@@ -1,5 +1,5 @@
 /*
- * Kernel Debugger Architecture Independent Support Functions
+ * Kernel Debugger Architecture Dependent Support Functions
  *
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Scott Lurndal (slurn@engr.sgi.com)
@@ -24,6 +24,7 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/stddef.h>
+#include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/ptrace.h>
@@ -37,6 +38,7 @@
 #include <asm/uaccess.h>
 #include <asm/machdep.h>
 #include <asm/prom.h>
+#include <asm/iommu.h>
 #include "../kernel/pci.h"  // for traverse_all_pci_devices()
 
 extern const char *kdb_diemsg;
@@ -63,7 +65,8 @@ extern int kdb_ps(int argc, const char **argv, const char **envp, struct pt_regs
 
 extern int kdb_parse(const char *cmdstr, struct pt_regs *regs);
 
-/* 60secs * 1000*1000 usecs/sec.  HMC interface requires larger amount of time,.. */
+/* 60secs * 1000*1000 usecs/sec.  
+ * HMC interface requires larger amount of time,.. */
 #define KDB_RESET_TIMEOUT 60*1000*1000
 
 /* kdb will use UDBG */
@@ -424,7 +427,7 @@ kdba_getpc(kdb_eframe_t ef)
 int
 kdba_setpc(kdb_eframe_t ef, kdb_machreg_t newpc)
 {
-/* for ppc64, newpc passed in is actually a function descriptor for kdb. */
+	/* for ppc64, newpc passed in is actually a function descriptor for kdb. */
     ef->nip =     kdba_getword(newpc+8, 8);
     KDB_STATE_SET(IP_ADJUSTED);
     return 0;
@@ -471,38 +474,38 @@ kdba_main_loop(kdb_reason_t reason, kdb_reason_t reason2, int error,
 	{
 		struct pt_regs regs;
 		asm volatile ("std	0,0(%0)\n\
-                               std	1,8(%0)\n\
-                               std	2,16(%0)\n\
-                               std	3,24(%0)\n\
-                               std	4,32(%0)\n\
-                               std	5,40(%0)\n\
-                               std	6,48(%0)\n\
-                               std	7,56(%0)\n\
-                               std	8,64(%0)\n\
-                               std	9,72(%0)\n\
-                               std	10,80(%0)\n\
-                               std	11,88(%0)\n\
-                               std	12,96(%0)\n\
-                               std	13,104(%0)\n\
-                               std	14,112(%0)\n\
-                               std	15,120(%0)\n\
-                               std	16,128(%0)\n\
-                               std	17,136(%0)\n\
-                               std	18,144(%0)\n\
-                               std	19,152(%0)\n\
-                               std	20,160(%0)\n\
-                               std	21,168(%0)\n\
-                               std	22,176(%0)\n\
-                               std	23,184(%0)\n\
-                               std	24,192(%0)\n\
-                               std	25,200(%0)\n\
-                               std	26,208(%0)\n\
-                               std	27,216(%0)\n\
-                               std	28,224(%0)\n\
-                               std	29,232(%0)\n\
-                               std	30,240(%0)\n\
-                               std	31,248(%0)" : : "b" (&regs));
-                /* one extra step back..  this frame disappears */
+		               std	1,8(%0)\n\
+		               std	2,16(%0)\n\
+		               std	3,24(%0)\n\
+		               std	4,32(%0)\n\
+		               std	5,40(%0)\n\
+		               std	6,48(%0)\n\
+		               std	7,56(%0)\n\
+		               std	8,64(%0)\n\
+		               std	9,72(%0)\n\
+		               std	10,80(%0)\n\
+		               std	11,88(%0)\n\
+		               std	12,96(%0)\n\
+		               std	13,104(%0)\n\
+		               std	14,112(%0)\n\
+		               std	15,120(%0)\n\
+		               std	16,128(%0)\n\
+		               std	17,136(%0)\n\
+		               std	18,144(%0)\n\
+		               std	19,152(%0)\n\
+		               std	20,160(%0)\n\
+		               std	21,168(%0)\n\
+		               std	22,176(%0)\n\
+		               std	23,184(%0)\n\
+		               std	24,192(%0)\n\
+		               std	25,200(%0)\n\
+		               std	26,208(%0)\n\
+		               std	27,216(%0)\n\
+		               std	28,224(%0)\n\
+		               std	29,232(%0)\n\
+		               std	30,240(%0)\n\
+		               std	31,248(%0)" : : "b" (&regs));
+		/* one extra step back..  this frame disappears */
 		regs.gpr[1] = kdba_getword(regs.gpr[1], 8);
 		/* Fetch the link reg for this stack frame.
 		 NOTE: the prev kdb_printf fills in the lr. */
@@ -548,15 +551,17 @@ kdba_setsinglestep(struct pt_regs *regs)
 void
 kdba_clearsinglestep(struct pt_regs *regs)
 {
-	
-	regs->msr &= ~MSR_SE;
+	if (!KDB_STATE(DOING_SSB)) {
+		regs->msr &= ~MSR_SE;
+	}
 }
 
 int
 kdba_getcurrentframe(struct pt_regs *regs)
 {
 	regs->gpr[1] = getsp();
-	/* this stack pointer becomes invalid after we return, so take another step back.  */
+	/* this stack pointer becomes invalid after we return, 
+	 * so take another step back.  */
 	regs->gpr[1] = kdba_getword(regs->gpr[1], 8);
 	return 0;
 }
@@ -748,17 +753,17 @@ kdba_getword(unsigned long addr, size_t width)
 	 * is a user address, we use get_user() to verify validity.
 	 */
 
-    if (!valid_ppc64_kernel_address(addr, width)) {
-		        /*
-			 * Would appear to be an illegal kernel address;
-			 * Print a message once, and don't print again until
-			 * a legal address is used.
-			 */
-			if (!KDB_STATE(SUPPRESS)) {
-				kdb_printf("    kdb: Not a kernel-space address 0x%lx \n",addr);
-				KDB_STATE_SET(SUPPRESS);
-			}
-			return 0L;
+	if (!valid_ppc64_kernel_address(addr, width)) {
+		/*
+		 * Would appear to be an illegal kernel address;
+		 * Print a message once, and don't print again until
+		 * a legal address is used.
+		 */
+		if (!KDB_STATE(SUPPRESS)) {
+			kdb_printf("    kdb: Not a kernel-space address 0x%lx \n",addr);
+			KDB_STATE_SET(SUPPRESS);
+		}
+		return 0L;
 	}
 
 
@@ -1008,8 +1013,6 @@ kdba_callback_debug(struct pt_regs *regs, int error_code, long trapno, void *vp)
 }
 
 
-
-
 /*
  * kdba_adjust_ip
  *
@@ -1037,18 +1040,19 @@ kdba_adjust_ip(kdb_reason_t reason, int error, kdb_eframe_t ef)
 }
 
 
-
 /*
  * kdba_find_tb_table
  *
- * 	Find the traceback table (defined by the ELF64 ABI) located at
+ * Find the traceback table (defined by the ELF64 ABI) located at
  *	the end of the function containing pc.
  *
  * Parameters:
- *	nip	starting instruction addr.  does not need to be at the start of the func.
+ *	nip	starting instruction addr.  
+ *	      does not need to be at the start of the func.
  *	tab	table to populate if successful
  * Returns:
- *	non-zero if successful.  unsuccessful means that a valid tb table was not found
+ *	    non-zero if successful.  unsuccessful means that 
+ *	    a valid tb table was not found
  * Locking:
  *	None.
  * Remarks:
@@ -1066,7 +1070,8 @@ int kdba_find_tb_table(kdb_machreg_t nip, kdbtbtable_t *tab)
 		return 0;
 	memset(tab, 0, sizeof(tab));
 
-	if (nip < PAGE_OFFSET) {  /* this is gonna fail for userspace, at least for now.. */
+	if (nip < PAGE_OFFSET) {  
+		 /* this is gonna fail for userspace, at least for now.. */
 	    return 0;
 	}
 
@@ -1222,8 +1227,8 @@ kdba_getarea_size(void *to, unsigned long from_xxx, size_t size)
 	if (is_valid_kern_addr) {
 		memcpy(to, (void *)from_xxx, size);
 	} else {
-            /*  user space address, just return.  */
-	    diag = -1;
+		/*  user space address, just return.  */
+		diag = -1;
 	}
 
 	return diag;
@@ -1239,20 +1244,18 @@ kdba_getarea_size(void *to, unsigned long from_xxx, size_t size)
 int
 kdba_readarea_size(unsigned long from_xxx,void *to, size_t size)
 {
-    int is_valid_kern_addr = valid_ppc64_kernel_address(from_xxx, size);
+	int is_valid_kern_addr = valid_ppc64_kernel_address(from_xxx, size);
 
-    *((volatile char *)to) = '\0';
-    *((volatile char *)to + size - 1) = '\0';
+	*((volatile char *)to) = '\0';
+	*((volatile char *)to + size - 1) = '\0';
 
-    if (is_valid_kern_addr) {
-	memcpy(to, (void *)from_xxx, size);
-	return size;
-    } else {
-	/*  user-space, just return...    */
+	if (is_valid_kern_addr) {
+		memcpy(to, (void *)from_xxx, size);
+		return size;
+	} 
+
+	/*  user-space, just return...	*/
 	return 0;
-    }
-    /* wont get here */
-    return 0;
 }
 
 
@@ -1283,46 +1286,6 @@ int hexdigit(int c);
 void machine_halt(void); 
 
 
-
-/*
- A traceback table typically follows each function.
- The find_tb_table() func will fill in this struct.  Note that the struct
- is not an exact match with the encoded table defined by the ABI.  It is
- defined here more for programming convenience.
- */
-struct tbtable {
-	unsigned long	flags;		/* flags: */
-#define TBTAB_FLAGSGLOBALLINK	(1L<<47)
-#define TBTAB_FLAGSISEPROL	(1L<<46)
-#define TBTAB_FLAGSHASTBOFF	(1L<<45)
-#define TBTAB_FLAGSINTPROC	(1L<<44)
-#define TBTAB_FLAGSHASCTL	(1L<<43)
-#define TBTAB_FLAGSTOCLESS	(1L<<42)
-#define TBTAB_FLAGSFPPRESENT	(1L<<41)
-#define TBTAB_FLAGSNAMEPRESENT	(1L<<38)
-#define TBTAB_FLAGSUSESALLOCA	(1L<<37)
-#define TBTAB_FLAGSSAVESCR	(1L<<33)
-#define TBTAB_FLAGSSAVESLR	(1L<<32)
-#define TBTAB_FLAGSSTORESBC	(1L<<31)
-#define TBTAB_FLAGSFIXUP	(1L<<30)
-#define TBTAB_FLAGSPARMSONSTK	(1L<<0)
-	unsigned char	fp_saved;	/* num fp regs saved f(32-n)..f31 */
-	unsigned char	gpr_saved;	/* num gpr's saved */
-	unsigned char	fixedparms;	/* num fixed point parms */
-	unsigned char	floatparms;	/* num float parms */
-	unsigned char	parminfo[32];	/* types of args.  null terminated */
-#define TBTAB_PARMFIXED 1
-#define TBTAB_PARMSFLOAT 2
-#define TBTAB_PARMDFLOAT 3
-	unsigned int	tb_offset;	/* offset from start of func */
-	unsigned long	funcstart;	/* addr of start of function */
-	char		name[64];	/* name of function (null terminated)*/
-};
-
-
-static int find_tb_table(unsigned long codeaddr, struct tbtable *tab);
-
-
 /* Very cheap human name for vector lookup. */
 static
 const char *getvecname(unsigned long vec)
@@ -1351,15 +1314,32 @@ kdba_halt(int argc, const char **argv, const char **envp, struct pt_regs *fp)
 {
     kdb_printf("halting machine. ");
     machine_halt();
-return 0;
+	return 0;
 }
 
 
+static inline void 
+kdba_printname (unsigned long addr)
+{
+	const char *name;
+	char *modname;
+	long size, offset;
+	char tmpstr[128];
+
+	name = kallsyms_lookup(addr, &size, &offset, &modname, tmpstr);
+	if (name) {
+		if (modname) 
+			kdb_printf(" (%s:%s+0x%lx)", modname, name, offset);
+		else
+			kdb_printf(" (%s+0x%lx)", name, offset);
+	}
+}
+
 int
-kdba_excprint(int argc, const char **argv, const char **envp, struct pt_regs *fp)
+kdba_excprint(int argc, const char **argv, 
+              const char **envp, struct pt_regs *fp)
 {
 	struct task_struct *c;
-	struct tbtable tab;
 
 #ifdef CONFIG_SMP
 	kdb_printf("cpu %d: ", smp_processor_id());
@@ -1367,18 +1347,12 @@ kdba_excprint(int argc, const char **argv, const char **envp, struct pt_regs *fp
 
 	kdb_printf("Vector: %lx %s at  [%p]\n", fp->trap, getvecname(fp->trap), fp);
 	kdb_printf("    pc: %lx", fp->nip);
-	if (find_tb_table(fp->nip, &tab) && tab.name[0]) {
-		/* Got a nice name for it */
-		int delta = fp->nip - tab.funcstart;
-		kdb_printf(" (%s+0x%x)", tab.name, delta);
-	}
+	
+	kdba_printname (fp->nip);
 	kdb_printf("\n");
 	kdb_printf("    lr: %lx", fp->link);
-	if (find_tb_table(fp->link, &tab) && tab.name[0]) {
-		/* Got a nice name for it */
-		int delta = fp->link - tab.funcstart;
-		kdb_printf(" (%s+0x%x)", tab.name, delta);
-	}
+	kdba_printname (fp->link);
+
 	kdb_printf("\n");
 	kdb_printf("    sp: %lx\n", fp->gpr[1]);
 	kdb_printf("   msr: %lx\n", fp->msr);
@@ -1396,182 +1370,78 @@ kdba_excprint(int argc, const char **argv, const char **envp, struct pt_regs *fp
 		kdb_printf("  current = %p, pid = %ld, comm = %s\n",
 		       c, (unsigned long)c->pid, (char *)c->comm);
 	}
-return 0;
-}
-
-
-/* Starting at codeaddr scan forward for a tbtable and fill in the
- given table.  Return non-zero if successful at doing something.
- */
-static int
-find_tb_table(unsigned long codeaddr, struct tbtable *tab)
-{
-	unsigned long codeaddr_max;
-	unsigned long tbtab_start;
-	int nr;
-	int instr;
-	int num_parms;
-
-	if (tab == NULL)
-		return 0;
-	memset(tab, 0, sizeof(tab));
-
-	/* Scan instructions starting at codeaddr for 128k max */
-	for (codeaddr_max = codeaddr + 128*1024*4;
-	     codeaddr < codeaddr_max;
-	     codeaddr += 4) {
-	    nr=kdba_readarea_size(codeaddr,&instr,4);
-		if (nr != 4)
-			return 0;	/* Bad read.  Give up promptly. */
-		if (instr == 0) {
-			/* table should follow. */
-			int version;
-			unsigned long flags;
-			tbtab_start = codeaddr;	/* save it to compute func start addr */
-			codeaddr += 4;
-			nr = kdba_readarea_size(codeaddr,&flags,8);
-			if (nr != 8)
-				return 0;	/* Bad read or no tb table. */
-			tab->flags = flags;
-			version = (flags >> 56) & 0xff;
-			if (version != 0)
-				continue;	/* No tb table here. */
-			/* Now, like the version, some of the flags are values
-			 that are more conveniently extracted... */
-			tab->fp_saved = (flags >> 24) & 0x3f;
-			tab->gpr_saved = (flags >> 16) & 0x3f;
-			tab->fixedparms = (flags >> 8) & 0xff;
-			tab->floatparms = (flags >> 1) & 0x7f;
-			codeaddr += 8;
-			num_parms = tab->fixedparms + tab->floatparms;
-			if (num_parms) {
-				unsigned int parminfo;
-				int parm;
-				if (num_parms > 32)
-					return 1;	/* incomplete */
-				nr = kdba_readarea_size(codeaddr,&parminfo,4);
-				if (nr != 4)
-					return 1;	/* incomplete */
-				/* decode parminfo...32 bits.
-				 A zero means fixed.  A one means float and the
-				 following bit determines single (0) or double (1).
-				 */
-				for (parm = 0; parm < num_parms; parm++) {
-					if (parminfo & 0x80000000) {
-						parminfo <<= 1;
-						if (parminfo & 0x80000000)
-							tab->parminfo[parm] = TBTAB_PARMDFLOAT;
-						else
-							tab->parminfo[parm] = TBTAB_PARMSFLOAT;
-					} else {
-						tab->parminfo[parm] = TBTAB_PARMFIXED;
-					}
-					parminfo <<= 1;
-				}
-				codeaddr += 4;
-			}
-			if (flags & TBTAB_FLAGSHASTBOFF) {
-			    nr = kdba_readarea_size(codeaddr,&tab->tb_offset,4);
-				if (nr != 4)
-					return 1;	/* incomplete */
-				if (tab->tb_offset > 0) {
-					tab->funcstart = tbtab_start - tab->tb_offset;
-				}
-				codeaddr += 4;
-			}
-			/* hand_mask appears to be always be omitted. */
-			if (flags & TBTAB_FLAGSHASCTL) {
-				/* Assume this will never happen for C or asm */
-				return 1;	/* incomplete */
-			}
-			if (flags & TBTAB_FLAGSNAMEPRESENT) {
-				short namlen;
-				nr = kdba_readarea_size(codeaddr,&namlen,2);
-				if (nr != 2)
-					return 1;	/* incomplete */
-				if (namlen >= sizeof(tab->name))
-					namlen = sizeof(tab->name)-1;
-				codeaddr += 2;
-				nr = kdba_readarea_size(codeaddr,tab->name,namlen);
-				tab->name[namlen] = '\0';
-				codeaddr += namlen;
-			}
-			return 1;
-		}
-	}
-	return 0;	/* hit max...sorry. */
+	return 0;
 }
 
 
 int
 kdba_dissect_msr(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-   long int msr;
+	long int msr;
 
-   if (argc==0)
-       msr = regs->msr;
-/*       msr = get_msr(); */
-    else 
+	if (argc==0)
+		msr = regs->msr;
+	else 
 	kdbgetularg(argv[1], &msr);
 
-   kdb_printf("msr: %lx (",msr);
-   {
-       if (msr & MSR_SF)   kdb_printf("SF ");
-       if (msr & MSR_ISF)  kdb_printf("ISF ");
-       if (msr & MSR_HV)   kdb_printf("HV ");
-       if (msr & MSR_VEC)  kdb_printf("VEC ");
-       if (msr & MSR_POW)  kdb_printf("POW/");  /* pow/we share */
-       if (msr & MSR_WE)   kdb_printf("WE ");
-       if (msr & MSR_TGPR) kdb_printf("TGPR/"); /* tgpr/ce share */
-       if (msr & MSR_CE)   kdb_printf("CE ");
-       if (msr & MSR_ILE)  kdb_printf("ILE ");
-       if (msr & MSR_EE)   kdb_printf("EE ");
-       if (msr & MSR_PR)   kdb_printf("PR ");
-       if (msr & MSR_FP)   kdb_printf("FP ");
-       if (msr & MSR_ME)   kdb_printf("ME ");
-       if (msr & MSR_FE0)  kdb_printf("FE0 ");
-       if (msr & MSR_SE)   kdb_printf("SE ");
-       if (msr & MSR_BE)   kdb_printf("BE/");   /* be/de share */
-       if (msr & MSR_DE)   kdb_printf("DE ");
-       if (msr & MSR_FE1)  kdb_printf("FE1 ");
-       if (msr & MSR_IP)   kdb_printf("IP ");
-       if (msr & MSR_IR)   kdb_printf("IR ");
-       if (msr & MSR_DR)   kdb_printf("DR ");
-       if (msr & MSR_PE)   kdb_printf("PE ");
-       if (msr & MSR_PX)   kdb_printf("PX ");
-       if (msr & MSR_RI)   kdb_printf("RI ");
-       if (msr & MSR_LE)   kdb_printf("LE ");
-   }
-   kdb_printf(")\n");
+	kdb_printf("msr: %lx (",msr);
+	{
+		if (msr & MSR_SF)	kdb_printf("SF ");
+		if (msr & MSR_ISF)  kdb_printf("ISF ");
+		if (msr & MSR_HV)	kdb_printf("HV ");
+		if (msr & MSR_VEC)  kdb_printf("VEC ");
+		if (msr & MSR_POW)  kdb_printf("POW/");  /* pow/we share */
+		if (msr & MSR_WE)	kdb_printf("WE ");
+		if (msr & MSR_TGPR) kdb_printf("TGPR/"); /* tgpr/ce share */
+		if (msr & MSR_CE)	kdb_printf("CE ");
+		if (msr & MSR_ILE)  kdb_printf("ILE ");
+		if (msr & MSR_EE)	kdb_printf("EE ");
+		if (msr & MSR_PR)	kdb_printf("PR ");
+		if (msr & MSR_FP)	kdb_printf("FP ");
+		if (msr & MSR_ME)	kdb_printf("ME ");
+		if (msr & MSR_FE0)  kdb_printf("FE0 ");
+		if (msr & MSR_SE)	kdb_printf("SE ");
+		if (msr & MSR_BE)	kdb_printf("BE/");	/* be/de share */
+		if (msr & MSR_DE)	kdb_printf("DE ");
+		if (msr & MSR_FE1)  kdb_printf("FE1 ");
+		if (msr & MSR_IP)	kdb_printf("IP ");
+		if (msr & MSR_IR)	kdb_printf("IR ");
+		if (msr & MSR_DR)	kdb_printf("DR ");
+		if (msr & MSR_PE)	kdb_printf("PE ");
+		if (msr & MSR_PX)	kdb_printf("PX ");
+		if (msr & MSR_RI)	kdb_printf("RI ");
+		if (msr & MSR_LE)	kdb_printf("LE ");
+	}
+	kdb_printf(")\n");
 
-   if (msr & MSR_SF)   kdb_printf(" 64 bit mode enabled \n");
-   if (msr & MSR_ISF)  kdb_printf(" Interrupt 64b mode valid on 630 \n");
-   if (msr & MSR_HV)   kdb_printf(" Hypervisor State \n");
-   if (msr & MSR_VEC)  kdb_printf(" Enable Altivec \n");
-   if (msr & MSR_POW)  kdb_printf(" Enable Power Management  \n");
-   if (msr & MSR_WE)   kdb_printf(" Wait State Enable   \n");
-   if (msr & MSR_TGPR) kdb_printf(" TLB Update registers in use   \n");
-   if (msr & MSR_CE)   kdb_printf(" Critical Interrupt Enable   \n");
-   if (msr & MSR_ILE)  kdb_printf(" Interrupt Little Endian   \n");
-   if (msr & MSR_EE)   kdb_printf(" External Interrupt Enable   \n");
-   if (msr & MSR_PR)   kdb_printf(" Problem State / Privilege Level  \n"); 
-   if (msr & MSR_FP)   kdb_printf(" Floating Point enable   \n");
-   if (msr & MSR_ME)   kdb_printf(" Machine Check Enable   \n");
-   if (msr & MSR_FE0)  kdb_printf(" Floating Exception mode 0  \n"); 
-   if (msr & MSR_SE)   kdb_printf(" Single Step   \n");
-   if (msr & MSR_BE)   kdb_printf(" Branch Trace   \n");
-   if (msr & MSR_DE)   kdb_printf(" Debug Exception Enable   \n");
-   if (msr & MSR_FE1)  kdb_printf(" Floating Exception mode 1   \n");
-   if (msr & MSR_IP)   kdb_printf(" Exception prefix 0x000/0xFFF   \n");
-   if (msr & MSR_IR)   kdb_printf(" Instruction Relocate   \n");
-   if (msr & MSR_DR)   kdb_printf(" Data Relocate   \n");
-   if (msr & MSR_PE)   kdb_printf(" Protection Enable   \n");
-   if (msr & MSR_PX)   kdb_printf(" Protection Exclusive Mode   \n");
-   if (msr & MSR_RI)   kdb_printf(" Recoverable Exception   \n");
-   if (msr & MSR_LE)   kdb_printf(" Little Endian   \n");
-   kdb_printf(".\n");
+	if (msr & MSR_SF)	kdb_printf(" 64 bit mode enabled \n");
+	if (msr & MSR_ISF)  kdb_printf(" Interrupt 64b mode valid on 630 \n");
+	if (msr & MSR_HV)	kdb_printf(" Hypervisor State \n");
+	if (msr & MSR_VEC)  kdb_printf(" Enable Altivec \n");
+	if (msr & MSR_POW)  kdb_printf(" Enable Power Management  \n");
+	if (msr & MSR_WE)	kdb_printf(" Wait State Enable	\n");
+	if (msr & MSR_TGPR) kdb_printf(" TLB Update registers in use	\n");
+	if (msr & MSR_CE)	kdb_printf(" Critical Interrupt Enable	\n");
+	if (msr & MSR_ILE)  kdb_printf(" Interrupt Little Endian	\n");
+	if (msr & MSR_EE)	kdb_printf(" External Interrupt Enable	\n");
+	if (msr & MSR_PR)	kdb_printf(" Problem State / Privilege Level  \n"); 
+	if (msr & MSR_FP)	kdb_printf(" Floating Point enable	\n");
+	if (msr & MSR_ME)	kdb_printf(" Machine Check Enable	\n");
+	if (msr & MSR_FE0)  kdb_printf(" Floating Exception mode 0  \n"); 
+	if (msr & MSR_SE)	kdb_printf(" Single Step	\n");
+	if (msr & MSR_BE)	kdb_printf(" Branch Trace	\n");
+	if (msr & MSR_DE)	kdb_printf(" Debug Exception Enable	\n");
+	if (msr & MSR_FE1)  kdb_printf(" Floating Exception mode 1	\n");
+	if (msr & MSR_IP)	kdb_printf(" Exception prefix 0x000/0xFFF	\n");
+	if (msr & MSR_IR)	kdb_printf(" Instruction Relocate	\n");
+	if (msr & MSR_DR)	kdb_printf(" Data Relocate	\n");
+	if (msr & MSR_PE)	kdb_printf(" Protection Enable	\n");
+	if (msr & MSR_PX)	kdb_printf(" Protection Exclusive Mode	\n");
+	if (msr & MSR_RI)	kdb_printf(" Recoverable Exception	\n");
+	if (msr & MSR_LE)	kdb_printf(" Little Endian	\n");
+	kdb_printf(".\n");
 
-return 0;
+	return 0;
 }
 
 int
@@ -1600,7 +1470,7 @@ kdba_super_regs(int argc, const char **argv, const char **envp, struct pt_regs *
 		// Dump out relevant Paca data areas.
 		kdb_printf("Paca: \n");
 		ptrPaca = (struct paca_struct*)get_sprg3();
-    
+
 		kdb_printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->xLpPacaPtr;
 		kdb_printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n", ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
@@ -1617,411 +1487,406 @@ kdba_super_regs(int argc, const char **argv, const char **envp, struct pt_regs *
 	} 
 }
 
-
-#ifdef TCE_HAS_CHANGED_FIX_LATER
-
 int
 kdba_dump_tce_table(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-    struct TceTable kt; 
-    long tce_table_address;
-    int nr;
-    int i,j,k;
-    int full,empty;
-    int fulldump=0;
-    u64 mapentry;
-    int totalpages;
-    int levelpages;
+	struct iommu_table it;
+	unsigned long tce_table_address;
+	unsigned long bitmap, alloced = 0;
+	int nr, i, j;
 
-    if (argc == 0) {
-	kdb_printf("need address\n");
-	return 0;
-    }
-    else 
-	kdbgetularg(argv[1], &tce_table_address);
+	if (argc == 0) {
+		kdb_printf("need address\n");
+		return 0;
+	} else 
+		kdbgetularg(argv[1], &tce_table_address);
 
-    if (argc==2)
-	if (strcmp(argv[2], "full") == 0) 
-	    fulldump=1;
-
-    /* with address, read contents of memory and dump tce table. */
-    /* possibly making some assumptions on the depth and size of table..*/
-
-    nr = kdba_readarea_size(tce_table_address+0 ,&kt.busNumber,8);
-    nr = kdba_readarea_size(tce_table_address+8 ,&kt.size,8);
-    nr = kdba_readarea_size(tce_table_address+16,&kt.startOffset,8);
-    nr = kdba_readarea_size(tce_table_address+24,&kt.base,8);
-    nr = kdba_readarea_size(tce_table_address+32,&kt.index,8);
-    nr = kdba_readarea_size(tce_table_address+40,&kt.tceType,8);
-    nr = kdba_readarea_size(tce_table_address+48,&kt.lock,8);
-
-    kdb_printf("\n");
-    kdb_printf("TceTable at address %s:\n",argv[1]);
-    kdb_printf("BusNumber:   0x%x \n",(uint)kt.busNumber);
-    kdb_printf("size:        0x%x \n",(uint)kt.size);
-    kdb_printf("startOffset: 0x%x \n",(uint)kt.startOffset);
-    kdb_printf("base:        0x%x \n",(uint)kt.base);
-    kdb_printf("index:       0x%x \n",(uint)kt.index);
-    kdb_printf("tceType:     0x%x \n",(uint)kt.tceType);
-#ifdef CONFIG_SMP
-    kdb_printf("lock:        0x%x \n",(uint)kt.lock.lock);
-#endif
-
-    nr = kdba_readarea_size(tce_table_address+56,&kt.mlbm.maxLevel,8);
-    kdb_printf(" maxLevel:        0x%x \n",(uint)kt.mlbm.maxLevel);
-    totalpages=0;
-    for (i=0;i<NUM_TCE_LEVELS;i++) {
-	nr = kdba_readarea_size(tce_table_address+64+i*24,&kt.mlbm.level[i].numBits,8);
-	nr = kdba_readarea_size(tce_table_address+72+i*24,&kt.mlbm.level[i].numBytes,8);
-	nr = kdba_readarea_size(tce_table_address+80+i*24,&kt.mlbm.level[i].map,8);
-	kdb_printf("   level[%d]\n",i);
-	kdb_printf("   numBits:   0x%x\n",(uint)kt.mlbm.level[i].numBits);
-	kdb_printf("   numBytes:  0x%x\n",(uint)kt.mlbm.level[i].numBytes);
-	kdb_printf("   map*:      %p\n",kt.mlbm.level[i].map);
-
-	 /* if these dont match, this might not be a valid tce table, so
-	    dont try to iterate the map entries. */
-	if (kt.mlbm.level[i].numBits == 8*kt.mlbm.level[i].numBytes) {
-	    full=0;empty=0;levelpages=0;
-	    for (j=0;j<kt.mlbm.level[i].numBytes; j++) {
-		mapentry=0;
-		nr = kdba_readarea_size((long int)(kt.mlbm.level[i].map+j),&mapentry,1);
-		if (mapentry)
-		    full++;
-		else
-		    empty++;
-		if (mapentry && fulldump) {
-		    kdb_printf("0x%lx\n",mapentry);
-		}
-		for (k=0;(k<=64) && ((0x1UL<<k) <= mapentry);k++) {
-		    if ((0x1UL<<k) & mapentry) levelpages++;
-		}
-	    }
-	    kdb_printf("      full:0x%x empty:0x%x pages:0x%x\n",full,empty,levelpages);
-	} else {
-	    kdb_printf("      numBits/numBytes mismatch..? \n");
+	/* with address, read contents of memory and dump tce table. */
+	nr = kdba_readarea_size(tce_table_address + 0, &it.it_busno, 8);
+	if (nr == 0) {
+		kdb_printf("Invalid address\n");
+		return 0;
 	}
-	totalpages+=levelpages;
-    }
-    kdb_printf("      Total pages:0x%x\n",totalpages);
-    kdb_printf("\n");
-    return 0;
-}
+	nr = kdba_readarea_size(tce_table_address, &it, 
+					sizeof(struct iommu_table));
+    
+	kdb_printf("\n");
+	kdb_printf("tce_table at address %s:\n",argv[1]);
+	kdb_printf("it_busno: 0x%lx\n", (unsigned long)it.it_busno);
+	kdb_printf("it_size: 0x%lx\n", (unsigned long)it.it_size);
+	kdb_printf("it_offset: 0x%lx\n", (unsigned long)it.it_offset);
+	kdb_printf("it_base: 0x%lx\n", (unsigned long)it.it_base);
+	kdb_printf("it_index: 0x%lx\n", (unsigned long)it.it_index);
+	kdb_printf("it_type: 0x%lx\n", (unsigned long)it.it_type);
+	kdb_printf("it_entrysize: 0x%lx\n", (unsigned long)it.it_entrysize);
+	kdb_printf("it_blocksize: 0x%lx\n", (unsigned long)it.it_blocksize);
+	kdb_printf("it_hint: 0x%lx\n", (unsigned long)it.it_hint);
+	kdb_printf("it_largehint: 0x%lx\n", (unsigned long)it.it_largehint);
+	kdb_printf("it_halfpoint: 0x%lx\n", (unsigned long)it.it_halfpoint);
+#ifdef CONFIG_SMP
+	kdb_printf("it_lock: 0x%lx\n", (unsigned long)it.it_lock.lock);
 #endif
+	kdb_printf("it_mapsize: 0x%lx\n", (unsigned long)it.it_mapsize);
+	kdb_printf("it_map: 0x%lx\n", (unsigned long)it.it_map);
+
+	if (it.it_map && 
+		(valid_ppc64_kernel_address((unsigned long)it.it_map, 8))) {
+		for (i = 0; i < (it.it_mapsize/64); i++) {
+			nr = kdba_readarea_size((unsigned long)(it.it_map + (i * 8)), &bitmap, 8);
+			if (bitmap) {
+				for (j = 0; j < 64; j++) {
+					if ((bitmap >> j) & 0x01)
+						alloced++;
+				}
+			}
+		}
+	}
+
+	kdb_printf("TCE entries alloced = %ld\n", alloced);
+	kdb_printf("TCE entries free = %ld\n", it.it_mapsize - alloced);
+	
+	kdb_printf("\n");
+	return 0;
+}
 
 int
-kdba_kernelversion(int argc, const char **argv, const char **envp, struct pt_regs *regs){
-    extern char *linux_banner;
-
-    kdb_printf("%s\n",linux_banner);
-
-    return 0;
+kdba_kernelversion(int argc, const char **argv, 
+                   const char **envp, struct pt_regs *regs)
+{
+	extern char *linux_banner;
+	kdb_printf("%s\n",linux_banner);
+	return 0;
 }
 
 
 static void * 
 kdba_dump_pci(struct device_node *dn, void *data)
 {
-    struct pci_controller *phb;
-    char *device_type;
-    char *status;
+	struct pci_controller *phb;
+	char *device_type;
+	char *status;
 
-    phb = (struct pci_controller *)data;
-    device_type = get_property(dn, "device_type", 0);
-    status = get_property(dn, "status", 0);
+	phb = (struct pci_controller *)data;
+	device_type = get_property(dn, "device_type", 0);
+	status = get_property(dn, "status", 0);
 
-    dn->phb = phb;
-    kdb_printf("dn:   %p \n",dn);
-    kdb_printf("    phb      : %p\n",dn->phb);
-    kdb_printf("    name     : %s\n",dn->name);
-    kdb_printf("    full_name: %s\n",dn->full_name);
-    kdb_printf("    busno    : 0x%x\n",dn->busno);
-    kdb_printf("    devfn    : 0x%x\n",dn->devfn);
-	 // XXX fix me later, bring up to date
-    // kdb_printf("    tce_table: %p\n",dn->tce_table);
-    return NULL;
+	dn->phb = phb;
+	kdb_printf("dn:   %p \n",dn);
+	kdb_printf("    phb      : %p\n",dn->phb);
+	kdb_printf("    name     : %s\n",dn->name);
+	kdb_printf("    full_name: %s\n",dn->full_name);
+	kdb_printf("    busno    : 0x%x\n",dn->busno);
+	kdb_printf("    devfn    : 0x%x\n",dn->devfn);
+	kdb_printf("    iommu_table: %p\n",dn->iommu_table);
+	return NULL;
 }
 
 int
-kdba_dump_pci_info(int argc, const char **argv, const char **envp, struct pt_regs *regs){
+kdba_dump_pci_info(int argc, const char **argv, const char **envp, 
+                   struct pt_regs *regs)
+{
+	kdb_printf("kdba_dump_pci_info\n");
 
-    kdb_printf("kdba_dump_pci_info\n");
-
-/* call this traverse function with my function pointer.. it takes care of traversing, my func just needs to parse the device info.. */
-    traverse_all_pci_devices(kdba_dump_pci);
-    return 0;
+	/* call this traverse function with my function pointer.. 
+	 * it takes care of traversing, my func just needs to 
+	 * parse the device info.. */
+	traverse_all_pci_devices(kdba_dump_pci);
+	return 0;
 }
 
 
 char *kdb_dumpall_cmds[] = {
-    "excp\n",
-    "bt\n",
-    "rd\n",
-    "dmesg\n",
-    "msr\n",
-    "superreg\n",
-    "pci_info\n",
-    "ps\n",
-    "cpu\n",
-    "set BTAPROMPT=none\n",
-    "bta\n",
-    0
+	"excp\n",
+	"bt\n",
+	"rd\n",
+	"dmesg\n",
+	"msr\n",
+	"superreg\n",
+	"pci_info\n",
+	"ps\n",
+	"cpu\n",
+	"set BTAPROMPT=none\n",
+	"bta\n",
+	0
 };
 
 char *kdb_dumpbasic_cmds[] = {
-    "excp\n",
-    "bt\n",
-    "rd\n",
-    "dmesg 25\n",
-    "msr\n",
-    "superreg\n",
-    "ps\n",
-    "cpu\n",
-    0
+	"excp\n",
+	"bt\n",
+	"rd\n",
+	"dmesg 25\n",
+	"msr\n",
+	"superreg\n",
+	"ps\n",
+	"cpu\n",
+	0
 };
 
-
-/* dump with "all" parm will dump all.  all other variations dump basic.  See the dump*_cmds defined above */
+/* dump with "all" parm will dump all.  
+ * all other variations dump basic.  
+ * See the dump*_cmds defined above 
+ */
 int
 kdba_dump(int argc, const char **argv, const char **envp, struct pt_regs *fp)
 {
-    int i, diag;
-    kdb_printf("dump-all\n");
-    if ((argc==1)&& (strcmp(argv[1], "all")==0))	{
-	for (i = 0; kdb_dumpall_cmds[i]; ++i) {
-	    kdb_printf("kdb_cmd[%d]%s: %s",
-		       i, " ", kdb_dumpall_cmds[i]);
-	    diag = kdb_parse(kdb_dumpall_cmds[i], fp);
-	    if (diag)
-		kdb_printf("command failed, kdb diag %d\n", diag);
+	int i, diag;
+	kdb_printf("dump-all\n");
+	if ((argc==1)&& (strcmp(argv[1], "all")==0))	{
+		for (i = 0; kdb_dumpall_cmds[i]; ++i) {
+			kdb_printf("kdb_cmd[%d]%s: %s",
+			       i, " ", kdb_dumpall_cmds[i]);
+			diag = kdb_parse(kdb_dumpall_cmds[i], fp);
+			if (diag)
+			kdb_printf("command failed, kdb diag %d\n", diag);
+		}
+	} else {
+		kdb_printf("dump-basic\n");
+		for (i = 0; kdb_dumpbasic_cmds[i]; ++i) {
+			kdb_printf("kdb_cmd[%d]%s: %s",
+			       i, " ", kdb_dumpbasic_cmds[i]);
+			diag = kdb_parse(kdb_dumpbasic_cmds[i], fp);
+			if (diag)
+				kdb_printf("command failed, kdb diag %d\n", diag);
+		}
 	}
-    } else {
-	kdb_printf("dump-basic\n");
-	for (i = 0; kdb_dumpbasic_cmds[i]; ++i) {
-	    kdb_printf("kdb_cmd[%d]%s: %s",
-		       i, " ", kdb_dumpbasic_cmds[i]);
-	    diag = kdb_parse(kdb_dumpbasic_cmds[i], fp);
-	    if (diag)
-		kdb_printf("command failed, kdb diag %d\n", diag);
-	}
-    }
-    return 0;
+	return 0;
 }
 
 
-/* Toggle the ppcdbg options.   kdb_parse tokenizes the parms, so need to account for that here.  */
+/* Toggle the ppcdbg options.   
+ * kdb_parse tokenizes the parms, 
+ * so need to account for that here. 
+ */
 int
 kdba_ppcdbg(int argc, const char **argv, const char **envp, struct pt_regs *fp) {
-    extern char *trace_names[PPCDBG_NUM_FLAGS];
+	extern char *trace_names[PPCDBG_NUM_FLAGS];
 
-    int i,j;
-    unsigned long mask;
-    int onoff;
-    if (argc==0)
+	int i,j;
+	unsigned long mask;
+	int onoff;
+	if (argc==0)
 	goto ppcdbg_exit;
 
-    for (i=1;i<=argc;i++) {
-	onoff = 1;	/* default */
-	if (argv[i][0] == '+' || argv[i][0] == '-') {
+	for (i=1;i<=argc;i++) {
+		onoff = 1;	/* default */
+		if (argv[i][0] == '+' || argv[i][0] == '-') {
 			/* explicit on or off */
-	    onoff = (argv[i][0] == '+');
-	    argv[i]++;
+			onoff = (argv[i][0] == '+');
+			argv[i]++;
+		}
+	
+		for (j=0;j<PPCDBG_NUM_FLAGS;j++) {
+			if (trace_names[j] && strcmp(trace_names[j],argv[i])==0) {
+				/* have a match */
+				mask = (1 << j);
+				/* check special case */
+				if (strcmp(argv[i],"all")==0) {
+					mask = PPCDBG_ALL;
+				}
+				if (mask) {
+		   		if (onoff)
+						naca->debug_switch |= mask;
+		   	 	else
+						naca->debug_switch &= ~mask;
+				}
+			} 
+		}
 	}
 
-	for (j=0;j<PPCDBG_NUM_FLAGS;j++) {
-	    if (trace_names[j] && strcmp(trace_names[j],argv[i])==0) {
-		/* have a match */
-		mask = (1 << j);
-		/* check special case */
-		if (strcmp(argv[i],"all")==0) {
-		    mask = PPCDBG_ALL;
-		}
-		if (mask) {
-		    if (onoff)
-			naca->debug_switch |= mask;
-		    else
-			naca->debug_switch &= ~mask;
-		}
-	    } 
-	}
-    }
-    ppcdbg_exit:
-      kdb_printf("naca->debug_switch 0x%lx\n",naca->debug_switch);
-    return 0;
+ppcdbg_exit:
+	kdb_printf("naca->debug_switch 0x%lx\n",naca->debug_switch);
+	return 0;
 }
 
 /* enable or disable surveillance.. based on rtasd.c function.
-  no arguments - display current timeout value.
-  one argument - 'off' or '0' turn off surveillance.
-               - '1-255' set surveillance timeout to argument. */
+ * no arguments - display current timeout value.
+ * one argument - 'off' or '0' turn off surveillance.
+ *	             - '1-255' set surveillance timeout to argument. 
+ */
+
 int
-kdba_surveillance(int argc, const char **argv, const char **envp, struct pt_regs *fp)
+kdba_surveillance(int argc, const char **argv, 
+                   const char **envp, struct pt_regs *fp)
 {
-    unsigned long timeout;
-    int ibm_indicator_token = 9000;
-    int error;
-    unsigned long ret;
+	unsigned long timeout;
+	int ibm_indicator_token = 9000;
+	int error;
+	unsigned long ret;
 
-    if (argc==0) {
-	goto surveillance_status;
-    } else if (((argc==1)&& (strcmp(argv[1], "off")==0))) {
-	timeout=0;
-    } else {
-	kdbgetularg(argv[1], &timeout);
-    }
+	if (argc==0) {
+		goto surveillance_status;
+	} else if (((argc==1)&& (strcmp(argv[1], "off")==0))) {
+		timeout=0;
+	} else {
+		kdbgetularg(argv[1], &timeout);
+	}
 
-    error = rtas_call(rtas_token("set-indicator"), 3, 1, &ret,
-		      ibm_indicator_token, 0, timeout);
-    /*    kdb_printf("Surveillance set-indicator returned value: 0x%x\n",ret); */
+	error = rtas_call(rtas_token("set-indicator"), 3, 1, &ret,
+		              ibm_indicator_token, 0, timeout);
+	/* kdb_printf("Surveillance set-indicator returned value: 0x%x\n",ret); */
 
-    if (error) 
-	kdb_printf("surveillance rtas_call failure 0x%x \n",error);
+	if (error) 
+		kdb_printf("surveillance rtas_call failure 0x%x \n",error);
 
-    surveillance_status:
-      rtas_call(rtas_token("get-sensor-state"), 2, 2, &ret, 
-		ibm_indicator_token, 
-		0/* instance */);
-    kdb_printf("Current surveillance timeout is %ld minutes%s",ret,
-	       ret==0?" (disabled).\n":".\n");
-    return 0;
+surveillance_status:
+	rtas_call(rtas_token("get-sensor-state"), 2, 2, &ret, 
+	          ibm_indicator_token, 
+	          0 /* instance */);
+	kdb_printf("Current surveillance timeout is %ld minutes%s",
+	           ret, ret==0?" (disabled).\n":".\n");
+	return 0;
 }
 
-/* generic debugger() hooks into kdb.  These eliminate the need to add
-  ifdef CONFIG_KDB goop to traps.c and fault.c */
+/* generic debugger() hooks into kdb.  
+ * These eliminate the need to add
+ * ifdef CONFIG_KDB goop to traps.c and fault.c 
+ */
 
 void
-kdb_reset_debugger(struct pt_regs *regs) {
-    int cpu=smp_processor_id();
-    static int reset_cpu = -1;
-    static spinlock_t reset_lock = SPIN_LOCK_UNLOCKED;
-    spin_lock(&reset_lock);
-    if (reset_cpu == -1 || reset_cpu == cpu) {
-	reset_cpu = cpu;
-	spin_unlock(&reset_lock);
-	if (kdb_on) {
-	    ppc64_attention_msg(0x3200+cpu,"KDB Call        ");
-	    kdb(KDB_REASON_ENTER, regs->trap, (kdb_eframe_t) regs);
-	    ppc64_attention_msg(0x3300+cpu,"KDB Done        ");
+kdb_reset_debugger(struct pt_regs *regs) 
+{
+	int cpu=smp_processor_id();
+	static int reset_cpu = -1;
+	static spinlock_t reset_lock = SPIN_LOCK_UNLOCKED;
+	
+	spin_lock(&reset_lock);
+	if (reset_cpu == -1 || reset_cpu == cpu) {
+		reset_cpu = cpu;
+		spin_unlock(&reset_lock);
+		if (kdb_on) {
+			ppc64_attention_msg(0x3200+cpu,"KDB Call        ");
+			kdb(KDB_REASON_ENTER, regs->trap, (kdb_eframe_t) regs);
+			ppc64_attention_msg(0x3300+cpu,"KDB Done        ");
+		} else {
+			kdb_on=1;
+			kdb_do_reboot=1;
+			ppc64_attention_msg(0x3600+cpu,"KDB Enabled     ");
+			udelay(KDB_RESET_TIMEOUT);
+			kdb_on=0;
+			if (kdb_do_reboot) {
+				ppc64_attention_msg(0x3900+cpu,"Rebooting       ");
+				ppc_md.restart("rebooting...");
+				return;	/* not reached */
+			} else {
+				ppc64_attention_msg(0x3800+cpu,"KDB skip reboot ");
+				return;
+			}
+		}
 	} else {
-	    kdb_on=1;
-	    kdb_do_reboot=1;
-	    ppc64_attention_msg(0x3600+cpu,"KDB Enabled     ");
-	    udelay(KDB_RESET_TIMEOUT);
-	    kdb_on=0;
-	    if (kdb_do_reboot) {
-		ppc64_attention_msg(0x3900+cpu,"Rebooting       ");
-		ppc_md.restart("rebooting...");
-		return;	/* not reached */
-	    } else {
-		ppc64_attention_msg(0x3800+cpu,"KDB skip reboot ");
+		spin_unlock(&reset_lock);
 		return;
-	    }
 	}
-    } else {
-	spin_unlock(&reset_lock);
-	return;
-    }
 }
 
 int
 kdb_debugger(struct pt_regs *regs) {
-    if (regs)
-	if (regs->trap==0x100) {
-	    kdb_reset_debugger(regs);
-	} else
-	    kdb(KDB_REASON_ENTER,regs->trap,regs);   /* ok */
-    else  /* regs invalid */
-	kdb(KDB_REASON_SILENT,0,regs);
-
+	if (regs) {
+		if (regs->trap==0x100) {
+			kdb_reset_debugger(regs);
+		} else {
+			kdb(KDB_REASON_ENTER,regs->trap,regs);   /* ok */
+		}
+	} else { /* regs invalid */
+		kdb(KDB_REASON_SILENT,0,regs);
+	}
 	return 0;
 }
 
 int
-kdb_debugger_bpt(struct pt_regs *regs) {
-    if (regs)
-	return kdb(KDB_REASON_BREAK,regs->trap,regs);
-    else  /* regs invalid */
-	return kdb(KDB_REASON_SILENT,0,regs);
+kdb_debugger_bpt(struct pt_regs *regs) 
+{
+	if (regs) {
+		if (regs->msr & MSR_SE) {
+			regs->msr &= ~MSR_SE;
+			return kdb(KDB_REASON_DEBUG, regs->trap, regs);
+		}
+		return kdb(KDB_REASON_BREAK,regs->trap,regs);
+	} else  /* regs invalid */
+		return kdb(KDB_REASON_SILENT,0,regs);
 }
 
 int
-kdb_debugger_sstep(struct pt_regs *regs) {
-    if (regs)
-	return kdb(KDB_REASON_DEBUG,regs->trap,regs); /* ok */
-    else  /* regs invalid */
-	return kdb(KDB_REASON_SILENT,0,regs);
+kdb_debugger_sstep(struct pt_regs *regs) 
+{
+	if (regs)
+		return kdb(KDB_REASON_DEBUG,regs->trap,regs); /* ok */
+	else  /* regs invalid */
+		return kdb(KDB_REASON_SILENT,0,regs);
 }
 
 int
-kdb_debugger_iabr_match(struct pt_regs *regs) {
-    if (regs)
-	return kdb(KDB_REASON_BREAK,regs->trap,regs);
-    else  /* regs invalid */
-	return kdb(KDB_REASON_SILENT,0,regs);
+kdb_debugger_iabr_match(struct pt_regs *regs) 
+{
+	if (regs)
+		return kdb(KDB_REASON_BREAK,regs->trap,regs);
+	else  /* regs invalid */
+		return kdb(KDB_REASON_SILENT,0,regs);
 }
 
 int
-kdb_debugger_dabr_match(struct pt_regs *regs) {
-    if (regs)
-	return kdb(KDB_REASON_BREAK,regs->trap,regs);
-    else  /* regs invalid */
-	return kdb(KDB_REASON_SILENT,0,regs);
+kdb_debugger_dabr_match(struct pt_regs *regs) 
+{
+	if (regs)
+		return kdb(KDB_REASON_BREAK,regs->trap,regs);
+	else  /* regs invalid */
+		return kdb(KDB_REASON_SILENT,0,regs);
 }
 
 void
-kdb_debugger_fault_handler(struct pt_regs *regs) {
-    if (regs)
-	kdb(KDB_REASON_FAULT,regs->trap,regs);
-    else  /* regs invalid */
-	kdb(KDB_REASON_SILENT,0,regs);
-    return;
+kdb_debugger_fault_handler(struct pt_regs *regs) 
+{
+	if (regs)
+		kdb(KDB_REASON_FAULT,regs->trap,regs);
+	else  /* regs invalid */
+		kdb(KDB_REASON_SILENT,0,regs);
+	return;
 }
-
-
 
 int
 kdba_state(int argc, const char **argv, const char **envp, struct pt_regs *fp)
 {
-    int i;
-    for (i=0;i<NR_CPUS;i++) {
-	if ( kdb_state[i] != 0 ) {
-	    kdb_printf("kdb_state[%d] = %x" ,i,kdb_state[i]);
-	    kdb_printf(" [");
-	    if KDB_STATE_CPU(KDB,i) kdb_printf("KDB,");
-	    if KDB_STATE_CPU(LEAVING,i) kdb_printf("LEAVING,");
-	    if KDB_STATE_CPU(CMD,i) kdb_printf("CMD,");
-	    if KDB_STATE_CPU(KDB_CONTROL,i) kdb_printf("KDB_CONTROL,");
-	    if KDB_STATE_CPU(HOLD_CPU,i) kdb_printf("HOLD_CPU,");
-	    if KDB_STATE_CPU(DOING_SS,i) kdb_printf("DOING_SS,");
-	    if KDB_STATE_CPU(DOING_SSB,i) kdb_printf("DOING_SSB,");
-	    if KDB_STATE_CPU(SSBPT,i) kdb_printf("SSBPT,");
-	    if KDB_STATE_CPU(REENTRY,i) kdb_printf("REENTRY,");
-	    if KDB_STATE_CPU(SUPPRESS,i) kdb_printf("SUPPRESS,");
-	    if KDB_STATE_CPU(LONGJMP,i) kdb_printf("LONGJMP,");
-	    if KDB_STATE_CPU(PRINTF_LOCK,i) kdb_printf("PRINTF_LOCK,");
-	    if KDB_STATE_CPU(WAIT_IPI,i) kdb_printf("WAIT_IPI,");
-	    if KDB_STATE_CPU(RECURSE,i) kdb_printf("RECURSE,");
-	    if KDB_STATE_CPU(IP_ADJUSTED,i) kdb_printf("IP_ADJUSTED,");
-	    kdb_printf("]\n");
+	int i;
+	for (i=0;i<NR_CPUS;i++) {
+		if ( kdb_state[i] != 0 ) {
+			kdb_printf("kdb_state[%d] = %x" ,i,kdb_state[i]);
+			kdb_printf(" [");
+			if KDB_STATE_CPU(KDB,i) kdb_printf("KDB,");
+			if KDB_STATE_CPU(LEAVING,i) kdb_printf("LEAVING,");
+			if KDB_STATE_CPU(CMD,i) kdb_printf("CMD,");
+			if KDB_STATE_CPU(KDB_CONTROL,i) kdb_printf("KDB_CONTROL,");
+			if KDB_STATE_CPU(HOLD_CPU,i) kdb_printf("HOLD_CPU,");
+			if KDB_STATE_CPU(DOING_SS,i) kdb_printf("DOING_SS,");
+			if KDB_STATE_CPU(DOING_SSB,i) kdb_printf("DOING_SSB,");
+			if KDB_STATE_CPU(SSBPT,i) kdb_printf("SSBPT,");
+			if KDB_STATE_CPU(REENTRY,i) kdb_printf("REENTRY,");
+			if KDB_STATE_CPU(SUPPRESS,i) kdb_printf("SUPPRESS,");
+			if KDB_STATE_CPU(LONGJMP,i) kdb_printf("LONGJMP,");
+			if KDB_STATE_CPU(PRINTF_LOCK,i) kdb_printf("PRINTF_LOCK,");
+			if KDB_STATE_CPU(WAIT_IPI,i) kdb_printf("WAIT_IPI,");
+			if KDB_STATE_CPU(RECURSE,i) kdb_printf("RECURSE,");
+			if KDB_STATE_CPU(IP_ADJUSTED,i) kdb_printf("IP_ADJUSTED,");
+			kdb_printf("]\n");
+		}
 	}
-    }
-return 0;
+	return 0;
 }
 
 
 /*
  * kdba_init
  * 	Architecture specific initialization.
+ * 	
+ * kdb_register("commandname",           # name of command user 
+ *                                         will use to invoke function  
+ *           function_name,              # name of function within the code 
+ *           "function example usage",   # sample usage 
+ *           "function description",     # brief description. 
+ *           0                           # if i hit enter again, 
+ *                                         will command repeat itself ?
+ * Note: functions must take parameters as such:
+ * functionname(int argc, const char **argv, const char **envp, 
+ *              struct pt_regs *regs)
  */
-/*
-kdb_register("commandname",              # name of command user will use to invoke function  
-             function_name,              # name of function within the code 
-             "function example usage",   # sample usage 
-             "function description",     # brief description. 
-             0                           # if i hit enter again, will command repeat itself ?
-Note: functions must take parameters as such:
-functionname(int argc, const char **argv, const char **envp, struct pt_regs *regs)
-*/
 
 void __init
 kdba_init(void)
@@ -2043,8 +1908,7 @@ kdba_init(void)
 	kdb_register("superreg", kdba_super_regs, "superreg", "display super_regs", 0);
 	kdb_register("msr", kdba_dissect_msr, "msr", "dissect msr", 0);
 	kdb_register("halt", kdba_halt, "halt", "halt machine", 0);
-	// XXX fix me later, tce has changed radically
-	// kdb_register("tce_table", kdba_dump_tce_table, "tce_table <addr> [full]", "dump the tce table located at <addr>", 0);
+	kdb_register("tce_table", kdba_dump_tce_table, "tce_table <addr> [full]", "dump the tce table located at <addr>", 0);
 	kdb_register("kernel", kdba_kernelversion, "version", "display running kernel version", 0);
 	kdb_register("pci_info", kdba_dump_pci_info, "dump_pci_info", "dump pci device info", 0);
 	kdb_register("dump", kdba_dump, "dump (all|basic)", "dump all info", 0); 

@@ -152,27 +152,27 @@ kdba_db_trap(kdb_eframe_t ef, int error_unused)
 		/* single step */
 		rv = KDB_DB_SS;		/* Indicate single step */
 		if (KDB_STATE(DOING_SSB)) {
-		    unsigned long instruction;
+			unsigned long instruction;
 
 			kdb_id1(ef->nip);
 			kdb_getarea(instruction,ef->nip);
-			primary=instruction & 0xfc000000;
-			extended=instruction & 0x000007fe;
-			if (kdb_getarea(instruction, ef->nip) ||   /* read failure */
-/* branch conditional */
-			    (primary==16 )||
-/* branch */
-			    (primary==18 )||    
-/* branch conditional to LR, or branch conditional to CR */
-			    (primary==19 && (extended==16 || extended == 528) 
-			     )) {
+			primary=instruction & 0xfc00000000000000;
+			extended=instruction & 0x000007fe00000000;
+			if ((primary == 0x4800000000000000) ||      
+					(primary == 0x4000000000000000) ||
+					((primary == 0x4c00000000000000) && 
+					((extended == 0x0000042000000000) || 
+					 (extended == 0x0000002000000000)))) {
 				/*
 				 * End the ssb command here.
 				 */
-			    KDB_STATE_CLEAR(DOING_SSB);
-			    KDB_STATE_CLEAR(DOING_SS);
-			    }
-			rv = KDB_DB_SSB; /* Indicate ssb - dismiss immediately */
+				KDB_STATE_CLEAR(DOING_SSB);
+				KDB_STATE_CLEAR(DOING_SS);
+			} else {
+				char *argv[] = {"ssb", NULL};
+				rv = KDB_DB_SSB; /* Indicate ssb - dismiss immediately */
+				kdb_ss(0, (char **)argv, NULL, ef);
+			}
 		} else {
 			/*
 			 * Print current insn
@@ -190,8 +190,6 @@ kdba_db_trap(kdb_eframe_t ef, int error_unused)
 	if (rv > 0)
 		goto handled;
 	
-handle:
-
 	/*
 	 * Determine which breakpoint was encountered.
 	 */
