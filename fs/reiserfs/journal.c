@@ -1913,7 +1913,7 @@ static int journal_init_dev( struct super_block *super,
 			result = -ENOMEM;
 		if( result != 0 )
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				kdevname( to_kdev_t(jdev) ), result );
+				bdevname(journal->j_dev_bd), result );
 
 		else if (jdev != super->s_dev) {
 			set_blocksize(journal->j_dev_bd, super->s_blocksize);
@@ -1946,7 +1946,7 @@ static int journal_init_dev( struct super_block *super,
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s", kdevname(to_kdev_t(jdev)) );
+	printk( "journal_init_dev: journal device: %s", bdevname(journal->j_dev_bd));
 	return result;
 }
 
