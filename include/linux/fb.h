@@ -602,7 +602,7 @@ struct fb_info {
 	struct fb_pixmap sprite;	/* Cursor hardware mapper */
 	struct fb_cmap cmap;		/* Current cmap */
 	struct fb_ops *fbops;
-	char *screen_base;		/* Virtual address */
+	char __iomem *screen_base;	/* Virtual address */
 	int currcon;			/* Current VC. */
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
 #define FBINFO_STATE_RUNNING	0

@@ -282,7 +282,7 @@ static void __devexit radeon_unmap_ROM(struct radeonfb_info *rinfo, struct pci_d
 
 static int __devinit radeon_map_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
 {
-	void *rom;
+	void __iomem *rom;
 	struct resource *r;
 	u16 dptr;
 	u8 rom_type;
@@ -395,13 +395,13 @@ static int  __devinit radeon_find_mem_vbios(struct radeonfb_info *rinfo)
 	 * if we end up having conflicts
 	 */
         u32  segstart;
-        unsigned char *rom_base = NULL;
+	void __iomem *rom_base = NULL;
                                                 
         for(segstart=0x000c0000; segstart<0x000f0000; segstart+=0x00001000) {
-                rom_base = (char *)ioremap(segstart, 0x10000);
+                rom_base = ioremap(segstart, 0x10000);
 		if (rom_base == NULL)
 			return -ENOMEM;
-                if ((*rom_base == 0x55) && (((*(rom_base + 1)) & 0xff) == 0xaa))
+                if (readb(rom_base) == 0x55 && readb(rom_base + 1) == 0xaa)
 	                break;
                 iounmap(rom_base);
 		rom_base = NULL;
@@ -1719,10 +1719,10 @@ static ssize_t radeonfb_read(struct file *file, char __user *buf, size_t count, 
 		count = rinfo->mapped_vram - p;
 	radeonfb_sync(info);
 	if (count) {
-	    char *base_addr;
+	    void __iomem *base_addr;
 
 	    base_addr = info->screen_base;
-	    count -= copy_to_user(buf, base_addr+p, count);
+	    count -= copy_to_user(buf, base_addr+p, count);	/* Ayee!! */
 	    if (!count)
 		return -EFAULT;
 	    *ppos += count;
@@ -1751,10 +1751,10 @@ static ssize_t radeonfb_write(struct file *file, const char __user *buf, size_t 
 	}
 	radeonfb_sync(info);
 	if (count) {
-	    char *base_addr;
+	    void __iomem *base_addr;
 
 	    base_addr = info->screen_base;
-	    count -= copy_from_user(base_addr+p, buf, count);
+	    count -= copy_from_user(base_addr+p, buf, count);	/* Ayee!! */
 	    *ppos += count;
 	    err = -EFAULT;
 	}
@@ -1795,7 +1795,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 		    | FBINFO_HWACCEL_XPAN
 		    | FBINFO_HWACCEL_YPAN;
 	info->fbops = &radeonfb_ops;
-	info->screen_base = (char *)rinfo->fb_base;
+	info->screen_base = rinfo->fb_base;
 
 	/* Fill fix common fields */
 	strlcpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
@@ -2117,7 +2117,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	/* map the regions */
-	rinfo->mmio_base = (unsigned long) ioremap(rinfo->mmio_base_phys, RADEON_REGSIZE);
+	rinfo->mmio_base = ioremap(rinfo->mmio_base_phys, RADEON_REGSIZE);
 	if (!rinfo->mmio_base) {
 		printk(KERN_ERR "radeonfb: cannot map MMIO\n");
 		ret = -EIO;
@@ -2228,8 +2228,8 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	rinfo->mapped_vram = min_t(unsigned long, MAX_MAPPED_VRAM, rinfo->video_ram);
 
 	do {
-		rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys,
-							  rinfo->mapped_vram);
+		rinfo->fb_base = ioremap (rinfo->fb_base_phys,
+					  rinfo->mapped_vram);
 	} while (   rinfo->fb_base == 0 &&
 		  ((rinfo->mapped_vram /=2) >= MIN_MAPPED_VRAM) );
 
@@ -2356,7 +2356,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 
 	return 0;
 err_unmap_fb:
-	iounmap ((void*)rinfo->fb_base);
+	iounmap(rinfo->fb_base);
 err_unmap_rom:
 	if (rinfo->mon1_EDID)
 	    kfree(rinfo->mon1_EDID);
@@ -2370,7 +2370,7 @@ err_unmap_rom:
 #endif
 	if (rinfo->bios_seg)
 		radeon_unmap_ROM(rinfo, pdev);
-	iounmap ((void*)rinfo->mmio_base);
+	iounmap(rinfo->mmio_base);
 err_release_pci:
 	pci_release_regions(pdev);
 err_release_fb:
@@ -2407,8 +2407,8 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 
         unregister_framebuffer(info);
 
-        iounmap ((void*)rinfo->mmio_base);
-        iounmap ((void*)rinfo->fb_base);
+        iounmap(rinfo->mmio_base);
+        iounmap(rinfo->fb_base);
  
  	pci_release_regions(pdev);
 
