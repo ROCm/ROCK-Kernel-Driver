@@ -674,6 +674,60 @@ int wake_up_state(task_t *p, unsigned int state)
 }
 
 /*
+ * Perform scheduler related setup for a newly forked process p.
+ * p is forked by current.
+ */
+void sched_fork(task_t *p)
+{
+	/*
+	 * We mark the process as running here, but have not actually
+	 * inserted it onto the runqueue yet. This guarantees that
+	 * nobody will actually run it, and a signal or other external
+	 * event cannot wake it up and insert it on the runqueue either.
+	 */
+	p->state = TASK_RUNNING;
+	INIT_LIST_HEAD(&p->run_list);
+	p->array = NULL;
+	spin_lock_init(&p->switch_lock);
+#ifdef CONFIG_PREEMPT
+	/*
+	 * During context-switch we hold precisely one spinlock, which
+	 * schedule_tail drops. (in the common case it's this_rq()->lock,
+	 * but it also can be p->switch_lock.) So we compensate with a count
+	 * of 1. Also, we want to start with kernel preemption disabled.
+	 */
+	p->thread_info->preempt_count = 1;
+#endif
+	/*
+	 * Share the timeslice between parent and child, thus the
+	 * total amount of pending timeslices in the system doesn't change,
+	 * resulting in more scheduling fairness.
+	 */
+	local_irq_disable();
+        p->time_slice = (current->time_slice + 1) >> 1;
+	/*
+	 * The remainder of the first timeslice might be recovered by
+	 * the parent if the child exits early enough.
+	 */
+	p->first_time_slice = 1;
+	current->time_slice >>= 1;
+	p->timestamp = sched_clock();
+	if (!current->time_slice) {
+		/*
+	 	 * This case is rare, it happens when the parent has only
+	 	 * a single jiffy left from its timeslice. Taking the
+		 * runqueue lock is not a problem.
+		 */
+		current->time_slice = 1;
+		preempt_disable();
+		scheduler_tick(0, 0);
+		local_irq_enable();
+		preempt_enable();
+	} else
+		local_irq_enable();
+}
+
+/*
  * wake_up_forked_process - wake up a freshly forked process.
  *
  * This function will do some initial scheduler statistics housekeeping
