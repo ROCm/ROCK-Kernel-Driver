@@ -41,12 +41,6 @@ static int llc_conn_rsp_handler(struct llc_prim_if_block *prim);
 static int llc_rst_rsp_handler(struct llc_prim_if_block *prim);
 static int llc_no_rsp_handler(struct llc_prim_if_block *prim);
 
-extern void llc_register_sap(unsigned char sap,
-			     int (*rcvfunc)(struct sk_buff *skb,
-					    struct net_device *dev,
-					    struct packet_type *pt));
-extern void llc_unregister_sap(unsigned char sap);
-
 /* table of request handler functions */
 static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
 	[LLC_DATAUNIT_PRIM]	= llc_unitdata_req_handler,
@@ -105,7 +99,6 @@ struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 	sap->parent_station = llc_station_get();
 	/* initialized SAP; add it to list of SAPs this station manages */
 	llc_sap_save(sap);
-	llc_register_sap(lsap, mac_indicate);
 out:
 	return sap;
 err:
@@ -122,7 +115,6 @@ err:
  */
 void llc_sap_close(struct llc_sap *sap)
 {
-	llc_unregister_sap(sap->laddr.lsap);
 	llc_free_sap(sap);
 	MOD_DEC_USE_COUNT;
 }
@@ -141,7 +133,7 @@ static int llc_sap_req(struct llc_prim_if_block *prim)
 	int rc = 1;
 
 	if (prim->prim > 8 || prim->prim == 6) {
-		printk(KERN_ERR __FUNCTION__ ": invalid primitive %d\n",
+		printk(KERN_ERR "%s: invalid primitive %d\n", __FUNCTION__,
 			prim->prim);
 		goto out;
 	}

@@ -44,13 +44,17 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 fi
 tristate '802.1Q VLAN Support' CONFIG_VLAN_8021Q
 
-comment ' '
-tristate 'The IPX protocol' CONFIG_IPX
+tristate 'ANSI/IEEE 802.2 Data link layer protocol' CONFIG_LLC
+if [ "$CONFIG_LLC" != "n" ]; then
+   tristate '  LLC sockets interface' CONFIG_LLC_UI
+fi
+
+dep_tristate 'The IPX protocol' CONFIG_IPX $CONFIG_LLC
 if [ "$CONFIG_IPX" != "n" ]; then
    source net/ipx/Config.in
 fi
 
-tristate 'Appletalk protocol support' CONFIG_ATALK
+dep_tristate 'Appletalk protocol support' CONFIG_ATALK $CONFIG_LLC
 source drivers/net/appletalk/Config.in
 
 tristate 'DECnet Support' CONFIG_DECNET
@@ -61,11 +65,6 @@ dep_tristate '802.1d Ethernet Bridging' CONFIG_BRIDGE $CONFIG_INET
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    tristate 'CCITT X.25 Packet Layer (EXPERIMENTAL)' CONFIG_X25
    tristate 'LAPB Data Link Driver (EXPERIMENTAL)' CONFIG_LAPB
-   tristate 'ANSI/IEEE 802.2 Data link layer protocol' CONFIG_LLC
-   if [ "$CONFIG_LLC" != "n" ]; then
-	# When NETBEUI is added the following line will be a tristate
-	define_bool CONFIG_LLC_UI y
-   fi
    bool 'Frame Diverter (EXPERIMENTAL)' CONFIG_NET_DIVERT
    if [ "$CONFIG_INET" = "y" ]; then
       tristate 'Acorn Econet/AUN protocols (EXPERIMENTAL)' CONFIG_ECONET

@@ -106,7 +106,7 @@ int llc_conn_ac_conn_confirm(struct sock *sk, struct llc_conn_state_ev *ev)
 	if (skb)
 		prim_data->conn.dev    = skb->dev;
 	else
-		printk(KERN_ERR __FUNCTION__ "ev->data.pdu.skb == NULL\n");
+		printk(KERN_ERR "%s: ev->data.pdu.skb == NULL\n", __FUNCTION__);
 	prim->data   = prim_data;
 	prim->prim   = LLC_CONN_PRIM;
 	prim->sap    = sap;

@@ -1782,13 +1782,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 		SOCK_DEBUG(sk, "SK %p: Loop back.\n", sk);
 		/* loop back */
 		skb_orphan(skb);
-		ddp_dl->datalink_header(ddp_dl, skb, dev->dev_addr);
-		skb->mac.raw = skb->data;
-		skb->h.raw   = skb->data + ddp_dl->header_length +
-				dev->hard_header_len;
-		skb_pull(skb, dev->hard_header_len);
-		skb_pull(skb, ddp_dl->header_length);
-		atalk_rcv(skb, dev, NULL);
+		ddp_dl->request(ddp_dl, skb, dev->dev_addr);
 	} else {
 		SOCK_DEBUG(sk, "SK %p: send out.\n", sk);
 		if (rt->flags & RTF_GATEWAY) {
@@ -2040,7 +2034,7 @@ static void __exit atalk_exit(void)
 	unregister_netdevice_notifier(&ddp_notifier);
 	dev_remove_pack(&ltalk_packet_type);
 	dev_remove_pack(&ppptalk_packet_type);
-	unregister_snap_client(ddp_snap_id);
+	unregister_snap_client(ddp_dl);
 	sock_unregister(PF_APPLETALK);
 }
 module_exit(atalk_exit);
