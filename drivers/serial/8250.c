@@ -2217,6 +2217,12 @@ static struct device_driver serial8250_isa_driver = {
 };
 
 /*
+ * This "device" covers _all_ ISA 8250-compatible serial devices listed
+ * in the table in include/asm-*/serial.h
+ */
+static struct platform_device *serial8250_isa_devs;
+
+/*
  * serial8250_register_port and serial8250_unregister_port allows for
  * 16x50 serial ports to be configured at run-time, to support PCMCIA
  * modems and PCI multiport cards.
@@ -2336,7 +2342,7 @@ void serial8250_unregister_port(int line)
 	uart_remove_one_port(&serial8250_reg, &uart->port);
 	uart->port.flags &= ~UPF_BOOT_AUTOCONF;
 	uart->port.type = PORT_UNKNOWN;
-	uart->port.dev = NULL;
+	uart->port.dev = &serial8250_isa_devs->dev;
 	uart_add_one_port(&serial8250_reg, &uart->port);
 	up(&serial_sem);
 }
@@ -2357,14 +2363,20 @@ static int __init serial8250_init(void)
 	if (ret)
 		goto out;
 
-	serial8250_register_ports(&serial8250_reg, NULL);
+	serial8250_isa_devs = platform_device_register_simple("serial8250",
+							      -1, NULL, 0);
+	if (IS_ERR(serial8250_isa_devs)) {
+		ret = PTR_ERR(serial8250_isa_devs);
+		goto unreg;
+	}
+
+	serial8250_register_ports(&serial8250_reg, &serial8250_isa_devs->dev);
 
 	ret = driver_register(&serial8250_isa_driver);
-	if (ret)
-		goto unreg;
+	if (ret == 0)
+		goto out;
 
-	goto out;
-
+	platform_device_unregister(serial8250_isa_devs);
  unreg:
 	uart_unregister_driver(&serial8250_reg);
  out:
@@ -2377,8 +2389,13 @@ static void __exit serial8250_exit(void)
 
 	driver_unregister(&serial8250_isa_driver);
 
-	for (i = 0; i < UART_NR; i++)
-		uart_remove_one_port(&serial8250_reg, &serial8250_ports[i].port);
+	for (i = 0; i < UART_NR; i++) {
+		struct uart_8250_port *up = &serial8250_ports[i];
+		if (up->port.dev == &serial8250_isa_devs->dev)
+			uart_remove_one_port(&serial8250_reg, &up->port);
+	}
+
+	platform_device_unregister(serial8250_isa_devs);
 
 	uart_unregister_driver(&serial8250_reg);
 }
