@@ -833,30 +833,14 @@ typedef struct ide_dma_ops_s {
 #define ide_rq_offset(rq) \
 	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
 
-/*
- * taskfiles really should use hard_cur_sectors as well!
- */
-#define task_rq_offset(rq) \
-	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
-
 static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
 {
-	/*
-	 * fs request
-	 */
-	if (rq->bio)
-		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-
-	/*
-	 * task request
-	 */
-	return rq->buffer + task_rq_offset(rq);
+	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
 }
 
 static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
 {
-	if (rq->bio)
-		bio_kunmap_irq(buffer, flags);
+	bio_kunmap_irq(buffer, flags);
 }
 #endif /* !CONFIG_IDE_TASKFILE_IO */
 
