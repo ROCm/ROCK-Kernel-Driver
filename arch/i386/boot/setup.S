@@ -46,8 +46,9 @@
  * by Robert Schwebel, December 2001 <robert@schwebel.de>
  *    
  * BIOS Enhanced Disk Drive support
- * by Matt Domsch <Matt_Domsch@dell.com> September 2002 
- *
+ * by Matt Domsch <Matt_Domsch@dell.com> October 2002
+ * conformant to T13 Committee www.t13.org
+ *   projects 1572D, 1484D, 1386D, 1226DT
  */
 
 #include <linux/config.h>
@@ -549,6 +550,27 @@ done_apm_bios:
 
 #if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
 # Do the BIOS Enhanced Disk Drive calls
+# This consists of two calls:
+#    int 13h ah=41h "Check Extensions Present"
+#    int 13h ah=48h "Get Device Parameters"
+#
+# A buffer of size EDDMAXNR*(EDDEXTSIZE+EDDPARMSIZE) is reserved for our use
+# in the empty_zero_page at EDDBUF.  The first four bytes of which are
+# used to store the device number, interface support map and version
+# results from fn41.  The following 74 bytes are used to store
+# the results from fn48.  Starting from device 80h, fn41, then fn48
+# are called and their results stored in EDDBUF+n*(EDDEXTSIZE+EDDPARMIZE).
+# Then the pointer is incremented to store the data for the next call.
+# This repeats until either a device doesn't exist, or until EDDMAXNR
+# devices have been stored.
+# The one tricky part is that ds:si always points four bytes into
+# the structure, and the fn41 results are stored at offsets
+# from there.  This removes the need to increment the pointer for
+# every store, and leaves it ready for the fn48 call.
+# A second one-byte buffer, EDDNR, in the empty_zero_page stores
+# the number of BIOS devices which exist, up to EDDMAXNR.
+# In setup.c, copy_edd() stores both empty_zero_page buffers away
+# for later use, as they would get overwritten otherwise. 
 # This code is sensitive to the size of the structs in edd.h
 edd_start:  
 						# %ds points to the bootsector
@@ -559,12 +581,12 @@ edd_start:
     	movb	$0x80, %dl			# BIOS device 0x80
 
 edd_check_ext:
-	movb	$0x41, %ah			# Function 41
-	movw	$0x55aa, %bx			# magic
+	movb	$CHECKEXTENSIONSPRESENT, %ah    # Function 41
+	movw	$EDDMAGIC1, %bx			# magic
 	int	$0x13				# make the call
 	jc	edd_done			# no more BIOS devices
 
-    	cmpw	$0xAA55, %bx			# is magic right?
+    	cmpw	$EDDMAGIC2, %bx			# is magic right?
 	jne	edd_next			# nope, next...
 
     	movb	%dl, %ds:-4(%si)		# store device number
@@ -574,7 +596,7 @@ edd_check_ext:
         
 edd_get_device_params:  
 	movw	$EDDPARMSIZE, %ds:(%si)		# put size
-    	movb	$0x48, %ah			# Function 48
+    	movb	$GETDEVICEPARAMETERS, %ah	# Function 48
 	int	$0x13				# make the call
 						# Don't check for fail return
 						# it doesn't matter.
