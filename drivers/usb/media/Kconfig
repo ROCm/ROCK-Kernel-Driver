@@ -120,15 +120,26 @@ config USB_PWC
 	tristate "USB Philips Cameras"
 	depends on USB && VIDEO_DEV
 	---help---
-	  Say Y or M here if you want to use one of these Philips USB webcams:
-	  PCA645, PCA646, PCVC675, PCVC680, PCVC690, PCVC730, PCVC740, or
-	  the Askey VC010. The PCA635, PCVC665 and PCVC720 are not supported
-	  by this driver and never will be.
+	  Say Y or M here if you want to use one of these Philips & OEM
+          webcams:
+           * Philips PCA645, PCA646
+           * Philips PCVC675, PCVC680, PCVC690
+           * Philips PCVC730, PCVC740, PCVC750
+	   * Askey VC010
+	   * Logitech QuickCam Pro 3000, 4000, 'Zoom' and 'Notebook'
+	   * Samsung MPC-C10, MPC-C30
+	   * Creative Webcam 5
+	   * SOTECT Afina Eye
+	   * Visionite VCS-UC300, VCS-UM100
+	   
+	  The PCA635, PCVC665 and PCVC720 are not supported by this driver
+	  and never will be, but the 665 and 720 are supported by other 
+	  drivers.
 
-	  This driver has an optional plugin, which is distributed as a binary
-	  module only.  It contains code that allow you to use higher
-	  resolutions and framerates but may not be distributed as source.
-	  But even without this plugin you can these cams for most
+	  This driver has an optional plugin (called PWCX), which is 
+	  distributed as a binary module only. It contains code that allow you 
+	  to use higher resolutions and framerates but may not be distributed 
+	  as source. But even without this plugin you can these cams for most
 	  applications.
 
 	  See <file:Documentation/usb/philips.txt> for more information and
