@@ -3630,12 +3630,7 @@ SetTimesRetryLegacy:
 	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
-	/* I doubt that passthrough levels apply to this old
-	preNT info level */
-/*	if (tcon->ses->capabilities & CAP_INFOLEVEL_PASSTHRU)
-		pSMB->InformationLevel = cpu_to_le16(SMB_SET_FILE_BASIC_INFO2);
-	else*/
-		pSMB->InformationLevel = cpu_to_le16(SMB_INFO_STANDARD);
+	pSMB->InformationLevel = cpu_to_le16(SMB_INFO_STANDARD);
 	pSMB->Reserved4 = 0;
 	pSMB->hdr.smb_buf_length += byte_count;
 	memcpy(data_offset, data, sizeof (FILE_INFO_STANDARD));
