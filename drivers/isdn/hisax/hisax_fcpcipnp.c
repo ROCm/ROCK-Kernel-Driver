@@ -782,7 +782,7 @@ static int __devinit fcpcipnp_setup(struct fritz_adapter *adapter)
 	case AVM_FRITZ_PCI:
 	case AVM_FRITZ_PNP:
 		fcpci_init(adapter);
-		isac_setup(&adapter->isac);
+		hisax_isac_setup(&adapter->isac);
 		break;
 	}
 	val = adapter->read_hdlc_status(adapter, 0);
