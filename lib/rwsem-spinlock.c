@@ -45,12 +45,13 @@ void fastcall init_rwsem(struct rw_semaphore *sem)
  *   - the 'active count' _reached_ zero
  *   - the 'waiting count' is non-zero
  * - the spinlock must be held by the caller
- * - woken process blocks are discarded from the list after having flags zeroised
+ * - woken process blocks are discarded from the list after having task zeroed
  * - writers are only woken if wakewrite is non-zero
  */
 static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int wakewrite)
 {
 	struct rwsem_waiter *waiter;
+	struct task_struct *tsk;
 	int woken;
 
 	rwsemtrace(sem,"Entering __rwsem_do_wake");
@@ -70,8 +71,10 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 	if (waiter->flags & RWSEM_WAITING_FOR_WRITE) {
 		sem->activity = -1;
 		list_del(&waiter->list);
-		waiter->flags = 0;
-		wake_up_process(waiter->task);
+		mb();
+		tsk = waiter->task;
+		waiter->task = NULL;
+		wake_up_process(tsk);
 		goto out;
 	}
 
@@ -82,8 +85,10 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 		struct list_head *next = waiter->list.next;
 
 		list_del(&waiter->list);
-		waiter->flags = 0;
-		wake_up_process(waiter->task);
+		mb();
+		tsk = waiter->task;
+		waiter->task = NULL;
+		wake_up_process(tsk);
 		woken++;
 		if (list_empty(&sem->wait_list))
 			break;
@@ -103,14 +108,17 @@ static inline struct rw_semaphore *__rwsem_do_wake(struct rw_semaphore *sem, int
 static inline struct rw_semaphore *__rwsem_wake_one_writer(struct rw_semaphore *sem)
 {
 	struct rwsem_waiter *waiter;
+	struct task_struct *tsk;
 
 	sem->activity = -1;
 
 	waiter = list_entry(sem->wait_list.next,struct rwsem_waiter,list);
 	list_del(&waiter->list);
 
-	waiter->flags = 0;
-	wake_up_process(waiter->task);
+	mb();
+	tsk = waiter->task;
+	waiter->task = NULL;
+	wake_up_process(tsk);
 	return sem;
 }
 
@@ -147,7 +155,7 @@ void fastcall __down_read(struct rw_semaphore *sem)
 
 	/* wait to be given the lock */
 	for (;;) {
-		if (!waiter.flags)
+		if (!waiter.task)
 			break;
 		schedule();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
@@ -215,7 +223,7 @@ void fastcall __down_write(struct rw_semaphore *sem)
 
 	/* wait to be given the lock */
 	for (;;) {
-		if (!waiter.flags)
+		if (!waiter.task)
 			break;
 		schedule();
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
