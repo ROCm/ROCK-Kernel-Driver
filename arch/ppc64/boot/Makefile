@@ -38,85 +38,64 @@ CFLAGS	= $(CPPFLAGS) -O -fno-builtin -DSTDC_HEADERS
 LD_ARGS = -Ttext 0x00400000 -e _start
 OBJCOPYFLAGS := -S -O binary
 
-OBJS = crt0.o start.o main.o zlib.o image.o imagesize.o
-#LIBS = $(TOPDIR)/lib/lib.a
-LIBS =
-
-ifeq ($(CONFIG_SMP),y)
-TFTPIMAGE=/tftpboot/zImage.chrp.smp
-else
-TFTPIMAGE=/tftpboot/zImage.chrp
-endif
-
-
-ifeq ($(CONFIG_PPC_ISERIES),y)
-all:	vmlinux.sm
-else
-all:	$(TOPDIR)/zImage
-endif
-
-
-znetboot: zImage
-	cp zImage $(TFTPIMAGE)
-
+OBJS = $(addprefix $(obj)/,crt0.o start.o main.o zlib.o image.o imagesize.o)
 
 ifeq ($(CONFIG_PPC_ISERIES),y)
 
-addSystemMap: addSystemMap.c
-	$(HOSTCC) $(HOSTCFLAGS) -o addSystemMap addSystemMap.c
+boot:	vmlinux.sm
 
-vmlinux.sm: $(TOPDIR)/vmlinux addSystemMap
-	./addSystemMap $(TOPDIR)/System.map $(TOPDIR)/vmlinux vmlinux.sm
+$(obj)/addSystemMap: $(obj)/addSystemMap.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
+$(obj)/vmlinux.sm: vmlinux $(obj)/addSystemMap
+	$(obj)/addSystemMap System.map vmlinux $(obj)/vmlinux.sm
 
-addRamDisk: addRamDisk.c
-	$(HOSTCC) $(HOSTCFLAGS) -o addRamDisk addRamDisk.c
+$(obj)/addRamDisk: $(obj)/addRamDisk.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
-vmlinux.initrd: $(TOPDIR)/vmlinux addRamDisk ramdisk.image.gz $(TOPDIR)/System.map
-	./addRamDisk ramdisk.image.gz $(TOPDIR)/System.map $(TOPDIR)/vmlinux vmlinux.initrd
+$(obj)/vmlinux.initrd: vmlinux $(obj)/addRamDisk $(obj)/ramdisk.image.gz System.map
+	$(obj)/addRamDisk $(obj)/ramdisk.image.gz System.map vmlinux $(obj)/vmlinux.initrd
 
-vmlinux.sminitrd: vmlinux.sm addRamDisk ramdisk.image.gz $(TOPDIR)/System.map
-	./addRamDisk ramdisk.image.gz $(TOPDIR)/System.map vmlinux.sm vmlinux.sminitrd
+$(obj)/vmlinux.sminitrd: $(obj)/vmlinux.sm $(obj)/addRamDisk $(obj)/ramdisk.image.gz System.map
+	$(obj)/addRamDisk $(obj)/ramdisk.image.gz System.map $(obj)/vmlinux.sm $(obj)/vmlinux.sminitrd
 
+else
+boot:	zImage
 endif
 
+$(obj)/piggyback: $(obj)/piggyback.c
+	$(HOSTCC) $(HOSTCFLAGS) -DKERNELBASE=$(KERNELBASE) -o $@ $<
 
-znetboot.initrd: zImage.initrd
-	cp zImage.initrd $(TFTPIMAGE)
+$(obj)/addnote: $(obj)/addnote.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
-floppy: zImage
-	mcopy zImage a:zImage
+$(obj)/image.o: $(obj)/piggyback $(obj)/vmlinux.gz
+	$(obj)/piggyback $(obj)/image < $(obj)/vmlinux.gz | $(BOOTAS) -o $@
 
-piggyback: piggyback.c
-	$(HOSTCC) $(HOSTCFLAGS) -DKERNELBASE=$(KERNELBASE) -o piggyback piggyback.c
+$(obj)/sysmap.o: $(obj)/piggyback System.map
+	$(obj)/piggyback $(obj)/sysmap < System.map | $(BOOTAS) -o $(obj)/sysmap.o
 
-addnote: addnote.c
-	$(HOSTCC) $(HOSTCFLAGS) -o addnote addnote.c
+$(obj)/initrd.o: $(obj)/ramdisk.image.gz $(obj)/piggyback
+	$(obj)/piggyback $(obj)/initrd < $(obj)/ramdisk.image.gz | $(BOOTAS) -o $(obj)/initrd.o
 
-image.o: piggyback vmlinux.gz
-	./piggyback image < vmlinux.gz | $(BOOTAS) -o image.o
+$(obj)/zImage: $(OBJS) $(obj)/no_initrd.o $(obj)/addnote
+	$(BOOTLD) $(LD_ARGS) -T $(obj)/zImage.lds -o $@ $(OBJS) $(obj)/no_initrd.o
+	$(obj)/addnote $@
 
-sysmap.o: piggyback ../../../System.map
-	./piggyback sysmap < ../../../System.map | $(BOOTAS) -o sysmap.o
-
-initrd.o: ramdisk.image.gz piggyback
-	./piggyback initrd < ramdisk.image.gz | $(BOOTAS) -o initrd.o
-
-zImage: $(OBJS) no_initrd.o addnote
-	$(BOOTLD) $(LD_ARGS) -T zImage.lds -o $@ $(OBJS) no_initrd.o $(LIBS)
+$(obj)/zImage.initrd: $(OBJS) $(obj)/initrd.o $(obj)/addnote
+	$(BOOTLD) $(LD_ARGS) -T $(obj)/zImage.lds -o $@ $(OBJS) $(obj)/initrd.o
 	./addnote $@
 
-zImage.initrd: $(OBJS) initrd.o addnote
-	$(BOOTLD) $(LD_ARGS) -T zImage.lds -o $@ $(OBJS) initrd.o $(LIBS)
-	./addnote $@
+$(obj)/vmlinux.gz: vmlinux
+	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux $(obj)/vmlinux
+	ls -l $(obj)/vmlinux | awk '{printf "/* generated -- do not edit! */\nint uncompressed_size = %d;\n", $$5}' > $(obj)/imagesize.c
+	$(CROSS_COMPILE)nm -n vmlinux | tail -1 | awk '{printf "long vmlinux_end = 0x%s;\n", substr($$1,8)}' >> $(obj)/imagesize.c
+	gzip -vf9 $(obj)/vmlinux
 
-vmlinux.gz: $(TOPDIR)/vmlinux
-	$(OBJCOPY) $(OBJCOPYFLAGS) $(TOPDIR)/vmlinux vmlinux
-	ls -l vmlinux | awk '{printf "/* generated -- do not edit! */\nint uncompressed_size = %d;\n", $$5}' > imagesize.c
-	$(CROSS_COMPILE)nm -n $(TOPDIR)/vmlinux | tail -1 | awk '{printf "long vmlinux_end = 0x%s;\n", substr($$1,8)}' >> imagesize.c
-	gzip -vf9 vmlinux
-
-imagesize.c: vmlinux.gz
+$(obj)/imagesize.c: $(obj)/vmlinux.gz
 
 clean:
-	rm -f piggyback note addnote $(OBJS) zImage zImage.initrd vmlinux.gz no_initrd.o imagesize.c addSystemMap vmlinux.sm addRamDisk vmlinux.initrd vmlinux.sminitrd 
+	@rm -f $(OBJS)
+	@rm -f $(addprefix $(obj)/,piggyback note addnote zImage \
+		zImage.initrd vmlinux.gz no_initrd.o imagesize.c addSystemMap
+		vmlinux.sm addRamDisk vmlinux.initrd vmlinux.sminitrd)
