@@ -67,17 +67,17 @@ static void iq80321_copy_to(struct map_info *map, unsigned long to, const void *
 }
 
 static struct map_info iq80321_map = {
-	name	= "IQ80321 flash",
-	size	= WINDOW_SIZE,
-	buswidth	= BUSWIDTH,
-	read8	= iq80321_read8,
-	read16	= iq80321_read16,
-	read32	= iq80321_read32,
-	copy_from	= iq80321_copy_from,
-	write8	= iq80321_write8,
-	write16	= iq80321_write16,
-	write32	= iq80321_write32,
-	copy_to	= iq80321_copy_to
+	.name	= "IQ80321 flash",
+	.size	= WINDOW_SIZE,
+	.buswidth	= BUSWIDTH,
+	.read8	= iq80321_read8,
+	.read16	= iq80321_read16,
+	.read32	= iq80321_read32,
+	.copy_from	= iq80321_copy_from,
+	.write8	= iq80321_write8,
+	.write16	= iq80321_write16,
+	.write32	= iq80321_write32,
+	.copy_to	= iq80321_copy_to
 };
 
 static struct mtd_partition iq80321_partitions[4] = {

@@ -184,9 +184,8 @@ void __flush_dcache_page(struct page *page)
 {
 	struct mm_struct *mm = current->active_mm;
 	struct list_head *l;
-	unsigned long kaddr = (unsigned long)page_address(page);
 
-	cpu_cache_clean_invalidate_range(kaddr, kaddr + PAGE_SIZE, 0);
+	__cpuc_flush_dcache_page(page_address(page));
 
 	if (!page->mapping)
 		return;
@@ -291,10 +290,9 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 	page = pfn_to_page(pfn);
 	if (page->mapping) {
 		int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
-		unsigned long kaddr = (unsigned long)page_address(page);
 
 		if (dirty)
-			cpu_cache_clean_invalidate_range(kaddr, kaddr + PAGE_SIZE, 0);
+			__cpuc_flush_dcache_page(page_address(page));
 
 		make_coherent(vma, addr, page, dirty);
 	}

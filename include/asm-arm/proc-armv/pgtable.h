@@ -51,6 +51,7 @@
 #define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
 
 #define PMD_SECT_UNCACHED	(0)
+#define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
 #define PMD_SECT_WT		(PMD_SECT_CACHEABLE)
 #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
 #define PMD_SECT_MINICACHE	(PMD_SECT_TEX(1) | PMD_SECT_CACHEABLE)
@@ -120,14 +121,19 @@
 #define _PAGE_KERNEL_TABLE	(PMD_TYPE_TABLE | PMD_BIT4 | PMD_DOMAIN(DOMAIN_KERNEL))
 
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
-#define set_pmd(pmdp,pmd)	do { *pmdp = pmd; cpu_flush_pmd(pmdp); } while (0)
 
-static inline void pmd_clear(pmd_t *pmdp)
-{
-	pmdp[0] = __pmd(0);
-	pmdp[1] = __pmd(0);
-	cpu_flush_pmd(pmdp);
-}
+#define set_pmd(pmdp,pmd)		\
+	do {				\
+		*pmdp = pmd;		\
+		flush_pmd_entry(pmdp);	\
+	} while (0)
+
+#define pmd_clear(pmdp)			\
+	do {				\
+		pmdp[0] = __pmd(0);	\
+		pmdp[1] = __pmd(0);	\
+		clean_pmd_entry(pmdp);	\
+	} while (0)
 
 static inline pte_t *pmd_page_kernel(pmd_t pmd)
 {

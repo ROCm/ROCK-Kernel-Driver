@@ -161,11 +161,11 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle,
 
 	/*
 	 * Invalidate any data that might be lurking in the
-	 * kernel direct-mapped region.
+	 * kernel direct-mapped region for device DMA.
 	 */
 	{
 		unsigned long kaddr = (unsigned long)page_address(page);
-		invalidate_dcache_range(kaddr, kaddr + size);
+		dmac_inv_range(kaddr, kaddr + size);
 	}
 
 	/*
@@ -330,7 +330,7 @@ static int __init consistent_init(void)
 core_initcall(consistent_init);
 
 /*
- * make an area consistent.
+ * make an area consistent for devices.
  */
 void consistent_sync(void *vaddr, size_t size, int direction)
 {
@@ -339,13 +339,13 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 
 	switch (direction) {
 	case DMA_FROM_DEVICE:		/* invalidate only */
-		invalidate_dcache_range(start, end);
+		dmac_inv_range(start, end);
 		break;
 	case DMA_TO_DEVICE:		/* writeback only */
-		clean_dcache_range(start, end);
+		dmac_clean_range(start, end);
 		break;
 	case DMA_BIDIRECTIONAL:		/* writeback and invalidate */
-		flush_dcache_range(start, end);
+		dmac_flush_range(start, end);
 		break;
 	default:
 		BUG();
