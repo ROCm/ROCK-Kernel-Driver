@@ -434,7 +434,9 @@ void cdev_init(struct cdev *cdev, struct file_operations *fops)
 
 static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
-	request_module("char-major-%d-%d", MAJOR(dev), MINOR(dev));
+	if (request_module("char-major-%d-%d", MAJOR(dev), MINOR(dev)) > 0)
+		/* Make old-style 2.4 aliases work */
+		request_module("char-major-%d", MAJOR(dev));
 	return NULL;
 }
 
