@@ -57,6 +57,12 @@ EXPORT_SYMBOL_NOVERS(__up);
 #include <asm/page.h>
 EXPORT_SYMBOL(clear_page);
 
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+#include <asm/pgtable.h>
+EXPORT_SYMBOL(vmalloc_end);
+EXPORT_SYMBOL(ia64_pfn_valid);
+#endif
+
 #include <asm/processor.h>
 EXPORT_SYMBOL(cpu_info__per_cpu);
 EXPORT_SYMBOL(kernel_thread);
