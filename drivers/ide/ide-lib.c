@@ -436,13 +436,17 @@ EXPORT_SYMBOL(ide_toggle_bounce);
  
 int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
 {
+	int ret;
 #ifndef CONFIG_BLK_DEV_IDEDMA
 	rate = min(rate, (u8) XFER_PIO_4);
 #endif
-	if(HWIF(drive)->speedproc)
-		return HWIF(drive)->speedproc(drive, rate);
+	ide_pin_hwgroup(drive);
+	if (HWIF(drive)->speedproc)
+		ret = HWIF(drive)->speedproc(drive, rate);
 	else
-		return -1;
+		ret = -1;
+	ide_unpin_hwgroup(drive);
+	return ret;
 }
 
 EXPORT_SYMBOL_GPL(ide_set_xfer_rate);
