@@ -80,6 +80,13 @@ static int create_strip_zones (mddev_t *mddev)
 				conf->nr_strip_zones, GFP_KERNEL);
 	if (!conf->strip_zone)
 		return 1;
+	conf->devlist = kmalloc(sizeof(mdk_rdev_t*)*
+				conf->nr_strip_zones*mddev->raid_disks,
+				GFP_KERNEL);
+	if (!conf->devlist) {
+		kfree(conf);
+		return 1;
+	}
 
 	memset(conf->strip_zone, 0,sizeof(struct strip_zone)*
 				   conf->nr_strip_zones);
@@ -89,6 +96,7 @@ static int create_strip_zones (mddev_t *mddev)
 	zone = &conf->strip_zone[0];
 	cnt = 0;
 	smallest = NULL;
+	zone->dev = conf->devlist;
 	ITERATE_RDEV(mddev, rdev1, tmp1) {
 		int j = rdev1->raid_disk;
 
@@ -122,6 +130,7 @@ static int create_strip_zones (mddev_t *mddev)
 	for (i = 1; i < conf->nr_strip_zones; i++)
 	{
 		zone = conf->strip_zone + i;
+		zone->dev = conf->strip_zone[i-1].dev + mddev->raid_disks;
 
 		printk("raid0: zone %d\n", i);
 		zone->dev_offset = current_offset;
@@ -181,6 +190,7 @@ static int create_strip_zones (mddev_t *mddev)
 	printk("raid0: done.\n");
 	return 0;
  abort:
+	kfree(conf->devlist);
 	kfree(conf->strip_zone);
 	return 1;
 }
@@ -288,6 +298,7 @@ out_free_zone_conf:
 	conf->strip_zone = NULL;
 
 out_free_conf:
+	kfree (conf->devlist);
 	kfree(conf);
 	mddev->private = NULL;
 out:

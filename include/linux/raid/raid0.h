@@ -8,14 +8,15 @@ struct strip_zone
 	sector_t zone_offset;	/* Zone offset in md_dev */
 	sector_t dev_offset;	/* Zone offset in real dev */
 	sector_t size;		/* Zone size */
-	int nb_dev;			/* # of devices attached to the zone */
-	mdk_rdev_t *dev[MD_SB_DISKS]; /* Devices attached to the zone */
+	int nb_dev;		/* # of devices attached to the zone */
+	mdk_rdev_t **dev;	/* Devices attached to the zone */
 };
 
 struct raid0_private_data
 {
 	struct strip_zone **hash_table; /* Table of indexes into strip_zone */
 	struct strip_zone *strip_zone;
+	mdk_rdev_t **devlist; /* lists of rdevs, pointed to by strip_zone->dev */
 	int nr_strip_zones;
 
 	sector_t hash_spacing;
