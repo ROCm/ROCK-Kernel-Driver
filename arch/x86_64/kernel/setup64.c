@@ -50,7 +50,7 @@ Control non executable mappings for 64bit processes.
 on	Enable(default)
 off	Disable
 */ 
-void __init nonx_setup(const char *str)
+int __init nonx_setup(char *str)
 {
 	if (!strncmp(str, "on", 2)) {
                 __supported_pte_mask |= _PAGE_NX; 
@@ -58,8 +58,29 @@ void __init nonx_setup(const char *str)
 	} else if (!strncmp(str, "off", 3)) {
 		do_not_nx = 1;
 		__supported_pte_mask &= ~_PAGE_NX;
-        } 
+        }
+	return 0;
 } 
+__setup("noexec=", nonx_setup);	/* parsed early actually */
+
+int force_personality32 = READ_IMPLIES_EXEC;
+
+/* noexec32=on|off
+Control non executable heap for 32bit processes.
+To control the stack too use noexec=off
+
+on	PROT_READ does not imply PROT_EXEC for 32bit processes
+off	PROT_READ implies PROT_EXEC (default)
+*/
+static int __init nonx32_setup(char *str)
+{
+	if (!strcmp(str, "on"))
+		force_personality32 &= ~READ_IMPLIES_EXEC;
+	else if (!strcmp(str, "off"))
+		force_personality32 |= READ_IMPLIES_EXEC;
+	return 0;
+}
+__setup("noexec32=", nonx32_setup);
 
 /*
  * Great future plan:
