@@ -490,6 +490,7 @@ static int __devinit snd_ice1712_delta_add_controls(ice1712_t *ice)
 
 	/* ak4524 controls */
 	switch (ice->eeprom.subvendor) {
+	case ICE1712_SUBDEVICE_DELTA1010LT:
 	case ICE1712_SUBDEVICE_AUDIOPHILE:
 	case ICE1712_SUBDEVICE_DELTA44:
 	case ICE1712_SUBDEVICE_DELTA66:

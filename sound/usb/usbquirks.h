@@ -366,6 +366,20 @@
 	}
 },
 {
+	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0025),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "EDIROL",
+		.product_name = "UA-20",
+		.ifnum = 3,
+		.type = QUIRK_MIDI_FIXED_ENDPOINT,
+		.data = & (const snd_usb_midi_endpoint_info_t) {
+			.epnum = -1,
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		}
+	}
+},
+{
 	USB_DEVICE(0x0582, 0x0027),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
@@ -394,7 +408,7 @@
 	}
 },
 {
-	USB_DEVICE(0x0582, 0x002b),
+	USB_DEVICE_VENDOR_SPEC(0x0582, 0x002b),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UA-700",

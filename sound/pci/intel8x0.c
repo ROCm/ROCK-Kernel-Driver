@@ -149,7 +149,7 @@ DEFINE_REGSET(PI, 0x00);	/* PCM in */
 DEFINE_REGSET(PO, 0x10);	/* PCM out */
 DEFINE_REGSET(MC, 0x20);	/* Mic in */
 
-/* ICH4 busmater blocks */
+/* ICH4 busmaster blocks */
 DEFINE_REGSET(MC2, 0x40);	/* Mic in 2 */
 DEFINE_REGSET(PI2, 0x50);	/* PCM in 2 */
 DEFINE_REGSET(SP, 0x60);	/* SPDIF out */

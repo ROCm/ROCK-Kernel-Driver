@@ -6,7 +6,7 @@
  *                   Abramo Bagnara <abramo@alsa-project.org>,
  *                   Markus Gruber <gruber@eikon.tum.de>
  * 
- * Rewritted from sonicvibes.c source.
+ * Rewritten from sonicvibes.c source.
  *
  *  TODO:
  *    Rewrite better spinlocks
@@ -38,7 +38,7 @@
     This is due to playback interrupts not generated.
     I suspect a timing issue.
   - Sometimes the interrupt handler is invoked wrongly during playback.
-    This generate some harmless "Unexpected hw_pointer: wrong interrupt
+    This generates some harmless "Unexpected hw_pointer: wrong interrupt
     acknowledge".
     I've seen that using small period sizes.
     Reproducible with:
@@ -573,7 +573,7 @@ static int snd_es1938_playback1_trigger(snd_pcm_substream_t * substream,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		/* According to the documentation this should be:
-		   0x13 but that value may random swap stereo channels */
+		   0x13 but that value may randomly swap stereo channels */
 		snd_es1938_mixer_write(chip, ESSSB_IREG_AUDIO2CONTROL1, 0x93);
 		outb(0x0a, SLIO_REG(chip, AUDIO2MODE));
 		chip->active |= DAC2;
