@@ -80,17 +80,14 @@ void smp_bogo(struct seq_file *m)
 
 void __init smp_store_cpu_info(int id)
 {
-	int i, no;
+	int i, cpu_node;
 
 	/* multiplier and counter set by
 	   smp_setup_percpu_timer()  */
 	cpu_data[id].udelay_val			= loops_per_jiffy;
 
-	for (no = 0; no < linux_num_cpus; no++)
-		if (linux_cpus[no].mid == id)
-			break;
-
-	cpu_data[id].clock_tick = prom_getintdefault(linux_cpus[no].prom_node,
+	cpu_find_by_mid(id, &cpu_node);
+	cpu_data[id].clock_tick = prom_getintdefault(cpu_node,
 						     "clock-frequency", 0);
 
 	cpu_data[id].pgcache_size		= 0;
@@ -297,8 +294,6 @@ static void smp_synchronize_one_tick(int cpu)
 	spin_unlock_irqrestore(&itc_sync_lock, flags);
 }
 
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-
 extern unsigned long sparc64_cpu_startup;
 
 /* The OBP cpu startup callback truncates the 3rd arg cookie to
@@ -314,7 +309,7 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	unsigned long cookie =
 		(unsigned long)(&cpu_new_thread);
 	struct task_struct *p;
-	int timeout, no, ret;
+	int timeout, ret, cpu_node;
 
 	kernel_thread(NULL, NULL, CLONE_IDLETASK);
 
@@ -325,12 +320,12 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	unhash_process(p);
 
 	callin_flag = 0;
-	for (no = 0; no < linux_num_cpus; no++)
-		if (linux_cpus[no].mid == cpu)
-			break;
 	cpu_new_thread = p->thread_info;
 	cpu_set(cpu, cpu_callout_map);
-	prom_startcpu(linux_cpus[no].prom_node, entry, cookie);
+
+	cpu_find_by_mid(cpu, &cpu_node);
+	prom_startcpu(cpu_node, entry, cookie);
+
 	for (timeout = 0; timeout < 5000000; timeout++) {
 		if (callin_flag)
 			break;
@@ -1150,6 +1145,7 @@ static void __init smp_tune_scheduling(void)
 	unsigned long orig_flush_base, flush_base, flags, *p;
 	unsigned int ecache_size, order;
 	cycles_t tick1, tick2, raw;
+	int cpu_node;
 
 	/* Approximate heuristic for SMP scheduling.  It is an
 	 * estimation of the time it takes to flush the L2 cache
@@ -1167,7 +1163,8 @@ static void __init smp_tune_scheduling(void)
 		goto report;
 	}
 
-	ecache_size = prom_getintdefault(linux_cpus[0].prom_node,
+	cpu_find_by_instance(0, &cpu_node, NULL);
+	ecache_size = prom_getintdefault(cpu_node,
 					 "ecache-size", (512 * 1024));
 	if (ecache_size > (4 * 1024 * 1024))
 		ecache_size = (4 * 1024 * 1024);
@@ -1249,22 +1246,27 @@ int setup_profiling_timer(unsigned int multiplier)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i;
+	int instance, mid;
 
-	for (i = 0; i < linux_num_cpus; i++) {
-		if (linux_cpus[i].mid < max_cpus) {
-			cpu_set(linux_cpus[i].mid, phys_cpu_present_map);
+	instance = 0;
+	while (!cpu_find_by_instance(instance, NULL, &mid)) {
+		if (mid < max_cpus) {
+			cpu_set(mid, phys_cpu_present_map);
 			atomic_inc(&sparc64_num_cpus_possible);
 		}
+		instance++;
 	}
+
 	if (atomic_read(&sparc64_num_cpus_possible) > max_cpus) {
-		for (i = linux_num_cpus - 1; i >= 0; i--) {
-			if (linux_cpus[i].mid != boot_cpu_id) {
-				cpu_clear(linux_cpus[i].mid, phys_cpu_present_map);
+		instance = 0;
+		while (!cpu_find_by_instance(instance, NULL, &mid)) {
+			if (mid != boot_cpu_id) {
+				cpu_clear(mid, phys_cpu_present_map);
 				atomic_dec(&sparc64_num_cpus_possible);
 				if (atomic_read(&sparc64_num_cpus_possible) <= max_cpus)
 					break;
 			}
+			instance++;
 		}
 	}
 

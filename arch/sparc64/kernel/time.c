@@ -956,7 +956,7 @@ static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struc
 			clock = prom_getint(node, "stick-frequency");
 		} else {
 			tick_ops = &tick_operations;
-			node = linux_cpus[0].prom_node;
+			cpu_find_by_instance(0, &node, NULL);
 			clock = prom_getint(node, "clock-frequency");
 		}
 	} else {

@@ -618,7 +618,7 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   prom_prev >> 16,
 		   (prom_prev >> 8) & 0xff,
 		   prom_prev & 0xff,
-		   (long)linux_num_cpus,
+		   (long)num_possible_cpus(),
 		   (long)num_online_cpus()
 #ifndef CONFIG_SMP
 		   , loops_per_jiffy/(500000/HZ),

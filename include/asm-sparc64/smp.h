@@ -17,18 +17,6 @@
 #include <linux/cpumask.h>
 #include <linux/cache.h>
 
-/* PROM provided per-processor information we need
- * to start them all up.
- */
-
-struct prom_cpuinfo {
-	int prom_node;
-	int mid;
-};
-
-extern int linux_num_cpus;	/* number of CPUs probed  */
-extern struct prom_cpuinfo linux_cpus[NR_CPUS];
-
 #endif /* !(__ASSEMBLY__) */
 
 #ifdef CONFIG_SMP
