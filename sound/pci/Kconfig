@@ -8,13 +8,15 @@ config SND_AC97_CODEC
 	select SND_PCM
 
 config SND_ALI5451
-	tristate "ALi PCI Audio M5451"
+	tristate "ALi M5451 PCI Audio Controller"
 	depends on SND
 	select SND_MPU401_UART
 	select SND_AC97_CODEC
 	help
-	  Say Y here to include support for the ALI PCI Audio M5451
-	  sound core.
+	  Say Y here to include support for the integrated AC97 sound
+	  device on motherboards using the ALi M5451 Audio Controller
+	  (M1535/M1535D/M1535+/M1535D+ south bridges).  Newer chipsets
+	  use the "Intel/SiS/nVidia/AMD/ALi AC97 Controller" driver.
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-ali5451.
@@ -414,7 +416,9 @@ config SND_INTEL8X0
 	select SND_AC97_CODEC
 	help
 	  Say Y here to include support for the integrated AC97 sound
-	  device on motherboards with Intel/SiS/nVidia/AMD/ALi chipsets.
+	  device on motherboards with Intel/SiS/nVidia/AMD chipsets, or
+	  ALi chipsets using the M5455 Audio Controller.  (There is a
+	  separate driver for ALi M5451 Audio Controllers.)
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-intel8x0.
