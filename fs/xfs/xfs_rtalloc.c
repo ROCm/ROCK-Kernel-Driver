@@ -2287,7 +2287,7 @@ xfs_rtmount_init(
 		return XFS_ERROR(E2BIG);
 	}
 	error = xfs_read_buf(mp, mp->m_rtdev_targp,
-				XFS_FSB_TO_BB(mp, d - 1),
+				d - XFS_FSB_TO_BB(mp, 1),
 				XFS_FSB_TO_BB(mp, 1), 0, &bp);
 	if (error) {
 		cmn_err(CE_WARN,
