@@ -31,9 +31,6 @@ extern int subdomain_complain;  /* 0 or 1 */
 extern int subdomain_audit;	/* 0 or 1 */
 extern int subdomain_owlsm;	/* 0 or 1 */
 
-/*temp fix for printk in sys_setscheduler bug*/
-#define PRINTK_TEMPFIX
-
 
 #define SD_UNCONSTRAINED "unconstrained"
 

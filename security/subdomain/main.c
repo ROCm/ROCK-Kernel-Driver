@@ -86,6 +86,7 @@ char *dptr, *newname = (char*)name;
 static char __log_buf[__LOG_BUF_LEN];
 static volatile int log_start = 0;
 static volatile int log_end = 0;
+static volatile int log_dumping = 0;
 static volatile int log_overflow = 0;
 /* this is used for fast testing in LSM.c */
 volatile int sd_log_buf_has_data = 0;
@@ -101,17 +102,31 @@ void dump_sdprintk()
 	unsigned long flags;
 	int start;
 	int end;
+	int overflow;
 
 	spin_lock_irqsave(&logbuf_lock, flags);
-
 	start = log_start;
 	end = log_end;
-	if (start == end) return;
+	if (start == end) goto done;
+	if (log_dumping) goto done;
+	overflow = log_overflow;
+	log_dumping = 1;
+	spin_unlock_irqrestore(&logbuf_lock, flags);
 
-	if (log_overflow) {
-		SD_WARN("Overflow in sd_printk buffer\n");
-		log_overflow = 0;
-	}
+	/* printk can not be called with the logbuf_lock held, on systems with the
+         * printk scheduler locking bug (sd_printk isn't needed on systems without this
+         * bug).
+         * IF dump_sdprintk held the logbuf_lock around the printk, then there would
+         * be a race condition that could deadlock on SMP systems.
+         * 1. CPU1 dump_sdprintk takes the logbuf_lock
+         * 2. CPU2 another cpu calls set_priority or set_scheduler taking the scheduler lock
+         *    the task is confined and subdomain goes to generate a reject message
+         *    thus attempting to take the logbuf_lock (spins)
+	 * 3. CPU1 printk finish and invokes the scheduler which tries to take the
+         *    scheduler lock (spins)
+         * 4. Deadlock
+	 */
+
 	if (start < end) {
 		printk("%.*s", end-start, &__log_buf[start]);
 	} else {
@@ -119,9 +134,19 @@ void dump_sdprintk()
 		printk("%.*s%.*s", __LOG_BUF_LEN-start, &__log_buf[start],
 		       end, __log_buf);
 	}
-	log_start = end;
-	sd_log_buf_has_data = 0;
+	if (overflow) {
+		SD_WARN("Overflow in sd_printk buffer\n");
+	}
 
+	spin_lock_irqsave(&logbuf_lock, flags);
+	if (overflow) {
+		log_overflow = 0;
+	}
+	log_start = end;
+	log_dumping = 0;
+ done:
+	if (end == log_end)
+		sd_log_buf_has_data = 0;
 	spin_unlock_irqrestore(&logbuf_lock, flags);
 }
 
@@ -130,7 +155,7 @@ static asmlinkage int sd_printk(const char *fmt, ...)
 	va_list args;
 	unsigned long flags;
 	int printed_len;
-	static char printk_buf[1024];
+	static char printk_buf[512];
 	char *p = printk_buf;
 	int start;
 	int end;
@@ -138,7 +163,8 @@ static asmlinkage int sd_printk(const char *fmt, ...)
 
 	/* emit to temporary buffer */
 	va_start(args, fmt);
-	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+	printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+	if (printed_len > sizeof(printk_buf)) printed_len = sizeof(printk_buf);
 	va_end(args);
 
 	spin_lock_irqsave(&logbuf_lock, flags);
@@ -165,7 +191,7 @@ static asmlinkage int sd_printk(const char *fmt, ...)
 
 	return i;
 }
-#endif //PRINTK_TEMPFIX
+#endif /* PRINTK_TEMPFIX */
 
 static inline 
 const char* sd_getpattern_type(pattern_t ptype)
@@ -720,61 +746,6 @@ out:
 	return error;
 }
 
-/**
- * do_change_hat - actually switch hats
- * @name: name of hat to swtich to
- * @sd: current SubDomain
- *
- * Switch to a new hat.  Return 0 on success, error otherwise.
- */
-static inline 
-int do_change_hat(const char *hat_name, struct subdomain *sd)
-{
-	struct sdprofile *sub;
-	struct sdprofile *p = sd->active;
-	int error = 0;
-
-	sub = __sd_find_profile(hat_name, &sd->profile->sub);
-
-	if (sub) {
-		/* change hat */
-		sd->active = sub;
-	} else {
-		/* There is no such subprofile change to a NULL profile.
-		 * The NULL profile grants no file access.
-		 *
-		 * 'null_profile' declared in sysctl.c
-		 *
-		 * This feature is used by changehat_apache.
-		 * 
-		 * N.B from the null-profile the task can still changehat back 
-		 * out to the parent profile (assuming magic != NULL)
-		 */
-		if (SUBDOMAIN_COMPLAIN(sd)) {
-			sd->active = get_sdprofile(null_complain_profile);
-			SD_WARN("LOGPROF-HINT unknown_hat %s pid=%d profile=%s active=%s\n",
-				 hat_name,
-				 current->pid,
-				 sd->profile->name, 
-				 sd->active->name);
-			
-		} else {
-			SD_DEBUG("%s: Unknown hatname '%s'. Changing to NULL profile (%s(%d) profile %s active %s)\n", 
-				 __FUNCTION__,
-				 hat_name,
-				 current->comm, current->pid,
-				 sd->profile->name, sd->active->name);
-
-			sd->active = get_sdprofile(&null_profile);
-			error = -EACCES;
-		}
-	}
-	put_sdprofile(p);
-
-	return error;
-}
-
-
 /**************************
  * GLOBAL UTILITY FUNCTIONS
  *************************/
@@ -1205,14 +1176,17 @@ int sd_attr(struct dentry *dentry, struct subdomain *sd, struct iattr *iattr)
 		name = sd_path_getname(&data);
 		if (name){
 			error = sd_file_perm(name, sd, MAY_WRITE, FALSE);
-			sd_put_name(name);
 			
 			/* access via any path is enough */
 			if (error){
 				sd_attr_trace(name, sd, iattr, error);
-			}else{
-				break;
 			}
+
+			sd_put_name(name);
+
+			if (!error){
+				break;
+			}	
 		}
 
 	}while (name);
@@ -1488,6 +1462,9 @@ int sd_symlink(struct dentry *link, const char *name, struct subdomain *sd)
 		nd.flags = LOOKUP_PARENT;
 		nd.dentry = dget(link->d_parent); /* relative to link parent */
 		nd.mnt = find_mnt(link); /* only finds the first mnt match */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,8)
+		nd.depth = 0;
+#endif
 		error = path_walk(name, &nd);
 	}
 	if (error)
@@ -1610,7 +1587,8 @@ int sd_register(struct file *filp)
 	int 	error = -ENOMEM,
 		findprofile=0,
 		findprofile_mandatory=0,
-		issdcopy=1;
+		issdcopy=1,
+		complain=0;
 
 	SD_DEBUG("%s\n", __FUNCTION__);
 
@@ -1620,7 +1598,9 @@ int sd_register(struct file *filp)
 	 * XXX  tony 10/2003
 	 * XXX  How is it possible to get here without a Subdomain?
 	 */
-	if (!sd) {
+	if (sd) {
+		complain=SUBDOMAIN_COMPLAIN(sd);
+	}else{
 		issdcopy=0;
 
 		sd = alloc_subdomain(current);
@@ -1704,7 +1684,7 @@ int sd_register(struct file *filp)
 
 		}else{ /* !sd_get_execmode(filename, sd, &exec_mode) */
 
-			if (SUBDOMAIN_COMPLAIN(sd)) {
+			if (complain) {
 				/* There was no entry in calling profile 
 				 * describing mode to execute image in.
 				 * Drop into null-profile
@@ -1740,7 +1720,7 @@ find_profile:
 		}else if (findprofile_mandatory){
 			/* Profile (mandatory) could not be found */
 
-			if (SUBDOMAIN_COMPLAIN(sd)) {
+			if (complain) {
 				SD_WARN("LOGPROF-HINT missing_mandatory_profile image=%s pid=%d profile=%s active=%s\n",
 				    filename,
 				    current->pid,
@@ -1805,6 +1785,27 @@ find_profile:
 		 */
 		latest_sd = SD_SUBDOMAIN(current->security);
 
+		/* Determine if profile we found earlier is stale.
+		 * If so, reobtain it.  N.B stale flag should never be 
+		 * set on null_complain profile.
+		 */
+		if (newprofile && unlikely(newprofile->isstale)){
+			BUG_ON(newprofile == null_complain_profile);
+
+			/* drop refcnt obtained from earlier get_sdprofile */
+			put_sdprofile(newprofile);
+
+			newprofile = sd_profilelist_find(filename);
+	
+			if (!newprofile){
+				/* Race, profile was removed, not replaced.
+				 * Redo with error checking
+				 */
+				SD_WUNLOCK;
+				goto find_profile;
+			}
+		}
+
 		put_sdprofile(latest_sd->profile);
 		put_sdprofile(latest_sd->active);
 
@@ -1820,36 +1821,7 @@ find_profile:
 		latest_sd->profile = newprofile; /* already refcounted */
 		latest_sd->active = get_sdprofile(newprofile);
 
-		/* Determine if profile we found earlier is stale.
-		 * If so, reobtain it.
-		 *
-		 * This can only happen if there is a profile replacement
-		 * in the window between calling sd_profilelist_find and here,
-		 * so it is unlikely that newprofile is stale.
-		 */
-		if (newprofile && unlikely(newprofile->isstale)){
-			struct sdprofile *tmp;
-
-			/* stale flag should never be set on 
-			 * null complain profile
-			 */
-			BUG_ON(newprofile == null_complain_profile);
-
-			tmp = sd_profilelist_find(filename);
-	
-			put_sdprofile(newprofile);
-			if (tmp){
-				newprofile=tmp;
-			}else{
-				/* Race, profile was removed, not replaced.
-				 * Redo with error checking
-				 */
-				SD_WUNLOCK;
-				goto find_profile;
-			}
-		}
-
-		if (SUBDOMAIN_COMPLAIN(sd)) {
+		if (complain) {
 			SD_WARN("LOGPROF-HINT changing_profile pid=%d newprofile=%s\n",
 				current->pid,
 				newprofile ? newprofile->name : SD_UNCONSTRAINED);
@@ -1894,6 +1866,61 @@ void sd_release(struct task_struct *p)
 /*****************************
  * GLOBAL SUBPROFILE FUNCTIONS
  ****************************/
+
+/**
+ * do_change_hat - actually switch hats
+ * @name: name of hat to swtich to
+ * @sd: current SubDomain
+ *
+ * Switch to a new hat.  Return 0 on success, error otherwise.
+ */
+static inline 
+int do_change_hat(const char *hat_name, struct subdomain *sd)
+{
+	struct sdprofile *sub;
+	struct sdprofile *p = sd->active;
+	int error = 0;
+
+	sub = __sd_find_profile(hat_name, &sd->profile->sub);
+
+	if (sub) {
+		/* change hat */
+		sd->active = sub;
+	} else {
+		/* There is no such subprofile change to a NULL profile.
+		 * The NULL profile grants no file access.
+		 *
+		 * 'null_profile' declared in sysctl.c
+		 *
+		 * This feature is used by changehat_apache.
+		 * 
+		 * N.B from the null-profile the task can still changehat back 
+		 * out to the parent profile (assuming magic != NULL)
+		 */
+		if (SUBDOMAIN_COMPLAIN(sd)) {
+			sd->active = get_sdprofile(null_complain_profile);
+			SD_WARN("LOGPROF-HINT unknown_hat %s pid=%d profile=%s active=%s\n",
+				 hat_name,
+				 current->pid,
+				 sd->profile->name, 
+				 sd->active->name);
+			
+		} else {
+			SD_DEBUG("%s: Unknown hatname '%s'. Changing to NULL profile (%s(%d) profile %s active %s)\n", 
+				 __FUNCTION__,
+				 hat_name,
+				 current->comm, current->pid,
+				 sd->profile->name, sd->active->name);
+
+			sd->active = get_sdprofile(&null_profile);
+			error = -EACCES;
+		}
+	}
+	put_sdprofile(p);
+
+	return error;
+}
+
 
 /**
  * sd_change_hat - change hat to/from subprofile

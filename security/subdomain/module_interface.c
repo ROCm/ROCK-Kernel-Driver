@@ -817,6 +817,7 @@ sd_file_prof_add(void *data, size_t size)
 	if (old_profile) {
 		SD_WARN("%s: trying to add profile (%s) that "
 			"already exists.\n", __FUNCTION__, profile->name);
+		put_sdprofile(old_profile);
 		free_sdprofile(profile);
 		return -EEXIST;
 	}
@@ -841,14 +842,34 @@ sd_file_prof_repl (void *udata, size_t size)
 		return error;
 	}
 
+	 
+	// Grab reference to close race window (see comment below)
+	get_sdprofile(data.new_profile);
+
 	/* Replace the profile on the global profile list.
 	 * This list is used by all new exec's to find the correct profile.
 	 * If there was a previous profile, it is returned, else NULL.
 	 *
-	 * N.B The old profile released still has a reference so it must
-	 * be put when no longer required.
+	 * N.B sd_profilelist_replace does not drop the refcnt on 
+	 * old_profile when removing it from the global list, otherwise it 
+	 * could reach zero and be automatically free'd. We nust manually 
+	 * drop it at the end of this function when we are finished with it.
 	 */
 	data.old_profile = sd_profilelist_replace(data.new_profile);
+
+
+	/* RACE window here.
+	 * At this point another task could preempt us trying to replace
+	 * the SAME profile. If it makes it to this point,  it has removed
+	 * the original tasks new_profile from the global list and holds a 
+	 * reference of 1 to it in it's old_profile.  If the new task 
+	 * reaches the end of the function it will put old_profile causing 
+	 * the profile to be deleted.
+	 * When the original task is rescheduled it will continue calling
+	 * sd_subdomainlist_iterate relabelling tasks with a profile 
+	 * which points to free'd memory. 
+	 */
+
 
 	/* If there was an old profile,  find all currently executing tasks
 	 * using this profile and replace the old profile with the new.
@@ -875,10 +896,10 @@ sd_file_prof_repl (void *udata, size_t size)
 		put_sdprofile(data.old_profile);
 	} 
 
-	/* XXX */
+	/* Free reference obtained above */
+	put_sdprofile(data.new_profile);
+
 	return size;
-
-
 }
 
 

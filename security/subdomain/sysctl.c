@@ -32,9 +32,187 @@
 
 #include "pcre_tables.h"
 
-/* forward */
-static inline void put_name(char *name);
-static inline void put_pattern(pcre *pattern);
+/* inlines must be forward of there use in newer version of gcc,
+   just forward declaring with a prototype won't work anymore */
+
+/**
+ * put_name - release name obtained by get_name
+ * @name: pointer to memory allocated for name by get_name
+ *
+ * Simple wrapper for kfree.
+ */
+static inline void put_name(char *name)
+{
+	if (name){
+		kfree(name);
+	}
+}
+
+/**
+ * put_pattern - release name obtained by get_pattern
+ * @name: pointer to memory allocated for name by get_name
+ *
+ * Simple wrapper for kfree.
+ */
+static inline void put_pattern(pcre *pattern)
+{
+	if (pattern){
+		kfree(pattern);
+	}
+}
+
+static inline void put_sd_entry(struct sd_entry *entry)
+{
+	if (entry) {
+		put_name (entry->filename);
+		if (entry->pattern_type == ePatternRegex){
+			put_name(entry->regex);
+			put_pattern(entry->compiled);
+		}
+		kfree(entry);
+	}
+}
+
+/*
+ * free_sd_entry - destroy existing sd_entry 
+ */
+static inline void free_sd_entry(struct sd_entry *entry)
+{
+	if (entry) {
+		kfree(entry);
+	}
+}
+
+/**
+ * alloc_nd_entry - create new network entry
+ *
+ * Creates, zeroes and returns a new network subdomain structure.
+ * Returns NULL on failure.
+ */
+static inline struct nd_entry * alloc_nd_entry(void)
+{
+	struct nd_entry *entry;
+
+	ND_DEBUG("%s\n", __FUNCTION__);
+
+	entry = kmalloc(sizeof(struct nd_entry), GFP_KERNEL);
+	if (entry)
+		memset(entry, 0, sizeof(struct nd_entry));
+	return entry;
+}		
+
+/*
+ * free_nd_entry - destroy existing nd_entry 
+ */
+static inline void free_nd_entry(struct nd_entry * entry)
+{
+	if (entry){
+		kfree(entry);
+	}
+}
+
+/**
+ * alloc_sd_entry - create new empty sd_entry
+ *
+ * This routine allocates, initializes, and returns a new SubDomain
+ * file entry structure.  Structure is zeroed.  Returns new structure on
+ * success, NULL on failure.
+ */
+static inline struct sd_entry * alloc_sd_entry(void) 
+{
+	struct sd_entry *entry;
+
+	SD_DEBUG("%s\n", __FUNCTION__);
+	entry = kmalloc(sizeof(struct sd_entry) , GFP_KERNEL);
+	if (entry)
+		memset(entry, 0, sizeof(struct sd_entry));
+	return entry;
+}
+
+
+/**
+ * count_entries - counts sd (file) entries in a profile
+ * @profile: profile to count
+ */
+static inline void count_entries(struct sdprofile *profile)
+{
+	struct sd_entry *entry;
+	int i, count=0;
+
+	SD_DEBUG("%s\n", __FUNCTION__) ;
+
+	for (entry = profile->file_entry; entry; entry = entry->next) {
+
+		count++;
+	}
+
+	for (i=0; i<=POS_KERN_COD_FILE_MAX; i++){
+		struct sd_entry *pentry;
+		int pcount=0;
+
+		pentry=profile->file_entryp[i];
+		for (; pentry ; pentry = pentry->nextp[i]){
+			pcount++;
+		}
+
+		profile->num_file_pentries[i]=pcount;
+		SD_DEBUG("%s index %d entries %d\n",  
+			__FUNCTION__, i, pcount);
+	}
+
+	profile->num_file_entries = count;
+
+	SD_DEBUG("%s %d total entries\n",  __FUNCTION__, count);
+}
+
+/**
+ * count_net_entries - counts non globbed sd (file) entries in a profile
+ * @profile: profile to count
+ */
+static inline void count_net_entries(struct sdprofile *profile)
+{
+	struct nd_entry *entry;
+	int i, count = 0;
+	
+	SD_DEBUG("%s\n", __FUNCTION__);
+
+	for (entry = profile->net_entry; entry; entry = entry->next) {
+		count++;
+	}
+
+	for (i=POS_KERN_COD_NET_MIN; i<=POS_KERN_COD_NET_MAX; i++){
+		struct nd_entry *pentry;
+		int j, pcount=0;
+
+		j=NET_POS_TO_INDEX(i);
+
+		pentry=profile->net_entryp[j];
+		for (;pentry ; pentry = pentry->nextp[j]){
+			pcount++;
+		}
+
+		profile->num_net_pentries[j]=pcount;
+		SD_DEBUG("%s index %d entries %d\n",  
+			__FUNCTION__, j, pcount);
+	}
+
+	profile->num_net_entries = count;
+
+	SD_DEBUG("%s %d total entries\n",  __FUNCTION__, count);
+}
+
+
+/**
+ * put_iface - free interface name (simple kfree() wrapper)
+ * @iface: pointer to interface name
+ */
+static inline void put_iface(char *iface)
+{
+	if (iface){
+		kfree(iface);
+	}
+}
+	
 
 /* NULL profile
  *
@@ -62,8 +240,6 @@ struct sdprofile null_profile = {
  * unloaded
  */
 struct sdprofile *null_complain_profile;
-
-static inline void put_sd_entry(struct sd_entry *entry);
 
 /**
  * free_sdprofile - free sdprofile structure
@@ -153,184 +329,6 @@ void free_sdprofile(struct sdprofile *profile)
 	kfree(profile);
 }
 
-/**
- * alloc_sd_entry - create new empty sd_entry
- *
- * This routine allocates, initializes, and returns a new SubDomain
- * file entry structure.  Structure is zeroed.  Returns new structure on
- * success, NULL on failure.
- */
-static inline struct sd_entry * alloc_sd_entry(void) 
-{
-	struct sd_entry *entry;
-
-	SD_DEBUG("%s\n", __FUNCTION__);
-	entry = kmalloc(sizeof(struct sd_entry) , GFP_KERNEL);
-	if (entry)
-		memset(entry, 0, sizeof(struct sd_entry));
-	return entry;
-}
-
-/*
- * free_sd_entry - destroy existing sd_entry 
- */
-static inline void free_sd_entry(struct sd_entry *entry)
-{
-	if (entry) {
-		kfree(entry);
-	}
-}
-
-static inline void put_sd_entry(struct sd_entry *entry)
-{
-	if (entry) {
-		put_name (entry->filename);
-		if (entry->pattern_type == ePatternRegex){
-			put_name(entry->regex);
-			put_pattern(entry->compiled);
-		}
-		kfree(entry);
-	}
-}
-
-/**
- * alloc_nd_entry - create new network entry
- *
- * Creates, zeroes and returns a new network subdomain structure.
- * Returns NULL on failure.
- */
-static inline struct nd_entry * alloc_nd_entry(void)
-{
-	struct nd_entry *entry;
-
-	ND_DEBUG("%s\n", __FUNCTION__);
-
-	entry = kmalloc(sizeof(struct nd_entry), GFP_KERNEL);
-	if (entry)
-		memset(entry, 0, sizeof(struct nd_entry));
-	return entry;
-}		
-
-/*
- * free_nd_entry - destroy existing nd_entry 
- */
-static inline void free_nd_entry(struct nd_entry * entry)
-{
-	if (entry){
-		kfree(entry);
-	}
-}
-
-
-/**
- * count_entries - counts sd (file) entries in a profile
- * @profile: profile to count
- */
-static inline void count_entries(struct sdprofile *profile)
-{
-	struct sd_entry *entry;
-	int i, count=0;
-
-	SD_DEBUG("%s\n", __FUNCTION__) ;
-
-	for (entry = profile->file_entry; entry; entry = entry->next) {
-
-		count++;
-	}
-
-	for (i=0; i<=POS_KERN_COD_FILE_MAX; i++){
-		struct sd_entry *pentry;
-		int pcount=0;
-
-		pentry=profile->file_entryp[i];
-		for (; pentry ; pentry = pentry->nextp[i]){
-			pcount++;
-		}
-
-		profile->num_file_pentries[i]=pcount;
-		SD_DEBUG("%s index %d entries %d\n",  
-			__FUNCTION__, i, pcount);
-	}
-
-	profile->num_file_entries = count;
-
-	SD_DEBUG("%s %d total entries\n",  __FUNCTION__, count);
-}
-
-/**
- * count_net_entries - counts non globbed sd (file) entries in a profile
- * @profile: profile to count
- */
-static inline void count_net_entries(struct sdprofile *profile)
-{
-	struct nd_entry *entry;
-	int i, count = 0;
-	
-	SD_DEBUG("%s\n", __FUNCTION__);
-
-	for (entry = profile->net_entry; entry; entry = entry->next) {
-		count++;
-	}
-
-	for (i=POS_KERN_COD_NET_MIN; i<=POS_KERN_COD_NET_MAX; i++){
-		struct nd_entry *pentry;
-		int j, pcount=0;
-
-		j=NET_POS_TO_INDEX(i);
-
-		pentry=profile->net_entryp[j];
-		for (;pentry ; pentry = pentry->nextp[j]){
-			pcount++;
-		}
-
-		profile->num_net_pentries[j]=pcount;
-		SD_DEBUG("%s index %d entries %d\n",  
-			__FUNCTION__, j, pcount);
-	}
-
-	profile->num_net_entries = count;
-
-	SD_DEBUG("%s %d total entries\n",  __FUNCTION__, count);
-}
-
-
-/**
- * put_name - release name obtained by get_name
- * @name: pointer to memory allocated for name by get_name
- *
- * Simple wrapper for kfree.
- */
-static inline void put_name(char *name)
-{
-	if (name){
-		kfree(name);
-	}
-}
-
-/**
- * put_pattern - release name obtained by get_pattern
- * @name: pointer to memory allocated for name by get_name
- *
- * Simple wrapper for kfree.
- */
-static inline void put_pattern(pcre *pattern)
-{
-	if (pattern){
-		kfree(pattern);
-	}
-}
-
-/**
- * put_iface - free interface name (simple kfree() wrapper)
- * @iface: pointer to interface name
- */
-static inline void put_iface(char *iface)
-{
-	if (iface){
-		kfree(iface);
-	}
-}
-	
 /** task_remove
  *
  * remove profile in a task's subdomain leaving the task unconfined
@@ -379,7 +377,6 @@ int remove=0;
 
 	return remove;
 }
-
 
 /** task_replace
  *

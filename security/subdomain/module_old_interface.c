@@ -623,6 +623,9 @@ static inline int sysctl_repl(struct codomain_user *codomain_u)
 	if (!data.new_profile)
 		return -ENOMEM;
 
+	/* prevent race (see comment in module_new_interface.c) */
+	get_sdprofile(data.new_profile);
+
 	/* Replace the profile on the global profile list.
 	 * This list is used by all new exec's to find the correct profile.
 	 * If there was a previous profile, it is returned, else NULL.
@@ -661,7 +664,8 @@ static inline int sysctl_repl(struct codomain_user *codomain_u)
 		return -EINVAL;
 	}
 
-	/* XXX */
+	put_sdprofile(data.new_profile);
+
 	return 1;
 }       
 

@@ -178,7 +178,7 @@ static int subdomain_sysctl (ctl_table * table, int op)
 
        	sd = SD_SUBDOMAIN(current->security);
 
-	if ((op & 002) && __sd_is_confined(sd)){
+	if ((op & 002) && __sd_is_confined(sd) && !capable(CAP_SYS_ADMIN)){
 		SD_WARN("REJECTING access to syscall 'sysctl (write)' (%s(%d) profile %s active %s)\n",
 			current->comm, current->pid,
 			sd->profile->name, sd->active->name);
@@ -524,15 +524,19 @@ struct subdomain sdcopy,
 		 *sd;
 int error = 0;
 
-	sd = get_sdcopy(&sdcopy);
+	if (dentry->d_inode->i_sb->s_magic != PIPEFS_MAGIC &&
+	    dentry->d_inode->i_sb->s_magic != SOCKFS_MAGIC) {
 
-	/* 
-	 * Mediate any attempt to change attributes of a file, chmod, chown,
-	 * chgrp, etc
-	 */
-	error = sd_attr(dentry, sd, iattr);
+		sd = get_sdcopy(&sdcopy);
 
-	put_sdcopy(sd);
+		/* 
+	 	 * Mediate any attempt to change attributes of a file 
+		 * (chmod, chown, chgrp, etc)
+	 	 */
+		error = sd_attr(dentry, sd, iattr);
+
+		put_sdcopy(sd);
+	}
 
 	return error;
 }
@@ -1014,7 +1018,6 @@ struct security_operations subdomain_ops = {
 #endif
 	
 #ifdef NETDOMAIN
-gak
 	.socket_create =		subdomain_socket_create,
 	.socket_post_create = 		subdomain_socket_post_create,
 	.socket_connect =		subdomain_socket_connect,
@@ -1183,7 +1186,6 @@ register_out:
 #ifdef NETDOMAIN
 	nd_restore_handlers();	
 #endif
-	kfree(null_complain_profile->name);
 
 complain2_out:
 	free_sdprofile(null_complain_profile);
