@@ -18,6 +18,10 @@
 
 #define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
 
+/* Separate out the type, so (int[3], foo) works. */
+#define DEFINE_PER_CPU(type, name) \
+    __attribute__((__section__(".data.percpu"))) __typeof__(type) per_cpu__##name
+
 /*
  * Pretty much a literal copy of asm-generic/percpu.h, except that percpu_modcopy() is an
  * external routine, to avoid include-hell.
@@ -29,10 +33,6 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 /* Equal to __per_cpu_offset[smp_processor_id()], but faster to access: */
 DECLARE_PER_CPU(unsigned long, local_per_cpu_offset);
 
-/* Separate out the type, so (int[3], foo) works. */
-#define DEFINE_PER_CPU(type, name) \
-    __attribute__((__section__(".data.percpu"))) __typeof__(type) per_cpu__##name
-
 #define per_cpu(var, cpu)  (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) (*RELOC_HIDE(&per_cpu__##var, __ia64_per_cpu_var(local_per_cpu_offset)))
 
@@ -40,7 +40,6 @@ extern void percpu_modcopy(void *pcpudst, const void *src, unsigned long size);
 
 #else /* ! SMP */
 
-#define DEFINE_PER_CPU(type, name)		__typeof__(type) per_cpu__##name
 #define per_cpu(var, cpu)			((void)cpu, per_cpu__##var)
 #define __get_cpu_var(var)			per_cpu__##var
 
