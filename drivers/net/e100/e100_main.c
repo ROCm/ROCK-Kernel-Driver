@@ -114,8 +114,10 @@ static int e100_ethtool_glink(struct net_device *, struct ifreq *);
 static int e100_ethtool_gregs(struct net_device *, struct ifreq *);
 static int e100_ethtool_nway_rst(struct net_device *, struct ifreq *);
 static int e100_ethtool_wol(struct net_device *, struct ifreq *);
+#ifdef CONFIG_PM
 static unsigned char e100_setup_filter(struct e100_private *bdp);
 static void e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp);
+#endif
 static u16 e100_get_ip_lbytes(struct net_device *dev);
 extern void e100_config_wol(struct e100_private *bdp);
 extern u32 e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags);
@@ -3799,6 +3801,7 @@ e100_get_speed_duplex_caps(struct e100_private *bdp)
 
 }
 
+#ifdef CONFIG_PM
 static unsigned char
 e100_setup_filter(struct e100_private *bdp)
 {
@@ -3839,7 +3842,6 @@ exit:
 
 }
 
-#ifdef CONFIG_PM
 static void
 e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp)
 {
