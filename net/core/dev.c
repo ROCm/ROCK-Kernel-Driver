@@ -696,7 +696,7 @@ int dev_change_name(struct net_device *dev, char *newname)
 
 	if (strchr(newname, '%')) {
 		int err = dev_alloc_name(dev, newname);
-		if (err)
+		if (err < 0)
 			return err;
 		strcpy(newname, dev->name);
 	}
