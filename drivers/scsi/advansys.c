@@ -1,4 +1,4 @@
-#define ASC_VERSION "3.3GJ"    /* AdvanSys Driver Version */
+#define ASC_VERSION "3.3K"    /* AdvanSys Driver Version */
 
 /*
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
@@ -676,6 +676,11 @@
      3.3GJD (10/14/02):
          1. change select_queue_depths to slave_configure
 	 2. make cmd_per_lun be sane again
+
+     3.3K [2004/06/24]:
+         1. continuing cleanup for lk 2.6 series
+         2. Fix problem in lk 2.6.7-bk2 that broke PCI wide cards
+         3. Fix problem that oopsed ISA cards
 
   I. Known Problems/Fix List (XXX)
 
@@ -6615,6 +6620,10 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
      * buffer command.
      */
 
+    scsiqp->data_cnt = cpu_to_le32(scp->request_bufflen);
+    scsiqp->vdata_addr = scp->request_buffer;
+    scsiqp->data_addr = cpu_to_le32(virt_to_bus(scp->request_buffer));
+
     if (scp->use_sg == 0) {
         /*
          * CDB request of single contiguous buffer.
@@ -6642,10 +6651,6 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
          */
 	struct scatterlist *slp;
 	int use_sg;
-
-	scsiqp->data_cnt = 0;
-	scsiqp->vdata_addr = 0;
-	scsiqp->data_addr = 0;
 
 	slp = (struct scatterlist *)scp->request_buffer;
 	use_sg = dma_map_sg(dev, slp, scp->use_sg, scp->sc_data_direction);
@@ -9198,9 +9203,7 @@ asc_prt_scsi_cmnd(Scsi_Cmnd *s)
 " timeout_per_command %d, timeout_total %d, timeout %d\n",
         s->timeout_per_command, s->timeout_total, s->timeout);
 
-    printk(
-" internal_timeout %u, flags %u\n",
-        s->internal_timeout, s->flags);
+    printk(" internal_timeout %u\n", s->internal_timeout);
 
     printk(
 " scsi_done 0x%lx, done 0x%lx, host_scribble 0x%lx, result 0x%x\n",
@@ -12011,7 +12014,10 @@ AscInitFromAscDvcVar(
     ushort              pci_device_id;
 
     iop_base = asc_dvc->iop_base;
-    pci_device_id = to_pci_dev(asc_dvc->cfg->dev)->device;
+    if (asc_dvc->cfg->dev)
+        pci_device_id = to_pci_dev(asc_dvc->cfg->dev)->device;
+    else
+	pci_device_id = 0;
     warn_code = 0;
     cfg_msw = AscGetChipCfgMsw(iop_base);
     if ((cfg_msw & ASC_CFG_MSW_CLR_MASK) != 0) {
