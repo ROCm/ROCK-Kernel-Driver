@@ -348,6 +348,9 @@ int pppoe_rcv_core(struct sock *sk, struct sk_buff *skb)
 	struct pppox_opt *po = pppox_sk(sk);
 	struct pppox_opt *relay_po = NULL;
 
+	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC))
+		goto abort_kfree;
+
 	if (sk->sk_state & PPPOX_BOUND) {
 		skb_pull(skb, sizeof(struct pppoe_hdr));
 		ppp_input(&po->chan, skb);
@@ -463,11 +466,13 @@ abort:
 struct packet_type pppoes_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_SES),
 	.func	= pppoe_rcv,
+	.data =	(void*) 1,
 };
 
 struct packet_type pppoed_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_DISC),
 	.func	= pppoe_disc_rcv,
+	.data =	(void*) 1,
 };
 
 /***********************************************************************
