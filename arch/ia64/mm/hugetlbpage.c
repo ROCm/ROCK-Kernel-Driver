@@ -20,12 +20,45 @@
 
 #define TASK_HPAGE_BASE (REGION_HPAGE << REGION_SHIFT)
 
-static long    htlbpagemem;
-int     htlbpage_max;
-static long    htlbzone_pages;
+static long	htlbpagemem;
+int		htlbpage_max;
+static long	htlbzone_pages;
 
-static LIST_HEAD(htlbpage_freelist);
+static struct list_head hugepage_freelists[MAX_NUMNODES];
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
+
+static void enqueue_huge_page(struct page *page)
+{
+	list_add(&page->list,
+		&hugepage_freelists[page_zone(page)->zone_pgdat->node_id]);
+}
+
+static struct page *dequeue_huge_page(void)
+{
+	int nid = numa_node_id();
+	struct page *page = NULL;
+
+	if (list_empty(&hugepage_freelists[nid])) {
+		for (nid = 0; nid < MAX_NUMNODES; ++nid)
+			if (!list_empty(&hugepage_freelists[nid]))
+				break;
+	}
+	if (nid >= 0 && nid < MAX_NUMNODES &&
+	    !list_empty(&hugepage_freelists[nid])) {
+		page = list_entry(hugepage_freelists[nid].next, struct page, list);
+		list_del(&page->list);
+	}
+	return page;
+}
+
+static struct page *alloc_fresh_huge_page(void)
+{
+	static int nid = 0;
+	struct page *page;
+	page = alloc_pages_node(nid, GFP_HIGHUSER, HUGETLB_PAGE_ORDER);
+	nid = (nid + 1) % numnodes;
+	return page;
+}
 
 void free_huge_page(struct page *page);
 
@@ -35,13 +68,11 @@ static struct page *alloc_hugetlb_page(void)
 	struct page *page;
 
 	spin_lock(&htlbpage_lock);
-	if (list_empty(&htlbpage_freelist)) {
+	page = dequeue_huge_page();
+	if (!page) {
 		spin_unlock(&htlbpage_lock);
 		return NULL;
 	}
-
-	page = list_entry(htlbpage_freelist.next, struct page, list);
-	list_del(&page->list);
 	htlbpagemem--;
 	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
@@ -228,7 +259,7 @@ void free_huge_page(struct page *page)
 	INIT_LIST_HEAD(&page->list);
 
 	spin_lock(&htlbpage_lock);
-	list_add(&page->list, &htlbpage_freelist);
+	enqueue_huge_page(page);
 	htlbpagemem++;
 	spin_unlock(&htlbpage_lock);
 }
@@ -364,7 +395,7 @@ int try_to_free_low(int count)
 
 	map = NULL;
 	spin_lock(&htlbpage_lock);
-	list_for_each(p, &htlbpage_freelist) {
+	list_for_each(p, &hugepage_freelists[0]) {
 		if (map) {
 			list_del(&map->list);
 			update_and_free_page(map);
@@ -401,11 +432,11 @@ int set_hugetlb_mem_size(int count)
 		return (int)htlbzone_pages;
 	if (lcount > 0) {	/* Increase the mem size. */
 		while (lcount--) {
-			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
+			page = alloc_fresh_huge_page();
 			if (page == NULL)
 				break;
 			spin_lock(&htlbpage_lock);
-			list_add(&page->list, &htlbpage_freelist);
+			enqueue_huge_page(page);
 			htlbpagemem++;
 			htlbzone_pages++;
 			spin_unlock(&htlbpage_lock);
@@ -442,17 +473,18 @@ __setup("hugepages=", hugetlb_setup);
 
 static int __init hugetlb_init(void)
 {
-	int i, j;
+	int i;
 	struct page *page;
 
+	for (i = 0; i < MAX_NUMNODES; ++i)
+		INIT_LIST_HEAD(&hugepage_freelists[i]);
+
 	for (i = 0; i < htlbpage_max; ++i) {
-		page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
+		page = alloc_fresh_huge_page();
 		if (!page)
 			break;
-		for (j = 0; j < HPAGE_SIZE/PAGE_SIZE; ++j)
-			SetPageReserved(&page[j]);
 		spin_lock(&htlbpage_lock);
-		list_add(&page->list, &htlbpage_freelist);
+		enqueue_huge_page(page);
 		spin_unlock(&htlbpage_lock);
 	}
 	htlbpage_max = htlbpagemem = htlbzone_pages = i;
