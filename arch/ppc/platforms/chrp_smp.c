@@ -16,8 +16,6 @@
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/delay.h>
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 

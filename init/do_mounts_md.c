@@ -154,7 +154,7 @@ static void __init md_setup_drive(void)
 
 		printk(KERN_INFO "md: Loading md%d: %s\n", minor, md_setup_args.device_names[minor]);
 
-		fd = open(name, 0, 0);
+		fd = sys_open(name, 0, 0);
 		if (fd < 0) {
 			printk(KERN_ERR "md: open failed - cannot start array %d\n", minor);
 			continue;
@@ -163,7 +163,7 @@ static void __init md_setup_drive(void)
 			printk(KERN_WARNING
 			       "md: Ignoring md=%d, already autodetected. (Use raid=noautodetect)\n",
 			       minor);
-			close(fd);
+			sys_close(fd);
 			continue;
 		}
 
@@ -209,7 +209,7 @@ static void __init md_setup_drive(void)
 			err = sys_ioctl(fd, RUN_ARRAY, 0);
 		if (err)
 			printk(KERN_WARNING "md: starting md%d failed\n", minor);
-		close(fd);
+		sys_close(fd);
 	}
 }
 
@@ -243,10 +243,10 @@ void __init md_run_setup(void)
 	if (raid_noautodetect)
 		printk(KERN_INFO "md: Skipping autodetection of RAID arrays. (raid=noautodetect)\n");
 	else {
-		int fd = open("/dev/md0", 0, 0);
+		int fd = sys_open("/dev/md0", 0, 0);
 		if (fd >= 0) {
 			sys_ioctl(fd, RAID_AUTORUN, 0);
-			close(fd);
+			sys_close(fd);
 		}
 	}
 	md_setup_drive();

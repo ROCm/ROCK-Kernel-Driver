@@ -27,9 +27,6 @@
 #include <asm/oplib.h>
 #include <asm/hardirq.h>
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 #define IRQ_RESCHEDULE		13
 #define IRQ_STOP_CPU		14
 #define IRQ_CROSS_CALL		15

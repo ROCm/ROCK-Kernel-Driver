@@ -1,4 +1,3 @@
-#define __KERNEL_SYSCALLS__
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/devfs_fs_kernel.h>

@@ -18,7 +18,6 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
-#include <linux/unistd.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
@@ -42,6 +41,7 @@
 #include <linux/writeback.h>
 #include <linux/cpu.h>
 #include <linux/efi.h>
+#include <linux/unistd.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -612,11 +612,11 @@ static int init(void * unused)
 	unlock_kernel();
 	system_running = 1;
 
-	if (open("/dev/console", O_RDWR, 0) < 0)
+	if (sys_open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
 
-	(void) dup(0);
-	(void) dup(0);
+	(void) sys_dup(0);
+	(void) sys_dup(0);
 	
 	/*
 	 * We try each of these until one succeeds.
