@@ -433,5 +433,8 @@ static void __exit exit_qlogic_cs(void)
 		qlogic_detach(dev_list);
 }
 
+MODULE_AUTHOR("Tom Zerucha, Michael Griffith");
+MODULE_DESCRIPTION("Driver for the PCMCIA Qlogic FAS SCSI controllers");
+MODULE_LICENSE("GPL");
 module_init(init_qlogic_cs);
 module_exit(exit_qlogic_cs);

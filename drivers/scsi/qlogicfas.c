@@ -721,10 +721,6 @@ static const char *qlogicfas_info(struct Scsi_Host *host)
 	return priv->qinfo;
 }
 
-MODULE_AUTHOR("Tom Zerucha, Michael Griffith");
-MODULE_DESCRIPTION("Driver for the Qlogic FAS SCSI controllers");
-MODULE_LICENSE("GPL");
-
 /*
  *	The driver template is also needed for PCMCIA
  */
@@ -765,6 +761,9 @@ static __exit void qlogicfas_exit(void)
 		qlogicfas_release(priv->shost);
 }
 
+MODULE_AUTHOR("Tom Zerucha, Michael Griffith");
+MODULE_DESCRIPTION("Driver for the Qlogic FAS SCSI controllers");
+MODULE_LICENSE("GPL");
 module_init(qlogicfas_init);
 module_exit(qlogicfas_exit);
 #endif	/* ifndef PCMCIA */
