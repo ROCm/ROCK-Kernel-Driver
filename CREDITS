@@ -502,6 +502,14 @@ S: 48287 Sawleaf
 S: Fremont, California 94539
 S: USA
 
+N: Florent Chabaud
+E: florent.chabaud@polytechnique.org
+D: software suspend
+S: SGDN/DCSSI/SDS/LTI
+S: 58, Bd Latour-Maubourg
+S: 75700 Paris 07 SP
+S: France
+
 N: Gordon Chaffee
 E: chaffee@cs.berkeley.edu
 W: http://bmrc.berkeley.edu/people/chaffee/
@@ -1708,7 +1716,7 @@ S: Germany
 N: Gabor Kuti
 M: seasons@falcon.sch.bme.hu
 M: seasons@makosteszta.sote.hu
-D: Software suspend
+D: Original author of software suspend
 
 N: Jaroslav Kysela
 E: perex@suse.cz
