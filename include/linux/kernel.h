@@ -66,6 +66,7 @@ void __might_sleep(char *file, int line);
 	})
 
 extern struct notifier_block *panic_notifier_list;
+extern long (*panic_blink)(long time);
 NORET_TYPE void panic(const char * fmt, ...)
 	__attribute__ ((NORET_AND format (printf, 1, 2)));
 asmlinkage NORET_TYPE void do_exit(long error_code)
