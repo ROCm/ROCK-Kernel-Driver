@@ -100,7 +100,7 @@ static void ext2_xattr_rehash(struct ext2_xattr_header *,
 
 static struct mb_cache *ext2_xattr_cache;
 
-static struct xattr_handler *ext2_xattr_handler_map[EXT2_XATTR_INDEX_MAX] = {
+static struct xattr_handler *ext2_xattr_handler_map[] = {
 	[EXT2_XATTR_INDEX_USER]		     = &ext2_xattr_user_handler,
 #ifdef CONFIG_EXT2_FS_POSIX_ACL
 	[EXT2_XATTR_INDEX_POSIX_ACL_ACCESS]  = &ext2_xattr_acl_access_handler,
@@ -130,7 +130,7 @@ ext2_xattr_handler(int name_index)
 {
 	struct xattr_handler *handler = NULL;
 
-	if (name_index > 0 && name_index <= EXT2_XATTR_INDEX_MAX)
+	if (name_index > 0 && name_index < ARRAY_SIZE(ext2_xattr_handler_map))
 		handler = ext2_xattr_handler_map[name_index];
 	return handler;
 }
