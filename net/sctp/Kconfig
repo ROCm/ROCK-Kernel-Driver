@@ -6,7 +6,7 @@ menu "SCTP Configuration (EXPERIMENTAL)"
 	depends on INET && EXPERIMENTAL
 
 config IPV6_SCTP__
-	bool
+	tristate
 	default y if IPV6=n
 	default IPV6 if IPV6
 
