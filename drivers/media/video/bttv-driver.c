@@ -1574,6 +1574,7 @@ int bttv_common_ioctls(struct bttv *btv, unsigned int cmd, void *arg)
 			return 0;
 		}
 
+		bttv_call_i2c_clients(btv,cmd,v);
 		btv->tvnorm = v->norm;
 		set_input(btv,v->channel);
 		up(&btv->lock);
