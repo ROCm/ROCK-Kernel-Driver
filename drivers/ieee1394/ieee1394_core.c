@@ -41,6 +41,10 @@ MODULE_PARM(disable_nodemgr, "i");
 MODULE_PARM_DESC(disable_nodemgr, "Disable nodemgr functionality.");
 static int disable_nodemgr = 0;
 
+MODULE_PARM(disable_hotplug, "i");
+MODULE_PARM_DESC(disable_hotplug, "Disable hotplug for detected nodes.");
+static int disable_hotplug = 0;
+
 /* We are GPL, so treat us special */
 MODULE_LICENSE("GPL");
 
@@ -108,7 +112,7 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
-        INIT_TQ_HEAD(packet->complete_tq);
+        INIT_LIST_HEAD(&packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
         packet->state = hpsb_unused;
@@ -177,6 +181,8 @@ static int check_selfids(struct hpsb_host *host)
         struct ext_selfid *esid;
         int esid_seq = 23;
 
+	host->nodes_active = 0;
+
         while (rest_of_selfids--) {
                 if (!sid->extended) {
                         nodeid++;
@@ -188,9 +194,11 @@ static int check_selfids(struct hpsb_host *host)
                                 return 0;
                         }
                         
-                        if (sid->contender && sid->link_active) {
-                                host->irm_id = LOCAL_BUS | sid->phy_id;
-                        }
+			if (sid->link_active) {
+				host->nodes_active++;
+				if (sid->contender)
+					host->irm_id = LOCAL_BUS | sid->phy_id;
+			}
                 } else {
                         esid = (struct ext_selfid *)sid;
 
@@ -224,7 +232,8 @@ static int check_selfids(struct hpsb_host *host)
                         return 0;
         }
 
-        return nodeid + 1;
+	host->node_count = nodeid + 1;
+        return 1;
 }
 
 static void build_speed_map(struct hpsb_host *host, int nodecount)
@@ -322,8 +331,7 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
         host->node_id = LOCAL_BUS | phyid;
         host->is_root = isroot;
 
-        host->node_count = check_selfids(host);
-        if (!host->node_count) {
+        if (!check_selfids(host)) {
                 if (host->reset_retries++ < 20) {
                         /* selfid stage did not complete without error */
                         HPSB_NOTICE("Error in SelfID stage, resetting");
@@ -803,8 +811,8 @@ static rwlock_t ieee1394_chardevs_lock = RW_LOCK_UNLOCKED;
 static int ieee1394_dispatch_open(struct inode *inode, struct file *file);
 
 static struct file_operations ieee1394_chardev_ops = {
-	OWNER_THIS_MODULE
-	open: ieee1394_dispatch_open,
+	owner:	THIS_MODULE,
+	open:	ieee1394_dispatch_open,
 };
 
 devfs_handle_t ieee1394_devfs_handle;
@@ -828,8 +836,6 @@ int ieee1394_register_chardev(int blocknum,
 		ieee1394_chardevs[blocknum].module = module;
 		
 		retval = 0;
-
-		V22_COMPAT_MOD_INC_USE_COUNT;
 	} else {
 		/* block already taken */
 		retval = -EBUSY;
@@ -851,7 +857,6 @@ void ieee1394_unregister_chardev(int blocknum)
 	if(ieee1394_chardevs[blocknum].file_ops) {
 		ieee1394_chardevs[blocknum].file_ops = NULL;
 		ieee1394_chardevs[blocknum].module = NULL;
-		V22_COMPAT_MOD_DEC_USE_COUNT;
 	}
 	
 	write_unlock(&ieee1394_chardevs_lock);
@@ -868,12 +873,6 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	/*
 	  Maintaining correct module reference counts is tricky here!
 
-	  For Linux v2.2:
-
-	  The task-specific driver is expected to maintain its own
-	  reference count via V22_COMPAT_MOD_[INC,DEC]_USE_COUNT.
-	  We don't need to do anything special.
-	  
 	  For Linux v2.4 and later:
 	  
 	  The key thing to remember is that the VFS increments the
@@ -894,17 +893,10 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	  
 	*/
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-	/* 2.2 */
-#define INCREF(mod) do {} while (0)
-#define DECREF(mod) do {} while (0)
-#else
-	/* 2.4 */
 #define INCREF(mod_) do { struct module *mod = (struct module*) mod_; \
                           if(mod != NULL) __MOD_INC_USE_COUNT(mod); } while(0)
 #define DECREF(mod_) do { struct module *mod = (struct module*) mod_; \
                           if(mod != NULL) __MOD_DEC_USE_COUNT(mod); } while(0)
-#endif
 	
         /* shift away lower four bits of the minor
 	   to get the index of the ieee1394_driver
@@ -1013,7 +1005,7 @@ static int __init ieee1394_init(void)
 	init_hpsb_highlevel();
 	init_csr();
 	if (!disable_nodemgr)
-		init_ieee1394_nodemgr();
+		init_ieee1394_nodemgr(disable_hotplug);
 	else
 		HPSB_INFO("nodemgr functionality disabled");
 
@@ -1099,8 +1091,10 @@ EXPORT_SYMBOL(highlevel_host_reset);
 
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
-EXPORT_SYMBOL(hpsb_get_host_by_ne);
-EXPORT_SYMBOL(hpsb_guid_fill_packet);
+EXPORT_SYMBOL(hpsb_node_fill_packet);
+EXPORT_SYMBOL(hpsb_node_read);
+EXPORT_SYMBOL(hpsb_node_write);
+EXPORT_SYMBOL(hpsb_node_lock);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(hpsb_release_unit_directory);

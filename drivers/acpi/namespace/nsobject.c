@@ -2,7 +2,7 @@
  *
  * Module Name: nsobject - Utilities for objects attached to namespace
  *                         table entries
- *              $Revision: 78 $
+ *              $Revision: 80 $
  *
  ******************************************************************************/
 
@@ -221,7 +221,7 @@ acpi_ns_detach_object (
 
 	node->type = ACPI_TYPE_ANY;
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Node %p [%4.4s] Object %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Node %p [%4.4s] Object %p\n",
 		node, (char *) &node->name, obj_desc));
 
 	/* Remove one reference on the object (and all subobjects) */
@@ -280,7 +280,7 @@ acpi_operand_object *
 acpi_ns_get_secondary_object (
 	acpi_operand_object     *obj_desc)
 {
-	ACPI_FUNCTION_TRACE_PTR ("Acpi_ns_get_secondary_object", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("Ns_get_secondary_object", obj_desc);
 
 
 	if ((!obj_desc)                                  ||

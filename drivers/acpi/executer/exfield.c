@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 105 $
+ *              $Revision: 108 $
  *
  *****************************************************************************/
 
@@ -41,7 +41,8 @@
  *
  * FUNCTION:    Acpi_ex_read_data_from_field
  *
- * PARAMETERS:  Obj_desc            - The named field
+ * PARAMETERS:  Walk_state          - Current execution state
+ *              Obj_desc            - The named field
  *              Ret_buffer_desc     - Where the return data object is stored
  *
  * RETURN:      Status
@@ -53,12 +54,14 @@
 
 acpi_status
 acpi_ex_read_data_from_field (
+	acpi_walk_state         *walk_state,
 	acpi_operand_object     *obj_desc,
 	acpi_operand_object     **ret_buffer_desc)
 {
 	acpi_status             status;
 	acpi_operand_object     *buffer_desc;
 	u32                     length;
+	u32                     integer_size;
 	void                    *buffer;
 	u8                      locked;
 
@@ -97,7 +100,18 @@ acpi_ex_read_data_from_field (
 	 */
 	length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->field.bit_length);
 
-	if (length > sizeof (acpi_integer)) {
+	/* Handle both ACPI 1.0 and ACPI 2.0 Integer widths */
+
+	integer_size = sizeof (acpi_integer);
+	if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
+		/*
+		 * We are running a method that exists in a 32-bit ACPI table.
+		 * Integer size is 4.
+		 */
+		integer_size = sizeof (u32);
+	}
+
+	if (length > integer_size) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
 		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
@@ -113,6 +127,7 @@ acpi_ex_read_data_from_field (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
+		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
 		buffer_desc->buffer.length = length;
 		buffer = buffer_desc->buffer.pointer;
 	}
@@ -124,14 +139,15 @@ acpi_ex_read_data_from_field (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		length = sizeof (buffer_desc->integer.value);
+		length = integer_size;
+		buffer_desc->integer.value = 0;
 		buffer = &buffer_desc->integer.value;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
 		obj_desc, obj_desc->common.type, buffer, length));
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Field_write: Bit_len=%X Bit_off=%X Byte_off=%X\n",
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,
@@ -257,10 +273,10 @@ acpi_ex_write_data_to_field (
 		length = required_length;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Obj=%p Type=%X Buf=%p Len=%X\n",
 		obj_desc, obj_desc->common.type, buffer, length));
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
 		"Field_read: Bit_len=%X Bit_off=%X Byte_off=%X\n",
 		obj_desc->common_field.bit_length,
 		obj_desc->common_field.start_field_bit_offset,

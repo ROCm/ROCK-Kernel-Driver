@@ -22,6 +22,7 @@
  *  2 of the License, or (at your option) any later version.
  *
  */
+#include <asm/tlbflush.h>
 
 extern void mapin_ram(void);
 extern void bat_mapin_ram(void);

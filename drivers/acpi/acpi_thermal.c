@@ -1,5 +1,5 @@
 /*
- *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 33 $)
+ *  acpi_thermal.c - ACPI Thermal Zone Driver ($Revision: 36 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -78,7 +78,6 @@ struct acpi_thermal_state {
 	u8			passive:1;
 	u8			active:1;
 	u8			reserved:4;
-	int			passive_index;		/* a.k.a. limit state */
 	int			active_index;
 };
 
@@ -467,15 +466,23 @@ acpi_thermal_passive (
 	 */
 	if (tz->temperature >= passive->temperature) {
 		trend = (passive->tc1 * (tz->temperature - tz->last_temperature)) + (passive->tc2 * (tz->temperature - passive->temperature));
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "trend[%d]=(tc1[%lu]*(tmp[%lu]-last[%lu]))+(tc2[%lu]*(tmp[%lu]-psv[%lu]))\n", trend, passive->tc1, tz->temperature, tz->last_temperature, passive->tc2, tz->temperature, passive->temperature));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"trend[%d]=(tc1[%lu]*(tmp[%lu]-last[%lu]))+(tc2[%lu]*(tmp[%lu]-psv[%lu]))\n", 
+			trend, passive->tc1, tz->temperature, 
+			tz->last_temperature, passive->tc2, 
+			tz->temperature, passive->temperature));
 		/* Heating up? */
 		if (trend > 0)
 			for (i=0; i<passive->devices.count; i++)
-				acpi_processor_set_limit(passive->devices.handles[i], ACPI_PROCESSOR_LIMIT_INCREMENT, &tz->state.passive_index);
+				acpi_processor_set_thermal_limit(
+					passive->devices.handles[i], 
+					ACPI_PROCESSOR_LIMIT_INCREMENT);
 		/* Cooling off? */
 		else if (trend < 0)
 			for (i=0; i<passive->devices.count; i++)
-				acpi_processor_set_limit(passive->devices.handles[i], ACPI_PROCESSOR_LIMIT_DECREMENT, &tz->state.passive_index);
+				acpi_processor_set_thermal_limit(
+					passive->devices.handles[i], 
+					ACPI_PROCESSOR_LIMIT_DECREMENT);
 	}
 
 	/*
@@ -487,10 +494,13 @@ acpi_thermal_passive (
 	 */
 	else if (tz->trips.passive.flags.enabled) {
 		for (i=0; i<passive->devices.count; i++)
-			acpi_processor_set_limit(passive->devices.handles[i], ACPI_PROCESSOR_LIMIT_DECREMENT, &tz->state.passive_index);
-		if (0 == tz->state.passive_index) {
+			result = acpi_processor_set_thermal_limit(
+				passive->devices.handles[i], 
+				ACPI_PROCESSOR_LIMIT_DECREMENT);
+		if (1 == result) {
 			tz->trips.passive.flags.enabled = 0;
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Disabling passive cooling (zone is cool)\n"));
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+				"Disabling passive cooling (zone is cool)\n"));
 		}
 	}
 
@@ -671,7 +681,7 @@ acpi_thermal_check (
 		if (timer_pending(&(tz->timer)))
 			mod_timer(&(tz->timer), (HZ * sleep_time) / 1000);
 		else {
-			tz->timer.data = (u32) tz;
+			tz->timer.data = (unsigned long) tz;
 			tz->timer.function = acpi_thermal_run;
 			tz->timer.expires = jiffies + (HZ * sleep_time) / 1000;
 			add_timer(&(tz->timer));
@@ -720,7 +730,7 @@ acpi_thermal_read_state (
 		if (tz->state.hot)
 			p += sprintf(p, "hot ");
 		if (tz->state.passive)
-			p += sprintf(p, "passive[%d] ", tz->state.passive_index);
+			p += sprintf(p, "passive ");
 		if (tz->state.active)
 			p += sprintf(p, "active[%d]", tz->state.active_index);
 		p += sprintf(p, "\n");
@@ -810,9 +820,10 @@ acpi_thermal_read_trip_points (
 			tz->trips.passive.tc1,
 			tz->trips.passive.tc2, 
 			tz->trips.passive.tsp);
-		for (j=0; j<tz->trips.passive.devices.count; j++) 
-			p += sprintf(p, "0x%p ", 
-				tz->trips.passive.devices.handles[j]);
+		for (j=0; j<tz->trips.passive.devices.count; j++) {
+
+			p += sprintf(p, "0x%p ", tz->trips.passive.devices.handles[j]);
+		}
 		p += sprintf(p, "\n");
 	}
 

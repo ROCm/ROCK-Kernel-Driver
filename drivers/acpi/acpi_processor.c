@@ -1,5 +1,5 @@
 /*
- * acpi_processor.c - ACPI Processor Driver ($Revision: 50 $)
+ * acpi_processor.c - ACPI Processor Driver ($Revision: 57 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -23,16 +23,12 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *  TBD:
  *	1. Make # power/performance states dynamic.
- *	2. Includes support for _real_ performance states (not just throttle).
- *	3. Support duty_cycle values that span bit 4.
- *	4. Optimize by having scheduler determine business instead of
- *         having us try to calculate it here.
- *      5. Need C1 timing -- must modify kernel (IRQ handler) to get this.
- *	6. Convert time values to ticks (initially) to avoid having to do
- *         the math (acpi_get_timer_duration).
- *      7. What is a good default value for the OS busy_metric?
- *      8. Support both thermal and power limits.
- *      9. Resolve PIIX4 BMISX errata issue (getting an I/O port value of 0).
+ *	2. Support duty_cycle values that span bit 4.
+ *	3. Optimize by having scheduler determine business instead of
+ *	   having us try to calculate it here.
+ *	4. Need C1 timing -- must modify kernel (IRQ handler) to get this.
+ *	5. Convert time values to ticks (initially) to avoid having to do
+ *	   the math (acpi_get_timer_duration).
  */
 
 #include <linux/kernel.h>
@@ -43,6 +39,7 @@
 #include <linux/pm.h>
 #include <asm/io.h>
 #include <asm/system.h>
+#include <asm/delay.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -56,20 +53,22 @@ MODULE_LICENSE("GPL");
 
 #define PREFIX				"ACPI: "
 
+#define ACPI_PROCESSOR_BUSY_METRIC	10
 
 #define ACPI_PROCESSOR_MAX_POWER	ACPI_C_STATE_COUNT
 #define ACPI_PROCESSOR_MAX_C2_LATENCY	100
 #define ACPI_PROCESSOR_MAX_C3_LATENCY	1000
 
-#define ACPI_PROCESSOR_MAX_PERFORMANCE	4
+#define ACPI_PROCESSOR_MAX_PERFORMANCE	8
 
 #define ACPI_PROCESSOR_MAX_THROTTLING	16
-#define ACPI_PROCESSOR_MAX_THROTTLE	500	/* 50% */
+#define ACPI_PROCESSOR_MAX_THROTTLE	250	/* 25% */
 #define ACPI_PROCESSOR_MAX_DUTY_WIDTH	4
 
 const u32 POWER_OF_2[] = {1,2,4,8,16,32,64};
 
-#define ACPI_PROCESSOR_MAX_LIMIT	20
+#define ACPI_PROCESSOR_LIMIT_USER	0
+#define ACPI_PROCESSOR_LIMIT_THERMAL	1
 
 static int acpi_processor_add (struct acpi_device *device);
 static int acpi_processor_remove (struct acpi_device *device, int type);
@@ -110,24 +109,35 @@ struct acpi_processor_power {
 	int			state;
 	int			default_state;
 	u32			bm_activity;
-	u32			busy_metric;
 	struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
 };
 
 /* Performance Management */
 
+struct acpi_pct_register {
+	u8			descriptor;
+	u16			length;
+	u8			space_id;
+	u8			bit_width;
+	u8			bit_offset;
+	u8			reserved;
+	u64			address;
+} __attribute__ ((packed));
+
 struct acpi_processor_px {
-	u8			valid;
-	u32			core_frequency;
-	u32			power;
-	u32			transition_latency;
-	u32			bus_master_latency;
-	u32			control;
-	u32			status;
+	acpi_integer		core_frequency;		/* megahertz */
+	acpi_integer		power;			/* milliWatts */
+	acpi_integer		transition_latency;	/* microseconds */
+	acpi_integer		bus_master_latency;	/* microseconds */
+	acpi_integer		control;		/* control value */
+	acpi_integer		status;			/* success indicator */
 };
 
 struct acpi_processor_performance {
 	int			state;
+	int			platform_limit;
+	u16			control_register;
+	u16			status_register;
 	int			state_count;
 	struct acpi_processor_px states[ACPI_PROCESSOR_MAX_PERFORMANCE];
 };
@@ -136,7 +146,6 @@ struct acpi_processor_performance {
 /* Throttling Control */
 
 struct acpi_processor_tx {
-	u8			valid;
 	u16			power;
 	u16			performance;
 };
@@ -153,37 +162,25 @@ struct acpi_processor_throttling {
 /* Limit Interface */
 
 struct acpi_processor_lx {
-	u8			valid;
-	u16			performance;
-	int			px;
-	int			tx;
+	int			px;		/* performace state */	
+	int			tx;		/* throttle level */
 };
 
 struct acpi_processor_limit {
-	int			state;
-	int			state_count;
-	struct {
-		u8			valid;
-		u16			performance;
-		int			px;
-		int			tx;
-	}			states[ACPI_PROCESSOR_MAX_LIMIT];
+	struct acpi_processor_lx state;		/* current limit */
+	struct acpi_processor_lx thermal;	/* thermal limit */
+	struct acpi_processor_lx user;		/* user limit */
 };
 
+
 struct acpi_processor_flags {
-	u8			bm_control:1;
 	u8			power:1;
 	u8			performance:1;
 	u8			throttling:1;
 	u8			limit:1;
-	u8			reserved:3;
-};
-
-struct acpi_processor_errata {
-	struct {
-		u8			reverse_throttle;
-		u32			bmisx;
-	}			piix4;
+	u8			bm_control:1;
+	u8			bm_check:1;
+	u8			reserved:2;
 };
 
 struct acpi_processor {
@@ -191,15 +188,25 @@ struct acpi_processor {
 	u32			acpi_id;
 	u32			id;
 	struct acpi_processor_flags flags;
-	struct acpi_processor_errata errata;
 	struct acpi_processor_power power;
 	struct acpi_processor_performance performance;
 	struct acpi_processor_throttling throttling;
 	struct acpi_processor_limit limit;
 };
 
+struct acpi_processor_errata {
+	u8			smp;
+	struct {
+		u8			throttle:1;
+		u8			fdma:1;
+		u8			reserved:6;
+		u32			bmisx;
+	}			piix4;
+};
 
-static u8			acpi_processor_smp = 0;
+static struct acpi_processor	*processors[NR_CPUS];
+static struct acpi_processor_errata errata;
+static void (*pm_idle_save)(void) = NULL;
 
 
 /* --------------------------------------------------------------------------
@@ -207,67 +214,137 @@ static u8			acpi_processor_smp = 0;
    -------------------------------------------------------------------------- */
 
 int
-acpi_processor_get_errata (
+acpi_processor_errata_piix4 (
+	struct pci_dev		*dev)
+{
+	u8			rev = 0;
+	u8			value1 = 0;
+	u8			value2 = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_errata_piix4");
+
+	if (!dev)
+		return_VALUE(-EINVAL);
+
+	/*
+	 * Note that 'dev' references the PIIX4 ACPI Controller.
+	 */
+
+	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
+
+	switch (rev) {
+	case 0:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found PIIX4 A-step\n"));
+		break;
+	case 1:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found PIIX4 B-step\n"));
+		break;
+	case 2:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found PIIX4E\n"));
+		break;
+	case 3:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found PIIX4M\n"));
+		break;
+	default:
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found unknown PIIX4\n"));
+		break;
+	}
+
+	switch (rev) {
+
+	case 0:		/* PIIX4 A-step */
+	case 1:		/* PIIX4 B-step */
+		/*
+		 * See specification changes #13 ("Manual Throttle Duty Cycle")
+		 * and #14 ("Enabling and Disabling Manual Throttle"), plus
+		 * erratum #5 ("STPCLK# Deassertion Time") from the January 
+		 * 2002 PIIX4 specification update.  Applies to only older 
+		 * PIIX4 models.
+		 */
+		errata.piix4.throttle = 1;
+
+	case 2:		/* PIIX4E */
+	case 3:		/* PIIX4M */
+		/*
+		 * See erratum #18 ("C3 Power State/BMIDE and Type-F DMA 
+		 * Livelock") from the January 2002 PIIX4 specification update.
+		 * Applies to all PIIX4 models.
+		 */
+
+		/* 
+		 * BM-IDE
+		 * ------
+		 * Find the PIIX4 IDE Controller and get the Bus Master IDE 
+		 * Status register address.  We'll use this later to read 
+		 * each IDE controller's DMA status to make sure we catch all
+		 * DMA activity.
+		 */
+		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+		           PCI_DEVICE_ID_INTEL_82371AB, 
+                           PCI_ANY_ID, PCI_ANY_ID, NULL);
+		if (dev)
+			errata.piix4.bmisx = pci_resource_start(dev, 4);
+
+		/* 
+		 * Type-F DMA
+		 * ----------
+		 * Find the PIIX4 ISA Controller and read the Motherboard
+		 * DMA controller's status to see if Type-F (Fast) DMA mode
+		 * is enabled (bit 7) on either channel.  Note that we'll 
+		 * disable C3 support if this is enabled, as some legacy 
+		 * devices won't operate well if fast DMA is disabled.
+		 */
+		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+			PCI_DEVICE_ID_INTEL_82371AB_0, 
+			PCI_ANY_ID, PCI_ANY_ID, NULL);
+		if (dev) {
+			pci_read_config_byte(dev, 0x76, &value1);
+			pci_read_config_byte(dev, 0x77, &value2);
+			if ((value1 & 0x80) || (value2 & 0x80))
+				errata.piix4.fdma = 1;
+		}
+
+		break;
+	}
+
+	if (errata.piix4.bmisx)
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Bus master activity detection (BM-IDE) erratum enabled\n"));
+	if (errata.piix4.fdma)
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Type-F DMA livelock erratum (C3 disabled)\n"));
+
+	return_VALUE(0);
+}
+
+
+int
+acpi_processor_errata (
 	struct acpi_processor	*pr)
 {
+	int			result = 0;
 	struct pci_dev		*dev = NULL;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_get_errata");
+	ACPI_FUNCTION_TRACE("acpi_processor_errata");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
 
 	/*
 	 * PIIX4
-	 * -----
 	 */
-	dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
-		PCI_DEVICE_ID_INTEL_82371AB_3, PCI_ANY_ID, PCI_ANY_ID, dev);
-	if (dev) {
-		u8		rev = 0;
+	dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+		PCI_DEVICE_ID_INTEL_82371AB_3, PCI_ANY_ID, PCI_ANY_ID, NULL);
+	if (dev)
+		result = acpi_processor_errata_piix4(dev);
 
-		pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
-
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "PIIX4 ACPI rev %d\n", rev));
-
-		switch (rev) {
-
-		case 0:		/* PIIX4 A-step */
-		case 1:		/* PIIX4 B-step */
-			/*
-			 * Workaround for reverse-notation on throttling states
-			 * used by early PIIX4 models.
-			 */
-			pr->errata.piix4.reverse_throttle = 1;
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
-				"Reverse-throttle errata enabled\n"));
-
-		case 2:		/* PIIX4E */
-		case 3:		/* PIIX4M */
-			/*
-			 * Workaround for errata #18 "C3 Power State/BMIDE and
-			 * Type-F DMA Livelock" from the July 2001 PIIX4
-			 * specification update.  Applies to all PIIX4 models.
-			 */
-			/* TBD: Why is the bmisx value always ZERO? */
-			pr->errata.piix4.bmisx = pci_resource_start(dev, 4);
-			if (pr->errata.piix4.bmisx)
-				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-					"BM-IDE errata enabled\n"));
-			break;
-		}
-	}
-
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
 /* --------------------------------------------------------------------------
                                 Power Management
    -------------------------------------------------------------------------- */
-
-static struct acpi_processor *acpi_processor_list[NR_CPUS];
-static void (*pm_idle_save)(void) = NULL;
 
 static void
 acpi_processor_power_activate (
@@ -311,9 +388,8 @@ acpi_processor_idle (void)
 	u32			start_ticks = 0;
 	u32			end_ticks = 0;
 	u32			time_elapsed = 0;
-	static unsigned long	last_idle_jiffies = 0;
 
-	pr = acpi_processor_list[smp_processor_id()];
+	pr = processors[smp_processor_id()];
 	if (!pr)
 		return;
 
@@ -323,55 +399,47 @@ acpi_processor_idle (void)
 	 */
 	__cli();
 
-	next_state = pr->power.state;
+	cx = &(pr->power.states[pr->power.state]);
 
 	/*
-	 * Check OS Idleness:
-	 * ------------------
-	 * If the OS has been busy (hasn't called the idle handler in a while)
-	 * then automatically demote to the default power state (e.g. C1).
-	 *
-	 * TBD: Optimize by having scheduler determine business instead
-	 *      of having us try to calculate it here.
+	 * Check BM Activity
+	 * -----------------
+	 * Check for bus mastering activity (if required), record, and check
+	 * for demotion.
 	 */
-	if (pr->power.state != pr->power.default_state) {
-		if ((jiffies - last_idle_jiffies) >= pr->power.busy_metric) {
-			next_state = pr->power.default_state;
-			if (next_state != pr->power.state)
-				acpi_processor_power_activate(pr, next_state);
-		}
-	}
+	if (pr->flags.bm_check) {
 
-	/*
-	 * Log BM Activity:
-	 * ----------------
-	 * Read BM_STS and record its value for later use by C3 policy.
-	 * (Note that we save the BM_STS values for the last 32 cycles).
-	 */
-	if (pr->flags.bm_control) {
 		pr->power.bm_activity <<= 1;
+		pr->power.bm_activity &= 0xFFFFFFFE;
+
 		if (acpi_hw_bit_register_read(ACPI_BITREG_BUS_MASTER_STATUS, ACPI_MTX_DO_NOT_LOCK)) {
-			pr->power.bm_activity |= 1;
-			acpi_hw_bit_register_write(ACPI_BITREG_BUS_MASTER_STATUS,
-				1, ACPI_MTX_DO_NOT_LOCK);
+			pr->power.bm_activity++;
+			acpi_hw_bit_register_write(ACPI_BITREG_BUS_MASTER_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
 		}
 		/*
-		 * PIIX4 Errata:
-		 * -------------
-		 * This code is a workaround for errata #18 "C3 Power State/
-		 * BMIDE and Type-F DMA Livelock" from the July '01 PIIX4
-		 * specification update.  Note that BM_STS doesn't always
-		 * reflect the true state of bus mastering activity; forcing
-		 * us to manually check the BMIDEA bit of each IDE channel.
+		 * PIIX4 Erratum #18: Note that BM_STS doesn't always reflect
+		 * the true state of bus mastering activity; forcing us to 
+		 * manually check the BMIDEA bit of each IDE channel.
 		 */
-		else if (pr->errata.piix4.bmisx) {
-			if ((inb_p(pr->errata.piix4.bmisx + 0x02) & 0x01) ||
-				(inb_p(pr->errata.piix4.bmisx + 0x0A) & 0x01))
-				pr->power.bm_activity |= 1;
+		else if (errata.piix4.bmisx) {
+			if ((inb_p(errata.piix4.bmisx + 0x02) & 0x01) 
+				|| (inb_p(errata.piix4.bmisx + 0x0A) & 0x01))
+				pr->power.bm_activity++;
+		}
+
+		/*
+		 * Apply bus mastering demotion policy.  Automatically demote
+		 * to avoid a faulty transition.  Note that the processor 
+		 * won't enter a low-power state during this call (to this 
+		 * funciton) but should upon the next.
+		 */
+		if (pr->power.bm_activity & cx->demotion.threshold.bm) {
+			__sti();
+			next_state = cx->demotion.state;
+			goto end;
 		}
 	}
 
-	cx = &(pr->power.states[pr->power.state]);
 	cx->usage++;
 
 	/*
@@ -416,7 +484,7 @@ acpi_processor_idle (void)
 		acpi_hw_bit_register_write(ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
 		/* See how long we're asleep for */
 		start_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
-		/* Invoke C2 */
+		/* Invoke C3 */
 		inb(pr->power.states[ACPI_STATE_C3].address);
 		/* Dummy op - must do something useless after P_LVL3 read */
 		end_ticks = inl(acpi_fadt.Xpm_tmr_blk.address);
@@ -439,6 +507,8 @@ acpi_processor_idle (void)
 		return;
 	}
 
+	next_state = pr->power.state;
+
 	/*
 	 * Promotion?
 	 * ----------
@@ -451,12 +521,16 @@ acpi_processor_idle (void)
 			cx->promotion.count++;
  			cx->demotion.count = 0;
 			if (cx->promotion.count >= cx->promotion.threshold.count) {
-				if (pr->flags.bm_control) {
-					if (!(pr->power.bm_activity & cx->promotion.threshold.bm))
+				if (pr->flags.bm_check) {
+					if (!(pr->power.bm_activity & cx->promotion.threshold.bm)) {
 						next_state = cx->promotion.state;
+						goto end;
+					}
 				}
-				else
+				else {
 					next_state = cx->promotion.state;
+					goto end;
+				}
 			}
 		}
 	}
@@ -466,21 +540,20 @@ acpi_processor_idle (void)
 	 * ---------
 	 * Track the number of shorts (time asleep is less than time threshold)
 	 * and demote when the usage threshold is reached.  Note that bus
-	 * mastering activity may cause immediate demotions.
+	 * mastering demotions are checked prior to state transitions (above).
 	 */
 	if (cx->demotion.state) {
 		if (time_elapsed < cx->demotion.threshold.time) {
 			cx->demotion.count++;
 			cx->promotion.count = 0;
-			if (cx->demotion.count >= cx->demotion.threshold.count)
+			if (cx->demotion.count >= cx->demotion.threshold.count) {
 				next_state = cx->demotion.state;
-		}
-		if (pr->flags.bm_control) {
-			if (pr->power.bm_activity & cx->demotion.threshold.bm)
-				next_state = cx->demotion.state;
+				goto end;
+			}
 		}
 	}
 
+end:
 	/*
 	 * New Cx State?
 	 * -------------
@@ -489,14 +562,6 @@ acpi_processor_idle (void)
 	 */
 	if (next_state != pr->power.state)
 		acpi_processor_power_activate(pr, next_state);
-
-	/*
-	 * Track OS Idleness:
-	 * ------------------
-	 * Record a jiffies timestamp to compute time elapsed between calls
-	 * to the idle handler.
-	 */
-	last_idle_jiffies = jiffies;
 
 	return;
 }
@@ -521,46 +586,30 @@ acpi_processor_set_power_policy (
 		return_VALUE(-EINVAL);
 
 	/*
-	 * The Busy Metric is used to determine when the OS has been busy
-	 * and thus when policy should return to using the default Cx state
-	 * (e.g. C1).  On Linux we use the number of jiffies (scheduler
-	 * quantums) that transpire between calls to the idle handler.
-	 *
-	 * TBD: What is a good value for the OS busy_metric?
-	 */
-	pr->power.busy_metric = 2;
-
-	/*
 	 * C0/C1
 	 * -----
 	 */
-	if (pr->power.states[ACPI_STATE_C1].valid) {
-		pr->power.state = ACPI_STATE_C1;
-		pr->power.default_state = ACPI_STATE_C1;
-	}
-	else {
-		pr->power.state = ACPI_STATE_C0;
-		pr->power.default_state = ACPI_STATE_C0;
-		return_VALUE(0);
-	}
+	pr->power.state = ACPI_STATE_C1;
+	pr->power.default_state = ACPI_STATE_C1;
 
 	/*
 	 * C1/C2
 	 * -----
 	 * Set the default C1 promotion and C2 demotion policies, where we
-	 * promote from C1 to C2 anytime we're asleep in C1 for longer than
-	 * two times the C2 latency (to amortize cost of transitions). Demote
-	 * from C2 to C1 anytime we're asleep in C2 for less than this time.
+	 * promote from C1 to C2 after several (10) successive C1 transitions,
+	 * as we cannot (currently) measure the time spent in C1. Demote from
+	 * C2 to C1 after experiencing several (3) 'shorts' (time spent in C2
+	 * is less than the C2 transtional latency).
 	 */
 	if (pr->power.states[ACPI_STATE_C2].valid) {
 		pr->power.states[ACPI_STATE_C1].promotion.threshold.count = 10;
 		pr->power.states[ACPI_STATE_C1].promotion.threshold.time =
-			(2 * pr->power.states[ACPI_STATE_C2].latency);
+			pr->power.states[ACPI_STATE_C2].latency;
 		pr->power.states[ACPI_STATE_C1].promotion.state = ACPI_STATE_C2;
 
-		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 1;
+		pr->power.states[ACPI_STATE_C2].demotion.threshold.count = 3;
 		pr->power.states[ACPI_STATE_C2].demotion.threshold.time =
-			(2 * pr->power.states[ACPI_STATE_C2].latency);
+			pr->power.states[ACPI_STATE_C2].latency;
 		pr->power.states[ACPI_STATE_C2].demotion.state = ACPI_STATE_C1;
 	}
 
@@ -576,13 +625,13 @@ acpi_processor_set_power_policy (
 		(pr->power.states[ACPI_STATE_C3].valid)) {
 		pr->power.states[ACPI_STATE_C2].promotion.threshold.count = 1;
 		pr->power.states[ACPI_STATE_C2].promotion.threshold.time =
-			(2 * pr->power.states[ACPI_STATE_C3].latency);
+			pr->power.states[ACPI_STATE_C3].latency;
 		pr->power.states[ACPI_STATE_C2].promotion.threshold.bm = 0x0F;
 		pr->power.states[ACPI_STATE_C2].promotion.state = ACPI_STATE_C3;
 
 		pr->power.states[ACPI_STATE_C3].demotion.threshold.count = 1;
 		pr->power.states[ACPI_STATE_C3].demotion.threshold.time =
-			(2 * pr->power.states[ACPI_STATE_C3].latency);
+			pr->power.states[ACPI_STATE_C3].latency;
 		pr->power.states[ACPI_STATE_C3].demotion.threshold.bm = 0x0F;
 		pr->power.states[ACPI_STATE_C3].demotion.state = ACPI_STATE_C2;
 	}
@@ -614,7 +663,7 @@ acpi_processor_get_power_info (
 	 * --
 	 * This state exists only as filler in our array.
 	 */
-	pr->power.states[ACPI_STATE_C0].valid = TRUE;
+	pr->power.states[ACPI_STATE_C0].valid = 1;
 
 	/*
 	 * C1
@@ -623,7 +672,7 @@ acpi_processor_get_power_info (
 	 *
 	 * TBD: What about PROC_C1?
 	 */
-	pr->power.states[ACPI_STATE_C1].valid = TRUE;
+	pr->power.states[ACPI_STATE_C1].valid = 1;
 
 	/*
 	 * C2
@@ -633,32 +682,82 @@ acpi_processor_get_power_info (
 	 * TBD: Support for C2 on MP (P_LVL2_UP).
 	 */
 	if (pr->power.states[ACPI_STATE_C2].address) {
+
 		pr->power.states[ACPI_STATE_C2].latency = acpi_fadt.plvl2_lat;
-		if (acpi_fadt.plvl2_lat > ACPI_PROCESSOR_MAX_C2_LATENCY)
+
+		/*
+		 * C2 latency must be less than or equal to 100 microseconds.
+		 */
+		if (acpi_fadt.plvl2_lat >= ACPI_PROCESSOR_MAX_C2_LATENCY)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 latency too large [%d]\n",
 				acpi_fadt.plvl2_lat));
-		else if (!acpi_processor_smp)
-			pr->power.states[ACPI_STATE_C2].valid = TRUE;
+		/*
+		 * Only support C2 on UP systems (see TBD above).
+		 */
+		else if (errata.smp)
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				"C2 not supported in SMP mode\n"));
+		/*
+		 * Otherwise we've met all of our C2 requirements.
+		 */
+		else
+			pr->power.states[ACPI_STATE_C2].valid = 1;
 	}
 
 	/*
 	 * C3
 	 * --
-	 * We're (currently) only supporting C3 on UP systems that include
-	 * bus mastering arbitration control.  Note that this method of
-	 * maintaining cache coherency (disabling of bus mastering) cannot be
-	 * used on SMP systems, and flushing caches (e.g. WBINVD) is simply
-	 * too costly (at this time).
+	 * TBD: Investigate use of WBINVD on UP/SMP system in absence of
+	 *	bm_control.
 	 */
 	if (pr->power.states[ACPI_STATE_C3].address) {
+
 		pr->power.states[ACPI_STATE_C3].latency = acpi_fadt.plvl3_lat;
-		if (acpi_fadt.plvl3_lat > ACPI_PROCESSOR_MAX_C3_LATENCY)
+
+		/*
+		 * C3 latency must be less than or equal to 1000 microseconds.
+		 */
+		if (acpi_fadt.plvl3_lat >= ACPI_PROCESSOR_MAX_C3_LATENCY)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 latency too large [%d]\n", 
 				acpi_fadt.plvl3_lat));
-		else if (!acpi_processor_smp && pr->flags.bm_control)
+		/*
+		 * Only support C3 when bus mastering arbitration control
+		 * is present (able to disable bus mastering to maintain
+		 * cache coherency while in C3).
+		 */
+		else if (!pr->flags.bm_control)
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				"C3 support requires bus mastering control\n"));
+		/*
+		 * Only support C3 on UP systems, as bm_control is only viable
+		 * on a UP system and flushing caches (e.g. WBINVD) is simply 
+		 * too costly (at this time).
+		 */
+		else if (errata.smp)
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				"C3 not supported in SMP mode\n"));
+		/*
+		 * PIIX4 Erratum #18: We don't support C3 when Type-F (fast) 
+		 * DMA transfers are used by any ISA device to avoid livelock.
+		 * Note that we could disable Type-F DMA (as recommended by
+		 * the erratum), but this is known to disrupt certain ISA 
+		 * devices thus we take the conservative approach.
+		 */
+		else if (errata.piix4.fdma) {
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+				"C3 not supported on PIIX4 with Type-F DMA\n"));
+		}
+		/*
+		 * Otherwise we've met all of our C3 requirements.  Enable
+		 * checking of bus mastering status (bm_check) so we can 
+		 * use this in our C3 policy.
+		 */
+		else {
 			pr->power.states[ACPI_STATE_C3].valid = 1;
+			pr->flags.bm_check = 1;
+		}
 	}
 
 	/*
@@ -678,7 +777,7 @@ acpi_processor_get_power_info (
 	 * manageable'.  Note that there's really no policy involved for
 	 * when only C1 is supported.
 	 */
-	if (pr->power.states[ACPI_STATE_C2].valid
+	if (pr->power.states[ACPI_STATE_C2].valid 
 		|| pr->power.states[ACPI_STATE_C3].valid)
 		pr->flags.power = 1;
 
@@ -690,21 +789,201 @@ acpi_processor_get_power_info (
                               Performance Management
    -------------------------------------------------------------------------- */
 
-static int
-acpi_processor_get_performance (
-	struct acpi_processor	*pr)
+static int 
+acpi_processor_get_platform_limit (
+	struct acpi_processor*	pr)
 {
-	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_state");
+	acpi_status		status = 0;
+	unsigned long		ppc = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_platform_limit");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-	if (!pr->flags.performance)
-		return_VALUE(0);
+	/*
+	 * _PPC indicates the maximum state currently supported by the platform
+	 * (e.g. 0 = states 0..n; 1 = states 1..n; etc.
+	 */
+	status = acpi_evaluate_integer(pr->handle, "_PPC", NULL, &ppc);
+	if(ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PPC\n"));
+		return_VALUE(-ENODEV);
+	}
 
-	/* TBD */
+	pr->performance.platform_limit = (int) ppc;
 
 	return_VALUE(0);
+}
+
+
+static int 
+acpi_processor_get_performance_control (
+	struct acpi_processor	*pr)
+{
+	int			result = 0;
+	acpi_status		status = 0;
+	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	acpi_object		*pct = NULL;
+	acpi_object		obj = {0};
+	struct acpi_pct_register *reg = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_control");
+
+	status = acpi_evaluate_object(pr->handle, "_PCT", NULL, &buffer);
+	if(ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PCT\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	pct = (acpi_object *) buffer.pointer;
+	if (!pct || (pct->type != ACPI_TYPE_PACKAGE) 
+		|| (pct->package.count != 2)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PCT data\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	/*
+	 * control_register
+	 */
+
+	obj = pct->package.elements[0];
+
+	if ((obj.type != ACPI_TYPE_BUFFER) 
+		|| (obj.buffer.length < sizeof(struct acpi_pct_register)) 
+		|| (obj.buffer.pointer == NULL)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid _PCT data (control_register)\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
+
+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unsupported address space [%d] (control_register)\n",
+			(u32) reg->space_id));
+		result = -EFAULT;
+		goto end;
+	}
+
+	pr->performance.control_register = (u16) reg->address;
+
+	/*
+	 * status_register
+	 */
+
+	obj = pct->package.elements[1];
+
+	if ((obj.type != ACPI_TYPE_BUFFER) 
+		|| (obj.buffer.length < sizeof(struct acpi_pct_register)) 
+		|| (obj.buffer.pointer == NULL)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid _PCT data (status_register)\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
+
+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unsupported address space [%d] (status_register)\n",
+			(u32) reg->space_id));
+		result = -EFAULT;
+		goto end;
+	}
+
+	pr->performance.status_register = (u16) reg->address;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"control_register[0x%04x] status_register[0x%04x]\n",
+		pr->performance.control_register,
+		pr->performance.status_register));
+
+end:
+	kfree(buffer.pointer);
+
+	return_VALUE(result);
+}
+
+
+static int 
+acpi_processor_get_performance_states (
+	struct acpi_processor*	pr)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	acpi_buffer		format = {sizeof("NNNNNN"), "NNNNNN"};
+	acpi_buffer		state = {0, NULL};
+	acpi_object 		*pss = NULL;
+	int			i = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
+
+	status = acpi_evaluate_object(pr->handle, "_PSS", NULL, &buffer);
+	if(ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PSS\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	pss = (acpi_object *) buffer.pointer;
+	if (!pss || (pss->type != ACPI_TYPE_PACKAGE)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d performance states\n", 
+		pss->package.count));
+
+	if (pss->package.count > ACPI_PROCESSOR_MAX_PERFORMANCE) {
+		pr->performance.state_count = ACPI_PROCESSOR_MAX_PERFORMANCE;
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Limiting number of states to max (%d)\n", 
+			ACPI_PROCESSOR_MAX_PERFORMANCE));
+	}
+	else
+		pr->performance.state_count = pss->package.count;
+
+	if (pr->performance.state_count > 1)
+		pr->flags.performance = 1;
+
+	for (i = 0; i < pr->performance.state_count; i++) {
+
+		struct acpi_processor_px *px = &(pr->performance.states[i]);
+
+		state.length = sizeof(struct acpi_processor_px);
+		state.pointer = px;
+
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Extracting state %d\n", i));
+
+		status = acpi_extract_package(&(pss->package.elements[i]), 
+			&format, &state);
+		if (ACPI_FAILURE(status)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
+			result = -EFAULT;
+			goto end;
+		}
+
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"State [%d]: core_frequency[%d] power[%d] transition_latency[%d] bus_master_latency[%d] control[0x%x] status[0x%x]\n",
+			i, 
+			(u32) px->core_frequency, 
+			(u32) px->power, 
+			(u32) px->transition_latency, 
+			(u32) px->bus_master_latency,
+			(u32) px->control, 
+			(u32) px->status));
+	}
+
+end:
+	kfree(buffer.pointer);
+
+	return_VALUE(result);
 }
 
 
@@ -713,7 +992,11 @@ acpi_processor_set_performance (
 	struct acpi_processor	*pr,
 	int			state)
 {
-	ACPI_FUNCTION_TRACE("acpi_processor_set_performance_state");
+	u16			port = 0;
+	u8			value = 0;
+	int			i = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_set_performance");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
@@ -721,13 +1004,71 @@ acpi_processor_set_performance (
 	if (!pr->flags.performance)
 		return_VALUE(-ENODEV);
 
-	if (state >= pr->performance.state_count)
+	if (state >= pr->performance.state_count) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
+			"Invalid target state (P%d)\n", state));
 		return_VALUE(-ENODEV);
+	}
 
-	if (state == pr->performance.state)
+	if (state < pr->performance.platform_limit) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
+			"Platform limit (P%d) overrides target state (P%d)\n",
+			pr->performance.platform_limit, state));
+		return_VALUE(-ENODEV);
+	}
+
+	if (state == pr->performance.state) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Already at target state (P%d)\n", state));
 		return_VALUE(0);
+	}
 
-	/* TBD */
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Transitioning from P%d to P%d\n",
+		pr->performance.state, state));
+
+	/*
+	 * First we write the target state's 'control' value to the
+	 * control_register.
+	 */
+
+	port = pr->performance.control_register;
+	value = (u16) pr->performance.states[state].control;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Writing 0x%02x to port 0x%04x\n", value, port));
+
+	outb(value, port); 
+
+	/*
+	 * Then we read the 'status_register' and compare the value with the
+	 * target state's 'status' to make sure the transition was successful.
+	 * Note that we'll poll for up to 1ms (100 cycles of 10us) before
+	 * giving up.
+	 */
+
+	port = pr->performance.status_register;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Looking for 0x%02x from port 0x%04x\n",
+		(u8) pr->performance.states[state].status, port));
+
+	for (i=0; i<100; i++) {
+		value = inb(port);
+		if (value == (u8) pr->performance.states[state].status)
+			break;
+		udelay(10);
+	}
+
+	if (value != pr->performance.states[state].status) {
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Transition failed\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Transition successful after %d microseconds\n",
+		i * 10));
+
+	pr->performance.state = state;
 
 	return_VALUE(0);
 }
@@ -738,13 +1079,37 @@ acpi_processor_get_performance_info (
 	struct acpi_processor	*pr)
 {
 	int			result = 0;
+	acpi_status		status = AE_OK;
+	acpi_handle		handle = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_info");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-	/* TBD: Support ACPI 2.0 objects */
+	status = acpi_get_handle(pr->handle, "_PCT", &handle);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"ACPI-based processor performance control unavailable\n"));
+		return_VALUE(0);
+	}
+
+	result = acpi_processor_get_performance_control(pr);
+	if (0 != result)
+		return_VALUE(result);
+
+	result = acpi_processor_get_performance_states(pr);
+	if (0 != result)
+		return_VALUE(result);
+
+	result = acpi_processor_get_platform_limit(pr);
+	if (0 != result)
+		return_VALUE(result);
+
+	/* 
+	 * TBD: Don't trust the latency values we get from BIOS, but rather
+	 *      measure the latencies during run-time (e.g. get_latencies).
+	 */
 
 	return_VALUE(0);
 }
@@ -776,32 +1141,29 @@ acpi_processor_get_throttling (
 	__cli();
 
 	duty_mask = pr->throttling.state_count - 1;
+
 	duty_mask <<= pr->throttling.duty_offset;
 
-	value = inb(pr->throttling.address);
+	value = inl(pr->throttling.address);
 
 	/*
 	 * Compute the current throttling state when throttling is enabled
-	 * (bit 4 is on).  Note that the reverse_throttling flag indicates
-	 * that the duty_value is opposite of that specified by ACPI.
+	 * (bit 4 is on).
 	 */
 	if (value & 0x10) {
 		duty_value = value & duty_mask;
 		duty_value >>= pr->throttling.duty_offset;
 
-		if (duty_value) {
-			if (pr->errata.piix4.reverse_throttle)
-				state = duty_value;
-			else
-				state = pr->throttling.state_count-duty_value;
-		}
+		if (duty_value)
+			state = pr->throttling.state_count-duty_value;
 	}
 
 	pr->throttling.state = state;
 
 	__sti();
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Throttling state is T%d (%d%% throttling applied)\n",
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Throttling state is T%d (%d%% throttling applied)\n",
 		state, pr->throttling.states[state].performance));
 
 	return_VALUE(0);
@@ -825,7 +1187,7 @@ acpi_processor_set_throttling (
 	if ((state < 0) || (state > (pr->throttling.state_count - 1)))
 		return_VALUE(-EINVAL);
 
-	if (!pr->flags.throttling || !pr->throttling.states[state].valid)
+	if (!pr->flags.throttling)
 		return_VALUE(-ENODEV);
 
 	if (state == pr->throttling.state)
@@ -834,20 +1196,16 @@ acpi_processor_set_throttling (
 	__cli();
 
 	/*
-	 * Calculate the duty_value and duty_mask.  Note that the
-	 * reverse_throttling flag indicates that the duty_value is
-	 * opposite of that specified by ACPI.
+	 * Calculate the duty_value and duty_mask.
 	 */
 	if (state) {
-		if (pr->errata.piix4.reverse_throttle)
-			duty_value = state;
-		else
-			duty_value = pr->throttling.state_count - state;
+		duty_value = pr->throttling.state_count - state;
 
 		duty_value <<= pr->throttling.duty_offset;
 
 		/* Used to clear all duty_value bits */
-		duty_mask = pr->performance.state_count - 1;
+		duty_mask = pr->throttling.state_count - 1;
+
 		duty_mask <<= acpi_fadt.duty_offset;
 		duty_mask = ~duty_mask;
 	}
@@ -856,7 +1214,7 @@ acpi_processor_set_throttling (
 	 * Disable throttling by writing a 0 to bit 4.  Note that we must
 	 * turn it off before you can change the duty_value.
 	 */
-	value = inb(pr->throttling.address);
+	value = inl(pr->throttling.address);
 	if (value & 0x10) {
 		value &= 0xFFFFFFEF;
 		outl(value, pr->throttling.address);
@@ -879,8 +1237,9 @@ acpi_processor_set_throttling (
 
 	__sti();
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Throttling state set to T%d (%d%%)\n",
-		state, (pr->throttling.states[state].performance?pr->throttling.states[state].performance/10:0)));
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"Throttling state set to T%d (%d%%)\n", state, 
+		(pr->throttling.states[state].performance?pr->throttling.states[state].performance/10:0)));
 
 	return_VALUE(0);
 }
@@ -912,13 +1271,24 @@ acpi_processor_get_throttling_info (
 		return_VALUE(0);
 	}
 	else if (!pr->throttling.duty_width) {
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Invalid duty_width\n"));
-		return_VALUE(-EFAULT);
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No throttling states\n"));
+		return_VALUE(0);
 	}
 	/* TBD: Support duty_cycle values that span bit 4. */
 	else if ((pr->throttling.duty_offset
 		+ pr->throttling.duty_width) > 4) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "duty_cycle spans bit 4\n"));
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "duty_cycle spans bit 4\n"));
+		return_VALUE(0);
+	}
+
+	/*
+	 * PIIX4 Errata: We don't support throttling on the original PIIX4.
+	 * This shouldn't be an issue as few (if any) mobile systems ever
+	 * used this part.
+	 */
+	if (errata.piix4.throttle) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Throttling not supported on PIIX4 A- or B-step\n"));
 		return_VALUE(0);
 	}
 
@@ -935,7 +1305,6 @@ acpi_processor_get_throttling_info (
 	for (i=0; i<pr->throttling.state_count; i++) {
 		pr->throttling.states[i].performance = step * i;
 		pr->throttling.states[i].power = step * i;
-		pr->throttling.states[i].valid = 1;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d throttling states\n", 
@@ -973,19 +1342,76 @@ end:
                                  Limit Interface
    -------------------------------------------------------------------------- */
 
+static int
+acpi_processor_apply_limit (
+	struct acpi_processor* 	pr)
+{
+	int			result = 0;
+	u16			px = 0;
+	u16			tx = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_apply_limit");
+
+	if (!pr)
+		return_VALUE(-EINVAL);
+
+	if (!pr->flags.limit)
+		return_VALUE(-ENODEV);
+
+	if (pr->flags.performance) {
+		px = pr->performance.platform_limit;
+		if (pr->limit.user.px > px)
+			px = pr->limit.user.px;
+		if (pr->limit.thermal.px > px)
+			px = pr->limit.thermal.px;
+
+		result = acpi_processor_set_performance(pr, px);
+		if (0 != result)
+			goto end;
+	}
+
+	if (pr->flags.throttling) {
+		if (pr->limit.user.tx > tx)
+			tx = pr->limit.user.tx;
+		if (pr->limit.thermal.tx > tx)
+			tx = pr->limit.thermal.tx;
+
+		result = acpi_processor_set_throttling(pr, tx);
+		if (0 != result)
+			goto end;
+	}
+
+	pr->limit.state.px = px;
+	pr->limit.state.tx = tx;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d] limit set to (P%d:T%d)\n",
+		pr->id,
+		pr->limit.state.px,
+		pr->limit.state.tx));
+
+end:
+	if (0 != result)
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to set limit\n"));
+
+	return_VALUE(result);
+}
+
+
 int
-acpi_processor_set_limit (
+acpi_processor_set_thermal_limit (
 	acpi_handle		handle,
-	int			type,
-	int			*state)
+	int			type)
 {
 	int			result = 0;
 	struct acpi_processor	*pr = NULL;
 	struct acpi_device	*device = NULL;
+	int			px = 0;
+	int			tx = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_processor_set_limit");
+	ACPI_FUNCTION_TRACE("acpi_processor_set_thermal_limit");
 
-	if (!state)
+	if ((type < ACPI_PROCESSOR_LIMIT_NONE) 
+		|| (type > ACPI_PROCESSOR_LIMIT_DECREMENT))
 		return_VALUE(-EINVAL);
 
 	result = acpi_bus_get_device(handle, &device);
@@ -999,56 +1425,75 @@ acpi_processor_set_limit (
 	if (!pr->flags.limit)
 		return_VALUE(-ENODEV);
 
+	/* Thermal limits are always relative to the current Px/Tx state. */
+	if (pr->flags.performance)
+		pr->limit.thermal.px = pr->performance.state;
+	if (pr->flags.throttling)
+		pr->limit.thermal.tx = pr->throttling.state;
+
+	/*
+	 * Our default policy is to only use throttling at the lowest
+	 * performance state.
+	 */
+
 	switch (type) {
+
 	case ACPI_PROCESSOR_LIMIT_NONE:
-		*state = 0;
-		pr->limit.state = 0;
+		px = 0;
+		tx = 0;
 		break;
+
 	case ACPI_PROCESSOR_LIMIT_INCREMENT:
-		if (*state == (pr->limit.state_count - 1)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Already at maximum limit state\n"));
-			return_VALUE(1);
+		if (pr->flags.performance) {
+			if (px == (pr->performance.state_count - 1))
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"At maximum performance state\n"));
+			else {
+				px++;
+				goto end;
+			}
 		}
-		*state = ++pr->limit.state;
+		if (pr->flags.throttling) {
+			if (tx == (pr->throttling.state_count - 1))
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"At maximum throttling state\n"));
+			else
+				tx++;
+		}
 		break;
+
 	case ACPI_PROCESSOR_LIMIT_DECREMENT:
-		if (*state == 0) {
-			ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Already at minimum limit state\n"));
-			return_VALUE(1);
+		if (pr->flags.performance) {
+			if (px == pr->performance.platform_limit)
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"At minimum performance state\n"));
+			else  {
+				px--;
+				goto end;
+			}
 		}
-		*state = --pr->limit.state;
+		if (pr->flags.throttling) {
+			if (tx == 0)
+				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"At minimum throttling state\n"));
+			else
+				tx--;
+		}
 		break;
-	default:
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid limit type [%d]\n",
-			type));
-		*state = pr->limit.state;
-		return_VALUE(-EINVAL);
-		break;
 	}
-
-	if (pr->flags.performance) {
-		result = acpi_processor_set_performance(pr, 
-			pr->limit.states[*state].px);
-		if (0 != result)
-			goto end;
-	}
-
-	if (pr->flags.throttling) {
-		result = acpi_processor_set_throttling(pr, 
-			pr->limit.states[*state].tx);
-		if (0 != result)
-			goto end;
-	}
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d] limit now %d%% (P%d:T%d)\n",
-		pr->id,
-		pr->limit.states[*state].performance / 10,
-		pr->limit.states[*state].px,
-		pr->limit.states[*state].tx));
 
 end:
+	pr->limit.thermal.px = px;
+	pr->limit.thermal.tx = tx;
+
+	result = acpi_processor_apply_limit(pr);
 	if (0 != result)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unable to set limit\n"));
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Unable to set thermal limit\n"));
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Thermal limit now (P%d:T%d)\n",
+		pr->limit.thermal.px,
+		pr->limit.thermal.tx));
 
 	return_VALUE(result);
 }
@@ -1058,58 +1503,12 @@ static int
 acpi_processor_get_limit_info (
 	struct acpi_processor	*pr)
 {
-	int			i = 0;
-	int			px = 0;
-	int			tx = 0;
-	int			base_perf = 1000;
-	int			throttle = 0;
-
 	ACPI_FUNCTION_TRACE("acpi_processor_get_limit_info");
 
 	if (!pr)
 		return_VALUE(-EINVAL);
 
-	/*
-	 * Limit
-	 * -----
-	 * Our default policy is to only use throttling at the lowest
-	 * performance state.  This is enforced by adding throttling states 
-	 * after perormance states.  We also only expose throttling states 
-	 * less than the maximum throttle value (e.g. 50%).
-	 */
-
-	if (pr->flags.performance) {
-		for (px=0; px<pr->performance.state_count; px++) {
-			if (!pr->performance.states[px].valid)
-				continue;
-			i = pr->limit.state_count++;
-			pr->limit.states[i].px = px;
-			pr->limit.states[i].performance = (pr->performance.states[px].core_frequency / pr->performance.states[0].core_frequency) * 1000;
-			pr->limit.states[i].valid = 1;
-		}
-		px--;
-		base_perf = pr->limit.states[i].performance;
-	}
-
-	if (pr->flags.throttling) {
-		for (tx=0; tx<pr->throttling.state_count; tx++) {
-			if (!pr->throttling.states[tx].valid)
-				continue;
-			if (pr->throttling.states[tx].performance > ACPI_PROCESSOR_MAX_THROTTLE)
-				continue;
-			i = pr->limit.state_count++;
-			pr->limit.states[i].px = px;
-			pr->limit.states[i].tx = tx;
-			throttle = (base_perf * pr->throttling.states[tx].performance) / 1000;
-			pr->limit.states[i].performance = base_perf - throttle;
-			pr->limit.states[i].valid = 1;
-		}
-	}
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d limit states\n", 
-		pr->limit.state_count));
-
-	if (pr->limit.state_count)
+	if (pr->flags.performance || pr->flags.throttling)
 		pr->flags.limit = 1;
 
 	return_VALUE(0);
@@ -1278,11 +1677,11 @@ acpi_processor_read_performance (
 	p += sprintf(p, "states:\n");
 
 	for (i=0; i<pr->performance.state_count; i++)
-		p += sprintf(p, "   %cP%d:                %d Mhz, %d mW %s\n",
+		p += sprintf(p, "   %cP%d:                  %d Mhz, %d mW, %d uS\n",
 			(i == pr->performance.state?'*':' '), i,
-			pr->performance.states[i].core_frequency,
-			pr->performance.states[i].power,
-			(pr->performance.states[i].valid?"":"(disabled)"));
+			(u32) pr->performance.states[i].core_frequency,
+			(u32) pr->performance.states[i].power,
+			(u32) pr->performance.states[i].transition_latency);
 
 end:
 	len = (p - page);
@@ -1316,8 +1715,8 @@ acpi_processor_write_performance (
 		return_VALUE(-EFAULT);
 	
 	state_string[count] = '\0';
-	
-	result = acpi_processor_set_throttling(pr, 
+
+	result = acpi_processor_set_performance(pr, 
 		simple_strtoul(state_string, NULL, 0));
 	if (0 != result)
 		return_VALUE(result);
@@ -1339,6 +1738,7 @@ acpi_processor_read_throttling (
 	char			*p = page;
 	int			len = 0;
 	int			i = 0;
+	int                     result = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_read_throttling");
 
@@ -1347,6 +1747,13 @@ acpi_processor_read_throttling (
 
 	if (!(pr->throttling.state_count > 0)) {
 		p += sprintf(p, "<not supported>\n");
+		goto end;
+	}
+
+	result = acpi_processor_get_throttling(pr);
+
+	if (result) {
+		p += sprintf(p, "Could not determine current throttling state.\n");
 		goto end;
 	}
 
@@ -1359,10 +1766,9 @@ acpi_processor_read_throttling (
 	p += sprintf(p, "states:\n");
 
 	for (i=0; i<pr->throttling.state_count; i++)
-		p += sprintf(p, "   %cT%d:                  %02d%% %s\n",
+		p += sprintf(p, "   %cT%d:                  %02d%%\n",
 			(i == pr->throttling.state?'*':' '), i,
-			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0),
-			(pr->throttling.states[i].valid?"":"(disabled)"));
+			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
 	len = (p - page);
@@ -1418,7 +1824,6 @@ acpi_processor_read_limit (
 	struct acpi_processor	*pr = (struct acpi_processor *) data;
 	char			*p = page;
 	int			len = 0;
-	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_read_limit");
 
@@ -1430,22 +1835,17 @@ acpi_processor_read_limit (
 		goto end;
 	}
 
-	p += sprintf(p, "state count:             %d\n",
-		pr->limit.state_count);
+	p += sprintf(p, "active limit:            P%d:T%d\n",
+		pr->limit.state.px, pr->limit.state.tx);
 
-	p += sprintf(p, "active state:            L%d\n",
-		pr->limit.state);
+	p += sprintf(p, "platform limit:          P%d:T0\n",
+		pr->flags.performance?pr->performance.platform_limit:0);
 
-	p += sprintf(p, "states:\n");
+	p += sprintf(p, "user limit:              P%d:T%d\n",
+		pr->limit.user.px, pr->limit.user.tx);
 
-	for (i=0; i<pr->limit.state_count; i++)
-		p += sprintf(p, "   %cL%d:                  %02d%% [P%d:T%d] %s\n",
-			(i == pr->limit.state?'*':' '),
-			i,
-			pr->limit.states[i].performance / 10,
-			pr->limit.states[i].px,
-			pr->limit.states[i].tx,
-			pr->limit.states[i].valid?"":"(disabled)");
+	p += sprintf(p, "thermal limit:           P%d:T%d\n",
+		pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
 	len = (p - page);
@@ -1468,25 +1868,47 @@ acpi_processor_write_limit (
 {
 	int			result = 0;
 	struct acpi_processor	*pr = (struct acpi_processor *) data;
-	char			limit_string[12] = {'\0'};
-	int			limit = 0;
-	int			state = 0;
+	char			limit_string[25] = {'\0'};
+	int			px = 0;
+	int			tx = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_write_limit");
 
-	if (!pr || (count > sizeof(limit_string) - 1))
+	if (!pr || (count > sizeof(limit_string) - 1)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid argument\n"));
 		return_VALUE(-EINVAL);
+	}
 	
-	if (copy_from_user(limit_string, buffer, count))
+	if (copy_from_user(limit_string, buffer, count)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data\n"));
 		return_VALUE(-EFAULT);
+	}
 	
 	limit_string[count] = '\0';
 
-	limit = simple_strtoul(limit_string, NULL, 0);
-	
-	result = acpi_processor_set_limit(pr->handle, limit, &state);
-	if (0 != result)
-		return_VALUE(result);
+	if (sscanf(limit_string, "%d:%d", &px, &tx) != 2) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data format\n"));
+		return_VALUE(-EINVAL);
+	}
+
+	if (pr->flags.performance) {
+		if ((px < pr->performance.platform_limit) 
+			|| (px > (pr->performance.state_count - 1))) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid px\n"));
+			return_VALUE(-EINVAL);
+		}
+		pr->limit.user.px = px;
+	}
+
+	if (pr->flags.throttling) {
+		if ((tx < 0) || (tx > (pr->throttling.state_count - 1))) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid tx\n"));
+			return_VALUE(-EINVAL);
+		}
+		pr->limit.user.tx = tx;
+	}
+
+	result = acpi_processor_apply_limit(pr);
 
 	return_VALUE(count);
 }
@@ -1564,7 +1986,7 @@ acpi_processor_add_fs (
 		entry->data = acpi_driver_data(device);
 	}
 
-	/* 'thermal_limit' [R/W] */
+	/* 'limit' [R/W] */
 	entry = create_proc_entry(ACPI_PROCESSOR_FILE_LIMIT,
 		S_IFREG|S_IRUGO|S_IWUSR, acpi_device_dir(device));
 	if (!entry)
@@ -1617,10 +2039,10 @@ acpi_processor_get_info (
 
 #ifdef CONFIG_SMP
 	if (smp_num_cpus > 1)
-		acpi_processor_smp = smp_num_cpus;
+		errata.smp = smp_num_cpus;
 #endif
 
-	acpi_processor_get_errata(pr);
+	acpi_processor_errata(pr);
 
 	/*
 	 * Check to see if we have bus mastering arbitration control.  This
@@ -1687,6 +2109,7 @@ acpi_processor_notify (
 	u32			event,
 	void			*data)
 {
+	int			result = 0;
 	struct acpi_processor	*pr = (struct acpi_processor *) data;
 	struct acpi_device	*device = NULL;
 
@@ -1700,7 +2123,15 @@ acpi_processor_notify (
 
 	switch (event) {
 	case ACPI_PROCESSOR_NOTIFY_PERFORMANCE:
+		result = acpi_processor_get_platform_limit(pr);
+		if (0 == result)
+			acpi_processor_apply_limit(pr);
+
+		acpi_bus_generate_event(device, event, 
+			pr->performance.platform_limit);
+		break;
 	case ACPI_PROCESSOR_NOTIFY_POWER:
+		/* TBD */
 		acpi_bus_generate_event(device, event, 0);
 		break;
 	default:
@@ -1745,9 +2176,6 @@ acpi_processor_add (
 	if (0 != result)
 		goto end;
 
-	/*
-	 * TBD: Fix notify handler installation for processors.
-	 *
 	status = acpi_install_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
 		acpi_processor_notify, pr);
 	if (ACPI_FAILURE(status)) {
@@ -1756,16 +2184,13 @@ acpi_processor_add (
 		result = -ENODEV;
 		goto end;
 	}
-	*/
 
-	acpi_processor_list[pr->id] = pr;
+	processors[pr->id] = pr;
 
 	/*
-	 * Set Idle Handler
-	 * ----------------
-	 * Install the idle handler if power management (states other than C1)
-	 * is supported.  Note that the default idle handler (default_idle)
-	 * will be used on platforms that only support C1.
+	 * Install the idle handler if processor power management is supported.
+	 * Note that the default idle handler (default_idle) will be used on 
+	 * platforms that only support C1.
 	 */
 	if ((pr->id == 0) && (pr->flags.power)) {
 		pm_idle_save = pm_idle;
@@ -1781,8 +2206,6 @@ acpi_processor_add (
 		printk(", %d performance states", pr->performance.state_count);
 	if (pr->flags.throttling)
 		printk(", %d throttling states", pr->throttling.state_count);
-	if (pr->errata.piix4.bmisx)
-		printk(", PIIX4 errata");
 	printk(")\n");
 
 end:
@@ -1810,7 +2233,10 @@ acpi_processor_remove (
 
 	pr = (struct acpi_processor *) acpi_driver_data(device);
 
-	/*
+	/* Unregister the idle handler when processor #0 is removed. */
+	if (pr->id == 0)
+		pm_idle = pm_idle_save;
+
 	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY, 
 		acpi_processor_notify);
 	if (ACPI_FAILURE(status)) {
@@ -1818,15 +2244,10 @@ acpi_processor_remove (
 			"Error removing notify handler\n"));
 		return_VALUE(-ENODEV);
 	}
-	*/
-
-	/* Unregister the idle handler when processor #0 is removed. */
-	if (pr->id == 0)
-		pm_idle = pm_idle_save;
 
 	acpi_processor_remove_fs(device);
 
-	acpi_processor_list[pr->id] = NULL;
+	processors[pr->id] = NULL;
 
 	kfree(pr);
 
@@ -1841,7 +2262,8 @@ acpi_processor_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_processor_init");
 
-	memset(&acpi_processor_list, 0, sizeof(acpi_processor_list));
+	memset(&processors, 0, sizeof(processors));
+	memset(&errata, 0, sizeof(errata));
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (0 > result)

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 59 $
+ *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -329,7 +329,7 @@ acpi_ex_load_op (
 		 * Read the entire field and thus the entire table.  Buffer is
 		 * allocated during the read.
 		 */
-		status = acpi_ex_read_data_from_field (obj_desc, &buffer_desc);
+		status = acpi_ex_read_data_from_field (walk_state, obj_desc, &buffer_desc);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}

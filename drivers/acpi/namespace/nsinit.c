@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsinit - namespace initialization
- *              $Revision: 41 $
+ *              $Revision: 43 $
  *
  *****************************************************************************/
 
@@ -59,15 +59,11 @@ acpi_ns_initialize_objects (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"**** Starting initialization of namespace objects ****\n"));
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Completing Region and Field initialization:"));
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Completing Region/Field/Buffer/Package initialization:"));
 
+	/* Set all init info to zero */
 
-	info.field_count = 0;
-	info.field_init = 0;
-	info.op_region_count = 0;
-	info.op_region_init = 0;
-	info.object_count = 0;
-
+	ACPI_MEMSET (&info, 0, sizeof (acpi_init_walk_info));
 
 	/* Walk entire namespace from the supplied root */
 
@@ -79,9 +75,11 @@ acpi_ns_initialize_objects (
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
-		"\n%d/%d Regions, %d/%d Fields initialized (%d nodes total)\n",
-		info.op_region_init, info.op_region_count, info.field_init,
-		info.field_count, info.object_count));
+		"\n Initialized %d/%d Regions %d/%d Fields %d/%d Buffers %d/%d Packages (%d nodes)\n",
+		info.op_region_init, info.op_region_count,
+		info.field_init,    info.field_count,
+		info.buffer_init,   info.buffer_count,
+		info.package_init,  info.package_count, info.object_count));
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"%d Control Methods found\n", info.method_count));
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -118,12 +116,15 @@ acpi_ns_initialize_devices (
 	ACPI_FUNCTION_TRACE ("Ns_initialize_devices");
 
 
+	/* Init counters */
+
 	info.device_count = 0;
 	info.num_STA = 0;
 	info.num_INI = 0;
 
+	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Executing all Device _STA and_INI methods:"));
 
-	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "Executing device _INI methods:"));
+	/* Walk namespace for all objects of type Device */
 
 	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT,
 			  ACPI_UINT32_MAX, FALSE, acpi_ns_init_one_device, &info, NULL);
@@ -132,9 +133,8 @@ acpi_ns_initialize_devices (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed! %x\n", status));
 	}
 
-
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK,
-		"\n%d Devices found: %d _STA, %d _INI\n",
+		"\n%d Devices found containing: %d _STA, %d _INI methods\n",
 		info.device_count, info.num_STA, info.num_INI));
 
 	return_ACPI_STATUS (status);
@@ -180,7 +180,6 @@ acpi_ns_init_one_object (
 
 	info->object_count++;
 
-
 	/* And even then, we are only interested in a few object types */
 
 	type = acpi_ns_get_type (obj_handle);
@@ -189,11 +188,37 @@ acpi_ns_init_one_object (
 		return (AE_OK);
 	}
 
-	if ((type != ACPI_TYPE_REGION) &&
-		(type != ACPI_TYPE_BUFFER_FIELD)) {
+	/* Increment counters for object types we are looking for */
+
+	switch (type) {
+	case ACPI_TYPE_REGION:
+		info->op_region_count++;
+		break;
+
+	case ACPI_TYPE_BUFFER_FIELD:
+		info->field_count++;
+		break;
+
+	case ACPI_TYPE_BUFFER:
+		info->buffer_count++;
+		break;
+
+	case ACPI_TYPE_PACKAGE:
+		info->package_count++;
+		break;
+
+	default:
+
+		/* No init required, just exit now */
 		return (AE_OK);
 	}
 
+	/*
+	 * If the object is already initialized, nothing else to do
+	 */
+	if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
+		return (AE_OK);
+	}
 
 	/*
 	 * Must lock the interpreter before executing AML code
@@ -203,61 +228,53 @@ acpi_ns_init_one_object (
 		return (status);
 	}
 
+	/*
+	 * Each of these types can contain executable AML code within
+	 * the declaration.
+	 */
 	switch (type) {
-
 	case ACPI_TYPE_REGION:
-
-		info->op_region_count++;
-		if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
-			break;
-		}
 
 		info->op_region_init++;
 		status = acpi_ds_get_region_arguments (obj_desc);
-		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"%s while getting region arguments [%4.4s]\n",
-					acpi_format_exception (status), (char *) &node->name));
-		}
-
-		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
-		}
-
 		break;
 
 
 	case ACPI_TYPE_BUFFER_FIELD:
 
-		info->field_count++;
-		if (obj_desc->common.flags & AOPOBJ_DATA_VALID) {
-			break;
-		}
-
 		info->field_init++;
 		status = acpi_ds_get_buffer_field_arguments (obj_desc);
-		if (ACPI_FAILURE (status)) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"%s while getting buffer field arguments [%4.4s]\n",
-					acpi_format_exception (status), (char *) &node->name));
-		}
-		if (!(acpi_dbg_level & ACPI_LV_INIT)) {
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
-		}
-
-
 		break;
 
-	default:
+
+	case ACPI_TYPE_BUFFER:
+
+		info->buffer_init++;
+		status = acpi_ds_get_buffer_arguments (obj_desc);
+		break;
+
+
+	case ACPI_TYPE_PACKAGE:
+
+		info->package_init++;
+		status = acpi_ds_get_package_arguments (obj_desc);
 		break;
 	}
 
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR, "\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Could not execute arguments for [%4.4s] (%s), %s\n",
+				(char *) &node->name, acpi_ut_get_type_name (type), acpi_format_exception (status)));
+	}
+
+	if (!(acpi_dbg_level & ACPI_LV_INIT)) {
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_OK, "."));
+	}
 
 	/*
 	 * We ignore errors from above, and always return OK, since
-	 * we don't want to abort the walk on a single error.
+	 * we don't want to abort the walk on any single error.
 	 */
 	acpi_ex_exit_interpreter ();
 	return (AE_OK);
@@ -334,7 +351,6 @@ acpi_ns_init_one_device (
 
 		return_ACPI_STATUS(AE_CTRL_DEPTH);
 	}
-
 
 	/*
 	 * The device is present. Run _INI.

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 30 $
+ *              $Revision: 32 $
  *
  *****************************************************************************/
 
@@ -215,8 +215,7 @@ acpi_ex_convert_to_buffer (
 		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
 			/*
 			 * We are running a method that exists in a 32-bit ACPI table.
-			 * Truncate the value to 32 bits by zeroing out the upper
-			 * 32-bit field
+			 * Use only 32 bits of the Integer for conversion.
 			 */
 			integer_size = sizeof (u32);
 		}
@@ -259,6 +258,9 @@ acpi_ex_convert_to_buffer (
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
+	/* Mark buffer initialized */
+
+	(*result_desc)->common.flags |= AOPOBJ_DATA_VALID;
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -399,8 +401,7 @@ acpi_ex_convert_to_string (
 		if (walk_state->method_node->flags & ANOBJ_DATA_WIDTH_32) {
 			/*
 			 * We are running a method that exists in a 32-bit ACPI table.
-			 * Truncate the value to 32 bits by zeroing out the upper
-			 * 32-bit field
+			 * Use only 32 bits of the Integer
 			 */
 			integer_size = sizeof (u32);
 		}

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 145 $
+ *              $Revision: 147 $
  *
  *****************************************************************************/
 
@@ -149,7 +149,7 @@ acpi_ex_dump_operand (
 	ACPI_FUNCTION_NAME ("Ex_dump_operand")
 
 
-	if (!((ACPI_LV_INFO & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
+	if (!((ACPI_LV_EXEC & acpi_dbg_level) && (_COMPONENT & acpi_dbg_layer))) {
 		return (AE_OK);
 	}
 
@@ -159,25 +159,25 @@ acpi_ex_dump_operand (
 		 * since most (if not all)
 		 * code that dumps the stack expects something to be there!
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Null stack entry ptr\n"));
+		acpi_os_printf ("Null stack entry ptr\n");
 		return (AE_OK);
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%p NS Node: ", obj_desc));
-		ACPI_DUMP_ENTRY (obj_desc, ACPI_LV_INFO);
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p NS Node: ", obj_desc));
+		ACPI_DUMP_ENTRY (obj_desc, ACPI_LV_EXEC);
 		return (AE_OK);
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_INTERNAL) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%p is not a local object\n", obj_desc));
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p is not a local object\n", obj_desc));
 		ACPI_DUMP_BUFFER (obj_desc, sizeof (acpi_operand_object));
 		return (AE_OK);
 	}
 
 	/*  Obj_desc is a valid object */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%p ", obj_desc));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
 
 	switch (obj_desc->common.type) {
 	case INTERNAL_TYPE_REFERENCE:
@@ -427,7 +427,7 @@ acpi_ex_dump_operand (
 
 		if (!obj_desc->buffer_field.buffer_obj)
 		{
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "*NULL* \n"));
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL* \n"));
 		}
 
 		else if (ACPI_TYPE_BUFFER !=
@@ -541,7 +541,7 @@ acpi_ex_dump_operands (
 	}
 
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 		"************* Operand Stack Contents (Opcode [%s], %d Operands)\n",
 		ident, num_levels));
 
@@ -562,7 +562,7 @@ acpi_ex_dump_operands (
 		}
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 		"************* Stack dump from %s(%d), %s\n",
 		module_name, line_number, note));
 	return;
@@ -734,7 +734,6 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("Flags",        obj_desc->package.flags);
 		acpi_ex_out_integer ("Count",        obj_desc->package.count);
 		acpi_ex_out_pointer ("Elements",     obj_desc->package.elements);
-		acpi_ex_out_pointer ("Next_element", obj_desc->package.next_element);
 
 		/* Dump the package contents */
 

@@ -12,11 +12,11 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <asm/byteorder.h>
-#include <asm/atomic.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/completion.h>
+#include <linux/delay.h>
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #endif
@@ -61,70 +61,122 @@ static rwlock_t unit_directory_lock = RW_LOCK_UNLOCKED;
 static LIST_HEAD(host_info_list);
 static spinlock_t host_info_lock = SPIN_LOCK_UNLOCKED;
 
+/* Disables use of the hotplug calls.  */
+static int nodemgr_disable_hotplug = 0;
+
 struct host_info {
 	struct hpsb_host *host;
 	struct list_head list;
-	struct completion started;
 	struct completion exited;
-	wait_queue_head_t wait;
+	struct semaphore reset_sem;
 	int pid;
 };
 
 #ifdef CONFIG_PROC_FS
 
-static int raw1394_read_proc(char *buffer, char **start, off_t offset,
-			     int size, int *eof, void *data )
+#define PUTF(fmt, args...) out += sprintf(out, fmt, ## args)
+
+static int raw1394_read_proc(char *page, char **start, off_t off,
+			     int count, int *eof, void *data)
 {
 	struct list_head *lh;
 	struct node_entry *ne;
-	int disp_size = 0;
-	char display_str[1024];
+	int len;
+	char *out = page;
 
-#define PUTF(fmt, args...) disp_size += sprintf(display_str, fmt, ## args); strcat(buffer,display_str)
-	buffer[0] = '\0';
 	list_for_each(lh, &node_list) {
+		struct list_head *l;
+		int ud_count = 0;
+
 		ne = list_entry(lh, struct node_entry, list);
 		if (!ne)
 			continue;
+
 		PUTF("Node[" NODE_BUS_FMT "]  GUID[%016Lx]:\n",
 		     NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid);
-		if (ne->host != NULL && ne->host->node_id == ne->nodeid) {
-			PUTF("\tNodes connected : %d\n", ne->host->node_count);
-			PUTF("\tSelfIDs received: %d\n", ne->host->selfid_count);
-			PUTF("\tOwn ID          : 0x%08x\n",ne->host->node_id);
-			PUTF("\tIrm ID          : 0x%08x\n",ne->host->irm_id);
-			PUTF("\tBusMgr ID       : 0x%08x\n",ne->host->busmgr_id);
-			PUTF("\tBR IR IC II IB\n");
-			PUTF("\t%02d %02d %02d %02d %02d\n",
-			     ne->host->in_bus_reset, ne->host->is_root,
-			     ne->host->is_cycmst, ne->host->is_irm,
-			     ne->host->is_busmgr);
-		}
-		PUTF("\tVendor ID: %s [0x%06x]\n",
+
+		/* Generic Node information */
+		PUTF("  Vendor ID: `%s' [0x%06x]\n",
 		     ne->vendor_name ?: "Unknown", ne->vendor_id);
-		PUTF("\tCapabilities: 0x%06x\n", ne->capabilities);
-		PUTF("\tirmc=%d cmc=%d isc=%d bmc=%d pmc=%d cyc_clk_acc=%d max_rec=%d gen=%d lspd=%d\n",
+		PUTF("  Capabilities: 0x%06x\n", ne->capabilities);
+		PUTF("  Bus Options:\n");
+		PUTF("    IRMC(%d) CMC(%d) ISC(%d) BMC(%d) PMC(%d) GEN(%d)\n"
+		     "    LSPD(%d) MAX_REC(%d) CYC_CLK_ACC(%d)\n",
 		     ne->busopt.irmc, ne->busopt.cmc, ne->busopt.isc, ne->busopt.bmc,
-		     ne->busopt.pmc, ne->busopt.cyc_clk_acc, ne->busopt.max_rec,
-		     ne->busopt.generation, ne->busopt.lnkspd);
+		     ne->busopt.pmc, ne->busopt.generation, ne->busopt.lnkspd,
+		     ne->busopt.max_rec, ne->busopt.cyc_clk_acc);
+
+		/* If this is the host entry, output some info about it aswell */
+		if (ne->host != NULL && ne->host->node_id == ne->nodeid) {
+			PUTF("  Host Node Status:\n");
+			PUTF("    Host Driver     : %s\n", ne->host->driver->name);
+			PUTF("    Nodes connected : %d\n", ne->host->node_count);
+			PUTF("    Nodes active    : %d\n", ne->host->nodes_active);
+			PUTF("    SelfIDs received: %d\n", ne->host->selfid_count);
+			PUTF("    Irm ID          : [" NODE_BUS_FMT "]\n",
+			     NODE_BUS_ARGS(ne->host->irm_id));
+			PUTF("    BusMgr ID       : [" NODE_BUS_FMT "]\n",
+			     NODE_BUS_ARGS(ne->host->busmgr_id));
+			PUTF("    In Bus Reset    : %s\n", ne->host->in_bus_reset ? "yes" : "no");
+			PUTF("    Root            : %s\n", ne->host->is_root ? "yes" : "no");
+			PUTF("    Cycle Master    : %s\n", ne->host->is_cycmst ? "yes" : "no");
+			PUTF("    IRM             : %s\n", ne->host->is_irm ? "yes" : "no");
+			PUTF("    Bus Manager     : %s\n", ne->host->is_busmgr ? "yes" : "no");
+		}
+
+		/* Now the unit directories */
+		list_for_each (l, &ne->unit_directories) {
+			struct unit_directory *ud = list_entry (l, struct unit_directory, node_list);
+			PUTF("  Unit Directory %d:\n", ud_count++);
+			if (ud->flags & UNIT_DIRECTORY_VENDOR_ID)
+				PUTF("    Vendor/Model ID: %s [%06x]",
+				     ud->vendor_name ?: "Unknown", ud->vendor_id);
+			else if (ud->flags & UNIT_DIRECTORY_MODEL_ID) /* Have to put something */
+				PUTF("    Vendor/Model ID: %s [%06x]",
+				      ne->vendor_name ?: "Unknown", ne->vendor_id);
+			if (ud->flags & UNIT_DIRECTORY_MODEL_ID)
+				PUTF(" / %s [%06x]", ud->model_name ?: "Unknown", ud->model_id);
+			PUTF("\n");
+			if (ud->flags & UNIT_DIRECTORY_SPECIFIER_ID)
+				PUTF("    Software Specifier ID: %06x\n", ud->specifier_id);
+			if (ud->flags & UNIT_DIRECTORY_VERSION)
+				PUTF("    Software Version: %06x\n", ud->version);
+			if (ud->driver)
+				PUTF("    Driver: %s\n", ud->driver->name);
+			PUTF("    Length (in quads): %d\n", ud->count);
+		}
+
 	}
-#undef PUTF
-    return disp_size;
+
+	len = out - page;
+	len -= off;
+	if (len < count) {
+		*eof = 1;
+		if (len <= 0)
+			return 0;
+	} else
+		len = count;
+
+        *start = page + off;
+
+	return len;
 }
+
+#undef PUTF
 #endif /* CONFIG_PROC_FS */
 
 static void nodemgr_process_config_rom(struct node_entry *ne, 
 				       quadlet_t busoptions);
 
 static int nodemgr_read_quadlet(struct hpsb_host *host,
-				nodeid_t nodeid, octlet_t address,
-				quadlet_t *quad)
+				nodeid_t nodeid, unsigned int generation,
+				octlet_t address, quadlet_t *quad)
 {
 	int i;
 	int ret = 0;
 
 	for (i = 0; i < 3; i++) {
-		ret = hpsb_read(host, nodeid, address, quad, 4);
+		ret = hpsb_read(host, nodeid, generation, address, quad, 4);
 		if (ret != -EAGAIN)
 			break;
 	}
@@ -134,17 +186,17 @@ static int nodemgr_read_quadlet(struct hpsb_host *host,
 }
 
 static int nodemgr_size_text_leaf(struct hpsb_host *host,
-				  nodeid_t nodeid,
+				  nodeid_t nodeid, unsigned int generation,
 				  octlet_t address)
 {
 	quadlet_t quad;
 	int size = 0;
-	if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 		return -1;
 	if (CONFIG_ROM_KEY(quad) == CONFIG_ROM_DESCRIPTOR_LEAF) {
 		/* This is the offset.  */
 		address += 4 * CONFIG_ROM_VALUE(quad); 
-		if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+		if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 			return -1;
 		/* Now we got the size of the text descriptor leaf. */
 		size = CONFIG_ROM_LEAF_LENGTH(quad);
@@ -152,21 +204,20 @@ static int nodemgr_size_text_leaf(struct hpsb_host *host,
 	return size;
 }
 
-static int nodemgr_read_text_leaf(struct hpsb_host *host,
-				  nodeid_t nodeid,
+static int nodemgr_read_text_leaf(struct node_entry *ne,
 				  octlet_t address,
 				  quadlet_t *quadp)
 {
 	quadlet_t quad;
 	int i, size, ret;
 
-	if (nodemgr_read_quadlet(host, nodeid, address, &quad)
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad)
 	    && CONFIG_ROM_KEY(quad) != CONFIG_ROM_DESCRIPTOR_LEAF)
 		return -1;
 
 	/* This is the offset.  */
 	address += 4 * CONFIG_ROM_VALUE(quad);
-	if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad))
 		return -1;
 
 	/* Now we got the size of the text descriptor leaf. */
@@ -176,7 +227,7 @@ static int nodemgr_read_text_leaf(struct hpsb_host *host,
 
 	address += 4;
 	for (i = 0; i < 2; i++, address += 4, quadp++) {
-		if (nodemgr_read_quadlet(host, nodeid, address, quadp))
+		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, quadp))
 			return -1;
 	}
 
@@ -184,7 +235,7 @@ static int nodemgr_read_text_leaf(struct hpsb_host *host,
 	ret = -ENXIO;
 	for (; size > 0; size--, address += 4, quadp++) {
 		for (i = 0; i < 3; i++) {
-			ret = hpsb_read(host, nodeid, address, quadp, 4);
+			ret = hpsb_read(ne->host, ne->nodeid, ne->generation, address, quadp, 4);
 			if (ret != -EAGAIN)
 				break;
 		}
@@ -196,7 +247,7 @@ static int nodemgr_read_text_leaf(struct hpsb_host *host,
 }
 
 static struct node_entry *nodemgr_scan_root_directory
-	(struct hpsb_host *host, nodeid_t nodeid)
+	(struct hpsb_host *host, nodeid_t nodeid, unsigned int generation)
 {
 	octlet_t address;
 	quadlet_t quad;
@@ -206,11 +257,11 @@ static struct node_entry *nodemgr_scan_root_directory
 
 	address = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
 	
-	if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 		return NULL;
 	address += 4 + CONFIG_ROM_BUS_INFO_LENGTH(quad) * 4;
 
-	if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 		return NULL;
 	length = CONFIG_ROM_ROOT_LENGTH(quad);
 	address += 4;
@@ -218,30 +269,22 @@ static struct node_entry *nodemgr_scan_root_directory
 	size = 0;
 	total_size = sizeof(struct node_entry);
 	for (; length > 0; length--, address += 4) {
-		if (nodemgr_read_quadlet(host, nodeid, address, &quad))
+		if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 			return NULL;
 		code = CONFIG_ROM_KEY(quad);
 
-		if (code == CONFIG_ROM_VENDOR_ID) {
+		if (code == CONFIG_ROM_VENDOR_ID && length > 0) {
 			/* Check if there is a text descriptor leaf
 			   immediately after this.  */
-			length--;
-			if (length <= 0)
-				break;	
-			address += 4;
-			size = nodemgr_size_text_leaf(host, nodeid,
-						      address);
-			switch (size) {
-			case -1:
-				return NULL;
-				break;
-			case 0:
-				break;
-			default:
+			size = nodemgr_size_text_leaf(host, nodeid, generation,
+						      address + 4);
+			if (size > 0) {
+				address += 4;
+				length--;
 				total_size += (size + 1) * sizeof (quadlet_t);
-				break;
 			}
-			break;
+			else if (size < 0)
+				return NULL;
 		}
 	}
 	ne = kmalloc(total_size, SLAB_ATOMIC);
@@ -259,12 +302,13 @@ static struct node_entry *nodemgr_scan_root_directory
 }
 
 static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoptions,
-					      struct hpsb_host *host, nodeid_t nodeid)
+					      struct hpsb_host *host,
+					      nodeid_t nodeid, unsigned int generation)
 {
         struct node_entry *ne;
         unsigned long flags;
 
-	ne = nodemgr_scan_root_directory (host, nodeid);
+	ne = nodemgr_scan_root_directory (host, nodeid, generation);
         if (!ne) return NULL;
 
         INIT_LIST_HEAD(&ne->list);
@@ -272,7 +316,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
         ne->host = host;
         ne->nodeid = nodeid;
         ne->guid = guid;
-	atomic_set(&ne->generation, get_hpsb_generation(ne->host));
+	ne->generation = generation;
 
         write_lock_irqsave(&node_lock, flags);
         list_add_tail(&ne->list, &node_list);
@@ -281,7 +325,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 	nodemgr_process_config_rom (ne, busoptions);
 
 	HPSB_DEBUG("%s added: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
-		   (host->node_id == nodeid) ? "Local host" : "Device",
+		   (host->node_id == nodeid) ? "Host" : "Device",
 		   NODE_BUS_ARGS(nodeid), (unsigned long long)guid,
 		   ne->vendor_name ?: "Unknown");
 
@@ -323,7 +367,7 @@ static struct unit_directory *nodemgr_scan_unit_directory
 	int length, size, total_size, count;
 	int vendor_name_size, model_name_size;
 
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation, address, &quad))
 		return NULL;
 	length = CONFIG_ROM_DIRECTORY_LENGTH(quad) ;
 	address += 4;
@@ -338,8 +382,8 @@ static struct unit_directory *nodemgr_scan_unit_directory
 		int code;
 		quadlet_t value;
 
-retry:
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+					 address, &quad))
 			return NULL;
 		code = CONFIG_ROM_KEY(quad);
 		value = CONFIG_ROM_VALUE(quad);
@@ -373,32 +417,27 @@ retry:
 			break;
 		}
 
-		if (todo) {
+		if (todo && length > 0) {
 			/* Check if there is a text descriptor leaf
 			   immediately after this.  */
-			length--;
-			if (length <= 0)
-				break;
-			address += 4;
 			size = nodemgr_size_text_leaf(ne->host,
 						      ne->nodeid,
-						      address);
-			if (todo | UNIT_DIRECTORY_VENDOR_TEXT)
+						      ne->generation,
+						      address + 4);
+
+			if (todo == UNIT_DIRECTORY_VENDOR_TEXT)
 				vendor_name_size = size;
 			else
 				model_name_size = size;
-			switch (size) {
-			case -1:
-				return NULL;
-				break;
-			case 0:
-				goto retry;
-				break;
-			default:
+
+			if (size > 0) {
+				address += 4;
+				length--;
 				flags |= todo;
 				total_size += (size + 1) * sizeof (quadlet_t);
-				break;
 			}
+			else if (size < 0)
+				return NULL;
 		}
 	}
 	total_size += count * sizeof (quadlet_t);
@@ -435,7 +474,8 @@ static void nodemgr_process_unit_directory(struct node_entry *ne,
 	ud->ne = ne;
 	ud->address = address;
 
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+				 address, &quad))
 		goto unit_directory_error;
 	length = CONFIG_ROM_DIRECTORY_LENGTH(quad) ;
 	address += 4;
@@ -446,7 +486,8 @@ static void nodemgr_process_unit_directory(struct node_entry *ne,
 		quadlet_t value;
 		quadlet_t *quadp;
 
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+					 address, &quad))
 			goto unit_directory_error;
 		code = CONFIG_ROM_KEY(quad) ;
 		value = CONFIG_ROM_VALUE(quad);
@@ -459,9 +500,7 @@ static void nodemgr_process_unit_directory(struct node_entry *ne,
 				length--;
 				address += 4;
 				quadp = &(ud->quadlets[ud->count]);
-				if (nodemgr_read_text_leaf(ne->host,
-							   ne->nodeid,
-							   address,
+				if (nodemgr_read_text_leaf(ne, address,
 							   quadp) == 0
 				    && quadp[0] == 0
 				    && quadp[1] == 0) {
@@ -481,9 +520,7 @@ static void nodemgr_process_unit_directory(struct node_entry *ne,
 				length--;
 				address += 4;
 				quadp = &(ud->quadlets[ud->count + ud->vendor_name_size + 1]);
-				if (nodemgr_read_text_leaf(ne->host,
-							   ne->nodeid,
-							   address,
+				if (nodemgr_read_text_leaf(ne, address,
 							   quadp) == 0
 				    && quadp[0] == 0
 				    && quadp[1] == 0) {
@@ -568,11 +605,13 @@ static void nodemgr_process_root_directory(struct node_entry *ne)
 
 	address = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
 	
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+				 address, &quad))
 		return;
 	address += 4 + CONFIG_ROM_BUS_INFO_LENGTH(quad) * 4;
 
-	if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+				 address, &quad))
 		return;
 	length = CONFIG_ROM_ROOT_LENGTH(quad);
 	address += 4;
@@ -580,7 +619,8 @@ static void nodemgr_process_root_directory(struct node_entry *ne)
 	for (; length > 0; length--, address += 4) {
 		int code, value;
 
-		if (nodemgr_read_quadlet(ne->host, ne->nodeid, address, &quad))
+		if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
+					 address, &quad))
 			return;
 		code = CONFIG_ROM_KEY(quad);
 		value = CONFIG_ROM_VALUE(quad);
@@ -593,9 +633,7 @@ static void nodemgr_process_root_directory(struct node_entry *ne)
 			if (ne->vendor_name != NULL) {
 				length--;
 				address += 4;
-				if (nodemgr_read_text_leaf(ne->host,
-							   ne->nodeid,
-							   address,
+				if (nodemgr_read_text_leaf(ne, address,
 							   ne->quadlets)
 				    != 0
 				    || ne->quadlets [0] != 0
@@ -630,6 +668,10 @@ static void nodemgr_call_policy(char *verb, struct unit_directory *ud)
 {
 	char *argv [3], **envp, *buf, *scratch;
 	int i = 0, value;
+
+	/* User requested to disable hotplug when module was loaded. */
+	if (nodemgr_disable_hotplug)
+		return;
 
 	if (!hotplug_path [0])
 		return;
@@ -902,7 +944,8 @@ static void nodemgr_process_config_rom(struct node_entry *ne,
  * the to take whatever actions required.
  */
 static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
-                               struct hpsb_host *host, nodeid_t nodeid)
+                               struct hpsb_host *host,
+				nodeid_t nodeid, unsigned int generation)
 {
 	struct list_head *lh;
 	struct unit_directory *ud;
@@ -917,7 +960,7 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 		nodemgr_process_config_rom (ne, busoptions);
 
 	/* Since that's done, we can declare this record current */
-	atomic_set(&ne->generation, get_hpsb_generation(ne->host));
+	ne->generation = generation;
 
 	list_for_each (lh, &ne->unit_directories) {
 		ud = list_entry (lh, struct unit_directory, node_list);
@@ -926,73 +969,59 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 	}
 }
 
-static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid,
+static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned int generation,
 			      quadlet_t *buffer, int buffer_length)
 {
-	octlet_t base = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
-	int retries = 3;
-	int header_count;
+	octlet_t addr = CSR_REGISTER_BASE + CSR_CONFIG_ROM;
 	unsigned header_size;
-	quadlet_t quad;
-	int ret;
+	int i;
 
-retry_configrom:
-
-	if (!retries--) {
-		HPSB_ERR("Giving up on node " NODE_BUS_FMT
-			 " for ConfigROM probe, too many errors",
-			 NODE_BUS_ARGS(nodeid));
-		return -1;
-	}
-
-	header_count = 0;
-	header_size = 0;
+	/* IEEE P1212 says that devices should support 64byte block
+	 * reads, aligned on 64byte boundaries. That doesn't seem to
+	 * work though, and we are forced to doing quadlet sized
+	 * reads.  */
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 	HPSB_INFO("Initiating ConfigROM request for node " NODE_BUS_FMT,
 		  NODE_BUS_ARGS(nodeid));
 #endif
 
-	/* Now, P1212 says that devices should support 64byte block
-	 * reads, aligned on 64byte boundaries. That doesn't seem
-	 * to work though, and we are forced to doing quadlet
-	 * sized reads.  */
-
-	ret = hpsb_read(host, nodeid, base, &quad, 4);
-	if (ret) {
-		HPSB_ERR("ConfigROM quadlet transaction error (%d) for node " NODE_BUS_FMT,
-			 ret, NODE_BUS_ARGS(nodeid));
-		goto retry_configrom;
-	}
-	buffer[header_count++] = be32_to_cpu(quad);
-
-	header_size = buffer[0] >> 24;
-
-	if (header_size < 4) {
-		HPSB_INFO("Node " NODE_BUS_FMT " has non-standard ROM format (%d quads), "
-			  "cannot parse", NODE_BUS_ARGS(nodeid), header_size);
+	if (nodemgr_read_quadlet(host, nodeid, generation,
+				 addr, &buffer[0]) < 0) {
+		HPSB_ERR("ConfigROM quadlet transaction error for node "
+			 NODE_BUS_FMT, NODE_BUS_ARGS(nodeid));
 		return -1;
 	}
 
-	while (header_count <= header_size && header_count < buffer_length) {
-		ret = hpsb_read(host, nodeid, base + (header_count<<2), &quad, 4);
-		if (ret) {
-			HPSB_ERR("ConfigROM quadlet transaction error (%d) for " NODE_BUS_FMT,
-				 ret, NODE_BUS_ARGS(nodeid));
-			goto retry_configrom;
+	header_size = buffer[0] >> 24;
+	addr += 4;
+
+	if (header_size < 4) {
+		HPSB_INFO("Node " NODE_BUS_FMT " has non-standard ROM "
+			  "format (%d quads), cannot parse",
+			  NODE_BUS_ARGS(nodeid), header_size);
+		return -1;
+	}
+
+	for (i = 1; i < buffer_length; i++, addr += 4) {
+		if (nodemgr_read_quadlet(host, nodeid, generation,
+					 addr, &buffer[i]) < 0) {
+			HPSB_ERR("ConfigROM quadlet transaction "
+				 "error for node " NODE_BUS_FMT,
+				 NODE_BUS_ARGS(nodeid));
+			return -1;
 		}
-		buffer[header_count++] = be32_to_cpu(quad);
 	}
 
 	return 0;
-}
+}		
 
 static void nodemgr_remove_node(struct node_entry *ne)
 {
 	unsigned long flags;
 
 	HPSB_DEBUG("%s removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
-		   (ne->host->node_id == ne->nodeid) ? "Local host" : "Device",
+		   (ne->host->node_id == ne->nodeid) ? "Host" : "Device",
 		   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid,
 		   ne->vendor_name ?: "Unknown");
 
@@ -1007,7 +1036,8 @@ static void nodemgr_remove_node(struct node_entry *ne)
 
 /* This is where we probe the nodes for their information and provided
  * features.  */
-static void nodemgr_node_probe_one(struct hpsb_host *host, nodeid_t nodeid)
+static void nodemgr_node_probe_one(struct hpsb_host *host,
+				   nodeid_t nodeid, int generation)
 {
 	struct node_entry *ne;
 	quadlet_t buffer[5];
@@ -1016,7 +1046,8 @@ static void nodemgr_node_probe_one(struct hpsb_host *host, nodeid_t nodeid)
 	/* We need to detect when the ConfigROM's generation has changed,
 	 * so we only update the node's info when it needs to be.  */
 
-	if (read_businfo_block (host, nodeid, buffer, sizeof(buffer) >> 2))
+	if (read_businfo_block (host, nodeid, generation,
+				buffer, sizeof(buffer) >> 2))
 		return;
 
 	if (buffer[1] != IEEE1394_BUSID_MAGIC) {
@@ -1030,14 +1061,14 @@ static void nodemgr_node_probe_one(struct hpsb_host *host, nodeid_t nodeid)
 	ne = hpsb_guid_get_entry(guid);
 
 	if (!ne)
-		nodemgr_create_node(guid, buffer[2], host, nodeid);
+		nodemgr_create_node(guid, buffer[2], host, nodeid, generation);
 	else
-		nodemgr_update_node(ne, buffer[2], host, nodeid);
+		nodemgr_update_node(ne, buffer[2], host, nodeid, generation);
 
 	return;
 }
 
-static void nodemgr_node_probe_cleanup(struct hpsb_host *host)
+static void nodemgr_node_probe_cleanup(struct hpsb_host *host, unsigned int generation)
 {
 	unsigned long flags;
 	struct list_head *lh, *next;
@@ -1057,7 +1088,7 @@ static void nodemgr_node_probe_cleanup(struct hpsb_host *host)
 		 * node was removed, or it failed the above probe. Either
 		 * way, we remove references to it, since they are
 		 * invalid.  */
-		if (!hpsb_node_entry_valid(ne))
+		if (ne->generation != generation)
 			nodemgr_remove_node(ne);
 	}
 	write_unlock_irqrestore(&node_lock, flags);
@@ -1067,22 +1098,46 @@ static void nodemgr_node_probe_cleanup(struct hpsb_host *host)
 
 static void nodemgr_node_probe(struct hpsb_host *host)
 {
-	int nodecount = host->node_count;
+	int count;
 	struct selfid *sid = (struct selfid *)host->topology_map;
 	nodeid_t nodeid = LOCAL_BUS;
+	unsigned int generation;
+
+	/* Pause for 1 second, to make sure things settle down. If
+	 * schedule_timeout returns non-zero, it means we caught a signal
+	 * and need to return. */
+	set_current_state(TASK_INTERRUPTIBLE);
+	if (schedule_timeout (HZ))
+		return;
+
+	/* Now get the generation in which the node ID's we collect
+	 * are valid.  During the bus scan we will use this generation
+	 * for the read transactions, so that if another reset occurs
+	 * during the scan the transactions will fail instead of
+	 * returning bogus data. */
+	generation = get_hpsb_generation(host);
 
 	/* Scan each node on the bus */
-	for (; nodecount; nodecount--, nodeid++, sid++) {
-		while (sid->extended)
-			sid++;
-		if (!sid->link_active)
+	for (count = host->selfid_count; count; count--, sid++) {
+		if (sid->extended)
 			continue;
 
-		nodemgr_node_probe_one(host, nodeid);
+		if (!sid->link_active) {
+			nodeid++;
+			continue;
+		}
+
+		nodemgr_node_probe_one(host, nodeid++, generation);
 	}
 
-	/* Cleanup if needed */
-	nodemgr_node_probe_cleanup(host);
+	/* If we had a bus reset while we were scanning the bus, it is
+	 * possible that we did not probe all nodes.  In that case, we
+	 * skip the clean up for now, since we could remove nodes that
+	 * were still on the bus.  The bus reset increased
+	 * hi->reset_sem, so there's a bus scan pending which will do
+	 * the clean up eventually. */
+	if (generation == get_hpsb_generation(host))
+		nodemgr_node_probe_cleanup(host, generation);
 
 	return;
 }
@@ -1090,28 +1145,20 @@ static void nodemgr_node_probe(struct hpsb_host *host)
 static int nodemgr_host_thread(void *__hi)
 {
 	struct host_info *hi = (struct host_info *)__hi;
-	lock_kernel();
 
 	/* No userlevel access needed */
 	daemonize();
 
-	strcpy(current->comm, "NodeMgr");
-
-	complete(&hi->started);
+	strcpy(current->comm, "knodemgrd");
 
 	/* Sit and wait for a signal to probe the nodes on the bus. This
-	 * happens when we get a bus reset.  */
-	do {
-		interruptible_sleep_on(&hi->wait);
-		if (!signal_pending(current))
-			nodemgr_node_probe(hi->host);
-	} while (!signal_pending(current));
+	 * happens when we get a bus reset. */
+	while (!down_interruptible(&hi->reset_sem))
+		nodemgr_node_probe(hi->host);
 
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 	HPSB_DEBUG ("NodeMgr: Exiting thread for %s", hi->host->driver->name);
 #endif
-
-	unlock_kernel();
 
 	complete_and_exit(&hi->exited, 0);
 }
@@ -1140,23 +1187,57 @@ struct node_entry *hpsb_nodeid_get_entry(nodeid_t nodeid)
 	return ne;
 }
 
-struct hpsb_host *hpsb_get_host_by_ne(struct node_entry *ne)
+/* The following four convenience functions use a struct node_entry
+ * for addressing a node on the bus.  They are intended for use by any
+ * process context, not just the nodemgr thread, so we need to be a
+ * little careful when reading out the node ID and generation.  The
+ * thing that can go wrong is that we get the node ID, then a bus
+ * reset occurs, and then we read the generation.  The node ID is
+ * possibly invalid, but the generation is current, and we end up
+ * sending a packet to a the wrong node.
+ *
+ * The solution is to make sure we read the generation first, so that
+ * if a reset occurs in the process, we end up with a stale generation
+ * and the transactions will fail instead of silently using wrong node
+ * ID's.
+ */
+
+void hpsb_node_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt)
 {
-        if (atomic_read(&ne->generation) != get_hpsb_generation(ne->host))
-		return NULL;
-        if (ne->nodeid == ne->host->node_id) return ne->host;
-        return NULL;
+        pkt->host = ne->host;
+        pkt->generation = ne->generation;
+	barrier();
+        pkt->node_id = ne->nodeid;
 }
 
-int hpsb_guid_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt)
+int hpsb_node_read(struct node_entry *ne, u64 addr,
+		   quadlet_t *buffer, size_t length)
 {
-        if (atomic_read(&ne->generation) != get_hpsb_generation(ne->host))
-		return 0;
+	unsigned int generation = ne->generation;
 
-        pkt->host = ne->host;
-        pkt->node_id = ne->nodeid;
-        pkt->generation = atomic_read(&ne->generation);
-        return 1;
+	barrier();
+	return hpsb_read(ne->host, ne->nodeid, generation,
+			 addr, buffer, length);
+}
+
+int hpsb_node_write(struct node_entry *ne, u64 addr, 
+		    quadlet_t *buffer, size_t length)
+{
+	unsigned int generation = ne->generation;
+
+	barrier();
+	return hpsb_write(ne->host, ne->nodeid, generation,
+			  addr, buffer, length);
+}
+
+int hpsb_node_lock(struct node_entry *ne, u64 addr, 
+		   int extcode, quadlet_t *data, quadlet_t arg)
+{
+	unsigned int generation = ne->generation;
+
+	barrier();
+	return hpsb_lock(ne->host, ne->nodeid, generation,
+			 addr, extcode, data, arg);
 }
 
 static void nodemgr_add_host(struct hpsb_host *host)
@@ -1169,22 +1250,23 @@ static void nodemgr_add_host(struct hpsb_host *host)
 		return;
 	}
 
-	/* We simply initialize the struct here. We don't start the thread
-	 * until the first bus reset.  */
+	/* Initialize the hostinfo here and start the thread.  The
+	 * thread blocks on the reset semaphore until a bus reset
+	 * happens. */
 	hi->host = host;
 	INIT_LIST_HEAD(&hi->list);
-	init_completion(&hi->started);
 	init_completion(&hi->exited);
-	init_waitqueue_head(&hi->wait);
+        sema_init(&hi->reset_sem, 0);
 
-	hi->pid = kernel_thread(nodemgr_host_thread, hi, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
-
+	hi->pid = kernel_thread(nodemgr_host_thread, hi,
+				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	
 	if (hi->pid < 0) {
-		HPSB_ERR ("NodeMgr: failed to start NodeMgr thread for %s", host->driver->name);
+		HPSB_ERR ("NodeMgr: failed to start NodeMgr thread for %s",
+			  host->driver->name);
+		kfree(hi);
 		return;
 	}
-
-	wait_for_completion(&hi->started);
 
 	spin_lock_irqsave (&host_info_lock, flags);
 	list_add_tail (&hi->list, &host_info_list);
@@ -1216,8 +1298,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 	HPSB_DEBUG ("NodeMgr: Processing host reset for %s", host->driver->name);
 #endif
-
-	wake_up(&hi->wait);
+	up(&hi->reset_sem);
 
 done_reset_host:
 	spin_unlock_irqrestore (&host_info_lock, flags);
@@ -1254,7 +1335,7 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 		ne = list_entry(lh, struct node_entry, list);
 
 		if (ne->host == host)
-		nodemgr_remove_node(ne);
+			nodemgr_remove_node(ne);
 	}
 	write_unlock_irqrestore(&node_lock, flags);
 
@@ -1279,8 +1360,9 @@ static struct hpsb_highlevel *hl;
 
 #define PROC_ENTRY "devices"
 
-void init_ieee1394_nodemgr(void)
+void init_ieee1394_nodemgr(int disable_hotplug)
 {
+	nodemgr_disable_hotplug = disable_hotplug;
 #ifdef CONFIG_PROC_FS
 	if (!create_proc_read_entry(PROC_ENTRY, 0444, ieee1394_procfs_entry, raw1394_read_proc, NULL))
 		HPSB_ERR("Can't create devices procfs entry");

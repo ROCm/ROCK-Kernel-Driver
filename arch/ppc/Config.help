@@ -1033,6 +1033,16 @@ CONFIG_XMON
   Include in-kernel hooks for the xmon kernel monitor/debugger
   supported by the PPC port.
 
+Include BDI2000 debugger support
+CONFIG_BDI_SWITCH
+  Include in-kernel support for the Abatron BDI2000 debugger.
+
+Add additional CFLAGS to the kernel build
+CONFIG_MORE_COMPILE_OPTIONS
+  If you want to add additional CFLAGS to the kernel build, such as
+  -g for KGDB, XMON or the BDI2000, enable this option and then
+  enter what you would like to add in the next question.
+
 CONFIG_ADVANCED_OPTIONS
   This option will enable prompting for a variety of advanced kernel
   configuration options.  These options can cause the kernel to not

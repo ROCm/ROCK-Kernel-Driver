@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 120 $
+ *              $Revision: 121 $
  *
  ******************************************************************************/
 
@@ -73,18 +73,16 @@ acpi_hw_clear_acpi_status (void)
 	/* Clear the fixed events */
 
 	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1b_evt_blk.address)) {
-		acpi_os_write_port ((ACPI_IO_ADDRESS)
-			ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm1b_evt_blk.address),
-			ACPI_BITMASK_ALL_FIXED_STATUS, 16);
+		acpi_hw_low_level_write (16, ACPI_BITMASK_ALL_FIXED_STATUS,
+				&acpi_gbl_FADT->Xpm1b_evt_blk, 0);
 	}
 
 	/* Clear the GPE Bits */
 
 	for (gpe_block = 0; gpe_block < ACPI_MAX_GPE_BLOCKS; gpe_block++) {
 		for (i = 0; i < acpi_gbl_gpe_block_info[gpe_block].register_count; i++) {
-			acpi_os_write_port ((ACPI_IO_ADDRESS)
-				(acpi_gbl_gpe_block_info[gpe_block].block_address + i),
-				0xFF, 8);
+			acpi_hw_low_level_write (8, 0xFF,
+				acpi_gbl_gpe_block_info[gpe_block].block_address, i);
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 22 $)
+ *  acpi_ac.c - ACPI AC Adapter Driver ($Revision: 23 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -296,6 +296,7 @@ acpi_ac_remove (
 	struct acpi_ac		*ac = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_ac_remove");
+
 	if (!device || !acpi_driver_data(device))
 		return_VALUE(-EINVAL);
 

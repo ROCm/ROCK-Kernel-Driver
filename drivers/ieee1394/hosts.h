@@ -36,6 +36,7 @@ struct hpsb_host {
 
         int node_count; /* number of identified nodes on this bus */
         int selfid_count; /* total number of SelfIDs received */
+	int nodes_active; /* number of nodes that are actually active */
 
         nodeid_t node_id; /* node ID of this host */
         nodeid_t irm_id; /* ID of this bus' isochronous resource manager */

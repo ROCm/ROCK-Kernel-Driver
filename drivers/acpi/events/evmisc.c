@@ -1,8 +1,7 @@
 /******************************************************************************
  *
- * Module Name: evmisc - ACPI device notification handler dispatch
- *                       and ACPI Global Lock support
- *              $Revision: 47 $
+ * Module Name: evmisc - Miscellaneous event manager support functions
+ *              $Revision: 48 $
  *
  *****************************************************************************/
 
@@ -32,6 +31,40 @@
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evmisc")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    Acpi_ev_is_notify_object
+ *
+ * PARAMETERS:  Node            - Node to check
+ *
+ * RETURN:      TRUE if notifies allowed on this object
+ *
+ * DESCRIPTION: Check type of node for a object that supports notifies.
+ *
+ *              TBD: This could be replaced by a flag bit in the node.
+ *
+ ******************************************************************************/
+
+u8
+acpi_ev_is_notify_object (
+	acpi_namespace_node     *node)
+{
+	switch (node->type) {
+	case ACPI_TYPE_DEVICE:
+	case ACPI_TYPE_PROCESSOR:
+	case ACPI_TYPE_POWER:
+	case ACPI_TYPE_THERMAL:
+		/*
+		 * These are the ONLY objects that can receive ACPI notifications
+		 */
+		return (TRUE);
+
+	default:
+		return (FALSE);
+	}
+}
 
 
 /*******************************************************************************

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 132 $
+ *       $Revision: 133 $
  *
  *****************************************************************************/
 
@@ -147,6 +147,7 @@ acpi_ex_set_buffer_datum (
 
 acpi_status
 acpi_ex_read_data_from_field (
+	acpi_walk_state         *walk_state,
 	acpi_operand_object     *obj_desc,
 	acpi_operand_object     **ret_buffer_desc);
 

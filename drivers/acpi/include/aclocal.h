@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 159 $
+ *       $Revision: 162 $
  *
  *****************************************************************************/
 
@@ -182,12 +182,18 @@ typedef enum
  * be the first byte in this structure.
  */
 
+typedef union acpi_name_union
+{
+	u32                     integer;
+	char                    ascii[4];
+} ACPI_NAME_UNION;
+
 typedef struct acpi_node
 {
 	u8                      descriptor;     /* Used to differentiate object descriptor types */
 	u8                      type;           /* Type associated with this name */
 	u16                     owner_id;
-	u32                     name;           /* ACPI Name, always 4 chars per ACPI spec */
+	ACPI_NAME_UNION         name;           /* ACPI Name, always 4 chars per ACPI spec */
 
 
 	union acpi_operand_obj  *object;        /* Pointer to attached ACPI object (optional) */
@@ -314,8 +320,9 @@ typedef struct
 
 typedef struct
 {
+	u8                      address_space_id;
+	acpi_generic_address    *block_address;
 	u16                     register_count;
-	u16                     block_address;
 	u8                      block_base_number;
 
 } ACPI_GPE_BLOCK_INFO;
@@ -324,8 +331,8 @@ typedef struct
 
 typedef struct
 {
-	u16                     status_addr;    /* Address of status reg */
-	u16                     enable_addr;    /* Address of enable reg */
+	acpi_generic_address    status_address; /* Address of status reg */
+	acpi_generic_address    enable_address; /* Address of enable reg */
 	u8                      status;         /* Current value of status reg */
 	u8                      enable;         /* Current value of enable reg */
 	u8                      wake_enable;    /* Mask of bits to keep enabled when sleeping */
@@ -410,11 +417,11 @@ struct acpi_obj_mutex;
 
 #define ACPI_STATE_COMMON                  /* Two 32-bit fields and a pointer */\
 	u8                      data_type;          /* To differentiate various internal objs */\
-	u8                      flags; \
-	u16                     value; \
-	u16                     state; \
-	u16                     acpi_eval; \
-	void                    *next; \
+	u8                      flags;      \
+	u16                     value;      \
+	u16                     state;      \
+	u16                     reserved;   \
+	void                    *next;      \
 
 typedef struct acpi_common_state
 {

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 104 $
+ *              $Revision: 105 $
  *
  *****************************************************************************/
 
@@ -84,49 +84,45 @@ acpi_ex_opcode_2A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_0T_0R",
+			acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the opcode */
 
 	switch (walk_state->opcode) {
-
 	case AML_NOTIFY_OP:         /* Notify (Notify_object, Notify_value) */
 
 		/* The first operand is a namespace node */
 
 		node = (acpi_namespace_node *) operand[0];
 
-		/* The node must refer to a device or thermal zone or processor */
+		/* Notifies allowed on this object? */
 
-		switch (node->type) {
-		case ACPI_TYPE_DEVICE:
-		case ACPI_TYPE_THERMAL:
-		case ACPI_TYPE_PROCESSOR:
-
-			/*
-			 * Dispatch the notify to the appropriate handler
-			 * NOTE: the request is queued for execution after this method
-			 * completes.  The notify handlers are NOT invoked synchronously
-			 * from this thread -- because handlers may in turn run other
-			 * control methods.
-			 */
-			status = acpi_ev_queue_notify_request (node,
-					 (u32) operand[1]->integer.value);
-			break;
-
-		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unexpected notify object type %X\n",
-				node->type));
+		if (!acpi_ev_is_notify_object (node)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unexpected notify object type [%s]\n",
+					acpi_ut_get_type_name (node->type)));
 
 			status = AE_AML_OPERAND_TYPE;
 			break;
 		}
+
+		/*
+		 * Dispatch the notify to the appropriate handler
+		 * NOTE: the request is queued for execution after this method
+		 * completes.  The notify handlers are NOT invoked synchronously
+		 * from this thread -- because handlers may in turn run other
+		 * control methods.
+		 */
+		status = acpi_ev_queue_notify_request (node,
+				  (u32) operand[1]->integer.value);
 		break;
+
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_0R: Unknown opcode %X\n", walk_state->opcode));
+		ACPI_REPORT_ERROR (("Acpi_ex_opcode_2A_0T_0R: Unknown opcode %X\n",
+				walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 	}
 

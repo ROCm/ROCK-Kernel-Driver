@@ -562,8 +562,8 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 	switch (func) {
 		case ide_dma_off:
 			printk("%s: DMA disabled\n", drive->name);
-			set_high = 0;
 		case ide_dma_off_quietly:
+			set_high = 0;
 			outb(inb(dma_base+2) & ~(1<<(5+unit)), dma_base+2);
 		case ide_dma_on:
 			ide_toggle_bounce(drive, set_high);

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 50 $
+ *              $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -122,10 +122,13 @@ acpi_ex_resolve_node_to_value (
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
-		/* Return an additional reference to the object */
+		status = acpi_ds_get_package_arguments (source_desc);
+		if (ACPI_SUCCESS (status)) {
+			/* Return an additional reference to the object */
 
-		obj_desc = source_desc;
-		acpi_ut_add_reference (obj_desc);
+			obj_desc = source_desc;
+			acpi_ut_add_reference (obj_desc);
+		}
 		break;
 
 
@@ -137,10 +140,13 @@ acpi_ex_resolve_node_to_value (
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
-		/* Return an additional reference to the object */
+		status = acpi_ds_get_buffer_arguments (source_desc);
+		if (ACPI_SUCCESS (status)) {
+			/* Return an additional reference to the object */
 
-		obj_desc = source_desc;
-		acpi_ut_add_reference (obj_desc);
+			obj_desc = source_desc;
+			acpi_ut_add_reference (obj_desc);
+		}
 		break;
 
 
@@ -182,7 +188,7 @@ acpi_ex_resolve_node_to_value (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Node=%p Source_desc=%p Type=%X\n",
 			node, source_desc, entry_type));
 
-		status = acpi_ex_read_data_from_field (source_desc, &obj_desc);
+		status = acpi_ex_read_data_from_field (walk_state, source_desc, &obj_desc);
 		break;
 
 	/*

@@ -21,10 +21,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,0)
 #include <linux/devfs_fs_kernel.h>
-#endif
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
@@ -919,13 +916,9 @@ static int raw1394_open(struct inode *inode, struct file *file)
                 return -ENXIO;
         }
 
-        V22_COMPAT_MOD_INC_USE_COUNT;
-
         fi = kmalloc(sizeof(struct file_info), SLAB_KERNEL);
-        if (fi == NULL) {
-                V22_COMPAT_MOD_DEC_USE_COUNT;
+        if (fi == NULL)
                 return -ENOMEM;
-        }
         
         memset(fi, 0, sizeof(struct file_info));
 
@@ -988,7 +981,6 @@ static int raw1394_release(struct inode *inode, struct file *file)
 
         kfree(fi);
 
-        V22_COMPAT_MOD_DEC_USE_COUNT;
         return 0;
 }
 
@@ -1001,12 +993,12 @@ static struct hpsb_highlevel_ops hl_ops = {
 };
 
 static struct file_operations file_ops = {
-        OWNER_THIS_MODULE
-        read:     raw1394_read, 
-        write:    raw1394_write, 
-        poll:     raw1394_poll, 
-        open:     raw1394_open, 
-        release:  raw1394_release, 
+	owner:		THIS_MODULE,
+        read:		raw1394_read, 
+        write:		raw1394_write, 
+        poll:		raw1394_poll, 
+        open:		raw1394_open, 
+        release:	raw1394_release, 
 };
 
 static int __init init_raw1394(void)

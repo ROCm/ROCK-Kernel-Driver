@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.c - ACPI Bus Driver ($Revision: 56 $)
+ *  acpi_bus.c - ACPI Bus Driver ($Revision: 66 $)
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
@@ -77,6 +77,8 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 	{"SONY  ", "U0      ", 0x20010313, ACPI_TABLE_DSDT, less_than_or_equal, "ACPI driver problem", 1},
 	/* Compaq Presario 800, Insyde BIOS */
 	{"INT440", "SYSFexxx", 0x00001001, ACPI_TABLE_DSDT, less_than_or_equal, "Does not use _REG to protect EC OpRegions", 1},
+	/* IBM 600E - _ADR should return 7, but it returns 1 */
+	{"IBM   ", "TP600E  ", 0x00000105, ACPI_TABLE_DSDT, less_than_or_equal, "Incorrect _ADR", 1},
 	{""}
 };
 
@@ -259,34 +261,6 @@ acpi_bus_data_handler (
 	void			*context)
 {
 	ACPI_FUNCTION_TRACE("acpi_bus_data_handler");
-
-	/* TBD */
-
-	return_VOID;
-}
-
-
-static void
-acpi_bus_data_handler_powerf (
-	acpi_handle		handle,
-	u32			function,
-	void			*context)
-{
-	ACPI_FUNCTION_TRACE("acpi_bus_data_handler_powerf");
-
-	/* TBD */
-
-	return_VOID;
-}
-
-
-static void
-acpi_bus_data_handler_sleepf (
-	acpi_handle		handle,
-	u32			function,
-	void			*context)
-{
-	ACPI_FUNCTION_TRACE("acpi_bus_data_handler_sleepf");
 
 	/* TBD */
 
@@ -1044,8 +1018,10 @@ acpi_bus_match (
 	if (!device || !driver)
 		return -EINVAL;
 
-	if (0 != strstr(driver->ids, device->pnp.hardware_id))
-		return 0;
+	if (device->flags.hardware_id) {
+		if (0 != strstr(driver->ids, device->pnp.hardware_id))
+			return 0;
+	}
 
 	if (device->flags.compatible_ids) {
 		acpi_status	status = AE_OK;
@@ -1055,8 +1031,8 @@ acpi_bus_match (
 
 		memset(cid, 0, sizeof(cid));
 
-		status = acpi_evaluate_object(device->handle, "_CID", 
-			NULL, &buffer);
+		status = acpi_evaluate_object(device->handle, "_CID", NULL, 
+			&buffer);
 		if (ACPI_FAILURE(status) || !buffer.pointer)
 			return -ENOENT;
 
@@ -1072,9 +1048,10 @@ acpi_bus_match (
 			break;
 		case ACPI_TYPE_PACKAGE:
 			/* TBD: Support CID packages */
-		default:
-			return -ENOENT;
 		}
+
+		if (!cid[0])
+			return -ENOENT;
 
 		if (0 != strstr(cid, device->pnp.hardware_id))
 			return 0;
@@ -1144,13 +1121,13 @@ acpi_bus_driver_init (
 
 
 /**
- * acpi_bus_bind 
+ * acpi_bus_attach 
  * -------------
  * Callback for acpi_bus_walk() used to find devices that match a specific 
- * driver's criteria and bind the driver to the device.
+ * driver's criteria and then attach the driver.
  */
 static int
-acpi_bus_bind (
+acpi_bus_attach (
 	struct acpi_device	*device, 
 	int			level, 
 	void			*data)
@@ -1158,7 +1135,7 @@ acpi_bus_bind (
 	int			result = 0;
 	struct acpi_driver	*driver = NULL;
 
-	ACPI_FUNCTION_TRACE("acpi_bus_bind");
+	ACPI_FUNCTION_TRACE("acpi_bus_attach");
 
 	if (!device || !data)
 		return_VALUE(-EINVAL);
@@ -1191,13 +1168,13 @@ acpi_bus_bind (
 
 
 /**
- * acpi_bus_unbind 
- * ---------------
+ * acpi_bus_unattach 
+ * -----------------
  * Callback for acpi_bus_walk() used to find devices that match a specific 
- * driver's criteria and unbind the driver from the device.
+ * driver's criteria and unattach the driver.
  */
 static int
-acpi_bus_unbind (
+acpi_bus_unattach (
 	struct acpi_device	*device, 
 	int			level, 
 	void			*data)
@@ -1205,7 +1182,7 @@ acpi_bus_unbind (
 	int			result = 0;
 	struct acpi_driver	*driver = (struct acpi_driver *) data;
 
-	ACPI_FUNCTION_TRACE("acpi_bus_unbind");
+	ACPI_FUNCTION_TRACE("acpi_bus_unattach");
 
 	if (!device || !driver)
 		return_VALUE(-EINVAL);
@@ -1291,7 +1268,7 @@ acpi_bus_register_driver (
 	list_add_tail(&driver->node, &acpi_bus_drivers);
 	up(&acpi_bus_drivers_lock);
 
-	acpi_bus_walk(acpi_root, acpi_bus_bind, 
+	acpi_bus_walk(acpi_root, acpi_bus_attach, 
 		WALK_DOWN, driver);
 
 	return_VALUE(driver->references);
@@ -1313,7 +1290,7 @@ acpi_bus_unregister_driver (
 	if (!driver)
 		return_VALUE(-EINVAL);
 
-	acpi_bus_walk(acpi_root, acpi_bus_unbind, WALK_UP, driver);
+	acpi_bus_walk(acpi_root, acpi_bus_unattach, WALK_UP, driver);
 
 	if (driver->references)
 		return_VALUE(driver->references);
@@ -1395,8 +1372,8 @@ acpi_bus_add (
 	char			bus_id[5] = {'?',0};
 	acpi_buffer		buffer = {sizeof(bus_id), bus_id};
 	acpi_device_info	info;
-	char			*hid = "?";
-	char			*uid = "0";
+	char			*hid = NULL;
+	char			*uid = NULL;
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_add");
@@ -1413,6 +1390,37 @@ acpi_bus_add (
 
 	device->handle = handle;
 	device->parent = parent;
+
+	memset(&info, 0, sizeof(acpi_device_info));
+
+	/*
+	 * Bus ID
+	 * ------
+	 * The device's Bus ID is simply the object name.
+	 * TBD: Shouldn't this value be unique (within the ACPI namespace)?
+	 */
+	switch (type) {
+	case ACPI_BUS_TYPE_SYSTEM:
+		sprintf(device->pnp.bus_id, "%s", "ACPI");
+		break;
+	case ACPI_BUS_TYPE_POWER_BUTTON:
+		sprintf(device->pnp.bus_id, "%s", "PWRF");
+		break;
+	case ACPI_BUS_TYPE_SLEEP_BUTTON:
+		sprintf(device->pnp.bus_id, "%s", "SLPF");
+		break;
+	default:
+		acpi_get_name(handle, ACPI_SINGLE_NAME, &buffer);
+		/* Clean up trailing underscores (if any) */
+		for (i = 3; i > 1; i--) {
+			if (bus_id[i] == '_')
+				bus_id[i] = '\0';
+			else
+				break;
+		}
+		sprintf(device->pnp.bus_id, "%s", bus_id);
+		break;
+	}
 
 	/*
 	 * Flags
@@ -1457,35 +1465,6 @@ acpi_bus_add (
 	 */
 
 	/*
-	 * Bus ID
-	 * ------
-	 * The device's Bus ID is simply the object name.
-	 * TBD: Shouldn't this value be unique (within the ACPI namespace)?
-	 */
-	switch (type) {
-	case ACPI_BUS_TYPE_SYSTEM:
-		sprintf(device->pnp.bus_id, "%s", "ACPI");
-		break;
-	case ACPI_BUS_TYPE_POWER_BUTTON:
-		sprintf(device->pnp.bus_id, "%s", "PWRF");
-		break;
-	case ACPI_BUS_TYPE_SLEEP_BUTTON:
-		sprintf(device->pnp.bus_id, "%s", "SLPF");
-		break;
-	default:
-		acpi_get_name(handle, ACPI_SINGLE_NAME, &buffer);
-		/* Clean up trailing underscores (if any) */
-		for (i = 3; i > 1; i--) {
-			if (bus_id[i] == '_')
-				bus_id[i] = '\0';
-			else
-				break;
-		}
-		sprintf(device->pnp.bus_id, "%s", bus_id);
-		break;
-	}
-
-	/*
 	 * Hardware ID, Unique ID, & Bus Address
 	 * -------------------------------------
 	 */
@@ -1505,8 +1484,10 @@ acpi_bus_add (
 			hid = info.hardware_id;
 		if (info.valid & ACPI_VALID_UID)
 			uid = info.unique_id;
-		if (info.valid & ACPI_VALID_ADR)
+		if (info.valid & ACPI_VALID_ADR) {
 			device->pnp.bus_address = info.address;
+			device->flags.bus_address = 1;
+		}
 		break;
 	case ACPI_BUS_TYPE_POWER:
 		hid = ACPI_POWER_HID;
@@ -1528,8 +1509,25 @@ acpi_bus_add (
 		break;
 	}
 
-	sprintf(device->pnp.hardware_id, "%s", hid);
-	sprintf(device->pnp.unique_id, "%s", uid);
+	/* 
+	 * \_SB
+	 * ----
+	 * Fix for the system root bus device -- the only root-level device.
+	 */
+	if ((parent == ACPI_ROOT_OBJECT) && (type == ACPI_BUS_TYPE_DEVICE)) {
+		hid = ACPI_BUS_HID;
+		sprintf(device->pnp.device_name, "%s", ACPI_BUS_DEVICE_NAME);
+		sprintf(device->pnp.device_class, "%s", ACPI_BUS_CLASS);
+	}
+
+	if (hid) {
+		sprintf(device->pnp.hardware_id, "%s", hid);
+		device->flags.hardware_id = 1;
+	}
+	if (uid) {
+		sprintf(device->pnp.unique_id, "%s", uid);
+		device->flags.unique_id = 1;
+	}
 
 	/*
 	 * Power Management
@@ -1555,18 +1553,13 @@ acpi_bus_add (
 	 * Context
 	 * -------
 	 * Attach this 'struct acpi_device' to the ACPI object.  This makes
-	 * resolutions from handle->device very efficient.  Note that since we
-	 * attach multiple context to the root object (system device plus all
-	 * fixed-feature devices) we must use alternate handlers.
+	 * resolutions from handle->device very efficient.  Note that we need
+	 * to be careful with fixed-feature devices as they all attach to the
+	 * root object.
 	 */
 	switch (type) {
 	case ACPI_BUS_TYPE_POWER_BUTTON:
-		status = acpi_attach_data(device->handle,
-			acpi_bus_data_handler_powerf, device);
-		break;
 	case ACPI_BUS_TYPE_SLEEP_BUTTON:
-		status = acpi_attach_data(device->handle,
-			acpi_bus_data_handler_sleepf, device);
 		break;
 	default:
 		status = acpi_attach_data(device->handle,
@@ -1591,21 +1584,9 @@ acpi_bus_add (
 	else
 		list_add_tail(&device->node, &device->parent->children);
 
-	/* 
-	 * \_SB
-	 * ----
-	 * Fix for the system root bus device -- the only root-level device.
-	 */
-	if ((type == ACPI_BUS_TYPE_DEVICE) && (parent == ACPI_ROOT_OBJECT)) {
-		sprintf(device->pnp.hardware_id, "%s", ACPI_BUS_HID);
-		sprintf(device->pnp.device_name, "%s", ACPI_BUS_DEVICE_NAME);
-		sprintf(device->pnp.device_class, "%s", ACPI_BUS_CLASS);
-	}
-
 #ifdef CONFIG_ACPI_DEBUG
 	{
 		char		*type_string = NULL;
-		char		*message = NULL;
 		char		name[80] = {'?','\0'};
 		acpi_buffer	buffer = {sizeof(name), name};
 
@@ -1640,7 +1621,7 @@ acpi_bus_add (
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %s %s [%p]\n", 
 			type_string, name, handle));
 	}
-#endif
+#endif /*CONFIG_ACPI_DEBUG*/
 
 	/*
 	 * Global Device Hierarchy:
@@ -1650,14 +1631,30 @@ acpi_bus_add (
 	acpi_device_register(device, parent);
 
 	/*
-	 * Find Driver
-	 * -----------
-	 * Check to see if there's a driver installed for this kind of device.
+	 * Bind _ADR-Based Devices
+	 * -----------------------
+	 * If there's a a bus address (_ADR) then we utilize the parent's 
+	 * 'bind' function (if exists) to bind the ACPI- and natively-
+	 * enumerated device representations.
 	 */
-	acpi_bus_find_driver(device);
+	if (device->flags.bus_address) {
+		if (device->parent && device->parent->ops.bind)
+			device->parent->ops.bind(device);
+	}
+
+	/*
+	 * Locate & Attach Driver
+	 * ----------------------
+	 * If there's a hardware id (_HID) or compatible ids (_CID) we check
+	 * to see if there's a driver installed for this kind of device.  Note
+	 * that drivers can install before or after a device in enumerated.
+	 *
+	 * TBD: Assumes LDM provides driver hot-plug capability.
+	 */
+	if (device->flags.hardware_id || device->flags.compatible_ids)
+		acpi_bus_find_driver(device);
 
 end:
-
 	if (0 != result) {
 		kfree(device);
 		return_VALUE(result);
@@ -1774,13 +1771,11 @@ acpi_bus_scan (
 		 * If the device is present, enabled, and functioning then
 		 * parse its scope (depth-first).  Note that we need to
 		 * represent absent devices to facilitate PnP notifications
-		 * -- but we only the subtree head (not all of its children,
+		 * -- but only the subtree head (not all of its children,
 		 * which will be enumerated when the parent is inserted).
 		 *
 		 * TBD: Need notifications and other detection mechanisms
 		 *	in place before we can fully implement this.
-		 *
-		 * if (STRUCT_TO_INT(child->status) & 0x0B) {
 		 */
 		if (child->status.present) {
 			status = acpi_get_next_object(ACPI_TYPE_ANY, chandle,
@@ -1884,6 +1879,55 @@ acpi_blacklisted(void)
 
 
 static int __init
+acpi_bus_init_irq (void)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	acpi_object		arg = {ACPI_TYPE_INTEGER};
+	acpi_object_list        arg_list = {1, &arg};
+	int			irq_model = 0;
+	char			*message = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_bus_init_irq");
+
+	/* 
+	 * Let the system know what interrupt model we are using by
+	 * evaluating the \_PIC object, if exists.
+	 */
+	result = acpi_get_interrupt_model(&irq_model);
+	if (0 != result)
+		return_VALUE(result);
+
+	switch (irq_model) {
+	case ACPI_INT_MODEL_PIC:
+		message = "PIC";
+		break;
+	case ACPI_INT_MODEL_IOAPIC:
+		message = "IOAPIC";
+		break;
+	case ACPI_INT_MODEL_IOSAPIC:
+		message = "IOSAPIC";
+		break;
+	default:
+		message = "UNKNOWN";
+		break;
+	}
+
+	printk(KERN_INFO PREFIX "Using %s for interrupt routing\n", message);
+
+	arg.integer.value = irq_model;
+
+	status = acpi_evaluate_object(NULL, "\\_PIC", &arg_list, NULL);
+	if (ACPI_FAILURE(status) && (status != AE_NOT_FOUND)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PIC\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	return_VALUE(0);
+}
+
+
+static int __init
 acpi_bus_init (void)
 {
 	int			result = 0;
@@ -1928,7 +1972,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [2] Get a separate copy of the FADT for use by other drivers.
+	 * [3] Get a separate copy of the FADT for use by other drivers.
 	 */
 	status = acpi_get_table(ACPI_TABLE_FADT, 1, &buffer);
 	if (ACPI_FAILURE(status)) {
@@ -1940,7 +1984,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [3] Enable the ACPI Core Subsystem.
+	 * [4] Enable the ACPI Core Subsystem.
 	 */
 	status = acpi_enable_subsystem(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
@@ -1954,7 +1998,14 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [4] Register for all standard device notifications.
+	 * [5] Register for all standard device notifications.
+	 */
+	result = acpi_bus_init_irq();
+	if (0 != result)
+		goto end;
+
+	/*
+	 * [6] Register for all standard device notifications.
 	 */
 	status = acpi_install_notify_handler(ACPI_ROOT_OBJECT, ACPI_SYSTEM_NOTIFY, &acpi_bus_notify, NULL);
 	if (ACPI_FAILURE(status)) {
@@ -1966,7 +2017,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [5] Create the root device.
+	 * [7] Create the root device.
 	 */
 	result = acpi_bus_add(&acpi_root, NULL, ACPI_ROOT_OBJECT, 
 		ACPI_BUS_TYPE_SYSTEM);
@@ -1976,7 +2027,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [6] Create the root file system.
+	 * [8] Create the root file system.
 	 */
 	acpi_device_dir(acpi_root) = proc_mkdir(ACPI_BUS_FILE_ROOT, NULL);
 	if (!acpi_root) {
@@ -1988,7 +2039,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [7] Install drivers required for proper enumeration of the
+	 * [9] Install drivers required for proper enumeration of the
 	 *     ACPI namespace.
 	 */
 	acpi_system_init();	/* ACPI System */
@@ -2003,7 +2054,7 @@ acpi_bus_init (void)
 	progress++;
 
 	/*
-	 * [8] Enumerate devices in the ACPI namespace.
+	 * [10] Enumerate devices in the ACPI namespace.
 	 */
 
 	result = acpi_bus_scan_fixed(acpi_root);
@@ -2017,11 +2068,12 @@ acpi_bus_init (void)
 end:
 	if (0 != result) {
 		switch (progress) {
-		case 9:
-		case 8: remove_proc_entry("ACPI", NULL);
-		case 7: acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
-		case 6: acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
+		case 10:
+		case 9: remove_proc_entry("ACPI", NULL);
+		case 8: acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
+		case 7: acpi_remove_notify_handler(ACPI_ROOT_OBJECT,
 				ACPI_SYSTEM_NOTIFY, &acpi_bus_notify);
+		case 6:
 		case 5:
 		case 4:
 		case 3:
@@ -2085,6 +2137,9 @@ acpi_init (void)
 	printk(KERN_INFO PREFIX "Core Subsystem revision %08x\n",
 		ACPI_CA_VERSION);
 
+	/* Initial core debug level excludes drivers, so include them now */
+	acpi_set_debug(ACPI_DEBUG_LOW);
+
 	if (acpi_disabled) {
 		printk(KERN_INFO PREFIX "Disabled via command line (acpi=off)\n");
 		return -ENODEV;
@@ -2143,3 +2198,4 @@ subsys_initcall(acpi_init);
 #endif
 
 __setup("acpi=", acpi_setup);
+

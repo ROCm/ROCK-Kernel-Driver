@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 37 $
+ *              $Revision: 38 $
  *
  *****************************************************************************/
 
@@ -68,7 +68,7 @@ acpi_ut_evaluate_numeric_object (
 	status = acpi_ns_evaluate_relative (device_node, object_name, NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s on %4.4s was not found\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s on %4.4s was not found\n",
 				object_name, (char *) &device_node->name));
 		}
 		else {
@@ -147,7 +147,7 @@ acpi_ut_execute_HID (
 			 METHOD_NAME__HID, NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_HID on %4.4s was not found\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_HID on %4.4s was not found\n",
 				(char *) &device_node->name));
 		}
 		else {
@@ -230,7 +230,7 @@ acpi_ut_execute_CID (
 			 METHOD_NAME__CID, NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_CID on %4.4s was not found\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_CID on %4.4s was not found\n",
 				(char *)&device_node->name));
 		}
 		else {
@@ -324,7 +324,7 @@ acpi_ut_execute_UID (
 			 METHOD_NAME__UID, NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		if (status == AE_NOT_FOUND) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "_UID on %4.4s was not found\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "_UID on %4.4s was not found\n",
 				(char *) &device_node->name));
 		}
 		else {
@@ -409,7 +409,7 @@ acpi_ut_execute_STA (
 	status = acpi_ns_evaluate_relative (device_node,
 			 METHOD_NAME__STA, NULL, &obj_desc);
 	if (AE_NOT_FOUND == status) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 			"_STA on %4.4s was not found, assuming present.\n",
 			(char *) &device_node->name));
 

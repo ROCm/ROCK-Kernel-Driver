@@ -33,10 +33,15 @@
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES		4
 
+extern int acpi_mp_config;
+
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 extern int acpi_find_rsdp (unsigned long *phys_addr);
 extern int acpi_parse_madt (unsigned long phys_addr, unsigned long size);
+extern int acpi_boot_init (char *cmdline);
 
+#else
+#define acpi_mp_config 0
 #endif /*CONFIG_ACPI_BOOT*/
 
 #ifdef CONFIG_ACPI_PCI

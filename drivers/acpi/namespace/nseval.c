@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 109 $
+ *              $Revision: 112 $
  *
  ******************************************************************************/
 
@@ -113,7 +113,7 @@ acpi_ns_evaluate_relative (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object [%s] not found [%s]\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Object [%s] not found [%s]\n",
 			pathname, acpi_format_exception (status)));
 		goto cleanup;
 	}
@@ -122,12 +122,12 @@ acpi_ns_evaluate_relative (
 	 * Now that we have a handle to the object, we can attempt
 	 * to evaluate it.
 	 */
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s [%p] Value %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
 		pathname, node, acpi_ns_get_attached_object (node)));
 
 	status = acpi_ns_evaluate_by_handle (node, params, return_object);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "*** Completed eval of object %s ***\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "*** Completed eval of object %s ***\n",
 		pathname));
 
 cleanup:
@@ -192,7 +192,7 @@ acpi_ns_evaluate_by_name (
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Object at [%s] was not found, status=%.4X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Object at [%s] was not found, status=%.4X\n",
 			pathname, status));
 		goto cleanup;
 	}
@@ -201,12 +201,12 @@ acpi_ns_evaluate_by_name (
 	 * Now that we have a handle to the object, we can attempt
 	 * to evaluate it.
 	 */
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "%s [%p] Value %p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%s [%p] Value %p\n",
 		pathname, node, acpi_ns_get_attached_object (node)));
 
 	status = acpi_ns_evaluate_by_handle (node, params, return_object);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "*** Completed eval of object %s ***\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "*** Completed eval of object %s ***\n",
 		pathname));
 
 
@@ -390,16 +390,11 @@ acpi_ns_execute_control_method (
 		return_ACPI_STATUS (AE_NULL_OBJECT);
 	}
 
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Control method at Offset %p Length %x]\n",
-		obj_desc->method.aml_start + 1, obj_desc->method.aml_length - 1));
-
 	ACPI_DUMP_PATHNAME (method_node, "Ns_execute_control_method: Executing",
-		ACPI_LV_NAMES, _COMPONENT);
+		ACPI_LV_INFO, _COMPONENT);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "At offset %p\n",
-			obj_desc->method.aml_start + 1));
-
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %x\n",
+		obj_desc->method.aml_start + 1, obj_desc->method.aml_length - 1));
 
 	/*
 	 * Unlock the namespace before execution.  This allows namespace access
@@ -497,7 +492,7 @@ acpi_ns_get_object_value (
 		if (ACPI_SUCCESS (status)) {
 			status = AE_CTRL_RETURN_VALUE;
 			*return_obj_desc = obj_desc;
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Returning obj %p\n", *return_obj_desc));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning obj %p\n", *return_obj_desc));
 		}
 	}
 

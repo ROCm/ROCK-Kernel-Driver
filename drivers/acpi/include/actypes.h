@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 224 $
+ *       $Revision: 227 $
  *
  *****************************************************************************/
 
@@ -57,12 +57,13 @@ typedef unsigned char                   BOOLEAN;
 typedef unsigned short                  UINT16;
 typedef int                             INT32;
 typedef unsigned int                    UINT32;
+typedef COMPILER_DEPENDENT_INT64        INT64;
 typedef COMPILER_DEPENDENT_UINT64       UINT64;
 
 typedef UINT64                          NATIVE_UINT;
 typedef UINT64                          NATIVE_INT;
 
-typedef NATIVE_UINT                     ACPI_TBLPTR;
+typedef UINT64                          ACPI_TBLPTR;
 typedef UINT64                          ACPI_IO_ADDRESS;
 typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
 typedef UINT64                          ACPI_SIZE;
@@ -119,12 +120,13 @@ typedef unsigned char                   BOOLEAN;
 typedef unsigned short                  UINT16;
 typedef int                             INT32;
 typedef unsigned int                    UINT32;
+typedef COMPILER_DEPENDENT_INT64        INT64;
 typedef COMPILER_DEPENDENT_UINT64       UINT64;
 
 typedef UINT32                          NATIVE_UINT;
 typedef INT32                           NATIVE_INT;
 
-typedef NATIVE_UINT                     ACPI_TBLPTR;
+typedef UINT64                          ACPI_TBLPTR;
 typedef UINT32                          ACPI_IO_ADDRESS;
 typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
 typedef UINT32                          ACPI_SIZE;
@@ -148,7 +150,6 @@ typedef char                            NATIVE_CHAR;
 /*
  * Data type ranges
  */
-
 #define ACPI_UINT8_MAX                  (UINT8)  0xFF
 #define ACPI_UINT16_MAX                 (UINT16) 0xFFFF
 #define ACPI_UINT32_MAX                 (UINT32) 0xFFFFFFFF
@@ -168,6 +169,31 @@ typedef UINT32                          u32;
 typedef UINT64                          u64;
 #endif
 /*! [End] no source code translation !*/
+
+
+/*
+ * Pointer overlays to avoid lots of typecasting for
+ * code that accepts both physical and logical pointers.
+ */
+typedef union acpi_pointers
+{
+	ACPI_PHYSICAL_ADDRESS       physical;
+	void                        *logical;
+	ACPI_TBLPTR                 value;
+
+} ACPI_POINTERS;
+
+typedef struct acpi_pointer
+{
+	u32                         pointer_type;
+	ACPI_POINTERS               pointer;
+
+} ACPI_POINTER;
+
+/* Pointer_types for above */
+
+#define ACPI_LOGICAL_POINTER            0x01
+#define ACPI_PHYSICAL_POINTER           0x02
 
 
 /*

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdebug.h - ACPI/AML debugger
- *       $Revision: 57 $
+ *       $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -271,6 +271,9 @@ acpi_status
 acpi_db_load_acpi_table (
 	NATIVE_CHAR             *filename);
 
+acpi_status
+acpi_db_get_acpi_table (
+	NATIVE_CHAR             *filename);
 
 /*
  * dbhistry - debugger HISTORY command

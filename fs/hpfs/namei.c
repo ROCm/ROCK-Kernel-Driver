@@ -365,11 +365,9 @@ again:
 			goto ret;
 		}
 		/*printk("HPFS: truncating file before delete.\n");*/
-		down(&inode->i_sem);
 		newattrs.ia_size = 0;
 		newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 		err = notify_change(dentry, &newattrs);
-		up(&inode->i_sem);
 		put_write_access(inode);
 		if (err)
 			goto ret;
