@@ -274,7 +274,7 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 	struct tc_action_ops *a_o;
 	char act_name[4 + IFNAMSIZ + 1];
 	struct rtattr *tb[TCA_ACT_MAX+1];
-	struct rtattr *kind = NULL;
+	struct rtattr *kind;
 
 	*err = -EINVAL;
 
@@ -494,7 +494,7 @@ static int tcf_action_get_1(struct rtattr *rta, struct tc_action *a,
 	struct tc_action_ops *a_o;
 	char act_name[4 + IFNAMSIZ + 1];
 	struct rtattr *tb[TCA_ACT_MAX+1];
-	struct rtattr *kind = NULL;
+	struct rtattr *kind;
 	int index;
 	int err = -EINVAL;
 
@@ -563,7 +563,7 @@ static void cleanup_a(struct tc_action *act)
 static struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 {
 	char act_name[4 + IFNAMSIZ + 1];
-	struct tc_action_ops *a_o = NULL;
+	struct tc_action_ops *a_o;
 
 	if (kind != NULL) {
 		sprintf(act_name, "%s", (char*)RTA_DATA(kind));
@@ -596,7 +596,7 @@ static struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 
 static struct tc_action *create_a(int i)
 {
-	struct tc_action *act = NULL;
+	struct tc_action *act;
 
 	act = kmalloc(sizeof(*act), GFP_KERNEL);
 	if (act == NULL) {
@@ -617,7 +617,7 @@ static int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 	struct netlink_callback dcb;
 	struct rtattr *x;
 	struct rtattr *tb[TCA_ACT_MAX+1];
-	struct rtattr *kind = NULL;
+	struct rtattr *kind;
 	struct tc_action *a = create_a(0);
 	int err = -EINVAL;
 
@@ -677,9 +677,8 @@ err_out:
 static int
 tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event)
 {
-	int s = 0;
 	int i, ret = 0;
-	struct tc_action *act = NULL;
+	struct tc_action *act;
 	struct rtattr *tb[TCA_ACT_MAX_PRIO+1];
 	struct tc_action *a = NULL, *a_s = NULL;
 
@@ -707,10 +706,8 @@ tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event)
 		} else
 			a = act;
 
-		if (!s) {
-			s = 1;
+		if (a_s == NULL)
 			a_s = a;
-		}
 
 		ret = tcf_action_get_1(tb[i], act, n, pid);
 		if (ret < 0) {
@@ -800,8 +797,8 @@ static int
 tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr)
 {
 	int ret = 0;
-	struct tc_action *act = NULL;
-	struct tc_action *a = NULL;
+	struct tc_action *act;
+	struct tc_action *a;
 	u32 seq = n->nlmsg_seq;
 
 	act = tcf_action_init(rta, NULL, NULL, ovr, 0, &ret);
@@ -865,7 +862,7 @@ find_dump_kind(struct nlmsghdr *n)
 	struct rtattr *tb1, *tb2[TCA_ACT_MAX+1];
 	struct rtattr *tb[TCA_ACT_MAX_PRIO + 1];
 	struct rtattr *rta[TCAA_MAX + 1];
-	struct rtattr *kind = NULL;
+	struct rtattr *kind;
 	int min_len = NLMSG_LENGTH(sizeof(struct tcamsg));
 	int attrlen = n->nlmsg_len - NLMSG_ALIGN(min_len);
 	struct rtattr *attr = (void *) n + NLMSG_ALIGN(min_len);
