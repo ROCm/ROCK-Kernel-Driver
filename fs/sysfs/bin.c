@@ -226,6 +226,7 @@ int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 {
 	sysfs_hash_and_remove(kobj->dentry,attr->attr.name);
+	return 0;
 }
 
 EXPORT_SYMBOL(sysfs_create_bin_file);
