@@ -81,6 +81,7 @@ u32 free_delegation= 0;
 
 /* forward declarations */
 struct nfs4_stateid * find_stateid(stateid_t *stid, int flags);
+static struct nfs4_delegation * find_delegation_stateid(struct inode *ino, stateid_t *stid);
 
 /* Locking:
  *
@@ -2056,6 +2057,32 @@ find_stateid(stateid_t *stid, int flags)
 	return NULL;
 }
 
+static struct nfs4_delegation *
+find_delegation_stateid(struct inode *ino, stateid_t *stid)
+{
+	struct nfs4_delegation *dp = NULL;
+	struct nfs4_file *fp = NULL;
+	u32 st_id;
+	unsigned int fi_hashval;
+
+	dprintk("NFSD:find_delegation_stateid stateid=(%08x/%08x/%08x/%08x)\n",
+                    stid->si_boot, stid->si_stateownerid,
+                    stid->si_fileid, stid->si_generation);
+
+	if(!ino || !stid)
+		return NULL;
+	st_id = stid->si_stateownerid;
+	fi_hashval = file_hashval(ino);
+	if (find_file(fi_hashval, ino, &fp)) {
+		list_for_each_entry(dp, &fp->fi_del_perfile, dl_del_perfile) {
+			if(dp->dl_stateid.si_stateownerid == st_id) {
+				dprintk("NFSD: find_delegation dp %p\n",dp);
+				return dp;
+			}
+		}
+	}
+	return NULL;
+}
 
 /*
  * TODO: Linux file offsets are _signed_ 64-bit quantities, which means that
