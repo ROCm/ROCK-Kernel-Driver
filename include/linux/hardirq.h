@@ -77,12 +77,10 @@ extern void synchronize_irq(unsigned int irq);
 # define synchronize_irq(irq)	barrier()
 #endif
 
-#ifdef CONFIG_GENERIC_HARDIRQS
 #define nmi_enter()		(preempt_count() += HARDIRQ_OFFSET)
 #define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
 
 #define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
 extern void irq_exit(void);
-#endif
 
 #endif /* LINUX_HARDIRQ_H */

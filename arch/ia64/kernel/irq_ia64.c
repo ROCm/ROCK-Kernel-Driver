@@ -60,21 +60,6 @@ __u8 isa_irq_to_vector_map[16] = {
 };
 EXPORT_SYMBOL(isa_irq_to_vector_map);
 
-static inline void
-irq_enter (void)
-{
-	preempt_count() += HARDIRQ_OFFSET;
-}
-
-static inline void
-irq_exit (void)
-{
-	preempt_count() -= IRQ_EXIT_OFFSET;
-	if (!in_interrupt() && local_softirq_pending())
-		do_softirq();
-	preempt_enable_no_resched();
-}
-
 int
 assign_irq_vector (int irq)
 {
