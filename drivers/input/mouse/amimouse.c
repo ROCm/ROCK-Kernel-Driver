@@ -64,7 +64,7 @@ static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 
 	input_report_rel(&amimouse_dev, REL_X, dx);
 	input_report_rel(&amimouse_dev, REL_Y, dy);
-	
+
 	input_report_key(&amimouse_dev, BTN_LEFT,   ciaa.pra & 0x40);
 	input_report_key(&amimouse_dev, BTN_MIDDLE, potgor & 0x0100);
 	input_report_key(&amimouse_dev, BTN_RIGHT,  potgor & 0x0400);
@@ -84,9 +84,9 @@ static int amimouse_open(struct input_dev *dev)
 	amimouse_lastx = joy0dat & 0xff;
 	amimouse_lasty = joy0dat >> 8;
 
-	if (request_irq(IRQ_AMIGA_VERTB, amimouse_interrupt, 0, "amimouse", NULL)) {
+	if (request_irq(IRQ_AMIGA_VERTB, amimouse_interrupt, 0, "amimouse", amimouse_interrupt)) {
                 amimouse_used--;
-                printk(KERN_ERR "amimouse.c: Can't allocate irq %d\n", amimouse_irq);
+                printk(KERN_ERR "amimouse.c: Can't allocate irq %d\n", IRQ_AMIGA_VERTB);
                 return -EBUSY;
         }
 
@@ -116,10 +116,11 @@ static int __init amimouse_init(void)
 	amimouse_dev.id.vendor = 0x0001;
 	amimouse_dev.id.product = 0x0002;
 	amimouse_dev.id.version = 0x0100;
-        
+
 	input_register_device(&amimouse_dev);
 
         printk(KERN_INFO "input: %s at joy0dat\n", amimouse_name);
+	return 0;
 }
 
 static void __exit amimouse_exit(void)
