@@ -857,3 +857,4 @@ EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_unregister_hook);
 EXPORT_SYMBOL(nf_unregister_queue_handler);
 EXPORT_SYMBOL(nf_unregister_sockopt);
+EXPORT_SYMBOL(nf_rcv_postxfrm_local)
