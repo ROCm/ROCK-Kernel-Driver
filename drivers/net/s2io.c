@@ -277,7 +277,7 @@ static int init_shared_mem(struct s2io_nic *nic)
 	int lst_size, lst_per_page;
 	struct net_device *dev = nic->dev;
 #ifdef CONFIG_2BUFF_MODE
-	u64 tmp;
+	unsigned long tmp;
 	buffAdd_t *ba;
 #endif
 
@@ -448,22 +448,22 @@ static int init_shared_mem(struct s2io_nic *nic)
 			while (k != MAX_RXDS_PER_BLOCK) {
 				ba = &nic->ba[i][j][k];
 
-				ba->ba_0_org = (void *) kmalloc
+				ba->ba_0_org = kmalloc
 				    (BUF0_LEN + ALIGN_SIZE, GFP_KERNEL);
 				if (!ba->ba_0_org)
 					return -ENOMEM;
-				tmp = (u64) ba->ba_0_org;
+				tmp = (unsigned long) ba->ba_0_org;
 				tmp += ALIGN_SIZE;
-				tmp &= ~((u64) ALIGN_SIZE);
+				tmp &= ~((unsigned long) ALIGN_SIZE);
 				ba->ba_0 = (void *) tmp;
 
-				ba->ba_1_org = (void *) kmalloc
+				ba->ba_1_org = kmalloc
 				    (BUF1_LEN + ALIGN_SIZE, GFP_KERNEL);
 				if (!ba->ba_1_org)
 					return -ENOMEM;
-				tmp = (u64) ba->ba_1_org;
+				tmp = (unsigned long) ba->ba_1_org;
 				tmp += ALIGN_SIZE;
-				tmp &= ~((u64) ALIGN_SIZE);
+				tmp &= ~((unsigned long) ALIGN_SIZE);
 				ba->ba_1 = (void *) tmp;
 				k++;
 			}
@@ -596,10 +596,10 @@ static void free_shared_mem(struct s2io_nic *nic)
 
 static int init_nic(struct s2io_nic *nic)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	struct net_device *dev = nic->dev;
 	register u64 val64 = 0;
-	void *add;
+	void __iomem *add;
 	u32 time;
 	int i, j;
 	mac_info_t *mac_control;
@@ -688,7 +688,7 @@ static int init_nic(struct s2io_nic *nic)
 	schedule_timeout(HZ / 2);
 
 	/*  Enable Receiving broadcasts */
-	add = (void *) &bar0->mac_cfg;
+	add = &bar0->mac_cfg;
 	val64 = readq(&bar0->mac_cfg);
 	val64 |= MAC_RMAC_BCAST_ENABLE;
 	writeq(RMAC_CFG_KEY(0x4C0D), &bar0->rmac_cfg_key);
@@ -989,7 +989,7 @@ static int init_nic(struct s2io_nic *nic)
 	writeq(0xffbbffbbffbbffbbULL, &bar0->mc_pause_thresh_q4q7);
 
 	/* Disable RMAC PAD STRIPPING */
-	add = (void *) &bar0->mac_cfg;
+	add = &bar0->mac_cfg;
 	val64 = readq(&bar0->mac_cfg);
 	val64 &= ~(MAC_CFG_RMAC_STRIP_PAD);
 	writeq(RMAC_CFG_KEY(0x4C0D), &bar0->rmac_cfg_key);
@@ -1055,7 +1055,7 @@ static int init_nic(struct s2io_nic *nic)
 
 static void en_dis_able_nic_intrs(struct s2io_nic *nic, u16 mask, int flag)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	register u64 val64 = 0, temp64 = 0;
 
 	/*  Top level interrupt classification */
@@ -1340,7 +1340,7 @@ static int verify_xena_quiescence(u64 val64, int flag)
 
 void fix_mac_address(nic_t * sp)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
 	int i = 0;
 
@@ -1365,7 +1365,7 @@ void fix_mac_address(nic_t * sp)
 
 static int start_nic(struct s2io_nic *nic)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	struct net_device *dev = nic->dev;
 	register u64 val64 = 0;
 	u16 interruptible, i;
@@ -1460,7 +1460,7 @@ static int start_nic(struct s2io_nic *nic)
 		val64 |= 0x0000800000000000ULL;
 		writeq(val64, &bar0->gpio_control);
 		val64 = 0x0411040400000000ULL;
-		writeq(val64, (void *) ((u8 *) bar0 + 0x2700));
+		writeq(val64, (void __iomem *) bar0 + 0x2700);
 	}
 
 	/* 
@@ -1543,7 +1543,7 @@ void free_tx_buffers(struct s2io_nic *nic)
 
 static void stop_nic(struct s2io_nic *nic)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	register u64 val64 = 0;
 	u16 interruptible, i;
 	mac_info_t *mac_control;
@@ -1601,7 +1601,7 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 #ifdef CONFIG_2BUFF_MODE
 	RxD_t *rxdpnext;
 	int nextblk;
-	u64 tmp;
+	unsigned long tmp;
 	buffAdd_t *ba;
 	dma_addr_t rxdpphys;
 #endif
@@ -1743,7 +1743,7 @@ int fill_rx_buffers(struct s2io_nic *nic, int ring_no)
 #else
 		ba = &nic->ba[ring_no][block_no][off];
 		skb_reserve(skb, BUF0_LEN);
-		tmp = (u64) skb->data;
+		tmp = (unsigned long) skb->data;
 		tmp += ALIGN_SIZE;
 		tmp &= ~ALIGN_SIZE;
 		skb->data = (void *) tmp;
@@ -1886,7 +1886,7 @@ static void free_rx_buffers(struct s2io_nic *sp)
 static int s2io_poll(struct net_device *dev, int *budget)
 {
 	nic_t *nic = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	int pkts_to_process = *budget, pkt_cnt = 0;
 	register u64 val64 = 0;
 	rx_curr_get_info_t get_info, put_info;
@@ -2255,7 +2255,7 @@ static void rx_intr_handler(struct s2io_nic *nic)
 
 static void tx_intr_handler(struct s2io_nic *nic)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	struct net_device *dev = (struct net_device *) nic->dev;
 	tx_curr_get_info_t get_info, put_info;
 	struct sk_buff *skb;
@@ -2362,7 +2362,7 @@ static void tx_intr_handler(struct s2io_nic *nic)
 static void alarm_intr_handler(struct s2io_nic *nic)
 {
 	struct net_device *dev = (struct net_device *) nic->dev;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	register u64 val64 = 0, err_reg = 0;
 
 	/* Handling link status change error Intr */
@@ -2413,7 +2413,7 @@ static void alarm_intr_handler(struct s2io_nic *nic)
 
 int wait_for_cmd_complete(nic_t * sp)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	int ret = FAILURE, cnt = 0;
 	u64 val64;
 
@@ -2444,7 +2444,7 @@ int wait_for_cmd_complete(nic_t * sp)
 
 void s2io_reset(nic_t * sp)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
 	u16 subid;
 
@@ -2480,7 +2480,7 @@ void s2io_reset(nic_t * sp)
 		val64 |= 0x0000800000000000ULL;
 		writeq(val64, &bar0->gpio_control);
 		val64 = 0x0411040400000000ULL;
-		writeq(val64, (void *) ((u8 *) bar0 + 0x2700));
+		writeq(val64, (void __iomem *) bar0 + 0x2700);
 	}
 
 	sp->device_enabled_once = FALSE;
@@ -2499,7 +2499,7 @@ void s2io_reset(nic_t * sp)
 int s2io_set_swapper(nic_t * sp)
 {
 	struct net_device *dev = sp->dev;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
 
 	/* 
@@ -2675,14 +2675,14 @@ int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 	u16 frg_cnt, frg_len, i, queue, queue_len, put_off, get_off;
 	register u64 val64;
 	TxD_t *txdp;
-	TxFIFO_element_t *tx_fifo;
+	TxFIFO_element_t __iomem *tx_fifo;
 	unsigned long flags;
 #ifdef NETIF_F_TSO
 	int mss;
 #endif
 	mac_info_t *mac_control;
 	struct config_param *config;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 
 	mac_control = &sp->mac_control;
 	config = &sp->config;
@@ -2799,7 +2799,7 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 #ifndef CONFIG_S2IO_NAPI
 	int i, ret;
 #endif
@@ -2925,11 +2925,11 @@ static void s2io_set_multicast(struct net_device *dev)
 	int i, j, prev_cnt;
 	struct dev_mc_list *mclist;
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64 = 0, multi_mac = 0x010203040506ULL, mask =
 	    0xfeffffffffffULL;
 	u64 dis_addr = 0xffffffffffffULL, mac_addr = 0;
-	void *add;
+	void __iomem *add;
 
 	if ((dev->flags & IFF_ALLMULTI) && (!sp->m_cast_flg)) {
 		/*  Enable all Multicast addresses */
@@ -2963,7 +2963,7 @@ static void s2io_set_multicast(struct net_device *dev)
 
 	if ((dev->flags & IFF_PROMISC) && (!sp->promisc_flg)) {
 		/*  Put the NIC into promiscuous mode */
-		add = (void *) &bar0->mac_cfg;
+		add = &bar0->mac_cfg;
 		val64 = readq(&bar0->mac_cfg);
 		val64 |= MAC_CFG_RMAC_PROM_ENABLE;
 
@@ -2978,7 +2978,7 @@ static void s2io_set_multicast(struct net_device *dev)
 			  dev->name);
 	} else if (!(dev->flags & IFF_PROMISC) && (sp->promisc_flg)) {
 		/*  Remove the NIC from promiscuous mode */
-		add = (void *) &bar0->mac_cfg;
+		add = &bar0->mac_cfg;
 		val64 = readq(&bar0->mac_cfg);
 		val64 &= ~MAC_CFG_RMAC_PROM_ENABLE;
 
@@ -3068,7 +3068,7 @@ static void s2io_set_multicast(struct net_device *dev)
 int s2io_set_mac_addr(struct net_device *dev, u8 * addr)
 {
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	register u64 val64, mac_addr = 0;
 	int i;
 
@@ -3211,7 +3211,7 @@ static void s2io_ethtool_gregs(struct net_device *dev,
 	regs->version = sp->pdev->subsystem_device;
 
 	for (i = 0; i < regs->len; i += 8) {
-		reg = readq((void *) (sp->bar0 + i));
+		reg = readq(sp->bar0 + i);
 		memcpy((reg_space + i), &reg, 8);
 	}
 }
@@ -3228,7 +3228,7 @@ static void s2io_ethtool_gregs(struct net_device *dev,
 static void s2io_phy_id(unsigned long data)
 {
 	nic_t *sp = (nic_t *) data;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64 = 0;
 	u16 subid;
 
@@ -3265,7 +3265,7 @@ static int s2io_ethtool_idnic(struct net_device *dev, u32 data)
 {
 	u64 val64 = 0, last_gpio_ctrl_val;
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u16 subid;
 
 	subid = sp->pdev->subsystem_device;
@@ -3313,7 +3313,7 @@ static void s2io_ethtool_getpause_data(struct net_device *dev,
 {
 	u64 val64;
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 
 	val64 = readq(&bar0->rmac_pause_cfg);
 	if (val64 & RMAC_PAUSE_GEN_ENABLE)
@@ -3340,7 +3340,7 @@ int s2io_ethtool_setpause_data(struct net_device *dev,
 {
 	u64 val64;
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 
 	val64 = readq(&bar0->rmac_pause_cfg);
 	if (ep->tx_pause)
@@ -3377,7 +3377,7 @@ static int read_eeprom(nic_t * sp, int off, u32 * data)
 	int ret = -1;
 	u32 exit_cnt = 0;
 	u64 val64;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 
 	val64 = I2C_CONTROL_DEV_ID(S2IO_DEV_ID) | I2C_CONTROL_ADDR(off) |
 	    I2C_CONTROL_BYTE_CNT(0x3) | I2C_CONTROL_READ |
@@ -3418,7 +3418,7 @@ static int write_eeprom(nic_t * sp, int off, u32 data, int cnt)
 {
 	int exit_cnt = 0, ret = -1;
 	u64 val64;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 
 	val64 = I2C_CONTROL_DEV_ID(S2IO_DEV_ID) | I2C_CONTROL_ADDR(off) |
 	    I2C_CONTROL_BYTE_CNT(cnt) | I2C_CONTROL_SET_DATA(data) |
@@ -3541,7 +3541,7 @@ static int s2io_ethtool_seeprom(struct net_device *dev,
 
 static int s2io_register_test(nic_t * sp, uint64_t * data)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64 = 0;
 	int fail = 0;
 
@@ -3712,7 +3712,7 @@ static int s2io_bist_test(nic_t * sp, uint64_t * data)
 
 static int s2io_link_test(nic_t * sp, uint64_t * data)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
 
 	val64 = readq(&bar0->adapter_status);
@@ -3737,7 +3737,7 @@ static int s2io_link_test(nic_t * sp, uint64_t * data)
 
 static int s2io_rldram_test(nic_t * sp, uint64_t * data)
 {
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	u64 val64;
 	int cnt, iteration = 0, test_pass = 0;
 
@@ -4078,7 +4078,7 @@ int s2io_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 int s2io_change_mtu(struct net_device *dev, int new_mtu)
 {
 	nic_t *sp = dev->priv;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	register u64 val64;
 
 	if (netif_running(dev)) {
@@ -4155,7 +4155,7 @@ static void s2io_set_link(unsigned long data)
 {
 	nic_t *nic = (nic_t *) data;
 	struct net_device *dev = nic->dev;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
+	XENA_dev_config_t __iomem *bar0 = nic->bar0;
 	register u64 val64;
 	u16 subid;
 
@@ -4219,7 +4219,7 @@ static void s2io_set_link(unsigned long data)
 static void s2io_card_down(nic_t * sp)
 {
 	int cnt = 0;
-	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
+	XENA_dev_config_t __iomem *bar0 = sp->bar0;
 	unsigned long flags;
 	register u64 val64 = 0;
 
@@ -4597,7 +4597,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	int dma_flag = FALSE;
 	u32 mac_up, mac_down;
 	u64 val64 = 0, tmp64 = 0;
-	XENA_dev_config_t *bar0 = NULL;
+	XENA_dev_config_t __iomem *bar0 = NULL;
 	u16 subid;
 	mac_info_t *mac_control;
 	struct config_param *config;
@@ -4727,7 +4727,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		goto mem_alloc_failed;
 	}
 
-	sp->bar0 = (caddr_t) ioremap(pci_resource_start(pdev, 0),
+	sp->bar0 = ioremap(pci_resource_start(pdev, 0),
 				     pci_resource_len(pdev, 0));
 	if (!sp->bar0) {
 		DBG_PRINT(ERR_DBG, "%s: S2IO: cannot remap io mem1\n",
@@ -4736,7 +4736,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		goto bar0_remap_failed;
 	}
 
-	sp->bar1 = (caddr_t) ioremap(pci_resource_start(pdev, 2),
+	sp->bar1 = ioremap(pci_resource_start(pdev, 2),
 				     pci_resource_len(pdev, 2));
 	if (!sp->bar1) {
 		DBG_PRINT(ERR_DBG, "%s: S2IO: cannot remap io mem2\n",
@@ -4750,7 +4750,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 
 	/* Initializing the BAR1 address as the start of the FIFO pointer. */
 	for (j = 0; j < MAX_TX_FIFOS; j++) {
-		mac_control->tx_FIFO_start[j] = (TxFIFO_element_t *)
+		mac_control->tx_FIFO_start[j] = (TxFIFO_element_t __iomem *)
 		    (sp->bar1 + (j * 0x00020000));
 	}
 
@@ -4815,7 +4815,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	 * MAC address initialization.
 	 * For now only one mac address will be read and used.
 	 */
-	bar0 = (XENA_dev_config_t *) sp->bar0;
+	bar0 = sp->bar0;
 	val64 = RMAC_ADDR_CMD_MEM_RD | RMAC_ADDR_CMD_MEM_STROBE_NEW_CMD |
 	    RMAC_ADDR_CMD_MEM_OFFSET(0 + MAC_MAC_ADDR_START_OFFSET);
 	writeq(val64, &bar0->rmac_addr_cmd_mem);
@@ -4872,7 +4872,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		val64 |= 0x0000800000000000ULL;
 		writeq(val64, &bar0->gpio_control);
 		val64 = 0x0411040400000000ULL;
-		writeq(val64, (u64 *) ((u8 *) bar0 + 0x2700));
+		writeq(val64, (void __iomem *) bar0 + 0x2700);
 		val64 = readq(&bar0->gpio_control);
 	}
 
