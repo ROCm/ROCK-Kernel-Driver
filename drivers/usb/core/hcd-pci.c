@@ -174,7 +174,6 @@ clean_3:
 	}
 	hcd->state = USB_STATE_HALT;
 
-	pci_set_master (dev);
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
 #else
