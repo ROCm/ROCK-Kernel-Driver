@@ -20,8 +20,8 @@ u8 sleep_states[ACPI_S_STATE_COUNT];
 
 static struct pm_ops acpi_pm_ops;
 
-extern void do_suspend_lowlevel_s4bios(int);
-extern void do_suspend_lowlevel(int);
+extern void do_suspend_lowlevel_s4bios(void);
+extern void do_suspend_lowlevel(void);
 
 static u32 acpi_suspend_states[] = {
 	[PM_SUSPEND_ON]		= ACPI_STATE_S0,
@@ -95,14 +95,14 @@ static int acpi_pm_enter(u32 state)
 		break;
 
 	case PM_SUSPEND_MEM:
-		do_suspend_lowlevel(0);
+		do_suspend_lowlevel();
 		break;
 
 	case PM_SUSPEND_DISK:
 		if (acpi_pm_ops.pm_disk_mode == PM_DISK_PLATFORM)
 			status = acpi_enter_sleep_state(acpi_state);
 		else
-			do_suspend_lowlevel_s4bios(0);
+			do_suspend_lowlevel_s4bios();
 		break;
 	default:
 		return -EINVAL;
