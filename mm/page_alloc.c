@@ -938,18 +938,18 @@ void __get_page_state(struct page_state *ret, int nr)
 	int cpu = 0;
 
 	memset(ret, 0, sizeof(*ret));
+
+	cpu = first_cpu(cpu_online_map);
 	while (cpu < NR_CPUS) {
 		unsigned long *in, *out, off;
 
-		if (!cpu_possible(cpu)) {
-			cpu++;
-			continue;
-		}
-
 		in = (unsigned long *)&per_cpu(page_states, cpu);
-		cpu++;
-		if (cpu < NR_CPUS && cpu_possible(cpu))
+
+		cpu = next_cpu(cpu, cpu_online_map);
+
+		if (cpu < NR_CPUS)
 			prefetch(&per_cpu(page_states, cpu));
+
 		out = (unsigned long *)ret;
 		for (off = 0; off < nr; off++)
 			*out++ += *in++;
@@ -976,11 +976,8 @@ unsigned long __read_page_state(unsigned offset)
 	unsigned long ret = 0;
 	int cpu;
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+	for_each_online_cpu(cpu) {
 		unsigned long in;
-
-		if (!cpu_possible(cpu))
-			continue;
 
 		in = (unsigned long)&per_cpu(page_states, cpu) + offset;
 		ret += *((unsigned long *)in);
@@ -1813,14 +1810,28 @@ static int page_alloc_cpu_notify(struct notifier_block *self,
 {
 	int cpu = (unsigned long)hcpu;
 	long *count;
+	unsigned long *src, *dest;
 
 	if (action == CPU_DEAD) {
+		int i;
+
 		/* Drain local pagecache count. */
 		count = &per_cpu(nr_pagecache_local, cpu);
 		atomic_add(*count, &nr_pagecache);
 		*count = 0;
 		local_irq_disable();
 		__drain_pages(cpu);
+
+		/* Add dead cpu's page_states to our own. */
+		dest = (unsigned long *)&__get_cpu_var(page_states);
+		src = (unsigned long *)&per_cpu(page_states, cpu);
+
+		for (i = 0; i < sizeof(struct page_state)/sizeof(unsigned long);
+				i++) {
+			dest[i] += src[i];
+			src[i] = 0;
+		}
+
 		local_irq_enable();
 	}
 	return NOTIFY_OK;
