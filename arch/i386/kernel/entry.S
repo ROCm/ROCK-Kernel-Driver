@@ -235,7 +235,9 @@ ENTRY(resume_kernel)
 	jnz restore_all
 	incl TI_PRE_COUNT(%ebx)
 	sti
-	call SYMBOL_NAME(preempt_schedule)
+	movl TI_TASK(%ebx), %ecx	# ti->task
+	movl $0, (%ecx)			# current->state = TASK_RUNNING
+	call SYMBOL_NAME(schedule)
 	jmp ret_from_intr
 #endif
 

@@ -841,6 +841,8 @@ switch_tasks:
  */
 asmlinkage void preempt_schedule(void)
 {
+	if (unlikely(preempt_get_count()))
+		return;
 	current->state = TASK_RUNNING;
 	schedule();
 }
