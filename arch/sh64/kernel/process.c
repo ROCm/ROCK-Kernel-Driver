@@ -901,7 +901,7 @@ unsigned long get_wchan(struct task_struct *p)
 	 */
 	pc = thread_saved_pc(p);
 
-#if CONFIG_FRAME_POINTER
+#ifdef CONFIG_FRAME_POINTER
 	if (in_sh64_switch_to(pc)) {
 		sh64_switch_to_fp = (long) p->thread.sp;
 		/* r14 is saved at offset 4 in the sh64_switch_to frame */
