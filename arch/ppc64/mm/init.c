@@ -59,6 +59,7 @@
 #include <asm/cputable.h>
 #include <asm/ppcdebug.h>
 #include <asm/sections.h>
+#include <asm/system.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_dma.h>
@@ -691,11 +692,7 @@ void __init do_init_bootmem(void)
 	bootmap_pages = bootmem_bootmap_pages(total_pages);
 
 	start = (unsigned long)__a2p(lmb_alloc(bootmap_pages<<PAGE_SHIFT, PAGE_SIZE));
-	if (start == 0) {
-		udbg_printf("do_init_bootmem: failed to allocate a bitmap.\n");
-		udbg_printf("\tbootmap_pages = 0x%lx.\n", bootmap_pages);
-		PPCDBG_ENTER_DEBUGGER(); 
-	}
+	BUG_ON(!start);
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 

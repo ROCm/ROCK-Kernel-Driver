@@ -37,12 +37,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#include <asm/ppcdebug.h>
-
-#ifdef CONFIG_DEBUG_KERNEL
-int debugger_kernel_faults = 1;
-#endif
-
 void bad_page_fault(struct pt_regs *, unsigned long, int);
 
 /*
@@ -60,13 +54,10 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	unsigned long code = SEGV_MAPERR;
 	unsigned long is_write = error_code & 0x02000000;
 
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_fault_handler && (regs->trap == 0x300 ||
-				       regs->trap == 0x380)) {
-		debugger_fault_handler(regs);
-		return;
+	if (regs->trap == 0x300 || regs->trap == 0x380) {
+		if (debugger_fault_handler(regs))
+			return;
 	}
-#endif
 
 	/* On a kernel SLB miss we can only check for a valid exception entry */
 	if (!user_mode(regs) && (regs->trap == 0x380)) {
@@ -74,13 +65,10 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 		return;
 	}
 
-#ifdef CONFIG_DEBUG_KERNEL
 	if (error_code & 0x00400000) {
-		/* DABR match */
 		if (debugger_dabr_match(regs))
 			return;
 	}
-#endif
 
 	if (in_atomic() || mm == NULL) {
 		bad_page_fault(regs, address, SIGSEGV);
@@ -149,11 +137,6 @@ bad_area:
 		info.si_errno = 0;
 		info.si_code = code;
 		info.si_addr = (void *) address;
-#ifdef CONFIG_XMON
-		ifppcdebug(PPCDBG_SIGNALXMON)
-			PPCDBG_ENTER_DEBUGGER_REGS(regs);
-#endif
-
 		force_sig_info(SIGSEGV, &info, current);
 		return;
 	}
@@ -207,9 +190,7 @@ bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 	}
 
 	/* kernel has accessed a bad area */
-#ifdef CONFIG_DEBUG_KERNEL
-	if (debugger_kernel_faults && debugger)
-		debugger(regs);
-#endif
+	if (debugger(regs))
+		return;
 	die("Kernel access of bad area", regs, sig);
 }

@@ -73,11 +73,10 @@ static struct bpt iabr;
 static unsigned bpinstr = 0x7fe00008;	/* trap */
 
 /* Prototypes */
-extern void (*debugger_fault_handler)(struct pt_regs *);
 static int cmds(struct pt_regs *);
 static int mread(unsigned long, void *, int);
 static int mwrite(unsigned long, void *, int);
-static void handle_fault(struct pt_regs *);
+static int handle_fault(struct pt_regs *);
 static void byterev(unsigned char *, int);
 static void memex(void);
 static int bsesc(void);
@@ -235,7 +234,7 @@ static inline void disable_surveillance(void)
 #endif
 }
 
-void
+int
 xmon(struct pt_regs *excp)
 {
 	struct pt_regs regs;
@@ -342,6 +341,8 @@ xmon(struct pt_regs *excp)
 	cpu_clear(smp_processor_id(), cpus_in_xmon);
 #endif /* CONFIG_SMP */
 	set_msrd(msr);		/* restore interrupt enable */
+
+	return 0;
 }
 
 int
@@ -627,7 +628,7 @@ static void cpu_cmd(void)
 		printf("stopping all cpus\n");
 		/* interrupt other cpu(s) */
 		cpu = MSG_ALL_BUT_SELF;
-		smp_send_xmon_break(cpu);
+		smp_send_debugger_break(cpu);
 		return;
 	}
 	termch = cmd;
@@ -1052,8 +1053,8 @@ cacheflush(void)
 	nflush = 1;
 	scanhex(&nflush);
 	nflush = (nflush + L1_CACHE_BYTES - 1) / L1_CACHE_BYTES;
-	if( setjmp(bus_error_jmp) == 0 ) {
-		debugger_fault_handler = handle_fault;
+	if (setjmp(bus_error_jmp) == 0) {
+		__debugger_fault_handler = handle_fault;
 		sync();
 
 		if (cmd != 'i') {
@@ -1067,7 +1068,7 @@ cacheflush(void)
 		/* wait a little while to see if we get a machine check */
 		__delay(200);
 	}
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 }
 
 unsigned long
@@ -1088,7 +1089,7 @@ read_spr(int n)
 	code = (unsigned long (*)(void)) opd;
 
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 
 		ret = code();
@@ -1100,7 +1101,7 @@ read_spr(int n)
 		printf("*** Error reading spr %x\n", n);
 	}
 
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 
 	return ret;
 }
@@ -1122,7 +1123,7 @@ write_spr(int n, unsigned long val)
 	code = (unsigned long (*)(unsigned long)) opd;
 
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 
 		code(val);
@@ -1134,7 +1135,7 @@ write_spr(int n, unsigned long val)
 		printf("*** Error writing spr %x\n", n);
 	}
 
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 }
 
 static unsigned long regno;
@@ -1213,7 +1214,7 @@ mread(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		p = (char *)adrs;
 		q = (char *)buf;
@@ -1238,7 +1239,7 @@ mread(unsigned long adrs, void *buf, int size)
 		__delay(200);
 		n = size;
 	}
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 	return n;
 }
 
@@ -1250,7 +1251,7 @@ mwrite(unsigned long adrs, void *buf, int size)
 
 	n = 0;
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		p = (char *) adrs;
 		q = (char *) buf;
@@ -1277,14 +1278,14 @@ mwrite(unsigned long adrs, void *buf, int size)
 	} else {
 		printf("*** Error writing address %x\n", adrs + n);
 	}
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 	return n;
 }
 
 static int fault_type;
 static char *fault_chars[] = { "--", "**", "##" };
 
-static void
+static int
 handle_fault(struct pt_regs *regs)
 {
 	switch (regs->trap) {
@@ -1300,6 +1301,8 @@ handle_fault(struct pt_regs *regs)
 	}
 
 	longjmp(bus_error_jmp, 1);
+
+	return 0;
 }
 
 #define SWAP(a, b, t)	((t) = (a), (a) = (b), (b) = (t))
@@ -1913,7 +1916,7 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 	char namebuf[128];
 
 	if (setjmp(bus_error_jmp) == 0) {
-		debugger_fault_handler = handle_fault;
+		__debugger_fault_handler = handle_fault;
 		sync();
 		name = kallsyms_lookup(address, &size, &offset, &modname,
 				       namebuf);
@@ -1924,7 +1927,7 @@ void __xmon_print_symbol(const char *fmt, unsigned long address)
 		name = "symbol lookup failed";
 	}
 
-	debugger_fault_handler = 0;
+	__debugger_fault_handler = 0;
 
 	if (!name) {
 		char addrstr[sizeof("0x%lx") + (BITS_PER_LONG*3/10)];
@@ -2035,6 +2038,15 @@ static void dump_stab(void)
 			printf("%016lx\n", b);
 		}
 	}
+}
+
+void xmon_init(void)
+{
+	__debugger = xmon;
+	__debugger_bpt = xmon_bpt;
+	__debugger_sstep = xmon_sstep;
+	__debugger_iabr_match = xmon_iabr_match;
+	__debugger_dabr_match = xmon_dabr_match;
 }
 
 void dump_segments(void)

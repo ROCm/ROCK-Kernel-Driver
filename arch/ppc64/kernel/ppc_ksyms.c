@@ -206,25 +206,6 @@ EXPORT_SYMBOL(timer_interrupt);
 EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(get_wchan);
 EXPORT_SYMBOL(console_drivers);
-#ifdef CONFIG_XMON
-EXPORT_SYMBOL(xmon);
-#endif
-
-#ifdef CONFIG_DEBUG_KERNEL
-extern void (*debugger)(struct pt_regs *regs);
-extern int (*debugger_bpt)(struct pt_regs *regs);
-extern int (*debugger_sstep)(struct pt_regs *regs);
-extern int (*debugger_iabr_match)(struct pt_regs *regs);
-extern int (*debugger_dabr_match)(struct pt_regs *regs);
-extern void (*debugger_fault_handler)(struct pt_regs *regs);
-
-EXPORT_SYMBOL(debugger);
-EXPORT_SYMBOL(debugger_bpt);
-EXPORT_SYMBOL(debugger_sstep);
-EXPORT_SYMBOL(debugger_iabr_match);
-EXPORT_SYMBOL(debugger_dabr_match);
-EXPORT_SYMBOL(debugger_fault_handler);
-#endif
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);
