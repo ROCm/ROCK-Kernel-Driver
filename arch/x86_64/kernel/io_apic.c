@@ -252,7 +252,8 @@ void __init check_ioapic(void)
 				switch (vendor) { 
 				case PCI_VENDOR_ID_VIA:
 #ifdef CONFIG_GART_IOMMU
-					if (end_pfn >= (0xffffffff>>PAGE_SHIFT) &&
+					if ((end_pfn >= (0xffffffff>>PAGE_SHIFT) ||
+					     force_iommu) &&
 					    !iommu_aperture_allowed) {
 						printk(KERN_INFO
     "Looks like a VIA chipset. Disabling IOMMU. Overwrite with \"iommu=allowed\"\n");
