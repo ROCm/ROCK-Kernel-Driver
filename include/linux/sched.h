@@ -837,10 +837,11 @@ static inline int need_resched(void)
 	return unlikely(test_thread_flag(TIF_NEED_RESCHED));
 }
 
+extern void __cond_resched(void);
 static inline void cond_resched(void)
 {
 	if (need_resched())
-		schedule();
+		__cond_resched();
 }
 
 /* Reevaluate whether the task has signals pending delivery.
