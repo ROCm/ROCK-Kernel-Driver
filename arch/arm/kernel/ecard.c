@@ -221,8 +221,7 @@ static void ecard_do_request(struct ecard_request *req)
 
 #include <linux/completion.h>
 
-static pid_t ecard_pid;
-static wait_queue_head_t ecard_wait;
+static DECLARE_WAIT_QUEUE_HEAD(ecard_wait);
 static struct ecard_request *ecard_req;
 static DECLARE_MUTEX(ecard_sem);
 static DECLARE_COMPLETION(ecard_completion);
@@ -319,9 +318,6 @@ ecard_call(struct ecard_request *req)
 	 */
 	if (current == &init_task || in_interrupt())
 		BUG();
-
-	if (ecard_pid <= 0)
-		ecard_pid = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
 
 	down(&ecard_sem);
 	ecard_req = req;
@@ -1061,9 +1057,14 @@ nomem:
  */
 static int __init ecard_init(void)
 {
-	int slot, irqhw;
+	int slot, irqhw, ret;
 
-	init_waitqueue_head(&ecard_wait);
+	ret = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
+	if (ret < 0) {
+		printk(KERN_ERR "Ecard: unable to create kernel thread: %d\n",
+		       ret);
+		return ret;
+	}
 
 	printk("Probing expansion cards\n");
 
