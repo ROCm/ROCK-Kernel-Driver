@@ -90,6 +90,22 @@
 
 #define SRMMU_CHG_MASK    (0xffffff00 | SRMMU_REF | SRMMU_DIRTY)
 
+/* SRMMU swap entry encoding
+ *
+ * We use 5 bits for the type and 19 for the offset.  This gives us
+ * 32 swapfiles of 4GB each.  Encoding looks like:
+ *
+ * oooooooooooooooooootttttRRRRRRRR
+ * fedcba9876543210fedcba9876543210
+ *
+ * The bottom 8 bits are reserved for protection and status bits, especially
+ * FILE and PRESENT.
+ */
+#define SRMMU_SWP_TYPE_MASK	0x1f
+#define SRMMU_SWP_TYPE_SHIFT	SRMMU_PTE_FILE_SHIFT
+#define SRMMU_SWP_OFF_MASK	0x7ffff
+#define SRMMU_SWP_OFF_SHIFT	(SRMMU_PTE_FILE_SHIFT + 5)
+
 /* Some day I will implement true fine grained access bits for
  * user pages because the SRMMU gives us the capabilities to
  * enforce all the protection levels that vma's can have.
