@@ -22,7 +22,7 @@ static inline int apic_id_registered(void)
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 static inline unsigned long target_cpus(void)
 { 
-	return ((cpu_online_map < 0xf)?cpu_online_map:0xf);
+	return cpu_online_map;
 }
 #define TARGET_CPUS	(target_cpus())
 
@@ -151,7 +151,7 @@ static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 			if (apicid_cluster(apicid) != 
 					apicid_cluster(new_apicid)){
 				printk ("%s: Not a valid mask!\n",__FUNCTION__);
-				return TARGET_CPUS;
+				return 0xFF;
 			}
 			apicid = apicid | new_apicid;
 			cpus_found++;

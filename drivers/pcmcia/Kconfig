@@ -29,8 +29,8 @@ config PCMCIA
 	  and ds.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.
 
-config CARDBUS
-	bool "CardBus support"
+config YENTA
+	tristate "CardBus yenta-compatible bridge support"
 	depends on PCMCIA && PCI
 	---help---
 	  CardBus is a bus mastering architecture for PC-cards, which allows
@@ -48,6 +48,11 @@ config CARDBUS
 
 	  If unsure, say Y.
 
+config CARDBUS
+	bool
+	depends on YENTA
+	default y if YENTA
+
 config I82092
 	tristate "i82092 compatible bridge support"
 	depends on PCMCIA && PCI
@@ -58,7 +63,7 @@ config I82092
 
 config I82365
 	tristate "i82365 compatible bridge support"
-	depends on PCMCIA
+	depends on PCMCIA && ISA
 	help
 	  Say Y here to include support for ISA-bus PCMCIA host bridges that
 	  are register compatible with the Intel i82365.  These are found on

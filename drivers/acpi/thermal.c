@@ -430,7 +430,7 @@ acpi_thermal_call_usermode (
 	ACPI_FUNCTION_TRACE("acpi_thermal_call_usermode");
 
 	if (!path)
-		return_VALUE(-EINVAL);;
+		return_VALUE(-EINVAL);
 
 	argv[0] = path;
 

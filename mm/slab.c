@@ -385,11 +385,7 @@ static int slab_break_gfp_order = BREAK_GFP_ORDER_LO;
 #define	GET_PAGE_SLAB(pg)     ((struct slab *)(pg)->list.prev)
 
 /* These are the default caches for kmalloc. Custom caches can have other sizes. */
-static struct cache_sizes {
-	size_t		 cs_size;
-	kmem_cache_t	*cs_cachep;
-	kmem_cache_t	*cs_dmacachep;
-} malloc_sizes[] = {
+struct cache_sizes malloc_sizes[] = {
 #define CACHE(x) { .cs_size = (x) },
 #include <linux/kmalloc_sizes.h>
 	{ 0, }
@@ -1967,7 +1963,7 @@ void * kmem_cache_alloc (kmem_cache_t *cachep, int flags)
  * platforms.  For example, on i386, it means that the memory must come
  * from the first 16MB.
  */
-void * kmalloc (size_t size, int flags)
+void * __kmalloc (size_t size, int flags)
 {
 	struct cache_sizes *csizep = malloc_sizes;
 

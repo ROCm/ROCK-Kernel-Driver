@@ -34,13 +34,13 @@ struct i2c_smbus_ioctl_data {
 	__u8 read_write;
 	__u8 command;
 	__u32 size;
-	union i2c_smbus_data *data;
+	union i2c_smbus_data __user *data;
 };
 
 /* This is the structure as used in the I2C_RDWR ioctl call */
 struct i2c_rdwr_ioctl_data {
-	struct i2c_msg *msgs;	/* pointers to i2c_msgs */
-	__u32 nmsgs;		/* number of i2c_msgs */
+	struct i2c_msg __user *msgs;	/* pointers to i2c_msgs */
+	__u32 nmsgs;			/* number of i2c_msgs */
 };
 
 #endif /* _LINUX_I2C_DEV_H */

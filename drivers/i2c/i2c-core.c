@@ -510,7 +510,7 @@ int i2c_master_send(struct i2c_client *client,const char *buf ,int count)
 		msg.addr   = client->addr;
 		msg.flags = client->flags & I2C_M_TEN;
 		msg.len = count;
-		(const char *)msg.buf = buf;
+		msg.buf = (char *)buf;
 	
 		DEB2(dev_dbg(&client->adapter->dev, "master_send: writing %d bytes.\n",
 				count));
@@ -861,13 +861,13 @@ int i2c_smbus_check_pec(u16 addr, u8 command, int size, u8 partial,
 	return 0;	
 }
 
-extern s32 i2c_smbus_write_quick(struct i2c_client * client, u8 value)
+s32 i2c_smbus_write_quick(struct i2c_client *client, u8 value)
 {
 	return i2c_smbus_xfer(client->adapter,client->addr,client->flags,
  	                      value,0,I2C_SMBUS_QUICK,NULL);
 }
 
-extern s32 i2c_smbus_read_byte(struct i2c_client * client)
+s32 i2c_smbus_read_byte(struct i2c_client *client)
 {
 	union i2c_smbus_data data;
 	if (i2c_smbus_xfer(client->adapter,client->addr,client->flags,
@@ -877,14 +877,14 @@ extern s32 i2c_smbus_read_byte(struct i2c_client * client)
 		return 0x0FF & data.byte;
 }
 
-extern s32 i2c_smbus_write_byte(struct i2c_client * client, u8 value)
+s32 i2c_smbus_write_byte(struct i2c_client *client, u8 value)
 {
 	union i2c_smbus_data data;	/* only for PEC */
 	return i2c_smbus_xfer(client->adapter,client->addr,client->flags,
 	                      I2C_SMBUS_WRITE,value, I2C_SMBUS_BYTE,&data);
 }
 
-extern s32 i2c_smbus_read_byte_data(struct i2c_client * client, u8 command)
+s32 i2c_smbus_read_byte_data(struct i2c_client *client, u8 command)
 {
 	union i2c_smbus_data data;
 	if (i2c_smbus_xfer(client->adapter,client->addr,client->flags,
@@ -894,8 +894,7 @@ extern s32 i2c_smbus_read_byte_data(struct i2c_client * client, u8 command)
 		return 0x0FF & data.byte;
 }
 
-extern s32 i2c_smbus_write_byte_data(struct i2c_client * client, u8 command,
-                                     u8 value)
+s32 i2c_smbus_write_byte_data(struct i2c_client *client, u8 command, u8 value)
 {
 	union i2c_smbus_data data;
 	data.byte = value;
@@ -904,7 +903,7 @@ extern s32 i2c_smbus_write_byte_data(struct i2c_client * client, u8 command,
 	                      I2C_SMBUS_BYTE_DATA,&data);
 }
 
-extern s32 i2c_smbus_read_word_data(struct i2c_client * client, u8 command)
+s32 i2c_smbus_read_word_data(struct i2c_client *client, u8 command)
 {
 	union i2c_smbus_data data;
 	if (i2c_smbus_xfer(client->adapter,client->addr,client->flags,
@@ -914,8 +913,7 @@ extern s32 i2c_smbus_read_word_data(struct i2c_client * client, u8 command)
 		return 0x0FFFF & data.word;
 }
 
-extern s32 i2c_smbus_write_word_data(struct i2c_client * client,
-                                     u8 command, u16 value)
+s32 i2c_smbus_write_word_data(struct i2c_client *client, u8 command, u16 value)
 {
 	union i2c_smbus_data data;
 	data.word = value;
@@ -924,8 +922,7 @@ extern s32 i2c_smbus_write_word_data(struct i2c_client * client,
 	                      I2C_SMBUS_WORD_DATA,&data);
 }
 
-extern s32 i2c_smbus_process_call(struct i2c_client * client,
-                                  u8 command, u16 value)
+s32 i2c_smbus_process_call(struct i2c_client *client, u8 command, u16 value)
 {
 	union i2c_smbus_data data;
 	data.word = value;
@@ -938,8 +935,7 @@ extern s32 i2c_smbus_process_call(struct i2c_client * client,
 }
 
 /* Returns the number of read bytes */
-extern s32 i2c_smbus_read_block_data(struct i2c_client * client,
-                                     u8 command, u8 *values)
+s32 i2c_smbus_read_block_data(struct i2c_client *client, u8 command, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
@@ -954,8 +950,7 @@ extern s32 i2c_smbus_read_block_data(struct i2c_client * client,
 	}
 }
 
-extern s32 i2c_smbus_write_block_data(struct i2c_client * client,
-                                      u8 command, u8 length, u8 *values)
+s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command, u8 length, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
@@ -970,8 +965,7 @@ extern s32 i2c_smbus_write_block_data(struct i2c_client * client,
 }
 
 /* Returns the number of read bytes */
-extern s32 i2c_smbus_block_process_call(struct i2c_client * client,
-                                        u8 command, u8 length, u8 *values)
+s32 i2c_smbus_block_process_call(struct i2c_client *client, u8 command, u8 length, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
@@ -990,8 +984,7 @@ extern s32 i2c_smbus_block_process_call(struct i2c_client * client,
 }
 
 /* Returns the number of read bytes */
-extern s32 i2c_smbus_read_i2c_block_data(struct i2c_client * client,
-                                         u8 command, u8 *values)
+s32 i2c_smbus_read_i2c_block_data(struct i2c_client *client, u8 command, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
@@ -1006,8 +999,7 @@ extern s32 i2c_smbus_read_i2c_block_data(struct i2c_client * client,
 	}
 }
 
-extern s32 i2c_smbus_write_i2c_block_data(struct i2c_client * client,
-                                          u8 command, u8 length, u8 *values)
+s32 i2c_smbus_write_i2c_block_data(struct i2c_client *client, u8 command, u8 length, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;

@@ -229,22 +229,20 @@ acpi_pci_irq_add_prt (
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */
 
-int
-acpi_pci_irq_lookup (
-	int			segment,
-	int			bus,
-	int			device,
-	int			pin)
+static int
+acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 {
 	struct acpi_prt_entry	*entry = NULL;
+	int segment = pci_domain_nr(bus);
+	int bus_nr = bus->number;
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_lookup");
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 		"Searching for PRT entry for %02x:%02x:%02x[%c]\n", 
-		segment, bus, device, ('A' + pin)));
+		segment, bus_nr, device, ('A' + pin)));
 
-	entry = acpi_pci_irq_find_prt_entry(segment, bus, device, pin); 
+	entry = acpi_pci_irq_find_prt_entry(segment, bus_nr, device, pin); 
 	if (!entry) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "PRT entry not found\n"));
 		return_VALUE(0);
@@ -288,7 +286,8 @@ acpi_pci_irq_derive (
 	while (!irq && bridge->bus->self) {
 		pin = (pin + PCI_SLOT(bridge->devfn)) % 4;
 		bridge = bridge->bus->self;
-		irq = acpi_pci_irq_lookup(0, bridge->bus->number, PCI_SLOT(bridge->devfn), pin);
+		irq = acpi_pci_irq_lookup(bridge->bus,
+				PCI_SLOT(bridge->devfn), pin);
 	}
 
 	if (!irq) {
@@ -331,7 +330,7 @@ acpi_pci_irq_enable (
 	 * First we check the PCI IRQ routing table (PRT) for an IRQ.  PRT
 	 * values override any BIOS-assigned IRQs set during boot.
 	 */
- 	irq = acpi_pci_irq_lookup(0, dev->bus->number, PCI_SLOT(dev->devfn), pin);
+ 	irq = acpi_pci_irq_lookup(dev->bus, PCI_SLOT(dev->devfn), pin);
  
 	/*
 	 * If no PRT entry was found, we'll try to derive an IRQ from the

@@ -114,10 +114,16 @@ void __init get_memcfg_numa_flat(void)
  */
 static void __init find_max_pfn_node(int nid)
 {
-	if (node_start_pfn[nid] >= node_end_pfn[nid])
-		BUG();
 	if (node_end_pfn[nid] > max_pfn)
 		node_end_pfn[nid] = max_pfn;
+	/*
+	 * if a user has given mem=XXXX, then we need to make sure 
+	 * that the node _starts_ before that, too, not just ends
+	 */
+	if (node_start_pfn[nid] > max_pfn)
+		node_start_pfn[nid] = max_pfn;
+	if (node_start_pfn[nid] > node_end_pfn[nid])
+		BUG();
 }
 
 /* 

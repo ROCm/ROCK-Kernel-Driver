@@ -104,11 +104,13 @@ static void background_writeout(unsigned long _min_pages);
  * clamping level.
  */
 static void
-get_dirty_limits(struct page_state *ps, long *background, long *dirty)
+get_dirty_limits(struct page_state *ps, long *pbackground, long *pdirty)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
 	int unmapped_ratio;
+	long background;
+	long dirty;
 
 	get_page_state(ps);
 
@@ -125,8 +127,14 @@ get_dirty_limits(struct page_state *ps, long *background, long *dirty)
 	if (background_ratio >= dirty_ratio)
 		background_ratio = dirty_ratio / 2;
 
-	*background = (background_ratio * total_pages) / 100;
-	*dirty = (dirty_ratio * total_pages) / 100;
+	background = (background_ratio * total_pages) / 100;
+	dirty = (dirty_ratio * total_pages) / 100;
+	if (current->flags & PF_LESS_THROTTLE) {
+		background += background / 4;
+		dirty += dirty / 4;
+	}
+	*pbackground = background;
+	*pdirty = dirty;
 }
 
 /*

@@ -898,7 +898,7 @@ void si_meminfo_node(struct sysinfo *val, int nid)
 
 	val->totalram = pgdat->node_size;
 	val->freeram = nr_free_pages_pgdat(pgdat);
-	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].spanned_pages;
+	val->totalhigh = pgdat->node_zones[ZONE_HIGHMEM].present_pages;
 	val->freehigh = pgdat->node_zones[ZONE_HIGHMEM].free_pages;
 	val->mem_unit = PAGE_SIZE;
 }
@@ -1152,8 +1152,11 @@ static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		size += zones_size[i];
 	size = LONG_ALIGN((size + 7) >> 3);
-	pgdat->valid_addr_bitmap = (unsigned long *)alloc_bootmem_node(pgdat, size);
-	memset(pgdat->valid_addr_bitmap, 0, size);
+	if (size) {
+		pgdat->valid_addr_bitmap = 
+			(unsigned long *)alloc_bootmem_node(pgdat, size);
+		memset(pgdat->valid_addr_bitmap, 0, size);
+	}
 }
 
 /*

@@ -95,7 +95,8 @@ EXPORT_SYMBOL(kmem_cache_free);
 EXPORT_SYMBOL(kmem_cache_size);
 EXPORT_SYMBOL(set_shrinker);
 EXPORT_SYMBOL(remove_shrinker);
-EXPORT_SYMBOL(kmalloc);
+EXPORT_SYMBOL(malloc_sizes);
+EXPORT_SYMBOL(__kmalloc);
 EXPORT_SYMBOL(kfree);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(__alloc_percpu);
