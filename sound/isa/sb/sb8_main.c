@@ -97,7 +97,7 @@ static int snd_sb8_hw_constraint_channels_rate(snd_pcm_hw_params_t *params,
 {
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (r->min > SB8_RATE(22050) || r->max <= SB8_RATE(11025)) {
-		snd_interval_t t = { min: 1, max: 1 };
+		snd_interval_t t = { .min = 1, .max = 1 };
 		return snd_interval_refine(hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS), &t);
 	}
 	return 0;

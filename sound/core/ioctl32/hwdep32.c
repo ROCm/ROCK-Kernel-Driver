@@ -31,6 +31,7 @@ struct sndrv_hwdep_dsp_image32 {
 	unsigned char name[64];
 	u32 image;	/* pointer */
 	u32 length;
+	u32 driver_data;
 } /* don't set packed attribute here */;
 
 static int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
@@ -47,6 +48,7 @@ static int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsig
 	memcpy(data.name, data32.name, sizeof(data.name));
 	data.image = A(data32.image);
 	data.length = data32.length;
+	data.driver_data = data32.driver_data;
 	oldseg = get_fs();
 	set_fs(KERNEL_DS);
 	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);

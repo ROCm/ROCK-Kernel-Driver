@@ -51,7 +51,7 @@ MODULE_PARM_SYNTAX(enable_loopback, SNDRV_BOOLEAN_FALSE_DESC);
 
  */
 
-static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97);
+static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97, const char *prefix);
 
 typedef struct {
 	unsigned int id;
@@ -135,8 +135,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x4e534300, 0xffffffff, "LM4540/43/45/46/48",	NULL,		NULL }, // only guess --jk
 { 0x4e534331, 0xffffffff, "LM4549",		NULL,		NULL },
 { 0x50534304, 0xffffffff, "UCB1400",		NULL,		NULL },
-{ 0x53494c22, 0xffffffff, "Si3036",		NULL,		NULL },
-{ 0x53494c23, 0xffffffff, "Si3038",		NULL,		NULL },
+{ 0x53494c20, 0xffffffe0, "Si3036/8",		NULL,		NULL },
 { 0x54524102, 0xffffffff, "TR28022",		NULL,		NULL },
 { 0x54524106, 0xffffffff, "TR28026",		NULL,		NULL },
 { 0x54524108, 0xffffffff, "TR28028",		patch_tritech_tr28028,	NULL }, // added by xin jin [07/09/99]
@@ -1082,6 +1081,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	/* 8: reserved */
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
 	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
+	AC97_SINGLE("Swap Surround Slot", AC97_ALC650_MULTICH, 14, 1, 0),
 #if 0 /* always set in patch_alc650 */
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
 	AC97_SINGLE("IEC958 Input Pin Enable", AC97_ALC650_CLOCK, 1, 1, 0),
@@ -1142,11 +1142,11 @@ static int snd_ac97_ymf753_put_speaker(snd_kcontrol_t * kcontrol, snd_ctl_elem_v
 
 static const snd_kcontrol_new_t snd_ac97_ymf753_controls_speaker =
 {
-	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-	name: "3D Control - Speaker",
-	info: snd_ac97_ymf753_info_speaker,
-	get: snd_ac97_ymf753_get_speaker,
-	put: snd_ac97_ymf753_put_speaker,
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name	= "3D Control - Speaker",
+	.info	= snd_ac97_ymf753_info_speaker,
+	.get	= snd_ac97_ymf753_get_speaker,
+	.put	= snd_ac97_ymf753_put_speaker,
 };
 
 /* It is possible to indicate to the Yamaha YMF753 the source to direct to the S/PDIF output. */
@@ -1227,18 +1227,18 @@ static int snd_ac97_ymf753_spdif_output_pin_put(snd_kcontrol_t * kcontrol, snd_c
 
 static const snd_kcontrol_new_t snd_ac97_ymf753_controls_spdif[3] = {
 	{
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Source",
-		info: snd_ac97_ymf753_spdif_source_info,
-		get: snd_ac97_ymf753_spdif_source_get,
-		put: snd_ac97_ymf753_spdif_source_put,
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name	= SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Source",
+		.info	= snd_ac97_ymf753_spdif_source_info,
+		.get	= snd_ac97_ymf753_spdif_source_get,
+		.put	= snd_ac97_ymf753_spdif_source_put,
 	},
 	{
-		iface: SNDRV_CTL_ELEM_IFACE_MIXER,
-		name: SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Output Pin",
-		info: snd_ac97_ymf753_spdif_output_pin_info,
-		get: snd_ac97_ymf753_spdif_output_pin_get,
-		put: snd_ac97_ymf753_spdif_output_pin_put,
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name	= SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "Output Pin",
+		.info	= snd_ac97_ymf753_spdif_output_pin_info,
+		.get	= snd_ac97_ymf753_spdif_output_pin_get,
+		.put	= snd_ac97_ymf753_spdif_output_pin_put,
 	},
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",NONE,NONE) "Mute", AC97_YMF753_DIT_CTRL2, 2, 1, 1)
 };
@@ -1870,7 +1870,7 @@ static void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name, int mod
  */
 static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 {
-	unsigned long end_time;
+	signed long end_time;
 	end_time = jiffies + timeout;
 	do {
 		unsigned short ext_mid;
@@ -1930,7 +1930,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	int err;
 	ac97_t *ac97;
 	char name[64];
-	unsigned long end_time;
+	signed long end_time;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ac97_dev_free,
 	};
@@ -2051,15 +2051,15 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		ac97->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name, 0);
 	snd_ac97_get_name(NULL, ac97->id, name, 0);  // ac97->id might be changed in the special setup code
-	if (card->mixername[0] == '\0') {
-		strcpy(card->mixername, name);
-	} else {
-		if (strlen(card->mixername) + 1 + strlen(name) + 1 <= sizeof(card->mixername)) {
-			strcat(card->mixername, ",");
-			strcat(card->mixername, name);
-		}
-	}
 	if (ac97_is_audio(ac97)) {
+		if (card->mixername[0] == '\0') {
+			strcpy(card->mixername, name);
+		} else {
+			if (strlen(card->mixername) + 1 + strlen(name) + 1 <= sizeof(card->mixername)) {
+				strcat(card->mixername, ",");
+				strcat(card->mixername, name);
+			}
+		}
 		if ((err = snd_component_add(card, "AC97a")) < 0) {
 			snd_ac97_free(ac97);
 			return err;
@@ -2069,7 +2069,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_free(ac97);
 		return -ENOMEM;
 	}
-	snd_ac97_proc_init(card, ac97);
+	snd_ac97_proc_init(card, ac97, "ac97");
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
 		snd_ac97_free(ac97);
 		return err;
@@ -2133,7 +2133,7 @@ int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	int err;
 	ac97_t *ac97;
 	char name[64];
-	// signed long end_time;
+	unsigned long end_time;
 	unsigned short tmp;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ac97_dev_free,
@@ -2169,7 +2169,7 @@ int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;
 	ac97->id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	if (ac97->id == 0x00000000 || ac97->id == 0xffffffff) {
-		snd_printk("AC'97 %d:%d access is not valid [0x%x], removing modem controls.\n", ac97->num, ac97->addr, ac97->id);
+		snd_printk("MC'97 %d:%d access is not valid [0x%x], removing modem controls.\n", ac97->num, ac97->addr, ac97->id);
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
@@ -2199,42 +2199,56 @@ int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 
 	/* FIXME: add powerdown control */
 	if (ac97->scaps & AC97_SCAP_MODEM) {
-#if 0 /* FIXME - add modem powerup */
 		/* nothing should be in powerdown mode */
-		snd_ac97_write_cache_test(ac97, AC97_POWERDOWN, 0);
-		snd_ac97_write_cache_test(ac97, AC97_RESET, 0);		/* reset to defaults */
+		/* note: it's important to set the rate at first */
+		tmp = AC97_MEA_GPIO;
+		if (ac97->ext_mid & AC97_MEI_LINE1) {
+			snd_ac97_write_cache_test(ac97, AC97_LINE1_RATE, 12000);
+			tmp |= AC97_MEA_ADC1 | AC97_MEA_DAC1;
+		}
+		if (ac97->ext_mid & AC97_MEI_LINE2) {
+			snd_ac97_write_cache_test(ac97, AC97_LINE2_RATE, 12000);
+			tmp |= AC97_MEA_ADC2 | AC97_MEA_DAC2;
+		}
+		if (ac97->ext_mid & AC97_MEI_HANDSET) {
+			snd_ac97_write_cache_test(ac97, AC97_HANDSET_RATE, 12000);
+			tmp |= AC97_MEA_HADC | AC97_MEA_HDAC;
+		}
+		snd_ac97_write_cache_test(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
 		udelay(100);
 		/* nothing should be in powerdown mode */
-		snd_ac97_write_cache_test(ac97, AC97_POWERDOWN, 0);
-		snd_ac97_write_cache_test(ac97, AC97_GENERAL_PURPOSE, 0);
+		snd_ac97_write_cache_test(ac97, AC97_EXTENDED_MSTATUS, 0xff00 & ~(tmp << 8));
 		end_time = jiffies + (HZ / 10);
 		do {
-			if ((snd_ac97_read(ac97, AC97_POWERDOWN) & 0x0f) == 0x0f)
+			if ((snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS) & tmp) == tmp)
 				goto __ready_ok;
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(HZ/10);
 		} while (time_after_eq(end_time, jiffies));
-		snd_printk("AC'97 %d:%d analog subsections not ready\n", ac97->num, ac97->addr);
-#endif
+		snd_printk("MC'97 %d:%d converters and GPIO not ready (0x%x)\n", ac97->num, ac97->addr, snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS));
 	}
 
       __ready_ok:
 	/* additional initializations */
 	/* FIXME: ADD MODEM INITALIZATION */
+	if (ac97_is_modem(ac97))
+		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
+	else
+		ac97->addr = (ac97->ext_id & AC97_EI_ADDR_MASK) >> AC97_EI_ADDR_SHIFT;
 
 	if (ac97->init)
 		ac97->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name, 1);
 	snd_ac97_get_name(NULL, ac97->id, name, 1);  // ac97->id might be changed in the special setup code
-	if (card->mixername[0] == '\0') {
-		strcpy(card->mixername, name);
-	} else {
-		if (strlen(card->mixername) + 1 + strlen(name) + 1 <= sizeof(card->mixername)) {
-			strcat(card->mixername, ",");
-			strcat(card->mixername, name);
-		}
-	}
 	if (ac97_is_modem(ac97)) {
+		if (card->mixername[0] == '\0') {
+			strcpy(card->mixername, name);
+		} else {
+			if (strlen(card->mixername) + 1 + strlen(name) + 1 <= sizeof(card->mixername)) {
+				strcat(card->mixername, ",");
+				strcat(card->mixername, name);
+			}
+		}
 		if ((err = snd_component_add(card, "AC97m")) < 0) {
 			snd_ac97_free(ac97);
 			return err;
@@ -2244,7 +2258,7 @@ int snd_ac97_modem(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_free(ac97);
 		return -ENOMEM;
 	}
-	snd_ac97_proc_init(card, ac97);
+	snd_ac97_proc_init(card, ac97, "mc97");
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, ac97, &ops)) < 0) {
 		snd_ac97_free(ac97);
 		return err;
@@ -2398,9 +2412,39 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 			(mext & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT,
 			mext & AC97_MEI_CID2 ? " CID2" : "",
 			mext & AC97_MEI_CID1 ? " CID1" : "",
-			mext & AC97_MEI_HEADSET ? " HSET" : "",
+			mext & AC97_MEI_HANDSET ? " HSET" : "",
 			mext & AC97_MEI_LINE2 ? " LIN2" : "",
 			mext & AC97_MEI_LINE1 ? " LIN1" : "");
+	val = snd_ac97_read(ac97, AC97_EXTENDED_MSTATUS);
+	snd_iprintf(buffer, "Modem status     :%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+			val & AC97_MEA_GPIO ? " GPIO" : "",
+			val & AC97_MEA_MREF ? " MREF" : "",
+			val & AC97_MEA_ADC1 ? " ADC1" : "",
+			val & AC97_MEA_DAC1 ? " DAC1" : "",
+			val & AC97_MEA_ADC2 ? " ADC2" : "",
+			val & AC97_MEA_DAC2 ? " DAC2" : "",
+			val & AC97_MEA_HADC ? " HADC" : "",
+			val & AC97_MEA_HDAC ? " HDAC" : "",
+			val & AC97_MEA_PRA ? " PRA(GPIO)" : "",
+			val & AC97_MEA_PRB ? " PRB(res)" : "",
+			val & AC97_MEA_PRC ? " PRC(ADC1)" : "",
+			val & AC97_MEA_PRD ? " PRD(DAC1)" : "",
+			val & AC97_MEA_PRE ? " PRE(ADC2)" : "",
+			val & AC97_MEA_PRF ? " PRF(DAC2)" : "",
+			val & AC97_MEA_PRG ? " PRG(HADC)" : "",
+			val & AC97_MEA_PRH ? " PRH(HDAC)" : "");
+	if (mext & AC97_MEI_LINE1) {
+		val = snd_ac97_read(ac97, AC97_LINE1_RATE);
+		snd_iprintf(buffer, "Line1 rate       : %iHz\n", val);
+	}
+	if (mext & AC97_MEI_LINE2) {
+		val = snd_ac97_read(ac97, AC97_LINE2_RATE);
+		snd_iprintf(buffer, "Line2 rate       : %iHz\n", val);
+	}
+	if (mext & AC97_MEI_HANDSET) {
+		val = snd_ac97_read(ac97, AC97_HANDSET_RATE);
+		snd_iprintf(buffer, "Headset rate     : %iHz\n", val);
+	}
 }
 
 static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
@@ -2468,21 +2512,21 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 	}	
 }
 
-static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97)
+static void snd_ac97_proc_init(snd_card_t * card, ac97_t * ac97, const char *prefix)
 {
 	snd_info_entry_t *entry;
 	char name[32];
 
 	if (ac97->num)
-		sprintf(name, "ac97#%d-%d", ac97->addr, ac97->num);
+		sprintf(name, "%s#%d-%d", prefix, ac97->addr, ac97->num);
 	else
-		sprintf(name, "ac97#%d", ac97->addr);
+		sprintf(name, "%s#%d", prefix, ac97->addr);
 	if (! snd_card_proc_new(card, name, &entry))
 		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_read);
 	if (ac97->num)
-		sprintf(name, "ac97#%d-%dregs", ac97->addr, ac97->num);
+		sprintf(name, "%s#%d-%dregs", prefix, ac97->addr, ac97->num);
 	else
-		sprintf(name, "ac97#%dregs", ac97->addr);
+		sprintf(name, "%s#%dregs", prefix, ac97->addr);
 	if (! snd_card_proc_new(card, name, &entry))
 		snd_info_set_text_ops(entry, ac97, snd_ac97_proc_regs_read);
 }

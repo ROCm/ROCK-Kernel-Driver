@@ -52,7 +52,6 @@
 #include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
-#include <sound/pcm_sgbuf.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/ac97_codec.h>
@@ -599,12 +598,12 @@ static void snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		status &= (VIA_REG_STAT_EOL|VIA_REG_STAT_FLAG);
 		if (! status)
 			continue;
-		outb(status, VIADEV_REG(viadev, OFFSET_STATUS)); /* ack */
 		if (viadev->substream && viadev->running) {
 			spin_unlock(&chip->reg_lock);
 			snd_pcm_period_elapsed(viadev->substream);
 			spin_lock(&chip->reg_lock);
 		}
+		outb(status, VIADEV_REG(viadev, OFFSET_STATUS)); /* ack */
 	}
 	spin_unlock(&chip->reg_lock);
 }
@@ -909,25 +908,6 @@ static int snd_via8233_multi_prepare(snd_pcm_substream_t *substream)
 	snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	snd_via82xx_channel_reset(chip, viadev);
 	snd_via82xx_set_table_ptr(chip, viadev);
-
-	/* FIXME: a more generic solutions would be better */
-	if (chip->chip_type == TYPE_VIA8233A) {
-		/* VIA8233A cannot change the slot mapping, so we need
-		 * to swap the RL/RR with C/L.
-		 */
-#define AC97_ID_ALC650		0x414c4720
-
-		if (chip->ac97->id == AC97_ID_ALC650) {
-			unsigned short val;
-			if (runtime->channels > 4)
-				/* slot mapping: 3,4,7,8 */
-				val = 0;
-			else
-				/* slot mapping: 3,4,6,9,7,8 */
-				val = 0x4000;
-			snd_ac97_update_bits(chip->ac97, AC97_ALC650_MULTICH, 0xc000, val);
-		}
-	}
 
 	fmt = (runtime->format == SNDRV_PCM_FORMAT_S16_LE) ? VIA_REG_MULTPLAY_FMT_16BIT : VIA_REG_MULTPLAY_FMT_8BIT;
 	fmt |= runtime->channels << 4;

@@ -1,6 +1,6 @@
 /*
  *  Advanced Linux Sound Architecture - ALSA - Driver
- *  Copyright (c) 1994-2000 by Jaroslav Kysela <perex@suse.cz>,
+ *  Copyright (c) 1994-2003 by Jaroslav Kysela <perex@suse.cz>,
  *                             Abramo Bagnara <abramo@alsa-project.org>
  *
  *
@@ -150,7 +150,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 4)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 5)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;
@@ -398,8 +398,8 @@ struct sndrv_pcm_channel_info {
 
 struct sndrv_pcm_status {
 	enum sndrv_pcm_state state;	/* stream state */
-	struct timeval trigger_tstamp;	/* time when stream was started/stopped/paused */
-	struct timeval tstamp;		/* reference timestamp */
+	struct timespec trigger_tstamp;	/* time when stream was started/stopped/paused */
+	struct timespec tstamp;		/* reference timestamp */
 	sndrv_pcm_uframes_t appl_ptr;	/* appl ptr */
 	sndrv_pcm_uframes_t hw_ptr;	/* hw ptr */
 	sndrv_pcm_sframes_t delay;	/* current delay in frames */
@@ -414,7 +414,7 @@ struct sndrv_pcm_mmap_status {
 	enum sndrv_pcm_state state;	/* RO: state - SNDRV_PCM_STATE_XXXX */
 	int pad1;			/* Needed for 64 bit alignment */
 	sndrv_pcm_uframes_t hw_ptr;	/* RO: hw ptr (0...boundary-1) */
-	struct timeval tstamp;		/* Timestamp */
+	struct timespec tstamp;		/* Timestamp */
 	enum sndrv_pcm_state suspended_state; /* RO: suspended stream state */
 };
 
@@ -438,6 +438,7 @@ struct sndrv_xfern {
 enum {
 	SNDRV_PCM_IOCTL_PVERSION = _IOR('A', 0x00, int),
 	SNDRV_PCM_IOCTL_INFO = _IOR('A', 0x01, struct sndrv_pcm_info),
+	SNDRV_PCM_IOCTL_TSTAMP = _IOW('A', 0x02, int),
 	SNDRV_PCM_IOCTL_HW_REFINE = _IOWR('A', 0x10, struct sndrv_pcm_hw_params),
 	SNDRV_PCM_IOCTL_HW_PARAMS = _IOWR('A', 0x11, struct sndrv_pcm_hw_params),
 	SNDRV_PCM_IOCTL_HW_FREE = _IO('A', 0x12),
@@ -513,7 +514,7 @@ struct sndrv_rawmidi_params {
 
 struct sndrv_rawmidi_status {
 	enum sndrv_rawmidi_stream stream;
-	struct timeval tstamp;		/* Timestamp */
+	struct timespec tstamp;		/* Timestamp */
 	size_t avail;			/* available bytes */
 	size_t xruns;			/* count of overruns since last status (in bytes) */
 	unsigned char reserved[16];	/* reserved for future use */
@@ -532,7 +533,7 @@ enum {
  *  Timer section - /dev/snd/timer
  */
 
-#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 0)
+#define SNDRV_TIMER_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
 
 enum sndrv_timer_class {
 	SNDRV_TIMER_CLASS_NONE = -1,
@@ -556,6 +557,9 @@ enum sndrv_timer_slave_class {
 #define SNDRV_TIMER_GLOBAL_SYSTEM	0
 #define SNDRV_TIMER_GLOBAL_RTC		1
 
+/* info flags */
+#define SNDRV_TIMER_FLG_SLAVE		(1<<0)	/* cannot be controlled */
+
 struct sndrv_timer_id {
 	enum sndrv_timer_class dev_class;	
 	enum sndrv_timer_slave_class dev_sclass;
@@ -564,36 +568,65 @@ struct sndrv_timer_id {
 	int subdevice;
 };
 
+struct sndrv_timer_ginfo {
+	struct sndrv_timer_id tid;	/* requested timer ID */
+	unsigned int flags;		/* timer flags - SNDRV_TIMER_FLG_* */
+	int card;			/* card number */
+	unsigned char id[64];		/* timer identification */
+	unsigned char name[80];		/* timer name */
+	unsigned long reserved0;	/* reserved for future use */
+	unsigned long resolution;	/* average period resolution in ns */
+	unsigned long resolution_min;	/* minimal period resolution in ns */
+	unsigned long resolution_max;	/* maximal period resolution in ns */
+	unsigned int clients;		/* active timer clients */
+	unsigned char reserved[32];
+};
+
+struct sndrv_timer_gparams {
+	struct sndrv_timer_id tid;	/* requested timer ID */
+	unsigned long period_num;	/* requested precise period duration (in seconds) - numerator */
+	unsigned long period_den;	/* requested precise period duration (in seconds) - denominator */
+	unsigned char reserved[32];
+};
+
+struct sndrv_timer_gstatus {
+	struct sndrv_timer_id tid;	/* requested timer ID */
+	unsigned long resolution;	/* current period resolution in ns */
+	unsigned long resolution_num;	/* precise current period resolution (in seconds) - numerator */
+	unsigned long resolution_den;	/* precise current period resolution (in seconds) - denominator */
+	unsigned char reserved[32];
+};
+
 struct sndrv_timer_select {
 	struct sndrv_timer_id id;	/* bind to timer ID */
 	unsigned char reserved[32];	/* reserved */
 };
 
-#define SNDRV_TIMER_FLG_SLAVE		(1<<0)	/* cannot be controlled */
-
 struct sndrv_timer_info {
 	unsigned int flags;		/* timer flags - SNDRV_TIMER_FLG_* */
-	int card;			/* R: card number */
+	int card;			/* card number */
 	unsigned char id[64];		/* timer identificator */
 	unsigned char name[80];		/* timer name */
-	unsigned long ticks;		/* maximum ticks */
-	unsigned long resolution;	/* average resolution */
+	unsigned long reserved0;	/* reserved for future use */
+	unsigned long resolution;	/* average period resolution in ns */
 	unsigned char reserved[64];	/* reserved */
 };
 
-#define SNDRV_TIMER_PSFLG_AUTO		(1<<0)	/* supports auto start */
+#define SNDRV_TIMER_PSFLG_AUTO		(1<<0)	/* auto start, otherwise one-shot */
+#define SNDRV_TIMER_PSFLG_EXCLUSIVE	(1<<1)	/* exclusive use, precise start/stop/pause/continue */
 
 struct sndrv_timer_params {
 	unsigned int flags;		/* flags - SNDRV_MIXER_PSFLG_* */
 	unsigned int ticks;		/* requested resolution in ticks */
 	unsigned int queue_size;	/* total size of queue (32-1024) */
 	unsigned int reserved0;		/* reserved, was: failure locations */
-	unsigned char reserved[64];	/* reserved */
+	unsigned int filter;		/* event filter (bitmask of SNDRV_TIMER_EVENT_*) */
+	unsigned char reserved[60];	/* reserved */
 };
 
 struct sndrv_timer_status {
-	struct timeval tstamp;		/* Timestamp */
-	unsigned int resolution;	/* current resolution */
+	struct timespec tstamp;		/* Timestamp - last update */
+	unsigned int resolution;	/* current period resolution in ns */
 	unsigned int lost;		/* counter of master tick lost */
 	unsigned int overrun;		/* count of read queue overruns */
 	unsigned int queue;		/* used queue size */
@@ -603,18 +636,43 @@ struct sndrv_timer_status {
 enum {
 	SNDRV_TIMER_IOCTL_PVERSION = _IOR('T', 0x00, int),
 	SNDRV_TIMER_IOCTL_NEXT_DEVICE = _IOWR('T', 0x01, struct sndrv_timer_id),
+	SNDRV_TIMER_IOCTL_TREAD = _IOW('T', 0x02, int),
+	SNDRV_TIMER_IOCTL_GINFO = _IOWR('T', 0x03, struct sndrv_timer_ginfo),
+	SNDRV_TIMER_IOCTL_GPARAMS = _IOW('T', 0x04, struct sndrv_timer_gparams),
+	SNDRV_TIMER_IOCTL_GSTATUS = _IOWR('T', 0x05, struct sndrv_timer_gstatus),
 	SNDRV_TIMER_IOCTL_SELECT = _IOW('T', 0x10, struct sndrv_timer_select),
 	SNDRV_TIMER_IOCTL_INFO = _IOR('T', 0x11, struct sndrv_timer_info),
 	SNDRV_TIMER_IOCTL_PARAMS = _IOW('T', 0x12, struct sndrv_timer_params),
-	SNDRV_TIMER_IOCTL_STATUS = _IOW('T', 0x14, struct sndrv_timer_status),
+	SNDRV_TIMER_IOCTL_STATUS = _IOR('T', 0x14, struct sndrv_timer_status),
 	SNDRV_TIMER_IOCTL_START = _IO('T', 0x20),
 	SNDRV_TIMER_IOCTL_STOP = _IO('T', 0x21),
 	SNDRV_TIMER_IOCTL_CONTINUE = _IO('T', 0x22),
+	SNDRV_TIMER_IOCTL_PAUSE = _IO('T', 0x23),
 };
 
 struct sndrv_timer_read {
 	unsigned int resolution;
 	unsigned int ticks;
+};
+
+enum sndrv_timer_event {
+	SNDRV_TIMER_EVENT_RESOLUTION = 0,	/* val = resolution in ns */
+	SNDRV_TIMER_EVENT_TICK,			/* val = ticks */
+	SNDRV_TIMER_EVENT_START,		/* val = resolution in ns */
+	SNDRV_TIMER_EVENT_STOP,			/* val = 0 */
+	SNDRV_TIMER_EVENT_CONTINUE,		/* val = resolution in ns */
+	SNDRV_TIMER_EVENT_PAUSE,		/* val = 0 */
+	/* master timer events for slave timer instances */
+	SNDRV_TIMER_EVENT_MSTART = SNDRV_TIMER_EVENT_START + 10,
+	SNDRV_TIMER_EVENT_MSTOP = SNDRV_TIMER_EVENT_STOP + 10,
+	SNDRV_TIMER_EVENT_MCONTINUE = SNDRV_TIMER_EVENT_CONTINUE + 10,
+	SNDRV_TIMER_EVENT_MPAUSE = SNDRV_TIMER_EVENT_PAUSE + 10,
+};
+
+struct sndrv_timer_tread {
+	enum sndrv_timer_event event;
+	struct timespec tstamp;
+	unsigned int val;
 };
 
 /****************************************************************************
@@ -623,7 +681,7 @@ struct sndrv_timer_read {
  *                                                                          *
  ****************************************************************************/
 
-#define SNDRV_CTL_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 0)
+#define SNDRV_CTL_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 1)
 
 struct sndrv_ctl_card_info {
 	int card;			/* card number */
@@ -664,6 +722,7 @@ enum sndrv_ctl_elem_iface {
 #define SNDRV_CTL_ELEM_ACCESS_WRITE		(1<<1)
 #define SNDRV_CTL_ELEM_ACCESS_READWRITE		(SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE)
 #define SNDRV_CTL_ELEM_ACCESS_VOLATILE		(1<<2)	/* control value may be changed without a notification */
+#define SNDRV_CTL_ELEM_ACCESS_TIMESTAMP		(1<<2)	/* when was control changed */
 #define SNDRV_CTL_ELEM_ACCESS_INACTIVE		(1<<8)	/* control does actually nothing, but may be updated */
 #define SNDRV_CTL_ELEM_ACCESS_LOCK		(1<<9)	/* write lock */
 #define SNDRV_CTL_ELEM_ACCESS_OWNER		(1<<10)	/* write lock owner */
@@ -744,7 +803,8 @@ struct sndrv_ctl_elem_value {
 		} bytes;
 		struct sndrv_aes_iec958 iec958;
         } value;                /* RO */
-        unsigned char reserved[128];
+	struct timespec tstamp;
+        unsigned char reserved[128-sizeof(struct timespec)];
 };
 
 enum {

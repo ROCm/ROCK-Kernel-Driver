@@ -148,12 +148,12 @@ static const struct isapnp_card_id *snd_interwave_isapnp_id[SNDRV_CARDS] = SNDRV
 #define ISAPNP_INTERWAVE(_va, _vb, _vc, _device, _audio) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), } \
 	}
 #define ISAPNP_INTERWAVE_STB(_va, _vb, _vc, _device, _audio, _tone) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
 			 ISAPNP_DEVICE_ID(_va, _vb, _vc, _tone), } \
 	}
 

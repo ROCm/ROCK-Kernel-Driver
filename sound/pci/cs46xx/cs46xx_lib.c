@@ -321,6 +321,7 @@ int snd_cs46xx_download(cs46xx_t *chip,
 #include "imgs/cwcasync.h"
 #include "imgs/cwcsnoop.h"
 #include "imgs/cwcbinhack.h"
+#include "imgs/cwcdma.h"
 
 int snd_cs46xx_clear_BA1(cs46xx_t *chip,
                          unsigned long offset,
@@ -963,13 +964,14 @@ static int _cs46xx_adjust_sample_rate (cs46xx_t *chip, cs46xx_pcm_t *cpcm,
 static int snd_cs46xx_playback_hw_params(snd_pcm_substream_t * substream,
 					 snd_pcm_hw_params_t * hw_params)
 {
-	/*cs46xx_t *chip = snd_pcm_substream_chip(substream);*/
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	cs46xx_pcm_t *cpcm;
 	int err;
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	int sample_rate = params_rate(hw_params);
 	int period_size = params_period_bytes(hw_params);
+#endif
 	cpcm = snd_magic_cast(cs46xx_pcm_t, runtime->private_data, return -ENXIO);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -1156,10 +1158,9 @@ static int snd_cs46xx_capture_hw_params(snd_pcm_substream_t * substream,
 	cs46xx_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-	int period_size = params_period_bytes(hw_params);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	cs46xx_dsp_pcm_ostream_set_period (chip,period_size);
+	cs46xx_dsp_pcm_ostream_set_period (chip, params_period_bytes(hw_params));
 #endif
 	if (runtime->periods == CS46XX_FRAGS) {
 		if (runtime->dma_area != chip->capt.hw_area)
@@ -1344,6 +1345,8 @@ static snd_pcm_hardware_t snd_cs46xx_capture =
 	.fifo_size =		0,
 };
 
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+
 static unsigned int period_sizes[] = { 32, 64, 128, 256, 512, 1024, 2048 };
 
 #define PERIOD_SIZES sizeof(period_sizes) / sizeof(period_sizes[0])
@@ -1353,6 +1356,8 @@ static snd_pcm_hw_constraint_list_t hw_constraints_period_sizes = {
 	.list = period_sizes,
 	.mask = 0
 };
+
+#endif
 
 static void snd_cs46xx_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
@@ -1886,7 +1891,8 @@ static int snd_cs46xx_iec958_put(snd_kcontrol_t *kcontrol,
 		res = (change != chip->dsp_spos_instance->spdif_status_in);
 		break;
 	default:
-		snd_assert(0, return -EINVAL);
+		res = -EINVAL;
+		snd_assert(0, (void)0);
 	}
 
 	return res;
@@ -2310,7 +2316,7 @@ static snd_kcontrol_new_t snd_hercules_controls[] __devinitdata = {
 
 static void snd_cs46xx_sec_codec_reset (ac97_t * ac97)
 {
-	signed long end_time;
+	unsigned long end_time;
 	int err;
 
 	/* reset to defaults */
@@ -2346,7 +2352,7 @@ static void snd_cs46xx_sec_codec_reset (ac97_t * ac97)
 		schedule_timeout(HZ/100);
 	} while (time_after_eq(end_time, jiffies));
 
-	snd_printk("CS46xx secondary codec don't respond!\n");  
+	snd_printk("CS46xx secondary codec dont respond!\n");  
 }
 #endif
 
@@ -2864,10 +2870,6 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 		kfree(chip->gameport);
 	}
 #endif
-#ifdef CONFIG_PM
-	if (chip->pm_dev)
-		pm_unregister(chip->pm_dev);
-#endif
 	if (chip->amplifier_ctrl)
 		chip->amplifier_ctrl(chip, -chip->amplifier); /* force to off */
 	
@@ -3172,6 +3174,11 @@ int __devinit snd_cs46xx_start_dsp(cs46xx_t *chip)
 		return -EIO;
 	}
 
+	if (cs46xx_dsp_load_module(chip, &cwcdma_module) < 0) {
+		snd_printk(KERN_ERR "image download error [cwcdma]\n");
+		return -EIO;
+	}
+
 	if (cs46xx_dsp_scb_and_task_init(chip) < 0)
 		return -EIO;
 #else
@@ -3381,10 +3388,10 @@ static void amp_voyetra(cs46xx_t *chip, int change)
 	oval = snd_cs46xx_codec_read(chip, AC97_POWERDOWN,
 				     CS46XX_PRIMARY_CODEC_INDEX);
 	val = oval;
-	if (chip->amplifier && !old) {
+	if (chip->amplifier) {
 		/* Turn the EAPD amp on */
 		val |= 0x8000;
-	} else if (old && !chip->amplifier) {
+	} else {
 		/* Turn the EAPD amp off */
 		val &= ~0x8000;
 	}
@@ -3519,23 +3526,23 @@ static void amp_voyetra_4294(cs46xx_t *chip, int change)
  
 static void clkrun_hack(cs46xx_t *chip, int change)
 {
-	u16 control;
-	int old;
+	u16 control, nval;
 	
 	if (chip->acpi_dev == NULL)
 		return;
 
-	old = chip->amplifier;
 	chip->amplifier += change;
 	
 	/* Read ACPI port */	
-	control = inw(chip->acpi_port + 0x10);
+	nval = control = inw(chip->acpi_port + 0x10);
 
 	/* Flip CLKRUN off while running */
-	if (! chip->amplifier && old)
-		outw(control | 0x2000, chip->acpi_port + 0x10);
-	else if (chip->amplifier && ! old)
-		outw(control & ~0x2000, chip->acpi_port + 0x10);
+	if (! chip->amplifier)
+		nval |= 0x2000;
+	else
+		nval &= ~0x2000;
+	if (nval != control)
+		outw(nval, chip->acpi_port + 0x10);
 }
 
 	

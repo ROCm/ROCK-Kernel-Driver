@@ -366,7 +366,7 @@ int patch_alc650(ac97_t * ac97)
 
 	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
 	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
-	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val | 0x03);
+	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val);
 
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);

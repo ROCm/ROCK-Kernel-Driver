@@ -168,12 +168,12 @@ static const struct isapnp_card_id *snd_sb16_isapnp_id[SNDRV_CARDS] = SNDRV_DEFA
 #define ISAPNP_SB16(_va, _vb, _vc, _device, _audio) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), } \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), } \
 	}
 #define ISAPNP_SBAWE(_va, _vb, _vc, _device, _audio, _awe) \
 	{ \
 		ISAPNP_CARD_ID(_va, _vb, _vc, _device), \
-		devs : { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
+		.devs = { ISAPNP_DEVICE_ID(_va, _vb, _vc, _audio), \
 			 ISAPNP_DEVICE_ID(_va, _vb, _vc, _awe), } \
 	}
 
@@ -636,9 +636,9 @@ static int __init alsa_card_sb16_init(void)
 #ifdef MODULE
 		printk(KERN_ERR "Sound Blaster 16 soundcard not found or device busy\n");
 #ifdef SNDRV_SBAWE_EMU8000
-		printk(KERN_ERR "In case, if you have non-AWE card, try snd-card-sb16 module\n");
+		printk(KERN_ERR "In case, if you have non-AWE card, try snd-sb16 module\n");
 #else
-		printk(KERN_ERR "In case, if you have AWE card, try snd-card-sbawe module\n");
+		printk(KERN_ERR "In case, if you have AWE card, try snd-sbawe module\n");
 #endif
 #endif
 		return -ENODEV;

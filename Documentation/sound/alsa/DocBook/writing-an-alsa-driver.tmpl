@@ -437,7 +437,7 @@
   // (see "Management of Cards and Components")
   static int __devinit snd_mychip_create(snd_card_t *card,
                                          struct pci_device *pci,
-                                         mychip_t *rchip)
+                                         mychip_t **rchip)
   {
           mychip_t *chip;
           int err;
@@ -1666,7 +1666,7 @@
   chip->iobase_phys = pci_resource_start(pci, 0);
   chip->iobase_virt = (unsigned long)
                       ioremap_nocache(chip->iobase_phys, 512);
-  if ((chip->res_port = request_mem_region(chip->port, 512,
+  if ((chip->res_port = request_mem_region(chip->iobase_phys, 512,
                                            "My Chip")) == NULL) {
           printk(KERN_ERR "cannot allocate the memory region\n");
           snd_mychip_free(chip);
@@ -2820,7 +2820,7 @@
         </para>
 
         <para>
-          If you acquire a spinlock in the interrupt handler, and the
+          If you aquire a spinlock in the interrupt handler, and the
         lock is used in other pcm callbacks, too, then you have to
         release the lock before calling
         <function>snd_pcm_period_elapsed()</function>, because
@@ -4480,8 +4480,7 @@
         <informalexample>
           <programlisting>
 <![CDATA[
-  snd_pcm_sgbuf_t *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t,
-                              substream->dma_private, return -EINVAL);
+  snd_pcm_sgbuf_t *sgbuf = (snd_pcm_sgbuf_t*)substream->dma_private;
 ]]>
           </programlisting>
         </informalexample>

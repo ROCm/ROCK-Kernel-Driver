@@ -50,6 +50,7 @@ MODULE_DEVICES("{{Intel,82801AA-ICH},"
 		"{Intel,82801BA-ICH2},"
 		"{Intel,82801CA-ICH3},"
 		"{Intel,82801DB-ICH4},"
+		"{Intel,ICH5},"
 		"{Intel,MX440},"
 		"{SiS,SI7012},"
 		"{NVidia,NForce Audio},"
@@ -122,6 +123,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_INTEL_ICH4
 #define PCI_DEVICE_ID_INTEL_ICH4	0x24c5
 #endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH5
+#define PCI_DEVICE_ID_INTEL_ICH5	0x24d5
+#endif
 #ifndef PCI_DEVICE_ID_SI_7012
 #define PCI_DEVICE_ID_SI_7012		0x7012
 #endif
@@ -191,6 +195,10 @@ DEFINE_REGSET(SP, 0x60);	/* SPDIF out */
 #define   ICH_PCM_6		0x00200000	/* 6 channels (not all chips) */
 #define   ICH_PCM_4		0x00100000	/* 4 channels (not all chips) */
 #define   ICH_PCM_2		0x00000000	/* 2 channels (stereo) */
+#define   ICH_SIS_PCM_246_MASK	0x000000c0	/* 6 channels (SIS7012) */
+#define   ICH_SIS_PCM_6		0x00000080	/* 6 channels (SIS7012) */
+#define   ICH_SIS_PCM_4		0x00000040	/* 4 channels (SIS7012) */
+#define   ICH_SIS_PCM_2		0x00000000	/* 2 channels (SIS7012) */
 #define   ICH_SRIE		0x00000020	/* secondary resume interrupt enable */
 #define   ICH_PRIE		0x00000010	/* primary resume interrupt enable */
 #define   ICH_ACLINK		0x00000008	/* AClink shut off */
@@ -385,6 +393,7 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x8086, 0x2445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 82801BA */
 	{ 0x8086, 0x2485, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* ICH3 */
 	{ 0x8086, 0x24c5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH4 */
+	{ 0x8086, 0x24d5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH5 */
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
@@ -818,11 +827,20 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 
 static void snd_intel8x0_setup_multi_channels(intel8x0_t *chip, int channels)
 {
-	unsigned int cnt = igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_PCM_246_MASK;
-	if (chip->multi4 && channels == 4)
-		cnt |= ICH_PCM_4;
-	else if (chip->multi6 && channels == 6)
-		cnt |= ICH_PCM_6;
+	unsigned int cnt = igetdword(chip, ICHREG(GLOB_CNT));
+	if (chip->device_type == DEVICE_SIS) {
+		cnt &= ~ICH_SIS_PCM_246_MASK;
+		if (chip->multi4 && channels == 4)
+			cnt |= ICH_SIS_PCM_4;
+		else if (chip->multi6 && channels == 6)
+			cnt |= ICH_SIS_PCM_6;
+	} else {
+		cnt &= ~ICH_PCM_246_MASK;
+		if (chip->multi4 && channels == 4)
+			cnt |= ICH_PCM_4;
+		else if (chip->multi6 && channels == 6)
+			cnt |= ICH_PCM_6;
+	}
 	iputdword(chip, ICHREG(GLOB_CNT), cnt);
 }
 
@@ -1510,6 +1528,7 @@ static struct _ac97_ali_rate_regs {
 
 static struct ac97_quirk ac97_quirks[] = {
 	{ 0x1028, 0x0126, "Dell Optiplex GX260", AC97_TUNE_HP_ONLY },
+	{ 0x1734, 0x0088, "Fujisu-Siemens D1522", AC97_TUNE_HP_ONLY },
 	{ } /* terminator */
 };
 
@@ -1759,7 +1778,7 @@ static void do_delay(intel8x0_t *chip)
 
 static int snd_intel8x0_ich_chip_init(intel8x0_t *chip)
 {
-	unsigned long end_time;
+	signed long end_time;
 	unsigned int cnt, status, nstatus;
 	
 	/* put logic to right state */
@@ -2320,6 +2339,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_440MX, "Intel 440MX" },
 	{ PCI_DEVICE_ID_INTEL_ICH3, "Intel 82801CA-ICH3" },
 	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel 82801DB-ICH4" },
+	{ PCI_DEVICE_ID_INTEL_ICH5, "Intel ICH5" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia NForce2" },
@@ -2451,12 +2471,12 @@ static void __devexit snd_intel8x0_remove(struct pci_dev *pci)
 
 static struct pci_driver driver = {
 	.name = "Intel ICH",
-	id_table: snd_intel8x0_ids,
-	probe: snd_intel8x0_probe,
-	remove: __devexit_p(snd_intel8x0_remove),
+	.id_table = snd_intel8x0_ids,
+	.probe = snd_intel8x0_probe,
+	.remove = __devexit_p(snd_intel8x0_remove),
 #ifdef CONFIG_PM
-	suspend: snd_intel8x0_suspend,
-	resume: snd_intel8x0_resume,
+	.suspend = snd_intel8x0_suspend,
+	.resume = snd_intel8x0_resume,
 #endif
 };
 

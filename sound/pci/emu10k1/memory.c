@@ -25,7 +25,6 @@
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/emu10k1.h>
-#include <sound/pcm_sgbuf.h>
 
 /* page arguments of these two macros are Emu page (4096 bytes), not like
  * aligned pages in others
@@ -229,10 +228,10 @@ __found_pages:
 /*
  * check if the given pointer is valid for pages
  */
-static int is_valid_page(dma_addr_t addr)
+static int is_valid_page(emu10k1_t *emu, dma_addr_t addr)
 {
-	if (addr & ~0x7fffffffUL) {
-		snd_printk("max memory size is 2GB (addr = 0x%lx)!!\n", (unsigned long)addr);
+	if (addr & ~emu->dma_mask) {
+		snd_printk("max memory size is 0x%lx (addr = 0x%lx)!!\n", emu->dma_mask, (unsigned long)addr);
 		return 0;
 	}
 	if (addr & (EMUPAGESIZE-1)) {
@@ -291,18 +290,20 @@ int snd_emu10k1_memblk_map(emu10k1_t *emu, emu10k1_memblk_t *blk)
 snd_util_memblk_t *
 snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 {
-	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return NULL);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	struct snd_sg_buf *sgbuf = runtime->dma_private;
 	snd_util_memhdr_t *hdr;
 	emu10k1_memblk_t *blk;
 	int page, err, idx;
 
 	snd_assert(emu, return NULL);
-	snd_assert(sgbuf->size > 0 && sgbuf->size < MAXPAGES * EMUPAGESIZE, return NULL);
+	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG, return NULL);
+	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes < MAXPAGES * EMUPAGESIZE, return NULL);
 	hdr = emu->memhdr;
 	snd_assert(hdr, return NULL);
 
 	down(&hdr->block_mutex);
-	blk = search_empty(emu, sgbuf->size);
+	blk = search_empty(emu, runtime->dma_bytes);
 	if (blk == NULL) {
 		up(&hdr->block_mutex);
 		return NULL;
@@ -322,7 +323,7 @@ snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 		}
 #endif
 		addr = sgbuf->table[idx].addr;
-		if (! is_valid_page(addr)) {
+		if (! is_valid_page(emu, addr)) {
 			printk(KERN_ERR "emu: failure page = %d\n", idx);
 			up(&hdr->block_mutex);
 			return NULL;
@@ -445,7 +446,7 @@ static int synth_alloc_pages(emu10k1_t *emu, emu10k1_memblk_t *blk)
 		ptr = snd_malloc_pci_page(emu->pci, &addr);
 		if (ptr == NULL)
 			goto __fail;
-		if (! is_valid_page(addr)) {
+		if (! is_valid_page(emu, addr)) {
 			snd_free_pci_page(emu->pci, ptr, addr);
 			goto __fail;
 		}

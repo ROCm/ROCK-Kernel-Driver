@@ -27,7 +27,7 @@
 #include <linux/rwsem.h>		/* struct rw_semaphore */
 
 /* Typedef's */
-typedef struct timeval snd_timestamp_t;
+typedef struct timespec snd_timestamp_t;
 typedef struct sndrv_interval snd_interval_t;
 typedef enum sndrv_card_type snd_card_type;
 typedef struct sndrv_xferi snd_xferi_t;
@@ -275,32 +275,6 @@ void snd_hidden_vfree(void *obj);
 #endif
 void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);
-void *snd_malloc_pages(unsigned long size, unsigned int dma_flags);
-void *snd_malloc_pages_fallback(unsigned long size, unsigned int dma_flags, unsigned long *res_size);
-void snd_free_pages(void *ptr, unsigned long size);
-#ifdef CONFIG_PCI
-void *snd_malloc_pci_pages(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr);
-void *snd_malloc_pci_pages_fallback(struct pci_dev *pci, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
-void snd_free_pci_pages(struct pci_dev *pci, unsigned long size, void *ptr, dma_addr_t dma_addr);
-void *snd_malloc_pci_page(struct pci_dev *pci, dma_addr_t *dma_addr);
-#define snd_free_pci_page(pci,ptr,addr) snd_free_pci_pages(pci,PAGE_SIZE,ptr,addr)
-#endif
-#ifdef CONFIG_SBUS
-void *snd_malloc_sbus_pages(struct sbus_dev *sdev, unsigned long size, dma_addr_t *dma_addr);
-void *snd_malloc_sbus_pages_fallback(struct sbus_dev *sdev, unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
-void snd_free_sbus_pages(struct sbus_dev *sdev, unsigned long size, void *ptr, dma_addr_t dma_addr);
-#endif
-#ifdef CONFIG_ISA
-#ifdef CONFIG_PCI
-#define snd_malloc_isa_pages(size, dma_addr) snd_malloc_pci_pages(NULL, size, dma_addr)
-#define snd_malloc_isa_pages_fallback(size, dma_addr, res_size) snd_malloc_pci_pages_fallback(NULL, size, dma_addr, res_size)
-#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pci_pages(NULL, size, ptr, dma_addr)
-#else /* !CONFIG_PCI */
-void *snd_malloc_isa_pages(unsigned long size, dma_addr_t *dma_addr);
-void *snd_malloc_isa_pages_fallback(unsigned long size, dma_addr_t *dma_addr, unsigned long *res_size);
-#define snd_free_isa_pages(size, ptr, dma_addr) snd_free_pages(ptr, size)
-#endif /* CONFIG_PCI */
-#endif /* CONFIG_ISA */
 int copy_to_user_fromio(void *dst, unsigned long src, size_t count);
 int copy_from_user_toio(unsigned long dst, const void *src, size_t count);
 
@@ -450,9 +424,27 @@ void snd_verbose_printd(const char *file, int line, const char *format, ...);
 #define snd_BUG() snd_assert(0, )
 
 
-#define snd_timestamp_now(tstamp) do_gettimeofday(tstamp)
-#define snd_timestamp_zero(tstamp) do { (tstamp)->tv_sec = 0; (tstamp)->tv_usec = 0; } while (0)
-#define snd_timestamp_null(tstamp) ((tstamp)->tv_sec == 0 && (tstamp)->tv_usec ==0)
+static inline void snd_timestamp_now(struct timespec *tstamp, int timespec)
+{
+	struct timeval val;
+	/* FIXME: use a linear time source */
+	do_gettimeofday(&val);
+	tstamp->tv_sec = val.tv_sec;
+	tstamp->tv_nsec = val.tv_usec;
+	if (timespec)
+		tstamp->tv_nsec *= 1000L;
+}
+
+static inline void snd_timestamp_zero(struct timespec *tstamp)
+{
+	tstamp->tv_sec = 0;
+	tstamp->tv_nsec = 0;
+}
+
+static inline int snd_timestamp_null(struct timespec *tstamp)
+{
+	return tstamp->tv_sec == 0 && tstamp->tv_nsec == 0;
+}
 
 #define SNDRV_OSS_VERSION         ((3<<16)|(8<<8)|(1<<4)|(0))	/* 3.8.1a */
 

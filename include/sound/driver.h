@@ -49,20 +49,6 @@
  *  ==========================================================================
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 0)
-#if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
-/*
- * Here a dirty hack for 2.4 kernels.. See sound/core/memory.c.
- */
-#define HACK_PCI_ALLOC_CONSISTENT
-#include <linux/pci.h>
-void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
-				    dma_addr_t *dma_handle);
-#undef pci_alloc_consistent
-#define pci_alloc_consistent snd_pci_hack_alloc_consistent
-#endif /* i386 or ppc */
-#endif /* 2.4.0 */
-
 #ifdef CONFIG_SND_DEBUG_MEMORY
 #include <linux/slab.h>
 #include <linux/vmalloc.h>

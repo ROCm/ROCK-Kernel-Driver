@@ -28,7 +28,6 @@
 #include <linux/time.h>
 #include <sound/core.h>
 #include <sound/trident.h>
-#include <sound/pcm_sgbuf.h>
 
 /* page arguments of these two macros are Trident page (4096 bytes), not like
  * aligned pages in others
@@ -181,23 +180,26 @@ static int is_valid_page(unsigned long ptr)
 }
 
 /*
- * page allocation for DMA
+ * page allocation for DMA (Scatter-Gather version)
  */
-snd_util_memblk_t *
-snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
+static snd_util_memblk_t *
+snd_trident_alloc_sg_pages(trident_t *trident, snd_pcm_substream_t *substream)
 {
 	snd_util_memhdr_t *hdr;
 	snd_util_memblk_t *blk;
+	snd_pcm_runtime_t *runtime = substream->runtime;
 	int idx, page;
-	struct snd_sg_buf *sgbuf = snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return NULL);
+	struct snd_sg_buf *sgbuf = runtime->dma_private;
 
-	snd_assert(trident != NULL, return NULL);
-	snd_assert(sgbuf->size > 0 && sgbuf->size < SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
+	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG, return NULL);
+	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;
 	snd_assert(hdr != NULL, return NULL);
 
+	
+
 	down(&hdr->block_mutex);
-	blk = search_empty(hdr, sgbuf->size);
+	blk = search_empty(hdr, runtime->dma_bytes);
 	if (blk == NULL) {
 		up(&hdr->block_mutex);
 		return NULL;
@@ -223,6 +225,61 @@ snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
 	}
 	up(&hdr->block_mutex);
 	return blk;
+}
+
+/*
+ * page allocation for DMA (contiguous version)
+ */
+static snd_util_memblk_t *
+snd_trident_alloc_cont_pages(trident_t *trident, snd_pcm_substream_t *substream)
+{
+	snd_util_memhdr_t *hdr;
+	snd_util_memblk_t *blk;
+	int page;
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	dma_addr_t addr;
+	unsigned long ptr;
+
+	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI, return NULL);
+	snd_assert(runtime->dma_bytes> 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
+	hdr = trident->tlb.memhdr;
+	snd_assert(hdr != NULL, return NULL);
+
+	down(&hdr->block_mutex);
+	blk = search_empty(hdr, runtime->dma_bytes);
+	if (blk == NULL) {
+		up(&hdr->block_mutex);
+		return NULL;
+	}
+			   
+	/* set TLB entries */
+	addr = runtime->dma_addr;
+	ptr = (unsigned long)runtime->dma_area;
+	for (page = firstpg(blk); page <= lastpg(blk); page++,
+	     ptr += SNDRV_TRIDENT_PAGE_SIZE, addr += SNDRV_TRIDENT_PAGE_SIZE) {
+		if (! is_valid_page(addr)) {
+			__snd_util_mem_free(hdr, blk);
+			up(&hdr->block_mutex);
+			return NULL;
+		}
+		set_tlb_bus(trident, page, ptr, addr);
+	}
+	up(&hdr->block_mutex);
+	return blk;
+}
+
+/*
+ * page allocation for DMA
+ */
+snd_util_memblk_t *
+snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
+{
+	snd_assert(trident != NULL, return NULL);
+	snd_assert(substream != NULL, return NULL);
+	if (substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG)
+		return snd_trident_alloc_sg_pages(trident, substream);
+	else
+		return snd_trident_alloc_cont_pages(trident, substream);
 }
 
 

@@ -29,6 +29,23 @@
 #include <sound/pcm.h>
 
 #include "ice1712.h"
+
+enum {
+	ICE_EEP2_SYSCONF = 0,	/* 06 */
+	ICE_EEP2_ACLINK,	/* 07 */
+	ICE_EEP2_I2S,		/* 08 */
+	ICE_EEP2_SPDIF,		/* 09 */
+	ICE_EEP2_GPIO_DIR,	/* 0a */
+	ICE_EEP2_GPIO_DIR1,	/* 0b */
+	ICE_EEP2_GPIO_DIR2,	/* 0c */
+	ICE_EEP2_GPIO_MASK,	/* 0d */
+	ICE_EEP2_GPIO_MASK1,	/* 0e */
+	ICE_EEP2_GPIO_MASK2,	/* 0f */
+	ICE_EEP2_GPIO_STATE,	/* 10 */
+	ICE_EEP2_GPIO_STATE1,	/* 11 */
+	ICE_EEP2_GPIO_STATE2	/* 12 */
+};
+	
 /*
  *  Direct registers
  */
@@ -72,13 +89,6 @@
 /*there is no consumer AC97 codec with the VT1724*/
 //#define VT1724_REG_AC97_INDEX		0x08	/* byte */
 //#define VT1724_REG_AC97_CMD		0x09	/* byte */
-#define   VT1724_AC97_COLD		0x80	/* cold reset */
-#define   VT1724_AC97_WARM		0x40	/* warm reset */
-#define   VT1724_AC97_WRITE		0x20	/* W: write, R: write in progress */
-#define   VT1724_AC97_READ		0x10	/* W: read, R: read in progress */
-#define   VT1724_AC97_READY		0x08	/* codec ready status bit */
-#define   VT1724_AC97_PBK_VSR		0x02	/* playback VSR */
-#define   VT1724_AC97_CAP_VSR		0x01	/* capture VSR */
 
 #define VT1724_REG_MPU_TXFIFO		0x0a	/*byte ro. number of bytes in TX fifo*/
 #define VT1724_REG_MPU_RXFIFO		0x0b	/*byte ro. number of bytes in RX fifo*/
@@ -100,12 +110,12 @@
 #define   VT1724_I2C_BUSY		0x01	/* busy bit */
 
 #define VT1724_REG_GPIO_DATA	0x14	/* word */
-#define VT1724_REG_GPIO_WRITE_MASK	0x15 /* word */
-#define VT1724_REG_GPIO_DIRECTION	0x16 /* dword? (3 bytes) 0=input 1=output. 
-							bit3 - during reset used for Eeprom power-on strapping
-							if TESTEN# pin active, bit 2 always input*/
+#define VT1724_REG_GPIO_WRITE_MASK	0x16 /* word */
+#define VT1724_REG_GPIO_DIRECTION	0x18 /* dword? (3 bytes) 0=input 1=output. 
+						bit3 - during reset used for Eeprom power-on strapping
+						if TESTEN# pin active, bit 2 always input*/
 #define VT1724_REG_POWERDOWN	0x1c
-#define VT1724_REG_GPIO_DIRECTION_22	0x1e /* byte direction for GPIO 16:22 */
+#define VT1724_REG_GPIO_DATA_22	0x1e /* byte direction for GPIO 16:22 */
 #define VT1724_REG_GPIO_WRITE_MASK_22	0x1f /* byte write mask for GPIO 16:22 */
 
 
@@ -128,15 +138,24 @@
 #define VT1724_MT_RATE			0x01	/* byte - sampling rate select */
 #define   VT1724_SPDIF_MASTER		0x10	/* S/PDIF input is master clock */
 #define VT1724_MT_I2S_FORMAT		0x02	/* byte - I2S data format */
+#define   VT1724_MT_I2S_MCLK_128X	0x08
+#define   VT1724_MT_I2S_FORMAT_MASK	0x03
+#define   VT1724_MT_I2S_FORMAT_I2S	0x00
 #define VT1724_MT_DMA_INT_MASK		0x03	/* byte -DMA Interrupt Mask */
 /* lool to VT1724_MULTI_* */
 #define VT1724_MT_AC97_INDEX		0x04	/* byte - AC'97 index */
 #define VT1724_MT_AC97_CMD		0x05	/* byte - AC'97 command & status */
-/* look to VT1724_AC97_* */
+#define   VT1724_AC97_COLD	0x80	/* cold reset */
+#define   VT1724_AC97_WARM	0x40	/* warm reset */
+#define   VT1724_AC97_WRITE	0x20	/* W: write, R: write in progress */
+#define   VT1724_AC97_READ	0x10	/* W: read, R: read in progress */
+#define   VT1724_AC97_READY	0x08	/* codec ready status bit */
+#define   VT1724_AC97_PBK_VSR	0x02	/* playback VSR */
+#define   VT1724_AC97_CAP_VSR	0x01	/* capture VSR */
 #define VT1724_MT_AC97_DATA		0x06	/* word - AC'97 data */
-#define VT1724_MT_PLAYBACK_ADDR	0x10	/* dword - playback address */
-#define VT1724_MT_PLAYBACK_SIZE	0x14	/* dword - playback size */
-#define VT1724_MT_PLAYBACK_CONTROL	0x18	/* byte - control */
+#define VT1724_MT_PLAYBACK_ADDR		0x10	/* dword - playback address */
+#define VT1724_MT_PLAYBACK_SIZE		0x14	/* dword - playback size */
+#define VT1724_MT_DMA_CONTROL		0x18	/* byte - control */
 #define   VT1724_PDMA4_START	0x80	/* SPDIF out / PDMA4 start */
 #define   VT1724_PDMA3_START	0x40	/* PDMA3 start */
 #define   VT1724_PDMA2_START	0x20	/* PDMA2 start */
@@ -145,14 +164,14 @@
 #define   VT1724_RDMA0_START	0x02	/* RMDA0 start */
 #define   VT1724_PDMA0_START	0x01	/* MC Interleave / PDMA0 start */
 #define VT1724_MT_BURST			0x19	/* Interleaved playback DMA Active streams / PCI burst size */
-#define VT1724_MT_DMA_FIFO_ERR	0x1a	/*Global playback and record DMA FIFO Underrun/Overrun */
-#define   VT1724_PDMA4_UNDERRUN	0x80
-#define   VT1724_PDMA2_UNDERRUN	0x40
-#define   VT1724_PDMA3_UNDERRUN	0x20
-#define   VT1724_PDMA1_UNDERRUN	0x10
-#define   VT1724_RDMA1_UNDERRUN	0x04
-#define   VT1724_RDMA0_UNDERRUN	0x02
-#define   VT1724_PDMA0_UNDERRUN	0x01
+#define VT1724_MT_DMA_FIFO_ERR		0x1a	/*Global playback and record DMA FIFO Underrun/Overrun */
+#define   VT1724_PDMA4_UNDERRUN		0x80
+#define   VT1724_PDMA2_UNDERRUN		0x40
+#define   VT1724_PDMA3_UNDERRUN		0x20
+#define   VT1724_PDMA1_UNDERRUN		0x10
+#define   VT1724_RDMA1_UNDERRUN		0x04
+#define   VT1724_RDMA0_UNDERRUN		0x02
+#define   VT1724_PDMA0_UNDERRUN		0x01
 #define VT1724_MT_DMA_PAUSE		0x1b	/*Global playback and record DMA FIFO pause/resume */
 #define	  VT1724_PDMA4_PAUSE	0x80
 #define	  VT1724_PDMA3_PAUSE	0x40
@@ -164,40 +183,31 @@
 #define VT1724_MT_PLAYBACK_COUNT	0x1c	/* word - playback count */
 #define VT1724_MT_CAPTURE_ADDR		0x20	/* dword - capture address */
 #define VT1724_MT_CAPTURE_SIZE		0x24	/* word - capture size */
-#define VT1724_MT_CAPTURE_COUNT	0x26	/* word - capture count */
-
-#define VT1724_MT_RDMA1_ADDR	0x30	/* dword - RDMA1 capture address */
-#define VT1724_MT_RDMA1_SIZE	0x34	/* word - RDMA1 capture size */
-#define VT1724_MT_RDMA1_COUNT	0x36	/* word - RDMA1 capture count */
+#define VT1724_MT_CAPTURE_COUNT		0x26	/* word - capture count */
 
 #define VT1724_MT_ROUTE_PLAYBACK	0x2c	/* word */
-//#define VT1724_MT_MONITOR_VOLUME	0x3f	/* word */
-//#define VT1724_MT_MONITOR_INDEX	0x3e	/* byte */
 
+#define VT1724_MT_RDMA1_ADDR		0x30	/* dword - RDMA1 capture address */
+#define VT1724_MT_RDMA1_SIZE		0x34	/* word - RDMA1 capture size */
+#define VT1724_MT_RDMA1_COUNT		0x36	/* word - RDMA1 capture count */
 
-#define VT1724_MT_PDMA4_ADDR	0x40	/* dword */
-#define VT7124_MT_PDMA4_SIZE	0x44	/* word */
-#define VT1724_MT_PDMA4_COUNT	0x46	/* word */
-#define VT1724_MT_PDMA3_ADDR	0x50	/* dword */
-#define VT7124_MT_PDMA3_SIZE	0x54	/* word */
-#define VT1724_MT_PDMA3_COUNT	0x56	/* word */
-#define VT1724_MT_PDMA2_ADDR	0x60	/* dword */
-#define VT7124_MT_PDMA2_SIZE	0x64	/* word */
-#define VT1724_MT_PDMA2_COUNT	0x66	/* word */
-#define VT1724_MT_PDMA1_ADDR	0x70	/* dword */
-#define VT7124_MT_PDMA1_SIZE	0x74	/* word */
-#define VT1724_MT_PDMA1_COUNT	0x76	/* word */
-
-
-//does VT1724 have these? don't think so
-//#define VT1724_MT_MONITOR_RATE		0x3b	/* byte */
-//#define VT1724_MT_MONITOR_ROUTECTRL	0x3c	/* byte */
-//#define   VT1724_ROUTE_AC97		0x01	/* route digital mixer output to AC'97 */
+#define VT1724_MT_SPDIF_CTRL		0x3c	/* word */
 #define VT1724_MT_MONITOR_PEAKINDEX	0x3e	/* byte */
 #define VT1724_MT_MONITOR_PEAKDATA	0x3f	/* byte */
 
-
-
+/* concurrent stereo channels */
+#define VT1724_MT_PDMA4_ADDR		0x40	/* dword */
+#define VT1724_MT_PDMA4_SIZE		0x44	/* word */
+#define VT1724_MT_PDMA4_COUNT		0x46	/* word */
+#define VT1724_MT_PDMA3_ADDR		0x50	/* dword */
+#define VT1724_MT_PDMA3_SIZE		0x54	/* word */
+#define VT1724_MT_PDMA3_COUNT		0x56	/* word */
+#define VT1724_MT_PDMA2_ADDR		0x60	/* dword */
+#define VT1724_MT_PDMA2_SIZE		0x64	/* word */
+#define VT1724_MT_PDMA2_COUNT		0x66	/* word */
+#define VT1724_MT_PDMA1_ADDR		0x70	/* dword */
+#define VT1724_MT_PDMA1_SIZE		0x74	/* word */
+#define VT1724_MT_PDMA1_COUNT		0x76	/* word */
 
 
 #endif /* __SOUND_VT1724_H */
