@@ -8,7 +8,9 @@ fore_200e-objs	:= fore200e.o
 host-progs	:= fore200e_mkfirm
 
 # Files generated that shall be removed upon make clean
-clean-files := {atmsar11,pca200e,pca200e_ecd,sba200e_ecd}.{bin,bin1,bin2}
+clean-files := atmsar11.bin atmsar11.bin1 atmsar11.bin2 pca200e.bin \
+	pca200e.bin1 pca200e.bin2 pca200e_ecd.bin pca200e_ecd.bin1 \
+	pca200e_ecd.bin2 sba200e_ecd.bin sba200e_ecd.bin1 sba200e_ecd.bin2
 # Firmware generated that shall be removed upon make clean
 clean-files += fore200e_pca_fw.c fore200e_sba_fw.c
 
