@@ -110,10 +110,10 @@ static int aac_cfg_open(struct inode * inode, struct file * file);
 static int aac_cfg_release(struct inode * inode,struct file * file);
 
 static struct file_operations aac_cfg_fops = {
-	owner: THIS_MODULE,
-	ioctl: aac_cfg_ioctl,
-	open: aac_cfg_open,
-	release: aac_cfg_release
+	.owner		= THIS_MODULE,
+	.ioctl		= aac_cfg_ioctl,
+	.open		= aac_cfg_open,
+	.release	= aac_cfg_release
 };
 
 static int aac_detect(Scsi_Host_Template *);
