@@ -17,6 +17,13 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (23/Jul/2003) Ian Abbott
+ *      Added PIDs for CrystalFontz 547, 633, 631, 635, 640 and 640 from
+ *      Wayne Wylupski.
+ *
+ * (10/Jul/2003) David Glance
+ *      Added PID for DSS-20 SyncStation cradle for Sony-Ericsson P800.
+ *
  * (27/Jun/2003) Ian Abbott
  *	Reworked the urb handling logic.  We have no more pool, but dynamically
  *	allocate the urb and the transfer buffer on the fly.  In testing this
@@ -254,8 +261,14 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_8U232AM_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_RELAIS_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID, 0, 0x3ff) },
-	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_634_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_632_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_634_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_547_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_633_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_631_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_635_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_640_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_642_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_VNHCPCUSB_D_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_DSS20_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_0_PID, 0, 0x3ff) },
@@ -319,8 +332,14 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_8U232AM_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_RELAIS_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID, 0x400, 0xffff) },
-	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_634_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_632_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_634_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_547_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_633_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_631_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_635_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_640_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_VID, FTDI_XF_642_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_VNHCPCUSB_D_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_DSS20_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_MTXORB_VID, FTDI_MTXORB_0_PID, 0x400, 0xffff) },
@@ -396,8 +415,14 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_SIO_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_8U232AM_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_RELAIS_PID) },
-	{ USB_DEVICE(FTDI_VID, FTDI_XF_634_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_XF_632_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_634_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_547_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_633_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_631_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_635_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_640_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_XF_642_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_DSS20_PID) },
 	{ USB_DEVICE(FTDI_NF_RIC_VID, FTDI_NF_RIC_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_VNHCPCUSB_D_PID) },
