@@ -295,7 +295,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         unsigned long flags;
         struct host_info *hi;
         struct file_info *fi;
-        struct pending_request *req;
+        struct pending_request *req, *req_next;
         struct iso_block_store *ibs = NULL;
         LIST_HEAD(reqs);
 
@@ -345,7 +345,7 @@ static void iso_receive(struct hpsb_host *host, int channel, quadlet_t *data,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-	list_for_each_entry(req, &reqs, list)
+	list_for_each_entry_safe(req, req_next, &reqs, list)
                 queue_complete_req(req);
 }
 
@@ -355,7 +355,7 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         unsigned long flags;
         struct host_info *hi;
         struct file_info *fi;
-        struct pending_request *req;
+        struct pending_request *req, *req_next;
         struct iso_block_store *ibs = NULL;
         LIST_HEAD(reqs);
 
@@ -405,7 +405,7 @@ static void fcp_request(struct hpsb_host *host, int nodeid, int direction,
         }
         spin_unlock_irqrestore(&host_info_lock, flags);
 
-	list_for_each_entry(req, &reqs, list)
+	list_for_each_entry_safe(req, req_next, &reqs, list)
                 queue_complete_req(req);
 }
 
