@@ -86,6 +86,9 @@
 /* PPC CPM type number */
 #define PORT_CPM        58
 
+/* MPC52xx type numbers */
+#define PORT_MPC52xx	59
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
