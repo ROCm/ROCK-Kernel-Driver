@@ -2906,7 +2906,6 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
-int ide_cdrom_init(void);
 int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
@@ -2929,7 +2928,6 @@ static ide_driver_t ide_cdrom_driver = {
 	capacity:		ide_cdrom_capacity,
 	special:		NULL,
 	proc:			NULL,
-	driver_init:		ide_cdrom_init,
 	driver_reinit:		ide_cdrom_reinit,
 };
 
@@ -2967,7 +2965,7 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 	failed--;
 
-	ide_register_module(&ide_cdrom_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2982,7 +2980,6 @@ static void __exit ide_cdrom_exit(void)
 			printk ("%s: cleanup_module() called while still busy\n", drive->name);
 			failed++;
 		}
-	ide_unregister_module (&ide_cdrom_driver);
 }
  
 int ide_cdrom_init(void)
@@ -3026,7 +3023,7 @@ int ide_cdrom_init(void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&ide_cdrom_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

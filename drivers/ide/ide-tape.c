@@ -6137,7 +6137,6 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
-int idetape_init (void);
 int idetape_reinit(ide_drive_t *drive);
 
 /*
@@ -6162,7 +6161,6 @@ static ide_driver_t idetape_driver = {
 	pre_reset:		idetape_pre_reset,
 	capacity:		NULL,
 	proc:			idetape_proc,
-	driver_init:		idetape_init,
 	driver_reinit:		idetape_reinit,
 };
 
@@ -6193,7 +6191,7 @@ int idetape_reinit (ide_drive_t *drive)
 			idetape_chrdevs[minor].drive = NULL;
 
 	if ((drive = ide_scan_devices (ide_tape, idetape_driver.name, NULL, failed++)) == NULL) {
-		ide_register_module (&idetape_module);
+		revalidate_drives();
 		MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
@@ -6252,7 +6250,7 @@ int idetape_reinit (ide_drive_t *drive)
 		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
-	ide_register_module (&idetape_module);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
@@ -6277,7 +6275,6 @@ static void __exit idetape_exit (void)
 		if (drive != NULL && idetape_cleanup (drive))
 		printk (KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
 	}
-	ide_unregister_module(&idetape_driver);
 }
 
 /*
@@ -6298,7 +6295,7 @@ int idetape_init (void)
 			idetape_chrdevs[minor].drive = NULL;
 
 	if ((drive = ide_scan_devices (ide_tape, idetape_driver.name, NULL, failed++)) == NULL) {
-		ide_register_module (&idetape_driver);
+		revalidate_drives();
 		MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 		printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");
@@ -6357,7 +6354,7 @@ int idetape_init (void)
 		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
-	ide_register_module (&idetape_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 #if ONSTREAM_DEBUG
 	printk(KERN_INFO "ide-tape: MOD_DEC_USE_COUNT in idetape_init\n");

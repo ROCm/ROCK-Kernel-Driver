@@ -373,20 +373,6 @@ static int ide_getdigit(char c)
 	return digit;
 }
 
-static int proc_ide_read_drivers
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	char		*out = page;
-	int		len;
-	struct ide_driver_s * driver;
-
-	for (driver = ide_drivers; driver; driver = driver->next) {
-		out += sprintf(out, "%s\n",driver->name);
-	}
-	len = out - page;
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
 static int proc_ide_read_imodel
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -851,9 +837,6 @@ void proc_ide_create(void)
 	if (!proc_ide_root) return;
 
 	create_proc_ide_interfaces();
-
-	create_proc_read_entry("drivers", 0, proc_ide_root,
-				proc_ide_read_drivers, NULL);
 
 #ifdef CONFIG_BLK_DEV_AEC62XX
 	if ((aec62xx_display_info) && (aec62xx_proc))

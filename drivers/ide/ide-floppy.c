@@ -2046,7 +2046,6 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-int idefloppy_init(void);
 int idefloppy_reinit(ide_drive_t *drive);
 
 /*
@@ -2072,7 +2071,6 @@ static ide_driver_t idefloppy_driver = {
 	capacity:		idefloppy_capacity,
 	special:		NULL,
 	proc:			idefloppy_proc,
-	driver_init:		idefloppy_init,
 	driver_reinit:		idefloppy_reinit,
 };
 
@@ -2105,7 +2103,7 @@ int idefloppy_reinit (ide_drive_t *drive)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idefloppy_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -2130,7 +2128,6 @@ static void __exit idefloppy_exit (void)
 			ide_remove_proc_entries(drive->proc, idefloppy_proc);
 #endif
 	}
-	ide_unregister_module(&idefloppy_driver);
 }
 
 /*
@@ -2167,7 +2164,7 @@ int idefloppy_init (void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idefloppy_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

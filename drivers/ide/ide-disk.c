@@ -1030,7 +1030,6 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
-int idedisk_init (void);
 int idedisk_reinit(ide_drive_t *drive);
 
 /*
@@ -1056,7 +1055,6 @@ static ide_driver_t idedisk_driver = {
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,
 	proc:			idedisk_proc,
-	driver_init:		idedisk_init,
 	driver_reinit:		idedisk_reinit,
 };
 
@@ -1083,7 +1081,7 @@ int idedisk_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy--;
 	failed--;
 
-	ide_register_module(&idedisk_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -1105,7 +1103,6 @@ static void __exit idedisk_exit (void)
 			ide_remove_proc_entries(drive->proc, idedisk_proc);
 #endif
 	}
-	ide_unregister_module(&idedisk_driver);
 }
 
 int idedisk_init (void)
@@ -1130,7 +1127,7 @@ int idedisk_init (void)
 		DRIVER(drive)->busy--;
 		failed--;
 	}
-	ide_register_module(&idedisk_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

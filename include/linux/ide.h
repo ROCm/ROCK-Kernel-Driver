@@ -722,12 +722,7 @@ typedef struct ide_driver_s {
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t		*proc;
-	int (*driver_init)(void);
 	int (*driver_reinit)(ide_drive_t *);
-
-	/* FIXME: Single linked list of drivers for iteration.
-	 */
-	struct ide_driver_s *next;
 } ide_driver_t;
 
 #define DRIVER(drive)		((drive)->driver)
@@ -742,7 +737,6 @@ typedef struct ide_driver_s {
  */
 #ifndef _IDE_C
 extern struct hwif_s ide_hwifs[];		/* master data repository */
-extern struct ide_driver_s *ide_drivers;
 #endif
 extern int noautodma;
 
@@ -1072,8 +1066,6 @@ int idescsi_init (void);
 #endif /* CONFIG_BLK_DEV_IDESCSI */
 #endif /* _IDE_C */
 
-extern int ide_register_module (struct ide_driver_s *d);
-extern void ide_unregister_module (struct ide_driver_s *d);
 ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n);
 extern int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver);
 extern int ide_unregister_subdriver(ide_drive_t *drive);
@@ -1108,5 +1100,6 @@ extern unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const
 extern spinlock_t ide_lock;
 
 extern int drive_is_ready(ide_drive_t *drive);
+extern void revalidate_drives(void);
 
 #endif /* _IDE_H */

@@ -535,7 +535,6 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-int idescsi_init(void);
 int idescsi_reinit(ide_drive_t *drive);
 
 /*
@@ -561,7 +560,6 @@ static ide_driver_t idescsi_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			NULL,
-	driver_init:		idescsi_init,
 	driver_reinit:		idescsi_reinit,
 };
 
@@ -596,7 +594,7 @@ int idescsi_reinit (ide_drive_t *drive)
 			failed--;
 		}
 	}
-	ide_register_module(&idescsi_module);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 #endif
 	return 0;
@@ -636,7 +634,7 @@ int idescsi_init (void)
 			failed--;
 		}
 	}
-	ide_register_module(&idescsi_driver);
+	revalidate_drives();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }
@@ -906,7 +904,6 @@ static void __exit exit_idescsi_module(void)
 				failed++;
 			}
 	}
-	ide_unregister_module(&idescsi_driver);
 }
 
 module_init(init_idescsi_module);

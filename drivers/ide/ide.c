@@ -196,11 +196,6 @@ static int	ide_intr_lock;
 int noautodma = 0;
 
 /*
- * This is the anchor of the single linked list of ide device type drivers.
- */
-struct ide_driver_s *ide_drivers;
-
-/*
  * This is declared extern in ide.h, for access by other IDE modules:
  */
 ide_hwif_t	ide_hwifs[MAX_HWIFS];	/* master data repository */
@@ -1842,7 +1837,11 @@ int ide_revalidate_disk (kdev_t i_rdev)
 	return res;
 }
 
-static void revalidate_drives (void)
+/*
+ * Look again for all drives in the system on all interfaces.  This is used
+ * after a new driver cathegory has been loaded as module.
+ */
+void revalidate_drives (void)
 {
 	ide_hwif_t *hwif;
 	ide_drive_t *drive;
@@ -1870,15 +1869,12 @@ static void ide_probe_module (void)
 static void ide_driver_module (void)
 {
 	int index;
-	struct ide_driver_s *d;
 
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (ide_hwifs[index].present)
 			goto search;
 	ide_probe_module();
 search:
-	for (d = ide_drivers; d != NULL; d = d->next)
-		d->driver_init();
 
 	revalidate_drives();
 }
@@ -3610,30 +3606,6 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	return 0;
 }
 
-int ide_register_module (struct ide_driver_s *d)
-{
-	struct ide_driver_s *p = ide_drivers;
-
-	while (p) {
-		if (p == d)
-			return 1;
-		p = p->next;
-	}
-	d->next = ide_drivers;
-	ide_drivers = d;
-	revalidate_drives();
-	return 0;
-}
-
-void ide_unregister_module (struct ide_driver_s *d)
-{
-	struct ide_driver_s **p;
-
-	for (p = &ide_drivers; (*p) && (*p) != d; p = &((*p)->next));
-	if (*p)
-		*p = (*p)->next;
-}
-
 struct block_device_operations ide_fops[] = {{
 	owner:			THIS_MODULE,
 	open:			ide_open,
@@ -3644,9 +3616,8 @@ struct block_device_operations ide_fops[] = {{
 }};
 
 EXPORT_SYMBOL(ide_hwifs);
-EXPORT_SYMBOL(ide_register_module);
-EXPORT_SYMBOL(ide_unregister_module);
 EXPORT_SYMBOL(ide_spin_wait_hwgroup);
+EXPORT_SYMBOL(revalidate_drives);
 
 /*
  * Probe module
