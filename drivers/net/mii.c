@@ -261,7 +261,7 @@ unsigned int mii_check_media (struct mii_if_info *mii,
 	return 0; /* duplex did not change */
 }
 
-int generic_mii_ioctl(struct net_device *dev, struct mii_if_info *mii_if,
+int generic_mii_ioctl(struct mii_if_info *mii_if,
 		      struct mii_ioctl_data *mii_data, int cmd)
 {
 	int rc = 0;
@@ -277,7 +277,7 @@ int generic_mii_ioctl(struct net_device *dev, struct mii_if_info *mii_if,
 
 	case SIOCGMIIREG:
 		mii_data->val_out =
-			mii_if->mdio_read(dev, mii_data->phy_id,
+			mii_if->mdio_read(mii_if->dev, mii_data->phy_id,
 					  mii_data->reg_num);
 		break;
 
@@ -313,7 +313,7 @@ int generic_mii_ioctl(struct net_device *dev, struct mii_if_info *mii_if,
 			}
 		}
 
-		mii_if->mdio_write(dev, mii_data->phy_id,
+		mii_if->mdio_write(mii_if->dev, mii_data->phy_id,
 				   mii_data->reg_num, val);
 		break;
 	}

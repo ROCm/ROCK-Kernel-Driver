@@ -2454,7 +2454,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	else {
 		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(dev, &np->mii, data, cmd);
+		rc = generic_mii_ioctl(&np->mii, data, cmd);
 		spin_unlock_irq(&np->lock);
 
 		if (rc == 1)	/* don't care about duplex change, fix up rc */
