@@ -1023,14 +1023,14 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 			return ide_started;
 		}
 		/* end of polling */
-		hwgroup->poll_timeout = 0;
+		hwgroup->polling = 0;
 		printk("%s: ATAPI reset timed-out, status=0x%02x\n",
 				drive->name, stat);
 		/* do it the old fashioned way */
 		return do_reset1(drive, 1);
 	}
 	/* done polling */
-	hwgroup->poll_timeout = 0;
+	hwgroup->polling = 0;
 	return ide_stopped;
 }
 
@@ -1090,7 +1090,7 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			printk("\n");
 		}
 	}
-	hwgroup->poll_timeout = 0;	/* done polling */
+	hwgroup->polling = 0;	/* done polling */
 	return ide_stopped;
 }
 
@@ -1165,6 +1165,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 		udelay (20);
 		hwif->OUTB(WIN_SRST, IDE_COMMAND_REG);
 		hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+		hwgroup->polling = 1;
 		__ide_set_handler(drive, &atapi_reset_pollfunc, HZ/20, NULL);
 		spin_unlock_irqrestore(&ide_lock, flags);
 		return ide_started;
@@ -1205,6 +1206,7 @@ static ide_startstop_t do_reset1 (ide_drive_t *drive, int do_not_try_atapi)
 	/* more than enough time */
 	udelay(10);
 	hwgroup->poll_timeout = jiffies + WAIT_WORSTCASE;
+	hwgroup->polling = 1;
 	__ide_set_handler(drive, &reset_pollfunc, HZ/20, NULL);
 
 	/*

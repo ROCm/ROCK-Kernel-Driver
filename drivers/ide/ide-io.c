@@ -1314,7 +1314,7 @@ void ide_timer_expiry (unsigned long data)
 			/* local CPU only,
 			 * as if we were handling an interrupt */
 			local_irq_disable();
-			if (hwgroup->poll_timeout != 0) {
+			if (hwgroup->polling) {
 				startstop = handler(drive);
 			} else if (drive_is_ready(drive)) {
 				if (drive->waiting_for_dma)
@@ -1442,8 +1442,7 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_NONE;
 	}
 
-	if ((handler = hwgroup->handler) == NULL ||
-	    hwgroup->poll_timeout != 0) {
+	if ((handler = hwgroup->handler) == NULL || hwgroup->polling) {
 		/*
 		 * Not expecting an interrupt from this drive.
 		 * That means this could be:
