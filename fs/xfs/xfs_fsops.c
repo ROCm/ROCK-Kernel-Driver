@@ -142,6 +142,7 @@ xfs_growfs_data_private(
 	int			dpct;
 	int			error;
 	xfs_agnumber_t		nagcount;
+	xfs_agnumber_t		nagimax = 0;
 	xfs_rfsblock_t		nb, nb_mod;
 	xfs_rfsblock_t		new;
 	xfs_rfsblock_t		nfree;
@@ -183,7 +184,7 @@ xfs_growfs_data_private(
 		memset(&mp->m_perag[oagcount], 0,
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mp->m_flags |= XFS_MOUNT_32BITINODES;
-		xfs_initialize_perag(mp, nagcount);
+		nagimax = xfs_initialize_perag(mp, nagcount);
 		up_write(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
@@ -372,6 +373,9 @@ xfs_growfs_data_private(
 	if (error) {
 		return error;
 	}
+	/* New allocation groups fully initialized, so update mount struct */
+	if (nagimax)
+		mp->m_maxagi = nagimax;
 	if (mp->m_sb.sb_imax_pct) {
 		__uint64_t icount = mp->m_sb.sb_dblocks * mp->m_sb.sb_imax_pct;
 		do_div(icount, 100);

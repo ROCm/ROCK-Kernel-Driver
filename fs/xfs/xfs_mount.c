@@ -318,10 +318,10 @@ xfs_mount_validate_sb(
 	return 0;
 }
 
-void
-xfs_initialize_perag(xfs_mount_t *mp, int agcount)
+xfs_agnumber_t
+xfs_initialize_perag(xfs_mount_t *mp, xfs_agnumber_t agcount)
 {
-	int		index, max_metadata;
+	xfs_agnumber_t	index, max_metadata;
 	xfs_perag_t	*pag;
 	xfs_agino_t	agino;
 	xfs_ino_t	ino;
@@ -377,7 +377,7 @@ xfs_initialize_perag(xfs_mount_t *mp, int agcount)
 			pag->pagi_inodeok = 1;
 		}
 	}
-	mp->m_maxagi = index;
+	return index;
 }
 
 /*
@@ -951,7 +951,7 @@ xfs_mountfs(
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 
-	xfs_initialize_perag(mp, sbp->sb_agcount);
+	mp->m_maxagi = xfs_initialize_perag(mp, sbp->sb_agcount);
 
 	/*
 	 * log's mount-time initialization. Perform 1st part recovery if needed

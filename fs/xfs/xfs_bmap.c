@@ -3427,19 +3427,20 @@ xfs_bmap_do_search_extents(
 	int		high;		/* high index of binary search */
 	int		low;		/* low index of binary search */
 
-	/* Initialize the extent entry structure to catch access to
-	* uninitialized br_startblock field.
-	*/
+	/*
+	 * Initialize the extent entry structure to catch access to
+	 * uninitialized br_startblock field.
+	 */
+	got.br_startoff = 0xffa5a5a5a5a5a5a5LL;
+	got.br_blockcount = 0xa55a5a5a5a5a5a5aLL;
+	got.br_state = XFS_EXT_INVALID;
 
-        got.br_startoff = 0xffa5a5a5a5a5a5a5;
-        got.br_blockcount = 0xa55a5a5a5a5a5a5a;
-        got.br_state = XFS_EXT_INVALID;
+#if XFS_BIG_BLKNOS
+	got.br_startblock = 0xffffa5a5a5a5a5a5LL;
+#else
+	got.br_startblock = 0xffffa5a5;
+#endif
 
-	#if XFS_BIG_BLKNOS
-        	got.br_startblock = 0xffffa5a5a5a5a5a5;
-	#else
-		got.br_startblock = 0xffffa5a5;
-	#endif
 	if (lastx != NULLEXTNUM && lastx < nextents)
 		ep = base + lastx;
 	else
