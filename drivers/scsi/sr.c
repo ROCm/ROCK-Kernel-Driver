@@ -88,7 +88,6 @@ static struct Scsi_Device_Template sr_template =
 };
 
 static Scsi_CD *scsi_CDs;
-static int *sr_sizes;
 
 static int sr_open(struct cdrom_device_info *, int);
 static void get_sectorsize(Scsi_CD *);
@@ -235,9 +234,9 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 		 * block.  Therefore, if we hit a medium error within the last
 		 * 75 2K sectors, we decrease the saved size value.
 		 */
-		if ((error_sector >> 1) < sr_sizes[device_nr] &&
+		if (error_sector < cd->disk->part[0].nr_sects &&
 		    cd->capacity - error_sector < 4 * 75)
-			sr_sizes[device_nr] = error_sector >> 1;
+			cd->disk->part[0].nr_sects = error_sector;
 	}
 
 	/*
@@ -477,8 +476,6 @@ static void get_sectorsize(Scsi_CD *cd)
 	int sector_size;
 	Scsi_Request *SRpnt = NULL;
 	request_queue_t *queue;
-	int unit = cd - scsi_CDs; /* gack... we still need it for corresponding
-				     sr_sizes[] element access */
 
 	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer)
@@ -558,7 +555,7 @@ static void get_sectorsize(Scsi_CD *cd)
 		 * what the device is capable of.
 		 */
 		cd->needs_sector_size = 0;
-		sr_sizes[unit] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
+		cd->disk->part[0].nr_sects = cd->capacity;
 	}
 
 	queue = &cd->device->request_queue;
@@ -713,15 +710,8 @@ static int sr_init()
 	memset(scsi_CDs, 0, sr_template.dev_max * sizeof(Scsi_CD));
 	for (i = 0; i < sr_template.dev_max; i++)
 		sprintf(scsi_CDs[i].cdi.name, "sr%d", i);
-
-	sr_sizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
-	if (!sr_sizes)
-		goto cleanup_cds;
-	memset(sr_sizes, 0, sr_template.dev_max * sizeof(int));
 	return 0;
 
-cleanup_cds:
-	kfree(scsi_CDs);
 cleanup_dev:
 	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
@@ -751,14 +741,34 @@ void sr_finish()
 	int i;
 
 	blk_dev[MAJOR_NR].queue = sr_find_queue;
-	blk_size[MAJOR_NR] = sr_sizes;
 
 	for (i = 0; i < sr_template.nr_dev; ++i) {
+		struct gendisk *disk;
+		/* KLUDGE - will go away */
+		struct {
+			struct gendisk disk;
+			struct hd_struct part;
+		} *p;
 		Scsi_CD *cd = &scsi_CDs[i];
 		/* If we have already seen this, then skip it.  Comes up
 		 * with loadable modules. */
-		if (cd->capacity)
+		if (cd->disk)
 			continue;
+		p = kmalloc(sizeof(*p), GFP_KERNEL);
+		if (!p)
+			continue;
+		if (cd->disk) {
+			kfree(p);
+			continue;
+		}
+		memset(p, 0, sizeof(*p));
+		p->disk.part = &p->part;
+		p->disk.major = MAJOR_NR;
+		p->disk.first_minor = i;
+		p->disk.major_name = cd->cdi.name;
+		p->disk.minor_shift = 0;
+		p->disk.fops = &sr_bdops;
+		cd->disk = disk = &p->disk;
 		cd->capacity = 0x1fffff;
 		cd->device->sector_size = 2048;/* A guess, just in case */
 		cd->needs_sector_size = 1;
@@ -774,7 +784,6 @@ void sr_finish()
 		cd->device->remap = 1;
 		cd->readcd_known = 0;
 		cd->readcd_cdda = 0;
-		sr_sizes[i] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
 
 		cd->cdi.ops = &sr_dops;
 		cd->cdi.handle = cd;
@@ -807,6 +816,9 @@ void sr_finish()
                                     S_IFBLK | S_IRUGO | S_IWUGO,
                                     &sr_bdops, NULL);
 		register_cdrom(&cd->cdi);
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+				1<<disk->minor_shift, disk->fops, cd->capacity);
 	}
 }
 
@@ -822,7 +834,9 @@ static void sr_detach(Scsi_Device * SDp)
 			 * the device.
 			 * We should be kind to our buffer cache, however.
 			 */
-			invalidate_device(mk_kdev(MAJOR_NR, i), 0);
+			del_gendisk(cpnt->disk);
+			kfree(cpnt->disk);
+			cpnt->disk = NULL;
 
 			/*
 			 * Reset things back to a sane state so that one can
@@ -834,7 +848,6 @@ static void sr_detach(Scsi_Device * SDp)
 			SDp->attached--;
 			sr_template.nr_dev--;
 			sr_template.dev_noticed--;
-			sr_sizes[i] = 0;
 			return;
 		}
 	}
@@ -857,12 +870,8 @@ static void __exit exit_sr(void)
 	scsi_unregister_device(&sr_template);
 	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
-	if (scsi_CDs != NULL) {
+	if (scsi_CDs != NULL)
 		kfree(scsi_CDs);
-
-		kfree(sr_sizes);
-		sr_sizes = NULL;
-	}
 	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;

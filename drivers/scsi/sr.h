@@ -18,6 +18,7 @@
 #define _SR_H
 
 #include "scsi.h"
+#include <linux/genhd.h>
 
 typedef struct {
 	unsigned capacity;	/* size in blocks                       */
@@ -30,6 +31,7 @@ typedef struct {
 	unsigned readcd_known:1;	/* drive supports READ_CD (0xbe) */
 	unsigned readcd_cdda:1;	/* reading audio data using READ_CD */
 	struct cdrom_device_info cdi;
+	struct gendisk *disk;
 } Scsi_CD;
 
 int sr_do_ioctl(Scsi_CD *, unsigned char *, void *, unsigned, int, int, struct request_sense *);
