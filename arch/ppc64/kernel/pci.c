@@ -87,30 +87,6 @@ static void fixup_broken_pcnet32(struct pci_dev* dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_TRIDENT, PCI_ANY_ID, fixup_broken_pcnet32);
 
-static void fixup_windbond_82c105(struct pci_dev* dev)
-{
-	/* Assume the windbond 82c105 is the IDE controller on a
-	 * p610.  We should probably be more careful in case
-	 * someone tries to plug in a similar adapter.
-	 */
-	int i;
-	unsigned int reg;
-
-	printk("Using INTC for W82c105 IDE controller.\n");
-	pci_read_config_dword(dev, 0x40, &reg);
-	/* Enable LEGIRQ to use INTC instead of ISA interrupts */
-	pci_write_config_dword(dev, 0x40, reg | (1<<11));
-
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; ++i) {
-		/* zap the 2nd function of the winbond chip */
-		if (dev->resource[i].flags & IORESOURCE_IO
-		    && dev->bus->number == 0 && dev->devfn == 0x81)
-			dev->resource[i].flags &= ~IORESOURCE_IO;
-	}
-}
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105,
-			 fixup_windbond_82c105);
-
 void  pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			      struct resource *res)
 {
