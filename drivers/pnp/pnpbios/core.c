@@ -531,6 +531,15 @@ int __init pnpbios_init(void)
 {
 	int ret;
 
+	/* Don't use pnpbios if pnpacpi is used */
+#ifdef CONFIG_PNPACPI
+	if (!acpi_disabled) {
+		pnpbios_disabled = 1;
+		printk(KERN_INFO "PnPBIOS: Disabled by pnpacpi\n");
+		return -ENODEV;
+	}
+#endif
+
 	if (pnpbios_disabled || dmi_check_system(pnpbios_dmi_table)) {
 		printk(KERN_INFO "PnPBIOS: Disabled\n");
 		return -ENODEV;
@@ -572,6 +581,8 @@ subsys_initcall(pnpbios_init);
 
 static int __init pnpbios_thread_init(void)
 {
+	if (pnpbios_disabled)
+		return 0;
 #ifdef CONFIG_HOTPLUG
 	init_completion(&unload_sem);
 	if (kernel_thread(pnp_dock_thread, NULL, CLONE_KERNEL) > 0)

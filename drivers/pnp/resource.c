@@ -421,6 +421,7 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 
 int pnp_check_dma(struct pnp_dev * dev, int idx)
 {
+#ifndef CONFIG_IA64
 	int tmp;
 	struct pnp_dev *tdev;
 	unsigned long * dma = &dev->res.dma_resource[idx].start;
@@ -470,6 +471,10 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 	}
 
 	return 1;
+#else
+	/* IA64 hasn't legacy DMA */
+	return 0;
+#endif
 }
 
 
