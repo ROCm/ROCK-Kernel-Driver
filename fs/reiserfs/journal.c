@@ -788,8 +788,7 @@ static int write_ordered_buffers(spinlock_t *lock,
 	    if (chunk.nr)
 		write_ordered_chunk(&chunk);
 	    wait_on_buffer(bh);
-	    if (need_resched)
-	        schedule();
+	    cond_resched();
 	    spin_lock(lock);
 	    goto loop_next;
 	}
@@ -803,11 +802,7 @@ static int write_ordered_buffers(spinlock_t *lock,
 	}
 loop_next:
 	put_bh(bh);
-	if (chunk.nr == 0 && need_resched) {
-	    spin_unlock(lock);
-	    schedule();
-	    spin_lock(lock);
-	}
+	cond_resched_lock(lock);
     }
     if (chunk.nr) {
 	spin_unlock(lock);
@@ -828,11 +823,7 @@ loop_next:
 	if (!buffer_uptodate(bh))
 	    ret = -EIO;
 	put_bh(bh);
-	if (need_resched()) {
-	    spin_unlock(lock);
-	    schedule();
-	    spin_lock(lock);
-	}
+	cond_resched_lock(lock);
     }
     spin_unlock(lock);
     return ret;
@@ -3469,6 +3460,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
     next = cn->next ;
     free_cnode(p_s_sb, cn) ;
     cn = next ;
+    cond_resched();
   }
 
   /* we are done  with both the c_bh and d_bh, but
