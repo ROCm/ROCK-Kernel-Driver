@@ -73,8 +73,10 @@ register_sn_serial_numbers(void) {
 	}
 }
 
-// Disable forced interrupts, but leave the code in, just in case.
-int sn_force_interrupt_flag = 0;
+/*
+ * Enable forced interrupt by default.
+ */
+int sn_force_interrupt_flag = 1;
 
 static int
 sn_force_interrupt_read_proc(char *page, char **start, off_t off,
