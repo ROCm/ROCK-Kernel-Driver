@@ -44,6 +44,7 @@ VERSION 1.6LK	<2004/04/14>
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -93,6 +94,7 @@ VERSION 1.6LK	<2004/04/14>
 /* media options */
 #define MAX_UNITS 8
 static int media[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1 };
+static int num_media = 0;
 
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 20;
@@ -405,9 +407,9 @@ struct rtl8169_private {
 
 MODULE_AUTHOR("Realtek");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
-MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(use_dac, "i");
+module_param_array(media, int, num_media, 0);
+module_param(rx_copybreak, int, 0);
+module_param(use_dac, int, 0);
 MODULE_PARM_DESC(use_dac, "Enable PCI DAC. Unsafe on 32 bit PCI slot.");
 MODULE_LICENSE("GPL");
 
