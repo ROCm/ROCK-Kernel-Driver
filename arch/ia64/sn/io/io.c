@@ -87,11 +87,7 @@ hub_pio_init(vertex_hdl_t hubv)
 	hub_set_piomode(nasid, HUB_PIO_CONVEYOR);
 
 	mutex_spinlock_init(&hubinfo->h_bwlock);
-/*
- * If this lock can be acquired from interrupts or bh's, add SV_INTS or SV_BHS,
- * respectively, to the flags here.
- */
-	sv_init(&hubinfo->h_bwwait, &hubinfo->h_bwlock, SV_ORDER_FIFO | SV_MON_SPIN); 
+	init_waitqueue_head(&hubinfo->h_bwwait);
 }
 
 /* 
@@ -215,10 +211,16 @@ tryagain:
 			if (flags & PIOMAP_NOSLEEP) {
 				bw_piomap = NULL;
 				goto done;
-			}
+			} else {
+				DECLARE_WAITQUEUE(wait, current);
 
-			sv_wait(&hubinfo->h_bwwait, 0, 0);
-			goto tryagain;
+				spin_unlock(&hubinfo->h_bwlock); 
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				add_wait_queue_exclusive(&hubinfo->h_bwwait, &wait);
+				schedule();
+				remove_wait_queue(&hubinfo->h_bwwait, &wait);
+				goto tryagain;
+			}
 		}
 	}
 
@@ -316,7 +318,7 @@ hub_piomap_free(hub_piomap_t hub_piomap)
 		} else
 			hub_piomap->hpio_flags &= ~HUB_PIOMAP_IS_VALID;
 
-		(void)sv_signal(&hubinfo->h_bwwait);
+		wake_up(&hubinfo->h_bwwait);
 	}
 
 	mutex_spinunlock(&hubinfo->h_bwlock, s);

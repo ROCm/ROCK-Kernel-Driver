@@ -99,7 +99,6 @@ extern int hwgraph_info_replace_LBL(vertex_hdl_t, char *, arbitrary_info_t,
 extern int hwgraph_info_get_exported_LBL(vertex_hdl_t, char *, int *, arbitrary_info_t *);
 extern int hwgraph_info_get_next_LBL(vertex_hdl_t, char *, arbitrary_info_t *,
                                 labelcl_info_place_t *);
-extern int hwgraph_path_lookup(vertex_hdl_t, char *, vertex_hdl_t *, char **);
 extern int hwgraph_info_export_LBL(vertex_hdl_t, char *, int);
 extern int hwgraph_info_unexport_LBL(vertex_hdl_t, char *);
 extern int hwgraph_info_remove_LBL(vertex_hdl_t, char *, arbitrary_info_t *);

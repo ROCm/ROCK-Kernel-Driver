@@ -69,6 +69,7 @@ walk_parents_mkdir(
 			return error;
 
 		nd->dentry = lookup_create(nd, is_dir);
+		nd->flags |= LOOKUP_PARENT;
 		if (unlikely(IS_ERR(nd->dentry)))
 			return PTR_ERR(nd->dentry);
 
