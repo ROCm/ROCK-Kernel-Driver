@@ -542,7 +542,7 @@ source "drivers/telephony/Kconfig"
 
 # This one must be before the filesystem configs. -DaveM
 
-menu "Unix 98 PTY support"
+menu "Unix98 PTY support"
 
 config UNIX98_PTYS
 	bool "Unix98 PTY support"
