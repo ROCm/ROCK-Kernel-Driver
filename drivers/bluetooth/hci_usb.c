@@ -376,12 +376,12 @@ static int hci_usb_close(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
+	/* Synchronize with completion handlers */
 	write_lock_irqsave(&husb->completion_lock, flags);
+	write_unlock_irqrestore(&husb->completion_lock, flags);
 	
 	hci_usb_unlink_urbs(husb);
 	hci_usb_flush(hdev);
-
-	write_unlock_irqrestore(&husb->completion_lock, flags);
 	return 0;
 }
 
