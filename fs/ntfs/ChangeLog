@@ -8,7 +8,7 @@ ToDo:
 	  functions need to clone block_read_full_page and modify it to cope
 	  with the significance of the different attribute sizes.
 	  Still need to go through:
-		aops.c, compress.c, dir.c
+		aops.c, dir.c
 	- Find and fix bugs.
 	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
 	  there are dragons lurking in the details, e.g. read_inode() currently
@@ -17,13 +17,8 @@ ToDo:
 	  truncate the visible i_size? Will the user just get -E2BIG (or
 	  whatever) on open()? Or will (s)he be able to open() but lseek() and
 	  read() will fail when s_maxbytes is reached? -> Investigate this!
-	- Perhaps don't bother getting the run list in ntfs_read_inode() at
-	  all. But we do have to find the data/index root attribute to get the
-	  inode size so we might want to decompress the mapping pairs of the
-	  first extent in there anyway. -> Ponder this. Directory listings
-	  would have significant speedups but the first access to each file/dir
-	  would have a small speed penalty.
-	- Implement/allow non-resident index bitmaps in ntfs_readdir().
+	- Implement/allow non-resident index bitmaps in ntfs_readdir() and
+	  consider initialized_size, etc.
 	- vcn_to_lcn() should somehow return the correct pointer within the
 	  ->run_list so we can get at the lcns for the following vcns, this is
 	  strictly a speed optimization. Obviously need to keep the ->run_list
@@ -33,6 +28,9 @@ ToDo:
 	  initialized_size, just zero the buffer heads instead. Question: How
 	  to setup the buffer heads so they point to the on disk location
 	  correctly (after all they are allocated) but are not read from disk?
+	- Consider if ntfs_file_read_compressed_block() shouldn't be coping
+	  with initialized_size < data_size. I don't think it can happen but
+	  it requires more careful consideration.
 
 tng-0.0.9 - Work in progress
 
@@ -44,6 +42,12 @@ tng-0.0.9 - Work in progress
 	  mft.c::ntfs_mft_readpage(), aops.c::end_buffer_read_index_async(),
 	  and attrib.c::load_attribute_list().
 	- Lock the run list in attrib.c::load_attribute_list() while using it.
+	- Fix memory leak in ntfs_file_read_compressed_block() and generally
+	  clean up compress.c a little, removing some uncommented/unused debug
+	  code.
+	- Tidy up dir.c a little bit.
+
+- Don't bother getting the run list in inode.c::ntfs_read_inode().
 
 tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 

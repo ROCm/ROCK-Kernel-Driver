@@ -569,19 +569,6 @@ skip_attr_list_load:
 				ctx->attr->_ANR(initialized_size));
 		ni->allocated_size = sle64_to_cpu(
 				ctx->attr->_ANR(allocated_size));
-		/*
-		 * Setup the run list. No need for locking as we have exclusive
-		 * access to the inode at this time.
-		 */
-		ni->run_list.rl = decompress_mapping_pairs(vol, ctx->attr,
-				NULL);
-		if (IS_ERR(ni->run_list.rl)) {
-			err = PTR_ERR(ni->run_list.rl);
-			ni->run_list.rl = NULL;
-			ntfs_error(vi->i_sb, "Mapping pairs decompression "
-					"failed with error code %i.", -err);
-			goto ec_put_unm_err_out;
-		}
 		/* Find bitmap attribute. */
 		reinit_attr_search_ctx(ctx);
 		if (!lookup_attr(AT_BITMAP, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
@@ -737,34 +724,30 @@ skip_large_dir_stuff:
 						"You should run chkdsk.");
 				goto put_unm_err_out;
 			}
-			/* $MFT is special as we have the run_list already. */
-			if (likely(vi->i_ino != FILE_MFT)) {
-				/*
-				 * Setup the run list. No need for locking as
-				 * we have exclusive access to the inode at
-				 * this time.
-				 */
-				ni->run_list.rl = decompress_mapping_pairs(vol,
-						ctx->attr, NULL);
-				if (IS_ERR(ni->run_list.rl)) {
-					err = PTR_ERR(ni->run_list.rl);
-					ni->run_list.rl = NULL;
-					ntfs_error(vi->i_sb, "Mapping pairs "
-							"decompression failed "
-							"with error code %i.",
-							-err);
-					goto ec_put_unm_err_out;
-				}
-			}
 			/* Setup all the sizes. */
 			vi->i_size = sle64_to_cpu(ctx->attr->_ANR(data_size));
 			ni->initialized_size = sle64_to_cpu(
 					ctx->attr->_ANR(initialized_size));
 			ni->allocated_size = sle64_to_cpu(
 					ctx->attr->_ANR(allocated_size));
-			if (NInoCompressed(ni))
+			if (NInoCompressed(ni)) {
 				ni->_ICF(compressed_size) = sle64_to_cpu(
 					ctx->attr->_ANR(compressed_size));
+				if (vi->i_size != ni->initialized_size)
+					ntfs_warning(vi->i_sb, "Compressed "
+							"file with data_size "
+							"unequal to "
+							"initialized size "
+							"found. This will "
+							"probably cause "
+							"problems when trying "
+							"to access the file. "
+							"Please notify "
+							"linux-ntfs-dev@"
+							"lists.sf.net that you"
+							"saw this message."
+							"Thanks!");
+			}
 		} else { /* Resident attribute. */
 			/*
 			 * Make all sizes equal for simplicity in read code

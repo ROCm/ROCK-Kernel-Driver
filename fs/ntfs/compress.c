@@ -305,7 +305,6 @@ do_next_tag:
 
 	/* Get the next tag and advance to first token. */
 	tag = *cb++;
-	//ntfs_debug("Found tag = 0x%x.", tag);
 
 	/* Parse the eight tokens described by the tag. */
 	for (token = 0; token < 8; token++, tag >>= 1) {
@@ -319,8 +318,6 @@ do_next_tag:
 
 		/* Determine token type and parse appropriately.*/
 		if ((tag & NTFS_TOKEN_MASK) == NTFS_SYMBOL_TOKEN) {
-			//ntfs_debug("Found symbol token = %c (0x%x).", *cb,
-			//		*cb);
 			/*
 			 * We have a symbol token, copy the symbol across, and
 			 * advance the source and destination positions.
@@ -332,7 +329,6 @@ do_next_tag:
 			continue;
 		}
 
-		//ntfs_debug("Found phrase token = 0x%x.", le16_to_cpup(cb));
 		/* 
 		 * We have a phrase token. Make sure it is not the first tag in
 		 * the sb as this is illegal and would confuse the code below.
@@ -365,11 +361,7 @@ do_next_tag:
 
 		/* Now calculate the length of the byte sequence. */
 		length = (pt & (0xfff >> lg)) + 3;
-#if 0
-		ntfs_debug("starting position = 0x%x, back pointer = 0x%x, "
-				"length = 0x%x.", *dest_ofs - do_sb_start -
-				1, (pt >> (12 - lg)) + 1, length);
-#endif
+
 		/* Advance destination position and verify it is in range. */
 		*dest_ofs += length;
 		if (*dest_ofs > do_sb_end)
@@ -379,14 +371,12 @@ do_next_tag:
 		max_non_overlap = dp_addr - dp_back_addr;
 
 		if (length <= max_non_overlap) {
-			//ntfs_debug("Found non-overlapping byte sequence.");
 			/* The byte sequence doesn't overlap, just copy it. */
 			memcpy(dp_addr, dp_back_addr, length);
 
 			/* Advance destination pointer. */
 			dp_addr += length;
 		} else {
-			//ntfs_debug("Found overlapping byte sequence.");
 			/*
 			 * The byte sequence does overlap, copy non-overlapping
 			 * part and then do a slow byte by byte copy for the
@@ -441,6 +431,12 @@ return_overflow:
  *
  * FIXME: Again for PAGE_CACHE_SIZE > cb_size we are screwing up both in
  * handling sparse and compressed cbs. (AIA)
+ *
+ * FIXME: At the moment we don't do any zeroing out in the case that
+ * initialized_size is less than data_size. This should be safe because of the
+ * nature of the compression algorithm used. Just in case we check and output
+ * an error message in read inode if the two sizes are not equal for a
+ * compressed file.
  */
 int ntfs_file_read_compressed_block(struct page *page)
 {
@@ -485,16 +481,6 @@ int ntfs_file_read_compressed_block(struct page *page)
 	ntfs_debug("Entering, page->index = 0x%lx, cb_size = 0x%x, nr_pages = "
 			"%i.", index, cb_size, nr_pages);
 
-	/*
-	 * Uncommenting the below line results in the compressed data being
-	 * read without any decompression. Compression blocks are padded with
-	 * zeroes in order to give them in their proper alignments. I am
-	 * leaving this here as it is a handy debugging / studying tool for
-	 * compressed data.
-	 */
-#if 0
-	return block_read_full_page(page, ntfs_file_get_block);
-#endif
 	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_NOFS);
 
 	/* Allocate memory to store the buffer heads we need. */
@@ -558,16 +544,11 @@ do_next_cb:
 	nr_cbs--;
 	nr_bhs = 0;
 
-	/* Read all cb buffer heads one cluster run at a time. */
+	/* Read all cb buffer heads one cluster at a time. */
 	for (vcn = start_vcn, start_vcn += cb_clusters; vcn < start_vcn;
 			vcn++) {
 		BOOL is_retry = FALSE;
 retry_remap:
-		/* Make sure we are not overflowing the file limits. */
-		if (vcn << vol->cluster_size_bits >= ni->initialized_size) {
-			/* Overflow, just zero this region. */
-			// TODO: AIA
-		}
 		/* Find lcn of vcn and convert it into blocks. */
 		down_read(&ni->run_list.lock);
 		lcn = vcn_to_lcn(ni->run_list.rl, vcn);
@@ -593,7 +574,6 @@ retry_remap:
 		/* Read the lcn from device in chunks of block_size bytes. */
 		max_block = block + (vol->cluster_size >> block_size_bits);
 		do {
-			// TODO: Need overflow checks here, too! (AIA)
 			ntfs_debug("block = 0x%x.", block);
 			if (unlikely(!(bhs[nr_bhs] = getblk(dev, block,
 					block_size))))
@@ -834,6 +814,9 @@ retry_remap:
 		}
 	}
 
+	/* We no longer need the list of pages. */
+	kfree(pages);
+
 	/* If we have completed the requested page, we return success. */
 	if (likely(xpage_done))
 		return 0;
@@ -876,6 +859,7 @@ err_out:
 				page_cache_release(page);
 		}
 	}
+	kfree(pages);
 	return -EIO;
 }
 

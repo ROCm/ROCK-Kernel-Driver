@@ -203,8 +203,8 @@ descend_into_child_node:
 	 * of PAGE_CACHE_SIZE and map the page cache page, reading it from
 	 * disk if necessary.
 	 */
-	page = ntfs_map_page(ia_mapping, vcn << dir_ni->_IDM(index_vcn_size_bits)
-			>> PAGE_CACHE_SHIFT);
+	page = ntfs_map_page(ia_mapping, vcn <<
+			dir_ni->_IDM(index_vcn_size_bits) >> PAGE_CACHE_SHIFT);
 	if (IS_ERR(page)) {
 		ntfs_error(sb, "Failed to map directory index page, error %ld.",
 				-PTR_ERR(page));
@@ -213,8 +213,8 @@ descend_into_child_node:
 	kaddr = (u8*)page_address(page);
 fast_descend_into_child_node:
 	/* Get to the index allocation block. */
-	ia = (INDEX_ALLOCATION*)(kaddr + ((vcn << dir_ni->_IDM(index_vcn_size_bits)) &
-			~PAGE_CACHE_MASK));
+	ia = (INDEX_ALLOCATION*)(kaddr + ((vcn <<
+			dir_ni->_IDM(index_vcn_size_bits)) & ~PAGE_CACHE_MASK));
 	/* Bounds checks. */
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed. Corrupt directory "
@@ -373,7 +373,8 @@ found_it2:
 		}
 		/* Child node present, descend into it. */
 		old_vcn = vcn;
-		vcn = sle64_to_cpup((u8*)ie + le16_to_cpu(ie->_IEH(length)) - 8);
+		vcn = sle64_to_cpup((u8*)ie +
+				le16_to_cpu(ie->_IEH(length)) - 8);
 		if (vcn >= 0) {
 			/* If vcn is in the same page cache page as old_vcn we
 			 * recycle the mapped page. */
@@ -641,7 +642,8 @@ skip_index_root:
 			err = -EIO;
 			goto kf_unm_err_out;
 		}
-		bmp = (u8*)ctx->attr + le16_to_cpu(ctx->attr->_ARA(value_offset));
+		bmp = (u8*)ctx->attr +
+				le16_to_cpu(ctx->attr->_ARA(value_offset));
 	}
 	/* Get the offset into the index allocation attribute. */
 	ia_pos = (s64)filp->f_pos - vol->mft_record_size;
@@ -698,7 +700,8 @@ find_next_index_buffer:
 				"Directory inode 0x%Lx is corrupt or driver "
 				"bug. ",
 				(long long)sle64_to_cpu(ia->index_block_vcn),
-				(long long)ia_pos >> ndir->_IDM(index_vcn_size_bits),
+				(long long)ia_pos >>
+				ndir->_IDM(index_vcn_size_bits),
 				(unsigned long long)ndir->mft_no);
 		err = -EIO;
 		goto unm_dir_err_out;
@@ -732,7 +735,8 @@ find_next_index_buffer:
 	if (index_end > (u8*)ia + ndir->_IDM(index_block_size)) {
 		ntfs_error(sb, "Size of index buffer (VCN 0x%Lx) of directory "
 				"inode 0x%Lx exceeds maximum size.",
-				(long long)ia_pos >> ndir->_IDM(index_vcn_size_bits),
+				(long long)ia_pos >>
+				ndir->_IDM(index_vcn_size_bits),
 				(unsigned long long)ndir->mft_no);
 		err = -EIO;
 		goto unm_dir_err_out;
@@ -809,31 +813,4 @@ struct file_operations ntfs_dir_ops = {
 	read:			generic_read_dir,	/* Return -EISDIR. */
 	readdir:		ntfs_readdir,		/* Read directory. */
 };
-
-#if 0
-/* NOTE: write, poll, fsync, readv, writev can be called without the big
- * kernel lock held in all filesystems. */
-struct file_operations {
-	loff_t (*llseek) (struct file *, loff_t, int);
-	ssize_t (*write) (struct file *, const char *, size_t, loff_t *);
-	unsigned int (*poll) (struct file *, struct poll_table_struct *);
-	int (*ioctl) (struct inode *, struct file *, unsigned int,
-			unsigned long);
-	int (*mmap) (struct file *, struct vm_area_struct *);
-	int (*open) (struct inode *, struct file *);
-	int (*flush) (struct file *);
-	int (*release) (struct inode *, struct file *);
-	int (*fsync) (struct file *, struct dentry *, int datasync);
-	int (*fasync) (int, struct file *, int);
-	int (*lock) (struct file *, int, struct file_lock *);
-	ssize_t (*readv) (struct file *, const struct iovec *, unsigned long,
-			loff_t *);
-	ssize_t (*writev) (struct file *, const struct iovec *, unsigned long,
-			loff_t *);
-	ssize_t (*sendpage) (struct file *, struct page *, int, size_t,
-			loff_t *, int);
-	unsigned long (*get_unmapped_area)(struct file *, unsigned long,
-			unsigned long, unsigned long, unsigned long);
-};
-#endif
 
