@@ -272,12 +272,16 @@ CONFIG_BLK_DEV_IDECD=y
 # CONFIG_BLK_DEV_IDESCSI is not set
 
 #
-# ATA host chipset support
+# ATA host chip set support
 #
 # CONFIG_BLK_DEV_CMD640 is not set
 # CONFIG_BLK_DEV_CMD640_ENHANCED is not set
 # CONFIG_BLK_DEV_ISAPNP is not set
 # CONFIG_BLK_DEV_RZ1000 is not set
+
+#
+#   PCI host chip set support
+#
 # CONFIG_BLK_DEV_OFFBOARD is not set
 # CONFIG_IDEPCI_SHARE_IRQ is not set
 CONFIG_BLK_DEV_IDEDMA_PCI=y
@@ -383,7 +387,6 @@ CONFIG_SCSI_FCAL=m
 # Fusion MPT device support
 #
 CONFIG_FUSION=m
-# CONFIG_FUSION_BOOT is not set
 
 #
 # (ability to boot linux kernel from Fusion device is DISABLED!)
@@ -612,6 +615,9 @@ CONFIG_SOUND_GAMEPORT=y
 # File systems
 #
 # CONFIG_QUOTA is not set
+# CONFIG_QFMT_V1 is not set
+# CONFIG_QFMT_V2 is not set
+# CONFIG_QIFACE_COMPAT is not set
 CONFIG_AUTOFS_FS=m
 CONFIG_AUTOFS4_FS=m
 # CONFIG_REISERFS_FS is not set
@@ -772,10 +778,11 @@ CONFIG_USB_DEVICEFS=y
 # USB Host Controller Drivers
 #
 CONFIG_USB_EHCI_HCD=m
-# CONFIG_USB_OHCI_HCD is not set
+CONFIG_USB_OHCI_HCD=y
+CONFIG_USB_UHCI_HCD=m
+# CONFIG_USB_UHCI_HCD_ALT is not set
 CONFIG_USB_UHCI=y
 # CONFIG_USB_UHCI_ALT is not set
-CONFIG_USB_OHCI=y
 
 #
 # USB Device Class drivers
@@ -792,6 +799,7 @@ CONFIG_USB_STORAGE_ISD200=y
 CONFIG_USB_STORAGE_DPCM=y
 CONFIG_USB_STORAGE_HP8200e=y
 CONFIG_USB_STORAGE_SDDR09=y
+CONFIG_USB_STORAGE_SDDR55=y
 # CONFIG_USB_STORAGE_JUMPSHOT is not set
 
 #
@@ -799,7 +807,7 @@ CONFIG_USB_STORAGE_SDDR09=y
 #
 CONFIG_USB_HID=y
 CONFIG_USB_HIDINPUT=y
-# CONFIG_USB_HIDDEV is not set
+CONFIG_USB_HIDDEV=y
 CONFIG_USB_WACOM=m
 
 #
