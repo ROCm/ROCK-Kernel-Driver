@@ -224,7 +224,7 @@ static void sb_dev2cfg(struct pnp_dev *dev, struct sb_card_config *scc)
 }
 
 /* Probe callback function for the PnP API */
-static int sb_pnp_probe(struct pnp_card_link *card, const struct pnp_card_id *card_id)
+static int sb_pnp_probe(struct pnp_card_link *card, const struct pnp_card_device_id *card_id)
 {
 	struct sb_card_config *scc;
 	struct sb_module_options sbmo = {0}; /* Default to 0 for PnP */

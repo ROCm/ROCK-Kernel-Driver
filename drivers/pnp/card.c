@@ -22,9 +22,9 @@ LIST_HEAD(pnp_cards);
 LIST_HEAD(pnp_card_drivers);
 
 
-static const struct pnp_card_id * match_card(struct pnp_card_driver * drv, struct pnp_card * card)
+static const struct pnp_card_device_id * match_card(struct pnp_card_driver * drv, struct pnp_card * card)
 {
-	const struct pnp_card_id * drv_id = drv->id_table;
+	const struct pnp_card_device_id * drv_id = drv->id_table;
 	while (*drv_id->id){
 		if (compare_pnp_id(card->id,drv_id->id))
 			return drv_id;
@@ -52,7 +52,7 @@ static void card_remove_first(struct pnp_dev * dev)
 
 static int card_probe(struct pnp_card * card, struct pnp_card_driver * drv)
 {
-	const struct pnp_card_id *id = match_card(drv,card);
+	const struct pnp_card_device_id *id = match_card(drv,card);
 	if (id) {
 		struct pnp_card_link * clink = pnp_alloc(sizeof(struct pnp_card_link));
 		if (!clink)
