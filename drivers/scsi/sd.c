@@ -251,7 +251,7 @@ static int sd_init_command(struct scsi_cmnd * SCpnt)
 	/*
 	 * we only do REQ_CMD and REQ_BLOCK_PC
 	 */
-	if (! blk_fs_request(rq))
+	if (!blk_fs_request(rq))
 		return 0;
 
 	disk = rq->rq_disk;
