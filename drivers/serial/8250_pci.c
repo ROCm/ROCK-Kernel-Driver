@@ -636,9 +636,10 @@ static int __devinit pci_init_one(struct pci_dev *dev, const struct pci_device_i
 		return rc;
 
 	if (ent->driver_data == pbn_default &&
-	    serial_pci_guess_board(dev, board))
+	    serial_pci_guess_board(dev, board)) {
+		pci_disable_device(dev);
 		return -ENODEV;
-	else if (serial_pci_guess_board(dev, &tmp) == 0) {
+	} else if (serial_pci_guess_board(dev, &tmp) == 0) {
 		printk(KERN_INFO "Redundant entry in serial pci_table.  "
 		       "Please send the output of\n"
 		       "lspci -vv, this message (%d,%d,%d,%d)\n"
@@ -652,8 +653,10 @@ static int __devinit pci_init_one(struct pci_dev *dev, const struct pci_device_i
 	priv = kmalloc(sizeof(struct serial_private) +
 			      sizeof(unsigned int) * board->num_ports,
 			      GFP_KERNEL);
-	if (!priv)
+	if (!priv) {
+		pci_disable_device(dev);
 		return -ENOMEM;
+	}
 
 	/*
 	 * Run the initialization function, if any
@@ -661,6 +664,7 @@ static int __devinit pci_init_one(struct pci_dev *dev, const struct pci_device_i
 	if (board->init_fn) {
 		rc = board->init_fn(dev, board, 1);
 		if (rc != 0) {
+			pci_disable_device(dev);
 			kfree(priv);
 			return rc;
 		}
