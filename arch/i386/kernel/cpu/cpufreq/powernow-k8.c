@@ -39,7 +39,7 @@
 
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
-#define VERSION "version 1.00.08b"
+#define VERSION "version 1.00.09b"
 #include "powernow-k8.h"
 
 /* serialize freq changes  */
@@ -450,13 +450,10 @@ static int check_supported_cpu(unsigned int cpu)
 		goto out;
 
 	eax = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
-	if ((eax & CPUID_XFAM_MOD) == ATHLON64_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Althon 64 Processor found\n");
-	} else if ((eax & CPUID_XFAM_MOD) == OPTERON_XFAM_MOD) {
-		dprintk(KERN_DEBUG PFX "AMD Opteron Processor found\n");
-	} else {
-		printk(KERN_INFO PFX
-		       "AMD Athlon 64 or AMD Opteron processor required\n");
+	if (((eax & CPUID_USE_XFAM_XMOD) != CPUID_USE_XFAM_XMOD) ||
+	    ((eax & CPUID_XFAM) != CPUID_XFAM_K8) ||
+	    ((eax & CPUID_XMOD) > CPUID_XMOD_REV_E)) {
+		printk(KERN_INFO PFX "Processor cpuid %x not supported\n", eax);
 		goto out;
 	}
 
