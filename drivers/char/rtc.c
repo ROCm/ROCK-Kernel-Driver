@@ -1345,3 +1345,4 @@ static void set_rtc_irq_bit(unsigned char bit)
 
 MODULE_AUTHOR("Paul Gortmaker");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_MISCDEV(RTC_MINOR);
