@@ -2377,6 +2377,8 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 			return error;
 	}
 
+	lock_kernel();
+
 	if (attr->ia_valid & ATTR_SIZE && attr->ia_size < inode->i_size) {
 		handle_t *handle;
 
@@ -2404,6 +2406,7 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 
 err_out:
 	ext3_std_error(inode->i_sb, error);
+	unlock_kernel();
 	if (!error)
 		error = rc;
 	return error;
