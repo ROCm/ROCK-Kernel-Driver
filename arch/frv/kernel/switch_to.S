@@ -43,20 +43,22 @@ __kernel_current_task:
 
 ###############################################################################
 #
-# struct task_struct *__switch_to(struct thread_struct *prev, struct thread_struct *next)
+# struct task_struct *__switch_to(struct thread_struct *prev_thread,
+#				  struct thread_struct *next_thread,
+#				  struct task_struct *prev)
 #
 ###############################################################################
 	.globl		__switch_to
 __switch_to:
 	# save outgoing process's context
-	sethi.p		%hi(__switch_back),gr11
-	setlo		%lo(__switch_back),gr11
-	movsg		lr,gr10
+	sethi.p		%hi(__switch_back),gr13
+	setlo		%lo(__switch_back),gr13
+	movsg		lr,gr12
 
 	stdi		gr28,@(gr8,#__THREAD_FRAME)
 	sti		sp  ,@(gr8,#__THREAD_SP)
 	sti		fp  ,@(gr8,#__THREAD_FP)
-	stdi		gr10,@(gr8,#__THREAD_LR)
+	stdi		gr12,@(gr8,#__THREAD_LR)
 	stdi		gr16,@(gr8,#__THREAD_GR(16))
 	stdi		gr18,@(gr8,#__THREAD_GR(18))
 	stdi		gr20,@(gr8,#__THREAD_GR(20))
@@ -68,14 +70,14 @@ __switch_to:
 	ldi.p		@(gr8,#__THREAD_USER),gr8
 	call		save_user_regs
 	or		gr22,gr22,gr8
-
+	
 	# retrieve the new context
 	sethi.p		%hi(__kernel_frame0_ptr),gr6
 	setlo		%lo(__kernel_frame0_ptr),gr6
 	movsg		psr,gr4
 
 	lddi.p		@(gr9,#__THREAD_FRAME),gr10
-	or		gr29,gr29,gr27		; ret_from_fork needs to know old current
+	or		gr10,gr10,gr27		; save prev for the return value
 
 	ldi		@(gr11,#4),gr19		; get new_current->thread_info
 
@@ -88,8 +90,8 @@ __switch_to:
 	andi		gr4,#~PSR_ET,gr5
 	movgs		gr5,psr
 
-	or.p		gr10,gr0,gr28
-	or		gr11,gr0,gr29
+	or.p		gr10,gr0,gr28		; set __frame
+	or		gr11,gr0,gr29		; set __current
 	or.p		gr12,gr0,sp
 	or		gr13,gr0,fp
 	or		gr19,gr0,gr15		; set __current_thread_info
@@ -108,14 +110,17 @@ __switch_to:
 111:
 
 	# jump to __switch_back or ret_from_fork as appropriate
+	# - move prev to GR8
 	movgs		gr4,psr
-	jmpl		@(gr18,gr0)
+	jmpl.p		@(gr18,gr0)
+	or		gr27,gr27,gr8
 
 ###############################################################################
 #
 # restore incoming process's context
 # - on entry:
 #   - SP, FP, LR, GR15, GR28 and GR29 will have been set up appropriately
+#   - GR8 will point to the outgoing task_struct
 #   - GR9 will point to the incoming thread_struct
 #
 ###############################################################################
@@ -128,12 +133,16 @@ __switch_back:
 	lddi		@(gr9,#__THREAD_GR(26)),gr26
 
 	# fall through into restore_user_regs()
-	ldi		@(gr9,#__THREAD_USER),gr8
+	ldi.p		@(gr9,#__THREAD_USER),gr8
+	or		gr8,gr8,gr9
 
 ###############################################################################
 #
 # restore extra general regs and FP/Media regs
-# - void restore_user_regs(const struct user_context *target)
+# - void *restore_user_regs(const struct user_context *target, void *retval)
+# - on entry:
+#   - GR8 will point to the user context to swap in
+#   - GR9 will contain the value to be returned in GR8 (prev task on context switch)
 #
 ###############################################################################
 	.globl		restore_user_regs
@@ -245,6 +254,7 @@ __restore_skip_fr32_fr63:
 	lddi		@(gr8,#__FPMEDIA_FNER(0)),gr4
 	movsg		fner0,gr4
 	movsg		fner1,gr5
+	or.p		gr9,gr9,gr8
 	bralr
 
 	# the FR451 also has ACC8-11/ACCG8-11 regs (but not 4-7...)
