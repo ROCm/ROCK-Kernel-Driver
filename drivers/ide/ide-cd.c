@@ -3196,6 +3196,7 @@ static int ide_cdrom_attach (ide_drive_t *drive)
 	g->minors = 1;
 	g->minor_shift = 0;
 	g->de = drive->de;
+	g->driverfs_dev = &drive->gendev;
 	g->flags = GENHD_FL_CD;
 	if (ide_cdrom_setup(drive)) {
 		struct cdrom_device_info *devinfo = &info->devinfo;

@@ -726,24 +726,6 @@ cleanup_dev:
 	return 1;
 }
 
-/* Driverfs file support */
-static ssize_t sr_device_kdev_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off)
-{
-	kdev_t kdev; 
-	kdev.value=(int)(long)driverfs_dev->driver_data;
-	return off ? 0 : sprintf(page, "%x\n",kdev.value);
-}
-static DEVICE_ATTR(kdev,S_IRUGO,sr_device_kdev_read,NULL);
-
-static ssize_t sr_device_type_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off) 
-{
-	return off ? 0 : sprintf (page, "CHR\n");
-}
-static DEVICE_ATTR(type,S_IRUGO,sr_device_type_read,NULL);
-
-
 void sr_finish()
 {
 	int i;
@@ -797,22 +779,8 @@ void sr_finish()
 		 */
 		get_capabilities(cd);
 		sr_vendor_init(cd);
-
-		sprintf(cd->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",
-			cd->device->sdev_driverfs_dev.bus_id);
-		sprintf(cd->cdi.cdrom_driverfs_dev.name, "%scdrom",
-			cd->device->sdev_driverfs_dev.name);
-		cd->cdi.cdrom_driverfs_dev.parent = 
-			&cd->device->sdev_driverfs_dev;
-		cd->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
-		cd->cdi.cdrom_driverfs_dev.driver_data = 
-			(void *)(long)__mkdev(MAJOR_NR, i);
-		device_register(&cd->cdi.cdrom_driverfs_dev);
-		device_create_file(&cd->cdi.cdrom_driverfs_dev,
-				   &dev_attr_type);
-		device_create_file(&cd->cdi.cdrom_driverfs_dev,
-				   &dev_attr_kdev);
 		disk->de = cd->device->de;
+		disk->driverfs_dev = &cd->device->sdev_driverfs_dev;
 		register_cdrom(&cd->cdi);
 		set_capacity(disk, cd->capacity);
 		add_disk(disk);

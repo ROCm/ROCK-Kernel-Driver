@@ -192,6 +192,10 @@ struct device_class disk_devclass = {
 	.name		= "disk",
 };
 
+static struct bus_type disk_bus = {
+	name:		"block",
+};
+
 int __init device_init(void)
 {
 	int i;
@@ -200,12 +204,20 @@ int __init device_init(void)
 		INIT_LIST_HEAD(&gendisks[i].list);
 	blk_dev_init();
 	devclass_register(&disk_devclass);
+	bus_register(&disk_bus);
 	return 0;
 }
 
 __initcall(device_init);
 
 EXPORT_SYMBOL(disk_devclass);
+
+static void disk_release(struct device *dev)
+{
+	struct gendisk *disk = dev->driver_data;
+	kfree(disk->part);
+	kfree(disk);
+}
 
 struct gendisk *alloc_disk(int minors)
 {
@@ -224,16 +236,19 @@ struct gendisk *alloc_disk(int minors)
 		disk->minors = minors;
 		while (minors >>= 1)
 			disk->minor_shift++;
+		disk->disk_dev.bus = &disk_bus;
+		disk->disk_dev.release = disk_release;
+		disk->disk_dev.driver_data = disk;
+		device_initialize(&disk->disk_dev);
 	}
 	return disk;
 }
 
 void put_disk(struct gendisk *disk)
 {
-	if (disk) {
-		kfree(disk->part);
-		kfree(disk);
-	}
+	if (disk)
+		put_device(&disk->disk_dev);
 }
+
 EXPORT_SYMBOL(alloc_disk);
 EXPORT_SYMBOL(put_disk);
