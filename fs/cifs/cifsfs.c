@@ -81,6 +81,9 @@ cifs_read_super(struct super_block *sb, void *data,
 	cifs_sb = CIFS_SB(sb);
 	if(cifs_sb == NULL)
 		return -ENOMEM;
+	else
+		memset(cifs_sb,0,sizeof(struct cifs_sb_info));
+	
 
 	rc = cifs_mount(sb, cifs_sb, data, devname);
 

@@ -1,3 +1,8 @@
+Version 0.98
+------------
+Fix hang in commit_write during reconnection of open files under heavy load.
+Fix unload_nls oops in a mount failure path. 
+
 Version 0.97
 ------------
 Fix byte range locking bug (endian problem) causing bad offset and
