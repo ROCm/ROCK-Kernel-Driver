@@ -22,8 +22,8 @@
 #define MAJOR_NR    JOYSTICK_MAJOR
 
 #define	ANALOG_JOY(n)	(!(n & 0x80))
-#define	DIGITAL_JOY(n)	(n & 0x80)
-#define	DEVICE_NR(n)	(MINOR(n) & 0x7f)
+#define	DIGITAL_JOY(n)	(minor(n) & 0x80)
+#define	DEVICE_NR(n)	(minor(n) & 0x7f)
 
 
 static struct joystick_status joystick[2];

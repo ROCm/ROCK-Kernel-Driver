@@ -76,6 +76,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/buffer_head.h>		/* for invalidate_buffers() */
 
 #include <asm/setup.h>
 #include <asm/system.h>
@@ -358,7 +359,7 @@ static void fd_select_side( int side );
 static void fd_select_drive( int drive );
 static void fd_deselect( void );
 static void fd_motor_off_timer( unsigned long dummy );
-static void check_change( void );
+static void check_change( unsigned long dummy );
 static __inline__ void set_head_settle_flag( void );
 static __inline__ int get_head_settle_flag( void );
 static void floppy_irq (int irq, void *dummy, struct pt_regs *fp);
@@ -378,7 +379,6 @@ static void fd_writetrack_done( int status );
 static void fd_times_out( unsigned long dummy );
 static void finish_fdc( void );
 static void finish_fdc_done( int dummy );
-static void floppy_off( unsigned int nr);
 static __inline__ void copy_buffer( void *from, void *to);
 static void setup_req_params( int drive );
 static void redo_fd_request( void);
@@ -539,7 +539,7 @@ static void fd_motor_off_timer( unsigned long dummy )
  * as possible) and keep track of the current state of the write protection.
  */
 
-static void check_change( void )
+static void check_change( unsigned long dummy )
 {
 	static int    drive = 0;
 
@@ -1339,9 +1339,6 @@ static void finish_fdc_done( int dummy )
 static int fd_ref[4] = { 0,0,0,0 };
 static int fd_device[4] = { 0,0,0,0 };
 
-/* dummy for blk.h */
-static void floppy_off( unsigned int nr) {}
-
 
 /* The detection of disk changes is a dark chapter in Atari history :-(
  * Because the "Drive ready" signal isn't present in the Atari
@@ -1458,9 +1455,6 @@ repeat:
 	if (major(CURRENT->rq_dev) != MAJOR_NR)
 		panic(DEVICE_NAME ": request list destroyed");
 
-	if (CURRENT->bh && !buffer_locked(CURRENT->bh))
-		panic(DEVICE_NAME ": block not locked");
-
 	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
 	type = device >> 2;
@@ -1507,7 +1501,7 @@ repeat:
 	del_timer( &motor_off_timer );
 		
 	ReqCnt = 0;
-	ReqCmd = CURRENT->cmd;
+	ReqCmd = rq_data_dir(CURRENT);
 	ReqBlock = CURRENT->sector;
 	ReqBuffer = CURRENT->buffer;
 	setup_req_params( drive );
@@ -2008,7 +2002,6 @@ int __init atari_floppy_init (void)
 	       UseTrackbuffer ? "" : "no ");
 	config_types();
 
-	(void)do_floppy; /* avoid warning about unused variable */
 	return 0;
 }
 

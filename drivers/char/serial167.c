@@ -237,8 +237,8 @@ void my_udelay (long us)
 }
 
 static inline int
-serial_paranoia_check(struct cyclades_port *info,
-			dev_t device, const char *routine)
+serial_paranoia_check(struct cyclades_port *info, kdev_t device,
+		      const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
     static const char *badmagic =
