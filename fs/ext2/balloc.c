@@ -166,6 +166,18 @@ found:
 	return bh;
 }
 
+static inline void release_blocks(struct super_block *sb, int count)
+{
+	if (count) {
+		struct ext2_sb_info * sbi = EXT2_SB(sb);
+		struct ext2_super_block * es = sbi->s_es;
+		unsigned free_blocks = le32_to_cpu(es->s_free_blocks_count);
+		es->s_free_blocks_count = cpu_to_le32(free_blocks + count);
+		mark_buffer_dirty(sbi->s_sbh);
+		sb->s_dirt = 1;
+	}
+}
+
 /* Free given blocks, update quota and i_blocks field */
 void ext2_free_blocks (struct inode * inode, unsigned long block,
 		       unsigned long count)
@@ -179,6 +191,7 @@ void ext2_free_blocks (struct inode * inode, unsigned long block,
 	struct super_block * sb;
 	struct ext2_group_desc * gdp;
 	struct ext2_super_block * es;
+	unsigned freed = 0;
 
 	sb = inode->i_sb;
 	if (!sb) {
@@ -239,14 +252,11 @@ do_more:
 			DQUOT_FREE_BLOCK(inode, 1);
 			gdp->bg_free_blocks_count =
 				cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count)+1);
-			es->s_free_blocks_count =
-				cpu_to_le32(le32_to_cpu(es->s_free_blocks_count)+1);
+			freed++;
 		}
 	}
 	
 	mark_buffer_dirty(bh2);
-	mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
-
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
 		ll_rw_block (WRITE, 1, &bh);
@@ -257,8 +267,8 @@ do_more:
 		count = overflow;
 		goto do_more;
 	}
-	sb->s_dirt = 1;
 error_return:
+	release_blocks(sb, freed);
 	unlock_super (sb);
 	return;
 }
