@@ -423,6 +423,8 @@ config SCSI_MEGARAID
 	  To compile this driver as a module, choose M here: the
 	  module will be called megaraid.
 
+source "drivers/scsi/megaraid-lsi/Kconfig.megaraid"
+
 config SCSI_SATA
 	bool "Serial ATA (SATA) support"
 	depends on SCSI && EXPERIMENTAL

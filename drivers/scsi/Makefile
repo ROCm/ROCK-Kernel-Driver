@@ -96,6 +96,7 @@ obj-$(CONFIG_SCSI_EATA)		+= eata.o
 obj-$(CONFIG_SCSI_DC395x)	+= dc395x.o
 obj-$(CONFIG_SCSI_DC390T)	+= tmscsim.o
 obj-$(CONFIG_SCSI_MEGARAID)	+= megaraid.o
+obj-$(CONFIG_MEGARAID_NEWGEN)	+= megaraid-lsi/
 obj-$(CONFIG_SCSI_ACARD)	+= atp870u.o
 obj-$(CONFIG_SCSI_SUNESP)	+= esp.o
 obj-$(CONFIG_SCSI_GDTH)		+= gdth.o
