@@ -73,6 +73,10 @@
 # - Support for multiple conditions in dep_tristate().
 # - Implemented new functions: define_tristate(), define_int(), define_hex(),
 #   define_string(), dep_bool().
+#
+# 12 November 2001, Keith Owens <kaos@ocs.com.au>
+# Escape double quotes on eval so the quotes are still there on the second
+# evaluation, required to handle strings with special characters.
 # 
 
 
@@ -105,11 +109,11 @@ function set_x_info () {
     eval x=\$$1
     if [ -z "$x" ]; then
 	eval `sed -n -e 's/# \(.*\) is not set.*/\1=n/' -e "/^$1=/p" arch/$ARCH/defconfig`
-	eval x=\${$1:-"$2"}
+	eval x=\${$1:-\"$2\"}
 	eval $1=$x
 	eval INFO_$1="' (NEW)'"
     fi
-    eval info="\$INFO_$1"
+    eval info=\"\$INFO_$1\"
 }
 
 #
@@ -151,7 +155,7 @@ function define_int () {
 }
 
 function define_string () {
-	eval $1="$2"
+	eval $1=\"$2\"
 }
 
 #
@@ -333,7 +337,7 @@ function choice () {
 
 	while [ -n "$2" ]
 	do
-		if eval [ "_\$$2" = "_y" ]
+		if eval [ \"_\$$2\" = \"_y\" ]
 		then
 			current=$1
 			break
@@ -543,9 +547,9 @@ function l_int () {
 			# we avoid them:
 			if expr "$answer" : '0$' '|' "$answer" : '[1-9][0-9]*$' '|' "$answer" : '-[1-9][0-9]*$' >/dev/null
 			then
-				eval $2="$answer"
+				eval $2=\"$answer\"
 			else
-				eval $2="$3"
+				eval $2=\"$3\"
 				echo -en "\007"
 				${DIALOG} --backtitle "$backtitle" \
 					--infobox "You have made an invalid entry." 3 43
@@ -576,9 +580,9 @@ function l_hex () {
 
 			if expr "$answer" : '[0-9a-fA-F][0-9a-fA-F]*$' >/dev/null
 			then
-				eval $2="$answer"
+				eval $2=\"$answer\"
 			else
-				eval $2="$3"
+				eval $2=\"$3\"
 				echo -en "\007"
 				${DIALOG} --backtitle "$backtitle" \
 					--infobox "You have made an invalid entry." 3 43
@@ -676,9 +680,9 @@ function l_choice () {
 	do
 		if [ "$2" = "$choice" ]
 		then
-			eval $2="y"
+			eval $2=\"y\"
 		else
-			eval $2="n"
+			eval $2=\"n\"
 		fi
 		
 		shift ; shift
@@ -941,9 +945,9 @@ last retrieved.  Leave blank to abort."\
 
 			[ "_" = "_$ALT_CONFIG" ] && break
 
-			if eval [ -r "$ALT_CONFIG" ]
+			if eval [ -r \"$ALT_CONFIG\" ]
 			then
-				eval load_config_file "$ALT_CONFIG"
+				eval load_config_file \"$ALT_CONFIG\"
 				break
 			else
 				echo -ne "\007"
@@ -1067,12 +1071,12 @@ save_configuration () {
 	#
 	function bool () {
 		set_x_info "$2" "n"
-		eval define_bool "$2" "$x"
+		eval define_bool \"$2\" \"$x\"
 	}
 
 	function tristate () {
 		set_x_info "$2" "n"
-		eval define_tristate "$2" "$x"
+		eval define_tristate \"$2\" \"$x\"
 	}
 
 	function dep_tristate () {
@@ -1138,19 +1142,19 @@ save_configuration () {
 	}
 
 	function define_hex () {
-		eval $1="$2"
+		eval $1=\"$2\"
                	echo "$1=$2"			>>$CONFIG
 		echo "#define $1 0x${2##*[x,X]}"	>>$CONFIG_H
 	}
 
 	function define_int () {
-		eval $1="$2"
+		eval $1=\"$2\"
 		echo "$1=$2" 			>>$CONFIG
 		echo "#define $1 ($2)"		>>$CONFIG_H
 	}
 
 	function define_string () {
-		eval $1="$2"
+		eval $1=\"$2\"
 		echo "$1=\"$2\""		>>$CONFIG
 		echo "#define $1 \"$2\""	>>$CONFIG_H
 	}
@@ -1160,7 +1164,7 @@ save_configuration () {
 	}
 
 	function define_tristate () {
-		eval $1="$2"
+		eval $1=\"$2\"
 
    		case "$2" in
          	y)
@@ -1199,7 +1203,7 @@ save_configuration () {
 		set -- $choices
 		while [ -n "$2" ]
 		do
-			if eval [ "_\$$2" = "_y" ]
+			if eval [ \"_\$$2\" = \"_y\" ]
 			then
 				current=$1
 				break
