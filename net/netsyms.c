@@ -348,26 +348,6 @@ EXPORT_SYMBOL(tcf_police_dump);
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);
 #endif
-#ifdef CONFIG_NETFILTER
-#include <linux/netfilter.h>
-EXPORT_SYMBOL(nf_register_hook);
-EXPORT_SYMBOL(nf_unregister_hook);
-EXPORT_SYMBOL(nf_register_sockopt);
-EXPORT_SYMBOL(nf_unregister_sockopt);
-EXPORT_SYMBOL(nf_reinject);
-EXPORT_SYMBOL(nf_register_queue_handler);
-EXPORT_SYMBOL(nf_unregister_queue_handler);
-EXPORT_SYMBOL(nf_hook_slow);
-EXPORT_SYMBOL(nf_hooks);
-EXPORT_SYMBOL(nf_setsockopt);
-EXPORT_SYMBOL(nf_getsockopt);
-EXPORT_SYMBOL(ip_ct_attach);
-#ifdef CONFIG_INET
-#include <linux/netfilter_ipv4.h>
-EXPORT_SYMBOL(ip_route_me_harder);
-#endif
-#endif
-
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
 
