@@ -551,15 +551,12 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	etherh_banner();
 
-	dev = alloc_etherdev(sizeof(struct etherh_priv));
+	dev = alloc_ei_netdev();
 	if (!dev) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
-	/*
-	 * alloc_etherdev allocs and zeros dev->priv
-	 */
 	eh = dev->priv;
 
 	spin_lock_init(&eh->eidev.page_lock);
@@ -622,21 +619,12 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto free;
 	}
 
-	if (ethdev_init(dev)) {
-		ret = -ENODEV;
-		goto release;
-	}
-
 	/*
 	 * If we're in the NIC slot, make sure the IRQ is enabled
 	 */
 	if (dev->irq == 11)
 		etherh_set_ctrl(eh, ETHERH_CP_IE);
 
-	/*
-	 * Unfortunately, ethdev_init eventually calls
-	 * ether_setup, which re-writes dev->flags.
-	 */
 	switch (ec->cid.product) {
 	case PROD_ANT_ETHERM:
 		dev_type = "ANT EtherM";

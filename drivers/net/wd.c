@@ -129,12 +129,11 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr - WD_NIC_OFFSET, WD_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init wd_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -142,8 +141,6 @@ struct net_device * __init wd_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_wd_probe(dev);
 	if (err)
@@ -301,19 +298,11 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 	} else if (dev->irq == 2)		/* Fixup bogosity: IRQ2 is really IRQ9 */
 		dev->irq = 9;
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (" unable to get memory for dev->priv.\n");
-		return -ENOMEM;
-	}
-
 	/* Snarf the interrupt now.  There's no point in waiting since we cannot
 	   share and the board will usually be enabled. */
 	i = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev);
 	if (i) {
 		printk (" unable to get IRQ %d.\n", dev->irq);
-		kfree(dev->priv);
-		dev->priv = NULL;
 		return i;
 	}
 
@@ -515,10 +504,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "wd.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_start = mem[this_dev];

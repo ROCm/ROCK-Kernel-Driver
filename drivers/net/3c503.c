@@ -145,12 +145,11 @@ static void cleanup_card(struct net_device *dev)
 {
 	/* NB: el2_close() handles free_irq */
 	release_region(dev->base_addr, EL2_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init el2_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -158,8 +157,6 @@ struct net_device * __init el2_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_el2_probe(dev);
 	if (err)
@@ -228,12 +225,6 @@ el2_probe1(struct net_device *dev, int ioaddr)
 	printk(version);
 
     dev->base_addr = ioaddr;
-    /* Allocate dev->priv and fill in 8390 specific dev fields. */
-    if (ethdev_init(dev)) {
-	printk ("3c503: unable to allocate memory for dev->priv.\n");
-	retval = -ENOMEM;
-	goto out1;
-    }
 
     printk("%s: 3c503 at i/o base %#3x, node ", dev->name, ioaddr);
 
@@ -699,10 +690,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "3c503.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_end = xcvr[this_dev];	/* low 4bits = xcvr sel. */

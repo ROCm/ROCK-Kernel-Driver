@@ -102,7 +102,6 @@ static void cleanup_card(struct net_device *dev)
 	int ioaddr = dev->base_addr - ULTRA32_NIC_OFFSET;
 	/* NB: ultra32_close_card() does free_irq */
 	release_region(ioaddr, ULTRA32_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 /*	Probe for the Ultra32.  This looks like a 8013 with the station
@@ -120,7 +119,7 @@ struct net_device * __init ultra32_probe(int unit)
 	if (!EISA_bus)
 		return ERR_PTR(-ENODEV);
 
-	dev = alloc_etherdev(0);
+	dev = alloc_ei_netdev();
 
 	if (!dev)
 		return ERR_PTR(-ENOMEM);
@@ -242,13 +241,6 @@ static int __init ultra32_probe1(struct net_device *dev, int ioaddr)
 		}
 		dev->irq = irq;
 	}
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (", no memory for dev->priv.\n");
-                retval = -ENOMEM;
-		goto out;
-        }
 
 	/* The 8390 isn't at the base address, so fake the offset */
 	dev->base_addr = ioaddr + ULTRA32_NIC_OFFSET;

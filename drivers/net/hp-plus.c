@@ -140,12 +140,11 @@ static void cleanup_card(struct net_device *dev)
 {
 	/* NB: hpp_close() handles free_irq */
 	release_region(dev->base_addr - NIC_OFFSET, HP_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init hp_plus_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -153,8 +152,6 @@ struct net_device * __init hp_plus_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_hpp_probe(dev);
 	if (err)
@@ -214,13 +211,6 @@ static int __init hpp_probe1(struct net_device *dev, int ioaddr)
 		outw(ID_Page, ioaddr + HP_PAGING);
 		printk(" ID %4.4x", inw(ioaddr + 12));
 	}
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk ("hp-plus.c: unable to allocate memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out;
-	 }
 
 	/* Read the IRQ line. */
 	outw(HW_Page, ioaddr + HP_PAGING);
@@ -460,10 +450,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "hp-plus.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		if (do_hpp_probe(dev) == 0) {

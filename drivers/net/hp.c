@@ -104,12 +104,11 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr - NIC_OFFSET, HP_IO_EXTENT);
-	kfree(dev->priv);
 }
 
 struct net_device * __init hp_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -117,8 +116,6 @@ struct net_device * __init hp_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_hp_probe(dev);
 	if (err)
@@ -167,13 +164,6 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 	if (ei_debug  &&  version_printed++ == 0)
 		printk(version);
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (" unable to get memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out;
-	}
-
 	printk("%s: %s (ID %02x) at %#3x,", dev->name, name, board_id, ioaddr);
 
 	for(i = 0; i < ETHER_ADDR_LEN; i++)
@@ -202,14 +192,14 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 		if (*irqp == 0) {
 			printk(" no free IRQ lines.\n");
 			retval = -EBUSY;
-			goto out1;
+			goto out;
 		}
 	} else {
 		if (dev->irq == 2)
 			dev->irq = 9;
 		if ((retval = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev))) {
 			printk (" unable to get IRQ %d.\n", dev->irq);
-			goto out1;
+			goto out;
 		}
 	}
 
@@ -231,9 +221,6 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 	hp_init_card(dev);
 
 	return 0;
-out1:
-	kfree(dev->priv);
-	dev->priv = NULL;
 out:
 	release_region(ioaddr, HP_IO_EXTENT);
 	return retval;
@@ -432,10 +419,9 @@ init_module(void)
 			if (this_dev != 0) break; /* only autoprobe 1st one */
 			printk(KERN_NOTICE "hp.c: Presently autoprobing (not recommended) for a single card.\n");
 		}
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		if (do_hp_probe(dev) == 0) {

@@ -189,7 +189,7 @@ static void cleanup_card(struct net_device *dev)
 
 struct net_device * __init ne_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -197,8 +197,6 @@ struct net_device * __init ne_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_ne_probe(dev);
 	if (err)
@@ -497,14 +495,6 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	if (! dev->irq) {
 		printk(" failed to detect IRQ line.\n");
 		ret = -EAGAIN;
-		goto err_out;
-	}
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev))
-	{
-        	printk (" unable to get memory for dev->priv.\n");
-        	ret = -ENOMEM;
 		goto err_out;
 	}
 
@@ -849,10 +839,9 @@ int init_module(void)
 	int this_dev, found = 0;
 
 	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
-		struct net_device *dev = alloc_etherdev(0);
+		struct net_device *dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->mem_end = bad[this_dev];
 		dev->base_addr = io[this_dev];

@@ -128,12 +128,11 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, AC_IO_EXTENT);
 	if (ei_status.reg0)
 		iounmap((void *)dev->mem_start);
-	kfree(dev->priv);
 }
 
 struct net_device * __init ac3200_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -141,8 +140,6 @@ struct net_device * __init ac3200_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_ac3200_probe(dev);
 	if (err)
@@ -197,13 +194,6 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 	}
 #endif
 
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (", unable to allocate memory for dev->priv.\n");
-		retval = -ENOMEM;
-		goto out;
-	}
-
 	/* Assign and allocate the interrupt now. */
 	if (dev->irq == 0) {
 		dev->irq = config2irq(inb(ioaddr + AC_CONFIG));
@@ -251,7 +241,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 			printk(KERN_CRIT "ac3200.c: or to an address above 0x%lx.\n", virt_to_phys(high_memory));
 			printk(KERN_CRIT "ac3200.c: Driver NOT installed.\n");
 			retval = -EINVAL;
-			goto out2;
+			goto out1;
 		}
 		dev->mem_start = (unsigned long)ioremap(dev->mem_start, AC_STOP_PG*0x100);
 		if (dev->mem_start == 0) {
@@ -259,7 +249,7 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 			printk(KERN_ERR "ac3200.c: Try using EISA SCU to set memory below 1MB.\n");
 			printk(KERN_ERR "ac3200.c: Driver NOT installed.\n");
 			retval = -EINVAL;
-			goto out2;
+			goto out1;
 		}
 		ei_status.reg0 = 1;	/* Use as remap flag */
 		printk("ac3200.c: remapped %dkB card memory to virtual address %#lx\n",
@@ -288,11 +278,8 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 	dev->stop = &ac_close_card;
 	NS8390_init(dev, 0);
 	return 0;
-out2:
-	free_irq(dev->irq, dev);
 out1:
-	kfree(dev->priv);
-	dev->priv = NULL;
+	free_irq(dev->irq, dev);
 out:
 	release_region(ioaddr, AC_IO_EXTENT);
 	return retval;
@@ -401,10 +388,9 @@ init_module(void)
 	for (this_dev = 0; this_dev < MAX_AC32_CARDS; this_dev++) {
 		if (io[this_dev] == 0 && this_dev != 0)
 			break;
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->base_addr = io[this_dev];
 		dev->mem_start = mem[this_dev];		/* Currently ignored by driver */

@@ -96,10 +96,9 @@ static int __init hydra_init(unsigned long board)
 	0x10, 0x12, 0x14, 0x16, 0x18, 0x1a, 0x1c, 0x1e,
     };
 
-    dev = alloc_etherdev(0);
+    dev = alloc_ei_netdev();
     if (!dev)
 	return -ENOMEM;
-    dev->priv = NULL;
     SET_MODULE_OWNER(dev);
 
     for(j = 0; j < ETHER_ADDR_LEN; j++)
@@ -118,14 +117,6 @@ static int __init hydra_init(unsigned long board)
 		    dev)) {
 	free_netdev(dev);
 	return -EAGAIN;
-    }
-
-    /* Allocate dev->priv and fill in 8390 specific dev fields. */
-    if (ethdev_init(dev)) {
-	printk("Unable to get memory for dev->priv.\n");
-	free_irq(IRQ_AMIGA_PORTS, dev);
-	free_netdev(dev);
-	return -ENOMEM;
     }
 
     printk("%s: hydra at 0x%08lx, address %02x:%02x:%02x:%02x:%02x:%02x (hydra.c " HYDRA_VERSION ")\n", dev->name, ZTWO_PADDR(board),
@@ -157,7 +148,6 @@ static int __init hydra_init(unsigned long board)
 	return 0;
 
     free_irq(IRQ_AMIGA_PORTS, dev);
-    kfree(dev->priv);
     free_netdev(dev);
     return err;
 }

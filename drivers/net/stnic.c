@@ -108,19 +108,10 @@ static int __init stnic_probe(void)
     return -ENODEV;
 
   /* New style probing API */
-  dev = alloc_etherdev(0);
+  dev = alloc_ei_netdev();
   if (!dev)
   	return -ENOMEM;
   SET_MODULE_OWNER(dev);
-  dev->priv = NULL;
-
-  /* Allocate dev->priv and fill in 8390 specific dev fields. */
-  if (ethdev_init (dev))
-    {
-      printk (KERN_EMERG "Unable to get memory for dev->priv.\n");
-      free_netdev(dev);
-      return -ENOMEM;
-    }
 
 #ifdef CONFIG_SH_STANDARD_BIOS 
   sh_bios_get_node_addr (stnic_eadr);
@@ -139,7 +130,6 @@ static int __init stnic_probe(void)
   err = request_irq (dev->irq, ei_interrupt, 0, dev->name, dev);
   if (err)  {
       printk (KERN_EMERG " unable to get IRQ %d.\n", dev->irq);
-      kfree(dev->priv);
       free_netdev(dev);
       return err;
     }
@@ -165,7 +155,6 @@ static int __init stnic_probe(void)
   err = register_netdev(dev);
   if (err) {
     free_irq(dev->irq, dev);
-    kfree(dev->priv);
     free_netdev(dev);
     return err;
   }
@@ -318,7 +307,6 @@ static void __exit stnic_cleanup(void)
 {
 	unregister_netdev(stnic_dev);
 	free_irq(stnic_dev->irq, stnic_dev);
-	kfree(stnic_dev->priv);
 	free_netdev(stnic_dev);
 }
 
