@@ -509,7 +509,7 @@ finished:
 
 static int ext3_release_dir (struct inode * inode, struct file * filp)
 {
-       if (is_dx(inode) && filp->private_data)
+       if (filp->private_data)
 		ext3_htree_free_dir_info(filp->private_data);
 
 	return 0;
