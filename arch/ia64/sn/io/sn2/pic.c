@@ -685,7 +685,7 @@ pic_attach2(vertex_hdl_t xconn_vhdl, void *bridge,
 
     /* Block off the range used by PROM. */
     res->start = prom_base_addr;
-    res->end = prom_base_addr + (prom_base_size - 1);;
+    res->end = prom_base_addr + (prom_base_size - 1);
     status = request_resource(&pcibr_soft->bs_mem_win_root_resource, res);
     if (status)
 	panic("PCIBR:Unable to request_resource()\n");

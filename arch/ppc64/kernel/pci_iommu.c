@@ -31,6 +31,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/iommu.h>
@@ -82,7 +83,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	if (order >= IOMAP_MAX_ORDER) {
 		printk("PCI_DMA: pci_alloc_consistent size too large: 0x%lx\n",
 			size);
-		return (void *)PCI_DMA_ERROR_CODE;
+		return (void *)DMA_ERROR_CODE;
 	}
 
 	tbl = devnode_table(hwdev); 
@@ -101,7 +102,7 @@ void *pci_iommu_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	/* Set up tces to cover the allocated range */
 	mapping = iommu_alloc(tbl, ret, npages, PCI_DMA_BIDIRECTIONAL);
 
-	if (mapping == PCI_DMA_ERROR_CODE) {
+	if (mapping == DMA_ERROR_CODE) {
 		free_pages((unsigned long)ret, order);
 		ret = NULL;
 	} else
@@ -139,7 +140,7 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 				size_t size, int direction)
 {
 	struct iommu_table * tbl;
-	dma_addr_t dma_handle = PCI_DMA_ERROR_CODE;
+	dma_addr_t dma_handle = DMA_ERROR_CODE;
 	unsigned long uaddr;
 	unsigned int npages;
 
@@ -153,7 +154,7 @@ dma_addr_t pci_iommu_map_single(struct pci_dev *hwdev, void *vaddr,
 
 	if (tbl) {
 		dma_handle = iommu_alloc(tbl, vaddr, npages, direction);
-		if (dma_handle == PCI_DMA_ERROR_CODE) {
+		if (dma_handle == DMA_ERROR_CODE) {
 			if (printk_ratelimit())  {
 				printk(KERN_INFO "iommu_alloc failed, tbl %p vaddr %p npages %d\n",
 				       tbl, vaddr, npages);

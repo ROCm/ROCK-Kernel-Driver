@@ -327,6 +327,7 @@ static int do_one_mathemu(u32 insn, unsigned long *pfsr, unsigned long *fregs)
 #ifdef DEBUG_MATHEMU
 			printk("unknown FPop1: %03lx\n",(insn>>5)&0x1ff);
 #endif
+			break;
 		}
 	} else if ((insn & 0xc1f80000) == 0x81a80000)	/* FPOP2 */ {
 		switch ((insn >> 5) & 0x1ff) {
@@ -340,6 +341,7 @@ static int do_one_mathemu(u32 insn, unsigned long *pfsr, unsigned long *fregs)
 #ifdef DEBUG_MATHEMU
 			printk("unknown FPop2: %03lx\n",(insn>>5)&0x1ff);
 #endif
+			break;
 		}
 	}
 

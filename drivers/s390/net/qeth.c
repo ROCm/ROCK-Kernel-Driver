@@ -5930,7 +5930,7 @@ __qeth_try_to_flush_packets(struct qeth_card *card, int last_pci_hit,
 			LOW_WATERMARK_PACK);
 	/* first_element is the last buffer that we got back from hydra */
 	if (!switch_state && !last_pci_hit)
-		return;;
+		return;
 	QETH_DBF_CARD3(0, trace, "stchcw", card);
 	if (atomic_swap(&card->outbound_ringbuffer_lock[queue], QETH_LOCK_FLUSH)
 	    == QETH_LOCK_UNLOCKED) {
@@ -6883,7 +6883,7 @@ qeth_idx_activate_read(struct qeth_card *card)
 
 	card->portname_required =
 	    ((!QETH_IDX_NO_PORTNAME_REQUIRED(card->dma_stuff->recbuf)) &&
-	     (card->type == QETH_CARD_TYPE_OSAE));;
+	     (card->type == QETH_CARD_TYPE_OSAE));
 
 	/*
 	 * however, as the portname indication of OSA is wrong, we have to

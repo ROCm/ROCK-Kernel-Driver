@@ -194,7 +194,7 @@ _GLOBAL(ret_from_syscall_1)
 _GLOBAL(ret_from_syscall_2)
 	std	r3,RESULT(r1)	/* Save result */	
 	li	r10,-_LAST_ERRNO
-	cmpl	0,r3,r10
+	cmpld	0,r3,r10
 	blt	60f
 	neg	r3,r3
 57:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
@@ -288,6 +288,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	mfcr	r23
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
+
+#ifdef CONFIG_SMP
+	/* We need a sync somewhere here to make sure that if the
+	 * previous task gets rescheduled on another CPU, it sees all
+	 * stores it has performed on this one.
+	 */
+	sync
+#endif /* CONFIG_SMP */
 
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */

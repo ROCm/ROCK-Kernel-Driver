@@ -1060,7 +1060,7 @@ static int nand_writev_ecc (struct mtd_info *mtd, const struct iovec *vecs, unsi
 			goto out;
 
 		/* Update written bytes count */
-		written += mtd->oobblock;;
+		written += mtd->oobblock;
 
 		/* Increment page address */
 		page++;
@@ -1192,7 +1192,7 @@ erase_exit:
 	nand_deselect ();
 	spin_unlock_bh (&this->chip_lock);
 
-	ret = instr->state == MTD_ERASE_DONE ? 0 : -EIO;;
+	ret = instr->state == MTD_ERASE_DONE ? 0 : -EIO;
 	/* Do call back function */
 	if (!ret && instr->callback)
 		instr->callback (instr);

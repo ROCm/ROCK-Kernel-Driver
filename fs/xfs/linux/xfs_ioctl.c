@@ -850,6 +850,9 @@ xfs_ioctl(
 	case XFS_IOC_ERROR_INJECTION: {
 		xfs_error_injection_t in;
 
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		if (copy_from_user(&in, (char *)arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
 
@@ -858,6 +861,9 @@ xfs_ioctl(
 	}
 
 	case XFS_IOC_ERROR_CLEARALL:
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = xfs_errortag_clearall(mp);
 		return -error;
 
@@ -882,7 +888,7 @@ xfs_ioc_space(
 	if (vp->v_inode.i_flags & (S_IMMUTABLE|S_APPEND))
 		return -XFS_ERROR(EPERM);
 
-	if (filp->f_flags & O_RDONLY)
+	if (!(filp->f_flags & FMODE_WRITE))
 		return -XFS_ERROR(EBADF);
 
 	if (vp->v_type != VREG)

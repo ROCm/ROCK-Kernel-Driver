@@ -14821,7 +14821,7 @@ void group_optimization(DIVA_CAPI_ADAPTER   * a, PLCI   * plci)
   for(i=0;i<MAX_CIP_TYPES;i++)
   {
     info_mask_group[i] = 0;
-    cip_mask_group [i] = 0;;
+    cip_mask_group [i] = 0;
   }
   for(i=0;i<MAX_APPL;i++)
   {

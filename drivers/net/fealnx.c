@@ -1303,14 +1303,15 @@ static void init_ring(struct net_device *dev)
 	/* for the last tx descriptor */
 	np->tx_ring[i - 1].next_desc = np->tx_ring_dma;
 	np->tx_ring[i - 1].next_desc_logical = &np->tx_ring[0];
-
-	return;
 }
 
 
 static int start_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
+	unsigned long flags;
+
+	spin_lock_irqsave(&np->lock, flags);
 
 	np->cur_tx_copy->skbuff = skb;
 
@@ -1377,6 +1378,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 	writel(0, dev->base_addr + TXPDR);
 	dev->trans_start = jiffies;
 
+	spin_unlock_irqrestore(&np->lock, flags);
 	return 0;
 }
 
@@ -1422,6 +1424,8 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	long ioaddr, boguscnt = max_interrupt_work;
 	unsigned int num_tx = 0;
 	int handled = 0;
+
+	spin_lock(&np->lock);
 
 	writel(0, dev->base_addr + IMR);
 
@@ -1564,6 +1568,8 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 		       dev->name, readl(ioaddr + ISR));
 
 	writel(np->imrvalue, ioaddr + IMR);
+
+	spin_unlock(&np->lock);
 
 	return IRQ_RETVAL(handled);
 }

@@ -109,7 +109,7 @@ static int gf2k_read_packet(struct gameport *gameport, int length, char *data)
 	local_irq_save(flags);
 
 	gameport_trigger(gameport);
-	v = gameport_read(gameport);;
+	v = gameport_read(gameport);
 
 	while (t > 0 && i < length) {
 		t--; u = v;

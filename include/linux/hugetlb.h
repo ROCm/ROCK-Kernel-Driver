@@ -19,6 +19,7 @@ int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
 int hugetlb_report_meminfo(char *);
 int is_hugepage_mem_enough(size_t);
+unsigned long hugetlb_total_pages(void);
 struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long address, int write);
 struct vm_area_struct *hugepage_vma(struct mm_struct *mm,
@@ -42,9 +43,20 @@ mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)
 #define hugetlb_free_pgtables(tlb, prev, start, end) do { } while (0)
 #endif
 
+#ifndef ARCH_HAS_PREPARE_HUGEPAGE_RANGE
+#define prepare_hugepage_range(addr, len)	\
+	is_aligned_hugepage_range(addr, len)
+#else
+int prepare_hugepage_range(unsigned long addr, unsigned long len);
+#endif
+
 #else /* !CONFIG_HUGETLB_PAGE */
 
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
+{
+	return 0;
+}
+static inline unsigned long hugetlb_total_pages(void)
 {
 	return 0;
 }
@@ -62,6 +74,7 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define mark_mm_hugetlb(mm, vma)		do { } while (0)
 #define follow_huge_pmd(mm, addr, pmd, write)	0
 #define is_aligned_hugepage_range(addr, len)	0
+#define prepare_hugepage_range(addr, len)	(-EINVAL)
 #define pmd_huge(x)	0
 #define is_hugepage_only_range(addr, len)	0
 #define hugetlb_free_pgtables(tlb, prev, start, end) do { } while (0)

@@ -202,7 +202,7 @@ static int __devinit mace_probe(struct macio_dev *mdev, const struct of_match *m
 		rc = -ENOMEM;
 		goto err_unmap_tx_dma;
 	}
-	mp->rx_dma_intr = macio_irq(mdev, 2);;
+	mp->rx_dma_intr = macio_irq(mdev, 2);
 
 	mp->tx_cmds = (volatile struct dbdma_cmd *) DBDMA_ALIGN(mp + 1);
 	mp->rx_cmds = mp->tx_cmds + NCMDS_TX * N_TX_RING + 1;

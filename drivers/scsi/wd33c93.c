@@ -2056,7 +2056,7 @@ wd33c93_proc_info(struct Scsi_Host *instance, char *buf, char **start, off_t off
 		return 0;
 	}
 	if (off > 0x40000)	/* ALWAYS stop after 256k bytes have been read */
-		stop = 1;;
+		stop = 1;
 	if (hd->proc & PR_STOP)	/* stop every other time */
 		stop = 1;
 	return strlen(bp);

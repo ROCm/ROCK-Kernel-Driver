@@ -1318,7 +1318,7 @@ typhoon_init_interface(struct typhoon *tp)
 	tp->rxHiRing.ringBase = (u8 *) tp->shared->rxHi;
 	tp->rxBuffRing.ringBase = (u8 *) tp->shared->rxBuff;
 	tp->cmdRing.ringBase = (u8 *) tp->shared->cmd;
-	tp->respRing.ringBase = (u8 *) tp->shared->resp;;
+	tp->respRing.ringBase = (u8 *) tp->shared->resp;
 
 	tp->txLoRing.writeRegister = TYPHOON_REG_TX_LO_READY;
 	tp->txHiRing.writeRegister = TYPHOON_REG_TX_HI_READY;

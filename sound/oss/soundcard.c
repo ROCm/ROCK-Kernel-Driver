@@ -706,7 +706,7 @@ void request_sound_timer(int count)
 
 void sound_stop_timer(void)
 {
-	del_timer(&seq_timer);;
+	del_timer(&seq_timer);
 }
 
 void conf_printf(char *name, struct address_info *hw_config)

@@ -900,7 +900,7 @@ prom_initialize_tce_table(void)
 			prom_panic(RELOC("ERROR, cannot find space for TCE table.\n"));
 		}
 
-		vbase = absolute_to_virt(base);
+		vbase = (unsigned long)abs_to_virt(base);
 
 		/* Save away the TCE table attributes for later use. */
 		prom_tce_table[table].node = node;
@@ -1007,9 +1007,12 @@ prom_hold_cpus(unsigned long mem)
 	extern void __secondary_hold(void);
         extern unsigned long __secondary_hold_spinloop;
         extern unsigned long __secondary_hold_acknowledge;
-        unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
-        unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
-        unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
+        unsigned long *spinloop
+		= (void *)virt_to_abs(&__secondary_hold_spinloop);
+        unsigned long *acknowledge
+		= (void *)virt_to_abs(&__secondary_hold_acknowledge);
+        unsigned long secondary_hold
+		= virt_to_abs(*PTRRELOC((unsigned long *)__secondary_hold));
         struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);

@@ -225,11 +225,13 @@ nautilus_init_pci(void)
 	if (request_resource(&iomem_resource, bus->resource[1]) < 0)
 		printk(KERN_ERR "Failed to request MEM on hose 0\n");
 
-	if (pci_mem < memtop && pci_mem > alpha_mv.min_mem_address) {
+	if (pci_mem < memtop)
+		memtop = pci_mem;
+	if (memtop > alpha_mv.min_mem_address) {
 		free_reserved_mem(__va(alpha_mv.min_mem_address),
-				  __va(pci_mem));
+				  __va(memtop));
 		printk("nautilus_init_pci: %ldk freed\n",
-			(pci_mem - alpha_mv.min_mem_address) >> 10);
+			(memtop - alpha_mv.min_mem_address) >> 10);
 	}
 
 	if ((IRONGATE0->dev_vendor >> 16) > 0x7006)	/* Albacore? */

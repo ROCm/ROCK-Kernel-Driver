@@ -737,7 +737,7 @@ static void hdlcdrv_setup(struct net_device *dev)
 	static const struct hdlcdrv_channel_params dflt_ch_params = { 
 		20, 2, 10, 40, 0 
 	};
-	struct hdlcdrv_state *s = dev->priv;;
+	struct hdlcdrv_state *s = dev->priv;
 
 	/*
 	 * initialize the hdlcdrv_state struct

@@ -2471,7 +2471,7 @@ found_virt:
 	if(file->f_mode & FMODE_READ) {
 		if((dmabuf->read_channel = card->alloc_rec_pcm_channel(card)) == NULL) {
 			kfree (card->states[i]);
-			card->states[i] = NULL;;
+			card->states[i] = NULL;
 			return -EBUSY;
 		}
 		dmabuf->trigger |= PCM_ENABLE_INPUT;
@@ -2483,7 +2483,7 @@ found_virt:
 			if(file->f_mode & FMODE_READ)
 				card->free_pcm_channel(card,dmabuf->read_channel->num);
 			kfree (card->states[i]);
-			card->states[i] = NULL;;
+			card->states[i] = NULL;
 			return -EBUSY;
 		}
 		/* Initialize to 8kHz?  What if we don't support 8kHz? */

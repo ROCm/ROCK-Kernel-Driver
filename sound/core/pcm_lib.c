@@ -167,7 +167,8 @@ static inline int snd_pcm_update_hw_ptr_post(snd_pcm_substream_t *substream,
 				   substream->pcm->card->number,
 				   substream->pcm->device,
 				   substream->stream ? 'c' : 'p');
-			dump_stack();
+			if (substream->pstr->xrun_debug > 1)
+				dump_stack();
 		}
 #endif
 		return -EPIPE;
@@ -194,8 +195,11 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	if (delta > 0) {
 		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
 #ifdef CONFIG_SND_DEBUG
-			if (runtime->periods > 1)
+			if (runtime->periods > 1 && substream->pstr->xrun_debug) {
 				snd_printd(KERN_ERR "Unexpected hw_pointer value [1] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+				if (substream->pstr->xrun_debug > 1)
+					dump_stack();
+			}
 #endif
 			return 0;
 		}
@@ -232,8 +236,11 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	if (delta > 0) {
 		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
 #ifdef CONFIG_SND_DEBUG
-			if (runtime->periods > 2)
+			if (runtime->periods > 2 && substream->pstr->xrun_debug) {
 				snd_printd(KERN_ERR "Unexpected hw_pointer value [2] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+				if (substream->pstr->xrun_debug > 1)
+					dump_stack();
+			}
 #endif
 			return 0;
 		}

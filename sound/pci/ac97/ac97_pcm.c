@@ -89,7 +89,7 @@ static unsigned char rate_reg_tables[2][4][9] = {
 	0xff,				/* slot 6 */
 	AC97_PCM_LFE_DAC_RATE,		/* slot 7 */
 	AC97_PCM_LFE_DAC_RATE,		/* slot 8 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 9 */
+	0xff,				/* slot 9 */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 10 */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 11 */
   },
@@ -140,7 +140,7 @@ static unsigned char rate_reg_tables[2][4][9] = {
 	0xff,				/* slot 6 */
 	AC97_PCM_LFE_DAC_RATE,		/* slot 7 */
 	AC97_PCM_LFE_DAC_RATE,		/* slot 8 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 9 */
+	0xff,				/* slot 9 */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 10 */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 11 */
   }

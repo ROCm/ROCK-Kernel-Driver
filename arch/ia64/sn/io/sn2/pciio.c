@@ -926,7 +926,7 @@ pciio_device_win_alloc(struct resource *root_resource,
 		win_alloc->wa_pages = size;
 	}
 
-	return new_res->start;;
+	return new_res->start;
 }
 
 /*

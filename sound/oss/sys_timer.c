@@ -116,7 +116,7 @@ static void
 def_tmr_close(int dev)
 {
 	opened = tmr_running = 0;
-	del_timer(&def_tmr);;
+	del_timer(&def_tmr);
 }
 
 static int

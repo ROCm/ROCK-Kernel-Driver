@@ -57,7 +57,7 @@ static unsigned long presto_xfs_freespace(struct presto_file_set *fset,
         VFS_STATVFS(vfsp, &stat, NULL, rc);
         avail = statp.f_bfree;
 
-        return sbp->sb_fdblocks;; 
+        return sbp->sb_fdblocks;
 #endif
         return 0x0fffffff;
 }

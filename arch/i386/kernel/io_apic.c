@@ -2440,7 +2440,11 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	entry.polarity = active_high_low;
 	entry.mask  = 1;
 
-	add_pin_to_irq(irq, ioapic, pin);
+	/*
+	 * IRQs < 16 are already in the irq_2_pin[] map
+	 */
+	if (irq >= 16)
+		add_pin_to_irq(irq, ioapic, pin);
 
 	entry.vector = assign_irq_vector(irq);
 
