@@ -219,6 +219,8 @@ typedef int (get_block_t)(struct inode *inode, sector_t iblock,
 typedef int (get_blocks_t)(struct inode *inode, sector_t iblock,
 			unsigned long max_blocks,
 			struct buffer_head *bh_result, int create);
+typedef void (dio_iodone_t)(struct inode *inode, loff_t offset,
+			ssize_t bytes, void *private);
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -1290,7 +1292,7 @@ extern ssize_t generic_file_direct_IO(int rw, struct kiocb *iocb,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
 extern int blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode, 
 	struct block_device *bdev, const struct iovec *iov, loff_t offset, 
-	unsigned long nr_segs, get_blocks_t *get_blocks);
+	unsigned long nr_segs, get_blocks_t *get_blocks, dio_iodone_t *end_io);
 extern ssize_t generic_file_readv(struct file *filp, const struct iovec *iov, 
 	unsigned long nr_segs, loff_t *ppos);
 ssize_t generic_file_writev(struct file *filp, const struct iovec *iov, 
