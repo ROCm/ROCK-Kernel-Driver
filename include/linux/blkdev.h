@@ -541,7 +541,7 @@ static inline void blkdev_dequeue_request(struct request *req)
 
 	list_del_init(&req->queuelist);
 
-	if (req->q)
+	if (req->rl)
 		elv_remove_request(req->q, req);
 }
 
