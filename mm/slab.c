@@ -2035,11 +2035,6 @@ static void free_block(kmem_cache_t *cachep, void **objpp, int nr_objects)
 		unsigned int objnr;
 
 		slabp = GET_PAGE_SLAB(virt_to_page(objp));
-		if ((&slabp->list->next < PAGE_OFFSET) || 
-					(&slabp->list->prev < PAGE_OFFSET)) {
-			printk("Slab corruption in %s\n", name);
-			BUG();
-		}
 		list_del(&slabp->list);
 		objnr = (objp - slabp->s_mem) / cachep->objsize;
 		check_slabp(cachep, slabp);
