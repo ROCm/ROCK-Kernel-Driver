@@ -37,8 +37,6 @@ typedef struct svc_export	svc_export;
 
 static svc_export *	exp_parent(svc_client *clp, struct super_block *sb,
 					struct dentry *dentry);
-static svc_export *	exp_child(svc_client *clp, struct super_block *sb,
-					struct dentry *dentry);
 static void		exp_unexport_all(svc_client *clp);
 static void		exp_do_unexport(svc_export *unexp);
 static svc_client *	exp_getclientbyname(char *name);
@@ -138,31 +136,6 @@ exp_parent(svc_client *clp, struct super_block *sb, struct dentry *dentry)
 	list_for_each(p, head) {
 		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		if (is_subdir(dentry, exp->ex_dentry)) {
-			spin_unlock(&dcache_lock);
-			return exp;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	return NULL;
-}
-
-/*
- * Find the child export entry for a given fs. This function is used
- * only by the export syscall to keep the export tree consistent.
- * <gam3@acm.org>
- */
-static svc_export *
-exp_child(svc_client *clp, struct super_block *sb, struct dentry *dentry)
-{
-	struct list_head *head = &clp->cl_export[EXPORT_HASH(sb->s_dev)];
-	struct list_head *p;
-	struct dentry *ndentry;
-
-	spin_lock(&dcache_lock);
-	list_for_each(p, head) {
-		svc_export *exp = list_entry(p, svc_export, ex_hash);
-		ndentry = exp->ex_dentry;
-		if (ndentry && is_subdir(ndentry->d_parent, dentry)) {
 			spin_unlock(&dcache_lock);
 			return exp;
 		}
@@ -320,16 +293,6 @@ exp_export(struct nfsctl_export *nxp)
 	if (!inode->i_sb->s_export_op->find_exported_dentry)
 		inode->i_sb->s_export_op->find_exported_dentry =
 			find_exported_dentry;
-
-	if (exp_child(clp, inode->i_sb, nd.dentry) != NULL) {
-		dprintk("exp_export: export not valid (Rule 3).\n");
-		goto finish;
-	}
-	/* Is this is a sub-export, must be a proper subset of FS */
-	if (exp_parent(clp, inode->i_sb, nd.dentry) != NULL) {
-		dprintk("exp_export: sub-export not valid (Rule 2).\n");
-		goto finish;
-	}
 
 	err = -ENOMEM;
 	if (!(exp = kmalloc(sizeof(*exp), GFP_USER)))
