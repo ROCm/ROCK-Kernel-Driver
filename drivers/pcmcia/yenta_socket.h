@@ -107,7 +107,7 @@ struct cardbus_type {
 struct yenta_socket {
 	struct pci_dev *dev;
 	int cb_irq, io_irq;
-	void *base;
+	void __iomem *base;
 	struct timer_list poll_timer;
 
 	struct pcmcia_socket socket;
