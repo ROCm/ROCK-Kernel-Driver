@@ -61,6 +61,7 @@
 #include <linux/interrupt.h>
 #include <linux/atm.h>
 #include <linux/atmdev.h>
+#include <linux/crc32.h>
 #include "atmsar.h"
 
 /*
@@ -246,8 +247,9 @@ static struct usb_driver udsl_usb_driver = {
 static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
 	struct udsl_control *ctrl = UDSL_SKB (skb);
 	unsigned int zero_padding;
-	int i;
+	unsigned char zero = 0;
 	u32 crc;
+	int i;
 
 	ctrl->atm_data.vcc = vcc;
 	ctrl->cell_header [0] = vcc->vpi >> 4;
@@ -271,10 +273,10 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
 	ctrl->aal5_trailer [2] = skb->len >> 8;
 	ctrl->aal5_trailer [3] = skb->len;
 
-	crc = crc32 (~0, skb->data, skb->len);
+	crc = crc32_be (~0, skb->data, skb->len);
 	for (i = 0; i < zero_padding; i++)
-		crc = CRC32 (0, crc);
-	crc = crc32 (crc, ctrl->aal5_trailer, 4);
+		crc = crc32_be (crc, &zero, 1);
+	crc = crc32_be (crc, ctrl->aal5_trailer, 4);
 	crc = ~crc;
 
 	ctrl->aal5_trailer [4] = crc >> 24;
