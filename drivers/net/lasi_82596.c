@@ -1149,12 +1149,11 @@ static void print_eth(unsigned char *add, char *str)
 
 #define LAN_PROM_ADDR	0xF0810000
 
-static int __devinit i82596_probe(struct net_device *dev)
+static int __devinit i82596_probe(struct net_device *dev,
+				  struct device *gen_dev)
 {
 	int i;
 	struct i596_private *lp;
-	/* we're going to overwrite dev->priv, so pull the device out */
-	struct device *gen_dev = dev->priv;
 	char eth_addr[6];
 	dma_addr_t dma_addr;
 
@@ -1204,7 +1203,6 @@ static int __devinit i82596_probe(struct net_device *dev)
 		return -ENOMEM;
 	}
 
-	ether_setup(dev);
 	DEB(DEB_PROBE,printk("%s: 82596 at %#3lx,", dev->name, dev->base_addr));
 
 	for (i = 0; i < 6; i++)
@@ -1537,12 +1535,19 @@ lan_init_chip(struct parisc_device *dev)
 
 	netdevice->base_addr = dev->hpa;
 	netdevice->irq = dev->irq;
-	netdevice->init = i82596_probe;
-	netdevice->priv = &dev->dev;
+
+	retval = i82596_probe(netdevice, &dev->dev);
+	if (retval) {
+		free_netdev(netdevice);
+		return -ENODEV;
+	}
 
 	retval = register_netdev(netdevice);
 	if (retval) {
+		struct i596_private *lp = netdevice->priv;
 		printk(KERN_WARNING __FILE__ ": register_netdevice ret'd %d\n", retval);
+		dma_free_noncoherent(lp->dev, sizeof(struct i596_private), 
+				    (void *)netdevice->mem_start, lp->dma_addr);
 		free_netdev(netdevice);
 		return -ENODEV;
 	};
