@@ -445,13 +445,13 @@ void kobject_cleanup(struct kobject * kobj)
 	struct kset * s = kobj->kset;
 
 	pr_debug("kobject %s: cleaning up\n",kobject_name(kobj));
+	if (kobj->k_name != kobj->name)
+		kfree(kobj->k_name);
+	kobj->k_name = NULL;
 	if (t && t->release)
 		t->release(kobj);
 	if (s)
 		kset_put(s);
-	if (kobj->k_name != kobj->name)
-		kfree(kobj->k_name);
-	kobj->k_name = NULL;
 }
 
 /**
