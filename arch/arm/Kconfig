@@ -145,6 +145,14 @@ config ARCH_S3C2410
 config ARCH_OMAP
 	bool "TI OMAP"
 
+config ARCH_LH7A40X
+	bool "Sharp LH7A40X"
+	help
+	  Say Y here for systems based on one of the Sharp LH7A40X
+	  System on a Chip processors.  These CPUs include an ARM922T
+	  core with a wide array of integrated devices for
+	  hand-held and low-power applications.
+
 endchoice
 
 source "arch/arm/mach-clps711x/Kconfig"
@@ -164,6 +172,8 @@ source "arch/arm/mach-sa1100/Kconfig"
 source "arch/arm/mach-omap/Kconfig"
 
 source "arch/arm/mach-s3c2410/Kconfig"
+
+source "arch/arm/mach-lh7a40x/Kconfig"
 
 # Definitions to make life easier
 config ARCH_ACORN
@@ -221,7 +231,7 @@ menu "General setup"
 # Select various configuration options depending on the machine type
 config DISCONTIGMEM
 	bool
-	depends on ARCH_EDB7211 || ARCH_SA1100
+	depends on ARCH_EDB7211 || ARCH_SA1100 || ARCH_LH7A40X
 	default y
 	help
 	  Say Y to upport efficient handling of discontiguous physical memory,
@@ -283,7 +293,7 @@ config ISA_DMA
 
 config FIQ
 	bool
-	depends on ARCH_ACORN || ARCH_L7200
+	depends on ARCH_ACORN || ARCH_L7200 || ARCH_LH7A400
 	default y
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about

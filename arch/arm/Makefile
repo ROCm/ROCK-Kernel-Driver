@@ -94,6 +94,7 @@ textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
  machine-$(CONFIG_ARCH_OMAP)	   := omap
  machine-$(CONFIG_ARCH_S3C2410)	   := s3c2410
+ machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
 
 TEXTADDR := $(textaddr-y)
 ifeq ($(incdir-y),)
