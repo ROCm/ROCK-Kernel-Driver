@@ -834,13 +834,6 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 		ide_end_drive_cmd(drive, stat, err);
 		return ide_stopped;
 	}
-#if 0
-	else if (rq->flags & REQ_DRIVE_TASKFILE) {
-		rq->errors = 1;
-		ide_end_taskfile(drive, stat, err);
-		return ide_stopped;
-	}
-#endif
 #ifdef CONFIG_IDE_TASKFILE_IO
 	/* make rq completion pointers new submission pointers */
 	blk_rq_prep_restart(rq);

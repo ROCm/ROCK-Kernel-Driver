@@ -219,66 +219,6 @@ ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 EXPORT_SYMBOL(do_rw_taskfile);
 
 /*
- * Clean up after success/failure of an explicit taskfile operation.
- */
-void ide_end_taskfile (ide_drive_t *drive, u8 stat, u8 err)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	struct request *rq;
-	ide_task_t *args;
-	task_ioreg_t command;
-
-	spin_lock_irqsave(&ide_lock, flags);
-	rq = HWGROUP(drive)->rq;
-	spin_unlock_irqrestore(&ide_lock, flags);
-	args = (ide_task_t *) rq->special;
-
-	command = args->tfRegister[IDE_COMMAND_OFFSET];
-
-	if (rq->errors == 0)
-		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
-
-	if (args->tf_in_flags.b.data) {
-		u16 data = hwif->INW(IDE_DATA_REG);
-		args->tfRegister[IDE_DATA_OFFSET] = (data) & 0xFF;
-		args->hobRegister[IDE_DATA_OFFSET_HOB]	= (data >> 8) & 0xFF;
-	}
-	args->tfRegister[IDE_ERROR_OFFSET]   = err;
-	args->tfRegister[IDE_NSECTOR_OFFSET] = hwif->INB(IDE_NSECTOR_REG);
-	args->tfRegister[IDE_SECTOR_OFFSET]  = hwif->INB(IDE_SECTOR_REG);
-	args->tfRegister[IDE_LCYL_OFFSET]    = hwif->INB(IDE_LCYL_REG);
-	args->tfRegister[IDE_HCYL_OFFSET]    = hwif->INB(IDE_HCYL_REG);
-	args->tfRegister[IDE_SELECT_OFFSET]  = hwif->INB(IDE_SELECT_REG);
-	args->tfRegister[IDE_STATUS_OFFSET]  = stat;
-	if ((drive->id->command_set_2 & 0x0400) &&
-	    (drive->id->cfs_enable_2 & 0x0400) &&
-	    (drive->addressing == 1)) {
-		hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG_HOB);
-		args->hobRegister[IDE_FEATURE_OFFSET_HOB] = hwif->INB(IDE_FEATURE_REG);
-		args->hobRegister[IDE_NSECTOR_OFFSET_HOB] = hwif->INB(IDE_NSECTOR_REG);
-		args->hobRegister[IDE_SECTOR_OFFSET_HOB]  = hwif->INB(IDE_SECTOR_REG);
-		args->hobRegister[IDE_LCYL_OFFSET_HOB]    = hwif->INB(IDE_LCYL_REG);
-		args->hobRegister[IDE_HCYL_OFFSET_HOB]    = hwif->INB(IDE_HCYL_REG);
-	}
-
-#if 0
-/*	taskfile_settings_update(drive, args, command); */
-
-	if (args->posthandler != NULL)
-		args->posthandler(drive, args);
-#endif
-
-	spin_lock_irqsave(&ide_lock, flags);
-	blkdev_dequeue_request(rq);
-	HWGROUP(drive)->rq = NULL;
-	end_that_request_last(rq);
-	spin_unlock_irqrestore(&ide_lock, flags);
-}
-
-EXPORT_SYMBOL(ide_end_taskfile);
-
-/*
  * set_multmode_intr() is invoked on completion of a WIN_SETMULT cmd.
  */
 ide_startstop_t set_multmode_intr (ide_drive_t *drive)

@@ -1433,9 +1433,6 @@ extern int wait_for_ready(ide_drive_t *, int /* timeout */);
  */
 extern ide_startstop_t do_rw_taskfile(ide_drive_t *, ide_task_t *);
 
-/* (ide_drive_t *drive, u8 stat, u8 err) */
-extern void ide_end_taskfile(ide_drive_t *, u8, u8);
-
 /*
  * Special Flagged Register Validation Caller
  */
