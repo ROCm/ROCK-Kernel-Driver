@@ -208,6 +208,12 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	} else {
 		childregs->gpr[1] = usp;
 		p->thread.regs = childregs;
+		if (clone_flags & CLONE_SETTLS) {
+			if (test_thread_flag(TIF_32BIT))
+				childregs->gpr[2] = childregs->gpr[6];
+			else
+				childregs->gpr[13] = childregs->gpr[6];
+		}
 	}
 	childregs->gpr[3] = 0;  /* Result from fork() */
 	sp -= STACK_FRAME_OVERHEAD;
@@ -304,7 +310,7 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 	if (clone_flags & (CLONE_PARENT_SETTID | CLONE_CHILD_SETTID |
 			   CLONE_CHILD_CLEARTID)) {
 		parent_tidptr = p3;
-		child_tidptr = p4;
+		child_tidptr = p5;
 		if (test_thread_flag(TIF_32BIT)) {
 			parent_tidptr &= 0xffffffff;
 			child_tidptr &= 0xffffffff;
