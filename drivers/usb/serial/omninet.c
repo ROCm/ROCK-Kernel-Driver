@@ -157,8 +157,6 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 	if (!serial)
 		return -ENODEV;
 
-	down (&port->sem);
-
 	++port->open_count;
 
 	if (port->open_count == 1) {
@@ -166,7 +164,6 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 		if( !od ) {
 			err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct omninet_data));
 			port->open_count = 0;
-			up (&port->sem);
 			return -ENOMEM;
 		}
 
@@ -183,8 +180,6 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 		if (result)
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	}
-
-	up (&port->sem);
 
 	return result;
 }
@@ -204,8 +199,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 
-	down (&port->sem);
-
 	--port->open_count;
 
 	if (port->open_count <= 0) {
@@ -220,8 +213,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 		if (od)
 			kfree(od);
 	}
-
-	up (&port->sem);
 }
 
 
