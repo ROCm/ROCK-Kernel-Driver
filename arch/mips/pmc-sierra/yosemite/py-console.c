@@ -48,9 +48,12 @@ struct yo_uartregs {
 #define iu_iir u3.iir
 #define iu_fcr u3.fcr
 
+#define ssnop()		__asm__ __volatile__("sll	$0, $0, 1\n");
+#define ssnop_4()	do { ssnop(); ssnop(); ssnop(); ssnop(); } while (0)
+
 #define IO_BASE_64	0x9000000000000000ULL
 
-static unsigned char readb_outer_space(unsigned long phys)
+static unsigned char readb_outer_space(unsigned long long phys)
 {
 	unsigned long long vaddr = IO_BASE_64 | phys;
 	unsigned char res;
@@ -58,29 +61,23 @@ static unsigned char readb_outer_space(unsigned long phys)
 
 	sr = read_c0_status();
 	write_c0_status((sr | ST0_KX) & ~ ST0_IE);
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
+	ssnop_4();
 
 	__asm__ __volatile__ (
 	"	.set	mips3		\n"
-	"	ld	%0, (%0)	\n"
+	"	ld	%0, %1		\n"
 	"	lbu	%0, (%0)	\n"
 	"	.set	mips0		\n"
 	: "=r" (res)
-	: "0" (&vaddr));
+	: "m" (vaddr));
 
 	write_c0_status(sr);
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
+	ssnop_4();
 
 	return res;
 }
 
-static void writeb_outer_space(unsigned long phys, unsigned char c)
+static void writeb_outer_space(unsigned long long phys, unsigned char c)
 {
 	unsigned long long vaddr = IO_BASE_64 | phys;
 	unsigned long tmp;
@@ -88,30 +85,24 @@ static void writeb_outer_space(unsigned long phys, unsigned char c)
 
 	sr = read_c0_status();
 	write_c0_status((sr | ST0_KX) & ~ ST0_IE);
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
+	ssnop_4();
 
 	__asm__ __volatile__ (
 	"	.set	mips3		\n"
-	"	ld	%0, (%1)	\n"
+	"	ld	%0, %1		\n"
 	"	sb	%2, (%0)	\n"
 	"	.set	mips0		\n"
-	: "=r" (tmp)
-	: "r" (&vaddr), "r" (c));
+	: "=&r" (tmp)
+	: "m" (vaddr), "r" (c));
 
 	write_c0_status(sr);
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
-	__asm__("sll	$0, $0, 2\n");
+	ssnop_4();
 }
 
 void prom_putchar(char c)
 {
-	unsigned long lsr = 0xfd000008UL + offsetof(struct yo_uartregs, iu_lsr);
-	unsigned long thr = 0xfd000008UL + offsetof(struct yo_uartregs, iu_thr);
+	unsigned long lsr = 0xfd000008ULL + offsetof(struct yo_uartregs, iu_lsr);
+	unsigned long thr = 0xfd000008ULL + offsetof(struct yo_uartregs, iu_thr);
 
 	while ((readb_outer_space(lsr) & 0x20) == 0);
 	writeb_outer_space(thr, c);

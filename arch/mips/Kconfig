@@ -388,6 +388,7 @@ config PMC_YOSEMITE
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select IRQ_CPU_RM9K
 	select SWAP_IO_SPACE
 	help
 	  Yosemite is an evaluation board for the RM9000x2 processor

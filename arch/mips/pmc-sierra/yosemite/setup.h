@@ -1,6 +1,7 @@
 /*
- * Copyright 2003 PMC-Sierra
+ * Copyright 2003, 04 PMC-Sierra
  * Author: Manish Lachwani (lachwani@pmc-sierra.com)
+ * Copyright 2004 Ralf Baechle <ralf@linux-mips.org>
  *
  * Board specific definititions for the PMC-Sierra Yosemite
  *
@@ -12,9 +13,9 @@
 #ifndef __SETUP_H__
 #define __SETUP_H__
 
-/* NVRAM Base */
-#define	YOSEMITE_NVRAM_BASE_ADDR	0xbb000678	/* XXX Need change */
-#define	YOSEMITE_RTC_BASE		0xbb000679	/* XXX Need change */
+/* M48T37 RTC + NVRAM */
+#define	YOSEMITE_RTC_BASE		0xfc800000
+#define	YOSEMITE_RTC_SIZE		0x00800000
 
 #define HYPERTRANSPORT_BAR0_ADDR        0x00000006
 #define HYPERTRANSPORT_SIZE0            0x0fffffff
