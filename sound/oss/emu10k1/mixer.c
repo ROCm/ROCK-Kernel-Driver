@@ -457,29 +457,29 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 				break;
 
 			if (addr >= 0) {
-				unsigned int state = card->ac97.mixer_state[id];
+				unsigned int state = card->ac97->mixer_state[id];
 
 				if (ch == 1) {
 					state >>= 8;
-					card->ac97.stereo_mixers |= (1 << id);
+					card->ac97->stereo_mixers |= (1 << id);
 				}
 
-				card->ac97.supported_mixers |= (1 << id);
+				card->ac97->supported_mixers |= (1 << id);
 
 				if (id == SOUND_MIXER_TREBLE) {
-					set_treble(card, card->ac97.mixer_state[id] & 0xff, (card->ac97.mixer_state[id] >> 8) & 0xff);
+					set_treble(card, card->ac97->mixer_state[id] & 0xff, (card->ac97->mixer_state[id] >> 8) & 0xff);
 				} else if (id == SOUND_MIXER_BASS) {
-					set_bass(card, card->ac97.mixer_state[id] & 0xff, (card->ac97.mixer_state[id] >> 8) & 0xff);
+					set_bass(card, card->ac97->mixer_state[id] & 0xff, (card->ac97->mixer_state[id] >> 8) & 0xff);
 				} else
 					emu10k1_set_volume_gpr(card, addr, state & 0xff,
 							       volume_params[id]);
 			} else {
-				card->ac97.stereo_mixers &= ~(1 << id);
-				card->ac97.stereo_mixers |= card->ac97_stereo_mixers;
+				card->ac97->stereo_mixers &= ~(1 << id);
+				card->ac97->stereo_mixers |= card->ac97_stereo_mixers;
 
 				if (ch == 0) {
-					card->ac97.supported_mixers &= ~(1 << id);
-					card->ac97.supported_mixers |= card->ac97_supported_mixers;
+					card->ac97->supported_mixers &= ~(1 << id);
+					card->ac97->supported_mixers |= card->ac97_supported_mixers;
 				}
 			}
 			break;
@@ -500,9 +500,9 @@ static int emu10k1_private_mixer(struct emu10k1_card *card, unsigned int cmd, un
 
 		case CMD_AC97_BOOST:
 			if(ctl->val[0])
-				emu10k1_ac97_write(&card->ac97, 0x18, 0x0);	
+				emu10k1_ac97_write(card->ac97, 0x18, 0x0);	
 			else
-				emu10k1_ac97_write(&card->ac97, 0x18, 0x0808);
+				emu10k1_ac97_write(card->ac97, 0x18, 0x0808);
 			break;
 		default:
 			ret = -EINVAL;
@@ -577,7 +577,7 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 	int val;
 	int scale;
 
-	card->ac97.modcnt++;
+	card->ac97->modcnt++;
 
 	if (get_user(val, (int *)arg))
 		return -EFAULT;
@@ -589,7 +589,7 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 	if (right > 100) right = 100;
 	if (left > 100) left = 100;
 
-	card->ac97.mixer_state[oss_mixer] = (right << 8) | left;
+	card->ac97->mixer_state[oss_mixer] = (right << 8) | left;
 	if (oss_mixer == SOUND_MIXER_TREBLE) {
 		set_treble(card, left, right);
 		return 0;
@@ -599,7 +599,7 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 	}
 
 	if (oss_mixer == SOUND_MIXER_VOLUME)
-		scale = 1 << card->ac97.bit_resolution;
+		scale = 1 << card->ac97->bit_resolution;
 	else
 		scale = volume_params[oss_mixer];
 
@@ -607,7 +607,7 @@ static int emu10k1_dsp_mixer(struct emu10k1_card *card, unsigned int oss_mixer, 
 	emu10k1_set_volume_gpr(card, card->mgr.ctrl_gpr[oss_mixer][1], right, scale);
 
 	if (card->ac97_supported_mixers & (1 << oss_mixer))
-		card->ac97.write_mixer(&card->ac97, oss_mixer, left, right);
+		card->ac97->write_mixer(card->ac97, oss_mixer, left, right);
 
 	return 0;
 }
@@ -623,9 +623,9 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		if (cmd == SOUND_MIXER_INFO) {
 			mixer_info info;
 
-			strlcpy(info.id, card->ac97.name, sizeof(info.id));
-			strlcpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
-			info.modify_counter = card->ac97.modcnt;
+			strncpy(info.id, card->ac97->name, sizeof(info.id));
+			strncpy(info.name, "Creative SBLive - Emu10k1", sizeof(info.name));
+			info.modify_counter = card->ac97->modcnt;
 
 			if (copy_to_user((void *)arg, &info, sizeof(info)))
 				return -EFAULT;
@@ -636,7 +636,7 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 		if ((_SIOC_DIR(cmd) == (_SIOC_WRITE|_SIOC_READ)) && oss_mixer <= SOUND_MIXER_NRDEVICES)
 			ret = emu10k1_dsp_mixer(card, oss_mixer, arg);
 		else
-			ret = card->ac97.mixer_ioctl(&card->ac97, cmd, arg);
+			ret = card->ac97->mixer_ioctl(card->ac97, cmd, arg);
 	}
 	
 	if (ret < 0)
@@ -656,7 +656,7 @@ static int emu10k1_mixer_open(struct inode *inode, struct file *file)
 	list_for_each(entry, &emu10k1_devs) {
 		card = list_entry(entry, struct emu10k1_card, list);
 
-		if (card->ac97.dev_mixer == minor)
+		if (card->ac97->dev_mixer == minor)
 			goto match;
 	}
 

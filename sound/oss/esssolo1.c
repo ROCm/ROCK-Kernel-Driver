@@ -721,8 +721,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strlcpy(info.id, "Solo1", sizeof(info.id));
-		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
+		strncpy(info.id, "Solo1", sizeof(info.id));
+		strncpy(info.name, "ESS Solo1", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -730,8 +730,8 @@ static int mixer_ioctl(struct solo1_state *s, unsigned int cmd, unsigned long ar
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strlcpy(info.id, "Solo1", sizeof(info.id));
-		strlcpy(info.name, "ESS Solo1", sizeof(info.name));
+		strncpy(info.id, "Solo1", sizeof(info.id));
+		strncpy(info.name, "ESS Solo1", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -1972,12 +1972,8 @@ static int solo1_midi_release(struct inode *inode, struct file *file)
 				break;
 			if (signal_pending(current))
 				break;
-			if (file->f_flags & O_NONBLOCK) {
-				remove_wait_queue(&s->midi.owait, &wait);
-				set_current_state(TASK_RUNNING);
-				unlock_kernel();
-				return -EBUSY;
-			}
+			if (file->f_flags & O_NONBLOCK)
+				break;
 			tmo = (count * HZ) / 3100;
 			if (!schedule_timeout(tmo ? : 1) && tmo)
 				printk(KERN_DEBUG "solo1: midi timed out??\n");

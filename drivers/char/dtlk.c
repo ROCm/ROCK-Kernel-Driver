@@ -55,7 +55,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>		/* for verify_area */
 #include <linux/errno.h>	/* for -EBUSY */
-#include <linux/ioport.h>	/* for check_region, request_region */
+#include <linux/ioport.h>	/* for request_region */
 #include <linux/delay.h>	/* for loops_per_jiffy */
 #include <asm/io.h>		/* for inb_p, outb_p, inb, outb, etc. */
 #include <asm/uaccess.h>	/* for get_user, etc. */

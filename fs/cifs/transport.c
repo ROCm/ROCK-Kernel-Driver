@@ -199,13 +199,15 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
         if (in_buf->smb_buf_length > 12)
                 in_buf->Flags2 = cpu_to_le16(in_buf->Flags2);
-
+	
         rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->sockAddr));
 
+	if (long_op == -1)
+		goto cifs_no_response_exit;
 	if (long_op > 1) /* writes past end of file can take looooong time */
 		timeout = 300 * HZ;
 	else if (long_op == 1)
@@ -283,7 +285,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		} else
 			rc = -EIO;
 	}
-
+cifs_no_response_exit:
 	DeleteMidQEntry(midQ);	/* BB what if process is killed?
 			 - BB add background daemon to clean up Mid entries from
 			 killed processes & test killing process with active mid */

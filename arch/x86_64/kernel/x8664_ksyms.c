@@ -214,5 +214,7 @@ EXPORT_SYMBOL(fake_node);
 
 EXPORT_SYMBOL(clear_page);
 
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL_GPL(flush_tlb_all);
+#endif

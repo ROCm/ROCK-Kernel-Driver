@@ -386,14 +386,21 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 
 			if (overrides[current_override].NCR5380_map_name != PORT_AUTO)
 				for (i = 0; ports[i]; i++) {
+					if (!request_region(ports[i],  16, "ncr53c80"))
+						continue;
 					if (overrides[current_override].NCR5380_map_name == ports[i])
 						break;
+					release_region(ports[i], 16);
 			} else
 				for (i = 0; ports[i]; i++) {
-					if ((!check_region(ports[i], 16)) && (inb(ports[i]) == 0xff))
+					if (!request_region(ports[i],  16, "ncr53c80"))
+						continue;
+					if (inb(ports[i]) == 0xff)
 						break;
+					release_region(ports[i], 16);
 				}
 			if (ports[i]) {
+				/* At this point we have our region reserved */
 				outb(0x59, 0x779);
 				outb(0xb9, 0x379);
 				outb(0xc5, 0x379);
@@ -408,12 +415,15 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 			} else
 				continue;
 		}
-
-		request_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380");
+		else
+		{
+			/* Not a 53C400A style setup - just grab */
+			if(!(request_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380")))
+				continue;
+		}
 #else
-		if (check_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size))
+		if(!request_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380"))
 			continue;
-		request_mem_region(overrides[current_override].NCR5380_map_name, NCR5380_region_size, "ncr5380");
 #endif
 		instance = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
 		if (instance == NULL) {
