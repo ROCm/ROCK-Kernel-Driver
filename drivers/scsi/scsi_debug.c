@@ -1279,7 +1279,7 @@ static ssize_t sdebug_delay_write(struct device_driver * ddp,
 	return -EINVAL;
 }
 
-DRIVER_ATTR(delay, "delay", S_IRUGO | S_IWUSR, sdebug_delay_read, 
+DRIVER_ATTR(delay, S_IRUGO | S_IWUSR, sdebug_delay_read, 
 	    sdebug_delay_write)
 
 static ssize_t sdebug_opts_read(struct device_driver * ddp, char * buf, 
@@ -1311,7 +1311,7 @@ opts_done:
 	return count;
 }
 
-DRIVER_ATTR(opts, "opts", S_IRUGO | S_IWUSR, sdebug_opts_read, 
+DRIVER_ATTR(opts, S_IRUGO | S_IWUSR, sdebug_opts_read, 
 	    sdebug_opts_write)
 
 static ssize_t sdebug_num_devs_read(struct device_driver * ddp, char * buf, 
@@ -1320,7 +1320,7 @@ static ssize_t sdebug_num_devs_read(struct device_driver * ddp, char * buf,
         return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_num_devs);
 }
 
-DRIVER_ATTR(num_devs, "num_devs", S_IRUGO, sdebug_num_devs_read, NULL) 
+DRIVER_ATTR(num_devs, S_IRUGO, sdebug_num_devs_read, NULL) 
 
 static void do_create_driverfs_files()
 {
