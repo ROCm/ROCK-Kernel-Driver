@@ -1878,6 +1878,7 @@ static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 	}
 }
 
+#ifdef CONFIG_PCI
 #include <linux/pci.h>
 
 static struct pci_device_id hisax_pci_tbl[] __initdata = {
@@ -1946,6 +1947,7 @@ static struct pci_device_id hisax_pci_tbl[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, hisax_pci_tbl);
+#endif /* CONFIG_PCI */
 
 module_init(HiSax_init);
 module_exit(HiSax_exit);
