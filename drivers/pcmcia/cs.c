@@ -1885,14 +1885,10 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     
 ======================================================================*/
 
-int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
+int pccard_reset_card(struct pcmcia_socket *skt)
 {
-	struct pcmcia_socket *skt;
 	int ret;
     
-	if (CHECK_HANDLE(handle))
-		return CS_BAD_HANDLE;
-	skt = SOCKET(handle);
 	cs_dbg(skt, 1, "resetting socket\n");
 
 	down(&skt->skt_sem);
@@ -1917,15 +1913,13 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
 				send_event(skt, CS_EVENT_CARD_RESET, CS_EVENT_PRI_LOW);
 		}
 
-		handle->event_callback_args.info = (void *)(u_long)ret;
-		EVENT(handle, CS_EVENT_RESET_COMPLETE, CS_EVENT_PRI_LOW);
-
 		ret = CS_SUCCESS;
 	} while (0);
 	up(&skt->skt_sem);
 
 	return ret;
 } /* reset_card */
+EXPORT_SYMBOL(pccard_reset_card);
 
 /*======================================================================
 
@@ -2090,7 +2084,6 @@ EXPORT_SYMBOL(pcmcia_request_configuration);
 EXPORT_SYMBOL(pcmcia_request_io);
 EXPORT_SYMBOL(pcmcia_request_irq);
 EXPORT_SYMBOL(pcmcia_request_window);
-EXPORT_SYMBOL(pcmcia_reset_card);
 EXPORT_SYMBOL(pcmcia_resume_card);
 EXPORT_SYMBOL(pcmcia_suspend_card);
 

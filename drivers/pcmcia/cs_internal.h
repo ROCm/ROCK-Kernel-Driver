@@ -173,6 +173,7 @@ extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
 int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req);
 int pccard_get_configuration_info(struct pcmcia_socket *s, unsigned int function, config_info_t *config);
+int pccard_reset_card(struct pcmcia_socket *skt);
 
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 

@@ -88,6 +88,20 @@ int pcmcia_get_configuration_info(client_handle_t handle,
 }
 EXPORT_SYMBOL(pcmcia_get_configuration_info);
 
+int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
+{
+	struct pcmcia_socket *skt;
+    
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	skt = SOCKET(handle);
+	if (!skt)
+		return CS_BAD_HANDLE;
+
+	return pccard_reset_card(skt);
+}
+EXPORT_SYMBOL(pcmcia_reset_card);
+
 #ifdef CONFIG_PCMCIA_OBSOLETE
 
 int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
