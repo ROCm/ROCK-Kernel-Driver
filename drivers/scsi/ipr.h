@@ -146,6 +146,7 @@
 /*
  * Adapter Commands
  */
+#define IPR_QUERY_RSRC_STATE				0xC2
 #define IPR_RESET_DEVICE				0xC3
 #define	IPR_RESET_TYPE_SELECT				0x80
 #define	IPR_LUN_RESET					0x40

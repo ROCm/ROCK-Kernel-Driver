@@ -3904,7 +3904,8 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 		ioarcb->cmd_pkt.flags_lo |= ipr_get_task_attributes(scsi_cmd);
 	}
 
-	if (!ipr_is_gscsi(res) && scsi_cmd->cmnd[0] >= 0xC0)
+	if (scsi_cmd->cmnd[0] >= 0xC0 &&
+	    (!ipr_is_gscsi(res) || scsi_cmd->cmnd[0] == IPR_QUERY_RSRC_STATE))
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
 	if (ipr_is_ioa_resource(res) && scsi_cmd->cmnd[0] == MODE_SELECT)
