@@ -289,8 +289,9 @@ static struct velocity_info_tbl chip_info_table[] = {
  */
 
 static struct pci_device_id velocity_id_table[] __devinitdata = {
-	{0x1106, 0x3119, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (unsigned long) &chip_info_table[0]},
-	{0,}
+	{PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_612X,
+	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, (unsigned long) chip_info_table},
+	{0, }
 };
 
 MODULE_DEVICE_TABLE(pci, velocity_id_table);
