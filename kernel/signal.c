@@ -587,15 +587,15 @@ void signal_wake_up(struct task_struct *t, int resume)
 	set_tsk_thread_flag(t, TIF_SIGPENDING);
 
 	/*
-	 * If resume is set, we want to wake it up in the TASK_STOPPED case.
-	 * We don't check for TASK_STOPPED because there is a race with it
+	 * For SIGKILL, we want to wake it up in the stopped/traced case.
+	 * We don't check t->state here because there is a race with it
 	 * executing another processor and just now entering stopped state.
-	 * By calling wake_up_process any time resume is set, we ensure
-	 * the process will wake up and handle its stop or death signal.
+	 * By using wake_up_state, we ensure the process will wake up and
+	 * handle its death signal.
 	 */
 	mask = TASK_INTERRUPTIBLE;
 	if (resume)
-		mask |= TASK_STOPPED;
+		mask |= TASK_STOPPED | TASK_TRACED;
 	if (!wake_up_state(t, mask))
 		kick_process(t);
 }
@@ -935,11 +935,11 @@ __group_complete_signal(int sig, struct task_struct *p)
 
 	/*
 	 * Don't bother traced and stopped tasks (but
-	 * SIGKILL will punch through stopped state)
+	 * SIGKILL will punch through that).
 	 */
-	mask = TASK_TRACED;
-	if (sig != SIGKILL)
-		mask |= TASK_STOPPED;
+	mask = TASK_STOPPED | TASK_TRACED;
+	if (sig == SIGKILL)
+		mask = 0;
 
 	/*
 	 * Now find a thread we can wake up to take the signal off the queue.
