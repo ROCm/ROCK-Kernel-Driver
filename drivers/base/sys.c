@@ -200,7 +200,7 @@ void sys_device_unregister(struct sys_device * sysdev)
 
 
 /**
- *	sys_device_shutdown - Shut down all system devices.
+ *	sysdev_shutdown - Shut down all system devices.
  *
  *	Loop over each class of system devices, and the devices in each
  *	of those classes. For each device, we call the shutdown method for
@@ -213,7 +213,7 @@ void sys_device_unregister(struct sys_device * sysdev)
  *	after their parents. 
  */
 
-void sys_device_shutdown(void)
+void sysdev_shutdown(void)
 {
 	struct sysdev_class * cls;
 
@@ -252,7 +252,53 @@ void sys_device_shutdown(void)
 
 
 /**
- *	sys_device_suspend - Suspend all system devices.
+ *	sysdev_save - Save system device state
+ *	@state:	Power state we're entering.
+ *
+ *	This is called when the system is going to sleep, but before interrupts 
+ *	have been disabled. This allows system device drivers to allocate and 
+ *	save device state, including sleeping during the process..
+ */
+
+int sysdev_save(u32 state)
+{
+	struct sysdev_class * cls;
+
+	pr_debug("Saving System Device State\n");
+
+	down_write(&system_subsys.rwsem);
+
+	list_for_each_entry_reverse(cls,&system_subsys.kset.list,
+				    kset.kobj.entry) {
+		struct sys_device * sysdev;
+		pr_debug("Saving state for type '%s':\n",cls->kset.kobj.name);
+
+		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
+			struct sysdev_driver * drv;
+
+			pr_debug(" %s\n",sysdev->kobj.name);
+
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->save)
+					drv->save(sysdev,state);
+			}
+
+			list_for_each_entry(drv,&cls->drivers,entry) {
+				if (drv->save)
+					drv->save(sysdev,state);
+			}
+
+			if (cls->save)
+				cls->save(sysdev,state);
+		}
+	}
+	up_write(&system_subsys.rwsem);
+	return 0;
+}
+
+
+/**
+ *	sysdev_suspend - Suspend all system devices.
  *	@state:		Power state to enter.
  *
  *	We perform an almost identical operation as sys_device_shutdown()
@@ -263,7 +309,7 @@ void sys_device_shutdown(void)
  *	warning and return an error.
  */
 
-int sys_device_suspend(u32 state)
+int sysdev_suspend(u32 state)
 {
 	struct sysdev_class * cls;
 
@@ -308,7 +354,7 @@ int sys_device_suspend(u32 state)
 
 
 /**
- *	sys_device_resume - Bring system devices back to life.
+ *	sysdev_resume - Bring system devices back to life.
  *
  *	Similar to sys_device_suspend(), but we iterate the list forwards
  *	to guarantee that parent devices are resumed before their children.
@@ -316,7 +362,7 @@ int sys_device_suspend(u32 state)
  *	Note: Interrupts are disabled when called.
  */
 
-int sys_device_resume(void)
+int sysdev_resume(void)
 {
 	struct sysdev_class * cls;
 
@@ -334,11 +380,9 @@ int sys_device_resume(void)
 			struct sysdev_driver * drv;
 			pr_debug(" %s\n",sysdev->kobj.name);
 
-			/* Call global drivers first. */
-			list_for_each_entry(drv,&global_drivers,entry) {
-				if (drv->resume)
-					drv->resume(sysdev);
-			}
+			/* First, call the class-specific one */
+			if (cls->resume)
+				cls->resume(sysdev);
 
 			/* Call auxillary drivers next. */
 			list_for_each_entry(drv,&cls->drivers,entry) {
@@ -346,14 +390,61 @@ int sys_device_resume(void)
 					drv->resume(sysdev);
 			}
 
-			/* Now call the generic one */
-			if (cls->resume)
-				cls->resume(sysdev);
+			/* Call global drivers. */
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->resume)
+					drv->resume(sysdev);
+			}
+
 		}
 	}
 	up_write(&system_subsys.rwsem);
 	return 0;
 }
+
+
+/**
+ *	sysdev_restore - Restore system device state
+ *
+ *	This is called during a suspend/resume cycle last, after interrupts 
+ *	have been re-enabled. This is intended for auxillary drivers, etc, 
+ *	that may sleep when restoring state.
+ */
+
+int sysdev_restore(void)
+{
+	struct sysdev_class * cls;
+
+	down_write(&system_subsys.rwsem);
+	pr_debug("Restoring System Device State\n");
+
+	list_for_each_entry(cls,&system_subsys.kset.list,kset.kobj.entry) {
+		struct sys_device * sysdev;
+
+		pr_debug("Restoring state for type '%s':\n",cls->kset.kobj.name);
+		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
+			struct sysdev_driver * drv;
+			pr_debug(" %s\n",sysdev->kobj.name);
+
+			if (cls->restore)
+				cls->restore(sysdev);
+
+			list_for_each_entry(drv,&cls->drivers,entry) {
+				if (drv->restore)
+					drv->restore(sysdev);
+			}
+
+			list_for_each_entry(drv,&global_drivers,entry) {
+				if (drv->restore)
+					drv->restore(sysdev);
+			}
+		}
+	}
+
+	up_write(&system_subsys.rwsem);
+	return 0;
+}
+
 
 int __init sys_bus_init(void)
 {

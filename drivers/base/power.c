@@ -30,9 +30,11 @@ extern struct subsystem devices_subsys;
  * they only get one called once when interrupts are disabled. 
  */
 
-extern int sys_device_shutdown(void);
-extern int sys_device_suspend(u32 state);
-extern int sys_device_resume(void);
+extern int sysdev_shutdown(void);
+extern int sysdev_save(u32 state);
+extern int sysdev_suspend(u32 state);
+extern int sysdev_resume(void);
+extern int sysdev_restore(void);
 
 /**
  * device_suspend - suspend/remove all devices on the device ree
@@ -64,8 +66,19 @@ int device_suspend(u32 state, u32 level)
 	}
 	up_write(&devices_subsys.rwsem);
 
-	if (level == SUSPEND_POWER_DOWN)
-		sys_device_suspend(state);
+	/*
+	 * Make sure system devices are suspended.
+	 */
+	switch(level) {
+	case SUSPEND_SAVE_STATE:
+		sysdev_save(state);
+		break;
+	case SUSPEND_POWER_DOWN:
+		sysdev_suspend(state);
+		break;
+	default:
+		break;
+	}
 
 	return error;
 }
@@ -82,8 +95,16 @@ void device_resume(u32 level)
 {
 	struct list_head * node;
 
-	if (level == RESUME_POWER_ON)
-		sys_device_resume();
+	switch (level) {
+	case RESUME_POWER_ON:
+		sysdev_resume();
+		break;
+	case RESUME_RESTORE_STATE:
+		sysdev_restore();
+		break;
+	default:
+		break;
+	}
 
 	down_write(&devices_subsys.rwsem);
 	list_for_each_prev(node,&devices_subsys.kset.list) {
@@ -119,7 +140,7 @@ void device_shutdown(void)
 	}
 	up_write(&devices_subsys.rwsem);
 
-	sys_device_shutdown();
+	sysdev_shutdown();
 }
 
 EXPORT_SYMBOL(device_suspend);
