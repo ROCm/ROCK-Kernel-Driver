@@ -223,6 +223,22 @@ xfs_alloc_delrec(
 			if ((error = xfs_alloc_put_freelist(cur->bc_tp,
 					cur->bc_private.a.agbp, NULL, bno)))
 				return error;
+			/*
+			 * Since blocks move to the free list without the
+			 * coordination used in xfs_bmap_finish, we can't allow
+			 * block to be available for reallocation and
+			 * non-transaction writing (user data) until we know
+			 * that the transaction that moved it to the free list
+			 * is permanently on disk. We track the blocks by
+			 * declaring these blocks as "busy"; the busy list is
+			 * maintained on a per-ag basis and each transaction
+			 * records which entries should be removed when the
+			 * iclog commits to disk. If a busy block is
+			 * allocated, the iclog is pushed up to the LSN
+			 * that freed the block.
+			 */
+			xfs_alloc_mark_busy(cur->bc_tp, agf->agf_seqno, bno, 1);
+
 			xfs_trans_agbtree_delta(cur->bc_tp, -1);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 				XFS_AGF_ROOTS | XFS_AGF_LEVELS);
@@ -528,6 +544,20 @@ xfs_alloc_delrec(
 	if ((error = xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp,
 			NULL, rbno)))
 		return error;
+	/*
+	 * Since blocks move to the free list without the coordination
+	 * used in xfs_bmap_finish, we can't allow block to be available
+	 * for reallocation and non-transaction writing (user data)
+	 * until we know that the transaction that moved it to the free
+	 * list is permanently on disk. We track the blocks by declaring
+	 * these blocks as "busy"; the busy list is maintained on a
+	 * per-ag basis and each transaction records which entries
+	 * should be removed when the iclog commits to disk. If a
+	 * busy block is allocated, the iclog is pushed up to the
+	 * LSN that freed the block.
+	 */
+	xfs_alloc_mark_busy(cur->bc_tp, agf->agf_seqno, bno, 1);
+
 	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	/*
 	 * Adjust the current level's cursor so that we're left referring
