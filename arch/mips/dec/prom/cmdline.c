@@ -6,32 +6,30 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/types.h>
 
 #include <asm/bootinfo.h>
-
-#include "prom.h"
+#include <asm/dec/prom.h>
 
 #undef PROM_DEBUG
 
-#ifdef PROM_DEBUG
-extern int (*prom_printf)(char *, ...);
-#endif
+char arcs_cmdline[CL_SIZE];
 
-char arcs_cmdline[COMMAND_LINE_SIZE];
-
-void __init prom_init_cmdline(int argc, char **argv, unsigned long magic)
+void __init prom_init_cmdline(s32 argc, s32 *argv, u32 magic)
 {
+	char *arg;
 	int start_arg, i;
 
 	/*
 	 * collect args and prepare cmd_line
 	 */
-	if (magic != REX_PROM_MAGIC)
+	if (!prom_is_rex(magic))
 		start_arg = 1;
 	else
 		start_arg = 2;
 	for (i = start_arg; i < argc; i++) {
-		strcat(arcs_cmdline, argv[i]);
+		arg = (void *)(long)(argv[i]);
+		strcat(arcs_cmdline, arg);
 		if (i < (argc - 1))
 			strcat(arcs_cmdline, " ");
 	}
@@ -39,6 +37,4 @@ void __init prom_init_cmdline(int argc, char **argv, unsigned long magic)
 #ifdef PROM_DEBUG
 	prom_printf("arcs_cmdline: %s\n", &(arcs_cmdline[0]));
 #endif
-
 }
-
