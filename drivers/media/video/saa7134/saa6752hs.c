@@ -168,13 +168,11 @@ static int saa6752hs_chip_command(struct i2c_client* client,
 		}
 	
 		// wait a bit
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 
 	// delay a bit to let encoder settle
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ/20);
+	msleep(50);
 	
 	// done
   	return status;

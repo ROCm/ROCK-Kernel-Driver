@@ -789,27 +789,6 @@ typedef struct ide_drive_s {
 	struct gendisk *disk;
 } ide_drive_t;
 
-/*
- * mapping stuff, prepare for highmem...
- * 
- * temporarily mapping a (possible) highmem bio for PIO transfer
- */
-#ifndef CONFIG_IDE_TASKFILE_IO
-
-#define ide_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
-
-static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-}
-
-static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
-{
-	bio_kunmap_irq(buffer, flags);
-}
-#endif /* !CONFIG_IDE_TASKFILE_IO */
-
 #define IDE_CHIPSET_PCI_MASK	\
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
 #define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
@@ -920,11 +899,17 @@ typedef struct hwif_s {
 	dma_addr_t	dmatable_dma;
 	/* Scatter-gather list used to build the above */
 	struct scatterlist *sg_table;
+	int sg_max_nents;		/* Maximum number of entries in it */
 	int sg_nents;			/* Current number of entries in it */
 	int sg_dma_direction;		/* dma transfer direction */
 
 	/* data phase of the active command (currently only valid for PIO/DMA) */
 	int		data_phase;
+
+	unsigned int nsect;
+	unsigned int nleft;
+	unsigned int cursg;
+	unsigned int cursg_ofs;
 
 	int		mmio;		/* hosts iomio (0) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
@@ -1369,35 +1354,6 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
-#define IDE_PIO_IN	0
-#define IDE_PIO_OUT	1
-
-static inline void __task_sectors(ide_drive_t *drive, char *buf,
-				  unsigned nsect, unsigned rw)
-{
-	/*
-	 * IRQ can happen instantly after reading/writing
-	 * last sector of the datablock.
-	 */
-	if (rw == IDE_PIO_OUT)
-		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
-	else
-		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
-}
-
-#ifdef CONFIG_IDE_TASKFILE_IO
-static inline void task_bio_sectors(ide_drive_t *drive, struct request *rq,
-				    unsigned nsect, unsigned rw)
-{
-	unsigned long flags;
-	char *buf = rq_map_buffer(rq, &flags);
-
-	process_that_request_first(rq, nsect);
-	__task_sectors(drive, buf, nsect, rw);
-	rq_unmap_buffer(buf, &flags);
-}
-#endif /* CONFIG_IDE_TASKFILE_IO */
-
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
 
@@ -1527,6 +1483,9 @@ typedef struct ide_pci_device_s {
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_device_t *);
+
+void ide_map_sg(ide_drive_t *, struct request *);
+void ide_init_sg_cmd(ide_drive_t *, struct request *);
 
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1

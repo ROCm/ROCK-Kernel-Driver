@@ -36,18 +36,18 @@
 #include <asm/semaphore.h>
 #include <asm/segment.h>
 #include <asm/uaccess.h>
-#include <asm-ia64/sal.h>
-#include <asm-ia64/sn/sn_sal.h>
+#include <asm/sal.h>
+#include <asm/sn/io.h>
+#include <asm/sn/sn_sal.h>
 #include <asm/sn/module.h>
 #include <asm/sn/geo.h>
-#include <asm-ia64/sn/sn2/sn_hwperf.h>
+#include <asm/sn/sn2/sn_hwperf.h>
 
 static void *sn_hwperf_salheap = NULL;
 static int sn_hwperf_obj_cnt = 0;
 static nasid_t sn_hwperf_master_nasid = INVALID_NASID;
 static int sn_hwperf_init(void);
 static DECLARE_MUTEX(sn_hwperf_init_mutex);
-extern int numionodes;
 
 static int sn_hwperf_enum_objects(int *nobj, struct sn_hwperf_object_info **ret)
 {
@@ -407,7 +407,7 @@ sn_hwperf_ioctl(struct inode *in, struct file *fp, u32 op, u64 arg)
 		r = -EINVAL;
 		goto error;
 	}
-	r = copy_from_user(&a, (const void *)arg,
+	r = copy_from_user(&a, (const void __user *)arg,
 		sizeof(struct sn_hwperf_ioctl_args));
 	if (r != 0) {
 		r = -EFAULT;
@@ -428,7 +428,7 @@ sn_hwperf_ioctl(struct inode *in, struct file *fp, u32 op, u64 arg)
 	}
 
 	if (op & SN_HWPERF_OP_MEM_COPYIN) {
-		r = copy_from_user(p, (const void *)a.ptr, a.sz);
+		r = copy_from_user(p, (const void __user *)a.ptr, a.sz);
 		if (r != 0) {
 			r = -EFAULT;
 			goto error;
@@ -528,7 +528,7 @@ sn_hwperf_ioctl(struct inode *in, struct file *fp, u32 op, u64 arg)
 	}
 
 	if (op & SN_HWPERF_OP_MEM_COPYOUT) {
-		r = copy_to_user((void *)a.ptr, p, a.sz);
+		r = copy_to_user((void __user *)a.ptr, p, a.sz);
 		if (r != 0) {
 			r = -EFAULT;
 			goto error;

@@ -84,11 +84,15 @@ sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int next_match;
 
+	write_seqlock(&xtime_lock);
+
 	do {
 		timer_tick(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
 	} while ((signed long)(next_match - OSCR) <= 0);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

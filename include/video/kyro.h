@@ -13,7 +13,7 @@
 #define _KYRO_H
 
 struct kyrofb_info {
-	void *regbase;
+	void __iomem *regbase;
 
 	u32 HTot;	/* Hor Total Time    */
 	u32 HFP;	/* Hor Front Porch   */

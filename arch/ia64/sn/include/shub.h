@@ -23,17 +23,17 @@
  *   SH_JUNK_BUS_LED0-3, defined in shub_mmr.h
  *		
  */
-#define SH_REAL_JUNK_BUS_LED0           0x7fed00000
-#define SH_REAL_JUNK_BUS_LED1           0x7fed10000
-#define SH_REAL_JUNK_BUS_LED2           0x7fed20000
-#define SH_REAL_JUNK_BUS_LED3           0x7fed30000
-#define SH_JUNK_BUS_UART0               0x7fed40000
-#define SH_JUNK_BUS_UART1               0x7fed40008
-#define SH_JUNK_BUS_UART2               0x7fed40010
-#define SH_JUNK_BUS_UART3               0x7fed40018
-#define SH_JUNK_BUS_UART4               0x7fed40020
-#define SH_JUNK_BUS_UART5               0x7fed40028
-#define SH_JUNK_BUS_UART6               0x7fed40030
-#define SH_JUNK_BUS_UART7               0x7fed40038
+#define SH_REAL_JUNK_BUS_LED0           0x7fed00000UL
+#define SH_REAL_JUNK_BUS_LED1           0x7fed10000UL
+#define SH_REAL_JUNK_BUS_LED2           0x7fed20000UL
+#define SH_REAL_JUNK_BUS_LED3           0x7fed30000UL
+#define SH_JUNK_BUS_UART0               0x7fed40000UL
+#define SH_JUNK_BUS_UART1               0x7fed40008UL
+#define SH_JUNK_BUS_UART2               0x7fed40010UL
+#define SH_JUNK_BUS_UART3               0x7fed40018UL
+#define SH_JUNK_BUS_UART4               0x7fed40020UL
+#define SH_JUNK_BUS_UART5               0x7fed40028UL
+#define SH_JUNK_BUS_UART6               0x7fed40030UL
+#define SH_JUNK_BUS_UART7               0x7fed40038UL
 
 #endif /* _ASM_IA64_SN_SHUB_H */

@@ -58,42 +58,42 @@ void __sn_outl(unsigned int val, unsigned long port)
 	___sn_outl(val, port);
 }
 
-unsigned char __sn_readb(void *addr)
+unsigned char __sn_readb(void __iomem *addr)
 {
 	return ___sn_readb(addr);
 }
 
-unsigned short __sn_readw(void *addr)
+unsigned short __sn_readw(void __iomem *addr)
 {
 	return ___sn_readw(addr);
 }
 
-unsigned int __sn_readl(void *addr)
+unsigned int __sn_readl(void __iomem *addr)
 {
 	return ___sn_readl(addr);
 }
 
-unsigned long __sn_readq(void *addr)
+unsigned long __sn_readq(void __iomem *addr)
 {
 	return ___sn_readq(addr);
 }
 
-unsigned char __sn_readb_relaxed(void *addr)
+unsigned char __sn_readb_relaxed(void __iomem *addr)
 {
 	return ___sn_readb_relaxed(addr);
 }
 
-unsigned short __sn_readw_relaxed(void *addr)
+unsigned short __sn_readw_relaxed(void __iomem *addr)
 {
 	return ___sn_readw_relaxed(addr);
 }
 
-unsigned int __sn_readl_relaxed(void *addr)
+unsigned int __sn_readl_relaxed(void __iomem *addr)
 {
 	return ___sn_readl_relaxed(addr);
 }
 
-unsigned long __sn_readq_relaxed(void *addr)
+unsigned long __sn_readq_relaxed(void __iomem *addr)
 {
 	return ___sn_readq_relaxed(addr);
 }

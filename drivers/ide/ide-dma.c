@@ -610,8 +610,10 @@ int ide_dma_setup(ide_drive_t *drive)
 		reading = 1 << 3;
 
 	/* fall back to pio! */
-	if (!ide_build_dmatable(drive, rq))
+	if (!ide_build_dmatable(drive, rq)) {
+		ide_map_sg(drive, rq);
 		return 1;
+	}
 
 	/* PRD table */
 	hwif->OUTL(hwif->dmatable_dma, hwif->dma_prdtable);
@@ -810,10 +812,6 @@ int ide_release_dma_engine (ide_hwif_t *hwif)
 				    hwif->dmatable_dma);
 		hwif->dmatable_cpu = NULL;
 	}
-	if (hwif->sg_table) {
-		kfree(hwif->sg_table);
-		hwif->sg_table = NULL;
-	}
 	return 1;
 }
 
@@ -846,15 +844,12 @@ int ide_allocate_dma_engine (ide_hwif_t *hwif)
 	hwif->dmatable_cpu = pci_alloc_consistent(hwif->pci_dev,
 						  PRD_ENTRIES * PRD_BYTES,
 						  &hwif->dmatable_dma);
-	hwif->sg_table = kmalloc(sizeof(struct scatterlist) * PRD_ENTRIES,
-				GFP_KERNEL);
 
-	if ((hwif->dmatable_cpu) && (hwif->sg_table))
+	if (hwif->dmatable_cpu)
 		return 0;
 
-	printk(KERN_ERR "%s: -- Error, unable to allocate%s%s table(s).\n",
+	printk(KERN_ERR "%s: -- Error, unable to allocate%s DMA table(s).\n",
 		(hwif->dmatable_cpu == NULL) ? " CPU" : "",
-		(hwif->sg_table == NULL) ?  " SG DMA" : " DMA",
 		hwif->cds->name);
 
 	ide_release_dma_engine(hwif);

@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-i2c.c,v 1.5 2004/10/06 17:30:51 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * i2c interface support
  *
@@ -381,21 +383,26 @@ saa7134_i2c_eeprom(struct saa7134_dev *dev, unsigned char *eedata, int len)
 	return 0;
 }
 
-static int
-saa7134_i2c_scan(struct saa7134_dev *dev)
+static char *i2c_devs[128] = {
+	[ 0x20      ] = "mpeg encoder (saa6752hs)",
+	[ 0xa0 >> 1 ] = "eeprom",
+	[ 0xc0 >> 1 ] = "tuner (analog)",
+	[ 0x86 >> 1 ] = "tda9887",
+};
+
+static void do_i2c_scan(char *name, struct i2c_client *c)
 {
 	unsigned char buf;
 	int i,rc;
 
-	for (i = 0; i < 256; i+= 2) {
-		dev->i2c_client.addr = i >> 1;
-		rc = i2c_master_recv(&dev->i2c_client,&buf,0);
+	for (i = 0; i < 128; i++) {
+		c->addr = i;
+		rc = i2c_master_recv(c,&buf,0);
 		if (rc < 0)
 			continue;
-		printk("%s: i2c scan: found device @ %x%s\n",
-		       dev->name, i, (i == 0xa0) ? " [eeprom]" : "");
+		printk("%s: i2c scan: found device @ 0x%x  [%s]\n",
+		       name, i << 1, i2c_devs[i] ? i2c_devs[i] : "???");
 	}
-	return 0;
 }
 
 void saa7134_i2c_call_clients(struct saa7134_dev *dev,
@@ -418,7 +425,7 @@ int saa7134_i2c_register(struct saa7134_dev *dev)
 	
 	saa7134_i2c_eeprom(dev,dev->eedata,sizeof(dev->eedata));
 	if (i2c_scan)
-		saa7134_i2c_scan(dev);
+		do_i2c_scan(dev->name,&dev->i2c_client);
 	return 0;
 }
 

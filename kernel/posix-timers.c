@@ -1326,12 +1326,8 @@ sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 	return do_sys_settimeofday(&new_tp, NULL);
 }
 
-asmlinkage long
-sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp)
+static int do_clock_gettime(clockid_t which_clock, struct timespec *tp)
 {
-	struct timespec rtn_tp;
-	int error = 0;
-
 	/* Process process specific clocks */
 	if (which_clock < 0) {
 		task_t *t;
@@ -1359,9 +1355,17 @@ sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp)
 					!posix_clocks[which_clock].res)
 		return -EINVAL;
 
-	error = do_posix_gettime(&posix_clocks[which_clock], &rtn_tp);
+	return do_posix_gettime(&posix_clocks[which_clock], tp);
+}
 
-	if (!error && copy_to_user(tp, &rtn_tp, sizeof (rtn_tp)))
+asmlinkage long
+sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp)
+{
+	struct timespec kernel_tp;
+	int error;
+
+	error = do_clock_gettime(which_clock, &kernel_tp);
+	if (!error && copy_to_user(tp, &kernel_tp, sizeof (kernel_tp)))
 		error = -EFAULT;
 
 	return error;

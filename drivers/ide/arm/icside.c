@@ -206,8 +206,6 @@ static void icside_maskproc(ide_drive_t *drive, int mask)
  * here, but we rely on the main IDE driver spotting that both
  * interfaces use the same IRQ, which should guarantee this.
  */
-#define NR_ENTRIES 256
-#define TABLE_SIZE (NR_ENTRIES * 8)
 
 static void icside_build_sglist(ide_drive_t *drive, struct request *rq)
 {
@@ -527,7 +525,7 @@ static int icside_dma_lostirq(ide_drive_t *drive)
 	return 1;
 }
 
-static int icside_dma_init(ide_hwif_t *hwif)
+static void icside_dma_init(ide_hwif_t *hwif)
 {
 	int autodma = 0;
 
@@ -536,11 +534,6 @@ static int icside_dma_init(ide_hwif_t *hwif)
 #endif
 
 	printk("    %s: SG-DMA", hwif->name);
-
-	hwif->sg_table = kmalloc(sizeof(struct scatterlist) * NR_ENTRIES,
-				 GFP_KERNEL);
-	if (!hwif->sg_table)
-		goto failed;
 
 	hwif->atapi_dma		= 1;
 	hwif->mwdma_mask	= 7; /* MW0..2 */
@@ -569,24 +562,9 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 
 	printk(" capable%s\n", hwif->autodma ? ", auto-enable" : "");
-
-	return 1;
-
-failed:
-	printk(" disabled, unable to allocate DMA table\n");
-	return 0;
-}
-
-static void icside_dma_exit(ide_hwif_t *hwif)
-{
-	if (hwif->sg_table) {
-		kfree(hwif->sg_table);
-		hwif->sg_table = NULL;
-	}
 }
 #else
 #define icside_dma_init(hwif)	(0)
-#define icside_dma_exit(hwif)	do { } while (0)
 #endif
 
 static ide_hwif_t *icside_find_hwif(unsigned long dataport)
@@ -811,9 +789,6 @@ static void __devexit icside_remove(struct expansion_card *ec)
 
 	case ICS_TYPE_V6:
 		/* FIXME: tell IDE to stop using the interface */
-		icside_dma_exit(state->hwif[1]);
-		icside_dma_exit(state->hwif[0]);
-
 		if (ec->dma != NO_DMA)
 			free_dma(ec->dma);
 

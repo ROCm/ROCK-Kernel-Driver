@@ -14,7 +14,7 @@
 #include "STG4000Reg.h"
 #include "STG4000Interface.h"
 
-void DisableVGA(volatile STG4000REG * pSTGReg)
+void DisableVGA(volatile STG4000REG __iomem *pSTGReg)
 {
 	u32 tmp;
 	volatile u32 count, i;
@@ -35,7 +35,7 @@ void DisableVGA(volatile STG4000REG * pSTGReg)
 	STG_WRITE_REG(SoftwareReset, tmp);
 }
 
-void StopVTG(volatile STG4000REG * pSTGReg)
+void StopVTG(volatile STG4000REG __iomem *pSTGReg)
 {
 	u32 tmp = 0;
 
@@ -45,7 +45,7 @@ void StopVTG(volatile STG4000REG * pSTGReg)
 	STG_WRITE_REG(DACSyncCtrl, tmp);
 }
 
-void StartVTG(volatile STG4000REG * pSTGReg)
+void StartVTG(volatile STG4000REG __iomem *pSTGReg)
 {
 	u32 tmp = 0;
 
@@ -56,7 +56,7 @@ void StartVTG(volatile STG4000REG * pSTGReg)
 	STG_WRITE_REG(DACSyncCtrl, tmp);
 }
 
-void SetupVTG(volatile STG4000REG * pSTGReg,
+void SetupVTG(volatile STG4000REG __iomem *pSTGReg,
 	      const struct kyrofb_info * pTiming)
 {
 	u32 tmp = 0;

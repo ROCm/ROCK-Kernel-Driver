@@ -59,11 +59,15 @@ imx_gettimeoffset(void)
 static irqreturn_t
 imx_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
+
 	/* clear the interrupt */
 	if (IMX_TSTAT(TIMER_BASE))
 		IMX_TSTAT(TIMER_BASE) = 0;
 
 	timer_tick(regs);
+	write_sequnlock(&xtime_lock);
+
 	return IRQ_HANDLED;
 }
 

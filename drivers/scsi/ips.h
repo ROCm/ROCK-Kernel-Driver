@@ -1117,8 +1117,8 @@ typedef struct ips_ha {
    uint32_t           mem_addr;           /* Memory mapped address      */
    uint32_t           io_len;             /* Size of IO Address         */
    uint32_t           mem_len;            /* Size of memory address     */
-   char              *mem_ptr;            /* Memory mapped Ptr          */
-   char              *ioremap_ptr;        /* ioremapped memory pointer  */
+   char              __iomem *mem_ptr;    /* Memory mapped Ptr          */
+   char              __iomem *ioremap_ptr;/* ioremapped memory pointer  */
    ips_hw_func_t      func;               /* hw function pointers       */
    struct pci_dev    *pcidev;             /* PCI device handle          */
    char              *flash_data;         /* Save Area for flash data   */

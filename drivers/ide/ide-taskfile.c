@@ -5,7 +5,7 @@
  *  Copyright (C) 2000-2002	Andre Hedrick <andre@linux-ide.org>
  *  Copyright (C) 2001-2002	Klaus Smolin
  *					IBM Storage Technology Division
- *  Copyright (C) 2003		Bartlomiej Zolnierkiewicz
+ *  Copyright (C) 2003-2004	Bartlomiej Zolnierkiewicz
  *
  *  The big the bad and the ugly.
  *
@@ -253,73 +253,6 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL(task_no_data_intr);
 
-static void task_buffer_sectors(ide_drive_t *drive, struct request *rq,
-				unsigned nsect, unsigned rw)
-{
-	char *buf = rq->buffer + blk_rq_offset(rq);
-
-	rq->sector += nsect;
-	rq->current_nr_sectors -= nsect;
-	rq->nr_sectors -= nsect;
-	__task_sectors(drive, buf, nsect, rw);
-}
-
-static inline void task_buffer_multi_sectors(ide_drive_t *drive,
-					     struct request *rq, unsigned rw)
-{
-	unsigned int msect = drive->mult_count, nsect;
-
-	nsect = rq->current_nr_sectors;
-	if (nsect > msect)
-		nsect = msect;
-
-	task_buffer_sectors(drive, rq, nsect, rw);
-}
-
-#ifdef CONFIG_IDE_TASKFILE_IO
-static void task_sectors(ide_drive_t *drive, struct request *rq,
-			 unsigned nsect, unsigned rw)
-{
-	if (rq->cbio) {	/* fs request */
-		rq->errors = 0;
-		task_bio_sectors(drive, rq, nsect, rw);
-	} else		/* task request */
-		task_buffer_sectors(drive, rq, nsect, rw);
-}
-
-static inline void task_bio_multi_sectors(ide_drive_t *drive,
-					  struct request *rq, unsigned rw)
-{
-	unsigned int nsect, msect = drive->mult_count;
-
-	do {
-		nsect = rq->current_nr_sectors;
-		if (nsect > msect)
-			nsect = msect;
-
-		task_bio_sectors(drive, rq, nsect, rw);
-
-		if (!rq->nr_sectors)
-			msect = 0;
-		else
-			msect -= nsect;
-	} while (msect);
-}
-
-static void task_multi_sectors(ide_drive_t *drive,
-			       struct request *rq, unsigned rw)
-{
-	if (rq->cbio) {	/* fs request */
-		rq->errors = 0;
-		task_bio_multi_sectors(drive, rq, rw);
-	} else		/* task request */
-		task_buffer_multi_sectors(drive, rq, rw);
-}
-#else
-# define task_sectors(d, rq, nsect, rw)	task_buffer_sectors(d, rq, nsect, rw)
-# define task_multi_sectors(d, rq, rw)	task_buffer_multi_sectors(d, rq, rw)
-#endif /* CONFIG_IDE_TASKFILE_IO */
-
 static u8 wait_drive_not_busy(ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -340,37 +273,86 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 	return stat;
 }
 
+static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
+{
+	ide_hwif_t *hwif = drive->hwif;
+	struct scatterlist *sg = hwif->sg_table;
+	struct page *page;
+#ifdef CONFIG_HIGHMEM
+	unsigned long flags;
+#endif
+	u8 *buf;
+
+	page = sg[hwif->cursg].page;
+#ifdef CONFIG_HIGHMEM
+	local_irq_save(flags);
+#endif
+	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) +
+	      sg[hwif->cursg].offset + (hwif->cursg_ofs * SECTOR_SIZE);
+
+	hwif->nleft--;
+	hwif->cursg_ofs++;
+
+	if ((hwif->cursg_ofs * SECTOR_SIZE) == sg[hwif->cursg].length) {
+		hwif->cursg++;
+		hwif->cursg_ofs = 0;
+	}
+
+	/* do the actual data transfer */
+	if (write)
+		taskfile_output_data(drive, buf, SECTOR_WORDS);
+	else
+		taskfile_input_data(drive, buf, SECTOR_WORDS);
+
+	kunmap_atomic(page, KM_BIO_SRC_IRQ);
+#ifdef CONFIG_HIGHMEM
+	local_irq_restore(flags);
+#endif
+}
+
+static void ide_pio_multi(ide_drive_t *drive, unsigned int write)
+{
+	unsigned int nsect;
+
+	nsect = min_t(unsigned int, drive->hwif->nleft, drive->mult_count);
+	while (nsect--)
+		ide_pio_sector(drive, write);
+}
+
 static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
 				     unsigned int write)
 {
+	if (rq->bio)	/* fs request */
+		rq->errors = 0;
+
 	switch (drive->hwif->data_phase) {
 	case TASKFILE_MULTI_IN:
 	case TASKFILE_MULTI_OUT:
-		task_multi_sectors(drive, rq, write);
+		ide_pio_multi(drive, write);
 		break;
 	default:
-		task_sectors(drive, rq, 1, write);
+		ide_pio_sector(drive, write);
 		break;
 	}
 }
 
-#ifdef CONFIG_IDE_TASKFILE_IO
 static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 				  const char *s, u8 stat)
 {
 	if (rq->bio) {
-		int sectors = rq->hard_nr_sectors - rq->nr_sectors;
+		ide_hwif_t *hwif = drive->hwif;
+		int sectors = hwif->nsect - hwif->nleft;
 
-		switch (drive->hwif->data_phase) {
+		switch (hwif->data_phase) {
 		case TASKFILE_IN:
-			if (rq->nr_sectors)
+			if (hwif->nleft)
 				break;
 			/* fall through */
 		case TASKFILE_OUT:
 			sectors--;
 			break;
 		case TASKFILE_MULTI_IN:
-			if (rq->nr_sectors)
+			if (hwif->nleft)
 				break;
 			/* fall through */
 		case TASKFILE_MULTI_OUT:
@@ -384,9 +366,6 @@ static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 	}
 	return drive->driver->error(drive, s, stat);
 }
-#else
-# define task_error(d, rq, s, stat) drive->driver->error(d, s, stat)
-#endif
 
 static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
 {
@@ -407,9 +386,11 @@ static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
  */
 ide_startstop_t task_in_intr (ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat = HWIF(drive)->INB(IDE_STATUS_REG);
+	u8 stat = hwif->INB(IDE_STATUS_REG);
 
+	/* new way for dealing with premature shared PCI interrupts */
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return task_error(drive, rq, __FUNCTION__, stat);
@@ -421,7 +402,7 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 	ide_pio_datablock(drive, rq, 0);
 
 	/* If it was the last datablock check status and finish transfer. */
-	if (!rq->nr_sectors) {
+	if (!hwif->nleft) {
 		stat = wait_drive_not_busy(drive);
 		if (!OK_STAT(stat, 0, BAD_R_STAT))
 			return task_error(drive, rq, __FUNCTION__, stat);
@@ -441,18 +422,18 @@ EXPORT_SYMBOL(task_in_intr);
  */
 ide_startstop_t task_out_intr (ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = HWGROUP(drive)->rq;
-	u8 stat;
+	u8 stat = hwif->INB(IDE_STATUS_REG);
 
-	stat = HWIF(drive)->INB(IDE_STATUS_REG);
 	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
 		return task_error(drive, rq, __FUNCTION__, stat);
 
 	/* Deal with unexpected ATA data phase. */
-	if (((stat & DRQ_STAT) == 0) ^ !rq->nr_sectors)
+	if (((stat & DRQ_STAT) == 0) ^ !hwif->nleft)
 		return task_error(drive, rq, __FUNCTION__, stat);
 
-	if (!rq->nr_sectors) {
+	if (!hwif->nleft) {
 		task_end_request(drive, rq, stat);
 		return ide_stopped;
 	}

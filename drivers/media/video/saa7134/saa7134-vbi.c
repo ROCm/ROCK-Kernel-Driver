@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-vbi.c,v 1.3 2004/09/23 13:58:19 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
  *
@@ -113,10 +115,10 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+static int buffer_prepare(void *priv, struct videobuf_buffer *vb,
 			  enum v4l2_field field)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = priv;
 	struct saa7134_dev *dev = fh->dev;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	struct saa7134_tvnorm *norm = dev->tvnorm;
@@ -167,9 +169,9 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+buffer_setup(void *priv, unsigned int *count, unsigned int *size)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = priv;
 	struct saa7134_dev *dev = fh->dev;
 	int llength,lines;
 	
@@ -188,18 +190,18 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = priv;
 	struct saa7134_dev *dev = fh->dev;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	
 	saa7134_buffer_queue(dev,&dev->vbi_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(void *priv, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = priv;
 	struct saa7134_dev *dev = fh->dev;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
 	

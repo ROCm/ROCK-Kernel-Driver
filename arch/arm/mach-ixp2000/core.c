@@ -182,10 +182,14 @@ unsigned long ixp2000_gettimeoffset (void)
 
 static int ixp2000_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	write_seqlock(&xtime_lock);
+
 	/* clear timer 1 */
 	ixp2000_reg_write(IXP2000_T1_CLR, 1);
 	
 	timer_tick(regs);
+
+	write_sequnlock(&xtime_lock);
 
 	return IRQ_HANDLED;
 }

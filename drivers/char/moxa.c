@@ -142,7 +142,7 @@ typedef struct _moxa_board_conf {
 } moxa_board_conf;
 
 static moxa_board_conf moxa_boards[MAX_BOARDS];
-static unsigned long moxaBaseAddr[MAX_BOARDS];
+static void __iomem *moxaBaseAddr[MAX_BOARDS];
 
 struct moxa_str {
 	int type;
@@ -467,7 +467,7 @@ static int __init moxa_init(void)
 	}
 #endif
 	for (i = 0; i < numBoards; i++) {
-		moxaBaseAddr[i] = (unsigned long) ioremap((unsigned long) moxa_boards[i].baseAddr, 0x4000);
+		moxaBaseAddr[i] = ioremap((unsigned long) moxa_boards[i].baseAddr, 0x4000);
 	}
 
 	return (0);
@@ -492,7 +492,6 @@ static void __exit moxa_exit(void)
 	put_tty_driver(moxaDriver);
 	if (verbose)
 		printk("Done\n");
-
 }
 
 module_init(moxa_init);
@@ -1497,12 +1496,12 @@ typedef struct mon_str mon_st;
 #define 	DCD_oldstate	0x80
 
 static unsigned char moxaBuff[10240];
-static unsigned long moxaIntNdx[MAX_BOARDS];
-static unsigned long moxaIntPend[MAX_BOARDS];
-static unsigned long moxaIntTable[MAX_BOARDS];
+static void __iomem *moxaIntNdx[MAX_BOARDS];
+static void __iomem *moxaIntPend[MAX_BOARDS];
+static void __iomem *moxaIntTable[MAX_BOARDS];
 static char moxaChkPort[MAX_PORTS];
 static char moxaLineCtrl[MAX_PORTS];
-static unsigned long moxaTableAddr[MAX_PORTS];
+static void __iomem *moxaTableAddr[MAX_PORTS];
 static long moxaCurBaud[MAX_PORTS];
 static char moxaDCDState[MAX_PORTS];
 static char moxaLowChkFlag[MAX_PORTS];
@@ -1513,15 +1512,15 @@ static int moxaFuncTout;
 static ushort moxaBreakCnt[MAX_PORTS];
 
 static void moxadelay(int);
-static void moxafunc(unsigned long, int, ushort);
-static void wait_finish(unsigned long);
-static void low_water_check(unsigned long);
+static void moxafunc(void __iomem *, int, ushort);
+static void wait_finish(void __iomem *);
+static void low_water_check(void __iomem *);
 static int moxaloadbios(int, unsigned char __user *, int);
 static int moxafindcard(int);
 static int moxaload320b(int, unsigned char __user *, int);
 static int moxaloadcode(int, unsigned char __user *, int);
-static int moxaloadc218(int, unsigned long, int);
-static int moxaloadc320(int, unsigned long, int, int *);
+static int moxaloadc218(int, void __iomem *, int);
+static int moxaloadc320(int, void __iomem *, int, int *);
 
 /*****************************************************************************
  *	Driver level functions: 					     *
@@ -1579,7 +1578,7 @@ static struct dl_str dltmp;
 
 void MoxaPortFlushData(int port, int mode)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	if ((mode < 0) || (mode > 2))
 		return;
 	ofsAddr = moxaTableAddr[port];
@@ -1711,7 +1710,8 @@ int MoxaDriverPoll(void)
 {
 	register ushort temp;
 	register int card;
-	unsigned long ip, ofsAddr;
+	void __iomem *ofsAddr;
+	void __iomem *ip;
 	int port, p, ports;
 
 	if (moxaCard == 0)
@@ -2144,7 +2144,7 @@ int MoxaPortIsValid(int port)
 
 void MoxaPortEnable(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int MoxaPortLineStatus(int);
 	short lowwater = 512;
 
@@ -2167,9 +2167,8 @@ void MoxaPortEnable(int port)
 
 void MoxaPortDisable(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr = moxaTableAddr[port];
 
-	ofsAddr = moxaTableAddr[port];
 	moxafunc(ofsAddr, FC_SetFlowCtl, 0);	/* disable flow control */
 	moxafunc(ofsAddr, FC_ClrLineIrq, Magic_code);
 	writew(0, ofsAddr + HostStat);
@@ -2188,7 +2187,7 @@ long MoxaPortGetMaxBaud(int port)
 
 long MoxaPortSetBaud(int port, long baud)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	long max, clock;
 	unsigned int val;
 
@@ -2212,7 +2211,7 @@ long MoxaPortSetBaud(int port, long baud)
 
 int MoxaPortSetTermio(int port, struct termios *termio)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	tcflag_t cflag;
 	long baud;
 	tcflag_t mode = 0;
@@ -2357,7 +2356,7 @@ int MoxaPortGetLineOut(int port, int *dtrState, int *rtsState)
 
 void MoxaPortLineCtrl(int port, int dtr, int rts)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int mode;
 
 	ofsAddr = moxaTableAddr[port];
@@ -2372,7 +2371,7 @@ void MoxaPortLineCtrl(int port, int dtr, int rts)
 
 void MoxaPortFlowCtrl(int port, int rts, int cts, int txflow, int rxflow, int txany)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int mode;
 
 	ofsAddr = moxaTableAddr[port];
@@ -2392,7 +2391,7 @@ void MoxaPortFlowCtrl(int port, int rts, int cts, int txflow, int rxflow, int tx
 
 int MoxaPortLineStatus(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int val;
 
 	ofsAddr = moxaTableAddr[port];
@@ -2465,7 +2464,7 @@ int MoxaPortWriteData(int port, unsigned char * buffer, int len)
 	int cnt;
 	ushort head, tx_mask, spage, epage;
 	ushort pageno, pageofs, bufhead;
-	unsigned long baseAddr, ofsAddr, ofs;
+	void __iomem *baseAddr, *ofsAddr, *ofs;
 
 	ofsAddr = moxaTableAddr[port];
 	baseAddr = moxaBaseAddr[port / MAX_PORTS_PER_BOARD];
@@ -2528,7 +2527,7 @@ int MoxaPortReadData(int port, unsigned char * buffer, int space)
 	int i, count, cnt, len, total, remain;
 	ushort tail, rx_mask, spage, epage;
 	ushort pageno, bufhead;
-	unsigned long baseAddr, ofsAddr, ofs;
+	void __iomem *baseAddr, *ofsAddr, *ofs;
 
 	ofsAddr = moxaTableAddr[port];
 	baseAddr = moxaBaseAddr[port / MAX_PORTS_PER_BOARD];
@@ -2594,7 +2593,7 @@ int MoxaPortReadData(int port, unsigned char * buffer, int space)
 
 int MoxaPortTxQueue(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	ushort rptr, wptr, mask;
 	int len;
 
@@ -2608,7 +2607,7 @@ int MoxaPortTxQueue(int port)
 
 int MoxaPortTxFree(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	ushort rptr, wptr, mask;
 	int len;
 
@@ -2622,7 +2621,7 @@ int MoxaPortTxFree(int port)
 
 int MoxaPortRxQueue(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	ushort rptr, wptr, mask;
 	int len;
 
@@ -2637,7 +2636,7 @@ int MoxaPortRxQueue(int port)
 
 void MoxaPortTxDisable(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 
 	ofsAddr = moxaTableAddr[port];
 	moxafunc(ofsAddr, FC_SetXoffState, Magic_code);
@@ -2645,7 +2644,7 @@ void MoxaPortTxDisable(int port)
 
 void MoxaPortTxEnable(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 
 	ofsAddr = moxaTableAddr[port];
 	moxafunc(ofsAddr, FC_SetXonState, Magic_code);
@@ -2663,7 +2662,7 @@ int MoxaPortResetBrkCnt(int port)
 
 void MoxaPortSendBreak(int port, int ms100)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 
 	ofsAddr = moxaTableAddr[port];
 	if (ms100) {
@@ -2752,7 +2751,7 @@ static void moxadelay(int tick)
 	while (time_before(jiffies, et));
 }
 
-static void moxafunc(unsigned long ofsAddr, int cmd, ushort arg)
+static void moxafunc(void __iomem *ofsAddr, int cmd, ushort arg)
 {
 
 	writew(arg, ofsAddr + FuncArg);
@@ -2760,7 +2759,7 @@ static void moxafunc(unsigned long ofsAddr, int cmd, ushort arg)
 	wait_finish(ofsAddr);
 }
 
-static void wait_finish(unsigned long ofsAddr)
+static void wait_finish(void __iomem *ofsAddr)
 {
 	unsigned long i, j;
 
@@ -2773,7 +2772,7 @@ static void wait_finish(unsigned long ofsAddr)
 	}
 }
 
-static void low_water_check(unsigned long ofsAddr)
+static void low_water_check(void __iomem *ofsAddr)
 {
 	int len;
 	ushort rptr, wptr, mask;
@@ -2790,7 +2789,7 @@ static void low_water_check(unsigned long ofsAddr)
 
 static int moxaloadbios(int cardno, unsigned char __user *tmp, int len)
 {
-	unsigned long baseAddr;
+	void __iomem *baseAddr;
 	int i;
 
 	if(copy_from_user(moxaBuff, tmp, len))
@@ -2808,7 +2807,7 @@ static int moxaloadbios(int cardno, unsigned char __user *tmp, int len)
 
 static int moxafindcard(int cardno)
 {
-	unsigned long baseAddr;
+	void __iomem *baseAddr;
 	ushort tmp;
 
 	baseAddr = moxaBaseAddr[cardno];
@@ -2837,7 +2836,7 @@ static int moxafindcard(int cardno)
 
 static int moxaload320b(int cardno, unsigned char __user *tmp, int len)
 {
-	unsigned long baseAddr;
+	void __iomem *baseAddr;
 	int i;
 
 	if(len > sizeof(moxaBuff))
@@ -2857,7 +2856,7 @@ static int moxaload320b(int cardno, unsigned char __user *tmp, int len)
 
 static int moxaloadcode(int cardno, unsigned char __user *tmp, int len)
 {
-	unsigned long baseAddr, ofsAddr;
+	void __iomem *baseAddr, *ofsAddr;
 	int retval, port, i;
 
 	if(copy_from_user(moxaBuff, tmp, len))
@@ -2937,7 +2936,7 @@ static int moxaloadcode(int cardno, unsigned char __user *tmp, int len)
 	return (0);
 }
 
-static int moxaloadc218(int cardno, unsigned long baseAddr, int len)
+static int moxaloadc218(int cardno, void __iomem *baseAddr, int len)
 {
 	char retry;
 	int i, j, len1, len2;
@@ -3013,7 +3012,7 @@ static int moxaloadc218(int cardno, unsigned long baseAddr, int len)
 	return (0);
 }
 
-static int moxaloadc320(int cardno, unsigned long baseAddr, int len, int *numPorts)
+static int moxaloadc320(int cardno, void __iomem *baseAddr, int len, int *numPorts)
 {
 	ushort usum;
 	int i, j, wlen, len2, retry;
@@ -3118,7 +3117,7 @@ long MoxaPortGetCurBaud(int port)
 
 static void MoxaSetFifo(int port, int enable)
 {
-	unsigned long ofsAddr = moxaTableAddr[port];
+	void __iomem *ofsAddr = moxaTableAddr[port];
 
 	if (!enable) {
 		moxafunc(ofsAddr, FC_SetRxFIFOTrig, 0);
@@ -3132,7 +3131,7 @@ static void MoxaSetFifo(int port, int enable)
 #if 0
 int MoxaPortSetMode(int port, int databits, int stopbits, int parity)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int val;
 
 	val = 0;
@@ -3191,7 +3190,7 @@ int MoxaPortSetMode(int port, int databits, int stopbits, int parity)
 
 int MoxaPortTxBufSize(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int size;
 
 	ofsAddr = moxaTableAddr[port];
@@ -3201,7 +3200,7 @@ int MoxaPortTxBufSize(int port)
 
 int MoxaPortRxBufSize(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int size;
 
 	ofsAddr = moxaTableAddr[port];
@@ -3211,7 +3210,7 @@ int MoxaPortRxBufSize(int port)
 
 int MoxaPortRxFree(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	ushort rptr, wptr, mask;
 	int len;
 
@@ -3229,7 +3228,7 @@ int MoxaPortGetBrkCnt(int port)
 
 void MoxaPortSetXonXoff(int port, int xonValue, int xoffValue)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 
 	ofsAddr = moxaTableAddr[port];
 	writew(xonValue, ofsAddr + FuncArg);
@@ -3240,7 +3239,7 @@ void MoxaPortSetXonXoff(int port, int xonValue, int xoffValue)
 
 int MoxaPortIsTxHold(int port)
 {
-	unsigned long ofsAddr;
+	void __iomem *ofsAddr;
 	int val;
 
 	ofsAddr = moxaTableAddr[port];

@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-core.c,v 1.10 2004/09/15 16:15:24 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * driver core
  *
@@ -27,6 +29,7 @@
 #include <linux/kmod.h>
 #include <linux/sound.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include "saa7134-reg.h"
 #include "saa7134.h"
@@ -897,7 +900,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 
 	/* initialize hardware #1 */
-	saa7134_board_init(dev);
+	saa7134_board_init1(dev);
 	saa7134_hwinit1(dev);
 
 	/* get irq */
@@ -910,11 +913,11 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	}
 
 	/* wait a bit, register i2c bus */
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ/10);
+	msleep(100);
 	saa7134_i2c_register(dev);
 
 	/* initialize hardware #2 */
+	saa7134_board_init2(dev);
 	saa7134_hwinit2(dev);
 
 	/* load i2c helpers */

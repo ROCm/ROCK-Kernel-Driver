@@ -33,6 +33,7 @@
 #include <linux/seq_file.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/nodemask.h>
 #include <linux/bitops.h>         /* hweight64() */
 
 #include <asm/delay.h>		/* ia64_get_itc() */
