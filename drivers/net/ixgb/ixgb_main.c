@@ -1665,25 +1665,32 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
  * @adapter: board private structure
  **/
 
-static int ixgb_clean(struct net_device *netdev, int *budget)
+static int
+ixgb_clean(struct net_device *netdev, int *budget)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
 	int work_to_do = min(*budget, netdev->quota);
+	int tx_cleaned;
 	int work_done = 0;
+	
+	if (!netif_carrier_ok(netdev))
+		goto quit_polling;
 
-	ixgb_clean_tx_irq(adapter);
+	tx_cleaned = ixgb_clean_tx_irq(adapter);
 	ixgb_clean_rx_irq(adapter, &work_done, work_to_do);
 
 	*budget -= work_done;
 	netdev->quota -= work_done;
-
-	if (work_done < work_to_do || !netif_running(netdev)) {
-		netif_rx_complete(netdev);
-		/* RAIDC will be automatically restarted by irq_enable */
+	
+	/* if no Tx cleanup and not enough Rx work done, exit the polling mode */
+	if((!tx_cleaned && (work_done < work_to_do)) || 
+				!netif_running(netdev)) {
+quit_polling:	netif_rx_complete(netdev);
 		ixgb_irq_enable(adapter);
+		return 0;
 	}
 
-	return (work_done >= work_to_do);
+	return 1;
 }
 #endif
 
