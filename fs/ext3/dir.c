@@ -157,7 +157,7 @@ static int ext3_readdir(struct file * filp,
 					brelse (bha[i]);
 			}
 		}
-		
+
 revalidate:
 		/* If the dir block has changed since the last call to
 		 * readdir(2), then we might be pointing to an invalid
@@ -183,7 +183,7 @@ revalidate:
 				| offset;
 			filp->f_version = inode->i_version;
 		}
-		
+
 		while (!error && filp->f_pos < inode->i_size 
 		       && offset < sb->s_blocksize) {
 			de = (struct ext3_dir_entry_2 *) (bh->b_data + offset);
@@ -329,7 +329,7 @@ void ext3_htree_free_dir_info(struct dir_private_info *p)
 	free_rb_tree_fname(&p->root);
 	kfree(p);
 }
-		
+
 /*
  * Given a directory entry, enter it into the fname rb tree.
  */
@@ -358,7 +358,7 @@ int ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 	new_fn->file_type = dirent->file_type;
 	memcpy(new_fn->name, dirent->name, dirent->name_len);
 	new_fn->name[dirent->name_len] = 0;
-	
+
 	while (*p) {
 		parent = *p;
 		fname = rb_entry(parent, struct fname, rb_hash);
@@ -373,7 +373,7 @@ int ext3_htree_store_dirent(struct file *dir_file, __u32 hash,
 			fname->next = new_fn;
 			return 0;
 		}
-			
+
 		if (new_fn->hash < fname->hash)
 			p = &(*p)->rb_left;
 		else if (new_fn->hash > fname->hash)
@@ -406,7 +406,7 @@ static int call_filldir(struct file * filp, void * dirent,
 	int error;
 
 	sb = inode->i_sb;
-	
+
 	if (!fname) {
 		printk("call_filldir: called with null fname?!?\n");
 		return 0;

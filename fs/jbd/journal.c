@@ -175,7 +175,6 @@ loop:
 		spin_unlock(&journal->j_state_lock);
 		refrigerator(PF_IOTHREAD);
 		spin_lock(&journal->j_state_lock);
-		jbd_debug(1, "Resuming kjournald\n");						
 	} else {
 		/*
 		 * We assume on resume that commits are already there,
@@ -185,7 +184,7 @@ loop:
 		int should_sleep = 1;
 
 		prepare_to_wait(&journal->j_wait_commit, &wait,
-				TASK_INTERRUPTIBLE);		
+				TASK_INTERRUPTIBLE);
 		if (journal->j_commit_sequence != journal->j_commit_request)
 			should_sleep = 0;
 		transaction = journal->j_running_transaction;
@@ -733,7 +732,7 @@ journal_t * journal_init_inode (struct inode *inode)
 		kfree(journal);
 		return NULL;
 	}
-	
+
 	bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
 	J_ASSERT(bh != NULL);
 	journal->j_sb_buffer = bh;
@@ -927,7 +926,7 @@ static int journal_get_superblock(journal_t *journal)
 	struct buffer_head *bh;
 	journal_superblock_t *sb;
 	int err = -EIO;
-	
+
 	bh = journal->j_sb_buffer;
 
 	J_ASSERT(bh != NULL);
@@ -944,7 +943,7 @@ static int journal_get_superblock(journal_t *journal)
 	sb = journal->j_superblock;
 
 	err = -EINVAL;
-	
+
 	if (sb->s_header.h_magic != htonl(JFS_MAGIC_NUMBER) ||
 	    sb->s_blocksize != htonl(journal->j_blocksize)) {
 		printk(KERN_WARNING "JBD: no valid journal superblock found\n");
@@ -1263,7 +1262,7 @@ int journal_flush(journal_t *journal)
 	unsigned long old_tail;
 
 	spin_lock(&journal->j_state_lock);
-	
+
 	/* Force everything buffered to the log... */
 	if (journal->j_running_transaction) {
 		transaction = journal->j_running_transaction;
@@ -1541,7 +1540,7 @@ int journal_blocks_per_page(struct inode *inode)
  */
 void * __jbd_kmalloc (const char *where, size_t size, int flags, int retry)
 {
-	return kmalloc(size, flags | (retry ? __GFP_NOFAIL : 0));	
+	return kmalloc(size, flags | (retry ? __GFP_NOFAIL : 0));
 }
 
 /*

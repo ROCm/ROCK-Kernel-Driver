@@ -462,13 +462,13 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 
 	for (i = 0; i < sbi->s_groups_count; i++) {
 		gdp = ext3_get_group_desc(sb, group, &bh2);
-		
+
 		err = -EIO;
 		brelse(bitmap_bh);
 		bitmap_bh = read_inode_bitmap(sb, group);
 		if (!bitmap_bh)
 			goto fail;
-		
+
 		ino = ext3_find_first_zero_bit((unsigned long *)
 				bitmap_bh->b_data, EXT3_INODES_PER_GROUP(sb));
 		if (ino < EXT3_INODES_PER_GROUP(sb)) {
@@ -532,7 +532,7 @@ got:
 	BUFFER_TRACE(bh2, "call ext3_journal_dirty_metadata");
 	err = ext3_journal_dirty_metadata(handle, bh2);
 	if (err) goto fail;
-	
+
 	percpu_counter_dec(&sbi->s_freeinodes_counter);
 	if (S_ISDIR(mode))
 		percpu_counter_inc(&sbi->s_dirs_counter);
@@ -580,7 +580,7 @@ got:
 	ei->i_prealloc_count = 0;
 #endif
 	ei->i_block_group = group;
-	
+
 	ext3_set_inode_flags(inode);
 	if (IS_DIRSYNC(inode))
 		handle->h_sync = 1;

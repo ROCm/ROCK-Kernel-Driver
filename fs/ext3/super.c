@@ -119,7 +119,7 @@ static void clear_ro_after(struct super_block *sb)
 handle_t *ext3_journal_start(struct inode *inode, int nblocks)
 {
 	journal_t *journal;
-	
+
 	if (inode->i_sb->s_flags & MS_RDONLY)
 		return ERR_PTR(-EROFS);
 
@@ -132,7 +132,7 @@ handle_t *ext3_journal_start(struct inode *inode, int nblocks)
 			   "Detected aborted journal");
 		return ERR_PTR(-EROFS);
 	}
-	
+
 	return journal_start(journal, nblocks);
 }
 
@@ -164,7 +164,7 @@ void ext3_journal_abort_handle(const char *caller, const char *err_fn,
 {
 	char nbuf[16];
 	const char *errstr = ext3_decode_error(NULL, err, nbuf);
-	
+
 	printk(KERN_ERR "%s: aborting transaction: %s in %s", 
 	       caller, errstr, err_fn);
 
@@ -236,7 +236,7 @@ void ext3_error (struct super_block * sb, const char * function,
 const char *ext3_decode_error(struct super_block * sb, int errno, char nbuf[16])
 {
 	char *errstr = NULL;
-	
+
 	switch (errno) {
 	case -EIO:
 		errstr = "IO failure";
@@ -259,7 +259,6 @@ const char *ext3_decode_error(struct super_block * sb, int errno, char nbuf[16])
 			if (snprintf(nbuf, 16, "error %d", -errno) >= 0)
 				errstr = nbuf;
 		}
-		
 		break;
 	}
 
@@ -277,7 +276,7 @@ void __ext3_std_error (struct super_block * sb, const char * function,
 
 	printk (KERN_CRIT "EXT3-fs error (device %s) in %s: %s\n",
 		sb->s_id, function, errstr);
-	
+
 	ext3_handle_error(sb);
 }
 
@@ -311,7 +310,7 @@ void ext3_abort (struct super_block * sb, const char * function,
 
 	if (sb->s_flags & MS_RDONLY)
 		return;
-	
+
 	printk (KERN_CRIT "Remounting filesystem read-only\n");
 	EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 	sb->s_flags |= MS_RDONLY;
@@ -426,10 +425,10 @@ static inline struct inode *orphan_list_entry(struct list_head *l)
 static void dump_orphan_list(struct super_block *sb, struct ext3_sb_info *sbi)
 {
 	struct list_head *l;
-	
+
 	printk(KERN_ERR "sb orphan head is %d\n", 
 	       le32_to_cpu(sbi->s_es->s_last_orphan));
-	
+
 	printk(KERN_ERR "sb_info orphan list:\n");
 	list_for_each(l, &sbi->s_orphan) {
 		struct inode *inode = orphan_list_entry(l);
@@ -1062,7 +1061,7 @@ static unsigned long descriptor_loc(struct super_block *sb,
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	unsigned long bg, first_data_block, first_meta_bg;
 	int has_super = 0;
-	
+
 	first_data_block = le32_to_cpu(sbi->s_es->s_first_data_block);
 	first_meta_bg = le32_to_cpu(sbi->s_es->s_first_meta_bg);
 
@@ -1138,7 +1137,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 			       sb->s_id);
 		goto failed_mount;
 	}
-	
+
 	/* Set defaults before we parse the mount options */
 	def_mount_opts = le32_to_cpu(es->s_default_mount_opts);
 	if (def_mount_opts & EXT3_DEFM_DEBUG)
@@ -1162,7 +1161,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
 	else if (le16_to_cpu(sbi->s_es->s_errors) == EXT3_ERRORS_RO)
 		set_opt(sbi->s_mount_opt, ERRORS_RO);
-	
+
 	sbi->s_resuid = le16_to_cpu(es->s_def_resuid);
 	sbi->s_resgid = le16_to_cpu(es->s_def_resgid);
 
@@ -1539,7 +1538,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 			"EXT3-fs: blocksize too small for journal device.\n");
 		goto out_bdev;
 	}
-	
+
 	sb_block = EXT3_MIN_BLOCK_SIZE / blocksize;
 	offset = EXT3_MIN_BLOCK_SIZE % blocksize;
 	set_blocksize(bdev, blocksize);
@@ -1753,7 +1752,7 @@ static void ext3_clear_journal_err(struct super_block * sb,
 	journal_t *journal;
 	int j_errno;
 	const char *errstr;
-	
+
 	journal = EXT3_SB(sb)->s_journal;
 
 	/*
@@ -1764,13 +1763,13 @@ static void ext3_clear_journal_err(struct super_block * sb,
 	j_errno = journal_errno(journal);
 	if (j_errno) {
 		char nbuf[16];
-		
+
 		errstr = ext3_decode_error(sb, j_errno, nbuf);
 		ext3_warning(sb, __FUNCTION__, "Filesystem error recorded "
 			     "from previous mount: %s", errstr);
 		ext3_warning(sb, __FUNCTION__, "Marking fs in need of "
 			     "filesystem check.");
-		
+
 		EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 		es->s_state |= cpu_to_le16(EXT3_ERROR_FS);
 		ext3_commit_super (sb, es, 1);
@@ -1886,7 +1885,7 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 	es = sbi->s_es;
 
 	ext3_init_journal_params(sbi, sbi->s_journal);
-	
+
 	if ((*flags & MS_RDONLY) != (sb->s_flags & MS_RDONLY)) {
 		if (sbi->s_mount_opt & EXT3_MOUNT_ABORT)
 			return -EROFS;
