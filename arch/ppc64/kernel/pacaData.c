@@ -36,6 +36,7 @@ struct systemcfg *systemcfg;
 {									    \
 	.xLpPacaPtr = &paca[number].xLpPaca,				    \
 	.xLpRegSavePtr = &paca[number].xRegSav,				    \
+	.lock_token = 0x8000,						    \
 	.xPacaIndex = (number),		/* Paca Index */		    \
 	.default_decr = 0x00ff0000,	/* Initial Decr */		    \
 	.xStab_data = {							    \
