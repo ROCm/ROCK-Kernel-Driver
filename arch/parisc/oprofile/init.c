@@ -18,3 +18,8 @@ int __init oprofile_arch_init(struct oprofile_operations ** ops)
 	timer_init(ops);
 	return 0;
 }
+
+
+void __exit oprofile_arch_exit()
+{
+}

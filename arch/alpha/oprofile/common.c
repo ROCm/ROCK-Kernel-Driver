@@ -186,3 +186,9 @@ oprofile_arch_init(struct oprofile_operations **ops)
 
 	return 0;
 }
+
+
+void __exit
+oprofile_arch_exit(void)
+{
+}
