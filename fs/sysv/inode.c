@@ -21,56 +21,68 @@
  *  the superblock.
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/byteorder.h>
+#include "sysv.h"
 
 /* This is only called on sync() and umount(), when s_dirt=1. */
 static void sysv_write_super(struct super_block *sb)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+	unsigned long time = CURRENT_TIME, old_time;
+
 	lock_kernel();
-	if (!(sb->s_flags & MS_RDONLY)) {
-		/* If we are going to write out the super block,
-		   then attach current time stamp.
-		   But if the filesystem was marked clean, keep it clean. */
-		unsigned long time = CURRENT_TIME;
-		unsigned long old_time = fs32_to_cpu(sb, *sb->sv_sb_time);
-		if (sb->sv_type == FSTYPE_SYSV4)
-			if (*sb->sv_sb_state == cpu_to_fs32(sb, 0x7c269d38 - old_time))
-				*sb->sv_sb_state = cpu_to_fs32(sb, 0x7c269d38 - time);
-		*sb->sv_sb_time = cpu_to_fs32(sb, time);
-		mark_buffer_dirty(sb->sv_bh2);
+	if (sb->s_flags & MS_RDONLY)
+		goto clean;
+
+	/*
+	 * If we are going to write out the super block,
+	 * then attach current time stamp.
+	 * But if the filesystem was marked clean, keep it clean.
+	 */
+	old_time = fs32_to_cpu(sbi, *sbi->s_sb_time);
+	if (sbi->s_type == FSTYPE_SYSV4) {
+		if (*sbi->s_sb_state == cpu_to_fs32(sbi, 0x7c269d38 - old_time))
+			*sbi->s_sb_state = cpu_to_fs32(sbi, 0x7c269d38 - time);
+		*sbi->s_sb_time = cpu_to_fs32(sbi, time);
+		mark_buffer_dirty(sbi->s_bh2);
 	}
+clean:
 	sb->s_dirt = 0;
 	unlock_kernel();
 }
 
 static void sysv_put_super(struct super_block *sb)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+
 	if (!(sb->s_flags & MS_RDONLY)) {
 		/* XXX ext2 also updates the state here */
-		mark_buffer_dirty(sb->sv_bh1);
-		if (sb->sv_bh1 != sb->sv_bh2)
-			mark_buffer_dirty(sb->sv_bh2);
+		mark_buffer_dirty(sbi->s_bh1);
+		if (sbi->s_bh1 != sbi->s_bh2)
+			mark_buffer_dirty(sbi->s_bh2);
 	}
 
-	brelse(sb->sv_bh1);
-	if (sb->sv_bh1 != sb->sv_bh2)
-		brelse(sb->sv_bh2);
+	brelse(sbi->s_bh1);
+	if (sbi->s_bh1 != sbi->s_bh2)
+		brelse(sbi->s_bh2);
+
+	kfree(sbi);
 }
 
 static int sysv_statfs(struct super_block *sb, struct statfs *buf)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sb->s_blocksize;
-	buf->f_blocks = sb->sv_ndatazones;
+	buf->f_blocks = sbi->s_ndatazones;
 	buf->f_bavail = buf->f_bfree = sysv_count_free_blocks(sb);
-	buf->f_files = sb->sv_ninodes;
+	buf->f_files = sbi->s_ninodes;
 	buf->f_ffree = sysv_count_free_inodes(sb);
 	buf->f_namelen = SYSV_NAMELEN;
 	return 0;
@@ -79,15 +91,15 @@ static int sysv_statfs(struct super_block *sb, struct statfs *buf)
 /* 
  * NXI <-> N0XI for PDP, XIN <-> XIN0 for le32, NIX <-> 0NIX for be32
  */
-static inline void read3byte(struct super_block *sb,
+static inline void read3byte(struct sysv_sb_info *sbi,
 	unsigned char * from, unsigned char * to)
 {
-	if (sb->sv_bytesex == BYTESEX_PDP) {
+	if (sbi->s_bytesex == BYTESEX_PDP) {
 		to[0] = from[0];
 		to[1] = 0;
 		to[2] = from[1];
 		to[3] = from[2];
-	} else if (sb->sv_bytesex == BYTESEX_LE) {
+	} else if (sbi->s_bytesex == BYTESEX_LE) {
 		to[0] = from[0];
 		to[1] = from[1];
 		to[2] = from[2];
@@ -100,14 +112,14 @@ static inline void read3byte(struct super_block *sb,
 	}
 }
 
-static inline void write3byte(struct super_block *sb,
+static inline void write3byte(struct sysv_sb_info *sbi,
 	unsigned char * from, unsigned char * to)
 {
-	if (sb->sv_bytesex == BYTESEX_PDP) {
+	if (sbi->s_bytesex == BYTESEX_PDP) {
 		to[0] = from[0];
 		to[1] = from[2];
 		to[2] = from[3];
-	} else if (sb->sv_bytesex == BYTESEX_LE) {
+	} else if (sbi->s_bytesex == BYTESEX_LE) {
 		to[0] = from[0];
 		to[1] = from[1];
 		to[2] = from[2];
@@ -146,6 +158,7 @@ void sysv_set_inode(struct inode *inode, dev_t rdev)
 static void sysv_read_inode(struct inode *inode)
 {
 	struct super_block * sb = inode->i_sb;
+	struct sysv_sb_info * sbi = SYSV_SB(sb);
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
 	struct sysv_inode_info * si;
@@ -153,7 +166,7 @@ static void sysv_read_inode(struct inode *inode)
 	dev_t rdev = 0;
 
 	ino = inode->i_ino;
-	if (!ino || ino > sb->sv_ninodes) {
+	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %d is out of range\n",
 		       inode->i_sb->s_id, ino);
 		goto bad_inode;
@@ -165,23 +178,23 @@ static void sysv_read_inode(struct inode *inode)
 		goto bad_inode;
 	}
 	/* SystemV FS: kludge permissions if ino==SYSV_ROOT_INO ?? */
-	inode->i_mode = fs16_to_cpu(sb, raw_inode->i_mode);
-	inode->i_uid = (uid_t)fs16_to_cpu(sb, raw_inode->i_uid);
-	inode->i_gid = (gid_t)fs16_to_cpu(sb, raw_inode->i_gid);
-	inode->i_nlink = fs16_to_cpu(sb, raw_inode->i_nlink);
-	inode->i_size = fs32_to_cpu(sb, raw_inode->i_size);
-	inode->i_atime = fs32_to_cpu(sb, raw_inode->i_atime);
-	inode->i_mtime = fs32_to_cpu(sb, raw_inode->i_mtime);
-	inode->i_ctime = fs32_to_cpu(sb, raw_inode->i_ctime);
+	inode->i_mode = fs16_to_cpu(sbi, raw_inode->i_mode);
+	inode->i_uid = (uid_t)fs16_to_cpu(sbi, raw_inode->i_uid);
+	inode->i_gid = (gid_t)fs16_to_cpu(sbi, raw_inode->i_gid);
+	inode->i_nlink = fs16_to_cpu(sbi, raw_inode->i_nlink);
+	inode->i_size = fs32_to_cpu(sbi, raw_inode->i_size);
+	inode->i_atime = fs32_to_cpu(sbi, raw_inode->i_atime);
+	inode->i_mtime = fs32_to_cpu(sbi, raw_inode->i_mtime);
+	inode->i_ctime = fs32_to_cpu(sbi, raw_inode->i_ctime);
 	inode->i_blocks = inode->i_blksize = 0;
 
 	si = SYSV_I(inode);
 	for (block = 0; block < 10+1+1+1; block++)
-		read3byte(sb, &raw_inode->i_a.i_addb[3*block],
-			(unsigned char*)&si->i_data[block]);
+		read3byte(sbi, &raw_inode->i_data[3*block],
+				(u8 *)&si->i_data[block]);
 	brelse(bh);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		rdev = (u16)fs32_to_cpu(sb, si->i_data[0]);
+		rdev = (u16)fs32_to_cpu(sbi, si->i_data[0]);
 	si->i_dir_start_lookup = 0;
 	sysv_set_inode(inode, rdev);
 	return;
@@ -194,13 +207,14 @@ bad_inode:
 static struct buffer_head * sysv_update_inode(struct inode * inode)
 {
 	struct super_block * sb = inode->i_sb;
+	struct sysv_sb_info * sbi = SYSV_SB(sb);
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
 	struct sysv_inode_info * si;
 	unsigned int ino, block;
 
 	ino = inode->i_ino;
-	if (!ino || ino > sb->sv_ninodes) {
+	if (!ino || ino > sbi->s_ninodes) {
 		printk("Bad inode number on dev %s: %d is out of range\n",
 		       inode->i_sb->s_id, ino);
 		return 0;
@@ -211,21 +225,21 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 		return 0;
 	}
 
-	raw_inode->i_mode = cpu_to_fs16(sb, inode->i_mode);
-	raw_inode->i_uid = cpu_to_fs16(sb, fs_high2lowuid(inode->i_uid));
-	raw_inode->i_gid = cpu_to_fs16(sb, fs_high2lowgid(inode->i_gid));
-	raw_inode->i_nlink = cpu_to_fs16(sb, inode->i_nlink);
-	raw_inode->i_size = cpu_to_fs32(sb, inode->i_size);
-	raw_inode->i_atime = cpu_to_fs32(sb, inode->i_atime);
-	raw_inode->i_mtime = cpu_to_fs32(sb, inode->i_mtime);
-	raw_inode->i_ctime = cpu_to_fs32(sb, inode->i_ctime);
+	raw_inode->i_mode = cpu_to_fs16(sbi, inode->i_mode);
+	raw_inode->i_uid = cpu_to_fs16(sbi, fs_high2lowuid(inode->i_uid));
+	raw_inode->i_gid = cpu_to_fs16(sbi, fs_high2lowgid(inode->i_gid));
+	raw_inode->i_nlink = cpu_to_fs16(sbi, inode->i_nlink);
+	raw_inode->i_size = cpu_to_fs32(sbi, inode->i_size);
+	raw_inode->i_atime = cpu_to_fs32(sbi, inode->i_atime);
+	raw_inode->i_mtime = cpu_to_fs32(sbi, inode->i_mtime);
+	raw_inode->i_ctime = cpu_to_fs32(sbi, inode->i_ctime);
 
 	si = SYSV_I(inode);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		si->i_data[0] = cpu_to_fs32(sb, kdev_t_to_nr(inode->i_rdev));
+		si->i_data[0] = cpu_to_fs32(sbi, kdev_t_to_nr(inode->i_rdev));
 	for (block = 0; block < 10+1+1+1; block++)
-		write3byte(sb, (unsigned char*)&si->i_data[block],
-			&raw_inode->i_a.i_addb[3*block]);
+		write3byte(sbi, (u8 *)&si->i_data[block],
+			&raw_inode->i_data[3*block]);
 	mark_buffer_dirty(bh);
 	return bh;
 }
