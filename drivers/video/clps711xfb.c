@@ -432,9 +432,7 @@ static void __exit clps711xfb_exit(void)
 	}
 }
 
-#ifdef MODULE
 module_init(clps711xfb_init);
-#endif
 module_exit(clps711xfb_exit);
 
 MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");

@@ -1571,6 +1571,9 @@ static struct pci_driver sstfb_driver = {
 
 int __devinit sstfb_init(void)
 {
+#ifndef MODULE
+	sstfb_setup(fb_get_options("sstfb"));
+#endif
 	return pci_module_init(&sstfb_driver);
 }
 
@@ -1693,9 +1696,9 @@ static void sstfb_drawdebugimage(struct fb_info *info)
 	sstfb_drawrect_XY(info, 250, 250, 120, 100, 0xf800, idx);
 }
 
+module_init(sstfb_init);
 
 #ifdef MODULE
-module_init(sstfb_init);
 module_exit(sstfb_exit);
 #endif
 

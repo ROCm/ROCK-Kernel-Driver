@@ -869,6 +869,9 @@ int __init sgivwfb_init(void)
 {
 	int ret;
 
+#ifndef MODULE
+	sgivwfb_setup(fb_get_options("sgivwfb"));
+#endif
 	ret = driver_register(&sgivwfb_driver);
 	if (!ret) {
 		ret = platform_device_register(&sgivwfb_device);
@@ -877,6 +880,8 @@ int __init sgivwfb_init(void)
 	}
 	return ret;
 }
+
+module_init(sgivwfb_init);
 
 #ifdef MODULE
 MODULE_LICENSE("GPL");
@@ -887,7 +892,6 @@ static void __exit sgivwfb_exit(void)
 	driver_unregister(&sgivwfb_driver);
 }
 
-module_init(sgivwfb_init);
 module_exit(sgivwfb_exit);
 
 #endif				/* MODULE */

@@ -609,8 +609,8 @@ MODULE_LICENSE("GPL");
 
 MODULE_PARM(nologo, "i");
 MODULE_PARM_DESC(nologo, "Disables startup logo if != 0 (default=0)");
+module_init(hgafb_init);
 
 #ifdef MODULE
-module_init(hgafb_init);
 module_exit(hgafb_exit);
 #endif

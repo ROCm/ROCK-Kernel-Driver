@@ -323,6 +323,8 @@ int __init valkyriefb_init(void)
 	unsigned long frame_buffer_phys, cmap_regs_phys, flags;
 	int err;
 
+	valkyriefb_setup(fb_get_options("valkyriefb"));
+
 #ifdef CONFIG_MAC
 	if (!MACH_IS_MAC)
 		return 0;
@@ -579,4 +581,5 @@ int __init valkyriefb_setup(char *options)
 	return 0;
 }
 
+module_init(valkyriefb_init);
 MODULE_LICENSE("GPL");

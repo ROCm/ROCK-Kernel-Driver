@@ -541,4 +541,5 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	       info->node, full_name);
 }
 
+module_init(offb_init);
 MODULE_LICENSE("GPL");

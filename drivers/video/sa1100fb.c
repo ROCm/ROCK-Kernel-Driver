@@ -1848,5 +1848,6 @@ int __init sa1100fb_setup(char *options)
 	return 0;
 }
 
+module_init(sa1100fb_init);
 MODULE_DESCRIPTION("StrongARM-1100/1110 framebuffer driver");
 MODULE_LICENSE("GPL");

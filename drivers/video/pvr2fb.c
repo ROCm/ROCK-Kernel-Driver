@@ -1057,6 +1057,9 @@ int __init pvr2fb_init(void)
 	int i, ret = -ENODEV;
 	int size;
 
+#ifndef MODULE
+	pvr2fb_setup(fb_get_options("pvr2fb"));
+#endif
 	size = sizeof(struct fb_info) + sizeof(struct pvr2fb_par) + 16 * sizeof(u32);
 
 	fb_info = kmalloc(size, GFP_KERNEL);
@@ -1108,9 +1111,7 @@ static void __exit pvr2fb_exit(void)
 	kfree(fb_info);
 }
 
-#ifdef MODULE
 module_init(pvr2fb_init);
-#endif
 module_exit(pvr2fb_exit);
 
 MODULE_AUTHOR("Paul Mundt <lethal@linux-sh.org>, M. R. Brown <mrbrown@0xd6.org>");

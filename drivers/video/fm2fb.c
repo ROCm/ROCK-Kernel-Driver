@@ -292,12 +292,14 @@ static int __devinit fm2fb_probe(struct zorro_dev *z,
 	return 0;
 }
 
+int __init fm2fb_setup(char *options);
+
 int __init fm2fb_init(void)
 {
+	fm2fb_setup(fb_get_options("fb2fb"));
 	return zorro_register_driver(&fm2fb_driver);
 }
 
-int __init fm2fb_setup(char *options)
 {
 	char *this_opt;
 
@@ -313,4 +315,5 @@ int __init fm2fb_setup(char *options)
 	return 0;
 }
 
+module_init(fm2fb_init);
 MODULE_LICENSE("GPL");

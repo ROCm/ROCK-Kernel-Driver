@@ -1218,8 +1218,13 @@ static struct pci_driver tridentfb_pci_driver = {
 	.remove		= __devexit_p(trident_pci_remove)
 };
 
+int tridentfb_setup(char *options);
+
 int __init tridentfb_init(void)
 {
+#ifndef MODULE
+	tridentfb_setup(fb_get_options("tridentfb"));
+#endif
 	output("Trident framebuffer %s initializing\n", VERSION);
 	return pci_module_init(&tridentfb_pci_driver);
 }
@@ -1279,9 +1284,7 @@ static struct fb_ops tridentfb_ops = {
 	.fb_cursor = soft_cursor,
 };
 
-#ifdef MODULE
 module_init(tridentfb_init);
-#endif
 module_exit(tridentfb_exit);
 
 MODULE_AUTHOR("Jani Monoses <jani@iv.ro>");

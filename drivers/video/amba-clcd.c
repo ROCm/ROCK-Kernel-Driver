@@ -496,12 +496,11 @@ static struct amba_driver clcd_driver = {
 
 int __init amba_clcdfb_init(void)
 {
+
 	return amba_driver_register(&clcd_driver);
 }
 
-#ifdef MODULE
 module_init(amba_clcdfb_init);
-#endif
 
 static void __exit amba_clcdfb_exit(void)
 {

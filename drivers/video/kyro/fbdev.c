@@ -787,6 +787,9 @@ static void __devexit kyrofb_remove(struct pci_dev *pdev)
 
 int __init kyrofb_init(void)
 {
+#ifndef MODULE
+	kyrofb_setup(fb_get_options("kyrofb"));
+#endif
 	return pci_module_init(&kyrofb_pci_driver);
 }
 
@@ -795,8 +798,9 @@ static void __exit kyrofb_exit(void)
 	pci_unregister_driver(&kyrofb_pci_driver);
 }
 
-#ifdef MODULE
 module_init(kyrofb_init);
+
+#ifdef MODULE
 module_exit(kyrofb_exit);
 #endif
 

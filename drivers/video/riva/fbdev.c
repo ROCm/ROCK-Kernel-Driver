@@ -2140,6 +2140,9 @@ static struct pci_driver rivafb_driver = {
 
 int __devinit rivafb_init(void)
 {
+#ifndef MODULE
+	rivafb_setup(fb_get_options("rivafb"));
+#endif
 	if (pci_register_driver(&rivafb_driver) > 0)
 		return 0;
 	pci_unregister_driver(&rivafb_driver);
@@ -2147,13 +2150,14 @@ int __devinit rivafb_init(void)
 }
 
 
+module_init(rivafb_init);
+
 #ifdef MODULE
 static void __exit rivafb_exit(void)
 {
 	pci_unregister_driver(&rivafb_driver);
 }
 
-module_init(rivafb_init);
 module_exit(rivafb_exit);
 
 MODULE_PARM(flatpanel, "i");

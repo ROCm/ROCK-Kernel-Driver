@@ -155,7 +155,7 @@ MODULE_DEVICE_TABLE(pci, tdfxfb_id_table);
  *  Frame buffer device API
  */
 int tdfxfb_init(void);
-void tdfxfb_setup(char *options, int *ints); 
+void tdfxfb_setup(char *options);
 
 static int tdfxfb_check_var(struct fb_var_screeninfo *var, struct fb_info *fb); 
 static int tdfxfb_set_par(struct fb_info *info); 
@@ -1362,6 +1362,9 @@ static void __devexit tdfxfb_remove(struct pci_dev *pdev)
 
 int __init tdfxfb_init(void)
 {
+#ifndef MODULE
+	tdfxfb_setup(fb_get_options("tdfxfb"));
+#endif
         return pci_module_init(&tdfxfb_driver);
 }
 
@@ -1374,14 +1377,12 @@ MODULE_AUTHOR("Hannu Mallat <hmallat@cc.hut.fi>");
 MODULE_DESCRIPTION("3Dfx framebuffer device driver");
 MODULE_LICENSE("GPL");
  
-#ifdef MODULE
 module_init(tdfxfb_init);
-#endif
 module_exit(tdfxfb_exit);
 
 
 #ifndef MODULE
-void tdfxfb_setup(char *options, int *ints)
+void tdfxfb_setup(char *options)
 { 
 	char* this_opt;
 

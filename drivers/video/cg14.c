@@ -626,8 +626,9 @@ cg14_setup(char *arg)
 	return 0;
 }
 
-#ifdef MODULE
 module_init(cg14_init);
+
+#ifdef MODULE
 module_exit(cg14_exit);
 #endif
 

@@ -2257,6 +2257,9 @@ int __init amifb_init(void)
 	u_long chipptr;
 	u_int defmode;
 
+#ifndef MODULE
+	amifb_setup(fb_get_options("amifb"));
+#endif
 	if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(AMI_VIDEO))
 		return -ENXIO;
 
@@ -3814,13 +3817,10 @@ static void ami_rebuild_copper(void)
 }
 
 
+module_init(amifb_init);
+
 #ifdef MODULE
 MODULE_LICENSE("GPL");
-
-int init_module(void)
-{
-	return amifb_init();
-}
 
 void cleanup_module(void)
 {
