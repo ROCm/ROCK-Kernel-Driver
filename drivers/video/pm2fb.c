@@ -646,10 +646,20 @@ static int pm2fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	case 32:
 		var->transp.offset = 24;
 		var->transp.length = 8;
-	case 24:
 		var->red.offset	  = 16;
 		var->green.offset = 8;
 		var->blue.offset  = 0;
+		var->red.length = var->green.length = var->blue.length = 8;
+		break;
+	case 24:
+#ifdef __BIG_ENDIAN
+		var->red.offset   = 0;
+		var->blue.offset  = 16;
+#else
+		var->red.offset   = 16;
+		var->blue.offset  = 0;
+#endif
+		var->green.offset = 8;
 		var->red.length = var->green.length = var->blue.length = 8;
 		break;
 	}
@@ -789,10 +799,6 @@ static int pm2fb_set_par(struct fb_info *info)
 	case 24:
 		pm2_WR(par, PM2R_FB_READ_PIXEL, 4);
 		clrmode |= PM2F_RD_TRUECOLOR | PM2F_RD_PIXELFORMAT_RGB888;
-#ifdef __BIG_ENDIAN
-		/* Use BGR not RGB */
-		clrmode &= ~PM2F_RD_COLOR_MODE_RGB;
-#endif
 		txtmap = PM2F_TEXTEL_SIZE_24;
 		pixsize = 4;
 		clrformat = 0x20;
