@@ -63,6 +63,8 @@
 #define BT_DMP(D...)
 #endif
 
+extern struct proc_dir_entry *proc_bt;
+
 /* Connection and socket states */
 enum {
 	BT_CONNECTED = 1, /* Equal to TCP_ESTABLISHED to make net code happy */

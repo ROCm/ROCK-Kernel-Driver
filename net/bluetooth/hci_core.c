@@ -66,8 +66,8 @@ static void hci_notify(struct hci_dev *hdev, int event);
 rwlock_t hci_task_lock = RW_LOCK_UNLOCKED;
 
 /* HCI device list */
-LIST_HEAD(hdev_list);
-rwlock_t hdev_list_lock = RW_LOCK_UNLOCKED;
+LIST_HEAD(hci_dev_list);
+rwlock_t hci_dev_list_lock = RW_LOCK_UNLOCKED;
 
 /* HCI protocols */
 #define HCI_MAX_PROTO	2
@@ -298,8 +298,8 @@ struct hci_dev *hci_dev_get(int index)
 	if (index < 0)
 		return NULL;
 
-	read_lock(&hdev_list_lock);
-	list_for_each(p, &hdev_list) {
+	read_lock(&hci_dev_list_lock);
+	list_for_each(p, &hci_dev_list) {
 		hdev = list_entry(p, struct hci_dev, list);
 		if (hdev->id == index) {
 			hci_dev_hold(hdev);
@@ -308,7 +308,7 @@ struct hci_dev *hci_dev_get(int index)
 	}
 	hdev = NULL;
 done:
-	read_unlock(&hdev_list_lock);
+	read_unlock(&hci_dev_list_lock);
 	return hdev;
 }
 
@@ -727,8 +727,8 @@ int hci_get_dev_list(unsigned long arg)
 		return -ENOMEM;
 	dr = dl->dev_req;
 
-	read_lock_bh(&hdev_list_lock);
-	list_for_each(p, &hdev_list) {
+	read_lock_bh(&hci_dev_list_lock);
+	list_for_each(p, &hci_dev_list) {
 		struct hci_dev *hdev;
 		hdev = list_entry(p, struct hci_dev, list);
 		(dr + n)->dev_id  = hdev->id;
@@ -736,7 +736,7 @@ int hci_get_dev_list(unsigned long arg)
 		if (++n >= dev_num)
 			break;
 	}
-	read_unlock_bh(&hdev_list_lock);
+	read_unlock_bh(&hci_dev_list_lock);
 
 	dl->dev_num = n;
 	size = n * sizeof(struct hci_dev_req) + sizeof(__u16);
@@ -787,7 +787,7 @@ int hci_get_dev_info(unsigned long arg)
 /* Register HCI device */
 int hci_register_dev(struct hci_dev *hdev)
 {
-	struct list_head *head = &hdev_list, *p;
+	struct list_head *head = &hci_dev_list, *p;
 	int id = 0;
 
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
@@ -795,10 +795,10 @@ int hci_register_dev(struct hci_dev *hdev)
 	if (!hdev->open || !hdev->close || !hdev->destruct)
 		return -EINVAL;
 
-	write_lock_bh(&hdev_list_lock);
+	write_lock_bh(&hci_dev_list_lock);
 
 	/* Find first available device id */
-	list_for_each(p, &hdev_list) {
+	list_for_each(p, &hci_dev_list) {
 	       	if (list_entry(p, struct hci_dev, list)->id != id)
 			break;
 		head = p; id++;
@@ -836,7 +836,9 @@ int hci_register_dev(struct hci_dev *hdev)
 		
 	MOD_INC_USE_COUNT;
 
-	write_unlock_bh(&hdev_list_lock);
+	write_unlock_bh(&hci_dev_list_lock);
+
+	hci_dev_proc_init(hdev);
 
 	hci_notify(hdev, HCI_DEV_REG);
 	hci_run_hotplug(hdev->name, "register");
@@ -849,9 +851,11 @@ int hci_unregister_dev(struct hci_dev *hdev)
 {
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
 
-	write_lock_bh(&hdev_list_lock);
+	hci_dev_proc_cleanup(hdev);
+
+	write_lock_bh(&hci_dev_list_lock);
 	list_del(&hdev->list);
-	write_unlock_bh(&hdev_list_lock);
+	write_unlock_bh(&hci_dev_list_lock);
 
 	hci_dev_do_close(hdev);
 

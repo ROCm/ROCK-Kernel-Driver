@@ -43,6 +43,7 @@
 #include <linux/wait.h>
 #include <linux/net.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
@@ -56,6 +57,10 @@
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
 #define BT_DBG(D...)
+#endif
+
+#ifdef CONFIG_PROC_FS
+struct proc_dir_entry *proc_bt_rfcomm;
 #endif
 
 struct task_struct *rfcomm_thread;
@@ -1723,60 +1728,112 @@ static int rfcomm_run(void *unused)
 }
 
 /* ---- Proc fs support ---- */
-static int rfcomm_dlc_dump(char *buf)
+#ifdef CONFIG_PROC_FS
+static void *rfcomm_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct rfcomm_session *s;
-	struct sock *sk;
-	struct list_head *p, *pp;
-	char *ptr = buf;
+	struct list_head *pp, *p;
+	loff_t l = *pos;
 
 	rfcomm_lock();
 
 	list_for_each(p, &session_list) {
 		s = list_entry(p, struct rfcomm_session, list);
-		sk = s->sock->sk;
+		list_for_each(pp, &s->dlcs)
+			if (!l--) {
+				seq->private = s;
+				return pp;
+			}
+	}
+	return NULL;
+}
 
-		list_for_each(pp, &s->dlcs) {
-		struct rfcomm_dlc *d;
-			d = list_entry(pp, struct rfcomm_dlc, list);
+static void *rfcomm_seq_next(struct seq_file *seq, void *e, loff_t *pos)
+{
+	struct rfcomm_session *s = seq->private;
+	struct list_head *pp, *p = e;
+	(*pos)++;
 
-			ptr += sprintf(ptr, "dlc %s %s %ld %d %d %d %d\n",
-				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
-				d->state, d->dlci, d->mtu, d->rx_credits, d->tx_credits);
+	if (p->next != &s->dlcs)
+		return p->next;
+
+	for (p = s->list.next; p != &session_list; p = p->next) {
+		s = list_entry(p, struct rfcomm_session, list);
+		__list_for_each(pp, &s->dlcs) {
+			seq->private = s;
+			return pp;
 		}
 	}
-	
-	rfcomm_unlock();
-
-	return ptr - buf;
+	return NULL;
 }
 
-extern int rfcomm_sock_dump(char *buf);
-
-static int rfcomm_read_proc(char *buf, char **start, off_t offset, int count, int *eof, void *priv)
+static void rfcomm_seq_stop(struct seq_file *seq, void *e)
 {
-	char *ptr = buf;
-	int len;
-
-	BT_DBG("count %d, offset %ld", count, offset);
-
-	ptr += rfcomm_dlc_dump(ptr);
-	ptr += rfcomm_sock_dump(ptr);
-	len  = ptr - buf;
-
-	if (len <= count + offset)
-		*eof = 1;
-
-	*start = buf + offset;
-	len -= offset;
-
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-
-	return len;
+	rfcomm_unlock();
 }
+
+static int  rfcomm_seq_show(struct seq_file *seq, void *e)
+{
+	struct rfcomm_session *s = seq->private;
+	struct sock *sk = s->sock->sk;
+	struct rfcomm_dlc *d = list_entry(e, struct rfcomm_dlc, list);
+
+	seq_printf(seq, "%s %s %ld %d %d %d %d\n",
+			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst),
+			d->state, d->dlci, d->mtu, d->rx_credits, d->tx_credits);
+	return 0;
+}
+
+static struct seq_operations rfcomm_seq_ops = {
+	.start  = rfcomm_seq_start,
+	.next   = rfcomm_seq_next,
+	.stop   = rfcomm_seq_stop,
+	.show   = rfcomm_seq_show 
+};
+
+static int rfcomm_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &rfcomm_seq_ops);
+}
+
+static struct file_operations rfcomm_seq_fops = {
+	.open    = rfcomm_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+static int __init rfcomm_proc_init(void)
+{
+        struct proc_dir_entry *p;
+
+	proc_bt_rfcomm = proc_mkdir("rfcomm", proc_bt);
+
+        p = create_proc_entry("dlc", S_IRUGO, proc_bt_rfcomm);
+        if (p)
+        	p->proc_fops = &rfcomm_seq_fops;
+        return 0;
+}
+
+static void __init rfcomm_proc_cleanup(void)
+{
+        remove_proc_entry("dlc", proc_bt_rfcomm);
+
+	remove_proc_entry("rfcomm", proc_bt);
+}
+
+#else /* CONFIG_PROC_FS */
+
+static int __init rfcomm_proc_init(void)
+{
+        return 0;
+}
+
+static void __init rfcomm_proc_cleanup(void)
+{
+        return 0;
+}
+#endif /* CONFIG_PROC_FS */
 
 /* ---- Initialization ---- */
 int __init rfcomm_init(void)
@@ -1785,13 +1842,13 @@ int __init rfcomm_init(void)
 
 	BT_INFO("RFCOMM ver %s", VERSION);
 
+	rfcomm_proc_init();
+
 	rfcomm_init_sockets();
 
 #ifdef CONFIG_BT_RFCOMM_TTY
 	rfcomm_init_ttys();
 #endif
-
-	create_proc_read_entry("bluetooth/rfcomm", 0, 0, rfcomm_read_proc, NULL);
 
 	return 0;
 }
@@ -1807,14 +1864,13 @@ void rfcomm_cleanup(void)
 	while (atomic_read(&running))
 		schedule();
 
-	remove_proc_entry("bluetooth/rfcomm", NULL);
-
 #ifdef CONFIG_BT_RFCOMM_TTY
 	rfcomm_cleanup_ttys();
 #endif
 
 	rfcomm_cleanup_sockets();
-	return;
+
+	rfcomm_proc_cleanup();
 }
 
 module_init(rfcomm_init);

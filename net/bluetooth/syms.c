@@ -78,3 +78,5 @@ EXPORT_SYMBOL(bt_sock_poll);
 EXPORT_SYMBOL(bt_accept_enqueue);
 EXPORT_SYMBOL(bt_accept_dequeue);
 EXPORT_SYMBOL(bt_sock_w4_connect);
+
+EXPORT_SYMBOL(proc_bt);

@@ -215,9 +215,9 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 
 	BT_DBG("%s -> %s", batostr(src), batostr(dst));
 
-	read_lock_bh(&hdev_list_lock);
+	read_lock_bh(&hci_dev_list_lock);
 
-	list_for_each(p, &hdev_list) {
+	list_for_each(p, &hci_dev_list) {
 		struct hci_dev *d;
 		d = list_entry(p, struct hci_dev, list);
 		
@@ -243,7 +243,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 	if (hdev)
 		hci_dev_hold(hdev);
 
-	read_unlock_bh(&hdev_list_lock);
+	read_unlock_bh(&hci_dev_list_lock);
 	return hdev;
 }
 

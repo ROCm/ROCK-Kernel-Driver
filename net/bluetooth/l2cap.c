@@ -46,6 +46,7 @@
 #include <linux/socket.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/list.h>
 #include <net/sock.h>
 
@@ -1993,51 +1994,89 @@ drop:
 }
 
 /* ---- Proc fs support ---- */
-static int l2cap_sock_dump(char *buf, struct bt_sock_list *list)
+#ifdef CONFIG_PROC_FS
+static void *l2cap_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	struct l2cap_pinfo *pi;
 	struct sock *sk;
-	char *ptr = buf;
+	loff_t l = *pos;
 
-	read_lock_bh(&list->lock);
+	read_lock_bh(&l2cap_sk_list.lock);
 
-	for (sk = list->head; sk; sk = sk->next) {
-		pi = l2cap_pi(sk);
-		ptr += sprintf(ptr, "%s %s %d %d 0x%4.4x 0x%4.4x %d %d 0x%x\n",
-				batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), 
-				sk->state, pi->psm, pi->scid, pi->dcid, pi->imtu, pi->omtu,
-				pi->link_mode);
-	}
-
-	read_unlock_bh(&list->lock);
-
-	ptr += sprintf(ptr, "\n");
-	return ptr - buf;
+	for (sk = l2cap_sk_list.head; sk; sk = sk->next)
+		if (!l--)
+			return sk;
+	return NULL;
 }
 
-static int l2cap_read_proc(char *buf, char **start, off_t offset, int count, int *eof, void *priv)
+static void *l2cap_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
-	char *ptr = buf;
-	int len;
-
-	BT_DBG("count %d, offset %ld", count, offset);
-
-	ptr += l2cap_sock_dump(ptr, &l2cap_sk_list);
-	len  = ptr - buf;
-
-	if (len <= count + offset)
-		*eof = 1;
-
-	*start = buf + offset;
-	len -= offset;
-
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-
-	return len;
+	struct sock *sk = e;
+	(*pos)++;
+	return sk->next;
 }
+
+static void l2cap_seq_stop(struct seq_file *seq, void *e)
+{
+	read_unlock_bh(&l2cap_sk_list.lock);
+}
+
+static int  l2cap_seq_show(struct seq_file *seq, void *e)
+{
+	struct sock *sk = e;
+	struct l2cap_pinfo *pi = l2cap_pi(sk);
+
+	seq_printf(seq, "%s %s %d %d 0x%4.4x 0x%4.4x %d %d 0x%x\n",
+			batostr(&bt_sk(sk)->src), batostr(&bt_sk(sk)->dst), 
+			sk->state, pi->psm, pi->scid, pi->dcid, pi->imtu, pi->omtu,
+			pi->link_mode);
+	return 0;
+}
+
+static struct seq_operations l2cap_seq_ops = {
+	.start  = l2cap_seq_start,
+	.next   = l2cap_seq_next,
+	.stop   = l2cap_seq_stop,
+	.show   = l2cap_seq_show 
+};
+
+static int l2cap_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &l2cap_seq_ops);
+}
+
+static struct file_operations l2cap_seq_fops = {
+	.open    = l2cap_seq_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release,
+};
+
+static int __init l2cap_proc_init(void)
+{
+        struct proc_dir_entry *p = create_proc_entry("l2cap", S_IRUGO, proc_bt);
+        if (!p)
+                return -ENOMEM;
+        p->proc_fops = &l2cap_seq_fops;
+        return 0;
+}
+
+static void __init l2cap_proc_cleanup(void)
+{
+        remove_proc_entry("l2cap", proc_bt);
+}
+
+#else /* CONFIG_PROC_FS */
+
+static int __init l2cap_proc_init(void)
+{
+        return 0;
+}
+
+static void __init l2cap_proc_cleanup(void)
+{
+        return 0;
+}
+#endif /* CONFIG_PROC_FS */
 
 static struct proto_ops l2cap_sock_ops = {
 	.family  =      PF_BLUETOOTH,
@@ -2088,8 +2127,9 @@ int __init l2cap_init(void)
 		return err;
 	}
 
-	create_proc_read_entry("bluetooth/l2cap", 0, 0, l2cap_read_proc, NULL);
 
+	l2cap_proc_init();
+	
 	BT_INFO("L2CAP ver %s", VERSION);
 	BT_INFO("L2CAP socket layer initialized");
 
@@ -2098,7 +2138,7 @@ int __init l2cap_init(void)
 
 void l2cap_cleanup(void)
 {
-	remove_proc_entry("bluetooth/l2cap", NULL);
+	l2cap_proc_cleanup();
 
 	/* Unregister socket and protocol */
 	if (bt_sock_unregister(BTPROTO_L2CAP))

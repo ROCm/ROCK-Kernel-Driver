@@ -56,6 +56,10 @@
 #define BT_DBG( A... )
 #endif
 
+#ifdef CONFIG_PROC_FS
+struct proc_dir_entry *proc_bt;
+#endif
+
 /* Bluetooth sockets */
 #define BT_MAX_PROTO	5
 static struct net_proto_family *bt_proto[BT_MAX_PROTO];
@@ -323,12 +327,14 @@ struct net_proto_family bt_sock_family_ops =
 
 extern int hci_sock_init(void);
 extern int hci_sock_cleanup(void);
+extern int hci_proc_init(void);
+extern int hci_proc_cleanup(void);
 
 static int __init bt_init(void)
 {
 	BT_INFO("Core ver %s", VERSION);
 
-	proc_mkdir("bluetooth", NULL);
+	proc_bt = proc_mkdir("bluetooth", NULL);
 
 	/* Init socket cache */
 	bt_sock_cache = kmem_cache_create("bt_sock",
@@ -344,6 +350,7 @@ static int __init bt_init(void)
 
 	BT_INFO("HCI device and connection manager initialized");
 
+	hci_proc_init();
 	hci_sock_init();
 	return 0;
 }
@@ -351,6 +358,7 @@ static int __init bt_init(void)
 static void __exit bt_cleanup(void)
 {
 	hci_sock_cleanup();
+	hci_proc_cleanup();
 
 	sock_unregister(PF_BLUETOOTH);
 	kmem_cache_destroy(bt_sock_cache);
