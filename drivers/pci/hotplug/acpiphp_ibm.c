@@ -340,7 +340,7 @@ static ssize_t ibm_read_apci_table(struct kobject *kobj,
 	int bytes_read = -EINVAL;
 	char *table = NULL;
 	
-	dbg("%s: pos = %d, size = %d\n", __FUNCTION__, (int)pos, size);
+	dbg("%s: pos = %d, size = %zd\n", __FUNCTION__, (int)pos, size);
 
 	if (pos == 0) {
 		bytes_read = ibm_get_table_from_acpi(&table);
@@ -383,8 +383,8 @@ static acpi_status __init ibm_find_acpi_device(acpi_handle handle,
 	if(info.current_status && (info.valid & ACPI_VALID_HID) &&
 			(!strcmp(info.hardware_id.value, IBM_HARDWARE_ID1) ||
 			!strcmp(info.hardware_id.value, IBM_HARDWARE_ID2))) {
-		dbg("found hardware: %s, handle: %x\n", info.hardware_id.value,
-				(unsigned int)handle);
+		dbg("found hardware: %s, handle: %p\n", info.hardware_id.value,
+				handle);
 		*phandle = handle;
 		/* returning non-zero causes the search to stop
 		 * and returns this value to the caller of 

@@ -18,6 +18,7 @@
 #include <linux/tty.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/console.h>
@@ -136,7 +137,9 @@ EXPORT_SYMBOL(pci_dac_dma_supported);
 EXPORT_SYMBOL(pci_dac_page_to_dma);
 EXPORT_SYMBOL(pci_dac_dma_to_page);
 EXPORT_SYMBOL(pci_dac_dma_to_offset);
+EXPORT_SYMBOL(alpha_gendev_to_pci);
 #endif
+EXPORT_SYMBOL(dma_set_mask);
 
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_elf_thread);

@@ -559,8 +559,7 @@ static int copy_mm(unsigned long clone_flags, struct task_struct * tsk)
 	int retval;
 
 	tsk->min_flt = tsk->maj_flt = 0;
-	tsk->cmin_flt = tsk->cmaj_flt = 0;
-	tsk->nvcsw = tsk->nivcsw = tsk->cnvcsw = tsk->cnivcsw = 0;
+	tsk->nvcsw = tsk->nivcsw = 0;
 
 	tsk->mm = NULL;
 	tsk->active_mm = NULL;
@@ -867,6 +866,10 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->leader = 0;	/* session leadership doesn't inherit */
 	sig->tty_old_pgrp = 0;
 
+	sig->utime = sig->stime = sig->cutime = sig->cstime = 0;
+	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
+	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
+
 	return 0;
 }
 
@@ -986,7 +989,6 @@ static task_t *copy_process(unsigned long clone_flags,
 	p->real_timer.data = (unsigned long) p;
 
 	p->utime = p->stime = 0;
-	p->cutime = p->cstime = 0;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
@@ -1118,18 +1120,17 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	SET_LINKS(p);
-	if (p->ptrace & PT_PTRACED)
+	if (unlikely(p->ptrace & PT_PTRACED))
 		__ptrace_link(p, current->parent);
 
 	attach_pid(p, PIDTYPE_PID, p->pid);
+	attach_pid(p, PIDTYPE_TGID, p->tgid);
 	if (thread_group_leader(p)) {
-		attach_pid(p, PIDTYPE_TGID, p->tgid);
 		attach_pid(p, PIDTYPE_PGID, process_group(p));
 		attach_pid(p, PIDTYPE_SID, p->signal->session);
 		if (p->pid)
 			__get_cpu_var(process_counts)++;
-	} else
-		link_pid(p, p->pids + PIDTYPE_TGID, &p->group_leader->pids[PIDTYPE_TGID].pid);
+	}
 
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);

@@ -160,10 +160,39 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 	 */
 	if (tbuf) {
 		struct compat_tms tmp;
-		tmp.tms_utime = compat_jiffies_to_clock_t(current->utime);
-		tmp.tms_stime = compat_jiffies_to_clock_t(current->stime);
-		tmp.tms_cutime = compat_jiffies_to_clock_t(current->cutime);
-		tmp.tms_cstime = compat_jiffies_to_clock_t(current->cstime);
+		struct task_struct *tsk = current;
+		struct task_struct *t;
+		unsigned long utime, stime, cutime, cstime;
+
+		read_lock(&tasklist_lock);
+		utime = tsk->signal->utime;
+		stime = tsk->signal->stime;
+		t = tsk;
+		do {
+			utime += t->utime;
+			stime += t->stime;
+			t = next_thread(t);
+		} while (t != tsk);
+
+		/*
+		 * While we have tasklist_lock read-locked, no dying thread
+		 * can be updating current->signal->[us]time.  Instead,
+		 * we got their counts included in the live thread loop.
+		 * However, another thread can come in right now and
+		 * do a wait call that updates current->signal->c[us]time.
+		 * To make sure we always see that pair updated atomically,
+		 * we take the siglock around fetching them.
+		 */
+		spin_lock_irq(&tsk->sighand->siglock);
+		cutime = tsk->signal->cutime;
+		cstime = tsk->signal->cstime;
+		spin_unlock_irq(&tsk->sighand->siglock);
+		read_unlock(&tasklist_lock);
+
+		tmp.tms_utime = compat_jiffies_to_clock_t(utime);
+		tmp.tms_stime = compat_jiffies_to_clock_t(stime);
+		tmp.tms_cutime = compat_jiffies_to_clock_t(cutime);
+		tmp.tms_cstime = compat_jiffies_to_clock_t(cstime);
 		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
 			return -EFAULT;
 	}
@@ -310,7 +339,7 @@ asmlinkage long compat_sys_getrlimit (unsigned int resource,
 	return ret;
 }
 
-static long put_compat_rusage(struct compat_rusage __user *ru, struct rusage *r)
+int put_compat_rusage(const struct rusage *r, struct compat_rusage __user *ru)
 {
 	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)) ||
 	    __put_user(r->ru_utime.tv_sec, &ru->ru_utime.tv_sec) ||
@@ -348,7 +377,7 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage __user *ru)
 	if (ret)
 		return ret;
 
-	if (put_compat_rusage(ru, &r))
+	if (put_compat_rusage(&r, ru))
 		return -EFAULT;
 
 	return 0;
@@ -374,7 +403,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 		set_fs (old_fs);
 
 		if (ret > 0) {
-			if (put_compat_rusage(ru, &r)) 
+			if (put_compat_rusage(&r, ru))
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))
 				return -EFAULT;

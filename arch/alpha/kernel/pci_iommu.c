@@ -930,3 +930,42 @@ pci_dac_dma_to_offset(struct pci_dev *pdev, dma64_addr_t dma_addr)
 {
 	return (dma_addr & ~PAGE_MASK);
 }
+
+
+/* Helper for generic DMA-mapping functions. */
+
+struct pci_dev *
+alpha_gendev_to_pci(struct device *dev)
+{
+	if (dev && dev->bus == &pci_bus_type)
+		return to_pci_dev(dev);
+
+	/* Assume that non-PCI devices asking for DMA are either ISA or EISA,
+	   BUG() otherwise. */
+	BUG_ON(!isa_bridge);
+
+	/* Assume non-busmaster ISA DMA when dma_mask is not set (the ISA
+	   bridge is bus master then). */
+	if (!dev || !dev->dma_mask || !*dev->dma_mask)
+		return isa_bridge;
+
+	/* For EISA bus masters, return isa_bridge (it might have smaller
+	   dma_mask due to wiring limitations). */
+	if (*dev->dma_mask >= isa_bridge->dma_mask)
+		return isa_bridge;
+
+	/* This assumes ISA bus master with dma_mask 0xffffff. */
+	return NULL;
+}
+
+int
+dma_set_mask(struct device *dev, u64 mask)
+{
+	if (!dev->dma_mask ||
+	    !pci_dma_supported(alpha_gendev_to_pci(dev), mask))
+		return -EIO;
+
+	*dev->dma_mask = mask;
+
+	return 0;
+}

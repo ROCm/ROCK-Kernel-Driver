@@ -214,6 +214,10 @@ EXPORT_SYMBOL(pci_dma_sync_single_for_cpu);
 EXPORT_SYMBOL(pci_dma_sync_single_for_device);
 EXPORT_SYMBOL(pci_dma_sync_sg_for_cpu);
 EXPORT_SYMBOL(pci_dma_sync_sg_for_device);
+EXPORT_SYMBOL(pci_map_sg);
+EXPORT_SYMBOL(pci_unmap_sg);
+EXPORT_SYMBOL(pci_map_page);
+EXPORT_SYMBOL(pci_unmap_page);
 /* Actually, ioremap/iounmap are not PCI specific. But it is ok for drivers. */
 EXPORT_SYMBOL(ioremap);
 EXPORT_SYMBOL(iounmap);
@@ -297,6 +301,9 @@ EXPORT_SYMBOL(csum_partial);
 
 /* Cache flushing.  */
 EXPORT_SYMBOL(sparc_flush_page_to_ram);
+
+/* For when serial stuff is built as modules. */
+EXPORT_SYMBOL(sun_do_break);
 
 EXPORT_SYMBOL(__ret_efault);
 

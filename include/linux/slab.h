@@ -4,7 +4,7 @@
  * (markhe@nextd.demon.co.uk)
  */
 
-#if	!defined(_LINUX_SLAB_H)
+#ifndef _LINUX_SLAB_H
 #define	_LINUX_SLAB_H
 
 #if	defined(__KERNEL__)

@@ -130,9 +130,9 @@ typedef struct uioc {
 	uint8_t			reserved[128];
 
 /* Driver Data: */
-	caddr_t			user_data;
+	void __user *		user_data;
 	uint32_t		user_data_len;
-	mraid_passthru_t	*user_pthru;
+	mraid_passthru_t	__user *user_pthru;
 
 	mraid_passthru_t	*pthru32;
 	dma_addr_t		pthru32_h;

@@ -791,16 +791,24 @@ void handler_irq(int irq, struct pt_regs *regs)
 #endif
 			if ((flags & IBF_MULTI) == 0) {
 				struct irqaction *ap = bp->irq_info;
-				ap->handler(__irq(bp), ap->dev_id, regs);
-				random |= ap->flags & SA_SAMPLE_RANDOM;
+				int ret;
+
+				ret = ap->handler(__irq(bp), ap->dev_id, regs);
+				if (ret == IRQ_HANDLED)
+					random |= ap->flags;
 			} else {
 				void **vector = (void **)bp->irq_info;
 				int ent;
 				for (ent = 0; ent < 4; ent++) {
 					struct irqaction *ap = vector[ent];
 					if (ap != NULL) {
-						ap->handler(__irq(bp), ap->dev_id, regs);
-						random |= ap->flags & SA_SAMPLE_RANDOM;
+						int ret;
+
+						ret = ap->handler(__irq(bp),
+								  ap->dev_id,
+								  regs);
+						if (ret == IRQ_HANDLED)
+							random |= ap->flags;
 					}
 				}
 			}
@@ -813,8 +821,9 @@ void handler_irq(int irq, struct pt_regs *regs)
 				}
 #endif
 				upa_writel(ICLR_IDLE, bp->iclr);
+
 				/* Test and add entropy */
-				if (random)
+				if (random & SA_SAMPLE_RANDOM)
 					add_interrupt_randomness(irq);
 			}
 		} else

@@ -67,7 +67,7 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_wccstat_sz		(1+NFS3_wcc_data_sz)
 #define NFS3_lookupres_sz	(1+NFS3_fh_sz+(2 * NFS3_post_op_attr_sz))
 #define NFS3_accessres_sz	(1+NFS3_post_op_attr_sz+1)
-#define NFS3_readlinkres_sz	(1+NFS3_post_op_attr_sz)
+#define NFS3_readlinkres_sz	(1+NFS3_post_op_attr_sz+1)
 #define NFS3_readres_sz		(1+NFS3_post_op_attr_sz+3)
 #define NFS3_writeres_sz	(1+NFS3_wcc_data_sz+4)
 #define NFS3_createres_sz	(1+NFS3_fh_sz+NFS3_post_op_attr_sz+NFS3_wcc_data_sz)
@@ -698,7 +698,6 @@ static int
 nfs3_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs3_readlinkargs *args)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
-	unsigned int count = args->count - 5;
 	unsigned int replen;
 
 	p = xdr_encode_fhandle(p, args->fh);
@@ -706,7 +705,7 @@ nfs3_xdr_readlinkargs(struct rpc_rqst *req, u32 *p, struct nfs3_readlinkargs *ar
 
 	/* Inline the page array */
 	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS3_readlinkres_sz) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0, count);
+	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, args->pgbase, args->pglen);
 	return 0;
 }
 
@@ -718,9 +717,8 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	struct kvec *iov = rcvbuf->head;
-	unsigned int hdrlen;
-	u32	*strlen, len;
-	char	*string;
+	int hdrlen, len, recvd;
+	char	*kaddr;
 	int	status;
 
 	status = ntohl(*p++);
@@ -729,25 +727,33 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 	if (status != 0)
 		return -nfs_stat_to_errno(status);
 
+	/* Convert length of symlink */
+	len = ntohl(*p++);
+	if (len >= rcvbuf->page_len || len <= 0) {
+		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
+		return -ENAMETOOLONG;
+	}
+
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	if (iov->iov_len > hdrlen) {
+	if (iov->iov_len < hdrlen) {
+		printk(KERN_WARNING "NFS: READLINK reply header overflowed:"
+				"length %d > %Zu\n", hdrlen, iov->iov_len);
+		return -errno_NFSERR_IO;
+	} else if (iov->iov_len != hdrlen) {
 		dprintk("NFS: READLINK header is short. iovec will be shifted.\n");
 		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
 	}
-
-	strlen = (u32*)kmap_atomic(rcvbuf->pages[0], KM_USER0);
-	/* Convert length of symlink */
-	len = ntohl(*strlen);
-	if (len > rcvbuf->page_len) {
-		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
-		kunmap_atomic(strlen, KM_USER0);
-		return -ENAMETOOLONG;
+	recvd = req->rq_rcv_buf.len - hdrlen;
+	if (recvd < len) {
+		printk(KERN_WARNING "NFS: server cheating in readlink reply: "
+				"count %u > recvd %u\n", len, recvd);
+		return -EIO;
 	}
-	*strlen = len;
+
 	/* NULL terminate the string we got */
-	string = (char *)(strlen + 1);
-	string[len] = '\0';
-	kunmap_atomic(strlen, KM_USER0);
+	kaddr = (char*)kmap_atomic(rcvbuf->pages[0], KM_USER0);
+	kaddr[len+rcvbuf->page_base] = '\0';
+	kunmap_atomic(kaddr, KM_USER0);
 	return 0;
 }
 

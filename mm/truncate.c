@@ -155,6 +155,7 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 
 	next = start;
 	for ( ; ; ) {
+		cond_resched();
 		if (!pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 			if (next == start)
 				break;

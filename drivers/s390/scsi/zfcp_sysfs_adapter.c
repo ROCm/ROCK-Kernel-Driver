@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.36 $"
+#define ZFCP_SYSFS_ADAPTER_C_REVISION "$Revision: 1.37 $"
 
 #include "zfcp_ext.h"
 
@@ -106,7 +106,7 @@ zfcp_sysfs_port_add_store(struct device *dev, const char *buf, size_t count)
 	if ((endp + 1) < (buf + count))
 		goto out;
 
-	port = zfcp_port_enqueue(adapter, wwpn, 0);
+	port = zfcp_port_enqueue(adapter, wwpn, 0, 0);
 	if (!port)
 		goto out;
 

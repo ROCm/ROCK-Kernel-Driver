@@ -12,8 +12,10 @@
  * destructors. 
  */
 
-#if defined(__KERNEL__) && !defined(_KOBJECT_H_)
+#ifndef _KOBJECT_H_
 #define _KOBJECT_H_
+
+#ifdef __KERNEL__
 
 #include <linux/types.h>
 #include <linux/list.h>
@@ -232,5 +234,5 @@ struct subsys_attribute {
 extern int subsys_create_file(struct subsystem * , struct subsys_attribute *);
 extern void subsys_remove_file(struct subsystem * , struct subsys_attribute *);
 
-
+#endif /* __KERNEL__ */
 #endif /* _KOBJECT_H_ */

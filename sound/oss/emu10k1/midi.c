@@ -320,7 +320,6 @@ static ssize_t emu10k1_midi_write(struct file *file, const char __user *buffer, 
 {
 	struct emu10k1_mididevice *midi_dev = (struct emu10k1_mididevice *) file->private_data;
 	struct midi_hdr *midihdr;
-	ssize_t ret = 0;
 	unsigned long flags;
 
 	DPD(4, "emu10k1_midi_write(), count=%#x\n", (u32) count);
@@ -344,7 +343,7 @@ static ssize_t emu10k1_midi_write(struct file *file, const char __user *buffer, 
 	if (copy_from_user(midihdr->data, buffer, count)) {
 		kfree(midihdr->data);
 		kfree(midihdr);
-		return ret ? ret : -EFAULT;
+		return -EFAULT;
 	}
 
 	spin_lock_irqsave(&midi_spinlock, flags);

@@ -1105,8 +1105,7 @@ zr36057_enable_jpg (struct zoran          *zr,
 			ZR36057_ISR);
 		btand(~ZR36057_JMC_Go_en, ZR36057_JMC);	// \Go_en
 
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ / 20);
+		msleep(50);
 
 		set_videobus_dir(zr, 0);
 		set_frame(zr, 1);	// /FRAME

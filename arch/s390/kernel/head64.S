@@ -31,6 +31,8 @@
 #include <asm/setup.h>
 #include <asm/lowcore.h>
 #include <asm/offsets.h>
+#include <asm/thread_info.h>
+#include <asm/page.h>
 
 #ifndef CONFIG_IPL
         .org   0
@@ -741,10 +743,10 @@ _stext:	basr  %r13,0                    # get base
 	larl  %r15,init_thread_union
 	lg    %r14,__TI_task(%r15)      # cache current in lowcore
 	stg   %r14,__LC_CURRENT
-        aghi  %r15,16384                # init_task_union + 16384
+        aghi  %r15,1<<(PAGE_SHIFT+THREAD_ORDER) # init_task_union + THREAD_SIZE
         stg   %r15,__LC_KERNEL_STACK    # set end of kernel stack
         aghi  %r15,-160
-        xc    0(8,%r15),0(%r15)         # set backchain to zero
+        xc    __SF_BACKCHAIN(4,%r15),__SF_BACKCHAIN(%r15) # clear backchain
 
 # check control registers
         stctg  %c0,%c15,0(%r15)

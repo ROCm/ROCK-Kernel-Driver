@@ -144,7 +144,7 @@ static int maint_close(struct inode *ino, struct file *filep)
 {
 	if (filep->private_data) {
 		diva_os_free(0, filep->private_data);
-		filep->private_data = 0;
+		filep->private_data = NULL;
 	}
 
 	/* clear 'used' flag */

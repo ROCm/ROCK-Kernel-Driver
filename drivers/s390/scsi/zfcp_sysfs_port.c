@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.43 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.44 $"
 
 #include "zfcp_ext.h"
 
@@ -279,7 +279,7 @@ zfcp_sysfs_port_create_files(struct device *dev, u32 flags)
 
 	retval = sysfs_create_group(&dev->kobj, &zfcp_port_common_attr_group);
 
-	if ((flags & ZFCP_STATUS_PORT_NAMESERVER) || retval)
+	if ((flags & ZFCP_STATUS_PORT_WKA) || retval)
 		return retval;
 
 	retval = sysfs_create_group(&dev->kobj, &zfcp_port_no_ns_attr_group);
@@ -299,7 +299,7 @@ void
 zfcp_sysfs_port_remove_files(struct device *dev, u32 flags)
 {
 	sysfs_remove_group(&dev->kobj, &zfcp_port_common_attr_group);
-	if (!(flags & ZFCP_STATUS_PORT_NAMESERVER))
+	if (!(flags & ZFCP_STATUS_PORT_WKA))
 		sysfs_remove_group(&dev->kobj, &zfcp_port_no_ns_attr_group);
 }
 

@@ -55,8 +55,8 @@ EXPORT_SYMBOL(zone_table);
 static char *zone_names[MAX_NR_ZONES] = { "DMA", "Normal", "HighMem" };
 int min_free_kbytes = 1024;
 
-static unsigned long __initdata nr_kernel_pages;
-static unsigned long __initdata nr_all_pages;
+unsigned long __initdata nr_kernel_pages;
+unsigned long __initdata nr_all_pages;
 
 /*
  * Temporary debugging check for pages not lying within a given zone.

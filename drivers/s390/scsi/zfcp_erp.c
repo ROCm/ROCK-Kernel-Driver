@@ -31,7 +31,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.62 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.65 $"
 
 #include "zfcp_ext.h"
 
@@ -126,6 +126,25 @@ static void zfcp_erp_memwait_handler(unsigned long);
 static void zfcp_erp_timeout_handler(unsigned long);
 static inline void zfcp_erp_timeout_init(struct zfcp_erp_action *);
 
+/**
+ * zfcp_fsf_request_timeout_handler - called if a request timed out
+ * @data: pointer to adapter for handler function
+ *
+ * This function needs to be called if requests (ELS, Generic Service,
+ * or SCSI commands) exceed a certain time limit. The assumption is
+ * that after the time limit the adapter get stuck. So we trigger a reopen of
+ * the adapter. This should not be used for error recovery, SCSI abort
+ * commands and SCSI requests from SCSI mid-layer.
+ */
+void
+zfcp_fsf_request_timeout_handler(unsigned long data)
+{
+	struct zfcp_adapter *adapter;
+
+	adapter = (struct zfcp_adapter *) data;
+
+	zfcp_erp_adapter_reopen(adapter, 0);
+}
 
 /*
  * function:	zfcp_fsf_scsi_er_timeout_handler
@@ -650,14 +669,15 @@ zfcp_erp_port_reopen_internal(struct zfcp_port *port, int clear_mask)
 	return retval;
 }
 
-/*
- * function:	
+/**
+ * zfcp_erp_port_reopen - initiate reopen of a remote port
+ * @port: port to be reopened
+ * @clear_mask: specifies flags in port status to be cleared
+ * Return: 0 on success, < 0 on error
  *
- * purpose:	Wrappper for zfcp_erp_port_reopen_internal
- *              used to ensure the correct locking
- *
- * returns:	0	- initiated action succesfully
- *		<0	- failed to initiate action
+ * This is a wrappper function for zfcp_erp_port_reopen_internal. It ensures
+ * correct locking. An error recovery task is initiated to do the reopen.
+ * To wait for the completion of the reopen zfcp_erp_wait should be used.
  */
 int
 zfcp_erp_port_reopen(struct zfcp_port *port, int clear_mask)
@@ -717,14 +737,15 @@ zfcp_erp_unit_reopen_internal(struct zfcp_unit *unit, int clear_mask)
 	return retval;
 }
 
-/*
- * function:	
+/**
+ * zfcp_erp_unit_reopen - initiate reopen of a unit
+ * @unit: unit to be reopened
+ * @clear_mask: specifies flags in unit status to be cleared
+ * Return: 0 on success, < 0 on error
  *
- * purpose:	Wrappper for zfcp_erp_unit_reopen_internal
- *              used to ensure the correct locking
- *
- * returns:	0	- initiated action succesfully
- *		<0	- failed to initiate action
+ * This is a wrappper for zfcp_erp_unit_reopen_internal. It ensures correct
+ * locking. An error recovery task is initiated to do the reopen.
+ * To wait for the completion of the reopen zfcp_erp_wait should be used.
  */
 int
 zfcp_erp_unit_reopen(struct zfcp_unit *unit, int clear_mask)
@@ -1902,12 +1923,10 @@ zfcp_erp_strategy_check_queues(struct zfcp_adapter *adapter)
 	return retval;
 }
 
-/*
- * function:	
- *
- * purpose:	
- *
- * returns:
+/**
+ * zfcp_erp_wait - wait for completion of error recovery on an adapter
+ * @adapter: adapter for which to wait for completion of its error recovery
+ * Return: 0
  */
 int
 zfcp_erp_wait(struct zfcp_adapter *adapter)
@@ -2045,7 +2064,7 @@ zfcp_erp_port_reopen_all_internal(struct zfcp_adapter *adapter, int clear_mask)
 	struct zfcp_port *port;
 
 	list_for_each_entry(port, &adapter->port_list_head, list)
-		if (!atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER, &port->status))
+		if (!atomic_test_mask(ZFCP_STATUS_PORT_WKA, &port->status))
 			zfcp_erp_port_reopen_internal(port, clear_mask);
 
 	return retval;
@@ -2640,7 +2659,7 @@ zfcp_erp_port_strategy_open(struct zfcp_erp_action *erp_action)
 {
 	int retval;
 
-	if (atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER,
+	if (atomic_test_mask(ZFCP_STATUS_PORT_WKA,
 			     &erp_action->port->status))
 		retval = zfcp_erp_port_strategy_open_nameserver(erp_action);
 	else
@@ -2778,10 +2797,10 @@ zfcp_erp_port_strategy_open_nameserver(struct zfcp_erp_action *erp_action)
 
 	case ZFCP_ERP_STEP_PORT_OPENING:
 		if (atomic_test_mask(ZFCP_STATUS_COMMON_OPEN, &port->status)) {
-			ZFCP_LOG_DEBUG("nameserver port is open\n");
+			ZFCP_LOG_DEBUG("WKA port is open\n");
 			retval = ZFCP_ERP_SUCCEEDED;
 		} else {
-			ZFCP_LOG_DEBUG("open failed for nameserver port\n");
+			ZFCP_LOG_DEBUG("open failed for WKA port\n");
 			retval = ZFCP_ERP_FAILED;
 		}
 		/* this is needed anyway (dont care for retval of wakeup) */

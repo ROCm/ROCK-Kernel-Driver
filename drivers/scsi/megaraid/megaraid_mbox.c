@@ -2307,7 +2307,7 @@ megaraid_isr(int irq, void *devp, struct pt_regs *regs)
 
 	/* Loop through any pending requests */
 	if (!adapter->quiescent) {
-		megaraid_mbox_runpendq(adapter, 0);
+		megaraid_mbox_runpendq(adapter, NULL);
 	}
 
 	return IRQ_RETVAL(handled);
@@ -3839,7 +3839,7 @@ megaraid_mbox_mm_done(adapter_t *adapter, scb_t *scb)
 
 		adapter->quiescent--;
 
-		megaraid_mbox_runpendq(adapter, 0);
+		megaraid_mbox_runpendq(adapter, NULL);
 	}
 
 	kioc->done(kioc);

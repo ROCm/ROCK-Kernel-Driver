@@ -695,6 +695,7 @@ void arp_send(int type, int ptype, u32 dest_ip,
 
 static void parp_redo(struct sk_buff *skb)
 {
+	nf_reset(skb);
 	arp_rcv(skb, skb->dev, NULL);
 }
 

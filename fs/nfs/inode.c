@@ -1377,9 +1377,6 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 	/* Zero out the NFS state stuff */
 	init_nfsv4_state(server);
 
-	root = &server->fh;
-	nfs_copy_fh(root, (struct nfs_fh *) &data->root);
-
 	if (data->version != NFS_MOUNT_VERSION) {
 		printk("nfs warning: mount version %s than kernel\n",
 			data->version < NFS_MOUNT_VERSION ? "older" : "newer");
@@ -1389,18 +1386,25 @@ static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
 			data->bsize  = 0;
 		if (data->version < 4) {
 			data->flags &= ~NFS_MOUNT_VER3;
-			root->size = NFS2_FHSIZE;
-			memcpy(root->data, data->old_root.data, NFS2_FHSIZE);
+			data->root.size = NFS2_FHSIZE;
+			memcpy(data->root.data, data->old_root.data, NFS2_FHSIZE);
 		}
 		if (data->version < 5)
 			data->flags &= ~NFS_MOUNT_SECFLAVOUR;
 	}
 
+	root = &server->fh;
+	if (data->flags & NFS_MOUNT_VER3)
+		root->size = data->root.size;
+	else
+		root->size = NFS2_FHSIZE;
 	if (root->size > sizeof(root->data)) {
 		printk("nfs_get_sb: invalid root filehandle\n");
 		kfree(server);
 		return ERR_PTR(-EINVAL);
 	}
+	memcpy(root->data, data->root.data, root->size);
+
 	/* We now require that the mount process passes the remote address */
 	memcpy(&server->addr, &data->addr, sizeof(server->addr));
 	if (server->addr.sin_addr.s_addr == INADDR_ANY) {

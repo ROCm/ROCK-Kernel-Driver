@@ -79,6 +79,8 @@ struct compat_rusage {
 	compat_long_t	ru_nivcsw;
 };
 
+extern int put_compat_rusage(const struct rusage *, struct compat_rusage __user *);
+
 struct compat_dirent {
 	u32		d_ino;
 	compat_off_t	d_off;

@@ -140,12 +140,13 @@ nfs_proc_lookup(struct inode *dir, struct qstr *name,
 	return status;
 }
 
-static int
-nfs_proc_readlink(struct inode *inode, struct page *page)
+static int nfs_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs_readlinkargs	args = {
 		.fh		= NFS_FH(inode),
-		.count		= PAGE_CACHE_SIZE,
+		.pgbase		= pgbase,
+		.pglen		= pglen,
 		.pages		= &page
 	};
 	int			status;
@@ -390,6 +391,7 @@ nfs_proc_symlink(struct inode *dir, struct qstr *name, struct qstr *path,
 		return -ENAMETOOLONG;
 	dprintk("NFS call  symlink %s -> %s\n", name->name, path->name);
 	fattr->valid = 0;
+	fhandle->size = 0;
 	status = rpc_call(NFS_CLIENT(dir), NFSPROC_SYMLINK, &arg, NULL, 0);
 	dprintk("NFS reply symlink: %d\n", status);
 	return status;

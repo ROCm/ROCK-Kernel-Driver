@@ -71,7 +71,6 @@ struct netem_sched_data {
 
 	struct disttable {
 		u32  size;
-		u32  factor;
 		s16 table[0];
 	} *delay_dist;
 };
@@ -113,11 +112,10 @@ static unsigned long get_crandom(struct crndstate *state)
  * std deviation sigma.  Uses table lookup to approximate the desired
  * distribution, and a uniformly-distributed pseudo-random source.
  */
-static unsigned long tabledist(int mu, int sigma, 
-			       struct crndstate *state,
-			       const struct disttable *dist)
+static long tabledist(unsigned long mu, long sigma, 
+		      struct crndstate *state, const struct disttable *dist)
 {
-	int t, x, factor;
+	long t, x;
 	unsigned long rnd;
 
 	if (sigma == 0)
@@ -129,16 +127,14 @@ static unsigned long tabledist(int mu, int sigma,
 	if (dist == NULL) 
 		return (rnd % (2*sigma)) - sigma + mu;
 
-	factor = dist->factor;
 	t = dist->table[rnd % dist->size];
-
-	x = (sigma % factor) * t;
+	x = (sigma % NETEM_DIST_SCALE) * t;
 	if (x >= 0)
-		x += factor/2;
+		x += NETEM_DIST_SCALE/2;
 	else
-		x -= factor/2;
+		x -= NETEM_DIST_SCALE/2;
 
-	return (x + (sigma / factor) * t) / factor + mu;
+	return  x / NETEM_DIST_SCALE + (sigma / NETEM_DIST_SCALE) * t + mu;
 }
 
 /* Put skb in the private delayed queue. */
@@ -305,25 +301,28 @@ static int set_fifo_limit(struct Qdisc *q, int limit)
 	return ret;
 }
 
+/*
+ * Distribution data is a variable size payload containing
+ * signed 16 bit values.
+ */
 static int get_dist_table(struct Qdisc *sch, const struct rtattr *attr)
 {
 	struct netem_sched_data *q = qdisc_priv(sch);
-	const struct tc_netem_dist *dist = RTA_DATA(attr);
+	unsigned long n = RTA_PAYLOAD(attr)/sizeof(__s16);
+	const __s16 *data = RTA_DATA(attr);
 	struct disttable *d;
 	int i;
 
-	if (RTA_PAYLOAD(attr) < sizeof(*dist) ||
-	    dist->factor < 2 || dist->factor > 1<<16 || dist->size > 65536)
+	if (n > 65536)
 		return -EINVAL;
 
-	d = kmalloc(sizeof(*d) + dist->size*sizeof(d->table[0]), GFP_KERNEL);
+	d = kmalloc(sizeof(*d) + n*sizeof(d->table[0]), GFP_KERNEL);
 	if (!d)
 		return -ENOMEM;
 
-	d->size = dist->size;
-	d->factor = dist->factor;
-	for (i = 0; i < dist->size; i++)
-		d->table[i] = dist->data[i];
+	d->size = n;
+	for (i = 0; i < n; i++)
+		d->table[i] = data[i];
 	
 	spin_lock_bh(&sch->dev->queue_lock);
 	d = xchg(&q->delay_dist, d);
@@ -431,6 +430,7 @@ static void netem_destroy(struct Qdisc *sch)
 
 	del_timer_sync(&q->timer);
 	qdisc_destroy(q->qdisc);
+	kfree(q->delay_dist);
 }
 
 static int netem_dump(struct Qdisc *sch, struct sk_buff *skb)

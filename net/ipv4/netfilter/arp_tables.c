@@ -193,7 +193,10 @@ static inline int arp_packet_match(const struct arphdr *arphdr,
 	}
 
 	for (i = 0, ret = 0; i < IFNAMSIZ/sizeof(unsigned long); i++) {
-		ret |= (((const unsigned long *)outdev)[i]
+		unsigned long odev;
+		memcpy(&odev, outdev + i*sizeof(unsigned long),
+		       sizeof(unsigned long));
+		ret |= (odev
 			^ ((const unsigned long *)arpinfo->outiface)[i])
 			& ((const unsigned long *)arpinfo->outiface_mask)[i];
 	}

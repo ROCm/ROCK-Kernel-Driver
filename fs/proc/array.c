@@ -310,6 +310,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	int num_threads = 0;
 	struct mm_struct *mm;
 	unsigned long long start_time;
+	unsigned long cmin_flt = 0, cmaj_flt = 0, cutime = 0, cstime = 0;
 	char tcomm[sizeof(task->comm)];
 
 	state = *get_task_state(task);
@@ -340,6 +341,10 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		}
 		pgid = process_group(task);
 		sid = task->signal->session;
+		cmin_flt = task->signal->cmin_flt;
+		cmaj_flt = task->signal->cmaj_flt;
+		cutime = task->signal->cutime;
+		cstime = task->signal->cstime;
 	}
 	read_unlock(&tasklist_lock);
 
@@ -368,13 +373,13 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		tty_pgrp,
 		task->flags,
 		task->min_flt,
-		task->cmin_flt,
+		cmin_flt,
 		task->maj_flt,
-		task->cmaj_flt,
+		cmaj_flt,
 		jiffies_to_clock_t(task->utime),
 		jiffies_to_clock_t(task->stime),
-		jiffies_to_clock_t(task->cutime),
-		jiffies_to_clock_t(task->cstime),
+		jiffies_to_clock_t(cutime),
+		jiffies_to_clock_t(cstime),
 		priority,
 		nice,
 		num_threads,

@@ -620,7 +620,10 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 		bufferinfo[i].available_length = subs->runtime->dma_bytes;
 		/* bufferinfo[i].buffer_id  is already defined */
 
-		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i, subs->runtime->dma_addr, subs->runtime->dma_bytes, subs->number);
+		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i,
+				bufferinfo[i].buffer_address,
+				bufferinfo[i].available_length,
+				subs->number);
 	}
 	up(&mgr->setup_mutex);
 
@@ -1288,11 +1291,10 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	pci_set_master(pci);
 
 	/* check if we can restrict PCI DMA transfers to 32 bits */
-	if (!pci_dma_supported(pci, 0xffffffff)) {
+	if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
 		snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0xffffffff);
 
 	/*
 	 */

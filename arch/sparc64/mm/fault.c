@@ -27,6 +27,7 @@
 #include <asm/asi.h>
 #include <asm/lsu.h>
 #include <asm/sections.h>
+#include <asm/kdebug.h>
 
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
@@ -147,6 +148,9 @@ static void unhandled_fault(unsigned long address, struct task_struct *tsk,
 	printk(KERN_ALERT "tsk->{mm,active_mm}->pgd = %016lx\n",
 	       (tsk->mm ? (unsigned long) tsk->mm->pgd :
 		          (unsigned long) tsk->active_mm->pgd));
+	if (notify_die(DIE_GPF, "general protection fault", regs,
+		       0, 0, SIGSEGV) == NOTIFY_OK)
+		return;
 	die_if_kernel("Oops", regs);
 }
 
@@ -318,8 +322,13 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	int si_code, fault_code;
 	unsigned long address;
 
-	si_code = SEGV_MAPERR;
 	fault_code = get_thread_fault_code();
+
+	if (notify_die(DIE_PAGE_FAULT, "page_fault", regs,
+		       fault_code, 0, SIGSEGV) == NOTIFY_OK)
+		return;
+
+	si_code = SEGV_MAPERR;
 	address = current_thread_info()->fault_address;
 
 	if ((fault_code & FAULT_CODE_ITLB) &&

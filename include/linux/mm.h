@@ -519,13 +519,21 @@ static inline int page_mapped(struct page *page)
 
 extern void show_free_areas(void);
 
-struct page *shmem_nopage(struct vm_area_struct * vma,
+#ifdef CONFIG_SHMEM
+struct page *shmem_nopage(struct vm_area_struct *vma,
 			unsigned long address, int *type);
 int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new);
 struct mempolicy *shmem_get_policy(struct vm_area_struct *vma,
 					unsigned long addr);
-struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 int shmem_lock(struct file *file, int lock, struct user_struct *user);
+#else
+#define shmem_nopage filemap_nopage
+#define shmem_lock(a, b) /* always in memory, no need to lock */
+#define shmem_set_policy(a, b) (0)
+#define shmem_get_policy(a, b) (NULL)
+#endif
+struct file *shmem_file_setup(char *name, loff_t size, unsigned long flags);
+
 int shmem_zero_setup(struct vm_area_struct *);
 
 static inline int can_do_mlock(void)

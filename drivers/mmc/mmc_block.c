@@ -124,7 +124,7 @@ mmc_blk_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 		geo.sectors	= 16;
 		geo.start	= get_start_sect(bdev);
 
-		return copy_to_user((void *)arg, &geo, sizeof(geo))
+		return copy_to_user((void __user *)arg, &geo, sizeof(geo))
 			? -EFAULT : 0;
 	}
 

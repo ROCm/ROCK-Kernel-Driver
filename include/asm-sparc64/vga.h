@@ -11,6 +11,9 @@
 
 #define VT_BUF_HAVE_RW
 
+#undef scr_writew
+#undef scr_readw
+
 static inline void scr_writew(u16 val, u16 *addr)
 {
 	BUG_ON((long) addr >= 0);

@@ -303,6 +303,7 @@ static int __init fd_mcs_setup(char *str)
 	static int done_setup = 0;
 	int ints[3];
 
+	get_options(str, 3, ints);
 	if (done_setup++ || ints[0] < 1 || ints[0] > 2 || ints[1] < 1 || ints[1] > 16) {
 		printk("fd_mcs: usage: fd_mcs=FIFO_COUNT, FIFO_SIZE\n");
 		return 0;

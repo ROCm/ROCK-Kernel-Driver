@@ -39,5 +39,9 @@ int main(void)
 	DEFINE(__PT_ILC, offsetof(struct pt_regs, ilc),);
 	DEFINE(__PT_TRAP, offsetof(struct pt_regs, trap),);
 	DEFINE(__PT_SIZE, sizeof(struct pt_regs),);
+	BLANK();
+	DEFINE(__SF_BACKCHAIN, offsetof(struct stack_frame, back_chain),);
+	DEFINE(__SF_GPRS, offsetof(struct stack_frame, gprs),);
+	DEFINE(__SF_EMPTY, offsetof(struct stack_frame, empty1),);
 	return 0;
 }

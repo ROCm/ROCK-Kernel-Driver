@@ -67,7 +67,7 @@ static inline cpumask_t pcibus_to_cpumask(int bus)
 }
 
 /* Node-to-Node distance */
-#define node_distance(from, to) (from != to)
+#define node_distance(from, to) ((from) != (to))
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 100

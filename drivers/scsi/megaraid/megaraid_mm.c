@@ -24,17 +24,17 @@ static int mraid_mm_ioctl(struct inode *, struct file *, uint, unsigned long);
 
 
 // routines to convert to and from the old the format
-static int mimd_to_kioc(mimd_t *, mraid_mmadp_t *, uioc_t *);
-static int kioc_to_mimd(uioc_t *, mimd_t *);
+static int mimd_to_kioc(mimd_t __user *, mraid_mmadp_t *, uioc_t *);
+static int kioc_to_mimd(uioc_t *, mimd_t __user *);
 
 
 // Helper functions
-static int handle_drvrcmd(unsigned long, uint8_t, int *);
+static int handle_drvrcmd(void __user *, uint8_t, int *);
 static int lld_ioctl(mraid_mmadp_t *, uioc_t *);
 static void ioctl_done(uioc_t *);
 static void lld_timedout(unsigned long);
 static void hinfo_to_cinfo(mraid_hba_info_t *, mcontroller_t *);
-static mraid_mmadp_t *mraid_mm_get_adapter(mimd_t *, int *);
+static mraid_mmadp_t *mraid_mm_get_adapter(mimd_t __user *, int *);
 static uioc_t *mraid_mm_alloc_kioc(mraid_mmadp_t *);
 static void mraid_mm_dealloc_kioc(mraid_mmadp_t *, uioc_t *);
 static int mraid_mm_attach_buf(mraid_mmadp_t *, uioc_t *, int);
@@ -108,6 +108,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	mraid_mmadp_t	*adp;
 	uint8_t		old_ioctl;
 	int		drvrcmd_rval;
+	void __user *argp = (void __user *)arg;
 
 	/*
 	 * Make sure only USCSICMD are issued through this interface.
@@ -121,7 +122,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	/*
 	 * Look for signature to see if this is the new or old ioctl format.
 	 */
-	if (copy_from_user(signature, (char *)arg, EXT_IOCTL_SIGN_SZ)) {
+	if (copy_from_user(signature, argp, EXT_IOCTL_SIGN_SZ)) {
 		con_log(CL_ANN, (KERN_WARNING
 			"megaraid cmm: copy from usr addr failed\n"));
 		return (-EFAULT);
@@ -142,7 +143,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	 * If it is a driver ioctl (as opposed to fw ioctls), then we can
 	 * handle the command locally. rval > 0 means it is not a drvr cmd
 	 */
-	rval = handle_drvrcmd(arg, old_ioctl, &drvrcmd_rval);
+	rval = handle_drvrcmd(argp, old_ioctl, &drvrcmd_rval);
 
 	if (rval < 0)
 		return rval;
@@ -150,7 +151,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 		return drvrcmd_rval;
 
 	rval = 0;
-	if ((adp = mraid_mm_get_adapter((mimd_t*)arg, &rval)) == NULL) {
+	if ((adp = mraid_mm_get_adapter(argp, &rval)) == NULL) {
 		return rval;
 	}
 
@@ -162,7 +163,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	/*
 	 * User sent the old mimd_t ioctl packet. Convert it to uioc_t.
 	 */
-	if ((rval = mimd_to_kioc((mimd_t*)arg, adp, kioc))) {
+	if ((rval = mimd_to_kioc(argp, adp, kioc))) {
 		mraid_mm_dealloc_kioc(adp, kioc);
 		return rval;
 	}
@@ -180,7 +181,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
 	/*
 	 * Convert the kioc back to user space
 	 */
-	rval = kioc_to_mimd(kioc, (mimd_t *)arg);
+	rval = kioc_to_mimd(kioc, argp);
 
 	/*
 	 * Return the kioc to free pool
@@ -197,7 +198,7 @@ mraid_mm_ioctl(struct inode *inode, struct file *filep, unsigned int cmd,
  * @adapter	: pointer to the adapter (OUT)
  */
 static mraid_mmadp_t *
-mraid_mm_get_adapter(mimd_t *umimd, int *rval)
+mraid_mm_get_adapter(mimd_t __user *umimd, int *rval)
 {
 	mraid_mmadp_t	*adapter;
 	mimd_t		mimd;
@@ -239,9 +240,9 @@ mraid_mm_get_adapter(mimd_t *umimd, int *rval)
  * @old_ioctl	: mimd if 1; uioc otherwise
  */
 static int
-handle_drvrcmd(unsigned long arg, uint8_t old_ioctl, int *rval)
+handle_drvrcmd(void __user *arg, uint8_t old_ioctl, int *rval)
 {
-	mimd_t		*umimd;
+	mimd_t		__user *umimd;
 	mimd_t		kmimd;
 	uint8_t		opcode;
 	uint8_t		subopcode;
@@ -256,7 +257,7 @@ new_packet:
 
 old_packet:
 	*rval = 0;
-	umimd = (mimd_t*) arg;
+	umimd = arg;
 
 	if (copy_from_user(&kmimd, umimd, sizeof(mimd_t)))
 		return (-EFAULT);
@@ -312,7 +313,7 @@ old_packet:
  */
 
 static int
-mimd_to_kioc(mimd_t *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
+mimd_to_kioc(mimd_t __user *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
 {
 	mbox64_t		*mbox64;
 	mbox_t			*mbox;
@@ -436,7 +437,7 @@ mimd_to_kioc(mimd_t *umimd, mraid_mmadp_t *adp, uioc_t *kioc)
 	kioc->user_pthru	= &umimd->pthru;
 	mbox->xferaddr		= (uint32_t)kioc->pthru32_h;
 
-	if (copy_from_user(pthru32, (caddr_t)kioc->user_pthru,
+	if (copy_from_user(pthru32, kioc->user_pthru,
 			sizeof(mraid_passthru_t))) {
 		return (-EFAULT);
 	}
@@ -473,7 +474,7 @@ mraid_mm_attach_buf(mraid_mmadp_t *adp, uioc_t *kioc, int xferlen)
 	int		i;
 
 	kioc->pool_index	= -1;
-	kioc->buf_vaddr		= 0;
+	kioc->buf_vaddr		= NULL;
 	kioc->buf_paddr		= 0;
 	kioc->free_buf		= 0;
 
@@ -573,13 +574,13 @@ mraid_mm_alloc_kioc(mraid_mmadp_t *adp)
 	memset((caddr_t)(unsigned long)kioc->cmdbuf, 0, sizeof(mbox64_t));
 	memset((caddr_t) kioc->pthru32, 0, sizeof(mraid_passthru_t));
 
-	kioc->buf_vaddr		= 0;
+	kioc->buf_vaddr		= NULL;
 	kioc->buf_paddr		= 0;
 	kioc->pool_index	=-1;
 	kioc->free_buf		= 0;
-	kioc->user_data		= 0;
+	kioc->user_data		= NULL;
 	kioc->user_data_len	= 0;
-	kioc->user_pthru	= 0;
+	kioc->user_pthru	= NULL;
 
 	return kioc;
 }
@@ -719,14 +720,14 @@ lld_timedout(unsigned long ptr)
  * @mimd	: User space MIMD packet
  */
 static int
-kioc_to_mimd(uioc_t *kioc, mimd_t *mimd)
+kioc_to_mimd(uioc_t *kioc, mimd_t __user *mimd)
 {
 	mimd_t			kmimd;
 	uint8_t			opcode;
 	uint8_t			subopcode;
 
 	mbox64_t		*mbox64;
-	mraid_passthru_t	*upthru32;
+	mraid_passthru_t	__user *upthru32;
 	mraid_passthru_t	*kpthru32;
 	mcontroller_t		cinfo;
 	mraid_hba_info_t	*hinfo;
@@ -767,8 +768,8 @@ kioc_to_mimd(uioc_t *kioc, mimd_t *mimd)
 		upthru32 = kioc->user_pthru;
 		kpthru32 = kioc->pthru32;
 
-		if (copy_to_user((void *)&upthru32->scsistatus,
-					(void *)&kpthru32->scsistatus,
+		if (copy_to_user(&upthru32->scsistatus,
+					&kpthru32->scsistatus,
 					sizeof(uint8_t))) {
 			return (-EFAULT);
 		}
@@ -781,8 +782,8 @@ kioc_to_mimd(uioc_t *kioc, mimd_t *mimd)
 		}
 	}
 
-	if (copy_to_user((void *)&mimd->mbox[17],
-			(void *)&mbox64->mbox32.status, sizeof(uint8_t))) {
+	if (copy_to_user(&mimd->mbox[17],
+			&mbox64->mbox32.status, sizeof(uint8_t))) {
 		return (-EFAULT);
 	}
 
@@ -1091,7 +1092,7 @@ mraid_mm_teardown_dma_pools(mraid_mmadp_t *adp)
 							pool->paddr);
 
 			pci_pool_destroy(pool->handle);
-			pool->handle = 0;
+			pool->handle = NULL;
 		}
 	}
 

@@ -211,43 +211,50 @@ static int usX2Y_create_alsa_devices(snd_card_t* card)
 
 static int snd_usX2Y_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 {
-	int	lret, err;
-	char*	buf;
+	usX2Ydev_t *priv = hw->private_data;
+	int	lret, err = -EINVAL;
 	snd_printdd( "dsp_load %s\n", dsp->name);
 
-	buf = dsp->image;
-
-	err = -EINVAL;
 	if (access_ok(VERIFY_READ, dsp->image, dsp->length)) {
-		struct usb_device* dev = ((usX2Ydev_t*)hw->private_data)->chip.dev;
-		buf = kmalloc(dsp->length, GFP_KERNEL);
-		copy_from_user(buf, dsp->image, dsp->length);
-		if ((err = usb_set_interface(dev, 0, 1)))
+		struct usb_device* dev = priv->chip.dev;
+		char *buf = kmalloc(dsp->length, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+		if (copy_from_user(buf, dsp->image, dsp->length)) {
+			kfree(buf);
+			return -EFAULT;
+		}
+		err = usb_set_interface(dev, 0, 1);
+		if (err)
 			snd_printk("usb_set_interface error \n");
 		else
 			err = usb_bulk_msg(dev, usb_sndbulkpipe(dev, 2), buf, dsp->length, &lret, 6*HZ);
 		kfree(buf);
 	}
-	if (!err  &&  1 == dsp->index)
-		do {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/4);			// give the device some time 
-			if ((err = usX2Y_AsyncSeq04_init((usX2Ydev_t*)hw->private_data))) {
-				snd_printk("usX2Y_AsyncSeq04_init error \n");
-				break;
-			}
-			if ((err = usX2Y_In04_init((usX2Ydev_t*)hw->private_data))) {
-				snd_printk("usX2Y_In04_init error \n");
-				break;
-			}
-			if ((err = usX2Y_create_alsa_devices(hw->card))) {
-				snd_printk("usX2Y_create_alsa_devices error %i \n", err);
-				snd_card_free(hw->card);
-				break;
-			}
-			((usX2Ydev_t*)hw->private_data)->chip_status |= USX2Y_STAT_CHIP_INIT; 
-			snd_printdd("%s: alsa all started\n", hw->name);
-		} while (0);
+	if (err)
+		return err;
+	if (dsp->index == 1) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/4);			// give the device some time 
+		err = usX2Y_AsyncSeq04_init(priv);
+		if (err) {
+			snd_printk("usX2Y_AsyncSeq04_init error \n");
+			return err;
+		}
+		err = usX2Y_In04_init(priv);
+		if (err) {
+			snd_printk("usX2Y_In04_init error \n");
+			return err;
+		}
+		err = usX2Y_create_alsa_devices(hw->card);
+		if (err) {
+			snd_printk("usX2Y_create_alsa_devices error %i \n", err);
+			snd_card_free(hw->card);
+			return err;
+		}
+		priv->chip_status |= USX2Y_STAT_CHIP_INIT; 
+		snd_printdd("%s: alsa all started\n", hw->name);
+	}
 	return err;
 }
 

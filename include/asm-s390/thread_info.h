@@ -11,6 +11,30 @@
 
 #ifdef __KERNEL__
 
+/*
+ * Size of kernel stack for each process
+ */
+#ifndef __s390x__
+#ifndef __SMALL_STACK
+#define THREAD_ORDER 1
+#define ASYNC_ORDER  1
+#else
+#define THREAD_ORDER 0
+#define ASYNC_ORDER  0
+#endif
+#else /* __s390x__ */
+#ifndef __SMALL_STACK_STACK
+#define THREAD_ORDER 2
+#define ASYNC_ORDER  2
+#else
+#define THREAD_ORDER 1
+#define ASYNC_ORDER  1
+#endif
+#endif /* __s390x__ */
+
+#define THREAD_SIZE (PAGE_SIZE << THREAD_ORDER)
+#define ASYNC_SIZE  (PAGE_SIZE << ASYNC_ORDER)
+
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/lowcore.h>
@@ -46,20 +70,6 @@ struct thread_info {
 
 #define init_thread_info	(init_thread_union.thread_info)
 #define init_stack		(init_thread_union.stack)
-
-/*
- * Size of kernel stack for each process
- */
-#ifndef __s390x__
-#define THREAD_ORDER 1
-#define ASYNC_ORDER  1
-#else /* __s390x__ */
-#define THREAD_ORDER 2
-#define ASYNC_ORDER  2
-#endif /* __s390x__ */
-
-#define THREAD_SIZE (PAGE_SIZE << THREAD_ORDER)
-#define ASYNC_SIZE  (PAGE_SIZE << ASYNC_ORDER)
 
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)

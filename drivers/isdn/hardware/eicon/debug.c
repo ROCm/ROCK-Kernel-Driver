@@ -573,7 +573,7 @@ static void DI_format (int do_lock,
                        unsigned short id,
                        int type,
                        char *format,
-                       va_list argument_list) {
+                       va_list ap) {
   diva_os_spin_lock_magic_t old_irql;
   dword sec, usec;
   diva_dbg_entry_head_t* pmsg = NULL;
@@ -582,7 +582,6 @@ static void DI_format (int do_lock,
   static char fmtBuf[MSG_FRAME_MAX_SIZE+sizeof(*pmsg)+1];
   char          *data;
   unsigned short code;
-  va_list ap;
 
   if (diva_os_in_irq()) {
     dbg_sequence++;
@@ -596,8 +595,6 @@ static void DI_format (int do_lock,
 
 
   
-  ap = argument_list;
-
   diva_os_get_time (&sec, &usec);
 
   if (do_lock) {
@@ -894,6 +891,7 @@ void diva_mnt_add_xdi_adapter (const DESCRIPTOR* d) {
     if (clients[id].hDbg && (clients[id].request == d->request)) {
       diva_os_leave_spin_lock (&dbg_q_lock, &old_irql, "register");
       diva_os_leave_spin_lock (&dbg_adapter_lock, &old_irql1, "register");
+      diva_os_free(0, pmem);
       return;
     }
     if (clients[id].hDbg) { /* slot is busy */
@@ -1807,7 +1805,7 @@ static void diva_maint_trace_notify (void* user_context,
     */
   if ((id >= 0) && (ch >= 0) && (id < sizeof(clients)/sizeof(clients[0])) &&
       (clients[id].Dbg.id == (byte)id) && (clients[id].pIdiLib == hLib)) {
-    const char* p = 0;
+    const char* p = NULL;
     int ch_value = -1;
     MI_XLOG_HDR *TrcData = (MI_XLOG_HDR *)xlog_buffer;
 
@@ -2099,7 +2097,7 @@ static int diva_get_dma_descriptor (IDI_CALL request, dword *dma_magic) {
 
   pReq->xdi_dma_descriptor_operation.info.operation =     IDI_SYNC_REQ_DMA_DESCRIPTOR_ALLOC;
   pReq->xdi_dma_descriptor_operation.info.descriptor_number  = -1;
-  pReq->xdi_dma_descriptor_operation.info.descriptor_address = 0;
+  pReq->xdi_dma_descriptor_operation.info.descriptor_address = NULL;
   pReq->xdi_dma_descriptor_operation.info.descriptor_magic   = 0;
 
   (*request)((ENTITY*)pReq);
@@ -2127,7 +2125,7 @@ static void diva_free_dma_descriptor (IDI_CALL request, int nr) {
 
   pReq->xdi_dma_descriptor_operation.info.operation = IDI_SYNC_REQ_DMA_DESCRIPTOR_FREE;
   pReq->xdi_dma_descriptor_operation.info.descriptor_number  = nr;
-  pReq->xdi_dma_descriptor_operation.info.descriptor_address = 0;
+  pReq->xdi_dma_descriptor_operation.info.descriptor_address = NULL;
   pReq->xdi_dma_descriptor_operation.info.descriptor_magic   = 0;
 
   (*request)((ENTITY*)pReq);

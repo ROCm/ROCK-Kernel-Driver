@@ -20,6 +20,7 @@
  */
 #include <linux/fs.h>
 #include <linux/stat.h>
+#include <linux/namei.h>
 #include "cifsfs.h"
 #include "cifspdu.h"
 #include "cifsglob.h"
@@ -94,7 +95,7 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	int rc = -EACCES;
 	int xid;
 	char *full_path = NULL;
-	char * target_path;
+	char * target_path = ERR_PTR(-ENOMEM);
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 
@@ -104,22 +105,17 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	full_path = build_path_from_dentry(direntry);
 	up(&direntry->d_sb->s_vfs_rename_sem);
 
-	if(full_path == NULL) {
-		FreeXid(xid);
-		return -ENOMEM;
-	}
+	if (!full_path)
+		goto out_no_free;
+
 	cFYI(1, ("Full path: %s inode = 0x%p", full_path, inode));
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 	target_path = kmalloc(PATH_MAX, GFP_KERNEL);
-	if(target_path == NULL) {
-		if (full_path)
-			kfree(full_path);
-		FreeXid(xid);
-		return -ENOMEM;
+	if (!target_path) {
+		target_path = ERR_PTR(-ENOMEM);
+		goto out;
 	}
-	/* can not call the following line due to EFAULT in vfs_readlink which is presumably expecting a user space buffer */
-	/* length = cifs_readlink(direntry,target_path, sizeof(target_path) - 1);    */
 
 /* BB add read reparse point symlink code and Unix extensions symlink code here BB */
 	if (pTcon->ses->capabilities & CAP_UNIX)
@@ -130,25 +126,25 @@ cifs_follow_link(struct dentry *direntry, struct nameidata *nd)
 	else {
 		/* rc = CIFSSMBQueryReparseLinkInfo */
 		/* BB Add code to Query ReparsePoint info */
+		/* BB Add MAC style xsymlink check here if enabled */
 	}
-	/* BB Anything else to do to handle recursive links? */
-	/* BB Should we be using page symlink ops here? */
 
 	if (rc == 0) {
 
 /* BB Add special case check for Samba DFS symlinks */
 
 		target_path[PATH_MAX-1] = 0;
-		rc = vfs_follow_link(nd, target_path);
-	}
-	/* else EACCESS */
-
-	if (target_path)
+	} else {
 		kfree(target_path);
-	if (full_path)
-		kfree(full_path);
+		target_path = ERR_PTR(rc);
+	}
+
+out:
+	kfree(full_path);
+out_no_free:
 	FreeXid(xid);
-	return rc;
+	nd_set_link(nd, target_path);
+	return 0;
 }
 
 int
@@ -322,4 +318,11 @@ cifs_readlink(struct dentry *direntry, char __user *pBuffer, int buflen)
 	}
 	FreeXid(xid);
 	return rc;
+}
+
+void cifs_put_link(struct dentry *direntry, struct nameidata *nd)
+{
+	char *p = nd_get_link(nd);
+	if (!IS_ERR(p))
+		kfree(p);
 }

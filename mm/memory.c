@@ -1744,6 +1744,8 @@ int make_pages_present(unsigned long addr, unsigned long end)
 	struct vm_area_struct * vma;
 
 	vma = find_vma(current->mm, addr);
+	if (!vma)
+		return -1;
 	write = (vma->vm_flags & VM_WRITE) != 0;
 	if (addr >= end)
 		BUG();

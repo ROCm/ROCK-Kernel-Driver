@@ -25,6 +25,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/profile.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -83,6 +84,7 @@ handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 		 struct irqaction *action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
+	int ret;
 
 	do {
 		if (!(action->flags & SA_INTERRUPT))
@@ -90,8 +92,9 @@ handle_IRQ_event(unsigned int irq, struct pt_regs *regs,
 		else
 			local_irq_disable();
 
-		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		ret = action->handler(irq, action->dev_id, regs);
+		if (ret == IRQ_HANDLED)
+			status |= action->flags;
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
@@ -328,9 +331,6 @@ register_irq_proc (unsigned int irq)
 void
 init_irq_proc (void)
 {
-#ifdef CONFIG_SMP
-	struct proc_dir_entry *entry;
-#endif
 	int i;
 
 	/* create /proc/irq */

@@ -1079,18 +1079,10 @@ osf_getrusage(int who, struct rusage32 __user *ru)
 		r.ru_majflt = current->maj_flt;
 		break;
 	case RUSAGE_CHILDREN:
-		jiffies_to_timeval32(current->cutime, &r.ru_utime);
-		jiffies_to_timeval32(current->cstime, &r.ru_stime);
-		r.ru_minflt = current->cmin_flt;
-		r.ru_majflt = current->cmaj_flt;
-		break;
-	default:
-		jiffies_to_timeval32(current->utime + current->cutime,
-				   &r.ru_utime);
-		jiffies_to_timeval32(current->stime + current->cstime,
-				   &r.ru_stime);
-		r.ru_minflt = current->min_flt + current->cmin_flt;
-		r.ru_majflt = current->maj_flt + current->cmaj_flt;
+		jiffies_to_timeval32(current->signal->cutime, &r.ru_utime);
+		jiffies_to_timeval32(current->signal->cstime, &r.ru_stime);
+		r.ru_minflt = current->signal->cmin_flt;
+		r.ru_majflt = current->signal->cmaj_flt;
 		break;
 	}
 

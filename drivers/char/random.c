@@ -781,8 +781,8 @@ static void batch_entropy_process(void *private_)
 
 /* There is one of these per entropy source */
 struct timer_rand_state {
-	__u32		last_time;
-	__s32		last_delta,last_delta2;
+	cycles_t	last_time;
+	long		last_delta,last_delta2;
 	unsigned	dont_count_entropy:1;
 };
 
@@ -799,14 +799,12 @@ static struct timer_rand_state *irq_timer_state[NR_IRQS];
  * The number "num" is also added to the pool - it should somehow describe
  * the type of event which just happened.  This is currently 0-255 for
  * keyboard scan codes, and 256 upwards for interrupts.
- * On the i386, this is assumed to be at most 16 bits, and the high bits
- * are used for a high-resolution timer.
  *
  */
 static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 {
-	__u32		time;
-	__s32		delta, delta2, delta3;
+	cycles_t	time;
+	long		delta, delta2, delta3;
 	int		entropy = 0;
 
 	/* if over the trickle threshold, use only 1 in 4096 samples */
@@ -814,22 +812,17 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	     (__get_cpu_var(trickle_count)++ & 0xfff))
 		return;
 
-#if defined (__i386__) || defined (__x86_64__)
-	if (cpu_has_tsc) {
-		__u32 high;
-		rdtsc(time, high);
-		num ^= high;
+	/*
+	 * Use get_cycles() if implemented, otherwise fall back to
+	 * jiffies.
+	 */
+	time = get_cycles();
+	if (time != 0) {
+		if (sizeof(time) > 4)
+			num ^= (u32)(time >> 32);
 	} else {
 		time = jiffies;
 	}
-#elif defined (__sparc_v9__)
-	unsigned long tick = tick_ops->get_tick();
-
-	time = (unsigned int) tick;
-	num ^= (tick >> 32UL);
-#else
-	time = jiffies;
-#endif
 
 	/*
 	 * Calculate number of bits of randomness we probably added.

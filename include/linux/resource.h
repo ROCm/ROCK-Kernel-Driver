@@ -17,6 +17,7 @@
 #define	RUSAGE_SELF	0
 #define	RUSAGE_CHILDREN	(-1)
 #define RUSAGE_BOTH	(-2)		/* sys_wait4() uses this */
+#define RUSAGE_GROUP	(-3)		/* thread group sum + dead threads */
 
 struct	rusage {
 	struct timeval ru_utime;	/* user time used */

@@ -73,7 +73,8 @@ static unsigned int
 seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
 {
 	return seq_printf(s, "packets=%llu bytes=%llu ",
-			  counter->packets, counter->bytes);
+			  (unsigned long long)counter->packets,
+			  (unsigned long long)counter->bytes);
 }
 #else
 #define seq_print_counters(x, y)	0
@@ -805,6 +806,12 @@ static int init_or_cleanup(int init)
  cleanup_defraglocalops:
 	nf_unregister_hook(&ip_conntrack_defrag_local_out_ops);
  cleanup_defragops:
+	/* Frag queues may hold fragments with skb->dst == NULL */
+	ip_ct_no_defrag = 1;
+	synchronize_net();
+	local_bh_disable();
+	ipfrag_flush();
+	local_bh_enable();
 	nf_unregister_hook(&ip_conntrack_defrag_ops);
  cleanup_proc_stat:
 	proc_net_remove("ip_conntrack_stat");

@@ -1173,11 +1173,13 @@ static int nfs4_proc_access(struct inode *inode, struct nfs_access_entry *entry)
  * Both of these changes to the XDR layer would in fact be quite
  * minor, but I decided to leave them for a subsequent patch.
  */
-static int _nfs4_proc_readlink(struct inode *inode, struct page *page)
+static int _nfs4_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs4_readlink args = {
 		.fh       = NFS_FH(inode),
-		.count    = PAGE_CACHE_SIZE,
+		.pgbase	  = pgbase,
+		.pglen    = pglen,
 		.pages    = &page,
 	};
 	struct rpc_message msg = {
@@ -1189,13 +1191,14 @@ static int _nfs4_proc_readlink(struct inode *inode, struct page *page)
 	return rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 }
 
-static int nfs4_proc_readlink(struct inode *inode, struct page *page)
+static int nfs4_proc_readlink(struct inode *inode, struct page *page,
+		unsigned int pgbase, unsigned int pglen)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
 		err = nfs4_handle_exception(NFS_SERVER(inode),
-				_nfs4_proc_readlink(inode, page),
+				_nfs4_proc_readlink(inode, page, pgbase, pglen),
 				&exception);
 	} while (exception.retry);
 	return err;

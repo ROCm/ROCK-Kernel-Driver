@@ -67,54 +67,93 @@ extern pgm_check_handler_t do_monitor_call;
 #define stack_pointer ({ void **sp; asm("la %0,0(15)" : "=&d" (sp)); sp; })
 
 #ifndef CONFIG_ARCH_S390X
-#define RET_ADDR 56
 #define FOURLONG "%08lx %08lx %08lx %08lx\n"
 static int kstack_depth_to_print = 12;
-
 #else /* CONFIG_ARCH_S390X */
-#define RET_ADDR 112
 #define FOURLONG "%016lx %016lx %016lx %016lx\n"
 static int kstack_depth_to_print = 20;
-
 #endif /* CONFIG_ARCH_S390X */
+
+/*
+ * For show_trace we have tree different stack to consider:
+ *   - the panic stack which is used if the kernel stack has overflown
+ *   - the asynchronous interrupt stack (cpu related)
+ *   - the synchronous kernel stack (process related)
+ * The stack trace can start at any of the three stack and can potentially
+ * touch all of them. The order is: panic stack, async stack, sync stack.
+ */
+static unsigned long
+__show_trace(unsigned long sp, unsigned long low, unsigned long high)
+{
+	struct stack_frame *sf;
+	struct pt_regs *regs;
+
+	while (1) {
+		sp = sp & PSW_ADDR_INSN;
+		if (sp < low || sp > high - sizeof(*sf))
+			return sp;
+		sf = (struct stack_frame *) sp;
+		printk("([<%016lx>] ", sf->gprs[8] & PSW_ADDR_INSN);
+		print_symbol("%s)\n", sf->gprs[8] & PSW_ADDR_INSN);
+		/* Follow the backchain. */
+		while (1) {
+			low = sp;
+			sp = sf->back_chain & PSW_ADDR_INSN;
+			if (!sp)
+				break;
+			if (sp <= low || sp > high - sizeof(*sf))
+				return sp;
+			sf = (struct stack_frame *) sp;
+			printk(" [<%016lx>] ", sf->gprs[8] & PSW_ADDR_INSN);
+			print_symbol("%s\n", sf->gprs[8] & PSW_ADDR_INSN);
+		}
+		/* Zero backchain detected, check for interrupt frame. */
+		sp = (unsigned long) (sf + 1);
+		if (sp <= low || sp > high - sizeof(*regs))
+			return sp;
+		regs = (struct pt_regs *) sp;
+		printk(" [<%016lx>] ", regs->psw.addr & PSW_ADDR_INSN);
+		print_symbol("%s\n", regs->psw.addr & PSW_ADDR_INSN);
+		low = sp;
+		sp = regs->gprs[15];
+	}
+}
 
 void show_trace(struct task_struct *task, unsigned long * stack)
 {
-	unsigned long backchain, low_addr, high_addr, ret_addr;
+	register unsigned long __r15 asm ("15");
+	unsigned long sp;
 
-	if (!stack)
-		stack = (task == NULL) ? *stack_pointer : &(task->thread.ksp);
-
+	sp = (unsigned long) stack;
+	if (!sp)
+		sp = task ? task->thread.ksp : __r15;
 	printk("Call Trace:\n");
-	low_addr = ((unsigned long) stack) & PSW_ADDR_INSN;
-	high_addr = (low_addr & (-THREAD_SIZE)) + THREAD_SIZE;
-	/* Skip the first frame (biased stack) */
-	backchain = *((unsigned long *) low_addr) & PSW_ADDR_INSN;
-	/* Print up to 8 lines */
-	while  (backchain > low_addr && backchain <= high_addr) {
-		ret_addr = *((unsigned long *) (backchain+RET_ADDR)) & PSW_ADDR_INSN;
-		printk(" [<%016lx>] ", ret_addr);
-		print_symbol("%s\n", ret_addr);
-		low_addr = backchain;
-		backchain = *((unsigned long *) backchain) & PSW_ADDR_INSN;
-	}
+#ifdef CONFIG_CHECK_STACK
+	sp = __show_trace(sp, S390_lowcore.panic_stack - 4096,
+			  S390_lowcore.panic_stack);
+#endif
+	sp = __show_trace(sp, S390_lowcore.async_stack - ASYNC_SIZE,
+			  S390_lowcore.async_stack);
+	if (task)
+		__show_trace(sp, (unsigned long) task->thread_info,
+			     (unsigned long) task->thread_info + THREAD_SIZE);
+	else
+		__show_trace(sp, S390_lowcore.thread_info - THREAD_SIZE,
+			     S390_lowcore.thread_info);
 	printk("\n");
 }
 
 void show_stack(struct task_struct *task, unsigned long *sp)
 {
+	register unsigned long * __r15 asm ("15");
 	unsigned long *stack;
 	int i;
 
 	// debugging aid: "show_stack(NULL);" prints the
 	// back trace for this cpu.
 
-	if (!sp) {
-		if (task)
-			sp = (unsigned long *) task->thread.ksp;
-		else
-			sp = *stack_pointer;
-	}
+	if (!sp)
+		sp = task ? (unsigned long *) task->thread.ksp : __r15;
 
 	stack = sp;
 	for (i = 0; i < kstack_depth_to_print; i++) {
@@ -591,6 +630,11 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	}
 }
 
+asmlinkage void kernel_stack_overflow(struct pt_regs * regs)
+{
+	die("Kernel stack overflow", regs, 0);
+	panic("Corrupt kernel stack, can't continue.");
+}
 
 
 /* init is done in lowcore.S and head.S */

@@ -13,6 +13,7 @@
 #define __ASM_ARM_MEMORY_H
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <asm/arch/memory.h>
 
 #ifndef TASK_SIZE

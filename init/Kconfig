@@ -283,7 +283,21 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say N.
 
+config SHMEM
+	default y
+	bool "Use full shmem filesystem" if EMBEDDED && MMU
+	help
+	  The shmem is an internal filesystem used to manage shared memory.
+	  It is backed by swap and manages resource limits. It is also exported
+	  to userspace as tmpfs if TMPFS is enabled. Disabling this
+	  option replaces shmem and tmpfs with the much simpler ramfs code,
+	  which may be appropriate on small systems without swap.
+
 endmenu		# General setup
+
+config TINY_SHMEM
+	default !SHMEM
+	bool
 
 menu "Loadable module support"
 
