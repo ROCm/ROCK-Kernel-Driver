@@ -1,5 +1,6 @@
 /*
  * wakeup.c - support wakeup devices
+ * Copyright (C) 2004 Li Shaohua <shaohua.li@intel.com>
  */
 
 #include <linux/init.h>
@@ -145,6 +146,26 @@ acpi_disable_wakeup_device (
 		spin_lock(&acpi_device_lock);
 	}
 	spin_unlock(&acpi_device_lock);
+}
+
+/*
+ * Disable all wakeup GPEs before power off - some buggy systems require it
+ */
+void acpi_wakeup_gpe_poweroff_prepare(void)
+{
+	struct list_head * node, * next;
+
+	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
+		struct acpi_device * dev = container_of(node,
+			struct acpi_device, wakeup_list);
+
+		/* The GPE can wakeup system from S5, don't touch it */
+		if ((u32)dev->wakeup.sleep_state == ACPI_STATE_S5)
+			continue;
+		/* acpi_set_gpe_type will automatically disable GPE */
+		acpi_set_gpe_type(dev->wakeup.gpe_device,
+			dev->wakeup.gpe_number, ACPI_GPE_TYPE_RUNTIME);
+	}
 }
 
 static int __init acpi_wakeup_device_init(void)
