@@ -91,6 +91,7 @@ struct serial_uart_config {
 #define UART_CLEAR_FIFO		0x01
 #define UART_USE_FIFO		0x02
 #define UART_STARTECH		0x04
+#define UART_NATSEMI		0x08
 
 /*
  * Definitions for async_struct (and serial_struct) flags field

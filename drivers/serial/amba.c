@@ -408,12 +408,13 @@ ambauart_set_termios(struct uart_port *port, struct termios *termios,
 {
 	unsigned int lcr_h, old_cr;
 	unsigned long flags;
-	unsigned int quot;
+	unsigned int baud, quot;
 
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -444,7 +445,7 @@ ambauart_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	port->read_status_mask = AMBA_UARTRSR_OE;
 	if (termios->c_iflag & INPCK)
