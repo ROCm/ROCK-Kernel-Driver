@@ -587,24 +587,10 @@ extern void free_irq(unsigned int, void *);
  * This has now become a routine instead of a macro, it sets a flag if
  * it returns true (to do BSD-style accounting where the process is flagged
  * if it uses root privs). The implication of this is that you should do
- * normal permissions checks first, and check suser() last.
+ * normal permissions checks first, and check fsuser() last.
  *
- * [Dec 1997 -- Chris Evans]
- * For correctness, the above considerations need to be extended to
- * fsuser(). This is done, along with moving fsuser() checks to be
- * last.
- *
- * These will be removed, but in the mean time, when the SECURE_NOROOT 
- * flag is set, uids don't grant privilege.
+ * suser() is gone, fsuser() should go soon too...
  */
-static inline int suser(void)
-{
-	if (!issecure(SECURE_NOROOT) && current->euid == 0) { 
-		current->flags |= PF_SUPERPRIV;
-		return 1;
-	}
-	return 0;
-}
 
 static inline int fsuser(void)
 {
@@ -616,19 +602,12 @@ static inline int fsuser(void)
 }
 
 /*
- * capable() checks for a particular capability.  
- * New privilege checks should use this interface, rather than suser() or
- * fsuser(). See include/linux/capability.h for defined capabilities.
+ * capable() checks for a particular capability.
+ * See include/linux/capability.h for defined capabilities.
  */
-
 static inline int capable(int cap)
 {
-#if 1 /* ok now */
-	if (cap_raised(current->cap_effective, cap))
-#else
-	if (cap_is_fs_cap(cap) ? current->fsuid == 0 : current->euid == 0)
-#endif
-	{
+	if (cap_raised(current->cap_effective, cap)) {
 		current->flags |= PF_SUPERPRIV;
 		return 1;
 	}
