@@ -1261,7 +1261,7 @@ int ip6_pkt_discard(struct sk_buff *skb)
  *	Add address
  */
 
-int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
+int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
 {
 	struct rt6_info *rt = ip6_dst_alloc();
 
@@ -1280,6 +1280,8 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	rt->u.dst.obsolete = -1;
 
 	rt->rt6i_flags = RTF_UP | RTF_NONEXTHOP;
+	if (!anycast)
+		rt->rt6i_flags |= RTF_LOCAL;
 	rt->rt6i_nexthop = ndisc_get_neigh(rt->rt6i_dev, &rt->rt6i_gateway);
 	if (rt->rt6i_nexthop == NULL) {
 		dst_free((struct dst_entry *) rt);
