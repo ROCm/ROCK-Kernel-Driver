@@ -220,7 +220,7 @@ config ACPI_TOSHIBA
 
 config ACPI_CUSTOM_DSDT
 	bool "Include Custom DSDT"
-	depends on X86 && ACPI_INTERPRETER && !STANDALONE
+	depends on ACPI_INTERPRETER && !STANDALONE
 	default n 
 	help
 	  Thist option is to load a custom ACPI DSDT
