@@ -786,8 +786,12 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
  */
 void usb_disconnect(struct usb_device **pdev)
 {
-	struct usb_device * dev = *pdev;
-	int i;
+	struct usb_device	*dev = *pdev;
+	struct usb_bus		*bus = dev->bus;
+	struct usb_operations	*ops = bus->op;
+	int			i;
+
+	might_sleep ();
 
 	if (!dev)
 		return;
@@ -808,13 +812,25 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
+	/* disconnect() drivers from interfaces (a key side effect) */
 	dev_dbg (&dev->dev, "unregistering interfaces\n");
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-			struct usb_interface *interface = &dev->actconfig->interface[i];
+			struct usb_interface	*interface;
 
 			/* remove this interface */
+			interface = &dev->actconfig->interface[i];
 			device_unregister(&interface->dev);
+		}
+	}
+
+	/* deallocate hcd/hardware state */
+	if (ops->disable) {
+		void	(*disable)(struct usb_device *, int) = ops->disable;
+
+		for (i = 0; i < 15; i++) {
+			disable (dev, i);
+			disable (dev, USB_DIR_IN | i);
 		}
 	}
 
