@@ -476,7 +476,6 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	new_jh->b_transaction = NULL;
 	new_bh->b_size = jh2bh(jh_in)->b_size;
 	new_bh->b_bdev = transaction->t_journal->j_dev;
-	new_bh->b_dev = to_kdev_t(transaction->t_journal->j_dev->bd_dev);
 	new_bh->b_blocknr = blocknr;
 	new_bh->b_state |= (1 << BH_Mapped) | (1 << BH_Dirty);
 
@@ -641,7 +640,7 @@ int journal_bmap(journal_t *journal, unsigned long blocknr,
 				": journal block not found "
 				"at offset %lu on %s\n",
 				blocknr,
-				bdevname(to_kdev_t(journal->j_dev->bd_dev)));
+				bdevname(journal->j_dev));
 			err = -EIO;
 			__journal_abort_soft(journal, err);
 		}
@@ -1366,7 +1365,7 @@ const char * journal_dev_name(journal_t *journal)
 	else
 		bdev = journal->j_dev;
 
-	return bdevname(to_kdev_t(bdev->bd_dev));
+	return bdevname(bdev);
 }
 
 /*

@@ -24,7 +24,6 @@ int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	int i, csum;
 	unsigned short *ush;
 	Sector sect;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct sun_disklabel {
 		unsigned char info[128];   /* Informative text string */
 		unsigned char spare[292];  /* Boot information etc. */
@@ -55,7 +54,7 @@ int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 	p = label->partitions;
 	if (be16_to_cpu(label->magic) != SUN_LABEL_MAGIC) {
 /*		printk(KERN_INFO "Dev %s Sun disklabel: bad magic %04x\n",
-		       bdevname(dev), be16_to_cpu(label->magic)); */
+		       bdevname(bdev), be16_to_cpu(label->magic)); */
 		put_dev_sector(sect);
 		return 0;
 	}
@@ -65,7 +64,7 @@ int sun_partition(struct gendisk *hd, struct block_device *bdev, unsigned long f
 		csum ^= *ush--;
 	if(csum) {
 		printk("Dev %s Sun disklabel: Csum bad, label corrupted\n",
-		       bdevname(dev));
+		       bdevname(bdev));
 		put_dev_sector(sect);
 		return 0;
 	}

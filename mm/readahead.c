@@ -35,10 +35,11 @@ static int get_max_readahead(struct inode *inode)
 {
 	unsigned blk_ra_kbytes = 0;
 
-	blk_ra_kbytes = blk_get_readahead(inode->i_dev) / 2;
-	if (blk_ra_kbytes < VM_MIN_READAHEAD)
-		blk_ra_kbytes = VM_MAX_READAHEAD;
-
+	if (inode->i_sb->s_bdev) {
+		blk_ra_kbytes = blk_get_readahead(inode->i_sb->s_bdev) / 2;
+		if (blk_ra_kbytes < VM_MIN_READAHEAD)
+			blk_ra_kbytes = VM_MAX_READAHEAD;
+	}
 	return blk_ra_kbytes >> (PAGE_CACHE_SHIFT - 10);
 }
 

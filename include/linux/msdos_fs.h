@@ -54,11 +54,28 @@
 
 #define MSDOS_FAT12 4084 /* maximum number of clusters in a 12 bit FAT */
 
-#define EOF_FAT12 0xFF8		/* standard EOF */
+/* media of boot sector */
+#define FAT_VALID_MEDIA(x)	((0xF8 <= (x) && (x) <= 0xFF) || (x) == 0xF0)
+#define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
+	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
+
+/* bad cluster mark */
+#define BAD_FAT12 0xFF7
+#define BAD_FAT16 0xFFF7
+#define BAD_FAT32 0xFFFFFF7
+#define BAD_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? BAD_FAT32 : \
+	MSDOS_SB(s)->fat_bits == 16 ? BAD_FAT16 : BAD_FAT12)
+
+/* standard EOF */
+#define EOF_FAT12 0xFF8
 #define EOF_FAT16 0xFFF8
 #define EOF_FAT32 0xFFFFFF8
 #define EOF_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? EOF_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? EOF_FAT16 : EOF_FAT12)
+
+#define FAT_ENT_FREE	(0)
+#define FAT_ENT_BAD	(BAD_FAT32)
+#define FAT_ENT_EOF	(EOF_FAT32)
 
 #define FAT_FSINFO_SIG1		0x41615252
 #define FAT_FSINFO_SIG2		0x61417272
@@ -102,7 +119,7 @@ struct fat_boot_sector {
 	__u8	fats;		/* number of FATs */
 	__u8	dir_entries[2];	/* root directory entries */
 	__u8	sectors[2];	/* number of sectors */
-	__u8	media;		/* media code (unused) */
+	__u8	media;		/* media code */
 	__u16	fat_length;	/* sectors/FAT */
 	__u16	secs_track;	/* sectors per track */
 	__u16	heads;		/* number of heads */
@@ -230,6 +247,7 @@ extern void fat_ll_rw_block(struct super_block *sb, int opr, int nbreq,
 
 /* fat/cache.c */
 extern int fat_access(struct super_block *sb, int nr, int new_value);
+extern int __fat_access(struct super_block *sb, int nr, int new_value);
 extern int fat_bmap(struct inode *inode, int sector);
 extern void fat_cache_init(void);
 extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
@@ -237,7 +255,6 @@ extern void fat_cache_lookup(struct inode *inode, int cluster, int *f_clu,
 extern void fat_cache_add(struct inode *inode, int f_clu, int d_clu);
 extern void fat_cache_inval_inode(struct inode *inode);
 extern void fat_cache_inval_dev(struct super_block *sb);
-extern int fat_get_cluster(struct inode *inode, int cluster);
 extern int fat_free(struct inode *inode, int skip);
 
 /* fat/dir.c */

@@ -106,7 +106,7 @@ int sb_set_blocksize(struct super_block *sb, int size)
 
 int sb_min_blocksize(struct super_block *sb, int size)
 {
-	int minsize = get_hardsect_size(sb->s_dev);
+	int minsize = bdev_hardsect_size(sb->s_bdev);
 	if (size < minsize)
 		size = minsize;
 	return sb_set_blocksize(sb, size);
@@ -117,7 +117,6 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 	if (iblock >= max_block(inode->i_rdev))
 		return -EIO;
 
-	bh->b_dev = inode->i_rdev;
 	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
 	bh->b_state |= 1UL << BH_Mapped;
@@ -353,6 +352,7 @@ struct block_device *bdget(dev_t dev)
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
+			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
 			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
@@ -563,7 +563,7 @@ int check_disk_change(kdev_t dev)
 		return 0;
 
 	printk(KERN_DEBUG "VFS: Disk change detected on device %s\n",
-		bdevname(dev));
+		__bdevname(dev));
 
 	if (invalidate_device(dev, 0))
 		printk("VFS: busy inodes on changed media.\n");
@@ -590,28 +590,62 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 {
 	int ret = -ENXIO;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	struct module *owner = NULL;
 
 	down(&bdev->bd_sem);
 	lock_kernel();
-	if (!bdev->bd_op)
+	if (!bdev->bd_op) {
 		bdev->bd_op = get_blkfops(major(dev));
-	if (bdev->bd_op) {
-		ret = 0;
-		if (bdev->bd_op->owner)
-			__MOD_INC_USE_COUNT(bdev->bd_op->owner);
-		if (bdev->bd_op->open)
-			ret = bdev->bd_op->open(inode, file);
-		if (!ret) {
-			bdev->bd_openers++;
-			bdev->bd_inode->i_size = blkdev_size(dev);
-			bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
-		} else {
-			if (bdev->bd_op->owner)
-				__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
-			if (!bdev->bd_openers)
-				bdev->bd_op = NULL;
+		if (!bdev->bd_op)
+			goto out;
+		owner = bdev->bd_op->owner;
+		if (owner)
+			__MOD_INC_USE_COUNT(owner);
+	}
+	if (!bdev->bd_contains) {
+		unsigned minor = minor(dev);
+		struct gendisk *g = get_gendisk(dev);
+		bdev->bd_contains = bdev;
+		if (g) {
+			int shift = g->minor_shift;
+			unsigned minor0 = (minor >> shift) << shift;
+			if (minor != minor0) {
+				struct block_device *disk;
+				disk = bdget(MKDEV(major(dev), minor0));
+				ret = -ENOMEM;
+				if (!disk)
+					goto out1;
+				ret = blkdev_get(disk, file->f_mode, file->f_flags, BDEV_RAW);
+				if (ret)
+					goto out1;
+				bdev->bd_contains = disk;
+			}
 		}
 	}
+	if (bdev->bd_op->open) {
+		ret = bdev->bd_op->open(inode, file);
+		if (ret)
+			goto out2;
+	}
+	bdev->bd_openers++;
+	bdev->bd_inode->i_size = blkdev_size(dev);
+	bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
+	unlock_kernel();
+	up(&bdev->bd_sem);
+	return 0;
+
+out2:
+	if (!bdev->bd_openers) {
+		bdev->bd_op = NULL;
+		if (bdev != bdev->bd_contains) {
+			blkdev_put(bdev->bd_contains, BDEV_RAW);
+			bdev->bd_contains = NULL;
+		}
+	}
+out1:
+	if (owner)
+		__MOD_DEC_USE_COUNT(owner);
+out:
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	if (ret)
@@ -676,8 +710,13 @@ int blkdev_put(struct block_device *bdev, int kind)
 		ret = bdev->bd_op->release(bd_inode, NULL);
 	if (bdev->bd_op->owner)
 		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
-	if (!bdev->bd_openers)
+	if (!bdev->bd_openers) {
 		bdev->bd_op = NULL;
+		if (bdev != bdev->bd_contains) {
+			blkdev_put(bdev->bd_contains, BDEV_RAW);
+			bdev->bd_contains = NULL;
+		}
+	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
 	bdput(bdev);
@@ -728,7 +767,7 @@ struct file_operations def_blk_fops = {
 	ioctl:		blkdev_ioctl,
 };
 
-const char * bdevname(kdev_t dev)
+const char *__bdevname(kdev_t dev)
 {
 	static char buffer[32];
 	const char * name = blkdevs[major(dev)].name;

@@ -37,7 +37,7 @@ static inline void __unhash_process(struct task_struct *p)
 	list_del(&p->thread_group);
 	p->pid = 0;
 	proc_dentry = p->proc_dentry;
-	if (unlikely(proc_dentry)) {
+	if (unlikely(proc_dentry != NULL)) {
 		spin_lock(&dcache_lock);
 		if (!list_empty(&proc_dentry->d_hash)) {
 			dget_locked(proc_dentry);
@@ -47,7 +47,7 @@ static inline void __unhash_process(struct task_struct *p)
 		spin_unlock(&dcache_lock);
 	}
 	write_unlock_irq(&tasklist_lock);
-	if (unlikely(proc_dentry)) {
+	if (unlikely(proc_dentry != NULL)) {
 		shrink_dcache_parent(proc_dentry);
 		dput(proc_dentry);
 	}

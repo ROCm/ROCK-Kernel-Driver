@@ -165,17 +165,15 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   int err;
   int sectornr, sectors, i;
   struct kiobuf *iobuf;
-  kdev_t dev;
   unsigned long *blocks;
 
   if(!rawdevice) {
     printk("blkmtd: readpage: PANIC file->private_data == NULL\n");
     return -EIO;
   }
-  dev = to_kdev_t(rawdevice->binding->bd_dev);
 
   DEBUG(2, "blkmtd: readpage called, dev = `%s' page = %p index = %ld\n",
-	bdevname(dev), page, page->index);
+	bdevname(rawdevice->binding), page, page->index);
 
   if(Page_Uptodate(page)) {
     DEBUG(2, "blkmtd: readpage page %ld is already upto date\n", page->index);
@@ -356,7 +354,6 @@ static int write_queue_task(void *data)
       int sectornr = item->pagenr << (PAGE_SHIFT - item->rawdevice->sector_bits);
       int sectorcnt = item->pagecnt << (PAGE_SHIFT - item->rawdevice->sector_bits);
       int max_sectors = KIO_MAX_SECTORS >> (item->rawdevice->sector_bits - 9);
-      kdev_t dev = to_kdev_t(item->rawdevice->binding->bd_dev);
 
       /* If we are writing to the last page on the device and it doesnt end
        * on a page boundary, subtract the number of sectors that dont exist.
@@ -546,7 +543,7 @@ static int blkmtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 
   /* check erase region has valid start and length */
   DEBUG(2, "blkmtd: erase: dev = `%s' from = 0x%x len = 0x%lx\n",
-	bdevname(rawdevice->binding->bd_dev), from, len);
+	bdevname(rawdevice->binding), from, len);
   while(numregions) {
     DEBUG(3, "blkmtd: checking erase region = 0x%08X size = 0x%X num = 0x%x\n",
 	  einfo->offset, einfo->erasesize, einfo->numblocks);
@@ -648,7 +645,7 @@ static int blkmtd_read(struct mtd_info *mtd, loff_t from, size_t len,
   *retlen = 0;
 
   DEBUG(2, "blkmtd: read: dev = `%s' from = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding->bd_dev), (long int)from, len, buf);
+	bdevname(rawdevice->binding), (long int)from, len, buf);
 
   pagenr = from >> PAGE_SHIFT;
   offset = from - (pagenr << PAGE_SHIFT);
@@ -718,7 +715,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 
   *retlen = 0;
   DEBUG(2, "blkmtd: write: dev = `%s' to = %ld len = %d buf = %p\n",
-	bdevname(rawdevice->binding->bd_dev), (long int)to, len, buf);
+	bdevname(rawdevice->binding), (long int)to, len, buf);
 
   /* handle readonly and out of range numbers */
 
@@ -1131,7 +1128,7 @@ static int __init init_blkmtd(void)
     return 1;
   }
 
-  DEBUG(1, "blkmtd: devname = %s\n", bdevname(rdev));
+  DEBUG(1, "blkmtd: devname = %s\n", __bdevname(rdev));
   blocksize = BLOCK_SIZE;
 
   blocksize = bs ? bs : block_size(rdev);
