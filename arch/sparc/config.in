@@ -81,11 +81,6 @@ bool 'Normal floppy disk support' CONFIG_BLK_DEV_FD
 tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
 dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
 
-#tristate 'Logical volume manager (LVM) support' CONFIG_BLK_DEV_LVM N
-#if [ "$CONFIG_BLK_DEV_LVM" != "n" ]; then
-#   bool '   LVM information in proc filesystem' CONFIG_LVM_PROC_FS Y
-#fi
-
 source drivers/md/Config.in
 
 tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
@@ -239,7 +234,10 @@ endmenu
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
+bool 'Debug memory allocations' CONFIG_DEBUG_SLAB
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+
 endmenu
 
 source security/Config.in

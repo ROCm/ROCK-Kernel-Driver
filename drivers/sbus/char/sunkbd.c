@@ -544,7 +544,7 @@ static void __sunkbd_inchar(unsigned char ch, struct pt_regs *regs)
 #ifdef CONFIG_MAGIC_SYSRQ			/* Handle the SysRq hack */
 	if (l1a_state.l1_down) {
 		if (!up_flag)
-			handle_sysrq(sun_sysrq_xlate[keycode], pt_regs, kbd, tty);
+			handle_sysrq(sun_sysrq_xlate[keycode], pt_regs, tty);
 		goto out;
 	}
 #endif
@@ -1548,12 +1548,12 @@ kbd_close (struct inode *i, struct file *f)
 
 static struct file_operations kbd_fops =
 {
-	read:		kbd_read,
-	poll:		kbd_poll,
-	ioctl:		kbd_ioctl,
-	open:		kbd_open,
-	release:	kbd_close,
-	fasync:		kbd_fasync,
+	.read =		kbd_read,
+	.poll =		kbd_poll,
+	.ioctl =	kbd_ioctl,
+	.open =		kbd_open,
+	.release =	kbd_close,
+	.fasync =	kbd_fasync,
 };
 
 void __init keyboard_zsinit(void (*put_char)(unsigned char))

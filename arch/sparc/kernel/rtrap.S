@@ -13,6 +13,7 @@
 #include <asm/contregs.h>
 #include <asm/winmacro.h>
 #include <asm/asmmacro.h>
+#include <asm/thread_info.h>
 
 #define t_psr     l0
 #define t_pc      l1
@@ -58,17 +59,17 @@ C_LABEL(ret_trap_lockless_ipi):
 	 nop
 
 1:
-#error	ld	[%curptr + AOFF_task_need_resched], %g2
-	orcc	%g2, %g0, %g0
+	ld	[%curptr + TI_FLAGS], %g2
+	andcc	%g2, (_TIF_NEED_RESCHED), %g0
 	be	signal_p
-#error	 ld	[%curptr + AOFF_task_sigpending], %g2
+	 nop
 
 	call	C_LABEL(schedule)
 	 nop
 
-#error	ld	[%curptr + AOFF_task_sigpending], %g2
+	ld	[%curptr + TI_FLAGS], %g2
 signal_p:
-	cmp	%g2, 0
+	andcc	%g2, (_TIF_NOTIFY_RESUME|_TIF_SIGPENDING), %g0
 	bz,a	ret_trap_continue
 	 ld	[%sp + REGWIN_SZ + PT_PSR], %t_psr
 
@@ -98,7 +99,7 @@ ret_trap_continue:
 	 add	%sp, REGWIN_SZ, %o0
 
 	b	signal_p
-#error	 ld	[%curptr + AOFF_task_sigpending], %g2
+	 ld	[%curptr + TI_FLAGS], %g2
 
 ret_trap_nobufwins:
 	/* Load up the user's out registers so we can pull
@@ -109,11 +110,11 @@ ret_trap_nobufwins:
 	/* If there are already live user windows in the
 	 * set we can return from trap safely.
 	 */
-	ld	[%curptr + AOFF_task_thread + AOFF_thread_uwinmask], %twin_tmp1
+	ld	[%curptr + TI_UWINMASK], %twin_tmp1
 	orcc	%g0, %twin_tmp1, %g0
 	bne	ret_trap_userwins_ok
 	 nop
-	
+
 		/* Calculate new %wim, we have to pull a register
 		 * window from the users stack.
 		 */
@@ -168,7 +169,7 @@ ret_trap_unaligned_pc:
 	 nop
 
 	b	signal_p
-#error	 ld	[%curptr + AOFF_task_sigpending], %g2
+	 ld	[%curptr + TI_FLAGS], %g2
 
 ret_trap_kernel:
 		/* Will the rett land us in the invalid window? */
@@ -218,7 +219,8 @@ ret_trap_user_stack_is_bolixed:
 	 add	%sp, REGWIN_SZ, %o0
 
 	b	signal_p
-#error	 ld	[%curptr + AOFF_task_sigpending], %g2
+	 ld	[%curptr + TI_FLAGS], %g2
+
 
 	.globl	C_LABEL(sun4c_rett_stackchk)
 C_LABEL(sun4c_rett_stackchk):

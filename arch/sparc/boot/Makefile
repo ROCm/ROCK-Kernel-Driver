@@ -22,8 +22,9 @@ btfixupprep: btfixupprep.c
 clean:
 	rm -f btfixupprep piggyback tftpboot.img btfix.o btfix.s
 
-BTOBJS := $(HEAD) init/main.o init/version.o
-BTLIBS := $(CORE_FILES_NO_BTFIX) $(FILESYSTEMS) \
+#BTOBJS := $(HEAD) init/main.o init/version.o
+BTOBJS := $(HEAD) $(INIT)
+BTLIBS := $(CORE_FILES_NO_BTFIX) $(LIBS) \
 	$(DRIVERS) $(NETWORKS)
 
 # I wanted to make this depend upon BTOBJS so that a parallel
@@ -34,7 +35,6 @@ vmlinux.o: FORCE
 	$(LD) $(LDFLAGS) -r $(patsubst %,$(TOPDIR)/%,$(BTOBJS)) \
 		--start-group \
 		$(patsubst %,$(TOPDIR)/%,$(BTLIBS)) \
-		$(LIBS) \
 		--end-group -o vmlinux.o
 
 btfix.s: btfixupprep vmlinux.o

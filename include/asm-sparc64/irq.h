@@ -91,6 +91,7 @@ extern unsigned char dma_sync_reg_table_entry;
 #define IBF_PCI		0x02	/* Indicates PSYCHO/SABRE/SCHIZO PCI interrupt.	 */
 #define IBF_ACTIVE	0x04	/* This interrupt is active and has a handler.	 */
 #define IBF_MULTI	0x08	/* On PCI, indicates shared bucket.		 */
+#define IBF_INPROGRESS	0x10	/* IRQ is being serviced.			 */
 
 #define NUM_IVECS	8192
 extern struct ino_bucket ivector_table[NUM_IVECS];

@@ -4,18 +4,17 @@
 #ifndef __SPARC_SYSTEM_H
 #define __SPARC_SYSTEM_H
 
+#include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/threads.h>	/* NR_CPUS */
 
 #include <asm/segment.h>
-
-#ifdef __KERNEL__
+#include <asm/thread_info.h>
 #include <asm/page.h>
-#include <asm/oplib.h>
+#include <asm/openprom.h>	/* romvec. XXX will be dealt later. Promise. */
 #include <asm/psr.h>
 #include <asm/ptrace.h>
 #include <asm/btfixup.h>
-
-#endif /* __KERNEL__ */
 
 #ifndef __ASSEMBLY__
 
@@ -48,6 +47,8 @@ extern enum sparc_cpu sparc_cpu_model;
 
 #define SUN4M_NCPUS            4              /* Architectural limit of sun4m. */
 
+extern struct thread_info *current_set[NR_CPUS];
+
 extern unsigned long empty_bad_page;
 extern unsigned long empty_bad_page_table;
 extern unsigned long empty_zero_page;
@@ -67,28 +68,43 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 		   void *fpqueue, unsigned long *fpqdepth);
 
 #ifdef CONFIG_SMP
-#define SWITCH_ENTER \
-	if(prev->flags & PF_USEDFPU) { \
+#define SWITCH_ENTER(prv) \
+	do {			\
+	if (test_tsk_thread_flag(prv, TIF_USEDFPU) { \
 		put_psr(get_psr() | PSR_EF); \
-		fpsave(&prev->thread.float_regs[0], &prev->thread.fsr, \
-		       &prev->thread.fpqueue[0], &prev->thread.fpqdepth); \
-		prev->flags &= ~PF_USEDFPU; \
-		prev->thread.kregs->psr &= ~PSR_EF; \
-	}
+		fpsave(&(prv)->thread.float_regs[0], &(prv)->thread.fsr, \
+		       &(prv)->thread.fpqueue[0], &(prv)->thread.fpqdepth); \
+		clear_tsk_thread_flag(prv, TIF_USEDFPU); \
+		(prv)->thread.kregs->psr &= ~PSR_EF; \
+	} \
+	} while(0)
 
-#define SWITCH_DO_LAZY_FPU
+#define SWITCH_DO_LAZY_FPU(next)	/* */
 #else
-#define SWITCH_ENTER
-#define SWITCH_DO_LAZY_FPU if(last_task_used_math != next) next->thread.kregs->psr&=~PSR_EF;
+#define SWITCH_ENTER(prv)		/* */
+#define SWITCH_DO_LAZY_FPU(nxt)	\
+	do {			\
+	if (last_task_used_math != (nxt))		\
+		(nxt)->thread.kregs->psr&=~PSR_EF;	\
+	} while(0)
 #endif
+
+// #define prepare_arch_schedule(prev)	task_lock(prev)
+// #define finish_arch_schedule(prev)	task_unlock(prev)
+#define prepare_arch_schedule(prev)	do{ }while(0)
+#define finish_arch_schedule(prev)	do{ }while(0)
 
 /*
  * Flush windows so that the VM switch which follows
  * would not pull the stack from under us.
  *
  * SWITCH_ENTER and SWITH_DO_LAZY_FPU do not work yet (e.g. SMP does not work)
+ * XXX WTF is the above comment? Found in late teen 2.4.x.
+ *
+ * XXX prepare_arch_switch() is much smarter than this in sparc64, are we sure?
+ * XXX Cosider if doing it the flush_user_windows way is faster (by uwinmask).
  */
-#define prepare_to_switch() do { \
+#define prepare_arch_switch(rq) do { \
 	__asm__ __volatile__( \
 	".globl\tflush_patch_switch\nflush_patch_switch:\n\t" \
 	"save %sp, -0x40, %sp; save %sp, -0x40, %sp; save %sp, -0x40, %sp\n\t" \
@@ -96,6 +112,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"save %sp, -0x40, %sp\n\t" \
 	"restore; restore; restore; restore; restore; restore; restore"); \
 } while(0)
+#define finish_arch_switch(rq)	do{ }while(0)
 
 	/* Much care has gone into this code, do not touch it.
 	 *
@@ -111,9 +128,8 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 #define switch_to(prev, next, last) do {						\
 	__label__ here;									\
 	register unsigned long task_pc asm("o7");					\
-	extern struct task_struct *current_set[NR_CPUS];				\
-	SWITCH_ENTER									\
-	SWITCH_DO_LAZY_FPU								\
+	SWITCH_ENTER(prev);								\
+	SWITCH_DO_LAZY_FPU(next);							\
 	next->active_mm->cpu_vm_mask |= (1 << smp_processor_id());			\
 	task_pc = ((unsigned long) &&here) - 0x8;					\
 	__asm__ __volatile__(								\
@@ -140,11 +156,13 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"nop\n\t"									\
 	"nop\n\t"									\
 	"jmpl	%%o7 + 0x8, %%g0\n\t"							\
-	" mov	%%g3, %0\n\t"								\
+	" ld	[%%g3 + %5], %0\n\t"								\
         : "=&r" (last)									\
-        : "r" (&(current_set[hard_smp_processor_id()])), "r" (next),			\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.kpsr)),		\
-	  "i" ((const unsigned long)(&((struct task_struct *)0)->thread.ksp)),		\
+        : "r" (&(current_set[hard_smp_processor_id()])),	\
+	  "r" ((next)->thread_info),				\
+	  "i" (TI_KPSR),					\
+	  "i" (TI_KSP),						\
+	  "i" (TI_TASK),					\
 	  "r" (task_pc)									\
 	: "g1", "g2", "g3", "g4", "g5", "g7", "l0", "l1",				\
 	"l4", "l5", "l6", "l7", "i0", "i1", "i2", "i3", "i4", "i5", "o0", "o1", "o2",	\

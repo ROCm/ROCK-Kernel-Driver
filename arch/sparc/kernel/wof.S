@@ -13,6 +13,7 @@
 #include <asm/asi.h>
 #include <asm/winmacro.h>
 #include <asm/asmmacro.h>
+#include <asm/thread_info.h>
 
 /* WARNING: This routine is hairy and _very_ complicated, but it
  *          must be as fast as possible as it handles the allocation
@@ -62,7 +63,7 @@ spnwin_patch3_7win:	and	%twin_tmp, 0x7f, %twin_tmp
 	 * andcc %l0, PSR_PS, %g0
 	 */
 
-	/* Datum current->thread.uwinmask contains at all times a bitmask
+	/* Datum current_thread_info->uwinmask contains at all times a bitmask
 	 * where if any user windows are active, at least one bit will
 	 * be set in to mask.  If no user windows are active, the bitmask
 	 * will be all zeroes.
@@ -96,10 +97,10 @@ spnwin_patch2:	and	%glob_tmp, 0xff, %glob_tmp
 	 save	%g0, %g0, %g0				! Go where saving will occur
 	
 	/* See if any user windows are active in the set. */
-	ld	[%curptr + AOFF_task_thread + AOFF_thread_uwinmask], %twin_tmp	! grab win mask
+	ld	[%curptr + TI_UWINMASK], %twin_tmp	! grab win mask
 	orcc	%g0, %twin_tmp, %g0			! check for set bits
 	bne	spwin_exist_uwins			! yep, there are some
-	 andn	%twin_tmp, %glob_tmp, %twin_tmp		! compute new umask
+	 andn	%twin_tmp, %glob_tmp, %twin_tmp		! compute new uwinmask
 
 	/* Save into the window which must be saved and do it.
 	 * Basically if we are here, this means that we trapped
@@ -139,7 +140,7 @@ spwin_exist_uwins:
 	 * But first, store the new user window mask calculated
 	 * above.
 	 */
-	st	%twin_tmp, [%curptr + AOFF_task_thread + AOFF_thread_uwinmask]
+	st	%twin_tmp, [%curptr + TI_UWINMASK]
 	save	%g0, %g0, %g0		! Go to where the saving will occur
 
 spwin_fromuser:
@@ -209,18 +210,20 @@ spwin_user_stack_is_bolixed:
 	bne	spwin_bad_ustack_from_kernel
 	 nop
 
+	ld	[%curptr + TI_TASK], %glob_tmp
+
 	/* Oh well, throw this one window into the per-task window
 	 * buffer, the first one.
 	 */
-	st	%sp, [%curptr + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
-	STORE_WINDOW(curptr + AOFF_task_thread + AOFF_thread_reg_window)
+	st	%sp, [%glob_tmp + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
+	STORE_WINDOW(glob_tmp + AOFF_task_thread + AOFF_thread_reg_window)
 	restore	%g0, %g0, %g0
 
 	/* LOCATION: Trap Window */
 
 	/* Back in the trap window, update winbuffer save count. */
-	mov	1, %glob_tmp
-	st	%glob_tmp, [%curptr + AOFF_task_thread + AOFF_thread_w_saved]
+	mov	1, %twin_tmp
+	st	%twin_tmp, [%glob_tmp + AOFF_task_thread + AOFF_thread_w_saved]
 
 		/* Compute new user window mask.  What we are basically
 		 * doing is taking two windows, the invalid one at trap
@@ -232,9 +235,9 @@ spwin_user_stack_is_bolixed:
 		or	%twin_tmp, %t_wim, %twin_tmp
 		not	%twin_tmp
 spnwin_patch3:	and	%twin_tmp, 0xff, %twin_tmp	! patched on 7win Sparcs
-		st	%twin_tmp, [%curptr + AOFF_task_thread + AOFF_thread_uwinmask]
+		st	%twin_tmp, [%curptr + TI_UWINMASK]
 
-#define STACK_OFFSET	(TASK_UNION_SIZE - TRACEREG_SZ - REGWIN_SZ)
+#define STACK_OFFSET	(THREAD_SIZE - TRACEREG_SZ - REGWIN_SZ)
 
 	sethi	%hi(STACK_OFFSET), %sp
 	or	%sp, %lo(STACK_OFFSET), %sp
@@ -247,7 +250,7 @@ spnwin_patch3:	and	%twin_tmp, 0xff, %twin_tmp	! patched on 7win Sparcs
 
 	sethi	%hi(STACK_OFFSET), %g6
 	or	%g6, %lo(STACK_OFFSET), %g6
-	sub	%sp, %g6, %g6
+	sub	%sp, %g6, %g6		! curptr
 
 	/* Turn on traps and call c-code to deal with it. */
 	wr	%t_psr, PSR_ET, %psr
@@ -271,7 +274,8 @@ spwin_bad_ustack_from_kernel:
 	 * a per-process window buffer until we can properly handle
 	 * this later on.
 	 */
-	SAVE_BOLIXED_USER_STACK(curptr, glob_tmp)
+	ld	[%curptr + TI_TASK], %glob_tmp	/* Using curptr one last time */
+	SAVE_BOLIXED_USER_STACK(glob_tmp, g6)	/* ...now using g6 as scratch */
 	restore	%g0, %g0, %g0
 
 	/* LOCATION: Trap window */

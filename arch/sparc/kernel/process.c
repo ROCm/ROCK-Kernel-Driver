@@ -57,7 +57,14 @@ void (*pm_power_off)(void);
 extern void fpsave(unsigned long *, unsigned long *, void *, unsigned long *);
 
 struct task_struct *last_task_used_math = NULL;
-struct task_struct *current_set[NR_CPUS] = {&init_task, };
+struct thread_info *current_set[NR_CPUS];
+
+/*
+ * default_idle is new in 2.5. XXX Review, currently stolen from sparc64.
+ */
+void default_idle(void)
+{
+}
 
 #ifndef CONFIG_SMP
 
@@ -106,8 +113,8 @@ int cpu_idle(void)
 			restore_flags(flags);
 		}
 
-		while((!current->need_resched) && pm_idle) {
-				(*pm_idle)();
+		while((!need_resched()) && pm_idle) {
+			(*pm_idle)();		/* XXX Huh? On sparc?! */
 		}
 
 		schedule();
@@ -306,7 +313,7 @@ void show_trace_task(struct task_struct *tsk)
 	if (!tsk)
 		return;
 
-	fp = tsk->thread.ksp;
+	fp = tsk->thread_info->ksp;
 	do {
 		/* Bogus frame pointer? */
 		if (fp < (task_base + sizeof(struct task_struct)) ||
@@ -318,6 +325,14 @@ void show_trace_task(struct task_struct *tsk)
 		fp = rw->ins[6];
 	} while (++count < 16);
 	printk("\n");
+}
+
+/*
+ * Note: sparc64 has a pretty intricated thread_saved_pc, check it out.
+ */
+unsigned long thread_saved_pc(struct task_struct *tsk)
+{
+	return tsk->thread_info->kpc;
 }
 
 /*
@@ -372,7 +387,7 @@ void flush_thread(void)
 		/* We must fixup kregs as well. */
 		current->thread.kregs = (struct pt_regs *)
 			(((unsigned long)current) +
-			 (TASK_UNION_SIZE - TRACEREG_SZ));
+			 (THREAD_SIZE - TRACEREG_SZ));
 	}
 }
 
@@ -445,6 +460,22 @@ clone_stackframe(struct sparc_stackf *dst, struct sparc_stackf *src)
 	return sp;
 }
 
+asmlinkage int sparc_do_fork(unsigned long clone_flags,
+                             unsigned long stack_start,
+                             struct pt_regs *regs,
+                             unsigned long stack_size)
+{
+	struct task_struct *p;
+
+	/* XXX This was spelled in DaveM's will and testament. Why? */
+	if (clone_flags & CLONE_IDLETASK) {
+		printk(KERN_DEBUG "Userland clone with CLONE_IDLETASK\n");
+		clone_flags &= ~CLONE_IDLETASK;
+	}
+
+	p = do_fork(clone_flags, stack_start, regs, stack_size);
+	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+}
 
 /* Copy a Sparc thread.  The fork() return value conventions
  * under SunOS are nothing short of bletcherous:
@@ -457,6 +488,7 @@ clone_stackframe(struct sparc_stackf *dst, struct sparc_stackf *src)
  *       if the parent should sleep while trying to
  *       allocate the task_struct and kernel stack in
  *       do_fork().
+ * XXX See comment above sys_vfork in sparc64. todo.
  */
 extern void ret_from_fork(void);
 
@@ -464,6 +496,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,
 		struct task_struct *p, struct pt_regs *regs)
 {
+	struct thread_info *ti = p->thread_info;
 	struct pt_regs *childregs;
 	struct reg_window *new_stack;
 	unsigned long stack_offset;
@@ -482,19 +515,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	}
 
 	/* Calculate offset to stack_frame & pt_regs */
-	stack_offset = TASK_UNION_SIZE - TRACEREG_SZ;
+	stack_offset = THREAD_SIZE - TRACEREG_SZ;
 
 	if(regs->psr & PSR_PS)
 		stack_offset -= REGWIN_SZ;
-	childregs = ((struct pt_regs *) (((unsigned long)p) + stack_offset));
+	childregs = ((struct pt_regs *) (((unsigned long)ti) + stack_offset));
 	copy_regs(childregs, regs);
 	new_stack = (((struct reg_window *) childregs) - 1);
 	copy_regwin(new_stack, (((struct reg_window *) regs) - 1));
 
-	p->thread.ksp = (unsigned long) new_stack;
-	p->thread.kpc = (((unsigned long) ret_from_fork) - 0x8);
-	p->thread.kpsr = current->thread.fork_kpsr;
-	p->thread.kwim = current->thread.fork_kwim;
+	ti->ksp = (unsigned long) new_stack;
+	ti->kpc = (((unsigned long) ret_from_fork) - 0x8);
+	ti->kpsr = current->thread.fork_kpsr;
+	ti->kwim = current->thread.fork_kwim;
 
 	/* This is used for sun4c only */
 	atomic_set(&p->thread.refcount, 1);
@@ -504,16 +537,14 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 		p->thread.kregs = &fake_swapper_regs;
 		new_stack = (struct reg_window *)
-			((((unsigned long)p) +
-			  (TASK_UNION_SIZE)) -
-			 (REGWIN_SZ));
+			((((unsigned long)ti) + (THREAD_SIZE)) - REGWIN_SZ);
 		childregs->u_regs[UREG_FP] = (unsigned long) new_stack;
 		p->thread.flags |= SPARC_FLAG_KTHREAD;
 		p->thread.current_ds = KERNEL_DS;
 		memcpy((void *)new_stack,
 		       (void *)regs->u_regs[UREG_FP],
 		       sizeof(struct reg_window));
-		childregs->u_regs[UREG_G6] = (unsigned long) p;
+		childregs->u_regs[UREG_G6] = (unsigned long) ti;
 	} else {
 		p->thread.kregs = childregs;
 		childregs->u_regs[UREG_FP] = sp;

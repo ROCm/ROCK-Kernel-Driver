@@ -115,9 +115,9 @@ static int apc_ioctl(struct inode *inode, struct file *f,
 }
 
 static struct file_operations apc_fops = {
-	ioctl:		apc_ioctl,
-	open:		apc_open,
-	release:	apc_release,
+	.ioctl =	apc_ioctl,
+	.open =		apc_open,
+	.release =	apc_release,
 };
 
 static struct miscdevice apc_miscdev = { APC_MINOR, APC_DEVNAME, &apc_fops };

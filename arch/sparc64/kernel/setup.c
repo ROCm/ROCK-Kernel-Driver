@@ -78,10 +78,10 @@ prom_console_write(struct console *con, const char *s, unsigned n)
 }
 
 static struct console prom_console = {
-	name:		"prom",
-	write:		prom_console_write,
-	flags:		CON_CONSDEV | CON_ENABLED,
-	index:		-1,
+	.name =		"prom",
+	.write =	prom_console_write,
+	.flags =	CON_CONSDEV | CON_ENABLED,
+	.index =	-1,
 };
 
 #define PROM_TRUE	-1
@@ -107,8 +107,13 @@ int prom_callback(long *args)
 	 * administrator has done a switch-cpu inside obp. In either 
 	 * case, the cpu is marked as in-interrupt. Drop IRQ locks.
 	 */
-	irq_exit(smp_processor_id(), 0);
-	save_and_cli(flags);
+	irq_exit();
+
+	/* XXX Revisit the locking here someday.  This is a debugging
+	 * XXX feature so it isnt all that critical.  -DaveM
+	 */
+	local_irq_save(flags);
+
 	spin_unlock(&prom_entry_lock);
 	cons = console_drivers;
 	while (cons) {
@@ -122,10 +127,10 @@ int prom_callback(long *args)
 	if (!strcmp(cmd, "sync")) {
 		prom_printf("PROM `%s' command...\n", cmd);
 		show_free_areas();
-		if(current->pid != 0) {
-			sti();
+		if (current->pid != 0) {
+			local_irq_enable();
 			sys_sync();
-			cli();
+			local_irq_disable();
 		}
 		args[2] = 0;
 		args[args[1] + 3] = -1;
@@ -301,11 +306,12 @@ int prom_callback(long *args)
 		register_console(cons);
 	}
 	spin_lock(&prom_entry_lock);
-	restore_flags(flags);
+	local_irq_restore(flags);
+
 	/*
 	 * Restore in-interrupt status for a resume from obp.
 	 */
-	irq_enter(smp_processor_id(), 0);
+	irq_enter();
 	return 0;
 }
 
@@ -324,10 +330,10 @@ static int console_fb __initdata = 0;
 unsigned long cmdline_memory_size = 0;
 
 static struct console prom_debug_console = {
-	name:		"debug",
-	write:		prom_console_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.write =	prom_console_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 /* XXX Implement this at some point... */
@@ -686,8 +692,8 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =c_start,
+	.next =	c_next,
+	.stop =	c_stop,
+	.show =	show_cpuinfo,
 };

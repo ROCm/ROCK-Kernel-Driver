@@ -708,14 +708,14 @@ asmlinkage void solaris_register(void)
 extern long solaris_to_linux_signals[], linux_to_solaris_signals[];
 
 struct exec_domain solaris_exec_domain = {
-	name:		"Solaris",
-	handler:	NULL,
-	pers_low:	1,		/* PER_SVR4 personality */
-	pers_high:	1,
-	signal_map:	solaris_to_linux_signals,
-	signal_invmap:	linux_to_solaris_signals,
-	module:		THIS_MODULE,
-	next:		NULL
+	.name =		"Solaris",
+	.handler =	NULL,
+	.pers_low =	1,		/* PER_SVR4 personality */
+	.pers_high =	1,
+	.signal_map =	solaris_to_linux_signals,
+	.signal_invmap =linux_to_solaris_signals,
+	.module =	THIS_MODULE,
+	.next =		NULL
 };
 
 extern int init_socksys(void);

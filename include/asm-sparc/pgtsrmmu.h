@@ -8,6 +8,7 @@
 #define _SPARC_PGTSRMMU_H
 
 #include <asm/page.h>
+#include <asm/thread_info.h>	/* TI_UWINMASK for WINDOW_FLUSH */
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define SRMMU_PMD_SHIFT         18
@@ -87,7 +88,7 @@
 
 #define WINDOW_FLUSH(tmp1, tmp2)					\
 	mov	0, tmp1;						\
-98:	ld	[%g6 + AOFF_task_thread + AOFF_thread_uwinmask], tmp2;	\
+98:	ld	[%g6 + TI_UWINMASK], tmp2;				\
 	orcc	%g0, tmp2, %g0;						\
 	add	tmp1, 1, tmp1;						\
 	bne	98b;							\

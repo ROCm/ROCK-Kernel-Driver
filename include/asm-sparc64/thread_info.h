@@ -114,6 +114,8 @@ struct thread_info {
 
 /*
  * macros/functions for gaining access to the thread information structure
+ *
+ * preempt_count needs to be 1 initially, until the scheduler is functional.
  */
 #ifndef __ASSEMBLY__
 
@@ -122,6 +124,7 @@ struct thread_info {
 	task:		&tsk,				\
 	flags:		((unsigned long)ASI_P) << TI_FLAG_CURRENT_DS_SHIFT,	\
 	exec_domain:	&default_exec_domain,		\
+	preempt_count:	1,				\
 }
 
 #define init_thread_info	(init_thread_union.thread_info)

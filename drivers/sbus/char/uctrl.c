@@ -224,10 +224,10 @@ void uctrl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct file_operations uctrl_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		uctrl_ioctl,
-	open:		uctrl_open,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.ioctl =	uctrl_ioctl,
+	.open =		uctrl_open,
 };
 
 static struct miscdevice uctrl_dev = {

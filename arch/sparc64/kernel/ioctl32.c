@@ -4857,13 +4857,15 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 	    (unsigned long)t < ((unsigned long)additional_ioctls) + PAGE_SIZE) {
 		ioctl32_hash_table[hash] = t->next;
 		t->cmd = 0;
+		t->next = 0;
 		return 0;
 	} else while (t->next) {
 		t1 = (struct ioctl_trans *)(long)t->next;
 		if (t1->cmd == cmd && t1 >= additional_ioctls &&
 		    (unsigned long)t1 < ((unsigned long)additional_ioctls) + PAGE_SIZE) {
-			t1->cmd = 0;
 			t->next = t1->next;
+			t1->cmd = 0;
+			t1->next = 0;
 			return 0;
 		}
 		t = t1;

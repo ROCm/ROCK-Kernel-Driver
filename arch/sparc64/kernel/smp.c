@@ -1049,12 +1049,12 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 					   regs->u_regs[UREG_RETPC]);
 		if (!--prof_counter(cpu)) {
 			if (cpu == boot_cpu_id) {
-				irq_enter(cpu, 0);
+				irq_enter();
 
 				kstat.irqs[cpu][0]++;
 				timer_tick_interrupt(regs);
 
-				irq_exit(cpu, 0);
+				irq_exit();
 			}
 
 			update_process_times(user);
@@ -1294,6 +1294,8 @@ report:
 }
 
 /* /proc/profile writes can call this, don't __init it please. */
+static spinlock_t prof_setup_lock = SPIN_LOCK_UNLOCKED;
+
 int setup_profiling_timer(unsigned int multiplier)
 {
 	unsigned long flags;
@@ -1302,11 +1304,11 @@ int setup_profiling_timer(unsigned int multiplier)
 	if ((!multiplier) || (timer_tick_offset / multiplier) < 1000)
 		return -EINVAL;
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&prof_setup_lock, flags);
 	for (i = 0; i < NR_CPUS; i++)
 		prof_multiplier(i) = multiplier;
 	current_tick_offset = (timer_tick_offset / multiplier);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&prof_setup_lock, flags);
 
 	return 0;
 }

@@ -151,11 +151,6 @@ __handle_signal:
 		.align			64
 		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme, rtrap_xcall
 rtrap_irq:
-#ifdef CONFIG_PREEMPT
-		ldsw			[%g6 + TI_PRE_COUNT], %l0
-		sub			%l0, 1, %l0
-		stw			%l0, [%g6 + TI_PRE_COUNT]
-#endif
 rtrap_clr_l6:	clr			%l6
 rtrap:		ldub			[%g6 + TI_CPU], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
@@ -276,7 +271,7 @@ to_kernel:
 		brnz			%l5, kern_fpucheck
 		 sethi			%hi(PREEMPT_ACTIVE), %l6
 		stw			%l6, [%g6 + TI_PRE_COUNT]
-		call			kpreempt_maybe
+		call			schedule
 		 nop
 		ba,pt			%xcc, rtrap
 		 stw			%g0, [%g6 + TI_PRE_COUNT]

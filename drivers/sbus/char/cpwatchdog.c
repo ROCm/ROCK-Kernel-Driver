@@ -460,12 +460,12 @@ static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct file_operations wd_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		wd_ioctl,
-	open:		wd_open,
-	write:		wd_write,
-	read:		wd_read,
-	release:	wd_release,
+	.owner =	THIS_MODULE,
+	.ioctl =	wd_ioctl,
+	.open =		wd_open,
+	.write =	wd_write,
+	.read =		wd_read,
+	.release =	wd_release,
 };
 
 static struct miscdevice wd0_miscdev = { WD0_MINOR, WD0_DEVNAME, &wd_fops };

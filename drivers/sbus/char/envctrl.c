@@ -722,11 +722,11 @@ envctrl_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations envctrl_fops = {
-	owner:		THIS_MODULE,
-	read:		envctrl_read,
-	ioctl:		envctrl_ioctl,
-	open:		envctrl_open,
-	release:	envctrl_release,
+	.owner =	THIS_MODULE,
+	.read =		envctrl_read,
+	.ioctl =	envctrl_ioctl,
+	.open =		envctrl_open,
+	.release =	envctrl_release,
 };	
 
 static struct miscdevice envctrl_dev = {
