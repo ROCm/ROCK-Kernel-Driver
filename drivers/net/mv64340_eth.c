@@ -752,9 +752,8 @@ static int ether_init_rx_desc_ring(struct mv64340_private * mp,
 		p_rx_desc[i].byte_cnt = 0x0000;
 		p_rx_desc[i].cmd_sts =
 			ETH_BUFFER_OWNED_BY_DMA | ETH_RX_ENABLE_INTERRUPT;
-		p_rx_desc[i].next_desc_ptr =
-			(struct eth_rx_desc *) mp->rx_desc_dma +
-				(i + 1) % rx_desc_num;
+		p_rx_desc[i].next_desc_ptr = mp->rx_desc_dma +
+			((i + 1) % rx_desc_num) * sizeof(struct eth_rx_desc);
 		p_rx_desc[i].buf_ptr = buffer_addr;
 
 		mp->rx_skb[i] = NULL;
@@ -818,9 +817,8 @@ static int ether_init_tx_desc_ring(struct mv64340_private *mp)
 		p_tx_desc[i].byte_cnt	= 0x0000;
 		p_tx_desc[i].l4i_chk	= 0x0000;
 		p_tx_desc[i].cmd_sts	= 0x00000000;
-		p_tx_desc[i].next_desc_ptr =
-			(struct eth_tx_desc *) mp->tx_desc_dma +
-			(i + 1) % tx_desc_num;
+		p_tx_desc[i].next_desc_ptr = mp->tx_desc_dma +
+			((i + 1) % tx_desc_num) * sizeof(struct eth_tx_desc);
 		p_tx_desc[i].buf_ptr	= 0x00000000;
 		mp->tx_skb[i]		= NULL;
 	}
@@ -2351,8 +2349,8 @@ static ETH_FUNC_RET_STATUS eth_port_send(struct mv64340_private * mp,
                 first_descriptor->cmd_sts = command_status;
                 first_descriptor->byte_cnt = p_pkt_info->byte_cnt;
                 first_descriptor->buf_ptr = p_pkt_info->buf_ptr;
-                first_descriptor->next_desc_ptr =
-			(struct eth_tx_desc *) mp->tx_desc_dma + tx_next_desc;
+                first_descriptor->next_desc_ptr = mp->tx_desc_dma +
+			tx_next_desc * sizeof(struct eth_tx_desc);
 		wmb();
         } else {
                 tx_first_desc = mp->tx_first_desc_q;
@@ -2365,8 +2363,8 @@ static ETH_FUNC_RET_STATUS eth_port_send(struct mv64340_private * mp,
                         current_descriptor->next_desc_ptr = 0x00000000;
                 else {
                         command_status |= ETH_BUFFER_OWNED_BY_DMA;
-                        current_descriptor->next_desc_ptr =
-			  (struct eth_tx_desc *) mp->tx_desc_dma + tx_next_desc;
+                        current_descriptor->next_desc_ptr = mp->tx_desc_dma +
+				tx_next_desc * sizeof(struct eth_tx_desc);
                 }
         }
 
