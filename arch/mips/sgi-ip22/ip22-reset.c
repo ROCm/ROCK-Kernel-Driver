@@ -3,23 +3,28 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1997, 1998, 2001 by Ralf Baechle
+ * Copyright (C) 1997, 1998, 2001, 2003 by Ralf Baechle
  */
+#include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
 #include <linux/timer.h>
+
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/reboot.h>
+#include <asm/ds1286.h>
 #include <asm/sgialib.h>
-#include <asm/sgi/sgihpc.h>
-#include <asm/sgi/sgint23.h>
+#include <asm/sgi/ioc.h>
+#include <asm/sgi/hpc3.h>
+#include <asm/sgi/ip22.h>
 
 /*
  * Just powerdown if init hasn't done after POWERDOWN_TIMEOUT seconds.
- * I'm not shure if this feature is a good idea, for now it's here just to
+ * I'm not sure if this feature is a good idea, for now it's here just to
  * make the power button make behave just like under IRIX.
  */
 #define POWERDOWN_TIMEOUT	120
@@ -30,10 +35,11 @@
 #define POWERDOWN_FREQ		(HZ / 4)
 #define PANIC_FREQ		(HZ / 8)
 
-static unsigned char sgi_volume;
-
 static struct timer_list power_timer, blink_timer, debounce_timer, volume_timer;
-static int shuting_down, has_paniced;
+
+#define MACHINE_PANICED		1
+#define MACHINE_SHUTTING_DOWN	2
+static int machine_state = 0;
 
 static void sgi_machine_restart(char *command) __attribute__((noreturn));
 static void sgi_machine_halt(void) __attribute__((noreturn));
@@ -42,35 +48,37 @@ static void sgi_machine_power_off(void) __attribute__((noreturn));
 /* XXX How to pass the reboot command to the firmware??? */
 static void sgi_machine_restart(char *command)
 {
-	if (shuting_down)
+	if (machine_state & MACHINE_SHUTTING_DOWN)
 		sgi_machine_power_off();
-	prom_reboot();
+	ArcReboot();
 }
 
 static void sgi_machine_halt(void)
 {
-	if (shuting_down)
+	if (machine_state & MACHINE_SHUTTING_DOWN)
 		sgi_machine_power_off();
 	ArcEnterInteractiveMode();
 }
 
 static void sgi_machine_power_off(void)
 {
-	struct indy_clock *clock = (struct indy_clock *)INDY_CLOCK_REGS;
+	unsigned char val;
 
-	cli();
+	local_irq_disable();
 
-	clock->cmd |= 0x08;	/* Disable watchdog */
-	clock->whsec = 0;
-	clock->wsec = 0;
+	/* Disable watchdog */
+	val = CMOS_READ(RTC_CMD);
+	CMOS_WRITE(val | RTC_WAM, RTC_CMD);
+	CMOS_WRITE(0, RTC_WSEC);
+	CMOS_WRITE(0, RTC_WHSEC);
 
 	while(1) {
-		hpc3mregs->panel=0xfe;
+		sgioc->panel = ~SGIOC_PANEL_POWERON;
 		/* Good bye cruel world ...  */
 
 		/* If we're still running, we probably got sent an alarm
 		   interrupt.  Read the flag to clear it.  */
-		clock->halarm;
+		val = CMOS_READ(RTC_HOURS_ALARM);
 	}
 }
 
@@ -82,8 +90,8 @@ static void power_timeout(unsigned long data)
 static void blink_timeout(unsigned long data)
 {
 	/* XXX fix this for fullhouse  */
-	sgi_hpc_write1 ^= (HPC3_WRITE1_LC0OFF|HPC3_WRITE1_LC1OFF);
-	hpc3mregs->write1 = sgi_hpc_write1;
+	sgi_ioc_reset ^= (SGIOC_RESET_LC0OFF|SGIOC_RESET_LC1OFF);
+	sgioc->reset = sgi_ioc_reset;
 
 	mod_timer(&blink_timer, jiffies+data);
 }
@@ -91,32 +99,35 @@ static void blink_timeout(unsigned long data)
 static void debounce(unsigned long data)
 {
 	del_timer(&debounce_timer);
-	if (ioc_icontrol->istat1 & 2) { /* Interrupt still being sent.  */
+	if (sgint->istat1 & SGINT_ISTAT1_PWR) {
+		/* Interrupt still being sent. */
 		debounce_timer.expires = jiffies + 5; /* 0.05s  */
 		add_timer(&debounce_timer);
 
-		hpc3mregs->panel = 0xf3;
+		sgioc->panel = SGIOC_PANEL_POWERON | SGIOC_PANEL_POWERINTR |
+			       SGIOC_PANEL_VOLDNINTR | SGIOC_PANEL_VOLDNHOLD |
+			       SGIOC_PANEL_VOLUPINTR | SGIOC_PANEL_VOLUPHOLD;
 
 		return;
 	}
 
-	if (has_paniced)
-		prom_reboot();
+	if (machine_state & MACHINE_PANICED)
+		ArcReboot();
 
 	enable_irq(SGI_PANEL_IRQ);
 }
 
 static inline void power_button(void)
 {
-	if (has_paniced)
+	if (machine_state & MACHINE_PANICED)
 		return;
 
-	if (shuting_down || kill_proc(1, SIGINT, 1)) {
+	if ((machine_state & MACHINE_SHUTTING_DOWN) || kill_proc(1,SIGINT,1)) {
 		/* No init process or button pressed twice.  */
 		sgi_machine_power_off();
 	}
 
-	shuting_down = 1;
+	machine_state |= MACHINE_SHUTTING_DOWN;
 	blink_timer.data = POWERDOWN_FREQ;
 	blink_timeout(POWERDOWN_FREQ);
 
@@ -126,60 +137,43 @@ static inline void power_button(void)
 	add_timer(&power_timer);
 }
 
-inline void sgi_volume_set(unsigned char volume)
-{
-	sgi_volume = volume;
-
-	hpc3c0->pbus_extregs[2][0] = sgi_volume;
-	hpc3c0->pbus_extregs[2][1] = sgi_volume;
-}
-
-inline void sgi_volume_get(unsigned char *volume)
-{
-	*volume = sgi_volume;
-}
+void (*indy_volume_button)(int) = NULL;
 
 static inline void volume_up_button(unsigned long data)
 {
 	del_timer(&volume_timer);
 
-	if (sgi_volume < 0xff)
-		sgi_volume++;
+	if (indy_volume_button)
+		indy_volume_button(1);
 
-	hpc3c0->pbus_extregs[2][0] = sgi_volume;
-	hpc3c0->pbus_extregs[2][1] = sgi_volume;
-
-	if (ioc_icontrol->istat1 & 2) {
+	if (sgint->istat1 & SGINT_ISTAT1_PWR) {
 		volume_timer.expires = jiffies + 1;
 		add_timer(&volume_timer);
 	}
-
 }
 
 static inline void volume_down_button(unsigned long data)
 {
 	del_timer(&volume_timer);
 
-	if (sgi_volume > 0)
-		sgi_volume--;
+	if (indy_volume_button)
+		indy_volume_button(-1);
 
-	hpc3c0->pbus_extregs[2][0] = sgi_volume;
-	hpc3c0->pbus_extregs[2][1] = sgi_volume;
-
-	if (ioc_icontrol->istat1 & 2) {
+	if (sgint->istat1 & SGINT_ISTAT1_PWR) {
 		volume_timer.expires = jiffies + 1;
 		add_timer(&volume_timer);
 	}
 }
 
-static void panel_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t panel_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int buttons;
 
-	buttons = hpc3mregs->panel;
-	hpc3mregs->panel = 3; /* power_interrupt | power_supply_on */
+	buttons = sgioc->panel;
+	sgioc->panel = SGIOC_PANEL_POWERON | SGIOC_PANEL_POWERINTR;
 
-	if (ioc_icontrol->istat1 & 2) { /* Wait until interrupt goes away */
+	if (sgint->istat1 & SGINT_ISTAT1_PWR) {
+		/* Wait until interrupt goes away */
 		disable_irq(SGI_PANEL_IRQ);
 		init_timer(&debounce_timer);
 		debounce_timer.function = debounce;
@@ -187,28 +181,42 @@ static void panel_int(int irq, void *dev_id, struct pt_regs *regs)
 		add_timer(&debounce_timer);
 	}
 
-	if (!(buttons & 2))		/* Power button was pressed */
+	/* Power button was pressed 
+	 *
+	 * ioc.ps page 22: "The Panel Register is called Power Control by Full
+	 * House. Only lowest 2 bits are used. Guiness uses upper four bits
+	 * for volume control". This is not true, all bits are pulled high
+	 * on fullhouse
+	 */
+	if (ip22_is_fullhouse() || !(buttons & SGIOC_PANEL_POWERINTR)) {
 		power_button();
-	if (!(buttons & 0x40)) {	/* Volume up button was pressed */
+		return IRQ_HANDLED;
+	}
+	/* TODO: mute/unmute */
+	/* Volume up button was pressed */
+	if (!(buttons & SGIOC_PANEL_VOLUPINTR)) {
 		init_timer(&volume_timer);
 		volume_timer.function = volume_up_button;
 		volume_timer.expires = jiffies + 1;
 		add_timer(&volume_timer);
 	}
-	if (!(buttons & 0x10)) {	/* Volume down button was pressed */
+	/* Volume down button was pressed */
+	if (!(buttons & SGIOC_PANEL_VOLDNINTR)) {
 		init_timer(&volume_timer);
 		volume_timer.function = volume_down_button;
 		volume_timer.expires = jiffies + 1;
 		add_timer(&volume_timer);
 	}
+
+	return IRQ_HANDLED;
 }
 
 static int panic_event(struct notifier_block *this, unsigned long event,
                       void *ptr)
 {
-	if (has_paniced)
+	if (machine_state & MACHINE_PANICED)
 		return NOTIFY_DONE;
-	has_paniced = 1;
+	machine_state |= MACHINE_PANICED;
 
 	blink_timer.data = PANIC_FREQ;
 	blink_timeout(PANIC_FREQ);
@@ -217,19 +225,11 @@ static int panic_event(struct notifier_block *this, unsigned long event,
 }
 
 static struct notifier_block panic_block = {
-	panic_event,
-	NULL,
-	0
+	.notifier_call	= panic_event,
 };
 
-void indy_reboot_setup(void)
+static int __init reboot_setup(void)
 {
-	static int setup_done;
-
-	if (setup_done)
-		return;
-	setup_done = 1;
-
 	_machine_restart = sgi_machine_restart;
 	_machine_halt = sgi_machine_halt;
 	_machine_power_off = sgi_machine_power_off;
@@ -238,4 +238,8 @@ void indy_reboot_setup(void)
 	init_timer(&blink_timer);
 	blink_timer.function = blink_timeout;
 	notifier_chain_register(&panic_notifier_list, &panic_block);
+
+	return 0;
 }
+
+subsys_initcall(reboot_setup);

@@ -1,12 +1,9 @@
-/* $Id: ng1hw.h,v 1.4 1999/08/04 06:01:51 ulfc Exp $
- * 
+/*
  * ng1hw.h: Tweaks the newport.h structures and definitions to be compatible
  * 	    with IRIX.  Quite ugly, but it works.
  *
  * Copyright (C) 1999 Ulf Carlsson (ulfc@thepuffingroup.com)
- *
  */
-
 #ifndef _SGI_NG1HW_H
 #define _SGI_NG1HW_H
 
@@ -77,7 +74,7 @@ typedef struct rex3chip Rex3chip;
 #define DM0_XYOFFSET		NPORT_DMODE0_XYOFF
 #define DM0_CICLAMP		NPORT_DMODE0_CLAMP
 #define DM0_ENDPTFILTER		NPORT_DMODE0_ENDPF
-#define	DM0_YSTRIDE		NPORT_DMODE0_YSTR 
+#define	DM0_YSTRIDE		NPORT_DMODE0_YSTR
 
 #define DM1_PLANES_SHIFT	0
 /* The rest of the DM1 planes defines are in newport.h */
@@ -119,7 +116,7 @@ typedef struct rex3chip Rex3chip;
 
 #define DM1_SF_SHIFT		19
 #define DM1_SF_MASK   		NPORT_DMODE1_SFMASK
-#define DM1_SF			NPORT_DMODE1_SFMASK 
+#define DM1_SF			NPORT_DMODE1_SFMASK
 #define DM1_SF_ZERO		NPORT_DMODE1_SF0
 #define DM1_SF_ONE		NPORT_DMODE1_SF1
 #define DM1_SF_DC		NPORT_DMODE1_SFDC
@@ -128,8 +125,8 @@ typedef struct rex3chip Rex3chip;
 #define DM1_SF_MSA		NPORT_DMODE1_SFMSA
 
 #define DM1_DF_SHIFT		22	/* dfactor(2:0)	*/
-#define DM1_DF_MASK		NPORT_DMODE1_DFMASK 
-#define DM1_DF			NPORT_DMODE1_DFMASK 
+#define DM1_DF_MASK		NPORT_DMODE1_DFMASK
+#define DM1_DF			NPORT_DMODE1_DFMASK
 #define DM1_DF_ZERO		NPORT_DMODE1_DF0
 #define DM1_DF_ONE		NPORT_DMODE1_DF1
 #define DM1_DF_SC		NPORT_DMODE1_DFSC
@@ -177,23 +174,23 @@ typedef struct rex3chip Rex3chip;
 #define VRINT           	NPORT_STAT_VRINT
 #define VIDEOINT        	NPORT_STAT_VIDINT
 #define GFIFO_LEVEL_SHIFT       7
-#define GFIFO_LEVEL_MASK        NPORT_STAT_GLMSK 
+#define GFIFO_LEVEL_MASK        NPORT_STAT_GLMSK
 #define BFIFO_LEVEL_SHIFT       13
-#define BFIFO_LEVEL_MASK        NPORT_STAT_BLMSK 
+#define BFIFO_LEVEL_MASK        NPORT_STAT_BLMSK
 #define BFIFO_INT        	NPORT_STAT_BFIRQ
 #define GFIFO_INT        	NPORT_STAT_GFIRQ
 
-#define GIO32MODE		NPORT_CFG_G32MD 
+#define GIO32MODE		NPORT_CFG_G32MD
 #define BUSWIDTH		NPORT_CFG_BWIDTH
-#define EXTREGXCVR		NPORT_CFG_ERCVR 
+#define EXTREGXCVR		NPORT_CFG_ERCVR
 #define BFIFODEPTH_SHIFT	3
 #define BFIFODEPTH_MASK		NPORT_CFG_BDMSK
 #define BFIFOABOVEINT		NPORT_CFG_BFAINT
 #define GFIFODEPTH_SHIFT        8
-#define GFIFODEPTH_MASK		NPORT_CFG_GDMSK 
+#define GFIFODEPTH_MASK		NPORT_CFG_GDMSK
 #define GFIFOABOVEINT		NPORT_CFG_GFAINT
 #define TIMEOUT_SHIFT		14
-#define TIMEOUT_MASK		NPORT_CFG_TOMSK 
+#define TIMEOUT_MASK		NPORT_CFG_TOMSK
 #define VREFRESH_SHIFT		17
 #define VREFRESH_MASK		NPORT_CFG_VRMSK
 #define FB_TYPE			NPORT_CFG_FBTYP
