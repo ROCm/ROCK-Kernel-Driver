@@ -221,7 +221,7 @@ int device_add(struct device *dev)
 	pr_debug("DEV: registering device: ID = '%s'\n", dev->bus_id);
 
 	/* first, register with generic layer. */
-	kobject_set_name(&dev->kobj, dev->bus_id);
+	kobject_set_name(&dev->kobj, "%s", dev->bus_id);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
