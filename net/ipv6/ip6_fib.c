@@ -896,6 +896,7 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp,
 	*rtp = rt->u.next;
 	rt->rt6i_node = NULL;
 	rt6_stats.fib_rt_entries--;
+	rt6_stats.fib_discarded_routes++;
 
 	/* Adjust walkers */
 	read_lock(&fib6_walker_lock);

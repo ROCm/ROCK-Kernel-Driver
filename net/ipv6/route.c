@@ -1786,11 +1786,12 @@ extern struct rt6_statistics rt6_stats;
 
 static int rt6_stats_seq_show(struct seq_file *seq, void *v)
 {
-	seq_printf(seq, "%04x %04x %04x %04x %04x %04x\n",
+	seq_printf(seq, "%04x %04x %04x %04x %04x %04x %04x\n",
 		      rt6_stats.fib_nodes, rt6_stats.fib_route_nodes,
 		      rt6_stats.fib_rt_alloc, rt6_stats.fib_rt_entries,
 		      rt6_stats.fib_rt_cache,
-		      atomic_read(&ip6_dst_ops.entries));
+		      atomic_read(&ip6_dst_ops.entries),
+		      rt6_stats.fib_discarded_routes);
 
 	return 0;
 }
