@@ -15,3 +15,12 @@ Why:	It has been unmaintained for a number of years, has unfixable
 	against the LSB, and can be replaced by using udev.
 Who:	Greg Kroah-Hartman <greg@kroah.com>
 
+---------------------------
+
+What:	/proc/sys/cpu and the sysctl interface to cpufreq (2.4.x interfaces)
+When:	January 2005
+Files:	drivers/cpufreq/: cpufreq_userspace.c, proc_intf.c
+	function calls throughout the kernel tree
+Why:	Deprecated, has been replaced/superseded by (what?)....
+Who:	Dominik Brodowski <linux@brodo.de>
+
