@@ -33,34 +33,6 @@
 
 #define SC_SEGV_IS_FIXABLE(sc) (SEGV_IS_FIXABLE(SC_TRAPNO(sc)))
 
-#ifdef CONFIG_MODE_TT
-/* XXX struct sigcontext needs declaring by now */
-static inline void sc_to_regs(struct uml_pt_regs *regs, struct sigcontext *sc,
-			      unsigned long syscall)
-{
-	regs->syscall = syscall;
-	regs->args[0] = SC_EBX(sc);
-	regs->args[1] = SC_ECX(sc);
-	regs->args[2] = SC_EDX(sc);
-	regs->args[3] = SC_ESI(sc);
-	regs->args[4] = SC_EDI(sc);
-	regs->args[5] = SC_EBP(sc);
-}
-#endif
-
-#ifdef CONFIG_MODE_SKAS
-static inline void host_to_regs(struct uml_pt_regs *regs)
-{
-	regs->syscall = UPT_ORIG_EAX(regs);
-	regs->args[0] = UPT_EBX(regs);
-	regs->args[1] = UPT_ECX(regs);
-	regs->args[2] = UPT_EDX(regs);
-	regs->args[3] = UPT_ESI(regs);
-	regs->args[4] = UPT_EDI(regs);
-	regs->args[5] = UPT_EBP(regs);
-}
-#endif
-
 extern unsigned long *sc_sigmask(void *sc_ptr);
 extern int sc_get_fpregs(unsigned long buf, void *sc_ptr);
 

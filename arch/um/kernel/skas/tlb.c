@@ -134,9 +134,8 @@ void flush_tlb_range_skas(struct vm_area_struct *vma, unsigned long start,
 
 void flush_tlb_mm_skas(struct mm_struct *mm)
 {
-	if(mm == NULL)
-		flush_tlb_kernel_vm_skas();
-	else fix_range(mm, 0, host_task_size, 0);
+	flush_tlb_kernel_vm_skas();
+	fix_range(mm, 0, host_task_size, 0);
 }
 
 void force_flush_all_skas(void)

@@ -15,12 +15,12 @@ struct frame_common {
 	int sr_index;
 	int sr_relative;
 	int sp_index;
+	struct arch_frame_data arch;
 };
 
 struct sc_frame {
 	struct frame_common common;
 	int sc_index;
-	struct arch_frame_data arch;
 };
 
 extern struct sc_frame signal_frame_sc;
@@ -31,6 +31,8 @@ struct si_frame {
 	struct frame_common common;
 	int sip_index;
 	int si_index;
+	int ucp_index;
+	int uc_index;
 };
 
 extern struct si_frame signal_frame_si;
