@@ -976,7 +976,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	if (smp_ops->give_timebase)
 		smp_ops->give_timebase();
 
-	while (cpu_is_offline(cpu))
+	while (!cpu_online(cpu))
 		cpu_relax();
 
 	return 0;
