@@ -66,6 +66,6 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
 	BOOT_PARAMS(0xc0020000)
 	MAPIO(autcpu12_map_io)
 	INITIRQ(clps711x_init_irq)
-	INITTIME(clp711x_init_time)
+	INITTIME(clps711x_init_time)
 MACHINE_END
 

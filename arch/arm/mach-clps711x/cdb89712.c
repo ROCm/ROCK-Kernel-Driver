@@ -34,7 +34,7 @@
 
 extern void clps711x_init_irq(void);
 extern void clps711x_map_io(void);
-extern void clps711x-init_time(void);
+extern void clps711x_init_time(void);
 
 /*
  * Map the CS89712 Ethernet port.  That should be moved to the
