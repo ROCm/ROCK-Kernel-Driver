@@ -963,6 +963,9 @@ _GLOBAL(sys_call_table32)
 	.llong .compat_sys_mq_notify
 	.llong .compat_sys_mq_getsetattr
 	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
+	.llong .sys32_add_key
+	.llong .sys32_request_key
+	.llong .compat_keyctl
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1235,3 +1238,6 @@ _GLOBAL(sys_call_table)
 	.llong .sys_mq_notify
 	.llong .sys_mq_getsetattr
 	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
+	.llong .sys_add_key
+	.llong .sys_request_key		/* 270 */
+	.llong .sys_keyctl

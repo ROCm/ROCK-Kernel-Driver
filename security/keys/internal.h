@@ -81,6 +81,26 @@ extern struct key *find_keyring_by_name(const char *name, key_serial_t bound);
 
 extern int install_thread_keyring(struct task_struct *tsk);
 
+/*
+ * keyctl functions
+ */
+extern long keyctl_get_keyring_ID(key_serial_t, int);
+extern long keyctl_join_session_keyring(const char __user *);
+extern long keyctl_update_key(key_serial_t, const void __user *, size_t);
+extern long keyctl_revoke_key(key_serial_t);
+extern long keyctl_keyring_clear(key_serial_t);
+extern long keyctl_keyring_link(key_serial_t, key_serial_t);
+extern long keyctl_keyring_unlink(key_serial_t, key_serial_t);
+extern long keyctl_describe_key(key_serial_t, char __user *, size_t);
+extern long keyctl_keyring_search(key_serial_t, const char __user *,
+				  const char __user *, key_serial_t);
+extern long keyctl_read_key(key_serial_t, char __user *, size_t);
+extern long keyctl_chown_key(key_serial_t, uid_t, gid_t);
+extern long keyctl_setperm_key(key_serial_t, key_perm_t);
+extern long keyctl_instantiate_key(key_serial_t, const void __user *,
+				   size_t, key_serial_t);
+extern long keyctl_negate_key(key_serial_t, unsigned, key_serial_t);
+
 
 /*
  * debugging key validation
