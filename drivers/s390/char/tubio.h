@@ -13,6 +13,7 @@
 
 #include <linux/module.h>
 #include <linux/version.h>
+#include <linux/tty.h>
 
 #include <linux/major.h>
 #ifndef IBM_TTY3270_MAJOR
@@ -284,15 +285,27 @@ typedef struct tub_s {
 #define	TUB_UE_BUSY	0x0800
 #define	TUB_INPUT_HACK	0x1000		/* Early init of command line */
 
-#ifdef CONFIG_TN3270_CONSOLE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+#define	S390_CONSOLE_DEV MKDEV(TTY_MAJOR, 64)
+#define tub_major(x) MAJOR(x)
+#define tub_minor(x) MINOR(x)
+#define tub_mkdev(x, y) MKDEV(x, y)
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+#define	S390_CONSOLE_DEV MKDEV(TTYAUX_MAJOR, 1)
+#define tub_major(x) MAJOR(x)
+#define tub_minor(x) MINOR(x)
+#define tub_mkdev(x, y) MKDEV(x, y)
+#else
+#define S390_CONSOLE_DEV mk_kdev(TTYAUX_MAJOR, 1)
+#define tub_major(x) major(x)
+#define tub_minor(x) minor(x)
+#define tub_mkdev(x, y) mk_kdev(x, y)
+#endif
+
 /*
  * Extra stuff for 3270 console support
  */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-#define	S390_CONSOLE_DEV MKDEV(TTY_MAJOR, 64)
-#else
-#define	S390_CONSOLE_DEV MKDEV(TTYAUX_MAJOR, 1)
-#endif
+#ifdef CONFIG_TN3270_CONSOLE
 extern int tub3270_con_devno;
 extern char (*tub3270_con_output)[];
 extern int tub3270_con_outputl;
@@ -351,7 +364,9 @@ extern void fs3270_devfs_unregister(tub_t *);
 /*
  * Find tub_t * given fullscreen device's irq (subchannel number)
  */
+#if 0
 extern tub_t *tubfindbyirq(int);
+#endif
 #define IRQ2TUB(irq) tubfindbyirq(irq)
 /*
  * Find tub_t * given fullscreen device's inode pointer
@@ -359,7 +374,7 @@ extern tub_t *tubfindbyirq(int);
  */
 extern inline tub_t *INODE2TUB(struct inode *ip)
 {
-	unsigned int minor = MINOR(ip->i_rdev);
+	unsigned int minor = minor(ip->i_rdev);
 	tub_t *tubp = NULL;
 	if (minor == 0 && current->tty != NULL) {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
@@ -370,8 +385,8 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
 		else
 #endif
 #endif
-		if (MAJOR(current->tty->device) == IBM_TTY3270_MAJOR)
-			minor = MINOR(current->tty->device);
+		if (tub_major(current->tty->device) == IBM_TTY3270_MAJOR)
+			minor = tub_minor(current->tty->device);
 	}
 	if (minor <= tubnummins && minor > 0)
 		tubp = (*tubminors)[minor];
@@ -383,7 +398,7 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
  */
 extern inline tub_t *TTY2TUB(struct tty_struct *tty)
 {
-	unsigned int minor = MINOR(tty->device);
+	unsigned int minor = minor(tty->device);
 	tub_t *tubp = NULL;
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
@@ -401,10 +416,12 @@ extern inline tub_t *TTY2TUB(struct tty_struct *tty)
 extern void tub_inc_use_count(void);
 extern void tub_dec_use_count(void);
 extern int tub3270_movedata(bcb_t *, bcb_t *, int);
+#if 0
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
 extern int tubmakemin(int, dev_info_t *);
 #else
 extern int tubmakemin(int, s390_dev_info_t *);
+#endif
 #endif
 extern int tub3270_con_copy(tub_t *);
 extern int tty3270_rcl_init(tub_t *);
@@ -412,9 +429,12 @@ extern int tty3270_rcl_set(tub_t *, char *, int);
 extern void tty3270_rcl_fini(tub_t *);
 extern int tty3270_rcl_get(tub_t *, char *, int, int);
 extern void tty3270_rcl_put(tub_t *, char *, int);
-extern void tty3270_rcl_sync(tub_t *);
 extern void tty3270_rcl_purge(tub_t *);
+#if 0
+/* these appear to be unused outside of tubttyrcl */
+extern void tty3270_rcl_sync(tub_t *);
 extern int tty3270_rcl_resize(tub_t *, int);
+#endif
 extern int tty3270_size(tub_t *, long *);
 extern int tty3270_aid_init(tub_t *);
 extern void tty3270_aid_fini(tub_t *);

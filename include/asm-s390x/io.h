@@ -40,6 +40,11 @@ extern inline void * phys_to_virt(unsigned long address)
         return __io_virt(address);
 }
 
+/*
+ * Change "struct page" to physical address.
+ */
+#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 extern inline void * ioremap (unsigned long offset, unsigned long size)

@@ -13,16 +13,14 @@
 
 #ifdef __KERNEL__
 
+#include <asm/thread_info.h>
+
 struct task_struct;
 
 static inline struct task_struct * get_current(void)
 {
-        struct task_struct *current;
-        __asm__("lhi   %0,-8192\n\t"
-                "al    %0,0xc40"
-                : "=&r" (current) : : "cc" );
-        return current;
- }
+	return current_thread_info()->task;
+}
 
 #define current get_current()
 

@@ -41,7 +41,7 @@
 
 void FixPerRegisters(struct task_struct *task)
 {
-	struct pt_regs *regs = task->thread.regs;
+	struct pt_regs *regs = __KSTK_PTREGS(task);
 	per_struct *per_info=
 			(per_struct *)&task->thread.per_info;
 
@@ -155,7 +155,7 @@ int copy_user(struct task_struct *task,saddr_t useraddr,addr_t copyaddr,int len,
 		mask=0xffffffff;
 		if(useraddr<PT_FPC)
 		{
-			realuseraddr=(addr_t)&(((u8 *)task->thread.regs)[useraddr]);
+			realuseraddr=((addr_t) __KSTK_PTREGS(task)) + useraddr;
 			if(useraddr<PT_PSWMASK)
 			{
 				copymax=PT_PSWMASK;
@@ -217,7 +217,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
 	struct task_struct *child;
 	int ret = -EPERM;
-	unsigned long flags;
 	unsigned long tmp;
 	int copied;
 	ptrace_area   parea; 
@@ -236,16 +235,18 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
 	child = find_task_by_pid(pid);
+	if (child)
+		get_task_struct(child);
 	read_unlock(&tasklist_lock);
 	if (!child)
 		goto out;
 	ret = -EPERM;
 	if (pid == 1)		/* you may not mess with init */
-		goto out;
+		goto out_tsk;
 	if (request == PTRACE_ATTACH) 
 	{
 		ret = ptrace_attach(child);
-		goto out;
+		goto out_tsk;
 	}
 	ret = -ESRCH;
 	// printk("child=%lX child->flags=%lX",child,child->flags);
@@ -254,14 +255,14 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	if(child!=current)
 	{
 		if (!(child->ptrace & PT_PTRACED))
-			goto out;
+			goto out_tsk;
 		if (child->state != TASK_STOPPED) 
 		{
 			if (request != PTRACE_KILL)
-				goto out;
+				goto out_tsk;
 		}
-		if (child->p_pptr != current)
-			goto out;
+		if (child->parent != current)
+			goto out_tsk;
 	}
 	switch (request) 
 	{
@@ -271,9 +272,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		copied = access_process_vm(child,ADDR_BITS_REMOVE(addr), &tmp, sizeof(tmp), 0);
 		ret = -EIO;
 		if (copied != sizeof(tmp))
-			goto out;
+			break;
 		ret = put_user(tmp,(unsigned long *) data);
-		goto out;
+		break;
 
 		/* read the word at location addr in the USER area. */
 	case PTRACE_PEEKUSR:
@@ -285,9 +286,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	case PTRACE_POKEDATA:
 		ret = 0;
 		if (access_process_vm(child,ADDR_BITS_REMOVE(addr), &data, sizeof(data), 1) == sizeof(data))
-			goto out;
+			break;
 		ret = -EIO;
-		goto out;
 		break;
 
 	case PTRACE_POKEUSR: /* write the word at location addr in the USER area */
@@ -300,9 +300,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data >= _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 		/* make sure the single step bit is not set. */
 		clear_single_step(child);
@@ -329,7 +329,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data >= _NSIG)
 			break;
-		child->ptrace &= ~PT_TRACESYS;
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 		set_single_step(child);
 		/* give it a chance to run. */
@@ -346,10 +346,20 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		   ret=copy_user(child,parea.kernel_addr,parea.process_addr,
 				 parea.len,1,(request==PTRACE_POKEUSR_AREA));
 		break;
+	case PTRACE_SETOPTIONS: {
+		if (data & PTRACE_O_TRACESYSGOOD)
+			child->ptrace |= PT_TRACESYSGOOD;
+		else
+			child->ptrace &= ~PT_TRACESYSGOOD;
+		ret = 0;
+		break;
+	}
 	default:
 		ret = -EIO;
 		break;
 	}
+ out_tsk:
+	put_task_struct(child);
  out:
 	unlock_kernel();
 	return ret;
@@ -357,12 +367,13 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 asmlinkage void syscall_trace(void)
 {
-	lock_kernel();
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-	    != (PT_PTRACED|PT_TRACESYS))
-		goto out;
-	current->exit_code = SIGTRAP;
-	set_current_state(TASK_STOPPED);
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
+		return;
+	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+					? 0x80 : 0);
+	current->state = TASK_STOPPED;
 	notify_parent(current, SIGCHLD);
 	schedule();
 	/*
@@ -374,6 +385,4 @@ asmlinkage void syscall_trace(void)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
- out:
-	unlock_kernel();
 }

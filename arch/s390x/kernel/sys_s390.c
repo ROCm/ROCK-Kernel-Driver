@@ -24,6 +24,7 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
+#include <linux/personality.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -203,3 +204,30 @@ asmlinkage int sys_pause(void)
 	return -ERESTARTNOHAND;
 }
 
+extern asmlinkage int sys_newuname(struct new_utsname * name);
+
+asmlinkage int s390x_newuname(struct new_utsname * name)
+{
+	int ret = sys_newuname(name);
+
+	if (current->personality == PER_LINUX32 && !ret) {
+		ret = copy_to_user(name->machine, "s390\0\0\0\0", 8);
+		if (ret) ret = -EFAULT;
+	}
+	return ret;
+}
+
+extern asmlinkage long sys_personality(unsigned long);
+
+asmlinkage int s390x_personality(unsigned long personality)
+{
+	int ret;
+
+	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
+		personality = PER_LINUX32;
+	ret = sys_personality(personality);
+	if (ret == PER_LINUX32)
+		ret = PER_LINUX;
+
+	return ret;
+}

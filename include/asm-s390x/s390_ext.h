@@ -25,6 +25,10 @@ typedef struct ext_int_info_t {
 extern ext_int_info_t *ext_int_hash[];
 
 int register_external_interrupt(__u16 code, ext_int_handler_t handler);
+int register_early_external_interrupt(__u16 code, ext_int_handler_t handler,
+				      ext_int_info_t *info);
 int unregister_external_interrupt(__u16 code, ext_int_handler_t handler);
+int unregister_early_external_interrupt(__u16 code, ext_int_handler_t handler,
+					ext_int_info_t *info);
 
 #endif

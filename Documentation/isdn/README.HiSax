@@ -41,9 +41,10 @@ ELSA Quickstep 3000 (same settings as QS1000)
 ELSA Quickstep 3000PCI
 ELSA PCMCIA
 ITK ix1-micro Rev.2
-Eicon.Diehl Diva 2.0 ISA and PCI (S0 and U interface, no PRO version)
-Eicon.Diehl Diva 2.01 ISA and PCI
-Eicon.Diehl Diva Piccola
+Eicon Diva 2.0 ISA and PCI (S0 and U interface, no PRO version)
+Eicon Diva 2.01 ISA and PCI
+Eicon Diva 2.02 PCI
+Eicon Diva Piccola
 ASUSCOM NETWORK INC. ISDNLink 128K PC adapter (order code I-IN100-ST-D)
 Dynalink IS64PH (OEM version of ASUSCOM NETWORK INC. ISDNLink 128K adapter)
 PCBIT-DP (OEM version of ASUSCOM NETWORK INC. ISDNLink)
@@ -52,6 +53,7 @@ Sedlbauer Speed Card (Speed Win, Teledat 100, PCI, Fax+)
 Sedlbauer Speed Star/Speed Star2 (PCMCIA)
 Sedlbauer ISDN-Controller PC/104
 USR Sportster internal TA (compatible Stollmann tina-pp V3)
+USR internal TA PCI
 ith Kommunikationstechnik GmbH MIC 16 ISA card
 Traverse Technologie NETjet PCI S0 card and NETspider U card
 Ovislink ISDN sc100-p card (NETjet driver)
@@ -66,13 +68,14 @@ Gazel ISDN cards
 HFC-PCI based cards
 Winbond W6692 based cards
 HFC-S+, HFC-SP/PCMCIA cards
+formula-n enternow
+Gerdes Power ISDN
 
 Note: PCF, PCF-Pro: up to now, only the ISDN part is supported
       PCC-8: not tested yet
       Eicon.Diehl Diva U interface not tested
 
 If you know other passive cards with the Siemens chipset, please let me know.
-To use the PNP cards you need the isapnptools.
 You can combine any card, if there is no conflict between the resources
 (io, mem, irq).
 
@@ -88,8 +91,15 @@ There is also some config needed before you compile the kernel and/or
 modules. It is included in the normal "make [menu]config" target at the
 kernel. Don't forget it, especially to select the right D-channel protocol.
 
-Please note: All PnP cards need to be configured with isapnp and will work
-only with the HiSax driver used as a module.
+Please note: In older versions of the HiSax driver, all PnP cards
+needed to be configured with isapnp and worked only with the HiSax
+driver used as a module.
+
+In the current version, HiSax will automatically use the in-kernel
+ISAPnP support, provided you selected it during kernel configuration
+(CONFIG_ISAPNP), if you don't give the io=, irq= command line parameters.
+
+The affected card types are: 4,7,12,14,19,27-30
 
 a) when built as a module
 -------------------------
@@ -190,6 +200,8 @@ Card types:
    37	HFC 2BDS0 S+, SP         irq,io 
    38	NETspider U PCI card     none
    39	HFC 2BDS0 SP/PCMCIA      irq,io (set with cardmgr)
+   40   hotplug interface
+   41   Formula-n enter:now PCI  none
 
 At the moment IRQ sharing is only possible with PCI cards. Please make sure
 that your IRQ is free and enabled for ISA use.
@@ -214,6 +226,13 @@ Examples for module loading
  		   (IO 0 (BASE 0x0580))
                    (IO 1 (BASE 0x0180))
    modprobe hisax type=4 protocol=2 irq=10 io0=0x580 io1=0x180
+
+   In the current version of HiSax, you can instead simply use
+
+   modprobe hisax type=4 protocol=2
+
+   if you configured your kernel for ISAPnP. Don't run isapnp in
+   this case!
 
 6. Teles 16.3, Euro ISDN, I/O base 280 hex, IRQ 12 and
    Teles 16.0, 1TR6, IRQ 5, Memory d0000 hex
@@ -295,7 +314,9 @@ type
    36	W6692 based PCI cards   none
    37	HFC 2BDS0 S+,SP/PCMCIA  ONLY WORKS AS A MODULE !
    38	NETspider U PCI card    none
-
+   39	HFC 2BDS0 SP/PCMCIA     ONLY WORKS AS A MODULE !
+   40   hotplug interface	ONLY WORKS AS A MODULE !
+   41   Formula-n enter:now PCI none
 
 Running the driver
 ------------------

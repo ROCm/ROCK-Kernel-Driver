@@ -7,22 +7,20 @@
 #include <asm/system.h>
 #include <asm/processor.h>
 
-#undef SPINLOCK_DEBUG
-
 /*
  * Simple spin lock operations.
  */
 
 typedef struct {
 	volatile unsigned long lock;
-#ifdef SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	volatile unsigned long owner_pc;
 	volatile unsigned long owner_cpu;
 #endif
 } spinlock_t;
 
 #ifdef __KERNEL__
-#if SPINLOCK_DEBUG
+#if CONFIG_DEBUG_SPINLOCK
 #define SPINLOCK_DEBUG_INIT     , 0, 0
 #else
 #define SPINLOCK_DEBUG_INIT     /* */
@@ -34,7 +32,7 @@ typedef struct {
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 
-#ifndef SPINLOCK_DEBUG
+#ifndef CONFIG_DEBUG_SPINLOCK
 
 static inline void _raw_spin_lock(spinlock_t *lock)
 {
@@ -88,12 +86,12 @@ extern unsigned long __spin_trylock(volatile unsigned long *lock);
  */
 typedef struct {
 	volatile unsigned long lock;
-#ifdef SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	volatile unsigned long owner_pc;
 #endif
 } rwlock_t;
 
-#if SPINLOCK_DEBUG
+#if CONFIG_DEBUG_SPINLOCK
 #define RWLOCK_DEBUG_INIT     , 0
 #else
 #define RWLOCK_DEBUG_INIT     /* */
@@ -102,7 +100,7 @@ typedef struct {
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 RWLOCK_DEBUG_INIT }
 #define rwlock_init(lp) do { *(lp) = RW_LOCK_UNLOCKED; } while(0)
 
-#ifndef SPINLOCK_DEBUG
+#ifndef CONFIG_DEBUG_SPINLOCK
 
 static __inline__ void _raw_read_lock(rwlock_t *rw)
 {

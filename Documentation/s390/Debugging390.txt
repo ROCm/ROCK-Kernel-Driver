@@ -237,9 +237,10 @@ they go to 64 Bit.
 
 
 On 390 our limitations & strengths make us slightly different.
-For backward compatibility we are only allowed use 31 bits (2GB)
-of our 32 bit addresses,however, we use entirely separate address 
-spaces for the user & kernel.
+For backward compatibility ( because of the psw address hi bit which
+indicates whether we are in 31 or 24 bit mode ) we are only allowed 
+use 31 bits (2GB) of our 32 bit addresses. However, 
+we use entirely separate address  spaces for the user & kernel.
 
 This means we can support 2GB of non Extended RAM on s/390, & more
 with the Extended memory managment swap device & 
@@ -1474,6 +1475,12 @@ Now display what gpr2 is pointing to
 D 00014CB4.20
 V00014CB4  2F646576 2F636F6E 736F6C65 00001BF5
 V00014CC4  FC00014C B4001001 E0001000 B8070707
+
+Alternatively you can do the more elegant
+D 0.20;BASE2
+BASE2 telling VM to use GPR2 as the base register.
+
+
 Now copy the text till the first 00 hex ( which is the end of the string
 to an xterm & do hex2ascii on it.
 hex2ascii 2F646576 2F636F6E 736F6C65 00 
@@ -2123,6 +2130,12 @@ rl_read_key + 180 in section .text
 now do
 p/x (*(**$sp+56))&0x7fffffff
 & so on.
+
+Another good trick to look at addresses on the stack if you've somehow lost 
+the backchain is.
+x/500xa $sp
+This displays anything the name of any known functions above the stack pointer
+for 500 bytes.
 
 Disassembling instructions without debug info
 ---------------------------------------------

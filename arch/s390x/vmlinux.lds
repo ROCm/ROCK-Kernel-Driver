@@ -14,6 +14,9 @@ SECTIONS
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x0700
+
+  _etext = .;			/* End of text section */
+
   .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 
@@ -25,12 +28,6 @@ SECTIONS
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
-
-  __start___kallsyms = .;       /* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
-
-  _etext = .;			/* End of text section */
 
   .data : {			/* Data */
 	*(.data)
@@ -46,9 +43,7 @@ SECTIONS
   __init_begin = .;
   .text.init : { *(.text.init) }
   .data.init : { *(.data.init) }
-  . = ALIGN(4096);
-  __init_end = .;
-
+  . = ALIGN(256);
   __setup_start = .;
   .setup.init : { *(.setup.init) }
   __setup_end = .;
@@ -63,6 +58,10 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  . = ALIGN(256);
+  __per_cpu_start = .;
+  .date.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
 

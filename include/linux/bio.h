@@ -20,6 +20,7 @@
 #ifndef __LINUX_BIO_H
 #define __LINUX_BIO_H
 
+#include <linux/kdev_t.h>
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
 #ifndef BIO_VMERGE_BOUNDARY

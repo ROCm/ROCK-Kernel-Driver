@@ -153,7 +153,6 @@ extern int diExtendFS(inode_t * ipimap, inode_t * ipbmap);
 extern int diMount(struct inode *);
 extern int diUnmount(struct inode *, int);
 extern int diRead(struct inode *);
-extern void diClearExtension(struct inode *);
 extern struct inode *diReadSpecial(struct super_block *, ino_t);
 extern void diWriteSpecial(struct inode *);
 extern void diFreeSpecial(struct inode *);

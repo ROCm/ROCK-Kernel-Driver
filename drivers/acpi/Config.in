@@ -23,7 +23,7 @@ if [ "$CONFIG_X86" = "y" ]; then
       if [ "$CONFIG_PCI" = "y" ]; then
         define_bool CONFIG_ACPI_PCI		y
       fi
-      define_bool CONFIG_ACPI_SLEEP		y
+      define_bool CONFIG_ACPI_SLEEP		$CONFIG_SOFTWARE_SUSPEND
       define_bool CONFIG_ACPI_SYSTEM		y
       tristate     '  AC Adapter'	CONFIG_ACPI_AC
       tristate     '  Battery'		CONFIG_ACPI_BATTERY

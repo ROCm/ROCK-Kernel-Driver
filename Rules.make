@@ -121,7 +121,7 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = $(CFLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+c_flags = $(CFLAGS) $(NOSTDINC_FLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags) 
 
 quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
@@ -159,7 +159,7 @@ $(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
-a_flags = $(AFLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+a_flags = $(AFLAGS) $(NOSTDINC_FLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
@@ -223,6 +223,35 @@ $(multi-used-y) : %.o: $(multi-objs-y) FORCE
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
+
+# Compile programs on the host
+# ===========================================================================
+
+host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))
+host-progs-multi      := $(foreach m,$(host-progs),$(if $($(m)-objs),$(m)))
+host-progs-multi-objs := $(foreach m,$(host-progs-multi),$($(m)-objs))
+
+quiet_cmd_host_cc__c  = HOSTCC $(RELDIR)/$@
+cmd_host_cc__c        = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -o $@ $<
+
+$(host-progs-single): %: %.c FORCE
+	$(call if_changed_dep,host_cc__c)
+
+quiet_cmd_host_cc_o_c = HOSTCC $(RELDIR)/$@
+cmd_host_cc_o_c       = $(HOSTCC) -Wp,-MD,.$(subst /,_,$@).d \
+			$(HOSTCFLAGS) $(HOST_EXTRACFLAGS) -c -o $@ $<
+
+$(host-progs-multi-objs): %.o: %.c FORCE
+	$(call if_changed_dep,host_cc_o_c)
+
+quiet_cmd_host_cc__o  = HOSTLD $(RELDIR)/$@
+cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
+			$(HOST_LOADLIBES)
+
+$(host-progs-multi): %: $(host-progs-multi-objs) FORCE
+	$(call if_changed,cmd_host_cc__o)
+
 
 # Descending when making module versions
 # ---------------------------------------------------------------------------

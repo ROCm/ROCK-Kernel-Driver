@@ -67,6 +67,7 @@
 #include <linux/miscdevice.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/spinlock.h>
+#include <linux/mm.h>
 
 #include <asm/msr.h>
 #include <asm/uaccess.h>

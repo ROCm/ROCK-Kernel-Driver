@@ -56,6 +56,8 @@ EXTRA_CFLAGS=-g
 
 fore_200e-objs	:= fore200e.o $(FORE200E_FW_OBJS)
 
+host-progs := fore200e_mkfirm
+
 include $(TOPDIR)/Rules.make
 
 
@@ -79,9 +81,6 @@ fore200e_sba_fw.c: $(patsubst "%", %, $(CONFIG_ATM_FORE200E_SBA_FW)) \
 	  echo 'FORE200E_FW_UP_TO_DATE += $@'; \
 	  echo 'endif' \
 	) >.$@.fw
-
-fore200e_mkfirm: fore200e_mkfirm.c
-	$(HOSTCC) $(HOSTCFLAGS) $< -o $@
 
 # deal with the various suffixes of the binary firmware images
 %.bin %.bin1 %.bin2: %.data

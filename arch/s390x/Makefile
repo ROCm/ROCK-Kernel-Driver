@@ -18,10 +18,11 @@ CPP=$(CC) -E
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 LDFLAGS=-e start
 ifeq ($(CONFIG_SHARED_KERNEL),y)
-LINKFLAGS =-T $(TOPDIR)/arch/s390x/vmlinux-shared.lds $(LDFLAGS)
+  LINKSCRIPT := arch/s390x/vmlinux-shared.lds
 else
-LINKFLAGS =-T $(TOPDIR)/arch/s390x/vmlinux.lds $(LDFLAGS)
+  LINKSCRIPT := arch/s390x/vmlinux.lds
 endif
+LINKFLAGS =-T $(TOPDIR)/$(LINKSCRIPT) $(LDFLAGS)
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe
@@ -30,8 +31,7 @@ CFLAGS := $(CFLAGS) $(CFLAGS_PIPE) $(CFLAGS_NSR)
 
 HEAD := arch/s390x/kernel/head.o arch/s390x/kernel/init_task.o
 
-SUBDIRS := $(SUBDIRS) arch/s390x/mm arch/s390x/kernel arch/s390x/lib \
-           drivers/s390
+SUBDIRS += arch/s390x/mm arch/s390x/kernel arch/s390x/lib drivers/s390
 CORE_FILES := arch/s390x/mm/mm.o arch/s390x/kernel/kernel.o $(CORE_FILES)
 DRIVERS := $(DRIVERS) drivers/s390/built-in.o
 LIBS := $(TOPDIR)/arch/s390x/lib/lib.a $(LIBS) $(TOPDIR)/arch/s390x/lib/lib.a
@@ -43,11 +43,17 @@ listing: vmlinux
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
+vmlinux: $(LINKSCRIPT)
+
 image: vmlinux 
 	@$(MAKEBOOT) image
 
+install: vmlinux
+	@$(MAKEBOOT) BOOTIMAGE=image install
+
 archclean:
 	@$(MAKEBOOT) clean
+	$(MAKE) -C arch/$(ARCH)/kernel clean
 
 archmrproper:
 

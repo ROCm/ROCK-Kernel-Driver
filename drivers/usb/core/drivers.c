@@ -35,7 +35,7 @@
  */
 
 #include <linux/fs.h>
-#include <linux/mm.h>
+#include <linux/gfp.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 #include <linux/smp_lock.h>

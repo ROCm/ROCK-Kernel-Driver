@@ -120,8 +120,8 @@ sys32_ptrace_wrapper:
 	lgfr	%r2,%r2			# long
 	lgfr	%r3,%r3			# long
 	llgtr	%r4,%r4			# long
-	lgfr	%r5,%r5			# long
-	jg	sys32_ptrace		# branch to system call
+	llgfr	%r5,%r5			# long
+	jg	sys_ptrace		# branch to system call
 
 	.globl  sys32_alarm_wrapper 
 sys32_alarm_wrapper:
@@ -310,6 +310,12 @@ sys32_old_getrlimit_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# struct rlimit_emu31 *
 	jg	sys32_old_getrlimit	# branch to system call
+
+	.globl  sys32_getrlimit_wrapper 
+sys32_getrlimit_wrapper:
+	llgfr	%r2,%r2			# unsigned int
+	llgtr	%r3,%r3			# struct rlimit_emu31 *
+	jg	sys32_getrlimit		# branch to system call
 
 	.globl  sys32_mmap2_wrapper 
 sys32_mmap2_wrapper:
@@ -537,7 +543,7 @@ sys32_setdomainname_wrapper:
 	.globl  sys32_newuname_wrapper 
 sys32_newuname_wrapper:
 	llgtr	%r2,%r2			# struct new_utsname *
-	jg	sys_newuname		# branch to system call
+	jg	s390x_newuname		# branch to system call
 
 	.globl  sys32_adjtimex_wrapper 
 sys32_adjtimex_wrapper:
@@ -614,7 +620,7 @@ sys32_sysfs_wrapper:
 	.globl  sys32_personality_wrapper 
 sys32_personality_wrapper:
 	llgfr	%r2,%r2			# unsigned long
-	jg	sys_personality		# branch to system call
+	jg	s390x_personality	# branch to system call
 
 	.globl  sys32_setfsuid16_wrapper 
 sys32_setfsuid16_wrapper:
@@ -1085,9 +1091,130 @@ sys32_lstat64_wrapper:
 	llgfr	%r4,%r4			# long
 	jg	sys32_lstat64		# branch to system call
 
+	.globl	sys32_stime_wrapper
+sys32_stime_wrapper:
+	llgtr	%r2,%r2			# int *
+	jg	sys_stime		# branch to system call
+
+	.globl  sys32_sysctl_wrapper
+sys32_sysctl_wrapper:
+	llgtr   %r2,%r2                 # struct __sysctl_args32 *
+	jg      sys32_sysctl
+
 	.globl	sys32_fstat64_wrapper
 sys32_fstat64_wrapper:
 	llgfr	%r2,%r2			# unsigned long
 	llgtr	%r3,%r3			# struct stat64 *
 	llgfr	%r4,%r4			# long
 	jg	sys32_fstat64		# branch to system call
+
+	.globl  sys32_futex_wrapper 
+sys32_futex_wrapper:
+	llgtr	%r2,%r2			# void *
+	lgfr	%r3,%r3			# int
+	jg	sys_futex		# branch to system call
+
+	.globl	sys32_setxattr_wrapper
+sys32_setxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	lgfr	%r6,%r6			# int
+	jg	sys_setxattr
+
+	.globl	sys32_lsetxattr_wrapper
+sys32_lsetxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	lgfr	%r6,%r6			# int
+	jg	sys_lsetxattr
+
+	.globl	sys32_fsetxattr_wrapper
+sys32_fsetxattr_wrapper:
+	lgfr	%r2,%r2			# int
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	lgfr	%r6,%r6			# int
+	jg	sys_fsetxattr
+
+	.globl	sys32_getxattr_wrapper
+sys32_getxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	jg	sys_getxattr
+
+	.globl	sys32_lgetxattr_wrapper
+sys32_lgetxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	jg	sys_lgetxattr
+
+	.globl	sys32_fgetxattr_wrapper
+sys32_fgetxattr_wrapper:
+	lgfr	%r2,%r2			# int
+	llgtr	%r3,%r3			# char *
+	llgtr	%r4,%r4			# void *
+	llgfr	%r5,%r5			# size_t
+	jg	sys_fgetxattr
+
+	.globl	sys32_listxattr_wrapper
+sys32_listxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgfr	%r4,%r4			# size_t
+	jg	sys_listxattr
+
+	.globl	sys32_llistxattr_wrapper
+sys32_llistxattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	llgfr	%r4,%r4			# size_t
+	jg	sys_llistxattr
+
+	.globl	sys32_flistxattr_wrapper
+sys32_flistxattr_wrapper:
+	lgfr	%r2,%r2			# int
+	llgtr	%r3,%r3			# char *
+	llgfr	%r4,%r4			# size_t
+	jg	sys_flistxattr
+
+	.globl	sys32_removexattr_wrapper
+sys32_removexattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	jg	sys_removexattr
+
+	.globl	sys32_lremovexattr_wrapper
+sys32_lremovexattr_wrapper:
+	llgtr	%r2,%r2			# char *
+	llgtr	%r3,%r3			# char *
+	jg	sys_lremovexattr
+
+	.globl	sys32_fremovexattr_wrapper
+sys32_fremovexattr_wrapper:
+	lgfr	%r2,%r2			# int
+	llgtr	%r3,%r3			# char *
+	jg	sys_fremovexattr
+
+	.globl	sys32_sched_setaffinity_wrapper
+sys32_sched_setaffinity_wrapper:
+	lgfr	%r2,%r2			# int
+	llgfr	%r3,%r3			# unsigned int
+	llgtr	%r4,%r4			# unsigned long *
+	jg	sys32_sched_setaffinity
+
+	.globl	sys32_sched_getaffinity_wrapper
+sys32_sched_getaffinity_wrapper:
+	lgfr	%r2,%r2			# int
+	llgfr	%r3,%r3			# unsigned int
+	llgtr	%r4,%r4			# unsigned long *
+	jg	sys32_sched_getaffinity
+

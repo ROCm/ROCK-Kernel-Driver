@@ -203,6 +203,9 @@ static struct fb_ops clps7111fb_ops = {
 	fb_get_cmap:	gen_get_cmap,
 	fb_setcolreg:	clps7111fb_setcolreg,
 	fb_blank:	clps7111fb_blank,
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,
 };
 
 static int 

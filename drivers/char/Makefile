@@ -214,17 +214,12 @@ obj-$(CONFIG_AGP) += agp/
 obj-$(CONFIG_DRM) += drm/
 obj-$(CONFIG_PCMCIA) += pcmcia/
 
+host-progs := conmakehash
+
 include $(TOPDIR)/Rules.make
 
-fastdep:
-
-conmakehash: conmakehash.c
-	$(HOSTCC) $(HOSTCFLAGS) -o conmakehash conmakehash.c
-
 consolemap_deftbl.c: $(FONTMAPFILE) conmakehash
-	./conmakehash $(FONTMAPFILE) > consolemap_deftbl.c
-
-consolemap_deftbl.o: consolemap_deftbl.c $(TOPDIR)/include/linux/types.h
+	./conmakehash $< > $@
 
 .DELETE_ON_ERROR:
 

@@ -68,12 +68,6 @@ static ssize_t debug_input(struct file *file, const char *user_buf,
 			   size_t user_len, loff_t * offset);
 static int debug_open(struct inode *inode, struct file *file);
 static int debug_close(struct inode *inode, struct file *file);
-static struct proc_dir_entry 
-*debug_create_proc_dir_entry(struct proc_dir_entry *root,
-			     const char *name, mode_t mode,
-			     struct file_operations *fops);
-static void debug_delete_proc_dir_entry(struct proc_dir_entry *root,
-					struct proc_dir_entry *entry);
 static debug_info_t*  debug_info_create(char *name, int page_order, int nr_areas, int buf_size);
 static void debug_info_get(debug_info_t *);
 static void debug_info_put(debug_info_t *);
@@ -155,7 +149,6 @@ DECLARE_MUTEX(debug_lock);
 static int initialized = 0;
 
 static struct file_operations debug_file_ops = {
-	owner:	THIS_MODULE,
 	read:    debug_output,
 	write:   debug_input,	
 	open:    debug_open,
@@ -217,8 +210,10 @@ static debug_info_t*  debug_info_alloc(char *name, int page_order,
 	strncpy(rc->name, name, MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1)));
 	rc->name[MIN(strlen(name), (DEBUG_MAX_PROCF_LEN - 1))] = 0;
 	memset(rc->views, 0, DEBUG_MAX_VIEWS * sizeof(struct debug_view *));
+#ifdef CONFIG_PROC_FS
 	memset(rc->proc_entries, 0 ,DEBUG_MAX_VIEWS *
 		sizeof(struct proc_dir_entry*));
+#endif /* CONFIG_PROC_FS */
 	atomic_set(&(rc->ref_count), 0);
 
 	return rc;
@@ -265,11 +260,9 @@ static debug_info_t*  debug_info_create(char *name, int page_order,
 
 
 	/* create proc rood directory */
-
         rc->proc_root_entry = proc_mkdir(rc->name, debug_proc_root_entry);
 
 	/* append new element to linked list */
-
         if (debug_area_first == NULL) {
                 /* first element in list */
                 debug_area_first = rc;
@@ -331,16 +324,22 @@ static void debug_info_put(debug_info_t *db_info)
 	if (!db_info)
 		return;
 	if (atomic_dec_and_test(&db_info->ref_count)) {
+#ifdef DEBUG
 		printk(KERN_INFO "debug: freeing debug area %p (%s)\n",
 		       db_info, db_info->name);
+#endif
 		for (i = 0; i < DEBUG_MAX_VIEWS; i++) {
-			if (db_info->views[i] != NULL)
-				debug_delete_proc_dir_entry
-				    (db_info->proc_root_entry,
-				     db_info->proc_entries[i]);
+			if (db_info->views[i] == NULL)
+				continue;
+#ifdef CONFIG_PROC_FS
+			remove_proc_entry(db_info->proc_entries[i]->name,
+					  db_info->proc_root_entry);
+#endif
 		}
-		debug_delete_proc_dir_entry(debug_proc_root_entry,
-					    db_info->proc_root_entry);
+#ifdef CONFIG_PROC_FS
+		remove_proc_entry(db_info->proc_root_entry->name,
+				  debug_proc_root_entry);
+#endif
 		if(db_info == debug_area_first)
 			debug_area_first = db_info->next;
 		if(db_info == debug_area_last)
@@ -497,6 +496,7 @@ static int debug_open(struct inode *inode, struct file *file)
 #ifdef DEBUG
 	printk("debug_open\n");
 #endif
+	MOD_INC_USE_COUNT;
 	down(&debug_lock);
 
 	/* find debug log and view */
@@ -524,14 +524,18 @@ static int debug_open(struct inode *inode, struct file *file)
 	debug_info_snapshot = debug_info_copy(debug_info);
 
 	if(!debug_info_snapshot){
+#ifdef DEBUG
 		printk(KERN_ERR "debug_open: debug_info_copy failed (out of mem)\n");
+#endif
 		rc = -ENOMEM;
 		goto out;
 	}
 
 	if ((file->private_data =
 	     kmalloc(sizeof(file_private_info_t), GFP_ATOMIC)) == 0) {
+#ifdef DEBUG
 		printk(KERN_ERR "debug_open: kmalloc failed\n");
+#endif
 		debug_info_free(debug_info_snapshot);	
 		rc = -ENOMEM;
 		goto out;
@@ -549,6 +553,8 @@ static int debug_open(struct inode *inode, struct file *file)
 
       out:
 	up(&debug_lock);
+	if (rc != 0)
+		MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -568,33 +574,8 @@ static int debug_close(struct inode *inode, struct file *file)
 	debug_info_free(p_info->debug_info_snap);
 	debug_info_put(p_info->debug_info_org);
 	kfree(file->private_data);
+	MOD_DEC_USE_COUNT;
 	return 0;		/* success */
-}
-
-/*
- * debug_create_proc_dir_entry:
- * - initializes proc-dir-entry and registers it
- */
-
-static struct proc_dir_entry *debug_create_proc_dir_entry
-    (struct proc_dir_entry *root, const char *name, mode_t mode,
-     struct file_operations *fops) 
-{
-	struct proc_dir_entry *rc = create_proc_entry(name, mode, root);
-	if (rc && fops)
-		rc->proc_fops = fops;
-	return rc;
-}
-
-
-/*
- * delete_proc_dir_entry:
- */
-
-static void debug_delete_proc_dir_entry
-    (struct proc_dir_entry *root, struct proc_dir_entry *proc_entry) 
-{
-	remove_proc_entry(proc_entry->name, root);
 }
 
 /*
@@ -620,9 +601,11 @@ debug_info_t *debug_register
 		goto out;
 	debug_register_view(rc, &debug_level_view);
         debug_register_view(rc, &debug_flush_view);
+#ifdef DEBUG
 	printk(KERN_INFO
 	       "debug: reserved %d areas of %d pages for debugging %s\n",
 	       nr_areas, 1 << page_order, rc->name);
+#endif
       out:
         if (rc == NULL){
 		printk(KERN_ERR "debug: debug_register failed for %s\n",name);
@@ -642,7 +625,9 @@ void debug_unregister(debug_info_t * id)
 	if (!id)
 		goto out;
 	down(&debug_lock);
+#ifdef DEBUG
 	printk(KERN_INFO "debug: unregistering %s\n", id->name);
+#endif
 	debug_info_put(id);
 	up(&debug_lock);
 
@@ -849,7 +834,9 @@ int debug_init(void)
 
 	down(&debug_lock);
 	if (!initialized) {
+#ifdef CONFIG_PROC_FS
 		debug_proc_root_entry = proc_mkdir(DEBUG_DIR_ROOT, NULL);
+#endif /* CONFIG_PROC_FS */
 		printk(KERN_INFO "debug: Initialization complete\n");
 		initialized = 1;
 	}
@@ -889,10 +876,10 @@ int debug_register_view(debug_info_t * id, struct debug_view *view)
 			mode |= S_IRUSR;
 		if (view->input_proc)
 			mode |= S_IWUSR;
-		id->proc_entries[i] =
-		    debug_create_proc_dir_entry(id->proc_root_entry,
-						view->name, mode,
-						&debug_file_ops);
+		id->proc_entries[i] = create_proc_entry(view->name, mode,
+							id->proc_root_entry);
+		if (id->proc_entries[i] != NULL)
+			id->proc_entries[i]->proc_fops = &debug_file_ops;
 		rc = 0;
 	}
 	spin_unlock_irqrestore(&id->lock, flags);
@@ -920,8 +907,10 @@ int debug_unregister_view(debug_info_t * id, struct debug_view *view)
 	if (i == DEBUG_MAX_VIEWS)
 		rc = -1;
 	else {
-		debug_delete_proc_dir_entry(id->proc_root_entry,
-					    id->proc_entries[i]);		
+#ifdef CONFIG_PROC_FS
+		remove_proc_entry(id->proc_entries[i]->name,
+				  id->proc_root_entry);
+#endif
 		id->views[i] = NULL;
 		rc = 0;
 	}
@@ -1209,7 +1198,9 @@ void cleanup_module(void)
 #ifdef DEBUG
 	printk("debug_cleanup_module: \n");
 #endif
-	debug_delete_proc_dir_entry(NULL, debug_proc_root_entry);
+#ifdef CONFIG_PROC_FS
+	remove_proc_entry(debug_proc_root_entry->name, NULL);
+#endif /* CONFIG_PROC_FS */
 	return;
 }
 

@@ -24,10 +24,17 @@
 #include <linux/route.h>
 #include <linux/ext2_fs.h>
 #include <linux/hdreg.h>
+#include <linux/if_bonding.h>
+#include <linux/loop.h>
+#include <linux/blkpg.h>
+#include <linux/blk.h>
+#include <linux/elevator.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/dasd.h>
+#include <asm/tape390.h>
 #include <asm/sockios.h>
+#include <asm/ioctls.h>
 
 #include "linux32.h"
 
@@ -198,6 +205,58 @@ out:
 	return err;
 }
 
+static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq ifr;
+	mm_segment_t old_fs;
+	int err, len;
+	u32 data;
+	
+	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
+		return -EFAULT;
+	ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
+	if (!ifr.ifr_data)
+		return -EAGAIN;
+
+	switch (cmd) {
+	case SIOCBONDENSLAVE:
+	case SIOCBONDRELEASE:
+	case SIOCBONDSETHWADDR:
+	case SIOCBONDCHANGEACTIVE:
+		len = IFNAMSIZ * sizeof(char);
+		break;
+	case SIOCBONDSLAVEINFOQUERY:
+		len = sizeof(struct ifslave);
+		break;
+	case SIOCBONDINFOQUERY:
+		len = sizeof(struct ifbond);
+		break;
+	default:
+		err = -EINVAL;
+		goto out;
+	};
+
+	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+	if (copy_from_user(ifr.ifr_data, (char *)A(data), len)) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	old_fs = get_fs();
+	set_fs (KERNEL_DS);
+	err = sys_ioctl (fd, cmd, (unsigned long)&ifr);
+	set_fs (old_fs);
+	if (!err) {
+		len = copy_to_user((char *)A(data), ifr.ifr_data, len);
+		if (len)
+			err = -EFAULT;
+	}
+
+out:
+	free_page((unsigned long)ifr.ifr_data);
+	return err;
+}
+
 static inline int dev_ifsioc(unsigned int fd, unsigned int cmd,
 			     unsigned long arg)
 {
@@ -320,6 +379,375 @@ static int do_ext2_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return sys_ioctl(fd, cmd, arg);
 }
 
+
+struct loop_info32 {
+	int			lo_number;      /* ioctl r/o */
+	__kernel_dev_t32	lo_device;      /* ioctl r/o */
+	unsigned int		lo_inode;       /* ioctl r/o */
+	__kernel_dev_t32	lo_rdevice;     /* ioctl r/o */
+	int			lo_offset;
+	int			lo_encrypt_type;
+	int			lo_encrypt_key_size;    /* ioctl w/o */
+	int			lo_flags;       /* ioctl r/o */
+	char			lo_name[LO_NAME_SIZE];
+	unsigned char		lo_encrypt_key[LO_KEY_SIZE]; /* ioctl w/o */
+	unsigned int		lo_init[2];
+	char			reserved[4];
+};
+
+static int loop_status(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	struct loop_info l;
+	int err = -EINVAL;
+
+	switch(cmd) {
+	case LOOP_SET_STATUS:
+		err = get_user(l.lo_number, &((struct loop_info32 *)arg)->lo_number);
+		err |= __get_user(l.lo_device, &((struct loop_info32 *)arg)->lo_device);
+		err |= __get_user(l.lo_inode, &((struct loop_info32 *)arg)->lo_inode);
+		err |= __get_user(l.lo_rdevice, &((struct loop_info32 *)arg)->lo_rdevice);
+		err |= __copy_from_user((char *)&l.lo_offset, (char *)&((struct loop_info32 *)arg)->lo_offset,
+					   8 + (unsigned long)l.lo_init - (unsigned long)&l.lo_offset);
+		if (err) {
+			err = -EFAULT;
+		} else {
+			set_fs (KERNEL_DS);
+			err = sys_ioctl (fd, cmd, (unsigned long)&l);
+			set_fs (old_fs);
+		}
+		break;
+	case LOOP_GET_STATUS:
+		set_fs (KERNEL_DS);
+		err = sys_ioctl (fd, cmd, (unsigned long)&l);
+		set_fs (old_fs);
+		if (!err) {
+			err = put_user(l.lo_number, &((struct loop_info32 *)arg)->lo_number);
+			err |= __put_user(l.lo_device, &((struct loop_info32 *)arg)->lo_device);
+			err |= __put_user(l.lo_inode, &((struct loop_info32 *)arg)->lo_inode);
+			err |= __put_user(l.lo_rdevice, &((struct loop_info32 *)arg)->lo_rdevice);
+			err |= __copy_to_user((char *)&((struct loop_info32 *)arg)->lo_offset,
+					   (char *)&l.lo_offset, (unsigned long)l.lo_init - (unsigned long)&l.lo_offset);
+			if (err)
+				err = -EFAULT;
+		}
+		break;
+	default: {
+		static int count = 0;
+		if (++count <= 20)
+			printk("%s: Unknown loop ioctl cmd, fd(%d) "
+			       "cmd(%08x) arg(%08lx)\n",
+			       __FUNCTION__, fd, cmd, arg);
+	}
+	}
+	return err;
+}
+
+
+struct blkpg_ioctl_arg32 {
+	int op;
+	int flags;
+	int datalen;
+	u32 data;
+};
+                                
+static int blkpg_ioctl_trans(unsigned int fd, unsigned int cmd, struct blkpg_ioctl_arg32 *arg)
+{
+	struct blkpg_ioctl_arg a;
+	struct blkpg_partition p;
+	int err;
+	mm_segment_t old_fs = get_fs();
+	
+	err = get_user(a.op, &arg->op);
+	err |= __get_user(a.flags, &arg->flags);
+	err |= __get_user(a.datalen, &arg->datalen);
+	err |= __get_user((long)a.data, &arg->data);
+	if (err) return err;
+	switch (a.op) {
+	case BLKPG_ADD_PARTITION:
+	case BLKPG_DEL_PARTITION:
+		if (a.datalen < sizeof(struct blkpg_partition))
+			return -EINVAL;
+                if (copy_from_user(&p, a.data, sizeof(struct blkpg_partition)))
+			return -EFAULT;
+		a.data = &p;
+		set_fs (KERNEL_DS);
+		err = sys_ioctl(fd, cmd, (unsigned long)&a);
+		set_fs (old_fs);
+	default:
+		return -EINVAL;
+	}                                        
+	return err;
+}
+
+
+typedef struct ica_z90_status_t {
+  int totalcount;
+  int leedslitecount;
+  int leeds2count;
+  int requestqWaitCount;
+  int pendingqWaitCount;
+  int totalOpenCount;
+  int cryptoDomain;
+  unsigned char status[64];
+  unsigned char qdepth[64];
+} ica_z90_status;
+
+typedef struct _ica_rsa_modexpo {
+  char         *inputdata;
+  unsigned int  inputdatalength;
+  char         *outputdata;
+  unsigned int  outputdatalength;
+  char         *b_key;
+  char         *n_modulus;
+} ica_rsa_modexpo_t;
+
+typedef struct _ica_rsa_modexpo_32 {
+  u32          inputdata;
+  u32          inputdatalength;
+  u32          outputdata;
+  u32          outputdatalength;
+  u32          b_key;
+  u32          n_modulus;
+} ica_rsa_modexpo_32_t;
+
+typedef struct _ica_rsa_modexpo_crt {
+  char         *inputdata;
+  unsigned int  inputdatalength;
+  char         *outputdata;
+  unsigned int  outputdatalength;
+  char         *bp_key;
+  char         *bq_key;
+  char         *np_prime;
+  char         *nq_prime;
+  char         *u_mult_inv;
+} ica_rsa_modexpo_crt_t;
+
+typedef struct _ica_rsa_modexpo_crt_32 {
+  u32          inputdata;
+  u32          inputdatalength;
+  u32          outputdata;
+  u32          outputdatalength;
+  u32          bp_key;
+  u32          bq_key;
+  u32          np_prime;
+  u32          nq_prime;
+  u32          u_mult_inv;
+} ica_rsa_modexpo_crt_32_t;
+
+#define ICA_IOCTL_MAGIC 'z'
+#define ICARSAMODEXPO   _IOC(_IOC_READ|_IOC_WRITE, ICA_IOCTL_MAGIC, 0x05, 0)
+#define ICARSACRT       _IOC(_IOC_READ|_IOC_WRITE, ICA_IOCTL_MAGIC, 0x06, 0) 
+#define ICARSAMODMULT   _IOC(_IOC_READ|_IOC_WRITE, ICA_IOCTL_MAGIC, 0x07, 0)
+#define ICAZ90STATUS    _IOC(_IOC_READ, ICA_IOCTL_MAGIC, 0x10, sizeof(ica_z90_status))
+#define ICAZ90QUIESCE   _IOC(_IOC_NONE, ICA_IOCTL_MAGIC, 0x11, 0)
+#define ICAZ90HARDRESET _IOC(_IOC_NONE, ICA_IOCTL_MAGIC, 0x12, 0)
+#define ICAZ90HARDERROR _IOC(_IOC_NONE, ICA_IOCTL_MAGIC, 0x13, 0)
+
+static int do_rsa_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	int err = 0;
+	ica_rsa_modexpo_t rsa;
+	ica_rsa_modexpo_32_t *rsa32 = (ica_rsa_modexpo_32_t *)arg;
+	u32 inputdata, outputdata, b_key, n_modulus;
+
+	memset (&rsa, 0, sizeof(rsa));
+
+	err |= __get_user (inputdata, &rsa32->inputdata);
+	err |= __get_user (rsa.inputdatalength, &rsa32->inputdatalength);
+	err |= __get_user (outputdata, &rsa32->outputdata);
+	err |= __get_user (rsa.outputdatalength, &rsa32->outputdatalength);
+	err |= __get_user (b_key, &rsa32->b_key);
+	err |= __get_user (n_modulus, &rsa32->n_modulus);
+	if (err)
+		return -EFAULT;
+
+	rsa.inputdata = (char *)kmalloc(rsa.inputdatalength, GFP_KERNEL);
+	if (!rsa.inputdata) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.inputdata, (char *)(u64)(inputdata & 0x7fffffff), 
+			   rsa.inputdatalength)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.outputdata = (char *)kmalloc(rsa.outputdatalength, GFP_KERNEL);
+	if (!rsa.outputdata) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+
+	rsa.b_key = (char *)kmalloc(rsa.inputdatalength, GFP_KERNEL);
+	if (!rsa.b_key) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.b_key, (char *)(u64)(b_key & 0x7fffffff), 
+			   rsa.inputdatalength)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.n_modulus = (char *)kmalloc(rsa.inputdatalength, GFP_KERNEL);
+	if (!rsa.n_modulus) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.n_modulus, (char *)(u64)(n_modulus & 0x7fffffff), 
+			   rsa.inputdatalength)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&rsa);
+	set_fs(old_fs);
+	if (err < 0)
+		goto cleanup;
+
+	if (copy_to_user((char *)(u64)(outputdata & 0x7fffffff), rsa.outputdata,
+			 rsa.outputdatalength))
+		err = -EFAULT;
+
+cleanup:
+	if (rsa.inputdata)
+		kfree(rsa.inputdata);
+	if (rsa.outputdata)
+		kfree(rsa.outputdata);
+	if (rsa.b_key)
+		kfree(rsa.b_key);
+	if (rsa.n_modulus)
+		kfree(rsa.n_modulus);
+	
+	return err;
+}
+
+static int do_rsa_crt_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs = get_fs();
+	int err = 0;
+	ica_rsa_modexpo_crt_t rsa;
+	ica_rsa_modexpo_crt_32_t *rsa32 = (ica_rsa_modexpo_crt_32_t *)arg;
+	u32 inputdata, outputdata, bp_key, bq_key, np_prime, nq_prime, u_mult_inv;
+
+	memset (&rsa, 0, sizeof(rsa));
+
+	err |= __get_user (inputdata, &rsa32->inputdata);
+	err |= __get_user (rsa.inputdatalength, &rsa32->inputdatalength);
+	err |= __get_user (outputdata, &rsa32->outputdata);
+	err |= __get_user (rsa.outputdatalength, &rsa32->outputdatalength);
+	err |= __get_user (bp_key, &rsa32->bp_key);
+	err |= __get_user (bq_key, &rsa32->bq_key);
+	err |= __get_user (np_prime, &rsa32->np_prime);
+	err |= __get_user (nq_prime, &rsa32->nq_prime);
+	err |= __get_user (u_mult_inv, &rsa32->u_mult_inv);
+	if (err)
+		return -EFAULT;
+
+	rsa.inputdata = (char *)kmalloc(rsa.inputdatalength, GFP_KERNEL);
+	if (!rsa.inputdata) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.inputdata, (char *)(u64)(inputdata & 0x7fffffff), 
+			   rsa.inputdatalength)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.outputdata = (char *)kmalloc(rsa.outputdatalength, GFP_KERNEL);
+	if (!rsa.outputdata) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+
+	rsa.bp_key = (char *)kmalloc(rsa.inputdatalength/2 + 8, GFP_KERNEL);
+	if (!rsa.bp_key) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.bp_key, (char *)(u64)(bp_key & 0x7fffffff), 
+			   rsa.inputdatalength/2 + 8)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.bq_key = (char *)kmalloc(rsa.inputdatalength/2, GFP_KERNEL);
+	if (!rsa.bq_key) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.bq_key, (char *)(u64)(bq_key & 0x7fffffff), 
+			   rsa.inputdatalength/2)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.np_prime = (char *)kmalloc(rsa.inputdatalength/2 + 8, GFP_KERNEL);
+	if (!rsa.np_prime) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.np_prime, (char *)(u64)(np_prime & 0x7fffffff), 
+			   rsa.inputdatalength/2 + 8)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.nq_prime = (char *)kmalloc(rsa.inputdatalength/2, GFP_KERNEL);
+	if (!rsa.nq_prime) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.nq_prime, (char *)(u64)(nq_prime & 0x7fffffff), 
+			   rsa.inputdatalength/2)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	rsa.u_mult_inv = (char *)kmalloc(rsa.inputdatalength/2 + 8, GFP_KERNEL);
+	if (!rsa.u_mult_inv) {
+		err = -ENOMEM;
+		goto cleanup;
+	}
+	if (copy_from_user(rsa.u_mult_inv, (char *)(u64)(u_mult_inv & 0x7fffffff), 
+			   rsa.inputdatalength/2 + 8)) {
+		err = -EFAULT;
+		goto cleanup;
+	}
+
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&rsa);
+	set_fs(old_fs);
+	if (err < 0)
+		goto cleanup;
+
+	if (copy_to_user((char *)(u64)(outputdata & 0x7fffffff), rsa.outputdata,
+			 rsa.outputdatalength))
+		err = -EFAULT;
+
+cleanup:
+	if (rsa.inputdata)
+		kfree(rsa.inputdata);
+	if (rsa.outputdata)
+		kfree(rsa.outputdata);
+	if (rsa.bp_key)
+		kfree(rsa.bp_key);
+	if (rsa.bq_key)
+		kfree(rsa.bq_key);
+	if (rsa.np_prime)
+		kfree(rsa.np_prime);
+	if (rsa.nq_prime)
+		kfree(rsa.nq_prime);
+	if (rsa.u_mult_inv)
+		kfree(rsa.u_mult_inv);
+	
+	return err;
+}
+
 static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t old_fs = get_fs();
@@ -360,7 +788,21 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_DEFAULT(BIODASDINFO),
 	IOCTL32_DEFAULT(BIODASDFMT),
 
+	IOCTL32_DEFAULT(TAPE390_DISPLAY),
+
+	IOCTL32_DEFAULT(BLKROSET),
+	IOCTL32_DEFAULT(BLKROGET),
 	IOCTL32_DEFAULT(BLKRRPART),
+	IOCTL32_DEFAULT(BLKFLSBUF),
+	IOCTL32_DEFAULT(BLKRASET),
+	IOCTL32_DEFAULT(BLKFRASET),
+	IOCTL32_DEFAULT(BLKSECTSET),
+	IOCTL32_DEFAULT(BLKSSZGET),
+	IOCTL32_DEFAULT(BLKBSZGET),
+	IOCTL32_DEFAULT(BLKGETSIZE64),
+
+	IOCTL32_DEFAULT(BLKELVGET),
+	IOCTL32_DEFAULT(BLKELVSET),
 
 	IOCTL32_HANDLER(HDIO_GETGEO, hd_geometry_ioctl),
 
@@ -455,6 +897,9 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 
 	IOCTL32_DEFAULT(SIOCGSTAMP),
 
+	IOCTL32_DEFAULT(LOOP_SET_FD),
+	IOCTL32_DEFAULT(LOOP_CLR_FD),
+
 	IOCTL32_HANDLER(SIOCGIFNAME, dev_ifname32),
 	IOCTL32_HANDLER(SIOCGIFCONF, dev_ifconf),
 	IOCTL32_HANDLER(SIOCGIFFLAGS, dev_ifsioc),
@@ -499,7 +944,22 @@ static struct ioctl32_list ioctl32_handler_table[] = {
 	IOCTL32_HANDLER(EXT2_IOC32_GETVERSION, do_ext2_ioctl),
 	IOCTL32_HANDLER(EXT2_IOC32_SETVERSION, do_ext2_ioctl),
 
-	IOCTL32_HANDLER(BLKGETSIZE, w_long)
+	IOCTL32_HANDLER(LOOP_SET_STATUS, loop_status),
+	IOCTL32_HANDLER(LOOP_GET_STATUS, loop_status),
+
+	IOCTL32_HANDLER(ICARSAMODEXPO, do_rsa_ioctl),
+	IOCTL32_HANDLER(ICARSACRT, do_rsa_crt_ioctl),
+	IOCTL32_HANDLER(ICARSAMODMULT, do_rsa_ioctl),
+	IOCTL32_DEFAULT(ICAZ90STATUS),
+	IOCTL32_DEFAULT(ICAZ90QUIESCE),
+	IOCTL32_DEFAULT(ICAZ90HARDRESET),
+	IOCTL32_DEFAULT(ICAZ90HARDERROR),
+
+	IOCTL32_HANDLER(BLKRAGET, w_long),
+	IOCTL32_HANDLER(BLKGETSIZE, w_long),
+	IOCTL32_HANDLER(BLKFRAGET, w_long),
+	IOCTL32_HANDLER(BLKSECTGET, w_long),
+	IOCTL32_HANDLER(BLKPG, blkpg_ioctl_trans)
 
 };
 

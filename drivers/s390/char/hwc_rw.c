@@ -231,6 +231,8 @@ static unsigned long cr0 __attribute__ ((aligned (8)));
 static unsigned long cr0_save __attribute__ ((aligned (8)));
 static unsigned char psw_mask __attribute__ ((aligned (8)));
 
+static ext_int_info_t ext_int_info_hwc;
+
 #define DELAYED_WRITE 0
 #define IMMEDIATE_WRITE 1
 
@@ -2004,7 +2006,8 @@ hwc_init (void)
 
 #endif
 
-	if (register_external_interrupt (0x2401, hwc_interrupt_handler) != 0)
+	if (register_early_external_interrupt (0x2401, hwc_interrupt_handler,
+					       &ext_int_info_hwc) != 0)
 		panic ("Couldn't request external interrupts 0x2401");
 
 	spin_lock_init (&hwc_data.lock);
@@ -2178,6 +2181,7 @@ hwc_do_interrupt (u32 ext_int_param)
 					unconditional_read_2 (ext_int_param);
 					break;
 				default:
+					break;
 				}
 			}
 		}

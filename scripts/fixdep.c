@@ -214,7 +214,7 @@ void use_config(char *m, int slen)
 		if (*p == '_')
 			*p = '/';
 		else
-			*p = tolower(*p);
+			*p = tolower((unsigned char)*p);
 	}
 	printf("    $(wildcard %s/include/config/%s.h) \\\n", topdir, s);
 }
@@ -238,7 +238,7 @@ void parse_config_file(char *map, size_t len)
 		if (memcmp(p, "CONFIG_", 7))
 			continue;
 		for (q = p + 7; q < map + len; q++) {
-			if (!(isalnum(*q)))
+			if (!(isalnum(*q) || *q == '_'))
 				goto found;
 		}
 		continue;
@@ -307,13 +307,12 @@ void parse_dep_file(void *map, size_t len)
 	clear_config();
 
 	while (m < end) {
-		while (*m == ' ' || *m == '\\' || *m == '\n')
+		while (m < end && (*m == ' ' || *m == '\\' || *m == '\n'))
 			m++;
-
-		p = strchr(m, ' ');
-		if (!p) {
-			p = end;
-			while (!isalpha(*p)) p--;
+		p = m;
+		while (p < end && *p != ' ') p++;
+		if (p == end) {
+			do p--; while (!isalnum(*p));
 			p++;
 		}
 		memcpy(s, m, p-m); s[p-m] = 0;

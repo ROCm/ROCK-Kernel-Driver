@@ -66,7 +66,12 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>  /* for in_interrupt() */
-#undef DEBUG
+
+#ifdef CONFIG_USB_DEBUG
+#	define DEBUG
+#else
+#	undef DEBUG
+#endif
 #include <linux/usb.h>
 
 #include <asm/io.h>
@@ -2391,7 +2396,11 @@ static ohci_t * __devinit hc_alloc_ohci (struct pci_dev *dev, void * mem_base)
 		return NULL;
 	}
 	ohci->bus->hcpriv = (void *) ohci;
+#ifdef CONFIG_PCI
 	ohci->bus->bus_name = dev->slot_name;
+#else
+	ohci->bus->bus_name = "ohci-hc";
+#endif
 
 	return ohci;
 } 
@@ -2430,9 +2439,6 @@ static void hc_release_ohci (ohci_t * ohci)
 
 	ohci_mem_cleanup (ohci);
     
-	/* unmap the IO address space */
-	iounmap (ohci->regs);
-
 	pci_free_consistent (ohci->ohci_dev, sizeof *ohci->hcca,
 		ohci->hcca, ohci->hcca_dma);
 	kfree (ohci);

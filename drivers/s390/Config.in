@@ -63,8 +63,8 @@ if [ "$CONFIG_S390_TAPE" != "n" ]; then
   bool '   Support for tape character devices' CONFIG_S390_TAPE_CHAR
   bool '   Support for tape block devices' CONFIG_S390_TAPE_BLOCK
   comment 'S/390 tape hardware support'
-  bool '   Support for 3490 tape hardware' CONFIG_S390_TAPE_3490
-  bool '   Support for 3480 tape hardware' CONFIG_S390_TAPE_3480
+  dep_tristate '   Support for 3490 tape hardware' CONFIG_S390_TAPE_3490 $CONFIG_S390_TAPE
+  dep_tristate '   Support for 3480 tape hardware' CONFIG_S390_TAPE_3480 $CONFIG_S390_TAPE
 fi
 endmenu
 
@@ -85,6 +85,10 @@ if [ "$CONFIG_NET" = "y" ]; then
     bool 'Channel Device Configuration' CONFIG_CHANDEV
     if [ "$CONFIG_CHANDEV" = "y" ]; then
 	define_bool CONFIG_HOTPLUG y
+    fi
+
+    if [ "$CONFIG_NET_ETHERNET" != "n" -o "$CONFIG_TR" != "n" ]; then
+      tristate 'Lan Channel Station Interface' CONFIG_LCS
     fi
 
     tristate 'CTC device support' CONFIG_CTC

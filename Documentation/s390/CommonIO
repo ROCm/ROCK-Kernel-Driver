@@ -21,7 +21,8 @@ Command line parameters
   Default is on.
 
 
-* cio_ignore = <range of device numbers>, <range of device numbers>, ...
+* cio_ignore = <device number> | <range of device numbers>, 
+	       <device number> | <range of device numbers>, ...
 
   The given device numbers will be ignored by the common I/O-layer; no detection
   and device sensing will be done on any of those devices. The subchannel to 
@@ -41,45 +42,27 @@ Command line parameters
   By default, no devices are ignored.
 
 
-* cio_proc_devinfo = yes | no
-
-  Determines whether the entries under /proc/deviceinfo/ (see below) should be
-  created. Since there are problems with systems with many devices attached, I
-  made it configurable.
-
-  Until the problems are dealt with, default is off.
-
-
 /proc entries
 -------------
 
 * /proc/subchannels
 
-  Shows for each subchannel
-  - device number
-  - device type/model and if applicable control unit type/model
-  - whether the device is in use
-  - path installed mask, path available mask, path operational mask and last 
-    path used mask
-  - the channel path IDs (chpids)
+  This entry shows information on a per-subchannel basis.
 
+  The data is ordered in the following way:
 
-* /proc/deviceinfo/
+  - device number 
+  - subchannel number 
+  - device type/model (if applicable; if not, this is empty) and control unit 
+    type/model
+  - whether the device is in use (i. e. a device driver has requested ownership 
+    and registered an interrupt handler)
+  - path installed mask (PIM), as reflected by last store subchannel
+  - path available mask (PAM), as reflected by last store subchannel
+  - path operational mask (POM), as reflected by last store subchannel
+  - the channel path IDs (CHPIDs)
 
-  Shows in subdirectories for each device some characteristics:
-  - /proc/deviceinfo/<devno>/chpids: 
-	the channel path IDs
-  - /proc/deviceinfo/<devno>/in_use: 
-	whether the device is in use
-  - /proc/deviceinfo/<devno>/sensedata:
-    	the device type/model and if applicable control unit type/model of the
-	device
-
-  NOTE: Since the number of inodes which can be dynamically allocated by procfs
-        is limited, device entries will only be created up to a magic number of
-        devices. The kernel will utter a warning that not all entries can be
-        created. In this case, you shouldn't use "cio_proc_devinfo=yes" (see
-        above).
+  All fields are separated by spaces, the chpids are in blocks of four chpids.
 
 * /proc/cio_ignore
 
@@ -137,3 +120,26 @@ Command line parameters
 
   This entry counts how many times s390_process_IRQ has been called for each 
   CPU. This info is in /proc/interrupts on other architectures.
+
+* /proc/chpids
+
+  This entry will only show up if you specified CONFIG_CHSC=y during kernel
+  config.
+
+  This entry serves a dual purpose:
+ 
+  - show which chpids are currently known to Linux and their status (online,
+    logically offline),
+
+  - toggling known chpids logically online/offline.
+
+  To toggle a known chpid logically offline, do an
+	echo off <chpid> > /proc/chpids
+  <chpid> is interpreted as hex, even if you omit the '0x'.
+  The chpid will be treated by Linux as if it were not online, which can mean 
+  some devices will become unavailable.
+
+  You can toggle a logically offline chpid online again by
+	echo on <chpid> > /proc/chpids
+  If devices became unavailable by toggling the chpid logically offline, they 
+  will become available again after you toggle the chpid online again.

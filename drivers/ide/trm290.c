@@ -223,15 +223,15 @@ static int trm290_udma_init(struct ata_device *drive, struct request *rq)
 	}
 
 	trm290_prepare_drive(drive, 1);	/* select DMA xfer */
+
 	outl(ch->dmatable_dma|reading|writing, ch->dma_base);
 	drive->waiting_for_dma = 1;
 	outw((count * 2) - 1, ch->dma_base+2); /* start DMA */
 
-	if (drive->type != ATA_DISK)
-		return 0;
-
-	ide_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
-	OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	if (drive->type == ATA_DISK) {
+		ata_set_handler(drive, ide_dma_intr, WAIT_CMD, NULL);
+		outb(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
+	}
 
 	return 0;
 }

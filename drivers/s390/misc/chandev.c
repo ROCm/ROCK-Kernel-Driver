@@ -132,7 +132,7 @@ struct chandev_irqinfo
 };
 
 
-chandev_irqinfo *chandev_irqinfo_head=NULL;
+static chandev_irqinfo *chandev_irqinfo_head=NULL;
 
 typedef struct chandev_parms chandev_parms;
 struct chandev_parms
@@ -146,7 +146,7 @@ struct chandev_parms
 
 static chandev_type chandev_persistent=0; 
 
-chandev_parms *chandev_parms_head=NULL;
+static chandev_parms *chandev_parms_head=NULL;
 
 
 typedef struct chandev_activelist chandev_activelist;
@@ -179,6 +179,7 @@ static chandev_force *chandev_force_head=NULL;
 static chandev_probelist *chandev_probelist_head=NULL;
 static chandev_activelist *chandev_activelist_head=NULL;
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
+/* not static, see comment in chandev.h */
 int chandev_use_devno_names=FALSE;
 #endif
 static int chandev_cautious_auto_detect=TRUE;
@@ -324,9 +325,9 @@ struct  chandev_not_oper_struct
 static qheader chandev_not_oper_head={NULL,NULL};
 static spinlock_t           chandev_not_oper_spinlock;
 
-#define chandev_interrupt_check() \
+#define chandev_interrupt_check(name) \
 if(in_interrupt())                \
-     printk(KERN_WARNING __FUNCTION__ " called under interrupt this shouldn't happen\n")
+     printk(KERN_WARNING name " called under interrupt this shouldn't happen\n")
 
 
 #define for_each(variable,head) \
@@ -343,7 +344,7 @@ for((variable)=(head);(variable)!=NULL;(variable)=(nextmember))
 static void chandev_lock(void)
 {
 	eieio();
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_lock");
 	if(chandev_lock_owner!=(long)current)
 	{
 		while(!spin_trylock(&chandev_spinlock))
@@ -397,7 +398,7 @@ static void chandev_unlock(void)
 
 
 
-void *chandev_alloc(size_t size)
+static void *chandev_alloc(size_t size)
 {
 	void *mem=kmalloc(size,GFP_ATOMIC);
 	if(mem)
@@ -441,7 +442,7 @@ static int chandev_remove_from_queue(qheader *qhead,queue *member)
 
 
 
-void chandev_free_listmember(list **listhead,list *member)
+static void chandev_free_listmember(list **listhead,list *member)
 {
 	chandev_lock();
 	if(member)
@@ -455,7 +456,7 @@ void chandev_free_listmember(list **listhead,list *member)
 	chandev_unlock();
 }
 
-void chandev_free_queuemember(qheader *qhead,queue *member)
+static void chandev_free_queuemember(qheader *qhead,queue *member)
 {
 	chandev_lock();
 	if(member)
@@ -471,7 +472,7 @@ void chandev_free_queuemember(qheader *qhead,queue *member)
 
 
 
-void chandev_free_all_list(list **listhead)
+static void chandev_free_all_list(list **listhead)
 {
 	list *head;
 
@@ -481,7 +482,7 @@ void chandev_free_all_list(list **listhead)
 	chandev_unlock();
 }
 
-void chandev_free_all_queue(qheader *qhead)
+static void chandev_free_all_queue(qheader *qhead)
 {
 	chandev_lock();
 	while(qhead->head)
@@ -542,6 +543,7 @@ static int chandev_exec_start_script(void *unused)
 					argc+=3;
 					break;
 				default:
+					break;
 				}
 				if(have_tag[tagidx]==FALSE)
 					argc++;
@@ -603,7 +605,7 @@ static int chandev_exec_start_script(void *unused)
 }
 
 
-void *chandev_allocstr(const char *str,size_t offset)
+static void *chandev_allocstr(const char *str,size_t offset)
 {
 	char *member;
 
@@ -658,7 +660,7 @@ char *devname, chandev_msck_status prev_status,chandev_msck_status curr_status)
 
 
 
-int chandev_oper_func(int irq,devreg_t *dreg)
+static int chandev_oper_func(int irq,devreg_t *dreg)
 {
 	chandev_last_machine_check=jiffies;
 	if(atomic_dec_and_test(&chandev_msck_thread_lock))
@@ -692,7 +694,7 @@ static void chandev_not_oper_handler(int irq,int status )
 		       irq,status);
 }
 
-chandev_irqinfo *chandev_get_irqinfo_by_irq(int irq)
+static chandev_irqinfo *chandev_get_irqinfo_by_irq(int irq)
 {
 	chandev_irqinfo *curr_irqinfo;
 	for_each(curr_irqinfo,chandev_irqinfo_head)
@@ -701,7 +703,7 @@ chandev_irqinfo *chandev_get_irqinfo_by_irq(int irq)
 	return(NULL);
 }
 
-chandev *chandev_get_by_irq(int irq)
+static chandev *chandev_get_by_irq(int irq)
 {
 	chandev *curr_chandev;
 
@@ -713,7 +715,7 @@ chandev *chandev_get_by_irq(int irq)
 	return(NULL);
 }
 
-chandev_activelist *chandev_get_activelist_by_irq(int irq)
+static chandev_activelist *chandev_get_activelist_by_irq(int irq)
 {
 	chandev_activelist *curr_device;
 
@@ -728,7 +730,7 @@ chandev_activelist *chandev_get_activelist_by_irq(int irq)
 }
 
 
-void chandev_remove_irqinfo_by_irq(unsigned int irq)
+static void chandev_remove_irqinfo_by_irq(unsigned int irq)
 {
 	chandev_irqinfo *remove_irqinfo;
 	chandev_activelist *curr_device;
@@ -762,7 +764,7 @@ void chandev_remove_irqinfo_by_irq(unsigned int irq)
 	
 }
 
-int chandev_add_schib_info(int irq,chandev_subchannel_info *sch)
+static int chandev_add_schib_info(int irq,chandev_subchannel_info *sch)
 {
 	schib_t *new_schib;
 	
@@ -849,7 +851,7 @@ void chandev_free_irq(unsigned int irq, void *dev_id)
 }
 
 /* This should be safe even if chandev_free_irq is already called by the device */
-void chandev_free_irq_by_irqinfo(chandev_irqinfo *irqinfo)
+static void chandev_free_irq_by_irqinfo(chandev_irqinfo *irqinfo)
 {
 	if(irqinfo)
 		chandev_free_irq(irqinfo->sch.irq,irqinfo->dev_id);
@@ -857,7 +859,7 @@ void chandev_free_irq_by_irqinfo(chandev_irqinfo *irqinfo)
 
 
 
-void chandev_sprint_type_model(char *buff,s32 type,s16 model)
+static void chandev_sprint_type_model(char *buff,s32 type,s16 model)
 {
 	if(type==-1)
 		strcpy(buff,"    *    ");
@@ -870,13 +872,13 @@ void chandev_sprint_type_model(char *buff,s32 type,s16 model)
 		sprintf(buff," 0x%02x  ",(int)model);
 }
 
-void chandev_sprint_devinfo(char *buff,s32 cu_type,s16 cu_model,s32 dev_type,s16 dev_model)
+static void chandev_sprint_devinfo(char *buff,s32 cu_type,s16 cu_model,s32 dev_type,s16 dev_model)
 {
 	chandev_sprint_type_model(buff,cu_type,cu_model);
 	chandev_sprint_type_model(&buff[strlen(buff)],dev_type,dev_model);
 }
 
-void chandev_remove_parms(chandev_type chan_type,int exact_match,int lo_devno)
+static void chandev_remove_parms(chandev_type chan_type,int exact_match,int lo_devno)
 {
 	chandev_parms      *curr_parms,*next_parms;
 
@@ -892,7 +894,7 @@ void chandev_remove_parms(chandev_type chan_type,int exact_match,int lo_devno)
 }
 
 
-void chandev_add_parms(chandev_type chan_type,u16 lo_devno,u16 hi_devno,char *parmstr)
+static void chandev_add_parms(chandev_type chan_type,u16 lo_devno,u16 hi_devno,char *parmstr)
 {
 	chandev_parms      *parms;
 
@@ -988,18 +990,18 @@ void chandev_add_model(chandev_type chan_type,s32 cu_type,s16 cu_model,
 }
 
 
-void chandev_remove(chandev *member)
+static void chandev_remove(chandev *member)
 {
 	chandev_free_queuemember(&chandev_head,(queue *)member);
 }
 
 
-void chandev_remove_all(void)
+static void chandev_remove_all(void)
 {
 	chandev_free_all_queue(&chandev_head);
 }
 
-void chandev_remove_model(chandev_model_info *model)
+static void chandev_remove_model(chandev_model_info *model)
 {
 	chandev *curr_chandev,*next_chandev;
 
@@ -1013,7 +1015,7 @@ void chandev_remove_model(chandev_model_info *model)
 	chandev_unlock();
 }
 
-void chandev_remove_all_models(void)
+static void chandev_remove_all_models(void)
 {
 	chandev_lock();
 	while(chandev_models_head)
@@ -1057,10 +1059,13 @@ static void chandev_init_default_models(void)
 	chandev_add_model(chandev_type_osad,0x3088,0x62,-1,-1,0,default_msck_bits,FALSE,FALSE);
 	/* claw */
 	chandev_add_model(chandev_type_claw,0x3088,0x61,-1,-1,0,default_msck_bits,FALSE,FALSE);
+
+	/* ficon attached ctc */
+	chandev_add_model(chandev_type_escon,0x3088,0x1E,-1,-1,0,default_msck_bits,FALSE,FALSE);
 }
 
 
-void chandev_del_noauto(u16 devno)
+static void chandev_del_noauto(u16 devno)
 {
 	chandev_noauto_range *curr_noauto,*next_noauto;
 	chandev_lock();
@@ -1070,7 +1075,7 @@ void chandev_del_noauto(u16 devno)
 	chandev_unlock();
 }
 
-void chandev_del_msck(u16 devno)
+static void chandev_del_msck(u16 devno)
 {
 	chandev_msck_range *curr_msck_range,*next_msck_range;
 	chandev_lock();
@@ -1081,7 +1086,8 @@ void chandev_del_msck(u16 devno)
 }
 
 
-void chandev_add(s390_dev_info_t  *newdevinfo,chandev_model_info *newmodelinfo)
+static void chandev_add(s390_dev_info_t  *newdevinfo,
+			chandev_model_info *newmodelinfo)
 {
 	chandev *new_chandev=NULL;
 
@@ -1100,7 +1106,7 @@ void chandev_add(s390_dev_info_t  *newdevinfo,chandev_model_info *newmodelinfo)
 	}
 }
 
-void chandev_unregister_probe(chandev_probefunc probefunc)
+static void chandev_unregister_probe(chandev_probefunc probefunc)
 {
 	chandev_probelist *curr_probe,*next_probe;
 
@@ -1112,7 +1118,7 @@ void chandev_unregister_probe(chandev_probefunc probefunc)
 	chandev_unlock();
 }
 
-void chandev_unregister_probe_by_chan_type(chandev_type chan_type)
+static void chandev_unregister_probe_by_chan_type(chandev_type chan_type)
 {
 	chandev_probelist *curr_probe,*next_probe;
 
@@ -1126,7 +1132,7 @@ void chandev_unregister_probe_by_chan_type(chandev_type chan_type)
 
 
 
-void chandev_reset(void)
+static void chandev_reset(void)
 {
 	chandev_lock();
 	chandev_remove_all_models();
@@ -1142,7 +1148,8 @@ void chandev_reset(void)
 }
 
 
-int chandev_is_chandev(int irq,s390_dev_info_t *devinfo,chandev_force **forceinfo,chandev_model_info **ret_model)
+static int chandev_is_chandev(int irq,s390_dev_info_t *devinfo,
+		chandev_force **forceinfo,chandev_model_info **ret_model)
 {
 	chandev_force *curr_force;
 	chandev_model_info *curr_model=NULL;
@@ -1192,7 +1199,7 @@ int chandev_is_chandev(int irq,s390_dev_info_t *devinfo,chandev_force **forceinf
 	return(retval);
 }
 
-void chandev_collect_devices(void)
+static void chandev_collect_devices(void)
 {
 	int curr_irq,loopcnt=0;
 	s390_dev_info_t   curr_devinfo;
@@ -1220,9 +1227,12 @@ void chandev_collect_devices(void)
 	}
 }
 
-int chandev_add_force(chandev_type chan_type,s32 devif_num,u16 read_lo_devno,
-u16 write_hi_devno,u16 data_devno,s32 memory_usage_in_k,s16 port_protocol_no,u8 checksum_received_ip_pkts,
-u8 use_hw_stats,char *host_name,char *adapter_name,char *api_type)
+static int chandev_add_force(chandev_type chan_type, s32 devif_num,
+			     u16 read_lo_devno, u16 write_hi_devno,
+			     u16 data_devno,s32 memory_usage_in_k,
+			     s16 port_protocol_no,u8 checksum_received_ip_pkts,
+			     u8 use_hw_stats,char *host_name,
+			     char *adapter_name,char *api_type)
 {
 	chandev_force *new_chandev_force;
 	
@@ -1270,7 +1280,7 @@ u8 use_hw_stats,char *host_name,char *adapter_name,char *api_type)
 	return(0);
 }
 
-void chandev_del_force(int read_lo_devno)
+static void chandev_del_force(int read_lo_devno)
 {
 	chandev_force *curr_force,*next_force;
 	
@@ -1285,7 +1295,7 @@ void chandev_del_force(int read_lo_devno)
 }
 
 
-void chandev_shutdown(chandev_activelist *curr_device)
+static void chandev_shutdown(chandev_activelist *curr_device)
 {
 	int err=0;
 	chandev_lock();
@@ -1319,12 +1329,12 @@ void chandev_shutdown(chandev_activelist *curr_device)
 	chandev_unlock();
 }
 
-void chandev_shutdown_all(void)
+static void chandev_shutdown_all(void)
 {
 	while(chandev_activelist_head)
 		chandev_shutdown(chandev_activelist_head);
 }
-void chandev_shutdown_by_name(char *devname)
+static void chandev_shutdown_by_name(char *devname)
 {
 	chandev_activelist *curr_device;
 
@@ -1352,7 +1362,7 @@ static chandev_activelist *chandev_active(u16 devno)
 	return(NULL);
 }
 
-void chandev_shutdown_by_devno(u16 devno)
+static void chandev_shutdown_by_devno(u16 devno)
 {
 	chandev_activelist *curr_device;
 
@@ -1364,7 +1374,7 @@ void chandev_shutdown_by_devno(u16 devno)
 }
 
 
-int chandev_pack_args(char *str)
+static int chandev_pack_args(char *str)
 {
 	char *newstr=str,*next;
 	int strcnt=1;
@@ -1404,7 +1414,7 @@ typedef enum
 	iscomma=4,
 } chandev_strval;
 
-chandev_strval chandev_strcmp(char *teststr,char **str,long *endlong)
+static chandev_strval chandev_strcmp(char *teststr,char **str,long *endlong)
 {
 	char *cur;
 	chandev_strval  retval=isnull;
@@ -1434,7 +1444,7 @@ int chandev_initdevice(chandev_probeinfo *probeinfo,void *dev_ptr,u8 port_no,cha
 {
 	chandev_activelist *newdevice,*curr_device;
 
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_initdevice");
 	if(probeinfo->newdevice!=NULL)
 	{
 		printk("probeinfo->newdevice!=NULL in chandev_initdevice for %s",devname);
@@ -1504,12 +1514,11 @@ char *chandev_build_device_name(chandev_probeinfo *probeinfo,char *destnamebuff,
 							char numbuff[10];
 							sprintf(numbuff,"%d",idx);
 							if(strcmp(&curr_device->devname[len],numbuff)==0)
-								goto next_idx;
+								continue;
 						}
 					}
 					sprintf(destnamebuff,"%s%d",basename,idx);
 					return(destnamebuff);
-				next_idx:
 				}
 				printk("chandev_build_device_name was usable to build a unique name for %s\n",basename);
 				return(NULL);
@@ -1526,13 +1535,15 @@ char *chandev_build_device_name(chandev_probeinfo *probeinfo,char *destnamebuff,
 }
 
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
-struct net_device *chandev_init_netdev(chandev_probeinfo *probeinfo,char *basename,
-struct net_device *dev, int sizeof_priv,
-struct net_device *(*init_netdevfunc)(struct net_device *dev, int sizeof_priv))
+struct net_device *chandev_init_netdev(chandev_probeinfo *probeinfo,
+			char *basename, struct net_device *dev, int sizeof_priv,
+			struct net_device *(*init_netdevfunc)
+				(struct net_device *dev, int sizeof_priv))
 #else
-struct device *chandev_init_netdev(chandev_probeinfo *probeinfo,char *basename,
-struct device *dev, int sizeof_priv,
-struct device *(*init_netdevfunc)(struct device *dev, int sizeof_priv))
+struct device *chandev_init_netdev(chandev_probeinfo *probeinfo,
+			char *basename, struct device *dev, int sizeof_priv,
+			struct device *(*init_netdevfunc)
+				(struct device *dev, int sizeof_priv))
 #endif
 {
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
@@ -1543,7 +1554,7 @@ struct device *(*init_netdevfunc)(struct device *dev, int sizeof_priv))
 #endif
 	
 
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_init_netdev");
 	if (!init_netdevfunc) 
 	{
 		printk("init_netdevfunc=NULL in chandev_init_netdev, it should not be valid.\n");
@@ -1614,7 +1625,7 @@ void (*unreg_netdevfunc)(struct device *dev))
 		printk("unreg_netdevfunc=NULL in chandev_initnetdevice, it should not be valid.\n");
 		return NULL;
 	}
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_initnetdevice");
 	retdevice=chandev_init_netdev(probeinfo,basename,dev,sizeof_priv,init_netdevfunc);
 	if (retdevice) 
 	{
@@ -1635,12 +1646,14 @@ void (*unreg_netdevfunc)(struct device *dev))
 }
 
 
-int chandev_compare_chpid_info(chandev_subchannel_info *chan1,chandev_subchannel_info *chan2)
+static int chandev_compare_chpid_info(chandev_subchannel_info *chan1,
+				      chandev_subchannel_info *chan2)
 {
 	return (chan1->pim!=chan2->pim || *chan1->chpid!=*chan2->chpid);
 }
 
-int chandev_compare_cu_dev_info(chandev_subchannel_info *chan1,chandev_subchannel_info *chan2)
+static int chandev_compare_cu_dev_info(chandev_subchannel_info *chan1,
+					chandev_subchannel_info *chan2)
 {
 	return ((chan1->cu_type != chan2->cu_type)||
 		(chan1->cu_model != chan2->cu_model)||
@@ -1648,7 +1661,8 @@ int chandev_compare_cu_dev_info(chandev_subchannel_info *chan1,chandev_subchanne
 		(chan1->dev_model != chan2->dev_model));
 }
 
-int chandev_compare_subchannel_info(chandev_subchannel_info *chan1,chandev_subchannel_info *chan2)
+static int chandev_compare_subchannel_info(chandev_subchannel_info *chan1,
+					   chandev_subchannel_info *chan2)
 {
 	return((chan1->devno == chan2->devno) &&
 	       (chan1->cu_type == chan2->cu_type) &&
@@ -1660,8 +1674,8 @@ int chandev_compare_subchannel_info(chandev_subchannel_info *chan1,chandev_subch
 }
 
 
-int chandev_doprobe(chandev_force *force,chandev *read,
-chandev *write,chandev *data)
+static int chandev_doprobe(chandev_force *force,chandev *read,
+			   chandev *write,chandev *data)
 {
 	chandev_probelist *probe;
 	chandev_model_info *model_info;
@@ -1793,7 +1807,7 @@ chandev *write,chandev *data)
 }
 
 
-int chandev_request_irq_from_irqinfo(chandev_irqinfo *irqinfo,chandev *this_chandev)
+static int chandev_request_irq_from_irqinfo(chandev_irqinfo *irqinfo,chandev *this_chandev)
 {
 	int retval=s390_request_irq_special(irqinfo->sch.irq,
 				   irqinfo->handler,
@@ -1809,14 +1823,15 @@ int chandev_request_irq_from_irqinfo(chandev_irqinfo *irqinfo,chandev *this_chan
 	return(retval);
 }
 
-void chandev_irqallocerr(chandev_irqinfo *irqinfo,int err)
+static void chandev_irqallocerr(chandev_irqinfo *irqinfo,int err)
 {
 	printk("chandev_probe failed to realloc irq=%d for %s err=%d\n",irqinfo->sch.irq,irqinfo->devname,err);
 }
 
 
-void chandev_call_notification_func(chandev_activelist *curr_device,chandev_irqinfo *curr_irqinfo,
-chandev_msck_status prevstatus)
+static void chandev_call_notification_func(chandev_activelist *curr_device,
+					   chandev_irqinfo *curr_irqinfo,
+					   chandev_msck_status prevstatus)
 {
 	if(curr_irqinfo->msck_status!=prevstatus)
 	{
@@ -1850,9 +1865,10 @@ chandev_msck_status prevstatus)
 	}
 }
 
-int chandev_find_eligible_channels(chandev *first_chandev_to_check,
-			       chandev **read,chandev **write,chandev **data,chandev **next,
-				   chandev_type chan_type)
+static int chandev_find_eligible_channels(chandev *first_chandev_to_check,
+				       chandev **read,chandev **write,
+				       chandev **data,chandev **next,
+				       chandev_type chan_type)
 {
 	chandev *curr_chandev;
 	int eligible_found=FALSE,changed;
@@ -1917,7 +1933,7 @@ int chandev_find_eligible_channels(chandev *first_chandev_to_check,
 	return(eligible_found);
 }
 
-chandev *chandev_get_free_chandev_by_devno(int devno)
+static chandev *chandev_get_free_chandev_by_devno(int devno)
 {
 	chandev *curr_chandev;
 	if(devno==-1)
@@ -1934,7 +1950,7 @@ chandev *chandev_get_free_chandev_by_devno(int devno)
 
 }
 
-void chandev_probe(void)
+static void chandev_probe(void)
 {
 	chandev *read_chandev,*write_chandev,*data_chandev,*curr_chandev,*next_chandev;
 	chandev_force *curr_force;
@@ -1948,7 +1964,7 @@ void chandev_probe(void)
 	chandev_msck_range *curr_msck_range;
 
 
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_probe");
 	chandev_read_conf_if_necessary();
 	chandev_collect_devices();
 	chandev_lock();
@@ -2264,7 +2280,7 @@ typedef enum
 	last_stridx,
 } chandev_str_enum;
 
-void chandev_add_noauto(u16 lo_devno,u16 hi_devno)
+static void chandev_add_noauto(u16 lo_devno,u16 hi_devno)
 {
 	chandev_noauto_range *new_range;
 
@@ -2277,7 +2293,8 @@ void chandev_add_noauto(u16 lo_devno,u16 hi_devno)
 }
 
 
-void chandev_add_msck_range(u16 lo_devno,u16 hi_devno,int auto_msck_recovery)
+static void chandev_add_msck_range(u16 lo_devno,u16 hi_devno,
+				   int auto_msck_recovery)
 {
 	chandev_msck_range *new_range;
 
@@ -2761,7 +2778,7 @@ static void __init chandev_parse_args(void)
 	}
 }
 
-int chandev_do_setup(int in_read_conf,char *buff,int size)
+static int chandev_do_setup(int in_read_conf,char *buff,int size)
 {
 	int curr,comment=FALSE,newline=FALSE,oldnewline=TRUE;
 	char *startline=NULL,*endbuff=&buff[size];
@@ -2864,7 +2881,7 @@ if(spoffset>offset) {                        \
 if(currlen>=length)                          \
        goto exitchan;
 
-void sprintf_msck(char *buff,int auto_msck_recovery)
+static void sprintf_msck(char *buff,int auto_msck_recovery)
 {
 	chandev_msck_status idx;
 	int first_time=TRUE;
@@ -3092,7 +3109,7 @@ static int chandev_read_proc(char *page, char **start, off_t offset,
 				chandevs_detected=TRUE;
 				if(pass)
 				{
-					chandev_printf(chan_exit,"0x%04x 0x%04x 0x%02x  0x%04x 0x%02x  0x%04x 0x%02x 0x%02x 0x%016Lx  %-5s %-5s\n",
+					chandev_printf(chan_exit,"0x%04x 0x%04x 0x%02x  0x%04x 0x%02x  0x%04x 0x%02x 0x%02x 0x%016Lx  %-5s%-5s\n",
 						       curr_irq,curr_devinfo.devno,
 						       ( curr_force ? curr_force->chan_type : 
 						       ( curr_model ? curr_model->chan_type : 
@@ -3148,21 +3165,19 @@ static int chandev_write_proc(struct file *file, const char *buffer,
 	int         rc;
 	char        *buff;
 	
-	buff=vmalloc(count+1);
-	if(buff)
-	{
-		rc = copy_from_user(buff,buffer,count) ? -EFAULT : 0;
-		if (rc)
-			goto chandev_write_exit;
+	if ((buff=vmalloc(count+1)) == 0)
+		return -ENOMEM;
+	
+	if (copy_from_user(buff,buffer,count) == 0) {
 		chandev_do_setup(FALSE,buff,count);
 		rc=count;
-	chandev_write_exit:
-		vfree(buff);
-		return rc;
+	} else {
+		rc=-EFAULT;
 	}
-	else
-		return -ENOMEM;
-	return(0);
+
+	vfree(buff);
+
+	return rc;
 }
 
 static void __init chandev_create_proc(void)
@@ -3219,7 +3234,7 @@ int chandev_register_and_probe(chandev_probefunc probefunc,
 	/* Avoid chicked & egg situations where we may be called before we */
 	/* are initialised. */
 
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_register_and_probe");
 	if(!atomic_compare_and_swap(FALSE,TRUE,&chandev_initialised))
 		chandev_init();
 	chandev_lock();
@@ -3252,7 +3267,7 @@ void chandev_unregister(chandev_probefunc probefunc,int call_shutdown)
 	chandev_probelist *curr_probe;
 	chandev_activelist *curr_device,*next_device;
 	
-	chandev_interrupt_check();
+	chandev_interrupt_check("chandev_unregister");
 	chandev_lock();
 	for_each(curr_probe,chandev_probelist_head)
 	{
@@ -3281,9 +3296,12 @@ EXPORT_SYMBOL(chandev_unregister);
 EXPORT_SYMBOL(chandev_initdevice);
 EXPORT_SYMBOL(chandev_build_device_name);
 EXPORT_SYMBOL(chandev_initnetdevice);
+/* see chandev.h as to why this is exported */
 EXPORT_SYMBOL(chandev_init_netdev);
 EXPORT_SYMBOL(chandev_use_devno_names);
 EXPORT_SYMBOL(chandev_free_irq);
+/* see chandev.h as to why chandev_add_model and chandev_del_model 
+ * are exported */
 EXPORT_SYMBOL(chandev_add_model);
 EXPORT_SYMBOL(chandev_del_model);
 EXPORT_SYMBOL(chandev_persist);

@@ -52,7 +52,7 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 	outw(status, io_addr + USBPORTSC1 + 2 * (wIndex-1))
 
 
-// FIXME: Shouldn't this return the length of the data too?
+/* size of returned buffer is part of USB spec */
 static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			u16 wIndex, char *buf, u16 wLength)
 {
