@@ -164,7 +164,7 @@
 #define IBM_CPM_CPU	0x10000000	/* PPC405B3 clock control */
 #define IBM_CPM_AUD	0x08000000	/* Audio Decoder */
 #define IBM_CPM_EBIU	0x04000000	/* External Bus Interface Unit */
-#define IBM_CPM_IRR	0x02000000	/* Infrared reciever */
+#define IBM_CPM_IRR	0x02000000	/* Infrared receiver */
 #define IBM_CPM_DMA	0x01000000	/* DMA controller */
 #define IBM_CPM_UART2	0x00200000	/* Serial Control Port */
 #define IBM_CPM_UART1	0x00100000	/* Serial 1 / Infrared */

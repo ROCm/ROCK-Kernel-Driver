@@ -22,7 +22,7 @@ struct ethtool_cmd {
 	u8	duplex;		/* Duplex, half or full */
 	u8	port;		/* Which connector port */
 	u8	phy_address;
-	u8	transceiver;	/* Which tranceiver to use */
+	u8	transceiver;	/* Which transceiver to use */
 	u8	autoneg;	/* Enable or disable autonegotiation */
 	u32	maxtxpkt;	/* Tx pkts before generating tx int */
 	u32	maxrxpkt;	/* Rx pkts before generating rx int */
@@ -336,7 +336,7 @@ struct ethtool_stats {
 #define PORT_FIBRE		0x03
 #define PORT_BNC		0x04
 
-/* Which tranceiver to use. */
+/* Which transceiver to use. */
 #define XCVR_INTERNAL		0x00
 #define XCVR_EXTERNAL		0x01
 #define XCVR_DUMMY1		0x02

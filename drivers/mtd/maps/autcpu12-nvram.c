@@ -83,17 +83,17 @@ void autcpu12_copy_to(struct map_info *map, unsigned long to, const void *from, 
 static struct mtd_info *sram_mtd;
 
 struct map_info autcpu12_sram_map = {
-	name: "SRAM",
-	size: 32768,
-	buswidth: 8,
-	read8: autcpu12_read8,
-	read16: autcpu12_read16,
-	read32: autcpu12_read32,
-	copy_from: autcpu12_copy_from,
-	write8: autcpu12_write8,
-	write16: autcpu12_write16,
-	write32: autcpu12_write32,
-	copy_to: autcpu12_copy_to
+	.name		= "SRAM",
+	.size		= 32768,
+	.buswidth	= 8,
+	.read8		= autcpu12_read8,
+	.read16		= autcpu12_read16,
+	.read32		= autcpu12_read32,
+	.copy_from	= autcpu12_copy_from,
+	.write8		= autcpu12_write8,
+	.write16	= autcpu12_write16,
+	.write32	= autcpu12_write32,
+	.copy_to	= autcpu12_copy_to
 };
 
 static int __init init_autcpu12_sram (void)

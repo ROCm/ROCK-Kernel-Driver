@@ -163,6 +163,7 @@ acpi_enable_event (
 {
 	acpi_status                     status = AE_OK;
 	u32                             value;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_enable_event");
@@ -209,19 +210,20 @@ acpi_enable_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if (acpi_ev_get_gpe_number_index (event) == ACPI_GPE_INVALID) {
+		gpe_event_info = acpi_ev_get_gpe_event_info (event);
+		if (!gpe_event_info) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
 		/* Enable the requested GPE number */
 
-		status = acpi_hw_enable_gpe (event);
+		status = acpi_hw_enable_gpe (gpe_event_info);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
 
 		if (flags & ACPI_EVENT_WAKE_ENABLE) {
-			acpi_hw_enable_gpe_for_wakeup (event);
+			acpi_hw_enable_gpe_for_wakeup (gpe_event_info);
 		}
 		break;
 
@@ -257,6 +259,7 @@ acpi_disable_event (
 {
 	acpi_status                     status = AE_OK;
 	u32                             value;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_disable_event");
@@ -301,7 +304,8 @@ acpi_disable_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if (acpi_ev_get_gpe_number_index (event) == ACPI_GPE_INVALID) {
+		gpe_event_info = acpi_ev_get_gpe_event_info (event);
+		if (!gpe_event_info) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
@@ -311,10 +315,10 @@ acpi_disable_event (
 		 */
 
 		if (flags & ACPI_EVENT_WAKE_DISABLE) {
-			acpi_hw_disable_gpe_for_wakeup (event);
+			acpi_hw_disable_gpe_for_wakeup (gpe_event_info);
 		}
 		else {
-			status = acpi_hw_disable_gpe (event);
+			status = acpi_hw_disable_gpe (gpe_event_info);
 		}
 		break;
 
@@ -346,6 +350,7 @@ acpi_clear_event (
 	u32                             type)
 {
 	acpi_status                     status = AE_OK;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_clear_event");
@@ -375,11 +380,12 @@ acpi_clear_event (
 
 		/* Ensure that we have a valid GPE number */
 
-		if (acpi_ev_get_gpe_number_index (event) == ACPI_GPE_INVALID) {
+		gpe_event_info = acpi_ev_get_gpe_event_info (event);
+		if (!gpe_event_info) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
-		status = acpi_hw_clear_gpe (event);
+		status = acpi_hw_clear_gpe (gpe_event_info);
 		break;
 
 
@@ -415,6 +421,7 @@ acpi_get_event_status (
 	acpi_event_status               *event_status)
 {
 	acpi_status                     status = AE_OK;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_event_status");
@@ -447,7 +454,8 @@ acpi_get_event_status (
 
 		/* Ensure that we have a valid GPE number */
 
-		if (acpi_ev_get_gpe_number_index (event) == ACPI_GPE_INVALID) {
+		gpe_event_info = acpi_ev_get_gpe_event_info (event);
+		if (!gpe_event_info) {
 			return_ACPI_STATUS (AE_BAD_PARAMETER);
 		}
 
@@ -463,4 +471,5 @@ acpi_get_event_status (
 
 	return_ACPI_STATUS (status);
 }
+
 

@@ -50,6 +50,8 @@ static int ibwdt_is_open;
 static spinlock_t ibwdt_lock;
 static int expect_close = 0;
 
+#define PFX "ib700wdt: "
+
 /*
  *
  * Watchdog Timer Configuration
@@ -226,8 +228,6 @@ ibwdt_open(struct inode *inode, struct file *file)
 			spin_unlock(&ibwdt_lock);
 			return -EBUSY;
 		}
-		if (nowayout)
-			MOD_INC_USE_COUNT;
 
 		/* Activate */
 		ibwdt_is_open = 1;
@@ -247,7 +247,7 @@ ibwdt_close(struct inode *inode, struct file *file)
 		if (expect_close)
 			outb_p(wd_times[wd_margin], WDT_STOP);
 		else
-			printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
+			printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
 		ibwdt_is_open = 0;
 		spin_unlock(&ibwdt_lock);
@@ -300,29 +300,49 @@ static struct notifier_block ibwdt_notifier = {
 	.priority = 0
 };
 
-static int __init
-ibwdt_init(void)
+static int __init ibwdt_init(void)
 {
-	printk("WDT driver for IB700 single board computer initialising.\n");
+	int res;
+
+	printk(KERN_INFO PFX "WDT driver for IB700 single board computer initialising.\n");
 
 	spin_lock_init(&ibwdt_lock);
-	if (misc_register(&ibwdt_miscdev))
-		return -ENODEV;
+	res = misc_register(&ibwdt_miscdev);
+	if (res) {
+		printk (KERN_ERR PFX "failed to register misc device\n");
+		goto out_nomisc;
+	}
+
 #if WDT_START != WDT_STOP
 	if (!request_region(WDT_STOP, 1, "IB700 WDT")) {
-		misc_deregister(&ibwdt_miscdev);
-		return -EIO;
+		printk (KERN_ERR PFX "STOP method I/O %X is not available.\n", WDT_STOP);
+		res = -EIO;
+		goto out_nostopreg;
 	}
 #endif
+
 	if (!request_region(WDT_START, 1, "IB700 WDT")) {
-#if WDT_START != WDT_STOP
-		release_region(WDT_STOP, 1);
-#endif
-		misc_deregister(&ibwdt_miscdev);
-		return -EIO;
+		printk (KERN_ERR PFX "START method I/O %X is not available.\n", WDT_START);
+		res = -EIO;
+		goto out_nostartreg;
 	}
-	register_reboot_notifier(&ibwdt_notifier);
+	res = register_reboot_notifier(&ibwdt_notifier);
+	if (res) {
+		printk (KERN_ERR PFX "Failed to register reboot notifier.\n");
+		goto out_noreboot;
+	}
 	return 0;
+
+out_noreboot:
+	release_region(WDT_START, 1);
+out_nostartreg:
+#if WDT_START != WDT_STOP
+	release_region(WDT_STOP, 1);
+#endif
+out_nostopreg:
+	misc_deregister(&ibwdt_miscdev);
+out_nomisc:
+	return res;
 }
 
 static void __exit

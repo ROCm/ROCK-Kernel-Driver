@@ -298,7 +298,7 @@
 #define CSCONFIG_NDISABLE       0x8000  /* Disable NRZI                */
 
 /* Happy Meal descriptor rings and such.
- * All descriptor rings must be aligned on a 2K boundry.
+ * All descriptor rings must be aligned on a 2K boundary.
  * All receive buffers must be 64 byte aligned.
  * Always write the address first before setting the ownership
  * bits to avoid races with the hardware scanning the ring.

@@ -188,7 +188,7 @@ struct hpfs_dirent *hpfs_add_de(struct super_block *s, struct dnode *d, unsigned
 	return de;
 }
 
-/* Delete dirent and don't care about it's subtree */
+/* Delete dirent and don't care about its subtree */
 
 void hpfs_delete_de(struct super_block *s, struct dnode *d, struct hpfs_dirent *de)
 {

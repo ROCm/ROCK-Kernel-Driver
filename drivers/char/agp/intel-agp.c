@@ -2,6 +2,11 @@
  * Intel AGPGART routines.
  */
 
+/*
+ * Intel(R) 855GM/852GM and 865G support added by David Dawes
+ * <dawes@tungstengraphics.com>.
+ */
+
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -294,34 +299,62 @@ static void intel_i830_init_gtt_entries(void)
 	u16 gmch_ctrl;
 	int gtt_entries;
 	u8 rdct;
+	int local = 0;
 	static const int ddt[4] = { 0, 16, 32, 64 };
 
 	pci_read_config_word(agp_bridge->dev,I830_GMCH_CTRL,&gmch_ctrl);
 
-	switch (gmch_ctrl & I830_GMCH_GMS_MASK) {
-	case I830_GMCH_GMS_STOLEN_512:
-		gtt_entries = KB(512) - KB(132);
-		printk(KERN_INFO PFX "detected %dK stolen memory.\n",gtt_entries / KB(1));
-		break;
-	case I830_GMCH_GMS_STOLEN_1024:
-		gtt_entries = MB(1) - KB(132);
-		printk(KERN_INFO PFX "detected %dK stolen memory.\n",gtt_entries / KB(1));
-		break;
-	case I830_GMCH_GMS_STOLEN_8192:
-		gtt_entries = MB(8) - KB(132);
-		printk(KERN_INFO PFX "detected %dK stolen memory.\n",gtt_entries / KB(1));
-		break;
-	case I830_GMCH_GMS_LOCAL:
-		rdct = INREG8(intel_i830_private.registers,I830_RDRAM_CHANNEL_TYPE);
-		gtt_entries = (I830_RDRAM_ND(rdct) + 1) * MB(ddt[I830_RDRAM_DDT(rdct)]);
-		printk(KERN_INFO PFX "detected %dK local memory.\n",gtt_entries / KB(1));
-		break;
-	default:
-		printk(KERN_INFO PFX "no video memory detected.\n");
-		gtt_entries = 0;
-		break;
+	if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82830_HB ||
+	    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82845G_HB) {
+		switch (gmch_ctrl & I830_GMCH_GMS_MASK) {
+		case I830_GMCH_GMS_STOLEN_512:
+			gtt_entries = KB(512) - KB(132);
+			break;
+		case I830_GMCH_GMS_STOLEN_1024:
+			gtt_entries = MB(1) - KB(132);
+			break;
+		case I830_GMCH_GMS_STOLEN_8192:
+			gtt_entries = MB(8) - KB(132);
+			break;
+		case I830_GMCH_GMS_LOCAL:
+			rdct = INREG8(intel_i830_private.registers,
+				      I830_RDRAM_CHANNEL_TYPE);
+			gtt_entries = (I830_RDRAM_ND(rdct) + 1) *
+					MB(ddt[I830_RDRAM_DDT(rdct)]);
+			local = 1;
+			break;
+		default:
+			gtt_entries = 0;
+			break;
+		}
+	} else {
+		switch (gmch_ctrl & I830_GMCH_GMS_MASK) {
+		case I855_GMCH_GMS_STOLEN_1M:
+			gtt_entries = MB(1) - KB(132);
+			break;
+		case I855_GMCH_GMS_STOLEN_4M:
+			gtt_entries = MB(4) - KB(132);
+			break;
+		case I855_GMCH_GMS_STOLEN_8M:
+			gtt_entries = MB(8) - KB(132);
+			break;
+		case I855_GMCH_GMS_STOLEN_16M:
+			gtt_entries = MB(16) - KB(132);
+			break;
+		case I855_GMCH_GMS_STOLEN_32M:
+			gtt_entries = MB(32) - KB(132);
+			break;
+		default:
+			gtt_entries = 0;
+			break;
+		}
 	}
-
+	if (gtt_entries > 0)
+		printk(KERN_INFO PFX "Detected %dK %s memory.\n",
+		       gtt_entries / KB(1), local ? "local" : "stolen");
+	else
+		printk(KERN_INFO PFX
+		       "No pre-allocated video memory detected.\n");
 	gtt_entries /= KB(4);
 
 	intel_i830_private.gtt_entries = gtt_entries;
@@ -374,8 +407,17 @@ static int intel_i830_fetch_size(void)
 	u16 gmch_ctrl;
 	struct aper_size_info_fixed *values;
 
-	pci_read_config_word(agp_bridge->dev,I830_GMCH_CTRL,&gmch_ctrl);
 	values = A_SIZE_FIX(agp_bridge->aperture_sizes);
+
+	if (agp_bridge->dev->device != PCI_DEVICE_ID_INTEL_82830_HB &&
+	    agp_bridge->dev->device != PCI_DEVICE_ID_INTEL_82845G_HB) {
+		/* 855GM/852GM/865G has 128MB aperture size */
+		agp_bridge->previous_size = agp_bridge->current_size = (void *) values;
+		agp_bridge->aperture_size_idx = 0;
+		return(values[0].size);
+	}
+
+	pci_read_config_word(agp_bridge->dev,I830_GMCH_CTRL,&gmch_ctrl);
 
 	if ((gmch_ctrl & I830_GMCH_MEM_MASK) == I830_GMCH_MEM_128M) {
 		agp_bridge->previous_size = agp_bridge->current_size = (void *) values;
@@ -558,6 +600,7 @@ static int __init intel_i830_setup(struct pci_dev *i830_dev)
 
 	return(0);
 }
+
 static int intel_fetch_size(void)
 {
 	int i;
@@ -1241,7 +1284,7 @@ struct agp_device_ids intel_agp_device_ids[] __initdata =
 	{
 		.device_id	= PCI_DEVICE_ID_INTEL_82830_HB,
 		.chipset	= INTEL_I830_M,
-		.chipset_name	= "i830M",
+		.chipset_name	= "830M",
 		.chipset_setup	= intel_830mp_setup
 	},
 	{
@@ -1259,7 +1302,7 @@ struct agp_device_ids intel_agp_device_ids[] __initdata =
 	{
 		.device_id	= PCI_DEVICE_ID_INTEL_82845G_HB,
 		.chipset	= INTEL_I845_G,
-		.chipset_name	= "i845G",
+		.chipset_name	= "845G",
 		.chipset_setup	= intel_845_setup
 	},
 	{
@@ -1269,10 +1312,22 @@ struct agp_device_ids intel_agp_device_ids[] __initdata =
 		.chipset_setup	= intel_850_setup
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_INTEL_82855_HB,
+		.chipset	= INTEL_I855_PM,
+		.chipset_name	= "855PM",
+		.chipset_setup	= intel_845_setup
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_INTEL_82860_HB,
 		.chipset	= INTEL_I860,
 		.chipset_name	= "i860",
 		.chipset_setup	= intel_860_setup
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_INTEL_82865_HB,
+		.chipset	= INTEL_I865_G,
+		.chipset_name	= "865G",
+		.chipset_setup	= intel_845_setup
 	},
 	{ }, /* dummy final entry, always present */
 };
@@ -1387,13 +1442,13 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 
 		if (i810_dev == NULL) {
 			/* 
-			 * We probably have a I845MP chipset with an external graphics
+			 * We probably have a I845G chipset with an external graphics
 			 * card. It will be initialized later 
 			 */
 			agp_bridge->type = INTEL_I845_G;
 			break;
 		}
-		printk(KERN_INFO PFX "Detected an Intel 845G Chipset.\n");
+		printk(KERN_INFO PFX "Detected an Intel(R) 845G Chipset.\n");
 		agp_bridge->type = INTEL_I810;
 		return intel_i830_setup(i810_dev);
 
@@ -1408,7 +1463,63 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 			agp_bridge->type = INTEL_I830_M;
 			break;
 		}
-		printk(KERN_INFO PFX "Detected an Intel 830M Chipset.\n");
+		printk(KERN_INFO PFX "Detected an Intel(R) 830M Chipset.\n");
+		agp_bridge->type = INTEL_I810;
+		return intel_i830_setup(i810_dev);
+
+	case PCI_DEVICE_ID_INTEL_82855_HB:
+		i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82855_IG, NULL);
+		if(i810_dev && PCI_FUNC(i810_dev->devfn) != 0)
+			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82855_IG, i810_dev);
+
+		if (i810_dev == NULL) {
+			/* Intel 855PM with external graphic card */
+			/* It will be initialized later */
+			agp_bridge->type = INTEL_I855_PM;
+			break;
+		}
+		{
+			u32 capval = 0;
+			const char *name = "855GM/852GM";
+			pci_read_config_dword(dev, I85X_CAPID, &capval);
+			switch ((capval >> I85X_VARIANT_SHIFT) &
+				I85X_VARIANT_MASK) {
+			case I855_GME:
+				name = "855GME";
+				break;
+			case I855_GM:
+				name = "855GM";
+				break;
+			case I852_GME:
+				name = "852GME";
+				break;
+			case I852_GM:
+				name = "852GM";
+				break;
+			}
+			printk(KERN_INFO PFX
+			       "Detected an Intel(R) %s Chipset.\n", name);
+		}
+		agp_bridge->type = INTEL_I810;
+		return intel_i830_setup(i810_dev);
+
+	case PCI_DEVICE_ID_INTEL_82865_HB:
+		i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82865_IG, NULL);
+		if (i810_dev && PCI_FUNC(i810_dev->devfn) != 0) {
+			i810_dev = pci_find_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82865_IG, i810_dev);
+		}
+
+		if (i810_dev == NULL) {
+			/* 
+			 * We probably have a 865G chipset with an external graphics
+			 * card. It will be initialized later 
+			 */
+			agp_bridge->type = INTEL_I865_G;
+			break;
+		}
+		printk(KERN_INFO PFX "Detected an Intel(R) 865G Chipset.\n");
 		agp_bridge->type = INTEL_I810;
 		return intel_i830_setup(i810_dev);
 

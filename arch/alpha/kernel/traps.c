@@ -411,7 +411,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 }
 
 /* There is an ifdef in the PALcode in MILO that enables a 
-   "kernel debugging entry point" as an unpriviledged call_pal.
+   "kernel debugging entry point" as an unprivileged call_pal.
 
    We don't want to have anything to do with it, but unfortunately
    several versions of MILO included in distributions have it enabled,

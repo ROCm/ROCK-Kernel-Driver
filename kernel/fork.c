@@ -72,15 +72,8 @@ int nr_processes(void)
 	return total;
 }
 
-void __put_task_struct(struct task_struct *tsk)
+static void free_task_struct(struct task_struct *tsk)
 {
-	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
-	WARN_ON(atomic_read(&tsk->usage));
-	WARN_ON(tsk == current);
-
-	security_task_free(tsk);
-	free_uid(tsk->user);
-
 	/*
 	 * The task cache is effectively disabled right now.
 	 * Do we want it? The slab cache already has per-cpu
@@ -101,6 +94,17 @@ void __put_task_struct(struct task_struct *tsk)
 		task_cache[cpu] = current;
 		put_cpu();
 	}
+}
+
+void __put_task_struct(struct task_struct *tsk)
+{
+	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
+	WARN_ON(atomic_read(&tsk->usage));
+	WARN_ON(tsk == current);
+
+	security_task_free(tsk);
+	free_uid(tsk->user);
+	free_task_struct(tsk);
 }
 
 void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
@@ -446,7 +450,7 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 		tsk->clear_child_tid = NULL;
 
 		/*
-		 * We dont check the error code - if userspace has
+		 * We don't check the error code - if userspace has
 		 * not set up a proper pointer then tough luck.
 		 */
 		put_user(0, tidptr);
@@ -901,7 +905,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	/*
 	 * Share the timeslice between parent and child, thus the
-	 * total amount of pending timeslices in the system doesnt change,
+	 * total amount of pending timeslices in the system doesn't change,
 	 * resulting in more scheduling fairness.
 	 */
 	local_irq_disable();
@@ -1034,7 +1038,7 @@ bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:
-	put_task_struct(p);
+	free_task_struct(p);
 	goto fork_out;
 }
 

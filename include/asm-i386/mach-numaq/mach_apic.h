@@ -5,7 +5,7 @@
 
 #define TARGET_CPUS (0xf)
 
-#define no_balance_irq (1)
+#define NO_BALANCE_IRQ (1)
 #define esr_disable (1)
 
 #define INT_DELIVERY_MODE dest_LowestPrio
@@ -73,8 +73,10 @@ static inline unsigned long apicid_to_cpu_present(int logical_apicid)
 	return ( (logical_apicid&0xf) << (4*apicid_to_node(logical_apicid)) );
 }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m, 
+			struct mpc_config_translation *translation_record)
 {
+	int quad = translation_record->trans_quad;
 	int logical_apicid = generate_logical_apicid(quad, m->mpc_apicid);
 
 	printk("Processor #%d %ld:%ld APIC version %d (quad %d, apic %d)\n",

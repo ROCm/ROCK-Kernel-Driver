@@ -70,7 +70,7 @@ void dec_entry(int argc, char **argv,
 
 #ifdef RELOC
 	/*
-	 * Now copy kernel image to it's destination.
+	 * Now copy kernel image to its destination.
 	 */
 	len = ((unsigned long) (&_end) - k_start);
 	memcpy((void *)k_start, &_ftext, len);

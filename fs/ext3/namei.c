@@ -533,7 +533,7 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	struct dx_hash_info hinfo;
 	struct buffer_head *bh;
 	struct ext3_dir_entry_2 *de, *top;
-	static struct dx_frame frames[2], *frame;
+	struct dx_frame frames[2], *frame;
 	struct inode *dir;
 	int block, err;
 	int count = 0;

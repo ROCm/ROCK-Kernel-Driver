@@ -120,7 +120,7 @@ static struct net_device_stats *irda_usb_net_get_stats(struct net_device *dev);
 /************************ TRANSMIT ROUTINES ************************/
 /*
  * Receive packets from the IrDA stack and send them on the USB pipe.
- * Handle speed change, timeout and lot's of uglyness...
+ * Handle speed change, timeout and lot's of ugliness...
  */
 
 /*------------------------------------------------------------------*/

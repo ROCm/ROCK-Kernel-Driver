@@ -47,7 +47,7 @@ unsigned long ds1287_regs = 0UL;
 
 extern unsigned long wall_jiffies;
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 static unsigned long mstk48t08_regs = 0UL;
 static unsigned long mstk48t59_regs = 0UL;

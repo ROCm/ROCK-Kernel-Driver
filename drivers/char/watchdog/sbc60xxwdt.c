@@ -50,7 +50,7 @@
  *
  *  Why `V' ?  Well, `V' is the character in ASCII for the value 86,
  *  and we all know that 86 is _the_ most random number in the universe.
- *  Therefore it is the letter that has the slightest chance of occuring
+ *  Therefore it is the letter that has the slightest chance of occurring
  *  by chance, when the system becomes corrupted.
  *
  */
@@ -206,9 +206,7 @@ static int fop_open(struct inode * inode, struct file * file)
 			/* Just in case we're already talking to someone... */
 			if(wdt_is_open)
 				return -EBUSY;
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
+
 			/* Good, fire up the show */
 			wdt_is_open = 1;
 			wdt_startup();

@@ -138,7 +138,7 @@ Bugs
 	- The driver is not your_favorite_toy-safe. this includes SMP...
           [Actually from inspection it seems to be safe - Alan]
 	- when using XFree86 FBdev (X over fbdev) you may see strange color
-	patterns at the border of your windows (the pixels loose the lowest
+	patterns at the border of your windows (the pixels lose the lowest
 	byte -> basicaly the blue component nd some of the green) . I'm unable
 	to reproduce this with XFree86-3.3, but one of the testers has this
 	problem with XFree86-4. apparently recent Xfree86-4.x solve this

@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/sys.h>
 #include <linux/linkage.h>
+#include <asm/unistd.h>
 #include <asm/thread_info.h>
 #include <asm/errno.h>
 #include <asm/setup.h>

@@ -223,7 +223,7 @@ static int dafb_setpalette (unsigned int regno, unsigned int red,
 	local_irq_save(flags);
 	
 	/* fbdev will set an entire colourmap, but X won't.  Hopefully
-	   this should accomodate both of them */
+	   this should accommodate both of them */
 	if (regno != lastreg+1) {
 		int i;
 		

@@ -494,7 +494,7 @@ static int snd_uda1341_info_enum(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 	
 	DEBUG_NAME(KERN_DEBUG "info_enum where: %d\n", where);
 
-	// this register we dont handle this way
+	// this register we don't handle this way
 	if (!uda1341_enum_items[where])
 		return -EINVAL;
 

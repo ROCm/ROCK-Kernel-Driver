@@ -1038,7 +1038,7 @@ the queue gets explicitly unplugged as part of waiting for completion,
 in fact all queues get unplugged as a side-effect.
 
 Aside:
-  This is kind of controversial territory, as its not clear if plugging is
+  This is kind of controversial territory, as it's not clear if plugging is
   always the right thing to do. Devices typically have their own queues,
   and allowing a big queue to build up in software, while letting the device be
   idle for a while may not always make sense. The trick is to handle the fine

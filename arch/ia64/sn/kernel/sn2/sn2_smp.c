@@ -395,7 +395,7 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 	mycnode = local_nodeid;
 
 	/* 
-	 * For now, we dont want to spin uninterruptibly waiting
+	 * For now, we don't want to spin uninterruptibly waiting
 	 * for the lock. Makes hangs hard to debug.
 	 */
 	local_irq_save(flags);
@@ -506,7 +506,7 @@ sn_send_IPI_phys(long physid, int vector, int delivery_mode)
 	pio_phys_write_mmr(p, val);
 
 #ifndef CONFIG_SHUB_1_0_SPECIFIC
-	/* doesnt work on shub 1.0 */
+	/* doesn't work on shub 1.0 */
 	wait_piowc();
 #endif
 }

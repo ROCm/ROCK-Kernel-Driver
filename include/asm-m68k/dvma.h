@@ -45,7 +45,7 @@ extern void dvma_free(void *vaddr);
 #define IOMMU_ENTRIES 120
 
 /* empirical kludge -- dvma regions only seem to work right on 0x10000 
-   byte boundries */
+   byte boundaries */
 #define DVMA_REGION_SIZE 0x10000
 #define DVMA_ALIGN(addr) (((addr)+DVMA_REGION_SIZE-1) & \
                          ~(DVMA_REGION_SIZE-1))

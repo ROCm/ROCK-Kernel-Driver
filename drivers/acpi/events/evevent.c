@@ -79,7 +79,7 @@ acpi_ev_initialize (
 
 	/*
 	 * Initialize the Fixed and General Purpose acpi_events prior. This is
-	 * done prior to enabling SCIs to prevent interrupts from occuring
+	 * done prior to enabling SCIs to prevent interrupts from occurring
 	 * before handers are installed.
 	 */
 	status = acpi_ev_fixed_event_initialize ();
@@ -110,7 +110,7 @@ acpi_ev_initialize (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Install handlers for the SCI, Global Lock, and GPEs.
+ * DESCRIPTION: Install interrupt handlers for the SCI and Global Lock
  *
  ******************************************************************************/
 
@@ -130,16 +130,6 @@ acpi_ev_handler_initialize (
 	if (ACPI_FAILURE (status)) {
 		ACPI_REPORT_ERROR ((
 				"Unable to install System Control Interrupt Handler, %s\n",
-				acpi_format_exception (status)));
-		return_ACPI_STATUS (status);
-	}
-
-	/* Install handlers for control method GPE handlers (_Lxx, _Exx) */
-
-	status = acpi_ev_init_gpe_control_methods ();
-	if (ACPI_FAILURE (status)) {
-		ACPI_REPORT_ERROR ((
-				"Unable to initialize GPE control methods, %s\n",
 				acpi_format_exception (status)));
 		return_ACPI_STATUS (status);
 	}

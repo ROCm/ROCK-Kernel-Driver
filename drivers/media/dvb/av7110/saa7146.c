@@ -1396,7 +1396,7 @@ int i2c_reset(struct saa7146* saa)
 		saa7146_write(saa->mem, MC2, (MASK_00 | MASK_16));
 	}
 
-	/* if any error is still present, a fatal error has occured ... */
+	/* if any error is still present, a fatal error has occurred ... */
 	if ( SAA7146_I2C_BBR != (status = i2c_status_check(saa)) ) {
 		hprintk("saa7146: i2c_reset: fatal error, status:0x%08x\n",status);
 		return -EIO;
@@ -1444,7 +1444,7 @@ int i2c_write_out(struct saa7146* saa, u32* data, int timeout)
 
 	/* check for some other mysterious error; we don't handle this here */
 	if ( 0 != ( status & 0xff)) {
-		hprintk("saa7146: i2c_write_out: some error has occured\n");
+		hprintk("saa7146: i2c_write_out: some error has occurred\n");
         	return -EIO;
   	}
 	
@@ -1570,7 +1570,7 @@ int	debi_transfer(struct saa7146* saa, struct saa7146_debi_transfer* dt)
 		/* check, if DEBI still active */
 		u32 psr = saa7146_read(saa->mem, PSR);
 		if (0 !=  (psr & SPCI_DEBI_S)) {
-			/* check, if error occured */
+			/* check, if error occurred */
 /*			if ( 0 != (saa7146_read(saa->mem, SSR) & (MASK_23|MASK_22))) { */
 			if ( 0 != (saa7146_read(saa->mem, SSR) & (MASK_22))) {
 				/* clear error status and indicate error */

@@ -228,7 +228,7 @@ static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
  * as these watchdog NMI IRQs are generated on every CPU, we only
  * have to check the current processor.
  *
- * since NMIs dont listen to _any_ locks, we have to be extremely
+ * since NMIs don't listen to _any_ locks, we have to be extremely
  * careful not to rely on unsafe variables. The printk might lock
  * up though, so we have to break up any console locks first ...
  * [when there will be more tty-related locks, break them up

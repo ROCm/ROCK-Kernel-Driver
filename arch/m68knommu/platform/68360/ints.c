@@ -291,7 +291,7 @@ void M68360_do_irq(int vec, struct pt_regs *fp)
 
 	/* unsigned long pend = *(volatile unsigned long *)pquicc->intr_cipr; */
 
-	/* Bugger all that wierdness. For the moment, I seem to know where I came from;
+	/* Bugger all that weirdness. For the moment, I seem to know where I came from;
 	 * vec is passed from a specific ISR, so I'll use it. */
 
 	if (int_irq_list[irq] && int_irq_list[irq]->handler) {

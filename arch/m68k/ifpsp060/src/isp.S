@@ -843,7 +843,7 @@ isp_acc_exit2:
 	bra.l		_real_access		
 
 # if the addressing mode was (an)+ or -(an), the address register must
-# be restored to it's pre-exception value before entering _real_access.
+# be restored to its pre-exception value before entering _real_access.
 isp_restore:
 	cmpi.b		SPCOND_FLG(%a6),&restore_flg # do we need a restore?
 	bne.b		isp_restore_done	# no

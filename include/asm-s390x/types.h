@@ -32,7 +32,7 @@ typedef unsigned long __u64;
 
 /* 
  * A address type so that arithmetic can be done on it & it can be upgraded to
- * 64 bit when neccessary 
+ * 64 bit when necessary 
  */
 
 typedef unsigned long  addr_t; 

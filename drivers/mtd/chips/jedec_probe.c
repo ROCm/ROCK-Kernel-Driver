@@ -75,176 +75,176 @@ struct amd_flash_info {
 
 static const struct amd_flash_info jedec_table[] = {
 	{
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29LV160DT,
-		name: "AMD AM29LV160DT",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,31),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29LV160DT,
+		.name = "AMD AM29LV160DT",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,31),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29LV160DB,
-		name: "AMD AM29LV160DB",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29LV160DB,
+		.name = "AMD AM29LV160DB",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,31)
 		}
 	}, {
-		mfr_id: MANUFACTURER_TOSHIBA,
-		dev_id: TC58FVT160,
-		name: "Toshiba TC58FVT160",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,31),
+		.mfr_id = MANUFACTURER_TOSHIBA,
+		.dev_id = TC58FVT160,
+		.name = "Toshiba TC58FVT160",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,31),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_FUJITSU,
-		dev_id: MBM29LV160TE,
-		name: "Fujitsu MBM29LV160TE",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,31),
+		.mfr_id = MANUFACTURER_FUJITSU,
+		.dev_id = MBM29LV160TE,
+		.name = "Fujitsu MBM29LV160TE",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,31),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_TOSHIBA,
-		dev_id: TC58FVB160,
-		name: "Toshiba TC58FVB160",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_TOSHIBA,
+		.dev_id = TC58FVB160,
+		.name = "Toshiba TC58FVB160",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,31)
 		}
 	}, {
-		mfr_id: MANUFACTURER_FUJITSU,
-		dev_id: MBM29LV160BE,
-		name: "Fujitsu MBM29LV160BE",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_FUJITSU,
+		.dev_id = MBM29LV160BE,
+		.name = "Fujitsu MBM29LV160BE",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,31)
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29LV800BB,
-		name: "AMD AM29LV800BB",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29LV800BB,
+		.name = "AMD AM29LV800BB",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,15),
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29F800BB,
-		name: "AMD AM29F800BB",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29F800BB,
+		.name = "AMD AM29F800BB",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,15),
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29LV800BT,
-		name: "AMD AM29LV800BT",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,15),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29LV800BT,
+		.name = "AMD AM29LV800BT",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,15),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29F800BT,
-		name: "AMD AM29F800BT",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,15),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29F800BT,
+		.name = "AMD AM29F800BT",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,15),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29LV800BB,
-		name: "AMD AM29LV800BB",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,15),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29LV800BB,
+		.name = "AMD AM29LV800BB",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,15),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_ST,
-		dev_id: M29W800T,
-		name: "ST M29W800T",
-		DevSize: SIZE_1MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,15),
+		.mfr_id = MANUFACTURER_ST,
+		.dev_id = M29W800T,
+		.name = "ST M29W800T",
+		.DevSize = SIZE_1MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,15),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_ST,
-		dev_id: M29W160DT,
-		name: "ST M29W160DT",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,31),
+		.mfr_id = MANUFACTURER_ST,
+		.dev_id = M29W160DT,
+		.name = "ST M29W160DT",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,31),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_ST,
-		dev_id: M29W160DB,
-		name: "ST M29W160DB",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x04000,1),
+		.mfr_id = MANUFACTURER_ST,
+		.dev_id = M29W160DB,
+		.name = "ST M29W160DB",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x04000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x10000,31)
 		}
 	}, {
-		mfr_id: MANUFACTURER_ATMEL,
-		dev_id: AT49BV16X4,
-		name: "Atmel AT49BV16X4",
-		DevSize: SIZE_2MiB,
-		NumEraseRegions: 3,
-		regions: {ERASEINFO(0x02000,8),
+		.mfr_id = MANUFACTURER_ATMEL,
+		.dev_id = AT49BV16X4,
+		.name = "Atmel AT49BV16X4",
+		.DevSize = SIZE_2MiB,
+		.NumEraseRegions = 3,
+		.regions = {ERASEINFO(0x02000,8),
 			  ERASEINFO(0x08000,2),
 			  ERASEINFO(0x10000,30)
 		}
 	}, {
-                mfr_id: MANUFACTURER_ATMEL,
-                dev_id: AT49BV16X4T,
-                name: "Atmel AT49BV16X4T",
-                DevSize: SIZE_2MiB,
-                NumEraseRegions: 3,
-                regions: {ERASEINFO(0x10000,30),
+                .mfr_id = MANUFACTURER_ATMEL,
+                .dev_id = AT49BV16X4T,
+                .name = "Atmel AT49BV16X4T",
+                .DevSize = SIZE_2MiB,
+                .NumEraseRegions = 3,
+                .regions = {ERASEINFO(0x10000,30),
                           ERASEINFO(0x08000,2),
 			  ERASEINFO(0x02000,8)
                 }
@@ -403,8 +403,8 @@ static int jedec_probe_chip(struct map_info *map, __u32 base,
 }
 
 static struct chip_probe jedec_chip_probe = {
-	name: "JEDEC",
-	probe_chip: jedec_probe_chip
+	.name = "JEDEC",
+	.probe_chip = jedec_probe_chip
 };
 
 struct mtd_info *jedec_probe(struct map_info *map)
@@ -417,9 +417,9 @@ struct mtd_info *jedec_probe(struct map_info *map)
 }
 
 static struct mtd_chip_driver jedec_chipdrv = {
-	probe: jedec_probe,
-	name: "jedec_probe",
-	module: THIS_MODULE
+	.probe	= jedec_probe,
+	.name	= "jedec_probe",
+	.module	= THIS_MODULE
 };
 
 int __init jedec_probe_init(void)

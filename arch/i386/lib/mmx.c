@@ -15,7 +15,7 @@
  *		(reported so on K6-III)
  *	We should use a better code neutral filler for the short jump
  *		leal ebx. [ebx] is apparently best for K6-2, but Cyrix ??
- *	We also want to clobber the filler register so we dont get any
+ *	We also want to clobber the filler register so we don't get any
  *		register forwarding stalls on the filler. 
  *
  *	Add *user handling. Checksums are not a win with MMX on any CPU

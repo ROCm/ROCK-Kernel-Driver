@@ -4,7 +4,7 @@
 extern int x86_summit;
 
 #define esr_disable (x86_summit ? 1 : 0)
-#define no_balance_irq (0)
+#define NO_BALANCE_IRQ (0)
 
 #define XAPIC_DEST_CPUS_MASK    0x0Fu
 #define XAPIC_DEST_CLUSTER_MASK 0xF0u
@@ -90,7 +90,8 @@ static inline unsigned long apicid_to_cpu_present(int apicid)
 		return (1ul << apicid);
 }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m, 
+			struct mpc_config_translation *translation_record)
 {
 	printk("Processor #%d %ld:%ld APIC version %d\n",
 			m->mpc_apicid,

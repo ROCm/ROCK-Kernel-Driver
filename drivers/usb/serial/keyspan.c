@@ -28,6 +28,24 @@
 
   Change History
 
+    Wed Feb 19 22:00:00 PST 2003 (Jeffrey S. Laing <keyspan@jsl.com>)
+      Merged the current (1/31/03) Keyspan code with the current (2.4.21-pre4)
+      Linux source tree.  The Linux tree lacked support for the 49WLC and
+      others.  The Keyspan patches didn't work with the current kernel.
+
+    2003jan30	LPM	add support for the 49WLC and MPR
+
+    Wed Apr 25 12:00:00 PST 2002 (Keyspan)
+      Started with Hugh Blemings' code dated Jan 17, 2002.  All adapters
+      now supported (including QI and QW).  Modified port open, port
+      close, and send setup() logic to fix various data and endpoint
+      synchronization bugs and device LED status bugs.  Changed keyspan_
+      write_room() to accurately return transmit buffer availability.
+      Changed forwardingLength from 1 to 16 for all adapters.
+
+    Fri Oct 12 16:45:00 EST 2001
+      Preliminary USA-19QI and USA-28 support (both test OK for me, YMMV)
+
     Wed Apr 25 12:00:00 PST 2002 (Keyspan)
       Started with Hugh Blemings' code dated Jan 17, 2002.  All adapters
       now supported (including QI and QW).  Modified port open, port
@@ -103,7 +121,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.1.3"
+#define DRIVER_VERSION "v1.1.4"
 #define DRIVER_AUTHOR "Hugh Blemings <hugh@misc.nu"
 #define DRIVER_DESC "Keyspan USB to Serial Converter Driver"
 
@@ -900,6 +918,9 @@ static int keyspan_open (struct usb_serial_port *port, struct file *filp)
 		/* usb_settoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe), 0); */
 	}
 
+	// if the device is a USA49x, determine whether it is an W or WLC model
+	// and set the baud clock accordingly
+
 	keyspan_send_setup(port, 1);
 	//mdelay(100);
 	keyspan_set_termios(port, NULL);
@@ -1008,6 +1029,11 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 		fw_name = "USA19QI";
 		break;
 			     
+	case keyspan_mpr_pre_product_id:
+		record = &keyspan_mpr_firmware[0];
+		fw_name = "MPR";
+		break;
+
 	case keyspan_usa19qw_pre_product_id:
 		record = &keyspan_usa19qw_firmware[0];
 		fw_name = "USA19QI";
@@ -1026,6 +1052,11 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 	case keyspan_usa49w_pre_product_id:
 		record = &keyspan_usa49w_firmware[0];
 		fw_name = "USA49W";
+		break;
+
+	case keyspan_usa49wlc_pre_product_id:
+		record = &keyspan_usa49wlc_firmware[0];
+		fw_name = "USA49WLC";
 		break;
 
 	default:

@@ -50,7 +50,7 @@
 #include "proto.h"
 #include "irq_impl.h"
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 extern unsigned long wall_jiffies;	/* kernel/timer.c */
 

@@ -164,7 +164,7 @@ static inline void *__va(unsigned long x)
  * NOTE: virtual isn't really correct, actually it should be the offset into the
  * memory node, but we have no highmem, so that works for now.
  * TODO: implement (fast) pfn<->pgdat_idx conversion functions, this makes lots
- * of the shifts unneccessary.
+ * of the shifts unnecessary.
  */
 #define virt_to_pfn(kaddr)	(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_virt(pfn)	__va((pfn) << PAGE_SHIFT)

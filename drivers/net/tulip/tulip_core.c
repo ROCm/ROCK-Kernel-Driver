@@ -1306,7 +1306,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	/* Intel Saturn. Switch to 8 long words burst, 8 long word cache aligned
 	   Aries might need this too. The Saturn errata are not pretty reading but
-	   thankfully its an old 486 chipset.
+	   thankfully it's an old 486 chipset.
 	*/
 
 	if (pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82424, NULL)) {

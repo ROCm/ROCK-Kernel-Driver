@@ -567,7 +567,7 @@ static inline void arlan_command_process(struct net_device *dev)
 				break;
 			times++;
 		}
-		/* if long command, we wont repeat trying */ ;
+		/* if long command, we won't repeat trying */ ;
 		if (priv->card_polling_interval > 1)
 			break;
 		times++;

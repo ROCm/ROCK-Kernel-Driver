@@ -112,7 +112,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	p->thread.reg31 = (unsigned long) ret_from_fork;
 
 	/*
-	 * New tasks loose permission to use the fpu. This accelerates context
+	 * New tasks lose permission to use the fpu. This accelerates context
 	 * switching for most programs since they don't use the fpu.
 	 */
 	p->thread.cp0_status = read_32bit_cp0_register(CP0_STATUS) &

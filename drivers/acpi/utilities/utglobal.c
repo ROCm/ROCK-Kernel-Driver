@@ -729,6 +729,10 @@ acpi_ut_init_globals (
 		acpi_gbl_acpi_mutex_info[i].use_count = 0;
 	}
 
+	/* GPE support */
+
+	acpi_gbl_gpe_block_list_head        = NULL;
+
 	/* Global notify handlers */
 
 	acpi_gbl_sys_notify.handler         = NULL;
@@ -766,8 +770,6 @@ acpi_ut_init_globals (
 
 	/* Hardware oriented */
 
-	acpi_gbl_gpe_register_info          = NULL;
-	acpi_gbl_gpe_number_info            = NULL;
 	acpi_gbl_events_initialized         = FALSE;
 
 	/* Namespace */

@@ -195,7 +195,7 @@ static const char SysKonnectFileId[] = "@(#)"
  *	zero.)
  *
  * Note:
- *	There is a bug in the ASIC whic may lead to wrong checksums.
+ *	There is a bug in the ASIC which may lead to wrong checksums.
  *
  * Arguments:
  *	pAc - A pointer to the adapter context struct.

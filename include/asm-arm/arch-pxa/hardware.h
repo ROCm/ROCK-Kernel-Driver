@@ -103,6 +103,5 @@ extern unsigned int get_lclk_frequency_10khz(void);
 
 #include "lubbock.h"
 #include "idp.h"
-#include "cerf.h"
 
 #endif  /* _ASM_ARCH_HARDWARE_H */

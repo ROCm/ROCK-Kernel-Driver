@@ -3127,7 +3127,7 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 	moveb	%d0,M162_SCC_CTRL_A
 	jra	3f
 5:
-	/* 166/167/177; its a CD2401 */
+	/* 166/167/177; it's a CD2401 */
 	moveb	#0,M167_CYCAR
 	moveb	M167_CYIER,%d2
 	moveb	#0x02,M167_CYIER

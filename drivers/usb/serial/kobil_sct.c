@@ -159,7 +159,7 @@ static int kobil_startup (struct usb_serial *serial)
 	}
 	usb_set_serial_port_data(serial->port, priv);
 
-	// search for the neccessary endpoints
+	// search for the necessary endpoints
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
  	interface = actconfig->interface;

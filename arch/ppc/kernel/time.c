@@ -68,7 +68,7 @@
 #include <asm/time.h>
 
 /* XXX false sharing with below? */
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 unsigned long disarm_decr[NR_CPUS];
 

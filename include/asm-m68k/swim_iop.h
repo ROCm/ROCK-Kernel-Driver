@@ -60,7 +60,7 @@
 
 #define	gcrOnMFMErr	-400	/* GCR (400/800K) on HD media */
 #define	verErr		-84	/* verify failed */
-#define	fmt2Err		-83	/* cant get enough sync during format */
+#define	fmt2Err		-83	/* can't get enough sync during format */
 #define	fmt1Err		-82	/* can't find sector 0 after track format */
 #define	sectNFErr	-81	/* can't find sector */
 #define	seekErr		-80	/* drive error during seek */

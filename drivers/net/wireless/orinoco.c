@@ -117,7 +117,7 @@
  *	o Init of priv->tx_rate_ctrl in firmware specific section.
  *	o Prism2/Symbol rate, upto should be 0xF and not 0x15. Doh !
  *	o Spectrum card always need cor_reset (for every reset)
- *	o Fix cor_reset to not loose bit 7 in the register
+ *	o Fix cor_reset to not lose bit 7 in the register
  *	o flush_stale_links to remove zombie Pcmcia instances
  *	o Ack previous hermes event before reset
  *		Me (with my little hands)
@@ -4166,7 +4166,7 @@ orinoco_proc_dev_init(struct net_device *dev)
 	e = create_proc_read_entry("buf", S_IFREG | S_IRUGO,
 					       priv->dir_dev, orinoco_proc_get_hermes_buf, priv);
 	if (! e) {
-		printk(KERN_ERR "Unable to intialize /proc/hermes/%s/buf\n", dev->name);
+		printk(KERN_ERR "Unable to initialize /proc/hermes/%s/buf\n", dev->name);
 		goto fail;
 	}
 

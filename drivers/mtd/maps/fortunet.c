@@ -78,16 +78,16 @@ void fortunet_copy_to(struct map_info *map, unsigned long to, const void *from, 
 }
 
 struct map_info default_map = {
-	size: DEF_WINDOW_SIZE,
-	buswidth: 4,
-	read8: fortunet_read8,
-	read16: fortunet_read16,
-	read32: fortunet_read32,
-	copy_from: fortunet_copy_from,
-	write8: fortunet_write8,
-	write16: fortunet_write16,
-	write32: fortunet_write32,
-	copy_to: fortunet_copy_to
+	.size		= DEF_WINDOW_SIZE,
+	.buswidth	= 4,
+	.read8		= fortunet_read8,
+	.read16		= fortunet_read16,
+	.read32		= fortunet_read32,
+	.copy_from	= fortunet_copy_from,
+	.write8		= fortunet_write8,
+	.write16	= fortunet_write16,
+	.write32	= fortunet_write32,
+	.copy_to	= fortunet_copy_to
 };
 
 static char * __init get_string_option(char *dest,int dest_size,char *sor)

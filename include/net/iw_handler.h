@@ -92,7 +92,7 @@
  * The implementation goals were as follow :
  *	o Obvious : you should not need a PhD to understand what's happening,
  *		the benefit is easier maintainance.
- *	o Flexible : it should accomodate a wide variety of driver
+ *	o Flexible : it should accommodate a wide variety of driver
  *		implementations and be as flexible as the old API.
  *	o Lean : it should be efficient memory wise to minimise the impact
  *		on kernel footprint.

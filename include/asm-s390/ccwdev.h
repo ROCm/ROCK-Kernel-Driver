@@ -120,7 +120,7 @@ struct ccw_driver {
 					/* device is no longer available     */
 	int (*set_online) (struct ccw_device *);
 	int (*set_offline) (struct ccw_device *);
-	struct device_driver driver;	/* higher level structure, dont init
+	struct device_driver driver;	/* higher level structure, don't init
 					   this from your driver	     */
 	char *name;
 };

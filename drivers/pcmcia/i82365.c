@@ -846,7 +846,7 @@ static void __init isa_probe(void)
 	
 	    printk("PNP ");
 	    
-	    if (pnp_activate_dev(dev, NULL) < 0) {
+	    if (pnp_activate_dev(dev) < 0) {
 		printk("activate failed\n");
 		pnp_device_detach(dev);
 		break;

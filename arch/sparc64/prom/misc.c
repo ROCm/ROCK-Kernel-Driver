@@ -142,7 +142,7 @@ int prom_getprev(void)
 	return prom_prev;
 }
 
-/* Install Linux trap table so PROM uses that instead of it's own. */
+/* Install Linux trap table so PROM uses that instead of its own. */
 void prom_set_trap_table(unsigned long tba)
 {
 	p1275_cmd("SUNW,set-trap-table", P1275_INOUT(1, 0), tba);

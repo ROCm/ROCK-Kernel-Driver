@@ -159,7 +159,8 @@ static const struct serial_uart_config uart_config[PORT_MAX_8250+1] = {
 	{ "16C950/954",	128,	UART_CLEAR_FIFO | UART_USE_FIFO },
 	{ "ST16654",	64,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
 	{ "XR16850",	128,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_STARTECH },
-	{ "RSA",	2048,	UART_CLEAR_FIFO | UART_USE_FIFO }
+	{ "RSA",	2048,	UART_CLEAR_FIFO | UART_USE_FIFO },
+	{ "NS16550A",	16,	UART_CLEAR_FIFO | UART_USE_FIFO | UART_NATSEMI }
 };
 
 static _INLINE_ unsigned int serial_in(struct uart_8250_port *up, int offset)
@@ -479,6 +480,40 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 		DEBUG_AUTOCONF("EFRv2 ");
 		autoconfig_has_efr(up);
 		return;
+	}
+
+	/*
+	 * Check for a National Semiconductor SuperIO chip.
+	 * Attempt to switch to bank 2, read the value of the LOOP bit
+	 * from EXCR1. Switch back to bank 0, change it in MCR. Then
+	 * switch back to bank 2, read it from EXCR1 again and check
+	 * it's changed. If so, set baud_base in EXCR2 to 921600.
+	 */
+	serial_outp(up, UART_LCR, 0);
+	status1 = serial_in(up, UART_MCR);
+	serial_outp(up, UART_LCR, 0xE0);
+	status2 = serial_in(up, 0x02); /* EXCR1 */
+
+	if (!((status2 ^ status1) & UART_MCR_LOOP)) {
+		serial_outp(up, UART_LCR, 0);
+		serial_outp(up, UART_MCR, status1 ^ UART_MCR_LOOP);
+		serial_outp(up, UART_LCR, 0xE0);
+		status2 = serial_in(up, 0x02); /* EXCR1 */
+		serial_outp(up, UART_LCR, 0);
+		serial_outp(up, UART_MCR, status1);
+
+		if ((status2 ^ status1) & UART_MCR_LOOP) {
+			serial_outp(up, UART_LCR, 0xE0);
+			status1 = serial_in(up, 0x04); /* EXCR1 */
+			status1 &= ~0xB0; /* Disable LOCK, mask out PRESL[01] */
+			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
+			serial_outp(up, 0x04, status1);
+			serial_outp(up, UART_LCR, 0);
+
+			up->port.type = PORT_NS16550A;
+			up->port.uartclk = 921600*16;
+			return;
+		}
 	}
 
 	/*
@@ -1241,7 +1276,7 @@ static int serial8250_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via set_termios(), which will be occuring imminently
+	 * are set via set_termios(), which will be occurring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -1318,6 +1353,26 @@ static void serial8250_shutdown(struct uart_port *port)
 		serial_unlink_irq_chain(up);
 }
 
+static unsigned int serial8250_get_divisor(struct uart_port *port, unsigned int baud)
+{
+	unsigned int quot;
+
+	/*
+	 * Handle magic divisors for baud rates above baud_base on
+	 * SMSC SuperIO chips.
+	 */
+	if ((port->flags & UPF_MAGIC_MULTIPLIER) &&
+	    baud == (port->uartclk/4))
+		quot = 0x8001;
+	else if ((port->flags & UPF_MAGIC_MULTIPLIER) &&
+		 baud == (port->uartclk/8))
+		quot = 0x8002;
+	else
+		quot = uart_get_divisor(port, baud);
+
+	return quot;
+}
+
 static void
 serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		       struct termios *old)
@@ -1325,7 +1380,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char cval, fcr = 0;
 	unsigned long flags;
-	unsigned int quot;
+	unsigned int baud, quot;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -1357,7 +1412,8 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = serial8250_get_divisor(port, baud);
 
 	/*
 	 * Work around a bug in the Oxford Semiconductor 952 rev B
@@ -1369,7 +1425,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		quot ++;
 
 	if (uart_config[up->port.type].flags & UART_USE_FIFO) {
-		if ((up->port.uartclk / quot) < (2400 * 16))
+		if (baud < 2400)
 			fcr = UART_FCR_ENABLE_FIFO | UART_FCR_TRIGGER_1;
 #ifdef CONFIG_SERIAL_8250_RSA
 		else if (up->port.type == PORT_RSA)
@@ -1390,7 +1446,7 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
 	if (termios->c_iflag & INPCK)
@@ -1434,7 +1490,13 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 		serial_outp(up, UART_EFR,
 			    termios->c_cflag & CRTSCTS ? UART_EFR_CTS :0);
 	}
-	serial_outp(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
+
+	if (uart_config[up->port.type].flags & UART_NATSEMI) {
+		/* Switch to bank 2 not bank 1, to avoid resetting EXCR2 */
+		serial_outp(up, UART_LCR, 0xe0);
+	} else {
+		serial_outp(up, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
+	}
 	serial_outp(up, UART_DLL, quot & 0xff);		/* LS of divisor */
 	serial_outp(up, UART_DLM, quot >> 8);		/* MS of divisor */
 	if (up->port.type == PORT_16750)
@@ -1989,7 +2051,7 @@ static int __register_serial(struct serial_struct *req, int line)
  *	port exists and is in use an error is returned. If the port
  *	is not currently in the table it is added.
  *
- *	The port is then probed and if neccessary the IRQ is autodetected
+ *	The port is then probed and if necessary the IRQ is autodetected
  *	If this fails an error is returned.
  *
  *	On success the port is ready to use and the line number is returned.

@@ -606,7 +606,7 @@ pc_proc_infos(unsigned char *nvram, char *buffer, int *len,
 
 #if MACH == COBALT
 
-/* the cobalt CMOS has a wider range of it's checksum */
+/* the cobalt CMOS has a wider range of its checksum */
 static int cobalt_check_checksum(void)
 {
 	int i;

@@ -1096,7 +1096,7 @@ static int apm_engage_power_management(u_short device, int enable)
  *	@blank: on/off
  *
  *	Attempt to blank the console, firstly by blanking just video device
- *	zero, and if that fails (some BIOSes dont support it) then it blanks
+ *	zero, and if that fails (some BIOSes don't support it) then it blanks
  *	all video devices. Typically the BIOS will do laptop backlight and
  *	monitor powerdown for us.
  */

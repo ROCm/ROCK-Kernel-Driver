@@ -482,7 +482,7 @@ static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_re
 
 static inline void reparent_thread(task_t *p, task_t *father, int traced)
 {
-	/* We dont want people slaying init.  */
+	/* We don't want people slaying init.  */
 	if (p->exit_signal != -1)
 		p->exit_signal = SIGCHLD;
 	p->self_exec_id++;

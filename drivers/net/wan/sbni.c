@@ -684,7 +684,7 @@ upload_data( struct net_device  *dev,  unsigned  framelen,  unsigned  frameno,
 
 		/*
 		 * if CRC is right but framelen incorrect then transmitter
-		 * error was occured... drop entire packet
+		 * error was occurred... drop entire packet
 		 */
 		else if( (frame_ok = skip_tail( dev->base_addr, framelen, crc ))
 			 != 0 )

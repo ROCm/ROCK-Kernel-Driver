@@ -1237,10 +1237,10 @@ typedef volatile struct {
 #define RTCISR		WORD_REF(RTCISR_ADDR)
 
 #define RTCISR_SW	0x0001	/* Stopwatch timed out */
-#define RTCISR_MIN	0x0002	/* 1-minute interrupt has occured */
-#define RTCISR_ALM	0x0004	/* Alarm interrupt has occured */
-#define RTCISR_DAY	0x0008	/* 24-hour rollover interrupt has occured */
-#define RTCISR_1HZ	0x0010	/* 1Hz interrupt has occured */
+#define RTCISR_MIN	0x0002	/* 1-minute interrupt has occurred */
+#define RTCISR_ALM	0x0004	/* Alarm interrupt has occurred */
+#define RTCISR_DAY	0x0008	/* 24-hour rollover interrupt has occurred */
+#define RTCISR_1HZ	0x0010	/* 1Hz interrupt has occurred */
 
 /*
  * RTC Interrupt Enable Register

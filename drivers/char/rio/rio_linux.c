@@ -464,7 +464,7 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
        recursive calls will hang the machine in the interrupt routine. 
 
      - hardware twiddling goes before "recursive". Otherwise when we
-       poll the card, and a recursive interrupt happens, we wont
+       poll the card, and a recursive interrupt happens, we won't
        ack the card, so it might keep on interrupting us. (especially
        level sensitive interrupt systems like PCI).
 

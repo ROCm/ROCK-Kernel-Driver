@@ -61,17 +61,17 @@ void rpxlite_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info rpxlite_map = {
-	name: "RPX",
-	size: WINDOW_SIZE,
-	buswidth: 4,
-	read8: rpxlite_read8,
-	read16: rpxlite_read16,
-	read32: rpxlite_read32,
-	copy_from: rpxlite_copy_from,
-	write8: rpxlite_write8,
-	write16: rpxlite_write16,
-	write32: rpxlite_write32,
-	copy_to: rpxlite_copy_to
+	.name		= "RPX",
+	.size		= WINDOW_SIZE,
+	.buswidth	= 4,
+	.read8		= rpxlite_read8,
+	.read16		= rpxlite_read16,
+	.read32		= rpxlite_read32,
+	.copy_from	= rpxlite_copy_from,
+	.write8		= rpxlite_write8,
+	.write16	= rpxlite_write16,
+	.write32	= rpxlite_write32,
+	.copy_to	= rpxlite_copy_to
 };
 
 int __init init_rpxlite(void)

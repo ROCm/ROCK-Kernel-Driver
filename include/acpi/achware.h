@@ -115,29 +115,25 @@ acpi_hw_clear_acpi_status (
 
 /* GPE support */
 
-u8
-acpi_hw_get_gpe_bit_mask (
-	u32                             gpe_number);
-
 acpi_status
 acpi_hw_enable_gpe (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 void
 acpi_hw_enable_gpe_for_wakeup (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
 acpi_hw_disable_gpe (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 void
 acpi_hw_disable_gpe_for_wakeup (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
 acpi_hw_clear_gpe (
-	u32                             gpe_number);
+	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
 acpi_hw_get_gpe_status (

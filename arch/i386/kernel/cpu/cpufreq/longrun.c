@@ -1,5 +1,5 @@
 /*
- *  $Id: longrun.c,v 1.22 2003/02/10 17:31:50 db Exp $
+ *  $Id: longrun.c,v 1.25 2003/02/28 16:03:50 db Exp $
  *
  * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
  *
@@ -133,7 +133,7 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
  *
  * Determines the lowest and highest possible core frequencies on this CPU.
- * This is neccessary to calculate the performance percentage according to
+ * This is necessary to calculate the performance percentage according to
  * TMTA rules:
  * performance_pctg = (target_freq - low_freq)/(high_freq - low_freq)
  */
@@ -244,10 +244,6 @@ static int longrun_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	longrun_get_policy(policy);
 	
-#ifdef CONFIG_CPU_FREQ_24_API
-	longrun_driver.cpu_cur_freq[policy->cpu] = longrun_low_freq; /* dummy value */
-#endif
-
 	return 0;
 }
 

@@ -61,14 +61,14 @@
  *	fix: chg pAc -> pAC
  *	
  *	Revision 1.4  1998/08/10 14:14:52  gklug
- *	rmv: unneccessary SK_ADDR macro
+ *	rmv: unnecessary SK_ADDR macro
  *	
  *	Revision 1.3  1998/08/07 12:53:44  gklug
  *	fix: first compiled version
  *	
  *	Revision 1.2  1998/08/07 09:19:29  gklug
  *	adapt functions to the C coding conventions
- *	rmv unneccessary functions.
+ *	rmv unnecessary functions.
  *	
  *	Revision 1.1  1998/08/05 11:28:36  gklug
  *	first version: adapted from SMT/FDDI

@@ -82,30 +82,30 @@ void impa7_copy_to(struct map_info *map, unsigned long to, const void *from, ssi
 
 static struct map_info impa7_map[NUM_FLASHBANKS] = {
 	{
-	name: "impA7 NOR Flash Bank #0",
-	size: WINDOW_SIZE0,
-	buswidth: BUSWIDTH,
-	read8: impa7_read8,
-	read16: impa7_read16,
-	read32: impa7_read32,
-	copy_from: impa7_copy_from,
-	write8: impa7_write8,
-	write16: impa7_write16,
-	write32: impa7_write32,
-	copy_to: impa7_copy_to
+		.name		= "impA7 NOR Flash Bank #0",
+		.size		= WINDOW_SIZE0,
+		.buswidth	= BUSWIDTH,
+		.read8		= impa7_read8,
+		.read16		= impa7_read16,
+		.read32		= impa7_read32,
+		.copy_from	= impa7_copy_from,
+		.write8		= impa7_write8,
+		.write16	= impa7_write16,
+		.write32	= impa7_write32,
+		.copy_to	= impa7_copy_to
 	},
 	{
-	name: "impA7 NOR Flash Bank #1",
-	size: WINDOW_SIZE1,
-	buswidth: BUSWIDTH,
-	read8: impa7_read8,
-	read16: impa7_read16,
-	read32: impa7_read32,
-	copy_from: impa7_copy_from,
-	write8: impa7_write8,
-	write16: impa7_write16,
-	write32: impa7_write32,
-	copy_to: impa7_copy_to
+		.name		= "impA7 NOR Flash Bank #1",
+		.size		= WINDOW_SIZE1,
+		.buswidth	= BUSWIDTH,
+		.read8		= impa7_read8,
+		.read16		= impa7_read16,
+		.read32		= impa7_read32,
+		.copy_from	= impa7_copy_from,
+		.write8		= impa7_write8,
+		.write16	= impa7_write16,
+		.write32	= impa7_write32,
+		.copy_to = impa7_copy_to
 	},
 };
 
@@ -114,13 +114,12 @@ static struct map_info impa7_map[NUM_FLASHBANKS] = {
 /*
  * MTD partitioning stuff 
  */
-static struct mtd_partition static_partitions[] =
-{
-    {
-	name: "FileSystem",
-	  size: 0x800000,
-	  offset: 0x00000000
-    },
+static struct mtd_partition static_partitions[] = {
+	{
+		.name	= "FileSystem",
+		.size	= 0x800000,
+		.offset	= 0x00000000
+	},
 };
 
 #define NB_OF(x) (sizeof (x) / sizeof (x[0]))
@@ -143,8 +142,8 @@ int __init init_impa7(void)
 	const char *part_type = 0;
 	int i;
 	static struct { u_long addr; u_long size; } pt[NUM_FLASHBANKS] = {
-	  { WINDOW_ADDR0, WINDOW_SIZE0 },
-	  { WINDOW_ADDR1, WINDOW_SIZE1 },
+	  { .addr = WINDOW_ADDR0, .size = WINDOW_SIZE0 },
+	  { .addr = WINDOW_ADDR1, .size = WINDOW_SIZE1 },
         };
 	char mtdid[10];
 	int devicesfound = 0;

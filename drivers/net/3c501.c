@@ -494,7 +494,7 @@ static int el_start_xmit(struct sk_buff *skb, struct net_device *dev)
  * @regs: Register data (surplus to our requirements)
  *
  * Handle the ether interface interrupts. The 3c501 needs a lot more 
- * hand holding than most cards. In paticular we get a transmit interrupt
+ * hand holding than most cards. In particular we get a transmit interrupt
  * with a collision error because the board firmware isnt capable of rewinding
  * its own transmit buffer pointers. It can however count to 16 for us.
  *
@@ -684,7 +684,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * @dev: Device to pull the packets from
  *
  * We have a good packet. Well, not really "good", just mostly not broken.
- * We must check everything to see if it is good. In paticular we occasionally
+ * We must check everything to see if it is good. In particular we occasionally
  * get wild packet sizes from the card. If the packet seems sane we PIO it
  * off the card and queue it for the protocol layers.
  */

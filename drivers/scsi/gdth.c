@@ -28,7 +28,7 @@
  *                                                                      *
  * $Log: gdth.c,v $
  * Revision 1.61  2002/10/03 09:35:22  boji
- * Fixed SCREENSERVICE intialisation in SMP cases.
+ * Fixed SCREENSERVICE initialisation in SMP cases.
  * Added checks for gdth_polling before GDTH_HA_LOCK
  *
  * Revision 1.60  2002/02/05 09:35:22  achim

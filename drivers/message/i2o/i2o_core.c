@@ -340,7 +340,7 @@ int i2o_remove_handler(struct i2o_handler *h)
 
 /*
  *	Each I2O controller has a chain of devices on it.
- * Each device has a pointer to it's LCT entry to be used
+ * Each device has a pointer to its LCT entry to be used
  * for fun purposes.
  */
 
@@ -2120,7 +2120,7 @@ static void i2o_sys_shutdown(void)
  *	@iop: controller
  *
  *	This function brings an I2O controller into HOLD state. The adapter
- *	is reset if neccessary and then the queues and resource table
+ *	is reset if necessary and then the queues and resource table
  *	are read. -1 is returned on a failure, 0 on success.
  *	
  */

@@ -159,6 +159,20 @@ config USB_WACOM
 	  The module will be called wacom.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config USB_KBTAB
+	tristate "KB Gear JamStudio tablet support"
+	depends on USB && INPUT
+	help
+	  Say Y here if you want to use the USB version of the KB Gear
+	  JamStudio tablet.  Make sure to say Y to "Mouse support"
+	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
+	  (CONFIG_INPUT_EVDEV) as well.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called kbtab.o.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
 config USB_POWERMATE
 	tristate "Griffin PowerMate and Contour Jog support"
 	depends on USB && INPUT

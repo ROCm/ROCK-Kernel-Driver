@@ -1161,7 +1161,7 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 			if(pnp_device_attach(pdev)<0)
 				continue;
 			
-			if(pnp_activate_dev(pdev, NULL)<0) {
+			if(pnp_activate_dev(pdev)<0) {
 				pnp_device_detach(pdev);
 				continue;
 			}

@@ -18,7 +18,7 @@
  *          Steve Whitehouse : Multiple ifaddr support
  *          Steve Whitehouse : SIOCGIFCONF is now a compile time option
  *          Steve Whitehouse : /proc/sys/net/decnet/conf/<sys>/forwarding
- *          Steve Whitehouse : Removed timer1 - its a user space issue now
+ *          Steve Whitehouse : Removed timer1 - it's a user space issue now
  *         Patrick Caulfield : Fixed router hello message format
  */
 
@@ -807,7 +807,7 @@ out:
  * This is one of those areas where the initial VMS concepts don't really
  * map onto the Linux concepts, and since we introduced multiple addresses
  * per interface we have to cope with slightly odd ways of finding out what
- * "our address" really is. Mostly its not a problem; for this we just guess
+ * "our address" really is. Mostly it's not a problem; for this we just guess
  * a sensible default. Eventually the routing code will take care of all the
  * nasties for us I hope.
  */

@@ -1233,7 +1233,7 @@ struct SCTP_association {
 		/* Pointer to last transport I have sent on.  */
 		struct sctp_transport *last_sent_to;
 
-		/* This is the last transport I have recieved DATA on.  */
+		/* This is the last transport I have received DATA on.  */
 		struct sctp_transport *last_data_from;
 
 		/*

@@ -375,7 +375,7 @@ do_control(snd_midi_op_t *ops, void *drv, snd_midi_channel_set_t *chset,
 
 
 /*
- * intialize the MIDI status
+ * initialize the MIDI status
  */
 void
 snd_midi_channel_set_clear(snd_midi_channel_set_t *chset)

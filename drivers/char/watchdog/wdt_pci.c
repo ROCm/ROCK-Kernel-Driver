@@ -158,7 +158,7 @@ static int wdtpci_status(void)
  *
  *	Handle an interrupt from the board. These are raised when the status
  *	map changes in what the board considers an interesting way. That means
- *	a failure condition occuring.
+ *	a failure condition occurring.
  */
  
 static void wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -365,9 +365,6 @@ static int wdtpci_open(struct inode *inode, struct file *file)
 			if (down_trylock(&open_sem))
 				return -EBUSY;
 
-			if (nowayout) {
-				MOD_INC_USE_COUNT;
-			}
 			/*
 			 *	Activate 
 			 */

@@ -521,7 +521,7 @@ hycapi_rx_capipkt
 Receive a capi-message.
 
 All B3_DATA_IND are converted to 64K-extension compatible format.
-New nccis are created if neccessary.
+New nccis are created if necessary.
 *******************************************************************/
 
 void
@@ -702,7 +702,7 @@ hycapi_cleanup(void)
 /********************************************************************
 hycapi_capi_create(hysdn_card *card)
 
-Attach the card with it's capi-ctrl.
+Attach the card with its capi-ctrl.
 *********************************************************************/
 
 static void hycapi_fill_profile(hysdn_card *card)

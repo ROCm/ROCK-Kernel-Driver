@@ -36,12 +36,12 @@
 #define SEGTYPE_SP_COEFFICIENT          0x00000004
 
 #define DSP_SPOS_UU      0x0deadul     /* unused */
-#define DSP_SPOS_DC      0x0badul      /* dont care */
-#define DSP_SPOS_DC_DC   0x0bad0badul  /* dont care */
+#define DSP_SPOS_DC      0x0badul      /* don't care */
+#define DSP_SPOS_DC_DC   0x0bad0badul  /* don't care */
 #define DSP_SPOS_UUUU    0xdeadc0edul  /* unused */
 #define DSP_SPOS_UUHI    0xdeadul
 #define DSP_SPOS_UULO    0xc0edul
-#define DSP_SPOS_DCDC    0x0badf1d0ul  /* dont care */
+#define DSP_SPOS_DCDC    0x0badf1d0ul  /* don't care */
 #define DSP_SPOS_DCDCHI  0x0badul
 #define DSP_SPOS_DCDCLO  0xf1d0ul
 

@@ -336,7 +336,7 @@ C_LABEL(__csum_partial_copy_sparc_generic):
 	bne	cc_dword_align		! yes, we check for short lengths there
 	 andcc	%g1, 0xffffff80, %g0	! can we use unrolled loop?
 3:	be	3f			! nope, less than one loop remains
-	 andcc	%o1, 4, %g0		! dest aligned on 4 or 8 byte boundry?
+	 andcc	%o1, 4, %g0		! dest aligned on 4 or 8 byte boundary?
 	be	ccdbl + 4		! 8 byte aligned, kick ass
 5:	CSUMCOPY_BIGCHUNK(%o0,%o1,%g7,0x00,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)
 	CSUMCOPY_BIGCHUNK(%o0,%o1,%g7,0x20,%o4,%o5,%g2,%g3,%g4,%g5,%o2,%o3)

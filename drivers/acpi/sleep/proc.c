@@ -27,8 +27,11 @@ static int acpi_system_sleep_seq_show(struct seq_file *seq, void *offset)
 	ACPI_FUNCTION_TRACE("acpi_system_sleep_seq_show");
 
 	for (i = 0; i <= ACPI_STATE_S5; i++) {
-		if (sleep_states[i])
+		if (sleep_states[i]) {
 			seq_printf(seq,"S%d ", i);
+			if (i == ACPI_STATE_S4 && acpi_gbl_FACS->S4bios_f)
+				seq_printf(seq, "S4bios ");
+		}
 	}
 
 	seq_puts(seq, "\n");

@@ -24,7 +24,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
 	if (ret != NULL) {
-	        /* Is it neccessary to do the memset? */
+	        /* Is it necessary to do the memset? */
 		memset(ret, 0, size);
 		*dma_handle = virt_to_bus(ret);
 	}

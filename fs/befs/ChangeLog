@@ -117,7 +117,7 @@ Version 0.6 (2001-12-15)
 * Rewrote datastream positon lookups.
 	(datastream.c) [WD]
 
-* Moved the TODO list to it's own file.
+* Moved the TODO list to its own file.
 
 
 Version 0.50 (2001-11-13)

@@ -288,7 +288,7 @@ ccw_device_online(struct ccw_device *cdev)
 	}
 	/* Is Set Path Group supported? */
 	if (!cdev->private->flags.pgid_supp) {
-		/* No, set state online immediatly. */
+		/* No, set state online immediately. */
 		ccw_device_done(cdev, DEV_STATE_ONLINE);
 		return 0;
 	}
@@ -333,7 +333,7 @@ ccw_device_offline(struct ccw_device *cdev)
 		return -EBUSY;
 	/* Is Set Path Group supported? */
 	if (!cdev->private->flags.pgid_supp) {
-		/* No, set state offline immediatly. */
+		/* No, set state offline immediately. */
 		ccw_device_done(cdev, DEV_STATE_OFFLINE);
 		return 0;
 	}

@@ -600,7 +600,7 @@ setup_diva(struct IsdnCard *card)
 							printk(KERN_ERR "Diva PnP: attach failed\n");
 							return 0;
 						}
-						if (pnp_activate_dev(pd, NULL) < 0) {
+						if (pnp_activate_dev(pd) < 0) {
 							printk(KERN_ERR "Diva PnP: activate failed\n");
 							pnp_device_detach(pd);
 							return 0;

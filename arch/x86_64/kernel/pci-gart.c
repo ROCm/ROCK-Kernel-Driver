@@ -437,6 +437,7 @@ static __init int init_k8_gatt(agp_kern_info *info)
 	}
 	flush_gart(); 
 	
+	global_flush_tlb();
 		
 	printk("PCI-DMA: aperture base @ %x size %u KB\n", aper_base, aper_size>>10); 
 	return 0;

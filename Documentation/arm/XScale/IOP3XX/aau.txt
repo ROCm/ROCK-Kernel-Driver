@@ -1,0 +1,178 @@
+Support functions for the Intel 80310 AAU
+===========================================
+
+Dave Jiang <dave.jiang@intel.com>
+Last updated: 09/18/2001
+
+The Intel 80312 companion chip in the 80310 chipset contains an AAU. The
+AAU is capable of processing up to 8 data block sources and perform XOR
+operations on them. This unit is typically used to accelerated XOR
+operations utilized by RAID storage device drivers such as RAID 5. This
+API is designed to provide a set of functions to take adventage of the
+AAU. The AAU can also be used to transfer data blocks and used as a memory
+copier. The AAU transfer the memory faster than the operation performed by
+using CPU copy therefore it is recommended to use the AAU for memory copy.
+
+------------------
+int aau_request(u32 *aau_context, const char *device_id);
+This function allows the user the acquire the control of the the AAU. The
+function will return a context of AAU to the user and allocate
+an interrupt for the AAU. The user must pass the context as a parameter to
+various AAU API calls.
+
+int aau_queue_buffer(u32 aau_context, aau_head_t *listhead);
+This function starts the AAU operation. The user must create a SGL
+header with a SGL attached. The format is presented below. The SGL is
+built from kernel memory.
+
+/* hardware descriptor */
+typedef struct _aau_desc
+{
+    u32 NDA;                    /* next descriptor address [READONLY] */
+    u32 SAR[AAU_SAR_GROUP];     /* src addrs */
+    u32 DAR;                    /* destination addr */
+    u32 BC;                     /* byte count */
+    u32 DC;                     /* descriptor control */
+    u32 SARE[AAU_SAR_GROUP];    /* extended src addrs */
+} aau_desc_t;
+
+/* user SGL format */
+typedef struct _aau_sgl
+{
+    aau_desc_t          aau_desc;  /* AAU HW Desc */
+    u32		        status;    /* status of SGL [READONLY] */
+    struct _aau_sgl	*next;     /* pointer to next SG [READONLY] */
+    void                *dest;     /* destination addr */
+    void                *src[AAU_SAR_GROUP]; 	    /* source addr[4] */
+    void                *ext_src[AAU_SAR_GROUP];    /* ext src addr[4] */
+    u32                 total_src; /* total number of source */
+} aau_sgl_t;
+
+/* header for user SGL */
+typedef struct _aau_head
+{
+    u32		total;      /* total descriptors allocated */
+    u32         status;     /* SGL status */
+    aau_sgl_t   *list;      /* ptr to head of list */
+    aau_callback_t  callback;  /* callback func ptr */
+} aau_head_t;
+
+
+The function will call aau_start() and start the AAU after it queues
+the SGL to the processing queue. When the function will either
+a. Sleep on the wait queue aau->wait_q if no callback has been provided, or
+b. Continue and then call the provided callback function when DMA interrupt
+   has been triggered.
+
+int aau_suspend(u32 aau_context);
+Stops/Suspends the AAU operation
+
+int aau_free(u32 aau_context);
+Frees the ownership of AAU. Called when no longer need AAU service.
+
+aau_sgl_t * aau_get_buffer(u32 aau_context, int num_buf);
+This function obtains an AAU SGL for the user. User must specify the number
+of descriptors to be allocated in the chain that is returned.
+
+void aau_return_buffer(u32 aau_context, aau_sgl_t *list);
+This function returns all SGL back to the API after user is done.
+
+int aau_memcpy(void *dest, void *src, u32 size);
+This function is a short cut for user to do memory copy utilizing the AAU for
+better large block memory copy vs using the CPU. This is similar to using
+typical memcpy() call.
+
+* User is responsible for the source address(es) and the destination address.
+  The source and destination should all be cached memory.
+
+
+
+void aau_test()
+{
+	u32 aau;
+	char dev_id[] = "AAU";
+	int size = 2;
+	int err = 0;
+	aau_head_t *head;
+	aau_sgl_t *list;
+	u32 i;
+	u32 result = 0;
+	void *src, *dest;
+
+	printk("Starting AAU test\n");
+	if((err = aau_request(&aau, dev_id))<0)
+	{
+		printk("test - AAU request failed: %d\n", err);
+		return;
+	}
+	else
+	{
+		printk("test - AAU request successful\n");
+	}
+
+	head = kmalloc(sizeof(aau_head_t), GFP_KERNEL);
+	head->total = size;
+	head->status = 0;
+	head->callback = NULL;
+
+	list = aau_get_buffer(aau, size);
+	if(!list)
+	{
+		printk("Can't get buffers\n");
+		return;
+	}
+	head->list = list;
+
+	src = kmalloc(1024, GFP_KERNEL);
+	dest = kmalloc(1024, GFP_KERNEL);
+
+	while(list)
+	{
+		list->status = 0;
+		list->aau_desc->SAR[0] = (u32)src;
+		list->aau_desc->DAR = (u32)dest;
+		list->aau_desc->BC = 1024;
+
+		/* see iop310-aau.h for more DCR commands */
+		list->aau_desc->DC = AAU_DCR_WRITE | AAU_DCR_BLKCTRL_1_DF;
+		if(!list->next)
+		{
+			list->aau_desc->DC = AAU_DCR_IE;
+			break;
+		}
+		list = list->next;
+	}
+
+	printk("test- Queueing buffer for AAU operation\n");
+	err = aau_queue_buffer(aau, head);
+	if(err >= 0)
+	{
+		printk("AAU Queue Buffer is done...\n");
+	}
+	else
+	{
+		printk("AAU Queue Buffer failed...: %d\n", err);
+	}
+
+
+
+#if 1
+	printk("freeing the AAU\n");
+	aau_return_buffer(aau, head->list);
+	aau_free(aau);
+	kfree(src);
+	kfree(dest);
+	kfree((void *)head);
+#endif
+}
+
+All Disclaimers apply. Use this at your own discretion. Neither Intel nor I
+will be responsible if anything goes wrong. =)
+
+
+TODO
+____
+* Testing
+* Do zero-size AAU transfer/channel at init
+  so all we have to do is chainining
+

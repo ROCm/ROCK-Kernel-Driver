@@ -65,17 +65,17 @@ void pnc_copy_to(struct map_info *map, unsigned long to, const void *from, ssize
 }
 
 struct map_info pnc_map = {
-	name: "PNC-2000",
-	size: WINDOW_SIZE,
-	buswidth: 4,
-	read8: pnc_read8,
-	read16: pnc_read16,
-	read32: pnc_read32,
-	copy_from: pnc_copy_from,
-	write8: pnc_write8,
-	write16: pnc_write16,
-	write32: pnc_write32,
-	copy_to: pnc_copy_to
+	.name		= "PNC-2000",
+	.size		= WINDOW_SIZE,
+	.buswidth	= 4,
+	.read8		= pnc_read8,
+	.read16		= pnc_read16,
+	.read32		= pnc_read32,
+	.copy_from	= pnc_copy_from,
+	.write8		= pnc_write8,
+	.write16	= pnc_write16,
+	.write32	= pnc_write32,
+	.copy_to	= pnc_copy_to
 };
 
 
@@ -84,19 +84,18 @@ struct map_info pnc_map = {
  */
 static struct mtd_partition pnc_partitions[3] = {
 	{
-		name: "PNC-2000 boot firmware",
-		size: 0x20000,
-		offset: 0
+		.name	= "PNC-2000 boot firmware",
+		.size	= 0x20000,
 	},
 	{
-		name: "PNC-2000 kernel",
-		size: 0x1a0000,
-		offset: 0x20000
+		.name	= "PNC-2000 kernel",
+		.size	= 0x1a0000,
+		.offset	= 0x20000
 	},
 	{
-		name: "PNC-2000 filesystem",
-		size: 0x240000,
-		offset: 0x1c0000
+		.name	= "PNC-2000 filesystem",
+		.size	= 0x240000,
+		.offset	= 0x1c0000
 	}
 };
 

@@ -1495,7 +1495,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
 
     /* Repeat this loop until we either cut the item without needing
-       to balance, or we fix_nodes without schedule occuring */
+       to balance, or we fix_nodes without schedule occurring */
     while ( 1 ) {
 	/* Determine the balance mode, position of the first byte to
 	   be cut, and size to be cut.  In case of the indirect item

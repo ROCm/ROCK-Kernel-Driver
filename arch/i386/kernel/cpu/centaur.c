@@ -412,8 +412,9 @@ static unsigned int centaur_size_cache(struct cpuinfo_x86 * c, unsigned int size
 		size >>= 8;
 
 	/* VIA also screwed up Nehemiah stepping 1, and made
-	   it return '65KB' instead of '64KB' */
-	if ((c->x86==6) && (c->x86_model==9) && (c->x86_mask==1))
+	   it return '65KB' instead of '64KB'
+	   - Note, it seems this may only be in engineering samples. */
+	if ((c->x86==6) && (c->x86_model==9) && (c->x86_mask==1) && (size==65))
 		size -=1;
 
 	return size;

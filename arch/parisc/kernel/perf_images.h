@@ -1556,7 +1556,7 @@ static uint32_t onyx_images[][PCXU_IMAGE_SIZE/sizeof(uint32_t)] = {
  * IRTN_AV fires twice for every I-cache miss returning from RIB to the IFU.
  * It will not fire if a second I-cache miss is issued from the IFU to RIB
  * before the first returns.  Therefore, if the IRTN_AV count is much less
- * than 2x the ICORE_AV count, many speculative I-cache misses are occuring
+ * than 2x the ICORE_AV count, many speculative I-cache misses are occurring
  * which are "discovered" to be incorrect fairly quickly.
  * The ratio of I-cache miss transactions on Runway to the ICORE_AV count is
  * a measure of the effectiveness of instruction prefetching.  This ratio

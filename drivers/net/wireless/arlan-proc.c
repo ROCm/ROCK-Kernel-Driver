@@ -79,7 +79,7 @@ static const char *arlan_diagnostic_info_string(struct net_device *dev)
 		case 0xFB:
 			return "ERROR BackBone failure ";
 		case 0xFA:
-			return "ERROR tranceiver not found ";
+			return "ERROR transceiver not found ";
 		case 0xF9:
 			return "ERROR no more address space ";
 		case 0xF8:

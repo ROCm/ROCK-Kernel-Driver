@@ -1212,7 +1212,7 @@ static int sq_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		return result ;
 		break ;
 	case SNDCTL_DSP_SPEED:
-		/* changing this on the fly will have wierd effects on the sound.
+		/* changing this on the fly will have weird effects on the sound.
 		   Where there are rate conversions implemented in soft form - it
 		   will cause the _ctx_xxx() functions to be substituted.
 		   However, there doesn't appear to be any reason to dis-allow it from

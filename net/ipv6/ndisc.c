@@ -208,7 +208,7 @@ struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
 		default:
 			/*
 			 * Unknown options must be silently ignored,
-			 * to accomodate future extension to the protocol.
+			 * to accommodate future extension to the protocol.
 			 */
 			ND_PRINTK2(KERN_WARNING
 				   "ndisc_parse_options(): ignored unsupported option; type=%d, len=%d\n",

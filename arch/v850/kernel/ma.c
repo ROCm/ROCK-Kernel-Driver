@@ -61,7 +61,7 @@ void ma_uart_pre_configure (unsigned chan, unsigned cflags, unsigned baud)
 	   specific chips may have more).  */
 	if (chan < 2) {
 		unsigned bits = 0x3 << (chan * 3);
-		/* Specify that the relevent pins on the chip should do
+		/* Specify that the relevant pins on the chip should do
 		   serial I/O, not direct I/O.  */
 		MA_PORT4_PMC |= bits;
 		/* Specify that we're using the UART, not the CSI device.  */

@@ -26,7 +26,7 @@
 #include <linux/timex.h>
 #include <linux/profile.h>
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 static inline int set_rtc_mmss(unsigned long nowtime)
 {

@@ -68,7 +68,7 @@
 * device installed in your system.  The PHONECTL_CAPABILITIES ioctl
 * returns an integer value indicating the number of capabilities the   
 * device has.  The PHONECTL_CAPABILITIES_LIST will fill an array of 
-* capability structs with all of it's capabilities.  The
+* capability structs with all of its capabilities.  The
 * PHONECTL_CAPABILITIES_CHECK takes a single capability struct and returns
 * a TRUE if the device has that capability, otherwise it returns false.
 * 

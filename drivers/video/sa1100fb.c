@@ -1370,7 +1370,7 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 #error Move me into __sa1100fb_lcd_power and/or __sa1100fb_backlight_power
 	if (machine_is_huw_webpanel()) {
-		// dont forget to set the control lines to zero (?)
+		// don't forget to set the control lines to zero (?)
 		DPRINTK("ShutDown HuW LCD controller\n");
 		BCR_clear(BCR_TFT_ENA + BCR_CCFL_POW + BCR_PWM_BACKLIGHT);
 	}

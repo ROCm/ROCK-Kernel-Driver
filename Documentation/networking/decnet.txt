@@ -42,7 +42,7 @@ worked with 2.4 will work under 2.5 with no change.
 3) Command line options
 
 You can set a DECnet address on the kernel command line for compatibility
-with the 2.4 configuration procedure, but in general its not needed any more.
+with the 2.4 configuration procedure, but in general it's not needed any more.
 If you do st a DECnet address on the command line, it has only one purpose
 which is that its added to the addresses on the loopback device.
 

@@ -173,14 +173,18 @@ static void free_cell(struct hash_cell *hc)
  */
 static int register_with_devfs(struct hash_cell *hc)
 {
-	char name[32];
 	struct gendisk *disk = dm_disk(hc->md);
+	char *name = kmalloc(DM_NAME_LEN + strlen(DM_DIR) + 1, GFP_KERNEL);
+	if (!name) {
+		return -ENOMEM;
+	}
 
 	sprintf(name, DM_DIR "/%s", hc->name);
 	devfs_register(NULL, name, DEVFS_FL_CURRENT_OWNER,
 		       disk->major, disk->first_minor,
 		       S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		       &dm_blk_dops, NULL);
+	kfree(name);
 	return 0;
 }
 
@@ -545,7 +549,7 @@ static inline int get_mode(struct dm_ioctl *param)
 
 static int check_name(const char *name)
 {
-	if (strchr(name, '/')) {
+	if (name[0] == '/') {
 		DMWARN("invalid device name");
 		return -EINVAL;
 	}
@@ -887,6 +891,7 @@ static int reload(struct dm_ioctl *param, struct dm_ioctl *user)
 		dm_table_put(t);
 		return r;
 	}
+	dm_table_put(t);	/* md will have taken its own reference */
 
 	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
 	dm_put(md);
@@ -1122,17 +1127,17 @@ int __init dm_interface_init(void)
 	return 0;
 
       failed:
+	devfs_remove(DM_DIR "/control");
+	if (misc_deregister(&_dm_misc) < 0)
+		DMERR("misc_deregister failed for control device");
 	dm_hash_exit();
-	misc_deregister(&_dm_misc);
 	return r;
 }
 
 void dm_interface_exit(void)
 {
-	dm_hash_exit();
-
 	devfs_remove(DM_DIR "/control");
-
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");
+	dm_hash_exit();
 }

@@ -56,7 +56,7 @@ static unsigned long ps_per_cycle = 0;
  * used directly to implement fine-grained timeouts.  However, on
  * Alpha PCs, the 8254 is *not* used to implement the clock tick
  * (which is 1024 Hz, normally) and the 8254 timer runs at some
- * "random" frequency (it seems to run at 18Hz, but its not safe to
+ * "random" frequency (it seems to run at 18Hz, but it's not safe to
  * rely on this value).  Instead, we use the Alpha's "rpcc"
  * instruction to read cycle counts.  As this is a 32 bit counter,
  * it will overflow only once per 30 seconds (on a 200MHz machine),

@@ -229,136 +229,55 @@ static int detect_ejectable_slots (acpi_handle *bridge_handle)
 /* decode ACPI _CRS data and convert into our internal resource list
  * TBD: _TRA, etc.
  */
-static void
-decode_acpi_resource (struct acpi_resource *resource, struct acpiphp_bridge *bridge)
+static acpi_status
+decode_acpi_resource (struct acpi_resource *resource, void *context)
 {
-	struct acpi_resource_address16 *address16_data;
-	struct acpi_resource_address32 *address32_data;
-	struct acpi_resource_address64 *address64_data;
+	struct acpiphp_bridge *bridge = (struct acpiphp_bridge *) context;
+	struct acpi_resource_address64 address;
 	struct pci_resource *res;
 
-	u32 resource_type, producer_consumer, address_length;
-	u64 min_address_range, max_address_range;
-	u16 cache_attribute = 0;
+	if (resource->id != ACPI_RSTYPE_ADDRESS16 &&
+	    resource->id != ACPI_RSTYPE_ADDRESS32 &&
+	    resource->id != ACPI_RSTYPE_ADDRESS64)
+		return AE_OK;
 
-	int done = 0, found;
+	acpi_resource_to_address64(resource, &address);
 
-	/* shut up gcc */
-	resource_type = producer_consumer = address_length = 0;
-	min_address_range = max_address_range = 0;
-
-	while (!done) {
-		found = 0;
-
-		switch (resource->id) {
-		case ACPI_RSTYPE_ADDRESS16:
-			address16_data = (struct acpi_resource_address16 *)&resource->data;
-			resource_type = address16_data->resource_type;
-			producer_consumer = address16_data->producer_consumer;
-			min_address_range = address16_data->min_address_range;
-			max_address_range = address16_data->max_address_range;
-			address_length = address16_data->address_length;
-			if (resource_type == ACPI_MEMORY_RANGE)
-				cache_attribute = address16_data->attribute.memory.cache_attribute;
-			found = 1;
-			break;
-
-		case ACPI_RSTYPE_ADDRESS32:
-			address32_data = (struct acpi_resource_address32 *)&resource->data;
-			resource_type = address32_data->resource_type;
-			producer_consumer = address32_data->producer_consumer;
-			min_address_range = address32_data->min_address_range;
-			max_address_range = address32_data->max_address_range;
-			address_length = address32_data->address_length;
-			if (resource_type == ACPI_MEMORY_RANGE)
-				cache_attribute = address32_data->attribute.memory.cache_attribute;
-			found = 1;
-			break;
-
-		case ACPI_RSTYPE_ADDRESS64:
-			address64_data = (struct acpi_resource_address64 *)&resource->data;
-			resource_type = address64_data->resource_type;
-			producer_consumer = address64_data->producer_consumer;
-			min_address_range = address64_data->min_address_range;
-			max_address_range = address64_data->max_address_range;
-			address_length = address64_data->address_length;
-			if (resource_type == ACPI_MEMORY_RANGE)
-				cache_attribute = address64_data->attribute.memory.cache_attribute;
-			found = 1;
-			break;
-
-		case ACPI_RSTYPE_END_TAG:
-			done = 1;
-			break;
-
-		default:
-			/* ignore */
-			break;
+	if (address.producer_consumer == ACPI_PRODUCER && address.address_length > 0) {
+		dbg("resource type: %d: 0x%llx - 0x%llx\n", address.resource_type, address.min_address_range, address.max_address_range);
+		res = acpiphp_make_resource(address.min_address_range,
+				    address.address_length);
+		if (!res) {
+			err("out of memory\n");
+			return AE_OK;
 		}
 
-		resource = (struct acpi_resource *)((char*)resource + resource->length);
-
-		if (found && producer_consumer == ACPI_PRODUCER && address_length > 0) {
-			switch (resource_type) {
-			case ACPI_MEMORY_RANGE:
-				if (cache_attribute == ACPI_PREFETCHABLE_MEMORY) {
-					dbg("resource type: prefetchable memory 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
-					res = acpiphp_make_resource(min_address_range,
-							    address_length);
-					if (!res) {
-						err("out of memory\n");
-						return;
-					}
-					res->next = bridge->p_mem_head;
-					bridge->p_mem_head = res;
-				} else {
-					dbg("resource type: memory 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
-					res = acpiphp_make_resource(min_address_range,
-							    address_length);
-					if (!res) {
-						err("out of memory\n");
-						return;
-					}
-					res->next = bridge->mem_head;
-					bridge->mem_head = res;
-				}
-				break;
-			case ACPI_IO_RANGE:
-				dbg("resource type: io 0x%x - 0x%x\n", (u32)min_address_range, (u32)max_address_range);
-				res = acpiphp_make_resource(min_address_range,
-						    address_length);
-				if (!res) {
-					err("out of memory\n");
-					return;
-				}
-				res->next = bridge->io_head;
-				bridge->io_head = res;
-				break;
-			case ACPI_BUS_NUMBER_RANGE:
-				dbg("resource type: bus number %d - %d\n", (u32)min_address_range, (u32)max_address_range);
-				res = acpiphp_make_resource(min_address_range,
-						    address_length);
-				if (!res) {
-					err("out of memory\n");
-					return;
-				}
-				res->next = bridge->bus_head;
-				bridge->bus_head = res;
-				break;
-			default:
-				/* invalid type */
-				break;
+		switch (address.resource_type) {
+		case ACPI_MEMORY_RANGE:
+			if (address.attribute.memory.cache_attribute == ACPI_PREFETCHABLE_MEMORY) {
+				res->next = bridge->p_mem_head;
+				bridge->p_mem_head = res;
+			} else {
+				res->next = bridge->mem_head;
+				bridge->mem_head = res;
 			}
+			break;
+		case ACPI_IO_RANGE:
+			res->next = bridge->io_head;
+			bridge->io_head = res;
+			break;
+		case ACPI_BUS_NUMBER_RANGE:
+			res->next = bridge->bus_head;
+			bridge->bus_head = res;
+			break;
+		default:
+			/* invalid type */
+			kfree(res);
+			break;
 		}
 	}
 
-	acpiphp_resource_sort_and_combine(&bridge->io_head);
-	acpiphp_resource_sort_and_combine(&bridge->mem_head);
-	acpiphp_resource_sort_and_combine(&bridge->p_mem_head);
-	acpiphp_resource_sort_and_combine(&bridge->bus_head);
-
-	dbg("ACPI _CRS resource:\n");
-	acpiphp_dump_resource(bridge);
+	return AE_OK;
 }
 
 
@@ -476,9 +395,6 @@ static void init_bridge_misc (struct acpiphp_bridge *bridge)
 static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 {
 	acpi_status status;
-	struct acpi_buffer buffer = { .length = ACPI_ALLOCATE_BUFFER,
-				      .pointer = NULL};
-
 	struct acpiphp_bridge *bridge;
 
 	bridge = kmalloc(sizeof(struct acpiphp_bridge), GFP_KERNEL);
@@ -501,7 +417,8 @@ static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 
 	/* decode resources */
 
-	status = acpi_get_current_resources(handle, &buffer);
+	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+		decode_acpi_resource, bridge);
 
 	if (ACPI_FAILURE(status)) {
 		err("failed to decode bridge resources\n");
@@ -509,8 +426,13 @@ static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 		return;
 	}
 
-	decode_acpi_resource(buffer.pointer, bridge);
-	kfree(buffer.pointer);
+	acpiphp_resource_sort_and_combine(&bridge->io_head);
+	acpiphp_resource_sort_and_combine(&bridge->mem_head);
+	acpiphp_resource_sort_and_combine(&bridge->p_mem_head);
+	acpiphp_resource_sort_and_combine(&bridge->bus_head);
+
+	dbg("ACPI _CRS resource:\n");
+	acpiphp_dump_resource(bridge);
 
 	if (bridge->bus_head) {
 		bridge->bus = bridge->bus_head->base;
@@ -1357,7 +1279,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta != ACPI_STA_ALL) {
 				retval = acpiphp_disable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling\n");
+					err("Error occurred in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}
@@ -1368,7 +1290,7 @@ int acpiphp_check_bridge (struct acpiphp_bridge *bridge)
 			if (sta == ACPI_STA_ALL) {
 				retval = acpiphp_enable_slot(slot);
 				if (retval) {
-					err("Error occured in enabling\n");
+					err("Error occurred in enabling\n");
 					up(&slot->crit_sect);
 					goto err_exit;
 				}

@@ -1024,7 +1024,7 @@ static struct net_device *lmc_probe1 (struct net_device *dev, unsigned long ioad
 }
 
 
-/* This is the entry point.  This is what is called immediatly. */
+/* This is the entry point.  This is what is called immediately. */
 /* This goes out and finds the card */
 
 int lmc_probe_fake(struct net_device *dev) /*fold00*/
@@ -2149,7 +2149,7 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
         /* owned by 21140 */
         sc->lmc_rxring[i].status = 0x80000000;
 
-        /* used to be PKT_BUF_SZ now uses skb since we loose some to head room */
+        /* used to be PKT_BUF_SZ now uses skb since we lose some to head room */
         sc->lmc_rxring[i].length = skb->end - skb->data;
 
         /* use to be tail which is dumb since you're thinking why write

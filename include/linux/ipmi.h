@@ -166,7 +166,7 @@ struct ipmi_msg
 typedef struct ipmi_user *ipmi_user_t;
 
 /*
- * Stuff coming from the recieve interface comes as one of these.
+ * Stuff coming from the receive interface comes as one of these.
  * They are allocated, the receiver must free them with
  * ipmi_free_recv_msg() when done with the message.  The link is not
  * used after the message is delivered, so the upper layer may use the

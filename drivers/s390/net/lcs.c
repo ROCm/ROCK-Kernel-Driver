@@ -1206,7 +1206,7 @@ __lcs_start_xmit(struct lcs_card *card, struct sk_buff *skb,
 	card->stats.tx_packets++;
 	dev_kfree_skb(skb);
 	if (card->tx_emitted <= 0)
-		/* If this is the first tx buffer emit it immediatly. */
+		/* If this is the first tx buffer emit it immediately. */
 		__lcs_emit_txbuffer(card);
 	return 0;
 }

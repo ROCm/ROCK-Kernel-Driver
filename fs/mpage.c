@@ -598,7 +598,7 @@ out:
  * If a page is already under I/O, generic_writepages() skips it, even
  * if it's dirty.  This is desirable behaviour for memory-cleaning writeback,
  * but it is INCORRECT for data-integrity system calls such as fsync().  fsync()
- * and msync() need to guarentee that all the data which was dirty at the time
+ * and msync() need to guarantee that all the data which was dirty at the time
  * the call was made get new I/O started against them.  So if called_for_sync()
  * is true, we must wait for existing IO to complete.
  *

@@ -194,7 +194,7 @@ int scsi_set_medium_removal(Scsi_Device *dev, char state)
  *      of the given command. There is no way to override this.
  *   -  Data transfers are limited to PAGE_SIZE (4K on i386, 8K on alpha).
  *   -  The length (x + y) must be at least OMAX_SB_LEN bytes long to
- *      accomodate the sense buffer when an error occurs.
+ *      accommodate the sense buffer when an error occurs.
  *      The sense buffer is truncated to OMAX_SB_LEN (16) bytes so that
  *      old code will not be surprised.
  *   -  If a Unix error occurs (e.g. ENOMEM) then the user will receive

@@ -153,7 +153,7 @@ write_lcd(struct file *file, const char *buffer,
 				}
 				interruptible_sleep_on_timeout(&lcd-> wait_q, NAK_TIMEOUT);
 				continue;
-			} else if (!result & partial) {
+			} else if (!result && partial) {
 				obuf += partial;
 				thistime -= partial;
 			} else

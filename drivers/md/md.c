@@ -119,7 +119,7 @@ static ctl_table raid_root_table[] = {
 		.procname	= "dev",
 		.maxlen		= 0,
 		.mode		= 0555,
-		.proc_handler	= raid_dir_table,
+		.child		= raid_dir_table,
 	},
 	{ .ctl_name = 0 }
 };
@@ -1427,7 +1427,7 @@ static int do_md_run(mddev_t * mddev)
 			/*
 			 * 'default chunksize' in the old md code used to
 			 * be PAGE_SIZE, baaad.
-			 * we abort here to be on the safe side. We dont
+			 * we abort here to be on the safe side. We don't
 			 * want to continue the bad practice.
 			 */
 			printk(BAD_CHUNKSIZE);
@@ -1731,7 +1731,7 @@ static void autorun_devices(void)
 			mddev_unlock(mddev);
 		}
 		/* on success, candidates will be empty, on error
-		 * it wont...
+		 * it won't...
 		 */
 		ITERATE_RDEV_GENERIC(candidates,rdev,tmp)
 			export_rdev(rdev);
@@ -2290,7 +2290,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 				}
 				err = set_array_info(mddev, &info);
 				if (err) {
-					printk(KERN_WARNING "md: couldnt set array info. %d\n", err);
+					printk(KERN_WARNING "md: couldn't set array info. %d\n", err);
 					goto abort_unlock;
 				}
 			}

@@ -264,7 +264,7 @@ struct s_smc *smc ;
  * para	start		start time
  *	duration	time to wait
  *
- * NOTE: The fuction will return immediatly, if the timer is not 
+ * NOTE: The fuction will return immediately, if the timer is not 
  *	 started
  ************************/
 void hwt_wait_time(smc,start,duration)

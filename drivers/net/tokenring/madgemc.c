@@ -80,7 +80,7 @@ static void madgemc_setint(struct net_device *dev, int val);
 static void madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
- * These work around paging, however they dont guarentee you're on the
+ * These work around paging, however they don't guarentee you're on the
  * right page.
  */
 #define SIFREADB(reg) (inb(dev->base_addr + ((reg<0x8)?reg:reg-0x8)))

@@ -389,7 +389,7 @@ ahc_handle_brkadrint(struct ahc_softc *ahc)
 
 	ahc_dump_card_state(ahc);
 
-	/* Tell everyone that this HBA is no longer availible */
+	/* Tell everyone that this HBA is no longer available */
 	ahc_abort_scbs(ahc, CAM_TARGET_WILDCARD, ALL_CHANNELS,
 		       CAM_LUN_WILDCARD, SCB_LIST_NULL, ROLE_UNKNOWN,
 		       CAM_NO_HBA);
@@ -2988,9 +2988,9 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	targ_scsirate = tinfo->scsirate;
 
 	/*
-	 * Parse as much of the message as is availible,
+	 * Parse as much of the message as is available,
 	 * rejecting it if we don't support it.  When
-	 * the entire message is availible and has been
+	 * the entire message is available and has been
 	 * handled, return MSGLOOP_MSGCOMPLETE, indicating
 	 * that we have parsed an entire message.
 	 *
@@ -4999,7 +4999,7 @@ ahc_init(struct ahc_softc *ahc)
 		/*
 		 * Wait for up to 500ms for our transceivers
 		 * to settle.  If the adapter does not have
-		 * a cable attached, the tranceivers may
+		 * a cable attached, the transceivers may
 		 * never settle, so don't complain if we
 		 * fail here.
 		 */

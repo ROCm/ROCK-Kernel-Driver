@@ -887,7 +887,7 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	cp_to_buf((char *) lp->tx_buf_ptr_cpu[entry], skb->data, skblen);
 
 	/* Clear the slack of the packet, do I need this? */
-	/* For a firewall its a good idea - AC */
+	/* For a firewall it's a good idea - AC */
 /*
    if (len != skblen)
    memset ((char *) &ib->tx_buf [entry][skblen], 0, (len - skblen) << 1);

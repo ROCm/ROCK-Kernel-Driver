@@ -26,7 +26,7 @@
  *	Modified by Richard Gooch <rgooch@atnf.csiro.au> to support devfs
  *
  *	Modified by Jens Axboe <axboe@suse.de> - support DVD-RAM
- *	transparently and loose the GHOST hack
+ *	transparently and lose the GHOST hack
  *
  *	Modified by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *	check resource allocation in sr_init and some cleanups

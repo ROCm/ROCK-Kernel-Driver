@@ -151,7 +151,7 @@ static char rcsid[] =
  * Revision 2.2.1.4  1998/08/04 11:02:50 ivan
  * /proc/cyclades implementation with great collaboration of 
  * Marc Lewis <marc@blarg.net>;
- * cyy_interrupt was changed to avoid occurence of kernel oopses
+ * cyy_interrupt was changed to avoid occurrence of kernel oopses
  * during PPP operation.
  *
  * Revision 2.2.1.3  1998/06/01 12:09:10 ivan

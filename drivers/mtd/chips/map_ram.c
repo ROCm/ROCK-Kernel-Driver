@@ -23,9 +23,9 @@ static struct mtd_info *map_ram_probe(struct map_info *map);
 
 
 static struct mtd_chip_driver mapram_chipdrv = {
-	probe: map_ram_probe,
-	name: "map_ram",
-	module: THIS_MODULE
+	.probe	= map_ram_probe,
+	.name	= "map_ram",
+	.module	= THIS_MODULE
 };
 
 static struct mtd_info *map_ram_probe(struct map_info *map)

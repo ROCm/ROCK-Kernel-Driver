@@ -737,10 +737,10 @@ int
 RIOCookMode(struct ttystatics *tp)
 {
 	/*
-	** We cant handle tm.c_mstate != 0 on SCO
-	** We cant handle mapping
-	** We cant handle non-ttwrite line disc.
-	** We cant handle lflag XCASE
+	** We can't handle tm.c_mstate != 0 on SCO
+	** We can't handle mapping
+	** We can't handle non-ttwrite line disc.
+	** We can't handle lflag XCASE
 	** We can handle oflag OPOST & (OCRNL, ONLCR, TAB3)
 	*/
 

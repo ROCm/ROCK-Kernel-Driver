@@ -41,7 +41,7 @@
 /* Befs B+tree structure:
  * 
  * The first thing in the tree is the tree superblock. It tells you
- * all kinds of usefull things about the tree, like where the rootnode
+ * all kinds of useful things about the tree, like where the rootnode
  * is located, and the size of the nodes (always 1024 with current version
  * of BeOS).
  *

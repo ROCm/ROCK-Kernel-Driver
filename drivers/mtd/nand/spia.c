@@ -66,12 +66,15 @@ __setup("spia_peddr=",spia_peddr);
  * Define partitions for flash device
  */
 const static struct mtd_partition partition_info[] = {
-	{ name: "SPIA flash partition 1",
-	  offset: 0,
-	  size: 2*1024*1024 },
-	{ name: "SPIA flash partition 2",
-	  offset: 2*1024*1024,
-	  size: 6*1024*1024 }
+	{
+		.name	= "SPIA flash partition 1",
+		.size	= 2*1024*1024
+	},
+	{
+		.name	= "SPIA flash partition 2",
+		.offset	= 2*1024*1024,
+		.size	= 6*1024*1024
+	}
 };
 #define NUM_PARTITIONS 2
 

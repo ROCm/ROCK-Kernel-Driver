@@ -1381,7 +1381,7 @@ static int check_before_balancing (struct tree_balance * tb)
   if ( cur_tb ) {
     reiserfs_panic (tb->tb_sb, "vs-12335: check_before_balancing: "
 		    "suspect that schedule occurred based on cur_tb not being null at this point in code. "
-		    "do_balance cannot properly handle schedule occuring while it runs.");
+		    "do_balance cannot properly handle schedule occurring while it runs.");
   }
   
   /* double check that buffers that we will modify are unlocked. (fix_nodes should already have

@@ -93,7 +93,7 @@ struct serial_struct {
  * board I would assume that RXRE is the safest setting.
  *
  * For EZ328 I use RXHE (Half empty) interrupt to reduce the number of
- * interrupts. RXFE (receive queue full) causes the system to loose data
+ * interrupts. RXFE (receive queue full) causes the system to lose data
  * at least at 115200 baud
  *
  * If your board is busy doing other stuff, you might consider to use

@@ -2991,7 +2991,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	gem_begin_auto_negotiation(gp, NULL);
 	spin_unlock_irq(&gp->lock);
 
-	/* It is guarenteed that the returned buffer will be at least
+	/* It is guaranteed that the returned buffer will be at least
 	 * PAGE_SIZE aligned.
 	 */
 	gp->init_block = (struct gem_init_block *)

@@ -416,7 +416,7 @@ static int gred_change(struct Qdisc *sch, struct rtattr *opt)
 	memcpy(q->Stab, RTA_DATA(tb[TCA_GRED_STAB-1]), 256);
 
 	if ( table->initd && table->grio) {
-	/* this looks ugly but its not in the fast path */
+	/* this looks ugly but it's not in the fast path */
 		for (i=0;i<table->DPs;i++) {
 			if ((!table->tab[i]) || (i==q->DP) )    
 				continue; 

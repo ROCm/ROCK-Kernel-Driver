@@ -80,7 +80,7 @@ LEAF(lazy_fpu_switch)
 	beqz	a0, 2f				# Save floating point state
 	 nor	t3, zero, t3
 	.set	reorder
-	lw	t1, ST_OFF(a0)			# last thread looses fpu
+	lw	t1, ST_OFF(a0)			# last thread loses fpu
 	and	t1, t3
 	sw	t1, ST_OFF(a0)
 	FPU_SAVE_SINGLE(a0, t1)			# clobbers t1
@@ -108,7 +108,7 @@ LEAF(restore_fp)
 
 /*
  * Load the FPU with signalling NANS.  This bit pattern we're using has
- * the property that no matter wether considered as single or as double
+ * the property that no matter whether considered as single or as double
  * precission represents signaling NANS.
  *
  * We initialize fcr31 to rounding to nearest, no exceptions.

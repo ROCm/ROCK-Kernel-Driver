@@ -65,7 +65,7 @@ struct thread_struct {
 /*
  * At user->kernel entry, the pt_regs struct is stacked on the top of the kernel-stack.
  * This macro allows us to find those regs for a task.
- * Notice that subsequent pt_regs stackings, like recursive interrupts occuring while
+ * Notice that subsequent pt_regs stackings, like recursive interrupts occurring while
  * we're in the kernel, won't affect this - only the first user->kernel transition
  * registers are reached by this.
  */

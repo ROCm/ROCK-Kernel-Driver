@@ -37,7 +37,16 @@
 
 #include <xfs.h>
 
+/*
+ * System memory size - used to scale certain data structures in XFS.
+ */
 unsigned long	xfs_physmem;
+
+/*
+ * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
+ * other XFS code uses these values.
+ */
+xfs_param_t xfs_params = { 0, 1, 0, 0, 0 };
 
 /*
  * Used to serialize atomicIncWithWrap.

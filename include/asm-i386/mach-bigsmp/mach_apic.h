@@ -10,7 +10,7 @@
 		((phys_apic) & (~0xf)) )
 #endif
 
-#define no_balance_irq (1)
+#define NO_BALANCE_IRQ (1)
 #define esr_disable (1)
 
 static inline int apic_id_registered(void)
@@ -87,7 +87,8 @@ static inline int cpu_to_logical_apicid(int cpu)
        return (int)cpu_2_logical_apicid[cpu];
  }
 
-static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+static inline int mpc_apic_id(struct mpc_config_processor *m,
+			struct mpc_config_translation *translation_record)
 {
 	printk("Processor #%d %ld:%ld APIC version %d\n",
 	        m->mpc_apicid,

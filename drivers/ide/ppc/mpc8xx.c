@@ -331,7 +331,7 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 					(0x80000000 >> ioport_dsc[data_port].irq);
 
 #ifdef CONFIG_IDE_8xx_PCCARD
-	/* Make sure we dont get garbage irq */
+	/* Make sure we don't get garbage irq */
 	((immap_t *) IMAP_ADDR)->im_pcmcia.pcmc_pscr = 0xFFFF;
 
 	/* Enable falling edge irq */

@@ -1882,7 +1882,7 @@ again:
 		buf = con_buf;
 	}
 
-	/* At this point 'buf' is guarenteed to be a kernel buffer
+	/* At this point 'buf' is guaranteed to be a kernel buffer
 	 * and therefore no access to userspace (and therefore sleeping)
 	 * will be needed.  The con_buf_sem serializes all tty based
 	 * console rendering and vcs write/read operations.  We hold
@@ -2872,7 +2872,7 @@ void reset_palette(int currcons)
  *  this is done in order to maintain compatibility with the EGA/VGA fonts. It 
  *  is upto the actual low-level console-driver convert data into its favorite
  *  format (maybe we should add a `fontoffset' field to the `display'
- *  structure so we wont have to convert the fontdata all the time.
+ *  structure so we won't have to convert the fontdata all the time.
  *  /Jes
  */
 

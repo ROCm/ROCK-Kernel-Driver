@@ -970,7 +970,7 @@ struct airo_info {
 	int open;
 	struct net_device             *dev;
 	/* Note, we can have MAX_FIDS outstanding.  FIDs are 16-bits, so we
-	   use the high bit to mark wether it is in use. */
+	   use the high bit to mark whether it is in use. */
 #define MAX_FIDS 6
 	int                           fids[MAX_FIDS];
 	int registered;
@@ -2213,7 +2213,7 @@ static void enable_interrupts( struct airo_info *ai ) {
 	/* Enable the interrupts */
 	OUT4500( ai, EVINTEN, STATUS_INTS );
 	/* Note there is a race condition between the last two lines that
-	   I dont know how to get rid of right now... */
+	   I don't know how to get rid of right now... */
 }
 
 static void disable_interrupts( struct airo_info *ai ) {
@@ -5126,7 +5126,7 @@ static int airo_set_scan(struct net_device *dev,
 	Resp rsp;
 
 	/* Note : you may have realised that, as this is a SET operation,
-	 * this is priviledged and therefore a normal user can't
+	 * this is privileged and therefore a normal user can't
 	 * perform scanning.
 	 * This is not an error, while the device perform scanning,
 	 * traffic doesn't flow, so it's a perfect DoS...

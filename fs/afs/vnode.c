@@ -272,7 +272,7 @@ int afs_vnode_fetch_data(afs_vnode_t *vnode, struct afs_rxfs_fetch_descriptor *d
 /*****************************************************************************/
 /*
  * break any outstanding callback on a vnode
- * - only relevent to server that issued it
+ * - only relevant to server that issued it
  */
 int afs_vnode_give_up_callback(afs_vnode_t *vnode)
 {

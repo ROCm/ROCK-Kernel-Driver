@@ -67,7 +67,7 @@ void __init multi_init (void)
 
 			if ((word & 0xFC0) == 0x780) {
 				/* A `jr' insn, fix up its offset (and yes, the
-				   wierd half-word swapping is intentional). */
+				   weird half-word swapping is intentional). */
 				unsigned short hi = word & 0xFFFF;
 				unsigned short lo = word >> 16;
 				unsigned long udisp22

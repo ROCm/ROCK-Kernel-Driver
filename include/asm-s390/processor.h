@@ -154,7 +154,7 @@ static inline void __load_psw_mask (unsigned long mask)
 }
  
 /*
- * Function to stop a processor until an interruption occured
+ * Function to stop a processor until an interruption occurred
  */
 static inline void enabled_wait(void)
 {

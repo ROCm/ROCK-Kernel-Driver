@@ -381,7 +381,7 @@
 	/* cr11 (sar) is a funny one.  5 bits on PA1.1 and 6 bit on PA2.0
 	 * For PA2.0 mtsar or mtctl always write 6 bits, but mfctl only
 	 * reads 5 bits.  Use mfctl,w to read all six bits.  Otherwise
-	 * we loose the 6th bit on a save/restore over interrupt.
+	 * we lose the 6th bit on a save/restore over interrupt.
 	 */
 	mfctl,w  %cr11, %r1
 	STREG    %r1, PT_SAR (\regs)

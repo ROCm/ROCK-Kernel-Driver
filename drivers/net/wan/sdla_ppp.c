@@ -2004,7 +2004,7 @@ void event_intr (sdla_t *card)
 					(unsigned long)card->u.p.txbuf, *card->u.p.txbuf_next,
 					(unsigned long)card->rxmb, *card->u.p.rxbuf_next);
 
-				/* Tell timer interrupt that PPP event occured */
+				/* Tell timer interrupt that PPP event occurred */
 				ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_PPP_EVENT;
 				flags->imask |= PPP_INTR_TIMER;
 
@@ -2221,7 +2221,7 @@ static int handle_IPXWAN(unsigned char *sendpacket, char *devname, unsigned char
 
 		return 1;
 	} else {
-		//If we get here's its an IPX-data packet, so it'll get passed up the stack.
+		//If we get here it's an IPX-data packet, so it'll get passed up the stack.
 
 		//switch the network numbers
 		switch_net_numbers(sendpacket, network_number, 1);	
@@ -3418,7 +3418,7 @@ static int config_ppp (sdla_t *card)
 					card->devname);
 		}else{ 
 			/* IP addresses are the same and the link is up, 
-                         * we dont have to do anything here. Therefore, exit */
+                         * we don't have to do anything here. Therefore, exit */
 			return 0;
 		}
 	}

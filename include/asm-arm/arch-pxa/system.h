@@ -27,7 +27,7 @@ static inline void arch_reset(char mode)
 		/* Initialize the watchdog and let it fire */
 		OWER = OWER_WME;
 		OSSR = OSSR_M3;
-		OSMR3 = OSCR + 36864;	/* ... in 10 ms */
+		OSMR3 = OSCR + 368640;	/* ... in 100 ms */
 	}
 }
 

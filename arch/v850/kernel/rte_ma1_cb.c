@@ -93,7 +93,7 @@ void __init mach_init_irqs (void)
 		/* Turn on the timer.  */
 		NB85E_TIMER_C_TMCC0 (tc) |= NB85E_TIMER_C_TMCC0_CAE;
 
-	/* Make sure the relevent port0/port1 pins are assigned
+	/* Make sure the relevant port0/port1 pins are assigned
 	   interrupt duty.  We used INTP001-INTP011 (don't screw with
 	   INTP000 because the monitor uses it).  */
 	MA_PORT0_PMC |= 0x4;	/* P02 (INTP001) in IRQ mode.  */

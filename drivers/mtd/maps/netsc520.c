@@ -93,27 +93,26 @@ static void netsc520_copy_to(struct map_info *map, unsigned long to, const void 
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the
  * device. */
-static struct mtd_partition partition_info[]={
-    { 
-	    name: "NetSc520 boot kernel", 
-	    offset: 0, 
-	    size: 	0xc0000
-    },
-    { 
-	    name: "NetSc520 Low BIOS", 
-	    offset: 0xc0000, 
-	    size: 	0x40000
-    },
-    { 
-	    name: "NetSc520 file system", 
-	    offset: 0x100000, 
-	    size: 	0xe80000
-    },
-    { 
-	    name: "NetSc520 High BIOS", 
-	    offset: 0xf80000, 
-	    size: 0x80000
-    },
+static struct mtd_partition partition_info[] = {
+	{ 
+		.name	= "NetSc520 boot kernel", 
+		.size	= 0xc0000
+	},
+	{ 
+		.name	= "NetSc520 Low BIOS", 
+		.offset	= 0xc0000, 
+		.size	= 0x40000
+	},
+	{ 
+		.name	= "NetSc520 file system", 
+		.offset	= 0x100000, 
+		.size	= 0xe80000
+	},
+	{ 
+		.name	= "NetSc520 High BIOS", 
+		.offset	= 0xf80000, 
+		.size	= 0x80000
+	},
 };
 #define NUM_PARTITIONS (sizeof(partition_info)/sizeof(partition_info[0]))
 
@@ -127,18 +126,18 @@ static struct mtd_partition partition_info[]={
 #define WINDOW_ADDR	0x00200000
 
 static struct map_info netsc520_map = {
-	name: "netsc520 Flash Bank",
-	size: WINDOW_SIZE,
-	buswidth: 4,
-	read8: netsc520_read8,
-	read16: netsc520_read16,
-	read32: netsc520_read32,
-	copy_from: netsc520_copy_from,
-	write8: netsc520_write8,
-	write16: netsc520_write16,
-	write32: netsc520_write32,
-	copy_to: netsc520_copy_to,
-	map_priv_2: WINDOW_ADDR
+	.name		= "netsc520 Flash Bank",
+	.size		= WINDOW_SIZE,
+	.buswidth	= 4,
+	.read8		= netsc520_read8,
+	.read16		= netsc520_read16,
+	.read32		= netsc520_read32,
+	.copy_from	= netsc520_copy_from,
+	.write8		= netsc520_write8,
+	.write16	= netsc520_write16,
+	.write32	= netsc520_write32,
+	.copy_to	= netsc520_copy_to,
+	.map_priv_2	= WINDOW_ADDR
 };
 
 #define NUM_FLASH_BANKS	(sizeof(netsc520_map)/sizeof(struct map_info))

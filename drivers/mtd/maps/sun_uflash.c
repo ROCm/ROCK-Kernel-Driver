@@ -91,17 +91,17 @@ void uflash_copy_to(struct map_info *map, unsigned long to, const void *from,
 }
 
 struct map_info uflash_map_templ = {
-		name:		"SUNW,???-????",
-		size:		UFLASH_WINDOW_SIZE,
-		buswidth:	UFLASH_BUSWIDTH,
-		read8:		uflash_read8,
-		read16:		uflash_read16,
-		read32:		uflash_read32,
-		copy_from:	uflash_copy_from,
-		write8:		uflash_write8,
-		write16:	uflash_write16,
-		write32:	uflash_write32,
-		copy_to:	uflash_copy_to
+	.name		= "SUNW,???-????",
+	.size		= UFLASH_WINDOW_SIZE,
+	.buswidth	= UFLASH_BUSWIDTH,
+	.read8		= uflash_read8,
+	.read16		= uflash_read16,
+	.read32		= uflash_read32,
+	.copy_from	= uflash_copy_from,
+	.write8		= uflash_write8,
+	.write16	= uflash_write16,
+	.write32	= uflash_write32,
+	.copy_to	= uflash_copy_to
 };
 
 int uflash_devinit(struct linux_ebus_device* edev)

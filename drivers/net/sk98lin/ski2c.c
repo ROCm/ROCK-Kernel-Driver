@@ -178,7 +178,7 @@
  *	Revision 1.2  1998/08/11 07:27:15  gklug
  *	add: functions of the interface
  *	adapt rest of source to C coding Conventions
- *	rmv: unneccessary code taken from Mona Lisa
+ *	rmv: unnecessary code taken from Mona Lisa
  *
  *	Revision 1.1  1998/06/19 14:28:43  malthoff
  *	Created. Sources taken from ML Projekt.

@@ -25,6 +25,7 @@ spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 extern long htlbpagemem;
 
 static void zap_hugetlb_resources(struct vm_area_struct *);
+void free_huge_page(struct page *page);
 
 #define MAX_ID 	32
 struct htlbpagekey {
@@ -64,6 +65,7 @@ static struct page *alloc_hugetlb_page(void)
 	spin_unlock(&htlbpage_lock);
 
 	set_page_count(page, 1);
+	page->lru.prev = (void *)free_huge_page;
 	memset(page_address(page), 0, HPAGE_SIZE);
 
 	return page;

@@ -274,9 +274,9 @@
    display of sprites, I use the following policy on horizontal panning and
    the hardware cursor:
 
-      - if you want to start display DMA too early, you loose the ability to
+      - if you want to start display DMA too early, you lose the ability to
         do smooth horizontal panning (xpanstep 1 -> 64).
-      - if you want to go even further, you loose the hardware cursor too.
+      - if you want to go even further, you lose the hardware cursor too.
 
    IMHO a hardware cursor is more important for X than horizontal scrolling,
    so that's my motivation.

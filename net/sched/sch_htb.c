@@ -623,7 +623,7 @@ htb_change_class_mode(struct htb_sched *q, struct htb_class *cl, long *diff)
 	if (new_mode == cl->cmode)
 		return;	
 	
-	if (cl->prio_activity) { /* not neccessary: speed optimization */
+	if (cl->prio_activity) { /* not necessary: speed optimization */
 		if (cl->cmode != HTB_CANT_SEND) 
 			htb_deactivate_prios(q,cl);
 		cl->cmode = new_mode;

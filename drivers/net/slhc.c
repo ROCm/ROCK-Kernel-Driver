@@ -265,7 +265,7 @@ slhc_compress(struct slcompress *comp, unsigned char *icp, int isize,
 
 	/*  Bail if the TCP packet isn't `compressible' (i.e., ACK isn't set or
 	 *  some other control bit is set). Also uncompressible if
-	 *  its a runt.
+	 *  it's a runt.
 	 */
 	if(hlen > isize || th->syn || th->fin || th->rst ||
 	    ! (th->ack)){

@@ -97,7 +97,7 @@
 
 /*
  * Remove the item from the list and perform its initialization.
- * This is usefull for us because we can test if the item is linked
+ * This is useful for us because we can test if the item is linked
  * using "EP_IS_LINKED(p)".
  */
 #define EP_LIST_DEL(p) do { list_del(p); INIT_LIST_HEAD(p); } while (0)
@@ -950,7 +950,7 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, po
 	}
 	else
 	{
-		/* We have to signal that an error occured */
+		/* We have to signal that an error occurred */
 		epi->nwait = -1;
 	}
 }

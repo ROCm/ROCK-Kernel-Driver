@@ -1949,7 +1949,7 @@ e100_rx_srv(struct e100_private *bdp)
 		/* to allow manipulation with current skb we need to unlink it */
 		list_del(&(rx_struct->list_elem));
 
-		/* do not free & unmap badly recieved packet.
+		/* do not free & unmap badly received packet.
 		 * move it to the end of skb list for reuse */
 		if (!(rfd_status & RFD_STATUS_OK)) {
 			e100_add_skb_to_end(bdp, rx_struct);
@@ -2236,7 +2236,7 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 	spin_lock_irqsave(&(bdp->bd_lock), lock_flag);
 	switch (bdp->next_cu_cmd) {
 	case RESUME_NO_WAIT:
-		/*last cu command was a CU_RESMUE if this is a 558 or newer we dont need to
+		/*last cu command was a CU_RESMUE if this is a 558 or newer we don't need to
 		 * wait for command word to clear, we reach here only if we are bachlor
 		 */
 		e100_exec_cmd(bdp, SCB_CUC_RESUME);

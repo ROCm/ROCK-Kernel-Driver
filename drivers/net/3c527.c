@@ -227,7 +227,7 @@ static int	netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
  * Because MCA bus is a real bus and we can scan for cards we could do a
  * single scan for all boards here. Right now we use the passed in device
  * structure and scan for only one board. This needs fixing for modules
- * in paticular.
+ * in particular.
  */
 
 int __init mc32_probe(struct net_device *dev)
@@ -1168,7 +1168,7 @@ static void mc32_update_stats(struct net_device *dev)
  * 	the stack or, if the packet is near MTU sized, we allocate
  *	another buffer and flip the old one up the stack.
  * 
- *	We must succeed in keeping a buffer on the ring. If neccessary we
+ *	We must succeed in keeping a buffer on the ring. If necessary we
  *	will toss a received packet rather than lose a ring entry. Once
  *	the first uncompleted descriptor is found, we move the
  *	End-Of-List bit to include the buffers just processed.

@@ -3947,7 +3947,7 @@ out:
  *
  *	But how to keep track of these kernel buffers?  We'd need to either
  *	keep track of them in some table _or_ know about usbdevicefs internals
- *	(ie. the exact layout of it's file private, which is actually defined
+ *	(ie. the exact layout of its file private, which is actually defined
  *	in linux/usbdevice_fs.h, the layout of the async queues are private to
  *	devio.c)
  *

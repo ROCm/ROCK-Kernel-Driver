@@ -301,7 +301,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	llc->daddr.lsap = addr->sllc_dsap;
 	memcpy(llc->daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));
-	/* assign new connection to it's SAP */
+	/* assign new connection to its SAP */
 	llc_sap_assign_sock(sap, sk);
 	rc = sk->zapped = 0;
 out:

@@ -6,6 +6,7 @@ menu "ACPI Support"
 
 config ACPI
 	bool "ACPI Support" if X86
+	depends on !X86_VISWS
 	default y if IA64 && (!IA64_HP_SIM || IA64_SGI_SN)
 	---help---
 	  Advanced Configuration and Power Interface (ACPI) support for 

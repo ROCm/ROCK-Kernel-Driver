@@ -1717,7 +1717,7 @@ static void proc_pcm_format_add(snd_usb_stream_t *stream)
 
 
 /*
- * intialize the substream instance.
+ * initialize the substream instance.
  */
 
 static void init_substream(snd_usb_stream_t *as, int stream, struct audioformat *fp)

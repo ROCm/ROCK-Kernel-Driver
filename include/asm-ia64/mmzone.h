@@ -44,7 +44,7 @@
  * Note that IO addresses are NOT considered valid addresses.
  *
  * Note, many platforms can simply check if kaddr exceeds a specific size.  
- *	(However, this wont work on SGI platforms since IO space is embedded 
+ *	(However, this won't work on SGI platforms since IO space is embedded 
  * 	within the range of valid memory addresses & nodes have holes in the 
  *	address range between banks). 
  */

@@ -129,7 +129,7 @@ static int tt_setfreq(struct tt_device *dev, unsigned long freq1)
 	long rest;
      
 	unsigned char buffer[25];		/* we have to bit shift 25 registers */
-	freq = freq1/160;			/* convert the freq. to a nice to handel value */
+	freq = freq1/160;			/* convert the freq. to a nice to handle value */
 	for(i=24;i>-1;i--)
 		buffer[i]=0;
 

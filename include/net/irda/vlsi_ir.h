@@ -382,7 +382,7 @@ enum vlsi_pio_irenable {
  *		PLSWID = (pulsetime * freq / (BAUD+1)) - 1
  *			where pulsetime is the requested IrPHY pulse width
  *			and freq is 8(16)MHz for 40(48)MHz primary input clock
- *		PREAMB: dont care for SIR
+ *		PREAMB: don't care for SIR
  *
  *		The nominal SIR pulse width is 3/16 bit time so we have PLSWID=12
  *		fixed for all SIR speeds at 40MHz input clock (PLSWID=24 at 48MHz).
@@ -401,7 +401,7 @@ enum vlsi_pio_irenable {
  *		PREAMB = 1
  *
  * FIR-mode:	BAUD = 0
- *		PLSWID: dont care
+ *		PLSWID: don't care
  *		PREAMB = 15
  */
 

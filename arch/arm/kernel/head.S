@@ -37,7 +37,7 @@
 	.globl	swapper_pg_dir
 	.equ	swapper_pg_dir, TEXTADDR - 0x4000
 
-	.macro	pgtbl, reg, rambase
+	.macro	pgtbl, reg
 	adr	\reg, stext
 	sub	\reg, \reg, #0x4000
 	.endm
@@ -47,7 +47,7 @@
  * can convert the page table base address to the base address of the section
  * containing both.
  */
-	.macro	krnladr, rd, pgtable, rambase
+	.macro	krnladr, rd, pgtable
 	bic	\rd, \pgtable, #0x000ff000
 	.endm
 
@@ -164,7 +164,7 @@ __mmap_switched:
  * r8 = page table flags
  */
 __create_page_tables:
-	pgtbl	r4, r5				@ page table address
+	pgtbl	r4				@ page table address
 
 	/*
 	 * Clear the 16K level 1 swapper page table
@@ -184,7 +184,7 @@ __create_page_tables:
 	 * cater for the MMU enable.  This identity mapping
 	 * will be removed by paging_init()
 	 */
-	krnladr	r2, r4, r5			@ start of kernel
+	krnladr	r2, r4				@ start of kernel
 	add	r3, r8, r2			@ flags + kernel base
 	str	r3, [r4, r2, lsr #18]		@ identity mapping
 

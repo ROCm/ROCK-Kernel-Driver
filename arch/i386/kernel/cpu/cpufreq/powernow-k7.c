@@ -1,5 +1,5 @@
 /*
- *  $Id: powernow-k7.c,v 1.31 2003/02/12 21:16:35 davej Exp $
+ *  $Id: powernow-k7.c,v 1.34 2003/02/22 10:23:46 db Exp $
  *
  *  (C) 2003 Dave Jones <davej@suse.de>
  *
@@ -71,8 +71,6 @@ static int fid_codes[32] = {
     30, 190, 40, 200, 130, 135, 140, 210,
     150, 225, 160, 165, 170, 180, -1, -1,
 };
-
-static struct cpufreq_driver powernow_driver;
 
 static struct cpufreq_frequency_table *powernow_table;
 
@@ -369,12 +367,17 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = latency;
-#ifdef CONFIG_CPU_FREQ_24_API
-	powernow_driver.cpu_cur_freq[policy->cpu] = maximum_speed;
-#endif
+	policy->cur = maximum_speed;
 
 	return cpufreq_frequency_table_cpuinfo(policy, powernow_table);
 }
+
+static struct cpufreq_driver powernow_driver = {
+	.verify 	= powernow_verify,
+	.target 	= powernow_target,
+	.init		= powernow_cpu_init,
+	.name		= "powernow-k7",
+};
 
 static int __init powernow_init (void)
 {
@@ -390,14 +393,6 @@ static void __exit powernow_exit (void)
 	if (powernow_table)
 		kfree(powernow_table);
 }
-
-static struct cpufreq_driver powernow_driver = {
-	.verify 	= powernow_verify,
-	.target 	= powernow_target,
-	.init		= powernow_cpu_init,
-	.name		= "powernow-k7",
-};
-
 
 MODULE_AUTHOR ("Dave Jones <davej@suse.de>");
 MODULE_DESCRIPTION ("Powernow driver for AMD K7 processors.");

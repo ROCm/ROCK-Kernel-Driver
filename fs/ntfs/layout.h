@@ -152,7 +152,7 @@ typedef enum {
  * been written to disk. The values 0 and -1 (ie. 0xffff) are not used. All
  * last u16's of each sector have to be equal to the usn (during reading) or
  * are set to it (during writing). If they are not, an incomplete multi sector
- * transfer has occured when the data was written.
+ * transfer has occurred when the data was written.
  * The maximum size for the update sequence array is fixed to:
  * 	maximum size = usa_ofs + (usa_count * 2) = 510 bytes
  * The 510 bytes comes from the fact that the last u16 in the array has to

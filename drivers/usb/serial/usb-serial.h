@@ -342,7 +342,7 @@ static inline struct usb_serial* get_usb_serial (struct usb_serial_port *port, c
 	if (!port || 
 		port_paranoia_check (port, function) ||
 		serial_paranoia_check (port->serial, function)) {
-		/* then say that we dont have a valid usb_serial thing, which will
+		/* then say that we don't have a valid usb_serial thing, which will
 		 * end up genrating -ENODEV return values */ 
 		return NULL;
 	}

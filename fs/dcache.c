@@ -1004,8 +1004,11 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 		 */ 
 		if (unlikely(move_count != dentry->d_move_count)) 
 			break;
-		if (!d_unhashed(dentry))
-			found = dget(dentry);
+		if (!d_unhashed(dentry)) {
+			atomic_inc(&dentry->d_count);
+			dentry->d_vfs_flags |= DCACHE_REFERENCED;
+			found = dentry;
+		}
 		spin_unlock(&dentry->d_lock);
 		break;
  	}
@@ -1053,7 +1056,7 @@ int d_validate(struct dentry *dentry, struct dentry *dparent)
 		 * as it is parsed under dcache_lock
 		 */
 		if (dentry == list_entry(lhp, struct dentry, d_hash)) {
-			dget(dentry);
+			__dget_locked(dentry);
 			spin_unlock(&dcache_lock);
 			return 1;
 		}

@@ -339,6 +339,12 @@ acpi_get_event_status (
  * Resource interfaces
  */
 
+typedef
+acpi_status (*ACPI_WALK_RESOURCE_CALLBACK) (
+	struct acpi_resource            *resource,
+	void                            *context);
+
+
 acpi_status
 acpi_get_current_resources(
 	acpi_handle                     device_handle,
@@ -350,6 +356,13 @@ acpi_get_possible_resources(
 	struct acpi_buffer              *ret_buffer);
 
 acpi_status
+acpi_walk_resources (
+	acpi_handle                             device_handle,
+	char                                    *path,
+	ACPI_WALK_RESOURCE_CALLBACK     user_function,
+	void                                    *context);
+
+acpi_status
 acpi_set_current_resources (
 	acpi_handle                     device_handle,
 	struct acpi_buffer              *in_buffer);
@@ -359,6 +372,10 @@ acpi_get_irq_routing_table (
 	acpi_handle                     bus_device_handle,
 	struct acpi_buffer              *ret_buffer);
 
+acpi_status
+acpi_resource_to_address64 (
+	struct acpi_resource            *resource,
+	struct acpi_resource_address64 *out);
 
 /*
  * Hardware (ACPI device) interfaces
@@ -397,6 +414,10 @@ acpi_enter_sleep_state_prep (
 acpi_status
 acpi_enter_sleep_state (
 	u8                              sleep_state);
+
+acpi_status
+acpi_enter_sleep_state_s4bios (
+	void);
 
 acpi_status
 acpi_leave_sleep_state (

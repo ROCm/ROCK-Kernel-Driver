@@ -227,7 +227,7 @@ snd_wavefront_fx_ioctl (snd_hwdep_t *sdev, struct file *file,
    This code was developed using DOSEMU. The Turtle Beach SETUPSND
    utility was run with I/O tracing in DOSEMU enabled, and a reconstruction
    of the port I/O done, using the Yamaha faxback document as a guide
-   to add more logic to the code. Its really pretty wierd.
+   to add more logic to the code. Its really pretty weird.
 
    There was an alternative approach of just dumping the whole I/O
    sequence as a series of port/value pairs and a simple loop
@@ -692,7 +692,7 @@ snd_wavefront_fx_start (snd_wavefront_t *dev)
 	return (0);
 }
 
-/* wierd stuff, derived from port I/O tracing with dosemu */
+/* weird stuff, derived from port I/O tracing with dosemu */
 
 static unsigned char page_zero[] __initdata = {
 0x01, 0x7c, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf5, 0x00,

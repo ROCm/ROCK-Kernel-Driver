@@ -1630,7 +1630,7 @@ u32 TLan_HandleDummy( struct net_device *dev, u16 host_int )
 	 *		host_int	The contents of the HOST_INT
 	 *				port.
 	 *
-	 *	This driver is structured to determine EOC occurances by
+	 *	This driver is structured to determine EOC occurrences by
 	 *	reading the CSTAT member of the list structure.  Tx EOC
 	 *	interrupts are disabled via the DIO INTDIS register.
 	 *	However, TLAN chips before revision 3.0 didn't have this
@@ -1753,7 +1753,7 @@ u32 TLan_HandleStatusCheck( struct net_device *dev, u16 host_int )
 	 *		host_int	The contents of the HOST_INT
 	 *				port.
 	 *
-	 *	This driver is structured to determine EOC occurances by
+	 *	This driver is structured to determine EOC occurrences by
 	 *	reading the CSTAT member of the list structure.  Rx EOC
 	 *	interrupts are disabled via the DIO INTDIS register.
 	 *	However, TLAN chips before revision 3.0 didn't have this
@@ -2399,7 +2399,7 @@ void TLan_SetMac( struct net_device *dev, int areg, char *mac )
 	 *		dev	A pointer to the device structure of the
 	 *			TLAN device having the PHYs to be detailed.
 	 *				
-	 *	This function prints the registers a PHY (aka tranceiver).
+	 *	This function prints the registers a PHY (aka transceiver).
 	 *
 	 ********************************************************************/
 
@@ -2515,7 +2515,7 @@ void TLan_PhyPowerDown( struct net_device *dev )
 
 	/* Wait for 50 ms and powerup
 	 * This is abitrary.  It is intended to make sure the
-	 * tranceiver settles.
+	 * transceiver settles.
 	 */
 	TLan_SetTimer( dev, (HZ/20), TLAN_TIMER_PHY_PUP );
 
@@ -2535,7 +2535,7 @@ void TLan_PhyPowerUp( struct net_device *dev )
 	TLan_MiiWriteReg( dev, priv->phy[priv->phyNum], MII_GEN_CTL, value );
 	TLan_MiiSync(dev->base_addr);
 	/* Wait for 500 ms and reset the
-	 * tranceiver.  The TLAN docs say both 50 ms and
+	 * transceiver.  The TLAN docs say both 50 ms and
 	 * 500 ms, so do the longer, just in case.
 	 */
 	TLan_SetTimer( dev, (HZ/20), TLAN_TIMER_PHY_RESET );
@@ -2650,7 +2650,7 @@ void TLan_PhyStartLink( struct net_device *dev )
         	TLan_MiiWriteReg( dev, phy, TLAN_TLPHY_CTL, tctl );
 	}
 
-	/* Wait for 2 sec to give the tranceiver time
+	/* Wait for 2 sec to give the transceiver time
 	 * to establish link.
 	 */
 	TLan_SetTimer( dev, (4*HZ), TLAN_TIMER_FINISH_RESET );

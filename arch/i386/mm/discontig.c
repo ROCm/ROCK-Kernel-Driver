@@ -48,6 +48,14 @@ extern unsigned long max_low_pfn;
 extern unsigned long totalram_pages;
 extern unsigned long totalhigh_pages;
 
+#define LARGE_PAGE_BYTES (PTRS_PER_PTE * PAGE_SIZE)
+
+unsigned long node_remap_start_pfn[MAX_NUMNODES];
+unsigned long node_remap_size[MAX_NUMNODES];
+unsigned long node_remap_offset[MAX_NUMNODES];
+void *node_remap_start_vaddr[MAX_NUMNODES];
+void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
+
 /*
  * Find the highest page frame number we have available for the node
  */
@@ -65,12 +73,13 @@ static void __init find_max_pfn_node(int nid)
  */
 static void __init allocate_pgdat(int nid)
 {
-	unsigned long node_datasz;
-
-	node_datasz = PFN_UP(sizeof(struct pglist_data));
-	NODE_DATA(nid) = (pg_data_t *)(__va(min_low_pfn << PAGE_SHIFT));
-	min_low_pfn += node_datasz;
-	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+	if (nid)
+		NODE_DATA(nid) = (pg_data_t *)node_remap_start_vaddr[nid];
+	else {
+		NODE_DATA(nid) = (pg_data_t *)(__va(min_low_pfn << PAGE_SHIFT));
+		min_low_pfn += PFN_UP(sizeof(pg_data_t));
+		memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
+	}
 }
 
 /*
@@ -113,14 +122,6 @@ static void __init register_bootmem_low_pages(unsigned long system_max_low_pfn)
 	}
 }
 
-#define LARGE_PAGE_BYTES (PTRS_PER_PTE * PAGE_SIZE)
-
-unsigned long node_remap_start_pfn[MAX_NUMNODES];
-unsigned long node_remap_size[MAX_NUMNODES];
-unsigned long node_remap_offset[MAX_NUMNODES];
-void *node_remap_start_vaddr[MAX_NUMNODES];
-extern void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
-
 void __init remap_numa_kva(void)
 {
 	void *vaddr;
@@ -145,7 +146,7 @@ static unsigned long calculate_numa_remap_pages(void)
 	for (nid = 1; nid < numnodes; nid++) {
 		/* calculate the size of the mem_map needed in bytes */
 		size = (node_end_pfn[nid] - node_start_pfn[nid] + 1) 
-			* sizeof(struct page);
+			* sizeof(struct page) + sizeof(pg_data_t);
 		/* convert size to large (pmd size) pages, rounding up */
 		size = (size + LARGE_PAGE_BYTES - 1) / LARGE_PAGE_BYTES;
 		/* now the roundup is correct, convert to PAGE_SIZE pages */
@@ -195,9 +196,9 @@ unsigned long __init setup_memory(void)
 	printk("Low memory ends at vaddr %08lx\n",
 			(ulong) pfn_to_kaddr(max_low_pfn));
 	for (nid = 0; nid < numnodes; nid++) {
-		allocate_pgdat(nid);
 		node_remap_start_vaddr[nid] = pfn_to_kaddr(
 			highstart_pfn - node_remap_offset[nid]);
+		allocate_pgdat(nid);
 		printk ("node %d will remap to vaddr %08lx - %08lx\n", nid,
 			(ulong) node_remap_start_vaddr[nid],
 			(ulong) pfn_to_kaddr(highstart_pfn
@@ -251,13 +252,6 @@ unsigned long __init setup_memory(void)
 	 */
 	find_smp_config();
 
-	/*insert other nodes into pgdat_list*/
-	for (nid = 1; nid < numnodes; nid++){       
-		NODE_DATA(nid)->pgdat_next = pgdat_list;
-		pgdat_list = NODE_DATA(nid);
-	}
-       
-
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (LOADER_TYPE && INITRD_START) {
 		if (INITRD_START + INITRD_SIZE <= (system_max_low_pfn << PAGE_SHIFT)) {
@@ -282,8 +276,21 @@ void __init zone_sizes_init(void)
 {
 	int nid;
 
+	/*
+	 * Insert nodes into pgdat_list backward so they appear in order.
+	 * Clobber node 0's links and NULL out pgdat_list before starting.
+	 */
+	pgdat_list = NULL;
+	for (nid = numnodes - 1; nid >= 0; nid--) {       
+		if (nid)
+			memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
+		NODE_DATA(nid)->pgdat_next = pgdat_list;
+		pgdat_list = NODE_DATA(nid);
+	}
+
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+		unsigned long *zholes_size;
 		unsigned int max_dma;
 
 		unsigned long low = max_low_pfn;
@@ -307,18 +314,24 @@ void __init zone_sizes_init(void)
 #endif
 			}
 		}
+		zholes_size = get_zholes_size(nid);
 		/*
 		 * We let the lmem_map for node 0 be allocated from the
 		 * normal bootmem allocator, but other nodes come from the
 		 * remapped KVA area - mbligh
 		 */
-		if (nid)
-			free_area_init_node(nid, NODE_DATA(nid), 
-				node_remap_start_vaddr[nid], zones_size, 
-				start, 0);
-		else
+		if (!nid)
 			free_area_init_node(nid, NODE_DATA(nid), 0, 
-				zones_size, start, 0);
+				zones_size, start, zholes_size);
+		else {
+			unsigned long lmem_map;
+			lmem_map = (unsigned long)node_remap_start_vaddr[nid];
+			lmem_map += sizeof(pg_data_t) + PAGE_SIZE - 1;
+			lmem_map &= PAGE_MASK;
+			free_area_init_node(nid, NODE_DATA(nid), 
+				(struct page *)lmem_map, zones_size, 
+				start, zholes_size);
+		}
 	}
 	return;
 }

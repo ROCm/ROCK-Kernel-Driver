@@ -86,7 +86,7 @@ void attach_inform(struct i2c_bus *bus, int id)
 		if (ztv->tuner_type >= 0)
 		{
 			if (i2c_control_device(&ztv->i2c,I2C_DRIVERID_TUNER,TUNER_SET_TYPE,&ztv->tuner_type)<0)
-			DEBUG(printk(CARD_INFO "attach_inform; tuner wont be set to type %d\n",CARD,ztv->tuner_type));
+			DEBUG(printk(CARD_INFO "attach_inform; tuner won't be set to type %d\n",CARD,ztv->tuner_type));
 		}
 		break;
 	 default:

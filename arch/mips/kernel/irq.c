@@ -44,7 +44,7 @@ static void ack_none(unsigned int irq)
 {
 	/*
 	 * 'what should we do if we get a hw irq event on an illegal vector'.
-	 * each architecture has to answer this themselves, it doesnt deserve
+	 * each architecture has to answer this themselves, it doesn't deserve
 	 * a generic callback i think.
 	 */
 	printk("unexpected interrupt %d\n", irq);

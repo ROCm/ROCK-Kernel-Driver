@@ -572,7 +572,7 @@ static void mts_command_done( struct urb *transfer, struct pt_regs *regs )
 			MTS_DEBUG_GOT_HERE();
 			context->srb->result = DID_ABORT<<16;
                 } else {
-		        /* A genuine error has occured */
+		        /* A genuine error has occurred */
 			MTS_DEBUG_GOT_HERE();
 
 		        context->srb->result = DID_ERROR<<16;

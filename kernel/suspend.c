@@ -961,7 +961,7 @@ static int relocate_pagedir(void)
 	printk("Relocating pagedir");
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
-		printk("not neccessary\n");
+		printk("not necessary\n");
 		return 0;
 	}
 

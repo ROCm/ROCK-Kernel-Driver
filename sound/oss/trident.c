@@ -19,6 +19,7 @@
  *	Ching-Ling Lee <cling-li@ali.com.tw> ALi 5451 Audio Core Support 
  *	Matt Wu <mattwu@acersoftech.com.cn> ALi 5451 Audio Core Support
  *	Peter Wächtler <pwaechtler@loewe-komp.de> CyberPro5050 support
+ *      Muli Ben-Yehuda <mulix@mulix.org>
  *
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -81,7 +82,7 @@
  *  v0.14.9a
  *	Aug 6 2001 Alan Cox
  *	0.14.9 crashed on rmmod due to a timer/bh left running. Simplified
- *	the existing logic (the BH doesnt help as ac97 is lock_irqsave)
+ *	the existing logic (the BH doesn't help as ac97 is lock_irqsave)
  *	and used del_timer_sync to clean up
  *	Fixed a problem where the ALi change broke my generic card
  *  v0.14.9
@@ -201,6 +202,7 @@
 #include <linux/interrupt.h>
 #include <linux/pm.h>
 #include <linux/gameport.h>
+#include <linux/kernel.h> 
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 #include <asm/io.h>
@@ -538,8 +540,8 @@ static int trident_enable_loop_interrupts(struct trident_card * card)
 
 	outl(global_control, TRID_REG(card, T4D_LFO_GC_CIR));
 
-	TRDBG("trident: Enable Loop Interrupts, globctl = 0x%08X\n",
-	      inl(TRID_REG(card, T4D_LFO_GC_CIR)));
+	pr_debug("trident: Enable Loop Interrupts, globctl = 0x%08X\n",
+		 inl(TRID_REG(card, T4D_LFO_GC_CIR)));
 
 	return (TRUE);
 }
@@ -552,8 +554,8 @@ static int trident_disable_loop_interrupts(struct trident_card * card)
 	global_control &= ~(ENDLP_IE | MIDLP_IE);
 	outl(global_control, TRID_REG(card, T4D_LFO_GC_CIR));
 
-	TRDBG("trident: Disabled Loop Interrupts, globctl = 0x%08X\n",
-	      global_control);
+	pr_debug("trident: Disabled Loop Interrupts, globctl = 0x%08X\n",
+		 global_control);
 
 	return (TRUE);
 }
@@ -570,8 +572,8 @@ static void trident_enable_voice_irq(struct trident_card * card, unsigned int ch
 
 #ifdef DEBUG
 	reg = inl(TRID_REG(card, addr));
-	TRDBG("trident: enabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
-	      channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
+	pr_debug("trident: enabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
+		 channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
 #endif /* DEBUG */ 
 }
 
@@ -590,8 +592,8 @@ static void trident_disable_voice_irq(struct trident_card * card, unsigned int c
 
 #ifdef DEBUG
 	reg = inl(TRID_REG(card, addr));
-	TRDBG("trident: disabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
-	      channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
+	pr_debug("trident: disabled IRQ on channel %d, %s = 0x%08x(addr:%X)\n",
+		 channel, addr==T4D_AINTEN_B? "AINTEN_B":"AINTEN_A",reg,addr);
 #endif /* DEBUG */ 
 }
 
@@ -609,8 +611,8 @@ static void trident_start_voice(struct trident_card * card, unsigned int channel
 
 #ifdef DEBUG 
 	reg = inl(TRID_REG(card, addr));
-	TRDBG("trident: start voice on channel %d, %s = 0x%08x(addr:%X)\n",
-	      channel, addr==T4D_START_B? "START_B":"START_A",reg,addr);
+	pr_debug("trident: start voice on channel %d, %s = 0x%08x(addr:%X)\n",
+		 channel, addr==T4D_START_B? "START_B":"START_A",reg,addr);
 #endif /* DEBUG */ 
 }
 
@@ -628,8 +630,8 @@ static void trident_stop_voice(struct trident_card * card, unsigned int channel)
 
 #ifdef DEBUG
 	reg = inl(TRID_REG(card, addr));
-	TRDBG("trident: stop voice on channel %d, %s = 0x%08x(addr:%X)\n",
-	      channel, addr==T4D_STOP_B? "STOP_B":"STOP_A",reg,addr);
+	pr_debug("trident: stop voice on channel %d, %s = 0x%08x(addr:%X)\n",
+		 channel, addr==T4D_STOP_B? "STOP_B":"STOP_A",reg,addr);
 #endif /* DEBUG */ 
 }
 
@@ -647,8 +649,8 @@ static int trident_check_channel_interrupt(struct trident_card * card, unsigned 
 
 #ifdef DEBUG
 	if (reg & mask)
-		TRDBG("trident: channel %d has interrupt, %s = 0x%08x\n",
-		      channel,reg==T4D_AINT_B? "AINT_B":"AINT_A", reg);
+		pr_debug("trident: channel %d has interrupt, %s = 0x%08x\n",
+			 channel,reg==T4D_AINT_B? "AINT_B":"AINT_A", reg);
 #endif /* DEBUG */ 
 	return (reg & mask) ? TRUE : FALSE;
 }
@@ -665,8 +667,8 @@ static void trident_ack_channel_interrupt(struct trident_card * card, unsigned i
 
 #ifdef DEBUG
 	reg = inl(TRID_REG(card, T4D_AINT_B));
-	TRDBG("trident: Ack channel %d interrupt, AINT_B = 0x%08x\n",
-	      channel, reg);
+	pr_debug("trident: Ack channel %d interrupt, AINT_B = 0x%08x\n",
+		 channel, reg);
 #endif /* DEBUG */ 
 }
 
@@ -914,7 +916,7 @@ static unsigned int trident_set_dac_rate(struct trident_state * state, unsigned 
 
 	trident_write_voice_regs(state);
 
-	TRDBG("trident: called trident_set_dac_rate : rate = %d\n", rate);
+	pr_debug("trident: called trident_set_dac_rate : rate = %d\n", rate);
 
 	return rate;
 }
@@ -934,7 +936,7 @@ static unsigned int trident_set_adc_rate(struct trident_state * state, unsigned 
 
 	trident_write_voice_regs(state);
 
-	TRDBG("trident: called trident_set_adc_rate : rate = %d\n", rate);
+	pr_debug("trident: called trident_set_adc_rate : rate = %d\n", rate);
 
 	return rate;
 }
@@ -978,9 +980,9 @@ static void trident_play_setup(struct trident_state *state)
 		/* stereo */
 		channel->control |= CHANNEL_STEREO;
 
-	TRDBG("trident: trident_play_setup, LBA = 0x%08x, "
-	      "Delta = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
-	      channel->lba, channel->delta, channel->eso, channel->control);
+	pr_debug("trident: trident_play_setup, LBA = 0x%08x, "
+		 "Delta = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
+		 channel->lba, channel->delta, channel->eso, channel->control);
 
 	trident_write_voice_regs(state);
 }
@@ -1064,9 +1066,9 @@ static void trident_rec_setup(struct trident_state *state)
 		/* stereo */
 		channel->control |= CHANNEL_STEREO;
 	
-	TRDBG("trident: trident_rec_setup, LBA = 0x%08x, "
-	      "Delat = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
-	      channel->lba, channel->delta, channel->eso, channel->control);
+	pr_debug("trident: trident_rec_setup, LBA = 0x%08x, "
+		 "Delta = 0x%08x, ESO = 0x%08x, Control = 0x%08x\n",
+		 channel->lba, channel->delta, channel->eso, channel->control);
 
 	trident_write_voice_regs(state);
 }
@@ -1101,8 +1103,8 @@ static inline unsigned trident_get_dma_addr(struct trident_state *state)
 	}
 
 	
-	TRDBG("trident: trident_get_dma_addr: chip reported channel: %d, "
-	      "cso = 0x%04x\n", dmabuf->channel->num, cso);
+	pr_debug("trident: trident_get_dma_addr: chip reported channel: %d, "
+		 "cso = 0x%04x\n", dmabuf->channel->num, cso);
 
 	/* ESO and CSO are in units of Samples, convert to byte offset */
 	cso <<= sample_shift[dmabuf->fmt];
@@ -1211,8 +1213,8 @@ static int alloc_dmabuf(struct dmabuf* dmabuf, struct pci_dev* pci_dev, int orde
 					    &dmabuf->dma_handle)))
 		return -ENOMEM;
 
-	TRDBG("trident: allocated %ld (order = %d) bytes at %p\n",
-	      PAGE_SIZE << order, order, rawbuf);
+	pr_debug("trident: allocated %ld (order = %d) bytes at %p\n",
+		 PAGE_SIZE << order, order, rawbuf);
 
 	dmabuf->ready  = dmabuf->mapped = 0;
 	dmabuf->rawbuf = rawbuf;
@@ -1349,10 +1351,11 @@ static int prog_dmabuf(struct trident_state *state, unsigned rec)
 		/* set the ready flag for the dma buffer */
 		dmabuf->ready = 1;
 
-		TRDBG("trident: prog_dmabuf(%d), sample rate = %d, format = %d, numfrag = %d, "
-		      "fragsize = %d dmasize = %d\n",
-		      dmabuf->channel->num, dmabuf->rate, dmabuf->fmt, dmabuf->numfrag,
-		      dmabuf->fragsize, dmabuf->dmasize);
+		pr_debug("trident: prog_dmabuf(%d), sample rate = %d, "
+			 "format = %d, numfrag = %d, fragsize = %d "
+			 "dmasize = %d\n", dmabuf->channel->num, dmabuf->rate, 
+			 dmabuf->fmt, dmabuf->numfrag, dmabuf->fragsize, 
+			 dmabuf->dmasize);
 	}
 	unlock_set_fmt(state);
 	return 0;
@@ -1704,7 +1707,7 @@ static void cyber_address_interrupt(struct trident_card *card)
 	/* FIXED: read interrupt status only once */
 	irq_status=inl(TRID_REG(card, T4D_AINT_A) );
 
-	TRDBG("cyber_address_interrupt: irq_status 0x%X\n",irq_status);
+	pr_debug("cyber_address_interrupt: irq_status 0x%X\n",irq_status);
 
 	for (i = 0; i < NR_HW_CH; i++) {
 		channel = 31 - i; 
@@ -1712,7 +1715,7 @@ static void cyber_address_interrupt(struct trident_card *card)
 			/* clear bit by writing a 1, zeroes are ignored */ 		
 			outl( (1 << channel), TRID_REG(card, T4D_AINT_A));
 		
-			TRDBG("cyber_interrupt: channel %d\n", channel);
+			pr_debug("cyber_interrupt: channel %d\n", channel);
 
 			if ((state = card->states[i]) != NULL) {
 				trident_update_ptr(state);
@@ -1735,7 +1738,7 @@ static void trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock(&card->lock);
 	event = inl(TRID_REG(card, T4D_MISCINT));
 
-	TRDBG("trident: trident_interrupt called, MISCINT = 0x%08x\n", event);
+	pr_debug("trident: trident_interrupt called, MISCINT = 0x%08x\n", event);
 
 	if (event & ADDRESS_IRQ) {
 		card->address_interrupt(card);
@@ -1773,7 +1776,7 @@ static ssize_t trident_read(struct file *file, char *buffer, size_t count, loff_
 	unsigned swptr;
 	int cnt;
 
-	TRDBG("trident: trident_read called, count = %d\n", count);
+	pr_debug("trident: trident_read called, count = %d\n", count);
 
 	VALIDATE_STATE(state);
 	if (ppos != &file->f_pos)
@@ -1827,7 +1830,7 @@ static ssize_t trident_read(struct file *file, char *buffer, size_t count, loff_
 			   which results in a (potential) buffer overrun. And worse, there is
 			   NOTHING we can do to prevent it. */
 			if (!interruptible_sleep_on_timeout(&dmabuf->wait, tmo)) {
-				TRDBG(KERN_ERR "trident: recording schedule timeout, "
+				pr_debug(KERN_ERR "trident: recording schedule timeout, "
 				      "dmasz %u fragsz %u count %i hwptr %u swptr %u\n",
 				      dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
 				      dmabuf->hwptr, dmabuf->swptr);
@@ -1885,7 +1888,7 @@ static ssize_t trident_write(struct file *file, const char *buffer, size_t count
 	unsigned int state_cnt;
 	unsigned int copy_count;
 
-	TRDBG("trident: trident_write called, count = %d\n", count);
+	pr_debug("trident: trident_write called, count = %d\n", count);
 
 	VALIDATE_STATE(state);
 	if (ppos != &file->f_pos)
@@ -1954,7 +1957,7 @@ static ssize_t trident_write(struct file *file, const char *buffer, size_t count
 			   which results in a (potential) buffer underrun. And worse, there is
 			   NOTHING we can do to prevent it. */
 			if (!interruptible_sleep_on_timeout(&dmabuf->wait, tmo)) {
-				TRDBG(KERN_ERR "trident: playback schedule timeout, "
+				pr_debug(KERN_ERR "trident: playback schedule timeout, "
 				      "dmasz %u fragsz %u count %i hwptr %u swptr %u\n",
 				      dmabuf->dmasize, dmabuf->fragsize, dmabuf->count,
 				      dmabuf->hwptr, dmabuf->swptr);
@@ -2137,7 +2140,7 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	VALIDATE_STATE(state);
 	mapped = ((file->f_mode & FMODE_WRITE) && dmabuf->mapped) ||
 		((file->f_mode & FMODE_READ) && dmabuf->mapped);
-	TRDBG("trident: trident_ioctl, command = %2d, arg = 0x%08x\n",
+	pr_debug("trident: trident_ioctl, command = %2d, arg = 0x%08x\n",
 	      _IOC_NR(cmd), arg ? *(int *)arg : 0);
 
 	switch (cmd) 
@@ -2702,7 +2705,7 @@ static int trident_open(struct inode *inode, struct file *file)
 	state->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	up(&card->open_sem);
 
-	TRDBG("trident: open virtual channel %d, hard channel %d\n", 
+	pr_debug("trident: open virtual channel %d, hard channel %d\n", 
               state->virt, dmabuf->channel->num);
 
 	return 0;
@@ -2724,7 +2727,7 @@ static int trident_release(struct inode *inode, struct file *file)
 		drain_dac(state, file->f_flags & O_NONBLOCK);
 	}
 
-	TRDBG("trident: closing virtual channel %d, hard channel %d\n", 
+	pr_debug("trident: closing virtual channel %d, hard channel %d\n", 
 	      state->virt, dmabuf->channel->num);
 
 	/* stop DMA state machine and free DMA buffers/channels */
@@ -2923,7 +2926,7 @@ static int acquirecodecaccess(struct trident_card *card)
 	}
 	if(!block)
 	{
-		TRDBG("accesscodecsemaphore: try unlock\n");
+		pr_debug("accesscodecsemaphore: try unlock\n");
 		block = 1;
 		goto unlock;
 	}
@@ -3002,7 +3005,7 @@ static u16 ali_ac97_get(struct trident_card *card, int secondary, u8 reg)
 		if(ncount <=0)
 			break;
 		if(ncount--==1) {
-			TRDBG("ali_ac97_read :try clear busy flag\n");
+			pr_debug("ali_ac97_read :try clear busy flag\n");
 			aud_reg = inl(TRID_REG(card,  ALI_AC97_WRITE));
 			outl((aud_reg & 0xffff7fff), TRID_REG(card, ALI_AC97_WRITE));
 		}
@@ -3056,12 +3059,12 @@ static void ali_ac97_set(struct trident_card *card, int secondary, u8 reg, u16 v
         ncount = 10;
 	while(1) {
 		wcontrol = inw(TRID_REG(card, ALI_AC97_WRITE));
-		if(!wcontrol & 0x8000)
+		if(!(wcontrol & 0x8000))
 			break;
 		if(ncount <= 0)
 			break;
 		if(ncount-- == 1) {
-			TRDBG("ali_ac97_set :try clear busy flag!!\n");
+			pr_debug("ali_ac97_set :try clear busy flag!!\n");
 			outw(wcontrol & 0x7fff, TRID_REG(card, ALI_AC97_WRITE));
 		}
 		udelay(10);
@@ -3933,8 +3936,10 @@ static int ali_reset_5451(struct trident_card *card)
 		udelay(5000);
 	}
 
-	printk(KERN_ERR "ALi 5451 did not come out of reset.\n");
-	return 1;
+	/* This is non fatal if you have a non PM capable codec.. */
+	printk(KERN_ERR "ALi 5451 did not come out of reset "
+	       "- continuing anyway.\n");
+	return 0;
 }
 
 /* AC97 codec initialisation. */

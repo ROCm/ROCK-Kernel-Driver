@@ -76,18 +76,18 @@ void l440gx_set_vpp(struct map_info *map, int vpp)
 }
 
 struct map_info l440gx_map = {
-	name: "L440GX BIOS",
-	size: WINDOW_SIZE,
-	buswidth: BUSWIDTH,
-	read8: l440gx_read8,
-	read16: l440gx_read16,
-	read32: l440gx_read32,
-	copy_from: l440gx_copy_from,
-	write8: l440gx_write8,
-	write16: l440gx_write16,
-	write32: l440gx_write32,
-	copy_to: l440gx_copy_to,
-	set_vpp: l440gx_set_vpp
+	.name		= "L440GX BIOS",
+	.size		= WINDOW_SIZE,
+	.buswidth	= BUSWIDTH,
+	.read8		= l440gx_read8,
+	.read16		= l440gx_read16,
+	.read32		= l440gx_read32,
+	.copy_from	= l440gx_copy_from,
+	.write8		= l440gx_write8,
+	.write16	= l440gx_write16,
+	.write32	= l440gx_write32,
+	.copy_to	= l440gx_copy_to,
+	.set_vpp	= l440gx_set_vpp
 };
 
 static int __init init_l440gx(void)

@@ -1598,7 +1598,7 @@ if_send_crit_exit:
 }
 
 /*============================================================================
- * Setup so that a frame can be transmitted on the occurence of a transmit
+ * Setup so that a frame can be transmitted on the occurrence of a transmit
  * interrupt.
  *===========================================================================*/
 
@@ -3064,7 +3064,7 @@ dflt_1:
 
 		/* Bug Fix: Mar 14 2000
                  * The Protocol violation error conditions were  
-                 * not handeled previously */
+                 * not handled previously */
 
 		switch (mb->cmd.pktType & 0x7F){
 
@@ -3178,7 +3178,7 @@ dflt_2:
  *	   when clearing a call because protocol encapsulation is not 
  *	   supported.
  *	4. If an incoming call is received while a call request is 
- *	   pending (i.e. call collision has occured), the incoming call 
+ *	   pending (i.e. call collision has occurred), the incoming call 
  *	   shall be rejected and call request shall be retried.
  *====================================================================*/
 
@@ -4088,7 +4088,7 @@ static int handle_IPXWAN(unsigned char *sendpacket, char *devname, unsigned char
 
 		return 1;
 	} else {
-		/*If we get here its an IPX-data packet, so it'll get passed up the stack.
+		/*If we get here it's an IPX-data packet, so it'll get passed up the stack.
 		 */
 		/* switch the network numbers */
 		switch_net_numbers(sendpacket, network_number, 1);	

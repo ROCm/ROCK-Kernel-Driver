@@ -42,7 +42,7 @@ static unsigned long pxa_gettimeoffset (void)
 	elapsed = LATCH - ticks_to_match;
 
 	/* Now convert them to usec */
-	usec = (unsigned long)(elapsed*tick)/LATCH;
+	usec = (unsigned long)(elapsed * (tick_nsec / 1000))/LATCH;
 
 	return usec;
 }
@@ -51,6 +51,8 @@ static void pxa_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	long flags;
 	int next_match;
+
+	do_profile(regs);
 
 	/* Loop until we get ahead of the free running timer.
 	 * This ensures an exact clock tick count and time accuracy.

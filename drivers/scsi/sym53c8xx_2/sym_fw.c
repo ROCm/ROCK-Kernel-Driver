@@ -539,7 +539,7 @@ void sym_fw_bind_script (hcb_p np, u32 *start, int len)
 		case 0x8:
 			/*
 			 *  JUMP / CALL
-			 *  dont't relocate if relative :-)
+			 *  don't relocate if relative :-)
 			 */
 			if (opcode & 0x00800000)
 				relocs = 0;

@@ -119,7 +119,7 @@ void __init sun3_bootmem_alloc(unsigned long memory_start, unsigned long memory_
 {
 	unsigned long start_page;
 
-	/* align start/end to page boundries */
+	/* align start/end to page boundaries */
 	memory_start = ((memory_start + (PAGE_SIZE-1)) & PAGE_MASK);
 	memory_end = memory_end & PAGE_MASK;
 		

@@ -966,7 +966,7 @@ static void snd_ali_update_ptr(ali_t *codec,int channel)
 
 	pchregs = &(codec->chregs);
 
-	// check if interrupt occured for channel
+	// check if interrupt occurred for channel
 	old  = pchregs->data.aint;
 	mask = ((unsigned int) 1L) << (channel & 0x1f);
 

@@ -803,7 +803,7 @@ pcibr_slot_info_init(devfs_handle_t 	pcibr_vhdl,
 	 * 'min_gnt' and attempt to calculate a latency time. 
 	 *
 	 * NOTE: For now if the device is on the 'real time' arbitration
-	 * ring we dont set the latency timer.  
+	 * ring we don't set the latency timer.  
 	 *
 	 * WAR: SGI's IOC3 and RAD devices target abort if you write a 
 	 * single byte into their config space.  So don't set the Latency
@@ -852,7 +852,7 @@ pcibr_slot_info_init(devfs_handle_t 	pcibr_vhdl,
 	}
 
 	/* Get the PCI-X capability if running in PCI-X mode.  If the func
-	 * doesnt have a pcix capability, allocate a PCIIO_VENDOR_ID_NONE
+	 * doesn't have a pcix capability, allocate a PCIIO_VENDOR_ID_NONE
 	 * pcibr_info struct so the device driver for that function is not
 	 * called.
 	 */
@@ -1449,7 +1449,7 @@ pcibr_slot_addr_space_init(devfs_handle_t pcibr_vhdl,
 	/*
 	 * The Adaptec 1160 FC Controller WAR #767995:
 	 * The part incorrectly ignores the upper 32 bits of a 64 bit
-	 * address when decoding references to it's registers so to
+	 * address when decoding references to its registers so to
 	 * keep it from responding to a bus cycle that it shouldn't
 	 * we only use I/O space to get at it's registers.  Don't
 	 * enable memory space accesses on that PCI device.
