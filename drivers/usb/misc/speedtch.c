@@ -299,6 +299,19 @@ static struct usb_driver udsl_usb_driver = {
 };
 
 
+/***********
+**  misc  **
+***********/
+
+static inline void udsl_pop (struct atm_vcc *vcc, struct sk_buff *skb)
+{
+	if (vcc->pop)
+		vcc->pop (vcc, skb);
+	else
+		dev_kfree_skb (skb);
+}
+
+
 /*************
 **  decode  **
 *************/
@@ -720,10 +733,7 @@ made_progress:
 	if (!UDSL_SKB (skb)->num_cells) {
 		struct atm_vcc *vcc = UDSL_SKB (skb)->atm_data.vcc;
 
-		if (vcc->pop)
-			vcc->pop (vcc, skb);
-		else
-			dev_kfree_skb (skb);
+		udsl_pop (vcc, skb);
 		instance->current_skb = NULL;
 
 		atomic_inc (&vcc->stats->tx);
@@ -742,10 +752,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 		if (UDSL_SKB (skb)->atm_data.vcc == vcc) {
 			dbg ("udsl_cancel_send: popping skb 0x%p", skb);
 			__skb_unlink (skb, &instance->sndqueue);
-			if (vcc->pop)
-				vcc->pop (vcc, skb);
-			else
-				dev_kfree_skb (skb);
+			udsl_pop (vcc, skb);
 		}
 	spin_unlock_irq (&instance->sndqueue.lock);
 
@@ -753,10 +760,7 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 	if ((skb = instance->current_skb) && (UDSL_SKB (skb)->atm_data.vcc == vcc)) {
 		dbg ("udsl_cancel_send: popping current skb (0x%p)", skb);
 		instance->current_skb = NULL;
-		if (vcc->pop)
-			vcc->pop (vcc, skb);
-		else
-			dev_kfree_skb (skb);
+		udsl_pop (vcc, skb);
 	}
 	tasklet_enable (&instance->send_tasklet);
 	dbg ("udsl_cancel_send done");
@@ -765,22 +769,26 @@ static void udsl_cancel_send (struct udsl_instance_data *instance, struct atm_vc
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
+	int err;
 
 	vdbg ("udsl_atm_send called (skb 0x%p, len %u)", skb, skb->len);
 
 	if (!instance || !instance->usb_dev) {
 		dbg ("udsl_atm_send: NULL data!");
-		return -ENODEV;
+		err = -ENODEV;
+		goto fail;
 	}
 
 	if (vcc->qos.aal != ATM_AAL5) {
 		dbg ("udsl_atm_send: unsupported ATM type %d!", vcc->qos.aal);
-		return -EINVAL;
+		err = -EINVAL;
+		goto fail;
 	}
 
 	if (skb->len > ATM_MAX_AAL5_PDU) {
 		dbg ("udsl_atm_send: packet too long (%d vs %d)!", skb->len, ATM_MAX_AAL5_PDU);
-		return -EINVAL;
+		err = -EINVAL;
+		goto fail;
 	}
 
 	PACKETDEBUG (skb->data, skb->len);
@@ -790,6 +798,10 @@ static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb)
 	tasklet_schedule (&instance->send_tasklet);
 
 	return 0;
+
+fail:
+	udsl_pop (vcc, skb);
+	return err;
 }
 
 
