@@ -71,12 +71,12 @@
 #define PG_nosave		14	/* Used for system suspend/resume */
 #define PG_maplock		15	/* Lock bit for rmap to ptes */
 
-#define PG_direct		16	/* ->pte_chain points directly at pte */
+#define PG_swapcache		16	/* Swap page: swp_entry_t in private */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
 #define PG_reclaim		18	/* To be reclaimed asap */
 #define PG_compound		19	/* Part of a compound page */
-#define PG_anon			20	/* Anonymous page: anon_vma in mapping*/
-#define PG_swapcache		21	/* Swap page: swp_entry_t in private */
+
+#define PG_anon			20	/* Anonymous page: anonmm in mapping */
 
 
 /*
@@ -280,12 +280,6 @@ extern void get_full_page_state(struct page_state *ret);
 #define TestSetPageNosave(page)	test_and_set_bit(PG_nosave, &(page)->flags)
 #define ClearPageNosave(page)		clear_bit(PG_nosave, &(page)->flags)
 #define TestClearPageNosave(page)	test_and_clear_bit(PG_nosave, &(page)->flags)
-
-#define PageDirect(page)	test_bit(PG_direct, &(page)->flags)
-#define SetPageDirect(page)	set_bit(PG_direct, &(page)->flags)
-#define TestSetPageDirect(page)	test_and_set_bit(PG_direct, &(page)->flags)
-#define ClearPageDirect(page)		clear_bit(PG_direct, &(page)->flags)
-#define TestClearPageDirect(page)	test_and_clear_bit(PG_direct, &(page)->flags)
 
 #define PageMappedToDisk(page)	test_bit(PG_mappedtodisk, &(page)->flags)
 #define SetPageMappedToDisk(page) set_bit(PG_mappedtodisk, &(page)->flags)

@@ -36,7 +36,7 @@ static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 			if (!PageReserved(page)) {
 				if (pte_dirty(pte))
 					set_page_dirty(page);
-				page_remove_rmap(page, ptep);
+				page_remove_rmap(page);
 				page_cache_release(page);
 				mm->rss--;
 			}

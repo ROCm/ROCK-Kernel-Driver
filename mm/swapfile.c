@@ -427,19 +427,19 @@ void free_swap_and_cache(swp_entry_t entry)
 /* vma->vm_mm->page_table_lock is held */
 static void
 unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	vma->vm_mm->rss++;
 	get_page(page);
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
-	*pte_chainp = page_add_rmap(page, dir, *pte_chainp);
+	page_add_anon_rmap(page, vma->vm_mm, address);
 	swap_free(entry);
 }
 
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 	unsigned long address, unsigned long size, unsigned long offset,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pte_t * pte;
 	unsigned long end;
@@ -464,8 +464,7 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		 * Test inline before going to call unuse_pte.
 		 */
 		if (unlikely(pte_same(*pte, swp_pte))) {
-			unuse_pte(vma, offset + address, pte,
-					entry, page, pte_chainp);
+			unuse_pte(vma, offset + address, pte, entry, page);
 			pte_unmap(pte);
 			return 1;
 		}
@@ -479,7 +478,7 @@ static int unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 	unsigned long address, unsigned long size,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	pmd_t * pmd;
 	unsigned long offset, end;
@@ -501,7 +500,7 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 		BUG();
 	do {
 		if (unuse_pmd(vma, pmd, address, end - address,
-				offset, entry, page, pte_chainp))
+				offset, entry, page))
 			return 1;
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
@@ -511,15 +510,14 @@ static int unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 
 /* vma->vm_mm->page_table_lock is held */
 static int unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
-	swp_entry_t entry, struct page *page, struct pte_chain **pte_chainp)
+	swp_entry_t entry, struct page *page)
 {
 	unsigned long start = vma->vm_start, end = vma->vm_end;
 
 	if (start >= end)
 		BUG();
 	do {
-		if (unuse_pgd(vma, pgdir, start, end - start,
-				entry, page, pte_chainp))
+		if (unuse_pgd(vma, pgdir, start, end - start, entry, page))
 			return 1;
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		pgdir++;
@@ -531,11 +529,6 @@ static int unuse_process(struct mm_struct * mm,
 			swp_entry_t entry, struct page* page)
 {
 	struct vm_area_struct* vma;
-	struct pte_chain *pte_chain;
-
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain)
-		return -ENOMEM;
 
 	/*
 	 * Go through process' page directory.
@@ -543,11 +536,10 @@ static int unuse_process(struct mm_struct * mm,
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		pgd_t * pgd = pgd_offset(mm, vma->vm_start);
-		if (unuse_vma(vma, pgd, entry, page, &pte_chain))
+		if (unuse_vma(vma, pgd, entry, page))
 			break;
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
 	return 0;
 }
 

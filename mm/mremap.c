@@ -81,7 +81,7 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static void
 copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
-	     pte_t *src, pte_t *dst, struct pte_chain **pte_chainp)
+	     unsigned long new_addr, pte_t *src, pte_t *dst)
 {
 	pte_t pte = ptep_clear_flush(vma, old_addr, src);
 	set_pte(dst, pte);
@@ -91,8 +91,8 @@ copy_one_pte(struct vm_area_struct *vma, unsigned long old_addr,
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
 			if (PageAnon(page)) {
-				page_remove_rmap(page, src);
-				*pte_chainp = page_add_rmap(page, dst, *pte_chainp);
+				page_remove_rmap(page);
+				page_add_anon_rmap(page, vma->vm_mm, new_addr);
 			}
 		}
 	}
@@ -105,13 +105,7 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 	struct mm_struct *mm = vma->vm_mm;
 	int error = 0;
 	pte_t *src, *dst;
-	struct pte_chain *pte_chain;
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
-	if (!pte_chain) {
-		error = -ENOMEM;
-		goto out;
-	}
 	spin_lock(&mm->page_table_lock);
 	src = get_one_pte_map_nested(mm, old_addr);
 	if (src) {
@@ -133,8 +127,7 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 */
 		if (src) {
 			if (dst)
-				copy_one_pte(vma, old_addr, src,
-						dst, &pte_chain);
+				copy_one_pte(vma, old_addr, new_addr, src, dst);
 			else
 				error = -ENOMEM;
 			pte_unmap_nested(src);
@@ -143,8 +136,6 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 			pte_unmap(dst);
 	}
 	spin_unlock(&mm->page_table_lock);
-	pte_chain_free(pte_chain);
-out:
 	return error;
 }
 

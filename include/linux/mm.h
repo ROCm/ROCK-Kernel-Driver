@@ -147,8 +147,6 @@ struct vm_operations_struct {
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
 };
 
-/* forward declaration; pte_chain is meant to be internal to rmap.c */
-struct pte_chain;
 struct mmu_gather;
 struct inode;
 
@@ -170,27 +168,25 @@ typedef unsigned long page_flags_t;
  *
  * The first line is data used in page cache lookup, the second line
  * is used for linear searches (eg. clock algorithm scans). 
- *
- * TODO: make this structure smaller, it could be as small as 32 bytes.
  */
 struct page {
-	page_flags_t flags;		/* atomic flags, some possibly
-					   updated asynchronously */
+	page_flags_t flags;		/* Atomic flags, some possibly
+					 * updated asynchronously */
 	atomic_t _count;		/* Usage count, see below. */
-	struct address_space *mapping;	/* The inode (or ...) we belong to. */
-	pgoff_t index;			/* Our offset within mapping. */
-	struct list_head lru;		/* Pageout list, eg. active_list;
-					   protected by zone->lru_lock !! */
-	union {
-		struct pte_chain *chain;/* Reverse pte mapping pointer.
-					 * protected by PG_chainlock */
-		pte_addr_t direct;
-		unsigned int mapcount;	/* Count ptes mapped into mms */
-	} pte;
+	unsigned int mapcount;		/* Count of ptes mapped in mms,
+					 * to show when page is mapped
+					 * & limit reverse map searches,
+					 * protected by PG_maplock.
+					 */
 	unsigned long private;		/* Mapping-private opaque data:
 					 * usually used for buffer_heads
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
+					 */
+	struct address_space *mapping;	/* The inode (or ...) we belong to. */
+	pgoff_t index;			/* Our offset within mapping. */
+	struct list_head lru;		/* Pageout list, eg. active_list
+					 * protected by zone->lru_lock !
 					 */
 	/*
 	 * On machines where all RAM is mapped into kernel address space,
@@ -440,13 +436,11 @@ static inline pgoff_t page_index(struct page *page)
 }
 
 /*
- * Return true if this page is mapped into pagetables.  Subtle: test pte.direct
- * rather than pte.chain.  Because sometimes pte.direct is 64-bit, and .chain
- * is only 32-bit.
+ * Return true if this page is mapped into pagetables.
  */
 static inline int page_mapped(struct page *page)
 {
-	return page->pte.direct != 0;
+	return page->mapcount != 0;
 }
 
 /*

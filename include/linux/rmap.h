@@ -15,20 +15,24 @@
 
 #ifdef CONFIG_MMU
 
-struct pte_chain;
-struct pte_chain *pte_chain_alloc(int gfp_flags);
-void __pte_chain_free(struct pte_chain *pte_chain);
-
-static inline void pte_chain_free(struct pte_chain *pte_chain)
-{
-	if (pte_chain)
-		__pte_chain_free(pte_chain);
-}
-
-struct pte_chain * fastcall
-	page_add_rmap(struct page *, pte_t *, struct pte_chain *);
+void fastcall page_add_anon_rmap(struct page *,
+		struct mm_struct *, unsigned long addr);
 void fastcall page_add_file_rmap(struct page *);
-void fastcall page_remove_rmap(struct page *, pte_t *);
+void fastcall page_remove_rmap(struct page *);
+
+/**
+ * page_dup_rmap - duplicate pte mapping to a page
+ * @page:	the page to add the mapping to
+ *
+ * For copy_page_range only: minimal extract from page_add_rmap,
+ * avoiding unnecessary tests (already checked) so it's quicker.
+ */
+static inline void page_dup_rmap(struct page *page)
+{
+	page_map_lock(page);
+	page->mapcount++;
+	page_map_unlock(page);
+}
 
 /*
  * Called from mm/vmscan.c to handle paging out
