@@ -1242,14 +1242,8 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 			isdn_ciscohdlck_receive(lp->netdev, olp, skb);
 			return;
 		case ISDN_NET_ENCAP_IPTYP:
-			/* IP with type field */
-			olp->huptimer = 0;
-			lp->huptimer = 0;
-			skb->protocol = *(unsigned short *) &(skb->data[0]);
-			skb_pull(skb, 2);
-			if (*(unsigned short *) skb->data == 0xFFFF)
-				skb->protocol = htons(ETH_P_802_3);
-			break;
+			isdn_iptyp_receive(lp->netdev, olp, skb);
+			return;
 		case ISDN_NET_ENCAP_SYNCPPP:
 			/*
 			 * If encapsulation is syncppp, don't reset
@@ -2511,7 +2505,19 @@ isdn_iptyp_header(struct sk_buff *skb, struct net_device *dev,
 	return 2;
 }
 
-int
+static void
+isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp, 
+		   struct sk_buff *skb)
+{
+	isdn_net_local *lp = &p->local;
+
+	isdn_net_reset_huptimer(lp, olp);
+	skb->protocol = get_u16(skb->data);
+	skb_pull(skb, 2);
+	netif_rx(skb);
+}
+
+static int
 isdn_iptyp_setup(isdn_net_dev *p)
 {
 	p->dev.hard_header = isdn_iptyp_header;
@@ -2547,7 +2553,7 @@ isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
-int
+static int
 isdn_uihdlc_setup(isdn_net_dev *p)
 {
 	p->dev.hard_header = isdn_uihdlc_header;
