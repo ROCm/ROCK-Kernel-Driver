@@ -335,7 +335,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec __user * uvector,
 			       unsigned long nr_segs, loff_t *pos)
 {
-	typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
+	typedef ssize_t (*io_fn_t)(struct file *, char __user *, size_t, loff_t *);
 	typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
 
 	size_t tot_len;
@@ -423,7 +423,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	ret = 0;
 	vector = iov;
 	while (nr_segs > 0) {
-		void * base;
+		void __user * base;
 		size_t len;
 		ssize_t nr;
 

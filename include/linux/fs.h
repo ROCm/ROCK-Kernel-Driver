@@ -752,11 +752,11 @@ struct inode_operations {
 
 struct seq_file;
 
-extern ssize_t vfs_read(struct file *, char *, size_t, loff_t *);
-extern ssize_t vfs_write(struct file *, const char *, size_t, loff_t *);
-extern ssize_t vfs_readv(struct file *, const struct iovec *,
+extern ssize_t vfs_read(struct file *, char __user *, size_t, loff_t *);
+extern ssize_t vfs_write(struct file *, const char __user *, size_t, loff_t *);
+extern ssize_t vfs_readv(struct file *, const struct iovec __user *,
 		unsigned long, loff_t *);
-extern ssize_t vfs_writev(struct file *, const struct iovec *,
+extern ssize_t vfs_writev(struct file *, const struct iovec __user *,
 		unsigned long, loff_t *);
 
 /*
@@ -1202,16 +1202,16 @@ extern int generic_file_mmap(struct file *, struct vm_area_struct *);
 extern int generic_file_readonly_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
-extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
+extern ssize_t generic_file_read(struct file *, char __user *, size_t, loff_t *);
 int generic_write_checks(struct inode *inode, struct file *file,
 			loff_t *pos, size_t *count, int isblk);
-extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
+extern ssize_t generic_file_write(struct file *, const char __user *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
 extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);
 extern ssize_t generic_file_aio_write_nolock(struct kiocb *, const struct iovec *,
 				unsigned long, loff_t *);
-extern ssize_t do_sync_read(struct file *filp, char *buf, size_t len, loff_t *ppos);
-extern ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, loff_t *ppos);
+extern ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos);
+extern ssize_t do_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos);
 extern ssize_t generic_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
@@ -1247,9 +1247,9 @@ static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 
 extern struct file_operations generic_ro_fops;
 
-extern int vfs_readlink(struct dentry *, char *, int, const char *);
+extern int vfs_readlink(struct dentry *, char __user *, int, const char *);
 extern int vfs_follow_link(struct nameidata *, const char *);
-extern int page_readlink(struct dentry *, char *, int);
+extern int page_readlink(struct dentry *, char __user *, int);
 extern int page_follow_link(struct dentry *, struct nameidata *);
 extern int page_symlink(struct inode *inode, const char *symname, int len);
 extern struct inode_operations page_symlink_inode_operations;

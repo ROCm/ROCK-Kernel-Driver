@@ -76,6 +76,7 @@ extern void polaris_machine_check(u64, u64, struct pt_regs *);
 /* core_t2.c */
 extern struct pci_ops t2_pci_ops;
 extern void t2_init_arch(void);
+extern void t2_kill_arch(int);
 extern void t2_machine_check(u64, u64, struct pt_regs *);
 extern void t2_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 

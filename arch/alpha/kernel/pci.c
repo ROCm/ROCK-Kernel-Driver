@@ -19,6 +19,7 @@
 #include <linux/ioport.h>
 #include <linux/kernel.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <linux/cache.h>
 #include <asm/machvec.h>
 

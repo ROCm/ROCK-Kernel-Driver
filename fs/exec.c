@@ -491,7 +491,8 @@ int kernel_read(struct file *file, unsigned long offset,
 
 	old_fs = get_fs();
 	set_fs(get_ds());
-	result = vfs_read(file, addr, count, &pos);
+	/* The cast to a user pointer is valid due to the set_fs() */
+	result = vfs_read(file, (void __user *)addr, count, &pos);
 	set_fs(old_fs);
 	return result;
 }

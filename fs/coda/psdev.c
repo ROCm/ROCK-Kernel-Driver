@@ -371,7 +371,7 @@ static int init_coda_psdev(void)
 		     CODA_PSDEV_MAJOR);
               return -EIO;
 	}
-	devfs_mk_dir (NULL, "coda", NULL);
+	devfs_mk_dir ("coda");
 	for (i = 0; i < MAX_CODADEVS; i++) {
 		char name[16];
 		sprintf(name, "coda/%d", i);

@@ -87,10 +87,10 @@ static struct {
 };
 
 long
-asmlinkage sys_nfsservctl(int cmd, struct nfsctl_arg *arg, void *res)
+asmlinkage sys_nfsservctl(int cmd, struct nfsctl_arg __user *arg, void __user *res)
 {
 	struct file *file;
-	void *p = &arg->u;
+	void __user *p = &arg->u;
 	int version;
 	int err;
 

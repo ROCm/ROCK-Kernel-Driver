@@ -1,12 +1,11 @@
 /**
- * $Id: fsm.c,v 1.3 2002/10/08 16:53:45 mschwide Exp $
+ * $Id: fsm.c,v 1.4 2003/03/28 08:54:40 mschwide Exp $
  *
  * A generic FSM based on fsm used in isdn4linux
  *
  */
 
 #include "fsm.h"
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/timer.h>

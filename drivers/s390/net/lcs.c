@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.44 $	 $Date: 2003/02/18 19:49:02 $
+ *    $Revision: 1.51 $	 $Date: 2003/03/28 08:54:40 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/if.h>
 #include <linux/netdevice.h>
@@ -59,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.44 $"
+#define VERSION_LCS_C  "$Revision: 1.51 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -335,7 +334,9 @@ lcs_setup_card(struct lcs_card *card)
 		  (void *)lcs_start_kernel_thread,card);
 	card->thread_mask = 0;
 	spin_lock_init(&card->lock);
+#ifdef CONFIG_IP_MULTICAST
 	INIT_LIST_HEAD(&card->ipm_list);
+#endif
 	INIT_LIST_HEAD(&card->lancmd_waiters);
 	return 0;
 }
@@ -358,6 +359,7 @@ lcs_cleanup_card(struct lcs_card *card)
 		kfree(ipm_list);
 	}
 #endif
+	kfree(card->dev);
 	/* Cleanup channels. */
 	lcs_cleanup_channel(&card->write);
 	lcs_cleanup_channel(&card->read);
@@ -556,13 +558,12 @@ lcs_ready_buffer(struct lcs_channel *channel, struct lcs_buffer *buffer)
 static int
 __lcs_processed_buffer(struct lcs_channel *channel, struct lcs_buffer *buffer)
 {
-	int index, prevprev, prev, next;
+	int index, prev, next;
 
 	if (buffer->state != BUF_STATE_READY)
 		BUG();
 	buffer->state = BUF_STATE_PROCESSED;
 	index = buffer - channel->iob;
-	prevprev = (index - 1) & (LCS_NUM_BUFFS - 1);
 	prev = (index - 1) & (LCS_NUM_BUFFS - 1);
 	next = (index + 1) & (LCS_NUM_BUFFS - 1);
 	/* Set the suspend bit and clear the PCI bit of this buffer. */
@@ -1082,7 +1083,7 @@ lcs_tasklet(unsigned long data)
 	unsigned long flags;
 	struct lcs_channel *channel;
 	struct lcs_buffer *iob;
-	int buf_idx, io_idx;
+	int buf_idx;
 	int rc;
 
 	channel = (struct lcs_channel *) data;
@@ -1092,9 +1093,7 @@ lcs_tasklet(unsigned long data)
 	/* Check for processed buffers. */
 	iob = channel->iob;
 	buf_idx = channel->buf_idx;
-	io_idx = channel->io_idx;
-	while (buf_idx != io_idx &&
-	       iob[buf_idx].state == BUF_STATE_PROCESSED) {
+	while (iob[buf_idx].state == BUF_STATE_PROCESSED) {
 		/* Do the callback thing. */
 		if (iob[buf_idx].callback != NULL)
 			iob[buf_idx].callback(channel, iob + buf_idx);
@@ -1434,6 +1433,7 @@ static int
 lcs_lgw_stoplan_thread(void *data)
 {
 	struct lcs_card *card;
+	int rc;
 
 	card = (struct lcs_card *) data;
 	daemonize("lgwstop");
@@ -1446,7 +1446,11 @@ lcs_lgw_stoplan_thread(void *data)
 	else
 		PRINT_ERR("Stoplan %s initiated by LGW failed!\n",
 			  card->dev->name);
-	return 0;
+	/*Try to reset the card, stop it on failure */
+        rc = lcs_resetcard(card);
+        if (rc != 0)
+                rc = lcs_stopcard(card);
+        return rc;
 }
 
 /**
@@ -1462,8 +1466,10 @@ lcs_start_kernel_thread(struct lcs_card *card)
 		kernel_thread(lcs_lgw_startlan_thread, (void *) card, SIGCHLD);
 	if (test_and_clear_bit(2, &card->thread_mask))
 		kernel_thread(lcs_lgw_stoplan_thread, (void *) card, SIGCHLD);
+#ifdef CONFIG_IP_MULTICAST
 	if (test_and_clear_bit(3, &card->thread_mask))
 		kernel_thread(lcs_fix_multicast_list, (void *) card, SIGCHLD);
+#endif
 }
 
 /**
@@ -1599,12 +1605,9 @@ lcs_stop_device(struct net_device *dev)
 	LCS_DBF_TEXT(2, trace, "stopdev");
 	card   = (struct lcs_card *) dev->priv;
 	netif_stop_queue(dev);
-	// FIXME: really free the net_device here ?!?
-	kfree(card->dev);
 	rc = lcs_stopcard(card);
 	if (rc)
 		PRINT_ERR("Try it again!\n ");
-	MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -1626,7 +1629,6 @@ lcs_open_device(struct net_device *dev)
 		PRINT_ERR("LCS:Error in opening device!\n");
 
 	} else {
-		MOD_INC_USE_COUNT;
 		netif_wake_queue(dev);
 		card->state = DEV_STATE_UP;
 	}
@@ -1784,6 +1786,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 		dev->set_multicast_list = lcs_set_multicast_list;
 #endif
 	dev->get_stats = lcs_getstats;
+	dev->owner = THIS_MODULE;
 	netif_stop_queue(dev);
 	lcs_stopcard(card);
 	return 0;

@@ -17,6 +17,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
+#include <asm/delay.h>
 
 #define __EXTERN_INLINE
 #include <asm/io.h>
@@ -26,6 +27,12 @@
 #include "proto.h"
 #include "pci_impl.h"
 
+/* For dumping initial DMA window settings. */
+#define DEBUG_PRINT_INITIAL_SETTINGS 0
+
+/* For dumping final DMA window settings. */
+#define DEBUG_PRINT_FINAL_SETTINGS 0
+
 /*
  * By default, we direct-map starting at 2GB, in order to allow the
  * maximum size direct-map window (2GB) to match the maximum amount of
@@ -34,10 +41,22 @@
  * ISA DMA, since the maximum ISA DMA address is 2GB-1.
  *
  * For now, this seems a reasonable trade-off: even though most SABLEs
- * have far less than even 1GB of memory, floppy usage/performance will
- * not really be affected by forcing it to go via scatter/gather...
+ * have less than 1GB of memory, floppy usage/performance will not
+ * really be affected by forcing it to go via scatter/gather...
  */
 #define T2_DIRECTMAP_2G 1
+
+#if T2_DIRECTMAP_2G
+# define T2_DIRECTMAP_START	0x80000000UL
+# define T2_DIRECTMAP_LENGTH	0x80000000UL
+#else
+# define T2_DIRECTMAP_START	0x40000000UL
+# define T2_DIRECTMAP_LENGTH	0x40000000UL
+#endif
+
+/* The ISA scatter/gather window settings. */
+#define T2_ISA_SG_START		0x00800000UL
+#define T2_ISA_SG_LENGTH	0x00800000UL
 
 /*
  * NOTE: Herein lie back-to-back mb instructions.  They are magic. 
@@ -57,6 +76,24 @@
 # define DBG(args)
 #endif
 
+static volatile unsigned int t2_mcheck_any_expected;
+static volatile unsigned int t2_mcheck_last_taken;
+
+/* Place to save the DMA Window registers as set up by SRM
+   for restoration during shutdown. */
+static struct
+{
+	struct {
+		unsigned long wbase;
+		unsigned long wmask;
+		unsigned long tbase;
+	} window[2];
+	unsigned long hae_1;
+  	unsigned long hae_2;
+	unsigned long hae_3;
+	unsigned long hae_4;
+	unsigned long hbase;
+} t2_saved_config __attribute((common));
 
 /*
  * Given a bus, device, and function number, compute resulting
@@ -134,42 +171,34 @@ mk_conf_addr(struct pci_bus *pbus, unsigned int device_fn, int where,
 	return 0;
 }
 
+/*
+ * NOTE: both conf_read() and conf_write() may set HAE_3 when needing
+ *       to do type1 access. This is protected by the use of spinlock IRQ
+ *       primitives in the wrapper functions pci_{read,write}_config_*()
+ *       defined in drivers/pci/pci.c.
+ */
 static unsigned int
 conf_read(unsigned long addr, unsigned char type1)
 {
-	unsigned long flags;
-	unsigned int value, cpu;
+	unsigned int value, cpu, taken;
 	unsigned long t2_cfg = 0;
 
 	cpu = smp_processor_id();
 
-	local_irq_save(flags);	/* avoid getting hit by machine check */
-
 	DBG(("conf_read(addr=0x%lx, type1=%d)\n", addr, type1));
-
-#if 0
-	{
-	  unsigned long stat0;
-	  /* Reset status register to avoid losing errors.  */
-	  stat0 = *(vulp)T2_IOCSR;
-	  *(vulp)T2_IOCSR = stat0;
-	  mb();
-	  DBG(("conf_read: T2 IOCSR was 0x%x\n", stat0));
-	}
-#endif
 
 	/* If Type1 access, must set T2 CFG.  */
 	if (type1) {
 		t2_cfg = *(vulp)T2_HAE_3 & ~0xc0000000UL;
 		*(vulp)T2_HAE_3 = 0x40000000UL | t2_cfg;
 		mb();
-		DBG(("conf_read: TYPE1 access\n"));
 	}
 	mb();
 	draina();
 
 	mcheck_expected(cpu) = 1;
 	mcheck_taken(cpu) = 0;
+	t2_mcheck_any_expected |= (1 << cpu);
 	mb();
 
 	/* Access configuration space. */
@@ -177,12 +206,20 @@ conf_read(unsigned long addr, unsigned char type1)
 	mb();
 	mb();  /* magic */
 
-	if (mcheck_taken(cpu)) {
+	/* Wait for possible mcheck. Also, this lets other CPUs clear
+	   their mchecks as well, as they can reliably tell when
+	   another CPU is in the midst of handling a real mcheck via
+	   the "taken" function. */
+	udelay(100);
+
+	if ((taken = mcheck_taken(cpu))) {
 		mcheck_taken(cpu) = 0;
+		t2_mcheck_last_taken |= (1 << cpu);
 		value = 0xffffffffU;
 		mb();
 	}
 	mcheck_expected(cpu) = 0;
+	t2_mcheck_any_expected = 0;
 	mb();
 
 	/* If Type1 access, must reset T2 CFG so normal IO space ops work.  */
@@ -190,45 +227,30 @@ conf_read(unsigned long addr, unsigned char type1)
 		*(vulp)T2_HAE_3 = t2_cfg;
 		mb();
 	}
-	DBG(("conf_read(): finished\n"));
 
-	local_irq_restore(flags);
 	return value;
 }
 
 static void
 conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 {
-	unsigned long flags;
-	unsigned int cpu;
+	unsigned int cpu, taken;
 	unsigned long t2_cfg = 0;
 
 	cpu = smp_processor_id();
-
-	local_irq_save(flags);	/* avoid getting hit by machine check */
-
-#if 0
-	{
-	  unsigned long stat0;
-	  /* Reset status register to avoid losing errors.  */
-	  stat0 = *(vulp)T2_IOCSR;
-	  *(vulp)T2_IOCSR = stat0;
-	  mb();
-	  DBG(("conf_write: T2 ERR was 0x%x\n", stat0));
-	}
-#endif
 
 	/* If Type1 access, must set T2 CFG.  */
 	if (type1) {
 		t2_cfg = *(vulp)T2_HAE_3 & ~0xc0000000UL;
 		*(vulp)T2_HAE_3 = t2_cfg | 0x40000000UL;
 		mb();
-		DBG(("conf_write: TYPE1 access\n"));
 	}
 	mb();
 	draina();
 
 	mcheck_expected(cpu) = 1;
+	mcheck_taken(cpu) = 0;
+	t2_mcheck_any_expected |= (1 << cpu);
 	mb();
 
 	/* Access configuration space.  */
@@ -236,7 +258,19 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 	mb();
 	mb();  /* magic */
 
+	/* Wait for possible mcheck. Also, this lets other CPUs clear
+	   their mchecks as well, as they can reliably tell when
+	   this CPU is in the midst of handling a real mcheck via
+	   the "taken" function. */
+	udelay(100);
+
+	if ((taken = mcheck_taken(cpu))) {
+		mcheck_taken(cpu) = 0;
+		t2_mcheck_last_taken |= (1 << cpu);
+		mb();
+	}
 	mcheck_expected(cpu) = 0;
+	t2_mcheck_any_expected = 0;
 	mb();
 
 	/* If Type1 access, must reset T2 CFG so normal IO space ops work.  */
@@ -244,8 +278,6 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1)
 		*(vulp)T2_HAE_3 = t2_cfg;
 		mb();
 	}
-	DBG(("conf_write(): finished\n"));
-	local_irq_restore(flags);
 }
 
 static int
@@ -290,48 +322,121 @@ struct pci_ops t2_pci_ops =
 	.write =	t2_write_config,
 };
 
+static void __init
+t2_direct_map_window1(unsigned long base, unsigned long length)
+{
+	unsigned long temp;
+
+	__direct_map_base = base;
+	__direct_map_size = length;
+
+	temp = (base & 0xfff00000UL) | ((base + length - 1) >> 20);
+	*(vulp)T2_WBASE1 = temp | 0x80000UL; /* OR in ENABLE bit */
+	temp = (length - 1) & 0xfff00000UL;
+	*(vulp)T2_WMASK1 = temp;
+	*(vulp)T2_TBASE1 = 0;
+
+#if DEBUG_PRINT_FINAL_SETTINGS
+	printk("%s: setting WBASE1=0x%lx WMASK1=0x%lx TBASE1=0x%lx\n",
+	       __FUNCTION__,
+	       *(vulp)T2_WBASE1,
+	       *(vulp)T2_WMASK1,
+	       *(vulp)T2_TBASE1);
+#endif
+}
+
+static void __init
+t2_sg_map_window2(struct pci_controller *hose,
+		  unsigned long base,
+		  unsigned long length)
+{
+	unsigned long temp;
+
+	/* Note we can only do 1 SG window, as the other is for direct, so
+	   do an ISA SG area, especially for the floppy. */
+	hose->sg_isa = iommu_arena_new(hose, base, length, 0);
+	hose->sg_pci = NULL;
+
+	temp = (base & 0xfff00000UL) | ((base + length - 1) >> 20);
+	*(vulp)T2_WBASE2 = temp | 0xc0000UL; /* OR in ENABLE/SG bits */
+	temp = (length - 1) & 0xfff00000UL;
+	*(vulp)T2_WMASK2 = temp;
+	*(vulp)T2_TBASE2 = virt_to_phys(hose->sg_isa->ptes) >> 1;
+	mb();
+
+	t2_pci_tbi(hose, 0, -1); /* flush TLB all */
+
+#if DEBUG_PRINT_FINAL_SETTINGS
+	printk("%s: setting WBASE2=0x%lx WMASK2=0x%lx TBASE2=0x%lx\n",
+	       __FUNCTION__,
+	       *(vulp)T2_WBASE2,
+	       *(vulp)T2_WMASK2,
+	       *(vulp)T2_TBASE2);
+#endif
+}
+
+static void __init
+t2_save_configuration(void)
+{
+#if DEBUG_PRINT_INITIAL_SETTINGS
+	printk("%s: HAE_1 was 0x%lx\n", __FUNCTION__, srm_hae); /* HW is 0 */
+	printk("%s: HAE_2 was 0x%lx\n", __FUNCTION__, *(vulp)T2_HAE_2);
+	printk("%s: HAE_3 was 0x%lx\n", __FUNCTION__, *(vulp)T2_HAE_3);
+	printk("%s: HAE_4 was 0x%lx\n", __FUNCTION__, *(vulp)T2_HAE_4);
+	printk("%s: HBASE was 0x%lx\n", __FUNCTION__, *(vulp)T2_HBASE);
+
+	printk("%s: WBASE1=0x%lx WMASK1=0x%lx TBASE1=0x%lx\n", __FUNCTION__, 
+	       *(vulp)T2_WBASE1, *(vulp)T2_WMASK1, *(vulp)T2_TBASE1);
+	printk("%s: WBASE2=0x%lx WMASK2=0x%lx TBASE2=0x%lx\n", __FUNCTION__, 
+	       *(vulp)T2_WBASE2, *(vulp)T2_WMASK2, *(vulp)T2_TBASE2);
+#endif
+
+	/*
+	 * Save the DMA Window registers.
+	 */
+	t2_saved_config.window[0].wbase = *(vulp)T2_WBASE1;
+	t2_saved_config.window[0].wmask = *(vulp)T2_WMASK1;
+	t2_saved_config.window[0].tbase = *(vulp)T2_TBASE1;
+	t2_saved_config.window[1].wbase = *(vulp)T2_WBASE2;
+	t2_saved_config.window[1].wmask = *(vulp)T2_WMASK2;
+	t2_saved_config.window[1].tbase = *(vulp)T2_TBASE2;
+
+	t2_saved_config.hae_1 = srm_hae; /* HW is already set to 0 */
+	t2_saved_config.hae_2 = *(vulp)T2_HAE_2;
+	t2_saved_config.hae_3 = *(vulp)T2_HAE_3;
+	t2_saved_config.hae_4 = *(vulp)T2_HAE_4;
+	t2_saved_config.hbase = *(vulp)T2_HBASE;
+}
+
 void __init
 t2_init_arch(void)
 {
 	struct pci_controller *hose;
-	unsigned long t2_iocsr;
+	unsigned long temp;
 	unsigned int i;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		mcheck_expected(i) = 0;
 		mcheck_taken(i) = 0;
 	}
-
-#if 0
-	/* Set up error reporting.  */
-	t2_iocsr = *(vulp)T2_IOCSR;
-	*(vulp)T2_IOCSR = t2_iocsr | (0x1UL << 7); /* TLB error check */
-	mb();
-	*(vulp)T2_IOCSR; /* read it back to make sure */
-#endif
+	t2_mcheck_any_expected = 0;
+	t2_mcheck_last_taken = 0;
 
 	/* Enable scatter/gather TLB use.  */
-	t2_iocsr = *(vulp)T2_IOCSR;
-	if (!(t2_iocsr & (0x1UL << 26))) {
+	temp = *(vulp)T2_IOCSR;
+	if (!(temp & (0x1UL << 26))) {
 		printk("t2_init_arch: enabling SG TLB, IOCSR was 0x%lx\n",
-		       t2_iocsr);
-		*(vulp)T2_IOCSR = t2_iocsr | (0x1UL << 26);
+		       temp);
+		*(vulp)T2_IOCSR = temp | (0x1UL << 26);
 		mb();	
 		*(vulp)T2_IOCSR; /* read it back to make sure */
 	}
 
-#if 0
-	printk("t2_init_arch: HBASE was 0x%lx\n", *(vulp)T2_HBASE);
-	printk("t2_init_arch: WBASE1=0x%lx WMASK1=0x%lx TBASE1=0x%lx\n",
-	       *(vulp)T2_WBASE1, *(vulp)T2_WMASK1, *(vulp)T2_TBASE1);
-	printk("t2_init_arch: WBASE2=0x%lx WMASK2=0x%lx TBASE2=0x%lx\n",
-	       *(vulp)T2_WBASE2, *(vulp)T2_WMASK2, *(vulp)T2_TBASE2);
-#endif
+	t2_save_configuration();
 
 	/*
 	 * Create our single hose.
 	 */
-
 	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
@@ -342,52 +447,51 @@ t2_init_arch(void)
 	hose->sparse_io_base = T2_IO - IDENT_ADDR;
 	hose->dense_io_base = 0;
 
-	/* Note we can only do 1 SG window, as the other is for direct, so
-	   do an ISA SG area, especially for the floppy. */
-        hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
-	hose->sg_pci = NULL;
-
 	/*
 	 * Set up the PCI->physical memory translation windows.
 	 *
-	 * Window 1 goes at ? GB and is ?GB large, direct mapped.
-	 * Window 2 goes at 8 MB and is 8MB large, scatter/gather (for ISA).
+	 * Window 1 is direct mapped.
+	 * Window 2 is scatter/gather (for ISA).
 	 */
 
-#if T2_DIRECTMAP_2G
-	__direct_map_base = 0x80000000UL;
-	__direct_map_size = 0x80000000UL;
+	t2_direct_map_window1(T2_DIRECTMAP_START, T2_DIRECTMAP_LENGTH);
 
-	/* WARNING!! must correspond to the direct map window params!!! */
-	*(vulp)T2_WBASE1 = 0x80080fffU;
-	*(vulp)T2_WMASK1 = 0x7ff00000U;
-	*(vulp)T2_TBASE1 = 0;
-#else /* T2_DIRECTMAP_2G */
-	__direct_map_base = 0x40000000UL;
-	__direct_map_size = 0x40000000UL;
+	/* Always make an ISA DMA window. */
+	t2_sg_map_window2(hose, T2_ISA_SG_START, T2_ISA_SG_LENGTH);
 
-	/* WARNING!! must correspond to the direct map window params!!! */
-	*(vulp)T2_WBASE1 = 0x400807ffU;
-	*(vulp)T2_WMASK1 = 0x3ff00000U;
-	*(vulp)T2_TBASE1 = 0;
-#endif /* T2_DIRECTMAP_2G */
-
-	/* WARNING!! must correspond to the SG arena/window params!!! */
-	*(vulp)T2_WBASE2 = 0x008c000fU;
-	*(vulp)T2_WMASK2 = 0x00700000U;
-	*(vulp)T2_TBASE2 = virt_to_phys(hose->sg_isa->ptes) >> 1;
-
-	*(vulp)T2_HBASE = 0x0;
+	*(vulp)T2_HBASE = 0x0; /* Disable HOLES. */
 
 	/* Zero HAE.  */
-	*(vulp)T2_HAE_1 = 0; mb();
-	*(vulp)T2_HAE_2 = 0; mb();
-	*(vulp)T2_HAE_3 = 0; mb();
+	*(vulp)T2_HAE_1 = 0; mb(); /* Sparse MEM HAE */
+	*(vulp)T2_HAE_2 = 0; mb(); /* Sparse I/O HAE */
+	*(vulp)T2_HAE_3 = 0; mb(); /* Config Space HAE */
 #if 0
-	*(vulp)T2_HAE_4 = 0; mb(); /* DO NOT TOUCH THIS!!! */
+	/* !!! DO NOT EVER TOUCH THIS !!! */
+	*(vulp)T2_HAE_4 = 0; mb(); /* Dense MEM HAE */
 #endif
+}
 
-	t2_pci_tbi(hose, 0, -1); /* flush TLB all */
+void
+t2_kill_arch(int mode)
+{
+	/*
+	 * Restore the DMA Window registers.
+	 */
+	*(vulp)T2_WBASE1 = t2_saved_config.window[0].wbase;
+	*(vulp)T2_WMASK1 = t2_saved_config.window[0].wmask;
+	*(vulp)T2_TBASE1 = t2_saved_config.window[0].tbase;
+	*(vulp)T2_WBASE2 = t2_saved_config.window[1].wbase;
+	*(vulp)T2_WMASK2 = t2_saved_config.window[1].wmask;
+	*(vulp)T2_TBASE2 = t2_saved_config.window[1].tbase;
+	mb();
+
+	*(vulp)T2_HAE_1 = srm_hae;
+	*(vulp)T2_HAE_2 = t2_saved_config.hae_2;
+	*(vulp)T2_HAE_3 = t2_saved_config.hae_3;
+	*(vulp)T2_HAE_4 = t2_saved_config.hae_4;
+	*(vulp)T2_HBASE = t2_saved_config.hbase;
+	mb();
+	*(vulp)T2_HBASE; /* READ it back to ensure WRITE occurred. */
 }
 
 void
@@ -415,13 +519,7 @@ t2_clear_errors(int cpu)
 {
 	struct sable_cpu_csr *cpu_regs;
 
-	cpu_regs = (struct sable_cpu_csr *)T2_CPU0_BASE;
-	if (cpu == 1)
-		cpu_regs = (struct sable_cpu_csr *)T2_CPU1_BASE;
-	if (cpu == 2)
-		cpu_regs = (struct sable_cpu_csr *)T2_CPU2_BASE;
-	if (cpu == 3)
-		cpu_regs = (struct sable_cpu_csr *)T2_CPU3_BASE;
+	cpu_regs = (struct sable_cpu_csr *)T2_CPUn_BASE(cpu);
 		
 	cpu_regs->sic &= ~SIC_SEIC;
 
@@ -438,19 +536,76 @@ t2_clear_errors(int cpu)
 	mb();  /* magic */
 }
 
+/*
+ * SABLE seems to have a "broadcast" style machine check, in that all
+ * CPUs receive it. And, the issuing CPU, in the case of PCI Config
+ * space read/write faults, will also receive a second mcheck, upon
+ * lowering IPL during completion processing in pci_read_config_byte()
+ * et al.
+ *
+ * Hence all the taken/expected/any_expected/last_taken stuff...
+ */
 void
 t2_machine_check(unsigned long vector, unsigned long la_ptr,
 		 struct pt_regs * regs)
 {
 	int cpu = smp_processor_id();
+#if DEBUG_MCHECK > 0
+	struct el_common *mchk_header = (struct el_common *)la_ptr;
+#endif /* DEBUG_MCHECK */
 
 	/* Clear the error before any reporting.  */
 	mb();
 	mb();  /* magic */
 	draina();
 	t2_clear_errors(cpu);
-	wrmces(rdmces()|1);	/* ??? */
+
+	/* This should not actually be done until the logout frame is
+	   examined, but, since we don't do that, go on and do this... */
+	wrmces(0x7);
 	mb();
+
+	/* Now, do testing for the anomalous conditions. */
+	if (!mcheck_expected(cpu) && t2_mcheck_any_expected) {
+		/*
+		 * FUNKY: Received mcheck on a CPU and not
+		 * expecting it, but another CPU is expecting one.
+		 *
+		 * Just dismiss it for now on this CPU...
+		 */
+#if DEBUG_MCHECK > 0
+		printk("t2_machine_check(cpu%d): any_expected 0x%x -"
+                       " (assumed) spurious -"
+                       " code 0x%x\n", cpu, t2_mcheck_any_expected,
+                       (unsigned int)mchk_header->code);
+#endif /* DEBUG_MCHECK */
+		return;
+	}
+
+	if (!mcheck_expected(cpu) && !t2_mcheck_any_expected) {
+		if (t2_mcheck_last_taken & (1 << cpu)) {
+#if DEBUG_MCHECK > 0
+			printk("t2_machine_check(cpu%d): last_taken 0x%x - "
+			       "unexpected mcheck - code 0x%x\n",
+			       cpu, t2_mcheck_last_taken,
+			       (unsigned int)mchk_header->code);
+#endif /* DEBUG_MCHECK */
+			t2_mcheck_last_taken = 0;
+			mb();
+			return;
+		} else {
+			t2_mcheck_last_taken = 0;
+			mb();
+		}
+	}
+
+#if DEBUG_MCHECK > 0
+	printk("%s t2_mcheck(cpu%d): last_taken 0x%x - "
+	       "any_expected 0x%x - code 0x%x\n",
+	       (mcheck_expected(cpu) ? "EX" : "UN"), cpu,
+	       t2_mcheck_last_taken, t2_mcheck_any_expected,
+	       (unsigned int)mchk_header->code);
+#endif /* DEBUG_MCHECK */
 
 	process_mcheck_info(vector, la_ptr, regs, "T2", mcheck_expected(cpu));
 }

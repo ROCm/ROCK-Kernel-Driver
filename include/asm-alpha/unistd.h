@@ -610,8 +610,12 @@ static inline pid_t waitpid(int pid, int * wait_stat, int flags)
  * "Conditional" syscalls
  *
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on all toolchains, so we just do it by hand
+ * but it doesn't work on all toolchains, so we just do it by hand.
+ *
+ * Note that we do *not* provide a parameter list to avoid 
+ * conflicting with one of the syscall declarations in some
+ * of the relevant header files (including this one).
  */
-#define cond_syscall(x) asmlinkage long x(void) __attribute__((weak,alias("sys_ni_syscall")));
+#define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
 
 #endif /* _ALPHA_UNISTD_H */
