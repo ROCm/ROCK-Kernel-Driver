@@ -1075,7 +1075,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	/* CLONE_PARENT re-uses the old parent */
-	if (clone_flags & CLONE_PARENT)
+	if (clone_flags & (CLONE_PARENT|CLONE_THREAD))
 		p->real_parent = current->real_parent;
 	else
 		p->real_parent = current;
