@@ -138,15 +138,15 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 
 	/* We have 12 bits of vlan ID.
 	 *
-	 * We must not drop the vlan_group_lock until we hold a
+	 * We must not drop allow preempt until we hold a
 	 * reference to the device (netif_rx does that) or we
 	 * fail.
 	 */
 
-	spin_lock_bh(&vlan_group_lock);
+	rcu_read_lock();
 	skb->dev = __find_vlan_dev(dev, vid);
 	if (!skb->dev) {
-		spin_unlock_bh(&vlan_group_lock);
+		rcu_read_unlock();
 
 #ifdef VLAN_DEBUG
 		printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
@@ -170,7 +170,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	if (dev != VLAN_DEV_INFO(skb->dev)->real_dev) {
-		spin_unlock_bh(&vlan_group_lock);
+		rcu_read_unlock();
 
 #ifdef VLAN_DEBUG
 		printk(VLAN_DBG "%s: dropping skb: %p because came in on wrong device, dev: %s  real_dev: %s, skb_dev: %s\n",
@@ -244,7 +244,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 			/* TODO:  Add a more specific counter here. */
 			stats->rx_errors++;
 		}
-		spin_unlock_bh(&vlan_group_lock);
+		rcu_read_lock();
 		return 0;
 	}
 
@@ -273,7 +273,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 			/* TODO:  Add a more specific counter here. */
 			stats->rx_errors++;
 		}
-		spin_unlock_bh(&vlan_group_lock);
+		rcu_read_unlock();
 		return 0;
 	}
 
@@ -296,7 +296,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		/* TODO:  Add a more specific counter here. */
 		stats->rx_errors++;
 	}
-	spin_unlock_bh(&vlan_group_lock);
+	rcu_read_unlock();
 	return 0;
 }
 
@@ -757,6 +757,34 @@ int vlan_dev_stop(struct net_device *dev)
 	vlan_flush_mc_list(dev);
 	return 0;
 }
+
+int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct net_device *real_dev = VLAN_DEV_INFO(dev)->real_dev;
+	struct ifreq ifrr;
+	int err = -EOPNOTSUPP;
+
+	strncpy(ifrr.ifr_name, real_dev->name, IFNAMSIZ);
+	ifrr.ifr_ifru = ifr->ifr_ifru;
+
+	switch(cmd) {
+	case SIOCGMIIPHY:
+	case SIOCGMIIREG:
+	case SIOCSMIIREG:
+		if (real_dev->do_ioctl && netif_device_present(real_dev)) 
+			err = real_dev->do_ioctl(dev, &ifrr, cmd);
+		break;
+
+	case SIOCETHTOOL:
+		err = dev_ethtool(&ifrr);
+	}
+
+	if (!err) 
+		ifr->ifr_ifru = ifrr.ifr_ifru;
+
+	return err;
+}
+
 /** Taken from Gleb + Lennert's VLAN code, and modified... */
 void vlan_dev_set_multicast_list(struct net_device *vlan_dev)
 {

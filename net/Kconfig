@@ -551,26 +551,6 @@ config WAN_ROUTER
 
 	  If unsure, say N.
 
-config NET_FASTROUTE
-	bool "Fast switching (read help!)"
-	depends on EXPERIMENTAL
-	---help---
-	  Saying Y here enables direct NIC-to-NIC (NIC = Network Interface
-	  Card) data transfers on the local network, which is fast.
-
-	  IMPORTANT NOTE: This option is NOT COMPATIBLE with "Network packet
-	  filtering" (CONFIG_NETFILTER). Say N here if you say Y there.
-
-	  However, it will work with all options in the "Advanced router"
-	  section (except for "Use TOS value as routing key" and
-	  "Use FWMARK value as routing key").
-
-	  At the moment, few devices support fast switching (tulip is one of
-	  them, a modified 8390 driver can be found at
-	  <ftp://ftp.tux.org/pub/net/ip-routing/fastroute/fastroute-8390.tar.gz>).
-
-	  If unsure, say N.
-
 config NET_HW_FLOWCONTROL
 	bool "Forwarding between high speed interfaces"
 	depends on EXPERIMENTAL

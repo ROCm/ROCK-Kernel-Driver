@@ -171,7 +171,6 @@ CONFIG_NET=y
 # CONFIG_LAPB is not set
 # CONFIG_NET_DIVERT is not set
 # CONFIG_WAN_ROUTER is not set
-# CONFIG_NET_FASTROUTE is not set
 # CONFIG_NET_HW_FLOWCONTROL is not set
 
 #

@@ -38,8 +38,7 @@
 /* Global VLAN variables */
 
 /* Our listing of VLAN group(s) */
-struct vlan_group *vlan_group_hash[VLAN_GRP_HASH_SIZE];
-spinlock_t vlan_group_lock = SPIN_LOCK_UNLOCKED;
+struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
 #define vlan_grp_hashfn(IDX)	((((IDX) >> VLAN_GRP_HASH_SHIFT) ^ (IDX)) & VLAN_GRP_HASH_MASK)
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
@@ -68,6 +67,10 @@ static struct packet_type vlan_packet_type = {
 	.type = __constant_htons(ETH_P_8021Q),
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
+
+/* Bits of netdev state that are propogated from real device to virtual */
+#define VLAN_LINK_STATE_MASK \
+	((1<<__LINK_STATE_PRESENT)|(1<<__LINK_STATE_NOCARRIER))
 
 /* End of global variables definitions. */
 
@@ -146,8 +149,7 @@ static void __exit vlan_cleanup_module(void)
 	 * references left.
 	 */
 	for (i = 0; i < VLAN_GRP_HASH_SIZE; i++) {
-		if (vlan_group_hash[i] != NULL)
-			BUG();
+		BUG_ON(!hlist_empty(&vlan_group_hash[i]));
 	}
 	vlan_proc_cleanup();
 
@@ -157,48 +159,24 @@ static void __exit vlan_cleanup_module(void)
 module_init(vlan_proto_init);
 module_exit(vlan_cleanup_module);
 
-/* Must be invoked with vlan_group_lock held. */
+/* Must be invoked with RCU read lock (no preempt) */
 static struct vlan_group *__vlan_find_group(int real_dev_ifindex)
 {
 	struct vlan_group *grp;
+	struct hlist_node *n;
+	int hash = vlan_grp_hashfn(real_dev_ifindex);
 
-	for (grp = vlan_group_hash[vlan_grp_hashfn(real_dev_ifindex)];
-	     grp != NULL;
-	     grp = grp->next) {
+	hlist_for_each_entry_rcu(grp, n, &vlan_group_hash[hash], hlist) {
 		if (grp->real_dev_ifindex == real_dev_ifindex)
-			break;
+			return grp;
 	}
 
-	return grp;
-}
-
-/* Must hold vlan_group_lock. */
-static void __grp_hash(struct vlan_group *grp)
-{
-	struct vlan_group **head;
-
-	head = &vlan_group_hash[vlan_grp_hashfn(grp->real_dev_ifindex)];
-	grp->next = *head;
-	*head = grp;
-}
-
-/* Must hold vlan_group_lock. */
-static void __grp_unhash(struct vlan_group *grp)
-{
-	struct vlan_group *next, **pprev;
-
-	pprev = &vlan_group_hash[vlan_grp_hashfn(grp->real_dev_ifindex)];
-	next = *pprev;
-	while (next != grp) {
-		pprev = &next->next;
-		next = *pprev;
-	}
-	*pprev = grp->next;
+	return NULL;
 }
 
 /*  Find the protocol handler.  Assumes VID < VLAN_VID_MASK.
  *
- * Must be invoked with vlan_group_lock held.
+ * Must be invoked with RCU read lock (no preempt)
  */
 struct net_device *__find_vlan_dev(struct net_device *real_dev,
 				   unsigned short VID)
@@ -210,6 +188,12 @@ struct net_device *__find_vlan_dev(struct net_device *real_dev,
 
 	return NULL;
 }
+
+static void vlan_rcu_free(struct rcu_head *rcu)
+{
+	kfree(container_of(rcu, struct vlan_group, rcu));
+}
+
 
 /* This returns 0 if everything went fine.
  * It will return 1 if the group was killed as a result.
@@ -233,9 +217,8 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 	if (vlan_id >= VLAN_VID_MASK)
 		return -EINVAL;
 
-	spin_lock_bh(&vlan_group_lock);
+	ASSERT_RTNL();
 	grp = __vlan_find_group(real_dev_ifindex);
-	spin_unlock_bh(&vlan_group_lock);
 
 	ret = 0;
 
@@ -275,16 +258,12 @@ static int unregister_vlan_dev(struct net_device *real_dev,
 				if (real_dev->features & NETIF_F_HW_VLAN_RX)
 					real_dev->vlan_rx_register(real_dev, NULL);
 
-				spin_lock_bh(&vlan_group_lock);
-				__grp_unhash(grp);
-				spin_unlock_bh(&vlan_group_lock);
+				hlist_del_rcu(&grp->hlist);
 
-				/* Free the group, after we have removed it
-				 * from the hash.
-				 */
-				kfree(grp);
+				/* Free the group, after all cpu's are done. */
+				call_rcu(&grp->rcu, vlan_rcu_free);
+
 				grp = NULL;
-
 				ret = 1;
 			}
 		}
@@ -358,6 +337,7 @@ static void vlan_setup(struct net_device *new_dev)
 	new_dev->set_mac_address = vlan_dev_set_mac_address;
 	new_dev->set_multicast_list = vlan_dev_set_multicast_list;
 	new_dev->destructor = free_netdev;
+	new_dev->do_ioctl = vlan_dev_ioctl;
 }
 
 /*  Attach a VLAN device to a mac address (ie Ethernet Card).
@@ -370,7 +350,6 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	struct vlan_group *grp;
 	struct net_device *new_dev;
 	struct net_device *real_dev; /* the ethernet device */
-	int r;
 	char name[IFNAMSIZ];
 
 #ifdef VLAN_DEBUG
@@ -419,11 +398,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	if (!(real_dev->flags & IFF_UP))
 		goto out_unlock;
 
-	spin_lock_bh(&vlan_group_lock);
-	r = (__find_vlan_dev(real_dev, VLAN_ID) != NULL);
-	spin_unlock_bh(&vlan_group_lock);
-
-	if (r) {
+	if (__find_vlan_dev(real_dev, VLAN_ID) != NULL) {
 		/* was already registered. */
 		printk(VLAN_DBG "%s: ALREADY had VLAN registered\n", __FUNCTION__);
 		goto out_unlock;
@@ -470,6 +445,8 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* IFF_BROADCAST|IFF_MULTICAST; ??? */
 	new_dev->flags = real_dev->flags;
 	new_dev->flags &= ~IFF_UP;
+
+	new_dev->state = real_dev->state & VLAN_LINK_STATE_MASK;
 
 	/* need 4 bytes for extra VLAN header info,
 	 * hope the underlying device can handle it.
@@ -520,9 +497,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* So, got the sucker initialized, now lets place
 	 * it into our local structure.
 	 */
-	spin_lock_bh(&vlan_group_lock);
 	grp = __vlan_find_group(real_dev->ifindex);
-	spin_unlock_bh(&vlan_group_lock);
 
 	/* Note, we are running under the RTNL semaphore
 	 * so it cannot "appear" on us.
@@ -536,9 +511,8 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 		memset(grp, 0, sizeof(struct vlan_group));
 		grp->real_dev_ifindex = real_dev->ifindex;
 
-		spin_lock_bh(&vlan_group_lock);
-		__grp_hash(grp);
-		spin_unlock_bh(&vlan_group_lock);
+		hlist_add_head_rcu(&grp->hlist, 
+				   &vlan_group_hash[vlan_grp_hashfn(real_dev->ifindex)]);
 
 		if (real_dev->features & NETIF_F_HW_VLAN_RX)
 			real_dev->vlan_rx_register(real_dev, grp);
@@ -580,14 +554,10 @@ out_ret_null:
 
 static int vlan_device_event(struct notifier_block *unused, unsigned long event, void *ptr)
 {
-	struct net_device *dev = (struct net_device *)(ptr);
-	struct vlan_group *grp = NULL;
+	struct net_device *dev = ptr;
+	struct vlan_group *grp = __vlan_find_group(dev->ifindex);
 	int i, flgs;
-	struct net_device *vlandev = NULL;
-
-	spin_lock_bh(&vlan_group_lock);
-	grp = __vlan_find_group(dev->ifindex);
-	spin_unlock_bh(&vlan_group_lock);
+	struct net_device *vlandev;
 
 	if (!grp)
 		goto out;
@@ -597,9 +567,20 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 	 */
 
 	switch (event) {
-	case NETDEV_CHANGEADDR:
-	case NETDEV_GOING_DOWN:
-		/* Ignore for now */
+	case NETDEV_CHANGE:
+		/* Propogate real device state to vlan devices */
+		flgs = dev->state & VLAN_LINK_STATE_MASK;
+		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
+			vlandev = grp->vlan_devices[i];
+			if (!vlandev)
+				continue;
+
+			if ((vlandev->state & VLAN_LINK_STATE_MASK) != flgs) {
+				vlandev->state = (vlandev->state &~ VLAN_LINK_STATE_MASK) 
+					| flgs;
+				netdev_state_change(vlandev);
+			}
+		}
 		break;
 
 	case NETDEV_DOWN:
@@ -644,7 +625,6 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 			ret = unregister_vlan_dev(dev,
 						  VLAN_DEV_INFO(vlandev)->vlan_id);
 
-			dev_put(vlandev);
 			unregister_netdevice(vlandev);
 
 			/* Group was destroyed? */
