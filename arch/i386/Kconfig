@@ -1204,6 +1204,8 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
+source "rpmify/Kconfig"
+
 #
 # Use the generic interrupt handling code in kernel/irq/:
 #

@@ -2,10 +2,10 @@
 All rights reserved
 ===========================================================================
 
-sk98lin.txt created 13-Feb-2004
+sk98lin.txt created 08-Jul-2004
 
-Readme File for sk98lin v6.23
-Marvell Yukon/SysKonnect SK-98xx Gigabit Ethernet Adapter family driver for LINUX
+Readme File for sk98lin v7.04
+Marvell Yukon/SysKonnect SK-98xx Gigabit Ethernet Adapter driver for LINUX
 
 This file contains
  1  Overview
@@ -110,13 +110,13 @@ To load the module manually, proceed as follows:
    
    NOTE 1: If you have more than one Marvell Yukon or SysKonnect SK-98xx 
            adapter installed, the adapters will be listed as 'eth0', 
-                   'eth1', 'eth2', etc.
-                   For each adapter, repeat steps 3 and 4 below.
+           'eth1', 'eth2', etc.
+           For each adapter, repeat steps 3 and 4 below.
 
    NOTE 2: If you have other Ethernet adapters installed, your Marvell
            Yukon or SysKonnect SK-98xx adapter will be mapped to the 
-                   next available number, e.g. 'eth1'. The mapping is executed 
-                   automatically.
+           next available number, e.g. 'eth1'. The mapping is executed 
+           automatically.
            The module installation message (displayed either in a system
            log file or on the console) prints a line for each adapter 
            found containing the corresponding 'ethX'.
@@ -174,7 +174,7 @@ In some distributions, the configuration tools are able to pass parameters
 to the driver module.
 
 If you use the kernel module loader, you can set driver parameters
-in the file /etc/modprobe.conf (or /etc/modules.conf in 2.4 or earlier).
+in the file /etc/modules.conf (or old name: /etc/conf.modules).
 To set the driver parameters in this file, proceed as follows:
 
 1. Insert a line of the form :

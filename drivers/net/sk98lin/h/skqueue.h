@@ -2,8 +2,8 @@
  *
  * Name:	skqueue.h
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
- * Version:	$Revision: 1.16 $
- * Date:	$Date: 2003/09/16 12:50:32 $
+ * Version:	$Revision: 2.3 $
+ * Date:	$Date: 2004/05/14 13:39:15 $
  * Purpose:	Defines for the Event queue
  *
  ******************************************************************************/
@@ -45,6 +45,9 @@
 #define	SKGE_RSF	11	/* RSF Aggregation Event Class */
 #define	SKGE_MARKER	12	/* MARKER Aggregation Event Class */
 #define	SKGE_FD		13	/* FD Distributor Event Class */
+#ifdef SK_ASF
+#define	SKGE_ASF	14	/* ASF Event Class */
+#endif
 
 /*
  * define event queue as circular buffer
@@ -90,5 +93,11 @@ extern	int SkEventDispatcher(SK_AC *pAC, SK_IOC Ioc);
 #define	SKERR_Q_E001MSG	"Event queue overflow"
 #define	SKERR_Q_E002	(SKERR_Q_E001+1)
 #define	SKERR_Q_E002MSG	"Undefined event class"
+#define	SKERR_Q_E003	(SKERR_Q_E001+2)
+#define	SKERR_Q_E003MSG	"Event queued in Init Level 0"
+#define	SKERR_Q_E004	(SKERR_Q_E001+3)
+#define	SKERR_Q_E004MSG	"Error Reported from Event Fuction (Queue Blocked)"
+#define	SKERR_Q_E005	(SKERR_Q_E001+4)
+#define	SKERR_Q_E005MSG	"Event scheduler called in Init Level 0 or 1"
 #endif	/* _SKQUEUE_H_ */
 

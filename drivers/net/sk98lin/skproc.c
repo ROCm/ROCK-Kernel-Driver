@@ -2,8 +2,8 @@
  *
  * Name:	skproc.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.11 $
- * Date:	$Date: 2003/12/11 16:03:57 $
+ * Version:	$Revision: 1.9 $
+ * Date:	$Date: 2004/06/23 12:04:55 $
  * Purpose:	Funktions to display statictic data
  *
  ******************************************************************************/
@@ -30,6 +30,11 @@
 #include "h/skdrv1st.h"
 #include "h/skdrv2nd.h"
 #include "h/skversion.h"
+
+/*
+ * Enable for advanced statistic counter
+ */
+/*#define ADVANCED_STATISTIC_OUTPUT = 1; */
 
 extern struct SK_NET_DEVICE *SkGeRootDev;
 static int sk_proc_print(void *writePtr, char *format, ...);
@@ -62,6 +67,7 @@ static void sk_gen_browse(void *buffer)
 {
 	struct SK_NET_DEVICE	*SkgeProcDev = SkGeRootDev;
 	struct SK_NET_DEVICE	*next;
+	SK_BOOL			DisableStatistic = 0;
 	SK_PNMI_STRUCT_DATA 	*pPnmiStruct;
 	SK_PNMI_STAT		*pPnmiStat;
 	unsigned long		Flags;	
@@ -69,6 +75,7 @@ static void sk_gen_browse(void *buffer)
 	DEV_NET			*pNet;
 	SK_AC			*pAC;
 	char			sens_msg[50];
+	int 			card_type;
 	int			MaxSecurityCount = 0;
 	int 			t;
 	int 			i;
@@ -91,7 +98,7 @@ static void sk_gen_browse(void *buffer)
 
 			spin_lock_irqsave(&pAC->SlowPathLock, Flags);
 			Size = SK_PNMI_STRUCT_SIZE;
-#ifdef SK_DIAG_SUPPORT
+			DisableStatistic = 0;
 			if (pAC->BoardLevel == SK_INIT_DATA) {
 				SK_MEMCPY(&(pAC->PnmiStruct), &(pAC->PnmiBackup), sizeof(SK_PNMI_STRUCT_DATA));
 				if (pAC->DiagModeActive == DIAG_NOTACTIVE) {
@@ -100,13 +107,13 @@ static void sk_gen_browse(void *buffer)
 			} else {
 				SkPnmiGetStruct(pAC, pAC->IoBase, pPnmiStruct, &Size, t-1);
 			}
-#else
-			SkPnmiGetStruct(pAC, pAC->IoBase, 
-				pPnmiStruct, &Size, t-1);
-#endif
 			spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
-	
 			if (strcmp(pAC->dev[t-1]->name, currDev->name) == 0) {
+				if (!pAC->GIni.GIYukon32Bit)
+					card_type = 64;
+				else
+					card_type = 32;
+
 				pPnmiStat = &pPnmiStruct->Stat[0];
 				len = sk_proc_print(buffer, 
 					"\nDetailed statistic for device %s\n",
@@ -118,6 +125,17 @@ static void sk_gen_browse(void *buffer)
 				len += sk_proc_print(buffer, 
 					"\nBoard statistics\n\n");
 				len += sk_proc_print(buffer,
+					"Card name                      %s\n",
+					pAC->DeviceStr);
+				len += sk_proc_print(buffer,
+					"Vendor/Device ID               %x/%x\n",
+					pAC->PciDev->vendor,
+					pAC->PciDev->device);
+				len += sk_proc_print(buffer,
+					"Card type (Bit)                %d\n",
+					card_type);
+					
+				len += sk_proc_print(buffer,
 					"Active Port                    %c\n",
 					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
 					Net[t-1].PrefPort]->PortNumber);
@@ -126,177 +144,215 @@ static void sk_gen_browse(void *buffer)
 					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
 					Net[t-1].PrefPort]->PortNumber);
 
-				len += sk_proc_print(buffer,
-					"Bus speed (MHz)                %d\n",
-					pPnmiStruct->BusSpeed);
+				if (pAC->DynIrqModInfo.IntModTypeSelect == C_INT_MOD_STATIC)
+					len += sk_proc_print(buffer,
+					"Interrupt Moderation           static (%d ints/sec)\n",
+					pAC->DynIrqModInfo.MaxModIntsPerSec);
+				else if (pAC->DynIrqModInfo.IntModTypeSelect == C_INT_MOD_DYNAMIC)
+					len += sk_proc_print(buffer,
+					"Interrupt Moderation           dynamic (%d ints/sec)\n",
+					pAC->DynIrqModInfo.MaxModIntsPerSec);
+				else
+					len += sk_proc_print(buffer,
+					"Interrupt Moderation           disabled\n");
 
-				len += sk_proc_print(buffer,
-					"Bus width (Bit)                %d\n",
-					pPnmiStruct->BusWidth);
+				if (CHIP_ID_YUKON_2(pAC)) {
+					len += sk_proc_print(buffer,
+						"Bus type                       PCI Express\n",
+						pPnmiStruct->BusSpeed);
+				} else {
+					len += sk_proc_print(buffer,
+						"Bus speed (MHz)                %d\n",
+						pPnmiStruct->BusSpeed);
+					len += sk_proc_print(buffer,
+						"Bus width (Bit)                %d\n",
+						pPnmiStruct->BusWidth);
+				}
 				len += sk_proc_print(buffer,
 					"Driver version                 %s\n",
 					VER_STRING);
+				len += sk_proc_print(buffer,
+					"Driver release date            %s\n",
+					pAC->Pnmi.pDriverReleaseDate);
 				len += sk_proc_print(buffer,
 					"Hardware revision              v%d.%d\n",
 					(pAC->GIni.GIPciHwRev >> 4) & 0x0F,
 					pAC->GIni.GIPciHwRev & 0x0F);
 
+				if (pAC->BoardLevel < 2) {
+					len += sk_proc_print(buffer,
+						"\n      Device %s is down.\n"
+						"      Therefore no statistics are available.\n"
+						"      After bringing the device up (ifconfig)"
+						" statistics will\n"
+						"      be displayed.\n",
+						pAC->dev[t-1]->name);
+					DisableStatistic = 1;
+				}
+
+				/* Display only if statistic info available */
 				/* Print sensor informations */
-				for (i=0; i < pAC->I2c.MaxSens; i ++) {
-					/* Check type */
-					switch (pAC->I2c.SenTable[i].SenType) {
-					case 1:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (C)");
-						len += sk_proc_print(buffer,
-							"%-25s      %d.%02d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue / 10,
-							pAC->I2c.SenTable[i].SenValue % 10);
+				if (!DisableStatistic) {
+					for (i=0; i < pAC->I2c.MaxSens; i ++) {
+						/* Check type */
+						switch (pAC->I2c.SenTable[i].SenType) {
+						case 1:
+							strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+							strcat(sens_msg, " (C)");
+							len += sk_proc_print(buffer,
+								"%-25s      %d.%02d\n",
+								sens_msg,
+								pAC->I2c.SenTable[i].SenValue / 10,
+								pAC->I2c.SenTable[i].SenValue %
+								10);
 
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (F)");
-						len += sk_proc_print(buffer,
-							"%-25s      %d.%02d\n",
-							sens_msg,
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200)/100,
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200) % 10);
-						break;
-					case 2:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (V)");
-						len += sk_proc_print(buffer,
-							"%-25s      %d.%03d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue / 1000,
-							pAC->I2c.SenTable[i].SenValue % 1000);
-						break;
-					case 3:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (rpm)");
-						len += sk_proc_print(buffer,
-							"%-25s      %d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue);
-						break;
-					default:
-						break;
+							strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+							strcat(sens_msg, " (F)");
+							len += sk_proc_print(buffer,
+								"%-25s      %d.%02d\n",
+								sens_msg,
+								((((pAC->I2c.SenTable[i].SenValue)
+								*10)*9)/5 + 3200)/100,
+								((((pAC->I2c.SenTable[i].SenValue)
+								*10)*9)/5 + 3200) % 10);
+							break;
+						case 2:
+							strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+							strcat(sens_msg, " (V)");
+							len += sk_proc_print(buffer,
+								"%-25s      %d.%03d\n",
+								sens_msg,
+								pAC->I2c.SenTable[i].SenValue / 1000,
+								pAC->I2c.SenTable[i].SenValue % 1000);
+							break;
+						case 3:
+							strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+							strcat(sens_msg, " (rpm)");
+							len += sk_proc_print(buffer,
+								"%-25s      %d\n",
+								sens_msg,
+								pAC->I2c.SenTable[i].SenValue);
+							break;
+						default:
+							break;
+						}
 					}
-				}
-				
-				/*Receive statistics */
-				len += sk_proc_print(buffer, 
-				"\nReceive statistics\n\n");
+			
+					/*Receive statistics */
+					len += sk_proc_print(buffer, 
+					"\nReceive statistics\n\n");
 
-				len += sk_proc_print(buffer,
-					"Received bytes                 %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxOctetsOkCts);
-				len += sk_proc_print(buffer,
-					"Received packets               %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxOkCts);
+					len += sk_proc_print(buffer,
+						"Received bytes                 %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxOctetsOkCts);
+					len += sk_proc_print(buffer,
+						"Received packets               %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxOkCts);
 #if 0
-				if (pAC->GIni.GP[0].PhyType == SK_PHY_XMAC && 
-					pAC->HWRevision < 12) {
-					pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts - 
-						pPnmiStat->StatRxShortsCts;
-					pPnmiStat->StatRxShortsCts = 0;
-				}
+					if (pAC->GIni.GP[0].PhyType == SK_PHY_XMAC && 
+						pAC->HWRevision < 12) {
+						pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts - 
+							pPnmiStat->StatRxShortsCts;
+						pPnmiStat->StatRxShortsCts = 0;
+					}
 #endif
-				if (pNet->Mtu > 1500) 
-					pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts -
-						pPnmiStat->StatRxTooLongCts;
+					if (pNet->Mtu > 1500) 
+						pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts -
+							pPnmiStat->StatRxTooLongCts;
 
-				len += sk_proc_print(buffer,
-					"Receive errors                 %Lu\n",
-					(unsigned long long) pPnmiStruct->InErrorsCts);
-				len += sk_proc_print(buffer,
-					"Receive dropped                %Lu\n",
-					(unsigned long long) pPnmiStruct->RxNoBufCts);
-				len += sk_proc_print(buffer,
-					"Received multicast             %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxMulticastOkCts);
-				len += sk_proc_print(buffer,
-					"Receive error types\n");
-				len += sk_proc_print(buffer,
-					"   length                      %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxRuntCts);
-				len += sk_proc_print(buffer,
-					"   buffer overflow             %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxFifoOverflowCts);
-				len += sk_proc_print(buffer,
-					"   bad crc                     %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxFcsCts);
-				len += sk_proc_print(buffer,
-					"   framing                     %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxFramingCts);
-				len += sk_proc_print(buffer,
-					"   missed frames               %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxMissedCts);
+					len += sk_proc_print(buffer,
+						"Receive errors                 %Lu\n",
+						(unsigned long long) pPnmiStruct->InErrorsCts);
+					len += sk_proc_print(buffer,
+						"Receive dropped                %Lu\n",
+						(unsigned long long) pPnmiStruct->RxNoBufCts);
+					len += sk_proc_print(buffer,
+						"Received multicast             %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxMulticastOkCts);
+#ifdef ADVANCED_STATISTIC_OUTPUT
+					len += sk_proc_print(buffer,
+						"Receive error types\n");
+					len += sk_proc_print(buffer,
+						"   length                      %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxRuntCts);
+					len += sk_proc_print(buffer,
+						"   buffer overflow             %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxFifoOverflowCts);
+					len += sk_proc_print(buffer,
+						"   bad crc                     %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxFcsCts);
+					len += sk_proc_print(buffer,
+						"   framing                     %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxFramingCts);
+					len += sk_proc_print(buffer,
+						"   missed frames               %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxMissedCts);
 
-				if (pNet->Mtu > 1500)
-					pPnmiStat->StatRxTooLongCts = 0;
+					if (pNet->Mtu > 1500)
+						pPnmiStat->StatRxTooLongCts = 0;
 
-				len += sk_proc_print(buffer,
-					"   too long                    %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxTooLongCts);					
-				len += sk_proc_print(buffer,
-					"   carrier extension           %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxCextCts);				
-				len += sk_proc_print(buffer,
-					"   too short                   %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxShortsCts);				
-				len += sk_proc_print(buffer,
-					"   symbol                      %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxSymbolCts);				
-				len += sk_proc_print(buffer,
-					"   LLC MAC size                %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxIRLengthCts);				
-				len += sk_proc_print(buffer,
-					"   carrier event               %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxCarrierCts);				
-				len += sk_proc_print(buffer,
-					"   jabber                      %Lu\n",
-					(unsigned long long) pPnmiStat->StatRxJabberCts);				
+					len += sk_proc_print(buffer,
+						"   too long                    %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxTooLongCts);					
+					len += sk_proc_print(buffer,
+						"   carrier extension           %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxCextCts);				
+					len += sk_proc_print(buffer,
+						"   too short                   %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxShortsCts);				
+					len += sk_proc_print(buffer,
+						"   symbol                      %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxSymbolCts);				
+					len += sk_proc_print(buffer,
+						"   LLC MAC size                %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxIRLengthCts);				
+					len += sk_proc_print(buffer,
+						"   carrier event               %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxCarrierCts);				
+					len += sk_proc_print(buffer,
+						"   jabber                      %Lu\n",
+						(unsigned long long) pPnmiStat->StatRxJabberCts);				
+#endif
 
-
-				/*Transmit statistics */
-				len += sk_proc_print(buffer, 
-				"\nTransmit statistics\n\n");
+					/*Transmit statistics */
+					len += sk_proc_print(buffer, 
+					"\nTransmit statistics\n\n");
 				
-				len += sk_proc_print(buffer,
-					"Transmited bytes               %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxOctetsOkCts);
-				len += sk_proc_print(buffer,
-					"Transmited packets             %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxOkCts);
-				len += sk_proc_print(buffer,
-					"Transmit errors                %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
-				len += sk_proc_print(buffer,
-					"Transmit dropped               %Lu\n",
-					(unsigned long long) pPnmiStruct->TxNoBufCts);
-				len += sk_proc_print(buffer,
-					"Transmit collisions            %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
-				len += sk_proc_print(buffer,
-					"Transmit error types\n");
-				len += sk_proc_print(buffer,
-					"   excessive collision         %ld\n",
-					pAC->stats.tx_aborted_errors);
-				len += sk_proc_print(buffer,
-					"   carrier                     %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxCarrierCts);
-				len += sk_proc_print(buffer,
-					"   fifo underrun               %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxFifoUnderrunCts);
-				len += sk_proc_print(buffer,
-					"   heartbeat                   %Lu\n",
-					(unsigned long long) pPnmiStat->StatTxCarrierCts);
-				len += sk_proc_print(buffer,
-					"   window                      %ld\n",
-					pAC->stats.tx_window_errors);
+					len += sk_proc_print(buffer,
+						"Transmited bytes               %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxOctetsOkCts);
+					len += sk_proc_print(buffer,
+						"Transmited packets             %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxOkCts);
+					len += sk_proc_print(buffer,
+						"Transmit errors                %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+					len += sk_proc_print(buffer,
+						"Transmit dropped               %Lu\n",
+						(unsigned long long) pPnmiStruct->TxNoBufCts);
+					len += sk_proc_print(buffer,
+						"Transmit collisions            %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+#ifdef ADVANCED_STATISTIC_OUTPUT
+					len += sk_proc_print(buffer,
+						"Transmit error types\n");
+					len += sk_proc_print(buffer,
+						"   excessive collision         %ld\n",
+						pAC->stats.tx_aborted_errors);
+					len += sk_proc_print(buffer,
+						"   carrier                     %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxCarrierCts);
+					len += sk_proc_print(buffer,
+						"   fifo underrun               %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxFifoUnderrunCts);
+					len += sk_proc_print(buffer,
+						"   heartbeat                   %Lu\n",
+						(unsigned long long) pPnmiStat->StatTxCarrierCts);
+					len += sk_proc_print(buffer,
+						"   window                      %ld\n",
+						pAC->stats.tx_window_errors);
+#endif
+				} /* if (!DisableStatistic) */
 				
 			} /* if (strcmp(pACname, currDeviceName) == 0) */
 		}

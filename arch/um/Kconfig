@@ -290,3 +290,5 @@ config INPUT
 	default n
 
 source "arch/um/Kconfig.debug"
+
+source "rpmify/Kconfig"

@@ -2,8 +2,8 @@
  *
  * Name:	skdebug.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.14 $
- * Date:	$Date: 2003/05/13 17:26:00 $
+ * Version:	$Revision: 2.2 $
+ * Date:	$Date: 2004/02/26 16:06:06 $
  * Purpose:	SK specific DEBUG support
  *
  ******************************************************************************/
@@ -58,6 +58,9 @@
 #define SK_DBGMOD_ADDR	0x00000080L	/* ADDR module */
 #define SK_DBGMOD_PECP	0x00000100L	/* PECP module */
 #define SK_DBGMOD_POWM	0x00000200L	/* Power Management module */
+#ifdef SK_ASF
+#define SK_DBGMOD_ASF	0x00000400L	/* ASF module */
+#endif
 
 /* Debug events */
 

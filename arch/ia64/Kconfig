@@ -390,3 +390,5 @@ source "arch/ia64/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
+
+source "rpmify/Kconfig"
