@@ -1572,9 +1572,9 @@ typedef struct {
 } FILE_SYSTEM_DEVICE_INFO;	/* device info, level 0x104 */
 
 typedef struct {
-	__u32 Attributes;
-	__u32 MaxPathNameComponentLength;
-	__u32 FileSystemNameLen;
+	__le32 Attributes;
+	__le32 MaxPathNameComponentLength;
+	__le32 FileSystemNameLen;
 	char FileSystemName[52];	/* do not really need to save this - so potentially get only subset of name */
 } FILE_SYSTEM_ATTRIBUTE_INFO;
 

@@ -137,8 +137,9 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
 			    le32_to_cpu(tcon->fsDevInfo.DeviceCharacteristics),
-			    tcon->fsAttrInfo.Attributes,
-			    tcon->fsAttrInfo.MaxPathNameComponentLength,tcon->tidStatus);
+			    le32_to_cpu(tcon->fsAttrInfo.Attributes),
+			    le32_to_cpu(tcon->fsAttrInfo.MaxPathNameComponentLength),
+			    tcon->tidStatus);
 		buf += length;        
 		if (dev_type == FILE_DEVICE_DISK)
 			length = sprintf(buf, " type: DISK ");

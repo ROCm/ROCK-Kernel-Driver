@@ -2356,11 +2356,6 @@ QFSAttributeRetry:
 			    (FILE_SYSTEM_ATTRIBUTE_INFO
 			     *) (((char *) &pSMBr->hdr.Protocol) +
 				 data_offset);
-			response_data->Attributes = le32_to_cpu(response_data->Attributes);
-			response_data->MaxPathNameComponentLength = 
-				le32_to_cpu(response_data->MaxPathNameComponentLength);
-			response_data->FileSystemNameLen = 
-				le32_to_cpu(response_data->FileSystemNameLen);
 			memcpy(&tcon->fsAttrInfo, response_data,
 			       sizeof (FILE_SYSTEM_ATTRIBUTE_INFO));
 		}
