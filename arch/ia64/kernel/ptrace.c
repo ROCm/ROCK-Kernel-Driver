@@ -1476,7 +1476,7 @@ syscall_trace (void)
 
 asmlinkage void
 syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
-	  long arg4, long arg5, long arg6, long arg7, long stack)
+		     long arg4, long arg5, long arg6, long arg7, long stack)
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 	long syscall;
@@ -1490,8 +1490,7 @@ syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
 		audit_syscall_entry(current, syscall, arg0, arg1, arg2, arg3);
 	}
 
-	if (test_thread_flag(TIF_SYSCALL_TRACE)
-	    && (current->ptrace & PT_PTRACED))
+	if (test_thread_flag(TIF_SYSCALL_TRACE) && (current->ptrace & PT_PTRACED))
 		syscall_trace();
 }
 
@@ -1499,14 +1498,11 @@ syscall_trace_enter (long arg0, long arg1, long arg2, long arg3,
 
 asmlinkage void
 syscall_trace_leave (long arg0, long arg1, long arg2, long arg3,
-	  long arg4, long arg5, long arg6, long arg7, long stack)
+		     long arg4, long arg5, long arg6, long arg7, long stack)
 {
-	struct pt_regs *regs = (struct pt_regs *) &stack;
-
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, regs->r8);
+		audit_syscall_exit(current, ((struct pt_regs *) &stack)->r8);
 
-	if (test_thread_flag(TIF_SYSCALL_TRACE)
-	    && (current->ptrace & PT_PTRACED))
+	if (test_thread_flag(TIF_SYSCALL_TRACE) && (current->ptrace & PT_PTRACED))
 		syscall_trace();
 }
