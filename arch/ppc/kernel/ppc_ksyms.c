@@ -218,13 +218,13 @@ EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 #ifdef SPINLOCK_DEBUG
-EXPORT_SYMBOL(_spin_lock);
-EXPORT_SYMBOL(_spin_unlock);
-EXPORT_SYMBOL(spin_trylock);
-EXPORT_SYMBOL(_read_lock);
-EXPORT_SYMBOL(_read_unlock);
-EXPORT_SYMBOL(_write_lock);
-EXPORT_SYMBOL(_write_unlock);
+EXPORT_SYMBOL(_raw_spin_lock);
+EXPORT_SYMBOL(_raw_spin_unlock);
+EXPORT_SYMBOL(_raw_spin_trylock);
+EXPORT_SYMBOL(_raw_read_lock);
+EXPORT_SYMBOL(_raw_read_unlock);
+EXPORT_SYMBOL(_raw_write_lock);
+EXPORT_SYMBOL(_raw_write_unlock);
 #endif
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_hw_index);
@@ -361,7 +361,7 @@ EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(handle_mm_fault); /* For MOL */
 EXPORT_SYMBOL_NOVERS(disarm_decr);
 #ifdef CONFIG_PPC_STD_MMU
-EXPORT_SYMBOL(flush_hash_page); /* For MOL */
+EXPORT_SYMBOL(flush_hash_pages); /* For MOL */
 extern long *intercept_table;
 EXPORT_SYMBOL(intercept_table);
 #endif

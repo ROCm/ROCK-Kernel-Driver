@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/highmem.h>
 
 #include <asm/prom.h>
 #include <asm/mmu.h>
@@ -289,7 +290,6 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 {
 	struct mm_struct *mm;
 	pmd_t *pmd;
-	pte_t *ptep;
 	static int nopreload;
 
 	if (Hash == 0 || nopreload)
@@ -299,8 +299,6 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 		return;
 	mm = (address < TASK_SIZE)? vma->vm_mm: &init_mm;
 	pmd = pmd_offset(pgd_offset(mm, address), address);
-	if (!pmd_none(*pmd)) {
-		ptep = pte_offset(pmd, address);
-		add_hash_page(mm->context, address, ptep);
-	}
+	if (!pmd_none(*pmd))
+		add_hash_page(mm->context, address, pmd_val(*pmd));
 }

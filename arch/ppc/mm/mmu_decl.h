@@ -61,11 +61,12 @@ extern void MMU_init_hw(void);
  * which includes all new 82xx processors.  We need tlbie/tlbsync here
  * in that case (I think). -- Dan.
  */
-static inline void flush_HPTE(unsigned context, unsigned long va, pte_t *pg)
+static inline void flush_HPTE(unsigned context, unsigned long va,
+			      unsigned long pdval)
 {
 	if ((Hash != 0) &&
 	    (cur_cpu_spec[0]->cpu_features & CPU_FTR_HPTE_TABLE))
-		flush_hash_page(0, va, pg);
+		flush_hash_pages(0, va, pdval, 1);
 	else
 		_tlbie(va);
 }

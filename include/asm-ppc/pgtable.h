@@ -13,6 +13,7 @@
 #include <asm/processor.h>		/* For TASK_SIZE */
 #include <asm/mmu.h>
 #include <asm/page.h>
+#include <asm/kmap_types.h>
 
 extern void _tlbie(unsigned long address);
 extern void _tlbia(void);
@@ -98,6 +99,7 @@ extern void flush_icache_user_range(struct vm_area_struct *vma,
 		struct page *page, unsigned long addr, int len);
 extern void flush_icache_range(unsigned long, unsigned long);
 extern void __flush_dcache_icache(void *page_va);
+extern void __flush_dcache_icache_phys(unsigned long physaddr);
 extern void flush_dcache_page(struct page *page);
 extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
 
@@ -274,7 +276,6 @@ extern unsigned long ioremap_bot, ioremap_base;
 #define _PAGE_HWWRITE	0x0100	/* h/w write enable: never set in Linux PTE */
 #define _PAGE_USER	0x0800	/* One of the PP bits, the other is USER&~RW */
 
-#define _PMD_PRESENT	0x0001
 #define _PMD_PAGE_MASK	0x000c
 #define _PMD_PAGE_8M	0x000c
 
@@ -385,8 +386,8 @@ extern unsigned long empty_zero_page[1024];
 #define pte_clear(ptep)		do { set_pte((ptep), __pte(0)); } while (0)
 
 #define pmd_none(pmd)		(!pmd_val(pmd))
-#define	pmd_bad(pmd)		((pmd_val(pmd) & ~PAGE_MASK) != 0)
-#define	pmd_present(pmd)	((pmd_val(pmd) & PAGE_MASK) != 0)
+#define	pmd_bad(pmd)		(0)
+#define	pmd_present(pmd)	(pmd_val(pmd) != 0)
 #define	pmd_clear(pmdp)		do { pmd_val(*(pmdp)) = 0; } while (0)
 
 #define pte_page(x)		(mem_map+(unsigned long)((pte_val(x)-PPC_MEMSTART) >> PAGE_SHIFT))
@@ -530,7 +531,10 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HASHPTE) == 0)
 
-#define pmd_page(pmd)	(pmd_val(pmd) & PAGE_MASK)
+#define pmd_page_kernel(pmd)	\
+	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pmd_page(pmd)		\
+	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
@@ -545,11 +549,18 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 	return (pmd_t *) dir;
 }
 
-/* Find an entry in the third-level page table.. */ 
-static inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
-{
-	return (pte_t *) pmd_page(*dir) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
-}
+/* Find an entry in the third-level page table.. */
+#define __pte_offset(address)		\
+	((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#define pte_offset_kernel(dir, addr)	\
+	((pte_t *) pmd_page_kernel(*(dir)) + __pte_offset(addr))
+#define pte_offset_map(dir, addr)		\
+	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE0) + __pte_offset(addr))
+#define pte_offset_map_nested(dir, addr)	\
+	((pte_t *) kmap_atomic(pmd_page(*(dir)), KM_PTE1) + __pte_offset(addr))
+
+#define pte_unmap(pte)		kunmap_atomic(pte, KM_PTE0)
+#define pte_unmap_nested(pte)	kunmap_atomic(pte, KM_PTE1)
 
 extern pgd_t swapper_pg_dir[1024];
 extern void paging_init(void);
@@ -558,10 +569,12 @@ extern void paging_init(void);
  * When flushing the tlb entry for a page, we also need to flush the hash
  * table entry.  flush_hash_page is assembler (for speed) in hashtable.S.
  */
-extern int flush_hash_page(unsigned context, unsigned long va, pte_t *ptep);
+extern int flush_hash_pages(unsigned context, unsigned long va,
+			    unsigned long pmdval, int count);
 
 /* Add an HPTE to the hash table */
-extern void add_hash_page(unsigned context, unsigned long va, pte_t *ptep);
+extern void add_hash_page(unsigned context, unsigned long va,
+			  unsigned long pmdval);
 
 /*
  * Encode and decode a swap entry.

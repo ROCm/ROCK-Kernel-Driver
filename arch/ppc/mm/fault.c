@@ -154,6 +154,7 @@ good_area:
 
 		/* Since 4xx supports per-page execute permission,
 		 * we lazily flush dcache to icache. */
+		ptep = NULL;
 		if (get_pteptr(mm, address, &ptep) && pte_present(*ptep)) {
 			struct page *page = pte_page(*ptep);
 
@@ -164,9 +165,12 @@ good_area:
 			}
 			pte_update(ptep, 0, _PAGE_HWEXEC);
 			_tlbie(address);
+			pte_unmap(ptep);
 			up_read(&mm->mmap_sem);
 			return;
 		}
+		if (ptep != NULL)
+			pte_unmap(ptep);
 #endif
 	/* a read */
 	} else {
@@ -289,27 +293,18 @@ pte_t *va_to_pte(unsigned long address)
 	struct mm_struct *mm;
 
 	if (address < TASK_SIZE)
-		mm = current->mm;
-	else
-		mm = &init_mm;
+		return NULL;
 
-	dir = pgd_offset(mm, address & PAGE_MASK);
+	dir = pgd_offset(&init_mm, address);
 	if (dir) {
 		pmd = pmd_offset(dir, address & PAGE_MASK);
 		if (pmd && pmd_present(*pmd)) {
-			pte = pte_offset(pmd, address & PAGE_MASK);
-			if (pte && pte_present(*pte)) {
+			pte = pte_offset_kernel(pmd, address & PAGE_MASK);
+			if (pte && pte_present(*pte))
 				return(pte);
-			}
-		}
-		else {
-			return (0);
 		}
 	}
-	else {
-		return (0);
-	}
-	return (0);
+	return NULL;
 }
 
 unsigned long va_to_phys(unsigned long address)
@@ -334,7 +329,7 @@ print_8xx_pte(struct mm_struct *mm, unsigned long addr)
         if (pgd) {
                 pmd = pmd_offset(pgd, addr & PAGE_MASK);
                 if (pmd && pmd_present(*pmd)) {
-                        pte = pte_offset(pmd, addr & PAGE_MASK);
+                        pte = pte_offset_kernel(pmd, addr & PAGE_MASK);
                         if (pte) {
                                 printk(" (0x%08lx)->(0x%08lx)->0x%08lx\n",
                                         (long)pgd, (long)pte, (long)pte_val(*pte));
@@ -375,9 +370,9 @@ get_8xx_pte(struct mm_struct *mm, unsigned long addr)
         if (pgd) {
                 pmd = pmd_offset(pgd, addr & PAGE_MASK);
                 if (pmd && pmd_present(*pmd)) {
-                        pte = pte_offset(pmd, addr & PAGE_MASK);
+                        pte = pte_offset_kernel(pmd, addr & PAGE_MASK);
                         if (pte) {
-                                        retval = (int)pte_val(*pte);
+				retval = (int)pte_val(*pte);
                         }
                 }
         }

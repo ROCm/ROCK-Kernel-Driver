@@ -291,26 +291,6 @@ void smp_call_function_interrupt(void)
 		atomic_inc(&call_data->finished);
 }
 
-/*
- * Task migration callback.
- */
-void smp_task_migration_interrupt(void *new_task)
-{
-	task_t *p;
-
-	p = new_task;
-	sched_task_migrated(p);
-}
-
-/*
- * This function sends a 'task migration' IPI to another CPU.
- * Must be called from syscall contexts, with interrupts *enabled*.
- */
-void smp_migrate_task(int cpu, task_t *p)
-{
-	__smp_call_function(smp_task_migration_interrupt, p, 0, cpu);
-}
-
 void __init smp_boot_cpus(void)
 {
 	int i, cpu_nr;

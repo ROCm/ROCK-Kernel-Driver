@@ -30,6 +30,7 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/highmem.h>
 
 #include "mmu_decl.h"
 
@@ -104,7 +105,6 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 {
 	struct mm_struct *mm;
 	pmd_t *pmd;
-	pte_t *pte;
 
 	if (Hash == 0) {
 		_tlbie(vmaddr);
@@ -112,11 +112,8 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 	}
 	mm = (vmaddr < TASK_SIZE)? vma->vm_mm: &init_mm;
 	pmd = pmd_offset(pgd_offset(mm, vmaddr), vmaddr);
-	if (!pmd_none(*pmd)) {
-		pte = pte_offset(pmd, vmaddr);
-		if (pte_val(*pte) & _PAGE_HASHPTE)
-			flush_hash_page(mm->context, vmaddr, pte);
-	}
+	if (!pmd_none(*pmd))
+		flush_hash_pages(mm->context, vmaddr, pmd_val(*pmd), 1);
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
 #endif	
@@ -133,8 +130,8 @@ local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned 
 {
 	struct mm_struct *mm = vma->vm_mm;
 	pmd_t *pmd;
-	pte_t *pte;
 	unsigned long pmd_end;
+	int count;
 	unsigned int ctx = mm->context;
 
 	if (Hash == 0) {
@@ -144,24 +141,21 @@ local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned 
 	start &= PAGE_MASK;
 	if (start >= end)
 		return;
+	end = (end - 1) | ~PAGE_MASK;
 	pmd = pmd_offset(pgd_offset(mm, start), start);
-	do {
-		pmd_end = (start + PGDIR_SIZE) & PGDIR_MASK;
+	for (;;) {
+		pmd_end = ((start + PGDIR_SIZE) & PGDIR_MASK) - 1;
+		if (pmd_end > end)
+			pmd_end = end;
 		if (!pmd_none(*pmd)) {
-			if (!pmd_end || pmd_end > end)
-				pmd_end = end;
-			pte = pte_offset(pmd, start);
-			do {
-				if ((pte_val(*pte) & _PAGE_HASHPTE) != 0)
-					flush_hash_page(ctx, start, pte);
-				start += PAGE_SIZE;
-				++pte;
-			} while (start && start < pmd_end);
-		} else {
-			start = pmd_end;
+			count = ((pmd_end - start) >> PAGE_SHIFT) + 1;
+			flush_hash_pages(ctx, start, pmd_val(*pmd), count);
 		}
+		if (pmd_end == end)
+			break;
+		start = pmd_end + 1;
 		++pmd;
-	} while (start && start < end);
+	}
 
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
