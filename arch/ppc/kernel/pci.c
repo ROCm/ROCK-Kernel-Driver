@@ -890,9 +890,10 @@ void __init
 pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			   struct device_node *dev, int primary)
 {
-	unsigned int *ranges, *prev;
+	static unsigned int static_lc_ranges[256] __initdata;
+	unsigned int *dt_ranges, *lc_ranges, *ranges, *prev;
 	unsigned int size;
-	int rlen = 0;
+	int rlen = 0, orig_rlen;
 	int memno = 0;
 	struct resource *res;
 	int np, na = prom_n_addr_cells(dev);
@@ -902,7 +903,22 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	 * that can have more than 3 ranges, fortunately using contiguous
 	 * addresses -- BenH
 	 */
-	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	dt_ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
+	if (!dt_ranges)
+		return;
+	/* Sanity check, though hopefully that never happens */
+	if (rlen > sizeof(static_lc_ranges)) {
+		printk(KERN_WARNING "OF ranges property too large !\n");
+		rlen = sizeof(static_lc_ranges);
+	}
+	lc_ranges = static_lc_ranges;
+	memcpy(lc_ranges, dt_ranges, rlen);
+	orig_rlen = rlen;
+
+	/* Let's work on a copy of the "ranges" property instead of damaging
+	 * the device-tree image in memory
+	 */
+	ranges = lc_ranges;
 	prev = NULL;
 	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
 		if (prev) {
@@ -927,10 +943,9 @@ pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	 *			(size depending on dev->n_addr_cells)
 	 *   cells 4+5 or 5+6:	the size of the range
 	 */
-	rlen = 0;
-	hose->io_base_phys = 0;
-	ranges = (unsigned int *) get_property(dev, "ranges", &rlen);
-	while ((rlen -= np * sizeof(unsigned int)) >= 0) {
+	ranges = lc_ranges;
+	rlen = orig_rlen;
+	while (ranges && (rlen -= np * sizeof(unsigned int)) >= 0) {
 		res = NULL;
 		size = ranges[na+4];
 		switch (ranges[0] >> 24) {
@@ -1027,7 +1042,7 @@ do_update_p2p_io_resource(struct pci_bus *bus, int enable_vga)
 
  	res = *(bus->resource[0]);
 
-	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->name);
+	DBG("Remapping Bus %d, bridge: %s\n", bus->number, bridge->slot_name);
 	res.start -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	res.end -= ((unsigned long) hose->io_base_virt - isa_io_base);
 	DBG("  IO window: %08lx-%08lx\n", res.start, res.end);
