@@ -6529,7 +6529,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	 */
 	err = 0;
 	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
-		hw_phy_id_masked = PHY_ID_INVALID;
+		hw_phy_id = hw_phy_id_masked = PHY_ID_INVALID;
 	} else {
 		/* Now read the physical PHY_ID from the chip and verify
 		 * that it is sane.  If it doesn't look good, we fall back
