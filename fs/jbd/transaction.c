@@ -1414,7 +1414,10 @@ out:
 /*
  * Append a buffer to a transaction list, given the transaction's list head
  * pointer.
+ *
  * journal_datalist_lock is held.
+ *
+ * jbd_lock_bh_state(jh2bh(jh)) is held.
  */
 
 static inline void 
@@ -1438,6 +1441,8 @@ __blist_add_buffer(struct journal_head **list, struct journal_head *jh)
  *
  * Called with journal_datalist_lock held, and the journal may not
  * be locked.
+ *
+ * jbd_lock_bh_state(jh2bh(jh)) is held.
  */
 
 static inline void
@@ -1468,16 +1473,13 @@ __blist_del_buffer(struct journal_head **list, struct journal_head *jh)
 void __journal_unfile_buffer(struct journal_head *jh)
 {
 	struct journal_head **list = 0;
-	transaction_t * transaction;
+	transaction_t *transaction;
+	struct buffer_head *bh = jh2bh(jh);
 
 	assert_spin_locked(&journal_datalist_lock);
 	transaction = jh->b_transaction;
 
-#ifdef __SMP__
-	J_ASSERT (current->lock_depth >= 0);
-#endif
 	J_ASSERT_JH(jh, jh->b_jlist < BJ_Types);
-
 	if (jh->b_jlist != BJ_None)
 		J_ASSERT_JH(jh, transaction != 0);
 
@@ -1511,15 +1513,17 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	
 	__blist_del_buffer(list, jh);
 	jh->b_jlist = BJ_None;
-	if (test_and_clear_bit(BH_JBDDirty, &jh2bh(jh)->b_state))
-		mark_buffer_dirty(jh2bh(jh));	/* Expose it to the VM */
+	if (test_clear_buffer_jbddirty(bh))
+		mark_buffer_dirty(bh);	/* Expose it to the VM */
 }
 
 void journal_unfile_buffer(struct journal_head *jh)
 {
+	jbd_lock_bh_state(jh2bh(jh));
 	spin_lock(&journal_datalist_lock);
 	__journal_unfile_buffer(jh);
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(jh2bh(jh));
 }
 
 /*

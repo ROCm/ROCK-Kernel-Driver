@@ -63,7 +63,7 @@ struct journal_head {
 
 	/*
 	 * Doubly-linked list of buffers on a transaction's data, metadata or
-	 * forget queue. [jbd_lock_bh_state()]
+	 * forget queue. [t_list_lock] [jbd_lock_bh_state()]
 	 */
 	struct journal_head *b_tnext, *b_tprev;
 
