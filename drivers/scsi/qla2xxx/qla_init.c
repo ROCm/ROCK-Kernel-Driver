@@ -3140,6 +3140,10 @@ qla2x00_restart_queues(scsi_qla_host_t *ha, uint8_t flush)
 		spin_lock_irqsave(&ha->list_lock,flags);
 		list_for_each_safe(list, temp, &ha->pending_queue) {
 			sp = list_entry(list, srb_t, list);
+
+			if ((sp->flags & SRB_TAPE))
+				continue;
+			 
 			/* 
 			 * When time expire return request back to OS as BUSY 
 			 */

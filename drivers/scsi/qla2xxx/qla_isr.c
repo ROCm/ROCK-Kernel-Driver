@@ -907,7 +907,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 	 * If loop is in transient state Report DID_BUS_BUSY
 	 */
 	if ((comp_status != CS_COMPLETE || scsi_status != 0)) {
-		if (!(sp->flags & SRB_IOCTL) &&
+		if (!(sp->flags & (SRB_IOCTL | SRB_TAPE)) &&
 		    (atomic_read(&ha->loop_down_timer) ||
 			atomic_read(&ha->loop_state) != LOOP_READY)) {
 
@@ -986,7 +986,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		if (sp->request_sense_length != 0)
 			ha->status_srb = sp;
 
-		if (!(sp->flags & SRB_IOCTL) &&
+		if (!(sp->flags & (SRB_IOCTL | SRB_TAPE)) &&
 		    qla2x00_check_sense(cp, lq) == QLA_SUCCESS) {
 			/* Throw away status_cont if any */
 			ha->status_srb = NULL;
@@ -1053,7 +1053,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 			if (sp->request_sense_length != 0)
 				ha->status_srb = sp;
 
-			if (!(sp->flags & SRB_IOCTL) &&
+			if (!(sp->flags & (SRB_IOCTL | SRB_TAPE)) &&
 			    (qla2x00_check_sense(cp, lq) == QLA_SUCCESS)) {
 				ha->status_srb = NULL;
 				add_to_scsi_retry_queue(ha, sp);
@@ -1137,7 +1137,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		    ha->host_no, t, l, cp->serial_number, comp_status,
 		    atomic_read(&fcport->state)));
 
-		if ((sp->flags & SRB_IOCTL) ||
+		if ((sp->flags & (SRB_IOCTL | SRB_TAPE)) ||
 		    atomic_read(&fcport->state) == FCS_DEVICE_DEAD) {
 			cp->result = DID_NO_CONNECT << 16;
 			if (atomic_read(&ha->loop_state) == LOOP_DOWN) 
@@ -1162,7 +1162,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		    "scsi(%ld): RESET status detected 0x%x-0x%x.\n",
 		    ha->host_no, comp_status, scsi_status));
 
-		if (sp->flags & SRB_IOCTL) {
+		if (sp->flags & (SRB_IOCTL | SRB_TAPE)) {
 			cp->result = DID_RESET << 16;
 		} else {
 			qla2x00_extend_timeout(cp, EXTEND_CMD_TIMEOUT);

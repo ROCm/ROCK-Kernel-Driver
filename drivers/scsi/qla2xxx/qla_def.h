@@ -285,7 +285,8 @@ typedef struct srb {
 
 #define SRB_BUSY		BIT_8	/* Command is in busy retry state */
 #define SRB_FO_CANCEL		BIT_9	/* Command don't need to do failover */
-#define	SRB_IOCTL		BIT_10	/* IOCTL command. */
+#define SRB_IOCTL		BIT_10	/* IOCTL command. */
+#define SRB_TAPE		BIT_11	/* FCP2 (Tape) command. */
 
 /*
  * SRB state definitions

@@ -775,10 +775,13 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 
 	/* Only modify the allowed count if the target is a *non* tape device */
 	if ((fcport->flags & FCF_TAPE_PRESENT) == 0) {
+		sp->flags &= ~SRB_TAPE;
 		if (cmd->allowed < ql2xretrycount) {
 			cmd->allowed = ql2xretrycount;
 		}
-	}
+	} else
+		sp->flags |= SRB_TAPE;
+
 
 	DEBUG5(printk("scsi(%ld:%2d:%2d): (queuecmd) queue sp = %p, "
 	    "flags=0x%x fo retry=%d, pid=%ld\n",
@@ -821,7 +824,8 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		spin_lock_irq(ha->host->host_lock);
 		return (0);
 	}
-	if (tq && test_bit(TQF_SUSPENDED, &tq->flags)) {
+	if (tq && test_bit(TQF_SUSPENDED, &tq->flags) &&
+	    (sp->flags & SRB_TAPE) == 0) {
 		/* If target suspended put incoming I/O in retry_q. */
 		qla2x00_extend_timeout(sp->cmd, 10);
 		add_to_scsi_retry_queue(ha, sp);
@@ -3943,8 +3947,8 @@ qla2x00_cmd_timeout(srb_t *sp)
 	int processed;
 	scsi_qla_host_t *vis_ha, *dest_ha;
 	struct scsi_cmnd *cmd;
-	ulong      flags;
-	fc_port_t	*fcport;
+	unsigned long flags, cpu_flags;
+	fc_port_t *fcport;
 
 	cmd = sp->cmd;
 	vis_ha = (scsi_qla_host_t *)cmd->device->host->hostdata;
@@ -4038,6 +4042,64 @@ qla2x00_cmd_timeout(srb_t *sp)
 
 		 return;
 	}
+
+	spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
+	if (sp->state == SRB_DONE_STATE) {
+		/* IO in done_q  -- leave it */
+		DEBUG(printk("scsi(%ld): Found in Done queue pid %ld sp=%p.\n",
+		    dest_ha->host_no, cmd->serial_number, sp));
+	} else if (sp->state == SRB_SUSPENDED_STATE) {
+		DEBUG(printk("scsi(%ld): Found SP %p in suspended state  "
+		    "- pid %ld:\n",
+		    dest_ha->host_no, sp, cmd->serial_number));
+		DEBUG(qla2x00_dump_buffer((uint8_t *)sp, sizeof(srb_t));)
+	} else if (sp->state == SRB_ACTIVE_STATE) {
+		/*
+		 * IO is with ISP find the command in our active list.
+		 */
+		spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
+		spin_lock_irqsave(&dest_ha->hardware_lock, flags);
+		if (sp == dest_ha->outstanding_cmds[
+		    (unsigned long)sp->cmd->host_scribble]) {
+
+			DEBUG(printk("cmd_timeout: Found in ISP \n"));
+
+			if (sp->flags & SRB_TAPE) {
+				/*
+				 * We cannot allow the midlayer error handler
+				 * to wakeup and begin the abort process.
+				 * Extend the timer so that the firmware can
+				 * properly return the IOCB.
+				 */
+				DEBUG(printk("cmd_timeout: Extending timeout "
+				    "of FCP2 tape command!\n"));
+				qla2x00_extend_timeout(sp->cmd,
+				    EXTEND_CMD_TIMEOUT);
+			}
+			sp->state = SRB_ACTIVE_TIMEOUT_STATE;
+			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
+		} else {
+			spin_unlock_irqrestore(&dest_ha->hardware_lock, flags);
+			printk(KERN_INFO 
+				"qla_cmd_timeout: State indicates it is with "
+				"ISP, But not in active array\n");
+		}
+		spin_lock_irqsave(&dest_ha->list_lock, cpu_flags);
+	} else if (sp->state == SRB_ACTIVE_TIMEOUT_STATE) {
+		DEBUG(printk("qla2100%ld: Found in Active timeout state"
+				"pid %ld, State = %x., \n",
+				dest_ha->host_no,
+				sp->cmd->serial_number, sp->state);)
+	} else {
+		/* EMPTY */
+		DEBUG2(printk("cmd_timeout%ld: LOST command state = "
+				"0x%x, sp=%p\n",
+				vis_ha->host_no, sp->state,sp);)
+
+		qla_printk(KERN_INFO, vis_ha,
+			"cmd_timeout: LOST command state = 0x%x\n", sp->state);
+	}
+	spin_unlock_irqrestore(&dest_ha->list_lock, cpu_flags);
 
 	DEBUG3(printk("cmd_timeout: Leaving\n");)
 }
@@ -4268,7 +4330,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 		 * continues until the LOOP DOWN time expires or the condition
 		 * goes away.
 		 */
-	 	if (!(sp->flags & SRB_IOCTL) &&
+		if (!(sp->flags & (SRB_IOCTL | SRB_TAPE)) &&
 		    (atomic_read(&fcport->state) != FCS_ONLINE ||
 			test_bit(ABORT_ISP_ACTIVE, &dest_ha->dpc_flags) ||
 			atomic_read(&dest_ha->loop_state) != LOOP_READY)) {
@@ -4293,7 +4355,7 @@ qla2x00_next(scsi_qla_host_t *vis_ha)
 		 * If this request's lun is suspended then put the request on
 		 * the  scsi_retry queue. 
 		 */
-	 	if (!(sp->flags & SRB_IOCTL) &&
+	 	if (!(sp->flags & (SRB_IOCTL | SRB_TAPE)) &&
 		    sp->lun_queue->q_state == LUN_STATE_WAIT) {
 			DEBUG3(printk("scsi(%ld): lun wait state - pid=%ld, "
 			    "opcode=%d, allowed=%d, retries=%d\n",
