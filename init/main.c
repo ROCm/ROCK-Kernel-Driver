@@ -102,6 +102,7 @@ extern void free_initmem(void);
 extern void populate_rootfs(void);
 extern void driver_init(void);
 extern void prepare_namespace(void);
+extern void usermodehelper_init(void);
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -603,6 +604,10 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
+	/* drivers will send hotplug events */
+	init_workqueues();
+	usermodehelper_init();
+
 	driver_init();
 
 #ifdef CONFIG_SYSCTL
@@ -612,7 +617,6 @@ static void __init do_basic_setup(void)
 	/* Networking initialization needs a process context */ 
 	sock_init();
 
-	init_workqueues();
 	do_initcalls();
 }
 
