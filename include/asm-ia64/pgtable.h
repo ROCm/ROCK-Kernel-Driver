@@ -63,8 +63,8 @@
 #define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below */
 
 #define _PFN_MASK		_PAGE_PPN_MASK
-/* Mask of bits which may be changed by pte_modify(): */
-#define _PAGE_CHG_MASK		_PAGE_AR_MASK
+/* Mask of bits which may be changed by pte_modify(); the odd bits are there for _PAGE_PROTNONE */
+#define _PAGE_CHG_MASK	(_PAGE_P | _PAGE_PROTNONE | _PAGE_PL_MASK | _PAGE_AR_MASK | _PAGE_ED)
 
 #define _PAGE_SIZE_4K	12
 #define _PAGE_SIZE_8K	13
