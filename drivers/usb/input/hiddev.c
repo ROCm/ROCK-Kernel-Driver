@@ -406,7 +406,6 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct hiddev_devinfo dinfo;
 	struct hid_report *report;
 	struct hid_field *field;
-	int __user *int_user_arg = (int __user *)arg;
 	void __user *user_arg = (void __user *)arg;
 	int i;
 
@@ -416,7 +415,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	switch (cmd) {
 
 	case HIDIOCGVERSION:
-		return put_user(HID_VERSION, int_user_arg);
+		return put_user(HID_VERSION, (int __user *)arg);
 
 	case HIDIOCAPPLICATION:
 		if (arg < 0 || arg >= hid->maxapplication)
@@ -447,7 +446,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		return 0;
 
 	case HIDIOCGFLAG:
-		if (put_user(list->flags, int_user_arg))
+		if (put_user(list->flags, (int __user *)arg))
 			return -EFAULT;
 
 		return 0;
@@ -455,7 +454,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	case HIDIOCSFLAG:
 		{
 			int newflags;
-			if (get_user(newflags, int_user_arg))
+			if (get_user(newflags, (int __user *)arg))
 				return -EFAULT;
 
 			if ((newflags & ~HIDDEV_FLAGS) != 0 ||
@@ -473,7 +472,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			int idx, len;
 			char *buf;
 
-			if (get_user(idx, int_user_arg))
+			if (get_user(idx, (int __user *)arg))
 				return -EFAULT;
 
 			if ((buf = kmalloc(HID_STRING_SIZE, GFP_KERNEL)) == NULL)

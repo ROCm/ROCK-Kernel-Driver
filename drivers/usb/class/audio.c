@@ -2008,7 +2008,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 {
 	struct usb_mixerdev *ms = (struct usb_mixerdev *)file->private_data;
 	int i, j, val;
-	int __user *int_user_arg = (int __user *)arg;
+	int __user *user_arg = (int __user *)arg;
 
 	if (!ms->state->usbdev)
 		return -ENODEV;
@@ -2035,7 +2035,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 		return 0;
 	}
 	if (cmd == OSS_GETVERSION)
-		return put_user(SOUND_VERSION, int_user_arg);
+		return put_user(SOUND_VERSION, user_arg);
 	if (_IOC_TYPE(cmd) != 'M' || _IOC_SIZE(cmd) != sizeof(int))
 		return -EINVAL;
 	if (_IOC_DIR(cmd) == _IOC_READ) {
@@ -2044,27 +2044,27 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 			val = get_rec_src(ms);
 			if (val < 0)
 				return val;
-			return put_user(val, int_user_arg);
+			return put_user(val, user_arg);
 
 		case SOUND_MIXER_DEVMASK: /* Arg contains a bit for each supported device */
 			for (val = i = 0; i < ms->numch; i++)
 				val |= 1 << ms->ch[i].osschannel;
-			return put_user(val, int_user_arg);
+			return put_user(val, user_arg);
 
 		case SOUND_MIXER_RECMASK: /* Arg contains a bit for each supported recording source */
 			for (val = i = 0; i < ms->numch; i++)
 				if (ms->ch[i].slctunitid)
 					val |= 1 << ms->ch[i].osschannel;
-			return put_user(val, int_user_arg);
+			return put_user(val, user_arg);
 
 		case SOUND_MIXER_STEREODEVS: /* Mixer channels supporting stereo */
 			for (val = i = 0; i < ms->numch; i++)
 				if (ms->ch[i].flags & (MIXFLG_STEREOIN | MIXFLG_STEREOOUT))
 					val |= 1 << ms->ch[i].osschannel;
-			return put_user(val, int_user_arg);
+			return put_user(val, user_arg);
 			
 		case SOUND_MIXER_CAPS:
-			return put_user(SOUND_CAP_EXCL_INPUT, int_user_arg);
+			return put_user(SOUND_CAP_EXCL_INPUT, user_arg);
 
 		default:
 			i = _IOC_NR(cmd);
@@ -2072,7 +2072,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 				return -EINVAL;
 			for (j = 0; j < ms->numch; j++) {
 				if (ms->ch[j].osschannel == i) {
-					return put_user(ms->ch[j].value, int_user_arg);
+					return put_user(ms->ch[j].value, user_arg);
 				}
 			}
 			return -EINVAL;
@@ -2083,7 +2083,7 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 	ms->modcnt++;
 	switch (_IOC_NR(cmd)) {
 	case SOUND_MIXER_RECSRC: /* Arg contains a bit for each recording source */
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		return set_rec_src(ms, val);
 
@@ -2094,11 +2094,11 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 		for (j = 0; j < ms->numch && ms->ch[j].osschannel != i; j++);
 		if (j >= ms->numch)
 			return -EINVAL;
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (wrmixer(ms, j, val))
 			return -EIO;
-		return put_user(ms->ch[j].value, int_user_arg);
+		return put_user(ms->ch[j].value, user_arg);
 	}
 }
 
@@ -2371,7 +2371,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 {
 	struct usb_audiodev *as = (struct usb_audiodev *)file->private_data;
 	struct usb_audio_state *s = as->state;
-	int __user *int_user_arg = (int __user *)arg;
+	int __user *user_arg = (int __user *)arg;
 	unsigned long flags;
 	audio_buf_info abinfo;
 	count_info cinfo;
@@ -2389,7 +2389,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 #endif
 	switch (cmd) {
 	case OSS_GETVERSION:
-		return put_user(SOUND_VERSION, int_user_arg);
+		return put_user(SOUND_VERSION, user_arg);
 
 	case SNDCTL_DSP_SYNC:
 		if (file->f_mode & FMODE_WRITE)
@@ -2401,7 +2401,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 	case SNDCTL_DSP_GETCAPS:
 		return put_user(DSP_CAP_DUPLEX | DSP_CAP_REALTIME | DSP_CAP_TRIGGER | 
-				DSP_CAP_MMAP | DSP_CAP_BATCH, int_user_arg);
+				DSP_CAP_MMAP | DSP_CAP_BATCH, user_arg);
 
 	case SNDCTL_DSP_RESET:
 		if (file->f_mode & FMODE_WRITE) {
@@ -2415,7 +2415,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return 0;
 
 	case SNDCTL_DSP_SPEED:
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (val >= 0) {
 			if (val < 4000)
@@ -2427,10 +2427,10 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		}
 		return put_user((file->f_mode & FMODE_READ) ? 
 				as->usbin.dma.srate : as->usbout.dma.srate,
-				int_user_arg);
+				user_arg);
 
 	case SNDCTL_DSP_STEREO:
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
 		if (val)
@@ -2442,7 +2442,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return 0;
 
 	case SNDCTL_DSP_CHANNELS:
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (val != 0) {
 			val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
@@ -2454,14 +2454,14 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 				return -EIO;
 		}
 		val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
-		return put_user(AFMT_ISSTEREO(val2) ? 2 : 1, int_user_arg);
+		return put_user(AFMT_ISSTEREO(val2) ? 2 : 1, user_arg);
 
 	case SNDCTL_DSP_GETFMTS: /* Returns a mask */
 		return put_user(AFMT_U8 | AFMT_U16_LE | AFMT_U16_BE |
-				AFMT_S8 | AFMT_S16_LE | AFMT_S16_BE, int_user_arg);
+				AFMT_S8 | AFMT_S16_LE | AFMT_S16_BE, user_arg);
 
 	case SNDCTL_DSP_SETFMT: /* Selects ONE fmt*/
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (val != AFMT_QUERY) {
 			if (hweight32(val) != 1)
@@ -2475,7 +2475,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 				return -EIO;
 		}
 		val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
-		return put_user(val2 & ~AFMT_STEREO, int_user_arg);
+		return put_user(val2 & ~AFMT_STEREO, user_arg);
 
 	case SNDCTL_DSP_POST:
 		return 0;
@@ -2486,10 +2486,10 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 			val |= PCM_ENABLE_INPUT;
 		if (file->f_mode & FMODE_WRITE && as->usbout.flags & FLG_RUNNING) 
 			val |= PCM_ENABLE_OUTPUT;
-		return put_user(val, int_user_arg);
+		return put_user(val, user_arg);
 
 	case SNDCTL_DSP_SETTRIGGER:
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			if (val & PCM_ENABLE_INPUT) {
@@ -2547,7 +2547,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		spin_lock_irqsave(&as->lock, flags);
 		val = as->usbout.dma.count;
 		spin_unlock_irqrestore(&as->lock, flags);
-		return put_user(val, int_user_arg);
+		return put_user(val, user_arg);
 
 	case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
@@ -2581,14 +2581,14 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if (file->f_mode & FMODE_WRITE) {
 			if ((val = prog_dmabuf_out(as)))
 				return val;
-			return put_user(as->usbout.dma.fragsize, int_user_arg);
+			return put_user(as->usbout.dma.fragsize, user_arg);
 		}
 		if ((val = prog_dmabuf_in(as)))
 			return val;
-		return put_user(as->usbin.dma.fragsize, int_user_arg);
+		return put_user(as->usbin.dma.fragsize, user_arg);
 
 	case SNDCTL_DSP_SETFRAGMENT:
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (file->f_mode & FMODE_READ) {
 			as->usbin.dma.ossfragshift = val & 0xffff;
@@ -2616,7 +2616,7 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 		if ((file->f_mode & FMODE_READ && as->usbin.dma.subdivision) ||
 		    (file->f_mode & FMODE_WRITE && as->usbout.dma.subdivision))
 			return -EINVAL;
-		if (get_user(val, int_user_arg))
+		if (get_user(val, user_arg))
 			return -EFAULT;
 		if (val != 1 && val != 2 && val != 4)
 			return -EINVAL;
@@ -2629,15 +2629,15 @@ static int usb_audio_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case SOUND_PCM_READ_RATE:
 		return put_user((file->f_mode & FMODE_READ) ? 
 				as->usbin.dma.srate : as->usbout.dma.srate,
-				int_user_arg);
+				user_arg);
 
 	case SOUND_PCM_READ_CHANNELS:
 		val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
-		return put_user(AFMT_ISSTEREO(val2) ? 2 : 1, int_user_arg);
+		return put_user(AFMT_ISSTEREO(val2) ? 2 : 1, user_arg);
 
 	case SOUND_PCM_READ_BITS:
 		val2 = (file->f_mode & FMODE_READ) ? as->usbin.dma.format : as->usbout.dma.format;
-		return put_user(AFMT_IS16BIT(val2) ? 16 : 8, int_user_arg);
+		return put_user(AFMT_IS16BIT(val2) ? 16 : 8, user_arg);
 
 	case SOUND_PCM_WRITE_FILTER:
 	case SNDCTL_DSP_SETSYNCRO:
