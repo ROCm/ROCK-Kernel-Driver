@@ -144,7 +144,7 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 
 static int __init dnotify_init(void)
 {
-	dn_cache = kmem_cache_create("dnotify cache",
+	dn_cache = kmem_cache_create("dnotify_cache",
 		sizeof(struct dnotify_struct), 0, 0, NULL, NULL);
 	if (!dn_cache)
 		panic("cannot create dnotify slab cache");
