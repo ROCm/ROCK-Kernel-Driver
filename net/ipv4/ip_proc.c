@@ -18,9 +18,6 @@
 #include <linux/netdevice.h>
 #include <net/neighbour.h>
 #include <net/arp.h>
-#include <net/udp.h>
-#include <linux/rtnetlink.h>
-#include <linux/route.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 
@@ -251,113 +248,11 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 
 /* ------------------------------------------------------------------------ */
 
-struct udp_iter_state {
-	int bucket;
-};
-
-static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
-{
-	int i;
-	struct sock *sk = NULL;
-	loff_t l = *pos;
-	struct udp_iter_state *state = seq->private;
-
-	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket)
-		for (i = 0, sk = udp_hash[state->bucket]; sk; ++i, sk = sk->next) {
-			if (sk->family != PF_INET)
-				continue;
-			if (l--)
-				continue;
-			*pos = i;
-			goto out;
-		}
-out:
-	return sk;
-}
-
-static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
-{
-	read_lock(&udp_hash_lock);
-	return *pos ? udp_get_bucket(seq, pos) : (void *)1;
-}
-
-static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
-{
-	struct sock *sk;
-	struct udp_iter_state *state;
-
-	if (v == (void *)1) {
-		sk = udp_get_bucket(seq, pos);
-		goto out;
-	}
-
-	sk = v;
-	sk = sk->next;
-	if (sk) 
-		goto out;
-
-	state = seq->private;
-	if (++state->bucket >= UDP_HTABLE_SIZE) 
-		goto out;
-
-	*pos = 0;
-	sk = udp_get_bucket(seq, pos);
-out:
-	++*pos;
-	return sk;
-}
-
-static void udp_seq_stop(struct seq_file *seq, void *v)
-{
-	read_unlock(&udp_hash_lock);
-}
-
-static void udp_format_sock(struct sock *sp, char *tmpbuf, int bucket)
-{
-	struct inet_opt *inet = inet_sk(sp);
-	unsigned int dest = inet->daddr;
-	unsigned int src  = inet->rcv_saddr;
-	__u16 destp	  = ntohs(inet->dport);
-	__u16 srcp	  = ntohs(inet->sport);
-
-	sprintf(tmpbuf, "%4d: %08X:%04X %08X:%04X"
-		" %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		bucket, src, srcp, dest, destp, sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0, sock_i_uid(sp), 0, sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
-}
-
-static int udp_seq_show(struct seq_file *seq, void *v)
-{
-	if (v == (void *)1)
-		seq_printf(seq, "%-127s\n",
-			   "  sl  local_address rem_address   st tx_queue "
-			   "rx_queue tr tm->when retrnsmt   uid  timeout "
-			   "inode");
-	else {
-		char tmpbuf[129];
-		struct udp_iter_state *state = seq->private;
-
-		udp_format_sock(v, tmpbuf, state->bucket);
-		seq_printf(seq, "%-127s\n", tmpbuf);
-	}
-	return 0;
-}
-/* ------------------------------------------------------------------------ */
-
 static struct seq_operations arp_seq_ops = {
 	.start  = arp_seq_start,
 	.next   = arp_seq_next,
 	.stop   = arp_seq_stop,
 	.show   = arp_seq_show,
-};
-
-static struct seq_operations udp_seq_ops = {
-	.start  = udp_seq_start,
-	.next   = udp_seq_next,
-	.stop   = udp_seq_stop,
-	.show   = udp_seq_show,
 };
 
 static int arp_seq_open(struct inode *inode, struct file *file)
@@ -393,38 +288,8 @@ int ip_seq_release(struct inode *inode, struct file *file)
 	return seq_release(inode, file);
 }
 
-static int udp_seq_open(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct udp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
-       
-	if (!s)
-		goto out;
-
-	rc = seq_open(file, &udp_seq_ops);
-	if (rc)
-		goto out_kfree;
-
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
-}
-
 static struct file_operations arp_seq_fops = {
 	.open           = arp_seq_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release	= ip_seq_release,
-};
-
-static struct file_operations udp_seq_fops = {
-	.open           = udp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
 	.release	= ip_seq_release,
@@ -452,11 +317,6 @@ int __init ipv4_proc_init(void)
 	if (!proc_net_create("tcp", 0, tcp_get_info))
 		goto out_tcp;
 
-	p = create_proc_entry("udp", S_IRUGO, proc_net);
-	if (!p)
-		goto out_udp;
-	p->proc_fops = &udp_seq_fops;
-
 	p = create_proc_entry("arp", S_IRUGO, proc_net);
 	if (!p)
 		goto out_arp;
@@ -465,8 +325,6 @@ int __init ipv4_proc_init(void)
 out:
 	return rc;
 out_arp:
-	remove_proc_entry("udp", proc_net);
-out_udp:
 	proc_net_remove("tcp");
 out_tcp:
 	proc_net_remove("sockstat");
