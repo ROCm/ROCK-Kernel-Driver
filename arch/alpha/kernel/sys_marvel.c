@@ -490,7 +490,6 @@ struct alpha_machine_vector marvel_ev7_mv __initmv = {
 	.device_interrupt	= io7_device_interrupt,
 
 	.agp_info		= marvel_agp_info,
-	.srmcons_allowed	= marvel_srmcons_allowed,
 
 	.smp_callin		= marvel_smp_callin,
 	.init_arch		= marvel_init_arch,
