@@ -156,6 +156,7 @@ extern int scsi_sysfs_add_sdev(struct scsi_device *);
 extern int scsi_sysfs_add_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
+extern struct scsi_transport_template blank_transport_template;
 
 extern struct class sdev_class;
 extern struct bus_type scsi_bus_type;

@@ -196,6 +196,25 @@ config SCSI_LOGGING
 	  there should be no noticeable performance impact as long as you have
 	  logging turned off.
 
+menu "SCSI Transport Attributes"
+	depends on SCSI
+
+config SCSI_SPI_ATTRS
+	tristate "Parallel SCSI (SPI) Transport Attributes"
+	depends on SCSI
+	help
+	  If you wish to export transport-specific information about
+	  each attached SCSI device to sysfs, say Y.  Otherwise, say N.
+
+config SCSI_FC_ATTRS
+	tristate "FiberChannel Transport Attributes"
+	depends on SCSI
+	help
+	  If you wish to export transport-specific information about
+	  each attached FiberChannel device to sysfs, say Y.
+	  Otherwise, say N.
+
+endmenu
 
 menu "SCSI low-level drivers"
 	depends on SCSI!=n

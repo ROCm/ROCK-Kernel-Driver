@@ -13,6 +13,7 @@
 #include <linux/device.h>
 
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_transport.h>
 #include "scsi.h"
 
 #include "scsi_priv.h"
@@ -349,6 +350,7 @@ static int attr_add(struct device *dev, struct device_attribute *attr)
  **/
 int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 {
+	struct class_device_attribute **attrs;
 	int error = -EINVAL, i;
 
 	if (sdev->sdev_state != SDEV_CREATED)
@@ -366,6 +368,12 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	if (error) {
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
+	}
+
+	if (sdev->transport_classdev.class) {
+		error = class_device_add(&sdev->transport_classdev);
+		if (error)
+			goto clean_device2;
 	}
 
 	get_device(&sdev->sdev_gendev);
@@ -393,10 +401,24 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		}
 	}
 
+ 	if (sdev->transport_classdev.class) {
+ 		attrs = sdev->host->transportt->attrs;
+ 		for (i = 0; attrs[i]; i++) {
+ 			error = class_device_create_file(&sdev->transport_classdev,
+ 							 attrs[i]);
+ 			if (error) {
+ 				scsi_remove_device(sdev);
+				goto out;
+			}
+ 		}
+ 	}
+
  out:
 	return error;
 
-clean_device:
+ clean_device2:
+	class_device_del(&sdev->sdev_classdev);
+ clean_device:
 	sdev->sdev_state = SDEV_CANCEL;
 
 	device_del(&sdev->sdev_gendev);
@@ -414,9 +436,12 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
 		sdev->sdev_state = SDEV_DEL;
 		class_device_unregister(&sdev->sdev_classdev);
+		class_device_unregister(&sdev->transport_classdev);
 		device_del(&sdev->sdev_gendev);
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
+		if (sdev->host->transportt->cleanup)
+			sdev->host->transportt->cleanup(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
 }
@@ -503,3 +528,7 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost)
 
 	return 0;
 }
+
+/* A blank transport template that is used in drivers that don't
+ * yet implement Transport Attributes */
+struct scsi_transport_template blank_transport_template = { 0, };
