@@ -35,15 +35,6 @@
 #define PCI_DMA_BUS_IS_PHYS 1
 #endif
 
-/* Either I can't figure out how they secretly implemented it (ie. RXD flags
- * for mini ring, where it should go in NIC sram, and how many entries the NIC
- * firmware expects) or it isn't really fully implemented.  Perhaps Broadcom
- * wants people to pay for a "performance enhanced" version of their firmware +
- * binary-only driver that has the mini ring actually implemented.
- * These kids today... -DaveM
- */
-#define TG3_MINI_RING_WORKS 0
-
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define TG3_VLAN_TAG_USED 1
 #else
@@ -63,8 +54,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.2"
-#define DRV_MODULE_RELDATE	"Nov 14, 2002"
+#define DRV_MODULE_VERSION	"1.2a"
+#define DRV_MODULE_RELDATE	"Dec 9, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -94,10 +85,6 @@
  */
 #define TG3_RX_RING_SIZE		512
 #define TG3_DEF_RX_RING_PENDING		200
-#if TG3_MINI_RING_WORKS
-#define TG3_RX_MINI_RING_SIZE		256 /* ??? */
-#define TG3_DEF_RX_MINI_RING_PENDING	100
-#endif
 #define TG3_RX_JUMBO_RING_SIZE		256
 #define TG3_DEF_RX_JUMBO_RING_PENDING	100
 #define TG3_RX_RCB_RING_SIZE		1024
@@ -106,10 +93,6 @@
 
 #define TG3_RX_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
 				 TG3_RX_RING_SIZE)
-#if TG3_MINI_RING_WORKS
-#define TG3_RX_MINI_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
-				 TG3_RX_MINI_RING_SIZE)
-#endif
 #define TG3_RX_JUMBO_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
 			         TG3_RX_JUMBO_RING_SIZE)
 #define TG3_RX_RCB_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
@@ -125,9 +108,6 @@
 #define NEXT_TX(N)		(((N) + 1) & (TG3_TX_RING_SIZE - 1))
 
 #define RX_PKT_BUF_SZ		(1536 + tp->rx_offset + 64)
-#if TG3_MINI_RING_WORKS
-#define RX_MINI_PKT_BUF_SZ	(256 + tp->rx_offset + 64)
-#endif
 #define RX_JUMBO_PKT_BUF_SZ	(9046 + tp->rx_offset + 64)
 
 /* minimum number of free TX descriptors required to wake up TX process */
@@ -1788,16 +1768,7 @@ static int tg3_alloc_rx_skb(struct tg3 *tp, u32 opaque_key,
 			src_map = &tp->rx_jumbo_buffers[src_idx];
 		skb_size = RX_JUMBO_PKT_BUF_SZ;
 		break;
-#if TG3_MINI_RING_WORKS
-	case RXD_OPAQUE_RING_MINI:
-		dest_idx = dest_idx_unmasked % TG3_RX_MINI_RING_SIZE;
-		desc = &tp->rx_mini[dest_idx];
-		map = &tp->rx_mini_buffers[dest_idx];
-		if (src_idx >= 0)
-			src_map = &tp->rx_mini_buffers[src_idx];
-		skb_size = RX_MINI_PKT_BUF_SZ;
-		break;
-#endif
+
 	default:
 		return -EINVAL;
 	};
@@ -1858,15 +1829,7 @@ static void tg3_recycle_rx(struct tg3 *tp, u32 opaque_key,
 		src_desc = &tp->rx_jumbo[src_idx];
 		src_map = &tp->rx_jumbo_buffers[src_idx];
 		break;
-#if TG3_MINI_RING_WORKS
-	case RXD_OPAQUE_RING_MINI:
-		dest_idx = dest_idx_unmasked % TG3_RX_MINI_RING_SIZE;
-		dest_desc = &tp->rx_mini[dest_idx];
-		dest_map = &tp->rx_mini_buffers[dest_idx];
-		src_desc = &tp->rx_mini[src_idx];
-		src_map = &tp->rx_mini_buffers[src_idx];
-		break;
-#endif
+
 	default:
 		return;
 	};
@@ -1942,14 +1905,6 @@ static int tg3_rx(struct tg3 *tp, int budget)
 			skb = tp->rx_jumbo_buffers[desc_idx].skb;
 			post_ptr = &tp->rx_jumbo_ptr;
 		}
-#if TG3_MINI_RING_WORKS
-		else if (opaque_key == RXD_OPAQUE_RING_MINI) {
-			dma_addr = pci_unmap_addr(&tp->rx_mini_buffers[desc_idx],
-						  mapping);
-			skb = tp->rx_mini_buffers[desc_idx].skb;
-			post_ptr = &tp->rx_mini_ptr;
-		}
-#endif
 		else {
 			goto next_pkt_nopost;
 		}
@@ -1969,7 +1924,6 @@ static int tg3_rx(struct tg3 *tp, int budget)
 
 		len = ((desc->idx_len & RXD_LEN_MASK) >> RXD_LEN_SHIFT) - 4; /* omit crc */
 
-		/* Kill the copy case if we ever get the mini ring working. */
 		if (len > RX_COPY_THRESHOLD) {
 			int skb_size;
 
@@ -2055,15 +2009,6 @@ next_pkt_nopost:
 		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 			tr32(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW);
 	}
-#if TG3_MINI_RING_WORKS
-	if (work_mask & RXD_OPAQUE_RING_MINI) {
-		sw_idx = tp->rx_mini_ptr % TG3_RX_MINI_RING_SIZE;
-		tw32_mailbox(MAILBOX_RCV_MINI_PROD_IDX + TG3_64BIT_REG_LOW,
-			     sw_idx);
-		if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-			tr32(MAILBOX_RCV_MINI_PROD_IDX + TG3_64BIT_REG_LOW);
-	}
-#endif
 
 	return received;
 }
@@ -2764,20 +2709,7 @@ static void tg3_free_rings(struct tg3 *tp)
 		dev_kfree_skb_any(rxp->skb);
 		rxp->skb = NULL;
 	}
-#if TG3_MINI_RING_WORKS
-	for (i = 0; i < TG3_RX_MINI_RING_SIZE; i++) {
-		rxp = &tp->rx_mini_buffers[i];
 
-		if (rxp->skb == NULL)
-			continue;
-		pci_unmap_single(tp->pdev,
-				 pci_unmap_addr(rxp, mapping),
-				 RX_MINI_PKT_BUF_SZ - tp->rx_offset,
-				 PCI_DMA_FROMDEVICE);
-		dev_kfree_skb_any(rxp->skb);
-		rxp->skb = NULL;
-	}
-#endif
 	for (i = 0; i < TG3_RX_JUMBO_RING_SIZE; i++) {
 		rxp = &tp->rx_jumbo_buffers[i];
 
@@ -2842,9 +2774,6 @@ static void tg3_init_rings(struct tg3 *tp)
 
 	/* Zero out all descriptors. */
 	memset(tp->rx_std, 0, TG3_RX_RING_BYTES);
-#if TG3_MINI_RING_WORKS
-	memset(tp->rx_mini, 0, TG3_RX_MINI_RING_BYTES);
-#endif
 	memset(tp->rx_jumbo, 0, TG3_RX_JUMBO_RING_BYTES);
 	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES);
 
@@ -2877,19 +2806,7 @@ static void tg3_init_rings(struct tg3 *tp)
 		rxd->opaque = (RXD_OPAQUE_RING_STD |
 			       (i << RXD_OPAQUE_INDEX_SHIFT));
 	}
-#if TG3_MINI_RING_WORKS
-	for (i = 0; i < TG3_RX_MINI_RING_SIZE; i++) {
-		struct tg3_rx_buffer_desc *rxd;
 
-		rxd = &tp->rx_mini[i];
-		rxd->idx_len = (RX_MINI_PKT_BUF_SZ - tp->rx_offset - 64)
-			<< RXD_LEN_SHIFT;
-		rxd->type_flags = (RXD_FLAG_END << RXD_FLAGS_SHIFT) |
-			RXD_FLAG_MINI;
-		rxd->opaque = (RXD_OPAQUE_RING_MINI |
-			       (i << RXD_OPAQUE_INDEX_SHIFT));
-	}
-#endif
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
 		for (i = 0; i < TG3_RX_JUMBO_RING_SIZE; i++) {
 			struct tg3_rx_buffer_desc *rxd;
@@ -2910,14 +2827,6 @@ static void tg3_init_rings(struct tg3 *tp)
 				     -1, i) < 0)
 			break;
 	}
-
-#if TG3_MINI_RING_WORKS
-	for (i = 0; i < tp->rx_mini_pending; i++) {
-		if (tg3_alloc_rx_skb(tp, RXD_OPAQUE_RING_MINI,
-				     -1, i) < 0)
-			break;
-	}
-#endif
 
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
 		for (i = 0; i < tp->rx_jumbo_pending; i++) {
@@ -2943,13 +2852,6 @@ static void tg3_free_consistent(struct tg3 *tp)
 				    tp->rx_std, tp->rx_std_mapping);
 		tp->rx_std = NULL;
 	}
-#if TG3_MINI_RING_WORKS
-	if (tp->rx_mini) {
-		pci_free_consistent(tp->pdev, TG3_RX_MINI_RING_BYTES,
-				    tp->rx_mini, tp->rx_mini_mapping);
-		tp->rx_mini = NULL;
-	}
-#endif
 	if (tp->rx_jumbo) {
 		pci_free_consistent(tp->pdev, TG3_RX_JUMBO_RING_BYTES,
 				    tp->rx_jumbo, tp->rx_jumbo_mapping);
@@ -2985,9 +2887,6 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 {
 	tp->rx_std_buffers = kmalloc((sizeof(struct ring_info) *
 				      (TG3_RX_RING_SIZE +
-#if TG3_MINI_RING_WORKS
-				       TG3_RX_MINI_RING_SIZE +
-#endif
 				       TG3_RX_JUMBO_RING_SIZE)) +
 				     (sizeof(struct tx_ring_info) *
 				      TG3_TX_RING_SIZE),
@@ -2995,29 +2894,14 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 	if (!tp->rx_std_buffers)
 		return -ENOMEM;
 
-#if TG3_MINI_RING_WORKS
-	memset(tp->rx_std_buffers, 0,
-	       (sizeof(struct ring_info) *
-		(TG3_RX_RING_SIZE +
-		 TG3_RX_MINI_RING_SIZE +
-		 TG3_RX_JUMBO_RING_SIZE)) +
-	       (sizeof(struct tx_ring_info) *
-		TG3_TX_RING_SIZE));
-#else
 	memset(tp->rx_std_buffers, 0,
 	       (sizeof(struct ring_info) *
 		(TG3_RX_RING_SIZE +
 		 TG3_RX_JUMBO_RING_SIZE)) +
 	       (sizeof(struct tx_ring_info) *
 		TG3_TX_RING_SIZE));
-#endif
 
-#if TG3_MINI_RING_WORKS
-	tp->rx_mini_buffers = &tp->rx_std_buffers[TG3_RX_RING_SIZE];
-	tp->rx_jumbo_buffers = &tp->rx_mini_buffers[TG3_RX_MINI_RING_SIZE];
-#else
 	tp->rx_jumbo_buffers = &tp->rx_std_buffers[TG3_RX_RING_SIZE];
-#endif
 	tp->tx_buffers = (struct tx_ring_info *)
 		&tp->rx_jumbo_buffers[TG3_RX_JUMBO_RING_SIZE];
 
@@ -3025,14 +2909,6 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 					  &tp->rx_std_mapping);
 	if (!tp->rx_std)
 		goto err_out;
-
-#if TG3_MINI_RING_WORKS
-	tp->rx_mini = pci_alloc_consistent(tp->pdev, TG3_RX_MINI_RING_BYTES,
-					   &tp->rx_mini_mapping);
-
-	if (!tp->rx_mini)
-		goto err_out;
-#endif
 
 	tp->rx_jumbo = pci_alloc_consistent(tp->pdev, TG3_RX_JUMBO_RING_BYTES,
 					    &tp->rx_jumbo_mapping);
@@ -4149,8 +4025,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 	 * Standard receive ring @ NIC_SRAM_RX_BUFFER_DESC, 512 entries.
 	 * Jumbo receive ring @ NIC_SRAM_RX_JUMBO_BUFFER_DESC, 256 entries.
 	 *
-	 * ??? No space allocated for mini receive ring? :(
-	 *
 	 * The size of each ring is fixed in the firmware, but the location is
 	 * configurable.
 	 */
@@ -4163,19 +4037,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_NIC_ADDR,
 	     NIC_SRAM_RX_BUFFER_DESC);
 
-#if TG3_MINI_RING_WORKS
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tp->rx_mini_mapping >> 32));
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tp->rx_mini_mapping & 0xffffffff));
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
-	     RX_MINI_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_NIC_ADDR,
-	     NIC_SRAM_RX_MINI_BUFFER_DESC);
-#else
 	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
 	     BDINFO_FLAGS_DISABLED);
-#endif
 
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
 		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
@@ -4193,9 +4056,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	/* Setup replenish thresholds. */
 	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
-#if TG3_MINI_RING_WORKS
-	tw32(RCVBDI_MINI_THRESH, tp->rx_mini_pending / 8);
-#endif
 	tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
 
 	/* Clear out send RCB ring in SRAM. */
@@ -4243,13 +4103,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 		     tp->rx_std_ptr);
 	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 		tr32(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW);
-#if TG3_MINI_RING_WORKS
-	tp->rx_mini_ptr = tp->rx_mini_pending;
-	tw32_mailbox(MAILBOX_RCV_MINI_PROD_IDX + TG3_64BIT_REG_LOW,
-		     tp->rx_mini_ptr);
-	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
-		tr32(MAILBOX_RCV_MINI_PROD_IDX + TG3_64BIT_REG_LOW);
-#endif
 
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)
 		tp->rx_jumbo_ptr = tp->rx_jumbo_pending;
@@ -4872,23 +4725,6 @@ static int tg3_open(struct net_device *dev)
 		       readl(rxd + 0x0), readl(rxd + 0x4),
 		       readl(rxd + 0x8), readl(rxd + 0xc));
 	}
-#if TG3_MINI_RING_WORKS
-	for (i = 0; i < 6; i++) {
-		unsigned long rxd;
-
-		rxd = tp->regs + NIC_SRAM_WIN_BASE + NIC_SRAM_RX_MINI_BUFFER_DESC
-			+ (i * sizeof(struct tg3_rx_buffer_desc));
-		printk("DEBUG: NIC RXD_MINI(%d)[0][%08x:%08x:%08x:%08x]\n",
-		       i,
-		       readl(rxd + 0x0), readl(rxd + 0x4),
-		       readl(rxd + 0x8), readl(rxd + 0xc));
-		rxd += (4 * sizeof(u32));
-		printk("DEBUG: NIC RXD_MINI(%d)[1][%08x:%08x:%08x:%08x]\n",
-		       i,
-		       readl(rxd + 0x0), readl(rxd + 0x4),
-		       readl(rxd + 0x8), readl(rxd + 0xc));
-	}
-#endif
 
 	for (i = 0; i < 6; i++) {
 		unsigned long rxd;
@@ -5419,19 +5255,11 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
 
 		ering.rx_max_pending = TG3_RX_RING_SIZE - 1;
-#if TG3_MINI_RING_WORKS
-		ering.rx_mini_max_pending = TG3_RX_MINI_RING_SIZE - 1;
-#else
 		ering.rx_mini_max_pending = 0;
-#endif
 		ering.rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
 
 		ering.rx_pending = tp->rx_pending;
-#if TG3_MINI_RING_WORKS
-		ering.rx_mini_pending = tp->rx_mini_pending;
-#else
 		ering.rx_mini_pending = 0;
-#endif
 		ering.rx_jumbo_pending = tp->rx_jumbo_pending;
 		ering.tx_pending = tp->tx_pending;
 
@@ -5446,9 +5274,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return -EFAULT;
 
 		if ((ering.rx_pending > TG3_RX_RING_SIZE - 1) ||
-#if TG3_MINI_RING_WORKS
-		    (ering.rx_mini_pending > TG3_RX_MINI_RING_SIZE - 1) ||
-#endif
 		    (ering.rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
 		    (ering.tx_pending > TG3_TX_RING_SIZE - 1))
 			return -EINVAL;
@@ -5457,9 +5282,6 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		spin_lock(&tp->tx_lock);
 
 		tp->rx_pending = ering.rx_pending;
-#if TG3_MINI_RING_WORKS
-		tp->rx_mini_pending = ering.rx_mini_pending;
-#endif
 		tp->rx_jumbo_pending = ering.rx_jumbo_pending;
 		tp->tx_pending = ering.tx_pending;
 
@@ -6182,6 +6004,13 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if ((pci_state_reg & PCISTATE_BUS_32BIT) != 0)
 		tp->tg3_flags |= TG3_FLAG_PCI_32BIT;
 
+	/* Chip-specific fixup from Broadcom driver */
+	if ((tp->pci_chip_rev_id == CHIPREV_ID_5704_A0) &&
+	    (!(pci_state_reg & PCISTATE_RETRY_SAME_DMA))) {
+		pci_state_reg |= PCISTATE_RETRY_SAME_DMA;
+		pci_write_config_dword(tp->pdev, TG3PCI_PCISTATE, pci_state_reg);
+	}
+
 	/* Force the chip into D0. */
 	err = tg3_set_power_state(tp, 0);
 	if (err)
@@ -6868,9 +6697,6 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	tg3_init_bufmgr_config(tp);
 
 	tp->rx_pending = TG3_DEF_RX_RING_PENDING;
-#if TG3_MINI_RING_WORKS
-	tp->rx_mini_pending = TG3_DEF_RX_MINI_RING_PENDING;
-#endif
 	tp->rx_jumbo_pending = TG3_DEF_RX_JUMBO_RING_PENDING;
 	tp->tx_pending = TG3_DEF_TX_RING_PENDING;
 

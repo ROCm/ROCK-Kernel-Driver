@@ -226,8 +226,6 @@ void gus_delay(void)
 
 static void gus_poke(long addr, unsigned char data)
 {				/* Writes a byte to the DRAM */
-	unsigned long   flags;
-
 	outb((0x43), u_Command);
 	outb((addr & 0xff), u_DataLo);
 	outb(((addr >> 8) & 0xff), u_DataHi);

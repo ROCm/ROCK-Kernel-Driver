@@ -3,8 +3,11 @@
 #define _SPARC64_TTABLE_H
 
 #include <linux/config.h>
-#include <asm/thread_info.h>
 #include <asm/utrap.h>
+
+#ifdef __ASSEMBLY__
+#include <asm/thread_info.h>
+#endif
 
 #define BOOT_KERNEL b sparc64_boot; nop; nop; nop; nop; nop; nop; nop;
 

@@ -18,7 +18,7 @@
 
 	.globl sys_call_table
 sys_call_table:
-/*0*/	.long sys_nis_syscall, sys_exit, sys_fork, sys_read, sys_write
+/*0*/	.long sys_restart_syscall, sys_exit, sys_fork, sys_read, sys_write
 /*5*/	.long sys_open, sys_close, sys_wait4, sys_creat, sys_link
 /*10*/  .long sys_unlink, sunos_execv, sys_chdir, sys_chown16, sys_mknod
 /*15*/	.long sys_chmod, sys_lchown16, sparc_brk, sys_nis_syscall, sys_lseek

@@ -66,7 +66,6 @@
 extern volatile unsigned char *chrp_int_ack_special;
 
 void chrp_progress(char *, unsigned short);
-void chrp_request_regions(void);
 
 extern void openpic_init_IRQ(void);
 extern void init_ras_IRQ(void);
@@ -141,11 +140,12 @@ chrp_setup_arch(void)
 
 	fwnmi_init();
 
+#ifndef CONFIG_PPC_ISERIES
 	/* Find and initialize PCI host bridges */
 	/* iSeries needs to be done much later. */
- 	#ifndef CONFIG_PPC_ISERIES
-		find_and_init_phbs();
- 	#endif
+	eeh_init();
+	find_and_init_phbs();
+#endif
 
 	/* Find the Open PIC if present */
 	root = find_path_device("/");
@@ -169,11 +169,6 @@ chrp_setup_arch(void)
 void __init
 chrp_init2(void)
 {
-	/*
-	 * It is sensitive, when this is called (not too earlu)
-	 * -- tibit
-	 */
-	chrp_request_regions();
 	/* Manually leave the kernel version on the panel. */
 	ppc_md.progress("Linux ppc64\n", 0);
 	ppc_md.progress(UTS_RELEASE, 0);

@@ -484,14 +484,17 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	 * and the hub thread have the kernel lock
 	 * (still acquire the kernel lock for safety)
 	 */
+	ret = -ENOMEM;
+	if (!(ps = kmalloc(sizeof(struct dev_state), GFP_KERNEL)))
+		goto out_nolock;
+
 	lock_kernel();
 	ret = -ENOENT;
 	dev = inode->u.generic_ip;
-	if (!dev)
+	if (!dev) {
+		kfree(ps);
 		goto out;
-	ret = -ENOMEM;
-	if (!(ps = kmalloc(sizeof(struct dev_state), GFP_KERNEL)))
-		goto out;
+	}
 	ret = 0;
 	ps->dev = dev;
 	ps->file = file;
@@ -509,6 +512,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	file->private_data = ps;
  out:
 	unlock_kernel();
+ out_nolock:
         return ret;
 }
 

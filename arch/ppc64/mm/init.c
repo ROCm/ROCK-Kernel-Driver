@@ -132,12 +132,10 @@ ioremap(unsigned long addr, unsigned long size)
 #ifdef CONFIG_PPC_ISERIES
 	return (void*)addr;
 #else
-	if(mem_init_done && (addr >> 60UL)) {
-		if (IS_EEH_TOKEN_DISABLED(addr))
-			return (void *)IO_TOKEN_TO_ADDR(addr);
-		return (void*)addr; /* already mapped address or EEH token. */
-	}
-	return __ioremap(addr, size, _PAGE_NO_CACHE);
+	void *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
+	if(mem_init_done)
+		return eeh_ioremap(addr, ret);	/* may remap the addr */
+	return ret;
 #endif
 }
 

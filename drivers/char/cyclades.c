@@ -12,7 +12,7 @@ static char rcsid[] =
  *
  * Initially written by Randolph Bentson <bentson@grieg.seaslug.org>.
  * Modified and maintained by Marcio Saito <marcio@cyclades.com>.
- * Currently maintained by Ivan Passos <ivan@cyclades.com>.
+ * Currently maintained by Henrique Gobbi <henrique.gobbi@cyclades.com>.
  *
  * For Technical support and installation problems, please send e-mail
  * to support@cyclades.com.
@@ -884,7 +884,7 @@ static long cyz_polling_cycle = CZ_DEF_POLL;
 
 static int cyz_timeron = 0;
 static struct timer_list cyz_timerlist = TIMER_INITIALIZER(cyz_poll, 0, 0);
-};
+
 #else /* CONFIG_CYZ_INTR */
 static void cyz_rx_restart(unsigned long);
 static struct timer_list cyz_rx_full_timer[NR_PORTS];

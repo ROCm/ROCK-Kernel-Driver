@@ -43,25 +43,25 @@ static int ibm_set_eeh_option;
 static int ibm_set_slot_reset;
 static int ibm_read_slot_reset_state;
 
-int eeh_implemented;
+static int eeh_implemented;
 #define EEH_MAX_OPTS 4096
 static char *eeh_opts;
 static int eeh_opts_last;
-static int eeh_check_opts_config(struct pci_dev *dev, int default_state);
 
+pte_t *find_linux_pte(pgd_t *pgdir, unsigned long va);	/* from htab.c */
+static int eeh_check_opts_config(struct device_node *dn,
+				 int class_code, int vendor_id, int device_id,
+				 int default_state);
 
-unsigned long eeh_token(unsigned long phb, unsigned long bus, unsigned long devfn, unsigned long offset)
+unsigned long eeh_token_to_phys(unsigned long token)
 {
-	if (phb > 0xff)
-		panic("eeh_token: phb 0x%lx is too large\n", phb);
-	if (offset & 0x0fffffff00000000)
-		panic("eeh_token: offset 0x%lx is out of range\n", offset);
-	return ((IO_UNMAPPED_REGION_ID << 60) | (phb << 48UL) | ((bus & 0xff) << 40UL) | (devfn << 32UL) | (offset & 0xffffffff));
-}
-
-int eeh_get_state(unsigned long ea)
-{
-	return 0;
+	if (REGION_ID(token) == EEH_REGION_ID) {
+		unsigned long vaddr = IO_TOKEN_TO_ADDR(token);
+		pte_t *ptep = find_linux_pte(ioremap_mm.pgd, vaddr);
+		unsigned long pa = pte_pfn(*ptep) << PAGE_SHIFT;
+		return pa | (vaddr & (PAGE_SIZE-1));
+	} else
+		return token;
 }
 
 /* Check for an eeh failure at the given token address.
@@ -73,40 +73,54 @@ int eeh_get_state(unsigned long ea)
  */
 unsigned long eeh_check_failure(void *token, unsigned long val)
 {
-	unsigned long config_addr = (unsigned long)token >> 24;	/* PPBBDDRR */
-	unsigned long phbidx = (config_addr >> 24) & 0xff;
-	struct pci_controller *phb;
+	unsigned long addr;
+	struct pci_dev *dev;
+	struct device_node *dn;
 	unsigned long ret, rets[2];
 
-	config_addr &= 0xffff00;  /* 00BBDD00 */
+	/* IO BAR access could get us here...or if we manually force EEH
+	 * operation on even if the hardware won't support it.
+	 */
+	if (!eeh_implemented || ibm_read_slot_reset_state == RTAS_UNKNOWN_SERVICE)
+		return val;
 
-	if (phbidx >= global_phb_number) {
-		panic("EEH: checking token %p phb index of %ld is greater than max of %d\n", token, phbidx, global_phb_number-1);
+	/* Finding the phys addr + pci device is quite expensive.
+	 * However, the RTAS call is MUCH slower.... :(
+	 */
+	addr = eeh_token_to_phys((unsigned long)token);
+	dev = pci_find_dev_by_addr(addr);
+	if (!dev) {
+		printk("EEH: no pci dev found for addr=0x%lx\n", addr);
+		return val;
 	}
-	phb = phbtab[phbidx];
+	dn = pci_device_to_OF_node(dev);
+	if (!dn) {
+		printk("EEH: no pci dn found for addr=0x%lx\n", addr);
+		return val;
+	}
 
-	ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
-			config_addr, BUID_HI(phb->buid), BUID_LO(phb->buid));
-	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-		struct pci_dev *dev;
-		int bus = ((unsigned long)token >> 40) & 0xffff; /* include PHB# in bus */
-		int devfn = (config_addr >> 8) & 0xff;
+	/* Access to IO BARs might get this far and still not want checking. */
+	if (!(dn->eeh_mode & EEH_MODE_SUPPORTED) || dn->eeh_mode & EEH_MODE_NOCHECK)
+		return val;
 
-		dev = pci_find_slot(bus, devfn);
-		if (dev) {
-			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
-			      rets[0], dev->slot_name, dev->dev.name);
-			PPCDBG_ENTER_DEBUGGER();
+
+	/* Now test for an EEH failure.  This is VERY expensive.
+	 * Note that the eeh_config_addr may be a parent device
+	 * in the case of a device behind a bridge, or it may be
+	 * function zero of a multi-function device.
+	 * In any case they must share a common PHB.
+	 */
+	if (dn->eeh_config_addr) {
+		ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
+				dn->eeh_config_addr, BUID_HI(dn->phb->buid), BUID_LO(dn->phb->buid));
+		if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
 			panic("EEH:  MMIO failure (%ld) on device:\n  %s %s\n",
 			      rets[0], dev->slot_name, dev->dev.name);
-		} else {
-			printk(KERN_ERR "EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
-			PPCDBG_ENTER_DEBUGGER();
-			panic("EEH:  MMIO failure (%ld) on device buid %lx, config_addr %lx\n", rets[0], phb->buid, config_addr);
 		}
 	}
 	eeh_false_positives++;
 	return val;	/* good case */
+
 }
 
 struct eeh_early_enable_info {
@@ -120,13 +134,69 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 {
 	struct eeh_early_enable_info *info = data;
 	long ret;
+	char *status = get_property(dn, "status", 0);
+	u32 *class_code = (u32 *)get_property(dn, "class-code", 0);
+	u32 *vendor_id =(u32 *) get_property(dn, "vendor-id", 0);
+	u32 *device_id = (u32 *)get_property(dn, "device-id", 0);
+	u32 *regs;
+	int enable;
 
-	/* Try to enable eeh */
-	ret = rtas_call(ibm_set_eeh_option, 4, 1, NULL,
-			CONFIG_ADDR(dn->busno, dn->devfn),
-			info->buid_hi, info->buid_lo, EEH_ENABLE);
-	if (ret == 0)
-		info->adapters_enabled++;
+	if (status && strcmp(status, "ok") != 0)
+		return NULL;	/* ignore devices with bad status */
+
+	/* Weed out PHBs or other bad nodes. */
+	if (!class_code || !vendor_id || !device_id)
+		return NULL;
+
+	/* Ignore known PHBs and EADs bridges */
+	if (*vendor_id == PCI_VENDOR_ID_IBM &&
+	    (*device_id == 0x0102 || *device_id == 0x008b ||
+	     *device_id == 0x0188 || *device_id == 0x0302))
+		return NULL;
+
+	/* Now decide if we are going to "Disable" EEH checking
+	 * for this device.  We still run with the EEH hardware active,
+	 * but we won't be checking for ff's.  This means a driver
+	 * could return bad data (very bad!), an interrupt handler could
+	 * hang waiting on status bits that won't change, etc.
+	 * But there are a few cases like display devices that make sense.
+	 */
+	enable = 1;	/* i.e. we will do checking */
+	if ((*class_code >> 16) == PCI_BASE_CLASS_DISPLAY)
+		enable = 0;
+
+	if (!eeh_check_opts_config(dn, *class_code, *vendor_id, *device_id, enable)) {
+		if (enable) {
+			printk(KERN_INFO "EEH: %s user requested to run without EEH.\n", dn->full_name);
+			enable = 0;
+		}
+	}
+
+	if (!enable)
+		dn->eeh_mode = EEH_MODE_NOCHECK;
+
+	/* This device may already have an EEH parent. */
+	if (dn->parent && (dn->parent->eeh_mode & EEH_MODE_SUPPORTED)) {
+		/* Parent supports EEH. */
+		dn->eeh_mode |= EEH_MODE_SUPPORTED;
+		dn->eeh_config_addr = dn->parent->eeh_config_addr;
+		return NULL;
+	}
+
+	/* Ok..see if this device supports EEH. */
+	regs = (u32 *)get_property(dn, "reg", 0);
+	if (regs) {
+		/* First register entry is addr (00BBSS00)  */
+		/* Try to enable eeh */
+		ret = rtas_call(ibm_set_eeh_option, 4, 1, NULL,
+				regs[0], info->buid_hi, info->buid_lo,
+				EEH_ENABLE);
+		if (ret == 0) {
+			info->adapters_enabled++;
+			dn->eeh_mode |= EEH_MODE_SUPPORTED;
+			dn->eeh_config_addr = regs[0];
+		}
+	}
 	return NULL; 
 }
 
@@ -157,7 +227,13 @@ void eeh_init(void)
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
 	ibm_read_slot_reset_state = rtas_token("ibm,read-slot-reset-state");
 
-	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
+	/* Allow user to force eeh mode on or off -- even if the hardware
+	 * doesn't exist.  This allows driver writers to at least test use
+	 * of I/O macros even if we can't actually test for EEH failure.
+	 */
+	if (eeh_force_on > eeh_force_off)
+		eeh_implemented = 1;
+	else if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
 		return;
 
 	if (eeh_force_off > eeh_force_on) {
@@ -168,8 +244,6 @@ void eeh_init(void)
 		return;
 	}
 
-	if (eeh_force_on > eeh_force_off)
-		eeh_implemented = 1;	/* User is forcing it on. */
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
 	info.adapters_enabled = 0;
@@ -197,44 +271,6 @@ void eeh_init(void)
 }
 
 
-/* Given a PCI device check if eeh should be configured or not.
- * This may look at firmware properties and/or kernel cmdline options.
- */
-int is_eeh_configured(struct pci_dev *dev)
-{
-	struct device_node *dn = pci_device_to_OF_node(dev);
-	struct pci_controller *phb = PCI_GET_PHB_PTR(dev);
-	unsigned long ret, rets[2];
-	int eeh_capable;
-	int default_state = 1;	/* default enable EEH if we can. */
-
-	if (dn == NULL || phb == NULL || !eeh_implemented)
-		return 0;
-
-	/* Hack: turn off eeh for display class devices by default.
-	 * This fixes matrox accel framebuffer.
-	 */
-	if ((dev->class >> 16) == PCI_BASE_CLASS_DISPLAY)
-		default_state = 0;
-
-	/* Ignore known PHBs and EADs bridges */
-	if (dev->vendor == PCI_VENDOR_ID_IBM &&
-	    (dev->device == 0x0102 || dev->device == 0x008b))
-		default_state = 0;
-
-	if (!eeh_check_opts_config(dev, default_state)) {
-		if (default_state)
-			printk(KERN_INFO "EEH: %s %s user requested to run without EEH.\n", dev->slot_name, dev->dev.name);
-		return 0;
-	}
-
-	ret = rtas_call(ibm_read_slot_reset_state, 3, 3, rets,
-			CONFIG_ADDR(dn->busno, dn->devfn),
-			BUID_HI(phb->buid), BUID_LO(phb->buid));
-	eeh_capable = (ret == 0 && rets[1] == 1);
-	return eeh_capable;
-}
-
 int eeh_set_option(struct pci_dev *dev, int option)
 {
 	struct device_node *dn = pci_device_to_OF_node(dev);
@@ -248,6 +284,30 @@ int eeh_set_option(struct pci_dev *dev, int option)
 			 BUID_HI(phb->buid), BUID_LO(phb->buid), option);
 }
 
+
+/* If EEH is implemented, find the PCI device using given phys addr
+ * and check to see if eeh failure checking is disabled.
+ * Remap the addr (trivially) to the EEH region if not.
+ * For addresses not known to PCI the vaddr is simply returned unchanged.
+ */
+void *eeh_ioremap(unsigned long addr, void *vaddr)
+{
+	struct pci_dev *dev;
+	struct device_node *dn;
+
+	if (!eeh_implemented)
+		return vaddr;
+	dev = pci_find_dev_by_addr(addr);
+	if (!dev)
+		return vaddr;
+	dn = pci_device_to_OF_node(dev);
+	if (!dn)
+		return vaddr;
+	if (dn->eeh_mode & EEH_MODE_NOCHECK)
+		return vaddr;
+
+	return (void *)IO_ADDR_TO_TOKEN(vaddr);
+}
 
 static int eeh_proc_falsepositive_read(char *page, char **start, off_t off,
 			 int count, int *eof, void *data)
@@ -279,28 +339,24 @@ static int __init eeh_init_proc(void)
  * This lets the user specify stupid combinations of options,
  * but at least the result should be very predictable.
  */
-static int eeh_check_opts_config(struct pci_dev *dev, int default_state)
+static int eeh_check_opts_config(struct device_node *dn,
+				 int class_code, int vendor_id, int device_id,
+				 int default_state)
 {
-	struct device_node *dn = pci_device_to_OF_node(dev);
-	struct pci_controller *phb = PCI_GET_PHB_PTR(dev);
-	char devname[32], classname[32], phbname[32];
+	char devname[32], classname[32];
 	char *strs[8], *s;
 	int nstrs, i;
 	int ret = default_state;
 
-	if (dn == NULL || phb == NULL)
-		return 0;
 	/* Build list of strings to match */
 	nstrs = 0;
 	s = (char *)get_property(dn, "ibm,loc-code", 0);
 	if (s)
 		strs[nstrs++] = s;
-	sprintf(devname, "dev%04x:%04x", dev->vendor, dev->device);
+	sprintf(devname, "dev%04x:%04x", vendor_id, device_id);
 	strs[nstrs++] = devname;
-	sprintf(classname, "class%04x", dev->class);
+	sprintf(classname, "class%04x", class_code);
 	strs[nstrs++] = classname;
-	sprintf(phbname, "pci@%lx", phb->buid);
-	strs[nstrs++] = phbname;
 	strs[nstrs++] = "";	/* yes, this matches the empty string */
 
 	/* Now see if any string matches the eeh_opts list.
@@ -332,7 +388,6 @@ static int eeh_check_opts_config(struct pci_dev *dev, int default_state)
  *
  *	dev#:#    vendor:device id in hex (e.g. dev1022:2000)
  *	class#    class id in hex (e.g. class0200)
- *	pci@buid  all devices under phb (e.g. pci@fef00000)
  *
  * If no location code is specified all devices are assumed
  * so eeh-off means eeh by default is off.
@@ -340,13 +395,11 @@ static int eeh_check_opts_config(struct pci_dev *dev, int default_state)
 
 /* This is implemented as a null separated list of strings.
  * Each string looks like this:  "+X" or "-X"
- * where X is a loc code, dev, class or pci string (as shown above)
+ * where X is a loc code, vendor:device, class (as shown above)
  * or empty which is used to indicate all.
  *
- * We interpret this option string list during the buswalk
- * so that it will literally behave left-to-right even if
- * some combinations don't make sense.  Give the user exactly
- * what they want! :)
+ * We interpret this option string list so that it will literally
+ * behave left-to-right even if some combinations don't make sense.
  */
 
 static int __init eeh_parm(char *str, int state)

@@ -16,12 +16,7 @@
  * We might want to consider doing the same to shave a few cycles.
  */
 
-// Applications do not include kernel headers anymore, period.
-// #ifdef __KERNEL__
-
-#ifndef _ASM_THREAD_INFO_H
-#include <asm/thread_info.h>
-#endif
+#include <linux/thread_info.h>
 
 struct task_struct;
 
@@ -32,7 +27,5 @@ static inline struct task_struct *__get_current(void)
 	return current_thread_info()->task;
 }
 #define current __get_current()
-
-// #endif /* __KERNEL__ */
 
 #endif /* !(_ASM_CURRENT_H) */

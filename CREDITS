@@ -1519,6 +1519,7 @@ E: davej@codemonkey.org.uk
 E: davej@suse.de
 W: http://www.codemonkey.org.uk
 D: x86 errata/setup maintenance.
+D: AGPGART driver.
 D: Backport/Forwardport merge monkey.
 D: Various Janitor work.
 S: c/o SuSE Linux UK Ltd
@@ -2841,6 +2842,16 @@ D: miroSOUND PCM20 radio RDS driver, ACI rewrite
 S: Klosterweg 28 / i309
 S: 76131 Karlsruhe
 S: Germany
+
+N: James Simmons 
+E: jsimmons@users.sf.net 
+D: Frame buffer device maintainer
+D: input layer developement 
+D: tty/console layer
+D: various mipsel devices 
+S: 115 Carmel Avenue 
+S: El Cerrito CA 94530
+S: USA 
 
 N: Jaspreet Singh
 E: jaspreet@sangoma.com

@@ -19,9 +19,6 @@
 
 
 extern struct socket *sockfd_lookup(int fd, int *err); /* @@@ fix this */
-#define sockfd_put(sock) fput((sock)->file)	/* @@@ copied because it's
-						   __inline__ in socket.c */
-
 
 #if 0 /* control */
 #define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)

@@ -978,13 +978,18 @@ rescan:
 		do {
 			/* clean any finished work for this qh */
 			if (!list_empty (&qh->qtd_list)) {
-				// dbg_qh ("scan_async", ehci, qh);
-				qh = qh_get (qh);
+				int temp;
 
-				/* concurrent unlink could happen here */
-				count += qh_completions (ehci, qh);
+				/* unlinks could happen here; completion
+				 * reporting drops the lock.
+				 */
+				qh = qh_get (qh);
+				temp = qh_completions (ehci, qh);
 				qh_put (ehci, qh);
-				goto rescan;
+				if (temp != 0) {
+					count += temp;
+					goto rescan;
+				}
 			}
 
 			/* unlink idle entries, reducing HC PCI usage as

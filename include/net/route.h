@@ -107,7 +107,7 @@ struct rt_cache_stat
 extern struct ip_rt_acct *ip_rt_acct;
 
 struct in_device;
-extern void		ip_rt_init(void);
+extern int		ip_rt_init(void);
 extern void		ip_rt_redirect(u32 old_gw, u32 dst, u32 new_gw,
 				       u32 src, u8 tos, struct net_device *dev);
 extern void		ip_rt_advice(struct rtable **rp, int advice);

@@ -6,7 +6,6 @@
 #include <asm/ptrace.h>
 #include <asm/processor.h>
 #include <asm/visasm.h>
-#include <asm/thread_info.h>
 
 #ifndef __ASSEMBLY__
 /*

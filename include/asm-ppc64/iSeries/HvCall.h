@@ -130,6 +130,7 @@ enum HvCall_VaryOffChunkRc
 #define HvCallBaseRouter28				HvCallBase + 28
 #define HvCallBaseRouter29				HvCallBase + 29
 #define HvCallBaseRouter30				HvCallBase + 30
+#define HvCallBaseSetDebugBus 				HvCallBase + 31
 
 #define HvCallCcSetDABR  				HvCallCc + 7
 
@@ -203,6 +204,11 @@ static inline void		HvCall_terminateMachineSrc(void)
 static inline void HvCall_setDABR(unsigned long val)
 {
 	HvCall1(HvCallCcSetDABR, val);
+}
+
+static inline void HvCall_setDebugBus(unsigned long val)
+{
+	HvCall1(HvCallBaseSetDebugBus, val);
 }
 
 #endif // _HVCALL_H

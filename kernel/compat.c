@@ -18,23 +18,72 @@
 
 #include <asm/uaccess.h>
 
+static long compat_nanosleep_restart(struct restart_block *restart)
+{
+	unsigned long expire = restart->arg0, now = jiffies;
+	struct timespec *rmtp = (struct timespec *) restart->arg1;
+	long ret;
+
+	/* Did it expire while we handled signals? */
+	if (!time_after(expire, now))
+		return 0;
+
+	current->state = TASK_INTERRUPTIBLE;
+	expire = schedule_timeout(expire - now);
+
+	ret = 0;
+	if (expire) {
+		struct compat_timespec ct;
+		struct timespec t;
+
+		jiffies_to_timespec(expire, &t);
+		ct.tv_sec = t.tv_sec;
+		ct.tv_nsec = t.tv_nsec;
+
+		ret = -ERESTART_RESTARTBLOCK;
+		if (copy_to_user(rmtp, &ct, sizeof(ct)))
+			ret = -EFAULT;
+		/* The 'restart' block is already filled in */
+	}
+	return ret;
+}
+
 asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 		struct compat_timespec *rmtp)
 {
-	struct timespec t;
 	struct compat_timespec ct;
+	struct timespec t;
+	unsigned long expire;
 	s32 ret;
 
 	if (copy_from_user(&ct, rqtp, sizeof(ct)))
 		return -EFAULT;
 	t.tv_sec = ct.tv_sec;
 	t.tv_nsec = ct.tv_nsec;
-	ret = do_nanosleep(&t);
-	if (rmtp && (ret == -EINTR)) {
+
+	if ((t.tv_nsec >= 1000000000L) || (t.tv_nsec < 0) || (t.tv_sec < 0))
+		return -EINVAL;
+
+	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
+	current->state = TASK_INTERRUPTIBLE;
+	expire = schedule_timeout(expire);
+
+	ret = 0;
+	if (expire) {
+		struct restart_block *restart;
+
+		jiffies_to_timespec(expire, &t);
 		ct.tv_sec = t.tv_sec;
 		ct.tv_nsec = t.tv_nsec;
+
 		if (copy_to_user(rmtp, &ct, sizeof(ct)))
 			return -EFAULT;
+
+		restart = &current_thread_info()->restart_block;
+		restart->fn = compat_nanosleep_restart;
+		restart->arg0 = jiffies + expire;
+		restart->arg1 = (unsigned long) rmtp;
+		ret = -ERESTART_RESTARTBLOCK;
 	}
 	return ret;
 }

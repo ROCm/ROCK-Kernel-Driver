@@ -125,12 +125,18 @@ struct device_node {
 	int	n_intrs;
 	struct	interrupt_info *intrs;
 	char	*full_name;
+
+	/* PCI stuff probably doesn't belong here */
 	int	busno;			/* for pci devices */
 	int	bussubno;		/* for pci devices */
 	int	devfn;			/* for pci devices */
+#define DN_STATUS_BIST_FAILED (1<<0)
+	int	status;			/* Current device status (non-zero is bad) */
+	int	eeh_mode;		/* See eeh.h for possible EEH_MODEs */
+	int	eeh_config_addr;
 	struct  pci_controller *phb;	/* for pci devices */
 	struct	TceTable *tce_table;	/* for phb's or bridges */
-#define DN_STATUS_BIST_FAILED (1<<0)
+
 	struct	property *properties;
 	struct	device_node *parent;
 	struct	device_node *child;

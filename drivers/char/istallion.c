@@ -796,7 +796,6 @@ static struct file_operations	stli_fsiomem = {
  *	not increase character latency by much either...
  */
 static struct timer_list stli_timerlist = TIMER_INITIALIZER(stli_poll, 0, 0);
-};
 
 static int	stli_timeron;
 
@@ -813,7 +812,7 @@ static int	stli_timeron;
  *	Loadable module initialization stuff.
  */
 
-int init_module()
+static int __init istallion_module_init(void)
 {
 	unsigned long	flags;
 
@@ -831,7 +830,7 @@ int init_module()
 
 /*****************************************************************************/
 
-void cleanup_module()
+static void __exit istallion_module_exit(void)
 {
 	stlibrd_t	*brdp;
 	stliport_t	*portp;
@@ -897,6 +896,9 @@ void cleanup_module()
 
 	restore_flags(flags);
 }
+
+module_init(istallion_module_init);
+module_exit(istallion_module_exit);
 
 /*****************************************************************************/
 

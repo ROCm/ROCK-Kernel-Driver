@@ -23,17 +23,16 @@
 #include <asm/uaccess.h>
 #include <linux/fb.h>
 #include <linux/init.h>
+#include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 
-#include <video/fbcon.h>
-
 #define INCLUDE_TIMING_TABLE_DATA
-#define DBE_REG_BASE regs
-#include <video/sgivw.h>
+#define DBE_REG_BASE default_par.regs
+#include <asm/sgi-vwdbe.h>
 
 struct sgivw_par {
-	asregs *regs;
+	struct asregs *regs;
 	u32 cmap_fifo;
 	u_long timing_num;
 };
@@ -46,11 +45,12 @@ struct sgivw_par {
  */
 
 /* set by arch/i386/kernel/setup.c */
-u_long sgivwfb_mem_phys;
-u_long sgivwfb_mem_size;
+extern unsigned long sgivwfb_mem_phys;
+extern unsigned long sgivwfb_mem_size;
 
-static struct fb_info fb_info;
 static struct sgivw_par default_par;
+static u32 pseudo_palette[17];
+static struct fb_info fb_info;
 static int ypan = 0;
 static int ywrap = 0;
 
@@ -60,7 +60,7 @@ static struct fb_fix_screeninfo sgivwfb_fix __initdata = {
         .visual		= FB_VISUAL_PSEUDOCOLOR,
 	.mmio_start	= DBE_REG_PHYS,
 	.mmio_len	= DBE_REG_SIZE,
-        .accel_flags	= FB_ACCEL_NONE
+        .accel		= FB_ACCEL_NONE
 };
 
 static struct fb_var_screeninfo sgivwfb_var __initdata = {
@@ -85,9 +85,6 @@ static struct fb_var_screeninfo sgivwfb_var __initdata = {
         .vmode		= FB_VMODE_NONINTERLACED
 };
 
-/* console related variables */
-static struct display disp;
-
 /*
  *  Interface used by the world
  */
@@ -104,15 +101,13 @@ static int sgivwfb_mmap(struct fb_info *info, struct file *file,
 
 static struct fb_ops sgivwfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_check_var	= sgivwfb_check_var,
 	.fb_set_par	= sgivwfb_set_par,
 	.fb_setcolreg	= sgivwfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= soft_cursor,
 	.fb_mmap	= sgivwfb_mmap,
 };
 
@@ -159,8 +154,8 @@ static unsigned long bytes_per_pixel(int bpp)
 
 static void dbe_TurnOffDma(void)
 {
-	int i;
 	unsigned int readVal;
+	int i;
 
 	// Check to see if things are already turned off:
 	// 1) Check to see if dbe is not using the internal dotclock.
@@ -226,7 +221,7 @@ static void dbe_TurnOffDma(void)
 static int sgivwfb_check_var(struct fb_var_screeninfo *var, 
 			     struct fb_info *info)
 {
-	int err, activate = var->activate;
+	struct sgivw_par *par = (struct sgivw_par *)info->par;
 	struct dbe_timing_info *timing;
 	u_long line_length;
 	u_long min_mode;
@@ -240,8 +235,8 @@ static int sgivwfb_check_var(struct fb_var_screeninfo *var,
 
 	if (var->vmode & FB_VMODE_CONUPDATE) {
 		var->vmode |= FB_VMODE_YWRAP;
-		var->xoffset = display->var.xoffset;
-		var->yoffset = display->var.yoffset;
+		var->xoffset = info->var.xoffset;
+		var->yoffset = info->var.yoffset;
 	}
 
 	/* XXX FIXME - forcing var's */
@@ -369,7 +364,7 @@ static int sgivwfb_set_par(struct fb_info *info)
 	u32 readVal, outputVal;
 	int wholeTilesX, maxPixelsPerTileX;
 	int frmWrite1, frmWrite2, frmWrite3b;
-	dbe_timing_info_t *currentTiming;	/* Current Video Timing */
+	struct dbe_timing_info_t *currentTiming; /* Current Video Timing */
 	int xpmax, ypmax;	// Monitor resolution
 	int bytesPerPixel;	// Bytes per pixel
 
@@ -705,11 +700,16 @@ int __init sgivwfb_init(void)
 	printk(KERN_INFO "sgivwfb: framebuffer at 0x%lx, size %ldk\n",
 	       sgivwfb_mem_phys, sgivwfb_mem_size / 1024);
 
-	default_par.regs = (asregs *) ioremap_nocache(DBE_REG_PHYS, DBE_REG_SIZE);
+	if (!request_mem_region(DBE_REG_PHYS, DBE_REG_SIZE, "sgivwfb")) {
+		printk(KERN_ERR "sgivwfb: couldn't reserve mmio region\n");
+		goto fail_request_mem_region;
+	}
+	default_par.regs = (struct asregs *) ioremap_nocache(DBE_REG_PHYS, DBE_REG_SIZE);
 	if (!default_par.regs) {
 		printk(KERN_ERR "sgivwfb: couldn't ioremap registers\n");
 		goto fail_ioremap_regs;
 	}
+
 #ifdef CONFIG_MTRR
 	mtrr_add((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size,
 		 MTRR_TYPE_WRCOMB, 1);
@@ -720,41 +720,29 @@ int __init sgivwfb_init(void)
 	sgivwfb_fix.ywrapstep = ywrap;
 	sgivwfb_fix.ypanstep = ypan;
 
-	strcpy(fb_info.modename, sgivwfb_fix.id);
-	fb_info.changevar = NULL;
 	fb_info.node = NODEV;
 	fb_info.fix = sgivwfb_fix;
 	fb_info.var = sgivwfb_var;
 	fb_info.fbops = &sgivwfb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.par = &default_par;
-	fb_info.disp = &disp;
-	fb_info.currcon = -1;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_info.screen_base =
-	    ioremap_nocache((unsigned long) sgivwfb_mem_phys,
-			    sgivwfb_mem_size);
+	fb_info.screen_base = ioremap_nocache((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size);
 	if (!fb_info.screen_base) {
 		printk(KERN_ERR "sgivwfb: couldn't ioremap screen_base\n");
 		goto fail_ioremap_fbmem;
 	}
 
-	/* turn on default video mode */
-	gen_set_var(&fb_info->var, -1, &fb_info);
+	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0) {
-		printk(KERN_ERR
-		       "sgivwfb: couldn't register framebuffer\n");
+		printk(KERN_ERR "sgivwfb: couldn't register framebuffer\n");
 		goto fail_register_framebuffer;
 	}
 
-	printk(KERN_INFO
-	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), sgivwfb_mem_size >> 10);
-
+	printk(KERN_INFO "fb%d: SGI BDE frame buffer device, using %ldK of video memory\n", minor(fb_info.node, sgivwfb_mem_size >> 10);
 	return 0;
 
       fail_register_framebuffer:

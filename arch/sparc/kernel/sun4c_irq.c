@@ -57,7 +57,7 @@ static void sun4c_disable_irq(unsigned int irq_nr)
 	unsigned char current_mask, new_mask;
     
 	save_and_cli(flags);
-	irq_nr &= NR_IRQS;
+	irq_nr &= (NR_IRQS - 1);
 	current_mask = *interrupt_enable;
 	switch(irq_nr) {
 	case 1:
@@ -86,7 +86,7 @@ static void sun4c_enable_irq(unsigned int irq_nr)
 	unsigned char current_mask, new_mask;
     
 	save_and_cli(flags);
-	irq_nr &= NR_IRQS;
+	irq_nr &= (NR_IRQS - 1);
 	current_mask = *interrupt_enable;
 	switch(irq_nr) {
 	case 1:

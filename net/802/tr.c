@@ -91,10 +91,10 @@ int tr_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
 	int hdr_len;
 
 	/* 
-	 * Add the 802.2 SNAP header if IP as the IPv4 code calls  
+	 * Add the 802.2 SNAP header if IP as the IPv4/IPv6 code calls  
 	 * dev->hard_header directly.
 	 */
-	if (type == ETH_P_IP || type == ETH_P_ARP)
+	if (type == ETH_P_IP || type == ETH_P_IPV6 || type == ETH_P_ARP)
 	{
 		struct trllc *trllc=(struct trllc *)(trh+1);
 
@@ -216,6 +216,7 @@ unsigned short tr_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 	if (trllc->dsap == EXTENDED_SAP &&
 	    (trllc->ethertype == ntohs(ETH_P_IP) ||
+	     trllc->ethertype == ntohs(ETH_P_IPV6) ||
 	     trllc->ethertype == ntohs(ETH_P_ARP)))
 	{
 		skb_pull(skb, sizeof(struct trllc));

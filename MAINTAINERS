@@ -198,6 +198,11 @@ P:	Roman Zippel
 M:	zippel@linux-m68k.org
 S:	Maintained
 
+AGPGART DRIVER
+P:	Dave Jones
+M:	davej@codemonkey.org.uk
+S:	Maintained
+
 AHA152X SCSI DRIVER
 P:	Juergen E. Fischer
 M:	Juergen Fischer <fischer@norbit.de>
@@ -635,6 +640,13 @@ P:	Kevin Curtis
 M:	kevin.curtis@farsite.co.uk
 M:	kevin.curtis@farsite.co.uk
 W:	http://www.farsite.co.uk/
+S:	Supported
+
+FRAMEBUFFER LAYER
+P:	James Simmons, Geert Uytterhoeven	
+M:	jsimmons@users.sf.net, geert@linux-m68k.org	
+L:	linux-fbdev-devel@lists.sourceforge.net	
+W:	http://www.linux-fbdev.org
 S:	Supported
 
 FILE LOCKING (flock() and fcntl()/lockf())

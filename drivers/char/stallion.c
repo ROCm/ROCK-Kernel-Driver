@@ -757,7 +757,7 @@ static struct file_operations	stl_fsiomem = {
  *	Loadable module initialization stuff.
  */
 
-int init_module()
+static int __init stallion_module_init(void)
 {
 	unsigned long	flags;
 
@@ -775,7 +775,7 @@ int init_module()
 
 /*****************************************************************************/
 
-void cleanup_module()
+static void __exit stallion_module_exit(void)
 {
 	stlbrd_t	*brdp;
 	stlpanel_t	*panelp;
@@ -850,6 +850,9 @@ void cleanup_module()
 
 	restore_flags(flags);
 }
+
+module_init(stallion_module_init);
+module_exit(stallion_module_exit);
 
 /*****************************************************************************/
 

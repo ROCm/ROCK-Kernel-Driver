@@ -10,6 +10,7 @@
 #include <linux/vt.h>
 #include <linux/kd.h>
 #include <linux/tty.h>
+#include <linux/console_struct.h>
 
 /*
  * Presently, a lot of graphics programs do not restore the contents of
@@ -37,14 +38,9 @@ extern int kbd_rate(struct kbd_repeat *rep);
 
 /* console.c */
 
-struct console_font_op;
-
 int vc_allocate(unsigned int console);
 int vc_cons_allocated(unsigned int console);
-int vc_resize(unsigned int lines, unsigned int cols,
-	      unsigned int first, unsigned int last);
-#define vc_resize_all(l, c) vc_resize(l, c, 0, MAX_NR_CONSOLES-1)
-#define vc_resize_con(l, c, x) vc_resize(l, c, x, x)
+int vc_resize(int currcons, unsigned int cols, unsigned int lines);
 void vc_disallocate(unsigned int console);
 void reset_palette(int currcons);
 void set_palette(int currcons);

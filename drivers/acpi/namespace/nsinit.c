@@ -278,7 +278,7 @@ acpi_ns_init_one_object (
 	/* Print a dot for each object unless we are going to print the entire pathname */
 
 	if (!(acpi_dbg_level & ACPI_LV_INIT_NAMES)) {
-		acpi_os_printf (".");
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 	}
 
 	/*
@@ -321,7 +321,7 @@ acpi_ns_init_one_device (
 
 
 	if ((acpi_dbg_level <= ACPI_LV_ALL_EXCEPTIONS) && (!(acpi_dbg_level & ACPI_LV_INFO))) {
-		acpi_os_printf (".");
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT, "."));
 	}
 
 	info->device_count++;

@@ -141,12 +141,6 @@ static struct timer_list epca_timer;
 	configured.
 ----------------------------------------------------------------------- */
 	
-
-#ifdef MODULE
-int                init_module(void);
-void               cleanup_module(void);
-#endif /* MODULE */
-
 static inline void memwinon(struct board_info *b, unsigned int win);
 static inline void memwinoff(struct board_info *b, unsigned int win);
 static inline void globalwinon(struct channel *ch);
@@ -1534,8 +1528,7 @@ static int pc_open(struct tty_struct *tty, struct file * filp)
 } /* End pc_open */
 
 #ifdef MODULE
-/* -------------------- Begin init_module ---------------------- */
-int __init init_module()
+static int __init epca_module_init(void)
 { /* Begin init_module */
 
 	unsigned long	flags;
@@ -1548,8 +1541,9 @@ int __init init_module()
 	restore_flags(flags);
 
 	return(0);
-} /* End init_module */
+}
 
+module_init(epca_module_init);
 #endif
 
 #ifdef ENABLE_PCI
@@ -1559,8 +1553,8 @@ static struct pci_driver epca_driver;
 #ifdef MODULE
 /* -------------------- Begin cleanup_module  ---------------------- */
 
-void cleanup_module()
-{ /* Begin cleanup_module */
+static void __exit epca_module_exit(void)
+{
 
 	int               count, crd;
 	struct board_info *bd;
@@ -1613,7 +1607,8 @@ void cleanup_module()
 
 	restore_flags(flags);
 
-} /* End cleanup_module */
+}
+module_exit(epca_module_exit);
 #endif /* MODULE */
 
 /* ------------------ Begin pc_init  ---------------------- */

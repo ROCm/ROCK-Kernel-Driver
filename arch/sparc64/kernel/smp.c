@@ -926,7 +926,7 @@ void smp_promstop_others(void)
 	smp_cross_call(&xcall_promstop, 0, 0, 0);
 }
 
-extern void sparc64_do_profile(unsigned long pc, unsigned long o7);
+extern void sparc64_do_profile(struct pt_regs *regs);
 
 static unsigned long current_tick_offset;
 
@@ -960,9 +960,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	}
 
 	do {
-		if (!user)
-			sparc64_do_profile(regs->tpc,
-					   regs->u_regs[UREG_RETPC]);
+		sparc64_do_profile(regs);
 		if (!--prof_counter(cpu)) {
 			if (cpu == boot_cpu_id) {
 				irq_enter();

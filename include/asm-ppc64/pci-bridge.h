@@ -12,17 +12,6 @@
 struct device_node;
 struct pci_controller;
 
-/*
- * pci_io_base returns the memory address at which you can access
- * the I/O space for PCI bus number `bus' (or NULL on error).
- */
-extern void *pci_bus_io_base(unsigned int bus);
-extern unsigned long pci_bus_io_base_phys(unsigned int bus);
-extern unsigned long pci_bus_mem_base_phys(unsigned int bus);
-
-/* Get the PCI host controller for a bus */
-extern struct pci_controller* pci_bus_to_hose(int bus);
-
 /* Get the PCI host controller for an OF device */
 extern struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node* node);
@@ -92,6 +81,7 @@ static inline struct device_node *pci_device_to_OF_node(struct pci_dev *dev)
 	else
 		return fetch_dev_dn(dev);
 }
+
 /* Use this macro after the PCI bus walk for max performance when it
  * is known that sysdata is correct.
  */

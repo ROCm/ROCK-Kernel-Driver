@@ -25,13 +25,7 @@
 #undef __IO_DEBUG
 
 extern unsigned long isa_io_base;
-extern unsigned long isa_mem_base;
 extern unsigned long pci_io_base;
-extern unsigned long pci_dram_offset;
-extern int have_print;
-#define _IO_BASE	isa_io_base
-#define _ISA_MEM_BASE	isa_mem_base
-#define PCI_DRAM_OFFSET	pci_dram_offset
 
 #ifdef CONFIG_PPC_ISERIES
 #define readb(addr)		iSeries_Read_Byte((void*)(addr))  
@@ -50,48 +44,34 @@ extern int have_print;
 #define outw(data,addr)		writew(data,((unsigned long)(addr)))  
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
 #else
-#define IS_MAPPED_VADDR(port)	((unsigned long)(port) >> 60UL)
 #define readb(addr)		eeh_readb((void*)(addr))  
 #define readw(addr)		eeh_readw((void*)(addr))  
 #define readl(addr)		eeh_readl((void*)(addr))
 #define writeb(data, addr)	eeh_writeb((data), ((void*)(addr)))
 #define writew(data, addr)	eeh_writew((data), ((void*)(addr)))
 #define writel(data, addr)	eeh_writel((data), ((void*)(addr)))
-#define memset_io(a,b,c)	eeh_memset((void *)(a),(b),(c))
+#define memset_io(a,b,c)	eeh_memset_io((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	eeh_memcpy_fromio((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	eeh_memcpy_toio((void *)(a),(b),(c))
-#define inb(port)		_inb((unsigned long)port)
-#define outb(val, port)		_outb(val, (unsigned long)port)
-#define inw(port)		_inw((unsigned long)port)
-#define outw(val, port)		_outw(val, (unsigned long)port)
-#define inl(port)		_inl((unsigned long)port)
-#define outl(val, port)		_outl(val, (unsigned long)port)
+#define inb(port)		eeh_inb((unsigned long)port)
+#define outb(val, port)		eeh_outb(val, (unsigned long)port)
+#define inw(port)		eeh_inw((unsigned long)port)
+#define outw(val, port)		eeh_outw(val, (unsigned long)port)
+#define inl(port)		eeh_inl((unsigned long)port)
+#define outl(val, port)		eeh_outl(val, (unsigned long)port)
 
 /*
  * The insw/outsw/insl/outsl macros don't do byte-swapping.
  * They are only used in practice for transferring buffers which
  * are arrays of bytes, and byte-swapping is not appropriate in
  * that case.  - paulus */
-#define insb(port, buf, ns)	eeh_insb((u8 *)(port), (buf), (ns))
-#define outsb(port, buf, ns)	eeh_outsb((u8 *)(port), (buf), (ns))
-#define insw(port, buf, ns)	eeh_insw_ns((u16 *)(port), (buf), (ns))
-#define outsw(port, buf, ns)	eeh_outsw_ns((u16 *)(port), (buf), (ns))
-#define insl(port, buf, nl)	eeh_insl_ns((u32 *)(port), (buf), (nl))
-#define outsl(port, buf, nl)	eeh_outsl_ns((u32 *)(port), (buf), (nl))
+#define insb(port, buf, ns)	_insb((u8 *)((port)+pci_io_base), (buf), (ns))
+#define outsb(port, buf, ns)	_outsb((u8 *)((port)+pci_io_base), (buf), (ns))
+#define insw(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define outsw(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define insl(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+#define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #endif
-
-
-/*
- * output pause versions need a delay at least for the
- * w83c105 ide controller in a p610.
- */
-#define inb_p(port)             inb(port)
-#define outb_p(val, port)       (udelay(1), outb((val), (port)))
-#define inw_p(port)             inw(port)
-#define outw_p(val, port)       (udelay(1), outw((val), (port)))
-#define inl_p(port)             inl(port)
-#define outl_p(val, port)       (udelay(1), outl((val, (port)))
-
 
 extern void _insb(volatile u8 *port, void *buf, int ns);
 extern void _outsb(volatile u8 *port, const void *buf, int ns);
@@ -105,14 +85,25 @@ extern void _insl_ns(volatile u32 *port, void *buf, int nl);
 extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 
 /*
+ * output pause versions need a delay at least for the
+ * w83c105 ide controller in a p610.
+ */
+#define inb_p(port)             inb(port)
+#define outb_p(val, port)       (udelay(1), outb((val), (port)))
+#define inw_p(port)             inw(port)
+#define outw_p(val, port)       (udelay(1), outw((val), (port)))
+#define inl_p(port)             inl(port)
+#define outl_p(val, port)       (udelay(1), outl((val, (port)))
+
+/*
  * The *_ns versions below don't do byte-swapping.
  * Neither do the standard versions now, these are just here
  * for older code.
  */
-#define insw_ns(port, buf, ns)	insw(port, buf, ns)
-#define outsw_ns(port, buf, ns)	outsw(port, buf, ns)
-#define insl_ns(port, buf, nl)	insl(port, buf, nl)
-#define outsl_ns(port, buf, nl)	outsl(port, buf, nl)
+#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define outsw_ns(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+#define outsl_ns(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 
 
 #define IO_SPACE_LIMIT ~(0UL)
@@ -249,49 +240,6 @@ static inline void out_be32(volatile unsigned *addr, int val)
 
 #ifndef CONFIG_PPC_ISERIES 
 #include <asm/eeh.h>
-
-static inline u8 _inb(unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return readb((void *)port);
-	else if (_IO_BASE)
-		return in_8((u8 *)((port)+_IO_BASE));
-	else
-		return 0xff;
-}
-static inline void _outb(u8 val, unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return writeb(val, (void *)port);
-	else if (_IO_BASE)
-		out_8((u8 *)((port)+_IO_BASE), val);
-}
-static inline u16 _inw(unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return readw((void *)port);
-	else if (_IO_BASE)
-		return in_le16((u16 *)((port)+_IO_BASE));
-	else
-		return 0xffff;
-}
-static inline void _outw(u16 val, unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return writew(val, (void *)port);
-	else if (_IO_BASE)
-		out_le16((u16 *)((port)+_IO_BASE), val);
-}
-static inline u32 _inl(unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return readl((void *)port);
-	else if (_IO_BASE)
-		return in_le32((u32 *)((port)+_IO_BASE));
-	else
-		return 0xffffffff;
-}
-static inline void _outl(u32 val, unsigned long port) {
-	if (IS_MAPPED_VADDR(port))
-		return writel(val, (void *)port);
-	else if (_IO_BASE)
-		out_le32((u32 *)((port)+_IO_BASE), val);
-}
 #endif
 
 #ifdef __KERNEL__

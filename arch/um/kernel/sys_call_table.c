@@ -485,9 +485,9 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_free_hugepages ] = sys_ni_syscall,
 	[ __NR_exit_group ] = sys_exit_group,
 	[ __NR_lookup_dcookie ] = sys_lookup_dcookie,
-	[ __NR_sys_epoll_create ] = sys_epoll_create,
-	[ __NR_sys_epoll_ctl ] = sys_epoll_ctl,
-	[ __NR_sys_epoll_wait ] = sys_epoll_wait,
+	[ __NR_epoll_create ] = sys_epoll_create,
+	[ __NR_epoll_ctl ] = sys_epoll_ctl,
+	[ __NR_epoll_wait ] = sys_epoll_wait,
         [ __NR_remap_file_pages ] = sys_remap_file_pages,
 
 	ARCH_SYSCALLS

@@ -38,6 +38,7 @@
 
 //#define DEBUG 1
 
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -52,9 +53,11 @@
 #include <linux/blk.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
+
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
+
 #include "scsi.h"
 #include "hosts.h"
 #include "pci2220i.h"

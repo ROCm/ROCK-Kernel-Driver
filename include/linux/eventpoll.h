@@ -16,22 +16,25 @@
 
 
 /* Valid opcodes to issue to sys_epoll_ctl() */
-#define EP_CTL_ADD 1
-#define EP_CTL_DEL 2
-#define EP_CTL_MOD 3
+#define EPOLL_CTL_ADD 1
+#define EPOLL_CTL_DEL 2
+#define EPOLL_CTL_MOD 3
 
+struct epoll_event {
+	__u32 events;
+	__u64 data;
+};
 
 #ifdef __KERNEL__
 
 /* Forward declarations to avoid compiler errors */
 struct file;
-struct pollfd;
 
 
 /* Kernel space functions implementing the user space "epoll" API */
 asmlinkage int sys_epoll_create(int size);
-asmlinkage int sys_epoll_ctl(int epfd, int op, int fd, unsigned int events);
-asmlinkage int sys_epoll_wait(int epfd, struct pollfd *events, int maxevents,
+asmlinkage int sys_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+asmlinkage int sys_epoll_wait(int epfd, struct epoll_event *events, int maxevents,
 			      int timeout);
 
 /* Used to initialize the epoll bits inside the "struct file" */

@@ -161,7 +161,6 @@ struct compress_tfm {
 struct crypto_tfm {
 
 	void *crt_ctx;
-	void *crt_work_block;
 	u32 crt_flags;
 	
 	union {
