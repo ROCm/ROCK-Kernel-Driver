@@ -537,6 +537,20 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	newinet->dport = htons(asoc->peer.port);
 	newnp->daddr =  asoc->peer.primary_addr.v6.sin6_addr;
 
+	/* Init the ipv4 part of the socket since we can have sockets
+	 * using v6 API for ipv4.
+	 */
+	newinet->ttl = sysctl_ip_default_ttl;
+	newinet->mc_loop = 1;
+	newinet->mc_ttl = 1;
+	newinet->mc_index = 0;
+	newinet->mc_list = NULL;
+
+	if (ipv4_config.no_pmtu_disc)
+		newinet->pmtudisc = IP_PMTUDISC_DONT;
+	else
+		newinet->pmtudisc = IP_PMTUDISC_WANT;
+
 #ifdef INET_REFCNT_DEBUG
 	atomic_inc(&inet6_sock_nr);
 	atomic_inc(&inet_sock_nr);
