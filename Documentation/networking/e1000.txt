@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/1000 Family of Adapters
 ===============================================================
 
-June 11, 2002
+August 6, 2002
 
 
 Contents
@@ -20,12 +20,12 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/1000 Family
-of Adapters, version 4.2.x.  This driver includes support for 
+of Adapters, version 4.3.x.  This driver includes support for 
 Itanium(TM)-based systems.
 
 This release version includes the following:
 
-   - Support for the ethtool 1.5 interface. A third-party application can use
+   - Support for the ethtool 1.6 interface. A third-party application can use
      the ethtool interface to get and set driver parameters.
 
    - Zero copy. This feature provides faster data throughput. Enabled by
@@ -113,12 +113,12 @@ Valid Range: 0x01-0x0F, 0x20-0x2F
 Default Value: 0x2F
     This parameter is a bit mask that specifies which speed and duplex
     settings the board advertises. When this parameter is used, the Speed and
-    Duplex parameters must not be specified.
+    Duplex parameters must not be specified.  
 
 Duplex (adapters using copper connections only)
 Valid Range: 0-2 (0=auto-negotiate, 1=half, 2=full)
 Default Value: 0
-    Defines the direction in which data is allowed to flow. Can by either one
+    Defines the direction in which data is allowed to flow. Can by either one 
     or two-directional. If both Duplex and the link partner are set to auto-
     negotiate, the board auto-detects the correct duplex. If the link partner
     is forced (either full or half), Duplex defaults to half-duplex.
@@ -126,45 +126,58 @@ Default Value: 0
 FlowControl
 Valid Range: 0-3 (0=none, 1=Rx only, 2=Tx only, 3=Rx&Tx)
 Default: Read flow control settings from the EEPROM
-    This parameter controls the automatic generation(Tx) and response(Rx) to
+    This parameter controls the automatic generation(Tx) and response(Rx) to 
     Ethernet PAUSE frames.
 
 RxDescriptors
 Valid Range: 80-256 for 82542 and 82543-based adapters
              80-4096 for 82540, 82544, 82545, and 82546-based adapters
 Default Value: 80
-    This value is the number of receive descriptors allocated by the driver.
-    Increasing this value allows the driver to buffer more incoming packets.
+    This value is the number of receive descriptors allocated by the driver. 
+    Increasing this value allows the driver to buffer more incoming packets. 
     Each descriptor is 16 bytes.  A receive buffer is also allocated for each
-    descriptor and can be either 2048, 4096, 8192, or 16384 bytes, depending
+    descriptor and can be either 2048, 4096, 8192, or 16384 bytes, depending 
     on the MTU setting. The maximum MTU size is 16110.
+
+    NOTE: MTU designates the frame size. It only needs to be set for Jumbo 
+          Frames.
 
 RxIntDelay
 Valid Range: 0-65535 (0=off)
 Default Value: 0 (82542, 82543, and 82544-based adapters)
                128 (82540, 82545, and 82546-based adapters)
-    This value delays the generation of receive interrupts in units of 1.024
-    microseconds.  Receive interrupt reduction can improve CPU efficiency if
-    properly tuned for specific network traffic. Increasing this value adds
-    extra latency to frame reception and can end up decreasing the throughput
-    of TCP traffic. If the system is reporting dropped receives, this value
-    may be set too high, causing the driver to run out of available receive
+    This value delays the generation of receive interrupts in units of 1.024 
+    microseconds.  Receive interrupt reduction can improve CPU efficiency if 
+    properly tuned for specific network traffic. Increasing this value adds 
+    extra latency to frame reception and can end up decreasing the throughput 
+    of TCP traffic. If the system is reporting dropped receives, this value 
+    may be set too high, causing the driver to run out of available receive 
     descriptors.
 
-    CAUTION: When setting RxIntDelay to a value other than 0, adapters based
-             on the Intel 82543 and 82544 LAN controllers may hang (stop
+    CAUTION: When setting RxIntDelay to a value other than 0, adapters based 
+             on the Intel 82543 and 82544 LAN controllers may hang (stop 
              transmitting) under certain network conditions. If this occurs a
-             message is logged in the system event log. In addition, the
-             controller is automatically reset, restoring the network
-             connection. To eliminate the potential for the hang ensure that
+             message is logged in the system event log. In addition, the 
+             controller is automatically reset, restoring the network 
+             connection. To eliminate the potential for the hang ensure that 
              RxIntDelay is set to 0.
+
+RxAbsIntDelay (82540, 82545, and 82546-based adapters only)
+Valid Range: 0-65535 (0=off)
+Default Value: 128
+    This value, in units of 1.024 microseconds, limits the delay in which a 
+    transmit interrupt is generated. Useful only if RxIntDelay is non-zero, 
+    this value ensures that an interrupt is generated after the initial 
+    packet is received within the set amount of time.  Proper tuning,
+    along with RxIntDelay, may improve traffic throughput in specific network
+    conditions.
 
 Speed (adapters using copper connections only)
 Valid Settings: 0, 10, 100, 1000
 Default Value: 0 (auto-negotiate at all supported speeds)
     Speed forces the line speed to the specified value in megabits per second
-    (Mbps). If this parameter is not specified or is set to 0 and the link
-    partner is set to auto-negotiate, the board will auto-detect the correct
+    (Mbps). If this parameter is not specified or is set to 0 and the link 
+    partner is set to auto-negotiate, the board will auto-detect the correct 
     speed. Duplex must also be set when Speed is set to either 10 or 100.
 
 TxDescriptors
@@ -172,8 +185,27 @@ Valid Range: 80-256 for 82542 and 82543-based adapters
              80-4096 for 82540, 82544, 82545, and 82546-based adapters
 Default Value: 256
     This value is the number of transmit descriptors allocated by the driver.
-    Increasing this value allows the driver to queue more transmits. Each
+    Increasing this value allows the driver to queue more transmits. Each 
     descriptor is 16 bytes.
+
+TxIntDelay
+Valid Range: 0-65535 (0=off)
+Default Value: 64
+    This value delays the generation of transmit interrupts in units of 
+    1.024 microseconds.  Transmit interrupt reduction can improve CPU
+    efficiency if properly tuned for specific network traffic. If the
+    system is reporting dropped transmits, this value may be set too high
+    causing the driver to run out of available transmit descriptors.
+
+TxAbsIntDelay (82540, 82545, and 82546-based adapters only)
+Valid Range: 0-65535 (0=off)
+Default Value: 64
+    This value, in units of 1.024 microseconds, limits the delay in which a 
+    transmit interrupt is generated. Useful only if TxIntDelay is non-zero, 
+    this value ensures that an interrupt is generated after the initial 
+    packet is sent on the wire within the set amount of time.  Proper tuning,
+    along with TxIntDelay, may improve traffic throughput in specific 
+    network conditions.
 
 XsumRX (not available on the PRO/1000 Gigabit Server Adapter)
 Valid Range: 0-1

@@ -147,6 +147,24 @@ E1000_PARAM(FlowControl, "Flow Control setting");
 
 E1000_PARAM(XsumRX, "Disable or enable Receive Checksum offload");
 
+/* Transmit Interrupt Delay in units of 1.024 microseconds
+ *
+ * Valid Range: 0-65535
+ *
+ * Default Value: 64
+ */
+
+E1000_PARAM(TxIntDelay, "Transmit Interrupt Delay");
+
+/* Transmit Absolute Interrupt Delay in units of 1.024 microseconds
+ *
+ * Valid Range: 0-65535
+ *
+ * Default Value: 0
+ */
+
+E1000_PARAM(TxAbsIntDelay, "Transmit Absolute Interrupt Delay");
+
 /* Receive Interrupt Delay in units of 1.024 microseconds
  *
  * Valid Range: 0-65535
@@ -155,6 +173,15 @@ E1000_PARAM(XsumRX, "Disable or enable Receive Checksum offload");
  */
 
 E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
+
+/* Receive Absolute Interrupt Delay in units of 1.024 microseconds
+ *
+ * Valid Range: 0-65535
+ *
+ * Default Value: 128
+ */
+
+E1000_PARAM(RxAbsIntDelay, "Receive Absolute Interrupt Delay");
 
 #define AUTONEG_ADV_DEFAULT  0x2F
 #define AUTONEG_ADV_MASK     0x2F
@@ -170,10 +197,22 @@ E1000_PARAM(RxIntDelay, "Receive Interrupt Delay");
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096
 
-#define DEFAULT_RDTR                   0
-#define DEFAULT_RADV                 128
+#define DEFAULT_RDTR                 128
+#define DEFAULT_RDTR_82544             0
 #define MAX_RXDELAY               0xFFFF
 #define MIN_RXDELAY                    0
+
+#define DEFAULT_RADV                 128
+#define MAX_RXABSDELAY            0xFFFF
+#define MIN_RXABSDELAY                 0
+
+#define DEFAULT_TIDV                  64
+#define MAX_TXDELAY               0xFFFF
+#define MIN_TXDELAY                    0
+
+#define DEFAULT_TADV                  64
+#define MAX_TXABSDELAY            0xFFFF
+#define MIN_TXABSDELAY                 0
 
 struct e1000_option {
 	enum { enable_option, range_option, list_option } type;
@@ -331,20 +370,60 @@ e1000_check_options(struct e1000_adapter *adapter)
 		e1000_validate_option(&fc, &opt);
 		adapter->hw.fc = adapter->hw.original_fc = fc;
 	}
+	{ /* Transmit Interrupt Delay */
+		char *tidv = "using default of " __MODULE_STRING(DEFAULT_TIDV);
+		struct e1000_option opt = {
+			.type = range_option,
+			.name = "Transmit Interrupt Delay",
+			.arg  = { r: { min: MIN_TXDELAY, max: MAX_TXDELAY }}
+		};
+		opt.def = DEFAULT_TIDV;
+		opt.err = tidv;
+
+		adapter->tx_int_delay = TxIntDelay[bd];
+		e1000_validate_option(&adapter->tx_int_delay, &opt);
+	}
+	{ /* Transmit Absolute Interrupt Delay */
+		char *tadv = "using default of " __MODULE_STRING(DEFAULT_TADV);
+		struct e1000_option opt = {
+			.type = range_option,
+			.name = "Transmit Absolute Interrupt Delay",
+			.arg  = { r: { min: MIN_TXABSDELAY, max: MAX_TXABSDELAY }}
+		};
+		opt.def = DEFAULT_TADV;
+		opt.err = tadv;
+
+		adapter->tx_abs_int_delay = TxAbsIntDelay[bd];
+		e1000_validate_option(&adapter->tx_abs_int_delay, &opt);
+	}
 	{ /* Receive Interrupt Delay */
 		char *rdtr = "using default of " __MODULE_STRING(DEFAULT_RDTR);
-		char *radv = "using default of " __MODULE_STRING(DEFAULT_RADV);
+		char *rdtr_82544 = "using default of "
+		       		   __MODULE_STRING(DEFAULT_RDTR_82544);
 		struct e1000_option opt = {
 			.type = range_option,
 			.name = "Receive Interrupt Delay",
 			.arg  = { r: { min: MIN_RXDELAY, max: MAX_RXDELAY }}
 		};
 		e1000_mac_type mac_type = adapter->hw.mac_type;
-		opt.def = mac_type < e1000_82540 ? DEFAULT_RDTR : DEFAULT_RADV;
-		opt.err = mac_type < e1000_82540 ? rdtr : radv;
+		opt.def = mac_type > e1000_82544 ? DEFAULT_RDTR : 0;
+		opt.err = mac_type > e1000_82544 ? rdtr : rdtr_82544;
 
 		adapter->rx_int_delay = RxIntDelay[bd];
 		e1000_validate_option(&adapter->rx_int_delay, &opt);
+	}
+	{ /* Receive Absolute Interrupt Delay */
+		char *radv = "using default of " __MODULE_STRING(DEFAULT_RADV);
+		struct e1000_option opt = {
+			.type = range_option,
+			.name = "Receive Absolute Interrupt Delay",
+			.arg  = { r: { min: MIN_RXABSDELAY, max: MAX_RXABSDELAY }}
+		};
+		opt.def = DEFAULT_RADV;
+		opt.err = radv;
+
+		adapter->rx_abs_int_delay = RxAbsIntDelay[bd];
+		e1000_validate_option(&adapter->rx_abs_int_delay, &opt);
 	}
 	
 	switch(adapter->hw.media_type) {

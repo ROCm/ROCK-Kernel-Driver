@@ -169,6 +169,8 @@ struct e1000_adapter {
 	/* TX */
 	struct e1000_desc_ring tx_ring;
 	uint32_t txd_cmd;
+	uint32_t tx_int_delay;
+	uint32_t tx_abs_int_delay;
 	int max_data_per_txd;
 
 	/* RX */
@@ -176,6 +178,7 @@ struct e1000_adapter {
 	uint64_t hw_csum_err;
 	uint64_t hw_csum_good;
 	uint32_t rx_int_delay;
+	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
 
 	/* OS defined structs */

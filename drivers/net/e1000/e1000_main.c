@@ -777,7 +777,9 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	/* Set the Tx Interrupt Delay register */
 
-	E1000_WRITE_REG(&adapter->hw, TIDV, 64);
+	E1000_WRITE_REG(&adapter->hw, TIDV, adapter->tx_int_delay);
+	if(adapter->hw.mac_type >= e1000_82540)
+		E1000_WRITE_REG(&adapter->hw, TADV, adapter->tx_abs_int_delay);
 
 	/* Program the Transmit Control Register */
 
@@ -907,8 +909,8 @@ e1000_configure_rx(struct e1000_adapter *adapter)
 	/* set the Receive Delay Timer Register */
 
 	if(adapter->hw.mac_type >= e1000_82540) {
-		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_int_delay);
-		E1000_WRITE_REG(&adapter->hw, RDTR, 64);
+		E1000_WRITE_REG(&adapter->hw, RDTR, adapter->rx_int_delay);
+		E1000_WRITE_REG(&adapter->hw, RADV, adapter->rx_abs_int_delay);
 
 		/* Set the interrupt throttling rate.  Value is calculated
 		 * as DEFAULT_ITR = 1/(MAX_INTS_PER_SEC * 256ns) */
