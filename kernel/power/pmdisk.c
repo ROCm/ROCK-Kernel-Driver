@@ -33,26 +33,3 @@
 
 #include "power.h"
 
-/* For resume= kernel option */
-static char resume_file[256] = CONFIG_PM_DISK_PARTITION;
-extern suspend_pagedir_t *pagedir_save;
-
-/*
- * Saving part...
- */
-
-
-static int __init pmdisk_setup(char *str)
-{
-	if (strlen(str)) {
-		if (!strcmp(str,"off"))
-			resume_file[0] = '\0';
-		else
-			strncpy(resume_file, str, 255);
-	} else
-		resume_file[0] = '\0';
-	return 1;
-}
-
-__setup("pmdisk=", pmdisk_setup);
-

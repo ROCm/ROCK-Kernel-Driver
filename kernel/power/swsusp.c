@@ -89,7 +89,7 @@ int pagedir_order_check;
 int nr_copy_pages_check;
 
 static int resume_status;
-static char resume_file[256] = "";			/* For resume= kernel option */
+static char resume_file[256] = CONFIG_PM_STD_PARTITION;
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;

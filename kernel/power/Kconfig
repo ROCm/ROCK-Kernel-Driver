@@ -54,12 +54,12 @@ config PM_DISK
 
 	If unsure, Say N.
 
-config PM_DISK_PARTITION
+config PM_STD_PARTITION
 	string "Default resume partition"
-	depends on PM_DISK
+	depends on SOFTWARE_SUSPEND
 	default ""
 	---help---
-	  The default resume partition is the partition that the pmdisk suspend-
+	  The default resume partition is the partition that the suspend-
 	  to-disk implementation will look for a suspended disk image. 
 
 	  The partition specified here will be different for almost every user. 
@@ -68,15 +68,9 @@ config PM_DISK_PARTITION
 
 	  The partition specified can be overridden by specifying:
 
-		pmdisk=/dev/<other device> 
+		resume=/dev/<other device> 
 
 	  which will set the resume partition to the device specified. 
-
-	  One may also do: 
-
-		pmdisk=off
-
-	  to inform the kernel not to perform a resume transition. 
 
 	  Note there is currently not a way to specify which device to save the
 	  suspended image to. It will simply pick the first available swap 
