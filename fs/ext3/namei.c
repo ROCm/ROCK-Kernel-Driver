@@ -610,10 +610,14 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 		de = (struct ext3_dir_entry_2 *) frames[0].bh->b_data;
 		if ((err = ext3_htree_store_dirent(dir_file, 0, 0, de)) != 0)
 			goto errout;
+		count++;
+	}
+	if (start_hash < 2 || (start_hash ==2 && start_minor_hash==0)) {
+		de = (struct ext3_dir_entry_2 *) frames[0].bh->b_data;
 		de = ext3_next_entry(de);
-		if ((err = ext3_htree_store_dirent(dir_file, 0, 0, de)) != 0)
+		if ((err = ext3_htree_store_dirent(dir_file, 2, 0, de)) != 0)
 			goto errout;
-		count += 2;
+		count++;
 	}
 
 	while (1) {
