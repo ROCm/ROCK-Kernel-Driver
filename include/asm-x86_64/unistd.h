@@ -724,7 +724,7 @@ static inline long dup(unsigned int fd)
 }
 
 /* implemented in asm in arch/x86_64/kernel/entry.S */
-extern long execve(char *, char **, char **);
+extern int execve(const char *, char * const *, char * const *);
 
 static inline long open(const char * filename, int flags, int mode)
 {

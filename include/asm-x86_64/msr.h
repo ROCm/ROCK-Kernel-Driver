@@ -67,7 +67,8 @@
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
 
-extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+extern inline void cpuid(int op, unsigned int *eax, unsigned int *ebx,
+			 unsigned int *ecx, unsigned int *edx)
 {
 	__asm__("cpuid"
 		: "=a" (*eax),
