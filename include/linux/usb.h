@@ -856,7 +856,7 @@ static inline void usb_fill_int_urb (struct urb *urb,
 #define FILL_INT_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL) \
     usb_fill_int_urb(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL)
 
-extern struct urb *usb_alloc_urb(int iso_packets);
+extern struct urb *usb_alloc_urb(int iso_packets, int mem_flags);
 extern void usb_free_urb(struct urb *urb);
 #define usb_put_urb usb_free_urb
 extern struct urb *usb_get_urb(struct urb *urb);

@@ -303,7 +303,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 	if (maxp > sizeof(hub->buffer))
 		maxp = sizeof(hub->buffer);
 
-	hub->urb = usb_alloc_urb(0);
+	hub->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!hub->urb) {
 		err("couldn't allocate interrupt urb");
 		kfree(hub->descriptor);
