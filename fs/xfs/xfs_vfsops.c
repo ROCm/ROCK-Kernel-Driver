@@ -264,7 +264,7 @@ xfs_start_flags(
 	 */
 	if (ap->flags & XFSMNT_WSYNC)
 		mp->m_flags |= XFS_MOUNT_WSYNC;
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	if (ap->flags & XFSMNT_INO64) {
 		mp->m_flags |= XFS_MOUNT_INO64;
 		mp->m_inoadd = XFS_INO64_OFFSET;
@@ -769,13 +769,13 @@ xfs_statvfs(
 	statp->f_blocks = sbp->sb_dblocks - lsize;
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	fakeinos += mp->m_inoadd;
 #endif
 	statp->f_files =
 	    MIN(sbp->sb_icount + fakeinos, (__uint64_t)XFS_MAXINUMBER);
 	if (mp->m_maxicount)
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files =
@@ -1674,7 +1674,7 @@ xfs_parseargs(
 			args->flags |= XFSMNT_NORECOVERY;
 		} else if (!strcmp(this_char, MNTOPT_INO64)) {
 			args->flags |= XFSMNT_INO64;
-#ifndef XFS_BIG_FILESYSTEMS
+#if !XFS_BIG_INUMS
 			printk("XFS: %s option not allowed on this system\n",
 				MNTOPT_INO64);
 			return EINVAL;
@@ -1697,7 +1697,7 @@ xfs_parseargs(
 			dswidth = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_64BITINODE)) {
 			args->flags &= ~XFSMNT_32BITINODES;
-#ifndef XFS_BIG_FILESYSTEMS
+#if !XFS_BIG_INUMS
 			printk("XFS: %s option not allowed on this system\n",
 				MNTOPT_64BITINODE);
 			return EINVAL;

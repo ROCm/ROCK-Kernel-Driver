@@ -354,7 +354,7 @@ typedef struct xfs_mount {
 	__uint64_t		m_maxioffset;	/* maximum inode offset */
 	__uint64_t		m_resblks;	/* total reserved blocks */
 	__uint64_t		m_resblks_avail;/* available reserved blocks */
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
 #endif
 	int			m_dalign;	/* stripe unit */
@@ -392,9 +392,7 @@ typedef struct xfs_mount {
 #define	XFS_MOUNT_WSYNC		0x00000001	/* for nfs - all metadata ops
 						   must be synchronous except
 						   for space allocations */
-#if XFS_BIG_FILESYSTEMS
 #define	XFS_MOUNT_INO64		0x00000002
-#endif
 			     /* 0x00000004	-- currently unused */
 			     /* 0x00000008	-- currently unused */
 #define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem

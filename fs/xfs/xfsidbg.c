@@ -4692,7 +4692,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_attroffset, mp->m_maxicount, mp->m_inoalign_mask);
 	kdb_printf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks,
 		mp->m_resblks_avail);
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	kdb_printf(" inoadd %llx\n", (unsigned long long) mp->m_inoadd);
 #else
 	kdb_printf("\n");

@@ -222,15 +222,21 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EWRONGFS);
 	}
 
-	if (unlikely(sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp)) {
-		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
+	if (unlikely(
+	    sbp->sb_logstart == 0 && mp->m_logdev_targp == mp->m_ddev_targp)) {
+		cmn_err(CE_WARN,
+	"XFS: filesystem is marked as having an external log; "
+	"specify logdev on the\nmount command line.");
 		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(1)",
 				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (unlikely(sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp)) {
-		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
+	if (unlikely(
+	    sbp->sb_logstart != 0 && mp->m_logdev_targp != mp->m_ddev_targp)) {
+		cmn_err(CE_WARN,
+	"XFS: filesystem is marked as having an internal log; "
+	"don't specify logdev on\nthe mount command line.");
 		XFS_CORRUPTION_ERROR("xfs_mount_validate_sb(2)",
 				     XFS_ERRLEVEL_HIGH, mp, sbp);
 		return XFS_ERROR(EFSCORRUPTED);
@@ -276,10 +282,14 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#if !XFS_BIG_FILESYSTEMS
-	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
+#if !XFS_BIG_BLKNOS
+	if (unlikely(
+	    (sbp->sb_dblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
+		> INT_MAX ||
+	    (sbp->sb_rblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
+		> INT_MAX)) {
 		cmn_err(CE_WARN,
-"XFS:  File systems greater than 1TB not supported on this system.");
+	"XFS: File system is too large to be mounted on this system.");
 		return XFS_ERROR(E2BIG);
 	}
 #endif
@@ -294,7 +304,7 @@ xfs_mount_validate_sb(
 	/*
 	 * Until this is fixed only page-sized or smaller data blocks work.
 	 */
-	if (sbp->sb_blocksize > PAGE_SIZE) {
+	if (unlikely(sbp->sb_blocksize > PAGE_SIZE)) {
 		cmn_err(CE_WARN,
 		"XFS: Attempted to mount file system with blocksize %d bytes",
 			sbp->sb_blocksize);
