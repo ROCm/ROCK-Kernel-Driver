@@ -71,7 +71,18 @@ struct scsi_host_template {
 	 * Status: OPTIONAL
 	 */
 	int (* ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
-	
+
+
+#ifdef CONFIG_COMPAT
+	/* 
+	 * Compat handler. Handle 32bit ABI.
+	 * When unknown ioctl is passed return -ENOIOCTLCMD.
+	 *
+	 * Status: OPTIONAL
+	 */
+	int (* compat_ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
+#endif
+
 	/*
 	 * The queuecommand function is used to queue up a scsi
 	 * command block to the LLDD.  When the driver finished
