@@ -513,8 +513,11 @@ int pmdisk_suspend(void)
 		root_swap = 0xFFFF;
 		return -ENOMEM;
 	}
-	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
-				   We should only consider resume_device. */
+
+	/* FIXME: si_swapinfo(&i) returns all swap devices information.
+	 * We should only consider resume_device. 
+	 */
+	si_swapinfo(&i);
 	if (i.freeswap < nr_needed_pages)  {
 		pr_debug("pmdisk: Not enough swap space. Need %d, Have %d\n",
 		       nr_needed_pages,i.freeswap);
@@ -526,14 +529,18 @@ int pmdisk_suspend(void)
 	if(!pm_pagedir_nosave) {
 		/* Shouldn't happen */
 		pr_debug("pmdisk: Couldn't allocate pagedir\n");
-		panic("pmdisk: Couldn't allocate pagedir\n");
 		return -ENOMEM;
 	}
 	nr_copy_pages_check = pmdisk_pages;
 	pagedir_order_check = pagedir_order;
 
-	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
-	if (pmdisk_pages != count_and_copy_data_pages(pm_pagedir_nosave))	/* copy */
+	/* During allocating of suspend pagedir, new cold pages may appear. 
+	 * Kill them 
+	 */
+	drain_local_pages();
+
+	/* copy */
+	if (pmdisk_pages != count_and_copy_data_pages(pm_pagedir_nosave))
 		BUG();
 
 	/*
