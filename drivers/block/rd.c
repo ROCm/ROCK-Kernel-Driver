@@ -168,7 +168,7 @@ static struct address_space_operations ramdisk_aops = {
 static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 				struct address_space *mapping)
 {
-	unsigned long index = sector >> (PAGE_CACHE_SHIFT - 9);
+	pgoff_t index = sector >> (PAGE_CACHE_SHIFT - 9);
 	unsigned int vec_offset = vec->bv_offset;
 	int offset = (sector << 9) & ~PAGE_CACHE_MASK;
 	int size = vec->bv_len;
@@ -199,25 +199,24 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
 		index++;
 
 		if (rw == READ) {
-			src = kmap(page) + offset;
-			dst = kmap(vec->bv_page) + vec_offset;
+			src = kmap_atomic(page, KM_USER0) + offset;
+			dst = kmap_atomic(vec->bv_page, KM_USER1) + vec_offset;
 		} else {
-			dst = kmap(page) + offset;
-			src = kmap(vec->bv_page) + vec_offset;
+			src = kmap_atomic(vec->bv_page, KM_USER0) + vec_offset;
+			dst = kmap_atomic(page, KM_USER1) + offset;
 		}
 		offset = 0;
 		vec_offset += count;
 
 		memcpy(dst, src, count);
 
-		kunmap(page);
-		kunmap(vec->bv_page);
+		kunmap_atomic(src, KM_USER0);
+		kunmap_atomic(dst, KM_USER1);
 
-		if (rw == READ) {
+		if (rw == READ)
 			flush_dcache_page(vec->bv_page);
-		} else {
+		else
 			set_page_dirty(page);
-		}
 		unlock_page(page);
 		put_page(page);
 	} while (size);
