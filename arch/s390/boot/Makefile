@@ -14,5 +14,5 @@ $(obj)/image: vmlinux FORCE
 	$(call if_changed,objcopy)
 
 install: $(CONFIGURE) $(obj)/image
-	sh -x $(obj)/install.sh $(KERNELRELEASE) $(obj)/image \
+	sh -x  $(srctree)/$(obj)/install.sh $(KERNELRELEASE) $(obj)/image \
 	      System.map Kerntypes "$(INSTALL_PATH)"

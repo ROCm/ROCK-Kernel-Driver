@@ -98,6 +98,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/user.h>
+#include <asm/system.h>		/* for save_access_regs */
 
 
 typedef s390_fp_regs elf_fpregset_t;
@@ -152,6 +153,7 @@ typedef s390_regs elf_gregset_t;
 static inline int dump_regs(struct pt_regs *ptregs, elf_gregset_t *regs)
 {
 	memcpy(&regs->psw, &ptregs->psw, sizeof(regs->psw)+sizeof(regs->gprs));
+	save_access_regs(regs->acrs);
 	regs->orig_gpr2 = ptregs->orig_gpr2;
 	return 1;
 }
@@ -160,8 +162,10 @@ static inline int dump_regs(struct pt_regs *ptregs, elf_gregset_t *regs)
 
 static inline int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 {
-	dump_regs(__KSTK_PTREGS(tsk), regs);
+	struct pt_regs *ptregs = __KSTK_PTREGS(tsk);
+	memcpy(&regs->psw, &ptregs->psw, sizeof(regs->psw)+sizeof(regs->gprs));
 	memcpy(regs->acrs, tsk->thread.acrs, sizeof(regs->acrs));
+	regs->orig_gpr2 = ptregs->orig_gpr2;
 	return 1;
 }
 
@@ -169,7 +173,10 @@ static inline int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 
 static inline int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
-	memcpy(fpregs, &tsk->thread.fp_regs, sizeof(elf_fpregset_t));
+	if (tsk == current)
+		save_fp_regs(fpregs);
+	else
+		memcpy(fpregs, &tsk->thread.fp_regs, sizeof(elf_fpregset_t));
 	return 1;
 }
 
