@@ -1364,7 +1364,7 @@ dc390_SRBdone( PACB pACB, PDCB pDCB, PSRB pSRB )
     status = pSRB->TargetStatus;
     ptr = (PSCSI_INQDATA) (pcmd->request_buffer);
     if( pcmd->use_sg )
-	ptr = (PSCSI_INQDATA) sg_dma_address((PSGL) ptr);
+	ptr = (PSCSI_INQDATA) (page_address(((PSGL) ptr)->page) + ((PSGL) ptr)->offset);
 	
     DEBUG0(printk (" SRBdone (%02x,%08x), SRB %p, pid %li\n", status, pcmd->result,\
 		pSRB, pcmd->pid));

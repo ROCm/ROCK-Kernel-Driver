@@ -916,6 +916,14 @@ static void dc390_SendSRB( PACB pACB, PSRB pSRB )
     }
 }
 
+static struct scatterlist* dc390_sg_build_single(struct scatterlist *sg, void *addr, unsigned int length)
+{
+	memset(sg, 0, sizeof(struct scatterlist));
+	sg->page	= virt_to_page(addr);
+	sg->length	= length;
+	sg->offset	= (unsigned long)addr & ~PAGE_MASK;
+	return sg;
+}
 
 /* Create pci mapping */
 static int dc390_pci_map (PSRB pSRB)
@@ -924,40 +932,43 @@ static int dc390_pci_map (PSRB pSRB)
 	Scsi_Cmnd *pcmd = pSRB->pcmd;
 	struct pci_dev *pdev = pSRB->pSRBDCB->pDCBACB->pdev;
 	dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp));
+
 	/* Map sense buffer */
 	if (pSRB->SRBFlag & AUTO_REQSENSE) {
-		sg_dma_address(&pSRB->Segmentx) = cmdp->saved_dma_handle = 
-			pci_map_page(pdev, virt_to_page(pcmd->sense_buffer),
-				     (unsigned long)pcmd->sense_buffer & ~PAGE_MASK, sizeof(pcmd->sense_buffer),
-				     DMA_FROM_DEVICE);
-		sg_dma_len(&pSRB->Segmentx) = sizeof(pcmd->sense_buffer);
-		pSRB->SGcount = 1;
-		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
+		pSRB->pSegmentList	= dc390_sg_build_single(&pSRB->Segmentx, pcmd->sense_buffer, sizeof(pcmd->sense_buffer));
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, 1,
+						     DMA_FROM_DEVICE);
+		cmdp->saved_dma_handle	= sg_dma_address(pSRB->pSegmentList);
+
+		/* TODO: error handling */
+		if (pSRB->SGcount != 1)
+			error = 1;
 		DEBUG1(printk("%s(): Mapped sense buffer %p at %x\n", __FUNCTION__, pcmd->sense_buffer, cmdp->saved_dma_handle));
-	/* Make SG list */	
+	/* Map SG list */
 	} else if (pcmd->use_sg) {
-		pSRB->pSegmentList = (PSGL) pcmd->request_buffer;
-		pSRB->SGcount = pci_map_sg(pdev, pSRB->pSegmentList,
-					   pcmd->use_sg,
-					   scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pSRB->pSegmentList	= (PSGL) pcmd->request_buffer;
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, pcmd->use_sg,
+						     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		/* TODO: error handling */
 		if (!pSRB->SGcount)
 			error = 1;
-		DEBUG1(printk("%s(): Mapped SG %p with %d (%d) elements\n", __FUNCTION__, pcmd->request_buffer, pSRB->SGcount, pcmd->use_sg));
+		DEBUG1(printk("%s(): Mapped SG %p with %d (%d) elements\n",\
+			      __FUNCTION__, pcmd->request_buffer, pSRB->SGcount, pcmd->use_sg));
 	/* Map single segment */
 	} else if (pcmd->request_buffer && pcmd->request_bufflen) {
-		sg_dma_address(&pSRB->Segmentx) = cmdp->saved_dma_handle =
-			pci_map_page(pdev, virt_to_page(pcmd->request_buffer),
-				     (unsigned long)pcmd->request_buffer & ~PAGE_MASK,
-				     pcmd->request_bufflen, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pSRB->pSegmentList	= dc390_sg_build_single(&pSRB->Segmentx, pcmd->request_buffer, pcmd->request_bufflen);
+		pSRB->SGcount		= pci_map_sg(pdev, pSRB->pSegmentList, 1,
+						     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		cmdp->saved_dma_handle	= sg_dma_address(pSRB->pSegmentList);
+
 		/* TODO: error handling */
-		sg_dma_len(&pSRB->Segmentx) = pcmd->request_bufflen;
-		pSRB->SGcount = 1;
-		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
+		if (pSRB->SGcount != 1)
+			error = 1;
 		DEBUG1(printk("%s(): Mapped request buffer %p at %x\n", __FUNCTION__, pcmd->request_buffer, cmdp->saved_dma_handle));
 	/* No mapping !? */	
     	} else
 		pSRB->SGcount = 0;
+
 	return error;
 }
 
@@ -966,21 +977,16 @@ static void dc390_pci_unmap (PSRB pSRB)
 {
 	Scsi_Cmnd* pcmd = pSRB->pcmd;
 	struct pci_dev *pdev = pSRB->pSRBDCB->pDCBACB->pdev;
-	dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp));
+	DEBUG1(dc390_cmd_scp_t* cmdp = ((dc390_cmd_scp_t*)(&pcmd->SCp)));
 
 	if (pSRB->SRBFlag) {
-		pci_unmap_page(pdev, cmdp->saved_dma_handle,
-			       sizeof(pcmd->sense_buffer), DMA_FROM_DEVICE);
+		pci_unmap_sg(pdev, &pSRB->Segmentx, 1, DMA_FROM_DEVICE);
 		DEBUG1(printk("%s(): Unmapped sense buffer at %x\n", __FUNCTION__, cmdp->saved_dma_handle));
 	} else if (pcmd->use_sg) {
-		pci_unmap_sg(pdev, pcmd->request_buffer, pcmd->use_sg,
-			     scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pci_unmap_sg(pdev, pcmd->request_buffer, pcmd->use_sg, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		DEBUG1(printk("%s(): Unmapped SG at %p with %d elements\n", __FUNCTION__, pcmd->request_buffer, pcmd->use_sg));
 	} else if (pcmd->request_buffer && pcmd->request_bufflen) {
-		pci_unmap_page(pdev,
-			       cmdp->saved_dma_handle,
-			       pcmd->request_bufflen,
-			       scsi_to_pci_dma_dir(pcmd->sc_data_direction));
+		pci_unmap_sg(pdev, &pSRB->Segmentx, 1, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		DEBUG1(printk("%s(): Unmapped request buffer at %x\n", __FUNCTION__, cmdp->saved_dma_handle));
 	}
 }
@@ -1540,15 +1546,16 @@ static void dc390_initDCB( PACB pACB, PDCB *ppDCB, UCHAR id, UCHAR lun )
 {
     PEEprom	prom;
     UCHAR	index;
-    PDCB pDCB, pDCB2;
+    PDCB	pDCB, pDCB2 = 0;
 
     pDCB = kmalloc (sizeof(DC390_DCB), GFP_ATOMIC);
     DCBDEBUG(printk (KERN_INFO "DC390: alloc mem for DCB (ID %i, LUN %i): %p\n",	\
 		     id, lun, pDCB));
- 
+
     *ppDCB = pDCB;
-    if (!pDCB) return;
-    pDCB2 = 0;
+    if (!pDCB)
+	return;
+
     if( pACB->DCBCnt == 0 )
     {
 	pACB->pLinkDCB = pDCB;
@@ -1724,7 +1731,6 @@ static void __init dc390_initACB (PSH psh, ULONG io_port, UCHAR Irq, UCHAR index
     pACB->SRBCount = MAX_SRB_CNT;
     pACB->AdapterIndex = index;
     pACB->status = 0;
-    psh->this_id = dc390_eepromBuf[index][EE_ADAPT_SCSI_ID];
     pACB->DCBCnt = 0;
     pACB->TagMaxNum = 2 << dc390_eepromBuf[index][EE_TAG_CMD_NUM];
     pACB->ACBFlag = 0;
