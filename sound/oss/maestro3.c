@@ -2936,9 +2936,6 @@ static struct pci_driver m3_pci_driver = {
 
 static int __init m3_init_module(void)
 {
-    if (!pci_present())   /* No PCI bus in this machine! */
-        return -ENODEV;
-
     printk(KERN_INFO PFX "version " DRIVER_VERSION " built at " __TIME__ " " __DATE__ "\n");
 
     if (register_reboot_notifier(&m3_reboot_nb)) {
