@@ -575,9 +575,6 @@ asiliantfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
 
 	init_asiliant(p, addr);
 
-	/* Clear the entire framebuffer */
-	memset(p->screen_base, 0, 0x200000);
-
 	pci_set_drvdata(dp, p);
 	return 0;
 }
