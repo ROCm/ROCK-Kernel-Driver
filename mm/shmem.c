@@ -1062,11 +1062,45 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			send_sig(SIGXFSZ, current, 0);
 			goto out;
 		}
-		if (count > limit - pos) {
-			send_sig(SIGXFSZ, current, 0);
-			count = limit - pos;
+		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = limit - (u32)pos;
 		}
 	}
+
+	/*
+	 *	LFS rule
+	 */
+	if (pos + count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
+		if (pos >= MAX_NON_LFS) {
+			send_sig(SIGXFSZ, current, 0);
+			goto out;
+		}
+		if (count > MAX_NON_LFS - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = MAX_NON_LFS - (u32)pos;
+		}
+	}
+
+	/*
+	 *	Are we about to exceed the fs block limit ?
+	 *
+	 *	If we have written data it becomes a short write
+	 *	If we have exceeded without writing data we send
+	 *	a signal and give them an EFBIG.
+	 *
+	 *	Linus frestrict idea will clean these up nicely..
+	 */
+	if (pos >= SHMEM_MAX_BYTES) {
+		if (count || pos > SHMEM_MAX_BYTES) {
+			send_sig(SIGXFSZ, current, 0);
+			err = -EFBIG;
+			goto out;
+		}
+		/* zero-length writes at ->s_maxbytes are OK */
+	}
+	if (pos + count > SHMEM_MAX_BYTES)
+		count = SHMEM_MAX_BYTES - pos;
 
 	status	= 0;
 	if (count) {
@@ -1077,51 +1111,62 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	while (count) {
 		unsigned long bytes, index, offset;
 		char *kaddr;
+		int left;
 
-		/*
-		 * Try to find the page in the cache. If it isn't there,
-		 * allocate a free page.
-		 */
 		offset = (pos & (PAGE_CACHE_SIZE -1)); /* Within page */
 		index = pos >> PAGE_CACHE_SHIFT;
 		bytes = PAGE_CACHE_SIZE - offset;
-		if (bytes > count) {
+		if (bytes > count)
 			bytes = count;
-		}
 
 		/*
 		 * We don't hold page lock across copy from user -
 		 * what would it guard against? - so no deadlock here.
+		 * But it still may be a good idea to prefault below.
 		 */
 
 		status = shmem_getpage(inode, index, &page, SGP_WRITE);
 		if (status)
 			break;
 
-		kaddr = kmap(page);
-		status = __copy_from_user(kaddr+offset, buf, bytes);
-		kunmap(page);
-		if (status)
-			goto fail_write;
+		left = bytes;
+		if (PageHighMem(page)) {
+			volatile unsigned char dummy;
+			__get_user(dummy, buf);
+			__get_user(dummy, buf + bytes - 1);
 
-		flush_dcache_page(page);
-		if (bytes > 0) {
-			set_page_dirty(page);
-			written += bytes;
-			count -= bytes;
-			pos += bytes;
-			buf += bytes;
-			if (pos > inode->i_size)
-				inode->i_size = pos;
+			kaddr = kmap_atomic(page, KM_USER0);
+			left = __copy_from_user(kaddr + offset, buf, bytes);
+			kunmap_atomic(kaddr, KM_USER0);
 		}
-release:
+		if (left) {
+			kaddr = kmap(page);
+			left = __copy_from_user(kaddr + offset, buf, bytes);
+			kunmap(page);
+		}
+		flush_dcache_page(page);
+		if (left) {
+			page_cache_release(page);
+			status = -EFAULT;
+			break;
+		}
+
+		set_page_dirty(page);
 		page_cache_release(page);
 
-		if (status < 0)
-			break;
-	}
-	*ppos = pos;
+		/*
+		 * Balance dirty pages??
+		 */
 
+		written += bytes;
+		count -= bytes;
+		pos += bytes;
+		buf += bytes;
+		if (pos > inode->i_size)
+			inode->i_size = pos;
+	}
+
+	*ppos = pos;
 	err = written ? written : status;
 out:
 	/* Short writes give back address space */
@@ -1130,10 +1175,6 @@ out:
 out_nc:
 	up(&inode->i_sem);
 	return err;
-fail_write:
-	status = -EFAULT;
-	ClearPageUptodate(page);
-	goto release;
 }
 
 static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_t *desc, read_actor_t actor)
@@ -1407,9 +1448,9 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		spin_lock(&shmem_ilock);
 		list_add_tail(&info->list, &shmem_inodes);
 		spin_unlock(&shmem_ilock);
-		kaddr = kmap(page);
+		kaddr = kmap_atomic(page, KM_USER0);
 		memcpy(kaddr, symname, len);
-		kunmap(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		set_page_dirty(page);
 		page_cache_release(page);
 	}
