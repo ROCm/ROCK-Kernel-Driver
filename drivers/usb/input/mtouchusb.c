@@ -173,7 +173,6 @@ static void mtouchusb_free_buffers(struct usb_device *udev, struct mtouch_usb *m
 
 static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
-        dbg("%s - called", __FUNCTION__);
         struct mtouch_usb *mtouch;
         struct usb_host_interface *interface;
         struct usb_endpoint_descriptor *endpoint;
@@ -184,6 +183,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         int ix;
         char valid_device = 0;
 
+        dbg("%s - called", __FUNCTION__);
         if (vendor != -1 && product != -1) {
                 info("%s - User specified USB Touch -- Vend:Prod - %x:%x",
                      __FUNCTION__, vendor, product);
