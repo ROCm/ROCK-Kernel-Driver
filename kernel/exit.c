@@ -729,8 +729,10 @@ NORET_TYPE void do_exit(long code)
 
 	profile_exit_task(tsk);
  
-	if (unlikely(current->ptrace & PT_TRACE_EXIT))
+	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
+		current->ptrace_message = code;
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);
+	}
 
 	acct_process(code);
 	__exit_mm(tsk);
