@@ -208,7 +208,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 
 	asoc->ctsn_ack_point = asoc->next_tsn - 1;
 	asoc->highest_sacked = asoc->ctsn_ack_point;
-
+	asoc->last_cwr_tsn = asoc->ctsn_ack_point;
 	asoc->unack_data = 0;
 
 	SCTP_DEBUG_PRINTK("myctsnap for %s INIT as 0x%x.\n",
@@ -403,6 +403,9 @@ sctp_transport_t *sctp_assoc_add_peer(sctp_association_t *asoc,
 		return NULL;
 
 	sctp_transport_set_owner(peer, asoc);
+
+	/* Cache a route for the transport. */
+	sctp_transport_route(peer, NULL);
 
 	/* If this is the first transport addr on this association,
 	 * initialize the association PMTU to the peer's PMTU.

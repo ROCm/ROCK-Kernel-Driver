@@ -1,40 +1,40 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * Various protocol defined structures.  
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * Various protocol defined structures.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
- *    lksctp developers <sctp-developers-list@cig.mot.com>
- * 
+ *    lksctp developers <lksctp-developerst@lists.sourceforge.net>
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson <karl@athena.chicago.il.us>
  *    Jon Grimm <jgrimm@us.ibm.com>
@@ -42,7 +42,7 @@
  *    randall@sctp.chicago.il.us
  *    kmorneau@cisco.com
  *    qxie1@email.mot.com
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -70,9 +70,9 @@ typedef struct sctp_chunkhdr {
 
 
 /* Section 3.2.  Chunk Type Values.
- * [Chunk Type] identifies the type of information contained in the Chunk 
- * Value field. It takes a value from 0 to 254. The value of 255 is 
- * reserved for future use as an extension field. 
+ * [Chunk Type] identifies the type of information contained in the Chunk
+ * Value field. It takes a value from 0 to 254. The value of 255 is
+ * reserved for future use as an extension field.
  */
 typedef enum {
 	SCTP_CID_DATA			= 0,
@@ -97,7 +97,7 @@ typedef enum {
 } sctp_cid_t; /* enum */
 
 
-/* Section 3.2  
+/* Section 3.2
  *  Chunk Types are encoded such that the highest-order two bits specify
  *  the action that must be taken if the processing endpoint does not
  *  recognize the Chunk Type.
@@ -107,7 +107,7 @@ typedef enum {
 	SCTP_CID_ACTION_DISCARD_ERR = 0x40,
 	SCTP_CID_ACTION_SKIP        = 0x80,
 	SCTP_CID_ACTION_SKIP_ERR    = 0xc0,
-} sctp_cid_action_t; 
+} sctp_cid_action_t;
 
 enum { SCTP_CID_ACTION_MASK = 0xc0, };
 
@@ -127,23 +127,23 @@ enum { SCTP_CHUNK_FLAG_T = 0x01 };
  *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  *     |   Type = 14   |Reserved     |T|      Length = 4               |
  *     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * 
+ *
  * Chunk Flags: 8 bits
- *   
+ *
  *   Reserved:  7 bits
  *     Set to 0 on transmit and ignored on receipt.
- * 
+ *
  *   T bit:  1 bit
  *     The T bit is set to 0 if the sender had a TCB that it destroyed. If
  *     the sender did NOT have a TCB it should set this bit to 1.
- * 
- * Note: Special rules apply to this chunk for verification, please 
+ *
+ * Note: Special rules apply to this chunk for verification, please
  * see Section 8.5.1 for details.
  */
 
 #define sctp_test_T_bit(c)    ((c)->chunk_hdr->flags & SCTP_CHUNK_FLAG_T)
 
-/* RFC 2960 
+/* RFC 2960
  * Section 3.2.1 Optional/Variable-length Parmaeter Format.
  */
 
@@ -167,11 +167,11 @@ typedef enum {
 	SCTP_PARAM_ECN_CAPABLE			= __constant_htons(0x8000),
 
 	/* Add-IP Extension. Section 3.2 */
-	SCTP_PARAM_ADD_IP		= __constant_htons(0xc001),  
-	SCTP_PARAM_DEL_IP		= __constant_htons(0xc002),  
-	SCTP_PARAM_ERR_CAUSE		= __constant_htons(0xc003),  
-	SCTP_PARAM_SET_PRIMARY		= __constant_htons(0xc004),  
-	SCTP_PARAM_SUCCESS_REPORT	= __constant_htons(0xc005),  
+	SCTP_PARAM_ADD_IP		= __constant_htons(0xc001),
+	SCTP_PARAM_DEL_IP		= __constant_htons(0xc002),
+	SCTP_PARAM_ERR_CAUSE		= __constant_htons(0xc003),
+	SCTP_PARAM_SET_PRIMARY		= __constant_htons(0xc004),
+	SCTP_PARAM_SUCCESS_REPORT	= __constant_htons(0xc005),
 	SCTP_PARAM_ADAPTION_LAYER_IND   = __constant_htons(0xc006),
 
 } sctp_param_t; /* enum */
@@ -188,7 +188,7 @@ typedef enum {
 	SCTP_PARAM_ACTION_DISCARD_ERR = __constant_htons(0x4000),
 	SCTP_PARAM_ACTION_SKIP        = __constant_htons(0x8000),
 	SCTP_PARAM_ACTION_SKIP_ERR    = __constant_htons(0xc000),
-} sctp_param_action_t; 
+} sctp_param_action_t;
 
 enum { SCTP_PARAM_ACTION_MASK = __constant_htons(0xc000), };
 
@@ -215,14 +215,14 @@ enum {
 	SCTP_DATA_NOT_FRAG	= 0x03,
 	SCTP_DATA_UNORDERED	= 0x04,
 };
-enum { SCTP_DATA_FRAG_MASK = 0x03, }; 
+enum { SCTP_DATA_FRAG_MASK = 0x03, };
 
 
 /* RFC 2960 Section 3.3.2 Initiation (INIT) (1)
  *
  *  This chunk is used to initiate a SCTP association between two
  *  endpoints.
- */  
+ */
 typedef struct sctp_inithdr {
 	__u32 init_tag;
 	__u32 a_rwnd;
@@ -249,7 +249,7 @@ typedef struct sctp_ipv6addr_param {
 	sctp_paramhdr_t param_hdr;
 	struct in6_addr addr;
 } sctp_ipv6addr_param_t __attribute__((packed));
-	
+
 /* Section 3.3.2.1 Cookie Preservative (9) */
 typedef struct sctp_cookie_preserve_param {
 	sctp_paramhdr_t param_hdr;
@@ -344,8 +344,8 @@ typedef struct sctp_heartbeat_chunk {
 	sctp_chunkhdr_t chunk_hdr;
 	sctp_heartbeathdr_t hb_hdr;
 } sctp_heartbeat_chunk_t __attribute__((packed));
-	
-  
+
+
 /* For the abort and shutdown ACK we must carry the init tag in the
  * common header. Just the common header is all that is needed with a
  * chunk descriptor.
@@ -366,7 +366,7 @@ struct sctp_shutdown_chunk_t {
         sctp_chunkhdr_t    chunk_hdr;
         sctp_shutdownhdr_t shutdown_hdr;
 } __attribute__((packed));
-        
+
 
 
 /* RFC 2960.  Section 3.3.10 Operation Error (ERROR) (9) */
@@ -403,9 +403,9 @@ typedef struct sctp_operr_chunk {
  */
 typedef enum {
 
-	SCTP_ERROR_NO_ERROR	   = __constant_htons(0x00), 
-	SCTP_ERROR_INV_STRM	   = __constant_htons(0x01), 
-	SCTP_ERROR_MISS_PARAM 	   = __constant_htons(0x02), 
+	SCTP_ERROR_NO_ERROR	   = __constant_htons(0x00),
+	SCTP_ERROR_INV_STRM	   = __constant_htons(0x01),
+	SCTP_ERROR_MISS_PARAM 	   = __constant_htons(0x02),
 	SCTP_ERROR_STALE_COOKIE	   = __constant_htons(0x03),
 	SCTP_ERROR_NO_RESOURCE 	   = __constant_htons(0x04),
 	SCTP_ERROR_DNS_FAILED      = __constant_htons(0x05),
@@ -416,13 +416,15 @@ typedef enum {
 	SCTP_ERROR_COOKIE_IN_SHUTDOWN = __constant_htons(0x0a),
 
 
-	/* SCTP Implementation Guide: 
-	 *  11              Restart of an association with new addresses
-	 *  12              User Initiated Abort
+	/* SCTP Implementation Guide:
+	 *  11  Restart of an association with new addresses
+	 *  12  User Initiated Abort
+	 *  13  Protocol Violation
 	 */
 
 	SCTP_ERROR_RESTART         = __constant_htons(0x0b),
 	SCTP_ERROR_USER_ABORT      = __constant_htons(0x0c),
+	SCTP_ERROR_PROTO_VIOLATION = __constant_htons(0x0d),
 
 	/* ADDIP Section 3.3  New Error Causes
 	 *
@@ -436,16 +438,16 @@ typedef enum {
 	 * 0x0102          Request to Delete Source IP Address.
 	 * 0x0103          Association Aborted due to illegal ASCONF-ACK
 	 */
-	SCTP_ERROR_DEL_LAST_IP	= __constant_htons(0x0100),	
-	SCTP_ERROR_RSRC_LOW	= __constant_htons(0x0101),	
-	SCTP_ERROR_DEL_SRC_IP	= __constant_htons(0x0102),	
+	SCTP_ERROR_DEL_LAST_IP	= __constant_htons(0x0100),
+	SCTP_ERROR_RSRC_LOW	= __constant_htons(0x0101),
+	SCTP_ERROR_DEL_SRC_IP	= __constant_htons(0x0102),
 	SCTP_ERROR_ASCONF_ACK   = __constant_htons(0x0103),
 
 } sctp_error_t;
 
 
 
-/* RFC 2960.  Appendix A.  Explicit Congestion Notification. 
+/* RFC 2960.  Appendix A.  Explicit Congestion Notification.
  *   Explicit Congestion Notification Echo (ECNE) (12)
  */
 typedef struct sctp_ecnehdr {
@@ -457,7 +459,7 @@ typedef struct sctp_ecne_chunk {
 	sctp_ecnehdr_t ence_hdr;
 } sctp_ecne_chunk_t __attribute__((packed));
 
-/* RFC 2960.  Appendix A.  Explicit Congestion Notification. 
+/* RFC 2960.  Appendix A.  Explicit Congestion Notification.
  *   Congestion Window Reduced (CWR) (13)
  */
 typedef struct sctp_cwrhdr {
@@ -478,18 +480,18 @@ typedef struct sctp_cwr_chunk {
 
 
 /* ADDIP Section 3.1.1
- * 
+ *
  * ASCONF-Request Correlation ID: 32 bits (unsigned integer)
- * 
+ *
  * This is an opaque integer assigned by the sender to identify each
  * request parameter. It is in host byte order and is only meaningful
  * to the sender. The receiver of the ASCONF Chunk will copy this 32
  * bit value into the ASCONF Correlation ID field of the
  * ASCONF-ACK. The sender of the ASCONF can use this same value in the
  * ASCONF-ACK to find which request the response is for.
- * 
+ *
  * ASCONF Parameter: TLV format
- * 
+ *
  * Each Address configuration change is represented by a TLV parameter
  * as defined in Section 3.2. One or more requests may be present in
  * an ASCONF Chunk.
@@ -502,7 +504,7 @@ typedef struct {
 
 /* ADDIP
  * 3.1.1  Address/Stream Configuration Change Chunk (ASCONF)
- * 
+ *
  * This chunk is used to communicate to the remote endpoint one of the
  * configuration change requests that MUST be acknowledged.  The
  * information carried in the ASCONF Chunk uses the form of a
@@ -517,18 +519,18 @@ typedef struct {
 	__u32	addr[4];
 	sctpAsconfReq_t requests[0];
 } sctpAsconf_t;
-  
+
 /* ADDIP
  * 3.1.2 Address/Stream Configuration Acknowledgment Chunk (ASCONF-ACK)
- * 
+ *
  * ASCONF-Request Correlation ID: 32 bits (unsigned integer)
- * 
+ *
  * This value is copied from the ASCONF Correlation ID received in the
  * ASCONF Chunk. It is used by the receiver of the ASCONF-ACK to identify
  * which ASCONF parameter this response is associated with.
- * 
+ *
  * ASCONF Parameter Response : TLV format
- * 
+ *
  * The ASCONF Parameter Response is used in the ASCONF-ACK to report
  * status of ASCONF processing. By default, if a responding endpoint
  * does not include any Error Cause, a success is indicated. Thus a
@@ -555,7 +557,7 @@ typedef union {
 
 /* ADDIP
  * 3.1.2 Address/Stream Configuration Acknowledgment Chunk (ASCONF-ACK)
- * 
+ *
  * This chunk is used by the receiver of an ASCONF Chunk to
  * acknowledge the reception. It carries zero or more results for any
  * ASCONF Parameters that were processed by the receiver.
@@ -579,11 +581,8 @@ typedef struct {
 	struct list_head hook;
 	int length;	/* length of the TLV */
 
-	/* the actually TLV to be copied into ASCONF_ACK */ 
+	/* the actually TLV to be copied into ASCONF_ACK */
 	sctpAsconfAckRsp_t TLV;
 } sctpAsconfAckRspNode_t;
-
-
-
 
 #endif /* __LINUX_SCTP_H__ */

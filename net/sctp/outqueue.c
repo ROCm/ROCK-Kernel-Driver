@@ -204,18 +204,43 @@ int sctp_push_outqueue(sctp_outqueue_t *q, sctp_chunk_t *chunk)
 	return error;
 }
 
+/* Insert a chunk into the retransmit queue.  Chunks on the retransmit
+ * queue are kept in order, based on the TSNs.
+ */
+void sctp_retransmit_insert(struct list_head *tlchunk, sctp_outqueue_t *q)
+{
+	struct list_head *rlchunk;
+	sctp_chunk_t *tchunk, *rchunk;
+	__u32 ttsn, rtsn;
+	int done = 0;
+
+	tchunk = list_entry(tlchunk, sctp_chunk_t, transmitted_list);
+	ttsn = ntohl(tchunk->subh.data_hdr->tsn);
+
+	list_for_each(rlchunk, &q->retransmit) {
+		rchunk = list_entry(rlchunk, sctp_chunk_t, transmitted_list);
+		rtsn = ntohl(rchunk->subh.data_hdr->tsn);
+		if (TSN_lt(ttsn, rtsn)) {
+			list_add(tlchunk, rlchunk->prev);
+			done = 1;
+			break;
+		}
+	}
+	if (!done) {
+		list_add_tail(tlchunk, &q->retransmit);
+	}
+}
+			
 /* Mark all the eligible packets on a transport for retransmission.  */
 void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
 			  __u8 fast_retransmit)
 {
-	struct list_head *lchunk;
+	struct list_head *lchunk, *ltemp;
 	sctp_chunk_t *chunk;
-	struct list_head tlist;
 
-	INIT_LIST_HEAD(&tlist);
 
-	while (!list_empty(&transport->transmitted)) {
-		lchunk = sctp_list_dequeue(&transport->transmitted);
+	/* Walk through the specified transmitted queue.  */
+	list_for_each_safe(lchunk, ltemp, &transport->transmitted) {
 		chunk = list_entry(lchunk, sctp_chunk_t, transmitted_list);
 
 		/* If we are doing retransmission due to a fast retransmit,
@@ -224,10 +249,8 @@ void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
 		 * retransmission due to a timeout, only the chunks that are
 		 * not yet acked should be added to the retransmit queue.
 		 */
-		if ((fast_retransmit && !chunk->fast_retransmit) ||
-		    (!fast_retransmit && chunk->tsn_gap_acked)) {
-			list_add_tail(lchunk, &tlist);
-		} else {
+		if ((fast_retransmit && chunk->fast_retransmit) ||
+		   (!fast_retransmit && !chunk->tsn_gap_acked)) {
 			/* RFC 2960 6.2.1 Processing a Received SACK
 			 *
 			 * C) Any time a DATA chunk is marked for
@@ -257,15 +280,14 @@ void sctp_retransmit_mark(sctp_outqueue_t *q, sctp_transport_t *transport,
 				chunk->rtt_in_progress = 0;
 				transport->rto_pending = 0;
 			}
-			list_add_tail(lchunk, &q->retransmit);
+
+			/* Move the chunk to the retransmit queue. The chunks
+			 * on the retransmit queue is always kept in order.
+			 */
+			list_del(lchunk);
+			sctp_retransmit_insert(lchunk, q);
 		}
 	}
-
-	/* Reconstruct the transmitted queue with chunks that are not
-	 * eligible for retransmission.
-	 */
-	while (NULL != (lchunk = sctp_list_dequeue(&tlist)))
-		list_add_tail(lchunk, &transport->transmitted);
 
 	SCTP_DEBUG_PRINTK("%s: transport: %p, fast_retransmit: %d, "
 			  "cwnd: %d, ssthresh: %d, flight_size: %d, "
