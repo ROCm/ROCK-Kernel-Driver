@@ -488,11 +488,20 @@ void vcs_remove_devfs(struct tty_struct *tty)
 	class_simple_device_remove(MKDEV(VCS_MAJOR, tty->index + 129));
 }
 
+static int
+vcs_no_hotplug(struct class_device *dev, char **envp, int num_envp, char *buffer, int buffer_size)
+{
+	return 1;
+}
+
 int __init vcs_init(void)
 {
 	if (register_chrdev(VCS_MAJOR, "vcs", &vcs_fops))
 		panic("unable to get major %d for vcs device", VCS_MAJOR);
 	vc_class = class_simple_create(THIS_MODULE, "vc");
+
+	/* Do not generate hotplug events for the vc device */
+	class_simple_set_hotplug(vc_class, vcs_no_hotplug);
 
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/0");
 	devfs_mk_cdev(MKDEV(VCS_MAJOR, 128), S_IFCHR|S_IRUSR|S_IWUSR, "vcc/a0");
