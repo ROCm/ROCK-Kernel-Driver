@@ -97,6 +97,7 @@ found:
 	return __kmalloc(size, flags);
 }
 
+extern void *kcalloc(size_t, size_t, int);
 extern void kfree(const void *);
 extern unsigned int ksize(const void *);
 
