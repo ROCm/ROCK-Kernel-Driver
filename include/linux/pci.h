@@ -343,6 +343,7 @@
 #include <linux/list.h>
 #include <linux/errno.h>
 #include <linux/device.h>
+#include <linux/pci-dynids.h>
 
 /* File state for mmap()s on /proc/bus/pci/X/Y */
 enum pci_mmap_state {
@@ -502,6 +503,7 @@ struct pci_driver {
 	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
 
 	struct device_driver	driver;
+	struct pci_dynamic_id_kobj  dynids;
 };
 
 #define	to_pci_driver(drv) container_of(drv,struct pci_driver, driver)
