@@ -42,11 +42,7 @@
 #include <asm/cacheflush.h>
 #include <asm/proc_fs.h>
 #ifdef CONFIG_PPC_ISERIES
-#include <asm/iSeries/iSeries_pci.h>
-#include <asm/iSeries/iSeries_proc.h>
-#include <asm/iSeries/mf.h>
-#include <asm/iSeries/HvLpEvent.h>
-#include <asm/iSeries/HvLpConfig.h>
+#include <asm/iSeries/HvCallSc.h>
 #endif
 
 extern int do_signal(sigset_t *, struct pt_regs *);
@@ -98,7 +94,6 @@ EXPORT_SYMBOL(msChunks);
 EXPORT_SYMBOL(reloc_offset);
 
 #ifdef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL(iSeries_proc_callback);
 EXPORT_SYMBOL(HvCall0);
 EXPORT_SYMBOL(HvCall1);
 EXPORT_SYMBOL(HvCall2);
@@ -107,11 +102,6 @@ EXPORT_SYMBOL(HvCall4);
 EXPORT_SYMBOL(HvCall5);
 EXPORT_SYMBOL(HvCall6);
 EXPORT_SYMBOL(HvCall7);
-EXPORT_SYMBOL(HvLpEvent_unregisterHandler);
-EXPORT_SYMBOL(HvLpEvent_registerHandler);
-EXPORT_SYMBOL(mf_allocateLpEvents);
-EXPORT_SYMBOL(mf_deallocateLpEvents);
-EXPORT_SYMBOL(HvLpConfig_getLpIndex_outline);
 #endif
 
 EXPORT_SYMBOL(_insb);
@@ -135,19 +125,6 @@ EXPORT_SYMBOL(pci_map_single);
 EXPORT_SYMBOL(pci_unmap_single);
 EXPORT_SYMBOL(pci_map_sg);
 EXPORT_SYMBOL(pci_unmap_sg);
-#ifdef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL(iSeries_GetLocationData);
-EXPORT_SYMBOL(iSeries_Device_ToggleReset);
-EXPORT_SYMBOL(iSeries_memset_io);
-EXPORT_SYMBOL(iSeries_memcpy_toio);
-EXPORT_SYMBOL(iSeries_memcpy_fromio);
-EXPORT_SYMBOL(iSeries_Read_Byte);
-EXPORT_SYMBOL(iSeries_Read_Word);
-EXPORT_SYMBOL(iSeries_Read_Long);
-EXPORT_SYMBOL(iSeries_Write_Byte);
-EXPORT_SYMBOL(iSeries_Write_Word);
-EXPORT_SYMBOL(iSeries_Write_Long);
-#endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(start_thread);
