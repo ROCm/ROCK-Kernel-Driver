@@ -3626,7 +3626,6 @@ extern int hub_ioerror_handler(vertex_hdl_t, int, int, struct io_error_s *);
 extern int kl_ioerror_handler(cnodeid_t, cnodeid_t, cpuid_t,
                               int, paddr_t, caddr_t, ioerror_mode_t);
 extern int hub_error_devenable(vertex_hdl_t, int, int);
-extern int  hub_dma_enabled(vertex_hdl_t);
 
 #endif /* __ASSEMBLY__ */
 #endif /* _KERNEL */

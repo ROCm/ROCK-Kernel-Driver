@@ -234,9 +234,6 @@ xtalk_widgetdev_enable_f (vertex_hdl_t, int);
 typedef void
 xtalk_widgetdev_shutdown_f (vertex_hdl_t, int);
 
-typedef int
-xtalk_dma_enabled_f (vertex_hdl_t);
-
 /* Error Management */
 
 typedef int
@@ -317,7 +314,6 @@ extern xtalk_provider_startup_f xtalk_provider_startup;
 extern xtalk_provider_shutdown_f xtalk_provider_shutdown;
 extern xtalk_widgetdev_enable_f xtalk_widgetdev_enable;
 extern xtalk_widgetdev_shutdown_f xtalk_widgetdev_shutdown;
-extern xtalk_dma_enabled_f xtalk_dma_enabled;
 extern xtalk_error_devenable_f xtalk_error_devenable;
 extern xtalk_early_piotrans_addr_f xtalk_early_piotrans_addr;
 

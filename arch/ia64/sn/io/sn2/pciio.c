@@ -91,12 +91,6 @@ get_master_baseio_nasid(void)
 }
 
 int
-hub_dma_enabled(vertex_hdl_t xconn_vhdl)
-{
-	return(0);
-}
-
-int
 hub_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
 {
 	return(0);
@@ -1387,12 +1381,6 @@ pciio_slot_inuse(vertex_hdl_t pconn_vhdl)
 	return 1;
     }
     return 0;
-}
-
-int
-pciio_dma_enabled(vertex_hdl_t pconn_vhdl)
-{
-	return DEV_FUNC(pconn_vhdl, dma_enabled)(pconn_vhdl);
 }
 
 int

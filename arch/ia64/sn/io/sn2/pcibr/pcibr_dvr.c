@@ -3782,19 +3782,7 @@ pciio_provider_t        pcibr_provider =
     (pciio_driver_reg_callback_f *) 0,
     (pciio_driver_unreg_callback_f *) 0,
     (pciio_device_unregister_f 	*) pcibr_device_unregister,
-    (pciio_dma_enabled_f		*) pcibr_dma_enabled,
 };
-
-int
-pcibr_dma_enabled(vertex_hdl_t pconn_vhdl)
-{
-    pciio_info_t            pciio_info = pciio_info_get(pconn_vhdl);
-    pcibr_soft_t            pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-	
-
-    return xtalk_dma_enabled(pcibr_soft->bs_conn);
-}
-
 
 /*
  * pcibr_debug() is used to print pcibr debug messages to the console.  A

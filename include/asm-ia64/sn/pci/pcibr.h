@@ -237,7 +237,7 @@ void			pcibr_set_rrb_callback(vertex_hdl_t xconn_vhdl,
 					       rrb_alloc_funct_f *func);
 
 extern int		pcibr_device_unregister(vertex_hdl_t);
-extern int		pcibr_dma_enabled(vertex_hdl_t);
+
 /*
  * Bridge-specific flags that can be set via pcibr_device_flags_set
  * and cleared via pcibr_device_flags_clear.  Other flags are

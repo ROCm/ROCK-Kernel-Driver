@@ -21,9 +21,9 @@
 #include <asm/sn/xtalk/xtalk_private.h>
 
 /*
- * Implement crosstalk provider operations.  The xtalk* layer provides a
- * platform-independent interface for crosstalk devices.  This layer
- * switches among the possible implementations of a crosstalk adapter.
+ * Implement io channel provider operations.  The xtalk* layer provides a
+ * platform-independent interface for io channel devices.  This layer
+ * switches among the possible implementations of a io channel adapter.
  *
  * On platforms with only one possible xtalk provider, macros can be
  * set up at the top that cause the table lookups and indirections to
@@ -34,11 +34,6 @@
 #define	DEL(ptr)	(kfree(ptr))
 
 char                    widget_info_fingerprint[] = "widget_info";
-
-#define	DEV_FUNC(dev,func)	hub_##func
-#define	CAST_PIOMAP(x)		((hub_piomap_t)(x))
-#define	CAST_DMAMAP(x)		((hub_dmamap_t)(x))
-#define	CAST_INTR(x)		((hub_intr_t)(x))
 
 /* =====================================================================
  *            Function Table of Contents
@@ -119,6 +114,7 @@ char			*xwidget_name_get(vertex_hdl_t);
 #define	CAST_PIOMAP(x)		((xtalk_piomap_t)(x))
 #define	CAST_DMAMAP(x)		((xtalk_dmamap_t)(x))
 #define	CAST_INTR(x)		((xtalk_intr_t)(x))
+xtalk_provider_t * xwidget_info_pops_get(xwidget_info_t info);
 
 static xtalk_provider_t *
 xwidget_to_provider_fns(vertex_hdl_t xconn)
@@ -133,6 +129,17 @@ xwidget_to_provider_fns(vertex_hdl_t xconn)
     ASSERT(provider_fns != NULL);
 
     return (provider_fns);
+}
+
+xtalk_provider_t *
+xwidget_info_pops_get(xwidget_info_t info) {
+	vertex_hdl_t master = info->w_master;
+	xtalk_provider_t *provider_fns;
+
+	provider_fns = xtalk_provider_fns_get(master);
+
+	ASSERT(provider_fns != NULL);
+	return provider_fns;
 }
 #endif
 
@@ -271,13 +278,13 @@ xtalk_set_early_piotrans_addr(xtalk_early_piotrans_addr_f *impl)
 }
 
 /* xtalk_early_piotrans_addr:
- * figure out a PIO address for the "nth" crosstalk widget that
+ * figure out a PIO address for the "nth" io channel widget that
  * matches the specified part and mfgr number. Returns NULL if
  * there is no such widget, or if the requested mapping can not
  * be constructed.
- * Limitations on which crosstalk slots (and busses) are
+ * Limitations on which io channel slots (and busses) are
  * checked, and definitions of the ordering of the search across
- * the crosstalk slots, are defined by the platform.
+ * the io channel slots, are defined by the platform.
  */
 caddr_t
 xtalk_early_piotrans_addr(xwidget_part_num_t part_num,
@@ -316,7 +323,7 @@ null_xtalk_early_piotrans_addr(xwidget_part_num_t part_num,
 /* =====================================================================
  *                    DMA MANAGEMENT
  *
- *      For mapping from crosstalk space to system
+ *      For mapping from io channel space to system
  *      physical space.
  */
 
@@ -413,7 +420,7 @@ xtalk_dmalist_drain(vertex_hdl_t dev, alenlist_t list)
 /* =====================================================================
  *                    INTERRUPT MANAGEMENT
  *
- *      Allow crosstalk devices to establish interrupts
+ *      Allow io channel devices to establish interrupts
  */
 
 /*
@@ -508,8 +515,8 @@ xtalk_intr_cpu_get(xtalk_intr_t intr_hdl)
  * This routine plays two roles during error delivery
  * to most widgets: first, the external agent (heart,
  * hub, or whatever) calls in with the error and the
- * connect point representing the crosstalk switch,
- * or whatever crosstalk device is directly connected
+ * connect point representing the io channel switch,
+ * or whatever io channel device is directly connected
  * to the agent.
  *
  * If there is a switch, it will generally look at the
@@ -526,6 +533,8 @@ xtalk_error_handler(
 		       ioerror_t *ioerror)
 {
     xwidget_info_t          xwidget_info;
+    char		    name[MAXDEVNAME];
+
 
     xwidget_info = xwidget_info_get(xconn);
     /* Make sure that xwidget_info is a valid pointer before derefencing it.
@@ -546,12 +555,7 @@ xtalk_error_handler(
 	(mode == MODE_DEVREENABLE))
 	return IOERROR_HANDLED;
 
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-    printk(KERN_WARNING "Xbow at %v encountered Fatal error", xconn);
-#else
-    printk(KERN_WARNING "Xbow at 0x%p encountered Fatal error", (void *)xconn);
-#endif
-    ioerror_dump("xtalk", error_code, mode, ioerror);
+    printk(KERN_WARNING "Xbow at %s encountered Fatal error", vertex_to_name(xconn, name, MAXDEVNAME));
 
     return IOERROR_UNHANDLED;
 }
@@ -568,24 +572,22 @@ xtalk_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
  */
 
 /*
- * Startup a crosstalk provider
+ * Startup an io channel provider
  */
 void
 xtalk_provider_startup(vertex_hdl_t xtalk_provider)
 {
-    DEV_FUNC(xtalk_provider, provider_startup)
-	(xtalk_provider);
+    ((xtalk_provider_t *) hwgraph_fastinfo_get(xtalk_provider))->provider_startup(xtalk_provider);
 }
 
 
 /*
- * Shutdown a crosstalk provider
+ * Shutdown an io channel provider
  */
 void
 xtalk_provider_shutdown(vertex_hdl_t xtalk_provider)
 {
-    DEV_FUNC(xtalk_provider, provider_shutdown)
-	(xtalk_provider);
+    ((xtalk_provider_t *) hwgraph_fastinfo_get(xtalk_provider))->provider_shutdown(xtalk_provider);
 }
 
 /* 
@@ -606,17 +608,12 @@ xtalk_widgetdev_shutdown(vertex_hdl_t xconn_vhdl, int devnum)
 	return;
 }
 
-int
-xtalk_dma_enabled(vertex_hdl_t xconn_vhdl)
-{
-    return DEV_FUNC(xconn_vhdl, dma_enabled) (xconn_vhdl);
-}
 /*
- * Generic crosstalk functions, for use with all crosstalk providers
- * and all crosstalk devices.
+ * Generic io channel functions, for use with all io channel providers
+ * and all io channel devices.
  */
 
-/****** Generic crosstalk interrupt interfaces ******/
+/* Generic io channel interrupt interfaces */
 vertex_hdl_t
 xtalk_intr_dev_get(xtalk_intr_t xtalk_intr)
 {
@@ -647,7 +644,7 @@ xtalk_intr_sfarg_get(xtalk_intr_t xtalk_intr)
     return (xtalk_intr->xi_sfarg);
 }
 
-/****** Generic crosstalk pio interfaces ******/
+/* Generic io channel pio interfaces */
 vertex_hdl_t
 xtalk_pio_dev_get(xtalk_piomap_t xtalk_piomap)
 {
@@ -679,7 +676,7 @@ xtalk_pio_kvaddr_get(xtalk_piomap_t xtalk_piomap)
 }
 
 
-/****** Generic crosstalk dma interfaces ******/
+/* Generic io channel dma interfaces */
 vertex_hdl_t
 xtalk_dma_dev_get(xtalk_dmamap_t xtalk_dmamap)
 {
@@ -693,7 +690,7 @@ xtalk_dma_target_get(xtalk_dmamap_t xtalk_dmamap)
 }
 
 
-/****** Generic crosstalk widget information interfaces ******/
+/* Generic io channel widget information interfaces */
 
 /* xwidget_info_chk:
  * check to see if this vertex is a widget;
@@ -795,7 +792,7 @@ xwidget_info_name_get(xwidget_info_t xwidget_info)
 	panic("xwidget_info_name_get: null xwidget_info");
     return(xwidget_info->w_name);
 }
-/****** Generic crosstalk initialization interfaces ******/
+/* Generic io channel initialization interfaces */
 
 /*
  * Associate a set of xtalk_provider functions with a vertex.

@@ -451,9 +451,6 @@ pciio_driver_unreg_callback_f	(vertex_hdl_t conn, /* pci connection point */
 typedef int
 pciio_device_unregister_f	(vertex_hdl_t conn);
 
-typedef int
-pciio_dma_enabled_f		(vertex_hdl_t conn);
-
 /*
  * Adapters that provide a PCI interface adhere to this software interface.
  */
@@ -502,7 +499,6 @@ typedef struct pciio_provider_s {
     pciio_driver_reg_callback_f *driver_reg_callback;
     pciio_driver_unreg_callback_f *driver_unreg_callback;
     pciio_device_unregister_f 	*device_unregister;
-    pciio_dma_enabled_f		*dma_enabled;
 } pciio_provider_t;
 
 /* PCI devices use these standard PCI provider interfaces */
@@ -702,7 +698,6 @@ extern iopaddr_t	pciio_info_rom_base_get(pciio_info_t);
 extern size_t		pciio_info_rom_size_get(pciio_info_t);
 extern int		pciio_info_type1_get(pciio_info_t);
 extern int              pciio_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
-extern int		pciio_dma_enabled(vertex_hdl_t);
 
 /**
  * sn_pci_set_vchan - Set the requested Virtual Channel bits into the mapped DMA

@@ -272,5 +272,4 @@ pciio_provider_t        pci_pic_provider =
     (pciio_driver_reg_callback_f *) pcibr_driver_reg_callback,
     (pciio_driver_unreg_callback_f *) pcibr_driver_unreg_callback,
     (pciio_device_unregister_f 	*) pcibr_device_unregister,
-    (pciio_dma_enabled_f		*) pcibr_dma_enabled,
 };
