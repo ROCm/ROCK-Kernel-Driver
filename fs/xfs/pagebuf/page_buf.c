@@ -1575,6 +1575,13 @@ pagebuf_delwri_dequeue(
 	spin_unlock(&pbd_delwrite_lock);
 }
 
+STATIC void
+pagebuf_runall_queues(
+	struct workqueue_struct	*queue)
+{
+	flush_workqueue(queue);
+}
+
 /* Defines for pagebuf daemon */
 DECLARE_WAIT_QUEUE_HEAD(pbd_waitq);
 STATIC int force_flush;
@@ -1680,9 +1687,12 @@ pagebuf_delwri_flush(
 	page_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
 	int			pincount = 0;
+	int			flush_cnt = 0;
 
 	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
+
+	pagebuf_runall_queues(pagebuf_dataio_workqueue);
 
 	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 		pb = list_entry(curr, page_buf_t, pb_list);
@@ -1725,6 +1735,10 @@ pagebuf_delwri_flush(
 		pb->pb_flags |= PBF_WRITE;
 
 		__pagebuf_iorequest(pb);
+		if (++flush_cnt > 32) {
+			pagebuf_run_queues(NULL);
+			flush_cnt = 0;
+		}
 
 		spin_lock(&pbd_delwrite_lock);
 	}

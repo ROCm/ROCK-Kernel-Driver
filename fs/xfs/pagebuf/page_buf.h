@@ -83,6 +83,20 @@ typedef enum {				/* pbm_flags values */
 					/* but uninitialized file data	*/
 } bmap_flags_t;
 
+typedef enum {
+	/* base extent manipulation calls */
+	BMAP_READ = (1 << 0),		/* read extents */
+	BMAP_WRITE = (1 << 1),		/* create extents */
+	BMAP_ALLOCATE = (1 << 2),	/* delayed allocate to real extents */
+	BMAP_UNWRITTEN  = (1 << 3),	/* unwritten extents to real extents */
+	/* modifiers */
+	BMAP_IGNSTATE = (1 << 4),	/* ignore unwritten state on read */
+	BMAP_DIRECT = (1 << 5),		/* direct instead of buffered write */
+	BMAP_MMAP = (1 << 6),		/* allocate for mmap write */
+	BMAP_SYNC = (1 << 7),		/* sync write */
+	BMAP_TRYLOCK = (1 << 8),	/* non-blocking request */
+} bmapi_flags_t;
+
 typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_READ = (1 << 0),	/* buffer intended for reading from device */
 	PBF_WRITE = (1 << 1),	/* buffer intended for writing to device   */
@@ -101,20 +115,18 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	/* flags used only as arguments to access routines */
 	PBF_LOCK = (1 << 13),	/* lock requested			   */
 	PBF_TRYLOCK = (1 << 14), /* lock requested, but do not wait	   */
-	PBF_FILE_ALLOCATE = (1 << 15), /* allocate all file space	   */
-	PBF_DONT_BLOCK = (1 << 16), /* do not block in current thread	   */
-	PBF_DIRECT = (1 << 17),	/* direct I/O desired			   */
-	PBF_FILE_UNWRITTEN = (1 << 18), /* convert unwritten extent space  */
+	PBF_DONT_BLOCK = (1 << 15), /* do not block in current thread	   */
 
 	/* flags used only internally */
-	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
-	_PBF_ALL_PAGES_MAPPED = (1 << 21), /* all pages in range mapped	   */
-	_PBF_ADDR_ALLOCATED = (1 << 22), /* pb_addr space was allocated	   */
-	_PBF_MEM_ALLOCATED = (1 << 23), /* pb_mem+underlying pages alloc'd */
+	_PBF_LOCKABLE = (1 << 16), /* page_buf_t may be locked		   */
+	_PBF_PRIVATE_BH = (1 << 17), /* do not use public buffer heads	   */
+	_PBF_ALL_PAGES_MAPPED = (1 << 18), /* all pages in range mapped	   */
+	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
+	_PBF_MEM_ALLOCATED = (1 << 20), /* pb_mem+underlying pages alloc'd */
 
-	PBF_FORCEIO = (1 << 24),
-	PBF_FLUSH = (1 << 25),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 26),
+	PBF_FORCEIO = (1 << 21),
+	PBF_FLUSH = (1 << 22),	/* flush disk write cache		   */
+	PBF_READ_AHEAD = (1 << 23),
 
 } page_buf_flags_t;
 

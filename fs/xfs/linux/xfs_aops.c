@@ -50,8 +50,6 @@ linvfs_unwritten_done(
 		pagebuf_ioerror(pb, -EIO);
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
-		pb->pb_flags &= ~_PBF_LOCKABLE;
-		pagebuf_rele(pb);
 	}
 	end_buffer_async_write(bh, uptodate);
 }
@@ -61,28 +59,21 @@ linvfs_unwritten_done(
  * to written extents.
  */
 STATIC void
-xfs_unwritten_conv(
-	xfs_buf_t		*bp)
+linvfs_unwritten_conv(
+	xfs_buf_t	*bp)
 {
-	bhv_desc_t		*bdp = XFS_BUF_FSPRIVATE(bp, bhv_desc_t *);
-	xfs_mount_t		*mp;
-	xfs_inode_t		*ip;
+	vnode_t		*vp = XFS_BUF_FSPRIVATE(bp, vnode_t *);
+	int		error;
 
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
+	if (atomic_read(&bp->pb_hold) < 1) 
+		BUG();
 
-	if (XFS_TEST_ERROR(XFS_BUF_GETERROR(bp), mp,
-			   XFS_ERRTAG_STRATCMPL_IOERR,
-			   XFS_RANDOM_STRATCMPL_IOERR)) {
-		xfs_ioerror_alert(__FUNCTION__, mp, bp, XFS_BUF_ADDR(bp));
-	}
-
-	XFS_IOMAP_WRITE_UNWRITTEN(mp, &ip->i_iocore,
-				  XFS_BUF_OFFSET(bp), XFS_BUF_SIZE(bp));
+	VOP_BMAP(vp, XFS_BUF_OFFSET(bp), XFS_BUF_SIZE(bp),
+			BMAP_UNWRITTEN, NULL, NULL, error);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	XFS_BUF_UNDATAIO(bp);
-	xfs_biodone(bp);
+	pagebuf_iodone(bp, 0, 0);
 }
 
 STATIC int
@@ -96,20 +87,20 @@ map_blocks(
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 	int			error, nmaps = 1;
 
-	if (((flags & (PBF_DIRECT|PBF_SYNC)) == PBF_DIRECT) &&
+	if (((flags & (BMAP_DIRECT|BMAP_SYNC)) == BMAP_DIRECT) &&
 	    (offset >= inode->i_size))
 		count = max_t(ssize_t, count, XFS_WRITE_IO_LOG);
 retry:
 	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
-	if (error == EAGAIN)
+	if ((error == EAGAIN) || (error == EIO))
 		return -error;
-	if (unlikely((flags & (PBF_WRITE|PBF_DIRECT)) ==
-					(PBF_WRITE|PBF_DIRECT) && nmaps &&
+	if (unlikely((flags & (BMAP_WRITE|BMAP_DIRECT)) ==
+					(BMAP_WRITE|BMAP_DIRECT) && nmaps &&
 					(pbmapp->pbm_flags & PBMF_DELAY))) {
-		flags = PBF_FILE_ALLOCATE;
+		flags = BMAP_ALLOCATE;
 		goto retry;
 	}
-	if (flags & (PBF_WRITE|PBF_FILE_ALLOCATE)) {
+	if (flags & (BMAP_WRITE|BMAP_ALLOCATE)) {
 		VMODIFY(vp);
 	}
 	return -error;
@@ -371,7 +362,7 @@ map_unwritten(
 	offset += p_offset;
 
 	pb = pagebuf_lookup(mp->pbm_target,
-			    mp->pbm_offset, mp->pbm_bsize, _PBF_LOCKABLE);
+			    mp->pbm_offset, mp->pbm_bsize, 0);
 	if (!pb)
 		return -ENOMEM;
 
@@ -390,7 +381,6 @@ map_unwritten(
 		tmp = match_offset_to_mapping(start_page, mp, p_offset);
 		if (!tmp)
 			break;
-		BUG_ON(!(tmp->pbm_flags & PBMF_UNWRITTEN));
 		map_buffer_at_offset(start_page, bh, p_offset, block_bits, mp);
 		set_buffer_unwritten_io(bh);
 		bh->b_private = pb;
@@ -442,15 +432,14 @@ map_unwritten(
 	size <<= block_bits;	/* convert fsb's to byte range */
 
 	XFS_BUF_DATAIO(pb);
+	XFS_BUF_ASYNC(pb);
 	XFS_BUF_SET_SIZE(pb, size);
 	XFS_BUF_SET_OFFSET(pb, offset);
-	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode)->v_fbhv);
-	XFS_BUF_SET_IODONE_FUNC(pb, xfs_unwritten_conv);
+	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode));
+	XFS_BUF_SET_IODONE_FUNC(pb, linvfs_unwritten_conv);
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb, 1, 1);
-		pb->pb_flags &= ~_PBF_LOCKABLE;
-		pagebuf_rele(pb);
 	}
 
 	return 0;
@@ -552,6 +541,7 @@ convert_page(
 		} else {
 			set_buffer_dirty(bh);
 			unlock_buffer(bh);
+			mark_buffer_dirty(bh);
 		}
 	} while (i++, (bh = bh->b_this_page) != head);
 
@@ -617,7 +607,7 @@ page_state_convert(
 	unsigned long		p_offset = 0, end_index;
 	loff_t			offset, end_offset;
 	int			len, err, i, cnt = 0, uptodate = 1;
-	int			flags = startio ? 0 : PBF_TRYLOCK;
+	int			flags = startio ? 0 : BMAP_TRYLOCK;
 	int			page_dirty = 1;
 
 
@@ -655,7 +645,7 @@ page_state_convert(
 		if (buffer_unwritten(bh)) {
 			if (!mp) {
 				err = map_blocks(inode, offset, len, &map,
-						PBF_FILE_UNWRITTEN);
+						BMAP_READ|BMAP_IGNSTATE);
 				if (err) {
 					goto error;
 				}
@@ -677,6 +667,7 @@ page_state_convert(
 				} else {
 					set_buffer_dirty(bh);
 					unlock_buffer(bh);
+					mark_buffer_dirty(bh);
 				}
 				page_dirty = 0;
 			}
@@ -687,7 +678,7 @@ page_state_convert(
 		} else if (buffer_delay(bh)) {
 			if (!mp) {
 				err = map_blocks(inode, offset, len, &map,
-					PBF_FILE_ALLOCATE | flags);
+					BMAP_ALLOCATE | flags);
 				if (err) {
 					goto error;
 				}
@@ -702,6 +693,7 @@ page_state_convert(
 				} else {
 					set_buffer_dirty(bh);
 					unlock_buffer(bh);
+					mark_buffer_dirty(bh);
 				}
 				page_dirty = 0;
 			}
@@ -720,8 +712,8 @@ page_state_convert(
 					size = probe_unmapped_cluster(
 							inode, page, bh, head);
 					err = map_blocks(inode, offset,
-							size, &map,
-							PBF_WRITE | PBF_DIRECT);
+						size, &map,
+						BMAP_WRITE | BMAP_MMAP);
 					if (err) {
 						goto error;
 					}
@@ -737,6 +729,7 @@ page_state_convert(
 					} else {
 						set_buffer_dirty(bh);
 						unlock_buffer(bh);
+						mark_buffer_dirty(bh);
 					}
 					page_dirty = 0;
 				}
@@ -760,13 +753,11 @@ next_bh:
 	if (uptodate)
 		SetPageUptodate(page);
 
-	if (startio) {
+	if (startio)
 		submit_page(page, bh_arr, cnt);
-	}
 
-	if (mp) {
+	if (mp)
 		cluster_write(inode, page->index + 1, mp, startio, unmapped);
-	}
 
 	return page_dirty;
 
@@ -797,7 +788,7 @@ linvfs_get_block_core(
 	struct buffer_head	*bh_result,
 	int			create,
 	int			direct,
-	page_buf_flags_t	flags)
+	bmapi_flags_t		flags)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 	page_buf_bmap_t		pbmap;
@@ -817,7 +808,7 @@ linvfs_get_block_core(
 		size = 1 << inode->i_blkbits;
 
 	VOP_BMAP(vp, offset, size,
-		create ? flags : PBF_READ, &pbmap, &retpbbm, error);
+		create ? flags : BMAP_READ, &pbmap, &retpbbm, error);
 	if (error)
 		return -error;
 
@@ -887,7 +878,7 @@ linvfs_get_block(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, PBF_WRITE);
+					create, 0, BMAP_WRITE);
 }
 
 STATIC int
@@ -898,7 +889,7 @@ linvfs_get_block_sync(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, 0, bh_result,
-					create, 0, PBF_SYNC|PBF_WRITE);
+					create, 0, BMAP_SYNC|BMAP_WRITE);
 }
 
 STATIC int
@@ -910,7 +901,7 @@ linvfs_get_blocks_direct(
 	int			create)
 {
 	return linvfs_get_block_core(inode, iblock, max_blocks, bh_result,
-					create, 1, PBF_WRITE|PBF_DIRECT);
+					create, 1, BMAP_WRITE|BMAP_DIRECT);
 }
 
 STATIC int

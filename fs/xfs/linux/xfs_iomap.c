@@ -97,7 +97,7 @@ xfs_iomap(
 {
 	xfs_mount_t	*mp = io->io_mount;
 	xfs_fileoff_t	offset_fsb, end_fsb;
-	int		error;
+	int		error = 0;
 	int		lockmode = 0;
 	xfs_bmbt_irec_t	imap;
 	int		nimaps = 1;
@@ -107,32 +107,31 @@ xfs_iomap(
 		return XFS_ERROR(EIO);
 
 	switch (flags &
-		(PBF_READ|PBF_WRITE|PBF_FILE_ALLOCATE|PBF_FILE_UNWRITTEN)) {
-	case PBF_READ:
+		(BMAP_READ|BMAP_WRITE|BMAP_ALLOCATE|BMAP_UNWRITTEN)) {
+	case BMAP_READ:
 		lockmode = XFS_LCK_MAP_SHARED(mp, io);
 		bmap_flags = XFS_BMAPI_ENTIRE;
+		if (flags & BMAP_IGNSTATE)
+			bmap_flags |= XFS_BMAPI_IGSTATE;
 		break;
 	case PBF_WRITE:
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
 		bmap_flags = 0;
 		XFS_ILOCK(mp, io, lockmode);
 		break;
-	case PBF_FILE_ALLOCATE:
+	case BMAP_ALLOCATE:
 		lockmode = XFS_ILOCK_SHARED|XFS_EXTSIZE_RD;
 		bmap_flags = XFS_BMAPI_ENTIRE;
 		/* Attempt non-blocking lock */
-		if (flags & PBF_TRYLOCK) {
+		if (flags & BMAP_TRYLOCK) {
 			if (!XFS_ILOCK_NOWAIT(mp, io, lockmode))
 				return XFS_ERROR(EAGAIN);
 		} else {
 			XFS_ILOCK(mp, io, lockmode);
 		}
 		break;
-	case PBF_FILE_UNWRITTEN:
-		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
-		bmap_flags = XFS_BMAPI_ENTIRE|XFS_BMAPI_IGSTATE;
-		XFS_ILOCK(mp, io, lockmode);
-		break;
+	case BMAP_UNWRITTEN:
+		goto phase2;
 	default:
 		BUG();
 	}
@@ -148,13 +147,14 @@ xfs_iomap(
 	if (error)
 		goto out;
 
-	switch (flags & (PBF_WRITE|PBF_FILE_ALLOCATE)) {
-	case PBF_WRITE:
+phase2:
+	switch (flags & (BMAP_WRITE|BMAP_ALLOCATE|BMAP_UNWRITTEN)) {
+	case BMAP_WRITE:
 		/* If we found an extent, return it */
 		if (nimaps && (imap.br_startblock != HOLESTARTBLOCK))
 			break;
 
-		if (flags & PBF_DIRECT) {
+		if (flags & (BMAP_DIRECT|BMAP_MMAP)) {
 			error = XFS_IOMAP_WRITE_DIRECT(mp, io, offset,
 					count, flags, &imap, &nimaps, nimaps);
 		} else {
@@ -162,7 +162,7 @@ xfs_iomap(
 					flags, &imap, &nimaps);
 		}
 		break;
-	case PBF_FILE_ALLOCATE:
+	case BMAP_ALLOCATE:
 		/* If we found an extent, return it */
 		XFS_IUNLOCK(mp, io, lockmode);
 		lockmode = 0;
@@ -172,12 +172,17 @@ xfs_iomap(
 
 		error = XFS_IOMAP_WRITE_ALLOCATE(mp, io, &imap, &nimaps);
 		break;
+	case BMAP_UNWRITTEN:
+		lockmode = 0;
+		error = XFS_IOMAP_WRITE_UNWRITTEN(mp, io, offset, count);
+		nimaps = 0;
+		break;
 	}
 
 	if (nimaps) {
 		*npbmaps = _xfs_imap_to_bmap(io, offset, &imap,
 						pbmapp, nimaps, *npbmaps);
-	} else {
+	} else if (npbmaps) {
 		*npbmaps = 0;
 	}
 
@@ -203,13 +208,13 @@ xfs_flush_space(
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			*fsynced = 1;
 		} else {
-			*ioflags |= PBF_SYNC;
+			*ioflags |= BMAP_SYNC;
 			*fsynced = 2;
 		}
 		return 0;
 	case 1:
 		*fsynced = 2;
-		*ioflags |= PBF_SYNC;
+		*ioflags |= BMAP_SYNC;
 		return 0;
 	case 2:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -228,7 +233,7 @@ xfs_iomap_write_direct(
 	xfs_inode_t	*ip,
 	loff_t		offset,
 	size_t		count,
-	int		ioflag,
+	int		flags,
 	xfs_bmbt_irec_t *ret_imap,
 	int		*nmaps,
 	int		found)
@@ -342,7 +347,7 @@ xfs_iomap_write_direct(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 
-	if (offset < ip->i_d.di_size || rt)
+	if (!(flags & BMAP_MMAP) && (offset < ip->i_d.di_size || rt))
 		bmapi_flag |= XFS_BMAPI_PREALLOC;
 
 	/*
@@ -441,7 +446,7 @@ retry:
 	 * We don't bother with this for sync writes, because we need
 	 * to minimize the amount we write for good performance.
 	 */
-	if (!(ioflag & PBF_SYNC) && ((offset + count) > ip->i_d.di_size)) {
+	if (!(ioflag & BMAP_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		xfs_off_t	aligned_offset;
 		unsigned int	iosize;
 		xfs_fileoff_t	ioalign;
