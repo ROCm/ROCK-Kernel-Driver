@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1251,6 +1251,28 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 /*
  * Helper routine for pagebuf_iorequest
  */
+
+STATIC __inline__ int
+_pagebuf_iolocked(
+	page_buf_t		*pb)
+{
+	ASSERT(pb->pb_flags & (PBF_READ|PBF_WRITE));
+	if (pb->pb_flags & PBF_READ)
+		return pb->pb_locked;
+	return ((pb->pb_flags & _PBF_LOCKABLE) == 0);
+}
+
+STATIC __inline__ void
+_pagebuf_iodone(
+	page_buf_t		*pb,
+	int			schedule)
+{
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pb->pb_locked = 0;
+		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), schedule);
+	}
+}
+
 STATIC int
 bio_end_io_pagebuf(
 	struct bio		*bio,
@@ -1286,43 +1308,19 @@ bio_end_io_pagebuf(
 				SetPageUptodate(page);
 		}
 
-		if (pb->pb_locked) {
+		if (_pagebuf_iolocked(pb)) {
 			unlock_page(page);
-		} else {
-			BUG_ON(PageLocked(page));
 		}
 	}
 
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		pb->pb_locked = 0;
-		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
-	}
-
+	_pagebuf_iodone(pb, 1);
 	bio_put(bio);
 	return 0;
 }
 
-/*
- *	pagebuf_iorequest
- *
- *	pagebuf_iorequest is the core I/O request routine.
- *	It assumes that the buffer is well-formed and
- *	mapped and ready for physical I/O, unlike
- *	pagebuf_iostart() and pagebuf_iophysio().  Those
- *	routines call the pagebuf_ioinitiate routine to start I/O,
- *	if it is present, or else call pagebuf_iorequest()
- *	directly if the pagebuf_ioinitiate routine is not present.
- *
- *	This function will be responsible for ensuring access to the
- *	pages is restricted whilst I/O is in progress - for locking
- *	pagebufs the pagebuf lock is the mediator, for non-locking
- *	pagebufs the pages will be locked. In the locking case we
- *	need to use the pagebuf lock as multiple meta-data buffers
- *	will reference the same page.
- */
-int
-pagebuf_iorequest(			/* start real I/O		*/
-	page_buf_t		*pb)	/* buffer to convey to device	*/
+void
+_pagebuf_ioapply(
+	page_buf_t		*pb)
 {
 	int			i, map_i, total_nr_pages, nr_pages;
 	struct bio		*bio;
@@ -1330,34 +1328,19 @@ pagebuf_iorequest(			/* start real I/O		*/
 	int			size = pb->pb_count_desired;
 	sector_t		sector = pb->pb_bn;
 	unsigned int		blocksize = pb->pb_target->pbr_bsize;
-	int			locking;
+	int			locking = _pagebuf_iolocked(pb);
 
-	locking = (pb->pb_flags & _PBF_LOCKABLE) == 0 && (pb->pb_locked == 0);
-
-	PB_TRACE(pb, PB_TRACE_REC(ioreq), 0);
-
-	if (pb->pb_flags & PBF_DELWRI) {
-		pagebuf_delwri_queue(pb, 1);
-		return 0;
-	}
-
-	/* Set the count to 1 initially, this will stop an I/O
-	 * completion callout which happens before we have started
-	 * all the I/O from calling pagebuf_iodone too early.
-	 */
-	atomic_set(&pb->pb_io_remaining, 1);
 	total_nr_pages = pb->pb_page_count;
 	map_i = 0;
-
 
 	/* Special code path for reading a sub page size pagebuf in --
 	 * we populate up the whole page, and hence the other metadata
 	 * in the same page.  This optimization is only valid when the
 	 * filesystem block size and the page size are equal.
 	 */
-	if (unlikely((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-	    (pb->pb_flags & PBF_READ) && pb->pb_locked &&
-	    (blocksize == PAGE_CACHE_SIZE))) {
+	if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
+	    (pb->pb_flags & PBF_READ) && locking &&
+	    (blocksize == PAGE_CACHE_SIZE)) {
 		bio = bio_alloc(GFP_NOIO, 1);
 
 		bio->bi_bdev = pb->pb_target->pbr_bdev;
@@ -1373,12 +1356,8 @@ pagebuf_iorequest(			/* start real I/O		*/
 		goto submit_io;
 	}
 
-	if (pb->pb_flags & PBF_WRITE) {
-		_pagebuf_wait_unpin(pb);
-	}
-
 	/* Lock down the pages which we need to for the request */
-	if (locking) {
+	if (locking && (pb->pb_flags & PBF_WRITE) && (pb->pb_locked == 0)) {
 		for (i = 0; size; i++) {
 			int		nbytes = PAGE_CACHE_SIZE - offset;
 			struct page	*page = pb->pb_pages[i];
@@ -1393,7 +1372,6 @@ pagebuf_iorequest(			/* start real I/O		*/
 		}
 		offset = pb->pb_offset;
 		size = pb->pb_count_desired;
-		pb->pb_locked = 1;
 	}
 
 next_chunk:
@@ -1440,12 +1418,48 @@ submit_io:
 	} else {
 		pagebuf_ioerror(pb, EIO);
 	}
+}
 
-	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
-		pb->pb_locked = 0;
-		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 1);
+/*
+ *	pagebuf_iorequest
+ *
+ *	pagebuf_iorequest is the core I/O request routine.
+ *	It assumes that the buffer is well-formed and
+ *	mapped and ready for physical I/O, unlike
+ *	pagebuf_iostart() and pagebuf_iophysio().  Those
+ *	routines call the pagebuf_ioinitiate routine to start I/O,
+ *	if it is present, or else call pagebuf_iorequest()
+ *	directly if the pagebuf_ioinitiate routine is not present.
+ *
+ *	This function will be responsible for ensuring access to the
+ *	pages is restricted whilst I/O is in progress - for locking
+ *	pagebufs the pagebuf lock is the mediator, for non-locking
+ *	pagebufs the pages will be locked. In the locking case we
+ *	need to use the pagebuf lock as multiple meta-data buffers
+ *	will reference the same page.
+ */
+int
+pagebuf_iorequest(			/* start real I/O		*/
+	page_buf_t		*pb)	/* buffer to convey to device	*/
+{
+	PB_TRACE(pb, PB_TRACE_REC(ioreq), 0);
+
+	if (pb->pb_flags & PBF_DELWRI) {
+		pagebuf_delwri_queue(pb, 1);
+		return 0;
 	}
 
+	if (pb->pb_flags & PBF_WRITE) {
+		_pagebuf_wait_unpin(pb);
+	}
+
+	/* Set the count to 1 initially, this will stop an I/O
+	 * completion callout which happens before we have started
+	 * all the I/O from calling pagebuf_iodone too early.
+	 */
+	atomic_set(&pb->pb_io_remaining, 1);
+	_pagebuf_ioapply(pb);
+	_pagebuf_iodone(pb, 0);
 	return 0;
 }
 
