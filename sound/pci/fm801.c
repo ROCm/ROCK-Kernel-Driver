@@ -35,7 +35,7 @@
 
 #include <asm/io.h>
 
-#if defined(CONFIG_SND_FM801_TEA575X) && (defined(CONFIG_VIDEO_DEV) || defined(CONFIG_VIDEO_DEV_MODULE))
+#if (defined(CONFIG_SND_FM801_TEA575X) || defined(CONFIG_SND_FM801_TEA575X_MODULE)) && (defined(CONFIG_VIDEO_DEV) || defined(CONFIG_VIDEO_DEV_MODULE))
 #include <sound/tea575x-tuner.h>
 #define TEA575X_RADIO 1
 #endif
@@ -703,7 +703,9 @@ static int __devinit snd_fm801_pcm(fm801_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "FM801");
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, chip->multichannel ? 128*1024 : 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci),
+					      chip->multichannel ? 128*1024 : 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

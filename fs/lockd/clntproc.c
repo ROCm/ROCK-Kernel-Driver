@@ -443,7 +443,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 		}
 		if (status < 0)
 			return status;
-	} while (resp->status == NLM_LCK_BLOCKED);
+	} while (resp->status == NLM_LCK_BLOCKED && req->a_args.block);
 
 	if (resp->status == NLM_LCK_GRANTED) {
 		fl->fl_u.nfs_fl.state = host->h_state;

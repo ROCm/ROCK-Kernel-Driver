@@ -117,7 +117,7 @@ struct usb_ep_ops {
 	void (*free_buffer) (struct usb_ep *ep, void *buf, dma_addr_t dma,
 		unsigned bytes);
 	// NOTE:  on 2.5, drivers may also use dma_map() and
-	// dma_sync_single() to manage dma overhead. 
+	// dma_sync_single_*() to manage dma overhead.
 
 	int (*queue) (struct usb_ep *ep, struct usb_request *req,
 		int gfp_flags);

@@ -135,7 +135,7 @@ static struct sym_fwz_ofs sym_fw2z_ofs = {
  *  Patch routine for firmware #1.
  */
 static void
-sym_fw1_patch(hcb_p np)
+sym_fw1_patch(struct sym_hcb *np)
 {
 	struct sym_fw1a_scr *scripta0;
 	struct sym_fw1b_scr *scriptb0;
@@ -176,7 +176,7 @@ sym_fw1_patch(hcb_p np)
  *  Patch routine for firmware #2.
  */
 static void
-sym_fw2_patch(hcb_p np)
+sym_fw2_patch(struct sym_hcb *np)
 {
 	struct sym_fw2a_scr *scripta0;
 	struct sym_fw2b_scr *scriptb0;
@@ -282,7 +282,7 @@ sym_fw_fill_data (u32 *in, u32 *out)
  *  To be done for all firmwares.
  */
 static void 
-sym_fw_setup_bus_addresses(hcb_p np, struct sym_fw *fw)
+sym_fw_setup_bus_addresses(struct sym_hcb *np, struct sym_fw *fw)
 {
 	u32 *pa;
 	u_short *po;
@@ -319,7 +319,7 @@ sym_fw_setup_bus_addresses(hcb_p np, struct sym_fw *fw)
  *  Setup routine for firmware #1.
  */
 static void 
-sym_fw1_setup(hcb_p np, struct sym_fw *fw)
+sym_fw1_setup(struct sym_hcb *np, struct sym_fw *fw)
 {
 	struct sym_fw1a_scr *scripta0;
 	struct sym_fw1b_scr *scriptb0;
@@ -343,7 +343,7 @@ sym_fw1_setup(hcb_p np, struct sym_fw *fw)
  *  Setup routine for firmware #2.
  */
 static void 
-sym_fw2_setup(hcb_p np, struct sym_fw *fw)
+sym_fw2_setup(struct sym_hcb *np, struct sym_fw *fw)
 {
 	struct sym_fw2a_scr *scripta0;
 	struct sym_fw2b_scr *scriptb0;
@@ -389,7 +389,7 @@ sym_find_firmware(struct sym_pci_chip *chip)
 /*
  *  Bind a script to physical addresses.
  */
-void sym_fw_bind_script (hcb_p np, u32 *start, int len)
+void sym_fw_bind_script(struct sym_hcb *np, u32 *start, int len)
 {
 	u32 opcode, new, old, tmp1, tmp2;
 	u32 *end, *cur;

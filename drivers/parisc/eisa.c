@@ -116,6 +116,16 @@ void eisa_out32(unsigned int data, unsigned short port)
 		gsc_writel(cpu_to_le32(data), eisa_permute(port));
 }
 
+#ifndef CONFIG_PCI
+/* We call these directly without PCI.  See asm/io.h. */
+EXPORT_SYMBOL(eisa_in8);
+EXPORT_SYMBOL(eisa_in16);
+EXPORT_SYMBOL(eisa_in32);
+EXPORT_SYMBOL(eisa_out8);
+EXPORT_SYMBOL(eisa_out16);
+EXPORT_SYMBOL(eisa_out32);
+#endif
+
 /* Interrupt handling */
 
 /* cached interrupt mask registers */

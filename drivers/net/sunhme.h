@@ -406,7 +406,8 @@ struct happy_meal {
 	void (*write_rxd)(struct happy_meal_rxd *, u32, u32);
 	u32 (*dma_map)(void *, void *, long, int);
 	void (*dma_unmap)(void *, u32, long, int);
-	void (*dma_sync)(void *, u32, long, int);
+	void (*dma_sync_for_cpu)(void *, u32, long, int);
+	void (*dma_sync_for_device)(void *, u32, long, int);
 #endif
 
 	/* This is either a sbus_dev or a pci_dev. */

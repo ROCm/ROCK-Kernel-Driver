@@ -399,6 +399,8 @@ struct _snd_intel8x0 {
 	unsigned long remap_bmaddr;
 	struct resource *res_bm;
 
+	struct snd_dma_device dma_dev;
+
 	struct pci_dev *pci;
 	snd_card_t *card;
 
@@ -423,8 +425,7 @@ struct _snd_intel8x0 {
 	spinlock_t ac97_lock;
 	
 	u32 bdbars_count;
-	u32 *bdbars;
-	dma_addr_t bdbars_addr;
+	struct snd_dma_buffer bdbars;
 	u32 int_sta_reg;		/* interrupt status register */
 	u32 int_sta_mask;		/* interrupt status mask */
 	unsigned int pcm_pos_shift;
@@ -812,10 +813,11 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 		if (status) {
 			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
-			status ^= igetdword(chip, chip->int_sta_reg);
+			if (chip->device_type != DEVICE_NFORCE)
+				status ^= igetdword(chip, chip->int_sta_reg);
 		}
 		spin_unlock(&chip->reg_lock);
-		if (status && err_count) {
+		if (chip->device_type != DEVICE_NFORCE && status && err_count) {
 			err_count--;
 			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
 				   status, chip->int_sta_mask);
@@ -1450,8 +1452,8 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 		strcpy(pcm->name, chip->card->shortname);
 	chip->pcm[device] = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, rec->prealloc_size,
-						  rec->prealloc_max_size);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
+					      rec->prealloc_size, rec->prealloc_max_size);
 
 	return 0;
 }
@@ -1673,6 +1675,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
+		.vendor = 0x1014,
+		.device = 0x1f00,
+		.name = "MS-9128",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
 		.name = "Dell Precision 530",	/* AD1885 */
@@ -1772,6 +1780,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
+#if 0 /* FIXME: this seems wrong on most boards */
 	{
 		.vendor = 0x8086,
 		.device = 0xa000,
@@ -1779,6 +1788,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
 	},
+#endif
 	{ } /* terminator */
 };
 
@@ -2129,10 +2139,10 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	/* --- */
 	synchronize_irq(chip->irq);
       __hw_end:
-	if (chip->bdbars) {
+	if (chip->bdbars.area) {
 		if (chip->fix_nocache)
-			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
-		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+			fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 0);
+		snd_dma_free_pages(&chip->dma_dev, &chip->bdbars);
 	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
@@ -2522,23 +2532,27 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	/* SIS7012 handles the pcm data in bytes, others are in words */
 	chip->pcm_pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 
+	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
+
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */
-	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
-	if (chip->bdbars == NULL) {
+	if (snd_dma_alloc_pages(&chip->dma_dev, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars) < 0) {
 		snd_intel8x0_free(chip);
+		snd_printk(KERN_ERR "intel8x0: cannot allocate buffer descriptors\n");
 		return -ENOMEM;
 	}
 	/* tables must be aligned to 8 bytes here, but the kernel pages
 	   are much bigger, so we don't care (on i386) */
 	/* workaround for 440MX */
 	if (chip->fix_nocache)
-		fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 1);
+		fill_nocache(chip->bdbars.area, chip->bdbars.bytes, 1);
 	int_sta_masks = 0;
 	for (i = 0; i < chip->bdbars_count; i++) {
 		ichdev = &chip->ichd[i];
-		ichdev->bdbar = chip->bdbars + (i * ICH_MAX_FRAGS * 2);
-		ichdev->bdbar_addr = chip->bdbars_addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar = ((u32 *)chip->bdbars.area) + (i * ICH_MAX_FRAGS * 2);
+		ichdev->bdbar_addr = chip->bdbars.addr + (i * sizeof(u32) * ICH_MAX_FRAGS * 2);
 		int_sta_masks |= ichdev->int_sta_mask;
 	}
 	chip->int_sta_reg = device_type == DEVICE_ALI ? ICH_REG_ALI_INTERRUPTSR : ICH_REG_GLOB_STA;

@@ -183,7 +183,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 		gfp |= GFP_DMA; 
 		dma_mask = 0xffffffff; 
 	} else {
-		dma_mask = hwdev->consistent_dma_mask; 
+		dma_mask = hwdev->dev.coherent_dma_mask;
 	}
 
 	if (dma_mask == 0) 

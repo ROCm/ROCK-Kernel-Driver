@@ -476,7 +476,7 @@ static int __devinit parport_init_chip(struct parisc_device *dev)
 	return 0;
 }
 
-static void __devexit parport_remove_chip(struct parisc_device *dev)
+static int __devexit parport_remove_chip(struct parisc_device *dev)
 {
 	struct parport *p = dev->dev.driver_data;
 	if (p) {
@@ -495,6 +495,7 @@ static void __devexit parport_remove_chip(struct parisc_device *dev)
 		parport_put_port(p);
 		kfree (ops); /* hope no-one cached it */
 	}
+	return 0;
 }
 
 static struct parisc_device_id parport_tbl[] = {
@@ -508,7 +509,7 @@ static struct parisc_driver parport_driver = {
 	.name		= "Parallel",
 	.id_table	= parport_tbl,
 	.probe		= parport_init_chip,
-	.remove		= parport_remove_chip,
+	.remove		= __devexit_p(parport_remove_chip),
 };
 
 int __devinit parport_gsc_init(void)

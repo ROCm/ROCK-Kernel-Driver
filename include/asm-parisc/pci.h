@@ -43,7 +43,7 @@
 **
 ** This is the "common" or "base" data structure which HBA drivers
 ** (eg Dino or LBA) are required to place at the top of their own
-** dev->sysdata structure.  I've heard this called "C inheritance" too.
+** platform_data structure.  I've heard this called "C inheritance" too.
 **
 ** Data needed by pcibios layer belongs here.
 */

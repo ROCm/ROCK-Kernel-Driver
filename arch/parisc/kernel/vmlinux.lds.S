@@ -61,6 +61,9 @@ SECTIONS
   RODATA
 
   /* writeable */
+  . = ALIGN(4096);		/* Make sure this is paged aligned so
+  				   that we can properly leave these
+				   as writable */
   data_start = .;
 
   . = ALIGN(16);		/* Exception table */

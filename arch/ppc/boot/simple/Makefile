@@ -26,11 +26,12 @@ common				:= $(boot)/common
 utils				:= $(boot)/utils
 bootlib				:= $(boot)/lib
 images				:= $(boot)/images
+of1275				:= $(boot)/of1275
 tftpboot			:= /tftpboot
 
 # Normally, we use the 'misc.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
-misc-y	:= misc.o ../common/bootinfo.o
+misc-y	:= misc.o
 
 # Normally, we have our images end in .elf, but something we want to
 # change this.
@@ -96,6 +97,12 @@ zimageinitrd-$(pcore)			:= zImage.initrd-STRIPELF
          end-$(pcore)			:= pcore
    cacheflag-$(pcore)			:= -include $(clear_L2_L3)
 
+      zimage-$(CONFIG_PPC_PREP)		:= zImage-PPLUS
+zimageinitrd-$(CONFIG_PPC_PREP)		:= zImage.initrd-PPLUS
+     extra.o-$(CONFIG_PPC_PREP)		:= legacy.o
+        misc-$(CONFIG_PPC_PREP)		+= misc-prep.o mpc10x_memory.o
+         end-$(CONFIG_PPC_PREP)		:= prep
+
          end-$(CONFIG_SANDPOINT)	:= sandpoint
    cacheflag-$(CONFIG_SANDPOINT)	:= -include $(clear_L2_L3)
 
@@ -138,6 +145,9 @@ boot-$(CONFIG_GT64260_CONSOLE)	+= gt64260_tty.o
 endif
 
 LIBS				:= $(common)/lib.a $(bootlib)/lib.a
+ifeq ($(CONFIG_PPC_PREP),y)
+LIBS 				+= $(of1275)/lib.a
+endif
 
 OBJS				:= $(addprefix $(obj)/,$(boot-y))
 

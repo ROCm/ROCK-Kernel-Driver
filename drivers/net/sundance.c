@@ -1331,9 +1331,6 @@ static void rx_poll(unsigned long data)
 		if (netif_msg_rx_status(np))
 			printk(KERN_DEBUG "  netdev_rx() status was %8.8x.\n",
 				   frame_status);
-		pci_dma_sync_single(np->pci_dev, desc->frag[0].addr,
-			np->rx_buf_sz, PCI_DMA_FROMDEVICE);
-
 		if (frame_status & 0x001f4000) {
 			/* There was a error. */
 			if (netif_msg_rx_err(np))
@@ -1363,7 +1360,16 @@ static void rx_poll(unsigned long data)
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
+				pci_dma_sync_single_for_cpu(np->pci_dev,
+							    desc->frag[0].addr,
+							    np->rx_buf_sz,
+							    PCI_DMA_FROMDEVICE);
+
 				eth_copy_and_sum(skb, np->rx_skbuff[entry]->tail, pkt_len, 0);
+				pci_dma_sync_single_for_device(np->pci_dev,
+							       desc->frag[0].addr,
+							       np->rx_buf_sz,
+							       PCI_DMA_FROMDEVICE);
 				skb_put(skb, pkt_len);
 			} else {
 				pci_unmap_single(np->pci_dev,

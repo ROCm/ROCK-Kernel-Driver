@@ -830,14 +830,18 @@ void usb_buffer_free (struct usb_device *dev, size_t size,
 	void *addr, dma_addr_t dma);
 
 struct urb *usb_buffer_map (struct urb *urb);
+#if 0
 void usb_buffer_dmasync (struct urb *urb);
+#endif
 void usb_buffer_unmap (struct urb *urb);
 
 struct scatterlist;
 int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int nents);
+#if 0
 void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents);
+#endif
 void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents);
 

@@ -1653,17 +1653,21 @@ int snd_cs4231_pcm(cs4231_t *chip, int device, snd_pcm_t **rpcm)
 	strcpy(pcm->name, snd_cs4231_chip_id(chip));
 
 #ifdef LEGACY_SUPPORT
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_isa_data(),
+					      64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 #else
 #  ifdef EBUS_SUPPORT
         if (chip->ebus_flag) {
-                snd_pcm_lib_preallocate_pci_pages_for_all(chip->dev_u.pdev, pcm,
-                                                          64*1024, 128*1024);
+                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
+                				      chip->dev_u.pdev,
+						      64*1024, 128*1024);
         } else {
 #  endif
 #  ifdef SBUS_SUPPORT
-                snd_pcm_lib_preallocate_sbus_pages_for_all(chip->dev_u.sdev, pcm,
-                                                           64*1024, 128*1024);
+                snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_SBUS,
+                				      chip->dev_u.sdev,
+						      64*1024, 128*1024);
 #  endif
 #  ifdef EBUS_SUPPORT
         }

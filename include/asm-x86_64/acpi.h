@@ -60,7 +60,7 @@ __acpi_acquire_global_lock (unsigned int *lock)
 	do {
 		old = *lock;
 		new = (((old & ~0x3) + 2) + ((old >> 1) & 0x1));
-		val = cmpxchg4_locked(lock, new, old);
+		val = cmpxchg(lock, old, new);
 	} while (unlikely (val != old));
 	return (new < 3) ? -1 : 0;
 }
@@ -72,7 +72,7 @@ __acpi_release_global_lock (unsigned int *lock)
 	do {
 		old = *lock;
 		new = old & ~0x3;
-		val = cmpxchg4_locked(lock, new, old);
+		val = cmpxchg(lock, old, new);
 	} while (unlikely (val != old));
 	return old & 0x1;
 }

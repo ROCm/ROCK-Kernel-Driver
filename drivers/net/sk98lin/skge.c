@@ -2533,12 +2533,6 @@ rx_start:
 				"Control: %x\nRxStat: %x\n",
 				Control, FrameStat));
 
-			PhysAddr = ((SK_U64) pRxd->VDataHigh) << (SK_U64)32;
-			PhysAddr |= (SK_U64) pRxd->VDataLow;
-			pci_dma_sync_single(pAC->PciDev,
-						(dma_addr_t) PhysAddr,
-						FrameLength,
-						PCI_DMA_FROMDEVICE);
 			ReQueueRxBuffer(pAC, pRxPort, pMsg,
 				pRxd->VDataHigh, pRxd->VDataLow);
 
@@ -2559,12 +2553,16 @@ rx_start:
 			PhysAddr = ((SK_U64) pRxd->VDataHigh) << (SK_U64)32;
 			PhysAddr |= (SK_U64) pRxd->VDataLow;
 
-			pci_dma_sync_single(pAC->PciDev,
-						(dma_addr_t) PhysAddr,
-						FrameLength,
-						PCI_DMA_FROMDEVICE);
+			pci_dma_sync_single_for_cpu(pAC->PciDev,
+						    (dma_addr_t) PhysAddr,
+						    FrameLength,
+						    PCI_DMA_FROMDEVICE);
 			eth_copy_and_sum(pNewMsg, pMsg->data,
 				FrameLength, 0);
+			pci_dma_sync_single_for_device(pAC->PciDev,
+						       (dma_addr_t) PhysAddr,
+						       FrameLength,
+						       PCI_DMA_FROMDEVICE);
 			ReQueueRxBuffer(pAC, pRxPort, pMsg,
 				pRxd->VDataHigh, pRxd->VDataLow);
 

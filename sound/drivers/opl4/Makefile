@@ -6,9 +6,6 @@
 snd-opl4-lib-objs := opl4_lib.o opl4_mixer.o opl4_proc.o
 snd-opl4-synth-objs := opl4_seq.o opl4_synth.o yrw801.o
 
-OPL4_OBJS := snd-opl4-lib.o
-OPL4_SYNTH_OBJS := snd-opl4-synth.o
-
 #
 # this function returns:
 #   "m" - CONFIG_SND_SEQUENCER is m
@@ -17,9 +14,5 @@ OPL4_SYNTH_OBJS := snd-opl4-synth.o
 #
 sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
-obj-$(CONFIG_SND_OPTI92X_AD1848) += $(OPL4_OBJS)
-obj-$(call sequencer,$(CONFIG_SND_OPTI92X_AD1848)) += $(OPL4_SYNTH_OBJS)
-obj-$(CONFIG_SND_OPTI92X_CS4231) += $(OPL4_OBJS)
-obj-$(call sequencer,$CONFIG_SND_OPTI92X_CS4231)) += $(OPL4_SYNTH_OBJS)
-
-obj-m := $(sort $(obj-m))
+obj-$(CONFIG_SND_OPL4_LIB) += snd-opl4-lib.o
+obj-$(call sequencer,$(CONFIG_SND_OPL4_LIB)) += snd-opl4-synth.o

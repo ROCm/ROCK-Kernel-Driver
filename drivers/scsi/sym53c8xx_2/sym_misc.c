@@ -315,7 +315,7 @@ __sym_sniff_inquiry(hcb_p np, u_char tn, u_char ln,
 	 */
 	inq_byte56 = tp->inq_byte56;
 	if (inq_version >= 4 && inq_len > 56)
-		tp->inq_byte56 = inq_data[56];
+		inq_byte56 = inq_data[56];
 #if 0
 printf("XXXXXX [%d] inq_version=%x inq_byte7=%x inq_byte56=%x XXXXX\n",
 	inq_len, inq_version, inq_byte7, inq_byte56);
@@ -328,6 +328,7 @@ printf("XXXXXX [%d] inq_version=%x inq_byte7=%x inq_byte56=%x XXXXX\n",
 	    tp->inq_byte56  != inq_byte56) {
 		tp->inq_version = inq_version;
 		tp->inq_byte7   = inq_byte7;
+		tp->inq_byte56  = inq_byte56;
 		return 1;
 	}
 	return 0;

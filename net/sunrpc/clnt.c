@@ -102,19 +102,22 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 {
 	struct rpc_version	*version;
 	struct rpc_clnt		*clnt = NULL;
+	int err;
 	int len;
 
 	dprintk("RPC: creating %s client for %s (xprt %p)\n",
 		program->name, servname, xprt);
 
+	err = -EINVAL;
 	if (!xprt)
-		goto out;
+		goto out_err;
 	if (vers >= program->nrvers || !(version = program->version[vers]))
-		goto out;
+		goto out_err;
 
+	err = -ENOMEM;
 	clnt = (struct rpc_clnt *) kmalloc(sizeof(*clnt), GFP_KERNEL);
 	if (!clnt)
-		goto out_no_clnt;
+		goto out_err;
 	memset(clnt, 0, sizeof(*clnt));
 	atomic_set(&clnt->cl_users, 0);
 	atomic_set(&clnt->cl_count, 1);
@@ -149,9 +152,11 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	clnt->cl_rtt = &clnt->cl_rtt_default;
 	rpc_init_rtt(&clnt->cl_rtt_default, xprt->timeout.to_initval);
 
-	if (rpc_setup_pipedir(clnt, program->pipe_dir_name) < 0)
+	err = rpc_setup_pipedir(clnt, program->pipe_dir_name);
+	if (err < 0)
 		goto out_no_path;
 
+	err = -ENOMEM;
 	if (!rpcauth_create(flavor, clnt)) {
 		printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
 				flavor);
@@ -163,20 +168,16 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	if (clnt->cl_nodelen > UNX_MAXNODENAME)
 		clnt->cl_nodelen = UNX_MAXNODENAME;
 	memcpy(clnt->cl_nodename, system_utsname.nodename, clnt->cl_nodelen);
-out:
 	return clnt;
 
-out_no_clnt:
-	printk(KERN_INFO "RPC: out of memory in rpc_create_client\n");
-	goto out;
 out_no_auth:
 	rpc_rmdir(clnt->cl_pathname);
 out_no_path:
 	if (clnt->cl_server != clnt->cl_inline_name)
 		kfree(clnt->cl_server);
 	kfree(clnt);
-	clnt = NULL;
-	goto out;
+out_err:
+	return ERR_PTR(err);
 }
 
 /*
@@ -198,11 +199,10 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	atomic_inc(&new->cl_parent->cl_count);
 	if (new->cl_auth)
 		atomic_inc(&new->cl_auth->au_count);
-out:
 	return new;
 out_no_clnt:
 	printk(KERN_INFO "RPC: out of memory in %s\n", __FUNCTION__);
-	goto out;
+	return ERR_PTR(-ENOMEM);
 }
 
 /*

@@ -351,12 +351,10 @@ static int attr_add(struct device *dev, struct device_attribute *attr)
 int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 {
 	struct class_device_attribute **attrs;
-	int error = -EINVAL, i;
+	int error, i;
 
-	if (sdev->sdev_state != SDEV_CREATED)
+	if ((error = scsi_device_set_state(sdev, SDEV_RUNNING)) != 0)
 		return error;
-
-	sdev->sdev_state = SDEV_RUNNING;
 
 	error = device_add(&sdev->sdev_gendev);
 	if (error) {
@@ -369,14 +367,19 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		printk(KERN_INFO "error 2\n");
 		goto clean_device;
 	}
+	/* take a reference for the sdev_classdev; this is
+	 * released by the sdev_class .release */
+	get_device(&sdev->sdev_gendev);
 
 	if (sdev->transport_classdev.class) {
 		error = class_device_add(&sdev->transport_classdev);
 		if (error)
 			goto clean_device2;
+		/* take a reference for the transport_classdev; this
+		 * is released by the transport_class .release */
+		get_device(&sdev->sdev_gendev);
+		
 	}
-
-	get_device(&sdev->sdev_gendev);
 
 	if (sdev->host->hostt->sdev_attrs) {
 		for (i = 0; sdev->host->hostt->sdev_attrs[i]; i++) {
@@ -419,7 +422,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
  clean_device2:
 	class_device_del(&sdev->sdev_classdev);
  clean_device:
-	sdev->sdev_state = SDEV_CANCEL;
+	scsi_device_set_state(sdev, SDEV_CANCEL);
 
 	device_del(&sdev->sdev_gendev);
 	put_device(&sdev->sdev_gendev);
@@ -434,9 +437,10 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 void scsi_remove_device(struct scsi_device *sdev)
 {
 	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
-		sdev->sdev_state = SDEV_DEL;
+		scsi_device_set_state(sdev, SDEV_DEL);
 		class_device_unregister(&sdev->sdev_classdev);
-		class_device_unregister(&sdev->transport_classdev);
+		if(sdev->transport_classdev.class)
+			class_device_unregister(&sdev->transport_classdev);
 		device_del(&sdev->sdev_gendev);
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);

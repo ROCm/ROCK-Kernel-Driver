@@ -373,7 +373,7 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 
 	hostdata->script = script;
 	hostdata->pScript = pScript;
-	dma_sync_single(hostdata->dev, pScript, sizeof(SCRIPT), DMA_TO_DEVICE);
+	dma_sync_single_for_device(hostdata->dev, pScript, sizeof(SCRIPT), DMA_TO_DEVICE);
 	hostdata->state = NCR_700_HOST_FREE;
 	hostdata->cmd = NULL;
 	host->max_id = 7;
@@ -1005,8 +1005,8 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				SCp->cmnd[7] = hostdata->status[0];
 				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
-				dma_sync_single(hostdata->dev, slot->pCmd,
-						SCp->cmd_len, DMA_TO_DEVICE);
+				dma_sync_single_for_device(hostdata->dev, slot->pCmd,
+							   SCp->cmd_len, DMA_TO_DEVICE);
 				SCp->request_bufflen = sizeof(SCp->sense_buffer);
 				slot->dma_handle = dma_map_single(hostdata->dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), DMA_FROM_DEVICE);
 				slot->SG[0].ins = bS_to_host(SCRIPT_MOVE_DATA_IN | sizeof(SCp->sense_buffer));
@@ -1030,7 +1030,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			//   SCp->cmnd[0] == INQUIRY && SCp->use_sg == 0) {
 			//	/* Piggy back the tag queueing support
 			//	 * on this command */
-			//	dma_sync_single(hostdata->dev,
+			//	dma_sync_single_for_cpu(hostdata->dev,
 			//			    slot->dma_handle,
 			//			    SCp->request_bufflen,
 			//			    DMA_FROM_DEVICE);
@@ -1522,6 +1522,8 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 			printk(KERN_ERR "scsi%d: Bus Reset detected, executing command %p, slot %p, dsp %08x[%04x]\n",
 			       host->host_no, SCp, SCp == NULL ? NULL : SCp->host_scribble, dsp, dsp - hostdata->pScript);
 
+			scsi_report_bus_reset(host, 0);
+
 			/* clear all the negotiated parameters */
 			__shost_for_each_device(SDp, host)
 				SDp->hostdata = 0;
@@ -1967,6 +1969,9 @@ NCR_700_bus_reset(Scsi_Cmnd * SCp)
 	wait_for_completion(&complete);
 	spin_lock_irq(SCp->device->host->host_lock);
 	hostdata->eh_complete = NULL;
+	/* Revalidate the transport parameters of the failing device */
+	if(hostdata->fast)
+		spi_schedule_dv_device(SCp->device);
 	return SUCCESS;
 }
 
@@ -1998,8 +2003,11 @@ NCR_700_set_period(struct scsi_device *SDp, int period)
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
 	
-	if(!hostdata->fast || period < hostdata->min_period)
+	if(!hostdata->fast)
 		return;
+
+	if(period < hostdata->min_period)
+		period = hostdata->min_period;
 
 	spi_period(SDp) = period;
 	NCR_700_clear_flag(SDp, NCR_700_DEV_NEGOTIATED_SYNC);
@@ -2012,11 +2020,14 @@ NCR_700_set_offset(struct scsi_device *SDp, int offset)
 {
 	struct NCR_700_Host_Parameters *hostdata = 
 		(struct NCR_700_Host_Parameters *)SDp->host->hostdata[0];
+	int max_offset = hostdata->chip710
+		? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET;
 	
-	if(!hostdata->fast ||
-	   offset > (hostdata->chip710
-		     ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET))
+	if(!hostdata->fast)
 		return;
+
+	if(offset > max_offset)
+		offset = max_offset;
 
 	/* if we're currently async, make sure the period is reasonable */
 	if(spi_offset(SDp) == 0 && (spi_period(SDp) < hostdata->min_period ||
@@ -2045,9 +2056,11 @@ NCR_700_slave_configure(Scsi_Device *SDp)
 		scsi_adjust_queue_depth(SDp, 0, SDp->host->cmd_per_lun);
 	}
 	if(hostdata->fast) {
-		NCR_700_set_period(SDp, hostdata->min_period);
-		NCR_700_set_offset(SDp, hostdata->chip710
-				   ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET);
+		/* Find the correct offset and period via domain validation */
+		spi_dv_device(SDp);
+	} else {
+		spi_offset(SDp) = 0;
+		spi_period(SDp) = 0;
 	}
 	return 0;
 }
@@ -2107,8 +2120,10 @@ EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
 
 static struct spi_function_template NCR_700_transport_functions =  {
-	.set_period = NCR_700_set_period,
-	.set_offset = NCR_700_set_offset,
+	.set_period	= NCR_700_set_period,
+	.show_period	= 1,
+	.set_offset	= NCR_700_set_offset,
+	.show_offset	= 1,
 };
 
 static int __init NCR_700_init(void)

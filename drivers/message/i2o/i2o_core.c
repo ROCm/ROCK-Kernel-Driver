@@ -1179,7 +1179,7 @@ void i2o_run_queue(struct i2o_controller *c)
 		 *	the processor 
 	 	 */
 
-		pci_dma_sync_single(c->pdev, c->page_frame_map, MSG_FRAME_SIZE, PCI_DMA_FROMDEVICE);
+		pci_dma_sync_single_for_cpu(c->pdev, c->page_frame_map, MSG_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 	
 		/*
 		 *	Despatch it

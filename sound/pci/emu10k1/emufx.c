@@ -26,6 +26,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -506,16 +507,16 @@ static void snd_emu10k1_fx8010_playback_tram_poke(emu10k1_t *emu,
 
 	while (frames > *tram_pos) {
 		count = *tram_pos + 1;
-		snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages + *tram_pos,
-						       (unsigned short *)emu->fx8010.etram_pages + *tram_pos + tram_size / 2,
+		snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
+						       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
 						       src, count, *tram_shift);
 		src += count * 2;
 		frames -= count;
 		*tram_pos = (tram_size / 2) - 1;
 		(*tram_shift)++;
 	}
-	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages + *tram_pos,
-					       (unsigned short *)emu->fx8010.etram_pages + *tram_pos + tram_size / 2,
+	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
+					       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
 					       src, frames, *tram_shift++);
 	*tram_pos -= frames;
 }
@@ -760,7 +761,7 @@ int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "EMU10K1 FX8010");
 	emu->pcm_fx8010 = pcm;
 	
-	snd_pcm_lib_preallocate_pci_pages_for_all(emu->pci, pcm, 64*1024, 0);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(emu->pci), 64*1024, 0);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -2218,32 +2219,30 @@ int snd_emu10k1_fx8010_tram_setup(emu10k1_t *emu, u32 size)
 		}
 		size = 0x2000 << size_reg;
 	}
-	if (emu->fx8010.etram_size == size)
+	if (emu->fx8010.etram_pages.bytes == size)
 		return 0;
 	spin_lock_irq(&emu->emu_lock);
 	outl(HCFG_LOCKTANKCACHE_MASK | inl(emu->port + HCFG), emu->port + HCFG);
 	spin_unlock_irq(&emu->emu_lock);
 	snd_emu10k1_ptr_write(emu, TCB, 0, 0);
 	snd_emu10k1_ptr_write(emu, TCBS, 0, 0);
-	if (emu->fx8010.etram_pages != NULL) {
-		snd_free_pci_pages(emu->pci, emu->fx8010.etram_size * 2, emu->fx8010.etram_pages, emu->fx8010.etram_pages_dmaaddr);
-		emu->fx8010.etram_pages = NULL;
-		emu->fx8010.etram_size = 0;
+	if (emu->fx8010.etram_pages.area != NULL) {
+		snd_dma_free_pages(&emu->dma_dev, &emu->fx8010.etram_pages);
+		emu->fx8010.etram_pages.area = NULL;
+		emu->fx8010.etram_pages.bytes = 0;
 	}
 
 	if (size > 0) {
-		emu->fx8010.etram_pages = snd_malloc_pci_pages(emu->pci, size * 2, &emu->fx8010.etram_pages_dmaaddr);
-		if (emu->fx8010.etram_pages == NULL)
+		if (snd_dma_alloc_pages(&emu->dma_dev, size * 2, &emu->fx8010.etram_pages) < 0)
 			return -ENOMEM;
-		memset(emu->fx8010.etram_pages, 0, size * 2);
-		snd_emu10k1_ptr_write(emu, TCB, 0, emu->fx8010.etram_pages_dmaaddr);
+		memset(emu->fx8010.etram_pages.area, 0, size * 2);
+		snd_emu10k1_ptr_write(emu, TCB, 0, emu->fx8010.etram_pages.addr);
 		snd_emu10k1_ptr_write(emu, TCBS, 0, size_reg);
 		spin_lock_irq(&emu->emu_lock);
 		outl(inl(emu->port + HCFG) & ~HCFG_LOCKTANKCACHE_MASK, emu->port + HCFG);
 		spin_unlock_irq(&emu->emu_lock);	
 	}
 
-	emu->fx8010.etram_size = size;
 	return 0;
 }
 
@@ -2269,7 +2268,7 @@ static int snd_emu10k1_fx8010_info(emu10k1_t *emu, emu10k1_fx8010_info_t *info)
 	memset(info, 0, sizeof(info));
 	info->card = emu->card_type;
 	info->internal_tram_size = emu->fx8010.itram_size;
-	info->external_tram_size = emu->fx8010.etram_size;
+	info->external_tram_size = emu->fx8010.etram_pages.bytes;
 	fxbus = fxbuses;
 	extin = emu->audigy ? audigy_ins : creative_ins;
 	extout = emu->audigy ? audigy_outs : creative_outs;

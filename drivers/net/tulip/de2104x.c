@@ -457,9 +457,11 @@ static void de_rx (struct de_private *de)
 					       buflen, PCI_DMA_FROMDEVICE);
 			de->rx_skb[rx_tail].skb = copy_skb;
 		} else {
-			pci_dma_sync_single(de->pdev, mapping, len, PCI_DMA_FROMDEVICE);
+			pci_dma_sync_single_for_cpu(de->pdev, mapping, len, PCI_DMA_FROMDEVICE);
 			skb_reserve(copy_skb, RX_OFFSET);
 			memcpy(skb_put(copy_skb, len), skb->tail, len);
+
+			pci_dma_sync_single_for_device(de->pdev, mapping, len, PCI_DMA_FROMDEVICE);
 
 			/* We'll reuse the original ring buffer. */
 			skb = copy_skb;

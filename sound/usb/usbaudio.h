@@ -136,6 +136,8 @@ struct snd_usb_audio {
 
 	struct list_head midi_list;	/* list of midi interfaces */
 	int next_midi_device;
+
+	unsigned int ignore_ctl_error;	/* for mixer */
 };  
 
 /*

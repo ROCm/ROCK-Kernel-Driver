@@ -453,8 +453,16 @@ static void snd_usbmidi_output_trigger(snd_rawmidi_substream_t* substream, int u
 	usbmidi_out_port_t* port = (usbmidi_out_port_t*)substream->runtime->private_data;
 
 	port->active = up;
-	if (up)
+	if (up) {
+		if (port->ep->umidi->chip->shutdown) {
+			/* gobble up remaining bytes to prevent wait in
+			 * snd_rawmidi_drain_output */
+			while (!snd_rawmidi_transmit_empty(substream))
+				snd_rawmidi_transmit_ack(substream, 1);
+			return;
+		}
 		tasklet_hi_schedule(&port->ep->tasklet);
+	}
 }
 
 static int snd_usbmidi_input_open(snd_rawmidi_substream_t* substream)
@@ -748,6 +756,7 @@ static struct {
 	{0x0582, 0x0003, 4, "%s MIDI 1"},
 	{0x0582, 0x0003, 5, "%s MIDI 2"},
 	/* Roland U-8 */
+	{0x0582, 0x0004, 0, "%s MIDI"},
 	{0x0582, 0x0004, 1, "%s Control"},
 	/* Roland SC-8820 */
 	{0x0582, 0x0007, 0, "%s Part A"},
@@ -779,6 +788,31 @@ static struct {
 	{0x0582, 0x0029, 1, "%s Part B"},
 	{0x0582, 0x0029, 2, "%s MIDI 1"},
 	{0x0582, 0x0029, 3, "%s MIDI 2"},
+	/* Edirol UA-700 */
+	{0x0582, 0x002b, 0, "%s MIDI"},
+	{0x0582, 0x002b, 1, "%s Control"},
+	/* Roland VariOS */
+	{0x0582, 0x002f, 0, "%s MIDI"},
+	{0x0582, 0x002f, 1, "%s External MIDI"},
+	{0x0582, 0x002f, 2, "%s Sync"},
+	/* Edirol PCR */
+	{0x0582, 0x0033, 0, "%s MIDI"},
+	{0x0582, 0x0033, 1, "%s 1"},
+	{0x0582, 0x0033, 2, "%s 2"},
+	/* BOSS GS-10 */
+	{0x0582, 0x003b, 0, "%s MIDI"},
+	{0x0582, 0x003b, 1, "%s Control"},
+	/* Edirol UA-1000 */
+	{0x0582, 0x0044, 0, "%s MIDI"},
+	{0x0582, 0x0044, 1, "%s Control"},
+	/* Edirol UR-80 */
+	{0x0582, 0x0048, 0, "%s MIDI"},
+	{0x0582, 0x0048, 1, "%s 1"},
+	{0x0582, 0x0048, 2, "%s 2"},
+	/* Edirol PCR-A */
+	{0x0582, 0x004d, 0, "%s MIDI"},
+	{0x0582, 0x004d, 1, "%s 1"},
+	{0x0582, 0x004d, 2, "%s 2"},
 	/* M-Audio MidiSport 8x8 */
 	{0x0763, 0x1031, 8, "%s Control"},
 	{0x0763, 0x1033, 8, "%s Control"},

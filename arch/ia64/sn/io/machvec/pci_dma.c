@@ -152,7 +152,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	 *   pcibr_dmatrans_addr ignores a missing PCIIO_DMA_A64 flag on
 	 *   PCI-X buses.
 	 */
-	if (hwdev->consistent_dma_mask == ~0UL)
+	if (hwdev->dev.coherent_dma_mask == ~0UL)
 		*dma_handle = pcibr_dmatrans_addr(vhdl, NULL, phys_addr, size,
 					  PCIIO_DMA_CMD | PCIIO_DMA_A64);
 	else {
@@ -169,7 +169,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 		}
 	}
 
-	if (!*dma_handle || *dma_handle > hwdev->consistent_dma_mask) {
+	if (!*dma_handle || *dma_handle > hwdev->dev.coherent_dma_mask) {
 		if (dma_map) {
 			pcibr_dmamap_done(dma_map);
 			pcibr_dmamap_free(dma_map);
@@ -437,7 +437,8 @@ sn_pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int
 }
 
 /**
- * sn_pci_dma_sync_single - make sure all DMAs have completed
+ * sn_pci_dma_sync_single_* - make sure all DMAs or CPU accesses
+ * have completed
  * @hwdev: device to sync
  * @dma_handle: DMA address to sync
  * @size: size of region
@@ -448,14 +449,19 @@ sn_pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int
  * anything on our platform.
  */
 void
-sn_pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
+sn_pci_dma_sync_single_for_cpu(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
 {
 	return;
+}
 
+void
+sn_pci_dma_sync_single_for_device(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
+{
+	return;
 }
 
 /**
- * sn_pci_dma_sync_sg - make sure all DMAs have completed
+ * sn_pci_dma_sync_sg_* - make sure all DMAs or CPU accesses have completed
  * @hwdev: device to sync
  * @sg: scatterlist to sync
  * @nents: number of entries in the scatterlist
@@ -466,10 +472,15 @@ sn_pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size
  * on our platform.
  */
 void
-sn_pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
+sn_pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
 {
 	return;
+}
 
+void
+sn_pci_dma_sync_sg_for_device(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
+{
+	return;
 }
 
 /**
@@ -602,28 +613,51 @@ sn_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 EXPORT_SYMBOL(sn_dma_unmap_sg);
 
 void
-sn_dma_sync_single(struct device *dev, dma_addr_t dma_handle, size_t size,
+sn_dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+			   int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	sn_pci_dma_sync_single_for_cpu(to_pci_dev(dev), dma_handle, size, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_sync_single_for_cpu);
+
+void
+sn_dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
 		int direction)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	sn_pci_dma_sync_single(to_pci_dev(dev), dma_handle, size, (int)direction);
+	sn_pci_dma_sync_single_for_device(to_pci_dev(dev), dma_handle, size, (int)direction);
 }
-EXPORT_SYMBOL(sn_dma_sync_single);
+EXPORT_SYMBOL(sn_dma_sync_single_for_device);
 
 void
-sn_dma_sync_sg(struct device *dev, struct scatterlist *sg, int nelems,
+sn_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 	    int direction)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	sn_pci_dma_sync_sg(to_pci_dev(dev), sg, nelems, (int)direction);
+	sn_pci_dma_sync_sg_for_cpu(to_pci_dev(dev), sg, nelems, (int)direction);
 }
-EXPORT_SYMBOL(sn_dma_sync_sg);
+EXPORT_SYMBOL(sn_dma_sync_sg_for_cpu);
+
+void
+sn_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+	    int direction)
+{
+	BUG_ON(dev->bus != &pci_bus_type);
+
+	sn_pci_dma_sync_sg_for_device(to_pci_dev(dev), sg, nelems, (int)direction);
+}
+EXPORT_SYMBOL(sn_dma_sync_sg_for_device);
 
 EXPORT_SYMBOL(sn_pci_unmap_single);
 EXPORT_SYMBOL(sn_pci_map_single);
-EXPORT_SYMBOL(sn_pci_dma_sync_single);
+EXPORT_SYMBOL(sn_pci_dma_sync_single_for_cpu);
+EXPORT_SYMBOL(sn_pci_dma_sync_single_for_device);
+EXPORT_SYMBOL(sn_pci_dma_sync_sg_for_cpu);
+EXPORT_SYMBOL(sn_pci_dma_sync_sg_for_device);
 EXPORT_SYMBOL(sn_pci_map_sg);
 EXPORT_SYMBOL(sn_pci_unmap_sg);
 EXPORT_SYMBOL(sn_pci_alloc_consistent);

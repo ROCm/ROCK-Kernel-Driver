@@ -269,6 +269,7 @@ nfs_direct_write_seg(struct inode *inode, struct file *file,
 	if (IS_SYNC(inode) || NFS_PROTO(inode)->version == 2 || count <= wsize)
 		wdata.args.stable = NFS_FILE_SYNC;
 
+	nfs_begin_data_update(inode);
 retry:
 	need_commit = 0;
 	tot_bytes = 0;
@@ -334,6 +335,8 @@ retry:
 						VERF_SIZE) != 0)
 			goto sync_retry;
 	}
+	nfs_end_data_update(inode);
+	NFS_FLAGS(inode) |= NFS_INO_INVALID_DATA;
 
 	return tot_bytes;
 

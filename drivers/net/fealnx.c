@@ -1647,10 +1647,6 @@ static int netdev_rx(struct net_device *dev)
 				printk(KERN_DEBUG "  netdev_rx() normal Rx pkt length %d"
 				       " status %x.\n", pkt_len, rx_status);
 #endif
-			pci_dma_sync_single(np->pci_dev, np->cur_rx->buffer,
-				np->rx_buf_sz, PCI_DMA_FROMDEVICE);
-			pci_unmap_single(np->pci_dev, np->cur_rx->buffer,
-				np->rx_buf_sz, PCI_DMA_FROMDEVICE);
 
 			/* Check if the packet is long enough to accept without copying
 			   to a minimally-sized skbuff. */
@@ -1658,6 +1654,10 @@ static int netdev_rx(struct net_device *dev)
 			    (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
+				pci_dma_sync_single_for_cpu(np->pci_dev,
+							    np->cur_rx->buffer,
+							    np->rx_buf_sz,
+							    PCI_DMA_FROMDEVICE);
 				/* Call copy + cksum if available. */
 
 #if ! defined(__alpha__)
@@ -1668,7 +1668,15 @@ static int netdev_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len),
 					np->cur_rx->skbuff->tail, pkt_len);
 #endif
+				pci_dma_sync_single_for_device(np->pci_dev,
+							       np->cur_rx->buffer,
+							       np->rx_buf_sz,
+							       PCI_DMA_FROMDEVICE);
 			} else {
+				pci_unmap_single(np->pci_dev,
+						 np->cur_rx->buffer,
+						 np->rx_buf_sz,
+						 PCI_DMA_FROMDEVICE);
 				skb_put(skb = np->cur_rx->skbuff, pkt_len);
 				np->cur_rx->skbuff = NULL;
 				if (np->really_rx_count == RX_RING_SIZE)
@@ -1689,8 +1697,10 @@ static int netdev_rx(struct net_device *dev)
 
 			if (skb != NULL) {
 				skb->dev = dev;	/* Mark as being used by this device. */
-				np->cur_rx->buffer = pci_map_single(np->pci_dev, skb->tail,
-					np->rx_buf_sz, PCI_DMA_FROMDEVICE);
+				np->cur_rx->buffer = pci_map_single(np->pci_dev,
+								    skb->tail,
+								    np->rx_buf_sz,
+								    PCI_DMA_FROMDEVICE);
 				np->cur_rx->skbuff = skb;
 				++np->really_rx_count;
 			}

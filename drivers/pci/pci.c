@@ -686,7 +686,7 @@ pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
 	if (!pci_dma_supported(dev, mask))
 		return -EIO;
 
-	dev->consistent_dma_mask = mask;
+	dev->dev.coherent_dma_mask = mask;
 
 	return 0;
 }

@@ -13,7 +13,6 @@
 #include <linux/in.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/auth.h>
-#include <linux/sunrpc/xdr.h>
 
 #define NFS_NGROUPS	16
 
@@ -156,7 +155,9 @@ unx_marshal(struct rpc_task *task, u32 *p, int ruid)
 	base = p++;
 	*p++ = htonl(jiffies/HZ);
 
-	/* Copy the UTS nodename captured when the client was created */
+	/*
+	 * Copy the UTS nodename captured when the client was created.
+	 */
 	p = xdr_encode_array(p, clnt->cl_nodename, clnt->cl_nodelen);
 
 	/* Note: we don't use real uid if it involves raising privilege */

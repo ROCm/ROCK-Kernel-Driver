@@ -191,9 +191,9 @@ int tulip_poll(struct net_device *dev, int *budget)
                                    && (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
                                        skb->dev = dev;
                                        skb_reserve(skb, 2);    /* 16 byte align the IP header */
-                                       pci_dma_sync_single(tp->pdev,
-                                                           tp->rx_buffers[entry].mapping,
-                                                           pkt_len, PCI_DMA_FROMDEVICE);
+                                       pci_dma_sync_single_for_cpu(tp->pdev,
+								   tp->rx_buffers[entry].mapping,
+								   pkt_len, PCI_DMA_FROMDEVICE);
 #if ! defined(__alpha__)
                                        eth_copy_and_sum(skb, tp->rx_buffers[entry].skb->tail,
                                                         pkt_len, 0);
@@ -203,6 +203,9 @@ int tulip_poll(struct net_device *dev, int *budget)
                                               tp->rx_buffers[entry].skb->tail,
                                               pkt_len);
 #endif
+                                       pci_dma_sync_single_for_device(tp->pdev,
+								      tp->rx_buffers[entry].mapping,
+								      pkt_len, PCI_DMA_FROMDEVICE);
                                } else {        /* Pass up the skb already on the Rx ring. */
                                        char *temp = skb_put(skb = tp->rx_buffers[entry].skb,
                                                             pkt_len);
@@ -412,9 +415,9 @@ static int tulip_rx(struct net_device *dev)
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-				pci_dma_sync_single(tp->pdev,
-						    tp->rx_buffers[entry].mapping,
-						    pkt_len, PCI_DMA_FROMDEVICE);
+				pci_dma_sync_single_for_cpu(tp->pdev,
+							    tp->rx_buffers[entry].mapping,
+							    pkt_len, PCI_DMA_FROMDEVICE);
 #if ! defined(__alpha__)
 				eth_copy_and_sum(skb, tp->rx_buffers[entry].skb->tail,
 						 pkt_len, 0);
@@ -424,6 +427,9 @@ static int tulip_rx(struct net_device *dev)
 				       tp->rx_buffers[entry].skb->tail,
 				       pkt_len);
 #endif
+				pci_dma_sync_single_for_device(tp->pdev,
+							       tp->rx_buffers[entry].mapping,
+							       pkt_len, PCI_DMA_FROMDEVICE);
 			} else { 	/* Pass up the skb already on the Rx ring. */
 				char *temp = skb_put(skb = tp->rx_buffers[entry].skb,
 						     pkt_len);

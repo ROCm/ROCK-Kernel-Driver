@@ -38,7 +38,7 @@ MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ATI IXP AC97 controller");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ATI,IXP150,200,250}}");
+MODULE_DEVICES("{{ATI,IXP150/200/250}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -220,7 +220,6 @@ typedef struct atiixp_dma_desc {
 	u32 next;	/* address of the next packet descriptor */
 } atiixp_dma_desc_t;
 
-
 /*
  * stream enum
  */
@@ -242,8 +241,8 @@ struct snd_atiixp_dma_ops {
  */
 struct snd_atiixp_dma {
 	const atiixp_dma_ops_t *ops;
-	atiixp_dma_desc_t *desc;	/* packets buffer */
-	dma_addr_t desc_addr;		/* physical address of packets buffer */
+	struct snd_dma_device desc_dev;
+	struct snd_dma_buffer desc_buf;
 	snd_pcm_substream_t *substream;	/* assigned PCM substream */
 	unsigned int buf_addr, buf_bytes;	/* DMA buffer address, bytes */
 	unsigned int period_bytes, periods;
@@ -359,9 +358,11 @@ static int atiixp_build_dma_packets(atiixp_t *chip, atiixp_dma_t *dma,
 	if (periods > ATI_MAX_DESCRIPTORS)
 		return -ENOMEM;
 
-	if (! dma->desc) {
-		dma->desc = snd_malloc_pci_pages(chip->pci, ATI_DESC_LIST_SIZE, &dma->desc_addr);
-		if (! dma->desc)
+	if (dma->desc_buf.area == NULL) {
+		memset(&dma->desc_dev, 0, sizeof(dma->desc_dev));
+		dma->desc_dev.type = SNDRV_DMA_TYPE_DEV;
+		dma->desc_dev.dev = snd_dma_pci_data(chip->pci);
+		if (snd_dma_alloc_pages(&dma->desc_dev, ATI_DESC_LIST_SIZE, &dma->desc_buf) < 0)
 			return -ENOMEM;
 		dma->period_bytes = dma->periods = 0; /* clear */
 	}
@@ -378,20 +379,21 @@ static int atiixp_build_dma_packets(atiixp_t *chip, atiixp_dma_t *dma,
 
 	/* fill the entries */
 	addr = (u32)substream->runtime->dma_addr;
-	desc_addr = (u32)dma->desc_addr;
+	desc_addr = (u32)dma->desc_buf.addr;
 	for (i = 0; i < periods; i++) {
-		dma->desc[i].addr = cpu_to_le32(addr);
-		dma->desc[i].status = 0;
-		dma->desc[i].size = period_bytes >> 2; /* in dwords */
+		atiixp_dma_desc_t *desc = &((atiixp_dma_desc_t *)dma->desc_buf.area)[i];
+		desc->addr = cpu_to_le32(addr);
+		desc->status = 0;
+		desc->size = period_bytes >> 2; /* in dwords */
 		desc_addr += sizeof(atiixp_dma_desc_t);
 		if (i == periods - 1)
-			dma->desc[i].next = cpu_to_le32((u32)dma->desc_addr);
+			desc->next = cpu_to_le32((u32)dma->desc_buf.addr);
 		else
-			dma->desc[i].next = cpu_to_le32(desc_addr);
+			desc->next = cpu_to_le32(desc_addr);
 		addr += period_bytes;
 	}
 
-	writel(cpu_to_le32((u32)dma->desc_addr | ATI_REG_LINKPTR_EN),
+	writel(cpu_to_le32((u32)dma->desc_buf.addr | ATI_REG_LINKPTR_EN),
 	       chip->remap_addr + dma->ops->llp_offset);
 
 	dma->period_bytes = period_bytes;
@@ -405,10 +407,10 @@ static int atiixp_build_dma_packets(atiixp_t *chip, atiixp_dma_t *dma,
  */
 static void atiixp_clear_dma_packets(atiixp_t *chip, atiixp_dma_t *dma, snd_pcm_substream_t *substream)
 {
-	if (dma->desc) {
+	if (dma->desc_buf.area) {
 		writel(0, chip->remap_addr + dma->ops->llp_offset);
-		snd_free_pci_pages(chip->pci, ATI_DESC_LIST_SIZE, dma->desc, dma->desc_addr);
-		dma->desc = NULL;
+		snd_dma_free_pages(&dma->desc_dev, &dma->desc_buf);
+		dma->desc_buf.area = NULL;
 	}
 }
 
@@ -1219,7 +1221,8 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 	pcm->private_data = chip;
 	strcpy(pcm->name, "ATI IXP AC97");
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
 
 	/* no SPDIF support on codec? */
 	if (chip->dmas[ATI_DMA_SPDIF].pcm && ! chip->dmas[ATI_DMA_SPDIF].pcm->rates)
@@ -1233,7 +1236,8 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 	pcm->private_data = chip;
 	strcpy(pcm->name, "ATI IXP IEC958");
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
 
 	/* pre-select AC97 SPDIF slots 10/11 */
 	for (i = 0; i < 3; i++) {
@@ -1563,4 +1567,3 @@ static int __init alsa_card_atiixp_setup(char *str)
 __setup("snd-atiixp=", alsa_card_atiixp_setup);
 
 #endif /* ifndef MODULE */
-

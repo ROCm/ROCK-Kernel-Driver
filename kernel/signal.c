@@ -1051,17 +1051,23 @@ int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 	struct task_struct *p;
 	struct list_head *l;
 	struct pid *pid;
-	int err, retval = -ESRCH;
+	int retval;
+	int found;
 
 	if (pgrp <= 0)
 		return -EINVAL;
 
+	found = 0;
+	retval = 0;
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+		int err;
+
+		found = 1;
 		err = group_send_sig_info(sig, info, p);
-		if (retval)
+		if (!retval)
 			retval = err;
 	}
-	return retval;
+	return found ? retval : -ESRCH;
 }
 
 int

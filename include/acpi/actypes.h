@@ -349,7 +349,6 @@ typedef u64                                     acpi_integer;
 /*
  * Power state values
  */
-
 #define ACPI_STATE_UNKNOWN              (u8) 0xFF
 
 #define ACPI_STATE_S0                   (u8) 0
@@ -393,7 +392,6 @@ typedef u64                                     acpi_integer;
 #define ACPI_NOTIFY_BUS_MODE_MISMATCH   (u8) 6
 #define ACPI_NOTIFY_POWER_FAULT         (u8) 7
 
-
 /*
  *  Table types.  These values are passed to the table related APIs
  */
@@ -408,7 +406,6 @@ typedef u32                                     acpi_table_type;
 #define ACPI_TABLE_XSDT                 (acpi_table_type) 6
 #define ACPI_TABLE_MAX                  6
 #define NUM_ACPI_TABLE_TYPES            (ACPI_TABLE_MAX+1)
-
 
 /*
  * Types associated with ACPI names and objects.  The first group of
@@ -794,7 +791,7 @@ acpi_status (*acpi_init_handler) (
 #define ACPI_INIT_DEVICE_INI        1
 
 
-/* Address Spaces (Operation Regions */
+/* Address Spaces (For Operation Regions) */
 
 typedef
 acpi_status (*acpi_adr_space_handler) (
