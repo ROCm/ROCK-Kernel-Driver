@@ -144,9 +144,6 @@ EXPORT_SYMBOL(fddi_type_trans);
 #endif /* CONFIG_FDDI */
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
-EXPORT_SYMBOL(dev_mc_add);
-EXPORT_SYMBOL(dev_mc_delete);
-EXPORT_SYMBOL(dev_mc_upload);
 EXPORT_SYMBOL(__kill_fasync);
 
 #ifdef CONFIG_HIPPI
