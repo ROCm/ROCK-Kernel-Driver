@@ -8,6 +8,9 @@
 #include <linux/workqueue.h>
 #endif
 
+typedef enum {
+  reiserfs_attrs_cleared	= 0x00000001,
+} reiserfs_super_block_flags;
 
 /* struct reiserfs_super_block accessors/mutators
  * since this is a disk structure, it will always be in 
@@ -397,6 +400,7 @@ struct reiserfs_sb_info
     reiserfs_proc_info_data_t s_proc_info_data;
     struct proc_dir_entry *procdir;
     int reserved_blocks; /* amount of blocks reserved for further allocations */
+    spinlock_t bitmap_lock; /* this lock on now only used to protect reserved_blocks variable */
 };
 
 /* Definitions of reiserfs on-disk properties: */
@@ -435,7 +439,6 @@ struct reiserfs_sb_info
 #define REISERFS_NO_BORDER 11
 #define REISERFS_NO_UNHASHED_RELOCATION 12
 #define REISERFS_HASHED_RELOCATION 13
-#define REISERFS_TEST4 14 
 
 #define REISERFS_ATTRS 15
 
@@ -457,6 +460,7 @@ struct reiserfs_sb_info
 #define have_small_tails(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_SMALLTAIL))
 #define replay_only(s) (REISERFS_SB(s)->s_mount_opt & (1 << REPLAYONLY))
 #define reiserfs_dont_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_NOLOG))
+#define reiserfs_attrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_ATTRS))
 #define old_format_only(s) (REISERFS_SB(s)->s_properties & (1 << REISERFS_3_5))
 #define convert_reiserfs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_CONVERT))
 

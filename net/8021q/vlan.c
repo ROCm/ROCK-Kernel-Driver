@@ -454,7 +454,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* set up method calls */
 	new_dev->init = vlan_dev_init;
 	new_dev->destructor = vlan_dev_destruct;
-	new_dev->owner = THIS_MODULE;
+	SET_MODULE_OWNER(new_dev);
 	    
 	/* new_dev->ifindex = 0;  it will be set when added to
 	 * the global list.

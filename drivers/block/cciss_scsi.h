@@ -38,23 +38,6 @@
 
 #define SCSI_CCISS_CAN_QUEUE 2
 
-/* this notation works fine for static initializations (as is the usual
-   case for linux scsi drivers), but not so well for dynamic settings,
-   so, if you change this, you also have to change cciss_unregister_scsi()
-   in cciss_scsi.c  */
-#define CCISS_SCSI {    \
-	name:           	"",				\
-	detect:         	cciss_scsi_detect,		\
-	release:        	cciss_scsi_release,		\
-	proc_info:           	cciss_scsi_proc_info,		\
-	queuecommand:   	cciss_scsi_queue_command,	\
-	can_queue:      	SCSI_CCISS_CAN_QUEUE,		\
-	this_id:        	7,				\
-	sg_tablesize:   	MAXSGENTRIES, 			\
-	cmd_per_lun:		1,				\
-	use_clustering:		DISABLE_CLUSTERING,\
-} 
-
 /* 
 	info:           	cciss_scsi_info,		\
 

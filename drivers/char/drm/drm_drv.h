@@ -334,7 +334,6 @@ static int DRM(setup)( drm_device_t *dev )
 	dev->last_context = 0;
 	dev->last_switch = 0;
 	dev->last_checked = 0;
-	init_timer( &dev->timer );
 	init_waitqueue_head( &dev->context_wait );
 
 	dev->ctx_start = 0;
@@ -560,7 +559,9 @@ static int __init drm_init( void )
 
 	drm_device_t *dev;
 	int i;
+#if __HAVE_CTX_BITMAP
 	int retcode;
+#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE
@@ -590,6 +591,7 @@ static int __init drm_init( void )
 		dev = &(DRM(device)[i]);
 		memset( (void *)dev, 0, sizeof(*dev) );
 		dev->count_lock = SPIN_LOCK_UNLOCKED;
+		init_timer( &dev->timer );
 		sema_init( &dev->struct_sem, 1 );
 
 		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)

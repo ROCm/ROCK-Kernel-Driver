@@ -103,7 +103,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		if (error < 0)
 			goto failure;
 
-#if CONFIG_NFSD_TCP
+#ifdef CONFIG_NFSD_TCP
 		error = svc_makesock(nfsd_serv, IPPROTO_TCP, port);
 		if (error < 0)
 			goto failure;
@@ -132,6 +132,7 @@ nfsd_svc(unsigned short port, int nrservs)
 	if (none_left) {
 		nfsd_serv = NULL;
 		nfsd_racache_shutdown();
+		nfs4_state_shutdown();
 	}
  out:
 	unlock_kernel();
@@ -247,6 +248,7 @@ nfsd(struct svc_rqst *rqstp)
 		}
 		nfsd_serv = NULL;
 	        nfsd_racache_shutdown();	/* release read-ahead cache */
+		nfs4_state_shutdown();
 	}
 	list_del(&me.list);
 	nfsdstats.th_cnt --;

@@ -67,7 +67,7 @@ struct snmp6_item
 #define SNMP6_SENTINEL	{ .name = NULL, .offset = 0 }
 
 static struct snmp6_item snmp6_ipv6_list[] = {
-/* ipv6 mib according to draft-ietf-ipngwg-ipv6-mib-04 */
+/* ipv6 mib according to RFC 2465 */
 #define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct ipv6_mib, x) }
 	SNMP6_GEN(Ip6InReceives),
 	SNMP6_GEN(Ip6InHdrErrors),
@@ -96,7 +96,7 @@ static struct snmp6_item snmp6_ipv6_list[] = {
 };
 
 static struct snmp6_item snmp6_icmp6_list[] = {
-/* icmpv6 mib according to draft-ietf-ipngwg-ipv6-icmp-mib-02
+/* icmpv6 mib according to RFC 2466
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
                 no good reasons to account them separately
@@ -198,6 +198,7 @@ static int sockstat6_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations sockstat6_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = sockstat6_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -210,6 +211,7 @@ static int snmp6_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations snmp6_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = snmp6_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -289,10 +291,19 @@ out:
 	return rc;
 
 proc_sockstat6_fail:
-	remove_proc_entry("dev_snmp6", proc_net);
+	proc_net_remove("dev_snmp6");
 proc_dev_snmp6_fail:
-	remove_proc_entry("snmp6", proc_net);
+	proc_net_remove("snmp6");
 proc_snmp6_fail:
 	rc = -ENOMEM;
 	goto out;
 }
+
+int ipv6_misc_proc_exit(void)
+{
+	proc_net_remove("sockstat6");
+	proc_net_remove("dev_snmp6");
+	proc_net_remove("snmp6");
+	return 0;
+}
+

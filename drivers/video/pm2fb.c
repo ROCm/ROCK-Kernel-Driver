@@ -2307,9 +2307,7 @@ static void __init pm2fb_mode_setup(char* options) {
 }
 
 static void __init pm2fb_font_setup(char* options) {
-
-	strncpy(pm2fb_options.font, options, sizeof(pm2fb_options.font));
-	pm2fb_options.font[sizeof(pm2fb_options.font)-1]='\0';
+	strlcpy(pm2fb_options.font, options, sizeof(pm2fb_options.font));
 }
 
 static void __init pm2fb_var_setup(char* options) {

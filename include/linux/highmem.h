@@ -3,8 +3,6 @@
 
 #include <linux/config.h>
 #include <linux/fs.h>
-#include <linux/mm.h>
-
 #include <asm/cacheflush.h>
 
 #ifdef CONFIG_HIGHMEM

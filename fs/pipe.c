@@ -44,7 +44,7 @@ void pipe_wait(struct inode * inode)
 }
 
 static ssize_t
-pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+pipe_read(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	int do_wakeup;
@@ -121,12 +121,12 @@ pipe_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 		kill_fasync(PIPE_FASYNC_WRITERS(*inode), SIGIO, POLL_OUT);
 	}
 	if (ret > 0)
-		UPDATE_ATIME(inode);
+		update_atime(inode);
 	return ret;
 }
 
 static ssize_t
-pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+pipe_write(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	ssize_t ret;
@@ -216,13 +216,13 @@ pipe_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
 }
 
 static ssize_t
-bad_pipe_r(struct file *filp, char *buf, size_t count, loff_t *ppos)
+bad_pipe_r(struct file *filp, char __user *buf, size_t count, loff_t *ppos)
 {
 	return -EBADF;
 }
 
 static ssize_t
-bad_pipe_w(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+bad_pipe_w(struct file *filp, const char __user *buf, size_t count, loff_t *ppos)
 {
 	return -EBADF;
 }
@@ -233,7 +233,7 @@ pipe_ioctl(struct inode *pino, struct file *filp,
 {
 	switch (cmd) {
 		case FIONREAD:
-			return put_user(PIPE_LEN(*pino), (int *)arg);
+			return put_user(PIPE_LEN(*pino), (int __user *)arg);
 		default:
 			return -EINVAL;
 	}
@@ -627,7 +627,7 @@ no_files:
  */
 
 static struct super_block *pipefs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "pipe:", NULL, PIPEFS_MAGIC);
 }

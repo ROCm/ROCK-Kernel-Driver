@@ -117,8 +117,7 @@ snd_seq_oss_synth_register(snd_seq_device_t *dev)
 	snd_use_lock_init(&rec->use_lock);
 
 	/* copy and truncate the name of synth device */
-	strncpy(rec->name, dev->name, sizeof(rec->name));
-	rec->name[sizeof(rec->name)-1] = 0;
+	strlcpy(rec->name, dev->name, sizeof(rec->name));
 
 	/* registration */
 	spin_lock_irqsave(&register_lock, flags);
@@ -450,7 +449,7 @@ snd_seq_oss_synth_reset(seq_oss_devinfo_t *dp, int dev)
  */
 int
 snd_seq_oss_synth_load_patch(seq_oss_devinfo_t *dp, int dev, int fmt,
-			    const char *buf, int p, int c)
+			    const char __user *buf, int p, int c)
 {
 	seq_oss_synth_t *rec;
 	int rc;
@@ -611,7 +610,7 @@ snd_seq_oss_synth_make_info(seq_oss_devinfo_t *dp, int dev, struct synth_info *i
 		inf->synth_subtype = 0;
 		inf->nr_voices = 16;
 		inf->device = dev;
-		strncpy(inf->name, minf.name, sizeof(inf->name));
+		strlcpy(inf->name, minf.name, sizeof(inf->name));
 	} else {
 		if ((rec = get_synthdev(dp, dev)) == NULL)
 			return -ENXIO;
@@ -619,7 +618,7 @@ snd_seq_oss_synth_make_info(seq_oss_devinfo_t *dp, int dev, struct synth_info *i
 		inf->synth_subtype = rec->synth_subtype;
 		inf->nr_voices = rec->nr_voices;
 		inf->device = dev;
-		strncpy(inf->name, rec->name, sizeof(inf->name));
+		strlcpy(inf->name, rec->name, sizeof(inf->name));
 		snd_use_lock_free(&rec->use_lock);
 	}
 	return 0;

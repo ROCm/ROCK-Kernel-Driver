@@ -6,13 +6,14 @@
  * of ugly preprocessor tricks. Talk about very very poor man's inheritance.
  */ 
 #include <linux/types.h>
-#include <linux/compat.h>
 #include <linux/config.h> 
 #include <linux/stddef.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
+#include <linux/compat.h>
 #include <linux/string.h>
 #include <linux/binfmts.h>
+#include <linux/mm.h>
 #include <asm/segment.h> 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -202,7 +203,6 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
 	struct _fpstate_ia32 *fpstate = (void*)fpu; 
 	struct pt_regs *regs = (struct pt_regs *)(tsk->thread.rsp0); 
 	mm_segment_t oldfs = get_fs();
-	int ret;
 
 	if (!tsk->used_math) 
 		return 0;
@@ -210,12 +210,12 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
 	if (tsk == current)
 		unlazy_fpu(tsk);
 	set_fs(KERNEL_DS); 
-	ret = save_i387_ia32(tsk, fpstate, regs, 1);
+	save_i387_ia32(tsk, fpstate, regs, 1);
 	/* Correct for i386 bug. It puts the fop into the upper 16bits of 
 	   the tag word (like FXSAVE), not into the fcs*/ 
 	fpstate->cssel |= fpstate->tag & 0xffff0000; 
 	set_fs(oldfs); 
-	return ret; 
+	return 1; 
 }
 
 #define ELF_CORE_COPY_XFPREGS 1
@@ -318,9 +318,6 @@ static void elf32_init(struct pt_regs *regs)
 	set_thread_flag(TIF_IA32); 
 }
 
-extern void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address);
- 
-
 int setup_arg_pages(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
@@ -350,8 +347,9 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
-		mpnt->vm_page_prot = PAGE_COPY_EXEC;
-		mpnt->vm_flags = VM_STACK_FLAGS;
+		mpnt->vm_flags = vm_stack_flags32; 
+ 		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC) ? 
+ 			PAGE_COPY_EXEC : PAGE_COPY;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
@@ -365,7 +363,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base);
+			put_dirty_page(current,page,stack_base,PAGE_COPY_EXEC);
 		}
 		stack_base += PAGE_SIZE;
 	}
@@ -381,7 +379,7 @@ elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int p
 	struct task_struct *me = current; 
 
 	if (prot & PROT_READ) 
-		prot |= PROT_EXEC; 
+		prot |= vm_force_exec32;
 
 	down_write(&me->mm->mmap_sem);
 	map_addr = do_mmap(filep, ELF_PAGESTART(addr),

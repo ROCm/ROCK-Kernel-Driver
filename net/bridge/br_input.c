@@ -64,7 +64,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	smp_read_barrier_depends();
 
 	if (p == NULL || p->state == BR_STATE_DISABLED) {
-		kfree(skb);
+		kfree_skb(skb);
 		goto out;
 	}
 
@@ -142,6 +142,9 @@ int br_handle_frame(struct sk_buff *skb)
 			rcu_read_unlock();
 			return -1;
 		}
+
+		if (!memcmp(p->br->dev.dev_addr, dest, ETH_ALEN))
+			skb->pkt_type = PACKET_HOST;
 
 		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);

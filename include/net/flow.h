@@ -7,6 +7,8 @@
 #ifndef _NET_FLOW_H
 #define _NET_FLOW_H
 
+#include <linux/in6.h>
+
 struct flowi {
 	int	oif;
 	int	iif;
@@ -21,8 +23,8 @@ struct flowi {
 		} ip4_u;
 		
 		struct {
-			struct in6_addr *	daddr;
-			struct in6_addr *	saddr;
+			struct in6_addr		daddr;
+			struct in6_addr		saddr;
 			__u32			flowlabel;
 		} ip6_u;
 
@@ -75,4 +77,16 @@ struct flowi {
 #define fl_icmp_code	uli_u.icmpt.code
 #define fl_ipsec_spi	uli_u.spi
 };
+
+#define FLOW_DIR_IN	0
+#define FLOW_DIR_OUT	1
+#define FLOW_DIR_FWD	2
+
+typedef void (*flow_resolve_t)(struct flowi *key, u16 family, u8 dir,
+			       void **objp, atomic_t **obj_refp);
+
+extern void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
+			       flow_resolve_t resolver);
+extern atomic_t flow_cache_genid;
+
 #endif

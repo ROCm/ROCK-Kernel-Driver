@@ -311,14 +311,14 @@ do_intr_reserve_level(cpuid_t cpu, int bit, int resflags, int reserve,
     /* Reserve the level and bump the count. */
     if (rv != -1) {
 	if (reserve) {
-	    int maxlen = sizeof(vecblk->info[bit].ii_name) - 1;
-	    int namelen;
 	    vecblk->info[bit].ii_flags |= (II_RESERVE | resflags);
 	    vecblk->info[bit].ii_owner_dev = owner_dev;
 	    /* Copy in the name. */
-	    namelen = name ? strlen(name) : 0;
-	    strncpy(vecblk->info[bit].ii_name, name, min(namelen, maxlen)); 
-	    vecblk->info[bit].ii_name[maxlen] = '\0';
+	    if (name)
+		strlcpy(vecblk->info[bit].ii_name, name,
+			sizeof(vecblk->info[bit].ii_name));
+	    else
+		vecblk->info[bit].ii_name[0] = '\0';
 	    vecblk->vector_count++;
 	} else {
 	    vecblk->info[bit].ii_flags = 0;	/* Clear all the flags */
@@ -333,7 +333,6 @@ do_intr_reserve_level(cpuid_t cpu, int bit, int resflags, int reserve,
 
 #if defined(DEBUG)
     if (rv >= 0) {
-	    int namelen = name ? strlen(name) : 0;
 	    /* Gather this device - target cpu mapping information
 	     * in a table which can be used later by the idbg "intrmap"
 	     * command
@@ -347,9 +346,10 @@ do_intr_reserve_level(cpuid_t cpu, int bit, int resflags, int reserve,
 		    p->cpuid 	= cpu; 
 		    p->cnodeid 	= cpuid_to_cnodeid(cpu); 
 		    p->bit 	= ip * N_INTPEND_BITS + rv;
-		    strncpy(p->intr_name,
-			    name,
-			    min(MAX_NAME,namelen));
+		    if (name)
+			strlcpy(p->intr_name, name, sizeof(p->intr_name));
+		    else
+			p->intr_name[0] = '\0';
 		    intr_dev_targ_map_size++;
 	    }
 	    mutex_spinunlock(&intr_dev_targ_map_lock,s);

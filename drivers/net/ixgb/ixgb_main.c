@@ -333,6 +333,7 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	SET_MODULE_OWNER(netdev);
+	SET_NETDEV_DEV(netdev, &pdev->dev);
 
 	pci_set_drvdata(pdev, netdev);
 	adapter = netdev->priv;

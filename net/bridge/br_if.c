@@ -84,9 +84,7 @@ static struct net_bridge *new_nb(const char *name)
 	memset(br, 0, sizeof(*br));
 	dev = &br->dev;
 
-	init_timer(&br->tick);
-
-	strncpy(dev->name, name, IFNAMSIZ);
+	strlcpy(dev->name, name, sizeof(dev->name));
 	dev->priv = br;
 	dev->priv_flags = IFF_EBRIDGE;
 	ether_setup(dev);
@@ -109,12 +107,10 @@ static struct net_bridge *new_nb(const char *name)
 	br->bridge_forward_delay = br->forward_delay = 15 * HZ;
 	br->topology_change = 0;
 	br->topology_change_detected = 0;
-	br_timer_clear(&br->hello_timer);
-	br_timer_clear(&br->tcn_timer);
-	br_timer_clear(&br->topology_change_timer);
-
 	br->ageing_time = 300 * HZ;
-	br->gc_interval = 4 * HZ;
+	INIT_LIST_HEAD(&br->age_list);
+
+	br_stp_timer_init(br);
 
 	return br;
 }
@@ -281,8 +277,7 @@ void __exit br_cleanup_bridges(void)
 	rtnl_lock();
 	for (dev = dev_base; dev; dev = nxt) {
 		nxt = dev->next;
-		if ((dev->priv_flags & IFF_EBRIDGE)
-		    && dev->owner == THIS_MODULE) {
+		if (dev->priv_flags & IFF_EBRIDGE) {
 			pr_debug("cleanup %s\n", dev->name);
 
 			del_ifs((struct net_bridge *) dev->priv);

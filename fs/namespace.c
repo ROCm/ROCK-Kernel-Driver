@@ -23,8 +23,6 @@
 #include <linux/mount.h>
 #include <asm/uaccess.h>
 
-extern struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
-extern int do_remount_sb(struct super_block *sb, int flags, void * data);
 extern int __init init_rootfs(void);
 extern int __init fs_subsys_init(void);
 
@@ -40,7 +38,7 @@ static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 	return tmp & hash_mask;
 }
 
-struct vfsmount *alloc_vfsmnt(char *name)
+struct vfsmount *alloc_vfsmnt(const char *name)
 {
 	struct vfsmount *mnt = kmem_cache_alloc(mnt_cache, GFP_KERNEL); 
 	if (mnt) {
@@ -64,8 +62,7 @@ struct vfsmount *alloc_vfsmnt(char *name)
 
 void free_vfsmnt(struct vfsmount *mnt)
 {
-	if (mnt->mnt_devname)
-		kfree(mnt->mnt_devname);
+	kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
 }
 
@@ -212,17 +209,10 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 		{ 0, NULL }
 	};
 	struct proc_fs_info *fs_infop;
-	char *path_buf, *path;
-
-	path_buf = (char *) __get_free_page(GFP_KERNEL);
-	if (!path_buf)
-		return -ENOMEM;
-	path = d_path(mnt->mnt_root, mnt, path_buf, PAGE_SIZE);
 
 	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
 	seq_putc(m, ' ');
-	mangle(m, path);
-	free_page((unsigned long) path_buf);
+	seq_path(m, mnt, mnt->mnt_root, " \t\n\\");
 	seq_putc(m, ' ');
 	mangle(m, mnt->mnt_sb->s_type->name);
 	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
@@ -326,7 +316,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 		down_write(&sb->s_umount);
 		if (!(sb->s_flags & MS_RDONLY)) {
 			lock_kernel();
-			retval = do_remount_sb(sb, MS_RDONLY, 0);
+			retval = do_remount_sb(sb, MS_RDONLY, 0, 0);
 			unlock_kernel();
 		}
 		up_write(&sb->s_umount);
@@ -419,36 +409,54 @@ static int mount_is_safe(struct nameidata *nd)
 #endif
 }
 
+static int
+lives_below_in_same_fs(struct dentry *d, struct dentry *dentry)
+{
+	while (1) {
+		if (d == dentry)
+			return 1;
+		if (d == NULL || d == d->d_parent)
+			return 0;
+		d = d->d_parent;
+	}
+}
+
 static struct vfsmount *copy_tree(struct vfsmount *mnt, struct dentry *dentry)
 {
-	struct vfsmount *p, *next, *q, *res;
+	struct vfsmount *res, *p, *q, *r, *s;
+	struct list_head *h;
 	struct nameidata nd;
 
-	p = mnt;
-	res = nd.mnt = q = clone_mnt(p, dentry);
+	res = q = clone_mnt(mnt, dentry);
 	if (!q)
 		goto Enomem;
-	q->mnt_parent = q;
-	q->mnt_mountpoint = p->mnt_mountpoint;
+	q->mnt_mountpoint = mnt->mnt_mountpoint;
 
-	while ( (next = next_mnt(p, mnt)) != NULL) {
-		while (p != next->mnt_parent) {
-			p = p->mnt_parent;
-			q = q->mnt_parent;
+	p = mnt;
+	for (h = mnt->mnt_mounts.next; h != &mnt->mnt_mounts; h = h->next) {
+		r = list_entry(h, struct vfsmount, mnt_child);
+		if (!lives_below_in_same_fs(r->mnt_mountpoint, dentry))
+			continue;
+
+		for (s = r; s; s = next_mnt(s, r)) {
+			while (p != s->mnt_parent) {
+				p = p->mnt_parent;
+				q = q->mnt_parent;
+			}
+			p = s;
+			nd.mnt = q;
+			nd.dentry = p->mnt_mountpoint;
+			q = clone_mnt(p, p->mnt_root);
+			if (!q)
+				goto Enomem;
+			spin_lock(&dcache_lock);
+			list_add_tail(&q->mnt_list, &res->mnt_list);
+			attach_mnt(q, &nd);
+			spin_unlock(&dcache_lock);
 		}
-		p = next;
-		nd.mnt = q;
-		nd.dentry = p->mnt_mountpoint;
-		q = clone_mnt(p, p->mnt_root);
-		if (!q)
-			goto Enomem;
-		spin_lock(&dcache_lock);
-		list_add_tail(&q->mnt_list, &res->mnt_list);
-		attach_mnt(q, &nd);
-		spin_unlock(&dcache_lock);
 	}
 	return res;
-Enomem:
+ Enomem:
 	if (res) {
 		spin_lock(&dcache_lock);
 		umount_tree(res);
@@ -476,9 +484,11 @@ static int graft_tree(struct vfsmount *mnt, struct nameidata *nd)
 	if (err)
 		goto out_unlock;
 
+	err = -ENOENT;
 	spin_lock(&dcache_lock);
 	if (IS_ROOT(nd->dentry) || !d_unhashed(nd->dentry)) {
 		struct list_head head;
+
 		attach_mnt(mnt, nd);
 		list_add_tail(&head, &mnt->mnt_list);
 		list_splice(&head, current->namespace->list.prev);
@@ -555,7 +565,7 @@ static int do_remount(struct nameidata *nd,int flags,int mnt_flags,void *data)
 		return -EINVAL;
 
 	down_write(&sb->s_umount);
-	err = do_remount_sb(sb, flags, data);
+	err = do_remount_sb(sb, flags, data, 0);
 	if (!err)
 		nd->mnt->mnt_flags=mnt_flags;
 	up_write(&sb->s_umount);

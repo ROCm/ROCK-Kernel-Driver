@@ -8,6 +8,8 @@
 
 struct seq_operations;
 struct file;
+struct vfsmount;
+struct dentry;
 struct inode;
 
 struct seq_file {
@@ -29,7 +31,7 @@ struct seq_operations {
 };
 
 int seq_open(struct file *, struct seq_operations *);
-ssize_t seq_read(struct file *, char *, size_t, loff_t *);
+ssize_t seq_read(struct file *, char __user *, size_t, loff_t *);
 loff_t seq_lseek(struct file *, loff_t, int);
 int seq_release(struct inode *, struct file *);
 int seq_escape(struct seq_file *, const char *, const char *);
@@ -58,7 +60,10 @@ static inline int seq_puts(struct seq_file *m, const char *s)
 int seq_printf(struct seq_file *, const char *, ...)
 	__attribute__ ((format (printf,2,3)));
 
+int seq_path(struct seq_file *, struct vfsmount *, struct dentry *, char *);
+
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_release(struct inode *, struct file *);
+int seq_release_private(struct inode *, struct file *);
 #endif
 #endif

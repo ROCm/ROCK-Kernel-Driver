@@ -112,6 +112,15 @@ static int ip_dev_loopback_xmit(struct sk_buff *newskb)
 	return 0;
 }
 
+static inline int ip_select_ttl(struct inet_opt *inet, struct dst_entry *dst)
+{
+	int ttl = inet->uc_ttl;
+
+	if (ttl < 0)
+		ttl = dst_metric(dst, RTAX_HOPLIMIT);
+	return ttl;
+}
+
 /* 
  *		Add an ip header to a skbuff and send it out.
  *
@@ -136,7 +145,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;
-	iph->ttl      = inet->ttl;
+	iph->ttl      = ip_select_ttl(inet, &rt->u.dst);
 	iph->daddr    = rt->rt_dst;
 	iph->saddr    = rt->rt_src;
 	iph->protocol = sk->protocol;
@@ -341,7 +350,7 @@ packet_routed:
 		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;
-	iph->ttl      = inet->ttl;
+	iph->ttl      = ip_select_ttl(inet, &rt->u.dst);
 	iph->protocol = sk->protocol;
 	iph->saddr    = rt->rt_src;
 	iph->daddr    = rt->rt_dst;
@@ -683,16 +692,6 @@ skb_can_coalesce(struct sk_buff *skb, int i, struct page *page, int off)
 			off == frag->page_offset+frag->size;
 	}
 	return 0;
-}
-
-static void
-skb_fill_page_desc(struct sk_buff *skb, int i, struct page *page, int off, int size)
-{
-	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-	frag->page = page;
-	frag->page_offset = off;
-	frag->size = size;
-	skb_shinfo(skb)->nr_frags = i+1;
 }
 
 static inline unsigned int
@@ -1130,7 +1129,7 @@ int ip_push_pending_frames(struct sock *sk)
 	if (rt->rt_type == RTN_MULTICAST)
 		ttl = inet->mc_ttl;
 	else
-		ttl = inet->ttl;
+		ttl = ip_select_ttl(inet, &rt->u.dst);
 
 	iph = (struct iphdr *)skb->data;
 	iph->version = 4;

@@ -273,7 +273,7 @@ static char default_sti_path[21];
 static int __init sti_setup(char *str)
 {
 	if (str)
-		strncpy (default_sti_path, str, sizeof (default_sti_path));
+		strlcpy (default_sti_path, str, sizeof (default_sti_path));
 	
 	return 0;
 }

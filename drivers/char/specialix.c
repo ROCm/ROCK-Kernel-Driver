@@ -833,9 +833,7 @@ static inline void sx_check_modem(struct specialix_board * bp)
 #ifdef SPECIALIX_DEBUG
 			printk ( "Sending HUP.\n");
 #endif
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&port->tqueue_hangup) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_task(&port->tqueue_hangup);
 		} else {
 #ifdef SPECIALIX_DEBUG
 			printk ( "Don't need to send HUP.\n");
@@ -980,7 +978,6 @@ static inline int sx_setup_board(struct specialix_board * bp)
 	turn_ints_on (bp);
 	bp->flags |= SX_BOARD_ACTIVE;
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1000,7 +997,6 @@ static inline void sx_shutdown_board(struct specialix_board *bp)
 
 	turn_ints_off (bp);
 
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -2150,7 +2146,6 @@ static void do_sx_hangup(void *private_)
 	tty = port->tty;
 	if (tty)
 		tty_hangup(tty);	/* FIXME: module removal race here */
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -2233,6 +2228,7 @@ static int sx_init_drivers(void)
 	init_bh(SPECIALIX_BH, do_specialix_bh);
 	memset(&specialix_driver, 0, sizeof(specialix_driver));
 	specialix_driver.magic = TTY_DRIVER_MAGIC;
+	specialix_driver.owner = THIS_MODULE;
 	specialix_driver.name = "ttyW";
 	specialix_driver.major = SPECIALIX_NORMAL_MAJOR;
 	specialix_driver.num = SX_NBOARD * SX_NPORT;

@@ -158,7 +158,7 @@ config ETHERTAP
 
 config NET_SB1000
 	tristate "General Instruments Surfboard 1000"
-	depends on NETDEVICES && ISAPNP
+	depends on NETDEVICES && PNP
 	---help---
 	  This is a driver for the General Instrument (also known as
 	  NextLevel) SURFboard 1000 internal
@@ -221,14 +221,7 @@ config MII
 	  or internal device.  It is safe to say Y or M here even if your
 	  ethernet card lack MII.
 
-config ARM_AM79C961A
-	bool "ARM EBSA110 AM79C961A support"
-	depends on NET_ETHERNET && ARM && ARCH_EBSA110
-	help
-	  If you wish to compile a kernel for the EBSA-110, then you should
-	  always answer Y to this.
-
-source "drivers/acorn/net/Kconfig"
+source "drivers/net/arm/Kconfig"
 
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
@@ -1877,7 +1870,7 @@ config 68360_ENET
 
 config FEC
 	bool "FEC ethernet controller (of ColdFire 5272)"
-	depends on M5272
+	depends on M5272 || M5282
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on the Motorola ColdFire 5272 processor.

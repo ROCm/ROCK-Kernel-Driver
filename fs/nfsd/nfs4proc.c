@@ -50,6 +50,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/nfs4.h>
+#include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
@@ -80,14 +81,14 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 		 * Note: create modes (UNCHECKED,GUARDED...) are the same
 		 * in NFSv4 as in v3.
 		 */
-		status = nfsd_create_v3(rqstp, current_fh, open->op_name,
-					open->op_namelen, &open->op_iattr,
+		status = nfsd_create_v3(rqstp, current_fh, open->op_fname.data,
+					open->op_fname.len, &open->op_iattr,
 					&resfh, open->op_createmode,
 					(u32 *)open->op_verf, &open->op_truncate);
 	}
 	else {
 		status = nfsd_lookup(rqstp, current_fh,
-				     open->op_name, open->op_namelen, &resfh);
+				     open->op_fname.data, open->op_fname.len, &resfh);
 		fh_unlock(current_fh);
 	}
 
@@ -107,45 +108,25 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 	return status;
 }
 
-static int
-nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
-{
-	struct iattr iattr;
-	int status;
-
-	if (open->op_truncate) {
-		iattr.ia_valid = ATTR_SIZE;
-		iattr.ia_size = 0;
-		status = nfsd_setattr(rqstp, current_fh, &iattr, 0, (time_t)0);
-		if (status)
-			return status;
-	}
-
-	memset(&open->op_stateid, 0xff, sizeof(stateid_t));
-	open->op_delegate_type = NFS4_OPEN_DELEGATE_NONE;
-	return 0;
-}
-
 static inline int
 nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
 	int status;
+	dprintk("NFSD: nfsd4_open filename %.*s\n",open->op_fname.len, open->op_fname.data);
 
 	/* This check required by spec. */
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
 		return nfserr_inval;
 
-	/*
-	 * For now, we have no state, so we may as well implement an
-	 * even stronger check...
-	 */
-	if (open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
-		return nfserr_notsupp;
-
+	/* check seqid for replay. set nfs4_owner */
+	status = nfsd4_process_open1(open);
+	if (status)
+		return status;
 	/*
 	 * This block of code will (1) set CURRENT_FH to the file being opened,
-	 * creating it if necessary, (2) set open->op_cinfo, (3) set open->op_truncate
-	 * if the file is to be truncated after opening, (4) do permission checking.
+	 * creating it if necessary, (2) set open->op_cinfo, 
+	 * (3) set open->op_truncate if the file is to be truncated 
+	 * after opening, (4) do permission checking.
 	 */
 	status = do_open_lookup(rqstp, current_fh, open);
 	if (status)
@@ -159,7 +140,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	status = nfsd4_process_open2(rqstp, current_fh, open);
 	if (status)
 		return status;
-
 	/*
 	 * To finish the open response, we just need to set the rflags.
 	 */
@@ -199,7 +179,8 @@ static inline int
 nfsd4_putrootfh(struct svc_rqst *rqstp, struct svc_fh *current_fh)
 {
 	fh_put(current_fh);
-	return exp_pseudoroot(rqstp->rq_client, current_fh);
+	return exp_pseudoroot(rqstp->rq_client, current_fh,
+			      &rqstp->rq_chandle);
 }
 
 static inline int

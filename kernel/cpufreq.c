@@ -22,15 +22,18 @@
 #include <linux/spinlock.h>
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependend low
  * level driver of CPUFreq support, and its locking mutex. 
  * cpu_max_freq is in kHz.
  */
-static struct cpufreq_driver   	*cpufreq_driver;
+struct cpufreq_driver   	*cpufreq_driver;
 static DECLARE_MUTEX            (cpufreq_driver_sem);
 
+/* required for the proc interface, remove when that goes away */
+EXPORT_SYMBOL_GPL(cpufreq_driver);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
@@ -115,6 +118,7 @@ static void cpufreq_remove_dev (struct class_device * dev);
 extern struct device_class cpu_devclass;
 
 static struct class_interface cpufreq_interface = {
+        .class =	&cpu_class,
         .add =		&cpufreq_add_dev,
         .remove =	&cpufreq_remove_dev,
 };
@@ -358,7 +362,7 @@ static int cpufreq_add_dev (struct class_device * class_dev)
 	policy->kobj.parent = &class_dev->kobj;
 	policy->kobj.ktype = &ktype_cpufreq;
 //	policy->dev = dev->dev;
-	strncpy(policy->kobj.name, "cpufreq", KOBJ_NAME_LEN);
+	strlcpy(policy->kobj.name, "cpufreq", KOBJ_NAME_LEN);
 
 	ret = kobject_register(&policy->kobj);
 	if (ret)

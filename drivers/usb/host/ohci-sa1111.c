@@ -209,7 +209,8 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd) driver->hcd_free(hcd);
+	if (hcd)
+		driver->hcd_free(hcd);
  err1:
 	sa1111_stop_hc(dev);
 	release_mem_region(dev->res.start, dev->res.end - dev->res.start + 1);
@@ -237,7 +238,8 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 
 	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
-	if (in_interrupt ()) BUG ();
+	if (in_interrupt ())
+		BUG ();
 
 	hub = hcd->self.root_hub;
 	hcd->state = USB_STATE_QUIESCING;

@@ -1932,7 +1932,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	spin_lock_irqsave(&info->lock, flags);
 
 	if (tty_hung_up_p(filp)) {
-		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore(&info->lock, flags);
 		return;
 	}
@@ -1956,7 +1955,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		info->count = 0;
 	}
 	if (info->count) {
-		MOD_DEC_USE_COUNT;
 		spin_unlock_irqrestore(&info->lock, flags);
 		return;
 	}
@@ -2026,7 +2024,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	info->flags &= ~(ZILOG_NORMAL_ACTIVE|ZILOG_CALLOUT_ACTIVE|
 			 ZILOG_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -2233,17 +2230,14 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	int 			retval, line;
 	unsigned long		page;
 
-	MOD_INC_USE_COUNT;
 	line = tty->index;
 	if ((line < 0) || (line >= zs_channels_found)) {
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 	info = zs_soft + line;
 
 #ifdef CONFIG_KGDB
 	if (info->kgdb_channel) {
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 #endif
@@ -2610,6 +2604,7 @@ no_dma:
 
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.owner = THIS_MODULE;
 	serial_driver.driver_name = "macserial";
 #ifdef CONFIG_DEVFS_FS
 	serial_driver.name = "tts/";

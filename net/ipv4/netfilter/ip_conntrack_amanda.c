@@ -207,6 +207,7 @@ static int __init init(void)
 	return 0;
 }
 
+PROVIDES_CONNTRACK(amanda);
 EXPORT_SYMBOL(ip_amanda_lock);
 
 module_init(init);

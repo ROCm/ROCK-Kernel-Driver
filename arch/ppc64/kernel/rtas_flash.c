@@ -210,7 +210,7 @@ int __init rtas_flash_init(void)
 {
 	struct proc_dir_entry *ent = NULL;
 
-	if (!rtas_proc_dir) {
+	if (!proc_ppc64.rtas) {
 		printk(KERN_WARNING "rtas proc dir does not already exist");
 		return -ENOENT;
 	}
@@ -218,7 +218,7 @@ int __init rtas_flash_init(void)
 	if (rtas_token("ibm,update-flash-64-and-reboot") != RTAS_UNKNOWN_SERVICE)
 		flash_possible = 1;
 
-	if ((ent = create_proc_entry(FIRMWARE_FLASH_NAME, S_IRUSR | S_IWUSR, rtas_proc_dir)) != NULL) {
+	if ((ent = create_proc_entry(FIRMWARE_FLASH_NAME, S_IRUSR | S_IWUSR, proc_ppc64.rtas)) != NULL) {
 		ent->nlink = 1;
 		ent->proc_fops = &rtas_flash_operations;
 		ent->owner = THIS_MODULE;
@@ -228,9 +228,9 @@ int __init rtas_flash_init(void)
 
 void __exit rtas_flash_cleanup(void)
 {
-	if (!rtas_proc_dir)
+	if (!proc_ppc64.rtas)
 		return;
-	remove_proc_entry(FIRMWARE_FLASH_NAME, rtas_proc_dir);
+	remove_proc_entry(FIRMWARE_FLASH_NAME, proc_ppc64.rtas);
 }
 
 module_init(rtas_flash_init);

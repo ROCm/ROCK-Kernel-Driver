@@ -721,7 +721,7 @@ pmac_find_ide_boot(char *bootdevice, int n)
 		}
 	}
 
-	return NODEV;
+	return 0;
 }
 
 void __init

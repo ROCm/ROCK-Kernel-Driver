@@ -30,21 +30,6 @@ static int ultrastor_biosparam(struct scsi_device *, struct block_device *, sect
 #define ULTRASTOR_24F_PORT 0xC80
 
 
-#define ULTRASTOR_14F {   .name              = "UltraStor 14F/24F/34F", 	\
-			  .detect            = ultrastor_detect, 		\
-			  .info              = ultrastor_info, 		\
-			  .queuecommand      = ultrastor_queuecommand,	\
-			  .eh_abort_handler  = ultrastor_abort, 		\
-			  .eh_host_reset_handler  = ultrastor_host_reset,	\
-			  .bios_param        = ultrastor_biosparam, 	\
-			  .can_queue         = ULTRASTOR_MAX_CMDS,	\
-			  .this_id           = 0, 			\
-			  .sg_tablesize      = ULTRASTOR_14F_MAX_SG, 	\
-			  .cmd_per_lun       = ULTRASTOR_MAX_CMDS_PER_LUN,\
-			  .unchecked_isa_dma = 1, 			\
-			  .use_clustering    = ENABLE_CLUSTERING }
-
-
 #ifdef ULTRASTOR_PRIVATE
 
 #define UD_ABORT	0x0001

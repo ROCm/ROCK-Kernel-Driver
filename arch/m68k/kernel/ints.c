@@ -60,14 +60,14 @@ static irq_node_t nodes[NUM_IRQ_NODES];
 static void dummy_enable_irq(unsigned int irq);
 static void dummy_disable_irq(unsigned int irq);
 static int dummy_request_irq(unsigned int irq,
-		void (*handler) (int, void *, struct pt_regs *),
+		irqreturn_t (*handler) (int, void *, struct pt_regs *),
 		unsigned long flags, const char *devname, void *dev_id);
 static void dummy_free_irq(unsigned int irq, void *dev_id);
 
 void (*enable_irq) (unsigned int) = dummy_enable_irq;
 void (*disable_irq) (unsigned int) = dummy_disable_irq;
 
-int (*mach_request_irq) (unsigned int, void (*)(int, void *, struct pt_regs *),
+int (*mach_request_irq) (unsigned int, irqreturn_t (*)(int, void *, struct pt_regs *),
                       unsigned long, const char *, void *) = dummy_request_irq;
 void (*mach_free_irq) (unsigned int, void *) = dummy_free_irq;
 
@@ -121,7 +121,7 @@ irq_node_t *new_irq_node(void)
  * include/asm/irq.h.
  */
 int request_irq(unsigned int irq,
-		void (*handler) (int, void *, struct pt_regs *),
+		irqreturn_t (*handler) (int, void *, struct pt_regs *),
 		unsigned long flags, const char *devname, void *dev_id)
 {
 	return mach_request_irq(irq, handler, flags, devname, dev_id);
@@ -133,7 +133,7 @@ void free_irq(unsigned int irq, void *dev_id)
 }
 
 int sys_request_irq(unsigned int irq, 
-                    void (*handler)(int, void *, struct pt_regs *), 
+                    irqreturn_t (*handler)(int, void *, struct pt_regs *), 
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq < IRQ1 || irq > IRQ7) {
@@ -215,7 +215,7 @@ static void dummy_disable_irq(unsigned int irq)
 }
 
 static int dummy_request_irq(unsigned int irq,
-		void (*handler) (int, void *, struct pt_regs *),
+		irqreturn_t (*handler) (int, void *, struct pt_regs *),
 		unsigned long flags, const char *devname, void *dev_id)
 {
 	printk("calling uninitialized request_irq()\n");

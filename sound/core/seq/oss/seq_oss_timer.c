@@ -227,19 +227,19 @@ snd_seq_oss_timer_tempo(seq_oss_timer_t *timer, int value)
  * ioctls
  */
 int
-snd_seq_oss_timer_ioctl(seq_oss_timer_t *timer, unsigned int cmd, void *arg)
+snd_seq_oss_timer_ioctl(seq_oss_timer_t *timer, unsigned int cmd, int __user *arg)
 {
 	int value;
 
 	if (cmd == SNDCTL_SEQ_CTRLRATE) {
 		debug_printk(("ctrl rate\n"));
 		/* if *arg == 0, just return the current rate */
-		if (get_user(value, (int *)arg))
+		if (get_user(value, arg))
 			return -EFAULT;
 		if (value)
 			return -EINVAL;
 		value = ((timer->oss_tempo * timer->oss_timebase) + 30) / 60;
-		return put_user(value, (int *)arg) ? -EFAULT : 0;
+		return put_user(value, arg) ? -EFAULT : 0;
 	}
 
 	if (timer->dp->seq_mode == SNDRV_SEQ_OSS_MODE_SYNTH)
@@ -257,12 +257,12 @@ snd_seq_oss_timer_ioctl(seq_oss_timer_t *timer, unsigned int cmd, void *arg)
 		return snd_seq_oss_timer_continue(timer);
 	case SNDCTL_TMR_TEMPO:
 		debug_printk(("timer tempo\n"));
-		if (get_user(value, (int *)arg))
+		if (get_user(value, arg))
 			return -EFAULT;
 		return snd_seq_oss_timer_tempo(timer, value);
 	case SNDCTL_TMR_TIMEBASE:
 		debug_printk(("timer timebase\n"));
-		if (get_user(value, (int *)arg))
+		if (get_user(value, arg))
 			return -EFAULT;
 		if (value < MIN_OSS_TIMEBASE)
 			value = MIN_OSS_TIMEBASE;

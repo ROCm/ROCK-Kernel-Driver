@@ -244,14 +244,31 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		    addr > sizeof(struct user) - 7)
 			break;
 
-		tmp = 0;  /* Default return condition */
-		if(addr < sizeof(struct user_regs_struct))
+		switch (addr) { 
+		case 0 ... sizeof(struct user_regs_struct):
 			tmp = getreg(child, addr);
-		if(addr >= offsetof(struct user, u_debugreg[0]) &&
-		   addr <= offsetof(struct user, u_debugreg[7])) {
-			addr -= offsetof(struct user, u_debugreg[0]);
-			addr = addr >> 3;
-			tmp = child->thread.debugreg[addr];
+			break;
+		case offsetof(struct user, u_debugreg[0]):
+			tmp = child->thread.debugreg0;
+			break;
+		case offsetof(struct user, u_debugreg[1]):
+			tmp = child->thread.debugreg1;
+			break;
+		case offsetof(struct user, u_debugreg[2]):
+			tmp = child->thread.debugreg2;
+			break;
+		case offsetof(struct user, u_debugreg[3]):
+			tmp = child->thread.debugreg3;
+			break;
+		case offsetof(struct user, u_debugreg[6]):
+			tmp = child->thread.debugreg6;
+			break;
+		case offsetof(struct user, u_debugreg[7]):
+			tmp = child->thread.debugreg7;
+			break;
+		default:
+			tmp = 0;
+			break;
 		}
 		ret = put_user(tmp,(unsigned long *) data);
 		break;
@@ -272,44 +289,49 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		    addr > sizeof(struct user) - 7)
 			break;
 
-		if (addr < sizeof(struct user_regs_struct)) {
+		switch (addr) { 
+		case 0 ... sizeof(struct user_regs_struct): 
 			ret = putreg(child, addr, data);
 			break;
-		}
-		/* We need to be very careful here.  We implicitly
-		   want to modify a portion of the task_struct, and we
-		   have to be selective about what portions we allow someone
-		   to modify. */
-
-		  ret = -EIO;
-		  if(addr >= offsetof(struct user, u_debugreg[0]) &&
-		     addr <= offsetof(struct user, u_debugreg[7])) {
-
-			  if(addr == offsetof(struct user, u_debugreg[4])) break;
-			  if(addr == offsetof(struct user, u_debugreg[5])) break;
-			  /* Disallows to set a breakpoint into the vsyscall */
-			  if(addr < offsetof(struct user, u_debugreg[4]) &&
-			     ((unsigned long) data) >= TASK_SIZE-3) break;
-			  
-			  if (addr == offsetof(struct user, u_debugreg[6])) {
+		/* Disallows to set a breakpoint into the vsyscall */
+		case offsetof(struct user, u_debugreg[0]):
+			if (data >= TASK_SIZE-7) break;
+			child->thread.debugreg0 = data;
+			ret = 0;
+			break;
+		case offsetof(struct user, u_debugreg[1]):
+			if (data >= TASK_SIZE-7) break;
+			child->thread.debugreg1 = data;
+			ret = 0;
+			break;
+		case offsetof(struct user, u_debugreg[2]):
+			if (data >= TASK_SIZE-7) break;
+			child->thread.debugreg2 = data;
+			ret = 0;
+			break;
+		case offsetof(struct user, u_debugreg[3]):
+			if (data >= TASK_SIZE-7) break;
+			child->thread.debugreg3 = data;
+			ret = 0;
+			break;
+		case offsetof(struct user, u_debugreg[6]):
 				  if (data >> 32)
-					  goto out_tsk;
-			  }
-
-			  if(addr == offsetof(struct user, u_debugreg[7])) {
+				break; 
+			child->thread.debugreg6 = data;
+			ret = 0;
+			break;
+		case offsetof(struct user, u_debugreg[7]):
 				  data &= ~DR_CONTROL_RESERVED;
 				  for(i=0; i<4; i++)
 					  if ((0x5454 >> ((data >> (16 + 4*i)) & 0xf)) & 1)
-						  goto out_tsk;
-			  }
-
-			  addr -= offsetof(struct user, u_debugreg);
-			  addr = addr >> 3;
-			  child->thread.debugreg[addr] = data;
+					break;
+			if (i == 4) {
+				child->thread.debugreg7 = data;
 			  ret = 0;
 		  }
 		  break;
-
+		}
+		break;
 	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
 	case PTRACE_CONT: { /* restart after signal. */
 		long tmp;

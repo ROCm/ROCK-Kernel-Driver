@@ -360,8 +360,8 @@ extern void ax25_uid_free(void);
 extern void ax25_register_sysctl(void);
 extern void ax25_unregister_sysctl(void);
 #else
-extern inline void ax25_register_sysctl(void) {};
-extern inline void ax25_unregister_sysctl(void) {};
+static inline void ax25_register_sysctl(void) {};
+static inline void ax25_unregister_sysctl(void) {};
 #endif /* CONFIG_SYSCTL */
 
 #endif

@@ -7,8 +7,6 @@
 #include <linux/mount.h>
 #include <linux/vfs.h>
 
-extern struct vfsmount *do_kern_mount(const char *, int, char *, void *);
-
 int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		   struct kstat *stat)
 {
@@ -157,7 +155,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	return 0;
 }
 
-ssize_t generic_read_dir(struct file *filp, char *buf, size_t siz, loff_t *ppos)
+ssize_t generic_read_dir(struct file *filp, char __user *buf, size_t siz, loff_t *ppos)
 {
 	return -EISDIR;
 }

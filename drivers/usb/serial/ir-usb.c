@@ -461,7 +461,8 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			 * contains a busy indicator and baud rate change.
 			 * See section 5.4.1.2 of the USB IrDA spec.
 			 */
-			if((*data & 0x0f) > 0) ir_baud = *data & 0x0f;
+			if ((*data & 0x0f) > 0)
+				ir_baud = *data & 0x0f;
 
 			usb_serial_debug_data (
 				__FILE__,

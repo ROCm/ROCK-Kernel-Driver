@@ -34,7 +34,7 @@ static struct i2c_client_address_data addr_data = {
 	.force			= ignore,
 };
 
-#define DAT(x) ((unsigned int)(x->data))
+#define DAT(x) ((unsigned int)(x->dev.driver_data))
 
 static int
 pcf8583_attach(struct i2c_adapter *adap, int addr, unsigned short flags,
@@ -51,13 +51,13 @@ pcf8583_attach(struct i2c_adapter *adap, int addr, unsigned short flags,
 	if (!c)
 		return -ENOMEM;
 
-	strcpy(c->name, "PCF8583");
+	strcpy(c->dev.name, "PCF8583");
 	c->id		= pcf8583_driver.id;
 	c->flags	= 0;
 	c->addr		= addr;
 	c->adapter	= adap;
 	c->driver	= &pcf8583_driver;
-	c->data		= NULL;
+	c->dev.driver_data = NULL;
 
 	if (i2c_transfer(c->adapter, msgs, 2) == 2)
 		DAT(c) = buf[0];

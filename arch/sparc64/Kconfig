@@ -1445,6 +1445,12 @@ source "net/Kconfig"
 
 source "net/ax25/Kconfig"
 
+source "net/irda/Kconfig"
+
+source "drivers/isdn/Kconfig"
+
+source "drivers/telephony/Kconfig"
+
 # This one must be before the filesystem configs. -DaveM
 
 menu "Unix 98 PTY support"

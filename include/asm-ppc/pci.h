@@ -102,6 +102,9 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
+
+	consistent_sync(ptr, size, direction);
+
 	return virt_to_bus(ptr);
 }
 
@@ -203,7 +206,8 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 {
 	if (direction == PCI_DMA_NONE)
 		BUG();
-	/* nothing to do */
+
+	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
 /* Make physical memory consistent for a set of streaming

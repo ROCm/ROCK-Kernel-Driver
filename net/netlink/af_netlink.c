@@ -1070,9 +1070,6 @@ static int __init netlink_proto_init(void)
 #endif
 	/* The netlink device handler may be needed early. */ 
 	rtnetlink_init();
-#ifdef CONFIG_NETLINK_DEV
-	init_netlink();
-#endif
 	return 0;
 }
 
@@ -1082,7 +1079,7 @@ static void __exit netlink_proto_exit(void)
        remove_proc_entry("net/netlink", NULL);
 }
 
-subsys_initcall(netlink_proto_init);
+core_initcall(netlink_proto_init);
 module_exit(netlink_proto_exit);
 
 MODULE_LICENSE("GPL");

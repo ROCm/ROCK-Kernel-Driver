@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/major.h>
 #include <linux/config.h>
 #include <linux/smp_lock.h>
 #include <linux/random.h>
@@ -329,8 +330,9 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 	tsdev->handle.private = tsdev;
 
 	tsdev_table[minor] = tsdev;
-	input_register_minor("input/ts%d", minor, TSDEV_MINOR_BASE);
-
+	
+	devfs_mk_cdev(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor),
+			S_IFCHR|S_IRUGO|S_IWUSR, "input/ts%d", minor);
 
 	return &tsdev->handle;
 }

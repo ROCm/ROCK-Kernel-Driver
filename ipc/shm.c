@@ -149,7 +149,7 @@ static void shm_close (struct vm_area_struct *shmd)
 
 static int shm_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	UPDATE_ATIME(file->f_dentry->d_inode);
+	update_atime(file->f_dentry->d_inode);
 	vma->vm_ops = &shm_vm_ops;
 	shm_inc(file->f_dentry->d_inode->i_ino);
 	return 0;
@@ -270,7 +270,7 @@ asmlinkage long sys_shmget (key_t key, size_t size, int shmflg)
 	return err;
 }
 
-static inline unsigned long copy_shmid_to_user(void *buf, struct shmid64_ds *in, int version)
+static inline unsigned long copy_shmid_to_user(void __user *buf, struct shmid64_ds *in, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -301,7 +301,7 @@ struct shm_setbuf {
 	mode_t	mode;
 };	
 
-static inline unsigned long copy_shmid_from_user(struct shm_setbuf *out, void *buf, int version)
+static inline unsigned long copy_shmid_from_user(struct shm_setbuf *out, void __user *buf, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -335,7 +335,7 @@ static inline unsigned long copy_shmid_from_user(struct shm_setbuf *out, void *b
 	}
 }
 
-static inline unsigned long copy_shminfo_to_user(void *buf, struct shminfo64 *in, int version)
+static inline unsigned long copy_shminfo_to_user(void __user *buf, struct shminfo64 *in, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -393,7 +393,7 @@ static void shm_get_stat(unsigned long *rss, unsigned long *swp)
 	}
 }
 
-asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
+asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds __user *buf)
 {
 	struct shm_setbuf setbuf;
 	struct shmid_kernel *shp;
@@ -580,7 +580,7 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 
 	case IPC_SET:
 	{
-		if(copy_shmid_from_user (&setbuf, buf, version)) {
+		if (copy_shmid_from_user (&setbuf, buf, version)) {
 			err = -EFAULT;
 			goto out;
 		}
@@ -630,8 +630,12 @@ out:
 
 /*
  * Fix shmaddr, allocate descriptor, map shm, add attach descriptor to lists.
+ *
+ * NOTE! Despite the name, this is NOT a direct system call entrypoint. The
+ * "raddr" thing points to kernel space, and there has to be a wrapper around
+ * this.
  */
-asmlinkage long sys_shmat (int shmid, char *shmaddr, int shmflg, ulong *raddr)
+long sys_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 {
 	struct shmid_kernel *shp;
 	unsigned long addr;
@@ -745,7 +749,7 @@ out:
  * detach and kill segment if marked destroyed.
  * The work is done in shm_close.
  */
-asmlinkage long sys_shmdt(char *shmaddr)
+asmlinkage long sys_shmdt(char __user *shmaddr)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma, *next;

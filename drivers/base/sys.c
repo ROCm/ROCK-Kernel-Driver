@@ -63,8 +63,8 @@ int sys_register_root(struct sys_root * root)
 
 	error = device_register(&root->dev);
 	if (!error) {
-		strncpy(root->sysdev.bus_id,"sys",BUS_ID_SIZE);
-		strncpy(root->sysdev.name,"System Bus",DEVICE_NAME_SIZE);
+		strlcpy(root->sysdev.bus_id,"sys",BUS_ID_SIZE);
+		strlcpy(root->sysdev.name,"System Bus",DEVICE_NAME_SIZE);
 		root->sysdev.parent = &root->dev;
 		error = device_register(&root->sysdev);
 	};

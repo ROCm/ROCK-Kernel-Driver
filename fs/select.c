@@ -194,6 +194,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	retval = 0;
 	for (;;) {
 		unsigned long *rinp, *routp, *rexp, *inp, *outp, *exp;
+
 		set_current_state(TASK_INTERRUPTIBLE);
 
 		inp = fds->in; outp = fds->out; exp = fds->ex;
@@ -238,9 +239,12 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					}
 				}
 			}
-			if (res_in) *rinp = res_in;
-			if (res_out) *routp = res_out;
-			if (res_ex) *rexp = res_ex;
+			if (res_in)
+				*rinp = res_in;
+			if (res_out)
+				*routp = res_out;
+			if (res_ex)
+				*rexp = res_ex;
 		}
 		wait = NULL;
 		if (retval || !__timeout || signal_pending(current))

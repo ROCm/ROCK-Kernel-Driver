@@ -71,8 +71,6 @@ static void sci_enable_rx_interrupts(void *ptr);
 static int  sci_get_CD(void *ptr);
 static void sci_shutdown_port(void *ptr);
 static int sci_set_real_termios(void *ptr);
-static void sci_hungup(void *ptr);
-static void sci_close(void *ptr);
 static int sci_chars_in_buffer(void *ptr);
 static int sci_request_irq(struct sci_port *port);
 static void sci_free_irq(struct sci_port *port);
@@ -216,8 +214,6 @@ static struct real_driver sci_real_driver = {
 	sci_shutdown_port,
 	sci_set_real_termios,
 	sci_chars_in_buffer,
-	sci_close,
-	sci_hungup,
 	NULL
 };
 
@@ -838,12 +834,7 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 	sci_setsignals(port, 1,1);
 
 	if (port->gs.count == 1) {
-		MOD_INC_USE_COUNT;
-
 		retval = sci_request_irq(port);
-		if (retval) {
-			goto failed_2;
-		}
 	}
 
 	retval = gs_block_til_ready(port, filp);
@@ -878,21 +869,9 @@ static int sci_open(struct tty_struct * tty, struct file * filp)
 
 failed_3:
 	sci_free_irq(port);
-failed_2:
-	MOD_DEC_USE_COUNT;
 failed_1:
 	port->gs.count--;
 	return retval;
-}
-
-static void sci_hungup(void *ptr)
-{
-	MOD_DEC_USE_COUNT;
-}
-
-static void sci_close(void *ptr)
-{
-	MOD_DEC_USE_COUNT;
 }
 
 static int sci_ioctl(struct tty_struct * tty, struct file * filp, 
@@ -1019,6 +998,7 @@ static int sci_init_drivers(void)
 
 	memset(&sci_driver, 0, sizeof(sci_driver));
 	sci_driver.magic = TTY_DRIVER_MAGIC;
+	sci_driver.owner = THIS_MODULE;
 	sci_driver.driver_name = "sci";
 #ifdef CONFIG_DEVFS_FS
 	sci_driver.name = "ttsc/";

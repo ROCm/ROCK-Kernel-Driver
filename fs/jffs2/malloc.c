@@ -73,7 +73,8 @@ int __init jffs2_create_slab_caches(void)
 
 	inode_cache_slab = kmem_cache_create("jffs2_inode_cache",
 					     sizeof(struct jffs2_inode_cache),
-					     0, JFFS2_SLAB_POISON, NULL, NULL);
+					     0, JFFS2_SLAB_POISON|SLAB_RECLAIM_ACCOUNT, 
+					     NULL, NULL);
 	if (inode_cache_slab)
 		return 0;
  err:

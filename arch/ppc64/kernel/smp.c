@@ -46,8 +46,9 @@
 #include <asm/ppcdebug.h>
 #include "open_pic.h"
 #include <asm/machdep.h>
+#include <asm/xics.h>
 
-int smp_threads_ready = 0;
+int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
 /* initialised so it doesn't end up in bss */
@@ -62,18 +63,6 @@ extern unsigned char stab_array[];
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
-
-void xics_setup_cpu(void);
-void xics_cause_IPI(int cpu);
-
-/*
- * XICS only has a single IPI, so encode the messages per CPU
- */
-struct xics_ipi_struct {
-	        volatile unsigned long value;
-} ____cacheline_aligned;
-
-struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 #define smp_message_pass(t,m,d,w) smp_ops->message_pass((t),(m),(d),(w))
 
@@ -189,7 +178,7 @@ void __init smp_init_iSeries(void)
 	smp_ops->kick_cpu     = smp_iSeries_kick_cpu;
 	smp_ops->setup_cpu    = smp_iSeries_setup_cpu;
 #warning fix for iseries
-	naca->processorCount	= smp_iSeries_numProcs();
+	systemcfg->processorCount	= smp_iSeries_numProcs();
 }
 #endif
 
@@ -353,7 +342,7 @@ void __init smp_init_pSeries(void)
 		smp_ops->probe		= smp_xics_probe;
 	}
 
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 		smp_ops->give_timebase = pSeries_give_timebase;
 		smp_ops->take_timebase = pSeries_take_timebase;
 	}
@@ -621,10 +610,11 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* create a process for the processor */
 	/* only regs.msr is actually used, and 0 is OK for it */
 	memset(&regs, 0, sizeof(struct pt_regs));
-	p = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	p = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
 
+	wake_up_forked_process(p);
 	init_idle(p, cpu);
 	unhash_process(p);
 

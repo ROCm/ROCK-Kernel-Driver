@@ -145,8 +145,6 @@ static struct sco_conn *sco_conn_add(struct hci_conn *hcon, __u8 status)
 		conn->mtu = 60;
 
 	BT_DBG("hcon %p conn %p", hcon, conn);
-
-	MOD_INC_USE_COUNT;
 	return conn;
 }
 
@@ -180,8 +178,6 @@ static int sco_conn_del(struct hci_conn *hcon, int err)
 
 	hcon->sco_data = NULL;
 	kfree(conn);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -347,8 +343,6 @@ static void sco_sock_destruct(struct sock *sk)
 
 	if (sk->protinfo)
 		kfree(sk->protinfo);
-	
-	MOD_DEC_USE_COUNT;
 }
 
 static void sco_sock_cleanup_listen(struct sock *parent)
@@ -434,6 +428,8 @@ static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
 	if (!sk)
 		return NULL;
 
+	sk_set_owner(sk, THIS_MODULE);
+
 	sk->destruct = sco_sock_destruct;
 	sk->sndtimeo = SCO_CONN_TIMEOUT;
 	sk->state    = BT_OPEN;
@@ -441,8 +437,6 @@ static struct sock *sco_sock_alloc(struct socket *sock, int proto, int prio)
 	sco_sock_init_timer(sk);
 
 	bt_sock_link(&sco_sk_list, sk);
-
-	MOD_INC_USE_COUNT;
 	return sk;
 }
 
@@ -933,6 +927,7 @@ static int sco_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations sco_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open    = sco_seq_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,

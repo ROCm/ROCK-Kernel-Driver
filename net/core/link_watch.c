@@ -48,7 +48,8 @@ struct lw_event {
 static struct lw_event singleevent;
 
 /* Must be called with the rtnl semaphore held */
-void linkwatch_run_queue(void) {
+void linkwatch_run_queue(void)
+{
 	LIST_HEAD(head);
 	struct list_head *n, *next;
 

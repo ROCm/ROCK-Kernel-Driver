@@ -46,7 +46,7 @@ int snd_seq_oss_timer_continue(seq_oss_timer_t *timer);
 int snd_seq_oss_timer_tempo(seq_oss_timer_t *timer, int value);
 #define snd_seq_oss_timer_reset  snd_seq_oss_timer_start
 
-int snd_seq_oss_timer_ioctl(seq_oss_timer_t *timer, unsigned int cmd, void *arg);
+int snd_seq_oss_timer_ioctl(seq_oss_timer_t *timer, unsigned int cmd, int __user *arg);
 
 /*
  * get current processed time

@@ -2318,15 +2318,25 @@ int __init atyfb_init(void)
 			return -ENOMEM;
 		}
 		memset(info, 0, sizeof(struct fb_info));
-		info->fix = atyfb_fix;		
+
+		default_par = kmalloc(sizeof(struct atyfb_par), GFP_ATOMIC);
+		if (!default_par) {
+			printk
+			    ("atyfb_init: can't alloc atyfb_par\n");
+			kfree(info);
+			return -ENXIO;
+		}
+		memset(default_par, 0, sizeof(struct atyfb_par));
+
+		info->fix = atyfb_fix;
 
 		/*
 		 *  Map the video memory (physical address given) to somewhere in the
 		 *  kernel address space.
 		 */
-		info->screen_base = (unsigned long)ioremap(phys_vmembase[m64_num],
+		info->screen_base = ioremap(phys_vmembase[m64_num],
 					 		   phys_size[m64_num]);	
-		info->fix.smem_start = info->screen_base;	/* Fake! */
+		info->fix.smem_start = (unsigned long)info->screen_base;	/* Fake! */
 		default_par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
 							  0x10000) + 0xFC00ul;
 		info->fix.mmio_start = default_par->ati_regbase; /* Fake! */
@@ -2415,7 +2425,7 @@ int __init atyfb_setup(char *options)
 			 && (!strncmp(this_opt, "Mach64:", 7))) {
 			static unsigned char m64_num;
 			static char mach64_str[80];
-			strncpy(mach64_str, this_opt + 7, 80);
+			strlcpy(mach64_str, this_opt + 7, sizeof(mach64_str));
 			if (!store_video_par(mach64_str, m64_num)) {
 				m64_num++;
 				mach64_count = m64_num;

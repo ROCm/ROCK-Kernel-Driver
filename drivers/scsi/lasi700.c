@@ -208,6 +208,11 @@ lasi700_release(struct Scsi_Host *host)
 	return 1;
 }
 
-static Scsi_Host_Template driver_template = LASI700_SCSI;
-
+static Scsi_Host_Template driver_template = {
+	.name		= "LASI SCSI 53c700",
+	.proc_name	= "lasi700",
+	.detect		= lasi700_detect,
+	.release	= lasi700_release,
+	.this_id	= 7,
+};
 #include "scsi_module.c"

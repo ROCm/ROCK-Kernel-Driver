@@ -307,7 +307,7 @@ acpi_tb_get_required_tables (
 
 	/* Always delete the RSDP mapping, we are done with it */
 
-	acpi_tb_delete_acpi_table (ACPI_TABLE_RSDP);
+	acpi_tb_delete_tables_by_type (ACPI_TABLE_RSDP);
 	return_ACPI_STATUS (status);
 }
 

@@ -552,7 +552,6 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 		goto out;
 	}
 
-	dev_probe_lock();
 	rtnl_lock();
 
 	ret = -ENODEV;
@@ -702,12 +701,10 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 	}
 done:
 	rtnl_unlock();
-	dev_probe_unlock();
 out:
 	return ret;
 rarok:
 	rtnl_unlock();
-	dev_probe_unlock();
 	ret = copy_to_user(arg, &ifr, sizeof(struct ifreq)) ? -EFAULT : 0;
 	goto out;
 }
@@ -1065,9 +1062,9 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 	return ret;
 }
 
-static int ipv4_doint_and_flush(ctl_table *ctl, int write,
-				struct file* filp, void *buffer,
-				size_t *lenp)
+int ipv4_doint_and_flush(ctl_table *ctl, int write,
+			 struct file* filp, void *buffer,
+			 size_t *lenp)
 {
 	int *valp = ctl->data;
 	int val = *valp;
@@ -1079,10 +1076,10 @@ static int ipv4_doint_and_flush(ctl_table *ctl, int write,
 	return ret;
 }
 
-static int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
-					 void *oldval, size_t *oldlenp,
-					 void *newval, size_t newlen, 
-					 void **context)
+int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
+				  void *oldval, size_t *oldlenp,
+				  void *newval, size_t newlen, 
+				  void **context)
 {
 	int *valp = table->data;
 	int new;
@@ -1305,9 +1302,7 @@ static void devinet_sysctl_register(struct in_device *in_dev,
 	if (!t)
 		return;
 	memcpy(t, &devinet_sysctl, sizeof(*t));
-	for (i = 0;
-	     i < sizeof(t->devinet_vars) / sizeof(t->devinet_vars[0]) - 1;
-	     i++) {
+	for (i = 0; i < ARRAY_SIZE(t->devinet_vars) - 1; i++) {
 		t->devinet_vars[i].data += (char *)p - (char *)&ipv4_devconf;
 		t->devinet_vars[i].de = NULL;
 	}

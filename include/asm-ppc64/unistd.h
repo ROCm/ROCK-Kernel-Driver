@@ -260,7 +260,7 @@
 #define __NR_clock_getres	247
 #define __NR_clock_nanosleep	248
 
-#define __NR_syscalls		249
+#define __NR_syscalls		239
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif

@@ -6,17 +6,22 @@
  * Copyright 1997 Linus Torvalds
  */
 #include <linux/config.h>
+#include <linux/mm.h>
+#include <linux/highmem.h>
+#include <linux/blkdev.h>
 #include <asm/uaccess.h>
 #include <asm/mmx.h>
 
-static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
+static inline int __movsl_is_ok(unsigned long a1, unsigned long a2, unsigned long n)
 {
 #ifdef CONFIG_X86_INTEL_USERCOPY
-	if (n >= 64 && (((const long)a1 ^ (const long)a2) & movsl_mask.mask))
+	if (n >= 64 && ((a1 ^ a2) & movsl_mask.mask))
 		return 0;
 #endif
 	return 1;
 }
+#define movsl_is_ok(a1,a2,n) \
+	__movsl_is_ok((unsigned long)(a1),(unsigned long)(a2),(n))
 
 /*
  * Copy a null terminated string from userspace.
@@ -71,7 +76,7 @@ do {									   \
  * and returns @count.
  */
 long
-__strncpy_from_user(char *dst, const char *src, long count)
+__strncpy_from_user(char *dst, const char __user *src, long count)
 {
 	long res;
 	__do_strncpy_from_user(dst, src, count, res);
@@ -97,7 +102,7 @@ __strncpy_from_user(char *dst, const char *src, long count)
  * and returns @count.
  */
 long
-strncpy_from_user(char *dst, const char *src, long count)
+strncpy_from_user(char *dst, const char __user *src, long count)
 {
 	long res = -EFAULT;
 	if (access_ok(VERIFY_READ, src, 1))
@@ -142,7 +147,7 @@ do {									\
  * On success, this will be zero.
  */
 unsigned long
-clear_user(void *to, unsigned long n)
+clear_user(void __user *to, unsigned long n)
 {
 	if (access_ok(VERIFY_WRITE, to, n))
 		__do_clear_user(to, n);
@@ -161,7 +166,7 @@ clear_user(void *to, unsigned long n)
  * On success, this will be zero.
  */
 unsigned long
-__clear_user(void *to, unsigned long n)
+__clear_user(void __user *to, unsigned long n)
 {
 	__do_clear_user(to, n);
 	return n;
@@ -178,7 +183,7 @@ __clear_user(void *to, unsigned long n)
  * On exception, returns 0.
  * If the string is too long, returns a value greater than @n.
  */
-long strnlen_user(const char *s, long n)
+long strnlen_user(const char __user *s, long n)
 {
 	unsigned long mask = -__addr_ok(s);
 	unsigned long res, tmp;
@@ -481,20 +486,67 @@ do {									\
 } while (0)
 
 
-unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n)
+unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned long n)
 {
+#ifndef CONFIG_X86_WP_WORKS_OK
+	if (unlikely(boot_cpu_data.wp_works_ok == 0) &&
+			((unsigned long )to) < TASK_SIZE) {
+		/* 
+		 * CPU does not honor the WP bit when writing
+		 * from supervisory mode, and due to preemption or SMP,
+		 * the page tables can change at any time.
+		 * Do it manually.	Manfred <manfred@colorfullife.com>
+		 */
+		while (n) {
+		      	unsigned long offset = ((unsigned long)to)%PAGE_SIZE;
+			unsigned long len = PAGE_SIZE - offset;
+			int retval;
+			struct page *pg;
+			void *maddr;
+			
+			if (len > n)
+				len = n;
+
+survive:
+			down_read(&current->mm->mmap_sem);
+			retval = get_user_pages(current, current->mm,
+					(unsigned long )to, 1, 1, 0, &pg, NULL);
+
+			if (retval == -ENOMEM && current->pid == 1) {
+				up_read(&current->mm->mmap_sem);
+				blk_congestion_wait(WRITE, HZ/50);
+				goto survive;
+			}
+
+			if (retval != 1)
+		       		break;
+
+			maddr = kmap_atomic(pg, KM_USER0);
+			memcpy(maddr + offset, from, len);
+			kunmap_atomic(maddr, KM_USER0);
+			set_page_dirty_lock(pg);
+			put_page(pg);
+			up_read(&current->mm->mmap_sem);
+
+			from += len;
+			to += len;
+			n -= len;
+		}
+		return n;
+	}
+#endif
 	if (movsl_is_ok(to, from, n))
-		__copy_user(to, from, n);
+		__copy_user((void *)to, from, n);
 	else
-		n = __copy_user_intel(to, from, n);
+		n = __copy_user_intel((void *)to, from, n);
 	return n;
 }
 
-unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n)
+unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned long n)
 {
 	if (movsl_is_ok(to, from, n))
-		__copy_user_zeroing(to, from, n);
+		__copy_user_zeroing(to, (const void *) from, n);
 	else
-		n = __copy_user_zeroing_intel(to, from, n);
+		n = __copy_user_zeroing_intel(to, (const void *) from, n);
 	return n;
 }

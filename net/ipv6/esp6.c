@@ -46,17 +46,6 @@
 /* Move to common area: it is shared with AH. */
 /* Common with AH after some work on arguments. */
 
-/* XXX no ipv6 esp specific */
-#define NIP6(addr) \
-	ntohs((addr).s6_addr16[0]),\
-	ntohs((addr).s6_addr16[1]),\
-	ntohs((addr).s6_addr16[2]),\
-	ntohs((addr).s6_addr16[3]),\
-	ntohs((addr).s6_addr16[4]),\
-	ntohs((addr).s6_addr16[5]),\
-	ntohs((addr).s6_addr16[6]),\
-	ntohs((addr).s6_addr16[7])
-
 static int get_offset(u8 *packet, u32 packet_len, u8 *nexthdr, struct ipv6_opt_hdr **prevhdr)
 {
 	u16 offset = sizeof(struct ipv6hdr);
@@ -184,8 +173,10 @@ int esp6_output(struct sk_buff *skb)
 		top_iph->nexthdr = IPPROTO_ESP;
 		top_iph->payload_len = htons(skb->len + alen - sizeof(struct ipv6hdr));
 		top_iph->hop_limit = iph->hop_limit;
-		memcpy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr, sizeof(struct in6_addr));
-		memcpy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&top_iph->saddr,
+			       (struct in6_addr *)&x->props.saddr);
+		ipv6_addr_copy(&top_iph->daddr,
+			       (struct in6_addr *)&x->id.daddr);
 	} else { 
 		/* XXX exthdr */
 		esph = (struct ipv6_esp_hdr*)skb_push(skb, x->props.header_len);

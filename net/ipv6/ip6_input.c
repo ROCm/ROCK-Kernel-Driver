@@ -152,6 +152,7 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 		skb->h.raw += (skb->h.raw[1]+1)<<3;
 	}
 
+	rcu_read_lock();
 resubmit:
 	if (!pskb_pull(skb, skb->h.raw - skb->data))
 		goto discard;
@@ -165,6 +166,7 @@ resubmit:
 	if ((ipprot = inet6_protos[hash]) != NULL) {
 		int ret;
 		
+		smp_read_barrier_depends();
 		if (ipprot->flags & INET6_PROTO_FINAL) {
 			if (!cksum_sub && skb->ip_summed == CHECKSUM_HW) {
 				skb->csum = csum_sub(skb->csum,
@@ -173,10 +175,8 @@ resubmit:
 			}
 		}
 		if (!(ipprot->flags & INET6_PROTO_NOPOLICY) &&
-		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-			kfree_skb(skb);
-			return 0;
-		}
+		    !xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) 
+			goto discard;
 		
 		ret = ipprot->handler(&skb, &nhoff);
 		if (ret > 0)
@@ -194,10 +194,11 @@ resubmit:
 			kfree_skb(skb);
 		}
 	}
-
+	rcu_read_unlock();
 	return 0;
 
 discard:
+	rcu_read_unlock();
 	kfree_skb(skb);
 	return 0;
 }

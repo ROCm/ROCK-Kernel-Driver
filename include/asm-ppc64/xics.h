@@ -12,7 +12,17 @@
 #ifndef _PPC64_KERNEL_XICS_H
 #define _PPC64_KERNEL_XICS_H
 
+#include <linux/cache.h>
+
 void xics_init_IRQ(void);
 int xics_get_irq(struct pt_regs *);
+void xics_setup_cpu(void);
+void xics_cause_IPI(int cpu);
+
+struct xics_ipi_struct {
+	volatile unsigned long value;
+} ____cacheline_aligned;
+
+extern struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 #endif /* _PPC64_KERNEL_XICS_H */

@@ -79,7 +79,7 @@
 	printk(KERN_ERR fmt, ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 918 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 931 $ Ben Collins <bcollins@debian.org>";
 
 /* Our ieee1394 highlevel driver */
 #define ETHER1394_DRIVER_NAME "ether1394"

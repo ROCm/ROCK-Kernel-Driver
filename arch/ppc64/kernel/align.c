@@ -21,6 +21,8 @@
 #include <asm/system.h>
 #include <asm/cache.h>
 
+void disable_kernel_fp(void); /* asm function from head.S */
+
 struct aligninfo {
 	unsigned char len;
 	unsigned char flags;
@@ -237,7 +239,7 @@ fix_alignment(struct pt_regs *regs)
 	dsisr = regs->dsisr;
 
 	/* Power4 doesn't set DSISR for an alignment interrupt */
-	if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
+	if (!cpu_alignexc_sets_dsisr()) {
 		unsigned int real_instr;
 		if (__get_user(real_instr, (unsigned int *)regs->nip))
 			return 0;
@@ -309,6 +311,7 @@ fix_alignment(struct pt_regs *regs)
 				/* Doing stfs, have to convert to single */
 				enable_kernel_fp();
 				cvt_df(&current->thread.fpr[reg], (float *)&data.v[4], &current->thread.fpscr);
+				disable_kernel_fp();
 			}
 			else
 				data.dd = current->thread.fpr[reg];
@@ -342,6 +345,7 @@ fix_alignment(struct pt_regs *regs)
 				/* Doing lfs, have to convert to double */
 				enable_kernel_fp();
 				cvt_fd((float *)&data.v[4], &current->thread.fpr[reg], &current->thread.fpscr);
+				disable_kernel_fp();
 			}
 			else
 				current->thread.fpr[reg] = data.dd;

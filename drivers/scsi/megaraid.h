@@ -121,33 +121,6 @@
 #define NVIRT_CHAN		4	/* # of virtual channels to represent
 					   up to 60 logical drives */
 
-#define MEGARAID						\
-{								\
-	.name =				"MegaRAID",		\
-	.proc_info =			megaraid_proc_info,	\
-	.detect =			megaraid_detect,	\
-	.release =			megaraid_release,	\
-	.info =				megaraid_info,		\
-	.command =			megaraid_command,	\
-	.queuecommand =			megaraid_queue,		\
-	.bios_param =			megaraid_biosparam,	\
-	.max_sectors =			MAX_SECTORS_PER_IO,	\
-	.can_queue =			MAX_COMMANDS,		\
-	.this_id =			DEFAULT_INITIATOR_ID,	\
-	.sg_tablesize =			MAX_SGLIST,		\
-	.cmd_per_lun =			DEF_CMD_PER_LUN,	\
-	.present =  			0,			\
-	.unchecked_isa_dma =		0,			\
-	.use_clustering =		ENABLE_CLUSTERING,	\
-	.eh_abort_handler =		megaraid_abort,		\
-	.eh_device_reset_handler =	megaraid_reset,		\
-	.eh_bus_reset_handler =		megaraid_reset,		\
-	.eh_host_reset_handler =	megaraid_reset,		\
-	.highmem_io =			1,			\
-}
-
-
-
 typedef struct {
 	/* 0x0 */ u8 cmd;
 	/* 0x1 */ u8 cmdid;

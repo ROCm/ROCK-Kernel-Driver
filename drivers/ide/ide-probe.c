@@ -693,7 +693,7 @@ static void hwif_register (ide_hwif_t *hwif)
 	u32 i = 0;
 
 	/* register with global device tree */
-	strncpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
+	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	snprintf(hwif->gendev.name,DEVICE_NAME_SIZE,"IDE Controller");
 	hwif->gendev.driver_data = hwif;
 	if (hwif->pci_dev)
@@ -803,7 +803,7 @@ void probe_hwif (ide_hwif_t *hwif)
 		return;
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
-#if CONFIG_BLK_DEV_PDC4030
+#ifdef CONFIG_BLK_DEV_PDC4030
 	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
 #endif /* CONFIG_BLK_DEV_PDC4030 */
 	    (hwif_check_regions(hwif))) {
@@ -998,6 +998,7 @@ EXPORT_SYMBOL(save_match);
 static void ide_init_queue(ide_drive_t *drive)
 {
 	request_queue_t *q = &drive->queue;
+	ide_hwif_t *hwif = HWIF(drive);
 	int max_sectors = 256;
 
 	/*
@@ -1013,8 +1014,10 @@ static void ide_init_queue(ide_drive_t *drive)
 	drive->queue_setup = 1;
 	blk_queue_segment_boundary(q, 0xffff);
 
-	if (HWIF(drive)->rqsize)
-		max_sectors = HWIF(drive)->rqsize;
+	if (!hwif->rqsize)
+		hwif->rqsize = hwif->addressing ? 256 : 65536;
+	if (hwif->rqsize < max_sectors)
+		max_sectors = hwif->rqsize;
 	blk_queue_max_sectors(q, max_sectors);
 
 	/* IDE DMA can do PRD_ENTRIES number of segments. */
@@ -1223,7 +1226,7 @@ static int ata_lock(dev_t dev, void *data)
 	return 0;
 }
 
-struct gendisk *ata_probe(dev_t dev, int *part, void *data)
+struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
 	int unit = *part >> PARTN_BITS;
@@ -1235,7 +1238,7 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 			(void) request_module("ide-disk");
 		if (drive->scsi)
 			(void) request_module("ide-scsi");
-		if (drive->media == ide_cdrom)
+		if (drive->media == ide_cdrom || drive->media == ide_optical)
 			(void) request_module("ide-cd");
 		if (drive->media == ide_tape)
 			(void) request_module("ide-tape");
@@ -1440,8 +1443,6 @@ int ideprobe_init (void)
 }
 
 #ifdef MODULE
-extern int (*ide_xlate_1024_hook)(struct block_device *, int, int, const char *);
-
 int init_module (void)
 {
 	unsigned int index;
@@ -1450,14 +1451,12 @@ int init_module (void)
 		ide_unregister(index);
 	ideprobe_init();
 	create_proc_ide_interfaces();
-	ide_xlate_1024_hook = ide_xlate_1024;
 	return 0;
 }
 
 void cleanup_module (void)
 {
 	ide_probe = NULL;
-	ide_xlate_1024_hook = 0;
 }
 MODULE_LICENSE("GPL");
 #endif /* MODULE */

@@ -126,9 +126,6 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	struct sk_buff *skb;
 	u8 *data;
 
-	if (gfp_mask & __GFP_WAIT)
-		might_sleep();
-
 	/* Get the HEAD */
 	skb = kmem_cache_alloc(skbuff_head_cache,
 			       gfp_mask & ~__GFP_DMA);
@@ -274,6 +271,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	n->sk = NULL;
 	C(stamp);
 	C(dev);
+	C(real_dev);
 	C(h);
 	C(nh);
 	C(mac);
@@ -337,6 +335,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->list	= NULL;
 	new->sk		= NULL;
 	new->dev	= old->dev;
+	new->real_dev	= old->real_dev;
 	new->priority	= old->priority;
 	new->protocol	= old->protocol;
 	new->dst	= dst_clone(old->dst);

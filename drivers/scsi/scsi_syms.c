@@ -21,6 +21,7 @@
 #include "scsi.h"
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
+#include "scsi_logging.h"
 
 #include <scsi/scsicam.h>
 
@@ -64,6 +65,7 @@ EXPORT_SYMBOL(scsi_get_command);
 EXPORT_SYMBOL(scsi_put_command);
 
 EXPORT_SYMBOL(scsi_report_bus_reset);
+EXPORT_SYMBOL(scsi_report_device_reset);
 EXPORT_SYMBOL(scsi_block_requests);
 EXPORT_SYMBOL(scsi_unblock_requests);
 EXPORT_SYMBOL(scsi_adjust_queue_depth);
@@ -76,8 +78,6 @@ EXPORT_SYMBOL(scsi_sleep);
 
 EXPORT_SYMBOL(scsi_io_completion);
 
-EXPORT_SYMBOL(scsi_slave_attach);
-EXPORT_SYMBOL(scsi_slave_detach);
 EXPORT_SYMBOL(scsi_device_get);
 EXPORT_SYMBOL(scsi_device_put);
 EXPORT_SYMBOL(scsi_add_device);
@@ -104,12 +104,5 @@ EXPORT_SYMBOL(scsi_calculate_bounce_limit);
 /*
  * Externalize timers so that HBAs can safely start/restart commands.
  */
-extern void scsi_add_timer(Scsi_Cmnd *, int, void ((*) (Scsi_Cmnd *)));
-extern int scsi_delete_timer(Scsi_Cmnd *);
 EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
-
-/*
- * sysfs support
- */
-EXPORT_SYMBOL(shost_class);

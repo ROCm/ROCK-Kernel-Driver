@@ -539,6 +539,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		(drm_r128_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				     init->sarea_priv_offset);
 
+#if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
 		DRM_IOREMAP( dev_priv->cce_ring, dev );
 		DRM_IOREMAP( dev_priv->ring_rptr, dev );
@@ -551,7 +552,9 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			r128_do_cleanup_cce( dev );
 			return DRM_ERR(ENOMEM);
 		}
-	} else {
+	} else
+#endif
+	{
 		dev_priv->cce_ring->handle =
 			(void *)dev_priv->cce_ring->offset;
 		dev_priv->ring_rptr->handle =
@@ -625,23 +628,22 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;
 
-#if __REALLY_HAVE_SG
+#if __REALLY_HAVE_AGP
 		if ( !dev_priv->is_pci ) {
-#endif
 			if ( dev_priv->cce_ring != NULL )
 				DRM_IOREMAPFREE( dev_priv->cce_ring, dev );
 			if ( dev_priv->ring_rptr != NULL )
 				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
 			if ( dev_priv->buffers != NULL )
 				DRM_IOREMAPFREE( dev_priv->buffers, dev );
-#if __REALLY_HAVE_SG
-		} else {
+		} else
+#endif
+		{
 			if (!DRM(ati_pcigart_cleanup)( dev,
 						dev_priv->phys_pci_gart,
 						dev_priv->bus_pci_gart ))
 				DRM_ERROR( "failed to cleanup PCI GART!\n" );
 		}
-#endif
 
 		DRM(free)( dev->dev_private, sizeof(drm_r128_private_t),
 			   DRM_MEM_DRIVER );

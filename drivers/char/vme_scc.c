@@ -83,10 +83,10 @@ static int scc_ioctl(struct tty_struct * tty, struct file * filp,
                      unsigned int cmd, unsigned long arg);
 static void scc_throttle(struct tty_struct *tty);
 static void scc_unthrottle(struct tty_struct *tty);
-static void scc_tx_int(int irq, void *data, struct pt_regs *fp);
-static void scc_rx_int(int irq, void *data, struct pt_regs *fp);
-static void scc_stat_int(int irq, void *data, struct pt_regs *fp);
-static void scc_spcond_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_tx_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_rx_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_stat_int(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp);
 static void scc_setsignals(struct scc_port *port, int dtr, int rts);
 static void scc_break_ctl(struct tty_struct *tty, int break_state);
 
@@ -129,6 +129,7 @@ static int scc_init_drivers(void)
 
 	memset(&scc_driver, 0, sizeof(scc_driver));
 	scc_driver.magic = TTY_DRIVER_MAGIC;
+	scc_driver.owner = THIS_MODULE;
 	scc_driver.driver_name = "scc";
 #ifdef CONFIG_DEVFS_FS
 	scc_driver.name = "tts/";
@@ -447,7 +448,7 @@ int vme_scc_init(void)
  * Interrupt handlers
  *--------------------------------------------------------------------------*/
 
-static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_rx_int(int irq, void *data, struct pt_regs *fp)
 {
 	unsigned char	ch;
 	struct scc_port *port = data;
@@ -458,7 +459,7 @@ static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
 	if (!tty) {
 		printk(KERN_WARNING "scc_rx_int with NULL tty!\n");
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	if (tty->flip.count < TTY_FLIPBUF_SIZE) {
 		*tty->flip.char_buf_ptr = ch;
@@ -475,16 +476,17 @@ static void scc_rx_int(int irq, void *data, struct pt_regs *fp)
 	if (SCCread(INT_PENDING_REG) &
 	    (port->channel == CHANNEL_A ? IPR_A_RX : IPR_B_RX)) {
 		scc_spcond_int (irq, data, fp);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 
 	tty_flip_buffer_push(tty);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	struct tty_struct *tty = port->gs.tty;
@@ -497,7 +499,7 @@ static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 		printk(KERN_WARNING "scc_spcond_int with NULL tty!\n");
 		SCCwrite(COMMAND_REG, CR_ERROR_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	do {
 		stat = SCCread(SPCOND_STATUS_REG);
@@ -531,10 +533,11 @@ static void scc_spcond_int(int irq, void *data, struct pt_regs *fp)
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 
 	tty_flip_buffer_push(tty);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_tx_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	SCC_ACCESS_INIT(port);
@@ -544,7 +547,7 @@ static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
 		SCCmod (INT_AND_DMA_REG, ~IDR_TX_INT_ENAB, 0);
 		SCCwrite(COMMAND_REG, CR_TX_PENDING_RESET);
 		SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
-		return;
+		return IRQ_HANDLED;
 	}
 	while ((SCCread_NB(STATUS_REG) & SR_TX_BUF_EMPTY)) {
 		if (port->x_char) {
@@ -576,10 +579,11 @@ static void scc_tx_int(int irq, void *data, struct pt_regs *fp)
 	}
 
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
+	return IRQ_HANDLED;
 }
 
 
-static void scc_stat_int(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t scc_stat_int(int irq, void *data, struct pt_regs *fp)
 {
 	struct scc_port *port = data;
 	unsigned channel = port->channel;
@@ -611,6 +615,7 @@ static void scc_stat_int(int irq, void *data, struct pt_regs *fp)
 	}
 	SCCwrite(COMMAND_REG, CR_EXTSTAT_RESET);
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
+	return IRQ_HANDLED;
 }
 
 
@@ -795,7 +800,6 @@ static void scc_hungup(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
 	scc_disable_rx_interrupts(ptr);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -803,7 +807,6 @@ static void scc_close(void *ptr)
 {
 	scc_disable_tx_interrupts(ptr);
 	scc_disable_rx_interrupts(ptr);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -938,13 +941,9 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 	port->gs.flags |= GS_ACTIVE;
-	if (port->gs.count == 1) {
-		MOD_INC_USE_COUNT;
-	}
 	retval = gs_block_til_ready(port, filp);
 
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		port->gs.count--;
 		return retval;
 	}

@@ -81,11 +81,7 @@
 #include <net/slhc_vj.h>
 #endif
 
-#ifdef MODULE
-#define SLIP_VERSION    "0.8.4-NET3.019-NEWTTY-MODULAR"
-#else
-#define	SLIP_VERSION	"0.8.4-NET3.019-NEWTTY"
-#endif
+#define SLIP_VERSION	"0.8.4-NET3.019-NEWTTY"
 
 
 typedef struct slip_ctrl {
@@ -97,8 +93,6 @@ static slip_ctrl_t	**slip_ctrls;
 int slip_maxdev = SL_NRUNIT;		/* Can be overridden with insmod! */
 MODULE_PARM(slip_maxdev, "i");
 MODULE_PARM_DESC(slip_maxdev, "Maximum number of slip devices");
-
-static struct tty_ldisc	sl_ldisc;
 
 static int slip_esc(unsigned char *p, unsigned char *d, int len);
 static void slip_unesc(struct slip *sl, unsigned char c);
@@ -1309,13 +1303,24 @@ static int sl_ioctl(struct net_device *dev,struct ifreq *rq,int cmd)
 #endif
 /* VSV changes end */
 
-/* Initialize SLIP control device -- register SLIP line discipline */
+static struct tty_ldisc	sl_ldisc = {
+	.owner 		= THIS_MODULE,
+	.magic 		= TTY_LDISC_MAGIC,
+	.name 		= "slip",
+	.open 		= slip_open,
+	.close	 	= slip_close,
+	.ioctl		= slip_ioctl,
+	.receive_buf	= slip_receive_buf,
+	.receive_room	= slip_receive_room,
+	.write_wakeup	= slip_write_wakeup,
+};
 
-int __init slip_init_ctrl_dev(void)
+static int __init slip_init(void)
 {
 	int status;
 
-	if (slip_maxdev < 4) slip_maxdev = 4; /* Sanity */
+	if (slip_maxdev < 4)
+		slip_maxdev = 4; /* Sanity */
 
 	printk(KERN_INFO "SLIP: version %s (dynamic channels, max=%d)"
 #ifdef CONFIG_SLIP_MODE_SLIP6
@@ -1323,16 +1328,15 @@ int __init slip_init_ctrl_dev(void)
 #endif
 	       ".\n",
 	       SLIP_VERSION, slip_maxdev );
-#if defined(SL_INCLUDE_CSLIP) && !defined(MODULE)
+#if defined(SL_INCLUDE_CSLIP)
 	printk(KERN_INFO "CSLIP: code copyright 1989 Regents of the University of California.\n");
 #endif
 #ifdef CONFIG_SLIP_SMART
 	printk(KERN_INFO "SLIP linefill/keepalive option.\n");
 #endif
 
-	slip_ctrls = (slip_ctrl_t **) kmalloc(sizeof(void*)*slip_maxdev, GFP_KERNEL);
-	if (slip_ctrls == NULL)
-	{
+	slip_ctrls = kmalloc(sizeof(void*)*slip_maxdev, GFP_KERNEL);
+	if (!slip_ctrls) {
 		printk(KERN_ERR "SLIP: Can't allocate slip_ctrls[] array!  Uaargh! (-> No SLIP available)\n");
 		return -ENOMEM;
 	}
@@ -1347,28 +1351,7 @@ int __init slip_init_ctrl_dev(void)
 	return status;
 }
 
-static struct tty_ldisc	sl_ldisc =
-{
-	.owner 		=	THIS_MODULE,
-	.magic 		= 	TTY_LDISC_MAGIC,
-	.name 		= 	"slip",
-	.open 		= 	slip_open,
-	.close	 	= 	slip_close,
-	.ioctl		=	slip_ioctl,
-	.receive_buf	=	slip_receive_buf,
-	.receive_room	=	slip_receive_room,
-	.write_wakeup	=	slip_write_wakeup,
-};
-
-#ifdef MODULE
-
-int init_module(void)
-{
-	return slip_init_ctrl_dev();
-}
-
-void
-cleanup_module(void)
+static void __exit slip_exit(void)
 {
 	int i;
 
@@ -1425,7 +1408,9 @@ cleanup_module(void)
 		printk(KERN_ERR "SLIP: can't unregister line discipline (err = %d)\n", i);
 	}
 }
-#endif /* MODULE */
+
+module_init(slip_init);
+module_exit(slip_exit);
 
 #ifdef CONFIG_SLIP_SMART
 /*

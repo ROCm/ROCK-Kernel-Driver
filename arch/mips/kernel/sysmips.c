@@ -64,14 +64,15 @@ sys_sysmips(int cmd, int arg1, int arg2, int arg3)
 
 		name = (char *) arg1;
 
-		len = strncpy_from_user(nodename, name, sizeof(nodename));
+		len = strncpy_from_user(nodename, name, __NEW_UTS_LEN);
 		if (len < 0) 
 			return -EFAULT;
+		nodename[__NEW_UTS_LEN] = '\0';
 
 		down_write(&uts_sem);
-		strncpy(system_utsname.nodename, name, len);
+		strlcpy(system_utsname.nodename, nodename,
+			sizeof(system_utsname.nodename));
 		up_write(&uts_sem);
-		system_utsname.nodename[len] = '\0'; 
 		return 0;
 	}
 

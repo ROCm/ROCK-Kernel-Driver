@@ -3,5 +3,3 @@
 
    Everything of consequence is in arch/alpha/kernel/irq_impl.h,
    to be used only in arch/alpha/kernel/.  */
-
-extern irq_desc_t irq_desc [NR_IRQS];

@@ -556,7 +556,7 @@ show_interrupts(struct seq_file *p, void *v)
 unlock:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	seq_puts(p, "IPI: ");
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_online(i))

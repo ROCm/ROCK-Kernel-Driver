@@ -14,11 +14,14 @@
  */
 extern void ioctime_init(void);
 
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
 	do_set_rtc();
 	do_profile(regs);
+
+	return IRQ_HANDLED;
 }
 
 /*

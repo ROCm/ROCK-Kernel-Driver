@@ -56,6 +56,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 
 /*
  * Definitions and constants.
@@ -110,16 +113,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"Unknown          ",
 	"Enclosure        ",
 };
-
-static const char * const spaces = "                "; /* 16 of them */
-
-static unsigned scsi_default_dev_flags;
-LIST_HEAD(scsi_dev_info_list);
-
-/* 
- * Function prototypes.
- */
-extern void scsi_times_out(struct scsi_cmnd *cmd);
 
 MODULE_PARM(scsi_logging_level, "i");
 MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");
@@ -178,6 +171,16 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
 	return sreq;
 }
 
+void __scsi_release_request(struct scsi_request *sreq)
+{
+	if (likely(sreq->sr_command != NULL)) {
+		struct scsi_cmnd *cmd = sreq->sr_command;
+
+		sreq->sr_command = NULL;
+		scsi_next_command(cmd);
+	}
+}
+
 /*
  * Function:    scsi_release_request
  *
@@ -189,14 +192,7 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
  */
 void scsi_release_request(struct scsi_request *sreq)
 {
-	if (likely(sreq->sr_command != NULL)) {
-    		struct request_queue *q = sreq->sr_device->request_queue;
-
-		scsi_put_command(sreq->sr_command);
-		sreq->sr_command = NULL;
-		scsi_queue_next_request(q, NULL);
-	}
-
+	__scsi_release_request(sreq);
 	kfree(sreq);
 }
 
@@ -534,7 +530,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 
 	cmd->request = sreq->sr_request;
 	memcpy(cmd->data_cmnd, sreq->sr_cmnd, sizeof(cmd->data_cmnd));
-	cmd->reset_chain = NULL;
 	cmd->serial_number = 0;
 	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;
@@ -936,250 +931,6 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 	return depth;
 }
 
-
-/*
- * scsi_strcpy_devinfo: called from scsi_dev_info_list_add to copy into
- * devinfo vendor and model strings.
- */
-static void scsi_strcpy_devinfo(char *name, char *to, size_t to_length,
-				char *from, int compatible)
-{
-	size_t from_length;
-
-	from_length = strlen(from);
-	strncpy(to, from, min(to_length, from_length));
-	if (from_length < to_length) {
-		if (compatible) {
-			/*
-			 * NUL terminate the string if it is short.
-			 */
-			to[from_length] = '\0';
-		} else {
-			/* 
-			 * space pad the string if it is short. 
-			 */
-			strncpy(&to[from_length], spaces,
-				to_length - from_length);
-		}
-	}
-	if (from_length > to_length)
-		 printk(KERN_WARNING "%s: %s string '%s' is too long\n",
-			__FUNCTION__, name, from);
-}
-
-/**
- * scsi_dev_info_list_add: add one dev_info list entry.
- * @vendor:	vendor string
- * @model:	model (product) string
- * @strflags:	integer string
- * @flag:	if strflags NULL, use this flag value
- *
- * Description:
- * 	Create and add one dev_info entry for @vendor, @model, @strflags or
- * 	@flag. If @compatible, add to the tail of the list, do not space
- * 	pad, and set devinfo->compatible. The scsi_static_device_list entries
- * 	are added with @compatible 1 and @clfags NULL.
- *
- * Returns: 0 OK, -error on failure.
- **/
-static int scsi_dev_info_list_add(int compatible, char *vendor, char *model,
-			    char *strflags, int flags)
-{
-	struct scsi_dev_info_list *devinfo;
-
-	devinfo = kmalloc(sizeof(*devinfo), GFP_KERNEL);
-	if (!devinfo) {
-		printk(KERN_ERR "%s: no memory\n", __FUNCTION__);
-		return -ENOMEM;
-	}
-
-	scsi_strcpy_devinfo("vendor", devinfo->vendor, sizeof(devinfo->vendor),
-			    vendor, compatible);
-	scsi_strcpy_devinfo("model", devinfo->model, sizeof(devinfo->model),
-			    model, compatible);
-
-	if (strflags)
-		devinfo->flags = simple_strtoul(strflags, NULL, 0);
-	else
-		devinfo->flags = flags;
-
-	devinfo->compatible = compatible;
-
-	if (compatible)
-		list_add_tail(&devinfo->dev_info_list, &scsi_dev_info_list);
-	else
-		list_add(&devinfo->dev_info_list, &scsi_dev_info_list);
-
-	return 0;
-}
-
-/**
- * scsi_dev_info_list_add_str: parse dev_list and add to the
- * scsi_dev_info_list.
- * @dev_list:	string of device flags to add
- *
- * Description:
- * 	Parse dev_list, and add entries to the scsi_dev_info_list.
- * 	dev_list is of the form "vendor:product:flag,vendor:product:flag".
- * 	dev_list is modified via strsep. Can be called for command line
- * 	addition, for proc or mabye a sysfs interface.
- *
- * Returns: 0 if OK, -error on failure.
- **/
-int scsi_dev_info_list_add_str (char *dev_list)
-{
-	char *vendor, *model, *strflags, *next;
-	char *next_check;
-	int res = 0;
-
-	next = dev_list;
-	if (next && next[0] == '"') {
-		/*
-		 * Ignore both the leading and trailing quote.
-		 */
-		next++;
-		next_check = ",\"";
-	} else {
-		next_check = ",";
-	}
-
-	/*
-	 * For the leading and trailing '"' case, the for loop comes
-	 * through the last time with vendor[0] == '\0'.
-	 */
-	for (vendor = strsep(&next, ":"); vendor && (vendor[0] != '\0')
-	     && (res == 0); vendor = strsep(&next, ":")) {
-		strflags = NULL;
-		model = strsep(&next, ":");
-		if (model)
-			strflags = strsep(&next, next_check);
-		if (!model || !strflags) {
-			printk(KERN_ERR "%s: bad dev info string '%s' '%s'"
-			       " '%s'\n", __FUNCTION__, vendor, model,
-			       strflags);
-			res = -EINVAL;
-		} else
-			res = scsi_dev_info_list_add(0 /* compatible */, vendor,
-						     model, strflags, 0);
-	}
-	return res;
-}
-
-/**
- * scsi_dev_info_list_delete: called from scsi.c:exit_scsi to remove
- * 	the scsi_dev_info_list.
- **/
-static void scsi_dev_info_list_delete (void)
-{
-	struct list_head *lh, *lh_next;
-	struct scsi_dev_info_list *devinfo;
-
-	list_for_each_safe(lh, lh_next, &scsi_dev_info_list) {
-		devinfo = list_entry(lh, struct scsi_dev_info_list,
-				     dev_info_list);
-		kfree(devinfo);
-	}
-}
-
-/**
- * scsi_dev_list_init: set up the dynamic device list.
- * @dev_list:	string of device flags to add
- *
- * Description:
- * 	Add command line @dev_list entries, then add
- * 	scsi_static_device_list entries to the scsi device info list.
- **/
-static int scsi_dev_info_list_init (char *dev_list)
-{
-	int error, i;
-
-	error = scsi_dev_info_list_add_str(dev_list);
-	if (error)
-		return error;
-
-	for (i = 0; scsi_static_device_list[i].vendor != NULL; i++) {
-		error = scsi_dev_info_list_add(1 /* compatibile */,
-				scsi_static_device_list[i].vendor,
-				scsi_static_device_list[i].model,
-				NULL,
-				scsi_static_device_list[i].flags);
-		if (error)
-			break;
-	}
-
-	if (error)
-		scsi_dev_info_list_delete();
-	return error;
-}
-
-/**
- * get_device_flags - get device specific flags from the dynamic device
- * list. Called during scan time.
- * @vendor:	vendor name
- * @model:	model name
- *
- * Description:
- *     Search the scsi_dev_info_list for an entry matching @vendor and
- *     @model, if found, return the matching flags value, else return
- *     scsi_default_dev_flags.
- **/
-int scsi_get_device_flags(unsigned char *vendor, unsigned char *model)
-{
-	struct scsi_dev_info_list *devinfo;
-
-	list_for_each_entry(devinfo, &scsi_dev_info_list, dev_info_list) {
-		if (devinfo->compatible) {
-			/*
-			 * Behave like the older version of get_device_flags.
-			 */
-			size_t max;
-			/*
-			 * XXX why skip leading spaces? If an odd INQUIRY
-			 * value, that should have been part of the
-			 * scsi_static_device_list[] entry, such as "  FOO"
-			 * rather than "FOO". Since this code is already
-			 * here, and we don't know what device it is
-			 * trying to work with, leave it as-is.
-			 */
-			max = 8;	/* max length of vendor */
-			while ((max > 0) && *vendor == ' ') {
-				max--;
-				vendor++;
-			}
-			/*
-			 * XXX removing the following strlen() would be
-			 * good, using it means that for a an entry not in
-			 * the list, we scan every byte of every vendor
-			 * listed in scsi_static_device_list[], and never match
-			 * a single one (and still have to compare at
-			 * least the first byte of each vendor).
-			 */
-			if (memcmp(devinfo->vendor, vendor,
-				    min(max, strlen(devinfo->vendor))))
-				continue;
-			/*
-			 * Skip spaces again.
-			 */
-			max = 16;	/* max length of model */
-			while ((max > 0) && *model == ' ') {
-				max--;
-				model++;
-			}
-			if (memcmp(devinfo->model, model,
-				   min(max, strlen(devinfo->model))))
-				continue;
-			return devinfo->flags;
-		} else {
-			if (!memcmp(devinfo->vendor, vendor,
-				     sizeof(devinfo->vendor)) &&
-			     !memcmp(devinfo->model, model,
-				      sizeof(devinfo->model)))
-				return devinfo->flags;
-		}
-	}
-	return scsi_default_dev_flags;
-}
-
 int scsi_attach_device(struct scsi_device *sdev)
 {
 	struct Scsi_Device_Template *sdt;
@@ -1280,39 +1031,6 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 }
 
 /*
- * Function:	scsi_slave_attach()
- *
- * Purpose:	Called from the upper level driver attach to handle common
- * 		attach code.
- *
- * Arguments:	sdev - scsi_device to attach
- *
- * Returns:	1 on error, 0 on succes
- *
- * Lock Status:	Protected via scsi_devicelist_mutex.
- */
-int scsi_slave_attach(struct scsi_device *sdev)
-{
-	sdev->attached++;
-	return 0;
-}
-
-/*
- * Function:	scsi_slave_detach()
- *
- * Purpose:	Called from the upper level driver attach to handle common
- * 		detach code.
- *
- * Arguments:	sdev - struct scsi_device to detach
- *
- * Lock Status:	Protected via scsi_devicelist_mutex.
- */
-void scsi_slave_detach(struct scsi_device *sdev)
-{
-	sdev->attached--;
-}
-
-/*
  * This entry point is called from the upper level module's module_init()
  * routine.  That implies that when this function is called, the
  * scsi_mod module is locked down because of upper module layering and
@@ -1377,42 +1095,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	return 0;
 }
 
-static char *scsi_dev_flags;
-MODULE_PARM(scsi_dev_flags, "s");
-MODULE_PARM_DESC(scsi_dev_flags,
-	 "Given scsi_dev_flags=vendor:model:flags, add a black/white list"
-	 " entry for vendor and model with an integer value of flags"
-	 " to the scsi device info list");
-MODULE_PARM(scsi_default_dev_flags, "i");
-MODULE_PARM_DESC(scsi_default_dev_flags,
-		 "scsi default device flag integer value");
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
-
-#ifndef MODULE
-static int __init setup_scsi_dev_flags(char *str)
-{
-	scsi_dev_flags = str;
-	return 1;
-}
-__setup("scsi_dev_flags=", setup_scsi_dev_flags);
-
-static int __init setup_scsi_default_dev_flags(char *str)
-{
-	unsigned int tmp;
-	if (get_option(&str, &tmp) == 1) {
-		scsi_default_dev_flags = tmp;
-		printk(KERN_WARNING "%s %d\n", __FUNCTION__,
-		       scsi_default_dev_flags);
-		return 1;
-	} else {
-		printk(KERN_WARNING "%s: usage scsi_default_dev_flags=intr\n",
-		       __FUNCTION__);
-		return 0;
-	}
-}
-__setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
-#endif
 
 static int __init init_scsi(void)
 {
@@ -1424,7 +1108,7 @@ static int __init init_scsi(void)
 	error = scsi_init_procfs();
 	if (error)
 		goto cleanup_queue;
-	error = scsi_dev_info_list_init(scsi_dev_flags);
+	error = scsi_init_devinfo();
 	if (error)
 		goto cleanup_procfs;
 	error = scsi_sysfs_register();
@@ -1441,7 +1125,7 @@ static int __init init_scsi(void)
 	return 0;
 
 cleanup_devlist:
-	scsi_dev_info_list_delete();
+	scsi_exit_devinfo();
 cleanup_procfs:
 	scsi_exit_procfs();
 cleanup_queue:
@@ -1454,7 +1138,7 @@ cleanup_queue:
 static void __exit exit_scsi(void)
 {
 	scsi_sysfs_unregister();
-	scsi_dev_info_list_delete();
+	scsi_exit_devinfo();
 	devfs_remove("scsi");
 	scsi_exit_procfs();
 	scsi_exit_queue();

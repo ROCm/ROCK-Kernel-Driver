@@ -155,7 +155,7 @@ sim710_probe_common(struct device *dev, unsigned long base_addr,
 static __devexit int
 sim710_device_remove(struct device *dev)
 {
-	struct Scsi_Host *host = to_scsi_host(dev);
+	struct Scsi_Host *host = dev_to_shost(dev);
 	struct NCR_700_Host_Parameters *hostdata =
 		(struct NCR_700_Host_Parameters *)host->hostdata[0];
 
@@ -253,7 +253,7 @@ sim710_mca_probe(struct device *dev)
 	} else {
 		return -ENODEV;
 	}
-	strncpy(dev->name, name, sizeof(dev->name));
+	strlcpy(dev->name, name, sizeof(dev->name));
 	mca_device_set_claim(mca_dev, 1);
 	base = mca_device_transform_ioport(mca_dev, base);
 	irq_vector = mca_device_transform_irq(mca_dev, irq_vector);

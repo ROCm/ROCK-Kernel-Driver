@@ -14,6 +14,7 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
 
 /*
  * shost_show_function: macro to create an attr function that can be used to
@@ -21,9 +22,9 @@
  */
 #define shost_show_function(field, format_string)			\
 static ssize_t								\
-show_##field (struct device *dev, char *buf)				\
+show_##field (struct class_device *class_dev, char *buf)		\
 {									\
-	struct Scsi_Host *shost = to_scsi_host(dev);			\
+	struct Scsi_Host *shost = class_to_shost(class_dev);		\
 	return snprintf (buf, 20, format_string, shost->field);	\
 }
 
@@ -32,8 +33,8 @@ show_##field (struct device *dev, char *buf)				\
  * read only field.
  */
 #define shost_rd_attr(field, format_string)				\
-	shost_show_function(field, format_string)				\
-static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
+	shost_show_function(field, format_string)			\
+static CLASS_DEVICE_ATTR(field, S_IRUGO, show_##field, NULL)
 
 /*
  * Create the actual show/store functions and data structures.
@@ -44,39 +45,16 @@ shost_rd_attr(cmd_per_lun, "%hd\n");
 shost_rd_attr(sg_tablesize, "%hu\n");
 shost_rd_attr(unchecked_isa_dma, "%d\n");
 
-static struct device_attribute *const shost_attrs[] = {
-	&dev_attr_unique_id,
-	&dev_attr_host_busy,
-	&dev_attr_cmd_per_lun,
-	&dev_attr_sg_tablesize,
-	&dev_attr_unchecked_isa_dma,
+static struct class_device_attribute *const shost_attrs[] = {
+	&class_device_attr_unique_id,
+	&class_device_attr_host_busy,
+	&class_device_attr_cmd_per_lun,
+	&class_device_attr_sg_tablesize,
+	&class_device_attr_unchecked_isa_dma,
 };
 
-/**
- * scsi_host_class_name_show - copy out the SCSI host name
- * @dev:		device to check
- * @page:		copy data into this area
- * @count:		number of bytes to copy
- * @off:		start at this offset in page
- * Return:
- *     number of bytes written into page.
- **/
-static ssize_t scsi_host_class_name_show(struct device *dev, char *page)
-{
-	struct Scsi_Host *shost;
-
-	shost = to_scsi_host(dev);
-
-	if (!shost)
-		return 0;
-	
-	return snprintf(page, 20, "scsi%d\n", shost->host_no);
-}
-
-DEVICE_ATTR(class_name, S_IRUGO, scsi_host_class_name_show, NULL);
-
-struct class shost_class = {
-	.name		= "scsi-host",
+static struct class shost_class = {
+	.name		= "scsi_host",
 };
 
 /**
@@ -113,10 +91,16 @@ static struct bus_type scsi_bus_type = {
 
 int scsi_sysfs_register(void)
 {
-	bus_register(&scsi_bus_type);
-	class_register(&shost_class);
+	int error;
 
-	return 0;
+	error = bus_register(&scsi_bus_type);
+	if (error)
+		return error;
+	error = class_register(&shost_class);
+	if (error)
+		return error;
+
+	return error;
 }
 
 void scsi_sysfs_unregister(void)
@@ -272,6 +256,16 @@ static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_rescan,
 };
 
+static void scsi_device_release(struct device *dev)
+{
+	struct scsi_device *sdev;
+
+	sdev = to_scsi_device(dev);
+	if (!sdev)
+		return;
+	scsi_free_sdev(sdev);
+}
+
 /**
  * scsi_device_register - register a scsi device with the scsi bus
  * @sdev:	scsi_device to register
@@ -285,8 +279,9 @@ int scsi_device_register(struct scsi_device *sdev)
 
 	sprintf(sdev->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
-	sdev->sdev_driverfs_dev.parent = sdev->host->host_gendev;
+	sdev->sdev_driverfs_dev.parent = &sdev->host->host_gendev;
 	sdev->sdev_driverfs_dev.bus = &scsi_bus_type;
+	sdev->sdev_driverfs_dev.release = scsi_device_release;
 
 	error = device_register(&sdev->sdev_driverfs_dev);
 	if (error)
@@ -314,3 +309,77 @@ void scsi_device_unregister(struct scsi_device *sdev)
 		device_remove_file(&sdev->sdev_driverfs_dev, sdev_attrs[i]);
 	device_unregister(&sdev->sdev_driverfs_dev);
 }
+
+static void scsi_host_release(struct device *dev)
+{
+	struct Scsi_Host *shost;
+
+	shost = dev_to_shost(dev);
+	if (!shost)
+		return;
+
+	scsi_free_shost(shost);
+}
+
+void scsi_sysfs_init_host(struct Scsi_Host *shost)
+{
+	device_initialize(&shost->host_gendev);
+	snprintf(shost->host_gendev.bus_id, BUS_ID_SIZE, "host%d",
+		shost->host_no);
+	snprintf(shost->host_gendev.name, DEVICE_NAME_SIZE, "%s",
+		shost->hostt->proc_name);
+	shost->host_gendev.release = scsi_host_release;
+
+	class_device_initialize(&shost->class_dev);
+	shost->class_dev.dev = &shost->host_gendev;
+	shost->class_dev.class = &shost_class;
+	snprintf(shost->class_dev.class_id, BUS_ID_SIZE, "host%d",
+		  shost->host_no);
+}
+
+/**
+ * scsi_sysfs_add_host - add scsi host to subsystem
+ * @shost:     scsi host struct to add to subsystem
+ * @dev:       parent struct device pointer
+ **/
+int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
+{
+	int i, error;
+
+	if (!shost->host_gendev.parent)
+		shost->host_gendev.parent = (dev) ? dev : &legacy_bus;
+
+	error = device_add(&shost->host_gendev);
+	if (error)
+		return error;
+
+	error = class_device_add(&shost->class_dev);
+	if (error)
+		goto clean_device;
+
+	for (i = 0; !error && i < ARRAY_SIZE(shost_attrs); i++)
+		error = class_device_create_file(&shost->class_dev,
+					   shost_attrs[i]);
+	if (error)
+		goto clean_class;
+
+	return error;
+
+clean_class:
+	class_device_del(&shost->class_dev);
+clean_device:
+	device_del(&shost->host_gendev);
+
+	return error;
+}
+
+/**
+ * scsi_sysfs_remove_host - remove scsi host from subsystem
+ * @shost:     scsi host to remove from subsystem
+ **/
+void scsi_sysfs_remove_host(struct Scsi_Host *shost)
+{
+	class_device_del(&shost->class_dev);
+	device_del(&shost->host_gendev);
+}
+

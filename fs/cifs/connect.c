@@ -57,8 +57,8 @@ struct smb_vol {
 	mode_t file_mode;
 	mode_t dir_mode;
 	int rw;
-    unsigned int rsize;
-    unsigned int wsize;
+	unsigned int rsize;
+	unsigned int wsize;
 	unsigned short int port;
 };
 
@@ -342,7 +342,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 }
 
 int
-parse_mount_options(char *options, char *devname, struct smb_vol *vol)
+parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 {
 	char *value;
 	char *data;
@@ -572,10 +572,31 @@ int
 connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 		    const char *old_path, const struct nls_table *nls_codepage)
 {
+	unsigned char *referrals = NULL;
+	unsigned int num_referrals;
+	int rc = 0;
+
+	rc = get_dfs_path(xid, pSesInfo,old_path, nls_codepage, 
+			&num_referrals, &referrals);
+
+	/* BB Add in code to: if valid refrl, if not ip address contact
+		the helper that resolves tcp names, mount to it, try to 
+		tcon to it unmount it if fail */
+
+	/* BB free memory for referrals string BB */
+
+	return rc;
+}
+
+int
+get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
+			const char *old_path, const struct nls_table *nls_codepage, 
+			unsigned int *pnum_referrals, unsigned char ** preferrals)
+{
 	char *temp_unc;
 	int rc = 0;
-	int num_referrals = 0;
-	unsigned char *referrals = NULL;
+
+	*pnum_referrals = 0;
 
 	if (pSesInfo->ipc_tid == 0) {
 		temp_unc = kmalloc(2 /* for slashes */ +
@@ -594,11 +615,10 @@ connect_to_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 		kfree(temp_unc);
 	}
 	if (rc == 0)
-		rc = CIFSGetDFSRefer(xid, pSesInfo, old_path, &referrals,
-				     &num_referrals, nls_codepage);
+		rc = CIFSGetDFSRefer(xid, pSesInfo, old_path, preferrals,
+				     pnum_referrals, nls_codepage);
 
-	return -ENODEV;	/* BB remove and add return code processing */
-
+	return rc;
 }
 
 int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_table * nls_info)
@@ -775,7 +795,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 
 int
 cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
-	   char *mount_data, char *devname)
+	   char *mount_data, const char *devname)
 {
 	int rc = 0;
 	int xid;
@@ -791,7 +811,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	xid = GetXid();
 	cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data));
 
-	if(parse_mount_options(mount_data, devname, &volume_info)) {
+	if (parse_mount_options(mount_data, devname, &volume_info)) {
 		FreeXid(xid);
 		return -EINVAL;
 	}

@@ -68,7 +68,7 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 	version = call >> 16; /* hack for backward compatibility */
 	call &= 0xffff;
 
-	ret = -EINVAL;
+	ret = -ENOSYS;
 	switch (call) {
 	case SEMOP:
 		ret = sys_semop (first, (struct sembuf *)ptr, second);

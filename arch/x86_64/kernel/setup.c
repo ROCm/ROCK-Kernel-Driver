@@ -201,6 +201,11 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		if (!memcmp(from, "mem=", 4))
 			parse_memopt(from+4, &from); 
 
+#ifdef CONFIG_DISCONTIGMEM
+		if (!memcmp(from, "numa=", 5))
+			numa_setup(from+5); 
+#endif
+
 #ifdef CONFIG_GART_IOMMU 
 		if (!memcmp(from,"iommu=",6)) { 
 			iommu_setup(from+6); 

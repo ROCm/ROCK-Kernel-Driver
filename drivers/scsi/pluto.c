@@ -246,11 +246,6 @@ int __init pluto_detect(Scsi_Host_Template *tpnt)
 				host->max_channel = inq->channels;
 				host->irq = fc->irq;
 
-#ifdef __sparc_v9__
-				host->unchecked_isa_dma = 1;
-#endif
-
-
 				fc->channels = inq->channels + 1;
 				fc->targets = inq->targets;
 				fc->ages = ages;
@@ -345,7 +340,23 @@ static int pluto_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cm
 	return 0;
 }
 
-static Scsi_Host_Template driver_template = PLUTO;
+static Scsi_Host_Template driver_template = {
+	.name			= "Sparc Storage Array 100/200",
+	.detect			= pluto_detect,
+	.release		= pluto_release,
+	.info			= pluto_info,
+	.queuecommand		= fcp_scsi_queuecommand,
+	.slave_configure	= pluto_slave_configure,
+	.can_queue		= PLUTO_CAN_QUEUE,
+	.this_id		= -1,
+	.sg_tablesize		= 1,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+	.eh_abort_handler	= fcp_scsi_abort,
+	.eh_device_reset_handler = fcp_scsi_dev_reset,
+	.eh_bus_reset_handler	= fcp_scsi_bus_reset,
+	.eh_host_reset_handler	= fcp_scsi_host_reset,
+};
 
 #include "scsi_module.c"
 

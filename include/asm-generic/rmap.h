@@ -61,7 +61,7 @@ static inline unsigned long ptep_to_address(pte_t * ptep)
 	return page->index + low_bits;
 }
 
-#if CONFIG_HIGHPTE
+#ifdef CONFIG_HIGHPTE
 static inline pte_addr_t ptep_to_paddr(pte_t *ptep)
 {
 	pte_addr_t paddr;

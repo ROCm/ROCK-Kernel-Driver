@@ -67,6 +67,8 @@ static int sg_version_num = 30528;	/* 2 digits for each component */
 #include <scsi/scsi_ioctl.h>
 #include <scsi/sg.h>
 
+#include "scsi_logging.h"
+
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 static int sg_proc_init(void);
@@ -1350,17 +1352,12 @@ sg_attach(Scsi_Device * scsidp)
 	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
-	char devfs_name[64];
 	int k, error;
 
 	disk = alloc_disk(1);
 	if (!disk)
 		return -ENOMEM;
 
-	error = scsi_slave_attach(scsidp);
-	if (error)
-		goto out_put;
-		
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1373,7 +1370,7 @@ sg_attach(Scsi_Device * scsidp)
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
 			error = -ENOMEM;
-			goto out_detach;
+			goto out;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
 		memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
@@ -1398,7 +1395,7 @@ find_empty_slot:
 		if (NULL != sdp)
 			vfree((char *) sdp);
 		error = -ENODEV;
-		goto out_detach;
+		goto out;
 	}
 	if (k < sg_dev_max) {
 		if (NULL == sdp) {
@@ -1414,7 +1411,7 @@ find_empty_slot:
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
 		error = -ENOMEM;
-		goto out_detach;
+		goto out;
 	}
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
@@ -1449,11 +1446,9 @@ find_empty_slot:
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
 
-	sprintf(devfs_name, "%s/generic", scsidp->devfs_name);
-	devfs_register(NULL, devfs_name, 0,
-			SCSI_GENERIC_MAJOR, k,
+	devfs_mk_cdev(MKDEV(SCSI_GENERIC_MAJOR, k),
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-			&sg_fops, sdp);
+			"%s/generic", scsidp->devfs_name);
 
 	switch (scsidp->type) {
 	case TYPE_DISK:
@@ -1471,9 +1466,7 @@ find_empty_slot:
 	}
 	return 0;
 
-out_detach:
-	scsi_slave_detach(scsidp);
-out_put:
+out:
 	put_disk(disk);
 	return error;
 }
@@ -1524,7 +1517,6 @@ sg_detach(Scsi_Device * scsidp)
 			SCSI_LOG_TIMEOUT(3, printk("sg_detach: dev=%d\n", k));
 			sg_dev_arr[k] = NULL;
 		}
-		scsi_slave_detach(scsidp);
 		sg_nr_dev--;
 		break;
 	}
@@ -2666,7 +2658,7 @@ sg_allow_access(unsigned char opcode, char dev_type)
 
 #ifdef CONFIG_PROC_FS
 static int
-sg_last_dev()
+sg_last_dev(void)
 {
 	int k;
 	unsigned long iflags;
@@ -2778,7 +2770,7 @@ static struct sg_proc_leaf sg_proc_leaf_arr[] = {
 extern struct proc_dir_entry *proc_scsi;
 
 static int
-sg_proc_init()
+sg_proc_init(void)
 {
 	int k, mask;
 	int num_leaves =
@@ -2806,7 +2798,7 @@ sg_proc_init()
 }
 
 static void
-sg_proc_cleanup()
+sg_proc_cleanup(void)
 {
 	int k;
 	int num_leaves =

@@ -1768,17 +1768,20 @@ static int hrz_send (struct atm_vcc * atm_vcc, struct sk_buff * skb) {
   
   {
     unsigned int tx_len = skb->len;
-    unsigned int tx_iovcnt = ATM_SKB(skb)->iovcnt;
+    unsigned int tx_iovcnt = skb_shinfo(skb)->nr_frags;
     // remember this so we can free it later
     dev->tx_skb = skb;
     
     if (tx_iovcnt) {
       // scatter gather transfer
       dev->tx_regions = tx_iovcnt;
-      dev->tx_iovec = (struct iovec *) skb->data;
+      dev->tx_iovec = 0;		/* @@@ needs rewritten */
       dev->tx_bytes = 0;
       PRINTD (DBG_TX|DBG_BUS, "TX start scatter-gather transfer (iovec %p, len %d)",
 	      skb->data, tx_len);
+      tx_release (dev);
+      hrz_kfree_skb (skb);
+      return -EIO;
     } else {
       // simple transfer
       dev->tx_regions = 0;

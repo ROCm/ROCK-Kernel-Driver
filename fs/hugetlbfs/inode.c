@@ -62,7 +62,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 
 	down(&inode->i_sem);
 
-	UPDATE_ATIME(inode);
+	update_atime(inode);
 	vma->vm_flags |= VM_HUGETLB | VM_RESERVED;
 	vma->vm_ops = &hugetlb_vm_ops;
 	ret = hugetlb_prefault(mapping, vma);
@@ -501,7 +501,7 @@ hugetlbfs_fill_super(struct super_block * sb, void * data, int silent)
 }
 
 static struct super_block *hugetlbfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, hugetlbfs_fill_super);
 }

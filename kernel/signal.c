@@ -336,7 +336,7 @@ void __exit_signal(struct task_struct *tsk)
 		 * If there is any task waiting for the group exit
 		 * then notify it:
 		 */
-		if (sig->group_exit_task && atomic_read(&sig->count) <= 2) {
+		if (sig->group_exit_task && atomic_read(&sig->count) == sig->notify_count) {
 			wake_up_process(sig->group_exit_task);
 			sig->group_exit_task = NULL;
 		}
@@ -521,18 +521,6 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	set_tsk_thread_flag(t,TIF_SIGPENDING);
 
 	/*
-	 * If the task is running on a different CPU
-	 * force a reschedule on the other CPU to make
-	 * it notice the new signal quickly.
-	 *
-	 * The code below is a tad loose and might occasionally
-	 * kick the wrong CPU if we catch the process in the
-	 * process of changing - but no harm is done by that
-	 * other than doing an extra (lightweight) IPI interrupt.
-	 */
-	if (t->state == TASK_RUNNING)
-		kick_if_running(t);
-	/*
 	 * If resume is set, we want to wake it up in the TASK_STOPPED case.
 	 * We don't check for TASK_STOPPED because there is a race with it
 	 * executing another processor and just now entering stopped state.
@@ -543,7 +531,7 @@ inline void signal_wake_up(struct task_struct *t, int resume)
 	if (resume)
 		mask |= TASK_STOPPED;
 	if (t->state & mask) {
-		wake_up_process(t);
+		wake_up_process_kick(t);
 		return;
 	}
 }
@@ -761,7 +749,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 
 	if (!irqs_disabled())
 		BUG();
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&t->sighand->siglock))
 		BUG();
 #endif
@@ -846,7 +834,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	unsigned int mask;
 	int ret = 0;
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	if (!spin_is_locked(&p->sighand->siglock))
 		BUG();
 #endif
@@ -1146,6 +1134,7 @@ int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret;
+	unsigned long flags;
 
 	/*
 	 * We need the tasklist lock even for the specific
@@ -1154,9 +1143,9 @@ send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 	 * going away or changing from under us.
 	 */
 	read_lock(&tasklist_lock);  
-	spin_lock_irq(&p->sighand->siglock);
+	spin_lock_irqsave(&p->sighand->siglock, flags);
 	ret = specific_send_sig_info(sig, info, p);
-	spin_unlock_irq(&p->sighand->siglock);
+	spin_unlock_irqrestore(&p->sighand->siglock, flags);
 	read_unlock(&tasklist_lock);
 	return ret;
 }
@@ -1357,6 +1346,9 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent)
 	spin_unlock_irqrestore(&sighand->siglock, flags);
 }
 
+
+#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
+
 static void
 finish_stop(int stop_count)
 {
@@ -1470,9 +1462,6 @@ do_signal_stop(int signr)
 
 	finish_stop(stop_count);
 }
-
-
-#ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER
 
 /*
  * Do appropriate magic when group_stop_count > 0.

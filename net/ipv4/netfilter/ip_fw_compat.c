@@ -15,33 +15,9 @@ struct notifier_block;
 #include <linux/netfilter_ipv4/compat_firewall.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 #include <linux/netfilter_ipv4/ip_conntrack_core.h>
+#include "ip_fw_compat.h"
 
 static struct firewall_ops *fwops;
-
-/* From ip_fw_compat_redir.c */
-extern unsigned int
-do_redirect(struct sk_buff *skb,
-	    const struct net_device *dev,
-	    u_int16_t redirpt);
-
-extern void
-check_for_redirect(struct sk_buff *skb);
-
-extern void
-check_for_unredirect(struct sk_buff *skb);
-
-/* From ip_fw_compat_masq.c */
-extern unsigned int
-do_masquerade(struct sk_buff **pskb, const struct net_device *dev);
-
-extern unsigned int
-check_for_masq_error(struct sk_buff *pskb);
-
-extern unsigned int
-check_for_demasq(struct sk_buff **pskb);
-
-extern int __init masq_init(void);
-extern void masq_cleanup(void);
 
 /* They call these; we do what they want. */
 int register_firewall(int pf, struct firewall_ops *fw)
@@ -75,31 +51,17 @@ fw_in(unsigned int hooknum,
 	int ret = FW_BLOCK;
 	u_int16_t redirpt;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	/* Assume worse case: any hook could change packet */
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		(*pskb)->ip_summed = CHECKSUM_NONE;
-
-	/* Firewall rules can alter TOS: raw socket (tcpdump) may have
-           clone of incoming skb: don't disturb it --RR */
-	if (skb_cloned(*pskb) && !(*pskb)->sk) {
-		struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
-		if (!nskb)
-			return NF_DROP;
-		kfree_skb(*pskb);
-		*pskb = nskb;
-	}
 
 	switch (hooknum) {
 	case NF_IP_PRE_ROUTING:
 		if (fwops->fw_acct_in)
 			fwops->fw_acct_in(fwops, PF_INET,
 					  (struct net_device *)in,
-					  (*pskb)->nh.raw, &redirpt, pskb);
+					  &redirpt, pskb);
 
 		if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET)) {
 			*pskb = ip_ct_gather_frags(*pskb);
@@ -109,7 +71,7 @@ fw_in(unsigned int hooknum,
 		}
 
 		ret = fwops->fw_input(fwops, PF_INET, (struct net_device *)in,
-				      (*pskb)->nh.raw, &redirpt, pskb);
+				      &redirpt, pskb);
 		break;
 
 	case NF_IP_FORWARD:
@@ -119,18 +81,18 @@ fw_in(unsigned int hooknum,
 			ret = FW_ACCEPT;
 		else ret = fwops->fw_forward(fwops, PF_INET,
 					     (struct net_device *)out,
-					     (*pskb)->nh.raw, &redirpt, pskb);
+					     &redirpt, pskb);
 		break;
 
 	case NF_IP_POST_ROUTING:
 		ret = fwops->fw_output(fwops, PF_INET,
 				       (struct net_device *)out,
-				       (*pskb)->nh.raw, &redirpt, pskb);
+				       &redirpt, pskb);
 		if (ret == FW_ACCEPT || ret == FW_SKIP) {
 			if (fwops->fw_acct_out)
 				fwops->fw_acct_out(fwops, PF_INET,
 						   (struct net_device *)out,
-						   (*pskb)->nh.raw, &redirpt,
+						   &redirpt,
 						   pskb);
 
 			/* ip_conntrack_confirm return NF_DROP or NF_ACCEPT */
@@ -167,7 +129,7 @@ fw_in(unsigned int hooknum,
 			/* Handle ICMP errors from client here */
 			if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP
 			    && (*pskb)->nfct)
-				check_for_masq_error(*pskb);
+				check_for_masq_error(pskb);
 		}
 		return NF_ACCEPT;
 
@@ -193,10 +155,6 @@ static unsigned int fw_confirm(unsigned int hooknum,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *))
 {
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	return ip_conntrack_confirm(*pskb);
 }
 

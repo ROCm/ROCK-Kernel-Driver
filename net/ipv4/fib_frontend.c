@@ -115,9 +115,9 @@ struct net_device * ip_dev_find(u32 addr)
 	if (res.type != RTN_LOCAL)
 		goto out;
 	dev = FIB_RES_DEV(res);
-	if (dev)
-		atomic_inc(&dev->refcnt);
 
+	if (dev)
+		dev_hold(dev);
 out:
 	fib_res_put(&res);
 	return dev;

@@ -73,7 +73,7 @@ struct svc_serv {
  * This assumes that the non-page part of an rpc reply will fit
  * in a page - NFSd ensures this.  lockd also has no trouble.
  */
-#define RPCSVC_MAXPAGES		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 2)
+#define RPCSVC_MAXPAGES		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 1)
 
 static inline u32 svc_getu32(struct iovec *iov)
 {
@@ -176,8 +176,10 @@ static inline int svc_take_page(struct svc_rqst *rqstp)
 {
 	if (rqstp->rq_arghi <= rqstp->rq_argused)
 		return -ENOMEM;
-	rqstp->rq_respages[rqstp->rq_resused++] =
-		rqstp->rq_argpages[--rqstp->rq_arghi];
+	rqstp->rq_arghi--;
+	rqstp->rq_respages[rqstp->rq_resused] =
+		rqstp->rq_argpages[rqstp->rq_arghi];
+	rqstp->rq_resused++;
 	return 0;
 }
 

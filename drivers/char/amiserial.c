@@ -490,7 +490,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 	}
 }
 
-static void ser_vbl_int( int irq, void *data, struct pt_regs *regs)
+static irqreturn_t ser_vbl_int( int irq, void *data, struct pt_regs *regs)
 {
         /* vbl is just a periodic interrupt we tie into to update modem status */
 	struct async_struct * info = IRQ_ports;
@@ -500,9 +500,10 @@ static void ser_vbl_int( int irq, void *data, struct pt_regs *regs)
 	 */
 	if(info->IER & UART_IER_MSI)
 	  check_modem_status(info);
+	return IRQ_HANDLED;
 }
 
-static void ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct async_struct * info;
 
@@ -512,16 +513,17 @@ static void ser_rx_int(int irq, void *dev_id, struct pt_regs * regs)
 
 	info = IRQ_ports;
 	if (!info || !info->tty)
-		return;
+		return IRQ_NONE;
 
 	receive_chars(info);
 	info->last_active = jiffies;
 #ifdef SERIAL_DEBUG_INTR
 	printk("end.\n");
 #endif
+	return IRQ_HANDLED;
 }
 
-static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct async_struct * info;
 
@@ -532,7 +534,7 @@ static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 
 	  info = IRQ_ports;
 	  if (!info || !info->tty)
-	    return;
+		return IRQ_NONE;
 
 	  transmit_chars(info);
 	  info->last_active = jiffies;
@@ -540,6 +542,7 @@ static void ser_tx_int(int irq, void *dev_id, struct pt_regs * regs)
 	  printk("end.\n");
 #endif
 	}
+	return IRQ_HANDLED;
 }
 
 /*
@@ -1528,7 +1531,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 
 	if (tty_hung_up_p(filp)) {
 		DBG_CNT("before DEC-hung");
-		MOD_DEC_USE_COUNT;
 		local_irq_restore(flags);
 		return;
 	}
@@ -1555,7 +1557,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	if (state->count) {
 		DBG_CNT("before DEC-2");
-		MOD_DEC_USE_COUNT;
 		local_irq_restore(flags);
 		return;
 	}
@@ -1615,7 +1616,6 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	info->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE|
 			 ASYNC_CLOSING);
 	wake_up_interruptible(&info->close_wait);
-	MOD_DEC_USE_COUNT;
 	local_irq_restore(flags);
 }
 
@@ -1894,15 +1894,12 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	int 			retval, line;
 	unsigned long		page;
 
-	MOD_INC_USE_COUNT;
 	line = tty->index;
 	if ((line < 0) || (line >= NR_PORTS)) {
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 	retval = get_async_struct(line, &info);
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 	tty->driver_data = info;
@@ -2116,6 +2113,7 @@ static int __init rs_init(void)
 
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.owner = THIS_MODULE;
 	serial_driver.driver_name = "amiserial";
 	serial_driver.name = "ttyS";
 	serial_driver.major = TTY_MAJOR;

@@ -244,7 +244,7 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 		if (inode->i_op && inode->i_op->readlink) {
 			error = security_inode_readlink(nd.dentry);
 			if (!error) {
-				UPDATE_ATIME(inode);
+				update_atime(inode);
 				error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
 			}
 		}

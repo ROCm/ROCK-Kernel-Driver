@@ -348,7 +348,7 @@ static int acsicmd_dma( const char *cmd, char *buffer, int blocks, int
                         rwflag, int enable);
 static int acsi_reqsense( char *buffer, int targ, int lun);
 static void acsi_print_error(const unsigned char *errblk, int struct acsi_info_struct *aip);
-static void acsi_interrupt (int irq, void *data, struct pt_regs *fp);
+static irqreturn_t acsi_interrupt (int irq, void *data, struct pt_regs *fp);
 static void unexpected_acsi_interrupt( void );
 static void bad_rw_intr( void );
 static void read_intr( void );
@@ -728,7 +728,7 @@ static void acsi_print_error(const unsigned char *errblk, struct acsi_info_struc
  *
  *******************************************************************/
 
-static void acsi_interrupt(int irq, void *data, struct pt_regs *fp )
+static irqreturn_t acsi_interrupt(int irq, void *data, struct pt_regs *fp )
 
 {	void (*acsi_irq_handler)(void) = do_acsi;
 
@@ -738,6 +738,7 @@ static void acsi_interrupt(int irq, void *data, struct pt_regs *fp )
 	if (!acsi_irq_handler)
 		acsi_irq_handler = unexpected_acsi_interrupt;
 	acsi_irq_handler();
+	return IRQ_HANDLED;
 }
 
 

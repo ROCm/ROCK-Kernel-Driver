@@ -521,6 +521,7 @@ static int __devinit TLan_probe1(struct pci_dev *pdev,
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 	
 	priv = dev->priv;
 
@@ -1536,7 +1537,7 @@ u32 TLan_HandleRxEOF( struct net_device *dev, u16 host_int )
 				t = (void *) skb_put( new_skb, TLAN_MAX_FRAME_SIZE );
 				head_list->buffer[0].address = pci_map_single(priv->pciDev, new_skb->data, TLAN_MAX_FRAME_SIZE, PCI_DMA_FROMDEVICE);
 				head_list->buffer[8].address = (u32) t;
-#ifdef __LP64__
+#if BITS_PER_LONG==64
 #error "Not 64bit clean"
 #endif				
 				head_list->buffer[9].address = (u32) new_skb;

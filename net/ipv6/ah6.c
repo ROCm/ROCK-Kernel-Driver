@@ -36,17 +36,6 @@
 #include <net/xfrm.h>
 #include <asm/scatterlist.h>
 
-/* XXX no ipv6 ah specific */
-#define NIP6(addr) \
-	ntohs((addr).s6_addr16[0]),\
-	ntohs((addr).s6_addr16[1]),\
-	ntohs((addr).s6_addr16[2]),\
-	ntohs((addr).s6_addr16[3]),\
-	ntohs((addr).s6_addr16[4]),\
-	ntohs((addr).s6_addr16[5]),\
-	ntohs((addr).s6_addr16[6]),\
-	ntohs((addr).s6_addr16[7])
-
 int ah6_output(struct sk_buff *skb)
 {
 	int err;
@@ -75,8 +64,10 @@ int ah6_output(struct sk_buff *skb)
 		skb->nh.ipv6h->version = 6;
 		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 		skb->nh.ipv6h->nexthdr = IPPROTO_AH;
-		memcpy(&skb->nh.ipv6h->saddr, &x->props.saddr, sizeof(struct in6_addr));
-		memcpy(&skb->nh.ipv6h->daddr, &x->id.daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&skb->nh.ipv6h->saddr,
+			       (struct in6_addr *) &x->props.saddr);
+		ipv6_addr_copy(&skb->nh.ipv6h->daddr,
+			       (struct in6_addr *) &x->id.daddr);
 		ah = (struct ip_auth_hdr*)(skb->nh.ipv6h+1);
 		ah->nexthdr = IPPROTO_IPV6;
 	} else {

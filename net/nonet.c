@@ -8,6 +8,7 @@
  * Copyright (c) Matthew Wilcox 2003
  */
 
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -24,5 +25,6 @@ static int sock_no_open(struct inode *irrelevant, struct file *dontcare)
 }
 
 struct file_operations bad_sock_fops = {
+	.owner = THIS_MODULE,
 	.open = sock_no_open,
 };

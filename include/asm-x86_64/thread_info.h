@@ -68,7 +68,7 @@ static inline struct thread_info *current_thread_info(void)
 static inline struct thread_info *stack_thread_info(void)
 {
 	struct thread_info *ti;
-	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));
+	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~(THREAD_SIZE - 1)));
 	return ti;
 }
 
@@ -104,6 +104,7 @@ static inline struct thread_info *stack_thread_info(void)
 #define TIF_IRET		5	/* force IRET */
 #define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
 #define TIF_IA32		17	/* 32bit process */ 
+#define TIF_FORK		18	/* ret_from_fork */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
@@ -113,6 +114,7 @@ static inline struct thread_info *stack_thread_info(void)
 #define _TIF_IRET		(1<<TIF_IRET)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 #define _TIF_IA32		(1<<TIF_IA32)
+#define _TIF_FORK		(1<<TIF_FORK)
 
 #define _TIF_WORK_MASK		0x0000FFFE	/* work to do on interrupt/exception return */
 #define _TIF_ALLWORK_MASK	0x0000FFFF	/* work to do on any return to u-space */

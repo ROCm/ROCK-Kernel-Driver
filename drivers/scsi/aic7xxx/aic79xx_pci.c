@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#70 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#71 $
  *
  * $FreeBSD$
  */
@@ -565,14 +565,13 @@ ahd_check_extport(struct ahd_softc *ahd)
 #if AHD_DEBUG
 	if (have_seeprom != 0
 	 && (ahd_debug & AHD_DUMP_SEEPROM) != 0) {
-		uint8_t *sc_data;
-		int	 i;
+		uint16_t *sc_data;
+		int	  i;
 
 		printf("%s: Seeprom Contents:", ahd_name(ahd));
-		sc_data = (uint8_t *)sc;
+		sc_data = (uint16_t *)sc;
 		for (i = 0; i < (sizeof(*sc)); i += 2)
-			printf("\n\t0x%.4x", 
-			       sc_data[i] | (sc_data[i+1] << 8));
+			printf("\n\t0x%.4x", sc_data[i]);
 		printf("\n");
 	}
 #endif

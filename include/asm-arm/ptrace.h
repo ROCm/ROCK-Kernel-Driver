@@ -17,8 +17,6 @@
 #define instruction_pointer(regs) \
 	(pc_pointer((regs)->ARM_pc))
 
-#define force_successful_syscall_return()	do { } while (0)
-
 #ifdef __KERNEL__
 extern void show_regs(struct pt_regs *);
 

@@ -204,6 +204,12 @@ extern inline pmd_t *pmd_offset (pgd_t *pgd, unsigned long address)
 #define pte_unmap(pte) kunmap(pte)
 #define pte_unmap_nested(pte) kunmap(pte)
 
+/* Macros to (de)construct the fake PTEs representing swap pages. */
+#define __swp_type(x)		((x).val & 0x7F)
+#define __swp_offset(x)		(((x).val) >> 7)
+#define __swp_entry(type,offset) ((swp_entry_t) { ((type) | ((offset) << 7)) })
+#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
+#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
 #endif	/* !__ASSEMBLY__ */
 #endif	/* !_SUN3_PGTABLE_H */

@@ -651,7 +651,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	int		lo_flags = 0;
 	int		error;
 
-	MOD_INC_USE_COUNT;
+	/* This is safe, since we have a reference from open(). */
+	__module_get(THIS_MODULE);
 
 	error = -EBUSY;
 	if (lo->lo_state != Lo_unbound)
@@ -751,7 +752,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
  out_putf:
 	fput(file);
  out:
-	MOD_DEC_USE_COUNT;
+	/* This is safe: open() is still holding a reference. */
+	module_put(THIS_MODULE);
 	return error;
 }
 
@@ -824,7 +826,8 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
-	MOD_DEC_USE_COUNT;
+	/* This is safe: open() is still holding a reference. */
+	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -864,7 +867,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	if (err)
 		return err;	
 
-	strncpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
+	strlcpy(lo->lo_name, info->lo_name, LO_NAME_SIZE);
 
 	lo->transfer = xfer_funcs[type]->transfer;
 	lo->ioctl = xfer_funcs[type]->ioctl;
@@ -899,7 +902,7 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 	info->lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
 	info->lo_offset = lo->lo_offset;
 	info->lo_flags = lo->lo_flags;
-	strncpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
+	strlcpy(info->lo_name, lo->lo_name, LO_NAME_SIZE);
 	info->lo_encrypt_type = lo->lo_encrypt_type;
 	if (lo->lo_encrypt_key_size && capable(CAP_SYS_ADMIN)) {
 		info->lo_encrypt_key_size = lo->lo_encrypt_key_size;

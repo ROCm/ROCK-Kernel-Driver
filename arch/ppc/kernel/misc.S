@@ -534,7 +534,7 @@ _GLOBAL(flush_instruction_cache)
 	isync
 	lis	r5, IDC_INVALL@h
 	mtspr	IC_CST, r5
-#elif defined(CONFIG_40x)
+#elif defined(CONFIG_4xx)
 #ifdef CONFIG_403GCX
 	li      r3, 512
 	mtctr   r3
@@ -1365,13 +1365,13 @@ _GLOBAL(sys_call_table)
 	.long sys_epoll_create
 	.long sys_epoll_ctl
 	.long sys_epoll_wait
- 	.long sys_remap_file_pages
- 	.long sys_timer_create	/* 240 */
- 	.long sys_timer_settime
- 	.long sys_timer_gettime
- 	.long sys_timer_getoverrun
- 	.long sys_timer_delete
- 	.long sys_clock_settime	/* 245 */
- 	.long sys_clock_gettime
- 	.long sys_clock_getres
- 	.long sys_clock_nanosleep
+	.long sys_remap_file_pages
+	.long sys_timer_create	/* 240 */
+	.long sys_timer_settime
+	.long sys_timer_gettime
+	.long sys_timer_getoverrun
+	.long sys_timer_delete
+	.long sys_clock_settime	/* 245 */
+	.long sys_clock_gettime
+	.long sys_clock_getres
+	.long sys_clock_nanosleep

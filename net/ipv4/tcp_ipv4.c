@@ -74,7 +74,6 @@
 #include <linux/seq_file.h>
 
 extern int sysctl_ip_dynaddr;
-extern int sysctl_ip_default_ttl;
 int sysctl_tcp_tw_reuse;
 int sysctl_tcp_low_latency;
 
@@ -171,7 +170,7 @@ static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
+inline void tcp_inherit_port(struct sock *sk, struct sock *child)
 {
 	local_bh_disable();
 	__tcp_inherit_port(sk, child);
@@ -316,7 +315,7 @@ static void __tcp_put_port(struct sock *sk)
 	spin_unlock(&head->lock);
 }
 
-__inline__ void tcp_put_port(struct sock *sk)
+inline void tcp_put_port(struct sock *sk)
 {
 	local_bh_disable();
 	__tcp_put_port(sk);
@@ -458,8 +457,8 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 }
 
 /* Optimize the common listener case. */
-__inline__ struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
-					       int dif)
+inline struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
+					   int dif)
 {
 	struct sock *sk;
 
@@ -529,8 +528,8 @@ static inline struct sock *__tcp_v4_lookup(u32 saddr, u16 sport,
 	return sk ? : tcp_v4_lookup_listener(daddr, hnum, dif);
 }
 
-__inline__ struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
-				      u16 dport, int dif)
+inline struct sock *tcp_v4_lookup(u32 saddr, u16 sport, u32 daddr,
+				  u16 dport, int dif)
 {
 	struct sock *sk;
 
@@ -633,7 +632,6 @@ unique:
 	} else if (tw) {
 		/* Silly. Should hash-dance instead... */
 		tcp_tw_deschedule(tw);
-		tcp_timewait_kill(tw);
 		NET_INC_STATS_BH(TimeWaitRecycled);
 
 		tcp_tw_put(tw);
@@ -737,7 +735,6 @@ ok:
 
  		if (tw) {
  			tcp_tw_deschedule(tw);
- 			tcp_timewait_kill(tw);
  			tcp_tw_put(tw);
  		}
 
@@ -1215,7 +1212,6 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 				      sizeof(struct tcphdr), IPPROTO_TCP, 0);
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2;
 
-	inet_sk(tcp_socket->sk)->ttl = sysctl_ip_default_ttl;
 	ip_send_reply(tcp_socket->sk, skb, &arg, sizeof rth);
 
 	TCP_INC_STATS_BH(TcpOutSegs);
@@ -1853,7 +1849,6 @@ do_time_wait:
 							  tcp_v4_iif(skb));
 		if (sk2) {
 			tcp_tw_deschedule((struct tcp_tw_bucket *)sk);
-			tcp_timewait_kill((struct tcp_tw_bucket *)sk);
 			tcp_tw_put((struct tcp_tw_bucket *)sk);
 			sk = sk2;
 			goto process;
@@ -2134,19 +2129,6 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 #ifdef CONFIG_PROC_FS
 /* Proc filesystem TCP sock list dumping. */
 
-enum tcp_seq_states {
-	TCP_SEQ_STATE_LISTENING,
-	TCP_SEQ_STATE_OPENREQ,
-	TCP_SEQ_STATE_ESTABLISHED,
-	TCP_SEQ_STATE_TIME_WAIT,
-};
-
-struct tcp_iter_state {
-	enum tcp_seq_states state;
-	struct sock	   *syn_wait_sk;
-	int		    bucket, sbucket, num, uid;
-};
-
 static void *listening_get_first(struct seq_file *seq)
 {
 	struct tcp_iter_state* st = seq->private;
@@ -2160,7 +2142,7 @@ static void *listening_get_first(struct seq_file *seq)
 		if (!sk)
 			continue;
 		++st->num;
-		if (TCP_INET_FAMILY(sk->family)) {
+		if (sk->family == st->family) {
 			rc = sk;
 			goto out;
 		}
@@ -2174,7 +2156,7 @@ static void *listening_get_first(struct seq_file *seq)
 			     ++st->sbucket) {
 				for (req = tp->listen_opt->syn_table[st->sbucket];
 				     req; req = req->dl_next, ++st->num) {
-					if (!TCP_INET_FAMILY(req->class->family))
+					if (req->class->family != st->family)
 						continue;
 					rc = req;
 					goto out;
@@ -2202,7 +2184,7 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 		while (1) {
 			while (req) {
 				++st->num;
-				if (TCP_INET_FAMILY(req->class->family)) {
+				if (req->class->family == st->family) {
 					cur = req;
 					goto out;
 				}
@@ -2220,7 +2202,7 @@ get_req:
 		sk = sk->next;
 get_sk:
 	while (sk) {
-		if (TCP_INET_FAMILY(sk->family)) {
+		if (sk->family == st->family) {
 			cur = sk;
 			goto out;
 		}
@@ -2267,7 +2249,7 @@ static void *established_get_first(struct seq_file *seq)
 		read_lock(&tcp_ehash[st->bucket].lock);
 		for (sk = tcp_ehash[st->bucket].chain; sk;
 		     sk = sk->next, ++st->num) {
-			if (!TCP_INET_FAMILY(sk->family))
+			if (sk->family != st->family)
 				continue;
 			rc = sk;
 			goto out;
@@ -2276,7 +2258,7 @@ static void *established_get_first(struct seq_file *seq)
 		for (tw = (struct tcp_tw_bucket *)
 				tcp_ehash[st->bucket + tcp_ehash_size].chain;
 		     tw; tw = (struct tcp_tw_bucket *)tw->next, ++st->num) {
-			if (!TCP_INET_FAMILY(tw->family))
+			if (tw->family != st->family)
 				continue;
 			rc = tw;
 			goto out;
@@ -2298,7 +2280,7 @@ static void *established_get_next(struct seq_file *seq, void *cur)
 		tw = cur;
 		tw = (struct tcp_tw_bucket *)tw->next;
 get_tw:
-		while (tw && !TCP_INET_FAMILY(tw->family)) {
+		while (tw && tw->family != st->family) {
 			++st->num;
 			tw = (struct tcp_tw_bucket *)tw->next;
 		}
@@ -2318,7 +2300,7 @@ get_tw:
 	} else
 		sk = sk->next;
 
-	while (sk && !TCP_INET_FAMILY(sk->family)) {
+	while (sk && sk->family != st->family) {
 		++st->num;
 		sk = sk->next;
 	}
@@ -2422,8 +2404,66 @@ static void tcp_seq_stop(struct seq_file *seq, void *v)
 	}
 }
 
-static void get_openreq(struct sock *sk, struct open_request *req,
-			char *tmpbuf, int i, int uid)
+static int tcp_seq_open(struct inode *inode, struct file *file)
+{
+	struct tcp_seq_afinfo *afinfo = PDE(inode)->data;
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct tcp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	memset(s, 0, sizeof(*s));
+	s->family		= afinfo->family;
+	s->seq_ops.start	= tcp_seq_start;
+	s->seq_ops.next		= tcp_seq_next;
+	s->seq_ops.show		= afinfo->seq_show;
+	s->seq_ops.stop		= tcp_seq_stop;
+
+	rc = seq_open(file, &s->seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq	     = file->private_data;
+	seq->private = s;
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+int tcp_proc_register(struct tcp_seq_afinfo *afinfo)
+{
+	int rc = 0;
+	struct proc_dir_entry *p;
+
+	if (!afinfo)
+		return -EINVAL;
+	afinfo->seq_fops->owner		= afinfo->owner;
+	afinfo->seq_fops->open		= tcp_seq_open;
+	afinfo->seq_fops->read		= seq_read;
+	afinfo->seq_fops->llseek	= seq_lseek;
+	afinfo->seq_fops->release	= seq_release_private;
+	
+	p = create_proc_entry(afinfo->name, S_IRUGO, proc_net);
+	if (p) {
+		p->data = afinfo;
+		p->proc_fops = afinfo->seq_fops;
+	} else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo)
+{
+	if (!afinfo)
+		return;
+	remove_proc_entry(afinfo->name, proc_net);
+	memset(afinfo->seq_fops, 0, sizeof(*afinfo->seq_fops)); 
+}
+
+static void get_openreq4(struct sock *sk, struct open_request *req,
+			 char *tmpbuf, int i, int uid)
 {
 	int ttd = req->expires - jiffies;
 
@@ -2446,7 +2486,7 @@ static void get_openreq(struct sock *sk, struct open_request *req,
 		req);
 }
 
-static void get_tcp_sock(struct sock *sp, char *tmpbuf, int i)
+static void get_tcp4_sock(struct sock *sp, char *tmpbuf, int i)
 {
 	int timer_active;
 	unsigned long timer_expires;
@@ -2486,7 +2526,7 @@ static void get_tcp_sock(struct sock *sp, char *tmpbuf, int i)
 		tp->snd_ssthresh >= 0xFFFF ? -1 : tp->snd_ssthresh);
 }
 
-static void get_timewait_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
+static void get_timewait4_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
 {
 	unsigned int dest, src;
 	__u16 destp, srcp;
@@ -2509,7 +2549,7 @@ static void get_timewait_sock(struct tcp_tw_bucket *tw, char *tmpbuf, int i)
 
 #define TMPSZ 150
 
-static int tcp_seq_show(struct seq_file *seq, void *v)
+static int tcp4_seq_show(struct seq_file *seq, void *v)
 {
 	struct tcp_iter_state* st;
 	char tmpbuf[TMPSZ + 1];
@@ -2526,13 +2566,13 @@ static int tcp_seq_show(struct seq_file *seq, void *v)
 	switch (st->state) {
 	case TCP_SEQ_STATE_LISTENING:
 	case TCP_SEQ_STATE_ESTABLISHED:
-		get_tcp_sock(v, tmpbuf, st->num);
+		get_tcp4_sock(v, tmpbuf, st->num);
 		break;
 	case TCP_SEQ_STATE_OPENREQ:
-		get_openreq(st->syn_wait_sk, v, tmpbuf, st->num, st->uid);
+		get_openreq4(st->syn_wait_sk, v, tmpbuf, st->num, st->uid);
 		break;
 	case TCP_SEQ_STATE_TIME_WAIT:
-		get_timewait_sock(v, tmpbuf, st->num);
+		get_timewait4_sock(v, tmpbuf, st->num);
 		break;
 	}
 	seq_printf(seq, "%-*s\n", TMPSZ - 1, tmpbuf);
@@ -2540,56 +2580,23 @@ out:
 	return 0;
 }
 
-static struct seq_operations tcp_seq_ops = {
-	.start	=	tcp_seq_start,
-	.next	=	tcp_seq_next,
-	.stop	=	tcp_seq_stop,
-	.show	=	tcp_seq_show,
+static struct file_operations tcp4_seq_fops;
+static struct tcp_seq_afinfo tcp4_seq_afinfo = {
+	.owner		= THIS_MODULE,
+	.name		= "tcp",
+	.family		= AF_INET,
+	.seq_show	= tcp4_seq_show,
+	.seq_fops	= &tcp4_seq_fops,
 };
 
-static int tcp_seq_open(struct inode *inode, struct file *file)
+int __init tcp4_proc_init(void)
 {
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct tcp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
-
-	if (!s)
-		goto out;
-	rc = seq_open(file, &tcp_seq_ops);
-	if (rc)
-		goto out_kfree;
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
+	return tcp_proc_register(&tcp4_seq_afinfo);
 }
 
-static struct file_operations tcp_seq_fops = {
-	.open		=	tcp_seq_open,
-	.read		=	seq_read,
-	.llseek		=	seq_lseek,
-	.release	=	ip_seq_release,
-};
-
-int __init tcp_proc_init(void)
+void tcp4_proc_exit(void)
 {
-	int rc = 0;
-	struct proc_dir_entry *p = create_proc_entry("tcp", S_IRUGO, proc_net);
-
-	if (p)
-		p->proc_fops = &tcp_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
-}
-
-void __init tcp_proc_exit(void)
-{
-	remove_proc_entry("tcp", proc_net);
+	tcp_proc_unregister(&tcp4_seq_afinfo);
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -2621,7 +2628,7 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	if (err < 0)
 		panic("Failed to create the TCP control socket.\n");
 	tcp_socket->sk->allocation   = GFP_ATOMIC;
-	inet_sk(tcp_socket->sk)->ttl = MAXTTL;
+	inet_sk(tcp_socket->sk)->uc_ttl = -1;
 
 	/* Unhash it so that IP input processing does not even
 	 * see it, we do not wish this socket to see incoming

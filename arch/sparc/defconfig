@@ -2,7 +2,6 @@
 # Automatically generated make config: don't edit
 #
 CONFIG_MMU=y
-CONFIG_SWAP=y
 CONFIG_UID16=y
 CONFIG_HIGHMEM=y
 CONFIG_GENERIC_ISA_DMA=y
@@ -15,10 +14,11 @@ CONFIG_EXPERIMENTAL=y
 #
 # General setup
 #
-CONFIG_NET=y
+CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
+CONFIG_LOG_BUF_SHIFT=14
 
 #
 # Loadable module support
@@ -26,6 +26,8 @@ CONFIG_SYSCTL=y
 CONFIG_MODULES=y
 CONFIG_MODULE_UNLOAD=y
 # CONFIG_MODULE_FORCE_UNLOAD is not set
+CONFIG_OBSOLETE_MODPARM=y
+# CONFIG_MODVERSIONS is not set
 CONFIG_KMOD=y
 
 #
@@ -45,6 +47,7 @@ CONFIG_RWSEM_GENERIC_SPINLOCK=y
 CONFIG_SUN_PM=y
 # CONFIG_SUN4 is not set
 CONFIG_PCI=y
+# CONFIG_PCI_LEGACY_PROC is not set
 # CONFIG_PCI_NAMES is not set
 CONFIG_SUN_OPENPROMFS=m
 CONFIG_KCORE_ELF=y
@@ -59,15 +62,17 @@ CONFIG_SUNOS_EMUL=y
 # CONFIG_PARPORT is not set
 
 #
-# Console drivers
-#
-# CONFIG_PROM_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
-
-#
-# Frame-buffer support
+# Graphics support
 #
 # CONFIG_FB is not set
+
+#
+# Console display driver support
+#
+# CONFIG_VGA_CONSOLE is not set
+# CONFIG_MDA_CONSOLE is not set
+# CONFIG_PROM_CONSOLE is not set
+CONFIG_DUMMY_CONSOLE=y
 
 #
 # Memory Technology Devices (MTD)
@@ -130,12 +135,42 @@ CONFIG_BLK_DEV_INITRD=y
 #
 # SCSI support
 #
-# CONFIG_SCSI is not set
+CONFIG_SCSI=y
+
+#
+# SCSI support type (disk, tape, CDrom)
+#
+CONFIG_BLK_DEV_SD=y
+CONFIG_SD_EXTRA_DEVS=40
+# CONFIG_CHR_DEV_ST is not set
+# CONFIG_CHR_DEV_OSST is not set
+CONFIG_BLK_DEV_SR=m
+# CONFIG_BLK_DEV_SR_VENDOR is not set
+CONFIG_SR_EXTRA_DEVS=2
+CONFIG_CHR_DEV_SG=m
+
+#
+# Some SCSI devices (e.g. CD jukebox) support multiple LUNs
+#
+# CONFIG_SCSI_MULTI_LUN is not set
+# CONFIG_SCSI_CONSTANTS is not set
+# CONFIG_SCSI_LOGGING is not set
+
+#
+# SCSI low-level drivers
+#
+CONFIG_SCSI_SUNESP=y
+CONFIG_SCSI_QLOGICPTI=m
 
 #
 # Fibre Channel support
 #
 # CONFIG_FC4 is not set
+
+#
+# Networking support
+#
+CONFIG_NET=y
 
 #
 # Networking options
@@ -389,6 +424,7 @@ CONFIG_NLS_DEFAULT="iso8859-1"
 # USB support
 #
 # CONFIG_USB is not set
+# CONFIG_USB_GADGET is not set
 
 #
 # Bluetooth support
@@ -407,6 +443,7 @@ CONFIG_DEBUG_SLAB=y
 CONFIG_MAGIC_SYSRQ=y
 CONFIG_DEBUG_SPINLOCK=y
 # CONFIG_DEBUG_SPINLOCK_SLEEP is not set
+CONFIG_DEBUG_BUGVERBOSE=y
 
 #
 # Security options

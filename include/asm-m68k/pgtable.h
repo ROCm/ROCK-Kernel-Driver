@@ -136,25 +136,6 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 {
 }
 
-#ifdef CONFIG_SUN3
-/* Macros to (de)construct the fake PTEs representing swap pages. */
-#define __swp_type(x)		((x).val & 0x7F)
-#define __swp_offset(x)		(((x).val) >> 7)
-#define __swp_entry(type,offset) ((swp_entry_t) { ((type) | ((offset) << 7)) })
-#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
-
-#else
-
-/* Encode and de-code a swap entry (must be !pte_none(e) && !pte_present(e)) */
-#define __swp_type(x)		(((x).val >> 1) & 0xff)
-#define __swp_offset(x)		((x).val >> 10)
-#define __swp_entry(type, offset) ((swp_entry_t) { ((type) << 1) | ((offset) << 10) })
-#define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
-#define __swp_entry_to_pte(x)	((pte_t) { (x).val })
-
-#endif /* CONFIG_SUN3 */
-
 #endif /* !__ASSEMBLY__ */
 
 #define kern_addr_valid(addr)	(1)

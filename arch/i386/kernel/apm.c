@@ -226,6 +226,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/desc.h>
+#include <asm/suspend.h>
 
 #include "io_ports.h"
 
@@ -511,9 +512,8 @@ static unsigned long apm_save_cpus(void)
 {
 	unsigned long x = current->cpus_allowed;
 	/* Some bioses don't like being called from CPU != 0 */
-	set_cpus_allowed(current, 1 << 0);
-	if (unlikely(smp_processor_id() != 0))
-		BUG();
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 	return x;
 }
 
@@ -913,11 +913,8 @@ static void apm_power_off(void)
 	 */
 #ifdef CONFIG_SMP
 	/* Some bioses don't like being called from CPU != 0 */
-	if (smp_processor_id() != 0) {
-		set_cpus_allowed(current, 1 << 0);
-		if (unlikely(smp_processor_id() != 0))
-			BUG();
-	}
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 #endif
 	if (apm_info.realmode_power_off)
 	{
@@ -1165,9 +1162,13 @@ static void get_time_diff(void)
 #endif
 }
 
-static inline void reinit_timer(void)
+static void reinit_timer(void)
 {
 #ifdef INIT_TIMER_AFTER_SUSPEND
+	unsigned long	flags;
+	extern spinlock_t i8253_lock;
+
+	spin_lock_irqsave(&i8253_lock, flags);
 	/* set the clock to 100 Hz */
 	outb_p(0x34, PIT_MODE);		/* binary, mode 2, LSB/MSB, ch 0 */
 	udelay(10);
@@ -1175,6 +1176,7 @@ static inline void reinit_timer(void)
 	udelay(10);
 	outb(LATCH >> 8, PIT_CH0);	/* MSB */
 	udelay(10);
+	spin_unlock_irqrestore(&i8253_lock, flags);
 #endif
 }
 
@@ -1212,7 +1214,9 @@ static int suspend(int vetoable)
 	spin_unlock(&i8253_lock);
 	write_sequnlock_irq(&xtime_lock);
 
+	save_processor_state();
 	err = set_system_power_state(APM_STATE_SUSPEND);
+	restore_processor_state();
 
 	write_seqlock_irq(&xtime_lock);
 	spin_lock(&i8253_lock);
@@ -1700,11 +1704,8 @@ static int apm(void *unused)
 	 * Some bioses don't like being called from CPU != 0.
 	 * Method suggested by Ingo Molnar.
 	 */
-	if (smp_processor_id() != 0) {
-		set_cpus_allowed(current, 1 << 0);
-		if (unlikely(smp_processor_id() != 0))
-			BUG();
-	}
+	set_cpus_allowed(current, 1UL << 0);
+	BUG_ON(smp_processor_id() != 0);
 #endif
 
 	if (apm_info.connection_version == 0) {
@@ -2005,7 +2006,7 @@ static int __init apm_init(void)
 
 	apm_proc = create_proc_info_entry("apm", 0, NULL, apm_get_info);
 	if (apm_proc)
-		SET_MODULE_OWNER(apm_proc);
+		apm_proc->owner = THIS_MODULE;
 
 	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
 

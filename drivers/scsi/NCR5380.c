@@ -2471,11 +2471,11 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 
 					if (cmd->cmnd[0] != REQUEST_SENSE)
 						cmd->result = cmd->SCp.Status | (cmd->SCp.Message << 8);
-					else if (cmd->SCp.Status != GOOD)
+					else if (status_byte(cmd->SCp.Status) != GOOD)
 						cmd->result = (cmd->result & 0x00ffff) | (DID_ERROR << 16);
 
 #ifdef AUTOSENSE
-					if ((cmd->cmnd[0] != REQUEST_SENSE) && (cmd->SCp.Status == CHECK_CONDITION)) {
+					if ((cmd->cmnd[0] != REQUEST_SENSE) && (status_byte(cmd->SCp.Status) == CHECK_CONDITION)) {
 						dprintk(NDEBUG_AUTOSENSE, ("scsi%d : performing request sense\n", instance->host_no));
 						cmd->cmnd[0] = REQUEST_SENSE;
 						cmd->cmnd[1] &= 0xe0;

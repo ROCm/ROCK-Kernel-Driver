@@ -1,4 +1,4 @@
-/* $Id: sungem.h,v 1.12 2002/01/23 15:40:45 davem Exp $
+/* $Id: sungem.h,v 1.10.2.4 2002/03/11 08:54:48 davem Exp $
  * sungem.h: Definitions for Sun GEM ethernet driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -936,16 +936,6 @@ enum gem_phy_type {
 	phy_serdes,
 };
 
-enum gem_phy_model {
-	phymod_generic,
-	phymod_bcm5201,
-	phymod_bcm5221,
-	phymod_bcm5400,
-	phymod_bcm5401,
-	phymod_bcm5411,
-	phymod_m1011,
-};
-
 enum link_state {
 	link_down = 0,	/* No link, will retry */
 	link_aneg,	/* Autoneg in progress */
@@ -980,26 +970,25 @@ struct gem {
 	struct net_device_stats net_stats;
 
 	enum gem_phy_type	phy_type;
-	enum gem_phy_model	phy_mod;
+	struct mii_phy		phy_mii;
+	
 	int			tx_fifo_sz;
 	int			rx_fifo_sz;
 	int			rx_pause_off;
 	int			rx_pause_on;
 	int			mii_phy_addr;
-	int			gigabit_capable;
 
 	u32			mac_rx_cfg;
 	u32			swrst_base;
 
 	/* Autoneg & PHY control */
-	int			link_cntl;
-	int			link_advertise;
-	int			link_fcntl;
+	int			want_autoneg;
+	int			last_forced_speed;
 	enum link_state		lstate;
 	struct timer_list	link_timer;
 	int			timer_ticks;
 	int			wake_on_lan;
-	struct work_struct			reset_task;
+	struct work_struct	reset_task;
 	volatile int		reset_task_pending;
 	
 	/* Diagnostic counters and state. */
@@ -1014,6 +1003,9 @@ struct gem {
 #endif
 };
 
+#define found_mii_phy(gp) ((gp->phy_type == phy_mii_mdio0 || gp->phy_type == phy_mii_mdio1) \
+				&& gp->phy_mii.def && gp->phy_mii.def->ops)
+			
 #define ALIGNED_RX_SKB_ADDR(addr) \
         ((((unsigned long)(addr) + (64UL - 1UL)) & ~(64UL - 1UL)) - (unsigned long)(addr))
 static __inline__ struct sk_buff *gem_alloc_skb(int size, int gfp_flags)

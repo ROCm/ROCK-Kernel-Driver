@@ -66,10 +66,7 @@ int sirdev_get_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 	int err = -EINVAL;
 
 #ifdef CONFIG_KMOD
-	char modname[30];
-
-	sprintf(modname, "irda-dongle-%d", type);
-	request_module(modname);
+	request_module("irda-dongle-%d", type);
 #endif
 
 	if (dev->dongle_drv != NULL)

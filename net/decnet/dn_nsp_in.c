@@ -28,6 +28,7 @@
  *    Steve Whitehouse:  Added backlog congestion level return codes.
  *   Patrick Caulfield:
  *    Steve Whitehouse:  Added flow control support (outbound)
+ *    Steve Whitehouse:  Prepare for nonlinear skbs
  */
 
 /******************************************************************************
@@ -240,7 +241,7 @@ static struct sock *dn_find_listener(struct sk_buff *skb, unsigned short *reason
 	cb->info     = msg->info;
 	cb->segsize  = dn_ntohs(msg->segsize);
 
-	if (skb->len < sizeof(*msg))
+	if (!pskb_may_pull(skb, sizeof(*msg)))
 		goto err_out;
 
 	skb_pull(skb, sizeof(*msg));
@@ -721,32 +722,17 @@ static int dn_nsp_rx_packet(struct sk_buff *skb)
 	unsigned char *ptr = (unsigned char *)skb->data;
 	unsigned short reason = NSP_REASON_NL;
 
+	if (!pskb_may_pull(skb, 2))
+		goto free_out;
+
 	skb->h.raw    = skb->data;
 	cb->nsp_flags = *ptr++;
 
 	if (decnet_debug_level & 2)
 		printk(KERN_DEBUG "dn_nsp_rx: Message type 0x%02x\n", (int)cb->nsp_flags);
 
-	if (skb->len < 2) 
-		goto free_out;
-
 	if (cb->nsp_flags & 0x83) 
 		goto free_out;
-
-	/*
-	 * Returned packets...
-	 * Swap src & dst and look up in the normal way.
-	 */
-	if (cb->rt_flags & DN_RT_F_RTS) {
-		unsigned short tmp = cb->dst_port;
-		cb->dst_port = cb->src_port;
-		cb->src_port = tmp;
-		tmp = cb->dst;
-		cb->dst = cb->src;
-		cb->src = tmp;
-		sk = dn_find_by_skb(skb);
-		goto got_it;
-	}
 
 	/*
 	 * Filter out conninits and useless packet types
@@ -759,12 +745,14 @@ static int dn_nsp_rx_packet(struct sk_buff *skb)
 				goto free_out;
 			case 0x10:
 			case 0x60:
+				if (unlikely(cb->rt_flags & DN_RT_F_RTS))
+					goto free_out;
 				sk = dn_find_listener(skb, &reason);
 				goto got_it;
 		}
 	}
 
-	if (skb->len < 3)
+	if (!pskb_may_pull(skb, 3))
 		goto free_out;
 
 	/*
@@ -777,10 +765,23 @@ static int dn_nsp_rx_packet(struct sk_buff *skb)
 	/*
 	 * If not a connack, grab the source address too.
 	 */
-	if (skb->len >= 5) {
+	if (pskb_may_pull(skb, 5)) {
 		cb->src_port = *(unsigned short *)ptr;
 		ptr += 2;
 		skb_pull(skb, 5);
+	}
+
+	/*
+	 * Returned packets...
+	 * Swap src & dst and look up in the normal way.
+	 */
+	if (unlikely(cb->rt_flags & DN_RT_F_RTS)) {
+		unsigned short tmp = cb->dst_port;
+		cb->dst_port = cb->src_port;
+		cb->src_port = tmp;
+		tmp = cb->dst;
+		cb->dst = cb->src;
+		cb->src = tmp;
 	}
 
 	/*
@@ -794,6 +795,15 @@ got_it:
 
 		/* Reset backoff */
 		scp->nsp_rxtshift = 0;
+
+		/*
+		 * We linearize everything except data segments here.
+		 */
+		if (cb->nsp_flags & ~0x60) {
+			if (unlikely(skb_is_nonlinear(skb)) &&
+			    skb_linearize(skb, GFP_ATOMIC) != 0)
+				goto free_out;
+		}
 
 		bh_lock_sock(sk);
 		ret = NET_RX_SUCCESS;
@@ -835,7 +845,10 @@ int dn_nsp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 
 	if (cb->rt_flags & DN_RT_F_RTS) {
-		dn_returned_conn_init(sk, skb);
+		if (cb->nsp_flags == 0x18 || cb->nsp_flags == 0x68)
+			dn_returned_conn_init(sk, skb);
+		else
+			kfree_skb(skb);
 		return NET_RX_SUCCESS;
 	}
 

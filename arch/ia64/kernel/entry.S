@@ -838,7 +838,7 @@ skip_rbs_switch:
 	rsm psr.i		// disable interrupts
 	;;
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 (pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
 	;;
 (pKStk)	st4 [r20]=r0		// preempt_count() <- 0

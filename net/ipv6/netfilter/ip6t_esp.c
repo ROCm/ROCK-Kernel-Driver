@@ -19,10 +19,6 @@ MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
 #define DEBUGP(format, args...)
 #endif
 
-struct esphdr {
-	__u32   spi;
-};
-
 /* Returns 1 if the spi is matched by the range, 0 otherwise */
 static inline int
 spi_match(u_int32_t min, u_int32_t max, u_int32_t spi, int invert)
@@ -45,7 +41,7 @@ match(const struct sk_buff *skb,
       u_int16_t datalen,
       int *hotdrop)
 {
-	struct esphdr *esp = NULL;
+	struct ip_esp_hdr *esp = NULL;
 	const struct ip6t_esp *espinfo = matchinfo;
 	unsigned int temp;
 	int len;
@@ -118,12 +114,12 @@ match(const struct sk_buff *skb,
 	/* ESP header not found */
 	if ( temp != MASK_ESP ) return 0;
 
-       if (len < (int)sizeof(struct esphdr)){
+       if (len < (int)sizeof(struct ip_esp_hdr)){
 	       *hotdrop = 1;
        		return 0;
        }
 
-	esp=skb->data+ptr;
+	esp = (struct ip_esp_hdr *) (skb->data + ptr);
 
 	DEBUGP("IPv6 ESP SPI %u %08X\n", ntohl(esp->spi), ntohl(esp->spi));
 

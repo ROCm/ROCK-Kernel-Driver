@@ -468,9 +468,8 @@ tubmakemin(int irq, s390_dev_info_t *dp)
 	}
 #endif /* CONFIG_TN3270_CONSOLE */
 
-#ifdef CONFIG_DEVFS_FS
-	fs3270_devfs_register(tubp);
-#endif
+	devfs_mk_cdev(MKDEV(IBM_FS3270_MAJOR, tubp->minor),
+			S_IFCHR|S_IRUSR|S_IWUSR, "3270/tub%.4x");
 
 	TUBUNLOCK(tubp->irq, flags);
 	return minor;
@@ -492,9 +491,7 @@ tubfiniminors(void)
 	for (i = 0; i < TUBMAXMINS; i++) {
 		tubpp = &(*tubminors)[i];
 		if ((tubp = *tubpp)) {
-#ifdef CONFIG_DEVFS_FS
-			fs3270_devfs_unregister(tubp);
-#endif
+			devfs_remove("3270/tub%.4x", tubp->devno);
 			tubdelbyirq(tubp, tubp->irq);
 			tty3270_rcl_fini(tubp);
 			kfree(tubp->tty_bcb.bc_buf);

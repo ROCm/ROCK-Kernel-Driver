@@ -1142,22 +1142,33 @@ init_ext3_xattr(void)
 				  &ext3_xattr_trusted_handler);
 	if (err)
 		goto out;
+#ifdef CONFIG_EXT3_FS_SECURITY
+	err = ext3_xattr_register(EXT3_XATTR_INDEX_SECURITY,
+				  &ext3_xattr_security_handler);
+	if (err)
+		goto out1;
+#endif
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	err = init_ext3_acl();
 	if (err)
-		goto out1;
+		goto out2;
 #endif
 	ext3_xattr_cache = mb_cache_create("ext3_xattr", NULL,
 		sizeof(struct mb_cache_entry) +
 		sizeof(struct mb_cache_entry_index), 1, 6);
 	if (!ext3_xattr_cache) {
 		err = -ENOMEM;
-		goto out2;
+		goto out3;
 	}
 	return 0;
-out2:
+out3:
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	exit_ext3_acl();
+out2:
+#endif
+#ifdef CONFIG_EXT3_FS_SECURITY
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_SECURITY,
+			      &ext3_xattr_security_handler);
 out1:
 #endif
 	ext3_xattr_unregister(EXT3_XATTR_INDEX_TRUSTED,
@@ -1176,6 +1187,10 @@ exit_ext3_xattr(void)
 	ext3_xattr_cache = NULL;
 #ifdef CONFIG_EXT3_FS_POSIX_ACL
 	exit_ext3_acl();
+#endif
+#ifdef CONFIG_EXT3_FS_SECURITY
+	ext3_xattr_unregister(EXT3_XATTR_INDEX_SECURITY,
+			      &ext3_xattr_security_handler);
 #endif
 	ext3_xattr_unregister(EXT3_XATTR_INDEX_TRUSTED,
 			      &ext3_xattr_trusted_handler);

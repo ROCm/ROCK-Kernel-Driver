@@ -317,7 +317,7 @@ static void xirc2ps_detach(dev_link_t *);
  * less on other parts of the kernel.
  */
 
-static void xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * The dev_info variable is the "key" that is used to match up this
@@ -1296,7 +1296,7 @@ xirc2ps_event(event_t event, int priority,
 /****************
  * This is the Interrupt service route.
  */
-static void
+static irqreturn_t
 xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
@@ -1312,7 +1312,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				  */
 
     if (!netif_device_present(dev))
-	return;
+	return IRQ_HANDLED;
 
     ioaddr = dev->base_addr;
     if (lp->mohawk) { /* must disable the interrupt */
@@ -1514,6 +1514,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * force an interrupt with this command:
      *	  PutByte(XIRCREG_CR, EnableIntr|ForceIntr);
      */
+    return IRQ_HANDLED;
 } /* xirc2ps_interrupt */
 
 /*====================================================================*/

@@ -134,7 +134,8 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 
 	/* Now transfer all of our blocks. */
 	US_DEBUGP("Start of read\n");
-	result = usb_stor_bulk_transfer_srb(us, ipipe, srb, count);
+	result = usb_stor_bulk_transfer_sg(us, ipipe, srb->request_buffer,
+			count, srb->use_sg, &srb->resid);
 	US_DEBUGP("freecom_readdata done!\n");
 
 	if (result > USB_STOR_XFER_SHORT)
@@ -168,7 +169,8 @@ freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
 
 	/* Now transfer all of our blocks. */
 	US_DEBUGP("Start of write\n");
-	result = usb_stor_bulk_transfer_srb(us, opipe, srb, count);
+	result = usb_stor_bulk_transfer_sg(us, opipe, srb->request_buffer,
+			count, srb->use_sg, &srb->resid);
 
 	US_DEBUGP("freecom_writedata done!\n");
 	if (result > USB_STOR_XFER_SHORT)

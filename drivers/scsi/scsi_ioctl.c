@@ -23,6 +23,8 @@
 #include "hosts.h"
 #include <scsi/scsi_ioctl.h>
 
+#include "scsi_logging.h"
+
 #define NORMAL_RETRIES			5
 #define IOCTL_NORMAL_TIMEOUT			(10 * HZ)
 #define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
@@ -219,9 +221,6 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 	unsigned int needed, buf_needed;
 	int timeout, retries, result;
 	int data_direction, gfp_mask = GFP_KERNEL;
-#if __GNUC__ < 3
-	int foo;
-#endif
 
 	if (!sic)
 		return -EINVAL;
@@ -235,21 +234,11 @@ int scsi_ioctl_send_command(Scsi_Device * dev, Scsi_Ioctl_Command * sic)
 	if (verify_area(VERIFY_READ, sic, sizeof(Scsi_Ioctl_Command)))
 		return -EFAULT;
 
-#if __GNUC__ < 3
-	foo = __get_user(inlen, &sic->inlen);
-	if (foo)
-		return -EFAULT;
-
-	foo = __get_user(outlen, &sic->outlen);
-	if (foo)
-		return -EFAULT;
-#else
 	if(__get_user(inlen, &sic->inlen))
 		return -EFAULT;
 		
 	if(__get_user(outlen, &sic->outlen))
 		return -EFAULT;
-#endif
 
 	/*
 	 * We do not transfer more than MAX_BUF with this interface.

@@ -222,8 +222,8 @@ acpi_ds_initialize_objects (
 	}
 
 	ACPI_DEBUG_PRINT_RAW ((ACPI_DB_INIT,
-		"\nTable [%4.4s] - %hd Objects with %hd Devices %hd Methods %hd Regions\n",
-		table_desc->pointer->signature, info.object_count,
+		"\nTable [%4.4s](id %4.4X) - %hd Objects with %hd Devices %hd Methods %hd Regions\n",
+		table_desc->pointer->signature, table_desc->table_id, info.object_count,
 		info.device_count, info.method_count, info.op_region_count));
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,

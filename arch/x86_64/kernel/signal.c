@@ -434,8 +434,8 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		 * have been cleared if the watchpoint triggered
 		 * inside the kernel.
 		 */
-		if (current->thread.debugreg[7])
-			asm volatile("movq %0,%%db7"	: : "r" (current->thread.debugreg[7]));
+		if (current->thread.debugreg7)
+			asm volatile("movq %0,%%db7"	: : "r" (current->thread.debugreg7));
 
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(signr, &info, oldset, regs);

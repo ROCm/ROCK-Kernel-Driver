@@ -1985,6 +1985,16 @@ void isp1020_print_scsi_cmd(Scsi_Cmnd *cmd)
 
 MODULE_LICENSE("GPL");
 
-static Scsi_Host_Template driver_template = QLOGICISP;
-
+static Scsi_Host_Template driver_template = {
+	.detect			= isp1020_detect,
+	.release		= isp1020_release,
+	.info			= isp1020_info,	
+	.queuecommand		= isp1020_queuecommand,
+	.bios_param		= isp1020_biosparam,
+	.can_queue		= QLOGICISP_REQ_QUEUE_LEN,
+	.this_id		= -1,
+	.sg_tablesize		= QLOGICISP_MAX_SG(QLOGICISP_REQ_QUEUE_LEN),
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"

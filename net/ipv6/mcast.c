@@ -20,7 +20,7 @@
  *	yoshfuji	: fix format of router-alert option
  *	YOSHIFUJI Hideaki @USAGI:
  *		Fixed source address for MLD message based on
- *		<draft-ietf-magma-mld-source-02.txt>.
+ *		<draft-ietf-magma-mld-source-05.txt>.
  *	YOSHIFUJI Hideaki @USAGI:
  *		- Ignore Queries for invalid addresses.
  *		- MLD for link-local addresses.
@@ -179,7 +179,7 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 		return -ENOMEM;
 
 	mc_lst->next = NULL;
-	memcpy(&mc_lst->addr, addr, sizeof(struct in6_addr));
+	ipv6_addr_copy(&mc_lst->addr, addr);
 
 	if (ifindex == 0) {
 		struct rt6_info *rt;
@@ -825,7 +825,7 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	mc->mca_timer.function = igmp6_timer_handler;
 	mc->mca_timer.data = (unsigned long) mc;
 
-	memcpy(&mc->mca_addr, addr, sizeof(struct in6_addr));
+	ipv6_addr_copy(&mc->mca_addr, addr);
 	mc->idev = idev;
 	mc->mca_users = 1;
 	atomic_set(&mc->mca_refcnt, 2);
@@ -1227,7 +1227,7 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-		/* <draft-ietf-magma-mld-source-02.txt>:
+		/* <draft-ietf-magma-mld-source-05.txt>:
 		 * use unspecified address as the source address 
 		 * when a valid link-local address is not available.
 		 */
@@ -1559,7 +1559,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-		/* <draft-ietf-magma-mld-source-02.txt>:
+		/* <draft-ietf-magma-mld-source-05.txt>:
 		 * use unspecified address as the source address 
 		 * when a valid link-local address is not available.
 		 */

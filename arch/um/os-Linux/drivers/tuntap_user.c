@@ -143,7 +143,7 @@ static int tuntap_open(void *data)
 		}
 		memset(&ifr, 0, sizeof(ifr));
 		ifr.ifr_flags = IFF_TAP;
-		strncpy(ifr.ifr_name, pri->dev_name, sizeof(ifr.ifr_name) - 1);
+		strlcpy(ifr.ifr_name, pri->dev_name, sizeof(ifr.ifr_name));
 		if(ioctl(pri->fd, TUNSETIFF, (void *) &ifr) < 0){
 			printk("TUNSETIFF failed, errno = %d", errno);
 			close(pri->fd);

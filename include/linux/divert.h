@@ -107,11 +107,24 @@ struct divert_cf
 
 /* diverter functions */
 #include <linux/skbuff.h>
+
+#ifdef CONFIG_NET_DIVERT
 int alloc_divert_blk(struct net_device *);
 void free_divert_blk(struct net_device *);
 int divert_ioctl(unsigned int cmd, struct divert_cf *arg);
 void divert_frame(struct sk_buff *skb);
+static inline void handle_diverter(struct sk_buff *skb)
+{
+	/* if diversion is supported on device, then divert */
+	if (skb->dev->divert && skb->dev->divert->divert)
+		divert_frame(skb);
+}
 
+#else
+# define alloc_divert_blk(dev)		(0)
+# define free_divert_blk(dev)		do {} while (0)
+# define divert_ioctl(cmd, arg)		(-ENOPKG)
+# define handle_diverter(skb)		do {} while (0)
+#endif
 #endif 
-
 #endif	/* _LINUX_DIVERT_H */

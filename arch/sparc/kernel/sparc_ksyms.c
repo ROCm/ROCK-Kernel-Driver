@@ -53,6 +53,7 @@
 #endif
 #include <asm/a.out.h>
 #include <asm/io-unit.h>
+#include <asm/bug.h>
 
 extern spinlock_t rtc_lock;
 
@@ -157,7 +158,7 @@ EXPORT_SYMBOL(ndelay);
 EXPORT_SYMBOL(rtc_lock);
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
-#if CONFIG_SUN_AUXIO
+#ifdef CONFIG_SUN_AUXIO
 EXPORT_SYMBOL(set_auxio);
 EXPORT_SYMBOL(get_auxio);
 #endif
@@ -183,7 +184,7 @@ EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_get_scsi_one));
 EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_release_scsi_sgl));
 EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_release_scsi_one));
 
-#if CONFIG_SBUS
+#ifdef CONFIG_SBUS
 EXPORT_SYMBOL(sbus_root);
 EXPORT_SYMBOL(dma_chain);
 EXPORT_SYMBOL(sbus_set_sbus64);
@@ -198,7 +199,7 @@ EXPORT_SYMBOL(sbus_dma_sync_sg);
 EXPORT_SYMBOL(sbus_iounmap);
 EXPORT_SYMBOL(sbus_ioremap);
 #endif
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 EXPORT_SYMBOL(ebus_chain);
 EXPORT_SYMBOL(insl);
 EXPORT_SYMBOL(outsl);
@@ -311,6 +312,10 @@ EXPORT_SYMBOL_DOT(mul);
 EXPORT_SYMBOL_DOT(umul);
 EXPORT_SYMBOL_DOT(div);
 EXPORT_SYMBOL_DOT(udiv);
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+EXPORT_SYMBOL(do_BUG);
+#endif
 
 /* Sun Power Management Idle Handler */
 EXPORT_SYMBOL(pm_idle);

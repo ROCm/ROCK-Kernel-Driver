@@ -87,7 +87,6 @@ struct pt_regs {
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
 #define user_mode(regs) (!!((regs)->cs & 3))
 #define instruction_pointer(regs) ((regs)->rip)
-#define force_successful_syscall_return()	do { } while (0)
 void signal_fault(struct pt_regs *regs, void *frame, char *where);
 
 enum {

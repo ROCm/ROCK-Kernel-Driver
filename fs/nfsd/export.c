@@ -848,12 +848,18 @@ out:
  * export point with fsid==0
  */
 int
-exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp)
+exp_pseudoroot(struct auth_domain *clp, struct svc_fh *fhp,
+	       struct cache_req *creq)
 {
 	struct svc_expkey *fsid_key;
 	int rv;
+	u32 fsidv[2];
 
-	fsid_key = exp_get_fsid_key(clp, 0);
+	mk_fsid_v1(fsidv, 0);
+
+	fsid_key = exp_find_key(clp, 1, fsidv, creq);
+	if (IS_ERR(fsid_key) && PTR_ERR(fsid_key) == -EAGAIN)
+		return nfserr_dropit;
 	if (!fsid_key || IS_ERR(fsid_key))
 		return nfserr_perm;
 

@@ -118,8 +118,8 @@ _start:
 	move.l #(0x00<<ACR_BASE_POS)+(0<<ACR_MASK_POS)+ACR_ENABLE+ACR_ANY+ACR_CM_CP,%d0
    movec  %d0,%ACR3
  
-   /* Enable cache */
-	move.l	#0x86088400, %d0
+	/* Enable cache */
+	move.l	#0xa4098400, %d0		/* Write buffer, dflt precise */
 	movec	%d0,%CACR
 	nop
 

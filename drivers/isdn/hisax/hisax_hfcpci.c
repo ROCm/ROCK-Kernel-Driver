@@ -1484,7 +1484,7 @@ new_adapter(struct pci_dev *pdev)
 
 	memset(adapter, 0, sizeof(struct hfcpci_adapter));
 
-	SET_MODULE_OWNER(&adapter->d_if);
+	adapter->d_if.owner = THIS_MODULE;
 	adapter->d_if.ifc.priv = adapter;
 	adapter->d_if.ifc.l2l1 = hfcpci_d_l2l1;
 	

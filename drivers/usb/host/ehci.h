@@ -52,8 +52,7 @@ struct ehci_hcd {			/* one per controller */
 	/* async schedule support */
 	struct ehci_qh		*async;
 	struct ehci_qh		*reclaim;
-	int			reclaim_ready : 1,
-				async_idle : 1;
+	int			reclaim_ready : 1;
 
 	/* periodic schedule support */
 #define	DEFAULT_I_TDPS		1024		/* some HCs can do less */
@@ -83,6 +82,7 @@ struct ehci_hcd {			/* one per controller */
 
 	struct timer_list	watchdog;
 	struct notifier_block	reboot_notifier;
+	unsigned long		actions;
 	unsigned		stamp;
 
 	/* irq statistics */
@@ -99,6 +99,53 @@ struct ehci_hcd {			/* one per controller */
 
 /* NOTE:  urb->transfer_flags expected to not use this bit !!! */
 #define EHCI_STATE_UNLINK	0x8000		/* urb being unlinked */
+
+enum ehci_timer_action {
+	TIMER_IO_WATCHDOG,
+	TIMER_IAA_WATCHDOG,
+	TIMER_ASYNC_SHRINK,
+	TIMER_ASYNC_OFF,
+};
+
+static inline void
+timer_action_done (struct ehci_hcd *ehci, enum ehci_timer_action action)
+{
+	clear_bit (action, &ehci->actions);
+}
+
+static inline void
+timer_action (struct ehci_hcd *ehci, enum ehci_timer_action action)
+{
+	if (!test_and_set_bit (action, &ehci->actions)) {
+		unsigned long t;
+
+		switch (action) {
+		case TIMER_IAA_WATCHDOG:
+			t = EHCI_IAA_JIFFIES;
+			break;
+		case TIMER_IO_WATCHDOG:
+			t = EHCI_IO_JIFFIES;
+			break;
+		case TIMER_ASYNC_OFF:
+			t = EHCI_ASYNC_JIFFIES;
+			break;
+		// case TIMER_ASYNC_SHRINK:
+		default:
+			t = EHCI_SHRINK_JIFFIES;
+			break;
+		}
+		t += jiffies;
+		// all timings except IAA watchdog can be overridden.
+		// async queue SHRINK often precedes IAA.  while it's ready
+		// to go OFF neither can matter, and afterwards the IO
+		// watchdog stops unless there's still periodic traffic.
+		if (action != TIMER_IAA_WATCHDOG
+				&& t > ehci->watchdog.expires
+				&& timer_pending (&ehci->watchdog))
+			return;
+		mod_timer (&ehci->watchdog, t);
+	}
+}
 
 /*-------------------------------------------------------------------------*/
 

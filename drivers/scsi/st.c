@@ -3725,16 +3725,13 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
-	if (scsi_slave_attach(SDp))
-		return 1;
-
 	i = SDp->host->sg_tablesize;
 	if (st_max_sg_segs < i)
 		i = st_max_sg_segs;
 	buffer = new_tape_buffer(TRUE, (SDp->host)->unchecked_isa_dma, i);
 	if (buffer == NULL) {
 		printk(KERN_ERR "st: Can't allocate new tape buffer. Device not attached.\n");
-		goto out_slave_detach;
+		goto out;
 	}
 
 	disk = alloc_disk(1);
@@ -3865,11 +3862,10 @@ static int st_attach(Scsi_Device * SDp)
 	write_unlock(&st_dev_arr_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-	    char name[8], devfs_name[64];
+	    char name[8];
 
 	    /*  Rewind entry  */
 	    sprintf(name, "mt%s", st_formats[mode]);
-	    sprintf(devfs_name, "%s/mt%s", SDp->devfs_name, st_formats[mode]);
 	    
 	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
 		    SDp->sdev_driverfs_dev.bus_id, name);
@@ -3883,13 +3879,12 @@ static int st_attach(Scsi_Device * SDp)
 	    device_create_file(&tpnt->driverfs_dev_r[mode], 
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-	    devfs_register(NULL, devfs_name, 0,
-				SCSI_TAPE_MAJOR, dev_num + (mode << 5),
+	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5)),
 				S_IFCHR | S_IRUGO | S_IWUGO,
-				&st_fops, NULL);
+				"%s/mt%s", SDp->devfs_name, st_formats[mode]);
+
 	    /*  No-rewind entry  */
 	    sprintf (name, "mt%sn", st_formats[mode]);
-	    sprintf(devfs_name, "%s/mt%sn", SDp->devfs_name, st_formats[mode]);
 
 	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
 		    SDp->sdev_driverfs_dev.bus_id, name);
@@ -3904,10 +3899,9 @@ static int st_attach(Scsi_Device * SDp)
 			       &dev_attr_type);
 	    device_create_file(&tpnt->driverfs_dev_n[mode], 
 			       &dev_attr_kdev);
-	    devfs_register(NULL, devfs_name, 0,
-				SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128,
+	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128),
 				S_IFCHR | S_IRUGO | S_IWUGO,
-				&st_fops, NULL);
+				"%s/mt%sn", SDp->devfs_name, st_formats[mode]);
 	}
 	disk->number = devfs_register_tape(SDp->devfs_name);
 
@@ -3923,8 +3917,7 @@ out_put_disk:
 	put_disk(disk);
 out_buffer_free:
 	kfree(buffer);
-out_slave_detach:
-	scsi_slave_detach(SDp);
+out:
 	return 1;
 };
 
@@ -3962,7 +3955,6 @@ static void st_detach(Scsi_Device * SDp)
 				normalize_buffer(tpnt->buffer);
 				kfree(tpnt->buffer);
 			}
-			scsi_slave_detach(SDp);
 			put_disk(tpnt->disk);
 			kfree(tpnt);
 			return;

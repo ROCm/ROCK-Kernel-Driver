@@ -1,7 +1,6 @@
 /*
  * Linker script for vsyscall DSO.  The vsyscall page is an ELF shared
- * object prelinked to its virtual address, and with only one read-only
- * segment (that fits in one page).  This script controls its layout.
+ * object prelinked to its virtual address. This script controls its layout.
  */
 
 /* This must match <asm/fixmap.h>.  */
@@ -24,18 +23,18 @@ SECTIONS
      is insufficient, ld -shared will barf.  Just increase it here.  */
   . = VSYSCALL_BASE + 0x400;
   
-  .text.vsyscall   : { *(.text.vsyscall) }	:text =0x90909090
+  .text.vsyscall   : { *(.text.vsyscall) } 	:text =0x90909090
 
   /* This is an 32bit object and we cannot easily get the offsets
      into the 64bit kernel. Just hardcode them here. This assumes
      that all the stubs don't need more than 0x100 bytes. */
   . = VSYSCALL_BASE + 0x500;
 
-  .text.sigreturn  : { *(.text.sigreturn) }	:text =0x90909091 
+  .text.sigreturn  : { *(.text.sigreturn) }	:text =0x90909090
 
   . = VSYSCALL_BASE + 0x600;
 
-  .text.rtsigreturn : { *(.text.rtsigreturn) }  :text =0x90909092  
+  .text.rtsigreturn : { *(.text.rtsigreturn) }   :text =0x90909090
 	
   .eh_frame_hdr   : { *(.eh_frame_hdr) }	:text :eh_frame_hdr
   .eh_frame       : { KEEP (*(.eh_frame)) }	:text

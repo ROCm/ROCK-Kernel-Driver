@@ -225,10 +225,6 @@ _GLOBAL(ppc32_rt_sigreturn)
 	bl	.sys32_rt_sigreturn
 	b	80f
 
-_GLOBAL(ppc64_sigreturn)
-	bl	.sys_sigreturn
-	b	80f
-
 _GLOBAL(ppc64_rt_sigreturn)
 	bl	.sys_rt_sigreturn
 
@@ -412,11 +408,6 @@ restore:
 	ld	r4,GPR4(r1)
 	ld	r1,GPR1(r1)
 
-	/*
-	 *  What if we took an exception and stole this segment, we may
-	 * fault on the above addresses and globber SRR0/1. Should check RI
-	 * bit and repeat - Anton
-	 */
 	rfid
 
 /* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */

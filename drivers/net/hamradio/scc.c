@@ -199,7 +199,7 @@ static void z8530_init(void);
 
 static void init_channel(struct scc_channel *scc);
 static void scc_key_trx (struct scc_channel *scc, char tx);
-static void scc_isr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs *regs);
 static void scc_init_timer(struct scc_channel *scc);
 
 static int scc_net_setup(struct scc_channel *scc, unsigned char *name, int addev);
@@ -625,7 +625,7 @@ static void scc_isr_dispatch(struct scc_channel *scc, int vector)
 
 #define SCC_IRQTIMEOUT 30000
 
-static void scc_isr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t scc_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned char vector;	
 	struct scc_channel *scc;
@@ -653,7 +653,7 @@ static void scc_isr(int irq, void *dev_id, struct pt_regs *regs)
 		if (k == SCC_IRQTIMEOUT)
 			printk(KERN_WARNING "z8530drv: endless loop in scc_isr()?\n");
 
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* Find the SCC generating the interrupt by polling all attached SCCs
@@ -701,6 +701,7 @@ static void scc_isr(int irq, void *dev_id, struct pt_regs *regs)
 		} else
 			ctrl++;
 	}
+	return IRQ_HANDLED;
 }
 
 

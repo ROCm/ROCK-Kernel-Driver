@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/soundcard.h>
+#include <linux/interrupt.h>
 
 #include <asm/uaccess.h>
 #include <asm/setup.h>

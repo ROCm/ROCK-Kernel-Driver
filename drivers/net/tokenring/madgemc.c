@@ -63,7 +63,6 @@ struct madgemc_card {
 static struct madgemc_card *madgemc_card_list;
 
 
-int madgemc_probe(void);
 static int madgemc_open(struct net_device *dev);
 static int madgemc_close(struct net_device *dev);
 static int madgemc_chipset_init(struct net_device *dev);
@@ -152,7 +151,7 @@ static void madgemc_sifwritew(struct net_device *dev, unsigned short val, unsign
 
 
 
-int __init madgemc_probe(void)
+static int __init madgemc_probe(void)
 {	
 	static int versionprinted;
 	struct net_device *dev;
@@ -773,19 +772,7 @@ static int madgemc_mcaproc(char *buf, int slot, void *d)
 	return len;
 }
 
-#ifdef MODULE
-
-int init_module(void)
-{
-	/* Probe for cards. */
-	if (madgemc_probe()) {
-		printk(KERN_NOTICE "madgemc.c: No cards found.\n");
-	}
-	/* lock_tms380_module(); */
-	return (0);
-}
-
-void cleanup_module(void)
+static void __exit madgemc_exit(void)
 {
 	struct net_device *dev;
 	struct madgemc_card *this_card;
@@ -801,9 +788,10 @@ void cleanup_module(void)
 		madgemc_card_list = this_card->next;
 		kfree(this_card);
 	}
-	/* unlock_tms380_module(); */
 }
-#endif /* MODULE */
+
+module_init(madgemc_probe);
+module_exit(madgemc_exit);
 
 MODULE_LICENSE("GPL");
 

@@ -201,24 +201,4 @@ int Pci2000_BiosParam		(struct scsi_device *sdev,
 	#define NULL 0
 #endif
 
-/* screen is 80 columns wide, damnit! */
-#define PCI2000 {				                        \
-	.proc_name	= "pci2000",					\
-	.name		= "PCI-2000 SCSI Intelligent Disk Controller",	\
-	.detect		= Pci2000_Detect,				\
-	.release	= Pci2000_Release,				\
-	.command	= Pci2000_Command,				\
-	.queuecommand	= Pci2000_QueueCommand,				\
-	.abort		= Pci2000_Abort,				\
-	.reset		= Pci2000_Reset,				\
-	.bios_param	= Pci2000_BiosParam,				\
-	.can_queue	= 16,						\
-	.this_id	= -1,						\
-	.sg_tablesize	= 16,						\
-	.cmd_per_lun	= 1,						\
-	.present	= 0,						\
-	.unchecked_isa_dma = 0,						\
-	.use_clustering	= DISABLE_CLUSTERING,				\
-}
-
 #endif

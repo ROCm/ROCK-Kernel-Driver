@@ -27,7 +27,7 @@ struct compat_cmsghdr {
 #define compat_msghdr	msghdr		/* to avoid compiler warnings */
 #endif /* defined(CONFIG_COMPAT) */
 
-extern int get_compat_msghdr(struct msghdr *, struct compat_msghdr *);
+extern int get_compat_msghdr(struct msghdr *, struct compat_msghdr __user *);
 extern int verify_compat_iovec(struct msghdr *, struct iovec *, char *, int);
 extern asmlinkage long compat_sys_sendmsg(int,struct compat_msghdr *,unsigned);
 extern asmlinkage long compat_sys_recvmsg(int,struct compat_msghdr *,unsigned);

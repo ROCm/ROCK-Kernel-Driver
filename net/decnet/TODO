@@ -23,14 +23,8 @@ Steve's quick list of things that need finishing off:
 
  o check MSG_CTRUNC is set where it should be.
 
- o Start to hack together user level software and add more DECnet support
-   in ifconfig for example. 
-
  o Find all the commonality between DECnet and IPv4 routing code and extract 
    it into a small library of routines. [probably a project for 2.7.xx]
-
- o Add the routing message grabbing netfilter module [written, tested,
-   awaiting merge]
 
  o Add perfect socket hashing - an idea suggested by Paul Koning. Currently
    we have a half-way house scheme which seems to work reasonably well, but
@@ -44,6 +38,4 @@ Steve's quick list of things that need finishing off:
  o DECnet sendpages() function
 
  o AIO for DECnet
-
- o Eliminate dn_db->parms.blksize
 

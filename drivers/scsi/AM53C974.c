@@ -2453,5 +2453,21 @@ MODULE_PARM(overrides, "1-32i");
 MODULE_LICENSE("GPL");
 
 
-static Scsi_Host_Template driver_template = AM53C974;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "am53c974",
+	.name           	= "AM53C974",
+	.detect         	= AM53C974_pci_detect,
+	.release        	= AM53C974_release,	
+	.info			= AM53C974_info,
+	.command		= AM53C974_command,
+	.queuecommand		= AM53C974_queue_command,
+	.abort			= AM53C974_abort,
+	.reset			= AM53C974_reset,
+	.can_queue		= 12,
+	.this_id		= -1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
+
 #include "scsi_module.c"

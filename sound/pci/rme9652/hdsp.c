@@ -26,7 +26,6 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 
 #include <sound/core.h>
 #include <sound/control.h>

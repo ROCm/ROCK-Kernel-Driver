@@ -101,9 +101,9 @@ static int jffs2_sb_set(struct super_block *sb, void *data)
 	return 0;
 }
 
-static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
-					      int flags, char *dev_name, 
-					      void *data, struct mtd_info *mtd)
+static struct super_block *
+jffs2_get_sb_mtd(struct file_system_type *fs_type, int flags,
+		 const char *dev_name, void *data, struct mtd_info *mtd)
 {
 	struct super_block *sb;
 	struct jffs2_sb_info *c;
@@ -153,9 +153,9 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 	return sb;
 }
 
-static struct super_block *jffs2_get_sb_mtdnr(struct file_system_type *fs_type,
-					      int flags, char *dev_name, 
-					      void *data, int mtdnr)
+static struct super_block *
+jffs2_get_sb_mtdnr(struct file_system_type *fs_type, int flags,
+		   const char *dev_name, void *data, int mtdnr)
 {
 	struct mtd_info *mtd;
 
@@ -168,8 +168,9 @@ static struct super_block *jffs2_get_sb_mtdnr(struct file_system_type *fs_type,
 	return jffs2_get_sb_mtd(fs_type, flags, dev_name, data, mtd);
 }
 
-static struct super_block *jffs2_get_sb(struct file_system_type *fs_type,
-					int flags, char *dev_name, void *data)
+static struct super_block *
+jffs2_get_sb(struct file_system_type *fs_type, int flags,
+	     const char *dev_name, void *data)
 {
 	int err;
 	struct nameidata nd;
@@ -299,7 +300,7 @@ static int __init init_jffs2_fs(void)
 
 	jffs2_inode_cachep = kmem_cache_create("jffs2_i",
 					     sizeof(struct jffs2_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     jffs2_i_init_once, NULL);
 	if (!jffs2_inode_cachep) {
 		printk(KERN_ERR "JFFS2 error: Failed to initialise inode cache\n");

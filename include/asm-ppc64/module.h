@@ -19,4 +19,8 @@ struct mod_arch_specific
 asm(".section .stubs,\"ax\",@nobits; .align 3; .previous");
 #endif
 
+struct exception_table_entry;
+void sort_ex_table(struct exception_table_entry *start,
+			struct exception_table_entry *finish);
+
 #endif /* _ASM_PPC64_MODULE_H */

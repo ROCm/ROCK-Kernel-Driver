@@ -116,7 +116,7 @@ static __inline__ volatile struct a2232memory *a2232mem (unsigned int board);
 static __inline__ void a2232_receive_char(	struct a2232_port *port,
 						int ch, int err );
 /* The interrupt service routine */
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp);
 /* Initialize the port structures */
 static void a2232_init_portstructs(void);
 /* Initialize and register TTY drivers. */
@@ -272,7 +272,6 @@ static void a2232_shutdown_port(void *ptr)
 		not in "a2232_close()". See the comment in "sx.c", too.
 		If you run into problems, compile this driver into the
 		kernel instead of compiling it as a module. */
-	MOD_DEC_USE_COUNT;
 }
 
 static int  a2232_set_real_termios(void *ptr)
@@ -414,7 +413,6 @@ static void a2232_close(void *ptr)
 	a2232_disable_tx_interrupts(ptr);
 	a2232_disable_rx_interrupts(ptr);
 	/* see the comment in a2232_shutdown_port above. */
-	/* MOD_DEC_USE_COUNT; */
 }
 
 static void a2232_hungup(void *ptr)
@@ -468,13 +466,9 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 	port->gs.flags |= GS_ACTIVE;
-	if (port->gs.count == 1) {
-		MOD_INC_USE_COUNT;
-	}
 	retval = gs_block_til_ready(port, filp);
 
 	if (retval) {
-		MOD_DEC_USE_COUNT;
 		port->gs.count--;
 		return retval;
 	}
@@ -539,7 +533,7 @@ static __inline__ void a2232_receive_char(	struct a2232_port *port,
 	tty_flip_buffer_push(tty);
 }
 
-static void a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
+static irqreturn_t a2232_vbl_inter(int irq, void *data, struct pt_regs *fp)
 {
 #if A2232_IOBUFLEN != 256
 #error "Re-Implement a2232_vbl_inter()!"
@@ -679,6 +673,7 @@ int ch, err, n, p;
 		} // if events in CD queue
 		
 	} // for every completely initialized A2232 board
+	return IRQ_HANDLED;
 }
 
 static void a2232_init_portstructs(void)
@@ -711,6 +706,7 @@ static int a2232_init_drivers(void)
 
 	memset(&a2232_driver, 0, sizeof(a2232_driver));
 	a2232_driver.magic = TTY_DRIVER_MAGIC;
+	a2232_driver.owner = THIS_MODULE;
 	a2232_driver.driver_name = "commodore_a2232";
 	a2232_driver.name = "ttyY";
 	a2232_driver.major = A2232_NORMAL_MAJOR;

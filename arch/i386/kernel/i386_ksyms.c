@@ -73,9 +73,6 @@ EXPORT_SYMBOL(physnode_map);
 #ifdef CONFIG_X86_NUMAQ
 EXPORT_SYMBOL(xquad_portio);
 #endif
-#ifndef CONFIG_X86_WP_WORKS_OK
-EXPORT_SYMBOL(__verify_write);
-#endif
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_extended_fpu);

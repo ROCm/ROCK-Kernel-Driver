@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -73,6 +73,9 @@ int xlog_btolrbb(int b);
 
 #define XLOG_HEADER_SIZE	512
 
+#define XLOG_REC_SHIFT(log) \
+	BTOBB(1 << (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) ? \
+	 XLOG_MAX_RECORD_BSHIFT : XLOG_BIG_RECORD_BSHIFT))
 #define XLOG_TOTAL_REC_SHIFT(log) \
 	BTOBB(XLOG_MAX_ICLOGS << (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) ? \
 	 XLOG_MAX_RECORD_BSHIFT : XLOG_BIG_RECORD_BSHIFT))
@@ -202,9 +205,9 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define LOG_LOCK(log)		mutex_spinlock(&(log)->l_icloglock)
 #define LOG_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_icloglock, s)
 
-#define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_warn(s)		{cmn_err(CE_WARN, s); }
+#define xlog_panic(args...)	cmn_err(CE_PANIC, ## args)
+#define xlog_exit(args...)	cmn_err(CE_PANIC, ## args)
+#define xlog_warn(args...)	cmn_err(CE_WARN, ## args)
 
 /*
  * In core log state
@@ -403,6 +406,7 @@ typedef struct xlog_rec_ext_header {
 	uint	  xh_cycle;	/* write cycle of log			: 4 */
 	uint	  xh_cycle_data[XLOG_HEADER_CYCLE_SIZE / BBSIZE]; /*	: 256 */
 } xlog_rec_ext_header_t;
+
 #ifdef __KERNEL__
 /*
  * - A log record header is 512 bytes.  There is plenty of room to grow the
@@ -441,12 +445,10 @@ typedef struct xlog_iclog_fields {
 	char			*ic_datap;	/* pointer to iclog data */
 } xlog_iclog_fields_t;
 
-typedef struct xlog_in_core2 {
-	union {
-		xlog_rec_header_t hic_header;
-		xlog_rec_ext_header_t hic_xheader;
-		char		  hic_sector[XLOG_HEADER_SIZE];
-	} ic_h;
+typedef union xlog_in_core2 {
+	xlog_rec_header_t	hic_header;
+	xlog_rec_ext_header_t	hic_xheader;
+	char			hic_sector[XLOG_HEADER_SIZE];
 } xlog_in_core_2_t;
 
 typedef struct xlog_in_core {
@@ -473,7 +475,7 @@ typedef struct xlog_in_core {
 #define	ic_bwritecnt	hic_fields.ic_bwritecnt
 #define	ic_state	hic_fields.ic_state
 #define ic_datap	hic_fields.ic_datap
-#define ic_header	hic_data->ic_h.hic_header
+#define ic_header	hic_data->hic_header
 
 /*
  * The reservation head lsn is not made up of a cycle number and block number.
@@ -530,8 +532,11 @@ typedef struct log {
     uint		l_flags;
     uint		l_quotaoffs_flag;/* XFS_DQ_*, if QUOTAOFFs found */
     struct xfs_buf_cancel **l_buf_cancel_table;
+    int			l_stripemask;	/* log stripe mask */
     int			l_iclog_hsize;  /* size of iclog header */
     int			l_iclog_heads;  /* number of iclog header sectors */
+    uint		l_sectbb_log;   /* log2 of sector size in bbs */
+    uint		l_sectbb_mask;  /* sector size in bbs alignment mask */
 } xlog_t;
 
 
@@ -546,10 +551,12 @@ extern int	 xlog_print_find_oldest(xlog_t *log, xfs_daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log, int readonly);
 extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
-extern struct xfs_buf *xlog_get_bp(int,xfs_mount_t *);
-extern void	 xlog_put_bp(struct xfs_buf *);
-extern int	 xlog_bread(xlog_t *, xfs_daddr_t blkno, int bblks, struct xfs_buf *bp);
 extern void	 xlog_recover_process_iunlinks(xlog_t *log);
+
+extern struct xfs_buf *xlog_get_bp(xlog_t *, int);
+extern void	 xlog_put_bp(struct xfs_buf *);
+extern int	 xlog_bread(xlog_t *, xfs_daddr_t, int, struct xfs_buf *);
+extern xfs_caddr_t xlog_align(xlog_t *, xfs_daddr_t, int, struct xfs_buf *);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2

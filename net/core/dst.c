@@ -123,6 +123,7 @@ void * dst_alloc(struct dst_ops * ops)
 	if (!dst)
 		return NULL;
 	memset(dst, 0, ops->entry_size);
+	atomic_set(&dst->__refcnt, 0);
 	dst->ops = ops;
 	dst->lastuse = jiffies;
 	dst->path = dst;
@@ -226,7 +227,6 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 				   _race_ _condition_.
 				 */
 				if (event!=NETDEV_DOWN &&
-				    dev->destructor == NULL &&
 				    dst->output == dst_blackhole) {
 					dst->dev = &loopback_dev;
 					dev_put(dev);

@@ -216,9 +216,7 @@ static int sound_open(struct inode *inode, struct file *file)
 	case SND_DEV_CTL:
 		dev >>= 4;
 		if (dev >= 0 && dev < MAX_MIXER_DEV && mixer_devs[dev] == NULL) {
-			char modname[20];
-			sprintf(modname, "mixer%d", dev);
-			request_module(modname);
+			request_module("mixer%d", dev);
 		}
 		if (dev && (dev >= num_mixers || mixer_devs[dev] == NULL))
 			return -ENXIO;
@@ -291,9 +289,8 @@ static int get_mixer_info(int dev, caddr_t arg)
 {
 	mixer_info info;
 
-	strncpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
-	strncpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
-	info.name[sizeof(info.name)-1] = 0;
+	strlcpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
+	strlcpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
 	info.modify_counter = mixer_devs[dev]->modify_counter;
 	if (__copy_to_user(arg, &info,  sizeof(info)))
 		return -EFAULT;
@@ -304,9 +301,8 @@ static int get_old_mixer_info(int dev, caddr_t arg)
 {
 	_old_mixer_info info;
 
- 	strncpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
- 	strncpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
- 	info.name[sizeof(info.name)-1] = 0;	
+ 	strlcpy(info.id, mixer_devs[dev]->id, sizeof(info.id));
+ 	strlcpy(info.name, mixer_devs[dev]->name, sizeof(info.name));
  	if (copy_to_user(arg, &info,  sizeof(info)))
 		return -EFAULT;
 	return 0;
@@ -318,9 +314,7 @@ static int sound_mixer_ioctl(int mixdev, unsigned int cmd, caddr_t arg)
  		return -ENXIO;
  	/* Try to load the mixer... */
  	if (mixer_devs[mixdev] == NULL) {
- 		char modname[20];
- 		sprintf(modname, "mixer%d", mixdev);
- 		request_module(modname);
+ 		request_module("mixer%d", mixdev);
  	}
  	if (mixdev >= num_mixers || !mixer_devs[mixdev])
  		return -ENXIO;
@@ -549,7 +543,6 @@ MODULE_PARM(dmabug, "i");
 static int __init oss_init(void)
 {
 	int             err;
-	char name_buf[32];
 	int i, j;
 	
 	/* drag in sound_syms.o */
@@ -573,19 +566,18 @@ static int __init oss_init(void)
 	sound_dmap_flag = (dmabuf > 0 ? 1 : 0);
 
 	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
-		sprintf(name_buf, "sound/%s", dev_list[i].name);
-		devfs_register (NULL, name_buf, DEVFS_FL_NONE,
-			SOUND_MAJOR, dev_list[i].minor,
-			S_IFCHR | dev_list[i].mode,
-			&oss_sound_fops, NULL);
+		devfs_mk_cdev(MKDEV(SOUND_MAJOR, dev_list[i].minor),
+				S_IFCHR | dev_list[i].mode,
+				"sound/%s", dev_list[i].name);
+
 		if (!dev_list[i].num)
 			continue;
+
 		for (j = 1; j < *dev_list[i].num; j++) {
-			sprintf(name_buf, "sound/%s%d", dev_list[i].name, j);
-			devfs_register (NULL, name_buf, DEVFS_FL_NONE,
-				SOUND_MAJOR, dev_list[i].minor + (j * 0x10),
-				S_IFCHR | dev_list[i].mode,
-				&oss_sound_fops, NULL);
+			devfs_mk_cdev(MKDEV(SOUND_MAJOR,
+						dev_list[i].minor + (j*0x10)),
+					S_IFCHR | dev_list[i].mode,
+					"sound/%s%d", dev_list[i].name, j);
 		}
 	}
 

@@ -37,6 +37,7 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
@@ -577,9 +578,10 @@ int dlci_init(struct net_device *dev)
 	return(0);
 }
 
-int __init dlci_setup(void)
+int __init init_dlci(void)
 {
 	int i;
+	dlci_ioctl_set(dlci_ioctl);
 
 	printk("%s.\n", version);
 	
@@ -589,25 +591,16 @@ int __init dlci_setup(void)
 	for(i=0;i<sizeof(basename) / sizeof(char *);i++)
 		basename[i] = NULL;
 
-	return(0);
+	return 0;
 }
 
-#ifdef MODULE
-
-extern int (*dlci_ioctl_hook)(unsigned int, void *);
-
-int init_module(void)
+void __exit dlci_exit(void)
 {
-	dlci_ioctl_hook = dlci_ioctl;
-
-	return(dlci_setup());
+	dlci_ioctl_set(NULL);
 }
 
-void cleanup_module(void)
-{
-	dlci_ioctl_hook = NULL;
-}
-#endif /* MODULE */
+module_init(init_dlci);
+module_exit(dlci_exit);
 
 MODULE_AUTHOR("Mike McLagan");
 MODULE_DESCRIPTION("Frame Relay DLCI layer");

@@ -80,11 +80,9 @@ struct inet_protosw {
 
 extern struct inet_protocol *inet_protocol_base;
 extern struct inet_protocol *inet_protos[MAX_INET_PROTOS];
-extern struct list_head inetsw[SOCK_MAX];
 
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 extern struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
-extern struct list_head inetsw6[SOCK_MAX];
 #endif
 
 extern int	inet_add_protocol(struct inet_protocol *prot, unsigned char num);

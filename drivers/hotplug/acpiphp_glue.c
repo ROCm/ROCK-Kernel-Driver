@@ -203,6 +203,7 @@ register_slot (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	if (ACPI_FAILURE(status)) {
 		err("failed to register interrupt notify handler\n");
+		kfree(newfunc);
 		return status;
 	}
 
@@ -806,6 +807,7 @@ static int enable_device (struct acpiphp_slot *slot)
 	struct list_head *l;
 	struct acpiphp_func *func;
 	int retval = 0;
+	int num;
 
 	if (slot->flags & SLOT_ENABLED)
 		goto err_exit;
@@ -825,7 +827,10 @@ static int enable_device (struct acpiphp_slot *slot)
 		goto err_exit;
 
 	/* returned `dev' is the *first function* only! */
-	dev = pci_scan_slot(slot->bridge->pci_bus, PCI_DEVFN(slot->device, 0));
+	num = pci_scan_slot(slot->bridge->pci_bus, PCI_DEVFN(slot->device, 0));
+	if (num)
+		pci_bus_add_devices(slot->bridge->pci_bus);
+	dev = pci_find_slot(slot->bridge->bus, PCI_DEVFN(slot->device, 0));
 
 	if (!dev) {
 		err("No new device found\n");

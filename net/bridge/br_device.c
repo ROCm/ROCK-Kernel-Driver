@@ -125,7 +125,7 @@ void br_dev_setup(struct net_device *dev)
 	dev->open = br_dev_open;
 	dev->set_multicast_list = br_dev_set_multicast_list;
 	dev->destructor = br_dev_destruct;
-	dev->owner = THIS_MODULE;
+	SET_MODULE_OWNER(dev);
 	dev->stop = br_dev_stop;
 	dev->accept_fastpath = br_dev_accept_fastpath;
 	dev->tx_queue_len = 0;

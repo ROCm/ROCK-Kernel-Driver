@@ -80,6 +80,7 @@ static int sockstat_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations sockstat_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = sockstat_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -110,7 +111,6 @@ fold_field(void *mib[], int nr)
  */
 static int snmp_seq_show(struct seq_file *seq, void *v)
 {
-	extern int sysctl_ip_default_ttl;
 	int i;
 
 	seq_printf(seq, "Ip: Forwarding DefaultTTL InReceives InHdrErrors "
@@ -171,6 +171,7 @@ static int snmp_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations snmp_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = snmp_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -227,6 +228,7 @@ static int netstat_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations netstat_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = netstat_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -263,11 +265,3 @@ out_netstat:
 	goto out;
 }
 
-int ip_seq_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq = (struct seq_file *)file->private_data;
-
-	kfree(seq->private);
-	seq->private = NULL;
-	return seq_release(inode, file);
-}

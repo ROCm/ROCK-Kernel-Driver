@@ -293,8 +293,6 @@ static int tda9887_configure(struct tda9887 *t)
 	unsigned char *buf = NULL;
 	int rc;
 
-	printk("tda9887_configure\n");
-
 	if (t->radio) {
 		dprintk("tda9885/6/7: FM Radio mode\n");
 		buf = buf_fm_stereo;
@@ -358,33 +356,19 @@ static int tda9887_attach(struct i2c_adapter *adap, int addr, int kind)
                 return -ENOMEM;
 	memset(t,0,sizeof(*t));
 	t->client = client_template;
-        i2c_set_clientdata(&t->client, t);
 	t->pinnacle_id = -1;
+	t->tvnorm=VIDEO_MODE_PAL;
+        i2c_set_clientdata(&t->client, t);
         i2c_attach_client(&t->client);
         
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static int tda9887_probe(struct i2c_adapter *adap)
 {
-	int rc;
-
-	switch (adap->id) {
-	case I2C_ALGO_BIT | I2C_HW_B_BT848:
-	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
-	case I2C_ALGO_SAA7134:
-		printk("tda9887: probing %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = i2c_probe(adap, &addr_data, tda9887_attach);
-		break;
-	default:
-		printk("tda9887: ignoring %s i2c adapter [id=0x%x]\n",
-		       adap->dev.name,adap->id);
-		rc = 0;
-		/* nothing */
-	}
-	return rc;
+	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+		return i2c_probe(adap, &addr_data, tda9887_attach);
+	return 0;
 }
 
 static int tda9887_detach(struct i2c_client *client)
@@ -393,7 +377,6 @@ static int tda9887_detach(struct i2c_client *client)
 
 	i2c_detach_client(client);
 	kfree(t);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -418,6 +401,7 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		int *i = arg;
 
 		t->pinnacle_id = *i;
+		tda9887_miro(t);
 		break;
 	}
 	/* --- v4l ioctls --- */

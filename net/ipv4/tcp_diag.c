@@ -88,8 +88,10 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		r->tcpdiag_inode = 0;
 #ifdef CONFIG_IPV6
 		if (r->tcpdiag_family == AF_INET6) {
-			memcpy(r->id.tcpdiag_src, &tw->v6_rcv_saddr, 16);
-			memcpy(r->id.tcpdiag_dst, &tw->v6_daddr, 16);
+			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
+				       &tw->v6_rcv_saddr);
+			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
+				       &tw->v6_daddr);
 		}
 #endif
 		nlh->nlmsg_len = skb->tail - b;
@@ -105,8 +107,10 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	if (r->tcpdiag_family == AF_INET6) {
 		struct ipv6_pinfo *np = inet6_sk(sk);
 
-		memcpy(r->id.tcpdiag_src, &np->rcv_saddr, 16);
-		memcpy(r->id.tcpdiag_dst, &np->daddr, 16);
+		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
+			       &np->rcv_saddr);
+		ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
+			       &np->daddr);
 	}
 #endif
 
@@ -599,7 +603,7 @@ err_inval:
 }
 
 
-extern __inline__ void tcpdiag_rcv_skb(struct sk_buff *skb)
+static inline void tcpdiag_rcv_skb(struct sk_buff *skb)
 {
 	int err;
 	struct nlmsghdr * nlh;
@@ -609,7 +613,7 @@ extern __inline__ void tcpdiag_rcv_skb(struct sk_buff *skb)
 		if (nlh->nlmsg_len < sizeof(*nlh) || skb->len < nlh->nlmsg_len)
 			return;
 		err = tcpdiag_rcv_msg(skb, nlh);
-		if (err) 
+		if (err || nlh->nlmsg_flags & NLM_F_ACK) 
 			netlink_ack(skb, nlh, err);
 	}
 }

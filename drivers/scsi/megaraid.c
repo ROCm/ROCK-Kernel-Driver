@@ -4664,7 +4664,7 @@ mega_is_bios_enabled(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	memset((void *)adapter->mega_buffer, 0, MEGA_BUFFER_SIZE);
 
@@ -4697,7 +4697,7 @@ mega_enum_raid_scsi(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	/*
 	 * issue command to find out what channels are raid/scsi
@@ -4818,7 +4818,7 @@ mega_support_random_del(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof(mbox));
+	memset(mbox, 0, sizeof(*mbox));
 
 	/*
 	 * issue command
@@ -4847,7 +4847,7 @@ mega_support_ext_cdb(adapter_t *adapter)
 
 	mbox = (mbox_t *)raw_mbox;
 
-	memset(mbox, 0, sizeof (mbox));
+	memset(mbox, 0, sizeof(*mbox));
 	/*
 	 * issue command to find out if controller supports extended CDBs.
 	 */
@@ -5377,9 +5377,27 @@ free_local_pdev(struct pci_dev *pdev)
 	kfree(pdev);
 }
 
-
-static Scsi_Host_Template driver_template = MEGARAID;
-
+static Scsi_Host_Template driver_template = {
+	.name =				"MegaRAID",
+	.proc_info =			megaraid_proc_info,
+	.detect =			megaraid_detect,
+	.release =			megaraid_release,
+	.info =				megaraid_info,
+	.command =			megaraid_command,
+	.queuecommand =			megaraid_queue,	
+	.bios_param =			megaraid_biosparam,
+	.max_sectors =			MAX_SECTORS_PER_IO,
+	.can_queue =			MAX_COMMANDS,
+	.this_id =			DEFAULT_INITIATOR_ID,
+	.sg_tablesize =			MAX_SGLIST,
+	.cmd_per_lun =			DEF_CMD_PER_LUN,
+	.use_clustering =		ENABLE_CLUSTERING,
+	.eh_abort_handler =		megaraid_abort,
+	.eh_device_reset_handler =	megaraid_reset,
+	.eh_bus_reset_handler =		megaraid_reset,
+	.eh_host_reset_handler =	megaraid_reset,
+	.highmem_io =			1,
+};
 #include "scsi_module.c"
 
 /* vi: set ts=8 sw=8 tw=78: */

@@ -132,19 +132,19 @@ static __inline__ unsigned int ip6qhashfn(u32 id, struct in6_addr *saddr,
 atomic_t ip6_frag_mem = ATOMIC_INIT(0);
 
 /* Memory Tracking Functions. */
-extern __inline__ void frag_kfree_skb(struct sk_buff *skb)
+static inline void frag_kfree_skb(struct sk_buff *skb)
 {
 	atomic_sub(skb->truesize, &ip6_frag_mem);
 	kfree_skb(skb);
 }
 
-extern __inline__ void frag_free_queue(struct frag_queue *fq)
+static inline void frag_free_queue(struct frag_queue *fq)
 {
 	atomic_sub(sizeof(struct frag_queue), &ip6_frag_mem);
 	kfree(fq);
 }
 
-extern __inline__ struct frag_queue *frag_alloc_queue(void)
+static inline struct frag_queue *frag_alloc_queue(void)
 {
 	struct frag_queue *fq = kmalloc(sizeof(struct frag_queue), GFP_ATOMIC);
 

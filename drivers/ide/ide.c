@@ -913,6 +913,8 @@ int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 		}
 		for (index = 0; index < MAX_HWIFS; ++index) {
 			hwif = &ide_hwifs[index];
+			if (hwif->hold)
+				continue;
 			if ((!hwif->present && !hwif->mate && !initializing) ||
 			    (!hwif->hw.io_ports[IDE_DATA_OFFSET] && initializing))
 				goto found;
@@ -924,6 +926,8 @@ int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 found:
 	if (hwif->present)
 		ide_unregister(index);
+	else if (!hwif->hold)
+		init_hwif_data(index);
 	if (hwif->present)
 		return -1;
 	memcpy(&hwif->hw, hw, sizeof(*hw));
@@ -1394,7 +1398,7 @@ int ide_replace_subdriver (ide_drive_t *drive, const char *driver)
 		goto abort;
 	if (DRIVER(drive)->cleanup(drive))
 		goto abort;
-	strncpy(drive->driver_req, driver, 9);
+	strlcpy(drive->driver_req, driver, sizeof(drive->driver_req));
 	if (ata_attach(drive)) {
 		spin_lock(&drives_lock);
 		list_del_init(&drive->list);
@@ -1691,6 +1695,33 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 	return 0;	/* zero = nothing matched */
 }
 
+#ifdef CONFIG_BLK_DEV_PDC4030
+static int __initdata probe_pdc4030;
+extern void init_pdc4030(void);
+#endif
+#ifdef CONFIG_BLK_DEV_ALI14XX
+static int __initdata probe_ali14xx;
+extern void init_ali14xx(void);
+#endif
+#ifdef CONFIG_BLK_DEV_UMC8672
+static int __initdata probe_umc8672;
+extern void init_umc8672(void);
+#endif
+#ifdef CONFIG_BLK_DEV_DTC2278
+static int __initdata probe_dtc2278;
+extern void init_dtc2278(void);
+#endif
+#ifdef CONFIG_BLK_DEV_HT6560B
+static int __initdata probe_ht6560b;
+extern void init_ht6560b(void);
+#endif
+#ifdef CONFIG_BLK_DEV_QD65XX
+static int __initdata probe_qd65xx;
+extern void init_qd65xx(void);
+#endif
+
+static int __initdata is_chipset_set[MAX_HWIFS];
+
 /*
  * ide_setup() gets called VERY EARLY during initialization,
  * to handle kernel "command line" strings beginning with "hdx="
@@ -1704,6 +1735,8 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
  * "hdx=nowerr"		: ignore the WRERR_STAT bit on this drive
  * "hdx=cdrom"		: drive is present, and is a cdrom drive
  * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
+ * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
+ * "hdx=remap"		: remap 0->1 (for EZDrive)
  * "hdx=noremap"	: do not remap 0->1 even though EZD was detected
  * "hdx=autotune"	: driver will attempt to tune interface speed
  *				to the fastest PIO mode supported,
@@ -1823,18 +1856,18 @@ int __init ide_setup (char *s)
 	 * Look for drive options:  "hdx="
 	 */
 	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
-		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
-				"serialize", "autotune", "noautotune",
-				"slow", "swapdata", "bswap", "flash",
-				"remap", "noremap", "scsi", "biostimings",
-				NULL};
+		const char *hd_words[] = {
+			"none", "noprobe", "nowerr", "cdrom", "serialize",
+			"autotune", "noautotune", "slow", "swapdata", "bswap",
+			"flash", "remap", "noremap", "scsi", "biostimings",
+			"remap63", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
 		hwif = &ide_hwifs[hw];
 		drive = &hwif->drives[unit];
 		if (strncmp(s + 4, "ide-", 4) == 0) {
-			strncpy(drive->driver_req, s + 4, 9);
+			strlcpy(drive->driver_req, s + 4, sizeof(drive->driver_req));
 			goto done;
 		}
 		/*
@@ -1877,8 +1910,8 @@ int __init ide_setup (char *s)
 			case -8: /* "slow" */
 				drive->slow = 1;
 				goto done;
-			case -9: /* "swapdata" or "bswap" */
-			case -10:
+			case -9: /* "swapdata" */
+			case -10: /* "bswap" */
 				drive->bswap = 1;
 				goto done;
 			case -11: /* "flash" */
@@ -1900,6 +1933,9 @@ int __init ide_setup (char *s)
 #endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
 			case -15: /* "biostimings" */
 				drive->autotune = IDE_TUNE_BIOS;
+				goto done;
+			case -16: /* "remap63" */
+				drive->sect0 = 63;
 				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;
@@ -1935,67 +1971,58 @@ int __init ide_setup (char *s)
 	if (s[3] >= '0' && s[3] <= max_hwif) {
 		/*
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
-		 * -8,-9,-10 : are reserved for future idex calls to ease the hardcoding.
+		 * -9,-10 : are reserved for future idex calls to ease the hardcoding.
 		 */
 		const char *ide_words[] = {
 			"noprobe", "serialize", "autotune", "noautotune", 
-			"reset", "dma", "ata66", "minus8", "minus9", "minus10",
-			"four", "qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", 
-			"umc8672", "ali14xx", "dc4030", "biostimings", NULL };
+			"reset", "dma", "ata66", "biostimings", "minus9",
+			"minus10", "four", "qd65xx", "ht6560b", "cmd640_vlb",
+			"dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
 		hw = s[3] - '0';
 		hwif = &ide_hwifs[hw];
 		i = match_parm(&s[4], ide_words, vals, 3);
 
 		/*
-		 * Cryptic check to ensure chipset not already set for hwif:
+		 * Cryptic check to ensure chipset not already set for hwif.
+		 * Note: we can't depend on hwif->chipset here.
 		 */
-		if (i > 0 || i <= -11) {			/* is parameter a chipset name? */
-			if (hwif->chipset != ide_unknown)
-				goto bad_option;	/* chipset already specified */
-			if (i <= -11 && i != -18 && hw != 0)
-				goto bad_hwif;		/* chipset drivers are for "ide0=" only */
-			if (i <= -11 && i != -18 && ide_hwifs[hw+1].chipset != ide_unknown)
-				goto bad_option;	/* chipset for 2nd port already specified */
+		if ((i >= -18 && i <= -11) || (i > 0 && i <= 3)) {
+			/* chipset already specified */
+			if (is_chipset_set[hw])
+				goto bad_option;
+			if (i > -18 && i <= -11) {
+				/* these drivers are for "ide0=" only */
+				if (hw != 0)
+					goto bad_hwif;
+				/* chipset already specified for 2nd port */
+				if (is_chipset_set[hw+1])
+					goto bad_option;
+			}
+			is_chipset_set[hw] = 1;
 			printk("\n");
 		}
 
 		switch (i) {
-			case -19: /* "biostimings" */
-				hwif->drives[0].autotune = IDE_TUNE_BIOS;
-				hwif->drives[1].autotune = IDE_TUNE_BIOS;
-				goto done;
 #ifdef CONFIG_BLK_DEV_PDC4030
 			case -18: /* "dc4030" */
-			{
-				extern void init_pdc4030(void);
-				init_pdc4030();
+				probe_pdc4030 = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
+#endif
 #ifdef CONFIG_BLK_DEV_ALI14XX
 			case -17: /* "ali14xx" */
-			{
-				extern void init_ali14xx (void);
-				init_ali14xx();
+				probe_ali14xx = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_ALI14XX */
+#endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 			case -16: /* "umc8672" */
-			{
-				extern void init_umc8672 (void);
-				init_umc8672();
+				probe_umc8672 = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_UMC8672 */
+#endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 			case -15: /* "dtc2278" */
-			{
-				extern void init_dtc2278 (void);
-				init_dtc2278();
+				probe_dtc2278 = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_DTC2278 */
+#endif
 #ifdef CONFIG_BLK_DEV_CMD640
 			case -14: /* "cmd640_vlb" */
 			{
@@ -2003,23 +2030,17 @@ int __init ide_setup (char *s)
 				cmd640_vlb = 1;
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_CMD640 */
+#endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 			case -13: /* "ht6560b" */
-			{
-				extern void init_ht6560b (void);
-				init_ht6560b();
+				probe_ht6560b = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_HT6560B */
+#endif
 #ifdef CONFIG_BLK_DEV_QD65XX
 			case -12: /* "qd65xx" */
-			{
-				extern void init_qd65xx (void);
-				init_qd65xx();
+				probe_qd65xx = 1;
 				goto done;
-			}
-#endif /* CONFIG_BLK_DEV_QD65XX */
+#endif
 #ifdef CONFIG_BLK_DEV_4DRIVES
 			case -11: /* "four" drives on one set of ports */
 			{
@@ -2034,8 +2055,11 @@ int __init ide_setup (char *s)
 #endif /* CONFIG_BLK_DEV_4DRIVES */
 			case -10: /* minus10 */
 			case -9: /* minus9 */
-			case -8: /* minus8 */
 				goto bad_option;
+			case -8: /* "biostimings" */
+				hwif->drives[0].autotune = IDE_TUNE_BIOS;
+				hwif->drives[1].autotune = IDE_TUNE_BIOS;
+				goto done;
 			case -7: /* ata66 */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
@@ -2473,6 +2497,31 @@ int __init ide_init (void)
 	bus_register(&ide_bus_type);
 
 	init_ide_data();
+
+#ifdef CONFIG_BLK_DEV_PDC4030
+	if (probe_pdc4030)
+		init_pdc4030();
+#endif
+#ifdef CONFIG_BLK_DEV_ALI14XX
+	if (probe_ali14xx)
+		init_ali14xx();
+#endif
+#ifdef CONFIG_BLK_DEV_UMC8672
+	if (probe_umc8672)
+		init_umc8672();
+#endif
+#ifdef CONFIG_BLK_DEV_DTC2278
+	if (probe_dtc2278)
+		init_dtc2278();
+#endif
+#ifdef CONFIG_BLK_DEV_HT6560B
+	if (probe_ht6560b)
+		init_ht6560b();
+#endif
+#ifdef CONFIG_BLK_DEV_QD65XX
+	if (probe_qd65xx)
+		init_qd65xx();
+#endif
 
 	initializing = 1;
 	ide_init_builtin_drivers();

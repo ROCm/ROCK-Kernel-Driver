@@ -174,7 +174,7 @@ void __init fs_subsys_init(void)
 		register_fs_subsys(*p);
 }
 
-static int fs_index(const char * __name)
+static int fs_index(const char __user * __name)
 {
 	struct file_system_type * tmp;
 	char * name;
@@ -198,7 +198,7 @@ static int fs_index(const char * __name)
 	return err;
 }
 
-static int fs_name(unsigned int index, char * buf)
+static int fs_name(unsigned int index, char __user * buf)
 {
 	struct file_system_type * tmp;
 	int len, res;
@@ -239,11 +239,11 @@ asmlinkage long sys_sysfs(int option, unsigned long arg1, unsigned long arg2)
 
 	switch (option) {
 		case 1:
-			retval = fs_index((const char *) arg1);
+			retval = fs_index((const char __user *) arg1);
 			break;
 
 		case 2:
-			retval = fs_name(arg1, (char *) arg2);
+			retval = fs_name(arg1, (char __user *) arg2);
 			break;
 
 		case 3:
@@ -279,7 +279,7 @@ struct file_system_type *get_fs_type(const char *name)
 	if (fs && !try_module_get(fs->owner))
 		fs = NULL;
 	read_unlock(&file_systems_lock);
-	if (!fs && (request_module(name) == 0)) {
+	if (!fs && (request_module("%s", name) == 0)) {
 		read_lock(&file_systems_lock);
 		fs = *(find_filesystem(name));
 		if (fs && !try_module_get(fs->owner))

@@ -1,9 +1,11 @@
 #ifndef _ASM_X86_64_COMPAT_H
 #define _ASM_X86_64_COMPAT_H
+
 /*
  * Architecture specific compatibility types
  */
 #include <linux/types.h>
+#include <linux/sched.h>
 
 #define COMPAT_USER_HZ	100
 
@@ -126,6 +128,12 @@ typedef	u32		compat_uptr_t;
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
 	return (void *)(unsigned long)uptr;
+}
+
+static __inline__ void *compat_alloc_user_space(long len)
+{
+	struct pt_regs *regs = (void *)current->thread.rsp0 - sizeof(struct pt_regs); 
+	return (void *)regs->rsp - len; 
 }
 
 #endif /* _ASM_X86_64_COMPAT_H */

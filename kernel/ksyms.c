@@ -40,7 +40,6 @@
 #include <linux/mm.h>
 #include <linux/capability.h>
 #include <linux/highuid.h>
-#include <linux/brlock.h>
 #include <linux/fs.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
@@ -224,6 +223,7 @@ EXPORT_SYMBOL(block_sync_page);
 EXPORT_SYMBOL(generic_cont_expand);
 EXPORT_SYMBOL(cont_prepare_write);
 EXPORT_SYMBOL(generic_commit_write);
+EXPORT_SYMBOL(block_commit_write);
 EXPORT_SYMBOL(block_truncate_page);
 EXPORT_SYMBOL(generic_block_bmap);
 EXPORT_SYMBOL(generic_file_read);
@@ -402,9 +402,7 @@ EXPORT_SYMBOL(add_timer);
 EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
-#if !defined(CONFIG_IA64)
 EXPORT_SYMBOL(irq_stat);
-#endif
 
 /* waitqueue handling */
 EXPORT_SYMBOL(add_wait_queue);
@@ -431,17 +429,6 @@ EXPORT_SYMBOL(del_timer_sync);
 #endif
 EXPORT_SYMBOL(mod_timer);
 
-#ifdef CONFIG_SMP
-
-/* Big-Reader lock implementation */
-EXPORT_SYMBOL(__brlock_array);
-#ifndef __BRLOCK_USE_ATOMICS
-EXPORT_SYMBOL(__br_write_locks);
-#endif
-EXPORT_SYMBOL(__br_write_lock);
-EXPORT_SYMBOL(__br_write_unlock);
-#endif
-
 #ifdef HAVE_DISABLE_HLT
 EXPORT_SYMBOL(disable_hlt);
 EXPORT_SYMBOL(enable_hlt);
@@ -461,7 +448,7 @@ EXPORT_SYMBOL(iomem_resource);
 EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(default_wake_function);
 EXPORT_SYMBOL(__wake_up);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
 #endif
 EXPORT_SYMBOL(wake_up_process);
@@ -479,10 +466,10 @@ EXPORT_SYMBOL(__cond_resched);
 EXPORT_SYMBOL(set_user_nice);
 EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
 #endif
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);
@@ -542,6 +529,7 @@ EXPORT_SYMBOL(seq_read);
 EXPORT_SYMBOL(seq_lseek);
 EXPORT_SYMBOL(single_open);
 EXPORT_SYMBOL(single_release);
+EXPORT_SYMBOL(seq_release_private);
 
 /* Program loader interfaces */
 #ifdef CONFIG_MMU
@@ -569,6 +557,8 @@ EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(__inode_dir_notify);
+EXPORT_SYMBOL(generic_osync_inode);
+EXPORT_SYMBOL(remove_suid);
 
 #ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);
@@ -580,8 +570,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 /* all busmice */
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
-
-EXPORT_SYMBOL(partition_name);
 
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);
@@ -604,9 +592,7 @@ EXPORT_SYMBOL(__tasklet_hi_schedule);
 /* init task, for moving kthread roots - ought to export a function ?? */
 
 EXPORT_SYMBOL(init_task);
-#ifndef CONFIG_IA64
 EXPORT_SYMBOL(init_thread_union);
-#endif
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(find_task_by_pid);

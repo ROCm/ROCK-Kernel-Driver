@@ -13,15 +13,6 @@
 #ifndef _LINUX_IPV6_ROUTE_H
 #define _LINUX_IPV6_ROUTE_H
 
-enum
-{
-	RTA_IPV6_UNSPEC,
-	RTA_IPV6_HOPLIMIT,
-};
-
-#define	RTA_IPV6_MAX RTA_IPV6_HOPLIMIT
-
-
 #define RTF_DEFAULT	0x00010000	/* default - learned via ND	*/
 #define RTF_ALLONLINK	0x00020000	/* fallback, no routers on link	*/
 #define RTF_ADDRCONF	0x00040000	/* addrconf route - RA		*/

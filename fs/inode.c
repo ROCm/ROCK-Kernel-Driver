@@ -18,6 +18,7 @@
 #include <linux/hash.h>
 #include <linux/swap.h>
 #include <linux/security.h>
+#include <linux/cdev.h>
 
 /*
  * This is needed for the following functions:
@@ -128,6 +129,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		memset(&inode->i_dquot, 0, sizeof(inode->i_dquot));
 		inode->i_pipe = NULL;
 		inode->i_bdev = NULL;
+		inode->i_cdev = NULL;
 		inode->i_rdev = to_kdev_t(0);
 		inode->i_security = NULL;
 		if (security_inode_alloc(inode)) {
@@ -241,6 +243,8 @@ void clear_inode(struct inode *inode)
 		inode->i_sb->s_op->clear_inode(inode);
 	if (inode->i_bdev)
 		bd_forget(inode);
+	if (inode->i_cdev)
+		cd_forget(inode);
 	inode->i_state = I_CLEAR;
 }
 
@@ -466,6 +470,7 @@ static int shrink_icache_memory(int nr, unsigned int gfp_mask)
 	return inodes_stat.nr_unused;
 }
 
+static void __wait_on_freeing_inode(struct inode *inode);
 /*
  * Called with the inode lock held.
  * NOTE: we are not increasing the inode-refcount, you must call __iget()
@@ -477,6 +482,7 @@ static struct inode * find_inode(struct super_block * sb, struct hlist_head *hea
 	struct hlist_node *node;
 	struct inode * inode = NULL;
 
+repeat:
 	hlist_for_each (node, head) { 
 		prefetch(node->next);
 		inode = hlist_entry(node, struct inode, i_hash);
@@ -484,6 +490,10 @@ static struct inode * find_inode(struct super_block * sb, struct hlist_head *hea
 			continue;
 		if (!test(inode, data))
 			continue;
+		if (inode->i_state & (I_FREEING|I_CLEAR)) {
+			__wait_on_freeing_inode(inode);
+			goto repeat;
+		}
 		break;
 	}
 	return node ? inode : NULL;
@@ -498,6 +508,7 @@ static struct inode * find_inode_fast(struct super_block * sb, struct hlist_head
 	struct hlist_node *node;
 	struct inode * inode = NULL;
 
+repeat:
 	hlist_for_each (node, head) {
 		prefetch(node->next);
 		inode = list_entry(node, struct inode, i_hash);
@@ -505,6 +516,10 @@ static struct inode * find_inode_fast(struct super_block * sb, struct hlist_head
 			continue;
 		if (inode->i_sb != sb)
 			continue;
+		if (inode->i_state & (I_FREEING|I_CLEAR)) {
+			__wait_on_freeing_inode(inode);
+			goto repeat;
+		}
 		break;
 	}
 	return node ? inode : NULL;
@@ -933,11 +948,22 @@ void remove_inode_hash(struct inode *inode)
 	spin_unlock(&inode_lock);
 }
 
+/*
+ * Tell the filesystem that this inode is no longer of any interest and should
+ * be completely destroyed.
+ *
+ * We leave the inode in the inode hash table until *after* the filesystem's
+ * ->delete_inode completes.  This ensures that an iget (such as nfsd might
+ * instigate) will always find up-to-date information either in the hash or on
+ * disk.
+ *
+ * I_FREEING is set so that no-one will take a new reference to the inode while
+ * it is being deleted.
+ */
 void generic_delete_inode(struct inode *inode)
 {
 	struct super_operations *op = inode->i_sb->s_op;
 
-	hlist_del_init(&inode->i_hash);
 	list_del_init(&inode->i_list);
 	inode->i_state|=I_FREEING;
 	inodes_stat.nr_inodes--;
@@ -956,6 +982,10 @@ void generic_delete_inode(struct inode *inode)
 		delete(inode);
 	} else
 		clear_inode(inode);
+	spin_lock(&inode_lock);
+	hlist_del_init(&inode->i_hash);
+	spin_unlock(&inode_lock);
+	wake_up_inode(inode);
 	if (inode->i_state != I_CLEAR)
 		BUG();
 	destroy_inode(inode);
@@ -1227,6 +1257,32 @@ repeat:
 	}
 	remove_wait_queue(wq, &wait);
 	__set_current_state(TASK_RUNNING);
+}
+
+/*
+ * If we try to find an inode in the inode hash while it is being deleted, we
+ * have to wait until the filesystem completes its deletion before reporting
+ * that it isn't found.  This is because iget will immediately call
+ * ->read_inode, and we want to be sure that evidence of the deletion is found
+ * by ->read_inode.
+ *
+ * This call might return early if an inode which shares the waitq is woken up.
+ * This is most easily handled by the caller which will loop around again
+ * looking for the inode.
+ *
+ * This is called with inode_lock held.
+ */
+static void __wait_on_freeing_inode(struct inode *inode)
+{
+	DECLARE_WAITQUEUE(wait, current);
+	wait_queue_head_t *wq = i_waitq_head(inode);
+
+	add_wait_queue(wq, &wait);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	spin_unlock(&inode_lock);
+	schedule();
+	remove_wait_queue(wq, &wait);
+	spin_lock(&inode_lock);
 }
 
 void wake_up_inode(struct inode *inode)

@@ -192,7 +192,7 @@ struct frad_local
 int register_frad(const char *name);
 int unregister_frad(const char *name);
 
-extern int (*dlci_ioctl_hook)(unsigned int, void *);
+extern void dlci_ioctl_set(int (*hook)(unsigned int, void *));
 
 #endif /* __KERNEL__ */
 

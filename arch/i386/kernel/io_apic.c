@@ -219,6 +219,14 @@ void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
 {
 	struct IO_APIC_route_entry entry;
 	unsigned long flags;
+	
+	/* Check delivery_mode to be sure we're not clearing an SMI pin */
+	spin_lock_irqsave(&ioapic_lock, flags);
+	*(((int*)&entry) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
+	*(((int*)&entry) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+	if (entry.delivery_mode == dest_SMI)
+		return;
 
 	/*
 	 * Disable it in the IO-APIC irq-routing table:
@@ -240,22 +248,22 @@ static void clear_IO_APIC (void)
 			clear_IO_APIC_pin(apic, pin);
 }
 
-static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
+static void set_ioapic_affinity (unsigned int irq, unsigned long cpu_mask)
 {
 	unsigned long flags;
 	int pin;
 	struct irq_pin_list *entry = irq_2_pin + irq;
-
-	/*
-	 * Only the first 8 bits are valid.
-	 */
-	mask = mask << 24;
+	unsigned int apicid_value;
+	
+	apicid_value = cpu_mask_to_apicid(cpu_mask);
+	/* Prepare to do the io_apic_write */
+	apicid_value = apicid_value << 24;
 	spin_lock_irqsave(&ioapic_lock, flags);
 	for (;;) {
 		pin = entry->pin;
 		if (pin == -1)
 			break;
-		io_apic_write(entry->apic, 0x10 + 1 + pin*2, mask);
+		io_apic_write(entry->apic, 0x10 + 1 + pin*2, apicid_value);
 		if (!entry->next)
 			break;
 		entry = irq_2_pin + entry->next;
@@ -279,8 +287,10 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 
 extern unsigned long irq_affinity[NR_IRQS];
 
-static int __cacheline_aligned pending_irq_balance_apicid[NR_IRQS];
-static int irqbalance_disabled = NO_BALANCE_IRQ;
+static int __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
+
+#define IRQBALANCE_CHECK_ARCH -999
+static int irqbalance_disabled = IRQBALANCE_CHECK_ARCH;
 static int physical_balance = 0;
 
 struct irq_cpu_info {
@@ -342,8 +352,10 @@ static inline void balance_irq(int cpu, int irq)
 	unsigned long allowed_mask;
 	unsigned int new_cpu;
 		
-	if (irqbalance_disabled)
+	if (irqbalance_disabled == IRQBALANCE_CHECK_ARCH && NO_BALANCE_IRQ)
 		return;
+	else if (irqbalance_disabled) 
+		return; 
 
 	allowed_mask = cpu_online_map & irq_affinity[irq];
 	new_cpu = move(cpu, allowed_mask, now, 1);
@@ -352,7 +364,7 @@ static inline void balance_irq(int cpu, int irq)
 		unsigned long flags;
 
 		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_apicid[irq]=cpu_to_logical_apicid(new_cpu);
+		pending_irq_balance_cpumask[irq] = 1 << new_cpu;
 		spin_unlock_irqrestore(&desc->lock, flags);
 	}
 }
@@ -549,8 +561,7 @@ tryanotherirq:
 				selected_irq, min_loaded);
 		/* mark for change destination */
 		spin_lock_irqsave(&desc->lock, flags);
-		pending_irq_balance_apicid[selected_irq] =
-				cpu_to_logical_apicid(min_loaded);
+		pending_irq_balance_cpumask[selected_irq] = 1 << min_loaded;
 		spin_unlock_irqrestore(&desc->lock, flags);
 		/* Since we made a change, come back sooner to 
 		 * check for more variation.
@@ -582,7 +593,7 @@ int balanced_irq(void *unused)
 	
 	/* push everything to CPU 0 to give us a starting point.  */
 	for (i = 0 ; i < NR_IRQS ; i++)
-		pending_irq_balance_apicid[i] = cpu_to_logical_apicid(0);
+		pending_irq_balance_cpumask[i] = 1;
 
 repeat:
 	set_current_state(TASK_INTERRUPTIBLE);
@@ -659,9 +670,9 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask);
 static inline void move_irq(int irq)
 {
 	/* note - we hold the desc->lock */
-	if (unlikely(pending_irq_balance_apicid[irq])) {
-		set_ioapic_affinity(irq, pending_irq_balance_apicid[irq]);
-		pending_irq_balance_apicid[irq] = 0;
+	if (unlikely(pending_irq_balance_cpumask[irq])) {
+		set_ioapic_affinity(irq, pending_irq_balance_cpumask[irq]);
+		pending_irq_balance_cpumask[irq] = 0;
 	}
 }
 

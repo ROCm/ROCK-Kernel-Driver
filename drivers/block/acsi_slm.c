@@ -247,7 +247,7 @@ static int slm_getstats( char *buffer, int device );
 static ssize_t slm_read( struct file* file, char *buf, size_t count, loff_t
                          *ppos );
 static void start_print( int device );
-static void slm_interrupt(int irc, void *data, struct pt_regs *fp);
+static irqreturn_t slm_interrupt(int irc, void *data, struct pt_regs *fp);
 static void slm_test_ready( unsigned long dummy );
 static void set_dma_addr( unsigned long paddr );
 static unsigned long get_dma_addr( void );
@@ -455,7 +455,7 @@ static void start_print( int device )
 
 /* Only called when an error happened or at the end of a page */
 
-static void slm_interrupt(int irc, void *data, struct pt_regs *fp)
+static irqreturn_t slm_interrupt(int irc, void *data, struct pt_regs *fp)
 
 {	unsigned long	addr;
 	int				stat;
@@ -476,6 +476,7 @@ static void slm_interrupt(int irc, void *data, struct pt_regs *fp)
 	wake_up( &print_wait );
 	stdma_release();
 	ENABLE_IRQ();
+	return IRQ_HANDLED;
 }
 
 
@@ -1008,11 +1009,8 @@ int slm_init( void )
 	
 	devfs_mk_dir("slm");
 	for (i = 0; i < MAX_SLM; i++) {
-		char name[16];
-		sprintf(name, "slm/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       ACSI_MAJOR, i, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &slm_fops, NULL);
+		devfs_mk_cdev(MKDEV(ACSI_MAJOR, i),
+				S_IFCHR|S_IRUSR|S_IWUSR, "slm/%d", i);
 	}
 	return 0;
 }

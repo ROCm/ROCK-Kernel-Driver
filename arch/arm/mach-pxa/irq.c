@@ -50,9 +50,9 @@ static struct irqchip pxa_internal_chip = {
  * Use this instead of directly setting GRER/GFER.
  */
 
-static int GPIO_IRQ_rising_edge[3];
-static int GPIO_IRQ_falling_edge[3];
-static int GPIO_IRQ_mask[3];
+static long GPIO_IRQ_rising_edge[3];
+static long GPIO_IRQ_falling_edge[3];
+static long GPIO_IRQ_mask[3];
 
 static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 {
@@ -189,7 +189,6 @@ static struct irqchip pxa_muxed_gpio_chip = {
 	.ack		= pxa_ack_muxed_gpio,
 	.mask		= pxa_mask_muxed_gpio,
 	.unmask		= pxa_unmask_muxed_gpio,
-	.rerun		= pxa_manual_rerun,
 	.type		= pxa_gpio_irq_type,
 };
 
@@ -217,20 +216,17 @@ void __init pxa_init_irq(void)
 	/* GPIO 0 and 1 must have their mask bit always set */
 	GPIO_IRQ_mask[0] = 3;
 
+	for (irq = PXA_IRQ(PXA_IRQ_SKIP); irq <= PXA_IRQ(31); irq++) {
+		set_irq_chip(irq, &pxa_internal_chip);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID);
+	}
+
 	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
 		set_irq_chip(irq, &pxa_low_gpio_chip);
 		set_irq_handler(irq, do_edge_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
-
-	for (irq = PXA_IRQ(11); irq <= PXA_IRQ(31); irq++) {
-		set_irq_chip(irq, &pxa_internal_chip);
-		set_irq_handler(irq, do_level_IRQ);
-		set_irq_flags(irq, IRQF_VALID);
-	}
-	/* Those are reserved */
-	set_irq_flags(PXA_IRQ(15), 0);
-	set_irq_flags(PXA_IRQ(16), 0);
 
 	for (irq = IRQ_GPIO(2); irq <= IRQ_GPIO(80); irq++) {
 		set_irq_chip(irq, &pxa_muxed_gpio_chip);

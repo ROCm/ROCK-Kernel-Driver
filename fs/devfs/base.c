@@ -752,6 +752,7 @@
 #  define DPRINTK(flag, format, args...)
 #endif
 
+typedef struct devfs_entry *devfs_handle_t;
 
 struct directory_type
 {
@@ -1424,98 +1425,6 @@ static void devfsd_notify (struct devfs_entry *de,unsigned short type)
 			 current->egid, &fs_info);
 } 
 
-
-/**
- *	devfs_register - Register a device entry.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
- *		new name is relative to the root of the devfs.
- *	@name: The name of the entry.
- *	@flags: Must be 0
- *	@major: The major number. Not needed for regular files.
- *	@minor: The minor number. Not needed for regular files.
- *	@mode: The default file mode.
- *	@ops: The &file_operations or &block_device_operations structure.
- *		This must not be externally deallocated.
- *	@info: An arbitrary pointer which will be written to the @private_data
- *		field of the &file structure passed to the device driver. You can set
- *		this to whatever you like, and change it once the file is opened (the next
- *		file opened will not see this change).
- *
- *	On failure %NULL is returned.
- */
-
-devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
-			       unsigned int flags,
-			       unsigned int major, unsigned int minor,
-			       umode_t mode, void *ops, void *info)
-{
-    int err;
-    dev_t devnum = 0, dev = MKDEV(major, minor);
-    struct devfs_entry *de;
-
-    /* we don't accept any flags anymore.  prototype will change soon. */
-    WARN_ON(flags);
-    WARN_ON(dir);
-    WARN_ON(!S_ISCHR(mode));
-
-    if (name == NULL)
-    {
-	PRINTK ("(): NULL name pointer\n");
-	return NULL;
-    }
-    if (ops == NULL)
-    {
-	PRINTK ("(%s): NULL ops pointer\n", name);
-	return NULL;
-    }
-    if ( S_ISDIR (mode) )
-    {
-	PRINTK ("(%s): creating directories is not allowed\n", name);
-	return NULL;
-    }
-    if ( S_ISLNK (mode) )
-    {
-	PRINTK ("(%s): creating symlinks is not allowed\n", name);
-	return NULL;
-    }
-    if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
-    {
-	PRINTK ("(%s): could not prepare leaf\n", name);
-	if (devnum) devfs_dealloc_devnum (mode, devnum);
-	return NULL;
-    }
-    if (S_ISCHR (mode)) {
-	de->u.cdev.dev = dev;
-	de->u.cdev.autogen = devnum != 0;
-	de->u.cdev.ops = ops;
-    } else if (S_ISBLK (mode)) {
-	de->u.bdev.dev = dev;
-	de->u.cdev.autogen = devnum != 0;
-    } else {
-	PRINTK ("(%s): illegal mode: %x\n", name, mode);
-	devfs_put (de);
-	devfs_put (dir);
-	return (NULL);
-    }
-    de->info = info;
-    de->inode.uid = 0;
-    de->inode.gid = 0;
-    err = _devfs_append_entry(dir, de, NULL);
-    if (err)
-    {
-	PRINTK ("(%s): could not append to parent, err: %d\n", name, err);
-	devfs_put (dir);
-	if (devnum) devfs_dealloc_devnum (mode, devnum);
-	return NULL;
-    }
-    DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"  pp: %p\n",
-	     name, de, dir, dir->name, dir->parent);
-    devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED);
-    devfs_put (dir);
-    return de;
-}   /*  End Function devfs_register  */
-
-
 int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 {
 	struct devfs_entry *dir = NULL, *de;
@@ -1560,6 +1469,52 @@ int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
 }
 
 EXPORT_SYMBOL(devfs_mk_bdev);
+
+
+int devfs_mk_cdev(dev_t dev, umode_t mode, const char *fmt, ...)
+{
+	struct devfs_entry *dir = NULL, *de;
+	char buf[64];
+	va_list args;
+	int error, n;
+
+	if (!S_ISCHR(mode)) {
+		printk(KERN_WARNING "%s: invalide mode (%u) for %s\n",
+				__FUNCTION__, mode, buf);
+		return -EINVAL;
+	}
+
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid format string\n",
+				__FUNCTION__);
+		return -EINVAL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, mode);
+	if (!de) {
+		printk(KERN_WARNING "%s: could not prepare leaf for %s\n",
+				__FUNCTION__, buf);
+		return -ENOMEM;		/* could be more accurate... */
+	}
+
+	de->u.cdev.dev = dev;
+
+	error = _devfs_append_entry(dir, de, NULL);
+	if (error) {
+		printk(KERN_WARNING "%s: could not append to parent for %s\n",
+				__FUNCTION__, buf);
+		goto out;
+	}
+
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
+ out:
+	devfs_put(dir);
+	return error;
+}
+
+EXPORT_SYMBOL(devfs_mk_cdev);
 
 
 /**
@@ -1889,7 +1844,6 @@ static int __init devfs_setup (char *str)
 __setup("devfs=", devfs_setup);
 
 EXPORT_SYMBOL(devfs_put);
-EXPORT_SYMBOL(devfs_register);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);
@@ -2600,8 +2554,9 @@ out_no_root:
     return -EINVAL;
 }   /*  End Function devfs_fill_super  */
 
-static struct super_block *devfs_get_sb (struct file_system_type *fs_type,
-					 int flags, char *dev_name, void *data)
+static struct super_block *
+devfs_get_sb (struct file_system_type *fs_type, int flags,
+	      const char *dev_name, void *data)
 {
     return get_sb_single (fs_type, flags, data, devfs_fill_super);
 }

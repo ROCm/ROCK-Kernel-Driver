@@ -153,6 +153,7 @@ static void atmtcp_v_close(struct atm_vcc *vcc)
 
 static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 {
+	unsigned long flags;
 	struct atm_cirange ci;
 	struct atm_vcc *vcc;
 
@@ -162,9 +163,14 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	if (ci.vci_bits == ATM_CI_MAX) ci.vci_bits = MAX_VCI_BITS;
 	if (ci.vpi_bits > MAX_VPI_BITS || ci.vpi_bits < 0 ||
 	    ci.vci_bits > MAX_VCI_BITS || ci.vci_bits < 0) return -EINVAL;
+	spin_lock_irqsave(&dev->lock, flags);
 	for (vcc = dev->vccs; vcc; vcc = vcc->next)
 		if ((vcc->vpi >> ci.vpi_bits) ||
-		    (vcc->vci >> ci.vci_bits)) return -EBUSY;
+		    (vcc->vci >> ci.vci_bits)) {
+			spin_unlock_irqrestore(&dev->lock, flags);
+			return -EBUSY;
+		}
+	spin_unlock_irqrestore(&dev->lock, flags);
 	dev->ci_range = ci;
 	return 0;
 }
@@ -227,6 +233,7 @@ static int atmtcp_v_proc(struct atm_dev *dev,loff_t *pos,char *page)
 
 static void atmtcp_c_close(struct atm_vcc *vcc)
 {
+	unsigned long flags;
 	struct atm_dev *atmtcp_dev;
 	struct atmtcp_dev_data *dev_data;
 	struct atm_vcc *walk;
@@ -239,13 +246,16 @@ static void atmtcp_c_close(struct atm_vcc *vcc)
 	kfree(dev_data);
 	shutdown_atm_dev(atmtcp_dev);
 	vcc->dev_data = NULL;
+	spin_lock_irqsave(&atmtcp_dev->lock, flags);
 	for (walk = atmtcp_dev->vccs; walk; walk = walk->next)
 		wake_up(&walk->sleep);
+	spin_unlock_irqrestore(&atmtcp_dev->lock, flags);
 }
 
 
 static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 {
+	unsigned long flags;
 	struct atm_dev *dev;
 	struct atmtcp_hdr *hdr;
 	struct atm_vcc *out_vcc;
@@ -260,11 +270,13 @@ static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		    (struct atmtcp_control *) skb->data);
 		goto done;
 	}
+	spin_lock_irqsave(&dev->lock, flags);
 	for (out_vcc = dev->vccs; out_vcc; out_vcc = out_vcc->next)
 		if (out_vcc->vpi == ntohs(hdr->vpi) &&
 		    out_vcc->vci == ntohs(hdr->vci) &&
 		    out_vcc->qos.rxtp.traffic_class != ATM_NONE)
 			break;
+	spin_unlock_irqrestore(&dev->lock, flags);
 	if (!out_vcc) {
 		atomic_inc(&vcc->stats->tx_err);
 		goto done;
@@ -318,6 +330,7 @@ static struct atm_dev atmtcp_control_dev = {
 	.ops		= &atmtcp_c_dev_ops,
 	.type		= "atmtcp",
 	.number		= 999,
+	.lock		= SPIN_LOCK_UNLOCKED
 };
 
 
@@ -350,9 +363,12 @@ int atmtcp_attach(struct atm_vcc *vcc,int itf)
 	struct atm_dev *dev;
 
 	dev = NULL;
-	if (itf != -1) dev = atm_find_dev(itf);
+	if (itf != -1) dev = atm_dev_lookup(itf);
 	if (dev) {
-		if (dev->ops != &atmtcp_v_dev_ops) return -EMEDIUMTYPE;
+		if (dev->ops != &atmtcp_v_dev_ops) {
+			atm_dev_release(dev);
+			return -EMEDIUMTYPE;
+		}
 		if (PRIV(dev)->vcc) return -EBUSY;
 	}
 	else {
@@ -383,14 +399,18 @@ int atmtcp_remove_persistent(int itf)
 	struct atm_dev *dev;
 	struct atmtcp_dev_data *dev_data;
 
-	dev = atm_find_dev(itf);
+	dev = atm_dev_lookup(itf);
 	if (!dev) return -ENODEV;
-	if (dev->ops != &atmtcp_v_dev_ops) return -EMEDIUMTYPE;
+	if (dev->ops != &atmtcp_v_dev_ops) {
+		atm_dev_release(dev);
+		return -EMEDIUMTYPE;
+	}
 	dev_data = PRIV(dev);
 	if (!dev_data->persist) return 0;
 	dev_data->persist = 0;
 	if (PRIV(dev)->vcc) return 0;
 	kfree(dev_data);
+	atm_dev_release(dev);
 	shutdown_atm_dev(dev);
 	return 0;
 }

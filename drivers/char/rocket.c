@@ -874,9 +874,6 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if (info->count++ == 0) {
-#ifdef MODULE
-		MOD_INC_USE_COUNT;
-#endif
 		rp_num_ports_open++;
 #ifdef ROCKET_DEBUG_OPEN
 		printk("rocket mod++ = %d...", rp_num_ports_open);
@@ -1071,9 +1068,6 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	tty->closing = 0;
 	wake_up_interruptible(&info->close_wait);
 	
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	rp_num_ports_open--;
 #ifdef ROCKET_DEBUG_OPEN
 	printk("rocket mod-- = %d...", rp_num_ports_open);
@@ -1504,9 +1498,6 @@ static void rp_hangup(struct tty_struct *tty)
 		return;
 	}
 	if (info->count) {
-#ifdef MODULE
-		MOD_DEC_USE_COUNT;
-#endif
 		rp_num_ports_open--;
 	}
 	
@@ -2012,6 +2003,7 @@ int __init rp_init(void)
 	 */
 	memset(&rocket_driver, 0, sizeof(struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
+	rocket_driver.owner = THIS_MODULE;
 #ifdef CONFIG_DEVFS_FS
 	rocket_driver.name = "tts/R";
 #else

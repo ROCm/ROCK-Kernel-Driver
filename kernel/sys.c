@@ -226,6 +226,11 @@ cond_syscall(sys_shutdown)
 cond_syscall(sys_sendmsg)
 cond_syscall(sys_recvmsg)
 cond_syscall(sys_socketcall)
+cond_syscall(sys_futex)
+cond_syscall(compat_sys_futex)
+cond_syscall(sys_epoll_create)
+cond_syscall(sys_epoll_ctl)
+cond_syscall(sys_epoll_wait)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
@@ -1218,7 +1223,7 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 			? -EFAULT : 0;
 }
 
-#if (!defined(__ia64__) && !defined(CONFIG_V850)) || defined(CONFIG_COMPAT)
+#if !defined(__ia64__) && !defined(CONFIG_V850)
 
 /*
  *	Back compatibility for getrlimit. Needed for some apps.

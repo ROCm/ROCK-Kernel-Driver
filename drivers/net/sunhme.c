@@ -3025,6 +3025,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	if (!dev)
 		goto err_out;
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (hme_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
@@ -3092,8 +3093,12 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 
 #ifdef __sparc__
 	hp->hm_revision = prom_getintdefault(node, "hm-rev", 0xff);
-	if (hp->hm_revision == 0xff)
-		hp->hm_revision = 0xa0;
+	if (hp->hm_revision == 0xff) {
+		unsigned char prev;
+
+		pci_read_config_byte(pdev, PCI_REVISION_ID, &prev);
+		hp->hm_revision = 0xc0 | (prev & 0x0f);
+	}
 #else
 	/* works with this on non-sparc hosts */
 	hp->hm_revision = 0x20;
@@ -3102,7 +3107,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	/* Now enable the feature flags we can. */
 	if (hp->hm_revision == 0x20 || hp->hm_revision == 0x21)
 		hp->happy_flags = HFLAG_20_21;
-	else if (hp->hm_revision != 0xa0)
+	else if (hp->hm_revision != 0xa0 && hp->hm_revision != 0xc0)
 		hp->happy_flags = HFLAG_NOT_A0;
 
 	if (qp != NULL)

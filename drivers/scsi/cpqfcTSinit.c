@@ -677,11 +677,6 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
         scsi_release_request(ScsiPassThruReq); // "de-allocate"
         ScsiPassThruReq = NULL;
 
-        // if (!SDpnt->was_reset && SDpnt->scsi_request_fn)
-        //  (*SDpnt->scsi_request_fn)();
-
-        wake_up(&SDpnt->scpnt_wait);
-
 	// need to pass data back to user (space)?
 	if( (vendor_cmd->rw_flag == VENDOR_READ_OPCODE) &&
 	     vendor_cmd->len )
@@ -1656,10 +1651,6 @@ return -ENOTSUPP;
   scsi_put_command(SCpnt);
   SCpnt = NULL;
 
-  // if (!SDpnt->was_reset && SDpnt->scsi_request_fn)
-  // 	(*SDpnt->scsi_request_fn)();
-
-  wake_up(&SDpnt->scpnt_wait);
   // printk("   LEAVING cpqfcTS_TargetDeviceReset() - return SUCCESS \n");
   return SUCCESS;
 }
@@ -2060,7 +2051,21 @@ void* fcMemManager( struct pci_dev *pdev, ALIGNED_MEM *dynamic_mem,
 }
 
 
-static Scsi_Host_Template driver_template = CPQFCTS;
-
+static Scsi_Host_Template driver_template = {
+	.detect                 = cpqfcTS_detect,
+	.release                = cpqfcTS_release,
+	.info                   = cpqfcTS_info,
+	.proc_info              = cpqfcTS_proc_info,
+	.ioctl                  = cpqfcTS_ioctl,
+	.queuecommand           = cpqfcTS_queuecommand,
+	.eh_device_reset_handler   = cpqfcTS_eh_device_reset,
+	.eh_abort_handler       = cpqfcTS_eh_abort, 
+	.bios_param             = cpqfcTS_biosparam, 
+	.can_queue              = CPQFCTS_REQ_QUEUE_LEN,
+	.this_id                = -1, 
+	.sg_tablesize           = SG_ALL, 
+	.cmd_per_lun            = CPQFCTS_CMD_PER_LUN,
+	.use_clustering         = ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 

@@ -697,7 +697,7 @@ int __init fat_init_inodecache(void)
 {
 	fat_inode_cachep = kmem_cache_create("fat_inode_cache",
 					     sizeof(struct msdos_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (fat_inode_cachep == NULL)
 		return -ENOMEM;
@@ -897,6 +897,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 			       sbi->fsinfo_sector);
 		} else {
 			sbi->free_clusters = CF_LE_L(fsinfo->free_clusters);
+			sbi->prev_free = CF_LE_L(fsinfo->next_cluster);
 		}
 
 		brelse(fsinfo_bh);

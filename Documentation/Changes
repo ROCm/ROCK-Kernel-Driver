@@ -50,7 +50,7 @@ with pcmcia-cs.
 
 o  Gnu C                  2.95.3                  # gcc --version
 o  Gnu make               3.78                    # make --version
-o  binutils               2.9.5.0.25              # ld -v
+o  binutils               2.12                    # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  module-init-tools      0.9.9                   # depmod -V
 o  e2fsprogs              1.29                    # tune2fs
@@ -82,8 +82,6 @@ have not received much testing for Linux kernel compilation, and there are
 almost certainly bugs (mainly, but not exclusively, in the kernel) that
 will need to be fixed in order to use these compilers. In any case, using
 pgcc instead of plain gcc is just asking for trouble.
-
-gcc 2.91.66 (egcs-1.1.2) continues to be supported for SPARC64 requirements.
 
 The Red Hat gcc 2.96 compiler subtree can also be used to build this tree.
 You should ensure you use gcc-2.96-74 or later. gcc-2.96-54 will not build

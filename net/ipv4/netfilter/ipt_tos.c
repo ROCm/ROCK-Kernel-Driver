@@ -11,14 +11,11 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
       int *hotdrop)
 {
 	const struct ipt_tos_info *info = matchinfo;
-	const struct iphdr *iph = skb->nh.iph;
 
-	return (iph->tos == info->tos) ^ info->invert;
+	return (skb->nh.iph->tos == info->tos) ^ info->invert;
 }
 
 static int

@@ -114,7 +114,7 @@ struct sctp_tsnmap_iter {
 };
 
 /* Create a new tsnmap.  */
-struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 init_tsn, int priority);
+struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 init_tsn, int gfp);
 
 /* Dispose of a tsnmap.  */
 void sctp_tsnmap_free(struct sctp_tsnmap *);

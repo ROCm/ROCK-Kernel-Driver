@@ -469,8 +469,6 @@
 #define	  IOCR_SPC	0x00000001
 
 
-/* Processor Version Register */
-
 /* Processor Version Register (PVR) field extraction */
 
 #define	PVR_VER(pvr)  (((pvr) >>  16) & 0xFFFF)	/* Version field */
@@ -595,6 +593,8 @@ GLUE(GLUE(.LT,NAME),_procname_end):
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
 
 #ifndef __ASSEMBLY__
+extern unsigned long *_get_SP(void);
+
 extern int have_of;
 
 struct task_struct;
@@ -654,8 +654,10 @@ struct thread_struct {
 	struct pt_regs	*regs;		/* Pointer to saved register state */
 	mm_segment_t	fs;		/* for get_fs() validation */
 	double		fpr[32];	/* Complete floating point set */
-	unsigned long	fpscr;		/* Floating point status */
-	unsigned int	fpexc_mode;	/* Floating-point exception mode */
+	unsigned long	fpscr;		/* Floating point status (plus pad) */
+	unsigned long	fpexc_mode;	/* Floating-point exception mode */
+	unsigned long	saved_msr;	/* Save MSR across signal handlers */
+	unsigned long	saved_softe;	/* Ditto for Soft Enable/Disable */
 };
 
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
@@ -702,7 +704,7 @@ static inline unsigned int __unpack_fe01(unsigned long msr_bits)
 	return ((msr_bits & MSR_FE0) >> 10) | ((msr_bits & MSR_FE1) >> 8);
 }
 
-static inline unsigned int __pack_fe01(unsigned int fpmode)
+static inline unsigned long __pack_fe01(unsigned int fpmode)
 {
 	return ((fpmode << 10) & MSR_FE0) | ((fpmode << 8) & MSR_FE1);
 }
@@ -739,6 +741,15 @@ static inline void prefetchw(const void *x)
 
 #define cpu_has_noexecute()	(processor_type() == PV_POWER4 || \
 				 processor_type() == PV_POWER4p)
+
+/* XXX we have to call HV to set when in LPAR */
+#define cpu_has_dabr()		(1)
+
+#define cpu_has_iabr()		(processor_type() != PV_POWER4 && \
+				 processor_type() != PV_POWER4p)
+
+#define cpu_alignexc_sets_dsisr() (processor_type() != PV_POWER4 && \
+				 processor_type() != PV_POWER4p)
 
 #endif /* ASSEMBLY */
 

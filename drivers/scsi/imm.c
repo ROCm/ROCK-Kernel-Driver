@@ -107,7 +107,23 @@ static int imm_pb_claim(int host_no)
  *                   Parallel port probing routines                        *
  ***************************************************************************/
 
-static Scsi_Host_Template driver_template = IMM;
+static Scsi_Host_Template driver_template = {
+	.proc_name			= "imm",
+	.proc_info			= imm_proc_info,
+	.name				= "Iomega VPI2 (imm) interface",
+	.detect				= imm_detect,
+	.release			= imm_release,
+	.command			= imm_command,
+	.queuecommand			= imm_queuecommand,
+	.eh_abort_handler               = imm_abort,
+	.eh_bus_reset_handler           = imm_reset,
+	.eh_host_reset_handler          = imm_reset, 
+	.bios_param		        = imm_biosparam,
+	.this_id			= 7,
+	.sg_tablesize			= SG_ALL,
+	.cmd_per_lun			= 1,
+	.use_clustering			= ENABLE_CLUSTERING,
+};
 #include  "scsi_module.c"
 
 int imm_detect(Scsi_Host_Template * host)

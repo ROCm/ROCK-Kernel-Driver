@@ -40,15 +40,60 @@ extern void e1000_down(struct e1000_adapter *adapter);
 extern void e1000_reset(struct e1000_adapter *adapter);
 extern int e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx);
 
-static char e1000_gstrings_stats[][ETH_GSTRING_LEN] = {
-	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes", "rx_errors",
-	"tx_errors", "rx_dropped", "tx_dropped", "multicast", "collisions",
-	"rx_length_errors", "rx_over_errors", "rx_crc_errors",
-	"rx_frame_errors", "rx_fifo_errors", "rx_missed_errors",
-	"tx_aborted_errors", "tx_carrier_errors", "tx_fifo_errors",
-	"tx_heartbeat_errors", "tx_window_errors",
+struct e1000_stats {
+	char stat_string[ETH_GSTRING_LEN];
+	int sizeof_stat;
+	int stat_offset;
 };
-#define E1000_STATS_LEN	sizeof(e1000_gstrings_stats) / ETH_GSTRING_LEN
+
+#define E1000_STAT(m) sizeof(((struct e1000_adapter *)0)->m), \
+		      offsetof(struct e1000_adapter, m)
+static struct e1000_stats e1000_gstrings_stats[] = {
+	{ "rx_packets", E1000_STAT(net_stats.rx_packets) },
+	{ "tx_packets", E1000_STAT(net_stats.tx_packets) },
+	{ "rx_bytes", E1000_STAT(net_stats.rx_bytes) },
+	{ "tx_bytes", E1000_STAT(net_stats.tx_bytes) },
+	{ "rx_errors", E1000_STAT(net_stats.rx_errors) },
+	{ "tx_errors", E1000_STAT(net_stats.tx_errors) },
+	{ "rx_dropped", E1000_STAT(net_stats.rx_dropped) },
+	{ "tx_dropped", E1000_STAT(net_stats.tx_dropped) },
+	{ "multicast", E1000_STAT(net_stats.multicast) },
+	{ "collisions", E1000_STAT(net_stats.collisions) },
+	{ "rx_length_errors", E1000_STAT(net_stats.rx_length_errors) },
+	{ "rx_over_errors", E1000_STAT(net_stats.rx_over_errors) },
+	{ "rx_crc_errors", E1000_STAT(net_stats.rx_crc_errors) },
+	{ "rx_frame_errors", E1000_STAT(net_stats.rx_frame_errors) },
+	{ "rx_fifo_errors", E1000_STAT(net_stats.rx_fifo_errors) },
+	{ "rx_missed_errors", E1000_STAT(net_stats.rx_missed_errors) },
+	{ "tx_aborted_errors", E1000_STAT(net_stats.tx_aborted_errors) },
+	{ "tx_carrier_errors", E1000_STAT(net_stats.tx_carrier_errors) },
+	{ "tx_fifo_errors", E1000_STAT(net_stats.tx_fifo_errors) },
+	{ "tx_heartbeat_errors", E1000_STAT(net_stats.tx_heartbeat_errors) },
+	{ "tx_window_errors", E1000_STAT(net_stats.tx_window_errors) },
+	{ "tx_abort_late_coll", E1000_STAT(stats.latecol) },
+	{ "tx_deferred_ok", E1000_STAT(stats.dc) },
+	{ "tx_single_coll_ok", E1000_STAT(stats.scc) },
+	{ "tx_multi_coll_ok", E1000_STAT(stats.mcc) },
+	{ "rx_long_length_errors", E1000_STAT(stats.roc) },
+	{ "rx_short_length_errors", E1000_STAT(stats.ruc) },
+	{ "rx_align_errors", E1000_STAT(stats.algnerrc) },
+	{ "tx_tcp_seg_good", E1000_STAT(stats.tsctc) },
+	{ "tx_tcp_seg_failed", E1000_STAT(stats.tsctfc) },
+	{ "rx_flow_control_xon", E1000_STAT(stats.xonrxc) },
+	{ "rx_flow_control_xoff", E1000_STAT(stats.xoffrxc) },
+	{ "tx_flow_control_xon", E1000_STAT(stats.xontxc) },
+	{ "tx_flow_control_xoff", E1000_STAT(stats.xofftxc) },
+	{ "rx_csum_offload_good", E1000_STAT(hw_csum_good) },
+	{ "rx_csum_offload_errors", E1000_STAT(hw_csum_err) }
+};
+#define E1000_STATS_LEN	\
+	sizeof(e1000_gstrings_stats) / sizeof(struct e1000_stats)
+static char e1000_gstrings_test[][ETH_GSTRING_LEN] = {
+	"Register test  (offline)", "Eeprom test    (offline)",
+	"Interrupt test (offline)", "Loopback test  (offline)",
+	"Link test   (on/offline)"
+};
+#define E1000_TEST_LEN sizeof(e1000_gstrings_test) / ETH_GSTRING_LEN
 
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
@@ -154,6 +199,7 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->fw_version, "N/A", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
 	drvinfo->n_stats = E1000_STATS_LEN;
+	drvinfo->testinfo_len = E1000_TEST_LEN;
 #define E1000_REGS_LEN 32
 	drvinfo->regdump_len  = E1000_REGS_LEN * sizeof(uint32_t);
 	drvinfo->eedump_len = adapter->hw.eeprom.word_size * 2;
@@ -164,6 +210,7 @@ e1000_ethtool_gregs(struct e1000_adapter *adapter,
                     struct ethtool_regs *regs, uint32_t *regs_buff)
 {
 	struct e1000_hw *hw = &adapter->hw;
+	uint16_t phy_data;
 
 	regs->version = (1 << 24) | (hw->revision_id << 16) | hw->device_id;
 
@@ -181,6 +228,62 @@ e1000_ethtool_gregs(struct e1000_adapter *adapter,
 	regs_buff[9]  = E1000_READ_REG(hw, TDH);
 	regs_buff[10] = E1000_READ_REG(hw, TDT);
 	regs_buff[11] = E1000_READ_REG(hw, TIDV);
+
+	regs_buff[12] = adapter->hw.phy_type;  /* PHY type (IGP=1, M88=0) */
+	if(hw->phy_type == e1000_phy_igp) {
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+				    IGP01E1000_PHY_AGC_A);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_AGC_A &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[13] = (uint32_t)phy_data; /* cable length */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+				    IGP01E1000_PHY_AGC_B);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_AGC_B &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[14] = (uint32_t)phy_data; /* cable length */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+				    IGP01E1000_PHY_AGC_C);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_AGC_C &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[15] = (uint32_t)phy_data; /* cable length */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+				    IGP01E1000_PHY_AGC_D);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_AGC_D &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[16] = (uint32_t)phy_data; /* cable length */
+		regs_buff[17] = 0; /* extended 10bt distance (not needed) */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT, 0x0);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_STATUS &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[18] = (uint32_t)phy_data; /* cable polarity */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT,
+				    IGP01E1000_PHY_PCS_INIT_REG);
+		e1000_read_phy_reg(hw, IGP01E1000_PHY_PCS_INIT_REG &
+				   IGP01E1000_PHY_PAGE_SELECT, &phy_data);
+		regs_buff[19] = (uint32_t)phy_data; /* cable polarity */
+		regs_buff[20] = 0; /* polarity correction enabled (always) */
+		regs_buff[22] = 0; /* phy receive errors (unavailable) */
+		regs_buff[23] = regs_buff[18]; /* mdix mode */
+		e1000_write_phy_reg(hw, IGP01E1000_PHY_PAGE_SELECT, 0x0);
+	} else {
+        	e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_STATUS, &phy_data);
+		regs_buff[13] = (uint32_t)phy_data; /* cable length */
+		regs_buff[14] = 0;  /* Dummy (to align w/ IGP phy reg dump) */
+		regs_buff[15] = 0;  /* Dummy (to align w/ IGP phy reg dump) */
+		regs_buff[16] = 0;  /* Dummy (to align w/ IGP phy reg dump) */
+        	e1000_read_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, &phy_data);
+		regs_buff[17] = (uint32_t)phy_data; /* extended 10bt distance */
+		regs_buff[18] = regs_buff[13]; /* cable polarity */
+		regs_buff[19] = 0;  /* Dummy (to align w/ IGP phy reg dump) */
+		regs_buff[20] = regs_buff[17]; /* polarity correction */
+		/* phy receive errors */
+		regs_buff[22] = adapter->phy_stats.receive_errors;
+		regs_buff[23] = regs_buff[13]; /* mdix mode */
+	}
+	regs_buff[21] = adapter->phy_stats.idle_errors;  /* phy idle errors */
+	e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_data);
+	regs_buff[24] = (uint32_t)phy_data;  /* phy local receiver status */
+	regs_buff[25] = regs_buff[24];  /* phy remote receiver status */
 
 	return;
 }
@@ -219,7 +322,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 		uint16_t i;
 		for (i = 0; i < last_word - first_word + 1; i++)
 			if((ret_val = e1000_read_eeprom(hw, first_word + i, 1,
-						       &eeprom_buff[i])))
+							&eeprom_buff[i])))
 				break;
 	}
 geeprom_error:
@@ -249,7 +352,7 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 	first_word = eeprom->offset >> 1;
 	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
 	eeprom_buff = kmalloc(max_len, GFP_KERNEL);
-	if(eeprom_buff == NULL)
+	if(!eeprom_buff)
 		return -ENOMEM;
 
 	ptr = (void *)eeprom_buff;
@@ -282,6 +385,765 @@ e1000_ethtool_seeprom(struct e1000_adapter *adapter,
 seeprom_error:
 	kfree(eeprom_buff);
 	return ret_val;
+}
+
+#define REG_PATTERN_TEST(R, M, W)                                              \
+{                                                                              \
+	uint32_t pat, value;                                                   \
+	uint32_t test[] =                                                      \
+		{0x5A5A5A5A, 0xA5A5A5A5, 0x00000000, 0xFFFFFFFF};              \
+	for(pat = 0; pat < sizeof(test)/sizeof(test[0]); pat++) {              \
+		E1000_WRITE_REG(&adapter->hw, R, (test[pat] & W));             \
+		value = E1000_READ_REG(&adapter->hw, R);                       \
+		if(value != (test[pat] & W & M)) {                             \
+			*data = (adapter->hw.mac_type < e1000_82543) ?         \
+				E1000_82542_##R : E1000_##R;                   \
+			return 1;                                              \
+		}                                                              \
+	}                                                                      \
+}
+
+#define REG_SET_AND_CHECK(R, M, W)                                             \
+{                                                                              \
+	uint32_t value;                                                        \
+	E1000_WRITE_REG(&adapter->hw, R, W & M);                               \
+	value = E1000_READ_REG(&adapter->hw, R);                               \
+	if ((W & M) != (value & M)) {                                          \
+		*data = (adapter->hw.mac_type < e1000_82543) ?                 \
+			E1000_82542_##R : E1000_##R;                           \
+		return 1;                                                      \
+	}                                                                      \
+}
+
+static int
+e1000_reg_test(struct e1000_adapter *adapter, uint64_t *data)
+{
+	uint32_t value;
+	uint32_t i;
+
+	/* The status register is Read Only, so a write should fail.
+	 * Some bits that get toggled are ignored.
+	 */
+	value = (E1000_READ_REG(&adapter->hw, STATUS) & (0xFFFFF833));
+	E1000_WRITE_REG(&adapter->hw, STATUS, (0xFFFFFFFF));
+	if(value != (E1000_READ_REG(&adapter->hw, STATUS) & (0xFFFFF833))) {
+		*data = 1;
+		return 1;
+	}
+
+	REG_PATTERN_TEST(FCAL, 0xFFFFFFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(FCAH, 0x0000FFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(FCT, 0x0000FFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(VET, 0x0000FFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(RDTR, 0x0000FFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(RDBAH, 0xFFFFFFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(RDLEN, 0x000FFF80, 0x000FFFFF);
+	REG_PATTERN_TEST(RDH, 0x0000FFFF, 0x0000FFFF);
+	REG_PATTERN_TEST(RDT, 0x0000FFFF, 0x0000FFFF);
+	REG_PATTERN_TEST(FCRTH, 0x0000FFF8, 0x0000FFF8);
+	REG_PATTERN_TEST(FCTTV, 0x0000FFFF, 0x0000FFFF);
+	REG_PATTERN_TEST(TIPG, 0x3FFFFFFF, 0x3FFFFFFF);
+	REG_PATTERN_TEST(TDBAH, 0xFFFFFFFF, 0xFFFFFFFF);
+	REG_PATTERN_TEST(TDLEN, 0x000FFF80, 0x000FFFFF);
+
+	REG_SET_AND_CHECK(RCTL, 0xFFFFFFFF, 0x00000000);
+	REG_SET_AND_CHECK(RCTL, 0x06DFB3FE, 0x003FFFFB);
+	REG_SET_AND_CHECK(TCTL, 0xFFFFFFFF, 0x00000000);
+
+	if(adapter->hw.mac_type >= e1000_82543) {
+
+		REG_SET_AND_CHECK(RCTL, 0x06DFB3FE, 0xFFFFFFFF);
+		REG_PATTERN_TEST(RDBAL, 0xFFFFFFF0, 0xFFFFFFFF);
+		REG_PATTERN_TEST(TXCW, 0xC000FFFF, 0x0000FFFF);
+		REG_PATTERN_TEST(TDBAL, 0xFFFFFFF0, 0xFFFFFFFF);
+		REG_PATTERN_TEST(TIDV, 0x0000FFFF, 0x0000FFFF);
+
+		for(i = 0; i < E1000_RAR_ENTRIES; i++) {
+			REG_PATTERN_TEST(RA + ((i << 1) << 2), 0xFFFFFFFF,
+					 0xFFFFFFFF);
+			REG_PATTERN_TEST(RA + (((i << 1) + 1) << 2), 0x8003FFFF,
+					 0xFFFFFFFF);
+		}
+
+	} else {
+
+		REG_SET_AND_CHECK(RCTL, 0xFFFFFFFF, 0x01FFFFFF);
+		REG_PATTERN_TEST(RDBAL, 0xFFFFF000, 0xFFFFFFFF);
+		REG_PATTERN_TEST(TXCW, 0x0000FFFF, 0x0000FFFF);
+		REG_PATTERN_TEST(TDBAL, 0xFFFFF000, 0xFFFFFFFF);
+
+	}
+
+	for(i = 0; i < E1000_MC_TBL_SIZE; i++)
+		REG_PATTERN_TEST(MTA + (i << 2), 0xFFFFFFFF, 0xFFFFFFFF);
+
+	return 0;
+}
+
+static int
+e1000_eeprom_test(struct e1000_adapter *adapter, uint64_t *data)
+{
+	uint16_t temp;
+	uint16_t checksum = 0;
+	uint16_t i;
+
+	*data = 0;
+	/* Read and add up the contents of the EEPROM */
+	for(i = 0; i < (EEPROM_CHECKSUM_REG + 1); i++) {
+		if((e1000_read_eeprom(&adapter->hw, i, 1, &temp)) < 0) {
+			*data = 1;
+			break;
+		}
+		checksum += temp;
+	}
+
+	/* If Checksum is not Correct return error else test passed */
+	if((checksum != (uint16_t) EEPROM_SUM) && !(*data))
+		*data = 2;
+
+	return *data;
+}
+
+static irqreturn_t
+e1000_test_intr(int irq,
+		void *data,
+		struct pt_regs *regs)
+{
+	struct net_device *netdev = (struct net_device *) data;
+	struct e1000_adapter *adapter = netdev->priv;
+
+	adapter->test_icr |= E1000_READ_REG(&adapter->hw, ICR);
+
+	return IRQ_HANDLED;
+}
+
+static int
+e1000_intr_test(struct e1000_adapter *adapter, uint64_t *data)
+{
+	struct net_device *netdev = adapter->netdev;
+	uint32_t icr, mask, i=0;
+
+	*data = 0;
+
+	/* Hook up test interrupt handler just for this test */
+	if(request_irq
+	   (netdev->irq, &e1000_test_intr, SA_SHIRQ, netdev->name, netdev)) {
+		*data = 1;
+		return -1;
+	}
+
+	/* Disable all the interrupts */
+	E1000_WRITE_REG(&adapter->hw, IMC, 0xFFFFFFFF);
+	msec_delay(10);
+
+	/* Interrupts are disabled, so read interrupt cause
+	 * register (icr) twice to verify that there are no interrupts
+	 * pending.  icr is clear on read.
+	 */
+	icr = E1000_READ_REG(&adapter->hw, ICR);
+	icr = E1000_READ_REG(&adapter->hw, ICR);
+
+	if(icr != 0) {
+		/* if icr is non-zero, there is no point
+		 * running other interrupt tests.
+		 */
+		*data = 2;
+		i = 10;
+	}
+
+	/* Test each interrupt */
+	for(; i < 10; i++) {
+
+		/* Interrupt to test */
+		mask = 1 << i;
+
+		/* Disable the interrupt to be reported in
+		 * the cause register and then force the same
+		 * interrupt and see if one gets posted.  If
+		 * an interrupt was posted to the bus, the
+		 * test failed.
+		 */
+		adapter->test_icr = 0;
+		E1000_WRITE_REG(&adapter->hw, IMC, mask);
+		E1000_WRITE_REG(&adapter->hw, ICS, mask);
+		msec_delay(10);
+
+		if(adapter->test_icr & mask) {
+			*data = 3;
+			break;
+		}
+
+		/* Enable the interrupt to be reported in
+		 * the cause register and then force the same
+		 * interrupt and see if one gets posted.  If
+		 * an interrupt was not posted to the bus, the
+		 * test failed.
+		 */
+		adapter->test_icr = 0;
+		E1000_WRITE_REG(&adapter->hw, IMS, mask);
+		E1000_WRITE_REG(&adapter->hw, ICS, mask);
+		msec_delay(10);
+
+		if(!(adapter->test_icr & mask)) {
+			*data = 4;
+			break;
+		}
+
+		/* Disable the other interrupts to be reported in
+		 * the cause register and then force the other
+		 * interrupts and see if any get posted.  If
+		 * an interrupt was posted to the bus, the
+		 * test failed.
+		 */
+		adapter->test_icr = 0;
+		E1000_WRITE_REG(&adapter->hw, IMC, ~mask);
+		E1000_WRITE_REG(&adapter->hw, ICS, ~mask);
+		msec_delay(10);
+
+		if(adapter->test_icr) {
+			*data = 5;
+			break;
+		}
+	}
+
+	/* Disable all the interrupts */
+	E1000_WRITE_REG(&adapter->hw, IMC, 0xFFFFFFFF);
+	msec_delay(10);
+
+	/* Unhook test interrupt handler */
+	free_irq(netdev->irq, netdev);
+
+	return *data;
+}
+
+static void
+e1000_free_desc_rings(struct e1000_adapter *adapter)
+{
+	struct e1000_desc_ring *txdr = &adapter->test_tx_ring;
+	struct e1000_desc_ring *rxdr = &adapter->test_rx_ring;
+	struct pci_dev *pdev = adapter->pdev;
+	int i;
+
+	if(txdr->desc && txdr->buffer_info) {
+		for(i = 0; i < txdr->count; i++) {
+			if(txdr->buffer_info[i].dma)
+				pci_unmap_single(pdev, txdr->buffer_info[i].dma,
+						 txdr->buffer_info[i].length,
+						 PCI_DMA_TODEVICE);
+			if(txdr->buffer_info[i].skb)
+				dev_kfree_skb(txdr->buffer_info[i].skb);
+		}
+	}
+
+	if(rxdr->desc && rxdr->buffer_info) {
+		for(i = 0; i < rxdr->count; i++) {
+			if(rxdr->buffer_info[i].dma)
+				pci_unmap_single(pdev, rxdr->buffer_info[i].dma,
+						 rxdr->buffer_info[i].length,
+						 PCI_DMA_FROMDEVICE);
+			if(rxdr->buffer_info[i].skb)
+				dev_kfree_skb(rxdr->buffer_info[i].skb);
+		}
+	}
+
+	if(txdr->desc)
+		pci_free_consistent(pdev, txdr->size, txdr->desc, txdr->dma);
+	if(rxdr->desc)
+		pci_free_consistent(pdev, rxdr->size, rxdr->desc, rxdr->dma);
+
+	if(txdr->buffer_info)
+		kfree(txdr->buffer_info);
+	if(rxdr->buffer_info)
+		kfree(rxdr->buffer_info);
+
+	return;
+}
+
+static int
+e1000_setup_desc_rings(struct e1000_adapter *adapter)
+{
+	struct e1000_desc_ring *txdr = &adapter->test_tx_ring;
+	struct e1000_desc_ring *rxdr = &adapter->test_rx_ring;
+	struct pci_dev *pdev = adapter->pdev;
+	uint32_t rctl;
+	int size, i, ret_val;
+
+	/* Setup Tx descriptor ring and Tx buffers */
+
+	txdr->count = 80;
+
+	size = txdr->count * sizeof(struct e1000_buffer);
+	if(!(txdr->buffer_info = kmalloc(size, GFP_KERNEL))) {
+		ret_val = 1;
+		goto err_nomem;
+	}
+	memset(txdr->buffer_info, 0, size);
+
+	txdr->size = txdr->count * sizeof(struct e1000_tx_desc);
+	E1000_ROUNDUP(txdr->size, 4096);
+	if(!(txdr->desc = pci_alloc_consistent(pdev, txdr->size, &txdr->dma))) {
+		ret_val = 2;
+		goto err_nomem;
+	}
+	memset(txdr->desc, 0, txdr->size);
+	txdr->next_to_use = txdr->next_to_clean = 0;
+
+	E1000_WRITE_REG(&adapter->hw, TDBAL,
+			((uint64_t) txdr->dma & 0x00000000FFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, TDBAH, ((uint64_t) txdr->dma >> 32));
+	E1000_WRITE_REG(&adapter->hw, TDLEN,
+			txdr->count * sizeof(struct e1000_tx_desc));
+	E1000_WRITE_REG(&adapter->hw, TDH, 0);
+	E1000_WRITE_REG(&adapter->hw, TDT, 0);
+	E1000_WRITE_REG(&adapter->hw, TCTL,
+			E1000_TCTL_PSP | E1000_TCTL_EN |
+			E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT |
+			E1000_FDX_COLLISION_DISTANCE << E1000_COLD_SHIFT);
+
+	for(i = 0; i < txdr->count; i++) {
+		struct e1000_tx_desc *tx_desc = E1000_TX_DESC(*txdr, i);
+		struct sk_buff *skb;
+		unsigned int size = 1024;
+
+		if(!(skb = alloc_skb(size, GFP_KERNEL))) {
+			ret_val = 3;
+			goto err_nomem;
+		}
+		skb_put(skb, size);
+		txdr->buffer_info[i].skb = skb;
+		txdr->buffer_info[i].length = skb->len;
+		txdr->buffer_info[i].dma =
+			pci_map_single(pdev, skb->data, skb->len,
+				       PCI_DMA_TODEVICE);
+		tx_desc->buffer_addr = cpu_to_le64(txdr->buffer_info[i].dma);
+		tx_desc->lower.data = cpu_to_le32(skb->len);
+		tx_desc->lower.data |= E1000_TXD_CMD_EOP;
+		tx_desc->lower.data |= E1000_TXD_CMD_IFCS;
+		tx_desc->lower.data |= E1000_TXD_CMD_RPS;
+		tx_desc->upper.data = 0;
+	}
+
+	/* Setup Rx descriptor ring and Rx buffers */
+
+	rxdr->count = 80;
+
+	size = rxdr->count * sizeof(struct e1000_buffer);
+	if(!(rxdr->buffer_info = kmalloc(size, GFP_KERNEL))) {
+		ret_val = 4;
+		goto err_nomem;
+	}
+	memset(rxdr->buffer_info, 0, size);
+
+	rxdr->size = rxdr->count * sizeof(struct e1000_rx_desc);
+	if(!(rxdr->desc = pci_alloc_consistent(pdev, rxdr->size, &rxdr->dma))) {
+		ret_val = 5;
+		goto err_nomem;
+	}
+	memset(rxdr->desc, 0, rxdr->size);
+	rxdr->next_to_use = rxdr->next_to_clean = 0;
+
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl & ~E1000_RCTL_EN);
+	E1000_WRITE_REG(&adapter->hw, RDBAL,
+			((uint64_t) rxdr->dma & 0xFFFFFFFF));
+	E1000_WRITE_REG(&adapter->hw, RDBAH, ((uint64_t) rxdr->dma >> 32));
+	E1000_WRITE_REG(&adapter->hw, RDLEN, rxdr->size);
+	E1000_WRITE_REG(&adapter->hw, RDH, 0);
+	E1000_WRITE_REG(&adapter->hw, RDT, 0);
+	rctl = E1000_RCTL_EN | E1000_RCTL_BAM | E1000_RCTL_SZ_2048 |
+		E1000_RCTL_LBM_NO | E1000_RCTL_RDMTS_HALF |
+		(adapter->hw.mc_filter_type << E1000_RCTL_MO_SHIFT);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
+
+	for(i = 0; i < rxdr->count; i++) {
+		struct e1000_rx_desc *rx_desc = E1000_RX_DESC(*rxdr, i);
+		struct sk_buff *skb;
+
+		if(!(skb = alloc_skb(E1000_RXBUFFER_2048 + 2, GFP_KERNEL))) {
+			ret_val = 6;
+			goto err_nomem;
+		}
+		skb_reserve(skb, 2);
+		rxdr->buffer_info[i].skb = skb;
+		rxdr->buffer_info[i].length = E1000_RXBUFFER_2048;
+		rxdr->buffer_info[i].dma =
+			pci_map_single(pdev, skb->data, E1000_RXBUFFER_2048,
+				       PCI_DMA_FROMDEVICE);
+		rx_desc->buffer_addr = cpu_to_le64(rxdr->buffer_info[i].dma);
+		memset(skb->data, 0x00, skb->len);
+	}
+
+	return 0;
+
+      err_nomem:
+	e1000_free_desc_rings(adapter);
+	return ret_val;
+}
+
+static void
+e1000_phy_disable_receiver(struct e1000_adapter *adapter)
+{
+	/* Write out to PHY registers 29 and 30 to disable the Receiver. */
+	e1000_write_phy_reg(&adapter->hw, 29, 0x001F);
+	e1000_write_phy_reg(&adapter->hw, 30, 0x8FFC);
+	e1000_write_phy_reg(&adapter->hw, 29, 0x001A);
+	e1000_write_phy_reg(&adapter->hw, 30, 0x8FF0);
+
+	return;
+}
+
+static void
+e1000_phy_reset_clk_and_crs(struct e1000_adapter *adapter)
+{
+	uint16_t phy_reg;
+
+	/* Because we reset the PHY above, we need to re-force TX_CLK in the
+	 * Extended PHY Specific Control Register to 25MHz clock.  This
+	 * value defaults back to a 2.5MHz clock when the PHY is reset.
+	 */
+	e1000_read_phy_reg(&adapter->hw, M88E1000_EXT_PHY_SPEC_CTRL, &phy_reg);
+	phy_reg |= M88E1000_EPSCR_TX_CLK_25;
+	e1000_write_phy_reg(&adapter->hw,
+		M88E1000_EXT_PHY_SPEC_CTRL, phy_reg);
+
+	/* In addition, because of the s/w reset above, we need to enable
+	 * CRS on TX.  This must be set for both full and half duplex
+	 * operation.
+	 */
+	e1000_read_phy_reg(&adapter->hw, M88E1000_PHY_SPEC_CTRL, &phy_reg);
+	phy_reg |= M88E1000_PSCR_ASSERT_CRS_ON_TX;
+	e1000_write_phy_reg(&adapter->hw,
+		M88E1000_PHY_SPEC_CTRL, phy_reg);
+}
+
+static int
+e1000_nonintegrated_phy_loopback(struct e1000_adapter *adapter)
+{
+	uint32_t ctrl_reg;
+	uint16_t phy_reg;
+
+	/* Setup the Device Control Register for PHY loopback test. */
+
+	ctrl_reg = E1000_READ_REG(&adapter->hw, CTRL);
+	ctrl_reg |= (E1000_CTRL_ILOS |		/* Invert Loss-Of-Signal */
+		     E1000_CTRL_FRCSPD |	/* Set the Force Speed Bit */
+		     E1000_CTRL_FRCDPX |	/* Set the Force Duplex Bit */
+		     E1000_CTRL_SPD_1000 |	/* Force Speed to 1000 */
+		     E1000_CTRL_FD);		/* Force Duplex to FULL */
+
+	E1000_WRITE_REG(&adapter->hw, CTRL, ctrl_reg);
+
+	/* Read the PHY Specific Control Register (0x10) */
+	e1000_read_phy_reg(&adapter->hw, M88E1000_PHY_SPEC_CTRL, &phy_reg);
+
+	/* Clear Auto-Crossover bits in PHY Specific Control Register
+	 * (bits 6:5).
+	 */
+	phy_reg &= ~M88E1000_PSCR_AUTO_X_MODE;
+	e1000_write_phy_reg(&adapter->hw, M88E1000_PHY_SPEC_CTRL, phy_reg);
+
+	/* Perform software reset on the PHY */
+	e1000_phy_reset(&adapter->hw);
+
+	/* Have to setup TX_CLK and TX_CRS after software reset */
+	e1000_phy_reset_clk_and_crs(adapter);
+
+	e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x8100);
+
+	/* Wait for reset to complete. */
+	udelay(500);
+
+	/* Have to setup TX_CLK and TX_CRS after software reset */
+	e1000_phy_reset_clk_and_crs(adapter);
+
+	/* Write out to PHY registers 29 and 30 to disable the Receiver. */
+	e1000_phy_disable_receiver(adapter);
+
+	/* Set the loopback bit in the PHY control register. */
+	e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_reg);
+	phy_reg |= MII_CR_LOOPBACK;
+	e1000_write_phy_reg(&adapter->hw, PHY_CTRL, phy_reg);
+
+	/* Setup TX_CLK and TX_CRS one more time. */
+	e1000_phy_reset_clk_and_crs(adapter);
+
+	/* Check Phy Configuration */
+	e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_reg);
+	if(phy_reg != 0x4100)
+		 return 9;
+
+	e1000_read_phy_reg(&adapter->hw, M88E1000_EXT_PHY_SPEC_CTRL, &phy_reg);
+	if(phy_reg != 0x0070)
+		return 10;
+
+	e1000_read_phy_reg(&adapter->hw, 29, &phy_reg);
+	if(phy_reg != 0x001A)
+		return 11;
+
+	return 0;
+}
+
+static int
+e1000_integrated_phy_loopback(struct e1000_adapter *adapter)
+{
+	uint32_t ctrl_reg = 0;
+	uint32_t stat_reg = 0;
+
+	adapter->hw.autoneg = FALSE;
+
+	if(adapter->hw.phy_type == e1000_phy_m88) {
+		/* Auto-MDI/MDIX Off */
+		e1000_write_phy_reg(&adapter->hw,
+				    M88E1000_PHY_SPEC_CTRL, 0x0808);
+		/* reset to update Auto-MDI/MDIX */
+		e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x9140);
+		/* autoneg off */
+		e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x8140);
+	}
+	/* force 1000, set loopback */
+	e1000_write_phy_reg(&adapter->hw, PHY_CTRL, 0x4140);
+
+	/* Now set up the MAC to the same speed/duplex as the PHY. */
+	ctrl_reg = E1000_READ_REG(&adapter->hw, CTRL);
+	ctrl_reg &= ~E1000_CTRL_SPD_SEL; /* Clear the speed sel bits */
+	ctrl_reg |= (E1000_CTRL_FRCSPD | /* Set the Force Speed Bit */
+		     E1000_CTRL_FRCDPX | /* Set the Force Duplex Bit */
+		     E1000_CTRL_SPD_1000 |/* Force Speed to 1000 */
+		     E1000_CTRL_FD);	 /* Force Duplex to FULL */
+
+	if(adapter->hw.media_type == e1000_media_type_copper &&
+	   adapter->hw.phy_type == e1000_phy_m88) {
+		ctrl_reg |= E1000_CTRL_ILOS; /* Invert Loss of Signal */
+	} else {
+		/* Set the ILOS bit on the fiber Nic is half
+		 * duplex link is detected. */
+		stat_reg = E1000_READ_REG(&adapter->hw, STATUS);
+		if((stat_reg & E1000_STATUS_FD) == 0)
+			ctrl_reg |= (E1000_CTRL_ILOS | E1000_CTRL_SLU);
+	}
+
+	E1000_WRITE_REG(&adapter->hw, CTRL, ctrl_reg);
+
+	/* Disable the receiver on the PHY so when a cable is plugged in, the
+	 * PHY does not begin to autoneg when a cable is reconnected to the NIC.
+	 */
+	if(adapter->hw.phy_type == e1000_phy_m88)
+		e1000_phy_disable_receiver(adapter);
+
+	udelay(500);
+
+	return 0;
+}
+
+static int
+e1000_set_phy_loopback(struct e1000_adapter *adapter)
+{
+	uint16_t phy_reg = 0;
+	uint16_t count = 0;
+
+	switch (adapter->hw.mac_type) {
+	case e1000_82543:
+		if(adapter->hw.media_type == e1000_media_type_copper) {
+			/* Attempt to setup Loopback mode on Non-integrated PHY.
+			 * Some PHY registers get corrupted at random, so
+			 * attempt this 10 times.
+			 */
+			while(e1000_nonintegrated_phy_loopback(adapter) &&
+			      count++ < 10);
+			if(count < 11)
+				return 0;
+		}
+		break;
+
+	case e1000_82544:
+	case e1000_82540:
+	case e1000_82545:
+	case e1000_82546:
+	case e1000_82541:
+	case e1000_82547:
+		return e1000_integrated_phy_loopback(adapter);
+		break;
+
+	default:
+		/* Default PHY loopback work is to read the MII
+		 * control register and assert bit 14 (loopback mode).
+		 */
+		e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_reg);
+		phy_reg |= MII_CR_LOOPBACK;
+		e1000_write_phy_reg(&adapter->hw, PHY_CTRL, phy_reg);
+		return 0;
+		break;
+	}
+
+	return 8;
+}
+
+static int
+e1000_setup_loopback_test(struct e1000_adapter *adapter)
+{
+	uint32_t rctl;
+
+	if(adapter->hw.media_type == e1000_media_type_fiber) {
+		if(adapter->hw.mac_type == e1000_82545 ||
+		   adapter->hw.mac_type == e1000_82546)
+			return e1000_set_phy_loopback(adapter);
+		else {
+			rctl = E1000_READ_REG(&adapter->hw, RCTL);
+			rctl |= E1000_RCTL_LBM_TCVR;
+			E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
+			return 0;
+		}
+	} else if(adapter->hw.media_type == e1000_media_type_copper)
+		return e1000_set_phy_loopback(adapter);
+
+	return 7;
+}
+
+static void
+e1000_loopback_cleanup(struct e1000_adapter *adapter)
+{
+	uint32_t rctl;
+	uint16_t phy_reg;
+
+	rctl = E1000_READ_REG(&adapter->hw, RCTL);
+	rctl &= ~(E1000_RCTL_LBM_TCVR | E1000_RCTL_LBM_MAC);
+	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
+
+	if(adapter->hw.media_type == e1000_media_type_copper ||
+	   (adapter->hw.media_type == e1000_media_type_fiber &&
+	    (adapter->hw.mac_type == e1000_82545 ||
+	     adapter->hw.mac_type == e1000_82546))) {
+		adapter->hw.autoneg = TRUE;
+		e1000_read_phy_reg(&adapter->hw, PHY_CTRL, &phy_reg);
+		if(phy_reg & MII_CR_LOOPBACK) {
+			phy_reg &= ~MII_CR_LOOPBACK;
+			e1000_write_phy_reg(&adapter->hw, PHY_CTRL, phy_reg);
+			e1000_phy_reset(&adapter->hw);
+		}
+	}
+}
+
+static void
+e1000_create_lbtest_frame(struct sk_buff *skb, unsigned int frame_size)
+{
+	memset(skb->data, 0xFF, frame_size);
+	frame_size = (frame_size % 2) ? (frame_size - 1) : frame_size;
+	memset(&skb->data[frame_size / 2], 0xAA, frame_size / 2 - 1);
+	memset(&skb->data[frame_size / 2 + 10], 0xBE, 1);
+	memset(&skb->data[frame_size / 2 + 12], 0xAF, 1);
+}
+
+static int
+e1000_check_lbtest_frame(struct sk_buff *skb, unsigned int frame_size)
+{
+	frame_size = (frame_size % 2) ? (frame_size - 1) : frame_size;
+	if(*(skb->data + 3) == 0xFF) {
+		if((*(skb->data + frame_size / 2 + 10) == 0xBE) &&
+		   (*(skb->data + frame_size / 2 + 12) == 0xAF)) {
+			return 0;
+		}
+	}
+	return 13;
+}
+
+static int
+e1000_run_loopback_test(struct e1000_adapter *adapter)
+{
+	struct e1000_desc_ring *txdr = &adapter->test_tx_ring;
+	struct e1000_desc_ring *rxdr = &adapter->test_rx_ring;
+	struct pci_dev *pdev = adapter->pdev;
+	int i;
+
+	E1000_WRITE_REG(&adapter->hw, RDT, rxdr->count - 1);
+
+	for(i = 0; i < 64; i++) {
+		e1000_create_lbtest_frame(txdr->buffer_info[i].skb, 1024);
+		pci_dma_sync_single(pdev, txdr->buffer_info[i].dma,
+				    txdr->buffer_info[i].length,
+				    PCI_DMA_TODEVICE);
+	}
+	E1000_WRITE_REG(&adapter->hw, TDT, i);
+
+	msec_delay(200);
+
+	pci_dma_sync_single(pdev, rxdr->buffer_info[0].dma,
+			    rxdr->buffer_info[0].length, PCI_DMA_FROMDEVICE);
+
+	return e1000_check_lbtest_frame(rxdr->buffer_info[0].skb, 1024);
+}
+
+static int
+e1000_loopback_test(struct e1000_adapter *adapter, uint64_t *data)
+{
+	if((*data = e1000_setup_desc_rings(adapter))) goto err_loopback;
+	if((*data = e1000_setup_loopback_test(adapter))) goto err_loopback;
+	*data = e1000_run_loopback_test(adapter);
+	e1000_loopback_cleanup(adapter);
+	e1000_free_desc_rings(adapter);
+err_loopback:
+	return *data;
+}
+
+static int
+e1000_link_test(struct e1000_adapter *adapter, uint64_t *data)
+{
+	*data = 0;
+	e1000_check_for_link(&adapter->hw);
+
+	if(!(E1000_READ_REG(&adapter->hw, STATUS) & E1000_STATUS_LU)) {
+		*data = 1;
+	}
+	return *data;
+}
+
+static int
+e1000_ethtool_test(struct e1000_adapter *adapter,
+		   struct ethtool_test *eth_test, uint64_t *data)
+{
+	boolean_t if_running = netif_running(adapter->netdev);
+
+	if(eth_test->flags == ETH_TEST_FL_OFFLINE) {
+		/* Offline tests */
+
+		/* Link test performed before hardware reset so autoneg doesn't
+		 * interfere with test result */
+		if(e1000_link_test(adapter, &data[4]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		if(if_running)
+			e1000_down(adapter);
+
+		e1000_reset(adapter);
+		if(e1000_reg_test(adapter, &data[0]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		e1000_reset(adapter);
+		if(e1000_eeprom_test(adapter, &data[1]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		e1000_reset(adapter);
+		if(e1000_intr_test(adapter, &data[2]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		e1000_reset(adapter);
+		if(e1000_loopback_test(adapter, &data[3]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		e1000_reset(adapter);
+		if(if_running)
+			e1000_up(adapter);
+	} else {
+		/* Online tests */
+		if(e1000_link_test(adapter, &data[4]))
+			eth_test->flags |= ETH_TEST_FL_FAILED;
+
+		/* Offline tests aren't run; pass by default */
+		data[0] = 0;
+		data[1] = 0;
+		data[2] = 0;
+		data[3] = 0;
+	}
+	return 0;
 }
 
 static void
@@ -443,24 +1305,46 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	case ETHTOOL_GSTRINGS: {
 		struct ethtool_gstrings gstrings = { ETHTOOL_GSTRINGS };
 		char *strings = NULL;
+		int err = 0;
 
 		if(copy_from_user(&gstrings, addr, sizeof(gstrings)))
 			return -EFAULT;
 		switch(gstrings.string_set) {
-		case ETH_SS_STATS:
-			gstrings.len = E1000_STATS_LEN;
-			strings = *e1000_gstrings_stats;
+		case ETH_SS_TEST:
+			gstrings.len = E1000_TEST_LEN;
+			strings = kmalloc(E1000_TEST_LEN * ETH_GSTRING_LEN,
+					  GFP_KERNEL);
+			if(!strings)
+				return -ENOMEM;
+			memcpy(strings, e1000_gstrings_test, E1000_TEST_LEN *
+			       ETH_GSTRING_LEN);
 			break;
+		case ETH_SS_STATS: {
+			int i;
+			gstrings.len = E1000_STATS_LEN;
+			strings = kmalloc(E1000_STATS_LEN * ETH_GSTRING_LEN,
+					  GFP_KERNEL);
+			if(!strings)
+				return -ENOMEM;
+			for(i=0; i < E1000_STATS_LEN; i++) {
+				memcpy(&strings[i * ETH_GSTRING_LEN],
+				       e1000_gstrings_stats[i].stat_string,
+				       ETH_GSTRING_LEN);
+			}
+			break;
+		}
 		default:
 			return -EOPNOTSUPP;
 		}
 		if(copy_to_user(addr, &gstrings, sizeof(gstrings)))
-			return -EFAULT;
+			err = -EFAULT;
 		addr += offsetof(struct ethtool_gstrings, data);
-		if(copy_to_user(addr, strings,
+		if(!err && copy_to_user(addr, strings,
 		   gstrings.len * ETH_GSTRING_LEN))
-			return -EFAULT;
-		return 0;
+			err = -EFAULT;
+
+		kfree(strings);
+		return err;
 	}
 	case ETHTOOL_GREGS: {
 		struct ethtool_regs regs = {ETHTOOL_GREGS};
@@ -522,15 +1406,13 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 		void *ptr;
 		int err = 0;
 
+		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
+			return -EFAULT;
+
 		eeprom_buff = kmalloc(hw->eeprom.word_size * 2, GFP_KERNEL);
 
-		if(eeprom_buff == NULL)
+		if(!eeprom_buff)
 			return -ENOMEM;
-
-		if(copy_from_user(&eeprom, addr, sizeof(eeprom))) {
-			err = -EFAULT;
-			goto err_geeprom_ioctl;
-		}
 
 		if((err = e1000_ethtool_geeprom(adapter, &eeprom,
 						eeprom_buff)))
@@ -565,15 +1447,42 @@ err_geeprom_ioctl:
 	}
 	case ETHTOOL_GSTATS: {
 		struct {
-			struct ethtool_stats cmd;
+			struct ethtool_stats eth_stats;
 			uint64_t data[E1000_STATS_LEN];
 		} stats = { {ETHTOOL_GSTATS, E1000_STATS_LEN} };
 		int i;
 
 		for(i = 0; i < E1000_STATS_LEN; i++)
-			stats.data[i] =
-				((unsigned long *)&adapter->net_stats)[i];
+			stats.data[i] = (e1000_gstrings_stats[i].sizeof_stat ==
+					sizeof(uint64_t)) ?
+				*(uint64_t *)((char *)adapter +
+					e1000_gstrings_stats[i].stat_offset) :
+				*(uint32_t *)((char *)adapter +
+					e1000_gstrings_stats[i].stat_offset);
 		if(copy_to_user(addr, &stats, sizeof(stats)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_TEST: {
+		struct {
+			struct ethtool_test eth_test;
+			uint64_t data[E1000_TEST_LEN];
+		} test = { {ETHTOOL_TEST} };
+		int err;
+
+		if(!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if(copy_from_user(&test.eth_test, addr, sizeof(test.eth_test)))
+			return -EFAULT;
+
+		test.eth_test.len = E1000_TEST_LEN;
+
+		if((err = e1000_ethtool_test(adapter, &test.eth_test,
+					     test.data)))
+			return err;
+
+		if(copy_to_user(addr, &test, sizeof(test)) != 0)
 			return -EFAULT;
 		return 0;
 	}

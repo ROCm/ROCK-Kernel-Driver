@@ -227,7 +227,7 @@ hycapi_register_appl(struct capi_ctr *ctrl, __u16 appl,
 		return;
 	}
 	if(chk == 1) {
-		printk(KERN_INFO "HYSDN: apl %d allready registered\n", appl);
+		printk(KERN_INFO "HYSDN: apl %d already registered\n", appl);
 		return;
 	}
 	MaxBDataBlocks = rp->datablkcnt > CAPI_MAXDATAWINDOW ? CAPI_MAXDATAWINDOW : rp->datablkcnt;
@@ -778,7 +778,7 @@ hycapi_capi_create(hysdn_card *card)
 		ctrl->procinfo      = hycapi_procinfo;
 		ctrl->ctr_read_proc = hycapi_read_proc;
 		strcpy(ctrl->name, cinfo->cardname);
-		SET_MODULE_OWNER(ctrl);
+		ctrl->owner = THIS_MODULE;
 
 		retval = attach_capi_ctr(ctrl);
 		if (retval) {

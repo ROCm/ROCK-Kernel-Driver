@@ -2495,8 +2495,6 @@ static s32 adpt_i2o_reparse_lct(adpt_hba* pHba)
 				pDev->pScsi_dev->online = FALSE;
 				if (pDev->pScsi_dev->access_count) {
 					// A drive that was mounted is no longer there... bad!
-					SCSI_LOG_ERROR_RECOVERY(1, printk ("%s:Rescan: Previously "
-								 "mounted drive not found!\n",pHba->name));
 					printk(KERN_WARNING"%s:Mounted drive taken offline\n",pHba->name);
 				}
 			}
@@ -3306,6 +3304,24 @@ static static void adpt_delay(int millisec)
 
 #endif
 
-static Scsi_Host_Template driver_template = DPT_I2O;
+static Scsi_Host_Template driver_template = {
+	.name			= "dpt_i2o",
+	.proc_name		= "dpt_i2o",
+	.proc_info		= adpt_proc_info,
+	.detect			= adpt_detect,	
+	.release		= adpt_release,
+	.info			= adpt_info,
+	.queuecommand		= adpt_queue,
+	.eh_abort_handler	= adpt_abort,
+	.eh_device_reset_handler = adpt_device_reset,
+	.eh_bus_reset_handler	= adpt_bus_reset,
+	.eh_host_reset_handler	= adpt_reset,
+	.bios_param		= adpt_bios_param,
+	.slave_configure	= adpt_slave_configure,
+	.can_queue		= MAX_TO_IOP_MESSAGES,
+	.this_id		= 7,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"
 MODULE_LICENSE("GPL");

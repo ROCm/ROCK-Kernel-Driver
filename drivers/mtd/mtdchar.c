@@ -461,22 +461,12 @@ static struct file_operations mtd_fops = {
 
 static void mtd_notify_add(struct mtd_info* mtd)
 {
-	char name[16];
-
 	if (!mtd)
 		return;
-
-	sprintf(name, "mtd/%d", mtd->index);
-	devfs_register(NULL, name,
-			DEVFS_FL_DEFAULT, MTD_CHAR_MAJOR, mtd->index*2,
-			S_IFCHR | S_IRUGO | S_IWUGO,
-			&mtd_fops, NULL);
-
-	sprintf(name, "mtd/%dro", mtd->index);
-	devfs_register(NULL, name,
-			DEVFS_FL_DEFAULT, MTD_CHAR_MAJOR, mtd->index*2+1,
-			S_IFCHR | S_IRUGO | S_IWUGO,
-			&mtd_fops, NULL);
+	devfs_mk_cdev(MKDEV(MTD_CHAR_MAJOR, mtd->index*2),
+			S_IFCHR | S_IRUGO | S_IWUGO, "mtd/%d", mtd->index);
+	devfs_mk_cdev(MKDEV(MTD_CHAR_MAJOR, mtd->index*2+1),
+			S_IFCHR | S_IRUGO | S_IWUGO, "mtd/%dro", mtd->index);
 }
 
 static void mtd_notify_remove(struct mtd_info* mtd)

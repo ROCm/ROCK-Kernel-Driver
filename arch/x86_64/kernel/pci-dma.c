@@ -32,7 +32,6 @@ int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	int i;
 
 	BUG_ON(direction == PCI_DMA_NONE);
- 
  	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
 

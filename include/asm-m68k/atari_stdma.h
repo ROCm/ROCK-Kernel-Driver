@@ -8,7 +8,8 @@
 
 /***************************** Prototypes *****************************/
 
-void stdma_lock(void (*handler)(int, void *, struct pt_regs *), void *data); 
+void stdma_lock(irqreturn_t (*handler)(int, void *, struct pt_regs *),
+		void *data);
 void stdma_release( void );
 int stdma_others_waiting( void );
 int stdma_islocked( void );

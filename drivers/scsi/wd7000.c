@@ -1375,7 +1375,6 @@ static int wd7000_set_info(char *buffer, int length, struct Scsi_Host *host)
 static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
 {
 	struct Scsi_Host *host = NULL;
-	Scsi_Device *scd;
 	Adapter *adapter;
 	unsigned long flags;
 	char *pos = buffer;
@@ -1449,27 +1448,6 @@ static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length
 
 	SPRINTF(count ? "\n" : "none\n");
 #endif
-
-	/*
-	 * Display driver information for each device attached to the board.
-	 */
-	SPRINTF("\nAttached devices: %s\n", !list_empty(&host->my_devices) ?
-		       	"" : "none");
-
-	list_for_each_entry (scd, &host->my_devices, siblings) {
-		SPRINTF("  [Channel: %02d, Id: %02d, Lun: %02d]  ", scd->channel, scd->id, scd->lun);
-		SPRINTF("%s ", (scd->type < MAX_SCSI_DEVICE_CODE) ? scsi_device_types[(short) scd->type] : "Unknown device");
-
-		for (i = 0; (i < 8) && (scd->vendor[i] >= 0x20); i++)
-			SPRINTF("%c", scd->vendor[i]);
-		SPRINTF(" ");
-
-		for (i = 0; (i < 16) && (scd->model[i] >= 0x20); i++)
-			SPRINTF("%c", scd->model[i]);
-		SPRINTF("\n");
-	}
-
-	SPRINTF("\n");
 
 	spin_unlock_irqrestore(host->host_lock, flags);
 

@@ -287,7 +287,8 @@ int copy_strings_kernel(int argc,char ** argv, struct linux_binprm *bprm)
  *
  * tsk->mmap_sem is held for writing.
  */
-void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address)
+void put_dirty_page(struct task_struct *tsk, struct page *page,
+			unsigned long address, pgprot_t prot)
 {
 	pgd_t * pgd;
 	pmd_t * pmd;
@@ -295,7 +296,8 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	struct pte_chain *pte_chain;
 
 	if (page_count(page) != 1)
-		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n", page, address);
+		printk(KERN_ERR "mem_map disagrees with %p at %08lx\n",
+				page, address);
 
 	pgd = pgd_offset(tsk->mm, address);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
@@ -314,7 +316,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	}
 	lru_cache_add_active(page);
 	flush_dcache_page(page);
-	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));
+	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, prot))));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_unmap(pte);
 	tsk->mm->rss++;
@@ -421,7 +423,8 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base);
+			put_dirty_page(current, page, stack_base,
+					mpnt->vm_page_prot);
 		}
 		stack_base += PAGE_SIZE;
 	}
@@ -434,8 +437,6 @@ int setup_arg_pages(struct linux_binprm *bprm)
 
 #else
 
-#define put_dirty_page(tsk, page, address)
-#define setup_arg_pages(bprm)			(0)
 static inline void free_arg_pages(struct linux_binprm *bprm)
 {
 	int i;
@@ -528,30 +529,6 @@ static int exec_mmap(struct mm_struct *mm)
 	return 0;
 }
 
-static struct dentry *clean_proc_dentry(struct task_struct *p)
-{
-	struct dentry *proc_dentry = p->proc_dentry;
-
-	if (proc_dentry) {
-		spin_lock(&dcache_lock);
-		if (!d_unhashed(proc_dentry)) {
-			dget_locked(proc_dentry);
-			__d_drop(proc_dentry);
-		} else
-			proc_dentry = NULL;
-		spin_unlock(&dcache_lock);
-	}
-	return proc_dentry;
-}
-
-static inline void put_proc_dentry(struct dentry *dentry)
-{
-	if (dentry) {
-		shrink_dcache_parent(dentry);
-		dput(dentry);
-	}
-}
-
 /*
  * This function makes sure the current process has its own signal table,
  * so that flush_signal_handlers can later reset the handlers without
@@ -632,6 +609,7 @@ static inline int de_thread(struct task_struct *tsk)
 		count = 1;
 	while (atomic_read(&oldsig->count) > count) {
 		oldsig->group_exit_task = current;
+		oldsig->notify_count = count;
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(lock);
 		schedule();
@@ -659,9 +637,11 @@ static inline int de_thread(struct task_struct *tsk)
 		while (leader->state != TASK_ZOMBIE)
 			yield();
 
+		spin_lock(&leader->proc_lock);
+		spin_lock(&current->proc_lock);
+		proc_dentry1 = proc_pid_unhash(current);
+		proc_dentry2 = proc_pid_unhash(leader);
 		write_lock_irq(&tasklist_lock);
-		proc_dentry1 = clean_proc_dentry(current);
-		proc_dentry2 = clean_proc_dentry(leader);
 
 		if (leader->tgid != current->tgid)
 			BUG();
@@ -701,9 +681,10 @@ static inline int de_thread(struct task_struct *tsk)
 		state = leader->state;
 
 		write_unlock_irq(&tasklist_lock);
-
-		put_proc_dentry(proc_dentry1);
-		put_proc_dentry(proc_dentry2);
+		spin_unlock(&leader->proc_lock);
+		spin_unlock(&current->proc_lock);
+		proc_pid_flush(proc_dentry1);
+		proc_pid_flush(proc_dentry2);
 
 		if (state != TASK_ZOMBIE)
 			BUG();
@@ -1033,14 +1014,12 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 #ifdef CONFIG_KMOD
 		}else{
 #define printable(c) (((c)=='\t') || ((c)=='\n') || (0x20<=(c) && (c)<=0x7e))
-			char modname[20];
 			if (printable(bprm->buf[0]) &&
 			    printable(bprm->buf[1]) &&
 			    printable(bprm->buf[2]) &&
 			    printable(bprm->buf[3]))
 				break; /* -ENOEXEC */
-			sprintf(modname, "binfmt-%04x", *(unsigned short *)(&bprm->buf[2]));
-			request_module(modname);
+			request_module("binfmt-%04x", *(unsigned short *)(&bprm->buf[2]));
 #endif
 		}
 	}

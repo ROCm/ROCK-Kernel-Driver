@@ -1,6 +1,9 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <asm/io.h>
+#include <linux/mmzone.h>
+
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 
 #define TARGET_CPUS (0xf)
@@ -14,6 +17,7 @@
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) ((bitmap) & (1 << (apicid)))
 #define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
+#define apicid_cluster(apicid) (apicid & 0xF0)
 
 static inline int apic_id_registered(void)
 {
@@ -101,6 +105,39 @@ static inline void setup_portio_remap(void)
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return (1);
+}
+
+static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
+{
+	int num_bits_set;
+	int cpus_found = 0;
+	int cpu;
+	int apicid;	
+
+	num_bits_set = hweight32(cpumask); 
+	/* Return id to all */
+	if (num_bits_set == 32)
+		return (int) 0xFF;
+	/* 
+	 * The cpus in the mask must all be on the apic cluster.  If are not 
+	 * on the same apicid cluster return default value of TARGET_CPUS. 
+	 */
+	cpu = ffs(cpumask)-1;
+	apicid = cpu_to_logical_apicid(cpu);
+	while (cpus_found < num_bits_set) {
+		if (cpumask & (1 << cpu)) {
+			int new_apicid = cpu_to_logical_apicid(cpu);
+			if (apicid_cluster(apicid) != 
+					apicid_cluster(new_apicid)){
+				printk ("%s: Not a valid mask!\n",__FUNCTION__);
+				return TARGET_CPUS;
+			}
+			apicid = apicid | new_apicid;
+			cpus_found++;
+		}
+		cpu++;
+	}
+	return apicid;
 }
 
 #endif /* __ASM_MACH_APIC_H */

@@ -221,9 +221,9 @@ gsend:
 	return c;
 }
 
-static void
+static irqreturn_t
 bionet_intr(int irq, void *data, struct pt_regs *fp) {
-	return;
+	return IRQ_HANDLED;
 }
 
 

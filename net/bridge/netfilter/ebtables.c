@@ -175,10 +175,6 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 	char *base;
 	struct ebt_table_info *private = table->private;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
-
 	read_lock_bh(&table->lock);
 	cb_base = COUNTER_BASE(private->counters, private->nentries,
 	   smp_processor_id());
@@ -319,10 +315,7 @@ find_inlist_lock(struct list_head *head, const char *name, const char *prefix,
 
 	ret = find_inlist_lock_noload(head, name, error, mutex);
 	if (!ret) {
-		char modulename[EBT_FUNCTION_MAXNAMELEN + strlen(prefix) + 1];
-		strcpy(modulename, prefix);
-		strcat(modulename, name);
-		request_module(modulename);
+		request_module("%s%s", prefix, name);
 		ret = find_inlist_lock_noload(head, name, error, mutex);
 	}
 	return ret;

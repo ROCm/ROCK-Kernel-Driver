@@ -6764,6 +6764,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	}
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (pci_using_dac)
 		dev->features |= NETIF_F_HIGHDMA;

@@ -20,32 +20,23 @@ static inline int cpu_to_node(int cpu)
 	return node;
 }
 
-static inline int node_to_first_cpu(int node)
-{
-	int cpu;
+#define memblk_to_node(memblk)	(memblk)
 
-	for(cpu = 0; cpu < NR_CPUS; cpu++)
-		if (numa_cpu_lookup_table[cpu] == node)
-			return cpu;
-
-	BUG(); /* couldn't find a cpu on given node */
-	return -1;
-}
+#define parent_node(node)	(node)
 
 static inline unsigned long node_to_cpumask(int node)
 {
-	int cpu;
-	unsigned long mask = 0UL;
-
-	if (sizeof(unsigned long) * 8 < NR_CPUS)
-		BUG();
-
-	for(cpu = 0; cpu < NR_CPUS; cpu++)
-		if (numa_cpu_lookup_table[cpu] == node)
-			mask |= 1UL << cpu;
-
-	return mask;
+	return numa_cpumask_lookup_table[node];
 }
+
+static inline int node_to_first_cpu(int node)
+{
+	return __ffs(node_to_cpumask(node));
+}
+
+#define node_to_memblk(node)	(node)
+
+#define pcibus_to_cpumask(bus)	(cpu_online_map)
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 10

@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1999-2000 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -236,8 +237,9 @@ static void ircomm_tty_ias_register(struct ircomm_tty_cb *self)
 		irias_insert_object(self->obj);
 	}
 	self->skey = irlmp_register_service(hints);
-	self->ckey = irlmp_register_client(
-		hints, ircomm_tty_discovery_indication, NULL, (void *) self);
+	self->ckey = irlmp_register_client(hints,
+					   ircomm_tty_discovery_indication,
+					   NULL, (void *) self);
 }
 
 /*
@@ -459,7 +461,7 @@ void ircomm_tty_connect_confirm(void *instance, void *sap,
 
 	ircomm_tty_do_event(self, IRCOMM_TTY_CONNECT_CONFIRM, NULL, NULL);
 
-	dev_kfree_skb(skb);
+	/* No need to kfree_skb - see ircomm_ttp_connect_confirm() */
 }
 
 /*
@@ -496,7 +498,7 @@ void ircomm_tty_connect_indication(void *instance, void *sap,
 
 	ircomm_tty_do_event(self, IRCOMM_TTY_CONNECT_INDICATION, NULL, NULL);
 
-	dev_kfree_skb(skb);
+	/* No need to kfree_skb - see ircomm_ttp_connect_indication() */
 }
 
 /*
@@ -647,7 +649,7 @@ static int ircomm_tty_state_idle(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -718,7 +720,7 @@ static int ircomm_tty_state_search(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -774,7 +776,7 @@ static int ircomm_tty_state_query_parameters(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -822,7 +824,7 @@ static int ircomm_tty_state_query_lsap_sel(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -874,7 +876,7 @@ static int ircomm_tty_state_setup(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }
@@ -917,7 +919,7 @@ static int ircomm_tty_state_ready(struct ircomm_tty_cb *self,
 	default:
 		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
-		return -EINVAL;
+		ret = -EINVAL;
 	}
 	return ret;
 }

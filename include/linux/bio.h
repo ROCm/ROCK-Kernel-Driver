@@ -22,6 +22,7 @@
 
 #include <linux/kdev_t.h>
 #include <linux/highmem.h>
+#include <linux/mempool.h>
 
 /* Platforms may set this to teach the BIO layer about IOMMU hardware. */
 #include <asm/io.h>
@@ -131,6 +132,7 @@ struct bio {
 #define bio_iovec(bio)		bio_iovec_idx((bio), (bio)->bi_idx)
 #define bio_page(bio)		bio_iovec((bio))->bv_page
 #define bio_offset(bio)		bio_iovec((bio))->bv_offset
+#define bio_segments(bio)	((bio)->bi_vcnt - (bio)->bi_idx)
 #define bio_sectors(bio)	((bio)->bi_size >> 9)
 #define bio_cur_sectors(bio)	(bio_iovec(bio)->bv_len >> 9)
 #define bio_data(bio)		(page_address(bio_page((bio))) + bio_offset((bio)))
@@ -201,6 +203,27 @@ struct bio {
  */
 #define bio_get(bio)	atomic_inc(&(bio)->bi_cnt)
 
+
+/*
+ * A bio_pair is used when we need to split a bio.
+ * This can only happen for a bio that refers to just one
+ * page of data, and in the unusual situation when the
+ * page crosses a chunk/device boundary
+ *
+ * The address of the master bio is stored in bio1.bi_private
+ * The address of the pool the pair was allocated from is stored
+ *   in bio2.bi_private
+ */
+struct bio_pair {
+	struct bio	bio1, bio2;
+	struct bio_vec	bv1, bv2;
+	atomic_t	cnt;
+	int		error;
+};
+extern struct bio_pair *bio_split(struct bio *bi, mempool_t *pool,
+				  int first_sectors);
+extern void bio_pair_release(struct bio_pair *dbio);
+
 extern struct bio *bio_alloc(int, int);
 extern void bio_put(struct bio *);
 
@@ -226,12 +249,12 @@ extern void bio_check_pages_dirty(struct bio *bio);
 #ifdef CONFIG_HIGHMEM
 /*
  * remember to add offset! and never ever reenable interrupts between a
- * bio_kmap_irq and bio_kunmap_irq!!
+ * bvec_kmap_irq and bvec_kunmap_irq!!
  *
  * This function MUST be inlined - it plays with the CPU interrupt flags.
  * Hence the `extern inline'.
  */
-extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
+extern inline char *bvec_kmap_irq(struct bio_vec *bvec, unsigned long *flags)
 {
 	unsigned long addr;
 
@@ -240,15 +263,15 @@ extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
 	 * balancing is a lot nicer this way
 	 */
 	local_irq_save(*flags);
-	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
+	addr = (unsigned long) kmap_atomic(bvec->bv_page, KM_BIO_SRC_IRQ);
 
 	if (addr & ~PAGE_MASK)
 		BUG();
 
-	return (char *) addr + bio_offset(bio);
+	return (char *) addr + bvec->bv_offset;
 }
 
-extern inline void bio_kunmap_irq(char *buffer, unsigned long *flags)
+extern inline void bvec_kunmap_irq(char *buffer, unsigned long *flags)
 {
 	unsigned long ptr = (unsigned long) buffer & PAGE_MASK;
 
@@ -257,8 +280,19 @@ extern inline void bio_kunmap_irq(char *buffer, unsigned long *flags)
 }
 
 #else
-#define bio_kmap_irq(bio, flags)	(bio_data(bio))
-#define bio_kunmap_irq(buf, flags)	do { *(flags) = 0; } while (0)
+#define bvec_kmap_irq(bvec, flags)	(page_address((bvec)->bv_page) + (bvec)->bv_offset)
+#define bvec_kunmap_irq(buf, flags)	do { *(flags) = 0; } while (0)
 #endif
+
+extern inline char *__bio_kmap_irq(struct bio *bio, unsigned short idx,
+				   unsigned long *flags)
+{
+	return bvec_kmap_irq(bio_iovec_idx(bio, idx), flags);
+}
+#define __bio_kunmap_irq(buf, flags)	bvec_kunmap_irq(buf, flags)
+
+#define bio_kmap_irq(bio, flags) \
+	__bio_kmap_irq((bio), (bio)->bi_idx, (flags))
+#define bio_kunmap_irq(buf,flags)	__bio_kunmap_irq(buf, flags)
 
 #endif /* __LINUX_BIO_H */

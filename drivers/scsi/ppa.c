@@ -97,7 +97,23 @@ static int ppa_pb_claim(int host_no)
  *                   Parallel port probing routines                        *
  ***************************************************************************/
 
-static Scsi_Host_Template driver_template = PPA;
+static Scsi_Host_Template driver_template = {
+	.proc_name			= "ppa",
+	.proc_info			= ppa_proc_info,
+	.name				= "Iomega VPI0 (ppa) interface",
+	.detect				= ppa_detect,
+	.release			= ppa_release,
+	.command			= ppa_command,
+	.queuecommand			= ppa_queuecommand,
+	.eh_abort_handler		= ppa_abort,
+	.eh_bus_reset_handler		= ppa_reset,
+	.eh_host_reset_handler		= ppa_reset,
+	.bios_param			= ppa_biosparam,
+	.this_id			= -1,
+	.sg_tablesize			= SG_ALL,
+	.cmd_per_lun			= 1,
+	.use_clustering			= ENABLE_CLUSTERING,
+};
 #include  "scsi_module.c"
 
 /*

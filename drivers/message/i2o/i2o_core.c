@@ -2018,15 +2018,14 @@ static int i2o_systab_send(struct i2o_controller *iop)
 	{
 		printk(KERN_ERR "%s: Unable to set SysTab (status=%#x).\n", 
 			iop->name, -ret);
-		kfree(privbuf);
 	}
 	else
 	{
 		dprintk(KERN_INFO "%s: SysTab set.\n", iop->name);
-		kfree(privbuf);
 	}
 	i2o_status_get(iop); // Entered READY state
 
+	kfree(privbuf);
 	return ret;	
 
  }

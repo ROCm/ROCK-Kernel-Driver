@@ -30,11 +30,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/highmem.h>
 #include "drmP.h"
-#include <linux/vmalloc.h>
-
-#include <asm/agp.h>
-#include <asm/tlbflush.h>
 
 /* Cut down version of drm_memory_debug.h, which used to be called
  * drm_memory.h.  If you want the debug functionality, change 0 to 1
@@ -43,6 +40,20 @@
 #define DEBUG_MEMORY 0
 
 #if __REALLY_HAVE_AGP
+
+#include <linux/vmalloc.h>
+
+#ifdef HAVE_PAGE_AGP
+#include <asm/agp.h>
+#else
+# ifdef __powerpc__
+#  define PAGE_AGP	__pgprot(_PAGE_KERNEL | _PAGE_NO_CACHE)
+# else
+#  define PAGE_AGP	PAGE_KERNEL
+# endif
+#endif
+
+#include <asm/tlbflush.h>
 
 /*
  * Find the drm_map that covers the range [offset, offset+size).
@@ -74,6 +85,10 @@ agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 	void *addr;
 
 	size = PAGE_ALIGN(size);
+
+#ifdef __alpha__
+	offset -= dev->hose->mem_space->start;
+#endif
 
 	for (agpmem = dev->agp->memory; agpmem; agpmem = agpmem->next)
 		if (agpmem->bound <= offset
@@ -113,63 +128,46 @@ drm_follow_page (void *vaddr)
 	return pte_pfn(*ptep) << PAGE_SHIFT;
 }
 
-#else /* !__REALLY_HAVE_AGP */
-
-static inline void *
-agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
-{
-	return NULL;
-}
-
-#endif /* !__REALLY_HAVE_AGP */
+#endif /* __REALLY_HAVE_AGP */
 
 static inline void *drm_ioremap(unsigned long offset, unsigned long size, drm_device_t *dev)
 {
-	int remap_aperture = 0;
-
 #if __REALLY_HAVE_AGP
-	if (dev->agp->cant_use_aperture) {
+	if (dev->agp && dev->agp->cant_use_aperture) {
 		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
 		if (map && map->type == _DRM_AGP)
-			remap_aperture = 1;
+			return agp_remap(offset, size, dev);
 	}
 #endif
-	if (remap_aperture)
-		return agp_remap(offset, size, dev);
- 	else
-		return ioremap(offset, size);
+
+	return ioremap(offset, size);
 }
 
 static inline void *drm_ioremap_nocache(unsigned long offset, unsigned long size,
 					drm_device_t *dev)
 {
-	int remap_aperture = 0;
-
 #if __REALLY_HAVE_AGP
-	if (dev->agp->cant_use_aperture) {
+	if (dev->agp && dev->agp->cant_use_aperture) {
 		drm_map_t *map = drm_lookup_map(offset, size, dev);
 
 		if (map && map->type == _DRM_AGP)
-			remap_aperture = 1;
+			return agp_remap(offset, size, dev);
 	}
 #endif
-	if (remap_aperture)
-		return agp_remap(offset, size, dev);
-	else
-		return ioremap_nocache(offset, size);
+
+	return ioremap_nocache(offset, size);
 }
 
 static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *dev)
 {
-	int unmap_aperture = 0;
 #if __REALLY_HAVE_AGP
 	/*
 	 * This is a bit ugly.  It would be much cleaner if the DRM API would use separate
 	 * routines for handling mappings in the AGP space.  Hopefully this can be done in
 	 * a future revision of the interface...
 	 */
-	if (dev->agp->cant_use_aperture
+	if (dev->agp && dev->agp->cant_use_aperture
 	    && ((unsigned long) pt >= VMALLOC_START && (unsigned long) pt < VMALLOC_END))
 	{
 		unsigned long offset;
@@ -177,14 +175,14 @@ static inline void drm_ioremapfree(void *pt, unsigned long size, drm_device_t *d
 
 		offset = drm_follow_page(pt) | ((unsigned long) pt & ~PAGE_MASK);
 		map = drm_lookup_map(offset, size, dev);
-		if (map && map->type == _DRM_AGP)
-			unmap_aperture = 1;
+		if (map && map->type == _DRM_AGP) {
+			vunmap(pt);
+			return;
+		}
 	}
 #endif
-	if (unmap_aperture)
-		vunmap(pt);
-	else
-		iounmap(pt);
+
+	iounmap(pt);
 }
 
 #if DEBUG_MEMORY
@@ -282,22 +280,22 @@ void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 }
 
 #if __REALLY_HAVE_AGP
-agp_memory *DRM(alloc_agp)(int pages, u32 type)
+struct agp_memory *DRM(alloc_agp)(int pages, u32 type)
 {
 	return DRM(agp_allocate_memory)(pages, type);
 }
 
-int DRM(free_agp)(agp_memory *handle, int pages)
+int DRM(free_agp)(struct agp_memory *handle, int pages)
 {
 	return DRM(agp_free_memory)(handle) ? 0 : -EINVAL;
 }
 
-int DRM(bind_agp)(agp_memory *handle, unsigned int start)
+int DRM(bind_agp)(struct agp_memory *handle, unsigned int start)
 {
 	return DRM(agp_bind_memory)(handle, start);
 }
 
-int DRM(unbind_agp)(agp_memory *handle)
+int DRM(unbind_agp)(struct agp_memory *handle)
 {
 	return DRM(agp_unbind_memory)(handle);
 }

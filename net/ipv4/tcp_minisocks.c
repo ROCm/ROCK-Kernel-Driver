@@ -54,7 +54,7 @@ int tcp_tw_count;
 
 
 /* Must be called with locally disabled BHs. */
-void tcp_timewait_kill(struct tcp_tw_bucket *tw)
+static void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 {
 	struct tcp_ehash_bucket *ehead;
 	struct tcp_bind_hashbucket *bhead;
@@ -166,7 +166,6 @@ tcp_timewait_state_process(struct tcp_tw_bucket *tw, struct sk_buff *skb,
 		if (!th->fin || TCP_SKB_CB(skb)->end_seq != tw->rcv_nxt+1) {
 kill_with_rst:
 			tcp_tw_deschedule(tw);
-			tcp_timewait_kill(tw);
 			tcp_tw_put(tw);
 			return TCP_TW_RST;
 		}
@@ -223,7 +222,6 @@ kill_with_rst:
 			if (sysctl_tcp_rfc1337 == 0) {
 kill:
 				tcp_tw_deschedule(tw);
-				tcp_timewait_kill(tw);
 				tcp_tw_put(tw);
 				return TCP_TW_SUCCESS;
 			}
@@ -381,10 +379,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		if(tw->family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 
-			memcpy(&tw->v6_daddr, &np->daddr,
-			       sizeof(struct in6_addr));
-			memcpy(&tw->v6_rcv_saddr, &np->rcv_saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&tw->v6_daddr, &np->daddr);
+			ipv6_addr_copy(&tw->v6_rcv_saddr, &np->rcv_saddr);
 		}
 #endif
 		/* Linkage updates. */
@@ -422,11 +418,15 @@ static int tcp_tw_death_row_slot = 0;
 
 static void tcp_twkill(unsigned long);
 
+/* TIME_WAIT reaping mechanism. */
+#define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
+#define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
+
 static struct tcp_tw_bucket *tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);
 
-static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
+static void tcp_twkill(unsigned long dummy)
 {
 	struct tcp_tw_bucket *tw;
 	int killed = 0;
@@ -444,6 +444,8 @@ static void SMP_TIMER_NAME(tcp_twkill)(unsigned long dummy)
 
 	while((tw = tcp_tw_death_row[tcp_tw_death_row_slot]) != NULL) {
 		tcp_tw_death_row[tcp_tw_death_row_slot] = tw->next_death;
+		if (tw->next_death)
+			tw->next_death->pprev_death = tw->pprev_death;
 		tw->pprev_death = NULL;
 		spin_unlock(&tw_death_lock);
 
@@ -464,8 +466,6 @@ out:
 	spin_unlock(&tw_death_lock);
 }
 
-SMP_TIMER_DEFINE(tcp_twkill, tcp_twkill_task);
-
 /* These are always called from BH context.  See callers in
  * tcp_input.c to verify this.
  */
@@ -484,6 +484,7 @@ void tcp_tw_deschedule(struct tcp_tw_bucket *tw)
 			del_timer(&tcp_tw_timer);
 	}
 	spin_unlock(&tw_death_lock);
+	tcp_timewait_kill(tw);
 }
 
 /* Short-time timewait calendar */
@@ -576,7 +577,7 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 	spin_unlock(&tw_death_lock);
 }
 
-void SMP_TIMER_NAME(tcp_twcal_tick)(unsigned long dummy)
+void tcp_twcal_tick(unsigned long dummy)
 {
 	int n, slot;
 	unsigned long j;
@@ -626,9 +627,6 @@ out:
 	NET_ADD_STATS_BH(TimeWaitKilled, killed);
 	spin_unlock(&tw_death_lock);
 }
-
-SMP_TIMER_DEFINE(tcp_twcal_tick, tcp_twcal_tasklet);
-
 
 /* This is not only more efficient than what we used to do, it eliminates
  * a lot of code duplication between IPv4/IPv6 SYN recv processing. -DaveM
@@ -758,6 +756,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			tcp_reset_keepalive_timer(newsk, keepalive_time_when(newtp));
 		newsk->socket = NULL;
 		newsk->sleep = NULL;
+		newsk->owner = NULL;
 
 		newtp->tstamp_ok = req->tstamp_ok;
 		if((newtp->sack_ok = req->sack_ok) != 0) {

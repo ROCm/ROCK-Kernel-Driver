@@ -347,13 +347,14 @@ struct ipt_match
 
 	/* Return true or false: return FALSE and set *hotdrop = 1 to
            force immediate packet drop. */
+	/* Arguments changed since 2.4, as this must now handle
+           non-linear skbs, using skb_copy_bits and
+           skb_ip_make_writable. */
 	int (*match)(const struct sk_buff *skb,
 		     const struct net_device *in,
 		     const struct net_device *out,
 		     const void *matchinfo,
 		     int offset,
-		     const void *hdr,
-		     u_int16_t datalen,
 		     int *hotdrop);
 
 	/* Called when user tries to insert an entry of this type. */
@@ -367,7 +368,7 @@ struct ipt_match
 	/* Called when entry of this type deleted. */
 	void (*destroy)(void *matchinfo, unsigned int matchinfosize);
 
-	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
+	/* Set this to THIS_MODULE. */
 	struct module *me;
 };
 
@@ -377,14 +378,6 @@ struct ipt_target
 	struct list_head list;
 
 	const char name[IPT_FUNCTION_MAXNAMELEN];
-
-	/* Returns verdict. */
-	unsigned int (*target)(struct sk_buff **pskb,
-			       unsigned int hooknum,
-			       const struct net_device *in,
-			       const struct net_device *out,
-			       const void *targinfo,
-			       void *userdata);
 
 	/* Called when user tries to insert an entry of this type:
            hook_mask is a bitmask of hooks from which it can be
@@ -399,7 +392,17 @@ struct ipt_target
 	/* Called when entry of this type deleted. */
 	void (*destroy)(void *targinfo, unsigned int targinfosize);
 
-	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
+	/* Returns verdict.  Argument order changed since 2.4, as this
+           must now handle non-linear skbs, using skb_copy_bits and
+           skb_ip_make_writable. */
+	unsigned int (*target)(struct sk_buff **pskb,
+			       const struct net_device *in,
+			       const struct net_device *out,
+			       unsigned int hooknum,
+			       const void *targinfo,
+			       void *userdata);
+
+	/* Set this to THIS_MODULE. */
 	struct module *me;
 };
 
@@ -429,7 +432,7 @@ struct ipt_table
 	/* Man behind the curtain... */
 	struct ipt_table_info *private;
 
-	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
+	/* Set to THIS_MODULE. */
 	struct module *me;
 };
 

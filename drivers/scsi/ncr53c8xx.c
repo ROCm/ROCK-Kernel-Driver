@@ -3701,7 +3701,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	/*
 	**	Store input informations in the host data structure.
 	*/
-	strncpy(np->chip_name, device->chip.name, sizeof(np->chip_name) - 1);
+	strlcpy(np->chip_name, device->chip.name, sizeof(np->chip_name));
 	np->unit	= unit;
 	np->verbose	= driver_setup.verbose;
 	sprintf(np->inst_name, "ncr53c%s-%d", np->chip_name, np->unit);
@@ -5033,7 +5033,7 @@ static int ncr_detach(ncb_p np)
 	char inst_name[16];
 
 	/* Local copy so we don't access np after freeing it! */
-	strncpy(inst_name, ncr_name(np), 16);
+	strlcpy(inst_name, ncr_name(np), sizeof(inst_name));
 
 	printk("%s: releasing host resources\n", ncr_name(np));
 
@@ -9430,18 +9430,6 @@ int zalon_attach(Scsi_Host_Template *tpnt, unsigned long io_port,
 */
 int __init ncr53c8xx_detect(Scsi_Host_Template *tpnt)
 {
-	/*
-	**    Initialize driver general stuff.
-	*/
-#ifdef SCSI_NCR_PROC_INFO_SUPPORT
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
-     tpnt->proc_dir  = &proc_scsi_ncr53c8xx;
-#else
-     tpnt->proc_name = NAME53C8XX;
-#endif
-     tpnt->proc_info = ncr53c8xx_proc_info;
-#endif
-
 #if	defined(SCSI_NCR_BOOT_COMMAND_LINE_SUPPORT) && defined(MODULE)
 if (ncr53c8xx)
 	ncr53c8xx_setup(ncr53c8xx);
@@ -9467,29 +9455,27 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 */
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-static
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
+static Scsi_Host_Template driver_template =  {
 #ifdef ENABLE_SCSI_ZALON
-Scsi_Host_Template driver_template =  {
-	.proc_name =		"zalon720",
-	.detect =		zalon7xx_detect,
-	.release =		zalon7xx_release,
-	.info =			ncr53c8xx_info,
-	.queuecommand =		ncr53c8xx_queue_command,
-	.slave_configure =	ncr53c8xx_slave_configure,
-	.eh_bus_reset_handler =	ncr53c8xx_bus_reset,
-	.can_queue =		SCSI_NCR_CAN_QUEUE,
-	.this_id =		7,
-	.sg_tablesize =		SCSI_NCR_SG_TABLESIZE,
-	.cmd_per_lun =		SCSI_NCR_CMD_PER_LUN,
-	.use_clustering =	DISABLE_CLUSTERING,
-};
-
-
+	.proc_name		= "zalon720",
+	.detect			= zalon7xx_detect,
+	.release		= zalon7xx_release,
 #else
-Scsi_Host_Template driver_template = NCR53C8XX;
+	.proc_name		= NAME53C8XX,
+	.detect			= ncr53c8xx_detect,
+	.release		= ncr53c8xx_release,
 #endif
+#ifdef SCSI_NCR_PROC_INFO_SUPPORT
+	.proc_info		= ncr53c8xx_proc_info,
+#endif
+	.info			= ncr53c8xx_info,
+	.queuecommand		= ncr53c8xx_queue_command,
+	.slave_configure	= ncr53c8xx_slave_configure,
+	.eh_bus_reset_handler	= ncr53c8xx_bus_reset,
+	.can_queue		= SCSI_NCR_CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SCSI_NCR_SG_TABLESIZE,
+	.cmd_per_lun		= SCSI_NCR_CMD_PER_LUN,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"
-#endif

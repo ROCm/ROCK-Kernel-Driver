@@ -45,7 +45,6 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/icmpv6.h>
-#include <linux/brlock.h>
 #include <linux/smp_lock.h>
 
 #include <net/ip.h>
@@ -75,12 +74,19 @@ MODULE_LICENSE("GPL");
 /* IPv6 procfs goodies... */
 
 #ifdef CONFIG_PROC_FS
+extern int raw6_proc_init(void);
+extern int raw6_proc_exit(void);
+
+extern int tcp6_proc_init(void);
+extern void tcp6_proc_exit(void);
+
+extern int udp6_proc_init(void);
+extern void udp6_proc_exit(void);
+
+extern int ipv6_misc_proc_init(void);
+extern int ipv6_misc_proc_exit(void);
+
 extern int anycast6_get_info(char *, char **, off_t, int);
-extern int raw6_get_info(char *, char **, off_t, int);
-extern int tcp6_get_info(char *, char **, off_t, int);
-extern int udp6_get_info(char *, char **, off_t, int);
-extern int afinet6_get_info(char *, char **, off_t, int);
-extern int afinet6_get_snmp(char *, char **, off_t, int);
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -102,7 +108,8 @@ kmem_cache_t *raw6_sk_cachep;
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
-struct list_head inetsw6[SOCK_MAX];
+static struct list_head inetsw6[SOCK_MAX];
+static spinlock_t inetsw6_lock = SPIN_LOCK_UNLOCKED;
 
 static void inet6_sock_destruct(struct sock *sk)
 {
@@ -111,7 +118,6 @@ static void inet6_sock_destruct(struct sock *sk)
 #ifdef INET_REFCNT_DEBUG
 	atomic_dec(&inet6_sock_nr);
 #endif
-	module_put(THIS_MODULE);
 }
 
 static __inline__ kmem_cache_t *inet6_sk_slab(int protocol)
@@ -163,8 +169,8 @@ static int inet6_create(struct socket *sock, int protocol)
 
 	/* Look for the requested type/protocol pair. */
 	answer = NULL;
-	br_read_lock_bh(BR_NETPROTO_LOCK);
-	list_for_each(p, &inetsw6[sock->type]) {
+	rcu_read_lock();
+	list_for_each_rcu(p, &inetsw6[sock->type]) {
 		answer = list_entry(p, struct inet_protosw, list);
 
 		/* Check the non-wild match. */
@@ -182,7 +188,6 @@ static int inet6_create(struct socket *sock, int protocol)
 		}
 		answer = NULL;
 	}
-	br_read_unlock_bh(BR_NETPROTO_LOCK);
 
 	if (!answer)
 		goto free_and_badtype;
@@ -199,6 +204,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	sk->no_check = answer->no_check;
 	if (INET_PROTOSW_REUSE & answer->flags)
 		sk->reuse = 1;
+	rcu_read_unlock();
 
 	inet = inet_sk(sk);
 
@@ -226,7 +232,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	/* Init the ipv4 part of the socket since we can have sockets
 	 * using v6 API for ipv4.
 	 */
-	inet->ttl	= 64;
+	inet->uc_ttl	= -1;
 
 	inet->mc_loop	= 1;
 	inet->mc_ttl	= 1;
@@ -243,11 +249,6 @@ static int inet6_create(struct socket *sock, int protocol)
 	atomic_inc(&inet6_sock_nr);
 	atomic_inc(&inet_sock_nr);
 #endif
-	if (!try_module_get(THIS_MODULE)) {
-		inet_sock_release(sk);
-		return -EBUSY;
-	}
-
 	if (inet->num) {
 		/* It assumes that any protocol which allows
 		 * the user to assign a number at socket
@@ -259,7 +260,6 @@ static int inet6_create(struct socket *sock, int protocol)
 	if (sk->prot->init) {
 		int err = sk->prot->init(sk);
 		if (err != 0) {
-			module_put(THIS_MODULE);
 			inet_sock_release(sk);
 			return err;
 		}
@@ -267,12 +267,15 @@ static int inet6_create(struct socket *sock, int protocol)
 	return 0;
 
 free_and_badtype:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -ESOCKTNOSUPPORT;
 free_and_badperm:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -EPERM;
 free_and_noproto:
+	rcu_read_unlock();
 	sk_free(sk);
 	return -EPROTONOSUPPORT;
 do_oom:
@@ -357,10 +360,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	/* Make sure we are allowed to bind here. */
 	if (sk->prot->get_port(sk, snum) != 0) {
-		inet->rcv_saddr = inet->saddr = 0;
-		memset(&np->rcv_saddr, 0, sizeof(struct in6_addr));
-		memset(&np->saddr, 0, sizeof(struct in6_addr));
-
+		inet_reset_saddr(sk);
 		release_sock(sk);
 		return -EADDRINUSE;
 	}
@@ -442,16 +442,14 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
 			return -ENOTCONN;
 		sin->sin6_port = inet->dport;
-		memcpy(&sin->sin6_addr, &np->daddr, sizeof(struct in6_addr));
+		ipv6_addr_copy(&sin->sin6_addr, &np->daddr);
 		if (np->sndflow)
 			sin->sin6_flowinfo = np->flow_label;
 	} else {
 		if (ipv6_addr_type(&np->rcv_saddr) == IPV6_ADDR_ANY)
-			memcpy(&sin->sin6_addr, &np->saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&sin->sin6_addr, &np->saddr);
 		else
-			memcpy(&sin->sin6_addr, &np->rcv_saddr,
-			       sizeof(struct in6_addr));
+			ipv6_addr_copy(&sin->sin6_addr, &np->rcv_saddr);
 
 		sin->sin6_port = inet->sport;
 	}
@@ -542,6 +540,7 @@ struct proto_ops inet6_dgram_ops = {
 struct net_proto_family inet6_family_ops = {
 	.family = PF_INET6,
 	.create = inet6_create,
+	.owner	= THIS_MODULE,
 };
 
 #ifdef MODULE
@@ -580,7 +579,7 @@ inet6_register_protosw(struct inet_protosw *p)
 	int protocol = p->protocol;
 	struct list_head *last_perm;
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
+	spin_lock_bh(&inetsw6_lock);
 
 	if (p->type > SOCK_MAX)
 		goto out_illegal;
@@ -609,9 +608,9 @@ inet6_register_protosw(struct inet_protosw *p)
 	 * non-permanent entry.  This means that when we remove this entry, the 
 	 * system automatically returns to the old behavior.
 	 */
-	list_add(&p->list, last_perm);
+	list_add_rcu(&p->list, last_perm);
 out:
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inetsw6_lock);
 	return;
 
 out_permanent:
@@ -629,7 +628,17 @@ out_illegal:
 void
 inet6_unregister_protosw(struct inet_protosw *p)
 {
-	inet_unregister_protosw(p);
+	if (INET_PROTOSW_PERMANENT & p->flags) {
+		printk(KERN_ERR
+		       "Attempt to unregister permanent protocol %d.\n",
+		       p->protocol);
+	} else {
+		spin_lock_bh(&inetsw6_lock);
+		list_del_rcu(&p->list);
+		spin_unlock_bh(&inetsw6_lock);
+
+		synchronize_net();
+	}
 }
 
 int
@@ -779,11 +788,11 @@ static int __init inet6_init(void)
 	/* Create /proc/foo6 entries. */
 #ifdef CONFIG_PROC_FS
 	err = -ENOMEM;
-	if (!proc_net_create("raw6", 0, raw6_get_info))
+	if (raw6_proc_init())
 		goto proc_raw6_fail;
-	if (!proc_net_create("tcp6", 0, tcp6_get_info))
+	if (tcp6_proc_init())
 		goto proc_tcp6_fail;
-	if (!proc_net_create("udp6", 0, udp6_get_info))
+	if (udp6_proc_init())
 		goto proc_udp6_fail;
 	if (ipv6_misc_proc_init())
 		goto proc_misc6_fail;
@@ -812,15 +821,13 @@ static int __init inet6_init(void)
 
 #ifdef CONFIG_PROC_FS
 proc_anycast6_fail:
-	proc_net_remove("snmp6");
-	proc_net_remove("dev_snmp6");
-	proc_net_remove("sockstat6");
+	ipv6_misc_proc_exit();
 proc_misc6_fail:
-	proc_net_remove("udp6");
+	udp6_proc_exit();
 proc_udp6_fail:
-	proc_net_remove("tcp6");
+	tcp6_proc_exit();
 proc_tcp6_fail:
-        proc_net_remove("raw6");
+	raw6_proc_exit();
 proc_raw6_fail:
 	igmp6_cleanup();
 #endif
@@ -845,12 +852,10 @@ static void inet6_exit(void)
 	/* First of all disallow new sockets creation. */
 	sock_unregister(PF_INET6);
 #ifdef CONFIG_PROC_FS
-	proc_net_remove("raw6");
+	raw6_proc_exit();
 	proc_net_remove("tcp6");
 	proc_net_remove("udp6");
-	proc_net_remove("sockstat6");
-	proc_net_remove("dev_snmp6");
-	proc_net_remove("snmp6");
+	ipv6_misc_proc_exit();
 	proc_net_remove("anycast6");
 #endif
 	/* Cleanup code parts. */
@@ -867,6 +872,9 @@ static void inet6_exit(void)
 	ipv6_sysctl_unregister();	
 #endif
 	cleanup_ipv6_mibs();
+	kmem_cache_destroy(tcp6_sk_cachep);
+	kmem_cache_destroy(udp6_sk_cachep);
+	kmem_cache_destroy(raw6_sk_cachep);
 }
 module_exit(inet6_exit);
 #endif /* MODULE */

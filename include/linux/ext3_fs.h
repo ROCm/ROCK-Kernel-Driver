@@ -625,6 +625,8 @@ struct dx_hash_info
 	u32		*seed;
 };
 
+#define EXT3_HTREE_EOF	0x7fffffff
+
 #ifdef __KERNEL__
 /*
  * Control parameters used by ext3_htree_next_block

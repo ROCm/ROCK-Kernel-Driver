@@ -217,7 +217,6 @@ struct nls_table *load_nls(char *charset)
 {
 	struct nls_table *nls;
 #ifdef CONFIG_KMOD
-	char buf[40];
 	int ret;
 #endif
 
@@ -226,14 +225,7 @@ struct nls_table *load_nls(char *charset)
 		return nls;
 
 #ifdef CONFIG_KMOD
-	if (strlen(charset) > sizeof(buf) - sizeof("nls_")) {
-		printk("Unable to load NLS charset %s: name too long\n",
-			charset);
-		return NULL;
-	}
-		
-	sprintf(buf, "nls_%s", charset);
-	ret = request_module(buf);
+	ret = request_module("nls_%s", charset);
 	if (ret != 0) {
 		printk("Unable to load NLS charset %s\n", charset);
 		return NULL;

@@ -66,6 +66,12 @@ __build: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(extra-y)) \
 	 $(subdir-ym) $(always)
 	@:
 
+# Linus' kernel sanity checking tool
+ifneq ($(KBUILD_CHECKSRC),0)
+quiet_cmd_checksrc = CHECK   $<
+      cmd_checksrc = $(CHECK) $(c_flags) $< ;
+endif
+ 
 # Module versioning
 # ---------------------------------------------------------------------------
 
@@ -91,6 +97,8 @@ quiet_cmd_vcc_o_c = CC $(quiet_modtag)  $@
 cmd_vcc_o_c       = $(CC) $(c_flags) -c -o $(@D)/.tmp_$(@F) $<
 
 define rule_vcc_o_c
+	$(if $($(quiet)cmd_checksrc),echo '  $($(quiet)cmd_checksrc)';)	      \
+	$(cmd_checksrc)							      \
 	$(if $($(quiet)cmd_vcc_o_c),echo '  $($(quiet)cmd_vcc_o_c)';)	      \
 	$(cmd_vcc_o_c);							      \
 									      \
@@ -158,6 +166,15 @@ cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 quiet_cmd_cc_o_c = CC $(quiet_modtag)  $@
 cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
+define rule_cc_o_c
+	$(if $($(quiet)cmd_checksrc),echo '  $($(quiet)cmd_checksrc)';)	      \
+	$(cmd_checksrc)							      \
+	$(if $($(quiet)cmd_cc_o_c),echo '  $($(quiet)cmd_cc_o_c)';)	      \
+	$(cmd_cc_o_c);							      \
+	scripts/fixdep $(depfile) $@ '$(cmd_cc_o_c)' > $(@D)/.$(@F).tmp;      \
+	rm -f $(depfile);						      \
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
+endef
 
 # Built-in and composite module parts
 
@@ -165,7 +182,7 @@ cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 ifdef CONFIG_MODVERSIONS
 	$(call if_changed_rule,vcc_o_c)
 else
-	$(call if_changed_dep,cc_o_c)
+	$(call if_changed_rule,cc_o_c)
 endif
 
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
@@ -174,7 +191,7 @@ $(single-used-m): %.o: %.c FORCE
 ifdef CONFIG_MODVERSIONS
 	$(call if_changed_rule,vcc_o_c)
 else
-	$(call if_changed_dep,cc_o_c)
+	$(call if_changed_rule,cc_o_c)
 endif
 	$(touch-module)
 

@@ -523,7 +523,7 @@ static struct comx_protocol comx25_protocol = {
 	NULL 
 };
 
-int __init comx_proto_lapb_init(void)
+static int __init comx_proto_lapb_init(void)
 {
 	int ret;
 
@@ -539,9 +539,7 @@ static void __exit comx_proto_lapb_exit(void)
 	comx_unregister_protocol(comx25_protocol.name);
 }
 
-#ifdef MODULE
 module_init(comx_proto_lapb_init);
-#endif
 module_exit(comx_proto_lapb_exit);
 
 MODULE_LICENSE("GPL");

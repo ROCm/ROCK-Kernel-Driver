@@ -24,8 +24,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <linux/config.h>
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -38,15 +36,8 @@
 #ifdef CONFIG_X86_IO_APIC
 #include <asm/mpspec.h>
 #endif
-#ifdef CONFIG_IOSAPIC
-# include <asm/iosapic.h>
-#endif
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
-
-#ifdef CONFIG_X86
-# define PCI_SEGMENT(x)	0	/* XXX fix me */
-#endif
 
 
 #define _COMPONENT		ACPI_PCI_COMPONENT
@@ -259,8 +250,6 @@ acpi_pci_irq_lookup (
 		return_VALUE(0);
 	}
 
-	entry->irq = entry->link.index;
-
 	if (!entry->irq && entry->link.handle) {
 		entry->irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
 		if (!entry->irq) {
@@ -299,7 +288,7 @@ acpi_pci_irq_derive (
 	while (!irq && bridge->bus->self) {
 		pin = (pin + PCI_SLOT(bridge->devfn)) % 4;
 		bridge = bridge->bus->self;
-		irq = acpi_pci_irq_lookup(PCI_SEGMENT(bridge), bridge->bus->number, PCI_SLOT(bridge->devfn), pin);
+		irq = acpi_pci_irq_lookup(0, bridge->bus->number, PCI_SLOT(bridge->devfn), pin);
 	}
 
 	if (!irq) {
@@ -342,7 +331,7 @@ acpi_pci_irq_enable (
 	 * First we check the PCI IRQ routing table (PRT) for an IRQ.  PRT
 	 * values override any BIOS-assigned IRQs set during boot.
 	 */
- 	irq = acpi_pci_irq_lookup(PCI_SEGMENT(dev), dev->bus->number, PCI_SLOT(dev->devfn), pin);
+ 	irq = acpi_pci_irq_lookup(0, dev->bus->number, PCI_SLOT(dev->devfn), pin);
  
 	/*
 	 * If no PRT entry was found, we'll try to derive an IRQ from the
@@ -368,11 +357,7 @@ acpi_pci_irq_enable (
 		}
  	}
 
-#ifdef CONFIG_IA64
-	dev->irq = gsi_to_irq(irq);
-#else
 	dev->irq = irq;
-#endif
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", dev->slot_name, dev->irq));
 
@@ -385,10 +370,6 @@ acpi_pci_irq_enable (
 		irq_mask |= (1 << dev->irq);
 		eisa_set_level_irq(dev->irq);
 	}
-#endif
-#ifdef CONFIG_IOSAPIC
-	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
-		iosapic_enable_intr(dev->irq);
 #endif
 
 	return_VALUE(dev->irq);

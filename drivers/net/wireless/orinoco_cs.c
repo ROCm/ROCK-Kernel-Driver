@@ -687,29 +687,27 @@ orinoco_cs_event(event_t event, int priority,
  * become const */
 static char version[] __initdata = "orinoco_cs.c 0.13a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
+static struct pcmcia_driver orinoco_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "orinoco_cs",
+	},
+	.attach		= orinoco_cs_attach,
+	.detach		= orinoco_cs_detach,
+};
+
 static int __init
 init_orinoco_cs(void)
 {
-	servinfo_t serv;
-
 	printk(KERN_DEBUG "%s\n", version);
 
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "orinoco_cs: Card Services release "
-		       "does not match!\n");
-		return -1;
-	}
-
-	register_pccard_driver(&dev_info, &orinoco_cs_attach, &orinoco_cs_detach);
-
-	return 0;
+	return pcmcia_register_driver(&orinoco_driver);
 }
 
 static void __exit
 exit_orinoco_cs(void)
 {
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&orinoco_driver);
 
 	if (dev_list)
 		DEBUG(0, "orinoco_cs: Removing leftover devices.\n");

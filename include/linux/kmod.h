@@ -24,12 +24,12 @@
 #include <linux/compiler.h>
 
 #ifdef CONFIG_KMOD
-extern int request_module(const char * name);
+extern int request_module(const char * name, ...) __attribute__ ((format (printf, 1, 2)));
 #else
-static inline int request_module(const char * name) { return -ENOSYS; }
+static inline int request_module(const char * name, ...) { return -ENOSYS; }
 #endif
 
-#define try_then_request_module(x, mod) ((x) ?: request_module(mod), (x))
+#define try_then_request_module(x, mod...) ((x) ?: request_module(mod), (x))
 extern int call_usermodehelper(char *path, char *argv[], char *envp[], int wait);
 
 #ifdef CONFIG_HOTPLUG

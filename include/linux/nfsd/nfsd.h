@@ -40,7 +40,7 @@
 #define MAY_OWNER_OVERRIDE	64
 #define	MAY_LOCAL_ACCESS	128 /* IRIX doing local access check on device special file*/
 #if (MAY_SATTR | MAY_TRUNC | MAY_LOCK | MAY_OWNER_OVERRIDE | MAY_LOCAL_ACCESS) & (MAY_READ | MAY_WRITE | MAY_EXEC)
-# error "please use a different value for MAY_SATTR or MAY_TRUNC or MAY_LOCK or MAY_OWNER_OVERRIDE."
+# error "please use a different value for MAY_SATTR or MAY_TRUNC or MAY_LOCK or MAY_LOCAL_ACCESS or MAY_OWNER_OVERRIDE."
 #endif
 #define MAY_CREATE		(MAY_EXEC|MAY_WRITE)
 #define MAY_REMOVE		(MAY_EXEC|MAY_WRITE|MAY_TRUNC)
@@ -170,6 +170,7 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_serverfault	__constant_htonl(NFSERR_SERVERFAULT)
 #define	nfserr_badtype		__constant_htonl(NFSERR_BADTYPE)
 #define	nfserr_jukebox		__constant_htonl(NFSERR_JUKEBOX)
+#define nfserr_expired          __constant_htonl(NFSERR_EXPIRED)
 #define	nfserr_bad_cookie	__constant_htonl(NFSERR_BAD_COOKIE)
 #define	nfserr_same		__constant_htonl(NFSERR_SAME)
 #define	nfserr_clid_inuse	__constant_htonl(NFSERR_CLID_INUSE)
@@ -177,6 +178,11 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_resource		__constant_htonl(NFSERR_RESOURCE)
 #define	nfserr_nofilehandle	__constant_htonl(NFSERR_NOFILEHANDLE)
 #define	nfserr_minor_vers_mismatch	__constant_htonl(NFSERR_MINOR_VERS_MISMATCH)
+#define nfserr_share_denied	__constant_htonl(NFSERR_SHARE_DENIED)
+#define nfserr_stale_stateid	__constant_htonl(NFSERR_STALE_STATEID)
+#define nfserr_old_stateid	__constant_htonl(NFSERR_OLD_STATEID)
+#define nfserr_bad_stateid	__constant_htonl(NFSERR_BAD_STATEID)
+#define nfserr_bad_seqid	__constant_htonl(NFSERR_BAD_SEQID)
 #define	nfserr_symlink		__constant_htonl(NFSERR_SYMLINK)
 #define	nfserr_not_same		__constant_htonl(NFSERR_NOT_SAME)
 #define	nfserr_readdir_nospc	__constant_htonl(NFSERR_READDIR_NOSPC)

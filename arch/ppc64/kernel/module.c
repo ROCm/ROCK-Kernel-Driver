@@ -20,6 +20,8 @@
 #include <linux/moduleloader.h>
 #include <linux/err.h>
 #include <linux/vmalloc.h>
+#include <asm/module.h>
+#include <asm/uaccess.h>
 
 /* FIXME: We don't do .init separately.  To do this, we'd need to have
    a separate r2 value in the init and core section, and stub between
@@ -374,15 +376,15 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 	return 0;
 }
 
-/* In arch/ppc64/mm/extable.c */
-extern void sort_ex_table(struct exception_table_entry *start,
-			  struct exception_table_entry *finish);
-
 int module_finalize(const Elf_Ehdr *hdr,
-		    const Elf_Shdr *sechdrs,
-		    struct module *me)
+		const Elf_Shdr *sechdrs, struct module *me)
 {
-	sort_ex_table(me->extable.entry,
-		      me->extable.entry + me->extable.num_entries);
+	sort_ex_table((struct exception_table_entry *)me->extable,
+		      (struct exception_table_entry *)me->extable +
+				me->num_exentries);
 	return 0;
+}
+
+void module_arch_cleanup(struct module *mod)
+{
 }

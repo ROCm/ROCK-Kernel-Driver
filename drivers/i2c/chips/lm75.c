@@ -121,6 +121,8 @@ static DEVICE_ATTR(temp_input, S_IRUGO, show_temp_input, NULL);
 
 static int lm75_attach_adapter(struct i2c_adapter *adapter)
 {
+	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+		return 0;
 	return i2c_detect(adapter, &addr_data, lm75_detect);
 }
 
@@ -192,7 +194,7 @@ static int lm75_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strncpy(new_client->dev.name, name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->dev.name, name, DEVICE_NAME_SIZE);
 
 	new_client->id = lm75_id++;
 	data->valid = 0;

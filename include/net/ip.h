@@ -141,7 +141,7 @@ struct ip_reply_arg {
 void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *arg,
 		   unsigned int len); 
 
-extern __inline__ int ip_finish_output(struct sk_buff *skb);
+extern int ip_finish_output(struct sk_buff *skb);
 
 struct ipv4_config
 {
@@ -230,6 +230,23 @@ static inline void ip_eth_mc_map(u32 addr, char *buf)
 	buf[3]=addr&0x7F;
 }
 
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#include <linux/ipv6.h>
+#endif
+
+static __inline__ void inet_reset_saddr(struct sock *sk)
+{
+	inet_sk(sk)->rcv_saddr = inet_sk(sk)->saddr = 0;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	if (sk->family == PF_INET6) {
+		struct ipv6_pinfo *np = inet6_sk(sk);
+
+		memset(&np->saddr, 0, sizeof(np->saddr));
+		memset(&np->rcv_saddr, 0, sizeof(np->rcv_saddr));
+	}
+#endif
+}
+
 #endif
 
 extern int	ip_call_ra_chain(struct sk_buff *skb);
@@ -278,7 +295,17 @@ extern void	ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 extern void	ip_local_error(struct sock *sk, int err, u32 daddr, u16 dport,
 			       u32 info);
 
-extern int ip_seq_release(struct inode *inode, struct file *file);
 extern int ipv4_proc_init(void);
+
+/* sysctl helpers - any sysctl which holds a value that ends up being
+ * fed into the routing cache should use these handlers.
+ */
+int ipv4_doint_and_flush(ctl_table *ctl, int write,
+			 struct file* filp, void *buffer,
+			 size_t *lenp);
+int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
+				  void *oldval, size_t *oldlenp,
+				  void *newval, size_t newlen, 
+				  void **context);
 
 #endif	/* _IP_H */

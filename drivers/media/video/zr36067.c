@@ -264,11 +264,11 @@ static void zoran_feed_stat_com(struct zoran *zr);
 /*
  *   Allocate the V4L grab buffers
  *
- *   These have to be pysically contiguous.
+ *   These have to be physically contiguous.
  *   If v4l_bufsize <= MAX_KMALLOC_MEM we use kmalloc
  *   else we try to allocate them with bigphysarea_alloc_pages
  *   if the bigphysarea patch is present in the kernel,
- *   else we try to use high memory (if the user has bootet
+ *   else we try to use high memory (if the user has booted
  *   Linux with the necessary memory left over).
  */
 
@@ -280,7 +280,7 @@ static int v4l_fbuffer_alloc(struct zoran *zr)
 	for (i = 0; i < v4l_nbufs; i++) {
 		if (zr->v4l_gbuf[i].fbuffer)
 			printk(KERN_WARNING
-			       "%s: v4l_fbuffer_alloc: buffer %d allready allocated ???\n",
+			       "%s: v4l_fbuffer_alloc: buffer %d already allocated ???\n",
 			       zr->name, i);
 
 		//udelay(20);
@@ -413,7 +413,7 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 	for (i = 0; i < zr->jpg_nbufs; i++) {
 		if (zr->jpg_gbuf[i].frag_tab)
 			printk(KERN_WARNING
-			       "%s: jpg_fbuffer_alloc: buffer %d allready allocated ???\n",
+			       "%s: jpg_fbuffer_alloc: buffer %d already allocated ???\n",
 			       zr->name, i);
 
 		/* Allocate fragment table for this buffer */
@@ -445,7 +445,7 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 			for (off = 0; off < zr->jpg_bufsize; off += PAGE_SIZE)
 				SetPageReserved(virt_to_page(mem + off));
 		} else {
-			/* jpg_bufsize is allreay page aligned */
+			/* jpg_bufsize is already page aligned */
 			for (j = 0; j < zr->jpg_bufsize / PAGE_SIZE; j++) 
 			{
 				mem = get_zeroed_page(GFP_KERNEL);
@@ -935,7 +935,7 @@ static void zr36057_overlay(struct zoran *zr, int on)
 				fmt);
 
 		/* Start and length of each line MUST be 4-byte aligned.
-		   This should be allready checked before the call to this routine.
+		   This should be already checked before the call to this routine.
 		   All error messages are internal driver checking only! */
 
 		/* video display top and bottom registers */
@@ -3242,7 +3242,7 @@ static int zoran_open(struct video_device *dev, int flags)
 	case 0:
 		if (zr->user > 1) {
 			DEBUG1(printk(KERN_WARNING
-			       "%s: zoran_open: Buz is allready in use\n",
+			       "%s: zoran_open: Buz is already in use\n",
 			       zr->name));
 			return -EBUSY;
 		}
@@ -3356,7 +3356,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 			struct video_capability b;
 			DEBUG2(printk("%s: ioctl VIDIOCGCAP\n", zr->name));
 
-			strncpy(b.name, zr->video_dev.name,
+			strlcpy(b.name, zr->video_dev.name,
 				sizeof(b.name));
 			b.type =
 			    VID_TYPE_CAPTURE | VID_TYPE_OVERLAY |
@@ -4067,7 +4067,7 @@ static int do_zoran_ioctl(struct zoran *zr, unsigned int cmd,
 
 			if (zr->jpg_buffers_allocated) {
 				DEBUG1(printk(KERN_ERR
-				       "%s: BUZIOC_REQBUFS: buffers allready allocated\n",
+				       "%s: BUZIOC_REQBUFS: buffers already allocated\n",
 				       zr->name));
 				return -EINVAL;
 			}

@@ -420,7 +420,7 @@ out:
 }
 
 /* Returns the embedded IPv4 address if the IPv6 address
-   comes from 6to4 (draft-ietf-ngtrans-6to4-04) addr space */
+   comes from 6to4 (RFC 3056) addr space */
 
 static inline u32 try_6to4(struct in6_addr *v6dst)
 {

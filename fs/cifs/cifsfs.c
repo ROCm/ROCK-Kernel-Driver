@@ -57,13 +57,14 @@ unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
 
 extern int cifs_mount(struct super_block *, struct cifs_sb_info *, char *,
-			char *);
+			const char *);
 extern int cifs_umount(struct super_block *, struct cifs_sb_info *);
 void cifs_proc_init(void);
 void cifs_proc_clean(void);
 
 static int
-cifs_read_super(struct super_block *sb, void *data, char *devname, int silent)
+cifs_read_super(struct super_block *sb, void *data,
+		const char *devname, int silent)
 {
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb;
@@ -209,8 +210,8 @@ cifs_destroy_inode(struct inode *inode)
 
 /*
  * cifs_show_options() is for displaying mount options in /proc/mounts.
- * It tries to avoid showing settings that were not changed from their
- * defaults.
+ * Not all settable options are displayed but most of the important
+ * ones are.
  */
 static int
 cifs_show_options(struct seq_file *s, struct vfsmount *m)
@@ -219,15 +220,19 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 
 	cifs_sb = CIFS_SB(m->mnt_sb);
 
-	if (cifs_sb)
+	if (cifs_sb) {
 		if (cifs_sb->tcon) {
-			seq_printf(s, ", TARGET: %s ", cifs_sb->tcon->treeName);
-			seq_printf(s, "FS TYPE: %s ",
-				   cifs_sb->tcon->nativeFileSystem);
+			seq_printf(s, ",unc=%s", cifs_sb->tcon->treeName);
 			if (cifs_sb->tcon->ses->userName)
-				seq_printf(s, " USER: %s ",
+				seq_printf(s, ",username=%s",
 					   cifs_sb->tcon->ses->userName);
+			if(cifs_sb->tcon->ses->domainName)
+				seq_printf(s, ",domain=%s",
+					cifs_sb->tcon->ses->domainName);
 		}
+		seq_printf(s, ",rsize=%d",cifs_sb->rsize);
+		seq_printf(s, ",wsize=%d",cifs_sb->wsize);
+	}
 	return 0;
 }
 
@@ -247,7 +252,7 @@ struct super_operations cifs_super_ops = {
 
 static struct super_block *
 cifs_get_sb(struct file_system_type *fs_type,
-	    int flags, char *dev_name, void *data)
+	    int flags, const char *dev_name, void *data)
 {
 	int rc;
 	struct super_block *sb = sget(fs_type, NULL, set_anon_super, NULL);
@@ -355,7 +360,7 @@ cifs_init_inodecache(void)
 {
 	cifs_inode_cachep = kmem_cache_create("cifs_inode_cache",
 					      sizeof (struct cifsInodeInfo),
-					      0, SLAB_HWCACHE_ALIGN,
+					      0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					      cifs_init_once, NULL);
 	if (cifs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -423,6 +428,7 @@ cifs_destroy_mids(void)
 static int cifs_oplock_thread(void * dummyarg)
 {
 	struct list_head * tmp;
+	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
 	struct file * pfile;
 	struct cifsTconInfo *pTcon;
@@ -438,9 +444,8 @@ static int cifs_oplock_thread(void * dummyarg)
 		/* BB add missing code */
 		cFYI(1,("oplock thread woken up - flush inode")); /* BB remove */
 		write_lock(&GlobalMid_Lock); 
-		list_for_each(tmp, &GlobalOplock_Q) {
-			oplock_item = list_entry(tmp, struct
-							       oplock_q_entry,
+		list_for_each_safe(tmp, tmp1, &GlobalOplock_Q) {
+			oplock_item = list_entry(tmp, struct oplock_q_entry,
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
@@ -449,6 +454,9 @@ static int cifs_oplock_thread(void * dummyarg)
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
 				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				if(rc)
+					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
+						= rc;
 				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
 				/* send oplock break */
 				write_lock(&GlobalMid_Lock);
@@ -465,7 +473,7 @@ static int __init
 init_cifs(void)
 {
 	int rc = 0;
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_init();
 #endif
 	INIT_LIST_HEAD(&GlobalServerList);	/* BB not implemented yet */
@@ -503,7 +511,7 @@ init_cifs(void)
 		}
 		cifs_destroy_inodecache();
 	}
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
 	return rc;
@@ -513,7 +521,7 @@ static void __exit
 exit_cifs(void)
 {
 	cFYI(0, ("In unregister ie exit_cifs"));
-#if CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 	cifs_proc_clean();
 #endif
 	unregister_filesystem(&cifs_fs_type);

@@ -68,7 +68,7 @@
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
-#define GFP_READAHEAD	__GFP_NOWARN
+#define GFP_READAHEAD	(__GFP_NOWARN|__GFP_NORETRY)
 #endif
 
 /*
@@ -76,11 +76,11 @@
  */
 
 #ifdef PAGEBUF_TRACE
-static	spinlock_t		pb_trace_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t		pb_trace_lock = SPIN_LOCK_UNLOCKED;
 struct pagebuf_trace_buf	pb_trace;
 EXPORT_SYMBOL(pb_trace);
 EXPORT_SYMBOL(pb_trace_func);
-#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
+#define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
 void
 pb_trace_func(
@@ -181,7 +181,7 @@ _bhash(
 	 * dev_t is 16 bits, loff_t is always 64 bits
 	 */
 	base ^= dev;
-	for (bit = hval = 0; base != 0 && bit < sizeof(base) * 8; bit += NBITS) {
+	for (bit = hval = 0; base && bit < sizeof(base) * 8; bit += NBITS) {
 		hval ^= (int)base & (NHASH-1);
 		base >>= NBITS;
 	}
@@ -189,18 +189,18 @@ _bhash(
 }
 
 /*
- * Mapping of multi-page buffers into contingous virtual space
+ * Mapping of multi-page buffers into contiguous virtual space
  */
 
 STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
-STATIC  spinlock_t              as_lock = SPIN_LOCK_UNLOCKED;
 typedef struct a_list {
-	void	*vm_addr;
+	void		*vm_addr;
 	struct a_list	*next;
 } a_list_t;
-STATIC  a_list_t	*as_free_head;
-STATIC  int		as_list_len;
+STATIC a_list_t		*as_free_head;
+STATIC int		as_list_len;
+STATIC spinlock_t	as_lock = SPIN_LOCK_UNLOCKED;
 
 
 /*
@@ -1897,13 +1897,6 @@ pagebuf_readstats(
 }
 #endif  /* CONFIG_PROC_FS */
 
-STATIC void
-pagebuf_shaker(void)
-{
-	pagebuf_daemon_wakeup(1);
-}
-
-
 /*
  *	Initialization and Termination
  */
@@ -1943,7 +1936,6 @@ pagebuf_init(void)
 #endif
 
 	pagebuf_daemon_start();
-	kmem_shake_register(pagebuf_shaker);
 	return 0;
 }
 
@@ -1959,7 +1951,6 @@ pagebuf_terminate(void)
 	pagebuf_daemon_stop();
 
 	kmem_cache_destroy(pagebuf_cache);
-	kmem_shake_deregister(pagebuf_shaker);
 
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef  CONFIG_PROC_FS

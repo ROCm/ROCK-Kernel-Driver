@@ -1522,7 +1522,7 @@ static int ccio_probe(struct parisc_device *dev)
 	memset(ioc, 0, sizeof(struct ioc));
 
 	ioc->name = dev->id.hversion == U2_IOA_RUNWAY ? "U2" : "UTurn";
-	strncpy(dev->dev.name, ioc->name, sizeof(dev->dev.name));
+	strlcpy(dev->dev.name, ioc->name, sizeof(dev->dev.name));
 
 	printk(KERN_INFO "Found %s at 0x%lx\n", ioc->name, dev->hpa);
 

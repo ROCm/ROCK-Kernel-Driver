@@ -201,7 +201,7 @@ static inline void init_sigpending(struct sigpending *sig)
 	sig->tail = &sig->head;
 }
 
-extern long do_sigpending(void *, unsigned long);
+extern long do_sigpending(void __user *, unsigned long);
 extern int sigprocmask(int, sigset_t *, sigset_t *);
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER

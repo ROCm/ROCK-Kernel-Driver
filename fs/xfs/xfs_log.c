@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -414,19 +414,6 @@ xfs_log_release_iclog(xfs_mount_t *mp,
 }
 
 /*
- * Initialize log manager data.  This routine is intended to be called when
- * a system boots up.  It is not a per filesystem initialization.
- *
- * As you can see, we currently do nothing.
- */
-int
-xfs_log_init(void)
-{
-	return( 0 );
-}
-
-
-/*
  *  1. Reserve an amount of on-disk log space and return a ticket corresponding
  *	to the reservation.
  *  2. Potentially, push buffers at tail of log to disk.
@@ -497,8 +484,6 @@ xfs_log_mount(xfs_mount_t	*mp,
 	      xfs_daddr_t	blk_offset,
 	      int		num_bblks)
 {
-	xlog_t *log;
-
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
 		cmn_err(CE_NOTE, "XFS mounting filesystem %s", mp->m_fsname);
 	else {
@@ -508,7 +493,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
 	}
 
-	mp->m_log = log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
+	mp->m_log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug) {
@@ -528,19 +513,19 @@ xfs_log_mount(xfs_mount_t	*mp,
 		if (readonly)
 			vfsp->vfs_flag &= ~VFS_RDONLY;
 
-		error = xlog_recover(log, readonly);
+		error = xlog_recover(mp->m_log, readonly);
 
 		if (readonly)
 			vfsp->vfs_flag |= VFS_RDONLY;
 		if (error) {
 			cmn_err(CE_WARN, "XFS: log mount/recovery failed");
-			xlog_unalloc_log(log);
+			xlog_unalloc_log(mp->m_log);
 			return error;
 		}
 	}
 
 	/* Normal transactions can now occur */
-	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+	mp->m_log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
 
 	/* End mounting message in xfs_log_mount_finish */
 	return 0;
@@ -1191,28 +1176,39 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	int			i;
 	int			iclogsize;
 
-	log = (void *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
+	log = (xlog_t *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
 
 	log->l_mp	   = mp;
 	log->l_dev	   = log_dev;
 	log->l_logsize     = BBTOB(num_bblks);
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
-	log->l_roundoff	   = 0;
 	log->l_covered_state = XLOG_STATE_COVER_IDLE;
 	log->l_flags	   |= XLOG_ACTIVE_RECOVERY;
 
 	log->l_prev_block  = -1;
 	ASSIGN_ANY_LSN(log->l_tail_lsn, 1, 0, ARCH_NOCONVERT);
-	/* log->l_tail_lsn    = 0x100000000LL; cycle = 1; current block = 0 */
+	/* log->l_tail_lsn = 0x100000000LL; cycle = 1; current block = 0 */
 	log->l_last_sync_lsn = log->l_tail_lsn;
 	log->l_curr_cycle  = 1;	    /* 0 is bad since this is initial value */
-	log->l_curr_block  = 0;		/* filled in by xlog_recover */
-	log->l_grant_reserve_bytes = 0;
 	log->l_grant_reserve_cycle = 1;
-	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
-	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
+
+	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
+		if (mp->m_sb.sb_logsunit <= 1) {
+			log->l_stripemask = 1;
+		} else {
+			log->l_stripemask = 1 <<
+				xfs_highbit32(mp->m_sb.sb_logsunit >> BBSHIFT);
+		}
+	}
+	if (XFS_SB_VERSION_HASSECTOR(&mp->m_sb)) {
+		log->l_sectbb_log = mp->m_sb.sb_logsectlog - BBSHIFT;
+		ASSERT(log->l_sectbb_log <= mp->m_sectbb_log);
+		ASSERT(XFS_SB_VERSION_HASLOGV2(&mp->m_sb));
+		ASSERT(mp->m_sb.sb_logsectlog >= BBSHIFT);
+	}
+	log->l_sectbb_mask = (1 << log->l_sectbb_log) - 1;
 
 	xlog_get_iclog_buffer_size(mp, log);
 
@@ -2811,10 +2807,9 @@ xlog_state_switch_iclogs(xlog_t		*log,
 
 	/* Round up to next log-sunit */
 	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		if (log->l_curr_block & (log->l_mp->m_lstripemask - 1)) {
-			roundup = log->l_mp->m_lstripemask -
-				(log->l_curr_block &
-				 (log->l_mp->m_lstripemask - 1));
+		if (log->l_curr_block & (log->l_stripemask - 1)) {
+			roundup = log->l_stripemask -
+				(log->l_curr_block & (log->l_stripemask - 1));
 		} else {
 			roundup = 0;
 		}
@@ -3293,15 +3288,17 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 {
     xfs_buf_t	*bp;
     uint	cycle_no;
+    xfs_caddr_t ptr;
     xfs_daddr_t	i;
 
     if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
 	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
-	bp = xlog_get_bp(1, log->l_mp);
+	bp = xlog_get_bp(log, 1);
 	ASSERT(bp);
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT); i++) {
 	    xlog_bread(log, i, 1, bp);
-	    if (GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT) != cycle_no)
+	    ptr = xlog_align(log, i, 1, bp);
+	    if (GET_CYCLE(ptr, ARCH_CONVERT) != cycle_no)
 		xlog_warn("XFS: xlog_verify_disk_cycle_no: bad cycle no");
 	}
 	xlog_put_bp(bp);

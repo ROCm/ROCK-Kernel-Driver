@@ -384,7 +384,6 @@ struct scsi_id_instance_data {
 	/*
 	 * Values pulled from the device's unit directory
 	 */
-	struct unit_directory *ud;
 	u32 sbp2_command_set_spec_id;
 	u32 sbp2_command_set;
 	u32 sbp2_unit_characteristics;
@@ -403,6 +402,8 @@ struct scsi_id_instance_data {
 	struct list_head sbp2_command_orb_inuse;
 	struct list_head sbp2_command_orb_completed;
 
+	struct list_head list;
+
 	/* Node entry, as retrieved from NodeMgr entries */
 	struct node_entry *ne;
 
@@ -412,6 +413,13 @@ struct scsi_id_instance_data {
 	/* Device specific workarounds/brokeness */
 	u32 workarounds;
 };
+
+
+/* Describes a per-ud scsi_id group */
+struct scsi_id_group {
+	struct list_head scsi_id_list;
+};
+
 
 /*
  * Sbp2 host data structure (one per sbp2 host)
@@ -464,8 +472,9 @@ static int sbp2_probe(struct device *dev);
 static int sbp2_remove(struct device *dev);
 static void sbp2_update(struct unit_directory *ud);
 
-static int sbp2_start_device(struct sbp2scsi_host_info *hi, 
-			     struct unit_directory *ud);
+static int sbp2_start_ud(struct sbp2scsi_host_info *hi,
+			 struct unit_directory *ud);
+static int sbp2_start_device(struct scsi_id_instance_data *scsi_id);
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id);
 
 #ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
@@ -499,7 +508,8 @@ static int sbp2_send_command(struct scsi_id_instance_data *scsi_id,
 static unsigned int sbp2_status_to_sense_data(unchar *sbp2_status, unchar *sense_data);
 static void sbp2_check_sbp2_command(struct scsi_id_instance_data *scsi_id, unchar *cmd);
 static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id, Scsi_Cmnd *SCpnt);
-static void sbp2_parse_unit_directory(struct scsi_id_instance_data *scsi_id);
+static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
+				      struct unit_directory *ud);
 static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id);
 static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id);
 

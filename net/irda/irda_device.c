@@ -433,13 +433,9 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 	ASSERT(dev != NULL, return NULL;);
 
 #ifdef CONFIG_KMOD
-	{
-	char modname[32];
 	ASSERT(!in_interrupt(), return NULL;);
 	/* Try to load the module needed */
-	sprintf(modname, "irda-dongle-%d", type);
-	request_module(modname);
-	}
+	request_module("irda-dongle-%d", type);
 #endif
 
 	if (!(reg = hashbin_lock_find(dongles, type, NULL))) {
@@ -536,6 +532,7 @@ int irda_device_set_mode(struct net_device* dev, int mode)
 	return ret;
 }
 
+#ifdef CONFIG_ISA
 /*
  * Function setup_dma (idev, buffer, count, mode)
  *
@@ -557,3 +554,4 @@ void setup_dma(int channel, char *buffer, int count, int mode)
 
 	release_dma_lock(flags);
 }
+#endif

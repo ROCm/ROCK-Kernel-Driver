@@ -682,7 +682,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		 * such as stat(2) */
 		inode->i_ino = hash;
 
-		/* We can't support UPDATE_ATIME(), since the server will reset it */
+		/* We can't support update_atime(), since the server will reset it */
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;
 		/* Why so? Because we want revalidate for devices/FIFOs, and
@@ -1192,7 +1192,7 @@ static int nfs_compare_super(struct super_block *sb, void *data)
 }
 
 static struct super_block *nfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *raw_data)
+	int flags, const char *dev_name, void *raw_data)
 {
 	int error;
 	struct nfs_server *server;
@@ -1421,7 +1421,7 @@ nfs_copy_user_string(char *dst, struct nfs_string *src, int maxlen)
 }
 
 static struct super_block *nfs4_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *raw_data)
+	int flags, const char *dev_name, void *raw_data)
 {
 	int error;
 	struct nfs_server *server;
@@ -1571,7 +1571,7 @@ int nfs_init_inodecache(void)
 {
 	nfs_inode_cachep = kmem_cache_create("nfs_inode_cache",
 					     sizeof(struct nfs_inode),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (nfs_inode_cachep == NULL)
 		return -ENOMEM;

@@ -2,24 +2,18 @@
 #ifndef _SPARC_BUG_H
 #define _SPARC_BUG_H
 
-/*
- * XXX I am hitting compiler bugs with __builtin_trap. This has
- * hit me before and rusty was blaming his netfilter bugs on
- * this so lets disable it. - Anton
- */
-#if 0
-/* We need the mb()'s so we don't trigger a compiler bug - Anton */
-#define BUG() do { \
-	mb(); \
-	__builtin_trap(); \
-	mb(); \
-} while(0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); *(int *)0=0; \
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+extern void do_BUG(const char *file, int line);
+#define BUG() do {					\
+	do_BUG(__FILE__, __LINE__);			\
+	__builtin_trap();				\
 } while (0)
+#else
+#define BUG()		__builtin_trap()
 #endif
 
-#define PAGE_BUG(page)	BUG()
+#define PAGE_BUG(page) do { \
+	BUG(); \
+} while (0)
 
 #endif

@@ -19,11 +19,8 @@
 
 #include <linux/version.h>
 
-#define netdevice_t struct net_device
-
-
 typedef struct {
-	netdevice_t *slave;
+	struct net_device *slave;
 	atomic_t packet_sent;
 	atomic_t receive_block;
 	atomic_t command;
@@ -32,8 +29,8 @@ typedef struct {
 	long common_critical;
 	struct timer_list *tx_timer;
 	struct sock *sk;		/* Wanpipe Sock bind's here */ 
-	int   (*func) (struct sk_buff *, netdevice_t *, 
-                       struct sock *);
+	int (*func)(struct sk_buff *skb, struct net_device *dev, 
+		    struct sock *sk);
 
 	struct work_struct wanpipe_work;    /* deferred keventd work */
 	unsigned char rw_bind;			  /* Sock bind state */

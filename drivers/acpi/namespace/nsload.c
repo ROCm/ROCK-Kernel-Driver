@@ -79,7 +79,7 @@ acpi_ns_load_table (
 
 	/* Check if table contains valid AML (must be DSDT, PSDT, SSDT, etc.) */
 
-	if (!(acpi_gbl_acpi_table_data[table_desc->type].flags & ACPI_TABLE_EXECUTABLE)) {
+	if (!(acpi_gbl_table_data[table_desc->type].flags & ACPI_TABLE_EXECUTABLE)) {
 		/* Just ignore this table */
 
 		return_ACPI_STATUS (AE_OK);
@@ -182,15 +182,13 @@ acpi_ns_load_table_by_type (
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading DSDT\n"));
 
-		table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_DSDT];
+		table_desc = acpi_gbl_table_lists[ACPI_TABLE_DSDT].next;
 
 		/* If table already loaded into namespace, just return */
 
 		if (table_desc->loaded_into_namespace) {
 			goto unlock_and_exit;
 		}
-
-		table_desc->table_id = TABLE_ID_DSDT;
 
 		/* Now load the single DSDT */
 
@@ -205,13 +203,13 @@ acpi_ns_load_table_by_type (
 	case ACPI_TABLE_SSDT:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading %d SSDTs\n",
-			acpi_gbl_acpi_tables[ACPI_TABLE_SSDT].count));
+			acpi_gbl_table_lists[ACPI_TABLE_SSDT].count));
 
 		/*
 		 * Traverse list of SSDT tables
 		 */
-		table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_SSDT];
-		for (i = 0; i < acpi_gbl_acpi_tables[ACPI_TABLE_SSDT].count; i++) {
+		table_desc = acpi_gbl_table_lists[ACPI_TABLE_SSDT].next;
+		for (i = 0; i < acpi_gbl_table_lists[ACPI_TABLE_SSDT].count; i++) {
 			/*
 			 * Only attempt to load table if it is not
 			 * already loaded!
@@ -233,14 +231,14 @@ acpi_ns_load_table_by_type (
 	case ACPI_TABLE_PSDT:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading %d PSDTs\n",
-			acpi_gbl_acpi_tables[ACPI_TABLE_PSDT].count));
+			acpi_gbl_table_lists[ACPI_TABLE_PSDT].count));
 
 		/*
 		 * Traverse list of PSDT tables
 		 */
-		table_desc = &acpi_gbl_acpi_tables[ACPI_TABLE_PSDT];
+		table_desc = acpi_gbl_table_lists[ACPI_TABLE_PSDT].next;
 
-		for (i = 0; i < acpi_gbl_acpi_tables[ACPI_TABLE_PSDT].count; i++) {
+		for (i = 0; i < acpi_gbl_table_lists[ACPI_TABLE_PSDT].count; i++) {
 			/* Only attempt to load table if it is not already loaded! */
 
 			if (!table_desc->loaded_into_namespace) {

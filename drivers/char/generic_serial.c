@@ -25,7 +25,6 @@
 #include <linux/serial.h>
 #include <linux/mm.h>
 #include <linux/generic_serial.h>
-#include <linux/interrupt.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 

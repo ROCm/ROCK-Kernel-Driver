@@ -40,23 +40,4 @@ int Pci2220i_BiosParam		(struct scsi_device *sdev,
 #ifndef NULL
 	#define NULL 0
 #endif
-
-#define PCI2220I {					\
-	.proc_name		= "pci2220i",		\
-	.name			= "PCI-2220I/PCI-2240I",	\
-	.detect			= Pci2220i_Detect,	\
-	.release		= Pci2220i_Release,	\
-	.command		= Pci2220i_Command,	\
-	.queuecommand		= Pci2220i_QueueCommand,	\
-	.abort			= Pci2220i_Abort,		\
-	.reset			= Pci2220i_Reset,		\
-	.bios_param		= Pci2220i_BiosParam,	\
-	.can_queue		= 1,			\
-	.this_id		= -1,			\
-	.sg_tablesize		= SG_ALL,			\
-	.cmd_per_lun		= 1,			\
-	.present		= 0,			\
-	.unchecked_isa_dma	= 0,			\
-	.use_clustering		= DISABLE_CLUSTERING,	\
-}
 #endif

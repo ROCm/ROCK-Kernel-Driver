@@ -108,8 +108,9 @@
 #include <net/netrom.h>
 #endif
 #endif
-#ifdef CONFIG_ATM_CLIP
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
 #include <net/atmclip.h>
+struct neigh_table *clip_tbl_hook;
 #endif
 
 #include <asm/system.h>
@@ -443,8 +444,8 @@ int arp_bind_neighbour(struct dst_entry *dst)
 		if (dev->flags&(IFF_LOOPBACK|IFF_POINTOPOINT))
 			nexthop = 0;
 		n = __neigh_lookup_errno(
-#ifdef CONFIG_ATM_CLIP
-		    dev->type == ARPHRD_ATM ? &clip_tbl :
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+		    dev->type == ARPHRD_ATM ? clip_tbl_hook :
 #endif
 		    &arp_tbl, &nexthop, dev);
 		if (IS_ERR(n))
@@ -948,7 +949,7 @@ static int arp_req_get(struct arpreq *r, struct net_device *dev)
 		r->arp_flags = arp_state_to_flags(neigh);
 		read_unlock_bh(&neigh->lock);
 		r->arp_ha.sa_family = dev->type;
-		strncpy(r->arp_dev, dev->name, sizeof(r->arp_dev));
+		strlcpy(r->arp_dev, dev->name, sizeof(r->arp_dev));
 		neigh_release(neigh);
 		err = 0;
 	}
@@ -1384,10 +1385,11 @@ out_kfree:
 }
 
 static struct file_operations arp_seq_fops = {
+	.owner		= THIS_MODULE,
 	.open           = arp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= ip_seq_release,
+	.release	= seq_release_private,
 };
 
 static int __init arp_proc_init(void)

@@ -90,7 +90,7 @@ static void ack_none(unsigned int irq)
  * each architecture has to answer this themselves, it doesn't deserve
  * a generic callback i think.
  */
-#if CONFIG_X86
+#ifdef CONFIG_X86
 	printk("unexpected IRQ trap at vector %02x\n", irq);
 #ifdef CONFIG_X86_LOCAL_APIC
 	/*
@@ -171,7 +171,7 @@ skip:
 		if (cpu_online(j))
 		seq_printf(p, "%10u ", cpu_pda[j].__nmi_count);
 	seq_putc(p, '\n');
-#if CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");
 	for (j = 0; j < NR_CPUS; j++)
 		if (cpu_online(j))
@@ -827,7 +827,7 @@ out:
 	return 0;
 }
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
@@ -906,7 +906,7 @@ static void register_irq_proc (unsigned int irq)
 	/* create /proc/irq/1234 */
 	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 	{
 		struct proc_dir_entry *entry;
 

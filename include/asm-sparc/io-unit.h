@@ -41,7 +41,7 @@
 #define IOUPTE_PARITY        0x00000001 /* Parity is checked during DVMA	*/
 
 struct iounit_struct {
-	unsigned int		bmap[(IOUNIT_DMA_SIZE >> (PAGE_SHIFT + 3)) / sizeof(unsigned int)];
+	unsigned long		bmap[(IOUNIT_DMA_SIZE >> (PAGE_SHIFT + 3)) / sizeof(unsigned long)];
 	spinlock_t		lock;
 	iopte_t			*page_table;
 	unsigned long		rotor[3];

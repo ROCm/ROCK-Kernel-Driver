@@ -12,6 +12,8 @@
 #define __SCLP_TTY_H__
 
 #include <linux/ioctl.h>
+#include <linux/termios.h>
+#include <linux/tty_driver.h>
 
 /* This is the type of data structures storing sclp ioctl setting. */
 struct sclp_ioctls {
@@ -63,5 +65,7 @@ struct sclp_ioctls {
 #define TIOCSCLPGDELIM	_IOR(SCLP_IOCTL_LETTER, 19, unsigned char)
 /* get the number of buffers/pages got from kernel at startup */
 #define TIOCSCLPGKBUF	_IOR(SCLP_IOCTL_LETTER, 20, unsigned short)
+
+extern struct tty_driver sclp_tty_driver;
 
 #endif	/* __SCLP_TTY_H__ */

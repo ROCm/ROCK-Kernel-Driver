@@ -6292,11 +6292,9 @@ static int idetape_attach (ide_drive_t *drive)
 
 	devfs_mk_cdev(MKDEV(HWIF(drive)->major, minor)
 			S_IFCHR | S_IRUGO | S_IWUGO,
-			&idetape_fops, NULL,
 			"%s/mt", drive->devfs_name);
 	devfs_mk_cdev(MKDEV(HWIF(drive)->major, minor + 128),
 			S_IFCHR | S_IRUGO | S_IWUGO,
-			&idetape_fops, NULL,
 			"%s/mtn", drive->devfs_name);
 
 	drive->disk->number = devfs_register_tape(drive->devfs_name);

@@ -670,7 +670,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, "kaweth", sizeof(info.driver)-1);
+		strlcpy(info.driver, "kaweth", sizeof(info.driver));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;
@@ -811,7 +811,8 @@ static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth)
 {
 	__u16 packet_filter_bitmap = kaweth->packet_filter_bitmap;
 	kaweth->packet_filter_bitmap = 0;
-	if(packet_filter_bitmap == 0) return;
+	if (packet_filter_bitmap == 0)
+		return;
 
 	{
 	int result;

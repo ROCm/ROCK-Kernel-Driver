@@ -81,7 +81,7 @@ typedef struct {
 #define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
 
 
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 # define in_atomic()   ((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else

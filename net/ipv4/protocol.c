@@ -37,7 +37,6 @@
 #include <linux/inet.h>
 #include <linux/netdevice.h>
 #include <linux/timer.h>
-#include <linux/brlock.h>
 #include <net/ip.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
@@ -49,6 +48,7 @@
 #include <linux/igmp.h>
 
 struct inet_protocol *inet_protos[MAX_INET_PROTOS];
+static spinlock_t inet_proto_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  *	Add a protocol handler to the hash tables
@@ -60,16 +60,14 @@ int inet_add_protocol(struct inet_protocol *prot, unsigned char protocol)
 
 	hash = protocol & (MAX_INET_PROTOS - 1);
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-
+	spin_lock_bh(&inet_proto_lock);
 	if (inet_protos[hash]) {
 		ret = -1;
 	} else {
 		inet_protos[hash] = prot;
 		ret = 0;
 	}
-
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	spin_unlock_bh(&inet_proto_lock);
 
 	return ret;
 }
@@ -84,16 +82,16 @@ int inet_del_protocol(struct inet_protocol *prot, unsigned char protocol)
 
 	hash = protocol & (MAX_INET_PROTOS - 1);
 
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-
+	spin_lock_bh(&inet_proto_lock);
 	if (inet_protos[hash] == prot) {
 		inet_protos[hash] = NULL;
 		ret = 0;
 	} else {
 		ret = -1;
 	}
+	spin_unlock_bh(&inet_proto_lock);
 
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 
 	return ret;
 }

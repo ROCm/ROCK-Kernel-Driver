@@ -25,7 +25,7 @@ EXPORT_SYMBOL(msdos_rmdir);
 EXPORT_SYMBOL(msdos_unlink);
 
 static struct super_block *msdos_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, msdos_fill_super);
 }

@@ -1232,7 +1232,7 @@ static int get_serial_info(struct sgi_serial * info,
 	tmp.close_delay = info->close_delay;
 	tmp.closing_wait = info->closing_wait;
 	tmp.custom_divisor = info->custom_divisor;
-	return copy_to_user(retinfo,&tmp,sizeof(*retinfo));
+	return copy_to_user(retinfo,&tmp,sizeof(*retinfo)) ? -EFAULT : 0;
 }
 
 static int set_serial_info(struct sgi_serial * info,
@@ -1867,6 +1867,7 @@ int rs_init(void)
 	
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.owner = THIS_MODULE;
 	serial_driver.name = "ttyS";
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;

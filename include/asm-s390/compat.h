@@ -4,6 +4,7 @@
  * Architecture specific compatibility types
  */
 #include <linux/types.h>
+#include <linux/sched.h>
 
 #define COMPAT_USER_HZ	100
 
@@ -120,6 +121,16 @@ typedef	u32		compat_uptr_t;
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
 	return (void *)(unsigned long)(uptr & 0x7fffffffUL);
+}
+
+static inline void *compat_alloc_user_space(long len)
+{
+	unsigned long stack;
+
+	stack = KSTK_ESP(current);
+	if (test_thread_flag(TIF_31BIT))
+		stack &= 0x7fffffffUL;
+	return (void *) (stack - len);
 }
 
 #endif /* _ASM_S390X_COMPAT_H */

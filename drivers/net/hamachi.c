@@ -207,8 +207,10 @@ KERN_INFO "   Further modifications by Keith Underwood <keithu@parl.clemson.edu>
 /* Condensed bus+endian portability operations. */
 #if ADDRLEN == 64
 #define cpu_to_leXX(addr)	cpu_to_le64(addr)
+#define desc_to_virt(addr) bus_to_virt(le64_to_cpu(addr))
 #else 
 #define cpu_to_leXX(addr)	cpu_to_le32(addr)
+#define desc_to_virt(addr) bus_to_virt(le32_to_cpu(addr))
 #endif   
 
 
@@ -613,6 +615,7 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 		goto err_out_iounmap;
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 #ifdef TX_CHECKSUM
 	printk("check that skbcopy in ip_queue_xmit isn't happening\n");
@@ -1497,7 +1500,7 @@ static int hamachi_rx(struct net_device *dev)
 			break;
 		pci_dma_sync_single(hmp->pci_dev, desc->addr, hmp->rx_buf_sz, 
 			PCI_DMA_FROMDEVICE);
-		buf_addr = (u8 *)hmp->rx_ring + entry*sizeof(*desc);
+		buf_addr = desc_to_virt(desc->addr);
 		frame_status = le32_to_cpu(get_unaligned((s32*)&(buf_addr[data_size - 12])));
 		if (hamachi_debug > 4)
 			printk(KERN_DEBUG "  hamachi_rx() status was %8.8x.\n",

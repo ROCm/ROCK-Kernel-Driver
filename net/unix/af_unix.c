@@ -169,7 +169,7 @@ static unix_socket *unix_peer_get(unix_socket *s)
 	return peer;
 }
 
-extern inline void unix_release_addr(struct unix_address *addr)
+static inline void unix_release_addr(struct unix_address *addr)
 {
 	if (atomic_dec_and_test(&addr->refcnt))
 		kfree(addr);
@@ -625,7 +625,7 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 			goto put_fail;
 
 		if (u->type == type)
-			UPDATE_ATIME(nd.dentry->d_inode);
+			update_atime(nd.dentry->d_inode);
 
 		path_release(&nd);
 
@@ -641,7 +641,7 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 			struct dentry *dentry;
 			dentry = unix_sk(u)->dentry;
 			if (dentry)
-				UPDATE_ATIME(dentry->d_inode);
+				update_atime(dentry->d_inode);
 		} else
 			goto fail;
 	}

@@ -1268,8 +1268,8 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 	VALIDATE_STATE(s);
         if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
-		strncpy(info.id, "cmpci", sizeof(info.id));
-		strncpy(info.name, "C-Media PCI", sizeof(info.name));
+		strlcpy(info.id, "cmpci", sizeof(info.id));
+		strlcpy(info.name, "C-Media PCI", sizeof(info.name));
 		info.modify_counter = s->mix.modcnt;
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
@@ -1277,8 +1277,8 @@ static int mixer_ioctl(struct cm_state *s, unsigned int cmd, unsigned long arg)
 	}
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
-		strncpy(info.id, "cmpci", sizeof(info.id));
-		strncpy(info.name, "C-Media cmpci", sizeof(info.name));
+		strlcpy(info.id, "cmpci", sizeof(info.id));
+		strlcpy(info.name, "C-Media cmpci", sizeof(info.name));
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

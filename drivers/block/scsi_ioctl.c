@@ -48,6 +48,7 @@ const unsigned char scsi_command_size[8] =
 static int blk_do_rq(request_queue_t *q, struct block_device *bdev, 
 		     struct request *rq)
 {
+	char sense[SCSI_SENSE_BUFFERSIZE];
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
@@ -58,6 +59,12 @@ static int blk_do_rq(request_queue_t *q, struct block_device *bdev,
 	 * it after io completion
 	 */
 	rq->ref_count++;
+
+	if (!rq->sense) {
+		memset(sense, 0, sizeof(sense));
+		rq->sense = sense;
+		rq->sense_len = 0;
+	}
 
 	rq->flags |= REQ_NOMERGE;
 	rq->waiting = &wait;
@@ -212,7 +219,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		}
 	}
 
-	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+	rq = blk_get_request(q, writing ? WRITE : READ, __GFP_WAIT);
 
 	/*
 	 * fill in request structure
@@ -227,8 +234,6 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	rq->sense_len = 0;
 
 	rq->flags |= REQ_BLOCK_PC;
-	if (writing)
-		rq->flags |= REQ_RW;
 
 	rq->hard_nr_sectors = rq->nr_sectors = nr_sectors;
 	rq->hard_cur_sectors = rq->current_nr_sectors = nr_sectors;
@@ -299,13 +304,14 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 #define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
 #define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
+#define OMAX_SB_LEN 16          /* For backward compatibility */
 
 static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 			 Scsi_Ioctl_Command *sic)
 {
 	struct request *rq;
 	int err, in_len, out_len, bytes, opcode, cmdlen;
-	char *buffer = NULL, sense[24];
+	char *buffer = NULL, sense[SCSI_SENSE_BUFFERSIZE];
 
 	/*
 	 * get in an out lengths, verify they don't exceed a page worth of data
@@ -328,7 +334,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 		memset(buffer, 0, bytes);
 	}
 
-	rq = blk_get_request(q, WRITE, __GFP_WAIT);
+	rq = blk_get_request(q, in_len ? WRITE : READ, __GFP_WAIT);
 
 	cmdlen = COMMAND_SIZE(opcode);
 
@@ -372,15 +378,16 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	rq->data = buffer;
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
-	if (in_len)
-		rq->flags |= REQ_RW;
 
 	blk_do_rq(q, bdev, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
-		if (rq->sense_len)
-			if (copy_to_user(sic->data, rq->sense, rq->sense_len))
+		if (rq->sense_len && rq->sense) {
+			bytes = (OMAX_SB_LEN > rq->sense_len) ?
+				rq->sense_len : OMAX_SB_LEN;
+			if (copy_to_user(sic->data, rq->sense, bytes))
 				err = -EFAULT;
+		}
 	} else {
 		if (copy_to_user(sic->data, buffer, out_len))
 			err = -EFAULT;

@@ -82,24 +82,4 @@ int isp2x00_biosparam(struct scsi_device *, struct block_device *,
 #define NULL (0)
 #endif
 
-#define QLOGICFC {							   \
-        .detect                 = isp2x00_detect,                            \
-        .release                = isp2x00_release,                           \
-        .info                   = isp2x00_info,                              \
-        .queuecommand           = isp2x00_queuecommand,                      \
-        .eh_abort_handler       = isp2x00_abort,                             \
-        .bios_param             = isp2x00_biosparam,                         \
-        .can_queue              = QLOGICFC_REQ_QUEUE_LEN,                    \
-        .this_id                = -1,                                        \
-        .sg_tablesize           = QLOGICFC_MAX_SG(QLOGICFC_REQ_QUEUE_LEN),   \
-	.cmd_per_lun		= QLOGICFC_CMD_PER_LUN, 			   \
-        .present                = 0,                                         \
-        .unchecked_isa_dma      = 0,                                         \
-        .use_clustering         = ENABLE_CLUSTERING, 			   \
-	.highmem_io		= 1					   \
-}
-
 #endif /* _QLOGICFC_H */
-
-
-

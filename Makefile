@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 69
+SUBLEVEL = 70
 EXTRAVERSION = -$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
 
 # *DOCUMENTATION*
@@ -90,7 +90,7 @@ ifneq ($(filter all,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
 endif
 
-export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
+export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE KBUILD_CHECKSRC
 
 # Beautify output
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
 # If it is set to "silent_", nothing wil be printed at all, since
 # the variable $(silent_cmd_cc_o_c) doesn't exist.
 
-#	For now, leave verbose as default
+# To put more focus on warnings, less verbose as default
 
 ifdef V
   ifeq ("$(origin V)", "command line")
@@ -115,8 +115,18 @@ ifdef V
   endif
 endif
 ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 1
+  KBUILD_VERBOSE = 0 
 endif
+
+ifdef C
+  ifeq ("$(origin C)", "command line")
+    KBUILD_CHECKSRC = $(C)
+  endif
+endif
+ifndef KBUILD_CHECKSRC
+  KBUILD_CHECKSRC = 0
+endif
+
 
 MAKEFLAGS += --no-print-directory
 
@@ -172,6 +182,7 @@ GENKSYMS	= scripts/genksyms/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
+CHECK		= /home/torvalds/parser/check
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -182,14 +193,14 @@ AFLAGS_KERNEL	=
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 CPPFLAGS	:= -D__KERNEL__ -Iinclude
-CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -g -O2 \
+CFLAGS 		:= $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__ $(CPPFLAGS)
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
-	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE
+	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE CHECK
 
 export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 

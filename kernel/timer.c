@@ -451,7 +451,6 @@ unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
  */
 struct timespec xtime __attribute__ ((aligned (16)));
 struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
-unsigned long last_nsec_offset;
 
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
@@ -606,7 +605,7 @@ static void second_overflow(void)
 /* in the NTP reference this is called "hardclock()" */
 static void update_wall_time_one_tick(void)
 {
-	long time_adjust_step, delta_nsec;
+	long time_adjust_step;
 
 	if ( (time_adjust_step = time_adjust) != 0 ) {
 	    /* We are doing an adjtime thing. 
@@ -622,11 +621,11 @@ static void update_wall_time_one_tick(void)
 		time_adjust_step = tickadj;
 	     else if (time_adjust < -tickadj)
 		time_adjust_step = -tickadj;
-
+	     
 	    /* Reduce by this step the amount of time left  */
 	    time_adjust -= time_adjust_step;
 	}
-	delta_nsec = tick_nsec + time_adjust_step * 1000;
+	xtime.tv_nsec += tick_nsec + time_adjust_step * 1000;
 	/*
 	 * Advance the phase, once it gets to one microsecond, then
 	 * advance the tick more.
@@ -635,33 +634,13 @@ static void update_wall_time_one_tick(void)
 	if (time_phase <= -FINEUSEC) {
 		long ltemp = -time_phase >> (SHIFT_SCALE - 10);
 		time_phase += ltemp << (SHIFT_SCALE - 10);
-		delta_nsec -= ltemp;
+		xtime.tv_nsec -= ltemp;
 	}
 	else if (time_phase >= FINEUSEC) {
 		long ltemp = time_phase >> (SHIFT_SCALE - 10);
 		time_phase -= ltemp << (SHIFT_SCALE - 10);
-		delta_nsec += ltemp;
+		xtime.tv_nsec += ltemp;
 	}
-	xtime.tv_nsec += delta_nsec;
-
-	/*
-	 * The whole point of last_nsec_offset is that it can be updated atomically and
-	 * lock-free.  Thus, arches that don't have __HAVE_ARCH_CMPXCHG probably can't use
-	 * last_nsec_offset anyhow... --davidm 2003-Feb-11
-	 */
-#ifdef __HAVE_ARCH_CMPXCHG
-	if (last_nsec_offset > 0) {
-		unsigned long new, old;
-
-		do {
-			old = last_nsec_offset;
-			if (old > delta_nsec)
-				new = old - delta_nsec;
-			else
-				new = 0;
-		} while (cmpxchg(&last_nsec_offset, old, new) != old);
-	}
-#endif
 }
 
 /*
@@ -798,6 +777,7 @@ unsigned long wall_jiffies = INITIAL_JIFFIES;
 #ifndef ARCH_HAVE_XTIME_LOCK
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 #endif
+unsigned long last_time_offset;
 
 /*
  * This function runs timers and the timer-tq in bottom half context.
@@ -831,6 +811,7 @@ static inline void update_times(void)
 		wall_jiffies += ticks;
 		update_wall_time(ticks);
 	}
+	last_time_offset = 0;
 	calc_load(ticks);
 }
   
@@ -924,7 +905,7 @@ asmlinkage long sys_getppid(void)
 	parent = me->group_leader->real_parent;
 	for (;;) {
 		pid = parent->tgid;
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 {
 		struct task_struct *old = parent;
 

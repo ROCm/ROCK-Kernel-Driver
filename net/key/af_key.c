@@ -1090,15 +1090,8 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	return x;
 
 out:
-	if (x->aalg)
-		kfree(x->aalg);
-	if (x->ealg)
-		kfree(x->ealg);
-	if (x->calg)
-		kfree(x->calg);
-	if (x->encap)
-		kfree(x->encap);
-	kfree(x);
+	x->km.state = XFRM_STATE_DEAD;
+	xfrm_state_put(x);
 	return ERR_PTR(-ENOBUFS);
 }
 
@@ -1249,7 +1242,8 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 		}
 	}
 
-	if (x1 && x1->id.spi && hdr->sadb_msg_type == SADB_ADD) {
+	if (x1 && ((x1->id.spi && hdr->sadb_msg_type == SADB_ADD) ||
+	     (hdr->sadb_msg_type == SADB_UPDATE && xfrm_state_kern(x1)))) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -1294,6 +1288,11 @@ static int pfkey_delete(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	if (x == NULL)
 		return -ESRCH;
 
+	if (xfrm_state_kern(x)) {
+		xfrm_state_put(x);
+		return -EPERM;
+	}
+	
 	xfrm_state_delete(x);
 	xfrm_state_put(x);
 
@@ -2245,6 +2244,7 @@ static void dump_ah_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_len = sizeof(struct sadb_prop)/8;
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
+	memset(p->sadb_prop_reserved, 0, sizeof(p->sadb_prop_reserved));
 
 	for (i = 0; ; i++) {
 		struct xfrm_algo_desc *aalg = xfrm_aalg_get_byidx(i);
@@ -2276,6 +2276,7 @@ static void dump_esp_combs(struct sk_buff *skb, struct xfrm_tmpl *t)
 	p->sadb_prop_len = sizeof(struct sadb_prop)/8;
 	p->sadb_prop_exttype = SADB_EXT_PROPOSAL;
 	p->sadb_prop_replay = 32;
+	memset(p->sadb_prop_reserved, 0, sizeof(p->sadb_prop_reserved));
 
 	for (i=0; ; i++) {
 		struct xfrm_algo_desc *ealg = xfrm_ealg_get_byidx(i);

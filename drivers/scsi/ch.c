@@ -1017,10 +1017,15 @@ static int ch_attach(Scsi_Device * sd)
 	if (init)
 		ch_init_elem(ch);
 
+#if 0
 	devfs_register(NULL, ch->name, 0,
 		       MAJOR_NR, ch->minor,
 		       S_IFCHR | S_IRUGO | S_IWUGO,
 		       &changer_fops, NULL);
+#else
+	devfs_mk_cdev(MKDEV(MAJOR_NR,ch->minor),
+		      S_IFCHR | S_IRUGO | S_IWUGO, ch->name);
+#endif
 
 	printk(KERN_INFO "Attached scsi changer %s "
 	       "at scsi%d, channel %d, id %d, lun %d\n", 

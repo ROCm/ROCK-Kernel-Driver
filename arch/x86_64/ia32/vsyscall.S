@@ -6,7 +6,7 @@
 #include <asm/offset.h>
 
 	.text
-	.section .text.vsyscall
+	.section .text.vsyscall,"ax"
 	.globl __kernel_vsyscall
 	.type __kernel_vsyscall,@function
 __kernel_vsyscall:
@@ -21,7 +21,7 @@ __kernel_vsyscall:
 .LEND_vsyscall:
 	.size __kernel_vsyscall,.-.LSTART_vsyscall
 
-	.section .text.sigreturn
+	.section .text.sigreturn,"ax"
 	.balign 32
 	.globl __kernel_sigreturn
 	.type __kernel_sigreturn,@function
@@ -33,9 +33,9 @@ __kernel_sigreturn:
 .LEND_sigreturn:
 	.size __kernel_sigreturn,.-.LSTART_sigreturn
 
-	.section .text.rtsigreturn
+	.section .text.rtsigreturn,"ax"
 	.balign 32
-	.globl __kernel_rt_sigreturn
+	.globl __kernel_rt_sigreturn,"ax"
 	.type __kernel_rt_sigreturn,@function
 __kernel_rt_sigreturn:
 .LSTART_rt_sigreturn:

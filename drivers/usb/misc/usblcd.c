@@ -34,7 +34,6 @@
 struct lcd_usb_data {
 	struct usb_device *lcd_dev;	/* init: probe_lcd */
 	unsigned int ifnum;		/* Interface number of the USB device */
-	int minor;			/* minor number for this device */
 	int isopen;			/* nz if open */
 	int present;			/* Device is present on the bus */
 	char *obuf, *ibuf;		/* transfer buffers */
@@ -245,6 +244,13 @@ file_operations usb_lcd_fops = {
 	.release =	close_lcd,
 };
 
+static struct usb_class_driver usb_lcd_class = {
+	.name =		"usb/lcd%d",
+	.fops =		&usb_lcd_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+	.minor_base =	USBLCD_MINOR,
+};
+
 static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
@@ -268,23 +274,25 @@ static int probe_lcd(struct usb_interface *intf, const struct usb_device_id *id)
 		(i & 0xF000)>>12,(i & 0xF00)>>8,(i & 0xF0)>>4,(i & 0xF),
 		dev->devnum);
 
-	retval = usb_register_dev(&usb_lcd_fops, USBLCD_MINOR, 1, &lcd->minor);
+	retval = usb_register_dev(intf, &usb_lcd_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		return -ENOMEM;
 	}
-	
+
 	lcd->present = 1;
 	lcd->lcd_dev = dev;
 
 	if (!(lcd->obuf = (char *) kmalloc(OBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the output buffer");
+		usb_deregister_dev(intf, &usb_lcd_class);
 		return -ENOMEM;
 	}
 	dbg("probe_lcd: obuf address:%p", lcd->obuf);
 
 	if (!(lcd->ibuf = (char *) kmalloc(IBUF_SIZE, GFP_KERNEL))) {
 		err("probe_lcd: Not enough memory for the input buffer");
+		usb_deregister_dev(intf, &usb_lcd_class);
 		kfree(lcd->obuf);
 		return -ENOMEM;
 	}
@@ -300,7 +308,7 @@ static void disconnect_lcd(struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	if (lcd) {
-		usb_deregister_dev(1, lcd->minor);
+		usb_deregister_dev(intf, &usb_lcd_class);
 
 		if (lcd->isopen) {
 			lcd->isopen = 0;

@@ -201,36 +201,6 @@ extern	int		 x_scsi_slave_configure(Scsi_Device *);
 extern	void		 x_scsi_slave_destroy(Scsi_Device *);
 extern	int		 x_scsi_proc_info(char *, char **, off_t, int, int, int);
 
-#define PROC_SCSI_DECL  .proc_name = "mptscsih",
-
-#define MPT_SCSIHOST {						\
-	PROC_SCSI_DECL						\
-	.proc_info			= x_scsi_proc_info,	\
-	.name				= "MPT SCSI Host",	\
-	.detect				= x_scsi_detect,	\
-	.release			= x_scsi_release,	\
-	.info				= x_scsi_info,		\
-	.command			= NULL,			\
-	.queuecommand			= x_scsi_queuecommand,	\
-	.slave_alloc			= x_scsi_slave_alloc,	\
-	.slave_configure		= x_scsi_slave_configure,	\
-	.slave_destroy			= x_scsi_slave_destroy,	\
-	.eh_strategy_handler		= NULL,			\
-	.eh_abort_handler		= x_scsi_abort,		\
-	.eh_device_reset_handler	= x_scsi_dev_reset,	\
-	.eh_bus_reset_handler		= x_scsi_bus_reset,	\
-	.eh_host_reset_handler		= x_scsi_host_reset,	\
-	.bios_param			= x_scsi_bios_param,	\
-	.can_queue			= MPT_SCSI_CAN_QUEUE,	\
-	.this_id			= -1,			\
-	.sg_tablesize			= MPT_SCSI_SG_DEPTH,	\
-	.max_sectors			= MPT_SCSI_MAX_SECTORS,	\
-	.cmd_per_lun			= MPT_SCSI_CMD_PER_LUN,	\
-	.unchecked_isa_dma		= 0,			\
-	.use_clustering			= ENABLE_CLUSTERING,	\
-}
-
-
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 /*  include/scsi/scsi.h may not be quite complete...  */

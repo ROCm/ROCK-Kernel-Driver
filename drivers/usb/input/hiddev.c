@@ -53,6 +53,7 @@ struct hiddev {
 	wait_queue_head_t wait;
 	struct hid_device *hid;
 	struct hiddev_list *list;
+	struct usb_interface intf;
 };
 
 struct hiddev_list {
@@ -95,16 +96,19 @@ hiddev_lookup_report(struct hid_device *hid, struct hiddev_report_info *rinfo)
 
 	case HID_REPORT_ID_FIRST:
 		list = report_enum->report_list.next;
-		if (list == &report_enum->report_list) return NULL;
+		if (list == &report_enum->report_list)
+			return NULL;
 		rinfo->report_id = ((struct hid_report *) list)->id;
 		break;
 		
 	case HID_REPORT_ID_NEXT:
 		list = (struct list_head *)
 			report_enum->report_id_hash[rinfo->report_id & HID_REPORT_ID_MASK];
-		if (list == NULL) return NULL;
+		if (list == NULL)
+			return NULL;
 		list = list->next;
-		if (list == &report_enum->report_list) return NULL;
+		if (list == &report_enum->report_list)
+			return NULL;
 		rinfo->report_id = ((struct hid_report *) list)->id;
 		break;
 		
@@ -226,10 +230,10 @@ static int hiddev_fasync(int fd, struct file *file, int on)
 /*
  * De-allocate a hiddev structure
  */
+static struct usb_class_driver hiddev_class;
 static void hiddev_cleanup(struct hiddev *hiddev)
 {
-	devfs_remove("usb/hid/hiddev%d", hiddev->minor);
-	usb_deregister_dev(1, hiddev->minor);
+	usb_deregister_dev(&hiddev->intf, &hiddev_class);
 	hiddev_table[hiddev->minor] = NULL;
 	kfree(hiddev);
 }
@@ -310,7 +314,8 @@ static ssize_t hiddev_read(struct file * file, char * buffer, size_t count, loff
 	event_size = ((list->flags & HIDDEV_FLAG_UREF) != 0) ?
 		sizeof(struct hiddev_usage_ref) : sizeof(struct hiddev_event);
 
-	if (count < event_size) return 0;
+	if (count < event_size)
+		return 0;
 
 	while (retval == 0) {
 		if (list->head == list->tail) {
@@ -403,7 +408,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct hid_field *field;
 	int i;
 
-	if (!hiddev->exist) return -EIO;
+	if (!hiddev->exist)
+		return -EIO;
 
 	switch (cmd) {
 
@@ -645,18 +651,22 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGNAME(0))) {
 			int len;
-			if (!hid->name) return 0;
+			if (!hid->name)
+				return 0;
 			len = strlen(hid->name) + 1;
-			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			if (len > _IOC_SIZE(cmd))
+				 len = _IOC_SIZE(cmd);
 			return copy_to_user((char *) arg, hid->name, len) ?
 				-EFAULT : len;
 		}
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGPHYS(0))) {
 			int len;
-			if (!hid->phys) return 0;
+			if (!hid->phys)
+				return 0;
 			len = strlen(hid->phys) + 1;
-			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			if (len > _IOC_SIZE(cmd))
+				len = _IOC_SIZE(cmd);
 			return copy_to_user((char *) arg, hid->phys, len) ?
 				-EFAULT : len;
 		}
@@ -675,15 +685,21 @@ static struct file_operations hiddev_fops = {
 	.fasync =	hiddev_fasync,
 };
 
+static struct usb_class_driver hiddev_class = {
+	.name =		"usb/hid/hiddev%d",
+	.fops =		&hiddev_fops,
+	.mode =		S_IFCHR | S_IRUGO | S_IWUSR,
+       	.minor_base =	HIDDEV_MINOR_BASE,
+};
+
 /*
  * This is where hid.c calls us to connect a hid device to the hiddev driver
  */
 int hiddev_connect(struct hid_device *hid)
 {
 	struct hiddev *hiddev;
-	int minor, i;
+	int i;
 	int retval;
-	char devfs_name[24];
 
 	for (i = 0; i < hid->maxcollection; i++)
 		if (hid->collection[i].type == 
@@ -694,31 +710,25 @@ int hiddev_connect(struct hid_device *hid)
 	if (i == hid->maxcollection && (hid->quirks & HID_QUIRK_HIDDEV) == 0)
 		return -1;
 
-	retval = usb_register_dev(&hiddev_fops, HIDDEV_MINOR_BASE, 1, &minor);
+ 	if (!(hiddev = kmalloc(sizeof(struct hiddev), GFP_KERNEL)))
+		return -1;
+	memset(hiddev, 0, sizeof(struct hiddev));
+
+ 	retval = usb_register_dev(&hiddev->intf, &hiddev_class);
 	if (retval) {
 		err("Not able to get a minor for this device.");
 		return -1;
 	}
 
-	if (!(hiddev = kmalloc(sizeof(struct hiddev), GFP_KERNEL))) {
-		usb_deregister_dev (1, minor);
-		return -1;
-	}
-	memset(hiddev, 0, sizeof(struct hiddev));
-
 	init_waitqueue_head(&hiddev->wait);
 
-	hiddev->minor = minor;
-	hiddev_table[minor - HIDDEV_MINOR_BASE] = hiddev;
+ 	hiddev->minor = hiddev->intf.minor;
+ 	hiddev_table[hiddev->intf.minor - HIDDEV_MINOR_BASE] = hiddev;
 
 	hiddev->hid = hid;
 	hiddev->exist = 1;
 
-	sprintf(devfs_name, "usb/hid/hiddev%d", minor);
-	devfs_register(NULL, devfs_name, 0,
-		USB_MAJOR, minor + HIDDEV_MINOR_BASE,
-		S_IFCHR | S_IRUGO | S_IWUSR, &hiddev_fops, NULL);
-	hid->minor = minor;
+ 	hid->minor = hiddev->intf.minor;
 	hid->hiddev = hiddev;
 
 	return 0;

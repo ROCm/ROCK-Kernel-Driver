@@ -763,7 +763,6 @@ titan_agp_info(void)
 	/*
 	 * Fill it in.
 	 */
-	agp->type = ALPHA_CORE_AGP;
 	agp->hose = hose;
 	agp->private = port;
 	agp->ops = &titan_agp_ops;

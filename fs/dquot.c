@@ -1011,9 +1011,12 @@ warn_put_all:
 	spin_unlock(&dq_data_lock);
 	flush_warnings(transfer_to, warntype);
 	
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
-		if (transfer_from[cnt] != NODQUOT)
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (ret == QUOTA_OK && transfer_from[cnt] != NODQUOT)
 			dqput(transfer_from[cnt]);
+		if (ret == NO_QUOTA && transfer_to[cnt] != NODQUOT)
+			dqput(transfer_to[cnt]);
+	}
 	up_write(&sb_dqopt(inode->i_sb)->dqptr_sem);
 	return ret;
 }
@@ -1380,7 +1383,7 @@ static int __init dquot_init(void)
 
 	dquot_cachep = kmem_cache_create("dquot", 
 			sizeof(struct dquot), sizeof(unsigned long) * 4,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!dquot_cachep)
 		panic("Cannot create dquot SLAB cache");
 

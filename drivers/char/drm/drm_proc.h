@@ -378,8 +378,6 @@ static int DRM(clients_info)(char *buf, char **start, off_t offset,
 
 #if DRM_DEBUG_CODE
 
-#define DRM_VMA_VERBOSE 0
-
 static int DRM(_vma_info)(char *buf, char **start, off_t offset, int request,
 			  int *eof, void *data)
 {
@@ -387,13 +385,6 @@ static int DRM(_vma_info)(char *buf, char **start, off_t offset, int request,
 	int                   len  = 0;
 	drm_vma_entry_t	      *pt;
 	struct vm_area_struct *vma;
-#if DRM_VMA_VERBOSE
-	unsigned long	      i;
-	unsigned long	      address;
-	pgd_t		      *pgd;
-	pmd_t		      *pmd;
-	pte_t		      *pte;
-#endif
 #if defined(__i386__)
 	unsigned int	      pgprot;
 #endif

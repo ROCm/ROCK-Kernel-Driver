@@ -59,7 +59,7 @@ struct vt_struct *vt_cons[MAX_NR_CONSOLES];
  */
 unsigned char keyboard_type = KB_101;
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && !defined(__arm__) && !defined(__sh__)
+#ifdef CONFIG_X86
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
 #endif
 
@@ -424,11 +424,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		ucval = keyboard_type;
 		goto setchar;
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && !defined(__arm__) && !defined(__sh__)
 		/*
 		 * These cannot be implemented on any machine that implements
-		 * ioperm() in user level (such as Alpha PCs).
+		 * ioperm() in user level (such as Alpha PCs) or not at all.
+		 *
+		 * XXX: you should never use these, just call ioperm directly..
 		 */
+#ifdef CONFIG_X86
 	case KDADDIO:
 	case KDDELIO:
 		/*
@@ -869,13 +871,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (clin > 32)
 			return -EINVAL;
 		    
-		if (vlin)
-			vc->vc_scan_lines = vlin;
-		if (clin)
-			vc->vc_font.height = clin;
-	
-		for (i = 0; i < MAX_NR_CONSOLES; i++)
+		for (i = 0; i < MAX_NR_CONSOLES; i++) {
+			if (vlin)
+				vc_cons[i].d->vc_scan_lines = vlin;
+			if (clin)
+				vc_cons[i].d->vc_font.height = clin;
 			vc_resize(i, cc, ll);
+		}
   		return 0;
 	}
 

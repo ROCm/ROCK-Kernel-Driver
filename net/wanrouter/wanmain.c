@@ -127,18 +127,21 @@ static void dbg_kfree(void * v, int line) {
  *	WAN device IOCTL handlers
  */
 
-static int device_setup(wan_device_t *wandev, wandev_conf_t *u_conf);
-static int device_stat(wan_device_t *wandev, wandev_stat_t *u_stat);
-static int device_shutdown(wan_device_t *wandev);
-static int device_new_if(wan_device_t *wandev, wanif_conf_t *u_conf);
-static int device_del_if(wan_device_t *wandev, char *u_name);
+static int wanrouter_device_setup(struct wan_device *wandev,
+				  wandev_conf_t *u_conf);
+static int wanrouter_device_stat(struct wan_device *wandev,
+				 wandev_stat_t *u_stat);
+static int wanrouter_device_shutdown(struct wan_device *wandev);
+static int wanrouter_device_new_if(struct wan_device *wandev,
+				   wanif_conf_t *u_conf);
+static int wanrouter_device_del_if(struct wan_device *wandev, char *u_name);
 
 /*
  *	Miscellaneous
  */
 
-static wan_device_t *find_device (char *name);
-static int delete_interface (wan_device_t *wandev, char *name);
+static struct wan_device *wanrouter_find_device(char *name);
+static int wanrouter_delete_interface(struct wan_device *wandev, char *name);
 void lock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
 
@@ -148,19 +151,18 @@ void unlock_adapter_irq(spinlock_t *lock, unsigned long *smp_flags);
  *	Global Data
  */
 
-static char fullname[]		= "Sangoma WANPIPE Router";
-static char copyright[]		= "(c) 1995-2000 Sangoma Technologies Inc.";
-static char modname[]		= ROUTER_NAME;	/* short module name */
-wan_device_t* router_devlist 	= NULL;	/* list of registered devices */
-static int devcnt 		= 0;
+static char wanrouter_fullname[]  = "Sangoma WANPIPE Router";
+static char wanrouter_copyright[] = "(c) 1995-2000 Sangoma Technologies Inc.";
+static char wanrouter_modname[] = ROUTER_NAME; /* short module name */
+struct wan_device* wanrouter_router_devlist; /* list of registered devices */
 
 /*
  *	Organize Unique Identifiers for encapsulation/decapsulation
  */
 
-static unsigned char oui_ether[] = { 0x00, 0x00, 0x00 };
+static unsigned char wanrouter_oui_ether[] = { 0x00, 0x00, 0x00 };
 #if 0
-static unsigned char oui_802_2[] = { 0x00, 0x80, 0xC2 };
+static unsigned char wanrouter_oui_802_2[] = { 0x00, 0x80, 0xC2 };
 #endif
 
 #ifndef MODULE
@@ -172,12 +174,13 @@ int wanrouter_init(void)
 	extern int sdladrv_init(void);
 
 	printk(KERN_INFO "%s v%u.%u %s\n",
-		fullname, ROUTER_VERSION, ROUTER_RELEASE, copyright);
+	       wanrouter_fullname, ROUTER_VERSION, ROUTER_RELEASE,
+	       wanrouter_copyright);
 
 	err = wanrouter_proc_init();
-	if (err){
-		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n", modname);
-	}
+	if (err)
+		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n",
+		       wanrouter_modname);
 
         /*
          *      Initialise compiled in boards
@@ -218,14 +221,14 @@ int init_module	(void)
 	int err;
 
 	printk(KERN_INFO "%s v%u.%u %s\n",
-		fullname, ROUTER_VERSION, ROUTER_RELEASE, copyright);
+	       wanrouter_fullname, ROUTER_VERSION, ROUTER_RELEASE,
+	       wanrouter_copyright);
 
 	err = wanrouter_proc_init();
 
-	if (err){
-		printk(KERN_INFO
-		"%s: can't create entry in proc filesystem!\n", modname);
-	}
+	if (err)
+		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n",
+		       wanrouter_modname);
 	return err;
 }
 
@@ -262,7 +265,7 @@ void cleanup_module (void)
  */
 
 
-int register_wan_device(wan_device_t *wandev)
+int register_wan_device(struct wan_device *wandev)
 {
 	int err, namelen;
 
@@ -274,12 +277,12 @@ int register_wan_device(wan_device_t *wandev)
 	if (!namelen || (namelen > WAN_DRVNAME_SZ))
 		return -EINVAL;
 
-	if (find_device(wandev->name) != NULL)
+	if (wanrouter_find_device(wandev->name))
 		return -EEXIST;
 
 #ifdef WANDEBUG
 	printk(KERN_INFO "%s: registering WAN device %s\n",
-		modname, wandev->name);
+	       wanrouter_modname, wandev->name);
 #endif
 
 	/*
@@ -289,7 +292,7 @@ int register_wan_device(wan_device_t *wandev)
 	if (err) {
 		printk(KERN_INFO
 			"%s: can't create /proc/net/router/%s entry!\n",
-			modname, wandev->name);
+			wanrouter_modname, wandev->name);
 		return err;
 	}
 
@@ -300,9 +303,8 @@ int register_wan_device(wan_device_t *wandev)
 
 	wandev->ndev = 0;
 	wandev->dev  = NULL;
-	wandev->next = router_devlist;
-	router_devlist = wandev;
-	++devcnt;
+	wandev->next = wanrouter_router_devlist;
+	wanrouter_router_devlist = wandev;
         MOD_INC_USE_COUNT;	/* prevent module from unloading */
 	return 0;
 }
@@ -322,12 +324,12 @@ int register_wan_device(wan_device_t *wandev)
 
 int unregister_wan_device(char *name)
 {
-	wan_device_t *wandev, *prev;
+	struct wan_device *wandev, *prev;
 
 	if (name == NULL)
 		return -EINVAL;
 
-	for (wandev = router_devlist, prev = NULL;
+	for (wandev = wanrouter_router_devlist, prev = NULL;
 		wandev && strcmp(wandev->name, name);
 		prev = wandev, wandev = wandev->next)
 		;
@@ -335,18 +337,18 @@ int unregister_wan_device(char *name)
 		return -ENODEV;
 
 #ifdef WANDEBUG
-	printk(KERN_INFO "%s: unregistering WAN device %s\n", modname, name);
+	printk(KERN_INFO "%s: unregistering WAN device %s\n",
+	       wanrouter_modname, name);
 #endif
 
 	if (wandev->state != WAN_UNCONFIGURED)
-		device_shutdown(wandev);
+		wanrouter_device_shutdown(wandev);
 
 	if (prev)
 		prev->next = wandev->next;
 	else
-		router_devlist = wandev->next;
+		wanrouter_router_devlist = wandev->next;
 
-	--devcnt;
 	wanrouter_proc_delete(wandev);
         MOD_DEC_USE_COUNT;
 	return 0;
@@ -363,8 +365,8 @@ int unregister_wan_device(char *name)
  */
 
 
-int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
-	unsigned short type)
+int wanrouter_encapsulate(struct sk_buff *skb, struct net_device *dev,
+			  unsigned short type)
 {
 	int hdr_len = 0;
 
@@ -381,14 +383,15 @@ int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
 		skb_push(skb, 7);
 		skb->data[0] = 0;
 		skb->data[1] = NLPID_SNAP;
-		memcpy(&skb->data[2], oui_ether, sizeof(oui_ether));
+		memcpy(&skb->data[2], wanrouter_oui_ether,
+		       sizeof(wanrouter_oui_ether));
 		*((unsigned short*)&skb->data[5]) = htons(type);
 		break;
 
 	default:		/* Unknown packet type */
 		printk(KERN_INFO
 			"%s: unsupported Ethertype 0x%04X on interface %s!\n",
-			modname, type, dev->name);
+			wanrouter_modname, type, dev->name);
 		hdr_len = -EINVAL;
 	}
 	return hdr_len;
@@ -406,7 +409,7 @@ int wanrouter_encapsulate (struct sk_buff *skb, netdevice_t *dev,
  */
 
 
-unsigned short wanrouter_type_trans (struct sk_buff *skb, netdevice_t *dev)
+unsigned short wanrouter_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	int cnt = skb->data[0] ? 0 : 1;	/* there may be a pad present */
 	unsigned short ethertype;
@@ -418,10 +421,11 @@ unsigned short wanrouter_type_trans (struct sk_buff *skb, netdevice_t *dev)
 		break;
 
         case NLPID_SNAP:	/* SNAP encapsulation */
-		if (memcmp(&skb->data[cnt + 1], oui_ether, sizeof(oui_ether))){
+		if (memcmp(&skb->data[cnt + 1], wanrouter_oui_ether,
+			   sizeof(wanrouter_oui_ether))){
           		printk(KERN_INFO
 				"%s: unsupported SNAP OUI %02X-%02X-%02X "
-				"on interface %s!\n", modname,
+				"on interface %s!\n", wanrouter_modname,
 				skb->data[cnt+1], skb->data[cnt+2],
 				skb->data[cnt+3], dev->name);
 			return 0;
@@ -435,7 +439,7 @@ unsigned short wanrouter_type_trans (struct sk_buff *skb, netdevice_t *dev)
 	default:
 		printk(KERN_INFO
 			"%s: unsupported NLPID 0x%02X on interface %s!\n",
-			modname, skb->data[cnt], dev->name);
+			wanrouter_modname, skb->data[cnt], dev->name);
 		return 0;
 	}
 	skb->protocol = ethertype;
@@ -457,7 +461,7 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 {
 	int err = 0;
 	struct proc_dir_entry *dent;
-	wan_device_t *wandev;
+	struct wan_device *wandev;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -475,23 +479,23 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case ROUTER_SETUP:
-		err = device_setup(wandev, (void*)arg);
+		err = wanrouter_device_setup(wandev, (void*)arg);
 		break;
 
 	case ROUTER_DOWN:
-		err = device_shutdown(wandev);
+		err = wanrouter_device_shutdown(wandev);
 		break;
 
 	case ROUTER_STAT:
-		err = device_stat(wandev, (void*)arg);
+		err = wanrouter_device_stat(wandev, (void*)arg);
 		break;
 
 	case ROUTER_IFNEW:
-		err = device_new_if(wandev, (void*)arg);
+		err = wanrouter_device_new_if(wandev, (void*)arg);
 		break;
 
 	case ROUTER_IFDEL:
-		err = device_del_if(wandev, (void*)arg);
+		err = wanrouter_device_del_if(wandev, (void*)arg);
 		break;
 
 	case ROUTER_IFSTAT:
@@ -519,7 +523,8 @@ int wanrouter_ioctl(struct inode *inode, struct file *file,
  *	o call driver's setup() entry point
  */
 
-static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
+static int wanrouter_device_setup(struct wan_device *wandev,
+				  wandev_conf_t *u_conf)
 {
 	void *data = NULL;
 	wandev_conf_t *conf;
@@ -595,9 +600,9 @@ static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
  *	o call driver's shutdown() entry point
  */
 
-static int device_shutdown (wan_device_t *wandev)
+static int wanrouter_device_shutdown(struct wan_device *wandev)
 {
-	netdevice_t *dev;
+	struct net_device *dev;
 	int err=0;
 
 	if (wandev->state == WAN_UNCONFIGURED)
@@ -606,7 +611,8 @@ static int device_shutdown (wan_device_t *wandev)
 	printk(KERN_INFO "\n%s: Shutting Down!\n",wandev->name);
 
 	for (dev = wandev->dev; dev;) {
-		if ((err=delete_interface(wandev, dev->name)) != 0)
+		err = wanrouter_delete_interface(wandev, dev->name);
+		if (err)
 			return err;
 		/* The above function deallocates the current dev
 		 * structure. Therefore, we cannot use dev->priv
@@ -628,7 +634,8 @@ static int device_shutdown (wan_device_t *wandev)
  *	Get WAN device status & statistics.
  */
 
-static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
+static int wanrouter_device_stat(struct wan_device *wandev,
+				 wandev_stat_t *u_stat)
 {
 	wandev_stat_t stat;
 
@@ -658,10 +665,11 @@ static int device_stat (wan_device_t *wandev, wandev_stat_t *u_stat)
  *	o register network interface
  */
 
-static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
+static int wanrouter_device_new_if(struct wan_device *wandev,
+				   wanif_conf_t *u_conf)
 {
 	wanif_conf_t conf;
-	netdevice_t *dev=NULL;
+	struct net_device *dev = NULL;
 #ifdef CONFIG_WANPIPE_MULTPPP
 	struct ppp_device *pppdev=NULL;
 #endif
@@ -682,13 +690,14 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 		if (pppdev == NULL)
 			return -ENOBUFS;
 		memset(pppdev, 0, sizeof(struct ppp_device));
-		pppdev->dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		pppdev->dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
 		if (pppdev->dev == NULL) {
 			kfree(pppdev);
 			return -ENOBUFS;
 		}
-		memset(pppdev->dev, 0, sizeof(netdevice_t));
-		err = wandev->new_if(wandev, (netdevice_t *)pppdev, &conf);
+		memset(pppdev->dev, 0, sizeof(struct net_device));
+		err = wandev->new_if(wandev,
+				     (struct net_device *)pppdev, &conf);
 		dev = pppdev->dev;
 #else
 		printk(KERN_INFO "%s: Wanpipe Mulit-Port PPP support has not been compiled in!\n",
@@ -696,10 +705,10 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 		return -EPROTONOSUPPORT;
 #endif
 	} else {
-		dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
+		dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
 		if (dev == NULL)
 			return -ENOBUFS;
-		memset(dev, 0, sizeof(netdevice_t));
+		memset(dev, 0, sizeof(struct net_device));
 		err = wandev->new_if(wandev, dev, &conf);
 	}
 
@@ -717,12 +726,12 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 
 			#ifdef WANDEBUG
 			printk(KERN_INFO "%s: registering interface %s...\n",
-				modname, dev->name);
+				wanrouter_modname, dev->name);
 			#endif
 
 			err = register_netdev(dev);
 			if (!err) {
-				netdevice_t *slave=NULL;
+				struct net_device *slave = NULL;
 				unsigned long smp_flags=0;
 
 				lock_adapter_irq(&wandev->lock, &smp_flags);
@@ -731,10 +740,10 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 					wandev->dev = dev;
 				} else {
 					for (slave=wandev->dev;
-					     *((netdevice_t**)slave->priv);
-					     slave=*((netdevice_t**)slave->priv));
+					 *((struct net_device **)slave->priv);
+				 slave = *((struct net_device **)slave->priv));
 
-					*((netdevice_t**)slave->priv) = dev;
+				     *((struct net_device **)slave->priv) = dev;
 				}
 				++wandev->ndev;
 
@@ -774,7 +783,7 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
  *	 o copy configuration data to kernel address space
  */
 
-static int device_del_if (wan_device_t *wandev, char *u_name)
+static int wanrouter_device_del_if(struct wan_device *wandev, char *u_name)
 {
 	char name[WAN_IFNAME_SZ + 1];
         int err = 0;
@@ -787,7 +796,7 @@ static int device_del_if (wan_device_t *wandev, char *u_name)
 	if (copy_from_user(name, u_name, WAN_IFNAME_SZ))
 		return -EFAULT;
 
-	err = delete_interface(wandev, name);
+	err = wanrouter_delete_interface(wandev, name);
 	if (err)
 		return err;
 
@@ -815,11 +824,12 @@ static int device_del_if (wan_device_t *wandev, char *u_name)
  *	Return pointer to the WAN device data space or NULL if device not found.
  */
 
-static wan_device_t *find_device(char *name)
+static struct wan_device *wanrouter_find_device(char *name)
 {
-	wan_device_t *wandev;
+	struct wan_device *wandev;
 
-	for (wandev = router_devlist;wandev && strcmp(wandev->name, name);
+	for (wandev = wanrouter_router_devlist;
+	     wandev && strcmp(wandev->name, name);
 		wandev = wandev->next);
 	return wandev;
 }
@@ -841,16 +851,16 @@ static wan_device_t *find_device(char *name)
  *	sure that opened interfaces are not removed!
  */
 
-static int delete_interface (wan_device_t *wandev, char *name)
+static int wanrouter_delete_interface(struct wan_device *wandev, char *name)
 {
-	netdevice_t *dev=NULL, *prev=NULL;
+	struct net_device *dev = NULL, *prev = NULL;
 	unsigned long smp_flags=0;
 
 	lock_adapter_irq(&wandev->lock, &smp_flags);
 	dev = wandev->dev;
 	prev = NULL;
 	while (dev && strcmp(name, dev->name)) {
-		netdevice_t **slave = dev->priv;
+		struct net_device **slave = dev->priv;
 		prev = dev;
 		dev = *slave;
 	}
@@ -867,12 +877,12 @@ static int delete_interface (wan_device_t *wandev, char *name)
 
 	lock_adapter_irq(&wandev->lock, &smp_flags);
 	if (prev) {
-		netdevice_t **prev_slave = prev->priv;
-		netdevice_t **slave = dev->priv;
+		struct net_device **prev_slave = prev->priv;
+		struct net_device **slave = dev->priv;
 
 		*prev_slave = *slave;
 	} else {
-		netdevice_t **slave = dev->priv;
+		struct net_device **slave = dev->priv;
 		wandev->dev = *slave;
 	}
 	--wandev->ndev;

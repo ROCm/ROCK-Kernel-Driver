@@ -423,6 +423,7 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_netdev;

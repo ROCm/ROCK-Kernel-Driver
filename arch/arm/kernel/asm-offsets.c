@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1995-2001 Russell King
+ * Copyright (C) 1995-2003 Russell King
  *               2001-2002 Keith Owens
  *     
  * Generate definitions needed by assembly language modules.
@@ -24,12 +24,21 @@
 #if defined(__APCS_26__)
 #error Sorry, your compiler targets APCS-26 but this kernel requires APCS-32
 #endif
-#if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 95)
-#error Sorry, your compiler is known to miscompile kernels.  Only use gcc 2.95.3 and later.
-#endif
-#if __GNUC__ == 2 && __GNUC_MINOR__ == 95
-/* shame we can't detect the .1 or .2 releases */
-#warning GCC 2.95.2 and earlier miscompiles kernels.
+/*
+ * GCC 2.95.1, 2.95.2: ignores register clobber list in asm().
+ * GCC 3.0, 3.1: general bad code generation.
+ * GCC 3.2.0: incorrect function argument offset calculation.
+ * GCC 3.2.x: miscompiles NEW_AUX_ENT in fs/binfmt_elf.c
+ *            (http://gcc.gnu.org/cgi-bin/gnatsweb.pl?cmd=view&pr=8896)
+ */
+#if __GNUC__ < 2 || \
+   (__GNUC__ == 2 && __GNUC_MINOR__ < 95) || \
+   (__GNUC__ == 2 && __GNUC_MINOR__ == 95 && __GNUC_PATCHLEVEL__ != 0 && \
+					     __GNUC_PATCHLEVEL__ < 3) || \
+   (__GNUC__ == 3 && __GNUC_MINOR__ < 2) || \
+   (__GNUC__ == 3 && __GNUC_MINOR__ == 2 && __GNUC_PATCHLEVEL__ < 1)
+#error Your compiler is too buggy; it is known to miscompile kernels.
+#error    Known good compilers: 2.95.3, 2.95.4, 2.96, 3.2.2+PR8896
 #endif
 
 /* Use marker if you need to separate the values later */
@@ -61,7 +70,6 @@ int main(void)
   DEFINE(LPTE_WRITE,		L_PTE_WRITE);
   DEFINE(LPTE_EXEC,		L_PTE_EXEC);
   DEFINE(LPTE_DIRTY,		L_PTE_DIRTY);
-  BLANK();
   BLANK();
   DEFINE(PAGE_SZ,	       	PAGE_SIZE);
   BLANK();

@@ -38,6 +38,7 @@
  * be incorporated into the next SCTP release.
  */
 
+#include <linux/kernel.h>
 #include <net/sctp/sctp.h>
 
 /*
@@ -55,6 +56,7 @@ SCTP_DBG_OBJCNT(bind_addr);
 SCTP_DBG_OBJCNT(chunk);
 SCTP_DBG_OBJCNT(addr);
 SCTP_DBG_OBJCNT(ssnmap);
+SCTP_DBG_OBJCNT(datamsg);
 
 /* An array to make it easy to pretty print the debug information
  * to the proc fs.
@@ -68,6 +70,7 @@ sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(bind_addr),
 	SCTP_DBG_OBJCNT_ENTRY(addr),
 	SCTP_DBG_OBJCNT_ENTRY(ssnmap),
+	SCTP_DBG_OBJCNT_ENTRY(datamsg),
 };
 
 /* Callback from procfs to read out objcount information.
@@ -86,7 +89,7 @@ static int sctp_dbg_objcnt_read(char *buffer, char **start, off_t offset,
 	char temp[128];
 
 	/* How many entries? */
-	entries = sizeof(sctp_dbg_objcnt)/sizeof(sctp_dbg_objcnt[0]);
+	entries = ARRAY_SIZE(sctp_dbg_objcnt);
 
 	/* Walk the entries and print out the debug information
 	 * for proc fs.

@@ -167,11 +167,12 @@ static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	decoder = kmalloc(sizeof(struct bt819), GFP_KERNEL);
 	if (decoder == NULL) {
 		MOD_DEC_USE_COUNT;
+		kfree(client);
 		return -ENOMEM;
 	}
 
 	memset(decoder, 0, sizeof(struct bt819));
-	strncpy(client->dev.name, "bt819", DEVICE_NAME_SIZE);
+	strlcpy(client->dev.name, "bt819", DEVICE_NAME_SIZE);
 	i2c_set_clientdata(client, decoder);
 	decoder->client = client;
 	decoder->addr = addr;

@@ -96,9 +96,8 @@ NORET_TYPE void panic(const char * fmt, ...)
         disabled_wait(caller);
 #endif
 	local_irq_enable();
-	for(;;) {
-		CHECK_EMERGENCY_SYNC
-	}
+	for (;;)
+		;
 }
 
 /**
@@ -111,7 +110,7 @@ NORET_TYPE void panic(const char * fmt, ...)
  *	The string is overwritten by the next call to print_taint().
  */
  
-const char *print_tainted()
+const char *print_tainted(void)
 {
 	static char buf[20];
 	if (tainted) {

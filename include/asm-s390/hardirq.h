@@ -82,8 +82,8 @@ extern void do_call_softirq(void);
 
 #define invoke_softirq() do_call_softirq()
 
-#if CONFIG_PREEMPT
-# define in_atomic()	(in_interrupt() || preempt_count() == PREEMPT_ACTIVE)
+#ifdef CONFIG_PREEMPT
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
 # define in_atomic()	(preempt_count() != 0)

@@ -55,13 +55,12 @@ static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 /* Create a new sctp_tsnmap.
  * Allocate room to store at least 'len' contiguous TSNs.
  */
-struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int priority)
+struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int gfp)
 {
 	struct sctp_tsnmap *retval;
 
 	retval = kmalloc(sizeof(struct sctp_tsnmap) +
-			 sctp_tsnmap_storage_size(len),
-			 priority);
+			 sctp_tsnmap_storage_size(len), gfp);
 	if (!retval)
 		goto fail;
 

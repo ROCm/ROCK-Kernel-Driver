@@ -380,7 +380,16 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 
 	if ( !priv->authenticated ) return -EACCES;
 
-	if (!VM_OFFSET(vma)) return DRM(mmap_dma)(filp, vma);
+	/* We check for "dma". On Apple's UniNorth, it's valid to have
+	 * the AGP mapped at physical address 0
+	 * --BenH.
+	 */
+	if (!VM_OFFSET(vma)
+#if __REALLY_HAVE_AGP
+	    && (!dev->agp || dev->agp->agp_info.device->vendor != PCI_VENDOR_ID_APPLE)
+#endif
+	    )
+		return DRM(mmap_dma)(filp, vma);
 
 				/* A sequential search of a linked list is
 				   fine here because: 1) there will only be
@@ -406,7 +415,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 	if (map->size != vma->vm_end - vma->vm_start) return -EINVAL;
 
 	if (!capable(CAP_SYS_ADMIN) && (map->flags & _DRM_READ_ONLY)) {
-		vma->vm_flags &= VM_MAYWRITE;
+		vma->vm_flags &= ~(VM_WRITE | VM_MAYWRITE);
 #if defined(__i386__) || defined(__x86_64__)
 		pgprot_val(vma->vm_page_prot) &= ~_PAGE_RW;
 #else
@@ -427,6 +436,9 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
                  * memory of type DRM_AGP, we'll deal with sorting out the real physical
                  * pages and mappings in nopage()
                  */
+#if defined(__powerpc__)
+		pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE;
+#endif
                 vma->vm_ops = &DRM(vm_ops);
                 break;
 	  }

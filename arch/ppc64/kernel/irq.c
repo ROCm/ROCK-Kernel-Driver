@@ -212,7 +212,8 @@ do_free_irq(int irq, void* dev_id)
 	return -ENOENT;
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int request_irq(unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
 {
 	struct irqaction *action;
@@ -695,7 +696,7 @@ static void register_irq_proc (unsigned int irq)
 	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
 
-	if (!root_irq_dir || (irq_desc[irq].handler == NULL))
+	if (!root_irq_dir || (irq_desc[irq].handler == NULL) || irq_dir[irq])
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
@@ -743,6 +744,7 @@ void init_irq_proc (void)
 	}
 }
 
-void no_action(int irq, void *dev, struct pt_regs *regs)
+irqreturn_t no_action(int irq, void *dev, struct pt_regs *regs)
 {
+	return IRQ_NONE;
 }

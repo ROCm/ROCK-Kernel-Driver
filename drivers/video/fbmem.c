@@ -839,10 +839,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 #ifdef CONFIG_KMOD
 static void try_to_load(int fb)
 {
-	char modname[16];
-
-	sprintf(modname, "fb%d", fb);
-	request_module(modname);
+	request_module("fb%d", fb);
 }
 #endif /* CONFIG_KMOD */
 
@@ -946,7 +943,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	/* ??? Varible sized stack allocation.  */
+	/* ??? Variable sized stack allocation.  */
 	u16 black[info->cmap.len];
 	struct fb_cmap cmap;
 	
@@ -993,7 +990,8 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		return 0;
 	case FBIOGET_FSCREENINFO:
-		return copy_to_user((void *) arg, &info->fix, sizeof(fix)) ? -EFAULT : 0;
+		return copy_to_user((void *) arg, &info->fix,
+				    sizeof(fix)) ? -EFAULT : 0;
 	case FBIOPUTCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
@@ -1214,7 +1212,6 @@ static struct file_operations fb_fops = {
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	char name_buf[12];
 	int i;
 
 	if (num_registered_fb == FB_MAX)
@@ -1242,10 +1239,9 @@ register_framebuffer(struct fb_info *fb_info)
 	spin_lock_init(&fb_info->pixmap.lock);
 
 	registered_fb[i] = fb_info;
-	sprintf(name_buf, "fb/%d", i);
-	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
-			FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
-			&fb_fops, NULL);
+
+	devfs_mk_cdev(MKDEV(FB_MAJOR, i),
+			S_IFCHR | S_IRUGO | S_IWUGO, "fb/%d", i);
 	return 0;
 }
 

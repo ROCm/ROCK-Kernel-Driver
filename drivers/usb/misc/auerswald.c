@@ -29,7 +29,6 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 #undef DEBUG   		/* include debug macros until it's done	*/
 #include <linux/usb.h>
 
@@ -60,16 +59,10 @@ do {			\
 /* Auerswald Vendor ID */
 #define ID_AUERSWALD  	0x09BF
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-/* we can have up to 256 devices at once */
-#define AUER_MINOR_BASE	0
-#define AUER_MAX_DEVICES 256
-#else
 #define AUER_MINOR_BASE	112	/* auerswald driver minor number */
 
 /* we can have up to this number of device plugged in at once */
 #define AUER_MAX_DEVICES 16
-#endif
 
 
 /* Number of read buffers for each device */
@@ -255,12 +248,6 @@ typedef struct
 	unsigned int		version;	    /* Version of the device */
 	wait_queue_head_t 	bufferwait;         /* wait for a control buffer */
 } auerswald_t,*pauerswald_t;
-
-/* array of pointers to our devices that are currently connected */
-static pauerswald_t dev_table[AUER_MAX_DEVICES];
-
-/* lock to protect the dev_table structure */
-static struct semaphore dev_table_mutex;
 
 /* ................................................................... */
 /* character device context */
@@ -585,7 +572,8 @@ static int auerchain_setup (pauerchain_t acp, unsigned int numElements)
         /* fill the list of free elements */
         for (;numElements; numElements--) {
                 acep = (pauerchainelement_t) kmalloc (sizeof (auerchainelement_t), GFP_KERNEL);
-                if (!acep) goto ac_fail;
+                if (!acep)
+			goto ac_fail;
 		memset (acep, 0, sizeof (auerchainelement_t));
                 INIT_LIST_HEAD (&acep->list);
                 list_add_tail (&acep->list, &acp->free_list);
@@ -793,16 +781,20 @@ static int auerbuf_setup (pauerbufctl_t bcp, unsigned int numElements, unsigned 
         /* fill the list of free elements */
         for (;numElements; numElements--) {
                 bep = (pauerbuf_t) kmalloc (sizeof (auerbuf_t), GFP_KERNEL);
-                if (!bep) goto bl_fail;
+                if (!bep)
+			goto bl_fail;
 	        memset (bep, 0, sizeof (auerbuf_t));
                 bep->list = bcp;
                 INIT_LIST_HEAD (&bep->buff_list);
                 bep->bufp = (char *) kmalloc (bufsize, GFP_KERNEL);
-                if (!bep->bufp) goto bl_fail;
+                if (!bep->bufp)
+			goto bl_fail;
                 bep->dr = (struct usb_ctrlrequest *) kmalloc (sizeof (struct usb_ctrlrequest), GFP_KERNEL);
-                if (!bep->dr) goto bl_fail;
+                if (!bep->dr)
+			goto bl_fail;
                 bep->urbp = usb_alloc_urb (0, GFP_KERNEL);
-                if (!bep->urbp) goto bl_fail;
+                if (!bep->urbp)
+			goto bl_fail;
                 list_add_tail (&bep->buff_list, &bcp->free_buff_list);
         }
         return 0;
@@ -1255,7 +1247,8 @@ static void auerchar_ctrlread_dispatch (pauerscon_t scp, pauerbuf_t bp)
 static void auerswald_delete( pauerswald_t cp)
 {
 	dbg( "auerswald_delete");
-	if (cp == NULL) return;
+	if (cp == NULL)
+		return;
 
 	/* Wake up all processes waiting for a buffer */
 	wake_up (&cp->bufferwait);
@@ -1274,7 +1267,8 @@ static void auerswald_delete( pauerswald_t cp)
 static void auerchar_delete( pauerchar_t ccp)
 {
 	dbg ("auerchar_delete");
-	if (ccp == NULL) return;
+	if (ccp == NULL)
+		return;
 
         /* wake up pending synchronous reads */
 	ccp->removed = 1;
@@ -1348,7 +1342,8 @@ static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp)
 	dbg ("auerswald_removeservice called");
 
 	/* check if we have a service allocated */
-	if (scp->id == AUH_UNASSIGNED) return;
+	if (scp->id == AUH_UNASSIGNED)
+		return;
 
 	/* If there is a device: close the channel */
 	if (cp->usbdev) {
@@ -1384,29 +1379,29 @@ static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp)
 /* Open a new character device */
 static int auerchar_open (struct inode *inode, struct file *file)
 {
-	int dtindex = minor(inode->i_rdev) - AUER_MINOR_BASE;
+	int dtindex = minor(inode->i_rdev);
 	pauerswald_t cp = NULL;
 	pauerchar_t ccp = NULL;
+	struct usb_interface *intf;
         int ret;
 
         /* minor number in range? */
-	if ((dtindex < 0) || (dtindex >= AUER_MAX_DEVICES)) {
+	if (dtindex < 0) {
 		return -ENODEV;
         }
-	/* usb device available? */
-	if (down_interruptible (&dev_table_mutex)) {
-		return -ERESTARTSYS;
+	intf = usb_find_interface(&auerswald_driver, dtindex);
+	if (!intf) {
+		return -ENODEV;
 	}
-	cp = dev_table[dtindex];
+
+	/* usb device available? */
+	cp = usb_get_intfdata (intf);
 	if (cp == NULL) {
-		up (&dev_table_mutex);
 		return -ENODEV;
 	}
 	if (down_interruptible (&cp->mutex)) {
-		up (&dev_table_mutex);
 		return -ERESTARTSYS;
 	}
-	up (&dev_table_mutex);
 
 	/* we have access to the device. Now lets allocate memory */
 	ccp = (pauerchar_t) kmalloc(sizeof(auerchar_t), GFP_KERNEL);
@@ -1507,7 +1502,8 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 		u = 0;	/* no data */
 		if (ccp->readbuf) {
 			int restlen = ccp->readbuf->len - ccp->readoffset;
-			if (restlen > 0) u = 1;
+			if (restlen > 0)
+				u = 1;
 		}
 		if (!u) {
         		if (!list_empty (&ccp->bufctl.rec_buff_list)) {
@@ -1800,7 +1796,8 @@ write_again:
 	}
 
 	/* protect against too big write requests */
-	if (len > cp->maxControlLength) len = cp->maxControlLength;
+	if (len > cp->maxControlLength)
+		len = cp->maxControlLength;
 
 	/* Fill the buffer */
 	if (copy_from_user ( bp->bufp+AUH_SIZE, buf, len)) {
@@ -1895,6 +1892,13 @@ static struct file_operations auerswald_fops =
 	.release =	auerchar_release,
 };
 
+static struct usb_class_driver auerswald_class = {
+	.name =		"usb/auer%d",
+	.fops =		&auerswald_fops,
+	.mode =		S_IFCHR | S_IRUGO | S_IWUGO,
+	.minor_base =	AUER_MINOR_BASE,
+};
+
 
 /* --------------------------------------------------------------------- */
 /* Special USB driver functions                                          */
@@ -1923,7 +1927,6 @@ static int auerswald_probe (struct usb_interface *intf,
 	struct usb_device *usbdev = interface_to_usbdev(intf);
 	pauerswald_t cp = NULL;
 	DECLARE_WAIT_QUEUE_HEAD (wqh);
-	unsigned int dtindex;
 	unsigned int u = 0;
 	char *pbuf;
 	int ret;
@@ -1954,27 +1957,17 @@ static int auerswald_probe (struct usb_interface *intf,
         auerbuf_init (&cp->bufctl);
 	init_waitqueue_head (&cp->bufferwait);
 
-	down (&dev_table_mutex);
-	ret = usb_register_dev (&auerswald_fops, AUER_MINOR_BASE, 1, &dtindex);
+	ret = usb_register_dev(intf, &auerswald_class);
 	if (ret) {
 		err ("Not able to get a minor for this device.");
-		up (&dev_table_mutex);
 		goto pfail;
 	}
 
 	/* Give the device a name */
-	sprintf (cp->name, "usb/auer%d", dtindex);
+	sprintf (cp->name, "usb/auer%d", intf->minor);
 
 	/* Store the index */
-	cp->dtindex = dtindex;
-	dev_table[dtindex] = cp;
-	up (&dev_table_mutex);
-
-	/* initialize the devfs node for this device and register it */
-	devfs_register(NULL, cp->name, 0, USB_MAJOR,
-				    AUER_MINOR_BASE + dtindex,
-				    S_IFCHR | S_IRUGO | S_IWUGO,
-				    &auerswald_fops, NULL);
+	cp->dtindex = intf->minor;
 
 	/* Get the usb version of the device */
 	cp->version = cp->usbdev->descriptor.bcdDevice;
@@ -2083,18 +2076,8 @@ static void auerswald_disconnect (struct usb_interface *intf)
 	down (&cp->mutex);
 	info ("device /dev/%s now disconnecting", cp->name);
 
-	/* remove from device table */
-	/* Nobody can open() this device any more */
-	down (&dev_table_mutex);
-	dev_table[cp->dtindex] = NULL;
-	up (&dev_table_mutex);
-
-	/* remove our devfs node */
-	/* Nobody can see this device any more */
-	devfs_remove(cp->name);
-
 	/* give back our USB minor number */
-	usb_deregister_dev (1, cp->dtindex);
+	usb_deregister_dev(intf, &auerswald_class);
 
 	/* Stop the interrupt endpoint */
 	auerswald_int_release (cp);
@@ -2123,7 +2106,8 @@ static void auerswald_disconnect (struct usb_interface *intf)
 		/* Inform all waiting readers */
 		for ( u = 0; u < AUH_TYPESIZE; u++) {
 			pauerscon_t scp = cp->services[u];
-			if (scp) scp->disconnect( scp);
+			if (scp)
+				scp->disconnect( scp);
 		}
 	}
 }
@@ -2162,10 +2146,6 @@ static int __init auerswald_init (void)
 {
 	int result;
 	dbg ("init");
-
-	/* initialize the device table */
-	memset (&dev_table, 0, sizeof(dev_table));
-	init_MUTEX (&dev_table_mutex);
 
 	/* register driver at the USB subsystem */
 	result = usb_register (&auerswald_driver);

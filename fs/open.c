@@ -280,7 +280,7 @@ out:
  * must be owner or have write permission.
  * Else, update from *times, must be owner or super user.
  */
-long do_utimes(char __user * filename, struct timeval __user * times)
+long do_utimes(char __user * filename, struct timeval * times)
 {
 	int error;
 	struct nameidata nd;
@@ -671,8 +671,8 @@ struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 	if (f->f_flags & O_DIRECT) {
 		if (!inode->i_mapping || !inode->i_mapping->a_ops ||
 			!inode->i_mapping->a_ops->direct_IO) {
-				error = -EINVAL;
-				goto cleanup_all;
+				fput(f);
+				f = ERR_PTR(-EINVAL);
 		}
 	}
 
@@ -902,7 +902,7 @@ asmlinkage long sys_vhangup(void)
 
 /*
  * Called when an inode is about to be open.
- * We use this to disallow opening RW large files on 32bit systems if
+ * We use this to disallow opening large files on 32bit systems if
  * the caller didn't specify O_LARGEFILE.  On 64bit systems we force
  * on this flag in sys_open.
  */

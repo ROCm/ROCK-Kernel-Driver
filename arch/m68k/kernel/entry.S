@@ -188,7 +188,7 @@ do_delayed_trace:
 
 
 #if 0
-#if CONFIG_AMIGA
+#ifdef CONFIG_AMIGA
 ami_inthandler:
 	addql	#1,irq_stat+CPUSTAT_LOCAL_IRQ_COUNT
 	SAVE_ALL_INT

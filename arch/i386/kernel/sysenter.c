@@ -21,21 +21,6 @@
 
 extern asmlinkage void sysenter_entry(void);
 
-/*
- * Create a per-cpu fake "SEP thread" stack, so that we can
- * enter the kernel without having to worry about things like
- * "current" etc not working (debug traps and NMI's can happen
- * before we can switch over to the "real" thread).
- *
- * Return the resulting fake stack pointer.
- */
-struct fake_sep_struct {
-	struct thread_info thread;
-	struct task_struct task;
-	unsigned char trampoline[32] __attribute__((aligned(1024)));
-	unsigned char stack[0];
-} __attribute__((aligned(8192)));
-	
 void enable_sep_cpu(void *info)
 {
 	int cpu = get_cpu();

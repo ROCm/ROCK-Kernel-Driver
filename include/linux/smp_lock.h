@@ -5,7 +5,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 
 extern spinlock_t kernel_flag;
 

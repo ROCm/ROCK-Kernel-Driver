@@ -373,11 +373,16 @@ void __init init_ISA_irqs (void)
 
 static void setup_timer(void)
 {
+	extern spinlock_t i8253_lock;
+	unsigned long flags;
+
+	spin_lock_irqsave(&i8253_lock, flags);
 	outb_p(0x34,PIT_MODE);		/* binary, mode 2, LSB/MSB, ch 0 */
 	udelay(10);
 	outb_p(LATCH & 0xff , PIT_CH0);	/* LSB */
 	udelay(10);
 	outb(LATCH >> 8 , PIT_CH0);	/* MSB */
+	spin_unlock_irqrestore(&i8253_lock, flags);
 }
 
 static int timer_resume(struct device *dev, u32 level)

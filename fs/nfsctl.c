@@ -19,8 +19,6 @@
  * open a file on nfsd fs
  */
 
-struct vfsmount *do_kern_mount(const char *type, int flags, char *name, void *data);
-
 static struct file *do_open(char *name, int flags)
 {
 	struct nameidata nd;

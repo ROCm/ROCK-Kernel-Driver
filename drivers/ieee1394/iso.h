@@ -79,9 +79,6 @@ struct hpsb_iso {
 	/* size of data_buf, in bytes (always a multiple of PAGE_SIZE) */
 	unsigned int buf_size;
 
-	/* ringbuffer of packet descriptors in regular kernel memory */
-	struct hpsb_iso_packet_info *infos;
-
 	/* # of packets in the ringbuffer */
 	unsigned int buf_packets;
 
@@ -118,6 +115,11 @@ struct hpsb_iso {
 	/* cycle at which next packet will be transmitted,
 	   -1 if not known */
 	int xmit_cycle;
+
+	/* ringbuffer of packet descriptors in regular kernel memory
+	 * XXX Keep this last, since we use over-allocated memory from
+	 * this entry to fill this field. */
+	struct hpsb_iso_packet_info *infos;
 };
 
 /* functions available to high-level drivers (e.g. raw1394) */

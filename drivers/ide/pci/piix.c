@@ -142,6 +142,9 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 		p += sprintf(p, "\nController: %d\n", i);
 		p += sprintf(p, "\n                                Intel ");
 		switch(dev->device) {
+			case PCI_DEVICE_ID_INTEL_82801EB_1:
+				p += sprintf(p, "PIIX4 SATA 150 ");
+				break;
 			case PCI_DEVICE_ID_INTEL_82801BA_8:
 			case PCI_DEVICE_ID_INTEL_82801BA_9:
 			case PCI_DEVICE_ID_INTEL_82801CA_10:
@@ -275,6 +278,9 @@ static u8 piix_ratemask (ide_drive_t *drive)
 	u8 mode;
 
 	switch(dev->device) {
+		case PCI_DEVICE_ID_INTEL_82801EB_1:
+			mode = 3;
+			break;
 		/* UDMA 100 capable */
 		case PCI_DEVICE_ID_INTEL_82801BA_8:
 		case PCI_DEVICE_ID_INTEL_82801BA_9:
@@ -325,6 +331,7 @@ static u8 piix_ratemask (ide_drive_t *drive)
  
 static u8 piix_dma_2_pio (u8 xfer_rate) {
 	switch(xfer_rate) {
+		case XFER_UDMA_6:
 		case XFER_UDMA_5:
 		case XFER_UDMA_4:
 		case XFER_UDMA_3:
@@ -603,6 +610,7 @@ no_dma_set:
 static unsigned int __devinit init_chipset_piix (struct pci_dev *dev, const char *name)
 {
         switch(dev->device) {
+		case PCI_DEVICE_ID_INTEL_82801EB_1:
 		case PCI_DEVICE_ID_INTEL_82801AA_1:
 		case PCI_DEVICE_ID_INTEL_82801AB_1:
 		case PCI_DEVICE_ID_INTEL_82801BA_8:
@@ -803,6 +811,7 @@ static struct pci_device_id piix_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_11,PCI_ANY_ID, PCI_ANY_ID, 0, 0, 15},
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_11, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 16},
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_10,PCI_ANY_ID, PCI_ANY_ID, 0, 0, 17},
+ 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 18},
 	{ 0, },
 };
 

@@ -93,7 +93,7 @@ _start:
 	move.l  %d0, 0x180(%a1)			/* Set PLL register */
 	nop
 
-#if CONFIG_CLOCK_140MHz
+#ifdef CONFIG_CLOCK_140MHz
 	/*
 	 *	Set initial clock frequency. This assumes M5249C3 board
 	 *	is fitted with 11.2896MHz crystal. It will program the

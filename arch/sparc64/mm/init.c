@@ -36,7 +36,7 @@
 #include <asm/tlb.h>
 #include <asm/spitfire.h>
 
-struct mmu_gather mmu_gathers[NR_CPUS];
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
 extern void device_scan(void);
 

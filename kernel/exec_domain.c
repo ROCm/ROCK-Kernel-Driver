@@ -88,11 +88,7 @@ lookup_exec_domain(u_long personality)
 
 #ifdef CONFIG_KMOD
 	read_unlock(&exec_domains_lock);
-	{
-		char buffer[30];
-		sprintf(buffer, "personality-%ld", pers);
-		request_module(buffer);
-	}
+	request_module("personality-%ld", pers);
 	read_lock(&exec_domains_lock);
 
 	for (ep = exec_domains; ep; ep = ep->next) {

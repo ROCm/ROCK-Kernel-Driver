@@ -113,7 +113,7 @@ struct inet_opt {
 	__u16			dport;		/* Destination port */
 	__u16			num;		/* Local port */
 	__u32			saddr;		/* Sending source */
-	int			ttl;		/* TTL setting */
+	int			uc_ttl;		/* Unicast TTL */
 	int			tos;		/* TOS */
 	unsigned	   	cmsg_flags;
 	struct ip_options	*opt;
@@ -196,6 +196,12 @@ struct ip_esp_hdr {
 	__u32 spi;
 	__u32 seq_no;		/* Sequence number */
 	__u8  enc_data[0];	/* Variable len but >=8. Mind the 64 bit alignment! */
+};
+
+struct ip_comp_hdr {
+	__u8 nexthdr;
+	__u8 flags;
+	__u16 cpi;
 };
 
 #endif	/* _LINUX_IP_H */

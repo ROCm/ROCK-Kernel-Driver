@@ -4,6 +4,7 @@
  * Architecture specific compatibility types
  */
 #include <linux/types.h>
+#include <linux/sched.h>
 
 #define COMPAT_USER_HZ	100
 
@@ -117,6 +118,21 @@ typedef	u32		compat_uptr_t;
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
 	return (void *)(unsigned long)uptr;
+}
+
+static inline void *compat_alloc_user_space(long len)
+{
+	struct pt_regs *regs = current->thread.regs;
+	unsigned long usp = regs->gpr[1];
+
+	/*
+	 * We cant access below the stack pointer in the 32bit ABI and
+	 * can access 288 bytes in the 64bit ABI
+	 */
+	if (!(test_thread_flag(TIF_32BIT)))
+		usp -= 288;
+
+	return (void *) (usp - len);
 }
 
 #endif /* _ASM_PPC64_COMPAT_H */

@@ -156,7 +156,7 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 }
 
 static ssize_t
-rpc_pipe_read(struct file *filp, char *buf, size_t len, loff_t *offset)
+rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct rpc_inode *rpci = RPC_I(inode);
@@ -193,7 +193,7 @@ out_unlock:
 }
 
 static ssize_t
-rpc_pipe_write(struct file *filp, const char *buf, size_t len, loff_t *offset)
+rpc_pipe_write(struct file *filp, const char __user *buf, size_t len, loff_t *offset)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct rpc_inode *rpci = RPC_I(inode);
@@ -310,6 +310,7 @@ rpc_info_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations rpc_info_operations = {
+	.owner		= THIS_MODULE,
 	.open		= rpc_info_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
@@ -748,7 +749,7 @@ out:
 
 static struct super_block *
 rpc_get_sb(struct file_system_type *fs_type,
-		int flags, char *dev_name, void *data)
+		int flags, const char *dev_name, void *data)
 {
 	return get_sb_single(fs_type, flags, data, rpc_fill_super);
 }
@@ -781,7 +782,7 @@ int register_rpc_pipefs(void)
 {
 	rpc_inode_cachep = kmem_cache_create("rpc_inode_cache",
                                              sizeof(struct rpc_inode),
-                                             0, SLAB_HWCACHE_ALIGN,
+                                             0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
                                              init_once, NULL);
 	if (!rpc_inode_cachep)
 		return -ENOMEM;

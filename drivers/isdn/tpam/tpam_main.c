@@ -132,7 +132,7 @@ static int __devinit tpam_probe(struct pci_dev *dev, const struct pci_device_id 
 	copy_to_pam_dword(card, (void *)0x01840070, 0x00000010);
 
 	/* fill the ISDN link layer structure */
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
 	card->interface.channels = TPAM_NBCHANNEL;
 	card->interface.maxbufsize = TPAM_MAXBUFSIZE;
 	card->interface.features = 

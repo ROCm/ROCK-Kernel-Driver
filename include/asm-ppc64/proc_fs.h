@@ -25,9 +25,14 @@
 
 #include <linux/proc_fs.h>
 
-void pmc_proc_init(struct proc_dir_entry *iSeries_proc);
-void proc_ppc64_init(void);
+struct proc_ppc64_t {
+	struct proc_dir_entry *root;
+	struct proc_dir_entry *naca;
+	struct proc_dir_entry *paca;
+	struct proc_dir_entry *systemcfg;
+	struct proc_dir_entry *rtas;
+};
 
-#include <asm/iSeries/iSeries_proc.h>
+extern struct proc_ppc64_t proc_ppc64;
 
-#endif
+#endif /* _PPC64_PROC_FS_H */

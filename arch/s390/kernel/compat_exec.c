@@ -18,6 +18,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 #include <linux/binfmts.h>
@@ -31,8 +32,6 @@
 #include <linux/kmod.h>
 #endif
 
-
-extern void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address);
 
 #undef STACK_TOP
 #define STACK_TOP TASK31_SIZE
@@ -81,7 +80,7 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current,page,stack_base);
+			put_dirty_page(current,page,stack_base,PAGE_COPY);
 		}
 		stack_base += PAGE_SIZE;
 	}

@@ -1700,7 +1700,20 @@ static int seagate_st0x_release(struct Scsi_Host *shost)
 	return 0;
 }
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = SEAGATE_ST0X;
-
+static Scsi_Host_Template driver_template = {
+	.detect         	= seagate_st0x_detect,
+	.release        	= seagate_st0x_release,
+	.info           	= seagate_st0x_info,
+	.command        	= seagate_st0x_command,
+	.queuecommand   	= seagate_st0x_queue_command,
+	.eh_abort_handler	= seagate_st0x_abort,
+	.eh_bus_reset_handler	= seagate_st0x_bus_reset,
+	.eh_host_reset_handler	= seagate_st0x_host_reset,
+	.eh_device_reset_handler = seagate_st0x_device_reset,
+	.can_queue      	= 1,
+	.this_id        	= 7,
+	.sg_tablesize   	= SG_ALL,
+	.cmd_per_lun    	= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"

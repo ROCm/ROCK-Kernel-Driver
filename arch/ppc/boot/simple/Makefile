@@ -160,8 +160,7 @@ MKBUGBOOT			:= $(utils)/mkbugboot
 MKPREP				:= $(utils)/mkprep
 MKTREE				:= $(utils)/mktree
 
-$(obj)/dummy.o: $(common)/dummy.c
-	$(CC) -c -o $@ $(common)/dummy.c
+targets := dummy.o
 
 $(obj)/zvmlinux: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
 		$(obj)/dummy.o

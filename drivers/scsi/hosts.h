@@ -482,9 +482,10 @@ struct Scsi_Host
     unsigned int max_host_blocked;
 
     /* 
-     * Support for driverfs filesystem
+     * Support for sysfs
      */
-    struct device *host_gendev;
+    struct device host_gendev;
+    struct class_device class_dev;
 
     /*
      * We should ensure that this is aligned, both for better performance
@@ -495,8 +496,11 @@ struct Scsi_Host
         __attribute__ ((aligned (sizeof(unsigned long))));
 };
 
-#define	to_scsi_host(d)	d->driver_data	/* Major logical breakage, but we compile again... */
-	
+#define		dev_to_shost(d)		\
+	container_of(d, struct Scsi_Host, host_gendev)
+#define		class_to_shost(d)	\
+	container_of(d, struct Scsi_Host, class_dev)
+
 /*
  * These two functions are used to allocate and free a pseudo device
  * which will connect to the host adapter itself rather than any
@@ -510,6 +514,7 @@ extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
 extern void scsi_report_bus_reset(struct Scsi_Host *, int);
+extern void scsi_report_device_reset(struct Scsi_Host *, int, int);
 
 static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 {
@@ -519,20 +524,13 @@ static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 static inline void scsi_set_device(struct Scsi_Host *shost,
                                    struct device *dev)
 {
-        shost->host_gendev = dev;
+        shost->host_gendev.parent = dev;
 }
 
 static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
-        return shost->host_gendev;
+        return shost->host_gendev.parent;
 }
-
-/*
- * Prototypes for functions/data in scsi_scan.c
- */
-extern void scsi_scan_host(struct Scsi_Host *);
-extern void scsi_forget_host(struct Scsi_Host *);
-
 
 struct Scsi_Device_Template
 {
@@ -572,16 +570,8 @@ extern int scsi_remove_host(struct Scsi_Host *);
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
-extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
 extern void scsi_host_put(struct Scsi_Host *);
-extern void scsi_host_init(void);
-
-/*
- * host_busy inc/dec/test functions
- */
-extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
-extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
 
 /**
  * scsi_find_device - find a device given the host
@@ -601,30 +591,4 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
         return NULL;
 }
 
-/*
- * sysfs support
- */
-extern int scsi_upper_driver_register(struct Scsi_Device_Template *);
-extern void scsi_upper_driver_unregister(struct Scsi_Device_Template *);
-
-extern struct class shost_class;
-
 #endif
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

@@ -1409,12 +1409,10 @@ static void proc_cpia_create(void)
 		LOG("Unable to initialise /proc/cpia\n");
 }
 
-#ifdef MODULE
-static void proc_cpia_destroy(void)
+static void __exit proc_cpia_destroy(void)
 {
 	remove_proc_entry("cpia", 0);
 }
-#endif /*MODULE*/
 #endif /* CONFIG_PROC_FS */
 
 /* ----------------------- debug functions ---------------------- */
@@ -2429,10 +2427,20 @@ static void set_flicker(struct cam_params *params, volatile u32 *command_flags,
 #define FIRMWARE_VERSION(x,y) (params->version.firmwareVersion == (x) && \
                                params->version.firmwareRevision == (y))
 /* define for compgain calculation */
+#if 0
 #define COMPGAIN(base, curexp, newexp) \
     (u8) ((((float) base - 128.0) * ((float) curexp / (float) newexp)) + 128.5)
 #define EXP_FROM_COMP(basecomp, curcomp, curexp) \
     (u16)((float)curexp * (float)(u8)(curcomp + 128) / (float)(u8)(basecomp - 128))
+#else
+  /* equivalent functions without floating point math */
+#define COMPGAIN(base, curexp, newexp) \
+    (u8)(128 + (((u32)(2*(base-128)*curexp + newexp)) / (2* newexp)) )
+#define EXP_FROM_COMP(basecomp, curcomp, curexp) \
+     (u16)(((u32)(curexp * (u8)(curcomp + 128)) / (u8)(basecomp - 128)))
+#endif
+
+ 
 	int currentexp = params->exposure.coarseExpLo +
 			 params->exposure.coarseExpHi*256;
 	int startexp;

@@ -9,7 +9,6 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <linux/brlock.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 
@@ -90,7 +89,7 @@ typedef struct {
 #ifndef CONFIG_SMP
 #define irq_enter()             (preempt_count() += HARDIRQ_OFFSET)
 
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 # define in_atomic()	(preempt_count() != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
@@ -116,7 +115,7 @@ do {                                                                    \
 #define irq_exit()		br_read_unlock(BR_GLOBALIRQ_LOCK)
 #endif
 
-#if CONFIG_PREEMPT
+#ifdef CONFIG_PREEMPT
 # define in_atomic()	(preempt_count() != kernel_locked())
 #else
 # define in_atomic()	(preempt_count() != 0)

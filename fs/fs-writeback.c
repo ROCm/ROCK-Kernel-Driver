@@ -90,7 +90,8 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * Only add valid (hashed) inodes to the superblock's
 		 * dirty list.  Add blockdev inodes as well.
 		 */
-		if (hlist_unhashed(&inode->i_hash) && !S_ISBLK(inode->i_mode))
+		if ((hlist_unhashed(&inode->i_hash) || (inode->i_state & (I_FREEING|I_CLEAR)))
+		    && !S_ISBLK(inode->i_mode))
 			goto out;
 
 		/*
@@ -367,7 +368,8 @@ void sync_inodes_sb(struct super_block *sb, int wait)
 	};
 
 	get_page_state(&ps);
-	wbc.nr_to_write = ps.nr_dirty + ps.nr_dirty / 4;
+	wbc.nr_to_write = ps.nr_dirty + ps.nr_unstable +
+		(ps.nr_dirty + ps.nr_unstable) / 4;
 	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);
 	spin_unlock(&inode_lock);

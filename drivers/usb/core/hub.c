@@ -42,7 +42,7 @@ static LIST_HEAD(hub_event_list);	/* List of hubs needing servicing */
 static LIST_HEAD(hub_list);		/* List of all hubs (for cleanup) */
 
 static DECLARE_WAIT_QUEUE_HEAD(khubd_wait);
-static int khubd_pid = 0;			/* PID of khubd */
+static pid_t khubd_pid = 0;			/* PID of khubd */
 static DECLARE_COMPLETION(khubd_exited);
 
 #ifdef	DEBUG
@@ -1126,7 +1126,7 @@ static struct usb_driver hub_driver = {
  */
 int usb_hub_init(void)
 {
-	int pid;
+	pid_t pid;
 
 	if (usb_register(&hub_driver) < 0) {
 		err("Unable to register USB hub driver");

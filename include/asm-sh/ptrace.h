@@ -64,7 +64,6 @@ struct pt_regs {
 #ifdef __KERNEL__
 #define user_mode(regs) (((regs)->sr & 0x40000000)==0)
 #define instruction_pointer(regs) ((regs)->pc)
-#define force_successful_syscall_return()	do { } while (0)
 extern void show_regs(struct pt_regs *);
 
 /* User Break Controller */

@@ -16,7 +16,7 @@
 /*
  * a maximum of 16 APICs with the current APIC ID architecture.
  */
-#if defined(CONFIG_X86_NUMAQ) || defined (CONFIG_X86_SUMMIT)
+#if defined(CONFIG_X86_NUMAQ) || defined (CONFIG_X86_SUMMIT) || defined(CONFIG_X86_GENERICARCH)
 #define MAX_APICS 256
 #else
 #define MAX_APICS 16

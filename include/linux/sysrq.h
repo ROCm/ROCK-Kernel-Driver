@@ -92,21 +92,3 @@ static inline int __reterr(void)
 #define unregister_sysrq_key(ig,nore) __reterr()
 
 #endif
-
-
-/* Deferred actions */
-
-extern int emergency_sync_scheduled;
-
-#define EMERG_SYNC 1
-#define EMERG_REMOUNT 2
-
-void do_emergency_sync(void);
-
-#ifdef CONFIG_MAGIC_SYSRQ
-#define CHECK_EMERGENCY_SYNC			\
-	if (emergency_sync_scheduled)		\
-		do_emergency_sync();
-#else
-#define CHECK_EMERGENCY_SYNC
-#endif

@@ -366,8 +366,8 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/* Mark single stepping.  */
-		child->thread_info->bpt_nsaved = -1;
+		/* Set single stepping.  */
+		ptrace_set_bpt(child);
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		wake_up_process(child);
 		child->exit_code = data;
@@ -397,11 +397,11 @@ syscall_trace(void)
 		return;
 	if (!(current->ptrace & PT_PTRACED))
 		return;
-	current->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-					? 0x80 : 0);
-	current->state = TASK_STOPPED;
-	notify_parent(current, SIGCHLD);
-	schedule();
+	/* The 0x80 provides a way for the tracing parent to distinguish
+	   between a syscall stop and SIGTRAP delivery */
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+				 ? 0x80 : 0));
+
 	/*
 	 * This isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

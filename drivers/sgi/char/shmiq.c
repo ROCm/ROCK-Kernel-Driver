@@ -470,9 +470,8 @@ shmiq_init (void)
 	printk ("SHMIQ setup\n");
 	register_chrdev(SHMIQ_MAJOR, "shmiq", &shmiq_fops);
 	for (i = 0; i < 3; i++) {
-		devfs_register (NULL, names[i], DEVFS_FL_DEFAULT,
-			SHMIQ_MAJOR, i, S_IFCHR | S_IRUSR | S_IWUSR,
-			&shmiq_fops, NULL);
+		devfs_mk_cdev(MKDEV(SHMIQ_MAJOR, i),
+				S_IFCHR | S_IRUSR | S_IWUSR, names[i]);
 	}
 }
 

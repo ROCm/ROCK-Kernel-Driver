@@ -787,15 +787,12 @@ sort_nic_names(lboard_t *lb)
         if (tmp == NULL)
 		return ;
 
-        if  ( (tmp1 = strchr(tmp, ';')) ){
-                strncpy(name, tmp, tmp1-tmp) ;
-                name[tmp1-tmp] = 0 ;
-        } else {
-                strncpy(name, tmp, (sizeof(name) -1)) ;
-                name[sizeof(name)-1] = 0 ;
-        }
+        if  ( (tmp1 = strchr(tmp, ';')) )
+                strlcpy(name, tmp, tmp1-tmp);
+        else
+                strlcpy(name, tmp, (sizeof(name)));
 
-	strcpy(lb->brd_name, name) ;
+	strlcpy(lb->brd_name, name, sizeof(lb->brd_name)) ;
 }
 
 

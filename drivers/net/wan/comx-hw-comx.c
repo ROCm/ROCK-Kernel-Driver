@@ -1427,24 +1427,20 @@ static struct comx_hardware hicomx_hw = {
 	NULL
 };
 
-#ifdef MODULE
-#define comx_hw_comx_init init_module
-#endif
-
-int __init comx_hw_comx_init(void)
+static int __init comx_hw_comx_init(void)
 {
 	comx_register_hardware(&comx_hw);
 	comx_register_hardware(&cmx_hw);
 	comx_register_hardware(&hicomx_hw);
-	memset(memory_used, 0, sizeof(memory_used));
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit comx_hw_comx_exit(void)
 {
 	comx_unregister_hardware("comx");
 	comx_unregister_hardware("cmx");
 	comx_unregister_hardware("hicomx");
 }
-#endif
+
+module_init(comx_hw_comx_init);
+module_exit(comx_hw_comx_exit);

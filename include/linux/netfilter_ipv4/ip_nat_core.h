@@ -16,10 +16,10 @@ extern unsigned int do_bindings(struct ip_conntrack *ct,
 
 extern struct list_head protos;
 
-extern unsigned int icmp_reply_translation(struct sk_buff *skb,
-					   struct ip_conntrack *conntrack,
-					   unsigned int hooknum,
-					   int dir);
+extern int icmp_reply_translation(struct sk_buff **pskb,
+				  struct ip_conntrack *conntrack,
+				  unsigned int hooknum,
+				  int dir);
 
 extern void replace_in_hashes(struct ip_conntrack *conntrack,
 			      struct ip_nat_info *info);

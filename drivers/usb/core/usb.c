@@ -457,12 +457,13 @@ usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 /**
  * usb_find_interface - find usb_interface pointer for driver and device
  * @drv: the driver whose current configuration is considered
- * @kdev: the desired device
+ * @minor: the minor number of the desired device
  *
  * This walks the driver device list and returns a pointer to the interface 
- * with the matching kdev_t.
+ * with the matching minor.  Note, this only works for devices that share the
+ * USB major number.
  */
-struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev)
+struct usb_interface *usb_find_interface(struct usb_driver *drv, int minor)
 {
 	struct list_head *entry;
 	struct device *dev;
@@ -476,9 +477,10 @@ struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev)
 			continue;
 
 		intf = to_usb_interface(dev);
-		if (kdev_same(intf->kdev,kdev)) {
+		if (intf->minor == -1)
+			continue;
+		if (intf->minor == minor)
 			return intf;
-		}
 	}
 
 	/* no device found that matches */

@@ -69,7 +69,6 @@ struct switch_stack {
 #ifdef __KERNEL__
 #define user_mode(regs) (((regs)->ps & 8) != 0)
 #define instruction_pointer(regs) ((regs)->pc)
-#define force_successful_syscall_return()	do { } while (0)
 extern void show_regs(struct pt_regs *);
 #endif
 

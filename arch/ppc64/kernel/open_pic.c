@@ -111,7 +111,6 @@ unsigned int openpic_vec_spurious;
  * data has probably been corrupted and we're going to panic or deadlock later
  * anyway --Troy
  */
-extern unsigned long* _get_SP(void);
 #define check_arg_irq(irq) \
     if (irq < open_pic_irq_offset || irq >= (NumSources+open_pic_irq_offset)){ \
       printk(KERN_ERR "open_pic.c:%d: illegal irq %d\n", __LINE__, irq); \
@@ -765,9 +764,11 @@ static void openpic_end_ipi(unsigned int irq_nr)
 	openpic_eoi();
 }
 
-static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
+static irqreturn_t openpic_ipi_action(int cpl, void *dev_id,
+					struct pt_regs *regs)
 {
 	smp_message_recv(cpl-openpic_vec_ipi, regs);
+	return IRQ_HANDLED;
 }
 
 #endif /* CONFIG_SMP */

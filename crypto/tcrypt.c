@@ -113,7 +113,7 @@ test_md5(void)
 	printk("\ntesting md5 across pages\n");
 
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 	memcpy(&xbuf[IDX1], "abcdefghijklm", 13);
 	memcpy(&xbuf[IDX2], "nopqrstuvwxyz", 13);
 
@@ -188,7 +188,7 @@ test_hmac_md5(void)
 
 	printk("\ntesting hmac_md5 across pages\n");
 
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 
 	memcpy(&xbuf[IDX1], "what do ya want ", 16);
 	memcpy(&xbuf[IDX2], "for nothing?", 12);
@@ -267,7 +267,7 @@ test_hmac_sha1(void)
 	printk("\ntesting hmac_sha1 across pages\n");
 
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 
 	memcpy(&xbuf[IDX1], "what do ya want ", 16);
 	memcpy(&xbuf[IDX2], "for nothing?", 12);
@@ -450,7 +450,7 @@ test_sha1(void)
 	printk("\ntesting sha1 across pages\n");
 
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 	memcpy(&xbuf[IDX1], "abcdbcdecdefdefgefghfghighij", 28);
 	memcpy(&xbuf[IDX2], "hijkijkljklmklmnlmnomnopnopq", 28);
 
@@ -525,7 +525,7 @@ test_sha256(void)
 	printk("\ntesting sha256 across pages\n");
 
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 	memcpy(&xbuf[IDX1], "abcdbcdecdefdefgefghfghighij", 28);
 	memcpy(&xbuf[IDX2], "hijkijkljklmklmnlmnomnopnopq", 28);
 
@@ -1027,7 +1027,7 @@ test_des(void)
 	}
 
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof (xbuf));
+	memset(xbuf, 0, XBUFSIZE);
 
 	xbuf[IDX1] = des_tv[i].plaintext[0];
 	xbuf[IDX2] = des_tv[i].plaintext[1];

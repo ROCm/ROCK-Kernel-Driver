@@ -53,8 +53,6 @@ static struct irda_entry dir[] = {
 	{"irias",	irias_proc_read},
 };
 
-#define IRDA_ENTRIES_NUM (sizeof(dir)/sizeof(dir[0]))
- 
 /*
  * Function irda_proc_register (void)
  *
@@ -70,7 +68,7 @@ void __init irda_proc_register(void)
 		return;
 	proc_irda->owner = THIS_MODULE;
 
-	for (i=0;i<IRDA_ENTRIES_NUM;i++)
+	for (i=0; i<ARRAY_SIZE(dir); i++)
 		create_proc_info_entry(dir[i].name,0,proc_irda,dir[i].fn);
 }
 
@@ -85,7 +83,7 @@ void __exit irda_proc_unregister(void)
 	int i;
 
         if (proc_irda) {
-                for (i=0;i<IRDA_ENTRIES_NUM;i++)
+                for (i=0; i<ARRAY_SIZE(dir); i++)
                         remove_proc_entry(dir[i].name, proc_irda);
 
                 remove_proc_entry("net/irda", NULL);

@@ -33,10 +33,7 @@
    - Tasklets: serialized wrt itself.
  */
 
-/* No separate irq_stat for ia64, it is part of PSA */
-#if !defined(CONFIG_IA64)
 irq_cpustat_t irq_stat[NR_CPUS] ____cacheline_aligned;
-#endif /* CONFIG_IA64 */
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
@@ -324,7 +321,7 @@ static int ksoftirqd(void * __bind_cpu)
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
 
-	local_ksoftirqd_task() = current;
+	ksoftirqd_task(cpu) = current;
 
 	for (;;) {
 		if (!local_softirq_pending())

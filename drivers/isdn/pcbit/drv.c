@@ -171,7 +171,7 @@ int pcbit_init_dev(int board, int mem_base, int irq)
 
 	dev->dev_if = dev_if;
 
-	SET_MODULE_OWNER(dev_if);
+	dev_if->owner = THIS_MODULE;
 
 	dev_if->channels = 2;
 	
@@ -1071,6 +1071,7 @@ static void pcbit_set_msn(struct pcbit_dev *dev, char *list)
 		ptr->msn = kmalloc(len, GFP_ATOMIC);
 		if (!ptr->msn) {
 			printk(KERN_WARNING "kmalloc failed\n");
+			kfree(ptr);
 			return;
 		}
 

@@ -28,7 +28,7 @@
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <linux/kobject.h>
+#include <linux/device.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -427,9 +427,6 @@ struct net_device
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
 
-	/* open/release and usage marking */
-	struct module *owner;
-
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;
 
@@ -444,9 +441,18 @@ struct net_device
 	struct divert_blk	*divert;
 #endif /* CONFIG_NET_DIVERT */
 
-	/* generic object representation */
-	struct kobject kobj;
+	/* class/net/name entry */
+	struct class_device	class_dev;
+
+	/* statistics sub-directory */
+	struct kobject		stats_kobj;
 };
+
+#define SET_MODULE_OWNER(dev) do { } while (0)
+/* Set the sysfs physical device reference for the network logical device
+ * if set prior to registration will cause a symlink during initialization.
+ */
+#define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
 
 struct packet_type 
@@ -456,7 +462,7 @@ struct packet_type
 	int			(*func) (struct sk_buff *, struct net_device *,
 					 struct packet_type *);
 	void			*data;	/* Private to the packet type		*/
-	struct packet_type	*next;
+	struct list_head	list;
 };
 
 
@@ -472,6 +478,7 @@ extern int 			netdev_boot_setup_check(struct net_device *dev);
 extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
+extern void		__dev_remove_pack(struct packet_type *pt);
 extern int		dev_get(const char *name);
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
@@ -562,12 +569,12 @@ static inline void netif_stop_queue(struct net_device *dev)
 	set_bit(__LINK_STATE_XOFF, &dev->state);
 }
 
-static inline int netif_queue_stopped(struct net_device *dev)
+static inline int netif_queue_stopped(const struct net_device *dev)
 {
 	return test_bit(__LINK_STATE_XOFF, &dev->state);
 }
 
-static inline int netif_running(struct net_device *dev)
+static inline int netif_running(const struct net_device *dev)
 {
 	return test_bit(__LINK_STATE_START, &dev->state);
 }
@@ -607,7 +614,9 @@ extern int		netif_rx(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void *);
+extern unsigned		dev_get_flags(const struct net_device *);
 extern int		dev_change_flags(struct net_device *, unsigned);
+extern int		dev_set_mtu(struct net_device *, int);
 extern void		dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev);
 
 extern void		dev_init(void);
@@ -625,12 +634,12 @@ static inline int netif_rx_ni(struct sk_buff *skb)
        return err;
 }
 
-extern int netdev_finish_unregister(struct net_device *dev);
+/* Called by rtnetlink.c:rtnl_unlock() */
+extern void netdev_run_todo(void);
 
 static inline void dev_put(struct net_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt))
-		netdev_finish_unregister(dev);
+	atomic_dec(&dev->refcnt);
 }
 
 #define __dev_put(dev) atomic_dec(&(dev)->refcnt)
@@ -643,7 +652,7 @@ static inline void dev_put(struct net_device *dev)
 
 extern void linkwatch_fire_event(struct net_device *dev);
 
-static inline int netif_carrier_ok(struct net_device *dev)
+static inline int netif_carrier_ok(const struct net_device *dev)
 {
 	return !test_bit(__LINK_STATE_NOCARRIER, &dev->state);
 }

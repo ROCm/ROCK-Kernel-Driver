@@ -28,7 +28,12 @@ int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci);
 void atm_release_vcc_sk(struct sock *sk,int free_sk);
 void atm_shutdown_dev(struct atm_dev *dev);
 
+int atmpvc_init(void);
+void atmpvc_exit(void);
+int atmsvc_init(void);
+void atmsvc_exit(void);
 int atm_proc_init(void);
+void atm_proc_exit(void);
 
 /* SVC */
 

@@ -234,7 +234,7 @@ static int init_inodecache(void)
 {
 	adfs_inode_cachep = kmem_cache_create("adfs_inode_cache",
 					     sizeof(struct adfs_inode_info),
-					     0, SLAB_HWCACHE_ALIGN,
+					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (adfs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -459,7 +459,7 @@ error:
 }
 
 static struct super_block *adfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, adfs_fill_super);
 }

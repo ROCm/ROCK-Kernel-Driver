@@ -97,8 +97,7 @@ static int map_area_pte(pte_t *pte, unsigned long address,
 	do {
 		struct page *page = **pages;
 
-		if (!pte_none(*pte))
-			printk(KERN_ERR "alloc_area_pte: page already exists\n");
+		WARN_ON(!pte_none(*pte));
 		if (!page)
 			return -ENOMEM;
 
@@ -261,6 +260,7 @@ struct vm_struct *remove_vm_area(void *addr)
 	return NULL;
 
 found:
+	unmap_vm_area(tmp);
 	*p = tmp->next;
 	write_unlock(&vmlist_lock);
 	return tmp;
@@ -284,8 +284,6 @@ void __vunmap(void *addr, int deallocate_pages)
 				addr);
 		return;
 	}
-
-	unmap_vm_area(area);
 	
 	if (deallocate_pages) {
 		int i;

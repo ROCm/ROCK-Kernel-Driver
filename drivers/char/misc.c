@@ -114,10 +114,8 @@ static int misc_open(struct inode * inode, struct file * file)
 	if (c != &misc_list)
 		new_fops = fops_get(c->fops);
 	if (!new_fops) {
-		char modname[20];
 		up(&misc_sem);
-		sprintf(modname, "char-major-%d-%d", MISC_MAJOR, minor);
-		request_module(modname);
+		request_module("char-major-%d-%d", MISC_MAJOR, minor);
 		down(&misc_sem);
 		c = misc_list.next;
 		while ((c != &misc_list) && (c->minor != minor))
@@ -200,8 +198,8 @@ int misc_register(struct miscdevice * misc)
 				"misc/%s", misc->name);
 	}
 
-	devfs_register(NULL, misc->devfs_name, 0, MISC_MAJOR, misc->minor,
-			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->fops, NULL);
+	devfs_mk_cdev(MKDEV(MISC_MAJOR, misc->minor),
+			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->devfs_name);
 
 	/*
 	 * Add it to the front, so that later devices can "override"

@@ -104,19 +104,21 @@ enum
 /* Netlink configuration messages.  */
 #define XFRM_MSG_BASE		0x10
 
-#define XFRM_MSG_NEWSA		(RTM_BASE + 0)
-#define XFRM_MSG_DELSA		(RTM_BASE + 1)
-#define XFRM_MSG_GETSA		(RTM_BASE + 2)
+#define XFRM_MSG_NEWSA		(XFRM_MSG_BASE + 0)
+#define XFRM_MSG_DELSA		(XFRM_MSG_BASE + 1)
+#define XFRM_MSG_GETSA		(XFRM_MSG_BASE + 2)
 
-#define XFRM_MSG_NEWPOLICY	(RTM_BASE + 3)
-#define XFRM_MSG_DELPOLICY	(RTM_BASE + 4)
-#define XFRM_MSG_GETPOLICY	(RTM_BASE + 5)
+#define XFRM_MSG_NEWPOLICY	(XFRM_MSG_BASE + 3)
+#define XFRM_MSG_DELPOLICY	(XFRM_MSG_BASE + 4)
+#define XFRM_MSG_GETPOLICY	(XFRM_MSG_BASE + 5)
 
-#define XFRM_MSG_ALLOCSPI	(RTM_BASE + 6)
-#define XFRM_MSG_ACQUIRE	(RTM_BASE + 7)
-#define XFRM_MSG_EXPIRE		(RTM_BASE + 8)
+#define XFRM_MSG_ALLOCSPI	(XFRM_MSG_BASE + 6)
+#define XFRM_MSG_ACQUIRE	(XFRM_MSG_BASE + 7)
+#define XFRM_MSG_EXPIRE		(XFRM_MSG_BASE + 8)
 
-#define XFRM_MSG_MAX		(XFRM_MSG_EXPIRE+1)
+#define XFRM_MSG_UPDPOLICY	(XFRM_MSG_BASE + 9)
+
+#define XFRM_MSG_MAX		(XFRM_MSG_UPDPOLICY+1)
 
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;

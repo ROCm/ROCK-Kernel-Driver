@@ -190,6 +190,7 @@ struct sk_buff {
 	struct sock		*sk;
 	struct timeval		stamp;
 	struct net_device	*dev;
+	struct net_device	*real_dev;
 
 	union {
 		struct tcphdr	*th;
@@ -790,6 +791,15 @@ static inline int skb_pagelen(const struct sk_buff *skb)
 	for (i = (int)skb_shinfo(skb)->nr_frags - 1; i >= 0; i--)
 		len += skb_shinfo(skb)->frags[i].size;
 	return len + skb_headlen(skb);
+}
+
+static inline void skb_fill_page_desc(struct sk_buff *skb, int i, struct page *page, int off, int size)
+{
+	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+	frag->page = page;
+	frag->page_offset = off;
+	frag->size = size;
+	skb_shinfo(skb)->nr_frags = i+1;
 }
 
 #define SKB_PAGE_ASSERT(skb) do { if (skb_shinfo(skb)->nr_frags) \

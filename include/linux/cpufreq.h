@@ -311,4 +311,7 @@ void cpufreq_frequency_table_put_attr(unsigned int cpu);
 
 #endif /* CONFIG_CPU_FREQ_TABLE */
 
+/* Currently exported only for the proc interface, remove when that goes */
+extern struct cpufreq_driver *cpufreq_driver;
+
 #endif /* _LINUX_CPUFREQ_H */

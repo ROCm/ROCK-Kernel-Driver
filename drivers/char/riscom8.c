@@ -552,9 +552,7 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 			wake_up_interruptible(&port->open_wait);
 		else if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
 			   (port->flags & ASYNC_CALLOUT_NOHUP))) {
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&port->tqueue_hangup) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_task(&port->tqueue_hangup);
 		}
 	}
 	
@@ -676,7 +674,6 @@ static inline int rc_setup_board(struct riscom_board * bp)
 	IRQ_to_board[bp->irq] = bp;
 	bp->flags |= RC_BOARD_ACTIVE;
 	
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -694,7 +691,6 @@ static inline void rc_shutdown_board(struct riscom_board *bp)
 	bp->DTR = ~0;
 	rc_out(bp, RC_DTR, bp->DTR);	       /* Drop DTR on all ports */
 	
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -1678,7 +1674,6 @@ static void do_rc_hangup(void *private_)
 	tty = port->tty;
 	if (tty)
 		tty_hangup(tty);	/* FIXME: module removal race still here */
-	MOD_DEC_USE_COUNT;
 }
 
 static void rc_hangup(struct tty_struct * tty)
@@ -1757,6 +1752,7 @@ static inline int rc_init_drivers(void)
 	memset(IRQ_to_board, 0, sizeof(IRQ_to_board));
 	memset(&riscom_driver, 0, sizeof(riscom_driver));
 	riscom_driver.magic = TTY_DRIVER_MAGIC;
+	riscom_driver.owner = THIS_MODULE;
 	riscom_driver.name = "ttyL";
 	riscom_driver.major = RISCOM8_NORMAL_MAJOR;
 	riscom_driver.num = RC_NBOARD * RC_NPORT;

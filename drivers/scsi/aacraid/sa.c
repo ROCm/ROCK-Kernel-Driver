@@ -352,7 +352,7 @@ int aac_sa_init(struct aac_dev *dev, unsigned long devnum)
 	 *	Wait for the adapter to be up and running. Wait up to 3 minutes.
 	 */
 	while (!(sa_readl(dev, Mailbox7) & KERNEL_UP_AND_RUNNING)) {
-		if (time_after(start+180*HZ, jiffies)) {
+		if (time_after(jiffies, start+180*HZ)) {
 			status = sa_readl(dev, Mailbox7) >> 16;
 			printk(KERN_WARNING "%s%d: adapter kernel failed to start, init status = %d.\n", name, instance, le32_to_cpu(status));
 			return -1;

@@ -82,8 +82,6 @@ extern int vsscanf(const char *, const char *, va_list);
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
 extern unsigned long long memparse(char *ptr, char **retptr);
-extern void dev_probe_lock(void);
-extern void dev_probe_unlock(void);
 
 extern int kernel_text_address(unsigned long addr);
 extern int session_of_pgrp(int pgrp);
@@ -135,6 +133,16 @@ extern void dump_stack(void);
 	((unsigned char *)&addr)[1], \
 	((unsigned char *)&addr)[2], \
 	((unsigned char *)&addr)[3]
+
+#define NIP6(addr) \
+	ntohs((addr).s6_addr16[0]), \
+	ntohs((addr).s6_addr16[1]), \
+	ntohs((addr).s6_addr16[2]), \
+	ntohs((addr).s6_addr16[3]), \
+	ntohs((addr).s6_addr16[4]), \
+	ntohs((addr).s6_addr16[5]), \
+	ntohs((addr).s6_addr16[6]), \
+	ntohs((addr).s6_addr16[7])
 
 #if defined(__LITTLE_ENDIAN)
 #define HIPQUAD(addr) \

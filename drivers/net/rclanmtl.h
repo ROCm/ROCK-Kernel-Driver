@@ -54,10 +54,10 @@
 #include <asm/io.h>
 
 /* Debug stuff. Define for debug output */
-#define RCDEBUG
+#undef RCDEBUG
 
 #ifdef RCDEBUG
-#define dprintk(args...) printk(KERN_DEBUG "(rcpci45 driver:) " args)
+#define dprintk(args...) printk(KERN_DEBUG "rc: " args)
 #else
 #define dprintk(args...) { }
 #endif

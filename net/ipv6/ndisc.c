@@ -232,6 +232,9 @@ int ndisc_mc_map(struct in6_addr *addr, char *buf, struct net_device *dev, int d
 	case ARPHRD_IEEE802_TR:
 		ipv6_tr_mc_map(addr,buf);
 		return 0;
+	case ARPHRD_ARCNET:
+		ipv6_arcnet_mc_map(addr, buf);
+		return 0;
 	default:
 		if (dir) {
 			memcpy(buf, dev->broadcast, dev->addr_len);
@@ -394,7 +397,7 @@ static inline void ndisc_rt_init(struct rt6_info *rt, struct net_device *dev,
 	rt->rt6i_expires  = 0;
 	rt->rt6i_flags    = RTF_LOCAL;
 	rt->rt6i_metric   = 0;
-	rt->rt6i_hoplimit = 255;
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
 	rt->u.dst.output  = ndisc_output;
 }
 
@@ -402,8 +405,8 @@ static inline void ndisc_flow_init(struct flowi *fl, u8 type,
 			    struct in6_addr *saddr, struct in6_addr *daddr)
 {
 	memset(fl, 0, sizeof(*fl));
-	fl->fl6_src		= saddr;
-	fl->fl6_dst	 	= daddr;
+	ipv6_addr_copy(&fl->fl6_src, saddr);
+	ipv6_addr_copy(&fl->fl6_dst, daddr);
 	fl->proto	 	= IPPROTO_ICMPV6;
 	fl->fl_icmp_type	= type;
 	fl->fl_icmp_code	= 0;
@@ -438,8 +441,10 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
 	} else {
-		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0))
+		if (ipv6_dev_get_saddr(dev, daddr, &tmpaddr, 0)) {
+			dst_free(dst);
 			return;
+		}
 		src_addr = &tmpaddr;
 	}
 
@@ -447,11 +452,10 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	ndisc_rt_init(rt, dev, neigh);	
 
 	dst = (struct dst_entry*)rt;
-	dst_clone(dst);
 
 	err = xfrm_lookup(&dst, &fl, NULL, 0);
 	if (err < 0) {
-		dst_release(dst);
+		dst_free(dst);
 		return;
 	}
 
@@ -467,6 +471,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	if (skb == NULL) {
 		ND_PRINTK1("send_na: alloc skb failed\n");
+		dst_free(dst);
 		return;
 	}
 
@@ -976,7 +981,7 @@ void ndisc_recv_na(struct sk_buff *skb)
 				struct rt6_info *rt;
 				rt = rt6_get_dflt_router(saddr, dev);
 				if (rt)
-					ip6_del_rt(rt, NULL);
+					ip6_del_rt(rt, NULL, NULL);
 			}
 		} else {
 			if (msg->icmph.icmp6_router)
@@ -1050,7 +1055,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	rt = rt6_get_dflt_router(&skb->nh.ipv6h->saddr, skb->dev);
 
 	if (rt && lifetime == 0) {
-		ip6_del_rt(rt, NULL);
+		ip6_del_rt(rt, NULL, NULL);
 		rt = NULL;
 	}
 

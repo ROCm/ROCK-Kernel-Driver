@@ -324,10 +324,11 @@ void cleanup_module(void) {
 
     /* Unregister devices */
     for (i = 0; i < 2; i++) {
-      if (info->dev[i].name)
+      if (info->dev[i].name) {
 	rtnl_lock();
 	unregister_netdevice(&info->dev[i]);
 	rtnl_unlock();
+      }
     }
 
     /* Reset board */

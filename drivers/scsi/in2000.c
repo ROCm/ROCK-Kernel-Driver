@@ -1820,8 +1820,7 @@ static void __init in2000_setup(char *str, int *ints)
 	int i;
 	char *p1, *p2;
 
-	strncpy(setup_buffer, str, SETUP_BUFFER_SIZE);
-	setup_buffer[SETUP_BUFFER_SIZE - 1] = '\0';
+	strlcpy(setup_buffer, str, SETUP_BUFFER_SIZE);
 	p1 = setup_buffer;
 	i = 0;
 	while (*p1 && (i < MAX_SETUP_ARGS)) {
@@ -2312,5 +2311,22 @@ static int in2000_proc_info(char *buf, char **start, off_t off, int len, int hn,
 MODULE_LICENSE("GPL");
 
 
-static Scsi_Host_Template driver_template = IN2000;
+static Scsi_Host_Template driver_template = {
+	.proc_name       		= "in2000",
+	.proc_info       		= in2000_proc_info,
+	.name            		= "Always IN2000",
+	.detect          		= in2000_detect, 
+	.release			= in2000_release,
+	.queuecommand    		= in2000_queuecommand,
+	.eh_abort_handler		= in2000_abort,
+	.eh_bus_reset_handler		= in2000_bus_reset,
+	.eh_device_reset_handler	= in2000_device_reset,
+	.eh_host_reset_handler	= in2000_host_reset, 
+	.bios_param      		= in2000_biosparam, 
+	.can_queue       		= IN2000_CAN_Q,
+	.this_id         		= IN2000_HOST_ID,
+	.sg_tablesize    		= IN2000_SG,
+	.cmd_per_lun     		= IN2000_CPL,
+	.use_clustering  		= DISABLE_CLUSTERING,
+};
 #include "scsi_module.c"

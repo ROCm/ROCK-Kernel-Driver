@@ -71,8 +71,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	unsigned long p = *ppos;
 	unsigned long end_mem;
 	ssize_t read;
-	void *addr;
-
+	
 	end_mem = __pa(high_memory);
 	if (p >= end_mem)
 		return 0;
@@ -95,14 +94,8 @@ static ssize_t read_mem(struct file * file, char * buf,
 		}
 	}
 #endif
-	if (file->f_flags & O_SYNC)
-		addr = ioremap(p, count);
-	else
-		addr = __va(p);
-	if (copy_to_user(buf, addr, count))
+	if (copy_to_user(buf, __va(p), count))
 		return -EFAULT;
-	if (file->f_flags & O_SYNC)
-		iounmap(addr);
 	read += count;
 	*ppos += read;
 	return read;
@@ -113,22 +106,13 @@ static ssize_t write_mem(struct file * file, const char * buf,
 {
 	unsigned long p = *ppos;
 	unsigned long end_mem;
-	ssize_t ret;
-	void *addr;
 
 	end_mem = __pa(high_memory);
 	if (p >= end_mem)
 		return 0;
 	if (count > end_mem - p)
 		count = end_mem - p;
-	if (file->f_flags & O_SYNC)
-		addr = ioremap(p, count);
-	else
-		addr = __va(p);
-	ret = do_write_mem(file, addr, p, buf, count, ppos);
-	if (file->f_flags & O_SYNC)
-		iounmap(addr);
-	return ret;
+	return do_write_mem(file, __va(p), p, buf, count, ppos);
 }
 
 #ifndef pgprot_noncached
@@ -545,12 +529,10 @@ static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 		case 0:
 			file->f_pos = offset;
 			ret = file->f_pos;
-			force_successful_syscall_return();
 			break;
 		case 1:
 			file->f_pos += offset;
 			ret = file->f_pos;
-			force_successful_syscall_return();
 			break;
 		default:
 			ret = -EINVAL;
@@ -678,15 +660,16 @@ static int memory_open(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-void __init memory_devfs_register (void)
-{
-    /*  These are never unregistered  */
-    static const struct {
-	unsigned short minor;
-	char *name;
-	umode_t mode;
-	struct file_operations *fops;
-    } list[] = { /* list of minor devices */
+static struct file_operations memory_fops = {
+	.open		= memory_open,	/* just a selector for the real open */
+};
+
+static const struct {
+	unsigned int		minor;
+	char			*name;
+	umode_t			mode;
+	struct file_operations	*fops;
+} devlist[] = { /* list of minor devices */
 	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops},
 	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops},
 	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops},
@@ -698,25 +681,20 @@ void __init memory_devfs_register (void)
 	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops},
 	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops},
 	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops},
-    };
-    int i;
-
-    for (i=0; i<(sizeof(list)/sizeof(*list)); i++)
-	devfs_register (NULL, list[i].name, DEVFS_FL_NONE,
-			MEM_MAJOR, list[i].minor,
-			list[i].mode | S_IFCHR,
-			list[i].fops, NULL);
-}
-
-static struct file_operations memory_fops = {
-	.open		= memory_open,	/* just a selector for the real open */
 };
 
-int __init chr_dev_init(void)
+static int __init chr_dev_init(void)
 {
+	int i;
+
 	if (register_chrdev(MEM_MAJOR,"mem",&memory_fops))
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
-	memory_devfs_register();
+
+	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
+		devfs_mk_cdev(MKDEV(MEM_MAJOR, devlist[i].minor),
+				S_IFCHR | devlist[i].mode, devlist[i].name);
+	}
+	
 	rand_initialize();
 #if defined (CONFIG_FB)
 	fbmem_init();
@@ -728,9 +706,6 @@ int __init chr_dev_init(void)
 	misc_init();
 #ifdef CONFIG_FTAPE
 	ftape_init();
-#endif
-#if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
-	tapechar_init();
 #endif
 	return 0;
 }

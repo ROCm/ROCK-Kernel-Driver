@@ -14,6 +14,8 @@
 #include <linux/mpage.h>
 #include <linux/writeback.h>
 
+extern int reiserfs_default_io_size; /* default io size devuned in super.c */
+
 /* args for the create parameter of reiserfs_get_block */
 #define GET_BLOCK_NO_CREATE 0 /* don't create new blocks or convert tails */
 #define GET_BLOCK_CREATE 1    /* add anything you need to find block */
@@ -766,7 +768,11 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	       pointer to 'block'-th block use block, which is already
 	       allocated */
 	    struct cpu_key tmp_key;
-	    struct unfm_nodeinfo un = {0, 0};
+	    unp_t unf_single=0; // We use this in case we need to allocate only
+				// one block which is a fastpath
+	    unp_t *un;
+	    __u64 max_to_insert=MAX_ITEM_LEN(inode->i_sb->s_blocksize)/UNFM_P_SIZE;
+	    __u64 blocks_needed;
 
 	    RFALSE( pos_in_item != ih_item_len(ih) / UNFM_P_SIZE,
 		    "vs-804: invalid position for append");
@@ -775,30 +781,58 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 			  le_key_k_offset (version, &(ih->ih_key)) + op_bytes_number (ih, inode->i_sb->s_blocksize),
 			  //pos_in_item * inode->i_sb->s_blocksize,
 			  TYPE_INDIRECT, 3);// key type is unimportant
-		  
-	    if (cpu_key_k_offset (&tmp_key) == cpu_key_k_offset (&key)) {
+
+	    blocks_needed = 1 + ((cpu_key_k_offset (&key) - cpu_key_k_offset (&tmp_key)) >> inode->i_sb->s_blocksize_bits);
+	    RFALSE( blocks_needed < 0, "green-805: invalid offset");
+
+	    if ( blocks_needed == 1 ) {
+		un = &unf_single;
+	    } else {
+		un=kmalloc( min(blocks_needed,max_to_insert)*UNFM_P_SIZE,
+			    GFP_ATOMIC); // We need to avoid scheduling.
+		if ( !un) {
+		    un = &unf_single;
+		    blocks_needed = 1;
+		    max_to_insert = 0;
+		} else
+		    memset(un, 0, UNFM_P_SIZE * min(blocks_needed,max_to_insert));
+	    }
+	    if ( blocks_needed <= max_to_insert) {
 		/* we are going to add target block to the file. Use allocated
 		   block for that */
-		un.unfm_nodenum = cpu_to_le32 (allocated_block_nr);
+		un[blocks_needed-1] = cpu_to_le32 (allocated_block_nr);
 		set_block_dev_mapped (bh_result, allocated_block_nr, inode);
 		set_buffer_new(bh_result);
 		done = 1;
 	    } else {
 		/* paste hole to the indirect item */
+		/* If kmalloc failed, max_to_insert becomes zero and it means we
+		   only have space for one block */
+		blocks_needed=max_to_insert?max_to_insert:1;
 	    }
-	    retval = reiserfs_paste_into_item (&th, &path, &tmp_key, (char *)&un, UNFM_P_SIZE);
+	    retval = reiserfs_paste_into_item (&th, &path, &tmp_key, (char *)un, UNFM_P_SIZE * blocks_needed);
+
+	    if (blocks_needed != 1)
+		kfree(un);
+
 	    if (retval) {
 		reiserfs_free_block (&th, allocated_block_nr);
 		goto failure;
 	    }
-	    if (un.unfm_nodenum)
+	    if (done) {
 		inode->i_blocks += inode->i_sb->s_blocksize / 512;
+	    } else {
+		/* We need to mark new file size in case this function will be
+		   interrupted/aborted later on. And we may do this only for
+		   holes. */
+		inode->i_size += inode->i_sb->s_blocksize * blocks_needed;
+	    }
 	    //mark_tail_converted (inode);
 	}
-		
+
 	if (done == 1)
 	    break;
-	 
+
 	/* this loop could log more blocks than we had originally asked
 	** for.  So, we have to allow the transaction to end if it is
 	** too big or too full.  Update the inode so things are 
@@ -876,7 +910,7 @@ static void init_inode (struct inode * inode, struct path * path)
 
 
     copy_key (INODE_PKEY (inode), &(ih->ih_key));
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
 
     INIT_LIST_HEAD(&(REISERFS_I(inode)->i_prealloc_list ));
     REISERFS_I(inode)->i_flags = 0;
@@ -884,8 +918,6 @@ static void init_inode (struct inode * inode, struct path * path)
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
     REISERFS_I(inode)->i_trans_index = 0;
-    /* nopack = 0, by default */
-    REISERFS_I(inode)->i_flags &= ~i_nopack_mask;
 
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
@@ -920,6 +952,9 @@ static void init_inode (struct inode * inode, struct path * path)
 
         rdev = sd_v1_rdev(sd);
 	REISERFS_I(inode)->i_first_direct_byte = sd_v1_first_direct_byte(sd);
+	/* nopack is initially zero for v1 objects. For v2 objects,
+	   nopack is initialised from sd_attrs */
+	REISERFS_I(inode)->i_flags &= ~i_nopack_mask;
     } else {
 	// new stat data found, but object may have old items
 	// (directories and symlinks)
@@ -949,6 +984,10 @@ static void init_inode (struct inode * inode, struct path * path)
 	    set_inode_item_key_version (inode, KEY_FORMAT_3_6);
 	REISERFS_I(inode)->i_first_direct_byte = 0;
 	set_inode_sd_version (inode, STAT_DATA_V2);
+	/* read persistent inode attributes from sd and initalise
+	   generic inode flags from them */
+	REISERFS_I(inode)->i_attrs = sd_v2_attrs( sd );
+	sd_attrs_to_i_attrs( sd_v2_attrs( sd ), inode );
     }
 
     pathrelse (path);
@@ -973,6 +1012,7 @@ static void init_inode (struct inode * inode, struct path * path)
 static void inode2sd (void * sd, struct inode * inode)
 {
     struct stat_data * sd_v2 = (struct stat_data *)sd;
+    __u16 flags;
 
     set_sd_v2_mode(sd_v2, inode->i_mode );
     set_sd_v2_nlink(sd_v2, inode->i_nlink );
@@ -983,13 +1023,13 @@ static void inode2sd (void * sd, struct inode * inode)
     set_sd_v2_atime(sd_v2, inode->i_atime.tv_sec );
     set_sd_v2_ctime(sd_v2, inode->i_ctime.tv_sec );
     set_sd_v2_blocks(sd_v2, inode->i_blocks );
-    if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
-        set_sd_v2_rdev(sd_v2, kdev_t_to_nr(inode->i_rdev) );
-}
+    if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
+	set_sd_v2_rdev(sd_v2, kdev_t_to_nr(inode->i_rdev) );
     else
-    {
-        set_sd_v2_generation(sd_v2, inode->i_generation);
-    }
+	set_sd_v2_generation(sd_v2, inode->i_generation);
+    flags = REISERFS_I(inode)->i_attrs;
+    i_attrs_to_sd_attrs( inode, &flags );
+    set_sd_v2_attrs( sd_v2, flags );
 }
 
 
@@ -1519,6 +1559,10 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
 
     /* uid and gid must already be set by the caller for quota init */
 
+    /* symlink cannot be immutable or append only, right? */
+    if( S_ISLNK( inode -> i_mode ) )
+	    inode -> i_flags &= ~ ( S_IMMUTABLE | S_APPEND );
+
     inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
     inode->i_size = i_size;
     inode->i_blocks = (inode->i_size + 511) >> 9;
@@ -1531,6 +1575,9 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
     REISERFS_I(inode)->i_trans_index = 0;
+    REISERFS_I(inode)->i_attrs =
+	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
+    sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
 
     if (old_format_only (sb))
 	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
@@ -1566,7 +1613,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     }
     // these do not go to on-disk stat data
     inode->i_ino = le32_to_cpu (ih.ih_key.k_objectid);
-    inode->i_blksize = PAGE_SIZE;
+    inode->i_blksize = reiserfs_default_io_size;
   
     // store in in-core inode the key of stat data and version all
     // object items will have (directory items will have old offset
@@ -2174,6 +2221,50 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
 	reiserfs_write_unlock(inode->i_sb);
     }
     return ret ;
+}
+
+void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode )
+{
+	if( reiserfs_attrs( inode -> i_sb ) ) {
+		if( sd_attrs & REISERFS_SYNC_FL )
+			inode -> i_flags |= S_SYNC;
+		else
+			inode -> i_flags &= ~S_SYNC;
+		if( sd_attrs & REISERFS_IMMUTABLE_FL )
+			inode -> i_flags |= S_IMMUTABLE;
+		else
+			inode -> i_flags &= ~S_IMMUTABLE;
+		if( sd_attrs & REISERFS_NOATIME_FL )
+			inode -> i_flags |= S_NOATIME;
+		else
+			inode -> i_flags &= ~S_NOATIME;
+		if( sd_attrs & REISERFS_NOTAIL_FL )
+			REISERFS_I(inode)->i_flags |= i_nopack_mask;
+		else
+			REISERFS_I(inode)->i_flags &= ~i_nopack_mask;
+	}
+}
+
+void i_attrs_to_sd_attrs( struct inode *inode, __u16 *sd_attrs )
+{
+	if( reiserfs_attrs( inode -> i_sb ) ) {
+		if( inode -> i_flags & S_IMMUTABLE )
+			*sd_attrs |= REISERFS_IMMUTABLE_FL;
+		else
+			*sd_attrs &= ~REISERFS_IMMUTABLE_FL;
+		if( inode -> i_flags & S_SYNC )
+			*sd_attrs |= REISERFS_SYNC_FL;
+		else
+			*sd_attrs &= ~REISERFS_SYNC_FL;
+		if( inode -> i_flags & S_NOATIME )
+			*sd_attrs |= REISERFS_NOATIME_FL;
+		else
+			*sd_attrs &= ~REISERFS_NOATIME_FL;
+		if( REISERFS_I(inode)->i_flags & i_nopack_mask )
+			*sd_attrs |= REISERFS_NOTAIL_FL;
+		else
+			*sd_attrs &= ~REISERFS_NOTAIL_FL;
+	}
 }
 
 /*

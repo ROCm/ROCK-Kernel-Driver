@@ -18,6 +18,7 @@
 #include <linux/module.h>
 
 #include <asm/prom.h>
+#include <asm/proc_fs.h>
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
 #include <asm/machdep.h>
@@ -27,7 +28,6 @@
 #include <asm/abs_addr.h>
 #include <asm/udbg.h>
 
-struct proc_dir_entry *rtas_proc_dir;	/* /proc/ppc64/rtas dir */
 struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
 
 /*
@@ -216,7 +216,11 @@ rtas_flash_firmware(void)
 			image_size += f->blocks[i].length;
 		}
 		next = f->next;
-		f->next = (struct flash_block_list *)virt_to_absolute((unsigned long)f->next);
+		/* Don't translate NULL pointer for last entry */
+		if(f->next)
+			f->next = (struct flash_block_list *)virt_to_absolute((unsigned long)f->next);
+		else
+			f->next = 0LL;
 		/* make num_blocks into the version/length field */
 		f->num_blocks = (FLASH_BLOCK_LIST_VERSION << 56) | ((f->num_blocks+1)*16);
 	}
@@ -283,7 +287,7 @@ rtas_halt(void)
         rtas_power_off();
 }
 
-EXPORT_SYMBOL(rtas_proc_dir);
+EXPORT_SYMBOL(proc_ppc64);
 EXPORT_SYMBOL(rtas_firmware_flash_list);
 EXPORT_SYMBOL(rtas_token);
 EXPORT_SYMBOL(rtas_call);

@@ -91,6 +91,7 @@ unsigned char aux_device_present;
 
 extern void early_cpu_init(void);
 extern void dmi_scan_machine(void);
+extern void generic_apic_probe(char *);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
 extern int blk_nohighio;
@@ -596,7 +597,7 @@ unsigned long __init find_max_low_pfn(void)
 	} else {
 		if (highmem_pages == -1)
 			highmem_pages = 0;
-#if CONFIG_HIGHMEM
+#ifdef CONFIG_HIGHMEM
 		if (highmem_pages >= max_pfn) {
 			printk(KERN_ERR "highmem size specified (%uMB) is bigger than pages available (%luMB)!.\n", pages_to_mb(highmem_pages), pages_to_mb(max_pfn));
 			highmem_pages = 0;
@@ -798,13 +799,13 @@ static void __init register_memory(unsigned long max_low_pfn)
 /* Use inline assembly to define this because the nops are defined 
    as inline assembly strings in the include files and we cannot 
    get them easily into strings. */
-asm("intelnops: " 
+asm("\t.data\nintelnops: " 
     GENERIC_NOP1 GENERIC_NOP2 GENERIC_NOP3 GENERIC_NOP4 GENERIC_NOP5 GENERIC_NOP6
     GENERIC_NOP7 GENERIC_NOP8); 
-asm("k8nops: " 
+asm("\t.data\nk8nops: " 
     K8_NOP1 K8_NOP2 K8_NOP3 K8_NOP4 K8_NOP5 K8_NOP6
     K8_NOP7 K8_NOP8); 
-asm("k7nops: " 
+asm("\t.data\nk7nops: " 
     K7_NOP1 K7_NOP2 K7_NOP3 K7_NOP4 K7_NOP5 K7_NOP6
     K7_NOP7 K7_NOP8); 
     
@@ -959,6 +960,13 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+
+	dmi_scan_machine();
+
+#ifdef CONFIG_X86_GENERICARCH
+	generic_apic_probe(*cmdline_p);
+#endif	
+
 #ifdef CONFIG_ACPI_BOOT
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
@@ -980,7 +988,6 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
-	dmi_scan_machine();
 }
 
 static int __init highio_setup(char *str)

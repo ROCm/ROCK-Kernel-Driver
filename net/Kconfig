@@ -213,7 +213,7 @@ source "net/xfrm/Kconfig"
 source "net/sctp/Kconfig"
 
 config ATM
-	bool "Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)"
+	tristate "Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
 	---help---
 	  ATM is a high-speed networking technology for Local Area Networks
@@ -230,7 +230,7 @@ config ATM
 	  further details.
 
 config ATM_CLIP
-	bool "Classical IP over ATM (EXPERIMENTAL)"
+	tristate "Classical IP over ATM (EXPERIMENTAL)"
 	depends on ATM && INET
 	help
 	  Classical IP over ATM for PVCs and SVCs, supporting InARP and
@@ -265,6 +265,23 @@ config ATM_MPOA
 	  bridges and ATM attached hosts establish direct ATM VCs across
 	  subnetwork boundaries. These shortcut connections bypass routers
 	  enhancing overall network performance.
+
+config ATM_BR2684
+	tristate "RFC1483/2684 Bridged protocols"
+	depends on ATM && INET
+	help
+	  ATM PVCs can carry ethernet PDUs according to rfc2684 (formerly 1483)
+	  This device will act like an ethernet from the kernels point of view,
+	  with the traffic being carried by ATM PVCs (currently 1 PVC/device).
+	  This is sometimes used over DSL lines.  If in doubt, say N.
+
+config ATM_BR2684_IPFILTER
+	bool "Per-VC IP filter kludge"
+	depends on ATM_BR2684
+	help
+	  This is an experimental mechanism for users who need to terminating a
+	  large number of IP-only vcc's.  Do not enable this unless you are sure
+	  you know what you are doing.
 
 config VLAN_8021Q
 	tristate "802.1Q VLAN Support"

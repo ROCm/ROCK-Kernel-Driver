@@ -293,7 +293,7 @@ static int smc_close(struct net_device *dev);
 static int smc_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void smc_tx_timeout(struct net_device *dev);
 static int smc_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void smc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void smc_rx(struct net_device *dev);
 static struct net_device_stats *smc_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
@@ -1574,16 +1574,18 @@ static void smc_eph_irq(struct net_device *dev)
 
 /*====================================================================*/
 
-static void smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct smc_private *smc = dev_id;
     struct net_device *dev = &smc->dev;
     ioaddr_t ioaddr;
     u_short saved_bank, saved_pointer, mask, status;
+    unsigned int handled = 1;
     char bogus_cnt = INTR_WORK;		/* Work we are willing to do. */
 
     if (!netif_device_present(dev))
-	return;
+	return IRQ_NONE;
+
     ioaddr = dev->base_addr;
 
     DEBUG(3, "%s: SMC91c92 interrupt %d at %#x.\n", dev->name,
@@ -1596,6 +1598,7 @@ static void smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	   maybe it has been ejected. */
 	DEBUG(1, "%s: SMC91c92 interrupt %d for non-existent"
 	      "/ejected device.\n", dev->name, irq);
+	handled = 0;
 	goto irq_done;
     }
 
@@ -1609,9 +1612,11 @@ static void smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	status = inw(ioaddr + INTERRUPT) & 0xff;
 	DEBUG(3, "%s: Status is %#2.2x (mask %#2.2x).\n", dev->name,
 	      status, mask);
-	if ((status & mask) == 0)
+	if ((status & mask) == 0) {
+	    if (bogus_cnt == INTR_WORK)
+		handled = 0;
 	    break;
-	
+	}
 	if (status & IM_RCV_INT) {
 	    /* Got a packet(s). */
 	    smc_rx(dev);
@@ -1683,6 +1688,7 @@ irq_done:
 	readb(smc->base+MEGAHERTZ_ISR);
     }
 #endif
+    return IRQ_RETVAL(handled);
 }
 
 /*====================================================================*/

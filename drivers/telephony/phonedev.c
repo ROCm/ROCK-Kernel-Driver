@@ -59,11 +59,8 @@ static int phone_open(struct inode *inode, struct file *file)
 	if (p)
 		new_fops = fops_get(p->f_op);
 	if (!new_fops) {
-		char modname[32];
-
 		up(&phone_lock);
-		sprintf(modname, "char-major-%d-%d", PHONE_MAJOR, minor);
-		request_module(modname);
+		request_module("char-major-%d-%d", PHONE_MAJOR, minor);
 		down(&phone_lock);
 		p = phone_device[minor];
 		if (p == NULL || (new_fops = fops_get(p->f_op)) == NULL)

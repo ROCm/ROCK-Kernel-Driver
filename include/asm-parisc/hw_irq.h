@@ -14,6 +14,4 @@
 
 #include <asm/irq.h>
 
-extern irq_desc_t irq_desc [NR_IRQS];
-
 #endif

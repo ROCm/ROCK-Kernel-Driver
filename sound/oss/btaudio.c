@@ -328,8 +328,8 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 	if (cmd == SOUND_MIXER_INFO) {
 		mixer_info info;
 		memset(&info,0,sizeof(info));
-                strncpy(info.id,"bt878",sizeof(info.id)-1);
-                strncpy(info.name,"Brooktree Bt878 audio",sizeof(info.name)-1);
+                strlcpy(info.id,"bt878",sizeof(info.id));
+                strlcpy(info.name,"Brooktree Bt878 audio",sizeof(info.name));
                 info.modify_counter = bta->mixcount;
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
@@ -338,8 +338,8 @@ static int btaudio_mixer_ioctl(struct inode *inode, struct file *file,
 	if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
 		memset(&info,0,sizeof(info));
-                strncpy(info.id,"bt878",sizeof(info.id)-1);
-                strncpy(info.name,"Brooktree Bt878 audio",sizeof(info.name)-1);
+                strlcpy(info.id,"bt878",sizeof(info.id)-1);
+                strlcpy(info.name,"Brooktree Bt878 audio",sizeof(info.name));
                 if (copy_to_user((void *)arg, &info, sizeof(info)))
                         return -EFAULT;
 		return 0;

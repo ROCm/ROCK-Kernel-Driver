@@ -760,10 +760,8 @@ static int __init ppdev_init (void)
 	}
 	devfs_mk_dir("parports");
 	for (i = 0; i < PARPORT_MAX; i++) {
-		char name[16];
-		sprintf(name, "parports/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT, PP_MAJOR, i,
-			       S_IFCHR | S_IRUGO | S_IWUGO, &pp_fops, NULL);
+		devfs_mk_cdev(MKDEV(PP_MAJOR, i),
+				S_IFCHR | S_IRUGO | S_IWUGO, "parports/%d", i);
 	}
 
 	printk (KERN_INFO PP_VERSION "\n");

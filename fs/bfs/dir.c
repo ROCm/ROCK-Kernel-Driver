@@ -65,7 +65,7 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 		brelse(bh);
 	}
 
-	UPDATE_ATIME(dir);
+	update_atime(dir);
 	unlock_kernel();
 	return 0;	
 }

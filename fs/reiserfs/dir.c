@@ -21,6 +21,7 @@ struct file_operations reiserfs_dir_operations = {
     .read	= generic_read_dir,
     .readdir	= reiserfs_readdir,
     .fsync	= reiserfs_dir_fsync,
+    .ioctl	= reiserfs_ioctl,
 };
 
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {
@@ -185,7 +186,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     filp->f_pos = next_pos;
     pathrelse (&path_to_entry);
     reiserfs_check_path(&path_to_entry) ;
-    UPDATE_ATIME(inode) ;
+    update_atime(inode) ;
  out:
     reiserfs_write_unlock(inode->i_sb);
     return ret;

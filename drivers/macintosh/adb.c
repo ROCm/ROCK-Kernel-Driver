@@ -896,8 +896,6 @@ adbdev_init(void)
 	if (register_chrdev(ADB_MAJOR, "adb", &adb_fops))
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
 	else
-		devfs_register (NULL, "adb", DEVFS_FL_DEFAULT,
-				ADB_MAJOR, 0,
-				S_IFCHR | S_IRUSR | S_IWUSR,
-				&adb_fops, NULL);
+		devfs_mk_cdev(MKDEV(ADB_MAJOR, 0),
+				S_IFCHR | S_IRUSR | S_IWUSR, "adb");
 }

@@ -145,4 +145,7 @@ typedef struct sigaltstack {
 
 #define ptrace_signal_deliver(regs, cookie) do { } while (0)
 
+struct pt_regs;
+int do_signal32(sigset_t *oldset, struct pt_regs *regs);
+
 #endif /* _ASMPPC64_SIGNAL_H */

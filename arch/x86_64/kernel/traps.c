@@ -529,7 +529,7 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	unsigned char reason = inb(0x61);
 
 	if (!(reason & 0xc0)) {
-#if CONFIG_X86_LOCAL_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 		/*
 		 * Ok, so this is none of the documented NMI sources,
 		 * so it must be the NMI watchdog.
@@ -584,12 +584,12 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
 	if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
-		if (!tsk->thread.debugreg[7]) { 
+		if (!tsk->thread.debugreg7) { 
 			goto clear_dr7;
 		}
 	}
 
-	tsk->thread.debugreg[6] = condition;
+	tsk->thread.debugreg6 = condition;
 
 	/* Mask out spurious TF errors due to lazy TF clearing */
 	if (condition & DR_STEP) {

@@ -1096,6 +1096,7 @@ static int nsc_ircc_hard_xmit_sir(struct sk_buff *skb, struct net_device *dev)
 				 * to make sure packets gets through the
 				 * proper xmit handler - Jean II */
 			}
+			dev->trans_start = jiffies;
 			spin_unlock_irqrestore(&self->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
@@ -1120,6 +1121,7 @@ static int nsc_ircc_hard_xmit_sir(struct sk_buff *skb, struct net_device *dev)
 	/* Restore bank register */
 	outb(bank, iobase+BSR);
 
+	dev->trans_start = jiffies;
 	spin_unlock_irqrestore(&self->lock, flags);
 
 	dev_kfree_skb(skb);
@@ -1164,6 +1166,7 @@ static int nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev)
 				 * the speed change has been done.
 				 * Jean II */
 			}
+			dev->trans_start = jiffies;
 			spin_unlock_irqrestore(&self->lock, flags);
 			dev_kfree_skb(skb);
 			return 0;
@@ -1250,6 +1253,7 @@ static int nsc_ircc_hard_xmit_fir(struct sk_buff *skb, struct net_device *dev)
 	/* Restore bank register */
 	outb(bank, iobase+BSR);
 
+	dev->trans_start = jiffies;
 	spin_unlock_irqrestore(&self->lock, flags);
 	dev_kfree_skb(skb);
 

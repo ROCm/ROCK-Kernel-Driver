@@ -114,10 +114,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
+	for (j = 0; j < PTRS_PER_PMD ; j++)
 		free_one_pmd(tlb, pmd+j);
-	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -691,8 +689,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		vma = find_extend_vma(mm, start);
 
-#ifdef VSYSCALL_START
-		if (!vma && start >= VSYSCALL_START && start < VSYSCALL_END) {
+#ifdef FIXADDR_START
+		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
 			static struct vm_area_struct fixmap_vma = {
 				/* Catch users - if there are any valid
 				   ones, we can make this be "&init_mm" or
@@ -1110,17 +1108,12 @@ int vmtruncate(struct inode * inode, loff_t offset)
 	if (inode->i_size < offset)
 		goto do_expand;
 	inode->i_size = offset;
+	pgoff = (offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	down(&mapping->i_shared_sem);
-	if (list_empty(&mapping->i_mmap) && list_empty(&mapping->i_mmap_shared))
-		goto out_unlock;
-
-	pgoff = (offset + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	if (!list_empty(&mapping->i_mmap))
+	if (unlikely(!list_empty(&mapping->i_mmap)))
 		vmtruncate_list(&mapping->i_mmap, pgoff);
-	if (!list_empty(&mapping->i_mmap_shared))
+	if (unlikely(!list_empty(&mapping->i_mmap_shared)))
 		vmtruncate_list(&mapping->i_mmap_shared, pgoff);
-
-out_unlock:
 	up(&mapping->i_shared_sem);
 	truncate_inode_pages(mapping, offset);
 	goto out_truncate;

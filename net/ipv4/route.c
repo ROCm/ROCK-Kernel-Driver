@@ -382,10 +382,11 @@ out_kfree:
 }
 
 static struct file_operations rt_cache_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = rt_cache_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = ip_seq_release,
+	.release = seq_release_private,
 };
 
 int __init rt_cache_proc_init(void)
@@ -431,16 +432,17 @@ static __inline__ int rt_valuable(struct rtable *rth)
 		rth->u.dst.expires;
 }
 
-static int rt_may_expire(struct rtable *rth, int tmo1, int tmo2)
+static int rt_may_expire(struct rtable *rth, unsigned long tmo1, unsigned long tmo2)
 {
-	int age;
+	unsigned long age;
 	int ret = 0;
 
 	if (atomic_read(&rth->u.dst.__refcnt))
 		goto out;
 
 	ret = 1;
-	if (rth->u.dst.expires && (long)(rth->u.dst.expires - jiffies) <= 0)
+	if (rth->u.dst.expires &&
+	    time_after_eq(jiffies, rth->u.dst.expires))
 		goto out;
 
 	age = jiffies - rth->u.dst.lastuse;
@@ -453,7 +455,7 @@ out:	return ret;
 }
 
 /* This runs via a timer and thus is always in BH context. */
-static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
+static void rt_check_expire(unsigned long dummy)
 {
 	static int rover;
 	int i = rover, t;
@@ -462,7 +464,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 
 	for (t = ip_rt_gc_interval << rt_hash_log; t >= 0;
 	     t -= ip_rt_gc_timeout) {
-		unsigned tmo = ip_rt_gc_timeout;
+		unsigned long tmo = ip_rt_gc_timeout;
 
 		i = (i + 1) & rt_hash_mask;
 		rthp = &rt_hash_table[i].chain;
@@ -471,7 +473,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		while ((rth = *rthp) != NULL) {
 			if (rth->u.dst.expires) {
 				/* Entry is expired even if it is in use */
-				if ((long)(now - rth->u.dst.expires) <= 0) {
+				if (time_before_eq(now, rth->u.dst.expires)) {
 					tmo >>= 1;
 					rthp = &rth->u.rt_next;
 					continue;
@@ -489,19 +491,17 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		spin_unlock(&rt_hash_table[i].lock);
 
 		/* Fallback loop breaker. */
-		if ((jiffies - now) > 0)
+		if (time_after(jiffies, now))
 			break;
 	}
 	rover = i;
 	mod_timer(&rt_periodic_timer, now + ip_rt_gc_interval);
 }
 
-SMP_TIMER_DEFINE(rt_check_expire, rt_gc_task);
-
 /* This can run from both BH and non-BH contexts, the latter
  * in the case of a forced flush event.
  */
-static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
+static void rt_run_flush(unsigned long dummy)
 {
 	int i;
 	struct rtable *rth, *next;
@@ -524,8 +524,6 @@ static void SMP_TIMER_NAME(rt_run_flush)(unsigned long dummy)
 	}
 }
 
-SMP_TIMER_DEFINE(rt_run_flush, rt_cache_flush_task);
-  
 static spinlock_t rt_flush_lock = SPIN_LOCK_UNLOCKED;
 
 void rt_cache_flush(int delay)
@@ -557,7 +555,7 @@ void rt_cache_flush(int delay)
 
 	if (delay <= 0) {
 		spin_unlock_bh(&rt_flush_lock);
-		SMP_TIMER_NAME(rt_run_flush)(0);
+		rt_run_flush(0);
 		return;
 	}
 
@@ -591,7 +589,7 @@ static void rt_secret_rebuild(unsigned long dummy)
 
 static int rt_garbage_collect(void)
 {
-	static unsigned expire = RT_GC_TIMEOUT;
+	static unsigned long expire = RT_GC_TIMEOUT;
 	static unsigned long last_gc;
 	static int rover;
 	static int equilibrium;
@@ -643,7 +641,7 @@ static int rt_garbage_collect(void)
 		int i, k;
 
 		for (i = rt_hash_mask, k = rover; i >= 0; i--) {
-			unsigned tmo = expire;
+			unsigned long tmo = expire;
 
 			k = (k + 1) & rt_hash_mask;
 			rthp = &rt_hash_table[k].chain;
@@ -689,7 +687,7 @@ static int rt_garbage_collect(void)
 
 		if (atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
 			goto out;
-	} while (!in_softirq() && jiffies - now < 1);
+	} while (!in_softirq() && time_before_eq(jiffies, now));
 
 	if (atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size)
 		goto out;
@@ -956,12 +954,15 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
  				INIT_RCU_HEAD(&rt->u.dst.rcu_head);
 				rt->u.dst.__use		= 1;
 				atomic_set(&rt->u.dst.__refcnt, 1);
+				rt->u.dst.child		= NULL;
 				if (rt->u.dst.dev)
 					dev_hold(rt->u.dst.dev);
+				rt->u.dst.obsolete	= 0;
 				rt->u.dst.lastuse	= jiffies;
+				rt->u.dst.path		= &rt->u.dst;
 				rt->u.dst.neighbour	= NULL;
 				rt->u.dst.hh		= NULL;
-				rt->u.dst.obsolete	= 0;
+				rt->u.dst.xfrm		= NULL;
 
 				rt->rt_flags		|= RTCF_REDIRECTED;
 
@@ -1067,7 +1068,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* No redirected packets during ip_rt_redirect_silence;
 	 * reset the algorithm.
 	 */
-	if (jiffies - rt->u.dst.rate_last > ip_rt_redirect_silence)
+	if (time_after(jiffies, rt->u.dst.rate_last + ip_rt_redirect_silence))
 		rt->u.dst.rate_tokens = 0;
 
 	/* Too many ignored redirects; do not send anything
@@ -1081,8 +1082,9 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 	/* Check for load limit; set rate_last to the latest sent
 	 * redirect.
 	 */
-	if (jiffies - rt->u.dst.rate_last >
-	    (ip_rt_redirect_load << rt->u.dst.rate_tokens)) {
+	if (time_after(jiffies,
+		       (rt->u.dst.rate_last +
+			(ip_rt_redirect_load << rt->u.dst.rate_tokens)))) {
 		icmp_send(skb, ICMP_REDIRECT, ICMP_REDIR_HOST, rt->rt_gateway);
 		rt->u.dst.rate_last = jiffies;
 		++rt->u.dst.rate_tokens;
@@ -1147,7 +1149,7 @@ static __inline__ unsigned short guess_mtu(unsigned short old_mtu)
 {
 	int i;
 	
-	for (i = 0; i < sizeof(mtu_plateau) / sizeof(mtu_plateau[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(mtu_plateau); i++)
 		if (old_mtu > mtu_plateau[i])
 			return mtu_plateau[i];
 	return 68;
@@ -1314,6 +1316,9 @@ static void rt_set_nexthop(struct rtable *rt, struct fib_result *res, u32 itag)
 			rt->rt_gateway = FIB_RES_GW(*res);
 		memcpy(rt->u.dst.metrics, fi->fib_metrics,
 		       sizeof(rt->u.dst.metrics));
+		if (rt->u.dst.metrics[RTAX_HOPLIMIT-1] == 0)
+			rt->u.dst.metrics[RTAX_HOPLIMIT-1] =
+				sysctl_ip_default_ttl;
 		if (fi->fib_mtu == 0) {
 			rt->u.dst.metrics[RTAX_MTU-1] = rt->u.dst.dev->mtu;
 			if (rt->u.dst.metrics[RTAX_LOCK-1] & (1 << RTAX_MTU) &&

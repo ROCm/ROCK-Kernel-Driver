@@ -2243,8 +2243,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->screen_base = (char *)rinfo->fb_base;
 
 	/* Fill fix common fields */
-	strncpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
-	info->fix.id[sizeof(info->fix.id) - 1] = '\0';
+	strlcpy(info->fix.id, rinfo->name, sizeof(info->fix.id));
         info->fix.smem_start = rinfo->fb_base_phys;
         info->fix.smem_len = rinfo->video_ram;
         info->fix.type = FB_TYPE_PACKED_PIXELS;
@@ -2840,8 +2839,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	/* map the regions */
-	rinfo->mmio_base = (u32) ioremap (rinfo->mmio_base_phys,
-				    		    RADEON_REGSIZE);
+	rinfo->mmio_base = (unsigned long) ioremap (rinfo->mmio_base_phys, RADEON_REGSIZE);
 	if (!rinfo->mmio_base) {
 		printk ("radeonfb: cannot map MMIO\n");
 		release_mem_region (rinfo->mmio_base_phys,
@@ -2978,8 +2976,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		}
 	}
 
-	rinfo->fb_base = (u32) ioremap (rinfo->fb_base_phys,
-				  		  rinfo->video_ram);
+	rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys, rinfo->video_ram);
 	if (!rinfo->fb_base) {
 		printk ("radeonfb: cannot map FB\n");
 		iounmap ((void*)rinfo->mmio_base);

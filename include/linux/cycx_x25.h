@@ -1,9 +1,11 @@
+#ifndef	_CYCX_X25_H
+#define	_CYCX_X25_H
 /*
 * cycx_x25.h	Cyclom X.25 firmware API definitions.
 *
 * Author:	Arnaldo Carvalho de Melo <acme@conectiva.com.br>
 *
-* Copyright:	(c) 1998-2000 Arnaldo Carvalho de Melo
+* Copyright:	(c) 1998-2003 Arnaldo Carvalho de Melo
 *
 * Based on sdla_x25.h by Gene Kozin <74604.152@compuserve.com>
 *
@@ -20,9 +22,6 @@
 *					 TX25Cmd & TX25Config structs
 *					 typedef'ed
 */
-#ifndef	_CYCX_X25_H
-#define	_CYCX_X25_H
-
 #ifndef PACKED
 #define PACKED __attribute__((packed))
 #endif 
@@ -38,13 +37,12 @@ extern unsigned int cycx_debug;
 
 /* Data Structures */
 /* X.25 Command Block. */
-typedef struct X25Cmd
-{
+struct cycx_x25_cmd {
 	u16 command PACKED;
 	u16 link    PACKED; /* values: 0 or 1 */
 	u16 len     PACKED; /* values: 0 thru 0x205 (517) */
 	u32 buf     PACKED;
-} TX25Cmd;
+};
 
 /* Defines for the 'command' field. */
 #define X25_CONNECT_REQUEST             0x4401
@@ -74,26 +72,45 @@ typedef struct X25Cmd
 #define X25_N2TRACEXC                   0x4702
 #define X25_N3TRACEXC                   0x4703
 
-typedef struct X25Config {
-	u8  link	PACKED; /* link number */
-	u8  speed	PACKED; /* line speed */
-	u8  clock	PACKED; /* internal/external */
-	u8  n2		PACKED; /* # of level 2 retransm.(values: 1 thru FF) */
-	u8  n2win	PACKED; /* level 2 window (values: 1 thru 7) */
-	u8  n3win	PACKED; /* level 3 window (values: 1 thru 7) */
-	u8  nvc		PACKED; /* # of logical channels (values: 1 thru 64) */
-	u8  pktlen	PACKED; /* level 3 packet lenght - log base 2 of size */
-	u8  locaddr	PACKED; /* my address */
-	u8  remaddr	PACKED; /* remote address */
-	u16 t1		PACKED;	/* time, in seconds */
-	u16 t2		PACKED;	/* time, in seconds */
-	u8  t21		PACKED;	/* time, in seconds */
-	u8  npvc	PACKED;	/* # of permanent virt. circuits (1 thru nvc) */
-	u8  t23		PACKED;	/* time, in seconds */
-	u8  flags	PACKED;	/* see dosx25.doc, in portuguese, for details */
-} TX25Config;
+/**
+ *	struct cycx_x25_config - cyclom2x x25 firmware configuration
+ *	@link - link number
+ *	@speed - line speed
+ *	@clock - internal/external
+ *	@n2 - # of level 2 retransm.(values: 1 thru FF)
+ *	@n2win - level 2 window (values: 1 thru 7)
+ *	@n3win - level 3 window (values: 1 thru 7)
+ *	@nvc - # of logical channels (values: 1 thru 64)
+ *	@pktlen - level 3 packet lenght - log base 2 of size
+ *	@locaddr - my address
+ *	@remaddr - remote address
+ *	@t1 - time, in seconds
+ *	@t2 - time, in seconds
+ *	@t21 - time, in seconds
+ *	@npvc - # of permanent virt. circuits (1 thru nvc)
+ *	@t23 - time, in seconds
+ *	@flags - see dosx25.doc, in portuguese, for details
+ */
+struct cycx_x25_config {
+	u8  link	PACKED;
+	u8  speed	PACKED;
+	u8  clock	PACKED;
+	u8  n2		PACKED;
+	u8  n2win	PACKED;
+	u8  n3win	PACKED;
+	u8  nvc		PACKED;
+	u8  pktlen	PACKED;
+	u8  locaddr	PACKED;
+	u8  remaddr	PACKED;
+	u16 t1		PACKED;
+	u16 t2		PACKED;
+	u8  t21		PACKED;
+	u8  npvc	PACKED;
+	u8  t23		PACKED;
+	u8  flags	PACKED;
+};
 
-typedef struct X25Stats {
+struct cycx_x25_stats {
 	u16 rx_crc_errors	PACKED;
 	u16 rx_over_errors	PACKED;
 	u16 n2_tx_frames 	PACKED;
@@ -104,5 +121,5 @@ typedef struct X25Stats {
 	u16 n3_rx_packets 	PACKED;
 	u16 tx_aborts	 	PACKED;
 	u16 rx_aborts	 	PACKED;
-} TX25Stats;
+};
 #endif	/* _CYCX_X25_H */

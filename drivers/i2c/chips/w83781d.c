@@ -1026,6 +1026,8 @@ device_create_file(&client->dev, &dev_attr_rt##offset); \
 static int
 w83781d_attach_adapter(struct i2c_adapter *adapter)
 {
+	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+		return 0;
 	return i2c_detect(adapter, &addr_data, w83781d_detect);
 }
 
@@ -1196,7 +1198,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 		request_region(address, W83781D_EXTENT, type_name);
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strncpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
 	data->type = kind;
 
 	data->valid = 0;
@@ -1269,7 +1271,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			data->lm75[i].adapter = adapter;
 			data->lm75[i].driver = &w83781d_driver;
 			data->lm75[i].flags = 0;
-			strncpy(data->lm75[i].dev.name, client_name,
+			strlcpy(data->lm75[i].dev.name, client_name,
 				DEVICE_NAME_SIZE);
 			if (kind == w83783s)
 				break;

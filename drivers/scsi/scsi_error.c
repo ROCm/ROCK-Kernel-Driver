@@ -28,6 +28,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
+#include "scsi_priv.h"
+#include "scsi_logging.h"
+
 #ifdef DEBUG
 #define SENSE_TIMEOUT SCSI_TIMEOUT
 #else
@@ -188,7 +191,7 @@ int scsi_block_when_processing_errors(struct scsi_device *sdev)
 	return sdev->online;
 }
 
-#if CONFIG_SCSI_LOGGING
+#ifdef CONFIG_SCSI_LOGGING
 /**
  * scsi_eh_prt_fail_stats - Log info on failures.
  * @shost:	scsi host being recovered.
@@ -916,7 +919,6 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
  **/
 static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -934,16 +936,9 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(BUS_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
@@ -953,7 +948,6 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
  **/
 static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 {
-	struct scsi_device *sdev;
 	unsigned long flags;
 	int rtn;
 
@@ -971,16 +965,9 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 
 	if (rtn == SUCCESS) {
 		scsi_sleep(HOST_RESET_SETTLE_TIME);
-		/*
-		 * Mark all affected devices to expect a unit attention.
-		 */
-		list_for_each_entry(sdev, &scmd->device->host->my_devices,
-				    siblings)
-			if (scmd->device->channel == sdev->channel) {
-				sdev->was_reset = 1;
-				sdev->expecting_cc_ua = 1;
-			}
+		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 	}
+
 	return rtn;
 }
 
@@ -1425,8 +1412,7 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * now that error recovery is done, we will need to ensure that these
 	 * requests are started.
 	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
-		blk_run_queue(sdev->request_queue);
+	scsi_run_host_queues(shost);
 }
 
 /**
@@ -1638,6 +1624,74 @@ void scsi_error_handler(void *data)
 	complete_and_exit(shost->eh_notify, 0);
 }
 
+/*
+ * Function:    scsi_report_bus_reset()
+ *
+ * Purpose:     Utility function used by low-level drivers to report that
+ *		they have observed a bus reset on the bus being handled.
+ *
+ * Arguments:   shost       - Host in question
+ *		channel     - channel on which reset was observed.
+ *
+ * Returns:     Nothing
+ *
+ * Lock status: No locks are assumed held.
+ *
+ * Notes:       This only needs to be called if the reset is one which
+ *		originates from an unknown location.  Resets originated
+ *		by the mid-level itself don't need to call this, but there
+ *		should be no harm.
+ *
+ *		The main purpose of this is to make sure that a CHECK_CONDITION
+ *		is properly treated.
+ */
+void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+		if (channel == sdev->channel) {
+			sdev->was_reset = 1;
+			sdev->expecting_cc_ua = 1;
+		}
+	}
+}
+
+/*
+ * Function:    scsi_report_device_reset()
+ *
+ * Purpose:     Utility function used by low-level drivers to report that
+ *		they have observed a device reset on the device being handled.
+ *
+ * Arguments:   shost       - Host in question
+ *		channel     - channel on which reset was observed
+ *		target	    - target on which reset was observed
+ *
+ * Returns:     Nothing
+ *
+ * Lock status: No locks are assumed held.
+ *
+ * Notes:       This only needs to be called if the reset is one which
+ *		originates from an unknown location.  Resets originated
+ *		by the mid-level itself don't need to call this, but there
+ *		should be no harm.
+ *
+ *		The main purpose of this is to make sure that a CHECK_CONDITION
+ *		is properly treated.
+ */
+void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
+{
+	struct scsi_device *sdev;
+
+	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+		if (channel == sdev->channel &&
+		    target == sdev->id) {
+			sdev->was_reset = 1;
+			sdev->expecting_cc_ua = 1;
+		}
+	}
+}
+
 static void
 scsi_reset_provider_done_command(struct scsi_cmnd *scmd)
 {
@@ -1662,7 +1716,6 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	struct scsi_cmnd *scmd = scsi_get_command(dev, GFP_KERNEL);
 	struct request req;
 	int rtn;
-	struct request_queue *q;
 
 	scmd->request = &req;
 	memset(&scmd->eh_timeout, 0, sizeof(scmd->eh_timeout));
@@ -1674,13 +1727,10 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
     
 	scmd->scsi_done		= scsi_reset_provider_done_command;
 	scmd->done			= NULL;
-	scmd->reset_chain		= NULL;
-        
 	scmd->buffer			= NULL;
 	scmd->bufflen			= 0;
 	scmd->request_buffer		= NULL;
 	scmd->request_bufflen		= 0;
-
 	scmd->internal_timeout		= NORMAL_TIMEOUT;
 	scmd->abort_reason		= DID_ABORT;
 
@@ -1717,8 +1767,6 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	}
 
 	scsi_delete_timer(scmd);
-	q = scmd->device->request_queue;
-	scsi_put_command(scmd);
-	scsi_queue_next_request(q, NULL);
+	scsi_next_command(scmd);
 	return rtn;
 }

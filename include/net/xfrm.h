@@ -123,6 +123,12 @@ struct xfrm_state
 	/* Data for encapsulator */
 	struct xfrm_encap_tmpl	*encap;
 
+	/* IPComp needs an IPIP tunnel for handling uncompressed packets */
+	struct xfrm_state	*tunnel;
+
+	/* If a tunnel, number of users + 1 */
+	atomic_t		tunnel_users;
+
 	/* State for replay detection */
 	struct xfrm_replay_state replay;
 
@@ -195,6 +201,8 @@ extern int xfrm_state_register_afinfo(struct xfrm_state_afinfo *afinfo);
 extern int xfrm_state_unregister_afinfo(struct xfrm_state_afinfo *afinfo);
 extern struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family);
 extern void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo);
+
+extern void xfrm_state_delete_tunnel(struct xfrm_state *x);
 
 struct xfrm_decap_state;
 struct xfrm_type
@@ -307,14 +315,14 @@ static inline u32 __flow_hash4(struct flowi *fl)
 
 static inline u32 __flow_hash6(struct flowi *fl)
 {
-	u32 hash = fl->fl6_src->s6_addr32[2] ^
-		   fl->fl6_src->s6_addr32[3] ^ 
+	u32 hash = fl->fl6_src.s6_addr32[2] ^
+		   fl->fl6_src.s6_addr32[3] ^ 
 		   fl->fl_ip_sport;
 
 	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
 
-	hash ^= fl->fl6_dst->s6_addr32[2] ^
-		fl->fl6_dst->s6_addr32[3] ^ 
+	hash ^= fl->fl6_dst.s6_addr32[2] ^
+		fl->fl6_dst.s6_addr32[3] ^ 
 		fl->fl_ip_dport;
 	hash ^= (hash >> 10);
 	hash ^= (hash >> 20);
@@ -336,7 +344,7 @@ extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
 {
-	if (policy)
+	if (likely(policy != NULL))
 		atomic_inc(&policy->refcnt);
 }
 
@@ -463,8 +471,8 @@ __xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 static inline int
 __xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
-	return  addr_match(fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
-		addr_match(fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
+	return  addr_match(&fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
+		addr_match(&fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
 		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
 		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
@@ -646,7 +654,7 @@ xfrm_address_t *xfrm_flowi_daddr(struct flowi *fl, unsigned short family)
 	case AF_INET:
 		return (xfrm_address_t *)&fl->fl4_dst;
 	case AF_INET6:
-		return (xfrm_address_t *)fl->fl6_dst;
+		return (xfrm_address_t *)&fl->fl6_dst;
 	}
 	return NULL;
 }
@@ -658,7 +666,7 @@ xfrm_address_t *xfrm_flowi_saddr(struct flowi *fl, unsigned short family)
 	case AF_INET:
 		return (xfrm_address_t *)&fl->fl4_src;
 	case AF_INET6:
-		return (xfrm_address_t *)fl->fl6_src;
+		return (xfrm_address_t *)&fl->fl6_src;
 	}
 	return NULL;
 }
@@ -697,6 +705,11 @@ xfrm_state_addr_check(struct xfrm_state *x,
 		return __xfrm6_state_addr_check(x, daddr, saddr);
 	}
 	return 0;
+}
+
+static inline int xfrm_state_kern(struct xfrm_state *x)
+{
+	return atomic_read(&x->tunnel_users);
 }
 
 /*
@@ -775,7 +788,6 @@ void xfrm4_policy_init(void);
 void xfrm6_policy_init(void);
 struct xfrm_policy *xfrm_policy_alloc(int gfp);
 extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
-struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl, unsigned short family);
 int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
 struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);

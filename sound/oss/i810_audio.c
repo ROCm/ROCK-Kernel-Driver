@@ -66,16 +66,19 @@
  *
  *	This driver is cursed. (Ben LaHaise)
  *
+ *  ICH 3 caveats
+ *	Intel errata #7 for ICH3 IO. We need to disable SMI stuff
+ *	when codec probing. [Not Yet Done]
  *
  *  ICH 4 caveats
  *
- *      The ICH4 has the feature, that the codec ID doesn't have to be 
- *      congruent with the IO connection.
+ *	The ICH4 has the feature, that the codec ID doesn't have to be 
+ *	congruent with the IO connection.
  * 
- *      Therefore, from driver version 0.23 on, there is a "codec ID" <->
- *      "IO register base offset" mapping (card->ac97_id_map) field.
+ *	Therefore, from driver version 0.23 on, there is a "codec ID" <->
+ *	"IO register base offset" mapping (card->ac97_id_map) field.
  *   
- *      Juergen "George" Sawinski (jsaw) 
+ *	Juergen "George" Sawinski (jsaw) 
  */
  
 #include <linux/module.h>
@@ -639,6 +642,10 @@ static void i810_set_dac_channels(struct i810_state *state, int channel)
 {
 	int	aud_reg;
 	struct ac97_codec *codec = state->card->ac97_codec[0];
+
+	/* No codec, no setup */
+	if(codec == NULL)
+		return;
 
 	aud_reg = i810_ac97_get(codec, AC97_EXTENDED_STATUS);
 	aud_reg |= AC97_EA_PRI | AC97_EA_PRJ | AC97_EA_PRK;

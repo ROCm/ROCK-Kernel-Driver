@@ -108,7 +108,6 @@ struct netlink_skb_parms
 extern int netlink_attach(int unit, int (*function)(int,struct sk_buff *skb));
 extern void netlink_detach(int unit);
 extern int netlink_post(int unit, struct sk_buff *skb);
-extern int init_netlink(void);
 extern struct sock *netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len));
 extern void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err);
 extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 pid, int nonblock);

@@ -62,6 +62,8 @@ void rtnl_unlock(void)
 {
 	rtnl_exunlock();
 	rtnl_shunlock();
+
+	netdev_run_todo();
 }
 
 int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len)
@@ -442,7 +444,7 @@ err_inval:
  * Malformed skbs with wrong lengths of messages are discarded silently.
  */
 
-extern __inline__ int rtnetlink_rcv_skb(struct sk_buff *skb)
+static inline int rtnetlink_rcv_skb(struct sk_buff *skb)
 {
 	int err;
 	struct nlmsghdr * nlh;
@@ -500,6 +502,8 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 		}
 
 		up(&rtnl_sem);
+
+		netdev_run_todo();
 	} while (rtnl && rtnl->receive_queue.qlen);
 }
 

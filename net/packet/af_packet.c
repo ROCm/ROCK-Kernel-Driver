@@ -255,7 +255,7 @@ static int packet_rcv_spkt(struct sk_buff *skb, struct net_device *dev,  struct 
 	 */
 
 	spkt->spkt_family = dev->type;
-	strncpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
+	strlcpy(spkt->spkt_device, dev->name, sizeof(spkt->spkt_device));
 	spkt->spkt_protocol = skb->protocol;
 
 	/*
@@ -774,6 +774,7 @@ static int packet_release(struct socket *sock)
 		 */
 		dev_remove_pack(&po->prot_hook);
 		po->running = 0;
+		po->num = 0;
 		__sock_put(sk);
 	}
 
@@ -819,9 +820,12 @@ static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 
 	spin_lock(&po->bind_lock);
 	if (po->running) {
-		dev_remove_pack(&po->prot_hook);
 		__sock_put(sk);
 		po->running = 0;
+		po->num = 0;
+		spin_unlock(&po->bind_lock);
+		dev_remove_pack(&po->prot_hook);
+		spin_lock(&po->bind_lock);
 	}
 
 	po->num = protocol;
@@ -874,8 +878,7 @@ static int packet_bind_spkt(struct socket *sock, struct sockaddr *uaddr, int add
 	 
 	if(addr_len!=sizeof(struct sockaddr))
 		return -EINVAL;
-	strncpy(name,uaddr->sa_data,14);
-	name[14]=0;
+	strlcpy(name,uaddr->sa_data,sizeof(name));
 
 	dev = dev_get_by_name(name);
 	if (dev) {
@@ -1092,7 +1095,7 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 	uaddr->sa_family = AF_PACKET;
 	dev = dev_get_by_index(pkt_sk(sk)->ifindex);
 	if (dev) {
-		strncpy(uaddr->sa_data, dev->name, 15);
+		strlcpy(uaddr->sa_data, dev->name, 15);
 		dev_put(dev);
 	} else
 		memset(uaddr->sa_data, 0, 14);
@@ -1374,7 +1377,7 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 			if (dev->ifindex == po->ifindex) {
 				spin_lock(&po->bind_lock);
 				if (po->running) {
-					dev_remove_pack(&po->prot_hook);
+					__dev_remove_pack(&po->prot_hook);
 					__sock_put(sk);
 					po->running = 0;
 					sk->err = ENETDOWN;
@@ -1618,9 +1621,14 @@ static int packet_set_ring(struct sock *sk, struct tpacket_req *req, int closing
 
 	/* Detach socket from network */
 	spin_lock(&po->bind_lock);
-	if (po->running)
-		dev_remove_pack(&po->prot_hook);
+	if (po->running) {
+		__dev_remove_pack(&po->prot_hook);
+		po->num = 0;
+		po->running = 0;
+	}
 	spin_unlock(&po->bind_lock);
+		
+	synchronize_net();
 
 	err = -EBUSY;
 	if (closing || atomic_read(&po->mapped) == 0) {

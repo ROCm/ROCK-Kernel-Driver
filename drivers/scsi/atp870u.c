@@ -2748,5 +2748,19 @@ static int atp870u_release(struct Scsi_Host *pshost)
 
 MODULE_LICENSE("GPL");
 
-static Scsi_Host_Template driver_template = ATP870U;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= atp870u_proc_info,
+	.detect			= atp870u_detect,
+	.release		= atp870u_release,
+	.info			= atp870u_info,
+	.command		= atp870u_command,
+	.queuecommand		= atp870u_queuecommand,
+	.eh_abort_handler	= atp870u_abort,
+	.bios_param		= atp870u_biosparam,
+	.can_queue		= qcnt,
+	.this_id		= 7,
+	.sg_tablesize		= ATP870U_SCATTER,
+	.cmd_per_lun		= ATP870U_CMDLUN,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
 #include "scsi_module.c"

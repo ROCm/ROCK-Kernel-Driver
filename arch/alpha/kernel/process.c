@@ -235,23 +235,18 @@ int
 alpha_clone(unsigned long clone_flags, unsigned long usp, int *parent_tid,
 	    int *child_tid, unsigned long tls_value, struct pt_regs *regs)
 {
-	struct task_struct *p;
-
 	if (!usp)
 		usp = rdusp();
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
-		    parent_tid, child_tid);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
+		       parent_tid, child_tid);
 }
 
 int
 alpha_vfork(struct pt_regs *regs)
 {
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(),
-		    regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(),
+		       regs, 0, NULL, NULL);
 }
 
 /*
