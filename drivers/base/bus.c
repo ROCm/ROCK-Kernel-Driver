@@ -325,10 +325,10 @@ int device_attach(struct device * dev)
  *	driver_attach - try to bind driver to devices.
  *	@drv:	driver.
  *
- *	Walk the list of devices that the bus has on it and try to match
- *	the driver with each one.
- *	If bus_match() returns 0 and the @dev->driver is set, we've found
- *	a compatible pair.
+ *	Walk the list of devices that the bus has on it and try to
+ *	match the driver with each one.  If driver_probe_device()
+ *	returns 0 and the @dev->driver is set, we've found a
+ *	compatible pair.
  *
  *	Note that we ignore the -ENODEV error from driver_probe_device(),
  *	since it's perfectly valid for a driver not to bind to any devices.
