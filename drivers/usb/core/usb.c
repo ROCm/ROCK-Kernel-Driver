@@ -77,15 +77,16 @@ int usb_device_probe(struct device *dev)
 	struct usb_driver * driver = to_usb_driver(dev->driver);
 	const struct usb_device_id *id;
 	int error = -ENODEV;
-	int m;
 
 	dbg("%s", __FUNCTION__);
 
 	if (!driver->probe)
 		return error;
 
-	if (!try_module_get(driver->owner))
+	if (!try_module_get(driver->owner)) {
+		err ("Can't get a module reference for %s", driver->name);
 		return error;
+	}
 
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
@@ -97,7 +98,7 @@ int usb_device_probe(struct device *dev)
 	if (!error)
 		intf->driver = driver;
 
-	put_module(driver->owner);
+	module_put(driver->owner);
 
 	return error;
 }
@@ -106,7 +107,6 @@ int usb_device_remove(struct device *dev)
 {
 	struct usb_interface *intf;
 	struct usb_driver *driver;
-	int m;
 
 	intf = list_entry(dev,struct usb_interface,dev);
 	driver = to_usb_driver(dev->driver);
@@ -117,8 +117,7 @@ int usb_device_remove(struct device *dev)
 		return -ENODEV;
 	}
 
-	m = try_module_get(driver->owner);
-	if (m == 0) {
+	if (!try_module_get(driver->owner)) {
 		// FIXME this happens even when we just rmmod
 		// drivers that aren't in active use...
 		err("Dieing driver still bound to device.\n");
@@ -138,7 +137,7 @@ int usb_device_remove(struct device *dev)
 		usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
-	module_put(driver->owner)
+	module_put(driver->owner);
 
 	return 0;
 }

@@ -1129,7 +1129,7 @@ static int proc_ioctl (struct dev_state *ps, void *arg)
 			}
 			unlock_kernel ();
 			retval = driver->ioctl (ifp, ctrl.ioctl_code, buf);
-			put_module (driver->owner);
+			module_put (driver->owner);
 		}
 
 		if (retval == -ENOIOCTLCMD)
