@@ -508,16 +508,15 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			if (ia64_psr(regs)->is == 0)
 			  ifa = regs->cr_iip;
 #endif
-			siginfo.si_addr = (void *) ifa;
 			break;
-		      case 35: siginfo.si_code = TRAP_BRANCH; break;
-		      case 36: siginfo.si_code = TRAP_TRACE; break;
+		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
+		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_flags = 0;
 		siginfo.si_isr = 0;
-		siginfo.si_addr = 0;
+		siginfo.si_addr = (void *) ifa;
 		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 		return;
