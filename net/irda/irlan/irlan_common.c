@@ -75,14 +75,14 @@ static int eth;   /* Use "eth" or "irlan" name for devices */
 static int access = ACCESS_PEER; /* PEER, DIRECT or HOSTED */
 
 #ifdef CONFIG_PROC_FS
-static char *irlan_access[] = {
+static const char *irlan_access[] = {
 	"UNKNOWN",
 	"DIRECT",
 	"PEER",
 	"HOSTED"
 };
 
-static char *irlan_media[] = {
+static const char *irlan_media[] = {
 	"UNKNOWN",
 	"802.3",
 	"802.5"
@@ -115,7 +115,7 @@ void irlan_close_tsaps(struct irlan_cb *self);
  *    Initialize IrLAN layer
  *
  */
-int __init irlan_init(void)
+static int __init irlan_init(void)
 {
 	struct irlan_cb *new;
 	__u16 hints;
@@ -156,7 +156,7 @@ int __init irlan_init(void)
 	return 0;
 }
 
-void __exit irlan_cleanup(void) 
+static void __exit irlan_cleanup(void) 
 {
 	struct irlan_cb *self, *next;
 
@@ -242,8 +242,6 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
  */
 static void __irlan_close(struct irlan_cb *self)
 {
-	struct sk_buff *skb;
-
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 	
 	ASSERT_RTNL();
@@ -260,8 +258,7 @@ static void __irlan_close(struct irlan_cb *self)
 		iriap_close(self->client.iriap);
 
 	/* Remove frames queued on the control channel */
-	while ((skb = skb_dequeue(&self->client.txq)))
-		dev_kfree_skb(skb);
+	skb_queue_purge(&self->client.txq);
 
 	/* Unregister and free self via destructor */
 	unregister_netdevice(self->dev);
@@ -1177,19 +1174,6 @@ MODULE_PARM_DESC(eth, "Name devices ethX (0) or irlanX (1)");
 MODULE_PARM(access, "i");
 MODULE_PARM_DESC(access, "Access type DIRECT=1, PEER=2, HOSTED=3");
 
-/*
- * Function init_module (void)
- *
- *    Initialize the IrLAN module, this function is called by the
- *    modprobe(1) program.
- */
 module_init(irlan_init);
-
-/*
- * Function cleanup_module (void)
- *
- *    Remove the IrLAN module, this function is called by the rmmod(1)
- *    program
- */
 module_exit(irlan_cleanup);
 
