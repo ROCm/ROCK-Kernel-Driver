@@ -531,8 +531,8 @@ void __init pgtable_cache_init(void)
 	if (PTRS_PER_PMD > 1) {
 		pmd_cache = kmem_cache_create("pmd",
 					PTRS_PER_PMD*sizeof(pmd_t),
+					PTRS_PER_PMD*sizeof(pmd_t),
 					0,
-					SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
 					pmd_ctor,
 					NULL);
 		if (!pmd_cache)
@@ -540,8 +540,8 @@ void __init pgtable_cache_init(void)
 	}
 	pgd_cache = kmem_cache_create("pgd",
 				PTRS_PER_PGD*sizeof(pgd_t),
+				PTRS_PER_PGD*sizeof(pgd_t),
 				0,
-				SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
 				pgd_ctor,
 				PTRS_PER_PMD == 1 ? pgd_dtor : NULL);
 	if (!pgd_cache)

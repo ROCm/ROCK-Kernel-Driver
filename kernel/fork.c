@@ -207,11 +207,14 @@ EXPORT_SYMBOL(autoremove_wake_function);
 void __init fork_init(unsigned long mempages)
 {
 #ifndef __HAVE_ARCH_TASK_STRUCT_ALLOCATOR
+#ifndef ARCH_MIN_TASKALIGN
+#define ARCH_MIN_TASKALIGN	0
+#endif
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
-				  sizeof(struct task_struct),0,
-				  SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+				  sizeof(struct task_struct),ARCH_MIN_TASKALIGN,
+				  0, NULL, NULL);
 	if (!task_struct_cachep)
 		panic("fork_init(): cannot create task_struct SLAB cache");
 #endif
