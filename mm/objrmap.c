@@ -302,8 +302,10 @@ void fastcall page_add_rmap(struct page *page, struct vm_area_struct * vma,
 	 * allowed to read PG_anon outside the page_map_lock.
 	 */
 	last_anon = PageAnon(page);
-	if (anon && !last_anon)
+	if (anon && !last_anon) {
+		BUG_ON(page->mapping);
 		SetPageAnon(page);
+	}
 	BUG_ON(!anon && last_anon);
 
 	if (!page->mapcount++)
@@ -796,6 +798,51 @@ void fastcall anon_vma_merge(struct vm_area_struct * vma,
 		list_del(&vma_dying->anon_vma_node);
 		spin_unlock(&anon_vma->anon_vma_lock);
 	}
+}
+
+/*
+ * This is called when _prev_ is being extended. This is needed
+ * by mprotect for example. This means prev->vm_end == next->vm_start
+ * and they both get moved to an address > next->vm_start and
+ * < next->vm_end. NOTE: it's critical that "prev" is extended.
+ * This will kernel-crash if it's "next" being extended down, this
+ * only works for prev->vm_end and next->vm_start going _up_,
+ * down not.
+ */
+void fastcall anon_vma_merge_extend(struct vm_area_struct * prev,
+				    struct vm_area_struct * next)
+{
+	anon_vma_t * anon_vma = next->anon_vma;
+
+	/*
+	 * If next->anon_vma is null we've nothing to do since
+	 * next is being shrunk.
+	 */
+	if (!anon_vma)
+		return;
+
+	/*
+	 * If both prev->anon_vma != 0 and next->anon_vma != 0
+	 * it means they're equal and we've nothing to do again.
+	 */
+	if (prev->anon_vma) {
+		BUG_ON(prev->anon_vma != anon_vma);
+		return;
+	}
+
+	/*
+	 * If we get here it means we've to propagate the anon_vma
+	 * from "next" to "prev" because "prev" will now have to
+	 * include pages in the previous "next" range that can
+	 * point to "anon_vma". The setting of prev->anon_vma
+	 * is serialized by the mmap_sem rwsem taken in write mode.
+	 */
+	prev->anon_vma = anon_vma;
+
+	/* Now link the "prev" vma into the "anon_vma_head" list. */
+	spin_lock(&anon_vma->anon_vma_lock);
+	list_add(&prev->anon_vma_node, &next->anon_vma_node);
+	spin_unlock(&anon_vma->anon_vma_lock);
 }
 
 void fastcall __anon_vma_link(struct vm_area_struct * vma)

@@ -135,7 +135,7 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 
 	prev_pgoff = vma->vm_pgoff - ((prev->vm_end - prev->vm_start) >> PAGE_SHIFT);
 	file = vma->vm_file;
-	if (!is_mergeable_vma(prev, file, newflags, prev_pgoff, NULL))
+	if (!vma->vm_private_data && !is_mergeable_vma(prev, file, newflags, prev_pgoff, NULL))
 		return 0;
 	if (!is_mergeable_anon_vma(prev, vma))
 		return 0;
@@ -215,6 +215,14 @@ mprotect_attempt_merge(struct vm_area_struct *vma, struct vm_area_struct *prev,
 	anon_vma_unlock(vma);
 	if (file)
 		up(i_shared_sem);
+
+	/*
+	 * No need of any lock for this (except the internal anon_vma_lock),
+	 * the whole vma->anon_vma handling is serialized enterely by the
+	 * mmap_sem rwsem taken in write mode.
+	 */
+	anon_vma_merge_extend(prev, vma);
+
 	return 1;
 }
 
@@ -241,7 +249,7 @@ mprotect_attempt_merge_final(struct vm_area_struct *prev,
 
 	next_pgoff = prev->vm_pgoff + ((prev->vm_end - prev->vm_start) >> PAGE_SHIFT);
 	file = prev->vm_file;
-	if (!is_mergeable_vma(next, file, newflags, next_pgoff, NULL))
+	if (!prev->vm_private_data && !is_mergeable_vma(next, file, newflags, next_pgoff, NULL))
 		return;
 	if (!is_mergeable_anon_vma(prev, next))
 		return;

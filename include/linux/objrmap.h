@@ -48,6 +48,8 @@ static inline void anon_vma_unlock(struct vm_area_struct * vma)
 extern int FASTCALL(anon_vma_prepare(struct vm_area_struct * vma));
 extern void FASTCALL(anon_vma_merge(struct vm_area_struct * vma,
 				    struct vm_area_struct * vma_dying));
+extern void FASTCALL(anon_vma_merge_extend(struct vm_area_struct * prev,
+					   struct vm_area_struct * next));
 extern void FASTCALL(anon_vma_unlink(struct vm_area_struct * vma));
 extern void FASTCALL(anon_vma_link(struct vm_area_struct * vma));
 extern void FASTCALL(__anon_vma_link(struct vm_area_struct * vma));
