@@ -8,7 +8,7 @@
 
 extern void timer(void);
 extern void switch_timers(int to_real);
-extern void user_time_init(void);
+extern void set_interval(int timer_type);
 extern void idle_sleep(int secs);
 extern void enable_timer(void);
 extern void time_lock(void);

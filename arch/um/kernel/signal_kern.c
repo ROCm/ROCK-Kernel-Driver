@@ -23,6 +23,7 @@
 #include "kern.h"
 #include "frame_kern.h"
 #include "sigcontext.h"
+#include "mode.h"
 
 EXPORT_SYMBOL(block_signals);
 EXPORT_SYMBOL(unblock_signals);
@@ -171,7 +172,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	 */
 	if((current->ptrace & PT_DTRACE) && 
 	   is_syscall(PT_REGS_IP(&current->thread.regs)))
-		current->thread.singlestep_syscall = 1;
+ 		(void) CHOOSE_MODE(current->thread.mode.tt.singlestep_syscall = 1, 0);
 	return(0);
 }
 
@@ -228,6 +229,16 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 	}
 }
 
+static int copy_sc_from_user(struct pt_regs *to, void *from)
+{
+	int ret;
+
+	ret = CHOOSE_MODE(copy_sc_from_user_tt(to->regs.mode.tt, from, 
+					       &signal_frame_sc.arch),
+			  copy_sc_from_user_skas(&to->regs, from));
+	return(ret);
+}
+
 int sys_sigreturn(struct pt_regs regs)
 {
 	void *sc = sp_to_sc(PT_REGS_SP(&regs));
@@ -241,8 +252,7 @@ int sys_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
-			  &signal_frame_sc.arch);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
@@ -257,8 +267,7 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(current->thread.regs.regs.sc, sc,
-			  &signal_frame_sc.arch);
+	copy_sc_from_user(&current->thread.regs, sc);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 

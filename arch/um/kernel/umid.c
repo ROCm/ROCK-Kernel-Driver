@@ -17,6 +17,8 @@
 #include "umid.h"
 #include "init.h"
 #include "os.h"
+#include "user_util.h"
+#include "choose-mode.h"
 
 #define UMID_LEN 64
 #define UML_DIR "~/.uml/"
@@ -91,7 +93,7 @@ static int __init create_pid_file(void)
 		return 0;
 	}
 
-	sprintf(pid, "%d\n", (tracing_pid == -1) ? os_getpid() : tracing_pid);
+	sprintf(pid, "%d\n", os_getpid());
 	if(write(fd, pid, strlen(pid)) != strlen(pid))
 		printk("Write of pid file failed - errno = %d\n", errno);
 	close(fd);
@@ -179,7 +181,7 @@ int not_dead_yet(char *dir)
 			dead = 1;
 		}
 		if(((kill(p, 0) < 0) && (errno == ESRCH)) ||
-		   (p == tracing_pid)) 
+		   (p == CHOOSE_MODE(tracing_pid, os_getpid())))
 			dead = 1;
 	}
 	if(!dead) return(1);

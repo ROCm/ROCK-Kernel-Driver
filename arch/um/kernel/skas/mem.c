@@ -1,0 +1,35 @@
+/* 
+ * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+ * Licensed under the GPL
+ */
+
+#include "linux/config.h"
+#include "linux/mm.h"
+#include "mem_user.h"
+
+unsigned long set_task_sizes_skas(int arg, unsigned long *host_size_out, 
+				  unsigned long *task_size_out)
+{
+	/* Round up to the nearest 4M */
+	unsigned long top = ROUND_4M((unsigned long) &arg);
+
+	*host_size_out = top;
+	*task_size_out = top;
+	return(((unsigned long) set_task_sizes_skas) & ~0xffffff);
+}
+
+struct page *arch_validate_skas(struct page *page, int mask, int order)
+{
+	return(page);
+}
+
+/*
+ * Overrides for Emacs so that we follow Linus's tabbing style.
+ * Emacs will notice this stuff at the end of the file and automatically
+ * adjust the settings for this buffer only.  This must remain at the end
+ * of the file.
+ * ---------------------------------------------------------------------------
+ * Local variables:
+ * c-file-style: "linux"
+ * End:
+ */
