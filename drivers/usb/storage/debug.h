@@ -53,7 +53,6 @@
 
 #ifdef CONFIG_USB_STORAGE_DEBUG
 void usb_stor_show_command(Scsi_Cmnd *srb);
-void usb_stor_print_Scsi_Cmnd( Scsi_Cmnd* cmd );
 void usb_stor_show_sense( unsigned char key,
 		unsigned char asc, unsigned char ascq );
 #define US_DEBUGP(x...) printk( KERN_DEBUG USB_STORAGE x )
