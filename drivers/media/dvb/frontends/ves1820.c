@@ -19,6 +19,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */    
 
+#include <linux/config.h>
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -70,7 +72,18 @@ static int verbose;
 #define GET_TUNER(data) ((u8) (((long) data >> 16) & 0xff))
 #define GET_DEMOD_ADDR(data) ((u8) (((long) data >> 24) & 0xff))
 
+#if defined(CONFIG_DBOX2)
+#define XIN 69600000UL
+#define DISABLE_INVERSION(reg0)		do { reg0 &= ~0x20; } while (0)
+#define ENABLE_INVERSION(reg0)		do { reg0 |= 0x20; } while (0)
+#define HAS_INVERSION(reg0)		(reg0 & 0x20)
+#else	/* PCI cards */
 #define XIN 57840000UL
+#define DISABLE_INVERSION(reg0)		do { reg0 |= 0x20; } while (0)
+#define ENABLE_INVERSION(reg0)		do { reg0 &= ~0x20; } while (0)
+#define HAS_INVERSION(reg0)		(!(reg0 & 0x20))
+#endif
+
 #define FIN (XIN >> 4)
 
 
@@ -209,9 +222,9 @@ static int ves1820_setup_reg0 (struct dvb_frontend *fe, u8 reg0,
 	reg0 |= GET_REG0(fe->data) & 0x62;
 	
 	if (INVERSION_ON == inversion)
-		reg0 &= ~0x20;
+		ENABLE_INVERSION(reg0);
 	else if (INVERSION_OFF == inversion)
-		reg0 |= 0x20;
+		DISABLE_INVERSION(reg0);
 	
 	ves1820_writereg (fe, 0x00, reg0 & 0xfe);
         ves1820_writereg (fe, 0x00, reg0 | 0x01);
@@ -220,7 +233,7 @@ static int ves1820_setup_reg0 (struct dvb_frontend *fe, u8 reg0,
 	 *  check lock and toggle inversion bit if required...
 	 */
 	if (INVERSION_AUTO == inversion && !(ves1820_readreg (fe, 0x11) & 0x08)) {
-		dvb_delay(10);
+		mdelay(30);
 		if (!(ves1820_readreg (fe, 0x11) & 0x08)) {
 			reg0 ^= 0x20;
 			ves1820_writereg (fe, 0x00, reg0 & 0xfe);
@@ -241,6 +254,10 @@ static int ves1820_init (struct dvb_frontend *fe)
         dprintk("DVB: VES1820(%d): init chip\n", fe->i2c->adapter->num);
 
         ves1820_writereg (fe, 0, 0);
+
+#if defined(CONFIG_DBOX2)
+	ves1820_inittab[2] &= ~0x08;
+#endif
 
 	for (i=0; i<53; i++)
                 ves1820_writereg (fe, i, ves1820_inittab[i]);
@@ -329,6 +346,10 @@ static int ves1820_set_parameters (struct dvb_frontend *fe,
         ves1820_writereg (fe, 0x09, reg0x09[real_qam]);
 
 	ves1820_setup_reg0 (fe, reg0x00[real_qam], p->inversion);
+
+	/* yes, this speeds things up: userspace reports lock in about 8 ms
+	   instead of 500 to 1200 ms after calling FE_SET_FRONTEND. */
+	mdelay(30);
 
 	return 0;
 }
@@ -419,14 +440,14 @@ static int ves1820_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 					fe->i2c->adapter->num, afc,
 				-((s32)(p->u.qam.symbol_rate >> 3) * afc >> 7));
 
-		p->inversion = reg0 & 0x20 ? INVERSION_OFF : INVERSION_ON;
+		p->inversion = HAS_INVERSION(reg0) ? INVERSION_ON : INVERSION_OFF;
 		p->u.qam.modulation = ((reg0 >> 2) & 7) + QAM_16;
 
 		p->u.qam.fec_inner = FEC_NONE;
 
 		p->frequency = ((p->frequency + 31250) / 62500) * 62500;
-		// To prevent overflow, shift symbol rate first a
-		// couple of bits.
+		/* To prevent overflow, shift symbol rate first a
+		   couple of bits. */
 		p->frequency -= (s32)(p->u.qam.symbol_rate >> 3) * afc >> 7;
 		break;
 	}
@@ -462,8 +483,6 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 		printk ("DVB: VES1820(%d): setup for tuner sp5659c\n", i2c->adapter->num);
 	} else {
 		type = -1;
-		printk ("DVB: VES1820(%d): unknown PLL, "
-			"please report to <linuxdvb@linuxtv.org>!!\n", i2c->adapter->num);
 	}
 
 	return type;
@@ -477,12 +496,10 @@ static u8 read_pwm (struct dvb_i2c_bus *i2c)
 	struct i2c_msg msg [] = { { .addr = 0x50, .flags = 0, .buf = &b, .len = 1 },
 			 { .addr = 0x50, .flags = I2C_M_RD, .buf = &pwm, .len = 1 } };
 
-	i2c->xfer (i2c, msg, 2);
+	if ((i2c->xfer(i2c, msg, 2) != 2) || (pwm == 0xff))
+		pwm = 0x48;
 
 	printk("DVB: VES1820(%d): pwm=0x%02x\n", i2c->adapter->num, pwm);
-
-	if (pwm == 0xff)
-		pwm = 0x48;
 
 	return pwm;
 }
@@ -516,8 +533,7 @@ static int ves1820_attach (struct dvb_i2c_bus *i2c, void **data)
 	if ((demod_addr = probe_demod_addr(i2c)) < 0)
 		return -ENODEV;
 
-	if ((tuner_type = probe_tuner(i2c)) < 0)
-		return -ENODEV;
+	tuner_type = probe_tuner(i2c);
 
 	if ((i2c->adapter->num < MAX_UNITS) && pwm[i2c->adapter->num] != -1) {
 		printk("DVB: VES1820(%d): pwm=0x%02x (user specified)\n",
