@@ -297,10 +297,14 @@ config USB_SERIAL_KEYSPAN_USA19W
 config USB_SERIAL_KEYSPAN_USA19QW
 	bool "USB Keyspan USA-19QW Firmware"
 	depends on USB_SERIAL_KEYSPAN
+	help
+	  Say Y here to include firmware for the USA-19QW converter.
 
 config USB_SERIAL_KEYSPAN_USA19QI
 	bool "USB Keyspan USA-19QI Firmware"
 	depends on USB_SERIAL_KEYSPAN
+	help
+	  Say Y here to include firmware for the USA-19QI converter.
 
 config USB_SERIAL_KEYSPAN_USA49W
 	bool "USB Keyspan USA-49W Firmware"
