@@ -359,6 +359,7 @@ unlock_and_exit:
  *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
  *                                  ACPI_ALL_NOTIFY:  both system and device
  *              Handler         - Address of the handler
+ *
  * RETURN:      Status
  *
  * DESCRIPTION: Remove a handler for notifies on an ACPI device
@@ -401,9 +402,8 @@ acpi_remove_notify_handler (
 		goto unlock_and_exit;
 	}
 
-	/*
-	 * Root Object
-	 */
+	/* Root Object */
+
 	if (device == ACPI_ROOT_OBJECT) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing notify handler for ROOT object.\n"));
 
@@ -437,9 +437,8 @@ acpi_remove_notify_handler (
 		}
 	}
 
-	/*
-	 * All Other Objects
-	 */
+	/* All Other Objects */
+
 	else {
 		/* Notifies allowed on this object? */
 
