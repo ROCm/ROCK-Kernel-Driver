@@ -228,6 +228,7 @@ EXPORT_SYMBOL(generic_block_bmap);
 EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(generic_file_sendfile);
 EXPORT_SYMBOL(do_generic_mapping_read);
+EXPORT_SYMBOL(file_ra_state_init);
 EXPORT_SYMBOL(generic_file_write);
 EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
