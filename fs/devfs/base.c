@@ -1874,7 +1874,7 @@ static struct file_operations *devfs_get_ops (devfs_handle_t de)
 	return NULL;
     owner = ops->owner;
     read_lock (&de->parent->u.dir.lock);  /*  Prevent module from unloading  */
-    if ( (de->next == de) || !try_inc_mod_count (owner) )
+    if ( (de->next == de) || !try_module_get (owner) )
     {   /*  Entry is already unhooked or module is unloading  */
 	read_unlock (&de->parent->u.dir.lock);
 	return NULL;

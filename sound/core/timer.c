@@ -102,7 +102,7 @@ static snd_timer_instance_t *snd_timer_instance_new(char *owner, snd_timer_t *ti
 	timeri->in_use = (atomic_t)ATOMIC_INIT(0);
 
 	timeri->timer = timer;
-	if (timer && timer->card && !try_inc_mod_count(timer->card->module)) {
+	if (timer && timer->card && !try_module_get(timer->card->module)) {
 		kfree(timeri->owner);
 		kfree(timeri);
 		return NULL;

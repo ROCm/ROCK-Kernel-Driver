@@ -111,13 +111,10 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 		ioctl = list_entry(l, dasd_ioctl_list_t, list);
 		if (ioctl->no == no) {
 			/* Found a matching ioctl. Call it. */
-			if (ioctl->owner) {
-				if (try_inc_mod_count(ioctl->owner) != 0)
-					continue;
-				rc = ioctl->handler(bdev, no, data);
-				module_put(ioctl->owner);
-			} else
-				rc = ioctl->handler(bdev, no, data);
+			if (try_module_get(ioctl->owner) != 0)
+				continue;
+			rc = ioctl->handler(bdev, no, data);
+			module_put(ioctl->owner);
 			return rc;
 		}
 	}

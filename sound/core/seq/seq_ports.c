@@ -401,7 +401,7 @@ static int subscribe_port(client_t *client, client_port_t *port, port_subs_info_
 {
 	int err = 0;
 
-	if (!try_inc_mod_count(port->owner))
+	if (!try_module_get(port->owner))
 		return -EFAULT;
 	grp->count++;
 	if (grp->open && (port->callback_all || grp->count == 1)) {

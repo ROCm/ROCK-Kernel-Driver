@@ -1584,7 +1584,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * is about to be unloaded).  Therefore, it is safe to set
 	 * tty->driver_data to be NULL, so uart_close() doesn't bite us.
 	 */
-	if (!try_inc_mod_count(drv->owner)) {
+	if (!try_module_get(drv->owner)) {
 		tty->driver_data = NULL;
 		goto fail;
 	}

@@ -207,9 +207,7 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
   		printk(KERN_ERR "capi: can't alloc capiminor\n");
 		return 0;
 	}
-#ifdef _DEBUG_REFCOUNT
-	printk(KERN_DEBUG "capiminor_alloc %d\n", GET_USE_COUNT(THIS_MODULE));
-#endif
+
 	memset(mp, 0, sizeof(struct capiminor));
 	mp->ap = ap;
 	mp->ncci = ncci;
@@ -252,9 +250,6 @@ static void capiminor_free(struct capiminor *mp)
 	capiminor_del_all_ack(mp);
 	kfree(mp);
 	MOD_DEC_USE_COUNT;
-#ifdef _DEBUG_REFCOUNT
-	printk(KERN_DEBUG "capiminor_free %d\n", GET_USE_COUNT(THIS_MODULE));
-#endif
 }
 
 struct capiminor *capiminor_find(unsigned int minor)
@@ -980,9 +975,7 @@ static int capinc_tty_open(struct tty_struct * tty, struct file * file)
 		return -ENXIO;
 
 	tty->driver_data = (void *)mp;
-#ifdef _DEBUG_REFCOUNT
-	printk(KERN_DEBUG "capi_tty_open %d\n", GET_USE_COUNT(THIS_MODULE));
-#endif
+
 	if (atomic_read(&mp->ttyopencount) == 0)
 		mp->tty = tty;
 	atomic_inc(&mp->ttyopencount);

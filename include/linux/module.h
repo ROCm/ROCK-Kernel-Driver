@@ -357,7 +357,6 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 	_MOD_INC_USE_COUNT(THIS_MODULE)
 #define MOD_DEC_USE_COUNT \
 	__MOD_DEC_USE_COUNT(THIS_MODULE)
-#define try_inc_mod_count(mod) try_module_get(mod)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
 #define GET_USE_COUNT(module) (module_dummy_usage)
