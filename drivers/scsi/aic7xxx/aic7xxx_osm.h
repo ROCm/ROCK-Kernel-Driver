@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#109 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#111 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -300,7 +300,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.23"
+#define AIC7XXX_DRIVER_VERSION "6.2.24"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -347,7 +347,8 @@ typedef enum {
 	AHC_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
 	AHC_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
 	AHC_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
-	AHC_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
+	AHC_DEV_PERIODIC_OTAG	 = 0x40, /* Send OTAG to prevent starvation */
+	AHC_DEV_SLAVE_CONFIGURED = 0x80	 /* slave_configure() has been called */
 } ahc_linux_dev_flags;
 
 struct ahc_linux_target;

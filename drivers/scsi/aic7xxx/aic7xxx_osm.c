@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#161 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#163 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -812,9 +812,10 @@ static int	   ahc_linux_release(struct Scsi_Host *);
 static int	   ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 static const char *ahc_linux_info(struct Scsi_Host *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int	   ahc_linux_slave_alloc(Scsi_Device *);
 static int	   ahc_linux_slave_configure(Scsi_Device *);
 static void	   ahc_linux_slave_destroy(Scsi_Device *);
-static int	   ahd_linux_biosparam(struct scsi_device*,
+static int	   ahc_linux_biosparam(struct scsi_device*,
 				       struct block_device*,
 				       sector_t, int[]);
 #else
@@ -872,15 +873,6 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	template->proc_name = "aic7xxx";
 #else
 	template->proc_dir = &proc_scsi_aic7xxx;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
-	/*
-	 * We can only map 16MB per-SG
-	 * so create a sector limit of
-	 * "16MB" in 2K sectors.
-	 */
-	template->max_sectors = 8192;
 #endif
 
 	/*
@@ -1029,9 +1021,11 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 static int
 ahc_linux_slave_alloc(Scsi_Device *device)
 {
-	/*
-	 * Nothing to be done for now.
-	 */
+	struct	ahc_softc *ahc;
+
+	ahc = *((struct ahc_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Alloc %d\n", ahc_name(ahc), device->id);
 	return (0);
 }
 
@@ -1043,6 +1037,8 @@ ahc_linux_slave_configure(Scsi_Device *device)
 	u_long	flags;
 
 	ahc = *((struct ahc_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Configure %d\n", ahc_name(ahc), device->id);
 	ahc_midlayer_entrypoint_lock(ahc, &flags);
 	/*
 	 * Since Linux has attached to the device, configure
@@ -1051,12 +1047,12 @@ ahc_linux_slave_configure(Scsi_Device *device)
 	 */
 	dev = ahc_linux_get_device(ahc, device->channel,
 				   device->id, device->lun,
-					   /*alloc*/TRUE);
+				   /*alloc*/TRUE);
 	if (dev != NULL) {
 		dev->flags &= ~AHC_DEV_UNCONFIGURED;
 		dev->scsi_device = device;
+		ahc_linux_device_queue_depth(ahc, dev);
 	}
-	ahc_linux_device_queue_depth(ahc, dev);
 	ahc_midlayer_entrypoint_unlock(ahc, &flags);
 	return (0);
 }
@@ -1069,12 +1065,26 @@ ahc_linux_slave_destroy(Scsi_Device *device)
 	u_long	flags;
 
 	ahc = *((struct ahc_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Destroy %d\n", ahc_name(ahc), device->id);
 	ahc_midlayer_entrypoint_lock(ahc, &flags);
 	dev = ahc_linux_get_device(ahc, device->channel,
 				   device->id, device->lun,
 					   /*alloc*/FALSE);
-	if (dev != NULL)
+	/*
+	 * Filter out "silly" deletions of real devices by only
+	 * deleting devices that have had slave_configure()
+	 * called on them.  All other devices that have not
+	 * been configured will automatically be deleted by
+	 * the refcounting process.
+	 */
+	if (dev != NULL
+	 && (dev->flags & AHC_DEV_SLAVE_CONFIGURED) != 0) {
 		dev->flags |= AHC_DEV_UNCONFIGURED;
+		if (TAILQ_EMPTY(&dev->busyq)
+		 && dev->active == 0)
+			ahc_linux_free_device(ahc, dev);
+	}
 	ahc_midlayer_entrypoint_unlock(ahc, &flags);
 }
 #else
@@ -1135,10 +1145,15 @@ static int
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 ahc_linux_biosparam(struct scsi_device *sdev, struct block_device *bdev,
 		    sector_t capacity, int geom[])
+{
+	uint8_t *bh;
 #else
 ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
-#endif
 {
+	struct	scsi_device *sdev = disk->device;
+	u_long	capacity = disk->capacity;
+	struct	buffer_head *bh;
+#endif
 	int	 heads;
 	int	 sectors;
 	int	 cylinders;
@@ -1146,23 +1161,9 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	int	 extended;
 	struct	 ahc_softc *ahc;
 	u_int	 channel;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	uint8_t	*bh;
 
-	channel = sdev->channel;
-#else
-	u_long	capacity;
-	struct	buffer_head *bh;
-
-	capacity = disk->capacity;
-	channel = disk->device->channel;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	ahc = *((struct ahc_softc **)sdev->host->hostdata);
-#else
-	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
-#endif
+	channel = sdev->channel;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	bh = scsi_bios_ptable(bdev);
@@ -1185,7 +1186,7 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	}
 	heads = 64;
 	sectors = 32;
-	cylinders = capacity / (heads * sectors);
+	cylinders = aic_sector_div(capacity, heads, sectors);
 
 	if (aic7xxx_extended != 0)
 		extended = 1;
@@ -1196,7 +1197,7 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	if (extended && cylinders >= 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = capacity / (heads * sectors);
+		cylinders = aic_sector_div(capacity, heads, sectors);
 	}
 	geom[0] = heads;
 	geom[1] = sectors;
@@ -1288,6 +1289,14 @@ Scsi_Host_Template aic7xxx_driver_template = {
 	.sg_tablesize		= AHC_NSEG,
 	.cmd_per_lun		= 2,
 	.use_clustering		= ENABLE_CLUSTERING,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+	/*
+	 * We can only map 16MB per-SG
+	 * so create a sector limit of
+	 * "16MB" in 2K sectors.
+	 */
+	.max_sectors		= 8192,
+#endif
 #if defined CONFIG_HIGHIO
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
@@ -1298,6 +1307,8 @@ Scsi_Host_Template aic7xxx_driver_template = {
 #endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	.name			= "aic7xxx",
+	.slave_alloc		= ahc_linux_slave_alloc,
 	.slave_configure	= ahc_linux_slave_configure,
 	.slave_destroy		= ahc_linux_slave_destroy,
 #else

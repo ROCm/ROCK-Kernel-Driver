@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#2 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#3 $
 #
 
 # Let kbuild descend into aicasm when cleaning
@@ -53,7 +53,7 @@ aic7xxx_gen = $(obj)/aic7xxx_seq.h $(obj)/aic7xxx_reg.h
 ifeq ($(CONFIG_AIC7XXX_REG_PRETTY_PRINT),y)
 aic7xxx_gen += $(obj)/aic7xxx_reg_print.c
 aic7xxx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
-		 -p aic7xxx_reg_print.c -i aic7xxx_osm.h	   \
+		 -p $(obj)/aic7xxx_reg_print.c -i aic7xxx_osm.h	   \
 		 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
 else
 aic7xxx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
@@ -69,7 +69,7 @@ aic79xx_gen = $(obj)/aic79xx_seq.h $(obj)/aic79xx_reg.h
 ifeq ($(CONFIG_AIC79XX_REG_PRETTY_PRINT),y)
 aic79xx_gen += $(obj)/aic79xx_reg_print.c
 aic79xx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
-		 -p aic79xx_reg_print.c -i aic79xx_osm.h	   \
+		 -p $(obj)/aic79xx_reg_print.c -i aic79xx_osm.h	   \
 		 -o $(obj)/aic79xx_seq.h $(src)/aic79xx.seq
 else
 aic79xx_asm_cmd = $(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#93 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#100 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -87,6 +87,11 @@ struct proc_dir_entry proc_scsi_aic79xx = {
 	0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 #endif
+
+/*
+ * Bucket size for counting good commands in between bad ones.
+ */
+#define AHD_LINUX_ERR_THRESH	1000
 
 /*
  * Set this to the delay in seconds after SCSI bus reset.
@@ -491,8 +496,8 @@ static void ahd_linux_dv_transition(struct ahd_softc *ahd,
 				    struct scsi_cmnd *cmd,
 				    struct ahd_devinfo *devinfo,
 				    struct ahd_linux_target *targ);
-static uint32_t aic_dv_error_action(struct scsi_cmnd *cmd,
-				    struct scsi_inquiry_data *inq_data);
+static uint32_t aic_error_action(struct scsi_cmnd *cmd,
+				 struct scsi_inquiry_data *inq_data);
 static void ahd_linux_dv_fill_cmd(struct ahd_softc *ahd,
 				  struct scsi_cmnd *cmd,
 				  struct ahd_devinfo *devinfo);
@@ -520,8 +525,13 @@ static void ahd_linux_dv_su(struct ahd_softc *ahd,
 			    struct scsi_cmnd *cmd,
 			    struct ahd_devinfo *devinfo,
 			    struct ahd_linux_target *targ);
+static __inline int
+	   ahd_linux_dv_fallback(struct ahd_softc *ahd,
+				 struct ahd_devinfo *devinfo);
 static int ahd_linux_fallback(struct ahd_softc *ahd,
 			      struct ahd_devinfo *devinfo);
+static __inline int ahd_linux_dv_fallback(struct ahd_softc *ahd,
+					  struct ahd_devinfo *devinfo);
 static void ahd_linux_dv_complete(Scsi_Cmnd *cmd);
 static void ahd_linux_generate_dv_pattern(struct ahd_linux_target *targ);
 static u_int ahd_linux_user_tagdepth(struct ahd_softc *ahd,
@@ -548,6 +558,7 @@ static void ahd_linux_setup_iocell_info(char *p, char *end, char *s, int index);
 static int ahd_linux_next_unit(void);
 static void ahd_runq_tasklet(unsigned long data);
 static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);
+static int aic79xx_setup(char *c);
 
 /****************************** Inlines ***************************************/
 static __inline void ahd_schedule_completeq(struct ahd_softc *ahd,
@@ -801,6 +812,7 @@ static int	   ahd_linux_release(struct Scsi_Host *);
 static const char *ahd_linux_info(struct Scsi_Host *);
 static int	   ahd_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+static int	   ahd_linux_slave_alloc(Scsi_Device *);
 static int	   ahd_linux_slave_configure(Scsi_Device *);
 static void	   ahd_linux_slave_destroy(Scsi_Device *);
 static int	   ahd_linux_biosparam(struct scsi_device*,
@@ -860,15 +872,6 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	template->proc_name = "aic79xx";
 #else
 	template->proc_dir = &proc_scsi_aic79xx;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
-	/*
-	 * We can only map 16MB per-SG
-	 * so create a sector limit of
-	 * "16MB" in 2K sectors.
-	 */
-	template->max_sectors = 8192;
 #endif
 
 	/*
@@ -1014,6 +1017,17 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 static int
+ahd_linux_slave_alloc(Scsi_Device *device)
+{
+	struct	ahd_softc *ahd;
+
+	ahd = *((struct ahd_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Alloc %d\n", ahd_name(ahd), device->id);
+	return (0);
+}
+
+static int
 ahd_linux_slave_configure(Scsi_Device *device)
 {
 	struct	ahd_softc *ahd;
@@ -1021,6 +1035,8 @@ ahd_linux_slave_configure(Scsi_Device *device)
 	u_long	flags;
 
 	ahd = *((struct ahd_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Configure %d\n", ahd_name(ahd), device->id);
 	ahd_midlayer_entrypoint_lock(ahd, &flags);
 	/*
 	 * Since Linux has attached to the device, configure
@@ -1029,12 +1045,13 @@ ahd_linux_slave_configure(Scsi_Device *device)
 	 */
 	dev = ahd_linux_get_device(ahd, device->channel,
 				   device->id, device->lun,
-					   /*alloc*/TRUE);
+				   /*alloc*/TRUE);
 	if (dev != NULL) {
 		dev->flags &= ~AHD_DEV_UNCONFIGURED;
+		dev->flags |= AHD_DEV_SLAVE_CONFIGURED;
 		dev->scsi_device = device;
+		ahd_linux_device_queue_depth(ahd, dev);
 	}
-	ahd_linux_device_queue_depth(ahd, dev);
 	ahd_midlayer_entrypoint_unlock(ahd, &flags);
 	return (0);
 }
@@ -1047,12 +1064,27 @@ ahd_linux_slave_destroy(Scsi_Device *device)
 	u_long	flags;
 
 	ahd = *((struct ahd_softc **)device->host->hostdata);
+	if (bootverbose)
+		printf("%s: Slave Destroy %d\n", ahd_name(ahd), device->id);
 	ahd_midlayer_entrypoint_lock(ahd, &flags);
 	dev = ahd_linux_get_device(ahd, device->channel,
 				   device->id, device->lun,
 					   /*alloc*/FALSE);
-	if (dev != NULL)
+
+	/*
+	 * Filter out "silly" deletions of real devices by only
+	 * deleting devices that have had slave_configure()
+	 * called on them.  All other devices that have not
+	 * been configured will automatically be deleted by
+	 * the refcounting process.
+	 */
+	if (dev != NULL
+	 && (dev->flags & AHD_DEV_SLAVE_CONFIGURED) != 0) {
 		dev->flags |= AHD_DEV_UNCONFIGURED;
+		if (TAILQ_EMPTY(&dev->busyq)
+		 && dev->active == 0)
+			ahd_linux_free_device(ahd, dev);
+	}
 	ahd_midlayer_entrypoint_unlock(ahd, &flags);
 }
 #else
@@ -1253,7 +1285,7 @@ ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 #endif
 	ahd = *(struct ahd_softc **)cmd->host->hostdata;
 #ifdef AHD_DEBUG
-	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0);
+	if ((ahd_debug & AHD_SHOW_RECOVERY) != 0)
 		printf("%s: Bus reset called for cmd %p\n",
 		       ahd_name(ahd), cmd);
 #endif
@@ -1299,6 +1331,14 @@ Scsi_Host_Template aic79xx_driver_template = {
 	.sg_tablesize		= AHD_NSEG,
 	.cmd_per_lun		= 2,
 	.use_clustering		= ENABLE_CLUSTERING,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
+	/*
+	 * We can only map 16MB per-SG
+	 * so create a sector limit of
+	 * "16MB" in 2K sectors.
+	 */
+	.max_sectors		= 8192,
+#endif
 #if defined CONFIG_HIGHIO
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
@@ -1309,6 +1349,8 @@ Scsi_Host_Template aic79xx_driver_template = {
 #endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	.name			= "aic79xx",
+	.slave_alloc		= ahd_linux_slave_alloc,
 	.slave_configure	= ahd_linux_slave_configure,
 	.slave_destroy		= ahd_linux_slave_destroy,
 #else
@@ -1879,7 +1921,7 @@ ahd_linux_setup_tag_info_global(char *p)
  * to a parameter with a ':' between the parameter and the value.
  * ie. aic79xx=stpwlev:1,extended
  */
-int
+static int
 aic79xx_setup(char *s)
 {
 	int	i, n;
@@ -2683,7 +2725,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 {
 	u_int32_t status;
 
-	status = aic_dv_error_action(cmd, targ->inq_data);
+	status = aic_error_action(cmd, targ->inq_data);
 
 	
 #ifdef AHD_DEBUG
@@ -2807,7 +2849,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 				break;
 			}
 
-			if (ahd_linux_fallback(ahd, devinfo) != 0) {
+			if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_EXIT);
 				break;
 			}
@@ -2830,7 +2872,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
-				if (ahd_linux_fallback(ahd, devinfo) != 0) {
+				if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 					AHD_SET_DV_STATE(ahd, targ,
 							 AHD_DV_STATE_EXIT);
 					break;
@@ -2874,7 +2916,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
-				if (ahd_linux_fallback(ahd, devinfo) != 0) {
+				if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 					AHD_SET_DV_STATE(ahd, targ,
 							 AHD_DV_STATE_EXIT);
 					break;
@@ -2987,7 +3029,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
-				if (ahd_linux_fallback(ahd, devinfo) != 0) {
+				if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 					AHD_SET_DV_STATE(ahd, targ,
 							 AHD_DV_STATE_EXIT);
 					break;
@@ -3018,7 +3060,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 		case SS_NOP:
 			if (memcmp(targ->dv_buffer, targ->dv_buffer1,
 				   targ->dv_echo_size) != 0) {
-				if (ahd_linux_fallback(ahd, devinfo) != 0)
+				if (ahd_linux_dv_fallback(ahd, devinfo) != 0)
 					AHD_SET_DV_STATE(ahd, targ,
 							 AHD_DV_STATE_EXIT);
 				else
@@ -3047,7 +3089,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			 == CAM_REQUEUE_REQ) {
 				targ->dv_state_retry--;
 			} else if ((status & SSQ_FALLBACK) != 0) {
-				if (ahd_linux_fallback(ahd, devinfo) != 0) {
+				if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 					AHD_SET_DV_STATE(ahd, targ,
 							 AHD_DV_STATE_EXIT);
 					break;
@@ -3126,7 +3168,7 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 }
 
 static uint32_t
-aic_dv_error_action(struct scsi_cmnd *cmd, struct scsi_inquiry_data *inq_data)
+aic_error_action(struct scsi_cmnd *cmd, struct scsi_inquiry_data *inq_data)
 {
 	aic_sense_action  err_action;
 	cam_status	  status;
@@ -3392,6 +3434,19 @@ ahd_linux_calc_speed(u_int width, u_int period, u_int offset)
 	return (freq);
 }
 
+static __inline int
+ahd_linux_dv_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
+{
+	u_long s;
+	int retval;
+
+	ahd_lock(ahd, &s);
+	retval = ahd_linux_fallback(ahd, devinfo);
+	ahd_unlock(ahd, &s);
+
+	return (retval);
+}
+
 static int
 ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 {
@@ -3399,7 +3454,6 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 	struct	ahd_initiator_tinfo *tinfo;
 	struct	ahd_transinfo *goal;
 	struct	ahd_tmode_tstate *tstate;
-	u_long	s;
 	u_int	width;
 	u_int	period;
 	u_int	offset;
@@ -3415,7 +3469,6 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 		printf("Trying to fallback\n");
 	}
 #endif
-	ahd_lock(ahd, &s);
 	targ = ahd->platform_data->targets[devinfo->target_offset];
 	tinfo = ahd_fetch_transinfo(ahd, devinfo->channel,
 				    devinfo->our_scsiid,
@@ -3545,7 +3598,6 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 			ppr_options = targ->dv_max_ppr_options;
 		}
 	} else {
-		ahd_unlock(ahd, &s);
 		return (-1);
 	}
 	offset = MAX_OFFSET;
@@ -3563,7 +3615,6 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 	ahd_set_syncrate(ahd, devinfo, period, offset,
 			 ppr_options, AHD_TRANS_GOAL, FALSE);
 	targ->dv_last_ppr_options = ppr_options;
-	ahd_unlock(ahd, &s);
 	return (0);
 }
 
@@ -3966,6 +4017,15 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		dev->openings--;
 		dev->active++;
 		dev->commands_issued++;
+
+		/* Update the error counting bucket and dump if needed */
+		if (dev->target->cmds_since_error) {
+			dev->target->cmds_since_error++;
+			if (dev->target->cmds_since_error >
+			    AHD_LINUX_ERR_THRESH)
+				dev->target->cmds_since_error = 0;
+		}
+
 		if ((dev->flags & AHD_DEV_PERIODIC_OTAG) != 0)
 			dev->commands_since_idle_or_otag++;
 		scb->flags |= SCB_ACTIVE;
@@ -4377,43 +4437,45 @@ ahd_linux_handle_scsi_status(struct ahd_softc *ahd,
 		 * structure if it is available.
 		 */
 		cmd = scb->io_ctx;
-		if (scb->flags & SCB_SENSE) {
-			u_int sense_size;
-
-			sense_size = MIN(sizeof(struct scsi_sense_data)
-				       - ahd_get_sense_residual(scb),
-					 sizeof(cmd->sense_buffer));
-			memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
-			memcpy(cmd->sense_buffer,
-			       ahd_get_sense_buf(ahd, scb), sense_size);
-			cmd->result |= (DRIVER_SENSE << 24);
-		} else if (scb->flags & SCB_PKT_SENSE) {
+		if ((scb->flags & (SCB_SENSE|SCB_PKT_SENSE)) != 0) {
 			struct scsi_status_iu_header *siu;
-			u_int sense_len;
+			u_int sense_size;
+			u_int sense_offset;
 
-			/*
-			* Copy only the sense data into the provided buffer.
-			 */
-			siu = (struct scsi_status_iu_header *)scb->sense_data;
-			sense_len = MIN(scsi_4btoul(siu->sense_length),
-					sizeof(cmd->sense_buffer));
+			if (scb->flags & SCB_SENSE) {
+				sense_size = MIN(sizeof(struct scsi_sense_data)
+					       - ahd_get_sense_residual(scb),
+						 sizeof(cmd->sense_buffer));
+				sense_offset = 0;
+			} else {
+				/*
+				 * Copy only the sense data into the provided
+				 * buffer.
+				 */
+				siu = (struct scsi_status_iu_header *)
+				    scb->sense_data;
+				sense_size = MIN(scsi_4btoul(siu->sense_length),
+						sizeof(cmd->sense_buffer));
+				sense_offset = SIU_SENSE_OFFSET(siu);
+			}
+
 			memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
 			memcpy(cmd->sense_buffer,
 			       ahd_get_sense_buf(ahd, scb)
-			     + SIU_SENSE_OFFSET(siu),
-			       sense_len);
+			       + sense_offset, sense_size);
+			cmd->result |= (DRIVER_SENSE << 24);
+
 #ifdef AHD_DEBUG
 			if (ahd_debug & AHD_SHOW_SENSE) {
 				int i;
 
 				printf("Copied %d bytes of sense data at %d:",
-				       sense_len, SIU_SENSE_OFFSET(siu));
-				for (i = 0; i < sense_len; i++)
+				       sense_size, sense_offset);
+				for (i = 0; i < sense_size; i++)
 					printf(" 0x%x", cmd->sense_buffer[i]);
 				printf("\n");
 			}
 #endif
-			cmd->result |= (DRIVER_SENSE << 24);
 		}
 		break;
 	}
@@ -4529,9 +4591,43 @@ ahd_linux_queue_cmd_complete(struct ahd_softc *ahd, Scsi_Cmnd *cmd)
 	 * state change decisions.
 	 */
 	if (AHD_DV_CMD(cmd) == FALSE) {
+		uint32_t status;
 		u_int new_status;
 
-		switch (ahd_cmd_get_transaction_status(cmd)) {
+		status = ahd_cmd_get_transaction_status(cmd);
+		if (status != CAM_REQ_CMP) {
+			struct ahd_linux_device *dev;
+			struct ahd_devinfo devinfo;
+			uint32_t action;
+
+			dev = ahd_linux_get_device(ahd, cmd->channel,
+						   cmd->target, cmd->lun,
+						   /*alloc*/FALSE);
+
+			if (dev == NULL)
+				goto no_fallback;
+
+			ahd_compile_devinfo(&devinfo,
+					    ahd->our_id,
+					    dev->target->target, dev->lun,
+					    dev->target->channel == 0 ? 'A':'B',
+					    ROLE_INITIATOR);
+	
+			action = aic_error_action(cmd, dev->target->inq_data);
+			if ((action & SSQ_FALLBACK) != 0) {
+
+				/* Update stats */
+				dev->target->errors_detected++;
+				if (dev->target->cmds_since_error == 0)
+					dev->target->cmds_since_error++;
+				else {
+					dev->target->cmds_since_error = 0;
+					ahd_linux_fallback(ahd, &devinfo);
+				}
+			}
+		}
+no_fallback:
+		switch (status) {
 		case CAM_REQ_INPROG:
 		case CAM_REQ_CMP:
 		case CAM_SCSI_STATUS_ERROR:

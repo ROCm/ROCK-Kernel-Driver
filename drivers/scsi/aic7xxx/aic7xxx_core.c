@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#103 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#104 $
  *
  * $FreeBSD$
  */
@@ -1848,7 +1848,6 @@ ahc_update_neg_request(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		tinfo->curr.period = AHC_PERIOD_UNKNOWN;
 		tinfo->curr.width = AHC_WIDTH_UNKNOWN;
 		tinfo->curr.offset = AHC_OFFSET_UNKNOWN;
-		tinfo->curr.ppr_options = AHC_OFFSET_UNKNOWN;
 	}
 	if (tinfo->curr.period != tinfo->goal.period
 	 || tinfo->curr.width != tinfo->goal.width

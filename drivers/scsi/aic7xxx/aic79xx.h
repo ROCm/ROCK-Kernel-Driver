@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#76 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#78 $
  *
  * $FreeBSD$
  */
@@ -356,7 +356,9 @@ typedef enum {
 	AHD_CURRENT_SENSING   = 0x40000,
 	AHD_SCB_CONFIG_USED   = 0x80000,/* No SEEPROM but SCB had info. */
 	AHD_HP_BOARD	      = 0x100000,
-	AHD_RESET_POLL_ACTIVE = 0x200000
+	AHD_RESET_POLL_ACTIVE = 0x200000,
+	AHD_UPDATE_PEND_CMDS  = 0x400000,
+	AHD_RUNNING_QOUTFIFO  = 0x800000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -1063,6 +1065,16 @@ struct ahd_softc {
 	 * Timer handles for timer driven callbacks.
 	 */
 	ahd_timer_t		  reset_timer;
+	ahd_timer_t		  stat_timer;
+
+	/*
+	 * Statistics.
+	 */
+#define	AHD_STAT_UPDATE_US	250000 /* 250ms */
+#define	AHD_STAT_BUCKETS	4
+	u_int			  cmdcmplt_bucket;
+	uint32_t		  cmdcmplt_counts[AHD_STAT_BUCKETS];
+	uint32_t		  cmdcmplt_total;
 
 	/*
 	 * Card characteristics
@@ -1105,6 +1117,12 @@ struct ahd_softc {
 	 */
 	struct target_cmd	 *targetcmds;
 	uint8_t			  tqinfifonext;
+
+	/*
+	 * Cached verson of the hs_mailbox so we can avoid
+	 * pausing the sequencer during mailbox updates.
+	 */
+	uint8_t			  hs_mailbox;
 
 	/*
 	 * Incoming and outgoing message handling.
@@ -1153,6 +1171,22 @@ struct ahd_softc {
 
 	/* Selection Timer settings */
 	int			  seltime;
+
+	/*
+	 * Interrupt coalessing settings.
+	 */
+#define	AHD_INT_COALESSING_TIMER_DEFAULT		250 /*us*/
+#define	AHD_INT_COALESSING_MAXCMDS_DEFAULT		10
+#define	AHD_INT_COALESSING_MAXCMDS_MAX			127
+#define	AHD_INT_COALESSING_MINCMDS_DEFAULT		5
+#define	AHD_INT_COALESSING_MINCMDS_MAX			127
+#define	AHD_INT_COALESSING_THRESHOLD_DEFAULT		2000
+#define	AHD_INT_COALESSING_STOP_THRESHOLD_DEFAULT	1000
+	u_int			  int_coalessing_timer;
+	u_int			  int_coalessing_maxcmds;
+	u_int			  int_coalessing_mincmds;
+	u_int			  int_coalessing_threshold;
+	u_int			  int_coalessing_stop_threshold;
 
 	uint16_t	 	  user_discenable;/* Disconnection allowed  */
 	uint16_t		  user_tagenable;/* Tagged Queuing allowed */
@@ -1240,6 +1274,7 @@ extern const int ahd_num_aic7770_devs;
 
 /*************************** Function Declarations ****************************/
 /******************************************************************************/
+void			ahd_reset_cmds_pending(struct ahd_softc *ahd);
 u_int			ahd_find_busy_tcl(struct ahd_softc *ahd, u_int tcl);
 void			ahd_busy_tcl(struct ahd_softc *ahd,
 				     u_int tcl, u_int busyid);
@@ -1273,6 +1308,12 @@ int			 ahd_default_config(struct ahd_softc *ahd);
 int			 ahd_parse_cfgdata(struct ahd_softc *ahd,
 					   struct seeprom_config *sc);
 void			 ahd_intr_enable(struct ahd_softc *ahd, int enable);
+void			 ahd_update_coalessing_values(struct ahd_softc *ahd,
+						      u_int timer,
+						      u_int maxcmds,
+						      u_int mincmds);
+void			 ahd_enable_coalessing(struct ahd_softc *ahd,
+					       int enable);
 void			 ahd_pause_and_flushwork(struct ahd_softc *ahd);
 int			 ahd_suspend(struct ahd_softc *ahd); 
 int			 ahd_resume(struct ahd_softc *ahd);
@@ -1295,6 +1336,7 @@ int			ahd_wait_flexport(struct ahd_softc *ahd);
 /*************************** Interrupt Services *******************************/
 void			ahd_pci_intr(struct ahd_softc *ahd);
 void			ahd_clear_intstat(struct ahd_softc *ahd);
+void			ahd_flush_qoutfifo(struct ahd_softc *ahd);
 void			ahd_run_qoutfifo(struct ahd_softc *ahd);
 #ifdef AHD_TARGET_MODE
 void			ahd_run_tqinfifo(struct ahd_softc *ahd, int paused);
@@ -1418,7 +1460,8 @@ extern uint32_t ahd_debug;
 #define AHD_SHOW_QUEUE		0x02000
 #define AHD_SHOW_TQIN		0x04000
 #define AHD_SHOW_SG		0x08000
-#define AHD_DEBUG_SEQUENCER	0x10000
+#define AHD_SHOW_INT_COALESSING	0x10000
+#define AHD_DEBUG_SEQUENCER	0x20000
 #endif
 void			ahd_print_scb(struct scb *scb);
 void			ahd_print_devinfo(struct ahd_softc *ahd,

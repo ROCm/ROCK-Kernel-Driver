@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#90 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#96 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -287,7 +287,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.0.ALPHA3"
+#define AIC79XX_DRIVER_VERSION "1.3.0.ALPHA5"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -334,7 +334,8 @@ typedef enum {
 	AHD_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
 	AHD_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
 	AHD_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
-	AHD_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
+	AHD_DEV_PERIODIC_OTAG	 = 0x40, /* Send OTAG to prevent starvation */
+	AHD_DEV_SLAVE_CONFIGURED = 0x80	 /* slave_configure() has been called */
 } ahd_linux_dev_flags;
 
 struct ahd_linux_target;
@@ -462,6 +463,12 @@ struct ahd_linux_target {
 	u_int			  dv_state_retry;
 	uint8_t			 *dv_buffer;
 	uint8_t			 *dv_buffer1;
+
+	/*
+	 * Cumulative counter of errors.
+	 */
+	u_long			errors_detected;
+	u_long			cmds_since_error;
 };
 
 /********************* Definitions Required by the Core ***********************/
@@ -525,6 +532,7 @@ struct ahd_platform_data {
 	pid_t			 dv_pid;
 	struct timer_list	 completeq_timer;
 	struct timer_list	 reset_timer;
+	struct timer_list	 stats_timer;
 	struct semaphore	 eh_sem;
 	struct semaphore	 dv_sem;
 	struct semaphore	 dv_cmd_sem;	/* XXX This needs to be in

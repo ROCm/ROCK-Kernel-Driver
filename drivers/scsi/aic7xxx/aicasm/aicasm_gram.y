@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#27 $
+ * $Id: //depot/aic7xxx/aic7xxx/aicasm/aicasm_gram.y#28 $
  *
  * $FreeBSD$
  */
@@ -707,7 +707,7 @@ expression:
 ;
 
 constant:
-	T_CONST T_SYMBOL numerical_value
+	T_CONST T_SYMBOL expression 
 	{
 		if ($2->type != UNINITIALIZED) {
 			stop("Re-definition of symbol as a constant",
@@ -716,7 +716,7 @@ constant:
 		}
 		$2->type = CONST;
 		initialize_symbol($2);
-		$2->info.cinfo->value = $3;
+		$2->info.cinfo->value = $3.value;
 	}
 |	T_CONST T_SYMBOL T_DOWNLOAD
 	{

@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#9 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#11 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -103,7 +103,7 @@ ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 	u_int mb;
 
 	if (tinfo->period == AHD_PERIOD_UNKNOWN) {
-		copy_info(info, "Renegotiation Pending");
+		copy_info(info, "Renegotiation Pending\n");
 		return;
 	}
         speed = 3300;
@@ -181,6 +181,7 @@ ahd_dump_target_state(struct ahd_softc *ahd, struct info_str *info,
 	ahd_format_transinfo(info, &tinfo->goal);
 	copy_info(info, "\tCurr: ");
 	ahd_format_transinfo(info, &tinfo->curr);
+	copy_info(info, "\tTransmission Errors %ld\n", targ->errors_detected);
 
 	for (lun = 0; lun < AHD_NUM_LUNS; lun++) {
 		struct ahd_linux_device *dev;
