@@ -88,6 +88,7 @@ load_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		ofinit(OFW_interface);
 	}
 
+	board_isa_init();
 #if defined(CONFIG_VGA_CONSOLE)
 	vga_init((unsigned char *)0xC0000000);
 #endif /* CONFIG_VGA_CONSOLE */
