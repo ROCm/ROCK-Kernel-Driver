@@ -268,8 +268,6 @@ extern inline int pgd_bad(pgd_t pgd)		{ return (pgd_val(pgd) & ~_PFN_MASK) != _P
 extern inline int pgd_present(pgd_t pgd)	{ return pgd_val(pgd) & _PAGE_VALID; }
 extern inline void pgd_clear(pgd_t * pgdp)	{ pgd_val(*pgdp) = 0; }
 
-#define page_address(page)	((page)->virtual)
-
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..

@@ -439,7 +439,6 @@ static inline unsigned long __pte_page(pte_t pte)
 
 /* permanent address of a page */
 
-#define page_address(page)      ((page)->virtual)
 #define __page_address(page)    (PAGE_OFFSET + (((page) - mem_map) << PAGE_SHIFT))
 #define pte_page(pte)           (mem_map+pte_pagenr(pte))
 

@@ -157,12 +157,23 @@ typedef struct page {
 					   updated asynchronously */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by pagemap_lru_lock !! */
-	wait_queue_head_t wait;		/* Page locked?  Stand in line... */
 	struct page **pprev_hash;	/* Complement to *next_hash. */
 	struct buffer_head * buffers;	/* Buffer maps us to a disk block. */
+
+	/*
+	 * On machines where all RAM is mapped into kernel address space,
+	 * we can simply calculate the virtual address. On machines with
+	 * highmem some memory is mapped into kernel virtual memory
+	 * dynamically, so we need a place to store that address.
+	 * Note that this field could be 16 bits on x86 ... ;)
+	 *
+	 * Architectures with slow multiplication can define
+	 * WANT_PAGE_VIRTUAL in asm/page.h
+	 */
+#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
 	void *virtual;			/* Kernel virtual address (NULL if
 					   not kmapped, ie. highmem) */
-	struct zone_struct *zone;	/* Memory zone we are in. */
+#endif /* CONFIG_HIGMEM || WANT_PAGE_VIRTUAL */
 } mem_map_t;
 
 /*
@@ -182,6 +193,11 @@ typedef struct page {
 #define put_page_testzero(p) 	atomic_dec_and_test(&(p)->count)
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
+
+static inline void init_page_count(struct page *page)
+{
+	page->count.counter = 0;
+}
 
 /*
  * Various page->flags bits:
@@ -237,7 +253,7 @@ typedef struct page {
  * - private pages which have been modified may need to be swapped out
  *   to swap space and (later) to be read back into memory.
  * During disk I/O, PG_locked is used. This bit is set before I/O
- * and reset when I/O completes. page->wait is a wait queue of all
+ * and reset when I/O completes. page_waitqueue(page) is a wait queue of all
  * tasks waiting for the I/O on this page to complete.
  * PG_uptodate tells whether the page's contents is valid.
  * When a read completes, the page becomes uptodate, unless a disk I/O
@@ -299,6 +315,61 @@ typedef struct page {
 #define SetPageChecked(page)	set_bit(PG_checked, &(page)->flags)
 #define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
 #define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
+#define __SetPageReserved(page)	__set_bit(PG_reserved, &(page)->flags)
+
+/*
+ * The zone field is never updated after free_area_init_core()
+ * sets it, so none of the operations on it need to be atomic.
+ */
+#define NODE_SHIFT 4
+#define ZONE_SHIFT (BITS_PER_LONG - 8)
+
+struct zone_struct;
+extern struct zone_struct *zone_table[];
+
+static inline zone_t *page_zone(struct page *page)
+{
+	return zone_table[page->flags >> ZONE_SHIFT];
+}
+
+static inline void set_page_zone(struct page *page, unsigned long zone_num)
+{
+	page->flags &= ~(~0UL << ZONE_SHIFT);
+	page->flags |= zone_num << ZONE_SHIFT;
+}
+
+/*
+ * In order to avoid #ifdefs within C code itself, we define
+ * set_page_address to a noop for non-highmem machines, where
+ * the field isn't useful.
+ * The same is true for page_address() in arch-dependent code.
+ */
+#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
+
+#define set_page_address(page, address)			\
+	do {						\
+		(page)->virtual = (address);		\
+	} while(0)
+
+#else /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+#define set_page_address(page, address)  do { } while(0)
+#endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+
+/*
+ * Permanent address of a page. Obviously must never be
+ * called on a highmem page.
+ */
+#if defined(CONFIG_HIGHMEM) || defined(WANT_PAGE_VIRTUAL)
+
+#define page_address(page) ((page)->virtual)
+
+#else /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
+
+#define page_address(page)						\
+	__va( (((page) - page_zone(page)->zone_mem_map) << PAGE_SHIFT)	\
+			+ page_zone(page)->zone_start_paddr)
+
+#endif /* CONFIG_HIGHMEM || WANT_PAGE_VIRTUAL */
 
 extern void FASTCALL(set_page_dirty(struct page *));
 

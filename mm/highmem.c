@@ -378,7 +378,7 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 		/*
 		 * is destination page below bounce pfn?
 		 */
-		if ((page - page->zone->zone_mem_map) + (page->zone->zone_start_paddr >> PAGE_SHIFT) < pfn)
+		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_paddr >> PAGE_SHIFT) < pfn)
 			continue;
 
 		/*
