@@ -695,6 +695,28 @@ int patch_ad1886(ac97_t * ac97)
 	return 0;
 }
 
+/* MISC bits */
+#define AC97_AD198X_MBC		0x0003	/* mic boost */
+#define AC97_AD198X_MBC_20	0x0000	/* +20dB */
+#define AC97_AD198X_MBC_10	0x0001	/* +10dB */
+#define AC97_AD198X_MBC_30	0x0002	/* +30dB */
+#define AC97_AD198X_VREFD	0x0004	/* VREF high-Z */
+#define AC97_AD198X_VREFH	0x0008	/* 2.25V, 3.7V */
+#define AC97_AD198X_VREF_0	0x000c	/* 0V */
+#define AC97_AD198X_SRU		0x0010	/* sample rate unlock */
+#define AC97_AD198X_LOSEL	0x0020	/* LINE_OUT amplifiers input select */
+#define AC97_AD198X_2MIC	0x0040	/* 2-channel mic select */
+#define AC97_AD198X_SPRD	0x0080	/* SPREAD enable */
+#define AC97_AD198X_DMIX0	0x0100	/* downmix mode: 0 = 6-to-4, 1 = 6-to-2 downmix */
+#define AC97_AD198X_DMIX1	0x0300	/* downmix mode: 1 = enabled */
+#define AC97_AD198X_HPSEL	0x0400	/* headphone amplifier input select */
+#define AC97_AD198X_CLDIS	0x0800	/* center/lfe disable */
+#define AC97_AD198X_LODIS	0x1000	/* LINE_OUT disable */
+#define AC97_AD198X_MSPLT	0x2000	/* mute split */
+#define AC97_AD198X_AC97NC	0x4000	/* AC97 no compatible mode */
+#define AC97_AD198X_DACZ	0x8000	/* DAC zero-fill mode */
+
+
 static int snd_ac97_ad1980_spdif_source_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[2] = { "AC-Link", "A/D Converter" };
@@ -755,7 +777,9 @@ int patch_ad1980(ac97_t * ac97)
 	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
-	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x0420);
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
+			     AC97_AD198X_LOSEL |
+			     AC97_AD198X_HPSEL);
 	return 0;
 }
 
@@ -768,7 +792,14 @@ int patch_ad1985(ac97_t * ac97)
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	/* switch front/surround line-out/hp-out */
 	/* center/LFE, surround in High-Z mode */
-	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x1c28);
+	/* AD-compatible mode */
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
+			     AC97_AD198X_VREFD |
+			     AC97_AD198X_LOSEL |
+			     AC97_AD198X_HPSEL |
+			     AC97_AD198X_CLDIS |
+			     AC97_AD198X_LODIS |
+			     AC97_AD198X_AC97NC);
 	return 0;
 }
 
