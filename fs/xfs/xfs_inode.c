@@ -1140,8 +1140,7 @@ xfs_ialloc(
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-	ASSERT(pip != NULL);
-	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, okalloc,
+	error = xfs_dialloc(tp, pip->i_ino, mode, okalloc,
 			    ialloc_context, call_again, &ino);
 	if (error != 0) {
 		return error;
@@ -3695,12 +3694,6 @@ xfs_iaccess(
 	int		error;
 	mode_t		orgmode = mode;
 	struct inode	*inode = LINVFS_GET_IP(XFS_ITOV(ip));
-
-	/*
-	 * Verify that the MAC policy allows the requested access.
-	 */
-	if ((error = _MAC_XFS_IACCESS(ip, mode, cr)))
-		return XFS_ERROR(error);
 
 	if (mode & S_IWUSR) {
 		umode_t		imode = inode->i_mode;
