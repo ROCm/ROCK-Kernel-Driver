@@ -193,7 +193,7 @@ int is_orphaned_pgrp(int pgrp)
 	return will_become_orphaned_pgrp(pgrp, 0);
 }
 
-static inline int __has_stopped_jobs(int pgrp)
+static inline int has_stopped_jobs(int pgrp)
 {
 	int retval = 0;
 	struct task_struct *p;
@@ -206,17 +206,6 @@ static inline int __has_stopped_jobs(int pgrp)
 		retval = 1;
 		break;
 	}
-	return retval;
-}
-
-static inline int has_stopped_jobs(int pgrp)
-{
-	int retval;
-
-	read_lock(&tasklist_lock);
-	retval = __has_stopped_jobs(pgrp);
-	read_unlock(&tasklist_lock);
-
 	return retval;
 }
 
@@ -506,7 +495,7 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	    (p->session == father->session)) {
 		int pgrp = p->pgrp;
 
-		if (__will_become_orphaned_pgrp(pgrp, 0) && __has_stopped_jobs(pgrp)) {
+		if (__will_become_orphaned_pgrp(pgrp, 0) && has_stopped_jobs(pgrp)) {
 			__kill_pg_info(SIGHUP, (void *)1, pgrp);
 			__kill_pg_info(SIGCONT, (void *)1, pgrp);
 		}
@@ -591,7 +580,7 @@ static void exit_notify(void)
 	if ((t->pgrp != current->pgrp) &&
 	    (t->session == current->session) &&
 	    __will_become_orphaned_pgrp(current->pgrp, current) &&
-	    __has_stopped_jobs(current->pgrp)) {
+	    has_stopped_jobs(current->pgrp)) {
 		__kill_pg_info(SIGHUP, (void *)1, current->pgrp);
 		__kill_pg_info(SIGCONT, (void *)1, current->pgrp);
 	}
