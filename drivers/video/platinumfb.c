@@ -575,7 +575,7 @@ static int __init init_platinum(struct fb_info_platinum *info)
 		return 0;
 
 	printk(KERN_INFO "fb%d: platinum frame buffer device\n",
-	       GET_FB_IDX(info->fb_info.node));
+	       minor(info->fb_info.node));
 
 	return 1;
 }

@@ -1052,28 +1052,7 @@ source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
 
-
-menu "Console drivers"
-	depends on VT
-
-config VGA_CONSOLE
-	bool "VGA text console"
-	depends on !ARCH_ACORN && !ARCH_EBSA110
-	help
-	  Saying Y here will allow you to use Linux in text mode through a
-	  display that complies with the generic VGA standard. Virtually
-	  everyone wants that.
-
-	  The program SVGATextMode can be used to utilize SVGA video cards to
-	  their full potential in text mode. Download it from
-	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
-
-	  Say Y.
-
 source "drivers/video/Kconfig"
-
-endmenu
-
 
 menu "Sound"
 	depends on ARCH_ACORN || ARCH_CLPS7500 || ARCH_TBOX || ARCH_SHARK || ARCH_SA1100 || PCI
