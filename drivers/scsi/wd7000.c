@@ -877,7 +877,6 @@ retry:
 	 */
 	if (freescbs < needed) {
 	    printk (KERN_ERR "wd7000: can't get enough free SCBs.\n");
-	    spin_unlock_irq(host->host_lock);
 	    return (NULL);
 	}
     }
