@@ -95,13 +95,18 @@ static __inline__ void __raw_writel(u32 b, unsigned long addr)
 #define inb(addr)		readb(addr)
 #define inw(addr)		readw(addr)
 #define inl(addr)		readl(addr)
-#define inb_p(addr)		readb(addr)
 
 #define outb_local(b, addr)	writeb(b, addr)
 #define outb(b, addr)		writeb(b, addr)
 #define outw(b, addr)		writew(b, addr)
 #define outl(b, addr)		writel(b, addr)
-#define outb_p(b, addr)		writeb(b, addr)
+
+#define inb_p inb
+#define outb_p outb
+#define inw_p inw
+#define outw_p outw
+#define inl_p inl
+#define outl_p outl
 
 extern void outsb(unsigned long addr, const void *src, unsigned long cnt);
 extern void outsw(unsigned long addr, const void *src, unsigned long cnt);
