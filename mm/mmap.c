@@ -1265,8 +1265,9 @@ void exit_mmap(struct mm_struct *mm)
 
 	tlb = tlb_gather_mmu(mm, 1);
 	flush_cache_mm(mm);
+	/* Use ~0UL here to ensure all VMAs in the mm are unmapped */
 	mm->map_count -= unmap_vmas(&tlb, mm, mm->mmap, 0,
-					TASK_SIZE, &nr_accounted);
+					~0UL, &nr_accounted);
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
