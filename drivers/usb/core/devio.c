@@ -339,18 +339,17 @@ static void driver_disconnect(struct usb_interface *intf)
 	if (!ps)
 		return;
 
-	/* this waits till synchronous requests complete */
-	down_write (&ps->devsem);
+	/* NOTE:  this relies on usbcore having canceled and completed
+	 * all pending I/O requests; 2.6 does that.
+	 */
 
 	/* prevent new I/O requests */
 	ps->dev = 0;
-	ps->ifclaimed = 0;
+	clear_bit(intf->cur_altsetting->desc.bInterfaceNumber, &ps->ifclaimed);
 	usb_set_intfdata (intf, NULL);
 
 	/* force async requests to complete */
 	destroy_all_async (ps);
-
-	up_write (&ps->devsem);
 }
 
 struct usb_driver usbdevfs_driver = {
