@@ -275,7 +275,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 				order = 0;
 			/* Exclude ranges with size > align from
 			   calculation of the alignment. */
-			if (size == align)
+			if (r_size == align)
 				aligns[order] += align;
 			if (order > max_order)
 				max_order = order;
