@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.107 $
+ *   $Revision: 1.110 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -263,10 +263,10 @@ ccw_device_set_offline(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
-	if (!cdev->online)
+	if (!cdev->online || !cdev->drv)
 		return -EINVAL;
 
-	if (cdev->drv && cdev->drv->set_offline) {
+	if (cdev->drv->set_offline) {
 		ret = cdev->drv->set_offline(cdev);
 		if (ret != 0)
 			return ret;
@@ -292,7 +292,7 @@ ccw_device_set_online(struct ccw_device *cdev)
 
 	if (!cdev)
 		return -ENODEV;
-	if (cdev->online)
+	if (cdev->online || !cdev->drv)
 		return -EINVAL;
 
 	spin_lock_irq(cdev->ccwlock);
@@ -307,8 +307,7 @@ ccw_device_set_online(struct ccw_device *cdev)
 	}
 	if (cdev->private->state != DEV_STATE_ONLINE)
 		return -ENODEV;
-	if (!cdev->drv || !cdev->drv->set_online ||
-	    cdev->drv->set_online(cdev) == 0) {
+	if (!cdev->drv->set_online || cdev->drv->set_online(cdev) == 0) {
 		cdev->online = 1;
 		return 0;
 	}
@@ -327,7 +326,7 @@ static ssize_t
 online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
-	int i, force;
+	int i, force, ret;
 	char *tmp;
 
 	if (atomic_compare_and_swap(0, 1, &cdev->private->onoff))
@@ -347,29 +346,46 @@ online_store (struct device *dev, const char *buf, size_t count)
 	if (i == 1) {
 		/* Do device recognition, if needed. */
 		if (cdev->id.cu_type == 0) {
-			ccw_device_recognition(cdev);
+			ret = ccw_device_recognition(cdev);
+			if (ret) {
+				printk(KERN_WARNING"Couldn't start recognition "
+				       "for device %s (ret=%d)\n",
+				       cdev->dev.bus_id, ret);
+				goto out;
+			}
 			wait_event(cdev->private->wait_q,
-				   dev_fsm_final_state(cdev));
+				   cdev->private->flags.recog_done);
 		}
-		ccw_device_set_online(cdev);
+		if (cdev->drv && cdev->drv->set_online)
+			ccw_device_set_online(cdev);
 	} else if (i == 0) {
 		if (cdev->private->state == DEV_STATE_DISCONNECTED)
 			ccw_device_remove_disconnected(cdev);
-		else
+		else if (cdev->drv && cdev->drv->set_offline)
 			ccw_device_set_offline(cdev);
 	}
 	if (force && cdev->private->state == DEV_STATE_BOXED) {
-		int ret;
 		ret = ccw_device_stlck(cdev);
-		if (ret)
+		if (ret) {
+			printk(KERN_WARNING"ccw_device_stlck for device %s "
+			       "returned %d!\n", cdev->dev.bus_id, ret);
 			goto out;
+		}
 		/* Do device recognition, if needed. */
 		if (cdev->id.cu_type == 0) {
-			ccw_device_recognition(cdev);
+			cdev->private->state = DEV_STATE_NOT_OPER;
+			ret = ccw_device_recognition(cdev);
+			if (ret) {
+				printk(KERN_WARNING"Couldn't start recognition "
+				       "for device %s (ret=%d)\n",
+				       cdev->dev.bus_id, ret);
+				goto out;
+			}
 			wait_event(cdev->private->wait_q,
-				   dev_fsm_final_state(cdev));
+				   cdev->private->flags.recog_done);
 		}
-		ccw_device_set_online(cdev);
+		if (cdev->drv && cdev->drv->set_online)
+			ccw_device_set_online(cdev);
 	}
 	out:
 	if (cdev->drv)
@@ -530,7 +546,9 @@ io_subchannel_register(void *data)
 		       __func__, sch->dev.bus_id);
 	put_device(&cdev->dev);
 out:
+	cdev->private->flags.recog_done = 1;
 	put_device(&sch->dev);
+	wake_up(&cdev->private->wait_q);
 }
 
 static void
@@ -555,10 +573,13 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
 
-	if (css_init_done == 0)
+	if (css_init_done == 0) {
+		cdev->private->flags.recog_done = 1;
 		return;
+	}
 	switch (cdev->private->state) {
 	case DEV_STATE_NOT_OPER:
+		cdev->private->flags.recog_done = 1;
 		/* Remove device found not operational. */
 		if (!get_device(&cdev->dev))
 			break;
