@@ -1504,12 +1504,12 @@ sys_call_table:
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall			// 1260
 	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall			// 1265
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_mq_open
+	data8 sys_mq_unlink
+	data8 sys_mq_timedsend
+	data8 sys_mq_timedreceive		// 1265
+	data8 sys_mq_notify
+	data8 sys_mq_getsetattr
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall			// 1270
