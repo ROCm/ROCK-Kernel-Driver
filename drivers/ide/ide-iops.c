@@ -830,7 +830,8 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 //		ide_delay_50ms();
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	hwif->ide_dma_host_off(drive);
+	if (hwif->ide_dma_check)	 /* check if host supports DMA */
+		hwif->ide_dma_host_off(drive);
 #endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
 
 	/*
@@ -906,10 +907,12 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
 	drive->id->dma_1word &= ~0x0F00;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(CONFIG_DMA_NONPCI)
-	if (speed >= XFER_SW_DMA_0)
+	if (speed >= XFER_SW_DMA_0) {
 		hwif->ide_dma_host_on(drive);
-	else
-		hwif->ide_dma_off_quietly(drive);
+	} else {
+		if (hwif->ide_dma_check) /* check if host supports DMA */
+			hwif->ide_dma_off_quietly(drive);
+	}
 #endif /* (CONFIG_BLK_DEV_IDEDMA) && !(CONFIG_DMA_NONPCI) */
 
 	switch(speed) {
