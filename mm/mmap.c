@@ -539,7 +539,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
  * The caller must hold down_write(current->mm->mmap_sem).
  */
 
-unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
+unsigned long __finish_do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
 			    unsigned long addr, unsigned long len,
 			    unsigned long prot, unsigned long flags,
 			    unsigned long pgoff)
@@ -820,7 +820,7 @@ static inline int mmap_hugetlb_implicit(unsigned long len)
 /*
  * The caller must hold down_write(current->mm->mmap_sem).
  */
-unsigned long __do_mmap_pgoff_hugetlb(struct mm_struct *mm, 
+unsigned long __do_mmap_pgoff(struct mm_struct *mm, 
 		struct file * file, unsigned long addr,
 		unsigned long len, unsigned long prot,
 		unsigned long flags, unsigned long pgoff)
@@ -869,10 +869,10 @@ unsigned long __do_mmap_pgoff_hugetlb(struct mm_struct *mm,
 	}
 
 again:
-	result = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
+	result = __finish_do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
 
 	/* Drop reference to implicit hugetlb file, it's already been
-	 * "gotten" in __do_mmap_pgoff in case of success
+	 * "gotten" in __finish_do_mmap_pgoff in case of success
 	 */
 	if (hugetlb_file)
 		fput(hugetlb_file);
@@ -887,9 +887,7 @@ again:
 	return result;
 }
 
-EXPORT_SYMBOL(__do_mmap_pgoff_hugetlb);
-
-
+EXPORT_SYMBOL(__do_mmap_pgoff);
 
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.
