@@ -1,12 +1,11 @@
 /*
- * arch/ppc/platforms/spruce_setup.c
+ * arch/ppc/platforms/spruce.c
  *
- * Board setup routines for IBM Spruce
+ * Board and PCI setup routines for IBM Spruce
  *
- * Authors: Johnnie Peters <jpeters@mvista.com>
- *          Matt Porter <mporter@mvista.com>
+ * Author: MontaVista Software <source@mvista.com>
  *
- * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2000-2004 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -39,18 +38,73 @@
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/time.h>
-#include <platforms/spruce.h>
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/kgdb.h>
 
 #include <syslib/cpc700.h>
 
-extern void spruce_init_IRQ(void);
-extern int spruce_get_irq(struct pt_regs *);
-extern void spruce_setup_hose(void);
+#include "spruce.h"
 
-extern char cmd_line[];
+static inline int
+spruce_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	static char pci_irq_table[][4] =
+		/*
+		 * 	PCI IDSEL/INTPIN->INTLINE
+		 * 	A	B	C	D
+		 */
+	{
+		{23, 24, 25, 26},	/* IDSEL 1 - PCI slot 3 */
+		{24, 25, 26, 23},	/* IDSEL 2 - PCI slot 2 */
+		{25, 26, 23, 24},	/* IDSEL 3 - PCI slot 1 */
+		{26, 23, 24, 25},	/* IDSEL 4 - PCI slot 0 */
+	};
+
+	const long min_idsel = 1, max_idsel = 4, irqs_per_slot = 4;
+	return PCI_IRQ_TABLE_LOOKUP;
+}
+
+static void __init
+spruce_setup_hose(void)
+{
+	struct pci_controller *hose;
+
+	/* Setup hose */
+	hose = pcibios_alloc_controller();
+	if (!hose)
+		return;
+
+	hose->first_busno = 0;
+	hose->last_busno = 0xff;
+
+	pci_init_resource(&hose->io_resource,
+			SPRUCE_PCI_LOWER_IO,
+			SPRUCE_PCI_UPPER_IO,
+			IORESOURCE_IO,
+			"PCI host bridge");
+
+	pci_init_resource(&hose->mem_resources[0],
+			SPRUCE_PCI_LOWER_MEM,
+			SPRUCE_PCI_UPPER_MEM,
+			IORESOURCE_MEM,
+			"PCI host bridge");
+
+	hose->io_space.start = SPRUCE_PCI_LOWER_IO;
+	hose->io_space.end = SPRUCE_PCI_UPPER_IO;
+	hose->mem_space.start = SPRUCE_PCI_LOWER_MEM;
+	hose->mem_space.end = SPRUCE_PCI_UPPER_MEM;
+	hose->io_base_virt = (void *)SPRUCE_ISA_IO_BASE;
+
+	setup_indirect_pci(hose,
+			SPRUCE_PCI_CONFIG_ADDR,
+			SPRUCE_PCI_CONFIG_DATA);
+
+	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
+
+	ppc_md.pci_swizzle = common_swizzle;
+	ppc_md.pci_map_irq = spruce_map_irq;
+}
 
 /*
  * CPC700 PIC interrupt programming table
@@ -122,7 +176,7 @@ spruce_early_serial_map(void)
 	memset(&serial_req, 0, sizeof(serial_req));
 	serial_req.uartclk = uart_clk;
 	serial_req.irq = UART0_INT;
-	serial_req.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
+	serial_req.flags = ASYNC_BOOT_AUTOCONF;
 	serial_req.iotype = SERIAL_IO_MEM;
 	serial_req.membase = (u_char *)UART0_IO_BASE;
 	serial_req.regshift = 0;

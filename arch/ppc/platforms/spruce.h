@@ -57,10 +57,10 @@
 #define UART0_INT	3
 #define UART1_INT	4
 
-#define STD_UART_OP(num)				\
-	{ 0, BASE_BAUD, 0, UART##num##_INT,		\
-		ASYNC_BOOT_AUTOCONF,			\
-		iomem_base: UART##num##_IO_BASE,	\
+#define STD_UART_OP(num)						\
+	{ 0, BASE_BAUD, 0, UART##num##_INT,				\
+		ASYNC_BOOT_AUTOCONF,					\
+		iomem_base: (unsigned char *) UART##num##_IO_BASE,	\
 		io_type: SERIAL_IO_MEM},
 
 #define SERIAL_PORT_DFNS	\
