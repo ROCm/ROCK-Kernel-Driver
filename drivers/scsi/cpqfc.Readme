@@ -7,6 +7,8 @@ Tested in single and dual HBA configuration, 32 and 64bit busses,
 SEST size 512 Exchanges (simultaneous I/Os) limited by module kmalloc() 
 	max of 128k bytes contiguous.
 
+Ver 2.5.3  Aug 01, 2002
+   * fix the passthru ioctl to handle the Scsi_Cmnd->request being a pointer
 Ver 2.5.1  Jul 30, 2002
    * fix ioctl to pay attention to the specified LUN.
 Ver 2.5.0  Nov 29, 2001

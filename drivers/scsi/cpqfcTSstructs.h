@@ -33,7 +33,7 @@
 // don't forget to also change MODULE_DESCRIPTION in cpqfcTSinit.c
 #define VER_MAJOR 2
 #define VER_MINOR 5
-#define VER_SUBMINOR 2
+#define VER_SUBMINOR 3
 
 // Macros for kernel (esp. SMP) tracing using a PCI analyzer
 // (e.g. x86).
@@ -907,9 +907,17 @@ typedef struct
 
 } FC_SCSI_QUE, *PFC_SCSI_QUE;
 
+typedef struct {
+	/* This is tacked on to a Scsi_Request in upper_private_data 
+	   for pasthrough ioctls, as a place to hold data that can't 
+	   be stashed anywhere else in the Scsi_Request.  We differentiate
+	   this from _real_ upper_private_data by checking if the virt addr
+	   is within our special pool.  */
+	ushort bus;
+	ushort pdrive;
+} cpqfc_passthru_private_t;
 
-
-
+#define CPQFC_MAX_PASSTHRU_CMDS 100
 
 #define DYNAMIC_ALLOCATIONS 4  // Tachyon aligned allocations: ERQ,IMQ,SFQ,SEST
 
@@ -949,6 +957,8 @@ typedef struct
   PFC_LINK_QUE fcLQ;             // the WorkerThread operates on this
 
   spinlock_t hba_spinlock;           // held/released by WorkerThread
+  cpqfc_passthru_private_t *private_data_pool;
+  unsigned long *private_data_bits;
 
 } CPQFCHBA;
 
@@ -1404,6 +1414,7 @@ struct ext_sg_entry_t {
 	__u32 uba:13;		/* upper bus address bits 18-31 */
 	__u32 lba;		/* lower bus address bits 0-31 */
 }; 
+
 
 // J. McCarty's LINK.H
 //
