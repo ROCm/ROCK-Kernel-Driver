@@ -260,24 +260,22 @@ static void PRINT_PKT(u_char *buf, int length)
 
 /* this enables an interrupt in the interrupt mask register */
 #define SMC_ENABLE_INT(x) do {						\
-	unsigned long flags;						\
 	unsigned char mask;						\
-	spin_lock_irqsave(&lp->lock, flags);				\
+	spin_lock_irq(&lp->lock);					\
 	mask = SMC_GET_INT_MASK();					\
 	mask |= (x);							\
 	SMC_SET_INT_MASK(mask);						\
-	spin_unlock_irqrestore(&lp->lock, flags);			\
+	spin_unlock_irq(&lp->lock);					\
 } while (0)
 
 /* this disables an interrupt from the interrupt mask register */
 #define SMC_DISABLE_INT(x) do {						\
-	unsigned long flags;						\
 	unsigned char mask;						\
-	spin_lock_irqsave(&lp->lock, flags);				\
+	spin_lock_irq(&lp->lock);					\
 	mask = SMC_GET_INT_MASK();					\
 	mask &= ~(x);							\
 	SMC_SET_INT_MASK(mask);						\
-	spin_unlock_irqrestore(&lp->lock, flags);			\
+	spin_unlock_irq(&lp->lock);					\
 } while (0)
 
 /*
@@ -312,8 +310,10 @@ static void smc_reset(struct net_device *dev)
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
 
 	/* Disable all interrupts */
+	spin_lock(&lp->lock);
 	SMC_SELECT_BANK(2);
 	SMC_SET_INT_MASK(0);
+	spin_unlock(&lp->lock);
 
 	/*
 	 * This resets the registers mostly to defaults, but doesn't
@@ -427,13 +427,18 @@ static void smc_enable(struct net_device *dev)
 /*
  * this puts the device in an inactive state
  */
-static void smc_shutdown(unsigned long ioaddr)
+static void smc_shutdown(struct net_device *dev)
 {
+	unsigned long ioaddr = dev->base_addr;
+	struct smc_local *lp = netdev_priv(dev);
+
 	DBG(2, "%s: %s\n", CARDNAME, __FUNCTION__);
 
 	/* no more interrupts for me */
+	spin_lock(&lp->lock);
 	SMC_SELECT_BANK(2);
 	SMC_SET_INT_MASK(0);
+	spin_unlock(&lp->lock);
 
 	/* and tell the card to stay away from that nasty outside world */
 	SMC_SELECT_BANK(0);
@@ -535,6 +540,37 @@ done:
 	SMC_SET_MMU_CMD(MC_RELEASE);
 }
 
+#ifdef CONFIG_SMP
+/*
+ * On SMP we have the following problem:
+ *
+ * 	A = smc_hardware_send_pkt()
+ * 	B = smc_hard_start_xmit()
+ * 	C = smc_interrupt()
+ *
+ * A and B can never be executed simultaneously.  However, at least on UP,
+ * it is possible (and even desirable) for C to interrupt execution of
+ * A or B in order to have better RX reliability and avoid overruns.
+ * C, just like A and B, must have exclusive access to the chip and
+ * each of them must lock against any other concurrent access.
+ * Unfortunately this is not possible to have C suspend execution of A or
+ * B taking place on another CPU. On UP this is no an issue since A and B
+ * are run from softirq context and C from hard IRQ context, and there is
+ * no other CPU where concurrent access can happen.
+ * If ever there is a way to force at least B and C to always be executed
+ * on the same CPU then we could use read/write locks to protect against
+ * any other concurrent access and C would always interrupt B. But life
+ * isn't that easy in a SMP world...
+ */
+#define smc_special_trylock(lock)	spin_trylock_irq(lock)
+#define smc_special_lock(lock)		spin_lock_irq(lock)
+#define smc_special_unlock(lock)	spin_unlock_irq(lock)
+#else
+#define smc_special_trylock(lock)	(1)
+#define smc_special_lock(lock)		do { } while (0)
+#define smc_special_unlock(lock)	do { } while (0)
+#endif
+
 /*
  * This is called to actually send a packet to the chip.
  * Returns non-zero when successful.
@@ -550,14 +586,18 @@ static void smc_hardware_send_pkt(unsigned long data)
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
+	if (!smc_special_trylock(&lp->lock)) {
+		tasklet_schedule(&lp->tx_task);
+		return;
+	}
+
 	lp->saved_skb = NULL;
 	packet_no = SMC_GET_AR();
 	if (unlikely(packet_no & AR_FAILED)) {
 		printk("%s: Memory allocation failed.\n", dev->name);
 		lp->stats.tx_errors++;
 		lp->stats.tx_fifo_errors++;
-		dev_kfree_skb(skb);
-		return;
+		goto done;
 	}
 
 	/* point to the beginning of the packet */
@@ -597,16 +637,18 @@ static void smc_hardware_send_pkt(unsigned long data)
 	/* queue the packet for TX */
 	SMC_SET_MMU_CMD(MC_ENQUEUE);
 	SMC_ACK_INT(IM_TX_EMPTY_INT);
+	SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
+
+	dev->trans_start = jiffies;
+	lp->stats.tx_packets++;
+	lp->stats.tx_bytes += len;
+
+done:	smc_special_unlock(&lp->lock);
 
 	if (!THROTTLE_TX_PKTS)
 		netif_wake_queue(dev);
 
-	SMC_ENABLE_INT(IM_TX_INT | IM_TX_EMPTY_INT);
-
 	dev_kfree_skb(skb);
-	dev->trans_start = jiffies;
-	lp->stats.tx_packets++;
-	lp->stats.tx_bytes += len;
 }
 
 /*
@@ -647,6 +689,8 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		return 0;
 	}
 
+	smc_special_lock(&lp->lock);
+
 	/* now, try to allocate the memory */
 	SMC_SET_MMU_CMD(MC_ALLOC | numPages);
 
@@ -662,6 +706,8 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
   			break;
 		}
    	} while (--poll_count);
+
+	smc_special_unlock(&lp->lock);
 
    	if (!poll_count) {
 		/* oh well, wait until the chip finds memory later */
@@ -1175,6 +1221,8 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
+	spin_lock(&lp->lock);
+
 	saved_pointer = SMC_GET_PTR();
 	mask = SMC_GET_INT_MASK();
 	SMC_SET_INT_MASK(0);
@@ -1195,8 +1243,6 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		status &= mask;
 		if (!status)
 			break;
-
-		spin_lock(&lp->lock);
 
 		if (status & IM_RCV_INT) {
 			DBG(3, "%s: RX irq\n", dev->name);
@@ -1240,13 +1286,13 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			SMC_ACK_INT(IM_ERCV_INT);
 			PRINTK("%s: UNSUPPORTED: ERCV INTERRUPT \n", dev->name);
 		}
-
-		spin_unlock(&lp->lock);
 	} while (--timeout);
 
 	/* restore register states */
 	SMC_SET_PTR(saved_pointer);
 	SMC_SET_INT_MASK(mask);
+
+	spin_unlock(&lp->lock);
 
 	DBG(3, "%s: Interrupt done (%d loops)\n", dev->name, 8-timeout);
 
@@ -1471,7 +1517,7 @@ static int smc_close(struct net_device *dev)
 	netif_carrier_off(dev);
 
 	/* clear everything */
-	smc_shutdown(dev->base_addr);
+	smc_shutdown(dev);
 
 	if (lp->phy_type != 0) {
 		flush_scheduled_work();
@@ -2093,7 +2139,7 @@ static int smc_drv_suspend(struct device *dev, u32 state, u32 level)
 	if (ndev && level == SUSPEND_DISABLE) {
 		if (netif_running(ndev)) {
 			netif_device_detach(ndev);
-			smc_shutdown(ndev->base_addr);
+			smc_shutdown(ndev);
 		}
 	}
 	return 0;
