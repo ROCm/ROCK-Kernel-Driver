@@ -115,6 +115,8 @@ struct hpet_task {
 	void *ht_opaque;
 };
 
+#define	HD_STATE(HD, TIMER)	(HD)->hd_state |= (1 << TIMER)
+
 struct hpet_data {
 	unsigned long hd_address;
 	unsigned short hd_nirqs;

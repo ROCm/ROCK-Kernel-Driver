@@ -434,6 +434,7 @@ Your cooperation is appreciated.
 		225 = /dev/pps		Pulse Per Second driver
 		226 = /dev/systrace	Systrace device
 		227 = /dev/mcelog	X86_64 Machine Check Exception driver
+		228 = /dev/hpet		HPET driver
 		240-254			Reserved for local use
 		255			Reserved for MISC_DYNAMIC_MINOR
 
