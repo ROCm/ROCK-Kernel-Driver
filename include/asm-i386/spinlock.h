@@ -15,7 +15,7 @@ asmlinkage int printk(const char * fmt, ...)
  */
 
 typedef struct {
-	volatile unsigned int lock;
+	volatile unsigned int slock;
 #ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
@@ -43,7 +43,7 @@ typedef struct {
  * We make no fairness assumptions. They have a cost.
  */
 
-#define spin_is_locked(x)	(*(volatile signed char *)(&(x)->lock) <= 0)
+#define spin_is_locked(x)	(*(volatile signed char *)(&(x)->slock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 
 #define spin_lock_string \
@@ -83,7 +83,7 @@ typedef struct {
 
 #define spin_unlock_string \
 	"movb $1,%0" \
-		:"=m" (lock->lock) : : "memory"
+		:"=m" (lock->slock) : : "memory"
 
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
@@ -101,7 +101,7 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 
 #define spin_unlock_string \
 	"xchgb %b0, %1" \
-		:"=q" (oldval), "=m" (lock->lock) \
+		:"=q" (oldval), "=m" (lock->slock) \
 		:"0" (oldval) : "memory"
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
@@ -123,7 +123,7 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 	char oldval;
 	__asm__ __volatile__(
 		"xchgb %b0,%1"
-		:"=q" (oldval), "=m" (lock->lock)
+		:"=q" (oldval), "=m" (lock->slock)
 		:"0" (0) : "memory");
 	return oldval > 0;
 }
@@ -138,7 +138,7 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 #endif
 	__asm__ __volatile__(
 		spin_lock_string
-		:"=m" (lock->lock) : : "memory");
+		:"=m" (lock->slock) : : "memory");
 }
 
 static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
@@ -151,7 +151,7 @@ static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 #endif
 	__asm__ __volatile__(
 		spin_lock_string_flags
-		:"=m" (lock->lock) : "r" (flags) : "memory");
+		:"=m" (lock->slock) : "r" (flags) : "memory");
 }
 
 /*
