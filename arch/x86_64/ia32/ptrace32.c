@@ -365,7 +365,7 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	}
 
 	case PTRACE_GETEVENTMSG:
-		ret = put_user(child->ptrace_message,(unsigned int __user *)(u64)data);
+		ret = put_user(child->ptrace_message,(unsigned int __user *)compat_ptr(data));
 		break;
 
 	default:
