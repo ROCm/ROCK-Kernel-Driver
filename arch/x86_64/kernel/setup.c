@@ -917,7 +917,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	mcheck_init(c);
 #endif
 #ifdef CONFIG_NUMA
-	numa_add_cpu(c - cpu_data);
+	if (c != &boot_cpu_data)
+		numa_add_cpu(c - cpu_data);
 #endif
 }
  
