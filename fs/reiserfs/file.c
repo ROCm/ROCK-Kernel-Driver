@@ -89,15 +89,16 @@ static int reiserfs_sync_file(
 			      ) {
   struct inode * p_s_inode = p_s_dentry->d_inode;
   int n_err;
-
-  reiserfs_write_lock(p_s_inode->i_sb);
+  int barrier_done;
 
   if (!S_ISREG(p_s_inode->i_mode))
       BUG ();
-
   n_err = sync_mapping_buffers(p_s_inode->i_mapping) ;
-  reiserfs_commit_for_inode(p_s_inode) ;
+  reiserfs_write_lock(p_s_inode->i_sb);
+  barrier_done = reiserfs_commit_for_inode(p_s_inode);
   reiserfs_write_unlock(p_s_inode->i_sb);
+  if (barrier_done != 1)
+      blkdev_issue_flush(p_s_inode->i_sb->s_bdev, NULL);
   return ( n_err < 0 ) ? -EIO : 0;
 }
 
