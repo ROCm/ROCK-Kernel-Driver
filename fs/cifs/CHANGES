@@ -2,6 +2,7 @@ Version 0.92
 ------------
 Active smb transactions should never go negative (fix double FreeXid). Fix
 list processing in file routines. Check return code on kmalloc in open.
+Fix spinlock usage for SMP.
 
 Version 0.91
 ------------

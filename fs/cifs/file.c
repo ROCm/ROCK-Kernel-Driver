@@ -144,6 +144,7 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile->pid = current->pid;
 			pCifsFile->pfile = file; /* needed for writepage */
 			pCifsFile->pInode = inode;
+			pCifsFile->invalidHandle = FALSE;
 			write_lock(&file->f_owner.lock);
 			write_lock(&GlobalSMBSeslock);
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
@@ -215,33 +216,51 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 	struct list_head *tmp;
 	struct list_head *tmp1;
 
-/* list all files open on tree connection */
-	write_lock(&GlobalSMBSeslock); /* BB change to semaphore */
+/* list all files open on tree connection and mark them invalid */
+	write_lock(&GlobalSMBSeslock);
 	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
 		if(open_file) {
-			if(open_file->search_resume_name) {
-				kfree(open_file->search_resume_name);
-			}
-			file = open_file->pfile;
-			list_del(&open_file->flist);
-			list_del(&open_file->tlist);
-			kfree(open_file);
-			if(file) {                
-				file->private_data = NULL;
-				if(file->f_dentry == 0) {
-					cFYI(1,("Null dentry for file %p",file));
-				} else {
-					rc = cifs_open(file->f_dentry->d_inode,file);
-					if(rc) {
-						cFYI(1,("reconnecting file %s failed with %d",
-							file->f_dentry->d_name.name,rc));
+			open_file->invalidHandle = TRUE;
+		}
+	}
+
+	/* reopen files */
+	for(;;) {
+		/* BB need to fix above to check list end and skip entries we do not need to reopen */
+		if(list_empty(&pTcon->openFileList)) {
+				break;
+		} else {
+			open_file = list_entry(tmp,struct cifsFileInfo, tlist);
+			if(open_file) {
+				if(open_file->invalidHandle == FALSE)
+					continue;
+				if(open_file->search_resume_name) {
+					kfree(open_file->search_resume_name);
+				}
+				file = open_file->pfile;
+				list_del(&open_file->flist);
+				list_del(&open_file->tlist);
+				kfree(open_file);
+				if(file) {                
+					file->private_data = NULL;
+					if(file->f_dentry == 0) {
+						cFYI(1,("Null dentry for file %p",file));
 					} else {
-						cFYI(1,("reconnection of %s succeeded",
+						write_unlock(&GlobalSMBSeslock);
+						rc = cifs_open(file->f_dentry->d_inode,file);
+						write_lock(&GlobalSMBSeslock);
+						if(rc) {
+							cFYI(1,("reconnecting file %s failed with %d",
+								file->f_dentry->d_name.name,rc));
+						} else {
+							cFYI(1,("reconnection of %s succeeded",
 							file->f_dentry->d_name.name));
+						}
 					}
-				} 
+				}
 			}
+
 		}
 	}
 	write_unlock(&GlobalSMBSeslock);
@@ -264,6 +283,7 @@ cifs_close(struct inode *inode, struct file *file)
 	pTcon = cifs_sb->tcon;
 	if (pSMBFile) {
 		write_lock(&file->f_owner.lock);
+		pSMBFile->invalidHandle = TRUE;
 		list_del(&pSMBFile->flist);
 		list_del(&pSMBFile->tlist);
 		write_unlock(&file->f_owner.lock);
@@ -1242,8 +1262,10 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					rc = 0;
 					break;
 				}
-			} else
+			} else {
+				cifsFile->invalidHandle = TRUE;
 				CIFSFindClose(xid, pTcon, cifsFile->netfid);
+			}
 			if(cifsFile->search_resume_name) {
 				kfree(cifsFile->search_resume_name);
 				cifsFile->search_resume_name = NULL;
@@ -1267,6 +1289,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cifsFile =
 				    (struct cifsFileInfo *) file->private_data;
 				cifsFile->netfid = searchHandle;
+				cifsFile->invalidHandle = FALSE;
 			} else {
 				rc = -ENOMEM;
 				break;
