@@ -455,7 +455,6 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 	unsigned int status;
 	int cpu;
 
-	irq_enter();
 	cpu = smp_processor_id(); /* for CONFIG_PREEMPT, this must come after irq_enter()! */
 
 	kstat_cpu(cpu).irqs[irq]++;
@@ -525,7 +524,6 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
 		desc->handler->end(irq);
 		spin_unlock(&desc->lock);
 	}
-	irq_exit();
 	return 1;
 }
 
