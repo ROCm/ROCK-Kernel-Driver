@@ -53,7 +53,6 @@ static int piix_init_one (struct pci_dev *pdev,
 
 static void piix_pata_phy_reset(struct ata_port *ap);
 static void piix_sata_phy_reset(struct ata_port *ap);
-static void piix_sata_port_disable(struct ata_port *ap);
 static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev,
 			      unsigned int pio);
 static void piix_set_udmamode (struct ata_port *ap, struct ata_device *adev,
@@ -137,7 +136,7 @@ static struct ata_port_operations piix_pata_ops = {
 };
 
 static struct ata_port_operations piix_sata_ops = {
-	.port_disable		= piix_sata_port_disable,
+	.port_disable		= ata_port_disable,
 	.set_piomode		= piix_set_piomode,
 	.set_udmamode		= piix_set_udmamode,
 
@@ -288,28 +287,6 @@ static void piix_pcs_probe (struct ata_port *ap, unsigned int *have_port,
 }
 
 /**
- *	piix_pcs_disable - Disable SATA port
- *	@ap: Port to disable
- *
- *	Disable SATA phy for specified port.
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-static void piix_pcs_disable (struct ata_port *ap)
-{
-	struct pci_dev *pdev = ap->host_set->pdev;
-	u16 pcs;
-
-	pci_read_config_word(pdev, ICH5_PCS, &pcs);
-
-	if (pcs & (1 << ap->port_no)) {
-		pcs &= ~(1 << ap->port_no);
-		pci_write_config_word(pdev, ICH5_PCS, pcs);
-	}
-}
-
-/**
  *	piix_sata_phy_reset - Probe specified port on SATA host controller
  *	@ap: Port to probe
  *
@@ -321,6 +298,7 @@ static void piix_pcs_disable (struct ata_port *ap)
 
 static void piix_sata_phy_reset(struct ata_port *ap)
 {
+	const char *msg;
 	unsigned int have_port = 0, have_dev = 0;
 
 	if (!pci_test_config_bits(ap->host_set->pdev,
@@ -332,19 +310,16 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 
 	piix_pcs_probe(ap, &have_port, &have_dev);
 
-	/* if port not enabled, exit */
-	if (!have_port) {
-		ata_port_disable(ap);
-		printk(KERN_INFO "ata%u: SATA port disabled. ignoring.\n",
-		       ap->id);
-		return;
-	}
+	if (!have_port)
+		msg = KERN_INFO "ata%u: SATA port disabled.\n";
+	else if (!have_dev)
+		msg = KERN_INFO "ata%u: SATA port has no device.\n";
+	else
+		msg = NULL;
 
-	/* if port enabled but no device, disable port and exit */
-	if (!have_dev) {
-		piix_sata_port_disable(ap);
-		printk(KERN_INFO "ata%u: SATA port has no device. disabling.\n",
-		       ap->id);
+	if (msg) {
+		ata_port_disable(ap);
+		printk(msg, ap->id);
 		return;
 	}
 
@@ -353,22 +328,6 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 	ata_port_probe(ap);
 
 	ata_bus_reset(ap);
-}
-
-/**
- *	piix_sata_port_disable - Disable SATA port
- *	@ap: Port to disable.
- *
- *	Disable SATA port.
- *
- *	LOCKING:
- *	None (inherited from caller).
- */
-
-static void piix_sata_port_disable(struct ata_port *ap)
-{
-	ata_port_disable(ap);
-	piix_pcs_disable(ap);
 }
 
 /**
