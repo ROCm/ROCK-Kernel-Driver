@@ -91,9 +91,9 @@ static int suspend_enter(u32 state)
 	if ((error = device_power_down(state)))
 		goto Done;
 	error = pm_ops->enter(state);
-	local_irq_restore(flags);
 	device_power_up();
  Done:
+	local_irq_restore(flags);
 	return error;
 }
 
