@@ -212,6 +212,7 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	list_for_each_entry(sdev, &shost->my_devices, siblings)
 		sdev->online = FALSE;
 
+	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
 	scsi_sysfs_remove_host(shost);
 	return 0;
@@ -238,6 +239,8 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (error)
 		return error;
 
+	scsi_proc_host_add(shost);
+
 	scsi_scan_host(shost);
 			
 	list_for_each_entry (sdev, &shost->my_devices, siblings) {
@@ -254,6 +257,15 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
  * @shost:	scsi host to be unregistered
  **/
 void scsi_unregister(struct Scsi_Host *shost)
+{
+	scsi_host_put(shost);
+}
+
+/**
+ * scsi_free_sdev - free a scsi hosts resources
+ * @shost:	scsi host to free 
+ **/
+void scsi_free_shost(struct Scsi_Host *shost)
 {
 	/* Remove shost from scsi_host_list */
 	spin_lock(&scsi_host_list_lock);
@@ -273,7 +285,6 @@ void scsi_unregister(struct Scsi_Host *shost)
 	}
 
 	shost->hostt->present--;
-	scsi_proc_host_rm(shost);
 	scsi_destroy_command_freelist(shost);
 	kfree(shost);
 }
@@ -394,7 +405,8 @@ found:
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
-	scsi_proc_host_add(shost);
+	device_initialize(&shost->host_gendev);
+	class_device_initialize(&shost->class_dev);
 
 	shost->eh_notify = &sem;
 	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
@@ -523,15 +535,26 @@ struct Scsi_Host *scsi_host_hn_get(unsigned short host_no)
 }
 
 /**
+ * *scsi_host_get - inc a Scsi_Host ref count
+ * @shost:	Pointer to Scsi_Host to inc.
+ **/
+void scsi_host_get(struct Scsi_Host *shost)
+{
+
+	get_device(&shost->host_gendev);
+	class_device_get(&shost->class_dev);
+	return;
+}
+
+/**
  * *scsi_host_put - dec a Scsi_Host ref count
  * @shost:	Pointer to Scsi_Host to dec.
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
 
-	/* XXX Get list lock */
-	/* XXX dec ref count */
-	/* XXX Release list lock */
+	put_device(&shost->host_gendev);
+	class_device_put(&shost->class_dev);
 	return;
 }
 

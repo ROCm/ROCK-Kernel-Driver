@@ -109,6 +109,8 @@ extern void scsi_exit_procfs(void);
 extern void scsi_scan_host(struct Scsi_Host *shost);
 extern void scsi_forget_host(struct Scsi_Host *shost);
 extern void scsi_free_sdev(struct scsi_device *);
+extern void scsi_free_shost(struct Scsi_Host *);
+extern void scsi_host_get(struct Scsi_Host *);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
