@@ -74,7 +74,7 @@ static int old_max = 0;
 	struct file * f;
 
 	if (likely(files_stat.nr_files < files_stat.max_files)) {
-		f = kmem_cache_alloc(filp_cachep, SLAB_KERNEL);
+		f = kmem_cache_alloc(filp_cachep, GFP_KERNEL);
 		if (f) {
 got_one:
 			memset(f, 0, sizeof(*f));
@@ -90,7 +90,8 @@ got_one:
 			f->f_uid = current->fsuid;
 			f->f_gid = current->fsgid;
 			f->f_owner.lock = RW_LOCK_UNLOCKED;
-			/* f->f_version, f->f_list.next: 0 */
+			/* f->f_version: 0 */
+			INIT_LIST_HEAD(&f->f_list);
 			return f;
 		}
 	}
@@ -132,7 +133,7 @@ int open_private_file(struct file *filp, struct dentry *dentry, int flags)
 	filp->f_uid    = current->fsuid;
 	filp->f_gid    = current->fsgid;
 	filp->f_op     = dentry->d_inode->i_fop;
-	filp->f_list.next = NULL;
+	INIT_LIST_HEAD(&filp->f_list);
 	error = security_file_alloc(filp);
 	if (!error)
 		if (filp->f_op && filp->f_op->open) {
@@ -187,8 +188,7 @@ void __fput(struct file * file)
 	file_list_lock();
 	file->f_dentry = NULL;
 	file->f_vfsmnt = NULL;
-	if (file->f_list.next)
-		list_del(&file->f_list);
+	list_del(&file->f_list);
 	file_free(file);
 	file_list_unlock();
 	dput(dentry);
@@ -215,8 +215,7 @@ void put_filp(struct file *file)
 	if(atomic_dec_and_test(&file->f_count)) {
 		security_file_free(file);
 		file_list_lock();
-		if (file->f_list.next)
-			list_del(&file->f_list);
+		list_del(&file->f_list);
 		file_free(file);
 		file_list_unlock();
 	}
@@ -227,18 +226,14 @@ void file_move(struct file *file, struct list_head *list)
 	if (!list)
 		return;
 	file_list_lock();
-	if (file->f_list.next)
-		list_del(&file->f_list);
-	list_add(&file->f_list, list);
+	list_move(&file->f_list, list);
 	file_list_unlock();
 }
 
 void file_kill(struct file *file)
 {
 	file_list_lock();
-	if (file->f_list.next)
-		list_del(&file->f_list);
-	file->f_list.next = NULL;
+	list_del_init(&file->f_list);
 	file_list_unlock();
 }
 
