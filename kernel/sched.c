@@ -3957,50 +3957,52 @@ wait_to_die:
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
+/* Figure out where task on dead CPU should go, use force if neccessary. */
+static void move_task_off_dead_cpu(int dead_cpu, struct task_struct *tsk)
+{
+	int dest_cpu;
+	cpumask_t mask;
+
+	/* On same node? */
+	mask = node_to_cpumask(cpu_to_node(dead_cpu));
+	cpus_and(mask, mask, tsk->cpus_allowed);
+	dest_cpu = any_online_cpu(mask);
+
+	/* On any allowed CPU? */
+	if (dest_cpu == NR_CPUS)
+		dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+	/* No more Mr. Nice Guy. */
+	if (dest_cpu == NR_CPUS) {
+		cpus_setall(tsk->cpus_allowed);
+		dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+		/*
+		 * Don't tell them about moving exiting tasks or
+		 * kernel threads (both mm NULL), since they never
+		 * leave kernel.
+		 */
+		if (tsk->mm && printk_ratelimit())
+			printk(KERN_INFO "process %d (%s) no "
+			       "longer affine to cpu%d\n",
+			       tsk->pid, tsk->comm, dead_cpu);
+	}
+	__migrate_task(tsk, dead_cpu, dest_cpu);
+}
+
 /* migrate_all_tasks - function to migrate all tasks from the dead cpu. */
 static void migrate_all_tasks(int src_cpu)
 {
 	struct task_struct *tsk, *t;
-	int dest_cpu;
-	unsigned int node;
 
 	write_lock_irq(&tasklist_lock);
 
-	/* watch out for per node tasks, let's stay on this node */
-	node = cpu_to_node(src_cpu);
-
 	do_each_thread(t, tsk) {
-		cpumask_t mask;
 		if (tsk == current)
 			continue;
 
-		if (task_cpu(tsk) != src_cpu)
-			continue;
-
-		/* Figure out where this task should go (attempting to
-		 * keep it on-node), and check if it can be migrated
-		 * as-is.  NOTE that kernel threads bound to more than
-		 * one online cpu will be migrated. */
-		mask = node_to_cpumask(node);
-		cpus_and(mask, mask, tsk->cpus_allowed);
-		dest_cpu = any_online_cpu(mask);
-		if (dest_cpu == NR_CPUS)
-			dest_cpu = any_online_cpu(tsk->cpus_allowed);
-		if (dest_cpu == NR_CPUS) {
-			cpus_setall(tsk->cpus_allowed);
-			dest_cpu = any_online_cpu(tsk->cpus_allowed);
-
-			/*
-			 * Don't tell them about moving exiting tasks
-			 * or kernel threads (both mm NULL), since
-			 * they never leave kernel.
-			 */
-			if (tsk->mm && printk_ratelimit())
-				printk(KERN_INFO "process %d (%s) no "
-				       "longer affine to cpu%d\n",
-				       tsk->pid, tsk->comm, src_cpu);
-		}
-		__migrate_task(tsk, src_cpu, dest_cpu);
+		if (task_cpu(tsk) == src_cpu)
+			move_task_off_dead_cpu(src_cpu, tsk);
 	} while_each_thread(t, tsk);
 
 	write_unlock_irq(&tasklist_lock);
