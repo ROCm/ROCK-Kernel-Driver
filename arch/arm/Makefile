@@ -7,7 +7,7 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=-p -X
+LDFLAGS_vmlinux	:=-p --no-undefined -X
 LDFLAGS_BLOB	:=--format binary
 AFLAGS_vmlinux.lds.o = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S

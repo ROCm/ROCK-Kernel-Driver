@@ -1230,6 +1230,9 @@ config AMD8111_ETH
 	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/networking/net-modules.txt>. The module
 	  will be called amd8111e.
+config AMD8111E_NAPI
+	bool "Enable NAPI support"
+	depends on AMD8111_ETH
 
 config ADAPTEC_STARFIRE
 	tristate "Adaptec Starfire/DuraLAN support"

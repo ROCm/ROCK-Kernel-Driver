@@ -502,6 +502,8 @@ affs_remount(struct super_block *sb, int *flags, char *data)
 
 	pr_debug("AFFS: remount(flags=0x%x,opts=\"%s\")\n",*flags,data);
 
+	*flags |= MS_NODIRATIME;
+
 	if (!parse_options(data,&uid,&gid,&mode,&reserved,&root_block,
 	    &blocksize,&sbi->s_prefix,sbi->s_volume,&mount_flags))
 		return -EINVAL;

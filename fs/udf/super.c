@@ -460,6 +460,12 @@ udf_remount_fs(struct super_block *sb, int *flags, char *options)
 	UDF_SB(sb)->s_gid   = uopt.gid;
 	UDF_SB(sb)->s_umask = uopt.umask;
 
+	if (UDF_SB_LVIDBH(sb)) {
+		int write_rev = le16_to_cpu(UDF_SB_LVIDIU(sb)->minUDFWriteRev);
+		if (write_rev > UDF_MAX_WRITE_VERSION)
+			*flags |= MS_RDONLY;
+	}
+
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 	if (*flags & MS_RDONLY)

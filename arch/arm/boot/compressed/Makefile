@@ -66,7 +66,7 @@ targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
 EXTRA_CFLAGS  := -fpic
 EXTRA_AFLAGS  :=
 
-LDFLAGS_vmlinux := -p -X \
+LDFLAGS_vmlinux := -p --no-undefined -X \
 	$(shell $(CC) $(CFLAGS) --print-libgcc-file-name) -T
 
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \

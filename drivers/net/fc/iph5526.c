@@ -2910,7 +2910,7 @@ static void iph5526_timeout(struct net_device *dev)
 {
 	struct fc_info *fi = dev->priv;
 	printk(KERN_WARNING "%s: timed out on send.\n", dev->name);
-	fi->fc_stats.rx_dropped++;
+	fi->fc_stats.tx_dropped++;
 	dev->trans_start = jiffies;
 	netif_wake_queue(dev);
 }
@@ -2953,7 +2953,7 @@ static int iph5526_send_packet(struct sk_buff *skb, struct net_device *dev)
 		fi->fc_stats.tx_packets++;
 	}
 	else
-		fi->fc_stats.rx_dropped++;
+		fi->fc_stats.tx_dropped++;
 	dev->trans_start = jiffies;
 	/* We free up the IP buffers in the OCI_interrupt handler.
 	 * status == 0 implies that the frame was not transmitted. So the

@@ -93,6 +93,12 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "smb_inode_cache: not all structures were freed\n");
 }
 
+static int smb_remount(struct super_block *sb, int *flags, char *data)
+{
+	*flags |= MS_NODIRATIME;
+	return 0;
+}
+
 static struct super_operations smb_sops =
 {
 	.alloc_inode	= smb_alloc_inode,
@@ -102,6 +108,7 @@ static struct super_operations smb_sops =
 	.put_super	= smb_put_super,
 	.statfs		= smb_statfs,
 	.show_options	= smb_show_options,
+	.remount_fs	= smb_remount,
 };
 
 
