@@ -123,7 +123,7 @@ static void __init intel_init_thermal(struct cpuinfo_x86 *c)
 
 
 /* P4/Xeon Extended MCE MSR retrieval, return 0 if unsupported */
-static int inline intel_get_extended_msrs(struct intel_mce_extended_msrs *r)
+static inline int intel_get_extended_msrs(struct intel_mce_extended_msrs *r)
 {
 	u32 h;
 

@@ -244,7 +244,7 @@ static inline struct cache_head  *cache_get(struct cache_head *h)
 }
 
 
-static int inline cache_put(struct cache_head *h, struct cache_detail *cd)
+static inline int cache_put(struct cache_head *h, struct cache_detail *cd)
 {
 	atomic_dec(&h->refcnt);
 	if (!atomic_read(&h->refcnt) &&

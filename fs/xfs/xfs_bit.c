@@ -117,7 +117,7 @@ static const char xfs_countbit[256] = {
 /*
  * xfs_highbit32: get high bit set out of 32-bit argument, -1 if none set.
  */
-int inline
+inline int
 xfs_highbit32(
 	__uint32_t	v)
 {

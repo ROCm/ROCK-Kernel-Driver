@@ -606,7 +606,7 @@ struct snmp_v1_trap
 #define SERR_NSI    1
 #define SERR_EOM    2
 
-static void inline mangle_address(unsigned char *begin,
+static inline void mangle_address(unsigned char *begin,
                                   unsigned char *addr,
                                   const struct oct1_map *map,
                                   u_int16_t *check);
@@ -995,7 +995,7 @@ static void fast_csum(unsigned char *csum,
  * 	- begin points to the start of the snmp messgae
  *      - addr points to the start of the address
  */
-static void inline mangle_address(unsigned char *begin,
+static inline void mangle_address(unsigned char *begin,
                                   unsigned char *addr,
                                   const struct oct1_map *map,
                                   u_int16_t *check)

@@ -152,7 +152,7 @@ struct baycom_state {
 
 /* --------------------------------------------------------------------- */
 
-static void inline baycom_int_freq(struct baycom_state *bc)
+static inline void baycom_int_freq(struct baycom_state *bc)
 {
 #ifdef BAYCOM_DEBUG
 	unsigned long cur_jiffies = jiffies;

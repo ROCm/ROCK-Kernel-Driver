@@ -185,7 +185,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs,
  *	This function may be called from IRQ context.
  */
  
-void inline disable_irq_nosync(unsigned int irq)
+inline void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;

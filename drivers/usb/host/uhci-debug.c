@@ -18,7 +18,7 @@
 #include "uhci-hcd.h"
 
 /* Handle REALLY large printk's so we don't overflow buffers */
-static void inline lprintk(char *buf)
+static inline void lprintk(char *buf)
 {
 	char *p;
 
@@ -34,7 +34,7 @@ static void inline lprintk(char *buf)
 	}
 }
 
-static int inline uhci_is_skeleton_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
+static inline int uhci_is_skeleton_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	int i;
 

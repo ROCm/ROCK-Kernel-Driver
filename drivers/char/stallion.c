@@ -2503,7 +2503,7 @@ static inline int stl_initeio(stlbrd_t *brdp)
  *	dealing with all types of ECH board.
  */
 
-static int inline stl_initech(stlbrd_t *brdp)
+static inline int stl_initech(stlbrd_t *brdp)
 {
 	stlpanel_t	*panelp;
 	unsigned int	status, nxtid, ioaddr, conflict;
@@ -5222,7 +5222,7 @@ static void stl_sc26198rxisr(stlport_t *portp, unsigned int iack)
  *	Process an RX bad character.
  */
 
-static void inline stl_sc26198rxbadch(stlport_t *portp, unsigned char status, char ch)
+static inline void stl_sc26198rxbadch(stlport_t *portp, unsigned char status, char ch)
 {
 	struct tty_struct	*tty;
 	unsigned int		ioaddr;

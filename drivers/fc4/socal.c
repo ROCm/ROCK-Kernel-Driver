@@ -133,7 +133,7 @@ static void socal_reset(fc_channel *fc)
 	socal_enable(s);
 }
 
-static void inline socal_solicited(struct socal *s, unsigned long qno)
+static inline void socal_solicited(struct socal *s, unsigned long qno)
 {
 	socal_rsp *hwrsp;
 	socal_cq *sw_cq;
@@ -225,7 +225,7 @@ static void inline socal_solicited(struct socal *s, unsigned long qno)
 	}
 }
 
-static void inline socal_request (struct socal *s, u32 cmd)
+static inline void socal_request (struct socal *s, u32 cmd)
 {
 	SOCAL_SETIMASK(s, s->imask & ~(cmd & SOCAL_CMD_REQ_QALL));
 	SOD(("imask %08x %08x\n", s->imask, sbus_readl(s->regs + IMASK)));
@@ -242,7 +242,7 @@ static void inline socal_request (struct socal *s, u32 cmd)
 		s->curr_port ^= 1;
 }
 
-static void inline socal_unsolicited (struct socal *s, unsigned long qno)
+static inline void socal_unsolicited (struct socal *s, unsigned long qno)
 {
 	socal_rsp *hwrsp, *hwrspc;
 	socal_cq *sw_cq;

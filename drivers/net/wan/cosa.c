@@ -1933,7 +1933,7 @@ reject:		/* Reject the packet */
 	spin_unlock_irqrestore(&cosa->lock, flags);
 }
 
-static void inline eot_interrupt(struct cosa_data *cosa, int status)
+static inline void eot_interrupt(struct cosa_data *cosa, int status)
 {
 	unsigned long flags, flags1;
 	spin_lock_irqsave(&cosa->lock, flags);

@@ -2245,7 +2245,7 @@ VidMode(av7110_t *av7110, int mode)
 }
            
 
-static int inline
+static inline int
 vidcom(av7110_t *av7110, u32 com, u32 arg)
 {
         return outcom(av7110, 0x80, 0x02, 4, 
@@ -2253,7 +2253,7 @@ vidcom(av7110_t *av7110, u32 com, u32 arg)
                       (arg>>16), (arg&0xffff));
 }
 
-static int inline
+static inline int
 audcom(av7110_t *av7110, u32 com)
 {
         return outcom(av7110, 0x80, 0x03, 4, 

@@ -22,7 +22,7 @@ MODULE_LICENSE("GPL");
  * 	return 0 in case there was no ECT codepoint
  * 	return 1 in case ECT codepoint has been overwritten
  * 	return < 0 in case there was error */
-static int inline
+static inline int
 set_ect_ip(struct sk_buff **pskb, struct iphdr *iph,
 	   const struct ipt_ECN_info *einfo)
 {
@@ -55,7 +55,7 @@ set_ect_ip(struct sk_buff **pskb, struct iphdr *iph,
 	return 0;
 }
 
-static int inline
+static inline int
 set_ect_tcp(struct sk_buff **pskb, struct iphdr *iph,
 	    const struct ipt_ECN_info *einfo)
 {

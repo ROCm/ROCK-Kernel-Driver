@@ -313,7 +313,7 @@ static const struct pnp_device_id pnp_dev_table[] = {
 
 MODULE_DEVICE_TABLE(pnp, pnp_dev_table);
 
-static void inline avoid_irq_share(struct pnp_dev *dev)
+static inline void avoid_irq_share(struct pnp_dev *dev)
 {
 	unsigned int map = 0x1FF8;
 	struct pnp_irq *irq;

@@ -1657,8 +1657,8 @@ __setup("sonycd535=", sonycd535_setup);
 
 #endif /* MODULE */
 
-void __exit
-static sony535_exit(void)
+static void __exit
+sony535_exit(void)
 {
 	int i;
 

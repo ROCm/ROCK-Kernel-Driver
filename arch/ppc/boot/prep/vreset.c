@@ -389,7 +389,7 @@ extern void puthex(unsigned long);
 extern void puts(const char *);
 static void unlockS3(void);
 
-static void inline
+static inline void
 outw(int port, unsigned short val)
 {
 	outb(port, val >> 8);

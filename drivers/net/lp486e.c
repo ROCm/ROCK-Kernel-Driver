@@ -1061,7 +1061,7 @@ err_out:
 	return ret;
 }
 
-static void inline
+static inline void
 i596_handle_CU_completion(struct net_device *dev,
 			  volatile struct i596_private *lp,
 			  unsigned short status,

@@ -862,7 +862,7 @@ static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
  * We need to reload %cr3 since the page tables may be going
  * away from under us..
  */
-static void inline 
+static inline void
 leave_mm (unsigned long cpu)
 {
 	if (cpu_tlbstate[cpu].state == TLBSTATE_OK)

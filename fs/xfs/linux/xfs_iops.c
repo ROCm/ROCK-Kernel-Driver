@@ -58,7 +58,7 @@ validate_fields(
  *
  * XXX(hch):  nfsd is broken, better fix it instead.
  */
-STATIC int inline
+STATIC inline int
 has_fs_struct(struct task_struct *task)
 {
 	return (task->fs != init_task.fs);
