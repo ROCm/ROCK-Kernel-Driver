@@ -27,7 +27,7 @@
 #include <linux/i2c.h>
 #include <linux/videodev.h>
 
-#include "tuner.h"
+#include <media/tuner.h>
 
 static int debug;	/* insmod parameter */
 static int this_adap;

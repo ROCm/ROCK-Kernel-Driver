@@ -37,7 +37,6 @@
 #include <asm/io.h>
 
 #include "bttvp.h"
-#include "tuner.h"
 
 int bttv_num;			/* number of Bt848s in use */
 struct bttv bttvs[BTTV_MAX];
