@@ -600,6 +600,17 @@ static inline void save_screen(int currcons)
  *	Redrawing of screen
  */
 
+static void clear_buffer_attributes(int currcons)
+{
+	unsigned short *p = (unsigned short *) origin;
+	int count = screenbuf_size/2;
+	int mask = hi_font_mask | 0xff;
+
+	for (; count > 0; count--, p++) {
+		scr_writew((scr_readw(p)&mask) | (video_erase_char&~mask), p);
+	}
+}
+
 void redraw_screen(int new_console, int is_switch)
 {
 	int redraw = 1;
@@ -637,9 +648,21 @@ void redraw_screen(int new_console, int is_switch)
 
 	if (redraw) {
 		int update;
+		int old_was_color = vc_cons[currcons].d->vc_can_do_color;
+
 		set_origin(currcons);
 		update = sw->con_switch(vc_cons[currcons].d);
 		set_palette(currcons);
+		/*
+		 * If console changed from mono<->color, the best we can do
+		 * is to clear the buffer attributes. As it currently stands,
+		 * rebuilding new attributes from the old buffer is not doable
+		 * without overly complex code.
+		 */
+		if (old_was_color != vc_cons[currcons].d->vc_can_do_color) {
+			update_attr(currcons);
+			clear_buffer_attributes(currcons);
+		}
 		if (update && vcmode != KD_GRAPHICS)
 			do_update_region(currcons, origin, screenbuf_size/2);
 	}
@@ -2652,17 +2675,6 @@ int __init vty_init(void)
 }
 
 #ifndef VT_SINGLE_DRIVER
-
-static void clear_buffer_attributes(int currcons)
-{
-	unsigned short *p = (unsigned short *) origin;
-	int count = screenbuf_size/2;
-	int mask = hi_font_mask | 0xff;
-
-	for (; count > 0; count--, p++) {
-		scr_writew((scr_readw(p)&mask) | (video_erase_char&~mask), p);
-	}
-}
 
 /*
  *	If we support more console drivers, this function is used

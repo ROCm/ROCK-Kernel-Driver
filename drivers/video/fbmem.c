@@ -432,6 +432,25 @@ static int ofonly __initdata = 0;
 #endif
 
 /*
+ * Helpers
+ */
+
+int fb_get_color_depth(struct fb_info *info)
+{
+	struct fb_var_screeninfo *var = &info->var;
+
+	if (var->green.length == var->blue.length &&
+	    var->green.length == var->red.length &&
+	    !var->green.offset && !var->blue.offset &&
+	    !var->red.offset)
+		return var->green.length;
+	else
+		return (var->green.length + var->red.length +
+			var->blue.length);
+}
+EXPORT_SYMBOL(fb_get_color_depth);
+
+/*
  * Drawing helpers.
  */
 void fb_iomove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
@@ -650,9 +669,12 @@ static void fb_set_logo(struct fb_info *info,
 			       const struct linux_logo *logo, u8 *dst,
 			       int depth)
 {
-	int i, j, shift;
+	int i, j, k, fg = 1;
 	const u8 *src = logo->data;
-	u8 d, xor = 0;
+	u8 d, xor = (info->fix.visual == FB_VISUAL_MONO01) ? 0xff : 0;
+
+	if (fb_get_color_depth(info) == 3)
+		fg = 7;
 
 	switch (depth) {
 	case 4:
@@ -666,17 +688,14 @@ static void fb_set_logo(struct fb_info *info,
 				}
 			}
 		break;
-	case ~1:
-		xor = 0xff;
 	case 1:
 		for (i = 0; i < logo->height; i++) {
-			shift = 7;
-			d = *src++ ^ xor;
-			for (j = 0; j < logo->width; j++) {
-				*dst++ = (d >> shift) & 1;
-				shift = (shift-1) & 7;
-				if (shift == 7)
-					d = *src++ ^ xor;
+			for (j = 0; j < logo->width; src++) {
+				d = *src ^ xor;
+				for (k = 7; k >= 0; k--) {
+					*dst++ = ((d >> k) & 1) ? fg : 0;
+					j++;
+				}
 			}
 		}
 		break;
@@ -738,7 +757,7 @@ int fb_prepare_logo(struct fb_info *info)
 	}
 
 	/* Return if no suitable logo was found */
-	fb_logo.logo = fb_find_logo(info->var.bits_per_pixel);
+	fb_logo.logo = fb_find_logo(fb_get_color_depth(info));
 	
 	if (!fb_logo.logo || fb_logo.logo->height > info->var.yres) {
 		fb_logo.logo = NULL;
@@ -765,7 +784,7 @@ int fb_show_logo(struct fb_info *info)
 	if (fb_logo.logo == NULL || info->state != FBINFO_STATE_RUNNING)
 		return 0;
 
-	image.depth = fb_logo.depth;
+	image.depth = 8;
 	image.data = fb_logo.logo->data;
 
 	if (fb_logo.needs_cmapreset)
@@ -786,7 +805,7 @@ int fb_show_logo(struct fb_info *info)
 		info->pseudo_palette = palette;
 	}
 
-	if (fb_logo.depth == 4) {
+	if (fb_logo.depth <= 4) {
 		logo_new = kmalloc(fb_logo.logo->width * fb_logo.logo->height, 
 				   GFP_KERNEL);
 		if (logo_new == NULL) {

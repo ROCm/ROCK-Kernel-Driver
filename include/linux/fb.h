@@ -380,6 +380,8 @@ struct fb_cursor {
 	__u16 set;		/* what to set */
 	__u16 enable;		/* cursor on/off */
 	__u16 rop;		/* bitop operation */
+	__u16 ul;               /* underlined? */
+	__u16 rev;              /* reversed? */
 	const char *mask;	/* cursor mask bits */
 	struct fbcurpos hot;	/* cursor hot spot */
 	struct fb_image	image;	/* Cursor image */
@@ -687,6 +689,7 @@ extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 				u32 height);
 extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
+extern int fb_get_color_depth(struct fb_info *info);
 
 extern struct fb_info *registered_fb[FB_MAX];
 extern int num_registered_fb;
