@@ -309,13 +309,8 @@ static Scsi_Host_Template *the_template = NULL;
 #undef TAG_NONE
 #define TAG_NONE 0xff
 
-/* For the m68k, the number of bits in 'allocated' must be a multiple of 32! */
-#if (MAX_TAGS % 32) != 0
-#error "MAX_TAGS must be a multiple of 32!"
-#endif
-
 typedef struct {
-    long	allocated[MAX_TAGS/32];
+    DECLARE_BITMAP(allocated, MAX_TAGS);
     int		nr_allocated;
     int		queue_size;
 } TAG_ALLOC;
@@ -334,7 +329,7 @@ static void __init init_tags( void )
     for( target = 0; target < 8; ++target ) {
 	for( lun = 0; lun < 8; ++lun ) {
 	    ta = &TagAlloc[target][lun];
-	    memset( &ta->allocated, 0, MAX_TAGS/8 );
+	    CLEAR_BITMAP( ta->allocated, MAX_TAGS );
 	    ta->nr_allocated = 0;
 	    /* At the beginning, assume the maximum queue size we could
 	     * support (MAX_TAGS). This value will be decreased if the target
@@ -394,8 +389,8 @@ static void cmd_get_tag( Scsi_Cmnd *cmd, int should_be_tagged )
     else {
 	TAG_ALLOC *ta = &TagAlloc[cmd->target][cmd->lun];
 
-	cmd->tag = find_first_zero_bit( &ta->allocated, MAX_TAGS );
-	set_bit( cmd->tag, &ta->allocated );
+	cmd->tag = find_first_zero_bit( ta->allocated, MAX_TAGS );
+	set_bit( cmd->tag, ta->allocated );
 	ta->nr_allocated++;
 	TAG_PRINTK( "scsi%d: using tag %d for target %d lun %d "
 		    "(now %d tags in use)\n",
@@ -424,7 +419,7 @@ static void cmd_free_tag( Scsi_Cmnd *cmd )
     }
     else {
 	TAG_ALLOC *ta = &TagAlloc[cmd->target][cmd->lun];
-	clear_bit( cmd->tag, &ta->allocated );
+	clear_bit( cmd->tag, ta->allocated );
 	ta->nr_allocated--;
 	TAG_PRINTK( "scsi%d: freed tag %d for target %d lun %d\n",
 		    H_NO(cmd), cmd->tag, cmd->target, cmd->lun );
@@ -443,7 +438,7 @@ static void free_all_tags( void )
     for( target = 0; target < 8; ++target ) {
 	for( lun = 0; lun < 8; ++lun ) {
 	    ta = &TagAlloc[target][lun];
-	    memset( &ta->allocated, 0, MAX_TAGS/8 );
+	    CLEAR_BITMAP( ta->allocated, MAX_TAGS );
 	    ta->nr_allocated = 0;
 	}
     }
