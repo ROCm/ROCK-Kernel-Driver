@@ -302,8 +302,8 @@ map_err_out:
 		ntfs_clear_extent_inode(ni);
 		goto map_err_out;
 	}
-	/* Verify the sequence number. */
-	if (unlikely(le16_to_cpu(m->sequence_number) != seq_no)) {
+	/* Verify the sequence number if it is present. */
+	if (seq_no && (le16_to_cpu(m->sequence_number) != seq_no)) {
 		ntfs_error(base_ni->vol->sb, "Found stale extent mft "
 				"reference! Corrupt file system. Run chkdsk.");
 		destroy_ni = TRUE;

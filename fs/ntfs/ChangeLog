@@ -134,6 +134,8 @@ ToDo/Notes:
 	  that resulted due to #includes and header file interdependencies.
 	- Simplify setup of i_mode in fs/ntfs/inode.c::ntfs_read_locked_inode().
 	- Add helpers fs/ntfs/layout.h::MK_MREF() and MK_LE_MREF().
+	- Modify fs/ntfs/mft.c::map_extent_mft_record() to only verify the mft
+	  record sequence number if it is specified (i.e. not zero).
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
