@@ -2015,10 +2015,10 @@ modem_write_profile(atemu * m)
 }
 
 int
-isdn_tty_modem_init(void)
+isdn_tty_init(void)
 {
 	modem *m;
-	int i;
+	int i, retval;
 	modem_info *info;
 
 	m = &dev->mdm;
@@ -2063,13 +2063,15 @@ isdn_tty_modem_init(void)
 	m->tty_modem.minor_start = 0;
 	m->cua_modem.subtype = ISDN_SERIAL_TYPE_CALLOUT;
 
-	if (tty_register_driver(&m->tty_modem)) {
+	retval = tty_register_driver(&m->tty_modem);
+	if (retval) {
 		printk(KERN_WARNING "isdn_tty: Couldn't register modem-device\n");
-		return -1;
+		goto err;
 	}
-	if (tty_register_driver(&m->cua_modem)) {
+	retval = tty_register_driver(&m->cua_modem);
+	if (retval) {
 		printk(KERN_WARNING "isdn_tty: Couldn't register modem-callout-device\n");
-		return -2;
+		goto err_unregister_tty;
 	}
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		info = &m->info[i];
@@ -2106,16 +2108,52 @@ isdn_tty_modem_init(void)
 #ifdef CONFIG_ISDN_AUDIO
 		skb_queue_head_init(&info->dtmf_queue);
 #endif
-		if (!(info->xmit_buf = kmalloc(ISDN_SERIAL_XMIT_MAX + 5, GFP_KERNEL))) {
+		info->xmit_buf = kmalloc(ISDN_SERIAL_XMIT_MAX + 5, GFP_KERNEL);
+		if (!info->xmit_buf) {
 			printk(KERN_ERR "Could not allocate modem xmit-buffer\n");
-			return -3;
+#ifdef CONFIG_ISDN_TTY_FAX
+			kfree(info->fax);
+#endif
+			goto err_unregister_cua;
 		}
 		/* Make room for T.70 header */
 		info->xmit_buf += 4;
 	}
 	return 0;
+
+ err_unregister_cua:
+	for (i--; i >= 0; i--) {
+		info = &m->info[i];
+#ifdef CONFIG_ISDN_TTY_FAX
+		kfree(info->fax);
+#endif
+		kfree(info->xmit_buf - 4);
+	}
+	tty_unregister_driver(&dev->mdm.cua_modem);
+ err_unregister_tty:
+	tty_unregister_driver(&dev->mdm.tty_modem);
+ err:
+	return retval;
 }
 
+void
+isdn_tty_exit(void)
+{
+	modem *m = &dev->mdm;
+	modem_info *info;
+	int i;
+
+	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
+		info = &m->info[i];
+		isdn_tty_cleanup_xmit(info);
+#ifdef CONFIG_ISDN_TTY_FAX
+		kfree(info->fax);
+#endif
+		kfree(info->xmit_buf - 4);
+	}
+	tty_unregister_driver(&dev->mdm.cua_modem);
+	tty_unregister_driver(&dev->mdm.tty_modem);
+}
 
 /*
  * isdn_tty_match_icall(char *MSN, atemu *tty_emulator, int dev_idx)

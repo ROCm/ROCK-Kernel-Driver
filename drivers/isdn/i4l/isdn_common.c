@@ -2247,13 +2247,15 @@ static void isdn_cleanup_devfs(void)
 static int __init isdn_init(void)
 {
 	int i;
+	int retval;
 	char tmprev[50];
 
-	if (!(dev = (isdn_dev *) vmalloc(sizeof(isdn_dev)))) {
-		printk(KERN_WARNING "isdn: Could not allocate device-struct.\n");
-		return -EIO;
+	dev = vmalloc(sizeof(*dev));
+	if (!dev) {
+		retval = -ENOMEM;
+		goto err;
 	}
-	memset((char *) dev, 0, sizeof(isdn_dev));
+	memset(dev, 0, sizeof(*dev));
 	init_timer(&dev->timer);
 	dev->timer.function = isdn_timer_funct;
 	init_MUTEX(&dev->sem);
@@ -2266,34 +2268,22 @@ static int __init isdn_init(void)
 		init_waitqueue_head(&dev->mdm.info[i].open_wait);
 		init_waitqueue_head(&dev->mdm.info[i].close_wait);
 	}
-	if (devfs_register_chrdev(ISDN_MAJOR, "isdn", &isdn_fops)) {
+	retval = devfs_register_chrdev(ISDN_MAJOR, "isdn", &isdn_fops);
+	if (retval) {
 		printk(KERN_WARNING "isdn: Could not register control devices\n");
-		vfree(dev);
-		return -EIO;
+		goto err_vfree;
 	}
 	isdn_init_devfs();
-	if ((i = isdn_tty_modem_init()) < 0) {
+	retval = isdn_tty_init();
+	if (retval < 0) {
 		printk(KERN_WARNING "isdn: Could not register tty devices\n");
-		if (i == -3)
-			tty_unregister_driver(&dev->mdm.cua_modem);
-		if (i <= -2)
-			tty_unregister_driver(&dev->mdm.tty_modem);
-		vfree(dev);
-		isdn_cleanup_devfs();
-		devfs_unregister_chrdev(ISDN_MAJOR, "isdn");
-		return -EIO;
+		goto err_cleanup_devfs;
 	}
 #ifdef CONFIG_ISDN_PPP
-	if (isdn_ppp_init() < 0) {
+	retval = isdn_ppp_init();
+	if (retval < 0) {
 		printk(KERN_WARNING "isdn: Could not create PPP-device-structs\n");
-		tty_unregister_driver(&dev->mdm.tty_modem);
-		tty_unregister_driver(&dev->mdm.cua_modem);
-		for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-			kfree(dev->mdm.info[i].xmit_buf - 4);
-		isdn_cleanup_devfs();
-		devfs_unregister_chrdev(ISDN_MAJOR, "isdn");
-		vfree(dev);
-		return -EIO;
+		goto err_tty_modem;
 	}
 #endif                          /* CONFIG_ISDN_PPP */
 
@@ -2317,6 +2307,15 @@ static int __init isdn_init(void)
 #endif
 	isdn_info_update();
 	return 0;
+
+ err_tty_modem:
+	isdn_tty_exit();
+ err_cleanup_devfs:
+	isdn_cleanup_devfs();
+ err_vfree:
+	vfree(dev);
+ err:
+	return retval;
 }
 
 /*
@@ -2325,46 +2324,24 @@ static int __init isdn_init(void)
 static void __exit isdn_exit(void)
 {
 	unsigned long flags;
-	int i;
 
 #ifdef CONFIG_ISDN_PPP
 	isdn_ppp_cleanup();
 #endif
 	save_flags(flags);
 	cli();
-	if (isdn_net_rmall() < 0) {
-		printk(KERN_WARNING "isdn: net-device busy, remove cancelled\n");
-		restore_flags(flags);
-		return;
-	}
-	if (tty_unregister_driver(&dev->mdm.tty_modem)) {
-		printk(KERN_WARNING "isdn: ttyI-device busy, remove cancelled\n");
-		restore_flags(flags);
-		return;
-	}
-	if (tty_unregister_driver(&dev->mdm.cua_modem)) {
-		printk(KERN_WARNING "isdn: cui-device busy, remove cancelled\n");
-		restore_flags(flags);
-		return;
-	}
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		isdn_tty_cleanup_xmit(&dev->mdm.info[i]);
-		kfree(dev->mdm.info[i].xmit_buf - 4);
-#ifdef CONFIG_ISDN_TTY_FAX
-		kfree(dev->mdm.info[i].fax);
-#endif
-	}
-	if (devfs_unregister_chrdev(ISDN_MAJOR, "isdn") != 0) {
-		printk(KERN_WARNING "isdn: controldevice busy, remove cancelled\n");
-		restore_flags(flags);
-	} else {
-		isdn_cleanup_devfs();
-		del_timer(&dev->timer);
-		restore_flags(flags);
-		/* call vfree with interrupts enabled, else it will hang */
-		vfree(dev);
-		printk(KERN_NOTICE "ISDN-subsystem unloaded\n");
-	}
+	if (isdn_net_rmall() < 0)
+		BUG();
+
+	isdn_tty_exit();
+	if (devfs_unregister_chrdev(ISDN_MAJOR, "isdn"))
+		BUG();
+
+	isdn_cleanup_devfs();
+	del_timer(&dev->timer);
+	restore_flags(flags);
+	/* call vfree with interrupts enabled, else it will hang */
+	vfree(dev);
 }
 
 module_init(isdn_init);
