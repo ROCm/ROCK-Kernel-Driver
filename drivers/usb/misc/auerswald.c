@@ -242,7 +242,6 @@ typedef struct
 	struct semaphore 	mutex;         	    /* protection in user context */
 	char 			name[20];	    /* name of the /dev/usb entry */
 	unsigned int		dtindex;	    /* index in the device table */
-	devfs_handle_t 		devfs;	 	    /* devfs device node */
 	struct usb_device *	usbdev;      	    /* USB device handle */
 	int			open_count;	    /* count the number of open character channels */
         char 			dev_desc[AUSI_DLEN];/* for storing a textual description */
@@ -1972,7 +1971,7 @@ static int auerswald_probe (struct usb_interface *intf,
 	up (&dev_table_mutex);
 
 	/* initialize the devfs node for this device and register it */
-	cp->devfs = devfs_register(NULL, cp->name, 0, USB_MAJOR,
+	devfs_register(NULL, cp->name, 0, USB_MAJOR,
 				    AUER_MINOR_BASE + dtindex,
 				    S_IFCHR | S_IRUGO | S_IWUGO,
 				    &auerswald_fops, NULL);
@@ -2092,7 +2091,7 @@ static void auerswald_disconnect (struct usb_interface *intf)
 
 	/* remove our devfs node */
 	/* Nobody can see this device any more */
-	devfs_unregister (cp->devfs);
+	devfs_remove(cp->name);
 
 	/* give back our USB minor number */
 	usb_deregister_dev (1, cp->dtindex);
