@@ -225,7 +225,6 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
 	do_openpic_setup_cpu();
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 /* Get state of physical CPU.
  * Return codes:
  *	0	- The processor is in the RTAS stopped state
@@ -234,13 +233,14 @@ static void __devinit smp_openpic_setup_cpu(int cpu)
  *	-1	- Hardware Error
  *	-2	- Hardware Busy, Try again later.
  */
-static int query_cpu_stopped(unsigned int pcpu)
+int query_cpu_stopped(unsigned int pcpu)
 {
 	int cpu_status;
 	int status, qcss_tok;
 
 	qcss_tok = rtas_token("query-cpu-stopped-state");
-	BUG_ON(qcss_tok == RTAS_UNKNOWN_SERVICE);
+	if (qcss_tok == RTAS_UNKNOWN_SERVICE)
+		return -1;
 	status = rtas_call(qcss_tok, 1, 2, &cpu_status, pcpu);
 	if (status != 0) {
 		printk(KERN_ERR
@@ -250,6 +250,8 @@ static int query_cpu_stopped(unsigned int pcpu)
 
 	return cpu_status;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
 
 int __cpu_disable(void)
 {

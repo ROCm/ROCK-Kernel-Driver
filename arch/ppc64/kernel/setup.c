@@ -232,16 +232,17 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		chrp_init(r3, r4, r5, r6, r7);
 
 #ifdef CONFIG_SMP
-		/* Start secondary threads on SMT systems */
-		for (i = 0; i < NR_CPUS; i++) {
-			if (cpu_available(i) && !cpu_possible(i)) {
+		/* Start secondary threads on SMT systems; primary threads
+		 * are already in the running state.
+		 */
+		for_each_present_cpu(i) {
+			if (query_cpu_stopped
+			    (get_hard_smp_processor_id(i)) == 0) {
 				printk("%16.16x : starting thread\n", i);
 				rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
 					  get_hard_smp_processor_id(i), 
 					  (u32)*((unsigned long *)pseries_secondary_smp_init),
 					  i);
-				cpu_set(i, cpu_possible_map);
-				systemcfg->processorCount++;
 			}
 		}
 #endif /* CONFIG_SMP */

@@ -1076,6 +1076,8 @@ next:
 				cpu_set(cpuid, RELOC(cpu_available_map));
 				cpu_set(cpuid, RELOC(cpu_present_at_boot));
 				cpu_set(cpuid, RELOC(cpu_present_map));
+				cpu_set(cpuid, RELOC(cpu_possible_map));
+				_systemcfg->processorCount++;
 				prom_printf("available\n");
 			} else {
 				prom_printf("not available\n");
