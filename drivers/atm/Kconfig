@@ -385,6 +385,15 @@ config ATM_FORE200E_SBA_FW
 	  not have to supply an alternative one. They just say Y to "Use
 	  default SBA-200E firmware", above.
 
+config ATM_FORE200E_USE_TASKLET
+	bool "Defer interrupt work to a tasklet"
+	depends on (PCI || SBUS) && (ATM_FORE200E_PCA || ATM_FORE200E_SBA)
+	default n
+	help
+	  This defers work to be done by the interrupt handler to a
+	  tasklet instead of hanlding everything at interrupt time.  This
+	  may improve the responsive of the host.
+
 config ATM_FORE200E_TX_RETRY
 	int "Maximum number of tx retries"
 	depends on (PCI || SBUS) && (ATM_FORE200E_PCA || ATM_FORE200E_SBA)

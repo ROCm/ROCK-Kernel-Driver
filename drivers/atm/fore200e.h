@@ -23,19 +23,21 @@
 #define BUFFER_S2_SIZE       SMALL_BUFFER_SIZE    /* size of small buffers, scheme 2 */
 #define BUFFER_L2_SIZE       LARGE_BUFFER_SIZE    /* size of large buffers, scheme 2 */
 
-#define BUFFER_S1_NBR        (RBD_BLK_SIZE * 2)
-#define BUFFER_L1_NBR        (RBD_BLK_SIZE * 2)
+#define BUFFER_S1_NBR        (RBD_BLK_SIZE * 6)
+#define BUFFER_L1_NBR        (RBD_BLK_SIZE * 4)
 
-#define BUFFER_S2_NBR        (RBD_BLK_SIZE * 2)
-#define BUFFER_L2_NBR        (RBD_BLK_SIZE * 2)
+#define BUFFER_S2_NBR        (RBD_BLK_SIZE * 6)
+#define BUFFER_L2_NBR        (RBD_BLK_SIZE * 4)
 
 
 #define QUEUE_SIZE_CMD       16	     /* command queue capacity       */
 #define QUEUE_SIZE_RX	     64	     /* receive queue capacity       */
 #define QUEUE_SIZE_TX	     256     /* transmit queue capacity      */
-#define QUEUE_SIZE_BS        16	     /* buffer supply queue capacity */
+#define QUEUE_SIZE_BS        32	     /* buffer supply queue capacity */
 
-#define NBR_CONNECT          1024    /* number of ATM connections     */
+#define FORE200E_VPI_BITS     0
+#define FORE200E_VCI_BITS    10
+#define NBR_CONNECT          (1 << (FORE200E_VPI_BITS + FORE200E_VCI_BITS)) /* number of connections */
 
 
 #define TSD_FIXED            2
@@ -207,6 +209,7 @@ typedef struct tpd_haddr {
     )
 } tpd_haddr_t;
 
+#define TPD_HADDR_SHIFT 5  /* addr aligned on 32 byte boundary */
 
 /* cp resident transmit queue entry */
 
@@ -517,13 +520,15 @@ typedef struct cp_cmdq_entry {
 /* host resident transmit queue entry */
 
 typedef struct host_txq_entry {
-    struct cp_txq_entry*   cp_entry;    /* addr of cp resident tx queue entry */
-    enum   status*         status;      /* addr of host resident status       */
-    struct tpd*            tpd;         /* addr of transmit PDU descriptor    */
-    u32                    tpd_dma;     /* DMA address of tpd                 */
-    struct sk_buff*        skb;         /* related skb                        */
-    struct atm_vcc*        vcc;         /* related vcc                        */
-    void*                  data;        /* copy of misaligned data            */
+    struct cp_txq_entry*    cp_entry;    /* addr of cp resident tx queue entry       */
+    enum   status*          status;      /* addr of host resident status             */
+    struct tpd*             tpd;         /* addr of transmit PDU descriptor          */
+    u32                     tpd_dma;     /* DMA address of tpd                       */
+    struct sk_buff*         skb;         /* related skb                              */
+    void*                   data;        /* copy of misaligned data                  */
+    unsigned long           incarn;      /* vc_map incarnation when submitted for tx */
+    struct fore200e_vc_map* vc_map;
+
 } host_txq_entry_t;
 
 
@@ -576,6 +581,10 @@ typedef struct buffer {
     enum   buffer_scheme scheme;      /* buffer scheme           */
     enum   buffer_magn   magn;        /* buffer magnitude        */
     struct chunk         data;        /* data buffer             */
+#ifdef FORE200E_BSQ_DEBUG
+    unsigned long        index;       /* buffer # in queue       */
+    int                  supplied;    /* 'buffer supplied' flag  */
+#endif
 } buffer_t;
 
 
@@ -602,6 +611,7 @@ typedef struct host_cmdq {
 typedef struct host_txq {
     struct host_txq_entry host_entry[ QUEUE_SIZE_TX ];    /* host resident tx queue entries         */
     int                   head;                           /* head of tx queue                       */
+    int                   tail;                           /* tail of tx queue                       */
     struct chunk          tpd;                            /* array of tpds                          */
     struct chunk          status;                         /* arry of completion status              */
     int                   txing;                          /* number of pending PDUs in tx queue     */
@@ -626,8 +636,8 @@ typedef struct host_bsq {
     struct chunk          rbd_block;                      /* array of rbds                             */
     struct chunk          status;                         /* array of completion status                */
     struct buffer*        buffer;                         /* array of rx buffers                       */
-    int                   free;                           /* index of first free rx buffer             */
-    volatile int          count;                          /* count of supplied rx buffers              */
+    struct buffer*        freebuf;                        /* list of free rx buffers                   */
+    volatile int          freebuf_count;                  /* count of free rx buffers                  */
 } host_bsq_t;
 
 
@@ -847,6 +857,17 @@ typedef struct fore200e_bus {
 #endif
 
 
+/* vc mapping */
+
+typedef struct fore200e_vc_map {
+    struct atm_vcc* vcc;       /* vcc entry              */
+    unsigned long   incarn;    /* vcc incarnation number */
+} fore200e_vc_map_t;
+
+#define FORE200E_VC_MAP(fore200e, vpi, vci)  \
+        (& (fore200e)->vc_map[ ((vpi) << FORE200E_VCI_BITS) | (vci) ])
+
+
 /* per-device data */
 
 typedef struct fore200e {
@@ -880,20 +901,29 @@ typedef struct fore200e {
     struct stats*              stats;                  /* last snapshot of the stats         */
     
     struct semaphore           rate_sf;                /* protects rate reservation ops      */
-    struct tasklet_struct      tasklet;                /* performs interrupt work            */
+    spinlock_t                 q_lock;                 /* protects queue ops                 */
+#ifdef FORE200E_USE_TASKLET
+    struct tasklet_struct      tx_tasklet;             /* performs tx interrupt work         */
+    struct tasklet_struct      rx_tasklet;             /* performs rx interrupt work         */
+#endif
+    unsigned long              tx_sat;                 /* tx queue saturation count          */
 
+    unsigned long              incarn_count;
+    struct fore200e_vc_map     vc_map[ NBR_CONNECT ];  /* vc mapping                         */
 } fore200e_t;
 
 
 /* per-vcc data */
 
 typedef struct fore200e_vcc {
-    enum buffer_scheme scheme;        /* rx buffer scheme                   */
-    struct tpd_rate    rate;          /* tx rate control data               */
-    int                rx_min_pdu;    /* size of smallest PDU received      */
-    int                rx_max_pdu;    /* size of largest PDU received       */
-    int                tx_min_pdu;    /* size of smallest PDU transmitted   */
-    int                tx_max_pdu;    /* size of largest PDU transmitted    */
+    enum buffer_scheme     scheme;             /* rx buffer scheme                   */
+    struct tpd_rate        rate;               /* tx rate control data               */
+    int                    rx_min_pdu;         /* size of smallest PDU received      */
+    int                    rx_max_pdu;         /* size of largest PDU received       */
+    int                    tx_min_pdu;         /* size of smallest PDU transmitted   */
+    int                    tx_max_pdu;         /* size of largest PDU transmitted    */
+    unsigned long          tx_pdu;             /* nbr of tx pdus                     */
+    unsigned long          rx_pdu;             /* nbr of rx pdus                     */
 } fore200e_vcc_t;
 
 
