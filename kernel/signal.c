@@ -620,7 +620,6 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 		t = p;
 		do {
 			rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
-			wake_up_state(t, TASK_STOPPED);
 			
 			/*
 			 * If there is a handler for SIGCONT, we must make
@@ -632,9 +631,13 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			 * flag set, the thread will pause and acquire the
 			 * siglock that we hold now and until we've queued
 			 * the pending signal. 
+			 *
+			 * Wake up the stopped thread _after_ setting
+			 * TIF_SIGPENDING
 			 */
 			if (!sigismember(&t->blocked, SIGCONT))
 				set_tsk_thread_flag(t, TIF_SIGPENDING);
+			wake_up_state(t, TASK_STOPPED);
 
 			t = next_thread(t);
 		} while (t != p);
