@@ -22,9 +22,9 @@
 
 LIST_HEAD(pnp_cards);
 
-static const struct pnp_card_device_id * match_card(struct pnpc_driver *drv, struct pnp_card *card)
+static const struct pnp_card_id * match_card(struct pnpc_driver *drv, struct pnp_card *card)
 {
-	const struct pnp_card_device_id *drv_id = drv->id_table;
+	const struct pnp_card_id *drv_id = drv->id_table;
 	while (*drv_id->id){
 		if (compare_pnp_id(card->id,drv_id->id))
 			return drv_id;
@@ -106,7 +106,6 @@ int pnpc_add_card(struct pnp_card *card)
 		return -EINVAL;
 	sprintf(card->dev.bus_id, "%02x:%02x", card->protocol->number, card->number);
 	INIT_LIST_HEAD(&card->rdevs);
-	strcpy(card->dev.name,card->name);
 	card->dev.parent = &card->protocol->dev;
 	card->dev.bus = &pnpc_bus_type;
 	card->dev.release = &pnp_release_card;
@@ -221,7 +220,7 @@ found:
 	cdrv = to_pnpc_driver(card->dev.driver);
 	if (dev->active == 0) {
 		if (!(cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE)) {
-			if(pnp_activate_dev(dev,NULL)<0) {
+			if(pnp_activate_dev(dev)<0) {
 				pnp_device_detach(dev);
 				return NULL;
 			}
@@ -286,7 +285,7 @@ static int pnpc_card_probe(struct device *dev)
 	int error = 0;
 	struct pnpc_driver *drv = to_pnpc_driver(dev->driver);
 	struct pnp_card *card = to_pnp_card(dev);
-	const struct pnp_card_device_id *card_id = NULL;
+	const struct pnp_card_id *card_id = NULL;
 
 	pnp_dbg("pnp: match found with the PnP card '%s' and the driver '%s'", dev->bus_id,drv->name);
 

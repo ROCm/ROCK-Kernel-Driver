@@ -30,7 +30,7 @@ void
 pnp_name_device(struct pnp_dev *dev)
 {
 	int i;
-	char *name = dev->name;
+	char *name = dev->dev.name;
 	for(i=0; i<sizeof(pnp_id_eisaid)/sizeof(pnp_id_eisaid[0]); i++){
 		if (compare_pnp_id(dev->id,pnp_id_eisaid[i])){
 			sprintf(name, "%s", pnp_id_names[i]);

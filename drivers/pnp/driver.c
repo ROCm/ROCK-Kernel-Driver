@@ -95,7 +95,7 @@ static int pnp_device_probe(struct device *dev)
 	pnp_dev = to_pnp_dev(dev);
 	pnp_drv = to_pnp_driver(dev->driver);
 
-	pnp_dbg("pnp: match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
+	pnp_dbg("match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
 
 	error = pnp_device_attach(pnp_dev);
 	if (error < 0)
@@ -103,7 +103,7 @@ static int pnp_device_probe(struct device *dev)
 
 	if (pnp_dev->active == 0) {
 		if (!(pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE)) {
-			error = pnp_activate_dev(pnp_dev, NULL);
+			error = pnp_activate_dev(pnp_dev);
 			if (error < 0)
 				return error;
 		}
