@@ -799,7 +799,7 @@ help:
 # Documentation targets
 # ---------------------------------------------------------------------------
 sgmldocs psdocs pdfdocs htmldocs: scripts
-	$(Q)$(MAKE) -f Documentation/DocBook/Makefile $@
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------
