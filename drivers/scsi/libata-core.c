@@ -1156,11 +1156,11 @@ retry:
 		ap->host->max_cmd_len = 16;
 
 		/* print device info to dmesg */
-		printk(KERN_INFO "ata%u: dev %u ATA, max %s, %Lu sectors%s\n",
+		printk(KERN_INFO "ata%u: dev %u ATA, max %s, %Lu sectors: %s\n",
 		       ap->id, device,
 		       ata_udma_string(udma_modes),
 		       (unsigned long long)dev->n_sectors,
-		       dev->flags & ATA_DFLAG_LBA48 ? " (lba48)" : "");
+		       dev->flags & ATA_DFLAG_LBA48 ? " lba48" : "");
 	}
 
 	/* ATAPI-specific feature tests */
@@ -2311,6 +2311,7 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 		qc->ap = ap;
 		qc->dev = dev;
 		qc->cursect = qc->cursg = qc->cursg_ofs = 0;
+		qc->nsect = 0;
 
 		ata_tf_init(ap, &qc->tf, dev->devno);
 
