@@ -194,7 +194,7 @@ MODULE_PARM(drive3, "1-8i");
 
 static void ps_tq_int( void *data);
 
-enum action {Fail = 0, Ok = 1, Claim, Hold, Wait};
+enum action {Fail = 0, Ok = 1, Hold, Wait};
 
 static enum action (*phase)(void);
 static unsigned long ps_timeout;
@@ -212,6 +212,7 @@ static void ps_set_intr(void)
 static struct pd_unit *pd_current; /* current request's drive */
 static PIA *pi_current; /* current request's PIA */
 static struct request *pd_req;	/* current request */
+static enum action do_pd_io_start(void);
 static struct request_queue *pd_queue;
 
 static void run_fsm(void)
@@ -221,9 +222,18 @@ static void run_fsm(void)
 		unsigned long saved_flags;
 		int stop = 0;
 
+		if (!phase) {
+			pd_current = pd_req->rq_disk->private_data;
+			pi_current = pd_current->pi;
+			phase = do_pd_io_start;
+			if (!pi_schedule_claimed(pi_current, run_fsm))
+				return;
+		}
+
 		switch(res = phase()) {
 			case Ok: case Fail:
 				pi_unclaim(pi_current);
+				phase = NULL;
 				spin_lock_irqsave(&pd_lock, saved_flags);
 				end_request(pd_req, res);
 				pd_req = elv_next_request(pd_queue);
@@ -232,19 +242,14 @@ static void run_fsm(void)
 				spin_unlock_irqrestore(&pd_lock, saved_flags);
 				if (stop)
 					return;
-				phase = do_pd_io;
+			case Hold:
 				ps_set_intr();
 				return;
 			case Wait:
 				pi_unclaim(pi_current);
-				/* fallthrough */
-			case Claim:
 				if (!pi_schedule_claimed(pi_current, run_fsm))
 					return;
 				break;
-			case Hold:
-				ps_set_intr();
-				return;
 		}
 	}
 }
@@ -307,8 +312,6 @@ static int pd_ioctl(struct inode *inode, struct file *file,
 static int pd_release(struct inode *inode, struct file *file);
 static int pd_revalidate(struct gendisk *p);
 static int pd_detect(void);
-static enum action do_pd_io(void);
-static enum action do_pd_io_start(void);
 static enum action do_pd_read_start(void);
 static enum action do_pd_write_start(void);
 static enum action do_pd_read_drq(void);
@@ -788,7 +791,6 @@ static void do_pd_request(request_queue_t * q)
 	if (!pd_req)
 		return;
 
-	phase = do_pd_io;
 	ps_set_intr();
 }
 
@@ -810,14 +812,6 @@ static int pd_next_buf(void)
 	pd_buf = pd_req->buffer;
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 	return 0;
-}
-
-static enum action do_pd_io(void)
-{
-	pd_current = pd_req->rq_disk->private_data;
-	pi_current = pd_current->pi;
-	phase = do_pd_io_start;
-	return Claim;
 }
 
 static enum action do_pd_io_start(void)
