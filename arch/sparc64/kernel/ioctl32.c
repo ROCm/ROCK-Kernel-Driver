@@ -1695,6 +1695,11 @@ static int ppp_sock_fprog_ioctl_trans(unsigned int fd, unsigned int cmd, unsigne
 	    put_user(fptr64, &u_fprog64->filter))
 		return -EFAULT;
 
+	if (cmd == PPPIOCSPASS32)
+		cmd = PPPIOCSPASS;
+	else
+		cmd = PPPIOCSACTIVE;
+
 	return sys_ioctl(fd, cmd, (unsigned long) u_fprog64);
 }
 
