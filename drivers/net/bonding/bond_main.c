@@ -1720,20 +1720,29 @@ static int bond_change_active(struct net_device *master_dev, struct net_device *
 		}
 	}
 
+	/*
+	 * Changing to the current active: do nothing; return success.
+	 */
+	if (newactive && (newactive == oldactive)) {
+		write_unlock_bh(&bond->lock);
+		return 0;
+	}
+
 	if ((newactive != NULL)&&
 	    (oldactive != NULL)&&
-	    (newactive != oldactive)&&
 	    (newactive->link == BOND_LINK_UP)&&
 	    IS_UP(newactive->dev)) {
-		bond_set_slave_inactive_flags(oldactive);
-		bond_set_slave_active_flags(newactive);
+		if (bond_mode == BOND_MODE_ACTIVEBACKUP) {
+			bond_set_slave_inactive_flags(oldactive);
+			bond_set_slave_active_flags(newactive);
+		}
+
 		bond_mc_update(bond, newactive, oldactive);
 		bond_assign_current_slave(bond, newactive);
 		printk("%s : activate %s(old : %s)\n",
 			master_dev->name, newactive->dev->name, 
 			oldactive->dev->name);
-	}
-	else {
+	} else {
 		ret = -EINVAL;
 	}
 	write_unlock_bh(&bond->lock);
