@@ -124,6 +124,12 @@ typedef struct _ReadCapdata_struct
  #define CCISS_READ   0x28    // Read(10)
  #define CCISS_WRITE  0x2a    // Write(10)
 
+// BMIC commands 
+#define BMIC_READ 0x26
+#define BMIC_WRITE 0x27
+#define BMIC_CACHE_FLUSH 0xc2
+#define CCISS_CACHE_FLUSH 0x01	//C2 was already being used by CCISS
+
 //Command List Structure
 typedef union _SCSI3Addr_struct {
    struct {

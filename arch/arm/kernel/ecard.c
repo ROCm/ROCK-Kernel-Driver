@@ -1097,8 +1097,6 @@ void __init ecard_init(void)
 	ecard_proc_init();
 }
 
-subsys_initcall(ecard_init);
-
 EXPORT_SYMBOL(ecard_startfind);
 EXPORT_SYMBOL(ecard_find);
 EXPORT_SYMBOL(ecard_readchunk);

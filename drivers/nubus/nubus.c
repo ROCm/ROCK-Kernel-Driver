@@ -1039,5 +1039,3 @@ void __init nubus_init(void)
 	nubus_proc_init();
 #endif
 }
-
-subsys_initcall(nubus_init);

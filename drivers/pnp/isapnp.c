@@ -2356,9 +2356,12 @@ int __init isapnp_init(void)
 	return 0;
 }
 
-subsys_initcall(isapnp_init);
-
 #ifdef MODULE
+
+int init_module(void)
+{
+	return isapnp_init();
+}
 
 void cleanup_module(void)
 {

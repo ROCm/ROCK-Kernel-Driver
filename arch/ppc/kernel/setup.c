@@ -535,8 +535,6 @@ void __init ppc_init(void)
 	}
 }
 
-subsys_initcall(ppc_init);
-
 /* Warning, IO base is not yet inited */
 void __init setup_arch(char **cmdline_p)
 {

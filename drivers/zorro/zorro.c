@@ -170,7 +170,6 @@ void __init zorro_init(void)
 			m68k_memory[i].addr+m68k_memory[i].size, 0);
 }
 
-subsys_initcall(zorro_init);
 
 EXPORT_SYMBOL(zorro_find_device);
 EXPORT_SYMBOL(zorro_unused_z2ram);

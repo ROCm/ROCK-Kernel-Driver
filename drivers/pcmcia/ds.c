@@ -966,9 +966,12 @@ int __init init_pcmcia_ds(void)
     return 0;
 }
 
-late_initcall(init_pcmcia_ds);
-
 #ifdef MODULE
+
+int __init init_module(void)
+{
+    return init_pcmcia_ds();
+}
 
 void __exit cleanup_module(void)
 {

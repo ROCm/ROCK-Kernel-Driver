@@ -50,26 +50,8 @@ typedef void (*exitcall_t)(void);
 
 extern initcall_t __initcall_start, __initcall_end;
 
-/* initcalls are now grouped by functionality into separate 
- * subsections. Ordering inside the subsections is determined
- * by link order. 
- * For backwards compatability, initcall() puts the call in 
- * the device init subsection.
- */
-
-#define __define_initcall(level,fn) \
-	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".initcall" level ".init"))) = fn
-
-#define early_arch_initcall(fn)		__define_initcall("1",fn)
-#define mem_initcall(fn)		__define_initcall("2",fn)
-#define subsys_initcall(fn)		__define_initcall("3",fn)
-#define arch_initcall(fn)		__define_initcall("4",fn)
-#define fs_initcall(fn)			__define_initcall("5",fn)
-#define device_initcall(fn)		__define_initcall("6",fn)
-#define late_initcall(fn)		__define_initcall("7",fn)
-
-#define __initcall(fn) device_initcall(fn)
-
+#define __initcall(fn)								\
+	static initcall_t __initcall_##fn __init_call = fn
 #define __exitcall(fn)								\
 	static exitcall_t __exitcall_##fn __exit_call = fn
 
@@ -98,7 +80,7 @@ extern struct kernel_param __setup_start, __setup_end;
 #define __initdata	__attribute__ ((__section__ (".data.init")))
 #define __exitdata	__attribute__ ((unused, __section__ (".data.exit")))
 #define __initsetup	__attribute__ ((unused,__section__ (".setup.init")))
-#define __init_call(level)  __attribute__ ((unused,__section__ (".initcall" level ".init")))
+#define __init_call	__attribute__ ((unused,__section__ (".initcall.init")))
 #define __exit_call	__attribute__ ((unused,__section__ (".exitcall.exit")))
 
 /* For assembly routines */
@@ -158,14 +140,6 @@ typedef void (*__cleanup_module_func_t)(void);
 	{ return x; }
 
 #define __setup(str,func) /* nothing */
-
-#define early_arch_initcall(fn)		module_init(fn)
-#define mem_initcall(fn)		module_init(fn)
-#define subsys_initcall(fn)		module_init(fn)
-#define arch_initcall(fn)		module_init(fn)
-#define fs_initcall(fn)			module_init(fn)
-#define device_initcall(fn)		module_init(fn)
-#define late_initcall(fn)		module_init(fn)
 
 #endif
 

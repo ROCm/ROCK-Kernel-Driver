@@ -311,8 +311,6 @@ void __init mca_init(void)
 #endif
 }
 
-subsys_initcall(mca_init);
-
 /*--------------------------------------------------------------------*/
 
 static void mca_handle_nmi_slot(int slot, int check_flag)

@@ -509,5 +509,3 @@ void __init sbus_init(void)
 	}
 #endif
 }
-
-subsys_initcall(sbus_init);

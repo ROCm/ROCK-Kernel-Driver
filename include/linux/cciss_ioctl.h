@@ -184,6 +184,11 @@ typedef struct _IOCTL_Command_struct {
 #define CCISS_GETDRIVVER   _IOR(CCISS_IOC_MAGIC, 9, DriverVer_type)
 #define CCISS_REVALIDVOLS  _IO(CCISS_IOC_MAGIC, 10)
 #define CCISS_PASSTHRU	   _IOWR(CCISS_IOC_MAGIC, 11, IOCTL_Command_struct)
+#define CCISS_DEREGDISK	   _IO(CCISS_IOC_MAGIC, 12)
 
+/* no longer used... use REGNEWD instead */ 
+#define CCISS_REGNEWDISK  _IOW(CCISS_IOC_MAGIC, 13, int)
+
+#define CCISS_REGNEWD	   _IO(CCISS_IOC_MAGIC, 14)
 
 #endif  

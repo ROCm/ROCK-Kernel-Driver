@@ -208,8 +208,6 @@ void __init dio_init(void)
         }
 }
 
-subsys_initcall(dio_init);
-
 /* Bear in mind that this is called in the very early stages of initialisation
  * in order to get the virtual address of the serial port for the console...
  */

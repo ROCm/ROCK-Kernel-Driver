@@ -1709,11 +1709,7 @@ int __init blk_dev_init(void)
 	printk("block: %d slots per queue, batch=%d\n", queue_nr_requests, batch_requests);
 
 	blk_max_low_pfn = max_low_pfn;
-#ifdef CONFIG_HIGHMEM
 	blk_max_pfn = max_pfn;
-#else
-	blk_max_pfn = max_low_pfn;
-#endif
 
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_IDE)
 	ide_init();		/* this MUST precede hd_init */

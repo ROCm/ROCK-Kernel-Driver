@@ -46,6 +46,8 @@ struct ctlr_info
 	__u32	board_id;
 	ulong   vaddr;
 	__u32	paddr;	
+	unsigned long io_mem_addr;
+	unsigned long io_mem_length;
 	CfgTable_struct *cfgtable;
 	int	intr;
 
@@ -53,6 +55,7 @@ struct ctlr_info
 	int	commands_outstanding;
 	int 	max_outstanding; /* Debug */ 
 	int	num_luns;
+	int 	highest_lun;
 	int	usage_count;  /* number of opens all all minor devices */
 
 	// information about each logical volume

@@ -139,6 +139,11 @@ struct super_block *devpts_read_super(struct super_block *s, void *data,
 		printk("devpts: called with bogus options\n");
 		goto fail_free;
 	}
+	s->u.generic_sbp = (void *) sbi;
+	s->s_blocksize = 1024;
+	s->s_blocksize_bits = 10;
+	s->s_magic = DEVPTS_SUPER_MAGIC;
+	s->s_op = &devpts_sops;
 
 	inode = new_inode(s);
 	if (!inode)
@@ -153,11 +158,6 @@ struct super_block *devpts_read_super(struct super_block *s, void *data,
 	inode->i_fop = &devpts_root_operations;
 	inode->i_nlink = 2;
 
-	s->u.generic_sbp = (void *) sbi;
-	s->s_blocksize = 1024;
-	s->s_blocksize_bits = 10;
-	s->s_magic = DEVPTS_SUPER_MAGIC;
-	s->s_op = &devpts_sops;
 	s->s_root = d_alloc_root(inode);
 	if (s->s_root)
 		return s;

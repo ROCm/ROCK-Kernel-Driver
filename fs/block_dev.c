@@ -220,17 +220,19 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 static struct super_block *bd_read_super(struct super_block *sb, void *data, int silent)
 {
 	static struct super_operations sops = {};
-	struct inode *root = new_inode(sb);
-	if (!root)
-		return NULL;
-	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
-	root->i_uid = root->i_gid = 0;
-	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
+	struct inode *root;
+
 	sb->s_maxbytes = ~0ULL;
 	sb->s_blocksize = 1024;
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = 0x62646576;
 	sb->s_op = &sops;
+	root = new_inode(sb);
+	if (!root)
+		return NULL;
+	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
+	root->i_uid = root->i_gid = 0;
+	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
 	sb->s_root = d_alloc(NULL, &(const struct qstr) { "bdev:", 5, 0 });
 	if (!sb->s_root) {
 		iput(root);
