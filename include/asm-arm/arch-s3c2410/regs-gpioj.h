@@ -11,6 +11,7 @@
  *
  *  Changelog:
  *    11-Aug-2004     BJD     Created file
+ *    10-Feb-2005     BJD     Fix GPJ12 definition (Guillaume Gourat)
 */
 
 
@@ -94,7 +95,7 @@
 #define S3C2440_GPJ12           S3C2410_GPIONO(S3C2440_GPIO_BANKJ, 12)
 #define S3C2440_GPJ12_INP       (0x00 << 24)
 #define S3C2440_GPJ12_OUTP      (0x01 << 24)
-#define S3C2440_GPJ12_CAMCLKOUT (0x02 << 24)
+#define S3C2440_GPJ12_CAMRESET  (0x02 << 24)
 
 #endif	/* __ASM_ARCH_REGS_GPIOJ_H */
 
