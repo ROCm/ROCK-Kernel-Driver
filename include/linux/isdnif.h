@@ -275,7 +275,6 @@ typedef struct setup_parm {
 } setup_parm;
 
 
-#ifdef CONFIG_ISDN_TTY_FAX
 /* T.30 Fax G3 */
 
 #define FAXIDLEN 21
@@ -349,8 +348,6 @@ typedef struct T30_s {
 #define ISDN_FAX_PHASE_C   	3
 #define ISDN_FAX_PHASE_D   	4
 #define ISDN_FAX_PHASE_E   	5
-
-#endif /* TTY_FAX */
 
 #define ISDN_FAX_CLASS1_FAE	0
 #define ISDN_FAX_CLASS1_FTS	1
