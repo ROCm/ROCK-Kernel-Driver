@@ -12,6 +12,14 @@
 #define _IOP310_HW_H_
 
 /*
+ * This is needed for mixed drivers that need to work on all
+ * IOP3xx variants but behave slightly differently on each.
+ */
+#ifndef __ASSEMBLY__
+#define iop_is_310() ((processor_id & 0xffffe3f0) == 0x69052000)
+#endif
+
+/*
  * IOP310 I/O and Mem space regions for PCI autoconfiguration
  */
 #define IOP310_PCISEC_LOWER_IO		0x90010000
