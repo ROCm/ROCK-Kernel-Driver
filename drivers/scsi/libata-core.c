@@ -78,7 +78,7 @@ MODULE_LICENSE("GPL");
  *	Inherited from caller.
  */
 
-void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
@@ -136,7 +136,7 @@ void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf)
  *	Inherited from caller.
  */
 
-void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 	unsigned int is_addr = tf->flags & ATA_TFLAG_ISADDR;
@@ -183,6 +183,14 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	ata_wait_idle(ap);
 }
 
+void ata_tf_load(struct ata_port *ap, struct ata_taskfile *tf)
+{
+	if (ap->flags & ATA_FLAG_MMIO)
+		ata_tf_load_mmio(ap, tf);
+	else
+		ata_tf_load_pio(ap, tf);
+}
+
 /**
  *	ata_exec_command_pio - issue ATA command to host controller
  *	@ap: port to which command is being issued
@@ -195,7 +203,7 @@ void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	DPRINTK("ata%u: cmd 0x%X\n", ap->id, tf->command);
 
@@ -216,12 +224,20 @@ void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	DPRINTK("ata%u: cmd 0x%X\n", ap->id, tf->command);
 
        	writeb(tf->command, (void __iomem *) ap->ioaddr.command_addr);
 	ata_pause(ap);
+}
+
+void ata_exec_command(struct ata_port *ap, struct ata_taskfile *tf)
+{
+	if (ap->flags & ATA_FLAG_MMIO)
+		ata_exec_command_mmio(ap, tf);
+	else
+		ata_exec_command_pio(ap, tf);
 }
 
 /**
@@ -297,7 +313,7 @@ void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf)
  *	Inherited from caller.
  */
 
-void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 
@@ -329,7 +345,7 @@ void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf)
  *	Inherited from caller.
  */
 
-void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
+static void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
 
@@ -349,6 +365,14 @@ void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 	}
 }
 
+void ata_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
+{
+	if (ap->flags & ATA_FLAG_MMIO)
+		ata_tf_read_mmio(ap, tf);
+	else
+		ata_tf_read_pio(ap, tf);
+}
+
 /**
  *	ata_check_status_pio - Read device status reg & clear interrupt
  *	@ap: port where the device is
@@ -360,7 +384,7 @@ void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf)
  *	LOCKING:
  *	Inherited from caller.
  */
-u8 ata_check_status_pio(struct ata_port *ap)
+static u8 ata_check_status_pio(struct ata_port *ap)
 {
 	return inb(ap->ioaddr.status_addr);
 }
@@ -376,9 +400,16 @@ u8 ata_check_status_pio(struct ata_port *ap)
  *	LOCKING:
  *	Inherited from caller.
  */
-u8 ata_check_status_mmio(struct ata_port *ap)
+static u8 ata_check_status_mmio(struct ata_port *ap)
 {
        	return readb((void __iomem *) ap->ioaddr.status_addr);
+}
+
+u8 ata_check_status(struct ata_port *ap)
+{
+	if (ap->flags & ATA_FLAG_MMIO)
+		return ata_check_status_mmio(ap);
+	return ata_check_status_pio(ap);
 }
 
 /**
@@ -671,7 +702,7 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
 }
 
 /**
- *	ata_dev_devchk - PATA device presence detection
+ *	ata_devchk - PATA device presence detection
  *	@ap: ATA channel to examine
  *	@device: Device to examine (starting at zero)
  *
@@ -683,7 +714,7 @@ static unsigned int ata_mmio_devchk(struct ata_port *ap,
  *	caller.
  */
 
-static unsigned int ata_dev_devchk(struct ata_port *ap,
+static unsigned int ata_devchk(struct ata_port *ap,
 				    unsigned int device)
 {
 	if (ap->flags & ATA_FLAG_MMIO)
@@ -1439,13 +1470,13 @@ static void ata_bus_post_reset(struct ata_port *ap, unsigned int devmask)
 	unsigned int dev1 = devmask & (1 << 1);
 	unsigned long timeout;
 
-	/* if device 0 was found in ata_dev_devchk, wait for its
+	/* if device 0 was found in ata_devchk, wait for its
 	 * BSY bit to clear
 	 */
 	if (dev0)
 		ata_busy_sleep(ap, ATA_TMOUT_BOOT_QUICK, ATA_TMOUT_BOOT);
 
-	/* if device 1 was found in ata_dev_devchk, wait for
+	/* if device 1 was found in ata_devchk, wait for
 	 * register access, then wait for BSY to clear
 	 */
 	timeout = jiffies + ATA_TMOUT_BOOT;
@@ -1580,9 +1611,9 @@ void ata_bus_reset(struct ata_port *ap)
 	if (ap->flags & ATA_FLAG_SATA_RESET)
 		dev0 = 1;
 	else {
-		dev0 = ata_dev_devchk(ap, 0);
+		dev0 = ata_devchk(ap, 0);
 		if (slave_possible)
-			dev1 = ata_dev_devchk(ap, 1);
+			dev1 = ata_devchk(ap, 1);
 	}
 
 	if (dev0)
@@ -2613,7 +2644,7 @@ int ata_qc_issue_prot(struct ata_queued_cmd *qc)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
+static void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
@@ -2643,7 +2674,7 @@ void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
+static void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
@@ -2674,7 +2705,7 @@ void ata_bmdma_start_mmio (struct ata_queued_cmd *qc)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
+static void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	unsigned int rw = (qc->tf.flags & ATA_TFLAG_WRITE);
@@ -2702,7 +2733,7 @@ void ata_bmdma_setup_pio (struct ata_queued_cmd *qc)
  *	spin_lock_irqsave(host_set lock)
  */
 
-void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
+static void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	u8 dmactl;
@@ -2711,6 +2742,22 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 	dmactl = inb(ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
 	outb(dmactl | ATA_DMA_START,
 	     ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
+}
+
+void ata_bmdma_start(struct ata_queued_cmd *qc)
+{
+	if (qc->ap->flags & ATA_FLAG_MMIO)
+		ata_bmdma_start_mmio(qc);
+	else
+		ata_bmdma_start_pio(qc);
+}
+
+void ata_bmdma_setup(struct ata_queued_cmd *qc)
+{
+	if (qc->ap->flags & ATA_FLAG_MMIO)
+		ata_bmdma_setup_mmio(qc);
+	else
+		ata_bmdma_setup_pio(qc);
 }
 
 void ata_bmdma_irq_clear(struct ata_port *ap)
@@ -3535,24 +3582,18 @@ EXPORT_SYMBOL_GPL(ata_sg_init_one);
 EXPORT_SYMBOL_GPL(ata_qc_complete);
 EXPORT_SYMBOL_GPL(ata_qc_issue_prot);
 EXPORT_SYMBOL_GPL(ata_eng_timeout);
-EXPORT_SYMBOL_GPL(ata_tf_load_pio);
-EXPORT_SYMBOL_GPL(ata_tf_load_mmio);
-EXPORT_SYMBOL_GPL(ata_tf_read_pio);
-EXPORT_SYMBOL_GPL(ata_tf_read_mmio);
+EXPORT_SYMBOL_GPL(ata_tf_load);
+EXPORT_SYMBOL_GPL(ata_tf_read);
 EXPORT_SYMBOL_GPL(ata_tf_to_fis);
 EXPORT_SYMBOL_GPL(ata_tf_from_fis);
-EXPORT_SYMBOL_GPL(ata_check_status_pio);
-EXPORT_SYMBOL_GPL(ata_check_status_mmio);
-EXPORT_SYMBOL_GPL(ata_exec_command_pio);
-EXPORT_SYMBOL_GPL(ata_exec_command_mmio);
+EXPORT_SYMBOL_GPL(ata_check_status);
+EXPORT_SYMBOL_GPL(ata_exec_command);
 EXPORT_SYMBOL_GPL(ata_port_start);
 EXPORT_SYMBOL_GPL(ata_port_stop);
 EXPORT_SYMBOL_GPL(ata_interrupt);
 EXPORT_SYMBOL_GPL(ata_qc_prep);
-EXPORT_SYMBOL_GPL(ata_bmdma_setup_pio);
-EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);
-EXPORT_SYMBOL_GPL(ata_bmdma_setup_mmio);
-EXPORT_SYMBOL_GPL(ata_bmdma_start_mmio);
+EXPORT_SYMBOL_GPL(ata_bmdma_setup);
+EXPORT_SYMBOL_GPL(ata_bmdma_start);
 EXPORT_SYMBOL_GPL(ata_bmdma_irq_clear);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);

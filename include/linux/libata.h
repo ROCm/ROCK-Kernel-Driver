@@ -379,16 +379,12 @@ extern unsigned int ata_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc
 /*
  * Default driver ops implementations
  */
-extern void ata_tf_load_pio(struct ata_port *ap, struct ata_taskfile *tf);
-extern void ata_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
-extern void ata_tf_read_pio(struct ata_port *ap, struct ata_taskfile *tf);
-extern void ata_tf_read_mmio(struct ata_port *ap, struct ata_taskfile *tf);
+extern void ata_tf_load(struct ata_port *ap, struct ata_taskfile *tf);
+extern void ata_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_tf_to_fis(struct ata_taskfile *tf, u8 *fis, u8 pmp);
 extern void ata_tf_from_fis(u8 *fis, struct ata_taskfile *tf);
-extern u8 ata_check_status_pio(struct ata_port *ap);
-extern u8 ata_check_status_mmio(struct ata_port *ap);
-extern void ata_exec_command_pio(struct ata_port *ap, struct ata_taskfile *tf);
-extern void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
+extern u8 ata_check_status(struct ata_port *ap);
+extern void ata_exec_command(struct ata_port *ap, struct ata_taskfile *tf);
 extern int ata_port_start (struct ata_port *ap);
 extern void ata_port_stop (struct ata_port *ap);
 extern irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
@@ -400,10 +396,8 @@ extern void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
 		 unsigned int n_elem);
 extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 			      unsigned int ofs, unsigned int len);
-extern void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc);
-extern void ata_bmdma_start_mmio (struct ata_queued_cmd *qc);
-extern void ata_bmdma_setup_pio (struct ata_queued_cmd *qc);
-extern void ata_bmdma_start_pio (struct ata_queued_cmd *qc);
+extern void ata_bmdma_setup (struct ata_queued_cmd *qc);
+extern void ata_bmdma_start (struct ata_queued_cmd *qc);
 extern void ata_bmdma_irq_clear(struct ata_port *ap);
 extern int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits);
 extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat);
