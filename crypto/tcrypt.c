@@ -46,15 +46,17 @@ static int mode = 0;
 static char *xbuf;
 static char *tvmem;
 
-static void hexdump(unsigned char *buf, size_t len)
+static void
+hexdump(unsigned char *buf, size_t len)
 {
 	while (len--)
 		printk("%02x", *buf++);
-	
+
 	printk("\n");
 }
 
-static void test_md5(void)
+static void
+test_md5(void)
 {
 	char *p;
 	int i;
@@ -66,29 +68,30 @@ static void test_md5(void)
 	size_t tsize;
 
 	printk("\ntesting md5\n");
-	
-	tsize = sizeof(md5_tv_template);
+
+	tsize = sizeof (md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, md5_tv_template, tsize);
-	md5_tv = (void *)tvmem;
-	
+	md5_tv = (void *) tvmem;
+
 	tfm = crypto_alloc_tfm("md5", 0);
 	if (tfm == NULL) {
 		printk("failed to load transform for md5\n");
 		return;
 	}
-	
+
 	for (i = 0; i < MD5_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
-		memset(result, 0, sizeof(result));
-		
+		memset(result, 0, sizeof (result));
+
 		p = md5_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(md5_tv[i].plaintext);
 
 		crypto_digest_init(tfm);
@@ -96,85 +99,99 @@ static void test_md5(void)
 		crypto_digest_final(tfm, result);
 
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
-		printk("%s\n", memcmp(result, md5_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+		printk("%s\n",
+		       memcmp(result, md5_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
 	}
 
 	printk("\ntesting md5 across pages\n");
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
+	memset(xbuf, 0, sizeof (xbuf));
 	memcpy(&xbuf[IDX1], "abcdefghijklm", 13);
 	memcpy(&xbuf[IDX2], "nopqrstuvwxyz", 13);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 13;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 13;
-	
-	memset(result, 0, sizeof(result));
+
+	memset(result, 0, sizeof (result));
 	crypto_digest_digest(tfm, sg, 2, result);
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
-	
-	printk("%s\n", memcmp(result, md5_tv[4].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
-	
+
+	printk("%s\n",
+	       memcmp(result, md5_tv[4].digest,
+		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+
 	printk("\ntesting hmac_md5\n");
-	
-	tsize = sizeof(hmac_md5_tv_template);
+
+	tsize = sizeof (hmac_md5_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, hmac_md5_tv_template, tsize);
-	hmac_md5_tv = (void *)tvmem;
-	
+	hmac_md5_tv = (void *) tvmem;
+
 	for (i = 0; i < HMAC_MD5_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
-		memset(result, 0, sizeof(result));
-		
+		memset(result, 0, sizeof (result));
+
 		p = hmac_md5_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(hmac_md5_tv[i].plaintext);
-		
-		crypto_digest_hmac(tfm, hmac_md5_tv[i].key, strlen(hmac_md5_tv[i].key),sg , 1, result);
-		
+
+		crypto_digest_hmac(tfm, hmac_md5_tv[i].key,
+				   strlen(hmac_md5_tv[i].key), sg, 1, result);
+
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
-		printk("%s\n", memcmp(result, hmac_md5_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+		printk("%s\n",
+		       memcmp(result, hmac_md5_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
 	}
-	
+
 	printk("\ntesting hmac_md5 across pages\n");
-	
-	memset(xbuf, 0, sizeof(xbuf));
-	
+
+	memset(xbuf, 0, sizeof (xbuf));
+
 	memcpy(&xbuf[IDX1], "what do ya want ", 16);
 	memcpy(&xbuf[IDX2], "for nothing?", 12);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 16;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 12;
-	
-	memset(result, 0, sizeof(result));
-	crypto_digest_hmac(tfm, hmac_md5_tv[1].key, strlen(hmac_md5_tv[1].key), sg, 2, result);
+
+	memset(result, 0, sizeof (result));
+	crypto_digest_hmac(tfm, hmac_md5_tv[1].key, strlen(hmac_md5_tv[1].key),
+			   sg, 2, result);
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
-	
-	printk("%s\n", memcmp(result, hmac_md5_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
-	
+
+	printk("%s\n",
+	       memcmp(result, hmac_md5_tv[1].digest,
+		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+
 	crypto_free_tfm(tfm);
 }
 
-static void test_md4(void)
+static void
+test_md4(void)
 {
 	char *p;
 	int i;
@@ -185,41 +202,46 @@ static void test_md4(void)
 	size_t tsize;
 
 	printk("\ntesting md4\n");
-	
-	tsize = sizeof(md4_tv_template);
+
+	tsize = sizeof (md4_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, md4_tv_template, tsize);
-	md4_tv = (void *)tvmem;
-	
+	md4_tv = (void *) tvmem;
+
 	tfm = crypto_alloc_tfm("md4", 0);
 	if (tfm == NULL) {
 		printk("failed to load transform for md4\n");
 		return;
 	}
-	
+
 	for (i = 0; i < MD4_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
-		memset(result, 0, sizeof(result));
-		
+		memset(result, 0, sizeof (result));
+
 		p = md4_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(md4_tv[i].plaintext);
 
 		crypto_digest_digest(tfm, sg, 1, result);
-		
+
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
-		printk("%s\n", memcmp(result, md4_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+		printk("%s\n",
+		       memcmp(result, md4_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
 	}
-	
+
 	crypto_free_tfm(tfm);
 }
 
-static void test_sha1(void)
+static void
+test_sha1(void)
 {
 	char *p;
 	int i;
@@ -229,18 +251,19 @@ static void test_sha1(void)
 	struct scatterlist sg[2];
 	size_t tsize;
 	char result[SHA1_DIGEST_SIZE];
-	
+
 	printk("\ntesting sha1\n");
-	
-	tsize = sizeof(sha1_tv_template);
+
+	tsize = sizeof (sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, sha1_tv_template, tsize);
-	sha1_tv = (void *)tvmem;
-	
+	sha1_tv = (void *) tvmem;
+
 	tfm = crypto_alloc_tfm("sha1", 0);
 	if (tfm == NULL) {
 		printk("failed to load transform for sha1\n");
@@ -249,96 +272,110 @@ static void test_sha1(void)
 
 	for (i = 0; i < SHA1_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
-		memset(result, 0, sizeof(result));
-		
+		memset(result, 0, sizeof (result));
+
 		p = sha1_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(sha1_tv[i].plaintext);
-		                
+
 		crypto_digest_init(tfm);
 		crypto_digest_update(tfm, sg, 1);
 		crypto_digest_final(tfm, result);
 
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
-		printk("%s\n", memcmp(result, sha1_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+		printk("%s\n",
+		       memcmp(result, sha1_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
 	}
 
 	printk("\ntesting sha1 across pages\n");
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
+	memset(xbuf, 0, sizeof (xbuf));
 	memcpy(&xbuf[IDX1], "abcdbcdecdefdefgefghfghighij", 28);
 	memcpy(&xbuf[IDX2], "hijkijkljklmklmnlmnomnopnopq", 28);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 28;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 28;
-	
-	memset(result, 0, sizeof(result));
+
+	memset(result, 0, sizeof (result));
 	crypto_digest_digest(tfm, sg, 2, result);
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
-	printk("%s\n", memcmp(result, sha1_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+	printk("%s\n",
+	       memcmp(result, sha1_tv[1].digest,
+		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
 
 	printk("\ntesting hmac_sha1\n");
 
-	tsize = sizeof(hmac_sha1_tv_template);
+	tsize = sizeof (hmac_sha1_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, hmac_sha1_tv_template, tsize);
-	hmac_sha1_tv = (void *)tvmem;
-	
+	hmac_sha1_tv = (void *) tvmem;
+
 	for (i = 0; i < HMAC_SHA1_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
-		memset(result, 0, sizeof(result));
-		
+		memset(result, 0, sizeof (result));
+
 		p = hmac_sha1_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = strlen(hmac_sha1_tv[i].plaintext);
-		
-		crypto_digest_hmac(tfm, hmac_sha1_tv[i].key, strlen(hmac_sha1_tv[i].key),sg , 1, result);
-		
-		hexdump(result, sizeof(result));
-		printk("%s\n", memcmp(result, hmac_sha1_tv[i].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+
+		crypto_digest_hmac(tfm, hmac_sha1_tv[i].key,
+				   strlen(hmac_sha1_tv[i].key), sg, 1, result);
+
+		hexdump(result, sizeof (result));
+		printk("%s\n",
+		       memcmp(result, hmac_sha1_tv[i].digest,
+			      crypto_tfm_alg_digestsize(tfm)) ? "fail" :
+		       "pass");
 	}
 
 	printk("\ntesting hmac_sha1 across pages\n");
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	memcpy(&xbuf[IDX1], "what do ya want ", 16);
 	memcpy(&xbuf[IDX2], "for nothing?", 12);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 16;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 12;
-	
-	memset(result, 0, sizeof(result));
-	crypto_digest_hmac(tfm, hmac_sha1_tv[1].key, strlen(hmac_sha1_tv[1].key), sg, 2, result);
+
+	memset(result, 0, sizeof (result));
+	crypto_digest_hmac(tfm, hmac_sha1_tv[1].key,
+			   strlen(hmac_sha1_tv[1].key), sg, 2, result);
 	hexdump(result, crypto_tfm_alg_digestsize(tfm));
-	
-	printk("%s\n", memcmp(result, hmac_sha1_tv[1].digest, crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
-	crypto_free_tfm(tfm);	
+
+	printk("%s\n",
+	       memcmp(result, hmac_sha1_tv[1].digest,
+		      crypto_tfm_alg_digestsize(tfm)) ? "fail" : "pass");
+	crypto_free_tfm(tfm);
 }
 
-void test_des(void)
+void
+test_des(void)
 {
 	int ret, i, len;
 	size_t tsize;
@@ -350,15 +387,16 @@ void test_des(void)
 	struct scatterlist sg[8];
 
 	printk("\ntesting des encryption\n");
-	
-	tsize = sizeof(des_enc_tv_template);
+
+	tsize = sizeof (des_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, des_enc_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	tfm = crypto_alloc_tfm("des", 0);
 	if (tfm == NULL) {
@@ -371,69 +409,70 @@ void test_des(void)
 
 		key = des_tv[i].key;
 		tfm->crt_flags |= CRYPTO_TFM_REQ_WEAK_KEY;
-		
+
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
-			
+
 			if (!des_tv[i].fail)
 				goto out;
 		}
 
 		len = des_tv[i].len;
-		
+
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 		ret = crypto_cipher_encrypt(tfm, sg, 1);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
-	
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
 	}
 
 	printk("\ntesting des ecb encryption across pages\n");
-	
+
 	i = 5;
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	hexdump(key, 8);
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
+	memset(xbuf, 0, sizeof (xbuf));
 	memcpy(&xbuf[IDX1], des_tv[i].plaintext, 8);
-	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 8 , 8);
-	
+	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 8, 8);
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 8;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 8;
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 2);
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	printk("page 1\n");
 	q = kmap(sg[0].page) + sg[0].offset;
 	hexdump(q, 8);
@@ -459,43 +498,43 @@ void test_des(void)
 	 *
 	 */
 	i = 7;
-	
+
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	/* Frag 1: 8 + 6 */
 	memcpy(&xbuf[IDX3], des_tv[i].plaintext, 14);
-	
+
 	/* Frag 2: 2 + 8 */
 	memcpy(&xbuf[IDX4], des_tv[i].plaintext + 14, 10);
-	
+
 	/* Frag 3: 8 */
 	memcpy(&xbuf[IDX5], des_tv[i].plaintext + 24, 8);
-	
+
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 14;
-	
+
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 10;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long)p & ~PAGE_MASK);
+	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 8;
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 3);
 
 	if (ret) {
@@ -527,51 +566,51 @@ void test_des(void)
 	 *  [2] [1] [3] [2 + 8 + 8]
 	 */
 	i = 7;
-	
+
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	/* Frag 1: 2 */
 	memcpy(&xbuf[IDX3], des_tv[i].plaintext, 2);
-	
+
 	/* Frag 2: 1 */
 	memcpy(&xbuf[IDX4], des_tv[i].plaintext + 2, 1);
-	
+
 	/* Frag 3: 3 */
 	memcpy(&xbuf[IDX5], des_tv[i].plaintext + 3, 3);
-	
+
 	/* Frag 4: 2 + 8 + 8 */
 	memcpy(&xbuf[IDX6], des_tv[i].plaintext + 6, 18);
-	
+
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 2;
-	
+
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 1;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long)p & ~PAGE_MASK);
+	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 3;
 
 	p = &xbuf[IDX6];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long)p & ~PAGE_MASK);
+	sg[3].offset = ((long) p & ~PAGE_MASK);
 	sg[3].length = 18;
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 4);
 
 	if (ret) {
@@ -608,59 +647,59 @@ void test_des(void)
 	 *  [2] [2] [2] [2] [8]
 	 */
 	i = 7;
-	
+
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	/* Frag 1: 2 */
 	memcpy(&xbuf[IDX3], des_tv[i].plaintext, 2);
-	
+
 	/* Frag 2: 2 */
 	memcpy(&xbuf[IDX4], des_tv[i].plaintext + 2, 2);
-	
+
 	/* Frag 3: 2 */
 	memcpy(&xbuf[IDX5], des_tv[i].plaintext + 4, 2);
-	
+
 	/* Frag 4: 2 */
 	memcpy(&xbuf[IDX6], des_tv[i].plaintext + 6, 2);
-	
+
 	/* Frag 5: 8 */
 	memcpy(&xbuf[IDX7], des_tv[i].plaintext + 8, 8);
-	
+
 	p = &xbuf[IDX3];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 2;
-	
+
 	p = &xbuf[IDX4];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 2;
 
 	p = &xbuf[IDX5];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long)p & ~PAGE_MASK);
+	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 2;
 
 	p = &xbuf[IDX6];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long)p & ~PAGE_MASK);
+	sg[3].offset = ((long) p & ~PAGE_MASK);
 	sg[3].length = 2;
 
 	p = &xbuf[IDX7];
 	sg[4].page = virt_to_page(p);
-	sg[4].offset = ((long)p & ~PAGE_MASK);
+	sg[4].offset = ((long) p & ~PAGE_MASK);
 	sg[4].length = 8;
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 5);
 
 	if (ret) {
@@ -687,12 +726,12 @@ void test_des(void)
 	q = kmap(sg[3].page) + sg[3].offset;
 	hexdump(q, 2);
 	printk("%s\n", memcmp(q, des_tv[i].result + 6, 2) ? "fail" : "pass");
-	
+
 	printk("page 5\n");
 	q = kmap(sg[4].page) + sg[4].offset;
 	hexdump(q, 8);
 	printk("%s\n", memcmp(q, des_tv[i].result + 8, 8) ? "fail" : "pass");
-	
+
 	printk("\ntesting des ecb encryption chunking scenario D (atomic)\n");
 
 	/*
@@ -701,16 +740,16 @@ void test_des(void)
 	i = 7;
 	key = des_tv[i].key;
 	tfm->crt_flags = CRYPTO_TFM_REQ_ATOMIC;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	xbuf[IDX1] = des_tv[i].plaintext[0];
 	xbuf[IDX2] = des_tv[i].plaintext[1];
 	xbuf[IDX3] = des_tv[i].plaintext[2];
@@ -719,47 +758,47 @@ void test_des(void)
 	xbuf[IDX6] = des_tv[i].plaintext[5];
 	xbuf[IDX7] = des_tv[i].plaintext[6];
 	xbuf[IDX8] = des_tv[i].plaintext[7];
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 1;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 1;
 
 	p = &xbuf[IDX3];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long)p & ~PAGE_MASK);
+	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 1;
 
 	p = &xbuf[IDX4];
 	sg[3].page = virt_to_page(p);
-	sg[3].offset = ((long)p & ~PAGE_MASK);
+	sg[3].offset = ((long) p & ~PAGE_MASK);
 	sg[3].length = 1;
 
 	p = &xbuf[IDX5];
 	sg[4].page = virt_to_page(p);
-	sg[4].offset = ((long)p & ~PAGE_MASK);
+	sg[4].offset = ((long) p & ~PAGE_MASK);
 	sg[4].length = 1;
 
 	p = &xbuf[IDX6];
 	sg[5].page = virt_to_page(p);
-	sg[5].offset = ((long)p & ~PAGE_MASK);
+	sg[5].offset = ((long) p & ~PAGE_MASK);
 	sg[5].length = 1;
 
 	p = &xbuf[IDX7];
 	sg[6].page = virt_to_page(p);
-	sg[6].offset = ((long)p & ~PAGE_MASK);
+	sg[6].offset = ((long) p & ~PAGE_MASK);
 	sg[6].length = 1;
 
 	p = &xbuf[IDX8];
 	sg[7].page = virt_to_page(p);
-	sg[7].offset = ((long)p & ~PAGE_MASK);
+	sg[7].offset = ((long) p & ~PAGE_MASK);
 	sg[7].length = 1;
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 8);
 	if (ret) {
 		printk("encrypt() failed flags=%x\n", tfm->crt_flags);
@@ -767,88 +806,90 @@ void test_des(void)
 	}
 
 	for (i = 0; i < 8; i++)
-		res[i] = *(char *)(kmap(sg[i].page) + sg[i].offset);
+		res[i] = *(char *) (kmap(sg[i].page) + sg[i].offset);
 
 	hexdump(res, 8);
 	printk("%s\n", memcmp(res, des_tv[7].result, 8) ? "fail" : "pass");
 
-
 	printk("\ntesting des decryption\n");
 
-	tsize = sizeof(des_dec_tv_template);
+	tsize = sizeof (des_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_dec_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	for (i = 0; i < DES_DEC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
 
 		key = des_tv[i].key;
-		
+
 		tfm->crt_flags = 0;
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		len = des_tv[i].len;
-		
+
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
-		
+
 		ret = crypto_cipher_decrypt(tfm, sg, 1);
 		if (ret) {
-			printk("des_decrypt() failed flags=%x\n", tfm->crt_flags);
+			printk("des_decrypt() failed flags=%x\n",
+			       tfm->crt_flags);
 			goto out;
 		}
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
-	
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
 	}
 
 	printk("\ntesting des ecb decryption across pages\n");
 
 	i = 6;
-	
+
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
+	memset(xbuf, 0, sizeof (xbuf));
 	memcpy(&xbuf[IDX1], des_tv[i].plaintext, 8);
-	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 8 , 8);
-	
+	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 8, 8);
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 8;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 8;
-	
+
 	ret = crypto_cipher_decrypt(tfm, sg, 2);
 	if (ret) {
 		printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	printk("page 1\n");
 	q = kmap(sg[0].page) + sg[0].offset;
 	hexdump(q, 8);
@@ -859,7 +900,6 @@ void test_des(void)
 	hexdump(q, 8);
 	printk("%s\n", memcmp(q, des_tv[i].result + 8, 8) ? "fail" : "pass");
 
-
 	/*
 	 * Scenario E:
 	 * 
@@ -867,40 +907,40 @@ void test_des(void)
 	 *  [3]  [5 + 7] [1]
 	 *
 	 */
-	printk("\ntesting des ecb decryption chunking scenario E\n"); 
+	printk("\ntesting des ecb decryption chunking scenario E\n");
 	i = 2;
-	
+
 	key = des_tv[i].key;
 	tfm->crt_flags = 0;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	memcpy(&xbuf[IDX1], des_tv[i].plaintext, 3);
 	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 3, 12);
 	memcpy(&xbuf[IDX3], des_tv[i].plaintext + 15, 1);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 3;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 12;
 
 	p = &xbuf[IDX3];
 	sg[2].page = virt_to_page(p);
-	sg[2].offset = ((long)p & ~PAGE_MASK);
+	sg[2].offset = ((long) p & ~PAGE_MASK);
 	sg[2].length = 1;
-	
+
 	ret = crypto_cipher_decrypt(tfm, sg, 3);
 
 	if (ret) {
@@ -933,45 +973,49 @@ void test_des(void)
 
 	printk("\ntesting des cbc encryption (atomic)\n");
 
-	tsize = sizeof(des_cbc_enc_tv_template);
+	tsize = sizeof (des_cbc_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_cbc_enc_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	for (i = 0; i < DES_CBC_ENC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
 
 		tfm->crt_flags |= CRYPTO_TFM_REQ_ATOMIC;
 		key = des_tv[i].key;
-		
+
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		len = des_tv[i].len;
 		p = des_tv[i].plaintext;
-		
+
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
-		
+		crypto_cipher_copy_iv(tfm, des_tv[i].iv,
+				      crypto_tfm_alg_ivsize(tfm));
+
 		ret = crypto_cipher_encrypt(tfm, sg, 1);
 		if (ret) {
-			printk("des_cbc_encrypt() failed flags=%x\n", tfm->crt_flags);
+			printk("des_cbc_encrypt() failed flags=%x\n",
+			       tfm->crt_flags);
 			goto out;
 		}
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
 	}
 
 	crypto_free_tfm(tfm);
@@ -983,48 +1027,48 @@ void test_des(void)
 	 *  [8 + 5]  [3 + 8]
 	 *
 	 */
-	printk("\ntesting des cbc encryption chunking scenario F\n"); 
+	printk("\ntesting des cbc encryption chunking scenario F\n");
 	i = 4;
-	
+
 	tfm = crypto_alloc_tfm("des", CRYPTO_TFM_MODE_CBC);
 	if (tfm == NULL) {
 		printk("failed to load transform for CRYPTO_ALG_DES_CCB\n");
 		return;
 	}
-	
+
 	tfm->crt_flags = 0;
 	key = des_tv[i].key;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
-	
+	memset(xbuf, 0, sizeof (xbuf));
+
 	memcpy(&xbuf[IDX1], des_tv[i].plaintext, 13);
 	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 13, 11);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 13;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 11;
-	
+
 	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
-	
+
 	ret = crypto_cipher_encrypt(tfm, sg, 2);
 	if (ret) {
 		printk("des_cbc_decrypt() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-		
+
 	printk("page 1\n");
 	q = kmap(sg[0].page) + sg[0].offset;
 	hexdump(q, 13);
@@ -1035,14 +1079,14 @@ void test_des(void)
 	hexdump(q, 11);
 	printk("%s\n", memcmp(q, des_tv[i].result + 13, 11) ? "fail" : "pass");
 
-
-	tsize = sizeof(des_cbc_dec_tv_template);
+	tsize = sizeof (des_cbc_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
 	memcpy(tvmem, des_cbc_dec_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	printk("\ntesting des cbc decryption\n");
 
@@ -1051,34 +1095,37 @@ void test_des(void)
 
 		tfm->crt_flags = 0;
 		key = des_tv[i].key;
-		
+
 		ret = crypto_cipher_setkey(tfm, key, 8);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		len = des_tv[i].len;
 		p = des_tv[i].plaintext;
-		
+
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 
-		crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_blocksize(tfm));
-		
+		crypto_cipher_copy_iv(tfm, des_tv[i].iv,
+				      crypto_tfm_alg_blocksize(tfm));
+
 		ret = crypto_cipher_decrypt(tfm, sg, 1);
 		if (ret) {
-			printk("des_cbc_decrypt() failed flags=%x\n", tfm->crt_flags);
+			printk("des_cbc_decrypt() failed flags=%x\n",
+			       tfm->crt_flags);
 			goto out;
 		}
-		
+
 		hexdump(tfm->crt_cipher.cit_iv, 8);
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
 	}
 
 	/*
@@ -1088,35 +1135,35 @@ void test_des(void)
 	 *  [4]  [4]
 	 *
 	 */
-	printk("\ntesting des cbc decryption chunking scenario G\n"); 
+	printk("\ntesting des cbc decryption chunking scenario G\n");
 	i = 3;
-	
+
 	tfm->crt_flags = 0;
 	key = des_tv[i].key;
-	
+
 	ret = crypto_cipher_setkey(tfm, key, 8);
 	if (ret) {
 		printk("setkey() failed flags=%x\n", tfm->crt_flags);
 		goto out;
 	}
-	
+
 	/* setup the dummy buffer first */
-	memset(xbuf, 0, sizeof(xbuf));
+	memset(xbuf, 0, sizeof (xbuf));
 	memcpy(&xbuf[IDX1], des_tv[i].plaintext, 4);
 	memcpy(&xbuf[IDX2], des_tv[i].plaintext + 4, 4);
-	
+
 	p = &xbuf[IDX1];
 	sg[0].page = virt_to_page(p);
-	sg[0].offset = ((long)p & ~PAGE_MASK);
+	sg[0].offset = ((long) p & ~PAGE_MASK);
 	sg[0].length = 4;
-	
+
 	p = &xbuf[IDX2];
 	sg[1].page = virt_to_page(p);
-	sg[1].offset = ((long)p & ~PAGE_MASK);
+	sg[1].offset = ((long) p & ~PAGE_MASK);
 	sg[1].length = 4;
-	
+
 	crypto_cipher_copy_iv(tfm, des_tv[i].iv, crypto_tfm_alg_ivsize(tfm));
-	
+
 	ret = crypto_cipher_decrypt(tfm, sg, 2);
 	if (ret) {
 		printk("des_cbc_decrypt() failed flags=%x\n", tfm->crt_flags);
@@ -1133,32 +1180,34 @@ void test_des(void)
 	hexdump(q, 4);
 	printk("%s\n", memcmp(q, des_tv[i].result + 4, 4) ? "fail" : "pass");
 
-out:
+      out:
 	crypto_free_tfm(tfm);
-	return;	
+	return;
 }
 
-void test_des3_ede(void)
+void
+test_des3_ede(void)
 {
 	int ret, i, len;
 	size_t tsize;
 	char *p, *q;
 	struct crypto_tfm *tfm;
 	char *key;
-	/*char res[8];*/
+	/*char res[8]; */
 	struct des_tv *des_tv;
 	struct scatterlist sg[8];
 
 	printk("\ntesting des3 ede encryption\n");
-	
-	tsize = sizeof(des3_ede_enc_tv_template);
+
+	tsize = sizeof (des3_ede_enc_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, des3_ede_enc_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	tfm = crypto_alloc_tfm("des3_ede", CRYPTO_TFM_MODE_ECB);
 	if (tfm == NULL) {
@@ -1173,39 +1222,41 @@ void test_des3_ede(void)
 		ret = crypto_cipher_setkey(tfm, key, 24);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
-			
+
 			if (!des_tv[i].fail)
 				goto out;
 		}
 
 		len = des_tv[i].len;
-		
+
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 		ret = crypto_cipher_encrypt(tfm, sg, 1);
 		if (ret) {
 			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
 	}
 
 	printk("\ntesting des3 ede decryption\n");
-	
-	tsize = sizeof(des3_ede_dec_tv_template);
+
+	tsize = sizeof (des3_ede_dec_tv_template);
 	if (tsize > TVMEMSIZE) {
-		printk("template (%Zd) too big for tvmem (%d)\n", tsize, TVMEMSIZE);
+		printk("template (%Zd) too big for tvmem (%d)\n", tsize,
+		       TVMEMSIZE);
 		return;
 	}
-	
+
 	memcpy(tvmem, des3_ede_dec_tv_template, tsize);
-	des_tv = (void *)tvmem;
+	des_tv = (void *) tvmem;
 
 	for (i = 0; i < DES3_EDE_DEC_TEST_VECTORS; i++) {
 		printk("test %d:\n", i + 1);
@@ -1214,36 +1265,37 @@ void test_des3_ede(void)
 		ret = crypto_cipher_setkey(tfm, key, 24);
 		if (ret) {
 			printk("setkey() failed flags=%x\n", tfm->crt_flags);
-			
+
 			if (!des_tv[i].fail)
 				goto out;
 		}
 
 		len = des_tv[i].len;
-		
+
 		p = des_tv[i].plaintext;
 		sg[0].page = virt_to_page(p);
-		sg[0].offset = ((long)p & ~PAGE_MASK);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
 		sg[0].length = len;
 		ret = crypto_cipher_decrypt(tfm, sg, 1);
 		if (ret) {
 			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
 			goto out;
 		}
-		
+
 		q = kmap(sg[0].page) + sg[0].offset;
 		hexdump(q, len);
-		
-		printk("%s\n", memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
+
+		printk("%s\n",
+		       memcmp(q, des_tv[i].result, len) ? "fail" : "pass");
 	}
 
-	
-out:
+      out:
 	crypto_free_tfm(tfm);
-	return;	
+	return;
 }
 
-static void do_test(void)
+static void
+do_test(void)
 {
 	switch (mode) {
 
@@ -1266,15 +1318,15 @@ static void do_test(void)
 	case 3:
 		test_des();
 		break;
-		
+
 	case 4:
 		test_des3_ede();
 		break;
-	
+
 	case 5:
 		test_md4();
 		break;
-		
+
 	default:
 		/* useful for debugging */
 		printk("not testing anything\n");
@@ -1282,8 +1334,8 @@ static void do_test(void)
 	}
 }
 
-
-static int __init init(void)
+static int __init
+init(void)
 {
 	tvmem = kmalloc(TVMEMSIZE, GFP_KERNEL);
 	if (tvmem == NULL)
@@ -1294,9 +1346,9 @@ static int __init init(void)
 		kfree(tvmem);
 		return -ENOMEM;
 	}
-	
+
 	do_test();
-	
+
 	kfree(xbuf);
 	kfree(tvmem);
 	return 0;

@@ -166,6 +166,9 @@ struct crypto_tfm {
  * If that fails and the kernel supports dynamically loadable modules, it
  * will then attempt to load a module of the same name or alias.  A refcount
  * is grabbed on the algorithm which is then associated with the new transform.
+ *
+ * crypto_free_tfm() frees up the transform and any associated resources,
+ * then drops the refcount on the associated algorithm.
  */
 struct crypto_tfm *crypto_alloc_tfm(char *alg_name, u32 tfm_flags);
 void crypto_free_tfm(struct crypto_tfm *tfm);
