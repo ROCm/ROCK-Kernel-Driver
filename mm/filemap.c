@@ -73,10 +73,9 @@ void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	if (unlikely(PageDirty(page)) && !PageSwapCache(page))
-		BUG();
+	BUG_ON(PageDirty(page) && !PageSwapCache(page));
 
-	radix_tree_delete(&page->mapping->page_tree, page->index);
+	radix_tree_delete(&mapping->page_tree, page->index);
 	list_del(&page->list);
 	page->mapping = NULL;
 
