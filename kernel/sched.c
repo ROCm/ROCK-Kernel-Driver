@@ -608,7 +608,7 @@ repeat_lock_task:
 				 */
 				p->activated = -1;
 			}
-			if (sync)
+			if (sync && (task_cpu(p) == smp_processor_id()))
 				__activate_task(p, rq);
 			else {
 				activate_task(p, rq);

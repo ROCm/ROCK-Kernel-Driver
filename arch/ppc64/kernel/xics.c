@@ -35,7 +35,6 @@ void xics_disable_irq(u_int irq);
 void xics_mask_and_ack_irq(u_int irq);
 void xics_end_irq(u_int irq);
 void xics_set_affinity(unsigned int irq_nr, cpumask_t cpumask);
-void ppc64_boot_msg(unsigned int src, const char *msg);
 
 struct hw_interrupt_type xics_pic = {
 	" XICS     ",
@@ -214,20 +213,37 @@ xics_ops pSeriesLP_ops = {
 	pSeriesLP_qirr_info
 };
 
+/* XXX Fix this when we clean up large irq support */
+extern cpumask_t get_irq_affinity(unsigned int irq);
+
 void xics_enable_irq(unsigned int irq)
 {
 	long call_status;
 	unsigned int server;
+	cpumask_t cpumask = get_irq_affinity(irq);
+	cpumask_t allcpus = CPU_MASK_ALL;
+	cpumask_t tmp = CPU_MASK_NONE;
 
 	irq = irq_offset_down(irq);
 	if (irq == XICS_IPI)
 		return;
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-	if (smp_threads_ready)
-		server = default_distrib_server;
-	else
+	/* For the moment only implement delivery to all cpus or one cpu */
+	if (smp_threads_ready) {
+		if (cpus_equal(cpumask, allcpus)) {
+			server = default_distrib_server;
+		} else {
+			cpus_and(tmp, cpu_online_map, cpumask);
+
+			if (cpus_empty(tmp))
+				server = default_distrib_server;
+			else
+				server = get_hard_smp_processor_id(first_cpu(tmp));
+		}
+	} else {
 		server = default_server;
+	}
 #else
 	server = default_server;
 #endif
@@ -533,6 +549,7 @@ arch_initcall(xics_setup_i8259);
 #ifdef CONFIG_SMP
 void xics_request_IPIs(void)
 {
+	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(irq_offset_up(XICS_IPI), xics_ipi_action, SA_INTERRUPT, "IPI", 0);
 	get_real_irq_desc(irq_offset_up(XICS_IPI))->status |= IRQ_PER_CPU;
 }
@@ -569,7 +586,7 @@ void xics_set_affinity(unsigned int irq, cpumask_t cpumask)
 		cpus_and(tmp, cpu_online_map, cpumask);
 		if (cpus_empty(tmp))
 			goto out;
-		newmask = get_hard_smp_processor_id(first_cpu(cpumask));
+		newmask = get_hard_smp_processor_id(first_cpu(tmp));
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,

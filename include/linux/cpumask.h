@@ -68,4 +68,20 @@ static inline int next_online_cpu(int cpu, cpumask_t map)
 		cpu < NR_CPUS;						\
 		cpu = next_online_cpu(cpu,map))
 
+static inline int format_cpumask(char *buf, cpumask_t cpus)
+{
+	int k, len = 0;
+
+	for (k = sizeof(cpumask_t)/sizeof(long) - 1; k >= 0; --k) {
+		int m;
+		cpumask_t tmp;
+
+		cpus_shift_right(tmp, cpus, BITS_PER_LONG*k);
+		m = sprintf(buf, "%0*lx", (int)(2*sizeof(long)), cpus_coerce(tmp));
+		len += m;
+		buf += m;
+	}
+	return len;
+}
+
 #endif /* __LINUX_CPUMASK_H */
