@@ -115,7 +115,7 @@ int __ntfs_bitmap_set_bits_in_run(struct inode *vi, const s64 start_bit,
 		len += pos;
 
 	/* If we are not in the last page, deal with all subsequent pages. */
-	while (end_index > index) {
+	while (index < end_index) {
 		BUG_ON(cnt <= 0);
 
 		/* Update @index and get the next page. */
@@ -168,8 +168,11 @@ rollback:
 	 */
 	if (is_rollback)
 		return PTR_ERR(page);
-	pos = __ntfs_bitmap_set_bits_in_run(vi, start_bit, count - cnt,
-			value ? 0 : 1, TRUE);
+	if (count != cnt)
+		pos = __ntfs_bitmap_set_bits_in_run(vi, start_bit, count - cnt,
+				value ? 0 : 1, TRUE);
+	else
+		pos = 0;
 	if (!pos) {
 		/* Rollback was successful. */
 		ntfs_error(vi->i_sb, "Failed to map subsequent page (error "
