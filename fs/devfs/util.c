@@ -87,7 +87,6 @@
 int devfs_register_tape (devfs_handle_t de)
 {
     int pos;
-    devfs_handle_t slave;
     char name[32], dest[64];
     static unsigned int tape_counter;
     int n = tape_counter++;
@@ -96,7 +95,7 @@ int devfs_register_tape (devfs_handle_t de)
     if (pos < 0) return -1;
     strncpy (dest + pos, "../", 3);
     sprintf (name, "tapes/tape%u", n);
-    devfs_mk_symlink (NULL, name, DEVFS_FL_DEFAULT, dest + pos, &slave, NULL);
+    devfs_mk_symlink (name, dest + pos);
     return n;
 }   /*  End Function devfs_register_tape  */
 EXPORT_SYMBOL(devfs_register_tape);

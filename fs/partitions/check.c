@@ -185,7 +185,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 {
 #ifdef CONFIG_DEVFS_FS
 	int pos = 0;
-	devfs_handle_t dir, slave;
+	devfs_handle_t dir;
 	char dirname[64], symlink[16];
 
 	if (dev->flags & GENHD_FL_DEVFS) {
@@ -205,8 +205,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 	}
 	dev->number = devfs_alloc_unique_number (&disc_numspace);
 	sprintf(symlink, "discs/disc%d", dev->number);
-	devfs_mk_symlink(NULL, symlink, DEVFS_FL_DEFAULT,
-			  dirname + pos, &slave, NULL);
+	devfs_mk_symlink(symlink, dirname + pos);
 	dev->disk_de = devfs_register(dir, "disc", 0,
 			    dev->major, dev->first_minor,
 			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
@@ -222,7 +221,6 @@ static void devfs_create_cdrom(struct gendisk *dev)
 	sprintf(vname, "cdroms/cdrom%d", dev->number);
 	if (dev->de) {
 		int pos;
-		devfs_handle_t slave;
 		char rname[64];
 
 		dev->disk_de = devfs_register(dev->de, "cd", DEVFS_FL_DEFAULT,
@@ -233,8 +231,7 @@ static void devfs_create_cdrom(struct gendisk *dev)
 		pos = devfs_generate_path(dev->disk_de, rname+3, sizeof(rname)-3);
 		if (pos >= 0) {
 			strncpy(rname + pos, "../", 3);
-			devfs_mk_symlink(NULL, vname, DEVFS_FL_DEFAULT,
-					 rname + pos, &slave, NULL);
+			devfs_mk_symlink(vname, rname + pos);
 		}
 	} else {
 		dev->disk_de = devfs_register (NULL, vname, DEVFS_FL_DEFAULT,

@@ -1089,8 +1089,6 @@ static struct file_operations _ctl_fops = {
 	.owner	 = THIS_MODULE,
 };
 
-static devfs_handle_t _ctl_handle;
-
 static struct miscdevice _dm_misc = {
 	.minor = MISC_DYNAMIC_MINOR,
 	.name  = DM_NAME,
@@ -1115,8 +1113,7 @@ int __init dm_interface_init(void)
 		return r;
 	}
 
-	r = devfs_mk_symlink(NULL, DM_DIR "/control", DEVFS_FL_DEFAULT,
-			"../misc/" DM_NAME, &_ctl_handle, NULL);
+	r = devfs_mk_symlink(DM_DIR "/control", "../misc/" DM_NAME);
 	if (r) {
 		DMERR("devfs_mk_symlink failed for control device");
 		goto failed;

@@ -41,9 +41,7 @@ extern devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 				      unsigned int major, unsigned int minor,
 				      umode_t mode, void *ops, void *info);
 extern void devfs_unregister (devfs_handle_t de);
-extern int devfs_mk_symlink (devfs_handle_t dir, const char *name,
-			     unsigned int flags, const char *link,
-			     devfs_handle_t *handle, void *info);
+extern int devfs_mk_symlink (const char *name, const char *link);
 extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
@@ -78,9 +76,7 @@ static inline void devfs_unregister (devfs_handle_t de)
 {
     return;
 }
-static inline int devfs_mk_symlink (devfs_handle_t dir, const char *name,
-				    unsigned int flags, const char *link,
-				    devfs_handle_t *handle, void *info)
+static inline int devfs_mk_symlink (const char *name, const char *link)
 {
     return 0;
 }
