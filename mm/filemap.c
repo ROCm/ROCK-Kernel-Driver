@@ -611,7 +611,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
  */
 static inline wait_queue_head_t *page_waitqueue(struct page *page)
 {
-	const zone_t *zone = page_zone(page);
+	const struct zone *zone = page_zone(page);
 
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }

@@ -93,8 +93,9 @@ static inline int is_page_cache_freeable(struct page *page)
 }
 
 static /* inline */ int
-shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
-		unsigned int gfp_mask, int priority, int *max_scan)
+shrink_list(struct list_head *page_list, int nr_pages,
+		struct zone *classzone, unsigned int gfp_mask,
+		int priority, int *max_scan)
 {
 	struct address_space *mapping;
 	LIST_HEAD(ret_pages);
@@ -275,7 +276,7 @@ keep:
  * in the kernel (apart from the copy_*_user functions).
  */
 static /* inline */ int
-shrink_cache(int nr_pages, zone_t *classzone,
+shrink_cache(int nr_pages, struct zone *classzone,
 		unsigned int gfp_mask, int priority, int max_scan)
 {
 	LIST_HEAD(page_list);
@@ -457,7 +458,7 @@ static /* inline */ void refill_inactive(const int nr_pages_in)
 }
 
 static /* inline */ int
-shrink_caches(zone_t *classzone, int priority,
+shrink_caches(struct zone *classzone, int priority,
 		unsigned int gfp_mask, int nr_pages)
 {
 	unsigned long ratio;
@@ -507,7 +508,8 @@ shrink_caches(zone_t *classzone, int priority,
 	return nr_pages;
 }
 
-int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int order)
+int try_to_free_pages(struct zone *classzone,
+		unsigned int gfp_mask, unsigned int order)
 {
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
@@ -530,9 +532,9 @@ int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int ord
 
 DECLARE_WAIT_QUEUE_HEAD(kswapd_wait);
 
-static int check_classzone_need_balance(zone_t * classzone)
+static int check_classzone_need_balance(struct zone *classzone)
 {
-	zone_t * first_classzone;
+	struct zone *first_classzone;
 
 	first_classzone = classzone->zone_pgdat->node_zones;
 	while (classzone >= first_classzone) {
@@ -546,7 +548,7 @@ static int check_classzone_need_balance(zone_t * classzone)
 static int kswapd_balance_pgdat(pg_data_t * pgdat)
 {
 	int need_more_balance = 0, i;
-	zone_t * zone;
+	struct zone *zone;
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {
 		zone = pgdat->node_zones + i;
@@ -584,7 +586,7 @@ static void kswapd_balance(void)
 
 static int kswapd_can_sleep_pgdat(pg_data_t * pgdat)
 {
-	zone_t * zone;
+	struct zone *zone;
 	int i;
 
 	for (i = pgdat->nr_zones-1; i >= 0; i--) {

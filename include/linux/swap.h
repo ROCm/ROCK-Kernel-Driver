@@ -139,7 +139,7 @@ struct task_struct;
 struct vm_area_struct;
 struct sysinfo;
 struct address_space;
-struct zone_t;
+struct zone;
 
 /* linux/mm/rmap.c */
 extern int FASTCALL(page_referenced(struct page *));
@@ -163,7 +163,7 @@ extern void swap_setup(void);
 
 /* linux/mm/vmscan.c */
 extern wait_queue_head_t kswapd_wait;
-extern int FASTCALL(try_to_free_pages(zone_t *, unsigned int, unsigned int));
+extern int try_to_free_pages(struct zone *, unsigned int, unsigned int);
 
 /* linux/mm/page_io.c */
 int swap_readpage(struct file *file, struct page *page);
