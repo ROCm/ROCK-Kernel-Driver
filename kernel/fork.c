@@ -756,7 +756,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		/* ?? should we just memset this ?? */
 		for(i = 0; i < NR_CPUS; i++)
 			p->per_cpu_utime[i] = p->per_cpu_stime[i] = 0;
-		spin_lock_init(&p->sigmask_lock);
 	}
 #endif
 	p->array = NULL;

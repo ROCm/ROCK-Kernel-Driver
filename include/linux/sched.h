@@ -380,7 +380,6 @@ struct task_struct {
 /* namespace */
 	struct namespace *namespace;
 /* signal handlers */
-	spinlock_t sigmask_lock;	/* Protects signal and blocked */
 	struct signal_struct *sig;
 
 	sigset_t blocked, real_blocked, shared_unblocked;
@@ -657,7 +656,6 @@ extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
-extern void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
@@ -955,7 +953,7 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
-   Athread cathreaders should have t->sigmask_lock.  */
+   callers must hold sig->siglock.  */
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);

@@ -649,12 +649,19 @@ out:
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
 	init_sigpending(&newsig->shared_pending);
 
-	remove_thread_group(current, current->sig);
-	spin_lock_irq(&current->sigmask_lock);
+	write_lock_irq(&tasklist_lock);
+	spin_lock(&oldsig->siglock);
+	spin_lock(&newsig->siglock);
+
+	if (current == oldsig->curr_target)
+		oldsig->curr_target = next_thread(current);
 	current->sig = newsig;
 	init_sigpending(&current->pending);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+
+	spin_unlock(&newsig->siglock);
+	spin_unlock(&oldsig->siglock);
+	write_unlock_irq(&tasklist_lock);
 
 	if (atomic_dec_and_test(&oldsig->count))
 		kmem_cache_free(sigact_cachep, oldsig);
@@ -753,12 +760,12 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 mmap_failed:
 flush_failed:
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	if (current->sig != oldsig) {
 		kmem_cache_free(sigact_cachep, current->sig);
 		current->sig = oldsig;
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	return retval;
 }
 

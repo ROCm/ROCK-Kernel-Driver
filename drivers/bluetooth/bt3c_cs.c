@@ -528,19 +528,19 @@ static int bt3c_firmware_load(bt3c_info_t *info)
 	}
 
 	/* Block signals, everything but SIGKILL/SIGSTOP */
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	result = waitpid(pid, NULL, __WCLONE);
 
 	/* Allow signals again */
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = tmpsig;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (result != pid) {
 		printk(KERN_WARNING "bt3c_cs: Waiting for pid %d failed (errno=%d).\n", pid, -result);

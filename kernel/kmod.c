@@ -110,12 +110,12 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	   as the super user right after the execve fails if you time
 	   the signal just right.
 	*/
-	spin_lock_irq(&curtask->sigmask_lock);
+	spin_lock_irq(&curtask->sig->siglock);
 	sigemptyset(&curtask->blocked);
 	flush_signals(curtask);
 	flush_signal_handlers(curtask);
 	recalc_sigpending();
-	spin_unlock_irq(&curtask->sigmask_lock);
+	spin_unlock_irq(&curtask->sig->siglock);
 
 	for (i = 0; i < curtask->files->max_fds; i++ ) {
 		if (curtask->files->fd[i]) close(i);
@@ -238,20 +238,20 @@ int request_module(const char * module_name)
 	}
 
 	/* Block everything but SIGKILL/SIGSTOP */
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	waitpid_result = waitpid(pid, NULL, __WCLONE);
 	atomic_dec(&kmod_concurrent);
 
 	/* Allow signals again.. */
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = tmpsig;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (waitpid_result != pid) {
 		printk(KERN_ERR "request_module[%s]: waitpid(%d,...) failed, errno %d\n",
