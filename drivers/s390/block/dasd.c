@@ -270,7 +270,7 @@ dasd_free_device(dasd_device_t *device)
 		kfree(device->private);
 	free_page((unsigned long) device->erp_mem);
 	free_pages((unsigned long) device->ccw_mem, 1);
-	dasd_gendisk_free(device->gdp);
+	put_disk(device->gdp);
 	kfree(device);
 }
 
