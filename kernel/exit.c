@@ -674,13 +674,19 @@ static void exit_notify(struct task_struct *tsk)
 
 	tsk->state = TASK_ZOMBIE;
 	/*
-	 * No need to unlock IRQs, we'll schedule() immediately
-	 * anyway. In the preemption case this also makes it
-	 * impossible for the task to get runnable again (thus
-	 * the "_raw_" unlock - to make sure we don't try to
-	 * preempt here).
+	 * In the preemption case it must be impossible for the task
+	 * to get runnable again, so use "_raw_" unlock to keep
+	 * preempt_count elevated until we schedule().
+	 *
+	 * To avoid deadlock on SMP, interrupts must be unmasked.  If we
+	 * don't, subsequently called functions (e.g, wait_task_inactive()
+	 * via release_task()) will spin, with interrupt flags
+	 * unwittingly blocked, until the other task sleeps.  That task
+	 * may itself be waiting for smp_call_function() to answer and
+	 * complete, and with interrupts blocked that will never happen.
 	 */
 	_raw_write_unlock(&tasklist_lock);
+	local_irq_enable();
 }
 
 NORET_TYPE void do_exit(long code)
@@ -727,7 +733,6 @@ NORET_TYPE void do_exit(long code)
 
 	tsk->exit_code = code;
 	exit_notify(tsk);
-	preempt_disable();
 
 	if (tsk->exit_signal == -1)
 		release_task(tsk);
