@@ -51,7 +51,7 @@ static inline void __save_init_fpu( struct task_struct *tsk )
 #define __clear_fpu( tsk )					\
 do {								\
 	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
-		asm volatile("fwait");				\
+		asm volatile("fnclex ; fwait");				\
 		(tsk)->thread_info->status &= ~TS_USEDFPU;	\
 		stts();						\
 	}							\
