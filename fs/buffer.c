@@ -368,9 +368,9 @@ asmlinkage long sys_sync(void)
 	sync_buffers(NODEV, 0);
 
 	lock_kernel();
-	sync_inodes(NODEV);
+	sync_inodes();
 	DQUOT_SYNC(NULL);
-	sync_supers(NODEV);
+	sync_supers();
 	unlock_kernel();
 
 	sync_buffers(NODEV, 1);
@@ -2617,7 +2617,7 @@ static int sync_old_buffers(void)
 {
 	lock_kernel();
 	sync_unlocked_inodes();
-	sync_supers(NODEV);
+	sync_supers();
 	unlock_kernel();
 
 	for (;;) {
