@@ -71,13 +71,6 @@ char saved_command_line[CL_SIZE];
 char m68k_debug_device[6] = "";
 
 void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *)) __initdata = NULL;
-/* machine dependent keyboard functions */
-#ifdef CONFIG_VT
-int (*mach_keyb_init) (void) __initdata = NULL;
-int (*mach_kbdrate) (struct kbd_repeat *) = NULL;
-void (*mach_kbd_leds) (unsigned int) = NULL;
-int (*mach_kbd_translate)(unsigned char scancode, unsigned char *keycode, char raw_mode) = NULL;
-#endif
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) __initdata = NULL;
 void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
@@ -89,6 +82,8 @@ void (*mach_process_int) (int, struct pt_regs *) = NULL;
 unsigned long (*mach_gettimeoffset) (void);
 int (*mach_hwclk) (int, struct rtc_time*) = NULL;
 int (*mach_set_clock_mmss) (unsigned long) = NULL;
+int (*mach_get_rtc_pll)(struct rtc_pll_info *) = NULL;
+int (*mach_set_rtc_pll)(struct rtc_pll_info *) = NULL;
 void (*mach_reset)( void );
 void (*mach_halt)( void ) = NULL;
 void (*mach_power_off)( void ) = NULL;
@@ -103,15 +98,9 @@ EXPORT_SYMBOL(mach_heartbeat);
 #ifdef CONFIG_M68K_L2_CACHE
 void (*mach_l2_flush) (int) = NULL;
 #endif
-
-#ifdef CONFIG_MAGIC_SYSRQ
-unsigned int SYSRQ_KEY;
-int mach_sysrq_key = -1;
-int mach_sysrq_shift_state = 0;
-int mach_sysrq_shift_mask = 0;
-char *mach_sysrq_xlate = NULL;
+#ifdef CONFIG_INPUT_M68K_BEEP
+void (*mach_beep)(unsigned int, unsigned int) = NULL;
 #endif
-
 #if defined(CONFIG_ISA) && defined(MULTI_ISA)
 int isa_type;
 int isa_sex;

@@ -17,7 +17,6 @@
 #include <linux/init.h>
 #include <asm/machdep.h>
 #include <asm/blinken.h>
-#include <asm/io.h>                               /* readb() and writeb() */
 #include <asm/hwtest.h>                           /* hwreg_present() */
 
 #include "ints.h"
@@ -26,14 +25,6 @@
 extern void hp300_reset(void);
 extern void (*hp300_default_handler[])(int, void *, struct pt_regs *);
 extern int show_hp300_interrupts(struct seq_file *, void *);
-
-#ifdef CONFIG_VT
-extern int hp300_keyb_init(void);
-static int hp300_kbdrate(struct kbd_repeat *k)
-{
-  return 0;
-}
-#endif
 
 #ifdef CONFIG_HEARTBEAT
 static void hp300_pulse(int x)
@@ -53,10 +44,6 @@ static void hp300_get_model(char *model)
 void __init config_hp300(void)
 {
   mach_sched_init      = hp300_sched_init;
-#ifdef CONFIG_VT
-  mach_keyb_init       = hp300_keyb_init;
-  mach_kbdrate         = hp300_kbdrate;
-#endif
   mach_init_IRQ        = hp300_init_IRQ;
   mach_request_irq     = hp300_request_irq;
   mach_free_irq        = hp300_free_irq;
