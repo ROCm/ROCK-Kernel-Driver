@@ -4123,10 +4123,10 @@ static int snd_hdsp_prepare(snd_pcm_substream_t *substream)
 		return -EIO;
 	}
 
-	spin_lock_irq(&hdsp->lock);
+	spin_lock(&hdsp->lock);
 	if (!hdsp->running)
 		hdsp_reset_hw_pointer(hdsp);
-	spin_unlock_irq(&hdsp->lock);
+	spin_unlock(&hdsp->lock);
 	return result;
 }
 
