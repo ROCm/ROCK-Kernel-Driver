@@ -131,23 +131,7 @@ extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *);
 extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *);
 
 typedef struct {
-  unsigned long seqerrs;
-  unsigned long frame_drops;
-  unsigned long overflows;
-  unsigned long max_queue_len;
-} isdn_mppp_stats;
-
-typedef struct {
   int mp_mrru;                        /* unused                             */
-  struct sk_buff * frags;	/* fragments sl list -- use skb->next */
-  long frames;			/* number of frames in the frame list */
-  unsigned int seq;		/* last processed packet seq #: any packets
-  				 * with smaller seq # will be dropped
-				 * unconditionally */
-  spinlock_t lock;
-  int ref_ct;				 
-  /* statistics */
-  isdn_mppp_stats stats;
 } ippp_bundle;
 
 #define IPPP_MAX_RQ_LEN     8

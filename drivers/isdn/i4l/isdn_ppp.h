@@ -27,6 +27,12 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,
 int
 isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto);
 
+void
+ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
+
+void
+ippp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
+
 struct sk_buff *
 isdn_ppp_dev_alloc_skb(void *priv, int len, int gfp_mask);
 

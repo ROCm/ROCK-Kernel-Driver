@@ -459,11 +459,12 @@ isdn_net_addslave(char *parm)
 
 	rtnl_lock();
 
-	if (netif_running(&mlp->dev))
-		return -EBUSY;
-
+	if (netif_running(&mlp->dev)) {
+		retval = -EBUSY;
+		goto out;
+	}
 	retval = isdn_net_addif(p, mlp);
-	
+ out:	
 	rtnl_unlock();
 	return retval;
 }
@@ -814,6 +815,29 @@ isdn_net_dial_out(char *name)
 	return isdn_net_dial(idev);
 }
 
+static int
+__isdn_net_dial_slave(isdn_net_local *mlp)
+{
+	isdn_net_dev *idev;
+
+	list_for_each_entry(idev, &mlp->slaves, slaves) {
+		if (isdn_net_dial(idev) == 0)
+			return 0;
+	}
+	return -EBUSY;
+}
+
+static int
+isdn_net_dial_slave(char *name)
+{
+	isdn_net_dev *idev = isdn_net_findif(name);
+
+	if (!idev)
+		return -ENODEV;
+
+	return __isdn_net_dial_slave(idev->mlp);
+}
+
 /*
  * Force a hangup of a network-interface.
  */
@@ -972,22 +996,20 @@ isdn_net_ioctl(struct inode *ino, struct file *file, uint cmd, ulong arg)
 		}
 		retval = isdn_net_getpeer(&phone, (isdn_net_ioctl_phone *) arg);
 		break;
-#ifdef CONFIG_ISDN_PPP
 	case IIOCNETALN: /* Add link */
 		if (copy_from_user(name, (char *) arg, sizeof(name))) {
 			retval = -EFAULT;
 			break;
 		}
-		retval = isdn_ppp_dial_slave(name);
+		retval = isdn_net_dial_slave(name);
 		break;
 	case IIOCNETDLN: /* Delete link */
 		if (copy_from_user(name, (char *) arg, sizeof(name))) {
 			retval = -EFAULT;
 			break;
 		}
-		retval = isdn_ppp_hangup_slave(name);
+		retval = isdn_net_force_hangup(name);
 		break;
-#endif
 	default:
 		retval = -ENOTTY;
 	}
@@ -1346,22 +1368,6 @@ isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev)
 	isdn_net_unreachable(ndev, skb, "dial rejected");
 	dev_kfree_skb(skb);
 	return 0;
-}
-
-
-static void
-isdn_net_dial_slave(isdn_net_local *mlp)
-{
-	isdn_net_dev *idev;
-
-	if (ISDN_NET_DIALMODE(*mlp) != ISDN_NET_DM_AUTO)
-		return;
-
-	list_for_each_entry(idev, &mlp->slaves, slaves) {
-		if (fsm_event(&idev->fi, EV_DO_DIAL, NULL) != -ESRCH) {
-			break;
-		}
-	}
 }
 
 static int
@@ -2224,7 +2230,8 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		} else {
 			/* subsequent overload: if slavedelay exceeded, start dialing */
 			if (time_after(jiffies, idev->sqfull_stamp + mlp->slavedelay)) {
-				isdn_net_dial_slave(mlp);
+				if (ISDN_NET_DIALMODE(*mlp) == ISDN_NET_DM_AUTO)
+					__isdn_net_dial_slave(mlp);
 			}
 		}
 	} else {

@@ -312,6 +312,13 @@ struct isdn_netif_ops {
 	void                    (*close)(struct isdn_net_local_s *);
 };
 
+typedef struct {
+  unsigned long seqerrs;
+  unsigned long frame_drops;
+  unsigned long overflows;
+  unsigned long max_queue_len;
+} isdn_mppp_stats;
+
 /* Local interface-data */
 typedef struct isdn_net_local_s {
   ulong                  magic;
@@ -357,8 +364,12 @@ typedef struct isdn_net_local_s {
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
 #endif
 #ifdef CONFIG_ISDN_PPP
-  unsigned int           mpppcfg;
-  long                   mp_seqno;
+  unsigned int           mp_cfg;
+  u32                    mp_txseq;
+  struct sk_buff_head    mp_frags;     /* fragments sl list */
+  u32                    mp_rxseq;     /* last processed packet seq #: any 
+					  packets with smaller seq # will 
+					  be dropped unconditionally       */
   struct ippp_ccp        *ccp;
   unsigned long          debug;
 #ifdef CONFIG_ISDN_PPP_VJ
@@ -427,7 +438,7 @@ typedef struct isdn_net_dev_s {
   struct list_head       global_list;  /* global list of all isdn_net_devs */
 #ifdef CONFIG_ISDN_PPP
   unsigned int           pppcfg;
-  unsigned int           pppseq;       /* last seq no seen                 */
+  u32                    mp_rxseq;     /* last seq no seen on this channel */
   struct ippp_ccp        *ccp;
   unsigned long          debug;
 
