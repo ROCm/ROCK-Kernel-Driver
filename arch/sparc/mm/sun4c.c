@@ -2194,7 +2194,7 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(pte_alloc_one_kernel, sun4c_pte_alloc_one_kernel, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_alloc_one, sun4c_pte_alloc_one, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_pmd_fast, sun4c_free_pmd_fast, BTFIXUPCALL_NOP);
-	BTFIXUPSET_CALL(pmd_alloc_one, sun4c_lpmd_alloc_one, BTFIXUPCALL_RETO0);
+	BTFIXUPSET_CALL(pmd_alloc_one, sun4c_pmd_alloc_one, BTFIXUPCALL_RETO0);
 	BTFIXUPSET_CALL(free_pgd_fast, sun4c_free_pgd_fast, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(get_pgd_fast, sun4c_get_pgd_fast, BTFIXUPCALL_NORM);
 
