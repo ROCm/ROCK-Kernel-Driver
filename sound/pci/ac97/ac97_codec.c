@@ -118,7 +118,6 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4770, 0xfffffff0, "ALC203",		NULL,		NULL },
 { 0x434d4941, 0xffffffff, "CMI9738",		patch_cm9738,	NULL },
 { 0x434d4961, 0xffffffff, "CMI9739",		patch_cm9739,	NULL },
-{ 0x434d4983, 0xffffffff, "CMI9739A",		patch_cm9739,	NULL },
 { 0x434d4978, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
 { 0x434d4982, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
 { 0x434d4983, 0xffffffff, "CMI9761",		patch_cm9761,	NULL },
@@ -1292,7 +1291,11 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 	/* build master controls */
 	/* AD claims to remove this control from AD1887, although spec v2.2 does not allow this */
 	if (snd_ac97_try_volume_mix(ac97, AC97_MASTER)) {
-		if ((err = snd_ac97_cmix_new(card, "Master Playback", AC97_MASTER, ac97)) < 0)
+		if (ac97->flags & AC97_HAS_NO_MASTER_VOL)
+			err = snd_ac97_cmute_new(card, "Master Playback Switch", AC97_MASTER, ac97);
+		else
+			err = snd_ac97_cmix_new(card, "Master Playback", AC97_MASTER, ac97);
+		if (err < 0)
 			return err;
 	}
 
@@ -1429,7 +1432,11 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 		}
 		snd_ac97_write_cache(ac97, AC97_PCM, init_val);
 	} else {
-		if ((err = snd_ac97_cmix_new(card, "PCM Playback", AC97_PCM, ac97)) < 0)
+		if (ac97->flags & AC97_HAS_NO_PCM_VOL)
+			err = snd_ac97_cmute_new(card, "PCM Playback Switch", AC97_PCM, ac97);
+		else
+			err = snd_ac97_cmix_new(card, "PCM Playback", AC97_PCM, ac97);
+		if (err < 0)
 			return err;
 	}
 

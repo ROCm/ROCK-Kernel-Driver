@@ -364,6 +364,8 @@
 #define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
 #define AC97_STEREO_MUTES	(1<<4)	/* has stereo mute bits */
 #define AC97_DOUBLE_RATE	(1<<5)	/* supports double rate playback */
+#define AC97_HAS_NO_MASTER_VOL	(1<<6)	/* no Master volume */
+#define AC97_HAS_NO_PCM_VOL	(1<<7)	/* no PCM volume */
 
 /* rates indexes */
 #define AC97_RATES_FRONT_DAC	0

@@ -1755,6 +1755,11 @@ static struct snd_ac97_build_ops patch_cm9738_ops = {
 int patch_cm9738(ac97_t * ac97)
 {
 	ac97->build_ops = &patch_cm9738_ops;
+	/* FIXME: can anyone confirm below? */
+	/* CM9738 has no PCM volume although the register reacts */
+	ac97->flags |= AC97_HAS_NO_PCM_VOL;
+	snd_ac97_write_cache(ac97, AC97_PCM, 0x8000);
+
 	return 0;
 }
 
@@ -1858,6 +1863,11 @@ int patch_cm9739(ac97_t * ac97)
 	unsigned short val;
 
 	ac97->build_ops = &patch_cm9739_ops;
+
+	/* CM9739/A has no Master and PCM volume although the register reacts */
+	ac97->flags |= AC97_HAS_NO_MASTER_VOL | AC97_HAS_NO_PCM_VOL;
+	snd_ac97_write_cache(ac97, AC97_MASTER, 0x8000);
+	snd_ac97_write_cache(ac97, AC97_PCM, 0x8000);
 
 	/* check spdif */
 	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
@@ -1973,6 +1983,11 @@ static struct snd_ac97_build_ops patch_cm9761_ops = {
 int patch_cm9761(ac97_t *ac97)
 {
 	unsigned short val;
+
+	/* CM9761 has no Master and PCM volume although the register reacts */
+	ac97->flags |= AC97_HAS_NO_MASTER_VOL | AC97_HAS_NO_PCM_VOL;
+	snd_ac97_write_cache(ac97, AC97_MASTER, 0x8000);
+	snd_ac97_write_cache(ac97, AC97_PCM, 0x8000);
 
 	ac97->spec.dev_flags = 0; /* 1 = model 82 revision B */
 	if (ac97->id == AC97_ID_CM9761_82) {
