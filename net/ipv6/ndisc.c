@@ -277,25 +277,21 @@ static int ndisc_constructor(struct neighbour *neigh)
 	struct in6_addr *addr = (struct in6_addr*)&neigh->primary_key;
 	struct net_device *dev = neigh->dev;
 	struct inet6_dev *in6_dev = in6_dev_get(dev);
-	int addr_type;
+	int is_multicast = ipv6_addr_is_multicast(addr);
 
 	if (in6_dev == NULL)
 		return -EINVAL;
 
-	addr_type = ipv6_addr_type(addr);
 	if (in6_dev->nd_parms)
 		neigh->parms = in6_dev->nd_parms;
 
-	if (addr_type&IPV6_ADDR_MULTICAST)
-		neigh->type = RTN_MULTICAST;
-	else
-		neigh->type = RTN_UNICAST;
+	neigh->type = is_multicast ? RTN_MULTICAST : RTN_UNICAST;
 	if (dev->hard_header == NULL) {
 		neigh->nud_state = NUD_NOARP;
 		neigh->ops = &ndisc_direct_ops;
 		neigh->output = neigh->ops->queue_xmit;
 	} else {
-		if (addr_type&IPV6_ADDR_MULTICAST) {
+		if (is_multicast) {
 			neigh->nud_state = NUD_NOARP;
 			ndisc_mc_map(addr, neigh->ha, dev, 1);
 		} else if (dev->flags&(IFF_NOARP|IFF_LOOPBACK)) {
@@ -355,7 +351,7 @@ ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
 	unsigned char *h_dest = NULL;
 
 	if (dev->hard_header) {
-		if (ipv6_addr_type(daddr) & IPV6_ADDR_MULTICAST) {
+		if (ipv6_addr_is_multicast(daddr)) {
 			ndisc_mc_map(daddr, ha, dev, 1);
 			h_dest = ha;
 		} else if (neigh) {
@@ -545,7 +541,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	}
 
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
-	send_llinfo = dev->addr_len && ipv6_addr_type(saddr) != IPV6_ADDR_ANY;
+	send_llinfo = dev->addr_len && !ipv6_addr_any(saddr);
 	if (send_llinfo)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
@@ -714,7 +710,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	struct neighbour *neigh;
 	int addr_type = ipv6_addr_type(saddr);
 
-	if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
+	if (ipv6_addr_is_multicast(&msg->target)) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "ICMP NS: target address is multicast\n");
 		return;
@@ -800,9 +796,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		}
 
 		if (addr_type & IPV6_ADDR_UNICAST) {
-			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
-
-			if (inc)
+			if (ipv6_addr_is_multicast(daddr))
 				nd_tbl.stats.rcv_probes_mcast++;
 			else
 				nd_tbl.stats.rcv_probes_ucast++;
@@ -844,7 +838,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		}
 
 		if (addr_type & IPV6_ADDR_UNICAST) {
-			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
+			int inc = ipv6_addr_is_multicast(daddr);
 			if (inc)  
 				nd_tbl.stats.rcv_probes_mcast++;
 			else
@@ -873,7 +867,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		    (addr_type & IPV6_ADDR_UNICAST ||
 		     addr_type == IPV6_ADDR_ANY) &&
 		    pneigh_lookup(&nd_tbl, &msg->target, dev, 0)) {
-			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
+			int inc = ipv6_addr_is_multicast(daddr);
 
 			if (skb->stamp.tv_sec == 0 ||
 			    skb->pkt_type == PACKET_HOST ||
@@ -932,13 +926,13 @@ static void ndisc_recv_na(struct sk_buff *skb)
 		return;
 	}
 
-	if (ipv6_addr_type(&msg->target)&IPV6_ADDR_MULTICAST) {
+	if (ipv6_addr_is_multicast(&msg->target)) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "NDISC NA: target address is multicast\n");
 		return;
 	}
 
-	if ((ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST) &&
+	if (ipv6_addr_is_multicast(daddr) &&
 	    msg->icmph.icmp6_solicited) {
 		ND_PRINTK0("NDISC: solicited NA is multicasted\n");
 		return;
@@ -1232,7 +1226,7 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	target = (struct in6_addr *) (icmph + 1);
 	dest = target + 1;
 
-	if (ipv6_addr_type(dest) & IPV6_ADDR_MULTICAST) {
+	if (ipv6_addr_is_multicast(dest)) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "ICMP redirect for multicast addr\n");
 		return;

@@ -1,7 +1,7 @@
 /*
  * netfilter module for userspace packet logging daemons
  *
- * (C) 2000-2002 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2000-2002 by Harald Welte <laforge@netfilter.org>
  *
  * 2000/09/22 ulog-cprange feature added
  * 2001/01/04 in-kernel queue as proposed by Sebastian Zander 
@@ -14,7 +14,12 @@
  * 2002/08/29 fix shifted/unshifted nlgroup bug -HW
  * 2002/10/30 fix uninitialized mac_len field - <Anders K. Pedersen>
  *
- * Released under the terms of the GPL
+ * (C) 1999-2001 Paul `Rusty' Russell
+ * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This module accepts two parameters: 
  * 

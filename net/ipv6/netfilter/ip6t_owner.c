@@ -1,8 +1,13 @@
 /* Kernel module to match various things tied to sockets associated with
-   locally generated outgoing packets.
+   locally generated outgoing packets. */
 
-   Copyright (C) 2000,2001 Marc Boucher
+/* (C) 2000-2001 Marc Boucher <marc@mbsi.ca>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/file.h>
