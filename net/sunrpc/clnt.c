@@ -43,6 +43,7 @@
 static DECLARE_WAIT_QUEUE_HEAD(destroy_wait);
 
 
+static void	call_start(struct rpc_task *task);
 static void	call_reserve(struct rpc_task *task);
 static void	call_reserveresult(struct rpc_task *task);
 static void	call_allocate(struct rpc_task *task);
@@ -326,13 +327,9 @@ rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 		rpcauth_bindcred(task);
 
 	if (task->tk_status == 0)
-		task->tk_action = call_reserve;
+		task->tk_action = call_start;
 	else
 		task->tk_action = NULL;
-
-	/* Increment call count */
-	if (task->tk_msg.rpc_proc < task->tk_client->cl_maxproc)
-		rpcproc_count(task->tk_client, task->tk_msg.rpc_proc)++;
 }
 
 void
@@ -359,8 +356,36 @@ rpc_restart_call(struct rpc_task *task)
 	if (RPC_ASSASSINATED(task))
 		return;
 
+	task->tk_action = call_start;
+}
+
+/*
+ * 0.  Initial state
+ *
+ *     Other FSM states can be visited zero or more times, but
+ *     this state is visited exactly once for each RPC.
+ */
+static void
+call_start(struct rpc_task *task)
+{
+	struct rpc_clnt	*clnt = task->tk_client;
+
+	if (task->tk_msg.rpc_proc > clnt->cl_maxproc) {
+		printk(KERN_ERR "%s (vers %d): bad procedure number %d\n",
+				clnt->cl_protname, clnt->cl_vers,
+				task->tk_msg.rpc_proc);
+		rpc_exit(task, -EIO);
+		return;
+	}
+
+	dprintk("RPC: %4d call_start %s%d proc %d (%s)\n", task->tk_pid,
+		clnt->cl_protname, clnt->cl_vers, task->tk_msg.rpc_proc,
+		(RPC_IS_ASYNC(task) ? "async" : "sync"));
+
+	/* Increment call count */
+	rpcproc_count(clnt, task->tk_msg.rpc_proc)++;
+	clnt->cl_stats->rpccnt++;
 	task->tk_action = call_reserve;
-	rpcproc_count(task->tk_client, task->tk_msg.rpc_proc)++;
 }
 
 /*
@@ -371,14 +396,8 @@ call_reserve(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
 
-	if (task->tk_msg.rpc_proc > clnt->cl_maxproc) {
-		printk(KERN_WARNING "%s (vers %d): bad procedure number %d\n",
-			clnt->cl_protname, clnt->cl_vers, task->tk_msg.rpc_proc);
-		rpc_exit(task, -EIO);
-		return;
-	}
-
 	dprintk("RPC: %4d call_reserve\n", task->tk_pid);
+
 	if (!rpcauth_uptodatecred(task)) {
 		task->tk_action = call_refresh;
 		return;
@@ -387,7 +406,6 @@ call_reserve(struct rpc_task *task)
 	task->tk_status  = 0;
 	task->tk_action  = call_reserveresult;
 	task->tk_timeout = clnt->cl_timeout.to_resrvval;
-	clnt->cl_stats->rpccnt++;
 	xprt_reserve(task);
 }
 
@@ -645,7 +663,6 @@ call_status(struct rpc_task *task)
 	case -ENOMEM:
 	case -EAGAIN:
 		task->tk_action = call_transmit;
-		clnt->cl_stats->rpcretrans++;
 		break;
 	default:
 		if (clnt->cl_chatty)
