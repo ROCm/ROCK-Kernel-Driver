@@ -163,8 +163,7 @@ static void io_err_dtr(struct dm_target *ti)
 
 static int io_err_map(struct dm_target *ti, struct bio *bio)
 {
-	bio_io_error(bio, 0);
-	return 0;
+	return -EIO;
 }
 
 static struct target_type error_target = {
