@@ -16,7 +16,7 @@
 int atm_charge(struct atm_vcc *vcc,int truesize)
 {
 	atm_force_charge(vcc,truesize);
-	if (atomic_read(&vcc->rx_inuse) <= vcc->sk->rcvbuf) return 1;
+	if (atomic_read(&vcc->sk->rmem_alloc) <= vcc->sk->rcvbuf) return 1;
 	atm_return(vcc,truesize);
 	atomic_inc(&vcc->stats->rx_drop);
 	return 0;
@@ -29,11 +29,11 @@ struct sk_buff *atm_alloc_charge(struct atm_vcc *vcc,int pdu_size,
 	int guess = atm_guess_pdu2truesize(pdu_size);
 
 	atm_force_charge(vcc,guess);
-	if (atomic_read(&vcc->rx_inuse) <= vcc->sk->rcvbuf) {
+	if (atomic_read(&vcc->sk->rmem_alloc) <= vcc->sk->rcvbuf) {
 		struct sk_buff *skb = alloc_skb(pdu_size,gfp_flags);
 
 		if (skb) {
-			atomic_add(skb->truesize-guess,&vcc->rx_inuse);
+			atomic_add(skb->truesize-guess,&vcc->sk->rmem_alloc);
 			return skb;
 		}
 	}

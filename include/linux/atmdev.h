@@ -277,7 +277,6 @@ enum {
 
 struct atm_vcc {
 	unsigned long	flags;		/* VCC flags (ATM_VF_*) */
-	unsigned char	family;		/* address family; 0 if unused */
 	short		vpi;		/* VPI and VCI (types must be equal */
 					/* with sockaddr) */
 	int 		vci;
@@ -286,7 +285,6 @@ struct atm_vcc {
 	struct atm_dev	*dev;		/* device back pointer */
 	struct atm_qos	qos;		/* QOS */
 	struct atm_sap	sap;		/* SAP */
-	atomic_t	tx_inuse,rx_inuse; /* buffer space in use */
 	void (*push)(struct atm_vcc *vcc,struct sk_buff *skb);
 	void (*pop)(struct atm_vcc *vcc,struct sk_buff *skb); /* optional */
 	struct sk_buff *(*alloc_tx)(struct atm_vcc *vcc,unsigned int size);
@@ -297,7 +295,6 @@ struct atm_vcc {
 	int (*send)(struct atm_vcc *vcc,struct sk_buff *skb);
 	void		*dev_data;	/* per-device data */
 	void		*proto_data;	/* per-protocol data */
-	struct sk_buff_head recvq;	/* receive queue */
 	struct k_atm_aal_stats *stats;	/* pointer to AAL stats group */
 	wait_queue_head_t sleep;	/* if socket is busy */
 	struct sock	*sk;		/* socket backpointer */
@@ -346,7 +343,7 @@ struct atm_dev {
 	struct proc_dir_entry *proc_entry; /* proc entry */
 	char *proc_name;		/* proc entry name */
 #endif
-	struct atm_dev	*prev,*next;	/* linkage */
+	struct list_head dev_list;	/* linkage */
 };
 
 
@@ -425,19 +422,19 @@ static __inline__ int atm_guess_pdu2truesize(int pdu_size)
 
 static __inline__ void atm_force_charge(struct atm_vcc *vcc,int truesize)
 {
-	atomic_add(truesize+ATM_PDU_OVHD,&vcc->rx_inuse);
+	atomic_add(truesize+ATM_PDU_OVHD,&vcc->sk->rmem_alloc);
 }
 
 
 static __inline__ void atm_return(struct atm_vcc *vcc,int truesize)
 {
-	atomic_sub(truesize+ATM_PDU_OVHD,&vcc->rx_inuse);
+	atomic_sub(truesize+ATM_PDU_OVHD,&vcc->sk->rmem_alloc);
 }
 
 
 static __inline__ int atm_may_send(struct atm_vcc *vcc,unsigned int size)
 {
-	return size+atomic_read(&vcc->tx_inuse)+ATM_PDU_OVHD < vcc->sk->sndbuf;
+	return size+atomic_read(&vcc->sk->wmem_alloc)+ATM_PDU_OVHD < vcc->sk->sndbuf;
 }
 
 
