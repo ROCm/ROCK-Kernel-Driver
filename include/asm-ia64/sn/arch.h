@@ -22,8 +22,6 @@
  */
 #define MAX_COMPACT_NODES       2048
 
-typedef u64	nic_t;
-
 extern void sn_flush_all_caches(long addr, long bytes);
 
 #endif /* _ASM_IA64_SN_ARCH_H */
