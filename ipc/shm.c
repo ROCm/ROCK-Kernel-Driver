@@ -361,27 +361,35 @@ static inline unsigned long copy_shminfo_to_user(void *buf, struct shminfo64 *in
 	}
 }
 
-static void shm_get_stat (unsigned long *rss, unsigned long *swp) 
+static void shm_get_stat(unsigned long *rss, unsigned long *swp) 
 {
-	struct shmem_inode_info *info;
 	int i;
 
 	*rss = 0;
 	*swp = 0;
 
-	for(i = 0; i <= shm_ids.max_id; i++) {
-		struct shmid_kernel* shp;
-		struct inode * inode;
+	for (i = 0; i <= shm_ids.max_id; i++) {
+		struct shmid_kernel *shp;
+		struct inode *inode;
 
 		shp = shm_get(i);
-		if(shp == NULL)
+		if(!shp)
 			continue;
+
 		inode = shp->shm_file->f_dentry->d_inode;
-		info = SHMEM_I(inode);
-		spin_lock (&info->lock);
-		*rss += inode->i_mapping->nrpages;
-		*swp += info->swapped;
-		spin_unlock (&info->lock);
+
+		if (is_file_hugepages(shp->shm_file)) {
+			struct address_space *mapping = inode->i_mapping;
+			spin_lock(&mapping->page_lock);
+			*rss += (HPAGE_SIZE/PAGE_SIZE)*mapping->nrpages;
+			spin_unlock(&mapping->page_lock);
+		} else {
+			struct shmem_inode_info *info = SHMEM_I(inode);
+			spin_lock(&info->lock);
+			*rss += inode->i_mapping->nrpages;
+			*swp += info->swapped;
+			spin_unlock(&info->lock);
+		}
 	}
 }
 
