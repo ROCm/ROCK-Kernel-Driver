@@ -18,7 +18,6 @@
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_cpuid.h>
 
-extern cpuid_t master_procid;
 int		maxcpus;
 
 extern xwidgetnum_t hub_widget_id(nasid_t);

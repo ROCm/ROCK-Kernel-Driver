@@ -7,4 +7,4 @@
 #
 # Makefile for the sn2 io routines.
 
-obj-y				+=  sgi_io_init.o irix_io_init.o
+obj-y				+=  sgi_io_init.o
