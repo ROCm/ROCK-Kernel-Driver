@@ -36,7 +36,7 @@ ifeq ($(filter $(subdir-y),oss),oss)
   obj-y += oss/_oss.o
 endif
 
-obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o
+obj-$(CONFIG_SND_PCM_OSS) += snd-pcm.o snd-timer.o
 
 subdir-$(CONFIG_SND_SEQUENCER) += seq
 ifeq ($(CONFIG_SND_SEQUENCER),y)
