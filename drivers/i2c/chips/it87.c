@@ -500,7 +500,7 @@ static ssize_t set_fan_div(struct device *dev, const char *buf,
 		else
 			data->fan_div[nr] = 3;
 	}
-	val = old & 0x100;
+	val = old & 0x80;
 	val |= (data->fan_div[0] & 0x07);
 	val |= (data->fan_div[1] & 0x07) << 3;
 	if (data->fan_div[2] == 3)
@@ -703,6 +703,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	int err = 0;
 	const char *name = "";
 	int is_isa = i2c_is_isa_adapter(adapter);
+	int enable_pwm_interface;
+	int tmp;
 
 	if (!is_isa && 
 	    !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
@@ -812,6 +814,17 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the IT87 chip */
 	it87_init_client(new_client, data);
 
+	/* Some BIOSes fail to correctly configure the IT87 fans. All fans off
+	 * and polarity set to active low is sign that this is the case so we
+	 * disable pwm control to protect the user. */
+	enable_pwm_interface = 1;
+	tmp = it87_read_value(new_client, IT87_REG_FAN_CTL);
+	if ((tmp & 0x87) == 0) {
+		enable_pwm_interface = 0;
+		dev_info(&new_client->dev,
+			"detected broken BIOS defaults, disabling pwm interface");
+	}
+
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in0_input);
 	device_create_file(&new_client->dev, &dev_attr_in1_input);
@@ -860,12 +873,14 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan2_div);
 	device_create_file(&new_client->dev, &dev_attr_fan3_div);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
-	device_create_file(&new_client->dev, &dev_attr_pwm1_enable);
-	device_create_file(&new_client->dev, &dev_attr_pwm2_enable);
-	device_create_file(&new_client->dev, &dev_attr_pwm3_enable);
-	device_create_file(&new_client->dev, &dev_attr_pwm1);
-	device_create_file(&new_client->dev, &dev_attr_pwm2);
-	device_create_file(&new_client->dev, &dev_attr_pwm3);
+	if (enable_pwm_interface) {
+		device_create_file(&new_client->dev, &dev_attr_pwm1_enable);
+		device_create_file(&new_client->dev, &dev_attr_pwm2_enable);
+		device_create_file(&new_client->dev, &dev_attr_pwm3_enable);
+		device_create_file(&new_client->dev, &dev_attr_pwm1);
+		device_create_file(&new_client->dev, &dev_attr_pwm2);
+		device_create_file(&new_client->dev, &dev_attr_pwm3);
+	}
 
 	if (data->type == it8712) {
 		device_create_file_vrm(new_client);
