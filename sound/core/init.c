@@ -216,7 +216,7 @@ static void snd_card_info_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 		snd_iprintf(buffer, "--- no soundcards ---\n");
 }
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)
 
 void snd_card_info_read_oss(snd_info_buffer_t * buffer)
 {

@@ -305,8 +305,7 @@ _pagebuf_initialize(
 	/*
 	 * We don't want certain flags to appear in pb->pb_flags.
 	 */
-	flags &= ~(PBF_LOCK|PBF_ENTER_PAGES|PBF_MAPPED);
-	flags &= ~(PBF_DONT_BLOCK|PBF_READ_AHEAD);
+	flags &= ~(PBF_LOCK|PBF_MAPPED|PBF_DONT_BLOCK|PBF_READ_AHEAD);
 
 	pb_tracking_get(pb);
 
@@ -545,9 +544,9 @@ _pagebuf_lookup_pages(
 		size -= nbytes;
 
 		if (!PageUptodate(page)) {
-			if ((blocksize == PAGE_CACHE_SIZE) &&
-			    (flags & PBF_READ)) {
-				pb->pb_locked = 1;
+			if (blocksize == PAGE_CACHE_SIZE) {
+				if (flags & PBF_READ)
+					pb->pb_locked = 1;
 				good_pages--;
 			} else if (!PagePrivate(page)) {
 				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
@@ -717,7 +716,6 @@ found:
 				PBF_MAPPED | \
 				_PBF_LOCKABLE | \
 				_PBF_ALL_PAGES_MAPPED | \
-				_PBF_SOME_INVALID_PAGES | \
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED;
 	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
@@ -832,19 +830,11 @@ pagebuf_lookup(
 	int			flags)
 {
 	page_buf_t		*pb = NULL;
-	int			status;
 
 	flags |= _PBF_PRIVATE_BH;
 	pb = pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
-		if (flags & PBF_ENTER_PAGES) {
-			status = _pagebuf_lookup_pages(pb, &inode->i_data, 0);
-			if (status != 0) {
-				pagebuf_free(pb);
-				return (NULL);
-			}
-		}
 	}
 	return pb;
 }
@@ -985,6 +975,7 @@ pagebuf_get_no_daddr(
 	}
 	/* otherwise pagebuf_free just ignores it */
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
+	PB_CLEAR_OWNER(pb);
 	up(&PBP(pb)->pb_sema);	/* Return unlocked pagebuf */
 
 	PB_TRACE(pb, PB_TRACE_REC(no_daddr), rmem);
@@ -1926,14 +1917,14 @@ STATIC ctl_table pagebuf_table[] = {
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
 
-	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[3],
+	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[2],
 	sizeof(ulong), 0644, NULL, &pb_stats_clear_handler,
-	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
+	&sysctl_intvec, NULL, &pagebuf_min[2], &pagebuf_max[2]},
 
 #ifdef PAGEBUF_TRACE
-	{PB_DEBUG, "debug", &pb_params.data[4],
+	{PB_DEBUG, "debug", &pb_params.data[3],
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
-	&sysctl_intvec, NULL, &pagebuf_min[4], &pagebuf_max[4]},
+	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
 #endif
 	{0}
 };

@@ -183,6 +183,8 @@ int snd_unregister_oss_device(int type, snd_card_t * card, int dev)
  *  INFO PART
  */
 
+#ifdef CONFIG_PROC_FS
+
 static snd_info_entry_t *snd_minor_info_oss_entry = NULL;
 
 static void snd_minor_info_oss_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
@@ -207,8 +209,11 @@ static void snd_minor_info_oss_read(snd_info_entry_t *entry, snd_info_buffer_t *
 	up(&sound_oss_mutex);
 }
 
+#endif /* CONFIG_PROC_FS */
+
 int __init snd_minor_info_oss_init(void)
 {
+#ifdef CONFIG_PROC_FS
 	snd_info_entry_t *entry;
 
 	entry = snd_info_create_module_entry(THIS_MODULE, "devices", snd_oss_root);
@@ -222,13 +227,16 @@ int __init snd_minor_info_oss_init(void)
 		}
 	}
 	snd_minor_info_oss_entry = entry;
+#endif
 	return 0;
 }
 
 int __exit snd_minor_info_oss_done(void)
 {
+#ifdef CONFIG_PROC_FS
 	if (snd_minor_info_oss_entry)
 		snd_info_unregister(snd_minor_info_oss_entry);
+#endif
 	return 0;
 }
 
@@ -239,10 +247,6 @@ int __init snd_oss_init_module(void)
 	for (card = 0; card < SNDRV_CARDS; card++)
 		INIT_LIST_HEAD(&snd_oss_minors_hash[card]);
 	return 0;
-}
-
-void snd_oss_cleanup_module(void)
-{
 }
 
 #endif /* CONFIG_SND_OSSEMUL */

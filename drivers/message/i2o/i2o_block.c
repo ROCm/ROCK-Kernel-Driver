@@ -1647,7 +1647,7 @@ static int i2o_block_init(void)
 	}
 
 	for (i = 0; i < MAX_I2OB; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(16);
 		if (!disk)
 			goto oom;
 		i2o_disk[i] = disk;
@@ -1679,7 +1679,6 @@ static int i2o_block_init(void)
 		struct gendisk *disk = i2ob_disk + i;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i<<4;
-		disk->minor_shift = 4;
 		disk->fops = &i2ob_fops;
 		sprintf(disk->disk_name, "i2o/hd%c", 'a' + i);
 	}

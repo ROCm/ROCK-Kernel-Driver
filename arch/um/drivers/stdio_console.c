@@ -32,7 +32,13 @@
 
 #define MAX_TTYS (8)
 
+/* Referenced only by tty_driver below - presumably it's locked correctly
+ * by the tty driver.
+ */
+
 static struct tty_driver console_driver;
+
+static int console_refcount = 0;
 
 static struct chan_ops init_console_ops = {
 	init : 		NULL,
@@ -88,6 +94,9 @@ static struct line_driver driver = {
 
 static struct lines console_lines = LINES_INIT(MAX_TTYS);
 
+/* The array is initialized by line_init, which is an initcall.  The 
+ * individual elements are protected by individual semaphores.
+ */
 struct line vts[MAX_TTYS] = { LINE_INIT(CONFIG_CON_ZERO_CHAN, &driver),
 			      [ 1 ... MAX_TTYS - 1 ] = 
 			      LINE_INIT(CONFIG_CON_CHAN, &driver) };
@@ -130,15 +139,6 @@ int stdio_init(void)
 
 	printk(KERN_INFO "Initializing stdio console driver\n");
 
-	console_driver = ((struct tty_driver)
-		      {
-			      open :	 	con_open,
-			      close :	 	con_close,
-			      write :	 	con_write,
-			      chars_in_buffer :	chars_in_buffer,
-			      set_termios :	set_termios
-		      });
-
 	line_register_devfs(&console_lines, &driver, &console_driver, vts, 
 			    sizeof(vts)/sizeof(vts[0]));
 
@@ -157,8 +157,19 @@ __initcall(stdio_init);
 static void console_write(struct console *console, const char *string, 
 			  unsigned len)
 {
+	if(con_init_done) down(&vts[console->index].sem);
 	console_write_chan(&vts[console->index].chan_list, string, len);
+	if(con_init_done) up(&vts[console->index].sem);
 }
+
+static struct tty_driver console_driver = {
+	refcount :		&console_refcount,
+	open :	 		con_open,
+	close :	 		con_close,
+	write :	 		con_write,
+	chars_in_buffer :	chars_in_buffer,
+	set_termios :		set_termios
+};
 
 static kdev_t console_device(struct console *c)
 {
@@ -193,7 +204,6 @@ __channel_help(console_chan_setup, "con");
 static void console_exit(void)
 {
 	if(!con_init_done) return;
-	line_close(vts, NULL);
 	close_lines(vts, sizeof(vts)/sizeof(vts[0]));
 }
 

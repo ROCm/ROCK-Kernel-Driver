@@ -31,6 +31,7 @@
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
 #include <asm/arch_hooks.h>
+#include "mach_apic.h"
 
 void __init apic_intr_init(void)
 {
@@ -328,15 +329,13 @@ void __init setup_local_APIC (void)
 		 * Put the APIC into flat delivery mode.
 		 * Must be "all ones" explicitly for 82489DX.
 		 */
-		apic_write_around(APIC_DFR, 0xffffffff);
+		apic_write_around(APIC_DFR, APIC_DFR_VALUE);
 
 		/*
 		 * Set up the logical destination ID.
 		 */
 		value = apic_read(APIC_LDR);
-		value &= ~APIC_LDR_MASK;
-		value |= (1<<(smp_processor_id()+24));
-		apic_write_around(APIC_LDR, value);
+		apic_write_around(APIC_LDR, calculate_ldr(value));
 	}
 
 	/*
@@ -1008,17 +1007,9 @@ int setup_profiling_timer(unsigned int multiplier)
 
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
-	int user = user_mode(regs);
 	int cpu = smp_processor_id();
 
-	/*
-	 * The profiling function is SMP safe. (nothing can mess
-	 * around with "current", and the profiling counters are
-	 * updated with atomic operations). This is especially
-	 * useful with a profiling multiplier != 1
-	 */
-	if (!user)
-		x86_do_profile(regs->eip);
+	x86_do_profile(regs);
 
 	if (--prof_counter[cpu] <= 0) {
 		/*
@@ -1036,7 +1027,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 		}
 
 #ifdef CONFIG_SMP
-		update_process_times(user);
+		update_process_times(user_mode(regs));
 #endif
 	}
 

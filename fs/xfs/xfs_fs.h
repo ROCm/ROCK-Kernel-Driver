@@ -427,9 +427,9 @@ typedef struct xfs_handle {
 				 - (char *) &(handle))			  \
 				 + (handle).ha_fid.xfs_fid_len)
 
-#define XFS_HANDLE_CMP(h1, h2)	bcmp(h1, h2, sizeof (xfs_handle_t))
+#define XFS_HANDLE_CMP(h1, h2)	memcmp(h1, h2, sizeof(xfs_handle_t))
 
-#define FSHSIZE		sizeof (fsid_t)
+#define FSHSIZE		sizeof(fsid_t)
 
 
 /*
@@ -498,13 +498,5 @@ typedef struct xfs_handle {
 #define BTOBB(bytes)	(((__u64)(bytes) + BBSIZE - 1) >> BBSHIFT)
 #define BTOBBT(bytes)	((__u64)(bytes) >> BBSHIFT)
 #define BBTOB(bbs)	((bbs) << BBSHIFT)
-#define OFFTOBB(bytes)	(((__u64)(bytes) + BBSIZE - 1) >> BBSHIFT)
-#define OFFTOBBT(bytes) ((__u64)(bytes) >> BBSHIFT)
-#define BBTOOFF(bbs)	((__u64)(bbs) << BBSHIFT)
-
-#define SEEKLIMIT32	0x7fffffff
-#define BBSEEKLIMIT32	BTOBBT(SEEKLIMIT32)
-#define SEEKLIMIT	0x7fffffffffffffffLL
-#define BBSEEKLIMIT	OFFTOBBT(SEEKLIMIT)
 
 #endif	/* _LINUX_XFS_FS_H */

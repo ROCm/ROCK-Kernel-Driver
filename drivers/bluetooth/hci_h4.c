@@ -23,7 +23,7 @@
 */
 
 /*
- * BlueZ HCI UART(H4) protocol.
+ * Bluetooth HCI UART(H4) protocol.
  *
  * $Id: hci_h4.c,v 1.3 2002/09/09 01:17:32 maxk Exp $    
  */
@@ -56,7 +56,7 @@
 #include "hci_uart.h"
 #include "hci_h4.h"
 
-#ifndef HCI_UART_DEBUG
+#ifndef CONFIG_BT_HCIUART_DEBUG
 #undef  BT_DBG
 #define BT_DBG( A... )
 #undef  BT_DMP
@@ -160,7 +160,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 	ptr = data;
 	while (count) {
 		if (h4->rx_count) {
-			len = MIN(h4->rx_count, count);
+			len = min_t(unsigned int, h4->rx_count, count);
 			memcpy(skb_put(h4->rx_skb, len), ptr, len);
 			h4->rx_count -= len; count -= len; ptr += len;
 
@@ -238,7 +238,7 @@ static int h4_recv(struct hci_uart *hu, void *data, int count)
 		ptr++; count--;
 
 		/* Allocate packet */
-		h4->rx_skb = bluez_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC);
+		h4->rx_skb = bt_skb_alloc(HCI_MAX_FRAME_SIZE, GFP_ATOMIC);
 		if (!h4->rx_skb) {
 			BT_ERR("Can't allocate mem for new packet");
 			h4->rx_state = H4_W4_PACKET_TYPE;

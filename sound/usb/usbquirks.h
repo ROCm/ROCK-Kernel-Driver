@@ -38,7 +38,7 @@
 
 /* Yamaha devices */
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1000),
+	USB_DEVICE(0x0499, 0x1000),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "UX256",
@@ -47,7 +47,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1001),
+	USB_DEVICE(0x0499, 0x1001),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MU1000",
@@ -56,7 +56,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1002),
+	USB_DEVICE(0x0499, 0x1002),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MU2000",
@@ -65,7 +65,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1003),
+	USB_DEVICE(0x0499, 0x1003),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MU500",
@@ -74,7 +74,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1004),
+	USB_DEVICE(0x0499, 0x1004),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "UW500",
@@ -83,7 +83,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1005),
+	USB_DEVICE(0x0499, 0x1005),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MOTIF6",
@@ -92,7 +92,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1006),
+	USB_DEVICE(0x0499, 0x1006),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MOTIF7",
@@ -101,7 +101,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1007),
+	USB_DEVICE(0x0499, 0x1007),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "MOTIF8",
@@ -110,7 +110,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1008),
+	USB_DEVICE(0x0499, 0x1008),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "UX96",
@@ -119,7 +119,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1009),
+	USB_DEVICE(0x0499, 0x1009),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "UX16",
@@ -128,7 +128,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x100a),
+	USB_DEVICE(0x0499, 0x100a),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "EOS BX",
@@ -137,7 +137,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x100e),
+	USB_DEVICE(0x0499, 0x100e),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "S08",
@@ -146,7 +146,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x100f),
+	USB_DEVICE(0x0499, 0x100f),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "CLP-150",
@@ -155,7 +155,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0499, 0x1010),
+	USB_DEVICE(0x0499, 0x1010),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Yamaha",
 		.product_name = "CLP-170",
@@ -177,7 +177,7 @@
  * class-specific descriptors.
  */
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0000),
+	USB_DEVICE(0x0582, 0x0000),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "UA-100",
@@ -191,7 +191,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0002),
+	USB_DEVICE(0x0582, 0x0002),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UM-4",
@@ -205,7 +205,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0003),
+	USB_DEVICE(0x0582, 0x0003),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "SC-8850",
@@ -219,7 +219,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0004),
+	USB_DEVICE(0x0582, 0x0004),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "U-8",
@@ -233,7 +233,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0005),
+	USB_DEVICE(0x0582, 0x0005),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UM-2",
@@ -247,7 +247,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0007),
+	USB_DEVICE(0x0582, 0x0007),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "SC-8820",
@@ -261,7 +261,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0008),
+	USB_DEVICE(0x0582, 0x0008),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "PC-300",
@@ -275,7 +275,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0009),
+	USB_DEVICE(0x0582, 0x0009),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UM-1",
@@ -289,7 +289,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x000b),
+	USB_DEVICE(0x0582, 0x000b),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "SK-500",
@@ -303,7 +303,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x000c),
+	USB_DEVICE(0x0582, 0x000c),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "SC-D70",
@@ -317,7 +317,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0012),
+	USB_DEVICE(0x0582, 0x0012),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "Roland",
 		.product_name = "XV-5050",
@@ -331,7 +331,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0014),
+	USB_DEVICE(0x0582, 0x0014),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UM-880",
@@ -345,7 +345,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0016),
+	USB_DEVICE(0x0582, 0x0016),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "SD-90",
@@ -359,7 +359,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0023),
+	USB_DEVICE(0x0582, 0x0023),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UM-550",
@@ -373,7 +373,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0027),
+	USB_DEVICE(0x0582, 0x0027),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "SD-20",
@@ -387,7 +387,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x0029),
+	USB_DEVICE(0x0582, 0x0029),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "SD-80",
@@ -401,7 +401,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0582, 0x002b),
+	USB_DEVICE(0x0582, 0x002b),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
 		.product_name = "UA-700",
@@ -467,7 +467,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0763, 0x2001),
+	USB_DEVICE(0x0763, 0x2001),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "M-Audio",
 		.product_name = "Quattro",
@@ -477,7 +477,7 @@
 	}
 },
 {
-	USB_DEVICE_VENDOR_SPEC(0x0763, 0x2003),
+	USB_DEVICE(0x0763, 0x2003),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "M-Audio",
 		.product_name = "AudioPhile",

@@ -406,10 +406,6 @@ long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
 long time_adjust;
 
-unsigned int * prof_buffer;
-unsigned long prof_len;
-unsigned long prof_shift;
-
 /*
  * this routine handles the overflow of the microsecond field
  *

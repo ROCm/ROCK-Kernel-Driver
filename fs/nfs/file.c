@@ -259,6 +259,12 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	if (!inode)
 		return -EINVAL;
 
+	/* This will be in a forthcoming patch. */
+	if (NFS_PROTO(inode)->version == 4) {
+		printk(KERN_INFO "NFS: file locking over NFSv4 is not yet supported\n");
+		return -EIO;
+	}
+
 	/* No mandatory locks over NFS */
 	if ((inode->i_mode & (S_ISGID | S_IXGRP)) == S_ISGID)
 		return -ENOLCK;

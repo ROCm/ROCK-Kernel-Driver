@@ -120,7 +120,7 @@ enum nfs_ftype {
 /*
  * This is the kernel NFS client file handle representation
  */
-#define NFS_MAXFHSIZE		64
+#define NFS_MAXFHSIZE		128
 struct nfs_fh {
 	unsigned short		size;
 	unsigned char		data[NFS_MAXFHSIZE];

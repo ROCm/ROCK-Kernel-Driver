@@ -382,8 +382,7 @@ static void qla1280_done(struct scsi_qla_host *, srb_t **, srb_t **);
 static void qla1280_next(struct scsi_qla_host *, scsi_lu_t *, int);
 static void qla1280_putq_t(scsi_lu_t *, srb_t *);
 static void qla1280_done_q_put(srb_t *, srb_t **, srb_t **);
-static void qla1280_device_queue_depth(struct scsi_qla_host *, Scsi_Device *);
-static void qla1280_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
+static int qla1280_slave_attach(Scsi_Device *);
 #if STOP_ON_ERROR
 static void qla1280_panic(char *, struct Scsi_Host *host);
 #endif
@@ -840,7 +839,6 @@ qla1280_do_device_init(struct pci_dev *pdev,
 
 	host->can_queue = 0xfffff;	/* unlimited  */
 	host->cmd_per_lun = 1;
-	host->select_queue_depths = qla1280_select_queue_depth;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,18)
 	host->base = (unsigned char *)ha->mmpbase;
 #else
@@ -1796,7 +1794,7 @@ qla1280_do_dpc(void *p)
 }
 
 /**************************************************************************
- *   qla1280_device_queue_depth
+ *   qla1280_slave_attach
  *
  * Description:
  *   Determines the queue depth for a given device.  There are two ways
@@ -1806,51 +1804,28 @@ qla1280_do_dpc(void *p)
  *   as the default queue depth.  Otherwise, we use either 4 or 8 as the
  *   default queue depth (dependent on the number of hardware SCBs).
  **************************************************************************/
-static void
-qla1280_device_queue_depth(struct scsi_qla_host *p, Scsi_Device * device)
+static int
+qla1280_slave_attach(Scsi_Device * device)
 {
-	int default_depth = 3;
+	struct scsi_qla_host *p = (struct scsi_qla_host *)device->host->hostdata;
 	int bus = device->channel;
 	int target = device->id;
 
-	device->queue_depth = default_depth;
-
+	if (qla1280_check_for_dead_scsi_bus(p, bus))
+		return 1;
 	if (device->tagged_supported &&
 	    (p->bus_settings[bus].qtag_enables & (BIT_0 << target))) {
-		device->tagged_queue = 1;
-		device->current_tag = 0;
-		device->queue_depth = p->bus_settings[bus].hiwat;
+		scsi_adjust_queue_depth(device, MSG_ORDERED_TAG,
+			       	p->bus_settings[bus].hiwat);
 		/* device->queue_depth = 20; */
 		printk(KERN_INFO "scsi(%li:%d:%d:%d): Enabled tagged queuing, "
 		       "queue depth %d.\n", p->host_no, device->channel,
-		       device->id, device->lun, device->queue_depth);
+		       device->id, device->lun, device->new_queue_depth);
+	} else {
+		scsi_adjust_queue_depth(device, 0 /* TCQ off */, 3);
 	}
 	qla12160_get_target_parameters(p, bus, target, device->lun);
-}
-
-/**************************************************************************
- *   qla1280_select_queue_depth
- *
- *   Sets the queue depth for each SCSI device hanging off the input
- *   host adapter.  We use a queue depth of 2 for devices that do not
- *   support tagged queueing.
- **************************************************************************/
-static void
-qla1280_select_queue_depth(struct Scsi_Host *host, Scsi_Device * scsi_devs)
-{
-	Scsi_Device *device;
-	struct scsi_qla_host *ha = (struct scsi_qla_host *)host->hostdata;
-
-	ENTER("qla1280_select_queue_depth");
-	for (device = scsi_devs; device != NULL; device = device->next) {
-		if (device->host == host)
-			qla1280_device_queue_depth (ha, device);
-	}
-
-	if (scsi_devs)
-		qla1280_check_for_dead_scsi_bus(ha, scsi_devs->channel);
-
-	LEAVE("qla1280_select_queue_depth");
+	return 0;
 }
 
 /*

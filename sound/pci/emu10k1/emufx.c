@@ -862,6 +862,7 @@ static void snd_emu10k1_tram_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	int tram;
 
+	memset(icode->tram_valid, 0, sizeof(icode->tram_valid));
 	for (tram = 0; tram < 0xa0; tram++) {
 		set_bit(tram, icode->tram_valid);
 		icode->tram_data_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMDATAREGBASE + tram, 0);
@@ -885,6 +886,7 @@ static void snd_emu10k1_code_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	u32 pc;
 
+	memset(icode->code_valid, 0, sizeof(icode->code_valid));
 	for (pc = 0; pc < 512; pc++) {
 		set_bit(pc, icode->code_valid);
 		icode->code[pc][0] = snd_emu10k1_efx_read(emu, pc * 2);
@@ -1031,7 +1033,7 @@ static void snd_emu10k1_del_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 	}
 }
 
-static void snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
+static int snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	int i = 0, j;
 	unsigned int total = 0;
@@ -1044,7 +1046,7 @@ static void snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *ico
 	list_for_each(list, &emu->fx8010.gpr_ctl) {
 		ctl = emu10k1_gpr_ctl(list);
 		total++;
-		if (i < icode->gpr_list_control_count) {
+		if (_gctl && i < icode->gpr_list_control_count) {
 			memset(&gctl, 0, sizeof(gctl));
 			id = &ctl->kcontrol->id;
 			gctl.id.iface = id->iface;
@@ -1061,13 +1063,14 @@ static void snd_emu10k1_list_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *ico
 			gctl.min = ctl->min;
 			gctl.max = ctl->max;
 			gctl.translation = ctl->translation;
-			snd_runtime_check(copy_to_user(_gctl, &gctl, sizeof(gctl)) == 0, goto __next);
+			if (copy_to_user(_gctl, &gctl, sizeof(gctl)))
+				return -EFAULT;
+			_gctl++;
+			i++;
 		}
-	      __next:
-		_gctl++;
-		i++;
 	}
 	icode->gpr_list_control_total = total;
+	return 0;
 }
 
 static int snd_emu10k1_icode_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
@@ -1103,6 +1106,8 @@ static int snd_emu10k1_icode_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 
 static int snd_emu10k1_icode_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
+	int err;
+
 	down(&emu->fx8010.lock);
 	strncpy(icode->name, emu->fx8010.name, sizeof(icode->name)-1);
 	emu->fx8010.name[sizeof(emu->fx8010.name)-1] = '\0';
@@ -1110,9 +1115,9 @@ static int snd_emu10k1_icode_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	snd_emu10k1_gpr_peek(emu, icode);
 	snd_emu10k1_tram_peek(emu, icode);
 	snd_emu10k1_code_peek(emu, icode);
-	snd_emu10k1_list_controls(emu, icode);
+	err = snd_emu10k1_list_controls(emu, icode);
 	up(&emu->fx8010.lock);
-	return 0;
+	return err;
 }
 
 static int snd_emu10k1_ipcm_poke(emu10k1_t *emu, emu10k1_fx8010_pcm_t *ipcm)
@@ -2171,9 +2176,13 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		kfree(icode);
 		return res;
 	case SNDRV_EMU10K1_IOCTL_CODE_PEEK:
-		icode = (emu10k1_fx8010_code_t *)snd_kcalloc(sizeof(*icode), GFP_KERNEL);
+		icode = (emu10k1_fx8010_code_t *)kmalloc(sizeof(*icode), GFP_KERNEL);
 		if (icode == NULL)
 			return -ENOMEM;
+		if (copy_from_user(icode, (void *)arg, sizeof(*icode))) {
+			kfree(icode);
+			return -EFAULT;
+		}
 		res = snd_emu10k1_icode_peek(emu, icode);
 		if (res == 0 && copy_to_user((void *)arg, icode, sizeof(*icode))) {
 			kfree(icode);

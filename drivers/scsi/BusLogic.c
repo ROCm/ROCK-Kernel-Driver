@@ -2604,21 +2604,21 @@ static boolean BusLogic_TargetDeviceInquiry(BusLogic_HostAdapter_T
   through Host Adapter.
 */
 
-static void BusLogic_ReportTargetDeviceInfo(BusLogic_HostAdapter_T
+/*static void BusLogic_ReportTargetDeviceInfo(BusLogic_HostAdapter_T
 					    *HostAdapter)
 {
   int TargetID;
-  /*
+*/  /*
     Inhibit the Target Device Inquiry and Reporting if requested.
   */
-  if (BusLogic_MultiMasterHostAdapterP(HostAdapter) &&
+/*  if (BusLogic_MultiMasterHostAdapterP(HostAdapter) &&
       HostAdapter->DriverOptions != NULL &&
       HostAdapter->DriverOptions->LocalOptions.InhibitTargetInquiry)
     return;
-  /*
+*/  /*
     Report on the Target Devices found.
   */
-  for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++)
+/*  for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++)
     {
       BusLogic_TargetFlags_T *TargetFlags = &HostAdapter->TargetFlags[TargetID];
       if (TargetFlags->TargetExists && !TargetFlags->TargetInfoReported)
@@ -2674,7 +2674,7 @@ static void BusLogic_ReportTargetDeviceInfo(BusLogic_HostAdapter_T
 	}
     }
 }
-
+*/
 
 /*
   BusLogic_InitializeHostStructure initializes the fields in the SCSI Host
@@ -2700,6 +2700,49 @@ static void BusLogic_InitializeHostStructure(BusLogic_HostAdapter_T
   Host->cmd_per_lun = HostAdapter->UntaggedQueueDepth;
 }
 
+/*
+  BusLogic_SlaveAttach will actually set the queue depth on individual
+  scsi devices as they are permanently added to the device chain.  We
+  shamelessly rip off the SelectQueueDepths code to make this work mostly
+  like it used to.  Since we don't get called once at the end of the scan
+  but instead get called for each device, we have to do things a bit
+  differently.
+*/
+int BusLogic_SlaveAttach(SCSI_Device_T *Device)
+{
+  BusLogic_HostAdapter_T *HostAdapter =
+    (BusLogic_HostAdapter_T *) Device->host->hostdata;
+  int TargetID = Device->id;
+  int QueueDepth = HostAdapter->QueueDepth[TargetID];
+
+  if (HostAdapter->TargetFlags[TargetID].TaggedQueuingSupported &&
+      (HostAdapter->TaggedQueuingPermitted & (1 << TargetID)))
+    {
+      if (QueueDepth == 0)
+	QueueDepth = BusLogic_MaxAutomaticTaggedQueueDepth;
+      HostAdapter->QueueDepth[TargetID] = QueueDepth;
+      scsi_adjust_queue_depth(Device, MSG_SIMPLE_TAG, QueueDepth);
+    }
+  else
+    {
+      HostAdapter->TaggedQueuingPermitted &= ~(1 << TargetID);
+      QueueDepth = HostAdapter->UntaggedQueueDepth;
+      HostAdapter->QueueDepth[TargetID] = QueueDepth;
+      scsi_adjust_queue_depth(Device, 0, QueueDepth);
+    }
+  QueueDepth = 0;
+  for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++)
+    if (HostAdapter->TargetFlags[TargetID].TargetExists)
+      {
+	QueueDepth += HostAdapter->QueueDepth[TargetID];
+      }
+  if (QueueDepth > HostAdapter->AllocatedCCBs)
+    BusLogic_CreateAdditionalCCBs(HostAdapter,
+				  QueueDepth
+				  - HostAdapter->AllocatedCCBs,
+				  false);
+  return 0;
+}
 
 /*
   BusLogic_SelectQueueDepths selects Queue Depths for each Target Device based
@@ -2709,7 +2752,7 @@ static void BusLogic_InitializeHostStructure(BusLogic_HostAdapter_T
   since all the Target Devices have now been probed.
 */
 
-static void BusLogic_SelectQueueDepths(SCSI_Host_T *Host,
+/* static void BusLogic_SelectQueueDepths(SCSI_Host_T *Host,
 				       SCSI_Device_T *DeviceList)
 {
   BusLogic_HostAdapter_T *HostAdapter =
@@ -2764,8 +2807,8 @@ static void BusLogic_SelectQueueDepths(SCSI_Host_T *Host,
   for (Device = DeviceList; Device != NULL; Device = Device->next)
     if (Device->host == Host)
       Device->queue_depth = HostAdapter->QueueDepth[Device->id];
-  /* Allocate an extra CCB for each Target Device for a Bus Device Reset. */
-  AllocatedQueueDepth += HostAdapter->TargetDeviceCount;
+*/  /* Allocate an extra CCB for each Target Device for a Bus Device Reset. */
+/*  AllocatedQueueDepth += HostAdapter->TargetDeviceCount;
   if (AllocatedQueueDepth > HostAdapter->DriverQueueDepth)
     AllocatedQueueDepth = HostAdapter->DriverQueueDepth;
   BusLogic_CreateAdditionalCCBs(HostAdapter,
@@ -2778,7 +2821,7 @@ static void BusLogic_SelectQueueDepths(SCSI_Host_T *Host,
 	 HostAdapter = HostAdapter->Next)
       BusLogic_ReportTargetDeviceInfo(HostAdapter);
 }
-
+*/
 
 /*
   BusLogic_DetectHostAdapter probes for BusLogic Host Adapters at the standard
@@ -2881,7 +2924,10 @@ int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *HostTemplate)
       memcpy(HostAdapter, PrototypeHostAdapter, sizeof(BusLogic_HostAdapter_T));
       HostAdapter->SCSI_Host = Host;
       HostAdapter->HostNumber = Host->host_no;
+      /*
+       * This function is deprecated
       Host->select_queue_depths = BusLogic_SelectQueueDepths;
+       */
       /*
 	Add Host Adapter to the end of the list of registered BusLogic
 	Host Adapters.

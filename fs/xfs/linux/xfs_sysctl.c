@@ -35,30 +35,34 @@
 #include <linux/proc_fs.h>
 
 /*
- * Tunable xfs parameters
+ * Tunable XFS parameters
  */
 
 extern struct xfsstats xfsstats;
 
-unsigned long xfs_min[XFS_PARAM] = {			 0,			 0, 0 };
-unsigned long xfs_max[XFS_PARAM] = { XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX, 1 };
+STATIC ulong xfs_min[XFS_PARAM] = { \
+			    0,			    0, 0, 0, 0, 0 };
+STATIC ulong xfs_max[XFS_PARAM] = { \
+	XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX, 1, 1, 1, 1 };
 
-xfs_param_t xfs_params = { 128, 32, 0 };
+xfs_param_t xfs_params = { 128, 32, 0, 1, 0, 0 };
 
 static struct ctl_table_header *xfs_table_header;
 
-/* proc handlers */
 
-extern void xfs_refcache_resize(int xfs_refcache_new_size);
+/* Custom proc handlers */
 
-static int
-xfs_refcache_resize_proc_handler(ctl_table *ctl, int write, struct file * filp,
-		       void *buffer, size_t *lenp)
+STATIC int
+xfs_refcache_resize_proc_handler(
+	ctl_table	*ctl,
+	int		write,
+	struct file	*filp,
+	void		*buffer,
+	size_t		*lenp)
 {
-	int	ret;
-	int	*valp = ctl->data;
-	int	xfs_refcache_new_size;
-	int	xfs_refcache_old_size = *valp;
+	int		ret, *valp = ctl->data;
+	int		xfs_refcache_new_size;
+	int		xfs_refcache_old_size = *valp;
 
 	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
 	xfs_refcache_new_size = *valp;
@@ -73,12 +77,15 @@ xfs_refcache_resize_proc_handler(ctl_table *ctl, int write, struct file * filp,
 	return ret;
 }
 
-static int
-xfs_stats_clear_proc_handler(ctl_table *ctl, int write, struct file * filp,
-		       void *buffer, size_t *lenp)
+STATIC int
+xfs_stats_clear_proc_handler(
+	ctl_table	*ctl,
+	int		write,
+	struct file	*filp,
+	void		*buffer,
+	size_t		*lenp)
 {
-	int		ret;
-	int		*valp = ctl->data;
+	int		ret, *valp = ctl->data;
 	__uint32_t	vn_active;
 
 	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
@@ -95,7 +102,7 @@ xfs_stats_clear_proc_handler(ctl_table *ctl, int write, struct file * filp,
 	return ret;
 }
 
-static ctl_table xfs_table[] = {
+STATIC ctl_table xfs_table[] = {
 	{XFS_REFCACHE_SIZE, "refcache_size", &xfs_params.refcache_size,
 	sizeof(ulong), 0644, NULL, &xfs_refcache_resize_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[0], &xfs_max[0]},
@@ -108,15 +115,27 @@ static ctl_table xfs_table[] = {
 	sizeof(ulong), 0644, NULL, &xfs_stats_clear_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[2], &xfs_max[2]},
 
+	{XFS_RESTRICT_CHOWN, "restrict_chown", &xfs_params.restrict_chown,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &xfs_min[3], &xfs_max[3]},
+
+	{XFS_SGID_INHERIT, "irix_sgid_inherit", &xfs_params.sgid_inherit,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &xfs_min[4], &xfs_max[4]},
+
+	{XFS_SYMLINK_MODE, "irix_symlink_mode", &xfs_params.symlink_mode,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &xfs_min[5], &xfs_max[5]},
+
 	{0}
 };
 
-static ctl_table xfs_dir_table[] = {
+STATIC ctl_table xfs_dir_table[] = {
 	{FS_XFS, "xfs", NULL, 0, 0555, xfs_table},
 	{0}
 };
 
-static ctl_table xfs_root_table[] = {
+STATIC ctl_table xfs_root_table[] = {
 	{CTL_FS, "fs",	NULL, 0, 0555, xfs_dir_table},
 	{0}
 };

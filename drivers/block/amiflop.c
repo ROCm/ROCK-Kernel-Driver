@@ -1607,9 +1607,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		if (!kdev_same(old_dev, inode->i_rdev))
 			return -EBUSY;
 
-	if (unit[drive].type->code == FD_NODRIVE)
-		return -ENODEV;
-
 	if (filp && filp->f_mode & 3) {
 		check_disk_change(inode->i_bdev);
 		if (filp->f_mode & 2 ) {
@@ -1683,11 +1680,6 @@ static int amiga_floppy_change(kdev_t dev)
 	int changed;
 	static int first_time = 1;
 
-	if (major(dev) != MAJOR_NR) {
-		printk(KERN_CRIT "floppy_change: not a floppy\n");
-		return 0;
-	}
-
 	if (first_time)
 		changed = first_time--;
 	else {
@@ -1735,7 +1727,7 @@ static int __init fd_probe_drives(void)
 		fd_probe(drive);
 		if (unit[drive].type->code == FD_NODRIVE)
 			continue;
-		disk = alloc_disk();
+		disk = alloc_disk(1);
 		if (!disk) {
 			unit[drive].type->code = FD_NODRIVE;
 			continue;
@@ -1751,7 +1743,6 @@ static int __init fd_probe_drives(void)
 		printk("fd%d ",drive);
 		disk->major = MAJOR_NR;
 		disk->first_minor = drive;
-		disk->minor_shift = 0;
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", drive);
 		set_capacity(disk, 880*2);

@@ -23,6 +23,7 @@ restrictions referred to are that the relevant option is valid if:
 	HW	Appropriate hardware is enabled.
 	IA-32	IA-32 aka i386 architecture is enabled.
 	IA-64	IA-64 architecture is enabled.
+	IP_PNP	IP DCHP, BOOTP, or RARP is enabled.
 	ISAPNP  ISA PnP code is enabled.
 	ISDN	Appropriate ISDN support is enabled.
 	JOY 	Appropriate joystick support is enabled.
@@ -257,7 +258,7 @@ running once the system is up.
 
 	initrd=		[BOOT] Specify the location of the initial ramdisk. 
 
-	ip=		[PNP]
+	ip=		[IP_PNP]
 
 	isapnp=		[ISAPNP] Specify RDP, reset, pci_scan and verbosity.
 
@@ -279,9 +280,13 @@ running once the system is up.
  
 	kbd-reset	[VT]
 
-	keep_initrd	[HW, ARM]
+	keepinitrd	[HW, ARM]
 
 	load_ramdisk=	[RAM] List of ramdisks to load from floppy.
+
+	lockd.udpport=	[NFS]
+
+	lockd.tcpport=	[NFS]
 
 	logi_busmouse=	[HW, MOUSE]
 
@@ -323,6 +328,8 @@ running once the system is up.
 				to off as the mainboard support is not always present.
 				You must activate it as a boot option
 
+	mca-pentium	[BUGS=IA-32]
+
 	mcd=		[HW,CD]
 
 	mcdx=		[HW,CD]
@@ -335,6 +342,11 @@ running once the system is up.
 
 	megaraid=	[HW,SCSI]
  
+	mem=exactmap	[KNL,BOOT,IA-32] enable setting of an exact
+			e820 memory map, as specified by the user.
+			Such mem=exactmap lines can be constructed
+			based on BIOS output or other requirements.
+
 	mem=nn[KMG]	[KNL,BOOT] force use of a specific amount of
 			memory; to be used when the kernel is not able
 			to see the whole system memory or for test.
@@ -390,7 +402,9 @@ running once the system is up.
 
 	nohlt		[BUGS=ARM]
  
-	no-hlt		[BUGS=IA-32]
+	no-hlt		[BUGS=IA-32] Tells the kernel that the hlt
+			instruction doesn't work correctly and not to
+			use it.
 
 	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
 
@@ -536,6 +550,10 @@ running once the system is up.
 	ro		[KNL] Mount root device read-only on boot.
 
 	root=		[KNL] root filesystem.
+
+	rootflags=	[KNL] set root filesystem mount option string
+
+	rootfstype=	[KNL] set root filesystem type
 
 	rw		[KNL] Mount root device read-write on boot.
 

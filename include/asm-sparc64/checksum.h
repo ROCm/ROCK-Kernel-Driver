@@ -78,45 +78,8 @@ csum_and_copy_to_user(const char *src, char *dst, int len,
 /* ihl is always 5 or greater, almost always is 5, and iph is word aligned
  * the majority of the time.
  */
-static __inline__ unsigned short ip_fast_csum(__const__ unsigned char *iph,
-					      unsigned int ihl)
-{
-	unsigned short sum;
-
-	/* Note: We must read %2 before we touch %0 for the first time,
-	 *       because GCC can legitimately use the same register for
-	 *       both operands.
-	 */
-	__asm__ __volatile__(
-"	sub		%2, 4, %%g7		! IEU0\n"
-"	lduw		[%1 + 0x00], %0		! Load	Group\n"
-"	lduw		[%1 + 0x04], %%g2	! Load	Group\n"
-"	lduw		[%1 + 0x08], %%g3	! Load	Group\n"
-"	addcc		%%g2, %0, %0		! IEU1	1 Load Bubble + Group\n"
-"	lduw		[%1 + 0x0c], %%g2	! Load\n"
-"	addccc		%%g3, %0, %0		! Sngle	Group no Bubble\n"
-"	lduw		[%1 + 0x10], %%g3	! Load	Group\n"
-"	addccc		%%g2, %0, %0		! Sngle	Group no Bubble\n"
-"	addc		%0, %%g0, %0		! Sngle Group\n"
-"1:	addcc		%%g3, %0, %0		! IEU1	Group no Bubble\n"
-"	add		%1, 4, %1		! IEU0\n"
-"	addccc		%0, %%g0, %0		! Sngle Group no Bubble\n"
-"	subcc		%%g7, 1, %%g7		! IEU1	Group\n"
-"	be,a,pt		%%icc, 2f		! CTI\n"
-"	 sll		%0, 16, %%g2		! IEU0\n"
-"	lduw		[%1 + 0x10], %%g3	! Load	Group\n"
-"	ba,pt		%%xcc, 1b		! CTI\n"
-"	 nop					! IEU0\n"
-"2:	addcc		%0, %%g2, %%g2		! IEU1	Group\n"
-"	srl		%%g2, 16, %0		! IEU0	Group regdep	XXX Scheisse!\n"
-"	addc		%0, %%g0, %0		! Sngle	Group\n"
-"	xnor		%%g0, %0, %0		! IEU0	Group\n"
-"	srl		%0, 0, %0		! IEU0	Group		XXX Scheisse!\n"
-	: "=r" (sum), "=&r" (iph)
-	: "r" (ihl), "1" (iph)
-	: "g2", "g3", "g7", "cc");
-	return sum;
-}
+extern unsigned short ip_fast_csum(__const__ unsigned char *iph,
+				   unsigned int ihl);
 
 /* Fold a partial checksum without adding pseudo headers. */
 static __inline__ unsigned short csum_fold(unsigned int sum)

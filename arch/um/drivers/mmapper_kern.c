@@ -15,13 +15,14 @@
 #include <linux/mm.h> 
 #include <linux/slab.h>
 #include <linux/init.h> 
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <asm/irq.h>
-#include <asm/smplock.h>
 #include <asm/pgtable.h>
 #include "mem_user.h"
 #include "user_util.h"
  
+/* These are set in mmapper_init, which is called at boot time */
 static unsigned long mmapper_size;
 static unsigned long p_buf = 0;
 static char *v_buf = NULL;

@@ -12,13 +12,13 @@
    Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Sun Sep 29 22:29:16 2002 by makisara
+   Last modified: Tue Oct 15 22:01:04 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20020929";
+static char *verstr = "20021015";
 
 #include <linux/module.h>
 
@@ -290,6 +290,8 @@ static int st_chk_result(Scsi_Tape *STp, Scsi_Request * SRpnt)
 	}
 	if (sense[12] == 0 && sense[13] == 0x17) /* ASC and ASCQ => cleaning requested */
 		STp->cleaning_req = 1;
+
+	STp->pos_unknown |= STp->device->was_reset;
 
 	if ((sense[0] & 0x70) == 0x70 &&
 	    scode == RECOVERED_ERROR
@@ -566,7 +568,7 @@ static int flush_buffer(Scsi_Tape *STp, int seek_next)
 	 * If there was a bus reset, block further access
 	 * to this device.
 	 */
-	if (STp->device->was_reset)
+	if (STp->pos_unknown)
 		return (-EIO);
 
 	if (STp->ready != ST_READY)
@@ -639,6 +641,52 @@ static int set_mode_densblk(Scsi_Tape * STp, ST_mode * STm)
 			return (-EINVAL);
 	}
 	return 0;
+}
+
+
+/* Lock or unlock the drive door. Don't use when Scsi_Request allocated. */
+static int do_door_lock(Scsi_Tape * STp, int do_lock)
+{
+	int retval, cmd;
+	DEB(int dev = TAPE_NR(STp->devt);)
+
+
+	cmd = do_lock ? SCSI_IOCTL_DOORLOCK : SCSI_IOCTL_DOORUNLOCK;
+	DEBC(printk(ST_DEB_MSG "st%d: %socking drive door.\n", dev,
+		    do_lock ? "L" : "Unl"));
+	retval = scsi_ioctl(STp->device, cmd, NULL);
+	if (!retval) {
+		STp->door_locked = do_lock ? ST_LOCKED_EXPLICIT : ST_UNLOCKED;
+	}
+	else {
+		STp->door_locked = ST_LOCK_FAILS;
+	}
+	return retval;
+}
+
+
+/* Set the internal state after reset */
+static void reset_state(Scsi_Tape *STp)
+{
+	int i;
+	ST_partstat *STps;
+
+	STp->pos_unknown = 0;
+	for (i = 0; i < ST_NBR_PARTITIONS; i++) {
+		STps = &(STp->ps[i]);
+		STps->rw = ST_IDLE;
+		STps->eof = ST_NOEOF;
+		STps->at_sm = 0;
+		STps->last_block_valid = FALSE;
+		STps->drv_block = -1;
+		STps->drv_file = -1;
+	}
+	if (STp->can_partitions) {
+		STp->partition = find_partition(STp);
+		if (STp->partition < 0)
+			STp->partition = 0;
+		STp->new_partition = STp->partition;
+	}
 }
 
 /* Test if the drive is ready. Returns either one of the codes below or a negative system
@@ -757,7 +805,7 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 	    goto err_out;
 
 	if (retval == CHKRES_NEW_SESSION) {
-		(STp->device)->was_reset = 0;
+		STp->pos_unknown = 0;
 		STp->partition = STp->new_partition = 0;
 		if (STp->can_partitions)
 			STp->nbr_partitions = 1; /* This guess will be updated later
@@ -1021,7 +1069,7 @@ static int st_flush(struct file *filp)
 	STm = &(STp->modes[STp->current_mode]);
 	STps = &(STp->ps[STp->partition]);
 
-	if (STps->rw == ST_WRITING && !(STp->device)->was_reset) {
+	if (STps->rw == ST_WRITING && !STp->pos_unknown) {
 		result = flush_write_buffer(STp);
 		if (result != 0 && result != (-ENOSPC))
 			goto out;
@@ -1040,7 +1088,7 @@ static int st_flush(struct file *filp)
 		printk(KERN_WARNING "st%d: Number of r/w requests %d, dio used in %d, pages %d (%d).\n",
 		       dev, STp->nbr_requests, STp->nbr_dio, STp->nbr_pages, STp->nbr_combinable));
 
-	if (STps->rw == ST_WRITING && !(STp->device)->was_reset) {
+	if (STps->rw == ST_WRITING && !STp->pos_unknown) {
 
                 DEBC(printk(ST_DEB_MSG "st%d: File length %ld bytes.\n",
                             dev, (long) (filp->f_pos));
@@ -1136,7 +1184,7 @@ static int st_release(struct inode *inode, struct file *filp)
 	read_unlock(&st_dev_arr_lock);
 
 	if (STp->door_locked == ST_LOCKED_AUTO)
-		st_int_ioctl(STp, MTUNLOCK, 0);
+		do_door_lock(STp, 0);
 
 	normalize_buffer(STp->buffer);
 	write_lock(&st_dev_arr_lock);
@@ -1189,7 +1237,7 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 	 * If there was a bus reset, block further access
 	 * to this device.
 	 */
-	if (STp->device->was_reset) {
+	if (STp->pos_unknown) {
 		retval = (-EIO);
 		goto out;
 	}
@@ -1216,7 +1264,7 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 	}
 
 	if (STp->do_auto_lock && STp->door_locked == ST_UNLOCKED &&
-	    !st_int_ioctl(STp, MTLOCK, 0))
+	    !do_door_lock(STp, 1))
 		STp->door_locked = ST_LOCKED_AUTO;
 
  out:
@@ -2502,18 +2550,6 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
                 DEBC(printk(ST_DEB_MSG "st%d: Erasing tape.\n", dev));
 		fileno = blkno = at_sm = 0;
 		break;
-	case MTLOCK:
-		chg_eof = FALSE;
-		cmd[0] = ALLOW_MEDIUM_REMOVAL;
-		cmd[4] = SCSI_REMOVAL_PREVENT;
-                DEBC(printk(ST_DEB_MSG "st%d: Locking drive door.\n", dev));
-		break;
-	case MTUNLOCK:
-		chg_eof = FALSE;
-		cmd[0] = ALLOW_MEDIUM_REMOVAL;
-		cmd[4] = SCSI_REMOVAL_ALLOW;
-                DEBC(printk(ST_DEB_MSG "st%d: Unlocking drive door.\n", dev));
-		break;
 	case MTSETBLK:		/* Set block length */
 	case MTSETDENSITY:	/* Set tape density */
 	case MTSETDRVBUFFER:	/* Set drive buffering */
@@ -2593,11 +2629,6 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 		STps->drv_block = blkno;
 		STps->drv_file = fileno;
 		STps->at_sm = at_sm;
-
-		if (cmd_in == MTLOCK)
-			STp->door_locked = ST_LOCKED_EXPLICIT;
-		else if (cmd_in == MTUNLOCK)
-			STp->door_locked = ST_UNLOCKED;
 
 		if (cmd_in == MTBSFM)
 			ioctl_result = st_int_ioctl(STp, MTFSF, 1);
@@ -2712,9 +2743,6 @@ static int st_int_ioctl(Scsi_Tape *STp, unsigned int cmd_in, unsigned long arg)
 
 		if ((SRpnt->sr_sense_buffer[2] & 0x0f) == BLANK_CHECK)
 			STps->eof = ST_EOD;
-
-		if (cmd_in == MTLOCK)
-			STp->door_locked = ST_LOCK_FAILS;
 
 		scsi_release_request(SRpnt);
 		SRpnt = NULL;
@@ -3104,7 +3132,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			goto out;
 		}
 
-		if (!(STp->device)->was_reset) {
+		if (!STp->pos_unknown) {
 
 			if (STps->eof == ST_FM_HIT) {
 				if (mtc.mt_op == MTFSF || mtc.mt_op == MTFSFM ||
@@ -3152,16 +3180,9 @@ static int st_ioctl(struct inode *inode, struct file *file,
 				retval = (-EIO);
 				goto out;
 			}
+			reset_state(STp);
+			/* remove this when the midlevel properly clears was_reset */
 			STp->device->was_reset = 0;
-			if (STp->door_locked != ST_UNLOCKED &&
-			    STp->door_locked != ST_LOCK_FAILS) {
-				if (st_int_ioctl(STp, MTLOCK, 0)) {
-					printk(KERN_NOTICE
-                                               "st%d: Could not relock door after bus reset.\n",
-					       dev);
-					STp->door_locked = ST_UNLOCKED;
-				}
-			}
 		}
 
 		if (mtc.mt_op != MTNOP && mtc.mt_op != MTSETBLK &&
@@ -3170,7 +3191,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 			STps->rw = ST_IDLE;	/* Prevent automatic WEOF and fsf */
 
 		if (mtc.mt_op == MTOFFL && STp->door_locked != ST_UNLOCKED)
-			st_int_ioctl(STp, MTUNLOCK, 0);	/* Ignore result! */
+			do_door_lock(STp, 0);	/* Ignore result! */
 
 		if (mtc.mt_op == MTSETDRVBUFFER &&
 		    (mtc.mt_count & MT_ST_OPTIONS) != 0) {
@@ -3235,6 +3256,11 @@ static int st_ioctl(struct inode *inode, struct file *file,
 
 		if (mtc.mt_op == MTLOAD) {
 			retval = do_load_unload(STp, file, max(1, mtc.mt_count));
+			goto out;
+		}
+
+		if (mtc.mt_op == MTLOCK || mtc.mt_op == MTUNLOCK) {
+			retval = do_door_lock(STp, (mtc.mt_op == MTLOCK));
 			goto out;
 		}
 
@@ -3642,13 +3668,13 @@ static DEVICE_ATTR(type,S_IRUGO,st_device_type_read,NULL);
 
 static struct file_operations st_fops =
 {
-	owner:		THIS_MODULE,
-	read:		st_read,
-	write:		st_write,
-	ioctl:		st_ioctl,
-	open:		st_open,
-	flush:		st_flush,
-	release:	st_release,
+	.owner =	THIS_MODULE,
+	.read =		st_read,
+	.write =	st_write,
+	.ioctl =	st_ioctl,
+	.open =		st_open,
+	.flush =	st_flush,
+	.release =	st_release,
 };
 
 static int st_attach(Scsi_Device * SDp)
@@ -3909,12 +3935,12 @@ static void st_detach(Scsi_Device * SDp)
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_kdev);
-				put_device(&tpnt->driverfs_dev_r[mode]);
+				device_unregister(&tpnt->driverfs_dev_r[mode]);
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_n[mode],
 						   &dev_attr_kdev);
-				put_device(&tpnt->driverfs_dev_n[mode]);
+				device_unregister(&tpnt->driverfs_dev_n[mode]);
 			}
 			if (tpnt->buffer) {
 				tpnt->buffer->orig_frp_segs = 0;

@@ -48,23 +48,23 @@ void init_new_thread(void *sig_stack, void (*usr1_handler)(int))
 		flags = SA_ONSTACK;
 	}
 	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags,
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGFPE, (__sighandler_t) sig_handler, flags, 
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGILL, (__sighandler_t) sig_handler, flags, 
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGBUS, (__sighandler_t) sig_handler, flags, 
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGWINCH, (__sighandler_t) sig_handler, flags, 
-		    SIGUSR1, SIGIO, SIGWINCH, -1);
+		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
 		    SA_NOMASK | flags, -1);
 	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
-	set_timers(1);  /* XXX A bit of a race here */
+
 	init_irq_signals(sig_stack != NULL);
 }
 

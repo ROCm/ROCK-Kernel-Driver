@@ -72,10 +72,134 @@ unsigned char pci_highest_busnum = 0;
  */
 int pci_device_reorder = 0;
 
-spinlock_t pci_poke_lock = SPIN_LOCK_UNLOCKED;
 volatile int pci_poke_in_progress;
 volatile int pci_poke_cpu = -1;
 volatile int pci_poke_faulted;
+
+static spinlock_t pci_poke_lock = SPIN_LOCK_UNLOCKED;
+
+void pci_config_read8(u8 *addr, u8 *ret)
+{
+	unsigned long flags;
+	u8 byte;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "lduba [%1] %2, %0\n\t"
+			     "membar #Sync"
+			     : "=r" (byte)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	if (!pci_poke_faulted)
+		*ret = byte;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
+
+void pci_config_read16(u16 *addr, u16 *ret)
+{
+	unsigned long flags;
+	u16 word;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "lduha [%1] %2, %0\n\t"
+			     "membar #Sync"
+			     : "=r" (word)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	if (!pci_poke_faulted)
+		*ret = word;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
+
+void pci_config_read32(u32 *addr, u32 *ret)
+{
+	unsigned long flags;
+	u32 dword;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "lduwa [%1] %2, %0\n\t"
+			     "membar #Sync"
+			     : "=r" (dword)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	if (!pci_poke_faulted)
+		*ret = dword;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
+
+void pci_config_write8(u8 *addr, u8 val)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "stba %0, [%1] %2\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (val), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
+
+void pci_config_write16(u16 *addr, u16 val)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "stha %0, [%1] %2\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (val), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
+
+void pci_config_write32(u32 *addr, u32 val)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pci_poke_lock, flags);
+	pci_poke_cpu = smp_processor_id();
+	pci_poke_in_progress = 1;
+	pci_poke_faulted = 0;
+	__asm__ __volatile__("membar #Sync\n\t"
+			     "stwa %0, [%1] %2\n\t"
+			     "membar #Sync"
+			     : /* no outputs */
+			     : "r" (val), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L)
+			     : "memory");
+	pci_poke_in_progress = 0;
+	pci_poke_cpu = -1;
+	spin_unlock_irqrestore(&pci_poke_lock, flags);
+}
 
 /* Probe for all PCI controllers in the system. */
 extern void sabre_init(int, char *);

@@ -811,6 +811,13 @@ int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 			if (buffer_dirty(bh)) {
 				get_bh(bh);
 				spin_unlock(lock);
+				/*
+				 * Ensure any pending I/O completes so that
+				 * ll_rw_block() actually writes the current
+				 * contents - it is a noop if I/O is still in
+				 * flight on potentially older contents.
+				 */
+				wait_on_buffer(bh);
 				ll_rw_block(WRITE, 1, &bh);
 				brelse(bh);
 				spin_lock(lock);

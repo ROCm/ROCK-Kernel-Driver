@@ -74,7 +74,7 @@ static void NFTL_setup(struct mtd_info *mtd)
         }
 
 	nftl = kmalloc(sizeof(struct NFTLrecord), GFP_KERNEL);
-	gd = alloc_disk();
+	gd = alloc_disk(1 << NFTL_PARTN_BITS);
 	if (!nftl || !gd) {
 		kfree(nftl);
 		put_disk(gd);
@@ -132,7 +132,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 	sprintf(gd->disk_name, "nftl%c", 'a' + firstfree);
 	gd->major = MAJOR_NR;
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
-	gd->minor_shift = NFTL_PARTN_BITS;
 	set_capacity(gd, nftl->nr_sects);
 	nftl->disk = gd;
 	add_disk(gd);
@@ -771,7 +770,6 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
 	}
 	case BLKFLSBUF:
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 		fsync_bdev(inode->i_bdev);
 		invalidate_bdev(inode->i_bdev, 0);
 		if (nftl->mtd->sync)

@@ -489,7 +489,7 @@ xfs_bmap_add_attrfork_local(
 		return 0;
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		mp = ip->i_mount;
-		bzero(&dargs, sizeof(dargs));
+		memset(&dargs, 0, sizeof(dargs));
 		dargs.dp = ip;
 		dargs.firstblock = firstblock;
 		dargs.flist = flist;
@@ -3146,7 +3146,7 @@ xfs_bmap_delete_exlist(
 	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
 	base = ifp->if_u1.if_extents;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t) - count;
-	ovbcopy(&base[idx + count], &base[idx],
+	memmove(&base[idx], &base[idx + count],
 		(nextents - idx) * sizeof(*base));
 	xfs_iext_realloc(ip, -count, whichfork);
 }
@@ -3174,7 +3174,7 @@ xfs_bmap_extents_to_btree(
 	xfs_btree_cur_t		*cur;		/* bmap btree cursor */
 	xfs_bmbt_rec_t		*ep;		/* extent list pointer */
 	int			error;		/* error return value */
-	xfs_extnum_t		i;		/* extent list index */
+	xfs_extnum_t		i, cnt;		/* extent list index */
 	xfs_ifork_t		*ifp;		/* inode fork pointer */
 	xfs_bmbt_key_t		*kp;		/* root block key pointer */
 	xfs_mount_t		*mp;		/* mount structure */
@@ -3256,24 +3256,25 @@ xfs_bmap_extents_to_btree(
 	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
 	INT_SET(ablock->bb_magic, ARCH_CONVERT, XFS_BMAP_MAGIC);
 	INT_ZERO(ablock->bb_level, ARCH_CONVERT);
-	INT_ZERO(ablock->bb_numrecs, ARCH_CONVERT);
 	INT_SET(ablock->bb_leftsib, ARCH_CONVERT, NULLDFSBNO);
 	INT_SET(ablock->bb_rightsib, ARCH_CONVERT, NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
-	for (ep = ifp->if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
+	for (ep = ifp->if_u1.if_extents, cnt = i = 0; i < nextents; i++, ep++) {
 		if (!ISNULLSTARTBLOCK(xfs_bmbt_get_startblock(ep))) {
-			*arp++ = *ep;
-			INT_MOD(ablock->bb_numrecs, ARCH_CONVERT, +1);
+			arp->l0 = INT_GET(ep->l0, ARCH_CONVERT);
+			arp->l1 = INT_GET(ep->l1, ARCH_CONVERT);
+			arp++; cnt++;
 		}
 	}
+	INT_SET(ablock->bb_numrecs, ARCH_CONVERT, cnt);
 	ASSERT(INT_GET(ablock->bb_numrecs, ARCH_CONVERT) == XFS_IFORK_NEXTENTS(ip, whichfork));
 	/*
 	 * Fill in the root key and pointer.
 	 */
 	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
-	INT_SET(kp->br_startoff, ARCH_CONVERT, xfs_bmbt_get_startoff(arp));
+	INT_SET(kp->br_startoff, ARCH_CONVERT, xfs_bmbt_disk_get_startoff(arp));
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 	INT_SET(*pp, ARCH_CONVERT, args.fsbno);
 	/*
@@ -3310,7 +3311,7 @@ xfs_bmap_insert_exlist(
 	xfs_iext_realloc(ip, count, whichfork);
 	base = ifp->if_u1.if_extents;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
-	ovbcopy(&base[idx], &base[idx + count],
+	memmove(&base[idx + count], &base[idx],
 		(nextents - (idx + count)) * sizeof(*base));
 	for (to = idx; to < idx + count; to++, new++)
 		xfs_bmbt_set_all(&base[to], new);
@@ -3380,7 +3381,7 @@ xfs_bmap_local_to_extents(
 		ASSERT(args.len == 1);
 		*firstblock = args.fsbno;
 		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
-		bcopy(ifp->if_u1.if_data, (char *)XFS_BUF_PTR(bp),
+		memcpy((char *)XFS_BUF_PTR(bp), ifp->if_u1.if_data,
 			ifp->if_bytes);
 		xfs_trans_log_buf(tp, bp, 0, ifp->if_bytes - 1);
 		xfs_idata_realloc(ip, -ifp->if_bytes, whichfork);
@@ -3556,7 +3557,7 @@ xfs_bmap_trace_addentry(
 	if (cnt == 1) {
 		ASSERT(r2 == NULL);
 		r2 = &tr2;
-		bzero(&tr2, sizeof(tr2));
+		memset(&tr2, 0, sizeof(tr2));
 	} else
 		ASSERT(r2 != NULL);
 	ktrace_enter(xfs_bmap_trace_buf,
@@ -4332,7 +4333,7 @@ xfs_bmap_read_extents(
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_read_extents";
 #endif
-	xfs_extnum_t		i;	/* index into the extents list */
+	xfs_extnum_t		i, j;	/* index into the extents list */
 	xfs_ifork_t		*ifp;	/* fork structure */
 	int			level;	/* btree level, for checking */
 	xfs_mount_t		*mp;	/* file system mount structure */
@@ -4373,28 +4374,9 @@ xfs_bmap_read_extents(
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-#ifndef __KERNEL__
 		XFS_WANT_CORRUPTED_GOTO(
 			XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)),
 			error0);
-#else	/* additional, temporary, debugging code */
-		if (!(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)))) {
-			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: FSB Sanity Check:");
-			if (!(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount))
-				cmn_err(CE_NOTE,
-					"bad AG count %d < agcount %d",
-					XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)),
-					mp->m_sb.sb_agcount);
-			if (!(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks))
-				cmn_err(CE_NOTE,
-					"bad AG BNO %d < %d",
-					XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)),
-					mp->m_sb.sb_agblocks);
-			error = XFS_ERROR(EFSCORRUPTED);
-			goto error0;
-		}
-#endif
 		bno = INT_GET(*pp, ARCH_CONVERT);
 		xfs_trans_brelse(tp, bp);
 	}
@@ -4408,7 +4390,7 @@ xfs_bmap_read_extents(
 	 * Loop over all leaf nodes.  Copy information to the extent list.
 	 */
 	for (;;) {
-		xfs_bmbt_rec_t	*frp;
+		xfs_bmbt_rec_t	*frp, *temp;
 		xfs_fsblock_t	nextbno;
 		xfs_extnum_t	num_recs;
 
@@ -4422,35 +4404,9 @@ xfs_bmap_read_extents(
 				(unsigned long long) ip->i_ino);
 			goto error0;
 		}
-#ifndef __KERNEL__
 		XFS_WANT_CORRUPTED_GOTO(
 			XFS_BMAP_SANITY_CHECK(mp, block, 0),
 			error0);
-#else	/* additional, temporary, debugging code */
-		if (!(XFS_BMAP_SANITY_CHECK(mp, block, 0))) {
-			cmn_err(CE_NOTE,
-			"xfs_bmap_read_extents: BMAP Sanity Check:");
-			if (!(INT_GET(block->bb_magic, ARCH_CONVERT) == XFS_BMAP_MAGIC))
-				cmn_err(CE_NOTE,
-					"bb_magic 0x%x",
-					INT_GET(block->bb_magic, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_level, ARCH_CONVERT) == level))
-				cmn_err(CE_NOTE,
-					"bb_level %d",
-					INT_GET(block->bb_level, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_numrecs, ARCH_CONVERT) > 0))
-				cmn_err(CE_NOTE,
-					"bb_numrecs %d",
-					INT_GET(block->bb_numrecs, ARCH_CONVERT));
-			if (!(INT_GET(block->bb_numrecs, ARCH_CONVERT) <= (mp)->m_bmap_dmxr[(level) != 0]))
-				cmn_err(CE_NOTE,
-					"bb_numrecs %d < m_bmap_dmxr[] %d",
-					INT_GET(block->bb_numrecs, ARCH_CONVERT),
-					(mp)->m_bmap_dmxr[(level) != 0]);
-			error = XFS_ERROR(EFSCORRUPTED);
-			goto error0;
-		}
-#endif
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
@@ -4462,18 +4418,21 @@ xfs_bmap_read_extents(
 		 */
 		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt,
 			block, 1, mp->m_bmap_dmxr[0]);
-		bcopy(frp, trp, num_recs * sizeof(*frp));
+		temp = trp;
+		for (j = 0; j < num_recs; j++, frp++, trp++) {
+			trp->l0 = INT_GET(frp->l0, ARCH_CONVERT);
+			trp->l1 = INT_GET(frp->l1, ARCH_CONVERT);
+		}
 		if (exntf == XFS_EXTFMT_NOSTATE) {
 			/*
 			 * Check all attribute bmap btree records and
 			 * any "older" data bmap btree records for a
 			 * set bit in the "extent flag" position.
 			 */
-			if (xfs_check_nostate_extents(trp, num_recs)) {
+			if (xfs_check_nostate_extents(temp, num_recs)) {
 				goto error0;
 			}
 		}
-		trp += num_recs;
 		i += num_recs;
 		xfs_trans_brelse(tp, bp);
 		bno = nextbno;
@@ -4650,11 +4609,6 @@ xfs_bmapi(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	mp = ip->i_mount;
@@ -5150,11 +5104,6 @@ xfs_bmapi_single(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 	       return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
@@ -5228,11 +5177,6 @@ xfs_bunmapi(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
-#ifdef __KERNEL__	/* additional, temporary, debugging code */
-		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d",
-			__FILE__, __LINE__);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	mp = ip->i_mount;
@@ -6317,7 +6261,7 @@ xfs_bmap_count_leaves(
 	int		b;
 
 	for ( b = 1; b <= numrecs; b++, frp++)
-		*count += xfs_bmbt_get_blockcount(frp);
+		*count += xfs_bmbt_disk_get_blockcount(frp);
 	return 0;
 }
 

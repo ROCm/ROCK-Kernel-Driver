@@ -152,9 +152,11 @@ client_t *snd_seq_client_use_ptr(int clientid)
 			}
 		} else if (clientid >= 64 && clientid < 128) {
 			int card = (clientid - 64) / 8;
-			if (card < snd_ecards_limit && ! card_requested[card]) {
-				card_requested[card] = 1;
-				snd_request_card(card);
+			if (card < snd_ecards_limit) {
+				if (! card_requested[card]) {
+					card_requested[card] = 1;
+					snd_request_card(card);
+				}
 				snd_seq_device_load_drivers();
 			}
 		}

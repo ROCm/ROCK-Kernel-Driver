@@ -91,13 +91,13 @@ alcor_end_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type alcor_irq_type = {
-	typename:	"ALCOR",
-	startup:	alcor_startup_irq,
-	shutdown:	alcor_disable_irq,
-	enable:		alcor_enable_irq,
-	disable:	alcor_disable_irq,
-	ack:		alcor_mask_and_ack_irq,
-	end:		alcor_end_irq,
+	.typename	= "ALCOR",
+	.startup	= alcor_startup_irq,
+	.shutdown	= alcor_disable_irq,
+	.enable		= alcor_enable_irq,
+	.disable	= alcor_disable_irq,
+	.ack		= alcor_mask_and_ack_irq,
+	.end		= alcor_end_irq,
 };
 
 static void
@@ -245,29 +245,29 @@ alcor_kill_arch(int mode)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_ALCOR)
 struct alpha_machine_vector alcor_mv __initmv = {
-	vector_name:		"Alcor",
+	.vector_name		= "Alcor",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_ALCOR_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_ALCOR_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		48,
-	device_interrupt:	alcor_device_interrupt,
+	.nr_irqs		= 48,
+	.device_interrupt	= alcor_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		alcor_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cia_init_pci,
-	kill_arch:		alcor_kill_arch,
-	pci_map_irq:		alcor_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= alcor_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cia_init_pci,
+	.kill_arch		= alcor_kill_arch,
+	.pci_map_irq		= alcor_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { cia: {
-	    gru_int_req_bits:	ALCOR_GRU_INT_REQ_BITS
+	.sys = { .cia = {
+	    .gru_int_req_bits	= ALCOR_GRU_INT_REQ_BITS
 	}}
 };
 ALIAS_MV(alcor)
@@ -275,29 +275,29 @@ ALIAS_MV(alcor)
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_XLT)
 struct alpha_machine_vector xlt_mv __initmv = {
-	vector_name:		"XLT",
+	.vector_name		= "XLT",
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
 	DO_CIA_BUS,
-	machine_check:		cia_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
-	min_io_address:		EISA_DEFAULT_IO_BASE,
-	min_mem_address:	CIA_DEFAULT_MEM_BASE,
+	.machine_check		= cia_machine_check,
+	.max_dma_address	= ALPHA_MAX_DMA_ADDRESS,
+	.min_io_address		= EISA_DEFAULT_IO_BASE,
+	.min_mem_address	= CIA_DEFAULT_MEM_BASE,
 
-	nr_irqs:		48,
-	device_interrupt:	alcor_device_interrupt,
+	.nr_irqs		= 48,
+	.device_interrupt	= alcor_device_interrupt,
 
-	init_arch:		cia_init_arch,
-	init_irq:		alcor_init_irq,
-	init_rtc:		common_init_rtc,
-	init_pci:		cia_init_pci,
-	kill_arch:		alcor_kill_arch,
-	pci_map_irq:		alcor_map_irq,
-	pci_swizzle:		common_swizzle,
+	.init_arch		= cia_init_arch,
+	.init_irq		= alcor_init_irq,
+	.init_rtc		= common_init_rtc,
+	.init_pci		= cia_init_pci,
+	.kill_arch		= alcor_kill_arch,
+	.pci_map_irq		= alcor_map_irq,
+	.pci_swizzle		= common_swizzle,
 
-	sys: { cia: {
-	    gru_int_req_bits:	XLT_GRU_INT_REQ_BITS
+	.sys = { .cia = {
+	    .gru_int_req_bits	= XLT_GRU_INT_REQ_BITS
 	}}
 };
 ALIAS_MV(xlt)

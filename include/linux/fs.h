@@ -359,6 +359,7 @@ struct block_device {
 	sector_t		bd_offset;
 	unsigned		bd_part_count;
 	int			bd_invalidated;
+	struct gendisk *	bd_disk;
 };
 
 struct inode {
@@ -1087,6 +1088,7 @@ extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
 extern struct file_operations def_fifo_fops;
 extern int ioctl_by_bdev(struct block_device *, unsigned, unsigned long);
+extern int blkdev_ioctl(struct inode *, struct file *, unsigned, unsigned long);
 extern int blkdev_get(struct block_device *, mode_t, unsigned, int);
 extern int blkdev_put(struct block_device *, int);
 extern int bd_claim(struct block_device *, void *);

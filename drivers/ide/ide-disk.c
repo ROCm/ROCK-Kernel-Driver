@@ -1871,8 +1871,10 @@ static int idedisk_attach(ide_drive_t *drive)
 		goto failed;
 	}
 	DRIVER(drive)->busy--;
+	g->minors = 1 << PARTN_BITS;
 	g->minor_shift = PARTN_BITS;
 	g->de = drive->de;
+	g->driverfs_dev = &drive->gendev;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	g->flags |= GENHD_FL_DEVFS;
 	set_capacity(g, current_capacity(drive));

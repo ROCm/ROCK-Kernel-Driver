@@ -40,6 +40,7 @@
 #include <asm/debugreg.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/nmi.h>
 
 #include <asm/smp.h>
 #include <asm/pgalloc.h>
@@ -478,17 +479,16 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 		return;
 	}
 #endif
-	printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
+	printk("Uhhuh. NMI received for unknown reason %02x on CPU %d.\n",
+		reason, smp_processor_id());
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
+static void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = inb(0x61);
-
-	++nmi_count(smp_processor_id());
-
+ 
 	if (!(reason & 0xc0)) {
 #if CONFIG_X86_LOCAL_APIC
 		/*
@@ -515,6 +515,33 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 	inb(0x71);		/* dummy */
 	outb(0x0f, 0x70);
 	inb(0x71);		/* dummy */
+}
+
+static int dummy_nmi_callback(struct pt_regs * regs, int cpu)
+{
+	return 0;
+}
+ 
+static nmi_callback_t nmi_callback = dummy_nmi_callback;
+ 
+asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
+{
+	int cpu = smp_processor_id();
+
+	++nmi_count(cpu);
+
+	if (!nmi_callback(regs, cpu))
+		default_do_nmi(regs);
+}
+
+void set_nmi_callback(nmi_callback_t callback)
+{
+	nmi_callback = callback;
+}
+
+void unset_nmi_callback(void)
+{
+	nmi_callback = dummy_nmi_callback;
 }
 
 /*

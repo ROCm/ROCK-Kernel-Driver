@@ -568,7 +568,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 				   atomic_read(&SCpnt->host->host_active),
 				   SCpnt->host->host_failed));
 
-	if(SDpnt->queue_depth > SDpnt->new_queue_depth) {
+	if(SDpnt->current_queue_depth > SDpnt->new_queue_depth) {
 		Scsi_Cmnd *prev, *next;
 		/*
 		 * Release the command block and decrement the queue
@@ -582,10 +582,10 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 		else
 			prev->next = next->next;
 		kfree((char *)SCpnt);
-		SDpnt->queue_depth--;
-	} else if(SDpnt->queue_depth < SDpnt->new_queue_depth) {
+		SDpnt->current_queue_depth--;
+	} else if(SDpnt->current_queue_depth < SDpnt->new_queue_depth) {
 		alloc_cmd = 1;
-		SDpnt->queue_depth++;
+		SDpnt->current_queue_depth++;
 	}
 	spin_unlock_irqrestore(&device_request_lock, flags);
 
@@ -633,7 +633,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 			spin_unlock_irqrestore(&device_request_lock, flags);
 		} else {
 			spin_lock_irqsave(&device_request_lock, flags);
-			SDpnt->queue_depth--;
+			SDpnt->current_queue_depth--;
 			spin_unlock_irqrestore(&device_request_lock, flags);
 		}
 	}
@@ -1505,7 +1505,7 @@ void scsi_release_commandblocks(Scsi_Device * SDpnt)
 		SDpnt->device_queue = SCnext = SCpnt->next;
 		kfree((char *) SCpnt);
 	}
-	SDpnt->queue_depth = 0;
+	SDpnt->current_queue_depth = 0;
 	SDpnt->new_queue_depth = 0;
 	spin_unlock_irqrestore(&device_request_lock, flags);
 }
@@ -1529,7 +1529,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 	unsigned long flags;
 	Scsi_Cmnd *SCpnt;
 
-	if (SDpnt->queue_depth != 0)
+	if (SDpnt->current_queue_depth != 0)
 		return;
 		
 	SCpnt = (Scsi_Cmnd *) kmalloc(sizeof(Scsi_Cmnd), GFP_ATOMIC |
@@ -1567,7 +1567,7 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
 	spin_lock_irqsave(&device_request_lock, flags);
 	if(SDpnt->new_queue_depth == 0)
 		SDpnt->new_queue_depth = 1;
-	SDpnt->queue_depth++;
+	SDpnt->current_queue_depth++;
 	SCpnt->next = SDpnt->device_queue;
 	SDpnt->device_queue = SCpnt;
 	spin_unlock_irqrestore(&device_request_lock, flags);
@@ -1597,12 +1597,13 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt)
  *
  * 		If cmdblocks != 0 then we are a live device.  We just set the
  * 		new_queue_depth variable and when the scsi completion handler
- * 		notices that queue_depth != new_queue_depth it will work to
- *		rectify the situation.  If new_queue_depth is less than current
- *		queue_depth, then it will free the completed command instead of
- *		putting it back on the free list and dec queue_depth.  Otherwise
- *		it will try to allocate a new command block for the device and
- *		put it on the free list along with the command that is being
+ * 		notices that current_queue_depth != new_queue_depth it will
+ * 		work to rectify the situation.  If new_queue_depth is less than
+ * 		current_queue_depth, then it will free the completed command
+ * 		instead of putting it back on the free list and dec
+ * 		current_queue_depth.  Otherwise	it will try to allocate a new
+ * 		command block for the device and put it on the free list along
+ * 		with the command that is being
  *		completed.  Obviously, if the device isn't doing anything then
  *		neither is this code, so it will bring the devices queue depth
  *		back into line when the device is actually being used.  This
@@ -1648,14 +1649,11 @@ void scsi_adjust_queue_depth(Scsi_Device *SDpnt, int tagged, int tags)
 				SDpnt->channel, SDpnt->id, SDpnt->lun); 
 		case 0:
 			SDpnt->ordered_tags = SDpnt->simple_tags = 0;
-			if(SDpnt->host->cmd_per_lun)
-				SDpnt->new_queue_depth = SDpnt->host->cmd_per_lun;
-			else
-				SDpnt->new_queue_depth = 1;
+			SDpnt->new_queue_depth = tags;
 			break;
 	}
 	spin_unlock_irqrestore(&device_request_lock, flags);
-	if(SDpnt->queue_depth == 0)
+	if(SDpnt->current_queue_depth == 0)
 	{
 		scsi_build_commandblocks(SDpnt);
 	}
@@ -2116,7 +2114,7 @@ int scsi_register_host(Scsi_Host_Template * tpnt)
 							(*sdtpnt->attach) (SDpnt);
 					if (SDpnt->attached) {
 						scsi_build_commandblocks(SDpnt);
-						if (SDpnt->queue_depth == 0)
+						if (SDpnt->current_queue_depth == 0)
 							out_of_space = 1;
 					}
 				}
@@ -2405,10 +2403,10 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 			 * If this driver attached to the device, and don't have any
 			 * command blocks for this device, allocate some.
 			 */
-			if (SDpnt->attached && SDpnt->queue_depth == 0) {
+			if (SDpnt->attached && SDpnt->current_queue_depth == 0) {
 				SDpnt->online = TRUE;
 				scsi_build_commandblocks(SDpnt);
-				if (SDpnt->queue_depth == 0)
+				if (SDpnt->current_queue_depth == 0)
 					out_of_space = 1;
 			}
 		}
@@ -2816,7 +2814,7 @@ Scsi_Device * scsi_get_host_dev(struct Scsi_Host * SHpnt)
 	SDpnt->new_queue_depth = 1;
         
 	scsi_build_commandblocks(SDpnt);
-	if(SDpnt->queue_depth == 0) {
+	if(SDpnt->current_queue_depth == 0) {
 		kfree(SDpnt);
 		return NULL;
 	}

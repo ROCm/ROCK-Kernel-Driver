@@ -57,34 +57,13 @@ EXPORT_SYMBOL(blk_set_probe);	/* Will go away */
  * This function registers the partitioning information in @gp
  * with the kernel.
  */
-static void add_gendisk(struct gendisk *gp)
-{
-	struct hd_struct *p = NULL;
-
-	if (gp->minor_shift) {
-		size_t size = sizeof(struct hd_struct)*((1<<gp->minor_shift)-1);
-		p = kmalloc(size, GFP_KERNEL);
-		if (!p) {
-			printk(KERN_ERR "out of memory; no partitions for %s\n",
-				gp->disk_name);
-			gp->minor_shift = 0;
-		} else
-			memset(p, 0, size);
-	}
-	gp->part = p;
-
-	write_lock(&gendisk_lock);
-	list_add(&gp->list, &gendisks[gp->major].list);
-	if (gp->minor_shift)
-		list_add_tail(&gp->full_list, &gendisk_list);
-	else
-		INIT_LIST_HEAD(&gp->full_list);
-	write_unlock(&gendisk_lock);
-}
-
 void add_disk(struct gendisk *disk)
 {
-	add_gendisk(disk);
+	write_lock(&gendisk_lock);
+	list_add(&disk->list, &gendisks[disk->major].list);
+	list_add_tail(&disk->full_list, &gendisk_list);
+	write_unlock(&gendisk_lock);
+	disk->flags |= GENHD_FL_UP;
 	register_disk(disk);
 }
 
@@ -118,6 +97,8 @@ get_gendisk(dev_t dev, int *part)
 	read_lock(&gendisk_lock);
 	if (gendisks[major].get) {
 		disk = gendisks[major].get(minor);
+		if (disk)
+			get_disk(disk);
 		read_unlock(&gendisk_lock);
 		return disk;
 	}
@@ -125,8 +106,9 @@ get_gendisk(dev_t dev, int *part)
 		disk = list_entry(p, struct gendisk, list);
 		if (disk->first_minor > minor)
 			continue;
-		if (disk->first_minor + (1<<disk->minor_shift) <= minor)
+		if (disk->first_minor + disk->minors <= minor)
 			continue;
+		get_disk(disk);
 		read_unlock(&gendisk_lock);
 		*part = minor - disk->first_minor;
 		return disk;
@@ -134,8 +116,6 @@ get_gendisk(dev_t dev, int *part)
 	read_unlock(&gendisk_lock);
 	return NULL;
 }
-
-EXPORT_SYMBOL(get_gendisk);
 
 #ifdef CONFIG_PROC_FS
 /* iterator */
@@ -173,7 +153,7 @@ static int show_partition(struct seq_file *part, void *v)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
 	/* Don't show non-partitionable devices or empty devices */
-	if (!get_capacity(sgp))
+	if (!get_capacity(sgp) || sgp->minors == 1)
 		return 0;
 
 	/* show the full disk and all non-0 size partitions of it */
@@ -181,7 +161,7 @@ static int show_partition(struct seq_file *part, void *v)
 		sgp->major, sgp->first_minor,
 		(unsigned long long)get_capacity(sgp) >> 1,
 		disk_name(sgp, 0, buf));
-	for (n = 0; n < (1<<sgp->minor_shift) - 1; n++) {
+	for (n = 0; n < sgp->minors - 1; n++) {
 		if (sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10llu %s\n",
@@ -210,6 +190,10 @@ struct device_class disk_devclass = {
 	.name		= "disk",
 };
 
+static struct bus_type disk_bus = {
+	name:		"block",
+};
+
 int __init device_init(void)
 {
 	int i;
@@ -218,6 +202,7 @@ int __init device_init(void)
 		INIT_LIST_HEAD(&gendisks[i].list);
 	blk_dev_init();
 	devclass_register(&disk_devclass);
+	bus_register(&disk_bus);
 	return 0;
 }
 
@@ -225,17 +210,51 @@ __initcall(device_init);
 
 EXPORT_SYMBOL(disk_devclass);
 
-struct gendisk *alloc_disk(void)
+static void disk_release(struct device *dev)
+{
+	struct gendisk *disk = dev->driver_data;
+	kfree(disk->part);
+	kfree(disk);
+}
+
+struct gendisk *alloc_disk(int minors)
 {
 	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
-	if (disk)
+	if (disk) {
 		memset(disk, 0, sizeof(struct gendisk));
+		if (minors > 1) {
+			int size = (minors - 1) * sizeof(struct hd_struct);
+			disk->part = kmalloc(size, GFP_KERNEL);
+			if (!disk->part) {
+				kfree(disk);
+				return NULL;
+			}
+			memset(disk->part, 0, size);
+		}
+		disk->minors = minors;
+		while (minors >>= 1)
+			disk->minor_shift++;
+		INIT_LIST_HEAD(&disk->full_list);
+		disk->disk_dev.bus = &disk_bus;
+		disk->disk_dev.release = disk_release;
+		disk->disk_dev.driver_data = disk;
+		device_initialize(&disk->disk_dev);
+	}
+	return disk;
+}
+
+struct gendisk *get_disk(struct gendisk *disk)
+{
+	atomic_inc(&disk->disk_dev.refcount);
 	return disk;
 }
 
 void put_disk(struct gendisk *disk)
 {
-	kfree(disk);
+	if (disk)
+		put_device(&disk->disk_dev);
 }
+
 EXPORT_SYMBOL(alloc_disk);
+EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);

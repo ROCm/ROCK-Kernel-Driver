@@ -172,7 +172,8 @@ else
   if [ "$CONFIG_X86_NUMA" = "y" ]; then
      #Platform Choices
      bool 'Multiquad (IBM/Sequent) NUMAQ support' CONFIG_X86_NUMAQ
-     if [ "$CONFIG_X86_NUMAQ" = "y" ]; then
+     bool 'IBM x440 (Summit/EXA) support' CONFIG_X86_SUMMIT
+     if [ "$CONFIG_X86_NUMAQ" = "y" -o "$CONFIG_X86_SUMMIT" = "y" ]; then
         define_bool CONFIG_CLUSTERED_APIC y
      fi
      # Common NUMA Features
@@ -442,6 +443,8 @@ source drivers/usb/Config.in
 
 source net/bluetooth/Config.in
 
+source arch/i386/oprofile/Config.in
+ 
 mainmenu_option next_comment
 comment 'Kernel hacking'
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then

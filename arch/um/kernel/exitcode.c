@@ -8,6 +8,9 @@
 #include "linux/proc_fs.h"
 #include "asm/uaccess.h"
 
+/* If read and write race, the read will still atomically read a valid
+ * value.
+ */
 int uml_exitcode = 0;
 
 static int read_proc_exitcode(char *page, char **start, off_t off,

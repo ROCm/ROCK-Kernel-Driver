@@ -20,6 +20,7 @@ EXPORT_SYMBOL(__const_udelay);
 EXPORT_SYMBOL(sys_waitpid);
 EXPORT_SYMBOL(task_size);
 EXPORT_SYMBOL(__do_copy_from_user);
+EXPORT_SYMBOL(__do_copy_to_user);
 EXPORT_SYMBOL(__do_strncpy_from_user);
 EXPORT_SYMBOL(__do_strnlen_user); 
 EXPORT_SYMBOL(flush_tlb_range);

@@ -149,7 +149,7 @@ xfs_growfs_data_private(
 			sizeof(xfs_perag_t) * nagcount,
 			sizeof(xfs_perag_t) * oagcount,
 			KM_SLEEP);
-		bzero(&mp->m_perag[oagcount],
+		memset(&mp->m_perag[oagcount], 0,
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mp->m_flags |= XFS_MOUNT_32BITINODES;
 		xfs_initialize_perag(mp, nagcount);
@@ -175,7 +175,7 @@ xfs_growfs_data_private(
 				  disk_addr,
 				  sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
-		bzero(agf, mp->m_sb.sb_sectsize);
+		memset(agf, 0, mp->m_sb.sb_sectsize);
 		INT_SET(agf->agf_magicnum, ARCH_CONVERT, XFS_AGF_MAGIC);
 		INT_SET(agf->agf_versionnum, ARCH_CONVERT, XFS_AGF_VERSION);
 		INT_SET(agf->agf_seqno, ARCH_CONVERT, agno);
@@ -208,7 +208,7 @@ xfs_growfs_data_private(
 				  disk_addr,
 				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
-		bzero(agi, mp->m_sb.sb_sectsize);
+		memset(agi, 0, mp->m_sb.sb_sectsize);
 		INT_SET(agi->agi_magicnum, ARCH_CONVERT, XFS_AGI_MAGIC);
 		INT_SET(agi->agi_versionnum, ARCH_CONVERT, XFS_AGI_VERSION);
 		INT_SET(agi->agi_seqno, ARCH_CONVERT, agno);
@@ -233,7 +233,7 @@ xfs_growfs_data_private(
 			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		bzero(block, bsize);
+		memset(block, 0, bsize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTB_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
@@ -255,7 +255,7 @@ xfs_growfs_data_private(
 			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		bzero(block, bsize);
+		memset(block, 0, bsize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTC_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
@@ -278,7 +278,7 @@ xfs_growfs_data_private(
 			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
-		bzero(block, bsize);
+		memset(block, 0, bsize);
 		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_IBT_MAGIC);
 		INT_ZERO(block->bb_level, ARCH_CONVERT);
 		INT_ZERO(block->bb_numrecs, ARCH_CONVERT);
@@ -353,7 +353,7 @@ xfs_growfs_data_private(
 				  sectbb, 0, &bp);
 		if (error) {
 			xfs_fs_cmn_err(CE_WARN, mp,
-			"error %d reading secondary superblock for ag %d\n",
+			"error %d reading secondary superblock for ag %d",
 				error, agno);
 			break;
 		}
@@ -368,7 +368,7 @@ xfs_growfs_data_private(
 			continue;
 		} else {
 			xfs_fs_cmn_err(CE_WARN, mp,
-		"write error %d updating secondary superblock for ag %d\n",
+		"write error %d updating secondary superblock for ag %d",
 				error, agno);
 			break; /* no point in continuing */
 		}

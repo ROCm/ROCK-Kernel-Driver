@@ -1086,8 +1086,6 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 					   unsigned int cmd, unsigned long arg )
 {
 	int dev = DEVICE_NR(inode->i_rdev);
-	if (dev >= NDevices)
-		return -EINVAL;
 	switch (cmd) {
 	  case HDIO_GETGEO:
 		/* HDIO_GETGEO is supported more for getting the partition's
@@ -1130,13 +1128,8 @@ static int acsi_ioctl( struct inode *inode, struct file *file,
 
 static int acsi_open( struct inode * inode, struct file * filp )
 {
-	int  device;
-	struct acsi_info_struct *aip;
-
-	device = DEVICE_NR(inode->i_rdev);
-	if (device >= NDevices)
-		return -ENXIO;
-	aip = &acsi_info[device];
+	int device = DEVICE_NR(inode->i_rdev);
+	struct acsi_info_struct *aip = &acsi_info[device];
 
 	if (access_count[device] == 0 && aip->removable) {
 #if 0
@@ -1729,7 +1722,7 @@ int acsi_init( void )
 #endif
 	err = -ENOMEM;
 	for( i = 0; i < NDevices; ++i ) {
-		acsi_gendisk[i] = alloc_disk();
+		acsi_gendisk[i] = alloc_disk(16);
 		if (!acsi_gendisk[i])
 			goto out4;
 	}
@@ -1739,7 +1732,10 @@ int acsi_init( void )
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
 		disk->major = MAJOR_NR;
 		disk->first_minor = i << 4;
-		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
+		if (acsi_info[i].type != HARDDISK) {
+			disk->minor_shift = 0;
+			disk->minors = 1;
+		}
 		disk->fops = &acsi_fops;
 		set_capacity(disk, acsi_info[i].size);
 		add_disk(disk);

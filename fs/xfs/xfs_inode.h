@@ -98,7 +98,6 @@ struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct xfs_dquot;
-struct pm;
 
 
 /*
@@ -118,23 +117,6 @@ typedef struct xfs_gap {
 	xfs_fileoff_t	xg_offset_fsb;
 	xfs_extlen_t	xg_count_fsb;
 } xfs_gap_t;
-
-/*
- * This structure is used to hold common pieces of the buffer
- * and file for xfs_dio_write and xfs_dio_read.
- */
-typedef struct xfs_dio {
-	struct xfs_buf	*xd_bp;
-	bhv_desc_t	*xd_bdp;
-	struct xfs_inode *xd_ip;
-	struct xfs_iocore *xd_io;
-	struct cred	*xd_cr;
-	struct pm	*xd_pmp;
-	int		xd_blkalgn;
-	int		xd_ioflag;
-	xfs_off_t	xd_start;
-	size_t		xd_length;
-} xfs_dio_t;
 
 typedef struct dm_attrs_s {
 	__uint32_t	da_dmevmask;	/* DMIG event mask */
@@ -516,7 +498,7 @@ int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, xfs_daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
-			   dev_t, struct cred *, xfs_prid_t, int,
+			   xfs_dev_t, struct cred *, xfs_prid_t, int,
 			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
 void		xfs_xlate_dinode_core(xfs_caddr_t, struct xfs_dinode_core *, int,
 			   xfs_arch_t);
@@ -538,7 +520,7 @@ void		xfs_iext_realloc(xfs_inode_t *, int, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
-int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
+int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
 int		xfs_ibusy_check(xfs_inode_t *, int);
@@ -550,7 +532,7 @@ void		xfs_lock_inodes(xfs_inode_t **, int, int, uint);
 
 #define xfs_ipincount(ip)	((unsigned int) atomic_read(&ip->i_pincount))
 
-
+void xfs_revalidate_inode(struct xfs_mount *, vnode_t *vp, xfs_inode_t *);
 
 #ifdef DEBUG
 void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);

@@ -91,14 +91,14 @@ linvfs_mknod(
 		mode &= ~current->fs->umask;
 #endif
 
-	bzero(&va, sizeof(va));
+	memset(&va, 0, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = IFTOVT(mode);
 	va.va_mode = mode;
 
 	switch (mode & S_IFMT) {
 	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
-		va.va_rdev = rdev;
+		va.va_rdev = XFS_MKDEV(MAJOR(rdev), MINOR(rdev));
 		va.va_mask |= AT_RDEV;
 		/*FALLTHROUGH*/
 	case S_IFREG:
@@ -122,8 +122,6 @@ linvfs_mknod(
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
-		/* linvfs_revalidate_core returns (-) errors */
-		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
 		mark_inode_dirty_sync(ip);
@@ -186,7 +184,6 @@ linvfs_lookup(
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	if (error && (error != ENOENT))
 		return ERR_PTR(-error);
@@ -262,14 +259,13 @@ linvfs_symlink(
 
 	dvp = LINVFS_GET_VP(dir);
 
-	bzero(&va, sizeof(va));
+	memset(&va, 0, sizeof(va));
 	va.va_type = VLNK;
-	va.va_mode = 0777 & ~current->fs->umask;
-	va.va_mask = AT_TYPE|AT_MODE; /* AT_PROJID? */
+	va.va_mode = irix_symlink_mode ? 0777 & ~current->fs->umask : S_IRWXUGO;
+	va.va_mask = AT_TYPE|AT_MODE;
 
 	error = 0;
-	VOP_SYMLINK(dvp, dentry, &va, (char *)symname,
-							&cvp, NULL, error);
+	VOP_SYMLINK(dvp, dentry, &va, (char *)symname, &cvp, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
 		ASSERT(cvp->v_type == VLNK);
@@ -278,10 +274,9 @@ linvfs_symlink(
 			error = ENOMEM;
 			VN_RELE(cvp);
 		} else {
-			/* linvfs_revalidate_core returns (-) errors */
-			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
 			validate_fields(dir);
+			validate_fields(ip); /* size needs update */
 			mark_inode_dirty_sync(ip);
 			mark_inode_dirty_sync(dir);
 		}
@@ -369,7 +364,7 @@ linvfs_readlink(
 }
 
 /*
- * careful here - this function can get called recusively, so
+ * careful here - this function can get called recursively, so
  * we need to be very careful about how much stack we use.
  * uio is kmalloced for this reason...
  */
@@ -441,16 +436,6 @@ linvfs_permission(
  * from the results of a getattr. This gets called out of things
  * like stat.
  */
-int
-linvfs_revalidate_core(
-	struct inode	*inode,
-	int		flags)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-
-	/* vn_revalidate returns (-) error so this is ok */
-	return vn_revalidate(vp, flags);
-}
 
 STATIC int
 linvfs_getattr(
@@ -463,7 +448,7 @@ linvfs_getattr(
 	int		error = 0;
 
 	if (unlikely(vp->v_flag & VMODIFIED)) {
-		error = linvfs_revalidate_core(inode, 0);
+		error = vn_revalidate(vp);
 	}
 	if (!error)
 		generic_fillattr(inode, stat);
@@ -528,7 +513,7 @@ linvfs_setattr(
 	}
 
 	if (!error) {
-		vn_revalidate(vp, 0);
+		vn_revalidate(vp);
 		mark_inode_dirty_sync(inode);
 	}
 	return error;
@@ -618,29 +603,16 @@ linvfs_setxattr(
 		error = -ENOATTR;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_ACCESS);
-			if (!error) {
-				VMODIFY(vp);
-				error = linvfs_revalidate_core(inode, 0);
-			}
 		}
 		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
-			error = linvfs_revalidate_core(inode, 0);
-			if (error)
-				return error;
 			error = xfs_acl_vset(vp, data, size, _ACL_TYPE_DEFAULT);
-			if (!error) {
-				VMODIFY(vp);
-				error = linvfs_revalidate_core(inode, 0);
-			}
 		}
 		else if (strcmp(p, POSIXCAP) == 0) {
 			error = xfs_cap_vset(vp, data, size);
+		}
+		if (!error) {
+			error = vn_revalidate(vp);
 		}
 		return error;
 	}
@@ -689,19 +661,9 @@ linvfs_getxattr(
 		error = -ENOATTR;
 		p += xfs_namespaces[SYSTEM_NAMES].namelen;
 		if (strcmp(p, POSIXACL_ACCESS) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
 		}
 		else if (strcmp(p, POSIXACL_DEFAULT) == 0) {
-			if (vp->v_flag & VMODIFIED) {
-				error = linvfs_revalidate_core(inode, 0);
-				if (error)
-					return error;
-			}
 			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
 		}
 		else if (strcmp(p, POSIXCAP) == 0) {

@@ -171,14 +171,18 @@ void trap_init(void)
 
 spinlock_t trap_lock = SPIN_LOCK_UNLOCKED;
 
-void lock_trap(void)
-{
-	spin_lock(&trap_lock);
-}
+static int trap_index = 0;
 
-void unlock_trap(void)
+int next_trap_index(int limit)
 {
+	int ret;
+
+	spin_lock(&trap_lock);
+	ret = trap_index;
+	if(++trap_index == limit)
+		trap_index = 0;
 	spin_unlock(&trap_lock);
+	return(ret);
 }
 
 extern int debugger_pid;
@@ -209,6 +213,7 @@ static struct chan_opts opts = {
 	tramp_stack :	0,
 };
 
+/* Accessed by the tracing thread, which automatically serializes access */
 static void *xterm_data;
 static int xterm_fd;
 

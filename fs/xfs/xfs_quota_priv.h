@@ -181,7 +181,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 	  vmap_t dqvmap;		\
 	  vnode_t *dqvp;		\
 	  dqvp = XFS_ITOV(ip);		\
-	  VMAP(dqvp, ip, dqvmap);	\
+	  VMAP(dqvp, dqvmap);		\
 	  VN_RELE(dqvp);		\
 	}
 

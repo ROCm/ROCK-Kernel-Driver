@@ -41,6 +41,10 @@
 #include "2_5compat.h"
 #include "os.h"
 
+/* This is a per-cpu array.  A processor only modifies its entry and it only
+ * cares about its entry, so it's OK if another processor is modifying its
+ * entry.
+ */
 struct cpu_task cpu_tasks[NR_CPUS] = { [0 ... NR_CPUS - 1] = { -1, NULL } };
 
 struct task_struct *get_task(int pid, int require)
@@ -86,7 +90,7 @@ int pid_to_processor_id(int pid)
 {
 	int i;
 
-	for(i = 0; i < num_online_cpus(); i++){
+	for(i = 0; i < ncpus; i++){
 		if(cpu_tasks[i].pid == pid) return(i);
 	}
 	return(-1);
@@ -152,12 +156,19 @@ static void new_thread_handler(int sig)
 	current->thread.regs.regs.sc = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.switch_pipe[0]);
 
+	block_signals();
+#ifdef CONFIG_SMP
+	schedule_tail(NULL);
+#endif
+	enable_timer();
 	free_page(current->thread.temp_stack);
 	set_cmdline("(kernel thread)");
 	force_flush_all();
 
 	current->thread.prev_sched = NULL;
 	change_sig(SIGUSR1, 1);
+	change_sig(SIGVTALRM, 1);
+	change_sig(SIGPROF, 1);
 	unblock_signals();
 	if(!run_kernel_thread(fn, arg, &current->thread.jmp))
 		do_exit(0);
@@ -165,7 +176,9 @@ static void new_thread_handler(int sig)
 
 static int new_thread_proc(void *stack)
 {
-	block_signals();
+	change_sig(SIGIO, 0);
+	change_sig(SIGVTALRM, 0);
+	change_sig(SIGPROF, 0);
 	init_new_thread(stack, new_thread_handler);
 	os_usr1_process(os_getpid());
 	return(0);
@@ -204,6 +217,9 @@ void *switch_to(void *prev, void *next, void *last)
 	unsigned long flags;
 	int vtalrm, alrm, prof, err, cpu;
 	char c;
+	/* jailing and SMP are incompatible, so this doesn't need to be 
+	 * made per-cpu 
+	 */
 	static int reading;
 
 	from = prev;
@@ -229,7 +245,7 @@ void *switch_to(void *prev, void *next, void *last)
 	set_current(to);
 
 	reading = 0;
-	err = user_write(to->thread.switch_pipe[1], &c, sizeof(c));
+	err = os_write_file(to->thread.switch_pipe[1], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("write of switch_pipe failed, errno = %d", -err);
 
@@ -237,7 +253,7 @@ void *switch_to(void *prev, void *next, void *last)
 	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
 		os_kill_process(os_getpid());
 
-	err = user_read(from->thread.switch_pipe[0], &c, sizeof(c));
+	err = os_read_file(from->thread.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("read of switch_pipe failed, errno = %d", -err);
 
@@ -298,13 +314,16 @@ void exit_thread(void)
  * onto the signal frame.
  */
 
-extern int hit_me;
-
 void finish_fork_handler(int sig)
 {
 	current->thread.regs.regs.sc = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.switch_pipe[0]);
-	
+
+#ifdef CONFIG_SMP	
+	schedule_tail(NULL);
+#endif
+	enable_timer();
+	change_sig(SIGVTALRM, 1);
 	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect(uml_reserved, high_physmem - uml_reserved, 1, 1, 0, 1);
@@ -313,7 +332,6 @@ void finish_fork_handler(int sig)
 	current->thread.prev_sched = NULL;
 
 	free_page(current->thread.temp_stack);
-	block_signals();
 	change_sig(SIGUSR1, 0);
 	set_user_mode(current);
 }
@@ -339,7 +357,9 @@ int fork_tramp(void *stack)
 {
 	int sig = sigusr1;
 
-	block_signals();
+	change_sig(SIGIO, 0);
+	change_sig(SIGVTALRM, 0);
+	change_sig(SIGPROF, 0);
 	init_new_thread(stack, finish_fork_handler);
 
 	kill(os_getpid(), sig);
@@ -474,7 +494,7 @@ int current_pid(void)
 
 void default_idle(void)
 {
- 	if(current->thread_info->cpu == 0) idle_timer();
+	idle_timer();
 
 	atomic_inc(&init_mm.mm_count);
 	current->mm = &init_mm;
@@ -644,6 +664,7 @@ char *uml_strdup(char *string)
 	return(new);
 }
 
+/* Changed by jail_setup, which is a setup */
 int jail = 0;
 
 int __init jail_setup(char *line, int *add)
@@ -708,17 +729,14 @@ static void mprotect_kernel_mem(int w)
 	mprotect_kernel_vm(w);
 }
 
-int jail_timer_off = 0;
-
+/* No SMP problems since jailing and SMP are incompatible */
 void unprotect_kernel_mem(void)
 {
 	mprotect_kernel_mem(1);
-	jail_timer_off = 0;
 }
 
 void protect_kernel_mem(void)
 {
-	jail_timer_off = 1;
 	mprotect_kernel_mem(0);
 }
 
@@ -749,9 +767,11 @@ void set_thread_sc(void *sc)
 
 int smp_sigio_handler(void)
 {
+	int cpu = current->thread_info->cpu;
 #ifdef CONFIG_SMP
-	IPI_handler(hard_smp_processor_id());
-	if (hard_smp_processor_id() != 0) return(1);
+	IPI_handler(cpu);
+	if(cpu != 0)
+		return(1);
 #endif
 	return(0);
 }
@@ -759,6 +779,11 @@ int smp_sigio_handler(void)
 int um_in_interrupt(void)
 {
 	return(in_interrupt());
+}
+
+int cpu(void)
+{
+	return(current->thread_info->cpu);
 }
 
 /*

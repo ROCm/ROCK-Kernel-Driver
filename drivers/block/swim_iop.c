@@ -188,7 +188,7 @@ int swimiop_init(void)
 	printk("SWIM-IOP: detected %d installed drives.\n", floppy_count);
 
 	for (i = 0; i < floppy_count; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
 		disk->major = MAJOR_NR;

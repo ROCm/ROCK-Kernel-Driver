@@ -72,9 +72,9 @@ uiomove(void *cp, size_t n, enum uio_rw rw, struct uio *uio)
 
 		case UIO_SYSSPACE:
 			if (rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				memcpy(iov->iov_base, cp, cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				memcpy(cp, iov->iov_base, cnt);
 			break;
 
 		default:

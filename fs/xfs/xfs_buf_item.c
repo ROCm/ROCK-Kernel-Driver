@@ -766,7 +766,7 @@ xfs_buf_item_init(
 	 * to have logged.
 	 */
 	bip->bli_orig = (char *)kmem_alloc(XFS_BUF_COUNT(bp), KM_SLEEP);
-	bcopy(XFS_BUF_PTR(bp), bip->bli_orig, XFS_BUF_COUNT(bp));
+	memcpy(bip->bli_orig, XFS_BUF_PTR(bp), XFS_BUF_COUNT(bp));
 	bip->bli_logged = (char *)kmem_zalloc(XFS_BUF_COUNT(bp) / NBBY, KM_SLEEP);
 #endif
 

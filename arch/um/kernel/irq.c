@@ -78,6 +78,7 @@ struct hw_interrupt_type no_irq_type = {
 	end_none
 };
 
+/* Not changed */
 volatile unsigned long irq_err_count;
 
 /*
@@ -87,6 +88,7 @@ volatile unsigned long irq_err_count;
 int get_irq_list(char *buf)
 {
 	int i, j;
+	unsigned long flags;
 	struct irqaction * action;
 	char *p = buf;
 
@@ -96,9 +98,10 @@ int get_irq_list(char *buf)
 	*p++ = '\n';
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			continue;
+			goto end;
 		p += sprintf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
 		p += sprintf(p, "%10u ", kstat_irqs(i));
@@ -113,6 +116,8 @@ int get_irq_list(char *buf)
 		for (action=action->next; action; action = action->next)
 			p += sprintf(p, ", %s", action->name);
 		*p++ = '\n';
+	end:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
 	p += sprintf(p, "\n");
 #ifdef notdef
@@ -548,11 +553,15 @@ void free_irq(unsigned int irq, void *dev_id)
 	}
 }
 
+/* These are initialized by sysctl_init, which is called from init/main.c */
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
-unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+/* These are read and written as longs, so a read won't see a partial write
+ * even during a race.
+ */
+static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 
 #define HEX_DIGITS 8
 
@@ -679,6 +688,7 @@ static void register_irq_proc (unsigned int irq)
 	smp_affinity_entry[irq] = entry;
 }
 
+/* Read and written as a long */
 unsigned long prof_cpu_mask = -1;
 
 void __init init_irq_proc (void)
@@ -702,6 +712,21 @@ void __init init_irq_proc (void)
 	 */
 	for (i = 0; i < NR_IRQS; i++)
 		register_irq_proc(i);
+}
+
+static spinlock_t irq_spinlock = SPIN_LOCK_UNLOCKED;
+
+unsigned long irq_lock(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&irq_spinlock, flags);
+	return(flags);
+}
+
+void irq_unlock(unsigned long flags)
+{
+	spin_unlock_irqrestore(&irq_spinlock, flags);
 }
 
 unsigned long probe_irq_on(void)

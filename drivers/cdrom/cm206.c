@@ -1470,12 +1470,11 @@ int __init cm206_init(void)
 		printk(KERN_INFO "Cannot register for major %d!\n", MAJOR_NR);
 		goto out_blkdev;
 	}
-	disk = alloc_disk();
+	disk = alloc_disk(1);
 	if (!disk)
 		goto out_disk;
 	disk->major = MAJOR_NR;
 	disk->first_minor = 0;
-	disk->minor_shift = 0;
 	sprintf(disk->disk_name, "cm206");
 	disk->fops = &cm206_bdops;
 	disk->flags = GENHD_FL_CD;

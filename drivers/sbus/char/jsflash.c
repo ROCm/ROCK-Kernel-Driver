@@ -104,7 +104,6 @@ static void jsf_outl(unsigned long addr, __u32 data)
 struct jsfd_part {
 	unsigned long dbase;
 	unsigned long dsize;
-	int refcnt;
 };
 
 struct jsflash {
@@ -454,51 +453,9 @@ static int jsf_open(struct inode * inode, struct file * filp)
 	return 0;	/* XXX What security? */
 }
 
-static int jsfd_open(struct inode *inode, struct file *file)
-{
-	struct jsfd_part *jdp;
-	int dev;
-
-	if (!inode)
-		return -EINVAL;
-	dev = MINOR(inode->i_rdev);
-	if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-		printk(KERN_ALERT "jsfd_open: illegal minor %d\n", dev);
-		return -ENODEV;
-	}
-
-	jdp = &jsf0.dv[dev];
-	jdp->refcnt++;
-
-	return 0;
-}
-
 static int jsf_release(struct inode *inode, struct file *file)
 {
 	jsf0.busy = 0;
-	return 0;
-}
-
-static int jsfd_release(struct inode *inode, struct file *file)
-{
-	struct jsfd_part *jdp;
-	int dev;
-
-	if (!inode)
-		return -ENODEV;
-	dev = MINOR(inode->i_rdev);
-	if (dev >= JSF_MAX || (dev & JSF_PART_MASK) >= JSF_NPART) {
-		printk(KERN_ALERT "jsfd_release: illegal minor %d\n", dev);
-		return -ENODEV;
-	}
-
-	jdp = &jsf0.dv[dev];
-	if (jdp->refcnt <= 0) {
-		printk(KERN_ALERT "jsfd_release: bad ref on minor %d\n", dev);
-	} else {
-		--jdp->refcnt;
-	}
-	/* N.B. Doesn't lo->file need an fput?? */
 	return 0;
 }
 
@@ -517,8 +474,6 @@ static struct miscdevice jsf_dev = { JSF_MINOR, "jsflash", &jsf_fops };
 
 static struct block_device_operations jsfd_fops = {
 	.owner =	THIS_MODULE,
-	.open =		jsfd_open,
-	.release =	jsfd_release,
 };
 
 static int jsflash_init(void)
@@ -622,7 +577,7 @@ static int jsfd_init(void)
 
 	err = -ENOMEM;
 	for (i = 0; i < JSF_MAX; i++) {
-		struct gendisk *disk = alloc_disk();
+		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			goto out;
 		jsfd_disk[i] = disk;
@@ -642,13 +597,10 @@ static int jsfd_init(void)
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */
 		jdp = &jsf->dv[i&JSF_PART_MASK];
 
-		jdp->refcnt = 0;
-
 		disk->major = JSFD_MAJOR;
 		disk->first_minor = i;
 		sprintf(disk->disk_name, "jsfd%d", i);
 		disk->fops = &jsfd_fops;
-		disk->minor_shift = 0;
 		set_capacity(disk, jdp->dsize >> 9);
 		add_disk(disk);
 		set_device_ro(MKDEV(JSFD_MAJOR, i), 1);

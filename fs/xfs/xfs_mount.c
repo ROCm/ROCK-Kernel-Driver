@@ -31,6 +31,13 @@
  */
 
 #include <xfs.h>
+#include <linux/major.h>
+#include <linux/namei.h>
+#include <linux/pagemap.h>
+
+#ifndef EVMS_MAJOR
+#define EVMS_MAJOR	117
+#endif
 
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
@@ -375,9 +382,9 @@ xfs_xlatesb(
 		    size == 1 ||
 		    xfs_sb_info[f].type == 1) {
 			if (dir > 0) {
-				bcopy(buf_ptr + first, mem_ptr + first, size);
+				memcpy(mem_ptr + first, buf_ptr + first, size);
 			} else {
-				bcopy(mem_ptr + first, buf_ptr + first, size);
+				memcpy(buf_ptr + first, mem_ptr + first, size);
 			}
 		} else {
 			switch (size) {
@@ -673,7 +680,7 @@ xfs_mountfs(
 		}
 		uuid_mounted=1;
 		ret64 = uuid_hash64(&sbp->sb_uuid);
-		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
+		memcpy(&vfsp->vfs_fsid, &ret64, sizeof(ret64));
 	}
 
 	/*
@@ -904,7 +911,7 @@ xfs_mountfs(
 	rvp = XFS_ITOV(rip);
 	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
-		VMAP(rvp, rip, vmap);
+		VMAP(rvp, vmap);
 		prdev("Root inode %llu is not a directory",
 		      mp->m_dev, (unsigned long long)rip->i_ino);
 		rvp->v_flag |= VPURGE;
@@ -930,8 +937,7 @@ xfs_mountfs(
 
 	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
 	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
-	    (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
-	     bdev_read_only(mp->m_logdev_targp->pbr_bdev))) {
+	      xfs_dev_is_read_only(mp, "changing quota state")) {
 		cmn_err(CE_WARN,
 			"XFS: device %s is read-only, cannot change "
 			"quota state.  Please mount with%s quota option.",
@@ -952,7 +958,7 @@ xfs_mountfs(
 		 */
 		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
 		rvp->v_flag |= VPURGE;
-		VMAP(rvp, rip, vmap);
+		VMAP(rvp, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
 		goto error3;
@@ -1023,14 +1029,12 @@ xfs_mountfs(
 	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags;
-		rootqcheck = ((XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) &&
-				mp->m_dev == rootdev && needquotacheck);
-		if (rootqcheck && (error = xfs_quotacheck_read_only(mp)))
+		rootqcheck = (mp->m_dev == rootdev && needquotacheck);
+		if (rootqcheck && (error = xfs_dev_is_read_only(mp,
+					"quotacheck")))
 			goto error2;
 		if (xfs_qm_mount_quotas(mp))
 			xfs_mount_reset_sbqflags(mp);
-		if (rootqcheck)
-			XFS_MTOVFS(mp)->vfs_flag |= VFS_RDONLY;
 	}
 
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
@@ -1135,7 +1139,7 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	/*
 	 * clear all error tags on this filesystem
 	 */
-	bcopy(&(XFS_MTOVFS(mp)->vfs_fsid), &fsid, sizeof(int64_t));
+	memcpy(&fsid, &(XFS_MTOVFS(mp)->vfs_fsid), sizeof(int64_t));
 	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
 
@@ -1149,15 +1153,17 @@ xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 	int		have_logdev = (mp->m_logdev_targp != mp->m_ddev_targp);
 
 	if (mp->m_ddev_targp) {
-		pagebuf_lock_disable(mp->m_ddev_targp, 0);
+		xfs_free_buftarg(mp->m_ddev_targp);
 		mp->m_ddev_targp = NULL;
 	}
 	if (mp->m_rtdev_targp) {
-		pagebuf_lock_disable(mp->m_rtdev_targp, 1);
+		xfs_blkdev_put(mp->m_rtdev_targp->pbr_bdev);
+		xfs_free_buftarg(mp->m_rtdev_targp);
 		mp->m_rtdev_targp = NULL;
 	}
 	if (mp->m_logdev_targp && have_logdev) {
-		pagebuf_lock_disable(mp->m_logdev_targp, 1);
+		xfs_blkdev_put(mp->m_logdev_targp->pbr_bdev);
+		xfs_free_buftarg(mp->m_logdev_targp);
 		mp->m_logdev_targp = NULL;
 	}
 }
@@ -1724,4 +1730,72 @@ xfs_check_frozen(
 
 	if (level == XFS_FREEZE_TRANS)
 		atomic_inc(&mp->m_active_trans);
+}
+
+int
+xfs_blkdev_get(
+	const char		*name,
+	struct block_device	**bdevp)
+{
+	struct nameidata	nd;
+	int			error = 0;
+
+	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	if (error) {
+		printk("XFS: Invalid device [%s], error=%d\n",
+				name, error);
+		return error;
+	}
+
+	/* I think we actually want bd_acquire here..  --hch */
+	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
+	if (*bdevp) {
+		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
+	} else {
+		error = -ENOMEM;
+	}
+
+	path_release(&nd);
+	return -error;
+}
+
+void
+xfs_blkdev_put(
+	struct block_device	*bdev)
+{
+	blkdev_put(bdev, BDEV_FS);
+}
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+	kfree(btp);
+}
+
+xfs_buftarg_t *
+xfs_alloc_buftarg(
+	struct block_device	*bdev)
+{
+	xfs_buftarg_t		*btp;
+
+	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
+
+	btp->pbr_dev =  bdev->bd_dev;
+	btp->pbr_bdev = bdev;
+	btp->pbr_mapping = bdev->bd_inode->i_mapping;
+	btp->pbr_blocksize = PAGE_CACHE_SIZE;
+
+	switch (MAJOR(btp->pbr_dev)) {
+	case MD_MAJOR:
+	case EVMS_MAJOR:
+		btp->pbr_flags = PBR_ALIGNED_ONLY;
+		break;
+	case LVM_BLK_MAJOR:
+		btp->pbr_flags = PBR_SECTOR_ONLY;
+		break;
+	}
+
+	return btp;
 }

@@ -1386,7 +1386,7 @@ static int sd_attach(Scsi_Device * sdp)
 	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
 		return 0;
 
-	gd = alloc_disk();
+	gd = alloc_disk(16);
 	if (!gd)
 		return 1;
 
@@ -1423,7 +1423,6 @@ static int sd_attach(Scsi_Device * sdp)
         gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
-	gd->minor_shift = 4;
 	gd->fops = &sd_fops;
 	if (dsk_nr > 26)
 		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);
