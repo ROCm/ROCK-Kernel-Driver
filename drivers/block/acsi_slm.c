@@ -273,12 +273,12 @@ static int slm_get_pagesize( int device, int *w, int *h );
 static struct timer_list slm_timer = { function: slm_test_ready };
 
 static struct file_operations slm_fops = {
-	owner:		THIS_MODULE,
-	read:		slm_read,
-	write:		slm_write,
-	ioctl:		slm_ioctl,
-	open:		slm_open,
-	release:	slm_release,
+	.owner =	THIS_MODULE,
+	.read =		slm_read,
+	.write =	slm_write,
+	.ioctl =	slm_ioctl,
+	.open =		slm_open,
+	.release =	slm_release,
 };
 
 

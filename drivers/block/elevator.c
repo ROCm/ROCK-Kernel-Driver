@@ -380,9 +380,9 @@ inline struct list_head *elv_get_sort_head(request_queue_t *q,
 }
 
 elevator_t elevator_noop = {
-	elevator_merge_fn:		elevator_noop_merge,
-	elevator_next_req_fn:		elevator_noop_next_request,
-	elevator_add_req_fn:		elevator_noop_add_request,
+	.elevator_merge_fn		= elevator_noop_merge,
+	.elevator_next_req_fn		= elevator_noop_next_request,
+	.elevator_add_req_fn		= elevator_noop_add_request,
 };
 
 module_init(elevator_global_init);

@@ -140,10 +140,10 @@ static int ramdisk_commit_write(struct file *file, struct page *page, unsigned o
 }
 
 static struct address_space_operations ramdisk_aops = {
-	readpage: ramdisk_readpage,
-	writepage: fail_writepage,
-	prepare_write: ramdisk_prepare_write,
-	commit_write: ramdisk_commit_write,
+	.readpage = ramdisk_readpage,
+	.writepage = fail_writepage,
+	.prepare_write = ramdisk_prepare_write,
+	.commit_write = ramdisk_commit_write,
 };
 
 static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
@@ -316,8 +316,8 @@ static int initrd_release(struct inode *inode,struct file *file)
 
 
 static struct file_operations initrd_fops = {
-	read:		initrd_read,
-	release:	initrd_release,
+	.read =		initrd_read,
+	.release =	initrd_release,
 };
 
 #endif
@@ -361,9 +361,9 @@ static int rd_open(struct inode * inode, struct file * filp)
 }
 
 static struct block_device_operations rd_bd_op = {
-	owner:		THIS_MODULE,
-	open:		rd_open,
-	ioctl:		rd_ioctl,
+	.owner =	THIS_MODULE,
+	.open =		rd_open,
+	.ioctl =	rd_ioctl,
 };
 
 /* Before freeing the module, invalidate all of the protected buffers! */

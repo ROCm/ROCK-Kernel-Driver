@@ -1117,18 +1117,18 @@ static void mm_pci_remove(struct pci_dev *dev)
 }
 
 static const struct pci_device_id __devinitdata mm_pci_ids[] = { {
-	vendor:		PCI_VENDOR_ID_MICRO_MEMORY,
-	device:		PCI_DEVICE_ID_MICRO_MEMORY_5415CN,
+	.vendor =	PCI_VENDOR_ID_MICRO_MEMORY,
+	.device =	PCI_DEVICE_ID_MICRO_MEMORY_5415CN,
 	}, { /* end: all zeroes */ }
 };
 
 MODULE_DEVICE_TABLE(pci, mm_pci_ids);
 
 static struct pci_driver mm_pci_driver = {
-	name:		"umem",
-	id_table:	mm_pci_ids,
-	probe:		mm_pci_probe,
-	remove:		mm_pci_remove,
+	.name =		"umem",
+	.id_table =	mm_pci_ids,
+	.probe =	mm_pci_probe,
+	.remove =	mm_pci_remove,
 };
 /*
 -----------------------------------------------------------------------------------
