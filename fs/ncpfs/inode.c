@@ -32,6 +32,7 @@
 #include <linux/ncp_fs.h>
 
 #include "ncplib_kernel.h"
+#include "getopt.h"
 
 static void ncp_delete_inode(struct inode *);
 static void ncp_put_super(struct super_block *);
@@ -283,6 +284,88 @@ ncp_delete_inode(struct inode *inode)
 	clear_inode(inode);
 }
 
+static const struct ncp_option ncp_opts[] = {
+	{ "uid",	OPT_INT,	'u' },
+	{ "gid",	OPT_INT,	'g' },
+	{ "owner",	OPT_INT,	'o' },
+	{ "mode",	OPT_INT,	'm' },
+	{ "dirmode",	OPT_INT,	'd' },
+	{ "timeout",	OPT_INT,	't' },
+	{ "retry",	OPT_INT,	'r' },
+	{ "flags",	OPT_INT,	'f' },
+	{ "wdogpid",	OPT_INT,	'w' },
+	{ "ncpfd",	OPT_INT,	'n' },
+	{ "version",	OPT_INT,	'v' },
+	{ NULL,		0,		0 } };
+
+static int ncp_parse_options(struct ncp_mount_data_kernel *data, char *options) {
+	int optval;
+	char *optarg;
+	unsigned long optint;
+	int version = 0;
+
+	data->flags = 0;
+	data->int_flags = 0;
+	data->mounted_uid = 0;
+	data->wdog_pid = -1;
+	data->ncp_fd = ~0;
+	data->time_out = 10;
+	data->retry_count = 20;
+	data->uid = 0;
+	data->gid = 0;
+	data->file_mode = 0600;
+	data->dir_mode = 0700;
+	data->mounted_vol[0] = 0;
+	
+	while ((optval = ncp_getopt("ncpfs", &options, ncp_opts, NULL, &optarg, &optint)) != 0) {
+		if (optval < 0)
+			return optval;
+		switch (optval) {
+			case 'u':
+				data->uid = optint;
+				break;
+			case 'g':
+				data->gid = optint;
+				break;
+			case 'o':
+				data->mounted_uid = optint;
+				break;
+			case 'm':
+				data->file_mode = optint;
+				break;
+			case 'd':
+				data->dir_mode = optint;
+				break;
+			case 't':
+				data->time_out = optint;
+				break;
+			case 'r':
+				data->retry_count = optint;
+				break;
+			case 'f':
+				data->flags = optint;
+				break;
+			case 'w':
+				data->wdog_pid = optint;
+				break;
+			case 'n':
+				data->ncp_fd = optint;
+				break;
+			case 'v':
+				if (optint < NCP_MOUNT_VERSION_V4) {
+					return -ECHRNG;
+				}
+				if (optint > NCP_MOUNT_VERSION_V4) {
+					return -ECHRNG;
+				}
+				version = optint;
+				break;
+			
+		}
+	}
+	return 0;
+}
+
 static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct ncp_mount_data_kernel data;
@@ -347,7 +430,12 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 			break;
 		default:
 			error = -ECHRNG;
-			goto out;
+			if (*(__u32*)raw_data == cpu_to_be32(0x76657273)) {
+				error = ncp_parse_options(&data, raw_data);
+			}
+			if (error)
+				goto out;
+			break;
 	}
 	error = -EBADF;
 	ncp_filp = fget(data.ncp_fd);

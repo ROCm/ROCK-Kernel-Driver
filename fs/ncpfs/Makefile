@@ -5,7 +5,7 @@
 obj-$(CONFIG_NCP_FS) += ncpfs.o
 
 ncpfs-objs   := dir.o file.o inode.o ioctl.o mmap.o ncplib_kernel.o sock.o \
-		ncpsign_kernel.o
+		ncpsign_kernel.o getopt.o
 ifeq ($(CONFIG_NCPFS_EXTRAS),y)
 ncpfs-objs   += symlink.o
 endif

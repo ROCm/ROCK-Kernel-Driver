@@ -11,7 +11,7 @@
 #include <linux/types.h>
 #include <linux/ncp.h>
 
-#define NCP_MOUNT_VERSION 3
+#define NCP_MOUNT_VERSION 3	/* Binary */
 
 /* Values for flags */
 #define NCP_MOUNT_SOFT		0x0001
@@ -41,7 +41,7 @@ struct ncp_mount_data {
 	__kernel_mode_t dir_mode;
 };
 
-#define NCP_MOUNT_VERSION_V4	(4)
+#define NCP_MOUNT_VERSION_V4	(4)	/* Binary or text */
 
 struct ncp_mount_data_v4 {
 	int version;
