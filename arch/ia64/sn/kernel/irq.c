@@ -204,7 +204,7 @@ struct hw_interrupt_type irq_type_sn = {
 
 struct irq_desc *sn_irq_desc(unsigned int irq)
 {
-	return (_irq_desc + irq);
+	return (irq_desc + irq);
 }
 
 u8 sn_irq_to_vector(unsigned int irq)
@@ -220,7 +220,7 @@ unsigned int sn_local_vector_to_irq(u8 vector)
 void sn_irq_init(void)
 {
 	int i;
-	irq_desc_t *base_desc = _irq_desc;
+	irq_desc_t *base_desc = irq_desc;
 
 	for (i = 0; i < NR_IRQS; i++) {
 		if (base_desc[i].handler == &no_irq_type) {

@@ -60,6 +60,7 @@ __u8 isa_irq_to_vector_map[16] = {
 };
 EXPORT_SYMBOL(isa_irq_to_vector_map);
 
+#ifndef CONFIG_GENERIC_HARDIRQS
 static inline void
 irq_enter (void)
 {
@@ -74,6 +75,7 @@ irq_exit (void)
 		do_softirq();
 	preempt_enable_no_resched();
 }
+#endif
 
 int
 assign_irq_vector (int irq)

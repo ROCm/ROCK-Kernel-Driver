@@ -94,13 +94,13 @@ hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
  * Default implementations for the irq-descriptor API:
  */
 
-extern irq_desc_t _irq_desc[NR_IRQS];
+extern irq_desc_t irq_desc[NR_IRQS];
 
 #ifndef CONFIG_IA64_GENERIC
 static inline irq_desc_t *
 __ia64_irq_desc (unsigned int irq)
 {
-	return _irq_desc + irq;
+	return irq_desc + irq;
 }
 
 static inline ia64_vector
