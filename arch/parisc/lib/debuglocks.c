@@ -218,6 +218,40 @@ retry:
 	}
 }
 
+int _dbg_write_trylock(rwlock_t *rw, const char *bfile, int bline)
+{
+#if 0
+	void *inline_pc = __builtin_return_address(0);
+	int cpu = smp_processor_id();
+#endif
+	
+	if(unlikely(in_interrupt())) {	/* acquiring write lock in interrupt context, bad idea */
+		pdc_printf("write_lock caller: %s:%d, IRQs enabled,\n", bfile, bline);
+		BUG();
+	}
+
+	/* Note: if interrupts are disabled (which is most likely), the printk
+	will never show on the console. We might need a polling method to flush
+	the dmesg buffer anyhow. */
+	
+	_raw_spin_lock(&rw->lock);
+
+	if(rw->counter != 0) {
+		/* this basically never happens */
+		_raw_spin_unlock(&rw->lock);
+		
+		
+		return 0;
+	}
+
+	/* got it.  now leave without unlocking */
+	rw->counter = -1; /* remember we are locked */
+#if 0
+	pdc_printf("%s:%d: try write_lock grabbed in %s at %p(%d)\n",
+		   bfile, bline, current->comm, inline_pc, cpu);
+#endif
+}
+
 void _dbg_read_lock(rwlock_t * rw, const char *bfile, int bline)
 {
 #if 0

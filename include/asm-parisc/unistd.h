@@ -752,14 +752,10 @@
 
 #ifdef PIC
 /* WARNING: CANNOT BE USED IN A NOP! */
-# define K_STW_PIC stw %r19, -32(%sr0, %sp) ASM_LINE_SEP
-# define K_LDW_PIC ldw -32(%sr0, %sp), %r19 ASM_LINE_SEP
 # define K_STW_ASM_PIC	"       copy %%r19, %%r4\n"
 # define K_LDW_ASM_PIC	"       copy %%r4, %%r19\n"
 # define K_USING_GR4	"%r4",
 #else
-# define K_STW_PIC ASM_LINE_SEP
-# define K_LDW_PIC ASM_LINE_SEP
 # define K_STW_ASM_PIC	" \n"
 # define K_LDW_ASM_PIC	" \n"
 # define K_USING_GR4

@@ -104,7 +104,9 @@ static inline int map_pte_uncached(pte_t * pte,
 		if (!pte_none(*pte))
 			printk(KERN_ERR "map_pte_uncached: page already exists\n");
 		set_pte(pte, __mk_pte(*paddr_ptr, PAGE_KERNEL_UNC));
+		purge_tlb_start();
 		pdtlb_kernel(orig_vaddr);
+		purge_tlb_end();
 		vaddr += PAGE_SIZE;
 		orig_vaddr += PAGE_SIZE;
 		(*paddr_ptr) += PAGE_SIZE;
@@ -179,7 +181,9 @@ static inline void unmap_uncached_pte(pmd_t * pmd, unsigned long vaddr,
 	do {
 		pte_t page = *pte;
 		pte_clear(pte);
+		purge_tlb_start();
 		pdtlb_kernel(orig_vaddr);
+		purge_tlb_end();
 		vaddr += PAGE_SIZE;
 		orig_vaddr += PAGE_SIZE;
 		pte++;

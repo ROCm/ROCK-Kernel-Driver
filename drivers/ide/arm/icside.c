@@ -197,6 +197,11 @@ static void icside_maskproc(ide_drive_t *drive, int mask)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_ICS
+
+#ifndef CONFIG_IDEDMA_ICS_AUTO
+#warning CONFIG_IDEDMA_ICS_AUTO=n support is obsolete, and will be removed soon.
+#endif
+
 /*
  * SG-DMA support.
  *

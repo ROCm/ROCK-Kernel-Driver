@@ -2,9 +2,7 @@
 # Makefile for arch/parisc/kernel
 #
 
-head-y			:= head.o
-head-$(CONFIG_PARISC64)	:= head64.o
-extra-y			:= init_task.o $(head-y) vmlinux.lds
+extra-y			:= init_task.o head.o vmlinux.lds
 
 AFLAGS_entry.o	:= -traditional
 AFLAGS_pacache.o := -traditional

@@ -475,9 +475,9 @@ copy_user_page_asm:
 	.procend
 #endif
 
-	.export clear_user_page_asm,code
+	.export __clear_user_page_asm,code
 
-clear_user_page_asm:
+__clear_user_page_asm:
 	.proc
 	.callinfo NO_CALLS
 	.entry

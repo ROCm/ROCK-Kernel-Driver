@@ -177,7 +177,7 @@ ENTRY(fsys_gettimeofday)
 	// r11 = preserved: saved ar.pfs
 	// r12 = preserved: memory stack
 	// r13 = preserved: thread pointer
-	// r14 = debug pointer / usable
+	// r14 = address of mask / mask
 	// r15 = preserved: system call number
 	// r16 = preserved: current task pointer
 	// r17 = wall to monotonic use
@@ -226,7 +226,6 @@ ENTRY(fsys_gettimeofday)
 	add r10 = IA64_TIME_INTERPOLATOR_ADDRESS_OFFSET,r20
 	extr r3 = r21,32,32	// time_interpolator->nsec_per_cyc
 	extr r8 = r21,0,16	// time_interpolator->source
-	nop.i 123
 	cmp.ne p6, p0 = 0, r2	// Fallback if work is scheduled
 (p6)    br.cond.spnt.many fsys_fallback_syscall
 	;;
@@ -257,17 +256,20 @@ ENTRY(fsys_gettimeofday)
 	add r24 = IA64_TIME_INTERPOLATOR_OFFSET_OFFSET,r20
 (p15)	ld8 r17 = [r19],IA64_TIMESPEC_TV_NSEC_OFFSET
  	ld8 r9 = [r27],IA64_TIMESPEC_TV_NSEC_OFFSET
-	nop.i 123
+	add r14 = IA64_TIME_INTERPOLATOR_MASK_OFFSET, r20
 	;;
 	ld8 r18 = [r24]		// time_interpolator->offset
 	ld8 r8 = [r27],-IA64_TIMESPEC_TV_NSEC_OFFSET	// xtime.tv_nsec
 (p13)	sub r3 = r25,r2	// Diff needed before comparison (thanks davidm)
 	;;
+	ld8 r14 = [r14]		// time_interpolator->mask
 (p13)	cmp.gt.unc p6,p7 = r3,r0	// check if it is less than last. p6,p7 cleared
 	sub r10 = r2,r26	// current_counter - last_counter
 	;;
 (p6)	sub r10 = r25,r26	// time we got was less than last_cycle
 (p7)	mov ar.ccv = r25	// more than last_cycle. Prep for cmpxchg
+	;;
+	and r10 = r10,r14	// Apply mask
 	;;
 	setf.sig f8 = r10
 	nop.i 123
