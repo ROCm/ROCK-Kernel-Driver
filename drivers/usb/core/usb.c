@@ -155,8 +155,10 @@ int usb_register(struct usb_driver *new_driver)
  * usb_deregister_dev() should be called when the driver is done with
  * the minor numbers given out by this function.
  *
- * Returns a negative error code on failure and 0 on success, alone with
- * a value that the driver should use in start_minor.
+ * Returns -ENODEV if CONFIG_USB_DYNAMIC_MINORS is not enabled in this
+ * kernel, -EINVAL if something bad happens with trying to register a
+ * device, and 0 on success, alone with a value that the driver should
+ * use in start_minor.
  */
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 int usb_register_dev (struct usb_driver *new_driver, int num_minors, int *start_minor)
