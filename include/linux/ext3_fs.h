@@ -689,6 +689,7 @@ extern void ext3_check_blocks_bitmap (struct super_block *);
 extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
 						    struct buffer_head ** bh);
+extern int ext3_should_retry_alloc(struct super_block *sb, int *retries);
 
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,

@@ -1006,6 +1006,7 @@ int __log_space_left(journal_t *); /* Called with journal locked */
 int log_start_commit(journal_t *journal, tid_t tid);
 int __log_start_commit(journal_t *journal, tid_t tid);
 int journal_start_commit(journal_t *journal, tid_t *tid);
+int journal_force_commit_nested(journal_t *journal);
 int log_wait_commit(journal_t *journal, tid_t tid);
 int log_do_checkpoint(journal_t *journal);
 
