@@ -849,18 +849,19 @@ pci_set_master(struct pci_dev *dev)
 	pcibios_set_master(dev);
 }
 
+#ifndef HAVE_ARCH_PCI_MWI
 /**
- * pdev_set_mwi - helper function for pci_set_mwi
+ * pci_generic_prep_mwi - helper function for pci_set_mwi
  * @dev: the PCI device for which MWI is enabled
  *
- * Helper function for generic implementation of pci_set_mwi
+ * Helper function for generic implementation of pcibios_prep_mwi
  * function.  Originally copied from drivers/net/acenic.c.
  * Copyright 1998-2001 by Jes Sorensen, <jes@trained-monkey.org>.
  *
- * RETURNS: An appriopriate -ERRNO error value on eror, or zero for success.
+ * RETURNS: An appropriate -ERRNO error value on eror, or zero for success.
  */
 static int
-pdev_set_mwi(struct pci_dev *dev)
+pci_generic_prep_mwi(struct pci_dev *dev)
 {
 	int rc = 0;
 	u8 cache_size;
@@ -874,8 +875,8 @@ pdev_set_mwi(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cache_size);
 	cache_size <<= 2;
 	if (cache_size != SMP_CACHE_BYTES) {
-		printk(KERN_WARNING "PCI: %s PCI cache line size set incorrectly "
-		       "(%i bytes) by BIOS/FW, ",
+		printk(KERN_WARNING "PCI: %s PCI cache line size set "
+		       "incorrectly (%i bytes) by BIOS/FW, ",
 		       dev->slot_name, cache_size);
 		if (cache_size > SMP_CACHE_BYTES) {
 			printk("expecting %i\n", SMP_CACHE_BYTES);
@@ -889,6 +890,7 @@ pdev_set_mwi(struct pci_dev *dev)
 
 	return rc;
 }
+#endif /* !HAVE_ARCH_PCI_MWI */
 
 /**
  * pci_set_mwi - enables memory-write-validate PCI transaction
@@ -907,9 +909,9 @@ pci_set_mwi(struct pci_dev *dev)
 	u16 cmd;
 
 #ifdef HAVE_ARCH_PCI_MWI
-	rc = pcibios_set_mwi(dev);
+	rc = pcibios_prep_mwi(dev);
 #else
-	rc = pdev_set_mwi(dev);
+	rc = pci_generic_prep_mwi(dev);
 #endif
 
 	if (rc)
