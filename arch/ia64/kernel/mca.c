@@ -210,7 +210,7 @@ show_min_state (pal_min_state_area_t *minstate)
 	printk(" r8-11 %016lx %016lx %016lx %016lx\n",
 	       minstate->pmsa_gr[7], minstate->pmsa_gr[8],
 	       minstate->pmsa_gr[9], minstate->pmsa_gr[10]);
-	printk("r11-15 %016lx %016lx %016lx %016lx\n",
+	printk("r12-15 %016lx %016lx %016lx %016lx\n",
 	       minstate->pmsa_gr[11], minstate->pmsa_gr[12],
 	       minstate->pmsa_gr[13], minstate->pmsa_gr[14]);
 
