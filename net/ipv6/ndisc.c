@@ -894,25 +894,25 @@ static void ndisc_recv_na(struct sk_buff *skb)
 	neigh = neigh_lookup(&nd_tbl, &msg->target, dev);
 
 	if (neigh) {
-		if (neigh->flags & NTF_ROUTER) {
-			if (msg->icmph.icmp6_router == 0) {
-				/*
-				 *	Change: router to host
-				 */
-				struct rt6_info *rt;
-				rt = rt6_get_dflt_router(saddr, dev);
-				if (rt)
-					ip6_del_rt(rt, NULL, NULL);
-			}
-		} else {
-			if (msg->icmph.icmp6_router)
-				neigh->flags |= NTF_ROUTER;
-		}
+		u8 old_flags = neigh->flags;
 
 		neigh_update(neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
-			     (msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0));
+			     (msg->icmph.icmp6_override ? NEIGH_UPDATE_F_OVERRIDE : 0)|
+			     NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
+			     (msg->icmph.icmp6_router ? NEIGH_UPDATE_F_ISROUTER : 0));
+
+		if ((old_flags & ~neigh->flags) & NTF_ROUTER) {
+			/*
+			 * Change: router to host
+			 */
+			struct rt6_info *rt;
+			rt = rt6_get_dflt_router(saddr, dev);
+			if (rt)
+				ip6_del_rt(rt, NULL, NULL);
+		}
+
 		neigh_release(neigh);
 	}
 }
@@ -1082,7 +1082,9 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		}
 		neigh_update(neigh, lladdr, NUD_STALE,
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
-			     NEIGH_UPDATE_F_OVERRIDE);
+			     NEIGH_UPDATE_F_OVERRIDE|
+			     NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
+			     NEIGH_UPDATE_F_ISROUTER);
 	}
 
 	if (ndopts.nd_opts_pi) {
@@ -1209,7 +1211,10 @@ static void ndisc_redirect_rcv(struct sk_buff *skb)
 	if (neigh) {
 		neigh_update(neigh, lladdr, NUD_STALE, 
 			     NEIGH_UPDATE_F_WEAK_OVERRIDE|
-			     NEIGH_UPDATE_F_OVERRIDE);
+			     NEIGH_UPDATE_F_OVERRIDE|
+			     (on_link ? 0 : (NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
+					     NEIGH_UPDATE_F_ISROUTER))
+			     );
 		if (neigh->nud_state&NUD_VALID)
 			rt6_redirect(dest, &skb->nh.ipv6h->saddr, neigh, on_link);
 		else

@@ -810,6 +810,11 @@ static __inline__ void neigh_update_hhs(struct neighbour *neigh)
 				if lladdr is unchanged.
 	NEIGH_UPDATE_F_ADMIN	means that the change is administrative.
 
+	NEIGH_UPDATE_F_OVERRIDE_ISROUTER allows to override existing 
+				NTF_ROUTER flag.
+	NEIGH_UPDATE_F_ISROUTER	indicates if the neighbour is known as
+				a router.
+
    Caller MUST hold reference count on the entry.
  */
 
@@ -822,6 +827,7 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	int notify = 0;
 #endif
 	struct net_device *dev;
+	int update_isrouter = 0;
 
 	write_lock_bh(&neigh->lock);
 
@@ -878,8 +884,10 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	   do not change entry state, if new one is STALE.
 	 */
 	err = 0;
+	update_isrouter = flags & NEIGH_UPDATE_F_OVERRIDE_ISROUTER;
 	if (old & NUD_VALID) {
 		if (lladdr != neigh->ha && !(flags & NEIGH_UPDATE_F_OVERRIDE)) {
+			update_isrouter = 0;
 			if ((flags & NEIGH_UPDATE_F_WEAK_OVERRIDE) &&
 			    (old & NUD_CONNECTED)) {
 				lladdr = neigh->ha;
@@ -931,6 +939,11 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 		skb_queue_purge(&neigh->arp_queue);
 	}
 out:
+	if (update_isrouter) {
+		neigh->flags = (flags & NEIGH_UPDATE_F_ISROUTER) ?
+			(neigh->flags | NTF_ROUTER) :
+			(neigh->flags & ~NTF_ROUTER);
+	}
 	write_unlock_bh(&neigh->lock);
 #ifdef CONFIG_ARPD
 	if (notify && neigh->parms->app_probes)
