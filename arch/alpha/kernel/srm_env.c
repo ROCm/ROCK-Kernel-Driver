@@ -43,6 +43,7 @@
 #include <linux/proc_fs.h>
 #include <asm/console.h>
 #include <asm/uaccess.h>
+#include <asm/machvec.h>
 
 #define DIRNAME		"srm_environment"	/* Subdir in /proc/	*/
 #define VERSION		"0.0.2"			/* Module version	*/

@@ -5,6 +5,7 @@
 
 #include <asm/atomic.h>
 #include <linux/mount.h>
+#include <asm/page.h>			/* for BUG() */
 
 /*
  * linux/include/linux/dcache.h
