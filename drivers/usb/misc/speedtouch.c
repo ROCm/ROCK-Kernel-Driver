@@ -242,6 +242,86 @@ static struct usb_driver udsl_usb_driver = {
 };
 
 
+/*************
+**  encode  **
+*************/
+
+static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb) {
+	struct udsl_control *ctrl = UDSL_SKB (skb);
+	unsigned int zero_padding;
+	int i;
+	u32 crc;
+
+	ctrl->atm_data.vcc = vcc;
+	ctrl->cell_header [0] = vcc->vpi >> 4;
+	ctrl->cell_header [1] = (vcc->vpi << 4) | (vcc->vci >> 12);
+	ctrl->cell_header [2] = vcc->vci >> 4;
+	ctrl->cell_header [3] = vcc->vci << 4;
+	ctrl->cell_header [4] = 0xec;
+
+	ctrl->num_cells = (skb->len + ATM_AAL5_TRAILER + ATM_CELL_PAYLOAD - 1) / ATM_CELL_PAYLOAD;
+	ctrl->num_entire = skb->len / ATM_CELL_PAYLOAD;
+
+	zero_padding = ctrl->num_cells * ATM_CELL_PAYLOAD - skb->len - ATM_AAL5_TRAILER;
+
+	if (ctrl->num_entire + 1 < ctrl->num_cells)
+		ctrl->pdu_padding = zero_padding - (ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
+	else
+		ctrl->pdu_padding = zero_padding;
+
+	ctrl->aal5_trailer [0] = 0; /* UU = 0 */
+	ctrl->aal5_trailer [1] = 0; /* CPI = 0 */
+	ctrl->aal5_trailer [2] = skb->len >> 8;
+	ctrl->aal5_trailer [3] = skb->len;
+
+	crc = crc32 (~0, skb->data, skb->len);
+	for (i = 0; i < zero_padding; i++)
+		crc = CRC32 (0, crc);
+	crc = crc32 (crc, ctrl->aal5_trailer, 4);
+	crc = ~crc;
+
+	ctrl->aal5_trailer [4] = crc >> 24;
+	ctrl->aal5_trailer [5] = crc >> 16;
+	ctrl->aal5_trailer [6] = crc >> 8;
+	ctrl->aal5_trailer [7] = crc;
+}
+
+static char *udsl_write_cell (struct sk_buff *skb, char *target) {
+	struct udsl_control *ctrl = UDSL_SKB (skb);
+
+	ctrl->num_cells--;
+
+	memcpy (target, ctrl->cell_header, ATM_CELL_HEADER);
+	target += ATM_CELL_HEADER;
+
+	if (ctrl->num_entire) {
+		ctrl->num_entire--;
+		memcpy (target, skb->data, ATM_CELL_PAYLOAD);
+		target += ATM_CELL_PAYLOAD;
+		__skb_pull (skb, ATM_CELL_PAYLOAD);
+		return target;
+	}
+
+	memcpy (target, skb->data, skb->len);
+	target += skb->len;
+	__skb_pull (skb, skb->len);
+
+	memset (target, 0, ctrl->pdu_padding);
+	target += ctrl->pdu_padding;
+
+	if (ctrl->num_cells) {
+		ctrl->pdu_padding = ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
+	} else {
+		memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
+		target += ATM_AAL5_TRAILER;
+		/* set pti bit in last cell */
+		*(target + 3 - ATM_CELL_SIZE) |= 0x2;
+	}
+
+	return target;
+}
+
+
 /**************
 **  receive  **
 **************/
