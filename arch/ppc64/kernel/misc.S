@@ -631,7 +631,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_init_module
 	.llong .sys32_delete_module
 	.llong .sys32_get_kernel_syms	/* 130 */
-	.llong .sys32_quotactl
+	.llong .sys_quotactl
 	.llong .sys32_getpgid
 	.llong .sys_fchdir
 	.llong .sys32_bdflush

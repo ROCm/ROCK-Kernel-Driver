@@ -38,7 +38,6 @@
 #include <linux/smb_fs.h>
 #include <linux/smb_mount.h>
 #include <linux/ncp_fs.h>
-#include <linux/quota.h>
 #include <linux/module.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
@@ -519,68 +518,6 @@ struct dqblk32 {
     __kernel_time_t32 dqb_itime;
 };
                                 
-
-extern asmlinkage long sys_quotactl(int cmd, const char *special, int id, caddr_t addr);
-
-/* Note: it is necessary to treat cmd and id as unsigned ints, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_quotactl(u32 cmd_parm, const char *special, u32 id_parm, unsigned long addr)
-{
-  int cmd = (int)cmd_parm;
-  int id  = (int)id_parm;
-	int cmds = cmd >> SUBCMDSHIFT;
-	int err;
-	struct dqblk d;
-	mm_segment_t old_fs;
-	char *spec;
-	
-	PPCDBG(PPCDBG_SYS32, "sys32_quotactl - entered - pid=%ld current=%lx comm=%s \n",
-		    current->pid, current, current->comm);
-
-	switch (cmds) {
-	case Q_GETQUOTA:
-		break;
-	case Q_SETQUOTA:
-	case Q_SETUSE:
-	case Q_SETQLIM:
-		if (copy_from_user (&d, (struct dqblk32 *)addr,
-				    sizeof (struct dqblk32)))
-			return -EFAULT;
-		d.dqb_itime = ((struct dqblk32 *)&d)->dqb_itime;
-		d.dqb_btime = ((struct dqblk32 *)&d)->dqb_btime;
-		break;
-	default:
-		return sys_quotactl(cmd, special,
-				    id, (caddr_t)addr);
-	}
-	spec = getname32 (special);
-	err = PTR_ERR(spec);
-	if (IS_ERR(spec)) return err;
-	old_fs = get_fs ();
-	set_fs (KERNEL_DS);
-	err = sys_quotactl(cmd, (const char *)spec, id, (caddr_t)&d);
-	set_fs (old_fs);
-	putname (spec);
-	if (cmds == Q_GETQUOTA) {
-		__kernel_time_t b = d.dqb_btime, i = d.dqb_itime;
-		((struct dqblk32 *)&d)->dqb_itime = i;
-		((struct dqblk32 *)&d)->dqb_btime = b;
-		if (copy_to_user ((struct dqblk32 *)addr, &d,
-				  sizeof (struct dqblk32)))
-			return -EFAULT;
-	}
-	
-	PPCDBG(PPCDBG_SYS32, "sys32_quotactl - exited - pid=%ld current=%lx comm=%s \n",
-		    current->pid, current, current->comm);
-
-	return err;
-}
-
-
-
 /* readdir & getdents */
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 #define ROUND_UP(x) (((x)+sizeof(u32)-1) & ~(sizeof(u32)-1))
