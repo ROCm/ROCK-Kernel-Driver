@@ -98,14 +98,14 @@ struct fb_info_control {
 	struct fb_par_control	par;
 	u32			pseudo_palette[17];
 		
-	struct cmap_regs	*cmap_regs;
+	struct cmap_regs	__iomem *cmap_regs;
 	unsigned long		cmap_regs_phys;
 	
-	struct control_regs	*control_regs;
+	struct control_regs	__iomem *control_regs;
 	unsigned long		control_regs_phys;
 	unsigned long		control_regs_size;
 	
-	__u8			*frame_buffer;
+	__u8			__iomem *frame_buffer;
 	unsigned long		frame_buffer_phys;
 	unsigned long		fb_orig_base;
 	unsigned long		fb_orig_size;
@@ -497,7 +497,7 @@ try_again:
 static void control_set_hardware(struct fb_info_control *p, struct fb_par_control *par)
 {
 	struct control_regvals	*r;
-	volatile struct preg	*rp;
+	volatile struct preg	__iomem *rp;
 	int			i, cmode;
 
 	if (PAR_EQUAL(&p->par, par)) {
@@ -1017,7 +1017,7 @@ static void __init control_init_info(struct fb_info *info, struct fb_info_contro
 	info->fbops = &controlfb_ops;
 	info->pseudo_palette = p->pseudo_palette;
         info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN;
-	info->screen_base = (char *) p->frame_buffer + CTRLFB_OFF;
+	info->screen_base = p->frame_buffer + CTRLFB_OFF;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
