@@ -224,7 +224,7 @@ static int get_address(struct hotplug_slot *hotplug_slot, u32 *value)
 	return 0;
 }
 
-static int __init init_acpi (void)
+static int __init init_acpi(void)
 {
 	int retval;
 
@@ -276,7 +276,7 @@ static void release_slot(struct hotplug_slot *hotplug_slot)
 static int __init init_slots(void)
 {
 	struct slot *slot;
-	int retval = 0;
+	int retval = -ENOMEM;
 	int i;
 
 	for (i = 0; i < num_slots; ++i) {
@@ -318,8 +318,7 @@ static int __init init_slots(void)
 		retval = pci_hp_register(slot->hotplug_slot);
 		if (retval) {
 			err("pci_hp_register failed with error %d\n", retval);
-			release_slot(slot->hotplug_slot);
-			return retval;
+			goto error_name;
 		}
 
 		/* add slot to our internal list */
@@ -327,7 +326,9 @@ static int __init init_slots(void)
 		info("Slot [%s] registered\n", slot->hotplug_slot->name);
 	}
 
-	return retval;
+	return 0;
+error_name:
+	kfree(slot->hotplug_slot->name);
 error_info:
 	kfree(slot->hotplug_slot->info);
 error_hpslot:
@@ -335,7 +336,7 @@ error_hpslot:
 error_slot:
 	kfree(slot);
 error:
-	return -ENOMEM;
+	return retval;
 }
 
 
