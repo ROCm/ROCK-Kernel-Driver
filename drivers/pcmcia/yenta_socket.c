@@ -933,7 +933,7 @@ static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 	struct yenta_socket *socket = pci_get_drvdata(dev);
 	int ret;
 
-	ret = pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+	ret = pcmcia_socket_dev_suspend(&dev->dev, state);
 
 	if (socket) {
 		if (socket->type && socket->type->save_state)
@@ -965,7 +965,7 @@ static int yenta_dev_resume (struct pci_dev *dev)
 			socket->type->restore_state(socket);
 	}
 
-	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
+	return pcmcia_socket_dev_resume(&dev->dev);
 }
 
 

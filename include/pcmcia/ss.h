@@ -247,7 +247,7 @@ extern void pcmcia_unregister_socket(struct pcmcia_socket *socket);
 extern struct class pcmcia_socket_class;
 
 /* socket drivers are expected to use these callbacks in their .drv struct */
-extern int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level);
-extern int pcmcia_socket_dev_resume(struct device *dev, u32 level);
+extern int pcmcia_socket_dev_suspend(struct device *dev, u32 state);
+extern int pcmcia_socket_dev_resume(struct device *dev);
 
 #endif /* _LINUX_SS_H */
