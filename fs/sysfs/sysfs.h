@@ -9,5 +9,5 @@ extern struct dentry * sysfs_get_dentry(struct dentry *, const char *);
 extern int sysfs_add_file(struct dentry * dir, const struct attribute * attr);
 extern void sysfs_hash_and_remove(struct dentry * dir, const char * name);
 
-extern struct dentry * sysfs_create_subdir(struct kobject *, const char *);
+extern int sysfs_create_subdir(struct kobject *, const char *, struct dentry **);
 extern void sysfs_remove_subdir(struct dentry *);
