@@ -129,7 +129,7 @@ static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
-static inline void e1000_irq_enable(struct e1000_adapter *adapter);
+static void e1000_irq_enable(struct e1000_adapter *adapter);
 static irqreturn_t e1000_intr(int irq, void *data, struct pt_regs *regs);
 static boolean_t e1000_clean_tx_irq(struct e1000_adapter *adapter);
 #ifdef CONFIG_E1000_NAPI
@@ -2091,7 +2091,7 @@ e1000_irq_disable(struct e1000_adapter *adapter)
  * @adapter: board private structure
  **/
 
-static inline void
+static void
 e1000_irq_enable(struct e1000_adapter *adapter)
 {
 	if(likely(atomic_dec_and_test(&adapter->irq_sem))) {
