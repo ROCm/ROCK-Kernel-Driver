@@ -135,7 +135,7 @@ repeat:
 oom:
 	if (!journal_oom_retry)
 		return -ENOMEM;
-	jbd_debug(1, "ENOMEM in " __FUNCTION__ ", retrying.\n");
+	jbd_debug(1, "ENOMEM in %s, retrying\n", __FUNCTION__);
 	yield();
 	goto repeat;
 }
