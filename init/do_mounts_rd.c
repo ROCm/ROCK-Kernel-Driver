@@ -122,7 +122,8 @@ identify_ramdisk_image(int fd, int start_block)
 		printk(KERN_NOTICE
 		       "RAMDISK: ext2 filesystem found at block %d\n",
 		       start_block);
-		nblocks = le32_to_cpu(ext2sb->s_blocks_count);
+		nblocks = le32_to_cpu(ext2sb->s_blocks_count) <<
+			le32_to_cpu(ext2sb->s_log_block_size);
 		goto done;
 	}
 
@@ -173,10 +174,15 @@ int __init rd_load_image(char *from)
 	}
 
 	/*
-	 * NOTE NOTE: nblocks suppose that the blocksize is BLOCK_SIZE, so
-	 * rd_load_image will work only with filesystem BLOCK_SIZE wide!
-	 * So make sure to use 1k blocksize while generating ext2fs
-	 * ramdisk-images.
+	 * NOTE NOTE: nblocks is not actually blocks but
+	 * the number of kibibytes of data to load into a ramdisk.
+	 * So any ramdisk block size that is a multiple of 1KiB should
+	 * work when the appropriate ramdisk_blocksize is specified
+	 * on the command line.
+	 *
+	 * The default ramdisk_blocksize is 1KiB and it is generally
+	 * silly to use anything else, so make sure to use 1KiB
+	 * blocksize while generating ext2fs ramdisk-images.
 	 */
 	if (sys_ioctl(out_fd, BLKGETSIZE, (unsigned long)&rd_blocks) < 0)
 		rd_blocks = 0;
@@ -184,7 +190,7 @@ int __init rd_load_image(char *from)
 		rd_blocks >>= 1;
 
 	if (nblocks > rd_blocks) {
-		printk("RAMDISK: image too big! (%d/%ld blocks)\n",
+		printk("RAMDISK: image too big! (%dKiB/%ldKiB)\n",
 		       nblocks, rd_blocks);
 		goto done;
 	}
@@ -211,7 +217,7 @@ int __init rd_load_image(char *from)
 		goto done;
 	}
 
-	printk(KERN_NOTICE "RAMDISK: Loading %d blocks [%ld disk%s] into ram disk... ", 
+	printk(KERN_NOTICE "RAMDISK: Loading %dKiB [%ld disk%s] into ram disk... ",
 		nblocks, ((nblocks-1)/devblocks)+1, nblocks>devblocks ? "s" : "");
 	for (i = 0, disk = 1; i < nblocks; i++) {
 		if (i && (i % devblocks == 0)) {
