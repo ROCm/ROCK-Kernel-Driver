@@ -69,6 +69,21 @@ config CPU_FREQ_GOV_USERSPACE
 
 	  If in doubt, say Y.
 
+config CPU_FREQ_24_API
+	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
+	depends on CPU_FREQ_GOV_USERSPACE
+	depends on SYSCTL
+	help
+	  This enables the /proc/sys/cpu/ sysctl interface for controlling
+	  the CPUFreq,"userspace" governor. This is the same interface
+	  as known from the 2.4.-kernel patches for CPUFreq, and offers
+	  the same functionality as long as "userspace" is the
+	  selected governor for the specified CPU.
+	
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  If in doubt, say N.
+
 config CPU_FREQ_GOV_ONDEMAND
 	tristate "'ondemand' cpufreq policy governor"
 	depends on CPU_FREQ
@@ -81,19 +96,5 @@ config CPU_FREQ_GOV_ONDEMAND
 	  transitions). 
 
 	  For details, take a look at linux/Documentation/cpu-freq.
-
-	  If in doubt, say N.
-
-config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
-	depends on CPU_FREQ && SYSCTL && CPU_FREQ_GOV_USERSPACE
-	help
-	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  the CPUFreq,"userspace" governor. This is the same interface
-	  as known from the 2.4.-kernel patches for CPUFreq, and offers
-	  the same functionality as long as "userspace" is the
-	  selected governor for the specified CPU.
-	
-	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
