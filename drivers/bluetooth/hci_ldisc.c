@@ -250,8 +250,6 @@ static void hci_uart_destruct(struct hci_dev *hdev)
 
 	hu = (struct hci_uart *) hdev->driver_data;
 	kfree(hu);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------ LDISC part ------ */
@@ -290,8 +288,7 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
-	
-	MOD_INC_USE_COUNT;
+
 	return 0;
 }
 
@@ -317,8 +314,6 @@ static void hci_uart_tty_close(struct tty_struct *tty)
 			hu->proto->close(hu);
 			hci_unregister_dev(hdev);
 		}
-
-		MOD_DEC_USE_COUNT;
 	}
 }
 
@@ -411,11 +406,13 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 	hdev->send  = hci_uart_send_frame;
 	hdev->destruct = hci_uart_destruct;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		BT_ERR("Can't register HCI device %s", hdev->name);
 		return -ENODEV;
 	}
-	MOD_INC_USE_COUNT;
+
 	return 0;
 }
 

@@ -287,10 +287,10 @@ static void hci_encrypt_req(struct hci_dev *hdev, unsigned long opt)
 }
 
 /* Get HCI device by index. 
- * Device is locked on return. */
+ * Device is held on return. */
 struct hci_dev *hci_dev_get(int index)
 {
-	struct hci_dev *hdev;
+	struct hci_dev *hdev = NULL;
 	struct list_head *p;
 
 	BT_DBG("%d", index);
@@ -300,14 +300,12 @@ struct hci_dev *hci_dev_get(int index)
 
 	read_lock(&hci_dev_list_lock);
 	list_for_each(p, &hci_dev_list) {
-		hdev = list_entry(p, struct hci_dev, list);
-		if (hdev->id == index) {
-			hci_dev_hold(hdev);
-			goto done;
+		struct hci_dev *d = list_entry(p, struct hci_dev, list);
+		if (d->id == index) {
+			hdev = hci_dev_hold(d);
+			break;
 		}
 	}
-	hdev = NULL;
-done:
 	read_unlock(&hci_dev_list_lock);
 	return hdev;
 }
@@ -483,6 +481,7 @@ int hci_dev_open(__u16 dev)
 	}
 
 	if (!ret) {
+		hci_dev_hold(hdev);
 		set_bit(HCI_UP, &hdev->flags);
 		hci_notify(hdev, HCI_DEV_UP);
 	} else {	
@@ -567,6 +566,8 @@ static int hci_dev_do_close(struct hci_dev *hdev)
 	hdev->flags = 0;
 
 	hci_req_unlock(hdev);
+
+	hci_dev_put(hdev);
 	return 0;
 }
 
@@ -790,7 +791,7 @@ int hci_register_dev(struct hci_dev *hdev)
 	struct list_head *head = &hci_dev_list, *p;
 	int id = 0;
 
-	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
+	BT_DBG("%p name %s type %d owner %p", hdev, hdev->name, hdev->type, hdev->owner);
 
 	if (!hdev->open || !hdev->close || !hdev->destruct)
 		return -EINVAL;
@@ -834,8 +835,6 @@ int hci_register_dev(struct hci_dev *hdev)
 
 	atomic_set(&hdev->promisc, 0);
 		
-	MOD_INC_USE_COUNT;
-
 	write_unlock_bh(&hci_dev_list_lock);
 
 	hci_dev_proc_init(hdev);
@@ -862,9 +861,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	hci_notify(hdev, HCI_DEV_UNREG);
 	hci_run_hotplug(hdev->name, "unregister");
 	
-	hci_dev_put(hdev);
-
-	MOD_DEC_USE_COUNT;
+	__hci_dev_put(hdev);
 	return 0;
 }
 

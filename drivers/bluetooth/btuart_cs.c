@@ -541,6 +541,8 @@ int btuart_open(btuart_info_t *info)
 	hdev->destruct = btuart_hci_destruct;
 	hdev->ioctl = btuart_hci_ioctl;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		printk(KERN_WARNING "btuart_cs: Can't register HCI device %s.\n", hdev->name);
 		return -ENODEV;
@@ -795,8 +797,6 @@ found_port:
 		goto failed;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	if (btuart_open(info) != 0)
 		goto failed;
 
@@ -821,8 +821,6 @@ void btuart_release(u_long arg)
 
 	if (link->state & DEV_PRESENT)
 		btuart_close(info);
-
-	MOD_DEC_USE_COUNT;
 
 	link->dev = NULL;
 
