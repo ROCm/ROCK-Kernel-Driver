@@ -43,7 +43,8 @@ static spinlock_t port_lock = SPIN_LOCK_UNLOCKED;
 
 /* basic value read/write functions */
 
-static unsigned char indirect_read(struct pd6729_socket *socket, unsigned short reg)
+static unsigned char indirect_read(struct pd6729_socket *socket,
+				   unsigned short reg)
 {
 	unsigned long port;
 	unsigned char val;
@@ -59,7 +60,8 @@ static unsigned char indirect_read(struct pd6729_socket *socket, unsigned short 
 	return val;
 }
 
-static unsigned short indirect_read16(struct pd6729_socket *socket, unsigned short reg)
+static unsigned short indirect_read16(struct pd6729_socket *socket,
+				      unsigned short reg)
 {
 	unsigned long port;
 	unsigned short tmp;
@@ -78,7 +80,8 @@ static unsigned short indirect_read16(struct pd6729_socket *socket, unsigned sho
 	return tmp;
 }
 
-static void indirect_write(struct pd6729_socket *socket, unsigned short reg, unsigned char value)
+static void indirect_write(struct pd6729_socket *socket, unsigned short reg,
+			   unsigned char value)
 {
 	unsigned long port;
 	unsigned long flags;
@@ -91,7 +94,8 @@ static void indirect_write(struct pd6729_socket *socket, unsigned short reg, uns
 	spin_unlock_irqrestore(&port_lock, flags);
 }
 
-static void indirect_setbit(struct pd6729_socket *socket, unsigned short reg, unsigned char mask)
+static void indirect_setbit(struct pd6729_socket *socket, unsigned short reg,
+			    unsigned char mask)
 {
 	unsigned long port;
 	unsigned char val;
@@ -108,7 +112,8 @@ static void indirect_setbit(struct pd6729_socket *socket, unsigned short reg, un
 	spin_unlock_irqrestore(&port_lock, flags);
 }
 
-static void indirect_resetbit(struct pd6729_socket *socket, unsigned short reg, unsigned char mask)
+static void indirect_resetbit(struct pd6729_socket *socket, unsigned short reg,
+			      unsigned char mask)
 {
 	unsigned long port;
 	unsigned char val;
@@ -125,7 +130,8 @@ static void indirect_resetbit(struct pd6729_socket *socket, unsigned short reg, 
 	spin_unlock_irqrestore(&port_lock, flags);
 }
 
-static void indirect_write16(struct pd6729_socket *socket, unsigned short reg, unsigned short value)
+static void indirect_write16(struct pd6729_socket *socket, unsigned short reg,
+			     unsigned short value)
 {
 	unsigned long port;
 	unsigned char val;
@@ -160,7 +166,8 @@ static irqreturn_t pd6729_interrupt(int irq, void *dev, struct pt_regs *regs)
 	while (1) {
 		loopcount++;
 		if (loopcount > 20) {
-			printk(KERN_ERR "pd6729: infinite eventloop in interrupt\n");
+			printk(KERN_ERR "pd6729: infinite eventloop "
+			       "in interrupt\n");
 			break;
 		}
 
@@ -182,14 +189,19 @@ static irqreturn_t pd6729_interrupt(int irq, void *dev, struct pt_regs *regs)
 				dprintk("Card detected in socket %i!\n", i);
 			}
 
-			if (indirect_read(&socket[i], I365_INTCTL) & I365_PC_IOCARD) {
+			if (indirect_read(&socket[i], I365_INTCTL)
+						& I365_PC_IOCARD) {
 				/* For IO/CARDS, bit 0 means "read the card" */
-				events |= (csc & I365_CSC_STSCHG) ? SS_STSCHG : 0;
+				events |= (csc & I365_CSC_STSCHG)
+						? SS_STSCHG : 0;
 			} else {
 				/* Check for battery/ready events */
-				events |= (csc & I365_CSC_BVD1) ? SS_BATDEAD : 0;
-				events |= (csc & I365_CSC_BVD2) ? SS_BATWARN : 0;
-				events |= (csc & I365_CSC_READY) ? SS_READY : 0;
+				events |= (csc & I365_CSC_BVD1)
+						? SS_BATDEAD : 0;
+				events |= (csc & I365_CSC_BVD2)
+						? SS_BATWARN : 0;
+				events |= (csc & I365_CSC_READY)
+						? SS_READY : 0;
 			}
 
 			if (events) {
@@ -216,7 +228,8 @@ static void set_bridge_state(struct pd6729_socket *socket)
 
 static int pd6729_get_status(struct pcmcia_socket *sock, u_int *value)
 {
-	struct pd6729_socket *socket = container_of(sock, struct pd6729_socket, socket);
+	struct pd6729_socket *socket
+			= container_of(sock, struct pd6729_socket, socket);
 	unsigned int status;
 	unsigned int data;
 	struct pd6729_socket *t;
@@ -265,7 +278,8 @@ static int pd6729_get_status(struct pcmcia_socket *sock, u_int *value)
 
 static int pd6729_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-	struct pd6729_socket *socket = container_of(sock, struct pd6729_socket, socket);
+	struct pd6729_socket *socket
+			= container_of(sock, struct pd6729_socket, socket);
 	unsigned char reg, vcc, vpp;
 
 	state->flags    = 0;
@@ -342,7 +356,8 @@ static int pd6729_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 
 static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-	struct pd6729_socket *socket = container_of(sock, struct pd6729_socket, socket);
+	struct pd6729_socket *socket
+			= container_of(sock, struct pd6729_socket, socket);
 	unsigned char reg;
 
 	/* First, set the global controller options */
@@ -354,9 +369,9 @@ static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	reg = 0;
  	/* The reset bit has "inverse" logic */
 	if (!(state->flags & SS_RESET))
-		reg = reg | I365_PC_RESET;
+		reg |= I365_PC_RESET;
 	if (state->flags & SS_IOCARD)
-		reg = reg | I365_PC_IOCARD;
+		reg |= I365_PC_IOCARD;
 
 	/* IGENC, Interrupt and General Control Register */
 	indirect_write(socket, I365_INTCTL, reg);
@@ -390,7 +405,8 @@ static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 		indirect_resetbit(socket, PD67_MISC_CTL_1, PD67_MC1_VCC_3V);
 		break;
 	default:
-		dprintk("pd6729: pd6729_set_socket called with invalid VCC power value: %i\n",
+		dprintk("pd6729: pd6729_set_socket called with "
+				"invalid VCC power value: %i\n",
 			state->Vcc);
 		return -EINVAL;
 	}
@@ -452,9 +468,11 @@ static int pd6729_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	return 0;
 }
 
-static int pd6729_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
+static int pd6729_set_io_map(struct pcmcia_socket *sock,
+			     struct pccard_io_map *io)
 {
-	struct pd6729_socket *socket = container_of(sock, struct pd6729_socket, socket);
+	struct pd6729_socket *socket
+			= container_of(sock, struct pd6729_socket, socket);
 	unsigned char map, ioctl;
 
 	map = io->map;
@@ -469,7 +487,8 @@ static int pd6729_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *i
 	if (indirect_read(socket, I365_ADDRWIN) & I365_ENA_IO(map))
 		indirect_resetbit(socket, I365_ADDRWIN, I365_ENA_IO(map));
 
-/*	dprintk("set_io_map: Setting range to %x - %x\n", io->start, io->stop);*/
+	/* dprintk("set_io_map: Setting range to %x - %x\n",
+	   io->start, io->stop);*/
 
 	/* write the new values */
 	indirect_write16(socket, I365_IO(map)+I365_W_START, io->start);
@@ -490,9 +509,11 @@ static int pd6729_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *i
 	return 0;
 }
 
-static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *mem)
+static int pd6729_set_mem_map(struct pcmcia_socket *sock,
+			      struct pccard_mem_map *mem)
 {
-	struct pd6729_socket *socket = container_of(sock, struct pd6729_socket, socket);
+	struct pd6729_socket *socket
+			 = container_of(sock, struct pd6729_socket, socket);
 	unsigned short base, i;
 	unsigned char map;
 
@@ -504,8 +525,6 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 
 	if ((mem->res->start > mem->res->end) || (mem->speed > 1000)) {
 		printk("pd6729_set_mem_map: invalid address / speed");
-		/* printk("invalid mem map for socket %i : %lx to %lx with a start of %x\n",
-			 sock, mem->res->start, mem->res->end, mem->card_start); */
 		return -EINVAL;
 	}
 
@@ -551,11 +570,11 @@ static int pd6729_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map 
 	if (mem->flags & MAP_WRPROT)
 		i |= I365_MEM_WRPROT;
 	if (mem->flags & MAP_ATTRIB) {
-/*		dprintk("requesting attribute memory for socket %i\n",
+		/* dprintk("requesting attribute memory for socket %i\n",
 			socket->number);*/
 		i |= I365_MEM_REG;
 	} else {
-/*		dprintk("requesting normal memory for socket %i\n",
+		/* dprintk("requesting normal memory for socket %i\n",
 			socket->number);*/
 	}
 	indirect_write16(socket, base + I365_W_OFF, i);
@@ -604,13 +623,15 @@ static struct pccard_operations pd6729_operations = {
 	.set_mem_map		= pd6729_set_mem_map,
 };
 
-static int __devinit pd6729_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
+static int __devinit pd6729_pci_probe(struct pci_dev *dev,
+				      const struct pci_device_id *id)
 {
 	int i, j, ret;
 	char configbyte;
 	struct pd6729_socket *socket;
 
-	socket = kmalloc(sizeof(struct pd6729_socket) * MAX_SOCKETS, GFP_KERNEL);
+	socket = kmalloc(sizeof(struct pd6729_socket) * MAX_SOCKETS,
+			 GFP_KERNEL);
 	if (!socket)
 		return -ENOMEM;
 
@@ -619,13 +640,11 @@ static int __devinit pd6729_pci_probe(struct pci_dev *dev, const struct pci_devi
 	if ((ret = pci_enable_device(dev)))
 		goto err_out_free_mem;
 
-	printk(KERN_INFO "pd6729: Cirrus PD6729 PCI to PCMCIA Bridge at 0x%lx on irq %d\n",
-		pci_resource_start(dev, 0), dev->irq);
-	printk(KERN_INFO "pd6729: configured as a %d socket device.\n", MAX_SOCKETS);
+	printk(KERN_INFO "pd6729: Cirrus PD6729 PCI to PCMCIA Bridge "
+		"at 0x%lx on irq %d\n",	pci_resource_start(dev, 0), dev->irq);
  	/*
-	 * Since we have no memory BARs some firmware we may not
-	 * have had PCI_COMMAND_MEM enabled, yet the device needs
-	 * it.
+	 * Since we have no memory BARs some firmware may not
+	 * have had PCI_COMMAND_MEMORY enabled, yet the device needs it.
 	 */
 	pci_read_config_byte(dev, PCI_COMMAND, &configbyte);
 	if (!(configbyte & PCI_COMMAND_MEMORY)) {
@@ -666,7 +685,8 @@ static int __devinit pd6729_pci_probe(struct pci_dev *dev, const struct pci_devi
 	for (i = 0; i < MAX_SOCKETS; i++) {
 		ret = pcmcia_register_socket(&socket[i].socket);
 		if (ret) {
-			printk(KERN_INFO "pd6729: pcmcia_register_socket failed.\n");
+			printk(KERN_INFO "pd6729: pcmcia_register_socket "
+					       "failed.\n");
 			for (j = 0; j < i ; j++)
 				pcmcia_unregister_socket(&socket[j].socket);
 			goto err_out_free_res2;
