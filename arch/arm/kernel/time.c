@@ -63,7 +63,7 @@ unsigned long profile_pc(struct pt_regs *regs)
 	unsigned long fp, pc = instruction_pointer(regs);
 
 	if (in_lock_functions(pc)) {
-		fp = thread_saved_fp(current);
+		fp = regs->ARM_fp;
 		pc = pc_pointer(((unsigned long *)fp)[-1]);
 	}
 
