@@ -186,7 +186,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	    int *pbytes_returned, const int long_op)
 {
 	int rc = 0;
-	int receive_len;
+	unsigned int receive_len;
 	long timeout;
 	struct mid_q_entry *midQ;
 
