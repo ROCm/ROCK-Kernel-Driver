@@ -384,11 +384,11 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 static struct request_queue mtd_queue;
 static void handle_mtdblock_request(void)
 {
+	struct request *req;
 	struct mtdblk_dev *mtdblk;
 	unsigned int res;
 
-	while (!blk_queue_empty(&mtd_queue)) {
-		struct request *req = elv_next_request(&mtd_queue);
+	while ((req = elv_next_request(&mtd_queue) != NULL) {
 		struct mtdblk_dev **p = req->rq_disk->private_data;
 		spin_unlock_irq(mtd_queue.queue_lock);
 		mtdblk = *p;
@@ -458,7 +458,7 @@ int mtdblock_thread(void *dummy)
 		add_wait_queue(&thr_wq, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
 		spin_lock_irq(mtd_queue.queue_lock);
-		if (blk_queue_empty(&mtd_queue) || blk_queue_plugged(&mtd_queue)) {
+		if (!elv_next_request(&mtd_queue) || blk_queue_plugged(&mtd_queue)) {
 			spin_unlock_irq(mtd_queue.queue_lock);
 			schedule();
 			remove_wait_queue(&thr_wq, &wait); 

@@ -153,33 +153,18 @@ int
 xfs_bioerror(
 	struct xfs_buf		*b);
 
-/*
- * XFS I/O core functions
- */
-extern int xfs_bioerror_relse(struct xfs_buf *);
-
-
-/*
- * Needed by xfs_rw.c
- */
 int
-xfs_rwlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
-
-void
-xfs_rwunlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
+xfs_bioerror_relse(
+	struct xfs_buf		*b);
 
 int
 xfs_read_buf(
-	struct xfs_mount *mp,
-	xfs_buftarg_t	 *target,
-	xfs_daddr_t	 blkno,
-	int		 len,
-	uint		 flags,
-	struct xfs_buf	 **bpp);
+	struct xfs_mount	*mp,
+	xfs_buftarg_t		*target,
+	xfs_daddr_t		blkno,
+	int			len,
+	uint			flags,
+	struct xfs_buf		**bpp);
 
 void
 xfs_ioerror_alert(
@@ -187,5 +172,36 @@ xfs_ioerror_alert(
 	struct xfs_mount	*mp,
 	xfs_buf_t		*bp,
 	xfs_daddr_t		blkno);
+
+
+/*
+ * Prototypes for functions in xfs_vnodeops.c.
+ */
+
+int
+xfs_rwlock(
+	bhv_desc_t		*bdp,
+	vrwlock_t		write_lock);
+
+void
+xfs_rwunlock(
+	bhv_desc_t		*bdp,
+	vrwlock_t		write_lock);
+
+int
+xfs_change_file_space(
+	bhv_desc_t		*bdp,
+	int			cmd,
+	xfs_flock64_t		*bf,
+	xfs_off_t		offset,
+	cred_t			*credp,
+	int			flags);
+
+int
+xfs_set_dmattrs(
+	bhv_desc_t		*bdp,
+	u_int			evmask,
+	u_int16_t		state,
+	cred_t			*credp);
 
 #endif /* __XFS_RW_H__ */

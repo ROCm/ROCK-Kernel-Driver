@@ -598,7 +598,7 @@ static void fd_error(void)
 {
 	printk("FDC1772: fd_error\n");
 	/*panic("fd1772: fd_error"); *//* DAG tmp */
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		return;
 	CURRENT->errors++;
 	if (CURRENT->errors >= MAX_ERRORS) {
@@ -1207,11 +1207,11 @@ static void redo_fd_request(void)
 
 	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
 		CURRENT, CURRENT ? CURRENT->rq_disk->disk_name : "",
-		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0));
+		CURRENT ? CURRENT->sector : 0));
 
 repeat:
 
-	if (blk_queue_empty(QUEUE))
+	if (!CURRENT)
 		goto the_end;
 
 	floppy = CURRENT->rq_disk->private_data;

@@ -46,7 +46,6 @@
 #include <support/ktrace.h>
 #include <support/mutex.h>
 #include <support/sema.h>
-#include <support/atomic.h>
 #include <support/debug.h>
 #include <support/move.h>
 #include <support/uuid.h>

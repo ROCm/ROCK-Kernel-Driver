@@ -253,6 +253,11 @@ config HDLC
 	  Generic HDLC driver currently supports raw HDLC, Cisco HDLC, Frame
 	  Relay, synchronous Point-to-Point Protocol (PPP) and X.25.
 
+ 	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read Documentation/modules.txt.  The module
+	  will be called hdlc.o.
+
 	  If unsure, say N here.
 
 config HDLC_RAW
@@ -261,6 +266,17 @@ config HDLC_RAW
 	help
 	  Say Y to this option if you want generic HDLC driver to support
 	  raw HDLC over WAN (Wide Area Network) connections.
+
+	  If unsure, say N here.
+
+config HDLC_RAW_ETH
+	bool "Raw HDLC Ethernet device support"
+	depends on HDLC
+	help
+	  Say Y to this option if you want generic HDLC driver to support
+	  raw HDLC Ethernet device emulation over WAN (Wide Area Network)
+	  connections.
+	  You will need it for Ethernet over HDLC bridges.
 
 	  If unsure, say N here.
 
@@ -344,6 +360,11 @@ config N2
 
 	  Note that N2csu and N2dds cards are not supported by this driver.
 
+	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called n2.o.
+
 	  If unsure, say N here.
 
 config C101
@@ -353,6 +374,11 @@ config C101
 	  This driver is for C101 SuperSync ISA cards made by Moxa
 	  Technologies Co., Ltd. If you have such a card,
 	  say Y here and see <http://hq.pm.waw.pl/pub/hdlc/>
+
+	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called c101.o.
 
 	  If unsure, say N here.
 
@@ -377,18 +403,33 @@ config FARSYNC
 config HDLC_DEBUG_PKT
 	bool "Debug received/transmitted packets"
 	depends on HDLC
+	help
+	  This option is for developers only - do NOT use on production
+	  systems.
 
 config HDLC_DEBUG_HARD_HEADER
 	bool "Debug hard_header routines"
 	depends on HDLC
+	help
+	  This option is for developers only - do NOT use on production
+	  systems.
 
 config HDLC_DEBUG_ECN
 	bool "Debug FECN/BECN conditions"
 	depends on HDLC
+	help
+	  This option is for developers only - do NOT use on production
+	  systems.
 
 config HDLC_DEBUG_RINGS
 	bool "Debug RX/TX packet rings"
 	depends on HDLC
+	help
+	  If you answer Y here you will be able to get a diagnostic dump of
+	  port's TX and RX packet rings, using "sethdlc hdlcX private"
+	  command. It does not affect normal operations.
+
+	  If unsure, say Y here.
 
 config DLCI
 	tristate "Frame relay DLCI support"

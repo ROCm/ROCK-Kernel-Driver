@@ -620,7 +620,7 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 		skb->tail += pkt_len;
 		skb->len = pkt_len;
        	if (netif_running(dev))
-			skb->protocol = htons(ETH_P_HDLC);
+			skb->protocol = hdlc_type_trans(skb, dev);
 		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
 	} else {

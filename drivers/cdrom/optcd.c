@@ -977,7 +977,7 @@ static int update_toc(void)
 
 static int current_valid(void)
 {
-        return !blk_queue_empty(QUEUE) &&
+        return CURRENT &&
 		CURRENT->cmd == READ &&
 		CURRENT->sector != -1;
 }
