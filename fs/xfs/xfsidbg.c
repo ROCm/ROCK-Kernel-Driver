@@ -2421,12 +2421,10 @@ static int	kdbm_vn(
 
 static char	*pb_flag_vals[] = {
 /*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
-/*  5 */ "NONE", "DELWRI", "INVALID0x07", "INVALID0x08", "INVALID0x09",
-/* 10 */ "STALE", "FS_MANAGED", "FS_DATAIOD", "LOCK", "TRYLOCK",
-/* 15 */ "DONT_BLOCK", "PAGECACHE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
-	 "ADDR_ALLOCATED",
-/* 20 */ "MEM_ALLOCATED", "MEM_SLAB", "FORCEIO", "FLUSH", "READ_AHEAD",
-/* 25 */ "RUN_QUEUES", "DIRECTIO",
+/*  5 */ "NONE", "DELWRI",  "STALE", "FS_MANAGED", "FS_DATAIOD",
+/* 10 */ "FORCEIO", "FLUSH", "READ_AHEAD", "DIRECTIO", "LOCK",
+/* 15 */ "TRYLOCK", "DONT_BLOCK", "PAGE_CACHE", "KMEM_ALLOC", "RUN_QUEUES",
+/* 20 */ "PRIVATE_BH",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
@@ -2505,12 +2503,12 @@ print_pagebuf(
 	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx pb_locked %d\n",
 		   pb->pb_bn,
 		   (unsigned long) pb->pb_count_desired, (int)pb->pb_locked);
-	kdb_printf("  pb_flushtime %ld (%ld) pb_io_remaining %d pb_error %u\n",
-		   pb->pb_flushtime, pb->pb_flushtime - jiffies,
+	kdb_printf("  pb_queuetime %ld (%ld/%ld) pb_io_remaining %d pb_error %u\n",
+		   pb->pb_queuetime, jiffies, pb->pb_queuetime + xfs_age_buffer,
 		   pb->pb_io_remaining.counter, pb->pb_error);
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
-		pb->pb_page_count, pb->pb_offset,
-		pb->pb_pages);
+		   pb->pb_page_count, pb->pb_offset,
+		   pb->pb_pages);
 #if 0
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
 		   pb->pb_iodonesema.count.counter,
@@ -2572,7 +2570,7 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	}
 
 	if (!verbose) {
-		kdb_printf("index pb       pin   flushtime\n");
+		kdb_printf("index pb       pin   queuetime\n");
 	}
 
 	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
@@ -2586,7 +2584,7 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 			kdb_printf("%4d  0x%lx   %d   %ld\n",
 				count++, addr, 
 				bp.pb_pin_count.counter,
-				bp.pb_flushtime - jiffies);
+				bp.pb_queuetime);
 		}
 	}
 #else

@@ -3707,8 +3707,8 @@ xfs_iaccess(
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
 	 */
-	if (!(orgmode & S_IXUSR) || (inode->i_mode & S_IXUGO) ||
-	    (ip->i_d.di_mode & S_IFMT) == S_IFDIR)
+	if (!(orgmode & S_IXUSR) ||
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
 		if (capable_cred(cr, CAP_DAC_OVERRIDE))
 			return 0;
 

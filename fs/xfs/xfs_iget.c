@@ -451,6 +451,9 @@ retry:
 		int		newnode;
 
 		vp = LINVFS_GET_VP(inode);
+#ifdef MS_NOBKL
+		inode->i_flags |= MS_NOBKL;	/* no BKL for permission() */
+#endif
 		if (inode->i_state & I_NEW) {
 inode_allocate:
 			vn_initialize(inode);

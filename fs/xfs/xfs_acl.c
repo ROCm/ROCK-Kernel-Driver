@@ -111,7 +111,7 @@ posix_acl_xattr_to_xfs(
 		return EINVAL;
 
 	if (src->a_version != cpu_to_le32(POSIX_ACL_XATTR_VERSION))
-		return EINVAL;
+		return EOPNOTSUPP;
 
 	memset(dest, 0, sizeof(xfs_acl_t));
 	dest->acl_cnt = posix_acl_xattr_count(size);

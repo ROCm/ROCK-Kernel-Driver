@@ -70,6 +70,12 @@
 # define XFS_TRACE_STRING
 #endif
 
+#ifdef CONFIG_XFS_DMAPI
+# define XFS_DMAPI_STRING	"dmapi support, "
+#else
+# define XFS_DMAPI_STRING
+#endif
+
 #ifdef XFSDEBUG
 # define XFS_DBG_STRING		"debug"
 #else
@@ -81,6 +87,7 @@
 				XFS_REALTIME_STRING \
 				XFS_BIGFS_STRING \
 				XFS_TRACE_STRING \
+				XFS_DMAPI_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
 #define LINVFS_GET_VFS(s) \
@@ -104,13 +111,5 @@ extern void xfs_flush_device(struct xfs_inode *);
 extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 				struct block_device **);
 extern void xfs_blkdev_put(struct block_device *);
-
-extern struct xfs_buftarg *xfs_alloc_buftarg(struct block_device *);
-extern void xfs_relse_buftarg(struct xfs_buftarg *);
-extern void xfs_free_buftarg(struct xfs_buftarg *);
-extern void xfs_flush_buftarg(struct xfs_buftarg *);
-extern int xfs_readonly_buftarg(struct xfs_buftarg *);
-extern void xfs_setsize_buftarg(struct xfs_buftarg *, unsigned int, unsigned int);
-extern unsigned int xfs_getsize_buftarg(struct xfs_buftarg *);
 
 #endif	/* __XFS_SUPER_H__ */

@@ -73,26 +73,22 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_ASYNC = (1 << 4),   /* initiator will not wait for completion  */
 	PBF_NONE = (1 << 5),    /* buffer not read at all                  */
 	PBF_DELWRI = (1 << 6),  /* buffer has dirty pages                  */
-	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
-	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
-	PBF_FS_DATAIOD = (1 << 12), /* schedule IO completion on fs datad  */
+	PBF_STALE = (1 << 7),	/* buffer has been staled, do not find it  */
+	PBF_FS_MANAGED = (1 << 8),  /* filesystem controls freeing memory  */
+	PBF_FS_DATAIOD = (1 << 9),  /* schedule IO completion on fs datad  */
+	PBF_FORCEIO = (1 << 10),    /* ignore any cache state		   */
+	PBF_FLUSH = (1 << 11),	    /* flush disk write cache		   */
+	PBF_READ_AHEAD = (1 << 12), /* asynchronous read-ahead		   */
 
 	/* flags used only as arguments to access routines */
-	PBF_LOCK = (1 << 13),	/* lock requested			   */
-	PBF_TRYLOCK = (1 << 14), /* lock requested, but do not wait	   */
-	PBF_DONT_BLOCK = (1 << 15), /* do not block in current thread	   */
+	PBF_LOCK = (1 << 14),       /* lock requested			   */
+	PBF_TRYLOCK = (1 << 15),    /* lock requested, but do not wait	   */
+	PBF_DONT_BLOCK = (1 << 16), /* do not block in current thread	   */
 
 	/* flags used only internally */
-	_PBF_PAGECACHE = (1 << 16),	/* backed by pagecache		   */
-	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
-	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
-	_PBF_MEM_SLAB = (1 << 21), /* underlying pages are slab allocated  */
-
-	PBF_FORCEIO = (1 << 22), /* ignore any cache state		   */
-	PBF_FLUSH = (1 << 23),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead		   */
-	PBF_RUN_QUEUES = (1 << 25), /* run block device task queue	   */
-
+	_PBF_PAGE_CACHE = (1 << 17),/* backed by pagecache		   */
+	_PBF_KMEM_ALLOC = (1 << 18),/* backed by kmem_alloc()		   */
+	_PBF_RUN_QUEUES = (1 << 19),/* run block device task queue	   */
 } page_buf_flags_t;
 
 #define PBF_UPDATE (PBF_READ | PBF_WRITE)
@@ -135,7 +131,7 @@ typedef int (*page_buf_bdstrat_t)(struct xfs_buf *);
 
 typedef struct xfs_buf {
 	struct semaphore	pb_sema;	/* semaphore for lockables  */
-	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
+	unsigned long		pb_queuetime;	/* time buffer was queued   */
 	atomic_t		pb_pin_count;	/* pin count		    */
 	wait_queue_head_t	pb_waiters;	/* unpin waiters	    */
 	struct list_head	pb_list;
@@ -250,7 +246,7 @@ extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 
 extern void pagebuf_ioerror(		/* mark buffer in error	(or not) */
 		xfs_buf_t *,		/* buffer to mark		*/
-		unsigned int);		/* error to store (0 if none)	*/
+		int);			/* error to store (0 if none)	*/
 
 extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		xfs_buf_t *,		/* buffer to start		*/
@@ -300,7 +296,6 @@ extern int pagebuf_ispin(		/* check if buffer is pinned	*/
 
 /* Delayed Write Buffer Routines */
 
-extern void pagebuf_delwri_flush(xfs_buftarg_t *, int, int *);
 extern void pagebuf_delwri_dequeue(xfs_buf_t *);
 
 /* Buffer Daemon Setup Routines */
@@ -506,7 +501,7 @@ static inline int	xfs_bawrite(void *mp, xfs_buf_t *bp)
 	bp->pb_fspriv3 = mp;
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
-	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | PBF_RUN_QUEUES);
+	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | _PBF_RUN_QUEUES);
 }
 
 static inline void	xfs_buf_relse(xfs_buf_t *bp)
@@ -543,7 +538,7 @@ static inline int	XFS_bwrite(xfs_buf_t *pb)
 	int	error = 0;
 
 	if (!iowait)
-		pb->pb_flags |= PBF_RUN_QUEUES;
+		pb->pb_flags |= _PBF_RUN_QUEUES;
 
 	xfs_buf_undelay(pb);
 	pagebuf_iostrategy(pb);
@@ -569,21 +564,6 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 
 #define xfs_iowait(pb)	pagebuf_iowait(pb)
 
-
-/*
- * Go through all incore buffers, and release buffers
- * if they belong to the given device. This is used in
- * filesystem error handling to preserve the consistency
- * of its metadata.
- */
-
-#define xfs_binval(buftarg)	xfs_flush_buftarg(buftarg)
-
-#define XFS_bflush(buftarg)	xfs_flush_buftarg(buftarg)
-
-#define xfs_incore_relse(buftarg,delwri_only,wait)	\
-	xfs_relse_buftarg(buftarg)
-
 #define xfs_baread(target, rablkno, ralen)  \
 	pagebuf_readahead((target), (rablkno), (ralen), PBF_DONT_BLOCK)
 
@@ -591,5 +571,24 @@ static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 #define xfs_buf_get_noaddr(len, target)	pagebuf_get_no_daddr((len), (target))
 #define xfs_buf_free(bp)		pagebuf_free(bp)
 
-#endif	/* __XFS_BUF_H__ */
 
+/*
+ *	Handling of buftargs.
+ */
+
+extern xfs_buftarg_t *xfs_alloc_buftarg(struct block_device *);
+extern void xfs_free_buftarg(xfs_buftarg_t *, int);
+extern void xfs_setsize_buftarg(xfs_buftarg_t *, unsigned int, unsigned int);
+extern void xfs_incore_relse(xfs_buftarg_t *, int, int);
+extern int xfs_flush_buftarg(xfs_buftarg_t *, int);
+
+#define xfs_getsize_buftarg(buftarg) \
+	block_size((buftarg)->pbr_bdev)
+#define xfs_readonly_buftarg(buftarg) \
+	bdev_read_only((buftarg)->pbr_bdev)
+#define xfs_binval(buftarg) \
+	xfs_flush_buftarg(buftarg, 1)
+#define XFS_bflush(buftarg) \
+	xfs_flush_buftarg(buftarg, 1)
+
+#endif	/* __XFS_BUF_H__ */

@@ -67,7 +67,6 @@
 #include "xfs_utils.h"
 #include "xfs_version.h"
 
-#include <linux/blkdev.h>
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/mount.h>
@@ -295,75 +294,6 @@ xfs_blkdev_put(
 		close_bdev_excl(bdev);
 }
 
-void
-xfs_flush_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	pagebuf_delwri_flush(btp, 1, NULL);
-}
-
-void
-xfs_free_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	xfs_flush_buftarg(btp);
-	kmem_free(btp, sizeof(*btp));
-}
-
-int
-xfs_readonly_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	return bdev_read_only(btp->pbr_bdev);
-}
-
-void
-xfs_relse_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	invalidate_bdev(btp->pbr_bdev, 1);
-	truncate_inode_pages(btp->pbr_mapping, 0LL);
-}
-
-unsigned int
-xfs_getsize_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	return block_size(btp->pbr_bdev);
-}
-
-void
-xfs_setsize_buftarg(
-	xfs_buftarg_t		*btp,
-	unsigned int		blocksize,
-	unsigned int		sectorsize)
-{
-	btp->pbr_bsize = blocksize;
-	btp->pbr_sshift = ffs(sectorsize) - 1;
-	btp->pbr_smask = sectorsize - 1;
-
-	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
-		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device %s\n",
-			sectorsize, XFS_BUFTARG_NAME(btp));
-	}
-}
-
-xfs_buftarg_t *
-xfs_alloc_buftarg(
-	struct block_device	*bdev)
-{
-	xfs_buftarg_t		*btp;
-
-	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
-
-	btp->pbr_dev =  bdev->bd_dev;
-	btp->pbr_bdev = bdev;
-	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	xfs_setsize_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev));
-
-	return btp;
-}
 
 STATIC struct inode *
 linvfs_alloc_inode(
@@ -501,7 +431,7 @@ linvfs_start_syncd(
 	pid = kernel_thread(xfssyncd, (void *) vfsp,
 			CLONE_VM | CLONE_FS | CLONE_FILES);
 	if (pid < 0)
-		return pid;
+		return -pid;
 	wait_event(vfsp->vfs_wait_sync_task, vfsp->vfs_sync_task);
 	return 0;
 }
@@ -771,7 +701,7 @@ linvfs_fill_super(
 	struct vfs		*vfsp = vfs_allocate();
 	struct xfs_mount_args	*args = xfs_args_allocate(sb);
 	struct kstatfs		statvfs;
-	int			error;
+	int			error, error2;
 
 	vfsp->vfs_super = sb;
 	LINVFS_SET_VFS(sb, vfsp);
@@ -812,11 +742,15 @@ linvfs_fill_super(
 		goto fail_unmount;
 
 	sb->s_root = d_alloc_root(LINVFS_GET_IP(rootvp));
-	if (!sb->s_root)
+	if (!sb->s_root) {
+		error = ENOMEM;
 		goto fail_vnrele;
-	if (is_bad_inode(sb->s_root->d_inode))
+	}
+	if (is_bad_inode(sb->s_root->d_inode)) {
+		error = EINVAL;
 		goto fail_vnrele;
-	if (linvfs_start_syncd(vfsp))
+	}
+	if ((error = linvfs_start_syncd(vfsp)))
 		goto fail_vnrele;
 	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
@@ -832,7 +766,7 @@ fail_vnrele:
 	}
 
 fail_unmount:
-	VFS_UNMOUNT(vfsp, 0, NULL, error);
+	VFS_UNMOUNT(vfsp, 0, NULL, error2);
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
@@ -913,6 +847,7 @@ init_xfs_fs( void )
 	vn_init();
 	xfs_init();
 	uuid_init();
+	XFS_DM_INIT();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -933,6 +868,7 @@ STATIC void __exit
 exit_xfs_fs( void )
 {
 	unregister_filesystem(&xfs_fs_type);
+	XFS_DM_EXIT();
 	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();

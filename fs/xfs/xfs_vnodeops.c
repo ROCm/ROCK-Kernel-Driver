@@ -680,24 +680,12 @@ xfs_setattr(
 	 * once it is a part of the transaction.
 	 */
 	if (mask & XFS_AT_SIZE) {
-		if (vap->va_size > ip->i_d.di_size) {
+		code = 0;
+		if (vap->va_size > ip->i_d.di_size)
 			code = xfs_igrow_start(ip, vap->va_size, credp);
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-#if 0
-		} else if (vap->va_size <= ip->i_d.di_size) {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE,
-					    (xfs_fsize_t)vap->va_size);
-			code = 0;
-#endif
-		} else {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			code = 0;
-		}
-
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		if (!code)
-			code = -vmtruncate(&vp->v_inode, vap->va_size);
-
+			code = xfs_itruncate_data(ip, vap->va_size);
 		if (code) {
 			ASSERT(tp == NULL);
 			lock_flags &= ~XFS_ILOCK_EXCL;

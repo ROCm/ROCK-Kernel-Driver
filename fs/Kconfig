@@ -421,6 +421,18 @@ config XFS_QUOTA
 	  with or without the generic quota support enabled (CONFIG_QUOTA) -
 	  they are completely independent subsystems.
 
+config XFS_DMAPI
+	tristate "DMAPI support"
+	depends on XFS_FS
+	help
+	  The Data Management API is a system interface used to implement
+	  the interface defined in the X/Open document:
+	  "Systems Management: Data Storage Management (XDSM) API",
+	  dated February 1997.  This interface is used by hierarchical
+	  storage management systems.
+
+	  If unsure, say N.
+
 config XFS_SECURITY
 	bool "Security Label support"
 	depends on XFS_FS
@@ -445,18 +457,6 @@ config XFS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N.
 
-config XFS_DMAPI
-	tristate "DMAPI support"
-	depends on XFS_FS
-	help
-	  The Data Management API is a system interface used to implement
-	  the interface defined in the X/Open document:
-	    "Systems Management: Data Storage Management (XDSM) API",
-	  dated February 1997.  This interface is used by hierarchical
-	  storage management systems.
-
-	  If unsure, say N.
-
 config XFS_DEBUG
 	bool "Debugging support (EXPERIMENTAL)"
 	depends on XFS_FS && EXPERIMENTAL
@@ -474,13 +474,13 @@ config XFS_TRACE
 	bool "Tracing support (EXPERIMENTAL)"
 	depends on XFS_FS && EXPERIMENTAL
 	help
-	  Say Y here to get an XFS build with activity tracing enabled.
+	  Say Y here to get an XFS build with activity tracing enabled.	
 	  Enabling this option will attach historical information to XFS
-	  inodes, pagebufs, certain locks, the log, the IO path, and a      
+	  inodes, buffers, certain locks, the log, the IO path, and a
 	  few other key areas within XFS.  These traces can be examined
 	  using the kdb kernel debugger.
 
-	  Say N unless you are an XFS developer.              
+	  Say N unless you are an XFS developer.
 
 config MINIX_FS
 	tristate "Minix fs support"

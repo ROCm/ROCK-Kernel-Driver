@@ -625,7 +625,7 @@ xfs_mntupdate(
 
 	if (*flags & MS_RDONLY) {
 		xfs_refcache_purge_mp(mp);
-		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
+		xfs_flush_buftarg(mp->m_ddev_targp, 0);
 		xfs_finish_reclaim_all(mp, 0);
 
 		/* This loop must run at least twice.
@@ -637,8 +637,11 @@ xfs_mntupdate(
 		 */ 
 		do {
 			VFS_SYNC(vfsp, REMOUNT_READONLY_FLAGS, NULL, error);
-			pagebuf_delwri_flush(mp->m_ddev_targp, 1, &pincount);
-			if(0 == pincount) { delay(50); count++; }
+			pincount = xfs_flush_buftarg(mp->m_ddev_targp, 1);
+			if (!pincount) {
+				delay(50);
+				count++;
+			}
 		} while (count < 2);
 
 		/* Ok now write out an unmount record */
