@@ -1387,11 +1387,12 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct smsc_ircc_cb *self;
 	int iobase, iir, lcra, lsr;
+	irqreturn_t ret = IRQ_NONE;
 
 	if (dev == NULL) {
 		printk(KERN_WARNING "%s: irq %d for unknown device.\n", 
 		       driver_name, irq);
-		return IRQ_NONE;
+		goto irq_ret;
 	}
 	self = (struct smsc_ircc_cb *) dev->priv;
 	ASSERT(self != NULL, return IRQ_NONE;);
@@ -1401,14 +1402,18 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 
 	/* Check if we should use the SIR interrupt handler */
 	if (self->io.speed <=  SMSC_IRCC2_MAX_SIR_SPEED) {
-		irqreturn_t ret = smsc_ircc_interrupt_sir(dev);
-		spin_unlock(&self->lock);	
-		return ret;
+		ret = smsc_ircc_interrupt_sir(dev);
+		goto irq_ret_unlock;
 	}
+
 	iobase = self->io.fir_base;
 
 	register_bank(iobase, 0);
 	iir = inb(iobase+IRCC_IIR);
+	if (iir == 0) 
+		goto irq_ret_unlock;
+	ret = IRQ_HANDLED;
+
 	/* Disable interrupts */
 	outb(0, iobase+IRCC_IER);
 	lcra = inb(iobase+IRCC_LCR_A);
@@ -1434,8 +1439,10 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	register_bank(iobase, 0);
 	outb(IRCC_IER_ACTIVE_FRAME|IRCC_IER_EOM, iobase+IRCC_IER);
 
+ irq_ret_unlock:
 	spin_unlock(&self->lock);
-	return IRQ_RETVAL(iir);
+ irq_ret:
+	return ret;
 }
 
 /*
@@ -1456,6 +1463,8 @@ static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev)
 	iobase = self->io.sir_base;
 
 	iir = inb(iobase+UART_IIR) & UART_IIR_ID;
+	if (iir == 0)
+		return IRQ_NONE;
 	while (iir) {
 		/* Clear interrupt */
 		lsr = inb(iobase+UART_LSR);
@@ -1489,7 +1498,7 @@ static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev)
  	        iir = inb(iobase + UART_IIR) & UART_IIR_ID;
 	}
 	/*spin_unlock(&self->lock);*/
-	return IRQ_RETVAL(iir);
+	return IRQ_HANDLED;
 }
 
 
