@@ -59,7 +59,7 @@ sys_call_table32:
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
 /*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_epoll_create, sys_epoll_ctl
 	.word sys_epoll_wait, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
-/*200*/	.word sys_ssetmask, sys_sigsuspend, sys32_newlstat, sys_uselib, old32_readdir
+/*200*/	.word sys_ssetmask, sys_sigsuspend, compat_sys_newlstat, sys_uselib, old32_readdir
 	.word sys32_readahead, sys32_socketcall, sys_syslog, sys32_lookup_dcookie, sys_nis_syscall
 /*210*/	.word sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys32_sysinfo
 	.word sys32_ipc, sys32_sigreturn, sys_clone, sys_nis_syscall, sys32_adjtimex
@@ -150,8 +150,8 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sys_access, sunos_nosys, sunos_nosys
-	.word sys_sync, sys_kill, sys32_newstat
-	.word sunos_nosys, sys32_newlstat, sys_dup
+	.word sys_sync, sys_kill, compat_sys_newstat
+	.word sunos_nosys, compat_sys_newlstat, sys_dup
 	.word sys_pipe, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys, sunos_getgid
 	.word sunos_nosys, sunos_nosys
@@ -159,7 +159,7 @@ sunos_sys_table:
 	.word sunos_mctl, sunos_ioctl, sys_reboot
 	.word sunos_nosys, sys_symlink, sys_readlink
 	.word sys32_execve, sys_umask, sys_chroot
-	.word sys32_newfstat, sunos_nosys, sys_getpagesize
+	.word compat_sys_newfstat, sunos_nosys, sys_getpagesize
 	.word sys_msync, sys_vfork, sunos_nosys
 	.word sunos_nosys, sunos_sbrk, sunos_sstk
 	.word sunos_mmap, sunos_vadvise, sys_munmap
