@@ -48,6 +48,7 @@
 
 #include "s3c2410.h"
 #include "devs.h"
+#include "cpu.h"
 
 static struct map_desc smdk2410_iodesc[] __initdata = {
   /* nothing here yet */
@@ -102,9 +103,8 @@ static struct s3c2410_board smdk2410_board __initdata = {
 
 void __init smdk2410_map_io(void)
 {
-	s3c2410_map_io(smdk2410_iodesc, ARRAY_SIZE(smdk2410_iodesc));
-	s3c2410_uartcfgs = smdk2410_uartcfgs;
-
+	s3c24xx_init_io(smdk2410_iodesc, ARRAY_SIZE(smdk2410_iodesc));
+	s3c2410_init_uarts(smdk2410_uartcfgs, ARRAY_SIZE(smdk2410_uartcfgs));
 	s3c2410_set_board(&smdk2410_board);
 }
 
@@ -127,3 +127,5 @@ MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switc
      INITIRQ(smdk2410_init_irq)
      INITTIME(smdk2410_init_time)
 MACHINE_END
+
+

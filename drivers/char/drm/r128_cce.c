@@ -586,13 +586,11 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 int r128_do_cleanup_cce( drm_device_t *dev )
 {
 
-#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
 	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
-#endif
 
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;

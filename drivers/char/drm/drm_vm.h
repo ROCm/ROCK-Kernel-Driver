@@ -493,18 +493,19 @@ int DRM(mmap_dma)(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
-#ifndef DRIVER_GET_MAP_OFS
-#define DRIVER_GET_MAP_OFS()	(map->offset)
-#endif
+unsigned long DRM(core_get_map_ofs)(drm_map_t *map)
+{
+	return map->offset;
+}
 
-#ifndef DRIVER_GET_REG_OFS
+unsigned long DRM(core_get_reg_ofs)(struct drm_device *dev)
+{
 #ifdef __alpha__
-#define DRIVER_GET_REG_OFS()	(dev->hose->dense_mem_base -	\
-				 dev->hose->mem_space->start)
+	return dev->hose->dense_mem_base - dev->hose->mem_space->start;
 #else
-#define DRIVER_GET_REG_OFS()	0
+	return 0;
 #endif
-#endif
+}
 
 /**
  * mmap DMA memory.
@@ -557,7 +558,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		r_list = list_entry(list, drm_map_list_t, head);
 		map = r_list->map;
 		if (!map) continue;
-		off = DRIVER_GET_MAP_OFS();
+		off = dev->fn_tbl.get_map_ofs(map);
 		if (off == VM_OFFSET(vma)) break;
 	}
 
@@ -612,7 +613,7 @@ int DRM(mmap)(struct file *filp, struct vm_area_struct *vma)
 		if (map->type != _DRM_AGP)
 			vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 #endif
-		offset = DRIVER_GET_REG_OFS();
+		offset = dev->fn_tbl.get_reg_ofs(dev);
 #ifdef __sparc__
 		if (io_remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
 					VM_OFFSET(vma) + offset,

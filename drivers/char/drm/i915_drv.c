@@ -19,6 +19,7 @@
 #include "drm_bufs.h"
 #include "drm_context.h"	/* is this needed? */
 #include "drm_drawable.h"	/* is this needed? */
+#include "drm_dma.h"
 #include "drm_drv.h"
 #include "drm_fops.h"
 #include "drm_init.h"

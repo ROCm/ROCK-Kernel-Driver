@@ -1712,8 +1712,13 @@ static void r128_driver_pretakedown(drm_device_t *dev)
 
 void r128_driver_register_fns(drm_device_t *dev)
 {
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG;
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL;
 	dev->dev_priv_size = sizeof(drm_r128_buf_priv_t);
 	dev->fn_tbl.prerelease = r128_driver_prerelease;
 	dev->fn_tbl.pretakedown = r128_driver_pretakedown;
+	dev->fn_tbl.vblank_wait = r128_driver_vblank_wait;
+	dev->fn_tbl.irq_preinstall = r128_driver_irq_preinstall;
+	dev->fn_tbl.irq_postinstall = r128_driver_irq_postinstall;
+	dev->fn_tbl.irq_uninstall = r128_driver_irq_uninstall;
+	dev->fn_tbl.irq_handler = r128_driver_irq_handler;
 }

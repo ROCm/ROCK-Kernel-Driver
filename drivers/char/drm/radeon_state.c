@@ -2603,10 +2603,15 @@ static void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_pri
 
 void radeon_driver_register_fns(struct drm_device *dev)
 {	
-	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG;
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL;
 	dev->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
 	dev->fn_tbl.prerelease = radeon_driver_prerelease;
 	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;
 	dev->fn_tbl.open_helper = radeon_driver_open_helper;
 	dev->fn_tbl.free_filp_priv = radeon_driver_free_filp_priv;
+	dev->fn_tbl.vblank_wait = radeon_driver_vblank_wait;
+ 	dev->fn_tbl.irq_preinstall = radeon_driver_irq_preinstall;
+ 	dev->fn_tbl.irq_postinstall = radeon_driver_irq_postinstall;
+ 	dev->fn_tbl.irq_uninstall = radeon_driver_irq_uninstall;
+ 	dev->fn_tbl.irq_handler = radeon_driver_irq_handler;
 }

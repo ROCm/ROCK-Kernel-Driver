@@ -6,9 +6,13 @@
 #include <linux/config.h>
 
 
-#if defined(CONFIG_ARCH_IQ80321)
+#if defined(CONFIG_ARCH_IQ80321) || defined(CONFIG_ARCH_IQ31244)
 
-#define CLOCK_TICK_RATE 200000000
+#define CLOCK_TICK_RATE IOP321_TICK_RATE
+
+#elif defined(CONFIG_ARCH_IQ80331)
+
+#define CLOCK_TICK_RATE IOP331_TICK_RATE
 
 #else
 

@@ -69,15 +69,9 @@
 
 /* DMA customization:
  */
-#define __HAVE_DMA			1
-#define __HAVE_OLD_DMA			1
-
 #define __HAVE_MULTIPLE_DMA_QUEUES	1
 #define __HAVE_DMA_WAITQUEUE		1
 
 /* removed from DRM HAVE_DMA_FREELIST & HAVE_DMA_SCHEDULE */
-
-#define __HAVE_IRQ			1
-#define __HAVE_IRQ_BH			1
 
 #endif /* __GAMMA_H__ */

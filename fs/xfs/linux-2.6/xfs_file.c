@@ -164,8 +164,6 @@ __linvfs_readv(
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
 	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, rval);
-	if (rval == -EIOCBQUEUED)
-		rval = wait_on_sync_kiocb(&kiocb);
 
 	*ppos = kiocb.ki_pos;
 	return rval;
@@ -211,8 +209,6 @@ __linvfs_writev(
 		ioflags |= IO_ISDIRECT;
 
 	VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, rval);
-	if (rval == -EIOCBQUEUED)
-		rval = wait_on_sync_kiocb(&kiocb);
 
 	*ppos = kiocb.ki_pos;
 	return rval;

@@ -56,6 +56,10 @@ extern int iop321_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *iop321_scan_bus(int nr, struct pci_sys_data *);
 extern void iop321_init(void);
 
+extern int iop331_setup(int nr, struct pci_sys_data *);
+extern struct pci_bus *iop331_scan_bus(int nr, struct pci_sys_data *);
+extern void iop331_init(void);
+
 extern int dc21285_setup(int nr, struct pci_sys_data *);
 extern struct pci_bus *dc21285_scan_bus(int nr, struct pci_sys_data *);
 extern void dc21285_preinit(void);

@@ -10,6 +10,8 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     29-Aug-2004 BJD  Added timers 0 through 3
+ *     29-Aug-2004 BJD  Changed index of devices we only have one of to -1
  *     21-Aug-2004 BJD  Added IRQ_TICK to RTC resources
  *     18-Aug-2004 BJD  Created initial version
 */
@@ -82,7 +84,7 @@ static u64 s3c_device_lcd_dmamask = 0xffffffffUL;
 
 struct platform_device s3c_device_lcd = {
 	.name		  = "s3c2410-lcd",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_lcd_resource),
 	.resource	  = s3c_lcd_resource,
 	.dev              = {
@@ -111,7 +113,7 @@ static struct resource s3c_nand_resource[] = {
 
 struct platform_device s3c_device_nand = {
 	.name		  = "s3c2410-nand",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_nand_resource),
 	.resource	  = s3c_nand_resource,
 };
@@ -136,7 +138,7 @@ static struct resource s3c_usbgadget_resource[] = {
 
 struct platform_device s3c_device_usbgadget = {
 	.name		  = "s3c2410-usbgadget",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_usbgadget_resource),
 	.resource	  = s3c_usbgadget_resource,
 };
@@ -161,7 +163,7 @@ static struct resource s3c_wdt_resource[] = {
 
 struct platform_device s3c_device_wdt = {
 	.name		  = "s3c2410-wdt",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_wdt_resource),
 	.resource	  = s3c_wdt_resource,
 };
@@ -186,7 +188,7 @@ static struct resource s3c_i2c_resource[] = {
 
 struct platform_device s3c_device_i2c = {
 	.name		  = "s3c2410-i2c",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_i2c_resource),
 	.resource	  = s3c_i2c_resource,
 };
@@ -207,7 +209,7 @@ static u64 s3c_device_iis_dmamask = 0xffffffffUL;
 
 struct platform_device s3c_device_iis = {
 	.name		  = "s3c2410-iis",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_iis_resource),
 	.resource	  = s3c_iis_resource,
 	.dev              = {
@@ -240,7 +242,7 @@ static struct resource s3c_rtc_resource[] = {
 
 struct platform_device s3c_device_rtc = {
 	.name		  = "s3c2410-rtc",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_rtc_resource),
 	.resource	  = s3c_rtc_resource,
 };
@@ -265,7 +267,7 @@ static struct resource s3c_adc_resource[] = {
 
 struct platform_device s3c_device_adc = {
 	.name		  = "s3c2410-adc",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_adc_resource),
 	.resource	  = s3c_adc_resource,
 };
@@ -288,7 +290,7 @@ static struct resource s3c_sdi_resource[] = {
 
 struct platform_device s3c_device_sdi = {
 	.name		  = "s3c2410-sdi",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_sdi_resource),
 	.resource	  = s3c_sdi_resource,
 };
@@ -344,3 +346,103 @@ struct platform_device s3c_device_spi1 = {
 };
 
 EXPORT_SYMBOL(s3c_device_spi1);
+
+/* pwm timer blocks */
+
+static struct resource s3c_timer0_resource[] = {
+	[0] = {
+		.start = S3C2410_PA_TIMER + 0x0C,
+		.end   = S3C2410_PA_TIMER + 0x0C + 0xB,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_TIMER0,
+		.end   = IRQ_TIMER0,
+		.flags = IORESOURCE_IRQ,
+	}
+
+};
+
+struct platform_device s3c_device_timer0 = {
+	.name		  = "s3c2410-timer",
+	.id		  = 0,
+	.num_resources	  = ARRAY_SIZE(s3c_timer0_resource),
+	.resource	  = s3c_timer0_resource,
+};
+
+EXPORT_SYMBOL(s3c_device_timer0);
+
+/* timer 1 */
+
+static struct resource s3c_timer1_resource[] = {
+	[0] = {
+		.start = S3C2410_PA_TIMER + 0x18,
+		.end   = S3C2410_PA_TIMER + 0x23,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_TIMER1,
+		.end   = IRQ_TIMER1,
+		.flags = IORESOURCE_IRQ,
+	}
+
+};
+
+struct platform_device s3c_device_timer1 = {
+	.name		  = "s3c2410-timer",
+	.id		  = 1,
+	.num_resources	  = ARRAY_SIZE(s3c_timer1_resource),
+	.resource	  = s3c_timer1_resource,
+};
+
+EXPORT_SYMBOL(s3c_device_timer1);
+
+/* timer 2 */
+
+static struct resource s3c_timer2_resource[] = {
+	[0] = {
+		.start = S3C2410_PA_TIMER + 0x24,
+		.end   = S3C2410_PA_TIMER + 0x2F,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_TIMER2,
+		.end   = IRQ_TIMER2,
+		.flags = IORESOURCE_IRQ,
+	}
+
+};
+
+struct platform_device s3c_device_timer2 = {
+	.name		  = "s3c2410-timer",
+	.id		  = 2,
+	.num_resources	  = ARRAY_SIZE(s3c_timer2_resource),
+	.resource	  = s3c_timer2_resource,
+};
+
+EXPORT_SYMBOL(s3c_device_timer2);
+
+/* timer 3 */
+
+static struct resource s3c_timer3_resource[] = {
+	[0] = {
+		.start = S3C2410_PA_TIMER + 0x30,
+		.end   = S3C2410_PA_TIMER + 0x3B,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_TIMER3,
+		.end   = IRQ_TIMER3,
+		.flags = IORESOURCE_IRQ,
+	}
+
+};
+
+struct platform_device s3c_device_timer3 = {
+	.name		  = "s3c2410-timer",
+	.id		  = 3,
+	.num_resources	  = ARRAY_SIZE(s3c_timer3_resource),
+	.resource	  = s3c_timer3_resource,
+};
+
+EXPORT_SYMBOL(s3c_device_timer3);

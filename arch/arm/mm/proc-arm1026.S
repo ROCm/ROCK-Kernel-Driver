@@ -471,7 +471,7 @@ __arm1026_proc_info:
 	b	__arm1026_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT
+	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_JAVA
 	.long	cpu_arm1026_name
 	.long	arm1026_processor_functions
 	.long	v4wbi_tlb_fns

@@ -205,6 +205,11 @@ extern int radeon_wait_irq(drm_device_t *dev, int swi_nr);
 extern int radeon_emit_irq(drm_device_t *dev);
 
 extern void radeon_do_release(drm_device_t *dev);
+extern int radeon_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
+extern irqreturn_t radeon_driver_irq_handler( DRM_IRQ_ARGS );
+extern void radeon_driver_irq_preinstall( drm_device_t *dev );
+extern void radeon_driver_irq_postinstall( drm_device_t *dev );
+extern void radeon_driver_irq_uninstall( drm_device_t *dev );
 
 /* Flags for stats.boxes
  */

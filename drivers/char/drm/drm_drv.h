@@ -52,16 +52,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-#ifndef __HAVE_IRQ
-#define __HAVE_IRQ			0
-#endif
-#ifndef __HAVE_DMA_QUEUE
-#define __HAVE_DMA_QUEUE		0
-#endif
-#ifndef __HAVE_MULTIPLE_DMA_QUEUES
-#define __HAVE_MULTIPLE_DMA_QUEUES	0
-#endif
 #ifndef __HAVE_COUNTERS
 #define __HAVE_COUNTERS			0
 #endif
@@ -109,9 +99,7 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { DRM(version),     0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_UNIQUE)]    = { DRM(getunique),   0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAGIC)]     = { DRM(getmagic),    0, 0 },
-#if __HAVE_IRQ
 	[DRM_IOCTL_NR(DRM_IOCTL_IRQ_BUSID)]     = { DRM(irq_by_busid), 0, 1 },
-#endif
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_MAP)]       = { DRM(getmap),      0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_CLIENT)]    = { DRM(getclient),   0, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_GET_STATS)]     = { DRM(getstats),    0, 0 },
@@ -144,17 +132,14 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 
 	[DRM_IOCTL_NR(DRM_IOCTL_FINISH)]        = { DRM(noop),      1, 0 },
 
-#if __HAVE_DMA
 	[DRM_IOCTL_NR(DRM_IOCTL_ADD_BUFS)]      = { DRM(addbufs),     1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_MARK_BUFS)]     = { DRM(markbufs),    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_INFO_BUFS)]     = { DRM(infobufs),    1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_MAP_BUFS)]      = { DRM(mapbufs),     1, 0 },
 	[DRM_IOCTL_NR(DRM_IOCTL_FREE_BUFS)]     = { DRM(freebufs),    1, 0 },
 	/* The DRM_IOCTL_DMA ioctl should be defined by the driver. */
-#endif
-#if __HAVE_IRQ || __HAVE_DMA
+
 	[DRM_IOCTL_NR(DRM_IOCTL_CONTROL)]       = { DRM(control),     1, 1 },
-#endif
 
 #if __OS_HAS_AGP
 	[DRM_IOCTL_NR(DRM_IOCTL_AGP_ACQUIRE)]   = { DRM(agp_acquire), 1, 1 },
@@ -170,9 +155,7 @@ drm_ioctl_desc_t		  DRM(ioctls)[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_ALLOC)]      = { DRM(sg_alloc),    1, 1 },
 	[DRM_IOCTL_NR(DRM_IOCTL_SG_FREE)]       = { DRM(sg_free),     1, 1 },
 
-#ifdef __HAVE_VBL_IRQ
 	[DRM_IOCTL_NR(DRM_IOCTL_WAIT_VBLANK)]   = { DRM(wait_vblank), 0, 0 },
-#endif
 
 	DRIVER_IOCTLS
 };
@@ -191,20 +174,26 @@ MODULE_LICENSE("GPL and additional rights");
 static int DRM(setup)( drm_device_t *dev )
 {
 	int i;
+	int ret;
 
 	if (dev->fn_tbl.presetup)
-		dev->fn_tbl.presetup(dev);
+	{
+		ret=dev->fn_tbl.presetup(dev);
+		if (ret!=0) 
+			return ret;
+	}
 
 	atomic_set( &dev->ioctl_count, 0 );
 	atomic_set( &dev->vma_count, 0 );
 	dev->buf_use = 0;
 	atomic_set( &dev->buf_alloc, 0 );
 
-#if __HAVE_DMA
-	i = DRM(dma_setup)( dev );
-	if ( i < 0 )
-		return i;
-#endif
+	if (drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+	{
+		i = DRM(dma_setup)( dev );
+		if ( i < 0 )
+			return i;
+	}
 
 	dev->counters  = 6 + __HAVE_COUNTERS;
 	dev->types[0]  = _DRM_STAT_LOCK;
@@ -327,9 +316,7 @@ static int DRM(takedown)( drm_device_t *dev )
 	if (dev->fn_tbl.pretakedown)
 	  dev->fn_tbl.pretakedown(dev);
 
-#if __HAVE_IRQ
 	if ( dev->irq_enabled ) DRM(irq_uninstall)( dev );
-#endif
 
 	down( &dev->struct_sem );
 	del_timer( &dev->timer );
@@ -430,8 +417,7 @@ static int DRM(takedown)( drm_device_t *dev )
 		dev->maplist = NULL;
  	}
 
-#if __HAVE_DMA_QUEUE || __HAVE_MULTIPLE_DMA_QUEUES
-	if ( dev->queuelist ) {
+	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE) && dev->queuelist ) {
 		for ( i = 0 ; i < dev->queue_count ; i++ ) {
 			if ( dev->queuelist[i] ) {
 				DRM(free)( dev->queuelist[i],
@@ -446,11 +432,10 @@ static int DRM(takedown)( drm_device_t *dev )
 		dev->queuelist = NULL;
 	}
 	dev->queue_count = 0;
-#endif
 
-#if __HAVE_DMA
-	DRM(dma_takedown)( dev );
-#endif
+	if (drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+		DRM(dma_takedown)( dev );
+
 	if ( dev->lock.hw_lock ) {
 		dev->sigdata.lock = dev->lock.hw_lock = NULL; /* SHM removed */
 		dev->lock.filp = NULL;
@@ -459,6 +444,13 @@ static int DRM(takedown)( drm_device_t *dev )
 	up( &dev->struct_sem );
 
 	return 0;
+}
+
+static void DRM(init_fn_table)(struct drm_device *dev)
+{
+	dev->fn_tbl.reclaim_buffers = DRM(core_reclaim_buffers);
+	dev->fn_tbl.get_map_ofs = DRM(core_get_map_ofs);
+	dev->fn_tbl.get_reg_ofs = DRM(core_get_reg_ofs);
 }
 
 #include "drm_pciids.h"
@@ -514,7 +506,10 @@ static int DRM(probe)(struct pci_dev *pdev)
 	dev->irq = pdev->irq;
 
 	/* dev_priv_size can be changed by a driver in driver_register_fns */
- 	dev->dev_priv_size = sizeof(u32);
+	dev->dev_priv_size = sizeof(u32);
+	
+	DRM(init_fn_table)(dev);
+
 	DRM(driver_register_fns)(dev);
 
 	if (dev->fn_tbl.preinit)
@@ -820,9 +815,10 @@ int DRM(release)( struct inode *inode, struct file *filp )
 		}
 	}
 	
-#if __HAVE_DMA
-	DRM(reclaim_buffers)( filp );
-#endif
+	if (drm_core_check_feature(dev, DRIVER_HAVE_DMA))
+	{
+		dev->fn_tbl.reclaim_buffers(filp);
+	}
 
 	DRM(fasync)( -1, filp, 0 );
 
@@ -966,9 +962,6 @@ int DRM(lock)( struct inode *inode, struct file *filp,
         DECLARE_WAITQUEUE( entry, current );
         drm_lock_t lock;
         int ret = 0;
-#if __HAVE_MULTIPLE_DMA_QUEUES
-	drm_queue_t *q;
-#endif
 
 	++priv->lock_count;
 
@@ -985,14 +978,9 @@ int DRM(lock)( struct inode *inode, struct file *filp,
 		   lock.context, current->pid,
 		   dev->lock.hw_lock->lock, lock.flags );
 
-#if __HAVE_DMA_QUEUE
-        if ( lock.context < 0 )
-                return -EINVAL;
-#elif __HAVE_MULTIPLE_DMA_QUEUES
-        if ( lock.context < 0 || lock.context >= dev->queue_count )
-                return -EINVAL;
-	q = dev->queuelist[lock.context];
-#endif
+	if (drm_core_check_feature(dev, DRIVER_DMA_QUEUE))
+		if ( lock.context < 0 )
+			return -EINVAL;
 
 	add_wait_queue( &dev->lock.lock_queue, &entry );
 	for (;;) {
@@ -1083,7 +1071,7 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 	 * modules but is required by the Sparc driver.
 	 */
 	if (dev->fn_tbl.kernel_context_switch_unlock)
-		dev->fn_tbl.kernel_context_switch_unlock(dev);
+		dev->fn_tbl.kernel_context_switch_unlock(dev, &lock);
 	else {
 		DRM(lock_transfer)( dev, &dev->lock.hw_lock->lock, 
 				    DRM_KERNEL_CONTEXT );

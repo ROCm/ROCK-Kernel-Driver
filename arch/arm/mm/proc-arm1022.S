@@ -475,7 +475,7 @@ __arm1022_proc_info:
 	b	__arm1022_setup
 	.long	cpu_arch_name
 	.long	cpu_elf_name
-	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_EDSP
 	.long	cpu_arm1022_name
 	.long	arm1022_processor_functions
 	.long	v4wbi_tlb_fns
