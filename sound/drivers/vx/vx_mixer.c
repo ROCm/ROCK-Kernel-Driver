@@ -26,8 +26,6 @@
 #include <sound/vx_core.h>
 #include "vx_cmd.h"
 
-#define chip_t vx_core_t
-
 
 /*
  * write a codec data (24bit)

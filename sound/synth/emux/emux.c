@@ -39,7 +39,7 @@ int snd_emux_new(snd_emux_t **remu)
 	snd_emux_t *emu;
 
 	*remu = NULL;
-	emu = snd_magic_kcalloc(snd_emux_t, 0, GFP_KERNEL);
+	emu = kcalloc(1, sizeof(*emu), GFP_KERNEL);
 	if (emu == NULL)
 		return -ENOMEM;
 
@@ -143,7 +143,7 @@ int snd_emux_free(snd_emux_t *emu)
 	if (emu->name)
 		kfree(emu->name);
 
-	snd_magic_kfree(emu);
+	kfree(emu);
 	return 0;
 }
 

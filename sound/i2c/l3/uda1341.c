@@ -17,7 +17,7 @@
  * 2002-05-12   Tomas Kasparek  another code cleanup
  */
 
-/* $Id: uda1341.c,v 1.10 2003/10/23 14:34:52 perex Exp $ */
+/* $Id: uda1341.c,v 1.11 2004/06/29 16:14:23 tiwai Exp $ */
 
 #include <sound/driver.h>
 #include <linux/module.h>
@@ -131,7 +131,6 @@ struct uda1341 {
 
 //hack for ALSA magic casting
 typedef struct l3_client l3_client_t;
-#define chip_t l3_client_t      
 
 /* transfer 8bit integer into string with binary representation */
 void int2str_bin8(uint8_t val, char *buf){
@@ -332,7 +331,7 @@ int snd_uda1341_cfg_write(struct l3_client *clnt, unsigned short what,
 static void snd_uda1341_proc_read(snd_info_entry_t *entry, 
 				  snd_info_buffer_t * buffer)
 {
-	struct l3_client *clnt = snd_magic_cast(l3_client_t, entry->private_data, return);
+	struct l3_client *clnt = entry->private_data;
 	struct uda1341 *uda = clnt->driver_data;
 	int peak;
 
@@ -397,7 +396,7 @@ static void snd_uda1341_proc_read(snd_info_entry_t *entry,
 static void snd_uda1341_proc_regs_read(snd_info_entry_t *entry, 
 				       snd_info_buffer_t * buffer)
 {
-	struct l3_client *clnt = snd_magic_cast(l3_client_t, entry->private_data, return);
+	struct l3_client *clnt = entry->private_data;
 	struct uda1341 *uda = clnt->driver_data;		
 	int reg;
 	char buf[12];
@@ -653,12 +652,12 @@ static snd_kcontrol_new_t snd_uda1341_controls[] = {
 static void uda1341_free(struct l3_client *uda1341)
 {
 	l3_detach_client(uda1341); // calls kfree for driver_data (uda1341_t)
-	snd_magic_kfree(uda1341);
+	kfree(uda1341);
 }
 
 static int uda1341_dev_free(snd_device_t *device)
 {
-	struct l3_client *clnt = snd_magic_cast(l3_client_t, device->device_data, return);
+	struct l3_client *clnt = device->device_data;
 	uda1341_free(clnt);
 	return 0;
 }
@@ -673,7 +672,7 @@ int __init snd_chip_uda1341_mixer_new(snd_card_t *card, struct l3_client **clnt)
 
 	snd_assert(card != NULL, return -EINVAL);
 
-	uda1341 = snd_magic_kcalloc(l3_client_t, 0, GFP_KERNEL);
+	uda1341 = kcalloc(1, sizeof(*uda1341), GFP_KERNEL);
 	if (uda1341 == NULL)
 		return -ENOMEM;
          
@@ -710,7 +709,7 @@ static int uda1341_attach(struct l3_client *clnt)
 {
 	struct uda1341 *uda;
 
-	uda = snd_magic_kcalloc(uda1341_t, 0, GFP_KERNEL);
+	uda = kcalloc(1, sizeof(*uda), 0, GFP_KERNEL);
 	if (!uda)
 		return -ENOMEM;
 
@@ -734,7 +733,7 @@ static int uda1341_attach(struct l3_client *clnt)
 static void uda1341_detach(struct l3_client *clnt)
 {
 	if (clnt->driver_data)
-		snd_magic_kfree(clnt->driver_data);
+		kfree(clnt->driver_data);
 }
 
 static int

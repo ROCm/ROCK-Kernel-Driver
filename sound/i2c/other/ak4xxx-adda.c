@@ -237,7 +237,7 @@ static int snd_akm4xxx_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t
 
 static int snd_akm4xxx_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int invert = AK_GET_INVERT(kcontrol->private_value);
@@ -250,7 +250,7 @@ static int snd_akm4xxx_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 
 static int snd_akm4xxx_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int invert = AK_GET_INVERT(kcontrol->private_value);
@@ -277,7 +277,7 @@ static int snd_akm4xxx_ipga_gain_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 
 static int snd_akm4xxx_ipga_gain_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	ucontrol->value.integer.value[0] = snd_akm4xxx_get_ipga(ak, chip, addr) & 0x7f;
@@ -286,7 +286,7 @@ static int snd_akm4xxx_ipga_gain_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 
 static int snd_akm4xxx_ipga_gain_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	unsigned char nval = (ucontrol->value.integer.value[0] % 37) | 0x80;
@@ -312,7 +312,7 @@ static int snd_akm4xxx_deemphasis_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_in
 
 static int snd_akm4xxx_deemphasis_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int shift = AK_GET_SHIFT(kcontrol->private_value);
@@ -322,7 +322,7 @@ static int snd_akm4xxx_deemphasis_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 
 static int snd_akm4xxx_deemphasis_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
+	akm4xxx_t *ak = snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int shift = AK_GET_SHIFT(kcontrol->private_value);

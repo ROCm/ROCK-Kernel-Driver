@@ -36,8 +36,6 @@
 #include <asm/feature.h>
 #endif
 
-#define chip_t pmac_t
-
 
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 static int snd_pmac_register_sleep_notifier(pmac_t *chip);
@@ -688,7 +686,7 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 static irqreturn_t
 snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	snd_pmac_pcm_update(chip, &chip->playback);
 	return IRQ_HANDLED;
 }
@@ -697,7 +695,7 @@ snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	snd_pmac_pcm_update(chip, &chip->capture);
 	return IRQ_HANDLED;
 }
@@ -706,7 +704,7 @@ snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	int ctrl = in_le32(&chip->awacs->control);
 
 	/*printk("pmac: control interrupt.. 0x%x\n", ctrl);*/
@@ -802,7 +800,7 @@ static int snd_pmac_free(pmac_t *chip)
 				release_OF_resource(chip->node, i);
 		}
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
@@ -812,7 +810,7 @@ static int snd_pmac_free(pmac_t *chip)
  */
 static int snd_pmac_dev_free(snd_device_t *device)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, device->device_data, return -ENXIO);
+	pmac_t *chip = device->device_data;
 	return snd_pmac_free(chip);
 }
 
@@ -1069,7 +1067,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	snd_runtime_check(chip_return, return -EINVAL);
 	*chip_return = NULL;
 
-	chip = snd_magic_kcalloc(pmac_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->card = card;
@@ -1206,7 +1204,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 
 static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
+	pmac_t *chip = card->pm_private_data;
 	unsigned long flags;
 
 	if (chip->suspend)
@@ -1228,7 +1226,7 @@ static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_pmac_resume(snd_card_t *card, unsigned int state)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
+	pmac_t *chip = card->pm_private_data;
 
 	snd_pmac_sound_feature(chip, 1);
 	if (chip->resume)

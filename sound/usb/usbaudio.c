@@ -207,8 +207,6 @@ struct snd_usb_stream {
 	struct list_head list;
 };
 
-#define chip_t snd_usb_stream_t
-
 
 /*
  * we keep the snd_usb_audio_t instances by ourselves for merging
@@ -2001,7 +1999,7 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 
 static void proc_pcm_format_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_stream_t *stream = snd_magic_cast(snd_usb_stream_t, entry->private_data, return);
+	snd_usb_stream_t *stream = entry->private_data;
 	
 	snd_iprintf(buffer, "%s : %s\n", stream->chip->card->longname, stream->pcm->name);
 
@@ -2089,7 +2087,7 @@ static void snd_usb_audio_stream_free(snd_usb_stream_t *stream)
 	free_substream(&stream->substream[0]);
 	free_substream(&stream->substream[1]);
 	list_del(&stream->list);
-	snd_magic_kfree(stream);
+	kfree(stream);
 }
 
 static void snd_usb_audio_pcm_free(snd_pcm_t *pcm)
@@ -2146,7 +2144,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	}
 
 	/* create a new pcm */
-	as = snd_magic_kmalloc(snd_usb_stream_t, 0, GFP_KERNEL);
+	as = kmalloc(sizeof(*as), GFP_KERNEL);
 	if (! as)
 		return -ENOMEM;
 	memset(as, 0, sizeof(*as));
@@ -2158,7 +2156,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 			  stream == SNDRV_PCM_STREAM_PLAYBACK ? 0 : 1,
 			  &pcm);
 	if (err < 0) {
-		snd_magic_kfree(as);
+		kfree(as);
 		return err;
 	}
 	as->pcm = pcm;
@@ -2934,14 +2932,14 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
  */
 static void proc_audio_usbbus_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	snd_usb_audio_t *chip = entry->private_data;
 	if (! chip->shutdown)
 		snd_iprintf(buffer, "%03d/%03d\n", chip->dev->bus->busnum, chip->dev->devnum);
 }
 
 static void proc_audio_usbid_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	snd_usb_audio_t *chip = entry->private_data;
 	if (! chip->shutdown)
 		snd_iprintf(buffer, "%04x:%04x\n", chip->dev->descriptor.idVendor, chip->dev->descriptor.idProduct);
 }
@@ -2964,13 +2962,13 @@ static void snd_usb_audio_create_proc(snd_usb_audio_t *chip)
 
 static int snd_usb_audio_free(snd_usb_audio_t *chip)
 {
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_usb_audio_dev_free(snd_device_t *device)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, device->device_data, return -ENXIO);
+	snd_usb_audio_t *chip = device->device_data;
 	return snd_usb_audio_free(chip);
 }
 
@@ -3004,7 +3002,7 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 		return -ENOMEM;
 	}
 
-	chip = snd_magic_kcalloc(snd_usb_audio_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (! chip) {
 		snd_card_free(card);
 		return -ENOMEM;
@@ -3196,7 +3194,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	if (ptr == (void *)-1L)
 		return;
 
-	chip = snd_magic_cast(snd_usb_audio_t, ptr, return);
+	chip = ptr;
 	card = chip->card;
 	down(&register_mutex);
 	chip->shutdown = 1;

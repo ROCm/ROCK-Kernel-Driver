@@ -20,8 +20,6 @@
 #include "opl4_local.h"
 #include <sound/control.h>
 
-#define chip_t opl4_t
-
 static int snd_opl4_ctl_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;

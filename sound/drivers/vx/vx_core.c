@@ -506,7 +506,7 @@ static int vx_test_irq_src(vx_core_t *chip, unsigned int *ret)
  */
 static void vx_interrupt(unsigned long private_data)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, (void*)private_data, return);
+	vx_core_t *chip = (vx_core_t *) private_data;
 	unsigned int events;
 		
 	if (chip->chip_status & VX_STAT_IS_STALE)
@@ -550,7 +550,7 @@ static void vx_interrupt(unsigned long private_data)
  */
 irqreturn_t snd_vx_irq_handler(int irq, void *dev, struct pt_regs *regs)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, dev, return IRQ_NONE);
+	vx_core_t *chip = dev;
 
 	if (! (chip->chip_status & VX_STAT_CHIP_INIT) ||
 	    (chip->chip_status & VX_STAT_IS_STALE))
@@ -604,7 +604,7 @@ static void vx_reset_board(vx_core_t *chip, int cold_reset)
 
 static void vx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, entry->private_data, return);
+	vx_core_t *chip = entry->private_data;
 	static char *audio_src_vxp[] = { "Line", "Mic", "Digital" };
 	static char *audio_src_vx2[] = { "Analog", "Analog", "Digital" };
 	static char *clock_mode[] = { "Auto", "Internal", "External" };
@@ -734,7 +734,7 @@ vx_core_t *snd_vx_create(snd_card_t *card, struct snd_vx_hardware *hw,
 
 	snd_assert(card && hw && ops, return NULL);
 
-	chip = snd_magic_kcalloc(vx_core_t, extra_size, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(chip) + extra_size, GFP_KERNEL);
 	if (! chip) {
 		snd_printk(KERN_ERR "vx_core: no memory\n");
 		return NULL;

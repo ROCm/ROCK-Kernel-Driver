@@ -345,7 +345,6 @@ typedef struct snd_amd7930 {
 	unsigned int		regs_size;
 	struct snd_amd7930	*next;
 } amd7930_t;
-#define chip_t amd7930_t
 
 static amd7930_t *amd7930_list;
 
@@ -764,7 +763,7 @@ static snd_pcm_ops_t snd_amd7930_capture_ops = {
 
 static void snd_amd7930_pcm_free(snd_pcm_t *pcm)
 {
-	amd7930_t *amd = snd_magic_cast(amd7930_t, pcm->private_data, return);
+	amd7930_t *amd = pcm->private_data;
 
 	amd->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
@@ -947,14 +946,14 @@ static int snd_amd7930_free(amd7930_t *amd)
 	if (amd->regs)
 		sbus_iounmap(amd->regs, amd->regs_size);
 
-	snd_magic_kfree(amd);
+	kfree(amd);
 
 	return 0;
 }
 
 static int snd_amd7930_dev_free(snd_device_t *device)
 {
-	amd7930_t *amd = snd_magic_cast(amd7930_t, device->device_data, return -ENXIO);
+	amd7930_t *amd = device->device_data;
 
 	return snd_amd7930_free(amd);
 }
@@ -976,7 +975,7 @@ static int __init snd_amd7930_create(snd_card_t *card,
 	int err;
 
 	*ramd = NULL;
-	amd = snd_magic_kcalloc(amd7930_t, 0, GFP_KERNEL);
+	amd = kcalloc(1, sizeof(*amd), 0, GFP_KERNEL);
 	if (amd == NULL)
 		return -ENOMEM;
 

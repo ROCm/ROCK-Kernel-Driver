@@ -99,7 +99,7 @@ void snd_opl3_synth_cleanup(opl3_t * opl3)
 
 int snd_opl3_synth_use(void *private_data, snd_seq_port_subscribe_t * info)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return -ENXIO);
+	opl3_t *opl3 = private_data;
 	int err;
 
 	if ((err = snd_opl3_synth_setup(opl3)) < 0)
@@ -126,7 +126,7 @@ int snd_opl3_synth_use(void *private_data, snd_seq_port_subscribe_t * info)
 
 int snd_opl3_synth_unuse(void *private_data, snd_seq_port_subscribe_t * info)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return -ENXIO);
+	opl3_t *opl3 = private_data;
 
 	snd_opl3_synth_cleanup(opl3);
 
@@ -151,7 +151,7 @@ snd_midi_op_t opl3_ops = {
 static int snd_opl3_synth_event_input(snd_seq_event_t * ev, int direct,
 				      void *private_data, int atomic, int hop)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return -EINVAL);
+	opl3_t *opl3 = private_data;
 
 	if (ev->type >= SNDRV_SEQ_EVENT_INSTR_BEGIN &&
 	    ev->type <= SNDRV_SEQ_EVENT_INSTR_CHANGE) {
@@ -169,7 +169,7 @@ static int snd_opl3_synth_event_input(snd_seq_event_t * ev, int direct,
 
 static void snd_opl3_synth_free_port(void *private_data)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, private_data, return);
+	opl3_t *opl3 = private_data;
 
 	snd_midi_channel_free_set(opl3->chset);
 }

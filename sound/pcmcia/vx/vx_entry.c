@@ -69,13 +69,13 @@ static int snd_vxpocket_free(vx_core_t *chip)
 		hw->card_list[vxp->index] = NULL;
 	chip->card = NULL;
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_vxpocket_dev_free(snd_device_t *device)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, device->device_data, return -ENXIO);
+	vx_core_t *chip = device->device_data;
 	return snd_vxpocket_free(chip);
 }
 
@@ -121,7 +121,7 @@ dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw)
 		return NULL;
 
 	if (snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops) < 0) {
-		snd_magic_kfree(chip);
+		kfree(chip);
 		snd_card_free(card);
 		return NULL;
 	}
@@ -226,7 +226,7 @@ static int snd_vxpocket_assign_resources(vx_core_t *chip, int port, int irq)
  */
 void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link)
 {
-	vx_core_t *chip = snd_magic_cast(vx_core_t, link->priv, return);
+	vx_core_t *chip = link->priv;
 
 	snd_printdd(KERN_DEBUG "vxpocket_detach called\n");
 	/* Remove the interface data from the linked list */
@@ -263,7 +263,7 @@ do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 static void vxpocket_config(dev_link_t *link)
 {
 	client_handle_t handle = link->handle;
-	vx_core_t *chip = snd_magic_cast(vx_core_t, link->priv, return);
+	vx_core_t *chip = link->priv;
 	struct snd_vxpocket *vxp = (struct snd_vxpocket *)chip;
 	tuple_t tuple;
 	cisparse_t parse;

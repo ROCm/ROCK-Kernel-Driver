@@ -28,7 +28,7 @@
  */
 irqreturn_t pdacf_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, dev, return IRQ_NONE);
+	pdacf_t *chip = dev;
 	unsigned short stat;
 
 	if ((chip->chip_status & (PDAUDIOCF_STAT_IS_STALE|
@@ -258,7 +258,7 @@ static void pdacf_transfer(pdacf_t *chip, unsigned int size, unsigned int off)
 
 void pdacf_tasklet(unsigned long private_data)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, (void *)private_data, return);
+	pdacf_t *chip = (pdacf_t *) private_data;
 	int size, off, cont, rdp, wdp;
 
 	if ((chip->chip_status & (PDAUDIOCF_STAT_IS_STALE|PDAUDIOCF_STAT_IS_CONFIGURED)) != PDAUDIOCF_STAT_IS_CONFIGURED)

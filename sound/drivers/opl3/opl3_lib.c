@@ -35,8 +35,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Hannu Savolainen 1993-1996, Rob 
 MODULE_DESCRIPTION("Routines for control of AdLib FM cards (OPL2/OPL3/OPL4 chips)");
 MODULE_LICENSE("GPL");
 
-#define chip_t opl3_t
-
 extern char snd_opl3_regmap[MAX_OPL2_VOICES][4];
 
 void snd_opl2_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
@@ -322,7 +320,7 @@ void snd_opl3_interrupt(snd_hwdep_t * hw)
 	if (hw == NULL)
 		return;
 
-	opl3 = snd_magic_cast(opl3_t, hw->private_data, return);
+	opl3 = hw->private_data;
 	status = inb(opl3->l_port);
 #if 0
 	snd_printk("AdLib IRQ status = 0x%x\n", status);
@@ -354,13 +352,13 @@ static int snd_opl3_free(opl3_t *opl3)
 		release_resource(opl3->res_r_port);
 		kfree_nocheck(opl3->res_r_port);
 	}
-	snd_magic_kfree(opl3);
+	kfree(opl3);
 	return 0;
 }
 
 static int snd_opl3_dev_free(snd_device_t *device)
 {
-	opl3_t *opl3 = snd_magic_cast(opl3_t, device->device_data, return -ENXIO);
+	opl3_t *opl3 = device->device_data;
 	return snd_opl3_free(opl3);
 }
 
@@ -379,7 +377,7 @@ int snd_opl3_create(snd_card_t * card,
 
 	*ropl3 = NULL;
 
-	opl3 = snd_magic_kcalloc(opl3_t, 0, GFP_KERNEL);
+	opl3 = kcalloc(1, sizeof(*opl3), GFP_KERNEL);
 	if (opl3 == NULL)
 		return -ENOMEM;
 

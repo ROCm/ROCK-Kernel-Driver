@@ -524,7 +524,7 @@ static void snd_uart16550_do_close(snd_uart16550_t * uart)
 static int snd_uart16550_input_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED)
@@ -538,7 +538,7 @@ static int snd_uart16550_input_open(snd_rawmidi_substream_t * substream)
 static int snd_uart16550_input_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	uart->filemode &= ~SERIAL_MODE_INPUT_OPEN;
@@ -552,7 +552,7 @@ static int snd_uart16550_input_close(snd_rawmidi_substream_t * substream)
 static void snd_uart16550_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (up) {
@@ -566,7 +566,7 @@ static void snd_uart16550_input_trigger(snd_rawmidi_substream_t * substream, int
 static int snd_uart16550_output_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (uart->filemode == SERIAL_MODE_NOT_OPENED)
@@ -580,7 +580,7 @@ static int snd_uart16550_output_open(snd_rawmidi_substream_t * substream)
 static int snd_uart16550_output_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return -ENXIO);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	uart->filemode &= ~SERIAL_MODE_OUTPUT_OPEN;
@@ -652,7 +652,7 @@ static void snd_uart16550_output_write(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
 	unsigned char midi_byte, addr_byte;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 	char first;
 	static unsigned long lasttime=0;
 	
@@ -730,7 +730,7 @@ static void snd_uart16550_output_write(snd_rawmidi_substream_t * substream)
 static void snd_uart16550_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, substream->rmidi->private_data, return);
+	snd_uart16550_t *uart = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&uart->open_lock, flags);
 	if (up) {
@@ -765,13 +765,13 @@ static int snd_uart16550_free(snd_uart16550_t *uart)
 		release_resource(uart->res_base);
 		kfree_nocheck(uart->res_base);
 	}
-	snd_magic_kfree(uart);
+	kfree(uart);
 	return 0;
 };
 
 static int snd_uart16550_dev_free(snd_device_t *device)
 {
-	snd_uart16550_t *uart = snd_magic_cast(snd_uart16550_t, device->device_data, return -ENXIO);
+	snd_uart16550_t *uart = device->device_data;
 	return snd_uart16550_free(uart);
 }
 
@@ -791,7 +791,7 @@ static int __init snd_uart16550_create(snd_card_t * card,
 	int err;
 
 
-	if ((uart = snd_magic_kcalloc(snd_uart16550_t, 0, GFP_KERNEL)) == NULL)
+	if ((uart = kcalloc(1, sizeof(*uart), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	uart->adaptor = adaptor;
 	uart->card = card;

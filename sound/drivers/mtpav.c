@@ -419,7 +419,7 @@ static void snd_mtpav_input_trigger(snd_rawmidi_substream_t * substream, int up)
 
 static void snd_mtpav_output_timer(unsigned long data)
 {
-	mtpav_t *chip = snd_magic_cast(mtpav_t, (void *)data, return);
+	mtpav_t *chip = (mtpav_t *)data;
 	int p;
 
 	spin_lock(&chip->spinlock);
@@ -587,7 +587,7 @@ static void snd_mtpav_read_bytes(mtpav_t * mcrd)
 
 static irqreturn_t snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mtpav_t *mcard = snd_magic_cast(mtpav_t, dev_id, return IRQ_NONE);
+	mtpav_t *mcard = dev_id;
 
 	//printk("irqh()\n");
 	spin_lock(&mcard->spinlock);
@@ -695,7 +695,7 @@ static int snd_mtpav_get_RAWMIDI(mtpav_t * mcard)
 
 static mtpav_t *new_mtpav(void)
 {
-	mtpav_t *ncrd = (mtpav_t *) snd_magic_kcalloc(mtpav_t, 0, GFP_KERNEL);
+	mtpav_t *ncrd = kcalloc(1, sizeof(*ncrd), GFP_KERNEL);
 	if (ncrd != NULL) {
 		spin_lock_init(&ncrd->spinlock);
 
@@ -728,7 +728,7 @@ static void free_mtpav(mtpav_t * crd)
 		release_resource(crd->res_port);
 		kfree_nocheck(crd->res_port);
 	}
-	snd_magic_kfree(crd);
+	kfree(crd);
 }
 
 /*

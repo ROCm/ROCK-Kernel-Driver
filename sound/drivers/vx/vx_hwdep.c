@@ -44,7 +44,7 @@ static int vx_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
 		[VX_TYPE_VXPOCKET] = "vxpocket",
 		[VX_TYPE_VXP440] = "vxp440",
 	};
-	vx_core_t *vx = snd_magic_cast(vx_core_t, hw->private_data, return -ENXIO);
+	vx_core_t *vx = hw->private_data;
 
 	snd_assert(type_ids[vx->type], return -EINVAL);
 	strcpy(info->id, type_ids[vx->type]);
@@ -60,7 +60,7 @@ static int vx_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *info)
 
 static int vx_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *dsp)
 {
-	vx_core_t *vx = snd_magic_cast(vx_core_t, hw->private_data, return -ENXIO);
+	vx_core_t *vx = hw->private_data;
 	int index, err;
 
 	snd_assert(vx->ops->load_dsp, return -ENXIO);

@@ -216,7 +216,6 @@ typedef struct snd_card_harmony {
 	snd_pcm_substream_t *capture_substream;
 	snd_info_entry_t *proc_entry;
 } snd_card_harmony_t;
-#define chip_t snd_card_harmony_t
 
 static snd_card_t *snd_harmony_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
@@ -893,7 +892,7 @@ static int snd_harmony_mixercontrol_info(snd_kcontrol_t * kcontrol, snd_ctl_elem
  
 static int snd_harmony_volume_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_harmony_t *harmony = _snd_kcontrol_chip(kcontrol);
+	snd_card_harmony_t *harmony = snd_kcontrol_chip(kcontrol);
 	int shift_left = (kcontrol->private_value) & 0xff;
 	int shift_right = (kcontrol->private_value >> 8) & 0xff;
 	int mask = (kcontrol->private_value >> 16) & 0xff;
@@ -918,7 +917,7 @@ static int snd_harmony_volume_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 
 static int snd_harmony_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
-	snd_card_harmony_t *harmony = _snd_kcontrol_chip(kcontrol);
+	snd_card_harmony_t *harmony = snd_kcontrol_chip(kcontrol);
 	int shift_left = (kcontrol->private_value) & 0xff;
 	int shift_right = (kcontrol->private_value >> 8) & 0xff;
 	int mask = (kcontrol->private_value >> 16) & 0xff;

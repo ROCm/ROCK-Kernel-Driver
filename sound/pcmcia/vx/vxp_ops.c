@@ -26,8 +26,6 @@
 #include <asm/io.h>
 #include "vxpocket.h"
 
-#define chip_t vx_core_t
-
 
 static int vxp_reg_offset[VX_REG_MAX] = {
 	[VX_ICR]	= 0x00,		// ICR

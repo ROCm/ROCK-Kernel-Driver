@@ -25,8 +25,6 @@
 #include <sound/control.h>
 #include "vxpocket.h"
 
-#define chip_t vx_core_t
-
 #define MIC_LEVEL_MIN	0
 #define MIC_LEVEL_MAX	8
 

@@ -292,7 +292,7 @@ snd_emux_nrpn(void *p, snd_midi_channel_t *chan, snd_midi_channel_set_t *chset)
 {
 	snd_emux_port_t *port;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL, return);
 	snd_assert(chan != NULL, return);
 
@@ -382,7 +382,7 @@ snd_emux_sysex(void *p, unsigned char *buf, int len, int parsed, snd_midi_channe
 	snd_emux_port_t *port;
 	snd_emux_t *emu;
 
-	port = snd_magic_cast(snd_emux_port_t, p, return);
+	port = p;
 	snd_assert(port != NULL, return);
 	snd_assert(chset != NULL, return);
 	emu = port->emu;

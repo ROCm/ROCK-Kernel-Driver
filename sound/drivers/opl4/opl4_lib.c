@@ -141,7 +141,7 @@ static int snd_opl4_detect(opl4_t *opl4)
 #if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 static void snd_opl4_seq_dev_free(snd_seq_device_t *seq_dev)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, seq_dev->private_data, return);
+	opl4_t *opl4 = seq_dev->private_data;
 	opl4->seq_dev = NULL;
 }
 
@@ -172,12 +172,12 @@ static void snd_opl4_free(opl4_t *opl4)
 		release_resource(opl4->res_pcm_port);
 		kfree_nocheck(opl4->res_pcm_port);
 	}
-	snd_magic_kfree(opl4);
+	kfree(opl4);
 }
 
 static int snd_opl4_dev_free(snd_device_t *device)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, device->device_data, return -ENXIO);
+	opl4_t *opl4 = device->device_data;
 	snd_opl4_free(opl4);
 	return 0;
 }
@@ -199,7 +199,7 @@ int snd_opl4_create(snd_card_t *card,
 	if (ropl4)
 		*ropl4 = NULL;
 
-	opl4 = snd_magic_kcalloc(opl4_t, 0, GFP_KERNEL);
+	opl4 = kcalloc(1, sizeof(*opl4), GFP_KERNEL);
 	if (!opl4)
 		return -ENOMEM;
 

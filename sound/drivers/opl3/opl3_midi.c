@@ -313,7 +313,7 @@ void snd_opl3_note_on(void *p, int note, int vel, snd_midi_channel_t *chan)
 	fm_instrument_t *fm;
 	unsigned long flags;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 
 #ifdef DEBUG_MIDI
 	snd_printk("Note on, ch %i, inst %i, note %i, vel %i\n",
@@ -672,7 +672,7 @@ void snd_opl3_note_off(void *p, int note, int vel, snd_midi_channel_t *chan)
 
 	unsigned long flags;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 
 #ifdef DEBUG_MIDI
 	snd_printk("Note off, ch %i, inst %i, note %i\n",
@@ -712,7 +712,7 @@ void snd_opl3_key_press(void *p, int note, int vel, snd_midi_channel_t *chan)
 {
   	opl3_t *opl3;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 #ifdef DEBUG_MIDI
 	snd_printk("Key pressure, ch#: %i, inst#: %i\n",
 		   chan->number, chan->midi_program);
@@ -726,7 +726,7 @@ void snd_opl3_terminate_note(void *p, int note, snd_midi_channel_t *chan)
 {
   	opl3_t *opl3;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 #ifdef DEBUG_MIDI
 	snd_printk("Terminate note, ch#: %i, inst#: %i\n",
 		   chan->number, chan->midi_program);
@@ -814,7 +814,7 @@ void snd_opl3_control(void *p, int type, snd_midi_channel_t *chan)
 {
   	opl3_t *opl3;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 #ifdef DEBUG_MIDI
 	snd_printk("Controller, TYPE = %i, ch#: %i, inst#: %i\n",
 		   type, chan->number, chan->midi_program);
@@ -851,7 +851,7 @@ void snd_opl3_nrpn(void *p, snd_midi_channel_t *chan,
 {
   	opl3_t *opl3;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 #ifdef DEBUG_MIDI
 	snd_printk("NRPN, ch#: %i, inst#: %i\n",
 		   chan->number, chan->midi_program);
@@ -866,7 +866,7 @@ void snd_opl3_sysex(void *p, unsigned char *buf, int len,
 {
   	opl3_t *opl3;
 
-	opl3 = snd_magic_cast(opl3_t, p, return);
+	opl3 = p;
 #ifdef DEBUG_MIDI
 	snd_printk("SYSEX\n");
 #endif

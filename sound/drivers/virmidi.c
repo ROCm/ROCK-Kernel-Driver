@@ -113,7 +113,7 @@ static int __init snd_card_virmidi_probe(int dev)
 		snd_virmidi_dev_t *rdev;
 		if ((err = snd_virmidi_new(card, idx, &rmidi)) < 0)
 			goto __nodev;
-		rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, continue);
+		rdev = rmidi->private_data;
 		vmidi->midi[idx] = rmidi;
 		strcpy(rmidi->name, "Virtual Raw MIDI");
 		rdev->seq_mode = SNDRV_VIRMIDI_SEQ_DISPATCH;

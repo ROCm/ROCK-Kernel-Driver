@@ -28,8 +28,6 @@
 #include <sound/asoundef.h>
 #include "pdaudiocf.h"
 
-#define chip_t	pdacf_t
-
 
 /*
  * we use a vmalloc'ed (sg-)buffer
@@ -331,7 +329,7 @@ static snd_pcm_ops_t pdacf_pcm_capture_ops = {
  */
 static void snd_pdacf_pcm_free(snd_pcm_t *pcm)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, pcm->private_data, return);
+	pdacf_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 }
 
