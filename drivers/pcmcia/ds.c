@@ -895,7 +895,7 @@ int __init init_pcmcia_ds(void)
      * We really should let the drivers themselves drive some of this..
      */
     current->state = TASK_INTERRUPTIBLE;
-    schedule_timeout(HZ/10);
+    schedule_timeout(HZ/4);
 
     pcmcia_get_card_services_info(&serv);
     if (serv.Revision != CS_RELEASE_CODE) {

@@ -105,7 +105,7 @@ int bterr(__u16 code)
 		return EACCES;
 
 	case 0x06:
-		return EINVAL;
+		return EBADE;
 
 	case 0x07:
 		return ENOMEM;

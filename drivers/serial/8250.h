@@ -30,11 +30,14 @@ void serial8250_get_irq_map(unsigned int *map);
 
 struct old_serial_port {
 	unsigned int uart;
-	unsigned int base_baud;
+	unsigned int baud_base;
 	unsigned int port;
 	unsigned int irq;
 	unsigned int flags;
 	unsigned char hub6;
+	unsigned char io_type;
+	unsigned char *iomem_base;
+	unsigned short iomem_reg_shift;
 };
 
 #undef SERIAL_DEBUG_PCI

@@ -113,10 +113,10 @@ enum {
 #define ACL_PTYPE_MASK	(~SCO_PTYPE_MASK)
 
 /* ACL flags */
-#define ACL_CONT		0x0001
-#define ACL_START		0x0002
-#define ACL_ACTIVE_BCAST	0x0010
-#define ACL_PICO_BCAST		0x0020
+#define ACL_CONT		0x01
+#define ACL_START		0x02
+#define ACL_ACTIVE_BCAST	0x04
+#define ACL_PICO_BCAST		0x08
 
 /* Baseband links */
 #define SCO_LINK	0x00
@@ -542,7 +542,7 @@ typedef struct {
 	bdaddr_t bdaddr;
 	__u8     role;
 } __attribute__ ((packed)) evt_role_change;
-#define EVT_ROLE_CHANGE_SIZE 1
+#define EVT_ROLE_CHANGE_SIZE 8
 
 #define EVT_PIN_CODE_REQ        0x16
 typedef struct {
@@ -658,29 +658,21 @@ struct sockaddr_hci {
 #define HCI_DEV_NONE	0xffff
 
 struct hci_filter {
-	__u32 type_mask;
-	__u32 event_mask[2];
-	__u16 opcode;
+	unsigned long type_mask;
+	unsigned long event_mask[2];
+	__u16   opcode;
+};
+
+struct hci_ufilter {
+	__u32   type_mask;
+	__u32   event_mask[2];
+	__u16   opcode;
 };
 
 #define HCI_FLT_TYPE_BITS	31
 #define HCI_FLT_EVENT_BITS	63
 #define HCI_FLT_OGF_BITS	63
 #define HCI_FLT_OCF_BITS	127
-
-#if BITS_PER_LONG == 64
-static inline void hci_set_bit(int nr, void *addr)
-{
-	*((__u32 *) addr + (nr >> 5)) |= ((__u32) 1 << (nr & 31));
-}
-static inline int hci_test_bit(int nr, void *addr)
-{
-	return *((__u32 *) addr + (nr >> 5)) & ((__u32) 1 << (nr & 31));
-}
-#else
-#define hci_set_bit	set_bit
-#define hci_test_bit	test_bit
-#endif
 
 /* Ioctl requests structures */
 struct hci_dev_stats {
