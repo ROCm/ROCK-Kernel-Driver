@@ -1212,9 +1212,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 
 	printk("fb: %s memory = %dK\n", tdfx_fix.id, tdfx_fix.smem_len >> 10);
 
-	/* clear framebuffer memory */
-	memset_io(info->screen_base, 0, tdfx_fix.smem_len);
-	
 	tdfx_fix.ypanstep	= nopan ? 0 : 1;
 	tdfx_fix.ywrapstep	= nowrap ? 0 : 1;
    

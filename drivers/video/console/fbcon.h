@@ -51,8 +51,6 @@ extern struct display fb_display[MAX_NR_CONSOLES];
 extern char con2fb_map[MAX_NR_CONSOLES];
 extern void set_con2fb_map(int unit, int newidx);
 
-#define fontheight(p) ((p)->_fontheight)
-
 #ifdef CONFIG_FONTWIDTH8_ONLY
 
 /* fontwidth w is supported by dispsw */
@@ -60,16 +58,12 @@ extern void set_con2fb_map(int unit, int newidx);
 /* fontwidths w1-w2 inclusive are supported by dispsw */
 #define FONTWIDTHRANGE(w1,w2)	FONTWIDTH(8)
 
-#define fontwidth(p) (8)
-
 #else
 
 /* fontwidth w is supported by dispsw */
 #define FONTWIDTH(w)	(1 << ((w) - 1))
 /* fontwidths w1-w2 inclusive are supported by dispsw */
 #define FONTWIDTHRANGE(w1,w2)	(FONTWIDTH(w2+1) - FONTWIDTH(w1))
-
-#define fontwidth(p) ((p)->_fontwidth)
 
 #endif
 

@@ -56,8 +56,6 @@
 #include <asm/uaccess.h>
 #include <linux/fb.h>
 #include <linux/init.h>
-#include <linux/selection.h>
-#include <linux/console.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <asm/io.h>

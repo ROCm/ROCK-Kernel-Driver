@@ -74,6 +74,22 @@ config STI_CONSOLE
           machines.  Say Y here to build support for it into your kernel.
           The alternative is to use your primary serial port as a console.
 
+config DUMMY_CONSOLE_COLUMNS
+        int "Initial number of STI console screen columns" if STI_CONSOLE
+        depends on STI_CONSOLE || FB_STI
+        default "160"
+        help
+          The default value is 160, which should fit a 1280x1024 monitor.
+          Select 80 if you use a 640x480 resolution by default.
+
+config DUMMY_CONSOLE_ROWS
+        int "Initial number of STI console screen rows" if STI_CONSOLE
+        depends on STI_CONSOLE || FB_STI
+        default "64"
+        help
+          The default value is 64, which should fit a 1280x1024 monitor.
+          Select 25 if you use a 640x480 resolution by default.
+
 config PROM_CONSOLE
 	bool "PROM console"
 	depends on SPARC32 || SPARC64
@@ -121,10 +137,6 @@ config FBCON_ADVANCED
 	  If unsure, say N.
 
 # Guess what we need
-config FBCON_STI
-	tristate
-	depends on !FBCON_ADVANCED && FRAMEBUFFER_CONSOLE && FB_STI
-	default y
 
 config FONTWIDTH8_ONLY
 	bool "Support only 8 pixels wide fonts"

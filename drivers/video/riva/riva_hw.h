@@ -44,7 +44,7 @@
  * from this source.  -- Jeff Garzik <jgarzik@pobox.com>, 01/Nov/99 
  */
 
-/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_hw.h,v 1.6 2000/02/08 17:19:12 dawes Exp $ */
+/* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_hw.h,v 1.21 2002/10/14 18:22:46 mvojkovi Exp $ */
 #ifndef __RIVA_HW_H__
 #define __RIVA_HW_H__
 #define RIVA_SW_VERSION 0x00010003
@@ -78,8 +78,8 @@ typedef unsigned int   U032;
 #define NV_WR08(p,i,d)	out_8(p+i, d)
 #define NV_RD08(p,i)	in_8(p+i)
 #else
-#define NV_WR08(p,i,d)	(((U008 *)(p))[i]=(d))
-#define NV_RD08(p,i)	(((U008 *)(p))[i])
+#define NV_WR08(p,i,d)  (((U008 *)(p))[i]=(d))
+#define NV_RD08(p,i)    (((U008 *)(p))[i])
 #endif
 #define NV_WR16(p,i,d)  (((U016 *)(p))[(i)/2]=(d))
 #define NV_RD16(p,i)    (((U016 *)(p))[(i)/2])
@@ -426,7 +426,7 @@ typedef struct _riva_hw_inst
      */
     U032 Architecture;
     U032 Version;
-    U032 Chipset;	
+    U032 Chipset;
     U032 CrystalFreqKHz;
     U032 RamAmountKBytes;
     U032 MaxVClockFreqKHz;
@@ -454,10 +454,7 @@ typedef struct _riva_hw_inst
     volatile U032 *PRAMIN;
     volatile U032 *FIFO;
     volatile U032 *CURSOR;
-    volatile U032 *CURSORPOS;
-    volatile U032 *VBLANKENABLE;
-    volatile U032 *VBLANK;
-    volatile U008 *PCIO0;	
+    volatile U008 *PCIO0;
     volatile U008 *PCIO;
     volatile U008 *PVIO;
     volatile U008 *PDIO0;
@@ -467,7 +464,7 @@ typedef struct _riva_hw_inst
      * Common chip functions.
      */
     int  (*Busy)(struct _riva_hw_inst *);
-    void (*CalcStateExt)(struct _riva_hw_inst *,struct _riva_hw_state *,int,int,int,int,int,int,int,int,int,int,int,int,int);
+    void (*CalcStateExt)(struct _riva_hw_inst *,struct _riva_hw_state *,int,int,int,int,int);
     void (*LoadStateExt)(struct _riva_hw_inst *,struct _riva_hw_state *);
     void (*UnloadStateExt)(struct _riva_hw_inst *,struct _riva_hw_state *);
     void (*SetStartAddress)(struct _riva_hw_inst *,U032);
@@ -516,10 +513,10 @@ typedef struct _riva_hw_state
     U032 pllsel;
     U032 general;
     U032 crtcOwner;
-    U032 head;
-    U032 head2;	 	
+    U032 head; 
+    U032 head2; 
     U032 config;
-    U032 cursorConfig;
+    U032 cursorConfig;	
     U032 cursor0;
     U032 cursor1;
     U032 cursor2;
@@ -535,16 +532,16 @@ typedef struct _riva_hw_state
 /*
  * External routines.
  */
-int RivaGetConfig(RIVA_HW_INST *);
+int RivaGetConfig(RIVA_HW_INST *, unsigned int);
 /*
  * FIFO Free Count. Should attempt to yield processor if RIVA is busy.
  */
 
-#define RIVA_FIFO_FREE(hwinst,hwptr,cnt)                           \
-{                                                                  \
-   while ((hwinst).FifoFreeCount < (cnt))                          \
-	(hwinst).FifoFreeCount = (hwinst).hwptr->FifoFree >> 2;        \
-   (hwinst).FifoFreeCount -= (cnt);                                \
+#define RIVA_FIFO_FREE(hwinst,hwptr,cnt)                            \
+{                                                                   \
+    while ((hwinst).FifoFreeCount < (cnt))                          \
+        (hwinst).FifoFreeCount = (hwinst).hwptr->FifoFree >> 2;     \
+    (hwinst).FifoFreeCount -= (cnt);                                \
 }
 #endif /* __RIVA_HW_H__ */
 

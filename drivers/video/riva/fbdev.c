@@ -722,9 +722,7 @@ static void riva_load_video_mode(struct fb_info *info)
 	newmode.ext.interlace = 0xff; /* interlace off */
 
 	par->riva.CalcStateExt(&par->riva, &newmode.ext, bpp, width,
-				  hDisplaySize, hDisplay, hStart, hEnd,
-				  hTotal, height, vDisplay, vStart, vEnd,
-				  vTotal, dotClock);
+				  hDisplaySize, height, dotClock);
 	if (par->SecondCRTC) {
 		newmode.ext.head  = par->riva.PCRTC0[0x00000860/4] & ~0x00001000;
 		newmode.ext.head2 = par->riva.PCRTC0[0x00002860/4] | 0x00001000;
@@ -1135,7 +1133,7 @@ static int rivafb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		temp = xx & 0xFFFF;
 		temp |= yy << 16;
 
-		*(par->riva.CURSORPOS) = temp;
+		par->riva.PRAMDAC[0x0000300/4] = temp;
 	}
 
 	if (flags & FB_CUR_SETSIZE) {
@@ -1263,7 +1261,7 @@ static int rivafb_open(struct fb_info *info, int user)
 			par->state.flags |= VGA_SAVE_CMAP;
 		save_vga(&par->state);
 
-		RivaGetConfig(&par->riva);	
+		RivaGetConfig(&par->riva, par->Chipset);	
 		CRTCout(par, 0x11, 0xFF);	/* vgaHWunlock() + riva unlock (0x7F) */
 		par->riva.LockUnlock(&par->riva, 0);
 
@@ -1791,7 +1789,9 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 
 	strcat(rivafb_fix.id, rci->name);
 	default_par->riva.Architecture = rci->arch_rev;
-
+	default_par->riva.Chipset = pd->device;
+	
+	printk(KERN_INFO PFX "nVidia device/chipset %X\n", pd->device);	
 	rivafb_fix.mmio_len = pci_resource_len(pd, 0);
 	rivafb_fix.smem_len = pci_resource_len(pd, 1);
 
@@ -1828,11 +1828,9 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 					     0x00000000);
 	default_par->riva.FIFO = (unsigned *)(default_par->ctrl_base + 
 					      0x00800000);
-
 	default_par->riva.PCIO = (U008 *)(default_par->ctrl_base + 0x00601000);
 	default_par->riva.PDIO = (U008 *)(default_par->ctrl_base + 0x00681000);
 	default_par->riva.PVIO = (U008 *)(default_par->ctrl_base + 0x000C0000);
-
 	default_par->riva.IO = (MISCin(default_par) & 0x01) ? 0x3D0 : 0x3B0;
 
 	if (default_par->riva.Architecture == NV_ARCH_03) {

@@ -102,10 +102,9 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 				   unsigned long start_index, unsigned long pitch_index)
 {
 	/* Draw the penguin */
-	int i, n;
-	int bpp = p->var.bits_per_pixel;
 	unsigned long *palette = (unsigned long *) p->pseudo_palette;
 	unsigned long *dst, *dst2, color = 0, val, shift;
+	int i, n, bpp = p->var.bits_per_pixel;
 	unsigned long null_bits = BITS_PER_LONG - bpp;
 	u8 *src = image->data;
 
@@ -189,6 +188,7 @@ static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, u8 
 				color = fgcolor;
 			else 
 				color = bgcolor;
+			color <<= LEFT_POS(bpp);
 			val |= SHIFT_HIGH(color, shift);
 			
 			/* Did the bitshift spill bits to the next long? */

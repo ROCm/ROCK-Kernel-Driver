@@ -84,7 +84,7 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt
 obj-$(CONFIG_FB_HIT)              += hitfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_E1355)            += epson1355fb.o
 obj-$(CONFIG_FB_PVR2)             += pvr2fb.o
-obj-$(CONFIG_FB_VOODOO1)          += sstfb.o
+obj-$(CONFIG_FB_VOODOO1)          += sstfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
 # Files generated that shall be removed upon make clean
 clean-files := promcon_tbl.c

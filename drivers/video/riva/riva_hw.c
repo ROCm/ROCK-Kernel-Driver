@@ -77,6 +77,20 @@ static int nv10Busy
 {
     return ((chip->Rop->FifoFree < chip->FifoEmptyCount) || (chip->PGRAPH[0x00000700/4] & 0x01));
 }
+
+static void vgaLockUnlock
+(
+    RIVA_HW_INST *chip,
+    int		  Lock
+)
+{
+    U008 cr11;
+    VGA_WR08(chip->PCIO, 0x3D4, 0x11);
+    cr11 = VGA_RD08(chip->PCIO, 0x3D5);
+    if(Lock) cr11 |= 0x80;				
+    else cr11 &= ~0x80;
+    VGA_WR08(chip->PCIO, 0x3D5, cr11);
+}
 static void nv3LockUnlock
 (
     RIVA_HW_INST *chip,
@@ -85,6 +99,7 @@ static void nv3LockUnlock
 {
     VGA_WR08(chip->PVIO, 0x3C4, 0x06);
     VGA_WR08(chip->PVIO, 0x3C5, Lock ? 0x99 : 0x57);
+    vgaLockUnlock(chip, Lock);	
 }
 static void nv4LockUnlock
 (
@@ -94,15 +109,7 @@ static void nv4LockUnlock
 {
     VGA_WR08(chip->PCIO, 0x3D4, 0x1F);
     VGA_WR08(chip->PCIO, 0x3D5, Lock ? 0x99 : 0x57);
-}
-static void nv10LockUnlock
-(
-    RIVA_HW_INST *chip,
-    int           Lock
-)
-{
-    VGA_WR08(chip->PCIO, 0x3D4, 0x1F);
-    VGA_WR08(chip->PCIO, 0x3D5, Lock ? 0x99 : 0x57);
+    vgaLockUnlock(chip, Lock);	
 }
 
 static int ShowHideCursor
@@ -1097,7 +1104,6 @@ static void nv10UpdateArbitrationSettings
 static int CalcVClock
 (
     int           clockIn,
-    int           double_scan,
     int          *clockOut,
     int          *mOut,
     int          *nOut,
@@ -1113,18 +1119,16 @@ static int CalcVClock
     DeltaOld = 0xFFFFFFFF;
 
     VClk     = (unsigned)clockIn;
-    if (double_scan)
-        VClk *= 2;
     
-    if (chip->CrystalFreqKHz == 14318)
-    {
-        lowM  = 8;
-        highM = 14 - (chip->Architecture == NV_ARCH_03);
-    }
-    else
+    if (chip->CrystalFreqKHz == 13500)
     {
         lowM  = 7;
         highM = 13 - (chip->Architecture == NV_ARCH_03);
+    }
+    else
+    {
+        lowM  = 8;
+        highM = 14 - (chip->Architecture == NV_ARCH_03);
     }                      
 
     highP = 4 - (chip->Architecture == NV_ARCH_03);
@@ -1135,8 +1139,9 @@ static int CalcVClock
         {
             for (M = lowM; M <= highM; M++)
             {
-                N    = (VClk * M / chip->CrystalFreqKHz) << P;
-                Freq = (chip->CrystalFreqKHz * N / M) >> P;
+                N    = (VClk << P) * M / chip->CrystalFreqKHz;
+		if(N <= 255) {
+               	Freq = (chip->CrystalFreqKHz * N / M) >> P;
                 if (Freq > VClk)
                     DeltaNew = Freq - VClk;
                 else
@@ -1152,6 +1157,7 @@ static int CalcVClock
             }
         }
     }
+    }
     return (DeltaOld != 0xFFFFFFFF);
 }
 /*
@@ -1165,15 +1171,7 @@ static void CalcStateExt
     int            bpp,
     int            width,
     int            hDisplaySize,
-    int            hDisplay,
-    int            hStart,
-    int            hEnd,
-    int            hTotal,
     int            height,
-    int            vDisplay,
-    int            vStart,
-    int            vEnd,
-    int            vTotal,
     int            dotClock
 )
 {
@@ -1188,8 +1186,7 @@ static void CalcStateExt
      * Extended RIVA registers.
      */
     pixelDepth = (bpp + 1)/8;
-    CalcVClock(dotClock, hDisplaySize < 512,  /* double scan? */
-               &VClk, &m, &n, &p, chip);
+    CalcVClock(dotClock, &VClk, &m, &n, &p, chip);
 
     switch (chip->Architecture)
     {
@@ -1229,9 +1226,9 @@ static void CalcStateExt
                                          &(state->arbitration0),
                                          &(state->arbitration1),
                                           chip);
-            state->cursor0  = 0x00;
-            state->cursor1  = 0xFC;
-            state->cursor2  = 0x00000000;
+            state->cursor0  = 0x00; 
+            state->cursor1  = 0xFC; 
+            state->cursor2  = 0x00000000; 
             state->pllsel   = 0x10000700;
             state->config   = chip->PFB[0x00000200/4];
             state->general  = bpp == 16 ? 0x00101100 : 0x00100100;
@@ -1239,13 +1236,7 @@ static void CalcStateExt
             break;
     }
     state->vpll     = (p << 16) | (n << 8) | m;
-    state->screen   = ((hTotal   & 0x040) >> 2)
-                    | ((vDisplay & 0x400) >> 7)
-                    | ((vStart   & 0x400) >> 8)
-                    | ((vDisplay & 0x400) >> 9)
-                    | ((vTotal   & 0x400) >> 10);
     state->repaint0 = (((width/8)*pixelDepth) & 0x700) >> 3;
-    state->horiz    = hTotal     < 260 ? 0x00 : 0x01;
     state->pixel    = pixelDepth > 2   ? 3    : pixelDepth;
     state->offset0  =
     state->offset1  =
@@ -1508,7 +1499,7 @@ static void LoadStateExt
             chip->PGRAPH[0x00000F50/4] = 0x00000040;
             for (i = 0; i < 4; i++)
                 chip->PGRAPH[0x00000F54/4] = 0x00000000;
-            break;
+    	    break;
     }
     LOAD_FIXED_STATE(Riva,FIFO);
     UpdateFifoState(chip);
@@ -1537,11 +1528,12 @@ static void LoadStateExt
     chip->PRAMDAC[0x00000508/4]  = state->vpll;
     chip->PRAMDAC[0x0000050C/4]  = state->pllsel;
     chip->PRAMDAC[0x00000600/4]  = state->general;
+    	
     /*
      * Turn off VBlank enable and reset.
      */
-    *(chip->VBLANKENABLE) = 0;
-    *(chip->VBLANK)       = chip->VBlankBit;
+    chip->PCRTC[0x00000140/4] = 0;
+    chip->PCRTC[0x00000100/4] = chip->VBlankBit;
     /*
      * Set interrupt enable.
      */    
@@ -1811,9 +1803,6 @@ static void nv3GetConfig
     }        
     chip->CrystalFreqKHz   = (chip->PEXTDEV[0x00000000/4] & 0x00000020) ? 14318 : 13500;
     chip->CURSOR           = &(chip->PRAMIN[0x00008000/4 - 0x0800/4]);
-    chip->CURSORPOS        = &(chip->PRAMDAC[0x0300/4]);
-    chip->VBLANKENABLE     = &(chip->PGRAPH[0x0140/4]);
-    chip->VBLANK           = &(chip->PGRAPH[0x0100/4]);
     chip->VBlankBit        = 0x00000100;
     chip->MaxVClockFreqKHz = 256000;
     /*
@@ -1872,9 +1861,6 @@ static void nv4GetConfig
     }
     chip->CrystalFreqKHz   = (chip->PEXTDEV[0x00000000/4] & 0x00000040) ? 14318 : 13500;
     chip->CURSOR           = &(chip->PRAMIN[0x00010000/4 - 0x0800/4]);
-    chip->CURSORPOS        = &(chip->PRAMDAC[0x0300/4]);
-    chip->VBLANKENABLE     = &(chip->PCRTC[0x0140/4]);
-    chip->VBLANK           = &(chip->PCRTC[0x0100/4]);
     chip->VBlankBit        = 0x00000001;
     chip->MaxVClockFreqKHz = 350000;
     /*
@@ -1892,12 +1878,30 @@ static void nv4GetConfig
 }
 static void nv10GetConfig
 (
-    RIVA_HW_INST *chip
+    RIVA_HW_INST *chip,
+    unsigned int chipset	
 )
 {
+    struct pci_dev* dev;
+    int amt;
+
+#ifdef __BIG_ENDIAN
+    /* turn on big endian register access */
+    chip->PMC[0x00000004/4] = 0x01000001;
+#endif		
+
     /*
      * Fill in chip configuration.
      */
+    if(chipset == NV_CHIP_IGEFORCE2) {
+        dev = pci_find_slot(0, 1);
+        pci_read_config_dword(dev, 0x7C, &amt);
+        chip->RamAmountKBytes = (((amt >> 6) & 31) + 1) * 1024;
+    } else if(chipset == NV_CHIP_0x01F0) {
+        dev = pci_find_slot(0, 1);
+        pci_read_config_dword(dev, 0x84, &amt);
+        chip->RamAmountKBytes = (((amt >> 4) & 127) + 1) * 1024;
+    } else {
     switch ((chip->PFB[0x0000020C/4] >> 20) & 0x000000FF)
     {
         case 0x02:
@@ -1925,6 +1929,7 @@ static void nv10GetConfig
             chip->RamAmountKBytes = 1024 * 16;
             break;
     }
+    }
     switch ((chip->PFB[0x00000000/4] >> 3) & 0x00000003)
     {
         case 3:
@@ -1936,9 +1941,6 @@ static void nv10GetConfig
     }
     chip->CrystalFreqKHz   = (chip->PEXTDEV[0x00000000/4] & 0x00000040) ? 14318 : 13500;
     chip->CURSOR           = &(chip->PRAMIN[0x00010000/4 - 0x0800/4]);
-    chip->CURSORPOS        = &(chip->PRAMDAC[0x0300/4]);
-    chip->VBLANKENABLE     = &(chip->PCRTC[0x0140/4]);
-    chip->VBLANK           = &(chip->PCRTC[0x0100/4]);
     chip->VBlankBit        = 0x00000001;
     chip->MaxVClockFreqKHz = 350000;
     /*
@@ -1952,11 +1954,12 @@ static void nv10GetConfig
     chip->SetStartAddress = SetStartAddress;
     chip->SetSurfaces2D   = nv10SetSurfaces2D;
     chip->SetSurfaces3D   = nv10SetSurfaces3D;
-    chip->LockUnlock      = nv10LockUnlock;
+    chip->LockUnlock      = nv4LockUnlock;
 }
 int RivaGetConfig
 (
-    RIVA_HW_INST *chip
+    RIVA_HW_INST *chip,
+    unsigned int chipset 	
 )
 {
     /*
@@ -1975,11 +1978,13 @@ int RivaGetConfig
             nv4GetConfig(chip);
             break;
         case NV_ARCH_10:
-            nv10GetConfig(chip);
+	case NV_ARCH_20:
+            nv10GetConfig(chip, chipset);
             break;
         default:
             return (-1);
     }
+    chip->Chipset = chipset;	
     /*
      * Fill in FIFO pointers.
      */
