@@ -22,13 +22,10 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-algo-pcf.h,v 1.7 2000/02/27 23:02:45 frodo Exp $ */
+/* $Id: i2c-algo-pcf.h,v 1.8 2003/01/21 08:08:16 kmalkki Exp $ */
 
-#ifndef I2C_ALGO_PCF_H
-#define I2C_ALGO_PCF_H 1
-
-/* --- Defines for pcf-adapters ---------------------------------------	*/
-#include <linux/i2c.h>
+#ifndef _LINUX_I2C_ALGO_PCF_H
+#define _LINUX_I2C_ALGO_PCF_H
 
 struct i2c_algo_pcf_data {
 	void *data;		/* private data for lolevel routines	*/
@@ -49,4 +46,4 @@ struct i2c_algo_pcf_data {
 int i2c_pcf_add_bus(struct i2c_adapter *);
 int i2c_pcf_del_bus(struct i2c_adapter *);
 
-#endif /* I2C_ALGO_PCF_H */
+#endif /* _LINUX_I2C_ALGO_PCF_H */

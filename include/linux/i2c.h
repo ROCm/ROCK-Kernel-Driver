@@ -23,19 +23,18 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c.h,v 1.59 2002/07/19 20:53:45 phil Exp $ */
+/* $Id: i2c.h,v 1.68 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #ifndef _LINUX_I2C_H
 #define _LINUX_I2C_H
 
-#define I2C_DATE "20020719"
-#define I2C_VERSION "2.6.4"
+#define I2C_DATE "20021208"
+#define I2C_VERSION "2.7.0"
 
-#include <linux/i2c-id.h>	/* id values of adapters et. al. 	*/
+#include <linux/module.h>
 #include <linux/types.h>
-#include <linux/config.h>
+#include <linux/i2c-id.h>
 #include <asm/semaphore.h>
-
 
 /* --- General options ------------------------------------------------	*/
 

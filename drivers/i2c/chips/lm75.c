@@ -18,12 +18,11 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
-#include <linux/init.h>
 
 
 #define LM75_SYSCTL_TEMP 1200	/* Degrees Celcius * 10 */
@@ -72,8 +71,6 @@ static int lm75_detect(struct i2c_adapter *adapter, int address,
 		       unsigned short flags, int kind);
 static void lm75_init_client(struct i2c_client *client);
 static int lm75_detach_client(struct i2c_client *client);
-static int lm75_command(struct i2c_client *client, unsigned int cmd,
-			void *arg);
 static u16 swap_bytes(u16 val);
 static int lm75_read_value(struct i2c_client *client, u8 reg);
 static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value);
@@ -84,12 +81,12 @@ static void lm75_update_client(struct i2c_client *client);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver lm75_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "LM75 sensor chip driver",
 	.id		= I2C_DRIVERID_LM75,
 	.flags		= I2C_DF_NOTIFY,
 	.attach_adapter	= lm75_attach_adapter,
 	.detach_client	= lm75_detach_client,
-	.command	= lm75_command,
 };
 
 /* These files are created for each detected LM75. This is just a template;
@@ -105,14 +102,14 @@ static ctl_table lm75_dir_table_template[] = {
 
 static int lm75_id = 0;
 
-int lm75_attach_adapter(struct i2c_adapter *adapter)
+static int lm75_attach_adapter(struct i2c_adapter *adapter)
 {
 	return i2c_detect(adapter, &addr_data, lm75_detect);
 }
 
 /* This function is called by i2c_detect */
-int lm75_detect(struct i2c_adapter *adapter, int address,
-		unsigned short flags, int kind)
+static int lm75_detect(struct i2c_adapter *adapter, int address,
+		       unsigned short flags, int kind)
 {
 	int i, cur, conf, hyst, os;
 	struct i2c_client *new_client;
@@ -217,7 +214,7 @@ int lm75_detect(struct i2c_adapter *adapter, int address,
 	return err;
 }
 
-int lm75_detach_client(struct i2c_client *client)
+static int lm75_detach_client(struct i2c_client *client)
 {
 	struct lm75_data *data = client->data;
 
@@ -227,12 +224,7 @@ int lm75_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-int lm75_command(struct i2c_client *client, unsigned int cmd, void *arg)
-{
-	return 0;
-}
-
-u16 swap_bytes(u16 val)
+static u16 swap_bytes(u16 val)
 {
 	return (val >> 8) | (val << 8);
 }
@@ -240,7 +232,7 @@ u16 swap_bytes(u16 val)
 /* All registers are word-sized, except for the configuration register.
    LM75 uses a high-byte first convention, which is exactly opposite to
    the usual practice. */
-int lm75_read_value(struct i2c_client *client, u8 reg)
+static int lm75_read_value(struct i2c_client *client, u8 reg)
 {
 	if (reg == LM75_REG_CONF)
 		return i2c_smbus_read_byte_data(client, reg);
@@ -251,7 +243,7 @@ int lm75_read_value(struct i2c_client *client, u8 reg)
 /* All registers are word-sized, except for the configuration register.
    LM75 uses a high-byte first convention, which is exactly opposite to
    the usual practice. */
-int lm75_write_value(struct i2c_client *client, u8 reg, u16 value)
+static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value)
 {
 	if (reg == LM75_REG_CONF)
 		return i2c_smbus_write_byte_data(client, reg, value);
@@ -260,7 +252,7 @@ int lm75_write_value(struct i2c_client *client, u8 reg, u16 value)
 						 swap_bytes(value));
 }
 
-void lm75_init_client(struct i2c_client *client)
+static void lm75_init_client(struct i2c_client *client)
 {
 	/* Initialize the LM75 chip */
 	lm75_write_value(client, LM75_REG_TEMP_OS,
@@ -270,7 +262,7 @@ void lm75_init_client(struct i2c_client *client)
 	lm75_write_value(client, LM75_REG_CONF, 0);
 }
 
-void lm75_update_client(struct i2c_client *client)
+static void lm75_update_client(struct i2c_client *client)
 {
 	struct lm75_data *data = client->data;
 
@@ -292,8 +284,8 @@ void lm75_update_client(struct i2c_client *client)
 }
 
 
-void lm75_temp(struct i2c_client *client, int operation, int ctl_name,
-	       int *nrels_mag, long *results)
+static void lm75_temp(struct i2c_client *client, int operation, int ctl_name,
+		      int *nrels_mag, long *results)
 {
 	struct lm75_data *data = client->data;
 	if (operation == SENSORS_PROC_REAL_INFO)
@@ -318,7 +310,7 @@ void lm75_temp(struct i2c_client *client, int operation, int ctl_name,
 	}
 }
 
-int __init sensors_lm75_init(void)
+static int __init sensors_lm75_init(void)
 {
 	return i2c_add_driver(&lm75_driver);
 }

@@ -21,20 +21,18 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-algo-bit.c,v 1.37 2002/07/08 00:41:49 mds Exp $ */
+/* $Id: i2c-algo-bit.c,v 1.44 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
-#include <linux/ioport.h>
 #include <linux/errno.h>
-
+#include <linux/sched.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+
 
 /* ----- global defines ----------------------------------------------- */
 #define DEB(x) if (i2c_debug>=1) x;

@@ -18,17 +18,16 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-velleman.c,v 1.23 2001/11/19 18:45:02 mds Exp $ */
+/* $Id: i2c-velleman.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/string.h>  /* for 2.0 kernels to get NULL   */
-#include <asm/errno.h>     /* for 2.0 kernels to get ENODEV */
-#include <asm/io.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/io.h>
 
 /* ----- global defines -----------------------------------------------	*/
 #define DEB(x)		/* should be reasonable open, close &c. 	*/
@@ -104,12 +103,13 @@ static int bit_velle_init(void)
  */
 
 static struct i2c_algo_bit_data bit_velle_data = {
-	NULL,
-	bit_velle_setsda,
-	bit_velle_setscl,
-	bit_velle_getsda,
-	bit_velle_getscl,
-	10, 10, 100,		/*	waits, timeout */
+	.setsda		= bit_velle_setsda,
+	.setscl		= bit_velle_setscl,
+	.getsda		= bit_velle_getsda,
+	.getscl		= bit_velle_getscl,
+	.udelay		= 10,
+	.mdelay		= 10,
+	.timeout	= HZ
 };
 
 static struct i2c_adapter bit_velle_ops = {

@@ -19,13 +19,12 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* $Id: i2c-dev.h,v 1.11 2002/07/07 15:42:47 mds Exp $ */
+/* $Id: i2c-dev.h,v 1.13 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #ifndef _LINUX_I2C_DEV_H
 #define _LINUX_I2C_DEV_H
 
 #include <linux/types.h>
-#include <linux/i2c.h>
 
 /* Some IOCTL commands are defined in <linux/i2c.h> */
 /* Note: 10-bit addresses are NOT supported! */
