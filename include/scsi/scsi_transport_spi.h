@@ -25,14 +25,29 @@
 struct scsi_transport_template;
 
 struct spi_transport_attrs {
-	int period;
+	int period;		/* value in the PPR/SDTR command */
 	int offset;
+	int width:1;		/* 0 - narrow, 1 - wide */
+	int iu:1;		/* Information Units enabled */
+	int dt:1;		/* DT clocking enabled */
+	int qas:1;		/* Quick Arbitration and Selection enabled */
+	int wr_flow:1;		/* Write Flow control enabled */
+	int rd_strm:1;		/* Read streaming enabled */
+	int rti:1;		/* Retain Training Information */
+	int pcomp_en:1;		/* Precompensation enabled */
 };
 
 /* accessor functions */
 #define spi_period(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->period)
 #define spi_offset(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->offset)
-
+#define spi_width(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->width)
+#define spi_iu(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->iu)
+#define spi_dt(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->dt)
+#define spi_qas(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->qas)
+#define spi_wr_flow(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->wr_flow)
+#define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rd_strm)
+#define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rti)
+#define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->pcomp_en)
 extern struct scsi_transport_template spi_transport_template;
 
 #endif /* SCSI_TRANSPORT_SPI_H */
