@@ -55,6 +55,16 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
+static inline void
+fh_dup2(struct svc_fh *dst, struct svc_fh *src)
+{
+	fh_put(dst);
+	dget(src->fh_dentry);
+	if (src->fh_export)
+		cache_get(&src->fh_export->h);
+	*dst = *src;
+}
+
 static int
 do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open *open)
 {
