@@ -214,6 +214,9 @@ static struct {
 #ifdef CONFIG_FB_RIVA
 	{ "rivafb", rivafb_init, rivafb_setup },
 #endif
+#ifdef CONFIG_FB_3DFX
+	{ "tdfxfb", tdfxfb_init, tdfxfb_setup },
+#endif
 #ifdef CONFIG_FB_RADEON
 	{ "radeonfb", radeonfb_init, radeonfb_setup },
 #endif
@@ -294,9 +297,6 @@ static struct {
 	 * Chipset specific drivers that don't use resource management (yet)
 	 */
 
-#ifdef CONFIG_FB_3DFX
-	{ "tdfxfb", tdfxfb_init, tdfxfb_setup },
-#endif
 #ifdef CONFIG_FB_SGIVW
 	{ "sgivwfb", sgivwfb_init, sgivwfb_setup },
 #endif
