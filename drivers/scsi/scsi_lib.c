@@ -1723,11 +1723,12 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 	return 0;
 
  illegal:
-	dev_printk(KERN_ERR, &sdev->sdev_gendev,
-		   "Illegal state transition %s->%s\n",
-		   scsi_device_state_name(oldstate),
-		   scsi_device_state_name(state));
-	WARN_ON(1);
+	SCSI_LOG_ERROR_RECOVERY(1, 
+				dev_printk(KERN_ERR, &sdev->sdev_gendev,
+					   "Illegal state transition %s->%s\n",
+					   scsi_device_state_name(oldstate),
+					   scsi_device_state_name(state))
+				);
 	return -EINVAL;
 }
 EXPORT_SYMBOL(scsi_device_set_state);
