@@ -36,7 +36,7 @@
 #include <net/irda/irda.h>
 #include <net/irda/irqueue.h>
 
-#define DISCOVERY_EXPIRE_TIMEOUT 6*HZ
+#define DISCOVERY_EXPIRE_TIMEOUT (2*sysctl_discovery_timeout*HZ)
 #define DISCOVERY_DEFAULT_SLOTS  0
 
 /* Types of discovery */
