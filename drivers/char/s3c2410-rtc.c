@@ -12,6 +12,7 @@
  *  Changelog:
  *	08-Nov-2004	BJD	Initial creation
  *	12-Nov-2004	BJD	Added periodic IRQ and PM code
+ *	22-Nov-2004	BJD	Sign-test on alarm code to check for <0
 */
 
 #include <linux/module.h>
@@ -236,26 +237,26 @@ static int s3c2410_rtc_setalarm(struct rtc_wkalrm *alrm)
 	struct rtc_time *tm = &alrm->time;
 	unsigned int alrm_en;
 
-	pr_debug("s3c2410_rtc_setalarm: %d, %02x.%02x.%02x %02x/%02x/%02x\n",
+	pr_debug("s3c2410_rtc_setalarm: %d, %02x/%02x/%02x %02x.%02x.%02x\n",
 		 alrm->enabled,
-		 tm->tm_year & 0xff, tm->tm_mon & 0xff, tm->tm_mday & 0xff,
-		 tm->tm_hour, tm->tm_min, tm->tm_sec);
+		 tm->tm_mday & 0xff, tm->tm_mon & 0xff, tm->tm_year & 0xff,
+		 tm->tm_hour & 0xff, tm->tm_min & 0xff, tm->tm_sec);
 
 	if (alrm->enabled || 1) {
 		alrm_en = readb(S3C2410_RTCALM) & S3C2410_RTCALM_ALMEN;
 		writeb(0x00, S3C2410_RTCALM);
 
-		if (tm->tm_sec < 60) {
+		if (tm->tm_sec < 60 && tm->tm_sec >= 0) {
 			alrm_en |= S3C2410_RTCALM_SECEN;
 			writeb(BIN2BCD(tm->tm_sec), S3C2410_ALMSEC);
 		}
 
-		if (tm->tm_min < 60) {
+		if (tm->tm_min < 60 && tm->tm_min >= 0) {
 			alrm_en |= S3C2410_RTCALM_MINEN;
 			writeb(BIN2BCD(tm->tm_min), S3C2410_ALMMIN);
 		}
 
-		if (tm->tm_hour < 24) {
+		if (tm->tm_hour < 24 && tm->tm_hour >= 0) {
 			alrm_en |= S3C2410_RTCALM_HOUREN;
 			writeb(BIN2BCD(tm->tm_hour), S3C2410_ALMHOUR);
 		}
