@@ -268,7 +268,7 @@ xfs_dm_send_data_event(
 	int		flags,
 	vrwlock_t	*locktype)
 {
-	return nopkg();
+	return ENOSYS;
 }
 
 static __inline int
@@ -288,7 +288,7 @@ dm_send_destroy_event(
 	bhv_desc_t	*bdp,
 	dm_right_t	vp_right)
 {
-	return nopkg();
+	return ENOSYS;
 }
 
 static __inline int
@@ -304,7 +304,7 @@ dm_send_namesp_event(
 	int		retcode,
 	int		flags)
 {
-	return nopkg();
+	return ENOSYS;
 }
 
 static __inline void

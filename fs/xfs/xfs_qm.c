@@ -1998,16 +1998,11 @@ xfs_qm_init_quotainos(
 	int		error;
 	__int64_t	sbflags;
 	uint		flags;
-	int		readonly;
-	vfs_t		*vfsp;
 
 	ASSERT(mp->m_quotainfo);
 	uip = gip = NULL;
-	error = 0;
 	sbflags = 0;
 	flags = 0;
-	vfsp = XFS_MTOVFS(mp);
-	readonly = vfsp->vfs_flag & VFS_RDONLY;
 
 	/*
 	 * Get the uquota and gquota inodes
@@ -2046,7 +2041,7 @@ xfs_qm_init_quotainos(
 		if ((error = xfs_qm_qino_alloc(mp, &uip,
 					      sbflags | XFS_SB_UQUOTINO,
 					      flags | XFS_QMOPT_UQUOTA)))
-			goto error;
+			return XFS_ERROR(error);
 
 		flags &= ~XFS_QMOPT_SBVERSION;
 	}
@@ -2057,18 +2052,14 @@ xfs_qm_init_quotainos(
 			if (uip)
 				VN_RELE(XFS_ITOV(uip));
 
-			goto error;
+			return XFS_ERROR(error);
 		}
 	}
 
 	XFS_QI_UQIP(mp) = uip;
 	XFS_QI_GQIP(mp) = gip;
 
-error:
-	if (readonly)
-		vfsp->vfs_flag |= VFS_RDONLY;
-
-	return XFS_ERROR(error);
+	return (0);
 }
 
 

@@ -341,7 +341,7 @@ STATIC int
 _pagebuf_get_pages(
 	page_buf_t		*pb,
 	int			page_count,
-	int			flags)
+	page_buf_flags_t	flags)
 {
 	int			gpf_mask = pb_to_gfp(flags);
 
@@ -392,10 +392,10 @@ _pagebuf_freepages(
  */
 void
 _pagebuf_free_object(
-	pb_hash_t	*hash,	/* hash bucket for buffer	*/
-	page_buf_t	*pb)	/* buffer to deallocate		*/
+	pb_hash_t		*hash,	/* hash bucket for buffer */
+	page_buf_t		*pb)	/* buffer to deallocate	*/
 {
-	int		pb_flags = pb->pb_flags;
+	page_buf_flags_t	pb_flags = pb->pb_flags;
 
 	PB_TRACE(pb, PB_TRACE_REC(free_obj), 0);
 	pb->pb_flags |= PBF_FREED;
@@ -571,7 +571,8 @@ _pagebuf_lookup_pages(
 
 	if (!pb->pb_locked) {
 		for (pi = 0; pi < page_count; pi++) {
-			unlock_page(pb->pb_pages[pi]);
+			if (pb->pb_pages[pi])
+				unlock_page(pb->pb_pages[pi]);
 		}
 	}
 
@@ -827,7 +828,7 @@ pagebuf_lookup(
 	struct inode		*inode,
 	loff_t			ioff,
 	size_t			isize,
-	int			flags)
+	page_buf_flags_t	flags)
 {
 	page_buf_t		*pb = NULL;
 
@@ -848,7 +849,7 @@ pagebuf_readahead(
 	pb_target_t		*target,
 	loff_t			ioff,
 	size_t			isize,
-	int			flags)
+	page_buf_flags_t	flags)
 {
 	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
 	pagebuf_get(target, ioff, isize, flags);
@@ -936,7 +937,7 @@ pagebuf_get_no_daddr(
 {
 	int			rval;
 	void			*rmem = NULL;
-	int			flags = _PBF_LOCKABLE | PBF_FORCEIO;
+	page_buf_flags_t	flags = _PBF_LOCKABLE | PBF_FORCEIO;
 	page_buf_t		*pb;
 	size_t			tlen = 0;
 
@@ -1229,10 +1230,8 @@ int
 pagebuf_iostart(			/* start I/O on a buffer	  */
 	page_buf_t		*pb,	/* buffer to start		  */
 	page_buf_flags_t	flags)	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
-					/* PBF_WRITE, PBF_ALLOCATE,	  */
-					/* PBF_DELWRI, 			  */
+					/* PBF_WRITE, PBF_DELWRI,	  */
 					/* PBF_SYNC, PBF_DONT_BLOCK	  */
-					/* PBF_RELEASE			  */
 {
 	int			status = 0;
 
