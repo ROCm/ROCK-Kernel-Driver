@@ -9,10 +9,12 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <asm/mbus.h>
+#include <asm/sbus.h>
 
 static char shouldnothappen[] __initdata = "SUN4 kernel can only run on SUN4\n";
 
 enum mbus_module srmmu_modtype;
+void *srmmu_nocache_pool;
 
 int vac_cache_size = 0;
 
@@ -44,11 +46,6 @@ void srmmu_mapioaddr(unsigned long physaddr, unsigned long virt_addr, int bus_ty
 
 void srmmu_unmapioaddr(unsigned long virt_addr)
 {
-}
-
-void __init srmmu_end_memory(unsigned long memory_size, unsigned long *mem_end_p)
-{
-	return 0;
 }
 
 __u32 iounit_map_dma_init(struct sbus_bus *sbus, int size)

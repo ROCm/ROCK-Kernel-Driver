@@ -21,7 +21,6 @@
 #include <asm/pgtsrmmu.h>
 #include <asm/vac-ops.h>
 #include <asm/oplib.h>
-#include <asm/sbus.h>
 #include <asm/btfixup.h>
 #include <asm/system.h>
 
@@ -33,71 +32,10 @@ struct page;
 extern void load_mmu(void);
 extern unsigned long calc_highpages(void);
 
-/* Routines for data transfer buffers. */
-BTFIXUPDEF_CALL(char *, mmu_lockarea, char *, unsigned long)
-BTFIXUPDEF_CALL(void,   mmu_unlockarea, char *, unsigned long)
-
-#define mmu_lockarea(vaddr,len) BTFIXUP_CALL(mmu_lockarea)(vaddr,len)
-#define mmu_unlockarea(vaddr,len) BTFIXUP_CALL(mmu_unlockarea)(vaddr,len)
-
-/* These are implementations for sbus_map_sg/sbus_unmap_sg... collapse later */
-BTFIXUPDEF_CALL(__u32, mmu_get_scsi_one, char *, unsigned long, struct sbus_bus *sbus)
-BTFIXUPDEF_CALL(void,  mmu_get_scsi_sgl, struct scatterlist *, int, struct sbus_bus *sbus)
-BTFIXUPDEF_CALL(void,  mmu_release_scsi_one, __u32, unsigned long, struct sbus_bus *sbus)
-BTFIXUPDEF_CALL(void,  mmu_release_scsi_sgl, struct scatterlist *, int, struct sbus_bus *sbus)
-
-#define mmu_get_scsi_one(vaddr,len,sbus) BTFIXUP_CALL(mmu_get_scsi_one)(vaddr,len,sbus)
-#define mmu_get_scsi_sgl(sg,sz,sbus) BTFIXUP_CALL(mmu_get_scsi_sgl)(sg,sz,sbus)
-#define mmu_release_scsi_one(vaddr,len,sbus) BTFIXUP_CALL(mmu_release_scsi_one)(vaddr,len,sbus)
-#define mmu_release_scsi_sgl(sg,sz,sbus) BTFIXUP_CALL(mmu_release_scsi_sgl)(sg,sz,sbus)
-
-/*
- * mmu_map/unmap are provided by iommu/iounit; Invalid to call on IIep.
- *
- * The mmu_map_dma_area establishes two mappings in one go.
- * These mappings point to pages normally mapped at 'va' (linear address).
- * First mapping is for CPU visible address at 'a', uncached.
- * This is an alias, but it works because it is an uncached mapping.
- * Second mapping is for device visible address, or "bus" address.
- * The bus address is returned at '*pba'.
- *
- * These functions seem distinct, but are hard to split. On sun4c,
- * at least for now, 'a' is equal to bus address, and retured in *pba.
- * On sun4m, page attributes depend on the CPU type, so we have to
- * know if we are mapping RAM or I/O, so it has to be an additional argument
- * to a separate mapping function for CPU visible mappings.
- */
-BTFIXUPDEF_CALL(int,  mmu_map_dma_area, dma_addr_t *, unsigned long, unsigned long, int len)
-BTFIXUPDEF_CALL(struct page *, mmu_translate_dvma, unsigned long busa)
-BTFIXUPDEF_CALL(void,  mmu_unmap_dma_area, unsigned long busa, int len)
-
-#define mmu_map_dma_area(pba,va,a,len) BTFIXUP_CALL(mmu_map_dma_area)(pba,va,a,len)
-#define mmu_unmap_dma_area(ba,len) BTFIXUP_CALL(mmu_unmap_dma_area)(ba,len)
-#define mmu_translate_dvma(ba)     BTFIXUP_CALL(mmu_translate_dvma)(ba)
-
-/*
- */
-BTFIXUPDEF_SIMM13(pmd_shift)
-BTFIXUPDEF_SETHI(pmd_size)
-BTFIXUPDEF_SETHI(pmd_mask)
-
-extern unsigned int pmd_align(unsigned int addr) __attribute_const__;
-extern __inline__ unsigned int pmd_align(unsigned int addr)
-{
-	return ((addr + ~BTFIXUP_SETHI(pmd_mask)) & BTFIXUP_SETHI(pmd_mask));
-}
-
 BTFIXUPDEF_SIMM13(pgdir_shift)
 BTFIXUPDEF_SETHI(pgdir_size)
 BTFIXUPDEF_SETHI(pgdir_mask)
 
-extern unsigned int pgdir_align(unsigned int addr) __attribute_const__;
-extern __inline__ unsigned int pgdir_align(unsigned int addr)
-{
-	return ((addr + ~BTFIXUP_SETHI(pgdir_mask)) & BTFIXUP_SETHI(pgdir_mask));
-}
-
-BTFIXUPDEF_SIMM13(ptrs_per_pte)
 BTFIXUPDEF_SIMM13(ptrs_per_pmd)
 BTFIXUPDEF_SIMM13(ptrs_per_pgd)
 BTFIXUPDEF_SIMM13(user_ptrs_per_pgd)
@@ -112,19 +50,19 @@ BTFIXUPDEF_INT(page_copy)
 BTFIXUPDEF_INT(page_readonly)
 BTFIXUPDEF_INT(page_kernel)
 
-#define PMD_SHIFT       	BTFIXUP_SIMM13(pmd_shift)
-#define PMD_SIZE        	BTFIXUP_SETHI(pmd_size)
-#define PMD_MASK        	BTFIXUP_SETHI(pmd_mask)
-#define PMD_ALIGN(addr) 	pmd_align(addr)
+#define PMD_SHIFT		SUN4C_PMD_SHIFT
+#define PMD_SIZE        	(1UL << PMD_SHIFT)
+#define PMD_MASK        	(~(PMD_SIZE-1))
+#define PMD_ALIGN(__addr) 	(((__addr) + ~PMD_MASK) & PMD_MASK)
 #define PGDIR_SHIFT     	BTFIXUP_SIMM13(pgdir_shift)
 #define PGDIR_SIZE      	BTFIXUP_SETHI(pgdir_size)
 #define PGDIR_MASK      	BTFIXUP_SETHI(pgdir_mask)
-#define PGDIR_ALIGN     	pgdir_align(addr)
-#define PTRS_PER_PTE    	BTFIXUP_SIMM13(ptrs_per_pte)
+#define PTRS_PER_PTE    	1024
 #define PTRS_PER_PMD    	BTFIXUP_SIMM13(ptrs_per_pmd)
 #define PTRS_PER_PGD    	BTFIXUP_SIMM13(ptrs_per_pgd)
 #define USER_PTRS_PER_PGD	BTFIXUP_SIMM13(user_ptrs_per_pgd)
 #define FIRST_USER_PGD_NR	0
+#define PTE_SIZE		(PTRS_PER_PTE*4)
 
 #define PAGE_NONE      __pgprot(BTFIXUP_INT(page_none))
 #define PAGE_SHARED    __pgprot(BTFIXUP_INT(page_shared))
