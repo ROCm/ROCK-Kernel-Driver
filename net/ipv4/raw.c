@@ -130,6 +130,9 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 {
 	int type;
 
+	if (!pskb_may_pull(skb, sizeof(struct icmphdr)))
+		return 1;
+
 	type = skb->h.icmph->type;
 	if (type < 32) {
 		__u32 data = raw4_sk(sk)->filter.data;
