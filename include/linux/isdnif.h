@@ -418,9 +418,7 @@ typedef struct {
 		char display[85];/* display message data		*/ 
 		isdn_cmd_stat isdn_io; /* ISDN IO-parameter/result	*/
 		aux_s aux;	/* for modem commands/indications	*/
-#ifdef CONFIG_ISDN_TTY_FAX
 		T30_s	*fax;	/* Pointer to ttys fax struct		*/
-#endif
 		ulong userdata;	/* User Data */
 	} parm;
 } isdn_ctrl;

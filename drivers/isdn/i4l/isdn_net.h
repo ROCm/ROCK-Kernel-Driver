@@ -31,8 +31,8 @@
 #define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
-extern char *isdn_net_new(char *, struct net_device *);
-extern char *isdn_net_newslave(char *);
+extern int isdn_net_new(char *, struct net_device *);
+extern int isdn_net_newslave(char *);
 extern int isdn_net_rm(char *);
 extern int isdn_net_rmall(void);
 extern int isdn_net_stat_callback(int, isdn_ctrl *);
@@ -44,7 +44,6 @@ extern int isdn_net_getpeer(isdn_net_ioctl_phone *, isdn_net_ioctl_phone *);
 extern int isdn_net_delphone(isdn_net_ioctl_phone *);
 extern int isdn_net_find_icall(int, int, int, setup_parm *);
 extern void isdn_net_hangup(struct net_device *);
-extern void isdn_net_dial(void);
 extern void isdn_net_autohup(void);
 extern int isdn_net_force_hangup(char *);
 extern int isdn_net_force_dial(char *);
@@ -131,7 +130,7 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 	if (master_lp->netdev->queue == lp) {
 		master_lp->netdev->queue = lp->next;
 		if (lp->next == lp) { /* last in queue */
-			master_lp->netdev->queue = master_lp->netdev->local;
+			master_lp->netdev->queue = &master_lp->netdev->local;
 		}
 	}
 	lp->next = lp->last = lp;	/* (re)set own pointers */
