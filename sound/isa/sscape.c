@@ -572,7 +572,8 @@ static int sscape_upload_bootblock(struct soundscape *sscape, struct sscape_boot
 			snd_printk(KERN_ERR "sscape: timeout reading firmware version\n");
 			ret = -EAGAIN;
 		} else {
-			__copy_to_user(&bb->version, &data, sizeof(bb->version));
+			if (__copy_to_user(&bb->version, &data, sizeof(bb->version)))
+				ret = -EFAULT;
 		}
 	}
 
