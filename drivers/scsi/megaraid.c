@@ -443,7 +443,7 @@
  * Mon Aug 6 14:59:29 BST 2001 - "Michael Johnson" <johnsom@home.com>
  *
  * Make the HP print formatting and check for buggy firmware runtime not
- * ifdef dependant.
+ * ifdef dependent.
  *
  *
  * Version 1.17d

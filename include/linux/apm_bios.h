@@ -45,7 +45,7 @@ struct apm_bios_info {
 #define APM_BIOS_DISENGAGED     0x0010
 
 /*
- * Data for APM that is persistant across module unload/load
+ * Data for APM that is persistent across module unload/load
  */
 struct apm_info {
 	struct apm_bios_info	bios;

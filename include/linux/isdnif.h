@@ -62,7 +62,7 @@
 /*                                                                         */ 
 /* The proceed command holds a incoming call in a state to leave processes */
 /* enough time to check whether ist should be accepted.                    */
-/* The PROT_IO Command extends the interface to make protocol dependant    */
+/* The PROT_IO Command extends the interface to make protocol dependent    */
 /* features available (call diversion, call waiting...).                   */
 /*                                                                         */ 
 /* The PROT_IO Command is executed with the desired driver id and the arg  */

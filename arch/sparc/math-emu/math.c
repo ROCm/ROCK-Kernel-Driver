@@ -203,7 +203,7 @@ int do_mathemu(struct pt_regs *regs, struct task_struct *fpt)
 }
 
 /* All routines returning an exception to raise should detect
- * such exceptions _before_ rounding to be consistant with
+ * such exceptions _before_ rounding to be consistent with
  * the behavior of the hardware in the implemented cases
  * (and thus with the recommendations in the V9 architecture
  * manual).

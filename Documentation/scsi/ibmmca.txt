@@ -906,7 +906,7 @@
       to does not offer more space, invalid memory accesses destabilized the
       kernel.
    3) version 4.0 is only valid for kernel 2.4.0 or later. This is necessary
-      to remove old kernel version dependant waste from the driver. 3.2d is
+      to remove old kernel version dependent waste from the driver. 3.2d is
       only distributed with older kernels but keeps compatibility with older
       kernel versions. 4.0 and higher versions cannot be used with older 
       kernels anymore!! You must have at least kernel 2.4.0!!
@@ -1382,7 +1382,7 @@
    
    9 Disclaimer
    ------------
-   Beside the GNU General Public License and the dependant disclaimers and disclaimers
+   Beside the GNU General Public License and the dependent disclaimers and disclaimers
    concerning the Linux-kernel in special, this SCSI-driver comes without any
    warranty. Its functionality is tested as good as possible on certain 
    machines and combinations of computer hardware, which does not exclude,

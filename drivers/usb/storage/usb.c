@@ -706,7 +706,7 @@ static int storage_probe(struct usb_interface *intf,
 
 	/* 
 	 * Set the handler pointers based on the protocol
-	 * Again, this data is persistant across reattachments
+	 * Again, this data is persistent across reattachments
 	 */
 	switch (ss->protocol) {
 	case US_PR_CB:

@@ -188,7 +188,7 @@ typedef struct sym_sccb *sccb_p;
 typedef struct sym_shcb *shcb_p;
 
 /*
- *  Define a reference to the O/S dependant IO request.
+ *  Define a reference to the O/S dependent IO request.
  */
 typedef Scsi_Cmnd *cam_ccb_p;	/* Generic */
 typedef Scsi_Cmnd *cam_scsiio_p;/* SCSI I/O */

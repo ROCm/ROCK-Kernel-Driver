@@ -513,7 +513,7 @@ void xxxfb_poll(struct fb_info *info, poll_table *wait)
  *		     for a graphics card take a specific amount of time.
  *		     Often we have to wait for the accelerator to finish
  *		     its operation before we can write to the framebuffer
- *		     so we can have consistant display output. 
+ *		     so we can have consistent display output. 
  *
  *      @info: frame buffer structure that represents a single frame buffer
  */

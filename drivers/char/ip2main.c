@@ -21,7 +21,7 @@
 //
 // 1.2.14	/\/\|=mhw=|\/\/
 // Added bounds checking to ip2_ipl_ioctl to avoid potential terroristic acts.
-// Changed the definition of ip2trace to be more consistant with kernel style
+// Changed the definition of ip2trace to be more consistent with kernel style
 //	Thanks to Andreas Dilger <adilger@turbolabs.com> for these updates
 //
 // 1.2.13	/\/\|=mhw=|\/\/

@@ -284,7 +284,7 @@
 /*
  * This set of flags enable and disable all the various warning,
  * error and debug message of this driver.
- * Each section can be enabled and disabled independantly
+ * Each section can be enabled and disabled independently
  */
 /* In the PPP part */
 #define DEBUG_CTRL_TRACE	0	/* Control channel */

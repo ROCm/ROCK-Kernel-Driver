@@ -22,7 +22,7 @@
 
 /*
  * TODO:
- *	- Get ridden of SisHostChipInfo[] completness dependancy.
+ *	- Get ridden of SisHostChipInfo[] completness dependency.
  *	- Study drivers/ide/ide-timing.h.
  *	- Are there pre-ATA_16 SiS5513 chips ? -> tune init code for them
  *	  or remove ATA_00 define
@@ -64,7 +64,7 @@
 /* Miscellaneaous flags */
 #define SIS5513_LATENCY		0x01
 
-/* registers layout and init values are chipset family dependant */
+/* registers layout and init values are chipset family dependent */
 /* 1/ define families */
 #define ATA_00		0x00
 #define ATA_16		0x01

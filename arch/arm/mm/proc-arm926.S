@@ -147,7 +147,7 @@ cpu_arm926_cache_clean_invalidate_all_r2:
  *
  * This is a little misleading, it is not intended to clean out
  * the i-cache but to make sure that any data written to the
- * range is made consistant.  This means that when we execute code
+ * range is made consistent.  This means that when we execute code
  * in that region, everything works as we expect.
  *
  * This generally means writing back data in the Dcache and

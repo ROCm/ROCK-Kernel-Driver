@@ -551,7 +551,7 @@ __cpu_up (unsigned int cpu)
 }
 
 /*
- * Assume that CPU's have been discovered by some platform-dependant interface.  For
+ * Assume that CPU's have been discovered by some platform-dependent interface.  For
  * SoftSDV/Lion, that would be ACPI.
  *
  * Setup of the IPI irq handler is done in irq.c:init_IRQ_SMP().
