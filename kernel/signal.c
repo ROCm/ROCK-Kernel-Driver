@@ -280,10 +280,12 @@ void __exit_sighand(struct task_struct *tsk)
 		if (atomic_read(&sig->count) == 1 &&
 					leader->state == TASK_ZOMBIE) {
 			__remove_thread_group(tsk, sig);
+			spin_unlock(&sig->siglock);
 			do_notify_parent(leader, leader->exit_signal);
-		} else
+		} else {
 			__remove_thread_group(tsk, sig);
-		spin_unlock(&sig->siglock);
+			spin_unlock(&sig->siglock);
+		}
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
