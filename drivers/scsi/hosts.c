@@ -283,8 +283,8 @@ struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
  **/
 void scsi_host_get(struct Scsi_Host *shost)
 {
-	get_device(&shost->host_gendev);
-	class_device_get(&shost->class_dev);
+	get_device(&shost->shost_gendev);
+	class_device_get(&shost->shost_classdev);
 }
 
 /**
@@ -293,6 +293,6 @@ void scsi_host_get(struct Scsi_Host *shost)
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
-	class_device_put(&shost->class_dev);
-	put_device(&shost->host_gendev);
+	class_device_put(&shost->shost_classdev);
+	put_device(&shost->shost_gendev);
 }

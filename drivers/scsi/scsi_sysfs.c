@@ -239,20 +239,20 @@ int scsi_device_register(struct scsi_device *sdev)
 {
 	int error = 0, i;
 
-	device_initialize(&sdev->sdev_driverfs_dev);
-	sprintf(sdev->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
+	device_initialize(&sdev->sdev_gendev);
+	sprintf(sdev->sdev_gendev.bus_id,"%d:%d:%d:%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
-	sdev->sdev_driverfs_dev.parent = &sdev->host->host_gendev;
-	sdev->sdev_driverfs_dev.bus = &scsi_bus_type;
-	sdev->sdev_driverfs_dev.release = scsi_device_release;
+	sdev->sdev_gendev.parent = &sdev->host->shost_gendev;
+	sdev->sdev_gendev.bus = &scsi_bus_type;
+	sdev->sdev_gendev.release = scsi_device_release;
 
 	class_device_initialize(&sdev->sdev_classdev);
-	sdev->sdev_classdev.dev = &sdev->sdev_driverfs_dev;
+	sdev->sdev_classdev.dev = &sdev->sdev_gendev;
 	sdev->sdev_classdev.class = &sdev_class;
 	snprintf(sdev->sdev_classdev.class_id, BUS_ID_SIZE, "%d:%d:%d:%d",
 		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
 
-	error = device_add(&sdev->sdev_driverfs_dev);
+	error = device_add(&sdev->sdev_gendev);
 	if (error) {
 		printk(KERN_INFO "error 1\n");
 		return error;
@@ -260,12 +260,12 @@ int scsi_device_register(struct scsi_device *sdev)
 	error = class_device_add(&sdev->sdev_classdev);
 	if (error) {
 		printk(KERN_INFO "error 2\n");
-		device_unregister(&sdev->sdev_driverfs_dev);
+		device_unregister(&sdev->sdev_gendev);
 		return error;
 	}
 
 	for (i = 0; !error && sdev->host->hostt->sdev_attrs[i] != NULL; i++)
-		error = device_create_file(&sdev->sdev_driverfs_dev,
+		error = device_create_file(&sdev->sdev_gendev,
 					   sdev->host->hostt->sdev_attrs[i]);
 
 	if (error)
@@ -283,9 +283,9 @@ void scsi_device_unregister(struct scsi_device *sdev)
 	int i;
 
 	for (i = 0; sdev->host->hostt->sdev_attrs[i] != NULL; i++)
-		device_remove_file(&sdev->sdev_driverfs_dev, sdev->host->hostt->sdev_attrs[i]);
+		device_remove_file(&sdev->sdev_gendev, sdev->host->hostt->sdev_attrs[i]);
 	class_device_unregister(&sdev->sdev_classdev);
-	device_unregister(&sdev->sdev_driverfs_dev);
+	device_unregister(&sdev->sdev_gendev);
 }
 
 int scsi_register_driver(struct device_driver *drv)
@@ -315,17 +315,17 @@ static void scsi_host_release(struct device *dev)
 
 void scsi_sysfs_init_host(struct Scsi_Host *shost)
 {
-	device_initialize(&shost->host_gendev);
-	snprintf(shost->host_gendev.bus_id, BUS_ID_SIZE, "host%d",
+	device_initialize(&shost->shost_gendev);
+	snprintf(shost->shost_gendev.bus_id, BUS_ID_SIZE, "host%d",
 		shost->host_no);
-	snprintf(shost->host_gendev.name, DEVICE_NAME_SIZE, "%s",
+	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
 		shost->hostt->proc_name);
-	shost->host_gendev.release = scsi_host_release;
+	shost->shost_gendev.release = scsi_host_release;
 
-	class_device_initialize(&shost->class_dev);
-	shost->class_dev.dev = &shost->host_gendev;
-	shost->class_dev.class = &shost_class;
-	snprintf(shost->class_dev.class_id, BUS_ID_SIZE, "host%d",
+	class_device_initialize(&shost->shost_classdev);
+	shost->shost_classdev.dev = &shost->shost_gendev;
+	shost->shost_classdev.class = &shost_class;
+	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
 		  shost->host_no);
 }
 
@@ -338,19 +338,19 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 {
 	int i, error;
 
-	if (!shost->host_gendev.parent)
-		shost->host_gendev.parent = dev ? dev : &legacy_bus;
+	if (!shost->shost_gendev.parent)
+		shost->shost_gendev.parent = dev ? dev : &legacy_bus;
 
-	error = device_add(&shost->host_gendev);
+	error = device_add(&shost->shost_gendev);
 	if (error)
 		return error;
 
-	error = class_device_add(&shost->class_dev);
+	error = class_device_add(&shost->shost_classdev);
 	if (error)
 		goto clean_device;
 
 	for (i = 0; !error && shost->hostt->shost_attrs[i] != NULL; i++)
-		error = class_device_create_file(&shost->class_dev,
+		error = class_device_create_file(&shost->shost_classdev,
 					   shost->hostt->shost_attrs[i]);
 	if (error)
 		goto clean_class;
@@ -358,9 +358,9 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 	return error;
 
 clean_class:
-	class_device_del(&shost->class_dev);
+	class_device_del(&shost->shost_classdev);
 clean_device:
-	device_del(&shost->host_gendev);
+	device_del(&shost->shost_gendev);
 
 	return error;
 }
@@ -371,8 +371,8 @@ clean_device:
  **/
 void scsi_sysfs_remove_host(struct Scsi_Host *shost)
 {
-	class_device_del(&shost->class_dev);
-	device_del(&shost->host_gendev);
+	class_device_del(&shost->shost_classdev);
+	device_del(&shost->shost_gendev);
 }
 
 /** scsi_sysfs_modify_shost_attribute - modify or add a host class attribute
