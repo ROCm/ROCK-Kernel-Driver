@@ -832,13 +832,17 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	if (state->info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
 		    old_custom_divisor != port->custom_divisor) {
-			/* If they're setting up a custom divisor or speed,
+			/*
+			 * If they're setting up a custom divisor or speed,
 			 * instead of clearing it, then bitch about it. No
-			 * need to rate-limit; it's CAP_SYS_ADMIN only. */
+			 * need to rate-limit; it's CAP_SYS_ADMIN only.
+			 */
 			if (port->flags & UPF_SPD_MASK) {
-				printk(KERN_NOTICE "%s sets custom speed on %s%d. This is deprecated.\n",
-				       current->comm, state->info->tty->driver->name, 
-				       state->port->line);
+				char buf[64];
+				printk(KERN_NOTICE
+				       "%s sets custom speed on %s. This "
+				       "is deprecated.\n", current->comm,
+				       tty_name(state->info->tty, buf));
 			}
 			uart_change_speed(state, NULL);
 		}
