@@ -1414,13 +1414,14 @@ static int snd_korg1212_playback_open(snd_pcm_substream_t *substream)
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_playback_open [%s]\n", stateName[korg1212->cardState]);
 #endif
 
+	substream->dma_device = korg1212->dma_dev; /* set for mmap */
+
         snd_pcm_set_sync(substream);    // ???
 
 	snd_korg1212_OpenCard(korg1212);
 
         runtime->hw = snd_korg1212_playback_info;
-	runtime->dma_area = (char *) korg1212->playDataBufsPtr;
-	runtime->dma_bytes = K1212_BUF_SIZE;
+	snd_pcm_set_runtime_buffer(substream, &korg1212->dma_play);
 
         spin_lock_irqsave(&korg1212->lock, flags);
 
@@ -1445,13 +1446,14 @@ static int snd_korg1212_capture_open(snd_pcm_substream_t *substream)
 		K1212_DEBUG_PRINTK("K1212_DEBUG: snd_korg1212_capture_open [%s]\n", stateName[korg1212->cardState]);
 #endif
 
+	substream->dma_device = korg1212->dma_dev; /* set for mmap */
+
         snd_pcm_set_sync(substream);    // ???
 
 	snd_korg1212_OpenCard(korg1212);
 
         runtime->hw = snd_korg1212_capture_info;
-	runtime->dma_area = (char *) korg1212->recordDataBufsPtr;
-	runtime->dma_bytes = K1212_BUF_SIZE;
+	snd_pcm_set_runtime_buffer(substream, &korg1212->dma_rec);
 
         spin_lock_irqsave(&korg1212->lock, flags);
 
