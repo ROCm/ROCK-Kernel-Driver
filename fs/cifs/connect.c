@@ -1033,7 +1033,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 
 	/* send RFC1001 sessinit */
 
-	if(psin_server->sin_port == htons(139)) {
+	if(psin_server->sin_port == htons(RFC1001_PORT)) {
 		/* some servers require RFC1001 sessinit before sending
 		negprot - BB check reconnection in case where second 
 		sessinit is sent but no second negprot */
@@ -1076,6 +1076,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
 	int connected = 0;
+	unsigned short int orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create_kern(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -1101,6 +1102,10 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	} 
 
 	if(!connected) {
+		/* save original port so we can retry user specified port  
+			later if fall back ports fail this time  */
+
+		orig_port = psin_server->sin6_port;
 		/* do not retry on the same port we just failed on */
 		if(psin_server->sin6_port != htons(CIFS_PORT)) {
 			psin_server->sin6_port = htons(CIFS_PORT);
@@ -1123,6 +1128,8 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	/* give up here - unless we want to retry on different
 		protocol families some day */
 	if (!connected) {
+		if(orig_port)
+			psin_server->sin6_port = orig_port;
 		cFYI(1,("Error %d connecting to server via ipv6",rc));
 		sock_release(*csocket);
 		*csocket = NULL;
@@ -1142,6 +1149,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 {
 	int rc = 0;
 	int xid;
+	int address_type = AF_INET;
 	struct socket *csocket = NULL;
 	struct sockaddr_in sin_server;
 	struct sockaddr_in6 sin_server6;
@@ -1183,12 +1191,16 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	if (volume_info.UNCip && volume_info.UNC) {
 		rc = cifs_inet_pton(AF_INET, volume_info.UNCip,&sin_server.sin_addr.s_addr);
 
-		if(rc == 0) {
+		if(rc <= 0) {
 			/* not ipv4 address, try ipv6 */
 			rc = cifs_inet_pton(AF_INET6,volume_info.UNCip,&sin_server6.sin6_addr.in6_u); 
-		} 
+			if(rc > 0)
+				address_type = AF_INET6;
+		} else {
+			address_type = AF_INET;
+		}
        
-		if(rc != 1) {
+		if(rc <= 0) {
 			/* we failed translating address */
 			if(volume_info.UNC)
 				kfree(volume_info.UNC);
@@ -1238,10 +1250,24 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		}
 	}
 
-	existingCifsSes =
-	    cifs_find_tcp_session(&sin_server.sin_addr,
+	if(address_type == AF_INET)
+		existingCifsSes = cifs_find_tcp_session(&sin_server.sin_addr,
 			NULL /* no ipv6 addr */,
 			volume_info.username, &srvTcp);
+	else if(address_type == AF_INET6)
+		existingCifsSes = cifs_find_tcp_session(NULL /* no ipv4 addr */,
+			&sin_server6.sin6_addr,
+			volume_info.username, &srvTcp);
+	else {
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
+		FreeXid(xid);
+		return -EINVAL;
+	}
+
+
 	if (srvTcp) {
 		cFYI(1, ("Existing tcp session with server found "));                
 	} else {	/* create socket */
