@@ -10,7 +10,5 @@ af_ax25.c:ax25_connect:
         }
 
 Do the ax25_list_lock, ax25_uid_lock, ax25_route_lock, protocol_list_lock,
-ax25_dev_lock, linkfail_lockreally and ax25_frag_lock have to be interrupt
-safe?
-
-What locking will be needed for listen_list?
+ax25_dev_lock, linkfail_lockreally, ax25_frag_lock and listen_lock have to
+be interrupt safe?

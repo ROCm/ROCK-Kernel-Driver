@@ -54,6 +54,7 @@ static struct listen_struct {
 	ax25_address  callsign;
 	struct net_device *dev;
 } *listen_list;
+static spinlock_t listen_lock = SPIN_LOCK_UNLOCKED;
 
 int ax25_protocol_register(unsigned int pid, int (*func)(struct sk_buff *, ax25_cb *))
 {
@@ -176,31 +177,27 @@ int ax25_listen_register(ax25_address *callsign, struct net_device *dev)
 	listen->callsign = *callsign;
 	listen->dev      = dev;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&listen_lock, flags);
 	listen->next = listen_list;
 	listen_list  = listen;
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&listen_lock, flags);
 
 	return 1;
 }
 
 void ax25_listen_release(ax25_address *callsign, struct net_device *dev)
 {
-	struct listen_struct *s, *listen = listen_list;
+	struct listen_struct *s, *listen;
 	unsigned long flags;
 
+	spin_lock_irqsave(&listen_lock, flags);
+	listen = listen_list;
 	if (listen == NULL)
 		return;
 
-	save_flags(flags);
-	cli();
-
 	if (ax25cmp(&listen->callsign, callsign) == 0 && listen->dev == dev) {
 		listen_list = listen->next;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&listen_lock, flags);
 		kfree(listen);
 		return;
 	}
@@ -209,15 +206,14 @@ void ax25_listen_release(ax25_address *callsign, struct net_device *dev)
 		if (ax25cmp(&listen->next->callsign, callsign) == 0 && listen->next->dev == dev) {
 			s = listen->next;
 			listen->next = listen->next->next;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&listen_lock, flags);
 			kfree(s);
 			return;
 		}
 
 		listen = listen->next;
 	}
-
-	restore_flags(flags);
+	spin_unlock_irqrestore(&listen_lock, flags);
 }
 
 int (*ax25_protocol_function(unsigned int pid))(struct sk_buff *, ax25_cb *)
@@ -240,10 +236,13 @@ int (*ax25_protocol_function(unsigned int pid))(struct sk_buff *, ax25_cb *)
 int ax25_listen_mine(ax25_address *callsign, struct net_device *dev)
 {
 	struct listen_struct *listen;
+	unsigned long flags;
 
+	spin_lock_irqsave(&listen_lock, flags);
 	for (listen = listen_list; listen != NULL; listen = listen->next)
 		if (ax25cmp(&listen->callsign, callsign) == 0 && (listen->dev == dev || listen->dev == NULL))
 			return 1;
+	spin_unlock_irqrestore(&listen_lock, flags);
 
 	return 0;
 }
