@@ -756,6 +756,13 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		printk ("EXT2-fs: not enough memory\n");
 		goto failed_mount;
 	}
+	sbi->debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->debts),
+			GFP_KERNEL);
+	if (!sbi->debts) {
+		printk ("EXT2-fs: not enough memory\n");
+		goto failed_mount_group_desc;
+	}
+	memset(sbi->debts, 0, sbi->s_groups_count * sizeof(*sbi->debts));
 	for (i = 0; i < db_count; i++) {
 		block = descriptor_loc(sb, logic_sb_block, i);
 		sbi->s_group_desc[i] = sb_bread(sb, block);
@@ -773,6 +780,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
+	sbi->s_dir_count = ext2_count_dirs(sb);
 	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
 	/*
 	 * set up enough so that it can read an inode
@@ -798,6 +806,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 failed_mount2:
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
+failed_mount_group_desc:
 	kfree(sbi->s_group_desc);
 failed_mount:
 	brelse(bh);

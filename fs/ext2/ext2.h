@@ -56,6 +56,7 @@ extern int ext2_new_block (struct inode *, unsigned long,
 extern void ext2_free_blocks (struct inode *, unsigned long,
 			      unsigned long);
 extern unsigned long ext2_count_free_blocks (struct super_block *);
+extern unsigned long ext2_count_dirs (struct super_block *);
 extern void ext2_check_blocks_bitmap (struct super_block *);
 extern struct ext2_group_desc * ext2_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
