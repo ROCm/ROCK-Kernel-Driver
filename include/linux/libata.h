@@ -37,7 +37,7 @@
 #undef ATA_VERBOSE_DEBUG	/* yet more debugging output */
 #undef ATA_IRQ_TRAP		/* define to ack screaming irqs */
 #undef ATA_NDEBUG		/* define to disable quick runtime checks */
-#define ATA_ENABLE_ATAPI	/* undefine to disable ATAPI support */
+#undef ATA_ENABLE_ATAPI		/* define to enable ATAPI support */
 #undef ATA_ENABLE_PATA		/* define to enable PATA support in some
 				 * low-level drivers */
 #undef ATAPI_ENABLE_DMADIR	/* enables ATAPI DMADIR bridge support */
@@ -95,7 +95,6 @@ enum {
 	ATA_DFLAG_LBA48		= (1 << 0), /* device supports LBA48 */
 	ATA_DFLAG_PIO		= (1 << 1), /* device currently in PIO mode */
 	ATA_DFLAG_LOCK_SECTORS	= (1 << 2), /* don't adjust max_sectors */
-	ATA_DFLAG_LBA		= (1 << 3), /* device supports LBA */
 
 	ATA_DEV_UNKNOWN		= 0,	/* unknown device */
 	ATA_DEV_ATA		= 1,	/* ATA device */
@@ -206,7 +205,6 @@ struct ata_probe_ent {
 	unsigned long		irq;
 	unsigned int		irq_flags;
 	unsigned long		host_flags;
-	unsigned long		port_flags[ATA_MAX_PORTS];
 	void __iomem		*mmio_base;
 	void			*private_data;
 };
@@ -280,11 +278,6 @@ struct ata_device {
 	u8			xfer_protocol;	/* taskfile xfer protocol */
 	u8			read_cmd;	/* opcode to use on read */
 	u8			write_cmd;	/* opcode to use on write */
-
-	/* for CHS addressing */
-	u16			cylinders;	/* Number of cylinders */
-	u16			heads;		/* Number of heads */
-	u16			sectors;	/* Number of sectors per track */
 };
 
 struct ata_port {
@@ -427,7 +420,6 @@ extern void ata_sg_init(struct ata_queued_cmd *qc, struct scatterlist *sg,
 extern unsigned int ata_dev_classify(struct ata_taskfile *tf);
 extern void ata_dev_id_string(u16 *id, unsigned char *s,
 			      unsigned int ofs, unsigned int len);
-extern void ata_dev_config(struct ata_port *ap, unsigned int i);
 extern void ata_bmdma_setup (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start (struct ata_queued_cmd *qc);
 extern void ata_bmdma_stop(struct ata_port *ap);

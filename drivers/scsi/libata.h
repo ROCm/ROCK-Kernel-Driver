@@ -40,8 +40,10 @@ extern struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
 extern void ata_qc_free(struct ata_queued_cmd *qc);
 extern int ata_qc_issue(struct ata_queued_cmd *qc);
 extern int ata_check_atapi_dma(struct ata_queued_cmd *qc);
-extern int ata_task_ioctl(struct scsi_device *scsidev, void __user *arg);
-extern int ata_cmd_ioctl(struct scsi_device *scsidev, void __user *arg);
+extern void ata_dev_select(struct ata_port *ap, unsigned int device,
+                           unsigned int wait, unsigned int can_sleep);
+extern void ata_tf_to_host_nolock(struct ata_port *ap, struct ata_taskfile *tf);
+extern void swap_buf_le16(u16 *buf, unsigned int buf_words);
 
 
 /* libata-scsi.c */

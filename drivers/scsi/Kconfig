@@ -432,19 +432,11 @@ config SCSI_SATA
 
 	  If unsure, say N.
 
-config SCSI_ATA_ADMA
-	tristate "ADMA ATA support"
-	depends on SCSI_SATA && PCI
-	help
-	  This option enables support for ADMA-standard ATA controllers.
-
-	  If unsure, say N.
-
 config SCSI_SATA_AHCI
 	tristate "AHCI SATA support"
 	depends on SCSI_SATA && PCI
 	help
-	  This option enables support for AHCI-standard Serial ATA.
+	  This option enables support for AHCI Serial ATA.
 
 	  If unsure, say N.
 
@@ -472,14 +464,6 @@ config SCSI_SATA_NV
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for NVIDIA Serial ATA.
-
-	  If unsure, say N.
-
-config SCSI_PATA_PDC2027X
-	tristate "Promise PATA 2027x support"
-	depends on SCSI_SATA && PCI
-	help
-	  This option enables support for Promise PATA pdc20268 to pdc20277 host adapters.
 
 	  If unsure, say N.
 
