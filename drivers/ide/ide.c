@@ -913,6 +913,8 @@ int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 		}
 		for (index = 0; index < MAX_HWIFS; ++index) {
 			hwif = &ide_hwifs[index];
+			if (hwif->hold)
+				continue;
 			if ((!hwif->present && !hwif->mate && !initializing) ||
 			    (!hwif->hw.io_ports[IDE_DATA_OFFSET] && initializing))
 				goto found;
@@ -924,6 +926,8 @@ int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 found:
 	if (hwif->present)
 		ide_unregister(index);
+	else if (!hwif->hold)
+		init_hwif_data(index);
 	if (hwif->present)
 		return -1;
 	memcpy(&hwif->hw, hw, sizeof(*hw));
