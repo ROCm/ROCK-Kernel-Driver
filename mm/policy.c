@@ -130,7 +130,10 @@ static int get_nodes(unsigned long *nodes, unsigned long *nmask,
 	unsigned long nlongs;
 	unsigned long endmask;
 
-	--maxnode;
+	bitmap_clear(nodes, MAX_NUMNODES);
+	if (--maxnode == 0) 
+		return 0;
+
 	nlongs = BITS_TO_LONGS(maxnode);
 	if ((maxnode % BITS_PER_LONG) == 0)
 		endmask = ~0UL;
@@ -154,7 +157,6 @@ static int get_nodes(unsigned long *nodes, unsigned long *nmask,
 		endmask = ~0UL;
 	}
 
-	bitmap_clear(nodes, MAX_NUMNODES);
 	if (nmask && copy_from_user(nodes, nmask, nlongs*sizeof(unsigned long)))
 		return -EFAULT;
 	nodes[nlongs-1] &= endmask;
