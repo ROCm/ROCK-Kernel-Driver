@@ -992,6 +992,9 @@ void usb_disconnect(struct usb_device **pdev)
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		usbfs_remove_device(dev);
 	}
+	kfree(dev->static_vendor);
+	kfree(dev->static_product);
+	kfree(dev->static_serial);
 	up(&dev->serialize);
 	device_unregister(&dev->dev);
 }
@@ -1044,17 +1047,16 @@ int usb_set_address(struct usb_device *dev)
 	return retval;
 }
 
-static inline void usb_show_string(struct usb_device *dev, char *id, int index)
+static void usb_add_static_info(struct usb_device *dev, int index, char **info)
 {
 	char *buf;
-
 	if (!index)
 		return;
 	if (!(buf = kmalloc(256, GFP_KERNEL)))
 		return;
 	if (usb_string(dev, index, buf, 256) > 0)
-		dev_printk(KERN_INFO, &dev->dev, "%s: %s\n", id, buf);
-	kfree(buf);
+		*info = buf;
+	return;
 }
 
 /*
@@ -1155,13 +1157,19 @@ int usb_new_device(struct usb_device *dev)
 	dev_dbg(&dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 
-#ifdef DEBUG
 	if (dev->descriptor.iProduct)
-		usb_show_string(dev, "Product", dev->descriptor.iProduct);
+		usb_add_static_info(dev, dev->descriptor.iProduct, &dev->static_product);
 	if (dev->descriptor.iManufacturer)
-		usb_show_string(dev, "Manufacturer", dev->descriptor.iManufacturer);
+		usb_add_static_info(dev, dev->descriptor.iManufacturer, &dev->static_vendor);
 	if (dev->descriptor.iSerialNumber)
-		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
+		usb_add_static_info(dev, dev->descriptor.iSerialNumber, &dev->static_serial);
+#if 1
+	if (dev->static_product)
+		dev_printk(KERN_INFO, &dev->dev, "Product: %s\n", dev->static_product);
+	if (dev->static_vendor)
+		dev_printk(KERN_INFO, &dev->dev, "Manufacturer: %s\n", dev->static_vendor);
+	if (dev->static_serial)
+		dev_printk(KERN_INFO, &dev->dev, "SerialNumber: %s\n", dev->static_serial);
 #endif
 
 	/* put device-specific files into sysfs */
