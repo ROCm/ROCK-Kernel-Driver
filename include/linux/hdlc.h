@@ -167,6 +167,7 @@ typedef struct hdlc_device_struct {
 					      int new_mtu);
 		}ppp;
 	}state;
+	void *priv;
 }hdlc_device;
 
 
@@ -188,6 +189,12 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 int register_hdlc_device(struct net_device *dev);
 void unregister_hdlc_device(struct net_device *dev);
 
+struct net_device *alloc_hdlcdev(void *priv);
+
+static inline void free_hdlcdev(struct net_device *dev)
+{
+	kfree(dev);
+}
 
 static __inline__ struct net_device* hdlc_to_dev(hdlc_device *hdlc)
 {

@@ -51,7 +51,7 @@ static const char* version = "wanXL serial card driver version: 0.47";
 
 
 typedef struct {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	struct card_t *card;
 	spinlock_t lock;	/* for wanxl_xmit */
         int node;		/* physical port #0 - 3 */
@@ -78,19 +78,20 @@ typedef struct card_t {
 	struct sk_buff *rx_skbs[RX_QUEUE_LENGTH];
 	card_status_t *status;	/* shared between host and card */
 	dma_addr_t status_address;
+	port_t __ports[0];
 }card_t;
 
 
 
 static inline port_t* dev_to_port(struct net_device *dev)
 {
-        return (port_t *)(dev_to_hdlc(dev));
+        return (port_t *)dev_to_hdlc(dev)->priv;
 }
 
 
 static inline struct net_device *port_to_dev(port_t* port)
 {
-        return hdlc_to_dev(&port->hdlc);
+        return port->dev;
 }
 
 
@@ -527,15 +528,15 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 	card_t *card = pci_get_drvdata(pdev);
 	int i;
 
-	/* unregister and free all host resources */
-	if (card->irq)
-		free_irq(card->irq, card);
-
 	for (i = 0; i < 4; i++)
 		if (card->ports[i]) {
 			struct net_device *dev = port_to_dev(card->ports[i]);
 			unregister_hdlc_device(dev);
 		}
+
+	/* unregister and free all host resources */
+	if (card->irq)
+		free_irq(card->irq, card);
 
 	wanxl_reset(card);
 
@@ -553,6 +554,10 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 	if (card->status)
 		pci_free_consistent(pdev, sizeof(card_status_t),
 				    card->status, card->status_address);
+
+	for (i = 0; i < card->n_ports; i++)
+		if (card->__ports[i].dev)
+			free_hdlcdev(card->__ports[i].dev);
 
 	pci_set_drvdata(pdev, NULL);
 	kfree(card);
@@ -621,6 +626,16 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, card);
 	card->pdev = pdev;
 	card->n_ports = ports;
+
+	for (i = 0; i < ports; i++) {
+		card->__ports[i].dev = alloc_hdlcdev(&card->__ports[i]);
+		if (!card->__ports[i].dev) {
+			printk(KERN_ERR "wanXL %s: unable to allocate memory\n",
+			       card_name(pdev));
+			wanxl_pci_remove_one(pdev);
+			return -ENOMEM;
+		}
+	}
 
 	card->status = pci_alloc_consistent(pdev, sizeof(card_status_t),
 					    &card->status_address);
@@ -702,32 +717,6 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	for (i = 0; i < ports; i++) {
-		port_t *port = (void *)card + sizeof(card_t) +
-			i * sizeof(port_t);
-		struct net_device *dev = port_to_dev(port);
-		hdlc_device *hdlc = dev_to_hdlc(dev);
-		spin_lock_init(&port->lock);
-		SET_MODULE_OWNER(dev);
-		dev->tx_queue_len = 50;
-		dev->do_ioctl = wanxl_ioctl;
-		dev->open = wanxl_open;
-		dev->stop = wanxl_close;
-		hdlc->attach = wanxl_attach;
-		hdlc->xmit = wanxl_xmit;
-		if (register_hdlc_device(dev)) {
-			printk(KERN_ERR "wanXL %s: unable to register hdlc"
-			       " device\n", card_name(pdev));
-			wanxl_pci_remove_one(pdev);
-			return -ENOBUFS;
-		}
-		card->ports[i] = port;
-		dev->get_stats = wanxl_get_stats;
-		port->card = card;
-		port->node = i;
-		get_status(port)->clocking = CLOCK_EXT;
-	}
-
 	for (i = 0; i < RX_QUEUE_LENGTH; i++) {
 		struct sk_buff *skb = dev_alloc_skb(BUFFER_LENGTH);
 		card->rx_skbs[i] = skb;
@@ -795,6 +784,32 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 		return -EBUSY;
 	}
 	card->irq = pdev->irq;
+
+	for (i = 0; i < ports; i++) {
+		port_t *port = &card->__ports[i];
+		struct net_device *dev = port_to_dev(port);
+		hdlc_device *hdlc = dev_to_hdlc(dev);
+		spin_lock_init(&port->lock);
+		SET_MODULE_OWNER(dev);
+		dev->tx_queue_len = 50;
+		dev->do_ioctl = wanxl_ioctl;
+		dev->open = wanxl_open;
+		dev->stop = wanxl_close;
+		hdlc->attach = wanxl_attach;
+		hdlc->xmit = wanxl_xmit;
+		card->ports[i] = port;
+		dev->get_stats = wanxl_get_stats;
+		port->card = card;
+		port->node = i;
+		get_status(port)->clocking = CLOCK_EXT;
+		if (register_hdlc_device(dev)) {
+			printk(KERN_ERR "wanXL %s: unable to register hdlc"
+			       " device\n", card_name(pdev));
+			card->ports[i] = NULL;
+			wanxl_pci_remove_one(pdev);
+			return -ENOBUFS;
+		}
+	}
 
 	return 0;
 }

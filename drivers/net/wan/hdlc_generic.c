@@ -226,7 +226,15 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 }
 
-
+struct net_device *alloc_hdlcdev(void *priv)
+{
+	void *p = kmalloc(sizeof(hdlc_device), GFP_KERNEL);
+	if (p) {
+		memset(p, 0, sizeof(hdlc_device));
+		dev_to_hdlc(p)->priv = priv;
+	}
+	return p;
+}
 
 int register_hdlc_device(struct net_device *dev)
 {
@@ -279,6 +287,7 @@ EXPORT_SYMBOL(hdlc_open);
 EXPORT_SYMBOL(hdlc_close);
 EXPORT_SYMBOL(hdlc_set_carrier);
 EXPORT_SYMBOL(hdlc_ioctl);
+EXPORT_SYMBOL(alloc_hdlcdev);
 EXPORT_SYMBOL(register_hdlc_device);
 EXPORT_SYMBOL(unregister_hdlc_device);
 
