@@ -61,7 +61,7 @@
 static struct proto_ops rfcomm_sock_ops;
 
 static struct bluez_sock_list rfcomm_sk_list = {
-	lock: RW_LOCK_UNLOCKED
+	.lock = RW_LOCK_UNLOCKED
 };
 
 static void rfcomm_sock_close(struct sock *sk);
