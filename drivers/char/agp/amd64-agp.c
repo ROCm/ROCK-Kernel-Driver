@@ -357,7 +357,7 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 		hammers[i++] = loop_dev;
 		nr_garts = i;
 #ifdef CONFIG_SMP
-		if (i == MAX_HAMMER_GARTS) { 
+		if (i > MAX_HAMMER_GARTS) { 
 			printk(KERN_INFO PFX "Too many northbridges for AGP\n");
 			return -1;
 		}
