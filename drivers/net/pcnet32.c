@@ -1082,7 +1082,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	fdx = 1; mii = 1;
 	break;
     case 0x2628:
-	chipname = "PCnet/FAST III 79C976";
+	chipname = "PCnet/PRO 79C976";
 	fdx = 1; mii = 1;
 	break;
     default:
