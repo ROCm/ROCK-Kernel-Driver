@@ -525,14 +525,12 @@ eesoxscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	unsigned char *base;
 	int ret;
 
+	ret = ecard_request_resources(ec);
+	if (ret)
+		goto out;
+
 	resbase = ecard_resource_start(ec, ECARD_RES_IOCFAST);
 	reslen = ecard_resource_len(ec, ECARD_RES_IOCFAST);
-
-	if (!request_mem_region(resbase, reslen, "eesoxscsi")) {
-		ret = -EBUSY;
-		goto out;
-	}
-
 	base = ioremap(resbase, reslen);
 	if (!base) {
 		ret = -ENOMEM;
@@ -622,7 +620,7 @@ eesoxscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	iounmap(base);
 
  out_region:
-	release_mem_region(resbase, reslen);
+	ecard_release_resources(ec);
 
  out:
 	return ret;
@@ -632,7 +630,6 @@ static void __devexit eesoxscsi_remove(struct expansion_card *ec)
 {
 	struct Scsi_Host *host = ecard_get_drvdata(ec);
 	struct eesoxscsi_info *info = (struct eesoxscsi_info *)host->hostdata;
-	unsigned long resbase, reslen;
 
 	ecard_set_drvdata(ec, NULL);
 	fas216_remove(host);
@@ -645,13 +642,9 @@ static void __devexit eesoxscsi_remove(struct expansion_card *ec)
 
 	iounmap((void *)host->base);
 
-	resbase = ecard_resource_start(ec, ECARD_RES_IOCFAST);
-	reslen = ecard_resource_len(ec, ECARD_RES_IOCFAST);
-
-	release_mem_region(resbase, reslen);
-
 	fas216_release(host);
 	scsi_host_put(host);
+	ecard_release_resources(ec);
 }
 
 static const struct ecard_id eesoxscsi_cids[] = {
