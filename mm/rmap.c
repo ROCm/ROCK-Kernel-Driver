@@ -18,14 +18,11 @@
  */
 
 /*
- * Locking:
- * - the page->mapcount field is protected by the PG_maplock bit,
- *   which nests within the mm->page_table_lock,
- *   which nests within the page lock.
- * - because swapout locking is opposite to the locking order
- *   in the page fault path, the swapout path uses trylocks
- *   on the mm->page_table_lock
+ * Locking: see "Lock ordering" summary in filemap.c.
+ * In swapout, page_map_lock is held on entry to page_referenced and
+ * try_to_unmap, so they trylock for i_mmap_lock and page_table_lock.
  */
+
 #include <linux/mm.h>
 #include <linux/pagemap.h>
 #include <linux/swap.h>
@@ -79,8 +76,12 @@ int anon_vma_prepare(struct vm_area_struct *vma)
 		/* page_table_lock to protect against threads */
 		spin_lock(&mm->page_table_lock);
 		if (likely(!vma->anon_vma)) {
+			if (!allocated)
+				spin_lock(&anon_vma->lock);
 			vma->anon_vma = anon_vma;
 			list_add(&vma->anon_vma_node, &anon_vma->head);
+			if (!allocated)
+				spin_unlock(&anon_vma->lock);
 			allocated = NULL;
 		}
 		spin_unlock(&mm->page_table_lock);
