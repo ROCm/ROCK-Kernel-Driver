@@ -43,6 +43,9 @@
 #define NB85E_UART_BRGC_ADDR(n)		(NB85E_UART_BASE_ADDR(n) + 0x7)
 #endif
 
+#ifndef NB85E_UART_CKSR_MAX_FREQ
+#define NB85E_UART_CKSR_MAX_FREQ (25*1000*1000)
+#endif
 
 /* UART config registers.  */
 #define NB85E_UART_ASIM(n)	(*(volatile u8 *)NB85E_UART_ASIM_ADDR(n))
@@ -81,7 +84,6 @@
 /* UART baud-rate generator control registers.  */
 #define NB85E_UART_CKSR(n)	(*(volatile u8 *)NB85E_UART_CKSR_ADDR(n))
 #define NB85E_UART_CKSR_MAX	11
-#define NB85E_UART_CKSR_MAX_FREQ (25*1000*1000)
 #define NB85E_UART_BRGC(n)	(*(volatile u8 *)NB85E_UART_BRGC_ADDR(n))
 
 
