@@ -102,6 +102,8 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <linux/skbuff.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/raw.h>
 #include <net/icmp.h>
@@ -1123,6 +1125,8 @@ static struct inet_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
 };
 
+int ipv4_proc_init(void);
+
 static int __init inet_init(void)
 {
 	struct sk_buff *dummy_skb;
@@ -1218,9 +1222,70 @@ static int __init inet_init(void)
 #endif
 
 	ipv4_proc_init();
-	udp_proc_init();
-	fib_proc_init();
 	return 0;
 }
 
 module_init(inet_init);
+
+/* ------------------------------------------------------------------------ */
+
+#ifdef CONFIG_PROC_FS
+
+extern int raw_get_info(char *, char **, off_t, int);
+extern int snmp_get_info(char *, char **, off_t, int);
+extern int netstat_get_info(char *, char **, off_t, int);
+extern int afinet_get_info(char *, char **, off_t, int);
+extern int tcp_get_info(char *, char **, off_t, int);
+extern int udp_get_info(char *, char **, off_t, int);
+
+int __init ipv4_proc_init(void)
+{
+	int rc = 0;
+
+	if (!proc_net_create("raw", 0, raw_get_info))
+		goto out_raw;
+	if (!proc_net_create("netstat", 0, netstat_get_info))
+		goto out_netstat;
+	if (!proc_net_create("snmp", 0, snmp_get_info))
+		goto out_snmp;
+	if (!proc_net_create("sockstat", 0, afinet_get_info))
+		goto out_sockstat;
+	if (!proc_net_create("tcp", 0, tcp_get_info))
+		goto out_tcp;
+	if (udp_proc_init())
+		goto out_udp;
+	if (fib_proc_init())
+		goto out_fib;
+out:
+	return rc;
+out_fib:
+	udp_proc_exit();
+out_udp:
+	proc_net_remove("tcp");
+out_tcp:
+	proc_net_remove("sockstat");
+out_sockstat:
+	proc_net_remove("snmp");
+out_snmp:
+	proc_net_remove("netstat");
+out_netstat:
+	proc_net_remove("raw");
+out_raw:
+	rc = -ENOMEM;
+	goto out;
+}
+
+int ip_seq_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq = (struct seq_file *)file->private_data;
+
+	kfree(seq->private);
+	seq->private = NULL;
+	return seq_release(inode, file);
+}
+#else /* CONFIG_PROC_FS */
+int __init ipv4_proc_init(void)
+{
+	return 0;
+}
+#endif /* CONFIG_PROC_FS */
