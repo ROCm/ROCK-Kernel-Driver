@@ -49,7 +49,7 @@ sys32_ipc(u32 call, int first, int second, int third,
 	      case SHMDT:
 		return sys_shmdt(compat_ptr(ptr));
 	      case SHMGET:
-		return sys_shmget(first, second, third);
+		return sys_shmget(first, (unsigned)second, third);
 	      case SHMCTL:
 		return compat_sys_shmctl(first, second, compat_ptr(ptr));
 	}

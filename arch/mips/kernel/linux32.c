@@ -1115,7 +1115,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		err = sys_shmdt ((char *)A(ptr));
 		break;
 	case SHMGET:
-		err = sys_shmget (first, second, third);
+		err = sys_shmget (first, (unsigned)second, third);
 		break;
 	case SHMCTL:
 		err = do_sys32_shmctl (first, second, (void *)AA(ptr));
