@@ -1435,6 +1435,8 @@ int lmLogInit(struct jfs_log * log)
 	 *      unwind on error
 	 */
       errout30:		/* release log page */
+	log->wqueue = NULL;
+	bp->l_wqnext = NULL;
 	lbmFree(bp);
 
       errout20:		/* release log superblock */
