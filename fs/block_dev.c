@@ -874,7 +874,7 @@ struct file_operations def_blk_fops = {
 	release:	blkdev_close,
 	llseek:		block_llseek,
 	read:		generic_file_read,
-	write:		generic_file_write,
+	write:		generic_file_write_nolock,
 	mmap:		generic_file_mmap,
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,

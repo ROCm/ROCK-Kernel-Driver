@@ -222,6 +222,7 @@ EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(generic_file_sendfile);
 EXPORT_SYMBOL(do_generic_file_read);
 EXPORT_SYMBOL(generic_file_write);
+EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(file_lock_list);
