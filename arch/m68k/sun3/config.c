@@ -129,7 +129,7 @@ void __init sun3_bootmem_alloc(unsigned long memory_start, unsigned long memory_
 	high_memory = (void *)memory_end;
 	availmem = memory_start;
 
-	availmem += init_bootmem(start_page, num_pages);
+	availmem += init_bootmem_node(NODE_DATA(0), start_page, 0, num_pages);
 	availmem = (availmem + (PAGE_SIZE-1)) & PAGE_MASK;
 
 	free_bootmem(__pa(availmem), memory_end - (availmem));
