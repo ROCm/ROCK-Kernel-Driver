@@ -117,6 +117,8 @@ extern struct address_space_operations ext2_aops;
 
 /* namei.c */
 extern struct inode_operations ext2_dir_inode_operations;
+extern struct inode_operations ext2_special_inode_operations;
 
 /* symlink.c */
 extern struct inode_operations ext2_fast_symlink_inode_operations;
+extern struct inode_operations ext2_symlink_inode_operations;

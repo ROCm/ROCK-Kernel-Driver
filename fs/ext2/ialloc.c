@@ -13,11 +13,12 @@
  */
 
 #include <linux/config.h>
-#include "ext2.h"
 #include <linux/quotaops.h>
 #include <linux/sched.h>
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
+#include "ext2.h"
+#include "xattr.h"
 
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
@@ -97,6 +98,7 @@ void ext2_free_inode (struct inode * inode)
 	 */
 	if (!is_bad_inode(inode)) {
 		/* Quota is already initialized in iput() */
+		ext2_xattr_delete_inode(inode);
 	    	DQUOT_FREE_INODE(inode);
 		DQUOT_DROP(inode);
 	}

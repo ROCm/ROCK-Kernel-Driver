@@ -19,7 +19,6 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#include "ext2.h"
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
@@ -27,6 +26,8 @@
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
+#include "ext2.h"
+#include "xattr.h"
 
 
 static void ext2_sync_super(struct super_block *sb,
@@ -127,6 +128,7 @@ static void ext2_put_super (struct super_block * sb)
 	int i;
 	struct ext2_sb_info *sbi = EXT2_SB(sb);
 
+	ext2_xattr_put_super(sb);
 	if (!(sb->s_flags & MS_RDONLY)) {
 		struct ext2_super_block *es = sbi->s_es;
 
@@ -278,6 +280,13 @@ static int parse_options (char * options,
 			continue;
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
+#ifdef CONFIG_EXT2_FS_XATTR
+		if (!strcmp (this_char, "user_xattr"))
+			set_opt (sbi->s_mount_opt, XATTR_USER);
+		else if (!strcmp (this_char, "nouser_xattr"))
+			clear_opt (sbi->s_mount_opt, XATTR_USER);
+		else
+#endif
 		if (!strcmp (this_char, "bsddf"))
 			clear_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nouid32")) {
@@ -560,6 +569,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, GRPID);
 	if (def_mount_opts & EXT2_DEFM_UID16)
 		set_opt(sbi->s_mount_opt, NO_UID32);
+	if (def_mount_opts & EXT2_DEFM_XATTR_USER)
+		set_opt(sbi->s_mount_opt, XATTR_USER);
 	
 	if (le16_to_cpu(sbi->s_es->s_errors) == EXT2_ERRORS_PANIC)
 		set_opt(sbi->s_mount_opt, ERRORS_PANIC);
@@ -917,7 +928,10 @@ static struct file_system_type ext2_fs_type = {
 
 static int __init init_ext2_fs(void)
 {
-	int err = init_inodecache();
+	int err = init_ext2_xattr();
+	if (err)
+		return err;
+	err = init_inodecache();
 	if (err)
 		goto out1;
         err = register_filesystem(&ext2_fs_type);
@@ -927,6 +941,7 @@ static int __init init_ext2_fs(void)
 out:
 	destroy_inodecache();
 out1:
+	exit_ext2_xattr();
 	return err;
 }
 
@@ -934,6 +949,7 @@ static void __exit exit_ext2_fs(void)
 {
 	unregister_filesystem(&ext2_fs_type);
 	destroy_inodecache();
+	exit_ext2_xattr();
 }
 
 module_init(init_ext2_fs)

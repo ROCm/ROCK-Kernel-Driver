@@ -18,8 +18,9 @@
  * 	(jj@sunsite.ms.mff.cuni.cz)
  */
 
-#include "ext2.h"
 #include <linux/time.h>
+#include "ext2.h"
+#include "xattr.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -55,4 +56,8 @@ struct file_operations ext2_file_operations = {
 
 struct inode_operations ext2_file_inode_operations = {
 	.truncate	= ext2_truncate,
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
 };

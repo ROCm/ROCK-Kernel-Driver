@@ -29,8 +29,9 @@
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
 
-#include "ext2.h"
 #include <linux/pagemap.h>
+#include "ext2.h"
+#include "xattr.h"
 
 /*
  * Couple of helper functions - make the code slightly cleaner.
@@ -162,7 +163,7 @@ static int ext2_symlink (struct inode * dir, struct dentry * dentry,
 
 	if (l > sizeof (EXT2_I(inode)->i_data)) {
 		/* slow symlink */
-		inode->i_op = &page_symlink_inode_operations;
+		inode->i_op = &ext2_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
 		err = page_symlink(inode, symname, l);
 		if (err)
@@ -368,4 +369,15 @@ struct inode_operations ext2_dir_inode_operations = {
 	.rmdir		= ext2_rmdir,
 	.mknod		= ext2_mknod,
 	.rename		= ext2_rename,
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
+};
+
+struct inode_operations ext2_special_inode_operations = {
+	.setxattr	= ext2_setxattr,
+	.getxattr	= ext2_getxattr,
+	.listxattr	= ext2_listxattr,
+	.removexattr	= ext2_removexattr,
 };

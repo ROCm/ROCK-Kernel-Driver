@@ -946,6 +946,16 @@ config EXT2_FS
 	  be compiled as a module, and so this could be dangerous.  Most
 	  everyone wants to say Y here.
 
+config EXT2_FS_XATTR
+	bool "Ext2 extended attributes"
+	depends on EXT2_FS
+	---help---
+	  Extended attributes are name:value pairs associated with inodes by
+	  the kernel or by users (see the attr(5) manual page, or visit
+	  <http://acl.bestbits.at/> for details).
+
+	  If unsure, say N.
+
 config SYSV_FS
 	tristate "System V/Xenix/V7/Coherent file system support"
 	---help---
