@@ -22,6 +22,10 @@ config SWAP
 	bool
 	default y
 
+config STACK_GROWSUP
+	bool
+	default y
+
 config UID16
 	bool
 
