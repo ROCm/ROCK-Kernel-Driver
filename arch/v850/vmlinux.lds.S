@@ -20,6 +20,10 @@
 # endif
 #endif
 
+#ifdef CONFIG_V850E_AS85EP1
+# include "as85ep1.ld"
+#endif
+
 #ifdef CONFIG_RTE_CB_MA1
 # ifdef CONFIG_ROM_KERNEL
 #  include "rte_ma1_cb-rom.ld"

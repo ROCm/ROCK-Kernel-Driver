@@ -109,10 +109,12 @@ static loff_t leds_dev_lseek (struct file *file, loff_t offs, int whence)
 	else if (whence == 2)
 		offs += LED_NUM_DIGITS; /* end-relative */
 
-	if (offs >= 0 && offs <= LED_NUM_DIGITS)
-		file->f_pos = offs;
-	else
+	if (offs < 0 || offs > LED_NUM_DIGITS)
 		return -EINVAL;
+
+	file->f_pos = offs;
+
+	return 0;
 }
 
 static struct file_operations leds_fops = {

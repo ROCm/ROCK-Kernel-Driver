@@ -78,6 +78,9 @@ void __init setup_arch (char **cmdline)
 	/* ... and tell the kernel about it.  */
 	init_mem_alloc (ram_start, ram_len);
 
+	printk (KERN_INFO "CPU: %s\nPlatform: %s\n",
+		CPU_MODEL_LONG, PLATFORM_LONG);
+
 	/* do machine-specific setups.  */
 	mach_setup (cmdline);
 
@@ -266,6 +269,16 @@ init_mem_alloc (unsigned long ram_start, unsigned long ram_len)
 	   initial gap from PAGE_OFFSET to ram_start.  */
 	zones_size[ZONE_DMA]
 		= ADDR_TO_PAGE (ram_len + (ram_start - PAGE_OFFSET));
+
+	/* The allocator is very picky about the address of the first
+	   allocatable page -- it must be at least as aligned as the
+	   maximum allocation -- so try to detect cases where it will get
+	   confused and signal them at compile time (this is a common
+	   problem when porting to a new platform with ).  There is a
+	   similar runtime check in free_area_init_core.  */
+#if ((PAGE_OFFSET >> PAGE_SHIFT) & ((1UL << (MAX_ORDER - 1)) - 1))
+#error MAX_ORDER is too large for given PAGE_OFFSET (use CONFIG_FORCE_MAX_ZONEORDER to change it)
+#endif
 
 	free_area_init_node (0, NODE_DATA(0), 0, zones_size,
 			     ADDR_TO_PAGE (PAGE_OFFSET), 0);

@@ -137,10 +137,10 @@
 #include <linux/signal.h>
 #include <linux/errno.h>
 #include <linux/proc_fs.h>
-#include <linux/stat.h>
 #include <linux/ioport.h>
 #include <linux/blk.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/bitops.h>

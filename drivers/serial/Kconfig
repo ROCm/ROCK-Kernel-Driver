@@ -365,7 +365,7 @@ config SERIAL_SUNSAB
 
 config V850E_NB85E_UART
 	bool "NEC V850E on-chip UART support"
-	depends on V850E_NB85E || V850E2_ANNA
+	depends on V850E_NB85E || V850E2_ANNA || V850E_AS85EP1
 	default y
 
 config V850E_NB85E_UART_CONSOLE

@@ -24,7 +24,7 @@ static int cpuinfo_print (struct seq_file *m, void *v)
 #else
 	seq_printf (m, "CPU-Model:	%s\n", CPU_MODEL);
 #endif
- 
+
 #ifdef CPU_CLOCK_FREQ
 	seq_printf (m, "CPU-Clock:	%ld (%ld MHz)\n",
 		    (long)CPU_CLOCK_FREQ,

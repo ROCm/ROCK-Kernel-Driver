@@ -22,6 +22,9 @@ CFLAGS += -ffixed-r16 -mno-prolog-function
 CFLAGS += -fno-builtin
 CFLAGS += -D__linux__ -DUTS_SYSNAME=\"uClinux\"
 
+LDFLAGS_BLOB := -b binary --oformat elf32-little
+OBJCOPY_FLAGS_BLOB := -I binary -O elf32-little -B v850e
+
 
 HEAD := $(arch_dir)/kernel/head.o $(arch_dir)/kernel/init_task.o
 core-y += $(arch_dir)/kernel/
@@ -40,10 +43,8 @@ core-y += root_fs_image.o
 # This results in it being built anew each time, but that's alright.
 root_fs_image.o: root_fs_image_force
 
-# Note that we use the build-system's objcopy, as the v850 tools are fairly
-# old, and don't have the --rename-section option.
 root_fs_image_force: $(ROOT_FS_IMAGE)
-	objcopy -I binary -O elf32-little -B i386 --rename-section .data=.root,alloc,load,readonly,data,contents $< root_fs_image.o
+	$(OBJCOPY) $(OBJCOPY_FLAGS_BLOB) --rename-section .data=.root,alloc,load,readonly,data,contents $< root_fs_image.o
 endif
 
 

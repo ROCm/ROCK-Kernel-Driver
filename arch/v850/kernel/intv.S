@@ -52,10 +52,10 @@
 	JUMP_TO_HANDLER (trap, ENTRY_SP)	// TRAP1n
 
 	.balign	0x10
-	JUMP_TO_HANDLER (illegal_instruction, ENTRY_SP) // illegal insn trap
+	JUMP_TO_HANDLER (irq, ENTRY_SP)		// illegal insn trap
 
 	.balign	0x10
-	JUMP_TO_HANDLER (dbtrap, ENTRY_SP)	// DBTRAP insn
+	JUMP_TO_HANDLER (irq, ENTRY_SP)		// DBTRAP insn
 
 
 	/* Hardware interrupt vectors.  */

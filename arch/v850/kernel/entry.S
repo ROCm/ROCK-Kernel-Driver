@@ -657,6 +657,12 @@ G_ENTRY(irq):
 	shl	16, r6			// clear upper 16 bits
 	shr	20, r6			// shift back, and remove lower nibble
 	add	-8, r6			// remove bias for irqs
+
+	// If the IRQ index is negative, it's actually one of the exception
+	// traps below 0x80 (currently, the illegal instruction trap, and
+	// the `debug trap').  Handle these separately.
+	bn	exception
+
 	// Call the high-level interrupt handling code.
 	jarl	CSYM(handle_irq), lp
 	// fall through
@@ -665,6 +671,23 @@ G_ENTRY(irq):
    handlers, below).  */
 ret_from_irq:
 	RETURN(IRQ)
+
+exception:
+	mov	hilo(ret_from_irq), lp	// where the handler should return
+	
+	cmp	-2, r6
+	bne	1f
+	// illegal instruction exception
+	addi	SIGILL, r0, r6		// Arg 0: signal number
+	mov	CURRENT_TASK, r7	// Arg 1: task
+	jr	CSYM(force_sig)		// tail call
+
+1:	cmp	-1, r6
+	bne	bad_trap_wrapper
+	// `dbtrap' exception
+	movea	PTO, sp, r6		// Arg 0: user regs
+	jr	CSYM(debug_trap)	// tail call
+
 END(irq)
 
 
@@ -692,44 +715,7 @@ G_ENTRY(nmi):
 	jarl	CSYM(handle_irq), lp
 
 	RETURN(NMI)
-END(nmi0)
-
-
-/*
- * Illegal instruction trap.
- *
- * The stack-pointer (r3) should have already been saved to the memory
- * location ENTRY_SP (the reason for this is that the interrupt vectors may be
- * beyond a 22-bit signed offset jump from the actual interrupt handler, and
- * this allows them to save the stack-pointer and use that register to do an
- * indirect jump).
- */
-G_ENTRY(illegal_instruction):
-	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers. 
-	ei
-	addi	SIGILL, r0, r6		// Arg 0: signal number
-	mov	CURRENT_TASK, r7	// Arg 1: task
-	mov	hilo(ret_from_irq), lp	// where the handler should return
-	jr	CSYM(force_sig)
-END(illegal_instruction)
-
-
-/*
- * `Debug' trap
- *
- * The stack-pointer (r3) should have already been saved to the memory
- * location ENTRY_SP (the reason for this is that the interrupt vectors may be
- * beyond a 22-bit signed offset jump from the actual interrupt handler, and
- * this allows them to save the stack-pointer and use that register to do an
- * indirect jump).
- */
-G_ENTRY(dbtrap):
-	SAVE_STATE (IRQ, r0, ENTRY_SP)	// Save registers. 
-	ei
-	movea	PTO, sp, r6		// Arg 0: user regs
-	mov	hilo(ret_from_irq), lp	// where the handler should return
-	jr	CSYM(debug_trap)
-END(dbtrap)
+END(nmi)
 
 
 /*
@@ -771,8 +757,7 @@ C_END(switch_thread)
 	.data
 
 	.align 4
-	.globl CSYM(trap_table)
-CSYM(trap_table):
+C_DATA(trap_table):
 	.long bad_trap_wrapper		// trap 0, doesn't use trap table. 
 	.long syscall_long		// trap 1, `long' syscall. 
 	.long bad_trap_wrapper
@@ -789,13 +774,13 @@ CSYM(trap_table):
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
 	.long bad_trap_wrapper
+C_END(trap_table)
 
 
 	.section .rodata
 	
 	.align 4
-	.globl CSYM(sys_call_table)
-CSYM(sys_call_table):
+C_DATA(sys_call_table):
 	.long CSYM(sys_ni_syscall)	// 0  -  old "setup()" system call
 	.long CSYM(sys_exit)
 	.long sys_fork_wrapper
@@ -923,10 +908,10 @@ CSYM(sys_call_table):
 	.long CSYM(sys_adjtimex)
 	.long CSYM(sys_ni_syscall)	// 125 - sys_mprotect
 	.long CSYM(sys_sigprocmask)
-	.long CSYM(sys_create_module)
+	.long CSYM(sys_ni_syscall)	// sys_create_module
 	.long CSYM(sys_init_module)
 	.long CSYM(sys_delete_module)
-	.long CSYM(sys_get_kernel_syms) // 130
+	.long CSYM(sys_ni_syscall)	// 130 - sys_get_kernel_syms
 	.long CSYM(sys_quotactl)
 	.long CSYM(sys_getpgid)
 	.long CSYM(sys_fchdir)
@@ -963,7 +948,7 @@ CSYM(sys_call_table):
 	.long CSYM(sys_setresuid)
 	.long CSYM(sys_getresuid)	// 165
 	.long CSYM(sys_ni_syscall)	// for vm86
-	.long CSYM(sys_query_module)
+	.long CSYM(sys_ni_syscall)	// sys_query_module
 	.long CSYM(sys_poll)
 	.long CSYM(sys_nfsservctl)
 	.long CSYM(sys_setresgid)	// 170
@@ -1003,3 +988,4 @@ CSYM(sys_call_table):
 	.long CSYM(sys_ni_syscall)	// sys_madvise
 
 	.space (NR_syscalls-205)*4
+C_END(sys_call_table)

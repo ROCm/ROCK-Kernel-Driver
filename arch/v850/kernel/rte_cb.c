@@ -60,25 +60,11 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-	printk (KERN_INFO
-		"CPU: %s\n"
-		"Platform: %s%s\n",
-		CPU_MODEL_LONG,
-		PLATFORM_LONG,
-#ifdef CONFIG_ROM_KERNEL
-		""
-#elif defined (CONFIG_RTE_CB_MULTI)
-		" (with Multi ROM monitor)"
-#else
-		" (with ROM monitor)"
-#endif		
-		);
-
 	/* Probe for Mother-A, and print a message if we find it.  */
-	*(volatile long *)MB_A_SRAM_ADDR = 0xDEADBEEF;
-	if (*(volatile long *)MB_A_SRAM_ADDR == 0xDEADBEEF) {
-		*(volatile long *)MB_A_SRAM_ADDR = 0x12345678;
-		if (*(volatile long *)MB_A_SRAM_ADDR == 0x12345678)
+	*(volatile unsigned long *)MB_A_SRAM_ADDR = 0xDEADBEEF;
+	if (*(volatile unsigned long *)MB_A_SRAM_ADDR == 0xDEADBEEF) {
+		*(volatile unsigned long *)MB_A_SRAM_ADDR = 0x12345678;
+		if (*(volatile unsigned long *)MB_A_SRAM_ADDR == 0x12345678)
 			printk (KERN_INFO
 				"          NEC SolutionGear/Midas lab"
 				" RTE-MOTHER-A motherboard\n");

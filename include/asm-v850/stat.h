@@ -46,13 +46,13 @@ struct stat64 {
 	unsigned long	__unused4; /* future possible st_blocks high bits */
 
 	unsigned long	st_atime;
-	unsigned long	__unused5;
+	unsigned long	st_atime_nsec;
 
 	unsigned long	st_mtime;
-	unsigned long	__unused6;
+	unsigned long	st_mtime_nsec;
 
 	unsigned long	st_ctime;
-	unsigned long	__unused7; /* high 32 bits of ctime someday */
+	unsigned long	st_ctime_nsec;
 
 	unsigned long	__unused8;
 };

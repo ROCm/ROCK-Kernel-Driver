@@ -33,7 +33,7 @@ void __init nb85e_intc_init_irq_types (struct nb85e_intc_irq_init *inits,
 {
 	struct nb85e_intc_irq_init *init;
 	for (init = inits; init->name; init++) {
-		int i;
+		unsigned i;
 		struct hw_interrupt_type *hwit = hw_irq_types++;
 
 		hwit->typename = init->name;

@@ -9,7 +9,6 @@
  *
  *  Filler routines for DMA buffers
  */
-#define __ASSEMBLY__
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 #include <asm/hardware.h>

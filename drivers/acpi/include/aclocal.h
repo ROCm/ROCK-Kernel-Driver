@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 179 $
+ *       $Revision: 181 $
  *
  *****************************************************************************/
 
@@ -301,7 +301,6 @@ typedef struct
 
 typedef struct
 {
-	u8                      address_space_id;
 	acpi_generic_address    *block_address;
 	u16                     register_count;
 	u8                      block_base_number;
@@ -330,7 +329,7 @@ typedef struct
 
 typedef struct
 {
-	acpi_handle             method_handle;  /* Method handle for direct (fast) execution */
+	acpi_namespace_node     *method_node;   /* Method node for this GPE level */
 	acpi_gpe_handler        handler;        /* Address of handler, if any */
 	void                    *context;       /* Context to be passed to handler */
 	u8                      type;           /* Level or Edge */

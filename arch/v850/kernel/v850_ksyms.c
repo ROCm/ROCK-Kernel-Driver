@@ -27,6 +27,9 @@ EXPORT_SYMBOL (trap_table);
 extern void dump_thread (struct pt_regs *, struct user *);
 EXPORT_SYMBOL (dump_thread);
 EXPORT_SYMBOL (kernel_thread);
+EXPORT_SYMBOL (enable_irq);
+EXPORT_SYMBOL (disable_irq);
+EXPORT_SYMBOL (disable_irq_nosync);
 EXPORT_SYMBOL (__bug);
 
 /* Networking helper routines. */
@@ -46,7 +49,6 @@ EXPORT_SYMBOL_NOVERS (strchr);
 EXPORT_SYMBOL_NOVERS (strlen);
 EXPORT_SYMBOL_NOVERS (strnlen);
 EXPORT_SYMBOL_NOVERS (strpbrk);
-EXPORT_SYMBOL_NOVERS (strtok);
 EXPORT_SYMBOL_NOVERS (strrchr);
 EXPORT_SYMBOL_NOVERS (strstr);
 EXPORT_SYMBOL_NOVERS (memset);

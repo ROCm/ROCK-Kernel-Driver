@@ -24,9 +24,12 @@
 #include <asm/teg.h>
 #endif
 
-/* Anna is both a chip _and_ a platform, so put it in the middle... */
+/* These are both chips _and_ platforms, so put them in the middle... */
 #ifdef CONFIG_V850E2_ANNA
 #include <asm/anna.h>
+#endif
+#ifdef CONFIG_V850E_AS85EP1
+#include <asm/as85ep1.h>
 #endif
 
 /* platforms */

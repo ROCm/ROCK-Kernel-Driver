@@ -16,10 +16,17 @@
    .globl name;								      \
    .type  name,@function;						      \
    name
+#define G_DATA(name)							      \
+   .globl name;								      \
+   .type  name,@object;							      \
+   name
 #define END(name)							      \
    .size  name,.-name
 
 #define L_ENTRY(name)							      \
    .align 4;								      \
    .type  name,@function;						      \
+   name
+#define L_DATA(name)							      \
+   .type  name,@object;							      \
    name

@@ -25,10 +25,10 @@
 
 /* Initial UART state.  This may be overridden by machine-dependent headers. */
 #ifndef NB85E_UART_INIT_BAUD
-#define NB85E_UART_INIT_BAUD	38400
+#define NB85E_UART_INIT_BAUD	115200
 #endif
 #ifndef NB85E_UART_INIT_CFLAGS
-#define NB85E_UART_INIT_CFLAGS	(B38400 | CS8 | CREAD)
+#define NB85E_UART_INIT_CFLAGS	(B115200 | CS8 | CREAD)
 #endif
 
 /* A string used for prefixing printed descriptions; since the same UART
@@ -304,7 +304,7 @@ void nb85e_uart_tx (struct uart_port *port)
 		port->icount.tx++;
 
 		if (uart_circ_chars_pending (xmit) < WAKEUP_CHARS)
-			uart_event (port, EVT_WRITE_WAKEUP);
+			uart_write_wakeup (port);
 	}
 
  no_xmit:

@@ -20,6 +20,7 @@
 #include <linux/sched.h>
 #include <linux/vmalloc.h>
 #include <linux/smp.h>
+#include <linux/errno.h>
  
 #include "cpu_buffer.h"
 #include "oprof.h"

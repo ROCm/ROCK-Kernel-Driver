@@ -79,8 +79,6 @@ void __init mach_early_init (void)
 
 void __init mach_setup (char **cmdline)
 {
-	printk (KERN_INFO "CPU: NEC V850E2 (sim85e2c simulator)\n");
-
 	memcons_setup ();
 }
 

@@ -239,11 +239,18 @@
 #define SYSCALL_SHORT_CLOBBERS	SYSCALL_CLOBBERS, "r13", "r14"
 
 
+/* User programs sometimes end up including this header file
+   (indirectly, via uClibc header files), so I'm a bit nervous just
+   including <linux/compiler.h>.  */
+#if !defined(__builtin_expect) && __GNUC__ == 2 && __GNUC_MINOR__ < 96
+#define __builtin_expect(x, expected_value) (x)
+#endif
+
 #define __syscall_return(type, res)					      \
   do {									      \
 	  /* user-visible error numbers are in the range -1 - -124:	      \
 	     see <asm-v850/errno.h> */					      \
-	  if ((unsigned long)(res) >= (unsigned long)(-125)) {		      \
+	  if (__builtin_expect ((unsigned long)(res) >= (unsigned long)(-125), 0)) { \
 		  errno = -(res);					      \
 		  res = -1;						      \
 	  }								      \
@@ -340,6 +347,30 @@ type name (atype a, btype b, ctype c, dtype d, etype e)			      \
   __syscall_return (type, __ret);					      \
 }
 
+#if __GNUC__ < 3
+/* In older versions of gcc, `asm' statements with more than 10
+   input/output arguments produce a fatal error.  To work around this
+   problem, we use two versions, one for gcc-3.x and one for earlier
+   versions of gcc (the `earlier gcc' version doesn't work with gcc-3.x
+   because gcc-3.x doesn't allow clobbers to also be input arguments).  */
+#define __SYSCALL6_TRAP(syscall, ret, a, b, c, d, e, f)			      \
+  __asm__ __volatile__ ("trap " SYSCALL_LONG_TRAP			      \
+			: "=r" (ret), "=r" (syscall)			      \
+			: "1" (syscall),				      \
+			"r" (a), "r" (b), "r" (c), "r" (d),		      \
+ 			"r" (e), "r" (f)				      \
+			: SYSCALL_CLOBBERS, SYSCALL_ARG4, SYSCALL_ARG5);
+#else /* __GNUC__ >= 3 */
+#define __SYSCALL6_TRAP(syscall, ret, a, b, c, d, e, f)			      \
+  __asm__ __volatile__ ("trap " SYSCALL_LONG_TRAP			      \
+			: "=r" (ret), "=r" (syscall),			      \
+ 			"=r" (e), "=r" (f)				      \
+			: "1" (syscall),				      \
+			"r" (a), "r" (b), "r" (c), "r" (d),		      \
+			"2" (e), "3" (f)				      \
+			: SYSCALL_CLOBBERS);
+#endif
+
 #define _syscall6(type, name, atype, a, btype, b, ctype, c, dtype, d, etype, e, ftype, f) \
 type name (atype a, btype b, ctype c, dtype d, etype e, ftype f)	      \
 {									      \
@@ -351,13 +382,7 @@ type name (atype a, btype b, ctype c, dtype d, etype e, ftype f)	      \
   register etype __f __asm__ (SYSCALL_ARG5) = f;			      \
   register unsigned long __syscall __asm__ (SYSCALL_NUM) = __NR_##name;	      \
   register unsigned long __ret __asm__ (SYSCALL_RET);			      \
-  __asm__ __volatile__ ("trap " SYSCALL_LONG_TRAP			      \
-			: "=r" (__ret), "=r" (__syscall), 		      \
- 			"=r" (__e), "=r" (__f)				      \
-			: "1" (__syscall),				      \
-			"r" (__a), "r" (__b), "r" (__c), "r" (__d),	      \
-			"2" (__e), "3" (__f)				      \
-			: SYSCALL_CLOBBERS);				      \
+  __SYSCALL6_TRAP(__syscall, __ret, __a, __b, __c, __d, __e, __f);	      \
   __syscall_return (type, __ret);					      \
 }
 		
@@ -398,8 +423,8 @@ extern inline pid_t wait(int * wait_stat)
 /*
  * "Conditional" syscalls
  */
-#define cond_syscall(name)						\
-  asm (".weak\t" C_SYMBOL_STRING(name) ";"				\
+#define cond_syscall(name)						      \
+  asm (".weak\t" C_SYMBOL_STRING(name) ";"				      \
        ".set\t" C_SYMBOL_STRING(name) "," C_SYMBOL_STRING(sys_ni_syscall));
 #if 0
 /* This doesn't work if there's a function prototype for NAME visible,

@@ -98,10 +98,15 @@ SECTIONS {
 			*(.initcall7.init)
 		. = ALIGN (4) ;
 		___initcall_end = . ;
+
+		. = ALIGN (4) ;
+		___initramfs_start = . ;
+			*(.init.ramfs)
+		___initramfs_end = . ;
 	} > SDRAM
 
-	/* This provides address at which the interrupt vectors are
-	   initially loaded by the loader.  */
+	/* The address at which the interrupt vectors are initially
+	   loaded by the loader.  */
 	__intv_load_start = ALIGN (0x10) ;
 
 	/* Interrupt vector space.  Because we're using the monitor

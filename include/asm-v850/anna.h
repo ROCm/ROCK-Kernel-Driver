@@ -127,6 +127,22 @@ extern void anna_uart_pre_configure (unsigned chan,
 				     unsigned cflags, unsigned baud);
 #endif
 
+/* This board supports RTS/CTS for the on-chip UART, but only for channel 1. */
+
+/* CTS for UART channel 1 is pin P37 (bit 7 of port 3).  */
+#define NB85E_UART_CTS(chan)	((chan) == 1 ? !(ANNA_PORT_IO(3) & 0x80) : 1)
+/* RTS for UART channel 1 is pin P07 (bit 7 of port 0).  */
+#define NB85E_UART_SET_RTS(chan, val)					      \
+   do {									      \
+	   if (chan == 1) {						      \
+		   unsigned old = ANNA_PORT_IO(0); 			      \
+		   if (val)						      \
+			   ANNA_PORT_IO(0) = old & ~0x80;		      \
+		   else							      \
+			   ANNA_PORT_IO(0) = old | 0x80;		      \
+	   }								      \
+   } while (0)
+
 
 /* Timer C details.  */
 #define NB85E_TIMER_C_BASE_ADDR		0xFFFFF600

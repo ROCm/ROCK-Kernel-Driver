@@ -246,6 +246,14 @@ acpi_os_write_pci_configuration (
 	acpi_integer            value,
 	u32                     width);
 
+/*
+ * Interim function needed for PCI IRQ routing
+ */
+void
+acpi_os_derive_pci_id(
+	acpi_handle	            rhandle,
+	acpi_handle             chandle,
+	acpi_pci_id	            **pci_id);
 
 /*
  * Miscellaneous

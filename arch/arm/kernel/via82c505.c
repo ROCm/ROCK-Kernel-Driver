@@ -20,7 +20,7 @@ static int
 via82c505_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 		      int size, u32 *value)
 {
-	outl(CONFIG_CMD(dev,where),0xCF8);
+	outl(CONFIG_CMD(bus,devfn,where),0xCF8);
 	switch (size) {
 	case 1:
 		*value=inb(0xCFC + (where&3));
@@ -36,7 +36,7 @@ via82c505_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 }
 
 static int
-via82c505_write_config(struct pci_bus *bus, unsigned int devfn, int where
+via82c505_write_config(struct pci_bus *bus, unsigned int devfn, int where,
 		       int size, u32 value)
 {
 	outl(CONFIG_CMD(bus,devfn,where),0xCF8);
@@ -61,8 +61,6 @@ static struct pci_ops via82c505_ops = {
 
 void __init via82c505_preinit(void *sysdata)
 {
-	struct pci_bus *bus;
-
 	printk(KERN_DEBUG "PCI: VIA 82c505\n");
 	if (!request_region(0xA8,2,"via config")) {
 		printk(KERN_WARNING"VIA 82c505: Unable to request region 0xA8\n");

@@ -13,7 +13,7 @@
 
 #define ELF_THUMB_OK(x) \
 	(( (elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 1) == 1) || \
-	 (!(elf_hwcap & HWCAP_THUMB) && ((x)->e_entry & 3) == 0))
+	 ((x)->e_entry & 3) == 0)
 
 #define ELF_26BIT_OK(x) \
 	(( (elf_hwcap & HWCAP_26BIT) && (x)->e_flags & EF_ARM_APCS26) || \

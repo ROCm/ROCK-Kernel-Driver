@@ -6,13 +6,14 @@
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/irq.h>
+#include <asm/signal.h>
 #include <asm/arch/assabet.h>
 
 #include "sa1100_generic.h"

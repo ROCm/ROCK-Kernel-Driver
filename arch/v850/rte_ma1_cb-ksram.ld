@@ -93,6 +93,11 @@ SECTIONS {
 			*(.initcall7.init)
 		. = ALIGN (4) ;
 		___initcall_end = . ;
+
+		. = ALIGN (4) ;
+		___initramfs_start = . ;
+			*(.init.ramfs)
+		___initramfs_end = . ;
 	} > SRAM
 
 	/* This provides address at which the interrupt vectors are

@@ -38,6 +38,4 @@
 #define __bus_to_virt__is_a_macro
 #define __bus_to_virt(x)	__phys_to_virt(x)
 
-#define isa_virt_to_bus		virt_to_bus
-
 #endif

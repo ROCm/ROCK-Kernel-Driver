@@ -1,5 +1,5 @@
 /*
- * arch/v850/kernel/anna.c -- Anna V850E2 evaluation chip/board
+ * arch/v850/kernel/as85ep1.c -- AS85EP1 V850E evaluation chip/board
  *
  *  Copyright (C) 2002  NEC Corporation
  *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
@@ -33,30 +33,56 @@
 #define RAM_END		(SDRAM_ADDR + SDRAM_SIZE)
 
 /* The bits of this port are connected to an 8-LED bar-graph.  */
-#define LEDS_PORT	0
+#define LEDS_PORT	4
 
 
-static void anna_led_tick (void);
+static void as85ep1_led_tick (void);
+
+extern char _intv_copy_src_start, _intv_copy_src_end;
+extern char _intv_copy_dst_start;
 
 
 void __init mach_early_init (void)
 {
-	ANNA_ILBEN  = 0;
-	ANNA_CSC(0) = 0x402F;
-	ANNA_CSC(1) = 0x4000;
-	ANNA_BPC    = 0;
-	ANNA_BSC    = 0xAAAA;
-	ANNA_BEC    = 0;
-	ANNA_BHC    = 0xFFFF;	/* icache all memory, dcache all */
-	ANNA_BCT(0) = 0xB088;
-	ANNA_BCT(1) = 0x0008;
-	ANNA_DWC(0) = 0x0027;
-	ANNA_DWC(1) = 0;
-	ANNA_BCC    = 0x0006;
-	ANNA_ASC    = 0;
-	ANNA_LBS    = 0x0089;
-	ANNA_SCR3   = 0x21A9;
-	ANNA_RFS3   = 0x8121;
+	const u32 *src;
+	register u32 *dst asm ("ep");
+
+	AS85EP1_CSC(0) = 0x0403;
+	AS85EP1_BCT(0) = 0xB8B8;
+	AS85EP1_DWC(0) = 0x0104;
+	AS85EP1_BCC    = 0x0012;
+	AS85EP1_ASC    = 0;
+	AS85EP1_LBS    = 0x00A9;
+	AS85EP1_RFS(1) = 0x8205;
+	AS85EP1_RFS(3) = 0x8205;
+	AS85EP1_SCR(1) = 0x20A9;
+	AS85EP1_SCR(3) = 0x20A9;
+
+	AS85EP1_PORT_PMC(6)  = 0xFF; /* A20-25, A0,A1 有効 */
+	AS85EP1_PORT_PMC(7)  = 0x0E; /* CS1,2,3       有効 */
+	AS85EP1_PORT_PMC(9)  = 0xFF; /* D16-23        有効 */
+	AS85EP1_PORT_PMC(10) = 0xFF; /* D24-31        有効 */
+
+	AS85EP1_IRAMM = 0x3;	/* 内蔵命令RAMは「write-mode」になります */
+
+	/* The early chip we have is buggy, so that writing the interrupt
+	   vectors into low RAM may screw up, so for non-ROM kernels, we
+	   only rely on the reset vector being downloaded, and copy the
+	   rest of the interrupt vectors into place here.  The specific bug
+	   is that writing address N, where (N & 0x10) == 0x10, will _also_
+	   write to address (N - 0x10).  We avoid this (effectively) by
+	   writing in 16-byte chunks backwards from the end.  */
+	src = (u32 *)(((u32)&_intv_copy_src_end - 1) & ~0xF);
+	dst = (u32 *)&_intv_copy_dst_start
+		+ (src - (u32 *)&_intv_copy_src_start);
+	do {
+		u32 t0 = src[0], t1 = src[1], t2 = src[2], t3 = src[3];
+		dst[0] = t0; dst[1] = t1; dst[2] = t2; dst[3] = t3;
+		dst -= 4;
+		src -= 4;
+	} while (src > (u32 *)&_intv_copy_src_start);
+
+	AS85EP1_IRAMM = 0x0;	/* 内蔵命令RAMは「read-mode」になります */
 
 	nb85e_intc_disable_irqs ();
 }
@@ -67,8 +93,11 @@ void __init mach_setup (char **cmdline)
 	nb85e_uart_cons_init (1);
 #endif
 
-	ANNA_PORT_PM (LEDS_PORT) = 0;	/* Make all LED pins output pins.  */
-	mach_tick = anna_led_tick;
+	AS85EP1_PORT_PMC (LEDS_PORT) = 0; /* Make the LEDs port an I/O port. */
+	AS85EP1_PORT_PM (LEDS_PORT) = 0; /* Make all the bits output pins.  */
+	mach_tick = as85ep1_led_tick;
+
+	ROOT_DEV = MKDEV (BLKMEM_MAJOR, 0);
 }
 
 void __init mach_get_physical_ram (unsigned long *ram_start,
@@ -80,16 +109,28 @@ void __init mach_get_physical_ram (unsigned long *ram_start,
 
 void __init mach_reserve_bootmem ()
 {
-	/* The space between SRAM and SDRAM is filled with duplicate
-	   images of SRAM.  Prevent the kernel from using them.  */
+	extern char _root_fs_image_start, _root_fs_image_end;
+	u32 root_fs_image_start = (u32)&_root_fs_image_start;
+	u32 root_fs_image_end = (u32)&_root_fs_image_end;
+
+	/* We can't use the space between SRAM and SDRAM, so prevent the
+	   kernel from trying.  */
 	reserve_bootmem (SRAM_ADDR + SRAM_SIZE,
 			 SDRAM_ADDR - (SRAM_ADDR + SRAM_SIZE));
+
+	/* Reserve the memory used by the root filesystem image if it's
+	   in RAM.  */
+	if (root_fs_image_end > root_fs_image_start
+	    && root_fs_image_start >= RAM_START
+	    && root_fs_image_start < RAM_END)
+		reserve_bootmem (root_fs_image_start,
+				 root_fs_image_end - root_fs_image_start);
 }
 
-void mach_gettimeofday (struct timespec *tv)
+void mach_gettimeofday (struct timeval *tv)
 {
 	tv->tv_sec = 0;
-	tv->tv_nsec = 0;
+	tv->tv_usec = 0;
 }
 
 void __init mach_sched_init (struct irqaction *timer_action)
@@ -102,11 +143,8 @@ void __init mach_sched_init (struct irqaction *timer_action)
 
 static struct nb85e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, 		NUM_MACH_IRQS,	1, 7 },
-	{ "PIN", IRQ_INTP(0),   IRQ_INTP_NUM,   1, 4 },
 	{ "CCC", IRQ_INTCCC(0),	IRQ_INTCCC_NUM, 1, 5 },
 	{ "CMD", IRQ_INTCMD(0), IRQ_INTCMD_NUM,	1, 5 },
-	{ "DMA", IRQ_INTDMA(0), IRQ_INTDMA_NUM,	1, 2 },
-	{ "DMXER", IRQ_INTDMXER,1,		1, 2 },
 	{ "SRE", IRQ_INTSRE(0), IRQ_INTSRE_NUM,	3, 3 },
 	{ "SR",	 IRQ_INTSR(0),	IRQ_INTSR_NUM, 	3, 4 },
 	{ "ST",  IRQ_INTST(0), 	IRQ_INTST_NUM, 	3, 5 },
@@ -135,7 +173,7 @@ void machine_halt (void)
 	disable_reset_guard ();
 #endif
 	local_irq_disable ();	/* Ignore all interrupts.  */
-	ANNA_PORT_IO(LEDS_PORT) = 0xAA;	/* Note that we halted.  */
+	AS85EP1_PORT_IO (LEDS_PORT) = 0xAA;	/* Note that we halted.  */
 	for (;;)
 		asm ("halt; nop; nop; nop; nop; nop");
 }
@@ -146,22 +184,26 @@ void machine_power_off (void)
 }
 
 /* Called before configuring an on-chip UART.  */
-void anna_uart_pre_configure (unsigned chan, unsigned cflags, unsigned baud)
+void as85ep1_uart_pre_configure (unsigned chan, unsigned cflags, unsigned baud)
 {
-	/* The Anna connects some general-purpose I/O pins on the CPU to
-	   the RTS/CTS lines of UART 1's serial connection.  I/O pins P07
-	   and P37 are RTS and CTS respectively.  */
+	/* Make the shared uart/port pins be uart pins.  */
+	AS85EP1_PORT_PMC(3) |= (0x5 << chan);
+
+	/* The AS85EP1 connects some general-purpose I/O pins on the CPU to
+	   the RTS/CTS lines of UART 1's serial connection.  I/O pins P53
+	   and P54 are RTS and CTS respectively.  */
 	if (chan == 1) {
-		ANNA_PORT_PM(0) &= ~0x80; /* P07 in output mode */
-		ANNA_PORT_PM(3) |=  0x80; /* P37 in input mode */
+		/* Put P53 & P54 in I/O port mode.  */
+		AS85EP1_PORT_PMC(5) &= ~0x18;
+		/* Make P53 an output, and P54 an input.  */
+		AS85EP1_PORT_PM(5) |=  0x10;
 	}
 }
 
 /* Minimum and maximum bounds for the moving upper LED boundary in the
-   clock tick display.  We can't use the last bit because it's used for
-   UART0's CTS output.  */
+   clock tick display.  */
 #define MIN_MAX_POS 0
-#define MAX_MAX_POS 6
+#define MAX_MAX_POS 7
 
 /* There are MAX_MAX_POS^2 - MIN_MAX_POS^2 cycles in the animation, so if
    we pick 6 and 0 as above, we get 49 cycles, which is when divided into
@@ -169,7 +211,7 @@ void anna_uart_pre_configure (unsigned chan, unsigned cflags, unsigned baud)
 #define TICKS_PER_FRAME \
 	(HZ / (MAX_MAX_POS * MAX_MAX_POS - MIN_MAX_POS * MIN_MAX_POS))
 
-static void anna_led_tick ()
+static void as85ep1_led_tick ()
 {
 	static unsigned counter = 0;
 	
@@ -188,9 +230,9 @@ static void anna_led_tick ()
 
 			if (pos + dir <= max_pos) {
 				/* Each bit of port 0 has a LED. */
-				clear_bit (pos, &ANNA_PORT_IO(LEDS_PORT));
+				set_bit (pos, &AS85EP1_PORT_IO(LEDS_PORT));
 				pos += dir;
-				set_bit (pos, &ANNA_PORT_IO(LEDS_PORT));
+				clear_bit (pos, &AS85EP1_PORT_IO(LEDS_PORT));
 			}
 		}
 
