@@ -440,7 +440,7 @@ repeat:
  * Timekeeping variables
  */
 unsigned long tick_usec = TICK_USEC; 		/* ACTHZ   period (usec) */
-unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
+unsigned long tick_nsec = TICK_NSEC;		/* USER_HZ period (nsec) */
 
 /* 
  * The current time 
@@ -470,7 +470,7 @@ long time_precision = 1;		/* clock precision (us)		*/
 long time_maxerror = NTP_PHASE_LIMIT;	/* maximum error (us)		*/
 long time_esterror = NTP_PHASE_LIMIT;	/* estimated error (us)		*/
 long time_phase;			/* phase offset (scaled us)	*/
-long time_freq = ((1000000 + HZ/2) % HZ - HZ/2) << SHIFT_USEC;
+long time_freq = (((NSEC_PER_SEC + HZ/2) % HZ - HZ/2) << SHIFT_USEC) / NSEC_PER_USEC;
 					/* frequency offset (scaled ppm)*/
 long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
@@ -634,12 +634,12 @@ static void update_wall_time_one_tick(void)
 	 * advance the tick more.
 	 */
 	time_phase += time_adj;
-	if (time_phase <= -FINEUSEC) {
+	if (time_phase <= -FINENSEC) {
 		long ltemp = -time_phase >> (SHIFT_SCALE - 10);
 		time_phase += ltemp << (SHIFT_SCALE - 10);
 		delta_nsec -= ltemp;
 	}
-	else if (time_phase >= FINEUSEC) {
+	else if (time_phase >= FINENSEC) {
 		long ltemp = time_phase >> (SHIFT_SCALE - 10);
 		time_phase -= ltemp << (SHIFT_SCALE - 10);
 		delta_nsec += ltemp;

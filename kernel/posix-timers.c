@@ -33,7 +33,7 @@
 		       result; })
 
 #endif
-#define CLOCK_REALTIME_RES TICK_NSEC(TICK_USEC)  // In nano seconds.
+#define CLOCK_REALTIME_RES TICK_NSEC  // In nano seconds.
 
 static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
 {
@@ -1192,6 +1192,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs || !rq_time) {
 			adjust_abs_time(&posix_clocks[which_clock], &t, abs,
 					&rq_time);
+			rq_time += (t.tv_sec || t.tv_nsec);
 		}
 
 		left = rq_time - get_jiffies_64();
@@ -1222,7 +1223,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		left *= TICK_NSEC(TICK_USEC);
+		left *= TICK_NSEC;
 		tsave->tv_sec = div_long_long_rem(left, 
 						  NSEC_PER_SEC, 
 						  &tsave->tv_nsec);

@@ -14,7 +14,11 @@
 
 typedef unsigned long cycles_t;
 
-#define CLOCK_TICK_RATE		100000000
+/*
+ * Something low processor frequency like 100Mhz but 
+ * yet multiple of HZ to avoid truncation in some formulas.
+ */
+#define CLOCK_TICK_RATE		(HZ * 100000UL)
 
 static inline cycles_t
 get_cycles (void)

@@ -127,7 +127,7 @@ int do_settimeofday(struct timespec *tv)
 	 * made, and then undo it!
 	 */
 	tv->tv_nsec -= timer->get_offset() * NSEC_PER_USEC;
-	tv->tv_nsec -= (jiffies - wall_jiffies) * TICK_NSEC(TICK_USEC);
+	tv->tv_nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
 	while (tv->tv_nsec < 0) {
 		tv->tv_nsec += NSEC_PER_SEC;
