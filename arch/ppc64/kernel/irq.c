@@ -568,6 +568,21 @@ int do_IRQ(struct pt_regs *regs)
 
 	irq_enter();
 
+#ifdef CONFIG_DEBUG_STACKOVERFLOW
+	/* Debugging check for stack overflow: is there less than 8KB free? */
+	{
+		long sp;
+
+		sp = (unsigned long)_get_SP() & (THREAD_SIZE-1);
+
+		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
+			printk("do_IRQ: stack overflow: %ld\n",
+				sp - sizeof(struct thread_info));
+			dump_stack();
+		}
+	}
+#endif
+
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
 	if (lpaca->xLpPaca.xIntDword.xFields.xIpiCnt) {
