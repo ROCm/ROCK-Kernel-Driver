@@ -1600,7 +1600,7 @@ static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
 		return -EFAULT;
 
 	if (uvd->debug >= 1)
-		info("%s: %d. bytes, noblock=%d.", __FUNCTION__, count, noblock);
+		info("%s: %Zd. bytes, noblock=%d.", __FUNCTION__, count, noblock);
 
 	down(&uvd->lock);	
 
@@ -1718,7 +1718,7 @@ static ssize_t usbvideo_v4l_read(struct file *file, char *buf,
 	/* Update last read position */
 	frame->seqRead_Index += count;
 	if (uvd->debug >= 1) {
-		err("%s: {copy} count used=%d, new seqRead_Index=%ld",
+		err("%s: {copy} count used=%Zd, new seqRead_Index=%ld",
 			__FUNCTION__, count, frame->seqRead_Index);
 	}
 
