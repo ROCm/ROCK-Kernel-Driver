@@ -171,7 +171,7 @@ static inline void __consistent_sync_page(struct page *page,
 		unsigned long offset, size_t size, int direction,
 		int in_int)
 {
-	size_t seg_size = min((size_t)PAGE_SIZE, size) - offset;
+	size_t seg_size = min((size_t)PAGE_SIZE - offset, size);
 	size_t cur_size = seg_size;
 	unsigned long flags, start, seg_offset = offset;
 	int nr_segs = PAGE_ALIGN(size + (PAGE_SIZE - offset))/PAGE_SIZE;
@@ -187,7 +187,7 @@ static inline void __consistent_sync_page(struct page *page,
 		/* Sync this buffer segment */
 		consistent_sync((void *)start, seg_size, direction);
 		if (in_int)
-			kunmap_atomic((void *)start, KM_PPC_SYNC_PAGE);
+			kunmap_atomic((void *)(start - seg_offset), KM_PPC_SYNC_PAGE);
 		else
 			kunmap(page + seg_nr);
 		seg_nr++;

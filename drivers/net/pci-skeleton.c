@@ -864,13 +864,6 @@ static void __devexit netdrv_remove_one (struct pci_dev *pdev)
 
 	pci_release_regions (pdev);
 
-#ifndef NETDRV_NDEBUG
-	/* poison memory before freeing */
-	memset (dev, 0xBC,
-		sizeof (struct net_device) +
-		sizeof (struct netdrv_private));
-#endif /* NETDRV_NDEBUG */
-
 	free_netdev (dev);
 
 	pci_set_drvdata (pdev, NULL);

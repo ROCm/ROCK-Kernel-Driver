@@ -105,3 +105,21 @@ long plpar_hcall(unsigned long opcode,
  * other than status.  Slightly more efficient.
  */
 long plpar_hcall_norets(unsigned long opcode, ...);
+
+/* 
+ * Special hcall interface for ibmveth support.
+ * Takes 8 input parms. Returns a rc and stores the
+ * R4 return value in *out1.
+ */
+long plpar_hcall_8arg_2ret(unsigned long opcode,
+			   unsigned long arg1,
+		  	   unsigned long arg2,
+			   unsigned long arg3,
+			   unsigned long arg4,
+			   unsigned long arg5,
+			   unsigned long arg6,
+			   unsigned long arg7,
+			   unsigned long arg8,
+			   unsigned long *out1);
+
+

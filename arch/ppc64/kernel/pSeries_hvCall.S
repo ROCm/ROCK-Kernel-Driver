@@ -77,14 +77,18 @@ _GLOBAL(plpar_hcall_norets)
 	 		     unsigned long arg5,		 R8 
 			     unsigned long arg6,		 R9 
 	 		     unsigned long arg7,		 R10 
-	 		     unsigned long arg8,		 R11
-	 		     unsigned long *out1);		 R12	
+	 		     unsigned long arg8,		 112(R1)
+	 		     unsigned long *out1);		 120(R1)
 
  */
 
 	.text
 _GLOBAL(plpar_hcall_8arg_2ret)
 	mfcr	r0
+
+	ld              r11, 112(r1) /* put arg8 and out1 in R11 and R12 */
+	ld              r12, 120(r1)
+
 	std	r0,-8(r1)
 	stdu	r1,-32(r1)
 

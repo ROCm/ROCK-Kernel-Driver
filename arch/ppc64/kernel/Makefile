@@ -29,7 +29,7 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
 			     eeh.o nvram.o rtasd.o ras.o \
 			     open_pic.o xics.o pSeries_htab.o rtas.o \
-			     chrp_setup.o i8259.o prom.o
+			     chrp_setup.o i8259.o prom.o vio.o
 
 obj-$(CONFIG_PROC_FS)		+= proc_ppc64.o
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o
