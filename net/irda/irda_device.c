@@ -388,6 +388,17 @@ void irda_device_setup(struct net_device *dev)
 }
 
 /*
+ * Funciton  alloc_irdadev 
+ * 	Allocates and sets up an IRDA device in a manner similar to
+ * 	alloc_etherdev.
+ */
+struct net_device *alloc_irdadev(int sizeof_priv)
+{
+	return alloc_netdev(sizeof_priv, "irda%d", irda_device_setup);
+}
+
+
+/*
  * Function irda_device_txqueue_empty (dev)
  *
  *    Check if there is still some frames in the transmit queue for this
