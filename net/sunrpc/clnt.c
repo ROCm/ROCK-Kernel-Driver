@@ -116,8 +116,6 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	memset(clnt, 0, sizeof(*clnt));
 	atomic_set(&clnt->cl_users, 0);
 
-	atomic_inc(&xprt->users);
-
 	clnt->cl_xprt     = xprt;
 	clnt->cl_procinfo = version->procs;
 	clnt->cl_maxproc  = version->nrprocs;
@@ -212,8 +210,7 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 	if (clnt->cl_pathname[0])
 		rpc_rmdir(clnt->cl_pathname);
 	if (clnt->cl_xprt) {
-		if (atomic_dec_and_test(&clnt->cl_xprt->users))
-			xprt_destroy(clnt->cl_xprt);
+		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
 	}
 	kfree(clnt);
