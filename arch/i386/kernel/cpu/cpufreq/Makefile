@@ -9,7 +9,7 @@ obj-$(CONFIG_X86_SPEEDSTEP_ICH)	+= speedstep-ich.o
 obj-$(CONFIG_X86_SPEEDSTEP_CENTRINO) += speedstep-centrino.o
 obj-$(CONFIG_X86_SPEEDSTEP_LIB) += speedstep-lib.o
 obj-$(CONFIG_X86_SPEEDSTEP_SMI) += speedstep-smi.o
-obj-$(CONFIG_X86_ACPI_CPUFREQ)	+= acpi.o
+obj-$(CONFIG_X86_ACPI_CPUFREQ)	+= acpi-cpufreq.o
 obj-$(CONFIG_X86_P4_CLOCKMOD)	+= p4-clockmod.o
 
 ifdef CONFIG_X86_ACPI_CPUFREQ
