@@ -349,6 +349,9 @@ repeat:
                         }
 		}
 
+		if (unlikely(slot == -2))
+			panic("hash_page: pte_insert failed\n");
+
 		pte_val(new_pte) |= (slot<<12) & _PAGE_GROUP_IX;
 
 		/* 
