@@ -76,6 +76,7 @@
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
+#include <asm/termbits.h>
 #include <linux/usb.h>
 #include <linux/serial_reg.h>
 #include <linux/serial.h>

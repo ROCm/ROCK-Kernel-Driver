@@ -366,7 +366,7 @@ static void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 	init_waitqueue_head(&vv->vbi_wq);
 }
 
-static void vbi_open(struct saa7146_dev *dev, struct file *file)
+static int vbi_open(struct saa7146_dev *dev, struct file *file)
 {
 	struct saa7146_fh *fh = (struct saa7146_fh *)file->private_data;
 	
@@ -374,6 +374,12 @@ static void vbi_open(struct saa7146_dev *dev, struct file *file)
 	int ret = 0;
 	
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
+
+	ret = saa7146_res_get(fh, RESOURCE_DMA3_BRS);
+	if (0 == ret) {
+		DEB_S(("cannot get vbi RESOURCE_DMA3_BRS resource\n"));
+		return -EBUSY;
+	}
 
 	/* adjust arbitrition control for video dma 3 */
 	arbtr_ctrl &= ~0x1f0000;
@@ -419,6 +425,7 @@ static void vbi_open(struct saa7146_dev *dev, struct file *file)
 
 	/* upload brs register */
 	saa7146_write(dev, MC2, (MASK_08|MASK_24));		
+	return 0;
 }
 
 static void vbi_close(struct saa7146_dev *dev, struct file *file)
@@ -430,6 +437,7 @@ static void vbi_close(struct saa7146_dev *dev, struct file *file)
 	if( fh == vv->vbi_streaming ) {
 		vbi_stop(fh, file);
 	}
+	saa7146_res_free(fh, RESOURCE_DMA3_BRS);
 }
 
 static void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)

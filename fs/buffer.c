@@ -189,9 +189,12 @@ void end_buffer_write_sync(struct buffer_head *bh, int uptodate)
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		buffer_io_error(bh);
-		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
-		       bdevname(bh->b_bdev, b));
+		if (printk_ratelimit()) {
+			buffer_io_error(bh);
+			printk(KERN_WARNING "lost page write due to "
+					"I/O error on %s\n",
+				       bdevname(bh->b_bdev, b));
+		}
 		set_buffer_write_io_error(bh);
 		clear_buffer_uptodate(bh);
 	}
@@ -572,9 +575,12 @@ void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		buffer_io_error(bh);
-		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
-		       bdevname(bh->b_bdev, b));
+		if (printk_ratelimit()) {
+			buffer_io_error(bh);
+			printk(KERN_WARNING "lost page write due to "
+					"I/O error on %s\n",
+			       bdevname(bh->b_bdev, b));
+		}
 		set_bit(AS_EIO, &page->mapping->flags);
 		clear_buffer_uptodate(bh);
 		SetPageError(page);

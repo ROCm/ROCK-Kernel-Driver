@@ -74,8 +74,11 @@
 
 /*
  * Baud rate (divisor)
+ * Actually, there are two of them, MCT website calls them "Philips solution"
+ * and "Intel solution". They are the regular MCT and "Sitecom" for us.
+ * This is pointless to document in the header, see the code for the bits.
  */
-#define MCT_U232_BAUD_RATE(b)		(115200/b)
+static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value);
 
 /*
  * Line Control Register (LCR)

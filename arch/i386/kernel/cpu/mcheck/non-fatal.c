@@ -1,5 +1,10 @@
 /*
  * Non Fatal Machine Check Exception Reporting
+ *
+ * (C) Copyright 2002 Dave Jones. <davej@codemonkey.org.uk>
+ *
+ * This file contains routines to check for non-fatal MCEs every 15s
+ *
  */
 
 #include <linux/init.h>
@@ -21,6 +26,7 @@
 
 static struct timer_list mce_timer;
 static int timerset;
+static int firstbank;
 
 #define MCE_RATE	15*HZ	/* timer rate is 15s */
 
@@ -30,7 +36,7 @@ static void mce_checkregs (void *info)
 	int i;
 
 	preempt_disable(); 
-	for (i=0; i<nr_mce_banks; i++) {
+	for (i=firstbank; i<nr_mce_banks; i++) {
 		rdmsr (MSR_IA32_MC0_STATUS+i*4, low, high);
 
 		if (high & (1<<31)) {
@@ -68,6 +74,23 @@ static void mce_timerfunc (unsigned long data)
 
 static int __init init_nonfatal_mce_checker(void)
 {
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	/* Check for MCE support */
+	if (!cpu_has(c, X86_FEATURE_MCE))
+		return -ENODEV;
+
+	/* Check for PPro style MCA */
+	if (!cpu_has(c, X86_FEATURE_MCA))
+		return -ENODEV;
+
+	/* Some Athlons misbehave when we frob bank 0 */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+		boot_cpu_data.x86 == 6)
+			firstbank = 1;
+	else
+			firstbank = 0;
+
 	if (timerset == 0) {
 		/* Set the timer to check for non-fatal
 		   errors every MCE_RATE seconds */

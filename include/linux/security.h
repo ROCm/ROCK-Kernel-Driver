@@ -46,6 +46,8 @@ extern void cap_capset_set (struct task_struct *target, kernel_cap_t *effective,
 extern int cap_bprm_set_security (struct linux_binprm *bprm);
 extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_bprm_secureexec(struct linux_binprm *bprm);
+extern int cap_inode_setxattr(struct dentry *dentry, char *name, void *value, size_t size, int flags);
+extern int cap_inode_removexattr(struct dentry *dentry, char *name);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_reparent_to_init (struct task_struct *p);
 extern int cap_syslog (int type);
@@ -2155,7 +2157,7 @@ static inline void security_inode_delete (struct inode *inode)
 static inline int security_inode_setxattr (struct dentry *dentry, char *name,
 					   void *value, size_t size, int flags)
 {
-	return 0;
+	return cap_inode_setxattr(dentry, name, value, size, flags);
 }
 
 static inline void security_inode_post_setxattr (struct dentry *dentry, char *name,
@@ -2174,7 +2176,7 @@ static inline int security_inode_listxattr (struct dentry *dentry)
 
 static inline int security_inode_removexattr (struct dentry *dentry, char *name)
 {
-	return 0;
+	return cap_inode_removexattr(dentry, name);
 }
 
 static inline int security_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)

@@ -175,9 +175,11 @@ void cache_register(struct cache_detail *cd)
 	if (cd->proc_ent) {
 		struct proc_dir_entry *p;
 		cd->proc_ent->owner = THIS_MODULE;
+		cd->channel_ent = cd->content_ent = NULL;
 		
  		p = create_proc_entry("flush", S_IFREG|S_IRUSR|S_IWUSR,
  				      cd->proc_ent);
+		cd->flush_ent =  p;
  		if (p) {
  			p->proc_fops = &cache_flush_operations;
  			p->owner = THIS_MODULE;
@@ -187,6 +189,7 @@ void cache_register(struct cache_detail *cd)
 		if (cd->cache_request || cd->cache_parse) {
 			p = create_proc_entry("channel", S_IFREG|S_IRUSR|S_IWUSR,
 					      cd->proc_ent);
+			cd->channel_ent = p;
 			if (p) {
 				p->proc_fops = &cache_file_operations;
 				p->owner = THIS_MODULE;
@@ -196,6 +199,7 @@ void cache_register(struct cache_detail *cd)
  		if (cd->cache_show) {
  			p = create_proc_entry("content", S_IFREG|S_IRUSR|S_IWUSR,
  					      cd->proc_ent);
+			cd->content_ent = p;
  			if (p) {
  				p->proc_fops = &content_file_operations;
  				p->owner = THIS_MODULE;
@@ -233,6 +237,13 @@ int cache_unregister(struct cache_detail *cd)
 	write_unlock(&cd->hash_lock);
 	spin_unlock(&cache_list_lock);
 	if (cd->proc_ent) {
+		if (cd->flush_ent)
+			remove_proc_entry("flush", cd->proc_ent);
+		if (cd->channel_ent)
+			remove_proc_entry("channel", cd->proc_ent);
+		if (cd->content_ent)
+			remove_proc_entry("content", cd->proc_ent);
+
 		cd->proc_ent = NULL;
 		remove_proc_entry(cd->name, proc_net_rpc);
 	}

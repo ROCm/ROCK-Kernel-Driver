@@ -7,6 +7,11 @@
 
 #include "av7110.h"
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+#include "input_fake.h"
+#endif
+
+
 #define UP_TIMEOUT (HZ/4)
 
 static int av7110_ir_debug = 0;
@@ -51,7 +56,7 @@ static void av7110_emit_keyup (unsigned long data)
 }
 
 
-static struct timer_list keyup_timer = { function: av7110_emit_keyup };
+static struct timer_list keyup_timer = { .function = av7110_emit_keyup };
 
 
 static void av7110_emit_key (u32 ircom)
@@ -84,8 +89,7 @@ static void av7110_emit_key (u32 ircom)
 			return;
 
 	if (!keycode) {
-		printk ("%s: unknown key 0x%02x!!\n",
-			__FUNCTION__, data);
+		printk ("%s: unknown key 0x%02x!!\n", __FUNCTION__, data);
 		return;
 	}
 
@@ -144,9 +148,8 @@ static int av7110_ir_write_proc (struct file *file, const char *buffer,
 		return -EINVAL;
 	
 	page = (char *)vmalloc(size);
-	if( NULL == page ) {
+	if (!page)
 		return -ENOMEM;
-	}
 	
 	if (copy_from_user(page, buffer, size)) {
 		vfree(page);

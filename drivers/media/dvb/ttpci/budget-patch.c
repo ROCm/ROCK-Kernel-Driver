@@ -32,6 +32,7 @@
 
 #include "budget.h"
 #include "av7110.h"
+#include "av7110_hw.h"
 
 #define budget_patch budget
 
@@ -46,7 +47,7 @@ static struct pci_device_id pci_tbl[] = {
         }
 };
 
-static int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
+static int budget_wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int count)
 {
         struct saa7146_dev *dev=budget->dev;
 
@@ -66,21 +67,21 @@ static int wdebi(struct budget_patch *budget, u32 config, int addr, u32 val, int
 }
 
 
-static int SOutCommand(struct budget_patch *budget, u16* buf, int length)
+static int budget_av7110_send_fw_cmd(struct budget_patch *budget, u16* buf, int length)
 {
         int i;
 
         DEB_EE(("budget: %p\n", budget));
 
         for (i = 2; i < length; i++)
-                wdebi(budget, DEBINOSWAP, COMMAND + 2*i, (u32) buf[i], 2);
+                budget_wdebi(budget, DEBINOSWAP, COMMAND + 2*i, (u32) buf[i], 2);
 
         if (length)
-                wdebi(budget, DEBINOSWAP, COMMAND + 2, (u32) buf[1], 2);
+                budget_wdebi(budget, DEBINOSWAP, COMMAND + 2, (u32) buf[1], 2);
         else
-                wdebi(budget, DEBINOSWAP, COMMAND + 2, 0, 2);
+                budget_wdebi(budget, DEBINOSWAP, COMMAND + 2, 0, 2);
 
-        wdebi(budget, DEBINOSWAP, COMMAND, (u32) buf[0], 2);
+        budget_wdebi(budget, DEBINOSWAP, COMMAND, (u32) buf[0], 2);
         return 0;
 }
 
@@ -90,7 +91,7 @@ static void av7110_set22k(struct budget_patch *budget, int state)
         u16 buf[2] = {( COMTYPE_AUDIODAC << 8) | (state ? ON22K : OFF22K), 0};
         
         DEB_EE(("budget: %p\n", budget));
-        SOutCommand(budget, buf, 2);
+        budget_av7110_send_fw_cmd(budget, buf, 2);
 }
 
 
@@ -116,7 +117,7 @@ static int av7110_send_diseqc_msg(struct budget_patch *budget, int len, u8 *msg,
         for (i=0; i<len; i++)
                 buf[i+4]=msg[i];
 
-        SOutCommand(budget, buf, 18);
+        budget_av7110_send_fw_cmd(budget, buf, 18);
         return 0;
 }
 

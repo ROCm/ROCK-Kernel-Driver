@@ -1101,7 +1101,7 @@ static int radeon_get_dfpinfo_BIOS(struct radeonfb_info *rinfo)
 	printk("radeonfb: detected DFP panel size from BIOS: %dx%d\n",
 		rinfo->panel_xres, rinfo->panel_yres);
 
-	for(i=0; i<20; i++) {
+	for(i=0; i<32; i++) {
 		tmp0 = rinfo->bios_seg + readw(tmp+64+i*2);
 		if (tmp0 == 0)
 			break;

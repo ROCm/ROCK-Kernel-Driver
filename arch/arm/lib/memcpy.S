@@ -16,14 +16,14 @@
 
 #define ENTER	\
 		mov	ip,sp	;\
-		stmfd	sp!,{r4-r9,fp,ip,lr,pc}	;\
+		stmfd	sp!,{r0,r4-r9,fp,ip,lr,pc}	;\
 		sub	fp,ip,#4
 
 #define EXIT	\
-		LOADREGS(ea, fp, {r4 - r9, fp, sp, pc})
+		LOADREGS(ea, fp, {r0, r4 - r9, fp, sp, pc})
 
 #define EXITEQ	\
-		LOADREGS(eqea, fp, {r4 - r9, fp, sp, pc})
+		LOADREGS(eqea, fp, {r0, r4 - r9, fp, sp, pc})
 
 /*
  * Prototype: void memcpy(void *to,const void *from,unsigned long n);

@@ -1181,11 +1181,8 @@ smb_open(struct dentry *dentry, int wish)
 		result = 0;
 		if (!smb_is_open(inode))
 			result = smb_proc_open(server, dentry, wish);
-		if (result) {
-			PARANOIA("%s/%s open failed, result=%d\n",
-				 DENTRY_PATH(dentry), result);
+		if (result)
 			goto out;
-		}
 		/*
 		 * A successful open means the path is still valid ...
 		 */

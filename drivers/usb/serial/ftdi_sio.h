@@ -145,6 +145,9 @@
 /* Note: OCT US101 is also rebadged as Dick Smith Electronics (NZ) XH6381 */
 #define OCT_US101_PID		0x0421	/* OCT US101 USB to RS-232 */
 
+/* an infrared receiver for user access control with IR tags */
+#define FTDI_PIEGROUP_PID	0xF208	/* Product Id */
+
 /*
  * Protego product ids
  */

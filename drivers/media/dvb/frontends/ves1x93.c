@@ -395,9 +395,6 @@ static int ves1x93_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 	else
 		ves1x93_writereg (i2c, 0x05, init_1x93_tab[0x05] & 0x7f);
 
-	ves1x93_writereg (i2c, 0x00, 0x00);
-	ves1x93_writereg (i2c, 0x00, 0x01);
-
 	/* ves1993 hates this, will lose lock */
 	if (demod_type != DEMOD_VES1993)
 		ves1x93_clr_bit (i2c);

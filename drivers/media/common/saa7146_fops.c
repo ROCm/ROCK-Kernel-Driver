@@ -2,6 +2,65 @@
 
 #define BOARD_CAN_DO_VBI(dev)   (dev->revision != 0 && dev->vv_data->vbi_minor != -1) 
 
+/****************************************************************************/
+/* resource management functions, shamelessly stolen from saa7134 driver */
+
+int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
+{
+	struct saa7146_dev *dev = fh->dev;
+	struct saa7146_vv *vv = dev->vv_data;
+
+	if (fh->resources & bit)
+		/* have it already allocated */
+		return 1;
+
+	/* is it free? */
+	DEB_D(("getting lock...\n"));
+	down(&dev->lock);
+	DEB_D(("got lock\n"));
+	if (vv->resources & bit) {
+		DEB_D(("locked! vv->resources:0x%02x, we want:0x%02x\n",vv->resources,bit));
+		/* no, someone else uses it */
+		up(&dev->lock);
+		return 0;
+	}
+	/* it's free, grab it */
+	fh->resources  |= bit;
+	vv->resources |= bit;
+	DEB_D(("res: get %d\n",bit));
+	up(&dev->lock);
+	return 1;
+}
+
+int saa7146_res_check(struct saa7146_fh *fh, unsigned int bit)
+{
+	return (fh->resources & bit);
+}
+
+int saa7146_res_locked(struct saa7146_dev *dev, unsigned int bit)
+{
+	struct saa7146_vv *vv = dev->vv_data;
+	return (vv->resources & bit);
+}
+
+void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits)
+{
+	struct saa7146_dev *dev = fh->dev;
+	struct saa7146_vv *vv = dev->vv_data;
+
+	if ((fh->resources & bits) != bits)
+		BUG();
+
+	DEB_D(("getting lock...\n"));
+	down(&dev->lock);
+	DEB_D(("got lock\n"));
+	fh->resources  &= ~bits;
+	vv->resources &= ~bits;
+	DEB_D(("res: put %d\n",bits));
+	up(&dev->lock);
+}
+
+
 /********************************************************************************/
 /* common dma functions */
 
@@ -216,29 +275,32 @@ static int fops_open(struct inode *inode, struct file *file)
 	}
 	memset(fh,0,sizeof(*fh));
 	
-	// FIXME: do we need to increase *our* usage count?
-
-	if( 0 == try_module_get(dev->ext->module)) {
-		result = -EINVAL;
-		goto out;
-	}
-
 	file->private_data = fh;
 	fh->dev = dev;
 	fh->type = type;
 
 	if( fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
 		DEB_S(("initializing vbi...\n"));
-		saa7146_vbi_uops.open(dev,file);
+		result = saa7146_vbi_uops.open(dev,file);
 	} else {
 		DEB_S(("initializing video...\n"));
-		saa7146_video_uops.open(dev,file);
+		result = saa7146_video_uops.open(dev,file);
+	}
+
+	if (0 != result) {
+		goto out;
+	}
+
+	if( 0 == try_module_get(dev->ext->module)) {
+		result = -EINVAL;
+		goto out;
 	}
 
 	result = 0;
 out:
 	if( fh != 0 && result != 0 ) {
 		kfree(fh);
+		file->private_data = NULL;
 	}
 	up(&saa7146_devices_lock);
         return result;

@@ -94,6 +94,8 @@ struct cache_detail {
 	/* fields for communication over channel */
 	struct list_head	queue;
 	struct proc_dir_entry	*proc_ent;
+	struct proc_dir_entry   *flush_ent, *channel_ent, *content_ent;
+
 	atomic_t		readers;		/* how many time is /chennel open */
 	time_t			last_close;		/* it no readers, when did last close */
 };
