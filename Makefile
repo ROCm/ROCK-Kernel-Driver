@@ -190,7 +190,7 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean \
-		    help tags TAGS sgmldocs psdocs pdfdocs htmldocs \
+		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
 RCS_FIND_IGNORE := \( -name SCCS -o -name BitKeeper -o -name .svn -o -name CVS \) -prune -o
@@ -693,7 +693,7 @@ MRPROPER_FILES += \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
-	tags TAGS kernel.spec \
+	tags TAGS cscope kernel.spec \
 	.tmp*
 
 # Directories removed with 'make mrproper'
@@ -751,6 +751,9 @@ define all-sources
 	       -name '*.[chS]' -print )
 endef
 
+quiet_cmd_cscope = MAKE   $@
+cmd_cscope = $(all-sources) | cscope -k -b -i -
+
 quiet_cmd_TAGS = MAKE   $@
 cmd_TAGS = $(all-sources) | etags -
 
@@ -762,6 +765,9 @@ define cmd_tags
 	CTAGSF=`ctags --version | grep -i exuberant >/dev/null && echo "-I __initdata,__exitdata,EXPORT_SYMBOL,EXPORT_SYMBOL_NOVERS"`; \
 	$(all-sources) | xargs ctags $$CTAGSF -a
 endef
+
+cscope: FORCE
+	$(call cmd,cscope)
 
 TAGS: FORCE
 	$(call cmd,TAGS)
