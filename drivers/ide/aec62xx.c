@@ -220,7 +220,7 @@ static byte pci_bus_clock_list_ultra (byte speed, struct chipset_bus_clock_list_
 
 static int aec6210_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	int err			= 0;
 	unsigned short d_conf	= 0x0000;
@@ -256,10 +256,10 @@ static int aec6210_tune_chipset (ide_drive_t *drive, byte speed)
 
 static int aec6260_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
-	byte ultra_pci		= hwif->channel ? 0x45 : 0x44;
+	byte ultra_pci		= hwif->unit ? 0x45 : 0x44;
 	int err			= 0;
 	byte drive_conf		= 0x00;
 	byte ultra_conf		= 0x00;
@@ -293,7 +293,7 @@ static int aec6260_tune_chipset (ide_drive_t *drive, byte speed)
 
 static int aec62xx_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	if (HWIF(drive)->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) {
+	if (drive->channel->pci_dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) {
 		return ((int) aec6210_tune_chipset(drive, speed));
 	} else {
 		return ((int) aec6260_tune_chipset(drive, speed));
@@ -304,7 +304,7 @@ static int aec62xx_tune_chipset (ide_drive_t *drive, byte speed)
 static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	byte unit		= (drive->select.b.unit & 0x01);
 	unsigned long dma_base	= hwif->dma_base;
 	byte speed		= -1;
@@ -349,7 +349,7 @@ static int config_aec6210_chipset_for_dma (ide_drive_t *drive, byte ultra)
 static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
 	struct hd_driveid *id	= drive->id;
-	ide_hwif_t *hwif	= HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	byte unit		= (drive->select.b.unit & 0x01);
 	unsigned long dma_base	= hwif->dma_base;
 	byte speed		= -1;
@@ -396,7 +396,7 @@ static int config_aec6260_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 {
-	switch(HWIF(drive)->pci_dev->device) {	
+	switch(drive->channel->pci_dev->device) {
 		case PCI_DEVICE_ID_ARTOP_ATP850UF:
 			return config_aec6210_chipset_for_dma(drive, ultra);
 		case PCI_DEVICE_ID_ARTOP_ATP860:
@@ -418,7 +418,7 @@ static void aec62xx_tune_drive (ide_drive_t *drive, byte pio)
 	else
 		speed = XFER_PIO_0 + min_t(byte, pio, 4);
 
-	switch(HWIF(drive)->pci_dev->device) {
+	switch(drive->channel->pci_dev->device) {
 		case PCI_DEVICE_ID_ARTOP_ATP850UF:
 			(void) aec6210_tune_chipset(drive, speed);
 		case PCI_DEVICE_ID_ARTOP_ATP860:
@@ -435,7 +435,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 	struct hd_driveid *id = drive->id;
 	ide_dma_action_t dma_func = ide_dma_on;
 
-	if (id && (id->capability & 1) && HWIF(drive)->autodma) {
+	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
 		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
 			dma_func = ide_dma_off;
@@ -476,7 +476,7 @@ fast_ata_pio:
 no_dma_set:
 		aec62xx_tune_drive(drive, 5);
 	}
-	return HWIF(drive)->dmaproc(dma_func, drive);
+	return drive->channel->dmaproc(dma_func, drive);
 }
 
 /*
@@ -489,16 +489,16 @@ int aec62xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			return config_drive_xfer_rate(drive);
 		case ide_dma_lostirq:
 		case ide_dma_timeout:
-			switch(HWIF(drive)->pci_dev->device) {
+			switch(drive->channel->pci_dev->device) {
 				case PCI_DEVICE_ID_ARTOP_ATP860:
 				case PCI_DEVICE_ID_ARTOP_ATP860R:
 //					{
 //						int i = 0;
 //						byte reg49h = 0;
-//						pci_read_config_byte(HWIF(drive)->pci_dev, 0x49, &reg49h);
+//						pci_read_config_byte(drive->channel->pci_dev, 0x49, &reg49h);
 //						for (i=0;i<256;i++)
-//							pci_write_config_byte(HWIF(drive)->pci_dev, 0x49, reg49h|0x10);
-//						pci_write_config_byte(HWIF(drive)->pci_dev, 0x49, reg49h & ~0x10);
+//							pci_write_config_byte(drive->channel->pci_dev, 0x49, reg49h|0x10);
+//						pci_write_config_byte(drive->channel->pci_dev, 0x49, reg49h & ~0x10);
 //					}
 //					return 0;
 				default:
@@ -530,16 +530,16 @@ unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 	return dev->irq;
 }
 
-unsigned int __init ata66_aec62xx (ide_hwif_t *hwif)
+unsigned int __init ata66_aec62xx(struct ata_channel *hwif)
 {
-	byte mask	= hwif->channel ? 0x02 : 0x01;
+	byte mask	= hwif->unit ? 0x02 : 0x01;
 	byte ata66	= 0;
 
 	pci_read_config_byte(hwif->pci_dev, 0x49, &ata66);
 	return ((ata66 & mask) ? 0 : 1);
 }
 
-void __init ide_init_aec62xx (ide_hwif_t *hwif)
+void __init ide_init_aec62xx(struct ata_channel *hwif)
 {
 #ifdef CONFIG_AEC62XX_TUNING
 	hwif->tuneproc = &aec62xx_tune_drive;
@@ -555,7 +555,7 @@ void __init ide_init_aec62xx (ide_hwif_t *hwif)
 #endif /* CONFIG_AEC62XX_TUNING */
 }
 
-void __init ide_dmacapable_aec62xx (ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_aec62xx(struct ata_channel *hwif, unsigned long dmabase)
 {
 #ifdef CONFIG_AEC62XX_TUNING
 	unsigned long flags;
@@ -565,7 +565,7 @@ void __init ide_dmacapable_aec62xx (ide_hwif_t *hwif, unsigned long dmabase)
 	__cli();		/* local CPU only */
 
 	pci_read_config_byte(hwif->pci_dev, 0x54, &reg54h);
-	pci_write_config_byte(hwif->pci_dev, 0x54, reg54h & ~(hwif->channel ? 0xF0 : 0x0F));
+	pci_write_config_byte(hwif->pci_dev, 0x54, reg54h & ~(hwif->unit ? 0xF0 : 0x0F));
 
 	__restore_flags(flags);	/* local CPU only */
 #endif /* CONFIG_AEC62XX_TUNING */

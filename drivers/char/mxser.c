@@ -32,6 +32,9 @@
  *      version         : 1.2 
  *      
  *    Fixes for C104H/PCI by Tim Hockin <thockin@sun.com>
+ *    Added support for: C102, CI-132, CI-134, CP-132, CP-114, CT-114 cards
+ *                        by Damian Wrobel <dwrobel@ertel.com.pl>
+ *
  */
 
 #include <linux/config.h>
@@ -61,7 +64,7 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-#define		MXSER_VERSION			"1.2"
+#define		MXSER_VERSION			"1.2.1"
 
 #define		MXSERMAJOR	 	174
 #define		MXSERCUMAJOR		175
@@ -114,10 +117,22 @@
 #ifndef PCI_DEVICE_ID_C104
 #define PCI_DEVICE_ID_C104	0x1040
 #endif
+#ifndef PCI_DEVICE_ID_CP132
+#define PCI_DEVICE_ID_CP132	0x1320
+#endif
+#ifndef PCI_DEVICE_ID_CP114
+#define PCI_DEVICE_ID_CP114	0x1141
+#endif
+#ifndef PCI_DEVICE_ID_CT114
+#define PCI_DEVICE_ID_CT114	0x1140
+#endif
 
 #define C168_ASIC_ID    1
 #define C104_ASIC_ID    2
+#define CI134_ASIC_ID   3
+#define CI132_ASIC_ID   4
 #define CI104J_ASIC_ID  5
+#define C102_ASIC_ID	0xB
 
 enum {
 	MXSER_BOARD_C168_ISA = 0,
@@ -125,6 +140,12 @@ enum {
 	MXSER_BOARD_CI104J,
 	MXSER_BOARD_C168_PCI,
 	MXSER_BOARD_C104_PCI,
+	MXSER_BOARD_C102_ISA,
+	MXSER_BOARD_CI132,
+	MXSER_BOARD_CI134,
+	MXSER_BOARD_CP132_PCI,
+	MXSER_BOARD_CP114_PCI,
+	MXSER_BOARD_CT114_PCI
 };
 
 static char *mxser_brdname[] =
@@ -134,6 +155,12 @@ static char *mxser_brdname[] =
 	"CI-104J series",
 	"C168H/PCI series",
 	"C104H/PCI series",
+	"C102 series",
+	"CI-132 series",
+	"CI-134 series",
+	"CP-132 series",
+	"CP-114 series",
+	"CT-114 series"
 };
 
 static int mxser_numports[] =
@@ -143,6 +170,12 @@ static int mxser_numports[] =
 	4,
 	8,
 	4,
+	2,
+	2,
+	4,
+	2,
+	4,
+	4
 };
 
 /*
@@ -163,6 +196,12 @@ static struct pci_device_id mxser_pcibrds[] = {
 	  MXSER_BOARD_C168_PCI },
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 	  MXSER_BOARD_C104_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP132, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+	  MXSER_BOARD_CP132_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP114, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+	  MXSER_BOARD_CP114_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CT114, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
+	  MXSER_BOARD_CT114_PCI },
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, mxser_pcibrds);
@@ -613,38 +652,35 @@ int mxser_init(void)
 		n = (sizeof(mxser_pcibrds) / sizeof(mxser_pcibrds[0])) - 1;
 		index = 0;
 		for (b = 0; b < n; b++) {
-			pdev = pci_find_device(mxser_pcibrds[b].vendor,
-					       mxser_pcibrds[b].device, pdev);
-			if (!pdev || pci_enable_device(pdev))
-				continue;
-			hwconf.pdev = pdev;
-			printk("Found MOXA %s board(BusNo=%d,DevNo=%d)\n",
-				mxser_brdname[mxser_pcibrds[b].driver_data],
+			while (pdev = pci_find_device(mxser_pcibrds[b].vendor, mxser_pcibrds[b].device, pdev)) 
+			{
+				if (pci_enable_device(pdev))
+					continue;
+				hwconf.pdev = pdev;
+				printk("Found MOXA %s board(BusNo=%d,DevNo=%d)\n",
+					mxser_brdname[mxser_pcibrds[b].driver_data],
 				pdev->bus->number, PCI_SLOT(pdev->devfn));
-			if (m >= MXSER_BOARDS) {
-				printk("Too many Smartio family boards found (maximum %d),board not configured\n", MXSER_BOARDS);
-			} else {
-				retval = mxser_get_PCI_conf(pdev,
-				   mxser_pcibrds[b].driver_data, &hwconf);
-				if (retval < 0) {
-					if (retval == MXSER_ERR_IRQ)
-						printk("Invalid interrupt number,board not configured\n");
-					else if (retval == MXSER_ERR_IRQ_CONFLIT)
-						printk("Invalid interrupt number,board not configured\n");
-					else if (retval == MXSER_ERR_VECTOR)
-						printk("Invalid interrupt vector,board not configured\n");
-					else if (retval == MXSER_ERR_IOADDR)
-						printk("Invalid I/O address,board not configured\n");
-					continue;
-
+				if (m >= MXSER_BOARDS) {
+					printk("Too many Smartio family boards found (maximum %d),board not configured\n", MXSER_BOARDS);
+				} else {
+					retval = mxser_get_PCI_conf(pdev, mxser_pcibrds[b].driver_data, &hwconf);
+					if (retval < 0) {
+						if (retval == MXSER_ERR_IRQ)
+							printk("Invalid interrupt number,board not configured\n");
+						else if (retval == MXSER_ERR_IRQ_CONFLIT)
+							printk("Invalid interrupt number,board not configured\n");	
+						else if (retval == MXSER_ERR_VECTOR)
+							printk("Invalid interrupt vector,board not configured\n");
+						else if (retval == MXSER_ERR_IOADDR)
+							printk("Invalid I/O address,board not configured\n");
+						continue;
+					}
+					if (mxser_initbrd(m, &hwconf) < 0)
+						continue;
+					mxser_getcfg(m, &hwconf);
+					m++;
 				}
-				if (mxser_initbrd(m, &hwconf) < 0)
-					continue;
-				mxser_getcfg(m, &hwconf);
-				m++;
-
 			}
-
 		}
 	}
 #endif
@@ -2306,6 +2342,12 @@ static int mxser_get_ISA_conf(int cap, struct mxser_hwconf *hwconf)
 		hwconf->board_type = MXSER_BOARD_C168_ISA;
 	else if (id == C104_ASIC_ID)
 		hwconf->board_type = MXSER_BOARD_C104_ISA;
+	else if (id == C102_ASIC_ID)
+		hwconf->board_type = MXSER_BOARD_C102_ISA;
+	else if (id == CI132_ASIC_ID)
+		hwconf->board_type = MXSER_BOARD_CI132;
+	else if (id == CI134_ASIC_ID)
+		hwconf->board_type = MXSER_BOARD_CI134;
 	else if (id == CI104J_ASIC_ID)
 		hwconf->board_type = MXSER_BOARD_CI104J;
 	else
@@ -2417,7 +2459,8 @@ static int mxser_program_mode(int port)
 	(void) inb(port);
 	restore_flags(flags);
 	id = inb(port + 1) & 0x1F;
-	if ((id != C168_ASIC_ID) && (id != C104_ASIC_ID) && (id != CI104J_ASIC_ID))
+	if ((id != C168_ASIC_ID) && (id != C104_ASIC_ID) && (id != CI104J_ASIC_ID) &&
+		(id != C102_ASIC_ID) &&	(id != CI132_ASIC_ID) && (id != CI134_ASIC_ID))
 		return (-1);
 	for (i = 0, j = 0; i < 4; i++) {
 		n = inb(port + 2);

@@ -47,7 +47,7 @@ if [ "$CONFIG_IP_NF_IPTABLES" != "n" ]; then
       define_bool CONFIG_IP_NF_NAT_NEEDED y
       dep_tristate '    MASQUERADE target support' CONFIG_IP_NF_TARGET_MASQUERADE $CONFIG_IP_NF_NAT
       dep_tristate '    REDIRECT target support' CONFIG_IP_NF_TARGET_REDIRECT $CONFIG_IP_NF_NAT
-      bool '    NAT of local connections' CONFIG_IP_NF_NAT_LOCAL
+      bool '    NAT of local connections (READ HELP)' CONFIG_IP_NF_NAT_LOCAL
       if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
         dep_tristate '    Basic SNMP-ALG support (EXPERIMENTAL)' CONFIG_IP_NF_NAT_SNMP_BASIC $CONFIG_IP_NF_NAT
       fi

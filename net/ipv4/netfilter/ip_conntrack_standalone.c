@@ -62,7 +62,13 @@ print_expect(char *buffer, const struct ip_conntrack_expect *expect)
 {
 	unsigned int len;
 
-	len = sprintf(buffer, "EXPECTING: proto=%u ",
+	if (expect->expectant->helper->timeout)
+		len = sprintf(buffer, "EXPECTING: %lu ",
+			      timer_pending(&expect->timeout)
+			      ? (expect->timeout.expires - jiffies)/HZ : 0);
+	else
+		len = sprintf(buffer, "EXPECTING: - ");
+	len += sprintf(buffer + len, "proto=%u ",
 		      expect->tuple.dst.protonum);
 	len += print_tuple(buffer + len, &expect->tuple,
 			   __find_proto(expect->tuple.dst.protonum));
@@ -314,7 +320,7 @@ void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 {
 	WRITE_LOCK(&ip_conntrack_lock);
 
-	/* find_proto() returns proto_generic in case there is no protocol 
+	/* ip_ct_find_proto() returns proto_generic in case there is no protocol 
 	 * helper. So this should be enough - HW */
 	LIST_DELETE(&protocol_list, proto);
 	WRITE_UNLOCK(&ip_conntrack_lock);
@@ -353,8 +359,12 @@ EXPORT_SYMBOL(ip_conntrack_helper_register);
 EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh);
+EXPORT_SYMBOL(ip_ct_find_proto);
+EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
+EXPORT_SYMBOL(ip_conntrack_change_expect);
 EXPORT_SYMBOL(ip_conntrack_unexpect_related);
 EXPORT_SYMBOL(ip_conntrack_tuple_taken);
 EXPORT_SYMBOL(ip_ct_gather_frags);
 EXPORT_SYMBOL(ip_conntrack_htable_size);
+EXPORT_SYMBOL(ip_conntrack_lock);

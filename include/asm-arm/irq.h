@@ -19,6 +19,8 @@
 #define NO_IRQ	((unsigned int)(-1))
 #endif
 
+struct irqaction;
+
 #define disable_irq_nosync(i) disable_irq(i)
 
 extern void disable_irq(unsigned int);
@@ -37,6 +39,8 @@ extern void enable_irq(unsigned int);
 #define IRQT_HIGH	(__IRQT_HIGHLVL)
 
 int set_irq_type(unsigned int irq, unsigned int type);
+
+int setup_irq(unsigned int, struct irqaction *);
 
 #endif
 

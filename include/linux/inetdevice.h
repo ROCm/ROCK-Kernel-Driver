@@ -18,6 +18,7 @@ struct ipv4_devconf
 	int	mc_forwarding;
 	int	tag;
 	int     arp_filter;
+	int	medium_id;
 	void	*sysctl;
 };
 
@@ -48,6 +49,7 @@ struct in_device
 #define IN_DEV_TX_REDIRECTS(in_dev)	(ipv4_devconf.send_redirects || (in_dev)->cnf.send_redirects)
 #define IN_DEV_SEC_REDIRECTS(in_dev)	(ipv4_devconf.secure_redirects || (in_dev)->cnf.secure_redirects)
 #define IN_DEV_IDTAG(in_dev)		((in_dev)->cnf.tag)
+#define IN_DEV_MEDIUM_ID(in_dev)	((in_dev)->cnf.medium_id)
 
 #define IN_DEV_RX_REDIRECTS(in_dev) \
 	((IN_DEV_FORWARD(in_dev) && \

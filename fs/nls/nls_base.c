@@ -470,12 +470,11 @@ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
 }
 
 static struct nls_table default_table = {
-	"default",
-	uni2char,
-	char2uni,
-	charset2lower,
-	charset2upper,
-	NULL,
+	charset:	"default",
+	uni2char:	uni2char,
+	char2uni:	char2uni,
+	charset2lower:	charset2lower,
+	charset2upper:	charset2upper,
 };
 
 /* Returns a simple default translation table */

@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -84,32 +84,26 @@ extern metapage_t *__get_metapage(struct inode *inode,
 	 __get_metapage(inode, lblock, size, absolute, TRUE)
 
 extern void release_metapage(metapage_t *);
-
-#define flush_metapage(mp) \
-{\
-	set_bit(META_dirty, &(mp)->flag);\
-	set_bit(META_sync, &(mp)->flag);\
-	release_metapage(mp);\
-}
-
-#define sync_metapage(mp) \
-	generic_buffer_fdatasync((struct inode *)mp->mapping->host,\
-				 mp->page->index, mp->page->index + 1)
-
-#define write_metapage(mp) \
-{\
-	set_bit(META_dirty, &(mp)->flag);\
-	release_metapage(mp);\
-}
-
-#define discard_metapage(mp) \
-{\
-	clear_bit(META_dirty, &(mp)->flag);\
-	set_bit(META_discard, &(mp)->flag);\
-	release_metapage(mp);\
-}
-
 extern void hold_metapage(metapage_t *, int);
+
+static inline void write_metapage(metapage_t *mp)
+{
+	set_bit(META_dirty, &mp->flag);
+	release_metapage(mp);
+}
+
+static inline void flush_metapage(metapage_t *mp)
+{
+	set_bit(META_sync, &mp->flag);
+	write_metapage(mp);
+}
+
+static inline void discard_metapage(metapage_t *mp)
+{
+	clear_bit(META_dirty, &mp->flag);
+	set_bit(META_discard, &mp->flag);
+	release_metapage(mp);
+}
 
 /*
  * This routine uses hash to explicitly find small number of pages

@@ -12,10 +12,12 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/highmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/io.h>
+#include <asm/tlbflush.h>
 
 /*
  * Known problems:

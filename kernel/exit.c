@@ -14,9 +14,7 @@
 #include <linux/personality.h>
 #include <linux/tty.h>
 #include <linux/namespace.h>
-#ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/acct.h>
-#endif
 #include <linux/file.h>
 #include <linux/binfmts.h>
 
@@ -471,12 +469,15 @@ static void exit_notify(void)
 			write_lock_irq(&tasklist_lock);
 		}
 	}
+
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
 	 * anyway. In the preemption case this also makes it
-	 * impossible for the task to get runnable again.
+	 * impossible for the task to get runnable again (thus
+	 * the "_raw_" unlock - to make sure we don't try to
+	 * preempt here).
 	 */
-	write_unlock(&tasklist_lock);
+	_raw_write_unlock(&tasklist_lock);
 }
 
 NORET_TYPE void do_exit(long code)
@@ -492,13 +493,15 @@ NORET_TYPE void do_exit(long code)
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
+	if (unlikely(preempt_get_count()))
+		printk(KERN_ERR "error: %s[%d] exited with preempt_count %d\n",
+				current->comm, current->pid,
+				preempt_get_count());
+
 fake_volatile:
-#ifdef CONFIG_BSD_PROCESS_ACCT
 	acct_process(code);
-#endif
 	__exit_mm(tsk);
 
-	lock_kernel();
 	sem_exit();
 	__exit_files(tsk);
 	__exit_fs(tsk);

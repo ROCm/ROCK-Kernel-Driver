@@ -29,7 +29,6 @@
 #define cpu_do_idle			__cpu_fn(CPU_NAME,_do_idle)
 #define cpu_cache_clean_invalidate_all	__cpu_fn(CPU_NAME,_cache_clean_invalidate_all)
 #define cpu_cache_clean_invalidate_range __cpu_fn(CPU_NAME,_cache_clean_invalidate_range)
-#define cpu_flush_ram_page		__cpu_fn(CPU_NAME,_flush_ram_page)
 #define cpu_dcache_invalidate_range	__cpu_fn(CPU_NAME,_dcache_invalidate_range)
 #define cpu_dcache_clean_range		__cpu_fn(CPU_NAME,_dcache_clean_range)
 #define cpu_dcache_clean_page		__cpu_fn(CPU_NAME,_dcache_clean_page)
@@ -57,7 +56,6 @@ extern int cpu_do_idle(int mode);
 
 extern void cpu_cache_clean_invalidate_all(void);
 extern void cpu_cache_clean_invalidate_range(unsigned long address, unsigned long end, int flags);
-extern void cpu_flush_ram_page(void *virt_page);
 
 extern void cpu_dcache_invalidate_range(unsigned long start, unsigned long end);
 extern void cpu_dcache_clean_range(unsigned long start, unsigned long end);

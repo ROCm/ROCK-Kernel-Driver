@@ -10,16 +10,9 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/err.h>
+#include "base.h"
 
-#undef DEBUG
-
-#ifdef DEBUG
-# define DBG(x...) printk(x)
-#else
-# define DBG(x...)
-#endif
-
-static struct device device_root = {
+struct device device_root = {
 	bus_id:		"root",
 	name:		"System root",
 };
@@ -27,10 +20,7 @@ static struct device device_root = {
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
-extern int device_make_dir(struct device * dev);
-extern void device_remove_dir(struct device * dev);
-
-static spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
 
 /**
  * device_register - register a device
@@ -39,10 +29,14 @@ static spinlock_t device_lock = SPIN_LOCK_UNLOCKED;
  * First, make sure that the device has a parent, create
  * a directory for it, then add it to the parent's list of
  * children.
+ *
+ * Maintains a global list of all devices, in depth-first ordering.
+ * The head for that list is device_root.g_list.
  */
 int device_register(struct device *dev)
 {
 	int error;
+	struct device *prev_dev;
 
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
@@ -50,6 +44,7 @@ int device_register(struct device *dev)
 	spin_lock(&device_lock);
 	INIT_LIST_HEAD(&dev->node);
 	INIT_LIST_HEAD(&dev->children);
+	INIT_LIST_HEAD(&dev->g_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
@@ -57,6 +52,13 @@ int device_register(struct device *dev)
 		if (!dev->parent)
 			dev->parent = &device_root;
 		get_device(dev->parent);
+
+		if (list_empty(&dev->parent->children))
+			prev_dev = dev->parent;
+		else
+			prev_dev = list_entry(dev->parent->children.prev, struct device, node);
+		list_add(&dev->g_list, &prev_dev->g_list);
+
 		list_add_tail(&dev->node,&dev->parent->children);
 	}
 	spin_unlock(&device_lock);
@@ -79,22 +81,15 @@ int device_register(struct device *dev)
 }
 
 /**
- * put_device - clean up device
+ * put_device - decrement reference count, and clean up when it hits 0
  * @dev:	device in question
- *
- * Decrement reference count for device.
- * If it hits 0, we need to clean it up.
- * However, we may be here in interrupt context, and it may
- * take some time to do proper clean up (removing files, calling
- * back down to device to clean up everything it has).
- * So, we remove it from its parent's list and add it to the list of
- * devices to be cleaned up.
  */
 void put_device(struct device * dev)
 {
 	if (!atomic_dec_and_lock(&dev->refcount,&device_lock))
 		return;
 	list_del_init(&dev->node);
+	list_del_init(&dev->g_list);
 	spin_unlock(&device_lock);
 
 	DBG("DEV: Unregistering device. ID = '%s', name = '%s'\n",

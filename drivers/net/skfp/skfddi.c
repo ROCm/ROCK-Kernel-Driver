@@ -520,8 +520,6 @@ static void init_dev(struct net_device *dev, u_long iobase)
 {
 	/* Initialize new device structure */
 
-	dev->rmem_end = 0;	/* shared memory isn't used */
-	dev->rmem_start = 0;	/* shared memory isn't used */
 	dev->mem_end = 0;	/* shared memory isn't used */
 	dev->mem_start = 0;	/* shared memory isn't used */
 	dev->base_addr = iobase;	/* save port (I/O) base address */

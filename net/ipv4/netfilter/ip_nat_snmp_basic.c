@@ -1244,6 +1244,7 @@ static int snmp_translate(struct ip_conntrack *ct,
  * NAT helper function, packets arrive here from NAT code.
  */
 static unsigned int nat_help(struct ip_conntrack *ct,
+			     struct ip_conntrack_expect *exp,
                              struct ip_nat_info *info,
                              enum ip_conntrack_info ctinfo,
                              unsigned int hooknum,
@@ -1304,19 +1305,27 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 	return NF_DROP;
 }
 
-static struct ip_nat_helper snmp = { { NULL, NULL },
+static struct ip_nat_helper snmp = { 
+	{ NULL, NULL },
+	"snmp",
+	IP_NAT_HELPER_F_STANDALONE,
+	THIS_MODULE,
 	{ { 0, { __constant_htons(SNMP_PORT) } },
 	  { 0, { 0 }, IPPROTO_UDP } },
 	{ { 0, { 0xFFFF } },
 	  { 0, { 0 }, 0xFFFF } },
-	  nat_help, "snmp" };
+	nat_help, NULL };
  
-static struct ip_nat_helper snmp_trap = { { NULL, NULL },
+static struct ip_nat_helper snmp_trap = { 
+	{ NULL, NULL },
+	"snmp_trap",
+	IP_NAT_HELPER_F_STANDALONE,
+	THIS_MODULE,
 	{ { 0, { __constant_htons(SNMP_TRAP_PORT) } },
 	  { 0, { 0 }, IPPROTO_UDP } },
 	{ { 0, { 0xFFFF } },
 	  { 0, { 0 }, 0xFFFF } },
-	nat_help, "snmp_trap" };
+	nat_help, NULL };
 
 /*****************************************************************************
  *

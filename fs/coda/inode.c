@@ -258,6 +258,8 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
         struct coda_vattr vattr;
         int error;
 	
+	lock_kernel();
+	
         memset(&vattr, 0, sizeof(vattr)); 
 
 	inode->i_ctime = CURRENT_TIME;
@@ -271,6 +273,8 @@ int coda_notify_change(struct dentry *de, struct iattr *iattr)
 	        coda_vattr_to_iattr(inode, &vattr); 
 		coda_cache_clear_inode(inode);
 	}
+
+	unlock_kernel();
 
 	return error;
 }

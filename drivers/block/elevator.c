@@ -230,12 +230,6 @@ void elevator_linus_add_request(request_queue_t *q, struct request *rq,
 	elevator_t *e = &q->elevator;
 	int lat = 0, *latency = e->elevator_data;
 
-	/*
-	 * it's a bug to let this rq preempt an already started request
-	 */
-	if (insert_here->next != &q->queue_head)
-		BUG_ON(list_entry_rq(insert_here->next)->flags & REQ_STARTED);
-
 	if (!(rq->flags & REQ_BARRIER))
 		lat = latency[rq_data_dir(rq)];
 

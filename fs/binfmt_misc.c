@@ -62,7 +62,7 @@ static Node *check_file(struct linux_binprm *bprm)
 	char *p = strrchr(bprm->filename, '.');
 	struct list_head *l;
 
-	for (l = entries.next; l != &entries; l = l->next) {
+	list_for_each(l, &entries) {
 		Node *e = list_entry(l, Node, list);
 		char *s;
 		int j;

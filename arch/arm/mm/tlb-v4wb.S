@@ -144,17 +144,22 @@ ENTRY(v4wbi_flush_kern_tlb_page)
 	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
 	mov	pc, lr
 
+	.section ".text.init", #alloc, #execinstr
+
+	.type	v4wb_tlb_fns, #object
 ENTRY(v4wb_tlb_fns)
-	.word	v4wb_flush_kern_tlb_all
-	.word	v4wb_flush_user_tlb_mm
-	.word	v4wb_flush_user_tlb_range
-	.word	v4wb_flush_user_tlb_page
-	.word	v4wb_flush_kern_tlb_page
+	.long	v4wb_flush_kern_tlb_all
+	.long	v4wb_flush_user_tlb_mm
+	.long	v4wb_flush_user_tlb_range
+	.long	v4wb_flush_user_tlb_page
+	.long	v4wb_flush_kern_tlb_page
+	.size	v4wb_tlb_fns, . - v4wb_tlb_fns
 
+	.type	v4wbi_tlb_fns, #object
 ENTRY(v4wbi_tlb_fns)
-	.word	v4wbi_flush_kern_tlb_all
-	.word	v4wbi_flush_user_tlb_mm
-	.word	v4wbi_flush_user_tlb_range
-	.word	v4wbi_flush_user_tlb_page
-	.word	v4wbi_flush_kern_tlb_page
-
+	.long	v4wbi_flush_kern_tlb_all
+	.long	v4wbi_flush_user_tlb_mm
+	.long	v4wbi_flush_user_tlb_range
+	.long	v4wbi_flush_user_tlb_page
+	.long	v4wbi_flush_kern_tlb_page
+	.size	v4wbi_tlb_fns, . - v4wbi_tlb_fns

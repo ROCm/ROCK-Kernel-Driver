@@ -44,17 +44,11 @@
  */
 
 #include <linux/config.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
-
-#ifdef CONFIG_BSD_PROCESS_ACCT
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/acct.h>
-#include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/tty.h>
-
 #include <asm/uaccess.h>
 
 /*
@@ -397,15 +391,3 @@ int acct_process(long exitcode)
 		spin_unlock(&acct_globals.lock);
 	return 0;
 }
-
-#else
-/*
- * Dummy system call when BSD process accounting is not configured
- * into the kernel.
- */
-
-asmlinkage long sys_acct(const char * filename)
-{
-	return -ENOSYS;
-}
-#endif

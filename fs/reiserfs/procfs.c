@@ -82,9 +82,9 @@ int reiserfs_version_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	if ( sb->u.reiserfs_sb.s_properties & (1 << REISERFS_3_6) ) {
+	if ( REISERFS_SB(sb)->s_properties & (1 << REISERFS_3_6) ) {
 		format = "3.6";
-	} else if ( sb->u.reiserfs_sb.s_properties & (1 << REISERFS_3_5) ) {
+	} else if ( REISERFS_SB(sb)->s_properties & (1 << REISERFS_3_5) ) {
 		format = "3.5";
 	} else {
 		format = "unknown";
@@ -140,7 +140,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	r = &sb->u.reiserfs_sb;
+	r = REISERFS_SB(sb);
 	len += sprintf( &buffer[ len ], 
 			"state: \t%s\n"
 			"mount options: \t%s%s%s%s%s%s%s%s%s%s%s%s\n"
@@ -220,7 +220,7 @@ int reiserfs_per_level_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	r = &sb->u.reiserfs_sb;
+	r = REISERFS_SB(sb);
 
 	len += sprintf( &buffer[ len ],
 			"level\t"
@@ -293,13 +293,13 @@ int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
 			     int count, int *eof, void *data )
 {
 	struct super_block *sb;
-	struct reiserfs_sb_info *r = &sb->u.reiserfs_sb;
+	struct reiserfs_sb_info *r;
 	int len = 0;
     
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	r = &sb->u.reiserfs_sb;
+	r = REISERFS_SB(sb);
 
 	len += sprintf( &buffer[ len ], "free_block: %lu\n"
 			"find_forward:"
@@ -340,7 +340,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	sb_info = &sb->u.reiserfs_sb;
+	sb_info = REISERFS_SB(sb);
 	rs = sb_info -> s_rs;
 	hash_code = DFL( s_hash_function_code );
 
@@ -397,7 +397,7 @@ int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	sb_info = &sb->u.reiserfs_sb;
+	sb_info = REISERFS_SB(sb);
 	rs = sb_info -> s_rs;
 	mapsize = le16_to_cpu( rs -> s_v1.s_oid_cursize );
 	total_used = 0;
@@ -449,7 +449,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
-	r = &sb->u.reiserfs_sb;
+	r = REISERFS_SB(sb);
 	rs = r -> s_rs;
 	jp = &rs->s_v1.s_journal;
 
@@ -557,9 +557,9 @@ static const char *proc_info_root_name = "fs/reiserfs";
 int reiserfs_proc_info_init( struct super_block *sb )
 {
 	spin_lock_init( & __PINFO( sb ).lock );
-	sb->u.reiserfs_sb.procdir = proc_mkdir(sb->s_id, proc_info_root);
-	if( sb->u.reiserfs_sb.procdir ) {
-		sb->u.reiserfs_sb.procdir -> owner = THIS_MODULE;
+	REISERFS_SB(sb)->procdir = proc_mkdir(sb->s_id, proc_info_root);
+	if( REISERFS_SB(sb)->procdir ) {
+		REISERFS_SB(sb)->procdir -> owner = THIS_MODULE;
 		return 0;
 	}
 	reiserfs_warning( "reiserfs: cannot create /proc/%s/%s\n",
@@ -575,7 +575,7 @@ int reiserfs_proc_info_done( struct super_block *sb )
 	spin_unlock( & __PINFO( sb ).lock );
 	if ( proc_info_root ) {
 		remove_proc_entry( sb->s_id, proc_info_root );
-		sb->u.reiserfs_sb.procdir = NULL;
+		REISERFS_SB(sb)->procdir = NULL;
 	}
 	return 0;
 }
@@ -587,14 +587,14 @@ int reiserfs_proc_info_done( struct super_block *sb )
 struct proc_dir_entry *reiserfs_proc_register( struct super_block *sb, 
 					       char *name, read_proc_t *func )
 {
-	return ( sb->u.reiserfs_sb.procdir ) ? create_proc_read_entry
-		( name, 0, sb->u.reiserfs_sb.procdir, func, 
+	return ( REISERFS_SB(sb)->procdir ) ? create_proc_read_entry
+		( name, 0, REISERFS_SB(sb)->procdir, func, 
 		  ( void * ) kdev_t_to_nr( sb -> s_dev ) ) : NULL;
 }
 
 void reiserfs_proc_unregister( struct super_block *sb, const char *name )
 {
-	remove_proc_entry( name, sb->u.reiserfs_sb.procdir );
+	remove_proc_entry( name, REISERFS_SB(sb)->procdir );
 }
 
 struct proc_dir_entry *reiserfs_proc_register_global( char *name, 

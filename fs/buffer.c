@@ -795,8 +795,11 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	unlock_buffer(bh);
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
-		if (buffer_async(tmp) && buffer_locked(tmp))
-			goto still_busy;
+		if (buffer_locked(tmp)) {
+			if (buffer_async(tmp))
+				goto still_busy;
+		} else if (!buffer_uptodate(tmp))
+			SetPageError(page);
 		tmp = tmp->b_this_page;
 	}
 
@@ -992,7 +995,7 @@ static int balance_dirty_state(void)
 
 	/* First, check for the "real" dirty limit. */
 	if (dirty > soft_dirty_limit) {
-		if (dirty > hard_dirty_limit)
+		if (dirty > hard_dirty_limit && !(current->flags & PF_NOIO))
 			return 1;
 		return 0;
 	}
@@ -1716,7 +1719,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		if (!buffer_mapped(bh)) {
 			if (iblock < lblock) {
 				if (get_block(inode, iblock, bh, 0))
-					continue;
+					SetPageError(page);
 			}
 			if (!buffer_mapped(bh)) {
 				memset(kmap(page) + i*blocksize, 0, blocksize);
@@ -1736,10 +1739,11 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 	if (!nr) {
 		/*
-		 * all buffers are uptodate - we can set the page
-		 * uptodate as well.
+		 * All buffers are uptodate - we can set the page uptodate
+		 * as well. But not if get_block() returned an error.
 		 */
-		SetPageUptodate(page);
+		if (!PageError(page))
+			SetPageUptodate(page);
 		UnlockPage(page);
 		return 0;
 	}
@@ -2122,7 +2126,7 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 	}
 
 	/* This does not understand multi-device filesystems currently */
-	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, blocks, blocksize);
+	retval = brw_kiovec(rw, 1, &iobuf, inode->i_sb->s_bdev, blocks, blocksize);
 
  out:
 	return retval;
@@ -2138,8 +2142,8 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
  * It is up to the caller to make sure that there are enough blocks
  * passed in to completely map the iobufs to disk.
  */
-int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
-	       int size)
+int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
+	       struct block_device *bdev, sector_t b[], int size)
 {
 	int		transferred;
 	int		i;
@@ -2167,7 +2171,7 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
 		iobuf = iovec[i];
 		iobuf->errno = 0;
 
-		ll_rw_kio(rw, iobuf, dev, b[i] * (size >> 9));
+		ll_rw_kio(rw, iobuf, bdev, b[i] * (size >> 9));
 	}
 
 	/*

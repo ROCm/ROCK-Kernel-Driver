@@ -162,3 +162,47 @@ void __init sa1100_map_io(void)
 {
 	iotable_init(standard_io_desc);
 }
+
+/*
+ * Disable the memory bus request/grant signals on the SA1110 to
+ * ensure that we don't receive spurious memory requests.  We set
+ * the MBGNT signal false to ensure the SA1111 doesn't own the
+ * SDRAM bus.
+ */
+void __init sa1110_mb_disable(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	
+	PGSR &= ~GPIO_MBGNT;
+	GPCR = GPIO_MBGNT;
+	GPDR = (GPDR & ~GPIO_MBREQ) | GPIO_MBGNT;
+
+	GAFR &= ~(GPIO_MBGNT | GPIO_MBREQ);
+
+	local_irq_restore(flags);
+}
+
+/*
+ * If the system is going to use the SA-1111 DMA engines, set up
+ * the memory bus request/grant pins.
+ */
+void __init sa1110_mb_enable(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	PGSR &= ~GPIO_MBGNT;
+	GPCR = GPIO_MBGNT;
+	GPDR = (GPDR & ~GPIO_MBREQ) | GPIO_MBGNT;
+
+	GAFR |= (GPIO_MBGNT | GPIO_MBREQ);
+	TUCR |= TUCR_MR;
+
+	local_irq_restore(flags);
+}
+
+EXPORT_SYMBOL(sa1111_wake);
+EXPORT_SYMBOL(sa1111_doze);

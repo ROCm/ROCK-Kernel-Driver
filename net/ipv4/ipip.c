@@ -572,7 +572,11 @@ static int ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto tx_error;
 	}
 
-	mtu = rt->u.dst.pmtu - sizeof(struct iphdr);
+	if (tiph->frag_off)
+		mtu = rt->u.dst.pmtu - sizeof(struct iphdr);
+	else
+		mtu = skb->dst ? skb->dst->pmtu : dev->mtu;
+
 	if (mtu < 68) {
 		tunnel->stat.collisions++;
 		ip_rt_put(rt);

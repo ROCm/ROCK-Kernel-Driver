@@ -25,6 +25,7 @@
  */
 
 #include <linux/timex.h>
+#include <linux/errno.h>
 #include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>

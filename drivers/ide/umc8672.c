@@ -111,7 +111,7 @@ static void umc_set_speeds (byte speeds[])
 static void tune_umc (ide_drive_t *drive, byte pio)
 {
 	unsigned long flags;
-	ide_hwgroup_t *hwgroup = ide_hwifs[HWIF(drive)->index^1].hwgroup;
+	ide_hwgroup_t *hwgroup = ide_hwifs[drive->channel->index ^ 1].hwgroup;
 
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
@@ -160,5 +160,5 @@ void __init init_umc8672 (void)	/* called from ide.c */
 	ide_hwifs[1].tuneproc = &tune_umc;
 	ide_hwifs[0].mate = &ide_hwifs[1];
 	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	ide_hwifs[1].unit = 1;
 }

@@ -201,14 +201,14 @@ do {\
         debug_sprintf_event(d_device->debug_area,d_level,\
                     DASD_DEVICE_FORMAT_STRING d_str "\n",\
                     d_device, d_data);\
-} while(0);
+} while(0)
 #define DASD_DEVICE_DEBUG_EXCEPTION(d_level, d_device, d_str, d_data...)\
 do {\
         if ( d_device->debug_area != NULL )\
         debug_sprintf_exception(d_device->debug_area,d_level,\
                         DASD_DEVICE_FORMAT_STRING d_str "\n",\
                         d_device, d_data);\
-} while(0);
+} while(0)
 
 #define DASD_DRIVER_FORMAT_STRING "Driver: <[%p]>"
 #define DASD_DRIVER_DEBUG_EVENT(d_level, d_fn, d_str, d_data...)\
@@ -217,14 +217,14 @@ do {\
         debug_sprintf_event(dasd_debug_area, d_level,\
                     DASD_DRIVER_FORMAT_STRING #d_fn ":" d_str "\n",\
                     d_fn, d_data);\
-} while(0);
+} while(0)
 #define DASD_DRIVER_DEBUG_EXCEPTION(d_level, d_fn, d_str, d_data...)\
 do {\
         if ( dasd_debug_area != NULL )\
         debug_sprintf_exception(dasd_debug_area, d_level,\
                         DASD_DRIVER_FORMAT_STRING #d_fn ":" d_str "\n",\
                         d_fn, d_data);\
-} while(0);
+} while(0)
 
 struct dasd_device_t;
 struct request;

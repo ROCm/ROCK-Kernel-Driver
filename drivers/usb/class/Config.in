@@ -1,0 +1,19 @@
+#
+# USB Class driver configuration
+#
+comment 'USB Device Class drivers'
+dep_tristate '  USB Audio support' CONFIG_USB_AUDIO $CONFIG_USB $CONFIG_SOUND
+dep_tristate '  USB Bluetooth support (EXPERIMENTAL)' CONFIG_USB_BLUETOOTH $CONFIG_USB $CONFIG_EXPERIMENTAL
+dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
+dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB
+
+
+# Turn on CONFIG_USB_CLASS if any of the drivers are compiled into the kernel
+# to make our Makefile logic a bit simpler.
+if [ "$CONFIG_USB_AUDIO" = "y" -o "$CONFIG_USB_BLUETOOTH" = "y" ]; then
+   define_bool CONFIG_USB_CLASS y
+fi
+if [ "$CONFIG_USB_ACM" = "y" -o "$CONFIG_USB_PRINTER" = "y" ]; then
+   define_bool CONFIG_USB_CLASS y
+fi
+   

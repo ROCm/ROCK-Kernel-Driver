@@ -20,6 +20,9 @@
  *
  *	(c) Copyright 1995    Alan Cox <alan@redhat.com>
  *
+ *      14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
+ *          Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
+ *          Added timeout module option to override default
  */
 
 #include <linux/config.h>
@@ -56,14 +59,26 @@ static spinlock_t advwdt_lock;
  *	the manual says WDT_STOP is 0x43, not 0x443).
  *	(0x43 is also a write-only control register for the 8254 timer!)
  *
- *	TODO: module parameters to set the I/O port addresses and NOWAYOUT
- *	option at load time.
+ *	TODO: module parameters to set the I/O port addresses
  */
  
 #define WDT_STOP 0x443
 #define WDT_START 0x443
 
 #define WD_TIMO 60		/* 1 minute */
+
+static int timeout = WD_TIMO;	/* in seconds */
+MODULE_PARM(timeout,"i");
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=60)"); 
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*
  *	Kernel methods.
@@ -73,7 +88,7 @@ static void
 advwdt_ping(void)
 {
 	/* Write a watchdog value */
-	outb_p(WD_TIMO, WDT_START);
+	outb_p(timeout, WDT_START);
 }
 
 static ssize_t
@@ -135,6 +150,9 @@ advwdt_open(struct inode *inode, struct file *file)
 				spin_unlock(&advwdt_lock);
 				return -EBUSY;
 			}
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/*
 			 *	Activate 
 			 */
@@ -153,9 +171,9 @@ advwdt_close(struct inode *inode, struct file *file)
 {
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 		spin_lock(&advwdt_lock);
-#ifndef CONFIG_WATCHDOG_NOWAYOUT	
-		inb_p(WDT_STOP);
-#endif		
+		if (!nowayout) {
+			inb_p(WDT_STOP);
+		}
 		advwdt_is_open = 0;
 		spin_unlock(&advwdt_lock);
 	}
@@ -207,11 +225,21 @@ static struct notifier_block advwdt_notifier = {
 	0
 };
 
+static void __init
+advwdt_validate_timeout(void)
+{
+	if (timeout < 1 || timeout > 63) {
+		timeout = WD_TIMO;
+		printk(KERN_INFO "advantechwdt: timeout value must be 1 <= x <= 63, using %d\n", timeout);
+	}
+}
+
 static int __init
 advwdt_init(void)
 {
 	printk("WDT driver for Advantech single board computer initialising.\n");
 
+	advwdt_validate_timeout();
 	spin_lock_init(&advwdt_lock);
 	misc_register(&advwdt_miscdev);
 #if WDT_START != WDT_STOP

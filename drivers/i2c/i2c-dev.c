@@ -141,7 +141,7 @@ loff_t i2cdev_lseek (struct file *file, loff_t offset, int origin)
 #ifdef DEBUG
 	struct inode *inode = file->f_dentry->d_inode;
 	printk("i2c-dev.o: i2c-%d lseek to %ld bytes relative to %d.\n",
-	       MINOR(inode->i_rdev),(long) offset,origin);
+	       minor(inode->i_rdev),(long) offset,origin);
 #endif /* DEBUG */
 	return -ESPIPE;
 }
@@ -165,7 +165,7 @@ static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
 		return -ENOMEM;
 
 #ifdef DEBUG
-	printk("i2c-dev.o: i2c-%d reading %d bytes.\n",MINOR(inode->i_rdev),
+	printk("i2c-dev.o: i2c-%d reading %d bytes.\n",minor(inode->i_rdev),
 	       count);
 #endif
 
@@ -197,7 +197,7 @@ static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
 	}
 
 #ifdef DEBUG
-	printk("i2c-dev.o: i2c-%d writing %d bytes.\n",MINOR(inode->i_rdev),
+	printk("i2c-dev.o: i2c-%d writing %d bytes.\n",minor(inode->i_rdev),
 	       count);
 #endif
 	ret = i2c_master_send(client,tmp,count);
@@ -218,7 +218,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 #ifdef DEBUG
 	printk("i2c-dev.o: i2c-%d ioctl, cmd: 0x%x, arg: %lx.\n", 
-	       MINOR(inode->i_rdev),cmd, arg);
+	       minor(inode->i_rdev),cmd, arg);
 #endif /* DEBUG */
 
 	switch ( cmd ) {

@@ -145,7 +145,9 @@ void irlan_client_wakeup(struct irlan_cb *self, __u32 saddr, __u32 daddr)
  *    Remote device with IrLAN server support discovered
  *
  */
-void irlan_client_discovery_indication(discovery_t *discovery, void *priv) 
+void irlan_client_discovery_indication(discovery_t *discovery,
+				       DISCOVERY_MODE mode,
+				       void *priv) 
 {
 	struct irlan_cb *self;
 	__u32 saddr, daddr;
@@ -154,6 +156,15 @@ void irlan_client_discovery_indication(discovery_t *discovery, void *priv)
 
 	ASSERT(irlan != NULL, return;);
 	ASSERT(discovery != NULL, return;);
+
+	/*
+	 * I didn't check it, but I bet that IrLAN suffer from the same
+	 * deficiency as IrComm and doesn't handle two instances
+	 * simultaneously connecting to each other.
+	 * Same workaround, drop passive discoveries.
+	 * Jean II */
+	if(mode == DISCOVERY_PASSIVE)
+		return;
 
 	saddr = discovery->saddr;
 	daddr = discovery->daddr;

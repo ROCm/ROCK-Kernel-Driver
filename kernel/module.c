@@ -11,6 +11,7 @@
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
 #include <linux/fs.h>
+#include <asm/cacheflush.h>
 
 /*
  * Originally by Anonymous (as far as I know...)

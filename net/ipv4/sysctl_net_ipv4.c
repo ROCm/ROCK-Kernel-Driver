@@ -219,6 +219,8 @@ ctl_table ipv4_table[] = {
 	 &sysctl_icmp_ratelimit, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_IPV4_ICMP_RATEMASK, "icmp_ratemask",
 	 &sysctl_icmp_ratemask, sizeof(int), 0644, NULL, &proc_dointvec},
+	{NET_TCP_TW_REUSE, "tcp_tw_reuse",
+	 &sysctl_tcp_tw_reuse, sizeof(int), 0644, NULL, &proc_dointvec},
 	{0}
 };
 

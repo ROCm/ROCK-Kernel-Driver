@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/pm.h>
+#include <asm/fixmap.h>
 #include <asm/apicdef.h>
 #include <asm/system.h>
 

@@ -440,7 +440,7 @@ static int sharp_do_wait_for_ready(struct map_info *map, struct flchip *chip,
 
 	timeo = jiffies + HZ;
 
-	while(jiffies<timeo){
+	while(time_before(jiffies, timeo)){
 		map->write32(map,CMD_READ_STATUS,adr);
 		status = map->read32(map,adr);
 		if((status & SR_READY)==SR_READY){

@@ -160,7 +160,7 @@ static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32
 	 * If possible, get a well-connected one
 	 */
 	spin_lock(&dcache_lock);
-	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+	list_for_each(lp, &inode->i_dentry) {
 		result = list_entry(lp,struct dentry, d_alias);
 		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 			dget_locked(result);
@@ -545,6 +545,9 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	u32		error = 0;
 
 	dprintk("nfsd: fh_verify(%s)\n", SVCFH_fmt(fhp));
+
+	/* keep this filehandle for possible reference  when encoding attributes */
+	rqstp->rq_reffh = fh;
 
 	if (!fhp->fh_dentry) {
 		kdev_t xdev = NODEV;

@@ -53,7 +53,7 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte speed);
 static int it8172_config_drive_for_dma (ide_drive_t *drive);
 static int it8172_dmaproc(ide_dma_action_t func, ide_drive_t *drive);
 #endif
-void __init ide_init_it8172 (ide_hwif_t *hwif);
+void __init ide_init_it8172(struct ata_channel *channel);
 
 
 static void it8172_tune_drive (ide_drive_t *drive, byte pio)
@@ -61,7 +61,7 @@ static void it8172_tune_drive (ide_drive_t *drive, byte pio)
     unsigned long flags;
     u16 master_data;
     u32 slave_data;
-    int is_slave	= (&HWIF(drive)->drives[1] == drive);
+    int is_slave	= (&drive->channel->drives[1] == drive);
     int master_port	= 0x40;
     int slave_port      = 0x44;
 
@@ -70,8 +70,8 @@ static void it8172_tune_drive (ide_drive_t *drive, byte pio)
     else
        pio = min_t(byte, pio, 4);
 
-    pci_read_config_word(HWIF(drive)->pci_dev, master_port, &master_data);
-    pci_read_config_dword(HWIF(drive)->pci_dev, slave_port, &slave_data);
+    pci_read_config_word(drive->channel->pci_dev, master_port, &master_data);
+    pci_read_config_dword(drive->channel->pci_dev, slave_port, &slave_data);
 
     /*
      * FIX! The DIOR/DIOW pulse width and recovery times in port 0x44
@@ -94,7 +94,7 @@ static void it8172_tune_drive (ide_drive_t *drive, byte pio)
 
     save_flags(flags);
     cli();
-    pci_write_config_word(HWIF(drive)->pci_dev, master_port, master_data);
+    pci_write_config_word(drive->channel->pci_dev, master_port, master_data);
     restore_flags(flags);
 }
 
@@ -133,7 +133,7 @@ static byte it8172_dma_2_pio (byte xfer_rate)
 
 static int it8172_tune_chipset (ide_drive_t *drive, byte speed)
 {
-    ide_hwif_t *hwif	= HWIF(drive);
+    struct ata_channel *hwif = drive->channel;
     struct pci_dev *dev	= hwif->pci_dev;
     int a_speed		= 3 << (drive->dn * 4);
     int u_flag		= 1 << drive->dn;
@@ -231,7 +231,7 @@ unsigned int __init pci_init_it8172 (struct pci_dev *dev)
 }
 
 
-void __init ide_init_it8172 (ide_hwif_t *hwif)
+void __init ide_init_it8172(struct ata_channel *hwif)
 {
     struct pci_dev* dev = hwif->pci_dev;
     unsigned long cmdBase, ctrlBase;

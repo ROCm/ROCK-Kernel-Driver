@@ -369,14 +369,20 @@ __setup("lockd.tcpport=", tcpport_set);
  * Define NLM program and procedures
  */
 static struct svc_version	nlmsvc_version1 = {
-	1, 17, nlmsvc_procedures, NULL
+		vs_vers:	1,
+		vs_nproc:	17,
+		vs_proc:	nlmsvc_procedures,
 };
 static struct svc_version	nlmsvc_version3 = {
-	3, 24, nlmsvc_procedures, NULL
+		vs_vers:	3,
+		vs_nproc:	24,
+		vs_proc:	nlmsvc_procedures,
 };
 #ifdef CONFIG_LOCKD_V4
 static struct svc_version	nlmsvc_version4 = {
-	4, 24, nlmsvc_procedures4, NULL
+		vs_vers:	4,
+		vs_nproc:	24,
+		vs_proc:	nlmsvc_procedures4,
 };
 #endif
 static struct svc_version *	nlmsvc_version[] = {
@@ -392,11 +398,12 @@ static struct svc_version *	nlmsvc_version[] = {
 static struct svc_stat		nlmsvc_stats;
 
 #define NLM_NRVERS	(sizeof(nlmsvc_version)/sizeof(nlmsvc_version[0]))
-struct svc_program		nlmsvc_program = {
-	NLM_PROGRAM,		/* program number */
-	1, NLM_NRVERS-1,	/* version range */
-	NLM_NRVERS,		/* number of entries in nlmsvc_version */
-	nlmsvc_version,		/* version table */
-	"lockd",		/* service name */
-	&nlmsvc_stats,		/* stats table */
+struct svc_program	nlmsvc_program = {
+	pg_prog:	NLM_PROGRAM,		/* program number */
+	pg_lovers:	1,			// version
+	pg_hivers:	NLM_NRVERS-1,		// range
+	pg_nvers:	NLM_NRVERS,		/* number of entries in nlmsvc_version */
+	pg_vers:	nlmsvc_version,		/* version table */
+	pg_name:	"lockd",		/* service name */
+	pg_stats:	&nlmsvc_stats,		/* stats table */
 };

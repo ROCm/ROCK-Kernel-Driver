@@ -25,6 +25,10 @@
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
 
+#ifdef CONFIG_EISA
+#include <linux/ioport.h>
+#endif
+
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
 #include <asm/processor.h>
@@ -951,11 +955,20 @@ cobalt_init(void)
 	printk("Cobalt APIC enabled: ID reg %lx\n", co_apic_read(CO_APIC_ID));
 }
 #endif
+
+#ifdef CONFIG_EISA
+int EISA_bus;
+static struct resource eisa_id = { "EISA ID", 0xc80, 0xc83, IORESOURCE_BUSY };
+#endif
+
 void __init trap_init(void)
 {
 #ifdef CONFIG_EISA
-	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24))
+	if (isa_readl(0x0FFFD9) == 'E'+('I'<<8)+('S'<<16)+('A'<<24)) {
 		EISA_bus = 1;
+		if (request_resource(&ioport_resource, &eisa_id) == -EBUSY)
+			printk ("EISA port was EBUSY :-(\n");
+	}
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC

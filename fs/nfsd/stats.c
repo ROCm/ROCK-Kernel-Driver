@@ -36,7 +36,9 @@
 #include <linux/nfsd/stats.h>
 
 struct nfsd_stats	nfsdstats;
-struct svc_stat		nfsd_svcstats = { &nfsd_program, };
+struct svc_stat		nfsd_svcstats = {
+	program:	&nfsd_program,
+};
 
 static int
 nfsd_proc_read(char *buffer, char **start, off_t offset, int count,

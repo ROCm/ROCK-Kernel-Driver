@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -14,20 +14,16 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
  */
 #ifndef	_H_JFS_SUPERBLOCK
 #define _H_JFS_SUPERBLOCK
-/*
- *	jfs_superblock.h
- */
 
 /*
  * make the magic number something a human could read
  */
-#define JFS_MAGIC 	"JFS1"	/* Magic word: Version 1 */
+#define JFS_MAGIC 	"JFS1"	/* Magic word */
 
-#define JFS_VERSION	1	/* Version number: Version 1 */
+#define JFS_VERSION	2	/* Version number: Version 2 */
 
 #define LV_NAME_SIZE	11	/* MUST BE 11 for OS/2 boot sector */
 
@@ -103,38 +99,10 @@ struct jfs_superblock {
 	pxd_t s_xlogpxd;	/* 8: extendfs logpxd */
 	/* - 128 byte boundary - */
 
-	/*
-	 *      DFS VFS support (preliminary) 
-	 */
-	char s_attach;		/* 1: VFS: flag: set when aggregate is attached
-				 */
-	u8 rsrvd4[7];		/* 7: reserved - set to 0 */
-
-	u64 totalUsable;	/* 8: VFS: total of 1K blocks which are
-				 * available to "normal" (non-root) users.
-				 */
-	u64 minFree;		/* 8: VFS: # of 1K blocks held in reserve for 
-				 * exclusive use of root.  This value can be 0,
-				 * and if it is then totalUsable will be equal 
-				 * to # of blocks in aggregate.  I believe this
-				 * means that minFree + totalUsable = # blocks.
-				 * In that case, we don't need to store both 
-				 * totalUsable and minFree since we can compute
-				 * one from the other.  I would guess minFree 
-				 * would be the one we should store, and 
-				 * totalUsable would be the one we should 
-				 * compute.  (Just a guess...)
+	u32 s_device;		/* Store device in case location changes
+				 * between reboots
 				 */
 
-	u64 realFree;		/* 8: VFS: # of free 1K blocks can be used by 
-				 * "normal" users.  It may be this is something
-				 * we should compute when asked for instead of 
-				 * storing in the superblock.  I don't know how
-				 * often this information is needed.
-				 */
-	/*
-	 *      graffiti area
-	 */
 };
 
 extern int readSuper(struct super_block *, struct metapage **);

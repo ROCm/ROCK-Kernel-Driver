@@ -679,10 +679,12 @@ CONFIG_ROMFS_FS
   answer N.
 
 CONFIG_QNX4FS_FS
-  This is the file system used by the operating system QNX 4. Say Y if
-  you intend to mount QNX hard disks or floppies. Unless you say Y to
-  "QNX4FS read-write support" below, you will only be able to read
-  these file systems.
+  This is the file system used by the real-time operating systems
+  QNX 4 and QNX 6 (the latter is also called QNX RTP).
+  Further information is available at <http://www.qnx.com/>.
+  Say Y if you intend to mount QNX hard disks or floppies.
+  Unless you say Y to "QNX4FS read-write support" below, you will
+  only be able to read these file systems.
 
   This file system support is also available as a module ( = code
   which can be inserted in and removed from the running kernel
@@ -695,6 +697,9 @@ CONFIG_QNX4FS_FS
 
 CONFIG_QNX4FS_RW
   Say Y if you want to test write support for QNX4 file systems.
+
+  It's currently broken, so for now:
+  answer N.
 
 CONFIG_AUTOFS_FS
   The automounter is a tool to automatically mount remote file systems

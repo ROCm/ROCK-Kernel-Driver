@@ -247,9 +247,9 @@ static int __init lne390_probe1(struct net_device *dev, int ioaddr)
 				LNE390_STOP_PG/4, dev->mem_start);
 	}
 
-	dev->mem_end = dev->rmem_end = dev->mem_start
+	dev->mem_end = ei_status.rmem_end = dev->mem_start
 		+ (LNE390_STOP_PG - LNE390_START_PG)*256;
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
 
 	/* The 8390 offset is zero for the LNE390 */
 	dev->base_addr = ioaddr;
@@ -334,12 +334,12 @@ static void lne390_block_input(struct net_device *dev, int count, struct sk_buff
 {
 	unsigned long xfer_start = dev->mem_start + ring_offset - (LNE390_START_PG<<8);
 
-	if (xfer_start + count > dev->rmem_end) {
+	if (xfer_start + count > ei_status.rmem_end) {
 		/* Packet wraps over end of ring buffer. */
-		int semi_count = dev->rmem_end - xfer_start;
+		int semi_count = ei_status.rmem_end - xfer_start;
 		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
 	} else {
 		/* Packet is in one chunk. */
 		isa_memcpy_fromio(skb->data, xfer_start, count);

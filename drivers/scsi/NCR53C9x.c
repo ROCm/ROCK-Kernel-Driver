@@ -3615,3 +3615,5 @@ void esp_release(void)
 	esps_running = esps_in_use;
 }
 #endif
+
+MODULE_LICENSE("GPL");

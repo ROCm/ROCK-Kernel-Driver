@@ -51,7 +51,6 @@
 #include <linux/crc32.h>
 
 #include <asm/bitops.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/errno.h>
 
@@ -496,14 +495,14 @@ static int lance_open (struct net_device *dev)
 
 	last_dev = dev;
 
+	/* Stop the Lance */
+	ll->rap = LE_CSR0;
+	ll->rdp = LE_C0_STOP;
+
 	/* Install the Interrupt handler */
 	ret = request_irq(IRQ_AMIGA_PORTS, lance_interrupt, SA_SHIRQ,
 			  dev->name, dev);
 	if (ret) return ret;
-
-	/* Stop the Lance */
-	ll->rap = LE_CSR0;
-	ll->rdp = LE_C0_STOP;
 
 	load_csrs (lp);
 	lance_init_ring (dev);

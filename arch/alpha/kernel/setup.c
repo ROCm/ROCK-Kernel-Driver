@@ -472,6 +472,7 @@ setup_arch(char **cmdline_p)
 	struct percpu_struct *cpu;
 	char *type_name, *var_name, *p;
 	void *kernel_end = _end; /* end of kernel */
+	char *args = command_line;
 
 	hwrpb = (struct hwrpb_struct*) __va(INIT_HWRPB->phys_addr);
 	boot_cpuid = hard_smp_processor_id();
@@ -509,7 +510,8 @@ setup_arch(char **cmdline_p)
 	/* 
 	 * Process command-line arguments.
 	 */
-	for (p = strtok(command_line, " \t"); p ; p = strtok(NULL, " \t")) {
+	while ((p = strsep(&args, " \t")) != NULL) {
+		if (!*p) continue;
 		if (strncmp(p, "alpha_mv=", 9) == 0) {
 			vec = get_sysvec_byname(p+9);
 			continue;
@@ -528,7 +530,7 @@ setup_arch(char **cmdline_p)
 		}
 	}
 
-	/* Replace the command line, now that we've killed it with strtok.  */
+	/* Replace the command line, now that we've killed it with strsep.  */
 	strcpy(command_line, saved_command_line);
 
 	/* If we want SRM console printk echoing early, do it now. */

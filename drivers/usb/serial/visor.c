@@ -11,7 +11,23 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
- * 
+ *
+ * (04/03/2002) gkh
+ *	Added support for the Sony OS 4.1 devices.  Thanks to Hiroyuki ARAKI
+ *	<hiro@zob.ne.jp> for the information.
+ *
+ * (03/27/2002) gkh
+ *	Removed assumptions that port->tty was always valid (is not true
+ *	for usb serial console devices.)
+ *
+ * (03/23/2002) gkh
+ *	Added support for the Palm i705 device, thanks to Thomas Riemer
+ *	<tom@netmech.com> for the information.
+ *
+ * (03/21/2002) gkh
+ *	Added support for the Palm m130 device, thanks to Udo Eisenbarth
+ *	<udo.eisenbarth@web.de> for the information.
+ *
  * (02/27/2002) gkh
  *	Reworked the urb handling logic.  We have no more pool, but dynamically
  *	allocate the urb and the transfer buffer on the fly.  In testing this
@@ -169,9 +185,12 @@ static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_I705_ID) },
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -186,9 +205,12 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M125_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_I705_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -199,7 +221,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 /* All of the device info needed for the Handspring Visor, and Palm 4.0 devices */
 static struct usb_serial_device_type handspring_device = {
 	owner:			THIS_MODULE,
-	name:			"Handspring Visor / Palm 4.0 / Clié 4.0",
+	name:			"Handspring Visor / Palm 4.0 / Clié 4.x",
 	id_table:		combined_id_table,
 	num_interrupt_in:	0,
 	num_bulk_in:		2,
@@ -262,32 +284,32 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	if (!port->read_urb) {
+		/* this is needed for some brain dead Sony devices */
 		err ("Device lied about number of ports, please use a lower one.");
 		return -ENODEV;
 	}
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		bytes_in = 0;
-		bytes_out = 0;
+	bytes_in = 0;
+	bytes_out = 0;
 
-		/* force low_latency on so that our tty_push actually forces the data through, 
-		   otherwise it is scheduled, and with high data rates (like with OHCI) data
-		   can get lost. */
+	/*
+	 * Force low_latency on so that our tty_push actually forces the data
+	 * through, otherwise it is scheduled, and with high data rates (like
+	 * with OHCI) data can get lost.
+	 */
+	if (port->tty)
 		port->tty->low_latency = 1;
-		
-		/* Start reading from the device */
-		usb_fill_bulk_urb (port->read_urb, serial->dev,
-				   usb_rcvbulkpipe (serial->dev, 
-						    port->bulk_in_endpointAddress),
-				   port->read_urb->transfer_buffer,
-				   port->read_urb->transfer_buffer_length,
-				   visor_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (result)
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-	}
+	
+	/* Start reading from the device */
+	usb_fill_bulk_urb (port->read_urb, serial->dev,
+			   usb_rcvbulkpipe (serial->dev, 
+					    port->bulk_in_endpointAddress),
+			   port->read_urb->transfer_buffer,
+			   port->read_urb->transfer_buffer_length,
+			   visor_read_bulk_callback, port);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (result)
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	
 	return result;
 }
@@ -307,28 +329,23 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* only send a shutdown message if the 
-			 * device is still here */
-			transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-			if (!transfer_buffer) {
-				err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
-			} else {
-				/* send a shutdown message to the device */
-				usb_control_msg (serial->dev,
-						 usb_rcvctrlpipe(serial->dev, 0),
-						 VISOR_CLOSE_NOTIFICATION, 0xc2,
-						 0x0000, 0x0000, 
-						 transfer_buffer, 0x12, 300);
-				kfree (transfer_buffer);
-			}
-			/* shutdown our bulk read */
-			usb_unlink_urb (port->read_urb);
+	if (serial->dev) {
+		/* only send a shutdown message if the 
+		 * device is still here */
+		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
+		if (!transfer_buffer) {
+			err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
+		} else {
+			/* send a shutdown message to the device */
+			usb_control_msg (serial->dev,
+					 usb_rcvctrlpipe(serial->dev, 0),
+					 VISOR_CLOSE_NOTIFICATION, 0xc2,
+					 0x0000, 0x0000, 
+					 transfer_buffer, 0x12, 300);
+			kfree (transfer_buffer);
 		}
-		port->open_count = 0;
+		/* shutdown our bulk read */
+		usb_unlink_urb (port->read_urb);
 	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -390,7 +407,7 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 	usb_free_urb (urb);
 
 	return count;
-} 
+}
 
 
 static int visor_write_room (struct usb_serial_port *port)
@@ -471,7 +488,7 @@ static void visor_read_bulk_callback (struct urb *urb)
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	tty = port->tty;
-	if (urb->actual_length) {
+	if (tty && urb->actual_length) {
 		for (i = 0; i < urb->actual_length ; ++i) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters, we drop them. */
 			if(tty->flip.count >= TTY_FLIPBUF_SIZE) {
@@ -481,8 +498,8 @@ static void visor_read_bulk_callback (struct urb *urb)
 			tty_insert_flip_char(tty, data[i], 0);
 		}
 		tty_flip_buffer_push(tty);
-		bytes_in += urb->actual_length;
 	}
+	bytes_in += urb->actual_length;
 
 	/* Continue trying to always read  */
 	usb_fill_bulk_urb (port->read_urb, serial->dev,
@@ -571,7 +588,8 @@ static int  visor_startup (struct usb_serial *serial)
 	}
 
 	if ((serial->dev->descriptor.idVendor == PALM_VENDOR_ID) ||
-	    (serial->dev->descriptor.idVendor == SONY_VENDOR_ID)) {
+	    ((serial->dev->descriptor.idVendor == SONY_VENDOR_ID) &&
+	     (serial->dev->descriptor.idProduct != SONY_CLIE_4_1_ID))) {
 		/* Palm OS 4.0 Hack */
 		response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), 
 					    PALM_GET_SOME_UNKNOWN_INFORMATION,
@@ -649,15 +667,8 @@ static int clie_3_5_startup (struct usb_serial *serial)
 
 static void visor_shutdown (struct usb_serial *serial)
 {
-	int i;
-
 	dbg (__FUNCTION__);
-
-	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i)
-		serial->port[i].open_count = 0;
 }
-
 
 static int visor_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
 {

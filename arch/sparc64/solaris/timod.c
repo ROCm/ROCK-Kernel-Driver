@@ -46,7 +46,7 @@ static char * page = NULL ;
 void * mykmalloc(size_t s, int gfp)
 {
 	static char * page;
-	static size_t free = 0;
+	static size_t free;
 	void * r;
 	s = ((s + 63) & ~63);
 	if( s > PAGE_SIZE ) {

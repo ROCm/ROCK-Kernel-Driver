@@ -1,9 +1,3 @@
-/*
- * pas2.h
- *
- * Copyright:	Christoph Hellwig <chhellwig@gmx.net>
- *
- */
 
 /*	From pas_card.c	*/
 int pas_set_intr(int mask);

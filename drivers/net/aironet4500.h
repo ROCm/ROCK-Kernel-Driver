@@ -450,7 +450,7 @@ struct awc_fid_queue {
 };
 
 
-extern  __inline__ void
+static  __inline__ void
 awc_fid_queue_init(struct awc_fid_queue * queue){
 
 	unsigned long flags;
@@ -463,7 +463,7 @@ awc_fid_queue_init(struct awc_fid_queue * queue){
 	spin_unlock_irqrestore(&queue->spinlock,flags);	
 };
 
-extern inline void
+static inline void
 awc_fid_queue_push_tail(	struct awc_fid_queue * 	queue,
 				struct awc_fid *	fid){
 
@@ -488,7 +488,7 @@ awc_fid_queue_push_tail(	struct awc_fid_queue * 	queue,
 };
 
 
-extern inline void
+static inline void
 awc_fid_queue_push_head(	struct awc_fid_queue * 	queue,
 				struct awc_fid *	fid){
 
@@ -513,7 +513,7 @@ awc_fid_queue_push_head(	struct awc_fid_queue * 	queue,
 
 
 
-extern inline void
+static inline void
 awc_fid_queue_rm(		struct awc_fid_queue * 	queue,
 				struct awc_fid *	fid){
 
@@ -541,7 +541,7 @@ awc_fid_queue_rm(		struct awc_fid_queue * 	queue,
 	}		
 };
 
-extern inline void
+static inline void
 awc_fid_queue_remove(		struct awc_fid_queue * 	queue,
 				struct awc_fid *	fid){
 	unsigned long flags;
@@ -555,7 +555,7 @@ awc_fid_queue_remove(		struct awc_fid_queue * 	queue,
 
 
 
-extern inline struct awc_fid * 
+static inline struct awc_fid * 
 awc_fid_queue_pop_head(		struct awc_fid_queue * 	queue){
 
 	unsigned long flags;
@@ -575,7 +575,7 @@ awc_fid_queue_pop_head(		struct awc_fid_queue * 	queue){
 
 
 
-extern inline struct awc_fid * 
+static inline struct awc_fid * 
 awc_fid_queue_pop_tail(		struct awc_fid_queue * 	queue){
 
 	unsigned long flags;

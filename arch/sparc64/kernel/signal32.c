@@ -1403,8 +1403,8 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -1446,7 +1446,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 				struct signal_struct *sig;
 
 				current->exit_code = signr;
-				sig = current->p_pptr->sig;
+				sig = current->parent->sig;
 				preempt_disable();
 				current->state = TASK_STOPPED;
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags &

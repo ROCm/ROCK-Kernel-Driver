@@ -1,5 +1,5 @@
 /* The "unknown" protocol.  This is what is used for protocols we
- * don't understand.  It's returned by find_proto().
+ * don't understand.  It's returned by ip_ct_find_proto().
  */
 
 #include <linux/types.h>

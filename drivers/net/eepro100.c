@@ -826,8 +826,9 @@ static int speedo_found1(struct pci_dev *pdev,
 	sp->phy[0] = eeprom[6];
 	sp->phy[1] = eeprom[7];
 	sp->rx_bug = (eeprom[3] & 0x03) == 3 ? 0 : 1;
-	if (((pdev->device > 0x1030 && (pdev->device < 0x1039))) 
-	    || (pdev->device == 0x2449)) {
+	if (((pdev->device > 0x1030 && (pdev->device < 0x103F))) 
+	    || (pdev->device == 0x2449) || (pdev->device == 0x2459) 
+            || (pdev->device == 0x245D)) {
 	    	sp->chip_id = 1;
 	}
 
@@ -1795,6 +1796,7 @@ speedo_rx(struct net_device *dev)
 			}
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
+			dev->last_rx = jiffies;
 			sp->stats.rx_packets++;
 			sp->stats.rx_bytes += pkt_len;
 		}
@@ -2284,8 +2286,17 @@ static struct pci_device_id eepro100_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, 0x1036, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x1037, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x1038, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x1039, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x103A, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x103B, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x103C, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x103D, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x103E, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x1227, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x1228, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x2449, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x2459, PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, 0x245D, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x5200, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, 0x5201, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0,}

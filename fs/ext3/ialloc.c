@@ -509,7 +509,7 @@ repeat:
 	if (IS_SYNC(inode))
 		handle->h_sync = 1;
 	insert_inode_hash(inode);
-	inode->i_generation = event++;
+	inode->i_generation = sb->u.ext3_sb.s_next_generation++;
 
 	ei->i_state = EXT3_STATE_NEW;
 	err = ext3_mark_inode_dirty(handle, inode);

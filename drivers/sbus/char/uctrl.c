@@ -389,15 +389,11 @@ static int __init ts102_uctrl_init(void)
 	if(!driver->irq) 
 		driver->irq = tmp_irq[0].pri;
 
-	request_irq(driver->irq, uctrl_interrupt, 0, 
-		    "uctrl", driver);
-
-	enable_irq(driver->irq);
+	request_irq(driver->irq, uctrl_interrupt, 0, "uctrl", driver);
 
 	if (misc_register(&uctrl_dev)) {
 		printk("%s: unable to get misc minor %d\n",
 		       __FUNCTION__, uctrl_dev.minor);
-		disable_irq(driver->irq);
 		free_irq(driver->irq, driver);
 		return -ENODEV;
 	}
@@ -414,10 +410,8 @@ static void __exit ts102_uctrl_cleanup(void)
 	struct uctrl_driver *driver = &drv;
 
 	misc_deregister(&uctrl_dev);
-	if (driver->irq) {
-		disable_irq(driver->irq);
+	if (driver->irq)
 		free_irq(driver->irq, driver);
-	}
 	if (driver->regs)
 		driver->regs = 0;
 }

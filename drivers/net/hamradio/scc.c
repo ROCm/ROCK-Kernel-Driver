@@ -1661,7 +1661,7 @@ static void scc_net_rx(struct scc_channel *scc, struct sk_buff *skb)
 	skb->pkt_type = PACKET_HOST;
 	
 	netif_rx(skb);
-	dev->last_rx = jiffies;
+	scc->dev->last_rx = jiffies;
 	return;
 }
 
@@ -2180,5 +2180,6 @@ static void __exit scc_cleanup_driver(void)
 MODULE_AUTHOR("Joerg Reuter <jreuter@yaina.de>");
 MODULE_DESCRIPTION("AX.25 Device Driver for Z8530 based HDLC cards");
 MODULE_SUPPORTED_DEVICE("Z8530 based SCC cards for Amateur Radio");
+MODULE_LICENSE("GPL");
 module_init(scc_init_driver);
 module_exit(scc_cleanup_driver);

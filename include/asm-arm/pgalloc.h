@@ -30,4 +30,6 @@ extern void free_pgd_slow(pgd_t *pgd);
 #define pgd_alloc(mm)			get_pgd_slow(mm)
 #define pgd_free(pgd)			free_pgd_slow(pgd)
 
+#define check_pgt_cache()		do { } while (0)
+
 #endif

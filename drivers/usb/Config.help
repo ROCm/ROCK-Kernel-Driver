@@ -37,66 +37,16 @@ CONFIG_USB_LONG_TIMEOUT
   If you have an MGE Ellipse UPS, or you see timeouts in HID
   transactions, say Y; otherwise say N.
 
-CONFIG_USB_UHCI
-  The Universal Host Controller Interface is a standard by Intel for
-  accessing the USB hardware in the PC (which is also called the USB
-  host controller). If your USB host controller conforms to this
-  standard, you may want to say Y, but see below. All recent boards
-  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
-  i810, i820) conform to this standard. Also all VIA PCI chipsets
-  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
-  133).
-
-  Currently there exist two drivers for UHCI host controllers: this
-  one and the so-called JE driver, which you can get from
-  "UHCI alternate (JE) support", below. You need only one.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-uhci.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_UHCI_ALT
-  The Universal Host Controller Interface is a standard by Intel for
-  accessing the USB hardware in the PC (which is also called the USB
-  host controller). If your USB host controller conforms to this
-  standard, you may want to say Y, but see below. All recent boards
-  with Intel PCI chipsets (like intel 430TX, 440FX, 440LX, 440BX,
-  i810, i820) conform to this standard. Also all VIA PCI chipsets
-  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
-  133). If unsure, say Y.
-
-  Currently there exist two drivers for UHCI host controllers: this
-  so-called JE driver, and the one you get from "UHCI support", above.
-  You need only one.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called uhci.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_OHCI
-  The Open Host Controller Interface is a standard by
-  Compaq/Microsoft/National for accessing the USB PC hardware (also
-  called USB host controller). If your USB host controller conforms to
-  this standard, say Y. The USB host controllers on most non-Intel
-  architectures and on several x86 compatibles with non-Intel chipsets
-  -- like SiS (aktual 610, 610 and so on) or ALi (ALi IV, ALi V,
-  Aladdin Pro..) -- conform to this standard.
-
-  You may want to read <file:Documentation/usb/ohci.txt>.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-ohci.o. If you want to compile it
-  as a module, say M here and read <file:Documentation/modules.txt>.
-
 CONFIG_USB_HID
   Say Y here if you want full HID support to connect keyboards,
   mice, joysticks, graphic tablets, or any other HID based devices
-  to your computer via USB. You can't use this driver and the
-  HIDBP (Boot Protocol) keyboard and mouse drivers at the same time.
-  More information is available: <file:Documentation/input/input.txt>.
+  to your computer via USB. You also need to select HID Input layer
+  support (below) if you want to use keyboards, mice, joysticks and
+  the like.
+
+  You can't use this driver and the HIDBP (Boot Protocol) keyboard
+  and mouse drivers at the same time. More information is available:
+  <file:Documentation/input/input.txt>.
 
   If unsure, say Y.
 
@@ -104,6 +54,13 @@ CONFIG_USB_HID
   inserted in and removed from the running kernel whenever you want).
   The module will be called hid.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_HIDINPUT
+  Say Y here if you want to use a USB keyboard, mouse or joystick,
+  or any other HID input device. You also need Input layer support, 
+  (CONFIG_INPUT) which you select under "Input core support".
+
+  If unsure, say Y.
 
 CONFIG_USB_HIDDEV
   Say Y here if you want to support HID devices (from the USB
@@ -114,31 +71,35 @@ CONFIG_USB_HIDDEV
   event interface on /dev/usb/hiddevX (char 180:96 to 180:111).
   This driver requires CONFIG_USB_HID.
 
-  If unsure, say N.
+  If unsure, say Y.
 
 CONFIG_USB_KBD
-  Say Y here if you don't want to use the generic HID driver for your
-  USB keyboard and prefer to use the keyboard in its limited Boot
-  Protocol mode instead. This driver is much smaller than the HID one.
+  Say Y here only if you are absolutely sure that you don't want
+  to use the generic HID driver for your USB keyboard and prefer
+  to use the keyboard in its limited Boot Protocol mode instead.
+
+  This is almost certainly not what you want.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbkbd.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-  If unsure, say N.
+  If even remotely unsure, say N.
 
 CONFIG_USB_MOUSE
-  Say Y here if you don't want to use the generic HID driver for your
-  USB mouse and prefer to use the mouse in its limited Boot Protocol
-  mode instead. This driver is much smaller than the HID one.
+  Say Y here only if you are absolutely sure that you don't want
+  to use the generic HID driver for your USB keyboard and prefer
+  to use the keyboard in its limited Boot Protocol mode instead.
+
+  This is almost certainly not what you want.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called usbmouse.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
-  If unsure, say N.
+  If even remotely unsure, say N.
 
 CONFIG_USB_WACOM
   Say Y here if you want to use the USB version of the Wacom Intuos
@@ -332,12 +293,22 @@ CONFIG_USB_PEGASUS
   If in doubt then look at linux/drivers/usb/pegasus.h for the complete
   list of supported devices.
   If your particular adapter is not in the list and you are _sure_ it
-  is Pegasus or Pegasus II based then send me (pmanolov@users.sourceforge.net)
+  is Pegasus or Pegasus II based then send me (petkan@users.sourceforge.net)
   vendor and device IDs.
 
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called pegasus.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_RTL8150
+  Say Y here if you have RTL8150 based usb-ethernet adapter.
+  Send me (petkan@users.sourceforge.net) any comments you may have.
+  You can also check for updates at http://pegasus2.sourceforge.net/
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called rtl8150.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_USB_KAWETH
@@ -419,32 +390,6 @@ CONFIG_USB_MDC800
   inserted in and removed from the running kernel whenever you want).
   The module will be called mdc800.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE
-  Say Y here if you want to connect USB mass storage devices to your
-  computer's USB port.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called usb-storage.o. If you want to compile it
-  as a module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_USB_STORAGE_DEBUG
-  Say Y here in order to have the USB Mass Storage code generate
-  verbose debugging messages.
-
-CONFIG_USB_STORAGE_ISD200
-  Say Y here if you want to use USB Mass Store devices based
-  on the In-Systems Design ISD-200 USB/ATA bridge.
-
-  Some of the products that use this chip are:
-
-    - Archos Jukebox 6000
-    - ISD SmartCable for Storage
-    - Taiwan Skymaster CD530U/DEL-0241 IDE bridge
-    - Sony CRX10U CD-R/RW drive
-    - CyQ've CQ8060A CDRW drive
-    - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
 
 CONFIG_USB_USS720
   This driver is for USB parallel port adapters that use the Lucent
@@ -551,19 +496,6 @@ CONFIG_USB_USBNET
   The module will be called usbnet.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_USB_STORAGE_FREECOM
-  Support for the Freecom USB to IDE/ATAPI adaptor.
-  Freecom has a web page at <http://www.freecom.de/>.
-
-CONFIG_USB_STORAGE_DPCM
-  Say Y here to support the Microtech ZiO! CompactFlash/SmartMedia
-  reader, details at <http://www.microtechint.com/zio/index.html>.
-  This driver treats the flash card as a removable storage device.
-
-CONFIG_USB_STORAGE_SDDR09
-  Say Y here to include additional code to support the Sandisk SDDR-09
-  SmartMedia reader in the USB Mass Storage driver.
-
 CONFIG_USB_RIO500
   Say Y here if you want to connect a USB Rio500 mp3 player to your
   computer's USB port. Please read <file:Documentation/usb/rio.txt>
@@ -626,3 +558,21 @@ CONFIG_USB_BLUETOOTH
   The module will be called bluetooth.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_USB_TIGL
+  If you own a Texas Instruments graphing calculator and use a 
+  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
+  interested in this driver.
+
+  If you enable this driver, you will be able to communicate with
+  your calculator through a set of device nodes under /dev.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tiglusb.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+  If you don't know what the SilverLink cable is or what a Texas
+  Instruments graphing calculator is, then you probably don't need this
+  driver.
+
+  If unsure, say N.

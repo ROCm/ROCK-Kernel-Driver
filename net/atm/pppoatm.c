@@ -363,3 +363,4 @@ module_exit(pppoatm_exit);
 
 MODULE_AUTHOR("Mitchell Blank Jr <mitch@sfgoth.com>");
 MODULE_DESCRIPTION("RFC2364 PPP over ATM/AAL5");
+MODULE_LICENSE("GPL");

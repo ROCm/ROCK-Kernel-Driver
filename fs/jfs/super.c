@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,7 +20,7 @@
 #include <linux/locks.h>
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/slab.h>
+#include <linux/completion.h>
 #include <asm/uaccess.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
@@ -170,9 +169,9 @@ static int parse_options (char * options, struct jfs_sb_info *sbi)
 
 	if (!options)
 		return 1;
-	for (this_char = strtok (options, ",");
-	     this_char != NULL;
-	     this_char = strtok (NULL, ",")) {
+	while ((this_char = strsep (&options, ",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
 		if (!strcmp (this_char, "iocharset")) {
@@ -268,10 +267,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	/*
 	 * Initialize blocksize to 4K.
 	 */
-	sb->s_blocksize = PSIZE;
-	sb->s_blocksize_bits = L2PSIZE;
-	set_blocksize(sb->s_dev, PSIZE);
-
+	sb_set_blocksize(sb, PSIZE);
 	sb->s_op = &jfs_sops;
 	/*
 	 * Initialize direct-mapping inode/address-space

@@ -63,7 +63,6 @@ ENTRY(cpu_arm720_dcache_invalidate_range)
 ENTRY(cpu_arm720_dcache_clean_range)
 ENTRY(cpu_arm720_dcache_clean_page)
 ENTRY(cpu_arm720_dcache_clean_entry)
-ENTRY(cpu_arm720_flush_ram_page)
 		mov	pc, lr
 
 /*
@@ -211,7 +210,6 @@ ENTRY(arm720_processor_functions)
 		/* cache */
 		.word	cpu_arm720_cache_clean_invalidate_all
 		.word	cpu_arm720_cache_clean_invalidate_range
-		.word	cpu_arm720_flush_ram_page
 
 		/* dcache */
 		.word	cpu_arm720_dcache_invalidate_range

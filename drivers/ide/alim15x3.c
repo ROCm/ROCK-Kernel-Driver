@@ -242,13 +242,13 @@ static struct pci_dev *isa_dev;
 static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 {
 	struct ata_timing *t;
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
 	int s_time, a_time, c_time;
 	byte s_clc, a_clc, r_clc;
 	unsigned long flags;
-	int port = hwif->index ? 0x5c : 0x58;
-	int portFIFO = hwif->channel ? 0x55 : 0x54;
+	int port = hwif->unit ? 0x5c : 0x58;
+	int portFIFO = hwif->unit ? 0x55 : 0x54;
 	byte cd_dma_fifo = 0;
 
 	if (pio == 255)
@@ -305,11 +305,11 @@ static void ali15x3_tune_drive (ide_drive_t *drive, byte pio)
 
 static int ali15x3_tune_chipset (ide_drive_t *drive, byte speed)
 {
-	ide_hwif_t *hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev	= hwif->pci_dev;
 	byte unit		= (drive->select.b.unit & 0x01);
 	byte tmpbyte		= 0x00;
-	int m5229_udma		= hwif->channel? 0x57 : 0x56;
+	int m5229_udma		= hwif->unit ? 0x57 : 0x56;
 	int err			= 0;
 
 	if (speed < XFER_UDMA_0) {
@@ -431,10 +431,10 @@ static byte ali15x3_can_ultra (ide_drive_t *drive)
 
 static int ali15x3_config_drive_for_dma(ide_drive_t *drive)
 {
-	struct hd_driveid *id		= drive->id;
-	ide_hwif_t *hwif		= HWIF(drive);
-	ide_dma_action_t dma_func	= ide_dma_on;
-	byte can_ultra_dma		= ali15x3_can_ultra(drive);
+	struct hd_driveid *id = drive->id;
+	struct ata_channel *hwif = drive->channel;
+	ide_dma_action_t dma_func = ide_dma_on;
+	byte can_ultra_dma = ali15x3_can_ultra(drive);
 
 	if ((m5229_revision<=0x20) && (drive->type != ATA_DISK))
 		return hwif->dmaproc(ide_dma_off_quietly, drive);
@@ -537,7 +537,7 @@ unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
  * of UDMA66 transfers. It doesn't check the drives.
  * But see note 2 below!
  */
-unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
+unsigned int __init ata66_ali15x3(struct ata_channel *hwif)
 {
 	struct pci_dev *dev	= hwif->pci_dev;
 	unsigned int ata66	= 0;
@@ -597,7 +597,7 @@ unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
 		/*
 		 * Allow ata66 if cable of current channel has 80 pins
 		 */
-		ata66 = (hwif->channel)?cable_80_pin[1]:cable_80_pin[0];
+		ata66 = (hwif->unit)?cable_80_pin[1]:cable_80_pin[0];
 	} else {
 		/*
 		 * revision 0x20 (1543-E, 1543-F)
@@ -632,14 +632,14 @@ unsigned int __init ata66_ali15x3 (ide_hwif_t *hwif)
 	return(ata66);
 }
 
-void __init ide_init_ali15x3 (ide_hwif_t *hwif)
+void __init ide_init_ali15x3(struct ata_channel *hwif)
 {
 #ifndef CONFIG_SPARC64
 	byte ideic, inmir;
 	byte irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
 				      1, 11, 0, 12, 0, 14, 0, 15 };
 
-	hwif->irq = hwif->channel ? 15 : 14;
+	hwif->irq = hwif->unit ? 15 : 14;
 
 	if (isa_dev) {
 		/*
@@ -651,14 +651,14 @@ void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 		ideic = ideic & 0x03;
 
 		/* get IRQ for IDE Controller */
-		if ((hwif->channel && ideic == 0x03) || (!hwif->channel && !ideic)) {
+		if ((hwif->unit && ideic == 0x03) || (!hwif->unit && !ideic)) {
 			/*
 			 * get SIRQ1 routing table
 			 */
 			pci_read_config_byte(isa_dev, 0x44, &inmir);
 			inmir = inmir & 0x0f;
 			hwif->irq = irq_routing_table[inmir];
-		} else if (hwif->channel && !(ideic & 0x01)) {
+		} else if (hwif->unit && !(ideic & 0x01)) {
 			/*
 			 * get SIRQ2 routing table
 			 */
@@ -690,7 +690,7 @@ void __init ide_init_ali15x3 (ide_hwif_t *hwif)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
-void __init ide_dmacapable_ali15x3 (ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_ali15x3(struct ata_channel *hwif, unsigned long dmabase)
 {
 	if ((dmabase) && (m5229_revision < 0x20)) {
 		return;

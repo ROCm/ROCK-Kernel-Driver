@@ -1,6 +1,5 @@
 /*
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -19,7 +18,6 @@
 
 #include <linux/fs.h>
 #include <linux/locks.h>
-#include <linux/slab.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_imap.h"

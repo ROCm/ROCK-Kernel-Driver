@@ -3,6 +3,9 @@
  * Purpose:	Generic MCA handling layer
  *
  * Updated for latest kernel
+ * Copyright (C) 2002 Dell Computer Corporation
+ * Copyright (C) Matt Domsch (Matt_Domsch@dell.com)
+ *
  * Copyright (C) 2002 Intel
  * Copyright (C) Jenna Hall (jenna.s.hall@intel.com)
  *
@@ -14,6 +17,8 @@
  *
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) Vijay Chander(vijay@engr.sgi.com)
+ *
+ * 02/03/25 M. Domsch	GUID cleanups
  *
  * 02/01/04 J. Hall	Aligned MCA stack to 16 bytes, added platform vs. CPU
  *			error flag, set SAL default return values, changed
@@ -348,17 +353,13 @@ static int
 verify_guid (efi_guid_t *test, efi_guid_t *target)
 {
 	int     rc;
+	char out[40];
 
-	if ((rc = memcmp((void *)test, (void *)target, sizeof(efi_guid_t)))) {
-		IA64_MCA_DEBUG("ia64_mca_print: invalid guid = "
-			       "{ %08x, %04x, %04x, { %#02x, %#02x, %#02x, %#02x, "
-			       "%#02x, %#02x, %#02x, %#02x, } } \n ",
-			       test->data1, test->data2, test->data3, test->data4[0],
-			       test->data4[1], test->data4[2], test->data4[3],
-			       test->data4[4], test->data4[5], test->data4[6],
-			       test->data4[7]);
+	if ((rc = efi_guidcmp(*test, *target))) {
+		IA64_MCA_DEBUG(KERN_DEBUG
+			       "verify_guid: invalid GUID = %s\n",
+			       efi_guid_unparse(test, out));
 	}
-
 	return rc;
 }
 
@@ -856,11 +857,8 @@ ia64_init_handler (struct pt_regs *regs)
 void
 ia64_log_prt_guid (efi_guid_t *p_guid, prfunc_t prfunc)
 {
-	printk("GUID = { %08x, %04x, %04x, { %#02x, %#02x, %#02x, %#02x, "
-	       "%#02x, %#02x, %#02x, %#02x, } } \n ", p_guid->data1,
-	       p_guid->data2, p_guid->data3, p_guid->data4[0], p_guid->data4[1],
-	       p_guid->data4[2], p_guid->data4[3], p_guid->data4[4],
-	       p_guid->data4[5], p_guid->data4[6], p_guid->data4[7]);
+	char out[40];
+	printk(KERN_DEBUG "GUID = %s\n", efi_guid_unparse(p_guid, out));
 }
 
 static void
@@ -1754,7 +1752,7 @@ ia64_log_processor_info_print(sal_log_record_header_t *lh, prfunc_t prfunc)
 		ia64_log_prt_section_header(slsh, prfunc);
 #endif  // MCA_PRT_XTRA_DATA for test only @FVL
 
-		if (verify_guid((void *)&slsh->guid, (void *)&(SAL_PROC_DEV_ERR_SECT_GUID))) {
+		if (verify_guid(&slsh->guid, &(SAL_PROC_DEV_ERR_SECT_GUID))) {
 			IA64_MCA_DEBUG("ia64_mca_log_print: unsupported record section\n");
 			continue;
 		}

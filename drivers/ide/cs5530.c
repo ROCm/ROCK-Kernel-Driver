@@ -101,7 +101,7 @@ static unsigned int cs5530_pio_timings[2][5] =
  * After chip reset, the PIO timings are set to 0x0000e132, which is not valid.
  */
 #define CS5530_BAD_PIO(timings) (((timings)&~0x80000000)==0x0000e132)
-#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->channel ? 0x30 : 0x20))
+#define CS5530_BASEREG(hwif)	(((hwif)->dma_base & ~0xf) + ((hwif)->unit ? 0x30 : 0x20))
 
 /*
  * cs5530_tuneproc() handles selection/setting of PIO modes
@@ -112,7 +112,7 @@ static unsigned int cs5530_pio_timings[2][5] =
  */
 static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "autotune" */
 {
-	ide_hwif_t	*hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	unsigned int	format, basereg = CS5530_BASEREG(hwif);
 
 	if (pio == 255)
@@ -134,7 +134,7 @@ static void cs5530_tuneproc (ide_drive_t *drive, byte pio)	/* pio=255 means "aut
 static int cs5530_config_dma (ide_drive_t *drive)
 {
 	int			udma_ok = 1, mode = 0;
-	ide_hwif_t		*hwif = HWIF(drive);
+	struct ata_channel *hwif = drive->channel;
 	int			unit = drive->select.b.unit;
 	ide_drive_t		*mate = &hwif->drives[unit^1];
 	struct hd_driveid	*id = drive->id;
@@ -344,7 +344,7 @@ unsigned int __init pci_init_cs5530(struct pci_dev *dev)
  * This gets invoked by the IDE driver once for each channel,
  * and performs channel-specific pre-initialization before drive probing.
  */
-void __init ide_init_cs5530 (ide_hwif_t *hwif)
+void __init ide_init_cs5530(struct ata_channel *hwif)
 {
 	if (hwif->mate)
 		hwif->serialized = hwif->mate->serialized = 1;

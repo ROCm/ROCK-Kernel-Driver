@@ -1,4 +1,5 @@
 /* FTP extension for IP connection tracking. */
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/ip.h>
@@ -242,8 +243,10 @@ static int help(const struct iphdr *iph, size_t len,
 	u_int32_t array[6] = { 0 };
 	int dir = CTINFO2DIR(ctinfo);
 	unsigned int matchlen, matchoff;
-	struct ip_conntrack_tuple t, mask;
-	struct ip_ct_ftp *info = &ct->help.ct_ftp_info;
+	struct ip_ct_ftp_master *ct_ftp_info = &ct->help.ct_ftp_info;
+	struct ip_conntrack_expect expect, *exp = &expect;
+	struct ip_ct_ftp_expect *exp_ftp_info = &exp->help.exp_ftp_info;
+
 	unsigned int i;
 	int found = 0;
 
@@ -271,8 +274,8 @@ static int help(const struct iphdr *iph, size_t len,
 	}
 
 	LOCK_BH(&ip_ftp_lock);
-	old_seq_aft_nl_set = info->seq_aft_nl_set[dir];
-	old_seq_aft_nl = info->seq_aft_nl[dir];
+	old_seq_aft_nl_set = ct_ftp_info->seq_aft_nl_set[dir];
+	old_seq_aft_nl = ct_ftp_info->seq_aft_nl[dir];
 
 	DEBUGP("conntrack_ftp: datalen %u\n", datalen);
 	if ((datalen > 0) && (data[datalen-1] == '\n')) {
@@ -281,8 +284,9 @@ static int help(const struct iphdr *iph, size_t len,
 		    || after(ntohl(tcph->seq) + datalen, old_seq_aft_nl)) {
 			DEBUGP("conntrack_ftp: updating nl to %u\n",
 			       ntohl(tcph->seq) + datalen);
-			info->seq_aft_nl[dir] = ntohl(tcph->seq) + datalen;
-			info->seq_aft_nl_set[dir] = 1;
+			ct_ftp_info->seq_aft_nl[dir] = 
+						ntohl(tcph->seq) + datalen;
+			ct_ftp_info->seq_aft_nl_set[dir] = 1;
 		}
 	}
 	UNLOCK_BH(&ip_ftp_lock);
@@ -330,16 +334,17 @@ static int help(const struct iphdr *iph, size_t len,
 	DEBUGP("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
 	       (int)matchlen, data + matchoff,
 	       matchlen, ntohl(tcph->seq) + matchoff);
+	       
+	memset(&expect, 0, sizeof(expect));
 
 	/* Update the ftp info */
 	LOCK_BH(&ip_ftp_lock);
 	if (htonl((array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3])
 	    == ct->tuplehash[dir].tuple.src.ip) {
-		info->is_ftp = 21;
-		info->seq = ntohl(tcph->seq) + matchoff;
-		info->len = matchlen;
-		info->ftptype = search[i].ftptype;
-		info->port = array[4] << 8 | array[5];
+		exp->seq = ntohl(tcph->seq) + matchoff;
+		exp_ftp_info->len = matchlen;
+		exp_ftp_info->ftptype = search[i].ftptype;
+		exp_ftp_info->port = array[4] << 8 | array[5];
 	} else {
 		/* Enrico Scholz's passive FTP to partially RNAT'd ftp
 		   server: it really wants us to connect to a
@@ -356,18 +361,21 @@ static int help(const struct iphdr *iph, size_t len,
 		if (!loose) goto out;
 	}
 
-	t = ((struct ip_conntrack_tuple)
+	exp->tuple = ((struct ip_conntrack_tuple)
 		{ { ct->tuplehash[!dir].tuple.src.ip,
 		    { 0 } },
 		  { htonl((array[0] << 24) | (array[1] << 16)
 			  | (array[2] << 8) | array[3]),
 		    { htons(array[4] << 8 | array[5]) },
 		    IPPROTO_TCP }});
-	mask = ((struct ip_conntrack_tuple)
+	exp->mask = ((struct ip_conntrack_tuple)
 		{ { 0xFFFFFFFF, { 0 } },
 		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+
+	exp->expectfn = NULL;
+
 	/* Ignore failure; should only happen with NAT */
-	ip_conntrack_expect_related(ct, &t, &mask, NULL);
+	ip_conntrack_expect_related(ct, &expect);
  out:
 	UNLOCK_BH(&ip_ftp_lock);
 
@@ -375,6 +383,7 @@ static int help(const struct iphdr *iph, size_t len,
 }
 
 static struct ip_conntrack_helper ftp[MAX_PORTS];
+static char ftp_names[MAX_PORTS][10];
 
 /* Not __exit: called from init() */
 static void fini(void)
@@ -390,9 +399,10 @@ static void fini(void)
 static int __init init(void)
 {
 	int i, ret;
+	char *tmpname;
 
 	if (ports[0] == 0)
-		ports[0] = 21;
+		ports[0] = FTP_PORT;
 
 	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
 		memset(&ftp[i], 0, sizeof(struct ip_conntrack_helper));
@@ -400,7 +410,19 @@ static int __init init(void)
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].mask.src.u.tcp.port = 0xFFFF;
 		ftp[i].mask.dst.protonum = 0xFFFF;
+		ftp[i].max_expected = 1;
+		ftp[i].timeout = 0;
+		ftp[i].flags = IP_CT_HELPER_F_REUSE_EXPECT;
+		ftp[i].me = ip_conntrack_ftp;
 		ftp[i].help = help;
+
+		tmpname = &ftp_names[i][0];
+		if (ports[i] == FTP_PORT)
+			sprintf(tmpname, "ftp");
+		else
+			sprintf(tmpname, "ftp-%d", ports[i]);
+		ftp[i].name = tmpname;
+
 		DEBUGP("ip_ct_ftp: registering helper for port %d\n", 
 				ports[i]);
 		ret = ip_conntrack_helper_register(&ftp[i]);
@@ -414,10 +436,10 @@ static int __init init(void)
 	return 0;
 }
 
-
+#ifdef CONFIG_IP_NF_NAT_NEEDED
 EXPORT_SYMBOL(ip_ftp_lock);
-EXPORT_SYMBOL(ip_conntrack_ftp);
-MODULE_LICENSE("GPL");
+#endif
 
+MODULE_LICENSE("GPL");
 module_init(init);
 module_exit(fini);

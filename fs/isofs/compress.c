@@ -330,7 +330,7 @@ struct address_space_operations zisofs_aops = {
 	/* No bmap operation supported */
 };
 
-static int initialized = 0;
+static int initialized;
 
 int __init zisofs_init(void)
 {

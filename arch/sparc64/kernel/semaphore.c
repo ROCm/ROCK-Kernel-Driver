@@ -7,6 +7,7 @@
  */
 
 #include <linux/sched.h>
+#include <linux/errno.h>
 
 /*
  * Atomically update sem->count.

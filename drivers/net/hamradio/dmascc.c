@@ -305,6 +305,7 @@ static unsigned long rand;
 MODULE_AUTHOR("Klaus Kudielka");
 MODULE_DESCRIPTION("Driver for high-speed SCC boards");
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_NUM_DEVS) "i");
+MODULE_LICENSE("GPL");
 
 
 int init_module(void) {
@@ -1121,6 +1122,7 @@ static void rx_bh(void *arg) {
       skb->protocol = ntohs(ETH_P_AX25);
       skb->mac.raw = skb->data;
       netif_rx(skb);
+      priv->dev->last_rx = jiffies;
       priv->stats.rx_packets++;
       priv->stats.rx_bytes += cb;
     }

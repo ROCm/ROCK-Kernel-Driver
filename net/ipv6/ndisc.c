@@ -361,7 +361,7 @@ void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	ipv6_addr_copy(&msg->target, solicited_addr);
 
 	if (inc_opt)
-		ndisc_fill_option((void*)&msg->opt, ND_OPT_TARGET_LL_ADDR, dev->dev_addr, dev->addr_len);
+		ndisc_fill_option(msg->opt, ND_OPT_TARGET_LL_ADDR, dev->dev_addr, dev->addr_len);
 
 	/* checksum */
 	msg->icmph.icmp6_cksum = csum_ipv6_magic(solicited_addr, daddr, len, 
@@ -422,7 +422,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	ipv6_addr_copy(&msg->target, solicit);
 
 	if (send_llinfo)
-		ndisc_fill_option((void*)&msg->opt, ND_OPT_SOURCE_LL_ADDR, dev->dev_addr, dev->addr_len);
+		ndisc_fill_option(msg->opt, ND_OPT_SOURCE_LL_ADDR, dev->dev_addr, dev->addr_len);
 
 	/* checksum */
 	msg->icmph.icmp6_cksum = csum_ipv6_magic(&skb->nh.ipv6h->saddr,
@@ -570,6 +570,11 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr) & IPV6_ADDR_LINKLOCAL)) {
 		if (net_ratelimit())
 			printk(KERN_WARNING "ICMP RA: source address is not linklocal\n");
+		return;
+	}
+	if (optlen < 0) {
+		if (net_ratelimit())
+			printk(KERN_WARNING "ICMP RA: packet too short\n");
 		return;
 	}
 
@@ -928,7 +933,7 @@ ndisc_recv_ns(struct in6_addr *saddr, struct sk_buff *skb)
 	u8 *opt;
 
 	opt = skb->h.raw;
-	opt += sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
+	opt += sizeof(struct nd_msg);
 	opt = ndisc_find_option(opt, skb->dev->addr_len+2, skb->tail - opt, ND_OPT_SOURCE_LL_ADDR);
 
 	return neigh_event_ns(&nd_tbl, opt, saddr, skb->dev);
@@ -936,12 +941,11 @@ ndisc_recv_ns(struct in6_addr *saddr, struct sk_buff *skb)
 
 static __inline__ int ndisc_recv_na(struct neighbour *neigh, struct sk_buff *skb)
 {
-	struct nd_msg *msg = (struct nd_msg *) skb->h.raw;
 	u8 *opt;
+	struct nd_msg *msg = (struct nd_msg*) skb->h.raw;
 
-	opt = skb->h.raw;
-	opt += sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
-	opt = ndisc_find_option(opt, skb->dev->addr_len+2, skb->tail - opt, ND_OPT_TARGET_LL_ADDR);
+	opt = ndisc_find_option(msg->opt, skb->dev->addr_len+2,
+				skb->tail - msg->opt, ND_OPT_TARGET_LL_ADDR);
 
 	return neigh_update(neigh, opt,
 			    msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
@@ -962,7 +966,6 @@ int ndisc_rcv(struct sk_buff *skb)
 	struct nd_msg *msg = (struct nd_msg *) skb->h.raw;
 	struct neighbour *neigh;
 	struct inet6_ifaddr *ifp;
-	unsigned int payload_len;
 
 	__skb_push(skb, skb->data-skb->h.raw);
 
@@ -985,11 +988,9 @@ int ndisc_rcv(struct sk_buff *skb)
 	 *	(Some checking in ndisc_find_option)
 	 */
 
-	payload_len = ntohs(skb->nh.ipv6h->payload_len);
 	switch (msg->icmph.icmp6_type) {
 	case NDISC_NEIGHBOUR_SOLICITATION:
-		/* XXX: import nd_neighbor_solicit from glibc netinet/icmp6.h */
-		if (payload_len < 8+16) {
+		if (skb->len < sizeof(struct nd_msg)) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP NS: packet too short\n");
 			return 0;
@@ -1069,12 +1070,13 @@ int ndisc_rcv(struct sk_buff *skb)
 
 				neigh = ndisc_recv_ns(saddr, skb);
 
-				if (neigh) {
+				if (neigh || !dev->hard_header) {
 					ndisc_send_na(dev, neigh, saddr, &ifp->addr, 
 						      ifp->idev->cnf.forwarding, 1, 
 						      ipv6_addr_type(&ifp->addr)&IPV6_ADDR_ANYCAST ? 0 : 1, 
 						      1);
-					neigh_release(neigh);
+					if (neigh)
+						neigh_release(neigh);
 				}
 			}
 			in6_ifa_put(ifp);
@@ -1118,8 +1120,7 @@ int ndisc_rcv(struct sk_buff *skb)
 		return 0;
 
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
-		/* XXX: import nd_neighbor_advert from glibc netinet/icmp6.h */
-		if (payload_len < 16+8 ) {
+		if (skb->len < sizeof(struct nd_msg)) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP NA: packet too short\n");
 			return 0;
@@ -1180,34 +1181,11 @@ int ndisc_rcv(struct sk_buff *skb)
 		break;
 
 	case NDISC_ROUTER_ADVERTISEMENT:
-		/* XXX: import nd_router_advert from glibc netinet/icmp6.h */
-		if (payload_len < 8+4+4) {
-			if (net_ratelimit())
-				printk(KERN_WARNING "ICMP RA: packet too short\n");
-			return 0;
-		}
 		ndisc_router_discovery(skb);
 		break;
 
 	case NDISC_REDIRECT:
-		/* XXX: import nd_redirect from glibc netinet/icmp6.h */
-		if (payload_len < 8+16+16) {
-			if (net_ratelimit())
-				printk(KERN_WARNING "ICMP redirect: packet too short\n");
-			return 0;
-		}
 		ndisc_redirect_rcv(skb);
-		break;
-
-	case NDISC_ROUTER_SOLICITATION:
-		/* No RS support in the kernel, but we do some required checks */
-
-		/* XXX: import nd_router_solicit from glibc netinet/icmp6.h */
-		if (payload_len < 8) {
-			if (net_ratelimit())
-				printk(KERN_WARNING "ICMP RS: packet too short\n");
-			return 0;
-		}
 		break;
 	};
 

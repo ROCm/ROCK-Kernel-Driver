@@ -584,8 +584,6 @@ static int ext3_alloc_branch(handle_t *handle, struct inode *inode,
 			
 			parent = nr;
 		}
-		if (IS_SYNC(inode))
-			handle->h_sync = 1;
 	}
 	if (n == num)
 		return 0;

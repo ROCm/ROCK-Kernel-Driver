@@ -1,0 +1,33 @@
+Here is a list of what each subdirectory here is, and what is contained in
+them.
+
+core/		- This is for the core USB host code, including the
+		  usbfs files.
+
+host/		- This is for all of the USB host drivers.  This
+		  includes UHCI, OHCI, EHCI, and any others that might
+		  be created in the future.
+
+device/		- This is for all of the USB device controller drivers. 
+
+
+Individual USB driver directories.  A new driver should be added to the
+first subdirectory in the list below that it fits into.
+
+image/		- This is for still image drivers, like scanners or
+		  digital cameras.
+input/		- This if for any driver that uses the input subsystem,
+		  like keyboard, mice, touchscreens, tablets, etc.
+media/		- This is for multimedia drivers, like video cameras,
+		  radios, and any other drivers that talk to the v4l
+		  subsystem.
+net/		- This is for network drivers.
+serial/		- This is for USB to serial drivers.
+storage/	- This is for USB mass-storage drivers.
+class/		- This is for all USB device drivers that do not fit
+		  into any of the above categories, and work for a range
+		  of USB Class specified devices. 
+misc/		- This is for all USB device drivers that do not fit
+		  into any of the above categories.
+	  
+

@@ -62,6 +62,7 @@
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -995,6 +996,8 @@ void sem_exit (void)
 	struct sem_array *sma;
 	int nsems, i;
 
+	lock_kernel();
+
 	/* If the current process was sleeping for a semaphore,
 	 * remove it from the queue.
 	 */
@@ -1051,6 +1054,8 @@ next_entry:
 		sem_unlock(semid);
 	}
 	current->semundo = NULL;
+
+	unlock_kernel();
 }
 
 #ifdef CONFIG_PROC_FS

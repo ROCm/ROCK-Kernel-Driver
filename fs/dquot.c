@@ -59,6 +59,7 @@
 #include <linux/tty.h>
 #include <linux/file.h>
 #include <linux/slab.h>
+#include <linux/sysctl.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 
@@ -336,7 +337,7 @@ static void invalidate_dquots(struct super_block *sb, short type)
 	struct list_head *head;
 
 restart:
-	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
+	list_for_each(head, &inuse_list) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
 		if (dquot->dq_sb != sb)
 			continue;
@@ -366,7 +367,7 @@ int sync_dquots(struct super_block *sb, short type)
 
 	lock_kernel();
 restart:
-	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
+	list_for_each(head, &inuse_list) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
 		if (sb && dquot->dq_sb != sb)
 			continue;
@@ -578,7 +579,7 @@ static void add_dquot_ref(struct super_block *sb, short type)
 
 restart:
 	file_list_lock();
-	for (p = sb->s_files.next; p != &sb->s_files; p = p->next) {
+	list_for_each(p, &sb->s_files) {
 		struct file *filp = list_entry(p, struct file, f_list);
 		struct inode *inode = filp->f_dentry->d_inode;
 		if (filp->f_mode & FMODE_WRITE && dqinit_needed(inode, type)) {
@@ -1240,9 +1241,22 @@ warn_put_all:
 	return ret;
 }
 
+static ctl_table fs_table[] = {
+	{FS_NRDQUOT, "dquot-nr", &nr_dquots, 2*sizeof(int),
+	 0444, NULL, &proc_dointvec},
+	{},
+};
+
+static ctl_table dquot_table[] = {
+	{CTL_FS, "fs", NULL, 0, 0555, fs_table},
+	{},
+};
+
 static int __init dquot_init(void)
 {
 	int i;
+
+	register_sysctl_table(dquot_table, 0);
 
 	for (i = 0; i < NR_DQHASH; i++)
 		INIT_LIST_HEAD(dquot_hash + i);
@@ -1255,13 +1269,13 @@ __initcall(dquot_init);
  * Definitions of diskquota operations.
  */
 struct dquot_operations dquot_operations = {
-	dquot_initialize,		/* mandatory */
-	dquot_drop,			/* mandatory */
-	dquot_alloc_block,
-	dquot_alloc_inode,
-	dquot_free_block,
-	dquot_free_inode,
-	dquot_transfer
+	initialize:	dquot_initialize,		/* mandatory */
+	drop:		dquot_drop,			/* mandatory */
+	alloc_block:	dquot_alloc_block,
+	alloc_inode:	dquot_alloc_inode,
+	free_block:	dquot_free_block,
+	free_inode:	dquot_free_inode,
+	transfer:	dquot_transfer
 };
 
 static inline void set_enable_flags(struct quota_mount_options *dqopt, short type)

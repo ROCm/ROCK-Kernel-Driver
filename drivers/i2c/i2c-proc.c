@@ -119,6 +119,10 @@ int i2c_create_name(char **name, const char *prefix,
 		sprintf(name_buffer, "%s-i2c-%d-%02x", prefix, id, addr);
 	}
 	*name = kmalloc(strlen(name_buffer) + 1, GFP_KERNEL);
+	if (!*name) {
+		printk (KERN_WARNING "i2c_create_name: not enough memory\n");
+		return -ENOMEM;
+	}
 	strcpy(*name, name_buffer);
 	return 0;
 }

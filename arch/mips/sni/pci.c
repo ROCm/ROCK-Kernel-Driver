@@ -25,7 +25,7 @@ do {                                                                         \
 		 ((dev->bus->number    & 0xff) << 0x10) |                    \
 	         ((dev->devfn & 0xff) << 0x08) |                             \
 	         (where  & 0xfc);                                            \
-} while(0);
+} while(0)
 
 #if 0
 /* To do:  Bring this uptodate ...  */

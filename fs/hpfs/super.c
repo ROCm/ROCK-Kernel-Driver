@@ -3,7 +3,7 @@
  *
  *  Mikulas Patocka (mikulas@artax.karlin.mff.cuni.cz), 1998-1999
  *
- *  mouning, unmounting, error handling
+ *  mounting, unmounting, error handling
  */
 
 #include <linux/string.h>
@@ -222,7 +222,9 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 
 	/*printk("Parsing opts: '%s'\n",opts);*/
 
-	for (p = strtok(opts, ","); p != 0; p = strtok(0, ",")) {
+	while ((p = strsep(&opts, ",")) != NULL) {
+		if (!*p)
+			continue;
 		if ((rhs = strchr(p, '=')) != 0)
 			*rhs++ = '\0';
 		if (!strcmp(p, "help")) return 2;

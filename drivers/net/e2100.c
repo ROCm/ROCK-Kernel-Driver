@@ -72,7 +72,7 @@ static int e21_probe_list[] = {0x300, 0x280, 0x380, 0x220, 0};
 #define E21_SAPROM		0x10	/* Offset to station address data. */
 #define E21_IO_EXTENT	 0x20
 
-extern inline void mem_on(short port, volatile char *mem_base,
+static inline void mem_on(short port, volatile char *mem_base,
 						  unsigned char start_page )
 {
 	/* This is a little weird: set the shared memory window by doing a
@@ -82,7 +82,7 @@ extern inline void mem_on(short port, volatile char *mem_base,
 	outb(E21_MEM_ON, port + E21_MEM_ENABLE + E21_MEM_ON);
 }
 
-extern inline void mem_off(short port)
+static inline void mem_off(short port)
 {
 	inb(port + E21_MEM_ENABLE);
 	outb(0x00, port + E21_MEM_ENABLE);
@@ -234,8 +234,8 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 #ifdef notdef
 	/* These values are unused.  The E2100 has a 2K window into the packet
 	   buffer.  The window can be set to start on any page boundary. */
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
-	dev->mem_end = dev->rmem_end = dev->mem_start + 2*1024;
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	dev->mem_end = ei_status.rmem_end = dev->mem_start + 2*1024;
 #endif
 
 	printk(", IRQ %d, %s media, memory @ %#lx.\n", dev->irq,

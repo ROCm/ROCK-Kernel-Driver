@@ -144,7 +144,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define E100_MAX_NIC 16
 
-#define E100_MAX_BUSY_WAIT 50	/*Max udelays in wait_scb and wait_cus_idle */
+#define E100_MAX_SCB_WAIT	100	/* Max udelays in wait_scb */
+#define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
 
 /* CPUSAVER_BUNDLE_MAX: Sets the maximum number of frames that will be bundled.
  * In some situations, such as the TCP windowing algorithm, it may be
@@ -899,6 +900,15 @@ struct cfg_params {
 	int PollingMaxWork;
 	u32 b_params;
 };
+#ifdef ETHTOOL_TEST 
+struct ethtool_lpbk_data{
+        dma_addr_t dma_handle;
+        tcb_t *tcb;
+        rfd_t *rfd;
+
+};
+#endif
+
 
 struct e100_private {
 	u32 flags;		/* board management flags */
@@ -988,6 +998,9 @@ struct e100_private {
 	u32 wolopts;
 	u16 ip_lbytes;
 #endif
+#ifdef ETHTOOL_TEST
+struct ethtool_lpbk_data loopback;
+#endif
 
 #ifdef CONFIG_PM
 	u32 pci_state[16];
@@ -1027,5 +1040,24 @@ extern void e100_deisolate_driver(struct e100_private *bdp,
 				  u8 recover, u8 full_reset);
 extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
 					   u32 reset_cmd);
+
+#ifdef ETHTOOL_TEST
+
+#define ROM_TEST_FAIL		0x01
+#define REGISTER_TEST_FAIL	0x02
+#define SELF_TEST_FAIL		0x04
+#define TEST_TIMEOUT		0x08
+
+enum test_offsets {
+	E100_EEPROM_TEST_FAIL = 0,
+	E100_CHIP_TIMEOUT,
+	E100_ROM_TEST_FAIL,
+	E100_REG_TEST_FAIL,
+	E100_MAC_TEST_FAIL,
+	E100_LPBK_MAC_FAIL,
+	E100_LPBK_PHY_FAIL,
+	E100_MAX_TEST_RES
+};
+#endif
 
 #endif

@@ -140,6 +140,10 @@ prototypes:
 	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*bmap)(struct address_space *, long);
+	int (*flushpage) (struct page *, unsigned long);
+	int (*releasepage) (struct page *, int);
+	int (*direct_IO)(int, struct inode *, struct kiobuf *, unsigned long, int);
+
 locking rules:
 	All may block
 		BKL	PageLocked(page)
@@ -149,6 +153,8 @@ sync_page:	no	maybe
 prepare_write:	no	yes
 commit_write:	no	yes
 bmap:		yes
+flushpage:	no	yes
+releasepage:	no	yes
 
 	->prepare_write(), ->commit_write(), ->sync_page() and ->readpage()
 may be called from the request handler (/dev/loop).
@@ -161,6 +167,15 @@ well-defined...
 filesystems and by the swapper. The latter will eventually go away. All
 instances do not actually need the BKL. Please, keep it that way and don't
 breed new callers.
+	->flushpage() is called when the filesystem must attempt to drop
+some or all of the buffers from the page when it is being truncated.  It
+returns zero on success.  If ->flushpage is zero, the kernel uses
+block_flushpage() instead.
+	->releasepage() is called when the kernel is about to try to drop the
+buffers from the page in preparation for freeing it.  It returns zero to
+indicate that the buffers are (or may be) freeable.  If ->releasepage is zero,
+the kernel assumes that the fs has no private interest in the buffers.
+
 	Note: currently almost all instances of address_space methods are
 using BKL for internal serialization and that's one of the worst sources
 of contention. Normally they are calling library functions (in fs/buffer.c)

@@ -24,6 +24,8 @@
  *  a system RESET and it starts wd#2 that unconditionaly will RESET 
  *  the system when the counter reaches zero.
  *
+ *  14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
+ *      Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
  */
 
 #include <linux/config.h>
@@ -102,6 +104,15 @@ MODULE_DESCRIPTION("MachZ ZF-Logic Watchdog driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(action, "i");
 MODULE_PARM_DESC(action, "after watchdog resets, generate: 0 = RESET(*)  1 = SMI  2 = NMI  3 = SCI");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 #define PFX "machzwd"
 
@@ -307,23 +318,23 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
  * no need to check for close confirmation
  * no way to disable watchdog ;)
  */
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		size_t ofs;
-
-		/* 
-		 * note: just in case someone wrote the magic character
-		 * five months ago...
-		 */
-		zf_expect_close = 0;
-
-		/* now scan */
-		for(ofs = 0; ofs != count; ofs++){
-			if(buf[ofs] == 'V'){
-				zf_expect_close = 1;
-				dprintk("zf_expect_close 1\n");
+		if (!nowayout) {
+			size_t ofs;
+			
+			/* 
+			 * note: just in case someone wrote the magic character
+			 * five months ago...
+			 */
+			zf_expect_close = 0;
+			
+			/* now scan */
+			for(ofs = 0; ofs != count; ofs++){
+				if(buf[ofs] == 'V'){
+					zf_expect_close = 1;
+					dprintk("zf_expect_close 1\n");
+				}
 			}
 		}
-#endif
 		/*
 		 * Well, anyhow someone wrote to us,
 		 * we should return that favour
@@ -386,9 +397,9 @@ static int zf_open(struct inode *inode, struct file *file)
 				return -EBUSY;
 			}
 
-#ifdef CONFIG_WATCHDOG_NOWAYOUT
-			MOD_INC_USE_COUNT;
-#endif
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			zf_is_open = 1;
 
 			spin_unlock(&zf_lock);

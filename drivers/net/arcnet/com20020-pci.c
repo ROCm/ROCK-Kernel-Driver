@@ -57,6 +57,7 @@ MODULE_PARM(timeout, "i");
 MODULE_PARM(backplane, "i");
 MODULE_PARM(clockp, "i");
 MODULE_PARM(clockm, "i");
+MODULE_LICENSE("GPL");
 
 static void com20020pci_open_close(struct net_device *dev, bool open)
 {
@@ -160,7 +161,7 @@ static struct pci_driver com20020pci_driver = {
 	name:		"com20020",
 	id_table:	com20020pci_id_table,
 	probe:		com20020pci_probe,
-	remove:		__devexit_p(com20020pci_remove)
+	remove:		__devexit_p(com20020pci_remove),
 };
 
 static int __init com20020pci_init(void)

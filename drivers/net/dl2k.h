@@ -1,6 +1,6 @@
 /*  D-Link DL2000-based Gigabit Ethernet Adapter Linux driver */
 /*  
-    Copyright (c) 2001 by D-Link Corporation
+    Copyright (c) 2001, 2002 by D-Link Corporation
     Written by Edward Peng.<edward_peng@dlink.com.tw>
     Created 03-May-2001, base on Linux' sundance.c.
 
@@ -649,6 +649,7 @@ struct netdev_private {
 	dma_addr_t rx_ring_dma;
 	struct pci_dev *pdev;
 	spinlock_t lock;
+	spinlock_t rx_lock;
 	struct net_device_stats stats;
 	unsigned int rx_buf_sz;		/* Based on MTU+slack. */
 	unsigned int speed;		/* Operating speed */
@@ -664,9 +665,11 @@ struct netdev_private {
 	unsigned int tx_flow:1;		/* Tx flow control enable */
 	unsigned int rx_flow:1;		/* Rx flow control enable */
 	unsigned int phy_media:1;	/* 1: fiber, 0: copper */
+	unsigned char pci_rev_id;	/* PCI revision ID */
 	struct netdev_desc *last_tx;	/* Last Tx descriptor used. */
 	unsigned long cur_rx, old_rx;	/* Producer/consumer ring indices */
 	unsigned long cur_tx, old_tx;
+	struct timer_list timer;
 	int wake_polarity;
 	char name[256];		/* net device description */
 	u8 duplex_polarity;

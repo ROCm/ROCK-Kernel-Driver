@@ -902,7 +902,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
-		if (HWIF(drive)->dmaproc(ide_dma_end, drive)) {
+		if (drive->channel->dmaproc(ide_dma_end, drive)) {
 			set_bit (PC_DMA_ERROR, &pc->flags);
 		} else {
 			pc->actually_transferred=pc->request_transfer;
@@ -945,7 +945,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_IN_PROGRESS, &pc->flags)) {
 		printk (KERN_ERR "ide-floppy: The floppy wants to issue more interrupts in DMA mode\n");
-		HWIF(drive)->dmaproc(ide_dma_off, drive);
+		drive->channel->dmaproc(ide_dma_off, drive);
 		return ide_stopped;
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -968,6 +968,7 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 			if (temp > pc->buffer_size) {
 				printk (KERN_ERR "ide-floppy: The floppy wants to send us more data than expected - discarding data\n");
 				idefloppy_discard_data (drive,bcount.all);
+				BUG_ON(HWGROUP(drive)->handler);
 				ide_set_handler (drive,&idefloppy_pc_intr,IDEFLOPPY_WAIT_CMD, NULL);
 				return ide_started;
 			}
@@ -990,7 +991,9 @@ static ide_startstop_t idefloppy_pc_intr (ide_drive_t *drive)
 	pc->actually_transferred+=bcount.all;				/* Update the current position */
 	pc->current_position+=bcount.all;
 
-	ide_set_handler (drive,&idefloppy_pc_intr,IDEFLOPPY_WAIT_CMD, NULL);		/* And set the interrupt handler again */
+	BUG_ON(HWGROUP(drive)->handler);
+	ide_set_handler(drive,&idefloppy_pc_intr,IDEFLOPPY_WAIT_CMD, NULL);		/* And set the interrupt handler again */
+
 	return ide_started;
 }
 
@@ -1014,8 +1017,11 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
 		return ide_stopped;
 	}
+
+	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, &idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
 	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
+
 	return ide_started;
 }
 
@@ -1055,17 +1061,19 @@ static ide_startstop_t idefloppy_transfer_pc1 (ide_drive_t *drive)
 		printk (KERN_ERR "ide-floppy: (IO,CoD) != (0,1) while issuing a packet command\n");
 		return ide_stopped;
 	}
-	/* 
+	/*
 	 * The following delay solves a problem with ATAPI Zip 100 drives where the
 	 * Busy flag was apparently being deasserted before the unit was ready to
 	 * receive data. This was happening on a 1200 MHz Athlon system. 10/26/01
-	 * 25msec is too short, 40 and 50msec work well. idefloppy_pc_intr will 
+	 * 25msec is too short, 40 and 50msec work well. idefloppy_pc_intr will
 	 * not be actually used until after the packet is moved in about 50 msec.
 	 */
-	ide_set_handler (drive, 
-	  &idefloppy_pc_intr, 		/* service routine for packet command */
+	BUG_ON(HWGROUP(drive)->handler);
+	ide_set_handler (drive,
+	  &idefloppy_pc_intr,		/* service routine for packet command */
 	  floppy->ticks,			/* wait this long before "failing" */
 	  &idefloppy_transfer_pc2);	/* fail == transfer_pc2 */
+
 	return ide_started;
 }
 
@@ -1117,10 +1125,10 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (test_and_clear_bit (PC_DMA_ERROR, &pc->flags)) {
-		(void) HWIF(drive)->dmaproc(ide_dma_off, drive);
+		(void) drive->channel->dmaproc(ide_dma_off, drive);
 	}
 	if (test_bit (PC_DMA_RECOMMENDED, &pc->flags) && drive->using_dma)
-		dma_ok=!HWIF(drive)->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
+		dma_ok=!drive->channel->dmaproc(test_bit (PC_WRITING, &pc->flags) ? ide_dma_write : ide_dma_read, drive);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 	if (IDE_CONTROL_REG)
@@ -1133,7 +1141,7 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (dma_ok) {							/* Begin DMA, if necessary */
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
-		(void) (HWIF(drive)->dmaproc(ide_dma_begin, drive));
+		(void) drive->channel->dmaproc(ide_dma_begin, drive);
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -1143,8 +1151,9 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 	} else {
 		pkt_xfer_routine = &idefloppy_transfer_pc;	/* immediate */
 	}
-	
+
 	if (test_bit (IDEFLOPPY_DRQ_INTERRUPT, &floppy->flags)) {
+		BUG_ON(HWGROUP(drive)->handler);
 		ide_set_handler (drive, pkt_xfer_routine, IDEFLOPPY_WAIT_CMD, NULL);
 		OUT_BYTE (WIN_PACKETCMD, IDE_COMMAND_REG);		/* Issue the packet command */
 		return ide_started;
@@ -1156,7 +1165,7 @@ static ide_startstop_t idefloppy_issue_pc (ide_drive_t *drive, idefloppy_pc_t *p
 
 static void idefloppy_rw_callback (ide_drive_t *drive)
 {
-#if IDEFLOPPY_DEBUG_LOG	
+#if IDEFLOPPY_DEBUG_LOG
 	printk (KERN_INFO "ide-floppy: Reached idefloppy_rw_callback\n");
 #endif /* IDEFLOPPY_DEBUG_LOG */
 
@@ -2004,7 +2013,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	(void) idefloppy_get_capacity (drive);
 	idefloppy_add_settings(drive);
 	for (i = 0; i < MAX_DRIVES; ++i) {
-		ide_hwif_t *hwif = HWIF(drive);
+		struct ata_channel *hwif = drive->channel;
 
 		if (drive != &hwif->drives[i]) continue;
 		hwif->gd->de_arr[i] = drive->de;
@@ -2109,10 +2118,9 @@ int idefloppy_init (void)
 			kfree (floppy);
 			continue;
 		}
-		/* ATA-PATTERN */
-		ata_ops(drive)->busy++;
+		MOD_INC_USE_COUNT;
 		idefloppy_setup (drive, floppy);
-		ata_ops(drive)->busy--;
+		MOD_DEC_USE_COUNT;
 
 		failed--;
 	}

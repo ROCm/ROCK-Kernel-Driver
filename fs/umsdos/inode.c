@@ -165,6 +165,8 @@ int UMSDOS_notify_change (struct dentry *dentry, struct iattr *attr)
 	struct dentry *temp, *old_dentry = NULL;
 	int ret;
 
+	lock_kernel();
+
 	ret = umsdos_parse (dentry->d_name.name, dentry->d_name.len,
 				&info);
 	if (ret)
@@ -208,14 +210,13 @@ dentry->d_parent->d_name.name, dentry->d_name.name, info.fake.fname));
 	if (ret)
 		goto out;
 
-	down(&dir->i_sem);
 	ret = umsdos_notify_change_locked(dentry, attr);
-	up(&dir->i_sem);
 	if (ret == 0)
 		ret = inode_setattr (inode, attr);
 out:
 	if (old_dentry)
 		dput (dentry);	/* if we had to use fake dentry for hardlinks, dput() it now */
+	unlock_kernel();
 	return ret;
 }
 

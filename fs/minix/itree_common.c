@@ -6,6 +6,8 @@ typedef struct {
 	struct buffer_head *bh;
 } Indirect;
 
+static rwlock_t pointers_lock = RW_LOCK_UNLOCKED;
+
 static inline void add_chain(Indirect *p, struct buffer_head *bh, block_t *v)
 {
 	p->key = *(p->p = v);
@@ -43,17 +45,18 @@ static inline Indirect *get_branch(struct inode *inode,
 		bh = sb_bread(sb, block_to_cpu(p->key));
 		if (!bh)
 			goto failure;
-		/* Reader: pointers */
+		read_lock(&pointers_lock);
 		if (!verify_chain(chain, p))
 			goto changed;
 		add_chain(++p, bh, (block_t *)bh->b_data + *++offsets);
-		/* Reader: end */
+		read_unlock(&pointers_lock);
 		if (!p->key)
 			goto no_block;
 	}
 	return NULL;
 
 changed:
+	read_unlock(&pointers_lock);
 	*err = -EAGAIN;
 	goto no_block;
 failure:
@@ -108,18 +111,15 @@ static inline int splice_branch(struct inode *inode,
 {
 	int i;
 
+	write_lock(&pointers_lock);
+
 	/* Verify that place we are splicing to is still there and vacant */
-
-	/* Writer: pointers */
 	if (!verify_chain(chain, where-1) || *where->p)
-		/* Writer: end */
 		goto changed;
-
-	/* That's it */
 
 	*where->p = where->key;
 
-	/* Writer: end */
+	write_unlock(&pointers_lock);
 
 	/* We are done with atomic stuff, now do the rest of housekeeping */
 
@@ -133,6 +133,7 @@ static inline int splice_branch(struct inode *inode,
 	return 0;
 
 changed:
+	write_unlock(&pointers_lock);
 	for (i = 1; i < num; i++)
 		bforget(where[i].bh);
 	for (i = 0; i < num; i++)
@@ -153,7 +154,6 @@ static inline int get_block(struct inode * inode, sector_t block,
 	if (depth == 0)
 		goto out;
 
-	lock_kernel();
 reread:
 	partial = get_branch(inode, depth, offsets, chain, &err);
 
@@ -173,7 +173,6 @@ cleanup:
 			brelse(partial->bh);
 			partial--;
 		}
-		unlock_kernel();
 out:
 		return err;
 	}
@@ -226,12 +225,14 @@ static Indirect *find_shared(struct inode *inode,
 	for (k = depth; k > 1 && !offsets[k-1]; k--)
 		;
 	partial = get_branch(inode, k, offsets, chain, &err);
-	/* Writer: pointers */
+
+	write_lock(&pointers_lock);
 	if (!partial)
 		partial = chain + k-1;
-	if (!partial->key && *partial->p)
-		/* Writer: end */
+	if (!partial->key && *partial->p) {
+		write_unlock(&pointers_lock);
 		goto no_top;
+	}
 	for (p=partial;p>chain && all_zeroes((block_t*)p->bh->b_data,p->p);p--)
 		;
 	if (p == chain + k - 1 && p > chain) {
@@ -240,7 +241,7 @@ static Indirect *find_shared(struct inode *inode,
 		*top = *p->p;
 		*p->p = 0;
 	}
-	/* Writer: end */
+	write_unlock(&pointers_lock);
 
 	while(partial > p)
 	{

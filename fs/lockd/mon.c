@@ -205,33 +205,49 @@ xdr_decode_stat(struct rpc_rqst *rqstp, u32 *p, struct nsm_res *resp)
 #endif
 
 static struct rpc_procinfo	nsm_procedures[] = {
-        { "sm_null",
-		(kxdrproc_t) xdr_error,
-		(kxdrproc_t) xdr_error, 0, 0 },
-        { "sm_stat",
-		(kxdrproc_t) xdr_error,
-		(kxdrproc_t) xdr_error, 0, 0 },
-        { "sm_mon",
-		(kxdrproc_t) xdr_encode_mon,
-		(kxdrproc_t) xdr_decode_stat_res, MAX(SM_mon_sz, SM_monres_sz) << 2, 0 },
-        { "sm_unmon",
-		(kxdrproc_t) xdr_encode_mon,
-		(kxdrproc_t) xdr_decode_stat, MAX(SM_mon_id_sz, SM_unmonres_sz) << 2, 0 },
-        { "sm_unmon_all",
-		(kxdrproc_t) xdr_error,
-		(kxdrproc_t) xdr_error, 0, 0 },
-        { "sm_simu_crash",
-		(kxdrproc_t) xdr_error,
-		(kxdrproc_t) xdr_error, 0, 0 },
-        { "sm_notify",
-		(kxdrproc_t) xdr_error,
-		(kxdrproc_t) xdr_error, 0, 0 },
+        {
+		p_procname:	"sm_null",
+		p_encode:	(kxdrproc_t) xdr_error,
+		p_decode:	(kxdrproc_t) xdr_error,
+	},
+        {
+		p_procname:	"sm_stat",
+		p_encode:	(kxdrproc_t) xdr_error,
+		p_decode:	(kxdrproc_t) xdr_error,
+	},
+        {
+		p_procname:	"sm_mon",
+		p_encode:	(kxdrproc_t) xdr_encode_mon,
+		p_decode:	(kxdrproc_t) xdr_decode_stat_res,
+		p_bufsiz:	MAX(SM_mon_sz, SM_monres_sz) << 2,
+	},
+        {
+		p_procname:	"sm_unmon",
+		p_encode:	(kxdrproc_t) xdr_encode_mon,
+		p_decode:	(kxdrproc_t) xdr_decode_stat,
+		p_bufsiz:	MAX(SM_mon_id_sz, SM_unmonres_sz) << 2,
+	},
+        {
+		p_procname:	"sm_unmon_all",
+		p_encode:	(kxdrproc_t) xdr_error,
+		p_decode:	(kxdrproc_t) xdr_error,
+	},
+        {
+		p_procname:	"sm_simu_crash",
+		p_encode:	(kxdrproc_t) xdr_error,
+		p_decode:	(kxdrproc_t) xdr_error, 0, 0
+	},
+        {
+		p_procname:	"sm_notify",
+		p_encode:	(kxdrproc_t) xdr_error,
+		p_decode:	(kxdrproc_t) xdr_error,
+	},
 };
 
 static struct rpc_version	nsm_version1 = {
-	1, 
-	sizeof(nsm_procedures)/sizeof(nsm_procedures[0]),
-	nsm_procedures
+		number:		1, 
+		nrprocs:	sizeof(nsm_procedures)/sizeof(nsm_procedures[0]),
+		procs:		nsm_procedures
 };
 
 static struct rpc_version *	nsm_version[] = {
@@ -242,9 +258,9 @@ static struct rpc_version *	nsm_version[] = {
 static struct rpc_stat		nsm_stats;
 
 struct rpc_program		nsm_program = {
-	"statd",
-	SM_PROGRAM,
-	sizeof(nsm_version)/sizeof(nsm_version[0]),
-	nsm_version,
-	&nsm_stats
+		name:		"statd",
+		number:		SM_PROGRAM,
+		nrvers:		sizeof(nsm_version)/sizeof(nsm_version[0]),
+		version:	nsm_version,
+		stats:		&nsm_stats
 };

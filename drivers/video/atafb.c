@@ -2860,28 +2860,6 @@ int __init atafb_init(void)
 	return 0;
 }
 
-/* a strtok which returns empty strings, too */
-
-static char * strtoke(char * s,const char * ct)
-{
-  char *sbegin, *send;
-  static char *ssave = NULL;
-  
-  sbegin  = s ? s : ssave;
-  if (!sbegin) {
-	  return NULL;
-  }
-  if (*sbegin == '\0') {
-    ssave = NULL;
-    return NULL;
-  }
-  send = strpbrk(sbegin, ct);
-  if (send && *send != '\0')
-    *send++ = '\0';
-  ssave = send;
-  return sbegin;
-}
-
 int __init atafb_setup( char *options )
 {
     char *this_opt;
@@ -2956,18 +2934,18 @@ int __init atafb_setup( char *options )
 	int xres;
 	char *p;
 
-	if (!(p = strtoke(int_str, ";")) ||!*p) goto int_invalid;
+	if (!(p = strsep(&int_str, ";")) || !*p) goto int_invalid;
 	xres = simple_strtoul(p, NULL, 10);
-	if (!(p = strtoke(NULL, ";")) || !*p) goto int_invalid;
+	if (!(p = strsep(&int_str, ";")) || !*p) goto int_invalid;
 	sttt_xres=xres;
 	tt_yres=st_yres=simple_strtoul(p, NULL, 10);
-	if ((p=strtoke(NULL, ";")) && *p) {
+	if ((p=strsep(&int_str, ";")) && *p) {
 		sttt_xres_virtual=simple_strtoul(p, NULL, 10);
 	}
-	if ((p=strtoke(NULL, ";")) && *p) {
+	if ((p=strsep(&int_str, ";")) && *p) {
 		sttt_yres_virtual=simple_strtoul(p, NULL, 0);
 	}
-	if ((p=strtoke(NULL, ";")) && *p) {
+	if ((p=strsep(&int_str, ";")) && *p) {
 		ovsc_offset=simple_strtoul(p, NULL, 0);
 	}
 
@@ -2993,20 +2971,20 @@ int __init atafb_setup( char *options )
 	 *
 	 * Even xres_virtual is available, we neither support panning nor hw-scrolling!
 	 */
-	if (!(p = strtoke(ext_str, ";")) ||!*p) goto ext_invalid;
+	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
 	xres_virtual = xres = simple_strtoul(p, NULL, 10);
 	if (xres <= 0) goto ext_invalid;
 
-	if (!(p = strtoke(NULL, ";")) ||!*p) goto ext_invalid;
+	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
 	yres = simple_strtoul(p, NULL, 10);
 	if (yres <= 0) goto ext_invalid;
 
-	if (!(p = strtoke(NULL, ";")) ||!*p) goto ext_invalid;
+	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
 	depth = simple_strtoul(p, NULL, 10);
 	if (depth != 1 && depth != 2 && depth != 4 && depth != 8 &&
 		depth != 16 && depth != 24) goto ext_invalid;
 
-	if (!(p = strtoke(NULL, ";")) ||!*p) goto ext_invalid;
+	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
 	if (*p == 'i')
 		planes = FB_TYPE_INTERLEAVED_PLANES;
 	else if (*p == 'p')
@@ -3019,19 +2997,19 @@ int __init atafb_setup( char *options )
 		goto ext_invalid;
 
 
-	if (!(p = strtoke(NULL, ";")) ||!*p) goto ext_invalid;
+	if (!(p = strsep(&ext_str, ";")) || !*p) goto ext_invalid;
 	addr = simple_strtoul(p, NULL, 0);
 
-	if (!(p = strtoke(NULL, ";")) ||!*p)
+	if (!(p = strsep(&ext_str, ";")) || !*p)
 		len = xres*yres*depth/8;
 	else
 		len = simple_strtoul(p, NULL, 0);
 
-	if ((p = strtoke(NULL, ";")) && *p) {
+	if ((p = strsep(&ext_str, ";")) && *p) {
 		external_vgaiobase=simple_strtoul(p, NULL, 0);
 	}
 
-	if ((p = strtoke(NULL, ";")) && *p) {
+	if ((p = strsep(&ext_str, ";")) && *p) {
 		external_bitspercol = simple_strtoul(p, NULL, 0);
 		if (external_bitspercol > 8)
 			external_bitspercol = 8;
@@ -3039,14 +3017,14 @@ int __init atafb_setup( char *options )
 			external_bitspercol = 1;
 	}
 	
-	if ((p = strtoke(NULL, ";")) && *p) {
+	if ((p = strsep(&ext_str, ";")) && *p) {
 		if (!strcmp(p, "vga"))
 			external_card_type = IS_VGA;
 		if (!strcmp(p, "mv300"))
 			external_card_type = IS_MV300;
 	}
 
-	if ((p = strtoke(NULL, ";")) && *p) {
+	if ((p = strsep(&ext_str, ";")) && *p) {
 		xres_virtual = simple_strtoul(p, NULL, 10);
 		if (xres_virtual < xres)
 			xres_virtual = xres;
@@ -3089,16 +3067,16 @@ int __init atafb_setup( char *options )
 	 * <V*> vertical freq. in Hz
 	 * <H*> horizontal freq. in kHz
 	 */
-	if (!(p = strtoke(mcap_spec, ";")) || !*p) goto cap_invalid;
+	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
 	vmin = simple_strtoul(p, NULL, 10);
 	if (vmin <= 0) goto cap_invalid;
-	if (!(p = strtoke(NULL, ";")) || !*p) goto cap_invalid;
+	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
 	vmax = simple_strtoul(p, NULL, 10);
 	if (vmax <= 0 || vmax <= vmin) goto cap_invalid;
-	if (!(p = strtoke(NULL, ";")) || !*p) goto cap_invalid;
+	if (!(p = strsep(&mcap_spec, ";")) || !*p) goto cap_invalid;
 	hmin = 1000 * simple_strtoul(p, NULL, 10);
 	if (hmin <= 0) goto cap_invalid;
-	if (!(p = strtoke(NULL, "")) || !*p) goto cap_invalid;
+	if (!(p = strsep(&mcap_spec, "")) || !*p) goto cap_invalid;
 	hmax = 1000 * simple_strtoul(p, NULL, 10);
 	if (hmax <= 0 || hmax <= hmin) goto cap_invalid;
 
@@ -3117,11 +3095,11 @@ int __init atafb_setup( char *options )
 		char *p;
 		int xres, yres, depth, temp;
 
-		if (!(p = strtoke(user_mode, ";")) || !*p) goto user_invalid;
+		if (!(p = strsep(&user_mode, ";")) || !*p) goto user_invalid;
 		xres = simple_strtoul(p, NULL, 10);
-		if (!(p = strtoke(NULL, ";")) || !*p) goto user_invalid;
+		if (!(p = strsep(&user_mode, ";")) || !*p) goto user_invalid;
 		yres = simple_strtoul(p, NULL, 10);
-		if (!(p = strtoke(NULL, "")) || !*p) goto user_invalid;
+		if (!(p = strsep(&user_mode, "")) || !*p) goto user_invalid;
 		depth = simple_strtoul(p, NULL, 10);
 		if ((temp=get_video_mode("user0"))) {
 			default_par=temp;

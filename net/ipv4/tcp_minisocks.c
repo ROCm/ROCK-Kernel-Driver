@@ -786,6 +786,8 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			newtp->ack.last_seg_size = skb->len-newtp->tcp_header_len;
 		newtp->mss_clamp = req->mss;
 		TCP_ECN_openreq_child(newtp, req);
+
+		TCP_INC_STATS_BH(TcpPassiveOpens);
 	}
 	return newsk;
 }
@@ -849,8 +851,38 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 	/* Further reproduces section "SEGMENT ARRIVES"
 	   for state SYN-RECEIVED of RFC793.
 	   It is broken, however, it does not work only
-	   when SYNs are crossed, which is impossible in our
-	   case.
+	   when SYNs are crossed.
+
+	   You would think that SYN crossing is impossible here, since
+	   we should have a SYN_SENT socket (from connect()) on our end,
+	   but this is not true if the crossed SYNs were sent to both
+	   ends by a malicious third party.  We must defend against this,
+	   and to do that we first verify the ACK (as per RFC793, page
+	   36) and reset if it is invalid.  Is this a true full defense?
+	   To convince ourselves, let us consider a way in which the ACK
+	   test can still pass in this 'malicious crossed SYNs' case.
+	   Malicious sender sends identical SYNs (and thus identical sequence
+	   numbers) to both A and B:
+
+		A: gets SYN, seq=7
+		B: gets SYN, seq=7
+
+	   By our good fortune, both A and B select the same initial
+	   send sequence number of seven :-)
+
+		A: sends SYN|ACK, seq=7, ack_seq=8
+		B: sends SYN|ACK, seq=7, ack_seq=8
+
+	   So we are now A eating this SYN|ACK, ACK test passes.  So
+	   does sequence test, SYN is truncated, and thus we consider
+	   it a bare ACK.
+
+	   If tp->defer_accept, we silently drop this bare ACK.  Otherwise,
+	   we create an established connection.  Both ends (listening sockets)
+	   accept the new incoming connection and try to talk to each other. 8-)
+
+	   Note: This case is both harmless, and rare.  Possibility is about the
+	   same as us discovering intelligent life on another plant tomorrow.
 
 	   But generally, we should (RFC lies!) to accept ACK
 	   from SYNACK both here and in tcp_rcv_state_process().
@@ -860,6 +892,22 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 	   we cannot optimize anything here without
 	   violating protocol. All the checks must be made
 	   before attempt to create socket.
+	 */
+
+	/* RFC793 page 36: "If the connection is in any non-synchronized state ...
+	 *                  and the incoming segment acknowledges something not yet
+	 *                  sent (the segment carries an unaccaptable ACK) ...
+	 *                  a reset is sent."
+	 */
+	if (!(flg & TCP_FLAG_ACK))
+		return NULL;
+
+	/* Invalid ACK: reset will be sent by listening socket */
+	if (TCP_SKB_CB(skb)->ack_seq != req->snt_isn+1)
+		return sk;
+	/* Also, it would be not so bad idea to check rcv_tsecr, which
+	 * is essentially ACK extension and too early or too late values
+	 * should cause reset in unsynchronized states.
 	 */
 
 	/* RFC793: "first check sequence number". */
@@ -890,19 +938,6 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 	 */
 	if (flg & (TCP_FLAG_RST|TCP_FLAG_SYN))
 		goto embryonic_reset;
-
-	/* RFC793: "fifth check the ACK field" */
-
-	if (!(flg & TCP_FLAG_ACK))
-		return NULL;
-
-	/* Invalid ACK: reset will be sent by listening socket */
-	if (TCP_SKB_CB(skb)->ack_seq != req->snt_isn+1)
-		return sk;
-	/* Also, it would be not so bad idea to check rcv_tsecr, which
-	 * is essentially ACK extension and too early or too late values
-	 * should cause reset in unsynchronized states.
-	 */
 
 	/* If TCP_DEFER_ACCEPT is set, drop bare ACK. */
 	if (tp->defer_accept && TCP_SKB_CB(skb)->end_seq == req->rcv_isn+1) {

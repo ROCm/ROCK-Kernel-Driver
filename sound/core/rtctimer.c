@@ -52,7 +52,7 @@ static int rtctimer_stop(snd_timer_t *t);
 
 
 /*
- * The hardware dependent description for this timer.
+ * The hardware dependant description for this timer.
  */
 static struct _snd_timer_hardware rtc_hw = {
 	flags:		SNDRV_TIMER_HW_FIRST|SNDRV_TIMER_HW_AUTO,

@@ -3718,8 +3718,8 @@ static int __init smctr_probe1(struct net_device *dev, int ioaddr)
         }
 
         tp = (struct net_local *)dev->priv;
-        dev->rmem_start = dev->mem_start = tp->ram_base;
-        dev->rmem_end = dev->mem_end = dev->mem_start + 0x10000;
+        dev->mem_start = tp->ram_base;
+        dev->mem_end = dev->mem_start + 0x10000;
         ram = (__u32 *)phys_to_virt(dev->mem_start);
         tp->ram_access = *(__u32 *)&ram;
 	tp->status = NOT_INITIALIZED;

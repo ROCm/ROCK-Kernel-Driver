@@ -2,9 +2,8 @@
 
   This software program is available to you under a choice of one of two
   licenses. You may choose to be licensed under either the GNU General Public
-  License (GPL) Version 2, June 1991, available at
-  http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the
-  text of which follows:
+  License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html,
+  or the Intel BSD + Patent License, the text of which follows:
   
   Recipient has requested a license and Intel Corporation ("Intel") is willing
   to grant a license for the software entitled Linux Base Driver for the
@@ -18,7 +17,7 @@
   "Recipient" means the party to whom Intel delivers this Software.
   
   "Licensee" means Recipient and those third parties that receive a license to
-  any operating system available under the GNU Public License version 2.0 or
+  any operating system available under the GNU General Public License 2.0 or
   later.
   
   Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@
   version of an operating system that has been distributed under the GNU
   General Public License 2.0 or later. This patent license shall apply to the
   combination of the Software and any operating system licensed under the GNU
-  Public License version 2.0 or later if, at the time Intel provides the
+  General Public License 2.0 or later if, at the time Intel provides the
   Software to Recipient, such addition of the Software to the then publicly
-  available versions of such operating systems available under the GNU Public
-  License version 2.0 or later (whether in gold, beta or alpha form) causes
+  available versions of such operating systems available under the GNU General
+  Public License 2.0 or later (whether in gold, beta or alpha form) causes
   such combination to be covered by the Licensed Patents. The patent license
   shall not apply to any other combinations which include the Software. NO
   hardware per se is licensed hereunder.
@@ -89,9 +88,9 @@ extern void e1000_enable_WOL(struct e1000_adapter *adapter);
 static void
 e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 
-	if(shared->media_type == e1000_media_type_copper) {
+	if(hw->media_type == e1000_media_type_copper) {
 
 		ecmd->supported = (SUPPORTED_10baseT_Half |
 		                   SUPPORTED_10baseT_Full |
@@ -103,18 +102,18 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 
 		ecmd->advertising = ADVERTISED_TP;
 
-		if(shared->autoneg == 1) {
+		if(hw->autoneg == 1) {
 			ecmd->advertising |= ADVERTISED_Autoneg;
 
 			/* the e1000 autoneg seems to match ethtool nicely */
 
-			ecmd->advertising |= shared->autoneg_advertised;
+			ecmd->advertising |= hw->autoneg_advertised;
 		}
 
 		ecmd->port = PORT_TP;
-		ecmd->phy_address = shared->phy_addr;
+		ecmd->phy_address = hw->phy_addr;
 
-		if(shared->mac_type == e1000_82543)
+		if(hw->mac_type == e1000_82543)
 			ecmd->transceiver = XCVR_EXTERNAL;
 		else
 			ecmd->transceiver = XCVR_INTERNAL;
@@ -129,13 +128,12 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 				     SUPPORTED_Autoneg);
 
 		ecmd->port = PORT_FIBRE;
-
 		ecmd->transceiver = XCVR_EXTERNAL;
 	}
 
 	if(netif_carrier_ok(adapter->netdev)) {
 
-		e1000_get_speed_and_duplex(shared, &adapter->link_speed,
+		e1000_get_speed_and_duplex(hw, &adapter->link_speed,
 		                                   &adapter->link_duplex);
 		ecmd->speed = adapter->link_speed;
 
@@ -151,37 +149,35 @@ e1000_ethtool_gset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 		ecmd->duplex = -1;
 	}
 
-	ecmd->autoneg = (shared->autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE);
-
-	return;
+	ecmd->autoneg = (hw->autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE);
 }
 
 static int
 e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 
 	if(ecmd->autoneg == AUTONEG_ENABLE) {
-		shared->autoneg = 1;
-		shared->autoneg_advertised = (ecmd->advertising & 0x002F);
+		hw->autoneg = 1;
+		hw->autoneg_advertised = (ecmd->advertising & 0x002F);
 	} else {
-		shared->autoneg = 0;
+		hw->autoneg = 0;
 		switch(ecmd->speed + ecmd->duplex) {
 		case SPEED_10 + DUPLEX_HALF:
-			shared->forced_speed_duplex = e1000_10_half;
+			hw->forced_speed_duplex = e1000_10_half;
 			break;
 		case SPEED_10 + DUPLEX_FULL:
-			shared->forced_speed_duplex = e1000_10_full;
+			hw->forced_speed_duplex = e1000_10_full;
 			break;
 		case SPEED_100 + DUPLEX_HALF:
-			shared->forced_speed_duplex = e1000_100_half;
+			hw->forced_speed_duplex = e1000_100_half;
 			break;
 		case SPEED_100 + DUPLEX_FULL:
-			shared->forced_speed_duplex = e1000_100_full;
+			hw->forced_speed_duplex = e1000_100_full;
 			break;
 		case SPEED_1000 + DUPLEX_FULL:
-			shared->autoneg = 1;
-			shared->autoneg_advertised = ADVERTISE_1000_FULL;
+			hw->autoneg = 1;
+			hw->autoneg_advertised = ADVERTISE_1000_FULL;
 			break;
 		case SPEED_1000 + DUPLEX_HALF: /* not supported */
 		default:
@@ -198,9 +194,13 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 }
 
 static inline int
-e1000_eeprom_size(struct e1000_shared_adapter *shared)
+e1000_eeprom_size(struct e1000_hw *hw)
 {
-	return 128;
+	if((hw->mac_type > e1000_82544) &&
+	   (E1000_READ_REG(hw, EECD) & E1000_EECD_SIZE))
+		return 512;
+	else
+		return 128;
 }
 
 static void
@@ -211,36 +211,33 @@ e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
 	strncpy(drvinfo->version, e1000_driver_version, 32);
 	strncpy(drvinfo->fw_version, "", 32);
 	strncpy(drvinfo->bus_info, adapter->pdev->slot_name, 32);
-	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->shared);
-	return;
+	drvinfo->eedump_len  = e1000_eeprom_size(&adapter->hw);
 }
 
 static void
 e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	int i, max_len;
 
-	eeprom->magic = shared->vendor_id | (shared->device_id << 16);
+	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
-	max_len = e1000_eeprom_size(shared);
+	max_len = e1000_eeprom_size(hw);
 
 	if ((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
 	for(i = 0; i < max_len; i++)
-		eeprom_buff[i] = e1000_read_eeprom(&adapter->shared, i);
-
-	return;
+		e1000_read_eeprom(&adapter->hw, i, &eeprom_buff[i]);
 }
 
 static void
 e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 	
-	if(shared->mac_type < e1000_82544) {
+	if(hw->mac_type < e1000_82544) {
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
@@ -260,17 +257,15 @@ e1000_ethtool_gwol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 		wol->wolopts |= WAKE_BCAST;
 	if(adapter->wol & E1000_WUFC_MAG)
 		wol->wolopts |= WAKE_MAGIC;
-
-	return;
 }
 
 static int
 e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 {
-	struct e1000_shared_adapter *shared = &adapter->shared;
+	struct e1000_hw *hw = &adapter->hw;
 
-	if(shared->mac_type < e1000_82544)
-		return wol->wolopts == 0 ? 0 : -EOPNOTSUPP;
+	if(hw->mac_type < e1000_82544)
+		return wol->wolopts ? -EOPNOTSUPP : 0;
 
 	adapter->wol = 0;
 

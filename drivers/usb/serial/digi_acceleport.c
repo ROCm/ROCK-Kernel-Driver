@@ -1490,26 +1490,15 @@ dbg( "digi_open: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_cou
 		return( -EAGAIN );
 	}
 
-	/* inc module use count before sleeping to wait for closes */
-	++port->open_count;
-
 	/* wait for a close in progress to finish */
 	while( priv->dp_in_close ) {
 		cond_wait_interruptible_timeout_irqrestore(
 			&priv->dp_close_wait, DIGI_RETRY_TIMEOUT,
 			&priv->dp_port_lock, flags );
 		if( signal_pending(current) ) {
-			--port->open_count;
 			return( -EINTR );
 		}
 		spin_lock_irqsave( &priv->dp_port_lock, flags );
-	}
-
-	/* if port is already open, just return */
-	/* be sure exactly one open proceeds */
-	if( port->open_count != 1)  {
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-		return( 0 );
 	}
 
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
@@ -1557,14 +1546,6 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 
 	/* do cleanup only after final close on this port */
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
-	if( port->open_count > 1 ) {
-		--port->open_count;
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-		return;
-	} else if( port->open_count <= 0 ) {
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-		return;
-	}
 	priv->dp_in_close = 1;
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 
@@ -1637,7 +1618,6 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 	spin_lock_irqsave( &priv->dp_port_lock, flags );
 	priv->dp_write_urb_in_use = 0;
 	priv->dp_in_close = 0;
-	--port->open_count;
 	wake_up_interruptible( &priv->dp_close_wait );
 	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 
@@ -1765,8 +1745,6 @@ static void digi_shutdown( struct usb_serial *serial )
 {
 
 	int i;
-	struct digi_port *priv;
-	unsigned long flags;
 
 
 dbg( "digi_shutdown: TOP, in_interrupt()=%d", in_interrupt() );
@@ -1775,16 +1753,6 @@ dbg( "digi_shutdown: TOP, in_interrupt()=%d", in_interrupt() );
 	for( i=0; i<serial->type->num_ports+1; i++ ) {
 		usb_unlink_urb( serial->port[i].read_urb );
 		usb_unlink_urb( serial->port[i].write_urb );
-	}
-
-	/* dec module use count */
-	for( i=0; i<serial->type->num_ports; i++ ) {
-		priv = serial->port[i].private;
-		spin_lock_irqsave( &priv->dp_port_lock, flags );
-		while( serial->port[i].open_count > 0 ) {
-			--serial->port[i].open_count;
-		}
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
 	}
 
 	/* free the private data structures for all ports */

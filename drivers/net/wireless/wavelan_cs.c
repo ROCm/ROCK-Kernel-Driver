@@ -4477,9 +4477,8 @@ wv_pcmcia_config(dev_link_t *	link)
 	  break;
 	}
 
-      dev->rmem_start = dev->mem_start =
-	  (u_long)ioremap(req.Base, req.Size);
-      dev->rmem_end = dev->mem_end = dev->mem_start + req.Size;
+      dev->mem_start = (u_long)ioremap(req.Base, req.Size);
+      dev->mem_end = dev->mem_start + req.Size;
 
       mem.CardOffset = 0; mem.Page = 0;
       i = CardServices(MapMemPage, link->win, &mem);

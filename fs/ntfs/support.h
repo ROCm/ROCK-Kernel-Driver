@@ -32,9 +32,39 @@ void ntfs_debug(int mask, const char *fmt, ...);
 
 #define ntfs_free(ptr)     kfree(ptr)
 
-#define ntfs_vmalloc(size)	vmalloc_32(size)
+/**
+ * ntfs_vmalloc - allocate memory in multiples of pages
+ * @size	number of bytes to allocate
+ *
+ * Allocates @size bytes of memory, rounded up to multiples of PAGE_SIZE and
+ * returns a pointer to the allocated memory.
+ *
+ * If there was insufficient memory to complete the request, return NULL.
+ */
+static inline void *ntfs_vmalloc(unsigned long size)
+{
+	if (size <= PAGE_SIZE) {
+		if (size) {
+			/* kmalloc() has per-CPU caches so if faster for now. */
+			return kmalloc(PAGE_SIZE, GFP_NOFS);
+			/* return (void *)__get_free_page(GFP_NOFS |
+					__GFP_HIGHMEM); */
+		}
+		BUG();
+	}
+	if (size >> PAGE_SHIFT < num_physpages)
+		return __vmalloc(size, GFP_NOFS | __GFP_HIGHMEM, PAGE_KERNEL);
+	return NULL;
+}
 
-#define ntfs_vfree(ptr)		vfree(ptr)
+static inline void ntfs_vfree(void *addr)
+{
+	if ((unsigned long)addr < VMALLOC_START) {
+		return kfree(addr);
+		/* return free_page((unsigned long)addr); */
+	}
+	vfree(addr);
+}
 
 void ntfs_bzero(void *s, int n);
 

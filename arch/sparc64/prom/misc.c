@@ -171,7 +171,7 @@ int prom_get_mmu_ihandle(void)
 
 static int prom_get_memory_ihandle(void)
 {
-	static int memory_ihandle_cache = 0;
+	static int memory_ihandle_cache;
 	int node, ret;
 
 	if (memory_ihandle_cache != 0)

@@ -1,7 +1,7 @@
 /*
  * USB Serial Converter driver
  *
- *	Copyright (C) 1999 - 2001
+ *	Copyright (C) 1999 - 2002
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -10,6 +10,10 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * (03/26/2002) gkh
+ *	removed the port->tty check from port_paranoia_check() due to serial
+ *	consoles not having a tty device assigned to them.
  *
  * (12/03/2001) gkh
  *	removed active from the port structure.
@@ -224,10 +228,6 @@ static inline int port_paranoia_check (struct usb_serial_port *port, const char 
 	}
 	if (!port->serial) {
 		dbg("%s - port->serial == NULL", function);
-		return -1;
-	}
-	if (!port->tty) {
-		dbg("%s - port->tty == NULL", function);
 		return -1;
 	}
 

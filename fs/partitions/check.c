@@ -35,6 +35,7 @@
 #include "sun.h"
 #include "ibm.h"
 #include "ultrix.h"
+#include "efi.h"
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
@@ -42,6 +43,9 @@ static int (*check_part[])(struct gendisk *hd, struct block_device *bdev,
 			   unsigned long first_sect, int first_minor) = {
 #ifdef CONFIG_ACORN_PARTITION
 	acorn_partition,
+#endif
+#ifdef CONFIG_EFI_PARTITION
+	efi_partition,		/* this must come before msdos */
 #endif
 #ifdef CONFIG_LDM_PARTITION
 	ldm_partition,		/* this must come before msdos */

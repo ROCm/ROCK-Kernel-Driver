@@ -1,11 +1,5 @@
 /*
- * unistrk:  Unicode kernel case support
- *
- * Function:
- *     Convert a unicode character to upper or lower case using
- *     compressed tables.
- *
- *   Copyright (c) International Business Machines  Corp., 2000
+ *   Copyright (c) International Business Machines Corp., 2000-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,9 +14,9 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program;  if not, write to the Free Software 
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- *
  */
+#ifndef _H_JFS_UNICODE
+#define _H_JFS_UNICODE
 
 #include <asm/byteorder.h>
 #include "jfs_types.h"
@@ -106,9 +100,9 @@ static inline wchar_t *UniStrncpy_le(wchar_t * ucs1, const wchar_t * ucs2,
 /*
  * UniToupper:  Convert a unicode character to upper case
  */
-static inline wchar_t UniToupper(register wchar_t uc)
+static inline wchar_t UniToupper(wchar_t uc)
 {
-	register UNICASERANGE *rp;
+	UNICASERANGE *rp;
 
 	if (uc < sizeof(UniUpperTable)) {	/* Latin characters */
 		return uc + UniUpperTable[uc];	/* Use base tables */
@@ -129,9 +123,9 @@ static inline wchar_t UniToupper(register wchar_t uc)
 /*
  * UniStrupr:  Upper case a unicode string
  */
-static inline wchar_t *UniStrupr(register wchar_t * upin)
+static inline wchar_t *UniStrupr(wchar_t * upin)
 {
-	register wchar_t *up;
+	wchar_t *up;
 
 	up = upin;
 	while (*up) {		/* For all characters */
@@ -141,3 +135,4 @@ static inline wchar_t *UniStrupr(register wchar_t * upin)
 	return upin;		/* Return input pointer */
 }
 
+#endif				/* !_H_JFS_UNICODE */

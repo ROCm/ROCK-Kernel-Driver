@@ -308,7 +308,8 @@ static const unsigned char chktabh[256] =
 static void delay(int ms)
 {
 	unsigned long timeout = jiffies + ((ms * HZ) / 1000);
-	while (jiffies < timeout);
+	while (time_before(jiffies, timeout))
+		cpu_relax();
 }
 
 /*
@@ -1178,6 +1179,7 @@ static void __exit yam_cleanup_driver(void)
 
 MODULE_AUTHOR("Frederic Rible F1OAT frible@teaser.fr");
 MODULE_DESCRIPTION("Yam amateur radio modem driver");
+MODULE_LICENSE("GPL");
 
 module_init(yam_init_driver);
 module_exit(yam_cleanup_driver);

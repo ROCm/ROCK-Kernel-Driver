@@ -589,8 +589,8 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 				info.si_signo = signr;
 				info.si_errno = 0;
 				info.si_code = SI_USER;
-				info.si_pid = current->p_pptr->pid;
-				info.si_uid = current->p_pptr->uid;
+				info.si_pid = current->parent->pid;
+				info.si_uid = current->parent->uid;
 			}
 
 			/* If the (new) signal is now blocked, requeue it.  */
@@ -626,13 +626,18 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 					continue;
 				/* FALLTHRU */
 
-			case SIGSTOP:
-				current->state = TASK_STOPPED;
+			case SIGSTOP: {
+				struct signal_struct *sig;
 				current->exit_code = signr;
-				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
+				sig = current->parent->sig;
+				preempt_disable();
+				current->state = TASK_STOPPED;
+				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
+				preempt_enable();
 				continue;
+			}
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:

@@ -151,14 +151,14 @@ eesoxscsi_terminator_ctl(struct Scsi_Host *host, int on_off)
 	EESOXScsi_Info *info = (EESOXScsi_Info *)host->hostdata;
 	unsigned long flags;
 
-	save_flags_cli(flags);
+	spin_lock_irqsave(host->host_lock, flags);
 	if (on_off)
 		info->control.control |= EESOX_TERM_ENABLE;
 	else
 		info->control.control &= ~EESOX_TERM_ENABLE;
-	restore_flags(flags);
 
 	outb(info->control.control, info->control.io_port);
+	spin_unlock_irqrestore(host->host_lock, flags);
 }
 
 /* Prototype: void eesoxscsi_intr(irq, *dev_id, *regs)

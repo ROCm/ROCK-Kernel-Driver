@@ -267,6 +267,7 @@ int kjournald(void *arg)
 	journal->j_task = NULL;
 	wake_up(&journal->j_wait_done_commit);
 	jbd_debug(1, "Journal thread exiting.\n");
+	unlock_kernel();
 	return 0;
 }
 
@@ -894,7 +895,7 @@ int journal_create (journal_t *journal)
 		__brelse(bh);
 	}
 
-	fsync_dev(to_kdev_t(journal->j_dev->bd_dev));
+	fsync_bdev(journal->j_dev);
 	jbd_debug(1, "JBD: journal cleared.\n");
 
 	/* OK, fill in the initial static fields in the new superblock */

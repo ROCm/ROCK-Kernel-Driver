@@ -14,7 +14,6 @@
 #include <linux/sonet.h>
 #include <linux/skbuff.h>
 #include <linux/time.h>
-#include <linux/sched.h> /* for xtime */
 #include <linux/delay.h>
 #include <linux/uio.h>
 #include <linux/init.h>

@@ -144,7 +144,6 @@ struct dqstats {
 
 #ifdef __KERNEL__
 
-extern int nr_dquots, nr_free_dquots;
 extern int dquot_root_squash;
 
 #define NR_DQHASH 43            /* Just an arbitrary number */

@@ -764,6 +764,13 @@ need_resched:
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
 
+	/*
+	 * if entering from preempt_schedule, off a kernel preemption,
+	 * go straight to picking the next task.
+	 */
+	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
+		goto pick_next_task;
+	
 	switch (prev->state) {
 	case TASK_INTERRUPTIBLE:
 		if (unlikely(signal_pending(prev))) {
@@ -775,9 +782,7 @@ need_resched:
 	case TASK_RUNNING:
 		;
 	}
-#if CONFIG_SMP
 pick_next_task:
-#endif
 	if (unlikely(!rq->nr_running)) {
 #if CONFIG_SMP
 		load_balance(rq, 1);
@@ -841,10 +846,15 @@ switch_tasks:
  */
 asmlinkage void preempt_schedule(void)
 {
-	if (unlikely(preempt_get_count()))
+	struct thread_info *ti = current_thread_info();
+
+	if (unlikely(ti->preempt_count))
 		return;
-	current->state = TASK_RUNNING;
+
+	ti->preempt_count = PREEMPT_ACTIVE;
 	schedule();
+	ti->preempt_count = 0;
+	barrier();
 }
 #endif /* CONFIG_PREEMPT */
 

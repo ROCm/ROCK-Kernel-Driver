@@ -356,6 +356,8 @@ EXPORT_SYMBOL(com20020_check);
 EXPORT_SYMBOL(com20020_found);
 EXPORT_SYMBOL(com20020_remove);
 
+MODULE_LICENSE("GPL");
+
 int init_module(void)
 {
 	BUGLVL(D_NORMAL) printk(VERSION);

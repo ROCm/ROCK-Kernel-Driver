@@ -78,7 +78,7 @@ struct tcp_ehash_bucket {
  */
 struct tcp_bind_bucket {
 	unsigned short		port;
-	unsigned short		fastreuse;
+	signed short		fastreuse;
 	struct tcp_bind_bucket	*next;
 	struct sock		*owners;
 	struct tcp_bind_bucket	**pprev;
@@ -469,6 +469,7 @@ extern int sysctl_tcp_wmem[3];
 extern int sysctl_tcp_rmem[3];
 extern int sysctl_tcp_app_win;
 extern int sysctl_tcp_adv_win_scale;
+extern int sysctl_tcp_tw_reuse;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -507,7 +508,7 @@ struct open_request {
 	__u16			rmt_port;
 	__u16			mss;
 	__u8			retrans;
-	__u8			index;
+	__u8			__pad;
 	__u16	snd_wscale : 4, 
 		rcv_wscale : 4, 
 		tstamp_ok : 1,
@@ -577,9 +578,7 @@ struct tcp_func {
 							 struct sk_buff *skb,
 							 struct open_request *req,
 							 struct dst_entry *dst);
-	
-	int			(*hash_connecting)	(struct sock *sk);
-
+    
 	int			(*remember_stamp)	(struct sock *sk);
 
 	__u16			net_header_len;
@@ -781,8 +780,7 @@ extern int			tcp_v4_connect(struct sock *sk,
 					       struct sockaddr *uaddr,
 					       int addr_len);
 
-extern int			tcp_connect(struct sock *sk,
-					    struct sk_buff *skb);
+extern int			tcp_connect(struct sock *sk);
 
 extern struct sk_buff *		tcp_make_synack(struct sock *sk,
 						struct dst_entry *dst,
@@ -1834,6 +1832,6 @@ static inline int tcp_paws_check(struct tcp_opt *tp, int rst)
 	return 1;
 }
 
-#define TCP_CHECK_TIMER(sk) do { } while (0);
+#define TCP_CHECK_TIMER(sk) do { } while (0)
 
 #endif	/* _TCP_H */

@@ -283,45 +283,42 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		if (buffer_size) {
-			/* override the default buffer sizes */
-			buffer = kmalloc (buffer_size, GFP_KERNEL);
-			if (!buffer) {
-				err ("%s - out of memory.", __FUNCTION__);
-				return -ENOMEM;
-			}
-			kfree (port->read_urb->transfer_buffer);
-			port->read_urb->transfer_buffer = buffer;
-			port->read_urb->transfer_buffer_length = buffer_size;
-
-			buffer = kmalloc (buffer_size, GFP_KERNEL);
-			if (!buffer) {
-				err ("%s - out of memory.", __FUNCTION__);
-				return -ENOMEM;
-			}
-			kfree (port->write_urb->transfer_buffer);
-			port->write_urb->transfer_buffer = buffer;
-			port->write_urb->transfer_buffer_length = buffer_size;
-			port->bulk_out_size = buffer_size;
+	if (buffer_size) {
+		/* override the default buffer sizes */
+		buffer = kmalloc (buffer_size, GFP_KERNEL);
+		if (!buffer) {
+			err ("%s - out of memory.", __FUNCTION__);
+			return -ENOMEM;
 		}
+		kfree (port->read_urb->transfer_buffer);
+		port->read_urb->transfer_buffer = buffer;
+		port->read_urb->transfer_buffer_length = buffer_size;
 
-		/* Start reading from the device */
-		usb_fill_bulk_urb (
-			port->read_urb,
-			serial->dev, 
-			usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-			port->read_urb->transfer_buffer,
-			port->read_urb->transfer_buffer_length,
-			ir_read_bulk_callback,
-			port);
-		port->read_urb->transfer_flags = USB_QUEUE_BULK;
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (result)
-			err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+		buffer = kmalloc (buffer_size, GFP_KERNEL);
+		if (!buffer) {
+			err ("%s - out of memory.", __FUNCTION__);
+			return -ENOMEM;
+		}
+		kfree (port->write_urb->transfer_buffer);
+		port->write_urb->transfer_buffer = buffer;
+		port->write_urb->transfer_buffer_length = buffer_size;
+		port->bulk_out_size = buffer_size;
 	}
+
+	/* Start reading from the device */
+	usb_fill_bulk_urb (
+		port->read_urb,
+		serial->dev, 
+		usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+		port->read_urb->transfer_buffer,
+		port->read_urb->transfer_buffer_length,
+		ir_read_bulk_callback,
+		port);
+	port->read_urb->transfer_flags = USB_QUEUE_BULK;
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (result)
+		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+
 	return result;
 }
 
@@ -338,15 +335,9 @@ static void ir_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* shutdown our bulk read */
-			usb_unlink_urb (port->read_urb);
-		}
-		port->open_count = 0;
-
+	if (serial->dev) {
+		/* shutdown our bulk read */
+		usb_unlink_urb (port->read_urb);
 	}
 }
 

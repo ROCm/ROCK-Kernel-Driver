@@ -447,8 +447,6 @@ static int __init com90xx_found(struct net_device *dev0, int ioaddr, int airq,
 
 	dev->mem_start = first_mirror;
 	dev->mem_end = last_mirror + MIRROR_SIZE - 1;
-	dev->rmem_start = dev->mem_start + BUFFER_SIZE * 0;
-	dev->rmem_end = dev->mem_start + BUFFER_SIZE * 2 - 1;
 
 	/* Initialize the rest of the device structure. */
 	memset(lp, 0, sizeof(struct arcnet_local));
@@ -619,6 +617,7 @@ MODULE_PARM(io, "i");
 MODULE_PARM(irq, "i");
 MODULE_PARM(shmem, "i");
 MODULE_PARM(device, "s");
+MODULE_LICENSE("GPL");
 
 int init_module(void)
 {

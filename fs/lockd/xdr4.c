@@ -609,5 +609,7 @@ static struct rpc_procinfo	nlm4_procedures[] = {
 };
 
 struct rpc_version	nlm_version4 = {
-	4, 24, nlm4_procedures,
+	number:		4,
+	nrprocs:	24,
+	procs:		nlm4_procedures,
 };

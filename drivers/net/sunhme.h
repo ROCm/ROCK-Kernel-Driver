@@ -227,7 +227,7 @@
 #define BIGMAC_RXCFG_PMISC    0x00000040 /* Enable promiscous mode          */
 #define BIGMAC_RXCFG_DERR     0x00000080 /* Disable error checking          */
 #define BIGMAC_RXCFG_DCRCS    0x00000100 /* Disable CRC stripping           */
-#define BIGMAC_RXCFG_ME       0x00000200 /* Receive packets addressed to me */
+#define BIGMAC_RXCFG_REJME    0x00000200 /* Reject packets addressed to me  */
 #define BIGMAC_RXCFG_PGRP     0x00000400 /* Enable promisc group mode       */
 #define BIGMAC_RXCFG_HENABLE  0x00000800 /* Enable the hash filter          */
 #define BIGMAC_RXCFG_AENABLE  0x00001000 /* Enable the address filter       */

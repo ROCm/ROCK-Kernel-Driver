@@ -345,7 +345,7 @@ static void ax_bump(struct ax_disp *ax)
 	skb->mac.raw  = skb->data;
 	skb->protocol = htons(ETH_P_AX25);
 	netif_rx(skb);
-	dev->last_rx = jiffies;
+	tmp_ax->dev->last_rx = jiffies;
 	tmp_ax->rx_packets++;
 }
 
@@ -1008,6 +1008,7 @@ MODULE_AUTHOR("Hans Albas PE1AYX <hans@esrac.ele.tue.nl>");
 MODULE_DESCRIPTION("KISS driver for AX.25 over TTYs");
 MODULE_PARM(ax25_maxdev, "i");
 MODULE_PARM_DESC(ax25_maxdev, "number of MKISS devices");
+MODULE_LICENSE("GPL");
 
 module_init(mkiss_init_driver);
 module_exit(mkiss_exit_driver);
