@@ -1,12 +1,13 @@
 /*
  * Network Checksum & Copy routine
  *
- * Copyright (C) 1999 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 1999, 2003 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * Most of the code has been imported from Linux/Alpha
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
 
@@ -146,3 +147,4 @@ csum_partial_copy_nocheck(const char *src, char *dst, int len, unsigned int sum)
 	return do_csum_partial_copy_from_user(src, dst, len, sum, NULL);
 }
 
+EXPORT_SYMBOL(csum_partial_copy_nocheck);
