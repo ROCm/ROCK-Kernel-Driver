@@ -27,6 +27,7 @@
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/smp_lock.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -79,7 +80,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 #endif
 
-	if (in_interrupt() || mm == NULL) {
+	if (in_atomic() || mm == NULL) {
 		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}
