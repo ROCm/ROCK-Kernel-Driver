@@ -252,6 +252,14 @@ UNUSUAL_DEV(  0x054c, 0x0025, 0x0100, 0x0100,
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN ),
 
+#ifdef CONFIG_USB_STORAGE_ISD200
+UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
+		"Sony",
+		"Portable USB Harddrive V2",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
+#endif
+
 UNUSUAL_DEV(  0x054c, 0x002d, 0x0100, 0x0100, 
 		"Sony",
 		"Memorystick MSAC-US1",
@@ -271,6 +279,12 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN ),
 		
+UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
+		"Sony",
+		"Memorystick MSC-U03",
+		US_SC_UFI, US_PR_CB, NULL,
+		US_FL_SINGLE_LUN ),
+
 /* Submitted by Nathan Babb <nathan@lexi.com> */
 UNUSUAL_DEV(  0x054c, 0x006d, 0x0000, 0x9999,
 		"Sony",
@@ -295,26 +309,6 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 		"USB Hard Disk",
 		US_SC_RBC, US_PR_CB, NULL, 0 ), 
 
-/* This Pentax still camera is not conformant
- * to the USB storage specification: -
- * - It does not like the INQUIRY command. So we must handle this command
- *   of the SCSI layer ourselves.
- * Tested on Rev. 10.00 (0x1000)
- * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
- */
-UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
-                "Pentax",
-                "Optio 2/3/400",
-                US_SC_DEVICE, US_PR_DEVICE, NULL,
-                US_FL_FIX_INQUIRY ),
-
-/* Submitted by Per Winkvist <per.winkvist@uk.com> */
-UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
-                "Pentax",
-                "Optio S",
-                US_SC_8070, US_PR_CBI, NULL,
-                US_FL_FIX_INQUIRY ),
-
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
 		"In-System",
@@ -337,12 +331,6 @@ UNUSUAL_DEV(  0x05ab, 0x0351, 0x0100, 0x0110,
 UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 		"In-System",
 		"USB Storage Adapter V2",
-		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-		0 ),
-
-UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
-		"Sony",
-		"Portable USB Harddrive V2",
 		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
 		0 ),
 #endif
@@ -385,12 +373,6 @@ UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
-UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0x9999,
-		"Unknown",
-		"GL641USB based CF Card reader",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY | US_FL_MODE_XLATE),
-
 /* Reported by Hanno Boeck <hanno@gmx.de>
  * Taken from the Lycoris Kernel */
 UNUSUAL_DEV(  0x0636, 0x0003, 0x0000, 0x9999,
@@ -431,7 +413,8 @@ UNUSUAL_DEV(  0x0781, 0x0001, 0x0200, 0x0200,
 UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009, 
 		"Sandisk",
 		"ImageMate SDDR-31",
-		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_IGNORE_SER ),
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
 		"Sandisk",
@@ -520,13 +503,6 @@ UNUSUAL_DEV( 0x07c4, 0xa006, 0x0000, 0xffff,
 		"Simple Tech/Datafab CF+SM Reader",
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
 		US_FL_MODE_XLATE ),
-
-/* Submitted by Olaf Hering <olh@suse.de> */
-UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
-		"Datafab Systems, Inc.",
-		"USB to CF + SM Combo (LC1)",
-		US_SC_SCSI, US_PR_DATAFAB, NULL,
-		US_FL_MODE_XLATE ),
 #endif
 		
 #ifdef CONFIG_USB_STORAGE_SDDR55
@@ -536,6 +512,15 @@ UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
 		"MDSM-B reader",
 		US_SC_SCSI, US_PR_SDDR55, NULL,
 		US_FL_FIX_INQUIRY ),
+#endif
+
+#ifdef CONFIG_USB_STORAGE_DATAFAB
+/* Submitted by Olaf Hering <olh@suse.de> */
+UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
+		"Datafab Systems, Inc.",
+		"USB to CF + SM Combo (LC1)",
+		US_SC_SCSI, US_PR_DATAFAB, NULL,
+		US_FL_MODE_XLATE ),
 #endif
 
 /* Datafab KECF-USB / Sagatek DCS-CF / Simpletech Flashlink UCF-100
@@ -563,6 +548,22 @@ UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		US_SC_8070, US_PR_CB, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
+UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
+		"Samsung",
+		"Digimax 410",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY),
+
+/* Aiptek PocketCAM 3Mega
+ * Nicolas DUPEUX <nicolas@dupeux.net> 
+ */
+UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
+		"AIPTEK",
+		"PocketCAM 3Mega",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_MODE_XLATE ),
+
 /* aeb */
 UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"Feiya",
@@ -570,13 +571,6 @@ UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_CAPACITY ),
 
-/* Submitted by Hartmut Wahl <hwahl@hwahl.de>*/
-UNUSUAL_DEV( 0x0839, 0x000a, 0x0001, 0x0001,
-        "Samsung",
-        "Digimax 410",
-        US_SC_SCSI, US_PR_BULK, NULL,
-        US_FL_FIX_INQUIRY),
-                
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 		"Minds@Work",
 		"Digital Wallet",
@@ -589,22 +583,26 @@ UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
 
-UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
-		"IBM",
-		"IBM USB Memory Key",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_FIX_INQUIRY ),
-		
-/* Pentax Optio S digital camera
- * adapted from http://www2.goldfisch.at/knowledge/233
- * (Peter Pilsl <pilsl@goldfisch.at>)
- * by Christoph Weidemann <cweidema@indiana.edu> */
-UNUSUAL_DEV(  0x0a17, 0x0006, 0x0000, 0xffff,
-		"Pentax",
-		"Optio S",
-		US_SC_8070, US_PR_CB, NULL,
-		US_FL_MODE_XLATE|US_FL_FIX_INQUIRY),
+/* This Pentax still camera is not conformant
+ * to the USB storage specification: -
+ * - It does not like the INQUIRY command. So we must handle this command
+ *   of the SCSI layer ourselves.
+ * Tested on Rev. 10.00 (0x1000)
+ * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
+ */
+UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
+                "Pentax",
+                "Optio 2/3/400",
+                US_SC_DEVICE, US_PR_DEVICE, NULL,
+                US_FL_FIX_INQUIRY ),
 
+/* Submitted by Per Winkvist <per.winkvist@uk.com> */
+UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
+                "Pentax",
+                "Optio S",
+                US_SC_8070, US_PR_CBI, NULL,
+                US_FL_FIX_INQUIRY ),
+		
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		"ATI",
@@ -612,13 +610,6 @@ UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
 		0 ),
 #endif
-
-/* EasyDisk support. Submitted by Stanislav Karchebny <berk@madfire.net> */
-UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x0001,
-		"Global Channel Solutions",
-		"EasyDisk EDxxxx",
-		US_SC_SCSI, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
 
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
@@ -648,13 +639,3 @@ UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999,
 		US_SC_SCSI, US_PR_SDDR55, NULL,
 		US_FL_SINGLE_LUN),
 #endif
-
-/* Aiptek PocketCAM 3Mega
- * Nicolas DUPEUX <nicolas@dupeux.net> 
- */
-UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
-	"AIPTEK",
-	"PocketCAM 3Mega",
-	US_SC_SCSI, US_PR_BULK, NULL,
-	US_FL_MODE_XLATE ),
-

@@ -2901,6 +2901,7 @@ static int setup_proc_entry( struct net_device *dev,
 					      airo_entry);
         apriv->proc_entry->uid = proc_uid;
         apriv->proc_entry->gid = proc_gid;
+        apriv->proc_entry->owner = THIS_MODULE;
 
 	/* Setup the StatsDelta */
 	entry = create_proc_entry("StatsDelta",
@@ -2909,6 +2910,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_statsdelta_ops);
 
 	/* Setup the Stats */
@@ -2918,6 +2920,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_stats_ops);
 
 	/* Setup the Status */
@@ -2927,6 +2930,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_status_ops);
 
 	/* Setup the Config */
@@ -2936,6 +2940,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_config_ops);
 
 	/* Setup the SSID */
@@ -2945,6 +2950,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_SSID_ops);
 
 	/* Setup the APList */
@@ -2954,6 +2960,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_APList_ops);
 
 	/* Setup the BSSList */
@@ -2963,6 +2970,7 @@ static int setup_proc_entry( struct net_device *dev,
 	entry->uid = proc_uid;
 	entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_BSSList_ops);
 
 	/* Setup the WepKey */
@@ -2972,6 +2980,7 @@ static int setup_proc_entry( struct net_device *dev,
         entry->uid = proc_uid;
         entry->gid = proc_gid;
 	entry->data = dev;
+        entry->owner = THIS_MODULE;
 	SETPROC_OPS(entry, proc_wepkey_ops);
 
 	return 0;
@@ -3062,8 +3071,6 @@ static int proc_status_open( struct inode *inode, struct file *file ) {
 	StatusRid status_rid;
 	int i;
 
-	MOD_INC_USE_COUNT;
-
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	memset(file->private_data, 0, sizeof(struct proc_data));
@@ -3143,8 +3150,6 @@ static int proc_stats_rid_open( struct inode *inode,
 	StatsRid stats;
 	int i, j;
 	int *vals = stats.vals;
-	MOD_INC_USE_COUNT;
-
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -3421,8 +3426,6 @@ static int proc_config_open( struct inode *inode, struct file *file ) {
 	struct airo_info *ai = dev->priv;
 	int i;
 
-	MOD_INC_USE_COUNT;
-
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	memset(file->private_data, 0, sizeof(struct proc_data));
@@ -3692,8 +3695,6 @@ static int proc_wepkey_open( struct inode *inode, struct file *file ) {
 	int j=0;
 	int rc;
 
-	MOD_INC_USE_COUNT;
-
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	memset(file->private_data, 0, sizeof(struct proc_data));
@@ -3742,8 +3743,6 @@ static int proc_SSID_open( struct inode *inode, struct file *file ) {
 	char *ptr;
 	SsidRid SSID_rid;
 
-	MOD_INC_USE_COUNT;
-
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
 	memset(file->private_data, 0, sizeof(struct proc_data));
@@ -3787,8 +3786,6 @@ static int proc_APList_open( struct inode *inode, struct file *file ) {
 	int i;
 	char *ptr;
 	APListRid APList_rid;
-
-	MOD_INC_USE_COUNT;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -3839,8 +3836,6 @@ static int proc_BSSList_open( struct inode *inode, struct file *file ) {
 	int rc;
 	/* If doLoseSync is not 1, we won't do a Lose Sync */
 	int doLoseSync = -1;
-
-	MOD_INC_USE_COUNT;
 
 	if ((file->private_data = kmalloc(sizeof(struct proc_data ), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -3904,7 +3899,6 @@ static int proc_close( struct inode *inode, struct file *file )
 {
 	struct proc_data *data = (struct proc_data *)file->private_data;
 	if ( data->on_close != NULL ) data->on_close( inode, file );
-	MOD_DEC_USE_COUNT;
 	if ( data->rbuffer ) kfree( data->rbuffer );
 	if ( data->wbuffer ) kfree( data->wbuffer );
 	kfree( data );

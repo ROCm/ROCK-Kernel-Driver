@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/if_ether.h>
 #include <linux/if_bridge.h>
+#include <linux/netfilter_bridge.h>
 #include "br_private.h"
 #include "br_private_stp.h"
 
@@ -53,7 +54,8 @@ static void br_send_bpdu(struct net_bridge_port *p, unsigned char *data, int len
 	memcpy(skb->nh.raw, data, length);
 	memset(skb->nh.raw + length, 0xa5, size - length - 2*ETH_ALEN - 2);
 
-	dev_queue_xmit(skb);
+	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_OUT, skb, NULL, skb->dev,
+		dev_queue_xmit);
 }
 
 static __inline__ void br_set_ticks(unsigned char *dest, int jiff)
@@ -130,67 +132,75 @@ void br_send_tcn_bpdu(struct net_bridge_port *p)
 	br_send_bpdu(p, buf, 7);
 }
 
-static unsigned char header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
+static const unsigned char header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
 
 /* NO locks */
-void br_stp_handle_bpdu(struct sk_buff *skb)
+int br_stp_handle_bpdu(struct sk_buff *skb)
 {
+	struct net_bridge_port *p = skb->dev->br_port;
+	struct net_bridge *br = p->br;
 	unsigned char *buf;
-	struct net_bridge_port *p;
-	struct net_bridge *br;
 
-	buf = skb->mac.raw + 14;
-	p = skb->dev->br_port;
-	br = p->br;
+	/* need at least the 802 and STP headers */
+	if (!pskb_may_pull(skb, sizeof(header)+1) ||
+	    memcmp(skb->data, header, sizeof(header)))
+		goto err;
+
+	buf = skb_pull(skb, sizeof(header));
 
 	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_DISABLED 
 	    || !(br->dev->flags & IFF_UP)
-	    || !br->stp_enabled 
-	    || memcmp(buf, header, 6)) 
+	    || !br->stp_enabled)
 		goto out;
 
-	if (buf[6] == BPDU_TYPE_CONFIG) {
+	if (buf[0] == BPDU_TYPE_CONFIG) {
 		struct br_config_bpdu bpdu;
 
-		bpdu.topology_change = (buf[7] & 0x01) ? 1 : 0;
-		bpdu.topology_change_ack = (buf[7] & 0x80) ? 1 : 0;
-		bpdu.root.prio[0] = buf[8];
-		bpdu.root.prio[1] = buf[9];
-		bpdu.root.addr[0] = buf[10];
-		bpdu.root.addr[1] = buf[11];
-		bpdu.root.addr[2] = buf[12];
-		bpdu.root.addr[3] = buf[13];
-		bpdu.root.addr[4] = buf[14];
-		bpdu.root.addr[5] = buf[15];
-		bpdu.root_path_cost =
-			(buf[16] << 24) |
-			(buf[17] << 16) |
-			(buf[18] << 8) |
-			buf[19];
-		bpdu.bridge_id.prio[0] = buf[20];
-		bpdu.bridge_id.prio[1] = buf[21];
-		bpdu.bridge_id.addr[0] = buf[22];
-		bpdu.bridge_id.addr[1] = buf[23];
-		bpdu.bridge_id.addr[2] = buf[24];
-		bpdu.bridge_id.addr[3] = buf[25];
-		bpdu.bridge_id.addr[4] = buf[26];
-		bpdu.bridge_id.addr[5] = buf[27];
-		bpdu.port_id = (buf[28] << 8) | buf[29];
+		if (!pskb_may_pull(skb, 32))
+		    goto out;
 
-		bpdu.message_age = br_get_ticks(buf+30);
-		bpdu.max_age = br_get_ticks(buf+32);
-		bpdu.hello_time = br_get_ticks(buf+34);
-		bpdu.forward_delay = br_get_ticks(buf+36);
+		buf = skb->data;
+		bpdu.topology_change = (buf[1] & 0x01) ? 1 : 0;
+		bpdu.topology_change_ack = (buf[1] & 0x80) ? 1 : 0;
+
+		bpdu.root.prio[0] = buf[2];
+		bpdu.root.prio[1] = buf[3];
+		bpdu.root.addr[0] = buf[4];
+		bpdu.root.addr[1] = buf[5];
+		bpdu.root.addr[2] = buf[6];
+		bpdu.root.addr[3] = buf[7];
+		bpdu.root.addr[4] = buf[8];
+		bpdu.root.addr[5] = buf[9];
+		bpdu.root_path_cost =
+			(buf[10] << 24) |
+			(buf[11] << 16) |
+			(buf[12] << 8) |
+			buf[13];
+		bpdu.bridge_id.prio[0] = buf[14];
+		bpdu.bridge_id.prio[1] = buf[15];
+		bpdu.bridge_id.addr[0] = buf[16];
+		bpdu.bridge_id.addr[1] = buf[17];
+		bpdu.bridge_id.addr[2] = buf[18];
+		bpdu.bridge_id.addr[3] = buf[19];
+		bpdu.bridge_id.addr[4] = buf[20];
+		bpdu.bridge_id.addr[5] = buf[21];
+		bpdu.port_id = (buf[22] << 8) | buf[23];
+
+		bpdu.message_age = br_get_ticks(buf+24);
+		bpdu.max_age = br_get_ticks(buf+26);
+		bpdu.hello_time = br_get_ticks(buf+28);
+		bpdu.forward_delay = br_get_ticks(buf+30);
 
 		br_received_config_bpdu(p, &bpdu);
-		goto out;
 	}
 
-	if (buf[6] == BPDU_TYPE_TCN) {
+	else if (buf[0] == BPDU_TYPE_TCN) {
 		br_received_tcn_bpdu(p);
-		goto out;
 	}
  out:
 	spin_unlock_bh(&br->lock);
+ err:
+	kfree(skb);
+	return 0;
 }

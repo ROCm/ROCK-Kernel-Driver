@@ -508,7 +508,7 @@ int ipc_checkid(struct ipc_ids* ids, struct kern_ipc_perm* ipcp, int uid)
 	return 0;
 }
 
-#ifndef __ia64__
+#if !defined(__ia64__) && !defined(__x86_64__)
 
 /**
  *	ipc_parse_version	-	IPC call version

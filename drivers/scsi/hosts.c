@@ -82,6 +82,13 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 			sht->info ? sht->info(shost) : sht->name);
 
 	error = scsi_sysfs_add_host(shost, dev);
+
+	if (!shost->can_queue) {
+		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
+				sht->name);
+		error = -EINVAL;
+	}
+
 	if (!error) {
 		scsi_proc_host_add(shost);
 		scsi_scan_host(shost);
@@ -187,7 +194,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->use_blk_tcq = sht->use_blk_tcq;
 	shost->highmem_io = sht->highmem_io;
 
-	if (!sht->max_host_blocked)
+	if (sht->max_host_blocked)
 		shost->max_host_blocked = sht->max_host_blocked;
 	else
 		shost->max_host_blocked = SCSI_DEFAULT_HOST_BLOCKED;

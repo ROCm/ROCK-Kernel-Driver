@@ -46,4 +46,6 @@ static inline void unset_nmi_pm_callback(struct pm_dev * dev)
 
 #endif /* CONFIG_PM */
  
+extern void default_do_nmi(struct pt_regs *);
+ 
 #endif /* ASM_NMI_H */

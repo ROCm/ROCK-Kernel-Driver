@@ -1,4 +1,4 @@
-/* $Id: signal.c,v 1.21 2000/03/11 14:06:21 gniibe Exp $
+/* $Id: signal.c,v 1.15 2003/05/06 23:28:47 lethal Exp $
  *
  *  linux/arch/sh/kernel/signal.c
  *
@@ -21,12 +21,15 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
-#include <linux/personality.h>
 #include <linux/tty.h>
+#include <linux/personality.h>
+#include <linux/binfmts.h>
+#include <linux/suspend.h>
 
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>
 
 #define DEBUG_SIG 0
 
@@ -45,11 +48,11 @@ sys_sigsuspend(old_sigset_t mask,
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs.regs[0] = -EINTR;
 	while (1) {
@@ -74,11 +77,11 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize,
 	if (copy_from_user(&newset, unewset, sizeof(newset)))
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs.regs[0] = -EINTR;
 	while (1) {
@@ -150,10 +153,13 @@ struct rt_sigframe
 	char retcode[4];
 };
 
-#if defined(__SH4__)
+#ifdef CONFIG_CPU_SH4
 static inline int restore_sigcontext_fpu(struct sigcontext *sc)
 {
 	struct task_struct *tsk = current;
+
+	if (!(cpu_data->flags & CPU_HAS_FPU))
+		return 0;
 
 	tsk->used_math = 1;
 	return __copy_from_user(&tsk->thread.fpu.hard, &sc->sc_fpregs[0],
@@ -163,31 +169,27 @@ static inline int restore_sigcontext_fpu(struct sigcontext *sc)
 static inline int save_sigcontext_fpu(struct sigcontext *sc)
 {
 	struct task_struct *tsk = current;
-	unsigned long flags;
-	int val;
+
+	if (!(cpu_data->flags & CPU_HAS_FPU))
+		return 0;
 
 	if (!tsk->used_math) {
-	  val = 0;
-		__copy_to_user(&sc->sc_ownedfp, &val, sizeof(int));
+		__put_user(0, &sc->sc_ownedfp);
 		return 0;
 	}
 
-	val = 1;
-	__copy_to_user(&sc->sc_ownedfp, &val, sizeof(int));
+	__put_user(1, &sc->sc_ownedfp);
 
 	/* This will cause a "finit" to be triggered by the next
 	   attempted FPU operation by the 'current' process.
 	   */
 	tsk->used_math = 0;
 
-	save_and_cli(flags);
 	unlazy_fpu(tsk);
-	restore_flags(flags);
-
 	return __copy_to_user(&sc->sc_fpregs[0], &tsk->thread.fpu.hard,
 			      sizeof(long)*(16*2+2));
 }
-#endif
+#endif /* CONFIG_CPU_SH4 */
 
 static int
 restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, int *r0_p)
@@ -208,21 +210,21 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, int *r0_p)
 	COPY(sr);	COPY(pc);
 #undef COPY
 
-#if defined(__SH4__)
-	{
+#ifdef CONFIG_CPU_SH4
+	if (cpu_data->flags & CPU_HAS_FPU) {
 		int owned_fp;
 		struct task_struct *tsk = current;
 
 		regs->sr |= SR_FD; /* Release FPU */
 		clear_fpu(tsk);
-		current->used_math = 0;
+		tsk->used_math = 0;
 		__get_user (owned_fp, &sc->sc_ownedfp);
 		if (owned_fp)
 			err |= restore_sigcontext_fpu(sc);
 	}
 #endif
 
-	regs->syscall_nr = -1;		/* disable syscall checks */
+	regs->tra = -1;		/* disable syscall checks */
 	err |= __get_user(*r0_p, &sc->sc_regs[0]);
 	return err;
 }
@@ -246,10 +248,10 @@ asmlinkage int sys_sigreturn(unsigned long r4, unsigned long r5,
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext(&regs, &frame->sc, &r0))
 		goto badframe;
@@ -276,10 +278,10 @@ asmlinkage int sys_rt_sigreturn(unsigned long r4, unsigned long r5,
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &r0))
 		goto badframe;
@@ -321,7 +323,7 @@ setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	COPY(sr);	COPY(pc);
 #undef COPY
 
-#if defined(__SH4__)
+#ifdef CONFIG_CPU_SH4
 	err |= save_sigcontext_fpu(sc);
 #endif
 
@@ -355,10 +357,10 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	signal = current->exec_domain
-		&& current->exec_domain->signal_invmap
+	signal = current_thread_info()->exec_domain
+		&& current_thread_info()->exec_domain->signal_invmap
 		&& sig < 32
-		? current->exec_domain->signal_invmap[sig]
+		? current_thread_info()->exec_domain->signal_invmap[sig]
 		: sig;
 
 	err |= setup_sigcontext(&frame->sc, regs, set->sig[0]);
@@ -420,10 +422,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	signal = current->exec_domain
-		&& current->exec_domain->signal_invmap
+	signal = current_thread_info()->exec_domain
+		&& current_thread_info()->exec_domain->signal_invmap
 		&& sig < 32
-		? current->exec_domain->signal_invmap[sig]
+		? current_thread_info()->exec_domain->signal_invmap[sig]
 		: sig;
 
 	err |= __put_user(&frame->info, &frame->pinfo);
@@ -490,10 +492,10 @@ static void
 handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs)
 {
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	/* Are we from a system call? */
-	if (regs->syscall_nr >= 0) {
+	if (regs->tra >= 0) {
 		/* If so, check system call restarting.. */
 		switch (regs->regs[0]) {
 			case -ERESTARTNOHAND:
@@ -507,9 +509,21 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 				}
 			/* fallthrough */
 			case -ERESTARTNOINTR:
-				regs->regs[0] = regs->syscall_nr;
 				regs->pc -= 2;
 		}
+#ifndef CONFIG_PREEMPT
+	} else {
+		/* gUSA handling */
+		if (regs->regs[15] >= 0xc0000000) {
+			int offset = (int)regs->regs[15];
+
+			/* Reset stack pointer: clear critical region mark */
+			regs->regs[15] = regs->regs[1];
+			if (regs->pc < regs->regs[0])
+				/* Go to rewind point #1 */
+				regs->pc = regs->regs[0] + offset - 2;
+		}
+#endif
 	}
 
 	/* Set up the stack frame */
@@ -522,11 +536,11 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
 
@@ -553,6 +567,11 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!user_mode(regs))
 		return 1;
 
+	if (current->flags & PF_FREEZE) {
+		refrigerator(0);
+		goto no_signal;
+	}
+
 	if (!oldset)
 		oldset = &current->blocked;
 
@@ -563,13 +582,14 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		return 1;
 	}
 
+ no_signal:
 	/* Did we come from a system call? */
-	if (regs->syscall_nr >= 0) {
+	if (regs->tra >= 0) {
 		/* Restart the system call - no handlers present */
 		if (regs->regs[0] == -ERESTARTNOHAND ||
 		    regs->regs[0] == -ERESTARTSYS ||
-		    regs->regs[0] == -ERESTARTNOINTR) {
-			regs->regs[0] = regs->syscall_nr;
+		    regs->regs[0] == -ERESTARTNOINTR ||
+		    regs->regs[0] == -ERESTART_RESTARTBLOCK) {
 			regs->pc -= 2;
 		}
 	}

@@ -1,6 +1,16 @@
 #ifndef __ASM_SH_PARAM_H
 #define __ASM_SH_PARAM_H
 
+#ifdef __KERNEL__
+# ifdef CONFIG_SH_WDT
+#  define HZ		1000		/* Needed for high-res WOVF */
+# else
+#  define HZ		100
+# endif
+# define USER_HZ	100		/* User interfaces are in "ticks" */
+# define CLOCKS_PER_SEC	(USER_HZ)	/* frequency at which times() counts */
+#endif
+
 #ifndef HZ
 #define HZ 100
 #endif
@@ -16,9 +26,5 @@
 #endif
 
 #define MAXHOSTNAMELEN	64	/* max length of hostname */
-
-#ifdef __KERNEL__
-#define CLOCKS_PER_SEC	HZ	/* frequency at which times() counts */
-#endif
 
 #endif /* __ASM_SH_PARAM_H */

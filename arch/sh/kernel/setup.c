@@ -1,9 +1,9 @@
-/* $Id: setup.c,v 1.31 2001/08/23 16:36:40 dwmw2 Exp $
+/* $Id: setup.c,v 1.17 2003/05/20 01:51:37 lethal Exp $
  *
  *  linux/arch/sh/kernel/setup.c
  *
  *  Copyright (C) 1999  Niibe Yutaka
- *
+ *  Copyright (C) 2002, 2003  Paul Mundt
  */
 
 /*
@@ -30,7 +30,10 @@
 #include <linux/console.h>
 #include <linux/ctype.h>
 #include <linux/seq_file.h>
+#include <linux/utsname.h>
 #include <linux/root_dev.h>
+#include <linux/utsname.h>
+#include <linux/cpu.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -41,6 +44,11 @@
 #include <asm/machvec.h>
 #ifdef CONFIG_SH_EARLY_PRINTK
 #include <asm/sh_bios.h>
+#endif
+
+#ifdef CONFIG_SH_KGDB
+#include <asm/kgdb.h>
+static int kgdb_parse_options(char *options);
 #endif
 
 /*
@@ -55,8 +63,9 @@
 struct sh_cpuinfo boot_cpu_data = { CPU_SH_NONE, 0, 10000000, };
 struct screen_info screen_info;
 unsigned char aux_device_present = 0xaa;
+static int fpu_disabled __initdata = 0;
 
-#if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_UNKNOWN)
+#if defined(CONFIG_SH_UNKNOWN)
 struct sh_machine_vector sh_mv;
 #endif
 
@@ -74,6 +83,8 @@ struct screen_info screen_info = {
 };
 
 extern void fpu_init(void);
+extern void platform_setup(void);
+extern char *get_system_type(void);
 extern int root_mountflags;
 extern int _text, _etext, _edata, _end;
 
@@ -128,6 +139,77 @@ static struct resource ram_resources[] = {
 };
 
 unsigned long memory_start, memory_end;
+
+/* XXX: MRB-remove - blatant hack */
+#if 1
+#define SCIF_REG	0xffe80000
+
+static void scif_sercon_putc(int c)
+{
+	while (!(ctrl_inw(SCIF_REG + 0x10) & 0x20)) ;
+
+	ctrl_outb(c, SCIF_REG + 12);
+	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0x9f), SCIF_REG + 0x10);
+
+	if (c == '\n')
+		scif_sercon_putc('\r');
+}
+
+static void scif_sercon_flush(void)
+{
+	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0xbf), SCIF_REG + 0x10);
+
+	while (!(ctrl_inw(SCIF_REG + 0x10) & 0x40)) ;
+
+	ctrl_outw((ctrl_inw(SCIF_REG + 0x10) & 0xbf), SCIF_REG + 0x10);
+}
+
+static void scif_sercon_write(struct console *con, const char *s, unsigned count)
+{
+	while (count-- > 0)
+		scif_sercon_putc(*s++);
+
+	scif_sercon_flush();
+}
+
+static int __init scif_sercon_setup(struct console *con, char *options)
+{
+	con->cflag = CREAD | HUPCL | CLOCAL | B115200 | CS8;
+
+	return 0;
+}
+
+static struct console scif_sercon = {
+	.name		= "sercon",
+	.write		= scif_sercon_write,
+	.setup		= scif_sercon_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
+};
+
+void scif_sercon_init(int baud)
+{
+	ctrl_outw(0, SCIF_REG + 8);
+	ctrl_outw(0, SCIF_REG);
+
+	/* Set baud rate */
+	ctrl_outb((50000000 / (32 * baud)) - 1, SCIF_REG + 4);
+
+	ctrl_outw(12, SCIF_REG + 24);
+	ctrl_outw(8, SCIF_REG + 24);
+	ctrl_outw(0, SCIF_REG + 32);
+	ctrl_outw(0x60, SCIF_REG + 16);
+	ctrl_outw(0, SCIF_REG + 36);
+	ctrl_outw(0x30, SCIF_REG + 8);
+
+	register_console(&scif_sercon);
+}
+
+void scif_sercon_unregister(void)
+{
+	unregister_console(&scif_sercon);
+}
+#endif
 
 #ifdef CONFIG_SH_EARLY_PRINTK
 /*
@@ -253,7 +335,7 @@ static inline void parse_cmdline (char ** cmdline_p, char mv_name[MV_NAME_SIZE],
 
 void __init setup_arch(char **cmdline_p)
 {
-#if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_UNKNOWN)
+#if defined(CONFIG_SH_UNKNOWN)
 	extern struct sh_machine_vector mv_unknown;
 #endif
 	struct sh_machine_vector *mv = NULL;
@@ -263,6 +345,10 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long bootmap_size;
 	unsigned long start_pfn, max_pfn, max_low_pfn;
 
+/* XXX: MRB-remove */
+#if 0
+	scif_sercon_init(115200);
+#endif
 #ifdef CONFIG_SH_EARLY_PRINTK
 	sh_console_init();
 #endif
@@ -289,6 +375,10 @@ void __init setup_arch(char **cmdline_p)
 
 	parse_cmdline(cmdline_p, mv_name, &mv, &mv_io_base, &mv_mmio_enable);
 
+#ifdef CONFIG_CMDLINE_BOOL
+	sprintf(*cmdline_p, CONFIG_CMDLINE);
+#endif
+
 #ifdef CONFIG_SH_GENERIC
 	if (mv == NULL) {
 		mv = &mv_unknown;
@@ -303,7 +393,7 @@ void __init setup_arch(char **cmdline_p)
 	sh_mv = mv_unknown;
 #endif
 
-#if defined(CONFIG_SH_GENERIC) || defined(CONFIG_SH_UNKNOWN)
+#if defined(CONFIG_SH_UNKNOWN)
 	if (mv_io_base != 0) {
 		sh_mv.mv_inb = generic_inb;
 		sh_mv.mv_inw = generic_inw;
@@ -378,7 +468,6 @@ void __init setup_arch(char **cmdline_p)
 	bootmap_size = init_bootmem_node(NODE_DATA(0), start_pfn,
 					 __MEMORY_START>>PAGE_SHIFT,
 					 max_low_pfn);
-
 	/*
 	 * Register fully available low RAM pages with the bootmem allocator.
 	 */
@@ -435,23 +524,6 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-#if 0
-	/*
-	 * Request the standard RAM and ROM resources -
-	 * they eat up PCI memory space
-	 */
-	request_resource(&iomem_resource, ram_resources+0);
-	request_resource(&iomem_resource, ram_resources+1);
-	request_resource(&iomem_resource, ram_resources+2);
-	request_resource(ram_resources+1, &code_resource);
-	request_resource(ram_resources+1, &data_resource);
-	probe_roms();
-
-	/* request I/O space for devices used on all i[345]86 PCs */
-	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
-		request_resource(&ioport_resource, standard_io_resources+i);
-#endif
-
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
 	conswitchp = &vga_con;
@@ -461,15 +533,31 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	/* Perform the machine specific initialisation */
-	if (sh_mv.mv_init_arch != NULL) {
-		sh_mv.mv_init_arch();
+	platform_setup();
+
+#if defined(CONFIG_CPU_SH4)
+	/* FPU initialization */
+	clear_thread_flag(TIF_USEDFPU);
+	current->used_math = 0;
+#endif
+
+	/* Disable the FPU */
+	if (fpu_disabled) {
+		printk("FPU Disabled\n");
+		cpu_data->flags &= ~CPU_HAS_FPU;
+		release_fpu();
 	}
 
-#if defined(__SH4__)
-	/* We already grab/initialized FPU in head.S.  Make it consisitent. */
-	init_task.used_math = 1;
-	init_task.flags |= PF_USEDFPU;
+#ifdef CONFIG_UBC_WAKEUP
+	/*
+	 * Some brain-damaged loaders decided it would be a good idea to put
+	 * the UBC to sleep. This causes some issues when it comes to things
+	 * like PTRACE_SINGLESTEP or doing hardware watchpoints in GDB.  So ..
+	 * we wake it up and hope that all is well.
+	 */
+	ubc_wakeup();
 #endif
+
 	paging_init();
 }
 
@@ -488,11 +576,45 @@ struct sh_machine_vector* __init get_mv_byname(const char* name)
 		struct sh_machine_vector *mv = &all_vecs[i];
 		if (mv == NULL)
 			continue;
-		if (strcasecmp(name, mv->mv_name) == 0) {
+		if (strcasecmp(name, get_system_type()) == 0) {
 			return mv;
 		}
 	}
 	return NULL;
+}
+
+static struct cpu cpu[NR_CPUS];
+
+static int __init topology_init(void)
+{
+	int cpu_id;
+
+	for (cpu_id = 0; cpu_id < NR_CPUS; cpu_id++)
+		if (cpu_possible(cpu_id))
+			register_cpu(&cpu[cpu_id], cpu_id, NULL);
+
+	return 0;
+}
+
+subsys_initcall(topology_init);
+
+static const char *cpu_name[] = {
+	[CPU_SH7604]	"SH7604",
+	[CPU_SH7708]	"SH7708",
+	[CPU_SH7729]	"SH7729",
+	[CPU_SH7750]	"SH7750",
+	[CPU_SH7750S]	"SH7750S",
+	[CPU_SH7750R]	"SH7750R",
+	[CPU_SH7751]	"SH7751",
+	[CPU_SH7751R]	"SH7751R",
+	[CPU_ST40RA]	"ST40RA",
+	[CPU_ST40GX1]	"ST40GX1",
+	[CPU_SH_NONE]	"Unknown"
+};
+
+const char *get_cpu_subtype(void)
+{
+	return cpu_name[boot_cpu_data.type];
 }
 
 /*
@@ -501,39 +623,62 @@ struct sh_machine_vector* __init get_mv_byname(const char* name)
 #ifdef CONFIG_PROC_FS
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
-#if defined(__sh3__)
-	seq_printf(m, "cpu family\t: SH-3\n"
-		      "cache size\t: 8K-byte\n");
-#elif defined(__SH4__)
-	seq_printf(m, "cpu family\t: SH-4\n"
-		      "cache size\t: 8K-byte/16K-byte\n");
-#endif
-	seq_printf(m, "bogomips\t: %lu.%02lu\n\n",
+	unsigned int dcachesz, icachesz;
+	unsigned int cpu = smp_processor_id();
+
+	icachesz = boot_cpu_data.icache.ways *
+		   boot_cpu_data.icache.sets *
+		   boot_cpu_data.icache.linesz;
+
+	if (!cpu && cpu_online(cpu))
+		seq_printf(m, "machine\t\t: %s\n", get_system_type());
+
+	seq_printf(m, "processor\t: %d\n", cpu);
+	seq_printf(m, "cpu family\t: %s\n", system_utsname.machine);
+	seq_printf(m, "cpu type\t: %s\n", get_cpu_subtype());
+	seq_printf(m, "cache size\t: %dK-bytes", icachesz >> 10);
+
+	/*
+	 * SH-2 and SH-3 have a combined cache, thus there's no real
+	 * I/D distinction ..  so don't inadvertently double
+	 * up the output.
+	 */
+	if (strcmp(system_utsname.machine, "sh2") ||
+	    strcmp(system_utsname.machine, "sh3")) {
+		dcachesz = boot_cpu_data.dcache.ways *
+			   boot_cpu_data.dcache.sets *
+			   boot_cpu_data.dcache.linesz;
+
+		seq_printf(m, "/%dK-bytes", dcachesz >> 10);
+	}
+
+	seq_printf(m, "\nbogomips\t: %lu.%02lu\n",
 		     loops_per_jiffy/(500000/HZ),
 		     (loops_per_jiffy/(5000/HZ)) % 100);
-	seq_printf(m, "Machine: %s\n", sh_mv.mv_name);
 
 #define PRINT_CLOCK(name, value) \
-	seq_printf(m, name " clock: %d.%02dMHz\n", \
+	seq_printf(m, name " clock\t: %d.%02dMHz\n", \
 		     ((value) / 1000000), ((value) % 1000000)/10000)
 	
-	PRINT_CLOCK("CPU", boot_cpu_data.cpu_clock);
-	PRINT_CLOCK("Bus", boot_cpu_data.bus_clock);
+	PRINT_CLOCK("cpu", boot_cpu_data.cpu_clock);
+	PRINT_CLOCK("bus", boot_cpu_data.bus_clock);
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
-	PRINT_CLOCK("Memory", boot_cpu_data.memory_clock);
+	PRINT_CLOCK("memory", boot_cpu_data.memory_clock);
 #endif
-	PRINT_CLOCK("Peripheral module", boot_cpu_data.module_clock);
+	PRINT_CLOCK("module", boot_cpu_data.module_clock);
 
 	return 0;
 }
 
+
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
-	return (void*)(*pos == 0);
+	return *pos < NR_CPUS ? cpu_data + *pos : NULL;
 }
 static void *c_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	return NULL;
+	++*pos;
+	return c_start(m, pos);
 }
 static void c_stop(struct seq_file *m, void *v)
 {
@@ -544,4 +689,101 @@ struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= show_cpuinfo,
 };
-#endif
+#endif /* CONFIG_PROC_FS */
+
+#ifdef CONFIG_SH_KGDB
+/*
+ * Parse command-line kgdb options.  By default KGDB is enabled,
+ * entered on error (or other action) using default serial info.
+ * The command-line option can include a serial port specification
+ * and an action to override default or configured behavior.
+ */
+struct kgdb_sermap kgdb_sci_sermap =
+{ "ttySC", 5, kgdb_sci_setup, NULL };
+
+struct kgdb_sermap *kgdb_serlist = &kgdb_sci_sermap;
+struct kgdb_sermap *kgdb_porttype = &kgdb_sci_sermap;
+
+void kgdb_register_sermap(struct kgdb_sermap *map)
+{
+	struct kgdb_sermap *last;
+
+	for (last = kgdb_serlist; last->next; last = last->next)
+		;
+	last->next = map;
+	if (!map->namelen) {
+		map->namelen = strlen(map->name);
+	}
+}
+
+static int __init kgdb_parse_options(char *options)
+{
+	char c;
+	int baud;
+
+	/* Check for port spec (or use default) */
+
+	/* Determine port type and instance */
+	if (!memcmp(options, "tty", 3)) {
+		struct kgdb_sermap *map = kgdb_serlist;
+
+		while (map && memcmp(options, map->name, map->namelen))
+			map = map->next;
+
+		if (!map) {
+			KGDB_PRINTK("unknown port spec in %s\n", options);
+			return -1;
+		}
+
+		kgdb_porttype = map;
+		kgdb_serial_setup = map->setup_fn;
+		kgdb_portnum = options[map->namelen] - '0';
+		options += map->namelen + 1;
+
+		options = (*options == ',') ? options+1 : options;
+		
+		/* Read optional parameters (baud/parity/bits) */
+		baud = simple_strtoul(options, &options, 10);
+		if (baud != 0) {
+			kgdb_baud = baud;
+
+			c = toupper(*options);
+			if (c == 'E' || c == 'O' || c == 'N') {
+				kgdb_parity = c;
+				options++;
+			}
+
+			c = *options;
+			if (c == '7' || c == '8') {
+				kgdb_bits = c;
+				options++;
+			}
+			options = (*options == ',') ? options+1 : options;
+		}
+	}
+
+	/* Check for action specification */
+	if (!memcmp(options, "halt", 4)) {
+		kgdb_halt = 1;
+		options += 4;
+	} else if (!memcmp(options, "disabled", 8)) {
+		kgdb_enabled = 0;
+		options += 8;
+	}
+
+	if (*options) {
+                KGDB_PRINTK("ignored unknown options: %s\n", options);
+		return 0;
+	}
+	return 1;
+}
+__setup("kgdb=", kgdb_parse_options);
+#endif /* CONFIG_SH_KGDB */
+
+static int __init fpu_setup(char *opts)
+{
+	fpu_disabled = 1;
+	return 0;
+}
+__setup("nofpu", fpu_setup);
+

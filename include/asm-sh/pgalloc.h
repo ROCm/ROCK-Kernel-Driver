@@ -4,19 +4,25 @@
 #include <asm/processor.h>
 #include <linux/threads.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 
 #define pgd_quicklist ((unsigned long *)0)
 #define pmd_quicklist ((unsigned long *)0)
 #define pte_quicklist ((unsigned long *)0)
 #define pgtable_cache_size 0L
 
-#define pmd_populate(mm, pmd, pte) \
+#define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
+
+static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd,
+				struct page *pte)
+{
+	set_pmd(pmd, __pmd(_PAGE_TABLE + page_to_phys(pte)));
+}
 
 /*
  * Allocate and free page tables.
  */
-
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	unsigned int pgd_size = (USER_PTRS_PER_PGD * sizeof(pgd_t));
@@ -33,69 +39,69 @@ static inline void pgd_free(pgd_t *pgd)
 	kfree(pgd);
 }
 
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm,
+					  unsigned long address)
 {
-	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	if (pte)
-		clear_page(pte);
+	int count = 0;
+	pte_t *pte;
+
+   	do {
+		pte = (pte_t *) __get_free_page(GFP_KERNEL | __GFP_REPEAT);
+		if (pte)
+			clear_page(pte);
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+
 	return pte;
 }
 
-static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static inline struct page *pte_alloc_one(struct mm_struct *mm,
+					 unsigned long address)
 {
-	return 0;
+	int count = 0;
+	struct page *pte;
+
+   	do {
+		pte = alloc_pages(GFP_KERNEL, 0);
+		if (pte)
+			clear_page(page_address(pte));
+		else {
+			current->state = TASK_UNINTERRUPTIBLE;
+			schedule_timeout(HZ);
+		}
+	} while (!pte && (count++ < 10));
+
+	return pte;
 }
 
-static inline void pte_free_slow(pte_t *pte)
+static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		pte_free_slow(pte)
+static inline void pte_free(struct page *pte)
+{
+	__free_page(pte);
+}
+
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
  */
-static inline void pmd_free(pmd_t * pmd)
-{
-}
 
-#define pmd_alloc_one_fast(mm, addr)	({ BUG(); ((pmd_t *)1); })
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
-#define pmd_free_slow(x)		do { } while (0)
-#define pmd_free_fast(x)		do { } while (0)
 #define pmd_free(x)			do { } while (0)
+#define __pmd_free_tlb(tlb,x)		do { } while (0)
 #define pgd_populate(mm, pmd, pte)	BUG()
 
-/* Do nothing */
-static inline int do_check_pgt_cache(int low, int high) { }
+#if defined(CONFIG_CPU_SH4)
+#define PG_mapped	PG_arch_1
 
-/*
- * TLB flushing:
- *
- *  - flush_tlb() flushes the current mm struct TLBs
- *  - flush_tlb_all() flushes all processes TLBs
- *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
- *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(vma, start, end) flushes a range of pages
- *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
- */
-
-extern void flush_tlb(void);
-extern void flush_tlb_all(void);
-extern void flush_tlb_mm(struct mm_struct *mm);
-extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
-			    unsigned long end);
-extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long page);
-extern void __flush_tlb_page(unsigned long asid, unsigned long page);
-
-static inline void flush_tlb_pgtables(struct mm_struct *mm,
-				      unsigned long start, unsigned long end)
-{ /* Nothing to do */
-}
-
-#if defined(__SH4__)
 /*
  * For SH-4, we have our own implementation for ptep_get_and_clear
  */
@@ -108,8 +114,9 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 		struct page *page;
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
-			page = pfn_to_page(page);
-			if (!page->mapping || !page->mapping->i_mmap_shared)
+			page = pfn_to_page(pfn);
+			if (!page->mapping
+			    || list_empty(&page->mapping->i_mmap_shared))
 				__clear_bit(PG_mapped, &page->flags);
 		}
 	}
@@ -156,4 +163,7 @@ static inline void ptep_mkdirty(pte_t *ptep)
 	pte_t old_pte = *ptep;
 	set_pte(ptep, pte_mkdirty(old_pte));
 }
+
+#define check_pgt_cache()	do { } while (0)
+
 #endif /* __ASM_SH_PGALLOC_H */

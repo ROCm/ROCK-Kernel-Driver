@@ -267,7 +267,7 @@ sysc_tracesys:
 	st	%r7,SP_R2(%r15)
 	basr	%r14,%r1
 	clc	SP_R2(4,%r15),BASED(.Lnr_syscalls)
-	bl	BASED(sysc_tracego)
+	bnl	BASED(sysc_tracenogo)
 	l	%r7,SP_R2(%r15)        # strace might have changed the 
 	sll	%r7,2                  #  system call
 	l	%r8,sys_call_table-entry_base(%r7,%r13)
@@ -276,6 +276,7 @@ sysc_tracego:
 	l	%r2,SP_ORIG_R2(%r15)
 	basr	%r14,%r8          # call sys_xxx
 	st	%r2,SP_R2(%r15)   # store return value
+sysc_tracenogo:
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
         bno     BASED(sysc_return)
 	l	%r1,BASED(.Ltrace)
@@ -486,7 +487,7 @@ pgm_tracesys:
 	st	%r7,SP_R2(%r15)
         basr    %r14,%r1
 	clc	SP_R2(4,%r15),BASED(.Lnr_syscalls)
-	bl	BASED(pgm_svc_go)
+	bnl	BASED(pgm_svc_nogo)
 	l	%r7,SP_R2(%r15)   # strace changed the syscall
 	sll     %r7,2
 	l	%r8,sys_call_table-entry_base(%r7,%r13)
@@ -495,6 +496,7 @@ pgm_svc_go:
 	l       %r2,SP_ORIG_R2(%r15)
         basr    %r14,%r8          # call sys_xxx
         st      %r2,SP_R2(%r15)   # store return value
+pgm_svc_nogo:
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
         bno     BASED(pgm_svcret)
         l       %r1,BASED(.Ltrace)

@@ -18,7 +18,7 @@ void __secpath_destroy(struct sec_path *sp)
 	kmem_cache_free(sp->pool, sp);
 }
 
-/* Fetch spi and seq frpm ipsec header */
+/* Fetch spi and seq from ipsec header */
 
 int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq)
 {

@@ -155,6 +155,7 @@ enum xfrm_attr_type_t {
 struct xfrm_usersa_info {
 	struct xfrm_selector		sel;
 	struct xfrm_id			id;
+	xfrm_address_t			saddr;
 	struct xfrm_lifetime_cfg	lft;
 	struct xfrm_lifetime_cur	curlft;
 	struct xfrm_stats		stats;

@@ -2,20 +2,7 @@
 #define ZALON7XX_H
 
 #include <linux/types.h>
-
-#include "sym53c8xx_defs.h"
-
-extern int zalon7xx_detect(Scsi_Host_Template *);
-
 #include <scsi/scsicam.h>
-
-extern struct proc_dir_entry proc_scsi_zalon7xx;
-
-/* borrowed from drivers/scsi/ncr53c8xx.h */
-int zalon7xx_detect(Scsi_Host_Template *tpnt);
-const char *ncr53c8xx_info(struct Scsi_Host *host);
-int ncr53c8xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int zalon7xx_release(struct Scsi_Host *);
 
 #define GSC_SCSI_ZALON_OFFSET 0x800
 

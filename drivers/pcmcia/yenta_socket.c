@@ -250,7 +250,6 @@ static int yenta_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 
 	if (state->flags & SS_DEBOUNCED) {
 		/* The insertion debounce period has ended.  Clear any pending insertion events */
-		socket->events &= ~SS_DETECT;
 		state->flags &= ~SS_DEBOUNCED;		/* SS_DEBOUNCED is oneshot */
 	}
 	yenta_set_power(socket, state);
@@ -420,19 +419,6 @@ static unsigned int yenta_events(struct yenta_socket *socket)
 }
 
 
-static void yenta_bh(void *data)
-{
-	struct yenta_socket *socket = data;
-	unsigned int events;
-
-	spin_lock_irq(&socket->event_lock);
-	events = socket->events;
-	socket->events = 0;
-	spin_unlock_irq(&socket->event_lock);
-	if (socket->handler)
-		socket->handler(socket->info, events);
-}
-
 static irqreturn_t yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int events;
@@ -440,10 +426,7 @@ static irqreturn_t yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	events = yenta_events(socket);
 	if (events) {
-		spin_lock(&socket->event_lock);
-		socket->events |= events;
-		spin_unlock(&socket->event_lock);
-		schedule_work(&socket->tq_task);
+		pcmcia_parse_events(&socket->socket, events);
 		return IRQ_HANDLED;
 	}
 	return IRQ_NONE;
@@ -771,21 +754,9 @@ static void yenta_close(struct pci_dev *dev)
 }
 
 
-static int yenta_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-
-	socket->handler = handler;
-	socket->info = info;
-	return 0;
-}
-
-
 static struct pccard_operations yenta_socket_operations = {
-	.owner			= THIS_MODULE,
 	.init			= yenta_init,
 	.suspend		= yenta_suspend,
-	.register_callback	= yenta_register_callback,
 	.get_status		= yenta_get_status,
 	.get_socket		= yenta_get_socket,
 	.set_socket		= yenta_set_socket,
@@ -860,11 +831,11 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	socket->socket.ss_entry = &yenta_socket_operations;
 	socket->socket.dev.dev = &dev->dev;
 	socket->socket.driver_data = socket;
+	socket->socket.owner = THIS_MODULE;
 
 	/* prepare struct yenta_socket */
 	socket->dev = dev;
 	pci_set_drvdata(dev, socket);
-	spin_lock_init(&socket->event_lock);
 
 	/*
 	 * Do some basic sanity checking..
@@ -906,8 +877,6 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 	}
 
 	/* We must finish initialization here */
-
-	INIT_WORK(&socket->tq_task, yenta_bh, socket);
 
 	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->dev.name, socket)) {
 		/* No IRQ or request_irq failed. Poll */

@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 73
+SUBLEVEL = 74
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -388,7 +388,7 @@ ifdef CONFIG_KALLSYMS
 kallsyms.o := .tmp_kallsyms2.o
 
 quiet_cmd_kallsyms = KSYM    $@
-cmd_kallsyms = $(NM) -n $< | scripts/kallsyms > $@
+cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) > $@
 
 .tmp_kallsyms1.o .tmp_kallsyms2.o: %.o: %.S scripts FORCE
 	$(call if_changed_dep,as_o_S)

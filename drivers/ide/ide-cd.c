@@ -2805,7 +2805,7 @@ static struct cdrom_device_ops ide_cdrom_dops = {
 				CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET |
 				CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_CD_R |
 				CDC_CD_RW | CDC_DVD | CDC_DVD_R| CDC_DVD_RAM |
-				CDC_GENERIC_PACKET,
+				CDC_GENERIC_PACKET | CDC_MO_DRIVE,
 	.generic_packet		= ide_cdrom_packet,
 };
 
@@ -2838,6 +2838,8 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_PLAY_AUDIO;
 	if (!CDROM_CONFIG_FLAGS(drive)->close_tray)
 		devinfo->mask |= CDC_CLOSE_TRAY;
+	if (!CDROM_CONFIG_FLAGS(drive)->mo_drive)
+		devinfo->mask |= CDC_MO_DRIVE;
 
 	return register_cdrom(devinfo);
 }
@@ -2884,6 +2886,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	int nslots = 1;
 
 	if (drive->media == ide_optical) {
+		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
 		printk("%s: ATAPI magneto-optical drive\n", drive->name);
 		return nslots;
 	}

@@ -25,6 +25,19 @@ static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
 	return x;
 }
 
+static inline __u64 ___arch__swab64(__u64 val) 
+{ 
+	union { 
+		struct { __u32 a,b; } s;
+		__u64 u;
+	} v, w;
+	v.u = val;
+	w.s.b = ___arch__swab32(v.s.a); 
+	w.s.a = ___arch__swab32(v.s.b); 
+	return w.u;	
+} 
+
+#define __arch__swab64(x) ___arch__swab64(x)
 #define __arch__swab32(x) ___arch__swab32(x)
 #define __arch__swab16(x) ___arch__swab16(x)
 

@@ -238,6 +238,7 @@ void __hash_remove(struct hash_cell *hc)
 	list_del(&hc->name_list);
 	unregister_with_devfs(hc);
 	dm_put(hc->md);
+	free_cell(hc);
 }
 
 void dm_hash_remove_all(void)
@@ -729,8 +730,7 @@ static int wait_device_event(struct dm_ioctl *param, struct dm_ioctl *user)
 	dm_table_put(table);
 	dm_put(md);
 
-	yield();
-	set_current_state(TASK_RUNNING);
+	schedule();
 
       out:
 	return results_to_user(user, param, NULL, 0);

@@ -465,10 +465,17 @@ t2_init_arch(void)
 	*(vulp)T2_HAE_1 = 0; mb(); /* Sparse MEM HAE */
 	*(vulp)T2_HAE_2 = 0; mb(); /* Sparse I/O HAE */
 	*(vulp)T2_HAE_3 = 0; mb(); /* Config Space HAE */
-#if 0
-	/* !!! DO NOT EVER TOUCH THIS !!! */
-	*(vulp)T2_HAE_4 = 0; mb(); /* Dense MEM HAE */
-#endif
+
+	/*
+	 * We also now zero out HAE_4, the dense memory HAE, so that
+	 * we need not account for its "offset" when accessing dense
+	 * memory resources which we allocated in our normal way. This
+	 * HAE would need to stay untouched were we to keep the SRM
+	 * resource settings.
+	 *
+	 * Thus we can now run standard X servers on SABLE/LYNX. :-)
+	 */
+	*(vulp)T2_HAE_4 = 0; mb();
 }
 
 void

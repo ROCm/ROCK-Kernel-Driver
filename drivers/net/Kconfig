@@ -1397,7 +1397,7 @@ config CS89x0
 
 config TC35815
 	tristate "TOSHIBA TC35815 Ethernet support"
-	depends on NET_PCI && PCI
+	depends on NET_PCI && PCI && TOSHIBA_JMR3927
 
 config DGRS
 	tristate "Digi Intl. RightSwitch SE-X support"

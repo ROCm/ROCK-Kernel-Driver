@@ -217,6 +217,9 @@ struct module
 	/* Here are the sizes of the init and core sections */
 	unsigned long init_size, core_size;
 
+	/* The size of the executable code in each section.  */
+	unsigned long init_text_size, core_text_size;
+
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
 

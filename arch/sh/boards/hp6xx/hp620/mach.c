@@ -60,9 +60,5 @@ struct sh_machine_vector mv_hp620 __initmv = {
 
         mv_rtc_gettimeofday:    sh_rtc_gettimeofday,
         mv_rtc_settimeofday:    sh_rtc_settimeofday,
-
-        mv_hw_hp600:            1,
-        mv_hw_hp620:            1,
-        mv_hw_hd64461:          1,
 };
 ALIAS_MV(hp620)

@@ -67,12 +67,14 @@ check_rela(Elf_Rela *rela, struct module *me)
 	switch (ELF_R_TYPE (rela->r_info)) {
 	case R_390_GOT12:	/* 12 bit GOT offset.  */
 	case R_390_GOT16:	/* 16 bit GOT offset.  */
+	case R_390_GOT20:	/* 20 bit GOT offset.  */
 	case R_390_GOT32:	/* 32 bit GOT offset.  */
 	case R_390_GOT64:	/* 64 bit GOT offset.  */
 	case R_390_GOTENT:	/* 32 bit PC rel. to GOT entry shifted by 1. */
 	case R_390_GOTPLT12:	/* 12 bit offset to jump slot.	*/
-	case R_390_GOTPLT16:	/* 16 bit offset to jump slot. */
-	case R_390_GOTPLT32:	/* 32 bit offset to jump slot. */
+	case R_390_GOTPLT16:	/* 16 bit offset to jump slot.  */
+	case R_390_GOTPLT20:	/* 20 bit offset to jump slot.  */
+	case R_390_GOTPLT32:	/* 32 bit offset to jump slot.  */
 	case R_390_GOTPLT64:	/* 64 bit offset to jump slot.	*/
 	case R_390_GOTPLTENT:	/* 32 bit rel. offset to jump slot >> 1. */
 		if (info->got_offset == -1UL) {
@@ -201,6 +203,7 @@ apply_rela(Elf_Rela *rela, Elf_Addr base, Elf_Sym *symtab,
 	case R_390_8:		/* Direct 8 bit.   */
 	case R_390_12:		/* Direct 12 bit.  */
 	case R_390_16:		/* Direct 16 bit.  */
+	case R_390_20:		/* Direct 20 bit.  */
 	case R_390_32:		/* Direct 32 bit.  */
 	case R_390_64:		/* Direct 64 bit.  */
 		val += rela->r_addend;
@@ -211,6 +214,10 @@ apply_rela(Elf_Rela *rela, Elf_Addr base, Elf_Sym *symtab,
 				(*(unsigned short *) loc & 0xf000);
 		else if (r_type == R_390_16)
 			*(unsigned short *) loc = val;
+		else if (r_type == R_390_20)
+			*(unsigned int *) loc =
+				(*(unsigned int *) loc & 0xf00000ff) |
+				(val & 0xfff) << 16 | (val & 0xff000) >> 4;
 		else if (r_type == R_390_32)
 			*(unsigned int *) loc = val;
 		else if (r_type == R_390_64)
@@ -235,12 +242,14 @@ apply_rela(Elf_Rela *rela, Elf_Addr base, Elf_Sym *symtab,
 		break;
 	case R_390_GOT12:	/* 12 bit GOT offset.  */
 	case R_390_GOT16:	/* 16 bit GOT offset.  */
+	case R_390_GOT20:	/* 20 bit GOT offset.  */
 	case R_390_GOT32:	/* 32 bit GOT offset.  */
 	case R_390_GOT64:	/* 64 bit GOT offset.  */
 	case R_390_GOTENT:	/* 32 bit PC rel. to GOT entry shifted by 1. */
 	case R_390_GOTPLT12:	/* 12 bit offset to jump slot.	*/
-	case R_390_GOTPLT16:	/* 16 bit offset to jump slot. */
-	case R_390_GOTPLT32:	/* 32 bit offset to jump slot. */
+	case R_390_GOTPLT20:	/* 20 bit offset to jump slot.  */
+	case R_390_GOTPLT16:	/* 16 bit offset to jump slot.  */
+	case R_390_GOTPLT32:	/* 32 bit offset to jump slot.  */
 	case R_390_GOTPLT64:	/* 64 bit offset to jump slot.	*/
 	case R_390_GOTPLTENT:	/* 32 bit rel. offset to jump slot >> 1. */
 		if (info->got_initialized == 0) {
@@ -259,6 +268,11 @@ apply_rela(Elf_Rela *rela, Elf_Addr base, Elf_Sym *symtab,
 		else if (r_type == R_390_GOT16 ||
 			 r_type == R_390_GOTPLT16)
 			*(unsigned short *) loc = val;
+		else if (r_type == R_390_GOT20 ||
+			 r_type == R_390_GOTPLT20)
+			*(unsigned int *) loc =
+				(*(unsigned int *) loc & 0xf00000ff) |
+				(val & 0xfff) << 16 | (val & 0xff000) >> 4;
 		else if (r_type == R_390_GOT32 ||
 			 r_type == R_390_GOTPLT32)
 			*(unsigned int *) loc = val;

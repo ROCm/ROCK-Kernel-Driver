@@ -13,10 +13,13 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
+check_gcc = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
+
 ifdef CONFIG_ARCH_S390_31
 LDFLAGS		:= -m elf_s390
 LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
 CFLAGS		+= -m31
+AFLAGS		+= -m31
 UTS_MACHINE	:= s390
 endif
 
@@ -25,12 +28,20 @@ LDFLAGS		:= -m elf64_s390
 MODFLAGS	+= -fpic -D__PIC__
 LDFLAGS_BLOB	:= --format binary --oformat elf64-s390
 CFLAGS		+= -m64
+AFLAGS		+= -m64
 UTS_MACHINE	:= s390x
 endif
 
+cflags-$(CONFIG_MARCH_G5)   += $(call check_gcc,-march=g5,)
+cflags-$(CONFIG_MARCH_Z900) += $(call check_gcc,-march=z900,)
+cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=trex,)
+
+CFLAGS		+= $(cflags-y)
+CFLAGS		+= $(call check_gcc,-finline-limit=10000,)
+CFLAGS 		+= -pipe -fno-strength-reduce -Wno-sign-compare 
+
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
-CFLAGS 		+= -pipe -fno-strength-reduce -finline-limit-10000 -Wno-sign-compare 
 
 head-$(CONFIG_ARCH_S390_31)	+= arch/$(ARCH)/kernel/head.o
 head-$(CONFIG_ARCH_S390X)	+= arch/$(ARCH)/kernel/head64.o

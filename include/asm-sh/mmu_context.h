@@ -1,14 +1,22 @@
 /*
  * Copyright (C) 1999 Niibe Yutaka
+ * Copyright (C) 2003 Paul Mundt
  *
  * ASID handling idea taken from MIPS implementation.
  */
 #ifndef __ASM_SH_MMU_CONTEXT_H
 #define __ASM_SH_MMU_CONTEXT_H
 
-/* The MMU "context" consists of two things:
-     (a) TLB cache version (or round, cycle whatever expression you like)
-     (b) ASID (Address Space IDentifier)
+#include <asm/cpu/mmu_context.h>
+#include <asm/tlbflush.h>
+#include <asm/pgalloc.h>
+#include <asm/uaccess.h>
+#include <asm/io.h>
+
+/*
+ * The MMU "context" consists of two things:
+ *    (a) TLB cache version (or round, cycle whatever expression you like)
+ *    (b) ASID (Address Space IDentifier)
  */
 
 /*
@@ -29,38 +37,37 @@ extern unsigned long mmu_context_cache;
  */
 #define MMU_VPN_MASK	0xfffff000
 
-static __inline__ void
-get_new_mmu_context(struct mm_struct *mm)
-{
-	extern void flush_tlb_all(void);
-
-	unsigned long mc = ++mmu_context_cache;
-
-	if (!(mc & MMU_CONTEXT_ASID_MASK)) {
-		/* We exhaust ASID of this version.
-		   Flush all TLB and start new cycle. */
-		flush_tlb_all();
-		/* Fix version if needed.
-		   Note that we avoid version #0 to distingush NO_CONTEXT. */
-		if (!mc)
-			mmu_context_cache = mc = MMU_CONTEXT_FIRST_VERSION;
-	}
-	mm->context = mc;
-}
-
+#ifdef CONFIG_MMU
 /*
  * Get MMU context if needed.
  */
 static __inline__ void
 get_mmu_context(struct mm_struct *mm)
 {
-	if (mm) {
-		unsigned long mc = mmu_context_cache;
-		/* Check if we have old version of context.
-		   If it's old, we need to get new context with new version. */
-		if ((mm->context ^ mc) & MMU_CONTEXT_VERSION_MASK)
-			get_new_mmu_context(mm);
+	extern void flush_tlb_all(void);
+	unsigned long mc = mmu_context_cache;
+
+	/* Check if we have old version of context. */
+	if (((mm->context ^ mc) & MMU_CONTEXT_VERSION_MASK) == 0)
+		/* It's up to date, do nothing */
+		return;
+
+	/* It's old, we need to get new context with new version. */
+	mc = ++mmu_context_cache;
+	if (!(mc & MMU_CONTEXT_ASID_MASK)) {
+		/*
+		 * We exhaust ASID of this version.
+		 * Flush all TLB and start new cycle.
+		 */
+		flush_tlb_all();
+		/*
+		 * Fix version; Note that we avoid version #0
+		 * to distingush NO_CONTEXT.
+		 */
+		if (!mc)
+			mmu_context_cache = mc = MMU_CONTEXT_FIRST_VERSION;
 	}
+	mm->context = mc;
 }
 
 /*
@@ -71,6 +78,7 @@ static __inline__ int init_new_context(struct task_struct *tsk,
 				       struct mm_struct *mm)
 {
 	mm->context = NO_CONTEXT;
+
 	return 0;
 }
 
@@ -82,49 +90,6 @@ static __inline__ void destroy_context(struct mm_struct *mm)
 {
 	/* Do nothing */
 }
-
-/* Other MMU related constants. */
-
-#if defined(__sh3__)
-#define MMU_PTEH	0xFFFFFFF0	/* Page table entry register HIGH */
-#define MMU_PTEL	0xFFFFFFF4	/* Page table entry register LOW */
-#define MMU_TTB		0xFFFFFFF8	/* Translation table base register */
-#define MMU_TEA		0xFFFFFFFC	/* TLB Exception Address */
-
-#define MMUCR		0xFFFFFFE0	/* MMU Control Register */
-
-#define MMU_TLB_ADDRESS_ARRAY	0xF2000000
-#define MMU_PAGE_ASSOC_BIT	0x80
-
-#define MMU_NTLB_ENTRIES	128	/* for 7708 */
-#define MMU_CONTROL_INIT	0x007	/* SV=0, TF=1, IX=1, AT=1 */
-
-#elif defined(__SH4__)
-#define MMU_PTEH	0xFF000000	/* Page table entry register HIGH */
-#define MMU_PTEL	0xFF000004	/* Page table entry register LOW */
-#define MMU_TTB		0xFF000008	/* Translation table base register */
-#define MMU_TEA		0xFF00000C	/* TLB Exception Address */
-#define MMU_PTEA	0xFF000034	/* Page table entry assistance register */
-
-#define MMUCR		0xFF000010	/* MMU Control Register */
-
-#define MMU_ITLB_ADDRESS_ARRAY	0xF2000000
-#define MMU_UTLB_ADDRESS_ARRAY	0xF6000000
-#define MMU_PAGE_ASSOC_BIT	0x80
-
-#define MMU_NTLB_ENTRIES	64	/* for 7750 */
-#define MMU_CONTROL_INIT	0x205	/* SQMD=1, SV=0, TI=1, AT=1 */
-
-#define MMU_ITLB_DATA_ARRAY	0xF3000000
-#define MMU_UTLB_DATA_ARRAY	0xF7000000
-
-#define MMU_UTLB_ENTRIES	   64
-#define MMU_U_ENTRY_SHIFT	    8
-#define MMU_UTLB_VALID		0x100
-#define MMU_ITLB_ENTRIES	    4
-#define MMU_I_ENTRY_SHIFT	    8
-#define MMU_ITLB_VALID		0x100
-#endif
 
 static __inline__ void set_asid(unsigned long asid)
 {
@@ -166,11 +131,9 @@ static __inline__ void switch_mm(struct mm_struct *prev,
 				 struct mm_struct *next,
 				 struct task_struct *tsk, unsigned int cpu)
 {
-	if (prev != next) {
+	if (likely(prev != next)) {
 		unsigned long __pgdir = (unsigned long)next->pgd;
 
-		clear_bit(cpu, &prev->cpu_vm_mask);
-		set_bit(cpu, &next->cpu_vm_mask);
 		__asm__ __volatile__("mov.l	%0, %1"
 				     : /* no output */
 				     : "r" (__pgdir), "m" (__m(MMU_TTB)));
@@ -187,28 +150,55 @@ static __inline__ void
 enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
 }
+#else /* !CONFIG_MMU */
+#define get_mmu_context(mm)		do { } while (0)
+#define init_new_context(tsk,mm)	(0)
+#define destroy_context(mm)		do { } while (0)
+#define set_asid(asid)			do { } while (0)
+#define get_asid()			(0)
+#define activate_context(mm)		do { } while (0)
+#define switch_mm(prev,next,tsk,cpu)	do { } while (0)
+#define deactivate_mm(tsk,mm)		do { } while (0)
+#define activate_mm(prev,next)		do { } while (0)
+#define enter_lazy_tlb(mm,tsk,cpu)	do { } while (0)
+#endif /* CONFIG_MMU */
 
+#if defined(CONFIG_CPU_SH3) || defined(CONFIG_CPU_SH4)
 /*
- * Every architecture must define this function. It's the fastest
- * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be set. It's guaranteed that at least one of the 168
- * bits is cleared.
+ * If this processor has an MMU, we need methods to turn it off/on ..
+ * paging_init() will also have to be updated for the processor in
+ * question.
  */
-#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
-# error update this function.
-#endif
-
-static inline int sched_find_first_zero_bit(unsigned long *b)
+static inline void enable_mmu(void)
 {
-	unsigned int rt;
+	/* Enable MMU */
+	ctrl_outl(MMU_CONTROL_INIT, MMUCR);
 
-	rt = b[0] & b[1] & b[2] & b[3];
-	if (unlikely(rt != 0xffffffff))
-		return find_first_zero_bit(b, MAX_RT_PRIO);
+	/* The manual suggests doing some nops after turning on the MMU */
+	__asm__ __volatile__ ("nop;nop;nop;nop;nop;nop;nop;nop\n\t");
 
-	if (b[4] != ~0)
-		return ffz(b[4]) + MAX_RT_PRIO;
-	return ffz(b[5]) + 32 + MAX_RT_PRIO;
+	if (mmu_context_cache == NO_CONTEXT)
+		mmu_context_cache = MMU_CONTEXT_FIRST_VERSION;
+
+	set_asid(mmu_context_cache & MMU_CONTEXT_ASID_MASK);
 }
+
+static inline void disable_mmu(void)
+{
+	unsigned long cr;
+
+	cr = ctrl_inl(MMUCR);
+	cr &= ~MMU_CONTROL_INIT;
+	ctrl_outl(cr, MMUCR);
+	__asm__ __volatile__ ("nop;nop;nop;nop;nop;nop;nop;nop\n\t");
+}
+#else
+/*
+ * MMU control handlers for processors lacking memory
+ * management hardware.
+ */
+#define enable_mmu()	do { BUG(); } while (0)
+#define disable_mmu()	do { BUG(); } while (0)
+#endif
 
 #endif /* __ASM_SH_MMU_CONTEXT_H */

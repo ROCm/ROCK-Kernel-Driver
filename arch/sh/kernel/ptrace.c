@@ -1,4 +1,4 @@
-/* $Id: ptrace.c,v 1.13 2001/10/01 02:21:50 gniibe Exp $
+/* $Id: ptrace.c,v 1.9 2003/05/06 23:28:47 lethal Exp $
  *
  * linux/arch/sh/kernel/ptrace.c
  *
@@ -19,6 +19,8 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/user.h>
+#include <linux/slab.h>
+#include <linux/security.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -39,7 +41,7 @@ static inline int get_stack_long(struct task_struct *task, int offset)
 {
 	unsigned char *stack;
 
-	stack = (unsigned char *)task + THREAD_SIZE - sizeof(struct pt_regs);
+	stack = (unsigned char *)task->thread_info + THREAD_SIZE - sizeof(struct pt_regs);
 	stack += offset;
 	return (*((int *)stack));
 }
@@ -52,7 +54,7 @@ static inline int put_stack_long(struct task_struct *task, int offset,
 {
 	unsigned char *stack;
 
-	stack = (unsigned char *)task + THREAD_SIZE - sizeof(struct pt_regs);
+	stack = (unsigned char *)task->thread_info + THREAD_SIZE - sizeof(struct pt_regs);
 	stack += offset;
 	*(unsigned long *) stack = data;
 	return 0;
@@ -122,29 +124,25 @@ ubc_set_tracing(int asid, unsigned long nextpc1, unsigned nextpc2)
 {
 	ctrl_outl(nextpc1, UBC_BARA);
 	ctrl_outb(asid, UBC_BASRA);
-	if(UBC_TYPE_SH7729){
-		ctrl_outl(0x0fff, UBC_BAMRA);
+	ctrl_outl(0, UBC_BAMRA);
+	if(UBC_TYPE_SH7729)
 		ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRA);
-	}else{
-		ctrl_outb(BAMR_12, UBC_BAMRA);
+	else
 		ctrl_outw(BBR_INST | BBR_READ, UBC_BBRA);
-	}
 
 	if (nextpc2 != (unsigned long) -1) {
 		ctrl_outl(nextpc2, UBC_BARB);
 		ctrl_outb(asid, UBC_BASRB);
-		if(UBC_TYPE_SH7729){
-			ctrl_outl(0x0fff, UBC_BAMRB);
+		ctrl_outl(0, UBC_BAMRB);
+		if(UBC_TYPE_SH7729)
 			ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRB);
-		}else{
-			ctrl_outb(BAMR_12, UBC_BAMRB);
+		else
 			ctrl_outw(BBR_INST | BBR_READ, UBC_BBRB);
-		}
 	}
 	if(UBC_TYPE_SH7729)
-		ctrl_outl(BRCR_PCBA | BRCR_PCBB | BRCR_PCTE, UBC_BRCR);
+		ctrl_outl(BRCR_PCTE, UBC_BRCR);
 	else
-		ctrl_outw(BRCR_PCBA | BRCR_PCBB, UBC_BRCR);
+		ctrl_outw(0, UBC_BRCR);
 }
 
 /*
@@ -159,7 +157,7 @@ void ptrace_disable(struct task_struct *child)
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 {
-	struct task_struct *child, *tsk = current;
+	struct task_struct *child;
 	struct user * dummy = NULL;
 	int ret;
 
@@ -168,6 +166,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	if (request == PTRACE_TRACEME) {
 		/* are we already being traced? */
 		if (current->ptrace & PT_PTRACED)
+			goto out;
+		ret = security_ptrace(current->parent, current);
+		if (ret)
 			goto out;
 		/* set the ptrace bit in the process flags. */
 		current->ptrace |= PT_PTRACED;
@@ -191,15 +192,11 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED))
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
 		goto out_tsk;
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL)
-			goto out_tsk;
-	}
-	if (child->p_pptr != tsk)
-		goto out_tsk;
+
 	switch (request) {
 	/* when I and D space are separate, these will need to be fixed. */
 	case PTRACE_PEEKTEXT: /* read word at location addr. */ 
@@ -279,9 +276,9 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data > _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
 		wake_up_process(child);
 		ret = 0;
@@ -312,7 +309,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		child->ptrace &= ~PT_TRACESYS;
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		if ((child->ptrace & PT_DTRACE) == 0) {
 			/* Spurious delayed TF traps may occur */
 			child->ptrace |= PT_DTRACE;
@@ -320,7 +317,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 
 		/* Compute next pc.  */
 		pc = get_stack_long(child, (long)&dummy->pc);
-		regs = (struct pt_regs *)((unsigned long)child + THREAD_SIZE - sizeof(struct pt_regs));
+		regs = (struct pt_regs *)(THREAD_SIZE + (unsigned long)child->thread_info) - 1;
 		if (access_process_vm(child, pc&~3, &tmp, sizeof(tmp), 0) != sizeof(tmp))
 			break;
  
@@ -335,15 +332,17 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		else
 			insn = tmp >> 16;
 #endif
-		compute_next_pc (regs, insn, &nextpc1, &nextpc2);
+		compute_next_pc(regs, insn, &nextpc1, &nextpc2);
 
 		if (nextpc1 & 0x80000000)
 			break;
 		if (nextpc2 != (unsigned long) -1 && (nextpc2 & 0x80000000))
 			break;
 
+#ifdef CONFIG_MMU
 		ubc_set_tracing(child->mm->context & MMU_CONTEXT_ASID_MASK,
 				nextpc1, nextpc2);
+#endif
 
 		child->exit_code = data;
 		/* give it a chance to run. */
@@ -356,31 +355,38 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = ptrace_detach(child, data);
 		break;
 
+	case PTRACE_SETOPTIONS:
+		if (data & PTRACE_O_TRACESYSGOOD)
+			child->ptrace |= PT_TRACESYSGOOD;
+		else
+			child->ptrace &= ~PT_TRACESYSGOOD;
+		ret = 0;
+		break;
+
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
 }
 
-asmlinkage void syscall_trace(void)
+asmlinkage void do_syscall_trace(void)
 {
 	struct task_struct *tsk = current;
 
-	if ((tsk->ptrace & (PT_PTRACED|PT_TRACESYS))
-	    != (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(tsk->ptrace & PT_PTRACED))
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	tsk->exit_code = SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
-				    ? 0x80 : 0);
-	tsk->state = TASK_STOPPED;
-	notify_parent(tsk, SIGCHLD);
-	schedule();
+	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD)
+				 ? 0x80 : 0));
+
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

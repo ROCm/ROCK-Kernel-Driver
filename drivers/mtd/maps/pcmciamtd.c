@@ -1,5 +1,5 @@
 /*
- * $Id: pcmciamtd.c,v 1.47 2003/05/28 13:36:14 dwmw2 Exp $
+ * $Id: pcmciamtd.c,v 1.48 2003/06/24 07:14:38 spse Exp $
  *
  * pcmciamtd.c - MTD driver for PCMCIA flash memory cards
  *
@@ -43,33 +43,32 @@ MODULE_PARM_DESC(debug, "Set Debug Level 0=quiet, 5=noisy");
 static const int debug = 0;
 #endif
 
-#define err(format, arg...) printk(KERN_ERR __FILE__ ": " format "\n" , ## arg)
-#define info(format, arg...) printk(KERN_INFO __FILE__ ": " format "\n" , ## arg)
-#define warn(format, arg...) printk(KERN_WARNING __FILE__ ": " format "\n" , ## arg)
+#define err(format, arg...) printk(KERN_ERR "pcmciamtd: " format "\n" , ## arg)
+#define info(format, arg...) printk(KERN_INFO "pcmciamtd: " format "\n" , ## arg)
+#define warn(format, arg...) printk(KERN_WARNING "pcmciamtd: " format "\n" , ## arg)
 
 
 #define DRIVER_DESC	"PCMCIA Flash memory card driver"
-#define DRIVER_VERSION	"$Revision: 1.47 $"
+#define DRIVER_VERSION	"$Revision: 1.48 $"
 
 /* Size of the PCMCIA address space: 26 bits = 64 MB */
 #define MAX_PCMCIA_ADDR	0x4000000
 
 struct pcmciamtd_dev {
-	struct list_head list;
 	dev_link_t	link;		/* PCMCIA link */
+	dev_node_t	node;		/* device node */
 	caddr_t		win_base;	/* ioremapped address of PCMCIA window */
 	unsigned int	win_size;	/* size of window */
-	unsigned int	cardsize;	/* size of whole card */
 	unsigned int	offset;		/* offset into card the window currently points at */
 	struct map_info	pcmcia_map;
 	struct mtd_info	*mtd_info;
-	u8		vpp;
+	int		vpp;
 	char		mtd_name[sizeof(struct cistpl_vers_1_t)];
 };
 
 
 static dev_info_t dev_info = "pcmciamtd";
-static LIST_HEAD(dev_list);
+static dev_link_t *dev_list;
 
 /* Module parameters */
 
@@ -99,7 +98,7 @@ MODULE_PARM_DESC(buswidth, "Set buswidth (1=8 bit, 2=16 bit, default=2)");
 MODULE_PARM(mem_speed, "i");
 MODULE_PARM_DESC(mem_speed, "Set memory access speed in ns");
 MODULE_PARM(force_size, "i");
-MODULE_PARM_DESC(force_size, "Force size of card in MB (1-64)");
+MODULE_PARM_DESC(force_size, "Force size of card in MiB (1-64)");
 MODULE_PARM(setvpp, "i");
 MODULE_PARM_DESC(setvpp, "Set Vpp (0=Never, 1=On writes, 2=Always on, default=0)");
 MODULE_PARM(vpp, "i");
@@ -115,6 +114,11 @@ static caddr_t remap_window(struct map_info *map, unsigned long to)
 	window_handle_t win = (window_handle_t)map->map_priv_2;
 	memreq_t mrq;
 	int ret;
+
+	if(!(dev->link.state & DEV_PRESENT)) {
+		DEBUG(1, "device removed state = 0x%4.4X", dev->link.state);
+		return 0;
+	}
 
 	mrq.CardOffset = to & ~(dev->win_size-1);
 	if(mrq.CardOffset != dev->offset) {
@@ -238,10 +242,15 @@ static void pcmcia_copy_to_remap(struct map_info *map, unsigned long to, const v
 
 /* read/write{8,16} copy_{from,to} routines with direct access */
 
+#define DEV_REMOVED(x)  (!(*(u_int *)x->map_priv_1 & DEV_PRESENT))
+
 static u8 pcmcia_read8(struct map_info *map, unsigned long ofs)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
 	u8 d;
+
+	if(DEV_REMOVED(map))
+		return 0;
 
 	d = readb(win_base + ofs);
 	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%02x", ofs, win_base + ofs, d);
@@ -254,6 +263,9 @@ static u16 pcmcia_read16(struct map_info *map, unsigned long ofs)
 	caddr_t win_base = (caddr_t)map->map_priv_2;
 	u16 d;
 
+	if(DEV_REMOVED(map))
+		return 0;
+
 	d = readw(win_base + ofs);
 	DEBUG(3, "ofs = 0x%08lx (%p) data = 0x%04x", ofs, win_base + ofs, d);
 	return d;
@@ -264,6 +276,9 @@ static void pcmcia_copy_from(struct map_info *map, void *to, unsigned long from,
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
 
+	if(DEV_REMOVED(map))
+		return;
+
 	DEBUG(3, "to = %p from = %lu len = %u", to, from, len);
 	memcpy_fromio(to, win_base + from, len);
 }
@@ -272,6 +287,9 @@ static void pcmcia_copy_from(struct map_info *map, void *to, unsigned long from,
 static void pcmcia_write8(struct map_info *map, u8 d, unsigned long adr)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
+
+	if(DEV_REMOVED(map))
+		return;
 
 	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%02x", adr, win_base + adr, d);
 	writeb(d, win_base + adr);
@@ -282,6 +300,9 @@ static void pcmcia_write16(struct map_info *map, u16 d, unsigned long adr)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
 
+	if(DEV_REMOVED(map))
+		return;
+
 	DEBUG(3, "adr = 0x%08lx (%p)  data = 0x%04x", adr, win_base + adr, d);
 	writew(d, win_base + adr);
 }
@@ -290,6 +311,9 @@ static void pcmcia_write16(struct map_info *map, u16 d, unsigned long adr)
 static void pcmcia_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
 	caddr_t win_base = (caddr_t)map->map_priv_2;
+
+	if(DEV_REMOVED(map))
+		return;
 
 	DEBUG(3, "to = %lu from = %p len = %u", to, from, len);
 	memcpy_toio(win_base + to, from, len);
@@ -323,40 +347,18 @@ static void pcmciamtd_set_vpp(struct map_info *map, int on)
 static void pcmciamtd_release(u_long arg)
 {
 	dev_link_t *link = (dev_link_t *)arg;
-	struct pcmciamtd_dev *dev = NULL;
-	int ret;
-	struct list_head *temp1, *temp2;
+	struct pcmciamtd_dev *dev = link->priv;
 
 	DEBUG(3, "link = 0x%p", link);
-	/* Find device in list */
-	list_for_each_safe(temp1, temp2, &dev_list) {
-		dev = list_entry(temp1, struct pcmciamtd_dev, list);
-		if(link == &dev->link)
-			break;
-	}
-	if(link != &dev->link) {
-		DEBUG(1, "Cant find %p in dev_list", link);
-		return;
-	}
 
-	if(dev) {
-		if(dev->mtd_info) {
-			del_mtd_device(dev->mtd_info);
-			dev->mtd_info = NULL;
-			MOD_DEC_USE_COUNT;
+	if (link->win) {
+		if(dev->win_base) {
+			iounmap(dev->win_base);
+			dev->win_base = NULL;
 		}
-		if (link->win) {
-			if(dev->win_base) {
-				iounmap(dev->win_base);
-				dev->win_base = NULL;
-			}
-			CardServices(ReleaseWindow, link->win);
-		}
-		ret = CardServices(ReleaseConfiguration, link->handle);
-		if(ret != CS_SUCCESS)
-			cs_error(link->handle, ReleaseConfiguration, ret);
-			
+		CardServices(ReleaseWindow, link->win);
 	}
+	CardServices(ReleaseConfiguration, link->handle);
 	link->state &= ~DEV_CONFIG;
 }
 
@@ -465,7 +467,6 @@ static void card_settings(struct pcmciamtd_dev *dev, dev_link_t *link, int *new_
 	if(force_size) {
 		dev->pcmcia_map.size = force_size << 20;
 		DEBUG(2, "size forced to %dM", force_size);
-
 	}
 
 	if(buswidth) {
@@ -580,9 +581,8 @@ static void pcmciamtd_config(dev_link_t *link)
 	}
 	DEBUG(1, "mapped window dev = %p req.base = 0x%lx base = %p size = 0x%x",
 	      dev, req.Base, dev->win_base, req.Size);
-	dev->cardsize = 0;
-	dev->offset = 0;
 
+	dev->offset = 0;
 	dev->pcmcia_map.map_priv_1 = (unsigned long)dev;
 	dev->pcmcia_map.map_priv_2 = (unsigned long)link->win;
 
@@ -614,9 +614,6 @@ static void pcmciamtd_config(dev_link_t *link)
 		cs_error(link->handle, RequestConfiguration, ret);
 	}
 
-	link->dev = NULL;
-	link->state &= ~DEV_CONFIG_PENDING;
-
 	if(mem_type == 1) {
 		mtd = do_map_probe("map_ram", &dev->pcmcia_map);
 	} else if(mem_type == 2) {
@@ -640,7 +637,6 @@ static void pcmciamtd_config(dev_link_t *link)
 
 	dev->mtd_info = mtd;
 	mtd->owner = THIS_MODULE;
-	dev->cardsize = mtd->size;
 
 	if(new_name) {
 		int size = 0;
@@ -649,19 +645,19 @@ static void pcmciamtd_config(dev_link_t *link)
 		   size */
 		if(mtd->size < 1048576) { /* <1MiB in size, show size in KiB */
 			size = mtd->size >> 10;
-			unit = 'K'; 
+			unit = 'K';
 		} else {
 			size = mtd->size >> 20;
 			unit = 'M';
 		}
-		sprintf(mtd->name, "%d%ciB %s", size, unit, "PCMCIA Memory card");
+		snprintf(dev->mtd_name, sizeof(dev->mtd_name), "%d%ciB %s", size, unit, "PCMCIA Memory card");
 	}
 
 	/* If the memory found is fits completely into the mapped PCMCIA window,
 	   use the faster non-remapping read/write functions */
-	if(dev->cardsize <= dev->win_size) {
+	if(mtd->size <= dev->win_size) {
 		DEBUG(1, "Using non remapping memory functions");
-
+		dev->pcmcia_map.map_priv_1 = (unsigned long)&(dev->link.state);
 		dev->pcmcia_map.map_priv_2 = (unsigned long)dev->win_base;
 		dev->pcmcia_map.read8 = pcmcia_read8;
 		dev->pcmcia_map.read16 = pcmcia_read16;
@@ -671,16 +667,17 @@ static void pcmciamtd_config(dev_link_t *link)
 		dev->pcmcia_map.copy_to = pcmcia_copy_to;
 	}
 
-	MOD_INC_USE_COUNT;
 	if(add_mtd_device(mtd)) {
+		map_destroy(mtd);
 		dev->mtd_info = NULL;
-		MOD_DEC_USE_COUNT;
 		err("Couldnt register MTD device");
 		pcmciamtd_release((u_long)link);
 		return;
 	}
-	DEBUG(1, "mtd added @ %p mtd->priv = %p", mtd, mtd->priv);
-
+	snprintf(dev->node.dev_name, sizeof(dev->node.dev_name), "mtd%d", mtd->index);
+	info("mtd%d: %s", mtd->index, mtd->name);
+	link->state &= ~DEV_CONFIG_PENDING;
+	link->dev = &dev->node;
 	return;
 
  cs_failed:
@@ -707,8 +704,14 @@ static int pcmciamtd_event(event_t event, int priority,
 	case CS_EVENT_CARD_REMOVAL:
 		DEBUG(2, "EVENT_CARD_REMOVAL");
 		link->state &= ~DEV_PRESENT;
-		if (link->state & DEV_CONFIG)
+		if (link->state & DEV_CONFIG) {
+			struct pcmciamtd_dev *dev = link->priv;
+			if(dev->mtd_info) {
+				del_mtd_device(dev->mtd_info);
+				info("mtd%d: Removed", dev->mtd_info->index);
+			}
 			mod_timer(&link->release, jiffies + HZ/20);
+		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
 		DEBUG(2, "EVENT_CARD_INSERTION");
@@ -746,47 +749,23 @@ static int pcmciamtd_event(event_t event, int priority,
 
 static void pcmciamtd_detach(dev_link_t *link)
 {
-	int ret;
-	struct pcmciamtd_dev *dev = NULL;
-	struct list_head *temp1, *temp2;
-
 	DEBUG(3, "link=0x%p", link);
 
-	/* Find device in list */
-	list_for_each_safe(temp1, temp2, &dev_list) {
-		dev = list_entry(temp1, struct pcmciamtd_dev, list);
-		if(link == &dev->link)
-			break;
-	}
-	if(link != &dev->link) {
-		DEBUG(1, "Cant find %p in dev_list", link);
-		return;
-	}
-	
 	del_timer(&link->release);
 
-	if(!dev) {
-		DEBUG(3, "dev is NULL");
-		return;
-	}
-
-	if (link->state & DEV_CONFIG) {
-		//pcmciamtd_release((u_long)link);
-		DEBUG(3, "DEV_CONFIG set");
-		link->state |= DEV_STALE_LINK;
-		return;
+	if(link->state & DEV_CONFIG) {
+		pcmciamtd_release((u_long)link);
 	}
 
 	if (link->handle) {
+		int ret;
 		DEBUG(2, "Deregistering with card services");
 		ret = CardServices(DeregisterClient, link->handle);
 		if (ret != CS_SUCCESS)
 			cs_error(link->handle, DeregisterClient, ret);
 	}
-	DEBUG(3, "Freeing dev (%p)", dev);
-	list_del(&dev->list);
-	link->priv = NULL;
-	kfree(dev);
+
+	link->state |= DEV_STALE_LINK;
 }
 
 
@@ -808,15 +787,18 @@ static dev_link_t *pcmciamtd_attach(void)
 	DEBUG(1, "dev=0x%p", dev);
 
 	memset(dev, 0, sizeof(*dev));
-	link = &dev->link; link->priv = dev;
+	link = &dev->link;
+	link->priv = dev;
 
+	init_timer(&link->release);
 	link->release.function = &pcmciamtd_release;
 	link->release.data = (u_long)link;
 
 	link->conf.Attributes = 0;
 	link->conf.IntType = INT_MEMORY;
 
-	list_add(&dev->list, &dev_list);
+	link->next = dev_list;
+	dev_list = link;
 
 	/* Register with Card Services */
 	client_reg.dev_info = &dev_info;
@@ -835,18 +817,20 @@ static dev_link_t *pcmciamtd_attach(void)
 		pcmciamtd_detach(link);
 		return NULL;
 	}
-
+	DEBUG(2, "link = %p", link);
 	return link;
 }
 
+
 static struct pcmcia_driver pcmciamtd_driver = {
-	.owner		= THIS_MODULE,
 	.drv		= {
-		.name	= "pcmciamtd",
+		.name	= "pcmciamtd"
 	},
 	.attach		= pcmciamtd_attach,
 	.detach		= pcmciamtd_detach,
+	.owner		= THIS_MODULE
 };
+
 
 static int __init init_pcmciamtd(void)
 {
@@ -864,25 +848,41 @@ static int __init init_pcmciamtd(void)
 		info("bad mem_type (%d), using default", mem_type);
 		mem_type = 0;
 	}
-
 	return pcmcia_register_driver(&pcmciamtd_driver);
 }
 
 
 static void __exit exit_pcmciamtd(void)
 {
-	struct list_head *temp1, *temp2;
-
 	DEBUG(1, DRIVER_DESC " unloading");
-
 	pcmcia_unregister_driver(&pcmciamtd_driver);
 
-	/* XXX: this really needs to move into generic code.. */
-	list_for_each_safe(temp1, temp2, &dev_list) {
-		dev_link_t *link = &list_entry(temp1, struct pcmciamtd_dev, list)->link;
-		if (link && (link->state & DEV_CONFIG)) {
-			pcmciamtd_release((u_long)link);
-			pcmciamtd_detach(link);
+	while(dev_list) {
+		dev_link_t *link = dev_list;
+
+		dev_list = link->next;
+		if (link) {
+			struct pcmciamtd_dev *dev = link->priv;
+			
+ 			if(dev) {
+				if(link->state & DEV_PRESENT) {
+					if (!(link->state & DEV_STALE_LINK)) {
+						pcmciamtd_detach(link);
+					}
+					link->state &= ~DEV_PRESENT;
+					if(dev->mtd_info) {
+						del_mtd_device(dev->mtd_info);
+						info("mtd%d: Removed",
+						     dev->mtd_info->index);
+					}
+				}
+				if(dev->mtd_info) {
+					DEBUG(2, "Destroying map for mtd%d",
+					      dev->mtd_info->index);
+					map_destroy(dev->mtd_info);
+				}
+				kfree(dev);
+			}
 		}
 	}
 }

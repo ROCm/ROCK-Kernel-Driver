@@ -45,6 +45,34 @@ config ARCH_S390_31
 	depends on ARCH_S390X = 'n'
 	default y
 
+choice 
+	prompt "Processor type"
+	default MARCH_G5
+
+config MARCH_G5
+	bool "S/390 model G5 and G6"
+	depends on ARCH_S390_31
+	help
+	  Select this to build a 31 bit kernel that works
+	  on all S/390 and zSeries machines.
+
+config MARCH_Z900
+	bool "IBM eServer zSeries model z800 and z900"
+	help
+	  Select this to optimize for zSeries machines. This
+	  will enable some optimizations that are not available
+	  on older 31 bit only CPUs.
+
+config MARCH_Z990
+	bool "IBM eServer zSeries model z990"
+	help
+	  Select this enable optimizations for model z990.
+	  This will be slightly faster but does not work on
+	  older machines such as the z900.
+
+endchoice 
+
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -90,7 +118,7 @@ config NR_CPUS
 
 config MATHEMU
 	bool "IEEE FPU emulation"
-	depends on ARCH_S390X = n
+	depends on MARCH_G5
 	help
 	  This option is required for IEEE compliant floating point arithmetic
 	  on older S/390 machines. Say Y unless you know your machine doesn't 
@@ -130,7 +158,7 @@ config QDIO
 	tristate "QDIO support"
 	---help---
 	  This driver provides the Queued Direct I/O base support for the
-	  IBM S/390 (G5 and G6) and eServer zSeries (z800 and z900).
+	  IBM S/390 (G5 and G6) and eServer zSeries (z800, z900 and z990).
 
 	  For details please refer to the documentation provided by IBM at
 	  <http://www10.software.ibm.com/developerworks/opensource/linux390>

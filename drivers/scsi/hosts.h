@@ -26,28 +26,8 @@
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
-#include <linux/types.h>
 
 #include <scsi/scsi_host.h>
-
-struct scsi_driver {
-	struct module		*owner;
-	struct device_driver	gendrv;
-
-	int (*init_command)(struct scsi_cmnd *);
-	void (*rescan)(struct device *);
-};
-#define to_scsi_driver(drv) \
-	container_of((drv), struct scsi_driver, gendrv)
-
-extern int scsi_register_driver(struct device_driver *);
-#define scsi_unregister_driver(drv) \
-	driver_unregister(drv);
-
-extern int scsi_register_interface(struct class_interface *);
-#define scsi_unregister_interface(intf) \
-	class_interface_unregister(intf)
-
 
 /**
  * scsi_find_device - find a device given the host

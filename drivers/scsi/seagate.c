@@ -266,20 +266,6 @@ MODULE_LICENSE("GPL");
 #define WRITE_CONTROL(d) { isa_writeb((d), st0x_cr_sr); }
 #define WRITE_DATA(d) { isa_writeb((d), st0x_dr); }
 
-static void st0x_setup (char *str, int *ints)
-{
-	controller_type = SEAGATE;
-	base_address = ints[1];
-	irq = ints[2];
-}
-
-static void tmc8xx_setup (char *str, int *ints)
-{
-	controller_type = FD;
-	base_address = ints[1];
-	irq = ints[2];
-}
-
 #ifndef OVERRIDE
 static unsigned int seagate_bases[] = {
 	0xc8000, 0xca000, 0xcc000,

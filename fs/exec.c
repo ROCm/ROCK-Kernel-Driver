@@ -392,7 +392,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	if (!mpnt)
 		return -ENOMEM;
 
-	if (!vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+	if (security_vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
 		kmem_cache_free(vm_area_cachep, mpnt);
 		return -ENOMEM;
 	}
@@ -441,9 +441,9 @@ static inline void free_arg_pages(struct linux_binprm *bprm)
 {
 	int i;
 
-	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+	for (i = 0; i < MAX_ARG_PAGES; i++) {
 		if (bprm->page[i])
-		__free_page(bprm->page[i]);
+			__free_page(bprm->page[i]);
 		bprm->page[i] = NULL;
 	}
 }
@@ -772,6 +772,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 	if (retval)
 		goto out;
 
+	bprm->mm = NULL;		/* We're using it now */
+
 	/* This is the point of no return */
 
 	current->sas_ss_sp = current->sas_ss_size = 0;
@@ -999,7 +1001,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			}
 			read_lock(&binfmt_lock);
 			put_binfmt(fmt);
-			if (retval != -ENOEXEC)
+			if (retval != -ENOEXEC || bprm->mm == NULL)
 				break;
 			if (!bprm->file) {
 				read_unlock(&binfmt_lock);
@@ -1007,7 +1009,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			}
 		}
 		read_unlock(&binfmt_lock);
-		if (retval != -ENOEXEC) {
+		if (retval != -ENOEXEC || bprm->mm == NULL) {
 			break;
 #ifdef CONFIG_KMOD
 		}else{
@@ -1035,7 +1037,6 @@ int do_execve(char * filename,
 	struct linux_binprm bprm;
 	struct file *file;
 	int retval;
-	int i;
 
 	sched_balance_exec();
 
@@ -1103,17 +1104,14 @@ int do_execve(char * filename,
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		struct page * page = bprm.page[i];
-		if (page)
-			__free_page(page);
-	}
+	free_arg_pages(&bprm);
 
 	if (bprm.security)
 		security_bprm_free(&bprm);
 
 out_mm:
-	mmdrop(bprm.mm);
+	if (bprm.mm)
+		mmdrop(bprm.mm);
 
 out_file:
 	if (bprm.file) {

@@ -395,35 +395,34 @@ void xfrm_state_insert(struct xfrm_state *x)
 	spin_unlock_bh(&xfrm_state_lock);
 }
 
-int xfrm_state_replace(struct xfrm_state *x, int excl)
+int xfrm_state_add(struct xfrm_state *x)
 {
 	struct xfrm_state_afinfo *afinfo;
 	struct xfrm_state *x1;
 	int err;
 
 	afinfo = xfrm_state_get_afinfo(x->props.family);
-	x1 = NULL;
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
 
 	spin_lock_bh(&xfrm_state_lock);
 
-	if (afinfo) {
-		x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
-		if (!x1) {
-			x1 = afinfo->find_acq(
-				x->props.mode, x->props.reqid, x->id.proto,
-				&x->id.daddr, &x->props.saddr, 0);
-			if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
-				xfrm_state_put(x1);
-				x1 = NULL;
-			}
-		}
-
-		if (x1 && (excl ? x1->id.spi : xfrm_state_kern(x1))) {
+	x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
+	if (!x1) {
+		x1 = afinfo->find_acq(
+			x->props.mode, x->props.reqid, x->id.proto,
+			&x->id.daddr, &x->props.saddr, 0);
+		if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
 			xfrm_state_put(x1);
 			x1 = NULL;
-			err = -EEXIST;
-			goto out;
 		}
+	}
+
+	if (x1 && x1->id.spi) {
+		xfrm_state_put(x1);
+		x1 = NULL;
+		err = -EEXIST;
+		goto out;
 	}
 
 	__xfrm_state_insert(x);
@@ -431,13 +430,75 @@ int xfrm_state_replace(struct xfrm_state *x, int excl)
 
 out:
 	spin_unlock_bh(&xfrm_state_lock);
+	xfrm_state_put_afinfo(afinfo);
 
 	if (x1) {
 		xfrm_state_delete(x1);
 		xfrm_state_put(x1);
 	}
 
+	return err;
+}
+
+int xfrm_state_update(struct xfrm_state *x)
+{
+	struct xfrm_state_afinfo *afinfo;
+	struct xfrm_state *x1;
+	int err;
+
+	afinfo = xfrm_state_get_afinfo(x->props.family);
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
+
+	spin_lock_bh(&xfrm_state_lock);
+	x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
+
+	err = -ESRCH;
+	if (!x1)
+		goto out;
+
+	if (xfrm_state_kern(x1)) {
+		xfrm_state_put(x1);
+		err = -EEXIST;
+		goto out;
+	}
+
+	if (x1->km.state == XFRM_STATE_ACQ) {
+		__xfrm_state_insert(x);
+		x = NULL;
+	}
+	err = 0;
+
+out:
+	spin_unlock_bh(&xfrm_state_lock);
 	xfrm_state_put_afinfo(afinfo);
+
+	if (err)
+		return err;
+
+	if (!x) {
+		xfrm_state_delete(x1);
+		xfrm_state_put(x1);
+		return 0;
+	}
+
+	err = -EINVAL;
+	spin_lock_bh(&x1->lock);
+	if (likely(x1->km.state == XFRM_STATE_VALID)) {
+		memcpy(x1->encap, x->encap, sizeof(*x1->encap));
+		memcpy(&x1->lft, &x->lft, sizeof(x1->lft));
+		x1->km.dying = 0;
+		err = 0;
+	}
+	spin_unlock_bh(&x1->lock);
+
+	if (!mod_timer(&x1->timer, jiffies + HZ))
+		xfrm_state_hold(x1);
+	if (x1->curlft.use_time)
+		xfrm_state_check_expire(x1);
+
+	xfrm_state_put(x1);
+
 	return err;
 }
 

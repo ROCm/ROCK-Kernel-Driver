@@ -1208,6 +1208,13 @@ td_error:
 	    			uhci_packetout(td_token(td)));
 
 err:
+	/* 
+	 * Enable this chunk of code if you want to see some more debugging.
+	 * But be careful, it has the tendancy to starve out khubd and prevent
+	 * disconnects from happening successfully if you have a slow debug
+	 * log interface (like a serial console.
+	 */
+#if 0
 	if ((debug == 1 && ret != -EPIPE) || debug > 1) {
 		/* Some debugging code */
 		dbg("uhci_result_common() failed with status %x", status);
@@ -1219,7 +1226,7 @@ err:
 			lprintk(errbuf);
 		}
 	}
-
+#endif
 	return ret;
 }
 

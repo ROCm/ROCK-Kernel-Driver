@@ -101,6 +101,8 @@ struct frag_hdr {
 	__u32		identification;
 };
 
+#define	IP6_MF	0x0001
+
 #ifdef __KERNEL__
 
 #include <net/sock.h>

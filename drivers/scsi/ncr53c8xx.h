@@ -42,6 +42,79 @@
 #ifndef NCR53C8XX_H
 #define NCR53C8XX_H
 
+/*
+**	Define the BSD style u_int32 and u_int64 type.
+**	Are in fact u_int32_t and u_int64_t :-)
+*/
+typedef u32 u_int32;
+typedef u64 u_int64;
+typedef	u_long		vm_offset_t;
+
 #include "sym53c8xx_defs.h"
+
+/*==========================================================
+**
+**	Structures used by the detection routine to transmit 
+**	device configuration to the attach function.
+**
+**==========================================================
+*/
+typedef struct {
+	int	bus;
+	u_char	device_fn;
+	u_long	base;
+	u_long	base_2;
+	u_long	io_port;
+	u_long	base_c;
+	u_long	base_2_c;
+	u_long	base_v;
+	u_long	base_2_v;
+	int	irq;
+/* port and reg fields to use INB, OUTB macros */
+	u_long	base_io;
+	volatile struct ncr_reg	*reg;
+} ncr_slot;
+
+/*==========================================================
+**
+**	Structure used to store the NVRAM content.
+**
+**==========================================================
+*/
+typedef struct {
+	int type;
+#define	SCSI_NCR_SYMBIOS_NVRAM	(1)
+#define	SCSI_NCR_TEKRAM_NVRAM	(2)
+#ifdef	SCSI_NCR_NVRAM_SUPPORT
+	union {
+		Symbios_nvram Symbios;
+		Tekram_nvram Tekram;
+	} data;
+#endif
+} ncr_nvram;
+
+/*==========================================================
+**
+**	Structure used by detection routine to save data on 
+**	each detected board for attach.
+**
+**==========================================================
+*/
+typedef struct {
+	struct device  *dev;
+	ncr_slot  slot;
+	ncr_chip  chip;
+	ncr_nvram *nvram;
+	u_char host_id;
+#ifdef	SCSI_NCR_PQS_PDS_SUPPORT
+	u_char pqs_pds;
+#endif
+	__u8 differential;
+	int attach_done;
+} ncr_device;
+
+extern struct Scsi_Host *ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device);
+extern int ncr53c8xx_release(struct Scsi_Host *host);
+irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 
 #endif /* NCR53C8XX_H */

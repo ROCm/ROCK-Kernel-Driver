@@ -59,43 +59,6 @@
 
 DEFINE_SNMP_STAT(struct udp_mib, udp_stats_in6);
 
-/* XXX This is identical to tcp_ipv6.c:ipv6_rcv_saddr_equal, put
- * XXX it somewhere common. -DaveM
- */
-static __inline__ int udv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
-{
-	struct ipv6_pinfo *np = inet6_sk(sk);
-	int addr_type = ipv6_addr_type(&np->rcv_saddr);
-
-	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 && 
-	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
-	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_ANY && 
-	    (!ipv6_only_sock(sk) || 
-	     !(sk2->sk_family == AF_INET6 ?
-	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) : 1)))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 && 
-	    !ipv6_addr_cmp(&inet6_sk(sk)->rcv_saddr,
-			   &inet6_sk(sk2)->rcv_saddr))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_MAPPED &&
-	    !ipv6_only_sock(sk2) &&
-	    (!inet_sk(sk2)->rcv_saddr || 
-	     !inet_sk(sk)->rcv_saddr ||
-	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
-		return 1;
-
-	return 0;
-}
-
 /* Grrr, addr_type already calculated by caller, but I don't want
  * to add some silly "cookie" argument to this method just for that.
  */
@@ -151,7 +114,7 @@ gotit:
 			    sk2 != sk &&
 			    sk2->sk_bound_dev_if == sk->sk_bound_dev_if &&
 			    (!sk2->sk_reuse || !sk->sk_reuse) &&
-			    udv6_rcv_saddr_equal(sk, sk2))
+			    ipv6_rcv_saddr_equal(sk, sk2))
 				goto fail;
 		}
 	}

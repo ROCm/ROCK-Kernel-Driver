@@ -9,7 +9,8 @@
 #define MREMAP_MAYMOVE	1
 #define MREMAP_FIXED	2
 
-extern int vm_enough_memory(long pages);
+extern int sysctl_overcommit_memory;
+extern int sysctl_overcommit_ratio;
 extern atomic_t vm_committed_space;
 
 #ifdef CONFIG_SMP

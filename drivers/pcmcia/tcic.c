@@ -116,8 +116,6 @@ static struct pccard_operations tcic_operations;
 
 struct tcic_socket {
     u_short	psock;
-    void	(*handler)(void *info, u_int events);
-    void	*info;
     u_char	last_sstat;
     u_char	id;
     struct pcmcia_socket	socket;
@@ -433,10 +431,9 @@ static int __init init_tcic(void)
     for (i = 0; i < sock; i++) {
 	if ((i == ignore) || is_active(i)) continue;
 	socket_table[sockets].psock = i;
-	socket_table[sockets].handler = NULL;
-	socket_table[sockets].info = NULL;
 	socket_table[sockets].id = get_tcic_id();
 
+	socket_table[sockets].socket.owner = THIS_MODULE;
 	/* only 16-bit cards, memory windows must be size-aligned */
 	/* No PCI or CardBus support */
 	socket_table[sockets].socket.features = SS_CAP_PCCARD | SS_CAP_MEM_ALIGN;
@@ -558,26 +555,6 @@ static void __exit exit_tcic(void)
 
 /*====================================================================*/
 
-static u_int pending_events[2];
-static spinlock_t pending_event_lock = SPIN_LOCK_UNLOCKED;
-
-static void tcic_bh(void *dummy)
-{
-	u_int events;
-	int i;
-
-	for (i=0; i < sockets; i++) {
-		spin_lock_irq(&pending_event_lock);
-		events = pending_events[i];
-		pending_events[i] = 0;
-		spin_unlock_irq(&pending_event_lock);
-		if (socket_table[i].handler)
-			socket_table[i].handler(socket_table[i].info, events);
-	}
-}
-
-static DECLARE_WORK(tcic_task, tcic_bh, NULL);
-
 static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
     int i, quick = 0;
@@ -605,7 +582,7 @@ static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    tcic_setb(TCIC_ICSR, TCIC_ICSR_CLEAR);
 	    quick = 1;
 	}
-	if ((latch == 0) || (socket_table[psock].handler == NULL))
+	if (latch == 0)
 	    continue;
 	events = (latch & TCIC_SSTAT_CD) ? SS_DETECT : 0;
 	events |= (latch & TCIC_SSTAT_WP) ? SS_WRPROT : 0;
@@ -617,10 +594,7 @@ static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    events |= (latch & TCIC_SSTAT_LBAT2) ? SS_BATWARN : 0;
 	}
 	if (events) {
-		spin_lock(&pending_event_lock);
-		pending_events[i] |= events;
-		spin_unlock(&pending_event_lock);
-		schedule_work(&tcic_task);
+		pcmcia_parse_events(&socket_table[i].socket, events);
 	}
     }
 
@@ -642,16 +616,6 @@ static void tcic_timer(u_long data)
     tcic_timer_pending = 0;
     tcic_interrupt(0, NULL, NULL);
 } /* tcic_timer */
-
-/*====================================================================*/
-
-static int tcic_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
-{
-    u_short psock = container_of(sock, struct tcic_socket, socket)->psock;
-    socket_table[psock].handler = handler;
-    socket_table[psock].info = info;
-    return 0;
-} /* tcic_register_callback */
 
 /*====================================================================*/
 
@@ -915,10 +879,8 @@ static int tcic_suspend(struct pcmcia_socket *sock)
 }
 
 static struct pccard_operations tcic_operations = {
-	.owner		   = THIS_MODULE,
 	.init		   = tcic_init,
 	.suspend	   = tcic_suspend,
-	.register_callback = tcic_register_callback,
 	.get_status	   = tcic_get_status,
 	.get_socket	   = tcic_get_socket,
 	.set_socket	   = tcic_set_socket,

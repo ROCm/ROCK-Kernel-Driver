@@ -33,6 +33,7 @@
 
 #include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_driver.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -116,7 +117,7 @@ static void scsi_unlock_floptical(struct scsi_request *sreq,
 	scsi_cmd[4] = 0x2a;	/* size */
 	scsi_cmd[5] = 0;
 	sreq->sr_cmd_len = 0;
-	sreq->sr_data_direction = SCSI_DATA_READ;
+	sreq->sr_data_direction = DMA_FROM_DEVICE;
 	scsi_wait_req(sreq, scsi_cmd, result, 0x2a /* size */, SCSI_TIMEOUT, 3);
 }
 
@@ -333,7 +334,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	scsi_cmd[0] = INQUIRY;
 	scsi_cmd[4] = 36;	/* issue conservative alloc_length */
 	sreq->sr_cmd_len = 0;
-	sreq->sr_data_direction = SCSI_DATA_READ;
+	sreq->sr_data_direction = DMA_FROM_DEVICE;
 
 	memset(inq_result, 0, 36);
 	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) inq_result, 36,
@@ -379,7 +380,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 		scsi_cmd[0] = INQUIRY;
 		scsi_cmd[4] = (unsigned char) possible_inq_resp_len;
 		sreq->sr_cmd_len = 0;
-		sreq->sr_data_direction = SCSI_DATA_READ;
+		sreq->sr_data_direction = DMA_FROM_DEVICE;
 		/*
 		 * re-zero inq_result just to be safe.
 		 */
@@ -940,7 +941,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags)
 	scsi_cmd[10] = 0;	/* reserved */
 	scsi_cmd[11] = 0;	/* control */
 	sreq->sr_cmd_len = 0;
-	sreq->sr_data_direction = SCSI_DATA_READ;
+	sreq->sr_data_direction = DMA_FROM_DEVICE;
 
 	/*
 	 * We can get a UNIT ATTENTION, for example a power on/reset, so

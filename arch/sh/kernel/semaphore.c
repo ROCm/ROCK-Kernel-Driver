@@ -7,6 +7,7 @@
  * specific changes in <asm/semaphore-helper.h>
  */
 
+#include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
 #include <asm/semaphore.h>

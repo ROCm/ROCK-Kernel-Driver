@@ -155,11 +155,13 @@ static int blkdev_commit_write(struct file *file, struct page *page, unsigned fr
  */
 static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 {
-	/* ewww */
-	loff_t size = file->f_dentry->d_inode->i_bdev->bd_inode->i_size;
+	struct inode *bd_inode;
+	loff_t size;
 	loff_t retval;
 
-	lock_kernel();
+	bd_inode = file->f_dentry->d_inode->i_bdev->bd_inode;
+	down(&bd_inode->i_sem);
+	size = bd_inode->i_size;
 
 	switch (origin) {
 		case 2:
@@ -175,7 +177,7 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 		}
 		retval = offset;
 	}
-	unlock_kernel();
+	up(&bd_inode->i_sem);
 	return retval;
 }
 	

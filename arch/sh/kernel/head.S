@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.17 2000/03/06 12:44:24 gniibe Exp $
+/* $Id: head.S,v 1.6 2003/05/04 19:29:53 lethal Exp $
  *
  *  arch/sh/kernel/head.S
  *
@@ -48,7 +48,7 @@ ENTRY(_stext)
 	mov	#0x20, r1	!
 	shll8	r1		! r1 = 8192
 	sub	r1, r0		!
-	ldc	r0, r7_bank	! ... and init_task
+	ldc	r0, r7_bank	! ... and initial thread_info
 	!
 	!			Enable cache
 	mov.l	6f, r0
@@ -73,4 +73,4 @@ ENTRY(_stext)
 3:	.long	__bss_start
 4:	.long	_end
 5:	.long	start_kernel
-6:	.long	cache_init
+6:	.long	sh_cache_init

@@ -1,10 +1,11 @@
-/* $Id: traps.c,v 1.14 2001/07/24 08:07:10 gniibe Exp $
+/* $Id: traps.c,v 1.7 2003/05/04 19:29:53 lethal Exp $
  *
  *  linux/arch/sh/traps.c
  *
  *  SuperH version: Copyright (C) 1999 Niibe Yutaka
  *                  Copyright (C) 2000 Philipp Rumpf
  *                  Copyright (C) 2000 David Howells
+ *                  Copyright (C) 2002, 2003 Paul Mundt
  */
 
 /*
@@ -24,12 +25,26 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/processor.h>
+
+#ifdef CONFIG_SH_KGDB
+#include <asm/kgdb.h>
+#define CHK_REMOTE_DEBUG(regs)                                               \
+{                                                                            \
+  if ((kgdb_debug_hook != (kgdb_debug_hook_t *) NULL) && (!user_mode(regs))) \
+  {                                                                          \
+    (*kgdb_debug_hook)(regs);                                                \
+  }                                                                          \
+}
+#else
+#define CHK_REMOTE_DEBUG(regs)
+#endif
 
 #define DO_ERROR(trapnr, signr, str, name, tsk) \
 asmlinkage void do_##name(unsigned long r4, unsigned long r5, \
@@ -39,9 +54,10 @@ asmlinkage void do_##name(unsigned long r4, unsigned long r5, \
 	unsigned long error_code; \
  \
 	asm volatile("stc	r2_bank, %0": "=r" (error_code)); \
-	sti(); \
+	local_irq_enable(); \
 	tsk->thread.error_code = error_code; \
 	tsk->thread.trap_no = trapnr; \
+        CHK_REMOTE_DEBUG(&regs); \
 	force_sig(signr, tsk); \
 	die_if_no_fixup(str,&regs,error_code); \
 }
@@ -59,9 +75,11 @@ spinlock_t die_lock;
 void die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
+
 	console_verbose();
 	spin_lock_irq(&die_lock);
 	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
+	CHK_REMOTE_DEBUG(regs);
 	show_regs(regs);
 	spin_unlock_irq(&die_lock);
 	do_exit(SIGSEGV);
@@ -86,10 +104,10 @@ static int die_if_no_fixup(const char * str, struct pt_regs * regs, long err)
 {
 	if (!user_mode(regs))
 	{
-		unsigned long fixup;
-		fixup = search_exception_table(regs->pc);
+		const struct exception_table_entry *fixup;
+		fixup = search_exception_tables(regs->pc);
 		if (fixup) {
-			regs->pc = fixup;
+			regs->pc = fixup->fixup;
 			return 0;
 		}
 		die(str, regs, err);
@@ -403,7 +421,7 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 		case 0x0F00: /* bf/s lab */
 			ret = handle_unaligned_delayslot(regs);
 			if (ret==0) {
-#if defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 				if ((regs->sr & 0x00000001) != 0)
 					regs->pc += 4; /* next after slot */
 				else
@@ -416,7 +434,7 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 		case 0x0D00: /* bt/s lab */
 			ret = handle_unaligned_delayslot(regs);
 			if (ret==0) {
-#if defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 				if ((regs->sr & 0x00000001) == 0)
 					regs->pc += 4; /* next after slot */
 				else
@@ -468,7 +486,7 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 	oldfs = get_fs();
 
 	if (user_mode(regs)) {
-		sti();
+		local_irq_enable();
 		current->thread.error_code = error_code;
 		current->thread.trap_no = (writeaccess) ? 8 : 7;
 
@@ -526,17 +544,9 @@ asmlinkage void do_exception_error(unsigned long r4, unsigned long r5,
 
 #if defined(CONFIG_SH_STANDARD_BIOS)
 void *gdb_vbr_vector;
-#endif
 
-void __init trap_init(void)
+static inline void __init gdb_vbr_init(void)
 {
-	extern void *vbr_base;
-	extern void *exception_handling_table[14];
-
-	exception_handling_table[12] = (void *)do_reserved_inst;
-	exception_handling_table[13] = (void *)do_illegal_slot_inst;
-
-#if defined(CONFIG_SH_STANDARD_BIOS)
     	/*
 	 * Read the old value of the VBR register to initialise
 	 * the vector through which debug and BIOS traps are
@@ -549,6 +559,15 @@ void __init trap_init(void)
 	    printk("Setting GDB trap vector to 0x%08lx\n",
 	    	(unsigned long)gdb_vbr_vector);
 	}
+}
+#endif
+
+void __init per_cpu_trap_init(void)
+{
+	extern void *vbr_base;
+
+#ifdef CONFIG_SH_STANDARD_BIOS
+	gdb_vbr_init();
 #endif
 
 	/* NOTE: The VBR value should be at P1
@@ -561,29 +580,70 @@ void __init trap_init(void)
 		     : "memory");
 }
 
-void dump_stack(void)
+void __init trap_init(void)
 {
-	unsigned long *start;
-	unsigned long *end;
-	unsigned long *p;
+	extern void *exception_handling_table[14];
 
-	asm("mov	r15, %0" : "=r" (start));
-	asm("stc	r7_bank, %0" : "=r" (end));
-	end += 8192/4;
+	exception_handling_table[12] = (void *)do_reserved_inst;
+	exception_handling_table[13] = (void *)do_illegal_slot_inst;
 
-	printk("%08lx:%08lx\n", (unsigned long)start, (unsigned long)end);
-	for (p=start; p < end; p++) {
-		extern long _text, _etext;
-		unsigned long v=*p;
+	per_cpu_trap_init();
+}
 
-		if ((v >= (unsigned long )&_text)
-		    && (v <= (unsigned long )&_etext)) {
-			printk("%08lx\n", v);
+void show_stack(struct task_struct *tsk, unsigned long *sp)
+{
+	unsigned long *stack, addr;
+	unsigned long module_start = VMALLOC_START;
+	unsigned long module_end = VMALLOC_END;
+	extern long _text, _etext;
+	int i = 1;
+
+	if (!sp) {
+		__asm__ __volatile__ (
+			"mov r15, %0\n\t"
+			"stc r7_bank, %1\n\t"
+			: "=r" (module_start),
+			  "=r" (module_end)
+		);
+		
+		sp = (unsigned long *)module_start;
+	}
+
+	stack = sp;
+
+	printk("\nCall trace: ");
+
+	while (((long)stack & (THREAD_SIZE - 1))) {
+		addr = *stack++;
+		if (((addr >= (unsigned long)&_text) &&
+		     (addr <= (unsigned long)&_etext)) ||
+		    ((addr >= module_start) && (addr <= module_end))) {
+			/*
+			 * For 80-columns display, 6 entry is maximum.
+			 * NOTE: '[<8c00abcd>] ' consumes 13 columns .
+			 */
+			if (i && ((i % 6) == 0))
+				printk("\n       ");
+			printk("[<%08lx>] ", addr);
+			i++;
 		}
 	}
+
+	printk("\n");
+}
+
+void show_task(unsigned long *sp)
+{
+	show_stack(NULL, sp);
 }
 
 void show_trace_task(struct task_struct *tsk)
 {
-	printk("Backtrace not yet implemented for SH.\n");
+	show_task((unsigned long *)tsk->thread.sp);
 }
+
+void dump_stack(void)
+{
+	show_stack(NULL, NULL);
+}
+

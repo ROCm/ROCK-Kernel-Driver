@@ -1176,6 +1176,9 @@ static void layout_sections(struct module *mod,
 			    const char *secstrings)
 {
 	static unsigned long const masks[][2] = {
+		/* NOTE: all executable code must be the first section
+		 * in this array; otherwise modify the text_size
+		 * finder in the two loops below */
 		{ SHF_EXECINSTR | SHF_ALLOC, ARCH_SHF_SMALL },
 		{ SHF_ALLOC, SHF_WRITE | ARCH_SHF_SMALL },
 		{ SHF_WRITE | SHF_ALLOC, ARCH_SHF_SMALL },
@@ -1199,6 +1202,8 @@ static void layout_sections(struct module *mod,
 			s->sh_entsize = get_offset(&mod->core_size, s);
 			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
+		if (m == 0)
+			mod->core_text_size = mod->core_size;
 	}
 
 	DEBUGP("Init section allocation order:\n");
@@ -1215,6 +1220,8 @@ static void layout_sections(struct module *mod,
 					 | INIT_OFFSET_MASK);
 			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
+		if (m == 0)
+			mod->init_text_size = mod->init_size;
 	}
 }
 
@@ -1726,6 +1733,7 @@ sys_init_module(void __user *umod,
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;
+	mod->init_text_size = 0;
 	up(&module_mutex);
 
 	return 0;
@@ -1747,9 +1755,9 @@ static const char *get_ksymbol(struct module *mod,
 
 	/* At worse, next value is at end of module */
 	if (within(addr, mod->module_init, mod->init_size))
-		nextval = (unsigned long)mod->module_init + mod->init_size;
+		nextval = (unsigned long)mod->module_init+mod->init_text_size;
 	else 
-		nextval = (unsigned long)mod->module_core + mod->core_size;
+		nextval = (unsigned long)mod->module_core+mod->core_text_size;
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
@@ -1757,11 +1765,15 @@ static const char *get_ksymbol(struct module *mod,
 		if (mod->symtab[i].st_shndx == SHN_UNDEF)
 			continue;
 
+		/* We ignore unnamed symbols: they're uninformative
+		 * and inserted at a whim. */
 		if (mod->symtab[i].st_value <= addr
-		    && mod->symtab[i].st_value > mod->symtab[best].st_value)
+		    && mod->symtab[i].st_value > mod->symtab[best].st_value
+		    && *(mod->strtab + mod->symtab[i].st_name) != '\0' )
 			best = i;
 		if (mod->symtab[i].st_value > addr
-		    && mod->symtab[i].st_value < nextval)
+		    && mod->symtab[i].st_value < nextval
+		    && *(mod->strtab + mod->symtab[i].st_name) != '\0')
 			nextval = mod->symtab[i].st_value;
 	}
 
@@ -1910,8 +1922,8 @@ struct module *module_text_address(unsigned long addr)
 	struct module *mod;
 
 	list_for_each_entry(mod, &modules, list)
-		if (within(addr, mod->module_init, mod->init_size)
-		    || within(addr, mod->module_core, mod->core_size))
+		if (within(addr, mod->module_init, mod->init_text_size)
+		    || within(addr, mod->module_core, mod->core_text_size))
 			return mod;
 	return NULL;
 }

@@ -14,9 +14,9 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	*a |= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static __inline__ void __set_bit(int nr, volatile void * addr)
@@ -42,9 +42,9 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	*a &= ~mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static __inline__ void __clear_bit(int nr, volatile void * addr)
@@ -65,9 +65,9 @@ static __inline__ void change_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	*a ^= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static __inline__ void __change_bit(int nr, volatile void * addr)
@@ -88,10 +88,10 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a |= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return retval;
 }
@@ -117,10 +117,10 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a &= ~mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return retval;
 }
@@ -146,10 +146,10 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	retval = (mask & *a) != 0;
 	*a ^= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return retval;
 }
@@ -185,6 +185,82 @@ static __inline__ unsigned long ffz(unsigned long word)
 		: "t");
 	return result;
 }
+
+/**
+ * __ffs - find first bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static __inline__ unsigned long __ffs(unsigned long word)
+{
+	unsigned long result;
+
+	__asm__("1:\n\t"
+		"shlr	%1\n\t"
+		"bf/s	1b\n\t"
+		" add	#1, %0"
+		: "=r" (result), "=r" (word)
+		: "0" (~0L), "1" (word)
+		: "t");
+	return result;
+}
+
+/**
+ * find_next_bit - find the next set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ */
+static __inline__ unsigned long find_next_bit(unsigned long *addr,
+	unsigned long size, unsigned long offset)
+{
+	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
+	unsigned int result = offset & ~31UL;
+	unsigned int tmp;
+
+	if (offset >= size)
+		return size;
+	size -= result;
+	offset &= 31UL;
+	if (offset) {
+		tmp = *p++;
+		tmp &= ~0UL << offset;
+		if (size < 32)
+			goto found_first;
+		if (tmp)
+			goto found_middle;
+		size -= 32;
+		result += 32;
+	}
+	while (size >= 32) {
+		if ((tmp = *p++) != 0)
+			goto found_middle;
+		result += 32;
+		size -= 32;
+	}
+	if (!size)
+		return result;
+	tmp = *p;
+
+found_first:
+	tmp &= ~0UL >> (32 - size);
+	if (tmp == 0UL)        /* Are any bits set? */
+		return result + size; /* Nope. */
+found_middle:
+	return result + __ffs(tmp);
+}
+
+/**
+ * find_first_bit - find the first set bit in a memory region
+ * @addr: The address to start the search at
+ * @size: The maximum size to search
+ *
+ * Returns the bit-number of the first set bit, not the number of the byte
+ * containing a bit.
+ */
+#define find_first_bit(addr, size) \
+	find_next_bit((addr), (size), 0)
 
 static __inline__ int find_next_zero_bit(void *addr, int size, int offset)
 {
@@ -242,6 +318,26 @@ found_middle:
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)
 
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is cleared.
+ */
+
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (b[3])
+		return __ffs(b[3]) + 96;
+	return __ffs(b[4]) + 128;
+}
+
 #ifdef __LITTLE_ENDIAN__
 #define ext2_set_bit(nr, addr) test_and_set_bit((nr), (addr))
 #define ext2_clear_bit(nr, addr) test_and_clear_bit((nr), (addr))
@@ -258,10 +354,10 @@ static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 
 	ADDR += nr >> 3;
 	mask = 1 << (nr & 0x07);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	retval = (mask & *ADDR) != 0;
 	*ADDR |= mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
@@ -273,10 +369,10 @@ static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 
 	ADDR += nr >> 3;
 	mask = 1 << (nr & 0x07);
-	save_and_cli(flags);
+	local_irq_save(flags);
 	retval = (mask & *ADDR) != 0;
 	*ADDR &= ~mask;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return retval;
 }
 
@@ -368,6 +464,12 @@ found_middle:
 #define minix_test_and_clear_bit(nr,addr) test_and_clear_bit(nr,addr)
 #define minix_test_bit(nr,addr) test_bit(nr,addr)
 #define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
+
+/*
+ * fls: find last bit set.
+ */
+
+#define fls(x) generic_fls(x)
 
 #endif /* __KERNEL__ */
 
