@@ -1,5 +1,4 @@
 OUTPUT_ARCH(powerpc:common64)
-SEARCH_DIR(/lib); SEARCH_DIR(/usr/lib); SEARCH_DIR(/usr/local/lib); SEARCH_DIR(/usr/local/powerpc-any-elf/lib);
 /* Do we need any of these for elf?
    __DYNAMIC = 0;    */
 jiffies = jiffies_64;
@@ -62,7 +61,6 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
 
-  .fixup   : { *(.fixup) }
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
@@ -70,6 +68,7 @@ SECTIONS
   __start___ksymtab = .;        /* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
+
   __start___kallsyms = .;	/* All kernel symbols */
   __kallsyms : { *(__kallsyms) }
   __stop___kallsyms = .;
@@ -83,21 +82,14 @@ SECTIONS
   . = ALIGN(128);
   .data.cacheline_aligned : { *(.data.cacheline_aligned) }
 
+  /* will be freed after init */
   . = ALIGN(4096);
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { 
-    *(.data.init);
-    __vtop_table_begin = .;
-    *(.vtop_fixup);
-    __vtop_table_end = .;
-    __ptov_table_begin = .;
-    *(.ptov_fixup);
-    __ptov_table_end = .;
-  }
+  .init.text : { *(.init.text) }
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -116,23 +108,16 @@ SECTIONS
   __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
+  /* freed after init ends here */
 
   __toc_start = .;
-  .toc       :
-  {
-   *(.toc)
-  }
+  .toc : { *(.toc) }
   . = ALIGN(4096);
   __toc_end = .;
 
   __bss_start = .;
-  .bss       :
-  {
-   *(.sbss) *(.scommon)
-   *(.dynbss)
-   *(.bss)
-   *(COMMON)
-  }
+  .bss : { *(.bss) }
+  __bss_stop = .;
 
   . = ALIGN(4096);
   _end = . ;
