@@ -243,7 +243,7 @@ static struct nf_hook_ops ing_ops = {
 	.pf             = PF_INET,
 	.hooknum        = NF_IP_PRE_ROUTING,
 	.priority       = NF_IP_PRI_FILTER + 1,
-}
+};
 
 int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 {
