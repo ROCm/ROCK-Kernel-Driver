@@ -2676,7 +2676,7 @@ static void ia_close(struct atm_vcc *vcc)
         return;        
 }  
   
-static int ia_open(struct atm_vcc *vcc, short vpi, int vci)  
+static int ia_open(struct atm_vcc *vcc)
 {  
 	IADEV *iadev;  
 	struct ia_vcc *ia_vcc;  
@@ -2687,15 +2687,7 @@ static int ia_open(struct atm_vcc *vcc, short vpi, int vci)
 		INPH_IA_VCC(vcc) = NULL;  
 	}  
 	iadev = INPH_IA_DEV(vcc->dev);  
-	error = atm_find_ci(vcc, &vpi, &vci);  
-	if (error)   
-	{  
-	    printk("iadev: atm_find_ci returned error %d\n", error);  
-	    return error;  
-	}  
-	vcc->vpi = vpi;  
-	vcc->vci = vci;  
-	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)  
+	if (vcc->vci != ATM_VPI_UNSPEC && vcc->vpi != ATM_VCI_UNSPEC)  
 	{  
 		IF_EVENT(printk("iphase open: unspec part\n");)  
 		set_bit(ATM_VF_ADDR,&vcc->flags);

@@ -1373,19 +1373,17 @@ static void zatm_close(struct atm_vcc *vcc)
 }
 
 
-static int zatm_open(struct atm_vcc *vcc,short vpi,int vci)
+static int zatm_open(struct atm_vcc *vcc)
 {
 	struct zatm_dev *zatm_dev;
 	struct zatm_vcc *zatm_vcc;
+	short vpi = vcc->vpi;
+	int vci = vcc->vci;
 	int error;
 
 	DPRINTK(">zatm_open\n");
 	zatm_dev = ZATM_DEV(vcc->dev);
 	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags)) ZATM_VCC(vcc) = NULL;
-	error = atm_find_ci(vcc,&vpi,&vci);
-	if (error) return error;
-	vcc->vpi = vpi;
-	vcc->vci = vci;
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR,&vcc->flags);
 	if (vcc->qos.aal != ATM_AAL5) return -EINVAL; /* @@@ AAL0 */

@@ -525,8 +525,8 @@ struct ip_vs_conn {
 	atomic_t                in_pkts;        /* incoming packet counter */
 
 	/* packet transmitter for different forwarding methods.  If it
-	   mangles the packet, it must return NF_DROP or NF_STOLEN, otherwise
-	   this must be changed to a sk_buff **.
+	   mangles the packet, it must return NF_DROP or better NF_STOLEN,
+	   otherwise this must be changed to a sk_buff **.
 	 */
 	int (*packet_xmit)(struct sk_buff *skb, struct ip_vs_conn *cp,
 			   struct ip_vs_protocol *pp);
