@@ -101,10 +101,6 @@ static int adm1031_attach_adapter(struct i2c_adapter *adapter);
 static int adm1031_detect(struct i2c_adapter *adapter, int address, int kind);
 static void adm1031_init_client(struct i2c_client *client);
 static int adm1031_detach_client(struct i2c_client *client);
-static inline u8 adm1031_read_value(struct i2c_client *client, u8 reg);
-static inline int
-adm1031_write_value(struct i2c_client *client, u8 reg, unsigned int value);
-
 static struct adm1031_data *adm1031_update_device(struct device *dev);
 
 /* This is the driver that will be inserted */
@@ -116,7 +112,19 @@ static struct i2c_driver adm1031_driver = {
 	.detach_client = adm1031_detach_client,
 };
 
-static int adm1031_id = 0;
+static int adm1031_id;
+
+static inline u8 adm1031_read_value(struct i2c_client *client, u8 reg)
+{
+	return i2c_smbus_read_byte_data(client, reg);
+}
+
+static inline int
+adm1031_write_value(struct i2c_client *client, u8 reg, unsigned int value)
+{
+	return i2c_smbus_write_byte_data(client, reg, value);
+}
+
 
 #define TEMP_TO_REG(val)		(((val) < 0 ? ((val - 500) / 1000) : \
 					((val + 500) / 1000)))
@@ -847,17 +855,6 @@ static int adm1031_detach_client(struct i2c_client *client)
 	}
 	kfree(client);
 	return 0;
-}
-
-static inline u8 adm1031_read_value(struct i2c_client *client, u8 reg)
-{
-	return i2c_smbus_read_byte_data(client, reg);
-}
-
-static inline int
-adm1031_write_value(struct i2c_client *client, u8 reg, unsigned int value)
-{
-	return i2c_smbus_write_byte_data(client, reg, value);
 }
 
 static void adm1031_init_client(struct i2c_client *client)
