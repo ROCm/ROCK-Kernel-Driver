@@ -3679,7 +3679,8 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
       set_buffer_uptodate(tmp_bh);
       page = cn->bh->b_page;
       addr = kmap(page);
-      memcpy(tmp_bh->b_data, addr, cn->bh->b_size) ;  
+      memcpy(tmp_bh->b_data, addr + offset_in_page(cn->bh->b_data), 
+             cn->bh->b_size);  
       kunmap(page);
       mark_buffer_dirty(tmp_bh);
       jindex++ ;
