@@ -99,7 +99,7 @@ static void get_sectorsize(struct scsi_cd *);
 static void get_capabilities(struct scsi_cd *);
 
 static int sr_media_change(struct cdrom_device_info *, int);
-static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *);
+static int sr_packet(struct cdrom_device_info *, struct packet_command *);
 
 static struct cdrom_device_ops sr_dops = {
 	.open			= sr_open,
@@ -908,7 +908,7 @@ static void get_capabilities(struct scsi_cd *cd)
  * by the Uniform CD-ROM layer. 
  */
 static int sr_packet(struct cdrom_device_info *cdi,
-		struct cdrom_generic_command *cgc)
+		struct packet_command *cgc)
 {
 	if (cgc->timeout <= 0)
 		cgc->timeout = IOCTL_TIMEOUT;

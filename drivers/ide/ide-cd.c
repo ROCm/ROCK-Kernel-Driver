@@ -2491,7 +2491,7 @@ static int cdrom_get_toc_entry(ide_drive_t *drive, int track,
 
 /* the generic packet interface to cdrom.c */
 static int ide_cdrom_packet(struct cdrom_device_info *cdi,
-			    struct cdrom_generic_command *cgc)
+			    struct packet_command *cgc)
 {
 	struct request req;
 	ide_drive_t *drive = (ide_drive_t*) cdi->handle;
@@ -2524,7 +2524,7 @@ static
 int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
 			 unsigned int cmd, unsigned long arg)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[16];
 	int stat;
 
@@ -2908,7 +2908,7 @@ int ide_cdrom_get_capabilities(ide_drive_t *drive, struct atapi_capabilities_pag
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int stat, attempts = 3, size = sizeof(*cap);
 
 	/*

@@ -455,7 +455,7 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 int cdrom_get_media_event(struct cdrom_device_info *cdi,
 			  struct media_event_desc *med)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	unsigned char buffer[8];
 	struct event_header *eh = (struct event_header *) buffer;
 
@@ -482,7 +482,7 @@ int cdrom_get_media_event(struct cdrom_device_info *cdi,
  */
 int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[16];
 
 	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
@@ -503,7 +503,7 @@ int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
 
 int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct mrw_feature_desc *mfd;
 	unsigned char buffer[16];
 	int ret;
@@ -529,7 +529,7 @@ int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 
 static int cdrom_mrw_bgformat(struct cdrom_device_info *cdi, int cont)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	unsigned char buffer[12];
 	int ret;
 
@@ -570,7 +570,7 @@ static int cdrom_mrw_bgformat(struct cdrom_device_info *cdi, int cont)
 
 static int cdrom_mrw_bgformat_susp(struct cdrom_device_info *cdi, int immed)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
 	init_cdrom_command(&cgc, NULL, 0, CGC_DATA_NONE);
 	cgc.cmd[0] = GPCMD_CLOSE_TRACK;
@@ -588,7 +588,7 @@ static int cdrom_mrw_bgformat_susp(struct cdrom_device_info *cdi, int immed)
 
 static int cdrom_flush_cache(struct cdrom_device_info *cdi)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
 	init_cdrom_command(&cgc, NULL, 0, CGC_DATA_NONE);
 	cgc.cmd[0] = GPCMD_FLUSH_CACHE;
@@ -619,7 +619,7 @@ static int cdrom_mrw_exit(struct cdrom_device_info *cdi)
 
 static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct mode_page_header *mph;
 	char buffer[16];
 	int ret, offset, size;
@@ -649,7 +649,7 @@ static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
 int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 			      struct rwrt_feature_desc *rfd)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[24];
 	struct feature_header *fh;
 	int ret;
@@ -677,7 +677,7 @@ int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 
 int cdrom_has_defect_mgt(struct cdrom_device_info *cdi)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[16];
 	struct feature_header *fh;
 	__u16 *feature_code;
@@ -785,7 +785,7 @@ static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
 
 static int mo_open_write(struct cdrom_device_info *cdi)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[255];
 	int ret;
 
@@ -1102,7 +1102,7 @@ int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 static int cdrom_read_mech_status(struct cdrom_device_info *cdi, 
 				  struct cdrom_changer_info *buf)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int length;
 
@@ -1185,7 +1185,7 @@ int cdrom_number_of_slots(struct cdrom_device_info *cdi)
 /* If SLOT < 0, unload the current slot.  Otherwise, try to load SLOT. */
 static int cdrom_load_unload(struct cdrom_device_info *cdi, int slot) 
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 
 	cdinfo(CD_CHANGER, "entering cdrom_load_unload()\n"); 
 	if (cdi->sanyo_slot && slot < 0)
@@ -1384,10 +1384,10 @@ void sanitize_format(union cdrom_addr *addr,
 	*curr = requested;
 }
 
-void init_cdrom_command(struct cdrom_generic_command *cgc, void *buf, int len,
+void init_cdrom_command(struct packet_command *cgc, void *buf, int len,
 			int type)
 {
-	memset(cgc, 0, sizeof(struct cdrom_generic_command));
+	memset(cgc, 0, sizeof(struct packet_command));
 	if (buf)
 		memset(buf, 0, len);
 	cgc->buffer = (char *) buf;
@@ -1401,7 +1401,7 @@ void init_cdrom_command(struct cdrom_generic_command *cgc, void *buf, int len,
 #define copy_key(dest,src)	memcpy((dest), (src), sizeof(dvd_key))
 #define copy_chal(dest,src)	memcpy((dest), (src), sizeof(dvd_challenge))
 
-static void setup_report_key(struct cdrom_generic_command *cgc, unsigned agid, unsigned type)
+static void setup_report_key(struct packet_command *cgc, unsigned agid, unsigned type)
 {
 	cgc->cmd[0] = GPCMD_REPORT_KEY;
 	cgc->cmd[10] = type | (agid << 6);
@@ -1423,7 +1423,7 @@ static void setup_report_key(struct cdrom_generic_command *cgc, unsigned agid, u
 	cgc->data_direction = CGC_DATA_READ;
 }
 
-static void setup_send_key(struct cdrom_generic_command *cgc, unsigned agid, unsigned type)
+static void setup_send_key(struct packet_command *cgc, unsigned agid, unsigned type)
 {
 	cgc->cmd[0] = GPCMD_SEND_KEY;
 	cgc->cmd[10] = type | (agid << 6);
@@ -1449,7 +1449,7 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 {
 	int ret;
 	u_char buf[20];
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 	rpc_state_t rpc_state;
 
@@ -1595,7 +1595,7 @@ static int dvd_read_physical(struct cdrom_device_info *cdi, dvd_struct *s)
 {
 	unsigned char buf[21], *base;
 	struct dvd_layer *layer;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int ret, layer_num = s->physical.layer_num;
 
@@ -1645,7 +1645,7 @@ static int dvd_read_copyright(struct cdrom_device_info *cdi, dvd_struct *s)
 {
 	int ret;
 	u_char buf[8];
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 
 	init_cdrom_command(&cgc, buf, sizeof(buf), CGC_DATA_READ);
@@ -1668,7 +1668,7 @@ static int dvd_read_disckey(struct cdrom_device_info *cdi, dvd_struct *s)
 {
 	int ret, size;
 	u_char *buf;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 
 	size = sizeof(s->disckey.value) + 4;
@@ -1694,7 +1694,7 @@ static int dvd_read_bca(struct cdrom_device_info *cdi, dvd_struct *s)
 {
 	int ret;
 	u_char buf[4 + 188];
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 
 	init_cdrom_command(&cgc, buf, sizeof(buf), CGC_DATA_READ);
@@ -1719,7 +1719,7 @@ static int dvd_read_manufact(struct cdrom_device_info *cdi, dvd_struct *s)
 {
 	int ret = 0, size;
 	u_char *buf;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct cdrom_device_ops *cdo = cdi->ops;
 
 	size = sizeof(s->manufact.value) + 4;
@@ -1777,7 +1777,7 @@ static int dvd_read_struct(struct cdrom_device_info *cdi, dvd_struct *s)
 }
 
 int cdrom_mode_sense(struct cdrom_device_info *cdi,
-		     struct cdrom_generic_command *cgc,
+		     struct packet_command *cgc,
 		     int page_code, int page_control)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
@@ -1793,7 +1793,7 @@ int cdrom_mode_sense(struct cdrom_device_info *cdi,
 }
 
 int cdrom_mode_select(struct cdrom_device_info *cdi,
-		      struct cdrom_generic_command *cgc)
+		      struct packet_command *cgc)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
 
@@ -1811,7 +1811,7 @@ static int cdrom_read_subchannel(struct cdrom_device_info *cdi,
 				 struct cdrom_subchnl *subchnl, int mcn)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	char buffer[32];
 	int ret;
 
@@ -1845,7 +1845,7 @@ static int cdrom_read_subchannel(struct cdrom_device_info *cdi,
  * Specific READ_10 interface
  */
 static int cdrom_read_cd(struct cdrom_device_info *cdi,
-			 struct cdrom_generic_command *cgc, int lba,
+			 struct packet_command *cgc, int lba,
 			 int blocksize, int nblocks)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
@@ -1865,7 +1865,7 @@ static int cdrom_read_cd(struct cdrom_device_info *cdi,
 
 /* very generic interface for reading the various types of blocks */
 static int cdrom_read_block(struct cdrom_device_info *cdi,
-			    struct cdrom_generic_command *cgc,
+			    struct packet_command *cgc,
 			    int lba, int nblocks, int format, int blksize)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
@@ -1899,7 +1899,7 @@ static int cdrom_read_block(struct cdrom_device_info *cdi,
 static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 			       int lba, int nframes)
 {
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int nr, ret;
 
 	memset(&cgc, 0, sizeof(cgc));
@@ -2446,7 +2446,7 @@ int msf_to_lba(char m, char s, char f)
 static int cdrom_switch_blocksize(struct cdrom_device_info *cdi, int size)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct modesel_head mh;
 
 	memset(&mh, 0, sizeof(mh));
@@ -2472,7 +2472,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		     unsigned long arg)
 {		
 	struct cdrom_device_ops *cdo = cdi->ops;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	struct request_sense sense;
 	char buffer[32];
 	int ret = 0;
@@ -2729,7 +2729,7 @@ static int cdrom_get_track_info(struct cdrom_device_info *cdi, __u16 track, __u8
 			 track_information *ti)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int ret;
 
 	init_cdrom_command(&cgc, ti, 8, CGC_DATA_READ);
@@ -2757,7 +2757,7 @@ static int cdrom_get_track_info(struct cdrom_device_info *cdi, __u16 track, __u8
 static int cdrom_get_disc_info(struct cdrom_device_info *cdi, disc_information *di)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
-	struct cdrom_generic_command cgc;
+	struct packet_command cgc;
 	int ret;
 
 	/* set up command and get the disc info */
