@@ -1147,6 +1147,8 @@ static void *vmstat_start(struct seq_file *m, loff_t *pos)
 	if (!ps)
 		return ERR_PTR(-ENOMEM);
 	get_full_page_state(ps);
+	ps->pgpgin /= 2;		/* sectors -> kbytes */
+	ps->pgpgout /= 2;
 	return (unsigned long *)ps + *pos;
 }
 

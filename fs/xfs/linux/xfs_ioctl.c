@@ -35,7 +35,6 @@
 #include <xfs_dfrag.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>
-#include <linux/iobuf.h>
 
 
 extern int xfs_change_file_space(bhv_desc_t *, int,
@@ -605,6 +604,7 @@ xfs_ioctl(
 		 * it is set to the file system block size to
 		 * avoid having to do block zeroing on short writes.
 		 */
+#define KIO_MAX_ATOMIC_IO 512	/* FIXME: what do we really want here? */
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
 				XFS_B_TO_FSBT(mp, KIO_MAX_ATOMIC_IO << 10));
 

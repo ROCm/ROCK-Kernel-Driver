@@ -24,7 +24,6 @@
 #include <linux/smp_lock.h>
 #include <linux/blk.h>
 #include <linux/hdreg.h>
-#include <linux/iobuf.h>
 #include <linux/bootmem.h>
 #include <linux/tty.h>
 #include <linux/percpu.h>
