@@ -157,6 +157,7 @@ struct cpu_cache_fns {
 	void (*flush_user_range)(unsigned long, unsigned long, unsigned int);
 
 	void (*coherent_kern_range)(unsigned long, unsigned long);
+	void (*coherent_user_range)(unsigned long, unsigned long);
 	void (*flush_kern_dcache_page)(void *);
 
 	void (*dma_inv_range)(unsigned long, unsigned long);
@@ -175,6 +176,7 @@ extern struct cpu_cache_fns cpu_cache;
 #define __cpuc_flush_user_all		cpu_cache.flush_user_all
 #define __cpuc_flush_user_range		cpu_cache.flush_user_range
 #define __cpuc_coherent_kern_range	cpu_cache.coherent_kern_range
+#define __cpuc_coherent_user_range	cpu_cache.coherent_user_range
 #define __cpuc_flush_dcache_page	cpu_cache.flush_kern_dcache_page
 
 /*
@@ -193,12 +195,14 @@ extern struct cpu_cache_fns cpu_cache;
 #define __cpuc_flush_user_all		__glue(_CACHE,_flush_user_cache_all)
 #define __cpuc_flush_user_range		__glue(_CACHE,_flush_user_cache_range)
 #define __cpuc_coherent_kern_range	__glue(_CACHE,_coherent_kern_range)
+#define __cpuc_coherent_user_range	__glue(_CACHE,_coherent_user_range)
 #define __cpuc_flush_dcache_page	__glue(_CACHE,_flush_kern_dcache_page)
 
 extern void __cpuc_flush_kern_all(void);
 extern void __cpuc_flush_user_all(void);
 extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
 extern void __cpuc_coherent_kern_range(unsigned long, unsigned long);
+extern void __cpuc_coherent_user_range(unsigned long, unsigned long);
 extern void __cpuc_flush_dcache_page(void *);
 
 /*
@@ -266,6 +270,14 @@ flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
 		__cpuc_flush_user_range(addr, addr + PAGE_SIZE, vma->vm_flags);
 	}
 }
+
+/*
+ * flush_cache_user_range is used when we want to ensure that the
+ * Harvard caches are synchronised for the user space address range.
+ * This is used for the ARM private sys_cacheflush system call.
+ */
+#define flush_cache_user_range(vma,start,end) \
+	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
 
 /*
  * Perform necessary cache operations to ensure that data previously

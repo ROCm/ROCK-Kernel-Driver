@@ -241,6 +241,22 @@ ENTRY(xscale_flush_user_cache_range)
  *	it also trashes the mini I-cache used by JTAG debuggers.
  */
 ENTRY(xscale_coherent_kern_range)
+	/* FALLTHROUGH */
+
+/*
+ *	coherent_user_range(start, end)
+ *
+ *	Ensure coherency between the Icache and the Dcache in the
+ *	region described by start.  If you have non-snooping
+ *	Harvard caches, you need to implement this function.
+ *
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
+ *
+ *	Note: single I-cache line invalidation isn't used here since
+ *	it also trashes the mini I-cache used by JTAG debuggers.
+ */
+ENTRY(xscale_coherent_user_range)
 	bic	r0, r0, #CACHELINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHELINESIZE
@@ -341,6 +357,7 @@ ENTRY(xscale_cache_fns)
 	.long	xscale_flush_user_cache_all
 	.long	xscale_flush_user_cache_range
 	.long	xscale_coherent_kern_range
+	.long	xscale_coherent_user_range
 	.long	xscale_flush_kern_dcache_page
 	.long	xscale_dma_inv_range
 	.long	xscale_dma_clean_range
