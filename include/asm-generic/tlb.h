@@ -44,11 +44,18 @@ extern mmu_gather_t	mmu_gathers[NR_CPUS];
 static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
 {
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
+	unsigned long nr;
 
 	tlb->mm = mm;
 	tlb->freed = 0;
-	/* Use fast mode if there is only one user of this mm (this process) */
-	tlb->nr = (atomic_read(&(mm)->mm_users) == 1) ? ~0UL : 0UL;
+
+	/* Use fast mode if this MM only exists on this CPU */
+	nr = ~0UL;
+#ifdef CONFIG_SMP
+	if (mm->cpu_vm_mask != (1<<smp_processor_id()))
+		nr = 0UL;
+#endif
+	tlb->nr = nr;
 	return tlb;
 }
 

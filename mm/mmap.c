@@ -1100,32 +1100,19 @@ void exit_mmap(struct mm_struct * mm)
 
 	release_segments(mm);
 	spin_lock(&mm->page_table_lock);
-	mpnt = mm->mmap;
-	mm->mmap = mm->mmap_cache = NULL;
-	mm->mm_rb = RB_ROOT;
-	mm->rss = 0;
-	mm->total_vm = 0;
-	mm->locked_vm = 0;
 
 	tlb = tlb_gather_mmu(mm);
 
 	flush_cache_mm(mm);
+	mpnt = mm->mmap;
 	while (mpnt) {
-		struct vm_area_struct * next = mpnt->vm_next;
 		unsigned long start = mpnt->vm_start;
 		unsigned long end = mpnt->vm_end;
 
-		if (mpnt->vm_ops) {
-			if (mpnt->vm_ops->close)
-				mpnt->vm_ops->close(mpnt);
-		}
 		mm->map_count--;
 		remove_shared_vm_struct(mpnt);
 		unmap_page_range(tlb, mpnt, start, end);
-		if (mpnt->vm_file)
-			fput(mpnt->vm_file);
-		kmem_cache_free(vm_area_cachep, mpnt);
-		mpnt = next;
+		mpnt = mpnt->vm_next;
 	}
 
 	/* This is just debugging */
@@ -1134,7 +1121,32 @@ void exit_mmap(struct mm_struct * mm)
 
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
 	tlb_finish_mmu(tlb, FIRST_USER_PGD_NR*PGDIR_SIZE, USER_PTRS_PER_PGD*PGDIR_SIZE);
+
+	mpnt = mm->mmap;
+	mm->mmap = mm->mmap_cache = NULL;
+	mm->mm_rb = RB_ROOT;
+	mm->rss = 0;
+	mm->total_vm = 0;
+	mm->locked_vm = 0;
+
 	spin_unlock(&mm->page_table_lock);
+
+	/*
+	 * Walk the list again, actually closing and freeing it
+	 * without holding any MM locks.
+	 */
+	while (mpnt) {
+		struct vm_area_struct * next = mpnt->vm_next;
+		if (mpnt->vm_ops) {
+			if (mpnt->vm_ops->close)
+				mpnt->vm_ops->close(mpnt);
+		}
+		if (mpnt->vm_file)
+			fput(mpnt->vm_file);
+		kmem_cache_free(vm_area_cachep, mpnt);
+		mpnt = next;
+	}
+		
 }
 
 /* Insert vm structure into process list sorted by address
