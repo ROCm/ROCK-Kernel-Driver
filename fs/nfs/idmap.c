@@ -43,6 +43,7 @@
 #include <linux/sched.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 #include <linux/nfs_fs_sb.h>

@@ -49,6 +49,7 @@
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/auth_gss.h>
 #include <linux/sunrpc/gss_err.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 #include <asm/uaccess.h>
 

@@ -30,6 +30,7 @@
 #include <linux/utsname.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 #include <linux/nfs.h>

@@ -25,6 +25,7 @@
 #include <linux/seq_file.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 static struct vfsmount *rpc_mount;
@@ -34,6 +35,8 @@ static struct file_system_type rpc_pipe_fs_type;
 
 
 static kmem_cache_t *rpc_inode_cachep;
+
+#define RPC_UPCALL_TIMEOUT (30*HZ)
 
 static void
 __rpc_purge_upcall(struct inode *inode, int err)
@@ -59,6 +62,18 @@ rpc_purge_upcall(struct inode *inode, int err)
 	up(&inode->i_sem);
 }
 
+static void
+rpc_timeout_upcall_queue(void *data)
+{
+	struct rpc_inode *rpci = (struct rpc_inode *)data;
+	struct inode *inode = &rpci->vfs_inode;
+
+	down(&inode->i_sem);
+	if (rpci->nreaders == 0 && !list_empty(&rpci->pipe))
+		__rpc_purge_upcall(inode, -ETIMEDOUT);
+	up(&inode->i_sem);
+}
+
 int
 rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 {
@@ -66,7 +81,13 @@ rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 	int res = 0;
 
 	down(&inode->i_sem);
-	if (rpci->nreaders || (rpci->flags & RPC_PIPE_WAIT_FOR_OPEN)) {
+	if (rpci->nreaders) {
+		list_add_tail(&msg->list, &rpci->pipe);
+		rpci->pipelen += msg->len;
+	} else if (rpci->flags & RPC_PIPE_WAIT_FOR_OPEN) {
+		if (list_empty(&rpci->pipe))
+			schedule_delayed_work(&rpci->queue_timeout,
+					RPC_UPCALL_TIMEOUT);
 		list_add_tail(&msg->list, &rpci->pipe);
 		rpci->pipelen += msg->len;
 	} else
@@ -80,6 +101,9 @@ void
 rpc_inode_setowner(struct inode *inode, void *private)
 {
 	struct rpc_inode *rpci = RPC_I(inode);
+
+	cancel_delayed_work(&rpci->queue_timeout);
+	flush_scheduled_work();
 	down(&inode->i_sem);
 	rpci->private = private;
 	if (!private)
@@ -133,7 +157,7 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 	down(&inode->i_sem);
 	if (filp->f_mode & FMODE_READ)
 		rpci->nreaders --;
-	if (!rpci->nreaders && !(rpci->flags & RPC_PIPE_WAIT_FOR_OPEN))
+	if (!rpci->nreaders)
 		__rpc_purge_upcall(inode, -EPIPE);
 	up(&inode->i_sem);
 	return 0;
@@ -769,6 +793,7 @@ init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		INIT_LIST_HEAD(&rpci->pipe);
 		rpci->pipelen = 0;
 		init_waitqueue_head(&rpci->waitq);
+		INIT_WORK(&rpci->queue_timeout, rpc_timeout_upcall_queue, rpci);
 		rpci->ops = NULL;
 	}
 }

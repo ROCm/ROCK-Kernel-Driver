@@ -21,6 +21,7 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 
