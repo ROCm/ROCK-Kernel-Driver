@@ -343,15 +343,11 @@ int setup_arg_pages(struct linux_binprm *bprm)
 struct file *open_exec(const char *name)
 {
 	struct nameidata nd;
-	struct inode *inode;
-	struct file *file;
-	int err = 0;
+	int err = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	struct file *file = ERR_PTR(err);
 
-	if (path_init(name, LOOKUP_FOLLOW, &nd))
-		err = path_walk(name, &nd);
-	file = ERR_PTR(err);
 	if (!err) {
-		inode = nd.dentry->d_inode;
+		struct inode *inode = nd.dentry->d_inode;
 		file = ERR_PTR(-EACCES);
 		if (!(nd.mnt->mnt_flags & MNT_NOEXEC) &&
 		    S_ISREG(inode->i_mode)) {

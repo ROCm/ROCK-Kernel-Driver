@@ -603,8 +603,7 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 	int err = 0;
 	
 	if (sunname->sun_path[0]) {
-		if (path_init(sunname->sun_path, LOOKUP_FOLLOW, &nd))
-			err = path_walk(sunname->sun_path, &nd);
+		err = path_lookup(sunname->sun_path, LOOKUP_FOLLOW, &nd);
 		if (err)
 			goto fail;
 		err = permission(nd.dentry->d_inode,MAY_WRITE);
@@ -690,8 +689,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		 * Get the parent directory, calculate the hash for last
 		 * component.
 		 */
-		if (path_init(sunaddr->sun_path, LOOKUP_PARENT, &nd))
-			err = path_walk(sunaddr->sun_path, &nd);
+		err = path_lookup(sunaddr->sun_path, LOOKUP_PARENT, &nd);
 		if (err)
 			goto out_mknod_parent;
 		/*

@@ -32,7 +32,6 @@ extern int presto_init_kml_file(struct presto_file_set *);
 
 int presto_walk(const char *name, struct nameidata *nd)
 {
-        int err;
         /* we do not follow symlinks to support symlink operations 
            correctly. The vfs should always hand us resolved dentries
            so we should not be required to use LOOKUP_FOLLOW. At the
@@ -41,12 +40,7 @@ int presto_walk(const char *name, struct nameidata *nd)
            XXX: This code implies that direct symlinks do not work. SHP
         */
         unsigned int flags = 0;
-
-        ENTRY;
-        err = 0;
-        if (path_init(name, flags, nd)) 
-                err = path_walk(name, nd);
-        return err;
+        return path_lookup(name, flags, nd);
 }
 
 inline struct presto_dentry_data *presto_d2d(struct dentry *dentry)
