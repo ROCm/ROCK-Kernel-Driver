@@ -1547,6 +1547,13 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
+	{
+		.vendor = 0x1106,
+		.device = 0x4161,
+		.codec_id = 0x56494161, /* VT1612A */
+		.name = "Soltek SL-75DRV5",
+		.type = AC97_TUNE_NONE
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x1106,
 		.device = 0x4161,
