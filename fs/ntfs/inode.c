@@ -1,7 +1,7 @@
 /**
  * inode.c - NTFS kernel inode handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001-2004 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -1046,7 +1046,7 @@ no_data_attr_special_case:
 	 * sizes of all non-resident attributes present to give us the Linux
 	 * correct size that should go into i_blocks (after division by 512).
 	 */
-	if (!NInoCompressed(ni))
+	if (S_ISDIR(vi->i_mode) || !NInoCompressed(ni))
 		vi->i_blocks = ni->allocated_size >> 9;
 	else
 		vi->i_blocks = ni->itype.compressed.size >> 9;
