@@ -895,21 +895,21 @@ S:	Maintained
 
 HEWLETT-PACKARD FIBRE CHANNEL 64-bit/66MHz PCI non-intelligent HBA
 P:	Chase Maupin
-M:	Chase Maupin (support@compaq.com)
- L:	compaqandlinux@cpqlin.van-dijk.net
- S:	Supported
+M:	chase.maupin@hp.com
+L:	iss_storagedev@hp.com
+S:	Maintained
  
 HEWLETT-PACKARD SMART2 RAID DRIVER
 P:	Francis Wiran
-M:	Francis Wiran <support@compaq.com>
- L:	compaqandlinux@cpqlin.van-dijk.net
- S:	Supported	
+M:	francis.wiran@hp.com
+L:	iss_storagedev@hp.com
+S:	Maintained
  
 HEWLETT-PACKARD SMART CISS RAID DRIVER 
-P:	Mike Miller, Michael Ni
-M:	Mike Miller, Michael Ni <support@compaq.com>
- L:	compaqandlinux@cpqlin.van-dijk.net
- S:	Supported 
+P:	Mike Miller
+M:	mike.miller@hp.com
+L:	iss_storagedev@hp.com
+S:	Supported
  
 HP100:	Driver for HP 10/100 Mbit/s Voice Grade Network Adapter Series
 P:	Jaroslav Kysela
