@@ -487,6 +487,12 @@ struct transaction_s
 	struct journal_head	*t_reserved_list;
 
 	/*
+	 * Doubly-linked circular list of all buffers under writeout during
+	 * commit [j_list_lock]
+	 */
+	struct journal_head	*t_locked_list;
+
+	/*
 	 * Doubly-linked circular list of all metadata buffers owned by this
 	 * transaction [j_list_lock]
 	 */
@@ -1079,7 +1085,8 @@ static inline int jbd_space_needed(journal_t *journal)
 #define BJ_Shadow	5	/* Buffer contents being shadowed to the log */
 #define BJ_LogCtl	6	/* Buffer contains log descriptors */
 #define BJ_Reserved	7	/* Buffer is reserved for access by journal */
-#define BJ_Types	8
+#define BJ_Locked	8	/* Locked for I/O during commit */
+#define BJ_Types	9
  
 extern int jbd_blocks_per_page(struct inode *inode);
 

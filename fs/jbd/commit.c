@@ -79,6 +79,21 @@ nope:
 }
 
 /*
+ * Try to acquire jbd_lock_bh_state() against the buffer, when j_list_lock is
+ * held.  For ranking reasons we must trylock.  If we lose, schedule away and
+ * return 0.  j_list_lock is dropped in this case.
+ */
+static int inverted_lock(journal_t *journal, struct buffer_head *bh)
+{
+	if (!jbd_trylock_bh_state(bh)) {
+		spin_unlock(&journal->j_list_lock);
+		schedule();
+		return 0;
+	}
+	return 1;
+}
+
+/*
  * journal_commit_transaction
  *
  * The primary function for committing a transaction to the log.  This
@@ -88,7 +103,6 @@ void journal_commit_transaction(journal_t *journal)
 {
 	transaction_t *commit_transaction;
 	struct journal_head *jh, *new_jh, *descriptor;
-	struct journal_head *next_jh, *last_jh;
 	struct buffer_head *wbuf[64];
 	int bufs;
 	int flags;
@@ -222,113 +236,110 @@ void journal_commit_transaction(journal_t *journal)
 	err = 0;
 	/*
 	 * Whenever we unlock the journal and sleep, things can get added
-	 * onto ->t_datalist, so we have to keep looping back to write_out_data
-	 * until we *know* that the list is empty.
+	 * onto ->t_sync_datalist, so we have to keep looping back to
+	 * write_out_data until we *know* that the list is empty.
 	 */
-write_out_data:
-
+	bufs = 0;
 	/*
 	 * Cleanup any flushed data buffers from the data list.  Even in
 	 * abort mode, we want to flush this out as soon as possible.
-	 *
-	 * We take j_list_lock to protect the lists from
-	 * journal_try_to_free_buffers().
 	 */
+write_out_data:
+	cond_resched();
 	spin_lock(&journal->j_list_lock);
 
-write_out_data_locked:
-	bufs = 0;
-	next_jh = commit_transaction->t_sync_datalist;
-	if (next_jh == NULL)
-		goto sync_datalist_empty;
-	last_jh = next_jh->b_tprev;
-
-	do {
+	while (commit_transaction->t_sync_datalist) {
 		struct buffer_head *bh;
 
-		jh = next_jh;
-		next_jh = jh->b_tnext;
+		jh = commit_transaction->t_sync_datalist;
+		commit_transaction->t_sync_datalist = jh->b_tnext;
 		bh = jh2bh(jh);
-		if (!buffer_locked(bh)) {
+		if (buffer_locked(bh)) {
+			BUFFER_TRACE(bh, "locked");
+			if (!inverted_lock(journal, bh))
+				goto write_out_data;
+			__journal_unfile_buffer(jh);
+			__journal_file_buffer(jh, jh->b_transaction, BJ_Locked);
+			jbd_unlock_bh_state(bh);
+			if (need_resched()) {
+				spin_unlock(&journal->j_list_lock);
+				goto write_out_data;
+			}
+		} else {
 			if (buffer_dirty(bh)) {
 				BUFFER_TRACE(bh, "start journal writeout");
-				atomic_inc(&bh->b_count);
+				get_bh(bh);
 				wbuf[bufs++] = bh;
-			} else {
-				BUFFER_TRACE(bh, "writeout complete: unfile");
-				/*
-				 * We have a lock ranking problem..
-				 */
-				if (!jbd_trylock_bh_state(bh)) {
+				if (bufs == ARRAY_SIZE(wbuf)) {
+					jbd_debug(2, "submit %d writes\n",
+							bufs);
 					spin_unlock(&journal->j_list_lock);
-					schedule();
+					ll_rw_block(WRITE, bufs, wbuf);
+					journal_brelse_array(wbuf, bufs);
+					bufs = 0;
 					goto write_out_data;
 				}
+			} else {
+				BUFFER_TRACE(bh, "writeout complete: unfile");
+				if (!inverted_lock(journal, bh))
+					goto write_out_data;
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
 				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
-				__brelse(bh);
-				if (need_resched() && commit_transaction->
-							t_sync_datalist) {
-					commit_transaction->t_sync_datalist =
-								next_jh;
-					if (bufs)
-						break;
+				put_bh(bh);
+				if (need_resched()) {
 					spin_unlock(&journal->j_list_lock);
-					cond_resched();
 					goto write_out_data;
 				}
 			}
 		}
-		if (bufs == ARRAY_SIZE(wbuf)) {
-			/*
-			 * Major speedup: start here on the next scan
-			 */
-			J_ASSERT(commit_transaction->t_sync_datalist != 0);
-			commit_transaction->t_sync_datalist = jh;
-			break;
-		}
-	} while (jh != last_jh);
+	}
 
-	if (bufs || need_resched()) {
-		jbd_debug(2, "submit %d writes\n", bufs);
+	if (bufs) {
 		spin_unlock(&journal->j_list_lock);
-		if (bufs)
-			ll_rw_block(WRITE, bufs, wbuf);
-		cond_resched();
+		ll_rw_block(WRITE, bufs, wbuf);
 		journal_brelse_array(wbuf, bufs);
 		spin_lock(&journal->j_list_lock);
-		goto write_out_data_locked;
 	}
 
 	/*
-	 * Wait for all previously submitted IO on the data list to complete.
+	 * Wait for all previously submitted IO to complete.
 	 */
-	jh = commit_transaction->t_sync_datalist;
-	if (jh == NULL)
-		goto sync_datalist_empty;
-
-	do {
+	while (commit_transaction->t_locked_list) {
 		struct buffer_head *bh;
-		jh = jh->b_tprev;	/* Wait on the last written */
+
+		jh = commit_transaction->t_locked_list->b_tprev;
 		bh = jh2bh(jh);
+		get_bh(bh);
 		if (buffer_locked(bh)) {
-			get_bh(bh);
 			spin_unlock(&journal->j_list_lock);
 			wait_on_buffer(bh);
 			if (unlikely(!buffer_uptodate(bh)))
 				err = -EIO;
-			put_bh(bh);
-			/* the journal_head may have been removed now */
-			goto write_out_data;
-		} else if (buffer_dirty(bh)) {
-			goto write_out_data_locked;
+			spin_lock(&journal->j_list_lock);
 		}
-	} while (jh != commit_transaction->t_sync_datalist);
-	goto write_out_data_locked;
-
-sync_datalist_empty:
+		if (!inverted_lock(journal, bh)) {
+			put_bh(bh);
+			spin_lock(&journal->j_list_lock);
+			continue;
+		}
+		if (buffer_jbd(bh) && jh->b_jlist == BJ_Locked) {
+			__journal_unfile_buffer(jh);
+			jh->b_transaction = NULL;
+			jbd_unlock_bh_state(bh);
+			journal_remove_journal_head(bh);
+			put_bh(bh);
+		} else {
+			jbd_unlock_bh_state(bh);
+		}
+		put_bh(bh);
+		if (need_resched()) {
+			spin_unlock(&journal->j_list_lock);
+			cond_resched();
+			spin_lock(&journal->j_list_lock);
+		}
+	}
 	spin_unlock(&journal->j_list_lock);
 
 	journal_write_revoke_records(journal, commit_transaction);

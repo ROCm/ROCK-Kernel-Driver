@@ -1010,7 +1010,8 @@ int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 			 * the write() data.
 			 */
 			if (jh->b_jlist != BJ_None &&
-					jh->b_jlist != BJ_SyncData) {
+					jh->b_jlist != BJ_SyncData &&
+					jh->b_jlist != BJ_Locked) {
 				JBUFFER_TRACE(jh, "Not stealing");
 				goto no_journal;
 			}
@@ -1048,7 +1049,7 @@ int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 		 * committing transaction, so might still be left on that
 		 * transaction's metadata lists.
 		 */
-		if (jh->b_jlist != BJ_SyncData) {
+		if (jh->b_jlist != BJ_SyncData && jh->b_jlist != BJ_Locked) {
 			JBUFFER_TRACE(jh, "not on correct data list: unfile");
 			J_ASSERT_JH(jh, jh->b_jlist != BJ_Shadow);
 			__journal_unfile_buffer(jh);
@@ -1539,6 +1540,9 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	case BJ_Reserved:
 		list = &transaction->t_reserved_list;
 		break;
+	case BJ_Locked:
+		list = &transaction->t_locked_list;
+		break;
 	}
 
 	__blist_del_buffer(list, jh);
@@ -1576,7 +1580,7 @@ __journal_try_to_free_buffer(journal_t *journal, struct buffer_head *bh)
 
 	spin_lock(&journal->j_list_lock);
 	if (jh->b_transaction != 0 && jh->b_cp_transaction == 0) {
-		if (jh->b_jlist == BJ_SyncData) {
+		if (jh->b_jlist == BJ_SyncData || jh->b_jlist == BJ_Locked) {
 			/* A written-back ordered data buffer */
 			JBUFFER_TRACE(jh, "release data");
 			__journal_unfile_buffer(jh);
@@ -1984,6 +1988,9 @@ void __journal_file_buffer(struct journal_head *jh,
 		break;
 	case BJ_Reserved:
 		list = &transaction->t_reserved_list;
+		break;
+	case BJ_Locked:
+		list =  &transaction->t_locked_list;
 		break;
 	}
 
