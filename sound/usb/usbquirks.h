@@ -501,6 +501,15 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		}
 	}
 },
+{
+	USB_DEVICE(0x0582, 0x0052),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "EDIROL",
+		.product_name = "UM-1SX",
+		.ifnum = 0,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
+},
 
 /* Midiman/M-Audio devices */
 {
