@@ -1667,6 +1667,8 @@ static void serial8250_release_port(struct uart_port *port)
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned long start, offset = 0, size = 0;
 
+	if (!(up->port.flags & UPF_RESOURCES))
+		return;
 	if (up->port.type == PORT_RSA) {
 		offset = UART_RSA_BASE << up->port.regshift;
 		size = 8;
