@@ -188,8 +188,8 @@ acpi_bus_match (
 
 		if (strlen(cid) && strstr(driver->ids,cid))
 			goto Done;
-		error = -ENOENT;
 	}
+	error = -ENOENT;
 
  Done:
 	if (buffer.pointer)
@@ -584,11 +584,11 @@ int acpi_device_set_context(struct acpi_device * device, int type)
 
 void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle, int type)
 {
+#ifdef CONFIG_ACPI_DEBUG
 	char		*type_string = NULL;
 	char		name[80] = {'?','\0'};
 	acpi_buffer	buffer = {sizeof(name), name};
 
-#ifdef CONFIG_ACPI_DEBUG
 	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 
 	switch (type) {
