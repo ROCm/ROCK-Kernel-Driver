@@ -303,6 +303,7 @@ static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *in
 
 	s->cis_mem.sys_start = res->start;
 	s->cis_mem.sys_stop = res->end;
+	s->cis_mem.res = res;
 	s->cis_virt = ioremap(res->start, s->map_size);
 	if (s->cis_virt) {
 		ret = pcmcia_validate_cis(s->clients, info);
@@ -313,6 +314,7 @@ static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *in
 	}
 	s->cis_mem.sys_start = 0;
 	s->cis_mem.sys_stop = 0;
+	s->cis_mem.res = NULL;
 	if ((ret != 0) || (info->Chains == 0))
 		return 0;
 	return 1;
@@ -332,6 +334,7 @@ static int checksum(struct pcmcia_socket *s, struct resource *res)
 		map.speed = 0;
 		map.sys_start = res->start;
 		map.sys_stop = res->end;
+		map.res = res;
 		map.card_start = 0;
 		s->ops->set_mem_map(s, &map);
 
@@ -661,8 +664,8 @@ struct resource *find_io_region(unsigned long base, int num,
 	return res;
 }
 
-int find_mem_region(u_long *base, u_long num, u_long align,
-		    int low, char *name, struct pcmcia_socket *s)
+struct resource *find_mem_region(u_long base, u_long num, u_long align,
+				 int low, char *name, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_MEM, name);
 	struct pcmcia_align_data data;
@@ -672,16 +675,16 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 	low = low || !(s->features & SS_CAP_PAGE_REGS);
 
 	data.mask = align - 1;
-	data.offset = *base & data.mask;
+	data.offset = base & data.mask;
 	data.map = &mem_db;
 
 	for (i = 0; i < 2; i++) {
 		if (low) {
 			max = 0x100000UL;
-			min = *base < max ? *base : 0;
+			min = base < max ? base : 0;
 		} else {
 			max = ~0UL;
-			min = 0x100000UL + *base;
+			min = 0x100000UL + base;
 		}
 
 		down(&rsrc_sem);
@@ -702,10 +705,9 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 
 	if (ret != 0) {
 		kfree(res);
-	} else {
-		*base = res->start;
+		res = NULL;
 	}
-	return ret;
+	return res;
 }
 
 /*======================================================================

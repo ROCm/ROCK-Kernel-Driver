@@ -1100,8 +1100,8 @@ int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
     if (w == MAX_WIN)
 	return CS_NO_MORE_ITEMS;
     win = &s->win[w];
-    req->Base = win->ctl.sys_start;
-    req->Size = win->ctl.sys_stop - win->ctl.sys_start + 1;
+    req->Base = win->ctl.res->start;
+    req->Size = win->ctl.res->end - win->ctl.res->start + 1;
     req->AccessSpeed = win->ctl.speed;
     req->Attributes = 0;
     if (win->ctl.flags & MAP_ATTRIB)
@@ -1548,8 +1548,11 @@ int pcmcia_release_window(window_handle_t win)
     s->state &= ~SOCKET_WIN_REQ(win->index);
 
     /* Release system memory */
-    if(!(s->features & SS_CAP_STATIC_MAP))
-	release_mem_region(win->ctl.sys_start, win->ctl.sys_stop - win->ctl.sys_start + 1);
+    if (win->ctl.res) {
+	release_resource(win->ctl.res);
+	kfree(win->ctl.res);
+	win->ctl.res = NULL;
+    }
     win->handle->state &= ~CLIENT_WIN_REQ(win->index);
 
     win->magic = 0;
@@ -1871,14 +1874,19 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     win->index = w;
     win->handle = *handle;
     win->sock = s;
-    win->ctl.sys_start = req->Base;
 
-    if (!(s->features & SS_CAP_STATIC_MAP) &&
-	find_mem_region(&win->ctl.sys_start, req->Size, align,
-			(req->Attributes & WIN_MAP_BELOW_1MB),
-			(*handle)->dev_info, s))
-	return CS_IN_USE;
-    win->ctl.sys_stop = win->ctl.sys_start + req->Size - 1;
+    if (!(s->features & SS_CAP_STATIC_MAP)) {
+	win->ctl.res = find_mem_region(req->Base, req->Size, align,
+				       (req->Attributes & WIN_MAP_BELOW_1MB),
+				       (*handle)->dev_info, s);
+	if (!win->ctl.res)
+	    return CS_IN_USE;
+	win->ctl.sys_start = win->ctl.res->start;
+	win->ctl.sys_stop = win->ctl.res->end;
+    } else {
+	win->ctl.sys_start = req->Base;
+	win->ctl.sys_stop = req->Base + req->Size - 1;
+    }
     (*handle)->state |= CLIENT_WIN_REQ(w);
 
     /* Configure the socket controller */

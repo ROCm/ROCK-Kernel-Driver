@@ -420,12 +420,12 @@ static void set_bridge_state(int sock)
 static int i82092aa_init(struct pcmcia_socket *sock)
 {
 	int i;
+	struct resource res = { .start = 0, .end = 0x0fff };
         pccard_io_map io = { 0, 0, 0, 0, 1 };
-        pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
+	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff, };
         
         enter("i82092aa_init");
                         
-        mem.sys_stop = 0x0fff;
         for (i = 0; i < 2; i++) {
         	io.map = i;
                 i82092aa_set_io_map(sock, &io);

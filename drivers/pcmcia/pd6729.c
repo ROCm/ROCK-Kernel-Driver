@@ -563,10 +563,10 @@ static int pd6729_suspend(struct pcmcia_socket *sock)
 static int pd6729_init(struct pcmcia_socket *sock)
 {
 	int i;
+	struct resource res = { .end = 0x0fff };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
+	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff };
 
-	mem.sys_stop = 0x0fff;
 	pd6729_set_socket(sock, &dead_socket);
 	for (i = 0; i < 2; i++) {
 		io.map = i;

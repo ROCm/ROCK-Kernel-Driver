@@ -445,10 +445,10 @@ static void yenta_interrupt_wrapper(unsigned long data)
 static void yenta_clear_maps(struct yenta_socket *socket)
 {
 	int i;
+	struct resource res = { .start = 0, .end = 0x0fff };
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
-	pccard_mem_map mem = { 0, 0, 0, 0, 0, 0 };
+	pccard_mem_map mem = { .res = &res, .sys_stop = 0x0fff, };
 
-	mem.sys_stop = 0x0fff;
 	yenta_set_socket(&socket->socket, &dead_socket);
 	for (i = 0; i < 2; i++) {
 		io.map = i;

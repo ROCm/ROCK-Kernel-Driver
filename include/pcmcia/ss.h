@@ -105,6 +105,7 @@ typedef struct pccard_mem_map {
     u_short	speed;
     u_long	sys_start, sys_stop;
     u_int	card_start;
+    struct resource *res;
 } pccard_mem_map;
 
 typedef struct cb_bridge_map {

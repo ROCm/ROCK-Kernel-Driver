@@ -185,7 +185,7 @@ struct resource *find_io_region(unsigned long base, int num, unsigned long align
 		   char *name, struct pcmcia_socket *s);
 int adjust_io_region(struct resource *res, unsigned long r_start,
 		     unsigned long r_end, struct pcmcia_socket *s);
-int find_mem_region(u_long *base, u_long num, u_long align,
+struct resource *find_mem_region(u_long base, u_long num, u_long align,
 		    int low, char *name, struct pcmcia_socket *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
