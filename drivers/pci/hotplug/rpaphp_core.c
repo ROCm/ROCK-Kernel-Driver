@@ -278,6 +278,36 @@ static int is_dr_dn(struct device_node *dn, int **indexes, int **names, int **ty
 	return get_dn_properties(dn->parent, indexes, names, types, power_domains);
 }
 
+char *rpaphp_get_drc_name(struct device_node *dn)
+{
+        char *name, *ptr = NULL;
+        int *drc_names, *drc_indexes, i;
+	struct device_node *parent = dn->parent;
+	u32 *my_drc_index;
+
+	my_drc_index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
+	if (!my_drc_index)
+		return NULL;
+
+	if (!parent)
+		return NULL;
+
+        drc_names = (int *) get_property(parent, "ibm,drc-names", NULL);
+        drc_indexes = (int *) get_property(parent, "ibm,drc-indexes", NULL);
+        if (!drc_names || !drc_indexes)
+		return NULL;
+
+	name = (char *) &drc_names[1];
+	for (i = 0; i < drc_indexes[0]; i++, name += (strlen(name) + 1)) {
+		if (drc_indexes[i + 1] == *my_drc_index) {
+                	ptr = (char *) name;
+			break;
+		}
+	}
+
+        return ptr;
+}
+
 static inline int is_vdevice_root(struct device_node *dn)
 {
 	return !strcmp(dn->name, "vdevice");
@@ -479,3 +509,4 @@ module_exit(rpaphp_exit);
 EXPORT_SYMBOL_GPL(rpaphp_add_slot);
 EXPORT_SYMBOL_GPL(rpaphp_remove_slot);
 EXPORT_SYMBOL_GPL(rpaphp_slot_head);
+EXPORT_SYMBOL_GPL(rpaphp_get_drc_name);

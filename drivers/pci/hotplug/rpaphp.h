@@ -129,6 +129,7 @@ extern struct hotplug_slot *rpaphp_find_hotplug_slot(struct pci_dev *dev);
 /* rpaphp_core.c */
 extern int rpaphp_add_slot(struct device_node *dn);
 extern int rpaphp_remove_slot(struct slot *slot);
+extern char *rpaphp_get_drc_name(struct device_node *dn);
 
 /* rpaphp_vio.c */
 extern int rpaphp_get_vio_adapter_status(struct slot *slot, int is_init, u8 * value);

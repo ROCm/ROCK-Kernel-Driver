@@ -67,31 +67,6 @@ static int setup_vio_hotplug_slot_info(struct slot *slot)
 	return 0;
 }
 
-static char *get_my_drc_name(struct device_node *dn, u32 my_drc_index)
-{
-        char *name, *ptr = NULL;
-        int *drc_names, *drc_indexes, i;
-	struct device_node *parent = dn->parent;	
-	
-	if (!parent)
-		return ptr;
-	
-        drc_names = (int *) get_property(parent, "ibm,drc-names", NULL);
-        drc_indexes = (int *) get_property(parent, "ibm,drc-indexes", NULL);
-        if (!drc_names || !drc_indexes)
-		return ptr;
-
-	name = (char *) &drc_names[1];
-	for (i = 0; i < drc_indexes[0]; i++, name += (strlen(name) + 1)) {
-		if (drc_indexes[i + 1] == my_drc_index) {
-                	ptr = (char *) name;
-			break;
-		}
-	}
-
-        return ptr;
-}
-
 int register_vio_slot(struct device_node *dn)
 {
 	u32 *index;
@@ -99,11 +74,11 @@ int register_vio_slot(struct device_node *dn)
 	int rc = 1;
 	struct slot *slot = NULL;
 	
+	name = rpaphp_get_drc_name(dn);
+	if (!name)
+		goto exit_rc;
 	index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
 	if (!index)
-		goto exit_rc;
-	name = get_my_drc_name(dn, *index);
-	if (!name)
 		goto exit_rc;
 	if (!(slot = alloc_slot_struct(dn, *index, name, 0))) {
 		rc = -ENOMEM;
