@@ -54,6 +54,7 @@
 #include <asm/mach-types.h>
 #include <asm/unaligned.h>
 #include <asm/hardware.h>
+#include <asm/arch/pxa-regs.h>
 
 #include <linux/usb_ch9.h>
 #include <linux/usb_gadget.h>

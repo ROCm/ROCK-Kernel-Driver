@@ -631,12 +631,10 @@ void paging_init(void)
 	unsigned long max_dma;
 	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long zholes_size[MAX_NR_ZONES];
-	unsigned long max_gap, pfn_offset = 0;
+	unsigned long pfn_offset = 0;
 	int node;
 
 	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	max_gap = 0;
-	efi_memmap_walk(find_largest_hole, &max_gap);
 
 	/* so min() will work in count_node_pages */
 	for (node = 0; node < numnodes; node++)

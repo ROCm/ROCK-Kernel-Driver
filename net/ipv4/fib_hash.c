@@ -43,6 +43,8 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 
+#include "fib_lookup.h"
+
 static kmem_cache_t *fn_hash_kmem;
 static kmem_cache_t *fn_alias_kmem;
 
@@ -51,17 +53,6 @@ struct fib_node {
 	struct list_head	fn_alias;
 	u32			fn_key;
 };
-
-struct fib_alias {
-	struct list_head	fa_list;
-	struct fib_info		*fa_info;
-	u8			fa_tos;
-	u8			fa_type;
-	u8			fa_scope;
-	u8			fa_state;
-};
-
-#define FN_S_ACCESSED	1
 
 struct fn_zone {
 	struct fn_zone		*fz_next;	/* Next not empty zone	*/
@@ -265,32 +256,14 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 
 		head = &fz->fz_hash[fn_hash(k, fz)];
 		hlist_for_each_entry(f, node, head, fn_hash) {
-			struct fib_alias *fa;
-
 			if (f->fn_key != k)
 				continue;
 
-			list_for_each_entry(fa, &f->fn_alias, fa_list) {
-				if (fa->fa_tos &&
-				    fa->fa_tos != flp->fl4_tos)
-					continue;
-				if (fa->fa_scope < flp->fl4_scope)
-					continue;
-
-				fa->fa_state |= FN_S_ACCESSED;
-
-				err = fib_semantic_match(fa->fa_type,
-							 fa->fa_info,
-							 flp, res);
-				if (err == 0) {
-					res->type = fa->fa_type;
-					res->scope = fa->fa_scope;
-					res->prefixlen = fz->fz_order;
-					goto out;
-				}
-				if (err < 0)
-					goto out;
-			}
+			err = fib_semantic_match(&f->fn_alias,
+						 flp, res,
+						 fz->fz_order);
+			if (err <= 0)
+				goto out;
 		}
 	}
 	err = 1;
@@ -358,7 +331,7 @@ fn_hash_select_default(struct fib_table *tb, const struct flowi *flp, struct fib
 			if (!next_fi->fib_nh[0].nh_gw ||
 			    next_fi->fib_nh[0].nh_scope != RT_SCOPE_LINK)
 				continue;
-			fa->fa_state |= FN_S_ACCESSED;
+			fa->fa_state |= FA_S_ACCESSED;
 
 			if (fi == NULL) {
 				if (next_fi != res->fi)
@@ -521,11 +494,11 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 			fa->fa_type = type;
 			fa->fa_scope = r->rtm_scope;
 			state = fa->fa_state;
-			fa->fa_state &= ~FN_S_ACCESSED;
+			fa->fa_state &= ~FA_S_ACCESSED;
 			write_unlock_bh(&fib_hash_lock);
 
 			fib_release_info(fi_drop);
-			if (state & FN_S_ACCESSED)
+			if (state & FA_S_ACCESSED)
 				rt_cache_flush(-1);
 			return 0;
 		}
@@ -669,7 +642,7 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		}
 		write_unlock_bh(&fib_hash_lock);
 
-		if (fa->fa_state & FN_S_ACCESSED)
+		if (fa->fa_state & FA_S_ACCESSED)
 			rt_cache_flush(-1);
 		fn_free_alias(fa);
 		if (kill_fn) {
