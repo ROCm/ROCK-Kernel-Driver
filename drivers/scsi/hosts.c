@@ -234,27 +234,18 @@ int scsi_remove_host(struct Scsi_Host *shost)
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
 	Scsi_Host_Template *sht = shost->hostt;
-	struct scsi_device *sdev;
-	int error = 0, saved_error = 0;
+	int error;
 
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
 	error = scsi_sysfs_add_host(shost, dev);
-	if (error)
-		return error;
-
-	scsi_proc_host_add(shost);
-
-	scsi_scan_host(shost);
+	if (!error) {
+		scsi_proc_host_add(shost);
+		scsi_scan_host(shost);
+	};
 			
-	list_for_each_entry (sdev, &shost->my_devices, siblings) {
-		error = scsi_attach_device(sdev);
-		if (error)
-			saved_error = error;
-	}
-
-	return saved_error;
+	return error;
 }
 
 /**

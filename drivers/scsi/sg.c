@@ -112,24 +112,17 @@ static int sg_allow_dio = SG_ALLOW_DIO_DEF;
 
 #define SG_DEV_ARR_LUMP 6	/* amount to over allocate sg_dev_arr by */
 
-static int sg_attach(Scsi_Device *);
-static void sg_detach(Scsi_Device *);
+static int sg_add(struct class_device *);
+static void sg_remove(struct class_device *);
 
 static Scsi_Request *dummy_cmdp;	/* only used for sizeof */
 
 static rwlock_t sg_dev_arr_lock = RW_LOCK_UNLOCKED;	/* Also used to lock
 							   file descriptor list for device */
 
-static struct Scsi_Device_Template sg_template = {
-	.module = THIS_MODULE,
-	.list = LIST_HEAD_INIT(sg_template.list),
-	.name = "generic",
-	.scsi_type = 0xff,
-	.attach = sg_attach,
-	.detach = sg_detach,
-	.scsi_driverfs_driver = {
-		.name = "sg",
-	},
+static struct class_interface sg_interface = {
+	.add		= sg_add,
+	.remove		= sg_remove,
 };
 
 typedef struct sg_scatter_hold { /* holding area for scsi scatter gather info */
@@ -180,15 +173,13 @@ typedef struct sg_fd {		/* holds the state of a file descriptor */
 } Sg_fd;
 
 typedef struct sg_device { /* holds the state of each scsi generic device */
-	struct Scsi_Device_Template *driver;
-	Scsi_Device *device;
+	struct scsi_device *device;
 	wait_queue_head_t o_excl_wait;	/* queue open() when O_EXCL in use */
 	int sg_tablesize;	/* adapter's max scatter-gather table size */
 	Sg_fd *headfp;		/* first open fd belonging to this device */
 	volatile char detached;	/* 0->attached, 1->detached pending removal */
 	volatile char exclude;	/* opened for exclusive access */
 	char sgdebug;		/* 0->off, 1->sense, 9->dump dev, 10-> all devs */
-	struct device sg_driverfs_dev;
 	struct gendisk *disk;
 } Sg_device;
 
@@ -1328,27 +1319,10 @@ static struct file_operations sg_fops = {
 	.fasync = sg_fasync,
 };
 
-/* Driverfs file support */
-static ssize_t
-sg_device_kdev_read(struct device *driverfs_dev, char *page)
-{
-	Sg_device *sdp = list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
-	return sprintf(page, "%x\n", MKDEV(sdp->disk->major,
-					   sdp->disk->first_minor));
-}
-static DEVICE_ATTR(kdev,S_IRUGO,sg_device_kdev_read,NULL);
-
-static ssize_t
-sg_device_type_read(struct device *driverfs_dev, char *page)
-{
-	return sprintf(page, "CHR\n");
-}
-
-static DEVICE_ATTR(type,S_IRUGO,sg_device_type_read,NULL);
-
 static int
-sg_attach(Scsi_Device * scsidp)
+sg_add(struct class_device *cdev)
 {
+	struct scsi_device *scsidp = to_scsi_device(cdev->dev);
 	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
@@ -1416,8 +1390,6 @@ find_empty_slot:
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
 	memset(sdp, 0, sizeof(*sdp));
-	sdp->driver = &sg_template;
-	disk->private_data = &sdp->driver;
 	sprintf(disk->disk_name, "sg%d", k);
 	disk->major = SCSI_GENERIC_MAJOR;
 	disk->first_minor = k;
@@ -1430,40 +1402,20 @@ find_empty_slot:
 	sdp->detached = 0;
 	sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
 
-	memset(&sdp->sg_driverfs_dev, 0, sizeof (struct device));
-	snprintf(sdp->sg_driverfs_dev.bus_id, BUS_ID_SIZE, "%s:gen",
-		scsidp->sdev_driverfs_dev.bus_id);
-	snprintf(sdp->sg_driverfs_dev.name, DEVICE_NAME_SIZE, "%sgeneric",
-		scsidp->sdev_driverfs_dev.name);
-	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
-	sdp->sg_driverfs_dev.bus = scsidp->sdev_driverfs_dev.bus;
-
 	sg_nr_dev++;
 	sg_dev_arr[k] = sdp;
 	write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
-
-	device_register(&sdp->sg_driverfs_dev);
-	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_type);
-	device_create_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
 
 	devfs_mk_cdev(MKDEV(SCSI_GENERIC_MAJOR, k),
 			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
 			"%s/generic", scsidp->devfs_name);
 
-	switch (scsidp->type) {
-	case TYPE_DISK:
-	case TYPE_MOD:
-	case TYPE_ROM:
-	case TYPE_WORM:
-	case TYPE_TAPE:
-		break;
-	default:
-		printk(KERN_NOTICE
-		       "Attached scsi generic sg%d at scsi%d, channel"
-		       " %d, id %d, lun %d,  type %d\n", k,
-		       scsidp->host->host_no, scsidp->channel, scsidp->id,
-		       scsidp->lun, scsidp->type);
-	}
+	printk(KERN_NOTICE
+	       "Attached scsi generic sg%d at scsi%d, channel"
+	       " %d, id %d, lun %d,  type %d\n", k,
+	       scsidp->host->host_no, scsidp->channel, scsidp->id,
+	       scsidp->lun, scsidp->type);
+
 	return 0;
 
 out:
@@ -1472,8 +1424,9 @@ out:
 }
 
 static void
-sg_detach(Scsi_Device * scsidp)
+sg_remove(struct class_device *cdev)
 {
+	struct scsi_device *scsidp = to_scsi_device(cdev->dev);
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
 	Sg_fd *sfp;
@@ -1524,9 +1477,6 @@ sg_detach(Scsi_Device * scsidp)
 
 	if (sdp) {
 		devfs_remove("%s/generic", scsidp->devfs_name);
-		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_type);
-		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
-		device_unregister(&sdp->sg_driverfs_dev);
 		put_disk(sdp->disk);
 		sdp->disk = NULL;
 		if (NULL == sdp->headfp)
@@ -1550,64 +1500,6 @@ MODULE_LICENSE("GPL");
 
 MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 
-static ssize_t sg_allow_dio_show(struct device_driver * ddp, char * buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", sg_allow_dio);
-}
-static ssize_t sg_allow_dio_store(struct device_driver * ddp,
-				  const char * buf, size_t count)
-{
-	if (1 == sscanf(buf, "%d", &sg_allow_dio)) {
-		sg_allow_dio = sg_allow_dio ? 1 : 0;
-		return count;
-	}
-	return -EINVAL;
-}
-DRIVER_ATTR(allow_dio, S_IRUGO | S_IWUSR, sg_allow_dio_show, 
-	    sg_allow_dio_store)
-
-static ssize_t sg_def_reserved_show(struct device_driver * ddp, char * buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", sg_big_buff);
-}
-static ssize_t sg_def_reserved_store(struct device_driver * ddp,
-				     const char * buf, size_t count)
-{
-	if (1 == sscanf(buf, "%d", &def_reserved_size)) {
-		if (def_reserved_size >= 0) {
-			sg_big_buff = def_reserved_size;
-			return count;
-		}
-	}
-	return -EINVAL;
-}
-DRIVER_ATTR(def_reserved_size, S_IRUGO | S_IWUSR, sg_def_reserved_show, 
-	    sg_def_reserved_store)
-
-static ssize_t sg_version_show(struct device_driver * ddp, char * buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%s\n", sg_version_str);
-}
-DRIVER_ATTR(version, S_IRUGO, sg_version_show, NULL)
-
-static void do_create_driverfs_files(void)
-{
-	struct device_driver * driverfs = &sg_template.scsi_driverfs_driver;
-
-	driver_create_file(driverfs, &driver_attr_allow_dio);
-	driver_create_file(driverfs, &driver_attr_def_reserved_size);
-	driver_create_file(driverfs, &driver_attr_version);
-}
-
-static void do_remove_driverfs_files(void)
-{
-	struct device_driver * driverfs = &sg_template.scsi_driverfs_driver;
-
-	driver_remove_file(driverfs, &driver_attr_version);
-	driver_remove_file(driverfs, &driver_attr_def_reserved_size);
-	driver_remove_file(driverfs, &driver_attr_allow_dio);
-}
-
 static int __init
 init_sg(void)
 {
@@ -1619,24 +1511,22 @@ init_sg(void)
 	rc = register_chrdev(SCSI_GENERIC_MAJOR, "sg", &sg_fops);
 	if (rc)
 		return rc;
-	rc = scsi_register_device(&sg_template);
+	rc = scsi_register_interface(&sg_interface);
 	if (rc)
 		return rc;
 #ifdef CONFIG_PROC_FS
 	sg_proc_init();
 #endif				/* CONFIG_PROC_FS */
-	do_create_driverfs_files();
 	return 0;
 }
 
 static void __exit
 exit_sg(void)
 {
-	do_remove_driverfs_files();
 #ifdef CONFIG_PROC_FS
 	sg_proc_cleanup();
 #endif				/* CONFIG_PROC_FS */
-	scsi_unregister_device(&sg_template);
+	scsi_unregister_interface(&sg_interface);
 	unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
 	if (sg_dev_arr != NULL) {
 		vfree((char *) sg_dev_arr);
