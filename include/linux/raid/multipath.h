@@ -2,7 +2,6 @@
 #define _MULTIPATH_H
 
 #include <linux/raid/md.h>
-#include <linux/bio.h>
 
 struct multipath_info {
 	mdk_rdev_t	*rdev;

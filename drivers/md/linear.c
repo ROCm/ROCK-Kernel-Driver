@@ -20,7 +20,6 @@
 
 #include <linux/raid/md.h>
 #include <linux/slab.h>
-#include <linux/bio.h>
 #include <linux/raid/linear.h>
 
 #define MAJOR_NR MD_MAJOR
@@ -67,7 +66,18 @@ static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio
 	dev0 = which_dev(mddev, bio->bi_sector);
 	maxsectors = (dev0->size << 1) - (bio->bi_sector - (dev0->offset<<1));
 
-	return (maxsectors - bio_sectors) << 9;
+	if (maxsectors < bio_sectors)
+		maxsectors = 0;
+	else
+		maxsectors -= bio_sectors;
+
+	if (maxsectors <= (PAGE_SIZE >> 9 ) && bio_sectors == 0)
+		return biovec->bv_len;
+	/* The bytes available at this offset could be really big,
+	 * so we cap at 2^31 to avoid overflow */
+	if (maxsectors > (1 << (31-9)))
+		return 1<<31;
+	return maxsectors << 9;
 }
 
 static int linear_run (mddev_t *mddev)
@@ -209,6 +219,23 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		bio_io_error(bio, bio->bi_size);
 		return 0;
 	}
+	if (unlikely(bio->bi_sector + (bio->bi_size >> 9) >
+		     (tmp_dev->offset + tmp_dev->size)<<1)) {
+		/* This bio crosses a device boundary, so we have to
+		 * split it.
+		 */
+		struct bio_pair *bp;
+		bp = bio_split(bio, bio_split_pool, 
+			       (bio->bi_sector + (bio->bi_size >> 9) -
+				(tmp_dev->offset + tmp_dev->size))<<1);
+		if (linear_make_request(q, &bp->bio1))
+			generic_make_request(&bp->bio1);
+		if (linear_make_request(q, &bp->bio2))
+			generic_make_request(&bp->bio2);
+		bio_pair_release(bp);
+		return 0;
+	}
+		    
 	bio->bi_bdev = tmp_dev->rdev->bdev;
 	bio->bi_sector = bio->bi_sector - (tmp_dev->offset << 1) + tmp_dev->rdev->data_offset;
 

@@ -40,6 +40,7 @@
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
 #include <linux/blkpg.h>
+#include <linux/bio.h>
 
 /*
  * 'md_p.h' holds the 'physical' layout of RAID devices

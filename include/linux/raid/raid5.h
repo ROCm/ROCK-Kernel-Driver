@@ -3,7 +3,6 @@
 
 #include <linux/raid/md.h>
 #include <linux/raid/xor.h>
-#include <linux/bio.h>
 
 /*
  *

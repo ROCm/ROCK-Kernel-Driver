@@ -20,7 +20,6 @@
 
 #include <linux/module.h>
 #include <linux/raid/raid0.h>
-#include <linux/bio.h>
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
@@ -179,15 +178,17 @@ static int create_strip_zones (mddev_t *mddev)
 static int raid0_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_vec *biovec)
 {
 	mddev_t *mddev = q->queuedata;
-	sector_t sector;
-	unsigned int chunk_sectors;
-	unsigned int bio_sectors;
+	sector_t sector = bio->bi_sector;
+	int max;
+	unsigned int chunk_sectors = mddev->chunk_size >> 9;
+	unsigned int bio_sectors = bio->bi_size >> 9;
 
-	chunk_sectors = mddev->chunk_size >> 9;
-	sector = bio->bi_sector;
-	bio_sectors = bio->bi_size >> 9;
-
-	return (chunk_sectors - ((sector & (chunk_sectors - 1)) + bio_sectors)) << 9;
+	max =  (chunk_sectors - ((sector & (chunk_sectors - 1)) + bio_sectors)) << 9;
+	if (max < 0) max = 0; /* bio_add cannot handle a negative return */
+	if (max <= biovec->bv_len && bio_sectors == 0)
+		return biovec->bv_len;
+	else 
+		return max;
 }
 
 static int raid0_run (mddev_t *mddev)
@@ -322,9 +323,23 @@ static int raid0_make_request (request_queue_t *q, struct bio *bio)
 		hash = conf->hash_table + x;
 	}
 
-	/* Sanity check -- queue functions should prevent this happening */
-	if (unlikely(chunk_size < (block & (chunk_size - 1)) + (bio->bi_size >> 10)))
-		goto bad_map;
+	if (unlikely(chunk_size < (block & (chunk_size - 1)) + (bio->bi_size >> 10))) {
+		struct bio_pair *bp;
+		/* Sanity check -- queue functions should prevent this happening */
+		if (bio->bi_vcnt != 1 ||
+		    bio->bi_idx != 0)
+			goto bad_map;
+		/* This is a one page bio that upper layers
+		 * refuse to split for us, so we need to split it.
+		 */
+		bp = bio_split(bio, bio_split_pool, (chunk_size - (block & (chunk_size - 1)))<<1 );
+		if (raid0_make_request(q, &bp->bio1))
+			generic_make_request(&bp->bio1);
+		if (raid0_make_request(q, &bp->bio2))
+			generic_make_request(&bp->bio2);
+		bio_pair_release(bp);
+		return 0;
+	}
  
 	if (!hash)
 		goto bad_hash;

@@ -20,7 +20,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/raid/raid5.h>
-#include <linux/bio.h>
 #include <linux/highmem.h>
 #include <asm/bitops.h>
 #include <asm/atomic.h>
