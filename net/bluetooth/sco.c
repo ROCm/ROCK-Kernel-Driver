@@ -371,7 +371,7 @@ static void sco_sock_kill(struct sock *sk)
 
 	/* Kill poor orphan */
 	bt_sock_unlink(&sco_sk_list, sk);
-	__set_bit(SOCK_DEAD, &sk->flags);
+	sock_set_flag(sk, SOCK_DEAD);
 	sock_put(sk);
 }
 

@@ -7,7 +7,7 @@ menu "Cryptographic options"
 config CRYPTO
 	bool "Cryptographic API"
 	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m || INET6_AH=y || INET6_AH=m || \
-		     INET6_ESP=y || INET6_ESP=m
+		     INET6_ESP=y || INET6_ESP=m || INET6_IPCOMP=y || INET6_IPCOMP=m || IPV6_PRIVACY=y
 	help
 	  This option provides the core Cryptographic API.
 
@@ -36,7 +36,7 @@ config CRYPTO_MD5
 	tristate "MD5 digest algorithm"
 	depends on CRYPTO
 	default y if INET_AH=y || INET_AH=m || INET_ESP=y || INET_ESP=m || INET6_AH=y || INET6_AH=m || \
-	             INET6_ESP=y || INET6_ESP=m
+	             INET6_ESP=y || INET6_ESP=m || IPV6_PRIVACY=y
 	help
 	  MD5 message digest algorithm (RFC1321).
 

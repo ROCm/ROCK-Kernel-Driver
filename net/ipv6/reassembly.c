@@ -54,10 +54,10 @@
 #include <net/ndisc.h>
 #include <net/addrconf.h>
 
-static int sysctl_ip6frag_high_thresh = 256*1024;
-static int sysctl_ip6frag_low_thresh = 192*1024;
+int sysctl_ip6frag_high_thresh = 256*1024;
+int sysctl_ip6frag_low_thresh = 192*1024;
 
-static int sysctl_ip6frag_time = IPV6_FRAG_TIMEOUT;
+int sysctl_ip6frag_time = IPV6_FRAG_TIMEOUT;
 
 struct ip6frag_skb_cb
 {
@@ -152,7 +152,7 @@ static unsigned int ip6qhashfn(u32 id, struct in6_addr *saddr,
 }
 
 static struct timer_list ip6_frag_secret_timer;
-static int ip6_frag_secret_interval = 10 * 60 * HZ;
+int sysctl_ip6frag_secret_interval = 10 * 60 * HZ;
 
 static void ip6_frag_secret_rebuild(unsigned long dummy)
 {
@@ -189,7 +189,7 @@ static void ip6_frag_secret_rebuild(unsigned long dummy)
 	}
 	write_unlock(&ip6_frag_lock);
 
-	mod_timer(&ip6_frag_secret_timer, now + ip6_frag_secret_interval);
+	mod_timer(&ip6_frag_secret_timer, now + sysctl_ip6frag_secret_interval);
 }
 
 atomic_t ip6_frag_mem = ATOMIC_INIT(0);
@@ -755,6 +755,6 @@ void __init ipv6_frag_init(void)
 
 	init_timer(&ip6_frag_secret_timer);
 	ip6_frag_secret_timer.function = ip6_frag_secret_rebuild;
-	ip6_frag_secret_timer.expires = jiffies + ip6_frag_secret_interval;
+	ip6_frag_secret_timer.expires = jiffies + sysctl_ip6frag_secret_interval;
 	add_timer(&ip6_frag_secret_timer);
 }

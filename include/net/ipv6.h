@@ -406,6 +406,14 @@ extern int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 extern int inet6_ioctl(struct socket *sock, unsigned int cmd, 
 		       unsigned long arg);
 
+/*
+ * reassembly.c
+ */
+extern int sysctl_ip6frag_high_thresh;
+extern int sysctl_ip6frag_low_thresh;
+extern int sysctl_ip6frag_time;
+extern int sysctl_ip6frag_secret_interval;
+
 #endif /* __KERNEL__ */
 #endif /* _NET_IPV6_H */
 

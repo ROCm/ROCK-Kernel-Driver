@@ -32,21 +32,61 @@
 #include <linux/atmlec.h>
 #include "lec.h"
 #include "lec_arpc.h"
-struct atm_lane_ops atm_lane_ops;
-#endif
-#ifdef CONFIG_ATM_LANE_MODULE
+struct atm_lane_ops *atm_lane_ops;
+static DECLARE_MUTEX(atm_lane_ops_mutex);
+
+void atm_lane_ops_set(struct atm_lane_ops *hook)
+{
+	down(&atm_lane_ops_mutex);
+	atm_lane_ops = hook;
+	up(&atm_lane_ops_mutex);
+}
+
+int try_atm_lane_ops(void)
+{
+	down(&atm_lane_ops_mutex);
+	if (atm_lane_ops && try_module_get(atm_lane_ops->owner)) {
+		up(&atm_lane_ops_mutex);
+		return 1;
+	}
+	up(&atm_lane_ops_mutex);
+	return 0;
+}
+
+#if defined(CONFIG_ATM_LANE_MODULE) || defined(CONFIG_ATM_MPOA_MODULE)
 EXPORT_SYMBOL(atm_lane_ops);
+EXPORT_SYMBOL(try_atm_lane_ops);
+EXPORT_SYMBOL(atm_lane_ops_set);
+#endif
 #endif
 
 #if defined(CONFIG_ATM_MPOA) || defined(CONFIG_ATM_MPOA_MODULE)
 #include <linux/atmmpc.h>
 #include "mpc.h"
-struct atm_mpoa_ops atm_mpoa_ops;
-#endif
+struct atm_mpoa_ops *atm_mpoa_ops;
+static DECLARE_MUTEX(atm_mpoa_ops_mutex);
+
+void atm_mpoa_ops_set(struct atm_mpoa_ops *hook)
+{
+	down(&atm_mpoa_ops_mutex);
+	atm_mpoa_ops = hook;
+	up(&atm_mpoa_ops_mutex);
+}
+
+int try_atm_mpoa_ops(void)
+{
+	down(&atm_mpoa_ops_mutex);
+	if (atm_mpoa_ops && try_module_get(atm_mpoa_ops->owner)) {
+		up(&atm_mpoa_ops_mutex);
+		return 1;
+	}
+	up(&atm_mpoa_ops_mutex);
+	return 0;
+}
 #ifdef CONFIG_ATM_MPOA_MODULE
 EXPORT_SYMBOL(atm_mpoa_ops);
-#ifndef CONFIG_ATM_LANE_MODULE
-EXPORT_SYMBOL(atm_lane_ops);
+EXPORT_SYMBOL(try_atm_mpoa_ops);
+EXPORT_SYMBOL(atm_mpoa_ops_set);
 #endif
 #endif
 
@@ -728,27 +768,40 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				ret_val = -EPERM;
 				goto done;
 			}
-                        if (atm_lane_ops.lecd_attach == NULL)
-				atm_lane_init();
-                        if (atm_lane_ops.lecd_attach == NULL) { /* try again */
+#if defined(CONFIG_ATM_LANE_MODULE)
+                        if (!atm_lane_ops)
+				request_module("lec");
+#endif
+			if (try_atm_lane_ops()) {
+				error = atm_lane_ops->lecd_attach(vcc, (int) arg);
+				module_put(atm_lane_ops->owner);
+				if (error >= 0)
+					sock->state = SS_CONNECTED;
+				ret_val =  error;
+			} else
 				ret_val = -ENOSYS;
-				goto done;
-			}
-			error = atm_lane_ops.lecd_attach(vcc, (int)arg);
-			if (error >= 0) sock->state = SS_CONNECTED;
-			ret_val =  error;
 			goto done;
                 case ATMLEC_MCAST:
-			if (!capable(CAP_NET_ADMIN))
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else
-				ret_val = atm_lane_ops.mcast_attach(vcc, (int)arg);
+				goto done;
+			}
+			if (try_atm_lane_ops()) {
+				ret_val = atm_lane_ops->mcast_attach(vcc, (int) arg);
+				module_put(atm_lane_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
                 case ATMLEC_DATA:
-			if (!capable(CAP_NET_ADMIN))
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else
-				ret_val = atm_lane_ops.vcc_attach(vcc, (void*)arg);
+				goto done;
+			}
+			if (try_atm_lane_ops()) {
+				ret_val = atm_lane_ops->vcc_attach(vcc, (void *) arg);
+				module_put(atm_lane_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 #endif
 #if defined(CONFIG_ATM_MPOA) || defined(CONFIG_ATM_MPOA_MODULE)
@@ -757,21 +810,29 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				ret_val = -EPERM;
 				goto done;
 			}
-			if (atm_mpoa_ops.mpoad_attach == NULL)
-                                atm_mpoa_init();
-			if (atm_mpoa_ops.mpoad_attach == NULL) { /* try again */
+#if defined(CONFIG_ATM_MPOA_MODULE)
+			if (!atm_mpoa_ops)
+                                request_module("mpoa");
+#endif
+			if (try_atm_mpoa_ops()) {
+				error = atm_mpoa_ops->mpoad_attach(vcc, (int) arg);
+				module_put(atm_mpoa_ops->owner);
+				if (error >= 0)
+					sock->state = SS_CONNECTED;
+				ret_val = error;
+			} else
 				ret_val = -ENOSYS;
-				goto done;
-			}
-			error = atm_mpoa_ops.mpoad_attach(vcc, (int)arg);
-			if (error >= 0) sock->state = SS_CONNECTED;
-			ret_val = error;
 			goto done;
 		case ATMMPC_DATA:
-			if (!capable(CAP_NET_ADMIN)) 
+			if (!capable(CAP_NET_ADMIN)) {
 				ret_val = -EPERM;
-			else
-				ret_val = atm_mpoa_ops.vcc_attach(vcc, arg);
+				goto done;
+			}
+			if (try_atm_mpoa_ops()) {
+				ret_val = atm_mpoa_ops->vcc_attach(vcc, arg);
+				module_put(atm_mpoa_ops->owner);
+			} else
+				ret_val = -ENOSYS;
 			goto done;
 #endif
 #if defined(CONFIG_ATM_TCP) || defined(CONFIG_ATM_TCP_MODULE)
@@ -1155,40 +1216,6 @@ int atm_getsockopt(struct socket *sock,int level,int optname,
 }
 
 
-/*
- * lane_mpoa_init.c: A couple of helper functions
- * to make modular LANE and MPOA client easier to implement
- */
-
-/*
- * This is how it goes:
- *
- * if xxxx is not compiled as module, call atm_xxxx_init_ops()
- *    from here
- * else call atm_mpoa_init_ops() from init_module() within
- *    the kernel when xxxx module is loaded
- *
- * In either case function pointers in struct atm_xxxx_ops
- * are initialized to their correct values. Either they
- * point to functions in the module or in the kernel
- */
- 
-extern struct atm_mpoa_ops atm_mpoa_ops; /* in common.c */
-extern struct atm_lane_ops atm_lane_ops; /* in common.c */
-
-#if defined(CONFIG_ATM_MPOA) || defined(CONFIG_ATM_MPOA_MODULE)
-void atm_mpoa_init(void)
-{
-#ifndef CONFIG_ATM_MPOA_MODULE /* not module */
-        atm_mpoa_init_ops(&atm_mpoa_ops);
-#else
-	request_module("mpoa");
-#endif
-
-        return;
-}
-#endif
-
 #if defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE)
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 struct net_bridge_fdb_entry *(*br_fdb_get_hook)(struct net_bridge *br,
@@ -1199,18 +1226,8 @@ EXPORT_SYMBOL(br_fdb_get_hook);
 EXPORT_SYMBOL(br_fdb_put_hook);
 #endif /* defined(CONFIG_ATM_LANE_MODULE) || defined(CONFIG_BRIDGE_MODULE) */
 #endif /* defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) */
+#endif /* defined(CONFIG_ATM_LANE) || defined(CONFIG_ATM_LANE_MODULE) */
 
-void atm_lane_init(void)
-{
-#ifndef CONFIG_ATM_LANE_MODULE /* not module */
-        atm_lane_init_ops(&atm_lane_ops);
-#else
-	request_module("lec");
-#endif
-
-        return;
-}        
-#endif
 
 static int __init atm_init(void)
 {
