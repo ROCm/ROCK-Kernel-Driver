@@ -694,7 +694,7 @@ cleanup_sysctl:
 	proc_net_remove(IPQ_PROC_FS_NAME);
 	
 cleanup_ipqnl:
-	sock_release(ipqnl->socket);
+	sock_release(ipqnl->sk_socket);
 	down(&ipqnl_sem);
 	up(&ipqnl_sem);
 	
