@@ -60,7 +60,7 @@
 /* Global data structures. */
 sctp_protocol_t sctp_proto;
 struct proc_dir_entry	*proc_net_sctp;
-struct sctp_mib sctp_statistics[NR_CPUS * 2];
+DEFINE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 
 /* This is the global socket data structure used for responding to
  * the Out-of-the-blue (OOTB) packets.  A control sock will be created
@@ -653,6 +653,40 @@ int sctp_register_pf(struct sctp_pf *pf, sa_family_t family)
 	return 1;
 }
 
+static int __init init_sctp_mibs(void)
+{
+	int i;
+	
+	sctp_statistics[0] = kmalloc_percpu(sizeof (struct sctp_mib),
+					    GFP_KERNEL);
+	if (!sctp_statistics[0])
+		return -ENOMEM;
+	sctp_statistics[1] = kmalloc_percpu(sizeof (struct sctp_mib),
+					    GFP_KERNEL);
+	if (!sctp_statistics[1]) {
+		kfree_percpu(sctp_statistics[0]);
+		return -ENOMEM;
+	}
+
+	/* Zero all percpu versions of the mibs */
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i)) {
+			memset(per_cpu_ptr(sctp_statistics[0], i), 0,
+					sizeof (struct sctp_mib));
+			memset(per_cpu_ptr(sctp_statistics[1], i), 0,
+					sizeof (struct sctp_mib));
+		}
+	}
+	return 0;
+	
+}
+
+static void cleanup_sctp_mibs(void)
+{
+	kfree_percpu(sctp_statistics[0]);
+	kfree_percpu(sctp_statistics[1]);
+}
+
 /* Initialize the universe into something sensible.  */
 int sctp_init(void)
 {
@@ -666,6 +700,11 @@ int sctp_init(void)
 	/* Add SCTP to inetsw linked list.  */
 	inet_register_protosw(&sctp_protosw);
 
+	/* Allocate and initialise sctp mibs.  */
+	status = init_sctp_mibs();
+	if (status) 
+		goto err_init_mibs;
+		
 	/* Initialize proc fs directory.  */
 	sctp_proc_init();
 
@@ -805,6 +844,8 @@ err_ehash_alloc:
 err_ahash_alloc:
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
+	cleanup_sctp_mibs();
+err_init_mibs:	
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_protosw);
 	return status;
@@ -836,6 +877,7 @@ void sctp_exit(void)
 
 	sctp_dbg_objcnt_exit();
 	sctp_proc_exit();
+	cleanup_sctp_mibs();
 
 	inet_del_protocol(&sctp_protocol, IPPROTO_SCTP);
 	inet_unregister_protosw(&sctp_protosw);
