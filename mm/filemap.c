@@ -791,6 +791,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		if (seg == 0)
 			return -EFAULT;
 		nr_segs = seg;
+		count -= iv->iov_len;	/* This segment is no good */
 		break;
 	}
 
@@ -1578,6 +1579,7 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 		if (seg == 0)
 			return -EFAULT;
 		nr_segs = seg;
+		ocount -= iv->iov_len;	/* This segment is no good */
 		break;
 	}
 	count = ocount;

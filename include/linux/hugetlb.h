@@ -2,17 +2,25 @@
 #define _LINUX_HUGETLB_H
 
 #ifdef CONFIG_HUGETLB_PAGE
+
+struct ctl_table;
+
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 {
 	return vma->vm_flags & VM_HUGETLB;
 }
 
+int hugetlb_sysctl_handler(struct ctl_table *, int, struct file *, void *, size_t *);
 int copy_hugetlb_page_range(struct mm_struct *, struct mm_struct *, struct vm_area_struct *);
 int follow_hugetlb_page(struct mm_struct *, struct vm_area_struct *, struct page **, struct vm_area_struct **, unsigned long *, int *, int);
 void zap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
 void unmap_hugepage_range(struct vm_area_struct *, unsigned long, unsigned long);
 int hugetlb_prefault(struct address_space *, struct vm_area_struct *);
 void huge_page_release(struct page *);
+int hugetlb_report_meminfo(char *);
+
+extern int htlbpage_max;
+
 #else /* !CONFIG_HUGETLB_PAGE */
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 {
@@ -25,6 +33,7 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define zap_hugepage_range(vma, start, len)	BUG()
 #define unmap_hugepage_range(vma, start, end)	BUG()
 #define huge_page_release(page)			BUG()
+#define hugetlb_report_meminfo(buf)		0
 
 #endif /* !CONFIG_HUGETLB_PAGE */
 

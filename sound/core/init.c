@@ -23,6 +23,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/time.h>
+#include <linux/ctype.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -45,7 +46,6 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 			 struct module *module, int extra_size)
 {
 	snd_card_t *card;
-	snd_info_entry_t *entry;
 	int err;
 
 	if (extra_size < 0)
@@ -79,8 +79,6 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	snd_cards_lock |= 1 << idx;		/* lock it */
 	write_unlock(&snd_card_rwlock);
 	card->number = idx;
-	if (!card->id[0])
-		sprintf(card->id, "card%i", card->number);
 	card->module = module;
 	INIT_LIST_HEAD(&card->devices);
 	rwlock_init(&card->control_rwlock);
@@ -97,28 +95,14 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 		snd_printd("unable to register control minors\n");
 		goto __error;
 	}
-	if ((err = snd_info_card_register(card)) < 0) {
-		snd_printd("unable to register card info\n");
+	if ((err = snd_info_card_create(card)) < 0) {
+		snd_printd("unable to create card info\n");
 		goto __error_ctl;
 	}
-	if ((entry = snd_info_create_card_entry(card, "id", card->proc_root)) == NULL) {
-		snd_printd("unable to create card entry\n");
-		goto __error_info;
-	}
-	entry->content = SNDRV_INFO_CONTENT_TEXT;
-	entry->c.text.read_size = PAGE_SIZE;
-	entry->c.text.read = snd_card_id_read;
-	if (snd_info_register(entry) < 0) {
-		snd_info_free_entry(entry);
-		goto __error_info;
-	}
-	card->proc_id = entry;
 	if (extra_size > 0)
 		card->private_data = (char *)card + sizeof(snd_card_t);
 	return card;
 
-      __error_info:
-      	snd_info_card_unregister(card);
       __error_ctl:
 	snd_ctl_unregister(card);
       __error:
@@ -157,8 +141,8 @@ int snd_card_free(snd_card_t * card)
 	if (card->private_free)
 		card->private_free(card);
 	snd_info_free_entry(card->proc_id);
-	if (snd_info_card_unregister(card) < 0) {
-		snd_printk(KERN_WARNING "unable to unregister card info\n");
+	if (snd_info_card_free(card) < 0) {
+		snd_printk(KERN_WARNING "unable to free card info\n");
 		/* Not fatal error */
 	}
 	write_lock(&snd_card_rwlock);
@@ -168,9 +152,66 @@ int snd_card_free(snd_card_t * card)
 	return 0;
 }
 
+static void choose_default_id(snd_card_t *card)
+{
+	int i, len, idx_flag = 0, loops = 8;
+	char *id, *spos;
+	
+	id = spos = card->shortname;	
+	while (*id != '\0') {
+		if (*id == ' ')
+			spos = id + 1;
+		id++;
+	}
+	id = card->id;
+	while (*spos != '\0' && id - card->id < sizeof(card->id) - 1) {
+		if (isalnum(*spos))
+			*id++ = *spos;
+		spos++;
+	}
+	*id = '\0';
+
+	id = card->id;
+
+	while (1) {
+	      	if (loops-- == 0) {
+      			snd_printk(KERN_ERR "unable to choose default card id (%s)", id);
+      			strcpy(card->id, card->proc_root->name);
+      			return;
+      		}
+	      	if (!snd_info_check_reserved_words(id))
+      			goto __change;
+		for (i = 0; i < snd_ecards_limit; i++) {
+			if (snd_cards[i] && !strcmp(snd_cards[i]->id, id))
+				goto __change;
+		}
+		break;
+
+	      __change:
+		len = strlen(id);
+		if (idx_flag)
+			id[len-1]++;
+		else if (len <= sizeof(card->id) - 3) {
+			strcat(id, "_1");
+			idx_flag++;
+		} else {
+			spos = id + len - 2;
+			if (len <= sizeof(card->id) - 2)
+				spos++;
+			*spos++ = '_';
+			*spos++ = '1';
+			*spos++ = '\0';
+			idx_flag++;
+		}
+	}
+		
+	strcpy(card->id, id);
+}
+
 int snd_card_register(snd_card_t * card)
 {
 	int err;
+	snd_info_entry_t *entry;
 
 	snd_runtime_check(card != NULL, return -EINVAL);
 	if ((err = snd_device_register_all(card)) < 0)
@@ -181,9 +222,28 @@ int snd_card_register(snd_card_t * card)
 		write_unlock(&snd_card_rwlock);
 		return 0;
 	}
+	if (!card->id[0])
+		choose_default_id(card);
 	snd_cards[card->number] = card;
 	snd_cards_count++;
 	write_unlock(&snd_card_rwlock);
+	if ((err = snd_info_card_register(card)) < 0) {
+		snd_printd("unable to create card info\n");
+		goto __skip_info;
+	}
+	if ((entry = snd_info_create_card_entry(card, "id", card->proc_root)) == NULL) {
+		snd_printd("unable to create card entry\n");
+		goto __skip_info;
+	}
+	entry->content = SNDRV_INFO_CONTENT_TEXT;
+	entry->c.text.read_size = PAGE_SIZE;
+	entry->c.text.read = snd_card_id_read;
+	if (snd_info_register(entry) < 0) {
+		snd_info_free_entry(entry);
+		entry = NULL;
+	}
+	card->proc_id = entry;
+      __skip_info:
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
 		snd_mixer_oss_notify_callback(card, 0);

@@ -29,4 +29,5 @@ int jfs_permission(struct inode *, int);
 int jfs_init_acl(struct inode *, struct inode *);
 int jfs_setattr(struct dentry *, struct iattr *);
 
-#endif                         /* CONFIG_JFS_POSIX_ACL */
+#endif		/* CONFIG_JFS_POSIX_ACL */
+#endif		/* _H_JFS_ACL */

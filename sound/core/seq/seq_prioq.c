@@ -25,7 +25,6 @@
 #include <sound/core.h>
 #include "seq_timer.h"
 #include "seq_prioq.h"
-#include "seq_timer.h"
 
 
 /* Implementation is a simple linked list for now...

@@ -564,7 +564,15 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 		} else {
 			ret = snd_pcm_lib_read(substream, ptr, frames);
 		}
-		if (ret != -EPIPE && ret != -ESTRPIPE)
+		if (ret == -EPIPE) {
+			if (runtime->status->state == SNDRV_PCM_STATE_DRAINING) {
+				ret = snd_pcm_kernel_ioctl(substream, SNDRV_PCM_IOCTL_DROP, 0);
+				if (ret < 0)
+					break;
+			}
+			continue;
+		}
+		if (ret != -ESTRPIPE)
 			break;
 	}
 	return ret;

@@ -157,6 +157,7 @@ struct runqueue {
 	task_t *migration_thread;
 	struct list_head migration_queue;
 
+	atomic_t nr_iowait;
 } ____cacheline_aligned;
 
 static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
@@ -557,9 +558,11 @@ unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		sum += cpu_rq(i)->nr_uninterruptible;
-
+	}
 	return sum;
 }
 
@@ -567,9 +570,23 @@ unsigned long nr_context_switches(void)
 {
 	unsigned long i, sum = 0;
 
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
 		sum += cpu_rq(i)->nr_switches;
+	}
+	return sum;
+}
 
+unsigned long nr_iowait(void)
+{
+	unsigned long i, sum = 0;
+
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
+			continue;
+		sum += atomic_read(&cpu_rq(i)->nr_iowait);
+	}
 	return sum;
 }
 
@@ -875,7 +892,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 		/* note: this timer irq context must be accounted for as well */
 		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
 			kstat_cpu(cpu).cpustat.system += sys_ticks;
-		else if (atomic_read(&nr_iowait_tasks) > 0)
+		else if (atomic_read(&rq->nr_iowait) > 0)
 			kstat_cpu(cpu).cpustat.iowait += sys_ticks;
 		else
 			kstat_cpu(cpu).cpustat.idle += sys_ticks;
@@ -1712,6 +1729,31 @@ void yield(void)
 	sys_sched_yield();
 }
 
+/*
+ * This task is about to go to sleep on IO.  Increment rq->nr_iowait so
+ * that process accounting knows that this is a task in IO wait state.
+ *
+ * But don't do that if it is a deliberate, throttling IO wait (this task
+ * has set its backing_dev_info: the queue against which it should throttle)
+ */
+void io_schedule(void)
+{
+	struct runqueue *rq = this_rq();
+
+	atomic_inc(&rq->nr_iowait);
+	schedule();
+	atomic_dec(&rq->nr_iowait);
+}
+
+void io_schedule_timeout(long timeout)
+{
+	struct runqueue *rq = this_rq();
+
+	atomic_inc(&rq->nr_iowait);
+	schedule_timeout(timeout);
+	atomic_dec(&rq->nr_iowait);
+}
+
 /**
  * sys_sched_get_priority_max - return maximum RT priority.
  * @policy: scheduling class.
@@ -2160,6 +2202,7 @@ void __init sched_init(void)
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
 		INIT_LIST_HEAD(&rq->migration_queue);
+		atomic_set(&rq->nr_iowait, 0);
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;

@@ -239,10 +239,12 @@ typedef struct {
 struct snd_ak4524 {
 	int num_adcs;			/* AK4524 or AK4528 ADCs */
 	int num_dacs;			/* AK4524 or AK4528 DACs */
-	unsigned char images[4][8];
+	unsigned char images[4][16];
 	unsigned char ipga_gain[4][2];
 	/* */
-	unsigned int is_ak4528: 1;	/* AK4524 or AK4528 */
+	enum {
+		SND_AK4524, SND_AK4528, SND_AK4529
+	} type;
 	unsigned int cif: 1;
 	unsigned char data_mask;
 	unsigned char clk_mask;

@@ -324,9 +324,16 @@ static ssize_t disk_size_read(struct gendisk * disk,
 {
 	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
 }
-static inline unsigned MSEC(unsigned x)
+
+static inline unsigned jiffies_to_msec(unsigned jif)
 {
-	return x * 1000 / HZ;
+#if 1000 % HZ == 0
+	return jif * (1000 / HZ);
+#elif HZ % 1000 == 0
+	return jif / (HZ / 1000);
+#else
+	return (jif / HZ) * 1000 + (jif % HZ) * 1000 / HZ;
+#endif
 }
 static ssize_t disk_stat_read(struct gendisk * disk,
 			      char *page, size_t count, loff_t off)
@@ -338,11 +345,11 @@ static ssize_t disk_stat_read(struct gendisk * disk,
 		"%8u %8u %8u"
 		"\n",
 		disk->reads, disk->read_merges, (u64)disk->read_sectors,
-		MSEC(disk->read_ticks),
+		jiffies_to_msec(disk->read_ticks),
 		disk->writes, disk->write_merges, (u64)disk->write_sectors,
-		MSEC(disk->write_ticks),
-		disk->in_flight, MSEC(disk->io_ticks),
-		MSEC(disk->time_in_queue));
+		jiffies_to_msec(disk->write_ticks),
+		disk->in_flight, jiffies_to_msec(disk->io_ticks),
+		jiffies_to_msec(disk->time_in_queue));
 }
 static struct disk_attribute disk_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },

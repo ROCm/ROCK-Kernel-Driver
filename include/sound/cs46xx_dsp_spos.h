@@ -36,23 +36,34 @@
 #define SEGTYPE_SP_COEFFICIENT          0x00000004
 
 #define DSP_SPOS_UU      0x0deadul     /* unused */
-#define DSP_SPOS_DC      0x0badul     /* dont care */
-#define DSP_SPOS_DC_DC   0x0bad0badul     /* dont care */
+#define DSP_SPOS_DC      0x0badul      /* dont care */
+#define DSP_SPOS_DC_DC   0x0bad0badul  /* dont care */
 #define DSP_SPOS_UUUU    0xdeadc0edul  /* unused */
 #define DSP_SPOS_UUHI    0xdeadul
 #define DSP_SPOS_UULO    0xc0edul
-#define DSP_SPOS_DCDC    0x0badf1d0ul /* dont care */
+#define DSP_SPOS_DCDC    0x0badf1d0ul  /* dont care */
 #define DSP_SPOS_DCDCHI  0x0badul
 #define DSP_SPOS_DCDCLO  0xf1d0ul
 
-#define DSP_MAX_TASK_NAME 60
+#define DSP_MAX_TASK_NAME   60
 #define DSP_MAX_SYMBOL_NAME 100
-#define DSP_MAX_SCB_NAME  60
-#define DSP_MAX_SCB_DESC  200
-#define DSP_MAX_TASK_DESC 50
+#define DSP_MAX_SCB_NAME    60
+#define DSP_MAX_SCB_DESC    200
+#define DSP_MAX_TASK_DESC   50
 
 #define DSP_MAX_PCM_CHANNELS 32
 #define DSP_MAX_SRC_NR       6
+
+#define DSP_PCM_MAIN_CHANNEL    1
+#define DSP_PCM_REAR_CHANNEL    2
+#define DSP_PCM_CENTER_CHANNEL  3
+#define DSP_PCM_LFE_CHANNEL     4
+#define DSP_IEC958_CHANNEL      5
+
+#define DSP_SPDIF_STATUS_OUTPUT_ENABLED 1
+#define DSP_SPDIF_STATUS_PLAYBACK_OPEN  2
+#define DSP_SPDIF_STATUS_HW_ENABLED     4
+#define DSP_SPDIF_STATUS_AC3_MODE       8
 
 struct _dsp_module_desc_t;
 
@@ -129,6 +140,8 @@ typedef struct _pcm_channel_descriptor_t {
 	u32 unlinked;
 	dsp_scb_descriptor_t * pcm_reader_scb;
 	dsp_scb_descriptor_t * src_scb;
+	dsp_scb_descriptor_t * mixer_scb;
+	int pcm_channel_id;
 
 	void * private_data;
 } pcm_channel_descriptor_t;
@@ -141,8 +154,14 @@ typedef struct _dsp_spos_instance_t {
 
 	segment_desc_t code;
 
-	/* PCM playback */
+	/* Main PCM playback mixer */
 	dsp_scb_descriptor_t * master_mix_scb;
+	u16 dac_volume_right;
+	u16 dac_volume_left;
+
+	/* Rear PCM playback mixer */
+	dsp_scb_descriptor_t * rear_mix_scb;
+
 	int npcm_channels;
 	int nsrc_scb;
 	pcm_channel_descriptor_t pcm_channels[DSP_MAX_PCM_CHANNELS];
@@ -175,7 +194,8 @@ typedef struct _dsp_spos_instance_t {
 	/* SPDIF status */
 	int spdif_status_out;
 	int spdif_status_in;
-	u32 spdif_input_volume;
+	u16 spdif_input_volume_right;
+	u16 spdif_input_volume_left;
 
 	/* SPDIF input sample rate converter */
 	dsp_scb_descriptor_t * spdif_in_src;
@@ -191,6 +211,12 @@ typedef struct _dsp_spos_instance_t {
 	/* reference snooper */
 	dsp_scb_descriptor_t * ref_snoop_scb;
 
+	/* SPDIF output  PCM reference  */
+	dsp_scb_descriptor_t * spdif_pcm_input_scb;
+
+	/* asynch TX task */
+	dsp_scb_descriptor_t * asynch_tx_scb;
+
 	/* record sources */
 	dsp_scb_descriptor_t * pcm_input;
 	dsp_scb_descriptor_t * adc_input;
@@ -199,4 +225,3 @@ typedef struct _dsp_spos_instance_t {
 } dsp_spos_instance_t;
 
 #endif /* __DSP_SPOS_H__ */
-

@@ -115,13 +115,15 @@ emu8k_open_dram_for_pcm(emu8000_t *emu, int channels)
 /*
  */
 static void
-snd_emu8000_write_wait(emu8000_t *emu)
+snd_emu8000_write_wait(emu8000_t *emu, int can_schedule)
 {
 	while ((EMU8000_SMALW_READ(emu) & 0x80000000) != 0) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(1);
-		if (signal_pending(current))
-			break;
+		if (can_schedule) {
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(1);
+			if (signal_pending(current))
+				break;
+		}
 	}
 }
 
@@ -457,7 +459,7 @@ static int emu8k_pcm_copy(snd_pcm_substream_t *subs,
 	emu8k_pcm_t *rec = subs->runtime->private_data;
 	emu8000_t *emu = rec->emu;
 
-	snd_emu8000_write_wait(emu);
+	snd_emu8000_write_wait(emu, 1);
 	if (voice == -1) {
 		unsigned short *buf = src;
 		int i, err;
@@ -494,7 +496,7 @@ static int emu8k_pcm_silence(snd_pcm_substream_t *subs,
 	emu8k_pcm_t *rec = subs->runtime->private_data;
 	emu8000_t *emu = rec->emu;
 
-	snd_emu8000_write_wait(emu);
+	snd_emu8000_write_wait(emu, 1);
 	if (voice == -1 && rec->voices == 1)
 		voice = 0;
 	if (voice == -1) {
@@ -524,7 +526,7 @@ static int emu8k_pcm_copy(snd_pcm_substream_t *subs,
 	emu8000_t *emu = rec->emu;
 	unsigned short *buf = src;
 
-	snd_emu8000_write_wait(emu);
+	snd_emu8000_write_wait(emu, 1);
 	EMU8000_SMALW_WRITE(emu, pos + rec->loop_start[0]);
 	if (rec->voices > 1)
 		EMU8000_SMARW_WRITE(emu, pos + rec->loop_start[1]);
@@ -553,7 +555,7 @@ static int emu8k_pcm_silence(snd_pcm_substream_t *subs,
 	emu8k_pcm_t *rec = subs->runtime->private_data;
 	emu8000_t *emu = rec->emu;
 
-	snd_emu8000_write_wait(emu);
+	snd_emu8000_write_wait(emu, 1);
 	EMU8000_SMALW_WRITE(emu, rec->loop_start[0] + pos);
 	if (rec->voices > 1)
 		EMU8000_SMARW_WRITE(emu, rec->loop_start[1] + pos);
@@ -645,7 +647,7 @@ static int emu8k_pcm_prepare(snd_pcm_substream_t *subs)
 		rec->dram_opened = 1;
 
 		/* clear loop blanks */
-		snd_emu8000_write_wait(rec->emu);
+		snd_emu8000_write_wait(rec->emu, 0);
 		EMU8000_SMALW_WRITE(rec->emu, rec->offset);
 		for (i = 0; i < LOOP_BLANK_SIZE; i++)
 			EMU8000_SMLD_WRITE(rec->emu, 0);

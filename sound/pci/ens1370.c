@@ -37,6 +37,7 @@
 #endif
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+#include <sound/asoundef.h>
 
 #define chip_t ensoniq_t
 
@@ -109,66 +110,70 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define ES_REG_CONTROL	0x00	/* R/W: Interrupt/Chip select control register */
 #define   ES_1370_ADC_STOP	(1<<31)		/* disable capture buffer transfers */
 #define   ES_1370_XCTL1 	(1<<30)		/* general purpose output bit */
-#define   ES_1371_SPDIF_EN	(1<<26)		/* SPDIF enable */
-#define   ES_1371_JOY_ASEL(o)	(((o)&0x03)<<24)	/* joystick port mapping */
+#define   ES_1373_TEST_BIT	(1<<29)		/* should be set to 0 for normal operation */
+#define   ES_1373_RECEN_B	(1<<28)		/* mix record with playback for I2S/SPDIF out */
+#define   ES_1373_SPDIF_THRU	(1<<26)		/* 0 = SPDIF thru mode, 1 = SPDIF == dig out */
+#define   ES_1371_JOY_ASEL(o)	(((o)&0x03)<<24)/* joystick port mapping */
 #define   ES_1371_JOY_ASELM	(0x03<<24)	/* mask for above */
 #define   ES_1371_JOY_ASELI(i)  (((i)>>24)&0x03)
-#define   ES_1371_GPIO_IN(i)	(((i)>>20)&0x0f)	/* GPIO in [3:0] pins - R/O */
-#define   ES_1370_PCLKDIVO(o)	(((o)&0x1fff)<<16)	/* clock divide ratio for DAC2 */
+#define   ES_1371_GPIO_IN(i)	(((i)>>20)&0x0f)/* GPIO in [3:0] pins - R/O */
+#define   ES_1370_PCLKDIVO(o)	(((o)&0x1fff)<<16)/* clock divide ratio for DAC2 */
 #define   ES_1370_PCLKDIVM	((0x1fff)<<16)	/* mask for above */
-#define   ES_1370_PCLKDIVI(i)	(((i)>>16)&0x1fff)	/* clock divide ratio for DAC2 */
-#define   ES_1371_GPIO_OUT(o)	(((o)&0x0f)<<16)	/* GPIO out [3:0] pins - W/R */
+#define   ES_1370_PCLKDIVI(i)	(((i)>>16)&0x1fff)/* clock divide ratio for DAC2 */
+#define   ES_1371_GPIO_OUT(o)	(((o)&0x0f)<<16)/* GPIO out [3:0] pins - W/R */
 #define   ES_1371_GPIO_OUTM     (0x0f<<16)	/* mask for above */
 #define   ES_MSFMTSEL		(1<<15)		/* MPEG serial data format; 0 = SONY, 1 = I2S */
 #define   ES_1370_M_SBB		(1<<14)		/* clock source for DAC - 0 = clock generator; 1 = MPEG clocks */
 #define   ES_1371_SYNC_RES	(1<<14)		/* Warm AC97 reset */
-#define   ES_1370_WTSRSEL(o)	(((o)&0x03)<<12)	/* fixed frequency clock for DAC1 */
+#define   ES_1370_WTSRSEL(o)	(((o)&0x03)<<12)/* fixed frequency clock for DAC1 */
 #define   ES_1370_WTSRSELM	(0x03<<12)	/* mask for above */
 #define   ES_1371_ADC_STOP	(1<<13)		/* disable CCB transfer capture information */
 #define   ES_1371_PWR_INTRM	(1<<12)		/* power level change interrupts enable */
 #define   ES_1370_DAC_SYNC	(1<<11)		/* DAC's are synchronous */
-#define   ES_1371_M_CB		(1<<11)		/* capture clock source; 0 = ADC; 1 = I2S */
+#define   ES_1371_M_CB		(1<<11)		/* capture clock source; 0 = AC'97 ADC; 1 = I2S */
 #define   ES_CCB_INTRM		(1<<10)		/* CCB voice interrupts enable */
-#define   ES_1370_M_CB		(1<<9)	/* capture clock source; 0 = ADC; 1 = MPEG */
-#define   ES_1370_XCTL0		(1<<8)	/* generap purpose output bit */
-#define   ES_1371_PDLEV(o)	(((o)&0x03)<<8)		/* current power down level */
+#define   ES_1370_M_CB		(1<<9)		/* capture clock source; 0 = ADC; 1 = MPEG */
+#define   ES_1370_XCTL0		(1<<8)		/* generap purpose output bit */
+#define   ES_1371_PDLEV(o)	(((o)&0x03)<<8)	/* current power down level */
 #define   ES_1371_PDLEVM	(0x03<<8)	/* mask for above */
-#define   ES_BREQ		(1<<7)	/* memory bus request enable */
-#define   ES_DAC1_EN		(1<<6)	/* DAC1 playback channel enable */
-#define   ES_DAC2_EN		(1<<5)	/* DAC2 playback channel enable */
-#define   ES_ADC_EN		(1<<4)	/* ADC capture channel enable */
-#define   ES_UART_EN		(1<<3)	/* UART enable */
-#define   ES_JYSTK_EN		(1<<2)	/* Joystick module enable */
-#define   ES_1370_CDC_EN	(1<<1)	/* Codec interface enable */
-#define   ES_1371_XTALCKDIS	(1<<1)	/* Xtal clock disable */
-#define   ES_1370_SERR_DISABLE	(1<<0)	/* PCI serr signal disable */
-#define   ES_1371_PCICLKDIS     (1<<0)	/* PCI clock disable */
+#define   ES_BREQ		(1<<7)		/* memory bus request enable */
+#define   ES_DAC1_EN		(1<<6)		/* DAC1 playback channel enable */
+#define   ES_DAC2_EN		(1<<5)		/* DAC2 playback channel enable */
+#define   ES_ADC_EN		(1<<4)		/* ADC capture channel enable */
+#define   ES_UART_EN		(1<<3)		/* UART enable */
+#define   ES_JYSTK_EN		(1<<2)		/* Joystick module enable */
+#define   ES_1370_CDC_EN	(1<<1)		/* Codec interface enable */
+#define   ES_1371_XTALCKDIS	(1<<1)		/* Xtal clock disable */
+#define   ES_1370_SERR_DISABLE	(1<<0)		/* PCI serr signal disable */
+#define   ES_1371_PCICLKDIS     (1<<0)		/* PCI clock disable */
 #define ES_REG_STATUS	0x04	/* R/O: Interrupt/Chip select status register */
-#define   ES_INTR               (1<<31)	/* Interrupt is pending */
-#define   ES_1371_ST_AC97_RST	(1<<29) /* CT5880 AC'97 Reset bit */
-#define   ES_1371_ST_SPDIF_EN	(1<<18) /* SPDIF enable */
-#define   ES_1371_ST_SPDIF_TEST (1<<17) /* SPDIF test */
-#define   ES_1371_TEST          (1<<16) /* test ASIC */
-#define   ES_1370_CSTAT		(1<<10)	/* CODEC is busy or register write in progress */
-#define   ES_1370_CBUSY         (1<<9)	/* CODEC is busy */
-#define   ES_1370_CWRIP		(1<<8)	/* CODEC register write in progress */
-#define   ES_1371_SYNC_ERR	(1<<8)	/* CODEC synchronization error occured */
-#define   ES_1371_VC(i)         (((i)>>6)&0x03)		/* voice code from CCB module */
-#define   ES_1370_VC(i)		(((i)>>5)&0x03)		/* voice code from CCB module */
-#define   ES_1371_MPWR          (1<<5)	/* power level interrupt pending */
-#define   ES_MCCB		(1<<4)	/* CCB interrupt pending */
-#define   ES_UART		(1<<3)	/* UART interrupt pending */
-#define   ES_DAC1		(1<<2)	/* DAC1 channel interrupt pending */
-#define   ES_DAC2		(1<<1)	/* DAC2 channel interrupt pending */
-#define   ES_ADC		(1<<0)	/* ADC channel interrupt pending */
+#define   ES_INTR               (1<<31)		/* Interrupt is pending */
+#define   ES_1371_ST_AC97_RST	(1<<29)		/* CT5880 AC'97 Reset bit */
+#define   ES_1373_GPIO_INT_EN(o)(((o)&0x0f)<<20)/* GPIO [3:0] pins - interrupt enable */
+#define   ES_1373_SPDIF_EN	(1<<18)		/* SPDIF enable */
+#define   ES_1373_SPDIF_TEST	(1<<17)		/* SPDIF test */
+#define   ES_1371_TEST          (1<<16)		/* test ASIC */
+#define   ES_1373_GPIO_INT(i)	(((i)&0x0f)>>12)/* GPIO [3:0] pins - interrupt pending */
+#define   ES_1370_CSTAT		(1<<10)		/* CODEC is busy or register write in progress */
+#define   ES_1370_CBUSY         (1<<9)		/* CODEC is busy */
+#define   ES_1370_CWRIP		(1<<8)		/* CODEC register write in progress */
+#define   ES_1371_SYNC_ERR	(1<<8)		/* CODEC synchronization error occured */
+#define   ES_1371_VC(i)         (((i)>>6)&0x03)	/* voice code from CCB module */
+#define   ES_1370_VC(i)		(((i)>>5)&0x03)	/* voice code from CCB module */
+#define   ES_1371_MPWR          (1<<5)		/* power level interrupt pending */
+#define   ES_MCCB		(1<<4)		/* CCB interrupt pending */
+#define   ES_UART		(1<<3)		/* UART interrupt pending */
+#define   ES_DAC1		(1<<2)		/* DAC1 channel interrupt pending */
+#define   ES_DAC2		(1<<1)		/* DAC2 channel interrupt pending */
+#define   ES_ADC		(1<<0)		/* ADC channel interrupt pending */
 #define ES_REG_UART_DATA 0x08	/* R/W: UART data register */
 #define ES_REG_UART_STATUS 0x09	/* R/O: UART status register */
-#define   ES_RXINT		(1<<7)	/* RX interrupt occured */
-#define   ES_TXINT		(1<<2)	/* TX interrupt occured */
-#define   ES_TXRDY		(1<<1)	/* transmitter ready */
-#define   ES_RXRDY		(1<<0)	/* receiver ready */
+#define   ES_RXINT		(1<<7)		/* RX interrupt occured */
+#define   ES_TXINT		(1<<2)		/* TX interrupt occured */
+#define   ES_TXRDY		(1<<1)		/* transmitter ready */
+#define   ES_RXRDY		(1<<0)		/* receiver ready */
 #define ES_REG_UART_CONTROL 0x09	/* W/O: UART control register */
-#define   ES_RXINTEN		(1<<7)	/* RX interrupt enable */
+#define   ES_RXINTEN		(1<<7)		/* RX interrupt enable */
 #define   ES_TXINTENO(o)	(((o)&0x03)<<5)	/* TX interrupt enable */
 #define   ES_TXINTENM		(0x03<<5)	/* mask for above */
 #define   ES_TXINTENI(i)	(((i)>>5)&0x03)
@@ -191,29 +196,29 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define   ES_1371_CODEC_READ(i)    (((i)>>0)&0xffff)
 
 #define ES_REG_1371_SMPRATE 0x10	/* W/R: Codec rate converter interface register */
-#define   ES_1371_SRC_RAM_ADDRO(o) (((o)&0x7f)<<25)	/* address of the sample rate converter */
+#define   ES_1371_SRC_RAM_ADDRO(o) (((o)&0x7f)<<25)/* address of the sample rate converter */
 #define   ES_1371_SRC_RAM_ADDRM	   (0x7f<<25)	/* mask for above */
-#define   ES_1371_SRC_RAM_ADDRI(i) (((i)>>25)&0x7f)	/* address of the sample rate converter */
+#define   ES_1371_SRC_RAM_ADDRI(i) (((i)>>25)&0x7f)/* address of the sample rate converter */
 #define   ES_1371_SRC_RAM_WE	   (1<<24)	/* R/W: read/write control for sample rate converter */
 #define   ES_1371_SRC_RAM_BUSY     (1<<23)	/* R/O: sample rate memory is busy */
 #define   ES_1371_SRC_DISABLE      (1<<22)	/* sample rate converter disable */
 #define   ES_1371_DIS_P1	   (1<<21)	/* playback channel 1 accumulator update disable */
 #define   ES_1371_DIS_P2	   (1<<20)	/* playback channel 1 accumulator update disable */
 #define   ES_1371_DIS_R1	   (1<<19)	/* capture channel accumulator update disable */
-#define   ES_1371_SRC_RAM_DATAO(o) (((o)&0xffff)<<0)	/* current value of the sample rate converter */
+#define   ES_1371_SRC_RAM_DATAO(o) (((o)&0xffff)<<0)/* current value of the sample rate converter */
 #define   ES_1371_SRC_RAM_DATAM	   (0xffff<<0)	/* mask for above */
-#define   ES_1371_SRC_RAM_DATAI(i) (((i)>>0)&0xffff)	/* current value of the sample rate converter */
+#define   ES_1371_SRC_RAM_DATAI(i) (((i)>>0)&0xffff)/* current value of the sample rate converter */
 
 #define ES_REG_1371_LEGACY 0x18	/* W/R: Legacy control/status register */
 #define   ES_1371_JFAST		(1<<31)		/* fast joystick timing */
 #define   ES_1371_HIB		(1<<30)		/* host interrupt blocking enable */
 #define   ES_1371_VSB		(1<<29)		/* SB; 0 = addr 0x220xH, 1 = 0x22FxH */
-#define   ES_1371_VMPUO(o)	(((o)&0x03)<<27)	/* base register address; 0 = 0x320xH; 1 = 0x330xH; 2 = 0x340xH; 3 = 0x350xH */
+#define   ES_1371_VMPUO(o)	(((o)&0x03)<<27)/* base register address; 0 = 0x320xH; 1 = 0x330xH; 2 = 0x340xH; 3 = 0x350xH */
 #define   ES_1371_VMPUM		(0x03<<27)	/* mask for above */
-#define   ES_1371_VMPUI(i)	(((i)>>27)&0x03)	/* base register address */
-#define   ES_1371_VCDCO(o)	(((o)&0x03)<<25)	/* CODEC; 0 = 0x530xH; 1 = undefined; 2 = 0xe80xH; 3 = 0xF40xH */
+#define   ES_1371_VMPUI(i)	(((i)>>27)&0x03)/* base register address */
+#define   ES_1371_VCDCO(o)	(((o)&0x03)<<25)/* CODEC; 0 = 0x530xH; 1 = undefined; 2 = 0xe80xH; 3 = 0xF40xH */
 #define   ES_1371_VCDCM		(0x03<<25)	/* mask for above */
-#define   ES_1371_VCDCI(i)	(((i)>>25)&0x03)	/* CODEC address */
+#define   ES_1371_VCDCI(i)	(((i)>>25)&0x03)/* CODEC address */
 #define   ES_1371_FIRQ		(1<<24)		/* force an interrupt */
 #define   ES_1371_SDMACAP	(1<<23)		/* enable event capture for slave DMA controller */
 #define   ES_1371_SPICAP	(1<<22)		/* enable event capture for slave IRQ controller */
@@ -223,36 +228,38 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define   ES_1371_SVCAP		(1<<18)		/* enable event capture for SB registers */
 #define   ES_1371_CDCCAP	(1<<17)		/* enable event capture for CODEC registers */
 #define   ES_1371_BACAP		(1<<16)		/* enable event capture for SoundScape base address */
-#define   ES_1371_EXI(i)	(((i)>>8)&0x07)		/* event number */
-#define   ES_1371_AI(i)		(((i)>>3)&0x1f)		/* event significant I/O address */
+#define   ES_1371_EXI(i)	(((i)>>8)&0x07)	/* event number */
+#define   ES_1371_AI(i)		(((i)>>3)&0x1f)	/* event significant I/O address */
 #define   ES_1371_WR		(1<<2)	/* event capture; 0 = read; 1 = write */
 #define   ES_1371_LEGINT	(1<<0)	/* interrupt for legacy events; 0 = interrupt did occur */
 
+#define ES_REG_CHANNEL_STATUS 0x1c /* R/W: first 32-bits from S/PDIF channel status block, es1373 */
+
 #define ES_REG_SERIAL	0x20	/* R/W: Serial interface control register */
 #define   ES_1371_DAC_TEST	(1<<22)		/* DAC test mode enable */
-#define   ES_P2_END_INCO(o)	(((o)&0x07)<<19)	/* binary offset value to increment / loop end */
+#define   ES_P2_END_INCO(o)	(((o)&0x07)<<19)/* binary offset value to increment / loop end */
 #define   ES_P2_END_INCM	(0x07<<19)	/* mask for above */
-#define   ES_P2_END_INCI(i)	(((i)>>16)&0x07)	/* binary offset value to increment / loop end */
-#define   ES_P2_ST_INCO(o)	(((o)&0x07)<<16)	/* binary offset value to increment / start */
+#define   ES_P2_END_INCI(i)	(((i)>>16)&0x07)/* binary offset value to increment / loop end */
+#define   ES_P2_ST_INCO(o)	(((o)&0x07)<<16)/* binary offset value to increment / start */
 #define   ES_P2_ST_INCM		(0x07<<16)	/* mask for above */
-#define   ES_P2_ST_INCI(i)	(((i)<<16)&0x07)	/* binary offset value to increment / start */
+#define   ES_P2_ST_INCI(i)	(((i)<<16)&0x07)/* binary offset value to increment / start */
 #define   ES_R1_LOOP_SEL	(1<<15)		/* ADC; 0 - loop mode; 1 = stop mode */
 #define   ES_P2_LOOP_SEL	(1<<14)		/* DAC2; 0 - loop mode; 1 = stop mode */
 #define   ES_P1_LOOP_SEL	(1<<13)		/* DAC1; 0 - loop mode; 1 = stop mode */
 #define   ES_P2_PAUSE		(1<<12)		/* DAC2; 0 - play mode; 1 = pause mode */
 #define   ES_P1_PAUSE		(1<<11)		/* DAC1; 0 - play mode; 1 = pause mode */
 #define   ES_R1_INT_EN		(1<<10)		/* ADC interrupt enable */
-#define   ES_P2_INT_EN		(1<<9)	/* DAC2 interrupt enable */
-#define   ES_P1_INT_EN		(1<<8)	/* DAC1 interrupt enable */
-#define   ES_P1_SCT_RLD		(1<<7)	/* force sample counter reload for DAC1 */
-#define   ES_P2_DAC_SEN		(1<<6)	/* when stop mode: 0 - DAC2 play back zeros; 1 = DAC2 play back last sample */
-#define   ES_R1_MODEO(o)	(((o)&0x03)<<4)		/* ADC mode; 0 = 8-bit mono; 1 = 8-bit stereo; 2 = 16-bit mono; 3 = 16-bit stereo */
+#define   ES_P2_INT_EN		(1<<9)		/* DAC2 interrupt enable */
+#define   ES_P1_INT_EN		(1<<8)		/* DAC1 interrupt enable */
+#define   ES_P1_SCT_RLD		(1<<7)		/* force sample counter reload for DAC1 */
+#define   ES_P2_DAC_SEN		(1<<6)		/* when stop mode: 0 - DAC2 play back zeros; 1 = DAC2 play back last sample */
+#define   ES_R1_MODEO(o)	(((o)&0x03)<<4)	/* ADC mode; 0 = 8-bit mono; 1 = 8-bit stereo; 2 = 16-bit mono; 3 = 16-bit stereo */
 #define   ES_R1_MODEM		(0x03<<4)	/* mask for above */
 #define   ES_R1_MODEI(i)	(((i)>>4)&0x03)
-#define   ES_P2_MODEO(o)	(((o)&0x03)<<2)		/* DAC2 mode; -- '' -- */
+#define   ES_P2_MODEO(o)	(((o)&0x03)<<2)	/* DAC2 mode; -- '' -- */
 #define   ES_P2_MODEM		(0x03<<2)	/* mask for above */
 #define   ES_P2_MODEI(i)	(((i)>>2)&0x03)
-#define   ES_P1_MODEO(o)	(((o)&0x03)<<0)		/* DAC1 mode; -- '' -- */
+#define   ES_P1_MODEO(o)	(((o)&0x03)<<0)	/* DAC1 mode; -- '' -- */
 #define   ES_P1_MODEM		(0x03<<0)	/* mask for above */
 #define   ES_P1_MODEI(i)	(((i)>>0)&0x03)
 
@@ -385,6 +392,10 @@ struct _snd_ensoniq {
 	snd_rawmidi_t *rmidi;
 	snd_rawmidi_substream_t *midi_input;
 	snd_rawmidi_substream_t *midi_output;
+
+	unsigned int spdif;
+	unsigned int spdif_default;
+	unsigned int spdif_stream;
 
 	snd_info_entry_t *proc_entry;
 
@@ -1032,6 +1043,10 @@ static int snd_ensoniq_playback1_open(snd_pcm_substream_t * substream)
 	ensoniq->playback1_substream = substream;
 	runtime->hw = snd_ensoniq_playback1;
 	snd_pcm_set_sync(substream);
+	spin_lock_irq(&ensoniq->reg_lock);
+	if (ensoniq->spdif && ensoniq->playback2_substream == NULL)
+		ensoniq->spdif_stream = ensoniq->spdif_default;
+	spin_unlock_irq(&ensoniq->reg_lock);
 #ifdef CHIP1370
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
 				   &snd_es1370_hw_constraints_rates);
@@ -1051,6 +1066,10 @@ static int snd_ensoniq_playback2_open(snd_pcm_substream_t * substream)
 	ensoniq->playback2_substream = substream;
 	runtime->hw = snd_ensoniq_playback2;
 	snd_pcm_set_sync(substream);
+	spin_lock_irq(&ensoniq->reg_lock);
+	if (ensoniq->spdif && ensoniq->playback1_substream == NULL)
+		ensoniq->spdif_stream = ensoniq->spdif_default;
+	spin_unlock_irq(&ensoniq->reg_lock);
 #ifdef CHIP1370
 	snd_pcm_hw_constraint_ratnums(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
 				      &snd_es1370_hw_constraints_clock);
@@ -1241,6 +1260,116 @@ static int __devinit snd_ensoniq_pcm2(ensoniq_t * ensoniq, int device, snd_pcm_t
 
 #ifdef CHIP1371
 
+
+static int snd_ens1373_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
+	uinfo->count = 1;
+	return 0;
+}
+
+static int snd_ens1373_spdif_default_get(snd_kcontrol_t * kcontrol,
+                                         snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	spin_lock_irq(&ensoniq->reg_lock);
+	ucontrol->value.iec958.status[0] = (ensoniq->spdif_default >> 0) & 0xff;
+	ucontrol->value.iec958.status[1] = (ensoniq->spdif_default >> 8) & 0xff;
+	ucontrol->value.iec958.status[2] = (ensoniq->spdif_default >> 16) & 0xff;
+	ucontrol->value.iec958.status[3] = (ensoniq->spdif_default >> 24) & 0xff;
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return 0;
+}
+
+static int snd_ens1373_spdif_default_put(snd_kcontrol_t * kcontrol,
+                                         snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	unsigned int val;
+	int change;
+
+	val = ((u32)ucontrol->value.iec958.status[0] << 0) |
+	      ((u32)ucontrol->value.iec958.status[1] << 8) |
+	      ((u32)ucontrol->value.iec958.status[2] << 16) |
+	      ((u32)ucontrol->value.iec958.status[3] << 24);
+	spin_lock_irq(&ensoniq->reg_lock);
+	change = ensoniq->spdif_default != val;
+	ensoniq->spdif_default = val;
+	if (change && ensoniq->playback1_substream == NULL && ensoniq->playback2_substream == NULL)
+		outl(val, ES_REG(ensoniq, CHANNEL_STATUS));
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return change;
+}
+
+static int snd_ens1373_spdif_mask_get(snd_kcontrol_t * kcontrol,
+                                         snd_ctl_elem_value_t * ucontrol)
+{
+	ucontrol->value.iec958.status[0] = 0xff;
+	ucontrol->value.iec958.status[1] = 0xff;
+	ucontrol->value.iec958.status[2] = 0xff;
+	ucontrol->value.iec958.status[3] = 0xff;
+	return 0;
+}
+
+static int snd_ens1373_spdif_stream_get(snd_kcontrol_t * kcontrol,
+                                         snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	spin_lock_irq(&ensoniq->reg_lock);
+	ucontrol->value.iec958.status[0] = (ensoniq->spdif_stream >> 0) & 0xff;
+	ucontrol->value.iec958.status[1] = (ensoniq->spdif_stream >> 8) & 0xff;
+	ucontrol->value.iec958.status[2] = (ensoniq->spdif_stream >> 16) & 0xff;
+	ucontrol->value.iec958.status[3] = (ensoniq->spdif_stream >> 24) & 0xff;
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return 0;
+}
+
+static int snd_ens1373_spdif_stream_put(snd_kcontrol_t * kcontrol,
+                                        snd_ctl_elem_value_t * ucontrol)
+{
+	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
+	unsigned int val;
+	int change;
+
+	val = ((u32)ucontrol->value.iec958.status[0] << 0) |
+	      ((u32)ucontrol->value.iec958.status[1] << 8) |
+	      ((u32)ucontrol->value.iec958.status[2] << 16) |
+	      ((u32)ucontrol->value.iec958.status[3] << 24);
+	spin_lock_irq(&ensoniq->reg_lock);
+	change = ensoniq->spdif_stream != val;
+	ensoniq->spdif_stream = val;
+	if (change && (ensoniq->playback1_substream != NULL || ensoniq->playback2_substream != NULL))
+		outl(val, ES_REG(ensoniq, CHANNEL_STATUS));
+	spin_unlock_irq(&ensoniq->reg_lock);
+	return change;
+}
+
+static snd_kcontrol_new_t snd_ens1373_spdif_default __devinitdata =
+{
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,DEFAULT),
+	.info =		snd_ens1373_spdif_info,
+	.get =		snd_ens1373_spdif_default_get,
+	.put =		snd_ens1373_spdif_default_put,
+};
+
+static snd_kcontrol_new_t snd_ens1373_spdif_mask __devinitdata =
+{
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
+	.info =		snd_ens1373_spdif_info,
+	.get =		snd_ens1373_spdif_mask_get
+};
+
+static snd_kcontrol_new_t snd_ens1373_spdif_stream __devinitdata =
+{
+	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
+	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,PCM_STREAM),
+	.info =		snd_ens1373_spdif_info,
+	.get =		snd_ens1373_spdif_stream_get,
+	.put =		snd_ens1373_spdif_stream_put
+};
+
 #define ES1371_SPDIF(xname) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .info = snd_es1371_spdif_info, \
   .get = snd_es1371_spdif_get, .put = snd_es1371_spdif_put }
@@ -1257,32 +1386,30 @@ static int snd_es1371_spdif_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *
 static int snd_es1371_spdif_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	
-	spin_lock_irqsave(&ensoniq->reg_lock, flags);
-	ucontrol->value.integer.value[0] = ensoniq->ctrl & ES_1371_SPDIF_EN ? 1 : 0;
-	spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
+	spin_lock_irq(&ensoniq->reg_lock);
+	ucontrol->value.integer.value[0] = ensoniq->ctrl & ES_1373_SPDIF_THRU ? 1 : 0;
+	spin_unlock_irq(&ensoniq->reg_lock);
 	return 0;
 }
 
 static int snd_es1371_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
 {
 	ensoniq_t *ensoniq = snd_kcontrol_chip(kcontrol);
-	unsigned long flags;
 	unsigned int nval1, nval2;
 	int change;
 	
-	nval1 = ucontrol->value.integer.value[0] ? ES_1371_SPDIF_EN : 0;
-	nval2 = ucontrol->value.integer.value[0] ? ES_1371_ST_SPDIF_EN : 0;
-	spin_lock_irqsave(&ensoniq->reg_lock, flags);
-	change = (ensoniq->ctrl & ES_1371_SPDIF_EN) != nval1;
-	ensoniq->ctrl &= ~ES_1371_SPDIF_EN;
+	nval1 = ucontrol->value.integer.value[0] ? ES_1373_SPDIF_THRU : 0;
+	nval2 = ucontrol->value.integer.value[0] ? ES_1373_SPDIF_EN : 0;
+	spin_lock_irq(&ensoniq->reg_lock);
+	change = (ensoniq->ctrl & ES_1373_SPDIF_THRU) != nval1;
+	ensoniq->ctrl &= ~ES_1373_SPDIF_THRU;
 	ensoniq->ctrl |= nval1;
-	ensoniq->cssr &= ~ES_1371_ST_SPDIF_EN;
+	ensoniq->cssr &= ~ES_1373_SPDIF_EN;
 	ensoniq->cssr |= nval2;
 	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
 	outl(ensoniq->cssr, ES_REG(ensoniq, STATUS));
-	spin_unlock_irqrestore(&ensoniq->reg_lock, flags);
+	spin_unlock_irq(&ensoniq->reg_lock);
 	return change;
 }
 
@@ -1299,7 +1426,7 @@ static struct {
 	unsigned short vid;		/* vendor ID */
 	unsigned short did;		/* device ID */
 	unsigned char rev;		/* revision */
-} es1371_spdif_present[] = {
+} __devinitdata es1371_spdif_present[] = {
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_C },
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_D },
 	{ .vid = PCI_VENDOR_ID_ENSONIQ, .did = PCI_DEVICE_ID_ENSONIQ_CT5880, .rev = CT5880REV_CT5880_E },
@@ -1325,9 +1452,29 @@ static int snd_ensoniq_1371_mixer(ensoniq_t * ensoniq)
 		if (ensoniq->pci->vendor == es1371_spdif_present[idx].vid &&
 		    ensoniq->pci->device == es1371_spdif_present[idx].did &&
 		    ensoniq->rev == es1371_spdif_present[idx].rev) {
-		    	snd_kcontrol_t *kctl = snd_ctl_new1(&snd_es1371_mixer_spdif, ensoniq); 
+		    	snd_kcontrol_t *kctl;
+			int index = 0; 
+
+			ensoniq->spdif_default = ensoniq->spdif_stream = SNDRV_PCM_DEFAULT_CON_SPDIF;
+			outl(ensoniq->spdif_default, ES_REG(ensoniq, CHANNEL_STATUS));
+
 		    	if (ensoniq->u.es1371.ac97->ext_id & AC97_EI_SPDIF)
-			    	kctl->id.index = 1;
+			    	index++;
+
+		    	kctl = snd_ctl_new1(&snd_es1371_mixer_spdif, ensoniq);
+			kctl->id.index = index;
+			snd_ctl_add(card, kctl);
+
+			kctl = snd_ctl_new1(&snd_ens1373_spdif_default, ensoniq);
+			kctl->id.index = index;
+			snd_ctl_add(card, kctl);
+
+			kctl = snd_ctl_new1(&snd_ens1373_spdif_mask, ensoniq);
+			kctl->id.index = index;
+			snd_ctl_add(card, kctl);
+
+			kctl = snd_ctl_new1(&snd_ens1373_spdif_stream, ensoniq);
+			kctl->id.index = index;
 			snd_ctl_add(card, kctl);
 			break;
 		}

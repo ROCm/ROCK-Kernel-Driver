@@ -1996,7 +1996,7 @@ static int snd_pcm_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int err;
-	snd_pcm_sframes_t n;
+	snd_pcm_sframes_t n = 0;
 
 	spin_lock_irq(&runtime->lock);
 	switch (runtime->status->state) {
@@ -2014,8 +2014,6 @@ static int snd_pcm_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
 			n = snd_pcm_playback_hw_avail(runtime);
 		else
 			n = snd_pcm_capture_avail(runtime);
-		if (put_user(n, res))
-			err = -EFAULT;
 		break;
 	case SNDRV_PCM_STATE_XRUN:
 		err = -EPIPE;
@@ -2026,6 +2024,9 @@ static int snd_pcm_delay(snd_pcm_substream_t *substream, snd_pcm_sframes_t *res)
 		break;
 	}
 	spin_unlock_irq(&runtime->lock);
+	if (!err)
+		if (put_user(n, res))
+			err = -EFAULT;
 	return err;
 }
 		
@@ -2668,12 +2669,13 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	if (offset > dma_bytes - PAGE_SIZE)
 		return NOPAGE_SIGBUS;
 	if (substream->ops->page) {
-		vaddr = substream->ops->page(substream, offset);
-		if (! vaddr)
+		page = substream->ops->page(substream, offset);
+		if (! page)
 			return NOPAGE_OOM;
-	} else
+	} else {
 		vaddr = runtime->dma_area + offset;
-	page = virt_to_page(vaddr);
+		page = virt_to_page(vaddr);
+	}
 	get_page(page);
 #ifndef LINUX_2_2
 	return page;

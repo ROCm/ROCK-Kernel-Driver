@@ -175,7 +175,6 @@ free_pages_bulk(struct zone *zone, int count,
 		/* have to delete it as __free_pages_bulk list manipulates */
 		list_del(&page->list);
 		__free_pages_bulk(page, base, zone, area, mask, order);
-		mod_page_state(pgfree, count<<order);
 		ret++;
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
@@ -186,6 +185,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 {
 	LIST_HEAD(list);
 
+	mod_page_state(pgfree, 1 << order);
 	free_pages_check(__FUNCTION__, page);
 	list_add(&page->list, &list);
 	free_pages_bulk(page_zone(page), 1, &list, order);
@@ -291,32 +291,19 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			unsigned long count, struct list_head *list)
 {
 	unsigned long flags;
-	int i, allocated = 0;
+	int i;
+	int allocated = 0;
 	struct page *page;
-	struct list_head *curr;
-	LIST_HEAD(temp);
 	
 	spin_lock_irqsave(&zone->lock, flags);
 	for (i = 0; i < count; ++i) {
 		page = __rmqueue(zone, order);
 		if (page == NULL)
 			break;
-		++allocated;
-		list_add(&page->list, &temp);
+		allocated++;
+		list_add_tail(&page->list, list);
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
-
-	/*
-	 * This may look inefficient because we're walking the list again,
-	 * but the cachelines are hot, so it's very cheap, and this way we
-	 * can drop the zone lock much earlier
-	 */
-	list_for_each(curr, &temp) {
-		page = list_entry(curr, struct page, list);
-		BUG_ON(bad_range(zone, page));
-		prep_new_page(page, order);
-	}
-	list_splice(&temp, list->prev);
 	return allocated;
 }
 
@@ -354,6 +341,7 @@ static void free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
+	inc_page_state(pgfree);
 	free_pages_check(__FUNCTION__, page);
 	pcp = &zone->pageset[get_cpu()].pcp[cold];
 	local_irq_save(flags);
@@ -405,6 +393,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
+		mod_page_state(pgalloc, 1 << order);
 		prep_new_page(page, order);
 	}
 	return page;
@@ -430,8 +419,6 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	cold = 0;
 	if (gfp_mask & __GFP_COLD)
 		cold = 1;
-
-	mod_page_state(pgalloc, 1<<order);
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	classzone = zones[0]; 

@@ -699,7 +699,6 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_PARAMS:
 	{
 		snd_rawmidi_params_t params;
-		int err;
 		if (copy_from_user(&params, (snd_rawmidi_params_t *) arg, sizeof(snd_rawmidi_params_t)))
 			return -EFAULT;
 		switch (params.stream) {
@@ -714,9 +713,6 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 		default:
 			return -EINVAL;
 		}
-		if (copy_to_user((snd_rawmidi_params_t *) arg, &params, sizeof(snd_rawmidi_params_t)))
-			return -EFAULT;
-		return err;
 	}
 	case SNDRV_RAWMIDI_IOCTL_STATUS:
 	{

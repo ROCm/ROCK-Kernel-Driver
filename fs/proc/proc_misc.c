@@ -40,7 +40,7 @@
 #include <linux/times.h>
 #include <linux/profile.h>
 #include <linux/blkdev.h>
-
+#include <linux/hugetlb.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -199,19 +199,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		ps.nr_reverse_maps
 		);
 
-#ifdef CONFIG_HUGETLB_PAGE
-	{
-		extern unsigned long htlbpagemem, htlbzone_pages;
-		len += sprintf(page + len,
-				"HugePages_Total: %5lu\n"
-				"HugePages_Free:  %5lu\n"
-				"Hugepagesize:    %5lu kB\n",
-				htlbzone_pages,
-				htlbpagemem,
-				HPAGE_SIZE/1024);
-	}
+		len += hugetlb_report_meminfo(page + len);
 
-#endif
 	return proc_calc_metrics(page, start, off, count, eof, len);
 #undef K
 }
@@ -341,7 +330,6 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	extern unsigned long total_forks;
 	unsigned long jif = jiffies;
 	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
-	int major, disk;
 
 	for (i = 0 ; i < NR_CPUS; i++) {
 		int j;
@@ -372,7 +360,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.system),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle));
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.iowait));
 	}
 	len += sprintf(page + len, "intr %u", sum);
 
@@ -381,37 +369,17 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		len += sprintf(page + len, " %u", kstat_irqs(i));
 #endif
 
-	len += sprintf(page + len, "\ndisk_io: ");
-
-	for (major = 0; major < DK_MAX_MAJOR; major++) {
-		for (disk = 0; disk < DK_MAX_DISK; disk++) {
-			int active = dkstat.drive[major][disk] +
-				dkstat.drive_rblk[major][disk] +
-				dkstat.drive_wblk[major][disk];
-			if (active)
-				len += sprintf(page + len,
-					"(%u,%u):(%u,%u,%u,%u,%u) ",
-					major, disk,
-					dkstat.drive[major][disk],
-					dkstat.drive_rio[major][disk],
-					dkstat.drive_rblk[major][disk],
-					dkstat.drive_wio[major][disk],
-					dkstat.drive_wblk[major][disk]
-			);
-		}
-	}
-
 	len += sprintf(page + len,
 		"\nctxt %lu\n"
 		"btime %lu\n"
 		"processes %lu\n"
 		"procs_running %lu\n"
-		"procs_blocked %u\n",
+		"procs_blocked %lu\n",
 		nr_context_switches(),
 		xtime.tv_sec - jif / HZ,
 		total_forks,
 		nr_running(),
-		atomic_read(&nr_iowait_tasks));
+		nr_iowait());
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
