@@ -50,11 +50,6 @@ static struct class shost_class = {
 	.release	= scsi_host_cls_release,
 };
 
-static int scsi_device_cancel_cb(struct device *dev, void *data)
-{
-	return scsi_device_cancel(to_scsi_device(dev), *(int *)data);
-}
-
 /**
  * scsi_host_cancel - cancel outstanding IO to this host
  * @shost:	pointer to struct Scsi_Host
@@ -62,9 +57,12 @@ static int scsi_device_cancel_cb(struct device *dev, void *data)
  **/
 void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
 {
+	struct scsi_device *sdev;
+
 	set_bit(SHOST_CANCEL, &shost->shost_state);
-	device_for_each_child(&shost->shost_gendev, &recovery,
-			      scsi_device_cancel_cb);
+	shost_for_each_device(sdev, shost) {
+		scsi_device_cancel(sdev, recovery);
+	}
 	wait_event(shost->host_wait, (!test_bit(SHOST_RECOVERY,
 						&shost->shost_state)));
 }
