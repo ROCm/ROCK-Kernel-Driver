@@ -99,6 +99,7 @@
 #include <linux/usbdevice_fs.h>
 #include <linux/nbd.h>
 #include <linux/random.h>
+#include <linux/filter.h>
 
 /* Use this to get at 32-bit user passed pointers. 
    See sys_sparc32.c for description about these. */
@@ -1666,6 +1667,35 @@ out:
 		}
 	}
 	return err;
+}
+
+struct sock_fprog32 {
+	__u16	len;
+	__u32	filter;
+};
+
+#define PPPIOCSPASS32	_IOW('t', 71, struct sock_fprog32)
+#define PPPIOCSACTIVE32	_IOW('t', 70, struct sock_fprog32)
+
+static int ppp_sock_fprog_ioctl_trans(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct sock_fprog32 *u_fprog32 = (struct sock_fprog32 *) arg;
+	struct sock_fprog *u_fprog64 = alloc_user_space(sizeof(struct sock_fprog));
+	void *fptr64;
+	u32 fptr32;
+	u16 flen;
+
+	if (get_user(flen, &u_fprog32->len) ||
+	    get_user(fptr32, &u_fprog32->filter))
+		return -EFAULT;
+
+	fptr64 = (void *) A(fptr32);
+
+	if (put_user(flen, &u_fprog64->len) ||
+	    put_user(fptr64, &u_fprog64->filter))
+		return -EFAULT;
+
+	return sys_ioctl(fd, cmd, (unsigned long) u_fprog64);
 }
 
 struct ppp_option_data32 {
@@ -4237,13 +4267,16 @@ COMPATIBLE_IOCTL(PPPIOCGMRU)
 COMPATIBLE_IOCTL(PPPIOCSMRU)
 COMPATIBLE_IOCTL(PPPIOCSMAXCID)
 COMPATIBLE_IOCTL(PPPIOCGXASYNCMAP)
-COMPATIBLE_IOCTL(LPGETSTATUS)
 COMPATIBLE_IOCTL(PPPIOCSXASYNCMAP)
 COMPATIBLE_IOCTL(PPPIOCXFERUNIT)
+/* PPPIOCSCOMPRESS is translated */
 COMPATIBLE_IOCTL(PPPIOCGNPMODE)
 COMPATIBLE_IOCTL(PPPIOCSNPMODE)
+/* PPPIOCSPASS is translated */
+/* PPPIOCSACTIVE is translated */
 COMPATIBLE_IOCTL(PPPIOCGDEBUG)
 COMPATIBLE_IOCTL(PPPIOCSDEBUG)
+/* PPPIOCGIDLE is translated */
 COMPATIBLE_IOCTL(PPPIOCNEWUNIT)
 COMPATIBLE_IOCTL(PPPIOCATTACH)
 COMPATIBLE_IOCTL(PPPIOCDETACH)
@@ -4252,6 +4285,8 @@ COMPATIBLE_IOCTL(PPPIOCCONNECT)
 COMPATIBLE_IOCTL(PPPIOCDISCONN)
 COMPATIBLE_IOCTL(PPPIOCATTCHAN)
 COMPATIBLE_IOCTL(PPPIOCGCHAN)
+/* LP */
+COMPATIBLE_IOCTL(LPGETSTATUS)
 /* PPPOX */
 COMPATIBLE_IOCTL(PPPOEIOCSFWD)
 COMPATIBLE_IOCTL(PPPOEIOCDFWD)
@@ -4677,6 +4712,8 @@ HANDLE_IOCTL(FDWERRORGET32, fd_ioctl_trans)
 HANDLE_IOCTL(SG_IO,sg_ioctl_trans)
 HANDLE_IOCTL(PPPIOCGIDLE32, ppp_ioctl_trans)
 HANDLE_IOCTL(PPPIOCSCOMPRESS32, ppp_ioctl_trans)
+HANDLE_IOCTL(PPPIOCSPASS32, ppp_sock_fprog_ioctl_trans)
+HANDLE_IOCTL(PPPIOCSACTIVE32, ppp_sock_fprog_ioctl_trans)
 HANDLE_IOCTL(MTIOCGET32, mt_ioctl_trans)
 HANDLE_IOCTL(MTIOCPOS32, mt_ioctl_trans)
 HANDLE_IOCTL(MTIOCGETCONFIG32, mt_ioctl_trans)
