@@ -64,24 +64,13 @@ struct rcu_head {
 
 
 
-/* Control variables for rcupdate callback mechanism. */
+/* Global control variables for rcupdate callback mechanism. */
 struct rcu_ctrlblk {
-	/* "const" members: only changed when starting/ending a grace period  */
-	struct {
-		long	cur;		/* Current batch number.	      */
-		long	completed;	/* Number of the last completed batch */
-		int	next_pending;	/* Is the next batch already waiting? */
-		seqcount_t lock;	/* for atomically reading cur and     */
-		                        /* next_pending. Spinlock not used,   */
-		                        /* protected by state.mutex           */
-	} batch ____cacheline_maxaligned_in_smp;
-	/* remaining members: bookkeeping of the progress of the grace period */
-	struct {
-		spinlock_t	mutex;	/* Guard this struct                  */
-		cpumask_t	rcu_cpu_mask; 	/* CPUs that need to switch   */
-				/* in order for current batch to proceed.     */
-	} state ____cacheline_maxaligned_in_smp;
-};
+	long	cur;		/* Current batch number.                      */
+	long	completed;	/* Number of the last completed batch         */
+	int	next_pending;	/* Is the next batch already waiting?         */
+	seqcount_t lock;	/* For atomic reads of cur and next_pending.  */
+} ____cacheline_maxaligned_in_smp;
 
 /* Is batch a before batch b ? */
 static inline int rcu_batch_before(long a, long b)
@@ -131,14 +120,14 @@ static inline int rcu_pending(int cpu)
 	 * for them has completed.
 	 */
 	if (!list_empty(&RCU_curlist(cpu)) &&
-		  !rcu_batch_before(rcu_ctrlblk.batch.completed,RCU_batch(cpu)))
+		  !rcu_batch_before(rcu_ctrlblk.completed,RCU_batch(cpu)))
 		return 1;
 	/* This cpu has no pending entries, but there are new entries */
 	if (list_empty(&RCU_curlist(cpu)) &&
 			 !list_empty(&RCU_nxtlist(cpu)))
 		return 1;
 	/* The rcu core waits for a quiescent state from the cpu */
-	if (RCU_quiescbatch(cpu) != rcu_ctrlblk.batch.cur || RCU_qs_pending(cpu))
+	if (RCU_quiescbatch(cpu) != rcu_ctrlblk.cur || RCU_qs_pending(cpu))
 		return 1;
 	/* nothing to do */
 	return 0;
