@@ -162,6 +162,7 @@ WEAK(eb66p_mv);
 WEAK(eiger_mv);
 WEAK(jensen_mv);
 WEAK(lx164_mv);
+WEAK(lynx_mv);
 WEAK(marvel_ev7_mv);
 WEAK(miata_mv);
 WEAK(mikasa_mv);
@@ -739,7 +740,7 @@ get_sysvec(unsigned long type, unsigned long variation, unsigned long cpu)
 		NULL,		/* Turbolaser */
 		&avanti_mv,
 		NULL,		/* Mustang */
-		&alcor_mv,	/* Alcor, Bret, Maverick.  */
+		NULL,		/* Alcor, Bret, Maverick. HWRPB inaccurate? */
 		NULL,		/* Tradewind */
 		NULL,		/* Mikasa -- see below.  */
 		NULL,		/* EB64 */
@@ -748,7 +749,7 @@ get_sysvec(unsigned long type, unsigned long variation, unsigned long cpu)
 		&alphabook1_mv,
 		&rawhide_mv,
 		NULL,		/* K2 */
-		NULL,		/* Lynx */
+		&lynx_mv,	/* Lynx */
 		&xl_mv,
 		NULL,		/* EB164 -- see variation.  */
 		NULL,		/* Noritake -- see below.  */
@@ -930,6 +931,7 @@ get_sysvec_byname(const char *name)
 		&eiger_mv,
 		&jensen_mv,
 		&lx164_mv,
+		&lynx_mv,
 		&miata_mv,
 		&mikasa_mv,
 		&mikasa_primo_mv,
