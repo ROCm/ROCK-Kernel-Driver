@@ -65,9 +65,9 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
-static void d_callback(void *arg)
+static void d_callback(struct rcu_head *head)
 {
-	struct dentry * dentry = (struct dentry *)arg;
+	struct dentry * dentry = container_of(head, struct dentry, d_rcu);
 
 	if (dname_external(dentry))
 		kfree(dentry->d_name.name);
@@ -82,7 +82,7 @@ static void d_free(struct dentry *dentry)
 {
 	if (dentry->d_op && dentry->d_op->d_release)
 		dentry->d_op->d_release(dentry);
- 	call_rcu(&dentry->d_rcu, d_callback, dentry);
+ 	call_rcu(&dentry->d_rcu, d_callback);
 }
 
 /*

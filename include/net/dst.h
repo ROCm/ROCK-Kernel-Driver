@@ -183,6 +183,12 @@ static inline void dst_free(struct dst_entry * dst)
 	__dst_free(dst);
 }
 
+static inline void dst_rcu_free(struct rcu_head *head)
+{
+	struct dst_entry *dst = container_of(head, struct dst_entry, rcu_head);
+	dst_free(dst);
+}
+
 static inline void dst_confirm(struct dst_entry *dst)
 {
 	if (dst)

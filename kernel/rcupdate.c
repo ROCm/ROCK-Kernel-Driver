@@ -68,20 +68,19 @@ static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
  * call_rcu - Queue an RCU update request.
  * @head: structure to be used for queueing the RCU updates.
  * @func: actual update function to be invoked after the grace period
- * @arg: argument to be passed to the update function
  *
  * The update function will be invoked as soon as all CPUs have performed 
  * a context switch or been seen in the idle loop or in a user process. 
  * The read-side of critical section that use call_rcu() for updation must 
  * be protected by rcu_read_lock()/rcu_read_unlock().
  */
-void fastcall call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg)
+void fastcall call_rcu(struct rcu_head *head,
+				void (*func)(struct rcu_head *rcu))
 {
 	int cpu;
 	unsigned long flags;
 
 	head->func = func;
-	head->arg = arg;
 	head->next = NULL;
 	local_irq_save(flags);
 	cpu = smp_processor_id();
@@ -100,7 +99,7 @@ static void rcu_do_batch(struct rcu_head *list)
 
 	while (list) {
 		next = list->next;
-		list->func(list->arg);
+		list->func(list);
 		list = next;
 	}
 }
@@ -358,11 +357,18 @@ void __init rcu_init(void)
 	register_cpu_notifier(&rcu_nb);
 }
 
+struct rcu_synchronize {
+	struct rcu_head head;
+	struct completion completion;
+};
 
 /* Because of FASTCALL declaration of complete, we use this wrapper */
-static void wakeme_after_rcu(void *completion)
+static void wakeme_after_rcu(struct rcu_head  *head)
 {
-	complete(completion);
+	struct rcu_synchronize *rcu;
+
+	rcu = container_of(head, struct rcu_synchronize, head);
+	complete(&rcu->completion);
 }
 
 /**
@@ -371,14 +377,14 @@ static void wakeme_after_rcu(void *completion)
  */
 void synchronize_kernel(void)
 {
-	struct rcu_head rcu;
-	DECLARE_COMPLETION(completion);
+	struct rcu_synchronize rcu;
 
+	init_completion(&rcu.completion);
 	/* Will wake me after RCU finished */
-	call_rcu(&rcu, wakeme_after_rcu, &completion);
+	call_rcu(&rcu.head, wakeme_after_rcu);
 
 	/* Wait for it */
-	wait_for_completion(&completion);
+	wait_for_completion(&rcu.completion);
 }
 
 

@@ -46,18 +46,16 @@
  * struct rcu_head - callback structure for use with RCU
  * @next: next update requests in a list
  * @func: actual update function to call after the grace period.
- * @arg: argument to be passed to the actual update function.
  */
 struct rcu_head {
 	struct rcu_head *next;
-	void (*func)(void *obj);
-	void *arg;
+	void (*func)(struct rcu_head *head);
 };
 
-#define RCU_HEAD_INIT(head) { .next = NULL, .func = NULL, .arg = NULL }
+#define RCU_HEAD_INIT(head) { .next = NULL, .func = NULL }
 #define RCU_HEAD(head) struct rcu_head head = RCU_HEAD_INIT(head)
 #define INIT_RCU_HEAD(ptr) do { \
-       (ptr)->next = NULL; (ptr)->func = NULL; (ptr)->arg = NULL; \
+       (ptr)->next = NULL; (ptr)->func = NULL; \
 } while (0)
 
 
@@ -144,7 +142,7 @@ extern void rcu_restart_cpu(int cpu);
 
 /* Exported interfaces */
 extern void FASTCALL(call_rcu(struct rcu_head *head, 
-                          void (*func)(void *arg), void *arg));
+				void (*func)(struct rcu_head *head)));
 extern void synchronize_kernel(void);
 
 #endif /* __KERNEL__ */

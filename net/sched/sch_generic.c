@@ -411,9 +411,9 @@ void qdisc_reset(struct Qdisc *qdisc)
 /* this is the rcu callback function to clean up a qdisc when there 
  * are no further references to it */
 
-static void __qdisc_destroy (void * arg) 
+static void __qdisc_destroy(struct rcu_head *head)
 {
-	struct Qdisc    *qdisc = (struct Qdisc *) arg;
+	struct Qdisc *qdisc = container_of(head, struct Qdisc, q_rcu);
 	struct Qdisc_ops  *ops = qdisc->ops;
 
 #ifdef CONFIG_NET_ESTIMATOR
@@ -448,7 +448,7 @@ void qdisc_destroy(struct Qdisc *qdisc)
 		}
 	}
 
-	call_rcu(&qdisc->q_rcu, __qdisc_destroy, qdisc);
+	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
 
 }
 
