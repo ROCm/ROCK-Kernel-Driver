@@ -694,8 +694,12 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 
 static int qlogicfas_release(struct Scsi_Host *shost)
 {
-	if (shost->irq)
+	if (shost->irq) {
+		REG1;
+		outb(0, qbase + 0xb);	/* disable ints */
+	
 		free_irq(shost->irq, shost);
+	}
 	if (shost->dma_channel != 0xff)
 		free_dma(shost->dma_channel);
 	if (shost->io_port && shost->n_io_port)
