@@ -1,0 +1,15 @@
+#
+# Security configuration
+#
+
+menu "Security options"
+
+config SECURITY_CAPABILITIES
+	bool
+	default y
+	help
+	  This enables the "default" Linux capabilities functionality.
+	  If you are unsure how to answer this question, answer Y.
+
+endmenu
+

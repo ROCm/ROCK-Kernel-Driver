@@ -1,0 +1,5 @@
+#
+# IPv6 configuration
+# 
+source "net/ipv6/netfilter/Kconfig"
+
