@@ -1669,7 +1669,7 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 							 vma->vm_page_prot)),
 				      vma);
 		lru_cache_add_active(page);
-		mark_page_accessed(page);
+		SetPageReferenced(page);
 		page_add_anon_rmap(page, vma, addr);
 	}
 
