@@ -485,7 +485,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	}
 	if (*csum == 0)
 		*csum = -1;
-	ip6_push_pending_frames(sk);
+	err = ip6_push_pending_frames(sk);
 out:
 	return err;
 }
