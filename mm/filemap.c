@@ -104,341 +104,6 @@ static inline int sync_page(struct page *page)
 	return 0;
 }
 
-/**
- * invalidate_inode_pages - Invalidate all the unlocked pages of one inode
- * @inode: the inode which pages we want to invalidate
- *
- * This function only removes the unlocked pages, if you want to
- * remove all the pages of one inode, you must call truncate_inode_pages.
- */
-
-void invalidate_inode_pages(struct inode * inode)
-{
-	struct list_head *head, *curr;
-	struct page * page;
-	struct address_space *mapping = inode->i_mapping;
-	struct pagevec pvec;
-
-	head = &mapping->clean_pages;
-	pagevec_init(&pvec);
-	write_lock(&mapping->page_lock);
-	curr = head->next;
-
-	while (curr != head) {
-		page = list_entry(curr, struct page, list);
-		curr = curr->next;
-
-		/* We cannot invalidate something in dirty.. */
-		if (PageDirty(page))
-			continue;
-
-		/* ..or locked */
-		if (TestSetPageLocked(page))
-			continue;
-
-		if (PagePrivate(page) && !try_to_release_page(page, 0))
-			goto unlock;
-
-		if (page_count(page) != 1)
-			goto unlock;
-
-		__remove_from_page_cache(page);
-		unlock_page(page);
-		if (!pagevec_add(&pvec, page))
-			__pagevec_release(&pvec);
-		continue;
-unlock:
-		unlock_page(page);
-		continue;
-	}
-
-	write_unlock(&mapping->page_lock);
-	pagevec_release(&pvec);
-}
-
-static int do_invalidatepage(struct page *page, unsigned long offset)
-{
-	int (*invalidatepage)(struct page *, unsigned long);
-	invalidatepage = page->mapping->a_ops->invalidatepage;
-	if (invalidatepage)
-		return (*invalidatepage)(page, offset);
-	return block_invalidatepage(page, offset);
-}
-
-static inline void truncate_partial_page(struct page *page, unsigned partial)
-{
-	memclear_highpage_flush(page, partial, PAGE_CACHE_SIZE-partial);
-	if (PagePrivate(page))
-		do_invalidatepage(page, partial);
-}
-
-/*
- * If truncate cannot remove the fs-private metadata from the page, the page
- * becomes anonymous.  It will be left on the LRU and may even be mapped into
- * user pagetables if we're racing with filemap_nopage().
- */
-static void truncate_complete_page(struct page *page)
-{
-	if (PagePrivate(page))
-		do_invalidatepage(page, 0);
-
-	clear_page_dirty(page);
-	ClearPageUptodate(page);
-	remove_from_page_cache(page);
-	page_cache_release(page);
-}
-
-/*
- * Writeback walks the page list in ->prev order, which is low-to-high file
- * offsets in the common case where he file was written linearly. So truncate
- * walks the page list in the opposite (->next) direction, to avoid getting
- * into lockstep with writeback's cursor.  To prune as many pages as possible
- * before the truncate cursor collides with the writeback cursor.
- */
-static int truncate_list_pages(struct address_space *mapping,
-	struct list_head *head, unsigned long start, unsigned *partial)
-{
-	struct list_head *curr;
-	struct page * page;
-	int unlocked = 0;
-	struct pagevec release_pvec;
-
-	pagevec_init(&release_pvec);
-restart:
-	curr = head->next;
-	while (curr != head) {
-		unsigned long offset;
-
-		page = list_entry(curr, struct page, list);
-		offset = page->index;
-
-		/* Is one of the pages to truncate? */
-		if ((offset >= start) || (*partial && (offset + 1) == start)) {
-			int failed;
-
-			page_cache_get(page);
-			failed = TestSetPageLocked(page);
-			if (!failed && PageWriteback(page)) {
-				unlock_page(page);
-				list_del(head);
-				list_add_tail(head, curr);
-				write_unlock(&mapping->page_lock);
-				wait_on_page_writeback(page);
-				if (!pagevec_add(&release_pvec, page))
-					__pagevec_release(&release_pvec);
-				unlocked = 1;
-				write_lock(&mapping->page_lock);
-				goto restart;
-			}
-
-			list_del(head);
-			if (!failed)		/* Restart after this page */
-				list_add(head, curr);
-			else			/* Restart on this page */
-				list_add_tail(head, curr);
-
-			write_unlock(&mapping->page_lock);
-			unlocked = 1;
-
- 			if (!failed) {
-				if (*partial && (offset + 1) == start) {
-					truncate_partial_page(page, *partial);
-					*partial = 0;
-				} else {
-					truncate_complete_page(page);
-				}
-				unlock_page(page);
-			} else {
- 				wait_on_page_locked(page);
-			}
-			if (!pagevec_add(&release_pvec, page))
-				__pagevec_release(&release_pvec);
-			cond_resched();
-			write_lock(&mapping->page_lock);
-			goto restart;
-		}
-		curr = curr->next;
-	}
-	if (pagevec_count(&release_pvec)) {
-		write_unlock(&mapping->page_lock);
-		pagevec_release(&release_pvec);
-		write_lock(&mapping->page_lock);
-		unlocked = 1;
-	}
-	return unlocked;
-}
-
-/*
- * Unconditionally clean all pages outside `start'.  The mapping lock
- * must be held.
- */
-static void clean_list_pages(struct address_space *mapping,
-		struct list_head *head, unsigned long start)
-{
-	struct page *page;
-	struct list_head *curr;
-
-	for (curr = head->next; curr != head; curr = curr->next) {
-		page = list_entry(curr, struct page, list);
-		if (page->index > start)
-			clear_page_dirty(page);
-	}
-}
-
-/**
- * truncate_inode_pages - truncate *all* the pages from an offset
- * @mapping: mapping to truncate
- * @lstart: offset from with to truncate
- *
- * Truncate the page cache at a set offset, removing the pages
- * that are beyond that offset (and zeroing out partial pages).
- * If any page is locked we wait for it to become unlocked.
- */
-void truncate_inode_pages(struct address_space * mapping, loff_t lstart) 
-{
-	unsigned long start = (lstart + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-	unsigned partial = lstart & (PAGE_CACHE_SIZE - 1);
-	int unlocked;
-
-	write_lock(&mapping->page_lock);
-	clean_list_pages(mapping, &mapping->io_pages, start);
-	clean_list_pages(mapping, &mapping->dirty_pages, start);
-	do {
-		unlocked = truncate_list_pages(mapping,
-				&mapping->io_pages, start, &partial);
-		unlocked |= truncate_list_pages(mapping,
-				&mapping->dirty_pages, start, &partial);
-		unlocked |= truncate_list_pages(mapping,
-				&mapping->clean_pages, start, &partial);
-		unlocked |= truncate_list_pages(mapping,
-				&mapping->locked_pages, start, &partial);
-	} while (unlocked);
-	/* Traversed all three lists without dropping the lock */
-	write_unlock(&mapping->page_lock);
-}
-
-static inline int invalidate_this_page2(struct address_space * mapping,
-					struct page * page,
-					struct list_head * curr,
-					struct list_head * head)
-{
-	int unlocked = 1;
-
-	/*
-	 * The page is locked and we hold the mapping lock as well
-	 * so both page_count(page) and page_buffers stays constant here.
-	 * AKPM: fixme: No global lock any more.  Is this still OK?
-	 */
-	if (page_count(page) == 1 + !!page_has_buffers(page)) {
-		/* Restart after this page */
-		list_del(head);
-		list_add_tail(head, curr);
-
-		page_cache_get(page);
-		write_unlock(&mapping->page_lock);
-		truncate_complete_page(page);
-	} else {
-		if (page_has_buffers(page)) {
-			/* Restart after this page */
-			list_del(head);
-			list_add_tail(head, curr);
-
-			page_cache_get(page);
-			write_unlock(&mapping->page_lock);
-			do_invalidatepage(page, 0);
-		} else
-			unlocked = 0;
-
-		clear_page_dirty(page);
-		ClearPageUptodate(page);
-	}
-
-	return unlocked;
-}
-
-static int invalidate_list_pages2(struct address_space * mapping,
-				  struct list_head * head)
-{
-	struct list_head *curr;
-	struct page * page;
-	int unlocked = 0;
-	struct pagevec release_pvec;
-
-	pagevec_init(&release_pvec);
-restart:
-	curr = head->prev;
-	while (curr != head) {
-		page = list_entry(curr, struct page, list);
-
-		if (!TestSetPageLocked(page)) {
-			int __unlocked;
-
-			if (PageWriteback(page)) {
-				write_unlock(&mapping->page_lock);
-				wait_on_page_writeback(page);
-				unlocked = 1;
-				write_lock(&mapping->page_lock);
-				unlock_page(page);
-				goto restart;
-			}
-
-			__unlocked = invalidate_this_page2(mapping,
-						page, curr, head);
-			unlock_page(page);
-			unlocked |= __unlocked;
-			if (!__unlocked) {
-				curr = curr->prev;
-				continue;
-			}
-		} else {
-			/* Restart on this page */
-			list_del(head);
-			list_add(head, curr);
-
-			page_cache_get(page);
-			write_unlock(&mapping->page_lock);
-			unlocked = 1;
-			wait_on_page_locked(page);
-		}
-
-		if (!pagevec_add(&release_pvec, page))
-			__pagevec_release(&release_pvec);
-		cond_resched();
-		write_lock(&mapping->page_lock);
-		goto restart;
-	}
-	if (pagevec_count(&release_pvec)) {
-		write_unlock(&mapping->page_lock);
-		pagevec_release(&release_pvec);
-		write_lock(&mapping->page_lock);
-		unlocked = 1;
-	}
-	return unlocked;
-}
-
-/**
- * invalidate_inode_pages2 - Clear all the dirty bits around if it can't
- * free the pages because they're mapped.
- * @mapping: the address_space which pages we want to invalidate
- */
-void invalidate_inode_pages2(struct address_space *mapping)
-{
-	int unlocked;
-
-	write_lock(&mapping->page_lock);
-	do {
-		unlocked = invalidate_list_pages2(mapping,
-				&mapping->clean_pages);
-		unlocked |= invalidate_list_pages2(mapping,
-				&mapping->dirty_pages);
-		unlocked |= invalidate_list_pages2(mapping,
-				&mapping->io_pages);
-		unlocked |= invalidate_list_pages2(mapping,
-				&mapping->locked_pages);
-	} while (unlocked);
-	write_unlock(&mapping->page_lock);
-}
-
 /*
  * In-memory filesystems have to fail their
  * writepage function - and this has to be
@@ -821,6 +486,37 @@ repeat:
 	if (cached_page)
 		page_cache_release(cached_page);
 	return page;
+}
+
+/**
+ * find_get_pages - gang pagecache lookup
+ * @mapping:	The address_space to search
+ * @start:	The starting page index
+ * @nr_pages:	The maximum number of pages
+ * @pages:	Where the resulting pages are placed
+ *
+ * find_get_pages() will search for and return a group of up to
+ * @nr_pages pages in the mapping.  The pages are placed at @pages.
+ * find_get_pages() takes a reference against the returned pages.
+ *
+ * The search returns a group of mapping-contiguous pages with ascending
+ * indexes.  There may be holes in the indices due to not-present pages.
+ *
+ * find_get_pages() returns the number of pages which were found.
+ */
+unsigned int find_get_pages(struct address_space *mapping, pgoff_t start,
+			    unsigned int nr_pages, struct page **pages)
+{
+	unsigned int i;
+	unsigned int ret;
+
+	read_lock(&mapping->page_lock);
+	ret = radix_tree_gang_lookup(&mapping->page_tree,
+				(void **)pages, start, nr_pages);
+	for (i = 0; i < ret; i++)
+		page_cache_get(pages[i]);
+	read_unlock(&mapping->page_lock);
+	return ret;
 }
 
 /*

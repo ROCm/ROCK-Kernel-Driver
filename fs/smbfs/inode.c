@@ -210,7 +210,7 @@ smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr)
 			(long) last_sz, (long) inode->i_size);
 
 		if (!S_ISDIR(inode->i_mode))
-			invalidate_inode_pages(inode);
+			invalidate_inode_pages(inode->i_mapping);
 	}
 }
 
@@ -274,7 +274,7 @@ smb_refresh_inode(struct dentry *dentry)
 			 * But we do want to invalidate the caches ...
 			 */
 			if (!S_ISDIR(inode->i_mode))
-				invalidate_inode_pages(inode);
+				invalidate_inode_pages(inode->i_mapping);
 			else
 				smb_invalid_dir_cache(inode);
 			error = -EIO;
