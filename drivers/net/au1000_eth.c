@@ -56,7 +56,7 @@ static void *dma_alloc(size_t, dma_addr_t *);
 static void dma_free(void *, size_t);
 static void hard_stop(struct net_device *);
 static void enable_rx_tx(struct net_device *dev);
-static int __init au1000_probe1(struct net_device *, long, int, int);
+static int __init au1000_probe1(long, int, int);
 static int au1000_init(struct net_device *);
 static int au1000_open(struct net_device *);
 static int au1000_close(struct net_device *);
@@ -644,17 +644,17 @@ static int __init au1000_init_module(void)
 		}
 		// check for valid entries, au1100 only has one entry
 		if (base_addr && irq) {
-			if (au1000_probe1(NULL, base_addr, irq, i) != 0) {
+			if (au1000_probe1(base_addr, irq, i) != 0)
 				return -ENODEV;
-			}
 		}
 	}
 	return 0;
 }
 
 static int __init
-au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
+au1000_probe1(long ioaddr, int irq, int port_num)
 {
+	struct net_device *dev;
 	static unsigned version_printed = 0;
 	struct au1000_private *aup = NULL;
 	int i, retval = 0;
@@ -668,14 +668,15 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	if (version_printed++ == 0)
 		printk(version);
 
-	if (!dev)
-		dev = init_etherdev(NULL, sizeof(struct au1000_private));
+	retval = -ENOMEM;
 
+	dev = alloc_etherdev(sizeof(struct au1000_private));
 	if (!dev) {
-		printk (KERN_ERR "au1000 eth: init_etherdev failed\n");  
-		release_region(ioaddr, MAC_IOSIZE);
-		return -ENODEV;
+		printk (KERN_ERR "au1000 eth: alloc_etherdev failed\n");  
+		goto out;
 	}
+
+	SET_MODULE_OWNER(dev);
 
 	printk("%s: Au1xxx ethernet found at 0x%lx, irq %d\n", 
 	       dev->name, ioaddr, irq);
@@ -685,10 +686,8 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	/* Allocate the data buffers */
 	aup->vaddr = (u32)dma_alloc(MAX_BUF_SIZE * 
 			(NUM_TX_BUFFS+NUM_RX_BUFFS), &aup->dma_addr);
-	if (!aup->vaddr) {
-		retval = -ENOMEM;
-		goto free_region;
-	}
+	if (!aup->vaddr)
+		goto out1;
 
 	/* aup->mac is the base address of the MAC's registers */
 	aup->mac = (volatile mac_reg_t *)((unsigned long)ioaddr);
@@ -749,10 +748,11 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 		MAC_EN_RESET2 | MAC_EN_CLOCK_ENABLE;
 	au_sync_delay(2);
 
-	if (mii_probe(dev) != 0) {
-		 goto free_region;
-	}
+	retval = mii_probe(dev);
+	if (retval)
+		 goto out2;
 
+	retval = -EINVAL;
 	pDBfree = NULL;
 	/* setup the data buffer descriptors and attach a buffer to each one */
 	pDB = aup->db;
@@ -767,13 +767,13 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 
 	for (i=0; i<NUM_RX_DMA; i++) {
 		pDB = GetFreeDB(aup);
-		if (!pDB) goto free_region;
+		if (!pDB) goto out2;
 		aup->rx_dma_ring[i]->buff_stat = (unsigned)pDB->dma_addr;
 		aup->rx_db_inuse[i] = pDB;
 	}
 	for (i=0; i<NUM_TX_DMA; i++) {
 		pDB = GetFreeDB(aup);
-		if (!pDB) goto free_region;
+		if (!pDB) goto out2;
 		aup->tx_dma_ring[i]->buff_stat = (unsigned)pDB->dma_addr;
 		aup->tx_dma_ring[i]->len = 0;
 		aup->tx_db_inuse[i] = pDB;
@@ -792,26 +792,25 @@ au1000_probe1(struct net_device *dev, long ioaddr, int irq, int port_num)
 	dev->tx_timeout = au1000_tx_timeout;
 	dev->watchdog_timeo = ETH_TX_TIMEOUT;
 
-
-	/* Fill in the fields of the device structure with ethernet values. */
-	ether_setup(dev);
-
 	/* 
 	 * The boot code uses the ethernet controller, so reset it to start 
 	 * fresh.  au1000_init() expects that the device is in reset state.
 	 */
 	reset_mac(dev);
+
+	retval = register_netdev(dev);
+	if (retval)
+		goto out2;
 	return 0;
 
-free_region:
+out2:
+	dma_free(aup->vaddr, MAX_BUF_SIZE * (NUM_TX_BUFFS+NUM_RX_BUFFS));
+out1:
+	free_netdev(dev);
+out:
 	release_region(PHYSADDR(ioaddr), MAC_IOSIZE);
-	unregister_netdev(dev);
-	if (aup->vaddr) 
-		dma_free((void *)aup->vaddr, 
-				MAX_BUF_SIZE * (NUM_TX_BUFFS+NUM_RX_BUFFS));
 	printk(KERN_ERR "%s: au1000_probe1 failed.  Returns %d\n",
 	       dev->name, retval);
-	free_netdev(dev);
 	return retval;
 }
 
@@ -933,15 +932,12 @@ static int au1000_open(struct net_device *dev)
 	int retval;
 	struct au1000_private *aup = (struct au1000_private *) dev->priv;
 
-	MOD_INC_USE_COUNT;
-
 	if (au1000_debug > 4)
 		printk("%s: open: dev=%p\n", dev->name, dev);
 
 	if ((retval = au1000_init(dev))) {
 		printk(KERN_ERR "%s: error in au1000_init\n", dev->name);
 		free_irq(dev->irq, dev);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 	netif_start_queue(dev);
@@ -950,7 +946,6 @@ static int au1000_open(struct net_device *dev)
 					dev->name, dev))) {
 		printk(KERN_ERR "%s: unable to get IRQ %d\n", 
 				dev->name, dev->irq);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
@@ -984,8 +979,6 @@ static int au1000_close(struct net_device *dev)
 	spin_unlock_irqrestore(&aup->lock, flags);
 
 	reset_mac(dev);
-	kfree(dev);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
