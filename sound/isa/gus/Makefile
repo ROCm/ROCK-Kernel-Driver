@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _gus.o
-
 export-objs  := gus_main.o gus_volume.o
 
 snd-gus-lib-objs := gus_main.o \

@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _pci.o
-
 mod-subdirs  := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
 
 snd-als4000-objs := als4000.o

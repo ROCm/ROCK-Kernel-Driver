@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _cs423x.o
-
 export-objs  := cs4231_lib.o cs4236_lib.o
 
 snd-cs4231-lib-objs := cs4231_lib.o

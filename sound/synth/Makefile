@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _synth.o
-
 mod-subdirs  := emux
 
 export-objs  := util_mem.o
@@ -18,9 +16,6 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_SBAWE) += snd-util-mem.o
 endif
 
-subdir-$(CONFIG_SND) += emux
-ifeq ($(CONFIG_SND),y)
-  obj-y += emux/_emux.o
-endif
+obj-$(CONFIG_SND) += emux/
 
 include $(TOPDIR)/Rules.make

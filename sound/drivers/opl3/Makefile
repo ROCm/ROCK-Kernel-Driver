@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _opl3.o
-
 export-objs  := opl3_lib.o
 
 snd-opl3-lib-objs := opl3_lib.o opl3_synth.o

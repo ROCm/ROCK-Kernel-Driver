@@ -3,8 +3,6 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := _instr.o
-
 export-objs  := ainstr_fm.o ainstr_simple.o ainstr_gf1.o ainstr_iw.o
 
 snd-ainstr-fm-objs := ainstr_fm.o
