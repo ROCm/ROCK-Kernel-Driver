@@ -1270,6 +1270,7 @@ static int rtl8139_open (struct net_device *dev)
 	tp->full_duplex = tp->duplex_lock;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
 	tp->twistie = 1;
+	tp->time_to_die = 0;
 
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);

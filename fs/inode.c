@@ -1065,24 +1065,27 @@ void iput(struct inode *inode)
 			if (inode->i_state != I_CLEAR)
 				BUG();
 		} else {
-			if (!list_empty(&inode->i_hash) && sb && sb->s_root) {
+			if (!list_empty(&inode->i_hash)) {
 				if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
 					list_del(&inode->i_list);
 					list_add(&inode->i_list, &inode_unused);
 				}
 				inodes_stat.nr_unused++;
 				spin_unlock(&inode_lock);
-				return;
-			} else {
-				list_del_init(&inode->i_list);
+				if (!sb || sb->s_flags & MS_ACTIVE)
+					return;
+				write_inode_now(inode, 1);
+				spin_lock(&inode_lock);
+				inodes_stat.nr_unused--;
 				list_del_init(&inode->i_hash);
-				inode->i_state|=I_FREEING;
-				inodes_stat.nr_inodes--;
-				spin_unlock(&inode_lock);
-				if (inode->i_data.nrpages)
-					truncate_inode_pages(&inode->i_data, 0);
-				clear_inode(inode);
 			}
+			list_del_init(&inode->i_list);
+			inode->i_state|=I_FREEING;
+			inodes_stat.nr_inodes--;
+			spin_unlock(&inode_lock);
+			if (inode->i_data.nrpages)
+				truncate_inode_pages(&inode->i_data, 0);
+			clear_inode(inode);
 		}
 		destroy_inode(inode);
 	}

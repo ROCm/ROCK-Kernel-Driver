@@ -462,6 +462,7 @@ static struct super_block * read_super(kdev_t dev, struct block_device *bdev,
 	lock_super(s);
 	if (!type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
+	s->s_flags |= MS_ACTIVE;
 	unlock_super(s);
 	/* tell bdcache that we are going to keep this one */
 	if (bdev)
@@ -614,6 +615,7 @@ restart:
 	lock_super(s);
 	if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 		goto out_fail;
+	s->s_flags |= MS_ACTIVE;
 	unlock_super(s);
 	get_filesystem(fs_type);
 	path_release(&nd);
@@ -695,6 +697,7 @@ retry:
 		lock_super(s);
 		if (!fs_type->read_super(s, data, flags & MS_VERBOSE ? 1 : 0))
 			goto out_fail;
+		s->s_flags |= MS_ACTIVE;
 		unlock_super(s);
 		get_filesystem(fs_type);
 		return s;
@@ -739,6 +742,7 @@ void kill_super(struct super_block *sb)
 	dput(root);
 	fsync_super(sb);
 	lock_super(sb);
+	sb->s_flags &= ~MS_ACTIVE;
 	invalidate_inodes(sb);	/* bad name - it should be evict_inodes() */
 	if (sop) {
 		if (sop->write_super && sb->s_dirt)

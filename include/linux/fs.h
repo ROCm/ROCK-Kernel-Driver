@@ -110,6 +110,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define MS_BIND		4096
 #define MS_REC		16384
 #define MS_VERBOSE	32768
+#define MS_ACTIVE	(1<<30)
 #define MS_NOUSER	(1<<31)
 
 /*
