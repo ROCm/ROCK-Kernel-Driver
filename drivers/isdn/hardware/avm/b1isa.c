@@ -18,6 +18,7 @@
 #include <linux/ioport.h>
 #include <linux/capi.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <asm/io.h>
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
@@ -34,32 +35,30 @@ MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 
-static void b1isa_remove_ctr(struct capi_ctr *ctrl)
+static struct capi_driver b1isa_driver;
+
+static void b1isa_remove(struct pci_dev *pdev)
 {
-	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
+	avmctrl_info *cinfo = pci_get_drvdata(pdev);
 	avmcard *card = cinfo->card;
-	unsigned int port = card->port;
+	unsigned int port = cinfo->card->port;
 
 	b1_reset(port);
 	b1_reset(port);
 
-	detach_capi_ctr(ctrl);
+	detach_capi_ctr(cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	release_region(card->port, AVMB1_PORTLEN);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
 
-static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
+static int __init b1isa_probe(struct pci_dev *pdev)
 {
 	avmctrl_info *cinfo;
 	avmcard *card;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -70,10 +69,10 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 
 	cinfo = card->ctrlinfo;
 
-	sprintf(card->name, "b1isa-%x", p->port);
-	card->port = p->port;
-	card->irq = p->irq;
+	card->port = pci_resource_start(pdev, 0);
+	card->irq = pdev->irq;
 	card->cardtype = avm_b1isa;
+	sprintf(card->name, "b1isa-%x", card->port);
 
 	if (   card->port != 0x150 && card->port != 0x250
 	    && card->port != 0x300 && card->port != 0x340) {
@@ -107,7 +106,7 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 	b1_reset(card->port);
 	b1_getrevision(card);
 
-	cinfo->capi_ctrl = attach_capi_ctr(driver, card->name, cinfo);
+	cinfo->capi_ctrl = attach_capi_ctr(&b1isa_driver, card->name, cinfo);
 	if (!cinfo->capi_ctrl) {
 		printk(KERN_ERR "b1isa: attach controller failed.\n");
 		retval = -EBUSY;
@@ -116,8 +115,9 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
 
 	printk(KERN_INFO
 		"%s: AVM B1 ISA at i/o %#x, irq %d, revision %d\n",
-		driver->name, card->port, card->irq, card->revision);
+		b1isa_driver.name, card->port, card->irq, card->revision);
 
+	pci_set_drvdata(pdev, cinfo);
 	return 0;
 
  err_free_irq:
@@ -127,7 +127,6 @@ static int b1isa_add_card(struct capi_driver *driver, struct capicardparams *p)
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
@@ -155,7 +154,6 @@ static struct capi_driver b1isa_driver = {
 	revision: "0.0",
 	load_firmware: b1_load_firmware,
 	reset_ctr: b1_reset_ctr,
-	remove_ctr: b1isa_remove_ctr,
 	register_appl: b1_register_appl,
 	release_appl: b1_release_appl,
 	send_message: b1_send_message,
@@ -163,34 +161,63 @@ static struct capi_driver b1isa_driver = {
 	procinfo: b1isa_procinfo,
 	ctr_read_proc: b1ctl_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: b1isa_add_card,
 };
+
+#define MAX_CARDS 4
+static struct pci_dev isa_dev[MAX_CARDS];
+static int io[MAX_CARDS];
+static int irq[MAX_CARDS];
+
+MODULE_PARM(io, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM_DESC(io, "I/O base address(es)");
+MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 
 static int __init b1isa_init(void)
 {
-	struct capi_driver *driver = &b1isa_driver;
-	char *p;
+	int i, retval;
+	int found = 0;
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision));
-		driver->revision[sizeof(driver->revision)-1] = 0;
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
+	b1_set_revision(&b1isa_driver, revision);
+        attach_capi_driver(&b1isa_driver);
+
+	for (i = 0; i < MAX_CARDS; i++) {
+		if (!io[i])
+			break;
+
+		isa_dev[i].resource[0].start = io[i];
+		isa_dev[i].irq_resource[0].start = irq[i];
+
+		if (b1isa_probe(&isa_dev[i]) == 0)
+			found++;
 	}
+	if (found == 0) {
+		retval = -ENODEV;
+		goto err;
+	}
+	retval = 0;
+	goto out;
 
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
-        attach_capi_driver(driver);
+ err:
+	detach_capi_driver(&b1isa_driver);
+ out:
 	MOD_DEC_USE_COUNT;
-	return 0;
+	return retval;
 }
 
 static void __exit b1isa_exit(void)
 {
-    detach_capi_driver(&b1isa_driver);
+	int i;
+
+	for (i = 0; i < MAX_CARDS; i++) {
+		if (!io[i])
+			break;
+
+		b1isa_remove(&isa_dev[i]);
+	}
+	detach_capi_driver(&b1isa_driver);
 }
 
 module_init(b1isa_init);

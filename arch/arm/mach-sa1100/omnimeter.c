@@ -41,7 +41,7 @@ static int __init omnimeter_init(void)
 __initcall(omnimeter_init);
 
 static void __init
-fixup_omnimeter(struct machine_desc *desc, struct param_struct *params,
+fixup_omnimeter(struct machine_desc *desc, struct tag *tags,
 		char **cmdline, struct meminfo *mi)
 {
 	SET_BANK( 0, 0xc0000000, 16*1024*1024 );

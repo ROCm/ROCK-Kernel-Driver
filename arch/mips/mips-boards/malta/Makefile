@@ -28,11 +28,6 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
 O_TARGET := malta.o
 
 obj-y := malta_int.o malta_rtc.o malta_setup.o

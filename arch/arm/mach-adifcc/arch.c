@@ -22,7 +22,7 @@ extern void adifcc_map_io(void);
 extern void adifcc_init_irq(void);
 
 static void __init
-fixup_adifcc(struct machine_desc *desc, struct param_struct *params,
+fixup_adifcc(struct machine_desc *desc, struct tag *tags,
 	      char **cmdline, struct meminfo *mi)
 {
 #ifdef CONFIG_ARCH_ADI_EVB

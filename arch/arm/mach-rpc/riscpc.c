@@ -61,7 +61,7 @@ __tagtable(ATAG_ACORN, parse_tag_acorn);
 #endif
 
 static void __init
-fixup_riscpc(struct machine_desc *desc, struct param_struct *unusd,
+fixup_riscpc(struct machine_desc *desc, struct tag *tags,
 	    char **cmdline, struct meminfo *mi)
 {
 	/*

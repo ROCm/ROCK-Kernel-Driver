@@ -151,7 +151,7 @@ not_angel:
 		add	r1, r1, r0		@ table.  This fixes up the
 		str	r1, [r6], #4		@ C references.
 		cmp	r6, ip
-		blt	1b
+		blo	1b
 
 not_relocated:	mov	r0, #0
 1:		str	r0, [r2], #4		@ clear bss
@@ -159,7 +159,7 @@ not_relocated:	mov	r0, #0
 		str	r0, [r2], #4
 		str	r0, [r2], #4
 		cmp	r2, r3
-		blt	1b
+		blo	1b
 
 		mrc	p15, 0, r6, c0, c0	@ get processor ID
 		bl	cache_on
@@ -206,7 +206,7 @@ not_relocated:	mov	r0, #0
 		ldmia	r2!, {r8 - r13}
 		stmia	r1!, {r8 - r13}
 		cmp	r2, r3
-		blt	1b
+		blo	1b
 
 		bl	cache_clean_flush
 		add	pc, r5, r0		@ call relocation code
@@ -270,9 +270,9 @@ __cache_on:	sub	r3, r4, #16384		@ Page directory size
 		orr	r1, r1, #3 << 10
 		add	r2, r3, #16384
 1:		cmp	r1, r8			@ if virt > start of RAM
-		orrge	r1, r1, #0x0c		@ set cacheable, bufferable
+		orrhs	r1, r1, #0x0c		@ set cacheable, bufferable
 		cmp	r1, r9			@ if virt > end of RAM
-		bicge	r1, r1, #0x0c		@ clear cacheable, bufferable
+		bichs	r1, r1, #0x0c		@ clear cacheable, bufferable
 		str	r1, [r0], #4		@ 1:1 mapping
 		add	r1, r1, #1048576
 		teq	r0, r2
@@ -330,7 +330,7 @@ reloc_start:	add	r8, r5, r0
 		.endr
 
 		cmp	r5, r8
-		blt	1b
+		blo	1b
 		debug_reloc_end
 
 call_kernel:	bl	cache_clean_flush
@@ -395,6 +395,12 @@ proc_types:
 		b	__cache_on
 		b	__armv4_cache_off
 		mov	pc, lr
+
+		.word	0x41129200		@ ARM920T
+		.word	0xff00fff0
+		b	__cache_on
+		b	__armv4_cache_off
+		b	__armv4_cache_flush
 
 		.word	0x4401a100		@ sa110 / sa1100
 		.word	0xffffffe0

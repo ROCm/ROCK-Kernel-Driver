@@ -33,10 +33,10 @@
 
 /*
  * Logical      Physical
- * e8000000	40000000	PCI memory
- * ec000000	62000000	PCI config space
- * ed000000	61000000	PCI V3 regs
- * ee000000	60000000	PCI IO
+ * e8000000	40000000	PCI memory		PHYS_PCI_MEM_BASE	(max 512M)
+ * ec000000	61000000	PCI config space	PHYS_PCI_CONFIG_BASE	(max 16M)
+ * ed000000	62000000	PCI V3 regs		PHYS_PCI_V3_BASE	(max 64k)
+ * ee000000	60000000	PCI IO			PHYS_PCI_IO_BASE	(max 16M)
  * ef000000			Cache flush
  * f1000000	10000000	Core module registers
  * f1100000	11000000	System controller registers
@@ -67,7 +67,7 @@ static struct map_desc integrator_io_desc[] __initdata = {
  { IO_ADDRESS(INTEGRATOR_GPIO_BASE),  INTEGRATOR_GPIO_BASE,  SZ_4K     , DOMAIN_IO, 0, 1},
  { PCI_MEMORY_VADDR,                  PHYS_PCI_MEM_BASE,     SZ_16M    , DOMAIN_IO, 0, 1},
  { PCI_CONFIG_VADDR,                  PHYS_PCI_CONFIG_BASE,  SZ_16M    , DOMAIN_IO, 0, 1},
- { PCI_V3_VADDR,                      PHYS_PCI_V3_BASE,      SZ_512K   , DOMAIN_IO, 0, 1},
+ { PCI_V3_VADDR,                      PHYS_PCI_V3_BASE,      SZ_64K   , DOMAIN_IO, 0, 1},
  { PCI_IO_VADDR,                      PHYS_PCI_IO_BASE,      SZ_64K    , DOMAIN_IO, 0, 1},
  LAST_DESC
 };

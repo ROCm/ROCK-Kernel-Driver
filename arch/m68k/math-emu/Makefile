@@ -7,10 +7,12 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-.S.o:
-	$(CC) $(EXTRA_CFLAGS) $(AFLAGS) -traditional -c $< -o $*.o
+USE_STANDARD_AS_RULE := true
 
-#EXTRA_CFLAGS=-DFPU_EMU_DEBUG
+EXTRA_AFLAGS := -traditional
+
+#EXTRA_AFLAGS += -DFPU_EMU_DEBUG
+#EXTRA_CFLAGS += -DFPU_EMU_DEBUG
 
 O_TARGET := mathemu.o
 

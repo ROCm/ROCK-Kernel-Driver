@@ -557,5 +557,5 @@ __arm1020_proc_info:
 	.long	cpu_arm1020_info
 	.long	arm1020_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v4_user_fns
+	.long	v4wb_user_fns
 	.size	__arm1020_proc_info, . - __arm1020_proc_info

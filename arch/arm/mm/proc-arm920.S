@@ -543,5 +543,5 @@ __arm920_proc_info:
 	.long	cpu_arm920_info
 	.long	arm920_processor_functions
 	.long	v4wbi_tlb_fns
-	.long	v4_user_fns
+	.long	v4wb_user_fns
 	.size	__arm920_proc_info, . - __arm920_proc_info
