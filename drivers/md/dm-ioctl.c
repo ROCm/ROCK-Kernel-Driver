@@ -560,7 +560,6 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	int r;
 	struct dm_table *t;
 	struct mapped_device *md;
-	unsigned int minor = 0;
 
 	r = check_name(param->name);
 	if (r)
@@ -577,9 +576,10 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		minor = minor(to_kdev_t(param->dev));
+		r = dm_create_with_minor(minor(to_kdev_t(param->dev)), t, &md);
+	else
+		r = dm_create(t, &md);
 
-	r = dm_create(minor, t, &md);
 	if (r) {
 		dm_table_put(t);
 		return r;

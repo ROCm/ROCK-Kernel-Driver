@@ -190,8 +190,8 @@ struct ArcProto {
 
 	void (*rx) (struct net_device * dev, int bufnum,
 		    struct archdr * pkthdr, int length);
-	int (*build_header) (struct sk_buff * skb, unsigned short ethproto,
-			     uint8_t daddr);
+	int (*build_header) (struct sk_buff * skb, struct net_device *dev,
+			     unsigned short ethproto, uint8_t daddr);
 
 	/* these functions return '1' if the skb can now be freed */
 	int (*prepare_tx) (struct net_device * dev, struct archdr * pkt, int length,

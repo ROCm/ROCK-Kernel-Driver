@@ -51,8 +51,9 @@ struct mapped_device;
  * Functions for manipulating a struct mapped_device.
  * Drop the reference with dm_put when you finish with the object.
  *---------------------------------------------------------------*/
-int dm_create(unsigned int minor, struct dm_table *table,
-	      struct mapped_device **md);
+int dm_create(struct dm_table *table, struct mapped_device **md);
+int dm_create_with_minor(unsigned int minor, struct dm_table *table,
+			 struct mapped_device **md);
 
 /*
  * Reference counting for md.

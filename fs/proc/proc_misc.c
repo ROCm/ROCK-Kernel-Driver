@@ -137,36 +137,19 @@ static struct vmalloc_info get_vmalloc_info(void)
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
-	u64 uptime;
-	unsigned long uptime_remainder;
+	struct timespec uptime;
+	struct timespec idle;
 	int len;
+	u64 idle_jiffies = init_task.utime + init_task.stime;
 
-	uptime = get_jiffies_64() - INITIAL_JIFFIES;
-	uptime_remainder = (unsigned long) do_div(uptime, HZ);
+	do_posix_clock_monotonic_gettime(&uptime);
+	jiffies_to_timespec(idle_jiffies, &idle);
+	len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
+			(unsigned long) uptime.tv_sec,
+			(uptime.tv_nsec / (NSEC_PER_SEC / 100)),
+			(unsigned long) idle.tv_sec,
+			(idle.tv_nsec / (NSEC_PER_SEC / 100)));
 
-#if HZ!=100
-	{
-		u64 idle = init_task.utime + init_task.stime;
-		unsigned long idle_remainder;
-
-		idle_remainder = (unsigned long) do_div(idle, HZ);
-		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-			(unsigned long) uptime,
-			(uptime_remainder * 100) / HZ,
-			(unsigned long) idle,
-			(idle_remainder * 100) / HZ);
-	}
-#else
-	{
-		unsigned long idle = init_task.utime + init_task.stime;
-
-		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
-			(unsigned long) uptime,
-			uptime_remainder,
-			idle / HZ,
-			idle % HZ);
-	}
-#endif
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 

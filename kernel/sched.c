@@ -219,8 +219,11 @@ __init void node_nr_running_init(void)
 {
 	int i;
 
-	for (i = 0; i < NR_CPUS; i++)
-		cpu_rq(i)->node_nr_running = &node_nr_running[cpu_to_node(i)];
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_possible(i))
+			cpu_rq(i)->node_nr_running =
+				&node_nr_running[cpu_to_node(i)];
+	}
 }
 
 #else /* !CONFIG_NUMA */

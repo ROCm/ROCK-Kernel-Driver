@@ -94,14 +94,21 @@ void do_gettimeofday(struct timeval *tv)
 	time_unlock(flags);
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
 	struct timeval now;
 	unsigned long flags;
+	struct timeval tv_in;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
+	tv_in.tv_sec = tv->tv_sec;
+	tv_in.tv_usec = tv->tv_nsec / 1000;
 
 	flags = time_lock();
 	gettimeofday(&now, NULL);
-	timersub(tv, &now, &local_offset);
+	timersub(&tv_in, &now, &local_offset);
 	time_unlock(flags);
 }
 

@@ -58,10 +58,11 @@ static int pcips2_write(struct serio *io, unsigned char val)
 	return 0;
 }
 
-static void pcips2_interrupt(int irq, void *devid, struct pt_regs *regs)
+static irqreturn_t pcips2_interrupt(int irq, void *devid, struct pt_regs *regs)
 {
 	struct pcips2_data *ps2if = devid;
 	unsigned char status, scancode;
+	int handled = 0;
 
 	do {
 		unsigned int flag;
@@ -69,6 +70,7 @@ static void pcips2_interrupt(int irq, void *devid, struct pt_regs *regs)
 		status = inb(ps2if->base + PS2_STATUS);
 		if (!(status & PS2_STAT_RXFULL))
 			break;
+		handled = 1;
 		scancode = inb(ps2if->base + PS2_DATA);
 		if (status == 0xff && scancode == 0xff)
 			break;
@@ -80,6 +82,7 @@ static void pcips2_interrupt(int irq, void *devid, struct pt_regs *regs)
 
 		serio_interrupt(&ps2if->io, scancode, flag, regs);
 	} while (1);
+	return IRQ_RETVAL(handled);
 }
 
 static void pcips2_flush_input(struct pcips2_data *ps2if)
@@ -206,9 +209,6 @@ static struct pci_driver pcips2_driver = {
 	.id_table		= pcips2_ids,
 	.probe			= pcips2_probe,
 	.remove			= __devexit_p(pcips2_remove),
-	.driver = {
-		.devclass	= &input_devclass,
-	},
 };
 
 static int __init pcips2_init(void)

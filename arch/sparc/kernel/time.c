@@ -53,7 +53,7 @@ spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;
 static struct mostek48t08 *mstk48t08_regs = 0;
 static int set_rtc_mmss(unsigned long);
-static void sbus_do_settimeofday(struct timeval *tv);
+static int sbus_do_settimeofday(struct timespec *tv);
 
 #ifdef CONFIG_SUN4
 struct intersil *intersil_clock;
@@ -500,32 +500,37 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
+	int ret;
+
 	write_seqlock_irq(&xtime_lock);
-	bus_do_settimeofday(tv);
+	ret = bus_do_settimeofday(tv);
 	write_sequnlock_irq(&xtime_lock);
+	return ret;
 }
 
-static void sbus_do_settimeofday(struct timeval *tv)
+static int sbus_do_settimeofday(struct timespec *tv)
 {
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
 	/*
 	 * This is revolting. We need to set "xtime" correctly. However, the
 	 * value in this location is the value at the most recent update of
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_usec -= do_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
+	tv->tv_nsec -= 1000 * (do_gettimeoffset() +
+			(jiffies - wall_jiffies) * (USEC_PER_SEC / HZ));
 
-	while (tv->tv_usec < 0) {
-		tv->tv_usec += USEC_PER_SEC;
+	while (tv->tv_nsec < 0) {
+		tv->tv_nsec += NSEC_PER_SEC;
 		tv->tv_sec--;
 	}
-	tv->tv_usec *= NSEC_PER_USEC;
 
 	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_usec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
 
 	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
 		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
@@ -537,11 +542,12 @@ static void sbus_do_settimeofday(struct timeval *tv)
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_usec;
+	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
+	return 0;
 }
 
 /*

@@ -26,8 +26,6 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
-#include <linux/module.h>
-
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -161,6 +159,7 @@ void __init connect_bsp_APIC(void)
 		outb(0x70, 0x22);
 		outb(0x01, 0x23);
 	}
+	enable_apic_mode();
 }
 
 void disconnect_bsp_APIC(void)

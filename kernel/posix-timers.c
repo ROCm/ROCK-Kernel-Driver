@@ -33,7 +33,7 @@
 		       result; })
 
 #endif
-#define CLOCK_REALTIME_RES TICK_NSEC(TICK_USEC)  // In nano seconds.
+#define CLOCK_REALTIME_RES TICK_NSEC  // In nano seconds.
 
 static inline u64  mpy_l_X_l_ll(unsigned long mpy1,unsigned long mpy2)
 {
@@ -409,7 +409,7 @@ sys_timer_create(clockid_t which_clock,
 	do {
 		if (unlikely(!idr_pre_get(&posix_timers_id))) {
 			error = -EAGAIN;
-			new_timer_id = (timer_t)-1;
+			new_timer->it_id = (timer_t)-1;
 			goto out;
 		}
 		spin_lock_irq(&idr_lock);
@@ -1026,8 +1026,7 @@ sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 	if (posix_clocks[which_clock].clock_set)
 		return posix_clocks[which_clock].clock_set(&new_tp);
 
-	new_tp.tv_nsec /= NSEC_PER_USEC;
-	return do_sys_settimeofday((struct timeval *) &new_tp, NULL);
+	return do_sys_settimeofday(&new_tp, NULL);
 }
 
 asmlinkage long
@@ -1193,6 +1192,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs || !rq_time) {
 			adjust_abs_time(&posix_clocks[which_clock], &t, abs,
 					&rq_time);
+			rq_time += (t.tv_sec || t.tv_nsec);
 		}
 
 		left = rq_time - get_jiffies_64();
@@ -1223,7 +1223,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		left *= TICK_NSEC(TICK_USEC);
+		left *= TICK_NSEC;
 		tsave->tv_sec = div_long_long_rem(left, 
 						  NSEC_PER_SEC, 
 						  &tsave->tv_nsec);

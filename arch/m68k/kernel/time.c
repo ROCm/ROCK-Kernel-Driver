@@ -138,9 +138,12 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
 	extern unsigned long wall_jiffies;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
 
 	write_seqlock_irq(&xtime_lock);
 	/* This is revolting. We need to set the xtime.tv_nsec
@@ -149,19 +152,20 @@ void do_settimeofday(struct timeval *tv)
 	 * Discover what correction gettimeofday
 	 * would have done, and then undo it!
 	 */
-	tv->tv_usec -= mach_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	tv->tv_nsec -= 1000 * (mach_gettimeoffset() +
+			(jiffies - wall_jiffies) * (1000000 / HZ));
 
-	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+	while (tv->tv_nsec < 0) {
+		tv->tv_nsec += NSEC_PER_SEC;
 		tv->tv_sec--;
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_usec * 1000;
+	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
+	return 0;
 }

@@ -1088,10 +1088,13 @@ static __inline__ unsigned long do_gettimeoffset(void)
 	return (ticks * timer_ticks_per_usec_quotient) >> 30UL;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
 	if (this_is_starfire)
-		return;
+		return 0;
 
 	write_seqlock_irq(&xtime_lock);
 	/*
@@ -1100,17 +1103,16 @@ void do_settimeofday(struct timeval *tv)
 	 * wall time.  Discover what correction gettimeofday() would have
 	 * made, and then undo it!
 	 */
-	tv->tv_usec -= do_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
+	tv->tv_nsec -= do_gettimeoffset() * 1000;
+	tv->tv_nsec -= (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
 
-	while (tv->tv_usec < 0) {
-		tv->tv_usec += USEC_PER_SEC;
+	while (tv->tv_nsec < 0) {
+		tv->tv_nsec += NSEC_PER_SEC;
 		tv->tv_sec--;
 	}
-	tv->tv_usec *= NSEC_PER_USEC;
 
 	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
-	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_usec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
 
 	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
 		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
@@ -1122,12 +1124,13 @@ void do_settimeofday(struct timeval *tv)
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = tv->tv_usec;
+	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
+	return 0;
 }
 
 /* Ok, my cute asm atomicity trick doesn't work anymore.
