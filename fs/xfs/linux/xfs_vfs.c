@@ -312,6 +312,7 @@ bhv_remove_all_vfsops(
 
 	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
 	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
+	bhv_remove_vfsops(vfsp, VFS_POSITION_IO);
 	if (!freebase)
 		return;
 	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));

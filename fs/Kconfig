@@ -437,9 +437,6 @@ config XFS_TRACE
 	  few other key areas within XFS.  These traces can be examined
 	  using the kdb kernel debugger.
 
-	  Note that for the pagebuf traces, you will also have to enable
-	  the sysctl in /proc/sys/vm/pagebuf/debug for this to work.
-                                                              
 	  Say N unless you are an XFS developer.              
 
 config MINIX_FS

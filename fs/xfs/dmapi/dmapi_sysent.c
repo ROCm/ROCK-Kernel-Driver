@@ -36,13 +36,13 @@
 
 /* We're using MISC_MAJOR / MISC_DYNAMIC_MINOR. */
 
+#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/major.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/module.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <asm/uaccess.h>
 
@@ -624,20 +624,19 @@ dmapi_dump(struct file *file, char *buf, size_t count, loff_t *ppos)
 }
 
 static struct file_operations dmapi_fops = {
-	.open		= dmapi_open,
-	.ioctl		= dmapi_ioctl,
-	.read		= dmapi_dump,
-	.release	= dmapi_release,
+	open:		dmapi_open,
+	ioctl:		dmapi_ioctl,
+	read:		dmapi_dump,
+	release:	dmapi_release
 };
 
 static struct miscdevice dmapi_dev = {
-	.minor		= MISC_DYNAMIC_MINOR,
-	.name		= "xfs_dmapi",
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	.devfs_name	= "xfs_dmapi",
-#endif
-	.fops		= &dmapi_fops
+	minor:	MISC_DYNAMIC_MINOR,
+	name:	"dmapi",
+	fops:	&dmapi_fops
 };
+
+
 
 #ifdef CONFIG_PROC_FS
 static int
@@ -678,10 +677,13 @@ dmapi_summary(char *buffer, char **start, off_t offset,
 
 	return len;
 }
+#endif
+
 
 static void __init
-dmapi_init_procfs(void)
+dmapi_init_procfs(int dmapi_minor)
 {
+#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *entry;
 
 	if ((entry = proc_mkdir( DMAPI_DBG_PROCFS, 0)) == NULL )
@@ -700,29 +702,30 @@ dmapi_init_procfs(void)
 	entry = create_proc_read_entry( DMAPI_DBG_PROCFS "/summary", 0, 0, dmapi_summary, NULL);
 	entry->owner = THIS_MODULE;
 
-	/*
-	 * Old versions of libdm expect the dmapi dev in /proc--put a
-	 * symlink there so the old libdm can still work.
-	 */
-	entry = proc_symlink(DMAPI_PROCFS, NULL, "/dev/xfs_dmapi");
-	if (entry == NULL)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	entry = proc_mknod( DMAPI_PROCFS, S_IFCHR | S_IRUSR | S_IWUSR,
+			   NULL, mk_kdev(MISC_MAJOR,dmapi_minor));
+	if( entry == NULL )
 		return;
 	entry->owner = THIS_MODULE;
+#endif
+#endif
 }
 
 static void __exit
 dmapi_cleanup_procfs(void)
 {
+#ifdef CONFIG_PROC_FS
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 	remove_proc_entry( DMAPI_PROCFS, NULL);
+#endif
 	remove_proc_entry( DMAPI_DBG_PROCFS "/summary", NULL);
 	remove_proc_entry( DMAPI_DBG_PROCFS "/fsreg", NULL);
 	remove_proc_entry( DMAPI_DBG_PROCFS "/sessions", NULL);
 	remove_proc_entry( DMAPI_DBG_PROCFS, NULL);
+#endif
 }
-#else
-# define dmapi_init_procfs()		do { } while (0)
-# define dmapi_cleanup_procfs()		do { } while (0)
-#endif /* CONFIG_PROC_FS */
+
 
 int __init dmapi_init(void)
 {
@@ -751,7 +754,7 @@ int __init dmapi_init(void)
 	ret = misc_register(&dmapi_dev);
 	if( ret != 0 )
 		printk(KERN_ERR "dmapi_init: misc_register returned %d\n", ret);
-	dmapi_init_procfs();
+	dmapi_init_procfs(dmapi_dev.minor);
 	xfs_dm_init();
 	return(0);
 }

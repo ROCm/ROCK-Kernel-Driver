@@ -503,6 +503,7 @@ _pagebuf_lookup_pages(
 		}
 	}
 
+	pb->pb_flags |= _PBF_PAGECACHE;
 mapit:
 	pb->pb_flags |= _PBF_MEM_ALLOCATED;
 	if (all_mapped) {
@@ -1641,7 +1642,7 @@ pagebuf_daemon(
 	struct list_head	*curr, *next, tmp;
 
 	/*  Set up the thread  */
-	daemonize("pagebufd");
+	daemonize("xfsbufd");
 	current->flags |= PF_MEMALLOC;
 
 	pagebuf_daemon_task = current;

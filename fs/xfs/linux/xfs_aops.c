@@ -71,9 +71,10 @@ xfs_page_trace(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	loff_t		isize = i_size_read(inode);
 	loff_t		offset = page->index << PAGE_CACHE_SHIFT;
-	int		delalloc, unmapped, unwritten;
+	int		delalloc = -1, unmapped = -1, unwritten = -1;
 
-	xfs_count_page_state(page, &delalloc, &unmapped, &unwritten);
+	if (page_has_buffers(page))
+		xfs_count_page_state(page, &delalloc, &unmapped, &unwritten);
 
 	bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
 	ip = XFS_BHVTOI(bdp);

@@ -93,7 +93,7 @@ open_private_file(struct file *file, struct dentry *dentry, int oflags)
 	if (error == -EFBIG) {
 		/* try again */
 		file->f_flags = oflags;
-		error = file.f_op->open(dentry->d_inode, file);
+		error = file->f_op->open(dentry->d_inode, file);
 	}
 
 	if (!error)
@@ -203,6 +203,9 @@ prohibited_mr_events(
 	struct address_space *mapping = LINVFS_GET_IP(vp)->i_mapping;
 	int prohibited = (1 << DM_EVENT_READ);
 	struct vm_area_struct *vma;
+
+	if (!VN_MAPPED(vp))
+		return 0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	down(&mapping->i_shared_sem);
@@ -1004,7 +1007,7 @@ xfs_dm_rdwr(
 	}
 
 	error = open_private_file(&file, dentry, oflags);
-	if (error){
+	if (error) {
 		error = EINVAL;
 		goto put_access;
 	}
