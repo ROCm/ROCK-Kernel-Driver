@@ -163,21 +163,15 @@ repeat:
 	spin_lock(&np->dev->xmit_lock);
 	np->dev->xmit_lock_owner = smp_processor_id();
 
-	if (netif_queue_stopped(np->dev)) {
-		np->dev->xmit_lock_owner = -1;
-		spin_unlock(&np->dev->xmit_lock);
-
-		netpoll_poll(np);
-		goto repeat;
-	}
-
 	status = np->dev->hard_start_xmit(skb, np->dev);
 	np->dev->xmit_lock_owner = -1;
 	spin_unlock(&np->dev->xmit_lock);
 
 	/* transmit busy */
-	if(status)
+	if(status) {
+		netpoll_poll(np);
 		goto repeat;
+	}
 }
 
 void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
