@@ -48,21 +48,22 @@ struct snmp_mib {
 }
 
 /*
- *	We use all unsigned longs. Linux will soon be so reliable that even these
- *	will rapidly get too small 8-). Seriously consider the IpInReceives count
- *	on the 20Gb/s + networks people expect in a few years time!
+ * We use all unsigned longs. Linux will soon be so reliable that even 
+ * these will rapidly get too small 8-). Seriously consider the IpInReceives 
+ * count on the 20Gb/s + networks people expect in a few years time!
  */
 
 /* 
  * The rule for padding: 
- * Best is power of two because then the right structure can be found by a simple
- * shift. The structure should be always cache line aligned.
- * gcc needs n=alignto(cachelinesize, popcnt(sizeof(bla_mib))) shift/add instructions
- * to emulate multiply in case it is not power-of-two. Currently n is always <=3 for
- * all sizes so simple cache line alignment is enough. 
+ * Best is power of two because then the right structure can be found by a 
+ * simple shift. The structure should be always cache line aligned.
+ * gcc needs n=alignto(cachelinesize, popcnt(sizeof(bla_mib))) shift/add 
+ * instructions to emulate multiply in case it is not power-of-two. 
+ * Currently n is always <=3 for all sizes so simple cache line alignment 
+ * is enough. 
  * 
- * The best solution would be a global CPU local area , especially on 64 and 128byte 
- * cacheline machine it makes a *lot* of sense -AK
+ * The best solution would be a global CPU local area , especially on 64 
+ * and 128byte cacheline machine it makes a *lot* of sense -AK
  */ 
 
 #define __SNMP_MIB_ALIGN__	____cacheline_aligned
@@ -113,9 +114,10 @@ struct linux_mib {
 
 
 /* 
- * FIXME: On x86 and some other CPUs the split into user and softirq parts is not needed because 
- * addl $1,memory is atomic against interrupts (but atomic_inc would be overkill because of the lock 
- * cycles). Wants new nonlocked_atomic_inc() primitives -AK
+ * FIXME: On x86 and some other CPUs the split into user and softirq parts
+ * is not needed because addl $1,memory is atomic against interrupts (but 
+ * atomic_inc would be overkill because of the lock cycles). Wants new 
+ * nonlocked_atomic_inc() primitives -AK
  */ 
 #define DEFINE_SNMP_STAT(type, name)	\
 	__typeof__(type) *name[2]
