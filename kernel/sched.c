@@ -2793,6 +2793,63 @@ static int migration_thread(void * data)
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/* migrate_all_tasks - function to migrate all the tasks from the
+ * current cpu caller must have already scheduled this to the target
+ * cpu via set_cpus_allowed.  Machine is stopped.  */
+void migrate_all_tasks(void)
+{
+	struct task_struct *tsk, *t;
+	int dest_cpu, src_cpu;
+	unsigned int node;
+
+	/* We're nailed to this CPU. */
+	src_cpu = smp_processor_id();
+
+	/* Not required, but here for neatness. */
+	write_lock(&tasklist_lock);
+
+	/* watch out for per node tasks, let's stay on this node */
+	node = cpu_to_node(src_cpu);
+
+	do_each_thread(t, tsk) {
+		cpumask_t mask;
+		if (tsk == current)
+			continue;
+
+		if (task_cpu(tsk) != src_cpu)
+			continue;
+
+		/* Figure out where this task should go (attempting to
+		 * keep it on-node), and check if it can be migrated
+		 * as-is.  NOTE that kernel threads bound to more than
+		 * one online cpu will be migrated. */
+		mask = node_to_cpumask(node);
+		cpus_and(mask, mask, tsk->cpus_allowed);
+		dest_cpu = any_online_cpu(mask);
+		if (dest_cpu == NR_CPUS)
+			dest_cpu = any_online_cpu(tsk->cpus_allowed);
+		if (dest_cpu == NR_CPUS) {
+			cpus_clear(tsk->cpus_allowed);
+			cpus_complement(tsk->cpus_allowed);
+			dest_cpu = any_online_cpu(tsk->cpus_allowed);
+
+			/* Don't tell them about moving exiting tasks
+			   or kernel threads (both mm NULL), since
+			   they never leave kernel. */
+			if (tsk->mm && printk_ratelimit())
+				printk(KERN_INFO "process %d (%s) no "
+				       "longer affine to cpu%d\n",
+				       tsk->pid, tsk->comm, src_cpu);
+		}
+
+		move_task_away(tsk, dest_cpu);
+	} while_each_thread(t, tsk);
+
+	write_unlock(&tasklist_lock);
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 /*
  * migration_call - callback that gets triggered when a CPU is added.
  * Here we can start up the necessary migration thread for the new CPU.
