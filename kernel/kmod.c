@@ -223,6 +223,7 @@ static void __call_usermodehelper(void *data)
 		complete(sub_info->complete);
 }
 
+#ifdef CONFIG_KMOD
 /**
  * call_usermodehelper - start a usermode application
  * @path: pathname for the application
@@ -237,7 +238,6 @@ static void __call_usermodehelper(void *data)
  * Must be called from process context.  Returns a negative error code
  * if program was not execed successfully, or 0.
  */
-#ifdef CONFIG_KMOD
 int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 {
 	DECLARE_COMPLETION(done);
