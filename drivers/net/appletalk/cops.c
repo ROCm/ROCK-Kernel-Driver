@@ -321,7 +321,7 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
 
         lp = (struct cops_local *)dev->priv;
         memset(lp, 0, sizeof(struct cops_local));
-        spinlock_init(&lp->lock);
+        spin_lock_init(&lp->lock);
 
 	/* Copy local board variable to lp struct. */
 	lp->board               = board;
