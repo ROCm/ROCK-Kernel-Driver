@@ -64,14 +64,13 @@ typedef struct drm_i830_private {
       	unsigned long hw_status_page;
    	unsigned long counter;
 
-   	atomic_t flush_done;
-   	wait_queue_head_t flush_queue;	/* Processes waiting until flush    */
 	drm_buf_t *mmap_buffer;
 	
 	u32 front_di1, back_di1, zi1;
 	
 	int back_offset;
 	int depth_offset;
+	int front_offset;
 	int w, h;
 	int pitch;
 	int back_pitch;
@@ -107,14 +106,13 @@ extern int i830_swap_bufs(struct inode *inode, struct file *filp,
 extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg);
 
-#define I830_VERBOSE 0
 
 #define I830_BASE(reg)		((unsigned long) \
 				dev_priv->mmio_map->handle)
 #define I830_ADDR(reg)		(I830_BASE(reg) + reg)
-#define I830_DEREF(reg)		*(__volatile__ int *)I830_ADDR(reg)
-#define I830_READ(reg)		I830_DEREF(reg)
-#define I830_WRITE(reg,val) 	do { I830_DEREF(reg) = val; } while (0)
+#define I830_DEREF(reg)		*(__volatile__ unsigned int *)I830_ADDR(reg)
+#define I830_READ(reg)		readl((volatile u32 *)I830_ADDR(reg))
+#define I830_WRITE(reg,val) 	writel(val, (volatile u32 *)I830_ADDR(reg))
 #define I830_DEREF16(reg)	*(__volatile__ u16 *)I830_ADDR(reg)
 #define I830_READ16(reg) 	I830_DEREF16(reg)
 #define I830_WRITE16(reg,val)	do { I830_DEREF16(reg) = val; } while (0)
@@ -143,15 +141,15 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040
 #define RING_TAIL      		0x00
-#define TAIL_ADDR		0x000FFFF8
+#define TAIL_ADDR		0x001FFFF8
 #define RING_HEAD      		0x04
 #define HEAD_WRAP_COUNT     	0xFFE00000
 #define HEAD_WRAP_ONE       	0x00200000
 #define HEAD_ADDR           	0x001FFFFC
 #define RING_START     		0x08
-#define START_ADDR          	0x00FFFFF8
+#define START_ADDR          	0x0xFFFFF000
 #define RING_LEN       		0x0C
-#define RING_NR_PAGES       	0x000FF000 
+#define RING_NR_PAGES       	0x001FF000 
 #define RING_REPORT_MASK    	0x00000006
 #define RING_REPORT_64K     	0x00000002
 #define RING_REPORT_128K    	0x00000004
@@ -182,6 +180,9 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 
 #define CMD_OP_DESTBUFFER_INFO	 ((0x3<<29)|(0x1d<<24)|(0x8e<<16)|1)
 
+#define CMD_3D                          (0x3<<29)
+#define STATE3D_CONST_BLEND_COLOR_CMD   (CMD_3D|(0x1d<<24)|(0x88<<16))
+#define STATE3D_MAP_COORD_SETBIND_CMD   (CMD_3D|(0x1d<<24)|(0x02<<16))
 
 #define BR00_BITBLT_CLIENT   0x40000000
 #define BR00_OP_COLOR_BLT    0x10000000
@@ -206,6 +207,8 @@ extern int i830_clear_bufs(struct inode *inode, struct file *filp,
 #define XY_SRC_COPY_BLT_WRITE_RGB       (1<<20)
 
 #define MI_BATCH_BUFFER 	((0x30<<23)|1)
+#define MI_BATCH_BUFFER_START 	(0x31<<23)
+#define MI_BATCH_BUFFER_END 	(0xA<<23)
 #define MI_BATCH_NON_SECURE	(1)
 
 
