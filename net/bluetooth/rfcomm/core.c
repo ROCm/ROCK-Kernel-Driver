@@ -850,7 +850,7 @@ static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig
 
 	msc = (void *) ptr; ptr += sizeof(*msc);
 	msc->dlci    = __addr(1, dlci);
-	msc->v24_sig = v24_sig;
+	msc->v24_sig = v24_sig | 0x01;
 
 	*ptr = __fcs(buf); ptr++;
 
