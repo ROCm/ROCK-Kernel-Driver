@@ -88,7 +88,7 @@ ifneq ($(filter all,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
 endif
 
-export KBUILD_MODULES KBUILD_BUILTIN
+export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
 
 # Beautify output
 # ---------------------------------------------------------------------------

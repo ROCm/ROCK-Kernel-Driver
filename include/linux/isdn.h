@@ -399,7 +399,7 @@ typedef struct isdn_net_dev_s {
 	                               /* be transmitted asap              */
   atomic_t               frame_cnt;    /* number of frames currently       */
                         	       /* queued in HL driver              */
-  struct tq_struct       tqueue;
+  struct tasklet_struct  tlet;
 
   isdn_net_local        *master;       /* Ptr to Master device for slaves  */
   struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */

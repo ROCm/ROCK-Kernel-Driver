@@ -164,13 +164,11 @@ isdn_net_dec_frame_cnt(isdn_net_dev *idev)
 {
 	atomic_dec(&idev->frame_cnt);
 
-	if (!(isdn_net_device_busy(idev))) {
-		if (!skb_queue_empty(&idev->super_tx_queue)) {
-			queue_task(&idev->tqueue, &tq_immediate);
-			mark_bh(IMMEDIATE_BH);
-		} else {
+	if (!isdn_net_device_busy(idev)) {
+		if (!skb_queue_empty(&idev->super_tx_queue))
+			tasklet_schedule(&idev->tlet);
+		else
 			isdn_net_dev_wake_queue(idev);
-		}
        }                                                                      
 }
 
@@ -858,8 +856,7 @@ isdn_net_write_super(isdn_net_dev *idev, struct sk_buff *skb)
 		// we can't grab the lock from irq context, 
 		// so we just queue the packet
 		skb_queue_tail(&idev->super_tx_queue, skb); 
-		queue_task(&idev->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		tasklet_schedule(&idev->tlet);
 		return;
 	}
 
@@ -872,12 +869,9 @@ isdn_net_write_super(isdn_net_dev *idev, struct sk_buff *skb)
 	spin_unlock_bh(&idev->xmit_lock);
 }
 
-/*
- * called from tq_immediate
- */
-static void isdn_net_softint(void *private)
+static void isdn_net_tasklet(unsigned long data)
 {
-	isdn_net_dev *idev = private;
+	isdn_net_dev *idev = (isdn_net_dev *) data;
 	struct sk_buff *skb;
 
 	spin_lock_bh(&idev->xmit_lock);
@@ -1594,9 +1588,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->next = netdev;
 	netdev->local.netdev = netdev;
 
-	netdev->tqueue.sync = 0;
-	netdev->tqueue.routine = isdn_net_softint;
-	netdev->tqueue.data = netdev;
+	tasklet_init(&netdev->tlet, isdn_net_tasklet, (unsigned long) netdev);
 	spin_lock_init(&netdev->xmit_lock);
 
 	netdev->isdn_slot = -1;

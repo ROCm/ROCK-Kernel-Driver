@@ -101,7 +101,7 @@ isdn_tty_try_read(modem_info * info, struct sk_buff *skb)
 #endif
 					if (info->emu.mdmreg[REG_CPPP] & BIT_CPPP)
 						tty->flip.flag_buf_ptr[len - 1] = 0xff;
-					queue_task(&tty->flip.tqueue, &tq_timer);
+					schedule_task(&tty->flip.tqueue);
 					kfree_skb(skb);
 					return 1;
 				}
@@ -153,7 +153,7 @@ isdn_tty_readmodem(void)
 							tty->flip.flag_buf_ptr += r;
 							tty->flip.char_buf_ptr += r;
 							if (r)
-								queue_task(&tty->flip.tqueue, &tq_timer);
+								schedule_task(&tty->flip.tqueue);
 							restore_flags(flags);
 						}
 					} else
@@ -2498,7 +2498,7 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 
 	} else {
 		restore_flags(flags);
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		schedule_task(&tty->flip.tqueue);
 	}
 }
 
