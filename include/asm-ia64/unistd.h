@@ -223,10 +223,10 @@
 #define __NR_sched_setaffinity		1231
 #define __NR_sched_getaffinity		1232
 #define __NR_security			1233
-#define __NR_get_large_pages		1234
-#define __NR_free_large_pages		1235
-#define __NR_share_large_pages		1236
-#define __NR_unshare_large_pages	1237
+#define __NR_alloc_hugepages		1234
+#define __NR_free_hugepages		1235
+/* 1236 currently unused */
+/* 1237 currently unused */
 #define __NR_io_setup			1238
 #define __NR_io_destroy			1239
 #define __NR_io_getevents		1240
