@@ -56,7 +56,7 @@ static void set_bitmap(unsigned long *bitmap, unsigned int base, unsigned int ex
  */
 asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
-	unsigned int i, max_long, bytes, bytes_updated;
+	unsigned long i, max_long, bytes, bytes_updated;
 	struct thread_struct * t = &current->thread;
 	struct tss_struct * tss;
 	unsigned long *bitmap;
@@ -107,6 +107,9 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 
 	/* Update the TSS: */
 	memcpy(tss->io_bitmap, t->io_bitmap_ptr, bytes_updated);
+	tss->io_bitmap_max = bytes;
+	tss->io_bitmap_owner = &current->thread;
+	tss->io_bitmap_base = IO_BITMAP_OFFSET;
 
 	put_cpu();
 
