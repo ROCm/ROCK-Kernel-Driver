@@ -1,5 +1,5 @@
 /*
- *  linux/arch/h8300/platform/h8300h/aki3068net/crt0_ram.S
+ *  linux/arch/h8300/platform/h8300h/generic/crt0_ram.S
  *
  *  Yoshinori Sato <ysato@users.sourceforge.jp>
  *
@@ -82,30 +82,27 @@ __platform_gpio_table:
 
 gpio_table:
 	;; P1DDR
-	.byte	0xff,0xff
+	.byte	0x00,0x00
 	;; P2DDR
-	.byte	0xff,0xff
+	.byte	0x00,0x00
 	;; P3DDR
-	.byte	0xff,0x00
+	.byte	0x00,0x00
 	;; P4DDR
 	.byte	0x00,0x00
 	;; P5DDR
-	.byte	0x01,0x01
+	.byte	0x00,0x00
 	;; P6DDR
 	.byte	0x00,0x00
 	;; dummy
 	.byte	0x00,0x00
 	;; P8DDR
-	.byte	0x0c,0x0c
+	.byte	0x00,0x00
 	;; P9DDR
 	.byte	0x00,0x00
 	;; PADDR
 	.byte	0x00,0x00
 	;; PBDDR
-	.byte	0x30,0x30
+	.byte	0x00,0x00
 
 __target_name:	
-	.asciz	"AE-3068"
-	
-	.section .bootvec,"ax"
-	jmp	@SYMBOL_NAME(_start)
+	.asciz	"generic"

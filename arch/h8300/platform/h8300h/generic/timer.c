@@ -1,7 +1,7 @@
 /*
  *  linux/arch/h8300/platform/h8300h/generic/timer.c
  *
- *  Yoshinori Sato <qzb04471@nifty.ne.jp>
+ *  Yoshinori Sato <ysato@users.sourceforge.jp>
  *
  *  Platform depend Timer Handler
  *
@@ -22,27 +22,31 @@
 
 #include <linux/timex.h>
 
+extern int request_irq_boot(unsigned int,
+		             irqreturn_t (*handler)(int, void *, struct pt_regs *),
+		             unsigned long, const char *, void *);
+
+
 #if defined(CONFIG_H83007) || defined(CONFIG_H83068)
-#define TMR8CMA2 0x00ffff94
-#define TMR8TCSR2 0x00ffff92
-#define TMR8TCNT2 0x00ffff90
+#include <asm/regs306x.h>
 
 int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
 {
 	outb(H8300_TIMER_COUNT_DATA,TMR8CMA2);
 	outb(0x00,TMR8TCSR2);
-	request_irq(40,timer_int,0,"timer",0);
+	request_irq_boot(40,timer_int,0,"timer",0);
 	outb(0x40|0x08|0x03,TMR8TCNT2);
 	return 0;
 }
 
 void platform_timer_eoi(void)
 {
-        __asm__("bclr #6,@0xffff92:8");
+	*(volatile unsigned char *)_8TCSR2 &= ~(1 << CMFA);
 }
 #endif
 
 #if defined(H8_3002) || defined(CONFIG_H83048)
+/* FIXME! */
 #define TSTR 0x00ffff60
 #define TSNC 0x00ffff61
 #define TMDR 0x00ffff62
@@ -63,7 +67,7 @@ int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
 	*(unsigned short *)TCNT=0;
 	outb(0x23,TCR);
 	outb(0x00,TIOR);
-	request_irq(26,timer_int,0,"timer",0);
+	request_timer_irq(26,timer_int,0,"timer",0);
 	outb(inb(TIER) | 0x01,TIER);
 	outb(inb(TSNC) & ~0x01,TSNC);
 	outb(inb(TMDR) & ~0x01,TMDR);

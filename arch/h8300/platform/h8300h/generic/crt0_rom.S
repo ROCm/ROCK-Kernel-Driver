@@ -3,7 +3,7 @@
  *
  *  Yoshinori Sato <ysato@users.sourceforge.jp>
  *
- *  Platform depend startup for uClinux-2.4.x
+ *  Platform depend startup
  *  Target Archtecture:	generic
  *  Memory Layout     :	ROM
  */
@@ -31,16 +31,16 @@ SYMBOL_NAME_LABEL(_start)
 	
 	/* .bss clear */
 	mov.l	#__sbss,er5
-	mov.l	er5,er6
-	inc.l	#1,er6
 	mov.l	#__ebss,er4
 	sub.l	er5,er4
-	sub.w	r0,r0
-	mov.b	r0l,@er5
+	shlr	er4
+	shlr	er4
+	sub.l	er0,er0
 1:	
-	eepmov.w
-	dec.w	#1,e4
-	bpl	1b
+	mov.l	er0,@er5
+	adds	#4,er5
+	dec.l	#1,er4
+	bne	1b
 
 	/* copy .data */
 #if !defined(CONFIG_H8300H_SIM)
@@ -60,10 +60,9 @@ SYMBOL_NAME_LABEL(_start)
 	mov.w	#512,r4
 	eepmov.w
 
-	/* uClinux kernel start */
+	/* linux kernel start */
 	ldc	#0x90,ccr	/* running kernel */
 	mov.l	#SYMBOL_NAME(init_thread_union),sp
-	mov.l	sp,@SYMBOL_NAME(_current_task)
 	add.l	#0x2000,sp
 	jsr	@_start_kernel
 _exit:
