@@ -2487,6 +2487,8 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
 	struct gendisk *disk = Controller->disks[n];
+
+	disk->queue = RequestQueue;
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	sprintf(disk->devfs_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	disk->major = MajorNumber;
@@ -2717,7 +2719,6 @@ DAC960_DetectController(struct pci_dev *PCI_Device,
 	if (!Controller->disks[i])
 		goto Failure;
 	Controller->disks[i]->private_data = (void *)i;
-	Controller->disks[i]->queue = Controller->RequestQueue;
   }
   init_waitqueue_head(&Controller->CommandWaitQueue);
   init_waitqueue_head(&Controller->HealthStatusWaitQueue);
