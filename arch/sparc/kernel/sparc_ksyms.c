@@ -183,7 +183,7 @@ EXPORT_SYMBOL(io_remap_page_range);
 #ifndef CONFIG_SMP
 EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(___xchg32));
 #else
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(__smp_processor_id));
+EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(__hard_smp_processor_id));
 #endif
 EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(enable_irq));
 EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(disable_irq));
