@@ -64,9 +64,9 @@ static int parse_options(struct super_block *s, char *data)
 {
 	char *curopt = NULL, *value;
 
-	if (data)
-		curopt = strtok(data, ",");
-	for (; curopt; curopt = strtok(NULL, ",")) {
+	while ((curopt = strsep(&data, ",")) != NULL) {
+		if (!*curopt)
+			continue;
 		if ((value = strchr(curopt, '=')) != NULL)
 			*value++ = 0;
 		if (!strcmp(curopt, "devuid")) {
