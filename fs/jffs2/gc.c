@@ -760,7 +760,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 
 	kunmap(pg);
 	/* XXX: Does the page get freed automatically? */
-	/* AAA: Judging by the unmount getting stuck in __wait_on_page_locked, nope. */
+	/* AAA: Judging by the unmount getting stuck in __wait_on_page, nope. */
 	page_cache_release(pg);
 	return ret;
 }

@@ -43,7 +43,6 @@
 #include <linux/pagemap.h>
 #include <linux/crc32.h>
 #include <linux/jffs2.h>
-#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));
@@ -110,12 +109,11 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	int mdatalen = 0;
 	unsigned int ivalid;
 	uint32_t phys_ofs, alloclen;
-	int ret = 0;
-	lock_kernel();
+	int ret;
 	D1(printk(KERN_DEBUG "jffs2_setattr(): ino #%lu\n", inode->i_ino));
 	ret = inode_change_ok(inode, iattr);
 	if (ret) 
-		goto out;
+		return ret;
 
 	/* Special cases - we don't want more than one data node
 	   for these types on the medium at any time. So setattr
@@ -132,14 +130,12 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	} else if (S_ISLNK(inode->i_mode)) {
 		mdatalen = f->metadata->size;
 		mdata = kmalloc(f->metadata->size, GFP_USER);
-		if (!mdata) {
-			ret = -ENOMEM;
-			goto out;
-		}
+		if (!mdata)
+			return -ENOMEM;
 		ret = jffs2_read_dnode(c, f->metadata, mdata, 0, mdatalen);
 		if (ret) {
 			kfree(mdata);
-			goto out;
+			return ret;
 		}
 		D1(printk(KERN_DEBUG "jffs2_setattr(): Writing %d bytes of symlink target\n", mdatalen));
 	}
@@ -148,8 +144,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	if (!ri) {
 		if (S_ISLNK(inode->i_mode))
 			kfree(mdata);
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 		
 	ret = jffs2_reserve_space(c, sizeof(*ri) + mdatalen, &phys_ofs, &alloclen, ALLOC_NORMAL);
@@ -157,7 +152,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		jffs2_free_raw_inode(ri);
 		if (S_ISLNK(inode->i_mode & S_IFMT))
 			 kfree(mdata);
-		goto out;
+		return ret;
 	}
 	down(&f->sem);
 	ivalid = iattr->ia_valid;
@@ -206,8 +201,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		jffs2_complete_reservation(c);
 		jffs2_free_raw_inode(ri);
 		up(&f->sem);
-		ret = PTR_ERR(new_metadata);
-		goto out;
+		return PTR_ERR(new_metadata);
 	}
 	/* It worked. Update the inode */
 	inode->i_atime = ri->atime;
@@ -241,9 +235,7 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 	up(&f->sem);
 	jffs2_complete_reservation(c);
 
-out:
-	unlock_kernel();	
-	return ret;
+	return 0;
 }
 
 int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg)
