@@ -10,7 +10,8 @@
 struct mb_cache_entry {
 	struct list_head		e_lru_list;
 	struct mb_cache			*e_cache;
-	atomic_t			e_used;
+	unsigned short			e_used;
+	unsigned short			e_queued;
 	struct block_device		*e_bdev;
 	sector_t			e_block;
 	struct list_head		e_block_list;
