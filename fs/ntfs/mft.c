@@ -148,7 +148,17 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
  *
  * Note, we only setup asynchronous I/O on the page and return. I/O completion
  * is signalled via our asynchronous I/O completion handler
- * end_buffer_read_index_async().
+ * end_buffer_read_index_async(). We also take care of the nitty gritty
+ * details towards the end of the file and zero out non-initialized regions.
+ *
+ * TODO:/FIXME: The current implementation is simple but wasteful as we perform
+ * actual i/o from disk for all data up to allocated size completely ignoring
+ * the fact that initialized size, and data size for that matter, may well be
+ * lower and hence there is no point in reading them in. We can just zero the
+ * page range, which is what is currently done in our async i/o completion
+ * handler anyway once the read from disk completes. However, I am not sure how
+ * to setup the buffer heads in that case, so for now we do the pointless i/o.
+ * Any help with this would be appreciated...
  */
 static int ntfs_mft_readpage(struct file *file, struct page *page)
 {
@@ -160,7 +170,7 @@ static int ntfs_mft_readpage(struct file *file, struct page *page)
 	ntfs_volume *vol;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock;
-	unsigned int blocksize, blocks,vcn_ofs;
+	unsigned int blocksize, blocks, vcn_ofs;
 	int i, nr;
 	unsigned char blocksize_bits;
 

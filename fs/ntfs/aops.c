@@ -431,12 +431,46 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 	unsigned long flags;
 	struct buffer_head *tmp;
 	struct page *page;
+	ntfs_inode *ni;
 
 	mark_buffer_uptodate(bh, uptodate);
 
-	/* This is a temporary buffer used for page I/O. */
 	page = bh->b_page;
-	if (!uptodate)
+	ni = NTFS_I(page->mapping->host);
+	if (likely(uptodate)) {
+		/*
+		 * The below code is very cpu intensive so we add an extra
+		 * check to ensure it is only run when processing buffer heads
+		 * in pages reaching beyond the initialized data size.
+		 */
+		if ((page->index + 1) << PAGE_CACHE_SHIFT >
+				ni->initialized_size) {
+			s64 file_ofs;
+			char *addr;
+			int page_ofs;
+
+			addr = kmap_atomic(page, KM_BIO_IRQ);
+			BUG_ON(bh->b_data < addr);
+			BUG_ON(bh->b_data + bh->b_size > addr +
+					PAGE_CACHE_SIZE);
+			page_ofs = bh->b_data - addr;
+			file_ofs = (page->index << PAGE_CACHE_SHIFT) + page_ofs;
+			/* Check for the current buffer head overflowing. */
+			if (file_ofs + bh->b_size > ni->initialized_size) {
+				int bh_ofs = 0;
+				if (file_ofs < ni->initialized_size) {
+					bh_ofs = ni->initialized_size -
+							file_ofs;
+					BUG_ON(bh_ofs < 0);
+					BUG_ON(bh_ofs >= bh->b_size);
+				}
+				memset(bh->b_data + bh_ofs, 0,
+						bh->b_size - bh_ofs);
+				flush_dcache_page(page);
+			}
+			kunmap_atomic(addr, KM_BIO_IRQ);
+		}
+	} else
 		SetPageError(page);
 	/*
 	 * Be _very_ careful from here on. Bad things can happen if
@@ -470,7 +504,6 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 		char *addr;
 		unsigned int i, recs, nr_err = 0;
 		u32 rec_size;
-		ntfs_inode *ni = NTFS_I(page->mapping->host);
 
 		addr = kmap_atomic(page, KM_BIO_IRQ);
 		rec_size = ni->_IDM(index_block_size);
@@ -487,6 +520,7 @@ void end_buffer_read_index_async(struct buffer_head *bh, int uptodate)
 					PAGE_CACHE_SHIFT >>
 					ni->_IDM(index_block_size_bits)) + i));
 		}
+		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_IRQ);
 		if (!nr_err && recs)
 			SetPageUptodate(page);

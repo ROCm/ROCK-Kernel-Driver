@@ -8,7 +8,7 @@ ToDo:
 	  functions need to clone block_read_full_page and modify it to cope
 	  with the significance of the different attribute sizes.
 	  Still need to go through:
-		aops.c, attrib.c, compress.c, dir.c, mft.c
+		aops.c, attrib.c, compress.c, dir.c
 	- Find and fix bugs.
 	- W.r.t. s_maxbytes still need to be careful on reading/truncating as
 	  there are dragons lurking in the details, e.g. read_inode() currently
@@ -33,12 +33,19 @@ ToDo:
 	  in between. But now we have a semaphore so are ok. Update
 	  load_attribute_list to use the semaphore so can be called outside
 	  read_inode, too. Apply the same optimization where desired.
+	- Optimize mft_readpage() to not do i/o on buffer heads beyond
+	  initialized_size, just zero the buffer heads instead. Question: How
+	  to setup the buffer heads so they point to the on disk location
+	  correctly (after all they are allocated) but are not read from disk?
 
 tng-0.0.9 - Work in progress
 
 	- Add kill_super, just keeping up with the vfs changes in the kernel.
 	- Repeat some changes from tng-0.0.8 that somehow got lost on the way
 	  from the CVS import into BitKeeper.
+	- Begin to implement proper handling of allocated_size vs
+	  initialized_size vs data_size (i.e. i_size). Done are
+	  mft.c::ntfs_mft_readpage() and aops.c::end_buffer_read_index_async().
 
 tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 
