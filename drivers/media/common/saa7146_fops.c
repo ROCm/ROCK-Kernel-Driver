@@ -73,9 +73,7 @@ int saa7146_buffer_queue(struct saa7146_dev *dev,
 			 struct saa7146_dmaqueue *q,
 			 struct saa7146_buf *buf)
 {
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 	DEB_EE(("dev:%p, dmaq:%p, buf:%p\n", dev, q, buf));
 
 	BUG_ON(!q);
@@ -96,9 +94,7 @@ void saa7146_buffer_finish(struct saa7146_dev *dev,
 			   struct saa7146_dmaqueue *q,
 			   int state)
 {
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 	DEB_EE(("dev:%p, dmaq:%p, state:%d\n", dev, q, state));
 	DEB_EE(("q->curr:%p\n",q->curr));
 
@@ -126,9 +122,7 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 
 	DEB_INT(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
 
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 	if (!list_empty(&q->queue)) {
 		/* activate next one from queue */
 		buf = list_entry(q->queue.next,struct saa7146_buf,vb.queue);

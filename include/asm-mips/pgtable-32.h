@@ -98,7 +98,7 @@ extern int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 
 extern void load_pgd(unsigned long pg_dir);
 
-extern pmd_t invalid_pte_table[PAGE_SIZE/sizeof(pmd_t)];
+extern pte_t invalid_pte_table[PAGE_SIZE/sizeof(pte_t)];
 
 /*
  * Empty pgd/pmd entries point to the invalid_pte_table.

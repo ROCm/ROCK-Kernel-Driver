@@ -41,17 +41,14 @@ void default_idle(void)
 	if (!need_resched()) {
 		if (powersave != NULL)
 			powersave();
-		else {
 #ifdef CONFIG_SMP
+		else {
 			set_thread_flag(TIF_POLLING_NRFLAG);
-			local_irq_enable();
 			while (!need_resched())
 				barrier();
 			clear_thread_flag(TIF_POLLING_NRFLAG);
-#else
-			local_irq_enable();
-#endif
 		}
+#endif
 	}
 	if (need_resched())
 		schedule();

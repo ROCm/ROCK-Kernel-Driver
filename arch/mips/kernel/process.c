@@ -76,7 +76,7 @@ void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp)
 #endif
 	status |= KU_USER;
 	regs->cp0_status = status;
-	current->used_math = 0;
+	clear_used_math();
 	lose_fpu();
 	regs->cp0_epc = pc;
 	regs->regs[29] = sp;
@@ -113,19 +113,15 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	*childregs = *regs;
 	childregs->regs[7] = 0;	/* Clear error flag */
 
-#ifdef CONFIG_BINFMT_IRIX
+#if defined(CONFIG_BINFMT_IRIX)
 	if (current->personality != PER_LINUX) {
 		/* Under IRIX things are a little different. */
-		childregs->regs[2] = 0;
 		childregs->regs[3] = 1;
-		regs->regs[2] = p->pid;
 		regs->regs[3] = 0;
-	} else
-#endif
-	{
-		childregs->regs[2] = 0;	/* Child gets zero as return value */
-		regs->regs[2] = p->pid;
 	}
+#endif
+	childregs->regs[2] = 0;	/* Child gets zero as return value */
+	regs->regs[2] = p->pid;
 
 	if (childregs->cp0_status & ST0_CU0) {
 		childregs->regs[28] = (unsigned long) ti;
@@ -153,6 +149,36 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *r)
 {
 	memcpy(r, &current->thread.fpu, sizeof(current->thread.fpu));
+
+	return 1;
+}
+
+void dump_regs(elf_greg_t *gp, struct pt_regs *regs)
+{
+	int i;
+
+	for (i = 0; i < EF_R0; i++)
+		gp[i] = 0;
+	gp[EF_R0] = 0;
+	for (i = 1; i <= 31; i++)
+		gp[EF_R0 + i] = regs->regs[i];
+	gp[EF_R26] = 0;
+	gp[EF_R27] = 0;
+	gp[EF_LO] = regs->lo;
+	gp[EF_HI] = regs->hi;
+	gp[EF_CP0_EPC] = regs->cp0_epc;
+	gp[EF_CP0_BADVADDR] = regs->cp0_badvaddr;
+	gp[EF_CP0_STATUS] = regs->cp0_status;
+	gp[EF_CP0_CAUSE] = regs->cp0_cause;
+#ifdef EF_UNUSED0
+	gp[EF_UNUSED0] = 0;
+#endif
+}
+
+int dump_task_fpu (struct task_struct *t, elf_fpregset_t *fpr)
+{
+	memcpy(fpr, &t->thread.fpu, sizeof(current->thread.fpu));
+
 	return 1;
 }
 
@@ -263,7 +289,6 @@ arch_initcall(frame_info_init);
  */
 unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	extern void ret_from_fork(void);
 	struct thread_struct *t = &tsk->thread;
 
 	/* New born processes are a special case */

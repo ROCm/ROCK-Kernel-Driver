@@ -112,7 +112,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 			tmp = regs->regs[addr];
 			break;
 		case FPR_BASE ... FPR_BASE + 31:
-			if (child->used_math) {
+			if (tsk_used_math(child)) {
 				fpureg_t *fregs = get_fpu_regs(child);
 
 				/*
@@ -193,7 +193,7 @@ asmlinkage int sys32_ptrace(int request, int pid, int addr, int data)
 		case FPR_BASE ... FPR_BASE + 31: {
 			fpureg_t *fregs = get_fpu_regs(child);
 
-			if (!child->used_math) {
+			if (!tsk_used_math(child)) {
 				/* FP not yet used  */
 				memset(&child->thread.fpu.hard, ~0,
 				       sizeof(child->thread.fpu.hard));

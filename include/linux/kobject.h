@@ -23,6 +23,7 @@
 #include <linux/rwsem.h>
 #include <linux/kref.h>
 #include <linux/kobject_uevent.h>
+#include <linux/kernel.h>
 #include <asm/atomic.h>
 
 #define KOBJ_NAME_LEN	20

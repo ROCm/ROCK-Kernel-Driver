@@ -239,13 +239,24 @@
 #define MALOBISR_CH0		0x80000000	/* EOB channel 1 bit */
 #define MALOBISR_CH2		0x40000000	/* EOB channel 2 bit */
 
-/* 440GP PLB Arbiter DCRs */
+/* 440GP/GX PLB Arbiter DCRs */
 #define DCRN_PLB0_REVID		0x082		/* PLB Arbiter Revision ID */
 #define DCRN_PLB0_ACR		0x083		/* PLB Arbiter Control */
 #define DCRN_PLB0_BESR		0x084		/* PLB Error Status */
 #define DCRN_PLB0_BEARL		0x086		/* PLB Error Address Low */
 #define DCRN_PLB0_BEAR		DCRN_PLB0_BEARL	/* 40x compatibility */
 #define DCRN_PLB0_BEARH		0x087		/* PLB Error Address High */
+
+/* 440GP/GX PLB to OPB bridge DCRs */
+#define DCRN_POB0_BESR0		0x090
+#define DCRN_POB0_BESR1		0x094
+#define DCRN_POB0_BEARL		0x092
+#define DCRN_POB0_BEARH		0x093
+
+/* 440GP/GX OPB to PLB bridge DCRs */
+#define DCRN_OPB0_BSTAT		0x0a9
+#define DCRN_OPB0_BEARL		0x0aa
+#define DCRN_OPB0_BEARH		0x0ab
 
 /* 440GP Clock, PM, chip control */
 #define DCRN_CPC0_SR		0x0b0

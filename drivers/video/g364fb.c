@@ -15,6 +15,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/console.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>

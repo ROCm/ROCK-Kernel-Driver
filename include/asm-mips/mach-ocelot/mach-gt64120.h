@@ -13,14 +13,14 @@
 /*
  * PCI address allocation
  */
-#define GT_PCI_MEM_BASE    (0x22000000UL)
-#define GT_PCI_MEM_SIZE    GT_DEF_PCI0_MEM0_SIZE
-#define GT_PCI_IO_BASE     (0x20000000UL)
-#define GT_PCI_IO_SIZE     GT_DEF_PCI0_IO_SIZE
+#define GT_PCI_MEM_BASE	(0x22000000UL)
+#define GT_PCI_MEM_SIZE	GT_DEF_PCI0_MEM0_SIZE
+#define GT_PCI_IO_BASE	(0x20000000UL)
+#define GT_PCI_IO_SIZE	GT_DEF_PCI0_IO_SIZE
 
 extern unsigned long gt64120_base;
 
-#define GT64120_BASE       (gt64120_base)
+#define GT64120_BASE	(gt64120_base)
 
 /*
  * GT timer irq

@@ -162,7 +162,7 @@ static inline int restore_sigcontext_fpu(struct sigcontext __user *sc)
 	if (!(cpu_data->flags & CPU_HAS_FPU))
 		return 0;
 
-	tsk->used_math = 1;
+	set_used_math();
 	return __copy_from_user(&tsk->thread.fpu.hard, &sc->sc_fpregs[0],
 				sizeof(long)*(16*2+2));
 }
@@ -175,7 +175,7 @@ static inline int save_sigcontext_fpu(struct sigcontext __user *sc,
 	if (!(cpu_data->flags & CPU_HAS_FPU))
 		return 0;
 
-	if (!tsk->used_math) {
+	if (!used_math()) {
 		__put_user(0, &sc->sc_ownedfp);
 		return 0;
 	}
@@ -185,7 +185,7 @@ static inline int save_sigcontext_fpu(struct sigcontext __user *sc,
 	/* This will cause a "finit" to be triggered by the next
 	   attempted FPU operation by the 'current' process.
 	   */
-	tsk->used_math = 0;
+	clear_used_math();
 
 	unlazy_fpu(tsk, regs);
 	return __copy_to_user(&sc->sc_fpregs[0], &tsk->thread.fpu.hard,
@@ -219,7 +219,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc, int *r0_p
 
 		regs->sr |= SR_FD; /* Release FPU */
 		clear_fpu(tsk, regs);
-		tsk->used_math = 0;
+		clear_used_math();
 		__get_user (owned_fp, &sc->sc_ownedfp);
 		if (owned_fp)
 			err |= restore_sigcontext_fpu(sc);

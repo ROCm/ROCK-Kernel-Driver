@@ -1048,7 +1048,7 @@ extern void mv64340_irq_init(unsigned int base);
 #define MPSC_ROUTING_REG_BLOCK_SIZE	0x000c
 #define MPSC_SDMA_INTR_REG_BLOCK_SIZE	0x0084
 
-struct mpsc_shared_pd_dd {
+struct mpsc_shared_pdata {
 	u32	mrr_val;
 	u32	rcrr_val;
 	u32	tcrr_val;
@@ -1067,7 +1067,7 @@ struct mpsc_shared_pd_dd {
 #define MPSC_SDMA_REG_BLOCK_SIZE	0x0c18
 #define MPSC_BRG_REG_BLOCK_SIZE		0x0008
 
-struct mpsc_pd_dd {
+struct mpsc_pdata {
 	u8	mirror_regs;
 	u8	cache_mgmt;
 	u8	max_idle;

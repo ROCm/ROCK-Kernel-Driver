@@ -21,7 +21,7 @@ NESTED(ip27_irq, PT_SIZE, sp)
 	mfc0	t0, CP0_STATUS
 	and	s0, t0
 	move	a0, sp
-	la	ra, ret_from_irq
+	PTR_LA	ra, ret_from_irq
 
 	/* First check for RT interrupt.  */
 	andi	t0, s0, CAUSEF_IP4

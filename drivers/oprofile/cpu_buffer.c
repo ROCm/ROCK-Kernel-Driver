@@ -233,7 +233,7 @@ static void oprofile_end_trace(struct oprofile_cpu_buffer * cpu_buf)
 void oprofile_add_sample(struct pt_regs * const regs, unsigned long event)
 {
 	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
-	unsigned long pc = instruction_pointer(regs);
+	unsigned long pc = profile_pc(regs);
 	int is_kernel = !user_mode(regs);
 
 	if (!backtrace_depth) {

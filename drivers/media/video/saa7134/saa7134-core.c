@@ -371,10 +371,8 @@ int saa7134_buffer_queue(struct saa7134_dev *dev,
 			 struct saa7134_buf *buf)
 {
 	struct saa7134_buf *next = NULL;
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
 
+	assert_spin_locked(&dev->slock);
 	dprintk("buffer_queue %p\n",buf);
 	if (NULL == q->curr) {
 		if (!q->need_two) {
@@ -400,9 +398,7 @@ void saa7134_buffer_finish(struct saa7134_dev *dev,
 			   struct saa7134_dmaqueue *q,
 			   unsigned int state)
 {
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 	dprintk("buffer_finish %p\n",q->curr);
 
 	/* finish current buffer */
@@ -417,9 +413,7 @@ void saa7134_buffer_next(struct saa7134_dev *dev,
 {
 	struct saa7134_buf *buf,*next = NULL;
 
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 	BUG_ON(NULL != q->curr);
 
 	if (!list_empty(&q->queue)) {
@@ -474,9 +468,7 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 	enum v4l2_field cap = V4L2_FIELD_ANY;
 	enum v4l2_field ov  = V4L2_FIELD_ANY;
 
-#ifdef DEBUG_SPINLOCKS
-	BUG_ON(!spin_is_locked(&dev->slock));
-#endif
+	assert_spin_locked(&dev->slock);
 
 	/* video capture -- dma 0 + video task A */
 	if (dev->video_q.curr) {

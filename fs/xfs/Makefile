@@ -70,6 +70,7 @@ xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
 xfs-$(CONFIG_PROC_FS)		+= linux-2.6/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= linux-2.6/xfs_sysctl.o
 xfs-$(CONFIG_COMPAT)		+= linux-2.6/xfs_ioctl32.o
+xfs-$(CONFIG_XFS_EXPORT)	+= linux-2.6/xfs_export.o
 
 
 xfs-y				+= xfs_alloc.o \

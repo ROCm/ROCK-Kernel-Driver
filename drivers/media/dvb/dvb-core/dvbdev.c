@@ -31,6 +31,8 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/device.h>
+#include <linux/fs.h>
+#include <linux/cdev.h>
 
 #include "dvbdev.h"
 
@@ -50,8 +52,9 @@ static const char * const dnames[] = {
 };
 
 
-#define DVB_MAX_IDS              4
+#define DVB_MAX_IDS              6
 #define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
+#define MAX_DVB_MINORS           (DVB_MAX_IDS*64)
 
 struct class_simple *dvb_class;
 EXPORT_SYMBOL(dvb_class);
@@ -108,6 +111,11 @@ static struct file_operations dvb_device_fops =
 	.open =		dvb_device_open,
 };
 
+
+static struct cdev dvb_device_cdev = {
+	.kobj   = {.name = "dvb", },
+	.owner  =       THIS_MODULE,
+};
 
 int dvb_generic_open(struct inode *inode, struct file *file)
 {
@@ -400,25 +408,41 @@ out:
 static int __init init_dvbdev(void)
 {
 	int retval;
+	dev_t dev = MKDEV(DVB_MAJOR, 0);
 
-	if ((retval = register_chrdev(DVB_MAJOR,"DVB", &dvb_device_fops)))
+	if ((retval = register_chrdev_region(dev, MAX_DVB_MINORS, "DVB")) != 0) {
 		printk("dvb-core: unable to get major %d\n", DVB_MAJOR);
+		return retval;
+	}
+
+	cdev_init(&dvb_device_cdev, &dvb_device_fops);
+	if ((retval = cdev_add(&dvb_device_cdev, dev, MAX_DVB_MINORS)) != 0) {
+		printk("dvb-core: unable to get major %d\n", DVB_MAJOR);
+		goto error;
+	}
 
 	devfs_mk_dir("dvb");
 
 	dvb_class = class_simple_create(THIS_MODULE, "dvb");
-	if (IS_ERR(dvb_class))
-		return PTR_ERR(dvb_class);
+	if (IS_ERR(dvb_class)) {
+		retval = PTR_ERR(dvb_class);
+		goto error;
+	}
+	return 0;
 
+error:
+	cdev_del(&dvb_device_cdev);
+	unregister_chrdev_region(dev, MAX_DVB_MINORS);
 	return retval;
 }
 
 
 static void __exit exit_dvbdev(void)
 {
-	unregister_chrdev(DVB_MAJOR, "DVB");
         devfs_remove("dvb");
 	class_simple_destroy(dvb_class);
+	cdev_del(&dvb_device_cdev);
+        unregister_chrdev_region(MKDEV(DVB_MAJOR, 0), MAX_DVB_MINORS);
 }
 
 module_init(init_dvbdev);

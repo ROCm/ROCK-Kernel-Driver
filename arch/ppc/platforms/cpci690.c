@@ -289,35 +289,6 @@ cpci690_setup_peripherals(void)
 	return;
 }
 
-static int __init
-cpci690_fixup_pd(void)
-{
-#if defined(CONFIG_SERIAL_MPSC)
-	struct list_head	*entry;
-	struct platform_device	*pd;
-	struct device		*dev;
-	struct mpsc_pd_dd	*dd;
-
-	list_for_each(entry, &platform_bus_type.devices.list) {
-		dev = container_of(entry, struct device, bus_list);
-		pd = container_of(dev, struct platform_device, dev);
-
-		if (!strncmp(pd->name, MPSC_CTLR_NAME, BUS_ID_SIZE)) {
-			dd = (struct mpsc_pd_dd *) dev_get_drvdata(&pd->dev);
-
-			dd->max_idle = 40;
-			dd->default_baud = 9600;
-			dd->brg_clk_src = 8;
-			dd->brg_clk_freq = 133000000;
-		}
-	}
-#endif
-
-	return 0;
-}
-
-subsys_initcall(cpci690_fixup_pd);
-
 static void __init
 cpci690_setup_arch(void)
 {
@@ -358,6 +329,50 @@ cpci690_setup_arch(void)
 
 	return;
 }
+
+/* Platform device data fixup routines. */
+#if defined(CONFIG_SERIAL_MPSC)
+static void __init
+cpci690_fixup_mpsc_pdata(struct platform_device *pdev)
+{
+	struct mpsc_pdata *pdata;
+
+	pdata = (struct mpsc_pdata *)pdev->dev.platform_data;
+
+	pdata->max_idle = 40;
+	pdata->default_baud = 9600;
+	pdata->brg_clk_src = 8;
+	pdata->brg_clk_freq = 133000000;
+
+	return;
+}
+
+static int __init
+cpci690_platform_notify(struct device *dev)
+{
+	static struct {
+		char	*bus_id;
+		void	((*rtn)(struct platform_device *pdev));
+	} dev_map[] = {
+		{ MPSC_CTLR_NAME "0", cpci690_fixup_mpsc_pdata },
+		{ MPSC_CTLR_NAME "1", cpci690_fixup_mpsc_pdata },
+	};
+	struct platform_device	*pdev;
+	int	i;
+
+	if (dev && dev->bus_id)
+		for (i=0; i<ARRAY_SIZE(dev_map); i++)
+			if (!strncmp(dev->bus_id, dev_map[i].bus_id,
+				BUS_ID_SIZE)) {
+
+				pdev = container_of(dev,
+					struct platform_device, dev);
+				dev_map[i].rtn(pdev);
+			}
+
+	return 0;
+}
+#endif
 
 static void
 cpci690_reset_board(void)
@@ -488,6 +503,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_io_mappings = cpci690_map_io;
 	ppc_md.early_serial_map = cpci690_early_serial_map;
 #endif	/* CONFIG_KGDB */
+
+#if defined(CONFIG_SERIAL_MPSC)
+	platform_notify = cpci690_platform_notify;
+#endif
 
 	return;
 }

@@ -35,11 +35,8 @@
 
 void udf_free_inode(struct inode * inode)
 {
-	struct super_block * sb = inode->i_sb;
-	int is_directory;
-	unsigned long ino;
-
-	ino = inode->i_ino;
+	struct super_block *sb = inode->i_sb;
+	struct udf_sb_info *sbi = UDF_SB(sb);
 
 	/*
 	 * Note: we must free any quota before locking the superblock,
@@ -48,36 +45,32 @@ void udf_free_inode(struct inode * inode)
 	DQUOT_FREE_INODE(inode);
 	DQUOT_DROP(inode);
 
-	lock_super(sb);
-
-	is_directory = S_ISDIR(inode->i_mode);
-
 	clear_inode(inode);
 
-	if (UDF_SB_LVIDBH(sb))
-	{
-		if (is_directory)
+	down(&sbi->s_alloc_sem);
+	if (sbi->s_lvidbh) {
+		if (S_ISDIR(inode->i_mode))
 			UDF_SB_LVIDIU(sb)->numDirs =
 				cpu_to_le32(le32_to_cpu(UDF_SB_LVIDIU(sb)->numDirs) - 1);
 		else
 			UDF_SB_LVIDIU(sb)->numFiles =
 				cpu_to_le32(le32_to_cpu(UDF_SB_LVIDIU(sb)->numFiles) - 1);
 		
-		mark_buffer_dirty(UDF_SB_LVIDBH(sb));
+		mark_buffer_dirty(sbi->s_lvidbh);
 	}
-	unlock_super(sb);
+	up(&sbi->s_alloc_sem);
 
 	udf_free_blocks(sb, NULL, UDF_I_LOCATION(inode), 0, 1);
 }
 
 struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
 {
-	struct super_block *sb;
+	struct super_block *sb = dir->i_sb;
+	struct udf_sb_info *sbi = UDF_SB(sb);
 	struct inode * inode;
 	int block;
 	uint32_t start = UDF_I_LOCATION(dir).logicalBlockNum;
 
-	sb = dir->i_sb;
 	inode = new_inode(sb);
 
 	if (!inode)
@@ -94,8 +87,8 @@ struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
 		iput(inode);
 		return NULL;
 	}
-	lock_super(sb);
 
+	down(&sbi->s_alloc_sem);
 	UDF_I_UNIQUE(inode) = 0;
 	UDF_I_LENEXTENTS(inode) = 0;
 	UDF_I_NEXT_ALLOC_BLOCK(inode) = 0;
@@ -160,8 +153,8 @@ struct inode * udf_new_inode (struct inode *dir, int mode, int * err)
 		UDF_I_CRTIME(inode) = current_fs_time(inode->i_sb);
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);
+	up(&sbi->s_alloc_sem);
 
-	unlock_super(sb);
 	if (DQUOT_ALLOC_INODE(inode))
 	{
 		DQUOT_DROP(inode);

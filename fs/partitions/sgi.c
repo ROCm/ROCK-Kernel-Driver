@@ -69,8 +69,12 @@ int sgi_partition(struct parsed_partitions *state, struct block_device *bdev)
 	for(i = 0; i < 16; i++, p++) {
 		blocks = be32_to_cpu(p->num_blocks);
 		start  = be32_to_cpu(p->first_block);
-		if (blocks)
-			put_partition(state, slot++, start, blocks);
+		if (blocks) {
+			put_partition(state, slot, start, blocks);
+			if (be32_to_cpu(p->type) == LINUX_RAID_PARTITION)
+				state->parts[slot].flags = 1;
+		}
+		slot++;
 	}
 	printk("\n");
 	put_dev_sector(sect);

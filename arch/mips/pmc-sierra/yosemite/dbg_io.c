@@ -31,9 +31,6 @@
  * the interrupt came from channel A or B.
  */
 
-#include <linux/config.h>
-
-#ifdef CONFIG_KGDB
 #include <asm/serial.h>
 
 /*
@@ -181,4 +178,3 @@ int putDebugChar(unsigned char byte)
 
 	return 1;
 }
-#endif

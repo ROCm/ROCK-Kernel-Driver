@@ -270,7 +270,7 @@ static int __init vr41xx_pciu_init(void)
 	/* Clear bus error */
 	readl(BUSERRADREG);
 
-	writel(CONFIG_DONE, PCIENREG);
+	writel(BLOODY_CONFIG_DONE, PCIENREG);
 
 	if (setup->mem_resource != NULL)
 		vr41xx_pci_controller.mem_resource = setup->mem_resource;

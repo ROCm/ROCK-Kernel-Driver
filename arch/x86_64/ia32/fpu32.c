@@ -157,7 +157,7 @@ int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 __user *buf,
 				     sizeof(struct i387_fxsave_struct)))
 			return -1;
 		tsk->thread.i387.fxsave.mxcsr &= mxcsr_feature_mask;
-		tsk->used_math = 1;
+		set_stopped_child_used_math(tsk);
 	} 
 	return convert_fxsr_from_user(&tsk->thread.i387.fxsave, buf);
 }  

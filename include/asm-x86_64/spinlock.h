@@ -75,7 +75,7 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(lock->magic != SPINLOCK_MAGIC);
-	BUG_ON(!spin_is_locked(lock));
+	assert_spin_locked(lock);
 #endif
 	__asm__ __volatile__(
 		spin_unlock_string
@@ -94,7 +94,7 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 	char oldval = 1;
 #ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(lock->magic != SPINLOCK_MAGIC);
-	BUG_ON(!spin_is_locked(lock));
+	assert_spin_locked(lock);
 #endif
 	__asm__ __volatile__(
 		spin_unlock_string

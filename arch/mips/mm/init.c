@@ -61,7 +61,7 @@ unsigned long setup_zero_pages(void)
 	else
 		order = 0;
 
-	empty_zero_page = __get_free_pages(GFP_KERNEL, order);
+	empty_zero_page = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
 	if (!empty_zero_page)
 		panic("Oh boy, that early out of memory?");
 
@@ -74,7 +74,6 @@ unsigned long setup_zero_pages(void)
 
 	size = PAGE_SIZE << order;
 	zero_page_mask = (size - 1) & PAGE_MASK;
-	memset((void *)empty_zero_page, 0, size);
 
 	return 1UL << order;
 }

@@ -94,9 +94,9 @@ static __inline unsigned int kmem_flags_convert(int flags)
 #endif
 
 	if (flags & KM_NOSLEEP) {
-		lflags = GFP_ATOMIC;
+		lflags |= GFP_ATOMIC;
 	} else {
-		lflags = GFP_KERNEL;
+		lflags |= GFP_KERNEL;
 
 		/* avoid recusive callbacks to filesystem during transactions */
 		if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))

@@ -34,10 +34,10 @@
 u8		mv64x60_pci_exclude_bridge = 1;
 spinlock_t	mv64x60_lock; /* Only really used by PIC code once init done */
 
-static u32	mv64x60_bridge_pbase = 0;
-static u32	mv64x60_bridge_vbase = 0;
-static u32	mv64x60_bridge_type = MV64x60_TYPE_INVALID;
-static u32	mv64x60_bridge_rev = 0;
+static phys_addr_t 	mv64x60_bridge_pbase = 0;
+static void 		*mv64x60_bridge_vbase = 0;
+static u32		mv64x60_bridge_type = MV64x60_TYPE_INVALID;
+static u32		mv64x60_bridge_rev = 0;
 
 static u32 gt64260_translate_size(u32 base, u32 size, u32 num_bits);
 static u32 gt64260_untranslate_size(u32 base, u32 size, u32 num_bits);
@@ -88,7 +88,7 @@ static struct mv64x60_chip_info gt64260a_ci __initdata = { /* GT64260A */
 	.translate_size		= gt64260_translate_size,
 	.untranslate_size	= gt64260_untranslate_size,
 	.set_pci2mem_window	= gt64260_set_pci2mem_window,
-	.set_pci2regs_window    = gt64260_set_pci2regs_window,
+	.set_pci2regs_window	= gt64260_set_pci2regs_window,
 	.is_enabled_32bit	= gt64260_is_enabled_32bit,
 	.enable_window_32bit	= gt64260_enable_window_32bit,
 	.disable_window_32bit	= gt64260_disable_window_32bit,
@@ -104,7 +104,7 @@ static struct mv64x60_chip_info gt64260b_ci __initdata = { /* GT64260B */
 	.translate_size		= gt64260_translate_size,
 	.untranslate_size	= gt64260_untranslate_size,
 	.set_pci2mem_window	= gt64260_set_pci2mem_window,
-	.set_pci2regs_window    = gt64260_set_pci2regs_window,
+	.set_pci2regs_window	= gt64260_set_pci2regs_window,
 	.is_enabled_32bit	= gt64260_is_enabled_32bit,
 	.enable_window_32bit	= gt64260_enable_window_32bit,
 	.disable_window_32bit	= gt64260_disable_window_32bit,
@@ -120,7 +120,7 @@ static struct mv64x60_chip_info mv64360_ci __initdata = { /* MV64360 */
 	.translate_size		= mv64360_translate_size,
 	.untranslate_size	= mv64360_untranslate_size,
 	.set_pci2mem_window	= mv64360_set_pci2mem_window,
-	.set_pci2regs_window    = mv64360_set_pci2regs_window,
+	.set_pci2regs_window	= mv64360_set_pci2regs_window,
 	.is_enabled_32bit	= mv64360_is_enabled_32bit,
 	.enable_window_32bit	= mv64360_enable_window_32bit,
 	.disable_window_32bit	= mv64360_disable_window_32bit,
@@ -138,7 +138,7 @@ static struct mv64x60_chip_info mv64460_ci __initdata = { /* MV64460 */
 	.translate_size		= mv64360_translate_size,
 	.untranslate_size	= mv64360_untranslate_size,
 	.set_pci2mem_window	= mv64360_set_pci2mem_window,
-	.set_pci2regs_window    = mv64360_set_pci2regs_window,
+	.set_pci2regs_window	= mv64360_set_pci2regs_window,
 	.is_enabled_32bit	= mv64360_is_enabled_32bit,
 	.enable_window_32bit	= mv64360_enable_window_32bit,
 	.disable_window_32bit	= mv64360_disable_window_32bit,
@@ -160,7 +160,7 @@ static struct mv64x60_chip_info mv64460_ci __initdata = { /* MV64460 */
  *****************************************************************************
  */
 #ifdef CONFIG_SERIAL_MPSC
-static struct mpsc_shared_pd_dd mv64x60_mpsc_shared_pd_dd = {
+static struct mpsc_shared_pdata mv64x60_mpsc_shared_pdata = {
 	.mrr_val		= 0x3ffffe38,
 	.rcrr_val		= 0,
 	.tcrr_val		= 0,
@@ -192,11 +192,11 @@ static struct platform_device mpsc_shared_device = { /* Shared device */
 	.num_resources	= ARRAY_SIZE(mv64x60_mpsc_shared_resources),
 	.resource	= mv64x60_mpsc_shared_resources,
 	.dev = {
-		.driver_data = &mv64x60_mpsc_shared_pd_dd,
+		.platform_data = &mv64x60_mpsc_shared_pdata,
 	},
 };
 
-static struct mpsc_pd_dd mv64x60_mpsc0_pd_dd = {
+static struct mpsc_pdata mv64x60_mpsc0_pdata = {
 	.mirror_regs		= 0,
 	.cache_mgmt		= 0,
 	.max_idle		= 0,
@@ -248,11 +248,11 @@ static struct platform_device mpsc0_device = {
 	.num_resources	= ARRAY_SIZE(mv64x60_mpsc0_resources),
 	.resource	= mv64x60_mpsc0_resources,
 	.dev = {
-		.driver_data = &mv64x60_mpsc0_pd_dd,
+		.platform_data = &mv64x60_mpsc0_pdata,
 	},
 };
 
-static struct mpsc_pd_dd mv64x60_mpsc1_pd_dd = {
+static struct mpsc_pdata mv64x60_mpsc1_pdata = {
 	.mirror_regs		= 0,
 	.cache_mgmt		= 0,
 	.max_idle		= 0,
@@ -305,7 +305,130 @@ static struct platform_device mpsc1_device = {
 	.num_resources	= ARRAY_SIZE(mv64x60_mpsc1_resources),
 	.resource	= mv64x60_mpsc1_resources,
 	.dev = {
-		.driver_data = &mv64x60_mpsc1_pd_dd,
+		.platform_data = &mv64x60_mpsc1_pdata,
+	},
+};
+#endif
+
+#ifdef CONFIG_MV643XX_ETH
+static struct resource mv64x60_eth_shared_resources[] = {
+	[0] = {
+		.name	= "ethernet shared base",
+		.start	= MV64340_ETH_SHARED_REGS,
+		.end	= MV64340_ETH_SHARED_REGS +
+					MV64340_ETH_SHARED_REGS_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device mv64x60_eth_shared_device = {
+	.name		= MV64XXX_ETH_SHARED_NAME,
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(mv64x60_eth_shared_resources),
+	.resource	= mv64x60_eth_shared_resources,
+};
+
+#ifdef CONFIG_MV643XX_ETH_0
+static struct resource mv64x60_eth0_resources[] = {
+	[0] = {
+		.name	= "eth0 irq",
+		.start	= MV64x60_IRQ_ETH_0,
+		.end	= MV64x60_IRQ_ETH_0,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct mv64xxx_eth_platform_data eth0_pd;
+
+static struct platform_device eth0_device = {
+	.name		= MV64XXX_ETH_NAME,
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(mv64x60_eth0_resources),
+	.resource	= mv64x60_eth0_resources,
+	.dev = {
+		.platform_data = &eth0_pd,
+	},
+};
+#endif
+
+#ifdef CONFIG_MV643XX_ETH_1
+static struct resource mv64x60_eth1_resources[] = {
+	[0] = {
+		.name	= "eth1 irq",
+		.start	= MV64x60_IRQ_ETH_1,
+		.end	= MV64x60_IRQ_ETH_1,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct mv64xxx_eth_platform_data eth1_pd;
+
+static struct platform_device eth1_device = {
+	.name		= MV64XXX_ETH_NAME,
+	.id		= 1,
+	.num_resources	= ARRAY_SIZE(mv64x60_eth1_resources),
+	.resource	= mv64x60_eth1_resources,
+	.dev = {
+		.platform_data = &eth1_pd,
+	},
+};
+#endif
+
+#ifdef CONFIG_MV643XX_ETH_2
+static struct resource mv64x60_eth2_resources[] = {
+	[0] = {
+		.name	= "eth2 irq",
+		.start	= MV64x60_IRQ_ETH_2,
+		.end	= MV64x60_IRQ_ETH_2,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct mv64xxx_eth_platform_data eth2_pd;
+
+static struct platform_device eth2_device = {
+	.name		= MV64XXX_ETH_NAME,
+	.id		= 2,
+	.num_resources	= ARRAY_SIZE(mv64x60_eth2_resources),
+	.resource	= mv64x60_eth2_resources,
+	.dev = {
+		.platform_data = &eth2_pd,
+	},
+};
+#endif
+#endif
+
+#ifdef	CONFIG_I2C_MV64XXX
+static struct mv64xxx_i2c_pdata mv64xxx_i2c_pdata = {
+	.freq_m			= 8,
+	.freq_n			= 3,
+	.timeout		= 1000, /* Default timeout of 1 second */
+	.retries		= 1,
+};
+
+static struct resource mv64xxx_i2c_resources[] = {
+	/* Do not change the order of the IORESOURCE_MEM resources */
+	[0] = {
+		.name	= "mv64xxx i2c base",
+		.start	= MV64XXX_I2C_OFFSET,
+		.end	= MV64XXX_I2C_OFFSET + MV64XXX_I2C_REG_BLOCK_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.name	= "mv64xxx i2c irq",
+		.start	= MV64x60_IRQ_I2C,
+		.end	= MV64x60_IRQ_I2C,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device i2c_device = {
+	.name		= MV64XXX_I2C_CTLR_NAME,
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(mv64xxx_i2c_resources),
+	.resource	= mv64xxx_i2c_resources,
+	.dev = {
+		.platform_data = &mv64xxx_i2c_pdata,
 	},
 };
 #endif
@@ -315,6 +438,21 @@ static struct platform_device *mv64x60_pd_devs[] __initdata = {
 	&mpsc_shared_device,
 	&mpsc0_device,
 	&mpsc1_device,
+#endif
+#ifdef CONFIG_MV643XX_ETH
+	&mv64x60_eth_shared_device,
+#endif
+#ifdef CONFIG_MV643XX_ETH_0
+	&eth0_device,
+#endif
+#ifdef CONFIG_MV643XX_ETH_1
+	&eth1_device,
+#endif
+#ifdef CONFIG_MV643XX_ETH_2
+	&eth2_device,
+#endif
+#ifdef	CONFIG_I2C_MV64XXX
+	&i2c_device,
 #endif
 };
 
@@ -344,7 +482,7 @@ mv64x60_init(struct mv64x60_handle *bh, struct mv64x60_setup_info *si)
 	mv64x60_early_init(bh, si);
 
 	if (mv64x60_get_type(bh) || mv64x60_setup_for_chip(bh)) {
-		iounmap((void *)bh->v_base);
+		iounmap(bh->v_base);
 		bh->v_base = 0;
 		if (ppc_md.progress)
 			ppc_md.progress("mv64x60_init: Can't determine chip",0);
@@ -416,7 +554,7 @@ mv64x60_early_init(struct mv64x60_handle *bh, struct mv64x60_setup_info *si)
 	memset(bh, 0, sizeof(*bh));
 
 	bh->p_base = si->phys_reg_base;
-	bh->v_base = (u32)ioremap(bh->p_base, MV64x60_INTERNAL_SPACE_SIZE);
+	bh->v_base = ioremap(bh->p_base, MV64x60_INTERNAL_SPACE_SIZE);
 
 	mv64x60_bridge_pbase = bh->p_base;
 	mv64x60_bridge_vbase = bh->v_base;
@@ -598,7 +736,7 @@ mv64x60_get_64bit_window(struct mv64x60_handle *bh, u32 window,
  */
 void __init
 mv64x60_set_64bit_window(struct mv64x60_handle *bh, u32 window,
-			u32 base_hi, u32 base_lo, u32 size, u32 other_bits)
+	u32 base_hi, u32 base_lo, u32 size, u32 other_bits)
 {
 	u32	val, base_lo_reg, size_reg, base_lo_bits, size_bits;
 	u32	(*map_to_field)(u32 val, u32 num_bits);
@@ -645,7 +783,7 @@ mv64x60_mask(u32 val, u32 num_bits)
 }
 
 /*
- * mv64x60_mask_shift_left()
+ * mv64x60_shift_left()
  *
  * Take the low-order 'num_bits' of 'val', shift left to align at bit 31 (MSB).
  */
@@ -702,7 +840,7 @@ mv64x60_get_type(struct mv64x60_handle *bh)
 	/* Get the revision of the chip */
 	early_read_config_word(&hose, 0, PCI_DEVFN(0, 0), PCI_CLASS_REVISION,
 		&val);
-	bh->rev = (u32) (val & 0xff);
+	bh->rev = (u32)(val & 0xff);
 
 	/* Figure out the type of Marvell bridge it is */
 	early_read_config_word(&hose, 0, PCI_DEVFN(0, 0), PCI_DEVICE_ID, &val);
@@ -790,7 +928,7 @@ mv64x60_setup_for_chip(struct mv64x60_handle *bh)
  *
  * Return the virtual address of the bridge's registers.
  */
-u32
+void *
 mv64x60_get_bridge_vbase(void)
 {
 	return mv64x60_bridge_vbase;
@@ -836,13 +974,13 @@ u32 __init
 mv64x60_get_mem_size(u32 bridge_base, u32 chip_type)
 {
 	struct mv64x60_handle	bh;
-	u32			mem_windows[MV64x60_CPU2MEM_WINDOWS][2];
-	u32			rc = 0;
+	u32	mem_windows[MV64x60_CPU2MEM_WINDOWS][2];
+	u32	rc = 0;
 
 	memset(&bh, 0, sizeof(bh));
 
 	bh.type = chip_type;
-	bh.v_base = bridge_base;
+	bh.v_base = (void *)bridge_base;
 
 	if (!mv64x60_setup_for_chip(&bh)) {
 		mv64x60_get_mem_windows(&bh, mem_windows);
@@ -1117,7 +1255,7 @@ mv64x60_config_resources(struct pci_controller *hose,
 			IORESOURCE_IO, s[hose->index][0]);
 		hose->io_space.start = pi->pci_io.pci_base_lo;
 		hose->io_space.end = pi->pci_io.pci_base_lo + pi->pci_io.size-1;
-		hose->io_base_phys = (ulong)pi->pci_io.cpu_base;
+		hose->io_base_phys = pi->pci_io.cpu_base;
 		hose->io_base_virt = (void *)isa_io_base;
 	}
 
@@ -1592,8 +1730,8 @@ gt64260a_chip_specific_init(struct mv64x60_handle *bh,
 	struct resource	*r;
 #endif
 #if !defined(CONFIG_NOT_COHERENT_CACHE)
-	u32		val;
-	u8		save_exclude;
+	u32	val;
+	u8	save_exclude;
 #endif
 
 	if (si->pci_0.enable_bus)
@@ -1638,10 +1776,10 @@ gt64260a_chip_specific_init(struct mv64x60_handle *bh,
 	mv64x60_clr_bits(bh, 0xf2c0, (1<< 6) | (1<<14) | (1<<22) | (1<<30));
 
 #ifdef CONFIG_SERIAL_MPSC
-	mv64x60_mpsc0_pd_dd.mirror_regs = 1;
-	mv64x60_mpsc0_pd_dd.cache_mgmt = 1;
-	mv64x60_mpsc1_pd_dd.mirror_regs = 1;
-	mv64x60_mpsc1_pd_dd.cache_mgmt = 1;
+	mv64x60_mpsc0_pdata.mirror_regs = 1;
+	mv64x60_mpsc0_pdata.cache_mgmt = 1;
+	mv64x60_mpsc1_pdata.mirror_regs = 1;
+	mv64x60_mpsc1_pdata.cache_mgmt = 1;
 
 	if ((r = platform_get_resource(&mpsc1_device, IORESOURCE_IRQ, 0))
 		!= NULL) {
@@ -1667,8 +1805,8 @@ gt64260b_chip_specific_init(struct mv64x60_handle *bh,
 	struct resource	*r;
 #endif
 #if !defined(CONFIG_NOT_COHERENT_CACHE)
-	u32		val;
-	u8		save_exclude;
+	u32	val;
+	u8	save_exclude;
 #endif
 
 	if (si->pci_0.enable_bus)
@@ -1720,8 +1858,8 @@ gt64260b_chip_specific_init(struct mv64x60_handle *bh,
 	 * can't access cache coherent regions.  However, testing has shown
 	 * that the MPSC, at least, still has this bug.
 	 */
-	mv64x60_mpsc0_pd_dd.cache_mgmt = 1;
-	mv64x60_mpsc1_pd_dd.cache_mgmt = 1;
+	mv64x60_mpsc0_pdata.cache_mgmt = 1;
+	mv64x60_mpsc1_pdata.cache_mgmt = 1;
 
 	if ((r = platform_get_resource(&mpsc1_device, IORESOURCE_IRQ, 0))
 		!= NULL) {
@@ -2228,10 +2366,10 @@ mv64360_chip_specific_init(struct mv64x60_handle *bh,
 	struct mv64x60_setup_info *si)
 {
 #ifdef CONFIG_SERIAL_MPSC
-	mv64x60_mpsc0_pd_dd.brg_can_tune = 1;
-	mv64x60_mpsc0_pd_dd.cache_mgmt = 1;
-	mv64x60_mpsc1_pd_dd.brg_can_tune = 1;
-	mv64x60_mpsc1_pd_dd.cache_mgmt = 1;
+	mv64x60_mpsc0_pdata.brg_can_tune = 1;
+	mv64x60_mpsc0_pdata.cache_mgmt = 1;
+	mv64x60_mpsc1_pdata.brg_can_tune = 1;
+	mv64x60_mpsc1_pdata.cache_mgmt = 1;
 #endif
 
 	return;
@@ -2247,8 +2385,8 @@ mv64460_chip_specific_init(struct mv64x60_handle *bh,
 	struct mv64x60_setup_info *si)
 {
 #ifdef CONFIG_SERIAL_MPSC
-	mv64x60_mpsc0_pd_dd.brg_can_tune = 1;
-	mv64x60_mpsc1_pd_dd.brg_can_tune = 1;
+	mv64x60_mpsc0_pdata.brg_can_tune = 1;
+	mv64x60_mpsc1_pdata.brg_can_tune = 1;
 #endif
 	return;
 }

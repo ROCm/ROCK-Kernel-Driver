@@ -25,16 +25,6 @@ extern void mxcsr_feature_mask_init(void);
 extern void init_fpu(struct task_struct *child);
 extern int save_i387(struct _fpstate __user *buf);
 
-static inline int need_signal_i387(struct task_struct *me) 
-{ 
-	if (!me->used_math)
-		return 0;
-	me->used_math = 0; 
-	if (me->thread_info->status & TS_USEDFPU)
-		return 0;
-	return 1;
-} 
-
 /*
  * FPU lazy state save handling...
  */

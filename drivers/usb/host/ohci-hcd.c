@@ -897,11 +897,16 @@ MODULE_LICENSE ("GPL");
 #include "ohci-pxa27x.c"
 #endif
 
+#ifdef CONFIG_SOC_AU1X00
+#include "ohci-au1xxx.c"
+#endif
+
 #if !(defined(CONFIG_PCI) \
       || defined(CONFIG_SA1111) \
       || defined(CONFIG_ARCH_OMAP) \
       || defined (CONFIG_ARCH_LH7A404) \
       || defined (CONFIG_PXA27x) \
+      || defined (CONFIG_SOC_AU1X00) \
 	)
 #error "missing bus glue for ohci-hcd"
 #endif

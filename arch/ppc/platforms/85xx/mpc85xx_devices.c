@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/serial_8250.h>
 #include <linux/fsl_devices.h>
 #include <asm/mpc85xx.h>
 #include <asm/irq.h>
@@ -45,6 +46,21 @@ static struct gianfar_platform_data mpc85xx_fec_pdata = {
 
 static struct fsl_i2c_platform_data mpc85xx_fsl_i2c_pdata = {
 	.device_flags = FSL_I2C_DEV_SEPARATE_DFSRR,
+};
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	[0] = {
+		.mapbase	= 0x4500,
+		.irq		= MPC85xx_IRQ_DUART,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_SHARE_IRQ,
+	},
+	[1] = {
+		.mapbase	= 0x4600,
+		.irq		= MPC85xx_IRQ_DUART,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_SHARE_IRQ,
+	},
 };
 
 struct platform_device ppc_sys_platform_devices[] = {
@@ -222,6 +238,11 @@ struct platform_device ppc_sys_platform_devices[] = {
 				.flags	= IORESOURCE_IRQ,
 			},
 		},
+	},
+	[MPC85xx_DUART] = {
+		.name = "serial8250",
+		.id	= 0,
+		.dev.platform_data = serial_platform_data,
 	},
 	[MPC85xx_PERFMON] = {
 		.name = "fsl-perfmon",

@@ -1,12 +1,4 @@
 /*
- *
- * BRIEF MODULE DESCRIPTION
- *	IT8172 system controller defines.
- *
- * Copyright 2000 MontaVista Software Inc.
- * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or source@mvista.com
- *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
  *  Free Software Foundation;  either version 2 of the  License, or (at your
@@ -26,4 +18,43 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * Copyright 2004 Ralf Baechle <ralf@linux-mips.org>
  */
+#include <asm/sn/addrs.h>
+#include <asm/sn/sn0/hub.h>
+#include <asm/sn/klconfig.h>
+#include <asm/sn/ioc3.h>
+#include <asm/sn/sn_private.h>
+
+#include <linux/serial.h>
+#include <linux/serial_core.h>
+#include <linux/serial_reg.h>
+
+#define IOC3_CLK        (22000000 / 3)
+#define IOC3_FLAGS      (0)
+
+static inline struct ioc3_uartregs *console_uart(void)
+{
+	struct ioc3 *ioc3;
+
+	ioc3 = (struct ioc3 *)KL_CONFIG_CH_CONS_INFO(get_nasid())->memory_base;
+
+	return &ioc3->sregs.uarta;
+}
+
+unsigned char getDebugChar(void)
+{
+	struct ioc3_uartregs *uart = console_uart();
+
+	while ((uart->iu_lsr & UART_LSR_DR) == 0);
+	return uart->iu_rbr;
+}
+
+void putDebugChar(unsigned char c)
+{
+	struct ioc3_uartregs *uart = console_uart();
+
+	while ((uart->iu_lsr & UART_LSR_THRE) == 0);
+	uart->iu_thr = c;
+}

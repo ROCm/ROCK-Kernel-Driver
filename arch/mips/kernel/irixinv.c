@@ -6,10 +6,8 @@
  * Miguel de Icaza, 1997.
  */
 #include <linux/mm.h>
-#include <linux/init.h>
-#include <linux/slab.h>
-#include <asm/uaccess.h>
 #include <asm/inventory.h>
+#include <asm/uaccess.h>
 
 #define MAX_INVENTORY 50
 int inventory_items = 0;
@@ -49,7 +47,7 @@ int dump_inventory_to_user (void *userbuf, int size)
 	return inventory_items * sizeof (inventory_t);
 }
 
-static int __init init_inventory(void)
+int __init init_inventory(void)
 {
 	/*
 	 * gross hack while we put the right bits all over the kernel
@@ -77,5 +75,3 @@ static int __init init_inventory(void)
 
 	return 0;
 }
-
-module_init(init_inventory);

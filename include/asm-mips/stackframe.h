@@ -64,7 +64,7 @@
 		addu	k1, k0
 		LONG_L	k1, %lo(kernelsp)(k1)
 #endif
-#ifdef CONFIG_MIPS64
+#if defined(CONFIG_MIPS64) && !defined(CONFIG_BUILD_ELF64)
 		MFC0	k1, CP0_CONTEXT
 		dsra	k1, 23
 		lui	k0, %hi(pgd_current)
@@ -73,6 +73,12 @@
 		lui	k0, %hi(kernelsp)
 		daddu	k1, k0
 		LONG_L	k1, %lo(kernelsp)(k1)
+#endif
+#if defined(CONFIG_MIPS64) && defined(CONFIG_BUILD_ELF64)
+		MFC0	k1, CP0_CONTEXT
+		dsrl	k1, 23
+		dsll	k1, k1, 3
+		LONG_L	k1, kernelsp(k1)
 #endif
 		.endm
 
@@ -83,12 +89,17 @@
 		sll	\temp, 2
 		LONG_S	\stackp, kernelsp(\temp)
 #endif
-#ifdef CONFIG_MIPS64
+#if defined(CONFIG_MIPS64) && !defined(CONFIG_BUILD_ELF64)
 		lw	\temp, TI_CPU(gp)
 		dsll	\temp, 3
 		lui	\temp2, %hi(kernelsp)
 		daddu	\temp, \temp2
 		LONG_S	\stackp, %lo(kernelsp)(\temp)
+#endif
+#if defined(CONFIG_MIPS64) && defined(CONFIG_BUILD_ELF64)
+		lw	\temp, TI_CPU(gp)
+		dsll	\temp, 3
+		LONG_S	\stackp, kernelsp(\temp)
 #endif
 		.endm
 #else
@@ -104,6 +115,7 @@
 
 		.macro	SAVE_SOME
 		.set	push
+		.set	noat
 		.set	reorder
 		mfc0	k0, CP0_STATUS
 		sll	k0, 3		/* extract cu0 bit */
@@ -278,16 +290,16 @@
 
 		.macro	RESTORE_ALL
 		RESTORE_TEMP
-		RESTORE_AT
 		RESTORE_STATIC
+		RESTORE_AT
 		RESTORE_SOME
 		RESTORE_SP
 		.endm
 
 		.macro	RESTORE_ALL_AND_RET
 		RESTORE_TEMP
-		RESTORE_AT
 		RESTORE_STATIC
+		RESTORE_AT
 		RESTORE_SOME
 		RESTORE_SP_AND_RET
 		.endm

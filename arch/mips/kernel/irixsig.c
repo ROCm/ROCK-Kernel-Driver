@@ -99,7 +99,7 @@ static void setup_irix_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	__put_user((u64) regs->hi, &ctx->hi);
 	__put_user((u64) regs->lo, &ctx->lo);
 	__put_user((u64) regs->cp0_epc, &ctx->pc);
-	__put_user(current->used_math, &ctx->usedfp);
+	__put_user(!!used_math(), &ctx->usedfp);
 	__put_user((u64) regs->cp0_cause, &ctx->cp0_cause);
 	__put_user((u64) regs->cp0_badvaddr, &ctx->cp0_badvaddr);
 
@@ -624,7 +624,7 @@ repeat:
 			}
 			goto end_waitsys;
 
-		case TASK_ZOMBIE:
+		case EXIT_ZOMBIE:
 			current->signal->cutime += p->utime + p->signal->cutime;
 			current->signal->cstime += p->stime + p->signal->cstime;
 			if (ru != NULL)
@@ -725,7 +725,7 @@ asmlinkage int irix_getcontext(struct pt_regs *regs)
 	__put_user(regs->cp0_epc, &ctx->regs[35]);
 
 	flags = 0x0f;
-	if(!current->used_math) {
+	if(!used_math()) {
 		flags &= ~(0x08);
 	} else {
 		/* XXX wheee... */

@@ -42,7 +42,6 @@
 
 int main(void)
 {
-  DEFINE(TSK_USED_MATH,		offsetof(struct task_struct, used_math));
   DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
   BLANK();
   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));

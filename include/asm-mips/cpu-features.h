@@ -3,10 +3,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2003 Ralf Baechle
+ * Copyright (C) 2003, 2004 Ralf Baechle
  */
 #ifndef __ASM_CPU_FEATURES_H
 #define __ASM_CPU_FEATURES_H
+
+#include <linux/config.h>
 
 #include <asm/cpu.h>
 #include <asm/cpu-info.h>
@@ -72,6 +74,25 @@
 #endif
 #ifndef cpu_has_ic_fills_f_dc
 #define cpu_has_ic_fills_f_dc	(cpu_data[0].icache.flags & MIPS_CACHE_IC_F_DC)
+#endif
+
+/*
+ * I-Cache snoops remote store.  This only matters on SMP.  Some multiprocessors
+ * such as the R10000 have I-Caches that snoop local stores; the embedded ones
+ * don't.  For maintaining I-cache coherency this means we need to flush the
+ * D-cache all the way back to whever the I-cache does refills from, so the
+ * I-cache has a chance to see the new data at all.  Then we have to flush the
+ * I-cache also.
+ * Note we may have been rescheduled and may no longer be running on the CPU
+ * that did the store so we can't optimize this into only doing the flush on
+ * the local CPU.
+ */
+#ifndef cpu_icache_snoops_remote_store
+#ifdef CONFIG_SMP
+#define cpu_icache_snoops_remote_store	(cpu_data[0].icache.flags & MIPS_IC_SNOOPS_REMOTE)
+#else
+#define cpu_icache_snoops_remote_store	1
+#endif
 #endif
 
 /*

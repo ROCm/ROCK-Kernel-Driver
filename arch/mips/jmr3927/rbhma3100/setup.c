@@ -108,7 +108,7 @@ static inline void do_reset(void)
 
 static void jmr3927_machine_restart(char *command)
 {
-	cli();
+	local_irq_disable();
 	puts("Rebooting...");
 	do_reset();
 }

@@ -22,91 +22,69 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#include <linux/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
-#include <linux/slab.h>
-#include <linux/version.h>
 
-#include <asm/pci.h>
-#include <asm/io.h>
 #include <asm/titan_dep.h>
 
-/*
- * Titan PCI Config Read Byte
- */
 static int titan_read_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	int size, u32 * val)
 {
+	uint32_t address, tmp;
 	int dev, busno, func;
-	uint32_t address_reg, data_reg;
-	uint32_t address;
 
 	busno = bus->number;
 	dev = PCI_SLOT(devfn);
 	func = PCI_FUNC(devfn);
-
-	address_reg = TITAN_PCI_0_CONFIG_ADDRESS;
-	data_reg = TITAN_PCI_0_CONFIG_DATA;
 
 	address = (busno << 16) | (dev << 11) | (func << 8) |
 	          (reg & 0xfc) | 0x80000000;
 
+
 	/* start the configuration cycle */
-	TITAN_WRITE(address_reg, address);
+	TITAN_WRITE(TITAN_PCI_0_CONFIG_ADDRESS, address);
+	tmp = TITAN_READ(TITAN_PCI_0_CONFIG_DATA) >> ((reg & 3) << 3);
 
 	switch (size) {
 	case 1:
-		*val = TITAN_READ_8(data_reg + (~reg & 0x3));
-		break;
-
+		tmp &= 0xff;
 	case 2:
-		*val = TITAN_READ_16(data_reg + (~reg & 0x2));
-		break;
-
-	case 4:
-		*val = TITAN_READ(data_reg);
-		break;
+		tmp &= 0xffff;
 	}
+	*val = tmp;
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
-/*
- * Titan PCI Config Byte Write
- */
 static int titan_write_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	int size, u32 val)
 {
-	uint32_t address_reg, data_reg, address;
+	uint32_t address;
 	int dev, busno, func;
 
 	busno = bus->number;
 	dev = PCI_SLOT(devfn);
 	func = PCI_FUNC(devfn);
-
-	address_reg = TITAN_PCI_0_CONFIG_ADDRESS;
-	data_reg = TITAN_PCI_0_CONFIG_DATA;
 
 	address = (busno << 16) | (dev << 11) | (func << 8) |
 		(reg & 0xfc) | 0x80000000;
 
 	/* start the configuration cycle */
-	TITAN_WRITE(address_reg, address);
+	TITAN_WRITE(TITAN_PCI_0_CONFIG_ADDRESS, address);
 
 	/* write the data */
 	switch (size) {
 	case 1:
-		TITAN_WRITE_8(data_reg + (~reg & 0x3), val);
+		TITAN_WRITE_8(TITAN_PCI_0_CONFIG_DATA + (~reg & 0x3), val);
 		break;
 
 	case 2:
-		TITAN_WRITE_16(data_reg + (~reg & 0x2), val);
+		TITAN_WRITE_16(TITAN_PCI_0_CONFIG_DATA + (~reg & 0x2), val);
 		break;
 
 	case 4:
-		TITAN_WRITE(data_reg, val);
+		TITAN_WRITE(TITAN_PCI_0_CONFIG_DATA, val);
 		break;
 	}
 

@@ -86,7 +86,7 @@ void	(*board_init_irq)(void);
 extern void counter0_irq(int irq, void *dev_id, struct pt_regs *regs);
 #endif
 
-static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(irq_lock);
 
 
 static unsigned int startup_irq(unsigned int irq_nr)

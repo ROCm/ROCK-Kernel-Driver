@@ -29,7 +29,7 @@
  * RTC ops
  */
 
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
 /* per VR41xx docs, bad data can be read if between 2 counts */
 static inline unsigned short

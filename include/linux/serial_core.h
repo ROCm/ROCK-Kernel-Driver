@@ -103,6 +103,9 @@
 /* Marvell MPSC */
 #define PORT_MPSC	63
 
+/* TXX9 type number */
+#define PORT_TXX9       64
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

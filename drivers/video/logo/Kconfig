@@ -25,7 +25,7 @@ config LOGO_LINUX_CLUT224
 
 config LOGO_DEC_CLUT224
 	bool "224-color Digital Equipment Corporation Linux logo"
-	depends on LOGO && DECSTATION
+	depends on LOGO && MACH_DECSTATION
 	default y
 
 config LOGO_MAC_CLUT224

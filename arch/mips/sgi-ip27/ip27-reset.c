@@ -14,6 +14,7 @@
 #include <linux/timer.h>
 #include <linux/smp.h>
 #include <linux/mmzone.h>
+#include <linux/nodemask.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>

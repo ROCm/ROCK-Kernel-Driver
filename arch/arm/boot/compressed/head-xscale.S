@@ -42,3 +42,8 @@ __XScale_start:
 		mov	r7, #MACH_TYPE_COTULLA_IDP
 #endif
 
+#ifdef  CONFIG_MACH_GTWX5715
+               mov     r7, #(MACH_TYPE_GTWX5715 & 0xff)
+               orr     r7, r7, #(MACH_TYPE_GTWX5715 & 0xff00)
+#endif
+

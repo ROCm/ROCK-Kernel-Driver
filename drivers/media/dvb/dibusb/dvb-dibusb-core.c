@@ -363,8 +363,8 @@ static struct dibusb_usb_device * dibusb_find_device (struct usb_device *udev,in
 	for (i = 0; i < sizeof(dibusb_devices)/sizeof(struct dibusb_usb_device); i++) {
 		for (j = 0; j < DIBUSB_ID_MAX_NUM && dibusb_devices[i].cold_ids[j] != NULL; j++) {
 			deb_info("check for cold %x %x\n",dibusb_devices[i].cold_ids[j]->idVendor, dibusb_devices[i].cold_ids[j]->idProduct);
-			if (dibusb_devices[i].cold_ids[j]->idVendor == udev->descriptor.idVendor &&
-				dibusb_devices[i].cold_ids[j]->idProduct == udev->descriptor.idProduct) {
+			if (dibusb_devices[i].cold_ids[j]->idVendor == le16_to_cpu(udev->descriptor.idVendor) &&
+				dibusb_devices[i].cold_ids[j]->idProduct == le16_to_cpu(udev->descriptor.idProduct)) {
 				*cold = 1;
 				return &dibusb_devices[i];
 			}
@@ -372,8 +372,8 @@ static struct dibusb_usb_device * dibusb_find_device (struct usb_device *udev,in
 
 		for (j = 0; j < DIBUSB_ID_MAX_NUM && dibusb_devices[i].warm_ids[j] != NULL; j++) {
 			deb_info("check for warm %x %x\n",dibusb_devices[i].warm_ids[j]->idVendor, dibusb_devices[i].warm_ids[j]->idProduct);
-			if (dibusb_devices[i].warm_ids[j]->idVendor == udev->descriptor.idVendor &&
-				dibusb_devices[i].warm_ids[j]->idProduct == udev->descriptor.idProduct) {
+			if (dibusb_devices[i].warm_ids[j]->idVendor == le16_to_cpu(udev->descriptor.idVendor) &&
+				dibusb_devices[i].warm_ids[j]->idProduct == le16_to_cpu(udev->descriptor.idProduct)) {
 				*cold = 0;
 				return &dibusb_devices[i];
 			}
@@ -396,7 +396,7 @@ static int dibusb_probe(struct usb_interface *intf,
 
 	if ((dibdev = dibusb_find_device(udev,&cold)) == NULL) {
 		err("something went very wrong, "
-				"unknown product ID: %.4x",udev->descriptor.idProduct);
+				"unknown product ID: %.4x",le16_to_cpu(udev->descriptor.idProduct));
 		return -ENODEV;
 	}
 	

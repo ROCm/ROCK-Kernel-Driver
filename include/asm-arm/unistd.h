@@ -281,7 +281,7 @@
 #define __NR_remap_file_pages		(__NR_SYSCALL_BASE+253)
 					/* 254 for set_thread_area */
 					/* 255 for get_thread_area */
-					/* 256 for set_tid_address */
+#define __NR_set_tid_address		(__NR_SYSCALL_BASE+256)
 #define __NR_timer_create		(__NR_SYSCALL_BASE+257)
 #define __NR_timer_settime		(__NR_SYSCALL_BASE+258)
 #define __NR_timer_gettime		(__NR_SYSCALL_BASE+259)
@@ -315,6 +315,8 @@
 #define __ARM_NR_cacheflush		(__ARM_NR_BASE+2)
 #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
 #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
+
+#define __ARM_NR_set_tls		(__ARM_NR_BASE+0x800)
 
 #define __sys2(x) #x
 #define __sys1(x) __sys2(x)

@@ -188,7 +188,8 @@ static irqreturn_t sibyte_bw_int(int irq, void *data, struct pt_regs *regs)
 	csr_out32(M_SCD_TRACE_CFG_START_READ, IOADDR(A_SCD_TRACE_CFG));
 
 	for (i=0; i<256*6; i++)
-		printk("%016llx\n", (unsigned long long)__raw_readq(IOADDR(A_SCD_TRACE_READ)));
+		printk("%016llx\n",
+		       (unsigned long long)bus_readq(IOADDR(A_SCD_TRACE_READ)));
 
 	csr_out32(M_SCD_TRACE_CFG_RESET, IOADDR(A_SCD_TRACE_CFG));
 	csr_out32(M_SCD_TRACE_CFG_START, IOADDR(A_SCD_TRACE_CFG));

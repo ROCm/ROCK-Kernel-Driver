@@ -248,7 +248,7 @@ static void toshiba_rbtx4927_irq_isa_mask_and_ack(unsigned int irq);
 static void toshiba_rbtx4927_irq_isa_end(unsigned int irq);
 #endif
 
-static spinlock_t toshiba_rbtx4927_ioc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(toshiba_rbtx4927_ioc_lock);
 
 
 #define TOSHIBA_RBTX4927_IOC_NAME "RBTX4927-IOC"
@@ -669,7 +669,7 @@ void __init arch_init_irq(void)
 {
 	extern void tx4927_irq_init(void);
 
-	cli();
+	local_irq_disable();
 
 	tx4927_irq_init();
 	toshiba_rbtx4927_irq_ioc_init();

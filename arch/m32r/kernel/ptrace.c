@@ -130,7 +130,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 #ifndef NO_FPU
 		else if (off >= (long)(&dummy->fpu >> 2) &&
 			 off < (long)(&dummy->u_fpvalid >> 2)) {
-			if (!tsk->used_math) {
+			if (!tsk_used_math(tsk)) {
 				if (off == (long)(&dummy->fpu.fpscr >> 2))
 					tmp = FPSCR_INIT;
 				else
@@ -139,7 +139,7 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 				tmp = ((long *)(&tsk->thread.fpu >> 2))
 					[off - (long)&dummy->fpu];
 		} else if (off == (long)(&dummy->u_fpvalid >> 2))
-			tmp = tsk->used_math;
+			tmp = !!tsk_used_math(tsk);
 #endif /* not NO_FPU */
 		else
 			tmp = 0;
@@ -187,12 +187,12 @@ static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
 #ifndef NO_FPU
 		else if (off >= (long)(&dummy->fpu >> 2) &&
 			 off < (long)(&dummy->u_fpvalid >> 2)) {
-			tsk->used_math = 1;
+			set_stopped_child_used_math(tsk);
 			((long *)&tsk->thread.fpu)
 				[off - (long)&dummy->fpu] = data;
 			ret = 0;
 		} else if (off == (long)(&dummy->u_fpvalid >> 2)) {
-			tsk->used_math = data ? 1 : 0;
+			conditional_stopped_child_used_math(data, tsk);
 			ret = 0;
 		}
 #endif /* not NO_FPU */

@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
+ * Copyright (C) 2005 Ralf Baechle (ralf@linux-mips.org)
  *
  * linux/arch/mips/vr4181/common/irq.c
  *	Completely re-written to use the new irq.c
@@ -12,7 +13,6 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  */
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>

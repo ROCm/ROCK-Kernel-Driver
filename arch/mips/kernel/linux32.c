@@ -99,7 +99,7 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 }
 
 asmlinkage unsigned long
-sys32_mmap2(unsigned long addr, size_t len, unsigned long prot,
+sys32_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
          unsigned long flags, unsigned long fd, unsigned long pgoff)
 {
 	struct file * file = NULL;

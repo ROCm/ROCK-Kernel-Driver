@@ -303,3 +303,19 @@ ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_ide_md.ide_init_hwif = ppc4xx_ide_init_hwif_ports;
 #endif /* defined(CONFIG_PCI) && defined(CONFIG_IDE) */
 }
+
+/* Called from MachineCheckException */
+void platform_machine_check(struct pt_regs *regs)
+{
+#if defined(DCRN_PLB0_BEAR)
+	printk("PLB0: BEAR= 0x%08x ACR=   0x%08x BESR=  0x%08x\n",
+	    mfdcr(DCRN_PLB0_BEAR), mfdcr(DCRN_PLB0_ACR),
+	    mfdcr(DCRN_PLB0_BESR));
+#endif
+#if defined(DCRN_POB0_BEAR)
+	printk("PLB0 to OPB: BEAR= 0x%08x BESR0= 0x%08x BESR1= 0x%08x\n",
+	    mfdcr(DCRN_POB0_BEAR), mfdcr(DCRN_POB0_BESR0),
+	    mfdcr(DCRN_POB0_BESR1));
+#endif
+
+}

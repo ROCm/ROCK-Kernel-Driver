@@ -24,7 +24,7 @@
  *
  * Second level Interrupt handlers for the PMC-Sierra Titan/Yosemite board
  */
-
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
@@ -58,7 +58,7 @@
 extern asmlinkage void titan_handle_int(void);
 extern void jaguar_mailbox_irq(struct pt_regs *);
 
-/* 
+/*
  * Handle hypertransport & SMP interrupts. The interrupt lines are scarce.
  * For interprocessor interrupts, the best thing to do is to use the INTMSG
  * register. We use the same external interrupt line, i.e. INTB3 and monitor
@@ -66,15 +66,15 @@ extern void jaguar_mailbox_irq(struct pt_regs *);
  */
 asmlinkage void ll_ht_smp_irq_handler(int irq, struct pt_regs *regs)
 {
-        u32 status = OCD_READ(RM9000x2_OCD_INTP0STATUS4);
+	u32 status = OCD_READ(RM9000x2_OCD_INTP0STATUS4);
 
 	/* Ack all the bits that correspond to the interrupt sources */
 	if (status != 0)
-	        OCD_WRITE(RM9000x2_OCD_INTP0STATUS4, IRQ_ACK_BITS);
+		OCD_WRITE(RM9000x2_OCD_INTP0STATUS4, IRQ_ACK_BITS);
 
 	status = OCD_READ(RM9000x2_OCD_INTP1STATUS4);
 	if (status != 0)
-                OCD_WRITE(RM9000x2_OCD_INTP1STATUS4, IRQ_ACK_BITS);
+		OCD_WRITE(RM9000x2_OCD_INTP1STATUS4, IRQ_ACK_BITS);
 
 #ifdef CONFIG_HT_LEVEL_TRIGGER
 	/*
@@ -110,6 +110,21 @@ asmlinkage void ll_ht_smp_irq_handler(int irq, struct pt_regs *regs)
 	do_IRQ(irq, regs);
 }
 
+asmlinkage void do_extended_irq(struct pt_regs *regs)
+{
+	unsigned int intcontrol = read_c0_intcontrol();
+	unsigned int cause = read_c0_cause();
+	unsigned int status = read_c0_status();
+	unsigned int pending_sr, pending_ic;
+
+	pending_sr = status & cause & 0xff00;
+	pending_ic = (cause >> 8) & intcontrol & 0xff00;
+
+	if (pending_ic & (1 << 13))
+		do_IRQ(13, regs);
+
+}
+
 #ifdef CONFIG_KGDB
 extern void init_second_port(void);
 #endif
@@ -124,6 +139,7 @@ void __init arch_init_irq(void)
 	set_except_vector(0, titan_handle_int);
 	mips_cpu_irq_init(0);
 	rm7k_cpu_irq_init(8);
+	rm9k_cpu_irq_init(12);
 
 #ifdef CONFIG_KGDB
 	/* At this point, initialize the second serial port */

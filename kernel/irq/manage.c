@@ -15,6 +15,8 @@
 
 #ifdef CONFIG_SMP
 
+cpumask_t irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
+
 /**
  *	synchronize_irq - wait for pending IRQ handlers (on other CPUs)
  *

@@ -69,7 +69,7 @@ extern void startup_match20_interrupt(void);
 static unsigned long last_pc0, last_match20;
 #endif
 
-static spinlock_t time_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(time_lock);
 
 static inline void ack_r4ktimer(unsigned long newval)
 {
@@ -304,8 +304,7 @@ unsigned long cal_r4koff(void)
 
 /* This is for machines which generate the exact clock. */
 #define USECS_PER_JIFFY (1000000/HZ)
-#define USECS_PER_JIFFY_FRAC (0x100000000*1000000/HZ&0xffffffff)
-
+#define USECS_PER_JIFFY_FRAC (0x100000000LL*1000000/HZ&0xffffffff)
 
 static unsigned long
 div64_32(unsigned long v1, unsigned long v2, unsigned long v3)
@@ -406,10 +405,6 @@ void au1xxx_timer_setup(struct irqaction *irq)
 
 	r4k_cur = (read_c0_count() + r4k_offset);
 	write_c0_compare(r4k_cur);
-
-	/* no RTC on the pb1000 */
-	xtime.tv_sec = 0;
-	//xtime.tv_usec = 0;
 
 #ifdef CONFIG_PM
 	/*

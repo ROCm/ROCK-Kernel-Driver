@@ -90,6 +90,7 @@ foreach $object (keys(%object)) {
 		     $from !~ /\.data\.exit$/ &&
 		     $from !~ /\.exit\.data$/ &&
 		     $from !~ /\.altinstructions$/ &&
+		     $from !~ /\.pdr$/ &&
 		     $from !~ /\.debug_info$/ &&
 		     $from !~ /\.debug_aranges$/ &&
 		     $from !~ /\.debug_ranges$/ &&

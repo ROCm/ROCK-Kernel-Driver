@@ -42,8 +42,8 @@
 #include <linux/init.h>
 
 #include <asm/addrspace.h>
+#include <asm/byteorder.h>
 #include <asm/tx4927/tx4927_pci.h>
-#include <asm/debug.h>
 
 /* initialize in setup */
 struct resource pci_io_resource = {
@@ -107,16 +107,6 @@ static int tx4927_pcibios_read_config(struct pci_bus *bus, unsigned int devfn, i
         dev = PCI_SLOT(devfn);
         func = PCI_FUNC(devfn);
 
-	if (size == 2) {
-		if (where & 1)
-	                return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-
-	if (size == 4) {
-		if (where & 3)
-			return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-
 	/* check if the bus is top-level */
 	if (bus->parent != NULL) {
 		busno = bus->number;
@@ -130,11 +120,21 @@ static int tx4927_pcibios_read_config(struct pci_bus *bus, unsigned int devfn, i
 	switch (size) {
 	case 1:
 		*val = *(volatile u8 *) ((ulong) & tx4927_pcicptr->
-                              g2pcfgdata | (where & 3));
+                              g2pcfgdata |
+#ifdef __LITTLE_ENDIAN
+						(where & 3));
+#else
+						((where & 0x3) ^ 0x3));
+#endif
 		break;
 	case 2:
 		*val = *(volatile u16 *) ((ulong) & tx4927_pcicptr->
-                               g2pcfgdata | (where & 3));
+                               g2pcfgdata |
+#ifdef __LITTLE_ENDIAN
+						(where & 3));
+#else
+						((where & 0x3) ^ 0x2));
+#endif
 		break;
 	case 4:
 		*val = tx4927_pcicptr->g2pcfgdata;
@@ -156,16 +156,6 @@ static int tx4927_pcibios_write_config(struct pci_bus *bus, unsigned int devfn, 
         dev = PCI_SLOT(devfn);
         func = PCI_FUNC(devfn);
 
-	if (size == 1) {
-		if (where & 1)
-			return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-
-	if (size == 4) {
-		if (where & 3)
-			return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-
 	/* check if the bus is top-level */
 	if (bus->parent != NULL) {
 		busno = bus->number;
@@ -179,12 +169,22 @@ static int tx4927_pcibios_write_config(struct pci_bus *bus, unsigned int devfn, 
 	switch (size) {
 	case 1:
 		 *(volatile u8 *) ((ulong) & tx4927_pcicptr->
-                          g2pcfgdata | (where & 3)) = val;
+                          g2pcfgdata |
+#ifdef __LITTLE_ENDIAN
+					(where & 3)) = val;
+#else
+					((where & 0x3) ^ 0x3)) = val;
+#endif
 		break;
 
 	case 2:
 		*(volatile u16 *) ((ulong) & tx4927_pcicptr->
-                           g2pcfgdata | (where & 3)) = val;
+                           g2pcfgdata |
+#ifdef __LITTLE_ENDIAN
+					(where & 3)) = val;
+#else
+					((where & 0x3) ^ 0x2)) = val;
+#endif
 		break;
 	case 4:
 		tx4927_pcicptr->g2pcfgdata = val;

@@ -6,7 +6,7 @@
  * for more details.
  *
  * Copyright (C) 2000 Harald Koerfgen
- * Copyright (C) 2002, 03 Ilya A. Volynets
+ * Copyright (C) 2002, 2003, 2005 Ilya A. Volynets
  */
 #include <linux/config.h>
 #include <linux/console.h>
@@ -94,10 +94,6 @@ void __init ip32_timer_setup(struct irqaction *irq)
 
 static int __init ip32_setup(void)
 {
-	set_io_port_base((unsigned long) ioremap(MACEPCI_LOW_IO, 0x2000000));
-
-	crime_init();
-
 	board_be_init = ip32_be_init;
 
 	rtc_get_time = mc146818_get_cmos_time;
