@@ -1040,7 +1040,8 @@ void generic_unplug_device(void *data)
 
 static void blk_unplug_work(void *data)
 {
-	generic_unplug_device(data);
+	request_queue_t *q = data;
+	q->unplug_fn(q);
 }
 
 static void blk_unplug_timeout(unsigned long data)
