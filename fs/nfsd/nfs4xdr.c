@@ -1425,7 +1425,7 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		if (status)
 			goto out_nfserr;
 	}
-	if ((bmval0 & FATTR4_WORD0_FILEHANDLE) && !fhp) {
+	if ((bmval0 & (FATTR4_WORD0_FILEHANDLE | FATTR4_WORD0_FSID)) && !fhp) {
 		fh_init(&tempfh, NFS4_FHSIZE);
 		status = fh_compose(&tempfh, exp, dentry, NULL);
 		if (status)
@@ -1508,10 +1508,15 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	if (bmval0 & FATTR4_WORD0_FSID) {
 		if ((buflen -= 16) < 0)
 			goto out_resource;
-		WRITE32(0);
-		WRITE32(MAJOR(stat.dev));
-		WRITE32(0);
-		WRITE32(MINOR(stat.dev));
+		if (is_fsid(fhp, rqstp->rq_reffh)) {
+			WRITE64((u64)exp->ex_fsid);
+			WRITE64((u64)0);
+		} else {
+			WRITE32(0);
+			WRITE32(MAJOR(stat.dev));
+			WRITE32(0);
+			WRITE32(MINOR(stat.dev));
+		}
 	}
 	if (bmval0 & FATTR4_WORD0_UNIQUE_HANDLES) {
 		if ((buflen -= 4) < 0)
