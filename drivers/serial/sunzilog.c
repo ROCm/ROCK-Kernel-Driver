@@ -301,7 +301,6 @@ static void sunzilog_kbdms_receive_chars(struct uart_sunzilog_port *up,
 			up->kbd_id = 0;
 			return;
 		}
-		kbd_pt_regs = regs;
 #ifdef CONFIG_SERIO
 		serio_interrupt(&up->serio, ch, 0, regs);
 #endif
