@@ -65,7 +65,9 @@
  *    ->i_mmap_lock		(truncate->unmap_mapping_range)
  *
  *  ->mmap_sem
- *    ->i_mmap_lock		(various places)
+ *    ->i_mmap_lock
+ *      ->page_table_lock	(various places, mainly in mmap.c)
+ *        ->mapping->tree_lock	(arch-dependent flush_dcache_mmap_lock)
  *
  *  ->mmap_sem
  *    ->lock_page		(access_process_vm)

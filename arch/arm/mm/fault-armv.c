@@ -94,6 +94,8 @@ void __flush_dcache_page(struct page *page)
 	 * and invalidate any user data.
 	 */
 	pgoff = page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
+
+	flush_dcache_mmap_lock(mapping);
 	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		/*
@@ -106,6 +108,7 @@ void __flush_dcache_page(struct page *page)
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		flush_cache_page(mpnt, mpnt->vm_start + offset);
 	}
+	flush_dcache_mmap_unlock(mapping);
 }
 
 static void
@@ -129,6 +132,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 	 * space, then we need to handle them specially to maintain
 	 * cache coherency.
 	 */
+	flush_dcache_mmap_lock(mapping);
 	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		/*
@@ -143,6 +147,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
 		aliases += adjust_pte(mpnt, mpnt->vm_start + offset);
 	}
+	flush_dcache_mmap_unlock(mapping);
 	if (aliases)
 		adjust_pte(vma, addr);
 	else

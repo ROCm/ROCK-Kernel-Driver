@@ -249,6 +249,7 @@ void __flush_dcache_page(struct page *page)
 	 * declared as MAP_PRIVATE or MAP_SHARED), so we only need
 	 * to flush one address here for them all to become coherent */
 
+	flush_dcache_mmap_lock(mapping);
 	while ((mpnt = vma_prio_tree_next(mpnt, &mapping->i_mmap,
 					&iter, pgoff, pgoff)) != NULL) {
 		offset = (pgoff - mpnt->vm_pgoff) << PAGE_SHIFT;
@@ -266,8 +267,9 @@ void __flush_dcache_page(struct page *page)
 
 		__flush_cache_page(mpnt, addr);
 
-		return;
+		break;
 	}
+	flush_dcache_mmap_unlock(mapping);
 }
 EXPORT_SYMBOL(__flush_dcache_page);
 

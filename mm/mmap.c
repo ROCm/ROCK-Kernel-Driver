@@ -25,6 +25,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 #include <asm/tlb.h>
 
 /*
@@ -74,10 +75,12 @@ static inline void __remove_shared_vm_struct(struct vm_area_struct *vma,
 	if (vma->vm_flags & VM_SHARED)
 		mapping->i_mmap_writable--;
 
+	flush_dcache_mmap_lock(mapping);
 	if (unlikely(vma->vm_flags & VM_NONLINEAR))
 		list_del_init(&vma->shared.vm_set.list);
 	else
 		vma_prio_tree_remove(vma, &mapping->i_mmap);
+	flush_dcache_mmap_unlock(mapping);
 }
 
 /*
@@ -266,11 +269,13 @@ static inline void __vma_link_file(struct vm_area_struct *vma)
 		if (vma->vm_flags & VM_SHARED)
 			mapping->i_mmap_writable++;
 
+		flush_dcache_mmap_lock(mapping);
 		if (unlikely(vma->vm_flags & VM_NONLINEAR))
 			list_add_tail(&vma->shared.vm_set.list,
 					&mapping->i_mmap_nonlinear);
 		else
 			vma_prio_tree_insert(vma, &mapping->i_mmap);
+		flush_dcache_mmap_unlock(mapping);
 	}
 }
 
@@ -350,14 +355,17 @@ void vma_adjust(struct vm_area_struct *vma, unsigned long start,
 	}
 	spin_lock(&mm->page_table_lock);
 
-	if (root)
+	if (root) {
+		flush_dcache_mmap_lock(mapping);
 		vma_prio_tree_remove(vma, root);
+	}
 	vma->vm_start = start;
 	vma->vm_end = end;
 	vma->vm_pgoff = pgoff;
 	if (root) {
 		vma_prio_tree_init(vma);
 		vma_prio_tree_insert(vma, root);
+		flush_dcache_mmap_unlock(mapping);
 	}
 
 	if (next) {

@@ -303,6 +303,11 @@ static inline void flush_dcache_page(struct page *page)
 		__flush_dcache_page(page);
 }
 
+#define flush_dcache_mmap_lock(mapping) \
+	spin_lock_irq(&(mapping)->tree_lock)
+#define flush_dcache_mmap_unlock(mapping) \
+	spin_unlock_irq(&(mapping)->tree_lock)
+
 #define flush_icache_user_range(vma,page,addr,len) \
 	flush_dcache_page(page)
 
