@@ -11,6 +11,7 @@
  *
  *  Changelog:
  *	03-Oct-2004  BJD  Initial include for Linux
+ *	08-Nov-2004  BJD  Added S3C2440 filter register
 */
 
 #ifndef __ASM_ARCH_REGS_IIC_H
@@ -24,6 +25,7 @@
 #define S3C2410_IICSTAT   S3C2410_IICREG(0x04)
 #define S3C2410_IICADD    S3C2410_IICREG(0x08)
 #define S3C2410_IICDS     S3C2410_IICREG(0x0C)
+#define S3C2440_IICLC	  S3C2410_IICREG(0x10)
 
 #define S3C2410_IICCON_ACKEN		(1<<7)
 #define S3C2410_IICCON_TXDIV_16		(0<<6)
@@ -46,5 +48,13 @@
 #define S3C2410_IICSTAT_ASSLAVE		(1<<2)
 #define S3C2410_IICSTAT_ADDR0		(1<<1)
 #define S3C2410_IICSTAT_LASTBIT		(1<<0)
+
+#define S3C2410_IICLC_SDA_DELAY0	(0 << 0)
+#define S3C2410_IICLC_SDA_DELAY5	(1 << 0)
+#define S3C2410_IICLC_SDA_DELAY10	(2 << 0)
+#define S3C2410_IICLC_SDA_DELAY15	(3 << 0)
+#define S3C2410_IICLC_SDA_DELAY_MASK	(3 << 0)
+
+#define S3C2410_IICLC_FILTER_ON		(1<<2)
 
 #endif /* __ASM_ARCH_REGS_IIC_H */
