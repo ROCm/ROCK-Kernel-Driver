@@ -1298,23 +1298,6 @@ out:
 
 EXPORT_SYMBOL(hwif_init);
 
-int export_ide_init_queue (ide_drive_t *drive)
-{
-	if (ide_init_queue(drive))
-		return 1;
-
-	return 0;
-}
-
-EXPORT_SYMBOL(export_ide_init_queue);
-
-u8 export_probe_for_drive (ide_drive_t *drive)
-{
-	return probe_for_drive(drive);
-}
-
-EXPORT_SYMBOL(export_probe_for_drive);
-
 int ideprobe_init (void);
 static ide_module_t ideprobe_module = {
 	IDE_PROBE_MODULE,
