@@ -28,6 +28,12 @@ struct powernow_k8_data {
 	 * fid are the lower 8 bits of the index, vid are the upper 8 bits.
 	 * frequency is in kHz */
 	struct cpufreq_frequency_table  *powernow_table;
+
+#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+	/* the acpi table needs to be kept. it's only available if ACPI was
+	 * used to determine valid frequency/vid/fid states */
+	struct acpi_processor_performance acpi_data;
+#endif
 };
 
 
@@ -170,3 +176,4 @@ static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid
 static int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvid);
 static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
 
+static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index);

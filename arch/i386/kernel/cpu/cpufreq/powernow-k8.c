@@ -32,6 +32,11 @@
 #include <asm/io.h>
 #include <asm/delay.h>
 
+#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+#include <linux/acpi.h>
+#include <acpi/processor.h>
+#endif
+
 #define PFX "powernow-k8: "
 #define BFX PFX "BIOS error: "
 #define VERSION "version 1.00.08a"
@@ -661,6 +666,113 @@ static int find_psb_table(struct powernow_k8_data *data)
 	return -ENODEV;
 }
 
+#ifdef CONFIG_X86_POWERNOW_K8_ACPI
+static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index)
+{
+	if (!data->acpi_data.state_count)
+		return;
+
+	data->irt = (data->acpi_data.states[index].control >> IRT_SHIFT) & IRT_MASK;
+	data->rvo = (data->acpi_data.states[index].control >> RVO_SHIFT) & RVO_MASK;
+	data->plllock = (data->acpi_data.states[index].control >> PLL_L_SHIFT) & PLL_L_MASK;
+	data->vidmvs = 1 << ((data->acpi_data.states[index].control >> MVS_SHIFT) & MVS_MASK);
+	data->vstable = (data->acpi_data.states[index].control >> VST_SHIFT) & VST_MASK;
+}
+
+static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
+{
+	int i;
+	int cntlofreq = 0;
+	struct cpufreq_frequency_table *powernow_table;
+
+	if (acpi_processor_register_performance(&data->acpi_data, data->cpu)) {
+		dprintk(KERN_DEBUG PFX "register performance failed\n");
+		return -EIO;
+	}
+
+	/* verify the data contained in the ACPI structures */
+	if (data->acpi_data.state_count <= 1) {
+		dprintk(KERN_DEBUG PFX "No ACPI P-States\n");
+		goto err_out;
+	}
+
+	if ((data->acpi_data.control_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) ||
+		(data->acpi_data.status_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE)) {
+		dprintk(KERN_DEBUG PFX "Invalid control/status registers\n");
+		goto err_out;
+	}
+
+	/* fill in data->powernow_table */
+	powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table)
+		* (data->acpi_data.state_count + 1)), GFP_KERNEL);
+	if (!powernow_table) {
+		dprintk(KERN_ERR PFX "powernow_table memory alloc failure\n");
+		goto err_out;
+	}
+
+	for (i = 0; i < data->acpi_data.state_count; i++) {
+		u32 fid = data->acpi_data.states[i].control & FID_MASK;
+		u32 vid = (data->acpi_data.states[i].control >> VID_SHIFT) & VID_MASK;
+
+		dprintk(KERN_INFO PFX "   %d : fid %x, vid %x\n", i, fid, vid);
+
+		powernow_table[i].index = fid; /* lower 8 bits */
+		powernow_table[i].index |= (vid << 8); /* upper 8 bits */
+		powernow_table[i].frequency = find_khz_freq_from_fid(fid);
+
+		/* verify frequency is OK */
+		if ((powernow_table[i].frequency > (MAX_FREQ * 1000)) ||
+			(powernow_table[i].frequency < (MIN_FREQ * 1000))) {
+			dprintk(KERN_INFO PFX "invalid freq %u kHz\n", powernow_table[i].frequency);
+			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+
+		/* verify only 1 entry from the lo frequency table */
+		if ((fid < HI_FID_TABLE_BOTTOM) && (cntlofreq++)) {
+			printk(KERN_ERR PFX "Too many lo freq table entries\n");
+			goto err_out;
+		}
+                                                                                                            
+		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
+			printk(KERN_INFO PFX "invalid freq entries %u kHz vs. %u kHz\n",
+				powernow_table[i].frequency,
+				(unsigned int) (data->acpi_data.states[i].core_frequency * 1000));
+			powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+	}
+
+	powernow_table[data->acpi_data.state_count].frequency = CPUFREQ_TABLE_END;
+	powernow_table[data->acpi_data.state_count].index = 0;
+	data->powernow_table = powernow_table;
+
+	/* fill in data */
+	data->numps = data->acpi_data.state_count;
+	print_basics(data);
+	powernow_k8_acpi_pst_values(data, 0);
+	return 0;
+err_out:
+	acpi_processor_unregister_performance(&data->acpi_data, data->cpu);
+
+	/* data->acpi_data.state_count informs us at ->exit() whether ACPI was used */
+	data->acpi_data.state_count = 0;
+                                                                                                            
+	return -ENODEV;
+}
+
+static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data)
+{
+	if (data->acpi_data.state_count)
+		acpi_processor_unregister_performance(&data->acpi_data, data->cpu);
+}
+
+#else
+static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data) { return -ENODEV; }
+static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data) { return; }
+static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index) { return; }
+#endif /* CONFIG_X86_POWERNOW_K8_ACPI */
+
 /* Take a frequency, and issue the fid/vid transition command */
 static int transition_frequency(struct powernow_k8_data *data, unsigned int index)
 {
@@ -766,7 +878,9 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 
 	if (cpufreq_frequency_table_target(pol, data->powernow_table, targfreq, relation, &newstate))
 		goto err_out;
-	
+
+	powernow_k8_acpi_pst_values(data, newstate);
+
 	if (transition_frequency(data, newstate)) {
 		printk(KERN_ERR PFX "transition frequency failed\n");
 		ret = 1;
@@ -811,20 +925,27 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	data->cpu = pol->cpu;
 
-	if (pol->cpu != 0) {
-		printk(KERN_ERR PFX "init not cpu 0\n");
-		kfree(data);
-		return -ENODEV;
-	}
-	if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
-		printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
-		kfree(data);
-		return 0;
-	}
-	rc = find_psb_table(data);
-	if (rc) {
-		kfree(data);
-		return -ENODEV;
+	if (powernow_k8_cpu_init_acpi(data)) {
+		/*
+		 * Use the PSB BIOS structure. This is only availabe on
+		 * an UP version, and is deprecated by AMD.
+		 */
+
+		if (pol->cpu != 0) {
+			printk(KERN_ERR PFX "init not cpu 0\n");
+			kfree(data);
+			return -ENODEV;
+		}
+		if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
+			printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
+			kfree(data);
+			return 0;
+		}
+		rc = find_psb_table(data);
+		if (rc) {
+			kfree(data);
+			return -ENODEV;
+		}
 	}
 
 	/* only run on specific CPU from here on */
@@ -892,6 +1013,8 @@ static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
 
 	if (!data)
 		return -EINVAL;
+
+	powernow_k8_cpu_exit_acpi(data);
 
 	cpufreq_frequency_table_put_attr(pol->cpu);
 
