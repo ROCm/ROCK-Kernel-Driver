@@ -1107,6 +1107,9 @@ static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
 	int err;
 
 	err = snd_intel8x0_pcm_open(substream, &chip->ichd[ICHD_PCMOUT]);
+	if (err < 0)
+		return err;
+
 	if (chip->multi6) {
 		runtime->hw.channels_max = 6;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels6);
