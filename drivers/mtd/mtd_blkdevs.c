@@ -1,5 +1,5 @@
 /*
- * $Id: mtd_blkdevs.c,v 1.12 2003/05/21 01:00:59 dwmw2 Exp $
+ * $Id: mtd_blkdevs.c,v 1.15 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -18,8 +18,10 @@
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/spinlock.h>
+#include <linux/hdreg.h>
 #include <linux/init.h>
 #include <asm/semaphore.h>
+#include <asm/uaccess.h>
 #include <linux/devfs_fs_kernel.h>
 
 static LIST_HEAD(blktrans_majors);
@@ -46,7 +48,7 @@ static int do_blktrans_request(struct mtd_blktrans_ops *tr,
 	nsect = req->current_nr_sectors;
 	buf = req->buffer;
 
-	if (!req->flags & REQ_CMD)
+	if (!(req->flags & REQ_CMD))
 		return 0;
 
 	if (block + nsect > get_capacity(req->rq_disk))
@@ -93,13 +95,13 @@ static int mtd_blktrans_thread(void *arg)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	spin_lock_irq(rq->queue_lock);
+		
 	while (!tr->blkcore_priv->exiting) {
 		struct request *req;
 		struct mtd_blktrans_dev *dev;
 		int res = 0;
 		DECLARE_WAITQUEUE(wait, current);
-
-		spin_lock_irq(rq->queue_lock);
 
 		req = elv_next_request(rq);
 
@@ -111,6 +113,8 @@ static int mtd_blktrans_thread(void *arg)
 
 			schedule();
 			remove_wait_queue(&tr->blkcore_priv->thread_wq, &wait);
+
+			spin_lock_irq(rq->queue_lock);
 
 			continue;
 		}
@@ -159,7 +163,7 @@ int blktrans_open(struct inode *i, struct file *f)
 	dev->mtd->usecount++;
 
 	ret = 0;
-	if (tr->open && (ret = tr->open(dev, i, f))) {
+	if (tr->open && (ret = tr->open(dev))) {
 		dev->mtd->usecount--;
 		module_put(dev->mtd->owner);
 	out_tr:
@@ -179,7 +183,7 @@ int blktrans_release(struct inode *i, struct file *f)
 	tr = dev->tr;
 
 	if (tr->release)
-		ret = tr->release(dev, i, f);
+		ret = tr->release(dev);
 
 	if (!ret) {
 		dev->mtd->usecount--;
@@ -194,21 +198,33 @@ int blktrans_release(struct inode *i, struct file *f)
 static int blktrans_ioctl(struct inode *inode, struct file *file, 
 			      unsigned int cmd, unsigned long arg)
 {
-	struct mtd_blktrans_dev *dev;
-	struct mtd_blktrans_ops *tr;
-	int ret = -ENOTTY;
+	struct mtd_blktrans_dev *dev = inode->i_bdev->bd_disk->private_data;
+	struct mtd_blktrans_ops *tr = dev->tr;
 
-	dev = inode->i_bdev->bd_disk->private_data;
-	tr = dev->tr;
-
-	if (tr->ioctl)
-		ret = tr->ioctl(dev, inode, file, cmd, arg);
-
-	if (ret == -ENOTTY && (cmd == BLKROSET || cmd == BLKFLSBUF)) {
+	switch (cmd) {
+	case BLKFLSBUF:
+		if (tr->flush)
+			return tr->flush(dev);
 		/* The core code did the work, we had nothing to do. */
-		ret = 0;
+		return 0;
+
+	case HDIO_GETGEO:
+		if (tr->getgeo) {
+			struct hd_geometry g;
+
+			memset(&g, 0, sizeof(g));
+			int ret = tr->getgeo(dev, &g);
+			if (ret)
+				return ret;
+
+			g.start = get_start_sect(inode->i_bdev);
+			if (copy_to_user((void *)arg, &g, sizeof(g)))
+				return -EFAULT;
+			return 0;
+		} /* else */
+	default:
+		return -ENOTTY;
 	}
-	return ret;
 }
 
 struct block_device_operations mtd_blktrans_ops = {

@@ -1,7 +1,7 @@
 /* 
  * Direct MTD block device access
  *
- * $Id: mtdblock.c,v 1.61 2003/05/21 10:49:38 dwmw2 Exp $
+ * $Id: mtdblock.c,v 1.63 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * (C) 2000-2003 Nicolas Pitre <nico@cam.org>
  * (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>
@@ -248,11 +248,19 @@ static int mtdblock_writesect(struct mtd_blktrans_dev *dev,
 			      unsigned long block, char *buf)
 {
 	struct mtdblk_dev *mtdblk = mtdblks[dev->devnum];
+	if (unlikely(!mtdblk->cache_data)) {
+		mtdblk->cache_data = vmalloc(mtdblk->mtd->erasesize);
+		if (!mtdblk->cache_data)
+			return -EINTR;
+		/* -EINTR is not really correct, but it is the best match
+		 * documented in man 2 write for all cases.  We could also
+		 * return -EAGAIN sometimes, but why bother?
+		 */
+	}
 	return do_cached_write(mtdblk, block<<9, 512, buf);
 }
 
-static int mtdblock_open(struct mtd_blktrans_dev *mbd, 
-			 struct inode *inode, struct file *file)
+static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 {
 	struct mtdblk_dev *mtdblk;
 	struct mtd_info *mtd = mbd->mtd;
@@ -279,11 +287,7 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd,
 	if ((mtdblk->mtd->flags & MTD_CAP_RAM) != MTD_CAP_RAM &&
 	    mtdblk->mtd->erasesize) {
 		mtdblk->cache_size = mtdblk->mtd->erasesize;
-		mtdblk->cache_data = vmalloc(mtdblk->mtd->erasesize);
-		if (!mtdblk->cache_data) {
-			kfree(mtdblk);
-			return -ENOMEM;
-		}
+		mtdblk->cache_data = NULL;
 	}
 
 	mtdblks[dev] = mtdblk;
@@ -293,16 +297,12 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd,
 	return 0;
 }
 
-static int mtdblock_release(struct mtd_blktrans_dev *mbd,
-				  struct inode *inode, struct file *file)
+static int mtdblock_release(struct mtd_blktrans_dev *mbd)
 {
-	int dev;
-	struct mtdblk_dev *mtdblk;
+	int dev = mbd->devnum;
+	struct mtdblk_dev *mtdblk = mtdblks[dev];
 
    	DEBUG(MTD_DEBUG_LEVEL1, "mtdblock_release\n");
-
-	dev = minor(inode->i_rdev);
-	mtdblk = mtdblks[dev];
 
 	down(&mtdblk->cache_sem);
 	write_cached_data(mtdblk);
@@ -321,27 +321,17 @@ static int mtdblock_release(struct mtd_blktrans_dev *mbd,
 	return 0;
 }  
 
-
-static int mtdblock_ioctl(struct mtd_blktrans_dev *dev, 
-			  struct inode * inode, struct file * file,
-			  unsigned int cmd, unsigned long arg)
+static int mtdblock_flush(struct mtd_blktrans_dev *dev)
 {
-	struct mtdblk_dev *mtdblk;
+	struct mtdblk_dev *mtdblk = mtdblks[dev->devnum];
 
-	mtdblk = mtdblks[minor(inode->i_rdev)];
+	down(&mtdblk->cache_sem);
+	write_cached_data(mtdblk);
+	up(&mtdblk->cache_sem);
 
-	switch (cmd) {
-	case BLKFLSBUF:
-		down(&mtdblk->cache_sem);
-		write_cached_data(mtdblk);
-		up(&mtdblk->cache_sem);
-		if (mtdblk->mtd->sync)
-			mtdblk->mtd->sync(mtdblk->mtd);
-		return 0;
-
-	default:
-		return -ENOTTY;
-	}
+	if (mtdblk->mtd->sync)
+		mtdblk->mtd->sync(mtdblk->mtd);
+	return 0;
 }
 
 static void mtdblock_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
@@ -376,7 +366,7 @@ struct mtd_blktrans_ops mtdblock_tr = {
 	.major		= 31,
 	.part_bits	= 0,
 	.open		= mtdblock_open,
-	.ioctl		= mtdblock_ioctl,
+	.flush		= mtdblock_flush,
 	.release	= mtdblock_release,
 	.readsect	= mtdblock_readsect,
 	.writesect	= mtdblock_writesect,

@@ -1,5 +1,5 @@
 /*
- * $Id: blktrans.h,v 1.4 2003/05/21 01:01:32 dwmw2 Exp $
+ * $Id: blktrans.h,v 1.5 2003/06/23 12:00:08 dwmw2 Exp $
  *
  * (C) 2003 David Woodhouse <dwmw2@infradead.org>
  *
@@ -12,6 +12,7 @@
 
 #include <asm/semaphore.h>
 
+struct hd_geometry;
 struct mtd_info;
 struct mtd_blktrans_ops;
 struct file;
@@ -42,17 +43,13 @@ struct mtd_blktrans_ops {
 	int (*writesect)(struct mtd_blktrans_dev *dev,
 		     unsigned long block, char *buffer);
 
-	/* HDIO_GETGEO and HDIO_GETGEO_BIG are the only non-private
-	   ioctls which are expected to be passed through */
-	int (*ioctl)(struct mtd_blktrans_dev *dev,
-		     struct inode * inode, struct file * file, 
-		     unsigned int cmd, unsigned long arg);
+	/* Block layer ioctls */
+	int (*getgeo)(struct mtd_blktrans_dev *dev, struct hd_geometry *geo);
+	int (*flush)(struct mtd_blktrans_dev *dev);
 
 	/* Called with mtd_table_mutex held; no race with add/remove */
-	int (*open)(struct mtd_blktrans_dev *dev, 
-		 struct inode *i, struct file *f);
-	int (*release)(struct mtd_blktrans_dev *dev,
-		    struct inode *i, struct file *f);
+	int (*open)(struct mtd_blktrans_dev *dev);
+	int (*release)(struct mtd_blktrans_dev *dev);
 
 	/* Called on {de,}registration and on subsequent addition/removal
 	   of devices, with mtd_table_mutex held. */
