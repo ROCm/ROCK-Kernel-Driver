@@ -26,8 +26,14 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 
+#if defined(CONFIG_VIDEO_CX88_DVB) || defined(CONFIG_VIDEO_CX88_DVB_MODULE)
+# define WITH_DVB 1
+#endif
+
 #include "cx88.h"
+#ifdef WITH_DVB
 #include "cx22702.h"
+#endif
 
 /* ------------------------------------------------------------------ */
 /* board config info                                                  */
@@ -641,6 +647,7 @@ static void hauppauge_eeprom(struct cx88_core *core, u8 *eeprom_data)
 	       core->tuner_type, radio ? "yes" : "no");
 }
 
+#ifdef WITH_DVB
 static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 {
 	int model;
@@ -683,6 +690,7 @@ static int hauppauge_eeprom_dvb(struct cx88_core *core, u8 *ee)
 	core->pll_addr = 0x61;
 	core->demod_addr = 0x43;
 }
+#endif
 
 /* ----------------------------------------------------------------------- */
 /* some GDI (was: Modular Technology) specific stuff                       */
@@ -820,6 +828,7 @@ void cx88_card_setup(struct cx88_core *core)
 		msleep(1);
 		cx_set(MO_GP0_IO, 0x00000101);
 		break;
+#ifdef WITH_DVB
 	case CX88_BOARD_HAUPPAUGE_DVB_T1:
 		if (0 == core->i2c_rc)
 			i2c_eeprom(&core->i2c_client,eeprom,sizeof(eeprom));
@@ -830,6 +839,7 @@ void cx88_card_setup(struct cx88_core *core)
 		core->pll_addr   = 0x60;
 		core->demod_addr = 0x43;
 		break;
+#endif
 	}
 	if (cx88_boards[core->board].radio.type == CX88_RADIO)
 		core->has_radio = 1;
