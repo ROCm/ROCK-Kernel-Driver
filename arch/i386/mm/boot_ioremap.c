@@ -19,6 +19,7 @@
 #undef CONFIG_X86_PAE
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 #include <linux/init.h>
 #include <linux/stddef.h>
 
@@ -48,10 +49,12 @@ static void __boot_ioremap(unsigned long phys_addr, unsigned long nrpages,
 {
 	boot_pte_t* pte;
 	int i;
+	char *vaddr = virtual_source;
 
 	pte = boot_vaddr_to_pte(virtual_source);
 	for (i=0; i < nrpages; i++, phys_addr += PAGE_SIZE, pte++) {
 		set_pte(pte, pfn_pte(phys_addr>>PAGE_SHIFT, PAGE_KERNEL));
+		__flush_tlb_one(&vaddr[i*PAGE_SIZE]);
 	}
 }
 

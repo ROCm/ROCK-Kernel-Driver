@@ -68,7 +68,7 @@ void show_swap_cache_info(void)
 		swap_cache_info.noent_race, swap_cache_info.exist_race);
 }
 
-int add_to_swap_cache(struct page *page, swp_entry_t entry)
+static int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {
 	int error;
 
@@ -78,7 +78,7 @@ int add_to_swap_cache(struct page *page, swp_entry_t entry)
 		INC_CACHE_INFO(noent_race);
 		return -ENOENT;
 	}
-	error = add_to_page_cache(page, &swapper_space, entry.val, GFP_ATOMIC);
+	error = add_to_page_cache(page, &swapper_space, entry.val, GFP_KERNEL);
 	/*
 	 * Anon pages are already on the LRU, we don't run lru_cache_add here.
 	 */

@@ -54,6 +54,15 @@
 
 #define BOND_DEFAULT_MAX_BONDS  1   /* Default maximum number of devices to support */
 
+#define BOND_MULTICAST_DISABLED 0
+#define BOND_MULTICAST_ACTIVE   1
+#define BOND_MULTICAST_ALL      2
+
+struct bond_parm_tbl {
+	char *modename;
+	int mode;
+};
+
 typedef struct ifbond {
 	__s32 bond_mode;
 	__s32 num_slaves;

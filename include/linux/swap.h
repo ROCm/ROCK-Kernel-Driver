@@ -177,21 +177,18 @@ struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
 					struct pte_chain *));
 void FASTCALL(page_remove_rmap(struct page *, pte_t *));
 int FASTCALL(try_to_unmap(struct page *));
-int FASTCALL(page_over_rsslimit(struct page *));
+
+/* linux/mm/shmem.c */
+extern int shmem_unuse(swp_entry_t entry, struct page *page);
+#else
+#define page_referenced(page)	TestClearPageReferenced(page)
+#define try_to_unmap(page)	SWAP_FAIL
+#endif /* CONFIG_MMU */
 
 /* return values of try_to_unmap */
 #define	SWAP_SUCCESS	0
 #define	SWAP_AGAIN	1
 #define	SWAP_FAIL	2
-#define	SWAP_ERROR	3
-
-/* linux/mm/shmem.c */
-extern int shmem_unuse(swp_entry_t entry, struct page *page);
-
-#else
-#define page_referenced(page) \
-	TestClearPageReferenced(page)
-#endif /* CONFIG_MMU */
 
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
@@ -203,7 +200,6 @@ extern int rw_swap_page_sync(int, swp_entry_t, struct page *);
 extern struct address_space swapper_space;
 #define total_swapcache_pages  swapper_space.nrpages
 extern void show_swap_cache_info(void);
-extern int add_to_swap_cache(struct page *, swp_entry_t);
 extern int add_to_swap(struct page *);
 extern void __delete_from_swap_cache(struct page *);
 extern void delete_from_swap_cache(struct page *);

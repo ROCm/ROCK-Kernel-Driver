@@ -1110,7 +1110,7 @@ static struct pci_driver rtl8169_pci_driver = {
 	.name		= MODULENAME,
 	.id_table	= rtl8169_pci_tbl,
 	.probe		= rtl8169_init_one,
-	.remove		= rtl8169_remove_one,
+	.remove		= __devexit_p(rtl8169_remove_one),
 	.suspend	= NULL,
 	.resume		= NULL,
 };

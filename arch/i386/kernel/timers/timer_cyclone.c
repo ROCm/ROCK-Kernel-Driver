@@ -10,6 +10,7 @@
 #include <linux/init.h>
 #include <linux/timex.h>
 #include <linux/errno.h>
+#include <linux/string.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -73,7 +74,7 @@ static unsigned long get_offset_cyclone(void)
 	return delay_at_last_interrupt + offset;
 }
 
-static int init_cyclone(void)
+static int __init init_cyclone(char* override)
 {
 	u32* reg;	
 	u32 base;		/* saved cyclone base address */
@@ -81,8 +82,11 @@ static int init_cyclone(void)
 	u32 offset;		/* offset from pageaddr to cyclone_timer register */
 	int i;
 	
+	/* check clock override */
+	if (override[0] && strncmp(override,"cyclone",7))
+			return -ENODEV;
+
 	/*make sure we're on a summit box*/
-	/*XXX need to use proper summit hooks! such as xapic -john*/
 	if(!use_cyclone) return -ENODEV; 
 	
 	printk(KERN_INFO "Summit chipset: Starting Cyclone Counter.\n");
