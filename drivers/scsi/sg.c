@@ -2967,6 +2967,7 @@ static void sg_proc_debug_helper(struct seq_file *s, Sg_device * sdp)
 				   (int) srp->data.cmd_opcode);
 		}
 		if (0 == m)
+			seq_printf(s, "     No requests active\n");
 	}
 }
 
