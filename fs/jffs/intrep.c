@@ -1908,7 +1908,7 @@ retry:
 	}
 
 	if ((err = flash_safe_writev(fmc->mtd, node_iovec, iovec_cnt,
-				    pos) < 0)) {
+				    pos)) < 0) {
 		jffs_fmfree_partly(fmc, fm, 0);
 		jffs_fm_write_unlock(fmc);
 		printk(KERN_ERR "JFFS: jffs_write_node: Failed to write, "
