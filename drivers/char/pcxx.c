@@ -153,7 +153,6 @@ static struct timer_list pcxx_timer;
 DECLARE_TASK_QUEUE(tq_pcxx);
 
 static void pcxxpoll(unsigned long dummy);
-static void pcxxdelay(int);
 static void fepcmd(struct channel *, int, int, int, int, int);
 static void pcxe_put_char(struct tty_struct *, unsigned char);
 static void pcxe_flush_chars(struct tty_struct *);
@@ -1271,7 +1270,7 @@ int __init pcxe_init(void)
 	for(crd=0; crd < numcards; crd++) {
 		bd = &boards[crd];
 		outb(FEPRST, bd->port);
-		pcxxdelay(1);
+		mdelay(1);
 
 		for(i=0; (inb(bd->port) & FEPMASK) != FEPRST; i++) {
 			if(i > 100) {
@@ -1283,7 +1282,7 @@ int __init pcxe_init(void)
 #ifdef MODULE
 			schedule();
 #endif
-			pcxxdelay(10);
+			mdelay(10);
 		}
 		if(bd->status == DISABLED)
 			continue;
@@ -1362,7 +1361,7 @@ int __init pcxe_init(void)
 #ifdef MODULE
 			schedule();
 #endif
-			pcxxdelay(1);
+			mdelay(1);
 		}
 		if(bd->status == DISABLED)
 			continue;
@@ -1413,7 +1412,7 @@ int __init pcxe_init(void)
 #ifdef MODULE
 				schedule();
 #endif
-				pcxxdelay(50);
+				mdelay(50);
 			}
 
 			printk("\nPC/Xx: BIOS download failed for board at 0x%x(addr=%lx-%lx)!\n",
@@ -1443,7 +1442,7 @@ int __init pcxe_init(void)
 #ifdef MODULE
 				schedule();
 #endif
-				pcxxdelay(10);
+				mdelay(10);
 			}
 
 			printk("\nPC/Xx: BIOS download failed on the %s at 0x%x!\n",
@@ -1487,7 +1486,7 @@ load_fep:
 #ifdef MODULE
 			schedule();
 #endif
-			pcxxdelay(1);
+			mdelay(1);
 		}
 
 		if(bd->status == DISABLED)
@@ -1520,7 +1519,7 @@ load_fep:
 #ifdef MODULE
 			schedule();
 #endif
-			pcxxdelay(1);
+			mdelay(1);
 		}
 		if(bd->status == DISABLED)
 			continue;
@@ -1822,15 +1821,6 @@ static void doevent(int crd)
 		globalwinon(chan0);
 	}
 
-}
-
-
-/*
- * pcxxdelay - delays a specified number of milliseconds
- */
-static void pcxxdelay(int msec)
-{
-	mdelay(msec);
 }
 
 
