@@ -2051,22 +2051,14 @@ static int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	return 0;
 }
 
-static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
+static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 			     u8 * data, int userfont)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 	int resize;
-	int w = op->width;
-	int h = op->height;
 	int cnt;
 	char *old_data = NULL;
-
-	if (!w > 32) {
-		if (userfont && op->op != KD_FONT_OP_COPY)
-			kfree(data - FONT_EXTRA_WORDS * sizeof(int));
-		return -ENXIO;
-	}
 
 	if (CON_IS_VISIBLE(vc) && softback_lines)
 		fbcon_set_origin(vc);
@@ -2170,14 +2162,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 static int fbcon_copy_font(struct vc_data *vc, int con)
 {
 	struct display *od = &fb_display[con];
-	struct console_font_op crap;
+	struct console_font_op *f = &vc->vc_font;
 
-	if (od->fontdata == vc->vc_font.data)
+	if (od->fontdata == f->data)
 		return 0;	/* already the same font... */
-	crap.op = KD_FONT_OP_COPY;
-	crap.width = vc->vc_font.width;
-	crap.height = vc->vc_font.height;
-	return fbcon_do_set_font(vc, &crap, od->fontdata, od->userfont);
+	return fbcon_do_set_font(vc, f->width, f->height, od->fontdata, od->userfont);
 }
 
 /*
@@ -2194,9 +2183,6 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font *font, unsigne
 	int size = h;
 	int i, k;
 	u8 *new_data, *data = font->data, *p;
-	struct console_font_op crap = {.width = font->width,
-				       .height = font->height, 
-				       .op = KD_FONT_OP_SET};
 
 	if (charcount != 256 && charcount != 512)
 		return -EINVAL;
@@ -2275,24 +2261,22 @@ static int fbcon_set_font(struct vc_data *vc, struct console_font *font, unsigne
 			break;
 		}
 	}
-	return fbcon_do_set_font(vc, &crap, new_data, 1);
+	return fbcon_do_set_font(vc, font->width, font->height, new_data, 1);
 }
 
 static int fbcon_set_def_font(struct vc_data *vc, struct console_font *font, char *name)
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct font_desc *f;
-	struct console_font_op crap;
 
 	if (!name)
 		f = get_default_font(info->var.xres, info->var.yres);
 	else if (!(f = find_font(name)))
 		return -ENOENT;
 
-	crap.op = KD_FONT_OP_SET_DEFAULT;
-	crap.width = font->width = f->width;
-	crap.height = font->height = f->height;
-	return fbcon_do_set_font(vc, &crap, f->data, 0);
+	font->width = f->width;
+	font->height = f->height;
+	return fbcon_do_set_font(vc, f->width, f->height, f->data, 0);
 }
 
 static u16 palette_red[16];
