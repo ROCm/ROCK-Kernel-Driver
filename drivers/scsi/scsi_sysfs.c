@@ -410,6 +410,8 @@ void scsi_remove_device(struct scsi_device *sdev)
 	if (class) {
 		down_write(&class->subsys.rwsem);
 		set_bit(SDEV_DEL, &sdev->sdev_state);
+		if (sdev->host->hostt->slave_destroy)
+			sdev->host->hostt->slave_destroy(sdev);
 		if (atomic_read(&sdev->access_count))
 			device_del(&sdev->sdev_gendev);
 		up_write(&class->subsys.rwsem);
