@@ -535,11 +535,6 @@ int pci_request_regions(struct pci_dev *pdev, char *res_name)
 	return 0;
 
 err_out:
-	printk (KERN_WARNING "PCI: Unable to reserve %s region #%d:%lx@%lx for device %s\n",
-		pci_resource_flags(pdev, i) & IORESOURCE_IO ? "I/O" : "mem",
-		i + 1, /* PCI BAR # */
-		pci_resource_len(pdev, i), pci_resource_start(pdev, i),
-		pci_name(pdev));
 	while(--i >= 0)
 		pci_release_region(pdev, i);
 		
