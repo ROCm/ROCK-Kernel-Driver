@@ -846,12 +846,12 @@ int hash_page(unsigned long ea, unsigned long access)
 	va = (vsid << 28) | (ea & 0x0fffffff);
 	vpn = va >> PAGE_SHIFT;
 	pgdir = mm->pgd;
-	PPCDBG(PPCDBG_MM, "hash_page ea = 0x%16.16lx, va = 0x%16.16lx\n          current = 0x%16.16lx, access = %lx\n", ea, va, current, access); 
-                if ( pgdir == NULL ) {
-                return 1;
-	}
-	
-	/* Lock the Linux page table to prevent mmap and kswapd
+
+	if (pgdir == NULL)
+		return 1;
+
+	/*
+	 * Lock the Linux page table to prevent mmap and kswapd
 	 * from modifying entries while we search and update
 	 */
 	
@@ -1044,7 +1044,6 @@ int hash_page(unsigned long ea, unsigned long access)
 void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte)
 {
 	unsigned long vsid, vpn, va, hash, secondary, slot, flags;
-	/* Local copy of first doubleword of HPTE */
 	union {
 		unsigned long d;
 		Hpte_dword0   h;
@@ -1063,17 +1062,21 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte)
 		hash = ~hash;
 	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (pte_val(pte) & _PAGE_GROUP_IX) >> 12;
-	/* If there is an HPTE for this page it is indexed by slot */
 
-	spin_lock_irqsave( &hash_table_lock, flags);
-	hpte_dw0.d = ppc_md.hpte_getword0( slot );
-	if ( (hpte_dw0.h.avpn == (vpn >> 11) ) &&
-	     (hpte_dw0.h.v) && 
-	     (hpte_dw0.h.h == secondary ) ){
+	spin_lock_irqsave(&hash_table_lock, flags);
+	/*
+	 * Id prefer to flush even if our hpte was stolen, but the new
+	 * entry could be bolted - Anton
+	 */
+	hpte_dw0.d = ppc_md.hpte_getword0(slot);
+	if ((hpte_dw0.h.avpn == (vpn >> 11)) &&
+	    (hpte_dw0.h.v) && 
+	    (hpte_dw0.h.h == secondary)){
 		/* HPTE matches */
 		ppc_md.hpte_invalidate(slot);	
 	}
-	spin_unlock_irqrestore( &hash_table_lock, flags );
+
+	spin_unlock_irqrestore(&hash_table_lock, flags);
 }
 
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
