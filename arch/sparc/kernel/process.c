@@ -45,7 +45,7 @@
 
 /* 
  * Power management idle function 
- * Set in pm platform drivers
+ * Set in pm platform drivers (apc.c and pmc.c)
  */
 void (*pm_idle)(void);
 
@@ -122,7 +122,7 @@ int cpu_idle(void)
 		}
 
 		while((!need_resched()) && pm_idle) {
-			(*pm_idle)();		/* XXX Huh? On sparc?! */
+			(*pm_idle)();
 		}
 
 		schedule();
