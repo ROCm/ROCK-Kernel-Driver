@@ -88,20 +88,20 @@ int get_UCSname(struct component_name * uniName, struct dentry *dentry,
 	int length = dentry->d_name.len;
 
 	if (length > JFS_NAME_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 
 	uniName->name =
 	    kmalloc((length + 1) * sizeof(wchar_t), GFP_NOFS);
 
 	if (uniName->name == NULL)
-		return ENOSPC;
+		return -ENOSPC;
 
 	uniName->namlen = jfs_strtoUCS(uniName->name, dentry->d_name.name,
 				       length, nls_tab);
 
 	if (uniName->namlen < 0) {
 		kfree(uniName->name);
-		return -uniName->namlen;
+		return uniName->namlen;
 	}
 
 	return 0;

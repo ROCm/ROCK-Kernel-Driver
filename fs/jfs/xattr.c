@@ -183,7 +183,7 @@ static int ea_write_inline(struct inode *ip, struct jfs_ea_list *ealist,
 		 * used for an inline EA.
 		 */
 		if (!(ji->mode2 & INLINEEA) && !(ji->ea.flag & DXD_INLINE))
-			return -1;
+			return -EPERM;
 
 		DXDsize(ea, size);
 		DXDlength(ea, 0);
@@ -252,7 +252,7 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 
 	rc = dbAlloc(ip, INOHINT(ip), nblocks, &blkno);
 	if (rc)
-		return -rc;
+		return rc;
 
 	/*
 	 * Now have nblocks worth of storage to stuff into the FEALIST.
@@ -513,7 +513,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		rc = dbAlloc(inode, INOHINT(inode), (s64) blocks_needed,
 			     &blkno);
 		if (rc)
-			return -rc;
+			return rc;
 
 		DXDlength(&ea_buf->new_ea, blocks_needed);
 		DXDaddress(&ea_buf->new_ea, blkno);

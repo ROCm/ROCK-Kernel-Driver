@@ -85,7 +85,7 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 	 */
 	ip = ialloc(dip, mode);
 	if (ip == NULL) {
-		rc = ENOSPC;
+		rc = -ENOSPC;
 		goto out2;
 	}
 
@@ -158,8 +158,8 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 
       out1:
 
-	jfs_info("jfs_create: rc:%d", -rc);
-	return -rc;
+	jfs_info("jfs_create: rc:%d", rc);
+	return rc;
 }
 
 
@@ -193,7 +193,7 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	/* link count overflow on parent directory ? */
 	if (dip->i_nlink == JFS_LINK_MAX) {
-		rc = EMLINK;
+		rc = -EMLINK;
 		goto out1;
 	}
 
@@ -211,7 +211,7 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	 */
 	ip = ialloc(dip, S_IFDIR | mode);
 	if (ip == NULL) {
-		rc = ENOSPC;
+		rc = -ENOSPC;
 		goto out2;
 	}
 
@@ -288,8 +288,8 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
       out1:
 
-	jfs_info("jfs_mkdir: rc:%d", -rc);
-	return -rc;
+	jfs_info("jfs_mkdir: rc:%d", rc);
+	return rc;
 }
 
 /*
@@ -300,8 +300,8 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
  * PARAMETER:	dip 	- parent inode
  *		dentry	- child directory dentry
  *
- * RETURN:	EINVAL	- if name is . or ..
- *		EINVAL  - if . or .. exist but are invalid.
+ * RETURN:	-EINVAL	- if name is . or ..
+ *		-EINVAL  - if . or .. exist but are invalid.
  *		errors from subroutines
  *
  * note:
@@ -325,7 +325,7 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	/* directory must be empty to be removed */
 	if (!dtEmpty(ip)) {
-		rc = ENOTEMPTY;
+		rc = -ENOTEMPTY;
 		goto out;
 	}
 
@@ -411,7 +411,7 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
       out:
 	jfs_info("jfs_rmdir: rc:%d", rc);
-	return -rc;
+	return rc;
 }
 
 /*
@@ -497,7 +497,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 			up(&JFS_IP(dip)->commit_sem);
 			up(&JFS_IP(ip)->commit_sem);
 			IWRITE_UNLOCK(ip);
-			rc = -new_size;		/* We return -rc */
+			rc = new_size;
 			goto out1;
 		}
 		tblk = tid_to_tblock(tid);
@@ -559,8 +559,8 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
       out1:
 	free_UCSname(&dname);
       out:
-	jfs_info("jfs_unlink: rc:%d", -rc);
-	return -rc;
+	jfs_info("jfs_unlink: rc:%d", rc);
+	return rc;
 }
 
 /*
@@ -585,7 +585,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
  * PARAMETERS:	cd	- pointer to commit data structure.
  *			  current inode is the one to truncate.
  *
- * RETURN :	Errors from subroutines
+ * RETURN:	Errors from subroutines
  */
 s64 commitZeroLink(tid_t tid, struct inode *ip)
 {
@@ -775,7 +775,7 @@ int jfs_link(struct dentry *old_dentry,
 	down(&JFS_IP(ip)->commit_sem);
 
 	if (ip->i_nlink == JFS_LINK_MAX) {
-		rc = EMLINK;
+		rc = -EMLINK;
 		goto out;
 	}
 
@@ -813,7 +813,7 @@ int jfs_link(struct dentry *old_dentry,
 	up(&JFS_IP(ip)->commit_sem);
 
 	jfs_info("jfs_link: rc:%d", rc);
-	return -rc;
+	return rc;
 }
 
 /*
@@ -871,7 +871,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	 */
 	ip = ialloc(dip, S_IFLNK | 0777);
 	if (ip == NULL) {
-		rc = ENOSPC;
+		rc = -ENOSPC;
 		goto out2;
 	}
 
@@ -963,7 +963,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 				if (mp == NULL) {
 					dtDelete(tid, dip, &dname, &ino,
 						 JFS_REMOVE);
-					rc = EIO;
+					rc = -EIO;
 					goto out3;
 				}
 				memcpy(mp->data, name, copy_size);
@@ -981,7 +981,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 			ip->i_blocks = LBLK2PBLK(sb, xlen);
 		} else {
 			dtDelete(tid, dip, &dname, &ino, JFS_REMOVE);
-			rc = ENOSPC;
+			rc = -ENOSPC;
 			goto out3;
 		}
 	}
@@ -1028,8 +1028,8 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 #endif
 
       out1:
-	jfs_info("jfs_symlink: rc:%d", -rc);
-	return -rc;
+	jfs_info("jfs_symlink: rc:%d", rc);
+	return rc;
 }
 
 
@@ -1078,7 +1078,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	 */
 	rc = dtSearch(old_dir, &old_dname, &ino, &btstack, JFS_LOOKUP);
 	if (rc || (ino != old_ip->i_ino)) {
-		rc = ENOENT;
+		rc = -ENOENT;
 		goto out3;
 	}
 
@@ -1088,26 +1088,26 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	rc = dtSearch(new_dir, &new_dname, &ino, &btstack, JFS_LOOKUP);
 	if (rc == 0) {
 		if ((new_ip == 0) || (ino != new_ip->i_ino)) {
-			rc = ESTALE;
+			rc = -ESTALE;
 			goto out3;
 		}
-	} else if (rc != ENOENT)
+	} else if (rc != -ENOENT)
 		goto out3;
 	else if (new_ip) {
 		/* no entry exists, but one was expected */
-		rc = ESTALE;
+		rc = -ESTALE;
 		goto out3;
 	}
 
 	if (S_ISDIR(old_ip->i_mode)) {
 		if (new_ip) {
 			if (!dtEmpty(new_ip)) {
-				rc = ENOTEMPTY;
+				rc = -ENOTEMPTY;
 				goto out3;
 			}
 		} else if ((new_dir != old_dir) &&
 			   (new_dir->i_nlink == JFS_LINK_MAX)) {
-			rc = EMLINK;
+			rc = -EMLINK;
 			goto out3;
 		}
 	} else if (new_ip)
@@ -1145,7 +1145,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			/* free block resources */
 			if ((new_size = commitZeroLink(tid, new_ip)) < 0) {
 				txAbort(tid, 1);	/* Marks FS Dirty */
-				rc = -new_size;		/* We return -rc */
+				rc = new_size;		
 				goto out4;
 			}
 			tblk = tid_to_tblock(tid);
@@ -1262,7 +1262,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		new_size = xtTruncate_pmap(tid, new_ip, new_size);
 		if (new_size < 0) {
 			txAbort(tid, 1);
-			rc = -new_size;		/* We return -rc */
+			rc = new_size;		
 		} else
 			rc = txCommit(tid, 1, &new_ip, COMMIT_SYNC);
 		txEnd(tid);
@@ -1289,7 +1289,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	}
 
 	jfs_info("jfs_rename: returning %d", rc);
-	return -rc;
+	return rc;
 }
 
 
@@ -1316,7 +1316,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
 	ip = ialloc(dir, mode);
 	if (ip == NULL) {
-		rc = ENOSPC;
+		rc = -ENOSPC;
 		goto out1;
 	}
 
@@ -1370,7 +1370,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
       out:
 	jfs_info("jfs_mknod: returning %d", rc);
-	return -rc;
+	return rc;
 }
 
 static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
@@ -1393,15 +1393,15 @@ static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
 	else {
 		if ((rc =
 		     get_UCSname(&key, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
-			return ERR_PTR(-rc);
+			return ERR_PTR(rc);
 		rc = dtSearch(dip, &key, &inum, &btstack, JFS_LOOKUP);
 		free_UCSname(&key);
-		if (rc == ENOENT) {
+		if (rc == -ENOENT) {
 			d_add(dentry, NULL);
 			return ERR_PTR(0);
 		} else if (rc) {
 			jfs_err("jfs_lookup: dtSearch returned %d", rc);
-			return ERR_PTR(-rc);
+			return ERR_PTR(rc);
 		}
 	}
 

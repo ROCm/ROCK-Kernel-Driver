@@ -519,7 +519,7 @@ free_metapage:
 	metapage_exit();
 free_slab:
 	kmem_cache_destroy(jfs_inode_cachep);
-	return -rc;
+	return rc;
 }
 
 static void __exit exit_jfs_fs(void)

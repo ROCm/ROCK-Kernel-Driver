@@ -257,7 +257,7 @@ int txInit(void)
 	size = sizeof(struct tblock) * nTxBlock;
 	TxBlock = (struct tblock *) vmalloc(size);
 	if (TxBlock == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 
 	for (k = 1; k < nTxBlock - 1; k++) {
 		TxBlock[k].next = k + 1;
@@ -283,7 +283,7 @@ int txInit(void)
 	TxLock = (struct tlock *) vmalloc(size);
 	if (TxLock == NULL) {
 		vfree(TxBlock);
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	/* initialize tlock table */
@@ -1098,7 +1098,7 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	     struct inode **iplist,	/* list of inode to commit */
 	     int flag)
 {
-	int rc = 0, rc1 = 0;
+	int rc = 0;
 	struct commit cd;
 	struct jfs_log *log;
 	struct tblock *tblk;
@@ -1318,8 +1318,6 @@ int txCommit(tid_t tid,		/* transaction identifier */
       out:
 	if (rc != 0)
 		txAbortCommit(&cd, rc);
-	else
-		rc = rc1;
 
       TheEnd:
 	jfs_info("txCommit: tid = %d, returning %d", tid, rc);

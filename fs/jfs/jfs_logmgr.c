@@ -667,7 +667,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 	/* group committed already ? */
 	if (tblk->flag & tblkGC_COMMITTED) {
 		if (tblk->flag & tblkGC_ERROR)
-			rc = EIO;
+			rc = -EIO;
 
 		LOGGC_UNLOCK(log);
 		return rc;
@@ -701,7 +701,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 
 	if (tblk->flag & tblkGC_COMMITTED) {
 		if (tblk->flag & tblkGC_ERROR)
-			rc = EIO;
+			rc = -EIO;
 
 		LOGGC_UNLOCK(log);
 		return rc;
@@ -717,7 +717,7 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 
 	/* removed from commit queue */
 	if (tblk->flag & tblkGC_ERROR)
-		rc = EIO;
+		rc = -EIO;
 
 	LOGGC_UNLOCK(log);
 	return rc;
@@ -1068,7 +1068,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	struct jfs_log *log;
 
 	if (!(log = kmalloc(sizeof(struct jfs_log), GFP_KERNEL)))
-		return ENOMEM;
+		return -ENOMEM;
 	memset(log, 0, sizeof(struct jfs_log));
 	init_waitqueue_head(&log->syncwait);
 
@@ -1113,7 +1113,6 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
 	}
 
 	if ((rc = bd_claim(bdev, log))) {
-		rc = -rc;
 		goto close;
 	}
 
@@ -1169,7 +1168,7 @@ int lmLogOpen(struct super_block *sb, struct jfs_log ** logptr)
  * PARAMETER:	log	- log structure
  *
  * RETURN:	0	- if ok
- *		EINVAL	- bad log magic number or superblock dirty
+ *		-EINVAL	- bad log magic number or superblock dirty
  *		error returned from logwait()
  *			
  * serialization: single first open thread
@@ -1209,21 +1208,21 @@ int lmLogInit(struct jfs_log * log)
 
 	if (logsuper->magic != cpu_to_le32(LOGMAGIC)) {
 		jfs_warn("*** Log Format Error ! ***");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto errout20;
 	}
 
 	/* logredo() should have been run successfully. */
 	if (logsuper->state != cpu_to_le32(LOGREDONE)) {
 		jfs_warn("*** Log Is Dirty ! ***");
-		rc = EINVAL;
+		rc = -EINVAL;
 		goto errout20;
 	}
 
 	/* initialize log inode from log superblock */
 	if (test_bit(log_INLINELOG,&log->flag)) {
 		if (log->size != le32_to_cpu(logsuper->size)) {
-			rc = EINVAL;
+			rc = -EINVAL;
 			goto errout20;
 		}
 		jfs_info("lmLogInit: inline log:0x%p base:0x%Lx size:0x%x",
@@ -1610,7 +1609,7 @@ static int lmLogFileSystem(struct jfs_log * log, char *uuid, int activate)
 		if (i == MAX_ACTIVE) {
 			jfs_warn("Somebody stomped on the journal!");
 			lbmFree(bpsuper);
-			return EIO;
+			return -EIO;
 		}
 		
 	}
@@ -1698,7 +1697,7 @@ static int lbmLogInit(struct jfs_log * log)
 
       error:
 	lbmLogShutdown(log);
-	return (ENOMEM);
+	return -ENOMEM;
 }
 
 
@@ -2007,7 +2006,7 @@ static int lbmIOWait(struct lbuf * bp, int flag)
 
 	LCACHE_SLEEP_COND(bp->l_ioevent, (bp->l_flag & lbmDONE), flags);
 
-	rc = (bp->l_flag & lbmERROR) ? EIO : 0;
+	rc = (bp->l_flag & lbmERROR) ? -EIO : 0;
 
 	if (flag & lbmFREE)
 		lbmfree(bp);
