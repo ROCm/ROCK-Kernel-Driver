@@ -50,3 +50,6 @@
 #define SAMSUNG_VENDOR_ID       0x04e8
 #define SAMSUNG_PRODUCT_ID      0x8001
 
+/* Pharos / Microsoft GPS puck */
+#define PHAROS_VENDOR_ID       0x067b
+#define PHAROS_PRODUCT_ID      0xaaa0
