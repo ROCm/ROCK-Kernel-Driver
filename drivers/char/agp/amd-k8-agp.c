@@ -278,12 +278,13 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 		default:	revstring="??";
 				break;
 		}
-		printk ("Detected AMD 8151 AGP Bridge rev %s", revstring);
+		printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
 		/*
 		 * Work around errata.
 		 * Chips before B2 stepping incorrectly reporting v3.5
 		 */
 		if (rev_id < 0x13) {
+			printk (KERN_INFO PFX "Correcting AGP revision (reports 3.5, is really 3.0)\n");
 			bridge->major_version = 3;
 			bridge->minor_version = 0;
 		}
