@@ -1,0 +1,64 @@
+/* Copyright 2002 Andi Kleen, SuSE Labs */
+
+/* vsyscall handling for 32bit processes. Map a stub page into it 
+   on demand because 32bit cannot reach the kernel's fixmaps */
+
+#include <linux/mm.h>
+#include <linux/string.h>
+#include <linux/kernel.h>
+#include <linux/gfp.h>
+#include <linux/init.h>
+#include <asm/proto.h>
+#include <asm/tlbflush.h>
+
+/* 32bit SYSCALL stub mapped into user space. */ 
+asm("	.code32\n"
+    "\nsyscall32:\n"
+    "	pushl %ebp\n"
+    "	movl  %ecx,%ebp\n"
+    "	syscall\n"
+    "	popl  %ebp\n"
+    "	ret\n"
+    "syscall32_end:\n"
+    "	.code64\n"); 
+
+extern unsigned char syscall32[], syscall32_end[];
+
+static unsigned long syscall32_page; 
+
+/* RED-PEN: This knows too much about high level VM */ 
+/* Alternative would be to generate a vma with appropiate backing options
+   and let it be handled by generic VM */ 
+int map_syscall32(struct mm_struct *mm, unsigned long address) 
+{ 
+	pte_t *pte;
+	int err = 0;
+	down_read(&mm->mmap_sem);
+	spin_lock(&mm->page_table_lock); 
+	pmd_t *pmd = pmd_alloc(mm, pgd_offset(mm, address), address); 
+	if (pmd && (pte = pte_alloc_map(mm, pmd, address)) != NULL) { 
+		if (pte_none(*pte)) { 
+			set_pte(pte, 
+				mk_pte(virt_to_page(syscall32_page), 
+				       PAGE_KERNEL_VSYSCALL)); 
+		}
+		/* Flush only the local CPU. Other CPUs taking a fault
+		   will just end up here again */
+		__flush_tlb_one(address); 
+	} else
+		err = -ENOMEM; 
+	spin_unlock(&mm->page_table_lock);
+	up_read(&mm->mmap_sem);
+	return err;
+}
+
+static int __init init_syscall32(void)
+{ 
+	syscall32_page = get_zeroed_page(GFP_KERNEL); 
+	if (!syscall32_page) 
+		panic("Cannot allocate syscall32 page"); 
+	SetPageReserved(virt_to_page(syscall32_page));
+	memcpy((void *)syscall32_page, syscall32, syscall32_end - syscall32);
+} 
+	
+__initcall(init_syscall32); 
