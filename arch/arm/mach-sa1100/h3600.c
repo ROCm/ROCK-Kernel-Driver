@@ -286,7 +286,7 @@ MACHINE_START(H3100, "Compaq iPAQ H3100")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3100_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3100 */
@@ -401,7 +401,7 @@ MACHINE_START(H3600, "Compaq iPAQ H3600")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3600_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3600 */
@@ -785,7 +785,7 @@ MACHINE_START(H3800, "Compaq iPAQ H3800")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(h3800_map_io)
 	INITIRQ(h3800_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END
 
 #endif /* CONFIG_SA1100_H3800 */

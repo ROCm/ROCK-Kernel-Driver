@@ -31,9 +31,7 @@
 
 #include <asm/mach/arch.h>
 
-extern void clps711x_map_io(void);
-extern void clps711x_init_irq(void);
-extern void clps711x_init_time(void);
+#include "common.h"
 
 struct meminfo memmap = {
 	.nr_banks	= 1,
@@ -83,5 +81,5 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
 	FIXUP(fortunet_fixup)
 	MAPIO(clps711x_map_io)
 	INITIRQ(clps711x_init_irq)
-	INITTIME(clps711x_init_time)
+	.timer		= &clps711x_timer,
 MACHINE_END

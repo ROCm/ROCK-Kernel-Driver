@@ -49,7 +49,7 @@ static struct irqaction shark_timer_irq = {
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-void __init shark_init_time(void)
+static void __init shark_timer_init(void)
 {
         unsigned long flags;
 
@@ -60,6 +60,9 @@ void __init shark_init_time(void)
 	setup_irq(IRQ_TIMER, &shark_timer_irq);
 }
 
+static struct sys_timer shark_timer = {
+	.init		= shark_timer_init,
+};
 
 MACHINE_START(SHARK, "Shark")
 	MAINTAINER("Alexander Schulz")
@@ -67,5 +70,5 @@ MACHINE_START(SHARK, "Shark")
 	BOOT_PARAMS(0x08003000)
 	MAPIO(shark_map_io)
 	INITIRQ(shark_init_irq)
-	INITTIME(shark_init_time)
+	.timer		= &shark_timer,
 MACHINE_END

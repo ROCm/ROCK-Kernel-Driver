@@ -113,11 +113,6 @@ void __init smdk2410_init_irq(void)
 	s3c2410_init_irq();
 }
 
-void __init smdk2410_init_time(void)
-{
-	s3c2410_init_time();
-}
-
 MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switch
 				    * to SMDK2410 */
      MAINTAINER("Jonas Dietsche")
@@ -125,7 +120,7 @@ MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switc
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(smdk2410_map_io)
      INITIRQ(smdk2410_init_irq)
-     INITTIME(smdk2410_init_time)
+     .timer		= &s3c2410_timer,
 MACHINE_END
 
 

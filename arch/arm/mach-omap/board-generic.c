@@ -30,8 +30,6 @@
 
 #include "common.h"
 
-extern void __init omap_init_time(void);
-
 static void __init omap_generic_init_irq(void)
 {
 	omap_init_irq();
@@ -118,5 +116,5 @@ MACHINE_START(OMAP_GENERIC, "Generic OMAP1510/1610/1710")
 	MAPIO(omap_generic_map_io)
 	INITIRQ(omap_generic_init_irq)
 	INIT_MACHINE(omap_generic_init)
-	INITTIME(omap_init_time)
+	.timer		= &omap_timer,
 MACHINE_END

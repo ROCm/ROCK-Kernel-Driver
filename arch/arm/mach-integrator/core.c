@@ -24,6 +24,8 @@
 #include <asm/leds.h>
 #include <asm/mach/time.h>
 
+#include "common.h"
+
 static struct amba_device rtc_device = {
 	.dev		= {
 		.bus_id	= "mb:15",
@@ -163,15 +165,13 @@ typedef struct TimerStruct {
 	unsigned long TimerClear;
 } TimerStruct_t;
 
-extern unsigned long (*gettimeoffset)(void);
-
 static unsigned long timer_reload;
 
 /*
  * Returns number of ms since last clock interrupt.  Note that interrupts
  * will have been disabled by do_gettimeoffset()
  */
-static unsigned long integrator_gettimeoffset(void)
+unsigned long integrator_gettimeoffset(void)
 {
 	volatile TimerStruct_t *timer1 = (TimerStruct_t *)TIMER1_VA_BASE;
 	unsigned long ticks1, ticks2, status;
@@ -264,5 +264,4 @@ void __init integrator_time_init(unsigned long reload, unsigned int ctrl)
 	 * Make irqs happen for the system timer
 	 */
 	setup_irq(IRQ_TIMERINT1, &integrator_timer_irq);
-	gettimeoffset = integrator_gettimeoffset;
 }

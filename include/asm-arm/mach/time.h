@@ -10,10 +10,22 @@
 #ifndef __ASM_ARM_MACH_TIME_H
 #define __ASM_ARM_MACH_TIME_H
 
-extern void (*init_arch_time)(void);
+#include <linux/sysdev.h>
+
+/*
+ * This is our kernel timer structure.
+ */
+struct sys_timer {
+	struct sys_device	dev;
+	void			(*init)(void);
+	void			(*suspend)(void);
+	void			(*resume)(void);
+	unsigned long		(*offset)(void);
+};
+
+extern struct sys_timer *system_timer;
 
 extern int (*set_rtc)(void);
-extern unsigned long (*gettimeoffset)(void);
 
 extern void timer_tick(struct pt_regs *);
 
