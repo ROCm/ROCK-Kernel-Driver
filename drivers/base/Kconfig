@@ -1,6 +1,4 @@
-#
-# To be sourced from lib/Kconfig
-#
+menu "Generic Driver Options"
 
 config FW_LOADER
 	tristate "Hotplug firmware loading support"
@@ -9,3 +7,4 @@ config FW_LOADER
 	  require hotplug firmware loading support, but a module built outside
 	  the kernel tree does.
 
+endmenu
