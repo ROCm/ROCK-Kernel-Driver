@@ -92,7 +92,7 @@ MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
 MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only)");
+MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
 MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,3}},dialog:list");
 
 
@@ -290,6 +290,7 @@ DEFINE_VIA_REGSET(CAPTURE_8233, 0x60);
 #define VIA_DXS_ENABLE	1
 #define VIA_DXS_DISABLE	2
 #define VIA_DXS_48K	3
+#define VIA_DXS_NO_VRA	4
 
 
 /*
@@ -449,6 +450,7 @@ struct _snd_via82xx {
 	viadev_t devs[VIA_MAX_DEVS];
 	struct via_rate_lock rates[2]; /* playback and capture */
 	unsigned int dxs_fixed: 1;	/* DXS channel accepts only 48kHz */
+	unsigned int no_vra: 1;		/* no need to set VRA on DXS channels */
 
 	snd_rawmidi_t *rmidi;
 
@@ -509,7 +511,6 @@ static int snd_via82xx_codec_valid(via82xx_t *chip, int secondary)
 		if ((val = snd_via82xx_codec_xread(chip)) & stat)
 			return val & 0xffff;
 	}
-	snd_printk(KERN_ERR "codec_valid: codec %i is not valid [0x%x]\n", secondary, snd_via82xx_codec_xread(chip));
 	return -EIO;
 }
  
@@ -554,6 +555,7 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
       	while (1) {
       		if (again++ > 3) {
 		        spin_unlock(&chip->ac97_lock);
+			snd_printk(KERN_ERR "codec_read: codec %i is not valid [0x%x]\n", ac97->num, snd_via82xx_codec_xread(chip));
 		      	return 0xffff;
 		}
 		snd_via82xx_codec_xwrite(chip, xval);
@@ -889,11 +891,11 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 
 	if ((rate_changed = via_lock_rate(&chip->rates[0], runtime->rate)) < 0)
 		return rate_changed;
-	if (rate_changed) {
-		snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, runtime->rate);
-		snd_ac97_set_rate(chip->ac97, AC97_PCM_SURR_DAC_RATE, runtime->rate);
-		snd_ac97_set_rate(chip->ac97, AC97_PCM_LFE_DAC_RATE, runtime->rate);
-		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
+	if (rate_changed || chip->no_vra) {
+		snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE,
+				  chip->no_vra ? 48000 : runtime->rate);
+		if (rate_changed)
+			snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
 #if 0
 	if (chip->revision == VIA_REV_8233A)
@@ -1974,8 +1976,9 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 {
 	static struct dxs_whitelist whitelist[] = {
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
+		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
-		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_ENABLE }, /* ASUS A7V8-X */
+		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ } /* terminator */
 	};
@@ -2002,7 +2005,8 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 	 * not detected, try 48k rate only to be sure.
 	 */
 	printk(KERN_INFO "via82xx: Assuming DXS channels with 48k fixed sample rate.\n");
-	printk(KERN_INFO "         Please try dxs_support=1 option and report if it works on your machine.\n");
+	printk(KERN_INFO "         Please try dxs_support=1 or dxs_support=4 option\n");
+	printk(KERN_INFO "         and report if it works on your machine.\n");
 	return VIA_DXS_48K;
 };
 
@@ -2087,6 +2091,8 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				goto __error;
 			if (dxs_support[dev] == VIA_DXS_48K)
 				chip->dxs_fixed = 1;
+			else if (dxs_support[dev] == VIA_DXS_NO_VRA)
+				chip->no_vra = 1;
 		}
 		if ((err = snd_via8233_init_misc(chip, dev)) < 0)
 			goto __error;
