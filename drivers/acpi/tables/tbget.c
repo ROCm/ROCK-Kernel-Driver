@@ -168,7 +168,7 @@ acpi_tb_get_table_header (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Table Signature: [%4.4s]\n",
-		&return_header->signature));
+		return_header->signature));
 
 	return_ACPI_STATUS (AE_OK);
 }
