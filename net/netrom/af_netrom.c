@@ -778,7 +778,6 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	do {
 		if ((skb = skb_dequeue(&sk->receive_queue)) == NULL) {
 			if (flags & O_NONBLOCK) {
-				sti();
 				return -EWOULDBLOCK;
 			}
 			interruptible_sleep_on(sk->sleep);

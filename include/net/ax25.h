@@ -298,6 +298,11 @@ extern ax25_route *ax25_rt_find_route(ax25_route *, ax25_address *,
 extern struct sk_buff *ax25_rt_build_path(struct sk_buff *, ax25_address *, ax25_address *, ax25_digi *);
 extern void ax25_rt_free(void);
 
+static inline void ax25_put_route(ax25_route *ax25_rt)
+{
+	atomic_dec(&ax25_rt->ref);
+}
+
 /* ax25_std_in.c */
 extern int  ax25_std_frame_in(ax25_cb *, struct sk_buff *, int);
 
