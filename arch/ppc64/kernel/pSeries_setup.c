@@ -135,7 +135,6 @@ static int pSeries_irq_cascade(struct pt_regs *regs, void *data)
 static void __init pSeries_init_mpic(void)
 {
         unsigned int *addrp;
-        unsigned char* chrp_int_ack_special = NULL;
 	struct device_node *np;
         int i;
 
@@ -148,8 +147,7 @@ static void __init pSeries_init_mpic(void)
                  get_property(np, "8259-interrupt-acknowledge", NULL)))
                 printk(KERN_ERR "Cannot find pci to get ack address\n");
         else
-		chrp_int_ack_special = (unsigned char *) 
-			ioremap(addrp[prom_n_addr_cells(np)-1], 1);
+		chrp_int_ack_special = ioremap(addrp[prom_n_addr_cells(np)-1], 1);
 	of_node_put(np);
 
 	/* Setup the legacy interrupts & controller */
