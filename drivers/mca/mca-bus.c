@@ -30,8 +30,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/list.h>
-#include <asm/io.h>
 
 /* Very few machines have more than one MCA bus.  However, there are
  * those that do (Voyager 35xx/5xxx), so we do it this way for future
@@ -50,15 +48,16 @@ static int mca_bus_match (struct device *dev, struct device_driver *drv)
 	struct mca_device *mca_dev = to_mca_device (dev);
 	struct mca_driver *mca_drv = to_mca_driver (drv);
 	const short *mca_ids = mca_drv->id_table;
+	int i;
 
 	if (!mca_ids)
 		return 0;
 
-	while (*mca_ids) {
-		if (*mca_ids == mca_dev->pos_id)
+	for(i = 0; mca_ids[i]; i++) {
+		if (mca_ids[i] == mca_dev->pos_id) {
+			mca_dev->index = i;
 			return 1;
-
-		mca_ids++;
+		}
 	}
 
 	return 0;
@@ -69,24 +68,6 @@ struct bus_type mca_bus_type = {
 	.match = mca_bus_match,
 };
 EXPORT_SYMBOL (mca_bus_type);
-
-int mca_driver_register (struct mca_driver *mca_drv)
-{
-	int r;
-	
-	mca_drv->driver.bus = &mca_bus_type;
-	if ((r = driver_register (&mca_drv->driver)) < 0)
-		return r;
-
-	return 1;
-}
-
-void mca_driver_unregister (struct mca_driver *mca_drv)
-{
-	bus_remove_driver (&mca_drv->driver);
-	driver_unregister (&mca_drv->driver);
-}
-
 
 static ssize_t mca_show_pos_id(struct device *dev, char *buf, size_t count,
 			       loff_t off)
@@ -135,7 +116,7 @@ static ssize_t mca_show_pos(struct device *dev, char *buf, size_t count,
 static DEVICE_ATTR(id, S_IRUGO, mca_show_pos_id, NULL);
 static DEVICE_ATTR(pos, S_IRUGO, mca_show_pos, NULL);
 
-int __init mca_register_device (int bus, struct mca_device *mca_dev)
+int __init mca_register_device(int bus, struct mca_device *mca_dev)
 {
 	struct mca_bus *mca_bus = mca_root_busses[bus];
 
@@ -184,6 +165,3 @@ int __init mca_system_init (void)
 {
 	return bus_register(&mca_bus_type);
 }
-
-EXPORT_SYMBOL (mca_driver_register);
-EXPORT_SYMBOL (mca_driver_unregister);

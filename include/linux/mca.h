@@ -52,6 +52,9 @@ struct mca_device {
 	int			pos_id;
 	int			slot;
 
+	/* index into id_table, set by the bus match routine */
+	int			index;
+
 	/* is there a driver installed? 0 - No, 1 - Yes */
 	int			driver_loaded;
 	/* POS registers */
@@ -100,8 +103,6 @@ struct mca_driver {
 #define to_mca_driver(mdriver) container_of(mdriver, struct mca_driver, driver)
 
 /* Ongoing supported API functions */
-extern int mca_driver_register(struct mca_driver *);
-extern int mca_register_device(int bus, struct mca_device *);
 extern struct mca_device *mca_find_device_by_slot(int slot);
 extern int mca_system_init(void);
 extern struct mca_bus *mca_attach_bus(int);
@@ -121,10 +122,11 @@ extern enum MCA_AdapterStatus mca_device_status(struct mca_device *mca_dev);
 
 extern struct bus_type mca_bus_type;
 
-static inline void mca_register_driver(struct mca_driver *drv)
-{
-	driver_register(&drv->driver);
-}
+extern int mca_register_driver(struct mca_driver *drv);
+extern void mca_unregister_driver(struct mca_driver *drv);
+
+/* WARNING: only called by the boot time device setup */
+extern int mca_register_device(int bus, struct mca_device *mca_dev);
 
 /* for now, include the legacy API */
 #include <linux/mca-legacy.h>
