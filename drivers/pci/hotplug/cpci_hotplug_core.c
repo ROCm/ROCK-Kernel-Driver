@@ -67,8 +67,6 @@ static int disable_slot(struct hotplug_slot *slot);
 static int set_attention_status(struct hotplug_slot *slot, u8 value);
 static int get_power_status(struct hotplug_slot *slot, u8 * value);
 static int get_attention_status(struct hotplug_slot *slot, u8 * value);
-static int get_latch_status(struct hotplug_slot *slot, u8 * value);
-static int get_adapter_status(struct hotplug_slot *slot, u8 * value);
 
 static struct hotplug_slot_ops cpci_hotplug_slot_ops = {
 	.owner = THIS_MODULE,
@@ -77,8 +75,6 @@ static struct hotplug_slot_ops cpci_hotplug_slot_ops = {
 	.set_attention_status = set_attention_status,
 	.get_power_status = get_power_status,
 	.get_attention_status = get_attention_status,
-	.get_latch_status = get_latch_status,
-	.get_adapter_status = get_adapter_status,
 };
 
 static int
@@ -189,20 +185,6 @@ static int
 set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 {
 	return cpci_set_attention_status(hotplug_slot->private, status);
-}
-
-static int
-get_latch_status(struct hotplug_slot *hotplug_slot, u8 * value)
-{
-	*value = hotplug_slot->info->latch_status;
-	return 0;
-}
-
-static int
-get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
-{
-	*value = hotplug_slot->info->adapter_status;
-	return 0;
 }
 
 static void release_slot(struct hotplug_slot *hotplug_slot)
