@@ -248,6 +248,29 @@ int nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 	return err;
 }
 
+static int _nfs4_proc_open_confirm(struct rpc_clnt *clnt, const struct nfs_fhandle *fh, struct nfs4_state_owner *sp, nfs4_stateid *stateid)
+{
+	struct nfs_open_confirmargs arg = {
+		.fh             = fh,
+		.seqid          = sp->so_seqid,
+		.stateid	= *stateid,
+	};
+	struct nfs_open_confirmres res;
+	struct 	rpc_message msg = {
+		.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_CONFIRM],
+		.rpc_argp       = &arg,
+		.rpc_resp       = &res,
+		.rpc_cred	= sp->so_cred,
+	};
+	int status;
+
+	status = rpc_call_sync(clnt, &msg, 0);
+	nfs4_increment_seqid(status, sp);
+	if (status >= 0)
+		memcpy(stateid, &res.stateid, sizeof(*stateid));
+	return status;
+}
+
 /*
  * Returns an nfs4_state + an referenced inode
  */
@@ -305,6 +328,12 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	if (status)
 		goto out_err;
 	update_changeattr(dir, &o_res.cinfo);
+	if(o_res.rflags & NFS4_OPEN_RESULT_CONFIRM) {
+		status = _nfs4_proc_open_confirm(server->client, &o_res.fh,
+				sp, &o_res.stateid);
+		if (status != 0)
+			goto out_err;
+	}
 	if (!(f_attr.valid & NFS_ATTR_FATTR)) {
 		status = server->rpc_ops->getattr(server, &o_res.fh, &f_attr);
 		if (status < 0)
@@ -318,28 +347,7 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	state = nfs4_get_open_state(inode, sp);
 	if (!state)
 		goto out_err;
-
-	if(o_res.rflags & NFS4_OPEN_RESULT_CONFIRM) {
-		struct nfs_open_confirmargs oc_arg = {
-			.fh             = &o_res.fh,
-			.seqid          = sp->so_seqid,
-		};
-		struct nfs_open_confirmres oc_res;
-		struct 	rpc_message msg = {
-			.rpc_proc       = &nfs4_procedures[NFSPROC4_CLNT_OPEN_CONFIRM],
-			.rpc_argp       = &oc_arg,
-			.rpc_resp       = &oc_res,
-			.rpc_cred	= cred,
-		};
-
-		memcpy(&oc_arg.stateid, &o_res.stateid, sizeof(oc_arg.stateid));
-		status = rpc_call_sync(server->client, &msg, 0);
-		nfs4_increment_seqid(status, sp);
-		if (status)
-			goto out_err;
-		memcpy(&state->stateid, &oc_res.stateid, sizeof(state->stateid));
-	} else
-		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
+	memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
 	spin_lock(&inode->i_lock);
 	if (flags & FMODE_READ)
 		state->nreaders++;
