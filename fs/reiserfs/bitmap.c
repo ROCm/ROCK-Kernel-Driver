@@ -238,6 +238,9 @@ static int bmap_hash_id(struct super_block *s, u32 id) {
 	if (!bm)
 	    bm = 1;
     }
+    /* this can only be true when SB_BMAP_NR = 1 */
+    if (bm >= SB_BMAP_NR(s))
+    	bm = 0;
     return bm;
 }
 
@@ -297,6 +300,10 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
 
     get_bit_address (s, *start, &bm, &off);
     get_bit_address (s, finish, &end_bm, &end_off);
+    if (bm > SB_BMAP_NR(s))
+        return 0;
+    if (end_bm > SB_BMAP_NR(s))
+        end_bm = SB_BMAP_NR(s);
 
     /* When the bitmap is more than 10% free, anyone can allocate.
      * When it's less than 10% free, only files that already use the
@@ -317,6 +324,7 @@ static int scan_bitmap (struct reiserfs_transaction_handle *th,
 	    if (nr_allocated)
 		goto ret;
         }
+	/* we know from above that start is a reasonable number */
 	get_bit_address (s, *start, &bm, &off);
     }
 
@@ -1063,9 +1071,10 @@ int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *hint,
 {
     int initial_amount_needed = amount_needed;
     int ret;
+    struct super_block *s = hint->th->t_super;
 
     /* Check if there is enough space, taking into account reserved space */
-    if ( SB_FREE_BLOCKS(hint->th->t_super) - REISERFS_SB(hint->th->t_super)->reserved_blocks <
+    if ( SB_FREE_BLOCKS(s) - REISERFS_SB(s)->reserved_blocks <
 	 amount_needed - reserved_by_us)
         return NO_DISK_SPACE;
     /* should this be if !hint->inode &&  hint->preallocate? */
@@ -1085,6 +1094,8 @@ int reiserfs_allocate_blocknrs(reiserfs_blocknr_hint_t *hint,
 
     /* find search start and save it in hint structure */
     determine_search_start(hint, amount_needed);
+    if (hint->search_start >= SB_BLOCK_COUNT(s))
+        hint->search_start = SB_BLOCK_COUNT(s) - 1;
 
     /* allocation itself; fill new_blocknrs and preallocation arrays */
     ret = blocknrs_and_prealloc_arrays_from_search_start
