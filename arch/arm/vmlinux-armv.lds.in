@@ -74,6 +74,12 @@ SECTIONS
 		__stop___ksymtab = .;
 	}
 
+	__kallsyms : {			/* All kernel symbols		*/
+		__start___kallsyms = .;
+			*(__kallsyms)
+		__stop___kallsyms = .;
+	}
+
 	. = ALIGN(8192);
 
 	.data : {

@@ -26,7 +26,7 @@ ENTRY(__backtrace)
 
 ENTRY(c_backtrace)
 
-#ifdef CONFIG_NO_FRAME_POINTER
+#ifndef CONFIG_FRAME_POINTER
 		mov	pc, lr
 #else
 
@@ -62,10 +62,9 @@ ENTRY(c_backtrace)
 		ldr	r3, .Ldsi+4
 		teq	r1, r3
 		subeq	save, save, #4
-		adr	r0, .Lfe
-		mov	r1, save
-		bic	r2, r2, mask
-		bl	printk			@ print pc and link register
+		mov	r0, save
+		bic	r1, r2, mask
+		bl	dump_backtrace_entry
 
 		ldr	r0, [frame, #-8]	@ get sp
 		sub	r0, r0, #4
@@ -140,7 +139,6 @@ ENTRY(c_backtrace)
 		mov	r0, stack
 		LOADREGS(fd, sp!, {instr, reg, stack, r7, pc})
 
-.Lfe:		.asciz	"Function entered at [<%p>] from [<%p>]\n"
 .Lfp:		.asciz	" r%d = %08X%c"
 .Lcr:		.asciz	"\n"
 .Lbad:		.asciz	"Backtrace aborted due to bad frame pointer <%p>\n"

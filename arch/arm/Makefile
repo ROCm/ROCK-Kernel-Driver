@@ -15,8 +15,8 @@ GZFLAGS		:=-9
 
 CFLAGS		:=$(CFLAGS:-O2=-Os)
 
-ifneq ($(CONFIG_NO_FRAME_POINTER),y)
-CFLAGS		:=$(CFLAGS: -fomit-frame-pointer=)
+ifeq ($(CONFIG_FRAME_POINTER),y)
+CFLAGS		:=$(CFLAGS:-fomit-frame-pointer=-mapcs -mno-sched-prolog)
 endif
 
 ifeq ($(CONFIG_DEBUG_INFO),y)

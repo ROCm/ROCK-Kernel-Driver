@@ -533,11 +533,14 @@ source net/bluetooth/Config.in
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-# Always compile kernel with framepointer (until 2.4 real comes out)
-# Bug reports aren't much use without this.
-bool 'Compile kernel without frame pointer' CONFIG_NO_FRAME_POINTER
+# RMK wants arm kernels compiled with frame pointers so hardwire this to y.  If
+# you know what you are doing and are willing to live without stack traces, you
+# can get a slightly smaller kernel by setting this option to n, but then RMK
+# will have to kill you ;).
+define_bool CONFIG_FRAME_POINTER y
+
 bool 'Verbose user fault messages' CONFIG_DEBUG_USER
-bool 'Include debugging information in kernel binary' CONFIG_DEBUG_INFO
+bool 'Include GDB debugging information in kernel binary' CONFIG_DEBUG_INFO
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 dep_bool '  Debug memory allocations' CONFIG_DEBUG_SLAB $CONFIG_DEBUG_KERNEL
@@ -546,6 +549,7 @@ dep_bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK $CONFIG_DEBUG_KERNEL
 dep_bool '  Wait queue debugging' CONFIG_DEBUG_WAITQ $CONFIG_DEBUG_KERNEL
 dep_bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE $CONFIG_DEBUG_KERNEL
 dep_bool '  Verbose kernel error messages' CONFIG_DEBUG_ERRORS $CONFIG_DEBUG_KERNEL
+dep_bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS $CONFIG_DEBUG_KERNEL $CONFIG_FRAME_POINTER
 # These options are only for real kernel hackers who want to get their hands dirty. 
 dep_bool '  Kernel low-level debugging functions' CONFIG_DEBUG_LL $CONFIG_DEBUG_KERNEL
 dep_bool '    Kernel low-level debugging messages via footbridge serial port' CONFIG_DEBUG_DC21285_PORT $CONFIG_DEBUG_LL $CONFIG_FOOTBRIDGE
