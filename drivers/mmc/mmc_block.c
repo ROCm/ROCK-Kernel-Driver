@@ -184,7 +184,7 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		brq.data.timeout_ns = card->csd.tacc_ns * 10;
 		brq.data.timeout_clks = card->csd.tacc_clks * 10;
 		brq.data.blksz_bits = md->block_bits;
-		brq.data.blocks = req->current_nr_sectors >> (md->block_bits - 9);
+		brq.data.blocks = req->nr_sectors >> (md->block_bits - 9);
 		brq.stop.opcode = MMC_STOP_TRANSMISSION;
 		brq.stop.arg = 0;
 		brq.stop.flags = MMC_RSP_SHORT | MMC_RSP_CRC | MMC_RSP_BUSY;
