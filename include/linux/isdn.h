@@ -294,8 +294,8 @@ struct isdn_netif_ops {
 	unsigned short		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		type;	/* interface hardware type	*/
 	unsigned char		addr_len;/* hardware address length	*/
-	void                    (*receive)(struct isdn_net_dev_s *p,
-					   struct isdn_net_local_s *olp,
+	void                    (*receive)(struct isdn_net_local_s *lp,
+					   struct isdn_net_dev_s *idev,
 					   struct sk_buff *skb);
 	void                    (*connected)(struct isdn_net_local_s *lp);
 	void                    (*disconnected)(struct isdn_net_local_s *lp);
@@ -334,11 +334,12 @@ typedef struct isdn_net_local_s {
   struct list_head       phone[2];     /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  struct net_device      *master;      /* Ptr to Master device for slaves  */
-  struct net_device      *slave;       /* Ptr to Slave device for masters  */
-  struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
-  struct isdn_net_local_s *last;       /* Ptr to last link in bundle       */
   struct isdn_net_dev_s  *netdev;      /* Ptr to netdev                    */
+
+  struct isdn_net_dev_s  *queue;      /* circular list of all bundled
+					  channels, which are currently
+					  online                           */
+  spinlock_t queue_lock;               /* lock to protect queue            */
 
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
@@ -351,8 +352,11 @@ typedef struct isdn_net_local_s {
   ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
   char cisco_line_state;		/* state of line according to keepalive packets */
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
-  struct timer_list cisco_timer;
-  struct isdn_netif_ops   *ops;
+  struct timer_list       cisco_timer;
+
+  struct isdn_netif_ops  *ops;
+
+  struct net_device       dev;          /* interface to upper levels        */
 } isdn_net_local;
 
 /* the interface itself */
@@ -397,13 +401,15 @@ typedef struct isdn_net_dev_s {
                         	       /* queued in HL driver              */
   struct tq_struct       tqueue;
 
-  isdn_net_local         *queue;       /* circular list of all bundled
-					  channels, which are currently
-					  online                           */
-  spinlock_t queue_lock;               /* lock to protect queue            */
+  isdn_net_local        *master;       /* Ptr to Master device for slaves  */
+  struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */
+
+  struct isdn_net_dev_s *next;         /* Ptr to next link in bundle       */
+  struct isdn_net_dev_s *last;         /* Ptr to last link in bundle       */
+
+
   char                   name[10];     /* Name of device                   */
   struct list_head global_list;        /* global list of all isdn_net_devs */
-  struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
    			         * with the per-bundle data */
