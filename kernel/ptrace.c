@@ -81,13 +81,20 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 	 * be changed by us so it's not changing right after this.
 	 */
 	read_lock(&tasklist_lock);
-	if ((child->ptrace & PT_PTRACED) && child->parent == current)
+	if ((child->ptrace & PT_PTRACED) && child->parent == current &&
+	    child->signal != NULL) {
 		ret = 0;
+		spin_lock_irq(&child->sighand->siglock);
+		if (child->state == TASK_STOPPED) {
+			child->state = TASK_TRACED;
+		} else if (child->state != TASK_TRACED && !kill) {
+			ret = -ESRCH;
+		}
+		spin_unlock_irq(&child->sighand->siglock);
+	}
 	read_unlock(&tasklist_lock);
 
 	if (!ret && !kill) {
-		if (child->state != TASK_TRACED)
-			return -ESRCH;
 		wait_task_inactive(child);
 	}
 
@@ -298,13 +305,15 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 
 static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	BUG_ON(child->last_siginfo == NULL);
+	if (child->last_siginfo == NULL)
+		return -EINVAL;
 	return copy_siginfo_to_user(data, child->last_siginfo);
 }
 
 static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	BUG_ON(child->last_siginfo == NULL);
+	if (child->last_siginfo == NULL)
+		return -EINVAL;
 	if (copy_from_user(child->last_siginfo, data, sizeof (siginfo_t)) != 0)
 		return -EFAULT;
 	return 0;
