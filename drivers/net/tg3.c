@@ -1059,16 +1059,15 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 		tp->mac_mode |= MAC_MODE_HALF_DUPLEX;
 
 	tp->mac_mode &= ~MAC_MODE_LINK_POLARITY;
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
-	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
-		if (current_link_up == 1)
-			tp->mac_mode |= MAC_MODE_LINK_POLARITY;
-		tw32(MAC_LED_CTRL, LED_CTRL_PHY_MODE_1);
-	} else {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700) {
 		if ((tp->led_mode == led_mode_link10) ||
 		    (current_link_up == 1 &&
 		     tp->link_config.active_speed == SPEED_10))
 			tp->mac_mode |= MAC_MODE_LINK_POLARITY;
+	} else {
+		if (current_link_up == 1)
+			tp->mac_mode |= MAC_MODE_LINK_POLARITY;
+		tw32(MAC_LED_CTRL, LED_CTRL_PHY_MODE_1);
 	}
 
 	/* ??? Without this setting Netgear GA302T PHY does not
