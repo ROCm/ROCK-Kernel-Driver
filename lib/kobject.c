@@ -295,7 +295,7 @@ void kset_unregister(struct kset * k)
  *	looking for a matching kobject. Return object if found.
  */
 
-struct kobject * kset_find_obj(struct kset * kset, char * name)
+struct kobject * kset_find_obj(struct kset * kset, const char * name)
 {
 	struct list_head * entry;
 	struct kobject * ret = NULL;
@@ -386,6 +386,8 @@ EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
+
+EXPORT_SYMBOL(kset_find_obj);
 
 EXPORT_SYMBOL(subsystem_init);
 EXPORT_SYMBOL(subsystem_register);

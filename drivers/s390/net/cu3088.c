@@ -63,17 +63,13 @@ struct device cu3088_root_dev = {
 };
 
 static ssize_t
-group_write(struct device_driver *drv, const char *buf, size_t count,
-	    loff_t off)
+group_write(struct device_driver *drv, const char *buf, size_t count)
 {
 	const char *start, *end;
 	char bus_ids[2][BUS_ID_SIZE], *argv[2];
 	int i;
 	int ret;
 	struct ccwgroup_driver *cdrv;
-
-	if (off)
-		return 0;
 
 	cdrv = to_ccwgroupdrv(drv);
 	if (!cdrv)

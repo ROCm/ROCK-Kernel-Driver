@@ -32,8 +32,8 @@ object of this type. They must initialize the name field, and may
 optionally initialize the match callback.
 
 struct bus_type pci_bus_type = {
-       name:	"pci",
-       match:	pci_bus_match,
+       .name	= "pci",
+       .match	= pci_bus_match,
 };
 
 The structure should be exported to drivers in a header file:

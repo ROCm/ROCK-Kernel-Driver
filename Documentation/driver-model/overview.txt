@@ -86,11 +86,11 @@ whole sysfs filesystem anywhere in userspace.
 This can be done permanently by providing the following entry into the
 /etc/fstab (under the provision that the mount point does exist, of course):
 
-none     	/devices	sysfs    defaults		0	0
+none     	/sys	sysfs    defaults		0	0
 
 Or by hand on the command line:
 
-~: mount -t sysfs none /devices
+# mount -t sysfs sysfs /devices
 
 Whenever a device is inserted into the tree, a directory is created for it.
 This directory may be populated at each layer of discovery - the global layer,
