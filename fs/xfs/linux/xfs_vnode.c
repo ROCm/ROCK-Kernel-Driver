@@ -98,7 +98,7 @@ vn_reclaim(
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
 
-#ifdef CONFIG_XFS_VNODE_TRACING
+#ifdef XFS_VNODE_TRACE
 	ktrace_free(vp->v_trace);
 	vp->v_trace = NULL;
 #endif
@@ -154,9 +154,10 @@ vn_initialize(
 	/* Initialize the first behavior and the behavior chain head. */
 	vn_bhv_head_init(VN_BHV_HEAD(vp), "vnode");
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef	XFS_VNODE_TRACE
 	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+	printk("Allocated VNODE_TRACE at 0x%p\n", vp->v_trace);
+#endif	/* XFS_VNODE_TRACE */
 
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
 	return vp;
@@ -392,7 +393,7 @@ vn_remove(
 }
 
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef	XFS_VNODE_TRACE
 
 #define KTRACE_ENTER(vp, vk, s, line, ra)			\
 	ktrace_enter(	(vp)->v_trace,				\
@@ -439,4 +440,4 @@ vn_trace_rele(vnode_t *vp, char *file, int line, inst_t *ra)
 {
 	KTRACE_ENTER(vp, VNODE_KTRACE_RELE, file, line, ra);
 }
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#endif	/* XFS_VNODE_TRACE */

@@ -54,13 +54,6 @@
 #include "xfs_error.h"
 
 
-#if defined(DEBUG)
-/*
- * Allocation tracing.
- */
-ktrace_t	*xfs_alloc_trace_buf;
-#endif
-
 #define XFS_ABSDIFF(a,b)	(((a) <= (b)) ? ((b) - (a)) : ((a) - (b)))
 
 #define	XFSA_FIXUP_BNO_OK	1
@@ -73,6 +66,8 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 		    xfs_extlen_t len);
 
 #if defined(XFS_ALLOC_TRACE)
+ktrace_t *xfs_alloc_trace_buf;
+
 #define	TRACE_ALLOC(s,a)	\
 	xfs_alloc_trace_alloc(fname, s, a, __LINE__)
 #define	TRACE_FREE(s,a,b,x,f)	\
@@ -85,8 +80,6 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	xfs_alloc_trace_busy(fname, s, mp, ag, -1, -1, sl, tp, XFS_ALLOC_KTRACE_UNBUSY, __LINE__)
 #define	TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)	\
 	xfs_alloc_trace_busy(fname, s, mp, ag, agb, l, sl, tp, XFS_ALLOC_KTRACE_BUSYSEARCH, __LINE__)
-
-
 #else
 #define	TRACE_ALLOC(s,a)
 #define	TRACE_FREE(s,a,b,x,f)

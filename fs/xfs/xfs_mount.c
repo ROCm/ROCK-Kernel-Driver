@@ -903,7 +903,7 @@ xfs_mountfs(
 	 *  File systems that don't support user level file handles (i.e.
 	 *  all of them except for XFS) will leave vfs_altfsid as NULL.
 	 */
-	vfsp->vfs_altfsid = (fsid_t *)mp->m_fixedfsid;
+	vfsp->vfs_altfsid = (xfs_fsid_t *)mp->m_fixedfsid;
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -39,8 +39,6 @@
 #include "spin.h"
 #include "debug.h"
 #include "ktrace.h"
-
-#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 
 static kmem_zone_t *ktrace_hdr_zone;
 static kmem_zone_t *ktrace_ent_zone;
@@ -121,7 +119,6 @@ ktrace_alloc(int nentries, int sleep)
 	ktp->kt_nentries = nentries;
 	ktp->kt_index    = 0;
 	ktp->kt_rollover = 0;
-
 	return ktp;
 }
 
@@ -182,6 +179,7 @@ ktrace_enter(
 	void            *val15)
 {
 	static lock_t   wrap_lock = SPIN_LOCK_UNLOCKED;
+	unsigned long	flags;
 	int             index;
 	ktrace_entry_t  *ktep;
 
@@ -190,11 +188,11 @@ ktrace_enter(
 	/*
 	 * Grab an entry by pushing the index up to the next one.
 	 */
-	spin_lock(&wrap_lock);
+	spin_lock_irqsave(&wrap_lock, flags);
 	index = ktp->kt_index;
 	if (++ktp->kt_index == ktp->kt_nentries)
 		ktp->kt_index = 0;
-	spin_unlock(&wrap_lock);
+	spin_unlock_irqrestore(&wrap_lock, flags);
 
 	if (!ktp->kt_rollover && index == ktp->kt_nentries - 1)
 		ktp->kt_rollover = 1;
@@ -234,7 +232,6 @@ ktrace_nentries(
 
 	return (ktp->kt_rollover ? ktp->kt_nentries : ktp->kt_index);
 }
-
 
 /*
  * ktrace_first()
@@ -276,7 +273,7 @@ ktrace_first(ktrace_t   *ktp, ktrace_snap_t     *ktsp)
 	}
 	return ktep;
 }
-
+EXPORT_SYMBOL(ktrace_first);
 
 /*
  * ktrace_next()
@@ -311,11 +308,7 @@ ktrace_next(
 
 	return ktep;
 }
-
-#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-EXPORT_SYMBOL(ktrace_first);
 EXPORT_SYMBOL(ktrace_next);
-#endif
 
 /*
  * ktrace_skip()
@@ -323,7 +316,6 @@ EXPORT_SYMBOL(ktrace_next);
  * Skip the next "count" entries and return the entry after that.
  * Return NULL if this causes us to iterate past the beginning again.
  */
-
 ktrace_entry_t *
 ktrace_skip(
 	ktrace_t        *ktp,
@@ -362,18 +354,3 @@ ktrace_skip(
 	}
 	return ktep;
 }
-
-#else
-
-ktrace_t *
-ktrace_alloc(int nentries, int sleep)
-{
-	/*
-	 * KM_SLEEP callers don't expect failure.
-	 */
-	if (sleep & KM_SLEEP)
-		panic("ktrace_alloc: NULL memory on KM_SLEEP request!");
-
-	return NULL;
-}
-#endif
