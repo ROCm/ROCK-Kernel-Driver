@@ -45,7 +45,7 @@
 #define PAL_wrperfmon	57
 #define PAL_rdusp	58
 #define PAL_whami	60
-#define PAL_rtsys	61
+#define PAL_retsys	61
 #define PAL_rti		63
 
 #endif /* __ALPHA_PAL_H */

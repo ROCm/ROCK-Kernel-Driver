@@ -125,11 +125,10 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 		goto bad_area;
 	if (expand_stack(vma, address))
 		goto bad_area;
-/*
- * Ok, we have a good vm_area for this memory access, so
- * we can handle it..
- */
-good_area:
+
+	/* Ok, we have a good vm_area for this memory access, so
+	   we can handle it.  */
+ good_area:
 	if (cause < 0) {
 		if (!(vma->vm_flags & VM_EXEC))
 			goto bad_area;
@@ -143,11 +142,9 @@ good_area:
 	}
 
  survive:
-	/*
-	 * If for any reason at all we couldn't handle the fault,
-	 * make sure we exit gracefully rather than endlessly redo
-	 * the fault.
-	 */
+	/* If for any reason at all we couldn't handle the fault,
+	   make sure we exit gracefully rather than endlessly redo
+	   the fault.  */
 	fault = handle_mm_fault(mm, vma, address, cause > 0);
 	up_read(&mm->mmap_sem);
 
@@ -155,14 +152,11 @@ good_area:
 		goto out_of_memory;
 	if (fault == 0)
 		goto do_sigbus;
-
 	return;
 
-/*
- * Something tried to access memory that isn't in our memory map..
- * Fix it, but check if it's kernel or user first..
- */
-bad_area:
+	/* Something tried to access memory that isn't in our memory map.
+	   Fix it, but check if it's kernel or user first.  */
+ bad_area:
 	up_read(&mm->mmap_sem);
 
 	if (user_mode(regs)) {
@@ -170,7 +164,7 @@ bad_area:
 		return;
 	}
 
-no_context:
+ no_context:
 	/* Are we prepared to handle this fault as an exception?  */
 	if ((fixup = search_exception_table(regs->pc, regs->gp)) != 0) {
 		unsigned long newpc;
@@ -183,20 +177,16 @@ no_context:
 		return;
 	}
 
-/*
- * Oops. The kernel tried to access some bad page. We'll have to
- * terminate things with extreme prejudice.
- */
+	/* Oops. The kernel tried to access some bad page. We'll have to
+	   terminate things with extreme prejudice.  */
 	printk(KERN_ALERT "Unable to handle kernel paging request at "
 	       "virtual address %016lx\n", address);
 	die_if_kernel("Oops", regs, cause, (unsigned long*)regs - 16);
 	do_exit(SIGKILL);
 
-/*
- * We ran out of memory, or some other thing happened to us that made
- * us unable to handle the page fault gracefully.
- */
-out_of_memory:
+	/* We ran out of memory, or some other thing happened to us that
+	   made us unable to handle the page fault gracefully.  */
+ out_of_memory:
 	if (current->pid == 1) {
 		yield();
 		down_read(&mm->mmap_sem);
@@ -208,18 +198,16 @@ out_of_memory:
 		goto no_context;
 	do_exit(SIGKILL);
 
-do_sigbus:
-	/*
-	 * Send a sigbus, regardless of whether we were in kernel
-	 * or user mode.
-	 */
+ do_sigbus:
+	/* Send a sigbus, regardless of whether we were in kernel
+	   or user mode.  */
 	force_sig(SIGBUS, current);
 	if (!user_mode(regs))
 		goto no_context;
 	return;
 
 #ifdef CONFIG_ALPHA_LARGE_VMALLOC
-vmalloc_fault:
+ vmalloc_fault:
 	if (user_mode(regs)) {
 		force_sig(SIGSEGV, current);
 		return;
