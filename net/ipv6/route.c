@@ -537,7 +537,22 @@ restart:
 	rt = fn->leaf;
 
 	if ((rt->rt6i_flags & RTF_CACHE)) {
+		struct neighbour *neigh;
 		rt = rt6_device_match(rt, fl->oif, strict);
+		/* removing routes created by icmp redirect */
+		if ((neigh = rt->rt6i_nexthop) != NULL) {
+			read_lock_bh(&neigh->lock);
+			if (neigh->nud_state == NUD_FAILED
+			 || (!(neigh->flags & NTF_ROUTER) && (rt->rt6i_flags & RTF_GATEWAY))) {
+				read_unlock_bh(&neigh->lock);
+				dst_hold(&rt->u.dst);
+				read_unlock_bh(&rt6_lock);
+				rt->rt6i_expires = jiffies - 1;
+				ip6_del_rt(rt, NULL, NULL);
+				goto relookup;
+			}
+			read_unlock_bh(&neigh->lock);
+		}
 		BACKTRACK();
 		dst_hold(&rt->u.dst);
 		goto out;
@@ -1132,7 +1147,7 @@ source_ok:
 	if (nrt == NULL)
 		goto out;
 
-	nrt->rt6i_flags = RTF_GATEWAY|RTF_UP|RTF_DYNAMIC|RTF_CACHE;
+	nrt->rt6i_flags = RTF_GATEWAY|RTF_UP|RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 	if (on_link)
 		nrt->rt6i_flags &= ~RTF_GATEWAY;
 
@@ -1145,6 +1160,8 @@ source_ok:
 	/* Reset pmtu, it may be better */
 	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
 	nrt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&nrt->u.dst));
+	/* redirect routes expires in 10min */
+	nrt->rt6i_expires = jiffies + (HZ * 600);
 
 	if (ip6_ins_rt(nrt, NULL, NULL))
 		goto out;
@@ -1168,6 +1185,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 			struct net_device *dev, u32 pmtu)
 {
 	struct rt6_info *rt, *nrt;
+	int fraghdr_flag = 0;
 
 	if (pmtu < IPV6_MIN_MTU) {
 		if (net_ratelimit())
@@ -1177,6 +1195,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		   link MTU if the node receives a Packet Too Big message
 		   reporting next-hop MTU that is less than the IPv6 minimum MTU.
 		   */
+		fraghdr_flag = DST_FRAGHDR;
 		pmtu = IPV6_MIN_MTU;
 	}
 
@@ -1185,7 +1204,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	if (rt == NULL)
 		return;
 
-	if (pmtu >= dst_pmtu(&rt->u.dst))
+	if (pmtu >= dst_pmtu(&rt->u.dst) && !fraghdr_flag)
 		goto out;
 
 	/* New mtu received -> path was valid.
@@ -1201,6 +1220,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 	 */
 	if (rt->rt6i_flags & RTF_CACHE) {
 		rt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+		rt->u.dst.flags |= fraghdr_flag;
 		dst_set_expires(&rt->u.dst, ip6_rt_mtu_expires);
 		rt->rt6i_flags |= RTF_MODIFIED|RTF_EXPIRES;
 		goto out;
@@ -1215,6 +1235,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		nrt = rt6_cow(rt, daddr, saddr);
 		if (!nrt->u.dst.error) {
 			nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+			nrt->u.dst.flags |= fraghdr_flag;
 			/* According to RFC 1981, detecting PMTU increase shouldn't be
 			   happened within 5 mins, the recommended timer is 10 mins.
 			   Here this route expiration time is set to ip6_rt_mtu_expires
@@ -1236,6 +1257,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
+		nrt->u.dst.flags |= fraghdr_flag;
 		ip6_ins_rt(nrt, NULL, NULL);
 	}
 

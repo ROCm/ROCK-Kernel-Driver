@@ -190,7 +190,7 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	addr_type = ipv6_addr_type(&addr->sin6_addr);
 
 	/* Raw sockets are IPv6 only */
-	if (addr_type == IPV6_ADDR_MAPPED)
+	if (addr_type & IPV6_ADDR_MAPPED)
 		return(-EADDRNOTAVAIL);
 
 	lock_sock(sk);

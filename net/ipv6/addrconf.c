@@ -1165,18 +1165,18 @@ int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 		return 1;
 
 	if (addr_type2 == IPV6_ADDR_ANY &&
-	    !(sk2_ipv6only && addr_type == IPV6_ADDR_MAPPED))
+	    !(sk2_ipv6only && (addr_type & IPV6_ADDR_MAPPED)))
 		return 1;
 
 	if (addr_type == IPV6_ADDR_ANY &&
-	    !(sk_ipv6only && addr_type2 == IPV6_ADDR_MAPPED))
+	    !(sk_ipv6only && (addr_type2 & IPV6_ADDR_MAPPED)))
 		return 1;
 
 	if (sk2_rcv_saddr6 &&
 	    ipv6_addr_equal(sk_rcv_saddr6, sk2_rcv_saddr6))
 		return 1;
 
-	if (addr_type == IPV6_ADDR_MAPPED &&
+	if ((addr_type & IPV6_ADDR_MAPPED) &&
 	    !sk2_ipv6only &&
 	    (!sk2_rcv_saddr || !sk_rcv_saddr || sk_rcv_saddr == sk2_rcv_saddr))
 		return 1;

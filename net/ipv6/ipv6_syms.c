@@ -39,3 +39,4 @@ EXPORT_SYMBOL(xfrm6_rcv);
 EXPORT_SYMBOL(rt6_lookup);
 EXPORT_SYMBOL(fl6_sock_lookup);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
+EXPORT_SYMBOL(ip6_dst_lookup);

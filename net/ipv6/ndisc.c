@@ -907,7 +907,12 @@ static void ndisc_recv_na(struct sk_buff *skb)
 				   "ICMPv6 NA: invalid link-layer address length\n");
 			return;
 		}
+	} else if (ipv6_addr_is_multicast(daddr)) {
+		ND_PRINTK2(KERN_WARNING
+			   "ICMPv6 NA: multicasted NA missing target link-layer address\n");
+		return;
 	}
+
 	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1))) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			addrconf_dad_failure(ifp);
