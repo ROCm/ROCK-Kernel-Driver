@@ -605,8 +605,10 @@ show_registers (struct device *dev, char *buf)
 	}
 
 #ifdef EHCI_STATS
-	temp = snprintf (next, size, "irq normal %ld err %ld reclaim %ld\n",
-		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
+	temp = snprintf (next, size,
+		"irq normal %ld err %ld reclaim %ld (lost %ld)\n",
+		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim,
+		ehci->stats.lost_iaa);
 	size -= temp;
 	next += temp;
 
