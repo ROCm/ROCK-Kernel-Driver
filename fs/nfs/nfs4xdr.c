@@ -116,6 +116,9 @@ static int nfs_stat_to_errno(int);
 #define encode_rename_maxsz	(op_encode_hdr_maxsz + \
 				2 * (1 + ((3 + NFS4_MAXNAMLEN) >> 2)))
 #define decode_rename_maxsz	(op_decode_hdr_maxsz + 5 + 5)
+#define encode_link_maxsz	(op_encode_hdr_maxsz + \
+				1 + ((3 + NFS4_MAXNAMLEN) >> 2))
+#define decode_link_maxsz	(op_decode_hdr_maxsz + 5)
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -291,6 +294,16 @@ static int nfs_stat_to_errno(int);
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
 				decode_rename_maxsz)
+#define NFS4_enc_link_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_savefh_maxsz + \
+				encode_putfh_maxsz + \
+				encode_link_maxsz)
+#define NFS4_dec_link_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_savefh_maxsz + \
+				decode_putfh_maxsz + \
+				decode_link_maxsz)
 
 
 
@@ -618,15 +631,14 @@ encode_getfh(struct xdr_stream *xdr)
 	return 0;
 }
 
-static int
-encode_link(struct xdr_stream *xdr, struct nfs4_link *link)
+static int encode_link(struct xdr_stream *xdr, const struct qstr *name)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(8 + link->ln_namelen);
+	RESERVE_SPACE(8 + name->len);
 	WRITE32(OP_LINK);
-	WRITE32(link->ln_namelen);
-	WRITEMEM(link->ln_name, link->ln_namelen);
+	WRITE32(name->len);
+	WRITEMEM(name->name, name->len);
 	
 	return 0;
 }
@@ -1112,9 +1124,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_GETFH:
 			status = encode_getfh(xdr);
 			break;
-		case OP_LINK:
-			status = encode_link(xdr, &cp->ops[i].u.link);
-			break;
 		case OP_PUTFH:
 			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
 			break;
@@ -1262,6 +1271,30 @@ static int nfs4_xdr_enc_rename(struct rpc_rqst *req, uint32_t *p, const struct n
 	if ((status = encode_putfh(&xdr, args->new_dir)) != 0)
 		goto out;
 	status = encode_rename(&xdr, args->old_name, args->new_name);
+out:
+	return status;
+}
+
+/*
+ * Encode LINK request
+ */
+static int nfs4_xdr_enc_link(struct rpc_rqst *req, uint32_t *p, const struct nfs4_link_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->fh)) != 0)
+		goto out;
+	if ((status = encode_savefh(&xdr)) != 0)
+		goto out;
+	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
+		goto out;
+	status = encode_link(&xdr, args->name);
 out:
 	return status;
 }
@@ -2512,15 +2545,14 @@ static int decode_getfh(struct xdr_stream *xdr, struct nfs_fh *fh)
 	return 0;
 }
 
-static int
-decode_link(struct xdr_stream *xdr, struct nfs4_link *link)
+static int decode_link(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 {
 	int status;
 	
 	status = decode_op_hdr(xdr, OP_LINK);
 	if (status)
 		return status;
-	return decode_change_info(xdr, link->ln_cinfo);
+	return decode_change_info(xdr, cinfo);
 }
 
 /*
@@ -2977,9 +3009,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_GETFH:
 			status = decode_getfh(xdr, op->u.getfh.gf_fhandle);
 			break;
-		case OP_LINK:
-			status = decode_link(xdr, &op->u.link);
-			break;
 		case OP_PUTFH:
 			status = decode_putfh(xdr);
 			break;
@@ -3154,6 +3183,29 @@ static int nfs4_xdr_dec_rename(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_
 	if ((status = decode_putfh(&xdr)) != 0)
 		goto out;
 	status = decode_rename(&xdr, &res->old_cinfo, &res->new_cinfo);
+out:
+	return status;
+}
+
+/*
+ * Decode LINK response
+ */
+static int nfs4_xdr_dec_link(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_change_info *cinfo)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_savefh(&xdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) != 0)
+		goto out;
+	status = decode_link(&xdr, cinfo);
 out:
 	return status;
 }
@@ -3671,6 +3723,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
   PROC(REMOVE,		enc_remove,	dec_remove),
   PROC(RENAME,		enc_rename,	dec_rename),
+  PROC(LINK,		enc_link,	dec_link),
 };
 
 struct rpc_version		nfs_version4 = {

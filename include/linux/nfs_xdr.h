@@ -544,10 +544,10 @@ struct nfs4_getfh {
 	struct nfs_fh *			gf_fhandle;       /* response */
 };
 
-struct nfs4_link {
-	u32				ln_namelen;       /* request */
-	const char *			ln_name;          /* request */
-	struct nfs4_change_info *	ln_cinfo;         /* response */
+struct nfs4_link_arg {
+	const struct nfs_fh *		fh;
+	const struct nfs_fh *		dir_fh;
+	const struct qstr *		name;
 };
 
 struct nfs4_lookup_arg {
@@ -650,7 +650,6 @@ struct nfs4_op {
 		struct nfs4_create	create;
 		struct nfs4_getattr	getattr;
 		struct nfs4_getfh	getfh;
-		struct nfs4_link	link;
 		struct nfs4_open	open;
 		struct nfs4_open_confirm open_confirm;
 		struct nfs4_putfh	putfh;

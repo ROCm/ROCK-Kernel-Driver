@@ -239,20 +239,6 @@ nfs4_setup_getfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
 }
 
 static void
-nfs4_setup_link(struct nfs4_compound *cp, struct qstr *name,
-		struct nfs4_change_info *info)
-{
-	struct nfs4_link *link = GET_OP(cp, link);
-
-	link->ln_namelen = name->len;
-	link->ln_name = name->name;
-	link->ln_cinfo = info;
-
-	OPNUM(cp) = OP_LINK;
-	cp->req_nops++;
-}
-
-static void
 nfs4_setup_putfh(struct nfs4_compound *cp, struct nfs_fh *fhandle)
 {
 	struct nfs4_putfh *putfh = GET_OP(cp, putfh);
@@ -1300,33 +1286,25 @@ static int nfs4_proc_rename(struct inode *old_dir, struct qstr *old_name,
 	return nfs4_map_errors(status);
 }
 
-static int
-nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
+static int nfs4_proc_link(struct inode *inode, struct inode *dir, struct qstr *name)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[7];
-	struct nfs4_change_info	dir_cinfo;
-	struct nfs_fattr	dir_attr, fattr;
+	struct nfs4_link_arg arg = {
+		.fh     = NFS_FH(inode),
+		.dir_fh = NFS_FH(dir),
+		.name   = name,
+	};
+	struct nfs4_change_info	cinfo = { };
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_LINK],
+		.rpc_argp = &arg,
+		.rpc_resp = &cinfo,
+	};
 	int			status;
-	
-	dir_attr.valid = 0;
-	fattr.valid = 0;
-	
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "link");
-	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_savefh(&compound);
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_link(&compound, name, &dir_cinfo);
-	nfs4_setup_getattr(&compound, &dir_attr);
-	nfs4_setup_restorefh(&compound);
-	nfs4_setup_getattr(&compound, &fattr);
-	status = nfs4_call_compound(&compound, NULL, 0);
 
-	if (!status) {
-		process_cinfo(&dir_cinfo, &dir_attr);
-		nfs_refresh_inode(dir, &dir_attr);
-		nfs_refresh_inode(inode, &fattr);
-	}
+	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
+	if (!status)
+		update_changeattr(dir, &cinfo);
+
 	return nfs4_map_errors(status);
 }
 
