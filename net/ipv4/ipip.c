@@ -433,7 +433,7 @@ out:
 		fl.fl4_src = eiph->saddr;
 		fl.fl4_tos = eiph->tos;
 		if (ip_route_output_key(&rt, &fl) ||
-		    rt->u.dst.dev->type != ARPHRD_IPGRE) {
+		    rt->u.dst.dev->type != ARPHRD_TUNNEL) {
 			ip_rt_put(rt);
 			kfree_skb(skb2);
 			return;
@@ -441,7 +441,7 @@ out:
 	} else {
 		ip_rt_put(rt);
 		if (ip_route_input(skb2, eiph->daddr, eiph->saddr, eiph->tos, skb2->dev) ||
-		    skb2->dst->dev->type != ARPHRD_IPGRE) {
+		    skb2->dst->dev->type != ARPHRD_TUNNEL) {
 			kfree_skb(skb2);
 			return;
 		}

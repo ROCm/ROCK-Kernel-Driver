@@ -467,7 +467,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_KSWAPD	0x00040000	/* I am kswapd */
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
 
-#if CONFIG_SMP
+#ifdef CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
 #else
 # define set_cpus_allowed(p, new_mask) do { } while (0)

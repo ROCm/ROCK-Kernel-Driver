@@ -128,9 +128,6 @@ BUFFER_FNS(Boundary, boundary)
 	})
 #define page_has_buffers(page)	PagePrivate(page)
 
-#define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
-
-
 /*
  * Declarations
  */
@@ -159,7 +156,6 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block);
 void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);
 void invalidate_bdev(struct block_device *, int);
-void __invalidate_buffers(kdev_t dev, int);
 int sync_blockdev(struct block_device *bdev);
 void __wait_on_buffer(struct buffer_head *);
 wait_queue_head_t *bh_waitq_head(struct buffer_head *bh);

@@ -38,8 +38,6 @@ typedef struct drm_i810_buf_priv {
 	int currently_mapped;
 	void *virtual;
 	void *kernel_virtual;
-	int map_count;
-   	struct vm_area_struct *vma;
 } drm_i810_buf_priv_t;
 
 typedef struct _drm_i810_ring_buffer{
@@ -61,7 +59,7 @@ typedef struct drm_i810_private {
 	drm_i810_sarea_t *sarea_priv;
    	drm_i810_ring_buffer_t ring;
 
-      	unsigned long hw_status_page;
+      	void *hw_status_page;
    	unsigned long counter;
 
 	dma_addr_t dma_status_page;
@@ -86,6 +84,7 @@ extern int  i810_getbuf(struct inode *inode, struct file *filp,
 			unsigned int cmd, unsigned long arg);
 extern int  i810_dma_init(struct inode *inode, struct file *filp,
 			  unsigned int cmd, unsigned long arg);
+extern int  i810_dma_cleanup(drm_device_t *dev);
 extern int  i810_flush_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg);
 extern void i810_reclaim_buffers(struct file *filp);

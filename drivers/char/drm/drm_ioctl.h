@@ -196,7 +196,7 @@ int DRM(getmap)( struct inode *inode, struct file *filp,
 	idx = map.offset;
 
 	down(&dev->struct_sem);
-	if (idx < 0 || idx >= dev->map_count) {
+	if (idx < 0) {
 		up(&dev->struct_sem);
 		return -EINVAL;
 	}

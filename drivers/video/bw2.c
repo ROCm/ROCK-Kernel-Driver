@@ -346,7 +346,6 @@ static void bw2_init_one(struct sbus_dev *sdev)
 
 	all->par.fbsize = PAGE_ALIGN(linebytes * all->info.var.yres);
 
-	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &bw2_ops;
 #if defined(CONFIG_SPARC32)

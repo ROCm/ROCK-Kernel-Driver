@@ -15,6 +15,7 @@
 #include <asm/sigcontext.h>
 #include <asm/cpufeature.h>
 #include <asm/msr.h>
+#include <asm/system.h>
 #include <linux/cache.h>
 #include <linux/config.h>
 #include <linux/threads.h>
@@ -495,32 +496,93 @@ static inline void rep_nop(void)
 
 #define cpu_relax()	rep_nop()
 
-/* Prefetch instructions for Pentium III and AMD Athlon */
-#ifdef 	CONFIG_X86_PREFETCH
+/* generic versions from gas */
+#define GENERIC_NOP1	".byte 0x90\n"
+#define GENERIC_NOP2    	".byte 0x89,0xf6\n"
+#define GENERIC_NOP3        ".byte 0x8d,0x76,0x00\n"
+#define GENERIC_NOP4        ".byte 0x8d,0x74,0x26,0x00\n"
+#define GENERIC_NOP5        GENERIC_NOP1 GENERIC_NOP4
+#define GENERIC_NOP6	".byte 0x8d,0xb6,0x00,0x00,0x00,0x00\n"
+#define GENERIC_NOP7	".byte 0x8d,0xb4,0x26,0x00,0x00,0x00,0x00\n"
+#define GENERIC_NOP8	GENERIC_NOP1 GENERIC_NOP7
 
+/* Opteron nops */
+#define K8_NOP1 GENERIC_NOP1
+#define K8_NOP2	".byte 0x66,0x90\n" 
+#define K8_NOP3	".byte 0x66,0x66,0x90\n" 
+#define K8_NOP4	".byte 0x66,0x66,0x66,0x90\n" 
+#define K8_NOP5	K8_NOP3 K8_NOP2 
+#define K8_NOP6	K8_NOP3 K8_NOP3
+#define K8_NOP7	K8_NOP4 K8_NOP3
+#define K8_NOP8	K8_NOP4 K8_NOP4
+
+/* K7 nops */
+/* uses eax dependencies (arbitary choice) */
+#define K7_NOP1  GENERIC_NOP1
+#define K7_NOP2	".byte 0x8b,0xc0\n" 
+#define K7_NOP3	".byte 0x8d,0x04,0x20\n"
+#define K7_NOP4	".byte 0x8d,0x44,0x20,0x00\n"
+#define K7_NOP5	K7_NOP4 ASM_NOP1
+#define K7_NOP6	".byte 0x8d,0x80,0,0,0,0\n"
+#define K7_NOP7        ".byte 0x8D,0x04,0x05,0,0,0,0\n"
+#define K7_NOP8        K7_NOP7 ASM_NOP1
+
+#ifdef CONFIG_MK8
+#define ASM_NOP1 K8_NOP1
+#define ASM_NOP2 K8_NOP2
+#define ASM_NOP3 K8_NOP3
+#define ASM_NOP4 K8_NOP4
+#define ASM_NOP5 K8_NOP5
+#define ASM_NOP6 K8_NOP6
+#define ASM_NOP7 K8_NOP7
+#define ASM_NOP8 K8_NOP8
+#elif CONFIG_MK7
+#define ASM_NOP1 K7_NOP1
+#define ASM_NOP2 K7_NOP2
+#define ASM_NOP3 K7_NOP3
+#define ASM_NOP4 K7_NOP4
+#define ASM_NOP5 K7_NOP5
+#define ASM_NOP6 K7_NOP6
+#define ASM_NOP7 K7_NOP7
+#define ASM_NOP8 K7_NOP8
+#else
+#define ASM_NOP1 GENERIC_NOP1
+#define ASM_NOP2 GENERIC_NOP2
+#define ASM_NOP3 GENERIC_NOP3
+#define ASM_NOP4 GENERIC_NOP4
+#define ASM_NOP5 GENERIC_NOP5
+#define ASM_NOP6 GENERIC_NOP6
+#define ASM_NOP7 GENERIC_NOP7
+#define ASM_NOP8 GENERIC_NOP8
+#endif
+
+#define ASM_NOP_MAX 8
+
+/* Prefetch instructions for Pentium III and AMD Athlon */
+/* It's not worth to care about 3dnow! prefetches for the K6
+   because they are microcoded there and very slow. */
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)
 {
-	__asm__ __volatile__ ("prefetchnta (%0)" : : "r"(x));
+	alternative_input(ASM_NOP4,
+			  "prefetchnta (%1)",
+			  X86_FEATURE_XMM,
+			  "r" (x));
 }
-
-#elif defined CONFIG_X86_USE_3DNOW
 
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-extern inline void prefetch(const void *x)
-{
-	 __asm__ __volatile__ ("prefetch (%0)" : : "r"(x));
-}
-
+/* 3dnow! prefetch to get an exclusive cache line. Useful for 
+   spinlocks to avoid one state transition in the cache coherency protocol. */
 extern inline void prefetchw(const void *x)
 {
-	 __asm__ __volatile__ ("prefetchw (%0)" : : "r"(x));
+	alternative_input(ASM_NOP4,
+			  "prefetchw (%1)",
+			  X86_FEATURE_3DNOW,
+			  "r" (x));
 }
 #define spin_lock_prefetch(x)	prefetchw(x)
-
-#endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

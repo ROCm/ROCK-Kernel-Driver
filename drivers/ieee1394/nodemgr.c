@@ -70,7 +70,6 @@ static char *nodemgr_find_oui_name(int oui)
 
 static DECLARE_MUTEX(nodemgr_serialize);
 
-static struct hpsb_highlevel *nodemgr_hl;
 
 struct host_info {
 	struct hpsb_host *host;
@@ -78,8 +77,22 @@ struct host_info {
 	struct completion exited;
 	struct semaphore reset_sem;
 	int pid;
-	int id;
 	char daemon_name[15];
+};
+
+static struct hpsb_highlevel nodemgr_highlevel;
+
+static int nodemgr_driverdata_ne;
+static int nodemgr_driverdata_host;
+
+static struct device_driver nodemgr_driver_ne = {
+	.name	= "ieee1394_node",
+	.bus	= &ieee1394_bus_type,
+};
+
+static struct device_driver nodemgr_driver_host = {
+	.name	= "ieee1394_host",
+	.bus	= &ieee1394_bus_type,
 };
 
 
@@ -364,7 +377,9 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
         struct unit_directory *ud;
 	struct ieee1394_device_id *id;
 
-	if (dev->class_num != DEV_CLASS_UNIT_DIRECTORY)
+	if (dev->driver_data == &nodemgr_driverdata_ne ||
+	    dev->driver_data == &nodemgr_driverdata_host ||
+	    drv == &nodemgr_driver_ne || drv == &nodemgr_driver_host)
 		return 0;
 
 	ud = container_of(dev, struct unit_directory, device);
@@ -448,7 +463,7 @@ static void nodemgr_update_ud_names(struct host_info *hi, struct node_entry *ne)
 
 		snprintf(ud->device.name, DEVICE_NAME_SIZE,
 			 "IEEE-1394 unit directory %d-" NODE_BUS_FMT "-%u",
-			 hi->id, NODE_BUS_ARGS(ne->nodeid), ud->id);
+			 hi->host->id, NODE_BUS_ARGS(ne->nodeid), ud->id);
 	}
 }
 
@@ -494,18 +509,21 @@ static void nodemgr_remove_host_dev(struct device *dev)
 static struct device nodemgr_dev_template_ud = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_ud,
-	.class_num	= DEV_CLASS_UNIT_DIRECTORY,
 };
+
 
 static struct device nodemgr_dev_template_ne = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_ne,
-	.class_num	= DEV_CLASS_NODE,
+	.driver		= &nodemgr_driver_ne,
+	.driver_data	= &nodemgr_driverdata_ne,
 };
+
 
 static struct device nodemgr_dev_template_host = {
 	.bus		= &ieee1394_bus_type,
-	.class_num	= DEV_CLASS_HOST,
+	.driver		= &nodemgr_driver_host,
+	.driver_data	= &nodemgr_driverdata_host,
 };
 
 
@@ -696,7 +714,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 	snprintf(ne->device.bus_id, BUS_ID_SIZE, "%016Lx",
 		 (unsigned long long)(ne->guid));
 	snprintf(ne->device.name, DEVICE_NAME_SIZE,
-		 "IEEE-1394 device %d-" NODE_BUS_FMT, hi->id,
+		 "IEEE-1394 device %d-" NODE_BUS_FMT, host->id,
 		 NODE_BUS_ARGS(ne->nodeid));
 
 	device_register(&ne->device);
@@ -711,7 +729,7 @@ static struct node_entry *nodemgr_create_node(octlet_t guid, quadlet_t busoption
 
 	HPSB_DEBUG("%s added: ID:BUS[%d-" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   (host->node_id == nodeid) ? "Host" : "Node",
-		   hi->id, NODE_BUS_ARGS(nodeid), (unsigned long long)guid);
+		   host->id, NODE_BUS_ARGS(nodeid), (unsigned long long)guid);
 
         return ne;
 }
@@ -727,7 +745,7 @@ static int nodemgr_guid_search_cb(struct device *dev, void *__data)
         struct guid_search_baton *search = __data;
         struct node_entry *ne;
 
-        if (dev->class_num != DEV_CLASS_NODE)
+        if (dev->driver_data != &nodemgr_driverdata_ne)
                 return 0;
 
         ne = container_of(dev, struct node_entry, device);
@@ -764,7 +782,7 @@ static int nodemgr_nodeid_search_cb(struct device *dev, void *__data)
 	struct nodeid_search_baton *search = __data;
 	struct node_entry *ne;
 
-	if (dev->class_num != DEV_CLASS_NODE)
+	if (dev->driver_data != &nodemgr_driverdata_ne)
 		return 0;
 
 	ne = container_of(dev, struct node_entry, device);
@@ -1131,7 +1149,9 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 	if (!dev)
 		return -ENODEV;
 
-	if (dev->class_num != DEV_CLASS_UNIT_DIRECTORY)
+	/* Have to check driver_data, since on remove, driver == NULL */
+	if (dev->driver_data == &nodemgr_driverdata_ne ||
+	    dev->driver_data == &nodemgr_driverdata_host)
 		return -ENODEV;
 
 	ud = container_of(dev, struct unit_directory, device);
@@ -1171,20 +1191,6 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 } 
 
 #endif /* CONFIG_HOTPLUG */
-
-
-static DECLARE_MUTEX(host_num_sema);
-/* Must hold above mutex until the result of the below call is assigned to
- * a hostinfo entry. */
-static int nodemgr_alloc_host_num(void)
-{
-	int hostnum;
-
-	for (hostnum = 0; hpsb_get_hostinfo_bykey(nodemgr_hl, hostnum); hostnum++)
-		/* Do nothing */;
-
-	return hostnum;
-}
 
 
 int hpsb_register_protocol(struct hpsb_protocol_driver *driver)
@@ -1258,7 +1264,8 @@ static int nodemgr_driver_search_cb(struct device *dev, void *__data)
 	struct node_entry *ne = __data;
 	struct unit_directory *ud;
 
-	if (dev->class_num != DEV_CLASS_UNIT_DIRECTORY)
+	if (dev->driver_data == &nodemgr_driverdata_ne ||
+	    dev->driver_data == &nodemgr_driverdata_host)
 		return 0;
 
 	ud = container_of(dev, struct unit_directory, device);
@@ -1295,7 +1302,7 @@ static void nodemgr_update_node(struct node_entry *ne, quadlet_t busoptions,
 	if (ne->nodeid != nodeid) {
 		snprintf(ne->device.name, DEVICE_NAME_SIZE,
 			 "IEEE-1394 device %d-" NODE_BUS_FMT,
-			 hi->id, NODE_BUS_ARGS(ne->nodeid));
+			 hi->host->id, NODE_BUS_ARGS(ne->nodeid));
 		HPSB_DEBUG("Node " NODE_BUS_FMT " changed to " NODE_BUS_FMT,
 			   NODE_BUS_ARGS(ne->nodeid), NODE_BUS_ARGS(nodeid));
 		ne->nodeid = nodeid;
@@ -1446,7 +1453,7 @@ static int nodemgr_remove_node(struct device *dev, void *__data)
 	struct cleanup_baton *cleanup = __data;
 	struct node_entry *ne;
 
-	if (dev->class_num != DEV_CLASS_NODE)
+	if (dev->driver_data != &nodemgr_driverdata_ne)
 		return 0;
 
 	ne = container_of(dev, struct node_entry, device);
@@ -1550,7 +1557,7 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 		else {
 			HPSB_DEBUG("The root node is not cycle master capable; "
 				   "selecting a new root node and resetting...");
-			hpsb_send_phy_config(host, host->node_id, -1);
+			hpsb_send_phy_config(host, NODEID_TO_NODE(host->node_id), -1);
 			hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
 		}
 	}
@@ -1583,7 +1590,7 @@ static int nodemgr_check_irm_capability(struct hpsb_host *host, int cycles)
 			return 1;
 		}
 
-		hpsb_send_phy_config(host, host->node_id, -1);
+		hpsb_send_phy_config(host, NODEID_TO_NODE(host->node_id), -1);
 		hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
 
 		return 0;
@@ -1732,26 +1739,16 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 			 addr, extcode, data, arg);
 }
 
-static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
+static void nodemgr_add_host(struct hpsb_host *host)
 {
 	struct host_info *hi;
-	int id;
 
-	down(&host_num_sema);
-	/* Must be called before we create the hostinfo entry, else it
-	 * will match entry '0' since all keys default to zero */
-	id = nodemgr_alloc_host_num();
-	hi = hpsb_create_hostinfo(hl, host, sizeof(*hi));
+	hi = hpsb_create_hostinfo(&nodemgr_highlevel, host, sizeof(*hi));
 
 	if (!hi) {
-		up(&host_num_sema);
 		HPSB_ERR ("NodeMgr: out of memory in add host");
 		return;
 	}
-
-	hi->id = id;
-	hpsb_set_hostinfo_key(hl, host, hi->id);
-	up(&host_num_sema);
 
 	hi->host = host;
 	init_completion(&hi->exited);
@@ -1760,11 +1757,11 @@ static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 	memcpy(&host->device, &nodemgr_dev_template_host,
 	       sizeof(host->device));
 	host->device.parent = &host->pdev->dev;
-	snprintf(host->device.bus_id, BUS_ID_SIZE, "fw-host%d", hi->id);
+	snprintf(host->device.bus_id, BUS_ID_SIZE, "fw-host%d", host->id);
 	snprintf(host->device.name, DEVICE_NAME_SIZE, "IEEE-1394 Host %s-%d",
-		 host->driver->name, hi->id);
+		 host->driver->name, host->id);
 
-	sprintf(hi->daemon_name, "knodemgrd_%d", hi->id);
+	sprintf(hi->daemon_name, "knodemgrd_%d", host->id);
 
 	hi->pid = kernel_thread(nodemgr_host_thread, hi,
 				CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -1772,7 +1769,7 @@ static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 	if (hi->pid < 0) {
 		HPSB_ERR ("NodeMgr: failed to start %s thread for %s",
 			  hi->daemon_name, host->driver->name);
-		hpsb_destroy_hostinfo(hl, host);
+		hpsb_destroy_hostinfo(&nodemgr_highlevel, host);
 		return;
 	}
 
@@ -1781,7 +1778,7 @@ static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 
 static void nodemgr_host_reset(struct hpsb_host *host)
 {
-	struct host_info *hi = hpsb_get_hostinfo(nodemgr_hl, host);
+	struct host_info *hi = hpsb_get_hostinfo(&nodemgr_highlevel, host);
 
 	if (hi != NULL) {
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
@@ -1796,7 +1793,7 @@ static void nodemgr_host_reset(struct hpsb_host *host)
 
 static void nodemgr_remove_host(struct hpsb_host *host)
 {
-	struct host_info *hi = hpsb_get_hostinfo(nodemgr_hl, host);
+	struct host_info *hi = hpsb_get_hostinfo(&nodemgr_highlevel, host);
 
 	if (hi) {
 		if (hi->pid >= 0) {
@@ -1812,7 +1809,8 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 	return;
 }
 
-static struct hpsb_highlevel_ops nodemgr_ops = {
+static struct hpsb_highlevel nodemgr_highlevel = {
+	.name =		"Node manager",
 	.add_host =	nodemgr_add_host,
 	.host_reset =	nodemgr_host_reset,
 	.remove_host =	nodemgr_remove_host,
@@ -1821,16 +1819,17 @@ static struct hpsb_highlevel_ops nodemgr_ops = {
 void init_ieee1394_nodemgr(void)
 {
 	bus_register(&ieee1394_bus_type);
+	driver_register(&nodemgr_driver_host);
+	driver_register(&nodemgr_driver_ne);
 
-	nodemgr_hl = hpsb_register_highlevel("Node manager", &nodemgr_ops);
-        if (!nodemgr_hl) {
-		HPSB_ERR("NodeMgr: out of memory during ieee1394 initialization");
-        }
+	hpsb_register_highlevel(&nodemgr_highlevel);
 }
 
 void cleanup_ieee1394_nodemgr(void)
 {
-        hpsb_unregister_highlevel(nodemgr_hl);
+        hpsb_unregister_highlevel(&nodemgr_highlevel);
 
+	driver_unregister(&nodemgr_driver_ne);
+	driver_unregister(&nodemgr_driver_host);
 	bus_unregister(&ieee1394_bus_type);
 }

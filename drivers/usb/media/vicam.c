@@ -1,7 +1,10 @@
 /*
  * USB ViCam WebCam driver
  * Copyright (c) 2002 Joe Burks (jburks@wavicle.org),
- *                    John Tyner (jtyner@cs.ucr.edu)
+ *                    Christopher L Cheney (ccheney@cheney.cx),
+ *                    Pavel Machek (pavel@suse.cz),
+ *                    John Tyner (jtyner@cs.ucr.edu),
+ *                    Monroe Williams (monroe@pobox.com)
  *
  * Supports 3COM HomeConnect PC Digital WebCam
  *
@@ -32,7 +35,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/wrapper.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/videodev.h>

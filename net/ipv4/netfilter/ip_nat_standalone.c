@@ -238,6 +238,7 @@ ip_nat_local_fn(unsigned int hooknum,
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_in_ops = {
 	.hook		= ip_nat_fn,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_PRE_ROUTING,
 	.priority	= NF_IP_PRI_NAT_DST,
@@ -246,6 +247,7 @@ static struct nf_hook_ops ip_nat_in_ops = {
 /* After packet filtering, change source */
 static struct nf_hook_ops ip_nat_out_ops = {
 	.hook		= ip_nat_out,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_POST_ROUTING,
 	.priority	= NF_IP_PRI_NAT_SRC,
@@ -254,6 +256,7 @@ static struct nf_hook_ops ip_nat_out_ops = {
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_local_out_ops = {
 	.hook		= ip_nat_local_fn,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_LOCAL_OUT,
 	.priority	= NF_IP_PRI_NAT_DST,
@@ -262,6 +265,7 @@ static struct nf_hook_ops ip_nat_local_out_ops = {
 #ifdef CONFIG_IP_NF_NAT_LOCAL
 static struct nf_hook_ops ip_nat_local_in_ops = {
 	.hook		= ip_nat_fn,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_LOCAL_IN,
 	.priority	= NF_IP_PRI_NAT_SRC,

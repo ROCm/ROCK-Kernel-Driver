@@ -457,17 +457,6 @@ static void flush_stale_links(void)
 }
 
 /* ----------------------------------------------------------------------------
-cs_error
-	Report a Card Services related error.
----------------------------------------------------------------------------- */
-
-static void cs_error(client_handle_t handle, int func, int ret)
-{
-    error_info_t err = { func, ret };
-    CardServices(ReportError, handle, &err);
-}
-
-/* ----------------------------------------------------------------------------
 nmclan_attach
 	Creates an "instance" of the driver, allocating local data
 	structures for one device.  The device is registered with Card
@@ -1741,33 +1730,25 @@ static void set_multicast_list(struct net_device *dev)
 
 } /* set_multicast_list */
 
-/* ----------------------------------------------------------------------------
-init_nmclan_cs
----------------------------------------------------------------------------- */
+static struct pcmcia_driver nmclan_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "nmclan_cs",
+	},
+	.attach		= nmclan_attach,
+	.detach		= nmclan_detach,
+};
 
 static int __init init_nmclan_cs(void)
 {
-  servinfo_t serv;
-  DEBUG(0, "%s\n", version);
-  CardServices(GetCardServicesInfo, &serv);
-  if (serv.Revision != CS_RELEASE_CODE) {
-    printk(KERN_NOTICE "nmclan_cs: Card Services release does not match!\n");
-    return -1;
-  }
-  register_pccard_driver(&dev_info, &nmclan_attach, &nmclan_detach);
-  return 0;
+	return pcmcia_register_driver(&nmclan_cs_driver);
 }
-
-/* ----------------------------------------------------------------------------
-exit_nmclan_cs
----------------------------------------------------------------------------- */
 
 static void __exit exit_nmclan_cs(void)
 {
-    DEBUG(0, "nmclan_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	nmclan_detach(dev_list);
+	pcmcia_unregister_driver(&nmclan_cs_driver);
+	while (dev_list != NULL)
+		nmclan_detach(dev_list);
 }
 
 module_init(init_nmclan_cs);

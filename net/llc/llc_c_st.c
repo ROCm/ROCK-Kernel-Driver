@@ -5,7 +5,7 @@
  * or in "llc_c_ac.c" and "llc_c_ev.c" modules.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.

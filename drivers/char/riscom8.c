@@ -590,23 +590,24 @@ static inline void rc_check_modem(struct riscom_board const * bp)
 }
 
 /* The main interrupt processing routine */
-static void rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	unsigned char status;
 	unsigned char ack;
 	struct riscom_board *bp;
 	unsigned long loop = 0;
-	
+	int handled = 0;
+
 	bp = IRQ_to_board[irq];
 	
 	if (!bp || !(bp->flags & RC_BOARD_ACTIVE))  {
-		return;
+		return IRQ_NONE;
 	}
 	
 	while ((++loop < 16) && ((status = ~(rc_in(bp, RC_BSR))) &
 				 (RC_BSR_TOUT | RC_BSR_TINT |
 				  RC_BSR_MINT | RC_BSR_RINT))) {
-	
+		handled = 1;
 		if (status & RC_BSR_TOUT) 
 			printk(KERN_WARNING "rc%d: Got timeout. Hardware "
 					    "error?\n", board_No(bp));
@@ -648,6 +649,7 @@ static void rc_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		rc_out(bp, CD180_EOIR, 0);   /* Mark end of interrupt */
 		rc_out(bp, RC_CTOUT, 0);     /* Clear timeout flag    */
 	}
+	return IRQ_RETVAL(handled);
 }
 
 /*

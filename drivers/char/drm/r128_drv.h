@@ -440,7 +440,7 @@ do {									\
 #if defined(__powerpc__)
 #define r128_flush_write_combine()	(void) GET_RING_HEAD( &dev_priv->ring )
 #else
-#define r128_flush_write_combine()	DRM_WRITEMEMORYBARRIER(dev_priv->ring_rptr)
+#define r128_flush_write_combine()	DRM_WRITEMEMORYBARRIER()
 #endif
 
 

@@ -34,6 +34,7 @@
 #include <asm/system.h>
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
+#include <asm/xmon.h>
 
 #if defined CONFIG_KGDB
 #include <asm/kgdb.h>
@@ -46,9 +47,6 @@ extern void identify_cpu(unsigned long offset, unsigned long cpu);
 extern void do_cpu_ftr_fixups(unsigned long offset);
 extern void reloc_got2(unsigned long offset);
 
-#ifdef CONFIG_XMON
-extern void xmon_map_scc(void);
-#endif
 
 #ifdef CONFIG_KGDB
 extern void kgdb_map_scc(void);

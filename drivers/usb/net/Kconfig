@@ -28,30 +28,6 @@ config USB_CATC
 	  The module will be called catc. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
-config USB_CDCETHER
-	tristate "USB CDC Ethernet support (EXPERIMENTAL)"
-	depends on USB && NET && EXPERIMENTAL
-	---help---
-	  This driver supports devices conforming to the Communication Device
-	  Class Ethernet Control Model.  This is used in some cable modems.
-	  For more details on the specification, get the Communication Device
-	  Class specification from <http://www.usb.org/>.
-
-	  This driver should work with the following devices:
-	  * Ericsson PipeRider (all variants)
-	  * Motorola (DM100 and SB4100)
-	  * Broadcom Cable Modem (reference design)
-	  * Toshiba PCX1100U and possibly other cable modems
-
-	  The device creates a network device (ethX, where X depends on what
-	  other networking devices you have in use), as for a normal PCI
-	  or ISA based ethernet network card.
-
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cdc-ether.  If you want to compile it 
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-
 config USB_KAWETH
 	tristate "USB KLSI KL5USB101-based ethernet device support"
 	depends on USB && NET
@@ -124,26 +100,147 @@ config USB_RTL8150
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_USBNET
-	tristate "USB-to-USB Networking for cables, PDAs and other devices"
+	tristate "Host-to-Host Networking for Cables and Smart Devices"
 	depends on USB && NET
 	---help---
-	  This driver supports network links over USB with USB "Network"
-	  or "data transfer" cables, often used to network laptops to PCs.
-	  Such cables have chips from suppliers such as Belkin/eTEK, GeneSys
-	  (GeneLink), NetChip and Prolific.  Some motherboards with USB PC2PC
-	  support include such chips.
-	  
-	  Intelligent USB devices, such as PDAs running Linux (like Yopy
-	  and Zaurus, or iPaqs after upgrading to Linux) can use the same
-	  approach to provide Internet access.
+	  This driver supports several kinds of network links over USB,
+	  with "minidrivers" built around a common network driver core
+	  that supports deep queues for efficient transfers.
 
-	  These links will have names like "usb0", "usb1", etc.  They act
-	  like two-node Ethernets, so you can use 802.1d Ethernet Bridging
-	  (CONFIG_BRIDGE) to simplify your network routing.  For more
-	  information see <http://www.linux-usb.org/usbnet/>.
+	  Typically, these links involves only two network hosts.  The
+	  host runs "usbnet", and the other end of the link might be:
+
+	  - Another USB host, when using USB "network" or "data transfer"
+	    cables.  These are often used to network laptops to PCs, like
+	    "Laplink" parallel cables or some motherboards.  These rely
+	    on specialized chips from many suppliers.
+
+	  - An intelligent USB gadget, perhaps embedding a Linux system.
+	    These include PDAs running Linux (iPaq, Yopy, Zaurus, and
+	    others), and devices that interoperate using the standard
+	    CDC-Ethernet specification (including many cable modems).
+
+	  The link will appear with a name like "usb0", when the link is
+	  a two-node link, or "eth0" for most CDC-Ethernet devices.  Those
+	  two-node links are most easily managed with Ethernet Bridging
+	  (CONFIG_BRIDGE) instead of routing.
+
+	  For more information see <http://www.linux-usb.org/usbnet/>.
 
 	  This code is also available as a kernel module (code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called usbnet. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
+
+comment "USB Host-to-Host Cables"
+	depends on USB_USBNET
+
+config USB_AN2720
+	boolean "AnchorChips 2720 based cables (Xircom PGUNET, ...)"
+	depends on USB_USBNET
+	default y
+	help
+	  Choose this option if you're using a host-to-host cable
+	  based on this design.  Note that AnchorChips is now a
+	  Cypress brand.
+
+config USB_BELKIN
+	boolean "eTEK based host-to-host cables (Advance, Belkin, ...)"
+	depends on USB_USBNET
+	default y
+	help
+	  Choose this option if you're using a host-to-host cable
+	  based on this design:  two NetChip 2890 chips and an Atmel
+	  microcontroller, with LEDs that indicate traffic.
+
+config USB_GENESYS
+	boolean "GeneSys GL620USB-A based cables"
+	default y
+	depends on USB_USBNET
+	help
+	  Choose this option if you're using a host-to-host cable,
+	  or PC2PC motherboard, with this chip.
+
+	  Note that the half-duplex "GL620USB" is not supported.
+
+config USB_NET1080
+	boolean "NetChip 1080 based cables (Laplink, ...)"
+	default y
+	depends on USB_USBNET
+	help
+	  Choose this option if you're using a host-to-host cable based
+	  on this design:  one NetChip 1080 chips and supporting logic,
+	  supporting LEDs that indicate traffic
+
+config USB_PL2301
+	boolean "Prolific PL-2301/2302 based cables"
+	default y
+	# handshake/init/reset problems, from original 'plusb' driver
+	depends on USB_USBNET && EXPERIMENTAL
+	help
+	  Choose this option if you're using a host-to-host cable
+	  with one of these chips.
+
+comment "Intelligent USB Devices/Gadgets"
+	depends on USB_USBNET
+
+config USB_ARMLINUX
+	boolean "Embedded ARM Linux links (iPaq, ...)"
+	depends on USB_USBNET
+	default y
+	help
+	  Choose this option to support the "usb-eth" networking driver
+	  used by most of the ARM Linux community with device controllers
+	  such as the SA-11x0 and PXA-25x UDCs.
+
+	  Although the ROMs shipped with Sharp Zaurus products use a
+	  different link level framing protocol, you can have them use
+	  this simpler protocol by installing a different kernel.
+
+config USB_EPSON2888
+	boolean "Epson 2888 based firmware (DEVELOPMENT)"
+	depends on USB_USBNET
+	default y
+	help
+	  Choose this option to support the usb networking links used
+	  by some sample firmware from Epson.
+
+config USB_ZAURUS
+	boolean "Sharp Zaurus (stock ROMs)"
+	depends on USB_USBNET
+	default y
+	help
+	  Choose this option to support the usb networking links used by
+	  Zaurus models like the SL-5000D, SL-5500, SL-5600, A-300, B-500.
+
+	  If you install an alternate ROM image, you may no longer need
+	  to support this protocol.  Only the "eth-fd" driver really needs
+	  this non-conformant variant of CDC Ethernet protocol.
+
+config USB_CDCETHER
+	boolean "CDC Ethernet support (smart devices such as cable modems)"
+	# experimental primarily because cdc-ether was.
+	# make it non-experimental after more interop testing
+	depends on USB_USBNET && EXPERIMENTAL
+	default y
+	help
+	  This option supports devices conforming to the Communication Device
+	  Class (CDC) Ethernet Control Model, a specification that's easy to
+	  implement in device firmware.  The CDC specifications are available
+	  from <http://www.usb.org/>.
+	  
+	  CDC Ethernet is an implementation option for DOCSIS cable modems
+	  that support USB connectivity, used for non-Microsoft USB hosts.
+ 	  This driver should work with at least the following devices:
+
+ 	    * Ericsson PipeRider (all variants)
+ 	    * Motorola (DM100 and SB4100)
+ 	    * Broadcom Cable Modem (reference design)
+ 	    * Toshiba PCX1100U
+	    * ...
+
+	  This driver creates an interface named "ethX", where X depends on
+	  what other networking devices you have in use.  However, if the
+	  IEEE 802 "local assignment" bit is set in the address, a "usbX"
+	  name is used instead.
 

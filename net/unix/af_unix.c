@@ -47,6 +47,9 @@
  *	     Alexey Kuznetsov   :	Full scale SMP. Lot of bugs are introduced 8)
  *	      Malcolm Beattie   :	Set peercred for socketpair
  *	     Michal Ostrowski   :       Module initialization cleanup.
+ *	     Arnaldo C. Melo	:	Remove MOD_{INC,DEC}_USE_COUNT,
+ *	     				the core infrastructure is doing that
+ *	     				for all net proto families now (2.5.69+)
  *
  *
  * Known differences from reference BSD that was tested:
@@ -360,7 +363,6 @@ static void unix_sock_destructor(struct sock *sk)
 #ifdef UNIX_REFCNT_DEBUG
 	printk(KERN_DEBUG "UNIX %p is destroyed, %d are still alive.\n", sk, atomic_read(&unix_nr_socks));
 #endif
-	MOD_DEC_USE_COUNT;
 }
 
 static int unix_release_sock (unix_socket *sk, int embrion)
@@ -478,19 +480,16 @@ extern struct proto_ops unix_dgram_ops;
 
 static struct sock * unix_create1(struct socket *sock)
 {
-	struct sock *sk;
+	struct sock *sk = NULL;
 	struct unix_sock *u;
 
 	if (atomic_read(&unix_nr_socks) >= 2*files_stat.max_files)
-		return NULL;
+		goto out;
 
-	MOD_INC_USE_COUNT;
 	sk = sk_alloc(PF_UNIX, GFP_KERNEL, sizeof(struct unix_sock),
 		      unix_sk_cachep);
-	if (!sk) {
-		MOD_DEC_USE_COUNT;
-		return NULL;
-	}
+	if (!sk)
+		goto out;
 
 	atomic_inc(&unix_nr_socks);
 
@@ -509,7 +508,7 @@ static struct sock * unix_create1(struct socket *sock)
 	init_MUTEX(&u->readsem); /* single task reading lock */
 	init_waitqueue_head(&u->peer_wait);
 	unix_insert_socket(&unix_sockets_unbound, sk);
-
+out:
 	return sk;
 }
 
@@ -1513,7 +1512,7 @@ static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
 		   - do not return fds - good, but too simple 8)
 		   - return fds, and do not return them on read (old strategy,
 		     apparently wrong)
-		   - clone fds (I choosed it for now, it is the most universal
+		   - clone fds (I chose it for now, it is the most universal
 		     solution)
 		
 	           POSIX 1003.1g does not actually define this clearly
@@ -1928,6 +1927,7 @@ struct proto_ops unix_dgram_ops = {
 struct net_proto_family unix_family_ops = {
 	.family = PF_UNIX,
 	.create = unix_create,
+	.owner	= THIS_MODULE,
 };
 
 #ifdef CONFIG_SYSCTL

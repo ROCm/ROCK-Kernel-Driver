@@ -418,7 +418,7 @@ void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 static inline void irlmp_update_cache(struct lap_cb *lap,
 				      struct lsap_cb *lsap)
 {
-	/* Prevent concurent read to get garbage */
+	/* Prevent concurrent read to get garbage */
 	lap->cache.valid = FALSE;
 	/* Update cache entry */
 	lap->cache.dlsap_sel = lsap->dlsap_sel;
@@ -431,7 +431,7 @@ static inline void irlmp_update_cache(struct lap_cb *lap,
 /*
  * Function irlmp_find_handle (self, dlsap_sel, slsap_sel, status, queue)
  *
- *    Find handle assosiated with destination and source LSAP
+ *    Find handle associated with destination and source LSAP
  *
  * Any IrDA connection (LSAP/TSAP) is uniquely identified by
  * 3 parameters, the local lsap, the remote lsap and the remote address. 
@@ -479,7 +479,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 		if ((status == CONNECT_CMD) && 
 		    (lsap->slsap_sel == slsap_sel) &&      
 		    (lsap->dlsap_sel == LSAP_ANY)) {
-			/* This is where the dest lsap sel is set on incomming
+			/* This is where the dest lsap sel is set on incoming
 			 * lsaps */
 			lsap->dlsap_sel = dlsap_sel;
 			break;

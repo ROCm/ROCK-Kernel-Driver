@@ -132,45 +132,43 @@ static int ipv6_chk_same_addr(const struct in6_addr *addr, struct net_device *de
 
 static struct notifier_block *inet6addr_chain;
 
-struct ipv6_devconf ipv6_devconf =
-{
-	0,				/* forwarding		*/
-	IPV6_DEFAULT_HOPLIMIT,		/* hop limit		*/
-	IPV6_MIN_MTU,			/* mtu			*/
-	1,				/* accept RAs		*/
-	1,				/* accept redirects	*/
-	1,				/* autoconfiguration	*/
-	1,				/* dad transmits	*/
-	MAX_RTR_SOLICITATIONS,		/* router solicits	*/
-	RTR_SOLICITATION_INTERVAL,	/* rtr solicit interval	*/
-	MAX_RTR_SOLICITATION_DELAY,	/* rtr solicit delay	*/
+struct ipv6_devconf ipv6_devconf = {
+	.forwarding		= 0,
+	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
+	.mtu6			= IPV6_MIN_MTU,
+	.accept_ra		= 1,
+	.accept_redirects	= 1,
+	.autoconf		= 1,
+	.dad_transmits		= 1,
+	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
+	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 #ifdef CONFIG_IPV6_PRIVACY
-	.use_tempaddr 			= 0,
-	.temp_valid_lft			= TEMP_VALID_LIFETIME,
-	.temp_prefered_lft		= TEMP_PREFERRED_LIFETIME,
-	.regen_max_retry		= REGEN_MAX_RETRY,
-	.max_desync_factor		= MAX_DESYNC_FACTOR,
+	.use_tempaddr 		= 0,
+	.temp_valid_lft		= TEMP_VALID_LIFETIME,
+	.temp_prefered_lft	= TEMP_PREFERRED_LIFETIME,
+	.regen_max_retry	= REGEN_MAX_RETRY,
+	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 };
 
-static struct ipv6_devconf ipv6_devconf_dflt =
-{
-	0,				/* forwarding		*/
-	IPV6_DEFAULT_HOPLIMIT,		/* hop limit		*/
-	IPV6_MIN_MTU,			/* mtu			*/
-	1,				/* accept RAs		*/
-	1,				/* accept redirects	*/
-	1,				/* autoconfiguration	*/
-	1,				/* dad transmits	*/
-	MAX_RTR_SOLICITATIONS,		/* router solicits	*/
-	RTR_SOLICITATION_INTERVAL,	/* rtr solicit interval	*/
-	MAX_RTR_SOLICITATION_DELAY,	/* rtr solicit delay	*/
+static struct ipv6_devconf ipv6_devconf_dflt = {
+	.forwarding		= 0,
+	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
+	.mtu6			= IPV6_MIN_MTU,
+	.accept_ra		= 1,
+	.accept_redirects	= 1,
+	.autoconf		= 1,
+	.dad_transmits		= 1,
+	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
+	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
+	.rtr_solicit_delay	= MAX_RTR_SOLICITATION_DELAY,
 #ifdef CONFIG_IPV6_PRIVACY
-	.use_tempaddr			= 0,
-	.temp_valid_lft			= TEMP_VALID_LIFETIME,
-	.temp_prefered_lft		= TEMP_PREFERRED_LIFETIME,
-	.regen_max_retry		= REGEN_MAX_RETRY,
-	.max_desync_factor		= MAX_DESYNC_FACTOR,
+	.use_tempaddr		= 0,
+	.temp_valid_lft		= TEMP_VALID_LIFETIME,
+	.temp_prefered_lft	= TEMP_PREFERRED_LIFETIME,
+	.regen_max_retry	= REGEN_MAX_RETRY,
+	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 };
 
@@ -300,6 +298,7 @@ void in6_dev_finish_destroy(struct inet6_dev *idev)
 		printk("Freeing alive inet6 device %p\n", idev);
 		return;
 	}
+	snmp6_unregister_dev(idev);
 	inet6_dev_count--;
 	kfree(idev);
 }
@@ -331,6 +330,15 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		inet6_dev_count++;
 		/* We refer to the device */
 		dev_hold(dev);
+
+		if (snmp6_register_dev(ndev) < 0) {
+			ADBG((KERN_WARNING
+				"%s(): cannot create /proc/net/dev_snmp6/%s\n",
+				__FUNCTION__, dev->name));
+			neigh_parms_release(&nd_tbl, ndev->nd_parms);
+			in6_dev_finish_destroy(ndev);
+			return NULL;
+		}
 
 #ifdef CONFIG_IPV6_PRIVACY
 		get_random_bytes(ndev->rndid, sizeof(ndev->rndid));
@@ -737,9 +745,9 @@ out:
 #endif
 
 /*
- *	Choose an apropriate source address
+ *	Choose an appropriate source address
  *	should do:
- *	i)	get an address with an apropriate scope
+ *	i)	get an address with an appropriate scope
  *	ii)	see if there is a specific route for the destination and use
  *		an address of the attached interface 
  *	iii)	don't use deprecated addresses

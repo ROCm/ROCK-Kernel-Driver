@@ -524,7 +524,7 @@ void irlan_ias_register(struct irlan_cb *self, __u8 tsap_sel)
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
 	/* 
-	 * Check if object has already been registred by a previous provider.
+	 * Check if object has already been registered by a previous provider.
 	 * If that is the case, we just change the value of the attribute
 	 */
 	if (!irias_find_object("IrLAN")) {
@@ -538,7 +538,7 @@ void irlan_ias_register(struct irlan_cb *self, __u8 tsap_sel)
 					      new_value);
 	}
 	
-        /* Register PnP object only if not registred before */
+        /* Register PnP object only if not registered before */
         if (!irias_find_object("PnP")) {
 		obj = irias_new_object("PnP", IAS_PNP_ID);
 #if 0
@@ -835,7 +835,7 @@ void irlan_set_multicast_filter(struct irlan_cb *self, int status)
 /*
  * Function irlan_get_unicast_addr (self)
  *
- *    Retrives the unicast address from the IrLAN provider. This address
+ *    Retrieves the unicast address from the IrLAN provider. This address
  *    will be inserted into the devices structure, so the ethernet layer
  *    can construct its packets.
  *

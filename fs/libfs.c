@@ -4,7 +4,10 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/mount.h>
 #include <linux/vfs.h>
+
+extern struct vfsmount *do_kern_mount(const char *, int, char *, void *);
 
 int simple_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		   struct kstat *stat)
@@ -331,4 +334,95 @@ int simple_commit_write(struct file *file, struct page *page,
 		inode->i_size = pos;
 	set_page_dirty(page);
 	return 0;
+}
+
+int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files)
+{
+	static struct super_operations s_ops = {statfs:simple_statfs};
+	struct inode *inode;
+	struct dentry *root;
+	struct dentry *dentry;
+	int i;
+
+	s->s_blocksize = PAGE_CACHE_SIZE;
+	s->s_blocksize_bits = PAGE_CACHE_SHIFT;
+	s->s_magic = magic;
+	s->s_op = &s_ops;
+
+	inode = new_inode(s);
+	if (!inode)
+		return -ENOMEM;
+	inode->i_mode = S_IFDIR | 0755;
+	inode->i_uid = inode->i_gid = 0;
+	inode->i_blksize = PAGE_CACHE_SIZE;
+	inode->i_blocks = 0;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
+	root = d_alloc_root(inode);
+	if (!root) {
+		iput(inode);
+		return -ENOMEM;
+	}
+	for (i = 0; !files->name || files->name[0]; i++, files++) {
+		struct qstr name;
+		if (!files->name)
+			continue;
+		name.name = files->name;
+		name.len = strlen(name.name);
+		name.hash = full_name_hash(name.name, name.len);
+		dentry = d_alloc(root, &name);
+		if (!dentry)
+			goto out;
+		inode = new_inode(s);
+		if (!inode)
+			goto out;
+		inode->i_mode = S_IFREG | files->mode;
+		inode->i_uid = inode->i_gid = 0;
+		inode->i_blksize = PAGE_CACHE_SIZE;
+		inode->i_blocks = 0;
+		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+		inode->i_fop = files->ops;
+		inode->i_ino = i;
+		d_add(dentry, inode);
+	}
+	s->s_root = root;
+	return 0;
+out:
+	d_genocide(root);
+	dput(root);
+	return -ENOMEM;
+}
+
+static spinlock_t pin_fs_lock = SPIN_LOCK_UNLOCKED;
+
+int simple_pin_fs(char *name, struct vfsmount **mount, int *count)
+{
+	struct vfsmount *mnt = NULL;
+	spin_lock(&pin_fs_lock);
+	if (unlikely(!*mount)) {
+		spin_unlock(&pin_fs_lock);
+		mnt = do_kern_mount(name, 0, name, NULL);
+		if (IS_ERR(mnt))
+			return PTR_ERR(mnt);
+		spin_lock(&pin_fs_lock);
+		if (!*mount)
+			*mount = mnt;
+	}
+	mntget(*mount);
+	++*count;
+	spin_unlock(&pin_fs_lock);
+	mntput(mnt);
+	return 0;
+}
+
+void simple_release_fs(struct vfsmount **mount, int *count)
+{
+	struct vfsmount *mnt;
+	spin_lock(&pin_fs_lock);
+	mnt = *mount;
+	if (!--*count)
+		*mount = NULL;
+	spin_unlock(&pin_fs_lock);
+	mntput(mnt);
 }

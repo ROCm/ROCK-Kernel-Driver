@@ -122,7 +122,7 @@ struct scc_enet_private {
 static int scc_enet_open(struct net_device *dev);
 static int scc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int scc_enet_rx(struct net_device *dev);
-static void scc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs);
+static irqreturn_t scc_enet_interrupt(int irq, void *dev_id, struct pt_regs *);
 static int scc_enet_close(struct net_device *dev);
 static struct net_device_stats *scc_enet_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
@@ -272,7 +272,7 @@ scc_enet_timeout(struct net_device *dev)
 /* The interrupt handler.
  * This is called from the CPM handler, not the MPC core interrupt.
  */
-static void
+static irqreturn_t
 scc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	struct	net_device *dev = dev_id;
@@ -403,7 +403,7 @@ scc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		printk("SCC ENET: BSY can't happen.\n");
 	}
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /* During a receive, the cur_rx points to the current incoming buffer.

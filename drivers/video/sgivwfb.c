@@ -773,7 +773,6 @@ int __init sgivwfb_init(void)
 	sgivwfb_fix.ywrapstep = ywrap;
 	sgivwfb_fix.ypanstep = ypan;
 
-	fb_info.node = NODEV;
 	fb_info.fix = sgivwfb_fix;
 
 	switch (flatpanel_id) {
@@ -807,7 +806,7 @@ int __init sgivwfb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: SGI DBE frame buffer device, using %ldK of video memory at %#lx\n",      
-		minor(fb_info.node), sgivwfb_mem_size >> 10, sgivwfb_mem_phys);
+		fb_info.node, sgivwfb_mem_size >> 10, sgivwfb_mem_phys);
 	return 0;
 
 fail_register_framebuffer:

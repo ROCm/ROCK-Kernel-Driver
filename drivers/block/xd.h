@@ -13,6 +13,8 @@
  * Also thanks to: Salvador Abreu, Dave Thaler, Risto Kankkunen and Wim Van Dorst.
  */
 
+#include <linux/interrupt.h>
+
 /* XT hard disk controller registers */
 #define XD_DATA		(xd_iobase + 0x00)	/* data RW register */
 #define XD_RESET	(xd_iobase + 0x01)	/* reset WO register */
@@ -107,7 +109,8 @@ static int xd_ioctl (struct inode *inode,struct file *file,unsigned int cmd,unsi
 static int xd_readwrite (u_char operation,XD_INFO *disk,char *buffer,u_int block,u_int count);
 static void xd_recalibrate (u_char drive);
 
-static void xd_interrupt_handler (int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t xd_interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *regs);
 static u_char xd_setup_dma (u_char opcode,u_char *buffer,u_int count);
 static u_char *xd_build (u_char *cmdblk,u_char command,u_char drive,u_char head,u_short cylinder,u_char sector,u_char count,u_char control);
 static void xd_watchdog (unsigned long unused);

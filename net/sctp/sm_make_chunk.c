@@ -91,7 +91,7 @@ static const sctp_ecn_capable_param_t ecap_param = {
 	}
 };
 
-/* A helper to initilize to initilize an op error inside a
+/* A helper to initialize to initialize an op error inside a
  * provided chunk, as most cause codes will be embedded inside an
  * abort chunk.
  */

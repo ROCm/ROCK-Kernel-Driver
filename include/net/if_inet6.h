@@ -15,6 +15,8 @@
 #ifndef _NET_IF_INET6_H
 #define _NET_IF_INET6_H
 
+#include <net/snmp.h>
+
 #define IF_RA_RCVD	0x20
 #define IF_RS_SENT	0x10
 
@@ -152,6 +154,11 @@ struct ipv6_devconf
 	void		*sysctl;
 };
 
+struct ipv6_devstat {
+	struct proc_dir_entry	*proc_dir_entry;
+	DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6);
+};
+
 struct inet6_dev 
 {
 	struct net_device		*dev;
@@ -185,6 +192,7 @@ struct inet6_dev
 	struct neigh_parms	*nd_parms;
 	struct inet6_dev	*next;
 	struct ipv6_devconf	cnf;
+	struct ipv6_devstat	stats;
 };
 
 extern struct ipv6_devconf ipv6_devconf;

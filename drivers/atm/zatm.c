@@ -1214,15 +1214,17 @@ static int start_tx(struct atm_dev *dev)
 /*------------------------------- interrupts --------------------------------*/
 
 
-static void zatm_int(int irq,void *dev_id,struct pt_regs *regs)
+static irqreturn_t zatm_int(int irq,void *dev_id,struct pt_regs *regs)
 {
 	struct atm_dev *dev;
 	struct zatm_dev *zatm_dev;
 	u32 reason;
+	int handled = 0;
 
 	dev = dev_id;
 	zatm_dev = ZATM_DEV(dev);
 	while ((reason = zin(GSR))) {
+		handled = 1;
 		EVENT("reason 0x%x\n",reason,0);
 		if (reason & uPD98401_INT_PI) {
 			EVENT("PHY int\n",0,0);
@@ -1285,6 +1287,7 @@ static void zatm_int(int irq,void *dev_id,struct pt_regs *regs)
 		}
 		/* @@@ handle RCRn */
 	}
+	return IRQ_RETVAL(handled);
 }
 
 

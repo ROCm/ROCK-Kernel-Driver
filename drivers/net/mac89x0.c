@@ -129,7 +129,7 @@ extern void reset_chip(struct net_device *dev);
 #endif
 static int net_open(struct net_device *dev);
 static int	net_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void set_multicast_list(struct net_device *dev);
 static void net_rx(struct net_device *dev);
 static int net_close(struct net_device *dev);
@@ -424,7 +424,7 @@ net_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
-static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *lp;
@@ -432,7 +432,7 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	if (dev == NULL) {
 		printk ("net_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 	if (dev->interrupt)
 		printk("%s: Re-entering the interrupt handler.\n", dev->name);
@@ -491,7 +491,7 @@ static void net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 	}
 	dev->interrupt = 0;
-	return;
+	return IRQ_HANDLED;
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */

@@ -437,9 +437,7 @@ static int __init init(void)
 	return 0;
 }
 
-#ifdef CONFIG_IP_NF_NAT_NEEDED
 EXPORT_SYMBOL(ip_ftp_lock);
-#endif
 
 MODULE_LICENSE("GPL");
 module_init(init);

@@ -395,7 +395,7 @@ static int snd_sb16_capture_trigger(snd_pcm_substream_t * substream,
 
 irqreturn_t snd_sb16dsp_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return);
+	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 	int ok;
 

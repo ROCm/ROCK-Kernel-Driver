@@ -91,7 +91,7 @@ static int serial_console_setup(struct console *co, char *options);
 
 static void serial_console_write(struct console *c, const char *s,
 				unsigned count);
-static kdev_t serial_console_device(struct console *c);
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 
 #if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 static unsigned long break_pressed; /* break, really ... */
@@ -2513,9 +2513,10 @@ void kgdb_map_scc(void)
 }
 #endif
 
-static kdev_t serial_console_device(struct console *c)
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 /*

@@ -416,7 +416,7 @@ static inline void sgiseeq_tx(struct net_device *dev, struct sgiseeq_private *sp
 	}
 }
 
-static void sgiseeq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sgiseeq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct sgiseeq_private *sp = (struct sgiseeq_private *) dev->priv;
@@ -436,6 +436,7 @@ static void sgiseeq_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if ((TX_BUFFS_AVAIL(sp) > 0) && netif_queue_stopped(dev)) {
 		netif_wake_queue(dev);
 	}
+	return IRQ_HANDLED;
 }
 
 static int sgiseeq_open(struct net_device *dev)

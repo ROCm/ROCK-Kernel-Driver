@@ -74,6 +74,9 @@ struct cpu_tlb_fns cpu_tlb;
 #ifdef MULTI_USER
 struct cpu_user_fns cpu_user;
 #endif
+#ifdef MULTI_CACHE
+struct cpu_cache_fns cpu_cache;
+#endif
 
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -282,6 +285,9 @@ static void __init setup_processor(void)
 #ifdef MULTI_USER
 	cpu_user = *list->user;
 #endif
+#ifdef MULTI_CACHE
+	cpu_cache = *list->cache;
+#endif
 
 	printk("CPU: %s [%08x] revision %d (ARMv%s)\n",
 	       cpu_name, processor_id, (int)processor_id & 15,
@@ -323,58 +329,77 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
 	return list;
 }
 
+static void __init early_initrd(char **p)
+{
+	unsigned long start, size;
+
+	start = memparse(*p, p);
+	if (**p == ',') {
+		size = memparse((*p) + 1, p);
+
+		phys_initrd_start = start;
+		phys_initrd_size = size;
+	}
+}
+__early_param("initrd=", early_initrd);
+
 /*
- * Initial parsing of the command line.  We need to pick out the
- * memory size.  We look for mem=size@start, where start and size
- * are "size[KkMm]"
+ * Pick out the memory size.  We look for mem=size@start,
+ * where start and size are "size[KkMm]"
  */
-static void __init
-parse_cmdline(struct meminfo *mi, char **cmdline_p, char *from)
+static void __init early_mem(char **p)
+{
+	static int usermem __initdata = 0;
+	unsigned long size, start;
+
+	/*
+	 * If the user specifies memory size, we
+	 * blow away any automatically generated
+	 * size.
+	 */
+	if (usermem == 0) {
+		usermem = 1;
+		meminfo.nr_banks = 0;
+	}
+
+	start = PHYS_OFFSET;
+	size  = memparse(*p, p);
+	if (**p == '@')
+		start = memparse(*p + 1, p);
+
+	meminfo.bank[meminfo.nr_banks].start = start;
+	meminfo.bank[meminfo.nr_banks].size  = size;
+	meminfo.bank[meminfo.nr_banks].node  = PHYS_TO_NID(start);
+	meminfo.nr_banks += 1;
+}
+__early_param("mem=", early_mem);
+
+/*
+ * Initial parsing of the command line.
+ */
+static void __init parse_cmdline(char **cmdline_p, char *from)
 {
 	char c = ' ', *to = command_line;
-	int usermem = 0, len = 0;
+	int len = 0;
 
 	for (;;) {
-		if (c == ' ' && !memcmp(from, "mem=", 4)) {
-			unsigned long size, start;
+		if (c == ' ') {
+			extern struct early_params __early_begin, __early_end;
+			struct early_params *p;
 
-			if (to != command_line)
-				to -= 1;
+			for (p = &__early_begin; p < &__early_end; p++) {
+				int len = strlen(p->arg);
 
-			/*
-			 * If the user specifies memory size, we
-			 * blow away any automatically generated
-			 * size.
-			 */
-			if (usermem == 0) {
-				usermem = 1;
-				mi->nr_banks = 0;
-			}
+				if (memcmp(from, p->arg, len) == 0) {
+					if (to != command_line)
+						to -= 1;
+					from += len;
+					p->fn(&from);
 
-			start = PHYS_OFFSET;
-			size  = memparse(from + 4, &from);
-			if (*from == '@')
-				start = memparse(from + 1, &from);
-
-			mi->bank[mi->nr_banks].start = start;
-			mi->bank[mi->nr_banks].size  = size;
-			mi->bank[mi->nr_banks].node  = PHYS_TO_NID(start);
-			mi->nr_banks += 1;
-		} else if (c == ' ' && !memcmp(from, "initrd=", 7)) {
-			unsigned long start, size;
-
-			/*
-			 * Remove space character
-			 */
-			if (to != command_line)
-				to -= 1;
-
-			start = memparse(from + 7, &from);
-			if (*from == ',') {
-				size = memparse(from + 1, &from);
-
-				phys_initrd_start = start;
-				phys_initrd_size = size;
+					while (*from != ' ' && *from != '\0')
+						from++;
+					break;
+				}
 			}
 		}
 		c = *from++;
@@ -536,6 +561,8 @@ __tagtable(ATAG_RAMDISK, parse_tag_ramdisk);
 
 static int __init parse_tag_initrd(const struct tag *tag)
 {
+	printk(KERN_WARNING "ATAG_INITRD is deprecated; "
+		"please update your bootloader.\n");
 	phys_initrd_start = __virt_to_phys(tag->u.initrd.start);
 	phys_initrd_size = tag->u.initrd.size;
 	return 0;
@@ -668,7 +695,7 @@ void __init setup_arch(char **cmdline_p)
 
 	memcpy(saved_command_line, from, COMMAND_LINE_SIZE);
 	saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
-	parse_cmdline(&meminfo, cmdline_p, from);
+	parse_cmdline(cmdline_p, from);
 	bootmem_init(&meminfo);
 	paging_init(&meminfo, mdesc);
 	request_standard_resources(&meminfo, mdesc);

@@ -274,7 +274,7 @@ static void ip2_hangup(PTTY);
 
 static void set_irq(int, int);
 static void ip2_interrupt_bh(i2eBordStrPtr pB);
-static void ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static void ip2_poll(unsigned long arg);
 static inline void service_all_boards(void);
 static void do_input(void *p);
@@ -1339,11 +1339,12 @@ ip2_interrupt_bh(i2eBordStrPtr pB)
 /*                                                                            */
 /*                                                                            */
 /******************************************************************************/
-static void
+static irqreturn_t
 ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	int i;
 	i2eBordStrPtr  pB;
+	int handled = 0;
 
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, 99, 1, irq );
 
@@ -1355,6 +1356,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 //			IRQ = 0 for polled boards, we won't poll "IRQ" boards
 
 		if ( pB && (pB->i2eUsingIrq == irq) ) {
+			handled = 1;
 #ifdef USE_IQI
 
 		    if (NO_MAIL_HERE != ( pB->i2eStartMail = iiGetMail(pB))) {
@@ -1379,6 +1381,7 @@ ip2_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	++irq_counter;
 
 	ip2trace (ITRC_NO_PORT, ITRC_INTR, ITRC_RETURN, 0 );
+	return IRQ_RETVAL(handled);
 }
 
 /******************************************************************************/

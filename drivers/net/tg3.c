@@ -2154,6 +2154,7 @@ static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct tg3 *tp = dev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
 	unsigned long flags;
+	unsigned int handled = 1;
 
 	spin_lock_irqsave(&tp->lock, flags);
 
@@ -2184,11 +2185,13 @@ static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			     	0x00000000);
 			tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 		}
+	} else {	/* shared interrupt */
+		handled = 0;
 	}
 
 	spin_unlock_irqrestore(&tp->lock, flags);
 
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(handled);
 }
 
 static void tg3_init_rings(struct tg3 *);
@@ -3102,6 +3105,7 @@ static int tg3_abort_hw(struct tg3 *tp)
 	err |= tg3_stop_block(tp, SNDDATAI_MODE, SNDDATAI_MODE_ENABLE);
 	err |= tg3_stop_block(tp, RDMAC_MODE, RDMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDDATAC_MODE, SNDDATAC_MODE_ENABLE);
+	err |= tg3_stop_block(tp, DMAC_MODE, DMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDBDC_MODE, SNDBDC_MODE_ENABLE);
 	if (err)
 		goto out;

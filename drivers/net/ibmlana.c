@@ -701,14 +701,14 @@ static void irqtxerr_handler(struct net_device *dev)
 
 /* general interrupt entry */
 
-static void irq_handler(int irq, void *device, struct pt_regs *regs)
+static irqreturn_t irq_handler(int irq, void *device, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) device;
 	u16 ival;
 
 	/* in case we're not meant... */
 	if (!(inb(dev->base_addr + BCMREG) & BCMREG_IPEND))
-		return;
+		return IRQ_NONE;
 
 	/* loop through the interrupt bits until everything is clear */
 	while (1) {
@@ -732,6 +732,7 @@ static void irq_handler(int irq, void *device, struct pt_regs *regs)
 		}
 		break;
 	}
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------------------

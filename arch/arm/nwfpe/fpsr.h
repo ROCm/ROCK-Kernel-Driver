@@ -38,12 +38,12 @@ The FPCR is a 32 bit register consisting of bit flags.
 ------------
 Note: the system id byte is read only  */
 
-typedef unsigned int FPSR;  /* type for floating point status register */
-typedef unsigned int FPCR;  /* type for floating point control register */
+typedef unsigned int FPSR;	/* type for floating point status register */
+typedef unsigned int FPCR;	/* type for floating point control register */
 
 #define MASK_SYSID		0xff000000
 #define BIT_HARDWARE		0x80000000
-#define FP_EMULATOR		0x01000000	/* System ID for emulator */ 
+#define FP_EMULATOR		0x01000000	/* System ID for emulator */
 #define FP_ACCELERATOR		0x81000000	/* System ID for FPA11 */
 
 /* EXCEPTION TRAP ENABLE BYTE
@@ -51,11 +51,11 @@ typedef unsigned int FPCR;  /* type for floating point control register */
 
 #define MASK_TRAP_ENABLE	0x00ff0000
 #define MASK_TRAP_ENABLE_STRICT	0x001f0000
-#define BIT_IXE		0x00100000   /* inexact exception enable */
-#define BIT_UFE		0x00080000   /* underflow exception enable */
-#define BIT_OFE		0x00040000   /* overflow exception enable */
-#define BIT_DZE		0x00020000   /* divide by zero exception enable */
-#define BIT_IOE		0x00010000   /* invalid operation exception enable */
+#define BIT_IXE		0x00100000	/* inexact exception enable */
+#define BIT_UFE		0x00080000	/* underflow exception enable */
+#define BIT_OFE		0x00040000	/* overflow exception enable */
+#define BIT_DZE		0x00020000	/* divide by zero exception enable */
+#define BIT_IOE		0x00010000	/* invalid operation exception enable */
 
 /* SYSTEM CONTROL BYTE
 ---------------------- */

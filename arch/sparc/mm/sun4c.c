@@ -534,9 +534,12 @@ static inline void sun4c_init_ss2_cache_bug(void)
 }
 
 /* Addr is always aligned on a page boundary for us already. */
-static void sun4c_map_dma_area(unsigned long va, u32 addr, int len)
+static int sun4c_map_dma_area(dma_addr_t *pba, unsigned long va,
+    unsigned long addr, int len)
 {
 	unsigned long page, end;
+
+	*pba = addr;
 
 	end = PAGE_ALIGN((addr + len));
 	while (addr < end) {
@@ -550,13 +553,15 @@ static void sun4c_map_dma_area(unsigned long va, u32 addr, int len)
 		addr += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
+
+	return 0;
 }
 
-static unsigned long sun4c_translate_dvma(unsigned long busa)
+static struct page *sun4c_translate_dvma(unsigned long busa)
 {
 	/* Fortunately for us, bus_addr == uncached_virt in sun4c. */
 	unsigned long pte = sun4c_get_pte(busa);
-	return (pte << PAGE_SHIFT) + PAGE_OFFSET;
+	return pfn_to_page(pte & SUN4C_PFN_MASK);
 }
 
 static void sun4c_unmap_dma_area(unsigned long busa, int len)
@@ -1578,21 +1583,33 @@ static void sun4c_flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	}
 }
 
-void sun4c_mapioaddr(unsigned long physaddr, unsigned long virt_addr,
-		     int bus_type, int rdonly)
+static inline void sun4c_mapioaddr(unsigned long physaddr, unsigned long virt_addr)
 {
 	unsigned long page_entry;
 
 	page_entry = ((physaddr >> PAGE_SHIFT) & SUN4C_PFN_MASK);
 	page_entry |= ((pg_iobits | _SUN4C_PAGE_PRIV) & ~(_SUN4C_PAGE_PRESENT));
-	if (rdonly)
-		page_entry &= ~_SUN4C_WRITEABLE;
 	sun4c_put_pte(virt_addr, page_entry);
 }
 
-void sun4c_unmapioaddr(unsigned long virt_addr)
+static void sun4c_mapiorange(unsigned int bus, unsigned long xpa,
+    unsigned long xva, unsigned int len)
 {
-	sun4c_put_pte(virt_addr, 0);
+	while (len != 0) {
+		len -= PAGE_SIZE;
+		sun4c_mapioaddr(xpa, xva);
+		xva += PAGE_SIZE;
+		xpa += PAGE_SIZE;
+	}
+}
+
+static void sun4c_unmapiorange(unsigned long virt_addr, unsigned int len)
+{
+	while (len != 0) {
+		len -= PAGE_SIZE;
+		sun4c_put_pte(virt_addr, 0);
+		virt_addr += PAGE_SIZE;
+	}
 }
 
 static void sun4c_alloc_context(struct mm_struct *old_mm, struct mm_struct *mm)
@@ -1783,7 +1800,7 @@ static pte_t sun4c_pte_mkyoung(pte_t pte)
  */
 static pte_t sun4c_mk_pte(struct page *page, pgprot_t pgprot)
 {
-	return __pte((page - mem_map) | pgprot_val(pgprot));
+	return __pte(page_to_pfn(page) | pgprot_val(pgprot));
 }
 
 static pte_t sun4c_mk_pte_phys(unsigned long phys_page, pgprot_t pgprot)
@@ -2224,6 +2241,9 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(mmu_map_dma_area, sun4c_map_dma_area, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mmu_unmap_dma_area, sun4c_unmap_dma_area, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(mmu_translate_dvma, sun4c_translate_dvma, BTFIXUPCALL_NORM);
+
+	BTFIXUPSET_CALL(sparc_mapiorange, sun4c_mapiorange, BTFIXUPCALL_NORM);
+	BTFIXUPSET_CALL(sparc_unmapiorange, sun4c_unmapiorange, BTFIXUPCALL_NORM);
 
 	BTFIXUPSET_CALL(alloc_thread_info, sun4c_alloc_thread_info, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_thread_info, sun4c_free_thread_info, BTFIXUPCALL_NORM);

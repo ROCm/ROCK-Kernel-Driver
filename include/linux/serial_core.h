@@ -300,6 +300,7 @@ void uart_parse_options(char *options, int *baud, int *parity, int *bits,
 			int *flow);
 int uart_set_options(struct uart_port *port, struct console *co, int baud,
 		     int parity, int bits, int flow);
+struct tty_driver *uart_console_device(struct console *co, int *index);
 
 /*
  * Port/driver registration/removal

@@ -85,6 +85,7 @@ SECTIONS
   __alt_instructions = .;
   .altinstructions : { *(.altinstructions) } 
   __alt_instructions_end = .; 
+ .altinstr_replacement : { *(.altinstr_replacement) }
   . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }

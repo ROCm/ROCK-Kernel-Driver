@@ -157,7 +157,9 @@ static inline void w9966_pdev_release(struct w9966_dev *vdev);
 
 static int w9966_rReg(struct w9966_dev* cam, int reg);
 static int w9966_wReg(struct w9966_dev* cam, int reg, int data);
+#if 0
 static int w9966_rReg_i2c(struct w9966_dev* cam, int reg);
+#endif
 static int w9966_wReg_i2c(struct w9966_dev* cam, int reg, int data);
 static int w9966_findlen(int near, int size, int maxlen);
 static int w9966_calcscale(int size, int min, int max, int* beg, int* end, unsigned char* factor);
@@ -171,7 +173,9 @@ static inline int  w9966_i2c_setscl(struct w9966_dev* cam, int state);
 static inline int  w9966_i2c_getsda(struct w9966_dev* cam);
 static inline int  w9966_i2c_getscl(struct w9966_dev* cam);
 static int w9966_i2c_wbyte(struct w9966_dev* cam, int data);
+#if 0
 static int w9966_i2c_rbyte(struct w9966_dev* cam);
+#endif
 
 static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 			   unsigned int cmd, unsigned long arg);
@@ -555,7 +559,8 @@ static inline void w9966_i2c_setsda(struct w9966_dev* cam, int state)
 // Expects a claimed pdev. -1 on error
 static inline int w9966_i2c_setscl(struct w9966_dev* cam, int state)
 {
-	int timeout;
+	unsigned long timeout;
+
 	if (state)
 		cam->i2c_state |= W9966_I2C_W_CLOCK;
 	else
@@ -616,6 +621,7 @@ static int w9966_i2c_wbyte(struct w9966_dev* cam, int data)
 
 // Read a data byte with ack from the i2c-bus
 // Expects a claimed pdev. -1 on error
+#if 0
 static int w9966_i2c_rbyte(struct w9966_dev* cam)
 {
 	unsigned char data = 0x00;
@@ -635,9 +641,11 @@ static int w9966_i2c_rbyte(struct w9966_dev* cam)
 	}
 	return data;
 }
+#endif
 
 // Read a register from the i2c device.
 // Expects claimed pdev. -1 on error
+#if 0
 static int w9966_rReg_i2c(struct w9966_dev* cam, int reg)
 {
 	int data;
@@ -671,6 +679,7 @@ static int w9966_rReg_i2c(struct w9966_dev* cam, int reg)
 	
 	return data;
 }
+#endif
 
 // Write a register to the i2c device.
 // Expects claimed pdev. -1 on error

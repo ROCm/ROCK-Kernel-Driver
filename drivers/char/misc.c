@@ -192,21 +192,12 @@ int misc_register(struct miscdevice * misc)
 		}
 		misc->minor = i;
 	}
+
 	if (misc->minor < DYNAMIC_MINORS)
 		misc_minors[misc->minor >> 3] |= 1 << (misc->minor & 7);
-
-
-	/*
-	 * please use it if you want to do fancy things with your
-	 * name...
-	 */
 	if (misc->devfs_name[0] == '\0') {
-		/* yuck, yet another stupid special-casing.
-		   whos actually using this?  Please switch over
-		   to ->devfs_name ASAP */
 		snprintf(misc->devfs_name, sizeof(misc->devfs_name),
-				strchr(misc->name, '/') ?
-				  "%s" : "misc/%s", misc->name);
+				"misc/%s", misc->name);
 	}
 
 	devfs_register(NULL, misc->devfs_name, 0, MISC_MAJOR, misc->minor,

@@ -340,14 +340,10 @@ int invalidate_inodes(struct super_block * sb)
 	return busy;
 }
  
-int invalidate_device(kdev_t dev, int do_sync)
+int __invalidate_device(struct block_device *bdev, int do_sync)
 {
 	struct super_block *sb;
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
 	int res;
-
-	if (!bdev)
-		return 0;
 
 	if (do_sync)
 		fsync_bdev(bdev);
@@ -366,7 +362,6 @@ int invalidate_device(kdev_t dev, int do_sync)
 		drop_super(sb);
 	}
 	invalidate_bdev(bdev, 0);
-	bdput(bdev);
 	return res;
 }
 

@@ -1202,7 +1202,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
  * Small, elegant, clear.
  */
 
-static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 {
 	struct sx_board *board = ptr;
 	struct sx_port *port;
@@ -1269,12 +1269,14 @@ static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 		}
 	}
 
-	if (!sx_initialized) return;
-	if (!(board->flags & SX_BOARD_INITIALIZED)) return;
+	if (!sx_initialized)
+		return IRQ_HANDLED;
+	if (!(board->flags & SX_BOARD_INITIALIZED))
+		return IRQ_HANDLED;
 
 	if (test_and_set_bit (SX_BOARD_INTR_LOCK, &board->locks)) {
 		printk (KERN_ERR "Recursive interrupt! (%d)\n", board->irq);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	 for (i=0;i<board->nports;i++) {
@@ -1298,6 +1300,7 @@ static void sx_interrupt (int irq, void *ptr, struct pt_regs *regs)
 
 	sx_dprintk (SX_DEBUG_FLOW, "sx: exit sx_interrupt (%d/%d)\n", irq, board->irq); 
 	/*  func_exit ();  */
+	return IRQ_HANDLED;
 }
 
 

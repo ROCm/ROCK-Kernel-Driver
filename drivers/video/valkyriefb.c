@@ -447,7 +447,7 @@ static void __init init_valkyrie(struct fb_info_valkyrie *p)
 		return;
 	}
 	
-	printk(KERN_INFO "fb%d: valkyrie frame buffer device\n", GET_FB_IDX(p->info.node));	
+	printk(KERN_INFO "fb%d: valkyrie frame buffer device\n", p->info.node);	
 }
 
 static void valkyrie_set_par(const struct fb_par_valkyrie *par,
@@ -715,7 +715,6 @@ static void valkyrie_par_to_display(struct fb_par_valkyrie *par,
 static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valkyrie *p)
 {
 	strcpy(info->modename, p->fix.id);
-	info->node = NODEV;
 	info->fbops = &valkyriefb_ops;
 	info->screen_base = (char *) p->frame_buffer + 0x1000;
 	info->disp = &p->disp;

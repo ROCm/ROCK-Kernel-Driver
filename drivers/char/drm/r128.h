@@ -85,7 +85,7 @@
 } while (0)
 
 #define DRIVER_PRETAKEDOWN() do {					\
-	if ( dev->dev_private ) r128_do_cleanup_cce( dev );		\
+	r128_do_cleanup_cce( dev );					\
 } while (0)
 
 /* DMA customization:

@@ -478,7 +478,7 @@ static void __irttp_close_tsap(struct tsap_cb *self)
  *    Remove TSAP from list of all TSAPs and then deallocate all resources
  *    associated with this TSAP
  *
- * Note : because we *free* the tsap structure, it is the responsability
+ * Note : because we *free* the tsap structure, it is the responsibility
  * of the caller to make sure we are called only once and to deal with
  * possible race conditions. - Jean II
  */
@@ -999,7 +999,7 @@ void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 /*
  * Function irttp_flow_request (self, command)
  *
- *    This funtion could be used by the upper layers to tell IrTTP to stop
+ *    This function could be used by the upper layers to tell IrTTP to stop
  *    delivering frames if the receive queues are starting to get full, or
  *    to tell IrTTP to start delivering frames again.
  */

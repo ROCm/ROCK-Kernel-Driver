@@ -16,6 +16,7 @@
 #include <asm/cputable.h>
 #include <asm/ppc_asm.h>
 #include <asm/offsets.h>
+#include <asm/cache.h>
 
 _GLOBAL(__setup_cpu_601)
 	blr
@@ -63,13 +64,7 @@ _GLOBAL(__setup_cpu_7410)
 	mtspr	SPRN_L2CR2,r3
 	mtlr	r4
 	blr
-_GLOBAL(__setup_cpu_7450)
-	mflr	r4
-	bl	setup_common_caches
-	bl	setup_745x_specifics
-	mtlr	r4
-	blr
-_GLOBAL(__setup_cpu_7455)
+_GLOBAL(__setup_cpu_745x)
 	mflr	r4
 	bl	setup_common_caches
 	bl	setup_745x_specifics
@@ -265,9 +260,10 @@ END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
 #define CS_SIZE		28
 
 	.data
-	.balign	4
+	.balign	L1_CACHE_LINE_SIZE
 cpu_state_storage:	
 	.space	CS_SIZE
+	.balign	L1_CACHE_LINE_SIZE,0
 	.text
 	
 /* Called in normal context to backup CPU 0 state. This
@@ -277,6 +273,9 @@ cpu_state_storage:
  * like HID0, HID1, MSSCR0, etc...
  */
 _GLOBAL(__save_cpu_setup)
+	/* Some CR fields are volatile, we back it up all */
+	mfcr	r7
+
 	/* Get storage ptr */
 	lis	r5,cpu_state_storage@h
 	ori	r5,r5,cpu_state_storage@l
@@ -322,6 +321,7 @@ _GLOBAL(__save_cpu_setup)
 	mfspr	r4,SPRN_HID1
 	stw	r4,CS_HID1(r5)
 1:
+	mtcr	r7
 	blr
 
 /* Called with no MMU context (typically MSR:IR/DR off) to
@@ -329,6 +329,9 @@ _GLOBAL(__save_cpu_setup)
  * function. This does not include cache setting
  */
 _GLOBAL(__restore_cpu_setup)
+	/* Some CR fields are volatile, we back it up all */
+	mfcr	r7
+
 	/* Get storage ptr */
 	lis	r5,(cpu_state_storage-KERNELBASE)@h
 	ori	r5,r5,cpu_state_storage@l
@@ -411,5 +414,6 @@ _GLOBAL(__restore_cpu_setup)
 	/* Setup final PLL */
 	mtspr	SPRN_HID1,r4
 1:
+	mtcr	r7
 	blr
 

@@ -359,13 +359,6 @@ unsigned long current_capacity (ide_drive_t *drive)
 
 EXPORT_SYMBOL(current_capacity);
 
-static inline u32 read_24 (ide_drive_t *drive)
-{
-	return  (HWIF(drive)->INB(IDE_HCYL_REG)<<16) |
-		(HWIF(drive)->INB(IDE_LCYL_REG)<<8) |
-		 HWIF(drive)->INB(IDE_SECTOR_REG);
-}
-
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
  */
@@ -412,9 +405,9 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 				    (drive->addressing == 1)) {
 					u64 sectors = 0;
 					u32 high = 0;
-					u32 low = read_24(drive);
+					u32 low = ide_read_24(drive);
 					hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
-					high = read_24(drive);
+					high = ide_read_24(drive);
 
 					sectors = ((u64)high << 24) | low;
 					printk(", LBAsect=%llu, high=%d, low=%d",

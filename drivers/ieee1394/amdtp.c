@@ -268,7 +268,7 @@ struct amdtp_host {
 	spinlock_t stream_list_lock;
 };
 
-static struct hpsb_highlevel *amdtp_highlevel;
+static struct hpsb_highlevel amdtp_highlevel;
 
 
 /* FIXME: This doesn't belong here... */
@@ -1169,7 +1169,7 @@ static int amdtp_open(struct inode *inode, struct file *file)
 	struct amdtp_host *host;
 	int i = ieee1394_file_to_instance(file);
 
-	host = hpsb_get_hostinfo_bykey(amdtp_highlevel, i);
+	host = hpsb_get_hostinfo_bykey(&amdtp_highlevel, i);
 	if (host == NULL)
 		return -ENODEV;
 
@@ -1201,7 +1201,7 @@ static struct file_operations amdtp_fops =
 
 /* IEEE1394 Subsystem functions */
 
-static void amdtp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
+static void amdtp_add_host(struct hpsb_host *host)
 {
 	struct amdtp_host *ah;
 	int minor;
@@ -1210,7 +1210,7 @@ static void amdtp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME) != 0)
 		return;
 
-	ah = hpsb_create_hostinfo(hl, host, sizeof(*ah));
+	ah = hpsb_create_hostinfo(&amdtp_highlevel, host, sizeof(*ah));
 	if (!ah) {
 		HPSB_ERR("amdtp: Unable able to alloc hostinfo");
 		return;
@@ -1219,7 +1219,7 @@ static void amdtp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 	ah->host = host;
 	ah->ohci = host->hostdata;
 
-	hpsb_set_hostinfo_key(hl, host, ah->ohci->id);
+	hpsb_set_hostinfo_key(&amdtp_highlevel, host, ah->ohci->id);
 
 	minor = IEEE1394_MINOR_BLOCK_AMDTP * 16 + ah->ohci->id;
 
@@ -1234,7 +1234,7 @@ static void amdtp_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 
 static void amdtp_remove_host(struct hpsb_host *host)
 {
-	struct amdtp_host *ah = hpsb_get_hostinfo(amdtp_highlevel, host);
+	struct amdtp_host *ah = hpsb_get_hostinfo(&amdtp_highlevel, host);
 
 	if (ah)
 		devfs_remove("amdtp/%d", ah->ohci->id);
@@ -1242,7 +1242,8 @@ static void amdtp_remove_host(struct hpsb_host *host)
 	return;
 }
 
-static struct hpsb_highlevel_ops amdtp_highlevel_ops = {
+static struct hpsb_highlevel amdtp_highlevel = {
+	.name =		"amdtp",
 	.add_host =	amdtp_add_host,
 	.remove_host =	amdtp_remove_host,
 };
@@ -1268,14 +1269,7 @@ static int __init amdtp_init_module (void)
 
 	devfs_mk_dir("amdtp");
 
-	amdtp_highlevel = hpsb_register_highlevel ("amdtp",
-						   &amdtp_highlevel_ops);
-	if (amdtp_highlevel == NULL) {
-		HPSB_ERR("amdtp: unable to register highlevel ops");
-		devfs_remove("amdtp");
-		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
-		return -EIO;
-	}
+	hpsb_register_highlevel(&amdtp_highlevel);
 
 #ifdef CONFIG_COMPAT
 	ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
@@ -1304,7 +1298,7 @@ static void __exit amdtp_exit_module (void)
 		HPSB_ERR("amdtp: Error unregistering ioctl32 translations");
 #endif
 
-        hpsb_unregister_highlevel(amdtp_highlevel);
+        hpsb_unregister_highlevel(&amdtp_highlevel);
 	devfs_remove("amdtp");
         ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
 

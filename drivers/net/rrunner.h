@@ -1,7 +1,8 @@
 #ifndef _RRUNNER_H_
 #define _RRUNNER_H_
 
-#include<linux/config.h>
+#include <linux/config.h>
+#include <linux/interrupt.h>
 
 #if ((BITS_PER_LONG != 32) && (BITS_PER_LONG != 64))
 #error "BITS_PER_LONG not defined or not valid"
@@ -830,7 +831,7 @@ struct rr_private
  */
 static int rr_init(struct net_device *dev);
 static int rr_init1(struct net_device *dev);
-static void rr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t rr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static int rr_open(struct net_device *dev);
 static int rr_start_xmit(struct sk_buff *skb, struct net_device *dev);

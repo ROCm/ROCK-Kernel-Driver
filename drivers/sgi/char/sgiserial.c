@@ -2109,9 +2109,10 @@ static void zs_console_write(struct console *co, const char *str,
 	rs_fair_output();
 }
 
-static kdev_t zs_console_device(struct console *con)
+static struct tty_driver *zs_console_device(struct console *con, int *index)
 {
-	return MKDEV(TTY_MAJOR, 64 + con->index);
+	*index = con->index;
+	return &serial_driver;
 }
 
 

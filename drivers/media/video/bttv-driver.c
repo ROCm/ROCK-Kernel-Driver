@@ -1279,7 +1279,7 @@ static int bttv_prepare_buffer(struct bttv *btv, struct bttv_buffer *buf,
 }
 
 static int
-buffer_setup(struct file *file, int *count, int *size)
+buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	struct bttv_fh *fh = file->private_data;
 	
@@ -3156,22 +3156,23 @@ bttv_irq_switch_fields(struct bttv *btv)
 	spin_unlock(&btv->s_lock);
 }
 
-static void bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
 {
 	u32 stat,astat;
 	u32 dstat;
 	int count;
 	struct bttv *btv;
+	int handled = 0;
 
 	btv=(struct bttv *)dev_id;
 	count=0;
-	while (1) 
-	{
+	while (1) {
 		/* get/clear interrupt status bits */
 		stat=btread(BT848_INT_STAT);
 		astat=stat&btread(BT848_INT_MASK);
 		if (!astat)
-			return;
+			break;
+		handled = 1;
 		btwrite(stat,BT848_INT_STAT);
 
 		/* get device status bits */
@@ -3231,6 +3232,7 @@ static void bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
 			       "bttv%d: IRQ lockup, cleared int mask\n", btv->nr);
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 

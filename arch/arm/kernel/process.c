@@ -418,7 +418,7 @@ unsigned long get_wchan(struct task_struct *p)
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
 
-	stack_page = 4096 + (unsigned long)p;
+	stack_page = 4096 + (unsigned long)p->thread_info;
 	fp = thread_saved_fp(p);
 	do {
 		if (fp < stack_page || fp > 4092+stack_page)

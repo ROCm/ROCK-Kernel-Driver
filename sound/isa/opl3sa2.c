@@ -300,7 +300,7 @@ static int __init snd_opl3sa2_detect(opl3sa2_t *chip)
 static irqreturn_t snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned short status;
-	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, dev_id, return);
+	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, dev_id, return IRQ_NONE);
 	int handled = 0;
 
 	if (chip == NULL || chip->card == NULL)

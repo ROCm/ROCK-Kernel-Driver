@@ -57,7 +57,9 @@
 #include "xd.h"
 
 static void __init do_xd_setup (int *integers);
+#ifdef MODULE
 static int xd[5] = { -1,-1,-1,-1, };
+#endif
 
 #define XD_DONT_USE_DMA		0  /* Initial value. may be overriden using
 				      "nodma" module option */
@@ -148,16 +150,18 @@ static struct request_queue xd_queue;
 static int __init xd_init(void)
 {
 	u_char i,controller;
-	u_char count = 0;
 	unsigned int address;
 	int err;
 
 #ifdef MODULE
-	for (i = 4; i > 0; i--)
-		if (((xd[i] = xd[i-1]) >= 0) && !count)
-			count = i;
-	if ((xd[0] = count))
-		do_xd_setup(xd);
+	{
+		u_char count = 0;
+		for (i = 4; i > 0; i--)
+			if (((xd[i] = xd[i-1]) >= 0) && !count)
+				count = i;
+		if ((xd[0] = count))
+			do_xd_setup(xd);
+	}
 #endif
 
 	init_timer (&xd_watchdog_int); xd_watchdog_int.function = xd_watchdog;
@@ -446,17 +450,20 @@ static void xd_recalibrate (u_char drive)
 }
 
 /* xd_interrupt_handler: interrupt service routine */
-static void xd_interrupt_handler(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t xd_interrupt_handler(int irq, void *dev_id,
+					struct pt_regs *regs)
 {
 	if (inb(XD_STATUS) & STAT_INTERRUPT) {							/* check if it was our device */
 #ifdef DEBUG_OTHER
 		printk("xd_interrupt_handler: interrupt detected\n");
 #endif /* DEBUG_OTHER */
 		outb(0,XD_CONTROL);								/* acknowledge interrupt */
-		wake_up(&xd_wait_int);								/* and wake up sleeping processes */
+		wake_up(&xd_wait_int);	/* and wake up sleeping processes */
+		return IRQ_HANDLED;
 	}
 	else
 		printk("xd: unexpected interrupt\n");
+	return IRQ_NONE;
 }
 
 /* xd_setup_dma: set up the DMA controller for a data transfer */

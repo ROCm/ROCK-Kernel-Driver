@@ -226,6 +226,7 @@ static int sock_fn(struct sock *sk, int optval, void *user, unsigned int len)
 
 static struct nf_hook_ops preroute_ops = {
 	.hook		= fw_in,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_PRE_ROUTING,
 	.priority	= NF_IP_PRI_FILTER,
@@ -233,6 +234,7 @@ static struct nf_hook_ops preroute_ops = {
 
 static struct nf_hook_ops postroute_ops = {
 	.hook		= fw_in,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_POST_ROUTING,
 	.priority	= NF_IP_PRI_FILTER,
@@ -240,6 +242,7 @@ static struct nf_hook_ops postroute_ops = {
 
 static struct nf_hook_ops forward_ops = {
 	.hook		= fw_in,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_FORWARD,
 	.priority	= NF_IP_PRI_FILTER,
@@ -247,6 +250,7 @@ static struct nf_hook_ops forward_ops = {
 
 static struct nf_hook_ops local_in_ops = {
 	.hook		= fw_confirm,
+	.owner		= THIS_MODULE,
 	.pf		= PF_INET,
 	.hooknum	= NF_IP_LOCAL_IN,
 	.priority	= NF_IP_PRI_LAST - 1,

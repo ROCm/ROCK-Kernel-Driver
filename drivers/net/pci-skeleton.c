@@ -505,7 +505,7 @@ static void netdrv_tx_timeout (struct net_device *dev);
 static void netdrv_init_ring (struct net_device *dev);
 static int netdrv_start_xmit (struct sk_buff *skb,
 			       struct net_device *dev);
-static void netdrv_interrupt (int irq, void *dev_instance,
+static irqreturn_t netdrv_interrupt (int irq, void *dev_instance,
 			       struct pt_regs *regs);
 static int netdrv_close (struct net_device *dev);
 static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
@@ -1665,7 +1665,7 @@ static void netdrv_weird_interrupt (struct net_device *dev,
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void netdrv_interrupt (int irq, void *dev_instance,
+static irqreturn_t netdrv_interrupt (int irq, void *dev_instance,
 			       struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
@@ -1673,6 +1673,7 @@ static void netdrv_interrupt (int irq, void *dev_instance,
 	int boguscnt = max_interrupt_work;
 	void *ioaddr = tp->mmio_addr;
 	int status = 0, link_changed = 0; /* avoid bogus "uninit" warning */
+	int handled = 0;
 
 	spin_lock (&tp->lock);
 
@@ -1683,6 +1684,7 @@ static void netdrv_interrupt (int irq, void *dev_instance,
 		if (status == 0xFFFF)
 			break;
 
+		handled = 1;
 		/* Acknowledge all of the current interrupt sources ASAP */
 		NETDRV_W16_F (IntrStatus, status);
 
@@ -1724,6 +1726,7 @@ static void netdrv_interrupt (int irq, void *dev_instance,
 
 	DPRINTK ("%s: exiting interrupt, intr_status=%#4.4x.\n",
 		 dev->name, NETDRV_R16 (IntrStatus));
+	return IRQ_RETVAL(handled);
 }
 
 

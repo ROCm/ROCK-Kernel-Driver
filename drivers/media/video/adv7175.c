@@ -39,7 +39,6 @@
 #include <asm/page.h>
 #include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 
 #include <linux/videodev.h>
 #include <linux/version.h>
@@ -164,7 +163,8 @@ static int adv717x_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 {
 	struct adv7175 *encoder;
 	struct	i2c_client	*client;
-	int rv, i, x_common=39; /* x is number entries init_common - 1 */
+	int rv = 0;
+	int i, x_common=39; /* x is number entries init_common - 1 */
 
 	printk(KERN_INFO "adv717x: video chip found.\n");
 	client=kmalloc(sizeof(*client), GFP_KERNEL);

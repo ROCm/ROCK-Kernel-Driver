@@ -2,7 +2,7 @@
  * llc_if.c - Defines LLC interface to upper layer
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -43,16 +43,15 @@ struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
 	/* verify this SAP is not already open; if so, return error */
 	struct llc_sap *sap;
 
-	MOD_INC_USE_COUNT;
 	sap = llc_sap_find(lsap);
 	if (sap) { /* SAP already exists */
 		sap = NULL;
-		goto err;
+		goto out;
 	}
 	/* sap requested does not yet exist */
 	sap = llc_sap_alloc();
 	if (!sap)
-		goto err;
+		goto out;
 	/* allocated a SAP; initialize it and clear out its memory pool */
 	sap->laddr.lsap = lsap;
 	sap->rcv_func	= func;
@@ -61,9 +60,6 @@ struct llc_sap *llc_sap_open(u8 lsap, int (*func)(struct sk_buff *skb,
 	llc_sap_save(sap);
 out:
 	return sap;
-err:
-	MOD_DEC_USE_COUNT;
-	goto out;
 }
 
 /**
@@ -76,7 +72,6 @@ err:
 void llc_sap_close(struct llc_sap *sap)
 {
 	llc_free_sap(sap);
-	MOD_DEC_USE_COUNT;
 }
 
 /**

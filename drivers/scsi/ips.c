@@ -375,7 +375,7 @@ int ips_eh_abort(Scsi_Cmnd *);
 int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
 const char * ips_info(struct Scsi_Host *);
-void do_ipsintr(int, void *, struct pt_regs *);
+irqreturn_t do_ipsintr(int, void *, struct pt_regs *);
 static int ips_hainit(ips_ha_t *);
 static int ips_map_status(ips_ha_t *, ips_scb_t *, ips_stat_t *);
 static int ips_send_wait(ips_ha_t *, ips_scb_t *, int, int);
@@ -1264,7 +1264,7 @@ ips_slave_configure(Scsi_Device *SDptr)
 /*   Wrapper for the interrupt handler                                      */
 /*                                                                          */
 /****************************************************************************/
-void
+irqreturn_t
 do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
    ips_ha_t         *ha;
    unsigned long     cpu_flags;
@@ -1274,19 +1274,19 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 
    ha = (ips_ha_t *) dev_id;
    if (!ha) 
-      return;
+      return IRQ_NONE;
    host = ips_sh[ha->host_num];
    /* interrupt during initialization */
    if(!host){
       (*ha->func.intr)(ha);
-      return;
+      return IRQ_HANDLED;
    }
 
    IPS_LOCK_SAVE(host->host_lock, cpu_flags);
 
    if (!ha->active) {
       IPS_UNLOCK_RESTORE(host->host_lock, cpu_flags);
-      return;
+      return IRQ_HANDLED;
    }
 
    (*ha->func.intr)(ha);
@@ -1295,6 +1295,7 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 
    /* start the next command */
    ips_next(ha, IPS_INTR_ON);
+   return IRQ_HANDLED;
 }
 
 /****************************************************************************/

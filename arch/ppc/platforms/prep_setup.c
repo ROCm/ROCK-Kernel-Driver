@@ -91,7 +91,7 @@ extern void prep_tiger1_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi
 #define cached_A1	(((char *)(ppc_cached_irq_mask))[2])
 
 /* for the mac fs */
-kdev_t boot_dev;
+dev_t boot_dev;
 
 #ifdef CONFIG_SOUND_CS4232 
 long ppc_cs4232_dma, ppc_cs4232_dma2;
@@ -850,7 +850,7 @@ prep_res_calibrate_decr(void)
 static volatile int calibrate_steps __initdata = 3;
 static unsigned tbstamp __initdata = 0;
 
-static void __init
+static irqreturn_t __init
 prep_calibrate_decr_handler(int irq, void *dev, struct pt_regs *regs)
 {
 	unsigned long t, freq;
@@ -866,6 +866,7 @@ prep_calibrate_decr_handler(int irq, void *dev, struct pt_regs *regs)
 		tb_ticks_per_jiffy = freq / HZ;
 		tb_to_us = mulhwu_scale_factor(freq, 1000000);
 	}
+	return IRQ_HANDLED;
 }
 
 static void __init

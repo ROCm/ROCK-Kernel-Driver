@@ -250,8 +250,9 @@ void DRM(driver_irq_postinstall)( drm_device_t *dev ) {
 void DRM(driver_irq_uninstall)( drm_device_t *dev ) {
 	drm_radeon_private_t *dev_priv =
 		(drm_radeon_private_t *)dev->dev_private;
-	if ( dev_priv ) {
-		/* Disable *all* interrupts */
-		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
-	}
+	if (!dev_priv)
+		return;
+
+	/* Disable *all* interrupts */
+	RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
 }

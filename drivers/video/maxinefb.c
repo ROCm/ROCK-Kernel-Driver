@@ -155,7 +155,6 @@ int __init maxinefb_init(void)
 		 */
 	}
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
 	fb_info.screen_base = (char *) maxinefb_fix.smem_start;
 	fb_info.var = maxinefb_defined;

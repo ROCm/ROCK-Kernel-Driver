@@ -40,7 +40,6 @@ void __init device_scan(void)
 
 	/* FIX ME FAST... -DaveM */
 	ioport_resource.end = 0xffffffffffffffffUL;
-	iomem_resource.end = 0xffffffffffffffffUL;
 
 	prom_getstring(prom_root_node, "device_type", node_str, sizeof(node_str));
 

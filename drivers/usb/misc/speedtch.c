@@ -20,7 +20,19 @@
  ******************************************************************************/
 
 /*
- *  Written by Johan Verrept (Johan.Verrept@advalvas.be)
+ *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@wanadoo.fr)
+ *
+ *  1.6:	- No longer opens a connection if the firmware is not loaded
+ *  		- Added support for the speedtouch 330
+ *  		- Removed the limit on the number of devices
+ *  		- Module now autoloads on device plugin
+ *  		- Merged relevant parts of sarlib
+ *  		- Replaced the kernel thread with a tasklet
+ *  		- New packet transmission code
+ *  		- Changed proc file contents
+ *  		- Fixed all known SMP races
+ *  		- Many fixes and cleanups
+ *  		- Various fixes by Oliver Neukum (oliver@neukum.name)
  *
  *  1.5A:	- Version for inclusion in 2.5 series kernel
  *		- Modifications by Richard Purdie (rpurdie@rpsys.net)
@@ -28,6 +40,7 @@
  *		udsl_usb_send_data_context->urb to a pointer and adding code
  *		to alloc and free it
  *		- remove_wait_queue() added to udsl_atm_processqueue_thread()
+ *		- Duncan Sands (duncan.sands@wanadoo.fr) is the new maintainer
  *
  *  1.5:	- fixed memory leak when atmsar_decode_aal5 returned NULL.
  *		(reported by stephen.robinson@zen.co.uk)
@@ -77,9 +90,9 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #define PACKETDEBUG(arg...)
 #endif
 
-#define DRIVER_AUTHOR	"Johan Verrept, Johan.Verrept@advalvas.be"
-#define DRIVER_DESC	"Driver for the Alcatel SpeedTouch USB ADSL modem"
-#define DRIVER_VERSION	"1.5A"
+#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@wanadoo.fr>"
+#define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
+#define DRIVER_VERSION	"1.6"
 
 #define SPEEDTOUCH_VENDORID		0x06b9
 #define SPEEDTOUCH_PRODUCTID		0x4061
@@ -393,11 +406,12 @@ static struct sk_buff *udsl_decode_aal5 (struct udsl_vcc_data *ctx, struct sk_bu
 **  encode  **
 *************/
 
+static const unsigned char zeros[ATM_CELL_PAYLOAD];
+
 static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 {
 	struct udsl_control *ctrl = UDSL_SKB (skb);
-	unsigned int i, zero_padding;
-	unsigned char zero = 0;
+	unsigned int zero_padding;
 	u32 crc;
 
 	ctrl->atm_data.vcc = vcc;
@@ -423,8 +437,7 @@ static void udsl_groom_skb (struct atm_vcc *vcc, struct sk_buff *skb)
 	ctrl->aal5_trailer [3] = skb->len;
 
 	crc = crc32_be (~0, skb->data, skb->len);
-	for (i = 0; i < zero_padding; i++)
-		crc = crc32_be (crc, &zero, 1);
+	crc = crc32_be (crc, zeros, zero_padding);
 	crc = crc32_be (crc, ctrl->aal5_trailer, 4);
 	crc = ~crc;
 
@@ -566,8 +579,7 @@ static void udsl_process_receive (unsigned long data)
 						atmsar_vcc->vcc->push (atmsar_vcc->vcc, new);
 					} else {
 						dbg
-						    ("dropping incoming packet : rx_inuse = %d, vcc->sk->rcvbuf = %d, skb->true_size = %d",
-						     atomic_read (&atmsar_vcc->vcc->rx_inuse),
+						    ("dropping incoming packet : vcc->sk->rcvbuf = %d, skb->true_size = %d",
 						     atmsar_vcc->vcc->sk->rcvbuf, new->truesize);
 						dev_kfree_skb (new);
 					}

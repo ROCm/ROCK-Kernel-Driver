@@ -198,6 +198,8 @@ extern void mp_parse_prt (void);
 #endif /*CONFIG_X86_IO_APIC*/
 #endif
 
+extern void mp_config_ioapic_for_sci(int irq);
+
 extern int using_apic_timer;
 
 #endif

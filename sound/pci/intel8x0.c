@@ -718,7 +718,7 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 
 static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return);
+	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return IRQ_NONE);
 	ichdev_t *ichdev;
 	unsigned int status;
 	unsigned int i;

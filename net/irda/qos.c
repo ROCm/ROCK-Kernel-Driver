@@ -72,7 +72,7 @@ unsigned sysctl_min_tx_turn_time = 10;
  * payload), that's only 2042 bytes. Oups !
  * My nsc-ircc hardware has troubles receiving 2048 bytes frames at 4 Mb/s,
  * so adjust to 2042... I don't know if this bug applies only for 2048
- * bytes frames or all negociated frame sizes, but you can use the sysctl
+ * bytes frames or all negotiated frame sizes, but you can use the sysctl
  * to play with this value anyway.
  * Jean II */
 unsigned sysctl_max_tx_data_size = 2042;
@@ -280,7 +280,7 @@ static inline int value_highest_bit(__u32 value, __u32 *array, int size, __u16 *
 /*
  * Function irda_qos_compute_intersection (qos, new)
  *
- *    Compute the intersection of the old QoS capabilites with new ones
+ *    Compute the intersection of the old QoS capabilities with new ones
  *
  */
 void irda_qos_compute_intersection(struct qos_info *qos, struct qos_info *new)

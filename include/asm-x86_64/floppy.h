@@ -51,7 +51,7 @@ static char *virtual_dma_addr;
 static int virtual_dma_mode;
 static int doing_pdma;
 
-static void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 {
 	register unsigned char st;
 
@@ -109,12 +109,14 @@ static void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 		doing_pdma = 0;
 		floppy_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 #ifdef TRACE_FLPY_INT
 	if(!virtual_dma_count)
 		dma_wait++;
 #endif
+
+	return IRQ_HANDLED;
 }
 
 static void fd_disable_dma(void)

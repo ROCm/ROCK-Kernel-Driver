@@ -23,10 +23,11 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <asm/assembler.h>
-#include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/proc/pgtable.h>
+#include <asm/page.h>
+#include "proc-macros.S"
 
 /*
  * This is the maximum size of an area which will be flushed.  If the area
@@ -43,11 +44,6 @@
  * the size of the data cache
  */
 #define CACHESIZE	32768
-
-/*
- * and the page size
- */
-#define PAGESIZE	4096
 
 /*
  * Virtual address used to allocate the cache when flushed
@@ -112,15 +108,6 @@ clean_addr:	.word	CLEAN_ADDR
 	.text
 
 /*
- * cpu_xscale_check_bugs()
- */
-ENTRY(cpu_xscale_check_bugs)
-	mrs	ip, cpsr
-	bic	ip, ip, #PSR_F_BIT
-	msr	cpsr, ip
-	mov	pc, lr
-
-/*
  * cpu_xscale_proc_init()
  *
  * Nothing too exciting at the moment
@@ -135,11 +122,11 @@ ENTRY(cpu_xscale_proc_fin)
 	str	lr, [sp, #-4]!
 	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE
 	msr	cpsr_c, r0
+	bl	xscale_flush_kern_cache_all	@ clean caches
 	mrc	p15, 0, r0, c1, c0, 0		@ ctrl register
 	bic	r0, r0, #0x1800			@ ...IZ...........
 	bic	r0, r0, #0x0006			@ .............CA.
 	mcr	p15, 0, r0, c1, c0, 0		@ disable caches
-	bl	cpu_xscale_cache_clean_invalidate_all	@ clean caches
 	ldr	pc, [sp], #4
 
 /*
@@ -168,15 +155,9 @@ ENTRY(cpu_xscale_reset)
 	mov	pc, r0
 
 /*
- * cpu_xscale_do_idle(type)
+ * cpu_xscale_do_idle()
  *
  * Cause the processor to idle
- *
- * type:
- *   0 = slow idle
- *   1 = fast idle
- *   2 = switch to slow processor clock
- *   3 = switch to fast processor clock
  *
  * For now we do nothing but go to idle mode for every case
  *
@@ -193,226 +174,179 @@ ENTRY(cpu_xscale_do_idle)
 /* ================================= CACHE ================================ */
 
 /*
- * cpu_xscale_cache_clean_invalidate_all (void)
+ *	flush_user_cache_all()
  *
- * clean and invalidate all cache lines
- *
- * Note:
- *  1. We should preserve r0 at all times.
- *  2. Even if this function implies cache "invalidation" by its name,
- *     we don't need to actually use explicit invalidation operations
- *     since the goal is to discard all valid references from the cache
- *     and the cleaning of it already has that effect.
- *  3. Because of 2 above and the fact that kernel space memory is always
- *     coherent across task switches there is no need to worry about
- *     inconsistencies due to interrupts, ence no irq disabling.
+ *	Invalidate all cache entries in a particular address
+ *	space.
  */
-	.align	5
-ENTRY(cpu_xscale_cache_clean_invalidate_all)
-	mov	r2, #1
-cpu_xscale_cache_clean_invalidate_all_r2:
+ENTRY(xscale_flush_user_cache_all)
+	/* FALLTHROUGH */
+
+/*
+ *	flush_kern_cache_all()
+ *
+ *	Clean and invalidate the entire cache.
+ */
+ENTRY(xscale_flush_kern_cache_all)
+	mov	r2, #VM_EXEC
+	mov	ip, #0
+__flush_whole_cache:
 	clean_d_cache r0, r1
-	teq	r2, #0
+	tst	r2, #VM_EXEC
 	mcrne	p15, 0, ip, c7, c5, 0		@ Invalidate I cache & BTB
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
+	mcrne	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
- * cpu_xscale_cache_clean_invalidate_range(start, end, flags)
+ *	flush_user_cache_range(start, end, vm_flags)
  *
- * clean and invalidate all cache lines associated with this area of memory
+ *	Invalidate a range of cache entries in the specified
+ *	address space.
  *
- * start: Area start address
- * end:   Area end address
- * flags: nonzero for I cache as well
+ *	- start - start address (may not be aligned)
+ *	- end	- end address (exclusive, may not be aligned)
+ *	- vma	- vma_area_struct describing address space
  */
 	.align	5
-ENTRY(cpu_xscale_cache_clean_invalidate_range)
-	bic	r0, r0, #CACHELINESIZE - 1	@ round down to cache line
-	sub	r3, r1, r0
+ENTRY(xscale_flush_user_cache_range)
+	mov	ip, #0
+	sub	r3, r1, r0			@ calculate total size
 	cmp	r3, #MAX_AREA_SIZE
-	bhi	cpu_xscale_cache_clean_invalidate_all_r2
-1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
+	bhs	__flush_whole_cache
+
+1:	tst	r2, #VM_EXEC
+	mcrne	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
+	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
 	mcr	p15, 0, r0, c7, c6, 1		@ Invalidate D cache line
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	teq	r2, #0
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	moveq	pc, lr
-	sub	r0, r0, r3
-1:	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
+	tst	r2, #VM_EXEC
+	mcrne	p15, 0, ip, c7, c5, 6		@ Invalidate BTB
+	mcrne	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
+	mov	pc, lr
+
+/*
+ *	coherent_kern_range(start, end)
+ *
+ *	Ensure coherency between the Icache and the Dcache in the
+ *	region described by start.  If you have non-snooping
+ *	Harvard caches, you need to implement this function.
+ *
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
+ */
+ENTRY(xscale_coherent_kern_range)
+	bic	r0, r0, #CACHELINESIZE - 1
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, ip, c7, c5, 6		@ Invalidate BTB
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c5, 0		@ Invalidate I cache & BTB
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
- * cpu_xscale_flush_ram_page(page)
+ *	flush_kern_dcache_page(void *page)
  *
- * clean all cache lines associated with this memory page
+ *	Ensure no D cache aliasing occurs, either with itself or
+ *	the I cache
  *
- * page: page to clean
+ *	- addr	- page aligned address
  */
-	.align	5
-ENTRY(cpu_xscale_flush_ram_page)
-	mov	r1, #PAGESIZE
-1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
+ENTRY(xscale_flush_kern_dcache_page)
+	add	r1, r0, #PAGE_SZ
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	subs	r1, r1, #2 * CACHELINESIZE
-	bne	1b
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
+	cmp	r0, r1
+	blo	1b
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c5, 0		@ Invalidate I cache & BTB
+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
-/* ================================ D-CACHE =============================== */
-
 /*
- * cpu_xscale_dcache_invalidate_range(start, end)
+ *	dma_inv_range(start, end)
  *
- * throw away all D-cached data in specified region without an obligation
- * to write them back.  Note however that on XScale we must clean all
- * entries also due to hardware errata (80200 A0 & A1 only).
+ *	Invalidate (discard) the specified virtual address range.
+ *	May not write back any entries.  If 'start' or 'end'
+ *	are not cache line aligned, those lines must be written
+ *	back.
  *
- * start: virtual start address
- * end:   virtual end address
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
  */
-	.align	5
-ENTRY(cpu_xscale_dcache_invalidate_range)
-	mrc	p15, 0, r2, c0, c0, 0		@ Read part no.
+ENTRY(xscale_dma_inv_range)
+	mrc	p15, 0, r2, c0, c0, 0		@ read ID
 	eor	r2, r2, #0x69000000
-	eor	r2, r2, #0x00052000		@ 80200 XX part no.
-	bics	r2, r2, #0x1			@ Clear LSB in revision field
-	moveq	r2, #0
-	beq	cpu_xscale_cache_clean_invalidate_range	@ An 80200 A0 or A1
+	eor	r2, r2, #0x00052000
+	bics	r2, r2, #1
+	beq	xscale_dma_flush_range
 
 	tst	r0, #CACHELINESIZE - 1
-	mcrne	p15, 0, r0, c7, c10, 1		@ Clean D cache line
+	bic	r0, r0, #CACHELINESIZE - 1
+	mcrne	p15, 0, r0, c7, c10, 1		@ clean D entry
 	tst	r1, #CACHELINESIZE - 1
-	mcrne	p15, 0, r1, c7, c10, 1		@ Clean D cache line
-	bic	r0, r0, #CACHELINESIZE - 1	@ round down to cache line
-1:	mcr	p15, 0, r0, c7, c6, 1		@ Invalidate D cache line
+	mcrne	p15, 0, r1, c7, c10, 1		@ clean D entry
+1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
+	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
- * cpu_xscale_dcache_clean_range(start, end)
+ *	dma_clean_range(start, end)
  *
- * For the specified virtual address range, ensure that all caches contain
- * clean data, such that peripheral accesses to the physical RAM fetch
- * correct data.
+ *	Clean the specified virtual address range.
  *
- * start: virtual start address
- * end:   virtual end address
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
  */
-	.align	5
-ENTRY(cpu_xscale_dcache_clean_range)
+ENTRY(xscale_dma_clean_range)
 	bic	r0, r0, #CACHELINESIZE - 1
-	sub	r2, r1, r0
-	cmp	r2, #MAX_AREA_SIZE
-	movhi	r2, #0
-	bhi	cpu_xscale_cache_clean_invalidate_all_r2
-
-1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
 /*
- * cpu_xscale_clean_dcache_page(page)
+ *	dma_flush_range(start, end)
  *
- * Cleans a single page of dcache so that if we have any future aliased
- * mappings, they will be consistent at the time that they are created.
+ *	Clean and invalidate the specified virtual address range.
  *
- * Note:
- *  1. we don't need to flush the write buffer in this case. [really? -Nico]
- *  2. we don't invalidate the entries since when we write the page
- *     out to disk, the entries may get reloaded into the cache.
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
  */
-	.align	5
-ENTRY(cpu_xscale_dcache_clean_page)
-	mov	r1, #PAGESIZE
-1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	add	r0, r0, #CACHELINESIZE
-	subs	r1, r1, #4 * CACHELINESIZE
-	bne	1b
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	mov	pc, lr
-
-/*
- * cpu_xscale_dcache_clean_entry(addr)
- *
- * Clean the specified entry of any caches such that the MMU
- * translation fetches will obtain correct data.
- *
- * addr: cache-unaligned virtual address
- */
-	.align	5
-ENTRY(cpu_xscale_dcache_clean_entry)
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	mov	pc, lr
-
-/* ================================ I-CACHE =============================== */
-
-/*
- * cpu_xscale_icache_invalidate_range(start, end)
- *
- * invalidate a range of virtual addresses from the Icache
- *
- * start: virtual start address
- * end:   virtual end address
- *
- * Note: This is vaguely defined as supposed to bring the dcache and the
- *       icache in sync by the way this function is used.
- */
-	.align	5
-ENTRY(cpu_xscale_icache_invalidate_range)
+ENTRY(xscale_dma_flush_range)
 	bic	r0, r0, #CACHELINESIZE - 1
-1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #CACHELINESIZE
 	cmp	r0, r1
 	blo	1b
-	mcr	p15, 0, ip, c7, c5, 6		@ Invalidate BTB
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
+	mcr	p15, 0, r0, c7, c10, 1		@ Drain Write (& Fill) Buffer
 	mov	pc, lr
 
-/*
- * cpu_xscale_icache_invalidate_page(page)
- *
- * invalidate all Icache lines associated with this area of memory
- *
- * page: page to invalidate
- */
-	.align	5
-ENTRY(cpu_xscale_icache_invalidate_page)
-	mov	r1, #PAGESIZE
-1:	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
+ENTRY(xscale_cache_fns)
+	.long	xscale_flush_kern_cache_all
+	.long	xscale_flush_user_cache_all
+	.long	xscale_flush_user_cache_range
+	.long	xscale_coherent_kern_range
+	.long	xscale_flush_kern_dcache_page
+	.long	xscale_dma_inv_range
+	.long	xscale_dma_clean_range
+	.long	xscale_dma_flush_range
+
+ENTRY(cpu_xscale_dcache_clean_area)
+1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
-	add	r0, r0, #CACHELINESIZE
-	mcr	p15, 0, r0, c7, c5, 1		@ Invalidate I cache line
-	add	r0, r0, #CACHELINESIZE
-	subs	r1, r1, #4 * CACHELINESIZE
-	bne	1b
-	mcr	p15, 0, r0, c7, c5, 6		@ Invalidate BTB
+	subs	r1, r1, #CACHELINESIZE
+	bhi	1b
 	mov	pc, lr
 
 /* ================================ CACHE LOCKING============================
@@ -553,39 +487,23 @@ ENTRY(xscale_dtlb_unlock)
 
 /* =============================== PageTable ============================== */
 
-#define PMD_CACHE_WRITE_ALLOCATE 0
 #define PTE_CACHE_WRITE_ALLOCATE 0
 
 /*
- * cpu_xscale_set_pgd(pgd)
+ * cpu_xscale_switch_mm(pgd)
  *
  * Set the translation base pointer to be as described by pgd.
  *
  * pgd: new page tables
  */
 	.align	5
-ENTRY(cpu_xscale_set_pgd)
+ENTRY(cpu_xscale_switch_mm)
 	clean_d_cache r1, r2
 	mcr	p15, 0, ip, c7, c5, 0		@ Invalidate I cache & BTB
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mcr	p15, 0, r0, c2, c0, 0		@ load page table pointer
 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I & D TLBs
 	cpwait_ret lr, ip
-
-/*
- * cpu_xscale_flush_pmd(pmdp)
- *
- * Set a level 1 translation table entry, and clean it out of
- * any caches such that the MMUs can load it correctly.
- *
- * pmdp: pointer to PMD entry
- */
-	.align	5
-ENTRY(cpu_xscale_flush_pmd)
-	mov	ip, #0
-	mcr	p15, 0, r0, c7, c10, 1		@ Clean D cache line
-	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
-	mov	pc, lr
 
 /*
  * cpu_xscale_set_pte(ptep, pte)
@@ -603,7 +521,7 @@ ENTRY(cpu_xscale_set_pte)
 
 	eor	r3, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	tst	r3, #L_PTE_USER | L_PTE_EXEC	@ User or Exec?
+	tst	r3, #L_PTE_USER			@ User?
 	orrne	r2, r2, #PTE_EXT_AP_URO_SRW	@ yes -> user r/o, system r/w
 
 	tst	r3, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
@@ -631,12 +549,10 @@ ENTRY(cpu_xscale_set_pte)
 	@ Erratum 40: The B bit must be cleared for a user read-only
 	@ cacheable page.
 	@
-	@  B = B & ~((U|E) & C & ~W)
+	@  B = B & ~(U & C & ~W)
 	@
-	and	ip, r1, #L_PTE_USER | L_PTE_EXEC | L_PTE_WRITE | L_PTE_CACHEABLE
+	and	ip, r1, #L_PTE_USER | L_PTE_WRITE | L_PTE_CACHEABLE
 	teq	ip, #L_PTE_USER | L_PTE_CACHEABLE
-	teqne	ip, #L_PTE_EXEC | L_PTE_CACHEABLE
-	teqne	ip, #L_PTE_USER | L_PTE_EXEC | L_PTE_CACHEABLE
 	biceq	r2, r2, #PTE_BUFFERABLE
 
 	tst	r3, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
@@ -696,30 +612,12 @@ __xscale_setup:
 	.type	xscale_processor_functions, #object
 ENTRY(xscale_processor_functions)
 	.word	xscale_abort
-	.word	cpu_xscale_check_bugs
 	.word	cpu_xscale_proc_init
 	.word	cpu_xscale_proc_fin
 	.word	cpu_xscale_reset
 	.word	cpu_xscale_do_idle
-
-	/* cache */
-	.word	cpu_xscale_cache_clean_invalidate_all
-	.word	cpu_xscale_cache_clean_invalidate_range
-	.word	cpu_xscale_flush_ram_page
-
-	/* dcache */
-	.word	cpu_xscale_dcache_invalidate_range
-	.word	cpu_xscale_dcache_clean_range
-	.word	cpu_xscale_dcache_clean_page
-	.word	cpu_xscale_dcache_clean_entry
-
-	/* icache */
-	.word	cpu_xscale_icache_invalidate_range
-	.word	cpu_xscale_icache_invalidate_page
-
-	/* pgtable */
-	.word	cpu_xscale_set_pgd
-	.word	cpu_xscale_flush_pmd
+	.word	cpu_xscale_dcache_clean_area
+	.word	cpu_xscale_switch_mm
 	.word	cpu_xscale_set_pte
 	.size	xscale_processor_functions, . - xscale_processor_functions
 
@@ -749,6 +647,7 @@ __80200_proc_info:
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
 	.size	__80200_proc_info, . - __80200_proc_info
 
 	.type	__80321_proc_info,#object
@@ -780,6 +679,7 @@ __pxa250_proc_info:
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
+	.long	xscale_cache_fns
 	.size	__pxa250_proc_info, . - __pxa250_proc_info
 
 	.type	__pxa210_proc_info,#object

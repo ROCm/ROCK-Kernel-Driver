@@ -92,7 +92,7 @@ struct ifconf32 {
 
 extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
-extern asmlinkage int sys32_ioctl(unsigned int, unsigned int, u32);
+extern asmlinkage int compat_sys_ioctl(unsigned int, unsigned int, u32);
 extern asmlinkage int sys_setsid(void);
 
 asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
@@ -127,39 +127,39 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 	}
 	switch(cmd) {
 	case _IOW('r', 10, struct rtentry32):
-		ret = sys32_ioctl(fd, SIOCADDRT, arg);
+		ret = compat_sys_ioctl(fd, SIOCADDRT, arg);
 		goto out;
 	case _IOW('r', 11, struct rtentry32):
-		ret = sys32_ioctl(fd, SIOCDELRT, arg);
+		ret = compat_sys_ioctl(fd, SIOCDELRT, arg);
 		goto out;
 
 	case _IOW('i', 12, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFADDR, arg);
 		goto out;
 	case _IOWR('i', 13, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFADDR, arg);
 		goto out;
 	case _IOW('i', 14, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFDSTADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFDSTADDR, arg);
 		goto out;
 	case _IOWR('i', 15, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFDSTADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFDSTADDR, arg);
 		goto out;
 	case _IOW('i', 16, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFFLAGS, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFFLAGS, arg);
 		goto out;
 	case _IOWR('i', 17, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFFLAGS, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFFLAGS, arg);
 		goto out;
 	case _IOW('i', 18, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFMEM, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFMEM, arg);
 		goto out;
 	case _IOWR('i', 19, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFMEM, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFMEM, arg);
 		goto out;
 
 	case _IOWR('i', 20, struct ifconf32):
-		ret = sys32_ioctl(fd, SIOCGIFCONF, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFCONF, arg);
 		goto out;
 
 	case _IOW('i', 21, struct ifreq): /* SIOCSIFMTU */
@@ -170,32 +170,32 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 		goto out;
 
 	case _IOWR('i', 23, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFBRDADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFBRDADDR, arg);
 		goto out;
 	case _IOW('i', 24, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFBRDADDR, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFBRDADDR, arg);
 		goto out;
 	case _IOWR('i', 25, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFNETMASK, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFNETMASK, arg);
 		goto out;
 	case _IOW('i', 26, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFNETMASK, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFNETMASK, arg);
 		goto out;
 	case _IOWR('i', 27, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCGIFMETRIC, arg);
+		ret = compat_sys_ioctl(fd, SIOCGIFMETRIC, arg);
 		goto out;
 	case _IOW('i', 28, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCSIFMETRIC, arg);
+		ret = compat_sys_ioctl(fd, SIOCSIFMETRIC, arg);
 		goto out;
 
 	case _IOW('i', 30, struct arpreq):
-		ret = sys32_ioctl(fd, SIOCSARP, arg);
+		ret = compat_sys_ioctl(fd, SIOCSARP, arg);
 		goto out;
 	case _IOWR('i', 31, struct arpreq):
-		ret = sys32_ioctl(fd, SIOCGARP, arg);
+		ret = compat_sys_ioctl(fd, SIOCGARP, arg);
 		goto out;
 	case _IOW('i', 32, struct arpreq):
-		ret = sys32_ioctl(fd, SIOCDARP, arg);
+		ret = compat_sys_ioctl(fd, SIOCDARP, arg);
 		goto out;
 
 	case _IOW('i', 40, struct ifreq32): /* SIOCUPPER */
@@ -209,10 +209,10 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 		goto out;
 
 	case _IOW('i', 49, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCADDMULTI, arg);
+		ret = compat_sys_ioctl(fd, SIOCADDMULTI, arg);
 		goto out;
 	case _IOW('i', 50, struct ifreq32):
-		ret = sys32_ioctl(fd, SIOCDELMULTI, arg);
+		ret = compat_sys_ioctl(fd, SIOCDELMULTI, arg);
 		goto out;
 
 	/* FDDI interface ioctls, unsupported. */
@@ -246,7 +246,7 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 		ret = -EFAULT;
 		if(get_user(oldval, ptr))
 			goto out;
-		ret = sys32_ioctl(fd, cmd, arg);
+		ret = compat_sys_ioctl(fd, cmd, arg);
 		__get_user(newval, ptr);
 		if(newval == -1) {
 			__put_user(oldval, ptr);
@@ -265,7 +265,7 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 		ret = -EFAULT;
 		if(get_user(oldval, ptr))
 			goto out;
-		ret = sys32_ioctl(fd, cmd, arg);
+		ret = compat_sys_ioctl(fd, cmd, arg);
 		__get_user(newval, ptr);
 		if(newval == -1) {
 			__put_user(oldval, ptr);
@@ -277,7 +277,7 @@ asmlinkage int sunos_ioctl (int fd, u32 cmd, u32 arg)
 	}
 	};
 
-	ret = sys32_ioctl(fd, cmd, arg);
+	ret = compat_sys_ioctl(fd, cmd, arg);
 	/* so stupid... */
 	ret = (ret == -EINVAL ? -EOPNOTSUPP : ret);
 out:

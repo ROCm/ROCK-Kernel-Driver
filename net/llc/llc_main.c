@@ -3,7 +3,7 @@
  * 	and connections of the LLC.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- * 		 2001, 2002 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ * 		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -162,7 +162,7 @@ out_kfree_skb:
 
 /**
  *     llc_sk_init - Initializes a socket with default llc values.
- *     @sk: socket to intiailize.
+ *     @sk: socket to initialize.
  *
  *     Initializes a socket with default llc values.
  */
@@ -224,9 +224,8 @@ struct sock *llc_sk_alloc(int family, int priority)
 {
 	struct sock *sk = sk_alloc(family, priority, 1, NULL);
 
-	MOD_INC_USE_COUNT;
 	if (!sk)
-		goto decmod;
+		goto out;
 	if (llc_sk_init(sk))
 		goto outsk;
 	sock_init_data(NULL, sk);
@@ -240,8 +239,6 @@ out:
 outsk:
 	sk_free(sk);
 	sk = NULL;
-decmod:
-	MOD_DEC_USE_COUNT;
 	goto out;
 }
 
@@ -279,7 +276,6 @@ void llc_sk_free(struct sock *sk)
 	}
 #endif
 	sock_put(sk);
-	MOD_DEC_USE_COUNT;
 }
 
 /**
@@ -604,5 +600,5 @@ module_init(llc_init);
 module_exit(llc_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001, 2002");
+MODULE_AUTHOR("Procom, 1997, Arnaldo C. Melo, Jay Schullist, 2001-2003");
 MODULE_DESCRIPTION("LLC 2.0, NET4.0 IEEE 802.2 extended support");

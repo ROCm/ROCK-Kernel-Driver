@@ -86,7 +86,7 @@
  *      Shall we try to damage output packets if routing dev changes?
  */
 
-int sysctl_ip_dynaddr = 0;
+int sysctl_ip_dynaddr;
 int sysctl_ip_default_ttl = IPDEFTTL;
 
 /* Generate a checksum for an outgoing IP datagram. */
@@ -263,7 +263,7 @@ int ip_mc_output(struct sk_buff *skb)
 				newskb->dev, ip_dev_loopback_xmit);
 	}
 
-	if (skb->len > dev->mtu || skb_shinfo(skb)->frag_list)
+	if (skb->len > dst_pmtu(&rt->u.dst) || skb_shinfo(skb)->frag_list)
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
@@ -273,7 +273,7 @@ int ip_output(struct sk_buff *skb)
 {
 	IP_INC_STATS(IpOutRequests);
 
-	if ((skb->len > skb->dst->dev->mtu || skb_shinfo(skb)->frag_list) &&
+	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list) &&
 	    !skb_shinfo(skb)->tso_size)
 		return ip_fragment(skb, ip_finish_output);
 	else

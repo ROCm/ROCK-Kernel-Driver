@@ -570,7 +570,7 @@ static _INLINE_ void check_modem_status(struct async_struct *info)
 /*
  * This is the serial driver's interrupt routine for a single port
  */
-static void rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
+static irqreturn_t rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
 	u_char	events;
 	int	idx;
@@ -610,6 +610,7 @@ static void rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 #ifdef SERIAL_DEBUG_INTR
 	printk("end.\n");
 #endif
+	return IRQ_HANDLED;
 }
 
 
@@ -2449,7 +2450,8 @@ void kgdb_map_scc(void)
 
 static kdev_t serial_console_device(struct console *c)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 

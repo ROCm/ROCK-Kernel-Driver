@@ -288,7 +288,9 @@ static int ql_pdma(int phase, char *request, int reqlen)
 
 static int ql_wai(void)
 {
-	int i, k;
+	int k;
+	unsigned long i;
+
 	k = 0;
 	i = jiffies + WATCHDOG;
 	while (time_before(jiffies, i) && !qabort && !((k = inb(qbase + 4)) & 0xe0)) {
@@ -359,7 +361,8 @@ static void ql_icmd(Scsi_Cmnd * cmd)
 
 static unsigned int ql_pcmd(Scsi_Cmnd * cmd)
 {
-	unsigned int i, j, k;
+	unsigned int i, j;
+	unsigned long k;
 	unsigned int result;	/* ultimate return result */
 	unsigned int status;	/* scsi returned status */
 	unsigned int message;	/* scsi returned message */
@@ -526,7 +529,7 @@ static void ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 	(icmd->scsi_done) (icmd);
 }
 
-static void do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct Scsi_Host *host = dev_id;
@@ -534,6 +537,7 @@ static void do_ql_ihandl(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(host->host_lock, flags);
 	ql_ihandl(irq, dev_id, regs);
 	spin_unlock_irqrestore(host->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 #endif

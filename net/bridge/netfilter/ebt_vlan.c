@@ -45,7 +45,7 @@ MODULE_LICENSE("GPL");
  * Function description: ebt_filter_vlan() is main engine for 
  * checking passed 802.1Q frame according to 
  * the passed extension parameters (in the *data buffer)
- * ebt_filter_vlan() is called after successfull check the rule params
+ * ebt_filter_vlan() is called after successful check the rule params
  * by ebt_check_vlan() function.
  * Parameters:
  * const struct sk_buff *skb - pointer to passed ethernet frame buffer
@@ -137,7 +137,7 @@ ebt_check_vlan(const char *tablename,
 	 */
 	if (datalen != sizeof(struct ebt_vlan_info)) {
 		DEBUG_MSG
-		    ("passed size %d is not eq to ebt_vlan_info (%d)\n",
+		    ("passed size %d is not eq to ebt_vlan_info (%Zd)\n",
 		     datalen, sizeof(struct ebt_vlan_info));
 		return -EINVAL;
 	}

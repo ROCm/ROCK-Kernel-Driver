@@ -169,7 +169,7 @@ enum Phase {
 
 /* Static function prototypes */
 static void NCR53c406a_intr(int, void *, struct pt_regs *);
-static void do_NCR53c406a_intr(int, void *, struct pt_regs *);
+static irqreturn_t do_NCR53c406a_intr(int, void *, struct pt_regs *);
 static void internal_done(Scsi_Cmnd *);
 static void wait_intr(void);
 static void chip_init(void);
@@ -658,7 +658,7 @@ static void internal_done(Scsi_Cmnd * SCpnt)
 
 static void wait_intr(void)
 {
-	int i = jiffies + WATCHDOG;
+	unsigned long i = jiffies + WATCHDOG;
 
 	while (time_after(i, jiffies) && !(inb(STAT_REG) & 0xe0)) {	/* wait for a pseudo-interrupt */
 		cpu_relax();
@@ -773,7 +773,8 @@ static int NCR53c406a_biosparm(struct scsi_device *disk,
 	return 0;
 }
 
-static void do_NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_NCR53c406a_intr(int unused, void *dev_id,
+					struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct Scsi_Host *dev = dev_id;
@@ -781,6 +782,7 @@ static void do_NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	NCR53c406a_intr(0, dev_id, regs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs)
@@ -970,7 +972,7 @@ static void NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs)
 static int irq_probe(void)
 {
 	int irqs, irq;
-	int i;
+	unsigned long i;
 
 	inb(INT_REG);		/* clear the interrupt register */
 	irqs = probe_irq_on();

@@ -113,7 +113,7 @@ static void promise_selectproc (ide_drive_t *drive)
  */
 int pdc4030_cmd(ide_drive_t *drive, u8 cmd)
 {
-	u32 timeout;
+	unsigned long timeout;
 	u8 status_val;
 
 	promise_selectproc(drive);	/* redundant? */

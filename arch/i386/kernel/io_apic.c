@@ -269,7 +269,7 @@ static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 # include <linux/slab.h>		/* kmalloc() */
 # include <linux/timer.h>	/* time_after() */
  
-# if CONFIG_BALANCED_IRQ_DEBUG
+# ifdef CONFIG_BALANCED_IRQ_DEBUG
 #  define TDprintk(x...) do { printk("<%ld:%s:%d>: ", jiffies, __FILE__, __LINE__); printk(x); } while (0)
 #  define Dprintk(x...) do { TDprintk(x); } while (0)
 # else

@@ -43,7 +43,9 @@ static kmem_cache_t *task_struct_cachep;
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
 extern void exit_semundo(struct task_struct *tsk);
 
-/* The idle threads do not count.. */
+/* The idle threads do not count..
+ * Protected by write_lock_irq(&tasklist_lock)
+ */
 int nr_threads;
 
 int max_threads;
@@ -792,9 +794,9 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	atomic_inc(&p->user->processes);
 
 	/*
-	 * Counter increases are protected by
-	 * the kernel lock so nr_threads can't
-	 * increase under us (but it may decrease).
+	 * If multiple threads are within copy_process(), then this check
+	 * triggers too late. This doesn't hurt, the check is only there
+	 * to stop root fork bombs.
 	 */
 	if (nr_threads >= max_threads)
 		goto bad_fork_cleanup_count;

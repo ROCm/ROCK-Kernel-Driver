@@ -59,7 +59,6 @@
 #include <asm/page.h>
 #include <linux/sched.h>
 #include <linux/types.h>
-#include <linux/wrapper.h>
 
 #include <linux/spinlock.h>
 #include <linux/vmalloc.h>
@@ -2781,12 +2780,13 @@ static void error_handler(struct zoran *zr, u32 astat, u32 stat)
 	}
 }
 
-static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 stat, astat;
 	int count;
 	struct zoran *zr;
 	unsigned long flags;
+	int handled = 0;
 
 	zr = (struct zoran *) dev_id;
 	count = 0;
@@ -2805,7 +2805,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		zr->last_isr = stat;
 		spin_unlock_irqrestore(&zr->lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	spin_lock_irqsave(&zr->lock, flags);
@@ -2816,6 +2816,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if (!astat) {
 			break;
 		}
+		handled = 1;
 		if (astat & cardvsync[zr->card]) {	// SW
 
 			if (zr->codec_mode == BUZ_MODE_MOTION_DECOMPRESS
@@ -3009,6 +3010,7 @@ static void zoran_irq(int irq, void *dev_id, struct pt_regs *regs)
 		zr->last_isr = stat;
 	}
 	spin_unlock_irqrestore(&zr->lock, flags);
+	return IRQ_RETVAL(handled);
 }
 
 /* Check a zoran_params struct for correctness, insert default params */

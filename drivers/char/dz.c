@@ -1502,9 +1502,10 @@ static void dz_console_print (struct console *cons,
 	}
 }
 
-static kdev_t dz_console_device(struct console *c)
+static struct tty_driver *dz_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 static int __init dz_console_setup(struct console *co, char *options)

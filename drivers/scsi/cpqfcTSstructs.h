@@ -21,6 +21,7 @@
 #define CPQFCTSSTRUCTS_H
 
 #include <linux/timer.h>  // timer declaration in our host data
+#include <linux/interrupt.h>
 #include <asm/atomic.h>
 #include "cpqfcTSioctl.h"
 
@@ -861,7 +862,7 @@ void BigEndianSwap(  UCHAR *source, UCHAR *dest,  USHORT cnt);
                   
 
 // Linux interrupt handler
-void cpqfcTS_intr_handler( int irq,void *dev_id,struct pt_regs *regs);
+irqreturn_t cpqfcTS_intr_handler( int irq,void *dev_id,struct pt_regs *regs);
 void cpqfcTSheartbeat( unsigned long ptr );
 
 

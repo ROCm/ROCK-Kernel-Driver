@@ -309,7 +309,6 @@ wildfire_init_arch(void)
 
 	/* With multiple PCI buses, we play with I/O as physical addrs.  */
 	ioport_resource.end = ~0UL;
-	iomem_resource.end = ~0UL;
 
 
 	/* Probe the hardware for info about configuration. */

@@ -133,11 +133,13 @@ static unsigned int arpt_hook(unsigned int hook,
 static struct nf_hook_ops arpt_ops[] = {
 	{
 		.hook		= arpt_hook,
+		.owner		= THIS_MODULE,
 		.pf		= NF_ARP,
 		.hooknum	= NF_ARP_IN,
 	},
 	{
 		.hook		= arpt_hook,
+		.owner		= THIS_MODULE,
 		.pf		= NF_ARP,
 		.hooknum	= NF_ARP_OUT,
 	}

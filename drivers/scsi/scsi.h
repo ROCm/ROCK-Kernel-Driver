@@ -87,21 +87,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #endif
 
 /*
- * Used for debugging the new queueing code.  We want to make sure
- * that the lock state is consistent with design.  Only do this in
- * the user space simulator.
- */
-#define ASSERT_LOCK(_LOCK, _COUNT)
-
-#if defined(CONFIG_SMP) && defined(CONFIG_USER_DEBUG)
-#undef ASSERT_LOCK
-#define ASSERT_LOCK(_LOCK,_COUNT)       \
-        { if( (_LOCK)->lock != _COUNT )   \
-                panic("Lock count inconsistent %s %d\n", __FILE__, __LINE__); \
-                                                                                       }
-#endif
-
-/*
  *  Use these to separate status msg and our bytes
  *
  *  These are set by:
@@ -470,13 +455,9 @@ extern void scsi_exit_procfs(void);
 
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);
-
-extern struct proc_dir_entry *proc_scsi;
-extern void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len);
 #else
 static inline int scsi_init_procfs(void) { return 0; }
 static inline void scsi_exit_procfs(void) { ; }
-static inline void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len) { ; }
 
 static inline void scsi_proc_host_add(struct Scsi_Host *);
 static inline void scsi_proc_host_rm(struct Scsi_Host *);
