@@ -120,7 +120,7 @@ struct yenta_socket {
 	unsigned int private[8];
 
 	/* PCI saved state */
-	u32 saved_state[18];
+	u32 saved_state[2];
 };
 
 

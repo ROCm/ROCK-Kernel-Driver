@@ -99,8 +99,11 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	 */
 	if (!dev->hose) {
 		struct pci_dev *pci_dev;
-		pci_dev = pci_find_class(PCI_CLASS_DISPLAY_VGA << 8, NULL);
-		if (pci_dev) dev->hose = pci_dev->sysdata;
+		pci_dev = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, NULL);
+		if (pci_dev) {
+			dev->hose = pci_dev->sysdata;
+			pci_dev_put(pci_dev);
+		}
 		if (!dev->hose) {
 			struct pci_bus *b = pci_bus_b(pci_root_buses.next);
 			if (b) dev->hose = b->sysdata;

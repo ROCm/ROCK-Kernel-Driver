@@ -1100,7 +1100,7 @@ static int __init init (void)
 		sizeof (struct ehci_qh), sizeof (struct ehci_qtd),
 		sizeof (struct ehci_itd), sizeof (struct ehci_sitd));
 
-	return pci_module_init (&ehci_pci_driver);
+	return pci_register_driver (&ehci_pci_driver);
 }
 module_init (init);
 

@@ -889,7 +889,6 @@ struct ipr_ioa_cfg {
 	unsigned long ioa_mailbox;
 	struct ipr_interrupts regs;
 
-	u32 pci_cfg_buf[64];
 	u16 saved_pcix_cmd_reg;
 	u16 reset_retries;
 

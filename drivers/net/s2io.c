@@ -1935,7 +1935,7 @@ void s2io_reset(nic_t * sp)
 	schedule_timeout(HZ / 4);
 
 	/* Restore the PCI state saved during initializarion. */
-	pci_restore_state(sp->pdev, sp->config_space);
+	pci_restore_state(sp->pdev);
 	s2io_init_pci(sp);
 
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -4238,7 +4238,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		goto register_failed;
 	}
 
-	pci_save_state(sp->pdev, sp->config_space);
+	pci_save_state(sp->pdev);
 
 	/* Setting swapper control on the NIC, for proper reset operation */
 	if (s2io_set_swapper(sp)) {

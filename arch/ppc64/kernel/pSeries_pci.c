@@ -190,7 +190,7 @@ void __init init_pci_config_tokens (void)
 	ibm_write_pci_config = rtas_token("ibm,write-pci-config");
 }
 
-unsigned long __init get_phb_buid (struct device_node *phb)
+unsigned long __devinit get_phb_buid (struct device_node *phb)
 {
 	int addr_cells;
 	unsigned int *buid_vals;
@@ -220,48 +220,85 @@ unsigned long __init get_phb_buid (struct device_node *phb)
 	return buid;
 }
 
-static struct pci_controller * __init alloc_phb(struct device_node *dev,
-				 unsigned int addr_size_words)
+static enum phb_types get_phb_type(struct device_node *dev)
 {
-	struct pci_controller *phb;
-	unsigned int *ui_ptr = NULL, len;
-	struct reg_property64 reg_struct;
-	int *bus_range;
+	enum phb_types type;
 	char *model;
-	enum phb_types phb_type;
- 	struct property *of_prop;
 
 	model = (char *)get_property(dev, "model", NULL);
 
 	if (!model) {
-		printk(KERN_ERR "alloc_phb: phb has no model property\n");
+		printk(KERN_ERR "%s: phb has no model property\n",
+				__FUNCTION__);
 		model = "<empty>";
 	}
+
+	if (strstr(model, "Python")) {
+		type = phb_type_python;
+	} else if (strstr(model, "Speedwagon")) {
+		type = phb_type_speedwagon;
+	} else if (strstr(model, "Winnipeg")) {
+		type = phb_type_winnipeg;
+	} else {
+		printk(KERN_ERR "%s: unknown PHB %s\n", __FUNCTION__, model);
+		type = phb_type_unknown;
+	}
+
+	return type;
+}
+
+int get_phb_reg_prop(struct device_node *dev, unsigned int addr_size_words,
+		struct reg_property64 *reg)
+{
+	unsigned int *ui_ptr = NULL, len;
 
 	/* Found a PHB, now figure out where his registers are mapped. */
 	ui_ptr = (unsigned int *) get_property(dev, "reg", &len);
 	if (ui_ptr == NULL) {
 		PPCDBG(PPCDBG_PHBINIT, "\tget reg failed.\n"); 
-		return NULL;
+		return 1;
 	}
 
 	if (addr_size_words == 1) {
-		reg_struct.address = ((struct reg_property32 *)ui_ptr)->address;
-		reg_struct.size    = ((struct reg_property32 *)ui_ptr)->size;
+		reg->address = ((struct reg_property32 *)ui_ptr)->address;
+		reg->size    = ((struct reg_property32 *)ui_ptr)->size;
 	} else {
-		reg_struct = *((struct reg_property64 *)ui_ptr);
+		*reg = *((struct reg_property64 *)ui_ptr);
 	}
 
-	if (strstr(model, "Python")) {
-		phb_type = phb_type_python;
-	} else if (strstr(model, "Speedwagon")) {
-		phb_type = phb_type_speedwagon;
-	} else if (strstr(model, "Winnipeg")) {
-		phb_type = phb_type_winnipeg;
-	} else {
-		printk(KERN_ERR "alloc_phb: unknown PHB %s\n", model);
-		phb_type = phb_type_unknown;
-	}
+	return 0;
+}
+
+int phb_set_bus_ranges(struct device_node *dev, struct pci_controller *phb)
+{
+	int *bus_range;
+	unsigned int len;
+
+	bus_range = (int *) get_property(dev, "bus-range", &len);
+	if (bus_range == NULL || len < 2 * sizeof(int)) {
+		return 1;
+ 	}
+ 
+	phb->first_busno =  bus_range[0];
+	phb->last_busno  =  bus_range[1];
+
+	return 0;
+}
+
+static struct pci_controller *alloc_phb(struct device_node *dev,
+				 unsigned int addr_size_words)
+{
+	struct pci_controller *phb;
+	struct reg_property64 reg_struct;
+	enum phb_types phb_type;
+	struct property *of_prop;
+	int rc;
+
+	phb_type = get_phb_type(dev);
+
+	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
+	if (rc)
+		return NULL;
 
 	phb = pci_alloc_pci_controller(phb_type);
 	if (phb == NULL)
@@ -270,11 +307,9 @@ static struct pci_controller * __init alloc_phb(struct device_node *dev,
 	if (phb_type == phb_type_python)
 		python_countermeasures(reg_struct.address);
 
-	bus_range = (int *) get_property(dev, "bus-range", &len);
-	if (bus_range == NULL || len < 2 * sizeof(int)) {
-		kfree(phb);
+	rc = phb_set_bus_ranges(dev, phb);
+	if (rc)
 		return NULL;
-	}
 
 	of_prop = (struct property *)alloc_bootmem(sizeof(struct property) +
 			sizeof(phb->global_number));        
@@ -291,15 +326,46 @@ static struct pci_controller * __init alloc_phb(struct device_node *dev,
 	memcpy(of_prop->value, &phb->global_number, sizeof(phb->global_number));
 	prom_add_property(dev, of_prop);
 
-	phb->first_busno =  bus_range[0];
-	phb->last_busno  =  bus_range[1];
-
 	phb->arch_data   = dev;
 	phb->ops = &rtas_pci_ops;
 
 	phb->buid = get_phb_buid(dev);
 
 	return phb;
+}
+
+static struct pci_controller * __devinit alloc_phb_dynamic(struct device_node *dev, unsigned int addr_size_words)
+{
+	struct pci_controller *phb;
+	struct reg_property64 reg_struct;
+	enum phb_types phb_type;
+	int rc;
+
+	phb_type = get_phb_type(dev);
+
+	rc = get_phb_reg_prop(dev, addr_size_words, &reg_struct);
+	if (rc)
+		return NULL;
+
+	phb = pci_alloc_phb_dynamic(phb_type);
+	if (phb == NULL)
+		return NULL;
+
+	if (phb_type == phb_type_python)
+		python_countermeasures(reg_struct.address);
+
+	rc = phb_set_bus_ranges(dev, phb);
+	if (rc)
+		return NULL;
+
+	/* TODO: linux,pci-domain? */
+
+	phb->arch_data   = dev;
+	phb->ops = &rtas_pci_ops;
+
+	phb->buid = get_phb_buid(dev);
+
+ 	return phb;
 }
 
 unsigned long __init find_and_init_phbs(void)
@@ -330,7 +396,8 @@ unsigned long __init find_and_init_phbs(void)
 		if (!phb)
 			continue;
 
-		pci_process_bridge_OF_ranges(phb, node, index == 0);
+		pci_process_bridge_OF_ranges(phb, node);
+		pci_setup_phb_io(phb, index == 0);
 
 		if (naca->interrupt_controller == IC_OPEN_PIC) {
 			int addr = root_size_cells * (index + 2) - 1;
@@ -345,6 +412,34 @@ unsigned long __init find_and_init_phbs(void)
 
 	return 0;
 }
+
+struct pci_controller * __devinit init_phb_dynamic(struct device_node *dn)
+{
+	struct device_node *root = of_find_node_by_path("/");
+	unsigned int root_size_cells = 0;
+	struct pci_controller *phb;
+	struct pci_bus *bus;
+
+	root_size_cells = prom_n_size_cells(root);
+
+	phb = alloc_phb_dynamic(dn, root_size_cells);
+	if (!phb)
+		return NULL;
+
+	pci_process_bridge_OF_ranges(phb, dn);
+
+	pci_setup_phb_io_dynamic(phb);
+	of_node_put(root);
+
+	pci_devs_phb_init_dynamic(phb);
+	phb->last_busno = 0xff;
+	bus = pci_scan_bus(phb->first_busno, phb->ops, phb->arch_data);
+	phb->bus = bus;
+	phb->last_busno = bus->subordinate;
+
+	return phb;
+}
+EXPORT_SYMBOL(init_phb_dynamic);
 
 #if 0
 void pcibios_name_device(struct pci_dev *dev)
@@ -464,13 +559,63 @@ int remap_bus_range(struct pci_bus *bus)
 }
 EXPORT_SYMBOL(remap_bus_range);
 
-static void phbs_fixup_io(void)
+static void phbs_remap_io(void)
 {
 	struct pci_controller *hose, *tmp;
 
 	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 		remap_bus_range(hose->bus);
 }
+
+/* RPA-specific bits for removing PHBs */
+int pcibios_remove_root_bus(struct pci_controller *phb)
+{
+	struct pci_bus *b = phb->bus;
+	struct resource *res;
+	int rc, i;
+
+	res = b->resource[0];
+	if (!res->flags) {
+		printk(KERN_ERR "%s: no IO resource for PHB %s\n", __FUNCTION__,
+				b->name);
+		return 1;
+	}
+
+	rc = unmap_bus_range(b);
+	if (rc) {
+		printk(KERN_ERR "%s: failed to unmap IO on bus %s\n",
+			__FUNCTION__, b->name);
+		return 1;
+	}
+
+	if (release_resource(res)) {
+		printk(KERN_ERR "%s: failed to release IO on bus %s\n",
+				__FUNCTION__, b->name);
+		return 1;
+	}
+
+	for (i = 1; i < 3; ++i) {
+		res = b->resource[i];
+		if (!res->flags && i == 0) {
+			printk(KERN_ERR "%s: no MEM resource for PHB %s\n",
+				__FUNCTION__, b->name);
+			return 1;
+		}
+		if (res->flags && release_resource(res)) {
+			printk(KERN_ERR
+			       "%s: failed to release IO %d on bus %s\n",
+				__FUNCTION__, i, b->name);
+			return 1;
+		}
+	}
+
+	list_del(&phb->list_node);
+	if (phb->is_dynamic)
+		kfree(phb);
+
+	return 0;
+}
+EXPORT_SYMBOL(pcibios_remove_root_bus);
 
 static void __init pSeries_request_regions(void)
 {
@@ -511,7 +656,7 @@ void __init pSeries_final_fixup(void)
 		}
 	}
 
-	phbs_fixup_io();
+	phbs_remap_io();
 	pSeries_request_regions();
 	pci_fix_bus_sysdata();
 

@@ -366,7 +366,6 @@ struct cp_private {
 #endif
 
 	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
-	u32			power_state[16];
 
 	struct mii_if_info	mii_if;
 };
@@ -1845,7 +1844,7 @@ static int cp_suspend (struct pci_dev *pdev, u32 state)
 	spin_unlock_irqrestore (&cp->lock, flags);
 
 	if (cp->pdev && cp->wol_enabled) {
-		pci_save_state (cp->pdev, cp->power_state);
+		pci_save_state (cp->pdev);
 		cp_set_d3_state (cp);
 	}
 
@@ -1864,7 +1863,7 @@ static int cp_resume (struct pci_dev *pdev)
 	
 	if (cp->pdev && cp->wol_enabled) {
 		pci_set_power_state (cp->pdev, 0);
-		pci_restore_state (cp->pdev, cp->power_state);
+		pci_restore_state (cp->pdev);
 	}
 	
 	cp_init_hw (cp);

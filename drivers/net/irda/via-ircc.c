@@ -157,15 +157,7 @@ static int __init via_ircc_init(void)
 #ifdef	HEADMSG
         DBG(printk(KERN_INFO "via_ircc_init :rc = %d......\n",rc));
 #endif
-	if (rc < 1) {
-#ifdef	HEADMSG
-        DBG(printk(KERN_INFO "via_ircc_init return -ENODEV......\n"));
-#endif
-		if (rc == 0)	pci_unregister_driver (&via_driver);
-		return -ENODEV;
-	}
-	return 0;
-
+	return rc;
 }
 
 static int __devinit via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id)

@@ -2545,7 +2545,7 @@ static int cx8800_suspend(struct pci_dev *pci_dev, u32 state)
 	cx8800_shutdown(dev);
 	del_timer(&dev->vidq.timeout);
 	
-	pci_save_state(pci_dev, dev->state.pci_cfg);
+	pci_save_state(pci_dev);
 	if (0 != pci_set_power_state(pci_dev, state)) {
 		pci_disable_device(pci_dev);
 		dev->state.disabled = 1;
@@ -2564,7 +2564,7 @@ static int cx8800_resume(struct pci_dev *pci_dev)
 		dev->state.disabled = 0;
 	}
 	pci_set_power_state(pci_dev, 0);
-	pci_restore_state(pci_dev, dev->state.pci_cfg);
+	pci_restore_state(pci_dev);
 
 	/* re-initialize hardware */
 	cx8800_reset(dev);

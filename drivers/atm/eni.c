@@ -2290,9 +2290,7 @@ static int __init eni_init(void)
 		    sizeof(skb->cb),sizeof(struct eni_skb_prv));
 		return -EIO;
 	}
-	if (pci_register_driver(&eni_driver) > 0) return 0;
-	pci_unregister_driver (&eni_driver);
-	return -ENODEV;
+	return pci_register_driver(&eni_driver);
 }
 
 

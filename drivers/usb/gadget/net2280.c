@@ -2940,7 +2940,7 @@ static int __init init (void)
 {
 	if (!use_dma)
 		use_dma_chaining = 0;
-	return pci_module_init (&net2280_pci_driver);
+	return pci_register_driver (&net2280_pci_driver);
 }
 module_init (init);
 

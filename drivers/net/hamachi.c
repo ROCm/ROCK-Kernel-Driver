@@ -2006,10 +2006,7 @@ static int __init hamachi_init (void)
 #ifdef MODULE
 	printk(version);
 #endif
-	if (pci_register_driver(&hamachi_driver) > 0)
-		return 0;
-	pci_unregister_driver(&hamachi_driver);
-	return -ENODEV;
+	return pci_register_driver(&hamachi_driver);
 }
 
 static void __exit hamachi_exit (void)

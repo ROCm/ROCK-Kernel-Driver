@@ -179,25 +179,10 @@ void pcibios_align_resource(void *data, struct resource *res,
 	res->start = start;
 }
 
-/* 
- * Allocate pci_controller(phb) initialized common variables. 
- */
-struct pci_controller * __init
-pci_alloc_pci_controller(enum phb_types controller_type)
+static void phb_set_model(struct pci_controller *hose, 
+			  enum phb_types controller_type)
 {
-        struct pci_controller *hose;
 	char *model;
-
-#ifdef CONFIG_PPC_ISERIES
-        hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
-#else
-        hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
-#endif
-        if(hose == NULL) {
-                printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
-                return NULL;
-        }
-        memset(hose, 0, sizeof(struct pci_controller));
 
 	switch(controller_type) {
 #ifdef CONFIG_PPC_ISERIES
@@ -226,21 +211,71 @@ pci_alloc_pci_controller(enum phb_types controller_type)
 		strcpy(hose->what,model);
         else
 		memcpy(hose->what,model,7);
-        hose->type = controller_type;
-        hose->global_number = global_phb_number++;
+}
+/*
+ * Allocate pci_controller(phb) initialized common variables.
+ */
+struct pci_controller * __init
+pci_alloc_pci_controller(enum phb_types controller_type)
+{
+	struct pci_controller *hose;
+
+#ifdef CONFIG_PPC_ISERIES
+	hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
+						GFP_KERNEL);
+#else
+	hose = (struct pci_controller *)alloc_bootmem(sizeof(struct pci_controller));
+#endif
+	if (hose == NULL) {
+		printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
+		return NULL;
+	}
+	memset(hose, 0, sizeof(struct pci_controller));
+
+	phb_set_model(hose, controller_type);
+
+	hose->is_dynamic = 0;
+	hose->type = controller_type;
+	hose->global_number = global_phb_number++;
 
 	list_add_tail(&hose->list_node, &hose_list);
 
-        return hose;
+	return hose;
+}
+
+/*
+ * Dymnamically allocate pci_controller(phb), initialize common variables.
+ */
+struct pci_controller *
+pci_alloc_phb_dynamic(enum phb_types controller_type)
+{
+	struct pci_controller *hose;
+
+	hose = (struct pci_controller *)kmalloc(sizeof(struct pci_controller),
+						GFP_KERNEL);
+	if(hose == NULL) {
+		printk(KERN_ERR "PCI: Allocate pci_controller failed.\n");
+		return NULL;
+	}
+	memset(hose, 0, sizeof(struct pci_controller));
+
+	phb_set_model(hose, controller_type);
+
+	hose->is_dynamic = 1;
+	hose->type = controller_type;
+	hose->global_number = global_phb_number++;
+
+	list_add_tail(&hose->list_node, &hose_list);
+
+	return hose;
 }
 
 static void __init pcibios_claim_one_bus(struct pci_bus *b)
 {
-	struct list_head *ld;
+	struct pci_dev *dev;
 	struct pci_bus *child_bus;
 
-	for (ld = b->devices.next; ld != &b->devices; ld = ld->next) {
-		struct pci_dev *dev = pci_dev_b(ld);
+	list_for_each_entry(dev, &b->devices, bus_list) {
 		int i;
 
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -259,12 +294,10 @@ static void __init pcibios_claim_one_bus(struct pci_bus *b)
 #ifndef CONFIG_PPC_ISERIES
 static void __init pcibios_claim_of_setup(void)
 {
-	struct list_head *lb;
+	struct pci_bus *b;
 
-	for (lb = pci_root_buses.next; lb != &pci_root_buses; lb = lb->next) {
-		struct pci_bus *b = pci_bus_b(lb);
+	list_for_each_entry(b, &pci_root_buses, node)
 		pcibios_claim_one_bus(b);
-	}
 }
 #endif
 
@@ -303,7 +336,7 @@ static int __init pcibios_init(void)
 		ppc_md.pcibios_fixup();
 
 	/* Cache the location of the ISA bridge (if we have one) */
-	ppc64_isabridge_dev = pci_find_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
+	ppc64_isabridge_dev = pci_get_class(PCI_CLASS_BRIDGE_ISA << 8, NULL);
 	if (ppc64_isabridge_dev != NULL)
 		printk("ISA bridge at %s\n", pci_name(ppc64_isabridge_dev));
 
@@ -534,7 +567,7 @@ void pcibios_add_platform_entries(struct pci_dev *pdev)
 #define ISA_SPACE_MASK 0x1
 #define ISA_SPACE_IO 0x1
 
-static void pci_process_ISA_OF_ranges(struct device_node *isa_node,
+static void __devinit pci_process_ISA_OF_ranges(struct device_node *isa_node,
 				      unsigned long phb_io_base_phys,
 				      void * phb_io_base_virt)
 {
@@ -579,8 +612,8 @@ static void pci_process_ISA_OF_ranges(struct device_node *isa_node,
 	}
 }
 
-void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
-					 struct device_node *dev, int primary)
+void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
+					struct device_node *dev)
 {
 	unsigned int *ranges;
 	unsigned long size;
@@ -589,7 +622,6 @@ void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 	struct resource *res;
 	int np, na = prom_n_addr_cells(dev);
 	unsigned long pci_addr, cpu_phys_addr;
-	struct device_node *isa_dn;
 
 	np = na + 5;
 
@@ -617,31 +649,11 @@ void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 		switch (ranges[0] >> 24) {
 		case 1:		/* I/O space */
 			hose->io_base_phys = cpu_phys_addr;
-			hose->io_base_virt = reserve_phb_iospace(size);
-			PPCDBG(PPCDBG_PHBINIT, 
-			       "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n", 
-			       hose->global_number, hose->io_base_phys, 
-			       (unsigned long) hose->io_base_virt);
-
-			if (primary) {
-				pci_io_base = (unsigned long)hose->io_base_virt;
-				isa_dn = of_find_node_by_type(NULL, "isa");
-				if (isa_dn) {
-					isa_io_base = pci_io_base;
-					pci_process_ISA_OF_ranges(isa_dn,
-						hose->io_base_phys,
-						hose->io_base_virt);
-					of_node_put(isa_dn);
-                                        /* Allow all IO */
-                                        io_page_mask = -1;
-				}
-			}
+			hose->pci_io_size = size;
 
 			res = &hose->io_resource;
 			res->flags = IORESOURCE_IO;
 			res->start = pci_addr;
-			res->start += (unsigned long)hose->io_base_virt -
-				pci_io_base;
 			break;
 		case 2:		/* memory space */
 			memno = 0;
@@ -666,6 +678,55 @@ void __init pci_process_bridge_OF_ranges(struct pci_controller *hose,
 		}
 		ranges += np;
 	}
+}
+
+void __init pci_setup_phb_io(struct pci_controller *hose, int primary)
+{
+	unsigned long size = hose->pci_io_size;
+	unsigned long io_virt_offset;
+	struct resource *res;
+	struct device_node *isa_dn;
+
+	hose->io_base_virt = reserve_phb_iospace(size);
+	PPCDBG(PPCDBG_PHBINIT, "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
+		hose->global_number, hose->io_base_phys,
+		(unsigned long) hose->io_base_virt);
+
+	if (primary) {
+		pci_io_base = (unsigned long)hose->io_base_virt;
+		isa_dn = of_find_node_by_type(NULL, "isa");
+		if (isa_dn) {
+			isa_io_base = pci_io_base;
+			pci_process_ISA_OF_ranges(isa_dn, hose->io_base_phys,
+						hose->io_base_virt);
+			of_node_put(isa_dn);
+			/* Allow all IO */
+			io_page_mask = -1;
+		}
+	}
+
+	io_virt_offset = (unsigned long)hose->io_base_virt - pci_io_base;
+	res = &hose->io_resource;
+	res->start += io_virt_offset;
+	res->end += io_virt_offset;
+}
+
+void __devinit pci_setup_phb_io_dynamic(struct pci_controller *hose)
+{
+	unsigned long size = hose->pci_io_size;
+	unsigned long io_virt_offset;
+	struct resource *res;
+
+	hose->io_base_virt = __ioremap(hose->io_base_phys, size,
+					_PAGE_NO_CACHE);
+	PPCDBG(PPCDBG_PHBINIT, "phb%d io_base_phys 0x%lx io_base_virt 0x%lx\n",
+		hose->global_number, hose->io_base_phys,
+		(unsigned long) hose->io_base_virt);
+
+	io_virt_offset = (unsigned long)hose->io_base_virt - pci_io_base;
+	res = &hose->io_resource;
+	res->start += io_virt_offset;
+	res->end += io_virt_offset;
 }
 
 /*********************************************************************** 

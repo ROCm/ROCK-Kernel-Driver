@@ -1396,17 +1396,19 @@ static int configure_existing_function(
 static int bind_pci_resources_to_slots ( struct controller *ctrl)
 {
 	struct pci_func *func, new_func;
-	int busn = ctrl->bus;
+	int busn = ctrl->slot_bus;
 	int devn, funn;
 	u32	vid;
 
 	for (devn = 0; devn < 32; devn++) {
 		for (funn = 0; funn < 8; funn++) {
+			/*
 			if (devn == ctrl->device && funn == ctrl->function)
 				continue;
+			*/
 			/* find out if this entry is for an occupied slot */
 			vid = 0xFFFFFFFF;
-			pci_bus_read_config_dword(ctrl->pci_bus, PCI_DEVFN(devn, funn), PCI_VENDOR_ID, &vid);
+			pci_bus_read_config_dword(ctrl->pci_dev->subordinate, PCI_DEVFN(devn, funn), PCI_VENDOR_ID, &vid);
 
 			if (vid != 0xFFFFFFFF) {
 				func = shpchp_slot_find(busn, devn, funn);

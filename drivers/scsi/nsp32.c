@@ -3440,11 +3440,10 @@ static int nsp32_prom_read_bit(nsp32_hw_data *data)
 static int nsp32_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	nsp32_hw_data    *data = (nsp32_hw_data *)host->hostdata;
 
 	nsp32_msg(KERN_INFO, "pci-suspend: pdev=0x%p, state=%ld, slot=%s, host=0x%p", pdev, state, pci_name(pdev), host);
 
-	pci_save_state     (pdev, data->PciState);
+	pci_save_state     (pdev);
 	pci_disable_device (pdev);
 	pci_set_power_state(pdev, state);
 
@@ -3462,7 +3461,7 @@ static int nsp32_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, 0);
 	pci_enable_wake    (pdev, 0, 0);
-	pci_restore_state  (pdev, data->PciState);
+	pci_restore_state  (pdev);
 
 	reg = nsp32_read2(data->BaseAddress, INDEX_REG);
 
