@@ -166,6 +166,8 @@ shubstats_ioctl(struct inode *inode, struct file *file,
 	int		nasid;
 
         cnode = (cnodeid_t)file->f_dentry->d_fsdata;
+        if (cnode < 0 || cnode >= numnodes)
+                return -ENODEV;
 
         switch (cmd) {
 	case SNDRV_SHUB_CONFIGURE:
