@@ -81,6 +81,9 @@ out:
 
 void scsi_proc_hostdir_add(struct scsi_host_template *sht)
 {
+	if (!sht->proc_info)
+		return;
+
 	down(&global_host_template_sem);
 	if (!sht->present++) {
 		sht->proc_dir = proc_mkdir(sht->proc_name, proc_scsi);
@@ -96,6 +99,9 @@ void scsi_proc_hostdir_add(struct scsi_host_template *sht)
 
 void scsi_proc_hostdir_rm(struct scsi_host_template *sht)
 {
+	if (!sht->proc_info)
+		return;
+
 	down(&global_host_template_sem);
 	if (!--sht->present && sht->proc_dir) {
 		remove_proc_entry(sht->proc_name, proc_scsi);
@@ -189,21 +195,13 @@ static int proc_print_scsidevice(struct device *dev, void *data)
 static int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 {
 	struct Scsi_Host *shost;
-	struct scsi_device *sdev;
 	int error = -ENXIO;
 
 	shost = scsi_host_lookup(host);
 	if (IS_ERR(shost))
 		return PTR_ERR(shost);
 
-	if (!scsi_find_device(shost, channel, id, lun)) {
-		sdev = scsi_add_device(shost, channel, id, lun);
-		if (IS_ERR(sdev))
-			error = PTR_ERR(sdev);
-		else
-			error = 0;
-	}
-
+	error = scsi_scan_host_selected(shost, channel, id, lun, 1);
 	scsi_host_put(shost);
 	return error;
 }

@@ -5862,14 +5862,7 @@ static void __devexit dc395x_remove_one(struct pci_dev *dev)
 	struct Scsi_Host *host = pci_get_drvdata(dev);
 
 	dprintkdbg(DBG_0, "Removing instance\n");
-	if (!host) {
-		dprintkl(KERN_ERR, "no host allocated\n");
-		return;
-	}
-	if (scsi_remove_host(host)) {
-		dprintkl(KERN_ERR, "scsi_remove_host failed\n");
-		return;
-	}
+	scsi_remove_host(host);
 	host_release(host);
 	scsi_host_put(host);
 	pci_set_drvdata(dev, NULL);

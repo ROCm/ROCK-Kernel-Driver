@@ -1553,18 +1553,12 @@ static void nsp_cs_detach(dev_link_t *link)
 		return;
 	}
 
-	if (link->state & DEV_CONFIG) {
+	if (link->state & DEV_CONFIG)
 		nsp_cs_release(link);
-		if (link->state & DEV_STALE_CONFIG) {
-			link->state |= DEV_STALE_LINK;
-			return;
-		}
-	}
 
 	/* Break the link with Card Services */
-	if (link->handle) {
+	if (link->handle)
 		CardServices(DeregisterClient, link->handle);
-	}
 
 	/* Unlink device structure, free bits */
 	*linkp = link->next;
@@ -1792,17 +1786,6 @@ static void nsp_cs_release(dev_link_t *link)
 
 	DEBUG(0, "%s(0x%p)\n", __FUNCTION__, link);
 
-	/*
-	 * If the device is currently in use, we won't release until it
-	 * is actually closed.
-	 */
-	if (link->open) {
-		DEBUG(1, "nsp_cs: release postponed, '%s' still open\n",
-		      link->dev->dev_name);
-		link->state |= DEV_STALE_CONFIG;
-		return;
-	}
-
 	/* Unlink the device chain */
 #if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,2))
 	scsi_unregister_module(MODULE_SCSI_HA, &nsp_driver_template);
@@ -1824,11 +1807,7 @@ static void nsp_cs_release(dev_link_t *link)
 		CardServices(ReleaseIRQ,    link->handle, &link->irq);
 	}
 	link->state &= ~DEV_CONFIG;
-
-	if (link->state & DEV_STALE_LINK) {
-		nsp_cs_detach(link);
-	}
-} /* nsp_cs_release */
+}
 
 /*======================================================================
 

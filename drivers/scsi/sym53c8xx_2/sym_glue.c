@@ -2029,7 +2029,7 @@ attach_failed:
 	printf_info("%s: giving up ...\n", sym_name(np));
 	if (np)
 		sym_free_resources(np);
-	scsi_unregister(instance);
+	scsi_host_put(instance);
 
         return -1;
  }

@@ -40,6 +40,16 @@
 static int scsi_host_next_hn;		/* host_no for next new host */
 
 
+static void scsi_host_cls_release(struct class_device *class_dev)
+{
+	put_device(&class_to_shost(class_dev)->shost_gendev);
+}
+
+static struct class shost_class = {
+	.name		= "scsi_host",
+	.release	= scsi_host_cls_release,
+};
+
 /**
  * scsi_host_cancel - cancel outstanding IO to this host
  * @shost:	pointer to struct Scsi_Host
@@ -64,10 +74,18 @@ void scsi_host_cancel(struct Scsi_Host *shost, int recovery)
  **/
 void scsi_remove_host(struct Scsi_Host *shost)
 {
+	unsigned long flags;
+
 	scsi_host_cancel(shost, 0);
 	scsi_proc_host_rm(shost);
 	scsi_forget_host(shost);
-	scsi_sysfs_remove_host(shost);
+
+	spin_lock_irqsave(shost->host_lock, flags);
+	set_bit(SHOST_DEL, &shost->shost_state);
+	spin_unlock_irqrestore(shost->host_lock, flags);
+
+	class_device_unregister(&shost->shost_classdev);
+	device_del(&shost->shost_gendev);
 }
 
 /**
@@ -89,21 +107,45 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (!shost->can_queue) {
 		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
 				sht->name);
-		error = -EINVAL;
+		return -EINVAL;
 	}
 
-	error = scsi_sysfs_add_host(shost, dev);
-	if (!error)
-		scsi_proc_host_add(shost);
+	if (!shost->shost_gendev.parent)
+		shost->shost_gendev.parent = dev ? dev : &legacy_bus;
+
+	error = device_add(&shost->shost_gendev);
+	if (error)
+		goto out;
+
+	set_bit(SHOST_ADD, &shost->shost_state);
+	get_device(shost->shost_gendev.parent);
+
+	error = class_device_add(&shost->shost_classdev);
+	if (error)
+		goto out_del_gendev;
+
+	get_device(&shost->shost_gendev);
+
+	error = scsi_sysfs_add_host(shost);
+	if (error)
+		goto out_del_classdev;
+
+	scsi_proc_host_add(shost);
+	return error;
+
+ out_del_classdev:
+	class_device_del(&shost->shost_classdev);
+ out_del_gendev:
+	device_del(&shost->shost_gendev);
+ out:
 	return error;
 }
 
-/**
- * scsi_free_sdev - free a scsi hosts resources
- * @shost:	scsi host to free 
- **/
-void scsi_free_shost(struct Scsi_Host *shost)
+static void scsi_host_dev_release(struct device *dev)
 {
+	struct Scsi_Host *shost = dev_to_shost(dev);
+	struct device *parent = dev->parent;
+
 	if (shost->ehandler) {
 		DECLARE_COMPLETION(sem);
 		shost->eh_notify = &sem;
@@ -115,6 +157,8 @@ void scsi_free_shost(struct Scsi_Host *shost)
 
 	scsi_proc_hostdir_rm(shost->hostt);
 	scsi_destroy_command_freelist(shost);
+
+	put_device(parent);
 	kfree(shost);
 }
 
@@ -214,7 +258,18 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	if (rval)
 		goto fail;
 
-	scsi_sysfs_init_host(shost);
+	device_initialize(&shost->shost_gendev);
+	snprintf(shost->shost_gendev.bus_id, BUS_ID_SIZE, "host%d",
+		shost->host_no);
+	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
+		shost->hostt->proc_name);
+	shost->shost_gendev.release = scsi_host_dev_release;
+
+	class_device_initialize(&shost->shost_classdev);
+	shost->shost_classdev.dev = &shost->shost_gendev;
+	shost->shost_classdev.class = &shost_class;
+	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
+		  shost->host_no);
 
 	shost->eh_notify = &complete;
 	/* XXX(hch): handle error return */
@@ -298,4 +353,14 @@ struct Scsi_Host *scsi_host_get(struct Scsi_Host *shost)
 void scsi_host_put(struct Scsi_Host *shost)
 {
 	put_device(&shost->shost_gendev);
+}
+
+int scsi_init_hosts(void)
+{
+	return class_register(&shost_class);
+}
+
+void scsi_exit_hosts(void)
+{
+	class_unregister(&shost_class);
 }
