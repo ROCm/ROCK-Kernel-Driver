@@ -760,7 +760,7 @@ void sr_finish()
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->minor_shift = 0;
-		disk->major_name = cd->cdi.name;
+		strcpy(disk->disk_name, cd->cdi.name);
 		disk->fops = &sr_bdops;
 		disk->flags = GENHD_FL_CD;
 		cd->disk = disk;

@@ -60,7 +60,6 @@
 static int nbd_blksizes[MAX_NBD];
 static int nbd_blksize_bits[MAX_NBD];
 static u64 nbd_bytesizes[MAX_NBD];
-static char nbd_names[MAX_NBD][7];
 
 static struct nbd_device nbd_dev[MAX_NBD];
 static devfs_handle_t devfs_handle;
@@ -531,8 +530,7 @@ static int __init nbd_init(void)
 		disk->first_minor = i;
 		disk->minor_shift = 0;
 		disk->fops = &nbd_fops;
-		sprintf(nbd_names[i], "nbd%d", i);
-		disk->major_name = nbd_names[i];
+		sprintf(disk->disk_name, "nbd%d", i);
 		set_capacity(disk, 0x3ffffe);
 		add_disk(disk);
 	}

@@ -695,13 +695,13 @@ static struct gendisk hd_gendisk[2] = {
 {
 	.major =	MAJOR_NR,
 	.first_minor =	0,
-	.major_name =	"hda",
+	.disk_name =	"hda",
 	.minor_shift =	6,
 	.fops =		&hd_fops,
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
-	.major_name =	"hdb",
+	.disk_name =	"hdb",
 	.minor_shift =	6,
 	.fops =		&hd_fops,
 }
@@ -810,7 +810,7 @@ static void __init hd_geninit(void)
 		sector_t size = hd_info[drive].head *
 			hd_info[drive].sect * hd_info[drive].cyl;
 		set_capacity(hd_gendisk + drive, size);
-		printk ("%s: %ldMB, CHS=%d/%d/%d\n", hd_gendisk[drive].major_name,
+		printk ("%s: %ldMB, CHS=%d/%d/%d\n", hd_gendisk[drive].disk_name,
 			size / 2048, hd_info[drive].cyl,
 			hd_info[drive].head, hd_info[drive].sect);
 	}

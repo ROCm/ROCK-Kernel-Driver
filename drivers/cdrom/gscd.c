@@ -903,7 +903,7 @@ static struct gendisk gscd_disk = {
 	.first_minor = 0,
 	.minor_shift = 0,
 	.fops = &gscd_fops,
-	.major_name = "gscd"
+	.disk_name = "gscd"
 };
 
 static void __exit gscd_exit(void)

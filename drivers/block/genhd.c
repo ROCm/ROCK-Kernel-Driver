@@ -66,7 +66,7 @@ static void add_gendisk(struct gendisk *gp)
 		p = kmalloc(size, GFP_KERNEL);
 		if (!p) {
 			printk(KERN_ERR "out of memory; no partitions for %s\n",
-				gp->major_name);
+				gp->disk_name);
 			gp->minor_shift = 0;
 		} else
 			memset(p, 0, size);

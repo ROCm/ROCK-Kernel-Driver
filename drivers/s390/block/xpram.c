@@ -60,7 +60,6 @@ typedef struct {
 static xpram_device_t xpram_devices[XPRAM_MAX_DEVS];
 static int xpram_sizes[XPRAM_MAX_DEVS];
 static struct gendisk xpram_disks[XPRAM_MAX_DEVS];
-static char xpram_names[XPRAM_MAX_DEV][8];
 static unsigned long xpram_pages;
 static int xpram_devs;
 static devfs_handle_t xpram_devfs_handle;
@@ -475,8 +474,7 @@ static int __init xpram_setup_blkdev(void)
 		disk->first_minor = i;
 		disk->minor_shift = 0;
 		disk->fops = &xpram_devops;
-		sprintf(xpram_names[i], "slram%d", i);
-		disk->major_name = xpram_names[i];
+		sprintf(disk->disk_name, "slram%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);
 	}

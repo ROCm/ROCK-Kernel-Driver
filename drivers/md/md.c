@@ -1287,8 +1287,6 @@ static int do_md_run(mddev_t * mddev)
 	struct list_head *tmp;
 	mdk_rdev_t *rdev;
 	struct gendisk *disk;
-	char *major_name;
-
 
 	if (list_empty(&mddev->disks)) {
 		MD_BUG();
@@ -1395,16 +1393,10 @@ static int do_md_run(mddev_t * mddev)
 	if (!disk)
 		return -ENOMEM;
 	memset(disk, 0, sizeof(struct gendisk));
-	major_name = kmalloc(6, GFP_KERNEL);
-	if (!major_name) {
-		kfree(disk);
-		return -ENOMEM;
-	}
 	disk->major = MD_MAJOR;
 	disk->first_minor = mdidx(mddev);
 	disk->minor_shift = 0;
-	sprintf(major_name, "md%d", mdidx(mddev));
-	disk->major_name = major_name;
+	sprintf(disk->disk_name, "md%d", mdidx(mddev));
 	disk->fops = &md_fops;
 
 	mddev->pers = pers[pnum];
@@ -1416,7 +1408,6 @@ static int do_md_run(mddev_t * mddev)
 	if (err) {
 		printk(KERN_ERR "md: pers->run() failed ...\n");
 		mddev->pers = NULL;
-		kfree(disk->major_name);
 		kfree(disk);
 		return -EINVAL;
 	}
@@ -1547,7 +1538,6 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		if (disk) {
 			del_gendisk(disk);
-			kfree(disk->major_name);
 			kfree(disk);
 		}
 

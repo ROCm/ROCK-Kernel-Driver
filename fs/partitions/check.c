@@ -96,17 +96,17 @@ char *disk_name(struct gendisk *hd, int part, char *buf)
 			if (pos >= 0)
 				return buf + pos;
 		}
-		sprintf(buf, "%s", hd->major_name);
+		sprintf(buf, "%s", hd->disk_name);
 	} else {
 		if (hd->part[part-1].de) {
 			pos = devfs_generate_path(hd->part[part-1].de, buf, 64);
 			if (pos >= 0)
 				return buf + pos;
 		}
-		if (isdigit(hd->major_name[strlen(hd->major_name)-1]))
-			sprintf(buf, "%sp%d", hd->major_name, part);
+		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
+			sprintf(buf, "%sp%d", hd->disk_name, part);
 		else
-			sprintf(buf, "%s%d", hd->major_name, part);
+			sprintf(buf, "%s%d", hd->disk_name, part);
 	}
 	return buf;
 }
@@ -313,7 +313,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 		strncpy(dirname + pos, "../", 3);
 	} else {
 		/*  Unaware driver: construct "real" directory  */
-		sprintf(dirname, "../%s/disc%d", dev->major_name,
+		sprintf(dirname, "../%s/disc%d", dev->disk_name,
 			dev->first_minor >> dev->minor_shift);
 		dir = devfs_mk_dir(NULL, dirname + 3, NULL);
 	}

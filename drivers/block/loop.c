@@ -84,7 +84,6 @@
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static struct gendisk *disks;
-static char *names;
 static devfs_handle_t devfs_handle;      /*  For the directory */
 
 /*
@@ -1053,8 +1052,6 @@ int __init loop_init(void)
 	if (!disks)
 		goto out_mem;
 
-	names = kmalloc(max_loop * 8, GFP_KERNEL);
-
 	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
 		struct gendisk *disk = disks + i;
@@ -1068,8 +1065,7 @@ int __init loop_init(void)
 		disk->major = LOOP_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &lo_fops;
-		sprintf(names + 8*i, "loop%d", i);
-		disk->major_name = names + 8 * i;
+		sprintf(disk->disk_name, "loop%d", i);
 		add_disk(disk);
 	}
 
@@ -1079,7 +1075,6 @@ int __init loop_init(void)
 	return 0;
 
 out_mem:
-	kfree(names);
 	kfree(disks);
 	kfree(loop_dev);
 	printk(KERN_ERR "loop: ran out of memory\n");
@@ -1095,7 +1090,6 @@ void loop_exit(void)
 	if (unregister_blkdev(MAJOR_NR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
 
-	kfree(names);
 	kfree(disks);
 	kfree(loop_dev);
 }

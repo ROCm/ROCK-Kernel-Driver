@@ -128,7 +128,6 @@ struct jsflash {
 /*
  */
 static struct gendisk jsfd_disk[JSF_MAX];
-static char names[JSF_MAX][6];
 
 /*
  * Let's pretend we may have several of these...
@@ -637,8 +636,7 @@ static int jsfd_init(void)
 
 		disk->major = JSFD_MAJOR;
 		disk->first_minor = i;
-		sprintf(names[i], "jsfd%d", i);
-		disk->major_name = names[i];
+		sprintf(disk->disk_name, "jsfd%d", i);
 		disk->fops = &jsfd_fops;
 		disk->minor_shift = 0;
 		set_capacity(disk, jdp->dsize >> 9);

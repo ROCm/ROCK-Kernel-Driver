@@ -396,7 +396,7 @@ devfs_handle_t ubd_fake_dir_handle;
 static int ubd_add(int n)
 {
  	devfs_handle_t real, fake;
-	char name[sizeof("nnnnnn\0")], dev_name[sizeof("ubd0x")];
+	char name[sizeof("nnnnnn\0")];
 	struct ubd *dev = &ubd_dev[n];
 	u64 size;
 
@@ -407,14 +407,17 @@ static int ubd_add(int n)
 	ubd_gendisk[n].first_minor = n << UBD_SHIFT;
 	ubd_gendisk[n].minor_shift = UBD_SHIFT;
 	ubd_gendisk[n].fops = &ubd_fops;
-	ubd_gendisk[n].major_name = fakehd_set ? "hd" : "ubd";	/* XXX */
+	if (fakehd_set)
+		sprintf(ubd_gendisk[n].disk_name, "hd%c", n + 'a');
+	else
+		sprintf(ubd_gendisk[n].disk_name, "ubd%d", n);
 
 	if (fake_major) {
 		fake_gendisk[n].major = fake_major;
 		fake_gendisk[n].first_minor = n << UBD_SHIFT;
 		fake_gendisk[n].minor_shift = UBD_SHIFT;
 		fake_gendisk[n].fops = &ubd_fops;
-		fake_gendisk[n].major_name = "ubd";	/* XXX */
+		sprintf(fake_gendisk[n].disk_name, "ubd%d", n);
 	}
 
 	if (!dev->is_dir && ubd_file_size(dev, &size) == 0) {
@@ -442,12 +445,7 @@ static int ubd_add(int n)
  	if(real == NULL) return(-1);
  	ubd_dev[n].real = real;
  
-	if (!fakehd_set)
-		sprintf(dev_name, "ubd%d", n);
-	else
-		sprintf(dev_name, "hd%c", n + 'a');
-
-	make_ide_entries(dev_name);
+	make_ide_entries(ubd_gendisk[n].name);
 	return(0);
 }
 

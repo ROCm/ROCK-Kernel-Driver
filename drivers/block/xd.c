@@ -129,13 +129,13 @@ static struct gendisk xd_gendisk[2] = {
 {
 	.major =	MAJOR_NR,
 	.first_minor =	0,
-	.major_name =	"xda",
+	.disk_name =	"xda",
 	.minor_shift =	6,
 	.fops =		&xd_fops,
 },{
 	.major =	MAJOR_NR,
 	.first_minor =	64,
-	.major_name =	"xdb",
+	.disk_name =	"xdb",
 	.minor_shift =	6,
 	.fops =		&xd_fops,
 }

@@ -4249,8 +4249,7 @@ int __init floppy_init(void)
 		disks[i].major = MAJOR_NR;
 		disks[i].first_minor = TOMINOR(i);
 		disks[i].fops = &floppy_fops;
-		sprintf(names[i], "fd%d", i);
-		disks[i].major_name = names[i];
+		sprintf(disks[i].disk_name, "fd%d", i);
 	}
 
 	blk_set_probe(MAJOR_NR, floppy_find);

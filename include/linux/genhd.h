@@ -73,10 +73,9 @@ struct hd_struct {
 struct gendisk {
 	int major;			/* major number of driver */
 	int first_minor;
-	const char *major_name;		/* name of major driver */
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
-
+	char disk_name[16];		/* name of major driver */
 	struct hd_struct *part;		/* [indexed by minor] */
 	struct block_device_operations *fops;
 	sector_t capacity;

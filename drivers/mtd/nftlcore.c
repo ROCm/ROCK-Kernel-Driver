@@ -56,7 +56,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 	unsigned long temp;
 	int firstfree = -1;
 	struct gendisk *gd;
-	char *name;
 
 	DEBUG(MTD_DEBUG_LEVEL1,"NFTL_setup\n");
 
@@ -76,11 +75,9 @@ static void NFTL_setup(struct mtd_info *mtd)
 
 	nftl = kmalloc(sizeof(struct NFTLrecord), GFP_KERNEL);
 	gd = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
-	name = kmalloc(6, GFP_KERNEL);
-	if (!nftl || !gd || !name) {
+	if (!nftl || !gd) {
 		kfree(nftl);
 		kfree(gd);
-		kfree(name);
 		printk(KERN_WARNING "Out of memory for NFTL data structures\n");
 		return;
 	}
@@ -96,7 +93,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 		printk(KERN_WARNING "Could not mount NFTL device\n");
 		kfree(nftl);
 		kfree(gd);
-		kfree(name);
 		return;
         }
 
@@ -134,11 +130,10 @@ static void NFTL_setup(struct mtd_info *mtd)
 	}
 	NFTLs[firstfree] = nftl;
 	memset(gd, 0, sizeof(struct gendisk));
-	sprintf(name, "nftl%c", 'a' + firstfree);
+	sprintf(gd->disk_name, "nftl%c", 'a' + firstfree);
 	gd->major = MAJOR_NR;
 	gd->first_minor = firstfree << NFTL_PARTN_BITS;
 	gd->minor_shift = NFTL_PARTN_BITS;
-	gd->major_name = name;
 	set_capacity(gd, nftl->nr_sects);
 	nftl->disk = gd;
 	add_disk(gd);
@@ -157,7 +152,6 @@ static void NFTL_unsetup(int i)
 	if (nftl->EUNtable)
 		kfree(nftl->EUNtable);
 	del_gendisk(nftl->disk);
-	kfree(nftl->disk->major_name);
 	kfree(nftl->disk);
 	kfree(nftl);
 }
