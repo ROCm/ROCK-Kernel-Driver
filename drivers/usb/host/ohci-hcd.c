@@ -863,6 +863,7 @@ static int ohci_restart (struct ohci_hcd *ohci)
 			writel (RH_PS_PSS,
 				&ohci->regs->roothub.portstatus [temp]);
 		ohci_dbg (ohci, "restart complete\n");
+		ohci->hcd.state = USB_STATE_RUNNING;
 	}
 	return 0;
 }
