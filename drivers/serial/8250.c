@@ -2178,7 +2178,7 @@ void serial8250_resume_port(int line)
 /*
  * Register a set of serial devices attached to a platform device.  The
  * list is terminated with a zero flags entry, which means we expect
- * all entries to have at least UPF_AUTOPROBE set.
+ * all entries to have at least UPF_BOOT_AUTOCONF set.
  */
 static int __devinit serial8250_probe(struct device *dev)
 {
@@ -2262,14 +2262,14 @@ static struct device_driver serial8250_isa_driver = {
 	.name		= "serial8250",
 	.bus		= &platform_bus_type,
 	.probe		= serial8250_probe,
-	.remove		= serial8250_remove,
+	.remove		= __devexit_p(serial8250_remove),
 	.suspend	= serial8250_suspend,
 	.resume		= serial8250_resume,
 };
 
 /*
  * This "device" covers _all_ ISA 8250-compatible serial devices listed
- * in the table in include/asm-*/serial.h
+ * in the table in include/asm/serial.h
  */
 static struct platform_device *serial8250_isa_devs;
 

@@ -65,7 +65,7 @@ serial_card_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	memset(&port, 0, sizeof(struct uart_port));
 	port.irq	= ec->irq;
-	port.flags	= UPF_AUTOPROBE | UPF_SHARE_IRQ;
+	port.flags	= UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
 	port.uartclk	= type->uartclk;
 	port.iotype	= UPIO_MEM;
 	port.regshift	= 2;

@@ -1689,7 +1689,7 @@ pciserial_init_one(struct pci_dev *dev, const struct pci_device_id *ent)
 		struct uart_port serial_port;
 		memset(&serial_port, 0, sizeof(struct uart_port));
 
-		serial_port.flags = UPF_SKIP_TEST | UPF_AUTOPROBE |
+		serial_port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF |
 				    UPF_SHARE_IRQ;
 		serial_port.uartclk = board->base_baud * 16;
 		serial_port.irq = get_pci_irq(dev, board, i);
