@@ -24,7 +24,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.116 $"
+#define VERSION_QETH_H 		"$Revision: 1.123 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -557,6 +557,7 @@ enum qeth_ip_types {
 	QETH_IP_TYPE_NORMAL,
 	QETH_IP_TYPE_VIPA,
 	QETH_IP_TYPE_RXIP,
+	QETH_IP_TYPE_DEL_ALL_MC,
 };
 
 enum qeth_cmd_buffer_state {
@@ -713,8 +714,7 @@ struct qeth_card_options {
  */
 enum qeth_threads {
 	QETH_SET_IP_THREAD  = 1,
-	QETH_SET_MC_THREAD  = 2,
-	QETH_RECOVER_THREAD = 4,
+	QETH_RECOVER_THREAD = 2,
 };
 
 struct qeth_card {
@@ -748,7 +748,7 @@ struct qeth_card {
 	volatile unsigned long thread_running_mask;
 	spinlock_t ip_lock;
 	struct list_head ip_list;
-	struct list_head ip_tbd_list;
+	struct list_head *ip_tbd_list;
 	struct qeth_ipato ipato;
 	struct list_head cmd_waiter_list;
 	/* QDIO buffer handling */

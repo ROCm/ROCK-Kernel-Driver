@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.94 $	 $Date: 2004/10/19 09:30:54 $
+ *    $Revision: 1.96 $	 $Date: 2004/11/11 13:42:33 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.94 $"
+#define VERSION_LCS_C  "$Revision: 1.96 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -191,6 +191,7 @@ lcs_alloc_card(void)
 		return NULL;
 	memset(card, 0, sizeof(struct lcs_card));
 	card->lan_type = LCS_FRAME_TYPE_AUTO;
+	card->pkt_seq = 0;
 	card->lancmd_timeout = LCS_LANCMD_TIMEOUT_DEFAULT;
 	/* Allocate io buffers for the read channel. */
 	rc = lcs_alloc_channel(&card->read);
@@ -1874,6 +1875,7 @@ lcs_get_skb(struct lcs_card *card, char *skb_data, unsigned int skb_len)
 	skb->protocol =	card->lan_type_trans(skb, card->dev);
 	card->stats.rx_bytes += skb_len;
 	card->stats.rx_packets++;
+	*((__u32 *)skb->cb) = ++card->pkt_seq;
 	netif_rx(skb);
 }
 
