@@ -1,9 +1,7 @@
 /*
  * Exported symbols for sequencer driver.
- * __NO_VERSION__ because this is still part of sound.o.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 char sequencer_syms_symbol;
