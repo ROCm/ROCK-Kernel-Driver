@@ -601,14 +601,28 @@ Module parameters
     ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
     joystick      - Enable joystick (default off)
     mpu_port      - MPU401 port # (0 = disabled, 0x330,0x300)
+    ac97_quirk    - AC'97 workaround for strange hardware (-1 = default)
+                    -1 = default, don't override
+                     0 = disable
+                     1 = use headphone control as master
+                     2 = swap headphone and master controls
+                     3 = for AD1985, turn on OMS bit and use headphone
 
     Module supports autoprobe and multiple bus-master chips (max 8).
+
     Note: the latest driver supports auto-detection of chip clock.
     if you still encounter too fast playback, specify the clock
     explicitly via the module option "ac97_clock=41194".
 
     The joystick and MPU-401 are supported only certain hardwares.
     MPU401 is experimental,  It doesn't work perfectly.
+
+    The ac97_quirk option is used to enable/override the workaround
+    for specific devices.  Some hardware have swapped output pins
+    between Master and Headphone, or Surround.  The driver provides
+    the auto-detection of known problematic devices, but some might
+    be unknown or wrongly detected.  In such a case, pass the proper
+    value with this option.
 
     The power-management is supported.
     
@@ -668,6 +682,7 @@ Module parameters
                        others) 
 
     Module supports autoprobe and multiple chips (max 8).
+
     Note: the binding of amplifier is dependent on hardware.
     If there is no sound even though all channels are unmuted, try to
     specify other gpio connection via amp_gpio option. 
@@ -711,6 +726,7 @@ Module parameters
     vaio_hack        - alias buffer_top=0x25a800
 
     Module supports autoprobe and multiple chips (max 8).
+
     Note: on some notebooks the buffer address cannot be detected
     automatically, or causes hang-up during initialization.
     In such a case, specify the buffer top address explicity via
@@ -797,6 +813,7 @@ Module parameters
     enable_beep     - enable beep using PCM (enabled as default)
 
     Module supports autoprobe a chip.
+
     Note: the driver may have problems regarding endianess.
 
     The power-management is supported.
@@ -1015,6 +1032,8 @@ Module parameters
 		  0 = auto (defalut), 1 = enable, 2 = disable,
 		  3 = 48k only, 4 = no VRA
 		  [VIA8233/C,8235 only]
+    ac97_quirk  - AC'97 workaround for strange hardware
+                  See the description of intel8x0 module for details.
 
     Module supports autoprobe and multiple bus-master chips (max 8).
 
