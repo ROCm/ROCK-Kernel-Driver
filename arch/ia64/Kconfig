@@ -182,6 +182,10 @@ config VIRTUAL_MEM_MAP
 	  require the DISCONTIGMEM option for your machine. If you are
 	  unsure, say Y.
 
+config HOLES_IN_ZONE
+	bool
+	default y if VIRTUAL_MEM_MAP
+
 config DISCONTIGMEM
 	bool "Discontiguous memory support"
 	depends on (IA64_DIG || IA64_SGI_SN2 || IA64_GENERIC || IA64_HP_ZX1) && NUMA && VIRTUAL_MEM_MAP
