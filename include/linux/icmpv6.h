@@ -85,7 +85,16 @@ struct icmp6hdr {
 #define ICMPV6_MGM_QUERY		130
 #define ICMPV6_MGM_REPORT       	131
 #define ICMPV6_MGM_REDUCTION    	132
+
+#define ICMPV6_NI_QUERY			139
+#define ICMPV6_NI_REPLY			140
+
 #define ICMPV6_MLD2_REPORT		143
+
+#define ICMPV6_DHAAD_REQUEST		144
+#define ICMPV6_DHAAD_REPLY		145
+#define ICMPV6_MOBILE_PREFIX_SOL	146
+#define ICMPV6_MOBILE_PREFIX_ADV	147
 
 /*
  *	Codes for Destination Unreachable
