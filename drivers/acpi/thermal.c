@@ -473,6 +473,7 @@ acpi_thermal_passive (
 			trend, passive->tc1, tz->temperature, 
 			tz->last_temperature, passive->tc2, 
 			tz->temperature, passive->temperature));
+		tz->trips.passive.flags.enabled = 1;
 		/* Heating up? */
 		if (trend > 0)
 			for (i=0; i<passive->devices.count; i++)
@@ -518,6 +519,7 @@ acpi_thermal_active (
 	struct acpi_thermal_active *active = NULL;
 	int                     i = 0;
 	int			j = 0;
+	unsigned long		maxtemp = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_active");
 
@@ -537,7 +539,8 @@ acpi_thermal_active (
 		 * associated with this active threshold.
 		 */
 		if (tz->temperature >= active->temperature) {
-			tz->state.active_index = i;
+			if (active->temperature > maxtemp)
+				tz->state.active_index = i, maxtemp = active->temperature;
 			if (!active->flags.enabled) {
 				for (j = 0; j < active->devices.count; j++) {
 					result = acpi_bus_set_power(active->devices.handles[j], ACPI_STATE_D0);
@@ -591,6 +594,7 @@ acpi_thermal_check (
 	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
 	unsigned long		sleep_time = 0;
 	int			i = 0;
+	struct acpi_thermal_state state = tz->state;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_check");
 
@@ -613,15 +617,15 @@ acpi_thermal_check (
 	 * this function determines when a state is entered, but the 
 	 * individual policy decides when it is exited (e.g. hysteresis).
 	 */
-	if ((tz->trips.critical.flags.valid) && (tz->temperature >= tz->trips.critical.temperature))
-		tz->trips.critical.flags.enabled = 1;
-	if ((tz->trips.hot.flags.valid) && (tz->temperature >= tz->trips.hot.temperature))
-		tz->trips.hot.flags.enabled = 1;
-	if ((tz->trips.passive.flags.valid) && (tz->temperature >= tz->trips.passive.temperature))
-		tz->trips.passive.flags.enabled = 1;
+	if (tz->trips.critical.flags.valid)
+		state.critical |= (tz->temperature >= tz->trips.critical.temperature);
+	if (tz->trips.hot.flags.valid)
+		state.hot |= (tz->temperature >= tz->trips.hot.temperature);
+	if (tz->trips.passive.flags.valid)
+		state.passive |= (tz->temperature >= tz->trips.passive.temperature);
 	for (i=0; i<ACPI_THERMAL_MAX_ACTIVE; i++)
-		if ((tz->trips.active[i].flags.valid) && (tz->temperature >= tz->trips.active[i].temperature))
-			tz->trips.active[i].flags.enabled = 1;
+		if (tz->trips.active[i].flags.valid)
+			state.active |= (tz->temperature >= tz->trips.active[i].temperature);
 
 	/*
 	 * Invoke Policy
@@ -629,13 +633,13 @@ acpi_thermal_check (
 	 * Separated from the above check to allow individual policy to 
 	 * determine when to exit a given state.
 	 */
-	if (tz->trips.critical.flags.enabled)
+	if (state.critical)
 		acpi_thermal_critical(tz);
-	if (tz->trips.hot.flags.enabled)
+	if (state.hot)
 		acpi_thermal_hot(tz);
-	if (tz->trips.passive.flags.enabled)
+	if (state.passive)
 		acpi_thermal_passive(tz);
-	if (tz->trips.active[0].flags.enabled)
+	if (state.active)
 		acpi_thermal_active(tz);
 
 	/*
