@@ -53,13 +53,6 @@ DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
-/*
- * A per-CPU task cache - this relies on the fact that
- * the very last portion of sys_exit() is executed with
- * preemption turned off.
- */
-static task_t *task_cache[NR_CPUS] __cacheline_aligned;
-
 int nr_processes(void)
 {
 	int cpu;
@@ -80,26 +73,8 @@ static kmem_cache_t *task_struct_cachep;
 
 static void free_task(struct task_struct *tsk)
 {
-	/*
-	 * The task cache is effectively disabled right now.
-	 * Do we want it? The slab cache already has per-cpu
-	 * stuff, but the thread info (usually a order-1 page
-	 * allocation) doesn't.
-	 */
-	if (tsk != current) {
-		free_thread_info(tsk->thread_info);
-		free_task_struct(tsk);
-	} else {
-		int cpu = get_cpu();
-
-		tsk = task_cache[cpu];
-		if (tsk) {
-			free_thread_info(tsk->thread_info);
-			free_task_struct(tsk);
-		}
-		task_cache[cpu] = current;
-		put_cpu();
-	}
+	free_thread_info(tsk->thread_info);
+	free_task_struct(tsk);
 }
 
 void __put_task_struct(struct task_struct *tsk)
@@ -220,25 +195,18 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
-	int cpu = get_cpu();
 
 	prepare_to_copy(orig);
 
-	tsk = task_cache[cpu];
-	task_cache[cpu] = NULL;
-	put_cpu();
-	if (!tsk) {
-		tsk = alloc_task_struct();
-		if (!tsk)
-			return NULL;
+	tsk = alloc_task_struct();
+	if (!tsk)
+		return NULL;
 
-		ti = alloc_thread_info(tsk);
-		if (!ti) {
-			free_task_struct(tsk);
-			return NULL;
-		}
-	} else
-		ti = tsk->thread_info;
+	ti = alloc_thread_info(tsk);
+	if (!ti) {
+		free_task_struct(tsk);
+		return NULL;
+	}
 
 	*ti = *orig->thread_info;
 	*tsk = *orig;
