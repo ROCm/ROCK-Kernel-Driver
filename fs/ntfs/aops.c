@@ -43,13 +43,13 @@
  * @uptodate:	whether @bh is now uptodate or not
  *
  * Asynchronous I/O completion handler for reading pages belonging to the
- * attribute address space of an inode. The inodes can either be files or
+ * attribute address space of an inode.  The inodes can either be files or
  * directories or they can be fake inodes describing some attribute.
  *
  * If NInoMstProtected(), perform the post read mst fixups when all IO on the
  * page has been completed and mark the page uptodate or set the error bit on
- * the page. To determine the size of the records that need fixing up, we cheat
- * a little bit by setting the index_block_size in ntfs_inode to the ntfs
+ * the page.  To determine the size of the records that need fixing up, we
+ * cheat a little bit by setting the index_block_size in ntfs_inode to the ntfs
  * record size, and index_block_size_bits, to the log(base 2) of the ntfs
  * record size.
  */
@@ -90,7 +90,6 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 				(unsigned long long)bh->b_blocknr);
 		SetPageError(page);
 	}
-
 	spin_lock_irqsave(&page_uptodate_lock, flags);
 	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
@@ -111,42 +110,30 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 * If none of the buffers had errors then we can set the page uptodate,
 	 * but we first have to perform the post read mst fixups, if the
 	 * attribute is mst protected, i.e. if NInoMstProteced(ni) is true.
+	 * Note we ignore fixup errors as those are detected when
+	 * map_mft_record() is called which gives us per record granularity
+	 * rather than per page granularity.
 	 */
 	if (!NInoMstProtected(ni)) {
 		if (likely(page_uptodate && !PageError(page)))
 			SetPageUptodate(page);
 	} else {
 		char *addr;
-		unsigned int i, recs, nr_err;
+		unsigned int i, recs;
 		u32 rec_size;
 
 		rec_size = ni->itype.index.block_size;
 		recs = PAGE_CACHE_SIZE / rec_size;
+		/* Should have been verified before we got here... */
+		BUG_ON(!recs);
 		addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
-		for (i = nr_err = 0; i < recs; i++) {
-			if (likely(!post_read_mst_fixup((NTFS_RECORD*)(addr +
-					i * rec_size), rec_size)))
-				continue;
-			nr_err++;
-			ntfs_error(ni->vol->sb, "post_read_mst_fixup() failed, "
-					"corrupt %s record 0x%llx. Run chkdsk.",
-					ni->mft_no ? "index" : "mft",
-					(unsigned long long)(((s64)page->index
-					<< PAGE_CACHE_SHIFT >>
-					ni->itype.index.block_size_bits) + i));
-		}
+		for (i = 0; i < recs; i++)
+			post_read_mst_fixup((NTFS_RECORD*)(addr +
+					i * rec_size), rec_size);
 		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_SRC_IRQ);
-		if (likely(!PageError(page))) {
-			if (likely(!nr_err && recs)) {
-				if (likely(page_uptodate))
-					SetPageUptodate(page);
-			} else {
-				ntfs_error(ni->vol->sb, "Setting page error, "
-						"index 0x%lx.", page->index);
-				SetPageError(page);
-			}
-		}
+		if (likely(!PageError(page) && page_uptodate))
+			SetPageUptodate(page);
 	}
 	unlock_page(page);
 	return;

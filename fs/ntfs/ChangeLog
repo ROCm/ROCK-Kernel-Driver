@@ -72,6 +72,15 @@ ToDo/Notes:
 	  thus was not mapped.  (Thanks to Ken MacFerrin for the bug report.)
 	- Drop the runlist lock after the vcn has been read in
 	  fs/ntfs/lcnalloc.c::__ntfs_cluster_free().
+	- Rewrite handling of multi sector transfer errors.  We now do not set
+	  PageError() when such errors are detected in the async i/o handler
+	  fs/ntfs/aops.c::ntfs_end_buffer_async_read().  All users of mst
+	  protected attributes now check the magic of each ntfs record as they
+	  use it and act appropriately.  This has the effect of making errors
+	  granular per ntfs record rather than per page which solves the case
+	  where we cannot access any of the ntfs records in a page when a
+	  single one of them had an mst error.  (Thanks to Ken MacFerrin for
+	  the bug report.)
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 

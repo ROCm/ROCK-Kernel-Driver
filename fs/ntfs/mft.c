@@ -68,20 +68,31 @@ static inline MFT_RECORD *map_mft_record_page(ntfs_inode *ni)
 		if (index > end_index || (mft_vi->i_size & ~PAGE_CACHE_MASK) <
 				ofs + vol->mft_record_size) {
 			page = ERR_PTR(-ENOENT);
+			ntfs_error(vol->sb, "Attemt to read mft record 0x%lx, "
+					"which is beyond the end of the mft.  "
+					"This is probably a bug in the ntfs "
+					"driver.", ni->mft_no);
 			goto err_out;
 		}
 	}
 	/* Read, map, and pin the page. */
 	page = ntfs_map_page(mft_vi->i_mapping, index);
 	if (likely(!IS_ERR(page))) {
-		ni->page = page;
-		ni->page_ofs = ofs;
-		return page_address(page) + ofs;
+		/* Catch multi sector transfer fixup errors. */
+		if (likely(ntfs_is_mft_recordp((le32*)(page_address(page) +
+				ofs)))) {
+			ni->page = page;
+			ni->page_ofs = ofs;
+			return page_address(page) + ofs;
+		}
+		ntfs_error(vol->sb, "Mft record 0x%lx is corrupt.  "
+				"Run chkdsk.", ni->mft_no);
+		ntfs_unmap_page(page);
+		page = ERR_PTR(-EIO);
 	}
 err_out:
 	ni->page = NULL;
 	ni->page_ofs = 0;
-	ntfs_error(vol->sb, "Failed with error code %lu.", -PTR_ERR(page));
 	return (void*)page;
 }
 

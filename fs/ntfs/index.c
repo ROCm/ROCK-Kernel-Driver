@@ -263,7 +263,6 @@ done:
 		ntfs_error(sb, "No index allocation attribute but index entry "
 				"requires one.  Inode 0x%lx is corrupt or "
 				"driver bug.", idx_ni->mft_no);
-		err = -EIO;
 		goto err_out;
 	}
 	/* Get the starting vcn of the index_block holding the child node. */
@@ -301,7 +300,13 @@ fast_descend_into_child_node:
 	if ((u8*)ia < kaddr || (u8*)ia > kaddr + PAGE_CACHE_SIZE) {
 		ntfs_error(sb, "Out of bounds check failed.  Corrupt inode "
 				"0x%lx or driver bug.", idx_ni->mft_no);
-		err = -EIO;
+		goto unm_err_out;
+	}
+	/* Catch multi sector transfer fixup errors. */
+	if (unlikely(!ntfs_is_indx_record(ia->magic))) {
+		ntfs_error(sb, "Index record with vcn 0x%llx is corrupt.  "
+				"Corrupt inode 0x%lx.  Run chkdsk.",
+				(long long)vcn, idx_ni->mft_no);
 		goto unm_err_out;
 	}
 	if (sle64_to_cpu(ia->index_block_vcn) != vcn) {
@@ -311,7 +316,6 @@ fast_descend_into_child_node:
 				(unsigned long long)
 				sle64_to_cpu(ia->index_block_vcn),
 				(unsigned long long)vcn, idx_ni->mft_no);
-		err = -EIO;
 		goto unm_err_out;
 	}
 	if (le32_to_cpu(ia->index.allocated_size) + 0x18 !=
@@ -323,7 +327,6 @@ fast_descend_into_child_node:
 				idx_ni->mft_no,
 				le32_to_cpu(ia->index.allocated_size) + 0x18,
 				idx_ni->itype.index.block_size);
-		err = -EIO;
 		goto unm_err_out;
 	}
 	index_end = (u8*)ia + idx_ni->itype.index.block_size;
@@ -333,7 +336,6 @@ fast_descend_into_child_node:
 				"access!  This is probably a bug in the "
 				"driver.", (unsigned long long)vcn,
 				idx_ni->mft_no);
-		err = -EIO;
 		goto unm_err_out;
 	}
 	index_end = (u8*)&ia->index + le32_to_cpu(ia->index.index_length);
@@ -341,7 +343,6 @@ fast_descend_into_child_node:
 		ntfs_error(sb, "Size of index buffer (VCN 0x%llx) of inode "
 				"0x%lx exceeds maximum size.",
 				(unsigned long long)vcn, idx_ni->mft_no);
-		err = -EIO;
 		goto unm_err_out;
 	}
 	/* The first index entry. */
@@ -359,11 +360,10 @@ fast_descend_into_child_node:
 				(u8*)ie + le16_to_cpu(ie->length) > index_end) {
 			ntfs_error(sb, "Index entry out of bounds in inode "
 					"0x%lx.", idx_ni->mft_no);
-			err = -EIO;
 			goto unm_err_out;
 		}
 		/*
-		 * The last entry cannot contain a ket.  It can however contain
+		 * The last entry cannot contain a key.  It can however contain
 		 * a pointer to a child node in the B+tree so we just break out.
 		 */
 		if (ie->flags & INDEX_ENTRY_END)
@@ -377,7 +377,6 @@ fast_descend_into_child_node:
 				le16_to_cpu(ie->length)) {
 			ntfs_error(sb, "Index entry out of bounds in inode "
 					"0x%lx.", idx_ni->mft_no);
-			err = -EIO;
 			goto unm_err_out;
 		}
 		/* If the keys match perfectly, we setup @ictx and return 0. */
@@ -424,7 +423,6 @@ ia_done:
 	if ((ia->index.flags & NODE_MASK) == LEAF_NODE) {
 		ntfs_error(sb, "Index entry with child node found in a leaf "
 				"node in inode 0x%lx.", idx_ni->mft_no);
-		err = -EIO;
 		goto unm_err_out;
 	}
 	/* Child node present, descend into it. */
@@ -446,11 +444,12 @@ ia_done:
 	}
 	ntfs_error(sb, "Negative child node vcn in inode 0x%lx.",
 			idx_ni->mft_no);
-	err = -EIO;
 unm_err_out:
 	unlock_page(page);
 	ntfs_unmap_page(page);
 err_out:
+	if (!err)
+		err = -EIO;
 	if (actx)
 		ntfs_attr_put_search_ctx(actx);
 	if (m)
@@ -458,6 +457,5 @@ err_out:
 	return err;
 idx_err_out:
 	ntfs_error(sb, "Corrupt index.  Aborting lookup.");
-	err = -EIO;
 	goto err_out;
 }
