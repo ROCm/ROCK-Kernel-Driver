@@ -105,6 +105,7 @@ struct tty_ldisc {
 	char	*name;
 	int	num;
 	int	flags;
+	
 	/*
 	 * The following routines are called from above.
 	 */
@@ -129,6 +130,8 @@ struct tty_ldisc {
 			       char *fp, int count);
 	int	(*receive_room)(struct tty_struct *);
 	void	(*write_wakeup)(struct tty_struct *);
+
+	struct  module *owner;
 };
 
 #define TTY_LDISC_MAGIC	0x5403
