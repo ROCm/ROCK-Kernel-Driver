@@ -455,6 +455,7 @@ extern int scsi_insert_special_cmd(Scsi_Cmnd * SCpnt, int);
 extern void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 			       int block_sectors);
 extern void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt);
+extern int scsi_prep_fn(struct request_queue *q, struct request *req);
 extern void scsi_request_fn(request_queue_t * q);
 extern int scsi_starvation_completion(Scsi_Device * SDpnt);
 

@@ -226,6 +226,8 @@ void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 
 	if (!SHpnt->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
+
+        blk_queue_prep_rq(q, scsi_prep_fn);
 }
 
 #ifdef MODULE
