@@ -1,0 +1,49 @@
+TARGET=$1
+ARCH=$2
+SMP=$3
+CC=$4
+
+# Generate a temporary compile.h
+
+( echo /\* This file is auto generated, version `cat .version` \*/
+
+  echo \#define UTS_MACHINE \"$ARCH\"
+
+  echo -n \#define UTS_VERSION \"\#`cat .version`
+  if [ -n "$SMP" ] ; then echo -n " SMP"; fi
+  echo ' '`date`'"'
+
+  echo \#define LINUX_COMPILE_TIME \"`date +%T`\"
+  echo \#define LINUX_COMPILE_BY \"`whoami`\"
+  echo \#define LINUX_COMPILE_HOST \"`hostname`\"
+
+  if [ -x /bin/dnsdomainname ]; then
+    echo \#define LINUX_COMPILE_DOMAIN \"`dnsdomainname`\"
+  elif [ -x /bin/domainname ]; then
+    echo \#define LINUX_COMPILE_DOMAIN \"`domainname`\"
+  else
+    echo \#define LINUX_COMPILE_DOMAIN
+  fi
+
+  echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | tail -1`\"
+) > .tmpcompile
+
+# Only replace the real compile.h if the new one is different,
+# in order to preserve the timestamp and avoid unnecessary
+# recompilations.
+# We don't consider the file changed if only the date/time changed.
+# A kernel config change will increase the generation number, thus
+# causing compile.h to be updated (including date/time) due to the 
+# changed comment in the
+# first line.
+
+if [ -r $TARGET ] && \
+      grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' $TARGET > .tmpver.1 && \
+      grep -v 'UTS_VERSION\|LINUX_COMPILE_TIME' .tmpcompile > .tmpver.2 && \
+      cmp -s .tmpver.1 .tmpver.2; then
+   echo $TARGET is unchanged;
+   rm -f .tmpcompile
+else
+   mv -f .tmpcompile $TARGET
+fi
+rm -f .tmpver.1 .tmpver.2
