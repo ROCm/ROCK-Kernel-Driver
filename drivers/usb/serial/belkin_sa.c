@@ -244,20 +244,12 @@ exit:
 
 static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 {
-	struct usb_serial *serial;
-
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-
 	dbg("%s port %d", __FUNCTION__, port->number);
 
-	if (serial->dev) {
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
-	}
+	/* shutdown our bulk reads and writes */
+	usb_unlink_urb (port->write_urb);
+	usb_unlink_urb (port->read_urb);
+	usb_unlink_urb (port->interrupt_in_urb);
 } /* belkin_sa_close */
 
 

@@ -492,10 +492,6 @@ bailout:
 static void serial_close(struct tty_struct *tty, struct file * filp)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -520,11 +516,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	int retval = -EINVAL;
-
-	if (!serial)
-		return -ENODEV;
 
 	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
 
@@ -534,7 +526,7 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 	}
 
 	/* pass on to the driver specific version of this function */
-	retval = serial->type->write(port, from_user, buf, count);
+	retval = port->serial->type->write(port, from_user, buf, count);
 
 exit:
 	return retval;
@@ -543,11 +535,7 @@ exit:
 static int serial_write_room (struct tty_struct *tty) 
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	int retval = -EINVAL;
-
-	if (!serial)
-		return -ENODEV;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -557,7 +545,7 @@ static int serial_write_room (struct tty_struct *tty)
 	}
 
 	/* pass on to the driver specific version of this function */
-	retval = serial->type->write_room(port);
+	retval = port->serial->type->write_room(port);
 
 exit:
 	return retval;
@@ -566,11 +554,7 @@ exit:
 static int serial_chars_in_buffer (struct tty_struct *tty) 
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	int retval = -EINVAL;
-
-	if (!serial)
-		return -ENODEV;
 
 	dbg("%s = port %d", __FUNCTION__, port->number);
 
@@ -580,7 +564,7 @@ static int serial_chars_in_buffer (struct tty_struct *tty)
 	}
 
 	/* pass on to the driver specific version of this function */
-	retval = serial->type->chars_in_buffer(port);
+	retval = port->serial->type->chars_in_buffer(port);
 
 exit:
 	return retval;
@@ -589,10 +573,6 @@ exit:
 static void serial_throttle (struct tty_struct * tty)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -602,8 +582,8 @@ static void serial_throttle (struct tty_struct * tty)
 	}
 
 	/* pass on to the driver specific version of this function */
-	if (serial->type->throttle)
-		serial->type->throttle(port);
+	if (port->serial->type->throttle)
+		port->serial->type->throttle(port);
 
 exit:
 	;
@@ -612,10 +592,6 @@ exit:
 static void serial_unthrottle (struct tty_struct * tty)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -625,8 +601,8 @@ static void serial_unthrottle (struct tty_struct * tty)
 	}
 
 	/* pass on to the driver specific version of this function */
-	if (serial->type->unthrottle)
-		serial->type->unthrottle(port);
+	if (port->serial->type->unthrottle)
+		port->serial->type->unthrottle(port);
 
 exit:
 	;
@@ -635,11 +611,7 @@ exit:
 static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	int retval = -ENODEV;
-
-	if (!serial)
-		return -ENODEV;
 
 	dbg("%s - port %d, cmd 0x%.4x", __FUNCTION__, port->number, cmd);
 
@@ -649,8 +621,8 @@ static int serial_ioctl (struct tty_struct *tty, struct file * file, unsigned in
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->ioctl)
-		retval = serial->type->ioctl(port, file, cmd, arg);
+	if (port->serial->type->ioctl)
+		retval = port->serial->type->ioctl(port, file, cmd, arg);
 	else
 		retval = -ENOIOCTLCMD;
 
@@ -661,10 +633,6 @@ exit:
 static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -674,8 +642,8 @@ static void serial_set_termios (struct tty_struct *tty, struct termios * old)
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->set_termios)
-		serial->type->set_termios(port, old);
+	if (port->serial->type->set_termios)
+		port->serial->type->set_termios(port, old);
 
 exit:
 	;
@@ -684,10 +652,6 @@ exit:
 static void serial_break (struct tty_struct *tty, int break_state)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -697,8 +661,8 @@ static void serial_break (struct tty_struct *tty, int break_state)
 	}
 
 	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->break_ctl)
-		serial->type->break_ctl(port, break_state);
+	if (port->serial->type->break_ctl)
+		port->serial->type->break_ctl(port, break_state);
 
 exit:
 	;
@@ -757,10 +721,6 @@ done:
 static int serial_tiocmget (struct tty_struct *tty, struct file *file)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		goto exit;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -769,8 +729,8 @@ static int serial_tiocmget (struct tty_struct *tty, struct file *file)
 		goto exit;
 	}
 
-	if (serial->type->tiocmget)
-		return serial->type->tiocmget(port, file);
+	if (port->serial->type->tiocmget)
+		return port->serial->type->tiocmget(port, file);
 
 exit:
 	return -EINVAL;
@@ -780,10 +740,6 @@ static int serial_tiocmset (struct tty_struct *tty, struct file *file,
 			    unsigned int set, unsigned int clear)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
-
-	if (!serial)
-		goto exit;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
@@ -792,8 +748,8 @@ static int serial_tiocmset (struct tty_struct *tty, struct file *file,
 		goto exit;
 	}
 
-	if (serial->type->tiocmset)
-		return serial->type->tiocmset(port, file, set, clear);
+	if (port->serial->type->tiocmset)
+		return port->serial->type->tiocmset(port, file, set, clear);
 
 exit:
 	return -EINVAL;
@@ -802,16 +758,11 @@ exit:
 void usb_serial_port_softint(void *private)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)private;
-	struct usb_serial *serial;
 	struct tty_struct *tty;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (!port)
-		return;
-
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
 		return;
 
 	tty = port->tty;

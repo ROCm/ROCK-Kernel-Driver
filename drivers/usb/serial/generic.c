@@ -220,18 +220,13 @@ int usb_serial_generic_chars_in_buffer (struct usb_serial_port *port)
 void usb_serial_generic_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+	struct usb_serial *serial = port->serial;
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -270,14 +265,8 @@ void usb_serial_generic_read_bulk_callback (struct urb *urb, struct pt_regs *reg
 void usb_serial_generic_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);

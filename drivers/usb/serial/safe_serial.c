@@ -211,18 +211,12 @@ static __u16 __inline__ fcs_compute10 (unsigned char *sp, int len, __u16 fcs)
 static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	unsigned char *data = urb->transfer_buffer;
 	unsigned char length = urb->actual_length;
 	int i;
 	int result;
 
 	dbg ("%s", __FUNCTION__);
-
-	if (!serial) {
-		dbg ("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg ("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -272,8 +266,8 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb (urb, serial->dev,
-		       usb_rcvbulkpipe (serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb (urb, port->serial->dev,
+		       usb_rcvbulkpipe (port->serial->dev, port->bulk_in_endpointAddress),
 		       urb->transfer_buffer, urb->transfer_buffer_length,
 		       safe_read_bulk_callback, port);
 
@@ -284,7 +278,6 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 static int safe_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
 {
-	struct usb_serial *serial = port->serial;
 	unsigned char *data;
 	int result;
 	int i;
@@ -367,7 +360,7 @@ static int safe_write (struct usb_serial_port *port, int from_user, const unsign
 		printk ("\n");
 	}
 #endif
-	port->write_urb->dev = serial->dev;
+	port->write_urb->dev = port->serial->dev;
 	if ((result = usb_submit_urb (port->write_urb, GFP_KERNEL))) {
 		err ("%s - failed submitting write urb, error %d", __FUNCTION__, result);
 		return 0;

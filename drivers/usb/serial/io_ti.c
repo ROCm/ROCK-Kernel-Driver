@@ -1792,15 +1792,9 @@ exit:
 static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 
 	dbg ("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg ("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg ("%s - nonzero write bulk status received: %d",
@@ -1808,7 +1802,7 @@ static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 
 		if (urb->status == -EPIPE) {
 			/* clear any problem that might have happened on this pipe */
-			usb_clear_halt (serial->dev, urb->pipe);
+			usb_clear_halt (port->serial->dev, urb->pipe);
 		}
 		return;
 	}
@@ -1978,7 +1972,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 
 static void edge_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	struct edgeport_serial *edge_serial;
 	struct edgeport_port *edge_port;
 	int port_number;
@@ -1986,50 +1979,43 @@ static void edge_close (struct usb_serial_port *port, struct file * filp)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
-	edge_serial = usb_get_serial_data(serial);
+	edge_serial = usb_get_serial_data(port->serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
 	
-	if (serial->dev) {
-		/* The bulkreadcompletion routine will check 
-		 * this flag and dump add read data */
-		edge_port->close_pending = 1;
+	/* The bulkreadcompletion routine will check 
+	 * this flag and dump add read data */
+	edge_port->close_pending = 1;
 
-		/* chase the port close */
-		TIChasePort (edge_port);
+	/* chase the port close */
+	TIChasePort (edge_port);
 
-		usb_unlink_urb (port->read_urb);
+	usb_unlink_urb (port->read_urb);
 
-		/* assuming we can still talk to the device,
-		 * send a close port command to it */
-		dbg("%s - send umpc_close_port", __FUNCTION__);
-		port_number = port->number - port->serial->minor;
-		status = TIWriteCommandSync (port->serial->dev,
-					     UMPC_CLOSE_PORT,
-					     (__u8)(UMPM_UART1_PORT + port_number),
-					     0,
-					     NULL,
-					     0);
-		--edge_port->edge_serial->num_ports_open;
-		if (edge_port->edge_serial->num_ports_open <= 0) {
-			/* last port is now closed, let's shut down our interrupt urb */
-			usb_unlink_urb (serial->port[0]->interrupt_in_urb);
-			edge_port->edge_serial->num_ports_open = 0;
-		}
-	edge_port->close_pending = 0;
+	/* assuming we can still talk to the device,
+	 * send a close port command to it */
+	dbg("%s - send umpc_close_port", __FUNCTION__);
+	port_number = port->number - port->serial->minor;
+	status = TIWriteCommandSync (port->serial->dev,
+				     UMPC_CLOSE_PORT,
+				     (__u8)(UMPM_UART1_PORT + port_number),
+				     0,
+				     NULL,
+				     0);
+	--edge_port->edge_serial->num_ports_open;
+	if (edge_port->edge_serial->num_ports_open <= 0) {
+		/* last port is now closed, let's shut down our interrupt urb */
+		usb_unlink_urb (port->serial->port[0]->interrupt_in_urb);
+		edge_port->edge_serial->num_ports_open = 0;
 	}
+	edge_port->close_pending = 0;
 
 	dbg("%s - exited", __FUNCTION__);
 }
 
 static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
 {
-	struct usb_serial *serial = port->serial;
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int result;
 
@@ -2062,8 +2048,8 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
 	/* set up our urb */
-	usb_fill_bulk_urb (port->write_urb, serial->dev,
-			   usb_sndbulkpipe (serial->dev,
+	usb_fill_bulk_urb (port->write_urb, port->serial->dev,
+			   usb_sndbulkpipe (port->serial->dev,
 					    port->bulk_out_endpointAddress),
 			   port->write_urb->transfer_buffer, count,
 			   edge_bulk_out_callback,

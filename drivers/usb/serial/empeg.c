@@ -187,18 +187,10 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 
 static void empeg_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-
-	if (serial->dev) {
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
-	}
+	/* shutdown our bulk read */
+	usb_unlink_urb (port->read_urb);
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
@@ -361,18 +353,12 @@ static void empeg_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -404,8 +390,8 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* Continue trying to always read  */
 	usb_fill_bulk_urb(
 		port->read_urb,
-		serial->dev, 
-		usb_rcvbulkpipe(serial->dev,
+		port->serial->dev, 
+		usb_rcvbulkpipe(port->serial->dev,
 			port->bulk_in_endpointAddress),
 		port->read_urb->transfer_buffer,
 		port->read_urb->transfer_buffer_length,

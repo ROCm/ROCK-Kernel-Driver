@@ -151,16 +151,12 @@ struct omninet_data
 
 static int omninet_open (struct usb_serial_port *port, struct file *filp)
 {
-	struct usb_serial	*serial;
+	struct usb_serial	*serial = port->serial;
 	struct usb_serial_port	*wport;
 	struct omninet_data	*od;
 	int			result = 0;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return -ENODEV;
 
 	od = kmalloc( sizeof(struct omninet_data), GFP_KERNEL );
 	if( !od ) {
@@ -186,21 +182,15 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 
 static void omninet_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial 	*serial;
+	struct usb_serial 	*serial = port->serial;
 	struct usb_serial_port 	*wport;
 	struct omninet_data 	*od;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-
-	if (serial->dev) {
-		wport = serial->port[1];
-		usb_unlink_urb (wport->write_urb);
-		usb_unlink_urb (port->read_urb);
-	}
+	wport = serial->port[1];
+	usb_unlink_urb(wport->write_urb);
+	usb_unlink_urb(port->read_urb);
 
 	od = usb_get_serial_port_data(port);
 	if (od)
@@ -215,8 +205,6 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 static void omninet_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port 	*port 	= (struct usb_serial_port *)urb->context;
-	struct usb_serial	*serial = get_usb_serial (port, __FUNCTION__);
-
 	unsigned char 		*data 	= urb->transfer_buffer;
 	struct omninet_header 	*header = (struct omninet_header *) &data[0];
 
@@ -224,11 +212,6 @@ static void omninet_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	int result;
 
 //	dbg("omninet_read_bulk_callback");
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -253,8 +236,8 @@ static void omninet_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb(urb, serial->dev, 
-		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb(urb, port->serial->dev, 
+		      usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
 		      urb->transfer_buffer, urb->transfer_buffer_length,
 		      omninet_read_bulk_callback, port);
 	result = usb_submit_urb(urb, GFP_ATOMIC);

@@ -294,19 +294,6 @@ extern struct usb_serial_device_type usb_serial_generic_device;
 extern struct bus_type usb_serial_bus_type;
 extern struct tty_driver *usb_serial_tty_driver;
 
-static inline struct usb_serial* get_usb_serial (struct usb_serial_port *port, const char *function) 
-{ 
-	/* if no port was specified, or it fails a paranoia check */
-	if (!port) {
-		/* then say that we don't have a valid usb_serial thing, which will
-		 * end up genrating -ENODEV return values */ 
-		return NULL;
-	}
-
-	return port->serial;
-}
-
-
 static inline void usb_serial_debug_data (const char *file, const char *function, int size, const unsigned char *data)
 {
 	int i;

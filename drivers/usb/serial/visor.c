@@ -443,15 +443,10 @@ exit:
 
 static void visor_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	unsigned char *transfer_buffer;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
 	/* shutdown our urbs */
 	usb_unlink_urb (port->read_urb);
 	if (port->interrupt_in_urb)
@@ -460,8 +455,8 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	/* Try to send shutdown message, if the device is gone, this will just fail. */
 	transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
 	if (transfer_buffer) {
-		usb_control_msg (serial->dev,
-				 usb_rcvctrlpipe(serial->dev, 0),
+		usb_control_msg (port->serial->dev,
+				 usb_rcvctrlpipe(port->serial->dev, 0),
 				 VISOR_CLOSE_NOTIFICATION, 0xc2,
 				 0x0000, 0x0000, 
 				 transfer_buffer, 0x12, 300);
@@ -578,18 +573,12 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -613,9 +602,9 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	bytes_in += urb->actual_length;
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb (port->read_urb, serial->dev,
-			   usb_rcvbulkpipe (serial->dev,
-					    port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb (port->read_urb, port->serial->dev,
+			   usb_rcvbulkpipe(port->serial->dev,
+					   port->bulk_in_endpointAddress),
 			   port->read_urb->transfer_buffer,
 			   port->read_urb->transfer_buffer_length,
 			   visor_read_bulk_callback, port);

@@ -1219,52 +1219,45 @@ static void block_until_tx_empty (struct edgeport_port *edge_port)
  *****************************************************************************/
 static void edge_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	struct edgeport_serial *edge_serial;
 	struct edgeport_port *edge_port;
 	int status;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
-	edge_serial = usb_get_serial_data(serial);
+	edge_serial = usb_get_serial_data(port->serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
 	
-	if (serial->dev) {
-		// block until tx is empty
-		block_until_tx_empty(edge_port);
+	// block until tx is empty
+	block_until_tx_empty(edge_port);
 
-		edge_port->closePending = TRUE;
+	edge_port->closePending = TRUE;
 
-		/* flush and chase */
-		edge_port->chaseResponsePending = TRUE;
+	/* flush and chase */
+	edge_port->chaseResponsePending = TRUE;
 
-		dbg("%s - Sending IOSP_CMD_CHASE_PORT", __FUNCTION__);
-		status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
-		if (status == 0) {
-			// block until chase finished
-			block_until_chase_response(edge_port);
-		} else {
-			edge_port->chaseResponsePending = FALSE;
-		}
+	dbg("%s - Sending IOSP_CMD_CHASE_PORT", __FUNCTION__);
+	status = send_iosp_ext_cmd (edge_port, IOSP_CMD_CHASE_PORT, 0);
+	if (status == 0) {
+		// block until chase finished
+		block_until_chase_response(edge_port);
+	} else {
+		edge_port->chaseResponsePending = FALSE;
+	}
 
-		/* close the port */
-		dbg("%s - Sending IOSP_CMD_CLOSE_PORT", __FUNCTION__);
-		send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
+	/* close the port */
+	dbg("%s - Sending IOSP_CMD_CLOSE_PORT", __FUNCTION__);
+	send_iosp_ext_cmd (edge_port, IOSP_CMD_CLOSE_PORT, 0);
 
-		//port->close = TRUE;
-		edge_port->closePending = FALSE;
-		edge_port->open = FALSE;
-		edge_port->openPending = FALSE;
+	//port->close = TRUE;
+	edge_port->closePending = FALSE;
+	edge_port->open = FALSE;
+	edge_port->openPending = FALSE;
 
-		if (edge_port->write_urb) {
-			usb_unlink_urb (edge_port->write_urb);
-		}
+	if (edge_port->write_urb) {
+		usb_unlink_urb (edge_port->write_urb);
 	}
 
 	if (edge_port->write_urb) {
