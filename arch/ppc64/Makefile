@@ -13,10 +13,10 @@
 # Adjusted for PPC64 by Tom Gall
 #
 
-KERNELLOAD	= 0xc000000000000000
+KERNELLOAD	:= 0xc000000000000000
 
 LDFLAGS		:= -m elf64ppc
-LDFLAGS_vmlinux	= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
+LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 LDFLAGS_BLOB	:= --format binary --oformat elf64-powerpc
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
 		-mtraceback=full -mcpu=power4
@@ -29,21 +29,19 @@ core-y				+= arch/ppc64/mm/
 core-$(CONFIG_XMON)		+= arch/ppc64/xmon/
 drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ppc64/boot $(1)
+boot := arch/ppc64/boot
 
 boottarget-$(CONFIG_PPC_PSERIES) := zImage zImage.initrd
 boottarget-$(CONFIG_PPC_ISERIES) := vmlinux.sminitrd vmlinux.initrd vmlinux.sm
 $(boottarget-y): vmlinux
-	$(call makeboot,arch/ppc64/boot/$@)
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 %_config: arch/ppc64/configs/%_defconfig
 	rm -f .config arch/ppc64/defconfig
 	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
 
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/ppc64/boot
-
-archmrproper:
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 prepare: include/asm-ppc64/offsets.h
 
