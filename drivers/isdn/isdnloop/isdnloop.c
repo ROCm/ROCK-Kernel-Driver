@@ -1345,36 +1345,10 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 					card->l2_proto[a & 255] = (a >> 8);
 				}
 				break;
-		case ISDN_CMD_GETL2:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				if ((c->arg & 255) < ISDNLOOP_BCH)
-					return card->l2_proto[c->arg & 255];
-				else
-					return -ENODEV;
 		case ISDN_CMD_SETL3:
 				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
 					return -ENODEV;
 				return 0;
-		case ISDN_CMD_GETL3:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				if ((c->arg & 255) < ISDNLOOP_BCH)
-					return ISDN_PROTO_L3_TRANS;
-				else
-					return -ENODEV;
-		case ISDN_CMD_GETEAZ:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
-		case ISDN_CMD_SETSIL:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
-		case ISDN_CMD_GETSIL:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
 		default:
 				return -EINVAL;
 			}

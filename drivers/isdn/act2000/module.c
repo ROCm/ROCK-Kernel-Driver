@@ -398,12 +398,6 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 				break;
 			chan->l2prot = (c->arg >> 8);
 			return 0;
-		case ISDN_CMD_GETL2:
-			if (!card->flags & ACT2000_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x0f)))
-				break;
-			return chan->l2prot;
 		case ISDN_CMD_SETL3:
 			if (!card->flags & ACT2000_FLAGS_RUNNING)
 				return -ENODEV;
@@ -414,27 +408,6 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 			if (!(chan = find_channel(card, c->arg & 0x0f)))
 				break;
 			chan->l3prot = (c->arg >> 8);
-			return 0;
-		case ISDN_CMD_GETL3:
-			if (!card->flags & ACT2000_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x0f)))
-				break;
-			return chan->l3prot;
-		case ISDN_CMD_GETEAZ:
-			if (!card->flags & ACT2000_FLAGS_RUNNING)
-				return -ENODEV;
-			printk(KERN_DEBUG "act2000 CMD_GETEAZ not implemented\n");
-			return 0;
-		case ISDN_CMD_SETSIL:
-			if (!card->flags & ACT2000_FLAGS_RUNNING)
-				return -ENODEV;
-			printk(KERN_DEBUG "act2000 CMD_SETSIL not implemented\n");
-			return 0;
-		case ISDN_CMD_GETSIL:
-			if (!card->flags & ACT2000_FLAGS_RUNNING)
-				return -ENODEV;
-			printk(KERN_DEBUG "act2000 CMD_GETSIL not implemented\n");
 			return 0;
         }
 	

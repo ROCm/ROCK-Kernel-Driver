@@ -1605,14 +1605,6 @@ HiSax_command(isdn_ctrl * ic)
 					printk(KERN_DEBUG "HiSax: delay card %d set to %d ms\n",
 						csta->cardnr + 1, num);
 					break;
-				case (3):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_dec_use_count(NULL);
-					break;
-				case (4):
-					for (i = 0; i < *(unsigned int *) ic->parm.num; i++)
-						HiSax_mod_inc_use_count(NULL);
-					break;
 				case (5):	/* set card in leased mode */
 					num = *(unsigned int *) ic->parm.num;
 					if ((num <1) || (num > 2)) {
@@ -1675,12 +1667,6 @@ HiSax_command(isdn_ctrl * ic)
 					}
 					L4L3(chanp->d_st, DL_ESTABLISH | REQUEST, NULL);
 					break;
-#ifdef MODULE
-				case (55):
-					MOD_USE_COUNT = 0;
-					HiSax_mod_inc_use_count(NULL);
-					break;
-#endif				/* MODULE */
 				case (11):
 					num = csta->debug & DEB_DLOG_HEX;
 					csta->debug = *(unsigned int *) ic->parm.num;

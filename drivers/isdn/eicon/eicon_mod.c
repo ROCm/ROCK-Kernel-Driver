@@ -529,12 +529,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 				break;
 			chan->l2prot = (c->arg >> 8);
 			return 0;
-		case ISDN_CMD_GETL2:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x1f)))
-				break;
-			return chan->l2prot;
 		case ISDN_CMD_SETL3:
 			if (!card->flags & EICON_FLAGS_RUNNING)
 				return -ENODEV;
@@ -547,27 +541,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 				eicon_log(card, 128, "idi_cmd: Ch%d: SETL3 struct fax=0x%x\n",chan->No, chan->fax);
 			}
 #endif
-			return 0;
-		case ISDN_CMD_GETL3:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			if (!(chan = find_channel(card, c->arg & 0x1f)))
-				break;
-			return chan->l3prot;
-		case ISDN_CMD_GETEAZ:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "eicon CMD_GETEAZ not implemented\n");
-			return 0;
-		case ISDN_CMD_SETSIL:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "eicon CMD_SETSIL not implemented\n");
-			return 0;
-		case ISDN_CMD_GETSIL:
-			if (!card->flags & EICON_FLAGS_RUNNING)
-				return -ENODEV;
-			eicon_log(card, 1, "eicon CMD_GETSIL not implemented\n");
 			return 0;
 #ifdef CONFIG_ISDN_TTY_FAX
 		case ISDN_CMD_FAXCMD:

@@ -277,9 +277,6 @@ int pcbit_command(isdn_ctrl* ctl)
 	case ISDN_CMD_SETL2:
 		chan->proto = (ctl->arg >> 8);
 		break;
-	case ISDN_CMD_GETL2:
-		return chan->proto;
-		break;
 	case ISDN_CMD_CLREAZ:
 		pcbit_clear_msn(dev);
 		break;
@@ -289,14 +286,6 @@ int pcbit_command(isdn_ctrl* ctl)
 	case ISDN_CMD_SETL3:
 		if ((ctl->arg >> 8) != ISDN_PROTO_L3_TRANS)
 			printk(KERN_DEBUG "L3 protocol unknown\n");
-		break;
-	case ISDN_CMD_GETL3:
-		return ISDN_PROTO_L3_TRANS;
-		break;
-	case ISDN_CMD_GETEAZ:
-	case ISDN_CMD_SETSIL:
-	case ISDN_CMD_GETSIL:
-		printk(KERN_DEBUG "pcbit_command: code %d not implemented yet\n", ctl->command);
 		break;
 	default:
 		printk(KERN_DEBUG "pcbit_command: unknown command\n");

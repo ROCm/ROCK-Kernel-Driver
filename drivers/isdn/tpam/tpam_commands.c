@@ -27,7 +27,6 @@ static int tpam_command_ioctl_dsprun(tpam_card *);
 static int tpam_command_ioctl_loopmode(tpam_card *, u8);
 static int tpam_command_dial(tpam_card *, u32, u8 *);
 static int tpam_command_setl2(tpam_card *, u32, u8);
-static int tpam_command_getl2(tpam_card *, u32);
 static int tpam_command_acceptd(tpam_card *, u32);
 static int tpam_command_acceptb(tpam_card *, u32);
 static int tpam_command_hangup(tpam_card *, u32);
@@ -93,8 +92,6 @@ int tpam_command(isdn_ctrl *c) {
 		case ISDN_CMD_SETL2:
 			return tpam_command_setl2(card, c->arg & 0xff, 
 						  c->arg >> 8);
-		case ISDN_CMD_GETL2:
-			return tpam_command_getl2(card, c->arg);
 		case ISDN_CMD_PROCEED:
 			return tpam_command_proceed(card, c->arg);
 		default:
@@ -362,30 +359,6 @@ static int tpam_command_setl2(tpam_card *card, u32 channel, u8 proto) {
 			return -EINVAL;
 	}
 	return 0;
-}
-
-/*
- * Return the level2 protocol (modem or HDLC).
- *
- * 	card: the board
- * 	channel: the channel number
- *
- * Return: ISDN_PROTO_L2_HDLC/MODEM if OK, <0 if error.
- */
-static int tpam_command_getl2(tpam_card *card, u32 channel) {
-
-	dprintk("TurboPAM(tpam_command_getl2): card=%d, channel=%lu\n",
-		card->id, (unsigned long)channel);
-	
-	/* board must be running */
-	if (!card->running)
-		return -ENODEV;
-
-	/* return the current mode */
-	if (card->channels[channel].realhdlc)
-		return ISDN_PROTO_L2_HDLC;
-	else
-		return ISDN_PROTO_L2_MODEM;
 }
 
 /*
