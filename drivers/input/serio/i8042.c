@@ -153,6 +153,7 @@ static int i8042_flush(void)
 	spin_lock_irqsave(&i8042_lock, flags);
 
 	while ((i8042_read_status() & I8042_STR_OBF) && (i++ < I8042_BUFFER_SIZE)) {
+		udelay(50);
 		data = i8042_read_data();
 		dbg("%02x <- i8042 (flush, %s)", data,
 			i8042_read_status() & I8042_STR_AUXDATA ? "aux" : "kbd");
