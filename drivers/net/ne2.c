@@ -82,6 +82,8 @@ static const char *version = "ne2.c:v0.91 Nov 16 1998 Wim Dumon <wimpie@kotnet.o
 
 #include "8390.h"
 
+#define DRV_NAME "ne2"
+
 /* Some defines that people can play with if so inclined. */
 
 /* Do we perform extra sanity checks on stuff ? */
@@ -284,6 +286,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, NE_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init ne2_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -308,6 +311,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int ne2_procinfo(char *buf, int slot, struct net_device *dev)
 {
@@ -368,7 +372,7 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 		irq = irqs[(POS & 0x60)>>5];
 	}
 
-	if (!request_region(base_addr, NE_IO_EXTENT, dev->name))
+	if (!request_region(base_addr, NE_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 #ifdef DEBUG
@@ -470,7 +474,7 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 
 	/* Snarf the interrupt now.  There's no point in waiting since we cannot
 	   share and the board will usually be enabled. */
-	retval = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev);
+	retval = request_irq(dev->irq, ei_interrupt, 0, DRV_NAME, dev);
 	if (retval) {
 		printk (" unable to get IRQ %d (irqval=%d).\n", 
 				dev->irq, retval);

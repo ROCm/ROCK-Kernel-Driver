@@ -30,7 +30,6 @@
 #define SUPPORTED_WIRELESS_EXT                  16
 
 void prism54_mib_init(islpci_private *);
-void prism54_mib_init_work(islpci_private *);
 
 struct iw_statistics *prism54_get_wireless_stats(struct net_device *);
 void prism54_update_stats(islpci_private *);

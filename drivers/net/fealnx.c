@@ -858,11 +858,16 @@ static int netdev_open(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
+	int i;
 
 	writel(0x00000001, ioaddr + BCR);	/* Reset */
 
 	if (request_irq(dev->irq, &intr_handler, SA_SHIRQ, dev->name, dev))
 		return -EAGAIN;
+
+	for (i = 0; i < 3; i++)
+		writew(((unsigned short*)dev->dev_addr)[i],
+				ioaddr + PAR0 + i*2);
 
 	init_ring(dev);
 

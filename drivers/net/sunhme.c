@@ -68,6 +68,8 @@ static char version[] =
 #include "sunhme.h"
 
 
+#define DRV_NAME "sunhme"
+
 static int macaddr[6];
 
 /* accept MAC address of the form macaddr=0x08,0x00,0x20,0x30,0x40,0x50 */
@@ -3085,7 +3087,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 		printk(KERN_ERR "happymeal(PCI): Cannot find proper PCI device base address.\n");
 		goto err_out_clear_quattro;
 	}
-	if (pci_request_regions(pdev, dev->name)) {
+	if (pci_request_regions(pdev, DRV_NAME)) {
 		printk(KERN_ERR "happymeal(PCI): Cannot obtain PCI resources, "
 		       "aborting.\n");
 		goto err_out_clear_quattro;

@@ -55,6 +55,8 @@ static const char version2[] =
 
 #include "8390.h"
 
+#define DRV_NAME "ne"
+
 /* Some defines that people can play with if so inclined. */
 
 /* Do we support clones that don't adhere to 14,15 of the SAprom ? */
@@ -203,6 +205,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, NE_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init ne_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -227,6 +230,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init ne_probe_isapnp(struct net_device *dev)
 {
@@ -284,7 +288,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	int reg0, ret;
 	static unsigned version_printed;
 
-	if (!request_region(ioaddr, NE_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, NE_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	reg0 = inb_p(ioaddr);

@@ -38,7 +38,7 @@ void mgt_le_to_cpu(int, void *);
 int mgt_set_request(islpci_private *, enum oid_num_t, int, void *);
 
 int mgt_get_request(islpci_private *, enum oid_num_t, int, void *,
-                    union oid_res_t *);
+		    union oid_res_t *);
 
 int mgt_commit_list(islpci_private *, enum oid_num_t *, int);
 

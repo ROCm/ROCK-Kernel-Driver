@@ -766,7 +766,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	i = pci_request_regions(pdev, dev->name);
+	i = pci_request_regions(pdev, DRV_NAME);
 	if (i)
 		goto err_pci_request_regions;
 
@@ -1798,14 +1798,9 @@ static void netdev_rx(struct net_device *dev)
 					np->rx_dma[entry],
 					buflen,
 					PCI_DMA_FROMDEVICE);
-#if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb,
 					np->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len),
-					np->rx_skbuff[entry]->tail, pkt_len);
-#endif
 				pci_dma_sync_single_for_device(np->pci_dev,
 					np->rx_dma[entry],
 					buflen,

@@ -26,6 +26,7 @@
 #include <linux/etherdevice.h>
 #include <linux/if_arp.h>
 
+#include "prismcompat.h"
 #include "isl_38xx.h"
 #include "islpci_eth.h"
 #include "islpci_mgt.h"
@@ -104,7 +105,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 
 	/* check whether the destination queue has enough fragments for the frame */
 	curr_frag = le32_to_cpu(cb->driver_curr_frag[ISL38XX_CB_TX_DATA_LQ]);
-	if (curr_frag - priv->free_data_tx >= ISL38XX_CB_TX_QSIZE) {
+	if (unlikely(curr_frag - priv->free_data_tx >= ISL38XX_CB_TX_QSIZE)) {
 		printk(KERN_ERR "%s: transmit device queue full when awake\n",
 		       ndev->name);
 		netif_stop_queue(ndev);
@@ -120,7 +121,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	/* Check alignment and WDS frame formatting. The start of the packet should
 	 * be aligned on a 4-byte boundary. If WDS is enabled add another 6 bytes
 	 * and add WDS address information */
-	if (((long) skb->data & 0x03) | init_wds) {
+	if (unlikely(((long) skb->data & 0x03) | init_wds)) {
 		/* get the number of bytes to add and re-allign */
 		offset = (4 - (long) skb->data) & 0x03;
 		offset += init_wds ? 6 : 0;
@@ -191,7 +192,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	pci_map_address = pci_map_single(priv->pdev,
 					 (void *) skb->data, skb->len,
 					 PCI_DMA_TODEVICE);
-	if (pci_map_address == 0) {
+	if (unlikely(pci_map_address == 0)) {
 		printk(KERN_WARNING "%s: cannot map buffer to PCI\n",
 		       ndev->name);
 
@@ -207,7 +208,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	priv->data_low_tx[index] = skb;
 	/* set the proper fragment start address and size information */
 	fragment->size = cpu_to_le16(frame_size);
-	fragment->flags = cpu_to_le16(0);  /* set to 1 if more fragments */
+	fragment->flags = cpu_to_le16(0);	/* set to 1 if more fragments */
 	fragment->address = cpu_to_le32(pci_map_address);
 	curr_frag++;
 
@@ -217,7 +218,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 	cb->driver_curr_frag[ISL38XX_CB_TX_DATA_LQ] = cpu_to_le32(curr_frag);
 
 	if (curr_frag - priv->free_data_tx + ISL38XX_MIN_QTHRESHOLD
-	                                           > ISL38XX_CB_TX_QSIZE) {
+	    > ISL38XX_CB_TX_QSIZE) {
 		/* stop sends from upper layers */
 		netif_stop_queue(ndev);
 
@@ -238,7 +239,7 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 
 	return 0;
 
- drop_free:
+      drop_free:
 	/* free the skbuf structure before aborting */
 	dev_kfree_skb(skb);
 	skb = NULL;
@@ -261,9 +262,9 @@ islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
 	if (priv->ndev->type == ARPHRD_IEEE80211_PRISM) {
 		struct avs_80211_1_header *avs;
 		/* extract the relevant data from the header */
-		u32 clock = hdr->clock;
+		u32 clock = le32_to_cpu(hdr->clock);
 		u8 rate = hdr->rate;
-		u16 freq = be16_to_cpu(hdr->freq);
+		u16 freq = le16_to_cpu(hdr->freq);
 		u8 rssi = hdr->rssi;
 
 		skb_pull(*skb, sizeof (struct rfmon_header));
@@ -274,7 +275,7 @@ islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
 									 avs_80211_1_header),
 								 0, GFP_ATOMIC);
 			if (newskb) {
-				kfree_skb(*skb);
+				dev_kfree_skb_irq(*skb);
 				*skb = newskb;
 			} else
 				return -1;
@@ -286,21 +287,21 @@ islpci_monitor_rx(islpci_private *priv, struct sk_buff **skb)
 		    (struct avs_80211_1_header *) skb_push(*skb,
 							   sizeof (struct
 								   avs_80211_1_header));
-
-		avs->version = htonl(P80211CAPTURE_VERSION);
-		avs->length = htonl(sizeof (struct avs_80211_1_header));
-		avs->mactime = __cpu_to_be64(clock);
-		avs->hosttime = __cpu_to_be64(jiffies);
-		avs->phytype = htonl(6);	/*OFDM: 6 for (g), 8 for (a) */
-		avs->channel = htonl(channel_of_freq(freq));
-		avs->datarate = htonl(rate * 5);
-		avs->antenna = htonl(0);	/*unknown */
-		avs->priority = htonl(0);	/*unknown */
-		avs->ssi_type = htonl(2);	/*2: dBm, 3: raw RSSI */
-		avs->ssi_signal = htonl(rssi);
-		avs->ssi_noise = htonl(priv->local_iwstatistics.qual.noise);	/*better than 'undefined', I assume */
-		avs->preamble = htonl(0);	/*unknown */
-		avs->encoding = htonl(0);	/*unknown */
+		
+		avs->version = cpu_to_be32(P80211CAPTURE_VERSION);
+		avs->length = cpu_to_be32(sizeof (struct avs_80211_1_header));
+		avs->mactime = cpu_to_be64(le64_to_cpu(clock));
+		avs->hosttime = cpu_to_be64(jiffies);
+		avs->phytype = cpu_to_be32(6);	/*OFDM: 6 for (g), 8 for (a) */
+		avs->channel = cpu_to_be32(channel_of_freq(freq));
+		avs->datarate = cpu_to_be32(rate * 5);
+		avs->antenna = cpu_to_be32(0);	/*unknown */
+		avs->priority = cpu_to_be32(0);	/*unknown */
+		avs->ssi_type = cpu_to_be32(3);	/*2: dBm, 3: raw RSSI */
+		avs->ssi_signal = cpu_to_be32(rssi & 0x7f);
+		avs->ssi_noise = cpu_to_be32(priv->local_iwstatistics.qual.noise);	/*better than 'undefined', I assume */
+		avs->preamble = cpu_to_be32(0);	/*unknown */
+		avs->encoding = cpu_to_be32(0);	/*unknown */
 	} else
 		skb_pull(*skb, sizeof (struct rfmon_header));
 
@@ -381,10 +382,10 @@ islpci_eth_receive(islpci_private *priv)
 	skb->dev = ndev;
 
 	/* take care of monitor mode and spy monitoring. */
-	if (priv->iw_mode == IW_MODE_MONITOR)
+	if (unlikely(priv->iw_mode == IW_MODE_MONITOR))
 		discard = islpci_monitor_rx(priv, &skb);
 	else {
-		if (skb->data[2 * ETH_ALEN] == 0) {
+		if (unlikely(skb->data[2 * ETH_ALEN] == 0)) {
 			/* The packet has a rx_annex. Read it for spy monitoring, Then
 			 * remove it, while keeping the 2 leading MAC addr.
 			 */
@@ -417,8 +418,8 @@ islpci_eth_receive(islpci_private *priv)
 	     skb->data[0], skb->data[1], skb->data[2], skb->data[3],
 	     skb->data[4], skb->data[5]);
 #endif
-	if (discard) {
-		dev_kfree_skb(skb);
+	if (unlikely(discard)) {
+		dev_kfree_skb_irq(skb);
 		skb = NULL;
 	} else
 		netif_rx(skb);
@@ -433,11 +434,13 @@ islpci_eth_receive(islpci_private *priv)
 	       index - priv->free_data_rx < ISL38XX_CB_RX_QSIZE) {
 		/* allocate an sk_buff for received data frames storage
 		 * include any required allignment operations */
-		if (skb = dev_alloc_skb(MAX_FRAGMENT_SIZE_RX + 2), skb == NULL) {
+		skb = dev_alloc_skb(MAX_FRAGMENT_SIZE_RX + 2);
+		if (unlikely(skb == NULL)) {
 			/* error allocating an sk_buff structure elements */
 			DEBUG(SHOW_ERROR_MESSAGES, "Error allocating skb \n");
 			break;
 		}
+		skb_reserve(skb, (4 - (long) skb->data) & 0x03);
 		/* store the new skb structure pointer */
 		index = index % ISL38XX_CB_RX_QSIZE;
 		priv->data_low_rx[index] = skb;
@@ -453,13 +456,13 @@ islpci_eth_receive(islpci_private *priv)
 		    pci_map_single(priv->pdev, (void *) skb->data,
 				   MAX_FRAGMENT_SIZE_RX + 2,
 				   PCI_DMA_FROMDEVICE);
-		if (priv->pci_map_rx_address[index] == (dma_addr_t) NULL) {
+		if (unlikely(priv->pci_map_rx_address[index] == (dma_addr_t) NULL)) {
 			/* error mapping the buffer to device accessable memory address */
 			DEBUG(SHOW_ERROR_MESSAGES,
 			      "Error mapping DMA address\n");
 
 			/* free the skbuf structure before aborting */
-			dev_kfree_skb((struct sk_buff *) skb);
+			dev_kfree_skb_irq((struct sk_buff *) skb);
 			skb = NULL;
 			break;
 		}
@@ -484,10 +487,10 @@ islpci_eth_receive(islpci_private *priv)
 void
 islpci_do_reset_and_wake(void *data)
 {
-       islpci_private *priv = (islpci_private *) data;
-       islpci_reset(priv, 1);
-       netif_wake_queue(priv->ndev);
-       priv->reset_task_pending = 0;
+	islpci_private *priv = (islpci_private *) data;
+	islpci_reset(priv, 1);
+	netif_wake_queue(priv->ndev);
+	priv->reset_task_pending = 0;
 }
 
 void

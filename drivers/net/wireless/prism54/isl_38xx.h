@@ -22,14 +22,6 @@
 
 #include <linux/version.h>
 #include <asm/io.h>
-
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,75))
-#include <linux/device.h>
-# define _REQ_FW_DEV_T struct device *
-#else
-# define _REQ_FW_DEV_T char *
-#endif
-
 #include <asm/byteorder.h>
 
 #define ISL38XX_CB_RX_QSIZE                     8
@@ -173,7 +165,5 @@ void isl38xx_handle_sleep_request(isl38xx_control_block *, int *,
 void isl38xx_handle_wakeup(isl38xx_control_block *, int *, void *);
 void isl38xx_trigger_device(int, void *);
 void isl38xx_interface_reset(void *, dma_addr_t);
-
-int isl38xx_upload_firmware(char *, _REQ_FW_DEV_T, void *, dma_addr_t);
 
 #endif				/* _ISL_38XX_H */

@@ -45,3 +45,20 @@ config ARM_ETHER00
 	  number (MTD support is required for this). Otherwise you will
 	  need to set a suitable hw address using ifconfig.
 
+config SMC91X
+	tristate "SMC 91C9x/91C1xxx support"
+	select CRC32
+	select MII
+	depends on ARM
+	help
+	  This is a driver for SMC's 91x series of Ethernet chipsets,
+	  including the SMC91C94 and the SMC91C111. Say Y if you want it
+	  compiled into the kernel, and read the file
+	  <file:Documentation/networking/smc9.txt>  and the Ethernet-HOWTO,
+	  available from  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called smc91x.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt> as well
+	  as <file:Documentation/networking/net-modules.txt>.
