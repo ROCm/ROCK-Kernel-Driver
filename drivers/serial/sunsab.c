@@ -763,20 +763,15 @@ static void sunsab_convert_to_sab(struct uart_sunsab_port *up, unsigned int cfla
 }
 
 /* port->lock is not held.  */
-static void sunsab_change_speed(struct uart_port *port, unsigned int cflag,
-				unsigned int iflag, unsigned int quot)
+static void sunsab_set_termios(struct uart_port *port, struct termios *termios,
+			       struct termios *old)
 {
 	struct uart_sunsab_port *up = (struct uart_sunsab_port *) port;
 	unsigned long flags;
-	int baud;
+	int baud = uart_get_baud_rate(port, termios);
 
 	spin_lock_irqsave(&up->port.lock, flags);
-
-	/* Undo what generic UART core did.  */
-	baud = (SAB_BASE_BAUD / (quot * 16));
-
-	sunsab_convert_to_sab(up, cflag, iflag, baud);
-
+	sunsab_convert_to_sab(up, termios->c_cflag, termios->c_iflag, baud);
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
@@ -819,7 +814,7 @@ static struct uart_ops sunsab_pops = {
 	.break_ctl	= sunsab_break_ctl,
 	.startup	= sunsab_startup,
 	.shutdown	= sunsab_shutdown,
-	.change_speed	= sunsab_change_speed,
+	.set_termios	= sunsab_set_termios,
 	.type		= sunsab_type,
 	.release_port	= sunsab_release_port,
 	.request_port	= sunsab_request_port,
