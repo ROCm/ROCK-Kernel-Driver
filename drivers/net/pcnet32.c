@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30c"
-#define DRV_RELDATE	"05.25.2004"
+#define DRV_VERSION	"1.30d"
+#define DRV_RELDATE	"06.07.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -1502,13 +1502,15 @@ pcnet32_purge_tx_ring(struct net_device *dev)
     int i;
 
     for (i = 0; i < TX_RING_SIZE; i++) {
+	lp->tx_ring[i].status = 0;	/* CPU owns buffer */
+	wmb();	/* Make sure adapter sees owner change */
 	if (lp->tx_skbuff[i]) {
 	    pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[i],
 		    lp->tx_skbuff[i]->len, PCI_DMA_TODEVICE);
 	    dev_kfree_skb_any(lp->tx_skbuff[i]);
-	    lp->tx_skbuff[i] = NULL;
-	    lp->tx_dma_addr[i] = 0;
 	}
+	lp->tx_skbuff[i] = NULL;
+	lp->tx_dma_addr[i] = 0;
     }
 }
 
@@ -1537,21 +1539,23 @@ pcnet32_init_ring(struct net_device *dev)
 	    skb_reserve (rx_skbuff, 2);
 	}
 
+	rmb();
 	if (lp->rx_dma_addr[i] == 0)
 	    lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev, rx_skbuff->tail,
 		    PKT_BUF_SZ-2, PCI_DMA_FROMDEVICE);
 	lp->rx_ring[i].base = (u32)le32_to_cpu(lp->rx_dma_addr[i]);
 	lp->rx_ring[i].buf_length = le16_to_cpu(2-PKT_BUF_SZ);
+	wmb();
 	lp->rx_ring[i].status = le16_to_cpu(0x8000);
     }
     /* The Tx buffer address is filled in as needed, but we do need to clear
      * the upper ownership bit. */
     for (i = 0; i < TX_RING_SIZE; i++) {
+	lp->tx_ring[i].status = 0;	/* CPU owns buffer */
+	wmb();	/* Make sure adapter sees owner change */
 	lp->tx_ring[i].base = 0;
-	lp->tx_ring[i].status = 0;
 	lp->tx_dma_addr[i] = 0;
     }
-    wmb(); /* Make sure all changes are visible */
 
     lp->init_block.tlen_rlen = le16_to_cpu(TX_RING_LEN_BITS | RX_RING_LEN_BITS);
     for (i = 0; i < 6; i++)
@@ -1560,6 +1564,7 @@ pcnet32_init_ring(struct net_device *dev)
 	    offsetof(struct pcnet32_private, rx_ring));
     lp->init_block.tx_ring = (u32)le32_to_cpu(lp->dma_addr +
 	    offsetof(struct pcnet32_private, tx_ring));
+    wmb(); /* Make sure all changes are visible */
     return 0;
 }
 
@@ -1569,6 +1574,15 @@ pcnet32_restart(struct net_device *dev, unsigned int csr0_bits)
     struct pcnet32_private *lp = dev->priv;
     unsigned long ioaddr = dev->base_addr;
     int i;
+
+    /* wait for stop */
+    for (i=0; i<100; i++)
+	if (lp->a.read_csr(ioaddr, 0) & 0x0004)
+	    break;
+
+    if (i >= 100 && netif_msg_drv(lp))
+	printk(KERN_ERR "%s: pcnet32_restart timed out waiting for stop.\n",
+		dev->name);
 
     pcnet32_purge_tx_ring(dev);
     if (pcnet32_init_ring(dev))
@@ -1878,18 +1892,18 @@ pcnet32_rx(struct net_device *dev)
 	    short pkt_len = (le32_to_cpu(lp->rx_ring[entry].msg_length) & 0xfff)-4;
 	    struct sk_buff *skb;
 
-	    if (pkt_len < 60) {
+	    if (unlikely(pkt_len > PKT_BUF_SZ - 2)) {
+		if (netif_msg_drv(lp))
+		    printk(KERN_ERR "%s: Impossible packet size %d!\n",
+			    dev->name, pkt_len);
+		lp->stats.rx_errors++;
+	    } else if (pkt_len < 60) {
 		if (netif_msg_rx_err(lp))
 		    printk(KERN_ERR "%s: Runt packet!\n", dev->name);
 		lp->stats.rx_errors++;
 	    } else {
 		int rx_in_place = 0;
 
-		if (unlikely(pkt_len > PKT_BUF_SZ - 2)) {
-		    if (netif_msg_drv(lp))
-		        printk(KERN_ERR "%s: Impossible packet size %u!\n", dev->name, pkt_len);
-		    skb = NULL;
-	        } else
 		if (pkt_len > rx_copybreak) {
 		    struct sk_buff *newskb;
 
