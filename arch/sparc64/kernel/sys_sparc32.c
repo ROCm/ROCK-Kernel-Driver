@@ -1001,7 +1001,7 @@ typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, 
 static long do_readv_writev32(int type, struct file *file,
 			      const struct iovec32 *vector, u32 count)
 {
-	unsigned long tot_len;
+	__kernel_ssize_t32 tot_len;
 	struct iovec iovstack[UIO_FASTIOV];
 	struct iovec *iov=iovstack, *ivp;
 	struct inode *inode;
@@ -1031,13 +1031,19 @@ static long do_readv_writev32(int type, struct file *file,
 	tot_len = 0;
 	i = count;
 	ivp = iov;
+	retval = -EINVAL;
 	while(i > 0) {
-		u32 len;
+		__kernel_ssize_t32 tmp = tot_len;
+		__kernel_ssize_t32 len;
 		u32 buf;
 
 		__get_user(len, &vector->iov_len);
 		__get_user(buf, &vector->iov_base);
+		if (len < 0)	/* size_t not fittina an ssize_t32 .. */
+			goto out;
 		tot_len += len;
+		if (tot_len < tmp) /* maths overflow on the ssize_t32 */
+			goto out;
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t) len;
 		vector++;
