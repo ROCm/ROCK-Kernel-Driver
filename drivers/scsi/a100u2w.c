@@ -100,7 +100,7 @@
 #include <scsi/scsi_host.h>
 #include "scsi.h"
 
-#include "inia100.h"
+#include "a100u2w.h"
 
 #define ORC_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
 
