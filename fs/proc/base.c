@@ -623,8 +623,10 @@ static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
 				} while (i);
 
 				ino = fake_ino(pid, PROC_PID_FD_DIR + fd);
-				if (filldir(dirent, buf+j, NUMBUF-j, fd+2, ino, DT_LNK) < 0)
+				if (filldir(dirent, buf+j, NUMBUF-j, fd+2, ino, DT_LNK) < 0) {
+					read_lock(&files->file_lock);
 					break;
+				}
 				read_lock(&files->file_lock);
 			}
 			read_unlock(&files->file_lock);

@@ -1473,7 +1473,9 @@ out_nofds:
 
 static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
-	err  = put_user(stat->dev, &statbuf->st_dev);
+	int err;
+
+	err = put_user(stat->dev, &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
 	err |= put_user(stat->nlink, &statbuf->st_nlink);
