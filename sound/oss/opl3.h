@@ -1,9 +1,3 @@
-/*
- *	opl3.h
- *
- * Copyright:	Christoph Hellwig <chhellwig@gmx.net>
- *
- */
 
 int opl3_detect (int ioaddr, int *osp);
 int opl3_init(int ioaddr, int *osp, struct module *owner);

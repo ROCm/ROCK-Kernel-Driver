@@ -130,11 +130,7 @@ static void cyberjack_shutdown (struct usb_serial *serial)
 	
 	dbg (__FUNCTION__);
 
-	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			cyberjack_close (&serial->port[i], NULL);
-		}
 		/* My special items, the standard routines free my urbs */
 		if (serial->port[i].private)
 			kfree(serial->port[i].private);
@@ -151,31 +147,27 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	++port->open_count;
+	/* force low_latency on so that our tty_push actually forces
+	 * the data through, otherwise it is scheduled, and with high
+	 * data rates (like with OHCI) data can get lost.
+	 */
+	port->tty->low_latency = 1;
 
-	if (port->open_count == 1) {
-		/* force low_latency on so that our tty_push actually forces
-		 * the data through, otherwise it is scheduled, and with high
-		 * data rates (like with OHCI) data can get lost.
-		 */
-		port->tty->low_latency = 1;
+	priv = (struct cyberjack_private *)port->private;
+	priv->rdtodo = 0;
+	priv->wrfilled = 0;
+	priv->wrsent = 0;
 
-		priv = (struct cyberjack_private *)port->private;
-		priv->rdtodo = 0;
-		priv->wrfilled = 0;
-		priv->wrsent = 0;
+	/* shutdown any bulk reads that might be going on */
+	usb_unlink_urb (port->write_urb);
+	usb_unlink_urb (port->read_urb);
+	usb_unlink_urb (port->interrupt_in_urb);
 
-		/* shutdown any bulk reads that might be going on */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		usb_unlink_urb (port->interrupt_in_urb);
-
-		port->interrupt_in_urb->dev = port->serial->dev;
-		result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-		if (result)
-			err(" usb_submit_urb(read int) failed");
-		dbg(__FUNCTION__ " - usb_submit_urb(int urb)");
-	}
+	port->interrupt_in_urb->dev = port->serial->dev;
+	result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+	if (result)
+		err(" usb_submit_urb(read int) failed");
+	dbg(__FUNCTION__ " - usb_submit_urb(int urb)");
 
 	return result;
 }
@@ -184,16 +176,11 @@ static void cyberjack_close (struct usb_serial_port *port, struct file *filp)
 {
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (port->serial->dev) {
-			/* shutdown any bulk reads that might be going on */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->read_urb);
-			usb_unlink_urb (port->interrupt_in_urb);
-		}
-		port->open_count = 0;
+	if (port->serial->dev) {
+		/* shutdown any bulk reads that might be going on */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
+		usb_unlink_urb (port->interrupt_in_urb);
 	}
 }
 

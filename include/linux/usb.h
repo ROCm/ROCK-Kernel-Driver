@@ -588,7 +588,7 @@ typedef void (*usb_complete_t)(struct urb *);
 /**
  * struct urb - USB Request Block
  * @urb_list: For use by current owner of the URB.
- * @next: Used primarily to link ISO requests into rings.
+ * @next: Used to link ISO requests into rings.
  * @pipe: Holds endpoint number, direction, type, and max packet size.
  *	Create these values with the eight macros available;
  *	usb_{snd,rcv}TYPEpipe(dev,endpoint), where the type is "ctrl"
@@ -627,8 +627,9 @@ typedef void (*usb_complete_t)(struct urb *);
  * @start_frame: Returns the initial frame for interrupt or isochronous
  *	transfers.
  * @number_of_packets: Lists the number of ISO transfer buffers.
- * @interval: Specifies the polling interval for interrupt transfers, in
- *	milliseconds.
+ * @interval: Specifies the polling interval for interrupt or isochronous
+ *	transfers.  The units are frames (milliseconds) for for full and low
+ *	speed devices, and microframes (1/8 millisecond) for highspeed ones.
  * @error_count: Returns the number of ISO transfers that reported errors.
  * @context: For use in completion functions.  This normally points to
  *	request-specific driver context.
@@ -668,12 +669,16 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * Control URBs must provide a setup_packet.
  *
- * Interupt UBS must provide an interval, saying how often (in milliseconds)
+ * Interrupt UBS must provide an interval, saying how often (in milliseconds
+ * or, for highspeed devices, 125 microsecond units)
  * to poll for transfers.  After the URB has been submitted, the interval
  * and start_frame fields reflect how the transfer was actually scheduled.
  * The polling interval may be more frequent than requested.
  * For example, some controllers have a maximum interval of 32 microseconds,
  * while others support intervals of up to 1024 microseconds.
+ * Isochronous URBs also have transfer intervals.  (Note that for isochronous
+ * endpoints, as well as high speed interrupt endpoints, the encoding of
+ * the transfer interval in the endpoint descriptor is logarithmic.)
  *
  * Isochronous URBs normally use the USB_ISO_ASAP transfer flag, telling
  * the host controller to schedule the transfer as soon as bandwidth
@@ -682,8 +687,8 @@ typedef void (*usb_complete_t)(struct urb *);
  * and handle the case where the transfer can't begin then.  However, drivers
  * won't know how bandwidth is currently allocated, and while they can
  * find the current frame using usb_get_current_frame_number () they can't
- * know the range for that frame number.  (Common ranges for the frame
- * counter include 256, 512, and 1024 frames.)
+ * know the range for that frame number.  (Ranges for frame counter values
+ * are HC-specific, and can go from 256 to 65536 frames from "now".)
  *
  * Isochronous URBs have a different data transfer model, in part because
  * the quality of service is only "best effort".  Callers provide specially
@@ -734,7 +739,7 @@ struct urb
 	unsigned char *setup_packet;	/* (in) setup packet (control only) */
 	int start_frame;		/* (modify) start frame (INT/ISO) */
 	int number_of_packets;		/* (in) number of ISO packets */
-	int interval;                   /* (in) polling interval (INT only) */
+	int interval;                   /* (in) transfer interval (INT/ISO) */
 	int error_count;		/* (return) number of ISO errors */
 	int timeout;			/* (in) timeout, in jiffies */
 	void *context;			/* (in) context for completion */

@@ -25,7 +25,8 @@ A simple daemon which translates the jogdial movements into mouse wheel events
 can be downloaded at: <http://www.alcove-labs.org/en/software/sonypi/>
 
 This driver supports also some ioctl commands for setting the LCD screen
-brightness (some more commands may be added in the future).
+brightness and querying the batteries charge information (some more 
+commands may be added in the future).
 
 This driver can also be used to set the camera controls on Picturebook series
 (brightness, contrast etc), and is used by the video4linux driver for the 

@@ -130,7 +130,7 @@ check_for_demasq(struct sk_buff **pskb)
 	struct ip_conntrack *ct;
 	int ret;
 
-	protocol = find_proto(iph->protocol);
+	protocol = ip_ct_find_proto(iph->protocol);
 
 	/* We don't feed packets to conntrack system unless we know
            they're part of an connection already established by an

@@ -2161,7 +2161,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 		if (signal_pending(current))
 			break;
 
-		if (timeout && ((orig_jiffies + timeout) < jiffies))
+		if (timeout && time_after(jiffies, orig_jiffies + timeout))
 			break;
 
 		serial_out(info, UART_ESI_CMD1, ESI_NO_COMMAND);

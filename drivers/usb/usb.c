@@ -791,9 +791,22 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 // usbcore-internal ...
 // but usb_dec_dev_use() is #defined to this, and that's public!!
+// FIXME the public call should BUG() whenever count goes to zero,
+// the usbcore-internal one should do so _unless_ it does so...
 void usb_free_dev(struct usb_device *dev)
 {
 	if (atomic_dec_and_test(&dev->refcnt)) {
+		/* Normally only goes to zero in usb_disconnect(), from
+		 * khubd or from roothub shutdown (rmmod/apmd/... thread).
+		 * Abnormally, roothub init errors can happen, so HCDs
+		 * call this directly.
+		 *
+		 * Otherwise this is a nasty device driver bug, often in
+		 * disconnect processing.
+		 */
+		if (in_interrupt ())
+			BUG ();
+
 		dev->bus->op->deallocate(dev);
 		usb_destroy_configuration(dev);
 

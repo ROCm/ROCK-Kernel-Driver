@@ -224,8 +224,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 		ehci->periodic [i] = EHCI_LIST_END;
 
 	/* software shadow of hardware table */
-	ehci->pshadow = kmalloc (ehci->periodic_size * sizeof (void *),
-		flags & ~EHCI_SLAB_FLAGS);
+	ehci->pshadow = kmalloc (ehci->periodic_size * sizeof (void *), flags);
 	if (ehci->pshadow == 0) {
 		dbg ("no shadow periodic table");
 		ehci_mem_cleanup (ehci);

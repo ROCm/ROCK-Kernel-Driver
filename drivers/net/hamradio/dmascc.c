@@ -1121,6 +1121,7 @@ static void rx_bh(void *arg) {
       skb->protocol = ntohs(ETH_P_AX25);
       skb->mac.raw = skb->data;
       netif_rx(skb);
+      priv->dev->last_rx = jiffies;
       priv->stats.rx_packets++;
       priv->stats.rx_bytes += cb;
     }

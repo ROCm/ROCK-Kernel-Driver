@@ -5,7 +5,7 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-q.c,v 1.6 2002/01/19 00:23:15 dbrownell Exp $
+ * $Id: ohci-q.c,v 1.8 2002/03/27 20:57:01 dbrownell Exp $
  */
 
 static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
@@ -54,124 +54,81 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 
 /*
  * URB goes back to driver, and isn't reissued.
- * It's completely gone from HC data structures, so no locking
- * is needed ... or desired! (Giveback can call back to hcd.)
+ * It's completely gone from HC data structures.
+ * PRECONDITION:  no locks held  (Giveback can call into HCD.)
  */
-static inline void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
+static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 {
-	if (urb->hcpriv) {
-		urb_free_priv (ohci, urb->hcpriv);
-		urb->hcpriv = NULL;
+	unsigned long	flags;
+
+#ifdef DEBUG
+	if (!urb->hcpriv) {
+		err ("already unlinked!");
+		BUG ();
 	}
+#endif
+
+	urb_free_priv (ohci, urb->hcpriv);
+	urb->hcpriv = NULL;
+
+	spin_lock_irqsave (&urb->lock, flags);
+	if (likely (urb->status == -EINPROGRESS))
+		urb->status = 0;
+	spin_unlock_irqrestore (&urb->lock, flags);
+
+#ifdef OHCI_VERBOSE_DEBUG
+	urb_print (urb, "RET", usb_pipeout (urb->pipe));
+#endif
 	usb_hcd_giveback_urb (&ohci->hcd, urb);
 }
 
 static void td_submit_urb (struct urb *urb);
 
-/*
- * URB is reported to driver, is reissued if it's periodic.
- */
-static int return_urb (struct ohci_hcd *hc, struct urb *urb)
+/* Report interrupt transfer completion, maybe reissue */
+static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 {
 	urb_priv_t	*urb_priv = urb->hcpriv;
-	struct urb	*urbt;
 	unsigned long	flags;
-	int		i;
 
-#ifdef DEBUG
-	if (!urb_priv) {
-		err ("already unlinked!");
-		BUG ();
-	}
-
-	/* just to be sure */
-	if (!urb->complete) {
-		err ("no completion!");
-		BUG ();
-	}
-#endif
-
-#ifdef OHCI_VERBOSE_DEBUG
-	urb_print (urb, "RET", usb_pipeout (urb->pipe));
-#endif
-
-	switch (usb_pipetype (urb->pipe)) {
-  		case PIPE_INTERRUPT:
 #ifdef CONFIG_PCI
 // FIXME rewrite this resubmit path.  use pci_dma_sync_single()
 // and requeue more cheaply, and only if needed.
-			pci_unmap_single (hc->hcd.pdev,
-				urb_priv->td [0]->data_dma,
-				urb->transfer_buffer_length,
-				usb_pipeout (urb->pipe)
-					? PCI_DMA_TODEVICE
-					: PCI_DMA_FROMDEVICE);
+// Better yet ... abolish the notion of automagic resubmission.
+	pci_unmap_single (hc->hcd.pdev,
+		urb_priv->td [0]->data_dma,
+		urb->transfer_buffer_length,
+		usb_pipeout (urb->pipe)
+			? PCI_DMA_TODEVICE
+			: PCI_DMA_FROMDEVICE);
 #endif
-			/* FIXME: MP race.  If another CPU partially unlinks
-			 * this URB (urb->status was updated, hasn't yet told
-			 * us to dequeue) before we call complete() here, an
-			 * extra "unlinked" completion will be reported...
-			 */
-			urb->complete (urb);
+	/* FIXME: MP race.  If another CPU partially unlinks
+	 * this URB (urb->status was updated, hasn't yet told
+	 * us to dequeue) before we call complete() here, an
+	 * extra "unlinked" completion will be reported...
+	 */
 
-			/* always requeued, but ED_SKIP if complete() unlinks.
-			 * removed from periodic table only at SOF intr.
-			 */
-  			urb->actual_length = 0;
-			if (urb_priv->state != URB_DEL)
-				urb->status = -EINPROGRESS;
-			spin_lock_irqsave (&hc->lock, flags);
-			td_submit_urb (urb);
-			spin_unlock_irqrestore (&hc->lock, flags);
-  			break;
+	spin_lock_irqsave (&urb->lock, flags);
+	if (likely (urb->status == -EINPROGRESS))
+		urb->status = 0;
+	spin_unlock_irqrestore (&urb->lock, flags);
 
-		case PIPE_ISOCHRONOUS:
-			for (urbt = urb->next;
-					urbt && (urbt != urb);
-					urbt = urbt->next)
-				continue;
-			if (urbt) { /* send the reply and requeue URB */	
-#ifdef CONFIG_PCI
-// FIXME rewrite this resubmit path too
-				pci_unmap_single (hc->hcd.pdev,
-					urb_priv->td [0]->data_dma,
-					urb->transfer_buffer_length,
-					usb_pipeout (urb->pipe)
-						? PCI_DMA_TODEVICE
-						: PCI_DMA_FROMDEVICE);
+#ifdef OHCI_VERBOSE_DEBUG
+	urb_print (urb, "INTR", usb_pipeout (urb->pipe));
 #endif
-				urb->complete (urb);
-				spin_lock_irqsave (&hc->lock, flags);
-				urb->actual_length = 0;
-  				urb->status = -EINPROGRESS;
-  				urb->start_frame = urb_priv->ed->last_iso + 1;
-  				if (urb_priv->state != URB_DEL) {
-  					for (i = 0; i < urb->number_of_packets;
-							i++) {
-  						urb->iso_frame_desc [i]
-							.actual_length = 0;
-  						urb->iso_frame_desc [i]
-							.status = -EXDEV;
-  					}
-  					td_submit_urb (urb);
-  				}
-// FIXME if not deleted, should have been "finished"
-  				spin_unlock_irqrestore (&hc->lock, flags);
+	urb->complete (urb);
 
-  			} else { /* not reissued */
-				finish_urb (hc, urb);
-			}		
-			break;
+	/* always requeued, but ED_SKIP if complete() unlinks.
+	 * EDs are removed from periodic table only at SOF intr.
+	 */
+	urb->actual_length = 0;
+	spin_lock_irqsave (&urb->lock, flags);
+	if (urb_priv->state != URB_DEL)
+		urb->status = -EINPROGRESS;
+	spin_unlock (&urb->lock);
 
-		/*
-		 * C/B requests that get here are never reissued.
-		 */
-		case PIPE_BULK:
-		case PIPE_CONTROL:
-			finish_urb (hc, urb);
-			break;
-	}
-	return 0;
+	spin_lock (&hc->lock);
+	td_submit_urb (urb);
+	spin_unlock_irqrestore (&hc->lock, flags);
 }
 
 
@@ -329,6 +286,26 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 
 /*-------------------------------------------------------------------------*/
 
+/* scan the periodic table to find and unlink this ED */
+static void periodic_unlink (
+	struct ohci_hcd	*ohci,
+	struct ed	*ed,
+	unsigned	index,
+	unsigned	period
+) {
+	for (; index < NUM_INTS; index += period) {
+		__u32	*ed_p = &ohci->hcca->int_table [index];
+
+		while (*ed_p != 0) {
+			if ((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
+				*ed_p = ed->hwNextED;		
+				break;
+			}
+			ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED);
+		}
+	}	
+}
+
 /* unlink an ed from one of the HC chains. 
  * just the link to the ed is unlinked.
  * the link from the ed still points to another operational ed or 0
@@ -336,11 +313,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
  */
 static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed) 
 {
-	int	int_branch;
 	int	i;
-	int	inter;
-	int	interval;
-	__u32	*ed_p;
 
 	ed->hwINFO |= ED_SKIP;
 
@@ -384,22 +357,9 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		break;
 
 	case PIPE_INTERRUPT:
-		int_branch = ed->int_branch;
-		interval = ed->int_interval;
-
-		for (i = 0; i < ep_rev (6, interval); i += inter) {
-			for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i) + int_branch]), inter = 1; 
-				 (*ed_p != 0) && (*ed_p != ed->hwNextED); 
-				ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED), 
-				inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval)) {				
-					if ((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
-			  			*ed_p = ed->hwNextED;		
-			  			break;
-			  		}
-			  }
-		}
-		for (i = int_branch; i < NUM_INTS; i += interval)
-		    ohci->ohci_int_load [i] -= ed->int_load;
+		periodic_unlink (ohci, ed, ed->int_branch, ed->int_interval);
+		for (i = ed->int_branch; i < NUM_INTS; i += ed->int_interval)
+			ohci->ohci_int_load [i] -= ed->int_load;
 #ifdef OHCI_VERBOSE_DEBUG
 		ohci_dump_periodic (ohci, "UNLINK_INT");
 #endif
@@ -412,21 +372,10 @@ static int ep_unlink (struct ohci_hcd *ohci, struct ed *ed)
 			(dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))
 		    		->ed_prev = ed->ed_prev;
 
-		if (ed->ed_prev != NULL) {
+		if (ed->ed_prev != NULL)
 			ed->ed_prev->hwNextED = ed->hwNextED;
-		} else {
-			for (i = 0; i < NUM_INTS; i++) {
-				for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i)]); 
-						*ed_p != 0; 
-						ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) {
-					// inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->int_interval);
-					if ((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
-						*ed_p = ed->hwNextED;		
-						break;
-					}
-				}
-			}	
-		}	
+		else
+			periodic_unlink (ohci, ed, 0, 1);
 #ifdef OHCI_VERBOSE_DEBUG
 		ohci_dump_periodic (ohci, "UNLINK_ISO");
 #endif
@@ -584,6 +533,12 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 		return;
 	}
 
+#if 0
+	/* no interrupt needed except for URB's last TD */
+	if (index != (urb_priv->length - 1))
+		info |= TD_DI;
+#endif
+
 	/* use this td as the next dummy */
 	td_pt = urb_priv->td [index];
 	td_pt->hwNextTD = 0;
@@ -660,6 +615,9 @@ static void td_submit_urb (struct urb *urb)
 	} else
 		data = 0;
 
+	/* NOTE:  TD_CC is set so we can tell which TDs the HC processed by
+	 * using TD_CC_GET, as well as by seeing them on the done list.
+	 */
 	switch (usb_pipetype (urb->pipe)) {
 		case PIPE_BULK:
 			info = usb_pipeout (urb->pipe)
@@ -726,8 +684,14 @@ static void td_submit_urb (struct urb *urb)
 
 		case PIPE_ISOCHRONOUS:
 			for (cnt = 0; cnt < urb->number_of_packets; cnt++) {
-				td_fill (ohci, TD_CC | TD_ISO
-					| ((urb->start_frame + cnt) & 0xffff), 
+				int	frame = urb->start_frame;
+
+				// FIXME scheduling should handle frame counter
+				// roll-around ... exotic case (and OHCI has
+				// a 2^16 iso range, vs other HCs max of 2^10)
+				frame += cnt * urb->interval;
+				frame &= 0xffff;
+				td_fill (ohci, TD_CC | TD_ISO | frame,
 				    data + urb->iso_frame_desc [cnt].offset, 
 				    urb->iso_frame_desc [cnt].length, urb, cnt); 
 			}
@@ -741,50 +705,77 @@ static void td_submit_urb (struct urb *urb)
  * Done List handling functions
  *-------------------------------------------------------------------------*/
 
-/* calculate the transfer length and update the urb */
-
-static void dl_transfer_length (struct td *td)
+/* calculate transfer length/status and update the urb
+ * PRECONDITION:  irqsafe (only for urb->status locking)
+ */
+static void td_done (struct urb *urb, struct td *td)
 {
-	__u32		tdINFO, tdBE, tdCBP;
- 	__u16		tdPSW;
- 	struct urb	*urb = td->urb;
- 	urb_priv_t	*urb_priv = urb->hcpriv;
-	int		dlen = 0;
-	int		cc = 0;
-
-	tdINFO = le32_to_cpup (&td->hwINFO);
-  	tdBE   = le32_to_cpup (&td->hwBE);
-  	tdCBP  = le32_to_cpup (&td->hwCBP);
+	u32	tdINFO = le32_to_cpup (&td->hwINFO);
+	int	cc = 0;
 
 
+	/* ISO ... drivers see per-TD length/status */
   	if (tdINFO & TD_ISO) {
- 		tdPSW = le16_to_cpu (td->hwPSW [0]);
- 		cc = (tdPSW >> 12) & 0xF;
-		if (cc < 0xE)  {
-			if (usb_pipeout (urb->pipe)) {
-				dlen = urb->iso_frame_desc [td->index].length;
-			} else {
-				dlen = tdPSW & 0x3ff;
-			}
-			urb->actual_length += dlen;
-			urb->iso_frame_desc [td->index].actual_length = dlen;
-			if (! (urb->transfer_flags & USB_DISABLE_SPD)
-					&& (cc == TD_DATAUNDERRUN))
-				cc = TD_CC_NOERROR;
+ 		u16	tdPSW = le16_to_cpu (td->hwPSW [0]);
+		int	dlen = 0;
 
-			urb->iso_frame_desc [td->index].status
-				= cc_to_error [cc];
+ 		cc = (tdPSW >> 12) & 0xF;
+		if (! ((urb->transfer_flags & USB_DISABLE_SPD)
+				&& (cc == TD_DATAUNDERRUN)))
+			cc = TD_CC_NOERROR;
+
+		if (usb_pipeout (urb->pipe))
+			dlen = urb->iso_frame_desc [td->index].length;
+		else
+			dlen = tdPSW & 0x3ff;
+		urb->actual_length += dlen;
+		urb->iso_frame_desc [td->index].actual_length = dlen;
+		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
+
+		if (cc != 0)
+			dbg ("  urb %p iso TD %d len %d CC %d",
+				urb, td->index, dlen, cc);
+
+	/* BULK, INT, CONTROL ... drivers see aggregate length/status,
+	 * except that "setup" bytes aren't counted and "short" transfers
+	 * might not be reported as errors.
+	 */
+	} else {
+		int	type = usb_pipetype (urb->pipe);
+		u32	tdBE = le32_to_cpup (&td->hwBE);
+
+  		cc = TD_CC_GET (tdINFO);
+
+		/* control endpoints only have soft stalls */
+  		if (type != PIPE_CONTROL && cc == TD_CC_STALL)
+			usb_endpoint_halt (urb->dev,
+				usb_pipeendpoint (urb->pipe),
+				usb_pipeout (urb->pipe));
+
+		/* update packet status if needed (short may be ok) */
+		if (((urb->transfer_flags & USB_DISABLE_SPD) != 0
+				&& cc == TD_DATAUNDERRUN))
+			cc = TD_CC_NOERROR;
+		if (cc != TD_CC_NOERROR) {
+			spin_lock (&urb->lock);
+			if (urb->status == -EINPROGRESS)
+				urb->status = cc_to_error [cc];
+			spin_unlock (&urb->lock);
 		}
-	} else { /* BULK, INT, CONTROL DATA */
-		if (! (usb_pipetype (urb->pipe) == PIPE_CONTROL && 
-				 ((td->index == 0)
-				 || (td->index == urb_priv->length - 1)))) {
- 			if (tdBE != 0) {
-				urb->actual_length += (td->hwCBP == 0)
-					? (tdBE - td->data_dma + 1)
-					: (tdCBP - td->data_dma);
-			}
-  		}
+
+		/* count all non-empty packets except control SETUP packet */
+		if ((type != PIPE_CONTROL || td->index != 0) && tdBE != 0) {
+			if (td->hwCBP == 0)
+				urb->actual_length += tdBE - td->data_dma + 1;
+			else
+				urb->actual_length +=
+					  le32_to_cpup (&td->hwCBP)
+					- td->data_dma;
+		}
+
+		if (cc != 0)
+			dbg ("  urb %p TD %d CC %d, len=%d",
+				urb, td->index, cc, urb->actual_length);
   	}
 }
 
@@ -811,13 +802,16 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 		if (TD_CC_GET (le32_to_cpup (&td_list->hwINFO))) {
 			urb_priv = (urb_priv_t *) td_list->urb->hcpriv;
-			dbg (" USB-error/status: %x : %p", 
-				TD_CC_GET (le32_to_cpup (&td_list->hwINFO)),
-				td_list);
-			/* typically the endpoint halted too */
+			/* typically the endpoint halts on error; un-halt,
+			 * and maybe dequeue other TDs from this urb
+			 */
 			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
+					dbg ("urb %p TD %d of %d, patch ED",
+						td_list->urb,
+						1 + td_list->index,
+						urb_priv->length);
 					td_list->ed->hwHeadP = 
 			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
 				    & __constant_cpu_to_le32 (TD_MASK))
@@ -870,16 +864,19 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 				le32_to_cpup (&td->hwNextTD));
 			if ((urb_priv->state == URB_DEL)) {
 				tdINFO = le32_to_cpup (&td->hwINFO);
+				/* HC may have partly processed this TD */
 				if (TD_CC_GET (tdINFO) < 0xE)
-					dl_transfer_length (td);
+					td_done (urb, td);
 				*td_p = td->hwNextTD | (*td_p
 					& __constant_cpu_to_le32 (0x3));
 
 				/* URB is done; clean up */
-				if (++ (urb_priv->td_cnt) == urb_priv->length)
-// FIXME:  we shouldn't hold ohci->lock here, else the
-// completion function can't talk to this hcd ...
+				if (++ (urb_priv->td_cnt) == urb_priv->length) {
+     					spin_unlock_irqrestore (&ohci->lock,
+						flags);
 					finish_urb (ohci, urb);
+					spin_lock_irqsave (&ohci->lock, flags);
+				}
 			} else {
 				td_p = &td->hwNextTD;
 			}
@@ -931,71 +928,52 @@ static void dl_del_list (struct ohci_hcd *ohci, unsigned int frame)
 /*-------------------------------------------------------------------------*/
 
 /*
- * process normal completions (error or success) and some unlinked eds
- * this is the main path for handing urbs back to drivers
+ * Process normal completions (error or success) and clean the schedules.
+ *
+ * This is the main path for handing urbs back to drivers.  The only other
+ * path is dl_del_list(), which unlinks URBs by scanning EDs, instead of
+ * scanning the (re-reversed) donelist as this does.
  */
-static void dl_done_list (struct ohci_hcd *ohci, struct td *td_list)
+static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
 {
-  	struct td	*td_list_next = NULL;
-	struct ed	*ed;
-	int		cc = 0;
-	struct urb	*urb;
-	urb_priv_t	*urb_priv;
- 	__u32		tdINFO;
+	unsigned long	flags;
 
- 	unsigned long flags;
+  	spin_lock_irqsave (&ohci->lock, flags);
+  	while (td) {
+		struct td	*td_next = td->next_dl_td;
+		struct urb	*urb = td->urb;
+		urb_priv_t	*urb_priv = urb->hcpriv;
+		struct ed	*ed = td->ed;
 
-  	while (td_list) {
-   		td_list_next = td_list->next_dl_td;
+		/* update URB's length and status from TD */
+   		td_done (urb, td);
+  		urb_priv->td_cnt++;
 
-  		urb = td_list->urb;
-  		urb_priv = urb->hcpriv;
-  		tdINFO = le32_to_cpup (&td_list->hwINFO);
+		/* If all this urb's TDs are done, call complete().
+		 * Interrupt transfers are the only special case:
+		 * they're reissued, until "deleted" by usb_unlink_urb
+		 * (real work done in a SOF intr, by dl_del_list).
+		 */
+  		if (urb_priv->td_cnt == urb_priv->length) {
+			int	resubmit;
 
-   		ed = td_list->ed;
+			resubmit = usb_pipeint (urb->pipe)
+					&& (urb_priv->state != URB_DEL);
 
-   		dl_transfer_length (td_list);
-
-  		/* error code of transfer */
-  		cc = TD_CC_GET (tdINFO);
-  		if (cc == TD_CC_STALL)
-			usb_endpoint_halt (urb->dev,
-				usb_pipeendpoint (urb->pipe),
-				usb_pipeout (urb->pipe));
-
-  		if (! (urb->transfer_flags & USB_DISABLE_SPD)
-				&& (cc == TD_DATAUNDERRUN))
-			cc = TD_CC_NOERROR;
-
-  		if (++ (urb_priv->td_cnt) == urb_priv->length) {
-			/*
-			 * Except for periodic transfers, both branches do
-			 * the same thing.  Periodic urbs get reissued until
-			 * they're "deleted" (in SOF intr) by usb_unlink_urb.
-			 */
-			if ((ed->state & (ED_OPER | ED_UNLINK))
-					&& (urb_priv->state != URB_DEL)) {
-				spin_lock (&urb->lock);
-				if (urb->status == -EINPROGRESS)
-  					urb->status = cc_to_error [cc];
-				spin_unlock (&urb->lock);
-  				return_urb (ohci, urb);
-  			} else
+     			spin_unlock_irqrestore (&ohci->lock, flags);
+			if (resubmit)
+  				intr_resub (ohci, urb);
+  			else
   				finish_urb (ohci, urb);
+  			spin_lock_irqsave (&ohci->lock, flags);
   		}
 
-  		spin_lock_irqsave (&ohci->lock, flags);
-  		if (ed->state != ED_NEW) { 
-  			u32 edHeadP = ed->hwHeadP;
-
-			/* unlink eds if they are not busy */
-			edHeadP &= __constant_cpu_to_le32 (ED_MASK);
-     			if ((edHeadP == ed->hwTailP) && (ed->state == ED_OPER)) 
-     				ep_unlink (ohci, ed);
-     		}	
-     		spin_unlock_irqrestore (&ohci->lock, flags);
-
-    		td_list = td_list_next;
+		/* clean schedule:  unlink EDs that are no longer busy */
+		if ((ed->hwHeadP & __constant_cpu_to_le32 (TD_MASK))
+					== ed->hwTailP
+				&& (ed->state == ED_OPER)) 
+			ep_unlink (ohci, ed);
+    		td = td_next;
   	}  
+	spin_unlock_irqrestore (&ohci->lock, flags);
 }
-

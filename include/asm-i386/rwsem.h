@@ -164,7 +164,7 @@ LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old valu
 		"  jmp       1b\n"
 		LOCK_SECTION_END
 		"# ending __up_read\n"
-		: "+m"(sem->count), "+d"(tmp)
+		: /*"+m"(sem->count),*/ "+d"(tmp)
 		: "a"(sem)
 		: "memory", "cc");
 }

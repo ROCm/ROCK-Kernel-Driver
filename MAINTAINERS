@@ -1437,8 +1437,6 @@ P:	Anton Blanchard
 M:	anton@samba.org
 L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
-W:	http://ultra.linux.cz
-W:	http://www.geog.ubc.ca/s_linux.html
 S:	Maintained
 
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
@@ -1501,6 +1499,13 @@ SYSV FILESYSTEM
 P:	Christoph Hellwig
 M:	hch@infradead.org
 S:	Maintained
+
+TI GRAPH LINK USB (SilverLink) CABLE DRIVER
+P:     Romain Lievin
+M:     roms@lpg.ticalc.org
+P:     Julien Blache
+M:     jb@technologeek.org
+S:     Maintained
 
 TLAN NETWORK DRIVER
 P:	Torben Mathiasen
@@ -1660,6 +1665,7 @@ P:	Petko Manolov
 M:	petkan@users.sourceforge.net
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
+W:	http://pegasus2.sourceforge.net/
 S:	Maintained
 
 USB PRINTER DRIVER
@@ -1667,6 +1673,14 @@ P:	Vojtech Pavlik
 M:	vojtech@suse.cz
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
+S:	Maintained
+
+USB RTL8150 DRIVER
+P:	Petko Manolov
+M:	petkan@users.sourceforge.net
+L:	linux-usb-users@lists.sourceforge.net
+L:	linux-usb-devel@lists.sourceforge.net
+W:	http://pegasus2.sourceforge.net/
 S:	Maintained
 
 USB SE401 DRIVER

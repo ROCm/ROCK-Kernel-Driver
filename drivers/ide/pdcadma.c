@@ -82,12 +82,12 @@ unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 	return 0;
 }
 
-unsigned int __init ata66_pdcadma (ide_hwif_t *hwif)
+unsigned int __init ata66_pdcadma(struct ata_channel *channel)
 {
 	return 1;
 }
 
-void __init ide_init_pdcadma (ide_hwif_t *hwif)
+void __init ide_init_pdcadma(struct ata_channel *hwif)
 {
 	hwif->autodma = 0;
 	hwif->dma_base = 0;
@@ -101,7 +101,7 @@ void __init ide_init_pdcadma (ide_hwif_t *hwif)
 //	}
 }
 
-void __init ide_dmacapable_pdcadma (ide_hwif_t *hwif, unsigned long dmabase)
+void __init ide_dmacapable_pdcadma(struct ata_channel *hwif, unsigned long dmabase)
 {
 //	ide_setup_dma(hwif, dmabase, 8);
 }

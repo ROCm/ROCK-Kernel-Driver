@@ -327,6 +327,7 @@ static int prio_dump_class(struct Qdisc *sch, unsigned long cl, struct sk_buff *
 
 	if (cl - 1 > q->bands)
 		return -ENOENT;
+	tcm->tcm_handle |= TC_H_MIN(cl);
 	if (q->queues[cl-1])
 		tcm->tcm_info = q->queues[cl-1]->handle;
 	return 0;

@@ -275,6 +275,25 @@ probe_interrupts:
 	printk("]");
 }
 
+static struct pci_dev *find_next_ebus(struct pci_dev *start, int *is_rio_p)
+{
+	struct pci_dev *pdev = start;
+
+	do {
+		pdev = pci_find_device(PCI_VENDOR_ID_SUN, PCI_ANY_ID, pdev);
+		if (pdev &&
+		    (pdev->device == PCI_DEVICE_ID_SUN_EBUS ||
+		     pdev->device == PCI_DEVICE_ID_SUN_RIO_EBUS))
+			break;
+	} while (pdev != NULL);
+
+	if (pdev && (pdev->device == PCI_DEVICE_ID_SUN_RIO_EBUS))
+		*is_rio_p = 1;
+	else
+		*is_rio_p = 0;
+
+	return pdev;
+}
 
 void __init ebus_init(void)
 {
@@ -289,12 +308,7 @@ void __init ebus_init(void)
 	if (!pci_present())
 		return;
 
-	is_rio = 0;
-	pdev = pci_find_device(PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_EBUS, 0);
-	if (!pdev) {
-		pdev = pci_find_device(PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_RIO_EBUS, 0);
-		is_rio = 1;
-	}
+	pdev = find_next_ebus(NULL, &is_rio);
 	if (!pdev) {
 		printk("ebus: No EBus's found.\n");
 		return;
@@ -315,16 +329,7 @@ void __init ebus_init(void)
 		   we'd have to tweak with the ebus_chain
 		   in the runtime after initialization. -jj */
 		if (!prom_getchild (ebusnd)) {
-			struct pci_dev *orig_pdev = pdev;
-
-			is_rio = 0;
-			pdev = pci_find_device(PCI_VENDOR_ID_SUN, 
-					       PCI_DEVICE_ID_SUN_EBUS, orig_pdev);
-			if (!pdev) {
-				pdev = pci_find_device(PCI_VENDOR_ID_SUN, 
-						       PCI_DEVICE_ID_SUN_RIO_EBUS, orig_pdev);
-				is_rio = 1;
-			}
+			pdev = find_next_ebus(pdev, &is_rio);
 			if (!pdev) {
 				if (ebus == ebus_chain) {
 					ebus_chain = NULL;
@@ -374,20 +379,9 @@ void __init ebus_init(void)
 	next_ebus:
 		printk("\n");
 
-		{
-			struct pci_dev *orig_pdev = pdev;
-
-			is_rio = 0;
-			pdev = pci_find_device(PCI_VENDOR_ID_SUN,
-					       PCI_DEVICE_ID_SUN_EBUS, orig_pdev);
-			if (!pdev) {
-				pdev = pci_find_device(PCI_VENDOR_ID_SUN,
-						       PCI_DEVICE_ID_SUN_RIO_EBUS, orig_pdev);
-				is_rio = 1;
-			}
-			if (!pdev)
-				break;
-		}
+		pdev = find_next_ebus(pdev, &is_rio);
+		if (!pdev)
+			break;
 
 		cookie = pdev->sysdata;
 		ebusnd = cookie->prom_node;

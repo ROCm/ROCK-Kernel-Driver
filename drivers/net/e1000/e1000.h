@@ -2,9 +2,8 @@
 
   This software program is available to you under a choice of one of two
   licenses. You may choose to be licensed under either the GNU General Public
-  License (GPL) Version 2, June 1991, available at
-  http://www.fsf.org/copyleft/gpl.html, or the Intel BSD + Patent License, the
-  text of which follows:
+  License 2.0, June 1991, available at http://www.fsf.org/copyleft/gpl.html,
+  or the Intel BSD + Patent License, the text of which follows:
   
   Recipient has requested a license and Intel Corporation ("Intel") is willing
   to grant a license for the software entitled Linux Base Driver for the
@@ -18,7 +17,7 @@
   "Recipient" means the party to whom Intel delivers this Software.
   
   "Licensee" means Recipient and those third parties that receive a license to
-  any operating system available under the GNU Public License version 2.0 or
+  any operating system available under the GNU General Public License 2.0 or
   later.
   
   Copyright (c) 1999 - 2002 Intel Corporation.
@@ -51,10 +50,10 @@
   version of an operating system that has been distributed under the GNU
   General Public License 2.0 or later. This patent license shall apply to the
   combination of the Software and any operating system licensed under the GNU
-  Public License version 2.0 or later if, at the time Intel provides the
+  General Public License 2.0 or later if, at the time Intel provides the
   Software to Recipient, such addition of the Software to the then publicly
-  available versions of such operating systems available under the GNU Public
-  License version 2.0 or later (whether in gold, beta or alpha form) causes
+  available versions of such operating systems available under the GNU General
+  Public License 2.0 or later (whether in gold, beta or alpha form) causes
   such combination to be covered by the Licensed Patents. The patent license
   shall not apply to any other combinations which include the Software. NO
   hardware per se is licensed hereunder.
@@ -109,11 +108,14 @@
 #include <net/pkt_sched.h>
 #include <linux/list.h>
 #include <asm/uaccess.h>
+#include <linux/ethtool.h>
+#ifdef NETIF_F_HW_VLAN_TX
+#include <linux/if_vlan.h>
+#endif
 
 struct e1000_adapter;
 
-#include "e1000_mac.h"
-#include "e1000_phy.h"
+#include "e1000_hw.h"
 
 #define BAR_0 0
 
@@ -138,7 +140,9 @@ struct e1000_adapter;
 #define E1000_RXBUFFER_16384 16384
 
 /* How many Tx Descriptors do we need to call netif_wake_queue ? */
-#define E1000_TX_QUEUE_WAKE 16
+#define E1000_TX_QUEUE_WAKE	16
+/* How many Rx Buffers do we bundle into one write to the hardware ? */
+#define E1000_RX_BUFFER_WRITE	16
 
 #define E1000_JUMBO_PBA      0x00000028
 #define E1000_DEFAULT_PBA    0x00000030
@@ -163,10 +167,6 @@ struct e1000_desc_ring {
 	unsigned int size;
 	/* number of descriptors in the ring */
 	unsigned int count;
-	/* (atomic) number of desc with no buffer */
-	atomic_t unused;
-	/* number of desc with no buffer */
-	unsigned int unused_count;
 	/* next descriptor to associate a buffer with */
 	unsigned int next_to_use;
 	/* next descriptor to check for DD status bit */
@@ -175,14 +175,13 @@ struct e1000_desc_ring {
 	struct e1000_buffer *buffer_info;
 };
 
-#define E1000_RX_DESC(ring, i) \
-	(&(((struct e1000_rx_desc *)((ring).desc))[i]))
+#define E1000_DESC_UNUSED(R) \
+((((R)->next_to_clean + (R)->count) - ((R)->next_to_use + 1)) % ((R)->count))
 
-#define E1000_TX_DESC(ring, i) \
-	(&(((struct e1000_tx_desc *)((ring).desc))[i]))
-
-#define E1000_CONTEXT_DESC(ring, i) \
-	(&(((struct e1000_context_desc *)((ring).desc))[i]))
+#define E1000_GET_DESC(R, i, type)	(&(((struct type *)((R).desc))[i]))
+#define E1000_RX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_rx_desc)
+#define E1000_TX_DESC(R, i)		E1000_GET_DESC(R, i, e1000_tx_desc)
+#define E1000_CONTEXT_DESC(R, i)	E1000_GET_DESC(R, i, e1000_context_desc)
 
 /* board specific private data structure */
 
@@ -191,6 +190,9 @@ struct e1000_adapter {
 	struct timer_list phy_info_timer;
 #ifdef CONFIG_PROC_FS
 	struct list_head proc_list_head;
+#endif
+#ifdef NETIF_F_HW_VLAN_TX
+	struct vlan_group *vlgrp;
 #endif
 	char *id_string;
 	uint32_t bd_number;
@@ -201,28 +203,29 @@ struct e1000_adapter {
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
-	boolean_t rx_csum;
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
 	unsigned long trans_finish;
-	uint32_t tx_int_delay;
+	spinlock_t tx_lock;
 	uint32_t txd_cmd;
+	int max_data_per_txd;
 
 	/* RX */
 	struct e1000_desc_ring rx_ring;
 	uint64_t hw_csum_err;
 	uint64_t hw_csum_good;
 	uint32_t rx_int_delay;
+	boolean_t rx_csum;
 
 	/* OS defined structs */
 	struct net_device *netdev;
 	struct pci_dev *pdev;
 	struct net_device_stats net_stats;
 
-	/* structs defined in e1000_mac.h or e1000_phy.h */
-	struct e1000_shared_adapter shared;
-	struct e1000_shared_stats stats;
+	/* structs defined in e1000_hw.h */
+	struct e1000_hw hw;
+	struct e1000_hw_stats stats;
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 };

@@ -662,52 +662,45 @@ static int keyspan_pda_open (struct usb_serial_port *port, struct file *filp)
 	int rc = 0;
 	struct keyspan_pda_private *priv;
 
-	++port->open_count;
+	/* find out how much room is in the Tx ring */
+	rc = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
+			     6, /* write_room */
+			     USB_TYPE_VENDOR | USB_RECIP_INTERFACE
+			     | USB_DIR_IN,
+			     0, /* value */
+			     0, /* index */
+			     &room,
+			     1,
+			     2*HZ);
+	if (rc < 0) {
+		dbg(__FUNCTION__" - roomquery failed");
+		goto error;
+	}
+	if (rc == 0) {
+		dbg(__FUNCTION__" - roomquery returned 0 bytes");
+		rc = -EIO;
+		goto error;
+	}
+	priv = (struct keyspan_pda_private *)(port->private);
+	priv->tx_room = room;
+	priv->tx_throttled = room ? 0 : 1;
 
-	if (port->open_count == 1) {
-		/* find out how much room is in the Tx ring */
-		rc = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
-				     6, /* write_room */
-				     USB_TYPE_VENDOR | USB_RECIP_INTERFACE
-				     | USB_DIR_IN,
-				     0, /* value */
-				     0, /* index */
-				     &room,
-				     1,
-				     2*HZ);
-		if (rc < 0) {
-			dbg(__FUNCTION__" - roomquery failed");
-			goto error;
-		}
-		if (rc == 0) {
-			dbg(__FUNCTION__" - roomquery returned 0 bytes");
-			rc = -EIO;
-			goto error;
-		}
-		priv = (struct keyspan_pda_private *)(port->private);
-		priv->tx_room = room;
-		priv->tx_throttled = room ? 0 : 1;
+	/* the normal serial device seems to always turn on DTR and RTS here,
+	   so do the same */
+	if (port->tty->termios->c_cflag & CBAUD)
+		keyspan_pda_set_modem_info(serial, (1<<7) | (1<<2) );
+	else
+		keyspan_pda_set_modem_info(serial, 0);
 
-		/* the normal serial device seems to always turn on DTR and RTS here,
-		   so do the same */
-		if (port->tty->termios->c_cflag & CBAUD)
-			keyspan_pda_set_modem_info(serial, (1<<7) | (1<<2) );
-		else
-			keyspan_pda_set_modem_info(serial, 0);
-
-		/*Start reading from the device*/
-		port->interrupt_in_urb->dev = serial->dev;
-		rc = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-		if (rc) {
-			dbg(__FUNCTION__" - usb_submit_urb(read int) failed");
-			goto error;
-		}
-
+	/*Start reading from the device*/
+	port->interrupt_in_urb->dev = serial->dev;
+	rc = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+	if (rc) {
+		dbg(__FUNCTION__" - usb_submit_urb(read int) failed");
+		goto error;
 	}
 
-	return rc;
 error:
-	--port->open_count;
 	return rc;
 }
 
@@ -716,19 +709,14 @@ static void keyspan_pda_close(struct usb_serial_port *port, struct file *filp)
 {
 	struct usb_serial *serial = port->serial;
 
-	--port->open_count;
+	if (serial->dev) {
+		/* the normal serial device seems to always shut off DTR and RTS now */
+		if (port->tty->termios->c_cflag & HUPCL)
+			keyspan_pda_set_modem_info(serial, 0);
 
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* the normal serial device seems to always shut off DTR and RTS now */
-			if (port->tty->termios->c_cflag & HUPCL)
-				keyspan_pda_set_modem_info(serial, 0);
-
-			/* shutdown our bulk reads and writes */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->interrupt_in_urb);
-		}
-		port->open_count = 0;
+		/* shutdown our bulk reads and writes */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->interrupt_in_urb);
 	}
 }
 
@@ -805,9 +793,6 @@ static void keyspan_pda_shutdown (struct usb_serial *serial)
 {
 	dbg (__FUNCTION__);
 	
-	while (serial->port[0].open_count > 0) {
-		keyspan_pda_close (&serial->port[0], NULL);
-	}
 	kfree(serial->port[0].private);
 }
 

@@ -425,7 +425,7 @@ extern unsigned long vac_hwflush_patch2, vac_hwflush_patch2_on;
 		daddr = &(dst);		\
 		iaddr = &(src);		\
 		*daddr = *iaddr;	\
-	} while (0);
+	} while (0)
 
 static void patch_kernel_fault_handler(void)
 {

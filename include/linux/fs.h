@@ -664,6 +664,7 @@ struct super_block {
 	kdev_t			s_dev;
 	unsigned long		s_blocksize;
 	unsigned char		s_blocksize_bits;
+	unsigned long		s_old_blocksize;
 	unsigned char		s_dirt;
 	unsigned long long	s_maxbytes;	/* Max file size */
 	struct file_system_type	*s_type;

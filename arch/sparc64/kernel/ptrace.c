@@ -122,6 +122,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	unsigned long data = regs->u_regs[UREG_I3];
 	unsigned long addr2 = regs->u_regs[UREG_I4];
 	struct task_struct *child;
+	int ret;
 
 	if (test_thread_flag(TIF_32BIT)) {
 		addr &= 0xffffffffUL;
@@ -184,18 +185,10 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 		pt_succ_return(regs, 0);
 		goto out_tsk;
 	}
-	if (!(child->ptrace & PT_PTRACED)) {
-		pt_error_return(regs, ESRCH);
-		goto out_tsk;
-	}
-	if (child->state != TASK_STOPPED) {
-		if (request != PTRACE_KILL) {
-			pt_error_return(regs, ESRCH);
-			goto out_tsk;
-		}
-	}
-	if (child->p_pptr != current) {
-		pt_error_return(regs, ESRCH);
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0) {
+		pt_error_return(regs, -ret);
 		goto out_tsk;
 	}
 

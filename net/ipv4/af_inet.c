@@ -627,7 +627,6 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 			int addr_len, int flags)
 {
 	struct sock *sk=sock->sk;
-	struct inet_opt *inet = inet_sk(sk);
 	int err;
 	long timeo;
 
@@ -654,13 +653,6 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 		err = -EISCONN;
 		if (sk->state != TCP_CLOSE) 
 			goto out;
-
-		err = -EAGAIN;
-		if (!inet->num) {
-			if (sk->prot->get_port(sk, 0) != 0)
-				goto out;
-			inet->sport = htons(inet->num);
-		}
 
 		err = sk->prot->connect(sk, uaddr, addr_len);
 		if (err < 0)

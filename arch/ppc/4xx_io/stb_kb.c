@@ -19,7 +19,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/kbd_kern.h>
 
 /* the following are borrowed from pc_keyb.c, thanks to those involved! */

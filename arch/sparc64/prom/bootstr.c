@@ -9,6 +9,11 @@
 #include <linux/init.h>
 #include <asm/oplib.h>
 
+/* WARNING: The boot loader knows that these next three variables come one right
+ *          after another in the .data section.  Do not move this stuff into
+ *          the .bss section or it will break things.
+ */
+
 #define BARG_LEN  256
 int bootstr_len = BARG_LEN;
 static int bootstr_valid = 0;

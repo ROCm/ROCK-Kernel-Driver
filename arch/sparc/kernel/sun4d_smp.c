@@ -47,7 +47,7 @@ extern struct task_struct *current_set[NR_CPUS];
 extern volatile int smp_processors_ready;
 extern unsigned long cpu_present_map;
 extern int smp_num_cpus;
-static int smp_highest_cpu = 0;
+static int smp_highest_cpu;
 extern int smp_threads_ready;
 extern unsigned char mid_xlate[NR_CPUS];
 extern volatile unsigned long cpu_callin_map[NR_CPUS];

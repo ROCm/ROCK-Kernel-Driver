@@ -65,7 +65,10 @@
 #include <linux/mm.h>
 #include <linux/highmem.h>
 #include <linux/sockios.h>
+
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #include <linux/if_vlan.h>
+#endif
 
 #ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
@@ -320,9 +323,11 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
 
 #if (defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)) && \
 	defined(NETIF_F_HW_VLAN_RX)
-#define ACENIC_DO_VLAN	1
+#define ACENIC_DO_VLAN		1
+#define ACE_RCB_VLAN_FLAG	RCB_FLG_VLAN_ASSIST
 #else
-#define ACENIC_DO_VLAN	0
+#define ACENIC_DO_VLAN		0
+#define ACE_RCB_VLAN_FLAG	0
 #endif
 
 #include "acenic.h"
@@ -563,7 +568,7 @@ static int tx_ratio[ACE_MAX_MOD_PARMS];
 static int dis_pci_mem_inval[ACE_MAX_MOD_PARMS] = {1, 1, 1, 1, 1, 1, 1, 1};
 
 static char version[] __initdata = 
-  "acenic.c: v0.88 03/14/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
+  "acenic.c: v0.89 03/15/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
 static struct net_device *root_dev;
@@ -1461,10 +1466,8 @@ static int __init ace_init(struct net_device *dev)
 
 	set_aceaddr(&info->rx_std_ctrl.rngptr, ap->rx_ring_base_dma);
 	info->rx_std_ctrl.max_len = ACE_STD_MTU + ETH_HLEN + 4;
-	info->rx_std_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
-#if ACENIC_DO_VLAN
-	info->rx_std_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
-#endif
+	info->rx_std_ctrl.flags =
+	  RCB_FLG_TCP_UDP_SUM | RCB_FLG_NO_PSEUDO_HDR | ACE_RCB_VLAN_FLAG;
 
 	memset(ap->rx_std_ring, 0,
 	       RX_STD_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1479,10 +1482,8 @@ static int __init ace_init(struct net_device *dev)
 		    (ap->rx_ring_base_dma +
 		     (sizeof(struct rx_desc) * RX_STD_RING_ENTRIES)));
 	info->rx_jumbo_ctrl.max_len = 0;
-	info->rx_jumbo_ctrl.flags = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
-#if ACENIC_DO_VLAN
-	info->rx_jumbo_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
-#endif
+	info->rx_jumbo_ctrl.flags =
+	  RCB_FLG_TCP_UDP_SUM | RCB_FLG_NO_PSEUDO_HDR | ACE_RCB_VLAN_FLAG;
 
 	memset(ap->rx_jumbo_ring, 0,
 	       RX_JUMBO_RING_ENTRIES * sizeof(struct rx_desc));
@@ -1504,10 +1505,7 @@ static int __init ace_init(struct net_device *dev)
 			       RX_JUMBO_RING_ENTRIES))));
 		info->rx_mini_ctrl.max_len = ACE_MINI_SIZE;
 		info->rx_mini_ctrl.flags = 
-			RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
-#if ACENIC_DO_VLAN
-		info->rx_mini_ctrl.flags |= RCB_FLG_VLAN_ASSIST;
-#endif
+		  RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR|ACE_RCB_VLAN_FLAG;
 
 		for (i = 0; i < RX_MINI_RING_ENTRIES; i++)
 			ap->rx_mini_ring[i].flags =
@@ -1554,7 +1552,7 @@ static int __init ace_init(struct net_device *dev)
 	}
 
 	info->tx_ctrl.max_len = ACE_TX_RING_ENTRIES(ap);
-	tmp = RCB_FLG_TCP_UDP_SUM|RCB_FLG_NO_PSEUDO_HDR;
+	tmp = RCB_FLG_TCP_UDP_SUM | RCB_FLG_NO_PSEUDO_HDR | ACE_RCB_VLAN_FLAG;
 
 	/*
 	 * The Tigon I does not like having the TX ring in host memory ;-(
@@ -1563,9 +1561,6 @@ static int __init ace_init(struct net_device *dev)
 		tmp |= RCB_FLG_TX_HOST_RING;
 #if TX_COAL_INTS_ONLY
 	tmp |= RCB_FLG_COAL_INT_ONLY;
-#endif
-#if ACENIC_DO_VLAN
-	tmp |= RCB_FLG_VLAN_ASSIST;
 #endif
 	info->tx_ctrl.flags = tmp;
 
@@ -1592,7 +1587,7 @@ static int __init ace_init(struct net_device *dev)
 	ace_set_rxtx_parms(dev, 0);
 
 	if (board_idx == BOARD_IDX_OVERFLOW) {
-		printk(KERN_WARNING "%s: more then %i NICs detected, "
+		printk(KERN_WARNING "%s: more than %i NICs detected, "
 		       "ignoring module parameters!\n",
 		       dev->name, ACE_MAX_MOD_PARMS);
 	} else if (board_idx >= 0) {
@@ -2181,14 +2176,6 @@ static u32 ace_handle_event(struct net_device *dev, u32 evtcsm, u32 evtprd)
 }
 
 
-#if ACENIC_DO_VLAN
-static int ace_vlan_rx(struct ace_private *ap, struct sk_buff *skb, u16 vlan_tag)
-{
-	return vlan_hwaccel_rx(skb, ap->vlgrp, vlan_tag);
-}
-#endif
-
-
 static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 {
 	struct ace_private *ap = dev->priv;
@@ -2274,11 +2261,9 @@ static void ace_rx_int(struct net_device *dev, u32 rxretprd, u32 rxretcsm)
 		}
 
 		/* send it up */
-
 #if ACENIC_DO_VLAN
-		if (ap->vlgrp != NULL &&
-		    (bd_flags & BD_FLG_VLAN_TAG)) {
-			ace_vlan_rx(ap, skb, retdesc->vlan);
+		if (ap->vlgrp && (bd_flags & BD_FLG_VLAN_TAG)) {
+			vlan_hwaccel_rx(skb, ap->vlgrp, retdesc->vlan);
 		} else
 #endif
 			netif_rx(skb);

@@ -257,11 +257,10 @@ static int ufs_parse_options (char * options, unsigned * mount_options)
 	
 	if (!options)
 		return 1;
-		
-	for (this_char = strtok (options, ",");
-	     this_char != NULL;
-	     this_char = strtok (NULL, ",")) {
-	     
+
+	while ((this_char = strsep (&options, ",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
 		if (!strcmp (this_char, "ufstype")) {

@@ -263,13 +263,13 @@ el2_probe1(struct net_device *dev, int ioaddr)
 #endif  /* EL2MEMTEST */
 
 	if (dev->mem_start)
-		dev->mem_end = dev->rmem_end = dev->mem_start + EL2_MEMSIZE;
+		dev->mem_end = ei_status.rmem_end = dev->mem_start + EL2_MEMSIZE;
 
 	if (wordlength) {	/* No Tx pages to skip over to get to Rx */
-		dev->rmem_start = dev->mem_start;
+		ei_status.rmem_start = dev->mem_start;
 		ei_status.name = "3c503/16";
 	} else {
-		dev->rmem_start = TX_PAGES*256 + dev->mem_start;
+		ei_status.rmem_start = TX_PAGES*256 + dev->mem_start;
 		ei_status.name = "3c503";
 	}
     }
@@ -549,7 +549,7 @@ el2_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring
     unsigned short int *buf;
     unsigned short word;
 
-    int end_of_ring = dev->rmem_end;
+    int end_of_ring = ei_status.rmem_end;
 
     /* Maybe enable shared memory just be to be safe... nahh.*/
     if (dev->mem_start) {	/* Use the shared memory. */
@@ -559,7 +559,7 @@ el2_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring
 	    int semi_count = end_of_ring - (dev->mem_start + ring_offset);
 	    isa_memcpy_fromio(skb->data, dev->mem_start + ring_offset, semi_count);
 	    count -= semi_count;
-	    isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+	    isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
 		isa_eth_io_copy_and_sum(skb, dev->mem_start + ring_offset, count, 0);

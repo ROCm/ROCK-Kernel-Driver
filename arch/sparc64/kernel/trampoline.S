@@ -215,13 +215,6 @@ startup_continue:
 #define KERN_HIGHBITS		((_PAGE_VALID|_PAGE_SZ4MB)^0xfffff80000000000)
 #define KERN_LOWBITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
 
-#define VPTE_BASE_SPITFIRE	0xfffffffe00000000
-#if 1
-#define VPTE_BASE_CHEETAH	VPTE_BASE_SPITFIRE
-#else
-#define VPTE_BASE_CHEETAH	0xffe0000000000000
-#endif
-
 	mov		TSB_REG, %g1
 	stxa		%g0, [%g1] ASI_DMMU
 	membar		#Sync
@@ -252,8 +245,6 @@ startup_continue:
 	clr	%g7
 #undef KERN_HIGHBITS
 #undef KERN_LOWBITS
-#undef VPTE_BASE_SPITFIRE
-#undef VPTE_BASE_CHEETAH
 
 	wrpr		%o1, 0x0, %pstate
 	ldx		[%g6 + TI_TASK], %g4

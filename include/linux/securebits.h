@@ -6,7 +6,7 @@
 extern unsigned securebits;
 
 /* When set UID 0 has no special privileges. When unset, we support
-   inheritance of root-permissions and suid-root executablew under
+   inheritance of root-permissions and suid-root executable under
    compatibility mode. We raise the effective and inheritable bitmasks
    *of the executable file* if the effective uid of the new process is
    0. If the real uid is 0, we raise the inheritable bitmask of the

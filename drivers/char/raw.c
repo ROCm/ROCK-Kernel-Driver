@@ -322,7 +322,7 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 		if (err)
 			break;
 
-		err = brw_kiovec(rw, 1, &iobuf, dev, &blocknr, sector_size);
+		err = brw_kiovec(rw, 1, &iobuf, raw_devices[minor].binding, &blocknr, sector_size);
 
 		if (rw == READ && err > 0)
 			mark_dirty_kiobuf(iobuf, err);

@@ -450,6 +450,32 @@ int arp_bind_neighbour(struct dst_entry *dst)
 }
 
 /*
+ * Check if we can use proxy ARP for this path
+ */
+
+static inline int arp_fwd_proxy(struct in_device *in_dev, struct rtable *rt)
+{
+	struct in_device *out_dev;
+	int imi, omi = -1;
+
+	if (!IN_DEV_PROXY_ARP(in_dev))
+		return 0;
+
+	if ((imi = IN_DEV_MEDIUM_ID(in_dev)) == 0)
+		return 1;
+	if (imi == -1)
+		return 0;
+
+	/* place to check for proxy_arp for routes */
+
+	if ((out_dev = in_dev_get(rt->u.dst.dev)) != NULL) {
+		omi = IN_DEV_MEDIUM_ID(out_dev);
+		in_dev_put(out_dev);
+	}
+	return (omi != imi && omi != -1);
+}
+
+/*
  *	Interface to link layer: send routine and receive handler.
  */
 
@@ -755,7 +781,7 @@ int arp_process(struct sk_buff *skb)
 		} else if (IN_DEV_FORWARD(in_dev)) {
 			if ((rt->rt_flags&RTCF_DNAT) ||
 			    (addr_type == RTN_UNICAST  && rt->u.dst.dev != dev &&
-			     (IN_DEV_PROXY_ARP(in_dev) || pneigh_lookup(&arp_tbl, &tip, dev, 0)))) {
+			     (arp_fwd_proxy(in_dev, rt) || pneigh_lookup(&arp_tbl, &tip, dev, 0)))) {
 				n = neigh_event_ns(&arp_tbl, sha, &sip, dev);
 				if (n)
 					neigh_release(n);

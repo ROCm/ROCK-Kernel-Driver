@@ -5,7 +5,7 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci.h,v 1.5 2002/01/19 00:24:01 dbrownell Exp $
+ * $Id: ohci.h,v 1.6 2002/03/22 16:04:54 dbrownell Exp $
  */
  
 /*

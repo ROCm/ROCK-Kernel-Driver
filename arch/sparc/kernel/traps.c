@@ -272,7 +272,7 @@ extern int do_mathemu(struct pt_regs *, struct task_struct *);
 void do_fpe_trap(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 		 unsigned long psr)
 {
-	static int calls = 0;
+	static int calls;
 	siginfo_t info;
 	unsigned long fsr;
 	int ret = 0;

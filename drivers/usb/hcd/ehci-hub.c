@@ -309,13 +309,6 @@ static int ehci_hub_control (
 					hcd->bus_name, wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
-				/* Philips 1562 wants CMD_RUN to reset */
-				if (!HCD_IS_RUNNING(ehci->hcd.state)) {
-					u32 cmd = readl (&ehci->regs->command);
-					cmd |= CMD_RUN;
-					writel (cmd, &ehci->regs->command);	
-					ehci->hcd.state = USB_STATE_RUNNING;
-				}
 				vdbg ("%s port %d reset",
 					hcd->bus_name, wIndex + 1);
 				temp |= PORT_RESET;

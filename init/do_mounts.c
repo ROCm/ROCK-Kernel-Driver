@@ -826,7 +826,7 @@ void prepare_namespace(void)
 
 	create_dev("/dev/root", ROOT_DEV, NULL);
 	if (mount_initrd) {
-		if (initrd_load() && kdev_same(ROOT_DEV, mk_kdev(RAMDISK_MAJOR, 0))) {
+		if (initrd_load() && !kdev_same(ROOT_DEV, mk_kdev(RAMDISK_MAJOR, 0))) {
 			handle_initrd();
 			goto out;
 		}

@@ -2468,68 +2468,68 @@ void dc390_sendstart (PACB pACB, PDCB pDCB)
  * '-' means no change
  *******************************************************************/
 
-static int dc390_scanf (char** p1, char** p2, int* var)
+static int dc390_scanf (char** buffer, char** pos, char** p0, int* var)
 {
-   *p2 = *p1;
-   *var = simple_strtoul (*p2, p1, 10);
-   if (*p2 == *p1) return -1;
-   *p1 = strtok (0, " \t\n:=,;.");
+   *p0 = *pos;
+   *var = simple_strtoul (*p0, pos, 10);
+   if (*p0 == *pos) return -1;
+   *pos = strsep (buffer, " \t\n:=,;.");
    return 0;
 };
 
-#define SCANF(p1, p2, var, min, max)		\
-if (dc390_scanf (&p1, &p2, &var)) goto einv;	\
+#define SCANF(buffer, pos, p0, var, min, max)		\
+if (dc390_scanf (&buffer, &pos, &p0, &var)) goto einv;	\
 else if (var<min || var>max) goto einv2
 
-static int dc390_yesno (char** p, char* var, char bmask)
+static int dc390_yesno (char** buffer, char** pos, char* var, char bmask)
 {
-   switch (**p)
+   switch (**pos)
      {
       case 'Y': *var |= bmask; break;
       case 'N': *var &= ~bmask; break;
       case '-': break;
       default: return -1;
      }
-   *p = strtok (0, " \t\n:=,;");
+   *pos = strsep (buffer, " \t\n:=,;");
    return 0;
 };
 
-#define YESNO(p, var, bmask)			\
-if (dc390_yesno (&p, &var, bmask)) goto einv;	\
+#define YESNO(buffer, pos, var, bmask)			\
+if (dc390_yesno (&buffer, &pos, &var, bmask)) goto einv;	\
 else dc390_updateDCB (pACB, pDCB);		\
 if (!p) goto ok
 
-static int dc390_search (char **p1, char **p2, char *var, char* txt, int max, int scale, char* ign)
+static int dc390_search (char** buffer, char** pos, char** p0, char* var, char* txt, int max, int scale, char* ign)
 {
    int dum;
-   if (! memcmp (*p1, txt, strlen(txt)))
+   if (! memcmp (*pos, txt, strlen(txt)))
      {
-	*p2 = strtok (0, " \t\n:=,;");
-	if (!*p2) return -1;
-	dum = simple_strtoul (*p2, p1, 10);
-	if (*p2 == *p1) return -1;
+	*p0 = strsep (buffer, " \t\n:=,;");
+	if (!*p0) return -1;
+	dum = simple_strtoul (*p0, pos, 10);
+	if (*p0 == *pos) return -1;
 	if (dum >= 0 && dum <= max) 
 	  { *var = (dum * 100) / scale; }
 	else return -2;
-	*p1 = strtok (0, " \t\n:=,;");
-	if (*ign && *p1 && strlen(*p1) >= strlen(ign) && 
-	    !(memcmp (*p1, ign, strlen(ign)))) 
-		*p1 = strtok (0, " \t\n:=,;");
+	*pos = strsep (buffer, " \t\n:=,;");
+	if (*ign && *pos && strlen(*pos) >= strlen(ign) && 
+	    !(memcmp (*pos, ign, strlen(ign)))) 
+		*pos = strsep (buffer, " \t\n:=,;");
 
      }
    return 0;
 };
 
-#define SEARCH(p1, p2, var, txt, max)						\
-if (dc390_search (&p1, &p2, (PUCHAR)(&var), txt, max, 100, "")) goto einv2;	\
+#define SEARCH(buffer, pos, p0, var, txt, max)						\
+if (dc390_search (&buffer, &pos, &p0, (PUCHAR)(&var), txt, max, 100, "")) goto einv2;	\
 else if (!p1) goto ok2
 
-#define SEARCH2(p1, p2, var, txt, max, scale)					\
-if (dc390_search (&p1, &p2, &var, txt, max, scale, "")) goto einv2; 		\
+#define SEARCH2(buffer, pos, p0, var, txt, max, scale)					\
+if (dc390_search (&buffer, &pos, &p0, &var, txt, max, scale, "")) goto einv2; 		\
 else if (!p1) goto ok2
 
-#define SEARCH3(p1, p2, var, txt, max, scale, ign)				\
-if (dc390_search (&p1, &p2, &var, txt, max, scale, ign)) goto einv2;		\
+#define SEARCH3(buffer, pos, &p0, var, txt, max, scale, ign)				\
+if (dc390_search (&buffer, &pos, p0, &var, txt, max, scale, ign)) goto einv2;		\
 else if (!p1) goto ok2
 
 
@@ -2565,12 +2565,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
   while (*pos) 
     { if (*pos >='a' && *pos <= 'z') *pos = *pos + 'A' - 'a'; pos++; };
   
-  /* We should protect __strtok ! */
-  /* spin_lock (strtok_lock); */
-
   /* Remove WS */
-  pos = strtok (buffer, " \t:\n=,;");
-  if (!pos) goto ok;
+  pos = strsep (&buffer, " \t:\n=,;");
+  if (!*pos) goto ok;
    
  next:
   if (!memcmp (pos, "RESET", 5)) goto reset;
@@ -2586,10 +2583,10 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
       int dev, id, lun; char* pdec;
       char olddevmode;
       
-      SCANF (pos, p0, dev, 0, pACB->DCBCnt-1);
-      if (pos) { SCANF (pos, p0, id, 0, 7); } else goto einv;
-      if (pos) { SCANF (pos, p0, lun, 0, 7); } else goto einv;
-      if (!pos) goto einv;
+      SCANF (buffer, pos, p0, dev, 0, pACB->DCBCnt-1);
+      if (*pos) { SCANF (buffer, pos, p0, id, 0, 7); } else goto einv;
+      if (*pos) { SCANF (buffer, pos, p0, lun, 0, 7); } else goto einv;
+      if (!*pos) goto einv;
       
       PARSEDEBUG(printk (KERN_INFO "DC390: config line %i %i %i:\"%s\"\n", dev, id, lun, prstr (pos, &buffer[length]));)
       pDCB = pACB->pLinkDCB;
@@ -2610,20 +2607,20 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
       };
 	  
       olddevmode = pDCB->DevMode;
-      YESNO (pos, pDCB->DevMode, PARITY_CHK_);
+      YESNO (buffer, pos, pDCB->DevMode, PARITY_CHK_);
       needs_inquiry++;
-      YESNO (pos, pDCB->DevMode, SYNC_NEGO_);
+      YESNO (buffer, pos, pDCB->DevMode, SYNC_NEGO_);
       if ((olddevmode & SYNC_NEGO_) == (pDCB->DevMode & SYNC_NEGO_)) needs_inquiry--;
       needs_inquiry++;
-      YESNO (pos, pDCB->DevMode, EN_DISCONNECT_);
+      YESNO (buffer, pos, pDCB->DevMode, EN_DISCONNECT_);
       if ((olddevmode & EN_DISCONNECT_) == (pDCB->DevMode & EN_DISCONNECT_)) needs_inquiry--;
-      YESNO (pos, pDCB->DevMode, SEND_START_);
+      YESNO (buffer, pos, pDCB->DevMode, SEND_START_);
       needs_inquiry++;
-      YESNO (pos, pDCB->DevMode, TAG_QUEUEING_);
+      YESNO (buffer, pos, pDCB->DevMode, TAG_QUEUEING_);
       if ((olddevmode & TAG_QUEUEING_) == (pDCB->DevMode & TAG_QUEUEING_)) needs_inquiry--;
 
       dc390_updateDCB (pACB, pDCB);
-      if (!pos) goto ok;
+      if (!*pos) goto ok;
        
       olddevmode = pDCB->NegoPeriod;
       /* Look for decimal point (Speed) */
@@ -2632,22 +2629,22 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
       /* NegoPeriod */
       if (*pos != '-')
 	{
-	  SCANF (pos, p0, dum, 72, 800); 
+	  SCANF (buffer, pos, p0, dum, 72, 800); 
 	  pDCB->NegoPeriod = dum >> 2;
 	  if (pDCB->NegoPeriod != olddevmode) needs_inquiry++;
 	  if (!pos) goto ok;
-	  if (memcmp (pos, "NS", 2) == 0) pos = strtok (0, " \t\n:=,;.");
+	  if (memcmp (pos, "NS", 2) == 0) pos = strsep (*pos, " \t\n:=,;.");
 	}
-      else pos = strtok (0, " \t\n:=,;.");
-      if (!pos) goto ok;
+      else pos = strsep (*pos, " \t\n:=,;.");
+      if (!*pos) goto ok;
       
       /* Sync Speed in MHz */
       if (*pos != '-')
 	{
-	  SCANF (pos, p0, dum, 1, 13); 
+	  SCANF (buffer, pos, p0, dum, 1, 13); 
 	  pDCB->NegoPeriod = (1000/dum) >> 2;
 	  if (pDCB->NegoPeriod != olddevmode && !pos) needs_inquiry++;
-	  if (!pos) goto ok;
+	  if (!*pos) goto ok;
 	  /* decimal */
 	  if (pos-1 == pdec)
 	     {
@@ -2656,38 +2653,38 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 		for (; p0-pos > 1; p0--) dum /= 10;
 		pDCB->NegoPeriod = (100000/(100*dumold + dum)) >> 2;
 		if (pDCB->NegoPeriod < 19) pDCB->NegoPeriod = 19;
-		pos = strtok (0, " \t\n:=,;");
-		if (!pos) goto ok;
+		pos = strsep (*pos, " \t\n:=,;");
+		if (!*pos) goto ok;
 	     };
-	  if (*pos == 'M') pos = strtok (0, " \t\n:=,;");
+	  if (*pos == 'M') pos = strsep (*pos, " \t\n:=,;");
 	  if (pDCB->NegoPeriod != olddevmode) needs_inquiry++;
 	}
-      else pos = strtok (0, " \t\n:=,;");
+      else pos = strsep (*pos, " \t\n:=,;");
       /* dc390_updateDCB (pACB, pDCB); */
-      if (!pos) goto ok;
+      if (!*pos) goto ok;
 
       olddevmode = pDCB->SyncOffset;
       /* SyncOffs */
       if (*pos != '-')
 	{
-	  SCANF (pos, p0, dum, 0, 0x0f); 
+	  SCANF (buffer, pos, p0, dum, 0, 0x0f); 
 	  pDCB->SyncOffset = dum;
 	  if (pDCB->SyncOffset > olddevmode) needs_inquiry++;
 	}
-      else pos = strtok (0, " \t\n:=,;");
-      if (!pos) goto ok;
+      else pos = strsep (*pos, " \t\n:=,;");
+      if (!*pos) goto ok;
       dc390_updateDCB (pACB, pDCB);
 
       //olddevmode = pDCB->MaxCommand;
       /* MaxCommand (Tags) */
       if (*pos != '-')
 	{
-	  SCANF (pos, p0, dum, 1, 32 /*pACB->TagMaxNum*/);
+	  SCANF (buffer, pos, p0, dum, 1, 32 /*pACB->TagMaxNum*/);
 	  if (pDCB->SyncMode & EN_TAG_QUEUEING)
 		pDCB->MaxCommand = dum;
 	  else printk (KERN_INFO "DC390: Can't set MaxCmd larger than one without Tag Queueing!\n");
 	}
-      else pos = strtok (0, " \t\n:=,;");
+      else pos = strsep (*pos, " \t\n:=,;");
 
     }
   else
@@ -2696,14 +2693,14 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
       PARSEDEBUG(printk (KERN_INFO "DC390: chg adapt cfg \"%s\"\n", prstr (pos, &buffer[length]));)
       dum = GLITCH_TO_NS (pACB->glitch_cfg);
       /* Adapter setting */
-      SEARCH (pos, p0, pACB->pScsiHost->max_id, "MAXID", 8); 
-      SEARCH (pos, p0, pACB->pScsiHost->max_lun, "MAXLUN", 8); 
-      SEARCH (pos, p0, newadaptid, "ADAPTERID", 7);
-      SEARCH (pos, p0, pACB->TagMaxNum, "TAGMAXNUM", 32);
-      SEARCH (pos, p0, pACB->ACBFlag, "ACBFLAG", 255);
-      SEARCH3 (pos, p0, dum, "GLITCHEATER", 40, 1000, "NS");
-      SEARCH3 (pos, p0, pACB->sel_timeout, "SELTIMEOUT", 400, 163, "MS");
-      SEARCH3 (pos, p0, dc390_eepromBuf[pACB->AdapterIndex][EE_DELAY], "DELAYRESET", 180, 100, "S");
+      SEARCH (buffer, pos, p0, pACB->pScsiHost->max_id, "MAXID", 8); 
+      SEARCH (buffer, pos, p0, pACB->pScsiHost->max_lun, "MAXLUN", 8); 
+      SEARCH (buffer, pos, p0, newadaptid, "ADAPTERID", 7);
+      SEARCH (buffer, pos, p0, pACB->TagMaxNum, "TAGMAXNUM", 32);
+      SEARCH (buffer, pos, p0, pACB->ACBFlag, "ACBFLAG", 255);
+      SEARCH3 (buffer, pos, p0, dum, "GLITCHEATER", 40, 1000, "NS");
+      SEARCH3 (buffer, pos, p0, pACB->sel_timeout, "SELTIMEOUT", 400, 163, "MS");
+      SEARCH3 (buffer, pos, p0, dc390_eepromBuf[pACB->AdapterIndex][EE_DELAY], "DELAYRESET", 180, 100, "S");
     ok2:
       pACB->glitch_cfg = NS_TO_GLITCH (dum);
       if (pACB->sel_timeout < 60) pACB->sel_timeout = 60;
@@ -2719,10 +2716,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
       // All devs should be INQUIRED now
       if (pos == p1) goto einv;
     }
-  if (pos) goto next;
+  if (*pos) goto next;
       
  ok:
-  /* spin_unlock (strtok_lock); */
   DC390_UNLOCK_ACB;
   if (needs_inquiry) 
      { dc390_updateDCB (pACB, pDCB); dc390_inquiry (pACB, pDCB); };
@@ -2732,7 +2728,6 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  einv2:
   pos = p0;
  einv:
-  /* spin_unlock (strtok_lock); */
   DC390_UNLOCK_ACB;
   DC390_UNLOCK_IO(pACB.pScsiHost);
   printk (KERN_WARNING "DC390: parse error near \"%s\"\n", (pos? pos: "NULL"));
@@ -2758,7 +2753,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 	
  inquiry:
      {
-	pos = strtok (0, " \t\n.:;="); if (!pos) goto einv;
+	pos = strsep (*pos, " \t\n.:;="); if (!*pos) goto einv;
 	dev = simple_strtoul (pos, &p0, 10);
 	if (dev >= pACB->DCBCnt) goto einv_dev;
 	for (dum = 0; dum < dev; dum++) pDCB = pDCB->pNextDCB;
@@ -2772,7 +2767,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 
  remove:
      {
-	pos = strtok (0, " \t\n.:;="); if (!pos) goto einv;
+	pos = strsep (*pos, " \t\n.:;="); if (!*pos) goto einv;
 	dev = simple_strtoul (pos, &p0, 10);
 	if (dev >= pACB->DCBCnt) goto einv_dev;
 	for (dum = 0; dum < dev; dum++) pDCB = pDCB->pNextDCB;
@@ -2788,9 +2783,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  add:
      {
 	int id, lun;
-	pos = strtok (0, " \t\n.:;=");
-	if (pos) { SCANF (pos, p0, id, 0, 7); } else goto einv;
-	if (pos) { SCANF (pos, p0, lun, 0, 7); } else goto einv;
+	pos = strsep (*pos, " \t\n.:;=");
+	if (*pos) { SCANF (buffer, pos, p0, id, 0, 7); } else goto einv;
+	if (*pos) { SCANF (buffer, pos, p0, lun, 0, 7); } else goto einv;
 	pDCB = dc390_findDCB (pACB, id, lun);
 	if (pDCB) { printk ("DC390: ADD: Device already existing\n"); goto einv; };
 	dc390_initDCB (pACB, &pDCB, id, lun);
@@ -2803,9 +2798,9 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  start:
      {
 	int id, lun;
-	pos = strtok (0, " \t\n.:;=");
-	if (pos) { SCANF (pos, p0, id, 0, 7); } else goto einv;
-	if (pos) { SCANF (pos, p0, lun, 0, 7); } else goto einv;
+	pos = strsep (*pos, " \t\n.:;=");
+	if (*pos) { SCANF (buffer, pos, p0, id, 0, 7); } else goto einv;
+	if (*pos) { SCANF (buffer, pos, p0, lun, 0, 7); } else goto einv;
 	pDCB = dc390_findDCB (pACB, id, lun);
 	if (pDCB) printk ("DC390: SendStart: Device already existing ...\n");
 	else dc390_initDCB (pACB, &pDCB, id, lun);

@@ -358,8 +358,8 @@ extern int psched_tod_diff(int delta_sec, int bound);
 #define PSCHED_TDIFF(tv1, tv2) (long)((tv1) - (tv2))
 #define PSCHED_TDIFF_SAFE(tv1, tv2, bound, guard) \
 ({ \
-	   long __delta = (tv1) - (tv2); \
-	   if ( __delta > (bound)) {  __delta = (bound); guard; } \
+	   long long __delta = (tv1) - (tv2); \
+	   if ( __delta > (long long)(bound)) {  __delta = (bound); guard; } \
 	   __delta; \
 })
 

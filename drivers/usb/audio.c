@@ -839,6 +839,7 @@ static int usbin_prepare_desc(struct usbin *u, struct urb *urb)
 		urb->iso_frame_desc[i].length = maxsize;
 		urb->iso_frame_desc[i].offset = offs;
 	}
+	urb->interval = 1;
 	return 0;
 }
 
@@ -938,6 +939,7 @@ static int usbin_sync_prepare_desc(struct usbin *u, struct urb *urb)
 		cp[1] = u->freqn >> 8;
 		cp[2] = u->freqn >> 16;
 	}
+	urb->interval = 1;
 	return 0;
 }
 

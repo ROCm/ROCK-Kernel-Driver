@@ -9,6 +9,9 @@
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
+ *
+ * 14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
+ *     Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -87,6 +90,15 @@ static unsigned long sh_is_open = 0;
 static struct watchdog_info sh_wdt_info;
 static struct timer_list timer;
 static unsigned long next_heartbeat;
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /**
  *	sh_wdt_write_cnt - Write to Counter
@@ -175,6 +187,10 @@ static int sh_wdt_open(struct inode *inode, struct file *file)
 			if (test_and_set_bit(0, &sh_is_open))
 				return -EBUSY;
 
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
+
 			sh_wdt_start();
 
 			break;
@@ -196,9 +212,9 @@ static int sh_wdt_open(struct inode *inode, struct file *file)
 static int sh_wdt_close(struct inode *inode, struct file *file)
 {
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-		sh_wdt_stop();
-#endif
+		if (!nowayout) {
+			sh_wdt_stop();
+		}
 		clear_bit(0, &sh_is_open);
 	}
 	

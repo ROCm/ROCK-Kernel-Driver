@@ -246,8 +246,6 @@ struct net_device
 	 *	I/O specific fields
 	 *	FIXME: Merge these and struct ifmap into one
 	 */
-	unsigned long		rmem_end;	/* shmem "recv" end	*/
-	unsigned long		rmem_start;	/* shmem "recv" start	*/
 	unsigned long		mem_end;	/* shared mem end	*/
 	unsigned long		mem_start;	/* shared mem start	*/
 	unsigned long		base_addr;	/* device I/O address	*/

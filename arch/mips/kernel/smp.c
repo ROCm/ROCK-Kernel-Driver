@@ -156,7 +156,7 @@ void __init smp_boot_cpus(void)
 		sprintf(p->comm, "%s%d", "Idle", i);
 		init_tasks[i] = p;
 		p->processor = i;
-		p->cpus_runnable = 1 << i; /* we schedule the first task manually *
+		p->cpus_runnable = 1 << i; /* we schedule the first task manually */
 		del_from_runqueue(p);
 		unhash_process(p);
 		/* Attach to the address space of init_task. */

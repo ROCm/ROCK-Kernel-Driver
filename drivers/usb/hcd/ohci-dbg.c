@@ -5,7 +5,7 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-dbg.c,v 1.2 2002/01/19 00:15:45 dbrownell Exp $
+ * $Id: ohci-dbg.c,v 1.4 2002/03/27 20:40:40 dbrownell Exp $
  */
  
 /*-------------------------------------------------------------------------*/
@@ -52,7 +52,7 @@ static void urb_print (struct urb * urb, char * str, int small)
 		int i, len;
 
 		if (usb_pipecontrol (pipe)) {
-			printk (KERN_DEBUG __FILE__ ": cmd(8):");
+			printk (KERN_DEBUG __FILE__ ": setup(8):");
 			for (i = 0; i < 8 ; i++) 
 				printk (" %02x", ((__u8 *) urb->setup_packet) [i]);
 			printk ("\n");

@@ -207,3 +207,5 @@ int nand_correct_data (u_char *dat, u_char *read_ecc, u_char *calc_ecc)
 
 EXPORT_SYMBOL(nand_calculate_ecc);
 EXPORT_SYMBOL(nand_correct_data);
+
+MODULE_LICENSE("GPL");

@@ -1463,11 +1463,11 @@ static int tokenize (char *str, char **tokens)
 {
         int cnt = 0;
 
-        tokens[0] = strtok(str, "/");
+        tokens[0] = strsep(&str, "/");
         while (tokens[cnt] && (cnt < 32 - 1))
         {
                 tokens[cnt] = strstrip(tokens[cnt], " \t");
-                tokens[++cnt] = strtok(NULL, "/");
+                tokens[++cnt] = strsep(&str, "/");
         }
 	return cnt;
 }

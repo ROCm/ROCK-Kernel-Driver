@@ -80,9 +80,9 @@ extern void free_kiobuf_bhs(struct kiobuf *);
 /* fs/buffer.c */
 
 int	brw_kiovec(int rw, int nr, struct kiobuf *iovec[], 
-		   kdev_t dev, sector_t [], int size);
+		   struct block_device *bdev, sector_t [], int size);
 
 /* fs/bio.c */
-void	ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t block);
+void	ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t block);
 
 #endif /* __LINUX_IOBUF_H */

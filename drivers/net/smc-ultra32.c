@@ -231,8 +231,8 @@ static int __init ultra32_probe1(struct net_device *dev, int ioaddr)
 	/* All Ultra32 cards have 32KB memory with an 8KB window. */
 	ei_status.stop_page = 128;
 
-	dev->rmem_start = dev->mem_start + TX_PAGES*256;
-	dev->mem_end = dev->rmem_end = dev->mem_start + 0x1fff;
+	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	dev->mem_end = ei_status.rmem_end = dev->mem_start + 0x1fff;
 
 	printk(", IRQ %d, 32KB memory, 8KB window at 0x%lx-0x%lx.\n",
 	       dev->irq, dev->mem_start, dev->mem_end);
@@ -353,7 +353,7 @@ static void ultra32_block_input(struct net_device *dev,
 		} else {
 			/* Select first 8KB Window. */
 			outb(ei_status.reg0, RamReg);
-			isa_memcpy_fromio(skb->data + semi_count, dev->rmem_start, count);
+			isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
 		}
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */

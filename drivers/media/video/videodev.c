@@ -107,20 +107,18 @@ static int video_open(struct inode *inode, struct file *file)
 }
 
 /*
- * ioctl helper function -- handles userspace copying
+ * helper function -- handles userspace copying for ioctl arguments
  */
 int
-video_generic_ioctl(struct inode *inode, struct file *file,
-		    unsigned int cmd, unsigned long arg)
+video_usercopy(struct inode *inode, struct file *file,
+	       unsigned int cmd, unsigned long arg,
+	       int (*func)(struct inode *inode, struct file *file,
+			   unsigned int cmd, void *arg))
 {
-	struct  video_device *vfl = video_devdata(file);
 	char	sbuf[128];
 	void    *mbuf = NULL;
 	void	*parg = NULL;
 	int	err  = -EINVAL;
-	
-	if (vfl->kernel_ioctl == NULL)
-		return -EINVAL;
 
 	/*  Copy arguments into temp kernel buffer  */
 	switch (_IOC_DIR(cmd)) {
@@ -147,7 +145,7 @@ video_generic_ioctl(struct inode *inode, struct file *file,
 	}
 
 	/* call driver */
-	err = vfl->kernel_ioctl(inode, file, cmd, parg);
+	err = func(inode, file, cmd, parg);
 	if (err == -ENOIOCTLCMD)
 		err = -EINVAL;
 	if (err < 0)
@@ -512,7 +510,7 @@ module_exit(videodev_exit)
 EXPORT_SYMBOL(video_register_device);
 EXPORT_SYMBOL(video_unregister_device);
 EXPORT_SYMBOL(video_devdata);
-EXPORT_SYMBOL(video_generic_ioctl);
+EXPORT_SYMBOL(video_usercopy);
 EXPORT_SYMBOL(video_exclusive_open);
 EXPORT_SYMBOL(video_exclusive_release);
 

@@ -536,7 +536,51 @@ romfs_read_inode(struct inode *i)
 	}
 }
 
+static kmem_cache_t * romfs_inode_cachep;
+
+static struct inode *romfs_alloc_inode(struct super_block *sb)
+{
+	struct romfs_inode_info *ei;
+	ei = (struct romfs_inode_info *)kmem_cache_alloc(romfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void romfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(romfs_inode_cachep, ROMFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct romfs_inode_info *ei = (struct romfs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	romfs_inode_cachep = kmem_cache_create("romfs_inode_cache",
+					     sizeof(struct romfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (romfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(romfs_inode_cachep))
+		printk(KERN_INFO "romfs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations romfs_ops = {
+	alloc_inode:	romfs_alloc_inode,
+	destroy_inode:	romfs_destroy_inode,
 	read_inode:	romfs_read_inode,
 	statfs:		romfs_statfs,
 };
@@ -557,12 +601,23 @@ static struct file_system_type romfs_fs_type = {
 
 static int __init init_romfs_fs(void)
 {
-	return register_filesystem(&romfs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+        err = register_filesystem(&romfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_romfs_fs(void)
 {
 	unregister_filesystem(&romfs_fs_type);
+	destroy_inodecache();
 }
 
 /* Yes, works even as a module... :) */
