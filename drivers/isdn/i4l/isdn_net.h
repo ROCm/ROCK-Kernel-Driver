@@ -53,7 +53,6 @@ extern int isdn_net_rcv_skb(int, struct sk_buff *);
 extern int isdn_net_dial_req(isdn_net_local *);
 extern void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_local *lp, struct sk_buff *skb);
-extern int isdn_other_setup(isdn_net_dev *p);
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 

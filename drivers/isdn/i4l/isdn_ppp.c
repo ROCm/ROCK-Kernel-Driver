@@ -2895,9 +2895,27 @@ static int isdn_ppp_set_compressor(struct ippp_struct *is, struct isdn_ppp_comp_
 	return -EINVAL;
 }
 
+// ISDN_NET_ENCAP_SYNCPPP
+// ======================================================================
+
+static int
+isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
+		unsigned short type, void *daddr, void *saddr, 
+		unsigned plen)
+{
+	skb_push(skb, IPPP_MAX_HEADER);
+
+	return IPPP_MAX_HEADER;
+}
+
+
+
 int isdn_ppp_setup(isdn_net_dev *p)
 {
-	isdn_other_setup(p);
+	p->dev.hard_header = isdn_ppp_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
 	p->dev.type = ARPHRD_PPP;	/* change ARP type */
 	p->dev.addr_len = 0;
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;

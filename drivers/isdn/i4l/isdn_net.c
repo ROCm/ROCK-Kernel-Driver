@@ -207,6 +207,8 @@ static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
 
 static int isdn_rawip_setup(isdn_net_dev *p);
 static int isdn_ether_setup(isdn_net_dev *p);
+static int isdn_uihdlc_setup(isdn_net_dev *p);
+static int isdn_other_setup(isdn_net_dev *p);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
@@ -1368,19 +1370,9 @@ isdn_net_header(struct sk_buff *skb, struct net_device *dev, unsigned short type
 	ushort len = 0;
 
 	switch (lp->p_encap) {
-		case ISDN_NET_ENCAP_SYNCPPP:
-			/* stick on a fake header to keep fragmentation code happy. */
-			len = IPPP_MAX_HEADER;
-			skb_push(skb,len);
-			break;
 		case ISDN_NET_ENCAP_IPTYP:
 			/* ethernet type field */
 			*((ushort *) skb_push(skb, 2)) = htons(type);
-			len = 2;
-			break;
-		case ISDN_NET_ENCAP_UIHDLC:
-			/* HDLC with UI-Frames (for ispa with -h1 option) */
-			*((ushort *) skb_push(skb, 2)) = htons(0x0103);
 			len = 2;
 			break;
 		default:
@@ -2088,6 +2080,9 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	case ISDN_NET_ENCAP_ETHER:
 		retval = isdn_ether_setup(p);
 		break;
+	case ISDN_NET_ENCAP_UIHDLC:
+		retval = isdn_uihdlc_setup(p);
+		break;
 	default:
 		retval = isdn_other_setup(p);
 		break;
@@ -2591,6 +2586,32 @@ isdn_net_rmall(void)
 	return 0;
 }
 
+// ISDN_NET_ENCAP_UIHDLC
+// HDLC with UI-Frames (for ispa with -h1 option) */
+// ======================================================================
+
+static int
+isdn_uihdlc_header(struct sk_buff *skb, struct net_device *dev,
+		   unsigned short type, void *daddr, void *saddr, 
+		   unsigned plen)
+{
+	put_u16(skb_push(skb, 2), 0x0103);
+	return 2;
+}
+
+int
+isdn_uihdlc_setup(isdn_net_dev *p)
+{
+	p->dev.hard_header = isdn_uihdlc_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+
+	return 0;
+}
+
+// ISDN_NET_ENCAP_RAWIP
+// ======================================================================
 
 static int
 isdn_rawip_setup(isdn_net_dev *p)
@@ -2602,6 +2623,9 @@ isdn_rawip_setup(isdn_net_dev *p)
 
 	return 0;
 }
+
+// ISDN_NET_ENCAP_ETHER
+// ======================================================================
 
 static int
 isdn_ether_setup(isdn_net_dev *p)
