@@ -447,6 +447,131 @@ retry_segments:
 }
 
 /**
+ *	bio_map_user	-	map user address into bio
+ *	@bdev: destination block device
+ *	@uaddr: start of user address
+ *	@len: length in bytes
+ *	@write_to_vm: bool indicating writing to pages or not
+ *
+ *	Map the user space address into a bio suitable for io to a block
+ *	device. Caller should check the size of the returned bio, we might
+ *	not have mapped the entire range specified.
+ */
+struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
+			 unsigned int len, int write_to_vm)
+{
+	unsigned long end = (uaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	unsigned long start = uaddr >> PAGE_SHIFT;
+	const int nr_pages = end - start;
+	request_queue_t *q = bdev_get_queue(bdev);
+	int ret, offset, i;
+	struct page **pages;
+	struct bio *bio;
+
+	/*
+	 * transfer and buffer must be aligned to at least hardsector
+	 * size for now, in the future we can relax this restriction
+	 */
+	if ((uaddr & queue_dma_alignment(q)) || (len & queue_dma_alignment(q)))
+		return NULL;
+
+	bio = bio_alloc(GFP_KERNEL, nr_pages);
+	if (!bio)
+		return NULL;
+
+	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_KERNEL);
+	if (!pages)
+		goto out;
+
+	down_read(&current->mm->mmap_sem);
+	ret = get_user_pages(current, current->mm, uaddr, nr_pages,
+						write_to_vm, 0, pages, NULL);
+	up_read(&current->mm->mmap_sem);
+
+	if (ret < nr_pages)
+		goto out;
+
+	bio->bi_bdev = bdev;
+
+	offset = uaddr & ~PAGE_MASK;
+	for (i = 0; i < nr_pages; i++) {
+		unsigned int bytes = PAGE_SIZE - offset;
+
+		if (len <= 0)
+			break;
+
+		if (bytes > len)
+			bytes = len;
+
+		/*
+		 * sorry...
+		 */
+		if (bio_add_page(bio, pages[i], bytes, offset) < bytes)
+			break;
+
+		len -= bytes;
+		offset = 0;
+	}
+
+	/*
+	 * release the pages we didn't map into the bio, if any
+	 */
+	while (i < nr_pages)
+		page_cache_release(pages[i++]);
+
+	kfree(pages);
+
+	/*
+	 * check if the mapped pages need bouncing for an isa host.
+	 */
+	blk_queue_bounce(q, &bio);
+	return bio;
+out:
+	kfree(pages);
+	bio_put(bio);
+	return NULL;
+}
+
+/**
+ *	bio_unmap_user	-	unmap a bio
+ *	@bio:		the bio being unmapped
+ *	@write_to_vm:	bool indicating whether pages were written to
+ *
+ *	Unmap a bio previously mapped by bio_map_user(). The @write_to_vm
+ *	must be the same as passed into bio_map_user(). Must be called with
+ *	a process context.
+ */
+void bio_unmap_user(struct bio *bio, int write_to_vm)
+{
+	struct bio_vec *bvec;
+	int i;
+
+	/*
+	 * find original bio if it was bounced
+	 */
+	if (bio->bi_private) {
+		/*
+		 * someone stole our bio, must not happen
+		 */
+		BUG_ON(!bio_flagged(bio, BIO_BOUNCED));
+	
+		bio = bio->bi_private;
+	}
+
+	/*
+	 * make sure we dirty pages we wrote to
+	 */
+	__bio_for_each_segment(bvec, bio, i, 0) {
+		if (write_to_vm)
+			set_page_dirty(bvec->bv_page);
+
+		page_cache_release(bvec->bv_page);
+	}
+
+	bio_put(bio);
+ }
+
+/**
  * bio_endio - end I/O on a bio
  * @bio:	bio
  * @bytes_done:	number of bytes completed
@@ -560,3 +685,5 @@ EXPORT_SYMBOL(bio_phys_segments);
 EXPORT_SYMBOL(bio_hw_segments);
 EXPORT_SYMBOL(bio_add_page);
 EXPORT_SYMBOL(bio_get_nr_vecs);
+EXPORT_SYMBOL(bio_map_user);
+EXPORT_SYMBOL(bio_unmap_user);
