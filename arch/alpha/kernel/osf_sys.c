@@ -844,7 +844,7 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 {
 	switch (op) {
 	case SSI_IEEE_FP_CONTROL: {
-		unsigned long swcr, fpcr;
+		unsigned long swcr, fpcr, fex;
 
 		/* 
 		 * Alpha Architecture Handbook 4.7.7.3:
@@ -867,9 +867,24 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
 		wrfpcr(fpcr);
 
  		/* If any exceptions are now unmasked, send a signal.  */
- 		if (((swcr & IEEE_STATUS_MASK)
- 		     >> IEEE_STATUS_TO_EXCSUM_SHIFT) & swcr) {
- 			send_sig(SIGFPE, current, 1);
+		fex = ((swcr & IEEE_STATUS_MASK)
+		       >> IEEE_STATUS_TO_EXCSUM_SHIFT) & swcr;
+ 		if (fex) {
+			siginfo_t info;
+			int si_code = 0;
+
+			if (fex & IEEE_TRAP_ENABLE_DNO) si_code = FPE_FLTUND;
+			if (fex & IEEE_TRAP_ENABLE_INE) si_code = FPE_FLTRES;
+			if (fex & IEEE_TRAP_ENABLE_UNF) si_code = FPE_FLTUND;
+			if (fex & IEEE_TRAP_ENABLE_OVF) si_code = FPE_FLTOVF;
+			if (fex & IEEE_TRAP_ENABLE_DZE) si_code = FPE_FLTDIV;
+			if (fex & IEEE_TRAP_ENABLE_INV) si_code = FPE_FLTINV;
+
+			info.si_signo = SIGFPE;
+			info.si_errno = 0;
+			info.si_code = si_code;
+			info.si_addr = 0;  /* FIXME */
+ 			send_sig_info(SIGFPE, &info, current);
  		}
 
 		return 0;
