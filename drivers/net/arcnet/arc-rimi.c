@@ -153,8 +153,6 @@ static int __init arcrimi_found(struct net_device *dev)
 
 	dev->mem_start = first_mirror;
 	dev->mem_end = last_mirror + MIRROR_SIZE - 1;
-	dev->rmem_start = dev->mem_start + BUFFER_SIZE * 0;
-	dev->rmem_end = dev->mem_start + BUFFER_SIZE * 2 - 1;
 
 	/* initialize the rest of the device structure. */
 
