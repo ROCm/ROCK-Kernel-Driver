@@ -1879,6 +1879,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 		err = -EINVAL;
 		goto out;
 	}
+	xp->selector.family = xp->family;
 	xp->selector.prefixlen_s = sa->sadb_address_prefixlen;
 	xp->selector.proto = pfkey_proto_to_xfrm(sa->sadb_address_proto);
 	xp->selector.sport = ((struct sockaddr_in *)(sa+1))->sin_port;
