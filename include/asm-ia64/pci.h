@@ -74,7 +74,7 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 #define pci_dac_dma_supported(pci_dev, mask)		(1)
 #define pci_dac_page_to_dma(dev,pg,off,dir)		((dma_addr_t) page_to_bus(pg) + (off))
 #define pci_dac_dma_to_page(dev,dma_addr)		(virt_to_page(bus_to_virt(dma_addr)))
-#define pci_dac_dma_to_offset(dev,dma_addr)		((dma_addr) & ~PAGE_MASK)
+#define pci_dac_dma_to_offset(dev,dma_addr)		offset_in_page(dma_addr)
 #define pci_dac_dma_sync_single(dev,dma_addr,len,dir)	do { mb(); } while (0)
 
 #define sg_dma_len(sg)		((sg)->dma_length)
