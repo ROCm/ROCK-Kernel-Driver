@@ -185,6 +185,8 @@ find_bmap:
 	/* search for the next bmap buffer with free bits */
 	i = sbi->s_bmap_count;
 	do {
+		if (--i < 0)
+			goto err_full;
 		bmap++;
 		bm++;
 		if (bmap < sbi->s_bmap_count)
@@ -192,8 +194,6 @@ find_bmap:
 		/* restart search at zero */
 		bmap = 0;
 		bm = sbi->s_bitmap;
-		if (--i <= 0)
-			goto err_full;
 	} while (!bm->bm_free);
 	blk = bmap * sbi->s_bmap_bits;
 
@@ -216,8 +216,8 @@ find_bmap_bit:
 	mask = ~0UL << (bit & 31);
 	blk &= ~31UL;
 
-	tmp = be32_to_cpu(*data) & mask;
-	if (tmp)
+	tmp = be32_to_cpu(*data);
+	if (tmp & mask)
 		goto find_bit;
 
 	/* scan the rest of the buffer */
@@ -230,10 +230,11 @@ find_bmap_bit:
 			goto find_bmap;
 	} while (!(tmp = *data));
 	tmp = be32_to_cpu(tmp);
+	mask = ~0;
 
 find_bit:
 	/* finally look for a free bit in the word */
-	bit = ffs(tmp) - 1;
+	bit = ffs(tmp & mask) - 1;
 	blk += bit + sbi->s_reserved;
 	mask2 = mask = 1 << (bit & 31);
 	AFFS_I(inode)->i_lastalloc = blk;
@@ -266,8 +267,8 @@ err_bh_read:
 	sbi->s_bmap_bh = NULL;
 	sbi->s_last_bmap = ~0;
 err_full:
-	pr_debug("failed\n");
 	up(&sbi->s_bmlock);
+	pr_debug("failed\n");
 	return 0;
 }
 
