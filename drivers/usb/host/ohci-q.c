@@ -430,7 +430,7 @@ done:
  * put the ep on the rm_list
  * real work is done at the next start frame (SF) hardware interrupt
  */
-static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
+static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
 	ed->hwINFO |= ED_DEQUEUE;
 	ed->state = ED_UNLINK;
@@ -441,7 +441,7 @@ static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	 * behave.  frame_no wraps every 2^16 msec, and changes right before
 	 * SF is triggered.
 	 */
-	ed->tick = le16_to_cpu (ohci->hcca->frame_no) + 1;
+	ed->tick = OHCI_FRAME_NO(ohci->hcca) + 1;
 
 	/* rm_list is just singly linked, for simplicity */
 	ed->ed_next = ohci->ed_rm_list;
@@ -479,7 +479,8 @@ td_fill (struct ohci_hcd *ohci, u32 info,
 	 * and iso; other urbs rarely need more than one TD per urb.
 	 * this way, only final tds (or ones with an error) cause IRQs.
 	 * at least immediately; use DI=6 in case any control request is
-	 * tempted to die part way through.
+	 * tempted to die part way through.  (and to force the hc to flush
+	 * its donelist soonish, even on unlink paths.)
 	 *
 	 * NOTE: could delay interrupts even for the last TD, and get fewer
 	 * interrupts ... increasing per-urb latency by sharing interrupts.
@@ -879,12 +880,27 @@ rescan_all:
 		u32			*prev;
 
 		/* only take off EDs that the HC isn't using, accounting for
-		 * frame counter wraps.
+		 * frame counter wraps and EDs with partially retired TDs
 		 */
-		if (tick_before (tick, ed->tick)
-				&& HCD_IS_RUNNING(ohci->hcd.state)) {
-			last = &ed->ed_next;
-			continue;
+		if (likely (HCD_IS_RUNNING(ohci->hcd.state))) {
+			if (tick_before (tick, ed->tick)) {
+skip_ed:
+				last = &ed->ed_next;
+				continue;
+			}
+
+			if (!list_empty (&ed->td_list)) {
+				struct td	*td;
+				u32		head;
+
+				td = list_entry (ed->td_list.next, struct td,
+							td_list);
+				head = cpu_to_le32 (ed->hwHeadP) & TD_MASK;
+
+				/* INTR_WDH may need to clean up first */
+				if (td->td_dma != head)
+					goto skip_ed;
+			}
 		}
 
 		/* reentrancy:  if we drop the schedule lock, someone might

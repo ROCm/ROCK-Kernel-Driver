@@ -145,6 +145,14 @@
 /* Note: OCT US101 is also rebadged as Dick Smith Electronics (NZ) XH6381 */
 #define OCT_US101_PID		0x0421	/* OCT US101 USB to RS-232 */
 
+/*
+ * Protego product ids
+ */
+#define PROTEGO_SPECIAL_1	0xFC70	/* special/unknown device */
+#define PROTEGO_R2X0		0xFC71	/* R200-USB TRNG unit (R210, R220, and R230) */
+#define PROTEGO_SPECIAL_3	0xFC72	/* special/unknown device */
+#define PROTEGO_SPECIAL_4	0xFC73	/* special/unknown device */ 
+
 /* Commands */
 #define FTDI_SIO_RESET 		0 /* Reset the port */
 #define FTDI_SIO_MODEM_CTRL 	1 /* Set the modem control register */

@@ -325,7 +325,8 @@ struct scsi_host_template usb_stor_host_template = {
 	.emulated =			TRUE,
 
 	/* modify scsi_device bits on probe */
-	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_USE_10_BYTE_MS),
+	.flags = (BLIST_MS_SKIP_PAGE_08 | BLIST_MS_SKIP_PAGE_3F |
+		  BLIST_USE_10_BYTE_MS),
 
 	/* module management */
 	.module =			THIS_MODULE
