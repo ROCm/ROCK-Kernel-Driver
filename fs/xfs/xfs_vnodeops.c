@@ -77,10 +77,6 @@
  */
 #define SYMLINK_MAPS 2
 
-extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
-			int, unsigned int, unsigned long);
-
-
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
  * No other open action is required for regular files.  Devices are handled

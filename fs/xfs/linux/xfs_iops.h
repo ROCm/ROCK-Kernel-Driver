@@ -69,4 +69,7 @@ extern struct address_space_operations linvfs_aops;
 extern int linvfs_get_block(struct inode *, sector_t, struct buffer_head *, int);
 extern void linvfs_unwritten_done(struct buffer_head *, int);
 
+extern int xfs_ioctl(struct bhv_desc *, struct inode *, struct file *,
+                        int, unsigned int, unsigned long);
+
 #endif /* __XFS_IOPS_H__ */
