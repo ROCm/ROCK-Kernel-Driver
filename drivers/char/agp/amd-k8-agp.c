@@ -1,12 +1,12 @@
 /* 
- * Copyright 2001-2003 SuSE Labs
+ * Copyright 2001-2003 SuSE Labs.
  * Distributed under the GNU public license, v2.
  * 
- * This is a GART driver for the AMD K8 northbridge and the AMD 8151 
- * AGP bridge. The main work is done in the northbridge. The configuration
- * is only mirrored in the 8151 for compatibility (could be likely
- * removed now).
- */ 
+ * This is a GART driver for the AMD64 on-CPU northbridge.
+ * It also includes support for the AMD 8151 AGP bridge,
+ * although it doesn't actually do much, as all the real
+ * work is done in the northbridge(s).
+ */
 
 /*
  * On x86-64 the AGP driver needs to be initialized early by the IOMMU 
