@@ -18,6 +18,7 @@
 #include <linux/config.h>	/* for CONFIG_SCSI_LOGGING */
 #include <linux/devfs_fs_kernel.h>
 #include <linux/proc_fs.h>
+#include <linux/init.h>
 
 /*
  * Some of the public constants are being moved to this file.
