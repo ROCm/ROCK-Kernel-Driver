@@ -80,7 +80,7 @@ MODULE_LICENSE("Dual MPL/GPL");
 /* Parameters that can be set with 'insmod' */
 
 /* The base port address of the TCIC-2 chip */
-static int tcic_base = TCIC_BASE;
+static unsigned long tcic_base = TCIC_BASE;
 
 /* Specify a socket number to ignore */
 static int ignore = -1;
@@ -105,7 +105,7 @@ static int poll_quick = HZ/20;
 /* CCLK external clock time, in nanoseconds.  70 ns = 14.31818 MHz */
 static int cycle_time = 70;
 
-module_param(tcic_base, int, 0444);
+module_param(tcic_base, ulong, 0444);
 module_param(ignore, int, 0444);
 module_param(do_scan, int, 0444);
 module_param(irq_mask, int, 0444);
@@ -144,26 +144,26 @@ static struct tcic_socket socket_table[2];
 static u_char tcic_getb(u_char reg)
 {
     u_char val = inb(tcic_base+reg);
-    printk(KERN_DEBUG "tcic_getb(%#x) = %#x\n", tcic_base+reg, val);
+    printk(KERN_DEBUG "tcic_getb(%#lx) = %#x\n", tcic_base+reg, val);
     return val;
 }
 
 static u_short tcic_getw(u_char reg)
 {
     u_short val = inw(tcic_base+reg);
-    printk(KERN_DEBUG "tcic_getw(%#x) = %#x\n", tcic_base+reg, val);
+    printk(KERN_DEBUG "tcic_getw(%#lx) = %#x\n", tcic_base+reg, val);
     return val;
 }
 
 static void tcic_setb(u_char reg, u_char data)
 {
-    printk(KERN_DEBUG "tcic_setb(%#x, %#x)\n", tcic_base+reg, data);
+    printk(KERN_DEBUG "tcic_setb(%#lx, %#x)\n", tcic_base+reg, data);
     outb(data, tcic_base+reg);
 }
 
 static void tcic_setw(u_char reg, u_short data)
 {
-    printk(KERN_DEBUG "tcic_setw(%#x, %#x)\n", tcic_base+reg, data);
+    printk(KERN_DEBUG "tcic_setw(%#lx, %#x)\n", tcic_base+reg, data);
     outw(data, tcic_base+reg);
 }
 #else
@@ -796,7 +796,7 @@ static int tcic_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
     u_short base, len, ioctl;
     
     debug(1, "SetIOMap(%d, %d, %#2.2x, %d ns, "
-	  "%#4.4x-%#4.4x)\n", psock, io->map, io->flags,
+	  "%#lx-%#lx)\n", psock, io->map, io->flags,
 	  io->speed, io->start, io->stop);
     if ((io->map > 1) || (io->start > 0xffff) || (io->stop > 0xffff) ||
 	(io->stop < io->start)) return -EINVAL;
@@ -833,7 +833,7 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
     u_long base, len, mmap;
 
     debug(1, "SetMemMap(%d, %d, %#2.2x, %d ns, "
-	  "%#5.5lx-%#5.5lx, %#5.5x)\n", psock, mem->map, mem->flags,
+	  "%#lx-%#lx, %#x)\n", psock, mem->map, mem->flags,
 	  mem->speed, mem->res->start, mem->res->end, mem->card_start);
     if ((mem->map > 3) || (mem->card_start > 0x3ffffff) ||
 	(mem->res->start > 0xffffff) || (mem->res->end > 0xffffff) ||

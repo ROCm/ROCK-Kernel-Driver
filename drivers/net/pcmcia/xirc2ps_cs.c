@@ -274,12 +274,12 @@ INT_MODULE_PARM(lockup_hack,	0);  /* anti lockup hack */
 static unsigned maxrx_bytes = 22000;
 
 /* MII management prototypes */
-static void mii_idle(ioaddr_t ioaddr);
-static void mii_putbit(ioaddr_t ioaddr, unsigned data);
-static int  mii_getbit(ioaddr_t ioaddr);
-static void mii_wbits(ioaddr_t ioaddr, unsigned data, int len);
-static unsigned mii_rd(ioaddr_t ioaddr,	u_char phyaddr, u_char phyreg);
-static void mii_wr(ioaddr_t ioaddr, u_char phyaddr, u_char phyreg,
+static void mii_idle(kio_addr_t ioaddr);
+static void mii_putbit(kio_addr_t ioaddr, unsigned data);
+static int  mii_getbit(kio_addr_t ioaddr);
+static void mii_wbits(kio_addr_t ioaddr, unsigned data, int len);
+static unsigned mii_rd(kio_addr_t ioaddr, u_char phyaddr, u_char phyreg);
+static void mii_wr(kio_addr_t ioaddr, u_char phyaddr, u_char phyreg,
 		   unsigned data, int len);
 
 /*
@@ -425,7 +425,7 @@ next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 static void
 PrintRegisters(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
 
     if (pc_debug > 1) {
 	int i, page;
@@ -461,7 +461,7 @@ PrintRegisters(struct net_device *dev)
  * Turn around for read
  */
 static void
-mii_idle(ioaddr_t ioaddr)
+mii_idle(kio_addr_t ioaddr)
 {
     PutByte(XIRCREG2_GPR2, 0x04|0); /* drive MDCK low */
     udelay(1);
@@ -473,7 +473,7 @@ mii_idle(ioaddr_t ioaddr)
  * Write a bit to MDI/O
  */
 static void
-mii_putbit(ioaddr_t ioaddr, unsigned data)
+mii_putbit(kio_addr_t ioaddr, unsigned data)
 {
   #if 1
     if (data) {
@@ -506,7 +506,7 @@ mii_putbit(ioaddr_t ioaddr, unsigned data)
  * Get a bit from MDI/O
  */
 static int
-mii_getbit(ioaddr_t ioaddr)
+mii_getbit(kio_addr_t ioaddr)
 {
     unsigned d;
 
@@ -519,7 +519,7 @@ mii_getbit(ioaddr_t ioaddr)
 }
 
 static void
-mii_wbits(ioaddr_t ioaddr, unsigned data, int len)
+mii_wbits(kio_addr_t ioaddr, unsigned data, int len)
 {
     unsigned m = 1 << (len-1);
     for (; m; m >>= 1)
@@ -527,7 +527,7 @@ mii_wbits(ioaddr_t ioaddr, unsigned data, int len)
 }
 
 static unsigned
-mii_rd(ioaddr_t ioaddr,	u_char phyaddr, u_char phyreg)
+mii_rd(kio_addr_t ioaddr,	u_char phyaddr, u_char phyreg)
 {
     int i;
     unsigned data=0, m;
@@ -549,7 +549,7 @@ mii_rd(ioaddr_t ioaddr,	u_char phyaddr, u_char phyreg)
 }
 
 static void
-mii_wr(ioaddr_t ioaddr, u_char phyaddr, u_char phyreg, unsigned data, int len)
+mii_wr(kio_addr_t ioaddr, u_char phyaddr, u_char phyreg, unsigned data, int len)
 {
     int i;
 
@@ -805,7 +805,7 @@ xirc2ps_config(dev_link_t * link)
     local_info_t *local = netdev_priv(dev);
     tuple_t tuple;
     cisparse_t parse;
-    ioaddr_t ioaddr;
+    kio_addr_t ioaddr;
     int err, i;
     u_char buf[64];
     cistpl_lan_node_id_t *node_id = (cistpl_lan_node_id_t*)parse.funce.data;
@@ -1240,7 +1240,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
     local_info_t *lp = netdev_priv(dev);
-    ioaddr_t ioaddr;
+    kio_addr_t ioaddr;
     u_char saved_page;
     unsigned bytes_rcvd;
     unsigned int_status, eth_status, rx_status, tx_status;
@@ -1345,7 +1345,7 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		    unsigned i;
 		    u_long *p = skb_put(skb, pktlen);
 		    register u_long a;
-		    ioaddr_t edpreg = ioaddr+XIRCREG_EDP-2;
+		    kio_addr_t edpreg = ioaddr+XIRCREG_EDP-2;
 		    for (i=0; i < len ; i += 4, p++) {
 			a = inl(edpreg);
 			__asm__("rorl $16,%0\n\t"
@@ -1474,7 +1474,7 @@ static int
 do_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     local_info_t *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     int okay;
     unsigned freespace;
     unsigned pktlen = skb? skb->len : 0;
@@ -1544,7 +1544,7 @@ do_get_stats(struct net_device *dev)
 static void
 set_addresses(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     local_info_t *lp = netdev_priv(dev);
     struct dev_mc_list *dmi = dev->mc_list;
     char *addr;
@@ -1586,7 +1586,7 @@ set_addresses(struct net_device *dev)
 static void
 set_multicast_list(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
 
     SelectPage(0x42);
     if (dev->flags & IFF_PROMISC) { /* snoop */
@@ -1670,7 +1670,7 @@ static int
 do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
     local_info_t *local = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     u16 *data = (u16 *)&rq->ifr_ifru;
 
     DEBUG(1, "%s: ioctl(%-.6s, %#04x) %04x %04x %04x %04x\n",
@@ -1702,7 +1702,7 @@ static void
 hardreset(struct net_device *dev)
 {
     local_info_t *local = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
 
     SelectPage(4);
     udelay(1);
@@ -1719,7 +1719,7 @@ static void
 do_reset(struct net_device *dev, int full)
 {
     local_info_t *local = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     unsigned value;
 
     DEBUG(0, "%s: do_reset(%p,%d)\n", dev? dev->name:"eth?", dev, full);
@@ -1880,7 +1880,7 @@ static int
 init_mii(struct net_device *dev)
 {
     local_info_t *local = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     unsigned control, status, linkpartner;
     int i;
 
@@ -1953,7 +1953,7 @@ static void
 do_powerdown(struct net_device *dev)
 {
 
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
 
     DEBUG(0, "do_powerdown(%p)\n", dev);
 
@@ -1965,7 +1965,7 @@ do_powerdown(struct net_device *dev)
 static int
 do_stop(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     local_info_t *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
 

@@ -741,19 +741,19 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 			  ioaddr_t num, u_int lines)
 {
     int i;
-    ioaddr_t try, align;
+    kio_addr_t try, align;
 
     align = (*base) ? (lines ? 1<<lines : 0) : 1;
     if (align && (align < num)) {
 	if (*base) {
-	    cs_dbg(s, 0, "odd IO request: num %04x align %04x\n",
+	    cs_dbg(s, 0, "odd IO request: num %#x align %#lx\n",
 		   num, align);
 	    align = 0;
 	} else
 	    while (align && (align < num)) align <<= 1;
     }
     if (*base & ~(align-1)) {
-	cs_dbg(s, 0, "odd IO request: base %04x align %04x\n",
+	cs_dbg(s, 0, "odd IO request: base %#x align %#lx\n",
 	       *base, align);
 	align = 0;
     }

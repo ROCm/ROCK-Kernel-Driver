@@ -81,7 +81,7 @@ typedef struct pccard_io_map {
     u_char	map;
     u_char	flags;
     u_short	speed;
-    ioaddr_t	start, stop;
+    kio_addr_t	start, stop;
 } pccard_io_map;
 
 typedef struct pccard_mem_map {
@@ -144,8 +144,8 @@ struct pcmcia_socket;
 
 typedef struct io_window_t {
 	u_int			Attributes;
-	ioaddr_t		BasePort, NumPorts;
-	ioaddr_t		InUse, Config;
+	kio_addr_t		BasePort, NumPorts;
+	kio_addr_t		InUse, Config;
 	struct resource		*res;
 } io_window_t;
 
@@ -199,7 +199,7 @@ struct pcmcia_socket {
 	u_int				features;
 	u_int				irq_mask;
 	u_int				map_size;
-	ioaddr_t			io_offset;
+	kio_addr_t			io_offset;
 	u_char				pci_irq;
 	struct pci_dev *		cb_dev;
 

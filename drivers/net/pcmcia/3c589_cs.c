@@ -147,7 +147,7 @@ static void tc589_release(dev_link_t *link);
 static int tc589_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
-static u16 read_eeprom(ioaddr_t ioaddr, int index);
+static u16 read_eeprom(kio_addr_t ioaddr, int index);
 static void tc589_reset(struct net_device *dev);
 static void media_check(unsigned long arg);
 static int el3_config(struct net_device *dev, struct ifmap *map);
@@ -299,7 +299,7 @@ static void tc589_config(dev_link_t *link)
     cisparse_t parse;
     u16 buf[32], *phys_addr;
     int last_fn, last_ret, i, j, multi = 0, fifo;
-    ioaddr_t ioaddr;
+    kio_addr_t ioaddr;
     char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
     
     DEBUG(0, "3c589_config(0x%p)\n", link);
@@ -500,7 +500,7 @@ static void tc589_wait_for_completion(struct net_device *dev, int cmd)
   Read a word from the EEPROM using the regular EEPROM access register.
   Assume that we are in register window zero.
 */
-static u16 read_eeprom(ioaddr_t ioaddr, int index)
+static u16 read_eeprom(kio_addr_t ioaddr, int index)
 {
     int i;
     outw(EEPROM_READ + index, ioaddr + 10);
@@ -518,7 +518,7 @@ static u16 read_eeprom(ioaddr_t ioaddr, int index)
 static void tc589_set_xcvr(struct net_device *dev, int if_port)
 {
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     
     EL3WINDOW(0);
     switch (if_port) {
@@ -540,7 +540,7 @@ static void tc589_set_xcvr(struct net_device *dev, int if_port)
 
 static void dump_status(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     EL3WINDOW(1);
     printk(KERN_INFO "  irq status %04x, rx status %04x, tx status "
 	   "%02x  tx free %04x\n", inw(ioaddr+EL3_STATUS),
@@ -556,7 +556,7 @@ static void dump_status(struct net_device *dev)
 /* Reset and restore all of the 3c589 registers. */
 static void tc589_reset(struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     int i;
     
     EL3WINDOW(0);
@@ -664,7 +664,7 @@ static int el3_open(struct net_device *dev)
 static void el3_tx_timeout(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     
     printk(KERN_WARNING "%s: Transmit timed out!\n", dev->name);
     dump_status(dev);
@@ -679,7 +679,7 @@ static void el3_tx_timeout(struct net_device *dev)
 static void pop_tx_status(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     int i;
     
     /* Clear the Tx status stack. */
@@ -701,7 +701,7 @@ static void pop_tx_status(struct net_device *dev)
 
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     struct el3_private *priv = netdev_priv(dev);
 
     DEBUG(3, "%s: el3_start_xmit(length = %ld) called, "
@@ -734,7 +734,8 @@ static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *) dev_id;
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr, status;
+    kio_addr_t ioaddr;
+    __u16 status;
     int i = 0, handled = 1;
     
     if (!netif_device_present(dev))
@@ -819,7 +820,7 @@ static void media_check(unsigned long arg)
 {
     struct net_device *dev = (struct net_device *)(arg);
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     u16 media, errs;
     unsigned long flags;
 
@@ -921,7 +922,7 @@ static struct net_device_stats *el3_get_stats(struct net_device *dev)
 static void update_stats(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
 
     DEBUG(2, "%s: updating the statistics.\n", dev->name);
     /* Turn off statistics updates while reading. */
@@ -948,7 +949,7 @@ static void update_stats(struct net_device *dev)
 static int el3_rx(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     int worklimit = 32;
     short rx_status;
     
@@ -1003,7 +1004,7 @@ static void set_multicast_list(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     u16 opts = SetRxFilter | RxStation | RxBroadcast;
 
     if (!(DEV_OK(link))) return;
@@ -1018,7 +1019,7 @@ static int el3_close(struct net_device *dev)
 {
     struct el3_private *lp = netdev_priv(dev);
     dev_link_t *link = &lp->link;
-    ioaddr_t ioaddr = dev->base_addr;
+    kio_addr_t ioaddr = dev->base_addr;
     
     DEBUG(1, "%s: shutting down ethercard.\n", dev->name);
 
