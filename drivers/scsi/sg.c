@@ -54,6 +54,7 @@ static int sg_version_num = 30527;	/* 2 digits for each component */
 #include <linux/fcntl.h>
 #include <linux/init.h>
 #include <linux/poll.h>
+#include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
 
 #include <asm/io.h>
