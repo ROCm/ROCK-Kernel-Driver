@@ -3,11 +3,14 @@
  *
  *	Alan Cox (GW4PTS) 	10/11/93
  */
- 
 #ifndef _AX25_H
 #define _AX25_H 
+
 #include <linux/config.h>
 #include <linux/ax25.h>
+#include <linux/spinlock.h>
+#include <linux/timer.h>
+#include <asm/atomic.h>
 
 #define	AX25_T1CLAMPLO  		1
 #define	AX25_T1CLAMPHI 			(30 * HZ)
@@ -147,10 +150,12 @@ typedef struct {
 
 typedef struct ax25_route {
 	struct ax25_route	*next;
+	atomic_t		ref;
 	ax25_address		callsign;
-	struct net_device		*dev;
+	struct net_device	*dev;
 	ax25_digi		*digipeat;
 	char			ip_mode;
+	struct timer_list	timer;
 } ax25_route;
 
 typedef struct {
@@ -197,7 +202,8 @@ typedef struct ax25_cb {
 #define ax25_sk(__sk) ((ax25_cb *)(__sk)->protinfo)
 
 /* af_ax25.c */
-extern ax25_cb *volatile ax25_list;
+extern ax25_cb *ax25_list;
+extern spinlock_t ax25_list_lock;
 extern void ax25_free_cb(ax25_cb *);
 extern void ax25_insert_socket(ax25_cb *);
 struct sock *ax25_find_listener(ax25_address *, int, struct net_device *, int);
@@ -224,6 +230,7 @@ extern void ax25_digi_invert(ax25_digi *, ax25_digi *);
 
 /* ax25_dev.c */
 extern ax25_dev *ax25_dev_list;
+extern spinlock_t ax25_dev_lock;
 extern ax25_dev *ax25_dev_ax25dev(struct net_device *);
 extern ax25_dev *ax25_addr_ax25dev(ax25_address *);
 extern void ax25_dev_device_up(struct net_device *);
@@ -286,7 +293,8 @@ extern void ax25_rt_device_down(struct net_device *);
 extern int  ax25_rt_ioctl(unsigned int, void *);
 extern int  ax25_rt_get_info(char *, char **, off_t, int);
 extern int  ax25_rt_autobind(ax25_cb *, ax25_address *);
-extern ax25_route *ax25_rt_find_route(ax25_address *, struct net_device *);
+extern ax25_route *ax25_rt_find_route(ax25_route *, ax25_address *,
+	struct net_device *);
 extern struct sk_buff *ax25_rt_build_path(struct sk_buff *, ax25_address *, ax25_address *, ax25_digi *);
 extern void ax25_rt_free(void);
 
