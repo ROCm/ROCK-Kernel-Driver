@@ -287,12 +287,6 @@ static void sg_complete (struct urb *urb)
  *
  * The request may be canceled with usb_sg_cancel(), either before or after
  * usb_sg_wait() is called.
- *
- * NOTE:
- *
- * At this writing, don't use the interrupt transfer mode, since the old old
- * "automagic resubmit" mode hasn't yet been removed.  It should be removed
- * by the time 2.5 finalizes.
  */
 int usb_sg_init (
 	struct usb_sg_request	*io,

@@ -471,11 +471,23 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 static void int_callback(struct urb *u)
 {
 	struct kaweth_device *kaweth = u->context;
-	int act_state;
+	int act_state, status;
 
 	/* we abuse the interrupt urb for rebsubmitting under low memory saving a timer */
 	if (kaweth->suspend_lowmem)
 		kaweth_resubmit_rx_urb(kaweth, GFP_ATOMIC);
+
+	switch (u->status) {
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
+	}
 
 	/* we check the link state to report changes */
 	if (kaweth->linkstate != (act_state = ( kaweth->intbuffer[STATE_OFFSET] | STATE_MASK) >> STATE_SHIFT)) {
@@ -486,7 +498,12 @@ static void int_callback(struct urb *u)
 
 		kaweth->linkstate = act_state;
 	}
-
+resubmit:
+	status = usb_submit_urb (u, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s, status %d",
+				kaweth->dev->bus->bus_name,
+				kaweth->dev->devpath, status);
 }
 
 /****************************************************************

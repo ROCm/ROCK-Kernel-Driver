@@ -119,6 +119,7 @@ static void hub_irq(struct urb *urb)
 {
 	struct usb_hub *hub = (struct usb_hub *)urb->context;
 	unsigned long flags;
+	int status;
 
 	switch (urb->status) {
 	case -ENOENT:		/* synchronous unlink */
@@ -131,7 +132,7 @@ static void hub_irq(struct urb *urb)
 		dbg("hub '%s' status %d for interrupt transfer",
 			urb->dev->devpath, urb->status);
 		if ((++hub->nerrors < 10) || hub->error)
-			return;
+			goto resubmit;
 		hub->error = urb->status;
 		/* FALL THROUGH */
 	
@@ -149,6 +150,12 @@ static void hub_irq(struct urb *urb)
 		wake_up(&khubd_wait);
 	}
 	spin_unlock_irqrestore(&hub_event_lock, flags);
+
+resubmit:
+	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0)
+		err ("hub '%s-%s' status %d for interrupt resubmit",
+			urb->dev->bus->bus_name, urb->dev->devpath,
+			status);
 }
 
 /* USB 2.0 spec Section 11.24.2.3 */

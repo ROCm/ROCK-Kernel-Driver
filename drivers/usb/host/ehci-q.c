@@ -160,13 +160,6 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 
 static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
 {
-#ifdef	INTR_AUTOMAGIC
-	struct urb		*resubmit = 0;
-	struct usb_device	*dev = 0;
-
-	static int ehci_urb_enqueue (struct usb_hcd *, struct urb *, int);
-#endif
-
 	if (likely (urb->hcpriv != 0)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
 
@@ -175,14 +168,6 @@ static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
 
 			/* ... update hc-wide periodic stats (for usbfs) */
 			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
-
-#ifdef	INTR_AUTOMAGIC
-			if (!((urb->status == -ENOENT)
-					|| (urb->status == -ECONNRESET))) {
-				resubmit = usb_get_urb (urb);
-				dev = urb->dev;
-			}
-#endif
 		}
 		qh_put (ehci, qh);
 		urb->hcpriv = 0;
@@ -206,25 +191,6 @@ static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
 	usb_hcd_giveback_urb (&ehci->hcd, urb);
-
-#ifdef	INTR_AUTOMAGIC
-	if (resubmit && ((urb->status == -ENOENT)
-				|| (urb->status == -ECONNRESET))) {
-		usb_put_urb (resubmit);
-		resubmit = 0;
-	}
-	// device drivers will soon be doing something like this
-	if (resubmit) {
-		int	status;
-
-		resubmit->dev = dev;
-		status = SUBMIT_URB (resubmit, SLAB_KERNEL);
-		if (status != 0)
-			err ("can't resubmit interrupt urb %p: status %d",
-					resubmit, status);
-		usb_put_urb (resubmit);
-	}
-#endif
 
 	spin_lock (&ehci->lock);
 }

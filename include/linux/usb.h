@@ -791,8 +791,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * @context: For use in completion functions.  This normally points to
  *	request-specific driver context.
  * @complete: Completion handler. This URB is passed as the parameter to the
- *	completion function.  Except for interrupt or isochronous transfers
- *	that aren't being unlinked, the completion function may then do what
+ *	completion function.  The completion function may then do what
  *	it likes with the URB, including resubmitting or freeing it.
  * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
  *	collect the transfer status for each buffer.
@@ -884,11 +883,6 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * When completion callback is invoked for non-isochronous URBs, the
  * actual_length field tells how many bytes were transferred.
- *
- * For interrupt URBs, the URB provided to the callback
- * function is still "owned" by the USB core subsystem unless the status
- * indicates that the URB has been unlinked.  Completion handlers should
- * not modify such URBs until they have been unlinked.
  *
  * ISO transfer status is reported in the status and actual_length fields
  * of the iso_frame_desc array, and the number of errors is reported in

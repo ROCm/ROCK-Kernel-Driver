@@ -900,12 +900,26 @@ static int hid_input_report(int type, struct urb *urb)
 
 static void hid_irq_in(struct urb *urb)
 {
-	if (urb->status) {
-		dbg("nonzero status in input irq %d", urb->status);
-		return;
-	}
+	struct hid_device	*hid = urb->context;
+	int			status;
 
-	hid_input_report(HID_INPUT_REPORT, urb);
+	switch (urb->status) {
+	case 0:			/* success */
+		hid_input_report(HID_INPUT_REPORT, urb);
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+	default:		/* error */
+		dbg("nonzero status in input irq %d", urb->status);
+	}
+	
+	status = usb_submit_urb (urb, SLAB_ATOMIC);
+	if (status)
+		err ("can't resubmit intr, %s-%s/input%d, status %d",
+				hid->dev->bus->bus_name, hid->dev->devpath,
+				hid->ifnum, status);
 }
 
 /*

@@ -449,7 +449,10 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	if (udev->descriptor.bNumConfigurations != 1) {
 		int	expected = udev->actconfig->bConfigurationValue;
 
-		/* [9.4.2] get_configuration always works */
+		/* [9.4.2] get_configuration always works
+		 * ... although some cheap devices (like one TI Hub I've got)
+		 * won't return config descriptors except before set_config.
+		 */
 		retval = usb_control_msg (udev, usb_rcvctrlpipe (udev, 0),
 				USB_REQ_GET_CONFIGURATION, USB_RECIP_DEVICE,
 				0, 0, dev->buf, 1, HZ * USB_CTRL_GET_TIMEOUT);
@@ -540,6 +543,10 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 	
 	return 0;
 }
+
+/*-------------------------------------------------------------------------*/
+
+// control queueing !!
 
 /*-------------------------------------------------------------------------*/
 
@@ -839,14 +846,6 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 			dev->out_pipe = usb_sndintpipe (udev, info->ep_out);
 			wtest = " intr-out";
 		}
-
-#if 1
-		// FIXME disabling this until we finally get rid of
-		// interrupt "automagic" resubmission
-		dbg ("%s:  no interrupt transfers for now", dev->id);
-		kfree (dev);
-		return -ENODEV;
-#endif
 	} else {
 		if (info->ep_in) {
 			dev->in_pipe = usb_rcvbulkpipe (udev, info->ep_in);
