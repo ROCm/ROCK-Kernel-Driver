@@ -480,7 +480,7 @@ static int __init do_boot_cpu(int cpu, int num_cpus)
 	 */
 	__cpu_number_map[cpu] = num_cpus;
 	__cpu_logical_map[num_cpus] = cpu;
-	CPUMASK_SETB(cpu_online_map, cpu);
+	cpu_set(cpu, cpu_online_map);
 
 	/*
 	 * Wait this cpu to start up and initialize its hub,

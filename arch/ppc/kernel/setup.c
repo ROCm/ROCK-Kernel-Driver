@@ -160,7 +160,7 @@ int show_cpuinfo(struct seq_file *m, void *v)
 	}
 
 #ifdef CONFIG_SMP
-	if (!(cpu_online_map & (1 << i)))
+	if (!cpu_online(i))
 		return 0;
 	pvr = cpu_data[i].pvr;
 	lpj = cpu_data[i].loops_per_jiffy;

@@ -320,7 +320,7 @@ static swp_entry_t *shmem_swp_alloc(struct shmem_inode_info *info, unsigned long
 		spin_unlock(&sbinfo->stat_lock);
 
 		spin_unlock(&info->lock);
-		page = shmem_dir_alloc(inode->i_mapping->gfp_mask);
+		page = shmem_dir_alloc(mapping_gfp_mask(inode->i_mapping));
 		if (page) {
 			clear_highpage(page);
 			page->nr_swapped = 0;

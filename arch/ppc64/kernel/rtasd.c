@@ -225,7 +225,7 @@ repeat:
 			continue;
 
 		DEBUG("scheduling on %d\n", cpu);
-		set_cpus_allowed(current, 1UL << cpu);
+		set_cpus_allowed(current, cpumask_of_cpu(cpu));
 		DEBUG("watchdog scheduled on cpu %d\n", smp_processor_id());
 
 		do {

@@ -203,10 +203,10 @@ static struct pci_device_id id_tbl[] = {
 MODULE_DEVICE_TABLE(pci, id_tbl);
 
 static struct pci_driver kahlua_driver = {
-	name:		"kahlua",
-	id_table:	id_tbl,
-	probe:		probe_one,
-	remove:         __devexit_p(remove_one),
+	.name		= "kahlua",
+	.id_table	= id_tbl,
+	.probe		= probe_one,
+	.remove		= __devexit_p(remove_one),
 };
 
 

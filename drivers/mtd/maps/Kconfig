@@ -468,7 +468,7 @@ config MTD_PCI
 
 config MTD_PCMCIA
 	tristate "PCMCIA MTD driver"
-	depends on MTD && PCMCIA && MTD_COMPLEX_MAPPINGS
+	depends on MTD && PCMCIA && MTD_COMPLEX_MAPPINGS && BROKEN
 	help
 	  Map driver for accessing PCMCIA linear flash memory cards. These
 	  cards are usually around 4-16MiB in size. This does not include

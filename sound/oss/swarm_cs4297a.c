@@ -1590,10 +1590,10 @@ static int cs4297a_ioctl_mixdev(struct inode *inode, struct file *file,
 //   Mixer file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_mixer_fops = {
-	llseek:cs4297a_llseek,
-	ioctl:cs4297a_ioctl_mixdev,
-	open:cs4297a_open_mixdev,
-	release:cs4297a_release_mixdev,
+	.llseek		= cs4297a_llseek,
+	.ioctl		= cs4297a_ioctl_mixdev,
+	.open		= cs4297a_open_mixdev,
+	.release	= cs4297a_release_mixdev,
 };
 
 // --------------------------------------------------------------------- 
@@ -2508,14 +2508,14 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 //   Wave (audio) file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_audio_fops = {
-	llseek:cs4297a_llseek,
-	read:cs4297a_read,
-	write:cs4297a_write,
-	poll:cs4297a_poll,
-	ioctl:cs4297a_ioctl,
-	mmap:cs4297a_mmap,
-	open:cs4297a_open,
-	release:cs4297a_release,
+	.llseek		= cs4297a_llseek,
+	.read		= cs4297a_read,
+	.write		= cs4297a_write,
+	.poll		= cs4297a_poll,
+	.ioctl		= cs4297a_ioctl,
+	.mmap		= cs4297a_mmap,
+	.open		= cs4297a_open,
+	.release	= cs4297a_release,
 };
 
 static irqreturn_t cs4297a_interrupt(int irq, void *dev_id, struct pt_regs *regs)

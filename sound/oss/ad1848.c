@@ -3027,7 +3027,7 @@ static struct pnp_dev *ad1848_init_generic(struct pnp_card *bus, struct address_
 
 static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_card *bus, int slot)
 {
-	char *busname = bus->dev.name[0] ? bus->dev.name : ad1848_isapnp_list[slot].name;
+	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
 
 	/* Initialize this baby. */
 

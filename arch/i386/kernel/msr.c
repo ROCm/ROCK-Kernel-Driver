@@ -242,7 +242,7 @@ static int msr_open(struct inode *inode, struct file *file)
   int cpu = minor(file->f_dentry->d_inode->i_rdev);
   struct cpuinfo_x86 *c = &(cpu_data)[cpu];
   
-  if ( !(cpu_online_map & (1UL << cpu)) )
+  if (!cpu_online(cpu))
     return -ENXIO;		/* No such CPU */
   if ( !cpu_has(c, X86_FEATURE_MSR) )
     return -EIO;		/* MSR not supported */

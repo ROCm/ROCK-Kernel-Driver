@@ -32,6 +32,17 @@ config EXPERIMENTAL
 	  you say Y here, you will be offered the choice of using features or
 	  drivers that are currently considered to be in the alpha-test phase.
 
+config BROKEN
+	bool "Prompt for old and known-broken drivers"
+	depends on EXPERIMENTAL
+	default n
+	help
+	  This option allows you to choose whether you want to try to
+	  compile (and fix) old drivers that haven't been updated to
+	  new infrastructure.
+
+	  If unsure, say N.
+
 endmenu
 
 
@@ -108,6 +119,31 @@ config LOG_BUF_SHIFT
 	             14 => 16 KB for uniprocessor
 		     13 =>  8 KB
 		     12 =>  4 KB
+
+config IKCONFIG
+	bool "Kernel .config support"
+	---help---
+	  This option enables the complete Linux kernel ".config" file
+	  contents, information on compiler used to build the kernel,
+	  kernel running when this kernel was built and kernel version
+	  from Makefile to be saved in kernel. It provides documentation
+	  of which kernel options are used in a running kernel or in an
+	  on-disk kernel.  This information can be extracted from the kernel
+	  image file with the script scripts/extract-ikconfig and used as
+	  input to rebuild the current kernel or to build another kernel.
+	  It can also be extracted from a running kernel by reading
+	  /proc/ikconfig/config and /proc/ikconfig/built_with, if enabled.
+	  /proc/ikconfig/config will list the configuration that was used
+	  to build the kernel and /proc/ikconfig/built_with will list
+	  information on the compiler and host machine that was used to
+	  build the kernel.
+
+config IKCONFIG_PROC
+	bool "Enable access to .config through /proc/ikconfig"
+	depends on IKCONFIG
+	---help---
+	  This option enables access to kernel configuration file and build
+	  information through /proc/ikconfig.
 
 
 menuconfig EMBEDDED

@@ -222,7 +222,7 @@ static int ns558_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *did)
 	port->gameport.id.version = 0x100;
 
 	sprintf(port->phys, "pnp%s/gameport0", dev->dev.bus_id);
-	sprintf(port->name, "%s", dev->dev.name[0] ? dev->dev.name : "NS558 PnP Gameport");
+	sprintf(port->name, "%s", "NS558 PnP Gameport");
 
 	gameport_register_port(&port->gameport);
 

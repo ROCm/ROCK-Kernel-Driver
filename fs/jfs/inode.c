@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/mpage.h>
 #include <linux/buffer_head.h>
+#include <linux/pagemap.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_imap.h"
@@ -51,7 +52,7 @@ void jfs_read_inode(struct inode *inode)
 		inode->i_op = &jfs_dir_inode_operations;
 		inode->i_fop = &jfs_dir_operations;
 		inode->i_mapping->a_ops = &jfs_aops;
-		inode->i_mapping->gfp_mask = GFP_NOFS;
+		mapping_set_gfp_mask(inode->i_mapping, GFP_NOFS);
 	} else if (S_ISLNK(inode->i_mode)) {
 		if (inode->i_size >= IDATASIZE) {
 			inode->i_op = &page_symlink_inode_operations;

@@ -2431,7 +2431,7 @@ make_io:
 		 * read the block from disk
 		 */
 		get_bh(bh);
-		bh->b_end_io = end_buffer_io_sync;
+		bh->b_end_io = end_buffer_read_sync;
 		submit_bh(READ, bh);
 		wait_on_buffer(bh);
 		if (!buffer_uptodate(bh)) {

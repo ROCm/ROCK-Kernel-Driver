@@ -398,10 +398,10 @@ MODULE_DEVICE_TABLE(pci,via_pci_tbl);
 
 
 static struct pci_driver via_driver = {
-	name:		VIA_MODULE_NAME,
-	id_table:	via_pci_tbl,
-	probe:		via_init_one,
-	remove:		__devexit_p(via_remove_one),
+	.name		= VIA_MODULE_NAME,
+	.id_table	= via_pci_tbl,
+	.probe		= via_init_one,
+	.remove		= __devexit_p(via_remove_one),
 };
 
 
@@ -2057,15 +2057,15 @@ static int via_interrupt_init (struct via_info *card)
  */
 
 static struct file_operations via_dsp_fops = {
-	owner:		THIS_MODULE,
-	open:		via_dsp_open,
-	release:	via_dsp_release,
-	read:		via_dsp_read,
-	write:		via_dsp_write,
-	poll:		via_dsp_poll,
-	llseek: 	no_llseek,
-	ioctl:		via_dsp_ioctl,
-	mmap:		via_dsp_mmap,
+	.owner		= THIS_MODULE,
+	.open		= via_dsp_open,
+	.release	= via_dsp_release,
+	.read		= via_dsp_read,
+	.write		= via_dsp_write,
+	.poll		= via_dsp_poll,
+	.llseek		= no_llseek,
+	.ioctl		= via_dsp_ioctl,
+	.mmap		= via_dsp_mmap,
 };
 
 
@@ -2179,10 +2179,10 @@ static int via_mm_swapout (struct page *page, struct file *filp)
 
 
 struct vm_operations_struct via_mm_ops = {
-	nopage:		via_mm_nopage,
+	.nopage		= via_mm_nopage,
 
 #ifndef VM_RESERVED
-	swapout:	via_mm_swapout,
+	.swapout	= via_mm_swapout,
 #endif
 };
 

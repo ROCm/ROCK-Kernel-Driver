@@ -12,6 +12,7 @@
 #include <linux/jiffies.h>
 #include <linux/rbtree.h>
 #include <linux/thread_info.h>
+#include <linux/cpumask.h>
 
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -203,7 +204,7 @@ struct mm_struct {
 	unsigned long arg_start, arg_end, env_start, env_end;
 	unsigned long rss, total_vm, locked_vm;
 	unsigned long def_flags;
-	unsigned long cpu_vm_mask;
+	cpumask_t cpu_vm_mask;
 	unsigned long swap_address;
 
 	unsigned dumpable:1;
@@ -342,7 +343,7 @@ struct task_struct {
 	unsigned long last_run;
 
 	unsigned long policy;
-	unsigned long cpus_allowed;
+	cpumask_t cpus_allowed;
 	unsigned int time_slice, first_time_slice;
 
 	struct list_head tasks;
@@ -489,9 +490,9 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 
 #ifdef CONFIG_SMP
-extern int set_cpus_allowed(task_t *p, unsigned long new_mask);
+extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
-static inline int set_cpus_allowed(task_t *p, unsigned long new_mask)
+static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 {
 	return 0;
 }

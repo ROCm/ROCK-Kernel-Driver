@@ -2933,15 +2933,15 @@ static int ali_release(struct inode *inode, struct file *file)
 }
 
 static /*const */ struct file_operations ali_audio_fops = {
-	owner:THIS_MODULE, 
-	llseek:no_llseek, 
-	read:ali_read,
-	write:ali_write, 
-	poll:ali_poll,
-	ioctl:ali_ioctl,
-	mmap:ali_mmap,
-	open:ali_open,
-	release:ali_release,
+	.owner		= THIS_MODULE, 
+	.llseek		= no_llseek, 
+	.read		= ali_read,
+	.write		= ali_write, 
+	.poll		= ali_poll,
+	.ioctl		= ali_ioctl,
+	.mmap		= ali_mmap,
+	.open		= ali_open,
+	.release	= ali_release,
 };
 
 /* Read AC97 codec registers */
@@ -3060,10 +3060,10 @@ static int ali_ioctl_mixdev(struct inode *inode,
 }
 
 static /*const */ struct file_operations ali_mixer_fops = {
-	owner:THIS_MODULE, 
-	llseek:no_llseek, 
-	ioctl:ali_ioctl_mixdev,
-	open:ali_open_mixdev,
+	.owner	= THIS_MODULE, 
+	.llseek	= no_llseek, 
+	.ioctl	= ali_ioctl_mixdev,
+	.open	= ali_open_mixdev,
 };
 
 /* AC97 codec initialisation.  These small functions exist so we don't
@@ -3661,10 +3661,13 @@ MODULE_PARM(controller_pcmout_share_spdif_locked, "i");
 MODULE_PARM(controller_independent_spdif_locked, "i");
 #define ALI5455_MODULE_NAME "ali5455"
 static struct pci_driver ali_pci_driver = {
-	name:ALI5455_MODULE_NAME, id_table:ali_pci_tbl, probe:ali_probe,
-	    remove:__devexit_p(ali_remove),
+	.name		= ALI5455_MODULE_NAME,
+	.id_table	= ali_pci_tbl,
+	.probe		= ali_probe,
+	.remove		= __devexit_p(ali_remove),
 #ifdef CONFIG_PM
-	suspend:ali_pm_suspend, resume:ali_pm_resume,
+	.suspend	= ali_pm_suspend,
+	.resume		= ali_pm_resume,
 #endif				/* CONFIG_PM */
 };
 

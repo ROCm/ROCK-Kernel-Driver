@@ -314,9 +314,9 @@ static __init int apm_is_horked(struct dmi_blacklist *d)
 static int __init local_apic_kills_bios(struct dmi_blacklist *d)
 {
 #ifdef CONFIG_X86_LOCAL_APIC
-	extern int dont_enable_local_apic;
-	if (!dont_enable_local_apic) {
-		dont_enable_local_apic = 1;
+	extern int enable_local_apic;
+	if (enable_local_apic == 0) {
+		enable_local_apic = -1;
 		printk(KERN_WARNING "%s with broken BIOS detected. "
 		       "Refusing to enable the local APIC.\n",
 		       d->ident);
@@ -774,6 +774,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ local_apic_kills_bios, "IBM Thinkpad T20", {
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_BOARD_NAME, "264741U"),
+			NO_MATCH, NO_MATCH
+			} },
+
+	{ local_apic_kills_bios, "ASUS L3C", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "P4_L3C"),
 			NO_MATCH, NO_MATCH
 			} },
 

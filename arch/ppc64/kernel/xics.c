@@ -34,7 +34,7 @@ void xics_enable_irq(u_int irq);
 void xics_disable_irq(u_int irq);
 void xics_mask_and_ack_irq(u_int irq);
 void xics_end_irq(u_int irq);
-void xics_set_affinity(unsigned int irq_nr, unsigned long cpumask);
+void xics_set_affinity(unsigned int irq_nr, cpumask_t cpumask);
 
 struct hw_interrupt_type xics_pic = {
 	" XICS     ",
@@ -524,7 +524,7 @@ void xics_request_IPIs(void)
 }
 #endif
 
-void xics_set_affinity(unsigned int virq, unsigned long cpumask)
+void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 {
         irq_desc_t *desc = irq_desc + virq;
 	unsigned int irq;
@@ -532,6 +532,8 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	long status;
 	unsigned long xics_status[2];
 	unsigned long newmask;
+	cpumask_t allcpus = CPU_MASK_ALL;
+	cpumask_t tmp = CPU_MASK_NONE;
 
 	virq -= XICS_IRQ_OFFSET;
 	irq = virt_irq_to_real(virq);
@@ -549,12 +551,13 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpumask == -1UL) {
+	if (cpus_equal(cpumask, allcpus)) {
 		newmask = default_distrib_server;
 	} else {
-		if (!(cpumask & cpu_online_map))
+		cpus_and(tmp, cpu_online_map, cpumask);
+		if (cpus_empty(tmp))
 			goto out;
-		newmask = find_first_bit(&cpumask, 8*sizeof(unsigned long));
+		newmask = first_cpu(cpumask);
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,

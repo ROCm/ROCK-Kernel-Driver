@@ -51,8 +51,8 @@ struct _lowcore *lowcore_ptr[NR_CPUS];
 cycles_t         cacheflush_time=0;
 int              smp_threads_ready=0;      /* Set when the idlers are all forked. */
 
-volatile unsigned long cpu_online_map;
-volatile unsigned long cpu_possible_map;
+cpumask_t cpu_online_map;
+cpumask_t cpu_possible_map;
 unsigned long    cache_decay_ticks = 0;
 
 /*
@@ -200,14 +200,14 @@ void smp_send_stop(void)
 /*
  * Reboot, halt and power_off routines for SMP.
  */
-static volatile unsigned long cpu_restart_map;
+static cpumask_t cpu_restart_map;
 
 static void do_machine_restart(void * __unused)
 {
-	clear_bit(smp_processor_id(), &cpu_restart_map);
+	cpu_clear(smp_processor_id(), cpu_restart_map);
 	if (smp_processor_id() == 0) {
 		/* Wait for all other cpus to enter do_machine_restart. */
-		while (cpu_restart_map != 0);
+		while (!cpus_empty(cpu_restart_map));
 		/* Store status of other cpus. */
 		do_store_status();
 		/*
@@ -427,7 +427,7 @@ void __init smp_check_cpus(unsigned int max_cpus)
                 if (signal_processor(num_cpus, sigp_sense) ==
                     sigp_not_operational)
                         continue;
-		set_bit(num_cpus, &cpu_possible_map);
+		cpu_set(num_cpus, cpu_possible_map);
                 num_cpus++;
         }
         printk("Detected %d CPU's\n",(int) num_cpus);
@@ -452,7 +452,7 @@ int __devinit start_secondary(void *cpuvoid)
 	pfault_init();
 #endif
 	/* Mark this cpu as online */
-	set_bit(smp_processor_id(), &cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
 	/* Switch on interrupts */
 	local_irq_enable();
         /* Print info about this processor */
@@ -558,8 +558,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __devinit smp_prepare_boot_cpu(void)
 {
-	set_bit(smp_processor_id(), &cpu_online_map);
-	set_bit(smp_processor_id(), &cpu_possible_map);
+	cpu_set(smp_processor_id(), cpu_online_map);
+	cpu_set(smp_processor_id(), cpu_possible_map);
 }
 
 void smp_cpus_done(unsigned int max_cpus)

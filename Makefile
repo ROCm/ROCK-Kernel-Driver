@@ -418,7 +418,7 @@ define rule_vmlinux
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
+LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
 
 #	Generate section listing all symbols and add it into vmlinux
 #	It's a three stage process:
@@ -444,23 +444,23 @@ cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) > $@
 .tmp_kallsyms%.S: .tmp_vmlinux%
 	$(call cmd,kallsyms)
 
-.tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
+.tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 	+$(call if_changed_rule,vmlinux__)
 
-.tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/vmlinux.lds.s FORCE
+.tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux__)
 
 endif
 
 #	Finally the vmlinux rule
 
-vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/vmlinux.lds.s FORCE
+vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux)
 
 #	The actual objects are generated when descending, 
 #	make sure no implicit rule kicks in
 
-$(sort $(vmlinux-objs)): $(SUBDIRS) ;
+$(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(SUBDIRS) ;
 
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
@@ -483,15 +483,10 @@ endif
 endif
 	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 
-#	This can be used by arch/$ARCH/Makefile to preprocess
-#	their vmlinux.lds.S file
+#	Leave this as default for preprocessing vmlinux.lds.S, which is now
+#	done in arch/$(ARCH)/kernel/Makefile
 
-AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
-
-arch/$(ARCH)/vmlinux.lds.s: %.s: %.S scripts FORCE
-	$(call if_changed_dep,as_s_S)
-
-targets += arch/$(ARCH)/vmlinux.lds.s
+export AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -831,9 +826,6 @@ endif #ifeq ($(mixed-targets),1)
 
 a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(AFLAGS_KERNEL) $(NOSTDINC_FLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
-
-quiet_cmd_as_s_S = CPP     $@
-cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 quiet_cmd_as_o_S = AS      $@
 cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<

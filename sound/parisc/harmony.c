@@ -1107,9 +1107,9 @@ MODULE_DEVICE_TABLE(parisc, snd_card_harmony_devicetbl);
  */
 
 static struct parisc_driver snd_card_harmony_driver = {
-	name:		"Lasi ALSA Harmony",
-	id_table:	snd_card_harmony_devicetbl,
-	probe:		snd_card_harmony_probe,
+	.name		= "Lasi ALSA Harmony",
+	.id_table	= snd_card_harmony_devicetbl,
+	.probe		= snd_card_harmony_probe,
 };
 
 static int __init alsa_card_harmony_init(void)

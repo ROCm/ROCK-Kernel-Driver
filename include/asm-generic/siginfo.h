@@ -26,6 +26,10 @@ typedef union sigval {
 #define __ARCH_SI_UID_T	uid_t
 #endif
 
+#ifndef __ARCH_SI_BAND_T
+#define __ARCH_SI_BAND_T long
+#endif
+
 #ifndef HAVE_ARCH_SIGINFO_T
 
 typedef struct siginfo {
@@ -77,7 +81,7 @@ typedef struct siginfo {
 
 		/* SIGPOLL */
 		struct {
-			int _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+			__ARCH_SI_BAND_T _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
 			int _fd;
 		} _sigpoll;
 	} _sifields;

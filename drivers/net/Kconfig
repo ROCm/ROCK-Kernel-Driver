@@ -1160,7 +1160,7 @@ config SEEQ8005
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
-	  called ewrk3.
+	  called seeq8005.
 
 config SK_G16
 	tristate "SK_G16 support (OBSOLETE)"

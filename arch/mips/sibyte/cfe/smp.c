@@ -66,7 +66,7 @@ void prom_setup_smp(void)
 	/* Use CFE to find out how many CPUs are available */
 	for (i=1; i<NR_CPUS; i++) {
 		if (cfe_cpu_stop(i) == 0) {
-			CPUMASK_SETB(cpu_online_map, i);
+			cpu_set(i, cpu_online_map);
 		}
 	}
 	printk("Detected %i available CPU(s)\n", num_online_cpus());

@@ -566,6 +566,7 @@ struct rtl8139_private {
 	void *mmio_addr;
 	int drv_flags;
 	struct pci_dev *pci_dev;
+	u32 pci_state[16];
 	struct net_device_stats stats;
 	unsigned char *rx_ring;
 	unsigned int cur_rx;	/* Index into the Rx buffer of next Rx pkt. */
@@ -2570,6 +2571,9 @@ static int rtl8139_suspend (struct pci_dev *pdev, u32 state)
 	tp->stats.rx_missed_errors += RTL_R32 (RxMissed);
 	RTL_W32 (RxMissed, 0);
 
+	pci_set_power_state (pdev, 3);
+	pci_save_state (pdev, tp->pci_state);
+
 	spin_unlock_irqrestore (&tp->lock, flags);
 	return 0;
 }
@@ -2578,11 +2582,15 @@ static int rtl8139_suspend (struct pci_dev *pdev, u32 state)
 static int rtl8139_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
+	struct rtl8139_private *tp = dev->priv;
 
 	if (!netif_running (dev))
 		return 0;
-	netif_device_attach (dev);
+	pci_restore_state (pdev, tp->pci_state);
+	pci_set_power_state (pdev, 0);
+	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);
+	netif_device_attach (dev);
 	return 0;
 }
 

@@ -811,8 +811,8 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	if (unlikely(page->index >= (vi->i_size + PAGE_CACHE_SIZE - 1) >>
 			PAGE_CACHE_SHIFT)) {
 		unlock_page(page);
-		ntfs_debug("Write outside i_size. Returning i/o error.");
-		return -EIO;
+		ntfs_debug("Write outside i_size - truncated?");
+		return 0;
 	}
 
 	ni = NTFS_I(vi);

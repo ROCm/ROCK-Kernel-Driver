@@ -214,7 +214,6 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	if (q->unplug_delay == 0)
 		q->unplug_delay = 1;
 
-	init_timer(&q->unplug_timer);
 	INIT_WORK(&q->unplug_work, blk_unplug_work, q);
 
 	q->unplug_timer.function = blk_unplug_timeout;
@@ -1268,6 +1267,7 @@ request_queue_t *blk_alloc_queue(int gfp_mask)
 		return NULL;
 
 	memset(q, 0, sizeof(*q));
+	init_timer(&q->unplug_timer);
 	atomic_set(&q->refcnt, 1);
 	return q;
 }

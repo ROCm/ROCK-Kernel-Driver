@@ -120,8 +120,8 @@ struct specialix_port {
 	int			xmit_cnt;
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
-	struct tq_struct	tqueue;
-	struct tq_struct	tqueue_hangup;
+	struct work_struct	tqueue;
+	struct work_struct	tqueue_hangup;
 	short			wakeup_chars;
 	short			break_length;
 	unsigned short		closing_wait;

@@ -156,6 +156,14 @@ static __inline__ int ffs(int x)
 
 #ifdef ULTRA_HAS_POPULATION_COUNT
 
+static __inline__ unsigned int hweight64(unsigned long w)
+{
+	unsigned int res;
+
+	__asm__ ("popc %1,%0" : "=r" (res) : "r" (w));
+	return res;
+}
+
 static __inline__ unsigned int hweight32(unsigned int w)
 {
 	unsigned int res;
@@ -182,6 +190,7 @@ static __inline__ unsigned int hweight8(unsigned int w)
 
 #else
 
+#define hweight64(x) generic_hweight64(x)
 #define hweight32(x) generic_hweight32(x)
 #define hweight16(x) generic_hweight16(x)
 #define hweight8(x) generic_hweight8(x)

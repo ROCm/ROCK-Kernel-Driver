@@ -18,6 +18,7 @@
 #include <linux/hash.h>
 #include <linux/swap.h>
 #include <linux/security.h>
+#include <linux/pagemap.h>
 #include <linux/cdev.h>
 
 /*
@@ -141,7 +142,8 @@ static struct inode *alloc_inode(struct super_block *sb)
 
 		mapping->a_ops = &empty_aops;
  		mapping->host = inode;
-		mapping->gfp_mask = GFP_HIGHUSER;
+		mapping->flags = 0;
+		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
 		mapping->dirtied_when = 0;
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;

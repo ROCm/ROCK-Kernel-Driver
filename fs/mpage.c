@@ -388,6 +388,7 @@ static struct bio *
 mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	sector_t *last_block_in_bio, int *ret, struct writeback_control *wbc)
 {
+	struct address_space *mapping = page->mapping;
 	struct inode *inode = page->mapping->host;
 	const unsigned blkbits = inode->i_blkbits;
 	unsigned long end_index;
@@ -562,6 +563,15 @@ confused:
 	if (bio)
 		bio = mpage_bio_submit(WRITE, bio);
 	*ret = page->mapping->a_ops->writepage(page, wbc);
+	/*
+	 * The caller has a ref on the inode, so *mapping is stable
+	 */
+	if (*ret) {
+		if (*ret == -ENOSPC)
+			set_bit(AS_ENOSPC, &mapping->flags);
+		else
+			set_bit(AS_EIO, &mapping->flags);
+	}
 out:
 	return bio;
 }
@@ -663,6 +673,14 @@ mpage_writepages(struct address_space *mapping,
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page, wbc);
+				if (ret) {
+					if (ret == -ENOSPC)
+						set_bit(AS_ENOSPC,
+							&mapping->flags);
+					else
+						set_bit(AS_EIO,
+							&mapping->flags);
+				}
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
 					&last_block_in_bio, &ret, wbc);

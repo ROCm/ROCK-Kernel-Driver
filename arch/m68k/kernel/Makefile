@@ -6,7 +6,8 @@ ifndef CONFIG_SUN3
   extra-y := head.o
 else
   extra-y := sun3-head.o
-endif 
+endif
+extra-y	+= vmlinux.lds.s
 
 obj-y		:= entry.o process.o traps.o ints.o signal.o ptrace.o \
 			sys_m68k.o time.o semaphore.o setup.o m68k_ksyms.o

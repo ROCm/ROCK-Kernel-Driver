@@ -2048,8 +2048,8 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
         last_offset = inode->i_size & (PAGE_CACHE_SIZE - 1) ;
 	/* no file contents in this page */
 	if (page->index >= end_index + 1 || !last_offset) {
-	    error =  -EIO ;
-	    goto fail ;
+	    error = 0 ;
+	    goto done ;
 	}
 	kaddr = kmap_atomic(page, KM_USER0);
 	memset(kaddr + last_offset, 0, PAGE_CACHE_SIZE-last_offset) ;

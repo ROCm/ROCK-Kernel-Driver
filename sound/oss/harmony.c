@@ -822,14 +822,14 @@ static irqreturn_t harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
  */
 
 static struct file_operations harmony_audio_fops = {
-	owner:	THIS_MODULE,
-	llseek:	no_llseek,
-	read: 	harmony_audio_read,
-	write:	harmony_audio_write,
-	poll: 	harmony_audio_poll,
-	ioctl: 	harmony_audio_ioctl,
-	open: 	harmony_audio_open,
-	release:harmony_audio_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= harmony_audio_read,
+	.write		= harmony_audio_write,
+	.poll		= harmony_audio_poll,
+	.ioctl		= harmony_audio_ioctl,
+	.open		= harmony_audio_open,
+	.release	= harmony_audio_release,
 };
 
 static int harmony_audio_init(void)
@@ -1144,11 +1144,11 @@ static int harmony_mixer_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations harmony_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	open:		harmony_mixer_open,
-	release:	harmony_mixer_release,
-	ioctl:		harmony_mixer_ioctl,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.open		= harmony_mixer_open,
+	.release	= harmony_mixer_release,
+	.ioctl		= harmony_mixer_ioctl,
 };
 
 
@@ -1274,9 +1274,9 @@ static struct parisc_device_id harmony_tbl[] = {
 MODULE_DEVICE_TABLE(parisc, harmony_tbl);
 
 static struct parisc_driver harmony_driver = {
-	name:		"Lasi Harmony",
-	id_table:	harmony_tbl,
-	probe:		harmony_driver_callback,
+	.name		= "Lasi Harmony",
+	.id_table	= harmony_tbl,
+	.probe		= harmony_driver_callback,
 };
 
 static int __init init_harmony(void)

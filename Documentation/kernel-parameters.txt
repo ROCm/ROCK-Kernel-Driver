@@ -439,6 +439,8 @@ running once the system is up.
 
 	l2cr=		[PPC]
 
+	lapic		[IA-32,APIC] Enable the local APIC even if BIOS disabled it.
+
 	lasi=		[HW,SCSI] PARISC LASI driver for the 53c700 chip
 			Format: addr:<io>,irq:<irq>
 
@@ -625,6 +627,8 @@ running once the system is up.
 			initial RAM disk.
 
 	nointroute	[IA-64]
+
+	nolapic		[IA-32,APIC] Do not enable or use the local APIC.
 
 	nomce		[IA-32] Machine Check Exception
 
