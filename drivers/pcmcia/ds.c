@@ -881,7 +881,18 @@ EXPORT_SYMBOL(unregister_pccard_driver);
 
 /*====================================================================*/
 
-int __init init_pcmcia_ds(void)
+struct bus_type pcmcia_bus_type = {
+	.name = "pcmcia",
+};
+EXPORT_SYMBOL(pcmcia_bus_type);
+
+static int __init init_pcmcia_bus(void)
+{
+	bus_register(&pcmcia_bus_type);
+	return 0;
+}
+
+static int __init init_pcmcia_ds(void)
 {
     client_reg_t client_reg;
     servinfo_t serv;
@@ -967,11 +978,8 @@ int __init init_pcmcia_ds(void)
     return 0;
 }
 
-late_initcall(init_pcmcia_ds);
 
-#ifdef MODULE
-
-void __exit cleanup_module(void)
+static void __exit exit_pcmcia_ds(void)
 {
     int i;
 #ifdef CONFIG_PROC_FS
@@ -984,6 +992,23 @@ void __exit cleanup_module(void)
 	pcmcia_deregister_client(socket_table[i].handle);
     sockets = 0;
     kfree(socket_table);
+    bus_unregister(&pcmcia_bus_type);
 }
 
+#ifdef MODULE
+
+/* init_pcmcia_bus must be done early, init_pcmcia_ds late. If we load this 
+ * as a module, we can only specify one initcall, though... 
+ */
+static int __init init_pcmcia_module(void) {
+	init_pcmcia_bus();
+	return init_pcmcia_ds();
+}
+module_init(init_pcmcia_module);
+
+#else /* !MODULE */
+subsys_initcall(init_pcmcia_bus);
+late_initcall(init_pcmcia_ds);
 #endif
+
+module_exit(exit_pcmcia_ds);
