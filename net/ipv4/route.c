@@ -472,7 +472,7 @@ static void SMP_TIMER_NAME(rt_check_expire)(unsigned long dummy)
 		while ((rth = *rthp) != NULL) {
 			if (rth->u.dst.expires) {
 				/* Entry is expired even if it is in use */
-				if (time_after_eq(now, rth->u.dst.expires)) {
+				if (time_before_eq(now, rth->u.dst.expires)) {
 					tmo >>= 1;
 					rthp = &rth->u.rt_next;
 					continue;
