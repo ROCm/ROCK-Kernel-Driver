@@ -390,6 +390,10 @@ running once the system is up.
 			Run specified binary instead of /sbin/init as init
 			process.
 
+	initcall_debug	[KNL] Trace initcalls as they are executed.  Useful
+			for working out where the kernel is dying during
+			startup.
+
 	initrd=		[BOOT] Specify the location of the initial ramdisk
 
 	inport_irq=	[HW] Inport (ATI XL and Microsoft) busmouse driver
