@@ -885,6 +885,8 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 /*====================================================================*/
 
 extern int pcmcia_adjust_resource_info(adjust_t *adj);
+extern int pccard_get_next_region(struct pcmcia_socket *s, region_info_t *rgn);
+extern int pccard_get_first_region(struct pcmcia_socket *s, region_info_t *rgn);
 
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
@@ -998,10 +1000,10 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	    ret = pccard_access_configuration_register(s->parent, buf.conf_reg.Function, &buf.conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
-        ret = pcmcia_get_first_region(s->handle, &buf.region);
+        ret = pccard_get_first_region(s->parent, &buf.region);
 	break;
     case DS_GET_NEXT_REGION:
-	ret = pcmcia_get_next_region(s->handle, &buf.region);
+	ret = pccard_get_next_region(s->parent, &buf.region);
 	break;
     case DS_GET_FIRST_WINDOW:
 	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, 0, &buf.win_info.window);

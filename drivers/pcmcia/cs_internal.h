@@ -148,10 +148,6 @@ void destroy_cis_cache(struct pcmcia_socket *s);
 int verify_cis_cache(struct pcmcia_socket *s);
 int pccard_read_tuple(struct pcmcia_socket *s, unsigned int function, cisdata_t code, void *parse);
 
-/* In bulkmem.c */
-int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn);
-int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn);
-
 /* In rsrc_mgr */
 void pcmcia_validate_mem(struct pcmcia_socket *s);
 struct resource *find_io_region(unsigned long base, int num, unsigned long align,

@@ -69,8 +69,8 @@ extern int pc_debug;
     
 ======================================================================*/
 
-static void setup_regions(client_handle_t handle, int attr,
-			  memory_handle_t *list)
+static void setup_regions(struct pcmcia_socket *s, unsigned int function,
+			  int attr,  memory_handle_t *list)
 {
     int i, code, has_jedec, has_geo;
     u_int offset;
@@ -79,22 +79,22 @@ static void setup_regions(client_handle_t handle, int attr,
     cistpl_device_geo_t geo;
     memory_handle_t r;
 
-    ds_dbg(SOCKET(handle), 1, "setup_regions(0x%p, %d, 0x%p)\n",
-	   handle, attr, list);
+    ds_dbg(s, 1, "setup_regions(0x%d, %d, 0x%p)\n",
+	   function, attr, list);
 
     code = (attr) ? CISTPL_DEVICE_A : CISTPL_DEVICE;
-    if (pccard_read_tuple(handle->Socket, handle->Function, code, &device) != CS_SUCCESS)
+    if (pccard_read_tuple(s, function, code, &device) != CS_SUCCESS)
 	return;
     code = (attr) ? CISTPL_JEDEC_A : CISTPL_JEDEC_C;
-    has_jedec = (pccard_read_tuple(handle->Socket, handle->Function, code, &jedec) == CS_SUCCESS);
+    has_jedec = (pccard_read_tuple(s, function, code, &jedec) == CS_SUCCESS);
     if (has_jedec && (device.ndev != jedec.nid)) {
-	ds_dbg(SOCKET(handle), 0, "Device info does not match JEDEC info.\n");
+	ds_dbg(s, 0, "Device info does not match JEDEC info.\n");
 	has_jedec = 0;
     }
     code = (attr) ? CISTPL_DEVICE_GEO_A : CISTPL_DEVICE_GEO;
-    has_geo = (pccard_read_tuple(handle->Socket, handle->Function, code, &geo) == CS_SUCCESS);
+    has_geo = (pccard_read_tuple(s, function, code, &geo) == CS_SUCCESS);
     if (has_geo && (device.ndev != geo.ngeo)) {
-	ds_dbg(SOCKET(handle), 0, "Device info does not match geometry tuple.\n");
+	ds_dbg(s, 0, "Device info does not match geometry tuple.\n");
 	has_geo = 0;
     }
     
@@ -142,6 +142,37 @@ static void setup_regions(client_handle_t handle, int attr,
     
 ======================================================================*/
 
+static int pccard_match_region(memory_handle_t list, region_info_t *match)
+{
+	if (list) {
+		*match = list->info;
+		return CS_SUCCESS;
+	}
+	return CS_NO_MORE_ITEMS;
+} /* match_region */
+
+int pccard_get_first_region(struct pcmcia_socket *s, region_info_t *rgn)
+{
+	if (!(s->state & SOCKET_REGION_INFO)) {
+		setup_regions(s, BIND_FN_ALL, 0, &s->c_region);
+		setup_regions(s, BIND_FN_ALL, 1, &s->a_region);
+		s->state |= SOCKET_REGION_INFO;
+	}
+
+	if (rgn->Attributes & REGION_TYPE_AM)
+		return pccard_match_region(s->a_region, rgn);
+	else
+		return pccard_match_region(s->c_region, rgn);
+} /* get_first_region */
+
+int pccard_get_next_region(struct pcmcia_socket *s, region_info_t *rgn)
+{
+    return pccard_match_region(rgn->next, rgn);
+} /* get_next_region */
+
+
+#ifdef CONFIG_PCMCIA_OBSOLETE
+
 static int match_region(client_handle_t handle, memory_handle_t list,
 			region_info_t *match)
 {
@@ -164,8 +195,8 @@ int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn)
     
     if ((handle->Attributes & INFO_MASTER_CLIENT) &&
 	(!(s->state & SOCKET_REGION_INFO))) {
-	setup_regions(handle, 0, &s->c_region);
-	setup_regions(handle, 1, &s->a_region);
+	setup_regions(s, handle->Function, 0, &s->c_region);
+	setup_regions(s, handle->Function, 1, &s->a_region);
 	s->state |= SOCKET_REGION_INFO;
     }
 
@@ -183,3 +214,5 @@ int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn)
     return match_region(handle, rgn->next, rgn);
 } /* get_next_region */
 EXPORT_SYMBOL(pcmcia_get_next_region);
+
+#endif
