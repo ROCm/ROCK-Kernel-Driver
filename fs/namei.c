@@ -686,7 +686,7 @@ void set_fs_altroot(void)
 	if (!emul)
 		goto set_it;
 	err = path_lookup(emul, LOOKUP_FOLLOW|LOOKUP_DIRECTORY|LOOKUP_NOALT, &nd);
-	if (err) {
+	if (!err) {
 		mnt = nd.mnt;
 		dentry = nd.dentry;
 	}
