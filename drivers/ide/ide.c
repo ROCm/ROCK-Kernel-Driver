@@ -442,7 +442,7 @@ u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 		int opcode = 0x100;
 
 		spin_lock(&ide_lock);
-		rq = 0;
+		rq = NULL;
 		if (HWGROUP(drive))
 			rq = HWGROUP(drive)->rq;
 		spin_unlock(&ide_lock);
