@@ -30,7 +30,7 @@
 
 char ixgb_driver_name[] = "ixgb";
 char ixgb_driver_string[] = "Intel(R) PRO/10GbE Network Driver";
-char ixgb_driver_version[] = "1.0.66";
+char ixgb_driver_version[] = "1.0.66-k2";
 char ixgb_copyright[] = "Copyright (c) 2001-2004 Intel Corporation.";
 
 /* ixgb_pci_tbl - PCI Device ID Table
@@ -1681,7 +1681,7 @@ static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter)
 	eop = tx_ring->buffer_info[i].next_to_watch;
 	eop_desc = IXGB_TX_DESC(*tx_ring, eop);
 
-	while (eop_desc->status & cpu_to_le32(IXGB_TX_DESC_STATUS_DD)) {
+	while (eop_desc->status & IXGB_TX_DESC_STATUS_DD) {
 
 		for (cleaned = FALSE; !cleaned;) {
 			tx_desc = IXGB_TX_DESC(*tx_ring, i);
