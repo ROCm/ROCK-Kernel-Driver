@@ -843,11 +843,11 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall		/* 245 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
+	.llong .compat_clock_settime	/* 245 */
+	.llong .compat_clock_gettime
+	.llong .compat_clock_getres
+	.llong .compat_clock_nanosleep
+	.llong .sys_ni_syscall		/* 249 swapcontext */
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
 	.llong .compat_statfs64
