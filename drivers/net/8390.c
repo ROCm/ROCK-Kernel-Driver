@@ -997,6 +997,11 @@ static void set_multicast_list(struct net_device *dev)
 	spin_unlock_irqrestore(&ei_local->page_lock, flags);
 }	
 
+static inline void ei_device_init(struct ei_device *ei_local)
+{
+	spin_lock_init(&ei_local->page_lock);
+}
+
 /**
  * ethdev_init - init rest of 8390 device struct
  * @dev: network device structure to init
@@ -1012,14 +1017,11 @@ int ethdev_init(struct net_device *dev)
     
 	if (dev->priv == NULL) 
 	{
-		struct ei_device *ei_local;
-		
 		dev->priv = kmalloc(sizeof(struct ei_device), GFP_KERNEL);
 		if (dev->priv == NULL)
 			return -ENOMEM;
 		memset(dev->priv, 0, sizeof(struct ei_device));
-		ei_local = (struct ei_device *)dev->priv;
-		spin_lock_init(&ei_local->page_lock);
+		ei_device_init(dev->priv);
 	}
     
 	dev->hard_start_xmit = &ei_start_xmit;
@@ -1030,6 +1032,29 @@ int ethdev_init(struct net_device *dev)
         
 	return 0;
 }
+
+/* wrapper to make alloc_netdev happy; probably should just cast... */
+static void __ethdev_init(struct net_device *dev)
+{
+	ethdev_init(dev);
+}
+
+/**
+ * alloc_ei_netdev - alloc_etherdev counterpart for 8390
+ *
+ * Allocate 8390-specific net_device.
+ */
+struct net_device *alloc_ei_netdev(void)
+{
+	struct net_device *dev;
+	
+	dev = alloc_netdev(sizeof(struct ei_device), "eth%d", __ethdev_init);
+	if (dev)
+		ei_device_init(dev->priv);
+
+	return dev;
+}
+
 
 
 
@@ -1133,6 +1158,7 @@ EXPORT_SYMBOL(ei_interrupt);
 EXPORT_SYMBOL(ei_tx_timeout);
 EXPORT_SYMBOL(ethdev_init);
 EXPORT_SYMBOL(NS8390_init);
+EXPORT_SYMBOL(alloc_ei_netdev);
 
 #if defined(MODULE)
 
