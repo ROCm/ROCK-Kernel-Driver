@@ -8,11 +8,11 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
+#include <linux/interrupt.h>
 #include <asm/checksum.h>
 #include <asm/delay.h>
 #include <asm/pgalloc.h>
 #include <asm/setup.h>
-#include <asm/softirq.h>
 #if CONFIG_IP_MULTICAST
 #include <net/arp.h>
 #endif

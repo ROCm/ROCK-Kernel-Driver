@@ -28,6 +28,8 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
+#include <asm/uaccess.h>
+
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 

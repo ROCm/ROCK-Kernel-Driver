@@ -75,7 +75,6 @@
 
 #define A(__x)		((unsigned long)(__x))
 #define AA(__x)		((unsigned long)(__x))
-#define u32_to_ptr(x)	((void *)(u64)(x))
 #define ROUND_UP(x,a)	((__typeof__(x))(((unsigned long)(x) + ((a) - 1)) & ~((a) - 1)))
 #define NAME_OFFSET(de) ((int) ((de)->d_name - (char *) (de)))
 
@@ -2091,7 +2090,7 @@ long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
 } 
 
 asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
-		   u32 *iocbpp)
+		   compat_uptr_t *iocbpp)
 {
 	struct kioctx *ctx;
 	long ret = 0;
@@ -2110,14 +2109,14 @@ asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 	} 
 
 	for (i=0; i<nr; i++) {
-		u32 p32;
+		compat_uptr_t p32;
 		struct iocb *user_iocb, tmp;
 
 		if (unlikely(__get_user(p32, iocbpp + i))) {
 			ret = -EFAULT;
 			break;
-	} 
-		user_iocb = u32_to_ptr(p32);
+		} 
+		user_iocb = compat_ptr(p32);
 
 		if (unlikely(copy_from_user(&tmp, user_iocb, sizeof(tmp)))) {
 			ret = -EFAULT;

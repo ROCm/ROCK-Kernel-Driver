@@ -39,6 +39,8 @@
 #include <linux/sched.h>
 #include <linux/kmod.h>
 #include <linux/seq_file.h>
+#include <asm/uaccess.h>
+
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 

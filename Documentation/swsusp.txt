@@ -62,14 +62,14 @@ home page). You might call 'swsusp' or 'shutdown -z <time>'. Next way is to
 echo 4 > /proc/acpi/sleep.
 
 Either way it saves the state of the machine into active swaps and then
-reboots. You must explicitly specify the swap partition to resume from with ``resume=''
-kernel option. If signature is found it loads and restores saved state. If the
-option ``noresume'' is specified as a boot parameter, it skips the resuming.
-Warning! Look at section ``Things to implement'' to see what isn't yet
-implemented.  Also I strongly suggest you to list all active swaps in
-/etc/fstab. Firstly because you don't have to specify anything to resume and
-secondly if you have more than one swap area you can't decide which one has the
-'root' signature. 
+reboots.  You must explicitly specify the swap partition to resume from with
+``resume='' kernel option. If signature is found it loads and restores saved
+state. If the option ``noresume'' is specified as a boot parameter, it skips
+the resuming.  Warning! Look at section ``Things to implement'' to see what
+isn't yet implemented.  Also I strongly suggest you to list all active swaps
+in /etc/fstab. Firstly because you don't have to specify anything to resume
+and secondly if you have more than one swap area you can't decide which one
+has the 'root' signature. 
 
 In the meantime while the system is suspended you should not touch any of the
 hardware!
@@ -110,10 +110,10 @@ notify_chain) and probably by some userland program (run-parts?) for users'
 pleasure. Check out my patch at the same location for the sysvinit patch.
 
 WARNINGS!
-- It does not like pcmcia cards. And this is logical: pcmcia cards need cardmgr to be
-  initialized. they are not initialized during singleuser boot, but "resumed" kernel does
-  expect them to be initialized. That leads to armagedon. You should eject any pcmcia cards
-  before suspending.
+- It does not like pcmcia cards. And this is logical: pcmcia cards need
+  cardmgr to be initialized. they are not initialized during singleuser boot,
+  but "resumed" kernel does expect them to be initialized. That leads to
+  armagedon. You should eject any pcmcia cards before suspending.
 
 Things to implement
 - SMP support. I've done an SMP support but since I don't have access to a kind
@@ -155,6 +155,20 @@ Drivers that need support
 - pc_keyb -- perhaps we can wait for vojtech's input patches
 - do IDE cdroms need some kind of support?
 - IDE CD-RW -- how to deal with that?
+
+Sleep states summary (thanx, Ducrot)
+====================================
+
+In a really perfect world:
+echo 1 > /proc/acpi/sleep       # for standby
+echo 2 > /proc/acpi/sleep       # for suspend to ram
+echo 3 > /proc/acpi/sleep       # for suspend to ram, but with more power conservative
+echo 4 > /proc/acpi/sleep       # for suspend to disk
+echo 5 > /proc/acpi/sleep       # for shutdown unfriendly the system
+
+and perhaps
+echo 4b > /proc/acpi/sleep      # for suspend to disk via s4bios
+
 
 FAQ:
 

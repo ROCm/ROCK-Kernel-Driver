@@ -23,8 +23,9 @@ Bugs in the present implementation:
   - Only file systems with no filesystem name and no pack name are recognized.
   (See Coherent "man mkfs" for a description of these features.)
 - SystemV Release 2 FS:
-  The superblock is only searched in the blocks 9, 15, 18, which corresponds to the
-  beginning of track 1 on floppy disks. No support for this FS on hard disk yet.
+  The superblock is only searched in the blocks 9, 15, 18, which
+  corresponds to the beginning of track 1 on floppy disks. No support
+  for this FS on hard disk yet.
 
 
 Please report any bugs and suggestions to

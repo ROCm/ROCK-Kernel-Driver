@@ -29,6 +29,7 @@ extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
 
   /* arch independent irq_stat fields */
 #define softirq_pending(cpu)	__IRQ_STAT((cpu), __softirq_pending)
+#define local_softirq_pending()	softirq_pending(smp_processor_id())
 #define syscall_count(cpu)	__IRQ_STAT((cpu), __syscall_count)
 #define ksoftirqd_task(cpu)	__IRQ_STAT((cpu), __ksoftirqd_task)
   /* arch dependent irq_stat fields */

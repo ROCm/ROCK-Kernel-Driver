@@ -324,7 +324,7 @@ befs_btree_find(struct super_block *sb, befs_data_stream * ds,
  *
  * finds exact match if one exists, and returns BEFS_BT_MATCH
  * If no exact match, finds first key in node that is greater
- * (alpabeticly) than the search key and returns BEFS_BT_PARMATCH
+ * (alphabetically) than the search key and returns BEFS_BT_PARMATCH
  * (for partial match, I guess). Can you think of something better to
  * call it?
  *
@@ -402,9 +402,9 @@ befs_find_key(struct super_block *sb, befs_btree_node * node,
  * @value: Value stored with the returned key
  *
  * Heres how it works: Key_no is the index of the key/value pair to 
- * retun in keybuf/value.
+ * return in keybuf/value.
  * Bufsize is the size of keybuf (BEFS_NAME_LEN+1 is a good size). Keysize is 
- * the number of charecters in the key (just a convience).
+ * the number of charecters in the key (just a convenience).
  *
  * Algorithm:
  *   Get the first leafnode of the tree. See if the requested key is in that
@@ -530,7 +530,7 @@ befs_btree_read(struct super_block *sb, befs_data_stream * ds,
  * befs_btree_seekleaf - Find the first leafnode in the btree
  * @sb: Filesystem superblock
  * @ds: Datastream containing btree
- * @bt_super: Pointer to the uperblock of the btree
+ * @bt_super: Pointer to the superblock of the btree
  * @this_node: Buffer to return the leafnode in
  * @node_off: Pointer to offset of current node within datastream. Modified
  * 		by the function.
@@ -615,10 +615,10 @@ befs_leafnode(befs_btree_node * node)
  * of the B+tree node *@node
  *
  * "The length of all the keys in the node is added to the size of the
- * header and then rounded up to a multiple of four to get the begining
+ * header and then rounded up to a multiple of four to get the beginning
  * of the key length index" (p.88, practical filesystem design).
  *
- * Exept that rounding up to 8 works, and rounding up to 4 doesn't.
+ * Except that rounding up to 8 works, and rounding up to 4 doesn't.
  */
 static u16 *
 befs_bt_keylen_index(befs_btree_node * node)
@@ -704,7 +704,7 @@ befs_bt_get_key(struct super_block *sb, befs_btree_node * node,
  * @key1: pointer to the first key to be compared 
  * @keylen1: length in bytes of key1
  * @key2: pointer to the second key to be compared
- * @kelen2: lenght in bytes of key2
+ * @kelen2: length in bytes of key2
  *
  * Returns 0 if @key1 and @key2 are equal.
  * Returns >0 if @key1 is greater.

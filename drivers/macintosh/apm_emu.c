@@ -436,40 +436,40 @@ static int apm_emu_get_info(char *buf, char **start, off_t fpos, int length)
 	int		percentage     = -1;
 	int             time_units     = -1;
 	int		real_count     = 0;
-	int		charge         = -1;
-	int		current        = 0;
 	int		i;
 	char *		p = buf;
 	char		charging       = 0;
+	long		charge	       = -1;
+	long		current        = 0;
+	unsigned long	btype          = 0;
 
 	ac_line_status = ((pmu_power_flags & PMU_PWR_AC_PRESENT) != 0);
 	for (i=0; i<pmu_battery_count; i++) {
-		if (percentage < 0)
-			percentage = 0;
-		if (charge < 0)
-			charge = 0;
 		if (pmu_batteries[i].flags & PMU_BATT_PRESENT) {
+			if (percentage < 0)
+				percentage = 0;
+			if (charge < 0)
+				charge = 0;
 			percentage += (pmu_batteries[i].charge * 100) /
 				pmu_batteries[i].max_charge;
-			/* hrm... should we provide the remaining charge
-			 * time when AC is plugged ? If yes, just remove
-			 * that test --BenH
-			 */
-			if (!ac_line_status) {
-				charge += pmu_batteries[i].charge;
-				current += pmu_batteries[i].current;
-			}
+			charge += pmu_batteries[i].charge;
+			current += pmu_batteries[i].current;
+			if (btype == 0)
+				btype = (pmu_batteries[i].flags & PMU_BATT_TYPE_MASK);
 			real_count++;
 			if ((pmu_batteries[i].flags & PMU_BATT_CHARGING))
 				charging++;
 		}
 	}
 	if (real_count) {
-		time_units = (charge * 59) / (current * -1);
-		if(!charging)
-			battery_flag &= ~0x08;
+		if (current < 0) {
+			if (btype == PMU_BATT_TYPE_SMART)
+				time_units = (charge * 59) / (current * -1);
+			else
+				time_units = (charge * 16440) / (current * -60);
+		}
 		percentage /= real_count;
-		if (battery_flag & 0x08) {
+		if (charging > 0) {
 			battery_status = 0x03;
 			battery_flag = 0x08;
 		} else if (percentage <= APM_CRITICAL) {

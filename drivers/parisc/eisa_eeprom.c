@@ -96,11 +96,21 @@ static struct miscdevice eisa_eeprom_dev=
 
 int __init eisa_eeprom_init(unsigned long addr)
 {
-	if (addr) {
-		eeprom_addr = addr;
-		misc_register(&eisa_eeprom_dev);
-		printk(KERN_INFO "EISA EEPROM at 0x%lx\n", eeprom_addr);
+	int retval;
+
+	/* XXX why return success when we haven't done anything? */
+	if (!addr)
+		return 0;
+
+	eeprom_addr = addr;
+
+	retval = misc_register(&eisa_eeprom_dev);
+	if (retval < 0) {
+		printk(KERN_ERR "EISA EEPROM: cannot register misc device.\n");
+		return retval;
 	}
+
+	printk(KERN_INFO "EISA EEPROM at 0x%lx\n", eeprom_addr);
 	return 0;
 }
 

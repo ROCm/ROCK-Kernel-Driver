@@ -367,7 +367,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	crypto_cipher_setkey(esp->conf.tfm, esp->conf.key, esp->conf.key_len);
 	x->props.header_len = 8 + esp->conf.ivlen;
 	if (x->props.mode)
-		x->props.header_len += 20;
+		x->props.header_len += sizeof(struct iphdr);
 	x->data = esp;
 	x->props.trailer_len = esp4_get_max_size(x, 0) - x->props.header_len;
 	return 0;

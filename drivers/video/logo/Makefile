@@ -25,3 +25,6 @@ $(obj)/%_clut224.c:	$(src)/%_clut224.ppm
 $(obj)/%_gray256.c:	$(src)/%_gray256.pgm
 		$(objtree)/scripts/pnmtologo -t gray256 -n $*_gray256 -o $@ $<
 
+
+# Files generated that shall be removed upon make clean
+clean-files := *_mono.c *_vga16.c *_clut224.c *_gray256.c

@@ -164,6 +164,7 @@ acpi_ns_walk_namespace (
 	void                            **return_value)
 {
 	acpi_status                     status;
+	acpi_status                     mutex_status;
 	struct acpi_namespace_node      *child_node;
 	struct acpi_namespace_node      *parent_node;
 	acpi_object_type                child_type;
@@ -211,9 +212,9 @@ acpi_ns_walk_namespace (
 				 * callback function
 				 */
 				if (unlock_before_callback) {
-					status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
-					if (ACPI_FAILURE (status)) {
-						return_ACPI_STATUS (status);
+					mutex_status = acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+					if (ACPI_FAILURE (mutex_status)) {
+						return_ACPI_STATUS (mutex_status);
 					}
 				}
 
@@ -221,9 +222,9 @@ acpi_ns_walk_namespace (
 						 context, return_value);
 
 				if (unlock_before_callback) {
-					status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
-					if (ACPI_FAILURE (status)) {
-						return_ACPI_STATUS (status);
+					mutex_status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+					if (ACPI_FAILURE (mutex_status)) {
+						return_ACPI_STATUS (mutex_status);
 					}
 				}
 

@@ -227,11 +227,13 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 	ncp_update_inode(inode, nwinfo);
 }
 
+#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 static struct inode_operations ncp_symlink_inode_operations = {
 	.readlink	= page_readlink,
 	.follow_link	= page_follow_link,
 	.setattr	= ncp_notify_change,
 };
+#endif
 
 /*
  * Get a new inode.

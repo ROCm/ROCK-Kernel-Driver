@@ -1076,7 +1076,6 @@ extern struct block_device *open_bdev_excl(const char *, int, int, void *);
 extern void close_bdev_excl(struct block_device *, int);
 
 extern const char * cdevname(kdev_t);
-extern const char * kdevname(kdev_t);
 extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */

@@ -12,13 +12,13 @@ The purpose of this driver is to supply an API for kernel and user applications
 to get access to the Time Service offered by EFI version 0.92.
 
 EFI provides 4 calls one can make once the OS is booted: GetTime(),
-SetTime(), GetWakeupTime(), SetWakeupTime() which are all supported by this driver.
-We describe those calls as well the design of the driver in the following
-sections.
+SetTime(), GetWakeupTime(), SetWakeupTime() which are all supported by this
+driver. We describe those calls as well the design of the driver in the
+following sections.
 
 II/ Design Decisions
 
-The original ideas was to provide a very simple  driver to get access to, 
+The original ideas was to provide a very simple driver to get access to, 
 at first, the time of day service. This is required in order to access, in a 
 portable way, the CMOS clock. A program like /sbin/hwclock uses such a clock 
 to initialize the system view of the time during boot.
@@ -39,8 +39,8 @@ One of the reasons for doing it this way is to allow for EFI to still evolve
 without necessarily impacting any of the user applications. The decoupling
 enables flexibility and permits writing wrapper code is ncase things change.
 
-The driver exposes two interfaces, one via the device file and a set of ioctl()s.
-The other is read-only via the /proc filesystem. 
+The driver exposes two interfaces, one via the device file and a set of
+ioctl()s. The other is read-only via the /proc filesystem. 
 
 As of today we don't offer a /proc/sys interface.
 
