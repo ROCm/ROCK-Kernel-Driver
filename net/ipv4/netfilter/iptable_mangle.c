@@ -29,25 +29,6 @@ MODULE_DESCRIPTION("iptables mangle table");
 			    (1 << NF_IP_LOCAL_OUT) | \
 			    (1 << NF_IP_POST_ROUTING))
 
-/* Standard entry. */
-struct ipt_standard
-{
-	struct ipt_entry entry;
-	struct ipt_standard_target target;
-};
-
-struct ipt_error_target
-{
-	struct ipt_entry_target target;
-	char errorname[IPT_FUNCTION_MAXNAMELEN];
-};
-
-struct ipt_error
-{
-	struct ipt_entry entry;
-	struct ipt_error_target target;
-};
-
 /* Ouch - five different hooks? Maybe this should be a config option..... -- BC */
 static struct
 {
