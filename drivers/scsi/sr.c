@@ -526,7 +526,6 @@ static int sr_probe(struct device *dev)
 	sdev->sector_size = 2048;	/* A guess, just in case */
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 0;
-	sdev->remap = 1;
 
 	/* FIXME: need to handle a get_capabilities failure properly ?? */
 	get_capabilities(cd);
