@@ -98,7 +98,7 @@ $(obj)/compressed/vmlinux: vmlinux FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
-	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
 
 .PHONY: initrd
 initrd:
