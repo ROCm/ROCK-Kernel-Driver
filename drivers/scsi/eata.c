@@ -464,6 +464,7 @@ MODULE_AUTHOR("Dario Ballabio");
 
 #endif
 
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -474,18 +475,18 @@ MODULE_AUTHOR("Dario Ballabio");
 #include <asm/byteorder.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
-#include "scsi.h"
-#include "hosts.h"
-#include <asm/dma.h>
-#include <asm/irq.h>
-#include "eata.h"
+#include <linux/interrupt.h>
 #include <linux/stat.h>
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/spinlock.h>
 #include <scsi/scsicam.h>
+#include "scsi.h"
+#include "hosts.h"
+#include <asm/dma.h>
+#include <asm/irq.h>
+#include "eata.h"
 
 #if !defined(__BIG_ENDIAN_BITFIELD) && !defined(__LITTLE_ENDIAN_BITFIELD)
 #error "Adjust your <asm/byteorder.h> defines"

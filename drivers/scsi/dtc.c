@@ -78,15 +78,16 @@
 #include <linux/sched.h>
 #include <linux/blk.h>
 #include <linux/delay.h>
+#include <linux/stat.h>
+#include <linux/string.h>
+#include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "dtc.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include <linux/stat.h>
-#include <linux/string.h>
-#include <linux/init.h>
 
 
 #define DTC_PUBLIC_RELEASE 2
