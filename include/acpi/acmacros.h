@@ -53,6 +53,9 @@
 #define ACPI_LOBYTE(l)                  ((u8)(u16)(l))
 #define ACPI_HIBYTE(l)                  ((u8)((((u16)(l)) >> 8) & 0xFF))
 
+#define ACPI_SET_BIT(target,bit)        ((target) |= (bit))
+#define ACPI_CLEAR_BIT(target,bit)      ((target) &= ~(bit))
+
 
 #if ACPI_MACHINE_WIDTH == 16
 
@@ -97,7 +100,7 @@
  * printf() format helpers
  */
 
-/* Split 64-bit integer into two 32-bit values. use with %8,8_x%8.8X */
+/* Split 64-bit integer into two 32-bit values. Use with %8.8X%8.8X */
 
 #define ACPI_FORMAT_UINT64(i)           ACPI_HIDWORD(i),ACPI_LODWORD(i)
 

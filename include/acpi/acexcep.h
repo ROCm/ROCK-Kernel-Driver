@@ -95,8 +95,9 @@
 #define AE_LOGICAL_ADDRESS              (acpi_status) (0x001B | AE_CODE_ENVIRONMENTAL)
 #define AE_ABORT_METHOD                 (acpi_status) (0x001C | AE_CODE_ENVIRONMENTAL)
 #define AE_SAME_HANDLER                 (acpi_status) (0x001D | AE_CODE_ENVIRONMENTAL)
+#define AE_WAKE_ONLY_GPE                (acpi_status) (0x001E | AE_CODE_ENVIRONMENTAL)
 
-#define AE_CODE_ENV_MAX                 0x001D
+#define AE_CODE_ENV_MAX                 0x001E
 
 /*
  * Programmer exceptions
@@ -222,7 +223,8 @@ char const   *acpi_gbl_exception_names_env[] =
 	"AE_NO_GLOBAL_LOCK",
 	"AE_LOGICAL_ADDRESS",
 	"AE_ABORT_METHOD",
-	"AE_SAME_HANDLER"
+	"AE_SAME_HANDLER",
+	"AE_WAKE_ONLY_GPE"
 };
 
 char const   *acpi_gbl_exception_names_pgm[] =
