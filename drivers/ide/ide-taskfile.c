@@ -1188,6 +1188,14 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 	void debug_taskfile(drive, task);
 #endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
+	if (task->data_phase == TASKFILE_MULTI_IN ||
+	    task->data_phase == TASKFILE_MULTI_OUT) {
+		if (!drive->mult_count) {
+			printk(KERN_ERR "%s: multimode not set!\n", drive->name);
+			return ide_stopped;
+		}
+	}
+
 	/*
 	 * (ks) Check taskfile in/out flags.
 	 * If set, then execute as it is defined.
@@ -1370,8 +1378,6 @@ ide_startstop_t flagged_task_mulin_intr (ide_drive_t *drive)
 	unsigned int msect, nsect;
 
 	msect = drive->mult_count;
-	if (msect == 0) 
-		return DRIVER(drive)->error(drive, "flagged_task_mulin_intr (multimode not set)", stat); 
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & ERR_STAT) {
@@ -1477,15 +1483,11 @@ ide_startstop_t flagged_task_out_intr (ide_drive_t *drive)
 
 ide_startstop_t flagged_pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 {
-	ide_hwif_t *hwif	= HWIF(drive);
-	u8 stat			= hwif->INB(IDE_STATUS_REG);
 	char *pBuf		= NULL;
 	ide_startstop_t startstop;
 	unsigned int msect, nsect;
 
 	msect = drive->mult_count;
-	if (msect == 0)
-		return DRIVER(drive)->error(drive, "flagged_pre_task_mulout_intr (multimode not set)", stat);
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY,
 			BAD_W_STAT, WAIT_DRQ)) {
@@ -1514,8 +1516,6 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 	unsigned int msect, nsect;
 
 	msect = drive->mult_count;
-	if (msect == 0)
-		return DRIVER(drive)->error(drive, "flagged_task_mulout_intr (multimode not set)", stat);
 
 	if (!OK_STAT(stat, DRIVE_READY, BAD_W_STAT)) 
 		return DRIVER(drive)->error(drive, "flagged_task_mulout_intr", stat);
