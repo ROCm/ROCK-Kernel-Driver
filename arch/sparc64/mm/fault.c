@@ -175,6 +175,7 @@ static void bad_kernel_pc(struct pt_regs *regs)
 static unsigned int get_user_insn(unsigned long tpc)
 {
 	pgd_t *pgdp = pgd_offset(current->mm, tpc);
+	pud_t *pudp;
 	pmd_t *pmdp;
 	pte_t *ptep, pte;
 	unsigned long pa;
@@ -183,7 +184,10 @@ static unsigned int get_user_insn(unsigned long tpc)
 
 	if (pgd_none(*pgdp))
 		goto outret;
-	pmdp = pmd_offset(pgdp, tpc);
+	pudp = pud_offset(pgdp, tpc);
+	if (pud_none(*pudp))
+		goto outret;
+	pmdp = pmd_offset(pudp, tpc);
 	if (pmd_none(*pmdp))
 		goto outret;
 
