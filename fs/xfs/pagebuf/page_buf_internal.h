@@ -123,7 +123,9 @@ struct pbstats {
 
 DECLARE_PER_CPU(struct pbstats, pbstats);
 
-#define PB_STATS_INC(count)   ( get_cpu_var(pbstats).count++ )
+/* We don't disable preempt, not too worried about poking the
+ * wrong cpu's stat for now */
+#define PB_STATS_INC(count)	(__get_cpu_var(pbstats).count++)
 
 #ifndef STATIC
 # define STATIC	static
