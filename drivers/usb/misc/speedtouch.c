@@ -165,8 +165,6 @@ struct udsl_instance_data {
 
 static const char udsl_driver_name [] = "Alcatel SpeedTouch USB";
 
-static DECLARE_MUTEX(udsl_usb_ioctl_lock);
-
 #ifdef DEBUG_PACKET
 static int udsl_print_packet (const unsigned char *data, int len);
 #endif
@@ -731,41 +729,6 @@ static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_v
 	return err;
 }
 
-static void udsl_usb_data_init (struct udsl_instance_data *instance)
-{
-	int i, succes;
-
-	if (instance->firmware_loaded)
-		return;
-
-	/* set alternate setting 1 on interface 1 */
-	usb_set_interface (instance->usb_dev, 1, 2);
-
-	PDEBUG ("max packet size on endpoint %d is %d\n", UDSL_ENDPOINT_DATA_OUT,
-		usb_maxpacket (instance->usb_dev,
-			       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT), 0));
-
-	skb_queue_head_init (&instance->sndqueue);
-
-	udsl_fire_receivers (instance);
-
-	for (i = 0, succes = 0; i < UDSL_NUMBER_SND_URBS; i++) {
-		instance->send_ctx[i].urb = usb_alloc_urb (0, GFP_KERNEL);
-		PDEBUG ("udsl_usb_data_init: send urb allocted address %p\n",
-			instance->send_ctx[i].urb);
-		if (instance->send_ctx[i].urb)
-			succes++;
-	}
-
-	PDEBUG ("udsl_usb_data_init %d urb%s queued for send\n", succes, (succes != 1) ? "s" : "");
-
-	wmb ();
-
-	instance->firmware_loaded = 1;
-
-	return;
-}
-
 
 /***************************************************************************
 *
@@ -776,25 +739,31 @@ static void udsl_usb_data_init (struct udsl_instance_data *instance)
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
-	int retval;
 
-	down(&udsl_usb_ioctl_lock);
+	PDEBUG ("udsl_usb_ioctl entered\n");
+
+	if (!instance) {
+		PDEBUG ("NULL instance!\n");
+		return -ENODEV;
+	}
+
 	switch (code) {
 	case UDSL_IOCTL_START:
 		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
-		udsl_usb_data_init (instance);
-		retval = 0;
-		break;
+		down (&instance->serialize); /* vs self */
+		if (!instance->firmware_loaded) {
+			usb_set_interface (instance->usb_dev, 1, 2);
+			instance->firmware_loaded = 1;
+		}
+		up (&instance->serialize);
+		udsl_fire_receivers (instance);
+		return 0;
 	case UDSL_IOCTL_STOP:
 		instance->atm_dev->signal = ATM_PHY_SIG_LOST;
-		retval = 0;
-		break;
+		return 0;
 	default:
-		retval = -ENOTTY;
-		break;
+		return -ENOTTY;
 	}
-	up(&udsl_usb_ioctl_lock);
-	return retval;
 }
 
 static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_id *id)
@@ -837,6 +806,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	tasklet_init (&instance->receive_tasklet, udsl_process_receive, (unsigned long) instance);
 
+	skb_queue_head_init (&instance->sndqueue);
+
 	/* receive urb init */
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
@@ -858,6 +829,18 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		list_add (&rcv->list, &instance->spare_receivers);
 
 		PDEBUG ("skb->truesize = %d (asked for %d)\n", rcv->skb->truesize, UDSL_RECEIVE_BUFFER_SIZE);
+	}
+
+	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
+		struct udsl_usb_send_data_context *snd = &(instance->send_ctx[i]);
+
+		if (!(snd->urb = usb_alloc_urb (0, GFP_KERNEL))) {
+			PDEBUG ("No memory for send urb %d!\n", i);
+			err = -ENOMEM;
+			goto fail_urbs;
+		}
+
+		snd->instance = instance;
 	}
 
 	/* atm init */
@@ -893,6 +876,13 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 fail_atm:
 fail_urbs:
+	for (i = 0; i < UDSL_NUMBER_SND_URBS; i++) {
+		struct udsl_usb_send_data_context *snd = &(instance->send_ctx[i]);
+
+		if (snd->urb)
+			usb_free_urb (snd->urb);
+	}
+
 	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_receiver *rcv = &(instance->all_receivers[i]);
 
