@@ -1293,10 +1293,7 @@ void rt6_purge_dflt_routers(int last_resort)
 	struct rt6_info *rt;
 	u32 flags;
 
-	if (last_resort)
-		flags = RTF_ALLONLINK;
-	else
-		flags = RTF_DEFAULT | RTF_ADDRCONF;	
+	flags = RTF_DEFAULT | RTF_ADDRCONF;	
 
 restart:
 	read_lock_bh(&rt6_lock);
@@ -1592,7 +1589,7 @@ static int rt6_fill_node(struct sk_buff *skb, struct rt6_info *rt,
 	rtm->rtm_protocol = rt->rt6i_protocol;
 	if (rt->rt6i_flags&RTF_DYNAMIC)
 		rtm->rtm_protocol = RTPROT_REDIRECT;
-	else if (rt->rt6i_flags&(RTF_ADDRCONF|RTF_ALLONLINK))
+	else if (rt->rt6i_flags & RTF_ADDRCONF)
 		rtm->rtm_protocol = RTPROT_KERNEL;
 	else if (rt->rt6i_flags&RTF_DEFAULT)
 		rtm->rtm_protocol = RTPROT_RA;

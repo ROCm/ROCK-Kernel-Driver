@@ -885,7 +885,7 @@ int ipv6_get_saddr(struct dst_entry *dst,
 	if (rt)
 		dev = rt->rt6i_dev;
 
-	onlink = (rt && (rt->rt6i_flags & RTF_ALLONLINK));
+	onlink = 0;
 
 	return ipv6_dev_get_saddr(dev, daddr, saddr, onlink);
 }

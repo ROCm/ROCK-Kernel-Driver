@@ -1026,7 +1026,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		 *	delete it
 		 */
 
-		rt6_purge_dflt_routers(RTF_ALLONLINK);
+		rt6_purge_dflt_routers(0);
 	}
 
 	if (rt)
