@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/types.h>
+#include <linux/compat.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
@@ -528,11 +529,6 @@ asmlinkage int sunos_pathconf(u32 u_path, int name)
 extern asmlinkage int
 sys32_select(int n, u32 inp, u32 outp, u32 exp, u32 tvp);
 
-struct timeval32
-{
-	int tv_sec, tv_usec;
-};
-
 asmlinkage int sunos_select(int width, u32 inp, u32 outp, u32 exp, u32 tvp_x)
 {
 	int ret;
@@ -540,7 +536,7 @@ asmlinkage int sunos_select(int width, u32 inp, u32 outp, u32 exp, u32 tvp_x)
 	/* SunOS binaries expect that select won't change the tvp contents */
 	ret = sys32_select (width, inp, outp, exp, tvp_x);
 	if (ret == -EINTR && tvp_x) {
-		struct timeval32 *tvp = (struct timeval32 *)A(tvp_x);
+		struct compat_timeval *tvp = (struct compat_timeval *)A(tvp_x);
 		time_t sec, usec;
 
 		__get_user(sec, &tvp->tv_sec);
@@ -948,9 +944,9 @@ struct msqid_ds32
         struct ipc_perm32 msg_perm;
         u32 msg_first;
         u32 msg_last;
-        __kernel_time_t32 msg_stime;
-        __kernel_time_t32 msg_rtime;
-        __kernel_time_t32 msg_ctime;
+        compat_time_t msg_stime;
+        compat_time_t msg_rtime;
+        compat_time_t msg_ctime;
         u32 wwait;
         u32 rwait;
         unsigned short msg_cbytes;
@@ -1085,9 +1081,9 @@ asmlinkage int sunos_msgsys(int op, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 struct shmid_ds32 {
         struct ipc_perm32       shm_perm;
         int                     shm_segsz;
-        __kernel_time_t32       shm_atime;
-        __kernel_time_t32       shm_dtime;
-        __kernel_time_t32       shm_ctime;
+        compat_time_t         shm_atime;
+        compat_time_t         shm_dtime;
+        compat_time_t         shm_ctime;
         __kernel_ipc_pid_t32    shm_cpid; 
         __kernel_ipc_pid_t32    shm_lpid; 
         unsigned short          shm_nattch;

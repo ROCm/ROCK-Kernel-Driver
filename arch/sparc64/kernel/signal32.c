@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/smp_lock.h>
 #include <linux/binfmts.h>
+#include <linux/compat.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -181,7 +182,7 @@ asmlinkage void do_rt_sigsuspend32(u32 uset, size_t sigsetsize, struct pt_regs *
 	sigset_t32 set32;
         
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (((__kernel_size_t32)sigsetsize) != sizeof(sigset_t)) {
+	if (((compat_size_t)sigsetsize) != sizeof(sigset_t)) {
 		regs->tstate |= TSTATE_ICARRY;
 		regs->u_regs[UREG_I0] = EINVAL;
 		return;
