@@ -85,7 +85,7 @@ config ARCH_CO285
 	bool "Co-EBSA285"
 
 config ARCH_PXA
-	bool "PXA250/210-based"
+	bool "PXA2xx-based"
 
 config ARCH_EBSA110
 	bool "EBSA-110"
