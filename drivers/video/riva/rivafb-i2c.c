@@ -120,8 +120,12 @@ static int riva_setup_i2c_bus(struct riva_i2c_chan *chan, const char *name)
 	rc = i2c_bit_add_bus(&chan->adapter);
 	if (rc == 0)
 		dev_dbg(&chan->par->pdev->dev, "I2C bus %s registered.\n", name);
-	else
-		dev_warn(&chan->par->pdev->dev, "Failed to register I2C bus %s.\n", name);
+	else {
+		dev_warn(&chan->par->pdev->dev,
+			 "Failed to register I2C bus %s.\n", name);
+		chan->par = NULL;
+	}
+
 	return rc;
 }
 
@@ -171,6 +175,9 @@ static u8 *riva_do_probe_i2c_edid(struct riva_i2c_chan *chan)
 		},
 	};
 	u8 *buf;
+
+	if (!chan->par)
+		return NULL;
 
 	buf = kmalloc(EDID_LENGTH, GFP_KERNEL);
 	if (!buf) {
