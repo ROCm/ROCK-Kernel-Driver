@@ -78,7 +78,7 @@ udf_get_last_block(struct super_block *sb)
 
 	if (ret) /* Hard Disk */
 	{
-		lblock = bdev->bd_inode->i_size / sb->s_blocksize;
+		lblock = bdev->bd_inode->i_size >> sb->s_blocksize_bits;
 	}
 
 	if (lblock)
