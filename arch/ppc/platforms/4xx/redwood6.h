@@ -46,7 +46,7 @@ typedef struct board_info {
 #define _ISA_MEM_BASE	0
 #define PCI_DRAM_OFFSET	0
 
-#define BASE_BAUD		1267200
+#define BASE_BAUD		(378000000 / 18 / 16)
 
 #define PPC4xx_MACHINE_NAME	"IBM Redwood6"
 
