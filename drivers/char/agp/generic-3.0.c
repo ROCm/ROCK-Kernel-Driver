@@ -18,7 +18,7 @@ struct agp_3_0_dev {
 	struct pci_dev *dev;
 };
 
-static int agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new)
+static void agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new)
 {
 	struct agp_3_0_dev *cur, *n = list_entry(new, struct agp_3_0_dev, list);
 	struct list_head *pos;
@@ -29,11 +29,9 @@ static int agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new
 			break;
 	}
 	list_add_tail(new, pos);
-
-	return 0;
 }
 
-static int agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
+static void agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
 {
 	struct agp_3_0_dev *cur;
 	struct pci_dev *dev;
@@ -53,7 +51,6 @@ static int agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
 		pos = pos->next;
 		agp_3_0_dev_list_insert(head, tmp);
 	}
-	return 0;
 }
 
 /* 
@@ -62,7 +59,8 @@ static int agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
  * lying behind it...)
  */
 
-static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigned int ndevs)
+static int agp_3_0_isochronous_node_enable(struct agp_bridge_data *bridge,
+		struct agp_3_0_dev *dev_list, unsigned int ndevs)
 {
 	/*
 	 * Convenience structure to make the calculations clearer
@@ -77,7 +75,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		struct agp_3_0_dev *dev;
 	};
 
-	struct pci_dev *td = agp_bridge->dev, *dev;
+	struct pci_dev *td = bridge->dev, *dev;
 	struct list_head *head = &dev_list->list, *pos;
 	struct agp_3_0_dev *cur;
 	struct isoch_data *master, target;
@@ -114,11 +112,10 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 	 * transfers are enabled and consequently whether maxbw will mean
 	 * anything.
 	 */
-	if((ret = agp_3_0_dev_list_sort(dev_list, ndevs)) != 0)
-		goto free_and_exit;
+	agp_3_0_dev_list_sort(dev_list, ndevs);
 
-	pci_read_config_dword(td, agp_bridge->capndx + 0x0c, &tnistat);
-	pci_read_config_dword(td, agp_bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(td, bridge->capndx + 0x0c, &tnistat);
+	pci_read_config_dword(td, bridge->capndx+AGPSTAT, &tstatus);
 
 	/* Extract power-on defaults from the target */
 	target.maxbw = (tnistat >> 16) & 0xff;
@@ -170,13 +167,13 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 	 * in the target's NISTAT register, so we need to do this now
 	 * to get an accurate value for ISOCH_N later.
 	 */
-	pci_read_config_word(td, agp_bridge->capndx + 0x20, &tnicmd);
+	pci_read_config_word(td, bridge->capndx + 0x20, &tnicmd);
 	tnicmd &= ~(0x3 << 6);
 	tnicmd |= target.y << 6;
-	pci_write_config_word(td, agp_bridge->capndx + 0x20, tnicmd);
+	pci_write_config_word(td, bridge->capndx + 0x20, tnicmd);
 
 	/* Reread the target's ISOCH_N */
-	pci_read_config_dword(td, agp_bridge->capndx + 0x0c, &tnistat);
+	pci_read_config_dword(td, bridge->capndx + 0x0c, &tnistat);
 	target.n = (tnistat >> 8) & 0xff;
 
 	/* Calculate the minimum ISOCH_N needed by each master */
@@ -260,7 +257,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		              ? (rem_async + rem_isoch) : step;
 
 		pci_read_config_word(dev, cur->capndx + 0x20, &mnicmd);
-		pci_read_config_dword(dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
 
 		mnicmd &= ~(0xff << 8);
 		mnicmd &= ~(0x3  << 6);
@@ -270,7 +267,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 		mnicmd |= master[cdev].y  << 6;
 		mcmd   |= master[cdev].rq << 24;
 
-		pci_write_config_dword(dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
 		pci_write_config_word(dev, cur->capndx + 0x20, mnicmd);
 	}
 
@@ -288,7 +285,8 @@ get_out:
  * target by ndevs.  Distribute this many slots to each AGP 3.0 device,
  * giving any left over slots to the last device in dev_list.
  */
-static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsigned int ndevs)
+static void agp_3_0_nonisochronous_node_enable(struct agp_bridge_data *bridge,
+		struct agp_3_0_dev *dev_list, unsigned int ndevs)
 {
 	struct agp_3_0_dev *cur;
 	struct list_head *head = &dev_list->list, *pos;
@@ -296,7 +294,7 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
 	u32 trq, mrq, rem;
 	unsigned int cdev = 0;
 
-	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(bridge->dev, bridge->capndx + 0x04, &tstatus);
 
 	trq = (tstatus >> 24) & 0xff;
 	mrq = trq / ndevs;
@@ -306,22 +304,20 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
 	for(pos = head->next; cdev < ndevs; cdev++, pos = pos->next) {
 		cur = list_entry(pos, struct agp_3_0_dev, list);
 
-		pci_read_config_dword(cur->dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(cur->dev, cur->capndx+AGPCMD, &mcmd);
 		mcmd &= ~(0xff << 24);
 		mcmd |= ((cdev == ndevs - 1) ? rem : mrq) << 24;
-		pci_write_config_dword(cur->dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(cur->dev, cur->capndx+AGPCMD, mcmd);
 	}
-
-	return 0;
 }
 
 /*
  * Fully configure and enable an AGP 3.0 host bridge and all the devices
  * lying behind it.
  */
-int agp_3_0_node_enable(u32 mode, u32 minor)
+int agp_3_0_node_enable(struct agp_bridge_data *bridge, u32 mode, u32 minor)
 {
-	struct pci_dev *td = agp_bridge->dev, *dev;
+	struct pci_dev *td = bridge->dev, *dev;
 	u8 mcapndx;
 	u32 isoch, arqsz, cal_cycle, tmp, rate;
 	u32 tstatus, tcmd, mcmd, mstatus, ncapid;
@@ -345,12 +341,22 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 
 	/* Find all AGP devices, and add them to dev_list. */
 	pci_for_each_dev(dev) { 
+		mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 		switch ((dev->class >>8) & 0xff00) {
+			case 0x0600:    /* Bridge */
+				/* Skip bridges. We should call this function for each one. */
+				continue;
+
 			case 0x0001:    /* Unclassified device */
+				/* Don't know what this is, but log it for investigation. */
+				if (mcapndx != 0) {
+					printk (KERN_INFO PFX "Wacky, found unclassified AGP device. %x:%x\n",
+						dev->vendor, dev->device);
+				}
+				continue;
+
 			case 0x0300:    /* Display controller */
 			case 0x0400:    /* Multimedia controller */
-			case 0x0600:    /* Bridge */
-				mcapndx = pci_find_capability(dev, PCI_CAP_ID_AGP);
 				if (mcapndx == 0)
 					continue;
 
@@ -371,7 +377,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	}
 
 	/* Extract some power-on defaults from the target */
-	pci_read_config_dword(td, agp_bridge->capndx + 0x04, &tstatus);
+	pci_read_config_dword(td, bridge->capndx + 0x04, &tstatus);
 	isoch     = (tstatus >> 17) & 0x1;
 	arqsz     = (tstatus >> 13) & 0x7;
 	cal_cycle = (tstatus >> 10) & 0x7;
@@ -409,8 +415,8 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 			goto free_and_exit;
 		}
 
-		mmajor = (ncapid >> 20) & 0xf;
-		mminor = (ncapid >> 16) & 0xf;
+		mmajor = (ncapid >> AGP_MAJOR_VERSION_SHIFT) & 0xf;
+		mminor = (ncapid >> AGP_MINOR_VERSION_SHIFT) & 0xf;
 
 		if(mmajor < 3) {
 			printk(KERN_ERR PFX "woah!  AGP 2.0 device "
@@ -463,13 +469,15 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	 * masters.  This process is dramatically different depending on
 	 * whether isochronous transfers are supported.
 	 */
-	if(isoch != 0) {
-		if((ret = agp_3_0_isochronous_node_enable(dev_list, ndevs)) != 0)
-			goto free_and_exit;
-	} else {
-		if((ret = agp_3_0_nonisochronous_node_enable(dev_list,ndevs)) != 0)
-			goto free_and_exit;
+	if (isoch) {
+		ret = agp_3_0_isochronous_node_enable(bridge, dev_list, ndevs);
+		if (ret) {
+			printk(KERN_INFO PFX "Something bad happened setting "
+			       "up isochronous xfers.  Falling back to "
+			       "non-isochronous xfer mode.\n");
+		}
 	}
+	agp_3_0_nonisochronous_node_enable(bridge, dev_list, ndevs);
 
 	/*
 	 * Set the calculated minimum supported cal_cycle and minimum
@@ -477,7 +485,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	 * Also set the AGP_ENABLE bit, effectively 'turning on' the
 	 * target (this has to be done _before_ turning on the masters).
 	 */
-	pci_read_config_dword(td, agp_bridge->capndx + 0x08, &tcmd);
+	pci_read_config_dword(td, bridge->capndx+AGPCMD, &tcmd);
 
 	tcmd &= ~(0x7 << 10);
 	tcmd &= ~0x7;
@@ -486,7 +494,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 	tcmd |= 0x1 << 8;
 	tcmd |= rate;
 
-	pci_write_config_dword(td, agp_bridge->capndx + 0x08, tcmd);
+	pci_write_config_dword(td, bridge->capndx+AGPCMD, tcmd);
 
 	/*
 	 * Set the target's advertised arqsz value, the minimum supported
@@ -499,16 +507,16 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 
 		mcapndx = cur->capndx;
 
-		pci_read_config_dword(dev, cur->capndx + 0x08, &mcmd);
+		pci_read_config_dword(dev, cur->capndx+AGPCMD, &mcmd);
 
-		mcmd &= ~(0x7 << 13);
+		mcmd &= ~(0x7 << AGPSTAT_ARQSZ_SHIFT);
 		mcmd &= ~0x7;
 
 		mcmd |= arqsz << 13;
-		mcmd |= 0x1 << 8;
+		mcmd |= AGPSTAT_AGP_ENABLE;
 		mcmd |= rate;
 
-		pci_write_config_dword(dev, cur->capndx + 0x08, mcmd);
+		pci_write_config_dword(dev, cur->capndx+AGPCMD, mcmd);
 	}
 
 free_and_exit:

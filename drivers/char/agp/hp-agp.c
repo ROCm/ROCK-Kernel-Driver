@@ -285,7 +285,7 @@ static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -296,11 +296,11 @@ static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		for (k = 0;
 		     k < hp->io_pages_per_kpage;
 		     k++, j++, paddr += hp->io_page_size) {
-			hp->gatt[j] = agp_bridge->mask_memory(paddr, type);
+			hp->gatt[j] = agp_bridge->driver->mask_memory(paddr, type);
 		}
 	}
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
 
@@ -319,7 +319,7 @@ static int hp_zx1_remove_memory(agp_memory * mem, off_t pg_start, int type)
 		hp->gatt[i] = agp_bridge->scratch_page;
 	}
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
 
@@ -328,58 +328,62 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 
-static int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
-{
-	agp_bridge->masks = hp_zx1_masks;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->size_type = FIXED_APER_SIZE;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = hp_zx1_configure;
-	agp_bridge->fetch_size = hp_zx1_fetch_size;
-	agp_bridge->cleanup = hp_zx1_cleanup;
-	agp_bridge->tlb_flush = hp_zx1_tlbflush;
-	agp_bridge->mask_memory = hp_zx1_mask_memory;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = hp_zx1_create_gatt_table;
-	agp_bridge->free_gatt_table = hp_zx1_free_gatt_table;
-	agp_bridge->insert_memory = hp_zx1_insert_memory;
-	agp_bridge->remove_memory = hp_zx1_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->cant_use_aperture = 1;
-	return hp_zx1_ioc_init();
-}
-
-static int __init agp_find_supported_device(struct pci_dev *dev)
-{
-	agp_bridge->dev = dev;
-
-	/* ZX1 LBAs can be either PCI or AGP bridges */
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)) {
-		printk(KERN_INFO PFX "Detected HP ZX1 AGP chipset at %s\n",
-			dev->slot_name);
-		agp_bridge->type = HP_ZX1;
-		agp_bridge->dev = dev;
-		return hp_zx1_setup(dev);
-	}
-	return -ENODEV;
-}
-
-static struct agp_driver hp_agp_driver = {
-	.owner = THIS_MODULE,
+struct agp_bridge_driver hp_zx1_driver = {
+	.owner			= THIS_MODULE,
+	.masks			= hp_zx1_masks,
+	.size_type		= FIXED_APER_SIZE,
+	.configure		= hp_zx1_configure,
+	.fetch_size		= hp_zx1_fetch_size,
+	.cleanup		= hp_zx1_cleanup,
+	.tlb_flush		= hp_zx1_tlbflush,
+	.mask_memory		= hp_zx1_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= hp_zx1_create_gatt_table,
+	.free_gatt_table	= hp_zx1_free_gatt_table,
+	.insert_memory		= hp_zx1_insert_memory,
+	.remove_memory		= hp_zx1_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.cant_use_aperture	= 1,
 };
 
-static int __init agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_hp_probe(struct pci_dev *pdev,
+			       const struct pci_device_id *ent)
 {
-	if (agp_find_supported_device(dev) == 0) {
-		hp_agp_driver.dev = dev;
-		agp_register_driver(&hp_agp_driver);
-		return 0;
-	}
-	return -ENODEV;
+	struct agp_bridge_data *bridge;
+	int error;
+
+	/* ZX1 LBAs can be either PCI or AGP bridges */
+	if (!pci_find_capability(pdev, PCI_CAP_ID_AGP))
+		return -ENODEV;
+
+	printk(KERN_INFO PFX "Detected HP ZX1 AGP chipset at %s\n",
+			pdev->slot_name);
+
+	error = hp_zx1_ioc_init();
+	if (error)
+		return error;
+
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->driver = &hp_zx1_driver;
+	bridge->dev = pdev;
+
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
+}
+
+static void __devexit agp_hp_remove(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_hp_pci_table[] __initdata = {
@@ -400,22 +404,16 @@ static struct __initdata pci_driver agp_hp_pci_driver = {
 	.name		= "agpgart-hp",
 	.id_table	= agp_hp_pci_table,
 	.probe		= agp_hp_probe,
+	.remove		= agp_hp_remove,
 };
 
 static int __init agp_hp_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_hp_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	return ret_val;
+	return pci_module_init(&agp_hp_pci_driver);
 }
 
 static void __exit agp_hp_cleanup(void)
 {
-	agp_unregister_driver(&hp_agp_driver);
 	pci_unregister_driver(&agp_hp_pci_driver);
 }
 
