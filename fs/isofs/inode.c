@@ -934,21 +934,22 @@ static int isofs_statfs (struct super_block *sb, struct statfs *buf)
  * or getblk() if they are not.  Returns the number of blocks inserted
  * (0 == error.)
  */
-int isofs_get_blocks(struct inode *inode, sector_t iblock,
+int isofs_get_blocks(struct inode *inode, sector_t iblock_s,
 		     struct buffer_head **bh, unsigned long nblocks)
 {
 	unsigned long b_off;
 	unsigned offset, sect_size;
 	unsigned int firstext;
 	unsigned long nextino;
+	long iblock = (long)iblock_s;
 	int section, rv;
 	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	lock_kernel();
 
 	rv = 0;
-	if (iblock < 0) {
-		printk("isofs_get_blocks: block < 0\n");
+	if (iblock < 0 || iblock != iblock_s) {
+		printk("isofs_get_blocks: block number too large\n");
 		goto abort;
 	}
 

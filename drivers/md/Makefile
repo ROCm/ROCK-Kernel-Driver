@@ -19,3 +19,16 @@ obj-$(CONFIG_BLK_DEV_MD)	+= md.o
 obj-$(CONFIG_BLK_DEV_LVM)	+= lvm-mod.o
 
 include $(TOPDIR)/Rules.make
+
+# I can't get around the need for 64-bit division in raid[0-5]
+ifdef CONFIG_LBD
+
+LIBGCC:= $(shell ${CC} ${CFLAGS} -print-libgcc-file-name)
+
+md.o: md.c _udivdi3.o _umoddi3.o
+	$(CC) $(c_flags) -c -o md-tmp.o md.c
+	$(LD) -r  -o md.o md-tmp.o _udivdi3.o _umoddi3.o
+
+_udivdi3.o _umoddi3.o: $(LIBGCC)
+	$(AR) x $(LIBGCC) $@
+endif

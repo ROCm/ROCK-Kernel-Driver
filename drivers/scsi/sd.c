@@ -299,7 +299,8 @@ static struct gendisk **sd_disks;
  **/
 static int sd_init_command(Scsi_Cmnd * SCpnt)
 {
-	int dsk_nr, part_nr, block, this_count;
+	int dsk_nr, part_nr, this_count;
+	sector_t block;
 	Scsi_Device *sdp;
 #if CONFIG_SCSI_LOGGING
 	char nbuff[6];
@@ -316,8 +317,8 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	block = SCpnt->request->sector;
 	this_count = SCpnt->request_bufflen >> 9;
 
-	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: dsk_nr=%d, block=%d, "
-			    "count=%d\n", dsk_nr, block, this_count));
+	SCSI_LOG_HLQUEUE(1, printk("sd_command_init: dsk_nr=%d, block=%llu, "
+			    "count=%d\n", dsk_nr, (unsigned long long)block, this_count));
 
 	sdp = SCpnt->device;
 	/* >>>>> the "(part_nr & 0xf)" excludes 15th partition, why?? */
@@ -340,8 +341,8 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		return 0;
 	}
 	SCSI_LOG_HLQUEUE(2, sd_dskname(dsk_nr, nbuff));
-	SCSI_LOG_HLQUEUE(2, printk("%s : [part_nr=%d], block=%d\n",
-				   nbuff, part_nr, block));
+	SCSI_LOG_HLQUEUE(2, printk("%s : [part_nr=%d], block=%llu\n",
+				   nbuff, part_nr, (unsigned long long)block));
 
 	/*
 	 * If we have a 1K hardware sectorsize, prevent access to single
@@ -604,8 +605,8 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 	int result = SCpnt->result;
 	int this_count = SCpnt->bufflen >> 9;
 	int good_sectors = (result == 0 ? this_count : 0);
-	int block_sectors = 1;
-	long error_sector;
+	sector_t block_sectors = 1;
+	sector_t error_sector;
 #if CONFIG_SCSI_LOGGING
 	char nbuff[6];
 
@@ -1008,7 +1009,7 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 		    SRpnt->sr_sense_buffer[2] == NOT_READY)
 			sdp->changed = 1;
 
-		/* Either no media are present but the drive didnt tell us,
+		/* Either no media are present but the drive didn't tell us,
 		   or they are present but the read capacity command fails */
 		/* sdkp->media_present = 0; -- not always correct */
 		sdkp->capacity = 0x200000; /* 1 GB - random */
@@ -1016,7 +1017,7 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 		return;
 	}
 
-	sdkp->capacity = 1 + ((buffer[0] << 24) |
+	sdkp->capacity = 1 + (((sector_t)buffer[0] << 24) |
 			      (buffer[1] << 16) |
 			      (buffer[2] << 8) |
 			      buffer[3]);
@@ -1052,24 +1053,31 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 		 * Jacques Gelinas (Jacques@solucorp.qc.ca)
 		 */
 		int hard_sector = sector_size;
-		int sz = sdkp->capacity * (hard_sector/256);
+		sector_t sz = sdkp->capacity * (hard_sector/256);
 		request_queue_t *queue = &sdp->request_queue;
+		sector_t mb;
 
 		blk_queue_hardsect_size(queue, hard_sector);
+		/* avoid 64-bit division on 32-bit platforms */
+		mb = sz >> 1;
+		sector_div(sz, 1250);
+		mb -= sz - 974;
+		sector_div(mb, 1950);
+
 		printk(KERN_NOTICE "SCSI device %s: "
-		       "%d %d-byte hdwr sectors (%d MB)\n",
-		       diskname, sdkp->capacity,
-		       hard_sector, (sz/2 - sz/1250 + 974)/1950);
+		       "%llu %d-byte hdwr sectors (%llu MB)\n",
+		       diskname, (unsigned long long)sdkp->capacity,
+		       hard_sector, (unsigned long long)mb);
 	}
 
 	/* Rescale capacity to 512-byte units */
 	if (sector_size == 4096)
 		sdkp->capacity <<= 3;
-	if (sector_size == 2048)
+	else if (sector_size == 2048)
 		sdkp->capacity <<= 2;
-	if (sector_size == 1024)
+	else if (sector_size == 1024)
 		sdkp->capacity <<= 1;
-	if (sector_size == 256)
+	else if (sector_size == 256)
 		sdkp->capacity >>= 1;
 
 	sdkp->device->sector_size = sector_size;

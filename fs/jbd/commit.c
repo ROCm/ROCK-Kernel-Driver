@@ -355,8 +355,8 @@ sync_datalist_empty:
 			}
 			
 			bh = jh2bh(descriptor);
-			jbd_debug(4, "JBD: got buffer %ld (%p)\n",
-				bh->b_blocknr, bh->b_data);
+			jbd_debug(4, "JBD: got buffer %llu (%p)\n",
+				(unsigned long long)bh->b_blocknr, bh->b_data);
 			header = (journal_header_t *)&bh->b_data[0];
 			header->h_magic     = htonl(JFS_MAGIC_NUMBER);
 			header->h_blocktype = htonl(JFS_DESCRIPTOR_BLOCK);
