@@ -631,7 +631,7 @@ clean:	archclean
 	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
 		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
-	@rm -f $(CLEAN_FILES)
+	@rm -rf $(CLEAN_FILES)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
