@@ -128,8 +128,6 @@ static struct usb_driver usb_dsbr100_driver = {
 	name:		"dsbr100",
 	probe:		usb_dsbr100_probe,
 	disconnect:	usb_dsbr100_disconnect,
-	fops:		NULL,
-	minor:		0,
 	id_table:	usb_dsbr100_table,
 };
 

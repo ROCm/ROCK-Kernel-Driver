@@ -2138,6 +2138,7 @@ static struct usb_driver auerswald_driver = {
 	disconnect:	auerswald_disconnect,
 	fops:		&auerswald_fops,
 	minor:		AUER_MINOR_BASE,
+	num_minors:	AUER_MAX_DEVICES,
 	id_table:	auerswald_ids,
 };
 

@@ -59,7 +59,7 @@ LIST_HEAD(usb_driver_list);
 
 devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
 
-static struct usb_driver *usb_minors[16];
+static struct usb_driver *usb_minors[256];
 
 /**
  *	usb_register - register a USB driver
@@ -72,12 +72,17 @@ static struct usb_driver *usb_minors[16];
  */
 int usb_register(struct usb_driver *new_driver)
 {
+	int i;
+
 	if (new_driver->fops != NULL) {
-		if (usb_minors[new_driver->minor/16]) {
-			 err("error registering %s driver", new_driver->name);
-			return -EINVAL;
+		for (i = new_driver->minor; i < new_driver->minor + new_driver->num_minors; ++i) {
+			if (usb_minors[i]) {
+				err("error registering %s driver", new_driver->name);
+				return -EINVAL;
+			}
 		}
-		usb_minors[new_driver->minor/16] = new_driver;
+		for (i = new_driver->minor; i < new_driver->minor + new_driver->num_minors; ++i)
+			usb_minors[i] = new_driver;
 	}
 
 	info("registered new driver %s", new_driver->name);
@@ -172,10 +177,12 @@ static void usb_drivers_purge(struct usb_driver *driver,struct usb_device *dev)
 void usb_deregister(struct usb_driver *driver)
 {
 	struct list_head *tmp;
+	int i;
 
 	info("deregistering driver %s", driver->name);
 	if (driver->fops != NULL)
-		usb_minors[driver->minor/16] = NULL;
+		for (i = driver->minor; i < driver->minor + driver->num_minors; ++i)
+			usb_minors[i] = NULL;
 
 	/*
 	 * first we remove the driver, to be sure it doesn't get used by
@@ -2517,7 +2524,7 @@ int usb_new_device(struct usb_device *dev)
 static int usb_open(struct inode * inode, struct file * file)
 {
 	int minor = minor(inode->i_rdev);
-	struct usb_driver *c = usb_minors[minor/16];
+	struct usb_driver *c = usb_minors[minor];
 	int err = -ENODEV;
 	struct file_operations *old_fops, *new_fops = NULL;
 

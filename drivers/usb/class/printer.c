@@ -1090,6 +1090,7 @@ static struct usb_driver usblp_driver = {
 	disconnect:	usblp_disconnect,
 	fops:		&usblp_fops,
 	minor:		USBLP_MINOR_BASE,
+	num_minors:	USBLP_MINORS,
 	id_table:	usblp_ids,
 };
 

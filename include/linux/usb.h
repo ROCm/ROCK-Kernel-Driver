@@ -493,6 +493,8 @@ struct usb_device_id {
  * @minor: Used with fops to simplify creating USB character devices.
  *	Such drivers have sixteen character devices, using the USB
  *	major number and starting with this minor number.
+ * @num_minors: Used with minor to specify how many minors are used by
+ *	this driver.
  * @ioctl: Used for drivers that want to talk to userspace through
  *	the "usbfs" filesystem.  This lets devices provide ways to
  *	expose information to user space regardless of where they
@@ -534,6 +536,7 @@ struct usb_driver {
 
 	struct file_operations *fops;
 	int minor;
+	int num_minors;
 
 	struct semaphore serialize;
 

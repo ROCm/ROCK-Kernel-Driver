@@ -933,6 +933,7 @@ static struct usb_driver mdc800_usb_driver =
 	disconnect:	mdc800_usb_disconnect,
 	fops:		&mdc800_device_ops,
 	minor:		MDC800_DEVICE_MINOR_BASE,
+	num_minors:	1,
 	id_table:	mdc800_table
 };
 
