@@ -35,7 +35,7 @@ static int __init pci_acpi_init(void)
 	 * also do it here in case there are still broken drivers that
 	 * don't use pci_enable_device().
 	 */
-	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 		acpi_pci_irq_enable(dev);
 
 #ifdef CONFIG_X86_IO_APIC
