@@ -135,9 +135,21 @@ static void RingQueue_Initialize(RingQueue_t *rq)
 
 static void RingQueue_Allocate(RingQueue_t *rq, int rqLen)
 {
+	/* Make sure the requested size is a power of 2 and
+	   round up if necessary. This allows index wrapping
+	   using masks rather than modulo */
+
+	int i = 1;
 	assert(rq != NULL);
 	assert(rqLen > 0);
+
+	while(rqLen >> i)
+		i++;
+	if(rqLen != 1 << (i-1))
+		rqLen = 1 << i;
+
 	rq->length = rqLen;
+	rq->ri = rq->wi = 0;
 	rq->queue = usbvideo_rvmalloc(rq->length);
 	assert(rq->queue != NULL);
 }
@@ -161,12 +173,32 @@ static void RingQueue_Free(RingQueue_t *rq)
 
 int RingQueue_Dequeue(RingQueue_t *rq, unsigned char *dst, int len)
 {
-	int i;
+	int rql, toread;
+
 	assert(rq != NULL);
 	assert(dst != NULL);
-	for (i=0; i < len; i++) {
-		dst[i] = rq->queue[rq->ri];
-		RING_QUEUE_DEQUEUE_BYTES(rq,1);
+
+	rql = RingQueue_GetLength(rq);
+	if(!rql)
+		return 0;
+
+	/* Clip requested length to available data */
+	if(len > rql)
+		len = rql;
+
+	toread = len;
+	if(rq->ri > rq->wi) {
+		/* Read data from tail */
+		int read = (toread < (rq->length - rq->ri)) ? toread : rq->length - rq->ri;
+		memcpy(dst, rq->queue + rq->ri, read);
+		toread -= read;
+		dst += read;
+		rq->ri = (rq->ri + read) & (rq->length-1);
+	}
+	if(toread) {
+		/* Read data from head */
+		memcpy(dst, rq->queue + rq->ri, toread);
+		rq->ri = (rq->ri + toread) & (rq->length-1);
 	}
 	return len;
 }
@@ -194,7 +226,7 @@ int RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n)
 		if (m > q_avail)
 			m = q_avail;
 
-		memmove(rq->queue + rq->wi, cdata, m);
+		memcpy(rq->queue + rq->wi, cdata, m);
 		RING_QUEUE_ADVANCE_INDEX(rq, wi, m);
 		cdata += m;
 		enqueued += m;
@@ -204,24 +236,6 @@ int RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n)
 }
 
 EXPORT_SYMBOL(RingQueue_Enqueue);
-
-int RingQueue_GetLength(const RingQueue_t *rq)
-{
-	int ri, wi;
-
-	assert(rq != NULL);
-
-	ri = rq->ri;
-	wi = rq->wi;
-	if (ri == wi)
-		return 0;
-	else if (ri < wi)
-		return wi - ri;
-	else
-		return wi + (rq->length - ri);
-}
-
-EXPORT_SYMBOL(RingQueue_GetLength);
 
 static void RingQueue_InterruptibleSleepOn(RingQueue_t *rq)
 {
@@ -237,6 +251,16 @@ void RingQueue_WakeUpInterruptible(RingQueue_t *rq)
 }
 
 EXPORT_SYMBOL(RingQueue_WakeUpInterruptible);
+
+void RingQueue_Flush(RingQueue_t *rq)
+{
+	assert(rq != NULL);
+	rq->ri = 0;
+	rq->wi = 0;
+}
+
+EXPORT_SYMBOL(RingQueue_Flush);
+
 
 /*
  * usbvideo_VideosizeToString()
@@ -374,7 +398,7 @@ static void usbvideo_OverlayStats(uvd_t *uvd, usbvideo_frame_t *frame)
 		q_used = RingQueue_GetLength(&uvd->dp);
 		if ((uvd->dp.ri + q_used) >= uvd->dp.length) {
 			u_hi = uvd->dp.length;
-			u_lo = (q_used + uvd->dp.ri) % uvd->dp.length;
+			u_lo = (q_used + uvd->dp.ri) & (uvd->dp.length-1);
 		} else {
 			u_hi = (q_used + uvd->dp.ri);
 			u_lo = -1;
@@ -1256,7 +1280,7 @@ static int usbvideo_v4l_open(struct inode *inode, struct file *file)
 		/* Allocate memory for the frame buffers */
 		uvd->fbuf_size = USBVIDEO_NUMFRAMES * uvd->max_frame_size;
 		uvd->fbuf = usbvideo_rvmalloc(uvd->fbuf_size);
-		RingQueue_Allocate(&uvd->dp, 128*1024); /* FIXME #define */
+		RingQueue_Allocate(&uvd->dp, RING_QUEUE_SIZE);
 		if ((uvd->fbuf == NULL) ||
 		    (!RingQueue_IsAllocated(&uvd->dp))) {
 			err("%s: Failed to allocate fbuf or dp", proc);

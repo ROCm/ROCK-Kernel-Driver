@@ -113,9 +113,10 @@ typedef unsigned long videosize_t;
     mr = LIMIT_RGB(mm_r); \
 }
 
-#define	RING_QUEUE_ADVANCE_INDEX(rq,ind,n) (rq)->ind = ((rq)->ind + (n)) % (rq)->length
+#define	RING_QUEUE_SIZE		(128*1024)	/* Must be a power of 2 */
+#define	RING_QUEUE_ADVANCE_INDEX(rq,ind,n) (rq)->ind = ((rq)->ind + (n)) & ((rq)->length-1)
 #define	RING_QUEUE_DEQUEUE_BYTES(rq,n) RING_QUEUE_ADVANCE_INDEX(rq,ri,n)
-#define	RING_QUEUE_PEEK(rq,ofs) ((rq)->queue[((ofs) + (rq)->ri) % (rq)->length])
+#define	RING_QUEUE_PEEK(rq,ofs) ((rq)->queue[((ofs) + (rq)->ri) & ((rq)->length-1)])
 
 typedef struct {
 	unsigned char *queue;	/* Data from the Isoc data pump */
@@ -306,8 +307,18 @@ typedef struct s_usbvideo_t usbvideo_t;
 
 int  RingQueue_Dequeue(RingQueue_t *rq, unsigned char *dst, int len);
 int  RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n);
-int  RingQueue_GetLength(const RingQueue_t *rq);
 void RingQueue_WakeUpInterruptible(RingQueue_t *rq);
+void RingQueue_Flush(RingQueue_t *rq);
+
+static inline int RingQueue_GetLength(const RingQueue_t *rq)
+{
+	return (rq->wi - rq->ri + rq->length) & (rq->length-1);
+}
+
+static inline int RingQueue_GetFreeSpace(const RingQueue_t *rq)
+{
+	return rq->length - RingQueue_GetLength(rq);
+}
 
 void usbvideo_DrawLine(
 	usbvideo_frame_t *frame,
