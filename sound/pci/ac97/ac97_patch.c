@@ -910,7 +910,7 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 
 static struct snd_ac97_build_ops patch_ad1881_build_ops = {
 #ifdef CONFIG_PM
-	.resume = &ad18xx_resume
+	.resume = ad18xx_resume
 #endif
 };
 
@@ -993,7 +993,7 @@ static int patch_ad1885_specific(ac97_t * ac97)
 static struct snd_ac97_build_ops patch_ad1885_build_ops = {
 	.build_specific = &patch_ad1885_specific,
 #ifdef CONFIG_PM
-	.resume = &ad18xx_resume
+	.resume = ad18xx_resume
 #endif
 };
 
