@@ -275,6 +275,9 @@ void cfb_imageblit(struct fb_info *p, const struct fb_image *image)
 	int x2, y2, vxres, vyres;
 	u8 *dst1;
 
+	if (p->state != FBINFO_STATE_RUNNING)
+		return;
+
 	vxres = p->var.xres_virtual;
 	vyres = p->var.yres_virtual;
 	/* 

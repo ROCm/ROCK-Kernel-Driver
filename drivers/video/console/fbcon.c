@@ -195,8 +195,8 @@ static void fb_flashcursor(void *private)
 {
 	struct fb_info *info = (struct fb_info *) private;
 
-	/* Test to see if the cursor is erased but still on */
-	if (!info || (info->cursor.rop == ROP_COPY))
+	if (!info || info->state != FBINFO_STATE_RUNNING ||
+	    info->cursor.rop == ROP_COPY)
 		return;
 	acquire_console_sem();
 	info->cursor.enable ^= 1;
@@ -939,6 +939,8 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
+	if (info->state != FBINFO_STATE_RUNNING)
+		return;
 
 	if (!height || !width)
 		return;
@@ -963,6 +965,8 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
+	if (info->state != FBINFO_STATE_RUNNING)
+		return;
 
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
@@ -977,6 +981,8 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	struct display *p = &fb_display[vc->vc_num];
 
 	if (!info->fbops->fb_blank && console_blanked)
+		return;
+	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)

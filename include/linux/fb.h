@@ -340,6 +340,24 @@ struct device;
 struct file;
 
 /*
+ * Register/unregister for framebuffer events
+ */
+
+/*	The resolution of the passed in fb_info about to change */ 
+#define FB_EVENT_MODE_CHANGE		0x01
+/*	The display on this fb_info is beeing suspended, no access to the
+ *	framebuffer is allowed any more after that call returns
+ */
+#define FB_EVENT_SUSPEND		0x02
+/*	The display on this fb_info was resumed, you can restore the display
+ *	if you own it
+ */
+#define FB_EVENT_RESUME			0x03
+
+extern int fb_register_client(struct notifier_block *nb);
+extern int fb_unregister_client(struct notifier_block *nb);
+
+/*
  * Pixmap structure definition
  *
  * The purpose of this structure is to translate data
@@ -447,6 +465,9 @@ struct fb_info {
 	struct vc_data *display_fg;	/* Console visible on this display */
 	int currcon;			/* Current VC. */
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
+#define FBINFO_STATE_RUNNING	0
+#define FBINFO_STATE_SUSPENDED	1
+	u32 state;			/* Hardware state i.e suspend */
 	/* From here on everything is device dependent */
 	void *par;	
 };

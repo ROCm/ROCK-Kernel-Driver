@@ -396,6 +396,7 @@ extern const char *global_mode_option;
 
 static initcall_t pref_init_funcs[FB_MAX];
 static int num_pref_init_funcs __initdata = 0;
+static struct notifier_block *fb_notifier_list;
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
 
@@ -695,8 +696,8 @@ int fb_show_logo(struct fb_info *info)
 	struct fb_image image;
 	int x;
 
-	/* Return if the frame buffer is not mapped */
-	if (fb_logo.logo == NULL)
+	/* Return if the frame buffer is not mapped or suspended */
+	if (fb_logo.logo == NULL || info->state != FBINFO_STATE_RUNNING)
 		return 0;
 
 	image.depth = fb_logo.depth;
@@ -788,6 +789,9 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (!info || ! info->screen_base)
 		return -ENODEV;
 
+	if (info->state != FBINFO_STATE_RUNNING)
+		return -EPERM;
+
 	if (info->fbops->fb_read)
 		return info->fbops->fb_read(file, buf, count, ppos);
 	
@@ -822,6 +826,9 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 
 	if (!info || !info->screen_base)
 		return -ENODEV;
+
+	if (info->state != FBINFO_STATE_RUNNING)
+		return -EPERM;
 
 	if (info->fbops->fb_write)
 		return info->fbops->fb_write(file, buf, count, ppos);
@@ -949,6 +956,8 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_pan_display(info, &info->var);
 
 			fb_set_cmap(&info->cmap, 1, info);
+
+			notifier_call_chain(&fb_notifier_list, FB_EVENT_MODE_CHANGE, info);
 		}
 	}
 	return 0;
@@ -1297,8 +1306,42 @@ unregister_framebuffer(struct fb_info *fb_info)
 	return 0;
 }
 
+/**
+ *	fb_register_client - register a client notifier
+ *	@nb: notifier block to callback on events
+ */
+int fb_register_client(struct notifier_block *nb)
+{
+	return notifier_chain_register(&fb_notifier_list, nb);
+}
+
+/**
+ *	fb_unregister_client - unregister a client notifier
+ *	@nb: notifier block to callback on events
+ */
+int fb_unregister_client(struct notifier_block *nb)
+{
+	return notifier_chain_unregister(&fb_notifier_list, nb);
+}
+
+/**
+ *	fb_set_suspend - low level driver signals suspend
+ *	@info: framebuffer affected
+ *	@state: 0 = resuming, !=0 = suspending
+ *
+ *	This is meant to be used by low level drivers to
+ * 	signal suspend/resume to the core & clients.
+ *	It must be called with the console semaphore held
+ */
 void fb_set_suspend(struct fb_info *info, int state)
 {
+	if (state) {
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_SUSPEND, info);
+		info->state = FBINFO_STATE_SUSPENDED;
+	} else {
+		info->state = FBINFO_STATE_RUNNING;
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_RESUME, info);
+	}
 }
 
 /**
@@ -1415,5 +1458,7 @@ EXPORT_SYMBOL(fb_get_buffer_offset);
 EXPORT_SYMBOL(move_buf_unaligned);
 EXPORT_SYMBOL(move_buf_aligned);
 EXPORT_SYMBOL(fb_set_suspend);
+EXPORT_SYMBOL(fb_register_client);
+EXPORT_SYMBOL(fb_unregister_client);
 
 MODULE_LICENSE("GPL");

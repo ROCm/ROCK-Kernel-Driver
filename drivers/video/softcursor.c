@@ -48,6 +48,9 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		info->cursor.image.depth = cursor->image.depth;
 	}	
 
+	if (info->state != FBINFO_STATE_RUNNING)
+		return 0;
+
 	s_pitch = (info->cursor.image.width + 7) >> 3;
 	dsize = s_pitch * info->cursor.image.height;
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
