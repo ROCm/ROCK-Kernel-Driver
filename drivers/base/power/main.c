@@ -24,10 +24,13 @@
 #include <linux/device.h>
 
 
-static LIST_HEAD(dpm_active_list);
+LIST_HEAD(dpm_active);
+LIST_HEAD(dpm_suspended);
+LIST_HEAD(dpm_off);
+LIST_HEAD(dpm_off_irq);
 
-static spinlock_t dpm_lock = SPIN_LOCK_UNLOCKED;
-static DECLARE_MUTEX(dpm_sem);
+spinlock_t dpm_lock = SPIN_LOCK_UNLOCKED;
+DECLARE_MUTEX(dpm_sem);
 
 static struct attribute power_attrs[] = {
 	{ .name = NULL },
@@ -45,7 +48,7 @@ int device_pm_add(struct device * dev)
 		 dev->bus ? dev->bus->name : "No Bus", dev->kobj.name);
 	down(&dpm_sem);
 	spin_lock(&dpm_lock);
-	list_add_tail(&dev->power.entry,&dpm_active_list);
+	list_add_tail(&dev->power.entry,&dpm_active);
 	spin_unlock(&dpm_lock);
 	error = sysfs_create_group(&dev->kobj,&pm_attr_group);
 	up(&dpm_sem);

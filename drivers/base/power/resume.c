@@ -9,46 +9,153 @@
  */
 
 #include <linux/device.h>
-
-#define to_dev(node) container_of(node,struct device,kobj.entry)
-
-extern struct subsystem devices_subsys;
-
+#include "power.h"
 
 extern int sysdev_resume(void);
 extern int sysdev_restore(void);
 
 
 /**
+ *	resume_device - Restore state for one device.
+ *	@dev:	Device.
+ *
+ */
+
+static int resume_device(struct device * dev)
+{
+	struct device_driver * drv = dev->driver;
+
+	if (drv && drv->resume)
+		return drv->resume(dev,RESUME_RESTORE_STATE);
+	return 0;
+}
+
+/**
+ *	dpm_resume - Restore all device state.
+ *
+ *	Walk the dpm_suspended list and restore each device. As they are 
+ *	resumed, move the devices to the dpm_active list.
+ */
+
+int dpm_resume(void)
+{
+	spin_lock(&dpm_lock);
+	while(!list_empty(&dpm_suspended)) {
+		struct list_head * entry = dpm_suspended.next;
+		struct device * dev = to_device(entry);
+		list_del_init(entry);
+		spin_unlock(&dpm_lock);
+		resume_device(dev);
+		spin_lock(&dpm_lock);
+		list_add_tail(entry,&dpm_active);
+	}
+	spin_unlock(&dpm_lock);
+	return 0;
+}
+
+
+/**
+ *	device_pm_resume - Restore state of each device in system.
+ *
+ *	Restore system device state, then common device state. Finally,
+ *	release dpm_sem, as we're done with device PM.
+ */
+
+void device_pm_resume(void)
+{
+	sysdev_restore();
+	dpm_resume();
+	up(&dpm_sem);
+}
+
+
+/**
+ *	power_up_device - Power one device on.
+ *	@dev:	Device.
+ */
+
+static void power_up_device(struct device * dev)
+{
+	struct device_driver * drv = dev->driver;
+	if (drv && drv->resume)
+		drv->resume(dev,RESUME_POWER_ON);
+}
+
+
+/**
+ *	device_power_up_irq - Power on some devices. 
+ *
+ *	Walk the dpm_off_irq list and power each device up. This 
+ *	is used for devices that required they be powered down with
+ *	interrupts disabled. As devices are powered on, they are moved to
+ *	the dpm_suspended list.
+ *
+ *	Interrupts must be disabled when calling this. 
+ */
+
+void dpm_power_up_irq(void)
+{
+	spin_lock_irq(&dpm_lock);
+	while(!list_empty(&dpm_off_irq)) {
+		struct list_head * entry = dpm_off_irq.next;
+		list_del_init(entry);
+		power_up_device(to_device(entry));
+		list_add_tail(entry,&dpm_suspended);
+	}
+	spin_unlock_irq(&dpm_lock);
+}
+
+
+/**
+ *	dpm_power_up - Power on most devices.
+ *
+ *	Walk the dpm_off list and power each device up. This is used
+ *	to power on devices that were able to power down with interrupts
+ *	enabled. 
+ */
+
+void dpm_power_up(void)
+{
+	spin_lock(&dpm_lock);
+	while (!list_empty(&dpm_off)) {
+		struct list_head * entry = dpm_off.next;
+		list_del_init(entry);
+		power_up_device(to_device(entry));
+		list_add_tail(entry,&dpm_suspended);
+	}
+	spin_unlock(&dpm_lock);
+}
+
+
+/**
+ *	device_pm_power_up - Turn on all devices.
+ *
+ *	First, power on system devices, which must happen with interrupts 
+ *	disbled. Then, power on devices that also require interrupts disabled.
+ *	Turn interrupts back on, and finally power up the rest of the normal
+ *	devices.
+ */
+
+void device_pm_power_up(void)
+{
+	sysdev_resume();
+	dpm_power_up_irq();
+	local_irq_enable();
+	dpm_power_up();
+}
+
+/**
  * device_resume - resume all the devices in the system
  * @level:	stage of resume process we're at 
  * 
- * Similar to device_suspend above, though we want to do a breadth-first
- * walk of the tree to make sure we wake up parents before children.
- * So, we iterate over the list backward. 
+ *	This function is deprecated, and should be replaced with appropriate
+ *	calls to device_pm_power_up() and device_pm_resume() above.
  */
+
 void device_resume(u32 level)
 {
-	struct device * dev;
 
-	switch (level) {
-	case RESUME_POWER_ON:
-		sysdev_resume();
-		break;
-	case RESUME_RESTORE_STATE:
-		sysdev_restore();
-		break;
-	default:
-		break;
-	}
-
-	down_write(&devices_subsys.rwsem);
-	list_for_each_entry(dev,&devices_subsys.kset.list,kobj.entry) {
-		if (dev->driver && dev->driver->resume) {
-			pr_debug("resuming device %s\n",dev->name);
-			dev->driver->resume(dev,level);
-		}
-	}
-	up_write(&devices_subsys.rwsem);
+	printk("%s is deprecated. Called from:\n",__FUNCTION__);
+	dump_stack();
 }
 

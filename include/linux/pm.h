@@ -197,6 +197,12 @@ struct dev_pm_info {
 #endif
 };
 
+extern int device_pm_suspend(u32 state);
+extern int device_pm_power_down(u32 state);
+extern void device_pm_power_up(void);
+extern void device_pm_resume(void);
+
+
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_PM_H */
