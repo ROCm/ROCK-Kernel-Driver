@@ -351,7 +351,7 @@ static int cis_readable(socket_info_t *s, u_long base)
     ret = pcmcia_validate_cis(s->clients, &info1);
     /* invalidate mapping and CIS cache */
     iounmap(s->cis_virt);
-    s->cis_used = 0;
+    destroy_cis_cache(s);
     if ((ret != 0) || (info1.Chains == 0))
 	return 0;
     s->cis_mem.sys_start = base+s->cap.map_size;
@@ -359,7 +359,7 @@ static int cis_readable(socket_info_t *s, u_long base)
     s->cis_virt = ioremap(base+s->cap.map_size, s->cap.map_size);
     ret = pcmcia_validate_cis(s->clients, &info2);
     iounmap(s->cis_virt);
-    s->cis_used = 0;
+    destroy_cis_cache(s);
     return ((ret == 0) && (info1.Chains == info2.Chains));
 }
 

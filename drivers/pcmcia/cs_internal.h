@@ -114,9 +114,13 @@ typedef struct config_t {
 /* Maximum number of memory windows per socket */
 #define MAX_WIN 4
 
-/* The size of the CIS cache */
-#define MAX_CIS_TABLE	64
-#define MAX_CIS_DATA	512
+struct cis_cache_entry {
+	struct list_head	node;
+	unsigned int		addr;
+	unsigned int		len;
+	unsigned int		attr;
+	unsigned char		cache[0];
+};
 
 typedef struct socket_info_t {
     spinlock_t			lock;
@@ -145,13 +149,7 @@ typedef struct socket_info_t {
     window_t			win[MAX_WIN];
     region_t			*c_region, *a_region;
     erase_busy_t		erase_busy;
-    int				cis_used;
-    struct {
-	u_int			addr;
-	u_short			len;
-	u_short			attr;
-    }				cis_table[MAX_CIS_TABLE];
-    char			cis_cache[MAX_CIS_DATA];
+    struct list_head		cis_cache;
     u_int			fake_cis_len;
     char			*fake_cis;
 #ifdef CONFIG_PROC_FS
@@ -206,6 +204,7 @@ int read_cis_mem(socket_info_t *s, int attr,
 void write_cis_mem(socket_info_t *s, int attr,
 		   u_int addr, u_int len, void *ptr);
 void release_cis_mem(socket_info_t *s);
+void destroy_cis_cache(socket_info_t *s);
 int verify_cis_cache(socket_info_t *s);
 void preload_cis_cache(socket_info_t *s);
 int get_first_tuple(client_handle_t handle, tuple_t *tuple);
