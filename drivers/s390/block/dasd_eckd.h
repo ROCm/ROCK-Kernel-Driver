@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.5 $
+ * $Revision: 1.6 $
  *
  * History of changes 
  * 
@@ -109,7 +109,7 @@ typedef struct DE_eckd_data_t {
 		unsigned char cfw:1;	/* Cache fast write */
 		unsigned char dfw:1;	/* DASD fast write */
 	} __attribute__ ((packed)) attributes;
-	__u16 short blk_size;	/* Blocksize */
+	__u16 blk_size;		/* Blocksize */
 	__u16 fast_write_id;
 	__u8 ga_additional;	/* Global Attributes Additional */
 	__u8 ga_extended;	/* Global Attributes Extended	*/

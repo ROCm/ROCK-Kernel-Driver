@@ -233,27 +233,29 @@ do {                                                         \
 
 #define _syscall0(type,name)                                 \
 type name(void) {                                            \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name)                          \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 
 #define _syscall1(type,name,type1,arg1)                      \
 type name(type1 arg1) {                                      \
         register type1 __arg1 asm("2") = arg1;               \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name),                         \
                   "0" (__arg1)                               \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 
@@ -261,15 +263,16 @@ type name(type1 arg1) {                                      \
 type name(type1 arg1, type2 arg2) {                          \
         register type1 __arg1 asm("2") = arg1;               \
         register type2 __arg2 asm("3") = arg2;               \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name),                         \
                   "0" (__arg1),                              \
                   "d" (__arg2)                               \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 
@@ -278,16 +281,17 @@ type name(type1 arg1, type2 arg2, type3 arg3) {              \
         register type1 __arg1 asm("2") = arg1;               \
         register type2 __arg2 asm("3") = arg2;               \
         register type3 __arg3 asm("4") = arg3;               \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name),                         \
                   "0" (__arg1),                              \
                   "d" (__arg2),                              \
                   "d" (__arg3)                               \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 
@@ -298,17 +302,18 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) {  \
         register type2 __arg2 asm("3") = arg2;               \
         register type3 __arg3 asm("4") = arg3;               \
         register type4 __arg4 asm("5") = arg4;               \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name),                         \
                   "0" (__arg1),                              \
                   "d" (__arg2),                              \
                   "d" (__arg3),                              \
                   "d" (__arg4)                               \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 
@@ -321,11 +326,11 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
         register type3 __arg3 asm("4") = arg3;               \
         register type4 __arg4 asm("5") = arg4;               \
         register type5 __arg5 asm("6") = arg5;               \
-        register long __res asm("2");                        \
+        register long __svcres asm("2");                     \
+        long __res;                                          \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
-                "    lgr  %0,2"                              \
-                : "=d" (__res)                               \
+                : "=d" (__svcres)                            \
                 : "i" (__NR_##name),                         \
                   "0" (__arg1),                              \
                   "d" (__arg2),                              \
@@ -333,6 +338,7 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
                   "d" (__arg4),                              \
                   "d" (__arg5)                               \
                 : _svc_clobber );                            \
+	__res = __svcres;                                    \
         __syscall_return(type,__res);                        \
 }
 

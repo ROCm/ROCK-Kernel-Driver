@@ -191,10 +191,10 @@ static inline int
 __idal_buffer_is_needed(struct idal_buffer *ib)
 {
 #ifdef CONFIG_ARCH_S390X
-	return ib->size > (4096 << ib->page_order) ||
+	return ib->size > (4096ul << ib->page_order) ||
 		idal_is_needed(ib->data[0], ib->size);
 #else
-	return ib->size > (4096 << ib->page_order);
+	return ib->size > (4096ul << ib->page_order);
 #endif
 }
 

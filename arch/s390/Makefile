@@ -18,7 +18,7 @@ OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
 LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
 
-CFLAGS += -pipe -fno-strength-reduce
+CFLAGS += -pipe -fno-strength-reduce -finline-limit=10000 -Wno-sign-compare
 
 head-y := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
 
