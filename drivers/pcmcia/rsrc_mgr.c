@@ -592,7 +592,7 @@ pcmcia_align(void *align_data, struct resource *res,
     
 ======================================================================*/
 
-int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
+int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
 		   char *name, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_IO, name);
