@@ -234,9 +234,9 @@ struct icom_port {
 	unsigned char cable_id;
 	unsigned char read_status_mask;
 	unsigned char ignore_status_mask;
-	unsigned long int_reg;
-	struct icom_regs *global_reg;
-	struct func_dram *dram;
+	void __iomem * int_reg;
+	struct icom_regs __iomem *global_reg;
+	struct func_dram __iomem *dram;
 	int port;
 	struct statusArea *statStg;
 	dma_addr_t statStg_pci;
@@ -256,7 +256,7 @@ struct icom_port {
 };
 
 struct icom_adapter {
-	unsigned long base_addr;
+	void __iomem * base_addr;
 	unsigned long base_addr_pci;
 	unsigned char irq_number;
 	struct pci_dev *pci_dev;
@@ -278,12 +278,12 @@ struct icom_adapter {
 extern void iCom_sercons_init(void);
 
 struct lookup_proc_table {
-	u32	*global_control_reg;
+	u32	__iomem *global_control_reg;
 	unsigned long	processor_id;
 };
 
 struct lookup_int_table {
-	u32	*global_int_mask;
+	u32	__iomem *global_int_mask;
 	unsigned long	processor_id;
 };
 
