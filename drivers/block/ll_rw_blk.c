@@ -1924,9 +1924,11 @@ int __init blk_dev_init(void)
 	 * Free request slots per queue.
 	 * (Half for reads, half for writes)
 	 */
-	queue_nr_requests = 64;
-	if (total_ram > MB(32))
-		queue_nr_requests = 256;
+	queue_nr_requests = (total_ram >> 8) & ~15;	/* One per quarter-megabyte */
+	if (queue_nr_requests < 32)
+		queue_nr_requests = 32;
+	if (queue_nr_requests > 512)
+		queue_nr_requests = 512;
 
 	/*
 	 * Batch frees according to queue length
