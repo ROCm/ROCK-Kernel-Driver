@@ -532,6 +532,18 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 	return stat;
 }
 
+static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
+				  const char *s, u8 stat, unsigned cur_bad)
+{
+	if (rq->bio) {
+		int sectors = rq->hard_nr_sectors - rq->nr_sectors - cur_bad;
+
+		if (sectors > 0)
+			drive->driver->end_request(drive, 1, sectors);
+	}
+	return drive->driver->error(drive, s, stat);
+}
+
 /*
  * Handler for command with PIO data-in phase (Read).
  */
@@ -542,23 +554,10 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+			return task_error(drive, rq, __FUNCTION__, stat, 0);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
-	}
-finish_rq:
-	/*
-	 * Complete previously submitted bios (if any).
-	 * Status was already verifyied.
-	 */
-	while (rq->bio != rq->cbio)
-		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
-			return ide_stopped;
-	/* Complete rq->buffer based request (ioctls). */
-	if (!rq->bio && !rq->nr_sectors) {
-		DRIVER(drive)->end_request(drive, 1, 0);
-		return ide_stopped;
 	}
 
 	task_sectors(drive, rq, 1, IDE_PIO_IN);
@@ -567,8 +566,9 @@ finish_rq:
 	if (!rq->nr_sectors) {
 		stat = wait_drive_not_busy(drive);
 		if (!OK_STAT(stat, 0, BAD_R_STAT))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
-		goto finish_rq;
+			return task_error(drive, rq, __FUNCTION__, stat, 1);
+		drive->driver->end_request(drive, 1, rq->hard_nr_sectors);
+		return ide_stopped;
 	}
 
 	/* Still data left to transfer. */
@@ -588,23 +588,10 @@ ide_startstop_t task_mulin_intr (ide_drive_t *drive)
 
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+			return task_error(drive, rq, __FUNCTION__, stat, 0);
 		/* BUSY_STAT: No data yet, so wait for another IRQ. */
 		ide_set_handler(drive, &task_mulin_intr, WAIT_WORSTCASE, NULL);
 		return ide_started;
-	}
-finish_rq:
-	/*
-	 * Complete previously submitted bios (if any).
-	 * Status was already verifyied.
-	 */
-	while (rq->bio != rq->cbio)
-		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
-			return ide_stopped;
-	/* Complete rq->buffer based request (ioctls). */
-	if (!rq->bio && !rq->nr_sectors) {
-		DRIVER(drive)->end_request(drive, 1, 0);
-		return ide_stopped;
 	}
 
 	task_multi_sectors(drive, rq, IDE_PIO_IN);
@@ -613,8 +600,9 @@ finish_rq:
 	if (!rq->nr_sectors) {
 		stat = wait_drive_not_busy(drive);
 		if (!OK_STAT(stat, 0, BAD_R_STAT))
-			return DRIVER(drive)->error(drive, __FUNCTION__, stat);
-		goto finish_rq;
+			return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
+		drive->driver->end_request(drive, 1, rq->hard_nr_sectors);
+		return ide_stopped;
 	}
 
 	/* Still data left to transfer. */
@@ -634,23 +622,15 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
 	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
-		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		return task_error(drive, rq, __FUNCTION__, stat, 1);
 
 	/* Deal with unexpected ATA data phase. */
 	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
 	    ((stat & DATA_READY) && !rq->nr_sectors))
-		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		return task_error(drive, rq, __FUNCTION__, stat, 1);
 
-	/* 
-	 * Complete previously submitted bios (if any).
-	 * Status was already verifyied.
-	 */
-	while (rq->bio != rq->cbio)
-		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
-			return ide_stopped;
-	/* Complete rq->buffer based request (ioctls). */
-	if (!rq->bio && !rq->nr_sectors) {
-		DRIVER(drive)->end_request(drive, 1, 0);
+	if (!rq->nr_sectors) {
+		drive->driver->end_request(drive, 1, rq->hard_nr_sectors);
 		return ide_stopped;
 	}
 
@@ -694,23 +674,15 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 
 	stat = HWIF(drive)->INB(IDE_STATUS_REG);
 	if (!OK_STAT(stat, DRIVE_READY, drive->bad_wstat))
-		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
 
 	/* Deal with unexpected ATA data phase. */
 	if ((!(stat & DATA_READY) && rq->nr_sectors) ||
 	    ((stat & DATA_READY) && !rq->nr_sectors))
-		return DRIVER(drive)->error(drive, __FUNCTION__, stat);
+		return task_error(drive, rq, __FUNCTION__, stat, drive->mult_count);
 
-	/* 
-	 * Complete previously submitted bios (if any).
-	 * Status was already verifyied.
-	 */
-	while (rq->bio != rq->cbio)
-		if (!DRIVER(drive)->end_request(drive, 1, bio_sectors(rq->bio)))
-			return ide_stopped;
-	/* Complete rq->buffer based request (ioctls). */
-	if (!rq->bio && !rq->nr_sectors) {
-		DRIVER(drive)->end_request(drive, 1, 0);
+	if (!rq->nr_sectors) {
+		drive->driver->end_request(drive, 1, rq->hard_nr_sectors);
 		return ide_stopped;
 	}
 
