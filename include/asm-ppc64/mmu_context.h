@@ -81,6 +81,8 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 {
 	long head;
 	unsigned long flags;
+	/* This does the right thing across a fork (I hope) */
+	unsigned long low_hpages = mm->context & CONTEXT_LOW_HPAGES;
 
 	spin_lock_irqsave(&mmu_context_queue.lock, flags);
 
@@ -91,6 +93,7 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 	head = mmu_context_queue.head;
 	mm->context = mmu_context_queue.elements[head];
+	mm->context |= low_hpages;
 
 	head = (head < LAST_USER_CONTEXT-1) ? head+1 : 0;
 	mmu_context_queue.head = head;
