@@ -539,7 +539,7 @@ ack_tx_int:
 	ZS_WSYNC(channel);
 }
 
-static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunzilog_port *up = dev_id;
 
@@ -587,6 +587,8 @@ static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		up = up->next;
 	}
+
+	return IRQ_HANDLED;
 }
 
 /* A convenient way to quickly get R0 status.  The caller must _not_ hold the
@@ -1029,9 +1031,9 @@ static struct uart_driver sunzilog_reg = {
 	.owner		=	THIS_MODULE,
 	.driver_name	=	"ttyS",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name	=	"tts/%d",
+	.dev_name	=	"tts/",
 #else
-	.dev_name	=	"ttyS%d",
+	.dev_name	=	"ttyS",
 #endif
 	.major		=	TTY_MAJOR,
 };

@@ -63,14 +63,15 @@ struct xtkbd {
 	char phys[32];
 };
 
-void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+irqreturn_t xtkbd_interrupt(struct serio *serio,
+	unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct xtkbd *xtkbd = serio->private;
 
 	switch (data) {
 		case XTKBD_EMUL0:
 		case XTKBD_EMUL1:
-			return;
+			break;
 		default:
 
 			if (xtkbd->keycode[data & XTKBD_KEY]) {
@@ -81,7 +82,8 @@ void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 				printk(KERN_WARNING "xtkbd.c: Unknown key (scancode %#x) %s.\n",
 					data & XTKBD_KEY, data & XTKBD_RELEASE ? "released" : "pressed");
 			}
-		}
+	}
+	return IRQ_HANDLED;
 }
 
 void xtkbd_connect(struct serio *serio, struct serio_dev *dev)

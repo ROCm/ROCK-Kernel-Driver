@@ -1295,7 +1295,6 @@ EXPORT_SYMBOL(highlevel_host_reset);
 /** nodemgr.c **/
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
-EXPORT_SYMBOL(hpsb_check_nodeid);
 EXPORT_SYMBOL(hpsb_node_fill_packet);
 EXPORT_SYMBOL(hpsb_node_read);
 EXPORT_SYMBOL(hpsb_node_write);

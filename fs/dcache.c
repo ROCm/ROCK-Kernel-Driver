@@ -155,12 +155,11 @@ repeat:
  	if (d_unhashed(dentry))
 		goto kill_it;
   	if (list_empty(&dentry->d_lru)) {
-  		dentry->d_vfs_flags &= ~DCACHE_REFERENCED;
+  		dentry->d_vfs_flags |= DCACHE_REFERENCED;
   		list_add(&dentry->d_lru, &dentry_unused);
   		dentry_stat.nr_unused++;
   	}
  	spin_unlock(&dentry->d_lock);
-	dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	spin_unlock(&dcache_lock);
 	return;
 
@@ -250,7 +249,6 @@ int d_invalidate(struct dentry * dentry)
 static inline struct dentry * __dget_locked(struct dentry *dentry)
 {
 	atomic_inc(&dentry->d_count);
-	dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	if (atomic_read(&dentry->d_count) == 1) {
 		dentry_stat.nr_unused--;
 		list_del_init(&dentry->d_lru);
@@ -379,17 +377,16 @@ static void prune_dcache(int count)
 		dentry = list_entry(tmp, struct dentry, d_lru);
 
  		spin_lock(&dentry->d_lock);
+		/* leave inuse dentries */
+ 		if (atomic_read(&dentry->d_count)) {
+ 			spin_unlock(&dentry->d_lock);
+			continue;
+		}
 		/* If the dentry was recently referenced, don't free it. */
 		if (dentry->d_vfs_flags & DCACHE_REFERENCED) {
 			dentry->d_vfs_flags &= ~DCACHE_REFERENCED;
-
-			/* don't add non zero d_count dentries 
-			 * back to d_lru list
-			 */
- 			if (!atomic_read(&dentry->d_count)) {
- 				list_add(&dentry->d_lru, &dentry_unused);
- 				dentry_stat.nr_unused++;
- 			}
+ 			list_add(&dentry->d_lru, &dentry_unused);
+ 			dentry_stat.nr_unused++;
  			spin_unlock(&dentry->d_lock);
 			continue;
 		}
@@ -538,13 +535,18 @@ resume:
 		struct list_head *tmp = next;
 		struct dentry *dentry = list_entry(tmp, struct dentry, d_child);
 		next = tmp->next;
-		list_del_init(&dentry->d_lru);
 
-		/* don't add non zero d_count dentries 
-		 * back to d_lru list
+		if (!list_empty(&dentry->d_lru)) {
+			dentry_stat.nr_unused--;
+			list_del_init(&dentry->d_lru);
+		}
+		/* 
+		 * move only zero ref count dentries to the end 
+		 * of the unused list for prune_dcache
 		 */
 		if (!atomic_read(&dentry->d_count)) {
 			list_add(&dentry->d_lru, dentry_unused.prev);
+			dentry_stat.nr_unused++;
 			found++;
 		}
 		/*
@@ -609,13 +611,18 @@ void shrink_dcache_anon(struct hlist_head *head)
 		spin_lock(&dcache_lock);
 		hlist_for_each(lp, head) {
 			struct dentry *this = hlist_entry(lp, struct dentry, d_hash);
-			list_del(&this->d_lru);
+			if (!list_empty(&this->d_lru)) {
+				dentry_stat.nr_unused--;
+				list_del(&this->d_lru);
+			}
 
-			/* don't add non zero d_count dentries 
-			 * back to d_lru list
+			/* 
+			 * move only zero ref count dentries to the end 
+			 * of the unused list for prune_dcache
 			 */
 			if (!atomic_read(&this->d_count)) {
 				list_add_tail(&this->d_lru, &dentry_unused);
+				dentry_stat.nr_unused++;
 				found++;
 			}
 		}
@@ -1017,7 +1024,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		if (likely(move_count == dentry->d_move_count)) {
 			if (!d_unhashed(dentry)) {
 				atomic_inc(&dentry->d_count);
-				dentry->d_vfs_flags |= DCACHE_REFERENCED;
 				found = dentry;
 			}
 		}

@@ -909,7 +909,7 @@ static struct {
 */
 static int     de4x5_open(struct net_device *dev);
 static int     de4x5_queue_pkt(struct sk_buff *skb, struct net_device *dev);
-static void    de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int     de4x5_close(struct net_device *dev);
 static struct  net_device_stats *de4x5_get_stats(struct net_device *dev);
 static void    de4x5_local_stats(struct net_device *dev, char *buf, int pkt_len);
@@ -1349,6 +1349,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct pci_dev *pdev)
     }
     
     /* The DE4X5-specific entries in the device structure. */
+    SET_MODULE_OWNER(dev);
     dev->open = &de4x5_open;
     dev->hard_start_xmit = &de4x5_queue_pkt;
     dev->stop = &de4x5_close;
@@ -1432,8 +1433,6 @@ de4x5_open(struct net_device *dev)
 	printk("\tstrr: 0x%08x\n", inl(DE4X5_STRR));
 	printk("\tsigr: 0x%08x\n", inl(DE4X5_SIGR));
     }
-    
-    MOD_INC_USE_COUNT;
     
     return status;
 }
@@ -1617,17 +1616,18 @@ de4x5_queue_pkt(struct sk_buff *skb, struct net_device *dev)
 ** is high and descriptor status bits cannot be set before the associated
 ** interrupt is asserted and this routine entered.
 */
-static void
+static irqreturn_t
 de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
     struct de4x5_private *lp;
     s32 imr, omr, sts, limit;
     u_long iobase;
+    unsigned int handled = 0;
     
     if (dev == NULL) {
 	printk ("de4x5_interrupt(): irq %d for unknown device.\n", irq);
-	return;
+	return IRQ_NONE;
     }
     lp = (struct de4x5_private *)dev->priv;
     spin_lock(&lp->lock);
@@ -1645,6 +1645,7 @@ de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outl(sts, DE4X5_STS);            /* Reset the board interrupts */
 	    
 	if (!(sts & lp->irq_mask)) break;/* All done */
+	handled = 1;
 	    
 	if (sts & (STS_RI | STS_RU))     /* Rx interrupt (packet[s] arrived) */
 	  de4x5_rx(dev);
@@ -1665,7 +1666,7 @@ de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    printk("%s: Fatal bus error occurred, sts=%#8x, device stopped.\n",
 		   dev->name, sts);
 	    spin_unlock(&lp->lock);
-	    return;
+	    return IRQ_HANDLED;
 	}
     }
 
@@ -1681,7 +1682,7 @@ de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     ENABLE_IRQs;
     spin_unlock(&lp->lock);
     
-    return;
+    return IRQ_RETVAL(handled);
 }
 
 static int
@@ -1923,8 +1924,6 @@ de4x5_close(struct net_device *dev)
     /* Free any socket buffers */
     de4x5_free_rx_buffs(dev);
     de4x5_free_tx_buffs(dev);
-    
-    MOD_DEC_USE_COUNT;
     
     /* Put the adapter to sleep to save power */
     yawn(dev, SLEEP);

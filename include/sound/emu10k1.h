@@ -30,6 +30,7 @@
 #include <sound/hwdep.h>
 #include <sound/ac97_codec.h>
 #include <sound/util_mem.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 
 #ifndef PCI_VENDOR_ID_CREATIVE
@@ -1014,7 +1015,7 @@ int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm);
 int snd_emu10k1_mixer(emu10k1_t * emu);
 int snd_emu10k1_fx8010_new(emu10k1_t *emu, int device, snd_hwdep_t ** rhwdep);
 
-void snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /* initialization */
 void snd_emu10k1_voice_init(emu10k1_t * emu, int voice);

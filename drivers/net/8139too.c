@@ -615,7 +615,7 @@ static void rtl8139_tx_timeout (struct net_device *dev);
 static void rtl8139_init_ring (struct net_device *dev);
 static int rtl8139_start_xmit (struct sk_buff *skb,
 			       struct net_device *dev);
-static void rtl8139_interrupt (int irq, void *dev_instance,
+static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
 			       struct pt_regs *regs);
 static int rtl8139_close (struct net_device *dev);
 static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
@@ -2029,7 +2029,7 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void rtl8139_interrupt (int irq, void *dev_instance,
+static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
 			       struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_instance;
@@ -2038,6 +2038,7 @@ static void rtl8139_interrupt (int irq, void *dev_instance,
 	void *ioaddr = tp->mmio_addr;
 	int ackstat, status;
 	int link_changed = 0; /* avoid bogus "uninit" warning */
+	int handled = 0;
 
 	spin_lock (&tp->lock);
 
@@ -2052,6 +2053,8 @@ static void rtl8139_interrupt (int irq, void *dev_instance,
 		     (PCIErr | PCSTimeout | RxUnderrun | RxOverflow |
 		      RxFIFOOver | TxErr | TxOK | RxErr | RxOK)) == 0)
 			break;
+
+		handled = 1;
 
 		/* Acknowledge all of the current interrupt sources ASAP, but
 		   an first get an additional status bit from CSCR. */
@@ -2097,6 +2100,7 @@ static void rtl8139_interrupt (int irq, void *dev_instance,
 
 	DPRINTK ("%s: exiting interrupt, intr_status=%#4.4x.\n",
 		 dev->name, RTL_R16 (IntrStatus));
+	return IRQ_RETVAL(handled);
 }
 
 

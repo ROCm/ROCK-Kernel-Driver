@@ -444,7 +444,7 @@ static void copy_ilv_block(struct woinst *woinst, u32 str, u8 *src, u32 len)
 	while (len) { 
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++) {
 			if (__copy_from_user((u8 *)(voice[voice_num].mem.addr[pg]) + pgoff, src, woinst->format.bytespervoicesample))
-				return -EFAULT;
+				return;
 			src += woinst->format.bytespervoicesample;
 		}
 

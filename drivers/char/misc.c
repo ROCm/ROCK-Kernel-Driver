@@ -167,7 +167,6 @@ static struct file_operations misc_fops = {
 int misc_register(struct miscdevice * misc)
 {
 	struct miscdevice *c;
-	char buf[256];
 	
 	if (misc->next || misc->prev)
 		return -EBUSY;
@@ -197,14 +196,21 @@ int misc_register(struct miscdevice * misc)
 		misc_minors[misc->minor >> 3] |= 1 << (misc->minor & 7);
 
 
-	/* yuck, yet another stupid special-casing.  We should rather
-	   add ->devfs_name to avoid this mess. */
-	snprintf(buf, sizeof(buf), strchr(misc->name, '/') ?
-			"%s" : "misc/%s", misc->name);
-	misc->devfs_handle = devfs_register(NULL, buf, 0,
-			MISC_MAJOR, misc->minor,
-			S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP,
-			misc->fops, NULL);
+	/*
+	 * please use it if you want to do fancy things with your
+	 * name...
+	 */
+	if (misc->devfs_name[0] == '\0') {
+		/* yuck, yet another stupid special-casing.
+		   whos actually using this?  Please switch over
+		   to ->devfs_name ASAP */
+		snprintf(misc->devfs_name, sizeof(misc->devfs_name),
+				strchr(misc->name, '/') ?
+				  "%s" : "misc/%s", misc->name);
+	}
+
+	devfs_register(NULL, misc->devfs_name, 0, MISC_MAJOR, misc->minor,
+			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->fops, NULL);
 
 	/*
 	 * Add it to the front, so that later devices can "override"
@@ -238,7 +244,7 @@ int misc_deregister(struct miscdevice * misc)
 	misc->next->prev = misc->prev;
 	misc->next = NULL;
 	misc->prev = NULL;
-	devfs_unregister (misc->devfs_handle);
+	devfs_remove(misc->devfs_name);
 	if (i < DYNAMIC_MINORS && i>0) {
 		misc_minors[i>>3] &= ~(1 << (misc->minor & 7));
 	}

@@ -773,7 +773,7 @@ static void gem_rx(struct gem *gp)
 		       gp->dev->name);
 }
 
-static void gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct gem *gp = dev->priv;
@@ -792,6 +792,8 @@ static void gem_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 out:
 	spin_unlock(&gp->lock);
+
+	return IRQ_HANDLED;
 }
 
 static void gem_tx_timeout(struct net_device *dev)

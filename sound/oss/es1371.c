@@ -887,7 +887,7 @@ static inline void dealloc_dmabuf(struct es1371_state *s, struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(s->dev, PAGE_SIZE << db->buforder, db->rawbuf, db->dmaaddr);
 	}
 	db->rawbuf = NULL;
@@ -913,7 +913,7 @@ static int prog_dmabuf(struct es1371_state *s, struct dmabuf *db, unsigned rate,
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 	fmt &= ES1371_FMT_MASK;
 	bytepersec = rate << sample_shift[fmt];
@@ -1091,7 +1091,7 @@ static void es1371_handle_midi(struct es1371_state *s)
 	outb((s->midi.ocnt > 0) ? UCTRL_RXINTEN | UCTRL_ENA_TXINT : UCTRL_RXINTEN, s->io+ES1371_REG_UART_CONTROL);
 }
 
-static void es1371_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t es1371_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct es1371_state *s = (struct es1371_state *)dev_id;
 	unsigned int intsrc, sctl;
@@ -1099,7 +1099,7 @@ static void es1371_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inl(s->io+ES1371_REG_STATUS);
 	if (!(intsrc & 0x80000000))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	/* clear audio interrupts first */
 	sctl = s->sctrl;
@@ -1114,6 +1114,7 @@ static void es1371_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	es1371_update_ptr(s);
 	es1371_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */

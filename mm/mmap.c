@@ -355,6 +355,26 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
+ * If the vma has a ->close operation then the driver probably needs to release
+ * per-vma resources, so we don't attempt to merge those.
+ */
+#define VM_SPECIAL (VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_RESERVED)
+
+static inline int is_mergeable_vma(struct vm_area_struct *vma,
+			struct file *file, unsigned long vm_flags)
+{
+	if (vma->vm_ops && vma->vm_ops->close)
+		return 0;
+	if (vma->vm_file != file)
+		return 0;
+	if (vma->vm_flags != vm_flags)
+		return 0;
+	if (vma->vm_private_data)
+		return 0;
+	return 1;
+}
+
+/*
  * Return true if we can merge this (vm_flags,file,vm_pgoff,size)
  * in front of (at a lower virtual address and file offset than) the vma.
  *
@@ -366,9 +386,7 @@ static int
 can_vma_merge_before(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff, unsigned long size)
 {
-	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
-		return 0;
-	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
+	if (is_mergeable_vma(vma, file, vm_flags)) {
 		if (!file)
 			return 1;	/* anon mapping */
 		if (vma->vm_pgoff == vm_pgoff + size)
@@ -385,9 +403,7 @@ static int
 can_vma_merge_after(struct vm_area_struct *vma, unsigned long vm_flags,
 	struct file *file, unsigned long vm_pgoff)
 {
-	if ((vma->vm_flags & VM_DONTEXPAND) || (vm_flags & VM_DONTEXPAND))
-		return 0;
-	if (vma->vm_file == file && vma->vm_flags == vm_flags) {
+	if (is_mergeable_vma(vma, file, vm_flags)) {
 		unsigned long vma_size;
 
 		if (!file)
@@ -412,6 +428,13 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 {
 	spinlock_t * lock = &mm->page_table_lock;
 
+	/*
+	 * We later require that vma->vm_flags == vm_flags, so this tests
+	 * vma->vm_flags & VM_SPECIAL, too.
+	 */
+	if (vm_flags & VM_SPECIAL)
+		return 0;
+
 	if (!prev) {
 		prev = rb_entry(rb_parent, struct vm_area_struct, vm_rb);
 		goto merge_next;
@@ -421,6 +444,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 	 * Can it merge with the predecessor?
 	 */
 	if (prev->vm_end == addr &&
+			is_mergeable_vma(prev, file, vm_flags) &&
 			can_vma_merge_after(prev, vm_flags, file, pgoff)) {
 		struct vm_area_struct *next;
 		struct inode *inode = file ? file->f_dentry->d_inode : NULL;

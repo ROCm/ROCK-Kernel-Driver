@@ -332,17 +332,17 @@ ctc_tty_tint(ctc_tty_info * info)
  ************************************************************/
 
 static inline int
-ctc_tty_paranoia_check(ctc_tty_info * info, kdev_t device, const char *routine)
+ctc_tty_paranoia_check(ctc_tty_info * info, char *name, const char *routine)
 {
 #ifdef MODEM_PARANOIA_CHECK
 	if (!info) {
-		printk(KERN_WARNING "ctc_tty: null info_struct for (%d, %d) in %s\n",
-		       major(device), minor(device), routine);
+		printk(KERN_WARNING "ctc_tty: null info_struct for %s in %s\n",
+		       name, routine);
 		return 1;
 	}
 	if (info->magic != CTC_ASYNC_MAGIC) {
-		printk(KERN_WARNING "ctc_tty: bad magic for info struct (%d, %d) in %s\n",
-		       major(device), minor(device), routine);
+		printk(KERN_WARNING "ctc_tty: bad magic for info struct %s in %s\n",
+		       name, routine);
 		return 1;
 	}
 #endif
@@ -502,7 +502,7 @@ ctc_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int cou
 
 	if (ctc_tty_shuttingdown)
 		return 0;
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_write"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_write"))
 		return 0;
 	if (!tty)
 		return 0;
@@ -551,7 +551,7 @@ ctc_tty_write_room(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_write_room"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_write_room"))
 		return 0;
 	return CTC_TTY_XMIT_SIZE;
 }
@@ -561,7 +561,7 @@ ctc_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_chars_in_buffer"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_chars_in_buffer"))
 		return 0;
 	return 0;
 }
@@ -576,7 +576,7 @@ ctc_tty_flush_buffer(struct tty_struct *tty)
 		return;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
 	info = (ctc_tty_info *) tty->driver_data;
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_flush_buffer")) {
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_flush_buffer")) {
 		spin_unlock_irqrestore(&ctc_tty_lock, flags);
 		return;
 	}
@@ -596,7 +596,7 @@ ctc_tty_flush_chars(struct tty_struct *tty)
 
 	if (ctc_tty_shuttingdown)
 		return;
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_flush_chars"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_flush_chars"))
 		return;
 	if (tty->stopped || tty->hw_stopped || (!skb_queue_len(&info->tx_queue)))
 		return;
@@ -616,7 +616,7 @@ ctc_tty_throttle(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_throttle"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_throttle"))
 		return;
 	info->mcr &= ~UART_MCR_RTS;
 	if (I_IXOFF(tty))
@@ -629,7 +629,7 @@ ctc_tty_unthrottle(struct tty_struct *tty)
 {
 	ctc_tty_info *info = (ctc_tty_info *) tty->driver_data;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_unthrottle"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_unthrottle"))
 		return;
 	info->mcr |= UART_MCR_RTS;
 	if (I_IXOFF(tty))
@@ -744,7 +744,7 @@ ctc_tty_ioctl(struct tty_struct *tty, struct file *file,
 	int error;
 	int retval;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_ioctl"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_ioctl"))
 		return -ENODEV;
 	if (tty->flags & (1 << TTY_IO_ERROR))
 		return -EIO;
@@ -973,17 +973,17 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 	int retval,
 	 line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if (line < 0 || line > CTC_TTY_MAX_DEVICES)
 		return -ENODEV;
 	info = &driver->info[line];
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_open"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_open"))
 		return -ENODEV;
 	if (!info->netdev)
 		return -ENODEV;
 #ifdef CTC_DEBUG_MODEM_OPEN
-	printk(KERN_DEBUG "ctc_tty_open %s%d, count = %d\n", tty->driver.name,
-	       info->line, info->count);
+	printk(KERN_DEBUG "ctc_tty_open %s, count = %d\n", tty->name,
+	       info->count);
 #endif
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	info->count++;
@@ -1012,7 +1012,7 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 		ctc_tty_change_speed(info);
 	}
 #ifdef CTC_DEBUG_MODEM_OPEN
-	printk(KERN_DEBUG "ctc_tty_open %s%d successful...\n", CTC_TTY_NAME, info->line);
+	printk(KERN_DEBUG "ctc_tty_open %s successful...\n", tty->name);
 #endif
 	return 0;
 }
@@ -1024,7 +1024,7 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 	ulong flags;
 	ulong timeout;
 
-	if (!info || ctc_tty_paranoia_check(info, tty->device, "ctc_tty_close"))
+	if (!info || ctc_tty_paranoia_check(info, tty->name, "ctc_tty_close"))
 		return;
 	spin_lock_irqsave(&ctc_tty_lock, flags);
 	if (tty_hung_up_p(filp)) {
@@ -1091,8 +1091,8 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		}
 	}
 	ctc_tty_shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	info->tty = 0;
@@ -1119,7 +1119,7 @@ ctc_tty_hangup(struct tty_struct *tty)
 	ctc_tty_info *info = (ctc_tty_info *)tty->driver_data;
 	unsigned long saveflags;
 
-	if (ctc_tty_paranoia_check(info, tty->device, "ctc_tty_hangup"))
+	if (ctc_tty_paranoia_check(info, tty->name, "ctc_tty_hangup"))
 		return;
 	ctc_tty_shutdown(info);
 	info->count = 0;

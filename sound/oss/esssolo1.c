@@ -423,7 +423,7 @@ static inline void dealloc_dmabuf(struct solo1_state *s, struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(s->dev, PAGE_SIZE << db->buforder, db->rawbuf, db->dmaaddr);
 	}
 	db->rawbuf = NULL;
@@ -449,7 +449,7 @@ static int prog_dmabuf(struct solo1_state *s, struct dmabuf *db)
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 	if (s->fmt & (AFMT_S16_LE | AFMT_U16_LE))
 		sample_shift++;
@@ -1694,7 +1694,7 @@ static void solo1_handle_midi(struct solo1_state *s)
 		wake_up(&s->midi.owait);
 }
 
-static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct solo1_state *s = (struct solo1_state *)dev_id;
 	unsigned int intsrc;
@@ -1702,7 +1702,7 @@ static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inb(s->iobase+7); /* get interrupt source(s) */
 	if (!intsrc)
-		return;
+		return IRQ_NONE;
 	(void)inb(s->sbbase+0xe);  /* clear interrupt */
 	spin_lock(&s->lock);
 	/* clear audio interrupts first */
@@ -1711,6 +1711,7 @@ static void solo1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	solo1_update_ptr(s);
 	solo1_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 static void solo1_midi_timer(unsigned long data)

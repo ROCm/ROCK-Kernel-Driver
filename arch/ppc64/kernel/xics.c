@@ -319,12 +319,14 @@ int xics_get_irq(struct pt_regs *regs)
 
 extern struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
-void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
+	int handled = 0;
 
 	ops->qirr_info(cpu, 0xff);
 	while (xics_ipi_message[cpu].value) {
+		handled = 1;
 		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION,
 				       &xics_ipi_message[cpu].value)) {
 			mb();
@@ -350,6 +352,7 @@ void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 		}
 #endif
 	}
+	return IRQ_RETVAL(handled);
 }
 
 void xics_cause_IPI(int cpu)
@@ -457,7 +460,7 @@ nextnode:
 		xics_irq_8259_cascade = virt_irq_create_mapping(xics_irq_8259_cascade_real);
 	}
 
-	if (naca->platform == PLATFORM_PSERIES) {
+	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for (i = 0; i < NR_CPUS; ++i) {
 			if (!cpu_possible(i))
@@ -474,7 +477,7 @@ nextnode:
 	/* actually iSeries does not use any of xics...but it has link dependencies
 	 * for now, except this new one...
 	 */
-	} else if (naca->platform == PLATFORM_PSERIES_LPAR) {
+	} else if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 		ops = &pSeriesLP_ops;
 #endif
 	}

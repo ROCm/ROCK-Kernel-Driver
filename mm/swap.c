@@ -21,7 +21,7 @@
 #include <linux/pagevec.h>
 #include <linux/init.h>
 #include <linux/mm_inline.h>
-#include <linux/buffer_head.h>
+#include <linux/buffer_head.h>	/* for try_to_release_page() */
 #include <linux/percpu.h>
 
 /* How many pages do we try to swap or page in/out together? */

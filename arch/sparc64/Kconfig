@@ -114,7 +114,7 @@ config SMP
 	  See also the <file:Documentation/smp.tex>,
 	  <file:Documentation/smp.txt>, <file:Documentation/i386/IO-APIC.txt>,
 	  <file:Documentation/nmi_watchdog.txt> and the SMP-HOWTO available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
 
@@ -281,7 +281,7 @@ config PCMCIA
 	  To use your PC-cards, you will need supporting software from David
 	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
 	  for location).  Please also read the PCMCIA-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -314,7 +314,7 @@ config PCI
 	  VESA. If you have PCI, say Y, otherwise N.
 
 	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
@@ -426,7 +426,7 @@ config BINFMT_ELF
 	  want to say Y here.
 
 	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you find that after upgrading from Linux kernel 1.2 and saying Y
 	  here, you still can't run any ELF binaries (they just crash), then
@@ -448,7 +448,7 @@ config BINFMT_MISC
 	  programs that need an interpreter to run like Java, Python or
 	  Emacs-Lisp. It's also useful if you often run DOS executables under
 	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  <http://www.tldp.org/docs.html#howto>). Once you have
 	  registered such a binary class with the kernel, you can start one of
 	  those programs simply by typing in its name at a shell prompt; Linux
 	  will automatically feed it to the correct interpreter.
@@ -496,7 +496,7 @@ config PRINTER
 	  box (as opposed to using a serial printer; if the connector at the
 	  printer has 9 or 25 holes ["female"], then it's serial), say Y.
 	  Also read the Printing-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
@@ -804,7 +804,7 @@ config BLK_DEV_SD
 	  If you want to use a SCSI hard disk or the SCSI or parallel port
 	  version of the IOMEGA ZIP drive under Linux, say Y and read the
 	  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. This is NOT for SCSI
+	  <http://www.tldp.org/docs.html#howto>. This is NOT for SCSI
 	  CD-ROMs.
 
 	  This driver is also available as a module ( = code which can be
@@ -839,7 +839,7 @@ config CHR_DEV_ST
 	---help---
 	  If you want to use a SCSI tape drive under Linux, say Y and read the
 	  SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, and
+	  <http://www.tldp.org/docs.html#howto>, and
 	  <file:Documentation/scsi/st.txt> in the kernel source.  This is NOT
 	  for SCSI CD-ROMs.
 
@@ -861,7 +861,7 @@ config CHR_DEV_OSST
 	  tape drives (ADR-x0) that supports the standard SCSI-2 commands for
 	  tapes (QIC-157) and can be driven by the standard driver st.
 	  For more information, you may have a look at the SCSI-HOWTO
-	  <http://www.linuxdoc.org/docs.html#howto>  and
+	  <http://www.tldp.org/docs.html#howto>  and
 	  <file:Documentation/scsi/osst.txt>  in the kernel source.
 	  More info on the OnStream driver may be found on
 	  <http://linux1.onstream.nl/test/>
@@ -880,7 +880,7 @@ config BLK_DEV_SR
 	---help---
 	  If you want to use a SCSI CD-ROM under Linux, say Y and read the
 	  SCSI-HOWTO and the CD-ROM-HOWTO at
-	  <http://www.linuxdoc.org/docs.html#howto>. Also make sure to say Y
+	  <http://www.tldp.org/docs.html#howto>. Also make sure to say Y
 	  or M to "ISO 9660 CD-ROM file system support" later.
 
 	  This driver is also available as a module ( = code which can be
@@ -1060,7 +1060,7 @@ config SCSI_AIC7XXX_OLD
 	  configuration options. You should read
 	  <file:Documentation/scsi/aic7xxx_old.txt> at a minimum before
 	  contacting the maintainer with any questions.  The SCSI-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>, can also
+	  available from <http://www.tldp.org/docs.html#howto>, can also
 	  be of great help.
 
 	  If you want to compile this driver as a module ( = code which can be
@@ -1406,7 +1406,7 @@ config SCSI_QLOGIC_ISP
 
 	  Please read the file <file:Documentation/scsi/qlogicisp.txt>.  You
 	  should also read the SCSI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1586,7 +1586,7 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
 	  <file:Documentation/sound/README.OSS> contains some slightly

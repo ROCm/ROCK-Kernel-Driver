@@ -32,11 +32,7 @@
 #include <linux/pci.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
-
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>
-#endif
-
+#include <linux/initrd.h>
 #ifdef CONFIG_MAGIC_SYSRQ
 #include <linux/sysrq.h>
 #include <linux/reboot.h>

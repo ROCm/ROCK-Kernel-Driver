@@ -15,7 +15,7 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_pci.o       iSeries_pci_reset.o \
 			     iSeries_IoMmTable.o iSeries_irq.o \
 			     iSeries_VpdInfo.o   XmPciLpEvent.o \
 			     HvCall.o HvLpConfig.o LparData.o mf_proc.o \
-			     proc_pmc.o iSeries_setup.o ItLpQueue.o hvCall.o \
+			     iSeries_setup.o ItLpQueue.o hvCall.o \
 			     mf.o HvLpEvent.o iSeries_proc.o 
 
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
@@ -25,6 +25,7 @@ obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
 obj-y			  += open_pic.o xics.o pSeries_htab.o rtas.o \
 			     chrp_setup.o i8259.o ras.o prom.o 
 
+obj-$(CONFIG_PROC_FS)		+= proc_ppc64.o
 obj-$(CONFIG_RTAS_FLASH)	+= rtas_flash.o
 obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o

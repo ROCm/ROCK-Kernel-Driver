@@ -15,7 +15,7 @@
 /* include comes from machine specific directory */
 #include "irq_vectors.h"
 
-static __inline__ int irq_cannonicalize(int irq)
+static __inline__ int irq_canonicalize(int irq)
 {
 	return ((irq == 2) ? 9 : irq);
 }

@@ -8,7 +8,7 @@
 /*
  *  
  *  This file contains the register definitions for the Excalibur
- *  Interrupnt controller INT_CTRL00.
+ *  Interrupt controller INT_CTRL00.
  *
  *  Copyright (C) 2001 Altera Corporation
  *

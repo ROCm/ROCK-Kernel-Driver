@@ -64,7 +64,7 @@
 #include <linux/pci.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
@@ -349,7 +349,7 @@ sandpoint_get_irq(struct pt_regs *regs)
 }
 
 static u32
-sandpoint_irq_cannonicalize(u32 irq)
+sandpoint_irq_canonicalize(u32 irq)
 {
 	if (irq == 2)
 	{
@@ -602,7 +602,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch = sandpoint_setup_arch;
 	ppc_md.show_cpuinfo = sandpoint_show_cpuinfo;
-	ppc_md.irq_cannonicalize = sandpoint_irq_cannonicalize;
+	ppc_md.irq_canonicalize = sandpoint_irq_canonicalize;
 	ppc_md.init_IRQ = sandpoint_init_IRQ;
 	ppc_md.get_irq = sandpoint_get_irq;
 	ppc_md.init = sandpoint_init2;

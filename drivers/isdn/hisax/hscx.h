@@ -10,6 +10,8 @@
  *
  */
 
+#include <linux/interrupt.h>
+
 /* All Registers original Siemens Spec  */
 
 #define HSCX_ISTA 0x20
@@ -37,7 +39,7 @@
 extern void modehscx(struct BCState *bcs, int mode, int bc);
 extern void inithscxisac(struct IsdnCardState *cs);
 extern void hscx_int_main(struct IsdnCardState *cs, u8 val);
-extern void hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs);
+extern irqreturn_t hscxisac_irq(int intno, void *dev_id, struct pt_regs *regs);
 extern int  hscxisac_setup(struct IsdnCardState *cs,
 			   struct dc_hw_ops *isac_ops,
 			   struct bc_hw_ops *hscx_ops);

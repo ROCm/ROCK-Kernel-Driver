@@ -36,7 +36,6 @@
 #include <linux/list.h>
 #include <linux/config.h>
 #include <linux/device.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <asm/ocp_ids.h>
 #include <asm/mmu.h>		/* For phys_addr_t */

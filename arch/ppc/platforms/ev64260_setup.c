@@ -25,7 +25,7 @@
 #include <linux/pci.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
@@ -437,7 +437,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch = ev64260_setup_arch;
 	ppc_md.show_cpuinfo = ev64260_show_cpuinfo;
-	ppc_md.irq_cannonicalize = NULL;
+	ppc_md.irq_canonicalize = NULL;
 	ppc_md.init_IRQ = ev64260_init_irq;
 	ppc_md.get_irq = gt64260_get_irq;
 	ppc_md.init = NULL;

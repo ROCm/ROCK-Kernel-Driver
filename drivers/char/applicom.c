@@ -108,7 +108,7 @@ static ssize_t ac_read (struct file *, char *, size_t, loff_t *);
 static ssize_t ac_write (struct file *, const char *, size_t, loff_t *);
 static int ac_ioctl(struct inode *, struct file *, unsigned int,
 		    unsigned long);
-static void ac_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t ac_interrupt(int, void *, struct pt_regs *);
 
 static struct file_operations ac_fops = {
 	.owner = THIS_MODULE,
@@ -606,11 +606,12 @@ static ssize_t ac_read (struct file *filp, char *buf, size_t count, loff_t *ptr)
 	} 
 }
 
-static void ac_interrupt(int vec, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t ac_interrupt(int vec, void *dev_instance, struct pt_regs *regs)
 {
 	unsigned int i;
 	unsigned int FlagInt;
 	unsigned int LoopCount;
+	int handled = 0;
 
 	//    printk("Applicom interrupt on IRQ %d occurred\n", vec);
 
@@ -632,6 +633,7 @@ static void ac_interrupt(int vec, void *dev_instance, struct pt_regs *regs)
 				continue;
 			}
 
+			handled = 1;
 			FlagInt = 1;
 			writeb(0, apbs[i].RamIO + RAM_IT_TO_PC);
 
@@ -675,6 +677,7 @@ static void ac_interrupt(int vec, void *dev_instance, struct pt_regs *regs)
 		else
 			LoopCount++;
 	} while(LoopCount < 2);
+	return IRQ_RETVAL(handled);
 }
 
 

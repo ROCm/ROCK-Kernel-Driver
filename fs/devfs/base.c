@@ -763,7 +763,6 @@ struct directory_type
 
 struct bdev_type
 {
-    struct block_device_operations *ops;
     dev_t dev;
 };
 
@@ -1442,7 +1441,6 @@ static void devfsd_notify (struct devfs_entry *de,unsigned short type)
  *		this to whatever you like, and change it once the file is opened (the next
  *		file opened will not see this change).
  *
- *	Returns a handle which may later be used in a call to devfs_unregister().
  *	On failure %NULL is returned.
  */
 
@@ -1457,6 +1455,8 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 
     /* we don't accept any flags anymore.  prototype will change soon. */
     WARN_ON(flags);
+    WARN_ON(dir);
+    WARN_ON(!S_ISCHR(mode));
 
     if (name == NULL)
     {
@@ -1491,7 +1491,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     } else if (S_ISBLK (mode)) {
 	de->u.bdev.dev = dev;
 	de->u.cdev.autogen = devnum != 0;
-	de->u.bdev.ops = ops;
     } else {
 	PRINTK ("(%s): illegal mode: %x\n", name, mode);
 	devfs_put (de);
@@ -1515,6 +1514,52 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     devfs_put (dir);
     return de;
 }   /*  End Function devfs_register  */
+
+
+int devfs_mk_bdev(dev_t dev, umode_t mode, const char *fmt, ...)
+{
+	struct devfs_entry *dir = NULL, *de;
+	char buf[64];
+	va_list args;
+	int error, n;
+
+	if (!S_ISBLK(mode)) {
+		printk(KERN_WARNING "%s: invalide mode (%u) for %s\n",
+				__FUNCTION__, mode, buf);
+		return -EINVAL;
+	}
+
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid format string\n",
+				__FUNCTION__);
+		return -EINVAL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, mode);
+	if (!de) {
+		printk(KERN_WARNING "%s: could not prepare leaf for %s\n",
+				__FUNCTION__, buf);
+		return -ENOMEM;		/* could be more accurate... */
+	}
+
+	de->u.bdev.dev = dev;
+
+	error = _devfs_append_entry(dir, de, NULL);
+	if (error) {
+		printk(KERN_WARNING "%s: could not append to parent for %s\n",
+				__FUNCTION__, buf);
+		goto out;
+	}
+
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
+ out:
+	devfs_put(dir);
+	return error;
+}
+
+EXPORT_SYMBOL(devfs_mk_bdev);
 
 
 /**
@@ -1577,24 +1622,6 @@ static void _devfs_unregister (struct devfs_entry *dir, struct devfs_entry *de)
 	devfs_put (child);
     }
 }   /*  End Function _devfs_unregister  */
-
-
-/**
- *	devfs_unregister - Unregister a device entry.
- *	@de: A handle previously created by devfs_register() or returned from
- *		devfs_get_handle(). If this is %NULL the routine does nothing.
- */
-
-void devfs_unregister (devfs_handle_t de)
-{
-    VERIFY_ENTRY (de);
-    if ( (de == NULL) || (de->parent == NULL) ) return;
-    DPRINTK (DEBUG_UNREGISTER, "(%s): de: %p  refcount: %d\n",
-	     de->name, de, atomic_read (&de->refcount) );
-    write_lock (&de->parent->u.dir.lock);
-    _devfs_unregister (de->parent, de);
-    devfs_put (de);
-}   /*  End Function devfs_unregister  */
 
 static int devfs_do_symlink (devfs_handle_t dir, const char *name,
 			     const char *link, devfs_handle_t *handle)
@@ -1678,45 +1705,42 @@ int devfs_mk_symlink(const char *from, const char *to)
  *	Use of this function is optional. The devfs_register() function
  *	will automatically create intermediate directories as needed. This function
  *	is provided for efficiency reasons, as it provides a handle to a directory.
- *	Returns a handle which may later be used in a call to devfs_unregister().
  *	On failure %NULL is returned.
  */
 
-devfs_handle_t devfs_mk_dir(const char *fmt, ...)
+int devfs_mk_dir(const char *fmt, ...)
 {
 	struct devfs_entry *dir = NULL, *de = NULL, *old;
 	char buf[64];
 	va_list args;
-	int n;
+	int error, n;
 
 	va_start(args, fmt);
 	n = vsnprintf(buf, 64, fmt, args);
 	if (n >= 64 || !buf[0]) {
 		printk(KERN_WARNING "%s: invalid argument.", __FUNCTION__);
-		return NULL;
+		return -EINVAL;
 	}
 
 	de = _devfs_prepare_leaf(&dir, buf, MODE_DIR);
 	if (!de) {
 		PRINTK("(%s): could not prepare leaf\n", buf);
-		return NULL;
+		return -EINVAL;
 	}
 
-	de->info = NULL;
-	if (_devfs_append_entry(dir, de, &old)) {
+	error = _devfs_append_entry(dir, de, &old);
+	if (error) {
 		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
 				buf, dir, dir->name);
 		devfs_put(old);
 		goto out_put;
 	}
 	
-	DPRINTK(DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
-			buf, de, dir, dir->name);
 	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED);
 
  out_put:
 	devfs_put(dir);
-	return de;
+	return error;
 }
 
 
@@ -1730,7 +1754,10 @@ void devfs_remove(const char *fmt, ...)
 	n = vsnprintf(buf, 64, fmt, args);
 	if (n < 64 && buf[0]) {
 		devfs_handle_t de = _devfs_find_entry(NULL, buf, 0);
-		devfs_unregister(de);
+
+		write_lock(&de->parent->u.dir.lock);
+		_devfs_unregister(de->parent, de);
+		devfs_put(de);
 		devfs_put(de);
 	}
 }
@@ -1863,7 +1890,6 @@ __setup("devfs=", devfs_setup);
 
 EXPORT_SYMBOL(devfs_put);
 EXPORT_SYMBOL(devfs_register);
-EXPORT_SYMBOL(devfs_unregister);
 EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);

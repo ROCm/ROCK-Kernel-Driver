@@ -398,15 +398,17 @@ int __devinit snd_ice1712_init_cs8427(ice1712_t *ice, int addr)
  *  Interrupt handler
  */
 
-static void snd_ice1712_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_ice1712_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return);
 	unsigned char status;
+	int handled = 0;
 
 	while (1) {
 		status = inb(ICEREG(ice, IRQSTAT));
 		if (status == 0)
 			break;
+		handled = 1;
 		if (status & ICE1712_IRQ_MPU1) {
 			if (ice->rmidi[0])
 				snd_mpu401_uart_interrupt(irq, ice->rmidi[0]->private_data, regs);
@@ -462,6 +464,7 @@ static void snd_ice1712_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			outb(ICE1712_IRQ_CONPBK, ICEREG(ice, IRQSTAT));
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 

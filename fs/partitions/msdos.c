@@ -214,12 +214,12 @@ parse_solaris_x86(struct parsed_partitions *state, struct block_device *bdev,
 #endif
 }
 
-#ifdef CONFIG_BSD_DISKLABEL
+#if defined(CONFIG_BSD_DISKLABEL) || defined(CONFIG_NEC98_PARTITION)
 /* 
  * Create devices for BSD partitions listed in a disklabel, under a
  * dos-like partition. See parse_extended() for more information.
  */
-static void
+void
 parse_bsd(struct parsed_partitions *state, struct block_device *bdev,
 		u32 offset, u32 size, int origin, char *flavour,
 		int max_partitions)

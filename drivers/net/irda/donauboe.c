@@ -1193,7 +1193,7 @@ dumpbufs(skb->data,skb->len,'>');
 }
 
 /*interrupt handler */
-STATIC void
+STATIC irqreturn_t
 toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
   struct toshoboe_cb *self = (struct toshoboe_cb *) dev_id;
@@ -1201,13 +1201,13 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
   struct sk_buff *skb = NULL;
 
   if (self == NULL && toshoboe_invalid_dev(irq)) 
-    return;
+    return IRQ_NONE;
 
   irqstat = INB (OBOE_ISR);
 
 /* was it us */
   if (!(irqstat & OBOE_INT_MASK))
-      return;
+      return IRQ_NONE;
 
 /* Ack all the interrupts */
   OUTB (irqstat, OBOE_ISR);
@@ -1381,6 +1381,7 @@ dumpbufs(self->rx_bufs[self->rxs],len,'<');
       IRDA_DEBUG (1, "%s.sip:%x(%x)%x\n", __FUNCTION__
 	      ,self->int_sip,irqstat,self->txpending);
     }
+  return IRQ_HANDLED;
 }
 
 STATIC int

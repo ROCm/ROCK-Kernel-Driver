@@ -45,7 +45,6 @@
 
 struct dvb_adapter {
 	int num;
-	devfs_handle_t devfs_handle;
 	struct list_head list_head;
 	struct list_head device_list;
 	const char *name;
@@ -55,7 +54,6 @@ struct dvb_adapter {
 struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
-	devfs_handle_t devfs_handle;
 	struct dvb_adapter *adapter;
 	int type;
 	u32 id;

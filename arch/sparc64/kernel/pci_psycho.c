@@ -713,7 +713,7 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
 #define  PSYCHO_UEAFSR_RESV2	0x00000000007fffff /* Reserved                     */
 #define PSYCHO_UE_AFAR	0x0038UL
 
-static void psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + PSYCHO_UE_AFSR;
@@ -730,7 +730,7 @@ static void psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(PSYCHO_UEAFSR_PPIO | PSYCHO_UEAFSR_PDRD | PSYCHO_UEAFSR_PDWR |
 		 PSYCHO_UEAFSR_SPIO | PSYCHO_UEAFSR_SDRD | PSYCHO_UEAFSR_SDWR);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -769,6 +769,8 @@ static void psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Interrogate IOMMU for error status. */
 	psycho_check_iommu_error(p, afsr, afar, UE_ERR);
+
+	return IRQ_HANDLED;
 }
 
 /* Correctable Errors. */
@@ -788,7 +790,7 @@ static void psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define  PSYCHO_CEAFSR_RESV2	0x00000000007fffff /* Reserved                     */
 #define PSYCHO_CE_AFAR	0x0040UL
 
-static void psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
 	unsigned long afsr_reg = p->controller_regs + PSYCHO_CE_AFSR;
@@ -805,7 +807,7 @@ static void psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 		(PSYCHO_CEAFSR_PPIO | PSYCHO_CEAFSR_PDRD | PSYCHO_CEAFSR_PDWR |
 		 PSYCHO_CEAFSR_SPIO | PSYCHO_CEAFSR_SDRD | PSYCHO_CEAFSR_SDWR);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -847,10 +849,12 @@ static void psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (!reported)
 		printk("(none)");
 	printk("]\n");
+
+	return IRQ_HANDLED;
 }
 
 /* PCI Errors.  They are signalled by the PCI bus module since they
- * are assosciated with a specific bus segment.
+ * are associated with a specific bus segment.
  */
 #define PSYCHO_PCI_AFSR_A	0x2010UL
 #define PSYCHO_PCI_AFSR_B	0x4010UL
@@ -871,7 +875,7 @@ static void psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 #define PSYCHO_PCI_AFAR_A	0x2018UL
 #define PSYCHO_PCI_AFAR_B	0x4018UL
 
-static void psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_pbm_info *pbm = dev_id;
 	struct pci_controller_info *p = pbm->parent;
@@ -899,7 +903,7 @@ static void psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 PSYCHO_PCIAFSR_SMA | PSYCHO_PCIAFSR_STA |
 		 PSYCHO_PCIAFSR_SRTRY | PSYCHO_PCIAFSR_SPERR);
 	if (!error_bits)
-		return;
+		return IRQ_NONE;
 	psycho_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -968,6 +972,8 @@ static void psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (error_bits & (PSYCHO_PCIAFSR_PPERR | PSYCHO_PCIAFSR_SPERR))
 		pci_scan_for_parity_error(p, pbm, pbm->pci_bus);
+
+	return IRQ_HANDLED;
 }
 
 /* XXX What about PowerFail/PowerManagement??? -DaveM */

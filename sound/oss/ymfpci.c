@@ -1016,7 +1016,7 @@ static int ymf_capture_prepare(struct ymf_state *state)
 	return 0;
 }
 
-void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ymfpci_t *codec = dev_id;
 	u32 status, nvoice, mode;
@@ -1050,6 +1050,7 @@ void ymf_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		/* timer handler */
 		ymfpci_writel(codec, YDSXGR_INTFLAG, ~0);
 	}
+	return IRQ_HANDLED;
 }
 
 static void ymf_pcm_free_substream(struct ymf_pcm *ypcm)

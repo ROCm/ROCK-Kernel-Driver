@@ -21,7 +21,7 @@ config PCMCIA
 	  To use your PC-cards, you will need supporting software from David
 	  Hinds' pcmcia-cs package (see the file <file:Documentation/Changes>
 	  for location).  Please also read the PCMCIA-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).

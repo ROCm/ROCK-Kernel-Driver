@@ -709,7 +709,7 @@ static void dealloc_dmabuf(struct sv_state *s, struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(s->dev, PAGE_SIZE << db->buforder, db->rawbuf, db->dmaaddr);
 	}
 	db->rawbuf = NULL;
@@ -760,7 +760,7 @@ static int prog_dmabuf(struct sv_state *s, unsigned rec)
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 	bytepersec = rate << sample_shift[fmt];
 	bufs = PAGE_SIZE << db->buforder;
@@ -899,7 +899,7 @@ static void sv_handle_midi(struct sv_state *s)
 		wake_up(&s->midi.owait);
 }
 
-static void sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct sv_state *s = (struct sv_state *)dev_id;
 	unsigned int intsrc;
@@ -907,11 +907,12 @@ static void sv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inb(s->ioenh + SV_CODEC_STATUS);
 	if (!(intsrc & (SV_CSTAT_DMAA | SV_CSTAT_DMAC | SV_CSTAT_MIDI)))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	sv_update_ptr(s);
 	sv_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 static void sv_midi_timer(unsigned long data)

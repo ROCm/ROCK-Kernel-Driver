@@ -120,20 +120,13 @@ static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long vmaddr)
 {
 	pte_t *pte;
-	int count;
         int i;
 
-	count = 0;
-	do {
-		pte = (pte_t *) __get_free_page(GFP_KERNEL);
-		if (pte != NULL) {
-			for (i=0; i < PTRS_PER_PTE; i++)
-				pte_clear(pte+i);
-		} else {
-			current->state = TASK_UNINTERRUPTIBLE;
-			schedule_timeout(HZ);
-		}
-	} while (!pte && (count++ < 10));
+	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	if (pte != NULL) {
+		for (i=0; i < PTRS_PER_PTE; i++)
+			pte_clear(pte+i);
+	}
 	return pte;
 }
 

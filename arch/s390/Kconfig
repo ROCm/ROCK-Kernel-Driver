@@ -60,7 +60,7 @@ config SMP
 
 	  See also the <file:Documentation/smp.tex>,
 	  <file:Documentation/smp.txt> and the SMP-HOWTO available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Even if you don't know what to do here, say Y.
 
@@ -226,7 +226,7 @@ config BINFMT_ELF
 	  want to say Y here.
 
 	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you find that after upgrading from Linux kernel 1.2 and saying Y
 	  here, you still can't run any ELF binaries (they just crash), then
@@ -248,7 +248,7 @@ config BINFMT_MISC
 	  programs that need an interpreter to run like Java, Python or
 	  Emacs-Lisp. It's also useful if you often run DOS executables under
 	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>). Once you have
+	  <http://www.tldp.org/docs.html#howto>). Once you have
 	  registered such a binary class with the kernel, you can start one of
 	  those programs simply by typing in its name at a shell prompt; Linux
 	  will automatically feed it to the correct interpreter.

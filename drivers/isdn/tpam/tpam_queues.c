@@ -74,7 +74,8 @@ void tpam_enqueue_data(tpam_channel *channel, struct sk_buff *skb) {
  * 	dev_id: the registered board to the irq
  * 	regs: not used.
  */
-void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
+irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
+{
 	tpam_card *card = (tpam_card *)dev_id;
 	u32 ackupload, uploadptr;
 	u32 waiting_too_long;
@@ -115,7 +116,7 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 			printk(KERN_ERR "TurboPAM(tpam_irq): "
 			       "alloc_skb failed\n");
 			spin_unlock(&card->lock);
-			return;
+			return IRQ_HANDLED;
 		}
 
 		/* build the skb_header */
@@ -147,7 +148,7 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 				spin_unlock(&card->lock);
 				printk(KERN_ERR "TurboPAM(tpam_irq): "
 						"waiting too long...\n");
-				return;
+				return IRQ_HANDLED;
 			}
 		} while (hpic & 0x00000002);
 
@@ -169,7 +170,7 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 			skb_queue_tail(&card->recvq, skb);
 			schedule_work(&card->recv_tq);
 		}
-		return;
+		return IRQ_HANDLED;
 	}
 	else {
 		/* it is a ack from the board */
@@ -185,10 +186,8 @@ void tpam_irq(int irq, void *dev_id, struct pt_regs *regs) {
 
 		/* schedule the send queue for execution */
 		schedule_work(&card->send_tq);
-		return;
 	}
-
-	/* not reached */
+	return IRQ_HANDLED;
 }
 
 /*

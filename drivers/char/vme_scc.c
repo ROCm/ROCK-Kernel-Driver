@@ -131,7 +131,7 @@ static int scc_init_drivers(void)
 	scc_driver.magic = TTY_DRIVER_MAGIC;
 	scc_driver.driver_name = "scc";
 #ifdef CONFIG_DEVFS_FS
-	scc_driver.name = "tts/%d";
+	scc_driver.name = "tts/";
 #else
 	scc_driver.name = "ttyS";
 #endif
@@ -168,7 +168,7 @@ static int scc_init_drivers(void)
 
 	scc_callout_driver = scc_driver;
 #ifdef CONFIG_DEVFS_FS
-	scc_callout_driver.name = "cua/%d";
+	scc_callout_driver.name = "cua/";
 #else
 	scc_callout_driver.name = "cua";
 #endif
@@ -842,7 +842,7 @@ static void scc_send_xchar(struct tty_struct *tty, char ch)
 
 static int scc_open (struct tty_struct * tty, struct file * filp)
 {
-	int line = minor(tty->device) - SCC_MINOR_BASE;
+	int line = tty->index;
 	int retval;
 	struct scc_port *port = &scc_ports[line];
 	int i, channel = port->channel;
@@ -950,7 +950,7 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 	}
 
 	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = port->gs.normal_termios;
 		else 
 			*tty->termios = port->gs.callout_termios;

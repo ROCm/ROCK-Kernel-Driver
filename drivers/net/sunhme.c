@@ -2101,7 +2101,7 @@ static void happy_meal_rx(struct happy_meal *hp, struct net_device *dev)
 	RXD((">"));
 }
 
-static void happy_meal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t happy_meal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct happy_meal *hp  = dev->priv;
@@ -2135,10 +2135,12 @@ static void happy_meal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	HMD(("done\n"));
 out:
 	spin_unlock(&hp->happy_lock);
+
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_SBUS
-static void quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs)
+static irqreturn_t quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs)
 {
 	struct quattro *qp = (struct quattro *) cookie;
 	int i;
@@ -2183,6 +2185,8 @@ static void quattro_sbus_interrupt(int irq, void *cookie, struct pt_regs *ptregs
 		spin_unlock(&hp->happy_lock);
 	}
 	HMD(("done\n"));
+
+	return IRQ_HANDLED;
 }
 #endif
 

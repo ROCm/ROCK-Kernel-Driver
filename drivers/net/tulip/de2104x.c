@@ -492,7 +492,7 @@ rx_next:
 	de->rx_tail = rx_tail;
 }
 
-static void de_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t de_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
 	struct de_private *de = dev->priv;
@@ -500,7 +500,7 @@ static void de_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 	status = dr32(MacStatus);
 	if ((!(status & (IntrOK|IntrErr))) || (status == 0xFFFF))
-		return;
+		return IRQ_NONE;
 
 	if (netif_msg_intr(de))
 		printk(KERN_DEBUG "%s: intr, status %08x mode %08x desc %u/%u/%u\n",
@@ -532,6 +532,8 @@ static void de_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_ERR "%s: PCI bus error, status=%08x, PCI status=%04x\n",
 		       dev->name, status, pci_status);
 	}
+
+	return IRQ_HANDLED;
 }
 
 static void de_tx (struct de_private *de)

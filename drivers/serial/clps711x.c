@@ -581,7 +581,7 @@ console_initcall(clps711xuart_console_init);
 
 static struct uart_driver clps711x_reg = {
 	.driver_name		= "ttyCL",
-	.dev_name		= "ttyCL%d",
+	.dev_name		= "ttyCL",
 	.major			= SERIAL_CLPS711X_MAJOR,
 	.minor			= SERIAL_CLPS711X_MINOR,
 	.nr			= UART_NR,

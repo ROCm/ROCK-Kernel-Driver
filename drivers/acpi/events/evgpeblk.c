@@ -71,7 +71,7 @@ acpi_ev_valid_gpe_event (
 	struct acpi_gpe_block_info      *gpe_block;
 
 
-	ACPI_FUNCTION_NAME ("ev_valid_gpe_event");
+	ACPI_FUNCTION_ENTRY ();
 
 
 	/* No need for spin lock since we are not changing any list elements */
@@ -81,7 +81,7 @@ acpi_ev_valid_gpe_event (
 		gpe_block = gpe_xrupt_block->gpe_block_list_head;
 		while (gpe_block) {
 			if ((&gpe_block->event_info[0] <= gpe_event_info) &&
-				(&gpe_block->event_info[gpe_block->register_count * 8] > gpe_event_info)) {
+				(&gpe_block->event_info[((acpi_size) gpe_block->register_count) * 8] > gpe_event_info)) {
 				return (TRUE);
 			}
 
@@ -186,13 +186,13 @@ acpi_ev_save_method_info (
 	acpi_status                     status;
 
 
-	ACPI_FUNCTION_NAME ("ev_save_method_info");
+	ACPI_FUNCTION_TRACE ("ev_save_method_info");
 
 
 	/* Extract the name from the object and convert to a string */
 
-	ACPI_MOVE_UNALIGNED32_TO_32 (name,
-			 &((struct acpi_namespace_node *) obj_handle)->name.integer);
+	ACPI_MOVE_32_TO_32 (name,
+			   &((struct acpi_namespace_node *) obj_handle)->name.integer);
 	name[ACPI_NAME_SIZE] = 0;
 
 	/*
@@ -213,7 +213,7 @@ acpi_ev_save_method_info (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Unknown GPE method type: %s (name not of form _Lnn or _Enn)\n",
 			name));
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Convert the last two characters of the name to the GPE Number */
@@ -225,7 +225,7 @@ acpi_ev_save_method_info (
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Could not extract GPE number from name: %s (name is not of form _Lnn or _Enn)\n",
 			name));
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/* Ensure that we have a valid GPE number for this GPE block */
@@ -237,7 +237,7 @@ acpi_ev_save_method_info (
 		 * However, it may be valid for a different GPE block, since GPE0 and GPE1
 		 * methods both appear under \_GPE.
 		 */
-		return (AE_OK);
+		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
@@ -254,13 +254,13 @@ acpi_ev_save_method_info (
 	 */
 	status = acpi_hw_enable_gpe (gpe_event_info);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return_ACPI_STATUS (status);
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 		"Registered GPE method %s as GPE number 0x%.2X\n",
 		name, gpe_number));
-	return (AE_OK);
+	return_ACPI_STATUS (AE_OK);
 }
 
 
@@ -279,7 +279,7 @@ acpi_ev_save_method_info (
  *
  ******************************************************************************/
 
-struct acpi_gpe_xrupt_info *
+static struct acpi_gpe_xrupt_info *
 acpi_ev_get_gpe_xrupt_block (
 	u32                             interrupt_level)
 {
@@ -288,12 +288,15 @@ acpi_ev_get_gpe_xrupt_block (
 	acpi_status                     status;
 
 
+	ACPI_FUNCTION_TRACE ("ev_get_gpe_xrupt_block");
+
+
 	/* No need for spin lock since we are not changing any list elements here */
 
 	next_gpe_xrupt = acpi_gbl_gpe_xrupt_list_head;
 	while (next_gpe_xrupt) {
 		if (next_gpe_xrupt->interrupt_level == interrupt_level) {
-			return (next_gpe_xrupt);
+			return_PTR (next_gpe_xrupt);
 		}
 
 		next_gpe_xrupt = next_gpe_xrupt->next;
@@ -303,7 +306,7 @@ acpi_ev_get_gpe_xrupt_block (
 
 	gpe_xrupt = ACPI_MEM_CALLOCATE (sizeof (struct acpi_gpe_xrupt_info));
 	if (!gpe_xrupt) {
-		return (NULL);
+		return_PTR (NULL);
 	}
 
 	gpe_xrupt->interrupt_level = interrupt_level;
@@ -330,9 +333,15 @@ acpi_ev_get_gpe_xrupt_block (
 	if (interrupt_level != acpi_gbl_FADT->sci_int) {
 		status = acpi_os_install_interrupt_handler (interrupt_level,
 				 acpi_ev_gpe_xrupt_handler, gpe_xrupt);
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+				"Could not install GPE interrupt handler at level 0x%X\n",
+				interrupt_level));
+			return_PTR (NULL);
+		}
 	}
 
-	return (gpe_xrupt);
+	return_PTR (gpe_xrupt);
 }
 
 
@@ -349,7 +358,7 @@ acpi_ev_get_gpe_xrupt_block (
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_ev_delete_gpe_xrupt (
 	struct acpi_gpe_xrupt_info      *gpe_xrupt)
 {
@@ -406,7 +415,7 @@ acpi_ev_delete_gpe_xrupt (
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_ev_install_gpe_block (
 	struct acpi_gpe_block_info      *gpe_block,
 	u32                             interrupt_level)
@@ -535,7 +544,7 @@ unlock_and_exit:
  *
  ******************************************************************************/
 
-acpi_status
+static acpi_status
 acpi_ev_create_gpe_info_blocks (
 	struct acpi_gpe_block_info      *gpe_block)
 {

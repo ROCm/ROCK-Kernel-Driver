@@ -1112,7 +1112,7 @@ static void unexpected_intr (int irq, ide_hwgroup_t *hwgroup)
  *	on the hwgroup and the process begins again.
  */
  
-void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = (ide_hwgroup_t *)dev_id;
@@ -1126,7 +1126,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!ide_ack_intr(hwif)) {
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return;
+		return IRQ_NONE;
 	}
 
 	if ((handler = hwgroup->handler) == NULL ||
@@ -1165,7 +1165,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 		}
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 	drive = hwgroup->drive;
 	if (!drive) {
@@ -1176,7 +1176,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		 * [Note - this can occur if the drive is hot unplugged]
 		 */
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 	if (!drive_is_ready(drive)) {
 		/*
@@ -1187,7 +1187,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		 * enough advance overhead that the latter isn't a problem.
 		 */
 		spin_unlock_irqrestore(&ide_lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 	if (!hwgroup->busy) {
 		hwgroup->busy = 1;	/* paranoia */
@@ -1222,6 +1222,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		}
 	}
 	spin_unlock_irqrestore(&ide_lock, flags);
+	return IRQ_HANDLED;
 }
 
 EXPORT_SYMBOL(ide_intr);

@@ -431,7 +431,6 @@ static int sfq_init(struct Qdisc *sch, struct rtattr *opt)
 	}
 	for (i=0; i<SFQ_DEPTH; i++)
 		sfq_link(q, i);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -439,7 +438,6 @@ static void sfq_destroy(struct Qdisc *sch)
 {
 	struct sfq_sched_data *q = (struct sfq_sched_data *)sch->data;
 	del_timer(&q->perturb_timer);
-	MOD_DEC_USE_COUNT;
 }
 
 static int sfq_dump(struct Qdisc *sch, struct sk_buff *skb)
@@ -464,24 +462,21 @@ rtattr_failure:
 	return -1;
 }
 
-struct Qdisc_ops sfq_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "sfq",
-	.priv_size	= sizeof(struct sfq_sched_data),
-
-	.enqueue	= sfq_enqueue,
-	.dequeue	= sfq_dequeue,
-	.requeue	= sfq_requeue,
-	.drop		= sfq_drop,
-
-	.init		= sfq_init,
-	.reset		= sfq_reset,
-	.destroy	= sfq_destroy,
-	.change		= NULL,
-
-	.dump		= sfq_dump,
+struct Qdisc_ops sfq_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"sfq",
+	.priv_size	=	sizeof(struct sfq_sched_data),
+	.enqueue	=	sfq_enqueue,
+	.dequeue	=	sfq_dequeue,
+	.requeue	=	sfq_requeue,
+	.drop		=	sfq_drop,
+	.init		=	sfq_init,
+	.reset		=	sfq_reset,
+	.destroy	=	sfq_destroy,
+	.change		=	NULL,
+	.dump		=	sfq_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE

@@ -93,7 +93,7 @@ pmd_alloc_one_fast (struct mm_struct *mm, unsigned long addr)
 static inline pmd_t*
 pmd_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	pmd_t *pmd = (pmd_t *) __get_free_page(GFP_KERNEL);
+	pmd_t *pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 
 	if (likely(pmd != NULL))
 		clear_page(pmd);
@@ -125,7 +125,7 @@ pmd_populate_kernel (struct mm_struct *mm, pmd_t *pmd_entry, pte_t *pte)
 static inline struct page *
 pte_alloc_one (struct mm_struct *mm, unsigned long addr)
 {
-	struct page *pte = alloc_pages(GFP_KERNEL, 0);
+	struct page *pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
 
 	if (likely(pte != NULL))
 		clear_page(page_address(pte));
@@ -135,7 +135,7 @@ pte_alloc_one (struct mm_struct *mm, unsigned long addr)
 static inline pte_t *
 pte_alloc_one_kernel (struct mm_struct *mm, unsigned long addr)
 {
-	pte_t *pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 
 	if (likely(pte != NULL))
 		clear_page(pte);

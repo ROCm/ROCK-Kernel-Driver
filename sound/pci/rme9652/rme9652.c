@@ -1947,12 +1947,12 @@ static void snd_rme9652_set_defaults(rme9652_t *rme9652)
 	rme9652_set_rate(rme9652, 48000);
 }
 
-void snd_rme9652_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_rme9652_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	rme9652_t *rme9652 = (rme9652_t *) dev_id;
 
 	if (!(rme9652_read(rme9652, RME9652_status_register) & RME9652_IRQ)) {
-		return;
+		return IRQ_NONE;
 	}
 
 	rme9652_write(rme9652, RME9652_irq_clear, 0);
@@ -1964,6 +1964,7 @@ void snd_rme9652_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (rme9652->playback_substream) {
 		snd_pcm_period_elapsed(rme9652->pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream);
 	}
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_uframes_t snd_rme9652_hw_pointer(snd_pcm_substream_t *substream)

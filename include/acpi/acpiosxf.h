@@ -229,13 +229,13 @@ acpi_os_stall (
 acpi_status
 acpi_os_read_port (
 	acpi_io_address                 address,
-	void                            *value,
+	u32                             *value,
 	u32                             width);
 
 acpi_status
 acpi_os_write_port (
 	acpi_io_address                 address,
-	acpi_integer                    value,
+	u32                             value,
 	u32                             width);
 
 
@@ -246,13 +246,13 @@ acpi_os_write_port (
 acpi_status
 acpi_os_read_memory (
 	acpi_physical_address           address,
-	void                            *value,
+	u32                             *value,
 	u32                             width);
 
 acpi_status
 acpi_os_write_memory (
 	acpi_physical_address           address,
-	acpi_integer                    value,
+	u32                             value,
 	u32                             width);
 
 

@@ -283,7 +283,7 @@ static struct bc_hw_ops isar_ops = {
 	.write_reg  = isar_write,
 };
 
-static void
+static irqreturn_t
 sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -292,12 +292,12 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		/* The card tends to generate interrupts while being removed
 		   causing us to just crash the kernel. bad. */
 		printk(KERN_WARNING "Sedlbauer: card not available!\n");
-		return;
+		return IRQ_NONE;
 	}
-	hscxisac_irq(intno, dev_id, regs);
+	return hscxisac_irq(intno, dev_id, regs);
 }
 
-static void
+static irqreturn_t
 sedlbauer_isar_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -334,6 +334,7 @@ sedlbauer_isar_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	isac_write(cs, ISAC_MASK, 0x0);
 	isar_write(cs, 0, ISAR_IRQBIT, ISAR_IRQMSK);
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static int

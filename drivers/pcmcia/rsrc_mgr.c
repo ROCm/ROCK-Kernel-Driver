@@ -351,7 +351,7 @@ static int cis_readable(socket_info_t *s, u_long base)
     ret = pcmcia_validate_cis(s->clients, &info1);
     /* invalidate mapping and CIS cache */
     iounmap(s->cis_virt);
-    s->cis_used = 0;
+    destroy_cis_cache(s);
     if ((ret != 0) || (info1.Chains == 0))
 	return 0;
     s->cis_mem.sys_start = base+s->cap.map_size;
@@ -359,7 +359,7 @@ static int cis_readable(socket_info_t *s, u_long base)
     s->cis_virt = ioremap(base+s->cap.map_size, s->cap.map_size);
     ret = pcmcia_validate_cis(s->clients, &info2);
     iounmap(s->cis_virt);
-    s->cis_used = 0;
+    destroy_cis_cache(s);
     return ((ret == 0) && (info1.Chains == info2.Chains));
 }
 
@@ -499,14 +499,16 @@ void validate_mem(socket_info_t *s)
 
 void validate_mem(socket_info_t *s)
 {
-    resource_map_t *m;
+    resource_map_t *m, *n;
     static int done = 0;
     
     if (probe_mem && done++ == 0) {
 	down(&rsrc_sem);
-	for (m = mem_db.next; m != &mem_db; m = m->next)
+	for (m = mem_db.next; m != &mem_db; m = n) {
+	    n = m->next;
 	    if (do_mem_probe(m->base, m->num, s))
 		break;
+	}
 	up(&rsrc_sem);
     }
 }
@@ -599,7 +601,7 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 
 #ifdef CONFIG_PCMCIA_PROBE
 
-static void fake_irq(int i, void *d, struct pt_regs *r) { }
+static irqreturn_t fake_irq(int i, void *d, struct pt_regs *r) { return IRQ_NONE; }
 static inline int check_irq(int irq)
 {
     if (request_irq(irq, fake_irq, 0, "bogus", NULL) != 0)
@@ -743,9 +745,6 @@ static int adjust_memory(adjust_t *adj)
 	if (ret == CS_SUCCESS) {
 	    for (i = 0; i < sockets; i++) {
 		release_cis_mem(socket_table[i]);
-#ifdef CONFIG_CARDBUS
-		cb_release_cis_mem(socket_table[i]);
-#endif
 	    }
 	}
 	break;

@@ -36,7 +36,6 @@ static char *version =
 
 #include <asm/openprom.h>
 #include <asm/oplib.h>
-#include <asm/auxio.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 
@@ -405,7 +404,7 @@ update_out:
 	}
 }
 
-static void socal_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t socal_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 cmd;
 	unsigned long flags;
@@ -429,6 +428,8 @@ static void socal_intr(int irq, void *dev_id, struct pt_regs *regs)
 			socal_request (s, cmd);
 	}
 	spin_unlock_irqrestore(&s->lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 #define TOKEN(proto, port, token) (((proto)<<12)|(token)|(port))

@@ -197,7 +197,8 @@ EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
 EXPORT_SYMBOL(request_fast_irq);
 #if CONFIG_SUN_AUXIO
-EXPORT_SYMBOL(auxio_register);
+EXPORT_SYMBOL(auxio_set_led);
+EXPORT_SYMBOL(auxio_set_lte);
 #endif
 #if CONFIG_SBUS
 EXPORT_SYMBOL(sbus_root);

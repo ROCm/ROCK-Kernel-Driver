@@ -31,6 +31,7 @@
 #include <linux/threads.h>
 #include <linux/tty.h>
 #include <linux/efi.h>
+#include <linux/initrd.h>
 
 #include <asm/ia32.h>
 #include <asm/page.h>
@@ -41,10 +42,6 @@
 #include <asm/system.h>
 #include <asm/mca.h>
 #include <asm/smp.h>
-
-#ifdef CONFIG_BLK_DEV_RAM
-# include <linux/blk.h>
-#endif
 
 #if defined(CONFIG_SMP) && (IA64_CPU_SIZE > PAGE_SIZE)
 # error "struct cpuinfo_ia64 too big!"

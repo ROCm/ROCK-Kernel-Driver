@@ -2,6 +2,8 @@
 #define _NM256_H_
 
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
+
 #include "ac97.h"
 
 /* The revisions that we currently handle.  */
@@ -113,7 +115,7 @@ struct nm256_info
     int has_irq;
 
     /* The card interrupt service routine. */
-    void (*introutine) (int, void *, struct pt_regs *);
+    irqreturn_t (*introutine) (int, void *, struct pt_regs *);
 
     /* Current audio config, cached. */
     struct sinfo {

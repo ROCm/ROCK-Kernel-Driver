@@ -280,7 +280,7 @@ config PM
 	  page on the WWW at
 	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
 	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Note that, even if you say N here, Linux on the x86 architecture
 	  will issue the hlt instruction if nothing is to be done, thereby
@@ -425,7 +425,7 @@ config SMP
 
 	  See also the <file:Documentation/smp.tex>,
 	  <file:Documentation/smp.txt>, and the SMP-HOWTO available at
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  If you don't know what to do here, say N.
 
@@ -497,7 +497,7 @@ config BINFMT_ELF
 	  systems. Saying Y here will enable your kernel to run ELF binaries.
 
 	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 config BINFMT_MISC
 	tristate "Kernel support for MISC binaries"
@@ -535,7 +535,7 @@ config PCI
 	  VESA. If you have PCI, say Y, otherwise N.
 
 	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
@@ -684,7 +684,7 @@ config CD_NO_IDESCSI
 	---help---
 	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
 	  here, otherwise N. Read the CD-ROM-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Note that the answer to this question doesn't directly affect the
 	  kernel: saying N will just cause the configurator to skip all
@@ -762,7 +762,7 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
 	  <file:Documentation/sound/README.OSS> contains some slightly

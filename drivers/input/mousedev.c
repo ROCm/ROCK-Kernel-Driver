@@ -22,6 +22,7 @@
 #include <linux/random.h>
 #include <linux/major.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 #include <linux/miscdevice.h>
 #endif
@@ -46,7 +47,6 @@ struct mousedev {
 	wait_queue_head_t wait;
 	struct list_head list;
 	struct input_handle handle;
-	devfs_handle_t devfs;
 };
 
 struct mousedev_list {
@@ -171,45 +171,52 @@ static int mousedev_fasync(int fd, struct file *file, int on)
 	return retval < 0 ? retval : 0;
 }
 
+static void mousedev_free(struct mousedev *mousedev)
+{
+	devfs_remove("input/mouse%d", mousedev->minor);
+	mousedev_table[mousedev->minor] = NULL;
+	kfree(mousedev);
+}
+
+static int mixdev_release(void)
+{
+	struct input_handle *handle;
+
+	list_for_each_entry(handle, &mousedev_handler.h_list, h_node) {
+		struct mousedev *mousedev = handle->private;
+
+		if (!mousedev->open) {
+			if (mousedev->exist)
+				input_close_device(&mousedev->handle);
+			else
+				mousedev_free(mousedev);
+		}
+	}
+
+	return 0;
+}
+
 static int mousedev_release(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list = file->private_data;
-	struct input_handle *handle;
-	struct mousedev *mousedev;
 
 	mousedev_fasync(-1, file, 0);
 
 	list_del(&list->node);
 
 	if (!--list->mousedev->open) {
-		if (list->mousedev->minor == MOUSEDEV_MIX) {
-			list_for_each_entry(handle, &mousedev_handler.h_list, h_node) {
-				mousedev = handle->private;
-				if (!mousedev->open) {
-					if (mousedev->exist) {
-						input_close_device(&mousedev->handle);
-					} else {
-						input_unregister_minor(mousedev->devfs);
-						mousedev_table[mousedev->minor] = NULL;
-						kfree(mousedev);
-					}
-				}
-			}
-		} else {
-			if (!mousedev_mix.open) {
-				if (list->mousedev->exist) {
-					input_close_device(&list->mousedev->handle);
-				} else {
-					input_unregister_minor(list->mousedev->devfs);
-					mousedev_table[list->mousedev->minor] = NULL;
-					kfree(list->mousedev);
-				}
-			}
+		if (list->mousedev->minor == MOUSEDEV_MIX)
+			return mixdev_release();
+
+		if (!mousedev_mix.open) {
+			if (list->mousedev->exist)
+				input_close_device(&list->mousedev->handle);
+			else
+				mousedev_free(list->mousedev);
 		}
 	}
 	
 	kfree(list);
-
 	return 0;
 }
 
@@ -425,7 +432,7 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 		input_open_device(&mousedev->handle);
 
 	mousedev_table[minor] = mousedev;
-	mousedev->devfs = input_register_minor("input/mouse%d", minor, MOUSEDEV_MINOR_BASE);
+	input_register_minor("input/mouse%d", minor, MOUSEDEV_MINOR_BASE);
 
 	return &mousedev->handle;
 }
@@ -441,9 +448,7 @@ static void mousedev_disconnect(struct input_handle *handle)
 	} else {
 		if (mousedev_mix.open)
 			input_close_device(handle);
-		input_unregister_minor(mousedev->devfs);
-		mousedev_table[mousedev->minor] = NULL;
-		kfree(mousedev);
+		mousedev_free(mousedev);
 	}
 }
 
@@ -507,7 +512,7 @@ static int __init mousedev_init(void)
 	mousedev_table[MOUSEDEV_MIX] = &mousedev_mix;
 	mousedev_mix.exist = 1;
 	mousedev_mix.minor = MOUSEDEV_MIX;
-	mousedev_mix.devfs = input_register_minor("input/mice", MOUSEDEV_MIX, MOUSEDEV_MINOR_BASE);
+	input_register_minor("input/mice", MOUSEDEV_MIX, MOUSEDEV_MINOR_BASE);
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 	if (!(mousedev_mix.misc = !misc_register(&psaux_mouse)))
@@ -525,7 +530,7 @@ static void __exit mousedev_exit(void)
 	if (mousedev_mix.misc)
 		misc_deregister(&psaux_mouse);
 #endif
-	input_unregister_minor(mousedev_mix.devfs);
+	devfs_remove("input/mice");
 	input_unregister_handler(&mousedev_handler);
 	interface_unregister(&mousedev_intf);
 }

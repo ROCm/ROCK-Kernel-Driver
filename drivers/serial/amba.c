@@ -720,7 +720,7 @@ console_initcall(ambauart_console_init);
 static struct uart_driver amba_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "ttyAM",
-	.dev_name		= "ttyAM%d",
+	.dev_name		= "ttyAM",
 	.major			= SERIAL_AMBA_MAJOR,
 	.minor			= SERIAL_AMBA_MINOR,
 	.nr			= UART_NR,

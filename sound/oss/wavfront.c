@@ -2123,8 +2123,8 @@ static void __exit unload_wavefront (struct address_info *hw_config)
 /* WaveFront: Linux modular sound kernel installation interface        */
 /***********************************************************************/
 
-void
-wavefrontintr (int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t
+wavefrontintr(int irq, void *dev_id, struct pt_regs *dummy)
 {
 	struct wf_config *hw = dev_id;
 
@@ -2149,12 +2149,13 @@ wavefrontintr (int irq, void *dev_id, struct pt_regs *dummy)
 	*/
 
 	if ((wavefront_status() & (STAT_INTR_READ|STAT_INTR_WRITE)) == 0) {
-		return;
+		return IRQ_NONE;
 	}
 
 	hw->irq_ok = 1;
 	hw->irq_cnt++;
 	wake_up_interruptible (&hw->interrupt_sleeper);
+	return IRQ_HANDLED;
 }
 
 /* STATUS REGISTER 

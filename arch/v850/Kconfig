@@ -341,7 +341,7 @@ config SOUND
 	  interrupt and DMA channel), because you will be asked for it.
 
 	  You want to read the Sound-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. General information about
+	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
 	  <file:Documentation/sound/Introduction>.  The file
 	  <file:Documentation/sound/README.OSS> contains some slightly

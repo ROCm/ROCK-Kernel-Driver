@@ -128,4 +128,11 @@ struct mm_dma_desc {
 #define PCI_VENDOR_ID_MICRO_MEMORY		0x1332
 #define PCI_DEVICE_ID_MICRO_MEMORY_5415CN	0x5415
 #define PCI_DEVICE_ID_MICRO_MEMORY_5425CN	0x5425
+#define PCI_DEVICE_ID_MICRO_MEMORY_6155		0x6155
+
+/* bits for card->flags */
+#define UM_FLAG_DMA_IN_REGS		1
+#define UM_FLAG_NO_BYTE_STATUS		2
+#define UM_FLAG_NO_BATTREG		4
+#define	UM_FLAG_NO_BATT			8
 #endif

@@ -36,7 +36,7 @@ static int do_reset = 0;
 static int sup_irq[] = { 11, 10, 9, 5, 12, 14, 7, 3, 4, 6 };
 #define MAX_IRQS	10
 
-extern void interrupt_handler(int, void *, struct pt_regs *);
+extern irqreturn_t interrupt_handler(int, void *, struct pt_regs *);
 extern int sndpkt(int, int, int, struct sk_buff *);
 extern int command(isdn_ctrl *);
 extern int indicate_status(int, int, ulong, char*);

@@ -3486,11 +3486,11 @@ int __init md_init(void)
 	devfs_mk_dir("md");
 	blk_register_region(MKDEV(MAJOR_NR, 0), MAX_MD_DEVS, THIS_MODULE,
 				md_probe, NULL, NULL);
+
 	for (minor=0; minor < MAX_MD_DEVS; ++minor) {
-		char name[16];
-		sprintf(name, "md/%d", minor);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT, MAJOR_NR, minor,
-			       S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
+		devfs_mk_bdev(MKDEV(MAJOR_NR, minor),
+				S_IFBLK|S_IRUSR|S_IWUSR,
+				"md/%d", minor);
 	}
 
 	register_reboot_notifier(&md_notifier);

@@ -1401,7 +1401,6 @@ static void scsi_eh_lock_door(struct scsi_device *sdev)
 static void scsi_restart_operations(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
-	unsigned long flags;
 
 	/*
 	 * If the door was locked, we need to insert a door lock request
@@ -1430,11 +1429,8 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * now that error recovery is done, we will need to ensure that these
 	 * requests are started.
 	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
-		__blk_run_queue(sdev->request_queue);
-		spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
-	}
+	list_for_each_entry(sdev, &shost->my_devices, siblings)
+		blk_run_queue(sdev->request_queue);
 }
 
 /**

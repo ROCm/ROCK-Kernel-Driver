@@ -311,7 +311,7 @@ static snd_pcm_uframes_t snd_ad1816a_capture_pointer(snd_pcm_substream_t *substr
 }
 
 
-static void snd_ad1816a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_ad1816a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ad1816a_t *chip = snd_magic_cast(ad1816a_t, dev_id, return);
 	unsigned char status;
@@ -332,6 +332,7 @@ static void snd_ad1816a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock(&chip->lock);
 	snd_ad1816a_out(chip, AD1816A_INTERRUPT_STATUS, 0x00);
 	spin_unlock(&chip->lock);
+	return IRQ_HANDLED;
 }
 
 

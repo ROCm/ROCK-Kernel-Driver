@@ -118,7 +118,6 @@ static interpret_func interpret_root_props;
 #define FB_MAX	8
 #endif
 
-static int ppc64_is_smp;
 
 struct prom_t prom = {
 	0,			/* entry */
@@ -301,7 +300,9 @@ prom_initialize_naca(unsigned long mem)
         unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
         struct naca_struct *_naca = RELOC(naca);
+        struct systemcfg *_systemcfg = RELOC(systemcfg);
 
+	/* NOTE: _naca->debug_switch is already initialized. */
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_initialize_naca: start...\n"));
 #endif
@@ -320,25 +321,35 @@ prom_initialize_naca(unsigned long mem)
 			 * d-cache and i-cache sizes... -Peter
 			 */
 			if ( num_cpus == 1 ) {
-				u32 size;
+				u32 size, lsize;
+
+				call_prom(RELOC("getprop"), 4, 1, node,
+					  RELOC("d-cache-size"),
+					  &size, sizeof(size));
 
 				call_prom(RELOC("getprop"), 4, 1, node,
 					  RELOC("d-cache-line-size"),
-					  &size, sizeof(size));
+					  &lsize, sizeof(lsize));
 
-				_naca->dCacheL1LineSize     = size;
-				_naca->dCacheL1LogLineSize  = __ilog2(size);
-				_naca->dCacheL1LinesPerPage = PAGE_SIZE / size;
+				_systemcfg->dCacheL1Size = size;
+				_systemcfg->dCacheL1LineSize = lsize;
+				_naca->dCacheL1LogLineSize = __ilog2(lsize);
+				_naca->dCacheL1LinesPerPage = PAGE_SIZE/lsize;
+
+				call_prom(RELOC("getprop"), 4, 1, node,
+					  RELOC("i-cache-size"),
+					  &size, sizeof(size));
 
 				call_prom(RELOC("getprop"), 4, 1, node,
 					  RELOC("i-cache-line-size"),
-					  &size, sizeof(size));
+					  &lsize, sizeof(lsize));
 
-				_naca->iCacheL1LineSize     = size;
-				_naca->iCacheL1LogLineSize  = __ilog2(size);
-				_naca->iCacheL1LinesPerPage = PAGE_SIZE / size;
+				_systemcfg->iCacheL1Size = size;
+				_systemcfg->iCacheL1LineSize = lsize;
+				_naca->iCacheL1LogLineSize = __ilog2(lsize);
+				_naca->iCacheL1LinesPerPage = PAGE_SIZE/lsize;
 
-				if (_naca->platform == PLATFORM_PSERIES_LPAR) {
+				if (_systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 					u32 pft_size[2];
 					call_prom(RELOC("getprop"), 4, 1, node, 
 						  RELOC("ibm,pft-size"),
@@ -408,20 +419,17 @@ prom_initialize_naca(unsigned long mem)
 	}
 
 	/* We gotta have at least 1 cpu... */
-        if (num_cpus < 1)
+        if ( (_systemcfg->processorCount = num_cpus) < 1 )
                 PROM_BUG();
 
-	if (num_cpus > 1)
-		RELOC(ppc64_is_smp) = 1;
+	_systemcfg->physicalMemorySize = lmb_phys_mem_size();
 
-	_naca->physicalMemorySize = lmb_phys_mem_size();
-
-	if (_naca->platform == PLATFORM_PSERIES) {
+	if (_systemcfg->platform == PLATFORM_PSERIES) {
 		unsigned long rnd_mem_size, pteg_count;
 
 		/* round mem_size up to next power of 2 */
-		rnd_mem_size = 1UL << __ilog2(_naca->physicalMemorySize);
-		if (rnd_mem_size < _naca->physicalMemorySize)
+		rnd_mem_size = 1UL << __ilog2(_systemcfg->physicalMemorySize);
+		if (rnd_mem_size < _systemcfg->physicalMemorySize)
 			rnd_mem_size <<= 1;
 
 		/* # pages / 2 */
@@ -442,49 +450,43 @@ prom_initialize_naca(unsigned long mem)
 	 */
 	_naca->slb_size = 64;
 
+	/* Add an eye catcher and the systemcfg layout version number */
+	strcpy(_systemcfg->eye_catcher, RELOC("SYSTEMCFG:PPC64"));
+	_systemcfg->version.major = SYSTEMCFG_MAJOR;
+	_systemcfg->version.minor = SYSTEMCFG_MINOR;
+	_systemcfg->processor = _get_PVR();
+
 #ifdef DEBUG_PROM
-        prom_print(RELOC("naca->physicalMemorySize   = 0x"));
-        prom_print_hex(_naca->physicalMemorySize);
+        prom_print(RELOC("systemcfg->processorCount       = 0x"));
+        prom_print_hex(_systemcfg->processorCount);
         prom_print_nl();
 
-        prom_print(RELOC("naca->pftSize              = 0x"));
+        prom_print(RELOC("systemcfg->physicalMemorySize   = 0x"));
+        prom_print_hex(_systemcfg->physicalMemorySize);
+        prom_print_nl();
+
+        prom_print(RELOC("naca->pftSize                   = 0x"));
         prom_print_hex(_naca->pftSize);
         prom_print_nl();
 
-        prom_print(RELOC("naca->dCacheL1LineSize     = 0x"));
-        prom_print_hex(_naca->dCacheL1LineSize);
+        prom_print(RELOC("systemcfg->dCacheL1LineSize     = 0x"));
+        prom_print_hex(_systemcfg->dCacheL1LineSize);
         prom_print_nl();
 
-        prom_print(RELOC("naca->dCacheL1LogLineSize  = 0x"));
-        prom_print_hex(_naca->dCacheL1LogLineSize);
+        prom_print(RELOC("systemcfg->iCacheL1LineSize     = 0x"));
+        prom_print_hex(_systemcfg->iCacheL1LineSize);
         prom_print_nl();
 
-        prom_print(RELOC("naca->dCacheL1LinesPerPage = 0x"));
-        prom_print_hex(_naca->dCacheL1LinesPerPage);
-        prom_print_nl();
-
-        prom_print(RELOC("naca->iCacheL1LineSize     = 0x"));
-        prom_print_hex(_naca->iCacheL1LineSize);
-        prom_print_nl();
-
-        prom_print(RELOC("naca->iCacheL1LogLineSize  = 0x"));
-        prom_print_hex(_naca->iCacheL1LogLineSize);
-        prom_print_nl();
-
-        prom_print(RELOC("naca->iCacheL1LinesPerPage = 0x"));
-        prom_print_hex(_naca->iCacheL1LinesPerPage);
-        prom_print_nl();
-
-        prom_print(RELOC("naca->serialPortAddr       = 0x"));
+        prom_print(RELOC("naca->serialPortAddr            = 0x"));
         prom_print_hex(_naca->serialPortAddr);
         prom_print_nl();
 
-        prom_print(RELOC("naca->interrupt_controller = 0x"));
+        prom_print(RELOC("naca->interrupt_controller      = 0x"));
         prom_print_hex(_naca->interrupt_controller);
         prom_print_nl();
 
-        prom_print(RELOC("naca->platform             = 0x"));
-        prom_print_hex(_naca->platform);
+        prom_print(RELOC("systemcfg->platform             = 0x"));
+        prom_print_hex(_systemcfg->platform);
         prom_print_nl();
 
 	prom_print(RELOC("prom_initialize_naca: end...\n"));
@@ -549,7 +551,7 @@ prom_instantiate_rtas(void)
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
 	struct rtas_t *_rtas = PTRRELOC(&rtas);
-	struct naca_struct *_naca = RELOC(naca);
+	struct systemcfg *_systemcfg = RELOC(systemcfg);
 	ihandle prom_rtas;
         u32 getprop_rval;
 
@@ -565,7 +567,7 @@ prom_instantiate_rtas(void)
 				  RELOC("ibm,hypertas-functions"), 
 				  hypertas_funcs, 
 				  sizeof(hypertas_funcs))) > 0) {
-			_naca->platform = PLATFORM_PSERIES_LPAR;
+			_systemcfg->platform = PLATFORM_PSERIES_LPAR;
 		}
 
 		call_prom(RELOC("getprop"), 
@@ -582,7 +584,7 @@ prom_instantiate_rtas(void)
 			 * of physical memory (or within the RMO region) because RTAS
 			 * runs in 32-bit mode and relocate off.
 			 */
-			if ( _naca->platform == PLATFORM_PSERIES_LPAR ) {
+			if ( _systemcfg->platform == PLATFORM_PSERIES_LPAR ) {
 				struct lmb *_lmb  = PTRRELOC(&lmb);
 				rtas_region = min(_lmb->rmo_size, RTAS_INSTANTIATE_MAX);
 			}
@@ -767,13 +769,21 @@ prom_initialize_tce_table(void)
 		 * By doing this, we avoid the pitfalls of trying to DMA to
 		 * MMIO space and the DMA alias hole.
 		 */
-		minsize = 4UL << 20;
+		/* 
+		 * On POWER4, firmware sets the TCE region by assuming
+		 * each TCE table is 8MB. Using this memory for anything
+		 * else will impact performance, so we always allocate 8MB.
+		 * Anton
+		 *
+		 * XXX FIXME use a cpu feature here
+		 */
+		minsize = 8UL << 20;
 
 		/* Align to the greater of the align or size */
-		align = (minalign < minsize) ? minsize : minalign;
+		align = max(minalign, minsize);
 
 		/* Carve out storage for the TCE table. */
-		base = lmb_alloc(8UL << 20, 8UL << 20);
+		base = lmb_alloc(minsize, align);
 
 		if ( !base ) {
 			prom_print(RELOC("ERROR, cannot find space for TCE table.\n"));
@@ -875,7 +885,7 @@ static void
 prom_hold_cpus(unsigned long mem)
 {
 	unsigned long i;
-	unsigned int reg;
+	unsigned int cpuid;
 	phandle node;
 	unsigned long offset = reloc_offset();
 	char type[64], *path;
@@ -885,8 +895,12 @@ prom_hold_cpus(unsigned long mem)
         unsigned long *spinloop     = __v2a(&__secondary_hold_spinloop);
         unsigned long *acknowledge  = __v2a(&__secondary_hold_acknowledge);
         unsigned long secondary_hold = (unsigned long)__v2a(*PTRRELOC((unsigned long *)__secondary_hold));
+        struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
+
+	/* Initially, we must have one active CPU. */
+	_systemcfg->processorCount = 1;
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: start...\n"));
@@ -933,12 +947,12 @@ prom_hold_cpus(unsigned long mem)
 		if (strcmp(type, RELOC("okay")) != 0)
 			continue;
 
-                reg = -1;
+                cpuid = -1;
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("reg"),
-			  &reg, sizeof(reg));
+			  &cpuid, sizeof(cpuid));
 
 		/* Only need to start secondary procs, not ourself. */
-		if ( reg == _prom->cpu )
+		if ( cpuid == _prom->cpu )
 			continue;
 
 		path = (char *) mem;
@@ -950,7 +964,7 @@ prom_hold_cpus(unsigned long mem)
 #ifdef DEBUG_PROM
 		prom_print_nl();
 		prom_print(RELOC("cpu hw idx   = 0x"));
-		prom_print_hex(reg);
+		prom_print_hex(cpuid);
 		prom_print_nl();
 #endif
 		prom_print(RELOC("starting cpu "));
@@ -978,9 +992,8 @@ prom_hold_cpus(unsigned long mem)
 		prom_print(RELOC("    3) secondary_hold = 0x"));
 		prom_print_hex(secondary_hold);
 		prom_print_nl();
-		prom_print_nl();
 #endif
-		call_prom(RELOC("start-cpu"), 3, 0, node, secondary_hold, reg);
+		call_prom(RELOC("start-cpu"), 3, 0, node, secondary_hold, cpuid);
 		prom_print(RELOC("..."));
 		for ( i = 0 ; (i < 100000000) && 
 			      (*acknowledge == ((unsigned long)-1)); i++ ) ;
@@ -992,10 +1005,11 @@ prom_hold_cpus(unsigned long mem)
 			prom_print_nl();
 		}
 #endif
-		if (*acknowledge == reg) {
+		if (*acknowledge == cpuid) {
 			prom_print(RELOC("ok\n"));
 			/* Set the number of active processors. */
-			_xPaca[reg].active = 1;
+			_systemcfg->processorCount++;
+			_xPaca[cpuid].active = 1;
 		} else {
 			prom_print(RELOC("failed: "));
 			prom_print_hex(*acknowledge);
@@ -1024,8 +1038,8 @@ prom_hold_cpus(unsigned long mem)
 				}
 			}
 			_xPaca[i+1].active = 1;
-			RELOC(hmt_thread_data)[i].threadid = i+1;
 		}
+		_systemcfg->processorCount *= 2;
 	} else {
 		prom_print(RELOC("Processor is not HMT capable\n"));
 	}
@@ -1046,20 +1060,21 @@ unsigned long __init
 prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	  unsigned long r6, unsigned long r7)
 {
+	int chrp = 0;
 	unsigned long mem;
-	ihandle prom_root, prom_cpu;
+	ihandle prom_mmu, prom_op, prom_root, prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
-	long l;
+	long l, sz;
 	char *p, *d;
  	unsigned long phys;
         u32 getprop_rval;
-        struct naca_struct *_naca = RELOC(naca);
+        struct systemcfg *_systemcfg = RELOC(systemcfg);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Default machine type. */
-	_naca->platform = PLATFORM_PSERIES;
+	_systemcfg->platform = PLATFORM_PSERIES;
 
 #if 0
 	/* Reset klimit to take into account the embedded system map */
@@ -1149,6 +1164,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	mem = prom_bi_rec_reserve(mem);
 
+	mem = check_display(mem);
+
 	prom_instantiate_rtas();
         
         /* Initialize some system info into the Naca early... */
@@ -1158,10 +1175,8 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
          * following, regardless of whether we have an SMP
          * kernel or not.
          */
-        if (RELOC(ppc64_is_smp))
+        if (_systemcfg->processorCount > 1)
 	        prom_hold_cpus(mem);
-
-	mem = check_display(mem);
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("copying OF device tree...\n"));
@@ -1172,7 +1187,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	lmb_reserve(0, __pa(RELOC(klimit)));
 
-	if (_naca->platform == PLATFORM_PSERIES)
+	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
 	prom_print(RELOC("Calling quiesce ...\n"));

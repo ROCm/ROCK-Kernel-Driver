@@ -225,10 +225,6 @@ _GLOBAL(ppc32_rt_sigreturn)
 	bl	.sys32_rt_sigreturn
 	b	80f
 
-_GLOBAL(ppc64_sigreturn)
-	bl	.sys_sigreturn
-	b	80f
-
 _GLOBAL(ppc64_rt_sigreturn)
 	bl	.sys_rt_sigreturn
 

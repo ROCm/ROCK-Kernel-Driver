@@ -1565,8 +1565,8 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 	}
 
 	/* flush driver and line discipline buffers */
-	if( tty->driver.flush_buffer )
-		tty->driver.flush_buffer( tty );
+	if( tty->driver->flush_buffer )
+		tty->driver->flush_buffer( tty );
 	if( tty->ldisc.flush_buffer )
 		tty->ldisc.flush_buffer( tty );
 

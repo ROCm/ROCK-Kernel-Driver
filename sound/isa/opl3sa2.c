@@ -297,26 +297,34 @@ static int __init snd_opl3sa2_detect(opl3sa2_t *chip)
 	return 0;
 }
 
-static void snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned short status;
 	opl3sa2_t *chip = snd_magic_cast(opl3sa2_t, dev_id, return);
+	int handled = 0;
 
 	if (chip == NULL || chip->card == NULL)
-		return;
+		return IRQ_NONE;
 
 	status = snd_opl3sa2_read(chip, OPL3SA2_IRQ_STATUS);
 
-	if (status & 0x20)
+	if (status & 0x20) {
+		handled = 1;
 		snd_opl3_interrupt(chip->synth);
+	}
 
-	if ((status & 0x10) && chip->rmidi != NULL)
+	if ((status & 0x10) && chip->rmidi != NULL) {
+		handled = 1;
 		snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
+	}
 
-	if (status & 0x07)	/* TI,CI,PI */
+	if (status & 0x07) {	/* TI,CI,PI */
+		handled = 1;
 		snd_cs4231_interrupt(irq, chip->cs4231, regs);
+	}
 
 	if (status & 0x40) { /* hardware volume change */
+		handled = 1;
 		/* reading from Master Lch register at 0x07 clears this bit */
 		snd_opl3sa2_read(chip, OPL3SA2_MASTER_RIGHT);
 		snd_opl3sa2_read(chip, OPL3SA2_MASTER_LEFT);
@@ -325,6 +333,7 @@ static void snd_opl3sa2_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE, &chip->master_volume->id);
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 #define OPL3SA2_SINGLE(xname, xindex, reg, shift, mask, invert) \

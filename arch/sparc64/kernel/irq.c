@@ -294,7 +294,7 @@ static void atomic_bucket_insert(struct ino_bucket *bucket)
 	__asm__ __volatile__("wrpr %0, 0x0, %%pstate" : : "r" (pstate));
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+int request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags, const char *name, void *dev_id)
 {
 	struct irqaction *action, *tmp = NULL;
@@ -831,7 +831,7 @@ void sparc_floppy_irq(int irq, void *dev_cookie, struct pt_regs *regs)
 #define SPARC_NOP (0x01000000)
 
 static void install_fast_irq(unsigned int cpu_irq,
-			     void (*handler)(int, void *, struct pt_regs *))
+			     irqreturn_t (*handler)(int, void *, struct pt_regs *))
 {
 	extern unsigned long sparc64_ttable_tl0;
 	unsigned long ttent = (unsigned long) &sparc64_ttable_tl0;
@@ -847,7 +847,7 @@ static void install_fast_irq(unsigned int cpu_irq,
 }
 
 int request_fast_irq(unsigned int irq,
-		     void (*handler)(int, void *, struct pt_regs *),
+		     irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		     unsigned long irqflags, const char *name, void *dev_id)
 {
 	struct irqaction *action;

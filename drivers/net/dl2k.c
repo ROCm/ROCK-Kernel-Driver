@@ -98,7 +98,7 @@ static void rio_timer (unsigned long data);
 static void rio_tx_timeout (struct net_device *dev);
 static void alloc_list (struct net_device *dev);
 static int start_xmit (struct sk_buff *skb, struct net_device *dev);
-static void rio_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t rio_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 static void rio_free_tx (struct net_device *dev, int irq);
 static void tx_error (struct net_device *dev, int tx_status);
 static int receive_packet (struct net_device *dev);
@@ -699,7 +699,7 @@ start_xmit (struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static void
+static irqreturn_t
 rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
@@ -707,6 +707,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 	unsigned int_status;
 	long ioaddr;
 	int cnt = max_intrloop;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -716,6 +717,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 		int_status &= DEFAULT_INTR;
 		if (int_status == 0 || --cnt < 0)
 			break;
+		handled = 1;
 		/* Processing received packets */
 		if (int_status & RxDMAComplete)
 			receive_packet (dev);
@@ -736,6 +738,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 	}
 	if (np->cur_tx != np->old_tx)
 		writel (100, ioaddr + CountDown);
+	return IRQ_RETVAL(handled);
 }
 
 static void 
@@ -744,7 +747,7 @@ rio_free_tx (struct net_device *dev, int irq)
 	struct netdev_private *np = (struct netdev_private *) dev->priv;
 	int entry = np->old_tx % TX_RING_SIZE;
 	int tx_use = 0;
-	long flag = 0;
+	unsigned long flag = 0;
 	
 	if (irq)
 		spin_lock(&np->tx_lock);

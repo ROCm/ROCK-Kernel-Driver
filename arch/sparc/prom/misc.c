@@ -68,7 +68,7 @@ prom_cmdline(void)
 	install_linux_ticker();
 	spin_unlock_irqrestore(&prom_lock, flags);
 #ifdef CONFIG_SUN_AUXIO
-	TURN_ON_LED;
+	set_auxio(AUXIO_LED, 0);
 #endif
 	if(!serial_console && prom_palette)
 		prom_palette (0);

@@ -235,7 +235,7 @@ char *sun4m_irq_itoa(unsigned int irq)
 	return buff;
 }
 
-static void __init sun4m_init_timers(void (*counter_fn)(int, void *, struct pt_regs *))
+static void __init sun4m_init_timers(irqreturn_t (*counter_fn)(int, void *, struct pt_regs *))
 {
 	int reg_count, irq, cpu;
 	struct linux_prom_registers cnt_regs[PROMREG_MAX];

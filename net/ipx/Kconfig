@@ -12,7 +12,7 @@ config IPX_INTERN
 	  same address). The way this is done is to create a virtual internal
 	  "network" inside your box and to assign an IPX address to this
 	  network. Say Y here if you want to do this; read the IPX-HOWTO at
-	  <http://www.linuxdoc.org/docs.html#howto> for details.
+	  <http://www.tldp.org/docs.html#howto> for details.
 
 	  The full internal IPX network enables you to allocate sockets on
 	  different virtual nodes of the internal network. This is done by

@@ -59,7 +59,7 @@ void setup_ee_mem_bitbanger(struct eeprom *ee, long memaddr, int eesel_bit, int 
 /* foo. put this in a .c file */
 static inline void eeprom_update(struct eeprom *ee, u32 mask, int pol)
 {
-	long flags;
+	unsigned long flags;
 	u32 data;
 
 	spin_lock_irqsave(ee->lock, flags);

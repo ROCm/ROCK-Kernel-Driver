@@ -577,8 +577,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 	struct uart_port *port = state->port;
 	unsigned long flags;
 
-	DPRINTK("uart_flush_buffer(%d) called\n",
-	        minor(tty->device) - tty->driver.minor_start);
+	DPRINTK("uart_flush_buffer(%d) called\n", tty->index);
 
 	spin_lock_irqsave(&port->lock, flags);
 	uart_circ_clear(&state->info->xmit);
@@ -683,7 +682,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 	if (HIGH_BITS_OFFSET)
 		new_port += (unsigned long) new_serial.port_high << HIGH_BITS_OFFSET;
 
-	new_serial.irq = irq_cannonicalize(new_serial.irq);
+	new_serial.irq = irq_canonicalize(new_serial.irq);
 
 	/*
 	 * This semaphore protects state->count.  It is also
@@ -782,8 +781,12 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 		/*
 		 * Claim and map the new regions
 		 */
-		if (port->type != PORT_UNKNOWN)
+		if (port->type != PORT_UNKNOWN) {
 			retval = port->ops->request_port(port);
+		} else {
+			/* Always success - Jean II */
+			retval = 0;
+		}
 
 		/*
 		 * If we fail to request resources for the
@@ -835,7 +838,7 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 			 * need to rate-limit; it's CAP_SYS_ADMIN only. */
 			if (port->flags & UPF_SPD_MASK) {
 				printk(KERN_NOTICE "%s sets custom speed on %s%d. This is deprecated.\n",
-				       current->comm, state->info->tty->driver.name, 
+				       current->comm, state->info->tty->driver->name, 
 				       state->port->line);
 			}
 			uart_change_speed(state, NULL);
@@ -1229,8 +1232,8 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 		state->count = 1;
 	}
 	if (--state->count < 0) {
-		printk("rs_close: bad serial port count for %s%d: %d\n",
-		       tty->driver.name, port->line, state->count);
+		printk("rs_close: bad serial port count for %s: %d\n",
+		       tty->name, state->count);
 		state->count = 0;
 	}
 	if (state->count)
@@ -1550,20 +1553,20 @@ static struct uart_state *uart_get(struct uart_driver *drv, int line)
  */
 static int uart_open(struct tty_struct *tty, struct file *filp)
 {
-	struct uart_driver *drv = (struct uart_driver *)tty->driver.driver_state;
+	struct uart_driver *drv = (struct uart_driver *)tty->driver->driver_state;
 	struct uart_state *state;
-	int retval, line = minor(tty->device) - tty->driver.minor_start;
+	int retval, line = tty->index;
 
 	BUG_ON(!kernel_locked());
 	DPRINTK("uart_open(%d) called\n", line);
 
 	/*
-	 * tty->driver.num won't change, so we won't fail here with
+	 * tty->driver->num won't change, so we won't fail here with
 	 * tty->driver_data set to something non-NULL (and therefore
 	 * we won't get caught by uart_close()).
 	 */
 	retval = -ENODEV;
-	if (line >= tty->driver.num)
+	if (line >= tty->driver->num)
 		goto fail;
 
 	/*
@@ -1957,7 +1960,7 @@ int uart_resume_port(struct uart_driver *drv, struct uart_port *port, u32 level)
 static inline void
 uart_report_port(struct uart_driver *drv, struct uart_port *port)
 {
-	printk(drv->dev_name, port->line);
+	printk("%s%d", drv->dev_name, port->line);
 	printk(" at ");
 	switch (port->iotype) {
 	case UPIO_PORT:
@@ -2231,7 +2234,7 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	 * Register the port whether it's detected or not.  This allows
 	 * setserial to be used to alter this ports parameters.
 	 */
-	tty_register_device(drv->tty_driver, drv->minor + port->line);
+	tty_register_device(drv->tty_driver, port->line);
 
  out:
 	up(&port_sem);
@@ -2263,7 +2266,7 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
 	/*
 	 * Remove the devices from devfs
 	 */
-	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
+	tty_unregister_device(drv->tty_driver, port->line);
 
 	uart_unconfigure_port(drv, state);
 	state->port = NULL;
@@ -2410,7 +2413,7 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 
 	if (line < 0 || line >= drv->nr) {
 		printk(KERN_ERR "Attempt to unregister ");
-		printk(drv->dev_name, line);
+		printk("%s%d", drv->dev_name, line);
 		printk("\n");
 		return;
 	}

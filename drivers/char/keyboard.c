@@ -601,7 +601,7 @@ static void k_spec(struct vc_data *vc, unsigned char value, char up_flag, struct
 		return;
 	if ((kbd->kbdmode == VC_RAW || 
 	     kbd->kbdmode == VC_MEDIUMRAW) && 
-	     value != K_SAK)
+	     value != KVAL(K_SAK))
 		return;		/* SAK is allowed even in raw mode */
 	fn_handler[value](vc, regs);
 }
@@ -1089,7 +1089,7 @@ void kbd_keycode(unsigned int keycode, int down, struct pt_regs *regs)
 		clear_bit(keycode, key_down);
 
 	if (rep && (!vc_kbd_mode(kbd, VC_REPEAT) || (tty && 
-		(!L_ECHO(tty) && tty->driver.chars_in_buffer(tty))))) {
+		(!L_ECHO(tty) && tty->driver->chars_in_buffer(tty))))) {
 		/*
 		 * Don't repeat a key if the input buffers are not empty and the
 		 * characters get aren't echoed locally. This makes key repeat 

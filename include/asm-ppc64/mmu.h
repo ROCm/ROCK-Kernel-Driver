@@ -221,6 +221,13 @@ static inline void _tlbiel(unsigned long va)
 
 #endif /* __ASSEMBLY__ */
 
+/*
+ * Location of cpu0's segment table
+ */
+#define STAB0_PAGE	0x9
+#define STAB0_PHYS_ADDR	(STAB0_PAGE<<PAGE_SHIFT)
+#define STAB0_VIRT_ADDR	(KERNELBASE+STAB0_PHYS_ADDR)
+
 /* Block size masks */
 #define BL_128K	0x000
 #define BL_256K 0x001

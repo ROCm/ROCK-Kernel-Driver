@@ -279,7 +279,7 @@ typedef struct {
 		unsigned int length;
 		struct sk_buff *skb;
 	        void *target;
-		long int start_time;
+		unsigned long start_time;
 	} current_dma;
 
 	/* flags */

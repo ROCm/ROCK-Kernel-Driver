@@ -60,7 +60,7 @@
 #include <asm/mc146818rtc.h>
 #include <linux/version.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <asm/gt64120/gt64120.h>
 #include "ocelot_pld.h"
 

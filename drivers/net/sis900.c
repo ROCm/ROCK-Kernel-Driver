@@ -195,11 +195,11 @@ static void sis900_init_rx_ring(struct net_device *net_dev);
 static int sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev);
 static int sis900_rx(struct net_device *net_dev);
 static void sis900_finish_xmit (struct net_device *net_dev);
-static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int sis900_close(struct net_device *net_dev);
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd);
 static struct net_device_stats *sis900_get_stats(struct net_device *net_dev);
-static u16 sis900_compute_hashtable_index(u8 *addr, u8 revision);
+static u16 sis900_mcast_bitnr(u8 *addr, u8 revision);
 static void set_rx_mode(struct net_device *net_dev);
 static void sis900_reset(struct net_device *net_dev);
 static void sis630_set_eq(struct net_device *net_dev, u8 revision);
@@ -1534,13 +1534,14 @@ sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
  *	and cleans up after the Tx thread
  */
 
-static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *net_dev = dev_instance;
 	struct sis900_private *sis_priv = net_dev->priv;
 	int boguscnt = max_interrupt_work;
 	long ioaddr = net_dev->base_addr;
 	u32 status;
+	unsigned int handled = 0;
 
 	spin_lock (&sis_priv->lock);
 
@@ -1550,6 +1551,7 @@ static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if ((status & (HIBERR|TxURN|TxERR|TxIDLE|RxORN|RxERR|RxOK)) == 0)
 			/* nothing intresting happened */
 			break;
+		handled = 1;
 
 		/* why dow't we break after Tx/Rx case ?? keyword: full-duplex */
 		if (status & (RxORN | RxERR | RxOK))
@@ -1580,7 +1582,7 @@ static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		       net_dev->name, inl(ioaddr + isr));
 	
 	spin_unlock (&sis_priv->lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /**
@@ -2031,7 +2033,7 @@ static int sis900_set_config(struct net_device *dev, struct ifmap *map)
 }
 
 /**
- *	sis900_compute_hashtable_index: - compute hashtable index 
+ *	sis900_mcast_bitnr: - compute hashtable index 
  *	@addr: multicast address
  *	@revision: revision id of chip
  *
@@ -2041,7 +2043,7 @@ static int sis900_set_config(struct net_device *dev, struct ifmap *map)
  *   	multicast hash table. 
  */
 
-static u16 sis900_compute_hashtable_index(u8 *addr, u8 revision)
+static inline u16 sis900_mcast_bitnr(u8 *addr, u8 revision)
 {
 
 	u32 crc = ether_crc(6, addr);
@@ -2095,9 +2097,11 @@ static void set_rx_mode(struct net_device *net_dev)
 		struct dev_mc_list *mclist;
 		rx_mode = RFAAB;
 		for (i = 0, mclist = net_dev->mc_list; mclist && i < net_dev->mc_count;
-		     i++, mclist = mclist->next)
-			set_bit(sis900_compute_hashtable_index(mclist->dmi_addr, revision),
-				mc_filter);
+		     i++, mclist = mclist->next) {
+			unsigned int bit_nr =
+				sis900_mcast_bitnr(mclist->dmi_addr, revision);
+			mc_filter[bit_nr >> 4] |= (1 << bit_nr);
+		}
 	}
 
 	/* update Multicast Hash Table in Receive Filter */

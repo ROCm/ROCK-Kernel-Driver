@@ -365,11 +365,13 @@ static int show_partition(struct seq_file *part, void *v)
 		(unsigned long long)get_capacity(sgp) >> 1,
 		disk_name(sgp, 0, buf));
 	for (n = 0; n < sgp->minors - 1; n++) {
-		if (sgp->part[n].nr_sects == 0)
+		if (!sgp->part[n])
+			continue;
+		if (sgp->part[n]->nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10llu %s\n",
 			sgp->major, n + 1 + sgp->first_minor,
-			(unsigned long long)sgp->part[n].nr_sects >> 1 ,
+			(unsigned long long)sgp->part[n]->nr_sects >> 1 ,
 			disk_name(sgp, n + 1, buf));
 	}
 
@@ -542,6 +544,92 @@ static struct kset_hotplug_ops block_hotplug_ops = {
 static decl_subsys(block, &ktype_block, &block_hotplug_ops);
 
 
+/*
+ * aggregate disk stat collector.  Uses the same stats that the sysfs
+ * entries do, above, but makes them available through one seq_file.
+ * Watching a few disks may be efficient through sysfs, but watching
+ * all of them will be more efficient through this interface.
+ *
+ * The output looks suspiciously like /proc/partitions with a bunch of
+ * extra fields.
+ */
+
+/* iterator */
+static void *diskstats_start(struct seq_file *part, loff_t *pos)
+{
+	loff_t k = *pos;
+	struct list_head *p;
+
+	down_read(&block_subsys.rwsem);
+	list_for_each(p, &block_subsys.kset.list)
+		if (!k--)
+			return list_entry(p, struct gendisk, kobj.entry);
+	return NULL;
+}
+
+static void *diskstats_next(struct seq_file *part, void *v, loff_t *pos)
+{
+	struct list_head *p = ((struct gendisk *)v)->kobj.entry.next;
+	++*pos;
+	return p==&block_subsys.kset.list ? NULL :
+		list_entry(p, struct gendisk, kobj.entry);
+}
+
+static void diskstats_stop(struct seq_file *part, void *v)
+{
+	up_read(&block_subsys.rwsem);
+}
+
+static int diskstats_show(struct seq_file *s, void *v)
+{
+	struct gendisk *gp = v;
+	char buf[64];
+	int n = 0;
+
+	/*
+	if (&sgp->kobj.entry == block_subsys.kset.list.next)
+		seq_puts(s,	"major minor name"
+				"     rio rmerge rsect ruse wio wmerge "
+				"wsect wuse running use aveq"
+				"\n\n");
+	*/
+ 
+	disk_round_stats(gp);
+	seq_printf(s, "%4d %4d %s %u %u %llu %u %u %u %llu %u %u %u %u\n",
+		gp->major, n + gp->first_minor, disk_name(gp, n, buf),
+		disk_stat_read(gp, reads), disk_stat_read(gp, read_merges),
+		(unsigned long long)disk_stat_read(gp, read_sectors),
+		jiffies_to_msec(disk_stat_read(gp, read_ticks)),
+		disk_stat_read(gp, writes), disk_stat_read(gp, write_merges),
+		(unsigned long long)disk_stat_read(gp, write_sectors),
+		jiffies_to_msec(disk_stat_read(gp, write_ticks)),
+		disk_stat_read(gp, in_flight),
+		jiffies_to_msec(disk_stat_read(gp, io_ticks)),
+		jiffies_to_msec(disk_stat_read(gp, time_in_queue)));
+
+	/* now show all non-0 size partitions of it */
+	for (n = 0; n < gp->minors - 1; n++) {
+		struct hd_struct *hd = gp->part[n];
+
+		if (hd && hd->nr_sects)
+			seq_printf(s, "%4d %4d %s %u %u %u %u\n",
+				gp->major, n + gp->first_minor + 1,
+				disk_name(gp, n + 1, buf),
+				hd->reads, hd->read_sectors,
+				hd->writes, hd->write_sectors);
+	}
+ 
+	return 0;
+}
+
+struct seq_operations diskstats_op = {
+	.start	= diskstats_start,
+	.next	= diskstats_next,
+	.stop	= diskstats_stop,
+	.show	= diskstats_show
+};
+
+
 struct gendisk *alloc_disk(int minors)
 {
 	struct gendisk *disk = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
@@ -552,7 +640,7 @@ struct gendisk *alloc_disk(int minors)
 			return NULL;
 		}
 		if (minors > 1) {
-			int size = (minors - 1) * sizeof(struct hd_struct);
+			int size = (minors - 1) * sizeof(struct hd_struct *);
 			disk->part = kmalloc(size, GFP_KERNEL);
 			if (!disk->part) {
 				kfree(disk);
@@ -604,8 +692,8 @@ void set_device_ro(struct block_device *bdev, int flag)
 	struct gendisk *disk = bdev->bd_disk;
 	if (bdev->bd_contains != bdev) {
 		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = &disk->part[part-1];
-		p->policy = flag;
+		struct hd_struct *p = disk->part[part-1];
+		if (p) p->policy = flag;
 	} else
 		disk->policy = flag;
 }
@@ -615,7 +703,7 @@ void set_disk_ro(struct gendisk *disk, int flag)
 	int i;
 	disk->policy = flag;
 	for (i = 0; i < disk->minors - 1; i++)
-		disk->part[i].policy = flag;
+		if (disk->part[i]) disk->part[i]->policy = flag;
 }
 
 int bdev_read_only(struct block_device *bdev)
@@ -626,8 +714,9 @@ int bdev_read_only(struct block_device *bdev)
 	disk = bdev->bd_disk;
 	if (bdev->bd_contains != bdev) {
 		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
-		struct hd_struct *p = &disk->part[part-1];
-		return p->policy;
+		struct hd_struct *p = disk->part[part-1];
+		if (p) return p->policy;
+		return 0;
 	} else
 		return disk->policy;
 }

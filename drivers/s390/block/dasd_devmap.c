@@ -406,27 +406,6 @@ dasd_device_from_devindex(int devindex)
 }
 
 /*
- * Return kdev for a dasd device.
- */
-kdev_t
-dasd_get_kdev(struct dasd_device *device)
-{
-	struct dasd_devmap *devmap;
-	int major, minor;
-	int devno;
-
-	devno = _ccw_device_get_device_number(device->cdev);
-	devmap = dasd_devmap_from_devno(devno);
-	if (devmap == NULL)
-		return NODEV;
-	major = dasd_gendisk_index_major(devmap->devindex);
-	if (major < 0)
-		return NODEV;
-	minor = devmap->devindex % DASD_PER_MAJOR;
-	return mk_kdev(major, minor);
-}
-
-/*
  * Create a dasd device structure for cdev.
  */
 struct dasd_device *

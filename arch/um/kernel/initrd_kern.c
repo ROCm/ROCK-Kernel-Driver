@@ -5,7 +5,7 @@
 
 #include "linux/init.h"
 #include "linux/bootmem.h"
-#include "linux/blk.h"
+#include "linux/initrd.h"
 #include "asm/types.h"
 #include "user_util.h"
 #include "kern_util.h"

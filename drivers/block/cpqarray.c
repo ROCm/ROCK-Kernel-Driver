@@ -144,7 +144,7 @@ static inline cmdlist_t *removeQ(cmdlist_t **Qptr, cmdlist_t *c);
 static inline void complete_buffers(struct bio *bio, int ok);
 static inline void complete_command(cmdlist_t *cmd, int timeout);
 
-static void do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ida_timer(unsigned long tdata);
 static int ida_revalidate(struct gendisk *disk);
 static int revalidate_allvol(kdev_t dev);
@@ -929,7 +929,7 @@ static inline void complete_command(cmdlist_t *cmd, int timeout)
  *  Find the command on the completion queue, remove it, tell the OS and
  *  try to queue up more IO
  */
-static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ctlr_info_t *h = dev_id;
 	cmdlist_t *c;
@@ -940,7 +940,7 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	istat = h->access.intr_pending(h);
 	/* Is this interrupt for us? */
 	if (istat == 0)
-		return;
+		return IRQ_NONE;
 
 	/*
 	 * If there are completed commands in the completion queue,
@@ -991,6 +991,7 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	do_ida_request(&h->queue);
 	spin_unlock_irqrestore(IDA_LOCK(h->ctlr), flags); 
+	return IRQ_HANDLED;
 }
 
 /*

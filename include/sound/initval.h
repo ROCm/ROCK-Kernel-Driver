@@ -100,8 +100,9 @@ static int snd_legacy_auto_probe(unsigned long *ports, int (*probe)(unsigned lon
 #ifdef SNDRV_LEGACY_FIND_FREE_IRQ
 #include <linux/interrupt.h>
 
-static void snd_legacy_empty_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_legacy_empty_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
+	return IRQ_HANDLED;
 }
 
 static int snd_legacy_find_free_irq(int *irq_table)

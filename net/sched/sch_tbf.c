@@ -330,23 +330,17 @@ done:
 
 static int tbf_init(struct Qdisc* sch, struct rtattr *opt)
 {
-	int err;
 	struct tbf_sched_data *q = (struct tbf_sched_data *)sch->data;
 	
 	if (opt == NULL)
 		return -EINVAL;
-	
-	MOD_INC_USE_COUNT;
 	
 	PSCHED_GET_TIME(q->t_c);
 	init_timer(&q->wd_timer);
 	q->wd_timer.function = tbf_watchdog;
 	q->wd_timer.data = (unsigned long)sch;
 	
-	if ((err = tbf_change(sch, opt)) != 0) {
-		MOD_DEC_USE_COUNT;
-	}
-	return err;
+	return tbf_change(sch, opt);
 }
 
 static void tbf_destroy(struct Qdisc *sch)
@@ -359,8 +353,6 @@ static void tbf_destroy(struct Qdisc *sch)
 		qdisc_put_rtab(q->P_tab);
 	if (q->R_tab)
 		qdisc_put_rtab(q->R_tab);
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int tbf_dump(struct Qdisc *sch, struct sk_buff *skb)
@@ -391,24 +383,20 @@ rtattr_failure:
 	return -1;
 }
 
-struct Qdisc_ops tbf_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "tbf",
-	.priv_size	= sizeof(struct tbf_sched_data),
-
-	.enqueue	= tbf_enqueue,
-	.dequeue	= tbf_dequeue,
-	.requeue	= tbf_requeue,
-	.drop		= tbf_drop,
-
-	.init		= tbf_init,
-	.reset		= tbf_reset,
-	.destroy	= tbf_destroy,
-	.change		= tbf_change,
-
-	.dump		= tbf_dump,
+struct Qdisc_ops tbf_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"tbf",
+	.priv_size	=	sizeof(struct tbf_sched_data),
+	.enqueue	=	tbf_enqueue,
+	.dequeue	=	tbf_dequeue,
+	.requeue	=	tbf_requeue,
+	.drop		=	tbf_drop,
+	.init		=	tbf_init,
+	.reset		=	tbf_reset,
+	.destroy	=	tbf_destroy,
+	.change		=	tbf_change,
+	.dump		=	tbf_dump,
 };
 
 

@@ -17,7 +17,7 @@
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
@@ -156,10 +156,10 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_PPC_ISERIES
 	/* pSeries systems are identified in prom.c via OF. */
 	if ( itLpNaca.xLparInstalled == 1 )
-		naca->platform = PLATFORM_ISERIES_LPAR;
+		systemcfg->platform = PLATFORM_ISERIES_LPAR;
 #endif
 	
-	switch (naca->platform) {
+	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
 		iSeries_init_early();
@@ -185,7 +185,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 
-	if (naca->platform & PLATFORM_PSERIES) {
+	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
 		register_console(&udbg_console);
 	}
@@ -193,32 +193,27 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
 	printk("-----------------------------------------------------\n");
-	printk("naca                       = 0x%p\n", naca);
-#if 0
-	printk("naca->processorCount       = 0x%x\n", naca->processorCount);
-#endif
-	printk("naca->physicalMemorySize   = 0x%lx\n", naca->physicalMemorySize);
-	printk("naca->dCacheL1LineSize     = 0x%x\n", naca->dCacheL1LineSize);
-	printk("naca->dCacheL1LogLineSize  = 0x%x\n", naca->dCacheL1LogLineSize);
-	printk("naca->dCacheL1LinesPerPage = 0x%x\n", naca->dCacheL1LinesPerPage);
-	printk("naca->iCacheL1LineSize     = 0x%x\n", naca->iCacheL1LineSize);
-	printk("naca->iCacheL1LogLineSize  = 0x%x\n", naca->iCacheL1LogLineSize);
-	printk("naca->iCacheL1LinesPerPage = 0x%x\n", naca->iCacheL1LinesPerPage);
-	printk("naca->pftSize              = 0x%lx\n", naca->pftSize);
-	printk("naca->debug_switch         = 0x%lx\n", naca->debug_switch);
-	printk("naca->interrupt_controller = 0x%d\n", naca->interrupt_controller);
-	printk("htab_data.htab             = 0x%p\n", htab_data.htab);
-	printk("htab_data.num_ptegs        = 0x%lx\n", htab_data.htab_num_ptegs);
+	printk("naca                          = 0x%p\n", naca);
+	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
+	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
+	printk("naca->interrupt_controller    = 0x%d\n", naca->interrupt_controller);
+	printk("systemcf                      = 0x%p\n", systemcfg);
+	printk("systemcfg->processorCount     = 0x%x\n", systemcfg->processorCount);
+	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
+	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
+	printk("systemcfg->iCacheL1LineSize   = 0x%x\n", systemcfg->iCacheL1LineSize);
+	printk("htab_data.htab                = 0x%p\n", htab_data.htab);
+	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
 	printk("-----------------------------------------------------\n");
 
-	if (naca->platform & PLATFORM_PSERIES) {
+	if (systemcfg->platform & PLATFORM_PSERIES) {
 		finish_device_tree();
 		chrp_init(r3, r4, r5, r6, r7);
 	}
 
 	mm_init_ppc64();
 
-	switch (naca->platform) {
+	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
 	case PLATFORM_ISERIES_LPAR:
 		iSeries_init();
@@ -312,7 +307,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	 * Assume here that all clock rates are the same in a
 	 * smp system.  -- Cort
 	 */
-	if (naca->platform != PLATFORM_ISERIES_LPAR) {
+	if (systemcfg->platform != PLATFORM_ISERIES_LPAR) {
 		struct device_node *cpu_node;
 		int *fp;
 
@@ -516,8 +511,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Systems with OF can look in the properties on the cpu node(s)
 	 * for a possibly more accurate value.
 	 */
-	dcache_bsize = naca->dCacheL1LineSize; 
-	icache_bsize = naca->iCacheL1LineSize; 
+	dcache_bsize = systemcfg->dCacheL1LineSize; 
+	icache_bsize = systemcfg->iCacheL1LineSize; 
 
 	/* reboot on panic */
 	panic_timeout = 180;

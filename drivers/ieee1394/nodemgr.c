@@ -19,7 +19,6 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <asm/atomic.h>
-#include <asm/byteorder.h>
 
 #include "ieee1394_types.h"
 #include "ieee1394.h"
@@ -47,6 +46,7 @@ static char *nodemgr_find_oui_name(int oui)
 #endif
 	return NULL;
 }
+
 
 /* 
  * Basically what we do here is start off retrieving the bus_info block.
@@ -594,7 +594,6 @@ static int nodemgr_read_text_leaf(struct node_entry *ne,
 	ret = -ENXIO;
 	for (; size > 0; size--, address += 4, quadp++) {
 		for (i = 0; i < 3; i++) {
-			
 			ret = hpsb_node_read(ne, address, quadp, 4);
 			if (ret != -EAGAIN)
 				break;
@@ -638,7 +637,6 @@ static struct node_entry *nodemgr_scan_root_directory
 		code = CONFIG_ROM_KEY(quad);
 
 		if (code == CONFIG_ROM_VENDOR_ID && length > 0) {
-
 			/* Check if there is a text descriptor leaf
 			   immediately after this.  */
 			size = nodemgr_size_text_leaf(host, nodeid, generation,
@@ -847,7 +845,7 @@ static struct unit_directory *nodemgr_scan_unit_directory
 			   store?  Only count immediate values and
 			   CSR offsets for now.  */
 			code &= CONFIG_ROM_KEY_TYPE_MASK;
-			if ((code & 0x80) == 0)
+			if ((code & CONFIG_ROM_KEY_TYPE_LEAF) == 0)
 				count++;
 			break;
 		}
@@ -894,20 +892,21 @@ static struct unit_directory *nodemgr_scan_unit_directory
 /* This implementation currently only scans the config rom and its
  * immediate unit directories looking for software_id and
  * software_version entries, in order to get driver autoloading working. */
-static void nodemgr_process_unit_directory(struct host_info *hi, struct node_entry *ne, 
-					   octlet_t address, unsigned int id)
+static struct unit_directory *nodemgr_process_unit_directory
+	(struct host_info *hi, struct node_entry *ne, octlet_t address, unsigned int *id)
 {
 	struct unit_directory *ud;
 	quadlet_t quad;
 	quadlet_t *infop;
 	int length;
+	struct unit_directory *ud_temp = NULL;
 
 	if (!(ud = nodemgr_scan_unit_directory(ne, address)))
 		goto unit_directory_error;
 
 	ud->ne = ne;
 	ud->address = address;
-	ud->id = id;
+	ud->id = (*id)++;
 
 	if (nodemgr_read_quadlet(ne->host, ne->nodeid, ne->generation,
 				 address, &quad))
@@ -983,12 +982,48 @@ static void nodemgr_process_unit_directory(struct host_info *hi, struct node_ent
 			/* TODO: read strings... icons? */
 			break;
 
+		case CONFIG_ROM_LOGICAL_UNIT_DIRECTORY:
+			/* TODO: Parent this with it's UD */
+			ud_temp = nodemgr_process_unit_directory(hi, ne, address + value * 4, id);
+
+			/* inherit unspecified values */
+			if (ud_temp != NULL)
+			{
+				if ((ud->flags & UNIT_DIRECTORY_VENDOR_ID) &&
+					!(ud_temp->flags & UNIT_DIRECTORY_VENDOR_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_VENDOR_ID;
+					ud_temp->vendor_id = ud->vendor_id;
+					ud_temp->vendor_oui = ud->vendor_oui;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_MODEL_ID) &&
+					!(ud_temp->flags & UNIT_DIRECTORY_MODEL_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_MODEL_ID;
+					ud_temp->model_id = ud->model_id;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_SPECIFIER_ID) &&
+					!(ud_temp->flags & UNIT_DIRECTORY_SPECIFIER_ID))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_SPECIFIER_ID;
+					ud_temp->specifier_id = ud->specifier_id;
+				}
+				if ((ud->flags & UNIT_DIRECTORY_VERSION) &&
+					!(ud_temp->flags & UNIT_DIRECTORY_VERSION))
+				{
+					ud_temp->flags |=  UNIT_DIRECTORY_VERSION;
+					ud_temp->version = ud->version;
+				}
+			}
+
+			break;
+
 		default:
 			/* Which types of quadlets do we want to
 			   store?  Only count immediate values and
 			   CSR offsets for now.  */
 			code &= CONFIG_ROM_KEY_TYPE_MASK;
-			if ((code & 0x80) == 0)
+			if ((code & CONFIG_ROM_KEY_TYPE_LEAF) == 0)
 				*infop++ = quad;
 			break;
 		}
@@ -1006,11 +1041,12 @@ static void nodemgr_process_unit_directory(struct host_info *hi, struct node_ent
 		device_create_file(&ud->device, &dev_attr_ud_vendor_oui);
 	nodemgr_create_ud_dev_files(ud);
 
-	return;
+	return ud;
 
 unit_directory_error:	
 	if (ud != NULL)
 		kfree(ud);
+	return NULL;
 }
 
 
@@ -1071,7 +1107,7 @@ static void nodemgr_process_root_directory(struct host_info *hi, struct node_ent
 			break;
 
 		case CONFIG_ROM_UNIT_DIRECTORY:
-			nodemgr_process_unit_directory(hi, ne, address + value * 4, ud_id++);
+			nodemgr_process_unit_directory(hi, ne, address + value * 4, &ud_id);
 			break;			
 
 		case CONFIG_ROM_DESCRIPTOR_LEAF:
@@ -1137,6 +1173,9 @@ static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
 #endif /* CONFIG_HOTPLUG */
 
 
+static DECLARE_MUTEX(host_num_sema);
+/* Must hold above mutex until the result of the below call is assigned to
+ * a hostinfo entry. */
 static int nodemgr_alloc_host_num(void)
 {
 	int hostnum;
@@ -1156,6 +1195,18 @@ int hpsb_register_protocol(struct hpsb_protocol_driver *driver)
 	/*
 	 * Right now registration always succeeds, but maybe we should
 	 * detect clashes in protocols handled by other drivers.
+     * DRD> No because multiple drivers are needed to handle certain devices.
+     * For example, a DV camera is an IEC 61883 device (dv1394) and AV/C (raw1394).
+     * This will become less an issue with libiec61883 using raw1394.
+     *
+     * BenC: But can we handle this with an ALLOW_SHARED flag for a
+     * protocol? When we get an SBP-3 driver, it will be nice if they were
+     * mutually exclusive, since SBP-3 can handle SBP-2 protocol.
+     *
+     * Not to mention that we currently do not seem to support multiple
+     * drivers claiming the same unitdirectory. If we implement both of
+     * those, then we'll need to keep probing when a driver claims a
+     * unitdirectory, but is sharable.
 	 */
 
 	return 0;
@@ -1434,9 +1485,9 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 	/* If we had a bus reset while we were scanning the bus, it is
 	 * possible that we did not probe all nodes.  In that case, we
 	 * skip the clean up for now, since we could remove nodes that
-	 * were still on the bus.  The bus reset increased
-	 * hi->reset_sem, so there's a bus scan pending which will do
-	 * the clean up eventually. */
+	 * were still on the bus.  The bus reset increased hi->reset_sem,
+	 * so there's a bus scan pending which will do the clean up
+	 * eventually. */
 	if (generation == get_hpsb_generation(host)) {
 		struct cleanup_baton cleanup;
 
@@ -1470,7 +1521,7 @@ static void nodemgr_node_probe(struct host_info *hi, int generation)
 
 /* Because we are a 1394a-2000 compliant IRM, we need to inform all the other
  * nodes of the broadcast channel.  (Really we're only setting the validity
- * bit).  Other IRM responsibilities go in here as well. */
+ * bit). Other IRM responsibilities go in here as well. */
 static void nodemgr_do_irm_duties(struct hpsb_host *host)
 {
 	quadlet_t bc;
@@ -1489,12 +1540,12 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 	/* If there is no bus manager then we should set the root node's
 	 * force_root bit to promote bus stability per the 1394
 	 * spec. (8.4.2.6) */
-	if(host->busmgr_id == 0x3f && host->node_count > 1)
-        {
+	if (host->busmgr_id == 0x3f && host->node_count > 1)
+	{
 		u16 root_node = host->node_count - 1;
 		struct node_entry *ne = hpsb_nodeid_get_entry(host, root_node);
-		
-		if(ne->busopt.cmc)
+
+		if (ne->busopt.cmc)
 			hpsb_send_phy_config(host, root_node, -1);
 		else {
 			HPSB_DEBUG("The root node is not cycle master capable; "
@@ -1508,7 +1559,7 @@ static void nodemgr_do_irm_duties(struct hpsb_host *host)
 /* We need to ensure that if we are not the IRM, that the IRM node is capable of
  * everything we can do, otherwise issue a bus reset and try to become the IRM
  * ourselves. */
-static int nodemgr_check_irm_capability(struct hpsb_host *host)
+static int nodemgr_check_irm_capability(struct hpsb_host *host, int cycles)
 {
 	quadlet_t bc;
 	int status;
@@ -1525,10 +1576,19 @@ static int nodemgr_check_irm_capability(struct hpsb_host *host)
 		/* The current irm node does not have a valid BROADCAST_CHANNEL
 		 * register and we do, so reset the bus with force_root set */
 		HPSB_DEBUG("Current remote IRM is not 1394a-2000 compliant, resetting...");
+
+		if (cycles >= 5) {
+			/* Oh screw it! Just leave the bus as it is */
+			HPSB_DEBUG("Stopping reset loop for IRM sanity");
+			return 1;
+		}
+
 		hpsb_send_phy_config(host, host->node_id, -1);
 		hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
+
 		return 0;
 	}
+
 	return 1;
 }
 
@@ -1536,6 +1596,7 @@ static int nodemgr_host_thread(void *__hi)
 {
 	struct host_info *hi = (struct host_info *)__hi;
 	struct hpsb_host *host = hi->host;
+	int reset_cycles = 0;
 
 	/* No userlevel access needed */
 	daemonize(hi->daemon_name);
@@ -1571,11 +1632,13 @@ static int nodemgr_host_thread(void *__hi)
 				i = HZ/4;
 		}
 
-		if (!nodemgr_check_irm_capability(host)) {
+		if (!nodemgr_check_irm_capability(host, reset_cycles++)) {
 			/* Do nothing, we are resetting */
 			up(&nodemgr_serialize);
 			continue;
 		}
+
+		reset_cycles = 0;
 
 		nodemgr_node_probe(hi, generation);
 		nodemgr_do_irm_duties(host);
@@ -1588,7 +1651,7 @@ static int nodemgr_host_thread(void *__hi)
 
 caught_signal:
 #ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_DEBUG ("NodeMgr: Exiting thread for %s", hi->host->driver->name);
+	HPSB_DEBUG ("NodeMgr: Exiting thread");
 #endif
 
 	complete_and_exit(&hi->exited, 0);
@@ -1610,18 +1673,6 @@ struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid
 	struct node_entry *ne;
 
 	down(&nodemgr_serialize);
-	ne = find_entry_by_nodeid(host, nodeid);
-	up(&nodemgr_serialize);
-
-	return ne;
-}
-
-struct node_entry *hpsb_check_nodeid(struct hpsb_host *host, nodeid_t nodeid)
-{
-	struct node_entry *ne;
-
-	if (down_trylock(&nodemgr_serialize))
-		return NULL;
 	ne = find_entry_by_nodeid(host, nodeid);
 	up(&nodemgr_serialize);
 
@@ -1684,24 +1735,27 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 static void nodemgr_add_host(struct hpsb_host *host, struct hpsb_highlevel *hl)
 {
 	struct host_info *hi;
+	int id;
 
+	down(&host_num_sema);
+	/* Must be called before we create the hostinfo entry, else it
+	 * will match entry '0' since all keys default to zero */
+	id = nodemgr_alloc_host_num();
 	hi = hpsb_create_hostinfo(hl, host, sizeof(*hi));
 
 	if (!hi) {
+		up(&host_num_sema);
 		HPSB_ERR ("NodeMgr: out of memory in add host");
 		return;
 	}
 
-	/* Initialize the hostinfo here and start the thread.  The
-	 * thread blocks on the reset semaphore until a bus reset
-	 * happens. */
+	hi->id = id;
+	hpsb_set_hostinfo_key(hl, host, hi->id);
+	up(&host_num_sema);
+
 	hi->host = host;
 	init_completion(&hi->exited);
         sema_init(&hi->reset_sem, 0);
-
-	hi->id = nodemgr_alloc_host_num();
-
-	hpsb_set_hostinfo_key(hl, host, hi->id);
 
 	memcpy(&host->device, &nodemgr_dev_template_host,
 	       sizeof(host->device));
@@ -1768,7 +1822,7 @@ void init_ieee1394_nodemgr(void)
 {
 	bus_register(&ieee1394_bus_type);
 
-        nodemgr_hl = hpsb_register_highlevel("Node manager", &nodemgr_ops);
+	nodemgr_hl = hpsb_register_highlevel("Node manager", &nodemgr_ops);
         if (!nodemgr_hl) {
 		HPSB_ERR("NodeMgr: out of memory during ieee1394 initialization");
         }

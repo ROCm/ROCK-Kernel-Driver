@@ -9,7 +9,7 @@
  *	Al Longyear <longyear@netcom.com>, Paul Mackerras <Paul.Mackerras@cs.anu.edu.au>
  *
  * Original release 01/11/99
- * $Id: n_hdlc.c,v 4.2 2002/10/10 14:52:41 paulkf Exp $
+ * $Id: n_hdlc.c,v 4.6 2003/04/21 19:14:07 paulkf Exp $
  *
  * This code is released under the GNU General Public License (GPL)
  *
@@ -78,7 +78,7 @@
  */
 
 #define HDLC_MAGIC 0x239e
-#define HDLC_VERSION "$Revision: 4.2 $"
+#define HDLC_VERSION "$Revision: 4.6 $"
 
 #include <linux/version.h>
 #include <linux/config.h>
@@ -171,9 +171,9 @@ struct n_hdlc {
 /*
  * HDLC buffer list manipulation functions
  */
-void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list);
-void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf);
-N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list);
+static void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list);
+static void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf);
+static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list);
 
 /* Local functions */
 
@@ -299,7 +299,6 @@ static void n_hdlc_tty_close(struct tty_struct *tty)
 			n_hdlc->tty = n_hdlc->backup_tty;
 		} else {
 			n_hdlc_release (n_hdlc);
-			MOD_DEC_USE_COUNT;
 		}
 	}
 	
@@ -320,9 +319,9 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	struct n_hdlc *n_hdlc = tty2n_hdlc (tty);
 
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
-		printk("%s(%d)n_hdlc_tty_open() called (major=%u,minor=%u)\n",
+		printk("%s(%d)n_hdlc_tty_open() called (device=%s)\n",
 		__FILE__,__LINE__,
-		major(tty->device), minor(tty->device));
+		tty->name);
 		
 	/* There should not be an existing table for this slot. */
 	if (n_hdlc) {
@@ -339,8 +338,6 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	tty->disc_data = n_hdlc;
 	n_hdlc->tty    = tty;
 	
-	MOD_INC_USE_COUNT;
-	
 #if defined(TTY_NO_WRITE_SPLIT)
 	/* change tty_io write() to not split large writes into 8K chunks */
 	set_bit(TTY_NO_WRITE_SPLIT,&tty->flags);
@@ -351,8 +348,8 @@ static int n_hdlc_tty_open (struct tty_struct *tty)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer (tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer (tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer (tty);
 		
 	if (debuglevel >= DEBUG_LEVEL_INFO)	
 		printk("%s(%d)n_hdlc_tty_open() success\n",__FILE__,__LINE__);
@@ -406,7 +403,7 @@ static void n_hdlc_send_frames (struct n_hdlc *n_hdlc, struct tty_struct *tty)
 			
 		/* Send the next block of data to device */
 		tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-		actual = tty->driver.write(tty, 0, tbuf->buf, tbuf->count);
+		actual = tty->driver->write(tty, 0, tbuf->buf, tbuf->count);
 		    
 		/* if transmit error, throw frame away by */
 		/* pretending it was accepted by driver */
@@ -783,8 +780,8 @@ static int n_hdlc_tty_ioctl (struct tty_struct *tty, struct file * file,
 
 	case TIOCOUTQ:
 		/* get the pending tx byte count in the driver */
-		count = tty->driver.chars_in_buffer ?
-				tty->driver.chars_in_buffer(tty) : 0;
+		count = tty->driver->chars_in_buffer ?
+				tty->driver->chars_in_buffer(tty) : 0;
 		/* add size of next output frame in queue */
 		spin_lock_irqsave(&n_hdlc->tx_buf_list.spinlock,flags);
 		if (n_hdlc->tx_buf_list.head)
@@ -903,7 +900,7 @@ static struct n_hdlc *n_hdlc_alloc (void)
  * Arguments:	 	list	pointer to buffer list
  * Return Value:	None	
  */
-void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list)
+static void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list)
 {
 	memset(list,0,sizeof(N_HDLC_BUF_LIST));
 	spin_lock_init(&list->spinlock);
@@ -920,7 +917,7 @@ void n_hdlc_buf_list_init(N_HDLC_BUF_LIST *list)
  * 
  * Return Value:	None	
  */
-void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf)
+static void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf)
 {
 	unsigned long flags;
 	spin_lock_irqsave(&list->spinlock,flags);
@@ -950,7 +947,7 @@ void n_hdlc_buf_put(N_HDLC_BUF_LIST *list,N_HDLC_BUF *buf)
  * 
  * 	pointer to HDLC buffer if available, otherwise NULL
  */
-N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
+static N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
 {
 	unsigned long flags;
 	N_HDLC_BUF *buf;
@@ -971,7 +968,25 @@ N_HDLC_BUF* n_hdlc_buf_get(N_HDLC_BUF_LIST *list)
 
 static int __init n_hdlc_init(void)
 {
-	static struct tty_ldisc	n_hdlc_ldisc;
+	static struct tty_ldisc	n_hdlc_ldisc = {
+		TTY_LDISC_MAGIC,    /* magic */
+		"hdlc",             /* name */
+		0,                  /* num */
+		0,                  /* flags */
+		n_hdlc_tty_open,    /* open */
+		n_hdlc_tty_close,   /* close */
+		0,                  /* flush_buffer */
+		0,                  /* chars_in_buffer */
+		n_hdlc_tty_read,    /* read */
+		n_hdlc_tty_write,   /* write */
+		n_hdlc_tty_ioctl,   /* ioctl */
+		0,                  /* set_termios */
+		n_hdlc_tty_poll,    /* poll */
+		n_hdlc_tty_receive, /* receive_buf */
+		n_hdlc_tty_room,    /* receive_room */
+		n_hdlc_tty_wakeup,  /* write_wakeup */
+		THIS_MODULE         /* owner */
+	};
 	int    status;
 
 	/* range check maxframe arg */
@@ -982,21 +997,6 @@ static int __init n_hdlc_init(void)
 
 	printk("HDLC line discipline: version %s, maxframe=%u\n", 
 		szVersion, maxframe);
-
-	/* Register the tty discipline */
-	
-	memset(&n_hdlc_ldisc, 0, sizeof (n_hdlc_ldisc));
-	n_hdlc_ldisc.magic		= TTY_LDISC_MAGIC;
-	n_hdlc_ldisc.name          	= "hdlc";
-	n_hdlc_ldisc.open		= n_hdlc_tty_open;
-	n_hdlc_ldisc.close		= n_hdlc_tty_close;
-	n_hdlc_ldisc.read		= n_hdlc_tty_read;
-	n_hdlc_ldisc.write		= n_hdlc_tty_write;
-	n_hdlc_ldisc.ioctl		= n_hdlc_tty_ioctl;
-	n_hdlc_ldisc.poll		= n_hdlc_tty_poll;
-	n_hdlc_ldisc.receive_room	= n_hdlc_tty_room;
-	n_hdlc_ldisc.receive_buf	= n_hdlc_tty_receive;
-	n_hdlc_ldisc.write_wakeup	= n_hdlc_tty_wakeup;
 
 	status = tty_register_ldisc(N_HDLC, &n_hdlc_ldisc);
 	if (!status)

@@ -29,9 +29,7 @@
 #include <linux/ioport.h>
 #include <linux/acpi.h>
 #include <linux/apm_bios.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
@@ -796,6 +794,63 @@ static void __init register_memory(unsigned long max_low_pfn)
 	if (low_mem_size > pci_mem_start)
 		pci_mem_start = low_mem_size;
 }
+
+/* Replace instructions with better alternatives for this CPU type.
+
+   This runs before SMP is initialized to avoid SMP problems with
+   self modifying code. This implies that assymetric systems where
+   APs have less capabilities than the boot processor are not handled. 
+    
+   In this case boot with "noreplacement". */ 
+void apply_alternatives(void *start, void *end) 
+{ 
+	struct alt_instr *a; 
+	int diff, i, k;
+
+	for (a = start; a < (struct alt_instr *)end; 
+	     a = (void *)ALIGN((unsigned long)(a + 1) + a->instrlen, 4)) { 
+		if (!boot_cpu_has(a->cpuid))
+			continue;
+		BUG_ON(a->replacementlen > a->instrlen); 
+		memcpy(a->instr, a->replacement, a->replacementlen); 
+		diff = a->instrlen - a->replacementlen; 
+		for (i = a->replacementlen; diff > 0; diff -= k, i += k) {
+			static const char *nops[] = {
+				0,
+				"\x90",
+#if CONFIG_MK7 || CONFIG_MK8
+				"\x66\x90",
+				"\x66\x66\x90",
+				"\x66\x66\x66\x90",
+#else
+				"\x89\xf6",
+				"\x8d\x76\x00",
+				"\x8d\x74\x26\x00",
+#endif
+			};
+			k = min_t(int, diff, ARRAY_SIZE(nops)); 
+			memcpy(a->instr + i, nops[k], k); 
+		} 
+	}
+} 
+
+static int no_replacement __initdata = 0; 
+ 
+void __init alternative_instructions(void)
+{
+	extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+	if (no_replacement) 
+		return;
+	apply_alternatives(__alt_instructions, __alt_instructions_end);
+}
+
+static int __init noreplacement_setup(char *s)
+{ 
+     no_replacement = 1; 
+     return 0; 
+} 
+
+__setup("noreplacement", noreplacement_setup); 
 
 void __init setup_arch(char **cmdline_p)
 {

@@ -1133,18 +1133,18 @@ static void snd_korg1212_OnDSPDownloadComplete(korg1212_t *korg1212)
 	snd_korg1212_setCardState(korg1212, K1212_STATE_DSP_COMPLETE);
 }
 
-static void snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         u32 doorbellValue;
         korg1212_t *korg1212 = snd_magic_cast(korg1212_t, dev_id, return);
 
 	if(irq != korg1212->irq)
-		return;
+		return IRQ_NONE;
 
         doorbellValue = readl(korg1212->inDoorbellPtr);
 
         if (!doorbellValue)
-		return;
+		return IRQ_NONE;
 
 	spin_lock(&korg1212->lock);
 
@@ -1218,6 +1218,8 @@ static void snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	korg1212->inIRQ--;
 
 	spin_unlock(&korg1212->lock);
+
+	return IRQ_HANDLED;
 }
 
 static int snd_korg1212_downloadDSPCode(korg1212_t *korg1212)

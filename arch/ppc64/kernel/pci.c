@@ -21,6 +21,7 @@
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <linux/mm.h>
 
 #include <asm/processor.h>

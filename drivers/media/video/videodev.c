@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/semaphore.h>
@@ -375,7 +376,6 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 	int base;
 	int end;
 	char *name_base;
-	char name[16];
 	
 	switch(type)
 	{
@@ -426,19 +426,19 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 	vfd->minor=i;
 	up(&videodev_lock);
 
-	sprintf (name, "v4l/%s%d", name_base, i - base);
-	vfd->devfs_handle =
-		devfs_register (NULL, name, DEVFS_FL_DEFAULT,
-				VIDEO_MAJOR, vfd->minor,
-				S_IFCHR | S_IRUSR | S_IWUSR,
-				&video_fops,
-				NULL);
+	sprintf(vfd->devfs_name, "v4l/%s%d", name_base, i - base);
+	devfs_register(NULL, vfd->devfs_name, 0, VIDEO_MAJOR, vfd->minor,
+			S_IFCHR | S_IRUSR | S_IWUSR, &video_fops, NULL);
 	init_MUTEX(&vfd->lock);
 	
 #ifdef CONFIG_VIDEO_PROC_FS
-	sprintf (name, "%s%d", name_base, i - base);
-	videodev_proc_create_dev (vfd, name);
+{
+	char name[16];
+	sprintf(name, "%s%d", name_base, i - base);
+	videodev_proc_create_dev(vfd, name);
+}
 #endif
+
 	return 0;
 }
 
@@ -460,7 +460,7 @@ void video_unregister_device(struct video_device *vfd)
 	videodev_proc_destroy_dev (vfd);
 #endif
 
-	devfs_unregister (vfd->devfs_handle);
+	devfs_remove(vfd->devfs_name);
 	video_device[vfd->minor]=NULL;
 	up(&videodev_lock);
 }

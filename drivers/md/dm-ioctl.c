@@ -14,6 +14,7 @@
 #include <linux/wait.h>
 #include <linux/blk.h>
 #include <linux/slab.h>
+#include <linux/devfs_fs_kernel.h>
 
 #include <asm/uaccess.h>
 
@@ -174,16 +175,10 @@ static void free_cell(struct hash_cell *hc)
 static int register_with_devfs(struct hash_cell *hc)
 {
 	struct gendisk *disk = dm_disk(hc->md);
-	char *name = kmalloc(DM_NAME_LEN + strlen(DM_DIR) + 1, GFP_KERNEL);
-	if (!name) {
-		return -ENOMEM;
-	}
 
-	sprintf(name, DM_DIR "/%s", hc->name);
-	devfs_register(NULL, name, 0, disk->major, disk->first_minor,
+	devfs_mk_bdev(MKDEV(disk->major, disk->first_minor),
 		       S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
-		       &dm_blk_dops, NULL);
-	kfree(name);
+		       DM_DIR "/%s", hc->name);
 	return 0;
 }
 

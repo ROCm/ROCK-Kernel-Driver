@@ -258,7 +258,7 @@ static int de600_start_xmit(struct sk_buff *skb, struct net_device *dev)
  * Handle the network interface interrupts.
  */
 
-static void de600_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t de600_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device	*dev = dev_id;
 	u8		irq_status;
@@ -268,7 +268,7 @@ static void de600_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	/* This might just as well be deleted now, no crummy drivers present :-) */
 	if ((dev == NULL) || (DE600_IRQ != irq)) {
 		printk(KERN_ERR "%s: bogus interrupt %d\n", dev?dev->name:"DE-600", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	spin_lock(&de600_lock);
@@ -303,7 +303,7 @@ static void de600_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if (retrig)
 		trigger_interrupt(dev);
 	spin_unlock(&de600_lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 static int de600_tx_intr(struct net_device *dev, int irq_status)

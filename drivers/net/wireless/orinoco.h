@@ -114,7 +114,7 @@ int orinoco_reinit_firmware(struct net_device *dev);
 
 extern int orinoco_proc_dev_init(struct net_device *dev);
 extern void orinoco_proc_dev_cleanup(struct net_device *dev);
-extern void orinoco_interrupt(int irq, void * dev_id, struct pt_regs *regs);
+extern irqreturn_t orinoco_interrupt(int irq, void * dev_id, struct pt_regs *regs);
 
 /********************************************************************/
 /* Locking and synchronization functions                            */

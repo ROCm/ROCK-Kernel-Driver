@@ -19,7 +19,6 @@
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
 #define DEVICE_NR(device) (device)
-#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 
@@ -528,25 +527,20 @@ static void mtd_notify_add(struct mtd_info* mtd)
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
 
-#ifdef CONFIG_DEVFS_FS
-        sprintf(name, DEVICE_NAME"/%d", mtd->index);
-        devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			MTD_BLOCK_MAJOR, mtd->index,
-                        S_IFBLK | S_IRUGO | S_IWUGO,
-                        &mtd_fops, NULL);
-#endif
-
 	disk = alloc_disk(1);
 	if (disk) {
 		disk->major = MAJOR_NR;
 		disk->first_minor = mtd->index;
 		disk->fops = &mtd_fops;
+
 		sprintf(disk->disk_name, "mtdblock%d", mtd->index);
+		sprintf(disk->devfs_name, "mtdblock/%d", mtd->index);
 
 		mtddisk[mtd->index] = disk;
 		set_capacity(disk, mtd->size / 512);
 		disk->private_data = &mtdblks[mtd->index];
 		disk->queue = &mtd_queue;
+
 		add_disk(disk);
 	}
 }
@@ -555,8 +549,6 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 {
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
-
-        devfs_remove(DEVICE_NAME"/%d", mtd->index);
 
         if (mtddisk[mtd->index]) {
 		del_gendisk(mtddisk[mtd->index]);

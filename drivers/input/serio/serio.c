@@ -135,13 +135,20 @@ void serio_rescan(struct serio *serio)
 	wake_up(&serio_wait);
 }
 
-void serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
-{       
-        if (serio->dev && serio->dev->interrupt) 
-                serio->dev->interrupt(serio, data, flags, regs);
-	else 
-		if (!flags)
+irqreturn_t serio_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
+{
+	irqreturn_t ret = IRQ_NONE;
+
+        if (serio->dev && serio->dev->interrupt) {
+                ret = serio->dev->interrupt(serio, data, flags, regs);
+	} else {
+		if (!flags) {
 			serio_rescan(serio);
+			ret = IRQ_HANDLED;
+		}
+	}
+	return ret;
 }
 
 void serio_register_port(struct serio *serio)

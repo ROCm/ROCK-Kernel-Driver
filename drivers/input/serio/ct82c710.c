@@ -64,7 +64,7 @@ static char ct82c710_phys[16];
 static int ct82c710_data;
 static int ct82c710_status;
 
-static void ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs);
+static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs);
 
 /*
  * Wait for device to send output char and flush any input char.
@@ -154,9 +154,9 @@ static struct serio ct82c710_port =
  * is waiting in the 82C710.
  */
 
-static void ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs)
 {
-	serio_interrupt(&ct82c710_port, inb(ct82c710_data), 0, regs);
+	return serio_interrupt(&ct82c710_port, inb(ct82c710_data), 0, regs);
 }
 
 /*

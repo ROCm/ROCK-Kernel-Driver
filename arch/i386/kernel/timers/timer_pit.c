@@ -54,7 +54,7 @@ static void delay_pit(unsigned long loops)
 }
 
 
-/* This function must be called with interrupts disabled 
+/* This function must be called with xtime_lock held.
  * It was inspired by Steve McCanne's microtime-i386 for BSD.  -- jrs
  * 
  * However, the pc-audio speaker driver changes the divisor so that
@@ -93,7 +93,7 @@ static unsigned long get_offset_pit(void)
 	static unsigned long jiffies_p = 0;
 
 	/*
-	 * cache volatile jiffies temporarily; we have IRQs turned off. 
+	 * cache volatile jiffies temporarily; we have xtime_lock. 
 	 */
 	unsigned long jiffies_t;
 
@@ -119,8 +119,6 @@ static unsigned long get_offset_pit(void)
                 count = LATCH - 1;
         }
 	
-	spin_unlock_irqrestore(&i8253_lock, flags);
-
 	/*
 	 * avoiding timer inconsistencies (they are rare, but they happen)...
 	 * there are two kinds of problems that must be avoided here:
@@ -129,7 +127,6 @@ static unsigned long get_offset_pit(void)
 	 *     the counter does small "jumps" upwards on some Pentium systems,
 	 *     (see c't 95/10 page 335 for Neptun bug.)
 	 */
-
 
 	if( jiffies_t == jiffies_p ) {
 		if( count > count_p ) {
@@ -140,6 +137,8 @@ static unsigned long get_offset_pit(void)
 		jiffies_p = jiffies_t;
 
 	count_p = count;
+
+	spin_unlock_irqrestore(&i8253_lock, flags);
 
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	count = (count + LATCH/2) / LATCH;

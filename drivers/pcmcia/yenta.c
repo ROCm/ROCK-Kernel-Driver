@@ -429,7 +429,7 @@ static void yenta_bh(void *data)
 		socket->handler(socket->info, events);
 }
 
-static void yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int events;
 	pci_socket_t *socket = (pci_socket_t *) dev_id;
@@ -440,7 +440,9 @@ static void yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		socket->events |= events;
 		spin_unlock(&socket->event_lock);
 		schedule_work(&socket->tq_task);
+		return IRQ_HANDLED;
 	}
+	return IRQ_NONE;
 }
 
 static void yenta_interrupt_wrapper(unsigned long data)

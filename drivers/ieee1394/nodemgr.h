@@ -55,6 +55,7 @@
 #define CONFIG_ROM_MODEL_ID			0x17
 #define CONFIG_ROM_NODE_CAPABILITES		0x0C
 #define CONFIG_ROM_UNIT_DIRECTORY		0xd1
+#define CONFIG_ROM_LOGICAL_UNIT_DIRECTORY	0xd4
 #define CONFIG_ROM_SPECIFIER_ID			0x12 
 #define CONFIG_ROM_UNIT_SW_VERSION		0x13
 #define CONFIG_ROM_DESCRIPTOR_LEAF		0x81
@@ -137,8 +138,7 @@ struct node_entry {
 	const char *vendor_name;
 	const char *vendor_oui;
 
-	u32 capabilities;	
-
+	u32 capabilities;
 	struct hpsb_tlabel_pool *tpool;
 
 	struct device device;
@@ -162,10 +162,6 @@ struct node_entry *hpsb_guid_get_entry(u64 guid);
 /* Same as above, but use the nodeid to get an node entry. This is not
  * fool-proof by itself, since the nodeid can change.  */
 struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid);
-
-/* Same as above except that it will not block waiting for the nodemgr
- * serialize semaphore.  */
-struct node_entry *hpsb_check_nodeid(struct hpsb_host *host, nodeid_t nodeid);
 
 /*
  * If the entry refers to a local host, this function will return the pointer

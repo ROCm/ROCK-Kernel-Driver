@@ -288,7 +288,7 @@ static void	TLan_Eisa_Cleanup( void );
 static int      TLan_Init( struct net_device * );
 static int	TLan_Open( struct net_device *dev );
 static int	TLan_StartTx( struct sk_buff *, struct net_device *);
-static void	TLan_HandleInterrupt( int, void *, struct pt_regs *);
+static irqreturn_t TLan_HandleInterrupt( int, void *, struct pt_regs *);
 static int	TLan_Close( struct net_device *);
 static struct	net_device_stats *TLan_GetStats( struct net_device *);
 static void	TLan_SetMulticastList( struct net_device *);
@@ -1106,7 +1106,7 @@ static int TLan_StartTx( struct sk_buff *skb, struct net_device *dev )
 	 *
 	 **************************************************************/
 
-static void TLan_HandleInterrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t TLan_HandleInterrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32		ack;
 	struct net_device	*dev;
@@ -1134,6 +1134,7 @@ static void TLan_HandleInterrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_unlock(&priv->lock);
 
+	return IRQ_HANDLED;
 } /* TLan_HandleInterrupts */
 
 

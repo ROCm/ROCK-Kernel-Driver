@@ -1316,7 +1316,7 @@ int qla1280_reset(Scsi_Cmnd *, unsigned int);
 int qla1280_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
 static int qla1280_slave_configure(Scsi_Device *);
-void qla1280_intr_handler(int, void *, struct pt_regs *);
+irqreturn_t qla1280_intr_handler(int, void *, struct pt_regs *);
 void qla1280_setup(char *s, int *dummy);
 
 /*

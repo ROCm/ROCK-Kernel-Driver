@@ -647,7 +647,7 @@ cleanup:
 		acpi_ds_delete_result_if_not_used (op, walk_state->result_obj, walk_state);
 	}
 
-#if _UNDER_DEVELOPMENT
+#ifdef _UNDER_DEVELOPMENT
 
 	if (walk_state->parser_state.aml == walk_state->parser_state.aml_end) {
 		acpi_db_method_end (walk_state);

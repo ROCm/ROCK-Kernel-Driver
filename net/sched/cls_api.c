@@ -17,6 +17,7 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -223,8 +224,9 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		tp->q = q;
 		tp->classify = tp_ops->classify;
 		tp->classid = parent;
-		err = tp_ops->init(tp);
-		if (err) {
+		err = -EBUSY;
+		if (!try_module_get(tp_ops->owner) ||
+		    (err = tp_ops->init(tp)) != 0) {
 			kfree(tp);
 			goto errout;
 		}
@@ -248,6 +250,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			write_unlock(&qdisc_tree_lock);
 
 			tp->ops->destroy(tp);
+			module_put(tp->ops->owner);
 			kfree(tp);
 			err = 0;
 			goto errout;

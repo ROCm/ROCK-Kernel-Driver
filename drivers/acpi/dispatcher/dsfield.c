@@ -249,9 +249,9 @@ acpi_ds_get_field_names (
 			 * In field_flags, preserve the flag bits other than the ACCESS_TYPE bits
 			 */
 			info->field_flags = (u8) ((info->field_flags & ~(AML_FIELD_ACCESS_TYPE_MASK)) |
-					  ((u8) (arg->common.value.integer32 >> 8)));
+					  ((u8) ((u32) arg->common.value.integer >> 8)));
 
-			info->attribute = (u8) (arg->common.value.integer32);
+			info->attribute = (u8) (arg->common.value.integer);
 			break;
 
 
@@ -356,7 +356,7 @@ acpi_ds_create_field (
 	/* Second arg is the field flags */
 
 	arg = arg->common.next;
-	info.field_flags = arg->common.value.integer8;
+	info.field_flags = (u8) arg->common.value.integer;
 	info.attribute = 0;
 
 	/* Each remaining arg is a Named Field */
@@ -509,12 +509,12 @@ acpi_ds_create_bank_field (
 	/* Third arg is the bank_value */
 
 	arg = arg->common.next;
-	info.bank_value = arg->common.value.integer32;
+	info.bank_value = (u32) arg->common.value.integer;
 
 	/* Fourth arg is the field flags */
 
 	arg = arg->common.next;
-	info.field_flags = arg->common.value.integer8;
+	info.field_flags = (u8) arg->common.value.integer;
 
 	/* Each remaining arg is a Named Field */
 
@@ -580,7 +580,7 @@ acpi_ds_create_index_field (
 	/* Next arg is the field flags */
 
 	arg = arg->common.next;
-	info.field_flags = arg->common.value.integer8;
+	info.field_flags = (u8) arg->common.value.integer;
 
 	/* Each remaining arg is a Named Field */
 

@@ -199,7 +199,7 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
+static irqreturn_t
 telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 20
@@ -223,6 +223,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	hscx_write(cs, 0, HSCX_MASK, 0x0);
 	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static struct card_ops telespci_ops = {

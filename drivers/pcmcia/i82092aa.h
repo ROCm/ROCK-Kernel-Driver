@@ -1,6 +1,8 @@
 #ifndef _INCLUDE_GUARD_i82092aa_H_
 #define _INCLUDE_GUARD_i82092aa_H_
 
+#include <linux/interrupt.h>
+
 /* $Id: i82092aa.h,v 1.1.1.1 2001/09/19 14:53:15 dwmw2 Exp $ */
 
 /* Debuging defines */
@@ -21,7 +23,7 @@
 static int  i82092aa_pci_probe(struct pci_dev *dev, const struct pci_device_id *id);
 static void i82092aa_pci_remove(struct pci_dev *dev);
 static int card_present(int socketno);
-static void i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs);
+static irqreturn_t i82092aa_interrupt(int irq, void *dev, struct pt_regs *regs);
 
 
 

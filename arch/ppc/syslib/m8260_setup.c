@@ -28,7 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/ioport.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
@@ -243,7 +243,7 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch		= m8260_setup_arch;
 	ppc_md.show_percpuinfo		= m8260_show_percpuinfo;
-	ppc_md.irq_cannonicalize	= NULL;
+	ppc_md.irq_canonicalize	= NULL;
 	ppc_md.init_IRQ			= m8260_init_IRQ;
 	ppc_md.get_irq			= m8260_get_irq;
 	ppc_md.init			= NULL;

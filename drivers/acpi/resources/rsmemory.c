@@ -92,7 +92,7 @@ acpi_rs_memory24_resource (
 	 */
 	buffer += 1;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	*bytes_consumed = (acpi_size) temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_MEM24;
@@ -107,28 +107,28 @@ acpi_rs_memory24_resource (
 	/*
 	 * Get min_base_address (Bytes 4-5)
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	output_struct->data.memory24.min_base_address = temp16;
 
 	/*
 	 * Get max_base_address (Bytes 6-7)
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	output_struct->data.memory24.max_base_address = temp16;
 
 	/*
 	 * Get Alignment (Bytes 8-9)
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	output_struct->data.memory24.alignment = temp16;
 
 	/*
 	 * Get range_length (Bytes 10-11)
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	output_struct->data.memory24.range_length = temp16;
 
 	/*
@@ -184,7 +184,7 @@ acpi_rs_memory24_stream (
 	 * The length field is static
 	 */
 	temp16 = 0x09;
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -197,25 +197,25 @@ acpi_rs_memory24_stream (
 	/*
 	 * Set the Range minimum base address
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &linked_list->data.memory24.min_base_address);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.memory24.min_base_address);
 	buffer += 2;
 
 	/*
 	 * Set the Range maximum base address
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &linked_list->data.memory24.max_base_address);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.memory24.max_base_address);
 	buffer += 2;
 
 	/*
 	 * Set the base alignment
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &linked_list->data.memory24.alignment);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.memory24.alignment);
 	buffer += 2;
 
 	/*
 	 * Set the range length
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &linked_list->data.memory24.range_length);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.memory24.range_length);
 	buffer += 2;
 
 	/*
@@ -269,7 +269,7 @@ acpi_rs_memory32_range_resource (
 	 */
 	buffer += 1;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	buffer += 2;
 	*bytes_consumed = (acpi_size) temp16 + 3;
 
@@ -296,27 +296,25 @@ acpi_rs_memory32_range_resource (
 	/*
 	 * Get min_base_address (Bytes 4-7)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.min_base_address,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.memory32.min_base_address, buffer);
 	buffer += 4;
 
 	/*
 	 * Get max_base_address (Bytes 8-11)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.max_base_address,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.memory32.max_base_address, buffer);
 	buffer += 4;
 
 	/*
 	 * Get Alignment (Bytes 12-15)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.alignment, buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.memory32.alignment, buffer);
 	buffer += 4;
 
 	/*
 	 * Get range_length (Bytes 16-19)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.memory32.range_length, buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.memory32.range_length, buffer);
 
 	/*
 	 * Set the Length parameter
@@ -373,7 +371,7 @@ acpi_rs_fixed_memory32_resource (
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	buffer += 2;
 	*bytes_consumed = (acpi_size) temp16 + 3;
@@ -390,15 +388,13 @@ acpi_rs_fixed_memory32_resource (
 	/*
 	 * Get range_base_address (Bytes 4-7)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.fixed_memory32.range_base_address,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.fixed_memory32.range_base_address, buffer);
 	buffer += 4;
 
 	/*
 	 * Get range_length (Bytes 8-11)
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.fixed_memory32.range_length,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.fixed_memory32.range_length, buffer);
 
 	/*
 	 * Set the Length parameter
@@ -454,7 +450,7 @@ acpi_rs_memory32_range_stream (
 	 */
 	temp16 = 0x11;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -467,25 +463,25 @@ acpi_rs_memory32_range_stream (
 	/*
 	 * Set the Range minimum base address
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer, &linked_list->data.memory32.min_base_address);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.memory32.min_base_address);
 	buffer += 4;
 
 	/*
 	 * Set the Range maximum base address
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer, &linked_list->data.memory32.max_base_address);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.memory32.max_base_address);
 	buffer += 4;
 
 	/*
 	 * Set the base alignment
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer, &linked_list->data.memory32.alignment);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.memory32.alignment);
 	buffer += 4;
 
 	/*
 	 * Set the range length
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer, &linked_list->data.memory32.range_length);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.memory32.range_length);
 	buffer += 4;
 
 	/*
@@ -537,7 +533,7 @@ acpi_rs_fixed_memory32_stream (
 	 */
 	temp16 = 0x09;
 
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer, &temp16);
+	ACPI_MOVE_16_TO_16 (buffer, &temp16);
 	buffer += 2;
 
 	/*
@@ -550,14 +546,14 @@ acpi_rs_fixed_memory32_stream (
 	/*
 	 * Set the Range base address
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
+	ACPI_MOVE_32_TO_32 (buffer,
 			 &linked_list->data.fixed_memory32.range_base_address);
 	buffer += 4;
 
 	/*
 	 * Set the range length
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
+	ACPI_MOVE_32_TO_32 (buffer,
 			 &linked_list->data.fixed_memory32.range_length);
 	buffer += 4;
 

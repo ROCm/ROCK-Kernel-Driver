@@ -319,7 +319,7 @@ static struct bc_hw_ops ipacx_bc_ops = {
 	.read_fifo  = ipacx_bc_read_fifo,
 };
 
-static void
+static irqreturn_t
 diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -331,9 +331,10 @@ diva_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	if (!cnt)
 		printk(KERN_WARNING "Diva: IRQ LOOP\n");
+	return IRQ_HANDLED;
 }
 
-static void
+static irqreturn_t
 diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -341,22 +342,24 @@ diva_ipac_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 
 	val = readb(cs->hw.diva.pci_cfg);
 	if (!(val & PITA_INT0_STATUS))
-		return; /* other shared IRQ */
+		return IRQ_NONE; /* other shared IRQ */
 	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg); /* Reset pending INT0 */
 
-	ipac_irq(intno, dev_id, regs);
+	return ipac_irq(intno, dev_id, regs);
 }
 
-static void
+static irqreturn_t
 diva_ipacx_pci_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
 
 	val = readb(cs->hw.diva.pci_cfg);
-	if (!(val &PITA_INT0_STATUS)) return; // other shared IRQ
+	if (!(val &PITA_INT0_STATUS))
+		return IRQ_NONE; // other shared IRQ
 	interrupt_ipacx(cs);      // handler for chip
 	writeb(PITA_INT0_STATUS, cs->hw.diva.pci_cfg);  // Reset PLX interrupt
+	return IRQ_HANDLED;
 }
 
 static void

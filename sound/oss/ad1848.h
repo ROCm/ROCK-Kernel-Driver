@@ -1,4 +1,6 @@
 
+#include <linux/interrupt.h>
+
 #define AD_F_CS4231     0x0001  /* Returned if a CS4232 (or compatible) detected */
 #define AD_F_CS4248     0x0001  /* Returned if a CS4248 (or compatible) detected */
 
@@ -16,7 +18,7 @@ void ad1848_unload (int io_base, int irq, int dma_playback, int dma_capture, int
 int ad1848_detect (int io_base, int *flags, int *osp);
 int ad1848_control(int cmd, int arg);
 
-void adintr(int irq, void *dev_id, struct pt_regs * dummy);
+irqreturn_t adintr(int irq, void *dev_id, struct pt_regs * dummy);
 void attach_ms_sound(struct address_info * hw_config, struct module * owner);
 
 int probe_ms_sound(struct address_info *hw_config);

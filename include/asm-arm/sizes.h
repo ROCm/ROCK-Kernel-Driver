@@ -16,7 +16,7 @@
 /* DO NOT EDIT!! - this file automatically generated
  *                 from .s file by awk -f s2h.awk
  */
-/*  Size defintions
+/*  Size definitions
  *  Copyright (C) ARM Limited 1998. All rights reserved.
  */
 

@@ -568,7 +568,6 @@ static int __init nbd_init(void)
 	devfs_mk_dir("nbd");
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
-		char name[16];
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
 		nbd_dev[i].magic = LO_MAGIC;
@@ -585,13 +584,9 @@ static int __init nbd_init(void)
 		disk->private_data = &nbd_dev[i];
 		disk->queue = &nbd_queue;
 		sprintf(disk->disk_name, "nbd%d", i);
+		sprintf(disk->devfs_name, "nbd/%d", i);
 		set_capacity(disk, 0x3ffffe);
 		add_disk(disk);
-		sprintf(name, "nbd/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       disk->major, disk->first_minor,
-			       S_IFBLK | S_IRUSR | S_IWUSR,
-			       disk->fops, NULL);
 	}
 
 	return 0;
@@ -607,7 +602,6 @@ static void __exit nbd_cleanup(void)
 	for (i = 0; i < MAX_NBD; i++) {
 		del_gendisk(nbd_dev[i].disk);
 		put_disk(nbd_dev[i].disk);
-		devfs_remove("nbd/%d", i);
 	}
 	devfs_remove("nbd");
 	blk_cleanup_queue(&nbd_queue);

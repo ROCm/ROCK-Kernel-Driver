@@ -154,7 +154,7 @@ typedef char                                    *acpi_physical_address;
 typedef u16                                     acpi_size;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000002
-#define _HW_ALIGNMENT_SUPPORT
+#define ACPI_MISALIGNED_TRANSFERS
 #define ACPI_USE_NATIVE_DIVIDE                          /* No 64-bit integers, ok to use native divide */
 #define ACPI_MAX_PTR                    ACPI_UINT16_MAX
 #define ACPI_SIZE_MAX                   ACPI_UINT16_MAX
@@ -192,7 +192,7 @@ typedef u64                                     acpi_physical_address;
 typedef u32                                     acpi_size;
 
 #define ALIGNED_ADDRESS_BOUNDARY        0x00000004
-#define _HW_ALIGNMENT_SUPPORT
+#define ACPI_MISALIGNED_TRANSFERS
 #define ACPI_MAX_PTR                    ACPI_UINT32_MAX
 #define ACPI_SIZE_MAX                   ACPI_UINT32_MAX
 
@@ -1194,7 +1194,7 @@ struct acpi_resource
 
 #define ACPI_NEXT_RESOURCE(res)             (struct acpi_resource *)((u8 *) res + res->length)
 
-#ifdef _HW_ALIGNMENT_SUPPORT
+#ifdef ACPI_MISALIGNED_TRANSFERS
 #define ACPI_ALIGN_RESOURCE_SIZE(length)    (length)
 #else
 #define ACPI_ALIGN_RESOURCE_SIZE(length)    ACPI_ROUND_UP_TO_NATIVE_WORD(length)

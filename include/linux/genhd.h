@@ -15,6 +15,7 @@
 #include <linux/device.h>
 #include <linux/smp.h>
 #include <linux/string.h>
+#include <linux/fs.h>
 
 enum {
 /* These three have identical behaviour; use the second one if DOS FDISK gets
@@ -55,16 +56,12 @@ struct partition {
 } __attribute__((packed));
 
 #ifdef __KERNEL__
-#include <linux/devfs_fs_kernel.h>	/* we don't need any devfs crap
-					   here, but some of the implicitly
-					   included headers.   will clean
-					   this mess up later.	--hch */
 struct hd_struct {
 	sector_t start_sect;
 	sector_t nr_sects;
 	struct kobject kobj;
 	unsigned reads, read_sectors, writes, write_sectors;
-	int policy;
+	int policy, partno;
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -89,7 +86,7 @@ struct gendisk {
 	int minor_shift;		/* number of times minor is shifted to
 					   get real minor */
 	char disk_name[16];		/* name of major driver */
-	struct hd_struct *part;		/* [indexed by minor] */
+	struct hd_struct **part;	/* [indexed by minor] */
 	struct block_device_operations *fops;
 	struct request_queue *queue;
 	void *private_data;

@@ -1196,7 +1196,7 @@ static int alloc_dmabuf(struct cs_state *state)
 
 	// 2. mark each physical page in range as 'reserved'.
 	for (map = virt_to_page(dmabuf->rawbuf); map <= mapend; map++)
-		cs4x_mem_map_reserve(map);
+		SetPageReserved(map);
 
 	CS_DBGOUT(CS_PARMS, 9, printk("cs46xx: alloc_dmabuf(): allocated %ld (order = %d) bytes at %p\n",
 	       PAGE_SIZE << order, order, rawbuf) );
@@ -1233,7 +1233,7 @@ static int alloc_dmabuf(struct cs_state *state)
 
 	// 2. mark each physical page in range as 'reserved'.
 	for (map = virt_to_page(dmabuf->tmpbuff); map <= mapend; map++)
-		cs4x_mem_map_reserve(map);
+		SetPageReserved(map);
 	return 0;
 }
 
@@ -1248,7 +1248,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->rawbuf + 
 				(PAGE_SIZE << dmabuf->buforder) - 1);
 		for (map = virt_to_page(dmabuf->rawbuf); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			cs4x_ClearPageReserved(map);
 		free_dmabuf(state->card, dmabuf);
 	}
 
@@ -1257,7 +1257,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->tmpbuff +
 				(PAGE_SIZE << dmabuf->buforder_tmpbuff) - 1);
 		for (map = virt_to_page(dmabuf->tmpbuff); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			cs4x_ClearPageReserved(map);
 		free_dmabuf2(state->card, dmabuf);
 	}
 
@@ -1670,7 +1670,7 @@ static void cs_handle_midi(struct cs_card *card)
                 wake_up(&card->midi.owait);
 }
 
-static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cs_card *card = (struct cs_card *)dev_id;
 	/* Single channel card */
@@ -1688,7 +1688,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	{
 		cs461x_pokeBA0(card, BA0_HICR, HICR_CHGM|HICR_IEV);
 		spin_unlock(&card->lock);
-		return;
+		return IRQ_HANDLED;	/* Might be IRQ_NONE.. */
 	}
 	
 	/*
@@ -1709,6 +1709,7 @@ static void cs_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	cs461x_pokeBA0(card, BA0_HICR, HICR_CHGM|HICR_IEV);
 	spin_unlock(&card->lock);
 	CS_DBGOUT(CS_INTERRUPT, 9, printk("cs46xx: cs_interrupt()- \n"));
+	return IRQ_HANDLED;
 }
 
 

@@ -376,6 +376,7 @@ static dev_link_t *smc91c92_attach(void)
     link->conf.IntType = INT_MEMORY_AND_IO;
 
     /* The SMC91c92-specific entries in the device structure. */
+    SET_MODULE_OWNER(dev);
     dev->hard_start_xmit = &smc_start_xmit;
     dev->get_stats = &smc_get_stats;
     dev->set_config = &s9k_config;
@@ -1301,7 +1302,6 @@ static int smc_open(struct net_device *dev)
 	return -ENODEV;
     }
     link->open++;
-    MOD_INC_USE_COUNT;
 
     netif_start_queue(dev);
     smc->saved_skb = 0;
@@ -1346,8 +1346,6 @@ static int smc_close(struct net_device *dev)
     del_timer(&smc->media);
     if (link->state & DEV_STALE_CONFIG)
 	mod_timer(&link->release, jiffies + HZ/20);
-
-    MOD_DEC_USE_COUNT;
 
     return 0;
 } /* smc_close */

@@ -306,7 +306,7 @@ chrp_halt(void)
 }
 
 u_int __chrp
-chrp_irq_cannonicalize(u_int irq)
+chrp_irq_canonicalize(u_int irq)
 {
 	if (irq == 2)
 		return 9;
@@ -456,7 +456,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.show_percpuinfo = of_show_percpuinfo;
 	ppc_md.show_cpuinfo   = chrp_show_cpuinfo;
-	ppc_md.irq_cannonicalize = chrp_irq_cannonicalize;
+	ppc_md.irq_canonicalize = chrp_irq_canonicalize;
 	ppc_md.init_IRQ       = chrp_init_IRQ;
 	ppc_md.get_irq        = openpic_get_irq;
 

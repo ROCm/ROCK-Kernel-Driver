@@ -342,6 +342,7 @@ int pcmcia_register_socket(struct device *dev)
 		s->cis_mem.flags = 0;
 		s->cis_mem.speed = cis_speed;
 		s->erase_busy.next = s->erase_busy.prev = &s->erase_busy;
+		INIT_LIST_HEAD(&s->cis_cache);
 		spin_lock_init(&s->lock);
     
 		/* TBD: remove usage of socket_table, use class_for_each_dev instead */
@@ -469,7 +470,7 @@ static void shutdown_socket(socket_info_t *s)
     init_socket(s);
     s->irq.AssignedIRQ = s->irq.Config = 0;
     s->lock_count = 0;
-    s->cis_used = 0;
+    destroy_cis_cache(s);
     if (s->fake_cis) {
 	kfree(s->fake_cis);
 	s->fake_cis = NULL;
@@ -484,7 +485,6 @@ static void shutdown_socket(socket_info_t *s)
     set_socket(s, &s->socket);
     /* */
 #ifdef CONFIG_CARDBUS
-    cb_release_cis_mem(s);
     cb_free(s);
 #endif
     s->functions = 0;

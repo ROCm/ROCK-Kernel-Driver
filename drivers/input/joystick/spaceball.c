@@ -149,7 +149,8 @@ static void spaceball_process_packet(struct spaceball* spaceball, struct pt_regs
  * can occur in the axis values.
  */
 
-static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
+static irqreturn_t spaceball_interrupt(struct serio *serio,
+		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
 	struct spaceball *spaceball = serio->private;
 
@@ -158,11 +159,11 @@ static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigne
 			spaceball_process_packet(spaceball, regs);
 			spaceball->idx = 0;
 			spaceball->escape = 0;
-			return;
+			break;
 		case '^':
 			if (!spaceball->escape) {
 				spaceball->escape = 1;
-				return;
+				break;
 			}
 			spaceball->escape = 0;
 		case 'M':
@@ -177,8 +178,9 @@ static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigne
 				spaceball->escape = 0;
 			if (spaceball->idx < SPACEBALL_MAX_LENGTH)
 				spaceball->data[spaceball->idx++] = data;
-			return;
+			break;
 	}
+	return IRQ_HANDLED;
 }
 
 /*

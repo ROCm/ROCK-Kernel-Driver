@@ -741,7 +741,6 @@ linvfs_get_dentry(
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 

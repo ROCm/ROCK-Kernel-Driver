@@ -270,7 +270,6 @@ static inline struct dentry *dget(struct dentry *dentry)
 		if (!atomic_read(&dentry->d_count))
 			BUG();
 		atomic_inc(&dentry->d_count);
-		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	}
 	return dentry;
 }

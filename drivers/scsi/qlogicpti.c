@@ -644,7 +644,7 @@ static int qlogicpti_verify_tmon(struct qlogicpti *qpti)
 	return 0;
 }
 
-static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t qpti_intr(int irq, void *dev_id, struct pt_regs *regs);
 
 static void __init qpti_chain_add(struct qlogicpti *qpti)
 {
@@ -1441,7 +1441,7 @@ static Scsi_Cmnd *qlogicpti_intr_handler(struct qlogicpti *qpti)
 	return done_queue;
 }
 
-static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct qlogicpti *qpti = dev_id;
 	unsigned long flags;
@@ -1463,6 +1463,8 @@ static void qpti_intr(int irq, void *dev_id, struct pt_regs *regs)
 		spin_unlock(qpti->qhost->host_lock);
 	}
 	local_irq_restore(flags);
+
+	return IRQ_HANDLED;
 }
 
 static int qlogicpti_abort(Scsi_Cmnd *Cmnd)

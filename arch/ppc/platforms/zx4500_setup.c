@@ -35,7 +35,7 @@
 #include <linux/kdev_t.h>
 #include <linux/types.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
@@ -331,7 +331,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.setup_arch = zx4500_setup_arch;
 	ppc_md.show_cpuinfo = zx4500_show_cpuinfo;
-	ppc_md.irq_cannonicalize = NULL;
+	ppc_md.irq_canonicalize = NULL;
 	ppc_md.init_IRQ = zx4500_init_IRQ;
 	ppc_md.get_irq = openpic_get_irq;
 	ppc_md.init = NULL;

@@ -139,7 +139,7 @@ int RIORemoveFromSavedTable(struct rio_info *, struct Map *);
 int riotopen(struct tty_struct * tty, struct file * filp);
 int riotclose(void  *ptr);
 int RIOCookMode(struct ttystatics *);
-int riotioctl(struct rio_info *, dev_t, register int, register caddr_t); 
+int riotioctl(struct rio_info *, struct tty_struct *, register int, register caddr_t); 
 void ttyseth(struct Port *, struct ttystatics *, struct old_sgttyb *sg);
 
 /* riotable.c */
@@ -166,8 +166,8 @@ struct rio_info * rio_info_store( int cmd, struct rio_info * p);
 #endif
 
 extern int    rio_pcicopy(char *src, char *dst, int n);
-extern int rio_minor (kdev_t device);
-extern int rio_ismodem (kdev_t device);
+extern int rio_minor (struct tty_struct *tty);
+extern int rio_ismodem (struct tty_struct *tty);
 extern void rio_udelay (int usecs);
 
 extern void rio_start_card_running (struct Host * HostP);

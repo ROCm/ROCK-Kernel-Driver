@@ -51,7 +51,6 @@
 #ifndef _LINUX_TIMEX_H
 #define _LINUX_TIMEX_H
 
-#include <linux/time.h>
 #include <asm/param.h>
 
 /*
@@ -177,6 +176,7 @@
 /* a value TUSEC for TICK_USEC (can be set bij adjtimex)		*/
 #define TICK_NSEC(TUSEC) (SH_DIV (TUSEC * USER_HZ * 1000, ACTHZ, 8))
 
+#include <linux/time.h>
 /*
  * syscall interface - used (mainly by NTP daemon)
  * to discipline kernel clock oscillator

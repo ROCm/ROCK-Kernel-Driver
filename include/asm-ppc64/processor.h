@@ -469,8 +469,6 @@
 #define	  IOCR_SPC	0x00000001
 
 
-/* Processor Version Register */
-
 /* Processor Version Register (PVR) field extraction */
 
 #define	PVR_VER(pvr)  (((pvr) >>  16) & 0xFFFF)	/* Version field */
@@ -656,8 +654,10 @@ struct thread_struct {
 	struct pt_regs	*regs;		/* Pointer to saved register state */
 	mm_segment_t	fs;		/* for get_fs() validation */
 	double		fpr[32];	/* Complete floating point set */
-	unsigned long	fpscr;		/* Floating point status */
-	unsigned int	fpexc_mode;	/* Floating-point exception mode */
+	unsigned long	fpscr;		/* Floating point status (plus pad) */
+	unsigned long	fpexc_mode;	/* Floating-point exception mode */
+	unsigned long	saved_msr;	/* Save MSR across signal handlers */
+	unsigned long	saved_softe;	/* Ditto for Soft Enable/Disable */
 };
 
 #define INIT_SP		(sizeof(init_stack) + (unsigned long) &init_stack)
@@ -704,7 +704,7 @@ static inline unsigned int __unpack_fe01(unsigned long msr_bits)
 	return ((msr_bits & MSR_FE0) >> 10) | ((msr_bits & MSR_FE1) >> 8);
 }
 
-static inline unsigned int __pack_fe01(unsigned int fpmode)
+static inline unsigned long __pack_fe01(unsigned int fpmode)
 {
 	return ((fpmode << 10) & MSR_FE0) | ((fpmode << 8) & MSR_FE1);
 }

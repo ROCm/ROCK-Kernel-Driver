@@ -202,7 +202,7 @@ static int at1700_probe1(struct net_device *dev, int ioaddr);
 static int read_eeprom(long ioaddr, int location);
 static int net_open(struct net_device *dev);
 static int	net_send_packet(struct sk_buff *skb, struct net_device *dev);
-static void net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void net_rx(struct net_device *dev);
 static int net_close(struct net_device *dev);
 static struct net_device_stats *net_get_stats(struct net_device *dev);
@@ -696,16 +696,17 @@ static int net_send_packet (struct sk_buff *skb, struct net_device *dev)
 
 /* The typical workload of the driver:
    Handle the network interface interrupts. */
-static void
+static irqreturn_t
 net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *lp;
 	int ioaddr, status;
+	int handled = 0;
 
 	if (dev == NULL) {
 		printk ("at1700_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	ioaddr = dev->base_addr;
@@ -726,6 +727,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		   Tx interrupt. Thus we flag on rx_started, so that we prevent
 		   the interrupt routine (net_interrupt) to dive into net_rx
 		   again. */
+		handled = 1;
 		lp->rx_started = 1;
 		outb(0x00, ioaddr + RX_INTR);	/* Disable RX intr. */
 		net_rx(dev);
@@ -733,6 +735,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		lp->rx_started = 0;
 	}
 	if (status & 0x00ff) {
+		handled = 1;
 		if (status & 0x02) {
 			/* More than 16 collisions occurred */
 			if (net_debug > 4)
@@ -760,7 +763,7 @@ net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	spin_unlock (&lp->lock);
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /* We have a good packet(s), get it/them out of the buffers. */
@@ -914,9 +917,11 @@ set_rx_mode(struct net_device *dev)
 
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
-			 i++, mclist = mclist->next)
-			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) >> 26,
-					mc_filter);
+			 i++, mclist = mclist->next) {
+			unsigned int bit =
+				ether_crc_le(ETH_ALEN, mclist->dmi_addr) >> 26;
+			mc_filter[bit >> 3] |= (1 << bit);
+		}
 		outb(0x02, ioaddr + RX_MODE);	/* Use normal mode. */
 	}
 

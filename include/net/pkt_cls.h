@@ -39,6 +39,8 @@ struct tcf_walker
 	int	(*fn)(struct tcf_proto *, unsigned long node, struct tcf_walker *);
 };
 
+struct module;
+
 struct tcf_proto_ops
 {
 	struct tcf_proto_ops	*next;
@@ -56,6 +58,8 @@ struct tcf_proto_ops
 
 	/* rtnetlink specific */
 	int			(*dump)(struct tcf_proto*, unsigned long, struct sk_buff *skb, struct tcmsg*);
+
+	struct module		*owner;
 };
 
 /* Main classifier routine: scans classifier chain attached

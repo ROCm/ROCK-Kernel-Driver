@@ -192,7 +192,7 @@ void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data)
 /********************************************************************************/
 /* interrupt handler */
 
-static void interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct saa7146_dev *dev = (struct saa7146_dev*)dev_id;
 	u32 isr = 0;
@@ -203,7 +203,7 @@ static void interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 	/* is this our interrupt? */
 	if ( 0 == isr ) {
 		/* nope, some other device */
-		return;
+		return IRQ_NONE;
 	}
 
 	saa7146_write(dev, ISR, isr);
@@ -254,6 +254,7 @@ static void interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 		ERR(("disabling interrupt source(s)!\n"));
 		IER_DISABLE(dev,isr);
 	}
+	return IRQ_HANDLED;
 }
 
 /*********************************************************************************/

@@ -156,7 +156,6 @@ struct brlvger_priv {
 	struct usb_device   *dev; /* USB device handle */
 	struct usb_endpoint_descriptor *in_interrupt;
 	struct urb *intr_urb;
-	devfs_handle_t devfs;
 
 	int subminor; /* which minor dev #? */
 
@@ -374,16 +373,11 @@ brlvger_probe (struct usb_interface *intf,
 	dbg("Display length: %d", priv->plength);
 
 	sprintf(devfs_name, "usb/brlvger%d", priv->subminor);
-	priv->devfs = devfs_register(NULL, devfs_name,
+	devfs_register(NULL, devfs_name,
 				     DEVFS_FL_DEFAULT, USB_MAJOR,
 				     BRLVGER_MINOR+priv->subminor,
 				     S_IFCHR |S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP,
 				     &brlvger_fops, NULL);
-	if (!priv->devfs) {
-#ifdef CONFIG_DEVFS_FS
-		err("devfs node registration failed");
-#endif
-	}
 
 	display_table[i] = priv;
 
@@ -420,7 +414,7 @@ brlvger_disconnect(struct usb_interface *intf)
 	if(priv){
 		info("Display %d disconnecting", priv->subminor);
 
-		devfs_unregister(priv->devfs);
+		devfs_remove("usb/brlvger%d", priv->subminor);
 		usb_deregister_dev(1, priv->subminor);
 
 		down(&disconnect_sem);

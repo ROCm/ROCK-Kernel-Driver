@@ -23,7 +23,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 
@@ -561,13 +561,13 @@ static void __init build_iSeries_Memory_Map(void)
 	 * which should be equal to 
 	 *   nextPhysChunk
 	 */
-	naca->physicalMemorySize = chunk_to_addr(nextPhysChunk);
+	systemcfg->physicalMemorySize = chunk_to_addr(nextPhysChunk);
 
 	/* Bolt kernel mappings for all of memory */
-	iSeries_bolt_kernel( 0, naca->physicalMemorySize );
+	iSeries_bolt_kernel( 0, systemcfg->physicalMemorySize );
 
 	lmb_init();
-	lmb_add( 0, naca->physicalMemorySize );
+	lmb_add( 0, systemcfg->physicalMemorySize );
 	lmb_analyze();	/* ?? */
 	lmb_reserve( 0, __pa(klimit));
 
@@ -584,29 +584,28 @@ static void __init build_iSeries_Memory_Map(void)
 
 static void __init setup_iSeries_cache_sizes(void)
 {
-	unsigned i,n;
-	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+	unsigned int i, n;
+	unsigned int procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
 
-	naca->iCacheL1LineSize = xIoHriProcessorVpd[procIx].xInstCacheOperandSize;
-	naca->dCacheL1LineSize = xIoHriProcessorVpd[procIx].xDataCacheOperandSize;
-	naca->iCacheL1LinesPerPage = PAGE_SIZE / naca->iCacheL1LineSize;
-	naca->dCacheL1LinesPerPage = PAGE_SIZE / naca->dCacheL1LineSize;
-	i = naca->iCacheL1LineSize;
+	systemcfg->iCacheL1Size = xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
+	systemcfg->iCacheL1LineSize = xIoHriProcessorVpd[procIx].xInstCacheOperandSize;
+	systemcfg->dCacheL1Size = xIoHriProcessorVpd[procIx].xDataL1CacheSizeKB * 1024;
+	systemcfg->dCacheL1LineSize = xIoHriProcessorVpd[procIx].xDataCacheOperandSize;
+	naca->iCacheL1LinesPerPage = PAGE_SIZE / systemcfg->iCacheL1LineSize;
+	naca->dCacheL1LinesPerPage = PAGE_SIZE / systemcfg->dCacheL1LineSize;
+
+	i = systemcfg->iCacheL1LineSize;
 	n = 0;
 	while ((i=(i/2))) ++n;
 	naca->iCacheL1LogLineSize = n;
-	i = naca->dCacheL1LineSize;
+
+	i = systemcfg->dCacheL1LineSize;
 	n = 0;
 	while ((i=(i/2))) ++n;
 	naca->dCacheL1LogLineSize = n;
 
-	printk( "D-cache line size = %d  (log = %d)\n",
-			(unsigned)naca->dCacheL1LineSize,
-			(unsigned)naca->dCacheL1LogLineSize );
-	printk( "I-cache line size = %d  (log = %d)\n",
-			(unsigned)naca->iCacheL1LineSize,
-			(unsigned)naca->iCacheL1LogLineSize );
-	
+	printk( "D-cache line size = %d\n", (unsigned int)systemcfg->dCacheL1LineSize);
+	printk( "I-cache line size = %d\n", (unsigned int)systemcfg->iCacheL1LineSize);
 }
 
 /*
@@ -647,6 +646,11 @@ iSeries_setup_arch(void)
 {
 	void *	eventStack;
 	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+
+	/* Add an eye catcher and the systemcfg layout version number */
+	strcpy(systemcfg->eye_catcher, "SYSTEMCFG:PPC64");
+	systemcfg->version.major = SYSTEMCFG_MAJOR;
+	systemcfg->version.minor = SYSTEMCFG_MINOR;
 
 	/* Setup the Lp Event Queue */
 
@@ -696,8 +700,8 @@ iSeries_setup_arch(void)
 	printk("Time base frequency = %lu.%02lu\n",
 			tbFreqMhz,
 			tbFreqMhzHundreths );
-	printk("Processor version = %x\n",
-			xIoHriProcessorVpd[procIx].xPVR );
+	systemcfg->processor = xIoHriProcessorVpd[procIx].xPVR;
+	printk("Processor version = %x\n", systemcfg->processor);
 
 }
 
@@ -726,9 +730,9 @@ void iSeries_setup_residual(struct seq_file *m)
 	seq_printf(m,"time base\t: %lu.%02luMHz\n",
 		tbFreqMhz, tbFreqMhzHundreths );
 	seq_printf(m,"i-cache\t\t: %d\n",
-		naca->iCacheL1LineSize);
+		systemcfg->iCacheL1LineSize);
 	seq_printf(m,"d-cache\t\t: %d\n",
-		naca->dCacheL1LineSize);
+		systemcfg->dCacheL1LineSize);
 
 }
 

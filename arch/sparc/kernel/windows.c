@@ -120,7 +120,7 @@ void try_to_clear_window_buffer(struct pt_regs *regs, int who)
 		unsigned long sp = tp->rwbuf_stkptrs[window];
 
 		if((sp & 7) ||
-		   copy_to_user((char *) sp, &tp->reg_window[window], REGWIN_SZ))
+		   copy_to_user((char *) sp, &tp->reg_window[window], sizeof(struct reg_window)))
 			do_exit(SIGILL);
 	}
 	tp->w_saved = 0;

@@ -20,4 +20,4 @@ clean-files := oui.c
 
 $(obj)/oui.o: $(obj)/oui.c
 $(obj)/oui.c: $(obj)/oui.db $(obj)/oui2c.sh
-	$(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $(obj)/oui.c
+	$(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $@

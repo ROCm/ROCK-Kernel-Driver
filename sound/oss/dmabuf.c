@@ -116,7 +116,7 @@ static int sound_alloc_dmap(struct dma_buffparms *dmap)
 	dmap->raw_buf_phys = virt_to_bus(start_addr);
 
 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 	return 0;
 }
 
@@ -136,7 +136,7 @@ static void sound_free_dmap(struct dma_buffparms *dmap)
 	end_addr = start_addr + dmap->buffsize;
 
 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
-		mem_map_unreserve(page);
+		ClearPageReserved(page);
 
 	free_pages((unsigned long) dmap->raw_buf, sz);
 	dmap->raw_buf = NULL;

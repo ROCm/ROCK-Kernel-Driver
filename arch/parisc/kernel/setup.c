@@ -29,7 +29,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/blk.h>          /* for initrd_start and initrd_end */
+#include <linux/initrd.h>
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>

@@ -54,8 +54,10 @@
 #include <asm/rtas.h>
 #include <asm/ppcdebug.h>
 
-static void ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs);
-static void ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t ras_epow_interrupt(int irq, void *dev_id,
+					struct pt_regs * regs);
+static irqreturn_t ras_error_interrupt(int irq, void *dev_id,
+					struct pt_regs * regs);
 void init_ras_IRQ(void);
 
 /* #define DEBUG */
@@ -73,7 +75,7 @@ void init_ras_IRQ(void) {
 						&len))) {
 		for(i=0; i<(len / sizeof(*ireg)); i++) {
 			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
-				    &ras_error_interrupt, 0, 
+				    ras_error_interrupt, 0, 
 				    "RAS_ERROR", NULL);
 			ireg++;
 		}
@@ -84,7 +86,7 @@ void init_ras_IRQ(void) {
 						&len))) {
 		for(i=0; i<(len / sizeof(*ireg)); i++) {
 			request_irq(virt_irq_create_mapping(*(ireg)) + NUM_8259_INTERRUPTS, 
-				    &ras_epow_interrupt, 0, 
+				    ras_epow_interrupt, 0, 
 				    "RAS_EPOW", NULL);
 			ireg++;
 		}
@@ -98,7 +100,7 @@ void init_ras_IRQ(void) {
  * to examine the type of power failure and take appropriate action where
  * the time horizon permits something useful to be done.
  */
-static void
+static irqreturn_t
 ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct rtas_error_log log_entry;
@@ -114,7 +116,8 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	udbg_printf("EPOW <0x%lx 0x%lx>\n", 
 		    *((unsigned long *)&log_entry), status); 
 	printk(KERN_WARNING 
-	       "EPOW <0x%lx 0x%lx>\n",*((unsigned long *)&log_entry), status);
+		"EPOW <0x%lx 0x%lx>\n",*((unsigned long *)&log_entry), status);
+	return IRQ_HANDLED;
 }
 
 /*
@@ -125,7 +128,7 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
  * For nonrecoverable errors, an error is logged and we stop all processing
  * as quickly as possible in order to prevent propagation of the failure.
  */
-static void
+static irqreturn_t
 ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct rtas_error_log log_entry;
@@ -158,7 +161,6 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		printk(KERN_WARNING 
 		       "Warning: Recoverable hardware error <0x%lx 0x%lx>\n",
 		       *((unsigned long *)&log_entry), status);
-
-		return;
 	}
+	return IRQ_HANDLED;
 }

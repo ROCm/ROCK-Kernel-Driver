@@ -104,9 +104,22 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	return -ENOEXEC;
 }
 
+extern void apply_alternatives(void *start, void *end); 
+
 int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
+	const Elf_Shdr *s;
+	char *secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+
+	/* look for .altinstructions to patch */ 
+	for (s = sechdrs; s < sechdrs + hdr->e_shnum; s++) { 
+		void *seg; 		
+		if (strcmp(".altinstructions", secstrings + s->sh_name))
+			continue;
+		seg = (void *)s->sh_addr; 
+		apply_alternatives(seg, seg + s->sh_size); 
+	} 	
 	return 0;
 }

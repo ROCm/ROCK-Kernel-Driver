@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-iop3xx/mm.c
  *
- * Low level memory intialization for IOP321 based systems
+ * Low level memory initialization for IOP321 based systems
  *
  * Author: Rory Bolt <rorybolt@pacbell.net>
  * Copyright (C) 2002 Rory Bolt
@@ -31,7 +31,7 @@ static struct map_desc iop80321_std_desc[] __initdata = {
  /* virtual     physical      length      type */
 
  /* mem mapped registers */
- { 0xfff00000,  0xffffe000,   0x00002000,  MT_DEVICE },
+ { IOP321_VIRT_MEM_BASE,  IOP321_PHY_MEM_BASE,   0x00002000,  MT_DEVICE },
 
  /* PCI IO space */
  { 0xfe000000,  0x90000000,   0x00020000,  MT_DEVICE }
@@ -52,7 +52,7 @@ static struct map_desc iq80321_io_desc[] __initdata = {
  /* virtual     physical      length        type */
 
  /* on-board devices */
- { 0xfe800000,  0xfe800000,   0x00100000,   MT_DEVICE }
+ { 0xfe800000,  IQ80321_UART1,   0x00100000,   MT_DEVICE }
 };
 
 void __init iq80321_map_io(void)

@@ -59,7 +59,7 @@ void	UxCardHandleFree(ux_diva_card_t *card);
  */
 
 long		UxCardLock(ux_diva_card_t *card);
-void	UxCardUnlock(ux_diva_card_t *card, long ipl);
+void	UxCardUnlock(ux_diva_card_t *card, unsigned long ipl);
 
 /*
  * Set the mapping address for PCI cards
