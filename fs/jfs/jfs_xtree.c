@@ -1071,8 +1071,10 @@ xtSplitUp(tid_t tid,
 		 */
 		/* get/pin the parent page <sp> */
 		XT_GETPAGE(ip, parent->bn, smp, PSIZE, sp, rc);
-		if (rc)
-			goto errout2;
+		if (rc) {
+			XT_PUTPAGE(rcmp);
+			return rc;
+		}
 
 		/*
 		 * The new key entry goes ONE AFTER the index of parent entry,
@@ -1106,8 +1108,10 @@ xtSplitUp(tid_t tid,
 			rc = (sp->header.flag & BT_ROOT) ?
 			    xtSplitRoot(tid, ip, split, &rmp) :
 			    xtSplitPage(tid, ip, split, &rmp, &rbn);
-			if (rc)
-				goto errout1;
+			if (rc) {
+				XT_PUTPAGE(smp);
+				return rc;
+			}
 
 			XT_PUTPAGE(smp);
 			/* keep new child page <rp> pinned */
@@ -1170,19 +1174,6 @@ xtSplitUp(tid_t tid,
 	XT_PUTPAGE(rmp);
 
 	return 0;
-
-	/*
-	 * If something fails in the above loop we were already walking back
-	 * up the tree and the tree is now inconsistent.
-	 * release all pages we're holding.
-	 */
-      errout1:
-	XT_PUTPAGE(smp);
-
-      errout2:
-	XT_PUTPAGE(rcmp);
-
-	return rc;
 }
 
 
