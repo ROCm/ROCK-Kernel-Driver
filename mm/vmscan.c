@@ -815,8 +815,6 @@ try_to_free_pages(struct zone *classzone,
 					nr_pages, &ps);
 		if (nr_reclaimed >= nr_pages)
 			return 1;
-		if (total_scanned == 0)
-			printk("%s: I am buggy\n", __FUNCTION__);
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
