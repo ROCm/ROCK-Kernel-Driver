@@ -316,7 +316,15 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 
 	wchan = get_wchan(task);
 
-	collect_sigign_sigcatch(task, &sigign, &sigcatch);
+	sigemptyset(&sigign);
+	sigemptyset(&sigcatch);
+	read_lock(&tasklist_lock);
+	if (task->sighand) {
+		spin_lock_irq(&task->sighand->siglock);
+		collect_sigign_sigcatch(task, &sigign, &sigcatch);
+		spin_unlock_irq(&task->sighand->siglock);
+	}
+	read_unlock(&tasklist_lock);		
 
 	/* scale priority and nice values from timeslices to -20..20 */
 	/* to make it look like a "normal" Unix priority/nice value  */
