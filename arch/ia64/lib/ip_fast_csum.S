@@ -28,6 +28,7 @@
 #define ret0	r8
 
 GLOBAL_ENTRY(ip_fast_csum)
+	.prologue
 	.body
 	cmp.ne	p6,p7=5,in1	// size other than 20 byte?
 	and	r14=3,in0	// is it aligned on 4-byte?
