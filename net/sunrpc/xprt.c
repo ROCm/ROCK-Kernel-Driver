@@ -1421,6 +1421,27 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 }
 
 /*
+ * Set socket buffer length
+ */
+void
+xprt_sock_setbufsize(struct rpc_xprt *xprt)
+{
+	struct sock *sk = xprt->inet;
+
+	if (xprt->stream)
+		return;
+	if (xprt->rcvsize) {
+		sk->userlocks |= SOCK_RCVBUF_LOCK;
+		sk->rcvbuf = xprt->rcvsize * RPC_MAXCONG * 2;
+	}
+	if (xprt->sndsize) {
+		sk->userlocks |= SOCK_SNDBUF_LOCK;
+		sk->sndbuf = xprt->sndsize * RPC_MAXCONG * 2;
+		sk->write_space(sk);
+	}
+}
+
+/*
  * Create a client socket given the protocol and peer address.
  */
 static struct socket *
