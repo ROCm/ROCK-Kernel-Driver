@@ -1668,10 +1668,10 @@ static int run(mddev_t *mddev)
 	}
 	conf->raid_disks = mddev->raid_disks;
 	conf->mddev = mddev;
-	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&conf->device_lock);
 	INIT_LIST_HEAD(&conf->retry_list);
 
-	conf->resync_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&conf->resync_lock);
 	init_waitqueue_head(&conf->wait_idle);
 	init_waitqueue_head(&conf->wait_resume);
 
