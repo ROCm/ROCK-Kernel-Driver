@@ -203,12 +203,6 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
 
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
-
 	return val;
 }
 
@@ -288,12 +282,6 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 	snd_assert(codec_index == CS46XX_PRIMARY_CODEC_INDEX ||
 		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
 		   return);
-
-	/* HACK: voyetra uses EAPD bit in the reverse way.
-	 * we flip the bit to show the mixer status correctly
-	 */
-	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
-		val ^= 0x8000;
 
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
 }
@@ -2405,6 +2393,8 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
+	if (chip->amplifier_ctrl == amp_voyetra)
+		ac97.scaps = AC97_SCAP_INV_EAPD;
 
 	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
 			       CS46XX_PRIMARY_CODEC_INDEX);

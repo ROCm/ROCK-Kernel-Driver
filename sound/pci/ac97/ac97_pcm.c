@@ -93,54 +93,52 @@ static unsigned char rate_reg_tables[2][4][9] = {
   },
 },
 {
-  /* FIXME: double rates */
+  /* double rates */
   {
-  	/* 3&4 front, 7&8 rear, 6&9 center/lfe */
+  	/* 3&4 front, 7&8 front (t+1) */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 3 */
 	AC97_PCM_FRONT_DAC_RATE,	/* slot 4 */
 	0xff,				/* slot 5 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 6 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 7 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 8 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 9 */
+	0xff,				/* slot 6 */
+	AC97_PCM_FRONT_DAC_RATE,	/* slot 7 */
+	AC97_PCM_FRONT_DAC_RATE,	/* slot 8 */
+	0xff,				/* slot 9 */
 	0xff,				/* slot 10 */
 	0xff,				/* slot 11 */
   },
   {
-  	/* 7&8 front, 6&9 rear, 10&11 center/lfe */
+	/* not specified in the specification */
 	0xff,				/* slot 3 */
 	0xff,				/* slot 4 */
 	0xff,				/* slot 5 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 6 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 7 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 8 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 9 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 10 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 11 */
-  },
-  {
-  	/* 6&9 front, 10&11 rear, 3&4 center/lfe */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 3 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 4 */
-	0xff,				/* slot 5 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 6 */
+	0xff,				/* slot 6 */
 	0xff,				/* slot 7 */
 	0xff,				/* slot 8 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 9 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 10 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 11 */
+	0xff,				/* slot 9 */
+	0xff,				/* slot 10 */
+	0xff,				/* slot 11 */
   },
   {
-  	/* 10&11 front, 3&4 rear, 7&8 center/lfe */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 3 */
-	AC97_PCM_SURR_DAC_RATE,		/* slot 4 */
+	0xff,				/* slot 3 */
+	0xff,				/* slot 4 */
 	0xff,				/* slot 5 */
 	0xff,				/* slot 6 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 7 */
-	AC97_PCM_LFE_DAC_RATE,		/* slot 8 */
+	0xff,				/* slot 7 */
+	0xff,				/* slot 8 */
 	0xff,				/* slot 9 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 10 */
-	AC97_PCM_FRONT_DAC_RATE,	/* slot 11 */
+	0xff,				/* slot 10 */
+	0xff,				/* slot 11 */
+  },
+  {
+	0xff,				/* slot 3 */
+	0xff,				/* slot 4 */
+	0xff,				/* slot 5 */
+	0xff,				/* slot 6 */
+	0xff,				/* slot 7 */
+	0xff,				/* slot 8 */
+	0xff,				/* slot 9 */
+	0xff,				/* slot 10 */
+	0xff,				/* slot 11 */
   }
 }};
 
@@ -180,6 +178,7 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
 	if (! (ac97->ext_id & AC97_EI_SPDIF))
 		return -ENODEV;
 
+	/* TODO: double rate support */
 	if (ac97->flags & AC97_CS_SPDIF) {
 		switch (rate) {
 		case 48000: bits = 0; break;
@@ -257,10 +256,19 @@ static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
  *
  * Returns zero if successful, or a negative error code on failure.
  */
-int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
+int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned int rate)
 {
+	int dbl;
 	unsigned int tmp;
 	
+	dbl = rate > 48000;
+	if (dbl) {
+		if (!(ac97->flags & AC97_DOUBLE_RATE))
+			return -EINVAL;
+		if (reg != AC97_PCM_FRONT_DAC_RATE)
+			return -EINVAL;
+	}
+
 	switch (reg) {
 	case AC97_PCM_MIC_ADC_RATE:
 		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRM) == 0)	/* MIC VRA */
@@ -270,7 +278,7 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 	case AC97_PCM_FRONT_DAC_RATE:
 	case AC97_PCM_LR_ADC_RATE:
 		if ((ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_VRA) == 0)	/* VRA */
-			if (rate != 48000)
+			if (rate != 48000 && rate != 96000)
 				return -EINVAL;
 		break;
 	case AC97_PCM_SURR_DAC_RATE:
@@ -287,9 +295,14 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 	default:
 		return -EINVAL;
 	}
-	tmp = ((unsigned int)rate * ac97->bus->clock) / 48000;
+	if (dbl)
+		rate /= 2;
+	tmp = (rate * ac97->bus->clock) / 48000;
 	if (tmp > 65535)
 		return -EINVAL;
+	if ((ac97->ext_id & AC97_EI_DRA) && reg == AC97_PCM_FRONT_DAC_RATE)
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, dbl ? AC97_EA_DRA : 0);
 	snd_ac97_update(ac97, reg, tmp & 0xffff);
 	snd_ac97_read(ac97, reg);
 	return 0;
@@ -401,6 +414,9 @@ static unsigned int get_rates(struct ac97_pcm *pcm, unsigned int cidx, unsigned 
 		}
 		rates &= pcm->r[dbl].codec[cidx]->rates[idx];
 	}
+	if (!dbl)
+		rates &= ~(SNDRV_PCM_RATE_64000 | SNDRV_PCM_RATE_88200 |
+			   SNDRV_PCM_RATE_96000);
 	return rates;
 }
 
@@ -447,7 +463,6 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			}
 		}
 	}
-	/* FIXME: add double rate allocation */
 	/* first step - exclusive devices */
 	for (i = 0; i < pcms_count; i++) {
 		pcm = &pcms[i];
@@ -498,6 +513,26 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			rpcm->r[0].slots |= tmp;
 			rpcm->rates &= rates;
 		}
+		/* for double rate, we check the first codec only */
+		if (pcm->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+		    bus->codec[0] && (bus->codec[0]->flags & AC97_DOUBLE_RATE) &&
+		    rate_table[pcm->stream][0] == 0) {
+			tmp = (1<<AC97_SLOT_PCM_LEFT) | (1<<AC97_SLOT_PCM_RIGHT) |
+			      (1<<AC97_SLOT_PCM_LEFT_0) | (1<<AC97_SLOT_PCM_RIGHT_0);
+			if ((tmp & pcm->r[1].slots) == tmp) {
+				rpcm->r[1].slots = tmp;
+				rpcm->r[1].rslots[0] = tmp;
+				rpcm->r[1].rate_table[0] = 0;
+				rpcm->r[1].codec[0] = bus->codec[0];
+				if (pcm->exclusive)
+					avail_slots[pcm->stream][0] &= ~tmp;
+				if (bus->no_vra)
+					rates = SNDRV_PCM_RATE_96000;
+				else
+					rates = get_rates(rpcm, 0, tmp, 1);
+				rpcm->rates |= rates;
+			}
+		}
 		if (rpcm->rates == ~0)
 			rpcm->rates = 0; /* not used */
 	}
@@ -519,13 +554,12 @@ int snd_ac97_pcm_open(struct ac97_pcm *pcm, unsigned int rate,
 		      enum ac97_pcm_cfg cfg, unsigned short slots)
 {
 	ac97_bus_t *bus;
-	int i, cidx, r = 0, ok_flag;
+	int i, cidx, r, ok_flag;
 	unsigned int reg_ok = 0;
 	unsigned char reg;
 	int err = 0;
 
-	if (rate > 48000)	/* FIXME: add support for double rate */
-		return -EINVAL;
+	r = rate > 48000;
 	bus = pcm->bus;
 	if (cfg == AC97_PCM_CFG_SPDIF) {
 		int err;
@@ -613,4 +647,56 @@ int snd_ac97_pcm_close(struct ac97_pcm *pcm)
 	pcm->aslots = 0;
 	spin_unlock_irq(&pcm->bus->bus_lock);
 	return 0;
+}
+
+static int double_rate_hw_constraint_rate(snd_pcm_hw_params_t *params,
+					  snd_pcm_hw_rule_t *rule)
+{
+	snd_interval_t *channels = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	if (channels->min > 2) {
+		static const snd_interval_t single_rates = {
+			.min = 1,
+			.max = 48000,
+		};
+		snd_interval_t *rate = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+		return snd_interval_refine(rate, &single_rates);
+	}
+	return 0;
+}
+
+static int double_rate_hw_constraint_channels(snd_pcm_hw_params_t *params,
+					      snd_pcm_hw_rule_t *rule)
+{
+	snd_interval_t *rate = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	if (rate->min > 48000) {
+		static const snd_interval_t double_rate_channels = {
+			.min = 2,
+			.max = 2,
+		};
+		snd_interval_t *channels = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+		return snd_interval_refine(channels, &double_rate_channels);
+	}
+	return 0;
+}
+
+/**
+ * snd_ac97_pcm_double_rate_rules - set double rate constraints
+ * @runtime: the runtime of the ac97 front playback pcm
+ *
+ * Installs the hardware constraint rules to prevent using double rates and
+ * more than two channels at the same time.
+ */
+int snd_ac97_pcm_double_rate_rules(snd_pcm_runtime_t *runtime)
+{
+	int err;
+
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				  double_rate_hw_constraint_rate, NULL,
+				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	if (err < 0)
+		return err;
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				  double_rate_hw_constraint_channels, NULL,
+				  SNDRV_PCM_HW_PARAM_RATE, -1);
+	return err;
 }

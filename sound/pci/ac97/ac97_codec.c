@@ -749,6 +749,14 @@ AC97_DOUBLE("Surround Playback Volume", AC97_SURROUND_MASTER, 8, 0, 31, 1),
 static const snd_kcontrol_new_t snd_ac97_control_eapd =
 AC97_SINGLE("External Amplifier", AC97_POWERDOWN, 15, 1, 1);
 
+/* change the existing EAPD control as inverted */
+static void set_inv_eapd(ac97_t *ac97, snd_kcontrol_t *kctl)
+{
+	kctl->private_value = AC97_SINGLE_VALUE(AC97_POWERDOWN, 15, 1, 0);
+	snd_ac97_update_bits(ac97, AC97_POWERDOWN, (1<<15), (1<<15)); /* EAPD up */
+	ac97->scaps |= AC97_SCAP_INV_EAPD;
+}
+
 static int snd_ac97_spdif_mask_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_IEC958;
@@ -1559,7 +1567,7 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 			return err;
 	}
 
-	snd_ac97_write_cache(ac97, AC97_GENERAL_PURPOSE, 0x0000);
+	snd_ac97_update_bits(ac97, AC97_GENERAL_PURPOSE, ~AC97_GP_DRSS_MASK, 0x0000);
 
 	/* build 3D controls */
 	if (ac97->build_ops && ac97->build_ops->build_3d) {
@@ -1610,7 +1618,12 @@ static int snd_ac97_mixer_build(ac97_t * ac97)
 			return err;
 
 	if (snd_ac97_try_bit(ac97, AC97_POWERDOWN, 15)) {
-		if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_control_eapd, ac97))) < 0)
+		kctl = snd_ac97_cnew(&snd_ac97_control_eapd, ac97);
+		if (! kctl)
+			return -ENOMEM;
+		if (ac97->scaps & AC97_SCAP_INV_EAPD)
+			set_inv_eapd(ac97, kctl);
+		if ((err = snd_ctl_add(card, kctl)) < 0)
 			return err;
 	}
 
@@ -1646,6 +1659,9 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 {
 	unsigned int result = 0;
 
+	if ((ac97->ext_id & AC97_EI_DRA) && reg == AC97_PCM_FRONT_DAC_RATE)
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, 0);
 	/* test a non-standard rate */
 	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 11000))
 		result |= SNDRV_PCM_RATE_CONTINUOUS;
@@ -1664,6 +1680,23 @@ static void snd_ac97_determine_rates(ac97_t *ac97, int reg, int shadow_reg, unsi
 		result |= SNDRV_PCM_RATE_44100;
 	if (snd_ac97_test_rate(ac97, reg, shadow_reg, 48000))
 		result |= SNDRV_PCM_RATE_48000;
+	if ((ac97->flags & AC97_DOUBLE_RATE) &&
+	    reg == AC97_PCM_FRONT_DAC_RATE) {
+		/* test standard double rates */
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, AC97_EA_DRA);
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 64000 / 2))
+			result |= SNDRV_PCM_RATE_64000;
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 88200 / 2))
+			result |= SNDRV_PCM_RATE_88200;
+		if (snd_ac97_test_rate(ac97, reg, shadow_reg, 96000 / 2))
+			result |= SNDRV_PCM_RATE_96000;
+		/* some codecs don't support variable double rates */
+		if (!snd_ac97_test_rate(ac97, reg, shadow_reg, 76100 / 2))
+			result &= ~SNDRV_PCM_RATE_CONTINUOUS;
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS,
+				     AC97_EA_DRA, 0);
+	}
 	*r_result = result;
 }
 
@@ -2006,11 +2039,20 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		ac97->addr = (ac97->ext_mid & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT;
 	if (ac97->ext_id & 0x0189)	/* L/R, MIC, SDAC, LDAC VRA support */
 		snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, ac97->ext_id & 0x0189);
+	if ((ac97->ext_id & AC97_EI_DRA) && bus->dra) {
+		/* Intel controllers require double rate data to be put in
+		 * slots 7+8, so let's hope the codec supports it. */
+		snd_ac97_update_bits(ac97, AC97_GENERAL_PURPOSE, AC97_GP_DRSS_MASK, AC97_GP_DRSS_78);
+		if ((snd_ac97_read(ac97, AC97_GENERAL_PURPOSE) & AC97_GP_DRSS_MASK) == AC97_GP_DRSS_78)
+			ac97->flags |= AC97_DOUBLE_RATE;
+	}
 	if (ac97->ext_id & AC97_EI_VRA) {	/* VRA support */
 		snd_ac97_determine_rates(ac97, AC97_PCM_FRONT_DAC_RATE, 0, &ac97->rates[AC97_RATES_FRONT_DAC]);
 		snd_ac97_determine_rates(ac97, AC97_PCM_LR_ADC_RATE, 0, &ac97->rates[AC97_RATES_ADC]);
 	} else {
 		ac97->rates[AC97_RATES_FRONT_DAC] = SNDRV_PCM_RATE_48000;
+		if (ac97->flags & AC97_DOUBLE_RATE)
+			ac97->rates[AC97_RATES_FRONT_DAC] |= SNDRV_PCM_RATE_96000;
 		ac97->rates[AC97_RATES_ADC] = SNDRV_PCM_RATE_48000;
 	}
 	if (ac97->ext_id & AC97_EI_SPDIF) {
@@ -2317,9 +2359,9 @@ int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *
 
 static int swap_headphone(ac97_t *ac97, int remove_master)
 {
+	if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
+		return -ENOENT;
 	if (remove_master) {
-		if (ctl_find(ac97, "Headphone Playback Switch", NULL) == NULL)
-			return 0;
 		snd_ac97_remove_ctl(ac97, "Master Playback", "Switch");
 		snd_ac97_remove_ctl(ac97, "Master Playback", "Volume");
 	} else
@@ -2330,9 +2372,9 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 
 static int swap_surround(ac97_t *ac97)
 {
-	/* FIXME: error checks.. */
-	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch");
-	snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume");
+	if (snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Switch") ||
+	    snd_ac97_swap_ctl(ac97, "Master Playback", "Surround Playback", "Volume"))
+		return -ENOENT;
 	return 0;
 }
 
@@ -2363,6 +2405,15 @@ static int tune_alc_jack(ac97_t *ac97)
 	return snd_ctl_add(ac97->bus->card, snd_ac97_cnew(&snd_ac97_alc_jack_detect, ac97));
 }
 
+static int tune_inv_eapd(ac97_t *ac97)
+{
+	snd_kcontrol_t *kctl = ctl_find(ac97, "External Amplifier", NULL);
+	if (! kctl)
+		return -ENOENT;
+	set_inv_eapd(ac97, kctl);
+	return 0;
+}
+
 static int apply_quirk(ac97_t *ac97, int quirk)
 {
 	switch (quirk) {
@@ -2378,6 +2429,8 @@ static int apply_quirk(ac97_t *ac97, int quirk)
 		return tune_ad_sharing(ac97);
 	case AC97_TUNE_ALC_JACK:
 		return tune_alc_jack(ac97);
+	case AC97_TUNE_INV_EAPD:
+		return tune_inv_eapd(ac97);
 	}
 	return -EINVAL;
 }
@@ -2413,6 +2466,8 @@ int snd_ac97_tune_hardware(ac97_t *ac97, struct ac97_quirk *quirk, int override)
 			continue;
 		if ((! quirk->mask && quirk->device == ac97->subsystem_device) ||
 		    quirk->device == (quirk->mask & ac97->subsystem_device)) {
+			if (quirk->codec_id && quirk->codec_id != ac97->id)
+				continue;
 			snd_printdd("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, ac97->subsystem_device);
 			result = apply_quirk(ac97, quirk->type);
 			if (result < 0)
@@ -2438,6 +2493,7 @@ EXPORT_SYMBOL(snd_ac97_mixer);
 EXPORT_SYMBOL(snd_ac97_pcm_assign);
 EXPORT_SYMBOL(snd_ac97_pcm_open);
 EXPORT_SYMBOL(snd_ac97_pcm_close);
+EXPORT_SYMBOL(snd_ac97_pcm_double_rate_rules);
 EXPORT_SYMBOL(snd_ac97_tune_hardware);
 EXPORT_SYMBOL(snd_ac97_set_rate);
 #ifdef CONFIG_PM

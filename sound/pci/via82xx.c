@@ -1547,6 +1547,13 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
+	{
+		.vendor = 0x1106,
+		.device = 0x4161,
+		.codec_id = 0x56494161, /* VT1612A */
+		.name = "Soltek SL-75DRV5",
+		.type = AC97_TUNE_NONE
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x1106,
 		.device = 0x4161,
@@ -1606,6 +1613,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 		return err;
 	chip->ac97_bus->private_free = snd_via82xx_mixer_free_ac97_bus;
 	chip->ac97_bus->clock = chip->ac97_clock;
+	chip->ac97_bus->shared_type = AC97_SHARED_TYPE_VIA;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;

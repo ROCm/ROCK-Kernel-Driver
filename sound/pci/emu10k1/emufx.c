@@ -480,7 +480,7 @@ static void snd_emu10k1_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr
 static void snd_emu10k1_audigy_write_op(emu10k1_fx8010_code_t *icode, unsigned int *ptr,
 					u32 op, u32 r, u32 a, u32 x, u32 y)
 {
-	snd_assert(*ptr < 512, return);
+	snd_assert(*ptr < 1024, return);
 	set_bit(*ptr, icode->code_valid);
 	icode->code[*ptr    ][0] = ((x & 0x7ff) << 12) | (y & 0x7ff);
 	icode->code[(*ptr)++][1] = ((op & 0x0f) << 24) | ((r & 0x7ff) << 12) | (a & 0x7ff);
@@ -505,7 +505,7 @@ static void snd_emu10k1_gpr_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	int gpr;
 
-	for (gpr = 0; gpr < 0x100; gpr++) {
+	for (gpr = 0; gpr < (emu->audigy ? 0x200 : 0x100); gpr++) {
 		if (!test_bit(gpr, icode->gpr_valid))
 			continue;
 		snd_emu10k1_ptr_write(emu, emu->gpr_base + gpr, 0, icode->gpr_map[gpr]);
@@ -516,7 +516,7 @@ static void snd_emu10k1_gpr_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	int gpr;
 
-	for (gpr = 0; gpr < 0x100; gpr++) {
+	for (gpr = 0; gpr < (emu->audigy ? 0x200 : 0x100); gpr++) {
 		set_bit(gpr, icode->gpr_valid);
 		icode->gpr_map[gpr] = snd_emu10k1_ptr_read(emu, emu->gpr_base + gpr, 0);
 	}
@@ -526,11 +526,16 @@ static void snd_emu10k1_tram_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	int tram;
 
-	for (tram = 0; tram < 0xa0; tram++) {
+	for (tram = 0; tram < (emu->audigy ? 0x100 : 0xa0); tram++) {
 		if (!test_bit(tram, icode->tram_valid))
 			continue;
 		snd_emu10k1_ptr_write(emu, TANKMEMDATAREGBASE + tram, 0, icode->tram_data_map[tram]);
-		snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + tram, 0, icode->tram_addr_map[tram]);
+		if (!emu->audigy)
+			snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + tram, 0, icode->tram_addr_map[tram]);
+		else {
+			snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + tram, 0, icode->tram_addr_map[tram] << 12);
+			snd_emu10k1_ptr_write(emu, A_TANKMEMCTLREGBASE + tram, 0, icode->tram_addr_map[tram] >> 20);
+		}
 	}
 }
 
@@ -539,10 +544,15 @@ static void snd_emu10k1_tram_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	int tram;
 
 	memset(icode->tram_valid, 0, sizeof(icode->tram_valid));
-	for (tram = 0; tram < 0xa0; tram++) {
+	for (tram = 0; tram < (emu->audigy ? 0x100 : 0xa0); tram++) {
 		set_bit(tram, icode->tram_valid);
 		icode->tram_data_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMDATAREGBASE + tram, 0);
-		icode->tram_addr_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMADDRREGBASE + tram, 0);
+		if (!emu->audigy)
+			icode->tram_addr_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMADDRREGBASE + tram, 0);
+		else {
+			icode->tram_addr_map[tram] = snd_emu10k1_ptr_read(emu, TANKMEMADDRREGBASE + tram, 0) >> 12;
+			icode->tram_addr_map[tram] |= snd_emu10k1_ptr_read(emu, A_TANKMEMCTLREGBASE + tram, 0) << 20;
+		}
 	}
 }
 
@@ -550,7 +560,7 @@ static void snd_emu10k1_code_poke(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 {
 	u32 pc;
 
-	for (pc = 0; pc < 512; pc++) {
+	for (pc = 0; pc < (emu->audigy ? 1024 : 512); pc++) {
 		if (!test_bit(pc, icode->code_valid))
 			continue;
 		snd_emu10k1_efx_write(emu, pc * 2, icode->code[pc][0]);
@@ -563,7 +573,7 @@ static void snd_emu10k1_code_peek(emu10k1_t *emu, emu10k1_fx8010_code_t *icode)
 	u32 pc;
 
 	memset(icode->code_valid, 0, sizeof(icode->code_valid));
-	for (pc = 0; pc < 512; pc++) {
+	for (pc = 0; pc < (emu->audigy ? 1024 : 512); pc++) {
 		set_bit(pc, icode->code_valid);
 		icode->code[pc][0] = snd_emu10k1_efx_read(emu, pc * 2);
 		icode->code[pc][1] = snd_emu10k1_efx_read(emu, pc * 2 + 1);
@@ -962,8 +972,12 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	}
 
 	/* clear free GPRs */
-	for (i = 0; i < 256; i++)
+	for (i = 0; i < 512; i++)
 		set_bit(i, icode->gpr_valid);
+		
+	/* clear TRAM data & address lines */
+	for (i = 0; i < 256; i++)
+		set_bit(i, icode->tram_valid);
 
 	strcpy(icode->name, "Audigy DSP code for ALSA");
 	ptr = 0;
@@ -1311,7 +1325,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 		goto __err;
 	}
 	/* clear remaining instruction memory */
-	while (ptr < 0x200)
+	while (ptr < 0x400)
 		A_OP(icode, &ptr, 0x0f, 0xc0, 0xc0, 0xcf, 0xc0);
 
 	seg = snd_enter_user();
@@ -2067,8 +2081,6 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		kfree(icode);
 		return res;
 	case SNDRV_EMU10K1_IOCTL_PCM_POKE:
-		if (emu->audigy)
-			return -EINVAL;
 		ipcm = (emu10k1_fx8010_pcm_t *)kmalloc(sizeof(*ipcm), GFP_KERNEL);
 		if (ipcm == NULL)
 			return -ENOMEM;
@@ -2080,8 +2092,6 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		kfree(ipcm);
 		return res;
 	case SNDRV_EMU10K1_IOCTL_PCM_PEEK:
-		if (emu->audigy)
-			return -EINVAL;
 		ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL);
 		if (ipcm == NULL)
 			return -ENOMEM;
@@ -2097,8 +2107,6 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 		kfree(ipcm);
 		return res;
 	case SNDRV_EMU10K1_IOCTL_TRAM_SETUP:
-		if (emu->audigy)
-			return -EINVAL;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 		if (get_user(addr, (unsigned int __user *)argp))
