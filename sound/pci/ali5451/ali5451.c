@@ -1831,9 +1831,10 @@ static int snd_ali5451_spdif_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t
 	return change;
 }
 
-static snd_kcontrol_new_t snd_ali5451_mixer_spdif[] __devinit = {
+static snd_kcontrol_new_t snd_ali5451_mixer_spdif[] __devinitdata = {
 	/* spdif aplayback switch */
-	ALI5451_SPDIF(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH), 0, 0),
+	/* FIXME: "IEC958 Playback Switch" may conflict with one on ac97_codec */
+	ALI5451_SPDIF("IEC958 Output switch", 0, 0),
 	/* spdif out to spdif channel */
 	ALI5451_SPDIF("IEC958 Channel Output Switch", 0, 1),
 	/* spdif in from spdif channel */
@@ -1861,7 +1862,7 @@ static int __devinit snd_ali_mixer(ali_t * codec)
 		return err;
 	}
 	if (codec->revision == ALI_5451_V02) {
-		for(idx = 0; idx < 3; idx++) {
+		for(idx = 0; idx < ARRAY_SIZE(snd_ali5451_mixer_spdif); idx++) {
 			err=snd_ctl_add(codec->card, snd_ctl_new1(&snd_ali5451_mixer_spdif[idx], codec));
 			if (err < 0) return err;
 		}
@@ -2010,10 +2011,12 @@ static int snd_ali_chip_init(ali_t *codec)
 	if (codec->revision == ALI_5451_V02) {
         	pci_dev = codec->pci_m1533;
 		pci_read_config_byte(pci_dev, 0x59, &temp);
+		temp |= 0x80;
+		pci_write_config_byte(pci_dev, 0x59, temp);
 	
 		pci_dev = codec->pci_m7101;
 		pci_read_config_byte(pci_dev, 0xb8, &temp);
-		temp |= 1 << 6;
+		temp |= 0x20;
 		pci_write_config_byte(pci_dev, 0xB8, temp);
 	}
 
