@@ -389,7 +389,7 @@ u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 					     CAPIMSG_NCCI(skb->data),
 					     CAPIMSG_MSGID(skb->data));
 		if (retval != CAPI_NOERROR) 
-			goto out;
+			return retval;
 
 		dlen = CAPIMSG_DATALEN(skb->data);
 
@@ -399,16 +399,14 @@ u16 b1_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 		b1_put_slice(port, skb->data + len, dlen);
 		spin_unlock_irqrestore(&card->lock, flags);
 	} else {
-		retval = CAPI_NOERROR;
-
 	 	spin_lock_irqsave(&card->lock, flags);
 		b1_put_byte(port, SEND_MESSAGE);
 		b1_put_slice(port, skb->data, len);
 		spin_unlock_irqrestore(&card->lock, flags);
 	}
- out:
+
 	dev_kfree_skb_any(skb);
-	return retval;
+	return CAPI_NOERROR;
 }
 
 /* ------------------------------------------------------------- */
