@@ -375,28 +375,6 @@ void reboot_skas(void)
 	siglongjmp(initial_jmpbuf, 4);
 }
 
-int new_mm(int from)
-{
-	struct proc_mm_op copy;
-	int n, fd = os_open_file("/proc/mm",
-				 of_cloexec(of_write(OPENFLAGS())), 0);
-
-	if(fd < 0)
-		return(fd);
-
-	if(from != -1){
-		copy = ((struct proc_mm_op) { .op 	= MM_COPY_SEGMENTS,
-					      .u 	= 
-					      { .copy_segments	= from } } );
-		n = os_write_file(fd, &copy, sizeof(copy));
-		if(n != sizeof(copy)) 
-			printk("new_mm : /proc/mm copy_segments failed, "
-			       "err = %d\n", -n);
-	}
-
-	return(fd);
-}
-
 void switch_mm_skas(int mm_fd)
 {
 	int err;

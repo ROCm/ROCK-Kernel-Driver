@@ -128,6 +128,17 @@ void exit_thread_tt(void)
 	os_close_file(current->thread.mode.tt.switch_pipe[1]);
 }
 
+void suspend_new_thread(int fd)
+{
+	int err;
+	char c;
+
+	os_stop_process(os_getpid());
+	err = os_read_file(fd, &c, sizeof(c));
+	if(err != sizeof(c))
+		panic("read failed in suspend_new_thread, err = %d", -err);
+}
+
 void schedule_tail(task_t *prev);
 
 static void new_thread_handler(int sig)
@@ -162,6 +173,12 @@ static void new_thread_handler(int sig)
 	local_irq_enable();
 	if(!run_kernel_thread(fn, arg, &current->thread.exec_buf))
 		do_exit(0);
+
+	/* XXX No set_user_mode here because a newly execed process will
+	 * immediately segfault on its non-existent IP, coming straight back
+	 * to the signal handler, which will call set_user_mode on its way
+	 * out.  This should probably change since it's confusing.
+	 */
 }
 
 static int new_thread_proc(void *stack)

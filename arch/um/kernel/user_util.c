@@ -88,11 +88,11 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				       errno);
 			}
 			else if(WIFEXITED(status)) 
-				printk("process exited with status %d\n", 
-				       WEXITSTATUS(status));
+				printk("process %d exited with status %d\n",
+				       pid, WEXITSTATUS(status));
 			else if(WIFSIGNALED(status))
-				printk("process exited with signal %d\n", 
-				       WTERMSIG(status));
+				printk("process %d exited with signal %d\n",
+				       pid, WTERMSIG(status));
 			else if((WSTOPSIG(status) == SIGVTALRM) ||
 				(WSTOPSIG(status) == SIGALRM) ||
 				(WSTOPSIG(status) == SIGIO) ||
@@ -108,8 +108,8 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				ptrace(cont_type, pid, 0, WSTOPSIG(status));
 				continue;
 			}
-			else printk("process stopped with signal %d\n", 
-				    WSTOPSIG(status));
+			else printk("process %d stopped with signal %d\n",
+				    pid, WSTOPSIG(status));
 			panic("wait_for_stop failed to wait for %d to stop "
 			      "with %d\n", pid, sig);
 		}

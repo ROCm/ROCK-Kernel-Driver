@@ -22,6 +22,7 @@
 #include "frame.h"
 #include "kern.h"
 #include "mode.h"
+#include "proc_mm.h"
 
 static atomic_t using_sysemu;
 int sysemu_supported;
@@ -194,6 +195,28 @@ int copy_thread_skas(int nr, unsigned long clone_flags, unsigned long sp,
 	new_thread(p->thread_info, &p->thread.mode.skas.switch_buf,
 		   &p->thread.mode.skas.fork_buf, handler);
 	return(0);
+}
+
+int new_mm(int from)
+{
+	struct proc_mm_op copy;
+	int n, fd;
+
+	fd = os_open_file("/proc/mm", of_cloexec(of_write(OPENFLAGS())), 0);
+	if(fd < 0)
+		return(fd);
+
+	if(from != -1){
+		copy = ((struct proc_mm_op) { .op 	= MM_COPY_SEGMENTS,
+					      .u 	=
+					      { .copy_segments	= from } } );
+		n = os_write_file(fd, &copy, sizeof(copy));
+		if(n != sizeof(copy))
+			printk("new_mm : /proc/mm copy_segments failed, "
+			       "err = %d\n", -n);
+	}
+
+	return(fd);
 }
 
 void init_idle_skas(void)

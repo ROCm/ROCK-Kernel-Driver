@@ -42,9 +42,9 @@ unsigned long os_process_pc(int pid)
 	}
 	os_close_file(fd);
 	pc = ARBITRARY_ADDR;
-	if(sscanf(buf, "%*d " COMM_SCANF " %*c %*d %*d %*d %*d %*d %*d %*d %*d "
+	if(sscanf(buf, "%*d " COMM_SCANF " %*c %*d %*d %*d %*d %*d %*d %*d "
 		  "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d "
-		  "%*d %*d %*d %*d %lu", &pc) != 1){
+		  "%*d %*d %*d %*d %*d %lu", &pc) != 1){
 		printk("os_process_pc - couldn't find pc in '%s'\n", buf);
 	}
 	return(pc);

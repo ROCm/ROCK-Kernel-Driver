@@ -139,16 +139,6 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 	return(arg.pid);
 }
 
-void suspend_new_thread(int fd)
-{
-	char c;
-
-	os_stop_process(os_getpid());
-
-	if(os_read_file(fd, &c, sizeof(c)) != sizeof(c))
-		panic("read failed in suspend_new_thread");
-}
-
 static int ptrace_child(void *arg)
 {
 	int pid = os_getpid();
