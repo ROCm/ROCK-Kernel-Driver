@@ -315,9 +315,10 @@ int __scsi_add_host(struct Scsi_Host *shost)
  **/
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
-	dev->class_data = shost;
-	shost->host_gendev = dev;
-
+	if (dev) {
+		dev->class_data = shost;
+		shost->host_gendev = dev;
+	}
 	return __scsi_add_host(shost);
 }
 
