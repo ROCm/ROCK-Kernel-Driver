@@ -538,7 +538,7 @@ RCPostRecvBuffers (struct net_device * dev, PRCTCB pTransCtrlBlock)
 ** Process I2O outbound message queue until empty.
 ** =========================================================================
 */
-void
+irqreturn_t
 RCProcI2OMsgQ (struct net_device *dev)
 {
 	U32 phyAddrMsg;
@@ -549,7 +549,7 @@ RCProcI2OMsgQ (struct net_device *dev)
 	unsigned char debug_msg[20];
 
 	if (pPab == NULL)
-		return;
+		return IRQ_NONE;
 
 	phyAddrMsg = pPab->p_atu->OutQueue;
 
@@ -642,6 +642,8 @@ RCProcI2OMsgQ (struct net_device *dev)
 		/* any more msgs? */
 		phyAddrMsg = pPab->p_atu->OutQueue;
 	}
+
+	return IRQ_HANDLED;
 }
 
 /*

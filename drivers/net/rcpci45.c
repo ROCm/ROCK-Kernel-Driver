@@ -107,7 +107,7 @@ static void rc_timer (unsigned long);
 
 static int RCopen (struct net_device *);
 static int RC_xmit_packet (struct sk_buff *, struct net_device *);
-static void RCinterrupt (int, void *, struct pt_regs *);
+static irqreturn_t RCinterrupt (int, void *, struct pt_regs *);
 static int RCclose (struct net_device *dev);
 static struct net_device_stats *RCget_stats (struct net_device *);
 static int RCioctl (struct net_device *, struct ifreq *, int);
@@ -635,7 +635,7 @@ RCrecv_callback (U32 Status,
  * RCProcI2OMsgQ(), which in turn process the message and
  * calls one of our callback functions.
  */
-static void
+static irqreturn_t
 RCinterrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 
@@ -648,7 +648,7 @@ RCinterrupt (int irq, void *dev_id, struct pt_regs *regs)
 		printk (KERN_DEBUG "%s: shutdown, service irq\n",
 				dev->name);
 
-	RCProcI2OMsgQ (dev);
+	return RCProcI2OMsgQ (dev);
 }
 
 #define REBOOT_REINIT_RETRY_LIMIT 4

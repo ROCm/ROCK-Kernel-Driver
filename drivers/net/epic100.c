@@ -360,7 +360,7 @@ static void epic_tx_timeout(struct net_device *dev);
 static void epic_init_ring(struct net_device *dev);
 static int epic_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int epic_rx(struct net_device *dev);
-static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int epic_close(struct net_device *dev);
 static struct net_device_stats *epic_get_stats(struct net_device *dev);
@@ -1028,12 +1028,13 @@ static int epic_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
-static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
+static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
 	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
 	int status, boguscnt = max_interrupt_work;
+	unsigned int handled = 0;
 
 	do {
 		status = inl(ioaddr + INTSTAT);
@@ -1047,6 +1048,7 @@ static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		if ((status & IntrSummary) == 0)
 			break;
+		handled = 1;
 
 		if (status & (RxDone | RxStarted | RxEarlyWarn | RxOverflow))
 			epic_rx(dev);
@@ -1156,7 +1158,7 @@ static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		printk(KERN_DEBUG "%s: exiting interrupt, intr_status=%#4.4x.\n",
 			   dev->name, status);
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 static int epic_rx(struct net_device *dev)
@@ -1343,9 +1345,11 @@ static void set_rx_mode(struct net_device *dev)
 
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
-			 i++, mclist = mclist->next)
-			set_bit(ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f,
-					mc_filter);
+			 i++, mclist = mclist->next) {
+			unsigned int bit_nr =
+				ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x3f;
+			mc_filter[bit_nr >> 3] |= (1 << bit_nr);
+		}
 	}
 	/* ToDo: perhaps we need to stop the Tx and Rx process here? */
 	if (memcmp(mc_filter, ep->mc_filter, sizeof(mc_filter))) {

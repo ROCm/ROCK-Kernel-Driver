@@ -422,7 +422,7 @@ RCGetRavlinIPandMask (struct net_device *dev, PU32 pIpAddr, PU32 pNetMask,
     ** callback functions, TransmitCallbackFunction or ReceiveCallbackFunction,
     ** if a TX or RX transaction has completed.
   */
-void RCProcI2OMsgQ (struct net_device *dev);
+irqreturn_t RCProcI2OMsgQ (struct net_device *dev);
 
  /*
     ** Disable and Enable I2O interrupts.  I2O interrupts are enabled at Init time

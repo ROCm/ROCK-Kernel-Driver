@@ -331,7 +331,7 @@ static int  pcnet32_init_ring(struct net_device *);
 static int  pcnet32_start_xmit(struct sk_buff *, struct net_device *);
 static int  pcnet32_rx(struct net_device *);
 static void pcnet32_tx_timeout (struct net_device *dev);
-static void pcnet32_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t pcnet32_interrupt(int, void *, struct pt_regs *);
 static int  pcnet32_close(struct net_device *);
 static struct net_device_stats *pcnet32_get_stats(struct net_device *);
 static void pcnet32_set_multicast_list(struct net_device *);
@@ -717,6 +717,7 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 
     spin_lock_init(&lp->lock);
     
+    SET_MODULE_OWNER(dev);
     dev->priv = lp;
     lp->name = chipname;
     lp->shared_irq = shared;
@@ -945,8 +946,6 @@ pcnet32_open(struct net_device *dev)
 	       lp->a.read_csr(ioaddr, 0));
 
 
-    MOD_INC_USE_COUNT;
-    
     return 0;	/* Always succeed */
 }
 
@@ -1148,7 +1147,7 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The PCNET32 interrupt handler. */
-static void
+static irqreturn_t
 pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
     struct net_device *dev = dev_id;
@@ -1161,7 +1160,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     if (!dev) {
 	printk (KERN_DEBUG "%s(): irq %d for unknown device\n",
 		__FUNCTION__, irq);
-	return;
+	return IRQ_NONE;
     }
 
     ioaddr = dev->base_addr;
@@ -1293,6 +1292,8 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	       dev->name, lp->a.read_csr (ioaddr, 0));
 
     spin_unlock(&lp->lock);
+
+    return IRQ_HANDLED;
 }
 
 static int
@@ -1440,8 +1441,6 @@ pcnet32_close(struct net_device *dev)
         lp->tx_dma_addr[i] = 0;
     }
     
-    MOD_DEC_USE_COUNT;
-
     return 0;
 }
 
