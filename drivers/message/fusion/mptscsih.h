@@ -248,15 +248,12 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1)
 
 #define MPT_SCSIHOST {						\
-	next:				NULL,			\
 	PROC_SCSI_DECL						\
 	name:				"MPT SCSI Host",	\
 	detect:				x_scsi_detect,		\
 	release:			x_scsi_release,		\
 	info:				x_scsi_info,		\
-	command:			NULL,			\
 	queuecommand:			x_scsi_queuecommand,	\
-	eh_strategy_handler:		NULL,			\
 	eh_abort_handler:		x_scsi_abort,		\
 	eh_device_reset_handler:	x_scsi_dev_reset,	\
 	eh_bus_reset_handler:		x_scsi_bus_reset,	\
@@ -275,19 +272,15 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 #else  /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,1) */
 
 #define MPT_SCSIHOST {						\
-	next:				NULL,			\
 	PROC_SCSI_DECL						\
 	name:				"MPT SCSI Host",	\
 	detect:				x_scsi_detect,		\
 	release:			x_scsi_release,		\
 	info:				x_scsi_info,		\
-	command:			NULL,			\
 	queuecommand:			x_scsi_queuecommand,	\
-	eh_strategy_handler:		NULL,			\
 	eh_abort_handler:		x_scsi_abort,		\
 	eh_device_reset_handler:	x_scsi_dev_reset,	\
 	eh_bus_reset_handler:		x_scsi_bus_reset,	\
-	eh_host_reset_handler:		NULL,			\
 	bios_param:			x_scsi_bios_param,	\
 	can_queue:			MPT_SCSI_CAN_QUEUE,	\
 	this_id:			-1,			\
@@ -303,13 +296,11 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 #else /* MPT_SCSI_USE_NEW_EH */
 
 #define MPT_SCSIHOST {						\
-	next:				NULL,			\
 	PROC_SCSI_DECL						\
 	name:				"MPT SCSI Host",	\
 	detect:				x_scsi_detect,		\
 	release:			x_scsi_release,		\
 	info:				x_scsi_info,		\
-	command:			NULL,			\
 	queuecommand:			x_scsi_queuecommand,	\
 	abort:				x_scsi_old_abort,	\
 	reset:				x_scsi_old_reset,	\
