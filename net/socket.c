@@ -92,7 +92,7 @@
 static int sock_no_open(struct inode *irrelevant, struct file *dontcare);
 static ssize_t sock_aio_read(struct kiocb *iocb, char *buf,
 			 size_t size, loff_t pos);
-static ssize_t sock_aio_write(struct kiocb *iocb, char *buf,
+static ssize_t sock_aio_write(struct kiocb *iocb, const char *buf,
 			  size_t size, loff_t pos);
 static int sock_mmap(struct file *file, struct vm_area_struct * vma);
 
