@@ -1061,9 +1061,9 @@ Module parameters
     and alsa-firmware packages.  You can load the firmware automatically
     by adding the following to /etc/modprobe.conf
 
-	install snd-vx222 /usr/bin/vxload
+	install snd-vx222 /sbin/modprobe --first-time -i snd-vx222 && /usr/bin/vxloader
 
-    (for 2.2/2.4 kernels, add "post-install /usr/bin/vxload" to
+    (for 2.2/2.4 kernels, add "post-install /usr/bin/vxloader" to
      /etc/modules.conf, instead.)
     IBL size defines the interrupts period for PCM.  The smaller size
     gives smaller latency but leads to more CPU consumption, too.
