@@ -285,7 +285,7 @@ typedef struct atemu {
 #endif
 	int          mdmcmdl;                    /* Length of Modem-Commandbuffer      */
 	int          pluscount;                  /* Counter for +++ sequence           */
-	int          lastplus;                   /* Timestamp of last +                */
+	unsigned long lastplus;                  /* Timestamp of last +                */
 	char         mdmcmd[255];                /* Modem-Commandbuffer                */
 	unsigned int charge;                     /* Charge units of current connection */
 } atemu;
