@@ -85,11 +85,12 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len, int token)
 
 /* update halted (but potentially linked) qh */
 
-static void qh_update (struct ehci_qh *qh, struct ehci_qtd *qtd)
+static void
+qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 {
 	qh->hw_current = 0;
 	qh->hw_qtd_next = QTD_NEXT (qtd->qtd_dma);
-	qh->hw_alt_next = EHCI_LIST_END;
+	qh->hw_alt_next = ehci->async->hw_alt_next;
 
 	/* HC must see latest qtd and qh data before we clear ACTIVE+HALT */
 	wmb ();
@@ -98,7 +99,12 @@ static void qh_update (struct ehci_qh *qh, struct ehci_qtd *qtd)
 
 /*-------------------------------------------------------------------------*/
 
-static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
+static inline void qtd_copy_status (
+	struct ehci_hcd *ehci,
+	struct urb *urb,
+	size_t length,
+	u32 token
+)
 {
 	/* count IN/OUT bytes, not SETUP (even short packets) */
 	if (likely (QTD_PID (token) != 2))
@@ -132,7 +138,7 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 
 		ehci_vdbg (ehci,
 			"dev%d ep%d%s qtd token %08x --> status %d\n",
-			usb_pipedev (urb->pipe),
+			usb_pipedevice (urb->pipe),
 			usb_pipeendpoint (urb->pipe),
 			usb_pipein (urb->pipe) ? "in" : "out",
 			token, urb->status);
@@ -157,9 +163,17 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 			}
 		}
 	}
+
+	/* force cleanup after short read; not necessarily an error */
+	if (unlikely (urb->status == -EINPROGRESS
+			&& QTD_LENGTH (token) != 0
+			&& QTD_PID (token) == 1)) {
+		urb->status = -EREMOTEIO;
+	}
 }
 
-static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
+static void
+ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 {
 	if (likely (urb->hcpriv != 0)) {
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
@@ -174,24 +188,26 @@ static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
 		urb->hcpriv = 0;
 	}
 
-	if (likely (urb->status == -EINPROGRESS)) {
-		if (urb->actual_length != urb->transfer_buffer_length
-				&& (urb->transfer_flags & URB_SHORT_NOT_OK))
-			urb->status = -EREMOTEIO;
-		else
-			urb->status = 0;
-	}
-
-	if (likely (urb->status == 0))
+	switch (urb->status) {
+	case -EINPROGRESS:		/* success */
+		urb->status = 0;
+	default:			/* fault */
 		COUNT (ehci->stats.complete);
-	else if (urb->status == -ECONNRESET || urb->status == -ENOENT)
+		break;
+	case -EREMOTEIO:		/* fault or normal */
+		if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+			urb->status = 0;
+		COUNT (ehci->stats.complete);
+		break;
+	case -ECONNRESET:		/* canceled */
+	case -ENOENT:
 		COUNT (ehci->stats.unlink);
-	else
-		COUNT (ehci->stats.error);
+		break;
+	}
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
-	usb_hcd_giveback_urb (&ehci->hcd, urb, NULL);
+	usb_hcd_giveback_urb (&ehci->hcd, urb, regs);
 
 	spin_lock (&ehci->lock);
 }
@@ -203,14 +219,14 @@ static void ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb)
  * indicating how much "real" work we did.
  */
 static unsigned
-qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 {
 	struct ehci_qtd		*qtd, *last;
 	struct list_head	*next, *qtd_list = &qh->qtd_list;
-	int			unlink = 0, halted = 0;
+	int			unlink = 0, stopped = 0;
 	unsigned		count = 0;
 
-	if (unlikely (list_empty (qtd_list)))
+	if (unlikely (list_empty (&qh->qtd_list)))
 		return count;
 
 	/* scan QTDs till end of list, or we reach an active one */
@@ -225,7 +241,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		/* clean up any state from previous QTD ...*/
 		if (last) {
 			if (likely (last->urb != urb)) {
-				ehci_urb_done (ehci, last->urb);
+				ehci_urb_done (ehci, last->urb, regs);
 				count++;
 			}
 			ehci_qtd_free (ehci, last);
@@ -236,12 +252,14 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		/* QTDs at tail may be active if QH+HC are running,
 		 * or when unlinking some urbs queued to this QH
 		 */
+		rmb ();
 		token = le32_to_cpu (qtd->hw_token);
-		halted = halted
+		stopped = stopped
+			|| (qh->qh_state == QH_STATE_IDLE)
 			|| (__constant_cpu_to_le32 (QTD_STS_HALT)
 				& qh->hw_token) != 0
 			|| (ehci->hcd.state == USB_STATE_HALT)
-			|| (qh->qh_state == QH_STATE_IDLE);
+			|| (qh->hw_current == ehci->async->hw_alt_next);
 
 		// FIXME Remove the automagic unlink mode.
 		// Drivers can now clean up safely; it's their job.
@@ -257,7 +275,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			/* status copied below */
 
 		/* QH halts only because of fault (above) or unlink (here). */
-		} else if (unlikely (halted != 0)) {
+		} else if (unlikely (stopped != 0)) {
 
 			/* unlinking everything because of HC shutdown? */
 			if (ehci->hcd.state == USB_STATE_HALT) {
@@ -293,7 +311,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		}
 
 		spin_lock (&urb->lock);
-		qtd_copy_status (urb, qtd->length, token);
+		qtd_copy_status (ehci, urb, qtd->length, token);
 		spin_unlock (&urb->lock);
 
 		list_del (&qtd->qtd_list);
@@ -311,14 +329,14 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 	/* last urb's completion might still need calling */
 	if (likely (last != 0)) {
-		ehci_urb_done (ehci, last->urb);
+		ehci_urb_done (ehci, last->urb, regs);
 		count++;
 		ehci_qtd_free (ehci, last);
 	}
 
 	/* reactivate queue after error and driver's cleanup */
-	if (unlikely (halted && !list_empty (qtd_list))) {
-		qh_update (qh, list_entry (qtd_list->next,
+	if (unlikely (stopped && !list_empty (&qh->qtd_list))) {
+		qh_update (ehci, qh, list_entry (qh->qtd_list.next,
 				struct ehci_qtd, qtd_list));
 	}
 
@@ -420,7 +438,6 @@ qh_urb_transaction (
 	for (;;) {
 		int this_qtd_len;
 
-		qtd->urb = urb;
 		this_qtd_len = qtd_fill (qtd, buf, len, token);
 		len -= this_qtd_len;
 		buf += this_qtd_len;
@@ -658,7 +675,7 @@ ehci_qh_make (
 
 		list_splice (qtd_list, &qh->qtd_list);
 		qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
-		qh_update (qh, qtd);
+		qh_update (ehci, qh, qtd);
 	} else {
 		qh->hw_qtd_next = qh->hw_alt_next = EHCI_LIST_END;
 	}
@@ -784,6 +801,7 @@ static struct ehci_qh *qh_append_tds (
 			list_add (&dummy->qtd_list, qtd_list);
 
 			ehci_qtd_init (qtd, qtd->qtd_dma);
+			qtd->hw_alt_next = ehci->async->hw_alt_next;
 			qh->dummy = qtd;
 
 			/* hc must see the new dummy at list end */
@@ -797,15 +815,6 @@ static struct ehci_qh *qh_append_tds (
 
 		/* no URB queued */
 		} else {
-			struct ehci_qtd		*last_qtd;
-
-			/* make sure hc sees current dummy at the end */
-			last_qtd = list_entry (qtd_list->prev,
-					struct ehci_qtd, qtd_list);
-			last_qtd->hw_next = QTD_NEXT (qh->dummy->qtd_dma);
-
-			// dbg_qh ("empty qh", ehci, qh);
-
 			/* usb_clear_halt() means qh data toggle gets reset */
 			if (unlikely (!usb_gettoggle (urb->dev,
 						(epnum & 0x0f),
@@ -813,8 +822,17 @@ static struct ehci_qh *qh_append_tds (
 				clear_toggle (urb->dev,
 					epnum & 0x0f, !(epnum & 0x10), qh);
 			}
-			if (qtd)
-				qh_update (qh, qtd);
+
+			/* make sure hc sees current dummy at the end */
+			if (qtd) {
+				struct ehci_qtd		*last_qtd;
+
+				last_qtd = list_entry (qtd_list->prev,
+						struct ehci_qtd, qtd_list);
+				last_qtd->hw_next = QTD_NEXT (
+						qh->dummy->qtd_dma);
+				qh_update (ehci, qh, qtd);
+			}
 		}
 		list_splice (qtd_list, qh->qtd_list.prev);
 
@@ -877,34 +895,38 @@ submit_async (
 /*-------------------------------------------------------------------------*/
 
 /* the async qh for the qtds being reclaimed are now unlinked from the HC */
-/* caller must not own ehci->lock */
 
-static void end_unlink_async (struct ehci_hcd *ehci)
+static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh = ehci->reclaim;
 
 	del_timer (&ehci->watchdog);
 
+	qh->hw_next = cpu_to_le32 (qh->qh_dma);
 	qh->qh_state = QH_STATE_IDLE;
 	qh->qh_next.qh = 0;
 	qh_put (ehci, qh);			// refcount from reclaim 
 	ehci->reclaim = 0;
 	ehci->reclaim_ready = 0;
 
-	qh_completions (ehci, qh);
+	qh_completions (ehci, qh, regs);
 
 	if (!list_empty (&qh->qtd_list)
 			&& HCD_IS_RUNNING (ehci->hcd.state))
 		qh_link_async (ehci, qh);
-	else
+	else {
 		qh_put (ehci, qh);		// refcount from async list
 
-	/* it's not free to turn the async schedule on/off, so we leave it
-	 * active but idle for a while once it empties.
-	 */
-	if (!ehci->async->qh_next.qh && !timer_pending (&ehci->watchdog)) {
-		ehci->async_idle = 1;
-		mod_timer (&ehci->watchdog, jiffies + EHCI_ASYNC_JIFFIES);
+		/* it's not free to turn the async schedule on/off; leave it
+		 * active but idle for a while once it empties.
+		 */
+		if (HCD_IS_RUNNING (ehci->hcd.state)
+				&& ehci->async->qh_next.qh == 0
+				&& !timer_pending (&ehci->watchdog)) {
+			ehci->async_idle = 1;
+			mod_timer (&ehci->watchdog,
+					jiffies + EHCI_ASYNC_JIFFIES);
+		}
 	}
 }
 
@@ -941,12 +963,6 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	qh->qh_state = QH_STATE_UNLINK;
 	ehci->reclaim = qh = qh_get (qh);
 
-	if (unlikely (ehci->hcd.state == USB_STATE_HALT)) {
-		ehci->reclaim_ready = 1;
-		tasklet_schedule (&ehci->tasklet);
-		return;
-	}
-
 	prev = ehci->async;
 	while (prev->qh_next.qh != qh)
 		prev = prev->qh_next.qh;
@@ -954,6 +970,11 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	prev->hw_next = qh->hw_next;
 	prev->qh_next = qh->qh_next;
 	wmb ();
+
+	if (unlikely (ehci->hcd.state == USB_STATE_HALT)) {
+		end_unlink_async (ehci, NULL);
+		return;
+	}
 
 	ehci->reclaim_ready = 0;
 	cmd |= CMD_IAAD;
@@ -966,7 +987,7 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 /*-------------------------------------------------------------------------*/
 
 static void
-scan_async (struct ehci_hcd *ehci)
+scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh;
 	unsigned		count;
@@ -984,7 +1005,7 @@ rescan:
 				 * reporting drops the lock.
 				 */
 				qh = qh_get (qh);
-				temp = qh_completions (ehci, qh);
+				temp = qh_completions (ehci, qh, regs);
 				qh_put (ehci, qh);
 				if (temp != 0) {
 					count += temp;
@@ -1000,14 +1021,6 @@ rescan:
 			 */
 			if (list_empty (&qh->qtd_list) && !ehci->reclaim) {
 				start_unlink_async (ehci, qh);
-			}
-
-			/* keep latencies down: let any irqs in */
-			if (count > max_completions) {
-				spin_unlock_irq (&ehci->lock);
-				cpu_relax ();
-				spin_lock_irq (&ehci->lock);
-				goto rescan;
 			}
 
 			qh = qh->qh_next.qh;
