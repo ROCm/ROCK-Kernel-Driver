@@ -58,7 +58,7 @@ EXPORT_SYMBOL(hci_conn_encrypt);
 
 EXPORT_SYMBOL(hci_send_acl);
 EXPORT_SYMBOL(hci_send_sco);
-EXPORT_SYMBOL(hci_send_raw);
+EXPORT_SYMBOL(hci_send_cmd);
 EXPORT_SYMBOL(hci_si_event);
 
 /* Bluetooth lib */
