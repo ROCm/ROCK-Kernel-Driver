@@ -936,6 +936,7 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	printk("%2.2x.\n", netdev->dev_addr[i]);
 	usb_set_intfdata(intf, catc);
 
+	SET_NETDEV_DEV(netdev, &intf->dev);
 	if (register_netdev(netdev) != 0) {
 		usb_set_intfdata(intf, NULL);
 		usb_free_urb(catc->ctrl_urb);
