@@ -1913,6 +1913,21 @@ int tty_ioctl(struct inode * inode, struct file * file,
 		case TIOCMBIC:
 		case TIOCMBIS:
 			return tty_tiocmset(tty, file, cmd, p);
+		/*
+		 * Without the real device to which /dev/console is connected,
+		 * blogd can not work.
+		 *	blogd spawns a pty/tty pair,
+		 *	set /dev/console to the tty of that pair (ioctl TIOCCONS),
+		 *	then reads in all input from the current /dev/console,
+		 *	buffer or write the readed data to /var/log/boot.msg
+		 *	_and_ to the original real device.
+		 */
+		case TIOCGDEV:
+		{
+			unsigned int ret = new_encode_dev(tty_devnum(real_tty));
+			return put_user(ret, (unsigned int __user *)p);
+		}
+
 	}
 	if (tty->driver->ioctl) {
 		int retval = (tty->driver->ioctl)(tty, file, cmd, arg);

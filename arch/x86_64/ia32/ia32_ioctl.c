@@ -18,25 +18,6 @@
 #define CODE
 #include "compat_ioctl.c"
   
-#ifndef TIOCGDEV
-#define TIOCGDEV       _IOR('T',0x32, unsigned int)
-#endif
-static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int __user *ptr) 
-{ 
-
-	struct file *file = fget(fd);
-	struct tty_struct *real_tty;
-
-	if (!file)
-		return -EBADF;
-	if (file->f_op->ioctl != tty_ioctl)
-		return -EINVAL; 
-	real_tty = (struct tty_struct *)file->private_data;
-	if (!real_tty) 	
-		return -EINVAL; 
-	return put_user(new_encode_dev(tty_devnum(real_tty)), ptr); 
-} 
-
 #define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */
 #define RTC_IRQP_SET32	_IOW('p', 0x0c, unsigned int)	 /* Set IRQ rate    */
 #define RTC_EPOCH_READ32	_IOR('p', 0x0d, unsigned)	 /* Read epoch      */
@@ -191,7 +172,6 @@ COMPATIBLE_IOCTL(RTC_WKALM_RD)
 COMPATIBLE_IOCTL(FIOQSIZE)
 
 /* And these ioctls need translation */
-HANDLE_IOCTL(TIOCGDEV, tiocgdev)
 /* realtime device */
 HANDLE_IOCTL(RTC_IRQP_READ,  rtc32_ioctl)
 HANDLE_IOCTL(RTC_IRQP_READ32,rtc32_ioctl)
