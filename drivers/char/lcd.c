@@ -33,11 +33,14 @@
 
 #include "lcd.h"
 
+static spinlock_t lcd_lock = SPIN_LOCK_UNLOCKED;
+
 static int lcd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg);
 
-static int lcd_present = 1;
+static unsigned int lcd_present = 1;
 
+/* used in arch/mips/cobalt/reset.c */
 int led_state = 0;
 
 #if defined(CONFIG_TULIP) && 0
@@ -63,7 +66,6 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 {
 	struct lcd_display button_display;
 	unsigned long address, a;
-	int index;
 
 	switch (cmd) {
 	case LCD_On:
@@ -220,6 +222,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 
 	case LCD_Write:{
 			struct lcd_display display;
+			unsigned int index;
 
 
 			if (copy_from_user
@@ -316,7 +319,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 //  set only bit led_display.leds
 
 	case LED_Bit_Set:{
-			int i;
+			unsigned int i;
 			int bit = 1;
 			struct lcd_display led_display;
 
@@ -338,7 +341,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 //  clear only bit led_display.leds
 
 	case LED_Bit_Clear:{
-			int i;
+			unsigned int i;
 			int bit = 1;
 			struct lcd_display led_display;
 
@@ -413,6 +416,10 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 
 			int ctr = 0;
 
+			if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
+
+			pr_info(LCD "Erasing Flash\n");
+
 			// Chip Erase Sequence
 			WRITE_FLASH(kFlash_Addr1, kFlash_Data1);
 			WRITE_FLASH(kFlash_Addr2, kFlash_Data2);
@@ -421,21 +428,15 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 			WRITE_FLASH(kFlash_Addr2, kFlash_Data2);
 			WRITE_FLASH(kFlash_Addr1, kFlash_Erase6);
 
-			printk("Erasing Flash.\n");
-
 			while ((!dqpoll(0x00000000, 0xFF))
 			       && (!timeout(0x00000000))) {
 				ctr++;
 			}
 
-			printk("\n");
-			printk("\n");
-			printk("\n");
-
 			if (READ_FLASH(0x07FFF0) == 0xFF) {
-				printk("Erase Successful\r\n");
+				pr_info(LCD "Erase Successful\n");
 			} else if (timeout) {
-				printk("Erase Timed Out\r\n");
+				pr_info(LCD "Erase Timed Out\n");
 			}
 
 			break;
@@ -447,11 +448,13 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 
 			volatile unsigned long burn_addr;
 			unsigned long flags;
-			int i;
+			unsigned int i, index;
 			unsigned char *rom;
 
 
 			struct lcd_display display;
+
+			if ( !capable(CAP_SYS_ADMIN) ) return -EPERM;
 
 			if (copy_from_user
 			    (&display, (struct lcd_display *) arg,
@@ -459,19 +462,21 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			rom = (unsigned char *) kmalloc((128), GFP_ATOMIC);
 			if (rom == NULL) {
-				printk("broken\n");
-				return 1;
+				printk(KERN_ERR LCD "kmalloc() failed in %s\n",
+						__FUNCTION__);
+				return -ENOMEM;
 			}
 
-			printk("Churning and Burning -");
-			save_flags(flags);
+			pr_info(LCD "Starting Flash burn\n");
 			for (i = 0; i < FLASH_SIZE; i = i + 128) {
 
 				if (copy_from_user
-				    (rom, display.RomImage + i, 128))
+				    (rom, display.RomImage + i, 128)) {
+					kfree(rom);
 					return -EFAULT;
+				}
 				burn_addr = kFlashBase + i;
-				cli();
+				spin_lock_irqsave(&lcd_lock, flags);
 				for (index = 0; index < (128); index++) {
 
 					WRITE_FLASH(kFlash_Addr1,
@@ -480,31 +485,29 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 						    kFlash_Data2);
 					WRITE_FLASH(kFlash_Addr1,
 						    kFlash_Prog);
-					*((volatile unsigned char *)
-					  burn_addr) =
-		 (volatile unsigned char) rom[index];
+					*((volatile unsigned char *)burn_addr) =
+					  (volatile unsigned char) rom[index];
 
-					while ((!dqpoll
-						(burn_addr,
-						 (volatile unsigned char)
-						 rom[index]))
-					       && (!timeout(burn_addr))) {
-					}
+					while ((!dqpoll (burn_addr,
+						(volatile unsigned char)
+						rom[index])) &&
+						(!timeout(burn_addr))) { }
 					burn_addr++;
 				}
-				restore_flags(flags);
-				if (*
-				    ((volatile unsigned char *) (burn_addr
-								 - 1)) ==
-				    (volatile unsigned char) rom[index -
-								 1]) {
+				spin_unlock_irqrestore(&lcd_lock, flags);
+				if (* ((volatile unsigned char *)
+					(burn_addr - 1)) ==
+					(volatile unsigned char)
+					rom[index - 1]) {
 				} else if (timeout) {
-					printk("Program timed out\r\n");
+					pr_info(LCD "Flash burn timed out\n");
 				}
 
 
 			}
 			kfree(rom);
+
+			pr_info(LCD "Flash successfully burned\n");
 
 			break;
 		}
@@ -515,7 +518,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 
 			unsigned char *user_bytes;
 			volatile unsigned long read_addr;
-			int i;
+			unsigned int i;
 
 			user_bytes =
 			    &(((struct lcd_display *) arg)->RomImage[0]);
@@ -524,7 +527,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 			    (VERIFY_WRITE, user_bytes, FLASH_SIZE))
 				return -EFAULT;
 
-			printk("Reading Flash");
+			pr_info(LCD "Reading Flash");
 			for (i = 0; i < FLASH_SIZE; i++) {
 				unsigned char tmp_byte;
 				read_addr = kFlashBase + i;
@@ -540,8 +543,7 @@ static int lcd_ioctl(struct inode *inode, struct file *file,
 		}
 
 	default:
-		return 0;
-		break;
+		return -EINVAL;
 
 	}
 
@@ -613,7 +615,7 @@ static int lcd_init(void)
 {
 	unsigned long data;
 
-	printk("%s\n", LCD_DRIVER);
+	pr_info("%s\n", LCD_DRIVER);
 	misc_register(&lcd_dev);
 
 	/* Check region? Naaah! Just snarf it up. */
@@ -623,7 +625,7 @@ static int lcd_init(void)
 	data = LCDReadData;
 	if ((data & 0x000000FF) == (0x00)) {
 		lcd_present = 0;
-		printk("LCD Not Present\n");
+		pr_info(LCD "LCD Not Present\n");
 	} else {
 		lcd_present = 1;
 		WRITE_GAL(kGal_DevBank2PReg, kGal_DevBank2Cfg);
