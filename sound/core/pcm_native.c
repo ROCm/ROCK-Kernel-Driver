@@ -947,7 +947,10 @@ static inline void snd_pcm_post_reset(snd_pcm_substream_t * substream, int state
 static int snd_pcm_reset(snd_pcm_substream_t *substream)
 {
 	int res;
+
+	spin_lock_irq(&substream->runtime->lock);
 	_SND_PCM_ACTION(reset, substream, 0, res, 0);
+	spin_unlock_irq(&substream->runtime->lock);
 	return res;
 }
 
@@ -984,6 +987,7 @@ int snd_pcm_prepare(snd_pcm_substream_t *substream)
 {
 	int res;
 	snd_card_t *card = substream->pcm->card;
+
 	snd_power_lock(card);
 	while (snd_power_get_state(card) != SNDRV_CTL_POWER_D0) {
 		if (substream->ffile->f_flags & O_NONBLOCK) {
@@ -993,7 +997,9 @@ int snd_pcm_prepare(snd_pcm_substream_t *substream)
 		snd_power_wait(card);
 	}
 
+	spin_lock_irq(&substream->runtime->lock);
 	_SND_PCM_ACTION(prepare, substream, 0, res, 0);
+	spin_unlock_irq(&substream->runtime->lock);
 
        _power_unlock:
 	snd_power_unlock(card);
@@ -2051,21 +2057,9 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 	case SNDRV_PCM_IOCTL_CHANNEL_INFO:
 		return snd_pcm_channel_info(substream, (snd_pcm_channel_info_t *) arg);
 	case SNDRV_PCM_IOCTL_PREPARE:
-	{
-		int res;
-		spin_lock_irq(&substream->runtime->lock);
-		res = snd_pcm_prepare(substream);
-		spin_unlock_irq(&substream->runtime->lock);
-		return res;
-	}
+		return snd_pcm_prepare(substream);
 	case SNDRV_PCM_IOCTL_RESET:
-	{
-		int res;
-		spin_lock_irq(&substream->runtime->lock);
-		res = snd_pcm_reset(substream);
-		spin_unlock_irq(&substream->runtime->lock);
-		return res;
-	}
+		return snd_pcm_reset(substream);
 	case SNDRV_PCM_IOCTL_START:
 	{
 		int res;

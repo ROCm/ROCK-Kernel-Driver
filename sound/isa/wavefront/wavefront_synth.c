@@ -1705,9 +1705,11 @@ snd_wavefront_internal_interrupt (snd_wavefront_card_t *card)
 		return;
 	}
 
+	spin_lock(&dev->irq_lock);
 	dev->irq_ok = 1;
 	dev->irq_cnt++;
-	wake_up_interruptible (&dev->interrupt_sleeper);
+	spin_unlock(&dev->irq_lock);
+	wake_up(&dev->interrupt_sleeper);
 }
 
 /* STATUS REGISTER 
@@ -1755,14 +1757,20 @@ wavefront_should_cause_interrupt (snd_wavefront_t *dev,
 				  int val, int port, int timeout)
 
 {
-	unsigned long flags;
+	wait_queue_t wait;
 
-	save_flags (flags);
-	cli();
+	init_waitqueue_entry(&wait, current);
+	spin_lock_irq(&dev->irq_lock);
+	add_wait_queue(&dev->interrupt_sleeper, &wait);
 	dev->irq_ok = 0;
 	outb (val,port);
-	interruptible_sleep_on_timeout (&dev->interrupt_sleeper, timeout);
-	restore_flags (flags);
+	spin_unlock_irq(&dev->irq_lock);
+	while (1) {
+		if ((timeout = schedule_timeout(timeout)) == 0)
+			return;
+		if (dev->irq_ok)
+			return;
+	}
 }
 
 static int __init
