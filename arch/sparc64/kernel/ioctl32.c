@@ -115,7 +115,6 @@
 #define EXT2_IOC32_GETVERSION             _IOR('v', 1, int)
 #define EXT2_IOC32_SETVERSION             _IOW('v', 2, int)
 
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
 static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
