@@ -1409,7 +1409,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_unlock(&mm->page_table_lock);
 
 	if (vma->vm_file) {
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 		sequence = atomic_read(&mapping->truncate_count);
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */

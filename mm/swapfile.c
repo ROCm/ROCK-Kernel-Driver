@@ -1031,13 +1031,13 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	if (IS_ERR(victim))
 		goto out;
 
-	mapping = victim->f_dentry->d_inode->i_mapping;
+	mapping = victim->f_mapping;
 	prev = -1;
 	swap_list_lock();
 	for (type = swap_list.head; type >= 0; type = swap_info[type].next) {
 		p = swap_info + type;
 		if ((p->flags & SWP_ACTIVE) == SWP_ACTIVE) {
-			if (p->swap_file->f_dentry->d_inode->i_mapping==mapping)
+			if (p->swap_file->f_mapping == mapping)
 				break;
 		}
 		prev = type;
@@ -1105,7 +1105,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	} else {
-		up(&swap_file->f_dentry->d_inode->i_mapping->host->i_sem);
+		up(&swap_file->f_mapping->host->i_sem);
 	}
 	filp_close(swap_file, NULL);
 	err = 0;
@@ -1280,7 +1280,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 
 	p->swap_file = swap_file;
 	inode = swap_file->f_dentry->d_inode;
-	mapping = swap_file->f_dentry->d_inode->i_mapping;
+	mapping = swap_file->f_mapping;
 
 	error = -EBUSY;
 	for (i = 0; i < nr_swapfiles; i++) {
@@ -1288,7 +1288,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 
 		if (i == type || !q->swap_file)
 			continue;
-		if (mapping == q->swap_file->f_dentry->d_inode->i_mapping)
+		if (mapping == q->swap_file->f_mapping)
 			goto bad_swap;
 	}
 

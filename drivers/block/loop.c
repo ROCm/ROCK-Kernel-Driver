@@ -140,8 +140,7 @@ figure_loop_size(struct loop_device *lo)
 	sector_t x;
 
 	/* Compute loopsize in bytes */
-	size = i_size_read(lo->lo_backing_file->f_dentry->
-				d_inode->i_mapping->host);
+	size = i_size_read(lo->lo_backing_file->f_mapping->host);
 	offset = lo->lo_offset;
 	loopsize = size - offset;
 	if (lo->lo_sizelimit > 0 && lo->lo_sizelimit < loopsize)
@@ -175,7 +174,7 @@ static int
 do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
 	char *kaddr, *data;
@@ -842,7 +841,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	memset(lo->lo_file_name, 0, LO_NAME_SIZE);
 	invalidate_bdev(bdev, 0);
 	set_capacity(disks[lo->lo_number], 0);
-	mapping_set_gfp_mask(filp->f_dentry->d_inode->i_mapping, gfp);
+	mapping_set_gfp_mask(filp->f_mapping, gfp);
 	lo->lo_state = Lo_unbound;
 	fput(filp);
 	/* This is safe: open() is still holding a reference. */

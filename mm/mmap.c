@@ -265,7 +265,7 @@ static void vma_link(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct address_space *mapping = NULL;
 
 	if (vma->vm_file)
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 
 	if (mapping)
 		down(&mapping->i_shared_sem);

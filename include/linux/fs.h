@@ -1332,7 +1332,7 @@ static inline void do_generic_file_read(struct file * filp, loff_t *ppos,
 					read_descriptor_t * desc,
 					read_actor_t actor)
 {
-	do_generic_mapping_read(filp->f_dentry->d_inode->i_mapping,
+	do_generic_mapping_read(filp->f_mapping,
 				&filp->f_ra,
 				filp,
 				ppos,

@@ -26,7 +26,7 @@ static unsigned char mincore_page(struct vm_area_struct * vma,
 	unsigned long pgoff)
 {
 	unsigned char present = 0;
-	struct address_space * as = vma->vm_file->f_dentry->d_inode->i_mapping;
+	struct address_space * as = vma->vm_file->f_mapping;
 	struct page * page;
 
 	page = find_get_page(as, pgoff);

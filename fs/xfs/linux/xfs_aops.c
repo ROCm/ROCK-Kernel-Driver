@@ -974,7 +974,7 @@ linvfs_direct_IO(
 	unsigned long		nr_segs)
 {
 	struct file	*file = iocb->ki_filp;
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	page_buf_bmap_t	pbmap;
 	int		maps = 1;

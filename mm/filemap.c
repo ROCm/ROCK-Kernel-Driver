@@ -812,7 +812,7 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		struct address_space *mapping;
 		struct inode *inode;
 
-		mapping = filp->f_dentry->d_inode->i_mapping;
+		mapping = filp->f_mapping;
 		inode = mapping->host;
 		retval = 0;
 		if (!count)
@@ -944,7 +944,7 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	file = fget(fd);
 	if (file) {
 		if (file->f_mode & FMODE_READ) {
-			struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+			struct address_space *mapping = file->f_mapping;
 			unsigned long start = offset >> PAGE_CACHE_SHIFT;
 			unsigned long end = (offset + count - 1) >> PAGE_CACHE_SHIFT;
 			unsigned long len = end - start + 1;
@@ -963,7 +963,7 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 static int FASTCALL(page_cache_read(struct file * file, unsigned long offset));
 static int page_cache_read(struct file * file, unsigned long offset)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct page *page; 
 	int error;
 
@@ -1002,7 +1002,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 {
 	int error;
 	struct file *file = area->vm_file;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct file_ra_state *ra = &file->f_ra;
 	struct inode *inode = mapping->host;
 	struct page *page;
@@ -1187,7 +1187,7 @@ EXPORT_SYMBOL(filemap_nopage);
 static struct page * filemap_getpage(struct file *file, unsigned long pgoff,
 					int nonblock)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct page *page;
 	int error;
 
@@ -1299,7 +1299,7 @@ static int filemap_populate(struct vm_area_struct *vma,
 			int nonblock)
 {
 	struct file *file = vma->vm_file;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	unsigned long size;
 	struct mm_struct *mm = vma->vm_mm;
@@ -1358,7 +1358,7 @@ static struct vm_operations_struct generic_file_vm_ops = {
 
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 
 	if (!mapping->a_ops->readpage)
@@ -1720,7 +1720,7 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 				unsigned long nr_segs, loff_t *ppos)
 {
 	struct file *file = iocb->ki_filp;
-	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space * mapping = file->f_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
 	size_t ocount;		/* original count */
 	size_t count;		/* after file limit checks */
@@ -1920,7 +1920,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 			       size_t count, loff_t pos)
 {
 	struct file *file = iocb->ki_filp;
-	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode *inode = file->f_mapping->host;
 	ssize_t err;
 	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
@@ -1939,7 +1939,7 @@ EXPORT_SYMBOL(generic_file_aio_write);
 ssize_t generic_file_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	struct inode	*inode = file->f_mapping->host;
 	ssize_t		err;
 	struct iovec local_iov = { .iov_base = (void __user *)buf, .iov_len = count };
 
@@ -1986,7 +1986,7 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs)
 {
 	struct file *file = iocb->ki_filp;
-	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct address_space *mapping = file->f_mapping;
 	ssize_t retval;
 
 	if (mapping->nrpages) {
