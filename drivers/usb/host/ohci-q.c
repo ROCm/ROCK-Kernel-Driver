@@ -321,7 +321,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_CLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				// a readl() later syncs CLE with the HC
+				// a ohci_readl() later syncs CLE with the HC
 			} else
 				writel (le32_to_cpup (&ed->hwNextED),
 					&ohci->regs->ed_controlhead);
@@ -345,7 +345,7 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_BLE;
 				writel (ohci->hc_control, &ohci->regs->control);
-				// a readl() later syncs BLE with the HC
+				// a ohci_readl() later syncs BLE with the HC
 			} else
 				writel (le32_to_cpup (&ed->hwNextED),
 					&ohci->regs->ed_bulkhead);
@@ -481,7 +481,7 @@ static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
 	writel (OHCI_INTR_SF, &ohci->regs->intrenable);
 	// flush those writes, and get latest HCCA contents
-	(void) readl (&ohci->regs->control);
+	(void) ohci_readl (&ohci->regs->control);
 
 	/* SF interrupt might get delayed; record the frame counter value that
 	 * indicates when the HC isn't looking at it, so concurrent unlinks
