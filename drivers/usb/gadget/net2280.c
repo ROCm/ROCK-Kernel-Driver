@@ -51,6 +51,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -487,8 +488,9 @@ net2280_free_buffer (
 ) {
 	/* free memory into the right allocator */
 #ifndef	USE_KMALLOC
+	struct net2280_ep *ep = container_of (_ep, struct net2280_ep, ep);
 	if (dma != DMA_ADDR_INVALID)
-		dma_free_coherent (ep->dev->pdev, bytes, dma);
+		dma_free_coherent (&ep->dev->pdev->dev, bytes, buf, dma);
 	else
 #endif
 		kfree (buf);

@@ -30,6 +30,7 @@
 
  */
 
+#include <linux/init.h>
 #include <sound/driver.h>
 #include <sound/core.h>
 #include <pcmcia/version.h>

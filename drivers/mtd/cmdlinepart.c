@@ -28,7 +28,6 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
-#include <asm/setup.h>
 #include <linux/bootmem.h>
 
 /* error message prefix */
