@@ -265,7 +265,7 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 	return sig;
 }
 
-static inline struct sigqueue *__sigqueue_alloc(struct task_struct *t, int flags)
+static struct sigqueue *__sigqueue_alloc(struct task_struct *t, int flags)
 {
 	struct sigqueue *q = NULL;
 
