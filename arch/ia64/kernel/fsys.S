@@ -151,14 +151,14 @@ ENTRY(fsys_gettimeofday)
 	;;
 
 #ifdef CONFIG_SMP
-	movl r10 = __per_cpu_offset
+	movl r10=__per_cpu_offset
 	;;
-	ld8 r10 = [r10]			// r10 <- __per_cpu_offset[0]
-	movl r21 = cpu_info__per_cpu
+	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
+	movl r21=cpu_info__per_cpu
 	;;
-	add r10 = r21, r10		// r10 <- &cpu_data(time_keeper_id)
+	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
 #else
-	mov r10 = r3
+	mov r10=r3
 #endif
 	ld4 r9=[r9]
 	movl r17=xtime_lock
@@ -166,7 +166,7 @@ ENTRY(fsys_gettimeofday)
 
 	// r32, r33 should contain the 2 args of gettimeofday
 	adds r21=IA64_CPUINFO_ITM_NEXT_OFFSET, r10
-	mov r2 = -1
+	mov r2=-1
 	tnat.nz p6,p7=r32		// guard against NaT args
 	;;
 
@@ -179,7 +179,7 @@ ENTRY(fsys_gettimeofday)
 	;;
 
 	ldf8 f7=[r10]			// f7 now contains itm_delta
-	setf.sig f11 = r2
+	setf.sig f11=r2
 	adds r10=8, r32
 
 	adds r20=IA64_TIMESPEC_TV_NSEC_OFFSET, r19	// r20 = &xtime->tv_nsec
@@ -229,13 +229,13 @@ EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 	xma.l f8=f6, f7, f8	// f8 (last_tick) <- -(lost + 1)*itm_delta + itm_next	(5 cyc)
 	nop 0
 
-	setf.sig f12=r31	// f12 <- ITC						(6 cyc)
+	setf.sig f12=r31		// f12 <- ITC					(6 cyc)
 	// *** if (unlikely(read_seqretry(&xtime_lock, seq))) continue; ***
 	ld4 r24=[r17]			// r24 = xtime_lock->sequence (re-read)
 	nop 0
 	;;
 
-	mov r31 = ar.itc		// re-read ITC in case we .retry		(35 cyc)
+	mov r31=ar.itc			// re-read ITC in case we .retry		(35 cyc)
 	xma.l f8=f11, f8, f12	// f8 (elapsed_cycles) <- (-1*last_tick + now) = (now - last_tick)
 	nop 0
 	;;
@@ -245,7 +245,7 @@ EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 	add r3=r29, r14			// r3 = (nsec + old)
 	;;
 
-	cmp.lt p7, p8 = r18, r0		// if now < last_tick, set p7 = 1, p8 = 0
+	cmp.lt p7, p8=r18, r0		// if now < last_tick, set p7 = 1, p8 = 0
 	getf.sig r18=f8			// r18 = elapsed_cycles*nsec_per_cyc		(6 cyc)
 	nop 0
 	;;
@@ -262,19 +262,19 @@ EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
 (p8)	cmpxchg8.rel r24=[r25], r18, ar.ccv	// compare-and-exchange (atomic!)
 (p8)	add r3=r29, r18			// r3 = (nsec + offset)
 	;;
-	shr.u r3 = r3, 3		// initiate dividing r3 by 1000
+	shr.u r3=r3, 3			// initiate dividing r3 by 1000
 	;;
-	setf.sig f8 = r3		//						(6 cyc)
+	setf.sig f8=r3			//						(6 cyc)
 	mov r10=1000000			// r10 = 1000000
 	;;
-(p8)	cmp.ne.unc p9, p0 = r24, r14
-	xmpy.hu f6 = f8, f9		//						(5 cyc)
+(p8)	cmp.ne.unc p9, p0=r24, r14
+	xmpy.hu f6=f8, f9		//						(5 cyc)
 (p9)	br.spnt.many .retry
 	;;
 
-	getf.sig r3 = f6		//						(6 cyc)
+	getf.sig r3=f6			//						(6 cyc)
 	;;
-	shr.u r3 = r3, 4		// end of division, r3 is divided by 1000 (=usec)
+	shr.u r3=r3, 4			// end of division, r3 is divided by 1000 (=usec)
 	;;
 
 1:	cmp.geu p7, p0=r3, r10		// while (usec >= 1000000)
