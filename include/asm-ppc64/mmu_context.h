@@ -186,7 +186,7 @@ get_kernel_vsid( unsigned long ea )
 {
 	unsigned long ordinal, vsid;
 	
-	ordinal = (((ea >> 28) & 0x1fffff) * LAST_USER_CONTEXT) | (ea >> 60);
+	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | (ea >> 60);
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
 	ifppcdebug(PPCDBG_HTABSTRESS) {
