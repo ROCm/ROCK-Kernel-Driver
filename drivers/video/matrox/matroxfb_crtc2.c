@@ -387,6 +387,7 @@ static int matroxfb_dh_set_par(struct fb_info* info) {
 		up_read(&ACCESS_FBINFO(altout).lock);
 		matroxfb_dh_cfbX_init(m2info);
 	}
+	m2info->initialized = 1;
 	return 0;
 #undef m2info
 }
@@ -633,7 +634,8 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	if (register_framebuffer(&m2info->fbcon)) {
 		return -ENXIO;
 	}
-	fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
+	if (!m2info->initialized)
+		fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
 	down_write(&ACCESS_FBINFO(crtc2.lock));
 	oldcrtc2 = ACCESS_FBINFO(crtc2.info);
 	ACCESS_FBINFO(crtc2.info) = m2info;
