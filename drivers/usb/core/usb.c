@@ -229,9 +229,9 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 	int i;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		if (dev->actconfig->interface[i].altsetting[0]
+		if (dev->actconfig->interface[i]->altsetting[0]
 				.desc.bInterfaceNumber == ifnum)
-			return &dev->actconfig->interface[i];
+			return dev->actconfig->interface[i];
 
 	return NULL;
 }
@@ -256,14 +256,14 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 	int i, j, k;
 
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
-		for (j = 0; j < dev->actconfig->interface[i].num_altsetting; j++)
-			for (k = 0; k < dev->actconfig->interface[i]
-				.altsetting[j].desc.bNumEndpoints; k++)
-				if (epnum == dev->actconfig->interface[i]
-						.altsetting[j].endpoint[k]
+		for (j = 0; j < dev->actconfig->interface[i]->num_altsetting; j++)
+			for (k = 0; k < dev->actconfig->interface[i]->
+				altsetting[j].desc.bNumEndpoints; k++)
+				if (epnum == dev->actconfig->interface[i]->
+						altsetting[j].endpoint[k]
 						.desc.bEndpointAddress)
-					return &dev->actconfig->interface[i]
-						.altsetting[j].endpoint[k]
+					return &dev->actconfig->interface[i]->
+						altsetting[j].endpoint[k]
 						.desc;
 
 	return NULL;
@@ -654,6 +654,26 @@ static int usb_hotplug (struct device *dev, char **envp,
 #endif	/* CONFIG_HOTPLUG */
 
 /**
+ * usb_release_dev - free a usb device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this usb device are
+ * done.
+ */
+static void usb_release_dev(struct device *dev)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device(dev);
+
+	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
+		udev->bus->op->deallocate(udev);
+	usb_destroy_configuration(udev);
+	usb_bus_put(udev->bus);
+	kfree (udev);
+}
+
+/**
  * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
  * @parent: hub to which device is connected
  * @bus: bus used to access the device
@@ -681,6 +701,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	}
 
 	device_initialize(&dev->dev);
+	dev->dev.release = usb_release_dev;
 	dev->state = USB_STATE_ATTACHED;
 
 	if (!parent)
@@ -735,27 +756,6 @@ void usb_put_dev(struct usb_device *dev)
 	if (dev)
 		put_device(&dev->dev);
 }
-
-/**
- * usb_release_dev - free a usb device structure when all users of it are finished.
- * @dev: device that's been disconnected
- *
- * Will be called only by the device core when all users of this usb device are
- * done.
- */
-static void usb_release_dev(struct device *dev)
-{
-	struct usb_device *udev;
-
-	udev = to_usb_device(dev);
-
-	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
-		udev->bus->op->deallocate(udev);
-	usb_destroy_configuration (udev);
-	usb_bus_put (udev->bus);
-	kfree (udev);
-}
-
 
 static struct usb_device *match_device(struct usb_device *dev,
 				       u16 vendor_id, u16 product_id)
@@ -926,7 +926,7 @@ void usb_disconnect(struct usb_device **pdev)
 			struct usb_interface	*interface;
 
 			/* remove this interface */
-			interface = &dev->actconfig->interface[i];
+			interface = dev->actconfig->interface[i];
 			device_unregister(&interface->dev);
 		}
 	}
@@ -1090,7 +1090,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.parent = parent;
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
-	dev->dev.release = usb_release_dev;
 	dev->dev.driver_data = &usb_generic_driver_data;
 	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
@@ -1216,7 +1215,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* Register all of the interfaces for this device with the driver core.
 	 * Remember, interfaces get bound to drivers, not devices. */
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *interface = &dev->actconfig->interface[i];
+		struct usb_interface *interface = dev->actconfig->interface[i];
 		struct usb_interface_descriptor *desc;
 
 		desc = &interface->altsetting [interface->act_altsetting].desc;

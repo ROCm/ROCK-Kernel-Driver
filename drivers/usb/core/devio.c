@@ -360,7 +360,7 @@ static int claimintf(struct dev_state *ps, unsigned int intf)
 	/* already claimed */
 	if (test_bit(intf, &ps->ifclaimed))
 		return 0;
-	iface = &dev->actconfig->interface[intf];
+	iface = dev->actconfig->interface[intf];
 	err = -EBUSY;
 	lock_kernel();
 	if (!usb_interface_claimed(iface)) {
@@ -384,7 +384,7 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 	dev = ps->dev;
 	down(&dev->serialize);
 	if (dev && test_and_clear_bit(intf, &ps->ifclaimed)) {
-		iface = &dev->actconfig->interface[intf];
+		iface = dev->actconfig->interface[intf];
 		usb_driver_release_interface(&usbdevfs_driver, iface);
 		err = 0;
 	}
@@ -414,7 +414,7 @@ static int findintfep(struct usb_device *dev, unsigned int ep)
 	if (ep & ~(USB_DIR_IN|0xf))
 		return -EINVAL;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		iface = &dev->actconfig->interface[i];
+		iface = dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
                         alts = &iface->altsetting[j];
 			for (e = 0; e < alts->desc.bNumEndpoints; e++) {
@@ -436,7 +436,7 @@ static int findintfif(struct usb_device *dev, unsigned int ifn)
 	if (ifn & ~0xff)
 		return -EINVAL;
 	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		iface = &dev->actconfig->interface[i];
+		iface = dev->actconfig->interface[i];
 		for (j = 0; j < iface->num_altsetting; j++) {
                         alts = &iface->altsetting[j];
 			if (alts->desc.bInterfaceNumber == ifn)
@@ -718,7 +718,7 @@ static int proc_resetdevice(struct dev_state *ps)
 		return ret;
 
 	for (i = 0; i < ps->dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *intf = &ps->dev->actconfig->interface[i];
+		struct usb_interface *intf = ps->dev->actconfig->interface[i];
 
 		/* Don't simulate interfaces we've claimed */
 		if (test_bit(i, &ps->ifclaimed))

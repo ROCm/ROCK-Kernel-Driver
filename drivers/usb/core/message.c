@@ -675,7 +675,7 @@ void usb_set_maxpacket(struct usb_device *dev)
 
 	/* NOTE:  affects all endpoints _except_ ep0 */
 	for (i=0; i<dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *ifp = dev->actconfig->interface + i;
+		struct usb_interface *ifp = dev->actconfig->interface[i];
 		struct usb_host_interface *as = ifp->altsetting + ifp->act_altsetting;
 		struct usb_host_endpoint *ep = as->endpoint;
 		int e;
