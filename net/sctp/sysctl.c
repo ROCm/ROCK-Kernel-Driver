@@ -162,6 +162,14 @@ static ctl_table sctp_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
+	{
+		.ctl_name	= NET_SCTP_ADDIP_ENABLE,
+		.procname	= "addip_enable",
+		.data		= &sctp_addip_enable,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
 	{ .ctl_name = 0 }
 };
 
