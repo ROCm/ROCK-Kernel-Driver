@@ -171,7 +171,7 @@ struct uart_icount {
 struct uart_port {
 	spinlock_t		lock;			/* port lock */
 	unsigned int		iobase;			/* in/out[bwl] */
-	char			*membase;		/* read/write[bwl] */
+	unsigned char __iomem	*membase;		/* read/write[bwl] */
 	unsigned int		irq;			/* irq number */
 	unsigned int		uartclk;		/* base uart clock */
 	unsigned char		fifosize;		/* tx fifo size */
