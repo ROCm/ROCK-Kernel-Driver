@@ -1,27 +1,24 @@
+if ARCH_OMAP
 
 menu "TI OMAP Implementations"
 
 comment "OMAP Core Type"
 
 config ARCH_OMAP730
-	depends on ARCH_OMAP
 	bool "OMAP730 Based System"
 	select CPU_ARM926T
 
 config ARCH_OMAP1510
-	depends on ARCH_OMAP
 	default y
 	bool "OMAP1510 Based System"
 	select CPU_ARM925T
 	select CPU_DCACHE_WRITETHROUGH
 
 config ARCH_OMAP1610
-	depends on ARCH_OMAP
 	bool "OMAP1610 Based System"
 	select CPU_ARM926T
 
 config ARCH_OMAP5912
-	depends on ARCH_OMAP
 	bool "OMAP5912 Based System"
 	select CPU_ARM926T
 
@@ -87,7 +84,6 @@ comment "OMAP Feature Selections"
 
 #config OMAP_BOOT_TAG
 #	bool "OMAP bootloader information passing"
-#        depends on ARCH_OMAP
 #        default n
 #        help
 #          Say Y, if you have a bootloader which passes information
@@ -95,7 +91,6 @@ comment "OMAP Feature Selections"
 
 config OMAP_MUX
 	bool "OMAP multiplexing support"
-        depends on ARCH_OMAP
 	default y
         help
           Pin multiplexing support for OMAP boards. If your bootloader
@@ -113,7 +108,6 @@ config OMAP_MUX_DEBUG
 
 choice
 	prompt "Low-level debug console UART"
-	depends on ARCH_OMAP
 	default OMAP_LL_DEBUG_UART1
 
 config OMAP_LL_DEBUG_UART1
@@ -171,3 +165,5 @@ config OMAP_ARM_30MHZ
           Enable 30MHz clock for OMAP CPU. If unsure, say N.
 
 endmenu
+
+endif

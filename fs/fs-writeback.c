@@ -433,18 +433,15 @@ restart:
  */
 void sync_inodes_sb(struct super_block *sb, int wait)
 {
-	struct page_state ps;
 	struct writeback_control wbc = {
-		.bdi		= NULL,
 		.sync_mode	= wait ? WB_SYNC_ALL : WB_SYNC_HOLD,
-		.older_than_this = NULL,
-		.nr_to_write	= 0,
 	};
+	unsigned long nr_dirty = read_page_state(nr_dirty);
+	unsigned long nr_unstable = read_page_state(nr_unstable);
 
-	get_page_state(&ps);
-	wbc.nr_to_write = ps.nr_dirty + ps.nr_unstable +
+	wbc.nr_to_write = nr_dirty + nr_unstable +
 			(inodes_stat.nr_inodes - inodes_stat.nr_unused) +
-			ps.nr_dirty + ps.nr_unstable;
+			nr_dirty + nr_unstable;
 	wbc.nr_to_write += wbc.nr_to_write / 2;		/* Bit more for luck */
 	spin_lock(&inode_lock);
 	sync_sb_inodes(sb, &wbc);

@@ -33,10 +33,10 @@
 #define OMAP_DMA_EXT_NDMA_REQ		5
 #define OMAP_DMA_EXT_NDMA_REQ2		6
 #define OMAP_DMA_UWIRE_TX		7
-#define OMAP_DMA_MCBSP1_DMA_TX		8
-#define OMAP_DMA_MCBSP1_DMA_RX		9
-#define OMAP_DMA_MCBSP3_DMA_TX		10
-#define OMAP_DMA_MCBSP3_DMA_RX		11
+#define OMAP_DMA_MCBSP1_TX		8
+#define OMAP_DMA_MCBSP1_RX		9
+#define OMAP_DMA_MCBSP3_TX		10
+#define OMAP_DMA_MCBSP3_RX		11
 #define OMAP_DMA_UART1_TX		12
 #define OMAP_DMA_UART1_RX		13
 #define OMAP_DMA_UART2_TX		14
@@ -86,75 +86,77 @@
 #define OMAP_DMA_CRYPTO_DES_OUT		56
 
 
-#define OMAP_DMA_BASE			0xfffed800
-#define OMAP_DMA_GCR_REG		(OMAP_DMA_BASE + 0x400)
-#define OMAP_DMA_GSCR_REG		(OMAP_DMA_BASE + 0x404)
-#define OMAP_DMA_GRST_REG		(OMAP_DMA_BASE + 0x408)
-#define OMAP_DMA_HW_ID_REG		(OMAP_DMA_BASE + 0x442)
-#define OMAP_DMA_PCH2_ID_REG		(OMAP_DMA_BASE + 0x444)
+#define OMAP_DMA_BASE			(0xfffed800)
+#define OMAP_DMA_GCR			(OMAP_DMA_BASE + 0x400)
+#define OMAP_DMA_GSCR			(OMAP_DMA_BASE + 0x404)
+#define OMAP_DMA_GRST			(OMAP_DMA_BASE + 0x408)
+#define OMAP_DMA_HW_ID			(OMAP_DMA_BASE + 0x442)
+#define OMAP_DMA_PCH2_ID		(OMAP_DMA_BASE + 0x444)
 #define OMAP_DMA_PCH0_ID		(OMAP_DMA_BASE + 0x446)
 #define OMAP_DMA_PCH1_ID		(OMAP_DMA_BASE + 0x448)
 #define OMAP_DMA_PCHG_ID		(OMAP_DMA_BASE + 0x44a)
 #define OMAP_DMA_PCHD_ID		(OMAP_DMA_BASE + 0x44c)
-#define OMAP_DMA_CAPS_0_U_REG		(OMAP_DMA_BASE + 0x44e)
-#define OMAP_DMA_CAPS_0_L_REG		(OMAP_DMA_BASE + 0x450)
-#define OMAP_DMA_CAPS_1_U_REG		(OMAP_DMA_BASE + 0x452)
-#define OMAP_DMA_CAPS_1_L_REG		(OMAP_DMA_BASE + 0x454)
-#define OMAP_DMA_CAPS_2_REG		(OMAP_DMA_BASE + 0x456)
-#define OMAP_DMA_CAPS_3_REG		(OMAP_DMA_BASE + 0x458)
-#define OMAP_DMA_CAPS_4_REG		(OMAP_DMA_BASE + 0x45a)
-#define OMAP_DMA_PCH2_SR_REG		(OMAP_DMA_BASE + 0x460)
-#define OMAP_DMA_PCH0_SR_REG		(OMAP_DMA_BASE + 0x480)
-#define OMAP_DMA_PCH1_SR_REG		(OMAP_DMA_BASE + 0x482)
-#define OMAP_DMA_PCHD_SR_REG		(OMAP_DMA_BASE + 0x4c0)
+#define OMAP_DMA_CAPS_0_U		(OMAP_DMA_BASE + 0x44e)
+#define OMAP_DMA_CAPS_0_L		(OMAP_DMA_BASE + 0x450)
+#define OMAP_DMA_CAPS_1_U		(OMAP_DMA_BASE + 0x452)
+#define OMAP_DMA_CAPS_1_L		(OMAP_DMA_BASE + 0x454)
+#define OMAP_DMA_CAPS_2			(OMAP_DMA_BASE + 0x456)
+#define OMAP_DMA_CAPS_3			(OMAP_DMA_BASE + 0x458)
+#define OMAP_DMA_CAPS_4			(OMAP_DMA_BASE + 0x45a)
+#define OMAP_DMA_PCH2_SR		(OMAP_DMA_BASE + 0x460)
+#define OMAP_DMA_PCH0_SR		(OMAP_DMA_BASE + 0x480)
+#define OMAP_DMA_PCH1_SR		(OMAP_DMA_BASE + 0x482)
+#define OMAP_DMA_PCHD_SR		(OMAP_DMA_BASE + 0x4c0)
 
-#define OMAP1510_DMA_LCD_CTRL		0xfffedb00
-#define OMAP1510_DMA_LCD_TOP_F1_L	0xfffedb02
-#define OMAP1510_DMA_LCD_TOP_F1_U	0xfffedb04
-#define OMAP1510_DMA_LCD_BOT_F1_L	0xfffedb06
-#define OMAP1510_DMA_LCD_BOT_F1_U	0xfffedb08
+#define OMAP1510_DMA_LCD_BASE		(0xfffedb00)
+#define OMAP1510_DMA_LCD_CTRL		(OMAP1510_DMA_LCD_BASE + 0x00)
+#define OMAP1510_DMA_LCD_TOP_F1_L	(OMAP1510_DMA_LCD_BASE + 0x02)
+#define OMAP1510_DMA_LCD_TOP_F1_U	(OMAP1510_DMA_LCD_BASE + 0x04)
+#define OMAP1510_DMA_LCD_BOT_F1_L	(OMAP1510_DMA_LCD_BASE + 0x06)
+#define OMAP1510_DMA_LCD_BOT_F1_U	(OMAP1510_DMA_LCD_BASE + 0x08)
 
-#define OMAP1610_DMA_LCD_CSDP		0xfffee3c0
-#define OMAP1610_DMA_LCD_CCR		0xfffee3c2
-#define OMAP1610_DMA_LCD_CTRL		0xfffee3c4
-#define OMAP1610_DMA_LCD_TOP_B1_L	0xfffee3c8
-#define OMAP1610_DMA_LCD_TOP_B1_U	0xfffee3ca
-#define OMAP1610_DMA_LCD_BOT_B1_L	0xfffee3cc
-#define OMAP1610_DMA_LCD_BOT_B1_U	0xfffee3ce
-#define OMAP1610_DMA_LCD_TOP_B2_L	0xfffee3d0
-#define OMAP1610_DMA_LCD_TOP_B2_U	0xfffee3d2
-#define OMAP1610_DMA_LCD_BOT_B2_L	0xfffee3d4
-#define OMAP1610_DMA_LCD_BOT_B2_U	0xfffee3d6
-#define OMAP1610_DMA_LCD_SRC_EI_B1	0xfffee3d8
-#define OMAP1610_DMA_LCD_SRC_FI_B1_L	0xfffee3da
-#define OMAP1610_DMA_LCD_SRC_EN_B1	0xfffee3e0
-#define OMAP1610_DMA_LCD_SRC_FN_B1	0xfffee3e4
-#define OMAP1610_DMA_LCD_LCH_CTRL	0xfffee3ea
-#define OMAP1610_DMA_LCD_SRC_FI_B1_U	0xfffee3f4
+#define OMAP1610_DMA_LCD_BASE		(0xfffee300)
+#define OMAP1610_DMA_LCD_CSDP      	(OMAP1610_DMA_LCD_BASE + 0xc0)
+#define OMAP1610_DMA_LCD_CCR		(OMAP1610_DMA_LCD_BASE + 0xc2)
+#define OMAP1610_DMA_LCD_CTRL		(OMAP1610_DMA_LCD_BASE + 0xc4)
+#define OMAP1610_DMA_LCD_TOP_B1_L	(OMAP1610_DMA_LCD_BASE + 0xc8)
+#define OMAP1610_DMA_LCD_TOP_B1_U	(OMAP1610_DMA_LCD_BASE + 0xca)
+#define OMAP1610_DMA_LCD_BOT_B1_L	(OMAP1610_DMA_LCD_BASE + 0xcc)
+#define OMAP1610_DMA_LCD_BOT_B1_U	(OMAP1610_DMA_LCD_BASE + 0xce)
+#define OMAP1610_DMA_LCD_TOP_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd0)
+#define OMAP1610_DMA_LCD_TOP_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd2)
+#define OMAP1610_DMA_LCD_BOT_B2_L	(OMAP1610_DMA_LCD_BASE + 0xd4)
+#define OMAP1610_DMA_LCD_BOT_B2_U	(OMAP1610_DMA_LCD_BASE + 0xd6)
+#define OMAP1610_DMA_LCD_SRC_EI_B1	(OMAP1610_DMA_LCD_BASE + 0xd8)
+#define OMAP1610_DMA_LCD_SRC_FI_B1_L	(OMAP1610_DMA_LCD_BASE + 0xda)
+#define OMAP1610_DMA_LCD_SRC_EN_B1	(OMAP1610_DMA_LCD_BASE + 0xe0)
+#define OMAP1610_DMA_LCD_SRC_FN_B1	(OMAP1610_DMA_LCD_BASE + 0xe4)
+#define OMAP1610_DMA_LCD_LCH_CTRL	(OMAP1610_DMA_LCD_BASE + 0xea)
+#define OMAP1610_DMA_LCD_SRC_FI_B1_U	(OMAP1610_DMA_LCD_BASE + 0xf4)
 
 
 /* Every LCh has its own set of the registers below */
-#define OMAP_DMA_CSDP_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x00)
-#define OMAP_DMA_CCR_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x02)
-#define OMAP_DMA_CICR_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x04)
-#define OMAP_DMA_CSR_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x06)
-#define OMAP_DMA_CSSA_L_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x08)
-#define OMAP_DMA_CSSA_U_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0a)
-#define OMAP_DMA_CDSA_L_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0c)
-#define OMAP_DMA_CDSA_U_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0e)
-#define OMAP_DMA_CEN_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x10)
-#define OMAP_DMA_CFN_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x12)
-#define OMAP_DMA_CSFI_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x14)
-#define OMAP_DMA_CSEI_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x16)
-#define OMAP_DMA_CSAC_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x18)
-#define OMAP_DMA_CDAC_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1a)
-#define OMAP_DMA_CDEI_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1c)
-#define OMAP_DMA_CDFI_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1e)
-#define OMAP_DMA_COLOR_L_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x20)
-#define OMAP_DMA_COLOR_U_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x22)
-#define OMAP_DMA_CCR2_REG(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x24)
-#define OMAP_DMA_CLNK_CTRL_REG(n)	(OMAP_DMA_BASE + 0x40 * (n) + 0x28)
-#define OMAP_DMA_LCH_CTRL_REG(n)	(OMAP_DMA_BASE + 0x40 * (n) + 0x2a)
+#define OMAP_DMA_CSDP(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x00)
+#define OMAP_DMA_CCR(n)			(OMAP_DMA_BASE + 0x40 * (n) + 0x02)
+#define OMAP_DMA_CICR(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x04)
+#define OMAP_DMA_CSR(n)			(OMAP_DMA_BASE + 0x40 * (n) + 0x06)
+#define OMAP_DMA_CSSA_L(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x08)
+#define OMAP_DMA_CSSA_U(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0a)
+#define OMAP_DMA_CDSA_L(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0c)
+#define OMAP_DMA_CDSA_U(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x0e)
+#define OMAP_DMA_CEN(n)			(OMAP_DMA_BASE + 0x40 * (n) + 0x10)
+#define OMAP_DMA_CFN(n)			(OMAP_DMA_BASE + 0x40 * (n) + 0x12)
+#define OMAP_DMA_CSFI(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x14)
+#define OMAP_DMA_CSEI(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x16)
+#define OMAP_DMA_CSAC(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x18)
+#define OMAP_DMA_CDAC(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1a)
+#define OMAP_DMA_CDEI(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1c)
+#define OMAP_DMA_CDFI(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x1e)
+#define OMAP_DMA_COLOR_L(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x20)
+#define OMAP_DMA_COLOR_U(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x22)
+#define OMAP_DMA_CCR2(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x24)
+#define OMAP_DMA_CLNK_CTRL(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x28)
+#define OMAP_DMA_LCH_CTRL(n)		(OMAP_DMA_BASE + 0x40 * (n) + 0x2a)
 
 #define OMAP_DMA_TOUT_IRQ		(1 << 0)
 #define OMAP_DMA_DROP_IRQ		(1 << 1)
@@ -192,6 +194,11 @@ enum {
 	OMAP_LCD_DMA_B2_BOTTOM
 };
 
+enum {
+	OMAP_DMA_DATA_BURST_4,
+	OMAP_DMA_DATA_BURST_8
+};
+
 extern int omap_request_dma(int dev_id, const char *dev_name,
 			    void (* callback)(int lch, u16 ch_status, void *data),
 			    void *data, int *dma_ch);
@@ -203,10 +210,20 @@ extern void omap_stop_dma(int lch);
 extern void omap_set_dma_transfer_params(int lch, int data_type,
 					 int elem_count, int frame_count,
 					 int sync_mode);
+extern void omap_set_dma_constant_fill(int lch, u32 color);
+extern void omap_set_dma_transparent_copy(int lch, u32 color);
+
 extern void omap_set_dma_src_params(int lch, int src_port, int src_amode,
 				    unsigned long src_start);
+extern void omap_set_dma_src_index(int lch, int eidx, int fidx);
+extern void omap_set_dma_src_data_pack(int lch, int enable);
+extern void omap_set_dma_src_burst_mode(int lch, int burst_mode);
+
 extern void omap_set_dma_dest_params(int lch, int dest_port, int dest_amode,
 				     unsigned long dest_start);
+extern void omap_set_dma_dest_index(int lch, int eidx, int fidx);
+extern void omap_set_dma_dest_data_pack(int lch, int enable);
+extern void omap_set_dma_dest_burst_mode(int lch, int burst_mode);
 
 extern void omap_dma_link_lch (int lch_head, int lch_queue);
 extern void omap_dma_unlink_lch (int lch_head, int lch_queue);

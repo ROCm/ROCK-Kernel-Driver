@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.119 $
+ *   $Revision: 1.120 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -526,7 +526,8 @@ get_disc_ccwdev_by_devno(unsigned int devno, struct ccw_device *sibling)
 		cdev = to_ccwdev(dev);
 		if ((cdev->private->state == DEV_STATE_DISCONNECTED) &&
 		    (cdev->private->devno == devno) &&
-		    (!strncmp(cdev->dev.bus_id, sibling->dev.bus_id, 4))) {
+		    (!strncmp(cdev->dev.bus_id, sibling->dev.bus_id,
+			      BUS_ID_SIZE))) {
 			cdev->private->state = DEV_STATE_NOT_OPER;
 			break;
 		}

@@ -13,7 +13,7 @@
  */
 #include <linux/sched.h>
 #include <asm/errno.h>
-#include <asm/arch/memory.h>
+#include <asm/memory.h>
 #include <asm/domain.h>
 #include <asm/system.h>
 

@@ -134,5 +134,5 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 void iounmap(void *addr)
 {
 	if (addr > high_memory)
-		return vfree(addr);
+		vfree(addr);
 }

@@ -84,7 +84,7 @@ static ck_info_t ck_info_table[] = {
 	}, {
 		.name		= "ck_gen1",
 		.flags		= CK_RATEF | CK_IDLEF,
-		.rate_reg	= CK_DPLL1,
+		.rate_reg	= DPLL_CTL,
 		.idle_reg	= ARM_IDLECT1,
 		.idle_shift	= IDLDPLL_ARM,
 		.parent		= OMAP_CLKIN,
@@ -629,39 +629,39 @@ init_ck(void)
 	omap_writew(0x1000, ARM_SYSST);
 #if defined(CONFIG_OMAP_ARM_30MHZ)
 	omap_writew(0x1555, ARM_CKCTL);
-	omap_writew(0x2290, DPLL_CTL_REG);
+	omap_writew(0x2290, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_60MHZ)
 	omap_writew(0x1005, ARM_CKCTL);
-	omap_writew(0x2290, DPLL_CTL_REG);
+	omap_writew(0x2290, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_96MHZ)
 	omap_writew(0x1005, ARM_CKCTL);
-	omap_writew(0x2410, DPLL_CTL_REG);
+	omap_writew(0x2410, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_120MHZ)
 	omap_writew(0x110a, ARM_CKCTL);
-	omap_writew(0x2510, DPLL_CTL_REG);
+	omap_writew(0x2510, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_168MHZ)
 	omap_writew(0x110f, ARM_CKCTL);
-	omap_writew(0x2710, DPLL_CTL_REG);
+	omap_writew(0x2710, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_182MHZ) && defined(CONFIG_ARCH_OMAP730)
 	omap_writew(0x250E, ARM_CKCTL);
-	omap_writew(0x2710, DPLL_CTL_REG);
+	omap_writew(0x2710, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_192MHZ) && (defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912))
 	omap_writew(0x150f, ARM_CKCTL);
 	if (crystal_type == 2) {
 		source_clock = 13;	/* MHz */
-		omap_writew(0x2510, DPLL_CTL_REG);
+		omap_writew(0x2510, DPLL_CTL);
 	} else
-		omap_writew(0x2810, DPLL_CTL_REG);
+		omap_writew(0x2810, DPLL_CTL);
 #elif defined(CONFIG_OMAP_ARM_195MHZ) && defined(CONFIG_ARCH_OMAP730)
 	omap_writew(0x250E, ARM_CKCTL);
-	omap_writew(0x2790, DPLL_CTL_REG);
+	omap_writew(0x2790, DPLL_CTL);
 #else
 #error "OMAP MHZ not set, please run make xconfig"
 #endif
 
 #ifdef CONFIG_MACH_OMAP_PERSEUS2
 	/* Select slicer output as OMAP input clock */
-	omap_writew(omap_readw(OMAP730_PCC_UPLD_CTRL_REG) & ~0x1, OMAP730_PCC_UPLD_CTRL_REG);
+	omap_writew(omap_readw(OMAP730_PCC_UPLD_CTRL) & ~0x1, OMAP730_PCC_UPLD_CTRL);
 #endif
 
 	/* Turn off some other junk the bootloader might have turned on */

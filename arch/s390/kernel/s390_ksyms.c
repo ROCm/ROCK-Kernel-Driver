@@ -45,25 +45,6 @@ EXPORT_SYMBOL(__down);
 EXPORT_SYMBOL(__down_interruptible);
 
 /*
- * string functions
- */
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(strlen);
-EXPORT_SYMBOL_NOVERS(strchr);
-EXPORT_SYMBOL_NOVERS(strcmp);
-EXPORT_SYMBOL_NOVERS(strncat);
-EXPORT_SYMBOL_NOVERS(strncmp);
-EXPORT_SYMBOL_NOVERS(strncpy);
-EXPORT_SYMBOL_NOVERS(strnlen);
-EXPORT_SYMBOL_NOVERS(strrchr);
-EXPORT_SYMBOL_NOVERS(strstr);
-EXPORT_SYMBOL_NOVERS(strpbrk);
-EXPORT_SYMBOL_NOVERS(strcpy);
-
-/*
  * binfmt_elf loader 
  */
 extern int dump_fpu (struct pt_regs * regs, s390_fp_regs *fpregs);

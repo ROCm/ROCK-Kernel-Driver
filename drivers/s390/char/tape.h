@@ -32,7 +32,7 @@ struct gendisk;
 #ifdef  DBF_LIKE_HELL
 #define DBF_LH(level, str, ...) \
 do { \
-	debug_sprintf_event(tape_dbf_area, level, str, ## __VA_ARGS__); \
+	debug_sprintf_event(TAPE_DBF_AREA, level, str, ## __VA_ARGS__); \
 } while (0)
 #else
 #define DBF_LH(level, str, ...) do {} while(0)
@@ -43,12 +43,12 @@ do { \
  */
 #define DBF_EVENT(d_level, d_str...) \
 do { \
-	debug_sprintf_event(tape_dbf_area, d_level, d_str); \
+	debug_sprintf_event(TAPE_DBF_AREA, d_level, d_str); \
 } while (0)
 
 #define DBF_EXCEPTION(d_level, d_str...) \
 do { \
-	debug_sprintf_exception(tape_dbf_area, d_level, d_str); \
+	debug_sprintf_exception(TAPE_DBF_AREA, d_level, d_str); \
 } while (0)
 
 #define TAPE_VERSION_MAJOR 2
@@ -313,7 +313,7 @@ extern void tape_dump_sense_dbf(struct tape_device *, struct tape_request *,
 extern void tape_med_state_set(struct tape_device *, enum tape_medium_state);
 
 /* The debug area */
-extern debug_info_t *tape_dbf_area;
+extern debug_info_t *TAPE_DBF_AREA;
 
 /* functions for building ccws */
 static inline struct ccw1 *

@@ -188,7 +188,7 @@ void show_registers(struct pt_regs *regs)
 	printk("%s Code: ", mode);
 	for (i = 0; i < 20; i++) {
 		unsigned char c;
-		if (__get_user(c, (char *)(regs->psw.addr + i))) {
+		if (__get_user(c, (char __user *)(regs->psw.addr + i))) {
 			printk(" Bad PSW.");
 			break;
 		}
@@ -391,7 +391,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 		local_irq_enable();
 
 	if (regs->psw.mask & PSW_MASK_PSTATE)
-		get_user(*((__u16 *) opcode), location);
+		get_user(*((__u16 *) opcode), (__u16 __user *)location);
 	else
 		*((__u16 *)opcode)=*((__u16 *)location);
 	if (*((__u16 *)opcode)==S390_BREAKPOINT_U16)

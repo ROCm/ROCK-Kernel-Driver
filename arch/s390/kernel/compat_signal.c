@@ -53,7 +53,7 @@ typedef struct
 
 asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
-int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from)
+int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 {
 	int err;
 
@@ -130,7 +130,8 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 }
 
 asmlinkage int
-sys32_rt_sigsuspend(struct pt_regs * regs,compat_sigset_t *unewset, size_t sigsetsize)
+sys32_rt_sigsuspend(struct pt_regs * regs, compat_sigset_t __user *unewset,
+								size_t sigsetsize)
 {
 	sigset_t saveset, newset;
 	compat_sigset_t set32;
@@ -162,11 +163,11 @@ sys32_rt_sigsuspend(struct pt_regs * regs,compat_sigset_t *unewset, size_t sigse
                 if (do_signal(regs, &saveset))
                         return -EINTR;
         }
-}                                                         
+}
 
 asmlinkage long
-sys32_sigaction(int sig, const struct old_sigaction32 *act,
-		 struct old_sigaction32 *oact)
+sys32_sigaction(int sig, const struct old_sigaction32 __user *act,
+		 struct old_sigaction32 __user *oact)
 {
         struct k_sigaction new_ka, old_ka;
         int ret;
@@ -199,9 +200,9 @@ sys32_sigaction(int sig, const struct old_sigaction32 *act,
 int
 do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact);
 
-asmlinkage long 
-sys32_rt_sigaction(int sig, const struct sigaction32 *act,
-	   struct sigaction32 *oact,  size_t sigsetsize)
+asmlinkage long
+sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
+	   struct sigaction32 __user *oact,  size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -258,7 +259,8 @@ sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 }
 
 asmlinkage long
-sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
+sys32_sigaltstack(const stack_t32 __user *uss, stack_t32 __user *uoss,
+							struct pt_regs *regs)
 {
 	stack_t kss, koss;
 	int ret, err = 0;
@@ -275,7 +277,9 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 	}
 
 	set_fs (KERNEL_DS);
-	ret = do_sigaltstack(uss ? &kss : NULL , uoss ? &koss : NULL, regs->gprs[15]);
+	ret = do_sigaltstack((stack_t __user *) (uss ? &kss : NULL),
+			     (stack_t __user *) (uoss ? &koss : NULL),
+			     regs->gprs[15]);
 	set_fs (old_fs);
 
 	if (!ret && uoss) {
@@ -290,7 +294,7 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 	return ret;
 }
 
-static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
+static int save_sigregs32(struct pt_regs *regs, _sigregs32 __user *sregs)
 {
 	_s390_regs_common32 regs32;
 	int err, i;
@@ -311,7 +315,7 @@ static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 			      sizeof(_s390_fp_regs32));
 }
 
-static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
+static int restore_sigregs32(struct pt_regs *regs,_sigregs32 __user *sregs)
 {
 	_s390_regs_common32 regs32;
 	int err, i;
@@ -343,7 +347,7 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 
 asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 {
-	sigframe32 *frame = (sigframe32 *)regs->gprs[15];
+	sigframe32 __user *frame = (sigframe32 __user *)regs->gprs[15];
 	sigset_t set;
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
@@ -365,11 +369,11 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 badframe:
 	force_sig(SIGSEGV, current);
 	return 0;
-}	
+}
 
 asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 {
-	rt_sigframe32 *frame = (rt_sigframe32 *)regs->gprs[15];
+	rt_sigframe32 __user *frame = (rt_sigframe32 __user *)regs->gprs[15];
 	sigset_t set;
 	stack_t st;
 	__u32 ss_sp;
@@ -399,8 +403,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
-	set_fs (KERNEL_DS);   
-	do_sigaltstack(&st, NULL, regs->gprs[15]);
+	set_fs (KERNEL_DS);
+	do_sigaltstack((stack_t __user *)&st, NULL, regs->gprs[15]);
 	set_fs (old_fs);
 
 	return regs->gprs[2];
@@ -418,7 +422,7 @@ badframe:
 /*
  * Determine which stack to use..
  */
-static inline void *
+static inline void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 {
 	unsigned long sp;
@@ -439,7 +443,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 		sp = (unsigned long) ka->sa.sa_restorer;
 	}
 
-	return (void *)((sp - frame_size) & -8ul);
+	return (void __user *)((sp - frame_size) & -8ul);
 }
 
 static inline int map_signal(int sig)
@@ -455,7 +459,7 @@ static inline int map_signal(int sig)
 static void setup_frame32(int sig, struct k_sigaction *ka,
 			sigset_t *set, struct pt_regs * regs)
 {
-	sigframe32 *frame = get_sigframe(ka, regs, sizeof(sigframe32));
+	sigframe32 __user *frame = get_sigframe(ka, regs, sizeof(sigframe32));
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(sigframe32)))
 		goto give_sigsegv;
 
@@ -474,12 +478,12 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 	} else {
 		regs->gprs[14] = (__u64) frame->retcode;
 		if (__put_user(S390_SYSCALL_OPCODE | __NR_sigreturn,
-		               (u16 *)(frame->retcode)))
+		               (u16 __user *)(frame->retcode)))
 			goto give_sigsegv;
         }
 
 	/* Set up backchain. */
-	if (__put_user(regs->gprs[15], (unsigned int *) frame))
+	if (__put_user(regs->gprs[15], (unsigned int __user *) frame))
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
@@ -505,7 +509,7 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
 	int err = 0;
-	rt_sigframe32 *frame = get_sigframe(ka, regs, sizeof(rt_sigframe32));
+	rt_sigframe32 __user *frame = get_sigframe(ka, regs, sizeof(rt_sigframe32));
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(rt_sigframe32)))
 		goto give_sigsegv;
 
@@ -531,11 +535,11 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 	} else {
 		regs->gprs[14] = (__u64) frame->retcode;
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn,
-		                  (u16 *)(frame->retcode));
+		                  (u16 __user *)(frame->retcode));
 	}
 
 	/* Set up backchain. */
-	if (__put_user(regs->gprs[15], (unsigned int *) frame))
+	if (__put_user(regs->gprs[15], (unsigned int __user *) frame))
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */

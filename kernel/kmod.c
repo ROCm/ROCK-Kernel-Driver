@@ -47,7 +47,7 @@ static struct workqueue_struct *khelper_wq;
 /*
 	modprobe_path is set via /proc/sys.
 */
-char modprobe_path[256] = "/sbin/modprobe";
+char modprobe_path[KMOD_PATH_LEN] = "/sbin/modprobe";
 
 /**
  * request_module - try to load a kernel module
@@ -132,7 +132,7 @@ EXPORT_SYMBOL(request_module);
 	events.  the command is expected to load drivers when
 	necessary, and may perform additional system setup.
 */
-char hotplug_path[256] = "/sbin/hotplug";
+char hotplug_path[KMOD_PATH_LEN] = "/sbin/hotplug";
 
 EXPORT_SYMBOL(hotplug_path);
 

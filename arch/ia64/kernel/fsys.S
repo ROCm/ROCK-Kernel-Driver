@@ -502,6 +502,7 @@ ENTRY(fsys_fallback_syscall)
 	adds r17=-1024,r15
 	movl r14=sys_call_table
 	;;
+	rsm psr.i
 	shladd r18=r17,3,r14
 	;;
 	ld8 r18=[r18]				// load normal (heavy-weight) syscall entry-point
@@ -542,7 +543,7 @@ GLOBAL_ENTRY(fsys_bubble_down)
 	 * to synthesize.
 	 */
 #	define PSR_ONE_BITS		((3 << IA64_PSR_CPL0_BIT) | (0x1 << IA64_PSR_RI_BIT) \
-					 | IA64_PSR_BN)
+					 | IA64_PSR_BN | IA64_PSR_I)
 
 	invala
 	movl r8=PSR_ONE_BITS

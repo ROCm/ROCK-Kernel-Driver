@@ -1289,7 +1289,7 @@ dasd_eckd_performance(struct block_device *bdev, int no, long args)
 		/* Prepare for Read Subsystem Data */
 		prssdp = (struct dasd_psf_prssd_data *) cqr->data;
 		stats = (struct dasd_rssd_perf_stats_t *) (prssdp + 1);
-		rc = copy_to_user((long *) args, (long *) stats,
+		rc = copy_to_user((long __user *) args, (long *) stats,
 				  sizeof(struct dasd_rssd_perf_stats_t));
 	}
 	dasd_sfree_request(cqr, cqr->device);
@@ -1319,10 +1319,10 @@ dasd_eckd_get_attrib (struct block_device *bdev, int no, long args)
 
         private = (struct dasd_eckd_private *) device->private;
         attrib = private->attrib;
-	
-        rc = copy_to_user((long *) args, (long *) &attrib,
+
+        rc = copy_to_user((long __user *) args, (long *) &attrib,
 			  sizeof (struct attrib_data_t));
-	
+
 	return rc;
 }
 
@@ -1346,7 +1346,7 @@ dasd_eckd_set_attrib(struct block_device *bdev, int no, long args)
 	if (device == NULL)
 		return -ENODEV;
 
-	if (copy_from_user(&attrib, (void *) args,
+	if (copy_from_user(&attrib, (void __user *) args,
 			   sizeof (struct attrib_data_t))) {
 		return -EFAULT;
 	}

@@ -46,12 +46,12 @@
  * - length(n_modulus) = inputdatalength
  */
 struct ica_rsa_modexpo {
-	char *		inputdata;
+	char __user *	inputdata;
 	unsigned int	inputdatalength;
-	char *		outputdata;
+	char __user *	outputdata;
 	unsigned int	outputdatalength;
-	char *		b_key;
-	char *		n_modulus;
+	char __user *	b_key;
+	char __user *	n_modulus;
 };
 
 /**
@@ -69,15 +69,15 @@ struct ica_rsa_modexpo {
  * - length(u_mult_inv) = inputdatalength/2 + 8
  */
 struct ica_rsa_modexpo_crt {
-	char *		inputdata;
+	char __user *	inputdata;
 	unsigned int	inputdatalength;
-	char *		outputdata;
+	char __user *	outputdata;
 	unsigned int	outputdatalength;
-	char *		bp_key;
-	char *		bq_key;
-	char *		np_prime;
-	char *		nq_prime;
-	char *		u_mult_inv;
+	char __user *	bp_key;
+	char __user *	bq_key;
+	char __user *	np_prime;
+	char __user *	nq_prime;
+	char __user *	u_mult_inv;
 };
 
 #define Z90_IOCTL_MAGIC 'z'  // NOTE:  Need to allocate from linux folks
