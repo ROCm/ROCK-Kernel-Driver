@@ -142,9 +142,31 @@ typedef struct	SHT
      * Host number is the POSITION IN THE hosts array of THIS
      * host adapter.
      *
-     * The done() function must only be called after QueueCommand() 
-     * has returned.
-     */
+     * if queuecommand returns 0, then the HBA has accepted the
+     * command.  The done() function must be called on the command
+     * when the driver has finished with it. (you may call done on the
+     * command before queuecommand returns, but in this case you
+     * *must* return 0 from queuecommand).
+     *
+     * queuecommand may also reject the command, in which case it may
+     * not touch the command and must not call done() for it.
+     *
+     * There are two possible rejection returns:
+     *
+     *   SCSI_MLQUEUE_DEVICE_BUSY: Block this device temporarily, but
+     *   allow commands to other devices serviced by this host.
+     *
+     *   SCSI_MLQUEUE_HOST_BUSY: Block all devices served by this
+     *   host temporarily.
+     *
+     *   for compatibility, any other non-zero return is treated the
+     *   same as SCSI_MLQUEUE_HOST_BUSY.
+     *
+     *   NOTE: "temporarily" means either until the next command for
+     *   this device/host completes, or a period of time determined by
+     *   I/O pressure in the system if there are no other outstanding
+     *   commands.
+     * */
     int (* queuecommand)(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 
     /*

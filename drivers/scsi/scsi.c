@@ -661,6 +661,7 @@ inline void __scsi_release_command(Scsi_Cmnd * SCpnt)
 int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 {
 	struct Scsi_Host *host = cmd->host;
+	struct scsi_device *device = cmd->device;
 	unsigned long flags;
 
 	SCSI_LOG_MLQUEUE(1,
@@ -688,7 +689,7 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
 		host->host_blocked = host->max_host_blocked;
 	} else {
-                cmd->device->device_blocked = cmd->device->max_device_blocked;
+		device->device_blocked = device->max_device_blocked;
 	}
 
 	/*
@@ -702,14 +703,19 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
-	spin_lock_irqsave(cmd->host->host_lock, flags);
-	cmd->host->host_busy--;
-	cmd->device->device_busy--;
-	spin_unlock_irqrestore(cmd->host->host_lock, flags);
+	scsi_host_busy_dec_and_test(host, device);
 
 	/*
 	 * Insert this command at the head of the queue for it's device.
 	 * It will go before all other commands that are already in the queue.
+	 *
+	 * NOTE: there is magic here about the way the queue is
+	 * plugged if we have no outstanding commands.
+	 * scsi_insert_special_cmd eventually calls
+	 * blk_queue_insert().  Although this *doesn't* plug the
+	 * queue, it does call the request function.  The SCSI request
+	 * function detects the blocked condition and plugs the queue
+	 * appropriately.
 	 */
 	scsi_insert_special_cmd(cmd, 1);
 	return 0;
