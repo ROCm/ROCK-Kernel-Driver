@@ -596,7 +596,9 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 		wait_for_zero_refcount(mod);
 
 	/* Final destruction now noone is using it. */
+	up(&module_mutex);
 	mod->exit();
+	down(&module_mutex);
 	free_module(mod);
 
  out:
