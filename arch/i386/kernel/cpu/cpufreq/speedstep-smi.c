@@ -168,7 +168,7 @@ static void speedstep_set_state (unsigned int state, unsigned int notify)
 	local_irq_restore(flags);
 
 	if (new_state == state) {
-		dprintk(KERN_INFO "cpufreq: change to %u MHz succeded\n", (freqs.new / 1000));
+		dprintk(KERN_INFO "cpufreq: change to %u MHz succeeded\n", (freqs.new / 1000));
 	} else {
 		printk(KERN_ERR "cpufreq: change failed\n");
 	}
