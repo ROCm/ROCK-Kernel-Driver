@@ -13,7 +13,7 @@ export-objs := sparc_ksyms.o
 IRQ_OBJS := irq.o sun4m_irq.o sun4c_irq.o sun4d_irq.o
 obj-y    := entry.o wof.o wuf.o etrap.o rtrap.o traps.o ${IRQ_OBJS} \
 	    process.o signal.o ioport.o setup.o idprom.o \
-	    sys_sparc.o sunos_asm.o sparc-stub.o systbls.o \
+	    sys_sparc.o sunos_asm.o systbls.o \
 	    time.o windows.o cpu.o devices.o sclow.o \
 	    tadpole.o tick14.o ptrace.o sys_solaris.o \
 	    unaligned.o muldiv.o pcic.o semaphore.o sparc_ksyms.o

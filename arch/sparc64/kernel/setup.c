@@ -314,12 +314,9 @@ int prom_callback(long *args)
 	return 0;
 }
 
-extern void rs_kgdb_hook(int tty_num); /* sparc/serial.c */
-
 unsigned int boot_flags = 0;
 #define BOOTME_DEBUG  0x1
 #define BOOTME_SINGLE 0x2
-#define BOOTME_KGDB   0x4
 
 static int console_fb __initdata = 0;
 
@@ -389,26 +386,6 @@ static void __init boot_flags_init(char *commands)
 			commands++;
 			while (*commands && *commands != ' ')
 				process_switch(*commands++);
-		} else if (strlen(commands) >= 9
-			   && !strncmp(commands, "kgdb=tty", 8)) {
-			boot_flags |= BOOTME_KGDB;
-			switch (commands[8]) {
-#ifdef CONFIG_SUN_SERIAL
-			case 'a':
-				rs_kgdb_hook(0);
-				prom_printf("KGDB: Using serial line /dev/ttya.\n");
-				break;
-			case 'b':
-				rs_kgdb_hook(1);
-				prom_printf("KGDB: Using serial line /dev/ttyb.\n");
-				break;
-#endif
-			default:
-				printk("KGDB: Unknown tty line.\n");
-				boot_flags &= ~BOOTME_KGDB;
-				break;
-			}
-			commands += 9;
 		} else {
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
@@ -484,7 +461,6 @@ extern void paging_init(void);
 
 void __init setup_arch(char **cmdline_p)
 {
-	extern int serial_console;  /* in console.c, of course */
 	unsigned long highest_paddr;
 	int i;
 
@@ -568,7 +544,6 @@ void __init setup_arch(char **cmdline_p)
 	}
 #endif
 
-#ifdef CONFIG_SUN_SERIAL
 	switch (console_fb) {
 	case 0: /* Let's get our io devices from prom */
 		{
@@ -597,10 +572,7 @@ void __init setup_arch(char **cmdline_p)
 	case 3: /* Force ttyb as console */
 		serial_console = 2;
 		break;
-	}
-#else
-	serial_console = 0;
-#endif
+	};
 	if (serial_console)
 		conswitchp = NULL;
 

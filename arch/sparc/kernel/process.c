@@ -94,7 +94,7 @@ int cpu_idle(void)
 			extern unsigned long sun4c_kernel_faults;
 			extern void sun4c_grow_kernel_ring(void);
 
-			save_and_cli(flags);
+			local_irq_save(flags);
 			now = jiffies;
 			count -= (now - last_jiffies);
 			last_jiffies = now;
@@ -110,7 +110,7 @@ int cpu_idle(void)
 					sun4c_grow_kernel_ring();
 				}
 			}
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 
 		while((!need_resched()) && pm_idle) {
@@ -143,8 +143,6 @@ int cpu_idle(void)
 #endif
 
 extern char reboot_command [];
-
-extern int serial_console;
 
 extern void (*prom_palette)(int);
 

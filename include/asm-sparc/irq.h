@@ -21,6 +21,8 @@ BTFIXUPDEF_CALL(char *, __irq_itoa, unsigned int)
 
 #define NR_IRQS    15
 
+#define irq_cannonicalize(irq)	(irq)
+
 /* Dave Redman (djhr@tadpole.co.uk)
  * changed these to function pointers.. it saves cycles and will allow
  * the irq dependencies to be split into different files at a later date
