@@ -99,7 +99,7 @@ unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
 int have_of = 1;
-
+int boot_cpuid = 0;
 dev_t boot_dev;
 
 /*
@@ -713,7 +713,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifdef CONFIG_SMP
 	pvr = per_cpu(pvr, cpu_id);
 #else
-	pvr = mfpvr(PSRN_PVR);
+	pvr = mfspr(SPRN_PVR);
 #endif
 	maj = (pvr >> 8) & 0xFF;
 	min = pvr & 0xFF;
