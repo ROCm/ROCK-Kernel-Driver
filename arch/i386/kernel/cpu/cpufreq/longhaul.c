@@ -131,14 +131,14 @@ static void do_powersaver(union msr_longhaul *longhaul,
 	int version;
 
 	switch (cpu_model) {
-		case CPU_EZRA_T:
-			version = 3;
-			break;
-		case CPU_NEHEMIAH:
-			version = 0xf;
-			break;
-		default:
-			return;
+	case CPU_EZRA_T:
+		version = 3;
+		break;
+	case CPU_NEHEMIAH:
+		version = 0xf;
+		break;
+	default:
+		return;
 	}
 
 	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
@@ -188,7 +188,7 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	dprintk (KERN_INFO PFX "Setting to FSB:%dMHz Mult:%d.%dx (%s)\n",
-					fsb, mult/10, mult%10, print_speed(speed/1000));
+			fsb, mult/10, mult%10, print_speed(speed/1000));
 
 	switch (longhaul_version) {
 
@@ -462,8 +462,7 @@ static int longhaul_verify(struct cpufreq_policy *policy)
 
 
 static int longhaul_target(struct cpufreq_policy *policy,
-			    unsigned int target_freq,
-			    unsigned int relation)
+			    unsigned int target_freq, unsigned int relation)
 {
 	unsigned int table_index = 0;
 	unsigned int new_clock_ratio = 0;
@@ -477,6 +476,7 @@ static int longhaul_target(struct cpufreq_policy *policy,
 
 	return 0;
 }
+
 
 static unsigned int longhaul_get(unsigned int cpu)
 {
@@ -564,13 +564,13 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 
 	printk (KERN_INFO PFX "VIA %s CPU detected.", cpuname);
 	switch (longhaul_version) {
-		case TYPE_LONGHAUL_V1:
-		case TYPE_LONGHAUL_V2:
-				printk ("Longhaul v%d supported.\n", longhaul_version);
-				break;
-		case TYPE_POWERSAVER:
-				printk ("Powersaver supported.\n");
-				break;
+	case TYPE_LONGHAUL_V1:
+	case TYPE_LONGHAUL_V2:
+		printk ("Longhaul v%d supported.\n", longhaul_version);
+		break;
+	case TYPE_POWERSAVER:
+		printk ("Powersaver supported.\n");
+		break;
 	};
 
 	ret = longhaul_get_ranges();
@@ -616,6 +616,7 @@ static struct cpufreq_driver longhaul_driver = {
 	.attr	= longhaul_attr,
 };
 
+
 static int __init longhaul_init(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
@@ -632,6 +633,7 @@ static int __init longhaul_init(void)
 
 	return -ENODEV;
 }
+
 
 static void __exit longhaul_exit(void)
 {
