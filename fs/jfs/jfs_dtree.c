@@ -977,8 +977,10 @@ static int dtSplitUp(tid_t tid,
 		n -= DTROOTMAXSLOT - sp->header.freecnt; /* header + entries */
 		if (n <= split->nslot)
 			xlen++;
-		if ((rc = dbAlloc(ip, 0, (s64) xlen, &xaddr)))
+		if ((rc = dbAlloc(ip, 0, (s64) xlen, &xaddr))) {
+			DT_PUTPAGE(smp);
 			goto freeKeyName;
+		}
 
 		pxdlist.maxnpxd = 1;
 		pxdlist.npxd = 0;

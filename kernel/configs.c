@@ -77,8 +77,10 @@ static int __init ikconfig_init(void)
 {
 	struct proc_dir_entry *entry;
 
+#if 0
 	printk(KERN_INFO "ikconfig %s with /proc/config*\n",
 	       IKCONFIG_VERSION);
+#endif
 
 	/* create the current config file */
 	entry = create_proc_entry("config.gz", S_IFREG | S_IRUGO,
