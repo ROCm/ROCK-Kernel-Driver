@@ -42,7 +42,7 @@
 extern void ia64_mca_check_errors( void );
 #endif
 
-struct pci_fixup pcibios_fixups[];
+struct pci_fixup pcibios_fixups[1];
 
 struct pci_ops *pci_root_ops;
 

@@ -14,6 +14,7 @@
 
 #include <linux/config.h>
 
+#include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -290,30 +291,6 @@ ia64_phys_addr_valid (unsigned long addr)
 # define pgprot_writecombine(prot)	__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_WC)
 #endif
 
-/*
- * Return the region index for virtual address ADDRESS.
- */
-static inline unsigned long
-rgn_index (unsigned long address)
-{
-	ia64_va a;
-
-	a.l = address;
-	return a.f.reg;
-}
-
-/*
- * Return the region offset for virtual address ADDRESS.
- */
-static inline unsigned long
-rgn_offset (unsigned long address)
-{
-	ia64_va a;
-
-	a.l = address;
-	return a.f.off;
-}
-
 static inline unsigned long
 pgd_index (unsigned long address)
 {
@@ -429,6 +406,31 @@ pte_same (pte_t a, pte_t b)
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
 
+/*
+ * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
+ * information.  However, we use this macro to take care of any (delayed) i-cache flushing
+ * that may be necessary.
+ */
+static inline void
+update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
+{
+	unsigned long addr;
+	struct page *page;
+
+	if (!pte_exec(pte))
+		return;				/* not an executable page... */
+
+	page = pte_page(pte);
+	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
+	addr = (unsigned long) page_address(page);
+
+	if (test_bit(PG_arch_1, &page->flags))
+		return;				/* i-cache is already coherent with d-cache */
+
+	flush_icache_range(addr, addr + PAGE_SIZE);
+	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
+}
+
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0xff)
 #define SWP_OFFSET(entry)		(((entry).val << 1) >> 10)
 #define SWP_ENTRY(type,offset)		((swp_entry_t) { ((type) << 1) | ((long) (offset) << 9) })
@@ -439,33 +441,6 @@ extern void paging_init (void);
 #define PageSkip(page)		(0)
 
 #define io_remap_page_range remap_page_range	/* XXX is this right? */
-
-
-/*
- * Now for some cache flushing routines.  This is the kind of stuff that can be very
- * expensive, so try to avoid them whenever possible.
- */
-
-/* Caches aren't brain-dead on the IA-64. */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_page_to_ram(page)			do { } while (0)
-#define flush_icache_page(vma,page)		do { } while (0)
-
-#define flush_dcache_page(page)			\
-do {						\
-	clear_bit(PG_arch_1, &page->flags);	\
-} while (0)
-
-extern void flush_icache_range (unsigned long start, unsigned long end);
-
-#define flush_icache_user_range(vma, page, user_addr, len)			\
-do {										\
-	unsigned long _addr = page_address(page) + ((user_addr) & ~PAGE_MASK);	\
-	flush_icache_range(_addr, _addr + (len));				\
-} while (0)
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
