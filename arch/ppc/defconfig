@@ -1209,7 +1209,6 @@ CONFIG_USB_EZUSB=y
 # CONFIG_USB_TIGL is not set
 # CONFIG_USB_AUERSWALD is not set
 # CONFIG_USB_RIO500 is not set
-# CONFIG_USB_BRLVGER is not set
 # CONFIG_USB_LCD is not set
 # CONFIG_USB_TEST is not set
 # CONFIG_USB_GADGET is not set
