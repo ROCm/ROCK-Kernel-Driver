@@ -204,7 +204,7 @@ static void hvc_poll(int index)
 					sysrq_pressed = 1;
 					continue;
 				} else if (sysrq_pressed) {
-					handle_sysrq(buf[i], NULL, NULL, tty);
+					handle_sysrq(buf[i], NULL, tty);
 					sysrq_pressed = 0;
 					continue;
 				}
