@@ -7,6 +7,8 @@
  *
  * History:
  *
+ * - Revision 0.1.8 (23 Oct 2002): Ported to new framebuffer api.
+ * 
  * - Revision 0.1.7 (23 Jan 2001): fix crash resulting from MDA only cards 
  *				   being detected as Hercules.	 (Paul G.)
  * - Revision 0.1.6 (17 Aug 2000): new style structs
@@ -111,45 +113,27 @@ static spinlock_t hga_reg_lock = SPIN_LOCK_UNLOCKED;
 /* Framebuffer driver structures */
 
 static struct fb_var_screeninfo hga_default_var = {
-	.xres =		720,
-	.yres =		348,
-	.xres_virtual =	720,
-	.yres_virtual =	348,
-	.xoffset =	0,
-	.yoffset =	0,
-	.bits_per_pixel =1,
-	.grayscale =	0,
-	.red =		{0, 1, 0},
-	.green =	{0, 1, 0},
-	.blue =		{0, 1, 0},
-	.transp =	{0, 0, 0},
-	.nonstd =	0,			/* (FB_NONSTD_HGA ?) */
-	.activate =	0,
-	.height =	-1,
-	.width =	-1,
-	.accel_flags =	0,
-	/* pixclock */
-	/* left_margin, right_margin */
-	/* upper_margin, lower_margin */
-	/* hsync_len, vsync_len */
-	/* sync */
-	/* vmode */
+	.xres		= 720,
+	.yres 		= 348,
+	.xres_virtual 	= 720,
+	.yres_virtual	= 348,
+	.bits_per_pixel = 1,
+	.red 		= {0, 1, 0},
+	.green 		= {0, 1, 0},
+	.blue 		= {0, 1, 0},
+	.transp 	= {0, 0, 0},
+	.height 	= -1,
+	.width 		= -1,
 };
 
 static struct fb_fix_screeninfo hga_fix = {
-	.id =		"HGA",
-	.smem_start =	(unsigned long) NULL,
-	.smem_len =	0,
-	.type =		FB_TYPE_PACKED_PIXELS,	/* (not sure) */
-	.type_aux =	0,			/* (not sure) */
-	.visual =	FB_VISUAL_MONO10,
-	.xpanstep =	8,
-	.ypanstep =	8,
-	.ywrapstep =	0,
-	.line_length =	90,
-	.mmio_start =	0,
-	.mmio_len =	0,
-	.accel =	FB_ACCEL_NONE
+	.id 		= "HGA",
+	.type 		= FB_TYPE_PACKED_PIXELS,	/* (not sure) */
+	.visual 	= FB_VISUAL_MONO10,
+	.xpanstep 	= 8,
+	.ypanstep 	= 8,
+	.line_length 	= 90,
+	.accel 		= FB_ACCEL_NONE
 };
 
 static struct fb_info fb_info;
@@ -380,97 +364,6 @@ static int __init hga_card_detect(void)
 	return 1;
 }
 
-/* ------------------------------------------------------------------------- *
- *
- * dispsw functions
- *
- * ------------------------------------------------------------------------- */
-
-/**
- *	hga_set_var - set the user defined part of the display
- *	@var:new video mode
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *	
- *	This function is called for changing video modes. Since HGA cards have
- *	only one fixed mode we have not much to do. After checking input 
- *	parameters @var is copied to @info->var and @info->changevar is called.
- *	A zero is returned on success and %-EINVAL for failure.
- *	
- *	FIXME:
- *	This is the most mystical function (at least for me).
- *	What is the exact specification of xxx_set_var()?
- *	Should it handle xoffset, yoffset? Should it do panning?
- *	What does vmode mean?
- */
-
-int hga_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_set_var: con:%d, activate:%x, info:0x%x, fb_info:%x\n", con, var->activate, (unsigned)info, (unsigned)&fb_info);
-	
-	if (var->xres != 720 ||	var->yres != 348 ||
-	    var->xres_virtual != 720 ||
-	    var->yres_virtual < 348 || var->yres_virtual > 348 + 16 ||
-	    var->bits_per_pixel != 1 || var->grayscale != 0) {
-		return -EINVAL;
-	}
-	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
-		info->var = *var;
-		if (info->changevar) 
-			(*info->changevar)(con);
-	}
-	return 0;
-}
-
-/**
- *	hga_getcolreg - read color registers
- *	@regno:register index to read out
- *	@red:red value
- *	@green:green value
- *	@blue:blue value
- *	@transp:transparency value
- *	@info:unused
- *
- *	This callback function is used to read the color registers of a HGA
- *	board. Since we have only two fixed colors, RGB values are 0x0000 
- *	for register0 and 0xaaaa for register1.
- *	A zero is returned on success and 1 for failure.
- */
-
-static int hga_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			 u_int *transp, struct fb_info *info)
-{
-	if (regno == 0) {
-		*red = *green = *blue = 0x0000;
-		*transp = 0;
-	} else if (regno == 1) {
-		*red = *green = *blue = 0xaaaa;
-		*transp = 0;
-	} else
-		return 1;
-	return 0;
-}
-
-/**
- *	hga_get_cmap - get the colormap
- *	@cmap:struct fb_cmap to fill in
- *	@kspc:called from kernel space?
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function passes it's input parameters to fb_get_cmap().
- *	Callback function hga_getcolreg() is used to read the color registers.
- */
-
-int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-                 struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_get_cmap: con:%d\n", con);
-	return fb_get_cmap(cmap, kspc, hga_getcolreg, info);
-}
-	
 /**
  *	hgafb_setcolreg - set color registers
  *	@regno:register index to set
@@ -558,8 +451,8 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 
 static struct fb_ops hgafb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= hga_set_var,
-	.fb_get_cmap	= hga_get_cmap,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
 	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= hgafb_setcolreg,
 	.fb_pan_display	= hga_pan_display,
@@ -572,69 +465,6 @@ static struct fb_ops hgafb_ops = {
  * Functions in fb_info
  * 
  * ------------------------------------------------------------------------- */
-
-/**
- *	hgafbcon_switch - switch console
- *	@con:new console to switch to
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This function should install a new colormap and change the video mode.
- *	Since we have fixed colors and only one video mode we have nothing to 
- *	do.
- *	Only console administration is done but it should go to fbcon.c IMHO.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-static int hgafbcon_switch(int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", info->currcon, con, (unsigned)info, (unsigned)&fb_info);
-
-	/* Save the colormap and video mode */
-#if 0	/* Not necessary in hgafb, we use fixed colormap */
-	fb_copy_cmap(&info->cmap, &fb_display[info->currcon].cmap, 0);
-#endif
-
-	if (info->currcon != -1) /* this check is absolute necessary! */
-		memcpy(&fb_display[info->currcon].var, &info->var,
-				sizeof(struct fb_var_screeninfo));
-
-	/* Install a new colormap and change the video mode. By default fbcon
-	 * sets all the colormaps and video modes to the default values at
-	 * bootup.
-	 */
-#if 0
-	fb_copy_cmap(&fb_display[con].cmap, &info->cmap, 0);
-	fb_set_cmap(&info->cmap, 1, info);
-#endif
-
-	memcpy(&info->var, &fb_display[con].var,
-			sizeof(struct fb_var_screeninfo));
-	/* hga_set_var(&info->var, con, &fb_info); is it necessary? */
-	info->currcon = con;
-
-	/* Hack to work correctly with XF86_Mono */
-	hga_gfx_mode();
-	return 0;
-}
-
-/**
- *	hgafbcon_updatevar - update the user defined part of the display
- *	@con:console to update or -1 when no consoles defined on this fb
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This function is called when @var is changed by fbcon.c without calling 
- *	hga_set_var(). It usually means scrolling.  hga_pan_display() is called
- *	to update the hardware and @info->var.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-static int hgafbcon_updatevar(int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_update_var: con:%d, info:%x, fb_info:%x\n", con, (unsigned)info, (unsigned)&fb_info);
-	return (con < 0) ? -EINVAL : hga_pan_display(&fb_display[con].var, con, info);
-}
 
 /* ------------------------------------------------------------------------- */
     
@@ -662,12 +492,6 @@ int __init hgafb_init(void)
 	hga_fix.smem_len = hga_vram_len;
 
 	disp.var = hga_default_var;
-	disp.visual = hga_fix.visual;
-	disp.type = hga_fix.type;
-	disp.type_aux = hga_fix.type_aux;
-	disp.ypanstep = hga_fix.ypanstep;
-	disp.ywrapstep = hga_fix.ywrapstep;
-	disp.line_length = hga_fix.line_length;
 	disp.can_soft_blank = 1;
 	disp.inverse = 0;
 #ifdef FBCON_HAS_HGA
@@ -695,10 +519,8 @@ int __init hgafb_init(void)
 	fb_info.disp = &disp;
 	fb_info.currcon = 1;
 	fb_info.changevar = NULL;
-	fb_info.switch_con = hgafbcon_switch;
-	fb_info.updatevar = hgafbcon_updatevar;
-	fb_info.pseudo_palette = NULL; /* ??? */
-	fb_info.par = NULL;
+	fb_info.switch_con = gen_switch;
+	fb_info.updatevar = gen_update_var;
 
         if (register_framebuffer(&fb_info) < 0)
                 return -EINVAL;
