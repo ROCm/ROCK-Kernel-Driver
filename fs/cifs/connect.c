@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/connect.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -52,6 +52,7 @@ struct smb_vol {
 	char *domainname;
 	char *UNC;
 	char *UNCip;
+	char *source_rfc1001_name; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
 	mode_t file_mode;
@@ -59,6 +60,7 @@ struct smb_vol {
 	int rw;
 	unsigned int rsize;
 	unsigned int wsize;
+	unsigned int sockopt;
 	unsigned short int port;
 };
 
@@ -272,7 +274,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				}
 
 				task_to_wake = NULL;
-				read_lock(&GlobalMid_Lock);
+				spin_lock(&GlobalMid_Lock);
 				list_for_each(tmp, &server->pending_mid_q) {
 					mid_entry = list_entry(tmp, struct
 							       mid_q_entry,
@@ -288,7 +290,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						    MID_RESPONSE_RECEIVED;
 					}
 				}
-				read_unlock(&GlobalMid_Lock);
+				spin_unlock(&GlobalMid_Lock);
 				if (task_to_wake) {
 					smb_buffer = NULL;	/* will be freed by users thread after he is done */
 					wake_up_process(task_to_wake);
@@ -466,6 +468,19 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			if (value && *value) {
 				vol->wsize =
 					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "sockopt", 5) == 0) {
+			if (value && *value) {
+				vol->sockopt =
+					simple_strtoul(value, &value, 0);
+			}
+		} else if (strnicmp(data, "netbiosname", 4) == 0) {
+			if (!value || !*value) {
+				vol->source_rfc1001_name = NULL;
+			} else if (strnlen(value, 17) < 17) {
+				vol->source_rfc1001_name = value;
+			} else {
+				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
 			}
 		} else if (strnicmp(data, "version", 3) == 0) {
 			/* ignore */

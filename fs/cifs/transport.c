@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/transport.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -39,7 +39,6 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 	struct mid_q_entry *temp;
 	int timeout = 10 * HZ;
 
-/* BB add spinlock to protect midq for each session BB */
 	if (ses == NULL) {
 		cERROR(1, ("Null session passed in to AllocMidQEntry "));
 		return NULL;
@@ -72,11 +71,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 	}
 
 	if (ses->server->tcpStatus == CifsGood) {
-		write_lock(&GlobalMid_Lock);
+		spin_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
 		atomic_inc(&midCount);
 		temp->midState = MID_REQUEST_ALLOCATED;
-		write_unlock(&GlobalMid_Lock);
+		spin_unlock(&GlobalMid_Lock);
 	} else { 
 		cERROR(1,("Need to reconnect after session died to server"));
 		if (temp)
@@ -89,12 +88,11 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 void
 DeleteMidQEntry(struct mid_q_entry *midEntry)
 {
-	/* BB add spinlock to protect midq for each session BB */
-	write_lock(&GlobalMid_Lock);
+	spin_lock(&GlobalMid_Lock);
 	midEntry->midState = MID_FREE;
 	list_del(&midEntry->qhead);
 	atomic_dec(&midCount);
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 	buf_release(midEntry->resp_buf);
 	kmem_cache_free(cifs_mid_cachep, midEntry);
 }
@@ -115,9 +113,9 @@ AllocOplockQEntry(struct inode * pinode, __u16 fid, struct cifsTconInfo * tcon)
 		temp->pinode = pinode;
 		temp->tcon = tcon;
 		temp->netfid = fid;
-		write_lock(&GlobalMid_Lock);
+		spin_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &GlobalOplock_Q);
-		write_unlock(&GlobalMid_Lock);
+		spin_unlock(&GlobalMid_Lock);
 	}
 	return temp;
 
@@ -125,11 +123,10 @@ AllocOplockQEntry(struct inode * pinode, __u16 fid, struct cifsTconInfo * tcon)
 
 void DeleteOplockQEntry(struct oplock_q_entry * oplockEntry)
 {
-	/* BB add spinlock to protect midq for each session BB */
-	write_lock(&GlobalMid_Lock); 
+	spin_lock(&GlobalMid_Lock); 
     /* should we check if list empty first? */
 	list_del(&oplockEntry->qhead);
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 	kmem_cache_free(cifs_oplock_cachep, oplockEntry);
 }
 
