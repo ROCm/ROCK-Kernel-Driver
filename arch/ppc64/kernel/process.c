@@ -456,6 +456,10 @@ unsigned long get_wchan(struct task_struct *p)
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
+			/*
+			 * XXX we mask the upper 32 bits until procps
+			 * gets fixed.
+			 */
 			if (ip < first_sched || ip >= last_sched)
 				return (ip & 0xFFFFFFFF);
 		}
