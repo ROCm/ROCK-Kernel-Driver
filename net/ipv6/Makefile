@@ -19,3 +19,5 @@ obj-$(CONFIG_INET6_IPCOMP) += ipcomp6.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
 obj-$(CONFIG_IPV6_TUNNEL) += ip6_tunnel.o
+
+obj-y += exthdrs_core.o
