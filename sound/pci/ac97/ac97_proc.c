@@ -241,12 +241,13 @@ static void snd_ac97_proc_read(snd_info_entry_t *entry, snd_info_buffer_t * buff
 		for (idx = 0; idx < 3; idx++)
 			if (ac97->spec.ad18xx.id[idx]) {
 				/* select single codec */
-				snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[idx] | ac97->spec.ad18xx.chained[idx]);
+				snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+						     ac97->spec.ad18xx.unchained[idx] | ac97->spec.ad18xx.chained[idx]);
 				snd_ac97_proc_read_main(ac97, buffer, idx);
 				snd_iprintf(buffer, "\n\n");
 			}
 		/* select all codecs */
-		snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
 		up(&ac97->spec.ad18xx.mutex);
 		
 		snd_iprintf(buffer, "\nAD18XX configuration\n");
@@ -285,11 +286,12 @@ static void snd_ac97_proc_regs_read(snd_info_entry_t *entry,
 		for (idx = 0; idx < 3; idx++)
 			if (ac97->spec.ad18xx.id[idx]) {
 				/* select single codec */
-				snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[idx] | ac97->spec.ad18xx.chained[idx]);
+				snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+						     ac97->spec.ad18xx.unchained[idx] | ac97->spec.ad18xx.chained[idx]);
 				snd_ac97_proc_regs_read_main(ac97, buffer, idx);
 			}
 		/* select all codecs */
-		snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
 		up(&ac97->spec.ad18xx.mutex);
 	} else {
 		snd_ac97_proc_regs_read_main(ac97, buffer, 0);

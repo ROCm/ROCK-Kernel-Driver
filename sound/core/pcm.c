@@ -403,7 +403,7 @@ static void snd_pcm_xrun_debug_write(snd_info_entry_t *entry, snd_info_buffer_t 
 	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
 	char line[64];
 	if (!snd_info_get_line(buffer, line, sizeof(line)))
-		pstr->xrun_debug = !!simple_strtoul(line, NULL, 10);
+		pstr->xrun_debug = simple_strtoul(line, NULL, 10);
 }
 #endif
 

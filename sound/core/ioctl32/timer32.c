@@ -88,8 +88,18 @@ struct ioctl32_mapper timer_mappers[] = {
 	{ SNDRV_TIMER_IOCTL_INFO32, AP(timer_info) },
 	MAP_COMPAT(SNDRV_TIMER_IOCTL_PARAMS),
 	{ SNDRV_TIMER_IOCTL_STATUS32, AP(timer_status) },
+#if 0
+	/* ** FIXME **
+	 * The following four entries are disabled because they conflict
+	 * with the TCOC* definitions.
+	 * Unfortunately, the current ioctl32 wrapper uses a single
+	 * hash table for all devices.  Once when the wrapper is fixed
+	 * with the table based on devices, they'll be back again.
+	 */
 	MAP_COMPAT(SNDRV_TIMER_IOCTL_START),
 	MAP_COMPAT(SNDRV_TIMER_IOCTL_STOP),
 	MAP_COMPAT(SNDRV_TIMER_IOCTL_CONTINUE),
+	MAP_COMPAT(SNDRV_TIMER_IOCTL_PAUSE),
+#endif
 	{ 0 },
 };

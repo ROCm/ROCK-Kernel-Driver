@@ -562,8 +562,11 @@ int patch_conexant(ac97_t * ac97)
  */
 int patch_ad1819(ac97_t * ac97)
 {
+	unsigned short scfg;
+
 	// patch for Analog Devices
-	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, 0x7000); /* select all codecs */
+	scfg = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
+	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, scfg | 0x7000); /* select all codecs */
 	return 0;
 }
 
@@ -572,7 +575,7 @@ static unsigned short patch_ad1881_unchained(ac97_t * ac97, int idx, unsigned sh
 	unsigned short val;
 
 	// test for unchained codec
-	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, mask);
+	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, mask);
 	snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, 0x0000);	/* ID0C, ID1C, SDIE = off */
 	val = snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	if ((val & 0xff40) != 0x5340)
@@ -588,7 +591,7 @@ static int patch_ad1881_chained1(ac97_t * ac97, int idx, unsigned short codec_bi
 	static int cfg_bits[3] = { 1<<12, 1<<14, 1<<13 };
 	unsigned short val;
 	
-	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, cfg_bits[idx]);
+	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, cfg_bits[idx]);
 	snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, 0x0004);	// SDIE
 	val = snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	if ((val & 0xff40) != 0x5340)
@@ -611,7 +614,8 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 	if (cidx1 < 0 && cidx2 < 0)
 		return;
 	// test for chained codecs
-	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, ac97->spec.ad18xx.unchained[unchained_idx]);
+	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+			     ac97->spec.ad18xx.unchained[unchained_idx]);
 	snd_ac97_write_cache(ac97, AC97_AD_CODEC_CFG, 0x0002);		// ID1C
 	ac97->spec.ad18xx.codec_cfg[unchained_idx] = 0x0002;
 	if (cidx1 >= 0) {
@@ -634,10 +638,13 @@ int patch_ad1881(ac97_t * ac97)
 	
 	// patch for Analog Devices
 	unsigned short codecs[3];
+	unsigned short val;
 	int idx, num;
 
 	init_MUTEX(&ac97->spec.ad18xx.mutex);
 
+	val = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
+	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, val);
 	codecs[0] = patch_ad1881_unchained(ac97, 0, (1<<12));
 	codecs[1] = patch_ad1881_unchained(ac97, 1, (1<<14));
 	codecs[2] = patch_ad1881_unchained(ac97, 2, (1<<13));
@@ -659,7 +666,7 @@ int patch_ad1881(ac97_t * ac97)
 
       __end:
 	/* select all codecs */
-	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, 0x7000);
+	snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
 	/* check if only one codec is present */
 	for (idx = num = 0; idx < 3; idx++)
 		if (ac97->spec.ad18xx.id[idx])
@@ -1003,6 +1010,7 @@ int patch_ad1985(ac97_t * ac97)
 {
 	unsigned short misc;
 	
+	patch_ad1881(ac97);
 	ac97->build_ops = &patch_ad1985_build_ops;
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	/* switch front/surround line-out/hp-out */

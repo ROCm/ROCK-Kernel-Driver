@@ -25,7 +25,6 @@
 #include <pcmcia/ciscode.h>
 #include <pcmcia/cisreg.h>
 #include "pdaudiocf.h"
-#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 /*

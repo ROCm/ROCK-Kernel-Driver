@@ -207,7 +207,6 @@ void snd_usbmidi_disconnect(struct list_head *p, struct usb_driver *driver);
  * (conditional for compatibility with the older API)
  */
 #ifndef get_iface_desc
-#define get_iface(cfg, num)	((cfg)->interface[(num)])
 #define get_iface_desc(iface)	(&(iface)->desc)
 #define get_endpoint(alt,ep)	(&(alt)->endpoint[ep].desc)
 #define get_ep_desc(ep)		(&(ep)->desc)

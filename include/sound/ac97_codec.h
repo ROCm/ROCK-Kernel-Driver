@@ -460,7 +460,7 @@ static inline int ac97_is_modem(ac97_t * ac97)
 }
 static inline int ac97_is_rev22(ac97_t * ac97)
 {
-	return (ac97->ext_id & AC97_EI_REV_MASK) == AC97_EI_REV_22;
+	return (ac97->ext_id & AC97_EI_REV_MASK) >= AC97_EI_REV_22;
 }
 static inline int ac97_can_amap(ac97_t * ac97)
 {
