@@ -134,9 +134,6 @@ struct isdn_net_local_s {
   struct list_head       running_devs; /* member of global running_devs    */
   atomic_t               refcnt;       /* references held by ISDN code     */
 
-#ifdef CONFIG_ISDN_X25
-  struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
-#endif
 #ifdef CONFIG_ISDN_PPP
   unsigned int           mp_cfg;
   u32                    mp_txseq;
@@ -208,10 +205,8 @@ struct isdn_net_dev_s {
   struct ippp_ccp        *ccp;
   unsigned long          debug;
 #endif
-#ifdef CONFIG_ISDN_X25
-  struct concap_proto  *cprot; /* connection oriented encapsulation protocol */
-#endif
-
+  void                  *ind_priv;     /* interface types can put their
+					  private data here                */
 };
 
 /* ====================================================================== */

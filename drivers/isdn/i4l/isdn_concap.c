@@ -111,8 +111,8 @@ static int
 isdn_x25_open(isdn_net_local *lp)
 {
 	struct net_device * dev = & lp -> netdev -> dev;
-	struct concap_proto * cprot = lp -> netdev -> cprot;
-	struct concap_proto * dops = lp -> dops;
+	struct concap_proto * cprot = lp -> netdev -> ind_priv;
+	struct concap_proto * dops = lp -> inl_priv;
 	unsigned long flags;
 
 	save_flags(flags);
@@ -126,7 +126,7 @@ isdn_x25_open(isdn_net_local *lp)
 static void
 isdn_x25_close(isdn_net_local *lp)
 {
-	struct concap_proto * cprot = lp -> netdev -> cprot;
+	struct concap_proto * cprot = lp -> netdev -> ind_priv;
 
 	if( cprot && cprot -> pops ) cprot -> pops -> close( cprot );
 }
@@ -134,7 +134,7 @@ isdn_x25_close(isdn_net_local *lp)
 static void
 isdn_x25_connected(isdn_net_local *lp)
 {
-	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto *cprot = lp -> netdev -> ind_priv;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
 
 	/* try if there are generic concap receiver routines */
@@ -148,7 +148,7 @@ isdn_x25_connected(isdn_net_local *lp)
 static void
 isdn_x25_disconnected(isdn_net_local *lp)
 {
-	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto *cprot = lp -> netdev -> ind_priv;
 	struct concap_proto_ops *pops = cprot ? cprot -> pops : 0;
 
 	/* try if there are generic encap protocol
@@ -173,7 +173,7 @@ isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev)
    when a dl_establish request is received from the upper layer.
 */
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
-	struct concap_proto * cprot = lp -> netdev -> cprot;
+	struct concap_proto * cprot = lp -> netdev -> ind_priv;
 	int ret = cprot -> pops -> encap_and_xmit ( cprot , skb);
 
 	if (ret)
@@ -186,7 +186,7 @@ static void
 isdn_x25_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb)
 {
 	isdn_net_local *lp = &p->local;
-	struct concap_proto *cprot = lp -> netdev -> cprot;
+	struct concap_proto *cprot = lp -> netdev -> ind_priv;
 
 	/* try if there are generic sync_device receiver routines */
 	if(cprot) 
@@ -207,7 +207,7 @@ isdn_x25_init(struct net_device *dev)
 	/* ... ,  prepare for configuration of new one ... */
 	switch ( lp->p_encap ){
 	case ISDN_NET_ENCAP_X25IFACE:
-		lp -> dops = &isdn_concap_reliable_dl_dops;
+		lp -> inl_priv = &isdn_concap_reliable_dl_dops;
 	}
 	/* ... and allocate new one ... */
 	p -> cprot = isdn_concap_new( cfg -> p_encap );
@@ -233,7 +233,7 @@ isdn_x25_cleanup(isdn_net_dev *p)
 	if( cprot && cprot -> pops )
 		cprot -> pops -> proto_del ( cprot );
 	p -> cprot = NULL;
-	lp -> dops = NULL;
+	lp -> inl_priv = NULL;
 	restore_flags(flags);
 }
 
