@@ -637,7 +637,7 @@ err_out_netdev:
 
 
 /* Read the EEPROM and MII Management Data I/O (MDIO) interfaces. */
-static int eeprom_read(long ioaddr, int location)
+static int __devinit eeprom_read(long ioaddr, int location)
 {
 	int boguscnt = 1000;		/* Typical 190 ticks. */
 	writew(0x0200 | (location & 0xff), ioaddr + EECtrl);
