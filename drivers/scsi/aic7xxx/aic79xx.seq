@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#78 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#79 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -1510,12 +1510,6 @@ data_phase_done:
  * the idle loop and there is no need to perform
  * any fixups.
  */
-calc_residual:
-	test	SG_CACHE_SHADOW, LAST_SEG jz residual_before_last_seg;
-	/* Record if we've consumed all S/G entries */
-	test	MDFFSTAT, SHVALID	jz . + 2;
-	bmov	SCB_RESIDUAL_DATACNT, SHCNT, 3 ret;
-	or	SCB_RESIDUAL_SGPTR[0], SG_LIST_NULL ret;
 residual_before_last_seg:
 	test    MDFFSTAT, SHVALID	jnz sgptr_fixup;
 	/*
@@ -1525,7 +1519,13 @@ residual_before_last_seg:
 	 */
 	call	idle_loop_service_fifos;
 	RESTORE_MODE(SAVED_MODE)
-	jmp	calc_residual;
+	/* FALLTHROUGH */
+calc_residual:
+	test	SG_CACHE_SHADOW, LAST_SEG jz residual_before_last_seg;
+	/* Record if we've consumed all S/G entries */
+	test	MDFFSTAT, SHVALID	jz . + 2;
+	bmov	SCB_RESIDUAL_DATACNT, SHCNT, 3 ret;
+	or	SCB_RESIDUAL_SGPTR[0], SG_LIST_NULL ret;
 
 sgptr_fixup:
 	/*
@@ -1570,7 +1570,45 @@ export timer_isr:
 	}
 
 export seq_isr:
-	nop;	/* Jumps in the first ISR instruction fail on Rev A. */
+	if ((ahd->features & AHD_RTI) == 0) {
+		/*
+		 * On RevA Silicon, if the target returns us to data-out
+		 * after we have already trained for data-out, it is
+		 * possible for us to transition the free running clock to
+		 * data-valid before the required 100ns P1 setup time (8 P1
+		 * assertions in fast-160 mode).  This will only happen if
+		 * this L-Q is a continuation of a data transfer for which
+		 * we have already prefetched data into our FIFO (LQ/Data
+		 * followed by LQ/Data for the same write transaction).
+		 * This can cause some target implementations to miss the
+		 * first few data transfers on the bus.  We detect this
+		 * situation by noticing that this is the first data transfer
+		 * after an LQ (LQIWORKONLQ true), that the data transfer is
+		 * a continuation of a transfer already setup in our FIFO
+		 * (SAVEPTRS interrupt), and that the transaction is a write
+		 * (DIRECTION set in DFCNTRL). The delay is performed by
+		 * disabling SCSIEN until we see the first REQ from the
+		 * target.
+		 * 
+		 * First instruction in an ISR cannot be a branch on
+		 * Rev A.  Snapshot LQISTAT2 so the status is not missed
+		 * and deffer the test by one instruction.
+		 */
+		mov	REG_ISR, LQISTAT2;
+		test	REG_ISR, LQIWORKONLQ jz data_valid;
+		test	SEQINTSRC, SAVEPTRS  jz data_valid;
+		test	LONGJMP_ADDR[1], INVALID_ADDR jz saveptr_active_fifo;
+		/*
+		 * Switch to the active FIFO.
+		 */
+		xor	MODE_PTR, MK_MODE(M_DFF1, M_DFF1);
+		test	DFCNTRL, DIRECTION jz snapshot_other_fifo;
+		and	DFCNTRL, ~SCSIEN;
+		test	SSTAT1, REQINIT	jz .;
+		or	DFCNTRL, SCSIEN;
+		jmp	snapshot_other_fifo;
+data_valid:
+	}
 	test	SEQINTSRC, CFG4DATA	jnz cfg4data_intr;
 	test	SEQINTSRC, CFG4ISTAT	jnz cfg4istat_intr;
 	test	SEQINTSRC, SAVEPTRS	jnz saveptr_intr;
@@ -1583,7 +1621,9 @@ export seq_isr:
  * active and contains a snapshot of the current poniter information.
  * This happens between packets in a stream for a single L_Q.  Since we
  * are not performing a pointer save, we can safely clear the channel
- * so it can be used for other transactions.
+ * so it can be used for other transactions.  On RTI capable controllers,
+ * where snapshots can, and are, disabled, the code to handle this type
+ * of snapshot is not active.
  *
  * The second case is a save pointers on an active FIFO which occurs
  * if the target changes to a new L_Q or busfrees/QAS' and the transfer
@@ -1592,12 +1632,20 @@ export seq_isr:
  * save.
  */
 saveptr_intr:
-	test	DFCNTRL, HDMAENACK jz snapshot_saveptr;
+	if ((ahd->features & AHD_RTI) == 0) {
+		test	LONGJMP_ADDR[1], INVALID_ADDR jnz snapshot_saveptr;
+	}
+saveptr_active_fifo:
 	and	SEQIMODE, ~ENSAVEPTRS;
 	or	SEQINTCTL, IRET ret;
+if ((ahd->features & AHD_RTI) == 0) {
+snapshot_other_fifo:
+	xor	MODE_PTR, MK_MODE(M_DFF1, M_DFF1);
+	/* FALLTHROUGH */
 snapshot_saveptr:
 	mvi	DFFSXFRCTL, CLRCHN;
 	or	SEQINTCTL, IRET ret;
+}
 
 cfg4data_intr:
 	test	SCB_SGPTR[0], SG_LIST_NULL jnz pkt_handle_overrun;
