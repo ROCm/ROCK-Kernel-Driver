@@ -1649,8 +1649,8 @@ static int register_drivers(void)
 
 static void unregister_drivers(void)
 {
-	int error;
-	if (tty_unregister_driver(isicom_normal))
+	int error = tty_unregister_driver(isicom_normal);
+	if (error)
 		printk(KERN_DEBUG "ISICOM: couldn't unregister normal driver error=%d.\n",error);
 	put_tty_driver(isicom_normal);
 }
