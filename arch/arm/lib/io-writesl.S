@@ -27,12 +27,11 @@ ENTRY(__raw_writesl)
 		str	lr, [r0, #0]
 		bpl	1b
 		ldmfd	sp!, {r4, lr}
-2:		tst	r2, #2
-		ldmneia	r1!, {r3, ip}
-		strne	r3, [r0, #0]
-		strne	ip, [r0, #0]
-		tst	r2, #1
+2:		movs	r2, r2, lsl #31
+		ldmcsia	r1!, {r3, ip}
+		strcs	r3, [r0, #0]
 		ldrne	r3, [r1, #0]
+		strcs	ip, [r0, #0]
 		strne	r3, [r0, #0]
 		mov	pc, lr
 

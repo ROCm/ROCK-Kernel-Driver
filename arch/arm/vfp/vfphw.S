@@ -199,6 +199,11 @@ vfp_get_double:
 	mov	pc, lr
 	.endr
 
+	@ virtual register 16 for compare with zero
+	mov	r0, #0
+	mov	r1, #0
+	mov	pc, lr
+
 	.globl	vfp_put_double
 vfp_put_double:
 	mov	r0, r0, lsr #1

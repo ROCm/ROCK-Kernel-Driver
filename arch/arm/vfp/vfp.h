@@ -249,6 +249,12 @@ struct vfp_double {
 	u64	significand;
 };
 
+/*
+ * VFP_REG_ZERO is a special register number for vfp_get_double
+ * which returns (double)0.0.  This is useful for the compare with
+ * zero instructions.
+ */
+#define VFP_REG_ZERO	16
 extern u64 vfp_get_double(unsigned int reg);
 extern void vfp_put_double(unsigned int reg, u64 val);
 
