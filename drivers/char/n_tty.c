@@ -1143,13 +1143,13 @@ static inline int copy_from_read_buf(struct tty_struct *tty,
 
 {
 	int retval;
-	ssize_t n;
+	size_t n;
 	unsigned long flags;
 
 	retval = 0;
 	spin_lock_irqsave(&tty->read_lock, flags);
 	n = min(tty->read_cnt, N_TTY_BUF_SIZE - tty->read_tail);
-	n = min((ssize_t)*nr, n);
+	n = min(*nr, n);
 	spin_unlock_irqrestore(&tty->read_lock, flags);
 	if (n) {
 		mb();
