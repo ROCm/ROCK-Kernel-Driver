@@ -26,6 +26,26 @@ extern void ptrace_pokeuser(unsigned long addr, unsigned long data);
 #define PTRACE_SYSEMU_SINGLESTEP 32
 #endif
 
+/* On architectures, that started to support PTRACE_O_TRACESYSGOOD
+ * in linux 2.4, there are two different definitions of
+ * PTRACE_SETOPTIONS: linux 2.4 uses 21 while linux 2.6 uses 0x4200.
+ * For binary compatibility, 2.6 also supports the old "21", named
+ * PTRACE_OLDSETOPTION. On these architectures, UML always must use
+ * "21", to ensure the kernel runs on 2.4 and 2.6 host without
+ * recompilation. So, we use PTRACE_OLDSETOPTIONS in UML.
+ * We also want to be able to build the kernel on 2.4, which doesn't
+ * have PTRACE_OLDSETOPTIONS. So, if it is missing, we declare
+ * PTRACE_OLDSETOPTIONS to to be the same as PTRACE_SETOPTIONS.
+ *
+ * On architectures, that start to support PTRACE_O_TRACESYSGOOD on
+ * linux 2.6, PTRACE_OLDSETOPTIONS never is defined, and also isn't
+ * supported by the host kernel. In that case, our trick lets us use
+ * the new 0x4200 with the name PTRACE_OLDSETOPTIONS.
+ */
+#ifndef PTRACE_OLDSETOPTIONS
+#define PTRACE_OLDSETOPTIONS PTRACE_SETOPTIONS
+#endif
+
 void set_using_sysemu(int value);
 int get_using_sysemu(void);
 extern int sysemu_supported;

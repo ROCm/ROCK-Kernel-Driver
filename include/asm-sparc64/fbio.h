@@ -102,8 +102,8 @@ struct fbcursor {
         struct fbcurpos hot;    /* cursor hot spot */
         struct fbcmap cmap;     /* color map info */
         struct fbcurpos size;   /* cursor bit map size */
-        char *image;            /* cursor image bits */
-        char *mask;             /* cursor mask bits */
+        char __user *image;     /* cursor image bits */
+        char __user *mask;      /* cursor mask bits */
 };
 
 /* set/get cursor attributes/shape */

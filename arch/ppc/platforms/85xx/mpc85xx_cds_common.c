@@ -281,16 +281,17 @@ mpc85xx_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 #define ARCADIA_HOST_BRIDGE_IDSEL     17
 #define ARCADIA_2ND_BRIDGE_IDSEL     3
 
+extern int mpc85xx_pci1_last_busno;
+
 int
 mpc85xx_exclude_device(u_char bus, u_char devfn)
 {
 	if (bus == 0 && PCI_SLOT(devfn) == 0)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 #ifdef CONFIG_85xx_PCI2
-	/* With the current code we know PCI2 will be bus 2, however this may
-	 * not be guarnteed */
-	if (bus == 2 && PCI_SLOT(devfn) == 0)
-		return PCIBIOS_DEVICE_NOT_FOUND;
+	if (mpc85xx_pci1_last_busno) 
+		if (bus == (mpc85xx_pci1_last_busno + 1) && PCI_SLOT(devfn) == 0)
+			return PCIBIOS_DEVICE_NOT_FOUND;
 #endif
 	/* We explicitly do not go past the Tundra 320 Bridge */
 	if (bus == 1)

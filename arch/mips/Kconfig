@@ -1174,10 +1174,6 @@ config TOSHIBA_BOARDS
 	depends on TOSHIBA_JMR3927 || TOSHIBA_RBTX4927
 	default y
 
-config TANBAC_TB0219
-	bool "Added TANBAC TB0219 Base board support"
-	depends on TANBAC_TB0229
-
 endmenu
 
 menu "CPU selection"

@@ -417,13 +417,13 @@ _memcpy_toio(volatile void __iomem *dst, const void *src, __kernel_size_t n)
 
 #define memcpy_toio(d,s,sz)	_memcpy_toio(d,s,sz)
 
-static inline int check_signature(unsigned long io_addr,
+static inline int check_signature(void __iomem *io_addr,
 				  const unsigned char *signature,
 				  int length)
 {
 	int retval = 0;
 	do {
-		if (readb((void __iomem *)io_addr) != *signature++)
+		if (readb(io_addr) != *signature++)
 			goto out;
 		io_addr++;
 	} while (--length);

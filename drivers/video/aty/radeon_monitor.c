@@ -1,11 +1,6 @@
 #include "radeonfb.h"
 #include "../edid.h"
 
-#ifdef CONFIG_PPC_OF
-#include <asm/prom.h>
-#include <asm/pci-bridge.h>
-#endif /* CONFIG_PPC_OF */
-
 static struct fb_var_screeninfo radeonfb_default_var = {
 	.xres		= 640,
 	.yres		= 480,
@@ -64,9 +59,11 @@ static char *radeon_get_mon_name(int type)
  * models with broken OF probing by hard-coding known EDIDs for some Mac
  * laptops internal LVDS panel. (XXX: not done yet)
  */
-static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_EDID, int hdno)
+static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_EDID,
+					       int hdno)
 {
-        static char *propnames[] = { "DFP,EDID", "LCD,EDID", "EDID", "EDID1", "EDID2",  NULL };
+        static char *propnames[] = { "DFP,EDID", "LCD,EDID", "EDID",
+				     "EDID1", "EDID2",  NULL };
 	u8 *pedid = NULL;
 	u8 *pmt = NULL;
 	u8 *tmp;
@@ -122,7 +119,7 @@ static int __devinit radeon_probe_OF_head(struct radeonfb_info *rinfo, int head_
 
 	RTRACE("radeon_probe_OF_head\n");
 
-        dp = pci_device_to_OF_node(rinfo->pdev);
+        dp = rinfo->of_node;
         while (dp == NULL)
 		return MT_NONE;
 
@@ -502,8 +499,9 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 #endif /* CONFIG_PPC_OF */
 #ifdef CONFIG_FB_RADEON_I2C
 			if (rinfo->mon1_type == MT_NONE)
-				rinfo->mon1_type = radeon_probe_i2c_connector(rinfo, ddc_dvi,
-								      &rinfo->mon1_EDID);
+				rinfo->mon1_type =
+					radeon_probe_i2c_connector(rinfo, ddc_dvi,
+								   &rinfo->mon1_EDID);
 			if (rinfo->mon1_type == MT_NONE)
 				rinfo->mon1_type =
 					radeon_probe_i2c_connector(rinfo, ddc_vga,
@@ -545,7 +543,8 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		 */
 #ifdef CONFIG_PPC_OF
 		if (rinfo->mon1_type == MT_NONE)
-			rinfo->mon1_type = radeon_probe_OF_head(rinfo, 0, &rinfo->mon1_EDID);
+			rinfo->mon1_type = radeon_probe_OF_head(rinfo, 0,
+								&rinfo->mon1_EDID);
 #endif /* CONFIG_PPC_OF */
 #ifdef CONFIG_FB_RADEON_I2C
 		if (rinfo->mon1_type == MT_NONE)
@@ -572,7 +571,8 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
 		 */
 #ifdef CONFIG_PPC_OF
 		if (rinfo->mon2_type == MT_NONE)
-			rinfo->mon2_type = radeon_probe_OF_head(rinfo, 1, &rinfo->mon2_EDID);
+			rinfo->mon2_type = radeon_probe_OF_head(rinfo, 1,
+								&rinfo->mon2_EDID);
 #endif /* CONFIG_PPC_OF */
 #ifdef CONFIG_FB_RADEON_I2C
 		if (rinfo->mon2_type == MT_NONE)
@@ -648,10 +648,10 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
  */
 static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 {
- #ifdef CONFIG_PPC_OF
+#ifdef CONFIG_PPC_OF
 	/*
 	 * LCD Flat panels should use fixed dividers, we enfore that on
-	 * PowerMac only for now...
+	 * PPC only for now...
 	 */
 	if (!rinfo->panel_info.use_bios_dividers && rinfo->mon1_type == MT_LCD
 	    && rinfo->is_mobility) {
@@ -702,40 +702,24 @@ static void radeon_var_to_panel_info(struct radeonfb_info *rinfo, struct fb_var_
 	rinfo->panel_info.pwr_delay = 200;
 }
 
-static void radeon_var_to_videomode(struct fb_videomode *mode,
-				    const struct fb_var_screeninfo *var)
-{
-    mode->xres = var->xres;
-    mode->yres = var->yres;
-    mode->pixclock = var->pixclock;
-    mode->left_margin = var->left_margin;
-    mode->right_margin = var->right_margin;
-    mode->upper_margin = var->upper_margin;
-    mode->lower_margin = var->lower_margin;
-    mode->hsync_len = var->hsync_len;
-    mode->vsync_len = var->vsync_len;
-    mode->sync = var->sync;
-    mode->vmode = var->vmode;
-}
-
 static void radeon_videomode_to_var(struct fb_var_screeninfo *var,
 				    const struct fb_videomode *mode)
 {
-    var->xres = mode->xres;
-    var->yres = mode->yres;
-    var->xres_virtual = mode->xres;
-    var->yres_virtual = mode->yres;
-    var->xoffset = 0;
-    var->yoffset = 0;
-    var->pixclock = mode->pixclock;
-    var->left_margin = mode->left_margin;
-    var->right_margin = mode->right_margin;
-    var->upper_margin = mode->upper_margin;
-    var->lower_margin = mode->lower_margin;
-    var->hsync_len = mode->hsync_len;
-    var->vsync_len = mode->vsync_len;
-    var->sync = mode->sync;
-    var->vmode = mode->vmode;
+	var->xres = mode->xres;
+	var->yres = mode->yres;
+	var->xres_virtual = mode->xres;
+	var->yres_virtual = mode->yres;
+	var->xoffset = 0;
+	var->yoffset = 0;
+	var->pixclock = mode->pixclock;
+	var->left_margin = mode->left_margin;
+	var->right_margin = mode->right_margin;
+	var->upper_margin = mode->upper_margin;
+	var->lower_margin = mode->lower_margin;
+	var->hsync_len = mode->hsync_len;
+	var->vsync_len = mode->vsync_len;
+	var->sync = mode->sync;
+	var->vmode = mode->vmode;
 }
 
 /*
@@ -744,12 +728,14 @@ static void radeon_videomode_to_var(struct fb_var_screeninfo *var,
  */
 void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_option)
 {
+	struct fb_info * info = rinfo->info;
 	int has_default_mode = 0;
 
 	/*
 	 * Fill default var first
 	 */
-	rinfo->info->var = radeonfb_default_var;
+	info->var = radeonfb_default_var;
+	INIT_LIST_HEAD(&info->modelist);
 
 	/*
 	 * First check out what BIOS has to say
@@ -783,7 +769,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	 * those
 	 */
 	if (rinfo->mon1_type != MT_CRT && rinfo->panel_info.valid) {
-		struct fb_var_screeninfo *var = &rinfo->info->var;
+		struct fb_var_screeninfo *var = &info->var;
 
 		RTRACE("Setting up default mode based on panel info\n");
 		var->xres = rinfo->panel_info.xres;
@@ -814,9 +800,12 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	 * Now build modedb from EDID
 	 */
 	if (rinfo->mon1_EDID) {
-		rinfo->mon1_modedb = fb_create_modedb(rinfo->mon1_EDID,
-						      &rinfo->mon1_dbsize);
-		fb_get_monitor_limits(rinfo->mon1_EDID, &rinfo->info->monspecs);
+		fb_edid_to_monspecs(rinfo->mon1_EDID, &info->monspecs);
+		fb_videomode_to_modelist(info->monspecs.modedb,
+					 info->monspecs.modedb_len,
+					 &info->modelist);
+		rinfo->mon1_modedb = info->monspecs.modedb;
+		rinfo->mon1_dbsize = info->monspecs.modedb_len;
 	}
 
 	
@@ -847,31 +836,62 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 		modedb = rinfo->mon1_modedb;
 		dbsize = rinfo->mon1_dbsize;
 		snprintf(modename, 31, "%dx%d", rinfo->panel_info.xres, rinfo->panel_info.yres);
-		if (fb_find_mode(&rinfo->info->var, rinfo->info, modename,
+		if (fb_find_mode(&info->var, info, modename,
 				 modedb, dbsize, NULL, 8) == 0) {
 			printk(KERN_WARNING "radeonfb: Can't find mode for panel size, going back to CRT\n");
 			rinfo->mon1_type = MT_CRT;
 			goto pickup_default;
 		}
 		has_default_mode = 1;
-		radeon_var_to_panel_info(rinfo, &rinfo->info->var);
+		radeon_var_to_panel_info(rinfo, &info->var);
 	}
 
  pickup_default:
 	/*
-	 * Pick up a random default mode
+	 * Apply passed-in mode option if any
 	 */
-	if (!has_default_mode || mode_option) {
-		struct fb_videomode default_mode;
-		if (has_default_mode)
-			radeon_var_to_videomode(&default_mode, &rinfo->info->var);
-		else
-			radeon_var_to_videomode(&default_mode, &radeonfb_default_var);
-		if (fb_find_mode(&rinfo->info->var, rinfo->info, mode_option,
-				 rinfo->mon1_modedb, rinfo->mon1_dbsize, &default_mode, 8) == 0)
-			rinfo->info->var = radeonfb_default_var;
-	}
+	if (mode_option) {
+		if (fb_find_mode(&info->var, info, mode_option,
+				 info->monspecs.modedb,
+				 info->monspecs.modedb_len, NULL, 8) != 0)
+			has_default_mode = 1;
+ 	}
 
+	/*
+	 * Still no mode, let's pick up a default from the db
+	 */
+	if (!has_default_mode && info->monspecs.modedb != NULL) {
+		struct fb_monspecs *specs = &info->monspecs;
+		struct fb_videomode *modedb = NULL;
+
+		/* get preferred timing */
+		if (specs->misc & FB_MISC_1ST_DETAIL) {
+			int i;
+
+			for (i = 0; i < specs->modedb_len; i++) {
+				if (specs->modedb[i].flag & FB_MODE_IS_FIRST) {
+					modedb = &specs->modedb[i];
+					break;
+				}
+			}
+		} else {
+			/* otherwise, get first mode in database */
+			modedb = &specs->modedb[0];
+		}
+		if (modedb != NULL) {
+			info->var.bits_per_pixel = 8;
+			radeon_videomode_to_var(&info->var, modedb);
+			has_default_mode = 1;
+		}
+	}
+	if (1) {
+		struct fb_videomode mode;
+		/* Make sure that whatever mode got selected is actually in the
+		 * modelist or the kernel may die
+		 */
+		fb_var_to_videomode(&mode, &info->var);
+		fb_add_videomode(&mode, &info->modelist);
+	}
 }
 
 /*

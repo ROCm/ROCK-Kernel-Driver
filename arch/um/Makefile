@@ -39,8 +39,8 @@ MODE_INCLUDE	+= $(foreach mode,$(um-modes-y),\
 MAKEFILES-INCL	+= $(foreach mode,$(um-modes-y),\
 		   $(srctree)/$(ARCH_DIR)/Makefile-$(mode))
 
-ifneq ($(MAKEFILE-INCL),)
-  include $(MAKEFILE-INCL)
+ifneq ($(MAKEFILES-INCL),)
+  include $(MAKEFILES-INCL)
 endif
 
 ARCH_INCLUDE	:= -I$(ARCH_DIR)/include

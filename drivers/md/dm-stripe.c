@@ -174,7 +174,7 @@ static int stripe_map(struct dm_target *ti, struct bio *bio,
 
 	sector_t offset = bio->bi_sector - ti->begin;
 	sector_t chunk = offset >> sc->chunk_shift;
-	uint32_t stripe = do_div(chunk, sc->stripes);
+	uint32_t stripe = sector_div(chunk, sc->stripes);
 
 	bio->bi_bdev = sc->stripe[stripe].dev->bdev;
 	bio->bi_sector = sc->stripe[stripe].physical_start +

@@ -49,10 +49,11 @@
 #define MAX_REG_NR ((MAX_REG_OFFSET) / sizeof(unsigned long))
 
 /* x86_64 FC3 doesn't define this in /usr/include/linux/ptrace.h even though
- * it's defined in the kernel's include/linux/ptrace.h
+ * it's defined in the kernel's include/linux/ptrace.h. Additionally, use the
+ * 2.4 name and value for 2.4 host compatibility.
  */
-#ifndef PTRACE_SETOPTIONS
-#define PTRACE_SETOPTIONS 0x4200
+#ifndef PTRACE_OLDSETOPTIONS
+#define PTRACE_OLDSETOPTIONS 21
 #endif
 
 #endif

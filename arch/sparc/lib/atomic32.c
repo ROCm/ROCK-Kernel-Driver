@@ -20,8 +20,9 @@ spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] = {
 
 #else /* SMP */
 
+static spinlock_t dummy = SPIN_LOCK_UNLOCKED;
 #define ATOMIC_HASH_SIZE	1
-#define ATOMIC_HASH(a)		0
+#define ATOMIC_HASH(a)		(&dummy)
 
 #endif /* SMP */
 

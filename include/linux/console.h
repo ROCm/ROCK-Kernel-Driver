@@ -105,6 +105,7 @@ extern void register_console(struct console *);
 extern int unregister_console(struct console *);
 extern struct console *console_drivers;
 extern void acquire_console_sem(void);
+extern int try_acquire_console_sem(void);
 extern void release_console_sem(void);
 extern void console_conditional_schedule(void);
 extern void console_unblank(void);

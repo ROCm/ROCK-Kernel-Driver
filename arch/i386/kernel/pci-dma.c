@@ -89,11 +89,11 @@ int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
 	if (!mem_base)
 		goto out;
 
-	dev->dma_mem = kmalloc(GFP_KERNEL, sizeof(struct dma_coherent_mem));
+	dev->dma_mem = kmalloc(sizeof(struct dma_coherent_mem), GFP_KERNEL);
 	if (!dev->dma_mem)
 		goto out;
 	memset(dev->dma_mem, 0, sizeof(struct dma_coherent_mem));
-	dev->dma_mem->bitmap = kmalloc(GFP_KERNEL, bitmap_size);
+	dev->dma_mem->bitmap = kmalloc(bitmap_size, GFP_KERNEL);
 	if (!dev->dma_mem->bitmap)
 		goto free1_out;
 	memset(dev->dma_mem->bitmap, 0, bitmap_size);

@@ -242,17 +242,8 @@ asmlinkage int sys_rt_sigreturn(void)
 	if (restore_sigcontext(&frame->uc.uc_mcontext, &gr8))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, __frame->sp) == -EFAULT)
 		goto badframe;
-
-	/* It is more difficult to avoid calling this function than to
-	 * call it and ignore errors.  */
-	/*
-	 * THIS CANNOT WORK! "&st" is a kernel address, and "do_sigaltstack()"
-	 * takes a user address (and verifies that it is a user address). End
-	 * result: it does exactly _nothing_.
-	 */
-	do_sigaltstack(&st, NULL, __frame->sp);
 
 	return gr8;
 

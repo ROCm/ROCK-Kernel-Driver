@@ -39,7 +39,7 @@ void do_exec(int old_pid, int new_pid)
 
 	os_kill_ptraced_process(old_pid, 0);
 
-	if (ptrace(PTRACE_SETOPTIONS, new_pid, 0, (void *)PTRACE_O_TRACESYSGOOD) < 0)
+	if (ptrace(PTRACE_OLDSETOPTIONS, new_pid, 0, (void *)PTRACE_O_TRACESYSGOOD) < 0)
 		tracer_panic("do_exec: PTRACE_SETOPTIONS failed, errno = %d", errno);
 
 	if(ptrace_setregs(new_pid, regs) < 0)

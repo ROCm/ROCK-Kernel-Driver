@@ -2848,48 +2848,42 @@ struct i2c_smbus_ioctl_data32 {
 	compat_caddr_t data; /* union i2c_smbus_data *data */
 };
 
+struct i2c_rdwr_aligned {
+	struct i2c_rdwr_ioctl_data cmd;
+	struct i2c_msg msgs[0];
+};
+
 static int do_i2c_rdwr_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct i2c_rdwr_ioctl_data	__user *tdata;
-	struct i2c_rdwr_ioctl_data32	__user *udata;
+	struct i2c_rdwr_ioctl_data32	__user *udata = compat_ptr(arg);
+	struct i2c_rdwr_aligned		__user *tdata;
 	struct i2c_msg			__user *tmsgs;
 	struct i2c_msg32		__user *umsgs;
 	compat_caddr_t			datap;
 	int				nmsgs, i;
 
-	tdata = compat_alloc_user_space(sizeof(*tdata));
-	if (tdata == NULL)
-		return -ENOMEM;
-	if (verify_area(VERIFY_WRITE, tdata, sizeof(*tdata)))
-		return -EFAULT;
-
-	udata = compat_ptr(arg);
-	if (verify_area(VERIFY_READ, udata, sizeof(*udata)))
-		return -EFAULT;
-	if (__get_user(nmsgs, &udata->nmsgs) || __put_user(nmsgs, &tdata->nmsgs))
+	if (get_user(nmsgs, &udata->nmsgs))
 		return -EFAULT;
 	if (nmsgs > I2C_RDRW_IOCTL_MAX_MSGS)
 		return -EINVAL;
-	if (__get_user(datap, &udata->msgs))
+
+	if (get_user(datap, &udata->msgs))
 		return -EFAULT;
 	umsgs = compat_ptr(datap);
-	if (verify_area(VERIFY_READ, umsgs, sizeof(struct i2c_msg) * nmsgs))
+
+	tdata = compat_alloc_user_space(sizeof(*tdata) +
+				      nmsgs * sizeof(struct i2c_msg));
+	tmsgs = &tdata->msgs[0];
+
+	if (put_user(nmsgs, &tdata->cmd.nmsgs) ||
+	    put_user(tmsgs, &tdata->cmd.msgs))
 		return -EFAULT;
 
-	tmsgs = compat_alloc_user_space(sizeof(struct i2c_msg) * nmsgs);
-	if (tmsgs == NULL)
-		return -ENOMEM;
-	if (verify_area(VERIFY_WRITE, tmsgs, sizeof(struct i2c_msg) * nmsgs))
-		return -EFAULT;
-	if (__put_user(tmsgs, &tdata->msgs))
-		return -ENOMEM;
 	for (i = 0; i < nmsgs; i++) {
-		if (__copy_in_user(&tmsgs[i].addr,
-				   &umsgs[i].addr,
-				   3 * sizeof(u16)))
+		if (copy_in_user(&tmsgs[i].addr, &umsgs[i].addr, 3*sizeof(u16)))
 			return -EFAULT;
-		if (__get_user(datap, &umsgs[i].buf) ||
-		    __put_user(compat_ptr(datap), &tmsgs[i].buf))
+		if (get_user(datap, &umsgs[i].buf) ||
+		    put_user(compat_ptr(datap), &tmsgs[i].buf))
 			return -EFAULT;
 	}
 	return sys_ioctl(fd, cmd, (unsigned long)tdata);

@@ -243,6 +243,8 @@ mpc85xx_setup_pci2(struct pci_controller *hose)
 }
 #endif /* CONFIG_85xx_PCI2 */
 
+int mpc85xx_pci1_last_busno = 0;
+
 void __init
 mpc85xx_setup_hose(void)
 {
@@ -341,6 +343,9 @@ mpc85xx_setup_hose(void)
 			IORESOURCE_IO, "PCI2 host bridge");
 
 	hose_b->last_busno = pciauto_bus_scan(hose_b, hose_b->first_busno);
+
+	/* let board code know what the last bus number was on PCI1 */
+	mpc85xx_pci1_last_busno = hose_a->last_busno;
 #endif
 	return;
 }
