@@ -7,41 +7,16 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/user.h>
 #include <linux/string.h>
-#include <linux/fs.h>
-#include <linux/mm.h>
-#include <linux/mman.h>
-#include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/in6.h>
-#include <linux/interrupt.h>
-#include <linux/pm.h>
-#include <linux/tty.h>
-#include <linux/vt_kern.h>
-#include <linux/smp_lock.h>
 #include <linux/syscalls.h>
 
-#include <asm/byteorder.h>
-#include <asm/elf.h>
+#include <asm/checksum.h>
 #include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/proc-fns.h>
-#include <asm/processor.h>
-#include <asm/semaphore.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/checksum.h>
-#include <asm/mach-types.h>
-
-extern void dump_thread(struct pt_regs *, struct user *);
-extern int dump_fpu(struct pt_regs *, struct user_fp_struct *);
-extern void inswb(unsigned int port, void *to, int len);
-extern void outswb(unsigned int port, const void *to, int len);
-
-extern void __bad_xchg(volatile void *ptr, int size);
 
 /*
  * libgcc functions - functions that are used internally by the
@@ -61,12 +36,9 @@ extern void __udivmoddi4(void);
 extern void __udivsi3(void);
 extern void __umodsi3(void);
 extern void __do_div64(void);
-extern void abort(void);
 
-extern void ret_from_exception(void);
 extern void fpundefinstr(void);
 extern void fp_enter(void);
-extern void fp_init(union fp_state *);
 
 /*
  * This has a special calling convention; it doesn't
@@ -88,32 +60,7 @@ EXPORT_SYMBOL_ALIAS(fp_send_sig,send_sig);
 EXPORT_SYMBOL_NOVERS(__backtrace);
 
 	/* platform dependent support */
-EXPORT_SYMBOL(dump_thread);
-EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(udelay);
-EXPORT_SYMBOL(__ioremap);
-EXPORT_SYMBOL(__iounmap);
-EXPORT_SYMBOL(kernel_thread);
-EXPORT_SYMBOL(system_rev);
-EXPORT_SYMBOL(system_serial_low);
-EXPORT_SYMBOL(system_serial_high);
-#ifdef CONFIG_DEBUG_BUGVERBOSE
-EXPORT_SYMBOL(__bug);
-#endif
-EXPORT_SYMBOL(__bad_xchg);
-EXPORT_SYMBOL(__readwrite_bug);
-EXPORT_SYMBOL(enable_irq);
-EXPORT_SYMBOL(disable_irq);
-EXPORT_SYMBOL(probe_irq_mask);
-EXPORT_SYMBOL(set_irq_type);
-EXPORT_SYMBOL(enable_irq_wake);
-EXPORT_SYMBOL(disable_irq_wake);
-EXPORT_SYMBOL(pm_idle);
-EXPORT_SYMBOL(pm_power_off);
-EXPORT_SYMBOL(fp_init);
-
-	/* processor dependencies */
-EXPORT_SYMBOL(__machine_arch_type);
 
 	/* networking */
 EXPORT_SYMBOL(csum_partial);
@@ -138,20 +85,6 @@ EXPORT_SYMBOL_NOVERS(__raw_writesw);
 #endif
 #ifndef __raw_writesl
 EXPORT_SYMBOL_NOVERS(__raw_writesl);
-#endif
-
-	/* address translation */
-#ifndef __virt_to_phys__is_a_macro
-EXPORT_SYMBOL(__virt_to_phys);
-#endif
-#ifndef __phys_to_virt__is_a_macro
-EXPORT_SYMBOL(__phys_to_virt);
-#endif
-#ifndef __virt_to_bus__is_a_macro
-EXPORT_SYMBOL(__virt_to_bus);
-#endif
-#ifndef __bus_to_virt__is_a_macro
-EXPORT_SYMBOL(__bus_to_virt);
 #endif
 
 	/* string / mem functions */
@@ -227,10 +160,6 @@ EXPORT_SYMBOL(_find_first_zero_bit_be);
 EXPORT_SYMBOL(_find_next_zero_bit_be);
 #endif
 
-	/* elf */
-EXPORT_SYMBOL(elf_platform);
-EXPORT_SYMBOL(elf_hwcap);
-
 	/* syscalls */
 EXPORT_SYMBOL(sys_write);
 EXPORT_SYMBOL(sys_read);
@@ -238,11 +167,3 @@ EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(sys_open);
 EXPORT_SYMBOL(sys_exit);
 EXPORT_SYMBOL(sys_wait4);
-
-	/* semaphores */
-EXPORT_SYMBOL_NOVERS(__down_failed);
-EXPORT_SYMBOL_NOVERS(__down_interruptible_failed);
-EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
-EXPORT_SYMBOL_NOVERS(__up_wakeup);
-
-EXPORT_SYMBOL(get_wchan);

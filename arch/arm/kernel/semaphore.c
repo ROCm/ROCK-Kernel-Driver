@@ -11,6 +11,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -213,3 +214,7 @@ __up_wakeup:					\n\
 	ldmfd	sp!, {r0 - r3, pc}		\n\
 	");
 
+EXPORT_SYMBOL_NOVERS(__down_failed);
+EXPORT_SYMBOL_NOVERS(__down_interruptible_failed);
+EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
+EXPORT_SYMBOL_NOVERS(__up_wakeup);
