@@ -395,8 +395,7 @@ static time_t ncp_obtain_mtime(struct dentry *dentry)
 	if (ncp_obtain_info(server, inode, NULL, &i))
 		return 0;
 
-	return ncp_date_dos2unix(le16_to_cpu(i.modifyTime),
-						le16_to_cpu(i.modifyDate));
+	return ncp_date_dos2unix(i.modifyTime, i.modifyDate);
 }
 
 static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
@@ -1213,8 +1212,9 @@ static int local2utc(int time)
 
 /* Convert a MS-DOS time/date pair to a UNIX date (seconds since 1 1 70). */
 int
-ncp_date_dos2unix(unsigned short time, unsigned short date)
+ncp_date_dos2unix(__le16 t, __le16 d)
 {
+	unsigned short time = le16_to_cpu(t), date = le16_to_cpu(d);
 	int month, year, secs;
 
 	/* first subtract and mask after that... Otherwise, if
@@ -1231,13 +1231,14 @@ ncp_date_dos2unix(unsigned short time, unsigned short date)
 
 /* Convert linear UNIX date to a MS-DOS time/date pair. */
 void
-ncp_date_unix2dos(int unix_date, unsigned short *time, unsigned short *date)
+ncp_date_unix2dos(int unix_date, __le16 *time, __le16 *date)
 {
 	int day, year, nl_day, month;
 
 	unix_date = utc2local(unix_date);
-	*time = (unix_date % 60) / 2 + (((unix_date / 60) % 60) << 5) +
-	    (((unix_date / 3600) % 24) << 11);
+	*time = cpu_to_le16(
+		(unix_date % 60) / 2 + (((unix_date / 60) % 60) << 5) +
+		(((unix_date / 3600) % 24) << 11));
 	day = unix_date / 86400 - 3652;
 	year = day / 365;
 	if ((year + 3) / 4 + 365 * year > day)
@@ -1252,5 +1253,5 @@ ncp_date_unix2dos(int unix_date, unsigned short *time, unsigned short *date)
 			if (day_n[month] > nl_day)
 				break;
 	}
-	*date = nl_day - day_n[month - 1] + 1 + (month << 5) + (year << 9);
+	*date = cpu_to_le16(nl_day - day_n[month - 1] + 1 + (month << 5) + (year << 9));
 }

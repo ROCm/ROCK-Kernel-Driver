@@ -142,12 +142,9 @@ static void ncp_update_dates(struct inode *inode, struct nw_info_struct *nwi)
 
 	inode->i_blocks = (inode->i_size + NCP_BLOCK_SIZE - 1) >> NCP_BLOCK_SHIFT;
 
-	inode->i_mtime.tv_sec = ncp_date_dos2unix(le16_to_cpu(nwi->modifyTime),
-					   le16_to_cpu(nwi->modifyDate));
-	inode->i_ctime.tv_sec = ncp_date_dos2unix(le16_to_cpu(nwi->creationTime),
-					   le16_to_cpu(nwi->creationDate));
-	inode->i_atime.tv_sec = ncp_date_dos2unix(0,
-					   le16_to_cpu(nwi->lastAccessDate));
+	inode->i_mtime.tv_sec = ncp_date_dos2unix(nwi->modifyTime, nwi->modifyDate);
+	inode->i_ctime.tv_sec = ncp_date_dos2unix(nwi->creationTime, nwi->creationDate);
+	inode->i_atime.tv_sec = ncp_date_dos2unix(0, nwi->lastAccessDate);
 	inode->i_atime.tv_nsec = 0;
 	inode->i_mtime.tv_nsec = 0;
 	inode->i_ctime.tv_nsec = 0;
@@ -918,23 +915,18 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 	if ((attr->ia_valid & ATTR_CTIME) != 0) {
 		info_mask |= (DM_CREATE_TIME | DM_CREATE_DATE);
 		ncp_date_unix2dos(attr->ia_ctime.tv_sec,
-			     &(info.creationTime), &(info.creationDate));
-		info.creationTime = le16_to_cpu(info.creationTime);
-		info.creationDate = le16_to_cpu(info.creationDate);
+			     &info.creationTime, &info.creationDate);
 	}
 	if ((attr->ia_valid & ATTR_MTIME) != 0) {
 		info_mask |= (DM_MODIFY_TIME | DM_MODIFY_DATE);
 		ncp_date_unix2dos(attr->ia_mtime.tv_sec,
-				  &(info.modifyTime), &(info.modifyDate));
-		info.modifyTime = le16_to_cpu(info.modifyTime);
-		info.modifyDate = le16_to_cpu(info.modifyDate);
+				  &info.modifyTime, &info.modifyDate);
 	}
 	if ((attr->ia_valid & ATTR_ATIME) != 0) {
-		__u16 dummy;
+		__le16 dummy;
 		info_mask |= (DM_LAST_ACCESS_DATE);
 		ncp_date_unix2dos(attr->ia_atime.tv_sec,
-				  &(dummy), &(info.lastAccessDate));
-		info.lastAccessDate = le16_to_cpu(info.lastAccessDate);
+				  &dummy, &info.lastAccessDate);
 	}
 	if (info_mask != 0) {
 		result = ncp_modify_file_or_subdir_dos_info(NCP_SERVER(inode),
