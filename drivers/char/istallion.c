@@ -4670,9 +4670,6 @@ static inline int stli_findpcibrds()
 	printk("stli_findpcibrds()\n");
 #endif
 
-	if (! pci_present())
-		return(0);
-
 	while ((dev = pci_find_device(PCI_VENDOR_ID_STALLION,
 	    PCI_DEVICE_ID_ECRA, dev))) {
 		if ((rc = stli_initpcibrd(BRD_ECPPCI, dev)))
