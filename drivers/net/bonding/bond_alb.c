@@ -338,7 +338,7 @@ static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct arp_pkt *arp = (struct arp_pkt *)skb->data;
-	int ret = NET_RX_DROP;
+	int res = NET_RX_DROP;
 
 	if (!(bond_dev->flags & IFF_MASTER)) {
 		goto out;
@@ -360,12 +360,12 @@ static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct
 		dprintk("Server received an ARP Reply from client\n");
 	}
 
-	ret = NET_RX_SUCCESS;
+	res = NET_RX_SUCCESS;
 
 out:
 	dev_kfree_skb(skb);
 
-	return ret;
+	return res;
 }
 
 /* Caller must hold bond lock for read */
@@ -1074,7 +1074,7 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 	struct sockaddr sa;
 	struct slave *slave, *stop_at;
 	char tmp_addr[ETH_ALEN];
-	int error;
+	int res;
 	int i;
 
 	if (bond->alb_info.rlb_enabled) {
@@ -1083,19 +1083,19 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 
 	bond_for_each_slave(bond, slave, i) {
 		if (slave->dev->set_mac_address == NULL) {
-			error = -EOPNOTSUPP;
+			res = -EOPNOTSUPP;
 			goto unwind;
 		}
 
 		/* save net_device's current hw address */
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
 
-		error = slave->dev->set_mac_address(slave->dev, addr);
+		res = slave->dev->set_mac_address(slave->dev, addr);
 
 		/* restore net_device's hw address */
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
 
-		if (error) {
+		if (res) {
 			goto unwind;
 		}
 	}
@@ -1114,7 +1114,7 @@ unwind:
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
 	}
 
-	return error;
+	return res;
 }
 
 /************************ exported alb funcions ************************/
@@ -1378,12 +1378,12 @@ out:
  */
 int bond_alb_init_slave(struct bonding *bond, struct slave *slave)
 {
-	int err = 0;
+	int res;
 
-	err = alb_set_slave_mac_addr(slave, slave->perm_hwaddr,
+	res = alb_set_slave_mac_addr(slave, slave->perm_hwaddr,
 				     bond->alb_info.rlb_enabled);
-	if (err) {
-		return err;
+	if (res) {
+		return res;
 	}
 
 	/* caller must hold the bond lock for write since the mac addresses
@@ -1391,12 +1391,12 @@ int bond_alb_init_slave(struct bonding *bond, struct slave *slave)
 	 */
 	write_lock_bh(&bond->lock);
 
-	err = alb_handle_addr_collision_on_attach(bond, slave);
+	res = alb_handle_addr_collision_on_attach(bond, slave);
 
 	write_unlock_bh(&bond->lock);
 
-	if (err) {
-		return err;
+	if (res) {
+		return res;
 	}
 
 	tlb_init_slave(slave);
@@ -1514,16 +1514,16 @@ int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct sockaddr *sa = addr;
 	struct slave *swap_slave;
-	int error = 0;
+	int res;
 	int i, found = 0;
 
 	if (!is_valid_ether_addr(sa->sa_data)) {
 		return -EADDRNOTAVAIL;
 	}
 
-	error = alb_set_mac_address(bond, addr);
-	if (error) {
-		return error;
+	res = alb_set_mac_address(bond, addr);
+	if (res) {
+		return res;
 	}
 
 	memcpy(bond_dev->dev_addr, sa->sa_data, bond_dev->addr_len);

@@ -704,12 +704,12 @@ static void bond_attach_slave(struct bonding *bond, struct slave *new_slave)
  * Needs "ioctl" variable to be supplied by calling context.
  */
 #define IOCTL(dev, arg, cmd) ({		\
-	int ret;			\
+	int res = 0;			\
 	mm_segment_t fs = get_fs();	\
 	set_fs(get_ds());		\
-	ret = ioctl(dev, arg, cmd);	\
+	res = ioctl(dev, arg, cmd);	\
 	set_fs(fs);			\
-	ret; })
+	res; })
 
 /*
  * Get link speed and duplex from the slave's base driver
@@ -810,7 +810,7 @@ static int bond_check_dev_link(struct net_device *slave_dev, int reporting)
 		if (IOCTL(slave_dev, &ifr, SIOCGMIIPHY) == 0) {
 			mii->reg_num = MII_BMSR;
 			if (IOCTL(slave_dev, &ifr, SIOCGMIIREG) == 0) {
-				return mii->val_out & BMSR_LSTATUS;
+				return (mii->val_out & BMSR_LSTATUS);
 			}
 		}
 
@@ -836,7 +836,7 @@ static int bond_check_dev_link(struct net_device *slave_dev, int reporting)
 	 * cannot report link status).  If not reporting, pretend
 	 * we're ok.
 	 */
-	return reporting ? -1 : BMSR_LSTATUS;
+	return (reporting ? -1 : BMSR_LSTATUS);
 }
 
 /* register to receive lacpdus on a bond */
@@ -1225,10 +1225,10 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct slave *new_slave = NULL;
-	int err = 0;
 	struct dev_mc_list *dmi;
 	int link_reporting;
 	struct sockaddr addr;
+	int res = 0;
 
 	if (slave_dev->do_ioctl == NULL) {
 		printk(KERN_WARNING DRV_NAME
@@ -1315,23 +1315,23 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 			 */
 			memcpy(addr.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
 			addr.sa_family = slave_dev->type;
-			err = slave_dev->set_mac_address(slave_dev, &addr);
-			if (err) {
-				dprintk("Error %d calling set_mac_address\n", err);
+			res = slave_dev->set_mac_address(slave_dev, &addr);
+			if (res) {
+				dprintk("Error %d calling set_mac_address\n", res);
 				goto err_free;
 			}
 
 		/* open the slave since the application closed it */
-		err = dev_open(slave_dev);
-		if (err) {
+		res = dev_open(slave_dev);
+		if (res) {
 			dprintk("Openning slave %s failed\n", slave_dev->name);
 			goto err_restore_mac;
 		}
 	}
 
-	err = netdev_set_master(slave_dev, bond_dev);
-	if (err) {
-		dprintk("Error %d calling netdev_set_master\n", err);
+	res = netdev_set_master(slave_dev, bond_dev);
+	if (res) {
+		dprintk("Error %d calling netdev_set_master\n", res);
 		if (app_abi_ver < 1) {
 			goto err_free;
 		} else {
@@ -1346,8 +1346,8 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 		/* bond_alb_init_slave() must be called before all other stages since
 		 * it might fail and we do not want to have to undo everything
 		 */
-		err = bond_alb_init_slave(bond, new_slave);
-		if (err) {
+		res = bond_alb_init_slave(bond, new_slave);
+		if (res) {
 			goto err_unset_master;
 		}
 	}
@@ -1585,7 +1585,7 @@ err_restore_mac:
 
 err_free:
 	kfree(new_slave);
-	return err;
+	return res;
 }
 
 /* 
@@ -1604,7 +1604,7 @@ static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_devi
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct slave *old_active = NULL;
 	struct slave *new_active = NULL;
-	int ret = 0;
+	int res = 0;
 
 	/* Verify that master_dev is indeed the master of slave_dev */
 	if (!(slave_dev->flags & IFF_SLAVE) ||
@@ -1632,10 +1632,10 @@ static int bond_ioctl_change_active(struct net_device *bond_dev, struct net_devi
 	    IS_UP(new_active->dev)) {
 		bond_change_active_slave(bond, new_active);
 	} else {
-		ret = -EINVAL;
+		res = -EINVAL;
 	}
 	write_unlock_bh(&bond->lock);
-	return ret;
+	return res;
 }
 
 /**
@@ -1958,7 +1958,6 @@ static int bond_release_all(struct net_device *bond_dev)
 	struct slave *slave;
 	struct net_device *slave_dev;
 	struct sockaddr addr;
-	int err = 0;
 
 	write_lock_bh(&bond->lock);
 
@@ -2050,7 +2049,7 @@ static int bond_release_all(struct net_device *bond_dev)
 out:
 	write_unlock_bh(&bond->lock);
 
-	return err;
+	return 0;
 }
 
 /* this function is called regularly to monitor each slave's link. */
@@ -2757,7 +2756,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 	struct ifslave *u_sinfo = NULL, k_sinfo;
 	struct mii_ioctl_data *mii = NULL;
 	int prev_abi_ver = orig_app_abi_ver;
-	int ret = 0;
+	int res = 0;
 
 	dprintk("bond_ioctl: master=%s, cmd=%d\n", 
 		bond_dev->name, cmd);
@@ -2800,26 +2799,26 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		if (copy_from_user(&k_binfo, u_binfo, sizeof(ifbond))) {
 			return -EFAULT;
 		}
-		ret = bond_info_query(bond_dev, &k_binfo);
-		if (ret == 0) {
+		res = bond_info_query(bond_dev, &k_binfo);
+		if (res == 0) {
 			if (copy_to_user(u_binfo, &k_binfo, sizeof(ifbond))) {
 				return -EFAULT;
 			}
 		}
-		return ret;
+		return res;
 	case BOND_SLAVE_INFO_QUERY_OLD:
 	case SIOCBONDSLAVEINFOQUERY:
 		u_sinfo = (struct ifslave *)ifr->ifr_data;
 		if (copy_from_user(&k_sinfo, u_sinfo, sizeof(ifslave))) {
 			return -EFAULT;
 		}
-		ret = bond_slave_info_query(bond_dev, &k_sinfo);
-		if (ret == 0) {
+		res = bond_slave_info_query(bond_dev, &k_sinfo);
+		if (res == 0) {
 			if (copy_to_user(u_sinfo, &k_sinfo, sizeof(ifslave))) {
 				return -EFAULT;
 			}
 		}
-		return ret;
+		return res;
 	}
 
 	if (!capable(CAP_NET_ADMIN)) {
@@ -2846,38 +2845,38 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 	dprintk("slave_dev=%p: \n", slave_dev);
 
 	if (slave_dev == NULL) {
-		ret = -ENODEV;
+		res = -ENODEV;
 	} else {
 		dprintk("slave_dev->name=%s: \n", slave_dev->name);
 		switch (cmd) {
 		case BOND_ENSLAVE_OLD:
 		case SIOCBONDENSLAVE:		
-			ret = bond_enslave(bond_dev, slave_dev);
+			res = bond_enslave(bond_dev, slave_dev);
 			break;
 		case BOND_RELEASE_OLD:			
 		case SIOCBONDRELEASE:	
-			ret = bond_release(bond_dev, slave_dev); 
+			res = bond_release(bond_dev, slave_dev); 
 			break;
 		case BOND_SETHWADDR_OLD:
 		case SIOCBONDSETHWADDR:
-			ret = bond_sethwaddr(bond_dev, slave_dev);
+			res = bond_sethwaddr(bond_dev, slave_dev);
 			break;
 		case BOND_CHANGE_ACTIVE_OLD:
 		case SIOCBONDCHANGEACTIVE:
 			if (USES_PRIMARY(bond_mode)) {
-				ret = bond_ioctl_change_active(bond_dev, slave_dev);
+				res = bond_ioctl_change_active(bond_dev, slave_dev);
 			}
 			else {
-				ret = -EINVAL;
+				res = -EINVAL;
 			}
 			break;
 		default:
-			ret = -EOPNOTSUPP;
+			res = -EOPNOTSUPP;
 		}
 		dev_put(slave_dev);
 	}
 
-	if (ret < 0) {
+	if (res < 0) {
 		/* The ioctl failed, so there's no point in changing the
 		 * orig_app_abi_ver. We'll restore it's value just in case
 		 * we've changed it earlier in this function.
@@ -2885,7 +2884,7 @@ static int bond_do_ioctl(struct net_device *bond_dev, struct ifreq *ifr, int cmd
 		orig_app_abi_ver = prev_abi_ver;
 	}
 
-	return ret;
+	return res;
 }
 
 #ifdef CONFIG_NET_FASTROUTE
@@ -3069,7 +3068,6 @@ static int bond_xmit_xor(struct sk_buff *skb, struct net_device *bond_dev)
 static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_dev)
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
-	int ret;
 
 	if (!IS_UP(bond_dev)) { /* bond down */
 		dev_kfree_skb(skb);
@@ -3094,7 +3092,7 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *bond_d
 		skb->dev = bond->curr_active_slave->dev;
 		read_unlock(&bond->curr_slave_lock);
 		skb->priority = 1;
-		ret = dev_queue_xmit(skb);
+		dev_queue_xmit(skb);
 		read_unlock(&bond->lock);
 		return 0;
 	}
@@ -3314,16 +3312,16 @@ static int bond_info_open(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq;
 	struct proc_dir_entry *proc;
-	int rc;
+	int res;
 
-	rc = seq_open(file, &bond_info_seq_ops);
-	if (!rc) {
+	res = seq_open(file, &bond_info_seq_ops);
+	if (!res) {
 		/* recover the pointer buried in proc_dir_entry data */
 		seq = file->private_data;
 		proc = PDE(inode);
 		seq->private = proc->data;
 	}
-	return rc;
+	return res;
 }
 
 static struct file_operations bond_info_fops = {
@@ -3435,7 +3433,7 @@ static int bond_set_mac_address(struct net_device *bond_dev, void *addr)
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct sockaddr *sa = addr, tmp_sa;
 	struct slave *slave, *stop_at;
-	int error;
+	int res = 0;
 	int i;
 
 	dprintk("bond=%p, name=%s\n", bond, (bond_dev ? bond_dev->name : "None"));
@@ -3462,20 +3460,20 @@ static int bond_set_mac_address(struct net_device *bond_dev, void *addr)
 	bond_for_each_slave(bond, slave, i) {
 		dprintk("slave %p %s\n", slave, slave->dev->name);
 		if (slave->dev->set_mac_address == NULL) {
-			error = -EOPNOTSUPP;
+			res = -EOPNOTSUPP;
 			dprintk("EOPNOTSUPP %s\n", slave->dev->name);
 			goto unwind;
 		}
 
-		error = slave->dev->set_mac_address(slave->dev, addr);
-		if (error) {
+		res = slave->dev->set_mac_address(slave->dev, addr);
+		if (res) {
 			/* TODO: consider downing the slave 
 			 * and retry ?
 			 * User should expect communications
 			 * breakage anyway until ARP finish
 			 * updating, so...
 			 */
-			dprintk("err %d %s\n", error, slave->dev->name);
+			dprintk("err %d %s\n", res, slave->dev->name);
 			goto unwind;
 		}
 	}
@@ -3491,16 +3489,16 @@ unwind:
 	/* unwind from the first slave that failed to head */
 	stop_at = slave;
 	bond_for_each_slave_from_to(bond, slave, i, bond->first_slave, stop_at) {
-		int tmp_error;
+		int tmp_res;
 
-		tmp_error = slave->dev->set_mac_address(slave->dev, &tmp_sa);
-		if (tmp_error) {
-			dprintk("unwind err %d dev %s\n", tmp_error,
+		tmp_res = slave->dev->set_mac_address(slave->dev, &tmp_sa);
+		if (tmp_res) {
+			dprintk("unwind err %d dev %s\n", tmp_res,
 				slave->dev->name);
 		}
 	}
 
-	return error;
+	return res;
 }
 
 /*
@@ -3510,7 +3508,7 @@ static int bond_change_mtu(struct net_device *bond_dev, int new_mtu)
 {
 	struct bonding *bond = (struct bonding *)bond_dev->priv;
 	struct slave *slave, *stop_at;
-	int error;
+	int res = 0;
 	int i;
 
 	dprintk("bond=%p, name=%s, new_mtu=%d\n", bond,
@@ -3535,13 +3533,13 @@ static int bond_change_mtu(struct net_device *bond_dev, int new_mtu)
 		dprintk("s %p s->p %p c_m %p\n", slave,
 			slave->prev, slave->dev->change_mtu);
 		if (slave->dev->change_mtu) {
-			error = slave->dev->change_mtu(slave->dev, new_mtu);
+			res = slave->dev->change_mtu(slave->dev, new_mtu);
 		} else {
 			slave->dev->mtu = new_mtu;
-			error = 0;
+			res = 0;
 		}
 
-		if (error) {
+		if (res) {
 			/* If we failed to set the slave's mtu to the new value
 			 * we must abort the operation even in ACTIVE_BACKUP
 			 * mode, because if we allow the backup slaves to have
@@ -3550,7 +3548,7 @@ static int bond_change_mtu(struct net_device *bond_dev, int new_mtu)
 			 * means changing their mtu from timer context, which
 			 * is probably not a good idea.
 			 */
-			dprintk("err %d %s\n", error, slave->dev->name);
+			dprintk("err %d %s\n", res, slave->dev->name);
 			goto unwind;
 		}
 	}
@@ -3563,14 +3561,20 @@ unwind:
 	/* unwind from the first slave that failed to head */
 	stop_at = slave;
 	bond_for_each_slave_from_to(bond, slave, i, bond->first_slave, stop_at) {
+		int tmp_res;
+
 		if (slave->dev->change_mtu) {
-			slave->dev->change_mtu(slave->dev, bond_dev->mtu);
+			tmp_res = slave->dev->change_mtu(slave->dev, bond_dev->mtu);
+			if (tmp_res) {
+				dprintk("unwind err %d dev %s\n", tmp_res,
+					slave->dev->name);
+			}
 		} else {
 			slave->dev->mtu = bond_dev->mtu;
 		}
 	}
 
-	return error;
+	return res;
 }
 
 /*
@@ -4054,13 +4058,13 @@ static int bond_check_params(void)
 static int __init bonding_init(void)
 {
 	int i;
-	int err;
+	int res;
 
 	printk(KERN_INFO "%s", version);
 
-	err = bond_check_params();
-	if (err) {
-		return err;
+	res = bond_check_params();
+	if (res) {
+		return res;
 	}
 
 	rtnl_lock();
@@ -4069,18 +4073,17 @@ static int __init bonding_init(void)
 	bond_create_proc_dir();
 #endif
 
-	err = 0;
 	for (i = 0; i < max_bonds; i++) {
 		struct net_device *bond_dev;
 
 		bond_dev = alloc_netdev(sizeof(struct bonding), "", ether_setup);
 		if (!bond_dev) {
-			err = -ENOMEM;
+			res = -ENOMEM;
 			goto out_err;
 		}
 
-		err = dev_alloc_name(bond_dev, "bond%d");
-		if (err < 0) {
+		res = dev_alloc_name(bond_dev, "bond%d");
+		if (res < 0) {
 			free_netdev(bond_dev);
 			goto out_err;
 		}
@@ -4089,16 +4092,16 @@ static int __init bonding_init(void)
 		 * /proc files), but before register_netdevice(), because we
 		 * need to set function pointers.
 		 */
-		err = bond_init(bond_dev);
-		if (err < 0) {
+		res = bond_init(bond_dev);
+		if (res < 0) {
 			free_netdev(bond_dev);
 			goto out_err;
 		}
 
 		SET_MODULE_OWNER(bond_dev);
 
-		err = register_netdevice(bond_dev);
-		if (err < 0) {
+		res = register_netdevice(bond_dev);
+		if (res < 0) {
 			bond_deinit(bond_dev);
 			free_netdev(bond_dev);
 			goto out_err;
@@ -4116,7 +4119,7 @@ out_err:
 
 	rtnl_unlock();
 
-	return err;
+	return res;
 }
 
 static void __exit bonding_exit(void)
