@@ -137,7 +137,7 @@ static int irda_thread(void *startup)
 
 		/* make swsusp happy with our thread */
 		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 
 		run_irda_queue();
 	}

@@ -2498,14 +2498,14 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 
 /* We thank Mingming Cao for helping us understand in great detail what
    to do in this section of the code. */
-static int reiserfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
-			      loff_t offset, unsigned long nr_segs)
+static ssize_t reiserfs_direct_IO(int rw, struct kiocb *iocb,
+		const struct iovec *iov, loff_t offset, unsigned long nr_segs)
 {
     struct file *file = iocb->ki_filp;
     struct inode *inode = file->f_mapping->host;
 
     return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-			      offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
+			offset, nr_segs, reiserfs_get_blocks_direct_io, NULL);
 }
 
 

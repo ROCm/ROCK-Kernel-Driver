@@ -1628,7 +1628,7 @@ int scsi_error_handler(void *data)
 
 	daemonize("scsi_eh_%d", shost->host_no);
 
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_NOFREEZE;
 
 	shost->eh_wait = &sem;
 	shost->ehandler = current;

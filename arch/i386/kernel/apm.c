@@ -1701,7 +1701,7 @@ static int apm(void *unused)
 
 	daemonize("kapmd");
 
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_NOFREEZE;
 
 #ifdef CONFIG_SMP
 	/* 2002/08/01 - WT

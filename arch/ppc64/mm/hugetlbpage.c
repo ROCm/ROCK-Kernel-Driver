@@ -335,15 +335,9 @@ follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 struct page *
-follow_huge_addr(struct mm_struct *mm,
-	struct vm_area_struct *vma, unsigned long address, int write)
+follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
 {
-	return NULL;
-}
-
-struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
-{
-	return NULL;
+	return ERR_PTR(-EINVAL);
 }
 
 int pmd_huge(pmd_t pmd)
