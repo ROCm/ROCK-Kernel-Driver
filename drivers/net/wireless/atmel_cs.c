@@ -379,7 +379,6 @@ static struct {
 
 /* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
 static struct device atmel_device = {
-        .name      = "Atmel at76c50x wireless",
         .bus_id    = "pcmcia",
 };
 
