@@ -18,7 +18,6 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
-#include <regex.h>
 
 #define LKC_DIRECT_LINK
 #include "lkc.h"
@@ -79,8 +78,45 @@ save_config_help[] =
 	"configuration options you have selected at that time.\n"
 	"\n"
 	"If you are uncertain what all this means then you should probably\n"
-	"leave this blank.\n"
-;
+	"leave this blank.\n",
+search_help[] =
+	"\n"
+	"Search for CONFIG_ symbols and display their relations.\n"
+	"Example: search for \"^FOO\"\n"
+	"Result:\n"
+	"-----------------------------------------------------------------\n"
+	"Symbol: FOO [=m]\n"
+	"Prompt: Foo bus is used to drive the bar HW\n"
+	"Defined at drivers/pci/Kconfig:47\n"
+	"Depends on: X86_LOCAL_APIC && X86_IO_APIC || IA64\n"
+	"Location:\n"
+	"  -> Bus options (PCI, PCMCIA, EISA, MCA, ISA)\n"
+	"    -> PCI support (PCI [=y])\n"
+	"      -> PCI access mode (<choice> [=y])\n"
+	"Selects: LIBCRC32\n"
+	"Selected by: BAR\n"
+	"-----------------------------------------------------------------\n"
+	"o The line 'Prompt:' shows the text used in the menu structure for\n"
+	"  this CONFIG_ symbol\n"
+	"o The 'Defined at' line tell at what file / line number the symbol\n"
+	"  is defined\n"
+	"o The 'Depends on:' line tell what symbols needs to be defined for\n"
+	"  this symbol to be visible in the menu (selectable)\n"
+	"o The 'Location:' lines tell where in the menu structure this symbol\n"
+	"  is located\n"
+	"    A location followed by a [=y] indicate that this is a selectable\n"
+	"    menu item - and current value is displayed inside brackets.\n"
+	"o The 'Selects:' line tell what symbol will be automatically\n"
+	"  selected if this symbol is selected (y or m)\n"
+	"o The 'Selected by' line tell what symbol has selected this symbol\n"
+	"\n"
+	"Only relevant lines are shown.\n"
+	"\n\n"
+	"Search examples:\n"
+	"Examples: USB	=> find all CONFIG_ symbols containing USB\n"
+	"          ^USB => find all CONFIG_ symbols starting with USB\n"
+	"          USB$ => find all CONFIG_ symbols ending with USB\n"
+	"\n";
 
 static signed char buf[4096], *bufptr = buf;
 static signed char input_buf[4096];
@@ -104,9 +140,6 @@ static void show_helptext(const char *title, const char *text);
 static void show_help(struct menu *menu);
 static void show_readme(void);
 static void show_file(const char *filename, const char *title, int r, int c);
-static void show_expr(struct menu *menu, FILE *fp);
-static void search_conf(char *pattern);
-static int regex_match(const char *string, regex_t *re);
 
 static void cprint_init(void);
 static int cprint1(const char *fmt, ...);
@@ -196,6 +229,74 @@ static int cprint(const char *fmt, ...)
 	return res;
 }
 
+static void get_prompt_str(struct gstr *r, struct property *prop)
+{
+	int i, j;
+	struct menu *submenu[8], *menu;
+
+	str_printf(r, "Prompt: %s\n", prop->text);
+	str_printf(r, "  Defined at %s:%d\n", prop->menu->file->name,
+		prop->menu->lineno);
+	if (!expr_is_yes(prop->visible.expr)) {
+		str_append(r, "  Depends on: ");
+		expr_gstr_print(prop->visible.expr, r);
+		str_append(r, "\n");
+	}
+	menu = prop->menu->parent;
+	for (i = 0; menu != &rootmenu && i < 8; menu = menu->parent)
+		submenu[i++] = menu;
+	if (i > 0) {
+		str_printf(r, "  Location:\n");
+		for (j = 4; --i >= 0; j += 2) {
+			menu = submenu[i];
+			str_printf(r, "%*c-> %s", j, ' ', menu_get_prompt(menu));
+			if (menu->sym) {
+				str_printf(r, " (%s [=%s])", menu->sym->name ?
+					menu->sym->name : "<choice>",
+					sym_get_string_value(menu->sym));
+			}
+			str_append(r, "\n");
+		}
+	}
+}
+
+static struct gstr get_relations_str(struct symbol **sym_arr)
+{
+	struct symbol *sym;
+	struct property *prop;
+	struct gstr res = str_new();
+	struct gstr *r = &res;
+	bool hit;
+	int i;
+
+	for (i = 0; sym_arr && (sym = sym_arr[i]); i++) {
+		str_printf(&res, "Symbol: %s [=%s]\n", sym->name,
+		                               sym_get_string_value(sym));
+		for_all_prompts(sym, prop)
+			get_prompt_str(r, prop);
+		hit = false;
+		for_all_properties(sym, prop, P_SELECT) {
+			if (!hit) {
+				str_append(r, "  Selects: ");
+				hit = true;
+			} else
+				str_printf(r, " && ");
+			expr_gstr_print(prop->expr, r);
+		}
+		if (hit)
+			str_append(r, "\n");
+		if (sym->rev_dep.expr) {
+			str_append(r, "  Selected by: ");
+			expr_gstr_print(sym->rev_dep.expr, r);
+			str_append(r, "\n");
+		}
+		str_append(r, "\n\n");
+	}
+	if (!i)
+		str_append(r, "No matches found.\n");
+	return res;
+}
+
 pid_t pid;
 
 static void winch_handler(int sig)
@@ -279,112 +380,39 @@ static int exec_conf(void)
 	return WEXITSTATUS(stat);
 }
 
-static int regex_match(const char *string, regex_t *re)
+static void search_conf(void)
 {
-	int rc;
+	struct symbol **sym_arr;
+	int stat;
+	struct gstr res;
 
-	rc = regexec(re, string, (size_t) 0, NULL, 0);
-	if (rc)
-		return 0;
-	return 1;
-}
-
-static void show_expr(struct menu *menu, FILE *fp)
-{
-	bool hit = false;
-	fprintf(fp, "Depends:\n ");
-	if (menu->prompt->visible.expr) {
-		if (!hit)
-			hit = true;
-		expr_fprint(menu->prompt->visible.expr, fp);
-	}
-	if (!hit)
-		fprintf(fp, "None");
-	if (menu->sym) {
-		struct property *prop;
-		hit = false;
-		fprintf(fp, "\nSelects:\n ");
-		for_all_properties(menu->sym, prop, P_SELECT) {
-			if (!hit)
-				hit = true;
-			expr_fprint(prop->expr, fp);
-		}
-		if (!hit)
-			fprintf(fp, "None");
-		hit = false;
-		fprintf(fp, "\nSelected by:\n ");
-		if (menu->sym->rev_dep.expr) {
-			hit = true;
-			expr_fprint(menu->sym->rev_dep.expr, fp);
-		}
-		if (!hit)
-			fprintf(fp, "None");
-	}
-}
-
-static void search_conf(char *pattern)
-{
-	struct symbol *sym = NULL;
-	struct menu *menu[32] = { 0 };
-	struct property *prop = NULL;
-	FILE *fp = NULL;
-	bool hit = false;
-	int i, j, k, l;
-	regex_t re;
-
-	if (regcomp(&re, pattern, REG_EXTENDED|REG_NOSUB))
-		return;
-
-	fp = fopen(".search.tmp", "w");
-	if (fp == NULL) {
-		perror("fopen");
+again:
+	cprint_init();
+	cprint("--title");
+	cprint("Search Configuration Parameter");
+	cprint("--inputbox");
+	cprint("Enter Keyword");
+	cprint("10");
+	cprint("75");
+	cprint("");
+	stat = exec_conf();
+	if (stat < 0)
+		goto again;
+	switch (stat) {
+	case 0:
+		break;
+	case 1:
+		show_helptext("Search Configuration", search_help);
+		goto again;
+	default:
 		return;
 	}
-	for_all_symbols(i, sym) {
-		if (!sym->name)
-			continue;
-		if (!regex_match(sym->name, &re))
-			continue;
-		for_all_prompts(sym, prop) {
-			struct menu *submenu = prop->menu;
-			if (!submenu)
-				continue;
-			j = 0;
-			hit = false;
-			while (submenu) {
-				menu[j++] = submenu;
-				submenu = submenu->parent;
-			}
-			if (j > 0) {
-				if (!hit)
-					hit = true;
-				fprintf(fp, "%s (%s)\n", prop->text, sym->name);
-				fprintf(fp, "Location:\n");
-			}
-			for (k = j-2, l=1; k > 0; k--, l++) {
-				const char *prompt = menu_get_prompt(menu[k]);
-				if (menu[k]->sym)
-					fprintf(fp, "%*c-> %s (%s)\n",
-								l, ' ',
-								prompt,
-								menu[k]->sym->name);
-				else
-					fprintf(fp, "%*c-> %s\n",
-								l, ' ',
-								prompt);
-			}
-			if (hit) {
-				show_expr(menu[0], fp);
-				fprintf(fp, "\n\n\n");
-			}
-		}
-	}
-	if (!hit)
-		fprintf(fp, "No matches found.");
-	regfree(&re);
-	fclose(fp);
-	show_file(".search.tmp", "Search Results", 0, 0);
-	unlink(".search.tmp");
+
+	sym_arr = sym_re_search(input_buf);
+	res = get_relations_str(sym_arr);
+	free(sym_arr);
+	show_textbox("Search Results", str_get(&res), 0, 0);
+	str_free(&res);
 }
 
 static void build_conf(struct menu *menu)
@@ -576,23 +604,6 @@ static void conf(struct menu *menu)
 			cprint("    Save Configuration to an Alternate File");
 		}
 		stat = exec_conf();
-		if (stat == 26) {
-			char *pattern;
-
-			if (!strlen(input_buf))
-				continue;
-			pattern = malloc(sizeof(char)*sizeof(input_buf));
-			if (pattern == NULL) {
-				perror("malloc");
-				continue;
-			}
-			for (i = 0; input_buf[i]; i++)
-				pattern[i] = toupper(input_buf[i]);
-			pattern[i] = '\0';
-			search_conf(pattern);
-			free(pattern);
-			continue;
-		}
 		if (stat < 0)
 			continue;
 
@@ -668,6 +679,9 @@ static void conf(struct menu *menu)
 				sym_toggle_tristate_value(sym);
 			else if (type == 'm')
 				conf(submenu);
+			break;
+		case 7:
+			search_conf();
 			break;
 		}
 	}
