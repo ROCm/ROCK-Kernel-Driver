@@ -197,7 +197,7 @@ handle_name:
 			goto err_out;
 		}
 		ctx = ntfs_attr_get_search_ctx(ni, m);
-		if (!ctx) {
+		if (unlikely(!ctx)) {
 			err = -ENOMEM;
 			goto err_out;
 		}
@@ -205,12 +205,14 @@ handle_name:
 			ATTR_RECORD *a;
 			u32 val_len;
 
-			if (!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0,
-					NULL, 0, ctx)) {
+			err = ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, 0, 0,
+					NULL, 0, ctx);
+			if (unlikely(err)) {
 				ntfs_error(vol->sb, "Inode corrupt: No WIN32 "
 						"namespace counterpart to DOS "
 						"file name. Run chkdsk.");
-				err = -EIO;
+				if (err == -ENOENT)
+					err = -EIO;
 				goto err_out;
 			}
 			/* Consistency checks. */
@@ -372,6 +374,7 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 	struct inode *parent_vi;
 	struct dentry *parent_dent;
 	unsigned long parent_ino;
+	int err;
 
 	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
 	/* Get the mft record of the inode belonging to the child dentry. */
@@ -385,13 +388,16 @@ struct dentry *ntfs_get_parent(struct dentry *child_dent)
 		return ERR_PTR(-ENOMEM);
 	}
 try_next:
-	if (unlikely(!ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE,
-			0, NULL, 0, ctx))) {
+	err = ntfs_attr_lookup(AT_FILE_NAME, NULL, 0, CASE_SENSITIVE, 0, NULL,
+			0, ctx);
+	if (unlikely(err)) {
 		ntfs_attr_put_search_ctx(ctx);
 		unmap_mft_record(ni);
-		ntfs_error(vi->i_sb, "Inode 0x%lx does not have a file name "
-				"attribute. Run chkdsk.", vi->i_ino);
-		return ERR_PTR(-ENOENT);
+		if (err == -ENOENT)
+			ntfs_error(vi->i_sb, "Inode 0x%lx does not have a "
+					"file name attribute.  Run chkdsk.",
+					vi->i_ino);
+		return ERR_PTR(err);
 	}
 	attr = ctx->attr;
 	if (unlikely(attr->non_resident))
