@@ -245,19 +245,27 @@ typedef struct a_list {
 STATIC	a_list_t	*as_free_head;
 STATIC	int		as_list_len;
 
+
+/*
+ * Try to batch vunmaps because they are costly.
+ */
 STATIC void
 free_address(
 	void		*addr)
 {
 	a_list_t	*aentry;
 
-	spin_lock(&as_lock);
 	aentry = kmalloc(sizeof(a_list_t), GFP_ATOMIC);
-	aentry->next = as_free_head;
-	aentry->vm_addr = addr;
-	as_free_head = aentry;
-	as_list_len++;
-	spin_unlock(&as_lock);
+	if (aentry) {
+		spin_lock(&as_lock);
+		aentry->next = as_free_head;
+		aentry->vm_addr = addr;
+		as_free_head = aentry;
+		as_list_len++;
+		spin_unlock(&as_lock);
+	} else {
+		vunmap(addr);
+	}
 }
 
 STATIC void
@@ -265,7 +273,8 @@ purge_addresses(void)
 {
 	a_list_t	*aentry, *old;
 
-	if (as_free_head == NULL) return;
+	if (as_free_head == NULL)
+		return;
 
 	spin_lock(&as_lock);
 	aentry = as_free_head;
