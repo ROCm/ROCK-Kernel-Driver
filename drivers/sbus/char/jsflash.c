@@ -546,7 +546,7 @@ static int jsflash_init(void)
 	return 0;
 }
 
-static struct request_queue jsf_queue;
+static struct request_queue *jsf_queue;
 
 static int jsfd_init(void)
 {
@@ -572,7 +572,13 @@ static int jsfd_init(void)
 		goto out;
 	}
 
-	blk_init_queue(&jsf_queue, jsfd_do_request, &lock);
+	jsf_queue = blk_init_queue(jsfd_do_request, &lock);
+	if (!jsf_queue) {
+		err = -ENOMEM;
+		unregister_blkdev(JSFD_MAJOR, "jsfd");
+		goto out;
+	}
+
 	for (i = 0; i < JSF_MAX; i++) {
 		struct gendisk *disk = jsfd_disk[i];
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
@@ -585,7 +591,7 @@ static int jsfd_init(void)
 		disk->fops = &jsfd_fops;
 		set_capacity(disk, jdp->dsize >> 9);
 		disk->private_data = jdp;
-		disk->queue = &jsf_queue;
+		disk->queue = jsf_queue;
 		add_disk(disk);
 		set_disk_ro(disk, 1);
 	}
@@ -625,7 +631,7 @@ static void __exit jsflash_cleanup_module(void)
 	misc_deregister(&jsf_dev);
 	if (unregister_blkdev(JSFD_MAJOR, "jsfd") != 0)
 		printk("jsfd: cleanup_module failed\n");
-	blk_cleanup_queue(&jsf_queue);
+	blk_cleanup_queue(jsf_queue);
 }
 
 module_init(jsflash_init_module);

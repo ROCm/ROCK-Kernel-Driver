@@ -191,7 +191,7 @@ struct i2ob_iop_queue
 	atomic_t queue_depth;
 	struct i2ob_request request_queue[MAX_I2OB_DEPTH];
 	struct i2ob_request *i2ob_qhead;
-	request_queue_t req_queue;
+	request_queue_t *req_queue;
 	spinlock_t lock;
 };
 static struct i2ob_iop_queue *i2ob_queues[MAX_I2O_CONTROLLERS];
@@ -1209,7 +1209,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 	 * code so that we can directly get the queue ptr from the
 	 * device instead of having to go the IOP data structure.
 	 */
-	dev->req_queue = &i2ob_queues[c->unit]->req_queue;
+	dev->req_queue = i2ob_queues[c->unit]->req_queue;
 
 	/* Register a size before we register for events - otherwise we
 	   might miss and overwrite an event */
@@ -1251,8 +1251,13 @@ static int i2ob_init_iop(unsigned int unit)
 	i2ob_queues[unit]->i2ob_qhead = &i2ob_queues[unit]->request_queue[0];
 	atomic_set(&i2ob_queues[unit]->queue_depth, 0);
 
-	blk_init_queue(&i2ob_queues[unit]->req_queue, i2ob_request, &i2ob_queues[unit]->lock);
-	i2ob_queues[unit]->req_queue.queuedata = &i2ob_queues[unit];
+	i2ob_queues[unit]->req_queue = blk_init_queue(i2ob_request, &i2ob_queues[unit]->lock);
+	if (!i2ob_queues[unit]->req_queue) {
+		kfree(i2ob_queues[unit]);
+		return -1;
+	}
+
+	i2ob_queues[unit]->req_queue->queuedata = &i2ob_queues[unit];
 
 	return 0;
 }

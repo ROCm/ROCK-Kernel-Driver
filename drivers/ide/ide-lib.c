@@ -406,7 +406,8 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 			addr = HWIF(drive)->pci_dev->dma_mask;
 	}
 
-	blk_queue_bounce_limit(&drive->queue, addr);
+	if (drive->queue)
+		blk_queue_bounce_limit(drive->queue, addr);
 }
 
 EXPORT_SYMBOL(ide_toggle_bounce);

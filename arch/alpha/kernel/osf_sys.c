@@ -821,8 +821,6 @@ osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
    affects all sorts of things, like timeval and itimerval.  */
 
 extern struct timezone sys_tz;
-extern int do_getitimer(int which, struct itimerval *value);
-extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
 extern asmlinkage int sys_utimes(char *, struct timeval *);
 extern int do_adjtimex(struct timex *);
 

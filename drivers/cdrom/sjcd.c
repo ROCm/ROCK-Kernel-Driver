@@ -78,11 +78,11 @@
 #include "sjcd.h"
 
 static int sjcd_present = 0;
-static struct request_queue sjcd_queue;
+static struct request_queue *sjcd_queue;
 
 #define MAJOR_NR SANYO_CDROM_MAJOR
-#define QUEUE (&sjcd_queue)
-#define CURRENT elv_next_request(&sjcd_queue)
+#define QUEUE (sjcd_queue)
+#define CURRENT elv_next_request(sjcd_queue)
 
 #define SJCD_BUF_SIZ 32		/* cdr-h94a has internal 64K buffer */
 
@@ -1679,8 +1679,11 @@ static int __init sjcd_init(void)
 	if (register_blkdev(MAJOR_NR, "sjcd"))
 		return -EIO;
 
-	blk_init_queue(&sjcd_queue, do_sjcd_request, &sjcd_lock);
-	blk_queue_hardsect_size(&sjcd_queue, 2048);
+	sjcd_queue = blk_init_queue(do_sjcd_request, &sjcd_lock);
+	if (!sjcd_queue)
+		goto out0;
+
+	blk_queue_hardsect_size(sjcd_queue, 2048);
 
 	sjcd_disk = alloc_disk(1);
 	if (!sjcd_disk) {
@@ -1778,17 +1781,18 @@ static int __init sjcd_init(void)
 	}
 
 	printk(KERN_INFO "SJCD: Status: port=0x%x.\n", sjcd_base);
-	sjcd_disk->queue = &sjcd_queue;
+	sjcd_disk->queue = sjcd_queue;
 	add_disk(sjcd_disk);
 
 	sjcd_present++;
 	return (0);
 out3:
 	release_region(sjcd_base, 4);
-	blk_cleanup_queue(&sjcd_queue);
 out2:
 	put_disk(sjcd_disk);
 out1:
+	blk_cleanup_queue(sjcd_queue);
+out0:
 	if ((unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
 		printk("SJCD: cannot unregister device.\n");
 	return (-EIO);
@@ -1799,7 +1803,7 @@ static void __exit sjcd_exit(void)
 	del_gendisk(sjcd_disk);
 	put_disk(sjcd_disk);
 	release_region(sjcd_base, 4);
-	blk_cleanup_queue(&sjcd_queue);
+	blk_cleanup_queue(sjcd_queue);
 	if ((unregister_blkdev(MAJOR_NR, "sjcd") == -EINVAL))
 		printk("SJCD: cannot unregister device.\n");
 	printk(KERN_INFO "SJCD: module: removed.\n");

@@ -27,26 +27,31 @@
 #define NtLmChallenge     2
 #define NtLmAuthenticate  3
 #define UnknownMessage    8
+
 /* Negotiate Flags */
 #define NTLMSSP_NEGOTIATE_UNICODE       0x01	// Text strings are in unicode
 #define NTLMSSP_NEGOTIATE_OEM           0x02	// Text strings are in OEM
 #define NTLMSSP_REQUEST_TARGET          0x04	// Server return its auth realm
 #define NTLMSSP_NEGOTIATE_SIGN        0x0010	// Request signature capability
 #define NTLMSSP_NEGOTIATE_SEAL        0x0020	// Request confidentiality
-#define NTLMSSP_NEGOTIATE_DGRAM       0x0040 
+#define NTLMSSP_NEGOTIATE_DGRAM       0x0040
 #define NTLMSSP_NEGOTIATE_LM_KEY      0x0080	// Use LM session key for sign/seal
 #define NTLMSSP_NEGOTIATE_NTLM        0x0200	// NTLM authentication
 #define NTLMSSP_NEGOTIATE_DOMAIN_SUPPLIED 0x1000
 #define NTLMSSP_NEGOTIATE_WORKSTATION_SUPPLIED 0x2000
 #define NTLMSSP_NEGOTIATE_LOCAL_CALL  0x4000	// client/server on same machine
 #define NTLMSSP_NEGOTIATE_ALWAYS_SIGN 0x8000	// Sign for all security levels
-#define NTLMSSP_NEGOTIATE_NTLMV2      0x80000
+#define NTLMSSP_TARGET_TYPE_DOMAIN   0x10000
+#define NTLMSSP_TARGET_TYPE_SERVER   0x20000
+#define NTLMSSP_TARGET_TYPE_SHARE    0x40000
+#define NTLMSSP_NEGOTIATE_NTLMV2     0x80000
+#define NTLMSSP_REQUEST_INIT_RESP   0x100000
+#define NTLMSSP_REQUEST_ACCEPT_RESP 0x200000
+#define NTLMSSP_REQUEST_NOT_NT_KEY  0x400000
 #define NTLMSSP_NEGOTIATE_TARGET_INFO 0x800000
 #define NTLMSSP_NEGOTIATE_128     0x20000000
 #define NTLMSSP_NEGOTIATE_KEY_XCH 0x40000000
-/* server only negotiate flags */
-#define NTLMSSP_TARGET_TYPE_DOMAIN  0x10000	/* NEGOTIATE_DOMAIN 0x1000 ? */
-#define NTLMSSP_TARGET_TYPE_SERVER  0x20000	/* NEGOTIATE_WORKSTATION 0x2000 ? */
+#define NTLMSSP_NEGOTIATE_56      0x80000000
 
 /* Although typedefs are not commonly used for structure definitions */
 /* in the Linux kernel, in this particular case they are useful      */
@@ -62,7 +67,7 @@ typedef struct _SECURITY_BUFFER {
 
 typedef struct _NEGOTIATE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;
+	__u32 MessageType;     /* 1 */
 	__u32 NegotiateFlags;
 	SECURITY_BUFFER DomainName;	/* RFC 1001 style and ASCII */
 	SECURITY_BUFFER WorkstationName;	/* RFC 1001 and ASCII */
@@ -72,7 +77,7 @@ typedef struct _NEGOTIATE_MESSAGE {
 
 typedef struct _CHALLENGE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;
+	__u32 MessageType;   /* 2 */
 	SECURITY_BUFFER TargetName;
 	__u32 NegotiateFlags;
 	__u8 Challenge[CIFS_CRYPTO_KEY_SIZE];
@@ -82,7 +87,7 @@ typedef struct _CHALLENGE_MESSAGE {
 
 typedef struct _AUTHENTICATE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;
+	__u32 MessageType;  /* 3 */
 	SECURITY_BUFFER LmChallengeResponse;
 	SECURITY_BUFFER NtChallengeResponse;
 	SECURITY_BUFFER DomainName;

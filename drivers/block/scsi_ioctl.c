@@ -406,26 +406,37 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 	if (!q)
 		return -ENXIO;
 
+	if (blk_get_queue(q))
+		return -ENXIO;
+
 	switch (cmd) {
 		/*
 		 * new sgv3 interface
 		 */
 		case SG_GET_VERSION_NUM:
-			return sg_get_version((int *) arg);
+			err = sg_get_version((int *) arg);
+			break;
 		case SCSI_IOCTL_GET_IDLUN:
-			return scsi_get_idlun(q, (int *) arg);
+			err = scsi_get_idlun(q, (int *) arg);
+			break;
 		case SCSI_IOCTL_GET_BUS_NUMBER:
-			return scsi_get_bus(q, (int *) arg);
+			err = scsi_get_bus(q, (int *) arg);
+			break;
 		case SG_SET_TIMEOUT:
-			return sg_set_timeout(q, (int *) arg);
+			err = sg_set_timeout(q, (int *) arg);
+			break;
 		case SG_GET_TIMEOUT:
-			return sg_get_timeout(q);
+			err = sg_get_timeout(q);
+			break;
 		case SG_GET_RESERVED_SIZE:
-			return sg_get_reserved_size(q, (int *) arg);
+			err = sg_get_reserved_size(q, (int *) arg);
+			break;
 		case SG_SET_RESERVED_SIZE:
-			return sg_set_reserved_size(q, (int *) arg);
+			err = sg_set_reserved_size(q, (int *) arg);
+			break;
 		case SG_EMULATED_HOST:
-			return sg_emulated_host(q, (int *) arg);
+			err = sg_emulated_host(q, (int *) arg);
+			break;
 		case SG_IO:
 			err = bd_claim(bdev, current);
 			if (err)
@@ -437,8 +448,9 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 		 * old junk scsi send command ioctl
 		 */
 		case SCSI_IOCTL_SEND_COMMAND:
+			err = -EINVAL;
 			if (!arg)
-				return -EINVAL;
+				break;
 
 			err = bd_claim(bdev, current);
 			if (err)

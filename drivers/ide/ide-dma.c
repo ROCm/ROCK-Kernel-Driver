@@ -210,7 +210,7 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 	if (hwif->sg_dma_active)
 		BUG();
 
-	nents = blk_rq_map_sg(&drive->queue, rq, hwif->sg_table);
+	nents = blk_rq_map_sg(drive->queue, rq, hwif->sg_table);
 		
 	if (rq_data_dir(rq) == READ)
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;

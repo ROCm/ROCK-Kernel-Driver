@@ -1164,11 +1164,12 @@ out:
  * @q:    the request queue to be released
  *
  * Description:
- *     blk_cleanup_queue is the pair to blk_init_queue().  It should
- *     be called when a request queue is being released; typically
- *     when a block device is being de-registered.  Currently, its
- *     primary task it to free all the &struct request structures that
- *     were allocated to the queue.
+ *     blk_cleanup_queue is the pair to blk_init_queue() or
+ *     blk_queue_make_request().  It should be called when a request queue is
+ *     being released; typically when a block device is being de-registered.
+ *     Currently, its primary task it to free all the &struct request
+ *     structures that were allocated to the queue and the queue itself.
+ *
  * Caveat:
  *     Hopefully the low level driver will have finished any
  *     outstanding requests first...
@@ -1177,17 +1178,21 @@ void blk_cleanup_queue(request_queue_t * q)
 {
 	struct request_list *rl = &q->rq;
 
+	if (!atomic_dec_and_test(&q->refcnt))
+		return;
+
 	elevator_exit(q);
 
 	del_timer_sync(&q->unplug_timer);
 	kblockd_flush();
 
-	mempool_destroy(rl->rq_pool);
+	if (rl->rq_pool)
+		mempool_destroy(rl->rq_pool);
 
 	if (blk_queue_tagged(q))
 		blk_queue_free_tags(q);
 
-	memset(q, 0, sizeof(*q));
+	kfree(q);
 }
 
 static int blk_init_free_list(request_queue_t *q)
@@ -1234,6 +1239,18 @@ static int __init elevator_setup(char *str)
 __setup("elevator=", elevator_setup);
 #endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE */
 
+request_queue_t *blk_alloc_queue(int gfp_mask)
+{
+	request_queue_t *q = kmalloc(sizeof(*q), gfp_mask);
+
+	if (!q)
+		return NULL;
+
+	memset(q, 0, sizeof(*q));
+	atomic_set(&q->refcnt, 1);
+	return q;
+}
+
 /**
  * blk_init_queue  - prepare a request queue for use with a block device
  * @q:    The &request_queue_t to be initialised
@@ -1262,23 +1279,25 @@ __setup("elevator=", elevator_setup);
  *    blk_init_queue() must be paired with a blk_cleanup_queue() call
  *    when the block device is deactivated (such as at module unload).
  **/
-int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
+request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 {
-	int ret;
+	request_queue_t *q;
 	static int printed;
 
+	q = blk_alloc_queue(GFP_KERNEL);
+	if (!q)
+		return NULL;
+
 	if (blk_init_free_list(q))
-		return -ENOMEM;
+		goto out_init;
 
 	if (!printed) {
 		printed = 1;
 		printk("Using %s elevator\n", chosen_elevator->elevator_name);
 	}
 
-	if ((ret = elevator_init(q, chosen_elevator))) {
-		blk_cleanup_queue(q);
-		return ret;
-	}
+	if (elevator_init(q, chosen_elevator))
+		goto out_elv;
 
 	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
@@ -1297,7 +1316,23 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
-	return 0;
+	return q;
+out_elv:
+	blk_cleanup_queue(q);
+out_init:
+	kfree(q);
+	return NULL;
+	
+}
+
+int blk_get_queue(request_queue_t *q)
+{
+	if (!test_bit(QUEUE_FLAG_DEAD, &q->queue_flags)) {
+		atomic_inc(&q->refcnt);
+		return 0;
+	}
+
+	return 1;
 }
 
 static inline void blk_free_request(request_queue_t *q, struct request *rq)
@@ -1833,7 +1868,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
 
-	ra = bio_flagged(bio, BIO_RW_AHEAD) || current->flags & PF_READAHEAD;
+	ra = bio->bi_rw & (1 << BIO_RW_AHEAD);
 
 again:
 	insert_here = NULL;
@@ -2091,6 +2126,9 @@ end_io:
 				q->max_sectors);
 			goto end_io;
 		}
+
+		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
+			goto end_io;
 
 		/*
 		 * If this device has partitions, remap block n
@@ -2749,6 +2787,8 @@ EXPORT_SYMBOL(end_that_request_last);
 EXPORT_SYMBOL(end_request);
 EXPORT_SYMBOL(blk_init_queue);
 EXPORT_SYMBOL(blk_cleanup_queue);
+EXPORT_SYMBOL(blk_get_queue);
+EXPORT_SYMBOL(blk_alloc_queue);
 EXPORT_SYMBOL(blk_queue_make_request);
 EXPORT_SYMBOL(blk_queue_bounce_limit);
 EXPORT_SYMBOL(generic_make_request);

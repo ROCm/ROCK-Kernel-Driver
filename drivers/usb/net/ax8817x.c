@@ -185,19 +185,22 @@ const struct usb_device_id ax8817x_id_table[] = {
 
 MODULE_DEVICE_TABLE(usb, ax8817x_id_table);
 
+/* The space before the ", ## arg" is deliberate: gcc-2.9x needs it */
+
 #ifdef DEBUG
 #define devdbg(ax_info, fmt, arg...) \
-	printk(KERN_DEBUG "%s: " fmt "\n" , (ax_info)->net->name, ## arg)
+	printk(KERN_DEBUG "%s: " fmt "\n" , (ax_info)->net->name , ## arg)
 #else
 #define devdbg(ax_info, fmt, arg...) do {} while(0)
 #endif
 
 #define deverr(ax_info, fmt, arg...) \
-	printk(KERN_ERR "%s: " fmt "\n", (ax_info)->net->name, ## arg)
+	printk(KERN_ERR "%s: " fmt "\n", (ax_info)->net->name , ## arg)
 	
 #define devinfo(ax_info, fmt, arg...) \
 	do { if ((ax_info)->msg_level >= 1) \
-		printk(KERN_INFO "%s: " fmt "\n", (ax_info)->net->name, ## arg); \
+		printk(KERN_INFO "%s: " fmt "\n", \
+			(ax_info)->net->name , ## arg); \
 	} while (0)
 
 static void ax_run_ctl_queue(struct ax8817x_info *, struct ax_cmd_req *,

@@ -1085,6 +1085,8 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	    // 100% of disk space anyway.
 	    write_bytes = min_t(int, count, inode->i_sb->s_blocksize - (pos & (inode->i_sb->s_blocksize - 1)));
 	    num_pages = 1;
+	    // No blocks were claimed before, so do it now.
+	    reiserfs_claim_blocks_to_be_allocated(inode->i_sb, 1 << (PAGE_CACHE_SHIFT - inode->i_blkbits));
 	}
 
 	/* Prepare for writing into the region, read in all the

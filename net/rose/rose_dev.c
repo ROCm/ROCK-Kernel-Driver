@@ -165,7 +165,7 @@ static struct net_device_stats *rose_get_stats(struct net_device *dev)
 	return (struct net_device_stats *)dev->priv;
 }
 
-int rose_init(struct net_device *dev)
+void rose_setup(struct net_device *dev)
 {
 	SET_MODULE_OWNER(dev);
 	dev->mtu		= ROSE_MAX_PACKET_SIZE - 2;
@@ -182,13 +182,5 @@ int rose_init(struct net_device *dev)
 
 	/* New-style flags. */
 	dev->flags		= 0;
-
-	if ((dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL)) == NULL)
-		return -ENOMEM;
-
-	memset(dev->priv, 0, sizeof(struct net_device_stats));
-
 	dev->get_stats = rose_get_stats;
-
-	return 0;
-};
+}

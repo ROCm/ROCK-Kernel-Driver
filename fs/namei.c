@@ -1375,8 +1375,15 @@ do_link:
 	goto do_last;
 }
 
-/* SMP-safe */
-static struct dentry *lookup_create(struct nameidata *nd, int is_dir)
+/**
+ * lookup_create - lookup a dentry, creating it if it doesn't exist
+ * @nd: nameidata info
+ * @is_dir: directory flag
+ *
+ * Simple function to lookup and return a dentry and create it
+ * if it doesn't exist.  Is SMP-safe.
+ */
+struct dentry *lookup_create(struct nameidata *nd, int is_dir)
 {
 	struct dentry *dentry;
 

@@ -247,7 +247,7 @@ struct mddev_s
 	unsigned int			safemode_delay;
 	struct timer_list		safemode_timer;
 	atomic_t			writes_pending; 
-	request_queue_t			queue;	/* for plugging ... */
+	request_queue_t			*queue;	/* for plugging ... */
 
 	struct list_head		all_mddevs;
 };

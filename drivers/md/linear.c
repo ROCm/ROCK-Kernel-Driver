@@ -173,7 +173,7 @@ static int linear_run (mddev_t *mddev)
 	if (table-conf->hash_table != nb_zone)
 		BUG();
 
-	blk_queue_merge_bvec(&mddev->queue, linear_mergeable_bvec);
+	blk_queue_merge_bvec(mddev->queue, linear_mergeable_bvec);
 	return 0;
 
 out:

@@ -734,12 +734,21 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 
+	lo->lo_queue = blk_alloc_queue(GFP_KERNEL);
+	if (!lo->lo_queue) {
+		error = -ENOMEM;
+		fput(file);
+		goto out_putf;
+	}
+
+	disks[lo->lo_number]->queue = lo->lo_queue;
+
 	/*
 	 * set queue make_request_fn, and add limits based on lower level
 	 * device
 	 */
-	blk_queue_make_request(&lo->lo_queue, loop_make_request);
-	lo->lo_queue.queuedata = lo;
+	blk_queue_make_request(lo->lo_queue, loop_make_request);
+	lo->lo_queue->queuedata = lo;
 
 	/*
 	 * we remap to a block device, make sure we correctly stack limits
@@ -747,12 +756,12 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (S_ISBLK(inode->i_mode)) {
 		request_queue_t *q = bdev_get_queue(lo_device);
 
-		blk_queue_max_sectors(&lo->lo_queue, q->max_sectors);
-		blk_queue_max_phys_segments(&lo->lo_queue,q->max_phys_segments);
-		blk_queue_max_hw_segments(&lo->lo_queue, q->max_hw_segments);
-		blk_queue_max_segment_size(&lo->lo_queue, q->max_segment_size);
-		blk_queue_segment_boundary(&lo->lo_queue, q->seg_boundary_mask);
-		blk_queue_merge_bvec(&lo->lo_queue, q->merge_bvec_fn);
+		blk_queue_max_sectors(lo->lo_queue, q->max_sectors);
+		blk_queue_max_phys_segments(lo->lo_queue,q->max_phys_segments);
+		blk_queue_max_hw_segments(lo->lo_queue, q->max_hw_segments);
+		blk_queue_max_segment_size(lo->lo_queue, q->max_segment_size);
+		blk_queue_segment_boundary(lo->lo_queue, q->seg_boundary_mask);
+		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
 	}
 
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
@@ -839,7 +848,6 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	lo->lo_sizelimit = 0;
 	lo->lo_encrypt_key_size = 0;
 	lo->lo_flags = 0;
-	lo->lo_queue.queuedata = NULL;
 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
 	memset(lo->lo_crypt_name, 0, LO_NAME_SIZE);
 	memset(lo->lo_file_name, 0, LO_NAME_SIZE);
@@ -848,6 +856,7 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
+	blk_put_queue(lo->lo_queue);
 	/* This is safe: open() is still holding a reference. */
 	module_put(THIS_MODULE);
 	return 0;
@@ -1204,7 +1213,7 @@ int __init loop_init(void)
 		sprintf(disk->disk_name, "loop%d", i);
 		sprintf(disk->devfs_name, "loop/%d", i);
 		disk->private_data = lo;
-		disk->queue = &lo->lo_queue;
+		disk->queue = lo->lo_queue;
 		add_disk(disk);
 	}
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);

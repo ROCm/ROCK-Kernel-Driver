@@ -12,7 +12,6 @@
 #include <linux/dm-ioctl.h>
 #include <linux/init.h>
 #include <linux/wait.h>
-#include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
 

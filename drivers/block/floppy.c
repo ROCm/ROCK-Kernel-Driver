@@ -248,7 +248,7 @@ static int irqdma_allocated;
 #include <linux/completion.h>
 
 static struct request *current_req;
-static struct request_queue floppy_queue;
+static struct request_queue *floppy_queue;
 
 #ifndef fd_get_dma_residue
 #define fd_get_dma_residue() get_dma_residue(FLOPPY_DMA)
@@ -2314,7 +2314,7 @@ static void floppy_end_request(struct request *req, int uptodate)
  * logical buffer */
 static void request_done(int uptodate)
 {
-	struct request_queue *q = &floppy_queue;
+	struct request_queue *q = floppy_queue;
 	struct request *req = current_req;
 	unsigned long flags;
 	int block;
@@ -2916,9 +2916,9 @@ static void redo_fd_request(void)
 		if (!current_req) {
 			struct request *req;
 
-			spin_lock_irq(floppy_queue.queue_lock);
-			req = elv_next_request(&floppy_queue);
-			spin_unlock_irq(floppy_queue.queue_lock);
+			spin_lock_irq(floppy_queue->queue_lock);
+			req = elv_next_request(floppy_queue);
+			spin_unlock_irq(floppy_queue->queue_lock);
 			if (!req) {
 				do_floppy = NULL;
 				unlock_fdc();
@@ -4244,6 +4244,12 @@ int __init floppy_init(void)
 		goto out;
 	}
 
+	floppy_queue = blk_init_queue(do_fd_request, &floppy_lock);
+	if (!floppy_queue) {
+		err = -ENOMEM;
+		goto fail_queue;
+	}
+
 	for (i=0; i<N_DRIVE; i++) {
 		disks[i]->major = FLOPPY_MAJOR;
 		disks[i]->first_minor = TOMINOR(i);
@@ -4260,7 +4266,6 @@ int __init floppy_init(void)
 		else
 			floppy_sizes[i] = MAX_DISK_SIZE << 1;
 
-	blk_init_queue(&floppy_queue, do_fd_request, &floppy_lock);
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
 
@@ -4365,7 +4370,7 @@ int __init floppy_init(void)
 			continue;
 		/* to be cleaned up... */
 		disks[drive]->private_data = (void*)(long)drive;
-		disks[drive]->queue = &floppy_queue;
+		disks[drive]->queue = floppy_queue;
 		add_disk(disks[drive]);
 	}
 
@@ -4376,8 +4381,9 @@ out1:
 	del_timer(&fd_timeout);
 out2:
 	blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
+	blk_cleanup_queue(floppy_queue);
+fail_queue:
 	unregister_blkdev(FLOPPY_MAJOR,"fd");
-	blk_cleanup_queue(&floppy_queue);
 out:
 	for (i=0; i<N_DRIVE; i++)
 		put_disk(disks[i]);
@@ -4588,7 +4594,7 @@ void cleanup_module(void)
 	}
 	devfs_remove("floppy");
 
-	blk_cleanup_queue(&floppy_queue);
+	blk_cleanup_queue(floppy_queue);
 	/* eject disk, if any */
 	fd_eject(0);
 }

@@ -1037,7 +1037,7 @@ static struct block_device_operations stram_fops = {
 };
 
 static struct gendisk *stram_disk;
-static struct request_queue stram_queue;
+static struct request_queue *stram_queue;
 static spinlock_t stram_lock = SPIN_LOCK_UNLOCKED;
 
 int __init stram_device_init(void)
@@ -1058,11 +1058,17 @@ int __init stram_device_init(void)
 		return -ENXIO;
 	}
 
-	blk_init_queue(&stram_queue, do_stram_request, &stram_lock);
+	stram_queue = blk_init_queue(do_stram_request, &stram_lock);
+	if (!stram_queue) {
+		unregister_blkdev(STRAM_MAJOR, "stram");
+		put_disk(stram_disk);
+		return -ENOMEM;
+	}
+
 	stram_disk->major = STRAM_MAJOR;
 	stram_disk->first_minor = STRAM_MINOR;
 	stram_disk->fops = &stram_fops;
-	stram_disk->queue = &stram_queue;
+	stram_disk->queue = stram_queue;
 	sprintf(stram_disk->disk_name, "stram");
 	set_capacity(stram_disk, (swap_end - swap_start)/512);
 	add_disk(stram_disk);
