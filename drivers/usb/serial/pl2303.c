@@ -367,56 +367,52 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 		
 	dbg (__FUNCTION__ " -  port %d", port->number);
 
-	++port->open_count;
+#define FISH(a,b,c,d)								\
+	result=usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev,0),	\
+			       b, a, c, d, buf, 1, 100);			\
+	dbg("0x%x:0x%x:0x%x:0x%x  %d - %x",a,b,c,d,result,buf[0]);
 
-	if (port->open_count == 1) {
-#define FISH(a,b,c,d)									\
-		result=usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev,0),	\
-				       b, a, c, d, buf, 1, 100);			\
-		dbg("0x%x:0x%x:0x%x:0x%x  %d - %x",a,b,c,d,result,buf[0]);
+#define SOUP(a,b,c,d)								\
+	result=usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev,0),	\
+			       b, a, c, d, NULL, 0, 100);			\
+	dbg("0x%x:0x%x:0x%x:0x%x  %d",a,b,c,d,result);
 
-#define SOUP(a,b,c,d)									\
-		result=usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev,0),	\
-				       b, a, c, d, NULL, 0, 100);			\
-		dbg("0x%x:0x%x:0x%x:0x%x  %d",a,b,c,d,result);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 0);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
+	FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0, 1);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 1, 0xc0);
+	SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 4);
 
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
-		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 0);
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
-		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0x0404, 1);
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8484, 0);
-		FISH (VENDOR_READ_REQUEST_TYPE, VENDOR_READ_REQUEST, 0x8383, 0);
-		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 0, 1);
-		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 1, 0xc0);
-		SOUP (VENDOR_WRITE_REQUEST_TYPE, VENDOR_WRITE_REQUEST, 2, 4);
+	/* Setup termios */
+	*(port->tty->termios) = tty_std_termios;
+	port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 
-		/* Setup termios */
-		*(port->tty->termios) = tty_std_termios;
-		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	pl2303_set_termios (port, &tmp_termios);
 
-		pl2303_set_termios (port, &tmp_termios);
+	//FIXME: need to assert RTS and DTR if CRTSCTS off
 
-		//FIXME: need to assert RTS and DTR if CRTSCTS off
+	dbg (__FUNCTION__ " - submitting read urb");
+	port->read_urb->dev = serial->dev;
+	result = usb_submit_urb (port->read_urb, GFP_KERNEL);
+	if (result) {
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+		pl2303_close (port, NULL);
+		return -EPROTO;
+	}
 
-		dbg (__FUNCTION__ " - submitting read urb");
-		port->read_urb->dev = serial->dev;
-		result = usb_submit_urb (port->read_urb, GFP_KERNEL);
-		if (result) {
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-			pl2303_close (port, NULL);
-			return -EPROTO;
-		}
-
-		dbg (__FUNCTION__ " - submitting interrupt urb");
-		port->interrupt_in_urb->dev = serial->dev;
-		result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
-		if (result) {
-			err(__FUNCTION__ " - failed submitting interrupt urb, error %d", result);
-			pl2303_close (port, NULL);
-			return -EPROTO;
-		}
+	dbg (__FUNCTION__ " - submitting interrupt urb");
+	port->interrupt_in_urb->dev = serial->dev;
+	result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
+	if (result) {
+		err(__FUNCTION__ " - failed submitting interrupt urb, error %d", result);
+		pl2303_close (port, NULL);
+		return -EPROTO;
 	}
 	return 0;
 }
@@ -437,39 +433,35 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	
 	dbg (__FUNCTION__ " - port %d", port->number);
 
-	--port->open_count;
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			c_cflag = port->tty->termios->c_cflag;
-			if (c_cflag & HUPCL) {
-				/* drop DTR and RTS */
-				priv = port->private;
-				priv->line_control = 0;
-				set_control_lines (port->serial->dev,
-						   priv->line_control);
-			}
-
-			/* shutdown our urbs */
-			dbg (__FUNCTION__ " - shutting down urbs");
-			result = usb_unlink_urb (port->write_urb);
-			if (result)
-				dbg (__FUNCTION__ " - usb_unlink_urb "
-				     "(write_urb) failed with reason: %d",
-				     result);
-
-			result = usb_unlink_urb (port->read_urb);
-			if (result)
-				dbg (__FUNCTION__ " - usb_unlink_urb "
-				     "(read_urb) failed with reason: %d",
-				     result);
-
-			result = usb_unlink_urb (port->interrupt_in_urb);
-			if (result)
-				dbg (__FUNCTION__ " - usb_unlink_urb "
-				     "(interrupt_in_urb) failed with reason: %d",
-				     result);
+	if (serial->dev) {
+		c_cflag = port->tty->termios->c_cflag;
+		if (c_cflag & HUPCL) {
+			/* drop DTR and RTS */
+			priv = port->private;
+			priv->line_control = 0;
+			set_control_lines (port->serial->dev,
+					   priv->line_control);
 		}
-		port->open_count = 0;
+
+		/* shutdown our urbs */
+		dbg (__FUNCTION__ " - shutting down urbs");
+		result = usb_unlink_urb (port->write_urb);
+		if (result)
+			dbg (__FUNCTION__ " - usb_unlink_urb "
+			     "(write_urb) failed with reason: %d",
+			     result);
+
+		result = usb_unlink_urb (port->read_urb);
+		if (result)
+			dbg (__FUNCTION__ " - usb_unlink_urb "
+			     "(read_urb) failed with reason: %d",
+			     result);
+
+		result = usb_unlink_urb (port->interrupt_in_urb);
+		if (result)
+			dbg (__FUNCTION__ " - usb_unlink_urb "
+			     "(interrupt_in_urb) failed with reason: %d",
+			     result);
 	}
 }
 
@@ -577,12 +569,8 @@ static void pl2303_shutdown (struct usb_serial *serial)
 
 	dbg (__FUNCTION__);
 
-	/* stop everything on all ports */
 	for (i = 0; i < serial->num_ports; ++i)
-		while (serial->port[i].open_count > 0) {
-			pl2303_close (&serial->port[i], NULL);
-			kfree (serial->port[i].private);
-		}
+		kfree (serial->port[i].private);
 }
 
 

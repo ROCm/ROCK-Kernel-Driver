@@ -268,32 +268,31 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	if (!port->read_urb) {
+		/* this is needed for some brain dead Sony devices */
 		err ("Device lied about number of ports, please use a lower one.");
 		return -ENODEV;
 	}
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		bytes_in = 0;
-		bytes_out = 0;
+	bytes_in = 0;
+	bytes_out = 0;
 
-		/* force low_latency on so that our tty_push actually forces the data through, 
-		   otherwise it is scheduled, and with high data rates (like with OHCI) data
-		   can get lost. */
-		port->tty->low_latency = 1;
-		
-		/* Start reading from the device */
-		usb_fill_bulk_urb (port->read_urb, serial->dev,
-				   usb_rcvbulkpipe (serial->dev, 
-						    port->bulk_in_endpointAddress),
-				   port->read_urb->transfer_buffer,
-				   port->read_urb->transfer_buffer_length,
-				   visor_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (result)
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-	}
+	/*
+	 * Force low_latency on so that our tty_push actually forces the data
+	 * through, otherwise it is scheduled, and with high data rates (like
+	 * with OHCI) data can get lost.
+	 */
+	port->tty->low_latency = 1;
+	
+	/* Start reading from the device */
+	usb_fill_bulk_urb (port->read_urb, serial->dev,
+			   usb_rcvbulkpipe (serial->dev, 
+					    port->bulk_in_endpointAddress),
+			   port->read_urb->transfer_buffer,
+			   port->read_urb->transfer_buffer_length,
+			   visor_read_bulk_callback, port);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (result)
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 	
 	return result;
 }
@@ -313,28 +312,23 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	if (!serial)
 		return;
 	
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* only send a shutdown message if the 
-			 * device is still here */
-			transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
-			if (!transfer_buffer) {
-				err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
-			} else {
-				/* send a shutdown message to the device */
-				usb_control_msg (serial->dev,
-						 usb_rcvctrlpipe(serial->dev, 0),
-						 VISOR_CLOSE_NOTIFICATION, 0xc2,
-						 0x0000, 0x0000, 
-						 transfer_buffer, 0x12, 300);
-				kfree (transfer_buffer);
-			}
-			/* shutdown our bulk read */
-			usb_unlink_urb (port->read_urb);
+	if (serial->dev) {
+		/* only send a shutdown message if the 
+		 * device is still here */
+		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
+		if (!transfer_buffer) {
+			err(__FUNCTION__ " - kmalloc(%d) failed.", 0x12);
+		} else {
+			/* send a shutdown message to the device */
+			usb_control_msg (serial->dev,
+					 usb_rcvctrlpipe(serial->dev, 0),
+					 VISOR_CLOSE_NOTIFICATION, 0xc2,
+					 0x0000, 0x0000, 
+					 transfer_buffer, 0x12, 300);
+			kfree (transfer_buffer);
 		}
-		port->open_count = 0;
+		/* shutdown our bulk read */
+		usb_unlink_urb (port->read_urb);
 	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
@@ -396,7 +390,7 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 	usb_free_urb (urb);
 
 	return count;
-} 
+}
 
 
 static int visor_write_room (struct usb_serial_port *port)
@@ -655,15 +649,8 @@ static int clie_3_5_startup (struct usb_serial *serial)
 
 static void visor_shutdown (struct usb_serial *serial)
 {
-	int i;
-
 	dbg (__FUNCTION__);
-
-	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i)
-		serial->port[i].open_count = 0;
 }
-
 
 static int visor_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
 {

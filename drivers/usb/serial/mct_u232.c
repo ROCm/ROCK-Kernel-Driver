@@ -324,9 +324,6 @@ static void mct_u232_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			mct_u232_close (&serial->port[i], NULL);
-		}
 		/* My special items, the standard routines free my urbs */
 		if (serial->port[i].private)
 			kfree(serial->port[i].private);
@@ -341,59 +338,54 @@ static int  mct_u232_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	++port->open_count;
+	/* Compensate for a hardware bug: although the Sitecom U232-P25
+	 * device reports a maximum output packet size of 32 bytes,
+	 * it seems to be able to accept only 16 bytes (and that's what
+	 * SniffUSB says too...)
+	 */
+	if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID)
+		port->bulk_out_size = 16;
 
-	if (port->open_count == 1) {
-		/* Compensate for a hardware bug: although the Sitecom U232-P25
-		 * device reports a maximum output packet size of 32 bytes,
-		 * it seems to be able to accept only 16 bytes (and that's what
-		 * SniffUSB says too...)
-		 */
-		if (serial->dev->descriptor.idProduct == MCT_U232_SITECOM_PID)
-			port->bulk_out_size = 16;
+	/* Do a defined restart: the normal serial device seems to 
+	 * always turn on DTR and RTS here, so do the same. I'm not
+	 * sure if this is really necessary. But it should not harm
+	 * either.
+	 */
+	if (port->tty->termios->c_cflag & CBAUD)
+		priv->control_state = TIOCM_DTR | TIOCM_RTS;
+	else
+		priv->control_state = 0;
+	mct_u232_set_modem_ctrl(serial, priv->control_state);
+	
+	priv->last_lcr = (MCT_U232_DATA_BITS_8 | 
+			  MCT_U232_PARITY_NONE |
+			  MCT_U232_STOP_BITS_1);
+	mct_u232_set_line_ctrl(serial, priv->last_lcr);
 
-		/* Do a defined restart: the normal serial device seems to 
-		 * always turn on DTR and RTS here, so do the same. I'm not
-		 * sure if this is really necessary. But it should not harm
-		 * either.
-		 */
-		if (port->tty->termios->c_cflag & CBAUD)
-			priv->control_state = TIOCM_DTR | TIOCM_RTS;
-		else
-			priv->control_state = 0;
-		mct_u232_set_modem_ctrl(serial, priv->control_state);
-		
-		priv->last_lcr = (MCT_U232_DATA_BITS_8 | 
-				  MCT_U232_PARITY_NONE |
-				  MCT_U232_STOP_BITS_1);
-		mct_u232_set_line_ctrl(serial, priv->last_lcr);
+	/* Read modem status and update control state */
+	mct_u232_get_modem_stat(serial, &priv->last_msr);
+	mct_u232_msr_to_state(&priv->control_state, priv->last_msr);
 
-		/* Read modem status and update control state */
-		mct_u232_get_modem_stat(serial, &priv->last_msr);
-		mct_u232_msr_to_state(&priv->control_state, priv->last_msr);
-
-		{
-			/* Puh, that's dirty */
-			struct usb_serial_port *rport;	
-			rport = &serial->port[1];
-			rport->tty = port->tty;
-			rport->private = port->private;
-			port->read_urb = rport->interrupt_in_urb;
-		}
-
-		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (retval) {
-			err("usb_submit_urb(read bulk) failed");
-			goto exit;
-		}
-
-		port->interrupt_in_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-		if (retval)
-			err(" usb_submit_urb(read int) failed");
-
+	{
+		/* Puh, that's dirty */
+		struct usb_serial_port *rport;	
+		rport = &serial->port[1];
+		rport->tty = port->tty;
+		rport->private = port->private;
+		port->read_urb = rport->interrupt_in_urb;
 	}
+
+	port->read_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (retval) {
+		err("usb_submit_urb(read bulk) failed");
+		goto exit;
+	}
+
+	port->interrupt_in_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+	if (retval)
+		err(" usb_submit_urb(read int) failed");
 
 exit:
 	return 0;
@@ -404,16 +396,11 @@ static void mct_u232_close (struct usb_serial_port *port, struct file *filp)
 {
 	dbg(__FUNCTION__" port %d", port->number);
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (port->serial->dev) {
-			/* shutdown our urbs */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->read_urb);
-			usb_unlink_urb (port->interrupt_in_urb);
-		}
-		port->open_count = 0;
+	if (port->serial->dev) {
+		/* shutdown our urbs */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
+		usb_unlink_urb (port->interrupt_in_urb);
 	}
 } /* mct_u232_close */
 

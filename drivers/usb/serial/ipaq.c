@@ -123,93 +123,89 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		bytes_in = 0;
-		bytes_out = 0;
-		priv = (struct ipaq_private *)kmalloc(sizeof(struct ipaq_private), GFP_KERNEL);
-		if (priv == NULL) {
-			err(__FUNCTION__ " - Out of memory");
-			return -ENOMEM;
+	bytes_in = 0;
+	bytes_out = 0;
+	priv = (struct ipaq_private *)kmalloc(sizeof(struct ipaq_private), GFP_KERNEL);
+	if (priv == NULL) {
+		err(__FUNCTION__ " - Out of memory");
+		return -ENOMEM;
+	}
+	port->private = (void *)priv;
+	priv->active = 0;
+	priv->queue_len = 0;
+	INIT_LIST_HEAD(&priv->queue);
+	INIT_LIST_HEAD(&priv->freelist);
+
+	for (i = 0; i < URBDATA_QUEUE_MAX / PACKET_SIZE; i++) {
+		pkt = kmalloc(sizeof(struct ipaq_packet), GFP_KERNEL);
+		if (pkt == NULL) {
+			goto enomem;
 		}
-		port->private = (void *)priv;
-		priv->active = 0;
-		priv->queue_len = 0;
-		INIT_LIST_HEAD(&priv->queue);
-		INIT_LIST_HEAD(&priv->freelist);
-
-		for (i = 0; i < URBDATA_QUEUE_MAX / PACKET_SIZE; i++) {
-			pkt = kmalloc(sizeof(struct ipaq_packet), GFP_KERNEL);
-			if (pkt == NULL) {
-				goto enomem;
-			}
-			pkt->data = kmalloc(PACKET_SIZE, GFP_KERNEL);
-			if (pkt->data == NULL) {
-				kfree(pkt);
-				goto enomem;
-			}
-			pkt->len = 0;
-			pkt->written = 0;
-			INIT_LIST_HEAD(&pkt->list);
-			list_add(&pkt->list, &priv->freelist);
-			priv->free_len += PACKET_SIZE;
+		pkt->data = kmalloc(PACKET_SIZE, GFP_KERNEL);
+		if (pkt->data == NULL) {
+			kfree(pkt);
+			goto enomem;
 		}
+		pkt->len = 0;
+		pkt->written = 0;
+		INIT_LIST_HEAD(&pkt->list);
+		list_add(&pkt->list, &priv->freelist);
+		priv->free_len += PACKET_SIZE;
+	}
 
-		/*
-		 * Force low latency on. This will immediately push data to the line
-		 * discipline instead of queueing.
-		 */
+	/*
+	 * Force low latency on. This will immediately push data to the line
+	 * discipline instead of queueing.
+	 */
 
-		port->tty->low_latency = 1;
-		port->tty->raw = 1;
-		port->tty->real_raw = 1;
+	port->tty->low_latency = 1;
+	port->tty->raw = 1;
+	port->tty->real_raw = 1;
 
-		/*
-		 * Lose the small buffers usbserial provides. Make larger ones.
-		 */
+	/*
+	 * Lose the small buffers usbserial provides. Make larger ones.
+	 */
 
+	kfree(port->bulk_in_buffer);
+	kfree(port->bulk_out_buffer);
+	port->bulk_in_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
+	if (port->bulk_in_buffer == NULL) {
+		goto enomem;
+	}
+	port->bulk_out_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
+	if (port->bulk_out_buffer == NULL) {
 		kfree(port->bulk_in_buffer);
-		kfree(port->bulk_out_buffer);
-		port->bulk_in_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
-		if (port->bulk_in_buffer == NULL) {
-			goto enomem;
-		}
-		port->bulk_out_buffer = kmalloc(URBDATA_SIZE, GFP_KERNEL);
-		if (port->bulk_out_buffer == NULL) {
-			kfree(port->bulk_in_buffer);
-			goto enomem;
-		}
-		port->read_urb->transfer_buffer = port->bulk_in_buffer;
-		port->write_urb->transfer_buffer = port->bulk_out_buffer;
-		port->read_urb->transfer_buffer_length = URBDATA_SIZE;
-		port->bulk_out_size = port->write_urb->transfer_buffer_length = URBDATA_SIZE;
-		
-		/* Start reading from the device */
-		FILL_BULK_URB(port->read_urb, serial->dev, 
-			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
-			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
-			      ipaq_read_bulk_callback, port);
-		result = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (result) {
-			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
-		}
+		goto enomem;
+	}
+	port->read_urb->transfer_buffer = port->bulk_in_buffer;
+	port->write_urb->transfer_buffer = port->bulk_out_buffer;
+	port->read_urb->transfer_buffer_length = URBDATA_SIZE;
+	port->bulk_out_size = port->write_urb->transfer_buffer_length = URBDATA_SIZE;
+	
+	/* Start reading from the device */
+	FILL_BULK_URB(port->read_urb, serial->dev, 
+		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
+		      ipaq_read_bulk_callback, port);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (result) {
+		err(__FUNCTION__ " - failed submitting read urb, error %d", result);
+	}
 
-		/*
-		 * Send out two control messages observed in win98 sniffs. Not sure what
-		 * they do.
-		 */
+	/*
+	 * Send out two control messages observed in win98 sniffs. Not sure what
+	 * they do.
+	 */
 
-		result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
-				0x1, 0, NULL, 0, 5 * HZ);
-		if (result < 0) {
-			err(__FUNCTION__ " - failed doing control urb, error %d", result);
-		}
-		result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
-				0x1, 0, NULL, 0, 5 * HZ);
-		if (result < 0) {
-			err(__FUNCTION__ " - failed doing control urb, error %d", result);
-		}
+	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
+			0x1, 0, NULL, 0, 5 * HZ);
+	if (result < 0) {
+		err(__FUNCTION__ " - failed doing control urb, error %d", result);
+	}
+	result = usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0), 0x22, 0x21,
+			0x1, 0, NULL, 0, 5 * HZ);
+	if (result < 0) {
+		err(__FUNCTION__ " - failed doing control urb, error %d", result);
 	}
 	
 	return result;
@@ -237,22 +233,16 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 	if (!serial)
 		return;
 
-	--port->open_count;
+	/*
+	 * shut down bulk read and write
+	 */
 
-	if (port->open_count <= 0) {
+	usb_unlink_urb(port->write_urb);
+	usb_unlink_urb(port->read_urb);
+	ipaq_destroy_lists(port);
+	kfree(priv);
+	port->private = NULL;
 
-		/*
-		 * shut down bulk read and write
-		 */
-
-		usb_unlink_urb(port->write_urb);
-		usb_unlink_urb(port->read_urb);
-		ipaq_destroy_lists(port);
-		kfree(priv);
-		port->private = NULL;
-		port->open_count = 0;
-
-	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
 }
@@ -507,16 +497,7 @@ static int ipaq_startup(struct usb_serial *serial)
 
 static void ipaq_shutdown(struct usb_serial *serial)
 {
-	int i;
-
 	dbg (__FUNCTION__);
-
-	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			ipaq_close(&serial->port[i], NULL);
-		}
-	}
 }
 
 static int __init ipaq_init(void)

@@ -191,9 +191,6 @@ static void belkin_sa_shutdown (struct usb_serial *serial)
 
 	/* stop reads and writes on all ports */
 	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			belkin_sa_close (&serial->port[i], NULL);
-		}
 		/* My special items, the standard routines free my urbs */
 		if (serial->port[i].private)
 			kfree(serial->port[i].private);
@@ -207,26 +204,22 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		/*Start reading from the device*/
-		/* TODO: Look at possibility of submitting mulitple URBs to device to
-		 *       enhance buffering.  Win trace shows 16 initial read URBs.
-		 */
-		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
-		if (retval) {
-			err("usb_submit_urb(read bulk) failed");
-			goto exit;
-		}
-
-		port->interrupt_in_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-		if (retval)
-			err(" usb_submit_urb(read int) failed");
+	/*Start reading from the device*/
+	/* TODO: Look at possibility of submitting mulitple URBs to device to
+	 *       enhance buffering.  Win trace shows 16 initial read URBs.
+	 */
+	port->read_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (retval) {
+		err("usb_submit_urb(read bulk) failed");
+		goto exit;
 	}
-	
+
+	port->interrupt_in_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
+	if (retval)
+		err(" usb_submit_urb(read int) failed");
+
 exit:
 	return retval;
 } /* belkin_sa_open */
@@ -245,16 +238,11 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" port %d", port->number);
 
-	--port->open_count;
-
-	if (port->open_count <= 0) {
-		if (serial->dev) {
-			/* shutdown our bulk reads and writes */
-			usb_unlink_urb (port->write_urb);
-			usb_unlink_urb (port->read_urb);
-			usb_unlink_urb (port->interrupt_in_urb);
-		}
-		port->open_count = 0;
+	if (serial->dev) {
+		/* shutdown our bulk reads and writes */
+		usb_unlink_urb (port->write_urb);
+		usb_unlink_urb (port->read_urb);
+		usb_unlink_urb (port->interrupt_in_urb);
 	}
 } /* belkin_sa_close */
 

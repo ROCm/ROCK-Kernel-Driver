@@ -306,58 +306,49 @@ static int whiteheat_open (struct usb_serial_port *port, struct file *filp)
 
 	dbg(__FUNCTION__" - port %d", port->number);
 
-	++port->open_count;
-	
-	if (port->open_count == 1) {
-		/* set up some stuff for our command port */
-		command_port = &port->serial->port[COMMAND_PORT];
-		if (command_port->private == NULL) {
-			info = (struct whiteheat_private *)kmalloc (sizeof(struct whiteheat_private), GFP_KERNEL);
-			if (info == NULL) {
-				err(__FUNCTION__ " - out of memory");
-				retval = -ENOMEM;
-				goto error_exit;
-			}
-			
-			init_waitqueue_head(&info->wait_command);
-			command_port->private = info;
-			command_port->write_urb->complete = command_port_write_callback;
-			command_port->read_urb->complete = command_port_read_callback;
-			command_port->read_urb->dev = port->serial->dev;
-			command_port->tty = port->tty;		/* need this to "fake" our our sanity check macros */
-			retval = usb_submit_urb (command_port->read_urb, GFP_KERNEL);
-			if (retval) {
-				err(__FUNCTION__ " - failed submitting read urb, error %d", retval);
-				goto error_exit;
-			}
+	/* set up some stuff for our command port */
+	command_port = &port->serial->port[COMMAND_PORT];
+	if (command_port->private == NULL) {
+		info = (struct whiteheat_private *)kmalloc (sizeof(struct whiteheat_private), GFP_KERNEL);
+		if (info == NULL) {
+			err(__FUNCTION__ " - out of memory");
+			retval = -ENOMEM;
+			goto exit;
 		}
 		
-		/* Start reading from the device */
-		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
+		init_waitqueue_head(&info->wait_command);
+		command_port->private = info;
+		command_port->write_urb->complete = command_port_write_callback;
+		command_port->read_urb->complete = command_port_read_callback;
+		command_port->read_urb->dev = port->serial->dev;
+		command_port->tty = port->tty;		/* need this to "fake" our our sanity check macros */
+		retval = usb_submit_urb (command_port->read_urb, GFP_KERNEL);
 		if (retval) {
 			err(__FUNCTION__ " - failed submitting read urb, error %d", retval);
-			goto error_exit;
+			goto exit;
 		}
+	}
 	
-		/* send an open port command */
-		/* firmware uses 1 based port numbering */
-		open_command.port = port->number - port->serial->minor + 1;
-		retval = whiteheat_send_cmd (port->serial, WHITEHEAT_OPEN, (__u8 *)&open_command, sizeof(open_command));
-		if (retval)
-			goto error_exit;
-	
-		/* Need to do device specific setup here (control lines, baud rate, etc.) */
-		/* FIXME!!! */
+	/* Start reading from the device */
+	port->read_urb->dev = port->serial->dev;
+	retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
+	if (retval) {
+		err(__FUNCTION__ " - failed submitting read urb, error %d", retval);
+		goto exit;
 	}
 
-	dbg(__FUNCTION__ " - exit");
-	return retval;
+	/* send an open port command */
+	/* firmware uses 1 based port numbering */
+	open_command.port = port->number - port->serial->minor + 1;
+	retval = whiteheat_send_cmd (port->serial, WHITEHEAT_OPEN, (__u8 *)&open_command, sizeof(open_command));
+	if (retval)
+		goto exit;
 
-error_exit:
-	--port->open_count;
+	/* Need to do device specific setup here (control lines, baud rate, etc.) */
+	/* FIXME!!! */
 
-	dbg(__FUNCTION__ " - error_exit");
+exit:
+	dbg(__FUNCTION__ " - exit, retval = %d", retval);
 	return retval;
 }
 
@@ -368,22 +359,17 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	
 	dbg(__FUNCTION__ " - port %d", port->number);
 	
-	--port->open_count;
+	/* send a close command to the port */
+	/* firmware uses 1 based port numbering */
+	close_command.port = port->number - port->serial->minor + 1;
+	whiteheat_send_cmd (port->serial, WHITEHEAT_CLOSE, (__u8 *)&close_command, sizeof(close_command));
 
-	if (port->open_count <= 0) {
-		/* send a close command to the port */
-		/* firmware uses 1 based port numbering */
-		close_command.port = port->number - port->serial->minor + 1;
-		whiteheat_send_cmd (port->serial, WHITEHEAT_CLOSE, (__u8 *)&close_command, sizeof(close_command));
+	/* Need to change the control lines here */
+	/* FIXME */
 	
-		/* Need to change the control lines here */
-		/* FIXME */
-		
-		/* shutdown our bulk reads and writes */
-		usb_unlink_urb (port->write_urb);
-		usb_unlink_urb (port->read_urb);
-		port->open_count = 0;
-	}
+	/* shutdown our bulk reads and writes */
+	usb_unlink_urb (port->write_urb);
+	usb_unlink_urb (port->read_urb);
 }
 
 
@@ -641,17 +627,9 @@ error_out:
 
 static void whiteheat_real_shutdown (struct usb_serial *serial)
 {
-	struct usb_serial_port 		*command_port;
-	int i;
+	struct usb_serial_port *command_port;
 
 	dbg(__FUNCTION__);
-
-	/* stop reads and writes on all ports */
-	for (i=0; i < serial->num_ports; ++i) {
-		while (serial->port[i].open_count > 0) {
-			whiteheat_close (&serial->port[i], NULL);
-		}
-	}
 
 	/* free up our private data for our command port */
 	command_port = &serial->port[COMMAND_PORT];
