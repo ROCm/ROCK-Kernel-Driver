@@ -38,7 +38,7 @@
  *    - zbuffer linear offset and pitch -- also invarient
  *    - drawing origin in back and depth buffers.
  *
- * Keep the depth/back buffer state here to acommodate private buffers
+ * Keep the depth/back buffer state here to accommodate private buffers
  * in the future.
  */
 #define I810_DESTREG_DI0  0	/* CMD_OP_DESTBUFFER_INFO (2 dwords) */

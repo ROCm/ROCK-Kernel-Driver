@@ -183,7 +183,7 @@
 #define S_ATN		0x80	/**/
 #define S_SELECT	0x40	/**/
 #define S_REQUEST	0x20    /* Request line from SCSI bus*/
-#define S_ACK		0x10    /* Acknowlege line from SCSI bus*/
+#define S_ACK		0x10    /* Acknowledge line from SCSI bus*/
 #define S_BUSY		0x08    /* Busy line from SCSI bus*/
 #define S_CD		0x04    /* Command/Data line from SCSI bus*/
 #define S_IO		0x02    /* Input/Output line from SCSI bus*/

@@ -68,7 +68,7 @@ static int sa1100_gpio_type(unsigned int irq, unsigned int type)
 }
 
 /*
- * GPIO IRQs must be acknoledged.  This is for IRQs from 0 to 10.
+ * GPIO IRQs must be acknowledged.  This is for IRQs from 0 to 10.
  */
 static void sa1100_low_gpio_ack(unsigned int irq)
 {

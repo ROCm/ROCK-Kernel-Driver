@@ -152,7 +152,7 @@
  *    (IPL too high, disabled, ...)
  *
  *  - The gdb stub is currently not reentrant, i.e. errors that happen therein
- *    (e.g. accesing invalid memory) may not be caught correctly. This could
+ *    (e.g. accessing invalid memory) may not be caught correctly. This could
  *    be removed in future by introducing a stack of struct registers.
  *
  */

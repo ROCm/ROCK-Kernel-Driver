@@ -1473,7 +1473,7 @@ send_CPI(__u32 cpuset, __u8 cpi)
 		outb((__u8)cpuset, VIC_CPI_Registers[VIC_CPI_LEVEL0]);
 }
 
-/* Acknowlege receipt of CPI in the QIC, clear in QIC hardware and
+/* Acknowledge receipt of CPI in the QIC, clear in QIC hardware and
  * set the cache line to shared by reading it.
  *
  * DON'T make this inline otherwise the cache line read will be

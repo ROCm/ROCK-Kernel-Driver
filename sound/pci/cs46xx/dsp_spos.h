@@ -173,7 +173,7 @@ typedef enum  {
 #define BG_INTERVAL_TIMER_PERIOD                0x0100
 
 
-/* Only SP accesible registers */
+/* Only SP accessible registers */
 #define SP_ASER_COUNTDOWN 0x8040
 #define SP_SPDOUT_FIFO    0x0108
 #define SP_SPDIN_MI_FIFO  0x01E0
