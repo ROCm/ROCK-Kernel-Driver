@@ -273,6 +273,9 @@ struct module_s {
     cnodeid_t		nodes[MODULE_MAX_NODES];
 #ifdef CONFIG_IA64_SGI_SN2
     geoid_t		geoid[MODULE_MAX_NODES];
+    struct {
+		char	moduleid[8];
+    } io[MODULE_MAX_NODES];
 #endif
     int			nodecnt;	/* Number of nodes in array        */
 

@@ -586,10 +586,21 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	// work.need_resched etc. mustn't get changed by this CPU before it returns to
 	// user- or fsys-mode:
 (pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
+#ifdef CONFIG_PREEMPT
+	rsm psr.i				// disable interrupts
+	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+(pKStk) adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+	;;
+(pKStk) ld4  r21=[r20]			// preempt_count ->r21
+	;;
+(pKStk)	cmp4.eq	p6,p0=r21,r0		// p6 <- preempt_count == 0
+	;;
+#else /* CONFIG_PREEMPT */
 (pUStk)	rsm psr.i
 	;;
 (pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
+#endif /* CONFIG_PREEMPT */
 .work_processed:
 (p6)	ld4 r18=[r17]				// load current_thread_info()->flags
 	adds r2=PT(R8)+16,r12
@@ -701,7 +712,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	 * NOTE: alloc, loadrs, and cover can't be predicated.
 	 */
 (pNonSys) br.cond.dpnt dont_preserve_current_frame
-	cover				// add current frame into dirty partition
+	cover				// add current frame into dirty partition and set cr.ifs
 	;;
 	mov r19=ar.bsp			// get new backing store pointer
 	sub r16=r16,r18			// krbs = old bsp - size of dirty partition
@@ -727,7 +738,7 @@ dont_preserve_current_frame:
 #	define Nregs	14
 #endif
 	alloc loc0=ar.pfs,2,Nregs-2,2,0
-	shr.u loc1=r18,9		// RNaTslots <= dirtySize / (64*8) + 1
+	shr.u loc1=r18,9		// RNaTslots <= floor(dirtySize / (64*8))
 	sub r17=r17,r18			// r17 = (physStackedSize + 8) - dirtySize
 	;;
 	mov ar.rsc=r19			// load ar.rsc to be used for "loadrs"
@@ -774,13 +785,13 @@ rse_clear_invalid:
 	;;
 	mov loc3=0
 	mov loc4=0
-	mov loc9=0
 	mov loc5=0
 	mov loc6=0
+	mov loc7=0
 (pRecurse) br.call.sptk.many b6=rse_clear_invalid
 	;;
-	mov loc7=0
 	mov loc8=0
+	mov loc9=0
 	cmp.ne pReturn,p0=r0,in1	// if recursion count != 0, we need to do a br.ret
 	mov loc10=0
 	mov loc11=0
@@ -810,15 +821,27 @@ skip_rbs_switch:
 .work_pending:
 	tbit.z p6,p0=r18,TIF_NEED_RESCHED		// current_thread_info()->need_resched==0?
 (p6)	br.cond.sptk.few .notify
+#ifdef CONFIG_PREEMPT
+(pKStk)	dep r21=-1,r0,PREEMPT_ACTIVE_BIT,1
+	;;
+(pKStk) st4 [r20]=r21
+	ssm  psr.i		// enable interrupts
+#endif
+
 #if __GNUC__ < 3
 	br.call.spnt.many rp=invoke_schedule
 #else
 	br.call.spnt.many rp=schedule
 #endif
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
-	rsm psr.i
+	rsm psr.i		// disable interrupts
 	;;
 	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+#if CONFIG_PREEMPT
+(pKStk)	adds r20=TI_PRE_COUNT+IA64_TASK_SIZE,r13
+	;;
+(pKStk)	st4 [r20]=r0		// preempt_count() <- 0
+#endif
 	br.cond.sptk.many .work_processed		// re-check
 
 .notify:
@@ -904,13 +927,14 @@ ENTRY(notify_resume_user)
 	mov r9=ar.unat
 	mov loc0=rp				// save return address
 	mov out0=0				// there is no "oldset"
-	adds out1=0,sp				// out1=&sigscratch
+	adds out1=8,sp				// out1=&sigscratch->ar_pfs
 (pSys)	mov out2=1				// out2==1 => we're in a syscall
 	;;
 (pNonSys) mov out2=0				// out2==0 => not a syscall
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out1]=loc1,-8			// save ar.pfs, out1=&sigscratch
 	.body
 	br.call.sptk.many rp=do_notify_resume_user
 .ret15:	.restore sp
@@ -931,11 +955,12 @@ GLOBAL_ENTRY(sys_rt_sigsuspend)
 	mov loc0=rp				// save return address
 	mov out0=in0				// mask
 	mov out1=in1				// sigsetsize
-	adds out2=0,sp				// out2=&sigscratch
+	adds out2=8,sp				// out2=&sigscratch->ar_pfs
 	;;
 	.fframe 16
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
+	st8 [out2]=loc1,-8			// save ar.pfs, out2=&sigscratch
 	.body
 	br.call.sptk.many rp=ia64_rt_sigsuspend
 .ret17:	.restore sp
@@ -1242,7 +1267,7 @@ sys_call_table:
 	data8 sys_sched_setaffinity
 	data8 sys_sched_getaffinity
 	data8 sys_set_tid_address
-	data8 ia64_ni_syscall
+	data8 sys_fadvise64
 	data8 ia64_ni_syscall 			// 1235
 	data8 sys_exit_group
 	data8 sys_lookup_dcookie
