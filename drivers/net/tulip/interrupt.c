@@ -197,7 +197,7 @@ static int tulip_rx(struct net_device *dev)
 					       "do not match in tulip_rx: %08x vs. %Lx %p / %p.\n",
 					       dev->name,
 					       le32_to_cpu(tp->rx_ring[entry].buffer1),
-					       (u64)tp->rx_buffers[entry].mapping,
+					       (long long)tp->rx_buffers[entry].mapping,
 					       skb->head, temp);
 				}
 #endif
