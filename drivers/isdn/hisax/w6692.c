@@ -340,15 +340,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 		}
 	}
 	if (val & W_B_EXI_XFR) {	/* XFR */
-		if (bcs->tx_skb) {
-			if (bcs->tx_skb->len) {
-				W6692B_fill_fifo(bcs);
-				return;
-			}
-			xmit_complete_b(bcs);
-			bcs->count = 0;
-		}
-		xmit_ready_b(bcs);
+		xmit_xpr(bcs);
 	}
 	if (val & W_B_EXI_XDUN) {	/* XDUN */
 		if (bcs->mode == 1)
