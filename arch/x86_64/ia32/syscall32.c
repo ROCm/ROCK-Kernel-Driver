@@ -83,9 +83,9 @@ void __init syscall32_cpu_init(void)
 
 	/* Load these always in case some future AMD CPU supports
 	   SYSENTER from compat mode too. */
-	wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
-	wrmsr(MSR_IA32_SYSENTER_ESP, 0, 0);
-	wrmsrl(MSR_IA32_SYSENTER_EIP, ia32_sysenter_target);
+	checking_wrmsrl(MSR_IA32_SYSENTER_CS, (u64)__KERNEL_CS);
+	checking_wrmsrl(MSR_IA32_SYSENTER_ESP, 0ULL);
+	checking_wrmsrl(MSR_IA32_SYSENTER_EIP, (u64)ia32_sysenter_target);
 
 	wrmsrl(MSR_CSTAR, ia32_cstar_target);
 }

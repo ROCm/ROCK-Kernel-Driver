@@ -280,8 +280,8 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 {
 	struct i2o_controller *c = dev->controller;
 	int tid = dev->tid;
-	unsigned long msg;
-	unsigned long mptr;
+	void *msg;
+	void *mptr;
 	u64 offset;
 	struct request *req = ireq->req;
 	int count = req->nr_sectors<<9;
@@ -291,7 +291,7 @@ static int i2ob_send(u32 m, struct i2ob_device *dev, struct i2ob_request *ireq, 
 
 	// printk(KERN_INFO "i2ob_send called\n");
 	/* Map the message to a virtual address */
-	msg = c->mem_offset + m;
+	msg = c->msg_virt + m;
 	
 	sgnum = i2ob_build_sglist(dev, ireq);
 	
@@ -479,7 +479,7 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 		/* Now flush the message by making it a NOP */
 		m[0]&=0x00FFFFFF;
 		m[0]|=(I2O_CMD_UTIL_NOP)<<24;
-		i2o_post_message(c, ((unsigned long)m) - c->mem_offset);
+		i2o_post_message(c, (unsigned long) m - (unsigned long) c->msg_virt);
 
 		return;
 	}
