@@ -95,9 +95,9 @@
 #include <linux/usb.h>
 
 #ifdef DEBUG
-#define UDSL_ASSERT(x)	BUG_ON(x)
+#define UDSL_ASSERT(x)	BUG_ON(!(x))
 #else
-#define UDSL_ASSERT(x)
+#define UDSL_ASSERT(x)	warn("failed assertion '" #x "' at line %d", __LINE__)
 #endif
 
 #ifdef VERBOSE_DEBUG
@@ -406,7 +406,7 @@ static unsigned int udsl_write_cells(struct udsl_instance_data *instance,
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
 		--ctrl->num_cells;
-		UDSL_ASSERT(ctrl->num_cells);
+		UDSL_ASSERT(!ctrl->num_cells);
 	}
 
 	memcpy(target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -445,7 +445,7 @@ static void udsl_complete_receive(struct urb *urb, struct pt_regs *regs)
 
 	vdbg("udsl_complete_receive: urb 0x%p, status %d, actual_length %d, filled_cells %u, rcv 0x%p, buf 0x%p", urb, urb->status, urb->actual_length, buf->filled_cells, rcv, buf);
 
-	UDSL_ASSERT(buf->filled_cells > rcv_buf_size);
+	UDSL_ASSERT(buf->filled_cells <= rcv_buf_size);
 
 	/* may not be in_interrupt() */
 	spin_lock_irqsave(&instance->receive_lock, flags);
