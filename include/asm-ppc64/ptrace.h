@@ -60,20 +60,20 @@ struct pt_regs32 {
 	PPC_REG_32 result; 	/* Result of a system call */
 };
 
-#endif
-
-#define STACK_FRAME_OVERHEAD	112	/* size of minimum stack frame */
-
-/* Size of dummy stack frame allocated when calling signal handler. */
-#define __SIGNAL_FRAMESIZE	128
-#define __SIGNAL_FRAMESIZE32	64
-
 #define instruction_pointer(regs) ((regs)->nip)
 #ifdef CONFIG_SMP
 extern unsigned long profile_pc(struct pt_regs *regs);
 #else
 #define profile_pc(regs) instruction_pointer(regs)
 #endif
+
+#endif /* __ASSEMBLY__ */
+
+#define STACK_FRAME_OVERHEAD	112	/* size of minimum stack frame */
+
+/* Size of dummy stack frame allocated when calling signal handler. */
+#define __SIGNAL_FRAMESIZE	128
+#define __SIGNAL_FRAMESIZE32	64
 
 #define user_mode(regs) ((((regs)->msr) >> MSR_PR_LG) & 0x1)
 
