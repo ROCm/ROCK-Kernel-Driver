@@ -370,6 +370,8 @@ struct uhci_hcd {
 	int rh_numports;
 
 	struct timer_list stall_timer;
+
+	wait_queue_head_t waitqh;		/* endpoint_disable waiters */
 };
 
 struct urb_priv {

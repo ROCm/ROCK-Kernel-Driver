@@ -1786,6 +1786,9 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 	spin_unlock(&uhci->schedule_lock);
 
+	/* Wake up anyone waiting for an URB to complete */
+	wake_up_all(&uhci->waitqh);
+
 	return IRQ_HANDLED;
 }
 
@@ -2086,6 +2089,8 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	INIT_LIST_HEAD(&uhci->complete_list);
 
+	init_waitqueue_head(&uhci->waitqh);
+
 	uhci->fl = dma_alloc_coherent(uhci_dev(uhci), sizeof(*uhci->fl),
 			&dma_handle, 0);
 	if (!uhci->fl) {
@@ -2296,6 +2301,9 @@ static void uhci_stop(struct usb_hcd *hcd)
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
 	spin_unlock_irq(&uhci->schedule_lock);
+
+	/* Wake up anyone waiting for an URB to complete */
+	wake_up_all(&uhci->waitqh);
 	
 	release_uhci(uhci);
 }
@@ -2361,6 +2369,46 @@ static void uhci_hcd_free(struct usb_hcd *hcd)
 	kfree(hcd_to_uhci(hcd));
 }
 
+/* Are there any URBs for a particular device/endpoint on a given list? */
+static int urbs_for_ep_list(struct list_head *head,
+		struct hcd_dev *hdev, int ep)
+{
+	struct urb_priv *urbp;
+
+	list_for_each_entry(urbp, head, urb_list) {
+		struct urb *urb = urbp->urb;
+
+		if (hdev == urb->dev->hcpriv && ep ==
+				(usb_pipeendpoint(urb->pipe) |
+				 usb_pipein(urb->pipe)))
+			return 1;
+	}
+	return 0;
+}
+
+/* Are there any URBs for a particular device/endpoint? */
+static int urbs_for_ep(struct uhci_hcd *uhci, struct hcd_dev *hdev, int ep)
+{
+	int rc;
+
+	spin_lock_irq(&uhci->schedule_lock);
+	rc = (urbs_for_ep_list(&uhci->urb_list, hdev, ep) ||
+			urbs_for_ep_list(&uhci->complete_list, hdev, ep) ||
+			urbs_for_ep_list(&uhci->urb_remove_list, hdev, ep));
+	spin_unlock_irq(&uhci->schedule_lock);
+	return rc;
+}
+
+/* Wait until all the URBs for a particular device/endpoint are gone */
+static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
+		struct hcd_dev *hdev, int endpoint)
+{
+	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+
+	wait_event_interruptible(uhci->waitqh,
+			!urbs_for_ep(uhci, hdev, endpoint));
+}
+
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 {
 	return uhci_get_current_frame_number(hcd_to_uhci(hcd));
@@ -2390,6 +2438,7 @@ static const struct hc_driver uhci_driver = {
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,
 
+	.endpoint_disable =	uhci_hcd_endpoint_disable,
 	.get_frame_number =	uhci_hcd_get_frame_number,
 
 	.hub_status_data =	uhci_hub_status_data,
