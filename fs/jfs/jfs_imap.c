@@ -53,6 +53,9 @@
 #include "jfs_metapage.h"
 #include "jfs_superblock.h"
 #include "jfs_debug.h"
+#ifdef CONFIG_JFS_DMAPI	
+#include "jfs_dmapi.h"
+#endif
 
 /*
  * imap locks
@@ -3086,6 +3089,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	diFreeSpecial(ip);
 }
 
+
 /*
  * NAME:        copy_from_dinode()
  *
@@ -3145,6 +3149,15 @@ static int copy_from_dinode(struct dinode * dip, struct inode *ip)
 	jfs_ip->atlhead = 0;
 	jfs_ip->atltail = 0;
 	jfs_ip->xtlid = 0;
+
+#ifdef CONFIG_JFS_DMAPI	
+	memset(&jfs_ip->dmattrs, 0, sizeof(dm_attrs_t));
+	/* Restore any DMAPI persistent data if DMAPI enabled */
+	if (JFS_SBI(ip->i_sb)->flag & JFS_DMI)
+		return jfs_dm_read_pers_data(jfs_ip);
+	ip->i_version = 0;
+#endif	
+
 	return (0);
 }
 

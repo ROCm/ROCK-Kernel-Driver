@@ -651,6 +651,7 @@ static int icmpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 		break;
 
 	case ICMPV6_MGM_REDUCTION:
+	case ICMPV6_MLD2_REPORT:
 		break;
 
 	case MIPV6_DHAAD_REQUEST:

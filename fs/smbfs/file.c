@@ -121,31 +121,33 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 	char *buffer = kmap(page) + pageoffset;
 	struct smb_sb_info *server = server_from_inode(inode);
 	unsigned int wsize = smb_get_wsize(server);
-	int result, written = 0;
+	int ret = 0;
 
 	offset = ((loff_t)page->index << PAGE_CACHE_SHIFT) + pageoffset;
 	VERBOSE("file ino=%ld, fileid=%d, count=%d@%Ld, wsize=%d\n",
 		inode->i_ino, SMB_I(inode)->fileid, count, offset, wsize);
 
 	do {
+		int write_ret;
+
 		if (count < wsize)
 			wsize = count;
 
-		result = server->ops->write(inode, offset, wsize, buffer);
-		if (result < 0) {
-			PARANOIA("failed write, wsize=%d, result=%d\n",
-				 wsize, result);
+		write_ret = server->ops->write(inode, offset, wsize, buffer);
+		if (write_ret < 0) {
+			PARANOIA("failed write, wsize=%d, write_ret=%d\n",
+				 wsize, write_ret);
+			ret = write_ret;
 			break;
 		}
 		/* N.B. what if result < wsize?? */
 #ifdef SMBFS_PARANOIA
-		if (result < wsize)
-			PARANOIA("short write, wsize=%d, result=%d\n",
-				 wsize, result);
+		if (write_ret < wsize)
+			PARANOIA("short write, wsize=%d, write_ret=%d\n",
+				 wsize, write_ret);
 #endif
 		buffer += wsize;
 		offset += wsize;
-		written += wsize;
 		count -= wsize;
 		/*
 		 * Update the inode now rather than waiting for a refresh.
@@ -157,7 +159,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 	} while (count);
 
 	kunmap(page);
-	return written ? written : result;
+	return ret;
 }
 
 /*

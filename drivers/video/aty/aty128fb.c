@@ -1998,10 +1998,12 @@ err_free_fb:
 static void __devexit aty128_remove(struct pci_dev *pdev)
 {
 	struct fb_info *info = pci_get_drvdata(pdev);
-	struct aty128fb_par *par = info->par;
+	struct aty128fb_par *par;
 
 	if (!info)
 		return;
+
+	par = info->par;
 
 	unregister_framebuffer(info);
 #ifdef CONFIG_MTRR

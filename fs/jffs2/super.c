@@ -129,7 +129,7 @@ static struct super_block *jffs2_get_sb_mtd(struct file_system_type *fs_type,
 		  mtd->index, mtd->name));
 
 	sb->s_op = &jffs2_super_operations;
-	sb->s_flags |= MS_NODIRATIME;
+	sb->s_flags |= MS_NOATIME;
 
 	ret = jffs2_do_fill_super(sb, data, (flags&MS_VERBOSE)?1:0);
 

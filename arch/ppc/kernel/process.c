@@ -83,7 +83,7 @@ kernel_stack_top(struct task_struct *tsk)
 unsigned long
 task_top(struct task_struct *tsk)
 {
-	return ((unsigned long)tsk) + sizeof(struct task_struct);
+	return ((unsigned long)tsk) + sizeof(struct thread_info);
 }
 
 /* check to make sure the kernel stack is healthy */

@@ -107,7 +107,7 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 				"                             %s\n",
 			(c0 & 0x80) ? "no" : "yes",
 			(c1 & 0x80) ? "no" : "yes");
-
+#if 0
 		if (hpt_minimum_revision(dev, 3)) {
 			u8 cbl;
 			cbl = inb(iobase + 0x7b);
@@ -120,7 +120,7 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 				(cbl & 0x01) ? 33 : 66);
 			p += sprintf(p, "\n");
 		}
-
+#endif
 		p += sprintf(p, "--------------- drive0 --------- drive1 "
 				"------- drive0 ---------- drive1 -------\n");
 		p += sprintf(p, "DMA capable:    %s              %s" 

@@ -522,7 +522,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		goto out_free_ph;
 
 	files = current->files;		/* Refcounted so ok */
-	if(unshare_files() < 0)
+	retval = unshare_files();
+	if (retval < 0)
 		goto out_free_ph;
 	if (files == current->files) {
 		put_files_struct(files);

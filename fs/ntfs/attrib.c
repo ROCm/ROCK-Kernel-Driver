@@ -1235,11 +1235,11 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 	u8 *al_end = al + initialized_size;
 	run_list_element *rl;
 	struct buffer_head *bh;
-	struct super_block *sb = vol->sb;
-	unsigned long block_size = sb->s_blocksize;
+	struct super_block *sb;
+	unsigned long block_size;
 	unsigned long block, max_block;
 	int err = 0;
-	unsigned char block_size_bits = sb->s_blocksize_bits;
+	unsigned char block_size_bits;
 
 	ntfs_debug("Entering.");
 	if (!vol || !run_list || !al || size <= 0 || initialized_size < 0 ||
@@ -1249,6 +1249,9 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 		memset(al, 0, size);
 		return 0;
 	}
+	sb = vol->sb;
+	block_size = sb->s_blocksize;
+	block_size_bits = sb->s_blocksize_bits;
 	down_read(&run_list->lock);
 	rl = run_list->rl;
 	/* Read all clusters specified by the run list one run at a time. */

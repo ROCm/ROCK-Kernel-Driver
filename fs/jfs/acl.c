@@ -247,7 +247,7 @@ cleanup:
 	return rc;
 }
 
-static int jfs_acl_chmod(struct inode *inode)
+int jfs_acl_chmod(struct inode *inode)
 {
 	struct posix_acl *acl, *clone;
 	int rc;
@@ -269,22 +269,5 @@ static int jfs_acl_chmod(struct inode *inode)
 		rc = jfs_set_acl(inode, ACL_TYPE_ACCESS, clone);
 
 	posix_acl_release(clone);
-	return rc;
-}
-
-int jfs_setattr(struct dentry *dentry, struct iattr *iattr)
-{
-	struct inode *inode = dentry->d_inode;
-	int rc;
-
-	rc = inode_change_ok(inode, iattr);
-	if (rc)
-		return rc;
-
-	inode_setattr(inode, iattr);
-
-	if (iattr->ia_valid & ATTR_MODE)
-		rc = jfs_acl_chmod(inode);
-
 	return rc;
 }

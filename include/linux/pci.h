@@ -676,6 +676,12 @@ int pci_request_region(struct pci_dev *, int, char *);
 void pci_release_region(struct pci_dev *, int);
 
 /* drivers/pci/bus.c */
+int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
+			   unsigned long size, unsigned long align,
+			   unsigned long min, unsigned int type_mask,
+			   void (*alignf)(void *, struct resource *,
+					  unsigned long, unsigned long),
+			   void *alignf_data);
 void pci_enable_bridges(struct pci_bus *bus);
 
 /* New-style probing supporting hot-pluggable devices */

@@ -125,7 +125,7 @@ struct dio {
 	/* AIO related stuff */
 	struct kiocb *iocb;		/* kiocb */
 	int is_async;			/* is IO async ? */
-	int result;			/* IO result */
+	ssize_t result;                 /* IO result */
 };
 
 /*
@@ -898,7 +898,7 @@ out:
 /*
  * Releases both i_sem and i_alloc_sem
  */
-static int
+static ssize_t
 direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode, 
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs, 
 	unsigned blkbits, get_blocks_t get_blocks, dio_iodone_t end_io,
@@ -906,8 +906,8 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 {
 	unsigned long user_addr; 
 	int seg;
-	int ret = 0;
-	int ret2;
+	ssize_t ret = 0;
+	ssize_t ret2;
 	size_t bytes;
 
 	dio->bio = NULL;
@@ -1096,7 +1096,7 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
  *
  * For writes to S_ISBLK files, i_sem is not held on entry; it is never taken.
  */
-int
+ssize_t
 __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct block_device *bdev, const struct iovec *iov, loff_t offset, 
 	unsigned long nr_segs, get_blocks_t get_blocks, dio_iodone_t end_io,

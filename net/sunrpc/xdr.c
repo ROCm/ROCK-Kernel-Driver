@@ -53,16 +53,50 @@ xdr_decode_netobj(u32 *p, struct xdr_netobj *obj)
 	return p + XDR_QUADLEN(len);
 }
 
-u32 *
-xdr_encode_array(u32 *p, const void *array, unsigned int len)
+/**
+ * xdr_encode_opaque_fixed - Encode fixed length opaque data
+ * @p - pointer to current position in XDR buffer.
+ * @ptr - pointer to data to encode (or NULL)
+ * @nbytes - size of data.
+ *
+ * Copy the array of data of length nbytes at ptr to the XDR buffer
+ * at position p, then align to the next 32-bit boundary by padding
+ * with zero bytes (see RFC1832).
+ * Note: if ptr is NULL, only the padding is performed.
+ *
+ * Returns the updated current XDR buffer position
+ *
+ */
+u32 *xdr_encode_opaque_fixed(u32 *p, const void *ptr, unsigned int nbytes)
 {
-	int quadlen = XDR_QUADLEN(len);
+	if (likely(nbytes != 0)) {
+		unsigned int quadlen = XDR_QUADLEN(nbytes);
+		unsigned int padding = (quadlen << 2) - nbytes;
 
-	p[quadlen] = 0;
-	*p++ = htonl(len);
-	memcpy(p, array, len);
-	return p + quadlen;
+		if (ptr != NULL)
+			memcpy(p, ptr, nbytes);
+		if (padding != 0)
+			memset((char *)p + nbytes, 0, padding);
+		p += quadlen;
+	}
+	return p;
 }
+EXPORT_SYMBOL(xdr_encode_opaque_fixed);
+
+/**
+ * xdr_encode_opaque - Encode variable length opaque data
+ * @p - pointer to current position in XDR buffer.
+ * @ptr - pointer to data to encode (or NULL)
+ * @nbytes - size of data.
+ *
+ * Returns the updated current XDR buffer position
+ */
+u32 *xdr_encode_opaque(u32 *p, const void *ptr, unsigned int nbytes)
+{
+	*p++ = htonl(nbytes);
+	return xdr_encode_opaque_fixed(p, ptr, nbytes);
+}
+EXPORT_SYMBOL(xdr_encode_opaque);
 
 u32 *
 xdr_encode_string(u32 *p, const char *string)

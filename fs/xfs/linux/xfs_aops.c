@@ -1016,7 +1016,7 @@ linvfs_get_blocks_direct(
 					create, 1, BMAPI_WRITE|BMAPI_DIRECT);
 }
 
-STATIC int
+STATIC ssize_t
 linvfs_direct_IO(
 	int			rw,
 	struct kiocb		*iocb,

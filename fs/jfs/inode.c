@@ -27,6 +27,9 @@
 #include "jfs_extent.h"
 #include "jfs_unicode.h"
 #include "jfs_debug.h"
+#ifdef CONFIG_JFS_DMAPI
+#include "jfs_dmapi.h"
+#endif
 
 
 extern struct inode_operations jfs_dir_inode_operations;
@@ -129,6 +132,11 @@ void jfs_delete_inode(struct inode *inode)
 {
 	jfs_info("In jfs_delete_inode, inode = 0x%p", inode);
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(inode, DM_EVENT_DESTROY))
+		JFS_SEND_DESTROY(inode, DM_RIGHT_NULL);
+#endif
+	
 	if (test_cflag(COMMIT_Freewmap, inode))
 		freeZeroLink(inode);
 
@@ -156,8 +164,7 @@ void jfs_dirty_inode(struct inode *inode)
 	set_cflag(COMMIT_Dirty, inode);
 }
 
-static int
-jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
+int jfs_get_blocks(struct inode *ip, sector_t lblock, unsigned long max_blocks,
 			struct buffer_head *bh_result, int create)
 {
 	s64 lblock64 = lblock;
@@ -302,8 +309,8 @@ static sector_t jfs_bmap(struct address_space *mapping, sector_t block)
 	return generic_block_bmap(mapping, block, jfs_get_block);
 }
 
-static int jfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
-			loff_t offset, unsigned long nr_segs)
+static ssize_t jfs_direct_IO(int rw, struct kiocb *iocb,
+	const struct iovec *iov, loff_t offset, unsigned long nr_segs)
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_mapping->host;

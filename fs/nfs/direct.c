@@ -190,16 +190,17 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
  * writes so that this read will see them when we read from the
  * server.
  */
-static int
+static ssize_t
 nfs_direct_read(struct inode *inode, struct file *file,
 		const struct iovec *iov, loff_t file_offset,
 		unsigned long nr_segs)
 {
-	int tot_bytes = 0;
+	ssize_t tot_bytes = 0;
 	unsigned long seg = 0;
 
 	while ((seg < nr_segs) && (tot_bytes >= 0)) {
-		int result, page_count;
+		ssize_t result;
+		int page_count;
 		struct page **pages;
 		const struct iovec *vec = &iov[seg++];
 		unsigned long user_addr = (unsigned long) vec->iov_base;
@@ -335,8 +336,7 @@ retry:
 						VERF_SIZE) != 0)
 			goto sync_retry;
 	}
-	nfs_end_data_update(inode);
-	NFS_FLAGS(inode) |= NFS_INO_INVALID_DATA;
+	nfs_end_data_update_defer(inode);
 
 	return tot_bytes;
 
@@ -358,16 +358,17 @@ sync_retry:
  * that non-direct readers might access, so they will pick up these
  * writes immediately.
  */
-static int
+static ssize_t
 nfs_direct_write(struct inode *inode, struct file *file,
 		const struct iovec *iov, loff_t file_offset,
 		unsigned long nr_segs)
 {
-	int tot_bytes = 0;
+	ssize_t tot_bytes = 0;
 	unsigned long seg = 0;
 
 	while ((seg < nr_segs) && (tot_bytes >= 0)) {
-		int result, page_count;
+		ssize_t result;
+		int page_count;
 		struct page **pages;
 		const struct iovec *vec = &iov[seg++];
 		unsigned long user_addr = (unsigned long) vec->iov_base;
@@ -395,10 +396,6 @@ nfs_direct_write(struct inode *inode, struct file *file,
 		if (result < size)
 			break;
 	}
-	/* Zap the page cache if we managed to write */
-	if (tot_bytes > 0)
-		invalidate_remote_inode(inode);
-
 	return tot_bytes;
 }
 
@@ -417,11 +414,11 @@ nfs_direct_write(struct inode *inode, struct file *file,
  * The inode's i_sem is no longer held by the VFS layer before it calls
  * this function to do a write.
  */
-int
+ssize_t
 nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 		loff_t file_offset, unsigned long nr_segs)
 {
-	int result = -EINVAL;
+	ssize_t result = -EINVAL;
 	struct file *file = iocb->ki_filp;
 	struct dentry *dentry = file->f_dentry;
 	struct inode *inode = dentry->d_inode;

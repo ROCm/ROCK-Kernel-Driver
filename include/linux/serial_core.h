@@ -97,6 +97,7 @@
 struct uart_port;
 struct uart_info;
 struct serial_struct;
+struct device;
 
 /*
  * This structure describes all the operations that can be
@@ -218,6 +219,7 @@ struct uart_port {
 	unsigned int		custom_divisor;
 	unsigned int		line;			/* port index */
 	unsigned long		mapbase;		/* for ioremap */
+	struct device		*dev;			/* parent device */
 	unsigned char		hub6;			/* this should be in the 8250 driver */
 	unsigned char		unused[3];
 };

@@ -340,6 +340,20 @@ config JFS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N
 
+config JFS_DMAPI
+	bool "JFS DMAPI (XDSM) Support"
+	depends on JFS_FS
+	help
+	  The Data Storage Management (XDSM) API is a CAE Specification.  It
+	  defines APIs which use events to notify Data Management (DM)
+	  applications about operations on files, enable DM applications to
+	  store arbitrary attribute information with a file, support managed
+	  regions within a file, and use DMAPI access rights to control 
+	  access to a file object.  DMAPI refers to the interface defined by
+	  the XDSM Specification.
+
+	  If you don't know what DMAPI is, say N.
+
 config JFS_DEBUG
 	bool "JFS debugging"
 	depends on JFS_FS

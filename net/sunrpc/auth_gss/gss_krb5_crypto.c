@@ -40,6 +40,7 @@
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
 #include <linux/highmem.h>
+#include <linux/pagemap.h>
 #include <linux/sunrpc/gss_krb5.h>
 
 #ifdef RPC_DEBUG
@@ -171,22 +172,24 @@ krb5_make_checksum(s32 cksumtype, char *header, struct xdr_buf *body,
 	}
 
 	len = body->page_len;
-	offset = body->page_base;
-	i = 0;
-	while (len) {
-		sg->page = body->pages[i];
-		sg->offset = offset;
-		offset = 0;
-		if (PAGE_SIZE > len)
-			thislen = len;
-		else
-			thislen = PAGE_SIZE;
-		sg->length = thislen;
-		kmap(sg->page); /* XXX kmap_atomic? */
-		crypto_digest_update(tfm, sg, 1);
-		kunmap(sg->page);
-		len -= thislen;
-		i++;
+	if (len != 0) {
+		offset = body->page_base & (PAGE_CACHE_SIZE - 1);
+		i = body->page_base >> PAGE_CACHE_SHIFT;
+		thislen = PAGE_CACHE_SIZE - offset;
+		do {
+			if (thislen > len)
+				thislen = len;
+			sg->page = body->pages[i];
+			sg->offset = offset;
+			sg->length = thislen;
+			kmap(sg->page); /* XXX kmap_atomic? */
+			crypto_digest_update(tfm, sg, 1);
+			kunmap(sg->page);
+			len -= thislen;
+			i++;
+			offset = 0;
+			thislen = PAGE_CACHE_SIZE;
+		} while(len != 0);
 	}
 	if (body->tail[0].iov_len) {
 		buf_to_sg(sg, body->tail[0].iov_base, body->tail[0].iov_len);

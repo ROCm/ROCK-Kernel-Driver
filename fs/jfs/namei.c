@@ -28,6 +28,10 @@
 #include "jfs_xattr.h"
 #include "jfs_acl.h"
 #include "jfs_debug.h"
+#ifdef CONFIG_JFS_DMAPI
+#include "jfs_dmapi.h"
+int jfs_setattr(struct dentry *, struct iattr *);
+#endif
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
@@ -73,6 +77,16 @@ static int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 	struct tblock *tblk;
 
 	jfs_info("jfs_create: dip:0x%p name:%s", dip, dentry->d_name.name);
+
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_CREATE)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_CREATE, dip, DM_RIGHT_NULL, NULL,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     NULL, mode, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
 
 	/*
 	 * search parent directory for entry/freespace
@@ -162,6 +176,14 @@ static int jfs_create(struct inode *dip, struct dentry *dentry, int mode,
 
       out1:
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_POSTCREATE))
+		JFS_SEND_NAMESP(DM_EVENT_POSTCREATE, dip, DM_RIGHT_NULL, ip,
+				DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				NULL, ip->i_mode, rc, 0);
+	out_dm:
+#endif	
+
 	jfs_info("jfs_create: rc:%d", rc);
 	return rc;
 }
@@ -194,6 +216,16 @@ static int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	struct tblock *tblk;
 
 	jfs_info("jfs_mkdir: dip:0x%p name:%s", dip, dentry->d_name.name);
+
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_CREATE)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_CREATE, dip, DM_RIGHT_NULL, NULL,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     NULL, mode, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
 
 	/* link count overflow on parent directory ? */
 	if (dip->i_nlink == JFS_LINK_MAX) {
@@ -293,6 +325,14 @@ static int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
       out1:
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_POSTCREATE))
+		JFS_SEND_NAMESP(DM_EVENT_POSTCREATE, dip, DM_RIGHT_NULL,
+				ip, DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				NULL, ip->i_mode, rc, 0);
+	out_dm:
+#endif	
+
 	jfs_info("jfs_mkdir: rc:%d", rc);
 	return rc;
 }
@@ -328,6 +368,16 @@ static int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	jfs_info("jfs_rmdir: dip:0x%p name:%s", dip, dentry->d_name.name);
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_REMOVE)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_REMOVE, dip, DM_RIGHT_NULL, NULL,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     NULL, 0, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
+	
 	/* directory must be empty to be removed */
 	if (!dtEmpty(ip)) {
 		rc = -ENOTEMPTY;
@@ -415,6 +465,14 @@ static int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 	free_UCSname(&dname);
 
       out:
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_POSTREMOVE))
+		JFS_SEND_NAMESP(DM_EVENT_POSTREMOVE, dip, DM_RIGHT_NULL, NULL,
+				DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				NULL, ip->i_mode, rc, 0);
+	out_dm:
+#endif	
+
 	jfs_info("jfs_rmdir: rc:%d", rc);
 	return rc;
 }
@@ -452,6 +510,17 @@ static int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	int commit_flag;
 
 	jfs_info("jfs_unlink: dip:0x%p name:%s", dip, dentry->d_name.name);
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_REMOVE)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_REMOVE, dip, DM_RIGHT_NULL, NULL,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     NULL, 0, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
+	
+	/* directory must be empty to be removed */
 
 	if ((rc = get_UCSname(&dname, dentry)))
 		goto out;
@@ -564,6 +633,15 @@ static int jfs_unlink(struct inode *dip, struct dentry *dentry)
       out1:
 	free_UCSname(&dname);
       out:
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_POSTREMOVE))
+		JFS_SEND_NAMESP(DM_EVENT_POSTREMOVE, dip, DM_RIGHT_NULL, NULL,
+				DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				NULL, ip->i_mode, rc, 0);
+
+	out_dm:
+#endif	
+
 	jfs_info("jfs_unlink: rc:%d", rc);
 	return rc;
 }
@@ -774,6 +852,16 @@ static int jfs_link(struct dentry *old_dentry,
 	jfs_info("jfs_link: %s %s", old_dentry->d_name.name,
 		 dentry->d_name.name);
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dir, DM_EVENT_LINK)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_LINK, dir, DM_RIGHT_NULL, ip,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     NULL, 0, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
+
 	if (ip->i_nlink == JFS_LINK_MAX)
 		return -EMLINK;
 
@@ -818,6 +906,13 @@ static int jfs_link(struct dentry *old_dentry,
 	up(&JFS_IP(dir)->commit_sem);
 	up(&JFS_IP(ip)->commit_sem);
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dir, DM_EVENT_POSTLINK))
+		JFS_SEND_NAMESP(DM_EVENT_POSTLINK, dir, DM_RIGHT_NULL,
+				ip, DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				NULL, 0, rc, 0);
+	out_dm:
+#endif	
 	jfs_info("jfs_link: rc:%d", rc);
 	return rc;
 }
@@ -861,6 +956,16 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 	struct inode *iplist[2];
 
 	jfs_info("jfs_symlink: dip:0x%p name:%s", dip, name);
+
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_SYMLINK)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_SYMLINK, dip, DM_RIGHT_NULL, NULL,
+				     DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				     (char *)name, 0, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
 
 	ssize = strlen(name) + 1;
 
@@ -1036,6 +1141,13 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 #endif
 
       out1:
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(dip, DM_EVENT_POSTSYMLINK))
+		JFS_SEND_NAMESP(DM_EVENT_POSTSYMLINK, dip, DM_RIGHT_NULL, ip,
+				DM_RIGHT_NULL, (char *)dentry->d_name.name,
+				(char *)name, 0, rc, 0);
+	out_dm:
+#endif	
 	jfs_info("jfs_symlink: rc:%d", rc);
 	return rc;
 }
@@ -1066,12 +1178,23 @@ static int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	s64 new_size = 0;
 	int commit_flag;
 
-
 	jfs_info("jfs_rename: %s %s", old_dentry->d_name.name,
 		 new_dentry->d_name.name);
 
 	old_ip = old_dentry->d_inode;
 	new_ip = new_dentry->d_inode;
+	
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(old_dir, DM_EVENT_RENAME) ||
+	    DM_EVENT_ENABLED(new_dir, DM_EVENT_RENAME)) {
+		rc = JFS_SEND_NAMESP(DM_EVENT_RENAME, old_dir, DM_RIGHT_NULL,
+				     new_dir, DM_RIGHT_NULL,
+				     (char *)old_dentry->d_name.name,
+				     (char *)new_dentry->d_name.name, 0, 0, 0);
+		if (rc)
+			goto out_dm;
+	}
+#endif	
 
 	if ((rc = get_UCSname(&old_dname, old_dentry)))
 		goto out1;
@@ -1304,6 +1427,16 @@ static int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		clear_cflag(COMMIT_Stale, old_dir);
 	}
 
+#ifdef CONFIG_JFS_DMAPI
+	if (DM_EVENT_ENABLED(old_dir, DM_EVENT_POSTRENAME) ||
+	    DM_EVENT_ENABLED(new_dir, DM_EVENT_POSTRENAME))
+		JFS_SEND_NAMESP(DM_EVENT_POSTRENAME, old_dir, DM_RIGHT_NULL,
+				new_dir, DM_RIGHT_NULL,
+				(char *)old_dentry->d_name.name,
+				(char *)new_dentry->d_name.name, 0, rc, 0);
+	out_dm:
+#endif	
+
 	jfs_info("jfs_rename: returning %d", rc);
 	return rc;
 }
@@ -1465,6 +1598,18 @@ struct dentry *jfs_get_parent(struct dentry *dentry)
 	return parent;
 }
 
+#ifdef CONFIG_JFS_DMAPI
+static int jfs_releasedir(struct inode *inode, struct file *file)
+{
+
+	if ((atomic_read(&file->f_dentry->d_count) == 1) && 
+	    (DM_EVENT_ENABLED(inode, DM_EVENT_CLOSE)))
+		JFS_SEND_NAMESP(DM_EVENT_CLOSE, inode, DM_RIGHT_NULL, NULL,
+				DM_RIGHT_NULL, NULL, NULL, 0, 0, 0);
+	return 0;
+}
+#endif	
+
 struct inode_operations jfs_dir_inode_operations = {
 	.create		= jfs_create,
 	.lookup		= jfs_lookup,
@@ -1482,6 +1627,8 @@ struct inode_operations jfs_dir_inode_operations = {
 #ifdef CONFIG_JFS_POSIX_ACL
 	.setattr	= jfs_setattr,
 	.permission	= jfs_permission,
+#elif defined(CONFIG_JFS_DMAPI)
+	.setattr	= jfs_setattr,
 #endif
 };
 
@@ -1489,4 +1636,7 @@ struct file_operations jfs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= jfs_readdir,
 	.fsync		= jfs_fsync,
+#ifdef CONFIG_JFS_DMAPI
+	.release	= jfs_releasedir,
+#endif	
 };

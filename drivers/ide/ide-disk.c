@@ -1068,7 +1068,8 @@ static inline int idedisk_supports_hpa(const struct hd_driveid *id)
  */
 static inline int idedisk_supports_lba48(const struct hd_driveid *id)
 {
-	return (id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400);
+	return (id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)
+	       && id->lba_capacity_2;
 }
 
 static inline void idedisk_check_hpa(ide_drive_t *drive)

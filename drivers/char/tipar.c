@@ -121,7 +121,7 @@ init_ti_parallel(int minor)
 
 /* ----- global defines ----------------------------------------------- */
 
-#define START(x) { x=jiffies+HZ/(timeout/10); }
+#define START(x) { x = jiffies + (HZ * timeout) / 10; }
 #define WAIT(x)  { \
   if (time_before((x), jiffies)) return -1; \
   if (need_resched()) schedule(); }

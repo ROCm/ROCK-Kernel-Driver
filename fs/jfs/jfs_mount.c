@@ -291,6 +291,13 @@ int jfs_mount_rw(struct super_block *sb, int remount)
 	return rc;
 }
 
+#ifdef CONFIG_JFS_DMAPI	
+u64 uuid_hash(u64 *uuid)
+{
+	return uuid[0] + uuid[1];
+}	
+#endif
+
 /*
  *	chkSuper()
  *
@@ -397,6 +404,11 @@ static int chkSuper(struct super_block *sb)
 	}
 	sbi->fsckpxd = j_sb->s_fsckpxd;
 	sbi->ait2 = j_sb->s_ait2;
+
+#ifdef CONFIG_JFS_DMAPI	
+	/* Initialize DMAPI field */
+	sbi->dm_fsid = uuid_hash((u64 *)j_sb->s_uuid);
+#endif	
 
       out:
 	brelse(bh);

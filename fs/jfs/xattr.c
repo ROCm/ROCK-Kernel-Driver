@@ -28,6 +28,9 @@
 #include "jfs_metapage.h"
 #include "jfs_xattr.h"
 #include "jfs_acl.h"
+#ifdef CONFIG_JFS_DMAPI
+#include "jfs_dmapi.h"
+#endif
 
 /*
  *	jfs_xattr.c: extended attribute service
@@ -143,7 +146,7 @@ static inline int copy_name(char *buffer, struct jfs_ea *ea)
 }
 
 /* Forward references */
-static void ea_release(struct inode *inode, struct ea_buffer *ea_buf);
+void jfs_ea_release(struct inode *inode, struct ea_buffer *ea_buf);
 
 /*
  * NAME: ea_write_inline
@@ -423,14 +426,14 @@ static int ea_read(struct inode *ip, struct jfs_ea_list *ealist)
 }
 
 /*
- * NAME: ea_get
+ * NAME: jfs_ea_get
  *                                                                    
  * FUNCTION: Returns buffer containing existing extended attributes.
  *	     The size of the buffer will be the larger of the existing
  *	     attributes size, or min_size.
  *
  *	     The buffer, which may be inlined in the inode or in the
- * 	     page cache must be release by calling ea_release or ea_put
+ * 	     page cache must be release by calling jfs_ea_release or ea_put
  *                                                                    
  * PARAMETERS:
  *	inode	- Inode pointer
@@ -439,7 +442,7 @@ static int ea_read(struct inode *ip, struct jfs_ea_list *ealist)
  *
  * RETURNS: 0 for success; Other indicates failure
  */
-static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
+int jfs_ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 	struct super_block *sb = inode->i_sb;
@@ -482,7 +485,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		current_blocks = 0;
 	} else {
 		if (!(ji->ea.flag & DXD_EXTENT)) {
-			jfs_error(sb, "ea_get: invalid ea.flag)");
+			jfs_error(sb, "jfs_ea_get: invalid ea.flag)");
 			return -EIO;
 		}
 		current_blocks = (ea_size + sb->s_blocksize - 1) >>
@@ -559,16 +562,16 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 
       size_check:
 	if (EALIST_SIZE(ea_buf->xattr) != ea_size) {
-		printk(KERN_ERR "ea_get: invalid extended attribute\n");
+		printk(KERN_ERR "jfs_ea_get: invalid extended attribute\n");
 		dump_mem("xattr", ea_buf->xattr, ea_size);
-		ea_release(inode, ea_buf);
+		jfs_ea_release(inode, ea_buf);
 		return -EIO;
 	}
 
 	return ea_size;
 }
 
-static void ea_release(struct inode *inode, struct ea_buffer *ea_buf)
+void jfs_ea_release(struct inode *inode, struct ea_buffer *ea_buf)
 {
 	if (ea_buf->flag & EA_MALLOC)
 		kfree(ea_buf->xattr);
@@ -590,7 +593,7 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 	tid_t tid;
 
 	if (new_size == 0) {
-		ea_release(inode, ea_buf);
+		jfs_ea_release(inode, ea_buf);
 		ea_buf = 0;
 	} else if (ea_buf->flag & EA_INLINE) {
 		assert(new_size <= sizeof (ji->i_inline_ea));
@@ -657,10 +660,13 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 static int can_set_system_xattr(struct inode *inode, const char *name,
 				const void *value, size_t value_len)
 {
+
 #ifdef CONFIG_JFS_POSIX_ACL
 	struct posix_acl *acl;
-	int rc;
+#endif	
+	int rc = -EOPNOTSUPP;
 
+#ifdef CONFIG_JFS_POSIX_ACL
 	if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
 		return -EPERM;
 
@@ -706,12 +712,15 @@ static int can_set_system_xattr(struct inode *inode, const char *name,
 			posix_acl_release(acl);
 		JFS_IP(inode)->i_default_acl = JFS_ACL_NOT_CACHED;
 	} else
+#endif		
+#ifdef CONFIG_JFS_DMAPI
+		/* Look for DMAPI xattr */
+		rc = (strcmp(name, DMATTR_PERS_REGIONS) == 0) ? 0 : -EINVAL;
+#else
 		/* Invalid xattr name */
-		return -EINVAL;
-	return 0;
-#else			/* CONFIG_JFS_POSIX_ACL */
-	return -EOPNOTSUPP;
-#endif			/* CONFIG_JFS_POSIX_ACL */
+		rc = -EINVAL;
+#endif		
+	return rc;
 }
 
 static int can_set_xattr(struct inode *inode, const char *name,
@@ -774,7 +783,7 @@ int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 
 	down_write(&JFS_IP(inode)->xattr_sem);
 
-	xattr_size = ea_get(inode, &ea_buf, 0);
+	xattr_size = jfs_ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
 		rc = xattr_size;
 		goto out;
@@ -820,8 +829,8 @@ int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 		 * We need to allocate more space for merged ea list.
 		 * We should only have loop to again: once.
 		 */
-		ea_release(inode, &ea_buf);
-		xattr_size = ea_get(inode, &ea_buf, new_size);
+		jfs_ea_release(inode, &ea_buf);
+		xattr_size = jfs_ea_get(inode, &ea_buf, new_size);
 		if (xattr_size < 0) {
 			rc = xattr_size;
 			goto out;
@@ -877,7 +886,7 @@ int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 
 	goto out;
       release:
-	ea_release(inode, &ea_buf);
+	jfs_ea_release(inode, &ea_buf);
       out:
 	up_write(&JFS_IP(inode)->xattr_sem);
 
@@ -890,12 +899,19 @@ int __jfs_setxattr(struct inode *inode, const char *name, const void *value,
 int jfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 		 size_t value_len, int flags)
 {
+	int rc;
+	
 	if (value == NULL) {	/* empty EA, do not remove */
 		value = "";
 		value_len = 0;
 	}
 
-	return __jfs_setxattr(dentry->d_inode, name, value, value_len, flags);
+	rc = __jfs_setxattr(dentry->d_inode, name, value, value_len, flags);
+#ifdef CONFIG_JFS_DMAPI
+	if (!rc)
+		dentry->d_inode->i_version++;
+#endif
+	return rc;
 }
 
 static int can_get_xattr(struct inode *inode, const char *name)
@@ -937,7 +953,7 @@ ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
 
 	down_read(&JFS_IP(inode)->xattr_sem);
 
-	xattr_size = ea_get(inode, &ea_buf, 0);
+	xattr_size = jfs_ea_get(inode, &ea_buf, 0);
 
 	if (xattr_size < 0) {
 		size = xattr_size;
@@ -968,7 +984,7 @@ ssize_t __jfs_getxattr(struct inode *inode, const char *name, void *data,
       not_found:
 	size = -ENODATA;
       release:
-	ea_release(inode, &ea_buf);
+	jfs_ea_release(inode, &ea_buf);
       out:
 	up_read(&JFS_IP(inode)->xattr_sem);
 
@@ -1000,7 +1016,7 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 
 	down_read(&JFS_IP(inode)->xattr_sem);
 
-	xattr_size = ea_get(inode, &ea_buf, 0);
+	xattr_size = jfs_ea_get(inode, &ea_buf, 0);
 	if (xattr_size < 0) {
 		size = xattr_size;
 		goto out;
@@ -1031,7 +1047,7 @@ ssize_t jfs_listxattr(struct dentry * dentry, char *data, size_t buf_size)
 	}
 
       release:
-	ea_release(inode, &ea_buf);
+	jfs_ea_release(inode, &ea_buf);
       out:
 	up_read(&JFS_IP(inode)->xattr_sem);
 	return size;

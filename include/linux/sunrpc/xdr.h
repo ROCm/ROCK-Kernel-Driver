@@ -87,7 +87,8 @@ struct xdr_buf {
 /*
  * Miscellaneous XDR helper functions
  */
-u32 *	xdr_encode_array(u32 *p, const void *s, unsigned int len);
+u32 *	xdr_encode_opaque_fixed(u32 *p, const void *ptr, unsigned int len);
+u32 *	xdr_encode_opaque(u32 *p, const void *ptr, unsigned int len);
 u32 *	xdr_encode_string(u32 *p, const char *s);
 u32 *	xdr_decode_string(u32 *p, char **sp, int *lenp, int maxlen);
 u32 *	xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen);
@@ -99,6 +100,11 @@ void	xdr_encode_pages(struct xdr_buf *, struct page **, unsigned int,
 			 unsigned int);
 void	xdr_inline_pages(struct xdr_buf *, unsigned int,
 			 struct page **, unsigned int, unsigned int);
+
+static inline u32 *xdr_encode_array(u32 *p, const void *s, unsigned int len)
+{
+	return xdr_encode_opaque(p, s, len);
+}
 
 /*
  * Decode 64bit quantities (NFSv3 support)

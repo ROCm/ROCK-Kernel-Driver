@@ -656,7 +656,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		if (!lo_file->f_op->sendfile)
+		if (!file->f_op->sendfile)
 			goto out_putf;
 
 		if (!aops->prepare_write || !aops->commit_write)

@@ -123,15 +123,17 @@ static int xtSplitPage(tid_t tid, struct inode *ip, struct xtsplit * split,
 static int xtSplitRoot(tid_t tid, struct inode *ip,
 		       struct xtsplit * split, struct metapage ** rmpp);
 
-#ifdef _STILL_TO_PORT
+#ifdef CONFIG_JFS_DMAPI
 static int xtDeleteUp(tid_t tid, struct inode *ip, struct metapage * fmp,
 		      xtpage_t * fp, struct btstack * btstack);
 
+static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * fp);
+#endif
+
+#ifdef _STILL_TO_PORT
 static int xtSearchNode(struct inode *ip,
 			xad_t * xad,
 			int *cmpp, struct btstack * btstack, int flag);
-
-static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * fp);
 #endif				/*  _STILL_TO_PORT */
 
 /* External references */
@@ -2557,8 +2559,8 @@ int xtAppend(tid_t tid,		/* transaction id */
 
 	return rc;
 }
-#ifdef _STILL_TO_PORT
 
+#ifdef CONFIG_JFS_DMAPI
 /* - TBD for defragmentaion/reorganization -
  *
  *      xtDelete()
@@ -2619,10 +2621,10 @@ int xtDelete(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
 	 *
 	 * action:xad deletion;
 	 */
-	tlck = txLock(tid, ip, mp, tlckXTREE);
+	tlck = txLock(tid, ip, mp, tlckXTREE | tlckFREE);
 	xtlck = (struct xtlock *) & tlck->lock;
 	xtlck->lwm.offset =
-	    (xtlck->lwm.offset) ? min(index, xtlck->lwm.offset) : index;
+	    (xtlck->lwm.offset) ? min((u8)index, xtlck->lwm.offset) : index;
 
 	/* if delete from middle, shift left/compact the remaining entries */
 	if (index < nextindex - 1)
@@ -2753,10 +2755,10 @@ xtDeleteUp(tid_t tid, struct inode *ip,
 			 *
 			 * action:xad deletion;
 			 */
-			tlck = txLock(tid, ip, mp, tlckXTREE);
+			tlck = txLock(tid, ip, mp, tlckXTREE | tlckFREE);
 			xtlck = (struct xtlock *) & tlck->lock;
 			xtlck->lwm.offset =
-			    (xtlck->lwm.offset) ? min(index,
+			    (xtlck->lwm.offset) ? min((u8)index,
 						      xtlck->lwm.
 						      offset) : index;
 
@@ -2784,8 +2786,9 @@ xtDeleteUp(tid_t tid, struct inode *ip,
 
 	return 0;
 }
+#endif				/* CONFIG_JFS_DMAPI */
 
-
+#ifdef _STILL_TO_PORT
 /*
  * NAME:        xtRelocate()
  *
@@ -2845,7 +2848,6 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		rc = xtSearch(ip, xoff, &cmp, &btstack, 0);
 		if (rc)
 			return rc;
-
 		/* retrieve search result */
 		XT_GETSEARCH(ip, btstack.top, bn, pmp, pp, index);
 
@@ -2866,7 +2868,6 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		rc = xtSearchNode(ip, oxad, &cmp, &btstack, 0);
 		if (rc)
 			return rc;
-
 		/* retrieve search result */
 		XT_GETSEARCH(ip, btstack.top, bn, pmp, pp, index);
 
@@ -3237,8 +3238,9 @@ static int xtSearchNode(struct inode *ip, xad_t * xad,	/* required XAD entry */
 		XT_PUTPAGE(mp);
 	}
 }
+#endif				/*  _STILL_TO_PORT */
 
-
+#ifdef CONFIG_JFS_DMAPI
 /*
  *      xtRelink()
  *
@@ -3306,7 +3308,7 @@ static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * p)
 
 	return 0;
 }
-#endif				/*  _STILL_TO_PORT */
+#endif				/* CONFIG_JFS_DMAPI */
 
 
 /*
@@ -4463,3 +4465,191 @@ int jfs_xtstat_read(char *buffer, char **start, off_t offset, int length,
 	return len;
 }
 #endif
+
+#ifdef CONFIG_JFS_DMAPI
+/* 
+ * 
+ *      xtPunchHole()
+ *
+ * function:
+ *      delete portion of file for the entry with the specified key.
+ *
+ *      N.B.: whole extent of the entry is assumed to be deleted.
+ *
+ * parameter:
+ *      tid             - transaction id;
+ *      ip              - file object;
+ *      xoff            - extent offset (in bytes);
+ *      xlen            - extent length (in bytes);
+ *      flag            -
+ *
+ * return:
+ *       ENOENT: if the entry is not found.
+ *
+ * exception:
+ */
+int xtPunchHole(tid_t tid, struct inode *ip, s64 xoff, s32 xlen, int flag)
+{
+	int		error = 0;
+	struct lxdlist	lxdlist;
+	lxd_t		lxd;
+	struct xadlist	xadlist;
+	xad_t		*pxad_array = NULL;
+	xad_t		xad;
+	int		elem = 0;			
+	int		alloc_size = 0;
+	int		i;
+	dm_off_t	xad_off;
+	dm_size_t	xad_len;
+	dm_off_t	xad_end;
+	u64 		xend;
+
+	/* Handle truncations first, they don't require twiddling xads */
+	if (xlen == 0) {
+		loff_t	old_size = ip->i_size;
+		s64	new_size;
+
+		new_size = xtTruncate(tid, ip, xoff, 0);
+
+		if (new_size < 0) {
+			ip->i_size = old_size;
+			return new_size;
+		} else {
+			return 0;
+		}
+	}
+
+	xoff >>= ip->i_blkbits;
+	xlen >>= ip->i_blkbits;
+	xend = xoff + xlen;
+
+	/* Obtain single array of xads that covers entire file */
+	do {
+		/* Free prior xad array if one exists */
+		if (pxad_array != NULL) {
+			kmem_free(pxad_array, alloc_size);
+		}
+
+		elem += 16; /* 256-byte chunk */
+		alloc_size = elem * sizeof(xad_t);
+		pxad_array = kmem_alloc(alloc_size, KM_SLEEP);
+
+		if (pxad_array == NULL) 
+			return -ENOMEM;
+
+		lxdlist.maxnlxd = lxdlist.nlxd = 1;
+		LXDlength(&lxd, (ip->i_size >> ip->i_blkbits)+1); 	
+		LXDoffset(&lxd, 0);
+		lxdlist.lxd = &lxd;
+
+		xadlist.maxnxad = xadlist.nxad = elem;
+		xadlist.xad = pxad_array;
+
+		error = xtLookupList(ip, &lxdlist, &xadlist, 0);
+
+		if (error) {
+			if (pxad_array != NULL)
+				kmem_free(pxad_array, alloc_size);
+			return error;
+		}
+	} while ((xadlist.nxad == elem) && 
+		 ((offsetXAD(&xadlist.xad[elem-1]) + lengthXAD(&xadlist.xad[elem-1])) < xoff + xlen));
+
+	for (i = 0, error = 0; (i < xadlist.nxad) && (error == 0); i++) {
+		/* nothing to do if xad is already hole */
+		if (xadlist.xad[i].flag & XAD_NOTRECORDED)
+			continue;
+
+		xad_off = offsetXAD(&xadlist.xad[i]);
+		xad_len = lengthXAD(&xadlist.xad[i]);
+		xad_end = xad_off + xad_len;
+
+		/* xad completely within hole
+		 *          |------XAD------|      
+		 * |----------------hole--------------------|
+		 */
+		if ((xad_off >= xoff) && (xad_end <= xend)) {
+			error = xtDelete(tid, ip, xad_off, xad_len, 0);
+		} 
+
+		/* xad overlaps beginning of hole, eliminate part of xad 
+		 * |--------XAD--------|---->
+		 *          |------hole------|      
+		 */
+		else if ((xad_off < xoff) && (xad_end <= xend) && (xad_end > xoff)) {
+			memcpy(&xad, &xadlist.xad[i], sizeof(xad_t));
+			XADlength(&xad, xoff - xad_off);
+		
+			error = xtUpdate(tid, ip, &xad);
+			if (!error) {
+				/* should now have following, so delete rXAD:
+				 * |--lXAD--|----rXAD---|---->
+				 *          |------hole------|      
+				 */
+
+				error = xtDelete(tid, ip, xoff, xad_len - xoff, 0);
+			}
+		} 
+	
+		/* xad overlaps end of hole, eliminate part of xad 
+		 *          >-------|--------XAD--------|
+		 *          |------hole------|      
+		 */
+		else if ((xad_off >= xoff) && (xad_end > xend) && (xad_off < xend)) {
+			memcpy(&xad, &xadlist.xad[i], sizeof(xad_t));
+			XADlength(&xad, xad_len - (xad_end - xend));
+			
+			error = xtUpdate(tid, ip, &xad);
+			if (!error) {
+				/* should now have following, so delete lXAD:
+			         *          >-------|--lXAD--|----rXAD---|
+				 *          |------hole------|      
+				 */
+
+				error = xtDelete(tid, ip, xad_off, 
+						 xad_len - (xad_end - xend), 0);
+			}
+		}
+
+		/* xad completely contains hole, need to do some twiddling
+		 * |----------------XAD--------------------|
+		 *          |------hole------|      
+		 */
+		else if ((xad_off < xoff) && (xad_end > xend)) {
+			dm_off_t xad_addr = addressXAD(&xadlist.xad[i]);
+			dm_off_t new_off;
+			dm_size_t new_len;
+			
+			memcpy(&xad, &xadlist.xad[i], sizeof(xad_t));
+			new_len = xoff - xad_off;
+			XADlength(&xad, new_len);
+			
+			error = xtUpdate(tid, ip, &xad);
+			if (!error) {
+				error = xtDelete(tid, ip, xoff, 
+						 (xad_end - xoff), 0);
+			}
+
+			/* should now have following, so create rXAD:
+			 * |--lXAD--|----------DELETED XAD---------|
+			 *          |------hole------|      
+			 */
+
+			if (!error) {
+				xad_addr += new_len + xlen;
+				new_off = xoff + xlen;
+				error = xtInsert(tid, ip, 0, new_off, xad_end - new_off, &xad_addr, 0);
+			}
+			
+			/* should now have following:
+			 * |--lXAD--|----DELETED-----|-----rXAD----|
+			 *          |------hole------|      
+			 */
+		}
+	}
+
+	if (pxad_array != NULL)
+		kmem_free(pxad_array, alloc_size);
+	return error;
+}
+#endif				/* CONFIG_JFS_DMAPI */

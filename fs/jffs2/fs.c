@@ -350,7 +350,7 @@ int jffs2_remount_fs (struct super_block *sb, int *flags, char *data)
 	if (!(*flags & MS_RDONLY))
 		jffs2_start_garbage_collect_thread(c);
 	
-	sb->s_flags = (sb->s_flags & ~MS_RDONLY)|(*flags & MS_RDONLY);
+	*flags |= MS_NOATIME;
 
 	return 0;
 }

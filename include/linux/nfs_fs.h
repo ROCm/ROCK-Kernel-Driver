@@ -275,6 +275,7 @@ extern void nfs_begin_attr_update(struct inode *);
 extern void nfs_end_attr_update(struct inode *);
 extern void nfs_begin_data_update(struct inode *);
 extern void nfs_end_data_update(struct inode *);
+extern void nfs_end_data_update_defer(struct inode *);
 
 /* linux/net/ipv4/ipconfig.c: trims ip addr off front of name, too. */
 extern u32 root_nfs_parse_addr(char *name); /*__init*/
@@ -317,7 +318,7 @@ nfs_file_cred(struct file *file)
 /*
  * linux/fs/nfs/direct.c
  */
-extern int nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,
+extern ssize_t nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,
 			unsigned long);
 
 /*
