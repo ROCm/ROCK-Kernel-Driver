@@ -19,15 +19,13 @@ config DE2104X
 	  21040 (Tulip series) chips.  Some LinkSys PCI cards are
 	  of this type.  (If your card is NOT SMC EtherPower 10/100 PCI
 	  (smc9332dst), you can also try the driver for "Generic DECchip"
-	  cards, above.  However, most people with a network card of this type
+	  cards, below.  However, most people with a network card of this type
 	  will say Y here.) Do read the Ethernet-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.  More specific
-	  information is contained in
-	  <file:Documentation/DocBook/tulip-user.tmpl>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tulip.  If you want to compile it as a
+	  The module will be called de2104x.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/networking/net-modules.txt>.
 
