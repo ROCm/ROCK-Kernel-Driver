@@ -98,7 +98,7 @@ static int __init fpe_init(void)
 	orig_fp_enter = kern_fp_enter;
 	orig_fp_init = fp_init;
 	kern_fp_enter = nwfpe_enter;
-	fp_init = nwfpe_init;
+	fp_init = nwfpe_init_fpa;
 
 	return 0;
 }
