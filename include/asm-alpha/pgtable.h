@@ -248,8 +248,13 @@ extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 })
 #endif
 
-extern inline unsigned long pmd_page(pmd_t pmd)
-{ return PAGE_OFFSET + ((pmd_val(pmd) & _PFN_MASK) >> (32-PAGE_SHIFT)); }
+extern inline unsigned long
+pmd_page_kernel(pmd_t pmd)
+{
+	return ((pmd_val(pmd) & _PFN_MASK) >> (32-PAGE_SHIFT)) + PAGE_OFFSET;
+}
+
+#define pmd_page(pmd)	(mem_map + ((pmd_val(pmd) & _PFN_MASK) >> 32))
 
 extern inline unsigned long pgd_page(pgd_t pgd)
 { return PAGE_OFFSET + ((pgd_val(pgd) & _PFN_MASK) >> (32-PAGE_SHIFT)); }
@@ -306,10 +311,16 @@ extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 }
 
 /* Find an entry in the third-level page table.. */
-extern inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
+extern inline pte_t * pte_offset_kernel(pmd_t * dir, unsigned long address)
 {
-	return (pte_t *) pmd_page(*dir) + ((address >> PAGE_SHIFT) & (PTRS_PER_PAGE - 1));
+	return (pte_t *) pmd_page_kernel(*dir)
+		+ ((address >> PAGE_SHIFT) & (PTRS_PER_PAGE - 1));
 }
+
+#define pte_offset_map(dir,addr)	pte_offset_kernel((dir),(addr))
+#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir),(addr))
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 extern pgd_t swapper_pg_dir[1024];
 

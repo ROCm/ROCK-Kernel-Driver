@@ -137,6 +137,7 @@ do {									  \
 	check_mmu_context();						  \
 } while (0)
 
+struct task_struct;
 extern void alpha_switch_to(unsigned long, struct task_struct*);
 
 #define mb() \
