@@ -343,6 +343,8 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	ipv6_addr_copy(&aca->aca_addr, addr);
 	aca->aca_idev = idev;
 	aca->aca_users = 1;
+	/* aca_tstamp should be updated upon changes */
+	aca->aca_cstamp = aca->aca_tstamp = jiffies;
 	atomic_set(&aca->aca_refcnt, 2);
 	aca->aca_lock = SPIN_LOCK_UNLOCKED;
 

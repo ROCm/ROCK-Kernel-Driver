@@ -830,6 +830,8 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 	ipv6_addr_copy(&mc->mca_addr, addr);
 	mc->idev = idev;
 	mc->mca_users = 1;
+	/* mca_stamp should be updated upon changes */
+	mc->mca_cstamp = mc->mca_tstamp = jiffies;
 	atomic_set(&mc->mca_refcnt, 2);
 	mc->mca_lock = SPIN_LOCK_UNLOCKED;
 
