@@ -414,7 +414,7 @@ static int configure_device (struct pci_func *func)
 			memset (io[count], 0, sizeof (struct resource_node));
 			io[count]->type = IO;
 			io[count]->busno = func->busno;
-			io[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+			io[count]->devfunc = PCI_DEVFN(func->device, func->function);
 			io[count]->len = len[count];
 			if (ibmphp_check_resource(io[count], 0) == 0) {
 				ibmphp_add_resource (io[count]);
@@ -452,7 +452,8 @@ static int configure_device (struct pci_func *func)
 				memset (pfmem[count], 0, sizeof (struct resource_node));
 				pfmem[count]->type = PFMEM;
 				pfmem[count]->busno = func->busno;
-				pfmem[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+				pfmem[count]->devfunc = PCI_DEVFN(func->device,
+							func->function);
 				pfmem[count]->len = len[count];
 				pfmem[count]->fromMem = FALSE;
 				if (ibmphp_check_resource (pfmem[count], 0) == 0) {
@@ -519,7 +520,8 @@ static int configure_device (struct pci_func *func)
 				memset (mem[count], 0, sizeof (struct resource_node));
 				mem[count]->type = MEM;
 				mem[count]->busno = func->busno;
-				mem[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+				mem[count]->devfunc = PCI_DEVFN(func->device,
+							func->function);
 				mem[count]->len = len[count];
 				if (ibmphp_check_resource (mem[count], 0) == 0) {
 					ibmphp_add_resource (mem[count]);
@@ -685,7 +687,8 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 			memset (bus_io[count], 0, sizeof (struct resource_node));
 			bus_io[count]->type = IO;
 			bus_io[count]->busno = func->busno;
-			bus_io[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+			bus_io[count]->devfunc = PCI_DEVFN(func->device,
+							func->function);
 			bus_io[count]->len = len[count];
 			if (ibmphp_check_resource (bus_io[count], 0) == 0) {
 				ibmphp_add_resource (bus_io[count]);
@@ -717,7 +720,8 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 				memset (bus_pfmem[count], 0, sizeof (struct resource_node));
 				bus_pfmem[count]->type = PFMEM;
 				bus_pfmem[count]->busno = func->busno;
-				bus_pfmem[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+				bus_pfmem[count]->devfunc = PCI_DEVFN(func->device,
+							func->function);
 				bus_pfmem[count]->len = len[count];
 				bus_pfmem[count]->fromMem = FALSE;
 				if (ibmphp_check_resource (bus_pfmem[count], 0) == 0) {
@@ -775,7 +779,8 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 				memset (bus_mem[count], 0, sizeof (struct resource_node));
 				bus_mem[count]->type = MEM;
 				bus_mem[count]->busno = func->busno;
-				bus_mem[count]->devfunc = ((func->device << 3) | (func->function & 0x7));
+				bus_mem[count]->devfunc = PCI_DEVFN(func->device,
+							func->function);
 				bus_mem[count]->len = len[count];
 				if (ibmphp_check_resource (bus_mem[count], 0) == 0) {
 					ibmphp_add_resource (bus_mem[count]);
@@ -846,7 +851,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		memset (io, 0, sizeof (struct resource_node));
 		io->type = IO;
 		io->busno = func->busno;
-		io->devfunc = ((func->device << 3) | (func->function & 0x7));
+		io->devfunc = PCI_DEVFN(func->device, func->function);
 		io->len = amount_needed->io;
 		if (ibmphp_check_resource (io, 1) == 0) {
 			debug ("were we able to add io\n");
@@ -869,7 +874,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		memset (mem, 0, sizeof (struct resource_node));
 		mem->type = MEM;
 		mem->busno = func->busno;
-		mem->devfunc = ((func->device << 3) | (func->function & 0x7));
+		mem->devfunc = PCI_DEVFN(func->device, func->function);
 		mem->len = amount_needed->mem;
 		if (ibmphp_check_resource (mem, 1) == 0) {
 			ibmphp_add_resource (mem);
@@ -892,7 +897,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		memset (pfmem, 0, sizeof (struct resource_node));
 		pfmem->type = PFMEM;
 		pfmem->busno = func->busno;
-		pfmem->devfunc = ((func->device << 3) | (func->function & 0x7));
+		pfmem->devfunc = PCI_DEVFN(func->device, func->function);
 		pfmem->len = amount_needed->pfmem;
 		pfmem->fromMem = FALSE;
 		if (ibmphp_check_resource (pfmem, 1) == 0) {
