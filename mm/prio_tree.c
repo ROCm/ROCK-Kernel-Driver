@@ -628,28 +628,37 @@ struct vm_area_struct *vma_prio_tree_next(struct vm_area_struct *vma,
 		 * First call is with NULL vma
 		 */
 		ptr = prio_tree_first(root, iter, begin, end);
-		if (ptr)
-			return prio_tree_entry(ptr, struct vm_area_struct,
+		if (ptr) {
+			next = prio_tree_entry(ptr, struct vm_area_struct,
 						shared.prio_tree_node);
-		else
+			prefetch(next->shared.vm_set.head);
+			return next;
+		} else
 			return NULL;
 	}
 
 	if (vma->shared.vm_set.parent) {
-		if (vma->shared.vm_set.head)
-			return vma->shared.vm_set.head;
+		if (vma->shared.vm_set.head) {
+			next = vma->shared.vm_set.head;
+			prefetch(next->shared.vm_set.list.next);
+			return next;
+		}
 	} else {
 		next = list_entry(vma->shared.vm_set.list.next,
 				struct vm_area_struct, shared.vm_set.list);
-		if (!next->shared.vm_set.head)
+		if (!next->shared.vm_set.head) {
+			prefetch(next->shared.vm_set.list.next);
 			return next;
+		}
 	}
 
 	ptr = prio_tree_next(root, iter, begin, end);
-	if (ptr)
-		return prio_tree_entry(ptr, struct vm_area_struct,
+	if (ptr) {
+		next = prio_tree_entry(ptr, struct vm_area_struct,
 					shared.prio_tree_node);
-	else
+		prefetch(next->shared.vm_set.head);
+		return next;
+	} else
 		return NULL;
 }
 EXPORT_SYMBOL(vma_prio_tree_next);
