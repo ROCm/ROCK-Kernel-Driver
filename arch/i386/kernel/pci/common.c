@@ -4,12 +4,8 @@
  *	(c) 1999--2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/pci.h>
-#include <linux/init.h>
 #include <linux/ioport.h>
 
 #include <asm/segment.h>
@@ -91,37 +87,6 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 }
 
 /*
- * Discover remaining PCI buses in case there are peer host bridges.
- * We use the number of last PCI bus provided by the PCI BIOS.
- */
-static void __devinit pcibios_fixup_peer_bridges(void)
-{
-	int n;
-	struct pci_bus bus;
-	struct pci_dev dev;
-	u16 l;
-
-	if (pcibios_last_bus <= 0 || pcibios_last_bus >= 0xff)
-		return;
-	DBG("PCI: Peer bridge fixup\n");
-	for (n=0; n <= pcibios_last_bus; n++) {
-		if (pci_bus_exists(&pci_root_buses, n))
-			continue;
-		bus.number = n;
-		bus.ops = pci_root_ops;
-		dev.bus = &bus;
-		for(dev.devfn=0; dev.devfn<256; dev.devfn += 8)
-			if (!pci_read_config_word(&dev, PCI_VENDOR_ID, &l) &&
-			    l != 0x0000 && l != 0xffff) {
-				DBG("Found device at %02x:%02x [%04x]\n", n, dev.devfn, l);
-				printk("PCI: Discovered peer bus %02x\n", n);
-				pci_scan_bus(n, pci_root_ops, NULL);
-				break;
-			}
-	}
-}
-
-/*
  *  Called after each bus is probed, but before its children
  *  are examined.
  */
@@ -158,15 +123,6 @@ static int __init pcibios_init(void)
 		return 0;
 	}
 
-	printk("PCI: Probing PCI hardware\n");
-	pci_root_bus = pcibios_scan_root(0);
-
-	pcibios_irq_init();
-
-	if (!pci_use_acpi_routing)
-		pcibios_fixup_peer_bridges();
-
-	pcibios_fixup_irqs();
 	pcibios_resource_survey();
 
 #ifdef CONFIG_PCI_BIOS
