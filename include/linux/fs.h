@@ -20,6 +20,7 @@
 #include <linux/radix-tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
+#include <linux/audit.h>
 
 struct iovec;
 struct nameidata;
@@ -1159,7 +1160,18 @@ extern char * getname(const char __user *);
 extern void vfs_caches_init(unsigned long);
 
 #define __getname()	kmem_cache_alloc(names_cachep, SLAB_KERNEL)
-#define putname(name)	kmem_cache_free(names_cachep, (void *)(name))
+#define __putname(name) kmem_cache_free(names_cachep, (void *)(name))
+#ifndef CONFIG_AUDITSYSCALL
+#define putname(name)   __putname(name)
+#else
+#define putname(name)							\
+	do {								\
+		if (unlikely(current->audit_context))			\
+			audit_putname(name);				\
+		else							\
+			__putname(name);				\
+	} while (0)
+#endif
 
 extern int register_blkdev(unsigned int, const char *);
 extern int unregister_blkdev(unsigned int, const char *);

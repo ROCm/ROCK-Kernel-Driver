@@ -95,7 +95,7 @@ _GLOBAL(DoSyscall)
 #endif /* SHOW_SYSCALLS */
 	clrrdi	r10,r1,THREAD_SHIFT
 	ld	r10,TI_FLAGS(r10)
-	andi.	r11,r10,_TIF_SYSCALL_TRACE
+	andi.	r11,r10,_TIF_SYSCALL_T_OR_A
 	bne-	50f
 	cmpli	0,r0,NR_syscalls
 	bge-	66f
@@ -151,7 +151,8 @@ _GLOBAL(ret_from_syscall_1)
 	b	22b
         
 /* Traced system call support */
-50:	bl	.do_syscall_trace
+50:	addi	r3,r1,STACK_FRAME_OVERHEAD
+	bl	.do_syscall_trace_enter
 	ld	r0,GPR0(r1)	/* Restore original registers */
 	ld	r3,GPR3(r1)
 	ld	r4,GPR4(r1)
@@ -201,7 +202,7 @@ _GLOBAL(ret_from_syscall_2)
 	oris	r10,r10,0x1000
 	std	r10,_CCR(r1)
 60:	std	r3,GPR3(r1)	/* Update return value */
-	bl	.do_syscall_trace
+	bl	.do_syscall_trace_leave
 	b	.ret_from_except
 66:	li	r3,ENOSYS
 	b	57b
@@ -234,14 +235,14 @@ _GLOBAL(ppc64_rt_sigreturn)
 
 80:	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_TRACE
+	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
 	bne-	81f
 	cmpi	0,r3,0
 	bge	.ret_from_except
 	b	.ret_from_syscall_1
 81:	cmpi	0,r3,0
 	blt	.ret_from_syscall_2
-	bl	.do_syscall_trace
+	bl	.do_syscall_trace_leave
 	b	.ret_from_except
 
 /*
@@ -352,9 +353,9 @@ _GLOBAL(ret_from_fork)
 	bl	.schedule_tail
 	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_TRACE
+	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
 	beq+	.ret_from_except
-	bl	.do_syscall_trace
+	bl	.do_syscall_trace_leave
 	b	.ret_from_except
 
 _GLOBAL(ret_from_except)

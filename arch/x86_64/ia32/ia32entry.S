@@ -78,8 +78,8 @@ ENTRY(ia32_sysenter_target)
  	.quad 1b,ia32_badarg
  	.previous	
 	GET_THREAD_INFO(%r10)
-	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
-	jc  sysenter_tracesys
+	testl  $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%r10)
+	jnz  sysenter_tracesys
 sysenter_do_call:	
 	cmpl	$(IA32_NR_syscalls),%eax
 	jae	ia32_badsys
@@ -106,7 +106,7 @@ sysenter_tracesys:
 	CLEAR_RREGS
 	movq	$-ENOSYS,RAX(%rsp)	/* really needed? */
 	movq	%rsp,%rdi        /* &pt_regs -> arg1 */
-	call	syscall_trace
+	call	syscall_trace_enter
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	movl	%ebp, %ebp
@@ -163,8 +163,8 @@ ENTRY(ia32_cstar_target)
 	.quad 1b,ia32_badarg
 	.previous	
 	GET_THREAD_INFO(%r10)
-	bt  $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
-	jc  cstar_tracesys
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%r10)
+	jnz   cstar_tracesys
 cstar_do_call:	
 	cmpl $IA32_NR_syscalls,%eax
 	jae  ia32_badsys
@@ -187,7 +187,7 @@ cstar_tracesys:
 	CLEAR_RREGS
 	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
 	movq %rsp,%rdi        /* &pt_regs -> arg1 */
-	call syscall_trace
+	call syscall_trace_enter
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	movl RSP-ARGOFFSET(%rsp), %r8d
@@ -236,8 +236,8 @@ ENTRY(ia32_syscall)
 	   this could be a problem. */
 	SAVE_ARGS 0,0,1
 	GET_THREAD_INFO(%r10)
-	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%r10)
-	jc ia32_tracesys
+	testl $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),threadinfo_flags(%r10)
+	jnz ia32_tracesys
 ia32_do_syscall:	
 	cmpl $(IA32_NR_syscalls),%eax
 	jae  ia32_badsys
@@ -251,7 +251,7 @@ ia32_tracesys:
 	SAVE_REST
 	movq $-ENOSYS,RAX(%rsp)	/* really needed? */
 	movq %rsp,%rdi        /* &pt_regs -> arg1 */
-	call syscall_trace
+	call syscall_trace_enter
 	LOAD_ARGS ARGOFFSET  /* reload args from stack in case ptrace changed it */
 	RESTORE_REST
 	jmp ia32_do_syscall

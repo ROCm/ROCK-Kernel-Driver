@@ -32,6 +32,7 @@
 #include <linux/futex.h>
 #include <linux/ptrace.h>
 #include <linux/mount.h>
+#include <linux/audit.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -83,6 +84,8 @@ void __put_task_struct(struct task_struct *tsk)
 	WARN_ON(atomic_read(&tsk->usage));
 	WARN_ON(tsk == current);
 
+	if (unlikely(tsk->audit_context))
+		audit_free(tsk);
 	security_task_free(tsk);
 	free_uid(tsk->user);
 	put_group_info(tsk->group_info);
@@ -949,13 +952,16 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
 	p->io_context = NULL;
+	p->audit_context = NULL;
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
 		goto bad_fork_cleanup;
+	if ((retval = audit_alloc(p)))
+		goto bad_fork_cleanup_security;
 	/* copy all the process information */
 	if ((retval = copy_semundo(clone_flags, p)))
-		goto bad_fork_cleanup_security;
+		goto bad_fork_cleanup_audit;
 	if ((retval = copy_files(clone_flags, p)))
 		goto bad_fork_cleanup_semundo;
 	if ((retval = copy_fs(clone_flags, p)))
@@ -1090,6 +1096,8 @@ bad_fork_cleanup_files:
 	exit_files(p); /* blocking */
 bad_fork_cleanup_semundo:
 	exit_sem(p);
+bad_fork_cleanup_audit:
+	audit_free(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
 bad_fork_cleanup:

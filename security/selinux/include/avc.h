@@ -127,9 +127,10 @@ static inline void avc_cache_stats_add(int type, unsigned val)
 /*
  * AVC display support
  */
-void avc_dump_av(u16 tclass, u32 av);
-void avc_dump_query(u32 ssid, u32 tsid, u16 tclass);
-void avc_dump_cache(char *tag);
+struct audit_buffer;
+void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av);
+void avc_dump_query(struct audit_buffer *ab, u32 ssid, u32 tsid, u16 tclass);
+void avc_dump_cache(struct audit_buffer *ab, char *tag);
 
 /*
  * AVC operations

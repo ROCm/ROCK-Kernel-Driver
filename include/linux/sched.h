@@ -371,6 +371,8 @@ int set_current_groups(struct group_info *group_info);
     ((gi)->blocks[(i)/NGROUPS_PER_BLOCK][(i)%NGROUPS_PER_BLOCK])
 
 
+struct audit_context;		/* See audit.c */
+
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	struct thread_info *thread_info;
@@ -474,6 +476,7 @@ struct task_struct {
 	sigset_t *notifier_mask;
 	
 	void *security;
+	struct audit_context *audit_context;
 
 /* Thread group tracking */
    	u32 parent_exec_id;

@@ -26,6 +26,7 @@
 #include <linux/personality.h>
 #include <linux/security.h>
 #include <linux/mount.h>
+#include <linux/audit.h>
 #include <asm/namei.h>
 #include <asm/uaccess.h>
 
@@ -141,10 +142,12 @@ char * getname(const char __user * filename)
 
 		result = tmp;
 		if (retval < 0) {
-			putname(tmp);
+			__putname(tmp);
 			result = ERR_PTR(retval);
 		}
 	}
+	if (unlikely(current->audit_context) && !IS_ERR(result) && result)
+		audit_getname(result);
 	return result;
 }
 
@@ -860,6 +863,8 @@ walk_init_root(const char *name, struct nameidata *nd)
 
 int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 {
+	int retval;
+
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
 	nd->flags = flags;
 
@@ -882,7 +887,13 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
 	}
 	read_unlock(&current->fs->lock);
 	current->total_link_count = 0;
-	return link_path_walk(name, nd);
+	retval = link_path_walk(name, nd);
+	if (unlikely(current->audit_context
+		     && nd && nd->dentry && nd->dentry->d_inode))
+		audit_inode(name,
+			    nd->dentry->d_inode->i_ino,
+			    nd->dentry->d_inode->i_rdev);
+	return retval;
 }
 
 /*

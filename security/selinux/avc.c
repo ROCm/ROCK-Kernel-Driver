@@ -22,11 +22,14 @@
 #include <linux/un.h>
 #include <net/af_unix.h>
 #include <linux/ip.h>
+#include <linux/audit.h>
 #include <linux/ipv6.h>
 #include <net/ipv6.h>
 #include "avc.h"
 #include "avc_ss.h"
+#ifdef CONFIG_AUDIT
 #include "class_to_string.h"
+#endif
 #include "common_perm_to_string.h"
 #include "av_inherit.h"
 #include "av_perm_to_string.h"
@@ -68,14 +71,10 @@ struct avc_callback_node {
 };
 
 static spinlock_t avc_lock = SPIN_LOCK_UNLOCKED;
-static spinlock_t avc_log_lock = SPIN_LOCK_UNLOCKED;
 static struct avc_node *avc_node_freelist = NULL;
 static struct avc_cache avc_cache;
-static char *avc_audit_buffer = NULL;
 static unsigned avc_cache_stats[AVC_NSTATS];
 static struct avc_callback_node *avc_callbacks = NULL;
-static unsigned int avc_log_level = 4; /* default:  KERN_WARNING */
-static char avc_level_string[4] = "< >";
 
 static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
@@ -87,14 +86,14 @@ static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
  * @tclass: target security class
  * @av: access vector
  */
-void avc_dump_av(u16 tclass, u32 av)
+void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av)
 {
 	char **common_pts = 0;
 	u32 common_base = 0;
 	int i, i2, perm;
 
 	if (av == 0) {
-		printk(" null");
+		audit_log_format(ab, " null");
 		return;
 	}
 
@@ -106,12 +105,12 @@ void avc_dump_av(u16 tclass, u32 av)
 		}
 	}
 
-	printk(" {");
+	audit_log_format(ab, " {");
 	i = 0;
 	perm = 1;
 	while (perm < common_base) {
 		if (perm & av)
-			printk(" %s", common_pts[i]);
+			audit_log_format(ab, " %s", common_pts[i]);
 		i++;
 		perm <<= 1;
 	}
@@ -124,13 +123,14 @@ void avc_dump_av(u16 tclass, u32 av)
 					break;
 			}
 			if (i2 < ARRAY_SIZE(av_perm_to_string))
-				printk(" %s", av_perm_to_string[i2].name);
+				audit_log_format(ab, " %s",
+						 av_perm_to_string[i2].name);
 		}
 		i++;
 		perm <<= 1;
 	}
 
-	printk(" }");
+	audit_log_format(ab, " }");
 }
 
 /**
@@ -139,7 +139,7 @@ void avc_dump_av(u16 tclass, u32 av)
  * @tsid: target security identifier
  * @tclass: target security class
  */
-void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
+void avc_dump_query(struct audit_buffer *ab, u32 ssid, u32 tsid, u16 tclass)
 {
 	int rc;
 	char *scontext;
@@ -147,20 +147,20 @@ void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
 
  	rc = security_sid_to_context(ssid, &scontext, &scontext_len);
 	if (rc)
-		printk("ssid=%d", ssid);
+		audit_log_format(ab, "ssid=%d", ssid);
 	else {
-		printk("scontext=%s", scontext);
+		audit_log_format(ab, "scontext=%s", scontext);
 		kfree(scontext);
 	}
 
 	rc = security_sid_to_context(tsid, &scontext, &scontext_len);
 	if (rc)
-		printk(" tsid=%d", tsid);
+		audit_log_format(ab, " tsid=%d", tsid);
 	else {
-		printk(" tcontext=%s", scontext);
+		audit_log_format(ab, " tcontext=%s", scontext);
 		kfree(scontext);
 	}
-	printk(" tclass=%s", class_to_string[tclass]);
+	audit_log_format(ab, " tclass=%s", class_to_string[tclass]);
 }
 
 /**
@@ -194,11 +194,7 @@ void __init avc_init(void)
 		avc_node_freelist = new;
 	}
 
-	avc_audit_buffer = (char *)__get_free_page(GFP_ATOMIC);
-	if (!avc_audit_buffer)
-		panic("AVC:  unable to allocate audit buffer\n");
-
-	avc_level_string[1] = '0' + avc_log_level;
+	audit_log(current->audit_context, "AVC INITIALIZED\n");
 }
 
 #if 0
@@ -430,12 +426,13 @@ static inline void avc_print_ipv6_addr(struct in6_addr *addr, u16 port,
 		printk(" %s=%d", name2, ntohs(port));
 }
 
-static inline void avc_print_ipv4_addr(u32 addr, u16 port, char *name1, char *name2)
+static inline void avc_print_ipv4_addr(struct audit_buffer *ab, u32 addr,
+				       u16 port, char *name1, char *name2)
 {
 	if (addr)
-		printk(" %s=%d.%d.%d.%d", name1, NIPQUAD(addr));
+		audit_log_format(ab, " %s=%d.%d.%d.%d", name1, NIPQUAD(addr));
 	if (port)
-		printk(" %s=%d", name2, ntohs(port));
+		audit_log_format(ab, " %s=%d", name2, ntohs(port));
 }
 
 /*
@@ -515,9 +512,8 @@ void avc_audit(u32 ssid, u32 tsid,
 {
 	struct task_struct *tsk = current;
 	struct inode *inode = NULL;
-	char *p;
 	u32 denied, audited;
-	unsigned long flags;
+	struct audit_buffer *ab;
 
 	denied = requested & ~avd->allowed;
 	if (denied) {
@@ -535,19 +531,18 @@ void avc_audit(u32 ssid, u32 tsid,
 	if (!check_avc_ratelimit())
 		return;
 
-	/* prevent overlapping printks */
-	spin_lock_irqsave(&avc_log_lock,flags);
-
-	printk("%s\n", avc_level_string);
-	printk("%savc:  %s ", avc_level_string, denied ? "denied" : "granted");
-	avc_dump_av(tclass,audited);
-	printk(" for ");
+	ab = audit_log_start(current->audit_context);
+	if (!ab)
+		return;		/* audit_panic has been called */
+	audit_log_format(ab, "avc:  %s ", denied ? "denied" : "granted");
+	avc_dump_av(ab, tclass,audited);
+	audit_log_format(ab, " for ");
 	if (a && a->tsk)
 		tsk = a->tsk;
 	if (tsk && tsk->pid) {
 		struct mm_struct *mm;
 		struct vm_area_struct *vma;
-		printk(" pid=%d", tsk->pid);
+		audit_log_format(ab, " pid=%d", tsk->pid);
 		if (tsk == current)
 			mm = current->mm;
 		else
@@ -558,11 +553,9 @@ void avc_audit(u32 ssid, u32 tsid,
 				while (vma) {
 					if ((vma->vm_flags & VM_EXECUTABLE) &&
 					    vma->vm_file) {
-						p = d_path(vma->vm_file->f_dentry,
-							   vma->vm_file->f_vfsmnt,
-							   avc_audit_buffer,
-							   PAGE_SIZE);
-						printk(" exe=%s", p);
+						audit_log_d_path(ab, "exe=",
+							vma->vm_file->f_dentry,
+							vma->vm_file->f_vfsmnt);
 						break;
 					}
 					vma = vma->vm_next;
@@ -572,29 +565,26 @@ void avc_audit(u32 ssid, u32 tsid,
 			if (tsk != current)
 				mmput(mm);
 		} else {
-			printk(" comm=%s", tsk->comm);
+			audit_log_format(ab, " comm=%s", tsk->comm);
 		}
 	}
 	if (a) {
 		switch (a->type) {
 		case AVC_AUDIT_DATA_IPC:
-			printk(" key=%d", a->u.ipc_id);
+			audit_log_format(ab, " key=%d", a->u.ipc_id);
 			break;
 		case AVC_AUDIT_DATA_CAP:
-			printk(" capability=%d", a->u.cap);
+			audit_log_format(ab, " capability=%d", a->u.cap);
 			break;
 		case AVC_AUDIT_DATA_FS:
 			if (a->u.fs.dentry) {
 				struct dentry *dentry = a->u.fs.dentry;
 				if (a->u.fs.mnt) {
-					p = d_path(dentry,
-						   a->u.fs.mnt,
-						   avc_audit_buffer,
-						   PAGE_SIZE);
-					if (p)
-						printk(" path=%s", p);
+					audit_log_d_path(ab, "path=", dentry,
+							a->u.fs.mnt);
 				} else {
-					printk(" name=%s", dentry->d_name.name);
+					audit_log_format(ab, " name=%s",
+							 dentry->d_name.name);
 				}
 				inode = dentry->d_inode;
 			} else if (a->u.fs.inode) {
@@ -602,29 +592,33 @@ void avc_audit(u32 ssid, u32 tsid,
 				inode = a->u.fs.inode;
 				dentry = d_find_alias(inode);
 				if (dentry) {
-					printk(" name=%s", dentry->d_name.name);
+					audit_log_format(ab, " name=%s",
+							 dentry->d_name.name);
 					dput(dentry);
 				}
 			}
 			if (inode)
-				printk(" dev=%s ino=%ld",
-				       inode->i_sb->s_id, inode->i_ino);
+				audit_log_format(ab, " dev=%s ino=%ld",
+						 inode->i_sb->s_id,
+						 inode->i_ino);
 			break;
 		case AVC_AUDIT_DATA_NET:
 			if (a->u.net.sk) {
 				struct sock *sk = a->u.net.sk;
 				struct unix_sock *u;
+				int len = 0;
+				char *p = NULL;
 
 				switch (sk->sk_family) {
 				case AF_INET: {
 					struct inet_opt *inet = inet_sk(sk);
 
-					avc_print_ipv4_addr(inet->rcv_saddr,
-					                    inet->sport,
-					                    "laddr", "lport");
-					avc_print_ipv4_addr(inet->daddr,
-					                    inet->dport,
-					                    "faddr", "fport");
+					avc_print_ipv4_addr(ab, inet->rcv_saddr,
+							    inet->sport,
+							    "laddr", "lport");
+					avc_print_ipv4_addr(ab, inet->daddr,
+							    inet->dport,
+							    "faddr", "fport");
 					break;
 				}
 				case AF_INET6: {
@@ -642,34 +636,32 @@ void avc_audit(u32 ssid, u32 tsid,
 				case AF_UNIX:
 					u = unix_sk(sk);
 					if (u->dentry) {
-						p = d_path(u->dentry,
-							   u->mnt,
-							   avc_audit_buffer,
-							   PAGE_SIZE);
-						printk(" path=%s", p);
-					} else if (u->addr) {
-						p = avc_audit_buffer;
-						memcpy(p,
-						       u->addr->name->sun_path,
-						       u->addr->len-sizeof(short));
-						if (*p == 0) {
-							*p = '@';
-							p += u->addr->len-sizeof(short);
-							*p = 0;
-						}
-						printk(" path=%s",
-						       avc_audit_buffer);
+						audit_log_d_path(ab, "path=",
+							u->dentry, u->mnt);
+						break;
 					}
+					if (!u->addr)
+						break;
+					len = u->addr->len-sizeof(short);
+					p = &u->addr->name->sun_path[0];
+					if (*p)
+						audit_log_format(ab,
+							"path=%*.*s", len,
+							len, p);
+					else
+						audit_log_format(ab,
+							"path=@%*.*s", len-1,
+							len-1, p+1);
 					break;
 				}
 			}
 			
 			switch (a->u.net.family) {
 			case AF_INET:
-				avc_print_ipv4_addr(a->u.net.v4info.saddr,
+				avc_print_ipv4_addr(ab, a->u.net.v4info.saddr,
 						    a->u.net.sport,
 						    "saddr", "src");
-				avc_print_ipv4_addr(a->u.net.v4info.daddr,
+				avc_print_ipv4_addr(ab, a->u.net.v4info.daddr,
 						    a->u.net.dport,
 						    "daddr", "dest");
 				break;
@@ -683,15 +675,14 @@ void avc_audit(u32 ssid, u32 tsid,
 				break;
 			}
 			if (a->u.net.netif)
-				printk(" netif=%s", a->u.net.netif);
+				audit_log_format(ab, " netif=%s",
+					a->u.net.netif);
 			break;
 		}
 	}
-	printk(" ");
-	avc_dump_query(ssid, tsid, tclass);
-	printk("\n");
-
-	spin_unlock_irqrestore(&avc_log_lock,flags);
+	audit_log_format(ab, " ");
+	avc_dump_query(ab, ssid, tsid, tclass);
+	audit_log_end(ab);
 }
 
 /**
@@ -1120,14 +1111,3 @@ int avc_has_perm(u32 ssid, u32 tsid, u16 tclass,
 	avc_audit(ssid, tsid, tclass, requested, &avd, rc, auditdata);
 	return rc;
 }
-
-static int __init avc_log_level_setup(char *str)
-{
-	avc_log_level = simple_strtol(str, NULL, 0);
-	if (avc_log_level > 7)
-		avc_log_level = 7;
-	return 1;
-}
-
-__setup("avc_log_level=", avc_log_level_setup);
-

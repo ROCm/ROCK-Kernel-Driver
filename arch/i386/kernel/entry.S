@@ -264,7 +264,7 @@ sysenter_past_esp:
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 
-	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)
@@ -287,7 +287,7 @@ ENTRY(system_call)
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 					# system call tracing in operation
-	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 syscall_call:
 	call *sys_call_table(,%eax,4)
@@ -354,7 +354,7 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	testb $_TIF_SYSCALL_TRACE, %cl
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT), %cl
 	jz work_pending
 	sti				# could let do_syscall_trace() call
 					# schedule() instead
