@@ -186,5 +186,12 @@ config DM_SNAPSHOT
        ---help---
          Allow volume managers to take writeable snapshots of a device.
 
+config DM_MIRROR
+       tristate "Mirror target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM && EXPERIMENTAL
+       ---help---
+         Allow volume managers to mirror logical volumes, also
+         needed for live data migration tools such as 'pvmove'.
+
 endmenu
 
