@@ -247,7 +247,7 @@ comment "USB Network Adapters"
 
 config USB_AX8817X
 	boolean "ASIX AX88172 Based USB 2.0 Ethernet Devices"
-	depends on USB_USBNET && EXPERIMENTAL
+	depends on USB_USBNET
 	default y
 	help
 
