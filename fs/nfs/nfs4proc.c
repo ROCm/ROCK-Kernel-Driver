@@ -417,7 +417,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 	 * when talking to the server, we always send cookie 0
 	 * instead of 1 or 2.
 	 */
-	start = p = (u32 *)kmap(*pages);
+	start = p = (u32 *)kmap_atomic(*pages, KM_USER0);
 	
 	if (cookie == 0) {
 		*p++ = xdr_one;                                  /* next */
@@ -445,7 +445,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 
 	readdir->rd_pgbase = (char *)p - (char *)start;
 	readdir->rd_count -= readdir->rd_pgbase;
-	kunmap(*pages);
+	kunmap_atomic(start, KM_USER0);
 }
 
 static void
@@ -1371,7 +1371,7 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	int flags;
 
 	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.offset = req_offset(req);
 	data->args.pgbase = req->wb_offset;
 	data->args.pages  = data->pagevec;
 	data->args.count  = count;
@@ -1444,7 +1444,7 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 		stable = NFS_UNSTABLE;
 
 	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.offset = req_offset(req);
 	data->args.pgbase = req->wb_offset;
 	data->args.count  = count;
 	data->args.stable = stable;

@@ -730,7 +730,7 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	
 	req = nfs_list_entry(data->pages.next);
 	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.offset = req_offset(req);
 	data->args.pgbase = req->wb_offset;
 	data->args.pages  = data->pagevec;
 	data->args.count  = count;
@@ -787,7 +787,7 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	
 	req = nfs_list_entry(data->pages.next);
 	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.offset = req_offset(req);
 	data->args.pgbase = req->wb_offset;
 	data->args.count  = count;
 	data->args.stable = stable;

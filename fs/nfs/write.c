@@ -750,7 +750,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how)
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
 		count,
-		(unsigned long long)req_offset(req) + req->wb_offset);
+		(unsigned long long)req_offset(req));
 }
 
 /*
@@ -884,7 +884,7 @@ nfs_writeback_done(struct rpc_task *task)
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(req_offset(req) + req->wb_offset));
+			(long long)req_offset(req));
 
 		if (task->tk_status < 0) {
 			ClearPageUptodate(page);
@@ -940,8 +940,8 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data, int how
 	 * Determine the offset range of requests in the COMMIT call.
 	 * We rely on the fact that data->pages is an ordered list...
 	 */
-	start = req_offset(first) + first->wb_offset;
-	end = req_offset(last) + (last->wb_offset + last->wb_bytes);
+	start = req_offset(first);
+	end = req_offset(last) + last->wb_bytes;
 	len = end - start;
 	/* If 'len' is not a 32-bit quantity, pass '0' in the COMMIT call */
 	if (end >= inode->i_size || len < 0 || len > (~((u32)0) >> 1))
@@ -1011,7 +1011,7 @@ nfs_commit_done(struct rpc_task *task)
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(req_offset(req) + req->wb_offset));
+			(long long)req_offset(req));
 		if (task->tk_status < 0) {
 			if (req->wb_file)
 				req->wb_file->f_error = task->tk_status;
