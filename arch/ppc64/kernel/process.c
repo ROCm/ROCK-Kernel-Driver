@@ -457,17 +457,26 @@ out:
 
 static int kstack_depth_to_print = 64;
 
-static inline int validate_sp(unsigned long sp, struct task_struct *p)
+static int validate_sp(unsigned long sp, struct task_struct *p)
 {
+	int cpu = task_cpu(p);
 	unsigned long stack_page = (unsigned long)p->thread_info;
 
-	if (sp < stack_page + sizeof(struct thread_struct))
-		return 0;
-	/* stack frames are at least 64 bytes */
-	if (sp > stack_page + THREAD_SIZE - 64)
-		return 0;
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - 112)
+		return 1;
 
-	return 1;
+	stack_page = (unsigned long) hardirq_ctx[cpu];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - 112)
+		return 1;
+
+	stack_page = (unsigned long) softirq_ctx[cpu];
+	if (sp >= stack_page + sizeof(struct thread_struct)
+	    && sp <= stack_page + THREAD_SIZE - 112)
+		return 1;
+
+	return 0;
 }
 
 /*

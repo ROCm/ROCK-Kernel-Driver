@@ -941,8 +941,6 @@ static void xmon_show_stack(unsigned long sp)
 
 		if (!mread(sp, &newsp, sizeof(unsigned long)))
 			break;
-		if (newsp < sp)
-			break;
 
 		sp = newsp;
 	} while (count++ < xmon_depth_to_print);

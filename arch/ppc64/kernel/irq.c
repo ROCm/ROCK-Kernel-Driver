@@ -41,6 +41,7 @@
 #include <linux/proc_fs.h>
 #include <linux/random.h>
 #include <linux/kallsyms.h>
+#include <linux/bootmem.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -370,8 +371,7 @@ skip:
 	return 0;
 }
 
-static inline int handle_irq_event(int irq, struct pt_regs *regs,
-				   struct irqaction *action)
+int handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 {
 	int status = 0;
 	int retval = 0;
@@ -482,6 +482,9 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = get_irq_desc(irq);
 	irqreturn_t action_ret;
+#ifdef CONFIG_IRQSTACKS
+	struct thread_info *curtp, *irqtp;
+#endif
 
 	kstat_cpu(cpu).irqs[irq]++;
 
@@ -548,7 +551,23 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	 */
 	for (;;) {
 		spin_unlock(&desc->lock);
-		action_ret = handle_irq_event(irq, regs, action);
+
+#ifdef CONFIG_IRQSTACKS
+		/* Switch to the irq stack to handle this */
+		curtp = current_thread_info();
+		irqtp = hardirq_ctx[smp_processor_id()];
+		if (curtp != irqtp) {
+			irqtp->task = curtp->task;
+			irqtp->flags = 0;
+			action_ret = call_handle_irq_event(irq, regs, action, irqtp);
+			irqtp->task = NULL;
+			if (irqtp->flags)
+				set_bits(irqtp->flags, &curtp->flags);
+		} else
+#else
+			action_ret = handle_irq_event(irq, regs, action);
+#endif
+
 		spin_lock(&desc->lock);
 		if (!noirqdebug)
 			note_interrupt(irq, desc, action_ret);
@@ -690,6 +709,7 @@ void __init init_IRQ(void)
 	once++;
 
 	ppc_md.init_IRQ();
+	irq_ctx_init();
 }
 
 static struct proc_dir_entry * root_irq_dir;
@@ -973,4 +993,57 @@ unsigned int real_irq_to_virt_slowpath(unsigned int real_irq)
 
 }
 
-#endif
+#endif /* CONFIG_PPC_ISERIES */
+
+#ifdef CONFIG_IRQSTACKS
+struct thread_info *softirq_ctx[NR_CPUS];
+struct thread_info *hardirq_ctx[NR_CPUS];
+
+void irq_ctx_init(void)
+{
+	struct thread_info *tp;
+	int i;
+	void *stack;
+
+	for_each_cpu(i) {
+		stack = __alloc_bootmem(THREAD_SIZE, THREAD_SIZE, 0);
+		BUG_ON(!stack);
+		memset(stack, 0, THREAD_SIZE);
+		tp = (struct thread_info *) stack;
+		softirq_ctx[i] = tp;
+		tp->cpu = i;
+		tp->preempt_count = SOFTIRQ_OFFSET;
+
+		stack = __alloc_bootmem(THREAD_SIZE, THREAD_SIZE, 0);
+		BUG_ON(!stack);
+		memset(stack, 0, THREAD_SIZE);
+		tp = (struct thread_info *) stack;
+		hardirq_ctx[i] = tp;
+		tp->cpu = i;
+		tp->preempt_count = HARDIRQ_OFFSET;
+	}
+}
+
+void do_softirq(void)
+{
+	unsigned long flags;
+	struct thread_info *curtp, *irqtp;
+
+	if (in_interrupt())
+		return;
+
+	local_irq_save(flags);
+
+	if (local_softirq_pending()) {
+		curtp = current_thread_info();
+		irqtp = softirq_ctx[smp_processor_id()];
+		irqtp->task = curtp->task;
+		call_do_softirq(irqtp);
+		irqtp->task = NULL;
+	}
+
+	local_irq_restore(flags);
+}
+
+#endif /* CONFIG_IRQSTACKS */
+
