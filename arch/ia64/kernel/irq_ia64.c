@@ -36,6 +36,10 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 
+#ifdef CONFIG_PERFMON
+# include <asm/perfmon.h>
+#endif
+
 #define IRQ_DEBUG	0
 
 /* default base addr of IPI table */
@@ -172,6 +176,9 @@ init_IRQ (void)
 	register_percpu_irq(IA64_SPURIOUS_INT_VECTOR, NULL);
 #ifdef CONFIG_SMP
 	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);
+#endif
+#ifdef CONFIG_PERFMON
+	perfmon_init_percpu();
 #endif
 	platform_irq_init();
 }

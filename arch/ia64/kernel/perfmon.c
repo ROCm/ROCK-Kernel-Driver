@@ -4157,11 +4157,6 @@ perfmon_init (void)
 	pal_perf_mon_info_u_t pm_info;
 	s64 status;
 
-	register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
-
-	ia64_set_pmv(IA64_PERFMON_VECTOR);
-	ia64_srlz_d();
-
 	pmu_conf.pfm_is_disabled = 1;
 
 	printk("perfmon: version %u.%u (sampling format v%u.%u) IRQ %u\n", 
@@ -4239,6 +4234,9 @@ __initcall(perfmon_init);
 void
 perfmon_init_percpu (void)
 {
+	if (smp_processor_id() == 0)
+		register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
+
 	ia64_set_pmv(IA64_PERFMON_VECTOR);
 	ia64_srlz_d();
 }
