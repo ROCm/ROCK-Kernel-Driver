@@ -2893,6 +2893,7 @@ static int sctp_getsockopt_peer_addrs(struct sock *sk, int len,
 		memcpy(&temp, &from->ipaddr, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(sk->sk_family)->sockaddr_len;
+		temp.v4.sin_port = htons(temp.v4.sin_port);
 		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
 		to += addrlen ;
@@ -2987,6 +2988,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 		memcpy(&temp, &from->a, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
+		temp.v4.sin_port = htons(temp.v4.sin_port);
 		if (copy_to_user(to, &temp, addrlen))
 			return -EFAULT;
 		to += addrlen;
