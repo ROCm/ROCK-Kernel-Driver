@@ -41,8 +41,8 @@ static int gs_debug;
 #define gs_dprintk(f, str...) /* nothing */
 #endif
 
-#define func_enter() gs_dprintk (GS_DEBUG_FLOW, "gs: enter " __FUNCTION__ "\n")
-#define func_exit()  gs_dprintk (GS_DEBUG_FLOW, "gs: exit  " __FUNCTION__ "\n")
+#define func_enter() gs_dprintk (GS_DEBUG_FLOW, "gs: enter %s\n", __FUNCTION__)
+#define func_exit()  gs_dprintk (GS_DEBUG_FLOW, "gs: exit  %s\n", __FUNCTION__)
 
 #if NEW_WRITE_LOCKING
 #define DECL      /* Nothing */

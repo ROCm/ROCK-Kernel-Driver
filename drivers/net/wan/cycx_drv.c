@@ -423,9 +423,9 @@ static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
 
 	/* Verify firmware module format version */
 	if (cfm->version != CFM_VERSION) {
-		printk(KERN_ERR "%s:" __FUNCTION__ ": firmware format %u rejected! "
+		printk(KERN_ERR "%s:%s: firmware format %u rejected! "
 				"Expecting %u.\n",
-				modname, cfm->version, CFM_VERSION);
+				modname, __FUNCTION__, cfm->version, CFM_VERSION);
 		return -EINVAL;
 	}
 
@@ -437,8 +437,8 @@ static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
 	if (((len - sizeof(cfm_t) - 1) != cfm->info.codesize) ||
 */
 	if (cksum != cfm->checksum) {
-		printk(KERN_ERR "%s:" __FUNCTION__ ": firmware corrupted!\n",
-				modname);
+		printk(KERN_ERR "%s:%s: firmware corrupted!\n",
+				modname, __FUNCTION__);
 		printk(KERN_ERR " cdsize = 0x%x (expected 0x%lx)\n",
 				len - sizeof(cfm_t) - 1, cfm->info.codesize);
                 printk(KERN_ERR " chksum = 0x%x (expected 0x%x)\n",
@@ -450,7 +450,7 @@ static int load_cyc2x(cycxhw_t *hw, cfm_t *cfm, u32 len)
 
 	img_hdr = (cycx_header_t*)(((u8*)cfm) + sizeof(cfm_t) - 1);
 #ifdef FIRMWARE_DEBUG
-	printk(KERN_INFO "%s:" __FUNCTION__ ": image sizes\n", modname);
+	printk(KERN_INFO "%s:%s: image sizes\n", __FUNCTION__, modname);
 	printk(KERN_INFO " reset=%lu\n", img_hdr->reset_size);
 	printk(KERN_INFO "  data=%lu\n", img_hdr->data_size);
 	printk(KERN_INFO "  code=%lu\n", img_hdr->code_size);

@@ -1446,7 +1446,7 @@ static void chan_x25_send_event(struct net_device *dev, u8 event)
         unsigned char *ptr;
 
         if ((skb = dev_alloc_skb(1)) == NULL) {
-                printk(KERN_ERR __FUNCTION__ ": out of memory\n");
+                printk(KERN_ERR "%s: out of memory\n", __FUNCTION__);
                 return;
         }
 
