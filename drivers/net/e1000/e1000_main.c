@@ -1760,7 +1760,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int mss = 0;
 	int count = 0;
 	unsigned int f;
-	nr_frags = skb_shinfo(skb)->nr_frags;
 	len -= skb->data_len;
 
 	if(unlikely(skb->len <= 0)) {
