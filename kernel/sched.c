@@ -2299,17 +2299,17 @@ static void account_it_prof(struct task_struct *p, cputime_t cputime)
 static void check_rlimit(struct task_struct *p, cputime_t cputime)
 {
 	cputime_t total, tmp;
+	unsigned long secs;
 
 	total = cputime_add(p->utime, p->stime);
-	tmp = jiffies_to_cputime(p->signal->rlim[RLIMIT_CPU].rlim_cur);
-	if (unlikely(cputime_gt(total, tmp))) {
+	secs = cputime_to_secs(total);
+	if (unlikely(secs >= p->signal->rlim[RLIMIT_CPU].rlim_cur)) {
 		/* Send SIGXCPU every second. */
 		tmp = cputime_sub(total, cputime);
-		if (cputime_to_secs(tmp) < cputime_to_secs(total))
+		if (cputime_to_secs(tmp) < secs)
 			send_sig(SIGXCPU, p, 1);
 		/* and SIGKILL when we go over max.. */
-		tmp = jiffies_to_cputime(p->signal->rlim[RLIMIT_CPU].rlim_max);
-		if (cputime_gt(total, tmp))
+		if (secs >= p->signal->rlim[RLIMIT_CPU].rlim_max)
 			send_sig(SIGKILL, p, 1);
 	}
 }
