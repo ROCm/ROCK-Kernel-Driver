@@ -159,8 +159,6 @@ static int	stli_nrbrds = sizeof(stli_brdconf) / sizeof(stlconf_t);
 #define	STL_CALLOUTMAJOR	25
 #endif
 
-#define	STL_DRVTYPSERIAL	1
-
 /*****************************************************************************/
 
 /*
@@ -5303,7 +5301,7 @@ int __init stli_init(void)
 	stli_serial.minor_start = 0;
 	stli_serial.num = STL_MAXBRDS * STL_MAXPORTS;
 	stli_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stli_serial.subtype = STL_DRVTYPSERIAL;
+	stli_serial.subtype = SERIAL_TYPE_NORMAL;
 	stli_serial.init_termios = stli_deftermios;
 	stli_serial.flags = TTY_DRIVER_REAL_RAW;
 	stli_serial.refcount = &stli_refcount;

@@ -249,11 +249,6 @@
    one machine. You'll have to increase the number of boards in sx.h
    if you want more than 4 boards.  */
 
-
-/* Why the hell am I defining these here? */
-#define SX_TYPE_NORMAL 1
-
-
 #ifndef PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8
 #define PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8 0x2000
 #endif
@@ -2240,7 +2235,7 @@ static int sx_init_drivers(void)
 	sx_driver.major = SX_NORMAL_MAJOR;
 	sx_driver.num = sx_nports;
 	sx_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	sx_driver.subtype = SX_TYPE_NORMAL;
+	sx_driver.subtype = SERIAL_TYPE_NORMAL;
 	sx_driver.init_termios = tty_std_termios;
 	sx_driver.init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;

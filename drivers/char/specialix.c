@@ -176,8 +176,6 @@ DECLARE_TASK_QUEUE(tq_specialix);
 #undef RS_EVENT_WRITE_WAKEUP
 #define RS_EVENT_WRITE_WAKEUP	0
 
-#define SPECIALIX_TYPE_NORMAL	1
-
 static struct tty_driver specialix_driver;
 static int    specialix_refcount;
 static struct tty_struct * specialix_table[SX_NBOARD * SX_NPORT];
@@ -2188,7 +2186,7 @@ static int sx_init_drivers(void)
 	specialix_driver.major = SPECIALIX_NORMAL_MAJOR;
 	specialix_driver.num = SX_NBOARD * SX_NPORT;
 	specialix_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	specialix_driver.subtype = SPECIALIX_TYPE_NORMAL;
+	specialix_driver.subtype = SERIAL_TYPE_NORMAL;
 	specialix_driver.init_termios = tty_std_termios;
 	specialix_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;

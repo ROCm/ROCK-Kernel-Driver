@@ -111,10 +111,6 @@ know why. If you want to try anyway you'll have to increase the number
 of boards in rio.h.  You'll have to allocate more majors if you need
 more than 512 ports.... */
 
-
-/* Why the hell am I defining these here? */
-#define RIO_TYPE_NORMAL 1
-
 #ifndef RIO_NORMAL_MAJOR0
 /* This allows overriding on the compiler commandline, or in a "major.h" 
    include or something like that */
@@ -885,7 +881,7 @@ static int rio_init_drivers(void)
   rio_driver.major = RIO_NORMAL_MAJOR0;
   rio_driver.num = 256;
   rio_driver.type = TTY_DRIVER_TYPE_SERIAL;
-  rio_driver.subtype = RIO_TYPE_NORMAL;
+  rio_driver.subtype = SERIAL_TYPE_NORMAL;
   rio_driver.init_termios = tty_std_termios;
   rio_driver.init_termios.c_cflag =
     B9600 | CS8 | CREAD | HUPCL | CLOCAL;

@@ -120,8 +120,6 @@ static int	stl_nrbrds = sizeof(stl_brdconf) / sizeof(stlconf_t);
 #define	STL_CALLOUTMAJOR	25
 #endif
 
-#define	STL_DRVTYPSERIAL	1
-
 /*
  *	Set the TX buffer size. Bigger is better, but we don't want
  *	to chew too much memory with buffers!
@@ -3185,7 +3183,7 @@ int __init stl_init(void)
 	stl_serial.minor_start = 0;
 	stl_serial.num = STL_MAXBRDS * STL_MAXPORTS;
 	stl_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stl_serial.subtype = STL_DRVTYPSERIAL;
+	stl_serial.subtype = SERIAL_TYPE_NORMAL;
 	stl_serial.init_termios = stl_deftermios;
 	stl_serial.flags = TTY_DRIVER_REAL_RAW;
 	stl_serial.refcount = &stl_refcount;

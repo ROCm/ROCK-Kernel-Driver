@@ -85,8 +85,6 @@ int irqhit=0;
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
-#define AURORA_TYPE_NORMAL	1
-
 static struct tty_driver aurora_driver;
 static struct Aurora_board aurora_board[AURORA_NBOARD] = {
 	{0,},
@@ -2293,7 +2291,7 @@ static int aurora_init_drivers(void)
 	aurora_driver.major = AURORA_MAJOR;
 	aurora_driver.num = AURORA_TNPORTS;
 	aurora_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	aurora_driver.subtype = AURORA_TYPE_NORMAL;
+	aurora_driver.subtype = SERIAL_TYPE_NORMAL;
 	aurora_driver.init_termios = tty_std_termios;
 	aurora_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;

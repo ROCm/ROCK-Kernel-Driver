@@ -699,7 +699,7 @@ static int a2232_init_drivers(void)
 	a2232_driver.major = A2232_NORMAL_MAJOR;
 	a2232_driver.num = NUMLINES * nr_a2232;
 	a2232_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	a2232_driver.subtype = A2232_TTY_SUBTYPE_NORMAL;
+	a2232_driver.subtype = SERIAL_TTY_NORMAL;
 	a2232_driver.init_termios = tty_std_termios;
 	a2232_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;

@@ -83,8 +83,6 @@
 
 static DECLARE_TASK_QUEUE(tq_riscom);
 
-#define RISCOM_TYPE_NORMAL	1
-
 static struct riscom_board * IRQ_to_board[16];
 static struct tty_driver riscom_driver;
 static int    riscom_refcount;
@@ -1715,7 +1713,7 @@ static inline int rc_init_drivers(void)
 	riscom_driver.major = RISCOM8_NORMAL_MAJOR;
 	riscom_driver.num = RC_NBOARD * RC_NPORT;
 	riscom_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	riscom_driver.subtype = RISCOM_TYPE_NORMAL;
+	riscom_driver.subtype = SERIAL_TYPE_NORMAL;
 	riscom_driver.init_termios = tty_std_termios;
 	riscom_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
