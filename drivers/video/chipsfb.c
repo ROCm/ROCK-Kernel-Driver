@@ -74,10 +74,10 @@ struct fb_info_chips {
 
 #define write_ind(num, val, ap, dp)	do { \
 	outb((num), (ap)); outb((val), (dp)); \
-} while (0);
+} while (0)
 #define read_ind(num, var, ap, dp)	do { \
 	outb((num), (ap)); var = inb((dp)); \
-} while (0);
+} while (0)
 
 /* extension registers */
 #define write_xr(num, val)	write_ind(num, val, 0x3d6, 0x3d7)

@@ -601,13 +601,13 @@ acornfb_adjust_timing(struct fb_var_screeninfo *var, int con)
 	/* Find int 'y', such that y * fll == s * sam < maxsize
 	 * y = s * sam / fll; s = maxsize / sam
 	 */
-	for (size = current_par.screen_size; min_size <= size;
+	for (size = current_par.screen_size;
+	     nr_y = size / font_line_len, min_size <= size;
 	     size -= sam_size) {
-		nr_y = size / font_line_len;
-
 		if (nr_y * font_line_len == size)
 			break;
 	}
+	nr_y *= fontht;
 
 	if (var->accel_flags & FB_ACCELF_TEXT) {
 		if (min_size > size) {
@@ -617,8 +617,9 @@ acornfb_adjust_timing(struct fb_var_screeninfo *var, int con)
 			size = current_par.screen_size;
 			var->yres_virtual = size / (font_line_len / fontht);
 		} else
-			var->yres_virtual = nr_y * fontht;
-	}
+			var->yres_virtual = nr_y;
+	} else if (var->yres_virtual > nr_y)
+		var->yres_virtual = nr_y;
 
 	current_par.screen_end = current_par.screen_base_p + size;
 
@@ -1100,6 +1101,41 @@ acornfb_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
+static int 
+acornfb_blank(int blank, struct fb_info *info)
+{
+	union palette p;
+	int i, bpp = fb_display[info->currcon].var.bits_per_pixel;
+
+#ifdef FBCON_HAS_CFB16
+	if (bpp == 16) {
+		p.p = 0;
+
+		for (i = 0; i < 256; i++) {
+			if (blank)
+				p = acornfb_palette_encode(i, 0, 0, 0, 0);
+			else {
+				p.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
+				p.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
+				p.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
+			}
+			acornfb_palette_write(i, current_par.palette[i]);
+		}
+	} else
+#endif
+	{
+		for (i = 0; i < current_par.palette_size; i++) {
+			if (blank)
+				p = acornfb_palette_encode(i, 0, 0, 0, 0);
+			else
+				p = current_par.palette[i];
+
+			acornfb_palette_write(i, p);
+		}
+	}
+	return 0;
+}
+
 /*
  * Note that we are entered with the kernel locked.
  */
@@ -1146,7 +1182,7 @@ static struct fb_ops acornfb_ops = {
 	fb_set_var:	acornfb_set_var,
 	fb_get_cmap:	acornfb_get_cmap,
 	fb_set_cmap:	gen_set_cmap,
-	fb_set_colreg:	acornfb_setcolreg,
+	fb_setcolreg:	acornfb_setcolreg,
 	fb_pan_display:	acornfb_pan_display,
 	fb_blank:	acornfb_blank,
 	fb_mmap:	acornfb_mmap,
@@ -1179,41 +1215,6 @@ acornfb_switch(int con, struct fb_info *info)
 
 	acornfb_set_var(&fb_display[con].var, con, info);
 
-	return 0;
-}
-
-static int 
-acornfb_blank(int blank, struct fb_info *info)
-{
-	union palette p;
-	int i, bpp = fb_display[info->currcon].var.bits_per_pixel;
-
-#ifdef FBCON_HAS_CFB16
-	if (bpp == 16) {
-		p.p = 0;
-
-		for (i = 0; i < 256; i++) {
-			if (blank)
-				p = acornfb_palette_encode(i, 0, 0, 0, 0);
-			else {
-				p.vidc20.red   = current_par.palette[ i       & 31].vidc20.red;
-				p.vidc20.green = current_par.palette[(i >> 1) & 31].vidc20.green;
-				p.vidc20.blue  = current_par.palette[(i >> 2) & 31].vidc20.blue;
-			}
-			acornfb_palette_write(i, current_par.palette[i]);
-		}
-	} else
-#endif
-	{
-		for (i = 0; i < current_par.palette_size; i++) {
-			if (blank)
-				p = acornfb_palette_encode(i, 0, 0, 0, 0);
-			else
-				p = current_par.palette[i];
-
-			acornfb_palette_write(i, p);
-		}
-	}
 	return 0;
 }
 
