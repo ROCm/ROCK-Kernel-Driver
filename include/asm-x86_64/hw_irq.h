@@ -77,7 +77,7 @@ struct hw_interrupt_type;
 
 #ifndef __ASSEMBLY__
 extern u8 irq_vector[NR_IRQ_VECTORS];
-#define IO_APIC_VECTOR(irq)	((int)irq_vector[irq])
+#define IO_APIC_VECTOR(irq)	(irq_vector[irq])
 
 /*
  * Various low-level irq details needed by irq.c, process.c,
@@ -132,7 +132,7 @@ static inline void x86_do_profile (struct pt_regs *regs)
 {
 	unsigned long rip;
 	extern unsigned long prof_cpu_mask;
-	extern char _stext;
+	extern char _stext[];
  
 	profile_hook(regs);
 
