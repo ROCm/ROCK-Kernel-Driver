@@ -82,9 +82,6 @@ udbg_putc(unsigned char c)
 				/* wait for idle */;
 			udbg_comport->thr = '\r'; eieio();
 		}
-	} else if (naca->platform == PLATFORM_ISERIES_LPAR) {
-		/* ToDo: switch this via ppc_md */
-		printk("%c", c);
 	}
 }
 
