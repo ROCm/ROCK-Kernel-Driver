@@ -98,8 +98,6 @@ void __init mach_setup (char **cmdline)
 	AS85EP1_PORT_PMC (LEDS_PORT) = 0; /* Make the LEDs port an I/O port. */
 	AS85EP1_PORT_PM (LEDS_PORT) = 0; /* Make all the bits output pins.  */
 	mach_tick = as85ep1_led_tick;
-
-	ROOT_DEV = MKDEV (BLKMEM_MAJOR, 0);
 }
 
 void __init mach_get_physical_ram (unsigned long *ram_start,
@@ -133,10 +131,10 @@ void __init mach_reserve_bootmem ()
 				 root_fs_image_end - root_fs_image_start);
 }
 
-void mach_gettimeofday (struct timeval *tv)
+void mach_gettimeofday (struct timespec *tv)
 {
 	tv->tv_sec = 0;
-	tv->tv_usec = 0;
+	tv->tv_nsec = 0;
 }
 
 void __init mach_sched_init (struct irqaction *timer_action)

@@ -14,8 +14,9 @@
 #ifndef __V850_AS85EP1_H__
 #define __V850_AS85EP1_H__
 
+#include <asm/v850e.h>
 
-#define CPU_ARCH 	"v850e"
+
 #define CPU_MODEL	"as85ep1"
 #define CPU_MODEL_LONG	"NEC V850E/AS85EP1"
 #define PLATFORM	"AS85EP1"
@@ -85,9 +86,6 @@
 #define AS85EP1_PORT_PMC_ADDR(n) (0xFFFFF440 + (n) * 2)
 #define AS85EP1_PORT_PMC(n)	(*(volatile u8 *)AS85EP1_PORT_PMC_ADDR(n))
 
-
-/* NB85E-style interrupt system.  */
-#include <asm/nb85e_intc.h>
 
 /* Hardware-specific interrupt numbers (in the kernel IRQ namespace).  */
 #define IRQ_INTCCC(n)	(0x0C + (n))
