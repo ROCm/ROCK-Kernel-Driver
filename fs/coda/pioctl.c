@@ -58,7 +58,7 @@ static int coda_pioctl(struct inode * inode, struct file * filp,
         struct coda_inode_info *cnp;
 
         /* get the Pioctl data arguments from user space */
-        if (copy_from_user(&data, (int *)user_data, sizeof(data))) {
+        if (copy_from_user(&data, (void __user *)user_data, sizeof(data))) {
 	    return -EINVAL;
 	}
        
