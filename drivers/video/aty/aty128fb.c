@@ -2439,14 +2439,6 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 
 int __init aty128fb_init(void)
 {
-#ifndef MODULE
-	char *option = NULL;
-
-	if (fb_get_options("aty128fb", &option))
-		return -ENODEV;
-	aty128fb_setup(option);
-#endif
-
 	return pci_module_init(&aty128fb_driver);
 }
 
