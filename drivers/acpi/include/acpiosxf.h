@@ -251,9 +251,9 @@ acpi_os_write_pci_configuration (
  */
 void
 acpi_os_derive_pci_id(
-	acpi_handle	            rhandle,
+	acpi_handle             rhandle,
 	acpi_handle             chandle,
-	acpi_pci_id	            **pci_id);
+	acpi_pci_id             **pci_id);
 
 /*
  * Miscellaneous
@@ -284,12 +284,12 @@ acpi_os_signal (
 
 void ACPI_INTERNAL_VAR_XFACE
 acpi_os_printf (
-	const NATIVE_CHAR       *format,
+	const char              *format,
 	...);
 
 void
 acpi_os_vprintf (
-	const NATIVE_CHAR       *format,
+	const char              *format,
 	va_list                 args);
 
 void
@@ -303,7 +303,7 @@ acpi_os_redirect_output (
 
 u32
 acpi_os_get_line (
-	NATIVE_CHAR             *buffer);
+	char                    *buffer);
 
 
 /*
@@ -315,7 +315,7 @@ acpi_os_dbg_assert(
 	void                    *failed_assertion,
 	void                    *file_name,
 	u32                     line_number,
-	NATIVE_CHAR             *message);
+	char                    *message);
 
 
 #endif /* __ACPIOSXF_H__ */

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 80 $
+ *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -108,7 +108,7 @@ acpi_ds_load1_begin_op (
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_object_type        object_type;
-	NATIVE_CHAR             *path;
+	char                    *path;
 	u32                     flags;
 
 
@@ -423,7 +423,7 @@ acpi_ds_load2_begin_op (
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_object_type        object_type;
-	NATIVE_CHAR             *buffer_ptr;
+	char                    *buffer_ptr;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_load2_begin_op");
@@ -456,7 +456,7 @@ acpi_ds_load2_begin_op (
 		else {
 			/* Get name from the op */
 
-			buffer_ptr = (NATIVE_CHAR *) &op->named.name;
+			buffer_ptr = (char *) &op->named.name;
 		}
 	}
 	else {

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exmisc - ACPI AML (p-code) execution - specific opcodes
- *              $Revision: 113 $
+ *              $Revision: 114 $
  *
  *****************************************************************************/
 
@@ -225,7 +225,7 @@ acpi_ex_do_concatenate (
 	u32                     i;
 	acpi_integer            this_integer;
 	acpi_operand_object     *return_desc;
-	NATIVE_CHAR             *new_buf;
+	char                    *new_buf;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -249,13 +249,13 @@ acpi_ex_do_concatenate (
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = (NATIVE_CHAR *) return_desc->buffer.pointer;
+		new_buf = (char *) return_desc->buffer.pointer;
 
 		/* Convert the first integer */
 
 		this_integer = obj_desc1->integer.value;
 		for (i = 0; i < acpi_gbl_integer_byte_width; i++) {
-			new_buf[i] = (NATIVE_CHAR) this_integer;
+			new_buf[i] = (char) this_integer;
 			this_integer >>= 8;
 		}
 
@@ -263,7 +263,7 @@ acpi_ex_do_concatenate (
 
 		this_integer = obj_desc2->integer.value;
 		for (; i < (ACPI_MUL_2 (acpi_gbl_integer_byte_width)); i++) {
-			new_buf[i] = (NATIVE_CHAR) this_integer;
+			new_buf[i] = (char) this_integer;
 			this_integer >>= 8;
 		}
 
@@ -315,7 +315,7 @@ acpi_ex_do_concatenate (
 			return (AE_NO_MEMORY);
 		}
 
-		new_buf = (NATIVE_CHAR *) return_desc->buffer.pointer;
+		new_buf = (char *) return_desc->buffer.pointer;
 
 		/* Concatenate the buffers */
 

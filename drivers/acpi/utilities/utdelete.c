@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utdelete - object deletion and reference count utilities
- *              $Revision: 93 $
+ *              $Revision: 94 $
  *
  ******************************************************************************/
 
@@ -74,6 +74,8 @@ acpi_ut_delete_internal_obj (
 		/* Free the actual string buffer */
 
 		if (!(object->common.flags & AOPOBJ_STATIC_POINTER)) {
+			/* But only if it is NOT a pointer into an ACPI table */
+
 			obj_pointer = object->string.pointer;
 		}
 		break;
@@ -86,7 +88,11 @@ acpi_ut_delete_internal_obj (
 
 		/* Free the actual buffer */
 
-		obj_pointer = object->buffer.pointer;
+		if (!(object->common.flags & AOPOBJ_STATIC_POINTER)) {
+			/* But only if it is NOT a pointer into an ACPI table */
+
+			obj_pointer = object->buffer.pointer;
+		}
 		break;
 
 

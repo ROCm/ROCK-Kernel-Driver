@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 63 $
+ *       $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -77,7 +77,7 @@ u32
 acpi_ps_get_next_package_length (
 	acpi_parse_state        *parser_state);
 
-NATIVE_CHAR *
+char *
 acpi_ps_get_next_namestring (
 	acpi_parse_state        *parser_state);
 
@@ -125,7 +125,7 @@ const acpi_opcode_info *
 acpi_ps_get_opcode_info (
 	u16                     opcode);
 
-NATIVE_CHAR *
+char *
 acpi_ps_get_opcode_name (
 	u16                     opcode);
 
@@ -222,7 +222,7 @@ acpi_ps_append_arg(
 acpi_parse_object*
 acpi_ps_find (
 	acpi_parse_object       *scope,
-	NATIVE_CHAR             *path,
+	char                    *path,
 	u16                     opcode,
 	u32                     create);
 
@@ -311,13 +311,13 @@ acpi_ps_set_name(
 
 u32
 acpi_ps_sprint_path (
-	NATIVE_CHAR             *buffer_start,
+	char                    *buffer_start,
 	u32                     buffer_size,
 	acpi_parse_object       *op);
 
 u32
 acpi_ps_sprint_op (
-	NATIVE_CHAR             *buffer_start,
+	char                    *buffer_start,
 	u32                     buffer_size,
 	acpi_parse_object       *op);
 

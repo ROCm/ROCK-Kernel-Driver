@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 105 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -288,7 +288,7 @@ void
 acpi_ut_trace_str (
 	u32                     line_number,
 	acpi_debug_print_info   *dbg_info,
-	NATIVE_CHAR             *string)
+	char                    *string)
 {
 
 	acpi_gbl_nesting_level++;

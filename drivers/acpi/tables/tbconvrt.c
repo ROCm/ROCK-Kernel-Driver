@@ -256,50 +256,50 @@ acpi_tb_convert_fadt2 (
 	 * we must selectively expand V1.0 fields if the corresponding X field
 	 * is zero.
 	 */
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xfirmware_ctrl))) {
+	if (!(local_fadt->Xfirmware_ctrl)) {
 		ACPI_STORE_ADDRESS (local_fadt->Xfirmware_ctrl, local_fadt->V1_firmware_ctrl);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xdsdt))) {
+	if (!(local_fadt->Xdsdt)) {
 		ACPI_STORE_ADDRESS (local_fadt->Xdsdt, local_fadt->V1_dsdt);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1a_evt_blk.address))) {
+	if (!(local_fadt->Xpm1a_evt_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_evt_blk,
 			local_fadt->pm1_evt_len, local_fadt->V1_pm1a_evt_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1b_evt_blk.address))) {
+	if (!(local_fadt->Xpm1b_evt_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_evt_blk,
 			local_fadt->pm1_evt_len, local_fadt->V1_pm1b_evt_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1a_cnt_blk.address))) {
+	if (!(local_fadt->Xpm1a_cnt_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1a_cnt_blk,
 			local_fadt->pm1_cnt_len, local_fadt->V1_pm1a_cnt_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm1b_cnt_blk.address))) {
+	if (!(local_fadt->Xpm1b_cnt_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm1b_cnt_blk,
 			local_fadt->pm1_cnt_len, local_fadt->V1_pm1b_cnt_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm2_cnt_blk.address))) {
+	if (!(local_fadt->Xpm2_cnt_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm2_cnt_blk,
 			local_fadt->pm2_cnt_len, local_fadt->V1_pm2_cnt_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xpm_tmr_blk.address))) {
+	if (!(local_fadt->Xpm_tmr_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xpm_tmr_blk,
 			local_fadt->pm_tm_len, local_fadt->V1_pm_tmr_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xgpe0_blk.address))) {
+	if (!(local_fadt->Xgpe0_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe0_blk,
 			local_fadt->gpe0_blk_len, local_fadt->V1_gpe0_blk);
 	}
 
-	if (!(ACPI_GET_ADDRESS (local_fadt->Xgpe1_blk.address))) {
+	if (!(local_fadt->Xgpe1_blk.address)) {
 		ASL_BUILD_GAS_FROM_V1_ENTRY (local_fadt->Xgpe1_blk,
 			local_fadt->gpe1_blk_len, local_fadt->V1_gpe1_blk);
 	}
@@ -437,7 +437,7 @@ acpi_tb_build_common_facs (
 
 	if ((acpi_gbl_RSDP->revision < 2) ||
 		(acpi_gbl_FACS->length < 32) ||
-		(!(ACPI_GET_ADDRESS (acpi_gbl_FACS->Xfirmware_waking_vector)))) {
+		(!(acpi_gbl_FACS->Xfirmware_waking_vector))) {
 		/* ACPI 1.0 FACS or short table or optional X_ field is zero */
 
 		acpi_gbl_common_fACS.firmware_waking_vector = ACPI_CAST_PTR (u64, &(acpi_gbl_FACS->firmware_waking_vector));

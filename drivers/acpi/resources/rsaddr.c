@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsaddr - Address resource descriptors (16/32/64)
- *              $Revision: 26 $
+ *              $Revision: 27 $
  *
  ******************************************************************************/
 
@@ -198,7 +198,7 @@ acpi_rs_address16_resource (
 		/* Point the String pointer to the end of this structure */
 
 		output_struct->data.address16.resource_source.string_ptr =
-				(NATIVE_CHAR *)((u8 * )output_struct + struct_size);
+				(char *)((u8 * )output_struct + struct_size);
 
 		temp_ptr = (u8 *) output_struct->data.address16.resource_source.string_ptr;
 
@@ -273,7 +273,7 @@ acpi_rs_address16_stream (
 	u8                      *buffer = *output_buffer;
 	u8                      *length_field;
 	u8                      temp8;
-	NATIVE_CHAR             *temp_pointer = NULL;
+	char                    *temp_pointer = NULL;
 	ACPI_SIZE               actual_bytes;
 
 
@@ -378,7 +378,7 @@ acpi_rs_address16_stream (
 		*buffer = temp8;
 		buffer += 1;
 
-		temp_pointer = (NATIVE_CHAR *) buffer;
+		temp_pointer = (char *) buffer;
 
 		/*
 		 * Copy the string
@@ -583,7 +583,7 @@ acpi_rs_address32_resource (
 		/* Point the String pointer to the end of this structure */
 
 		output_struct->data.address32.resource_source.string_ptr =
-				(NATIVE_CHAR *)((u8 *)output_struct + struct_size);
+				(char *)((u8 *)output_struct + struct_size);
 
 		temp_ptr = (u8 *) output_struct->data.address32.resource_source.string_ptr;
 
@@ -656,7 +656,7 @@ acpi_rs_address32_stream (
 	u8                      *buffer;
 	u16                     *length_field;
 	u8                      temp8;
-	NATIVE_CHAR             *temp_pointer;
+	char                    *temp_pointer;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_address32_stream");
@@ -762,7 +762,7 @@ acpi_rs_address32_stream (
 		*buffer = temp8;
 		buffer += 1;
 
-		temp_pointer = (NATIVE_CHAR *) buffer;
+		temp_pointer = (char *) buffer;
 
 		/*
 		 * Copy the string
@@ -968,7 +968,7 @@ acpi_rs_address64_resource (
 		/* Point the String pointer to the end of this structure */
 
 		output_struct->data.address64.resource_source.string_ptr =
-				(NATIVE_CHAR *)((u8 *)output_struct + struct_size);
+				(char *)((u8 *)output_struct + struct_size);
 
 		temp_ptr = (u8 *) output_struct->data.address64.resource_source.string_ptr;
 
@@ -1042,7 +1042,7 @@ acpi_rs_address64_stream (
 	u8                      *buffer;
 	u16                     *length_field;
 	u8                      temp8;
-	NATIVE_CHAR             *temp_pointer;
+	char                    *temp_pointer;
 
 
 	ACPI_FUNCTION_TRACE ("Rs_address64_stream");
@@ -1149,7 +1149,7 @@ acpi_rs_address64_stream (
 		*buffer = temp8;
 		buffer += 1;
 
-		temp_pointer = (NATIVE_CHAR *) buffer;
+		temp_pointer = (char *) buffer;
 
 		/*
 		 * Copy the string

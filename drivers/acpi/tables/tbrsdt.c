@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbrsdt - ACPI RSDT table utilities
- *              $Revision: 4 $
+ *              $Revision: 5 $
  *
  *****************************************************************************/
 
@@ -80,7 +80,7 @@ acpi_tb_verify_rsdp (
 	/*
 	 *  The signature and checksum must both be correct
 	 */
-	if (ACPI_STRNCMP ((NATIVE_CHAR *) rsdp, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
+	if (ACPI_STRNCMP ((char *) rsdp, RSDP_SIG, sizeof (RSDP_SIG)-1) != 0) {
 		/* Nope, BAD Signature */
 
 		status = AE_BAD_SIGNATURE;
@@ -163,7 +163,7 @@ acpi_tb_get_rsdt_address (
 		out_address->pointer.value = acpi_gbl_RSDP->rsdt_physical_address;
 	}
 	else {
-		out_address->pointer.value = ACPI_GET_ADDRESS (acpi_gbl_RSDP->xsdt_physical_address);
+		out_address->pointer.value = acpi_gbl_RSDP->xsdt_physical_address;
 	}
 }
 
