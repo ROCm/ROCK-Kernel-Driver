@@ -512,11 +512,6 @@ static int super_90_load(mdk_rdev_t *rdev, mdk_rdev_t *refdev, int minor_version
 		goto abort;
 	}
 
-	if (sb->md_minor >= MAX_MD_DEVS) {
-		printk(KERN_ERR "md: %s: invalid raid minor (%x)\n",
-			b, sb->md_minor);
-		goto abort;
-	}
 	if (sb->raid_disks <= 0)
 		goto abort;
 
@@ -1829,7 +1824,7 @@ static void autorun_devices(void)
 				"md: md%d already running, cannot run %s\n",
 				mdidx(mddev), bdevname(rdev0->bdev,b));
 			mddev_unlock(mddev);
-		} else {
+		} else if (rdev0->preferred_minor >= 0 && rdev0->preferred_minor < MAX_MD_DEVS) {
 			printk(KERN_INFO "md: created md%d\n", mdidx(mddev));
 			ITERATE_RDEV_GENERIC(candidates,rdev,tmp) {
 				list_del_init(&rdev->same_set);
@@ -1838,7 +1833,9 @@ static void autorun_devices(void)
 			}
 			autorun_array(mddev);
 			mddev_unlock(mddev);
-		}
+		} else
+			printk(KERN_WARNING "md: %s had invalid preferred minor %d\n",
+			       bdevname(rdev->bdev, b), rdev0->preferred_minor);
 		/* on success, candidates will be empty, on error
 		 * it won't...
 		 */
