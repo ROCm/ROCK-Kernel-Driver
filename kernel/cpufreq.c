@@ -677,19 +677,19 @@ static ctl_table ctl_cpu_table[NR_CPUS + 1] = {
 #error please extend CPU enumeration
 #endif
 	{
-		ctl_name:	0,
+		.ctl_name	= 0,
 	}
 };
 
 static ctl_table ctl_cpu[2] = {
 	{
-		ctl_name:	CTL_CPU,
-		procname:	"cpu",
-		mode:		0555,
-		child:		ctl_cpu_table,
+		.ctl_name	= CTL_CPU,
+		.procname	= "cpu",
+		.mode		= 0555,
+		.child		= ctl_cpu_table,
 	},
 	{
-		ctl_name:	0,
+		.ctl_name	= 0,
 	}
 };
 
