@@ -2649,6 +2649,11 @@ S: Markusstrasse 18
 S: 8006 Zuerich
 S: Switzerland
 
+N: Wayne Salamon
+E: wsalamon@tislabs.com
+E: wsalamon@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
+
 N: Robert Sanders
 E: gt8134b@prism.gatech.edu
 D: Dosemu
@@ -2774,6 +2779,11 @@ D: RSPF daemon
 S: 10 Stockalls Place
 S: Minto, NSW, 2566
 S: Australia
+
+N: Stephen Smalley
+E: sds@tislabs.com
+E: ssmalley@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
 
 N: Chris Smith
 E: csmith@convex.com
@@ -3040,6 +3050,11 @@ D: mipsel NEC DDB Vrc-5074
 S: C. Huysmansstraat 12
 S: B-3128 Baal
 S: Belgium
+
+N: Chris Vance
+E: cvance@tislabs.com
+E: cvance@nai.com
+D: portions of the Linux Security Module (LSM) framework and security modules
 
 N: Petr Vandrovec
 E: vandrove@vc.cvut.cz
