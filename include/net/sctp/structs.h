@@ -42,6 +42,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Dajiang Zhang         <dajiang.zhang@nokia.com>
+ *    Ardelle Fan           <ardelle.fan@intel.com> 
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -182,6 +183,9 @@ struct SCTP_protocol {
 
 	/* Valid.Cookie.Life        - 60  seconds  */
 	int valid_cookie_life;
+	
+	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	int cookie_preserve_enable;
 
 	/* Association.Max.Retrans  - 10 attempts
 	 * Path.Max.Retrans         - 5  attempts (per destination address)
@@ -234,7 +238,7 @@ struct SCTP_protocol {
  * Pointers to address related SCTP functions.
  * (i.e. things that depend on the address family.)
  */
-typedef struct sctp_func {
+struct sctp_af {
 	int		(*queue_xmit)	(struct sk_buff *skb);
 	int 		(*setsockopt)	(struct sock *sk,
 					 int level,
@@ -259,27 +263,34 @@ typedef struct sctp_func {
 	void            (*from_skb)     (union sctp_addr *,
 					 struct sk_buff *skb,
 					 int saddr);
+	void            (*from_sk)      (union sctp_addr *,
+					 struct sock *sk);
+	void            (*to_sk)        (union sctp_addr *,
+					 struct sock *sk);
 	int             (*addr_valid)   (union sctp_addr *);
 	sctp_scope_t    (*scope) (union sctp_addr *);
 	void            (*inaddr_any)   (union sctp_addr *, unsigned short);
 	int             (*is_any)       (const union sctp_addr *);
+	int             (*available)    (const union sctp_addr *);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
 	struct list_head list;
-} sctp_func_t;
+};
 
-sctp_func_t *sctp_get_af_specific(sa_family_t);
+struct sctp_af *sctp_get_af_specific(sa_family_t);
+int sctp_register_af(struct sctp_af *);
 
 /* Protocol family functions. */
 typedef struct sctp_pf {
 	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
-	void (*skb_msgname)(struct sk_buff *, char *, int *);
-	int  (*af_supported)(sa_family_t);
+	void (*skb_msgname)  (struct sk_buff *, char *, int *);
+	int  (*af_supported) (sa_family_t);
 	int  (*cmp_addr) (const union sctp_addr *,
 			  const union sctp_addr *,
 			  struct sctp_opt *);
-	struct sctp_func *af;
+	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
+	struct sctp_af *af;
 } sctp_pf_t;
 
 /* SCTP Socket type: UDP or TCP style. */
@@ -623,7 +634,7 @@ struct SCTP_transport {
 	union sctp_addr ipaddr;
 
 	/* These are the functions we call to handle LLP stuff.  */
-	sctp_func_t *af_specific;
+	struct sctp_af *af_specific;
 
 	/* Which association do we belong to?  */
 	sctp_association_t *asoc;
@@ -1271,7 +1282,6 @@ struct SCTP_association {
 
 	/* The cookie life I award for any cookie.  */
 	struct timeval cookie_life;
-	__u32 cookie_preserve;
 
 	/* Overall     : The overall association error count.
 	 * Error Count : [Clear this any time I get something.]
@@ -1349,6 +1359,9 @@ struct SCTP_association {
 	 * to set a_rwnd field in an INIT or a SACK chunk.
 	 */
 	__u32 rwnd;
+
+	/* This is the last advertised value of rwnd over a SACK chunk. */
+	__u32 a_rwnd;
 
 	/* Number of bytes by which the rwnd has slopped.  The rwnd is allowed
 	 * to slop over a maximum of the association's frag_point.

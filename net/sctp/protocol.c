@@ -40,6 +40,7 @@
  *    Jon Grimm <jgrimm@us.ibm.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Ardelle Fan <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -67,8 +68,10 @@ struct sctp_mib sctp_statistics[NR_CPUS * 2];
  */
 static struct socket *sctp_ctl_socket;
 
-static sctp_pf_t *sctp_pf_inet6_specific;
-static sctp_pf_t *sctp_pf_inet_specific;
+static struct sctp_pf *sctp_pf_inet6_specific;
+static struct sctp_pf *sctp_pf_inet_specific;
+static struct sctp_af *sctp_af_v4_specific;
+static struct sctp_af *sctp_af_v6_specific;
 
 extern struct net_proto_family inet_family_ops;
 
@@ -140,12 +143,12 @@ static void __sctp_get_local_addr_list(sctp_protocol_t *proto)
 {
 	struct net_device *dev;
 	struct list_head *pos;
-	struct sctp_func *af;
+	struct sctp_af *af;
 
 	read_lock(&dev_base_lock);
 	for (dev = dev_base; dev; dev = dev->next) {
 		list_for_each(pos, &proto->address_families) {
-			af = list_entry(pos, sctp_func_t, list);
+			af = list_entry(pos, struct sctp_af, list);
 			af->copy_addrlist(&proto->local_addr_list, dev);
 		}
 	}
@@ -251,7 +254,6 @@ struct dst_entry *sctp_v4_get_dst(union sctp_addr *daddr,
 	return &rt->u.dst;
 }
 
-
 /* Initialize a sctp_addr from in incoming skb.  */
 static void sctp_v4_from_skb(union sctp_addr *addr, struct sk_buff *skb,
 			     int is_saddr)
@@ -273,6 +275,21 @@ static void sctp_v4_from_skb(union sctp_addr *addr, struct sk_buff *skb,
 	}
 	memcpy(&addr->v4.sin_addr.s_addr, from, sizeof(struct in_addr));
 }
+
+/* Initialize an sctp_addr from a socket. */
+static void sctp_v4_from_sk(union sctp_addr *addr, struct sock *sk)
+{
+	addr->v4.sin_family = AF_INET;
+	addr->v4.sin_port = inet_sk(sk)->num;
+	addr->v4.sin_addr.s_addr = inet_sk(sk)->rcv_saddr;
+}
+
+/* Initialize sk->rcv_saddr from sctp_addr. */
+static void sctp_v4_to_sk(union sctp_addr *addr, struct sock *sk)
+{
+	inet_sk(sk)->rcv_saddr = addr->v4.sin_addr.s_addr;
+}
+
 
 /* Initialize a sctp_addr from a dst_entry. */
 static void sctp_v4_dst_saddr(union sctp_addr *saddr, struct dst_entry *dst)
@@ -311,7 +328,7 @@ static int sctp_v4_is_any(const union sctp_addr *addr)
 }
 
 /* This function checks if the address is a valid address to be used for
- * SCTP.
+ * SCTP binding.
  *
  * Output:
  * Return 0 - If the address is a non-unicast or an illegal address.
@@ -323,6 +340,18 @@ static int sctp_v4_addr_valid(union sctp_addr *addr)
 	if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
 		return 0;
 
+	return 1;
+}
+
+/* Should this be available for binding?   */
+static int sctp_v4_available(const union sctp_addr *addr)
+{
+	int ret = inet_addr_type(addr->v4.sin_addr.s_addr);
+	
+	/* FIXME: ip_nonlocal_bind sysctl support. */
+
+	if (addr->v4.sin_addr.s_addr != INADDR_ANY && ret != RTN_LOCAL)
+		return 0;
 	return 1;
 }
 
@@ -365,11 +394,11 @@ static sctp_scope_t sctp_v4_scope(union sctp_addr *addr)
 	return retval;
 }
 
-/* Event handler for inet device events.
+/* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
-static int sctp_netdev_event(struct notifier_block *this, unsigned long event,
-			     void *ptr)
+static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
+			       void *ptr)
 {
 	long flags __attribute__ ((unused));
 
@@ -405,29 +434,42 @@ int sctp_ctl_sock_init(void)
 	return 0;
 }
 
+/* Register address family specific functions. */
+int sctp_register_af(struct sctp_af *af)
+{
+	switch (af->sa_family) {
+	case AF_INET:
+		if (sctp_af_v4_specific)
+			return 0;
+		sctp_af_v4_specific = af;
+		break;
+	case AF_INET6:
+		if (sctp_af_v6_specific)
+			return 0;
+		sctp_af_v6_specific = af;
+		break;
+	default:
+		return 0;
+	}
+
+	INIT_LIST_HEAD(&af->list);
+	list_add_tail(&af->list, &sctp_proto.address_families);
+	return 1;
+}
+
 /* Get the table of functions for manipulating a particular address
  * family.
  */
-sctp_func_t *sctp_get_af_specific(sa_family_t family)
+struct sctp_af *sctp_get_af_specific(sa_family_t family)
 {
-	struct list_head *pos;
-	sctp_protocol_t *proto = sctp_get_protocol();
-	struct sctp_func *retval, *af;
-
-	retval = NULL;
-
-	/* Cycle through all AF specific functions looking for a
-	 * match.
-	 */
-	list_for_each(pos, &proto->address_families) {
-		af = list_entry(pos, sctp_func_t, list);
-		if (family == af->sa_family) {
-			retval = af;
-			break;
-		}
+	switch (family) {
+	case AF_INET:
+		return sctp_af_v4_specific;
+	case AF_INET6:
+		return sctp_af_v6_specific;
+	default:
+		return NULL;
 	}
-
-	return retval;
 }
 
 /* Common code to initialize a AF_INET msg_name. */
@@ -495,21 +537,28 @@ static int sctp_inet_cmp_addr(const union sctp_addr *addr1,
 	return 0;
 }
 
+/* Verify that provided sockaddr looks bindable.  Common verification has
+ * already been taken care of.
+ */
+static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
+{
+	return sctp_v4_available(addr);
+}
 
-struct sctp_func sctp_ipv4_specific;
+struct sctp_af sctp_ipv4_specific;
 
-static sctp_pf_t sctp_pf_inet = {
+static struct sctp_pf sctp_pf_inet = {
 	.event_msgname = sctp_inet_event_msgname,
 	.skb_msgname   = sctp_inet_skb_msgname,
 	.af_supported  = sctp_inet_af_supported,
 	.cmp_addr      = sctp_inet_cmp_addr,
+	.bind_verify   = sctp_inet_bind_verify,
 	.af            = &sctp_ipv4_specific,
 };
 
-
-/* Registration for netdev events.  */
-struct notifier_block sctp_netdev_notifier = {
-	.notifier_call = sctp_netdev_event,
+/* Notifier for inetaddr addition/deletion events.  */
+struct notifier_block sctp_inetaddr_notifier = {
+	.notifier_call = sctp_inetaddr_event,
 };
 
 /* Socket operations.  */
@@ -551,25 +600,28 @@ static struct inet_protocol sctp_protocol = {
 };
 
 /* IPv4 address related functions.  */
-struct sctp_func sctp_ipv4_specific = {
+struct sctp_af sctp_ipv4_specific = {
 	.queue_xmit     = ip_queue_xmit,
 	.setsockopt     = ip_setsockopt,
 	.getsockopt     = ip_getsockopt,
 	.get_dst	= sctp_v4_get_dst,
 	.copy_addrlist  = sctp_v4_copy_addrlist,
 	.from_skb       = sctp_v4_from_skb,
+	.from_sk        = sctp_v4_from_sk,
+	.to_sk          = sctp_v4_to_sk,
 	.dst_saddr      = sctp_v4_dst_saddr,
 	.cmp_addr       = sctp_v4_cmp_addr,
 	.addr_valid     = sctp_v4_addr_valid,
 	.inaddr_any     = sctp_v4_inaddr_any,
 	.is_any         = sctp_v4_is_any,
+	.available      = sctp_v4_available,
 	.scope          = sctp_v4_scope,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,
 };
 
-sctp_pf_t *sctp_get_pf_specific(int family) {
+struct sctp_pf *sctp_get_pf_specific(sa_family_t family) {
 
 	switch (family) {
 	case PF_INET:
@@ -581,20 +633,24 @@ sctp_pf_t *sctp_get_pf_specific(int family) {
 	}
 }
 
-/* Set the PF specific function table.  */
-void sctp_set_pf_specific(int family, sctp_pf_t *pf)
+/* Register the PF specific function table.  */
+int sctp_register_pf(struct sctp_pf *pf, sa_family_t family)
 {
 	switch (family) {
 	case PF_INET:
+		if (sctp_pf_inet_specific)
+			return 0;
 		sctp_pf_inet_specific = pf;
 		break;
 	case PF_INET6:
+		if (sctp_pf_inet6_specific)
+			return 0;
 		sctp_pf_inet6_specific = pf;
 		break;
 	default:
-		BUG();
-		break;
+		return 0;
 	}
+	return 1;
 }
 
 /* Initialize the universe into something sensible.  */
@@ -617,7 +673,7 @@ int sctp_init(void)
 	sctp_dbg_objcnt_init();
 
 	/* Initialize the SCTP specific PF functions. */
-	sctp_set_pf_specific(PF_INET, &sctp_pf_inet);
+	sctp_register_pf(&sctp_pf_inet, PF_INET);
 	/*
 	 * 14. Suggested SCTP Protocol Parameter Values
 	 */
@@ -635,6 +691,9 @@ int sctp_init(void)
 
 	/* Valid.Cookie.Life        - 60  seconds */
 	sctp_proto.valid_cookie_life	= 60 * HZ;
+
+	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	sctp_proto.cookie_preserve_enable = 1;
 
 	/* Max.Burst		    - 4 */
 	sctp_proto.max_burst = SCTP_MAX_BURST;
@@ -709,8 +768,7 @@ int sctp_init(void)
 	sctp_sysctl_register();
 
 	INIT_LIST_HEAD(&sctp_proto.address_families);
-	INIT_LIST_HEAD(&sctp_ipv4_specific.list);
-	list_add_tail(&sctp_ipv4_specific.list, &sctp_proto.address_families);
+	sctp_register_af(&sctp_ipv4_specific);
 
 	status = sctp_v6_init();
 	if (status)
@@ -727,7 +785,9 @@ int sctp_init(void)
 	INIT_LIST_HEAD(&sctp_proto.local_addr_list);
 	sctp_proto.local_addr_lock = SPIN_LOCK_UNLOCKED;
 
-	register_inetaddr_notifier(&sctp_netdev_notifier);
+	/* Register notifier for inet address additions/deletions. */ 
+	register_inetaddr_notifier(&sctp_inetaddr_notifier);
+
 	sctp_get_local_addr_list(&sctp_proto);
 
 	return 0;
@@ -757,8 +817,10 @@ void sctp_exit(void)
 	 * up all the remaining associations and all that memory.
 	 */
 
+	/* Unregister notifier for inet address additions/deletions. */
+	unregister_inetaddr_notifier(&sctp_inetaddr_notifier);
+
 	/* Free the local address list.  */
-	unregister_inetaddr_notifier(&sctp_netdev_notifier);
 	sctp_free_local_addr_list(&sctp_proto);
 
 	/* Free the control endpoint.  */

@@ -68,7 +68,8 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 					 sctp_transport_t *transport);
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *, sctp_association_t *asoc);
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *, sctp_association_t *asoc,
-				  sctp_event_t event_type, sctp_chunk_t *chunk);
+				  sctp_event_t event_type, sctp_subtype_t stype,
+				  sctp_chunk_t *chunk);
 static int sctp_cmd_process_init(sctp_cmd_seq_t *, sctp_association_t *asoc,
 				 sctp_chunk_t *chunk,
 				 sctp_init_chunk_t *peer_init,
@@ -517,7 +518,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 
 		case SCTP_CMD_ASSOC_FAILED:
 			sctp_cmd_assoc_failed(commands, asoc, event_type,
-					      chunk);
+					      subtype, chunk);
 			break;
 
 		case SCTP_CMD_COUNTER_INC:
@@ -735,6 +736,9 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			goto nomem;
+
+		/* Update the last advertised rwnd value. */
+		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
 		asoc->peer.next_dup_tsn = 0;
@@ -1046,18 +1050,27 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 				  sctp_association_t *asoc,
 				  sctp_event_t event_type,
+				  sctp_subtype_t subtype,
 				  sctp_chunk_t *chunk)
 {
 	sctp_ulpevent_t *event;
 	__u16 error = 0;
 
-	if (event_type == SCTP_EVENT_T_PRIMITIVE)
-		error = SCTP_ERROR_USER_ABORT;
-
-	if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
-	    (ntohs(chunk->chunk_hdr->length) >= (sizeof(struct sctp_chunkhdr) +
-				 		 sizeof(struct sctp_errhdr)))) {
-		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+	switch(event_type) {
+	case SCTP_EVENT_T_PRIMITIVE:
+		if (SCTP_PRIMITIVE_ABORT == subtype.primitive)
+			error = SCTP_ERROR_USER_ABORT;
+		break;
+	case SCTP_EVENT_T_CHUNK:
+		if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
+	    	    (ntohs(chunk->chunk_hdr->length) >=
+			(sizeof(struct sctp_chunkhdr) +
+				sizeof(struct sctp_errhdr)))) {
+			error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+		}
+		break;
+	default:
+		break;
 	}
 
 	event = sctp_ulpevent_make_assoc_change(asoc,
