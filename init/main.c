@@ -543,8 +543,6 @@ asmlinkage void __init start_kernel(void)
 #endif
 	check_bugs();
 
-	acpi_early_init(); /* before LAPIC and SMP init */
-
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
@@ -670,6 +668,14 @@ static int init(void * unused)
 	 */
 	child_reaper = current;
 
+	/*
+	 * Do this before initcalls, because some drivers want to access
+	 * firmware files.
+	 */
+	populate_rootfs();
+
+	acpi_early_init(); /* before LAPIC and SMP init */
+
 	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
 
@@ -678,12 +684,6 @@ static int init(void * unused)
 	fixup_cpu_present_map();
 	smp_init();
 	sched_init_smp();
-
-	/*
-	 * Do this before initcalls, because some drivers want to access
-	 * firmware files.
-	 */
-	populate_rootfs();
 
 	do_basic_setup();
 
