@@ -554,8 +554,6 @@ static struct mb_cache_entry *
 __mb_cache_entry_find(struct list_head *l, struct list_head *head,
 		      int index, struct block_device *bdev, unsigned int key)
 {
-	DEFINE_WAIT(wait);
-
 	while (l != head) {
 		struct mb_cache_entry *ce =
 			list_entry(l, struct mb_cache_entry,
