@@ -77,7 +77,14 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_MC)]      = { i810_dma_mc,     1, 1 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_RSTATUS)] = { i810_rstatus,    1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_I810_FLIP)] =    { i810_flip_bufs,  1, 0 }
- 
+
+#define DRIVER_PCI_IDS							\
+	{0x8086, 0x7121, 0},						\
+	{0x8086, 0x7123, 0},						\
+	{0x8086, 0x7125, 0},						\
+	{0x8086, 0x1132, 0},						\
+	{0, 0, 0}
+
 
 #define __HAVE_COUNTERS         4
 #define __HAVE_COUNTER6         _DRM_STAT_IRQ

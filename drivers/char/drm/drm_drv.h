@@ -159,15 +159,8 @@ __setup( DRIVER_NAME "=", DRM_OPTIONS_FUNC );
 #undef DRM_OPTIONS_FUNC
 #endif
 
-/**
- * The default number of instances (minor numbers) to initialize.
- */
-#ifndef DRIVER_NUM_CARDS
-#define DRIVER_NUM_CARDS 1
-#endif
-
-static drm_device_t	*DRM(device);
-static int		*DRM(minor);
+#define MAX_DEVICES 4
+static drm_device_t	DRM(device)[MAX_DEVICES];
 static int		DRM(numdevs) = 0;
 
 DRIVER_FOPS;
@@ -534,43 +527,93 @@ static int DRM(takedown)( drm_device_t *dev )
 	return 0;
 }
 
-/**
- * Figure out how many instances to initialize.
- *
- * \return number of cards found.
- *
- * Searches for every PCI card in \c DRIVER_CARD_LIST with matching vendor and device ids.
- */
-static int drm_count_cards(void)
+static drm_pci_id_list_t DRM(pciidlist)[] = {
+	DRIVER_PCI_IDS
+};
+
+static int DRM(probe)(struct pci_dev *pdev)
 {
-	int num = 0;
-#if defined(DRIVER_CARD_LIST)
-	int i;
-	drm_pci_list_t *l;
-	u16 device, vendor;
-	struct pci_dev *pdev = NULL;
+	drm_device_t *dev;
+#if __HAVE_CTX_BITMAP
+	int retcode;
 #endif
+	int i;
+	int is_compat = 0;
 
 	DRM_DEBUG( "\n" );
 
-#if defined(DRIVER_COUNT_CARDS)
-	num = DRIVER_COUNT_CARDS();
-#elif defined(DRIVER_CARD_LIST)
-	for (i = 0, l = DRIVER_CARD_LIST; l[i].vendor != 0; i++) {
-		pdev = NULL;
-		vendor = l[i].vendor;
-		device = l[i].device;
-		if(device == 0xffff) device = PCI_ANY_ID;
-		if(vendor == 0xffff) vendor = PCI_ANY_ID;
-		while ((pdev = pci_find_device(vendor, device, pdev))) {
-			num++;
+	for (i = 0; DRM(pciidlist)[i].vendor != 0; i++) {
+		if ((DRM(pciidlist)[i].vendor == pdev->vendor) &&
+		    (DRM(pciidlist)[i].device == pdev->device)) {
+			is_compat = 1;
 		}
 	}
-#else
-	num = DRIVER_NUM_CARDS;
+	if (is_compat == 0)
+		return -ENODEV;
+
+	if (DRM(numdevs) >= MAX_DEVICES)
+		return -ENODEV;
+
+	dev = &(DRM(device)[DRM(numdevs)]);
+
+	memset( (void *)dev, 0, sizeof(*dev) );
+	dev->count_lock = SPIN_LOCK_UNLOCKED;
+	init_timer( &dev->timer );
+	sema_init( &dev->struct_sem, 1 );
+
+	if ((dev->minor = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
+		return -EPERM;
+	dev->device = MKDEV(DRM_MAJOR, dev->minor );
+	dev->name   = DRIVER_NAME;
+
+	dev->pdev   = pdev;
+#ifdef __alpha__
+	dev->hose   = pdev->sysdata;
 #endif
-	DRM_DEBUG("numdevs = %d\n", num);
-	return num;
+
+	DRIVER_PREINIT();
+
+#if __REALLY_HAVE_AGP
+	dev->agp = DRM(agp_init)();
+#if __MUST_HAVE_AGP
+	if ( dev->agp == NULL ) {
+		DRM_ERROR( "Cannot initialize the agpgart module.\n" );
+		DRM(stub_unregister)(dev->minor);
+		DRM(takedown)( dev );
+		return -EINVAL;
+	}
+#endif
+#if __REALLY_HAVE_MTRR
+	if (dev->agp)
+		dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
+					dev->agp->agp_info.aper_size*1024*1024,
+					MTRR_TYPE_WRCOMB,
+					1 );
+#endif
+#endif
+
+#if __HAVE_CTX_BITMAP
+	retcode = DRM(ctxbitmap_init)( dev );
+	if( retcode ) {
+		DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
+		DRM(stub_unregister)(dev->minor);
+		DRM(takedown)( dev );
+		return retcode;
+ 	}
+#endif
+	DRM(numdevs)++; /* no errors, mark it reserved */
+	
+	DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
+		DRIVER_NAME,
+		DRIVER_MAJOR,
+		DRIVER_MINOR,
+		DRIVER_PATCHLEVEL,
+		DRIVER_DATE,
+		dev->minor);
+
+	DRIVER_POSTINIT();
+
+	return 0;
 }
 
 /**
@@ -588,88 +631,19 @@ static int drm_count_cards(void)
  */
 static int __init drm_init( void )
 {
+	struct pci_dev *pdev = NULL;
 
-	drm_device_t *dev;
-	int i;
-#if __HAVE_CTX_BITMAP
-	int retcode;
-#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE
 	DRM(parse_options)( drm_opts );
 #endif
 
-	DRM(numdevs) = drm_count_cards();
-	/* Force at least one instance. */
-	if (DRM(numdevs) <= 0)
-		DRM(numdevs) = 1;
-
-	DRM(device) = kmalloc(sizeof(*DRM(device)) * DRM(numdevs), GFP_KERNEL);
-	if (!DRM(device)) {
-		return -ENOMEM;
-	}
-	DRM(minor) = kmalloc(sizeof(*DRM(minor)) * DRM(numdevs), GFP_KERNEL);
-	if (!DRM(minor)) {
-		kfree(DRM(device));
-		return -ENOMEM;
-	}
-
-	DRIVER_PREINIT();
-
 	DRM(mem_init)();
 
-	for (i = 0; i < DRM(numdevs); i++) {
-		dev = &(DRM(device)[i]);
-		memset( (void *)dev, 0, sizeof(*dev) );
-		dev->count_lock = SPIN_LOCK_UNLOCKED;
-		init_timer( &dev->timer );
-		sema_init( &dev->struct_sem, 1 );
-
-		if ((DRM(minor)[i] = DRM(stub_register)(DRIVER_NAME, &DRM(fops),dev)) < 0)
-			return -EPERM;
-		dev->device = MKDEV(DRM_MAJOR, DRM(minor)[i] );
-		dev->name   = DRIVER_NAME;
-
-#if __REALLY_HAVE_AGP
-		dev->agp = DRM(agp_init)();
-#if __MUST_HAVE_AGP
-		if ( dev->agp == NULL ) {
-			DRM_ERROR( "Cannot initialize the agpgart module.\n" );
-			DRM(stub_unregister)(DRM(minor)[i]);
-			DRM(takedown)( dev );
-			return -EINVAL;
-		}
-#endif
-#if __REALLY_HAVE_MTRR
-		if (dev->agp)
-			dev->agp->agp_mtrr = mtrr_add( dev->agp->agp_info.aper_base,
-				       dev->agp->agp_info.aper_size*1024*1024,
-				       MTRR_TYPE_WRCOMB,
-				       1 );
-#endif
-#endif
-
-#if __HAVE_CTX_BITMAP
-		retcode = DRM(ctxbitmap_init)( dev );
-		if( retcode ) {
-			DRM_ERROR( "Cannot allocate memory for context bitmap.\n" );
-			DRM(stub_unregister)(DRM(minor)[i]);
-			DRM(takedown)( dev );
-			return retcode;
-		}
-#endif
-		DRM_INFO( "Initialized %s %d.%d.%d %s on minor %d\n",
-		  	DRIVER_NAME,
-		  	DRIVER_MAJOR,
-		  	DRIVER_MINOR,
-		  	DRIVER_PATCHLEVEL,
-		  	DRIVER_DATE,
-		  	DRM(minor)[i] );
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
+		DRM(probe)(pdev);
 	}
-
-	DRIVER_POSTINIT();
-
 	return 0;
 }
 
@@ -689,10 +663,10 @@ static void __exit drm_cleanup( void )
 
 	for (i = DRM(numdevs) - 1; i >= 0; i--) {
 		dev = &(DRM(device)[i]);
-		if ( DRM(stub_unregister)(DRM(minor)[i]) ) {
+		if ( DRM(stub_unregister)(dev->minor) ) {
 			DRM_ERROR( "Cannot unload module\n" );
 		} else {
-			DRM_DEBUG("minor %d unregistered\n", DRM(minor)[i]);
+			DRM_DEBUG("minor %d unregistered\n", dev->minor);
 			if (i == 0) {
 				DRM_INFO( "Module unloaded\n" );
 			}
@@ -722,8 +696,6 @@ static void __exit drm_cleanup( void )
 #endif
 	}
 	DRIVER_POSTCLEANUP();
-	kfree(DRM(minor));
-	kfree(DRM(device));
 	DRM(numdevs) = 0;
 }
 
@@ -795,7 +767,7 @@ int DRM(open)( struct inode *inode, struct file *filp )
 	int i;
 
 	for (i = 0; i < DRM(numdevs); i++) {
-		if (iminor(inode) == DRM(minor)[i]) {
+		if (iminor(inode) == DRM(device)[i].minor) {
 			dev = &(DRM(device)[i]);
 			break;
 		}

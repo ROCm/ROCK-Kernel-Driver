@@ -62,6 +62,13 @@
 	[DRM_IOCTL_NR(DRM_IOCTL_SIS_AGP_FREE)]	= { sis_ioctl_agp_free,	1, 0 }, \
 	[DRM_IOCTL_NR(DRM_IOCTL_SIS_FB_INIT)]	= { sis_fb_init,	1, 1 }
 
+#define DRIVER_PCI_IDS							\
+	{0x1039, 0x0300, 0},						\
+	{0x1039, 0x5300, 0},						\
+	{0x1039, 0x6300, 0},						\
+	{0x1039, 0x7300, 0},						\
+	{0, 0, 0}
+
 #define __HAVE_COUNTERS		5
 
 /* Buffer customization:
