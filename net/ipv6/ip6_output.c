@@ -381,7 +381,7 @@ static int ip6_frag_xmit(struct sock *sk, inet_getfrag_t getfrag,
 	/*
 	 *	Length of fragmented part on every packet but 
 	 *	the last must be an:
-	 *	"integer multiple of 8 octects".
+	 *	"integer multiple of 8 octets".
 	 */
 
 	frag_len = (mtu - unfrag_len) & ~0x7;
@@ -587,7 +587,7 @@ int ip6_build_xmit(struct sock *sk, inet_getfrag_t getfrag, const void *data,
 		if (err) {
 #if IP6_DEBUG >= 2
 			printk(KERN_DEBUG "ip6_build_xmit: "
-			       "no availiable source address\n");
+			       "no available source address\n");
 #endif
 			goto out;
 		}
@@ -1187,7 +1187,7 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 		if (err) {
 #if IP6_DEBUG >= 2
 			printk(KERN_DEBUG "ip6_build_xmit: "
-			       "no availiable source address\n");
+			       "no available source address\n");
 #endif
 			return err;
 		}

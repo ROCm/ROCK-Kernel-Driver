@@ -145,7 +145,7 @@ static inline int ip6_input_finish(struct sk_buff *skb)
 	nexthdr = skb->nh.ipv6h->nexthdr;
 	nhoff = offsetof(struct ipv6hdr, nexthdr);
 
-	/* Skip  hop-by-hop options, they are already parsed. */
+	/* Skip hop-by-hop options, they are already parsed. */
 	if (nexthdr == NEXTHDR_HOP) {
 		nhoff = sizeof(struct ipv6hdr);
 		nexthdr = skb->h.raw[0];
