@@ -90,7 +90,7 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 		return -1;
 	}
 
-	if (a == NULL || tb[TCA_MIRRED_PARMS - 1] == NULL) {
+	if (tb[TCA_MIRRED_PARMS - 1] == NULL) {
 		DPRINTK("BUG: tcf_mirred_init called with NULL params\n");
 		return -1;
 	}
@@ -169,27 +169,15 @@ tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 	struct sk_buff *skb = *pskb;
 	u32 at = G_TC_AT(skb->tc_verd);
 
-	if (a == NULL) {
-		if (net_ratelimit())
-			printk("BUG: tcf_mirred called with NULL action!\n");
-		return -1;
-	}
-
-	if (p == NULL) {
-		if (net_ratelimit())
-			printk("BUG: tcf_mirred called with NULL params\n");
-		return -1;
-	}
-
 	spin_lock(&p->lock);
 
 	dev = p->dev;
 	p->tm.lastuse = jiffies;
 
-	if (dev == NULL || !(dev->flags&IFF_UP) ) {
+	if (!(dev->flags&IFF_UP) ) {
 		if (net_ratelimit())
 			printk("mirred to Houston: device %s is gone!\n",
-			       dev ? dev->name : "");
+			       dev->name);
 bad_mirred:
 		if (skb2 != NULL)
 			kfree_skb(skb2);
@@ -236,11 +224,6 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	struct tc_mirred opt;
 	struct tcf_mirred *p = PRIV(a, mirred);
 	struct tcf_t t;
-
-	if (p == NULL) {
-		printk("BUG: tcf_mirred_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
 
 	opt.index = p->index;
 	opt.action = p->action;

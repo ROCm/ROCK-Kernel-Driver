@@ -96,7 +96,7 @@ tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 	u32 index = 0;
 	u32 hook = 0;
 
-	if (a == NULL || rta == NULL ||
+	if (rta == NULL ||
 	    rtattr_parse(tb, TCA_IPT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
 		return -1;
 
@@ -238,9 +238,6 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 	struct tcf_ipt *p = PRIV(a, ipt);
 	struct sk_buff *skb = *pskb;
 
-	if (p == NULL || skb == NULL)
-		return -1;
-
 	spin_lock(&p->lock);
 
 	p->tm.lastuse = jiffies;
@@ -288,10 +285,6 @@ tcf_ipt_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	unsigned char *b = skb->tail;
 	struct tcf_ipt *p = PRIV(a, ipt);
 
-	if (p == NULL) {
-		printk("BUG: tcf_ipt_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
 	/* for simple targets kernel size == user size
 	** user name = target name
 	** for foolproof you need to not assume this

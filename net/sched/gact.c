@@ -85,7 +85,7 @@ static int tcf_gact_init(struct rtattr *rta, struct rtattr *est,
 	if (rtattr_parse(tb, TCA_GACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
 		return -1;
 
-	if (a == NULL || tb[TCA_GACT_PARMS - 1] == NULL) {
+	if (tb[TCA_GACT_PARMS - 1] == NULL) {
 		printk("BUG: tcf_gact_init called with NULL params\n");
 		return -1;
 	}
@@ -140,12 +140,6 @@ tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 	struct sk_buff *skb = *pskb;
 	int action = TC_ACT_SHOT;
 
-	if (p == NULL) {
-		if (net_ratelimit())
-			printk("BUG: tcf_gact called with NULL params\n");
-		return -1;
-	}
-
 	spin_lock(&p->lock);
 #ifdef CONFIG_GACT_PROB
 	if (p->ptype && gact_rand[p->ptype] != NULL)
@@ -172,11 +166,6 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	struct tc_gact opt;
 	struct tcf_gact *p = PRIV(a, gact);
 	struct tcf_t t;
-
-	if (p == NULL) {
-		printk("BUG: tcf_gact_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
 
 	opt.index = p->index;
 	opt.refcnt = p->refcnt - ref;

@@ -170,13 +170,6 @@ static int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,
 	struct tc_police *parm;
 	struct tcf_police *p;
 
-	if (a == NULL) {
-		if (net_ratelimit())
-			printk("BUG: tcf_police_locate called with NULL "
-			       "params\n");
-		return -1;
-	}
-
 	if (rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta),
 	                 RTA_PAYLOAD(rta)) < 0)
 		return -1;
@@ -290,11 +283,6 @@ static int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 	long toks;
 	long ptoks = 0;
 
-	if (p == NULL) {
-		printk("BUG: tcf_police called with NULL params\n");
-		return -1;
-	}
-
 	spin_lock(&p->lock);
 
 	p->bstats.bytes += skb->len;
@@ -349,11 +337,6 @@ tcf_act_police_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	unsigned char	 *b = skb->tail;
 	struct tc_police opt;
 	struct tcf_police *p = PRIV(a);
-
-	if (p == NULL) {
-		printk("BUG: tcf_police_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
 
 	opt.index = p->index;
 	opt.action = p->action;

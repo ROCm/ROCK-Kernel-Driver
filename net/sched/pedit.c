@@ -65,7 +65,7 @@ tcf_pedit_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 	if (rtattr_parse(tb, TCA_PEDIT_MAX, RTA_DATA(rta),
 	                 RTA_PAYLOAD(rta)) < 0)
 		return -1;
-	if (a == NULL || tb[TCA_PEDIT_PARMS - 1] == NULL) {
+	if (tb[TCA_PEDIT_PARMS - 1] == NULL) {
 		printk("BUG: tcf_pedit_init called with NULL params\n");
 		return -1;
 	}
@@ -112,11 +112,6 @@ tcf_pedit(struct sk_buff **pskb, struct tc_action *a)
 	struct sk_buff *skb = *pskb;
 	int i, munged = 0;
 	u8 *pptr;
-
-	if (p == NULL) {
-		printk("BUG: tcf_pedit called with NULL params\n");
-		return -1; /* change to something symbolic */
-	}
 
 	if (!(skb->tc_verd & TC_OK2MUNGE)) {
 		/* should we set skb->cloned? */
@@ -189,11 +184,6 @@ tcf_pedit_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 	struct tcf_t t;
 	int s; 
 		
-	if (p == NULL) {
-		printk("BUG: tcf_pedit_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
-
 	s = sizeof(*opt) + p->nkeys * sizeof(struct tc_pedit_key);
 
 	/* netlink spinlocks held above us - must use ATOMIC */
