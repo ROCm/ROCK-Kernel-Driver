@@ -80,6 +80,7 @@ static const char version[] =
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/workqueue.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -201,6 +202,8 @@ struct smc_local {
 	u32	msg_enable;
 	u32	phy_type;
 	struct mii_if_info mii;
+	struct work_struct phy_configure;
+
 	spinlock_t lock;
 
 #ifdef SMC_USE_PXA_DMA
@@ -945,13 +948,10 @@ static int smc_phy_reset(struct net_device *dev, int phy)
  */
 static void smc_phy_powerdown(struct net_device *dev, int phy)
 {
-	struct smc_local *lp = netdev_priv(dev);
 	unsigned int bmcr;
 
-	spin_lock_irq(&lp->lock);
 	bmcr = smc_phy_read(dev, phy, MII_BMCR);
 	smc_phy_write(dev, phy, MII_BMCR, bmcr | BMCR_PDOWN);
-	spin_unlock_irq(&lp->lock);
 }
 
 /*
@@ -989,8 +989,9 @@ static void smc_phy_check_media(struct net_device *dev, int init)
  * of autonegotiation.)  If the RPC ANEG bit is cleared, the selection
  * is controlled by the RPC SPEED and RPC DPLX bits.
  */
-static void smc_phy_configure(struct net_device *dev)
+static void smc_phy_configure(void *data)
 {
+	struct net_device *dev = data;
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
 	int phyaddr = lp->mii.phy_id;
@@ -1261,24 +1262,13 @@ static void smc_timeout(struct net_device *dev)
 	smc_reset(dev);
 	smc_enable(dev);
 
-#if 0
 	/*
 	 * Reconfiguring the PHY doesn't seem like a bad idea here, but
-	 * it introduced a problem.  Now that this is a timeout routine,
-	 * we are getting called from within an interrupt context.
-	 * smc_phy_configure() calls msleep() which calls
-	 * schedule_timeout() which calls schedule().  When schedule()
-	 * is called from an interrupt context, it prints out
-	 * "Scheduling in interrupt" and then calls BUG().  This is
-	 * obviously not desirable.  This was worked around by removing
-	 * the call to smc_phy_configure() here because it didn't seem
-	 * absolutely necessary.  Ultimately, if msleep() is
-	 * supposed to be usable from an interrupt context (which it
-	 * looks like it thinks it should handle), it should be fixed.
+	 * smc_phy_configure() calls msleep() which calls schedule_timeout()
+	 * which calls schedule().  Ence we use a work queue.
 	 */
 	if (lp->phy_type != 0)
-		smc_phy_configure(dev);
-#endif
+		schedule_work(&lp->phy_configure);
 
 	/* clear anything saved */
 	if (lp->saved_skb != NULL) {
@@ -1471,8 +1461,10 @@ static int smc_close(struct net_device *dev)
 	/* clear everything */
 	smc_shutdown(dev->base_addr);
 
-	if (lp->phy_type != 0)
+	if (lp->phy_type != 0) {
+		flush_scheduled_work();
 		smc_phy_powerdown(dev, lp->mii.phy_id);
+	}
 
 	return 0;
 }
@@ -1819,6 +1811,7 @@ static int __init smc_probe(struct net_device *dev, unsigned long ioaddr)
 
 	spin_lock_init(&lp->lock);
 	tasklet_init(&lp->tx_task, smc_hardware_send_pkt, (unsigned long)dev);
+	INIT_WORK(&lp->phy_configure, smc_phy_configure, dev);
 	lp->mii.phy_id_mask = 0x1f;
 	lp->mii.reg_num_mask = 0x1f;
 	lp->mii.force_media = 0;
