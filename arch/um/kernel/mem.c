@@ -30,7 +30,6 @@ unsigned long highmem;
 int kmalloc_ok = 0;
 
 static unsigned long brk_end;
-static unsigned long totalram_pages = 0;
 
 void unmap_physmem(void)
 {
