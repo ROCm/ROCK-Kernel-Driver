@@ -1118,6 +1118,7 @@ zoran_release (struct zoran *zr)
 	kfree((void *) zr->stat_com);
 	zoran_proc_cleanup(zr);
 	iounmap(zr->zr36057_mem);
+	pci_disable_device(zr->pci_dev);
 	video_unregister_device(zr->video_dev);
 }
 
