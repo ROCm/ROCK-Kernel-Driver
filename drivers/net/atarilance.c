@@ -787,6 +787,21 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	DPRINTK( 2, ( "%s: lance_start_xmit() called, csr0 %4.4x.\n",
 				  dev->name, DREG ));
 
+
+	/* The old LANCE chips doesn't automatically pad buffers to min. size. */
+	len = skb->len;
+	if (len < ETH_ZLEN)
+		len = ETH_ZLEN;
+	/* PAM-Card has a bug: Can only send packets with even number of bytes! */
+	else if (lp->cardtype == PAM_CARD && (len & 1))
+		++len;
+		
+	if (len > skb->len) {
+		skb = skb_padto(skb, len);
+		if (skb == NULL)
+			return 0;
+	}
+		
 	netif_stop_queue (dev);
 
 	/* Fill in a Tx ring entry */
@@ -816,11 +831,6 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	 * last.
 	 */
 
-	/* The old LANCE chips doesn't automatically pad buffers to min. size. */
-	len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
-	/* PAM-Card has a bug: Can only send packets with even number of bytes! */
-	if (lp->cardtype == PAM_CARD && (len & 1))
-		++len;
 
 	head->length = -len;
 	head->misc = 0;
