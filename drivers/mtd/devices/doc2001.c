@@ -346,7 +346,7 @@ static void DoCMil_init(struct mtd_info *mtd)
 		if (DoCMil_is_alias(this, old)) {
 			printk(KERN_NOTICE "Ignoring DiskOnChip Millennium at "
 			       "0x%lX - already configured\n", this->physadr);
-			iounmap((void *)this->virtadr);
+			iounmap(this->virtadr);
 			kfree(mtd);
 			return;
 		}
@@ -392,7 +392,7 @@ static void DoCMil_init(struct mtd_info *mtd)
 
 	if (!this->totlen) {
 		kfree(mtd);
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 	} else {
 		this->nextdoc = docmillist;
 		docmillist = mtd;
@@ -873,7 +873,7 @@ static void __exit cleanup_doc2001(void)
 			
 		del_mtd_device(mtd);
 			
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 		kfree(this->chips);
 		kfree(mtd);
 	}

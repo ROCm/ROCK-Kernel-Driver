@@ -1699,7 +1699,7 @@ notfound:
 	   actually a DiskOnChip.  */
 	WriteDOC(save_control, virtadr, DOCControl);
 fail:
-	iounmap((void *)virtadr);
+	iounmap(virtadr);
 	return ret;
 }
 
@@ -1715,7 +1715,7 @@ static void release_nanddoc(void)
 
 		nextmtd = doc->nextdoc;
 		nand_release(mtd);
-		iounmap((void *)doc->virtadr);
+		iounmap(doc->virtadr);
 		kfree(mtd);
 	}
 }

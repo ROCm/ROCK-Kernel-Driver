@@ -470,7 +470,7 @@ static void DoCMilPlus_init(struct mtd_info *mtd)
 			printk(KERN_NOTICE "Ignoring DiskOnChip Millennium "
 				"Plus at 0x%lX - already configured\n",
 				this->physadr);
-			iounmap((void *)this->virtadr);
+			iounmap(this->virtadr);
 			kfree(mtd);
 			return;
 		}
@@ -514,7 +514,7 @@ static void DoCMilPlus_init(struct mtd_info *mtd)
 
 	if (!this->totlen) {
 		kfree(mtd);
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 	} else {
 		this->nextdoc = docmilpluslist;
 		docmilpluslist = mtd;
@@ -1139,7 +1139,7 @@ static void __exit cleanup_doc2001plus(void)
 			
 		del_mtd_device(mtd);
 			
-		iounmap((void *)this->virtadr);
+		iounmap(this->virtadr);
 		kfree(this->chips);
 		kfree(mtd);
 	}
