@@ -1,4 +1,4 @@
-/* linux/include/asm/hardware/s3c2410/
+/* linux/include/asm/hardware/s3c2410/regs-gpio.h
  *
  * Copyright (c) 2003,2004 Simtec Electronics <linux@simtec.co.uk>
  *		           http://www.simtec.co.uk/products/SWLINUX/
@@ -15,6 +15,7 @@
  *    12-03-2004     BJD     Updated include protection
  *    20-07-2004     BJD     Added GPIO pin numbers, added Port A definitions
  *    04-10-2004     BJD     Fixed number of bugs, added EXT IRQ filter defs
+ *    17-10-2004     BJD     Added GSTATUS1 register definitions
 */
 
 
@@ -805,6 +806,10 @@
 #define S3C2410_GSTATUS0_NCON	   (1<<2)
 #define S3C2410_GSTATUS0_RnB	   (1<<1)
 #define S3C2410_GSTATUS0_nBATTFLT  (1<<0)
+
+#define S3C2410_GSTATUS1_IDMASK	   (0xffff0000)
+#define S3C2410_GSTATUS1_2410	   (0x32410000)
+#define S3C2410_GSTATUS1_2440	   (0x32440000)
 
 #define S3C2410_GSTATUS2_WTRESET   (1<<2)
 #define S3C2410_GSTATUs2_OFFRESET  (1<<1)
