@@ -302,9 +302,203 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 	q->queue_lock = lock;
 }
 
+/**
+ * blk_queue_free_tags - release tag maintenance info
+ * @q:  the request queue for the device
+ *
+ *  Notes:
+ *    blk_cleanup_queue() will take care of calling this function, if tagging
+ *    has been used. So there's usually no need to call this directly, unless
+ *    tagging is just being disabled but the queue remains in function.
+ **/
+void blk_queue_free_tags(request_queue_t *q)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+
+	if (!bqt)
+		return;
+
+	BUG_ON(bqt->busy);
+	BUG_ON(!list_empty(&bqt->busy_list));
+
+	kfree(bqt->tag_index);
+	bqt->tag_index = NULL;
+
+	kfree(bqt->tag_map);
+	bqt->tag_map = NULL;
+
+	kfree(bqt);
+	q->queue_tags = NULL;
+	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
+}
+
+/**
+ * blk_queue_init_tags - initialize the queue tag info
+ * @q:  the request queue for the device
+ * @depth:  the maximum queue depth supported
+ **/
+int blk_queue_init_tags(request_queue_t *q, int depth)
+{
+	struct blk_queue_tag *tags;
+	int bits, i;
+
+	if (depth > queue_nr_requests)
+		depth = queue_nr_requests;
+
+	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
+	if (!tags)
+		goto fail;
+
+	tags->tag_index = kmalloc(depth * sizeof(struct request *), GFP_ATOMIC);
+	if (!tags->tag_index)
+		goto fail_index;
+
+	bits = (depth / BLK_TAGS_PER_LONG) + 1;
+	tags->tag_map = kmalloc(bits * sizeof(unsigned long), GFP_ATOMIC);
+	if (!tags->tag_map)
+		goto fail_map;
+
+	memset(tags->tag_index, depth * sizeof(struct request *), 0);
+	memset(tags->tag_map, bits * sizeof(unsigned long), 0);
+	INIT_LIST_HEAD(&tags->busy_list);
+	tags->busy = 0;
+	tags->max_depth = depth;
+
+	/*
+	 * set the upper bits if the depth isn't a multiple of the word size
+	 */
+	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
+		set_bit(i, tags->tag_map);
+
+	/*
+	 * assign it, all done
+	 */
+	q->queue_tags = tags;
+	q->queue_flags |= (1 << QUEUE_FLAG_QUEUED);
+	return 0;
+
+fail_map:
+	kfree(tags->tag_index);
+fail_index:
+	kfree(tags);
+fail:
+	return -ENOMEM;
+}
+
+/**
+ * blk_queue_end_tag - end tag operations for a request
+ * @q:  the request queue for the device
+ * @tag:  the tag that has completed
+ *
+ *  Description:
+ *    Typically called when end_that_request_first() returns 0, meaning
+ *    all transfers have been done for a request. It's important to call
+ *    this function before end_that_request_last(), as that will put the
+ *    request back on the free list thus corrupting the internal tag list.
+ *
+ *  Notes:
+ *   queue lock must be held.
+ **/
+void blk_queue_end_tag(request_queue_t *q, struct request *rq)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+	int tag = rq->tag;
+
+	BUG_ON(tag == -1);
+
+	if (unlikely(tag >= bqt->max_depth))
+		return;
+
+	if (unlikely(!__test_and_clear_bit(tag, bqt->tag_map))) {
+		printk("attempt to clear non-busy tag (%d)\n", tag);
+		return;
+	}
+
+	list_del(&rq->queuelist);
+	rq->flags &= ~REQ_QUEUED;
+	rq->tag = -1;
+
+	if (unlikely(bqt->tag_index[tag] == NULL))
+		printk("tag %d is missing\n", tag);
+
+	bqt->tag_index[tag] = NULL;
+	bqt->busy--;
+}
+
+/**
+ * blk_queue_start_tag - find a free tag and assign it
+ * @q:  the request queue for the device
+ * @rq:  the block request that needs tagging
+ *
+ *  Description:
+ *    This can either be used as a stand-alone helper, or possibly be
+ *    assigned as the queue &prep_rq_fn (in which case &struct request
+ *    automagically gets a tag assigned). Note that this function assumes
+ *    that only REQ_CMD requests can be queued! The request will also be
+ *    removed from the request queue, so it's the drivers responsibility to
+ *    readd it if it should need to be restarted for some reason.
+ *
+ *  Notes:
+ *   queue lock must be held.
+ **/
+int blk_queue_start_tag(request_queue_t *q, struct request *rq)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+	unsigned long *map = bqt->tag_map;
+	int tag = 0;
+
+	if (unlikely(!(rq->flags & REQ_CMD)))
+		return 1;
+
+	for (map = bqt->tag_map; *map == -1UL; map++) {
+		tag += BLK_TAGS_PER_LONG;
+
+		if (tag >= bqt->max_depth)
+			return 1;
+	}
+
+	tag += ffz(*map);
+	__set_bit(tag, bqt->tag_map);
+
+	rq->flags |= REQ_QUEUED;
+	rq->tag = tag;
+	bqt->tag_index[tag] = rq;
+	blkdev_dequeue_request(rq);
+	list_add(&rq->queuelist, &bqt->busy_list);
+	bqt->busy++;
+	return 0;
+}
+
+/**
+ * blk_queue_invalidate_tags - invalidate all pending tags
+ * @q:  the request queue for the device
+ *
+ *  Description:
+ *   Hardware conditions may dictate a need to stop all pending requests.
+ *   In this case, we will safely clear the block side of the tag queue and
+ *   readd all requests to the request queue in the right order.
+ *
+ *  Notes:
+ *   queue lock must be held.
+ **/
+void blk_queue_invalidate_tags(request_queue_t *q)
+{
+	struct blk_queue_tag *bqt = q->queue_tags;
+	struct list_head *tmp;
+	struct request *rq;
+
+	list_for_each(tmp, &bqt->busy_list) {
+		rq = list_entry_rq(tmp);
+
+		blk_queue_end_tag(q, rq);
+		rq->flags &= ~REQ_STARTED;
+		elv_add_request(q, rq, 0);
+	}
+}
+
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
-			   "REQ_DONTPREP", "REQ_DRIVE_CMD",
+			   "REQ_DONTPREP", "REQ_QUEUED", "REQ_DRIVE_CMD",
 			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
 			   "REQ_SENSE", "REQ_SPECIAL" };
 
@@ -610,7 +804,7 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 	total_hw_segments = req->nr_hw_segments + next->nr_hw_segments;
 	if (blk_hw_contig_segment(q, req->biotail, next->bio))
 		total_hw_segments--;
-    
+
 	if (total_hw_segments > q->max_hw_segments)
 		return 0;
 
@@ -710,7 +904,7 @@ static int __blk_cleanup_queue(struct request_list *list)
  *     when a block device is being de-registered.  Currently, its
  *     primary task it to free all the &struct request structures that
  *     were allocated to the queue.
- * Caveat: 
+ * Caveat:
  *     Hopefully the low level driver will have finished any
  *     outstanding requests first...
  **/
@@ -723,6 +917,9 @@ void blk_cleanup_queue(request_queue_t * q)
 
 	if (count)
 		printk("blk_cleanup_queue: leaked requests (%d)\n", count);
+
+	if (blk_queue_tagged(q))
+		blk_queue_free_tags(q);
 
 	elevator_exit(q, &q->elevator);
 
@@ -1590,7 +1787,7 @@ inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
  * Description:
  *     Ends I/O on the first buffer attached to @req, and sets it up
  *     for the next buffer_head (if any) in the cluster.
- *     
+ *
  * Return:
  *     0 - we are done with this request, call end_that_request_last()
  *     1 - still buffers pending for this request
@@ -1744,3 +1941,9 @@ EXPORT_SYMBOL(blk_hw_contig_segment);
 
 EXPORT_SYMBOL(ll_10byte_cmd_build);
 EXPORT_SYMBOL(blk_queue_prep_rq);
+
+EXPORT_SYMBOL(blk_queue_init_tags);
+EXPORT_SYMBOL(blk_queue_free_tags);
+EXPORT_SYMBOL(blk_queue_start_tag);
+EXPORT_SYMBOL(blk_queue_end_tag);
+EXPORT_SYMBOL(blk_queue_invalidate_tags);

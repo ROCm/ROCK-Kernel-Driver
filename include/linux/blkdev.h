@@ -56,6 +56,7 @@ struct request {
 
 	unsigned int current_nr_sectors;
 	unsigned int hard_cur_sectors;
+	int tag;
 	void *special;
 	char *buffer;
 	struct completion *waiting;
@@ -75,6 +76,7 @@ enum rq_flag_bits {
 	__REQ_NOMERGE,	/* don't touch this for merging */
 	__REQ_STARTED,	/* drive already may have started this one */
 	__REQ_DONTPREP,	/* don't call prep for this one */
+	__REQ_QUEUED,	/* uses queueing */
 	/*
 	 * for ATA/ATAPI devices
 	 */
@@ -97,6 +99,7 @@ enum rq_flag_bits {
 #define REQ_NOMERGE	(1 << __REQ_NOMERGE)
 #define REQ_STARTED	(1 << __REQ_STARTED)
 #define REQ_DONTPREP	(1 << __REQ_DONTPREP)
+#define REQ_QUEUED	(1 << __REQ_QUEUED)
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
 #define REQ_DRIVE_ACB	(1 << __REQ_DRIVE_ACB)
 #define REQ_PC		(1 << __REQ_PC)
@@ -119,6 +122,17 @@ typedef void (unplug_device_fn) (void *q);
 enum blk_queue_state {
 	Queue_down,
 	Queue_up,
+};
+
+#define BLK_TAGS_PER_LONG	(sizeof(unsigned long) * 8)
+#define BLK_TAGS_MASK		(BLK_TAGS_PER_LONG - 1)
+
+struct blk_queue_tag {
+	struct request **tag_index;	/* map of busy tags */
+	unsigned long *tag_map;		/* bit map of free/busy tags */
+	struct list_head busy_list;	/* fifo list of busy tags */
+	int busy;			/* current depth */
+	int max_depth;
 };
 
 /*
@@ -193,6 +207,8 @@ struct request_queue
 	unsigned long		seg_boundary_mask;
 
 	wait_queue_head_t	queue_wait;
+
+	struct blk_queue_tag	*queue_tags;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -203,9 +219,11 @@ struct request_queue
 
 #define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
 #define QUEUE_FLAG_CLUSTER	1	/* cluster several segments into 1 */
+#define QUEUE_FLAG_QUEUED	2	/* uses generic tag queueing */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
+#define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_empty(q)	elv_queue_empty(q)
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
@@ -315,6 +333,19 @@ extern unsigned long *blk_get_ra_pages(struct block_device *bdev);
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
+
+/*
+ * tag stuff
+ */
+#define blk_queue_tag_request(q, tag)	((q)->queue_tags->tag_index[(tag)])
+#define blk_queue_tag_depth(q)		((q)->queue_tags->busy)
+#define blk_queue_tag_queue(q)		((q)->queue_tags->busy < (q)->queue_tags->max_depth)
+#define blk_rq_tagged(rq)		((rq)->flags & REQ_QUEUED)
+extern int blk_queue_start_tag(request_queue_t *, struct request *);
+extern void blk_queue_end_tag(request_queue_t *, struct request *);
+extern int blk_queue_init_tags(request_queue_t *, int);
+extern void blk_queue_free_tags(request_queue_t *);
+extern void blk_queue_invalidate_tags(request_queue_t *);
 
 extern int * blk_size[MAX_BLKDEV];	/* in units of 1024 bytes */
 
