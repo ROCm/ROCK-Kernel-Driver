@@ -861,6 +861,7 @@ icmp_reply_translation(struct sk_buff **pskb,
 	} *inside;
 	unsigned int i;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	int hdrlen;
 
 	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
 		return 0;
@@ -868,10 +869,12 @@ icmp_reply_translation(struct sk_buff **pskb,
 
 	/* We're actually going to mangle it beyond trivial checksum
 	   adjustment, so make sure the current checksum is correct. */
-	if ((*pskb)->ip_summed != CHECKSUM_UNNECESSARY
-	    && (u16)csum_fold(skb_checksum(*pskb, (*pskb)->nh.iph->ihl*4,
-					   (*pskb)->len, 0)))
-		return 0;
+	if ((*pskb)->ip_summed != CHECKSUM_UNNECESSARY) {
+		hdrlen = (*pskb)->nh.iph->ihl * 4;
+		if ((u16)csum_fold(skb_checksum(*pskb, hdrlen,
+						(*pskb)->len - hdrlen, 0)))
+			return 0;
+	}
 
 	/* Must be RELATED */
 	IP_NF_ASSERT((*pskb)->nfct
@@ -948,10 +951,12 @@ icmp_reply_translation(struct sk_buff **pskb,
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
+	hdrlen = (*pskb)->nh.iph->ihl * 4;
+
 	inside->icmp.checksum = 0;
-	inside->icmp.checksum = csum_fold(skb_checksum(*pskb,
-						       (*pskb)->nh.iph->ihl*4,
-						       (*pskb)->len, 0));
+	inside->icmp.checksum = csum_fold(skb_checksum(*pskb, hdrlen,
+						       (*pskb)->len - hdrlen,
+						       0));
 	return 1;
 
  unlock_fail:

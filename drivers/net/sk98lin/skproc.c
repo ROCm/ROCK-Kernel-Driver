@@ -54,7 +54,6 @@
 //#define SPECIAL	32		/* 0x */
 #define LARGE	64
 
-extern void proc_fill_inode(struct inode *inode, int fill);
 extern char * SkNumber(char * str, long long num, int base, int size, 
 				int precision ,int type);
 int proc_read(char *buffer,
@@ -64,19 +63,8 @@ int proc_read(char *buffer,
 				int *eof,
 				void *data);
 
-static const char SK_Root_Dir_entry[] = "sk98lin";
+
 extern struct net_device *sk98lin_root_dev;
-
-
-struct proc_dir_entry pSkRootDir = { 
-	0,
-	sizeof(SK_Root_Dir_entry)-1,
-	(const char*)SK_Root_Dir_entry,
-	S_IFDIR | S_IRUGO,
-	2, 0, 0, 0, NULL,
-	NULL
-};
-
 
 /*****************************************************************************
  *
@@ -90,7 +78,7 @@ struct proc_dir_entry pSkRootDir = {
  * Returns: buffer with statistic data
  *	
  */
-int proc_read(char *buffer,
+int sk_proc_read(char *buffer,
 char **buffer_location,
 off_t offset,
 int buffer_length,

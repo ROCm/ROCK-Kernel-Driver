@@ -94,7 +94,9 @@ static int ipcomp_input(struct xfrm_state *x,
 	memcpy(&tmp_iph, iph, iph->ihl * 4);
 	nexthdr = *(u8 *)skb->data;
 	skb_pull(skb, sizeof(struct ipcomp_hdr));
+	skb->nh.raw += sizeof(struct ipcomp_hdr);
 	memcpy(skb->nh.raw, &tmp_iph, tmp_iph.iph.ihl * 4);
+	iph = skb->nh.iph;
 	iph->tot_len = htons(ntohs(iph->tot_len) - sizeof(struct ipcomp_hdr));
 	iph->protocol = nexthdr;
 	skb->h.raw = skb->data;

@@ -15,7 +15,7 @@
  *	liability nor provide warranty for any of this software. This material
  *	is provided as is and at no charge.
  *
- *	Portions Copyright (c) 2000-2002 Conectiva, Inc. <acme@conectiva.com.br>
+ *	Portions Copyright (c) 2000-2003 Conectiva, Inc. <acme@conectiva.com.br>
  *	Neither Arnaldo Carvalho de Melo nor Conectiva, Inc. admit liability nor
  *	provide warranty for any of this software. This material is provided
  *	"AS-IS" and at no charge.
@@ -371,6 +371,7 @@ static void __ipxitf_down(struct ipx_interface *intrfc)
 	if (intrfc->if_dev)
 		dev_put(intrfc->if_dev);
 	kfree(intrfc);
+	module_put(THIS_MODULE);
 }
 
 static void ipxitf_down(struct ipx_interface *intrfc)
@@ -936,6 +937,7 @@ static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 		intrfc->if_sklist 	= NULL;
 		atomic_set(&intrfc->refcnt, 1);
 		spin_lock_init(&intrfc->if_sklist_lock);
+		__module_get(THIS_MODULE);
 	}
 
 	return intrfc;
@@ -2260,9 +2262,9 @@ extern void destroy_8023_client(struct datalink_proto *);
 static unsigned char ipx_8022_type = 0xE0;
 static unsigned char ipx_snap_id[5] = { 0x0, 0x0, 0x0, 0x81, 0x37 };
 static char ipx_banner[] __initdata =
-	KERN_INFO "NET4: Linux IPX 0.50 for NET4.0\n"
+	KERN_INFO "NET4: Linux IPX 0.51 for NET4.0\n"
 	KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n" \
-	KERN_INFO "IPX Portions Copyright (c) 2000-2002 Conectiva, Inc.\n";
+	KERN_INFO "IPX Portions Copyright (c) 2000-2003 Conectiva, Inc.\n";
 static char ipx_EII_err_msg[] __initdata =
 	KERN_CRIT "IPX: Unable to register with Ethernet II\n";
 static char ipx_8023_err_msg[] __initdata =
@@ -2310,6 +2312,10 @@ static void __exit ipx_proto_finito(void)
 	 * when a interface is created we increment the module usage count, so
 	 * the module will only be unloaded when there are no more interfaces
 	 */
+	if (unlikely(!list_empty(&ipx_interfaces)))
+		BUG();
+	if (unlikely(!list_empty(&ipx_routes)))
+		BUG();
 
 	ipx_proc_exit();
 	ipx_unregister_sysctl();

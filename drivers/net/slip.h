@@ -116,10 +116,6 @@ struct slip {
 #endif  
 };
 
-
-
 #define SLIP_MAGIC 0x5302
-
-extern int slip_init(struct net_device *dev);
 
 #endif	/* _LINUX_SLIP.H */

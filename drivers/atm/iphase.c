@@ -1167,7 +1167,6 @@ static int rx_pkt(struct atm_dev *dev)
 	skb_put(skb,len);  
         // pwang_test
         ATM_SKB(skb)->vcc = vcc;
-        ATM_SKB(skb)->iovcnt = 0;
         ATM_DESC(skb) = desc;        
 	skb_queue_tail(&iadev->rx_dma_q, skb);  
 
