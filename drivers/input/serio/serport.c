@@ -1,32 +1,16 @@
 /*
- * $Id: serport_old.c,v 1.10 2002/01/24 19:52:57 vojtech Exp $
+ * Input device TTY line discipline
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
- */
-
-/*
+ * Copyright (c) 1999-2002 Vojtech Pavlik
+ *
  * This is a module that converts a tty line into a much simpler
  * 'serial io port' abstraction that the input device drivers use.
  */
 
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- *  Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #include <asm/uaccess.h>
@@ -41,10 +25,13 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Input device TTY line discipline");
 MODULE_LICENSE("GPL");
 
+#define SERPORT_BUSY	1
+
 struct serport {
 	struct tty_struct *tty;
 	wait_queue_head_t wait;
 	struct serio serio;
+	unsigned long flags;
 	char phys[32];
 };
 
@@ -68,20 +55,20 @@ static int serport_serio_open(struct serio *serio)
 static void serport_serio_close(struct serio *serio)
 {
 	struct serport *serport = serio->driver;
+
+	serport->serio.type = 0;
 	wake_up_interruptible(&serport->wait);
 }
 
 /*
  * serport_ldisc_open() is the routine that is called upon setting our line
- * discipline on a tty. It looks for the Mag, and if found, registers
- * it as a joystick device.
+ * discipline on a tty. It prepares the serio struct.
  */
 
 static int serport_ldisc_open(struct tty_struct *tty)
 {
 	struct serport *serport;
-	char ttyname[64];
-	int i;
+	char name[64];
 
 	MOD_INC_USE_COUNT;
 
@@ -96,11 +83,7 @@ static int serport_ldisc_open(struct tty_struct *tty)
 	serport->tty = tty;
 	tty->disc_data = serport;
 
-	strcpy(ttyname, tty->driver.name);
-	for (i = 0; ttyname[i] != 0 && ttyname[i] != '/'; i++);
-	ttyname[i] = 0;
-
-	sprintf(serport->phys, "%s%d/serio0", ttyname, minor(tty->device) - tty->driver.minor_start);
+	snprintf(serport->phys, sizeof(serport->phys), "%s/serio0", tty_name(tty, name));
 
 	serport->serio.name = serport_name;
 	serport->serio.phys = serport->phys;
@@ -161,28 +144,17 @@ static int serport_ldisc_room(struct tty_struct *tty)
 static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, unsigned char * buf, size_t nr)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
-	DECLARE_WAITQUEUE(wait, current);
-	char name[32];
+	char name[64];
 
-#ifdef CONFIG_DEVFS_FS
-	sprintf(name, tty->driver.name, minor(tty->device) - tty->driver.minor_start);
-#else
-	sprintf(name, "%s%d", tty->driver.name, minor(tty->device) - tty->driver.minor_start);
-#endif
+	if (test_and_set_bit(SERPORT_BUSY, &serport->flags))
+		return -EBUSY;
 
 	serio_register_port(&serport->serio);
-
-	printk(KERN_INFO "serio: Serial port %s\n", name);
-
-	add_wait_queue(&serport->wait, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-
-	while(serport->serio.type && !signal_pending(current)) schedule();
-
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&serport->wait, &wait);
-
+	printk(KERN_INFO "serio: Serial port %s\n", tty_name(tty, name));
+	wait_event_interruptible(serport->wait, !serport->serio.type);
 	serio_unregister_port(&serport->serio);
+
+	clear_bit(SERPORT_BUSY, &serport->flags);
 
 	return 0;
 }
@@ -195,10 +167,8 @@ static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsi
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
 	
-	switch (cmd) {
-		case SPIOCSTYPE:
-			return get_user(serport->serio.type, (unsigned long *) arg);
-	}
+	if (cmd == SPIOCSTYPE)
+		return get_user(serport->serio.type, (unsigned long *) arg);
 
 	return -EINVAL;
 }
@@ -208,7 +178,6 @@ static void serport_ldisc_write_wakeup(struct tty_struct * tty)
 	struct serport *sp = (struct serport *) tty->disc_data;
 
 	serio_dev_write_wakeup(&sp->serio);
-
 }
 
 /*
