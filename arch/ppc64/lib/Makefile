@@ -15,4 +15,4 @@ ifdef CONFIG_PPC_ISERIES
 obj-$(CONFIG_PCI)	+= e2a.o
 endif
 
-lib-$(CONFIG_XMON) += sstep.o
+lib-$(CONFIG_DEBUG_KERNEL) += sstep.o

@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <asm/kdebug.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -60,6 +61,20 @@ EXPORT_SYMBOL(__debugger_iabr_match);
 EXPORT_SYMBOL(__debugger_dabr_match);
 EXPORT_SYMBOL(__debugger_fault_handler);
 #endif
+
+struct notifier_block *ppc64_die_chain;
+static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+
+int register_die_notifier(struct notifier_block *nb)
+{
+	int err = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&die_notifier_lock, flags);
+	err = notifier_chain_register(&ppc64_die_chain, nb);
+	spin_unlock_irqrestore(&die_notifier_lock, flags);
+	return err;
+}
 
 /*
  * Trap & Exception support
@@ -287,6 +302,9 @@ UnknownException(struct pt_regs *regs)
 void
 InstructionBreakpointException(struct pt_regs *regs)
 {
+	if (notify_die(DIE_IABR_MATCH, "iabr_match", regs, 5,
+					5, SIGTRAP) == NOTIFY_STOP)
+		return;
 	if (debugger_iabr_match(regs))
 		return;
 	_exception(SIGTRAP, regs, TRAP_BRKPT, regs->nip);
@@ -297,6 +315,9 @@ SingleStepException(struct pt_regs *regs)
 {
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 
+	if (notify_die(DIE_SSTEP, "single_step", regs, 5,
+					5, SIGTRAP) == NOTIFY_STOP)
+		return;
 	if (debugger_sstep(regs))
 		return;
 
@@ -470,6 +491,9 @@ ProgramCheckException(struct pt_regs *regs)
 	} else if (regs->msr & 0x20000) {
 		/* trap exception */
 
+		if (notify_die(DIE_BPT, "breakpoint", regs, 5,
+					5, SIGTRAP) == NOTIFY_STOP)
+			return;
 		if (debugger_bpt(regs))
 			return;
 
