@@ -137,7 +137,6 @@ CONFIG_CHR_DEV_SG=y
 # CONFIG_SCSI_CPQFCTS is not set
 # CONFIG_SCSI_DMX3191D is not set
 # CONFIG_SCSI_EATA is not set
-# CONFIG_SCSI_EATA_DMA is not set
 # CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_FUTURE_DOMAIN is not set
 # CONFIG_SCSI_GDTH is not set
@@ -267,6 +266,7 @@ CONFIG_MII=y
 # CONFIG_SUNGEM is not set
 CONFIG_NET_VENDOR_3COM=y
 CONFIG_VORTEX=y
+# CONFIG_TYPHOON is not set
 
 #
 # Tulip family network device support
