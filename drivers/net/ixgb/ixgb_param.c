@@ -177,9 +177,6 @@ IXGB_PARAM(IntDelayEnable, "Transmit Interrupt Delay Enable");
 #define MAX_TXD				   4096
 #define MIN_TXD				     64
 
-#define DEFAULT_RXD			   1024
-#define MAX_RXD				   4096
-#define MIN_RXD				     64
 
 #define DEFAULT_TIDV	   		     32
 #define MAX_TIDV			 0xFFFF

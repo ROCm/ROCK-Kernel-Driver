@@ -85,6 +85,16 @@ struct ixgb_adapter;
 
 #define IXGB_ERR(args...) printk(KERN_ERR "ixgb: " args)
 
+
+/* hardware cannot reliably support more than 512 descriptors owned by
+ * hardware descrioptor cache otherwise an unreliable ring under heavy 
+ * recieve load may result */
+/* #define DEFAULT_RXD	   1024 */
+/* #define MAX_RXD	   4096 */
+#define DEFAULT_RXD	512
+#define MAX_RXD	512
+#define MIN_RXD	 64
+
 /* Supported Rx Buffer Sizes */
 #define IXGB_RXBUFFER_2048  2048
 #define IXGB_RXBUFFER_4096  4096
