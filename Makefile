@@ -538,8 +538,9 @@ define rule_vmlinux__
 	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
-do_system_map = $(NM) $(1) | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > $(2)
-
+quiet_cmd_sysmap = SYSMAP 
+      cmd_sysmap = $(CONFIG_SHELL) $(srctree)/scripts/mksysmap
+		   
 LDFLAGS_vmlinux += -T arch/$(ARCH)/kernel/vmlinux.lds.s
 
 #	Generate section listing all symbols and add it into vmlinux
@@ -570,8 +571,10 @@ endif
 kallsyms.o := .tmp_kallsyms$(last_kallsyms).o
 
 define rule_verify_kallsyms
-	@$(call do_system_map, .tmp_vmlinux$(last_kallsyms), .tmp_System.map)
-	@cmp -s System.map .tmp_System.map || \
+	$(Q)$(if $($(quiet)cmd_sysmap),                       \
+	  echo '  $($(quiet)cmd_sysmap) .tmp_System.map' &&)  \
+	  $(cmd_sysmap) .tmp_vmlinux$(last_kallsyms) .tmp_System.map
+	$(Q)cmp -s System.map .tmp_System.map || \
 		(echo Inconsistent kallsyms data, try setting CONFIG_KALLSYMS_EXTRA_PASS ; rm .tmp_kallsyms* ; false)
 endef
 
@@ -595,11 +598,19 @@ cmd_kallsyms = $(NM) -n $< | $(KALLSYMS) $(foreach x,$(CONFIG_KALLSYMS_ALL),--al
 
 endif
 
-#	Finally the vmlinux rule
+# Finally the vmlinux rule
+# This rule is also used to generate System.map
+# and to verify that the content of kallsyms are consistent
 
 define rule_vmlinux
-	$(rule_vmlinux__); \
-	$(call do_system_map, $@, System.map)
+	$(rule_vmlinux__);
+	$(Q)$(if $($(quiet)cmd_sysmap),          \
+	  echo '  $($(quiet)cmd_sysmap) $@' &&)  \
+	$(cmd_sysmap) $@ System.map;             \
+	if [ $$? -ne 0 ]; then                   \
+		rm -f $@;                        \
+		/bin/false;                      \
+	fi;
 	$(rule_verify_kallsyms)
 endef
 
