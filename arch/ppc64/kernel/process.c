@@ -70,23 +70,6 @@ enable_kernel_fp(void)
 #endif /* CONFIG_SMP */
 }
 
-#ifdef CONFIG_SMP
-static void smp_unlazy_onefpu(void *arg)
-{
-	struct pt_regs *regs = current->thread.regs;
-
-	if (!regs)
-		return;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-}
-
-void dump_smp_unlazy_fpu(void)
-{
-	smp_call_function(smp_unlazy_onefpu, NULL, 1, 1);
-}
-#endif
-
 int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 {
 	struct pt_regs *regs = tsk->thread.regs;
