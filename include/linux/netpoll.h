@@ -9,7 +9,6 @@
 
 #include <linux/netdevice.h>
 #include <linux/interrupt.h>
-#include <linux/irq.h>
 #include <linux/list.h>
 
 struct netpoll;
