@@ -473,8 +473,8 @@ static int tcp_v6_check_established(struct sock *sk)
 				tp->write_seq = tw->tw_snd_nxt + 65535 + 2;
 				if (!tp->write_seq)
 					tp->write_seq = 1;
-				tp->ts_recent = tw->tw_ts_recent;
-				tp->ts_recent_stamp = tw->tw_ts_recent_stamp;
+				tp->rx_opt.ts_recent = tw->tw_ts_recent;
+				tp->rx_opt.ts_recent_stamp = tw->tw_ts_recent_stamp;
 				sock_hold(sk2);
 				goto unique;
 			} else
@@ -609,10 +609,10 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 			return -EINVAL;
 	}
 
-	if (tp->ts_recent_stamp &&
+	if (tp->rx_opt.ts_recent_stamp &&
 	    !ipv6_addr_equal(&np->daddr, &usin->sin6_addr)) {
-		tp->ts_recent = 0;
-		tp->ts_recent_stamp = 0;
+		tp->rx_opt.ts_recent = 0;
+		tp->rx_opt.ts_recent_stamp = 0;
 		tp->write_seq = 0;
 	}
 
@@ -703,7 +703,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		tp->ext_header_len = np->opt->opt_flen + np->opt->opt_nflen;
 	tp->ext2_header_len = dst->header_len;
 
-	tp->mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
+	tp->rx_opt.mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
 
 	inet->dport = usin->sin6_port;
 
@@ -1202,7 +1202,8 @@ static void tcp_v6_synq_add(struct sock *sk, struct open_request *req)
 static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct tcp_sock tmptp, *tp = tcp_sk(sk);
+	struct tcp_options_received tmp_opt;
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct open_request *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
 
@@ -1228,14 +1229,14 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (req == NULL)
 		goto drop;
 
-	tcp_clear_options(&tmptp);
-	tmptp.mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
-	tmptp.user_mss = tp->user_mss;
+	tcp_clear_options(&tmp_opt);
+	tmp_opt.mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
+	tmp_opt.user_mss = tp->rx_opt.user_mss;
 
-	tcp_parse_options(skb, &tmptp, 0);
+	tcp_parse_options(skb, &tmp_opt, 0);
 
-	tmptp.tstamp_ok = tmptp.saw_tstamp;
-	tcp_openreq_init(req, &tmptp, skb);
+	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
+	tcp_openreq_init(req, &tmp_opt, skb);
 
 	req->class = &or_ipv6;
 	ipv6_addr_copy(&req->af.v6_req.rmt_addr, &skb->nh.ipv6h->saddr);

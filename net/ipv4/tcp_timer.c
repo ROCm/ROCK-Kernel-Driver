@@ -353,7 +353,7 @@ static void tcp_retransmit_timer(struct sock *sk)
 
 	if (tp->retransmits == 0) {
 		if (tp->ca_state == TCP_CA_Disorder || tp->ca_state == TCP_CA_Recovery) {
-			if (tp->sack_ok) {
+			if (tp->rx_opt.sack_ok) {
 				if (tp->ca_state == TCP_CA_Recovery)
 					NET_INC_STATS_BH(LINUX_MIB_TCPSACKRECOVERYFAIL);
 				else

@@ -236,13 +236,13 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 	/* Make sure we do not exceed the maximum possible
 	 * scaled window.
 	 */
-	if (!tp->rcv_wscale)
+	if (!tp->rx_opt.rcv_wscale)
 		new_win = min(new_win, MAX_TCP_WINDOW);
 	else
-		new_win = min(new_win, (65535U << tp->rcv_wscale));
+		new_win = min(new_win, (65535U << tp->rx_opt.rcv_wscale));
 
 	/* RFC1323 scaling applied */
-	new_win >>= tp->rcv_wscale;
+	new_win >>= tp->rx_opt.rcv_wscale;
 
 	/* If we advertise zero window, disable fast path. */
 	if (new_win == 0)
@@ -296,12 +296,12 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 				if(!(sysctl_flags & SYSCTL_FLAG_TSTAMPS))
 					tcp_header_size += TCPOLEN_SACKPERM_ALIGNED;
 			}
-		} else if (tp->eff_sacks) {
+		} else if (tp->rx_opt.eff_sacks) {
 			/* A SACK is 2 pad bytes, a 2 byte header, plus
 			 * 2 32-bit sequence numbers for each SACK block.
 			 */
 			tcp_header_size += (TCPOLEN_SACK_BASE_ALIGNED +
-					    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
+					    (tp->rx_opt.eff_sacks * TCPOLEN_SACK_PERBLOCK));
 		}
 		
 		/*
@@ -349,9 +349,9 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 					      (sysctl_flags & SYSCTL_FLAG_TSTAMPS),
 					      (sysctl_flags & SYSCTL_FLAG_SACK),
 					      (sysctl_flags & SYSCTL_FLAG_WSCALE),
-					      tp->rcv_wscale,
+					      tp->rx_opt.rcv_wscale,
 					      tcb->when,
-		      			      tp->ts_recent);
+		      			      tp->rx_opt.ts_recent);
 		} else {
 			tcp_build_and_update_options((__u32 *)(th + 1),
 						     tp, tcb->when);
@@ -607,10 +607,10 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 
 /* This function synchronize snd mss to current pmtu/exthdr set.
 
-   tp->user_mss is mss set by user by TCP_MAXSEG. It does NOT counts
+   tp->rx_opt.user_mss is mss set by user by TCP_MAXSEG. It does NOT counts
    for TCP options, but includes only bare TCP header.
 
-   tp->mss_clamp is mss negotiated at connection setup.
+   tp->rx_opt.mss_clamp is mss negotiated at connection setup.
    It is minumum of user_mss and mss received with SYN.
    It also does not include TCP options.
 
@@ -619,7 +619,7 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
    tp->mss_cache is current effective sending mss, including
    all tcp options except for SACKs. It is evaluated,
    taking into account current pmtu, but never exceeds
-   tp->mss_clamp.
+   tp->rx_opt.mss_clamp.
 
    NOTE1. rfc1122 clearly states that advertised MSS
    DOES NOT include either tcp or ip options.
@@ -643,8 +643,8 @@ unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	mss_now = pmtu - tp->af_specific->net_header_len - sizeof(struct tcphdr);
 
 	/* Clamp it (mss_clamp does not include tcp options) */
-	if (mss_now > tp->mss_clamp)
-		mss_now = tp->mss_clamp;
+	if (mss_now > tp->rx_opt.mss_clamp)
+		mss_now = tp->rx_opt.mss_clamp;
 
 	/* Now subtract optional transport overhead */
 	mss_now -= tp->ext_header_len + tp->ext2_header_len;
@@ -723,9 +723,9 @@ unsigned int tcp_current_mss(struct sock *sk, int large)
 		mss_now = tp->mss_cache;
 	}
 
-	if (tp->eff_sacks)
+	if (tp->rx_opt.eff_sacks)
 		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
-			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
+			    (tp->rx_opt.eff_sacks * TCPOLEN_SACK_PERBLOCK));
 	return mss_now;
 }
 
@@ -875,16 +875,16 @@ u32 __tcp_select_window(struct sock *sk)
 	 * scaled window will not line up with the MSS boundary anyway.
 	 */
 	window = tp->rcv_wnd;
-	if (tp->rcv_wscale) {
+	if (tp->rx_opt.rcv_wscale) {
 		window = free_space;
 
 		/* Advertise enough space so that it won't get scaled away.
 		 * Import case: prevent zero window announcement if
 		 * 1<<rcv_wscale > mss.
 		 */
-		if (((window >> tp->rcv_wscale) << tp->rcv_wscale) != window)
-			window = (((window >> tp->rcv_wscale) + 1)
-				  << tp->rcv_wscale);
+		if (((window >> tp->rx_opt.rcv_wscale) << tp->rx_opt.rcv_wscale) != window)
+			window = (((window >> tp->rx_opt.rcv_wscale) + 1)
+				  << tp->rx_opt.rcv_wscale);
 	} else {
 		/* Get the largest window that is a nice multiple of mss.
 		 * Window clamp already applied above.
@@ -962,7 +962,7 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 			tp->left_out -= tcp_skb_pcount(next_skb);
 		}
 		/* Reno case is special. Sigh... */
-		if (!tp->sack_ok && tp->sacked_out) {
+		if (!tp->rx_opt.sack_ok && tp->sacked_out) {
 			tcp_dec_pcount_approx(&tp->sacked_out, next_skb);
 			tp->left_out -= tcp_skb_pcount(next_skb);
 		}
@@ -1200,7 +1200,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 		return;
 
 	/* No forward retransmissions in Reno are possible. */
-	if (!tp->sack_ok)
+	if (!tp->rx_opt.sack_ok)
 		return;
 
 	/* Yeah, we have to make difficult choice between forward transmission
@@ -1439,8 +1439,8 @@ static inline void tcp_connect_init(struct sock *sk)
 		(sysctl_tcp_timestamps ? TCPOLEN_TSTAMP_ALIGNED : 0);
 
 	/* If user gave his TCP_MAXSEG, record it to clamp */
-	if (tp->user_mss)
-		tp->mss_clamp = tp->user_mss;
+	if (tp->rx_opt.user_mss)
+		tp->rx_opt.mss_clamp = tp->rx_opt.user_mss;
 	tp->max_window = 0;
 	tcp_sync_mss(sk, dst_pmtu(dst));
 
@@ -1451,11 +1451,11 @@ static inline void tcp_connect_init(struct sock *sk)
 	tcp_ca_init(tp);
 
 	tcp_select_initial_window(tcp_full_space(sk),
-				  tp->advmss - (tp->ts_recent_stamp ? tp->tcp_header_len - sizeof(struct tcphdr) : 0),
+				  tp->advmss - (tp->rx_opt.ts_recent_stamp ? tp->tcp_header_len - sizeof(struct tcphdr) : 0),
 				  &tp->rcv_wnd,
 				  &tp->window_clamp,
 				  sysctl_tcp_window_scaling,
-				  &tp->rcv_wscale);
+				  &tp->rx_opt.rcv_wscale);
 
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
