@@ -654,6 +654,7 @@ static __inline__ void gem_post_rxds(struct gem *gp, int limit)
 	cluster_start = curr = (gp->rx_new & ~(4 - 1));
 	count = 0;
 	kick = -1;
+	wmb();
 	while (curr != limit) {
 		curr = NEXT_RX(curr);
 		if (++count == 4) {
@@ -670,8 +671,10 @@ static __inline__ void gem_post_rxds(struct gem *gp, int limit)
 			count = 0;
 		}
 	}
-	if (kick >= 0)
+	if (kick >= 0) {
+		mb();
 		writel(kick, gp->regs + RXDMA_KICK);
+	}
 }
 
 static void gem_rx(struct gem *gp)
@@ -884,6 +887,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (gem_intme(entry))
 			ctrl |= TXDCTRL_INTME;
 		txd->buffer = cpu_to_le64(mapping);
+		wmb();
 		txd->control_word = cpu_to_le64(ctrl);
 		entry = NEXT_TX(entry);
 	} else {
@@ -923,6 +927,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			
 			txd = &gp->init_block->txd[entry];
 			txd->buffer = cpu_to_le64(mapping);
+			wmb();
 			txd->control_word = cpu_to_le64(this_ctrl | len);
 
 			if (gem_intme(entry))
@@ -932,6 +937,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 		txd = &gp->init_block->txd[first_entry];
 		txd->buffer = cpu_to_le64(first_mapping);
+		wmb();
 		txd->control_word =
 			cpu_to_le64(ctrl | TXDCTRL_SOF | intme | first_len);
 	}
@@ -943,6 +949,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (netif_msg_tx_queued(gp))
 		printk(KERN_DEBUG "%s: tx queued, slot %d, skblen %d\n",
 		       dev->name, entry, skb->len);
+	mb();
 	writel(gp->tx_new, gp->regs + TXDMA_KICK);
 	spin_unlock_irq(&gp->lock);
 
@@ -1418,6 +1425,7 @@ static void gem_clean_rings(struct gem *gp)
 			gp->rx_skbs[i] = NULL;
 		}
 		rxd->status_word = 0;
+		wmb();
 		rxd->buffer = 0;
 	}
 
@@ -1478,6 +1486,7 @@ static void gem_init_rings(struct gem *gp)
 					RX_BUF_ALLOC_SIZE(gp),
 					PCI_DMA_FROMDEVICE);
 		rxd->buffer = cpu_to_le64(dma_addr);
+		wmb();
 		rxd->status_word = cpu_to_le64(RXDCTRL_FRESH(gp));
 		skb_reserve(skb, RX_OFFSET);
 	}
@@ -1486,8 +1495,10 @@ static void gem_init_rings(struct gem *gp)
 		struct gem_txd *txd = &gb->txd[i];
 
 		txd->control_word = 0;
+		wmb();
 		txd->buffer = 0;
 	}
+	wmb();
 }
 
 /* Must be invoked under gp->lock. */
