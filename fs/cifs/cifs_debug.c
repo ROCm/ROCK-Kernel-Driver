@@ -108,7 +108,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 					mid_q_entry,
 					qhead);
 				if(mid_entry) {
-					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p\n",mid_entry->midState,mid_entry->command,mid_entry->pid,mid_entry->tsk);
+					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p mid %d\n",mid_entry->midState,mid_entry->command,mid_entry->pid,mid_entry->tsk,mid_entry->mid);
 					buf += length;
 				}
 			}
@@ -257,6 +257,12 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 			atomic_read(&tcon->num_deletes),
 			atomic_read(&tcon->num_mkdirs),
 			atomic_read(&tcon->num_rmdirs));
+		buf += item_length;
+		length += item_length;
+		item_length = sprintf(buf,
+			"\nRenames: %d T2 Renames %d",
+			atomic_read(&tcon->num_renames),
+			atomic_read(&tcon->num_t2renames));
 		buf += item_length;
 		length += item_length;
 	}
