@@ -87,6 +87,12 @@ ia64_outl (unsigned int val, unsigned long port)
 	__ia64_outl(val, port);
 }
 
+void
+ia64_mmiob (void)
+{
+	__ia64_mmiob();
+}
+
 /* define aliases: */
 
 asm (".global __ia64_inb, __ia64_inw, __ia64_inl");
@@ -98,5 +104,8 @@ asm (".global __ia64_outb, __ia64_outw, __ia64_outl");
 asm ("__ia64_outb = ia64_outb");
 asm ("__ia64_outw = ia64_outw");
 asm ("__ia64_outl = ia64_outl");
+
+asm (".global __ia64_mmiob");
+asm ("__ia64_mmiob = ia64_mmiob");
 
 #endif /* CONFIG_IA64_GENERIC */
