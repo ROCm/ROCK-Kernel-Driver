@@ -662,40 +662,10 @@ int hpet_control(struct hpet_task *tp, unsigned int cmd, unsigned long arg)
 
 #ifdef	CONFIG_TIME_INTERPOLATION
 
-static unsigned long hpet_offset, last_wall_hpet;
-static long hpet_nsecs_per_cycle, hpet_cycles_per_sec;
-
-static unsigned long hpet_getoffset(void)
-{
-	return hpet_offset + (read_counter(&hpets->hp_hpet->hpet_mc) -
-			      last_wall_hpet) * hpet_nsecs_per_cycle;
-}
-
-static void hpet_update(long delta)
-{
-	unsigned long mc;
-	unsigned long offset;
-
-	mc = read_counter(&hpets->hp_hpet->hpet_mc);
-	offset = hpet_offset + (mc - last_wall_hpet) * hpet_nsecs_per_cycle;
-
-	if (delta < 0 || (unsigned long)delta < offset)
-		hpet_offset = offset - delta;
-	else
-		hpet_offset = 0;
-	last_wall_hpet = mc;
-}
-
-static void hpet_reset(void)
-{
-	hpet_offset = 0;
-	last_wall_hpet = read_counter(&hpets->hp_hpet->hpet_mc);
-}
-
 static struct time_interpolator hpet_interpolator = {
-	.get_offset = hpet_getoffset,
-	.update = hpet_update,
-	.reset = hpet_reset
+	.source = TIME_SOURCE_MMIO64,
+	.shift = 10,
+	.addr = MC
 };
 
 #endif

@@ -45,146 +45,7 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 
-static void
-itc_reset (void)
-{
-}
-
-/*
- * Adjust for the fact that xtime has been advanced by delta_nsec (may be negative and/or
- * larger than NSEC_PER_SEC.
- */
-static void
-itc_update (long delta_nsec)
-{
-}
-
-/*
- * Return the number of nano-seconds that elapsed since the last
- * update to jiffy.  It is quite possible that the timer interrupt
- * will interrupt this and result in a race for any of jiffies,
- * wall_jiffies or itm_next.  Thus, the xtime_lock must be at least
- * read synchronised when calling this routine (see do_gettimeofday()
- * below for an example).
- */
-unsigned long
-itc_get_offset (void)
-{
-	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
-	unsigned long now = ia64_get_itc(), last_tick;
-
-	last_tick = (cpu_data(TIME_KEEPER_ID)->itm_next
-		     - (lost + 1)*cpu_data(TIME_KEEPER_ID)->itm_delta);
-
-	elapsed_cycles = now - last_tick;
-	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
-}
-
-static struct time_interpolator itc_interpolator = {
-	.get_offset =	itc_get_offset,
-	.update =	itc_update,
-	.reset =	itc_reset
-};
-
-int
-do_settimeofday (struct timespec *tv)
-{
-	time_t wtm_sec, sec = tv->tv_sec;
-	long wtm_nsec, nsec = tv->tv_nsec;
-
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
-		return -EINVAL;
-
-	write_seqlock_irq(&xtime_lock);
-	{
-		/*
-		 * This is revolting. We need to set "xtime" correctly. However, the value
-		 * in this location is the value at the most recent update of wall time.
-		 * Discover what correction gettimeofday would have done, and then undo
-		 * it!
-		 */
-		nsec -= time_interpolator_get_offset();
-
-		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
-		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
-
-		set_normalized_timespec(&xtime, sec, nsec);
-		set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
-
-		time_adjust = 0;		/* stop active adjtime() */
-		time_status |= STA_UNSYNC;
-		time_maxerror = NTP_PHASE_LIMIT;
-		time_esterror = NTP_PHASE_LIMIT;
-		time_interpolator_reset();
-	}
-	write_sequnlock_irq(&xtime_lock);
-	clock_was_set();
-	return 0;
-}
-
-EXPORT_SYMBOL(do_settimeofday);
-
-void
-do_gettimeofday (struct timeval *tv)
-{
-	unsigned long seq, nsec, usec, sec, old, offset;
-
-	while (1) {
-		seq = read_seqbegin(&xtime_lock);
-		{
-			old = last_nsec_offset;
-			offset = time_interpolator_get_offset();
-			sec = xtime.tv_sec;
-			nsec = xtime.tv_nsec;
-		}
-		if (unlikely(read_seqretry(&xtime_lock, seq)))
-			continue;
-		/*
-		 * Ensure that for any pair of causally ordered gettimeofday() calls, time
-		 * never goes backwards (even when ITC on different CPUs are not perfectly
-		 * synchronized).  (A pair of concurrent calls to gettimeofday() is by
-		 * definition non-causal and hence it makes no sense to talk about
-		 * time-continuity for such calls.)
-		 *
-		 * Doing this in a lock-free and race-free manner is tricky.  Here is why
-		 * it works (most of the time): read_seqretry() just succeeded, which
-		 * implies we calculated a consistent (valid) value for "offset".  If the
-		 * cmpxchg() below succeeds, we further know that last_nsec_offset still
-		 * has the same value as at the beginning of the loop, so there was
-		 * presumably no timer-tick or other updates to last_nsec_offset in the
-		 * meantime.  This isn't 100% true though: there _is_ a possibility of a
-		 * timer-tick occurring right right after read_seqretry() and then getting
-		 * zero or more other readers which will set last_nsec_offset to the same
-		 * value as the one we read at the beginning of the loop.  If this
-		 * happens, we'll end up returning a slightly newer time than we ought to
-		 * (the jump forward is at most "offset" nano-seconds).  There is no
-		 * danger of causing time to go backwards, though, so we are safe in that
-		 * sense.  We could make the probability of this unlucky case occurring
-		 * arbitrarily small by encoding a version number in last_nsec_offset, but
-		 * even without versioning, the probability of this unlucky case should be
-		 * so small that we won't worry about it.
-		 */
-		if (offset <= old) {
-			offset = old;
-			break;
-		} else if (likely(cmpxchg(&last_nsec_offset, old, offset) == old))
-			break;
-
-		/* someone else beat us to updating last_nsec_offset; try again */
-	}
-
-	usec = (nsec + offset) / 1000;
-
-	while (unlikely(usec >= USEC_PER_SEC)) {
-		usec -= USEC_PER_SEC;
-		++sec;
-	}
-
-	tv->tv_sec = sec;
-	tv->tv_usec = usec;
-}
-
-EXPORT_SYMBOL(do_gettimeofday);
+static struct time_interpolator itc_interpolator;
 
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
@@ -277,6 +138,18 @@ ia64_cpu_local_tick (void)
 	ia64_set_itm(local_cpu_data->itm_next);
 }
 
+static int nojitter;
+
+static int __init nojitter_setup(char *str)
+{
+	nojitter = 1;
+	printk("Jitter checking for ITC timers disabled\n");
+	return 1;
+}
+
+__setup("nojitter", nojitter_setup);
+
+
 void __devinit
 ia64_init_itm (void)
 {
@@ -339,7 +212,23 @@ ia64_init_itm (void)
 
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 		itc_interpolator.frequency = local_cpu_data->itc_freq;
+		itc_interpolator.shift = 16;
 		itc_interpolator.drift = itc_drift;
+		itc_interpolator.source = TIME_SOURCE_CPU;
+#ifdef CONFIG_SMP
+		/* On IA64 in an SMP configuration ITCs are never accurately synchronized.
+		 * Jitter compensation requires a cmpxchg which may limit
+		 * the scalability of the syscalls for retrieving time.
+		 * The ITC synchronization is usually successful to within a few
+		 * ITC ticks but this is not a sure thing. If you need to improve
+		 * timer performance in SMP situations then boot the kernel with the
+		 * "nojitter" option. However, doing so may result in time fluctuating (maybe
+		 * even going backward) if the ITC offsets between the individual CPUs
+		 * are too large.
+		 */
+		if (!nojitter) itc_interpolator.jitter = 1;
+#endif
+		itc_interpolator.addr = NULL;
 		register_time_interpolator(&itc_interpolator);
 	}
 

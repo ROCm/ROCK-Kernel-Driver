@@ -1,0 +1,40 @@
+Time Interpolators
+------------------
+
+Time interpolators are a base of time calculation between timer ticks and
+allow an accurate determination of time down to the accuracy of the time
+source in nanoseconds.
+
+The architecture specific code typically provides gettimeofday and
+settimeofday under Linux. The time interpolator provides both if an arch
+defines CONFIG_TIME_INTERPOLATION. The arch still must set up timer tick
+operations and call the necessary functions to advance the clock.
+With the time interpolator a standardized interface exists for time
+interpolation between ticks which also allows the determination
+of time in a hardware independent way. The provided logic is highly scalable
+and has been tested in SMP situations of up to 512 CPUs.
+
+If CONFIG_TIME_INTERPOLATION is defined then the architecture specific code
+(or the device drivers - like HPET) must register time interpolators.
+These are typically defined in the following way:
+
+static struct time_interpolator my_interpolator;
+
+void time_init(void)
+{
+	....
+	/* Initialization of the timer *.
+	my_interpolator.frequency = MY_FREQUENCY;
+	my_interpolator.source = TIME_SOURCE_MMIO32;
+	my_interpolator.address = &my_timer;
+	my_interpolator.shift = 32;		/* increase accuracy of scaling */
+	my_interpolator.drift = -1;		/* Unknown */
+	my_interpolator.jitter = 0;		/* A stable time source */
+	register_time_interpolator(&my_interpolator);
+	....
+}
+
+For more details see include/linux/timex.h.
+
+Christoph Lameter <christoph@lameter.com>, September 8, 2004
+

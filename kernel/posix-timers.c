@@ -219,6 +219,11 @@ static __init int init_posix_timers(void)
 		.clock_set = do_posix_clock_monotonic_settime
 	};
 
+#ifdef CONFIG_TIME_INTERPOLATION
+	/* Clocks are more accurate with time interpolators */
+	clock_realtime.res = clock_monotonic.res = time_interpolator_resolution();
+#endif
+
 	register_posix_clock(CLOCK_REALTIME, &clock_realtime);
 	register_posix_clock(CLOCK_MONOTONIC, &clock_monotonic);
 
