@@ -1821,8 +1821,31 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
 
-	if (mode_switch)
-		info->flags |= FBINFO_MISC_MODESWITCH;
+	if (mode_switch) {
+		struct fb_var_screeninfo var = info->var;
+
+/*
+ * HACK ALERT: Some hardware will require reinitializion at this stage,
+ *             others will require it to be done as late as possible.
+ *             For now, we differentiate this with the
+ *             FBINFO_MISC_MODESWITCHLATE bitflag.  Worst case will be
+ *             hardware that requires it here and another one later.
+ *             A definitive solution may require fixing X or the VT
+ *             system.
+ */
+		if (info->flags & FBINFO_MISC_MODESWITCHLATE)
+			info->flags |= FBINFO_MISC_MODESWITCH;
+
+		if (blank) {
+			fbcon_cursor(vc, CM_ERASE);
+			return 0;
+		}
+
+		if (!(info->flags & FBINFO_MISC_MODESWITCHLATE)) {
+			var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+			fb_set_var(info, &var);
+		}
+	}
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
 
