@@ -1559,6 +1559,7 @@ EXPORT_SYMBOL(kill_sl_info);
 EXPORT_SYMBOL(notify_parent);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
+EXPORT_SYMBOL(sigprocmask);
 EXPORT_SYMBOL(block_all_signals);
 EXPORT_SYMBOL(unblock_all_signals);
 
@@ -1585,6 +1586,41 @@ long do_no_restart_syscall(struct restart_block *param)
  * used by various programs)
  */
 
+/*
+ * This is also useful for kernel threads that want to temporarily
+ * (or permanently) block certain signals.
+ *
+ * NOTE! Unlike the user-mode sys_sigprocmask(), the kernel
+ * interface happily blocks "unblockable" signals like SIGKILL
+ * and friends.
+ */
+int sigprocmask(int how, sigset_t *set, sigset_t *oldset)
+{
+	int error;
+	sigset_t old_block;
+
+	spin_lock_irq(&current->sighand->siglock);
+	old_block = current->blocked;
+	error = 0;
+	switch (how) {
+	case SIG_BLOCK:
+		sigorsets(&current->blocked, &current->blocked, set);
+		break;
+	case SIG_UNBLOCK:
+		signandsets(&current->blocked, &current->blocked, set);
+		break;
+	case SIG_SETMASK:
+		current->blocked = *set;
+	default:
+		error = -EINVAL;
+	}
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+	if (oldset)
+		*oldset = old_block;
+	return error;
+}
+
 asmlinkage long
 sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
 {
@@ -1601,27 +1637,7 @@ sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize)
 			goto out;
 		sigdelsetmask(&new_set, sigmask(SIGKILL)|sigmask(SIGSTOP));
 
-		spin_lock_irq(&current->sighand->siglock);
-		old_set = current->blocked;
-
-		error = 0;
-		switch (how) {
-		default:
-			error = -EINVAL;
-			break;
-		case SIG_BLOCK:
-			sigorsets(&new_set, &old_set, &new_set);
-			break;
-		case SIG_UNBLOCK:
-			signandsets(&new_set, &old_set, &new_set);
-			break;
-		case SIG_SETMASK:
-			break;
-		}
-
-		current->blocked = new_set;
-		recalc_sigpending();
-		spin_unlock_irq(&current->sighand->siglock);
+		error = sigprocmask(how, &new_set, &old_set);
 		if (error)
 			goto out;
 		if (oset)

@@ -158,21 +158,14 @@ int autofs_wait(struct autofs_sb_info *sbi, struct qstr *name)
 
 	if ( wq->name ) {
 		/* Block all but "shutdown" signals while waiting */
-		sigset_t oldset;
-		unsigned long irqflags;
+		sigset_t sigmask;
 
-		spin_lock_irqsave(&current->sighand->siglock, irqflags);
-		oldset = current->blocked;
-		siginitsetinv(&current->blocked, SHUTDOWN_SIGS & ~oldset.sig[0]);
-		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+		siginitsetinv(&sigmask, SHUTDOWN_SIGS);
+		sigprocmask(SIG_BLOCK, &sigmask, &sigmask);
 
 		interruptible_sleep_on(&wq->queue);
 
-		spin_lock_irqsave(&current->sighand->siglock, irqflags);
-		current->blocked = oldset;
-		recalc_sigpending();
-		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+		sigprocmask(SIG_SETMASK, &sigmask, NULL);
 	} else {
 		DPRINTK(("autofs_wait: skipped sleeping\n"));
 	}
