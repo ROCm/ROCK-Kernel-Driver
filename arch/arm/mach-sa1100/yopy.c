@@ -65,7 +65,7 @@ static int __init yopy_hw_init(void)
 	return 0;
 }
 
-__initcall(yopy_hw_init);
+arch_initcall(yopy_hw_init);
 
 
 static struct map_desc yopy_io_desc[] __initdata = {

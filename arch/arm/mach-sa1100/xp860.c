@@ -54,7 +54,7 @@ static int __init xp860_init(void)
 	return 0;
 }
 
-__initcall(xp860_init);
+arch_initcall(xp860_init);
 
 static struct map_desc xp860_io_desc[] __initdata = {
  /* virtual     physical    length      type */

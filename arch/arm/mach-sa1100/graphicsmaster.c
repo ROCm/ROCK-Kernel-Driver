@@ -59,7 +59,7 @@ static int __init graphicsmaster_init(void)
 	return 0;
 }
 
-__initcall(graphicsmaster_init);
+arch_initcall(graphicsmaster_init);
 
 /*
  * Handlers for GraphicsMaster's external IRQ logic
