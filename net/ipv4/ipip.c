@@ -129,7 +129,7 @@ static struct net_device ipip_fb_tunnel_dev = {
 
 static struct ip_tunnel ipip_fb_tunnel = {
 	.dev =	&ipip_fb_tunnel_dev,
-	.parms ={ name:	"tunl0", }
+	.parms ={ .name	= "tunl0", }
 };
 
 static struct ip_tunnel *tunnels_r_l[HASH_SIZE];

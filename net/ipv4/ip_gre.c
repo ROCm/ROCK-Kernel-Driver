@@ -126,7 +126,7 @@ static struct net_device ipgre_fb_tunnel_dev = {
 
 static struct ip_tunnel ipgre_fb_tunnel = {
 	.dev =	&ipgre_fb_tunnel_dev,
-	.parms ={ name: "gre0" }
+	.parms ={ .name = "gre0" }
 };
 
 /* Tunnel hash table */

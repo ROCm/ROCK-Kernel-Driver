@@ -81,8 +81,8 @@ void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len,
 struct tcp_hashinfo __cacheline_aligned tcp_hashinfo = {
 	.__tcp_lhash_lock =   RW_LOCK_UNLOCKED,
 	.__tcp_lhash_users =  ATOMIC_INIT(0),
-	__tcp_lhash_wait:
-	  __WAIT_QUEUE_HEAD_INITIALIZER(tcp_hashinfo.__tcp_lhash_wait),
+	.__tcp_lhash_wait
+	  = __WAIT_QUEUE_HEAD_INITIALIZER(tcp_hashinfo.__tcp_lhash_wait),
 	.__tcp_portalloc_lock = SPIN_LOCK_UNLOCKED
 };
 

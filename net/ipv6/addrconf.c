@@ -94,7 +94,7 @@ rwlock_t addrconf_lock = RW_LOCK_UNLOCKED;
 
 static void addrconf_verify(unsigned long);
 
-static struct timer_list addr_chk_timer = { function: addrconf_verify };
+static struct timer_list addr_chk_timer = { .function = addrconf_verify };
 static spinlock_t addrconf_verify_lock = SPIN_LOCK_UNLOCKED;
 
 static int addrconf_ifdown(struct net_device *dev, int how);
