@@ -16,6 +16,8 @@
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/systemcfg.h>
+#include <asm/paca.h>
+#include <asm/iSeries/ItLpPaca.h>
 
 
 static DEFINE_PER_CPU(struct cpu, cpu_devices);
@@ -158,10 +160,8 @@ void ppc64_enable_pmcs(void)
 
 #ifdef CONFIG_PPC_PSERIES
 	/* instruct hypervisor to maintain PMCs */
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		char *ptr = (char *)&paca[smp_processor_id()].lppaca;
-		ptr[0xBB] = 1;
-	}
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
+		get_paca()->lppaca.xPMCRegsInUse = 1;
 
 	/*
 	 * On SMT machines we have to set the run latch in the ctrl register
