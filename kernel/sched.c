@@ -1681,6 +1681,11 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 	busiest = find_busiest_queue(group);
 	if (!busiest)
 		goto out_balanced;
+	/*
+	 * This should be "impossible", but since load
+	 * balancing is inherently racy and statistical,
+	 * it could happen in theory.
+	 */
 	if (unlikely(busiest == this_rq)) {
 		WARN_ON(1);
 		goto out_balanced;
@@ -1844,7 +1849,14 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
  		}
 
 		rq = cpu_rq(push_cpu);
-		if (busiest == rq)
+
+		/*
+		 * This condition is "impossible", but since load
+		 * balancing is inherently a bit racy and statistical,
+		 * it can trigger.. Reported by Bjorn Helgaas on a
+		 * 128-cpu setup.
+		 */
+		if (unlikely(busiest == rq))
 			goto next_group;
 		double_lock_balance(busiest, rq);
 		move_tasks(rq, push_cpu, busiest, 1, sd, IDLE);
