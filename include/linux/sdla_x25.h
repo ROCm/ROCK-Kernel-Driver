@@ -154,7 +154,7 @@ typedef struct X25Cmd
 #define X25RES_INVAL_CALL_ARG	0x3A	/* errorneous call arguments */
 #define X25RES_INVAL_CALL_DATA	0x3B	/* errorneous call user data */
 #define X25RES_ASYNC_PACKET	0x40	/* asynchronous packet received */
-#define X25RES_PROTO_VIOLATION	0x41	/* protocol violation occured */
+#define X25RES_PROTO_VIOLATION	0x41	/* protocol violation occurred */
 #define X25RES_PKT_TIMEOUT	0x42	/* X.25 packet time out */
 #define X25RES_PKT_RETRY_LIMIT	0x43	/* X.25 packet retry limit exceeded */
 /*----- Command-dependent results -----*/

@@ -2004,7 +2004,7 @@ void event_intr (sdla_t *card)
 					(unsigned long)card->u.p.txbuf, *card->u.p.txbuf_next,
 					(unsigned long)card->rxmb, *card->u.p.rxbuf_next);
 
-				/* Tell timer interrupt that PPP event occured */
+				/* Tell timer interrupt that PPP event occurred */
 				ppp_priv_area->timer_int_enabled |= TMR_INT_ENABLED_PPP_EVENT;
 				flags->imask |= PPP_INTR_TIMER;
 

@@ -413,7 +413,7 @@ extern "C" {
 #define XM_ST_BC		(1L<<7)		/* Bit	7:	Broadcast packet */
 #define XM_ST_MC		(1L<<6)		/* Bit	6:	Multicast packet */
 #define XM_ST_UC		(1L<<5)		/* Bit	5:	Unicast packet */
-#define XM_ST_TX_UR		(1L<<4)		/* Bit	4:	FIFO Underrun occured */
+#define XM_ST_TX_UR		(1L<<4)		/* Bit	4:	FIFO Underrun occurred */
 #define XM_ST_CS_ERR	(1L<<3)		/* Bit	3:	Carrier Sense Error */
 #define XM_ST_LAT_COL	(1L<<2)		/* Bit	2:	Late Collision Error */
 #define XM_ST_MUL_COL	(1L<<1)		/* Bit	1:	Multiple Collisions */

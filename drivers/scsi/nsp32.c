@@ -939,7 +939,7 @@ static int nsp32_reselection(nsp32_hw_data *data, unsigned char newlun)
 	/*
 	 * If reselected New ID:LUN is not existed
 	 * or current nexus is not existed, unexpected
-	 * reselection is occured. Send reject message.
+	 * reselection is occurred. Send reject message.
 	 */
 	if (newid >= MAX_TARGET || newlun >= MAX_LUN) {
 		nsp32_msg(KERN_WARNING, "unknown id/lun");
@@ -1333,7 +1333,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/*
 	 * AutoSCSI Interrupt.
-	 * Note: This interrupt is occured when AutoSCSI is finished.  Then
+	 * Note: This interrupt is occurred when AutoSCSI is finished.  Then
 	 * check SCSIEXECUTEPHASE, and do appropriate action.  Each phases are
 	 * recorded when AutoSCSI sequencer has been processed.
 	 */
@@ -1345,7 +1345,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 		/* Selection Timeout, go busfree phase. */
 		if (auto_stat & SELECTION_TIMEOUT) {
 			nsp32_dbg(NSP32_DEBUG_INTR,
-				  "selection timeout occured");
+				  "selection timeout occurred");
 
 			SCpnt->result = DID_TIME_OUT << 16;
 			nsp32_scsi_done(data, SCpnt);
@@ -1357,7 +1357,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 			 * MsgOut phase was processed.
 			 * If MSG_IN_OCCUER is not set, then MsgOut phase is
 			 * completed. Thus, msgoutlen must reset.  Otherwise,
-			 * nothing to do here. If MSG_OUT_OCCUER is occured,
+			 * nothing to do here. If MSG_OUT_OCCUER is occurred,
 			 * then we will encounter the condition and check.
 			 */
 			if (!(auto_stat & MSG_IN_OCCUER) &&
@@ -1515,7 +1515,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* PCI_IRQ */
 	if (irq_stat & IRQSTATUS_PCI_IRQ) {
-		nsp32_dbg(NSP32_DEBUG_INTR, "PCI IRQ occured");
+		nsp32_dbg(NSP32_DEBUG_INTR, "PCI IRQ occurred");
 		/* Do nothing */
 	}
 
@@ -1524,7 +1524,7 @@ static void do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 		nsp32_msg(KERN_ERR, "Received unexpected BMCNTERR IRQ! ");
 		/*
 		 * TODO: To be implemented improving bus master
-		 * transfer reliablity when BMCNTERR is occured in
+		 * transfer reliablity when BMCNTERR is occurred in
 		 * AutoSCSI phase described in specification.
 		 */
 	}
@@ -2300,7 +2300,7 @@ static int nsp32_busfree_occur(nsp32_hw_data *data, unsigned short execph)
 		} else {
 			/*
 			 * On the contrary, if unexpected bus free is
-			 * occured, then negotiation is failed. Fall
+			 * occurred, then negotiation is failed. Fall
 			 * back to ASYNC mode.
 			 */
 			nsp32_set_async(data, data->curtarget);
@@ -2338,7 +2338,7 @@ static int nsp32_busfree_occur(nsp32_hw_data *data, unsigned short execph)
 		return (TRUE);
 	} else {
 		/* Unexpected bus free */
-		nsp32_msg(KERN_WARNING, "unexpected bus free occured");
+		nsp32_msg(KERN_WARNING, "unexpected bus free occurred");
 
 		/* DID_ERROR? */
 		//SCpnt->result   = (DID_OK << 16) | (SCpnt->SCp.Message << 8) | (SCpnt->SCp.Status << 0);
@@ -2426,7 +2426,7 @@ static void nsp32_msgout_occur(nsp32_hw_data *data)
 		  "enter: msgoutlen: 0x%x", data->msgoutlen);
 
 	/*
-	 * If MsgOut phase is occured without having any
+	 * If MsgOut phase is occurred without having any
 	 * message, then No_Operation is sent (SCSI-2).
 	 */
 	if (data->msgoutlen == 0) {
@@ -2614,7 +2614,7 @@ static void nsp32_msgin_occur(nsp32_hw_data *data, unsigned long irq_status,
 	case COMMAND_COMPLETE:
 	case DISCONNECT:
 		/*
-		 * These messages should not be occured.
+		 * These messages should not be occurred.
 		 * They should be processed on AutoSCSI sequencer.
 		 */
 		nsp32_msg(KERN_WARNING, 
@@ -2654,7 +2654,7 @@ static void nsp32_msgin_occur(nsp32_hw_data *data, unsigned long irq_status,
 
 	case SAVE_POINTERS:
 		/*
-		 * These messages should not be occured.
+		 * These messages should not be occurred.
 		 * They should be processed on AutoSCSI sequencer.
 		 */
 		nsp32_msg (KERN_WARNING, 

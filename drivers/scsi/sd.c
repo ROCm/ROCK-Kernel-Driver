@@ -678,7 +678,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 	 */
 
 	/* An error occurred */
-	if (driver_byte(result) != 0 && 	/* An error occured */
+	if (driver_byte(result) != 0 && 	/* An error occurred */
 	    SCpnt->sense_buffer[0] == 0xF0) {	/* Sense data is valid */
 		switch (SCpnt->sense_buffer[2]) {
 		case MEDIUM_ERROR:
@@ -719,7 +719,7 @@ static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 
 		case RECOVERED_ERROR:
 			/*
-			 * An error occured, but it recovered.  Inform the
+			 * An error occurred, but it recovered.  Inform the
 			 * user, but make sure that it's not treated as a
 			 * hard error.
 			 */

@@ -2071,7 +2071,7 @@ static void fr_isr (sdla_t* card)
 			++card->statistics.isr_intr_test;
 	    		break;	
 
-                case FR_INTR_DLC: /* Event interrupt occured */
+                case FR_INTR_DLC: /* Event interrupt occurred */
 			mbox->cmd.command = FR_READ_STATUS;
 			mbox->cmd.length = 0;
 			err = sdla_exec(mbox) ? mbox->cmd.result : CMD_TIMEOUT;

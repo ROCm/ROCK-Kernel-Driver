@@ -1801,7 +1801,7 @@ error:
 /*                                                                          */
 /* Routine Description:                                                     */
 /*   Fill in a single scb sg_list element from an address                   */
-/*   return a -1 if a breakup occured                                       */
+/*   return a -1 if a breakup occurred                                      */
 /****************************************************************************/
 static inline int ips_fill_scb_sg_single(ips_ha_t *ha, dma_addr_t busaddr,
                             ips_scb_t *scb, int indx, unsigned int e_len)

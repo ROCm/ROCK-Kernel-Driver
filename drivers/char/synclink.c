@@ -7621,7 +7621,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		status = info->rx_buffer_list[0].status;
 
 		if ( status & (BIT8 + BIT3 + BIT1) ) {
-			/* receive error has occured */
+			/* receive error has occurred */
 			rc = FALSE;
 		} else {
 			if ( memcmp( info->tx_buffer_list[0].virt_addr ,

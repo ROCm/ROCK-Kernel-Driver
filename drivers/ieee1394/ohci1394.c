@@ -2366,7 +2366,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 			if (!(node_id & 0x80000000)) {
 				PRINT(KERN_ERR, ohci->id,
 				      "SelfID received, but NodeID invalid "
-				      "(probably new bus reset occured): %08X",
+				      "(probably new bus reset occurred): %08X",
 				      node_id);
 				goto selfid_not_valid;
 			}

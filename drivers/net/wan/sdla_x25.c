@@ -3178,7 +3178,7 @@ dflt_2:
  *	   when clearing a call because protocol encapsulation is not 
  *	   supported.
  *	4. If an incoming call is received while a call request is 
- *	   pending (i.e. call collision has occured), the incoming call 
+ *	   pending (i.e. call collision has occurred), the incoming call 
  *	   shall be rejected and call request shall be retried.
  *====================================================================*/
 

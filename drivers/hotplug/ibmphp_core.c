@@ -1343,12 +1343,12 @@ static int enable_slot (struct hotplug_slot *hs)
 		}
 		/* Check to see the error of why it failed */
 		if ((SLOT_POWER (slot_cur->status)) && !(SLOT_PWRGD (slot_cur->status)))
-			err ("power fault occured trying to power up \n");
+			err ("power fault occurred trying to power up \n");
 		else if (SLOT_BUS_SPEED (slot_cur->status)) {
-			err ("bus speed mismatch occured.  please check current bus speed and card capability \n");
+			err ("bus speed mismatch occurred.  please check current bus speed and card capability \n");
 			print_card_capability (slot_cur);
 		} else if (SLOT_BUS_MODE (slot_cur->ext_status)) {
-			err ("bus mode mismatch occured.  please check current bus mode and card capability \n");
+			err ("bus mode mismatch occurred.  please check current bus mode and card capability \n");
 			print_card_capability (slot_cur);
 		}
 		ibmphp_update_slot_info (slot_cur);
@@ -1376,10 +1376,10 @@ static int enable_slot (struct hotplug_slot *hs)
 	
 	if (SLOT_POWER (slot_cur->status) && !(SLOT_PWRGD (slot_cur->status))) {
 		faulted = 1;
-		err ("power fault occured trying to power up... \n");
+		err ("power fault occurred trying to power up... \n");
 	} else if (SLOT_POWER (slot_cur->status) && (SLOT_BUS_SPEED (slot_cur->status))) {
 		faulted = 1;
-		err ("bus speed mismatch occured.  please check current bus speed and card capability \n");
+		err ("bus speed mismatch occurred.  please check current bus speed and card capability \n");
 		print_card_capability (slot_cur);
 	} 
 	/* Don't think this case will happen after above checks... but just in case, for paranoia sake */

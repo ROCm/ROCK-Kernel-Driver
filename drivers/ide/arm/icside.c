@@ -731,7 +731,7 @@ static int icside_dma_verbose(ide_drive_t *drive)
 
 static int icside_dma_timeout(ide_drive_t *drive)
 {
-	printk(KERN_ERR "%s: DMA timeout occured: ", drive->name);
+	printk(KERN_ERR "%s: DMA timeout occurred: ", drive->name);
 
 	if (icside_dma_test_irq(drive))
 		return 0;

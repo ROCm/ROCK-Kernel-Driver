@@ -87,7 +87,7 @@ mips_pcibios_config_access(unsigned char access_type, struct pci_dev *dev,
 
 	if (intr & (GT_INTRCAUSE_MASABORT0_BIT | GT_INTRCAUSE_TARABORT0_BIT))
 	{
-	        /* Error occured */
+	        /* Error occurred */
 
 	        /* Clear bits */
 	        GT_WRITE( GT_INTRCAUSE_OFS, ~(GT_INTRCAUSE_MASABORT0_BIT | 

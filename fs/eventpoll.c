@@ -950,7 +950,7 @@ static void ep_ptable_queue_proc(struct file *file, wait_queue_head_t *whead, po
 	}
 	else
 	{
-		/* We have to signal that an error occured */
+		/* We have to signal that an error occurred */
 		epi->nwait = -1;
 	}
 }

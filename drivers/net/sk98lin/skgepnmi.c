@@ -1639,7 +1639,7 @@ int Level)		/* Initialization level */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
  *	SK_PNMI_ERR_UNKNOWN_OID  The requested OID is unknown
@@ -1678,7 +1678,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1722,7 +1722,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1766,7 +1766,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to take
  *	                         the data.
  *	SK_PNMI_ERR_UNKNOWN_NET  The requested NetIndex doesn't exist 
@@ -1944,7 +1944,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -1983,7 +1983,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -2934,7 +2934,7 @@ SK_U32 Id)		/* Object identifier to be searched */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3002,7 +3002,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3137,7 +3137,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3280,7 +3280,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3427,7 +3427,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3639,7 +3639,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -3758,7 +3758,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -4003,7 +4003,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -4482,7 +4482,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5189,7 +5189,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5498,7 +5498,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -5698,7 +5698,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -6362,7 +6362,7 @@ SK_U32 NetIndex)	/* NetIndex (0..n), in single net mode allways zero */
  *
  * Returns:
  *	SK_PNMI_ERR_OK           The request was successfully performed.
- *	SK_PNMI_ERR_GENERAL      A general severe internal error occured.
+ *	SK_PNMI_ERR_GENERAL      A general severe internal error occurred.
  *	SK_PNMI_ERR_TOO_SHORT    The passed buffer is too short to contain
  *	                         the correct data (e.g. a 32bit value is
  *	                         needed, but a 16 bit value was passed).
@@ -7364,7 +7364,7 @@ SK_U32 NetIndex)
  *
  * Description:
  *	The trap buffer stores various events. A user application somehow
- *	gets notified that an event occured and retrieves the trap buffer
+ *	gets notified that an event occurred and retrieves the trap buffer
  *	contens (or simply polls the buffer). The buffer is organized as
  *	a ring which stores the newest traps at the beginning. The oldest
  *	traps are overwritten by the newest ones. Each trap entry has a

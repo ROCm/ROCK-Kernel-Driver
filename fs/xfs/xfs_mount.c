@@ -1023,7 +1023,7 @@ xfs_mountfs(
 			/*
 			 * If the xfs quota code isn't installed,
 			 * we have to reset the quotachk'd bit.
-			 * If an error occured, qm_mount_quotas code
+			 * If an error occurred, qm_mount_quotas code
 			 * has already disabled quotas. So, just finish
 			 * mounting, and get on with the boring life
 			 * without disk quotas.

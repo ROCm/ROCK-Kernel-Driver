@@ -394,7 +394,7 @@ static int write_queue_task(void *data)
 	err = brw_kiovec(WRITE, 1, &iobuf, item->rawdevice->binding, blocks, item->rawdevice->sector_size);
 	DEBUG(3, "bklmtd: write_task: done, err = %d\n", err);
 	if(err != (cursectors << item->rawdevice->sector_bits)) {
-	  /* if an error occured - set this to exit the loop */
+	  /* if an error occurred - set this to exit the loop */
 	  sectorcnt = 0;
 	} else {
 	  sectorcnt -= cursectors;

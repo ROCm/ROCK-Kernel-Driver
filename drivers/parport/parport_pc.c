@@ -422,7 +422,7 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 			status = inb (STATUS (port));
 			if (status & 0x01) {
 				/* EPP timeout should never occur... */
-				printk (KERN_DEBUG "%s: EPP timeout occured while talking to "
+				printk (KERN_DEBUG "%s: EPP timeout occurred while talking to "
 					"w91284pic (should not have done)\n", port->name);
 				clear_epp_timeout (port);
 			}
