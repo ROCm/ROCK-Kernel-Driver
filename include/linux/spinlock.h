@@ -80,7 +80,7 @@ int in_lock_functions(unsigned long addr);
 #define in_lock_functions(ADDR) 0
 
 #if !defined(CONFIG_PREEMPT) && !defined(CONFIG_DEBUG_SPINLOCK)
-# define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
+# define _atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
 # define ATOMIC_DEC_AND_LOCK
 #endif
 
@@ -464,8 +464,10 @@ extern int  _metered_write_trylock(rwlock_t *lock);
 /* "lock on reference count zero" */
 #ifndef ATOMIC_DEC_AND_LOCK
 #include <asm/atomic.h>
-extern int atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
+extern int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
 #endif
+
+#define atomic_dec_and_lock(atomic,lock) _atomic_dec_and_lock(atomic,lock)
 
 /*
  *  bit-based spin_lock()
