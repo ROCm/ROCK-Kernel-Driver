@@ -372,7 +372,7 @@ xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
 		char *t = bcs->blog;
 
 		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
-			     bcs->hw.hscx.hscx ? 'B' : 'A', *count);
+			     bcs->unit ? 'B' : 'A', *count);
 		QuickHex(t, p, *count);
 		debugl1(cs, bcs->blog);
 	}
@@ -430,13 +430,13 @@ recv_empty_fifo_b(struct BCState *bcs, int count)
 	}
 	p = bcs->rcvbuf + bcs->rcvidx;
 	bcs->rcvidx += count;
-	cs->bc_hw_ops->read_fifo(cs, bcs->hw.hscx.hscx, p, count);
+	cs->bc_hw_ops->read_fifo(cs, bcs->unit, p, count);
 
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
 		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
+			     bcs->unit ? 'B' : 'A', count);
 		QuickHex(t, p, count);
 		debugl1(cs, bcs->blog);
 	}

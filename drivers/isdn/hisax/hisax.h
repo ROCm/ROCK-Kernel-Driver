@@ -349,15 +349,12 @@ struct l3_process {
 };
 
 struct hscx_hw {
-	int hscx;
 	u8 tsaxr0;
 	u8 tsaxr1;
 };
 
 struct w6692B_hw {
 	int bchan;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct isar_reg {
@@ -405,8 +402,6 @@ struct hdlc_hw {
 		struct hdlc_stat_reg sr;
 	} ctrl;
 	u_int stat;
-	int rcvidx;
-	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct hfcB_hw {
@@ -479,6 +474,7 @@ struct BCState {
 	int mode;
 	long Flag;
 	struct IsdnCardState *cs;
+	int unit;                       /* first or second unit (e.g. HSCX) */
 	int rcvidx;
 	u8 *rcvbuf;                     /* B-Channel receive Buffer */
 	int tx_cnt;  		        /* B-Channel transmit counter */

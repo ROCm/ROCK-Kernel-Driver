@@ -36,9 +36,8 @@ static inline void
 jade_write_fifo(struct BCState *bcs, u8 *p, int len)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_fifo(cs, hscx, p, len);
+	cs->bc_hw_ops->write_fifo(cs, bcs->unit, p, len);
 }
 
 int __init
@@ -103,7 +102,7 @@ void
 modejade(struct BCState *bcs, int mode, int bc)
 {
     struct IsdnCardState *cs = bcs->cs;
-    int jade = bcs->hw.hscx.hscx;
+    int jade = bcs->unit;
 
     if (cs->debug & L1_DEB_HSCX) {
 	char tmp[40];
@@ -270,8 +269,8 @@ initjade(struct IsdnCardState *cs)
 	cs->bcs[1].BC_SetStack = setstack_jade;
 	cs->bcs[0].BC_Close = close_jadestate;
 	cs->bcs[1].BC_Close = close_jadestate;
-	cs->bcs[0].hw.hscx.hscx = 0;
-	cs->bcs[1].hw.hscx.hscx = 1;
+	cs->bcs[0].unit = 0;
+	cs->bcs[1].unit = 1;
 
 	jade_write_reg(cs, 0, jade_HDLC_IMR, 0x00);
 	jade_write_reg(cs, 1, jade_HDLC_IMR, 0x00);

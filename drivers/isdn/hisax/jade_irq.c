@@ -32,7 +32,7 @@ waitforXFW(struct BCState *bcs)
 static inline void
 WriteJADECMDR(struct BCState *bcs, int reg, u8 data)
 {
-	int jade = bcs->hw.hscx.hscx;
+	int jade = bcs->unit;
 
 	waitforCEC(bcs->cs, jade, reg);
 	jade_write_reg(bcs->cs, jade, reg, data);

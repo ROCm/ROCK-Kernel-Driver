@@ -455,7 +455,7 @@ MemwaitforXFW(struct IsdnCardState *cs, int hscx)
 static inline void
 MemWriteHSCXCMDR(struct BCState *bcs, u8 data)
 {
-	int hscx = bcs->hw.hscx.hscx;
+	int hscx = bcs->unit;
 
 	MemwaitforCEC(bcs->cs, hscx);
 	mem_hscx_write(bcs->cs, hscx, HSCX_CMDR, data);
@@ -480,9 +480,9 @@ Memhscx_fill_fifo(struct BCState *bcs)
 	if (!p)
 		return;
 
-	MemwaitforXFW(cs, bcs->hw.hscx.hscx);
+	MemwaitforXFW(cs, bcs->unit);
 	while (count--)
-		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
+		memwritereg(cs->hw.diva.cfg_reg, bcs->unit ? 0x40 : 0,
 			*p++);
 	MemWriteHSCXCMDR(bcs, more ? 0x8 : 0xa);
 }

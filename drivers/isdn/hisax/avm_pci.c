@@ -367,7 +367,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_RRS;
 			write_ctrl(bcs, 1);
-			bcs->hw.hdlc.rcvidx = 0;
+			bcs->rcvidx = 0;
 		} else {
 			if (!(len = (stat & HDLC_STAT_RML_MASK)>>8))
 				len = 32;
@@ -381,7 +381,7 @@ HDLC_irq(struct BCState *bcs, u_int stat)
 						debugl1(bcs->cs, "invalid frame");
 					else
 						debugl1(bcs->cs, "ch%d invalid frame %#x", bcs->channel, stat);
-					bcs->hw.hdlc.rcvidx = 0;
+					bcs->rcvidx = 0;
 				}
 			}
 		}
@@ -468,9 +468,9 @@ close_hdlcstate(struct BCState *bcs)
 {
 	modehdlc(bcs, 0, 0);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.hdlc.rcvbuf) {
-			kfree(bcs->hw.hdlc.rcvbuf);
-			bcs->hw.hdlc.rcvbuf = NULL;
+		if (bcs->rcvbuf) {
+			kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 		}
 		if (bcs->blog) {
 			kfree(bcs->blog);
@@ -490,7 +490,7 @@ int
 open_hdlcstate(struct IsdnCardState *cs, struct BCState *bcs)
 {
 	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.hdlc.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+		if (!(bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
 			printk(KERN_WARNING
 			       "HiSax: No memory for hdlc.rcvbuf\n");
 			return (1);
@@ -499,8 +499,8 @@ open_hdlcstate(struct IsdnCardState *cs, struct BCState *bcs)
 			printk(KERN_WARNING
 				"HiSax: No memory for bcs->blog\n");
 			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.hdlc.rcvbuf);
-			bcs->hw.hdlc.rcvbuf = NULL;
+			kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 			return (2);
 		}
 		skb_queue_head_init(&bcs->rqueue);
@@ -509,7 +509,7 @@ open_hdlcstate(struct IsdnCardState *cs, struct BCState *bcs)
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	bcs->event = 0;
-	bcs->hw.hdlc.rcvidx = 0;
+	bcs->rcvidx = 0;
 	bcs->tx_cnt = 0;
 	return (0);
 }
@@ -518,7 +518,7 @@ int
 setstack_hdlc(struct PStack *st, struct BCState *bcs)
 {
 	bcs->channel = st->l1.bc;
-	bcs->hw.hscx.hscx = bcs->channel;
+	bcs->unit = bcs->channel;
 	if (open_hdlcstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;

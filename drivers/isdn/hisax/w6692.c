@@ -284,7 +284,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "W6692 B CRC error");
 			w6692_bc_write_reg(cs, bchan, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RRST | W_B_CMDR_RACT);
-			bcs->hw.w6692.rcvidx = 0;
+			bcs->rcvidx = 0;
 		} else {
 			count = w6692_bc_read_reg(cs, bchan, W_B_RBCL) & (W_B_FIFO_THRESH - 1);
 			if (count == 0)
@@ -599,9 +599,9 @@ close_w6692state(struct BCState *bcs)
 {
 	W6692Bmode(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->hw.w6692.rcvbuf) {
-			kfree(bcs->hw.w6692.rcvbuf);
-			bcs->hw.w6692.rcvbuf = NULL;
+		if (bcs->rcvbuf) {
+			kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 		}
 		if (bcs->blog) {
 			kfree(bcs->blog);
@@ -621,7 +621,7 @@ static int
 open_w6692state(struct IsdnCardState *cs, struct BCState *bcs)
 {
 	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->hw.w6692.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+		if (!(bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
 			printk(KERN_WARNING
 			       "HiSax: No memory for w6692.rcvbuf\n");
 			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
@@ -631,8 +631,8 @@ open_w6692state(struct IsdnCardState *cs, struct BCState *bcs)
 			printk(KERN_WARNING
 			       "HiSax: No memory for bcs->blog\n");
 			test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->hw.w6692.rcvbuf);
-			bcs->hw.w6692.rcvbuf = NULL;
+			kfree(bcs->rcvbuf);
+			bcs->rcvbuf = NULL;
 			return (2);
 		}
 		skb_queue_head_init(&bcs->rqueue);
@@ -641,7 +641,7 @@ open_w6692state(struct IsdnCardState *cs, struct BCState *bcs)
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	bcs->event = 0;
-	bcs->hw.w6692.rcvidx = 0;
+	bcs->rcvidx = 0;
 	bcs->tx_cnt = 0;
 	return (0);
 }

@@ -57,18 +57,16 @@ static inline u8
 ipacx_bc_read_reg(struct BCState *bcs, u8 addr)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
+	return cs->bc_hw_ops->read_reg(cs, bcs->unit, addr);
 }
 
 static inline void
 ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
+	cs->bc_hw_ops->write_reg(cs, bcs->unit, addr, val);
 }
 
 static inline u8
@@ -598,7 +596,7 @@ static void
 bch_mode(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int hscx = bcs->hw.hscx.hscx;
+	int hscx = bcs->unit;
 
         bc = bc ? 1 : 0;  // in case bc is greater than 1
 	if (cs->debug & L1_DEB_HSCX)
@@ -718,7 +716,7 @@ bch_init(struct IsdnCardState *cs, int hscx)
 {
 	cs->bcs[hscx].BC_SetStack   = bch_setstack;
 	cs->bcs[hscx].BC_Close      = bch_close_state;
-	cs->bcs[hscx].hw.hscx.hscx  = hscx;
+	cs->bcs[hscx].unit          = hscx;
 	cs->bcs[hscx].cs            = cs;
 	bch_mode(cs->bcs + hscx, 0, hscx);
 }
