@@ -521,6 +521,7 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	server->super_block = sb;
 	server->mnt = NULL;
 	server->sock_file = NULL;
+	init_waitqueue_head(&server->conn_wq);
 	init_MUTEX(&server->sem);
 	INIT_LIST_HEAD(&server->entry);
 	INIT_LIST_HEAD(&server->xmitq);
