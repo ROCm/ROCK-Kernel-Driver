@@ -32,7 +32,7 @@
 #ifdef DEBUG
 #define dprintk(msg...) printk(msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 #define PFX "powernow: "
@@ -89,7 +89,7 @@ static char have_a0;
 	rdmsr (msr, l__, h__);	\
 	val = l__;	\
 	val |= ((u64)h__<<32);	\
-} while(0);
+} while(0)
 #endif
 
 #ifndef wrmsrl
@@ -236,20 +236,24 @@ static void change_speed (unsigned int index)
 
 	if (have_a0 == 1)	/* A0 errata 5 */
 		__asm__("\tcli\n");
-	rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
-	fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
 
-	fidvidctl.bits.FID = fid;
-	fidvidctl.bits.FIDC = 1;
-
-	/* Set the voltage lazily. Ie, only do voltage transition
-	   if its changed since last time (Some speeds have the same voltage) */
-	if (fidvidctl.bits.VID != vid) {
-		fidvidctl.bits.VID = vid;
-		fidvidctl.bits.VIDC = 1;
+	/* First change the frequency. */
+	if (fidvidctl.bits.FID != fid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.SGTC = latency;	/* Stop grant timeout counter */
+		fidvidctl.bits.FID = fid;
+		fidvidctl.bits.FIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
 	}
 
-	wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	/* Now change voltage. */
+	if (fidvidctl.bits.VID != vid) {
+		rdmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+		fidvidctl.bits.VID = vid;
+		fidvidctl.bits.VIDC = 1;
+		wrmsrl (MSR_K7_FID_VID_CTL, fidvidctl.val);
+	}
+
 	if (have_a0 == 1)
 		__asm__("\tsti\n");
 
@@ -386,6 +390,10 @@ static struct cpufreq_driver powernow_driver = {
 
 static int __init powernow_init (void)
 {
+	if (dmi_broken & BROKEN_CPUFREQ) {
+		printk (KERN_INFO PFX "Disabled at boot time by DMI,\n");
+		return -ENODEV;
+	}
 	if (check_powernow()==0)
 		return -ENODEV;
 	return cpufreq_register_driver(&powernow_driver);
