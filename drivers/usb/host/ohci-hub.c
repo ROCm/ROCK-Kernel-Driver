@@ -405,7 +405,7 @@ ohci_hub_descriptor (
 	    temp |= 0x0010;
 	else if (rh & RH_A_OCPM)	/* per-port overcurrent reporting? */
 	    temp |= 0x0008;
-	desc->wHubCharacteristics = cpu_to_hc16 (ohci, temp);
+	desc->wHubCharacteristics = (__force __u16)cpu_to_hc16(ohci, temp);
 
 	/* two bitmaps:  ports removable, and usb 1.0 legacy PortPwrCtrlMask */
 	rh = roothub_b (ohci);
@@ -471,7 +471,7 @@ static void start_hnp(struct ohci_hcd *ohci);
 /* called from some task, normally khubd */
 static inline void root_port_reset (struct ohci_hcd *ohci, unsigned port)
 {
-	u32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
+	__hc32 __iomem *portstat = &ohci->regs->roothub.portstatus [port];
 	u32	temp;
 	u16	now = ohci_readl(ohci, &ohci->regs->fmnumber);
 	u16	reset_done = now + PORT_RESET_MSEC;
