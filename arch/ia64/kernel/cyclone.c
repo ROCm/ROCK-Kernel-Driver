@@ -1,6 +1,8 @@
+#include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/time.h>
 #include <linux/errno.h>
+#include <asm/io.h>
 
 /* IBM Summit (EXA) Cyclone counter code*/
 #define CYCLONE_CBAR_ADDR 0xFEB00CD0

@@ -145,6 +145,9 @@ ia32_gdt_init (void)
 	int cpu = smp_processor_id();
 
 	ia32_shared_page[cpu] = alloc_page(GFP_KERNEL);
+	if (!ia32_shared_page[cpu])
+		panic("failed to allocate ia32_shared_page[%d]\n", cpu);
+
 	cpu_gdt_table[cpu] = page_address(ia32_shared_page[cpu]);
 
 	/* Copy from the boot cpu's GDT */
@@ -161,6 +164,9 @@ ia32_boot_gdt_init (void)
 	unsigned long ldt_size;
 
 	ia32_shared_page[0] = alloc_page(GFP_KERNEL);
+	if (!ia32_shared_page[0])
+		panic("failed to allocate ia32_shared_page[0]\n");
+
 	ia32_boot_gdt = page_address(ia32_shared_page[0]);
 	cpu_gdt_table[0] = ia32_boot_gdt;
 
