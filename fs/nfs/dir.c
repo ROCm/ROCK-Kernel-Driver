@@ -614,12 +614,21 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 	struct inode *inode;
 	int error = -EACCES;
 
+	if (fhandle->size == 0 || !(fattr->valid & NFS_ATTR_FATTR)) {
+		struct inode *dir = dentry->d_parent->d_inode;
+		error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, fhandle, fattr);
+		if (error)
+			goto out_err;
+	}
 	inode = nfs_fhget(dentry, fhandle, fattr);
 	if (inode) {
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
 		error = 0;
 	}
+	return error;
+out_err:
+	d_drop(dentry);
 	return error;
 }
 
@@ -652,9 +661,9 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->create(dir, &dentry->d_name,
 					 &attr, 0, &fhandle, &fattr);
-	if (!error && fhandle.size != 0)
+	if (!error)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	if (error || fhandle.size == 0)
+	else
 		d_drop(dentry);
 	unlock_kernel();
 	return error;
@@ -680,9 +689,9 @@ static int nfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rde
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->mknod(dir, &dentry->d_name, &attr, rdev,
 					&fhandle, &fattr);
-	if (!error && fhandle.size != 0)
+	if (!error)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	if (error || fhandle.size == 0)
+	else
 		d_drop(dentry);
 	unlock_kernel();
 	return error;
@@ -717,9 +726,9 @@ static int nfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->mkdir(dir, &dentry->d_name, &attr, &fhandle,
 					&fattr);
-	if (!error && fhandle.size != 0)
+	if (!error)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
-	if (error || fhandle.size == 0)
+	else
 		d_drop(dentry);
 	unlock_kernel();
 	return error;
@@ -930,7 +939,7 @@ dentry->d_parent->d_name.name, dentry->d_name.name);
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->symlink(dir, &dentry->d_name, &qsymname,
 					  &attr, &sym_fh, &sym_attr);
-	if (!error && sym_fh.size != 0 && (sym_attr.valid & NFS_ATTR_FATTR)) {
+	if (!error) {
 		error = nfs_instantiate(dentry, &sym_fh, &sym_attr);
 	} else {
 		if (error == -EEXIST)
