@@ -1374,20 +1374,6 @@ static void net_tx_action(struct softirq_action *h)
 	}
 }
 
-/**
- *	net_call_rx_atomic
- *	@fn: function to call
- *
- *	Make a function call that is atomic with respect to the protocol
- *	layers.
- */
-void net_call_rx_atomic(void (*fn)(void))
-{
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	fn();
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
-}
-
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 int (*br_handle_frame_hook)(struct sk_buff *skb) = NULL;
 #endif

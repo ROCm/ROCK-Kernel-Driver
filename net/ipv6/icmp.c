@@ -198,7 +198,7 @@ static int is_ineligible(struct sk_buff *skb)
 		u8 type;
 		if (skb_copy_bits(skb, ptr+offsetof(struct icmp6hdr, icmp6_type),
 				  &type, 1)
-		    || !(type & 0x80))
+		    || !(type & ICMPV6_INFOMSG_MASK))
 			return 1;
 	}
 	return 0;
@@ -216,7 +216,7 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 	int res = 0;
 
 	/* Informational messages are not limited. */
-	if (type & 0x80)
+	if (type & ICMPV6_INFOMSG_MASK)
 		return 1;
 
 	/* Do not limit pmtu discovery, it would break it. */
@@ -519,22 +519,22 @@ static int icmpv6_rcv(struct sk_buff *skb)
 				    skb_checksum(skb, 0, skb->len, 0))) {
 			if (net_ratelimit())
 				printk(KERN_DEBUG "ICMPv6 checksum failed [%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x > %04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x]\n",
-				       ntohs(saddr->in6_u.u6_addr16[0]),
-				       ntohs(saddr->in6_u.u6_addr16[1]),
-				       ntohs(saddr->in6_u.u6_addr16[2]),
-				       ntohs(saddr->in6_u.u6_addr16[3]),
-				       ntohs(saddr->in6_u.u6_addr16[4]),
-				       ntohs(saddr->in6_u.u6_addr16[5]),
-				       ntohs(saddr->in6_u.u6_addr16[6]),
-				       ntohs(saddr->in6_u.u6_addr16[7]),
-				       ntohs(daddr->in6_u.u6_addr16[0]),
-				       ntohs(daddr->in6_u.u6_addr16[1]),
-				       ntohs(daddr->in6_u.u6_addr16[2]),
-				       ntohs(daddr->in6_u.u6_addr16[3]),
-				       ntohs(daddr->in6_u.u6_addr16[4]),
-				       ntohs(daddr->in6_u.u6_addr16[5]),
-				       ntohs(daddr->in6_u.u6_addr16[6]),
-				       ntohs(daddr->in6_u.u6_addr16[7]));
+				       ntohs(saddr->s6_addr16[0]),
+				       ntohs(saddr->s6_addr16[1]),
+				       ntohs(saddr->s6_addr16[2]),
+				       ntohs(saddr->s6_addr16[3]),
+				       ntohs(saddr->s6_addr16[4]),
+				       ntohs(saddr->s6_addr16[5]),
+				       ntohs(saddr->s6_addr16[6]),
+				       ntohs(saddr->s6_addr16[7]),
+				       ntohs(daddr->s6_addr16[0]),
+				       ntohs(daddr->s6_addr16[1]),
+				       ntohs(daddr->s6_addr16[2]),
+				       ntohs(daddr->s6_addr16[3]),
+				       ntohs(daddr->s6_addr16[4]),
+				       ntohs(daddr->s6_addr16[5]),
+				       ntohs(daddr->s6_addr16[6]),
+				       ntohs(daddr->s6_addr16[7]));
 			goto discard_it;
 		}
 	}
@@ -613,7 +613,7 @@ static int icmpv6_rcv(struct sk_buff *skb)
 			printk(KERN_DEBUG "icmpv6: msg of unkown type\n");
 
 		/* informational */
-		if (type & 0x80)
+		if (type & ICMPV6_INFOMSG_MASK)
 			break;
 
 		/* 

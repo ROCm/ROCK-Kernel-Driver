@@ -229,7 +229,7 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 	iph->version  = 4;
 	iph->ihl      = (sizeof(struct iphdr)+4)>>2;
 	iph->tos      = 0;
-	iph->frag_off = __constant_htons(IP_DF);
+	iph->frag_off = htons(IP_DF);
 	iph->ttl      = 1;
 	iph->daddr    = dst;
 	iph->saddr    = rt->rt_src;

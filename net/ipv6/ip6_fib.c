@@ -93,7 +93,7 @@ static struct fib6_node * fib6_repair_tree(struct fib6_node *fn);
 
 static __u32	rt_sernum	= 0;
 
-static struct timer_list ip6_fib_timer = { function: fib6_run_gc };
+static struct timer_list ip6_fib_timer = { .function = fib6_run_gc };
 
 static struct fib6_walker_t fib6_walker_list = {
 	&fib6_walker_list, &fib6_walker_list, 
