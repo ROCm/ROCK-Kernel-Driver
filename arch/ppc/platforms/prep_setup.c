@@ -692,7 +692,7 @@ prep_init_IRQ(void)
 	int i;
 
 	if (OpenPIC_Addr != NULL)
-		openpic_init(1, NUM_8259_INTERRUPTS, -1);
+		openpic_init(NUM_8259_INTERRUPTS);
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 	i8259_init(MPC10X_MAPA_PCI_INTACK_ADDR);

@@ -389,7 +389,6 @@ void __init chrp_init_IRQ(void)
 	int i;
 	unsigned long chrp_int_ack;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
-	int nmi_irq = -1;
 #if defined(CONFIG_VT) && defined(CONFIG_ADB_KEYBOARD) && defined(XMON)	
 	struct device_node *kbd;
 #endif
@@ -412,7 +411,7 @@ void __init chrp_init_IRQ(void)
 	OpenPIC_InitSenses = init_senses;
 	OpenPIC_NumInitSenses = NR_IRQS - NUM_8259_INTERRUPTS;
 
-	openpic_init(1, NUM_8259_INTERRUPTS, nmi_irq);
+	openpic_init(NUM_8259_INTERRUPTS);
 
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
