@@ -3034,7 +3034,7 @@ void __init gus_wave_init(struct address_info *hw_config)
 
 	gus_initialize();
 	
-	if ((gus_mem_size > 0) & !gus_no_wave_dma)
+	if ((gus_mem_size > 0) && !gus_no_wave_dma)
 	{
 		hw_config->slots[4] = -1;
 		if ((gus_devnum = sound_install_audiodrv(AUDIO_DRIVER_VERSION,

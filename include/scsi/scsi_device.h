@@ -10,6 +10,16 @@ struct scsi_cmnd;
 struct scsi_mode_data;
 
 
+/*
+ * sdev state
+ */
+enum {
+	SDEV_ADD,
+	SDEV_DEL,
+	SDEV_CANCEL,
+	SDEV_RECOVERY,
+};
+
 struct scsi_device {
 	struct list_head    siblings;   /* list of all devices on this host */
 	struct list_head    same_target_siblings; /* just the devices sharing same target id */
@@ -86,14 +96,19 @@ struct scsi_device {
 
 	struct device		sdev_gendev;
 	struct class_device	sdev_classdev;
+
+	unsigned long sdev_state;
 };
 #define	to_scsi_device(d)	\
 	container_of(d, struct scsi_device, sdev_gendev)
+#define	class_to_sdev(d)	\
+	container_of(d, struct scsi_device, sdev_classdev)
 
 extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint);
-extern int scsi_remove_device(struct scsi_device *);
-extern void scsi_set_device_offline(struct scsi_device *);
+extern void scsi_remove_device(struct scsi_device *);
+extern int scsi_device_cancel_cb(struct device *, void *);
+extern int scsi_device_cancel(struct scsi_device *, int);
 
 extern int scsi_device_get(struct scsi_device *);
 extern void scsi_device_put(struct scsi_device *);
@@ -106,5 +121,4 @@ extern int scsi_set_medium_removal(struct scsi_device *, char);
 extern int scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 			   unsigned char *buffer, int len, int timeout,
 			   int retries, struct scsi_mode_data *data);
-
 #endif /* _SCSI_SCSI_DEVICE_H */

@@ -2235,6 +2235,5 @@ static Scsi_Host_Template driver_template = {
         .sg_tablesize           = QLOGICFC_MAX_SG(QLOGICFC_REQ_QUEUE_LEN),
 	.cmd_per_lun		= QLOGICFC_CMD_PER_LUN,
         .use_clustering         = ENABLE_CLUSTERING,
-	.highmem_io		= 1,
 };
 #include "scsi_module.c"

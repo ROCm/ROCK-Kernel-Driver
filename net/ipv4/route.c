@@ -2785,8 +2785,10 @@ int __init ip_rt_init(void)
 	create_proc_read_entry("net/rt_acct", 0, 0, ip_rt_acct_read, NULL);
 #endif
 #endif
+#ifdef CONFIG_XFRM
 	xfrm_init();
 	xfrm4_init();
+#endif
 out:
 	return rc;
 out_enomem:

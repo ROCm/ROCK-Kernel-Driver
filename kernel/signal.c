@@ -1011,9 +1011,11 @@ void zap_other_threads(struct task_struct *p)
 		 * killed as part of a thread group due to another
 		 * thread doing an execve() or similar. So set the
 		 * exit signal to -1 to allow immediate reaping of
-		 * the process.
+		 * the process.  But don't detach the thread group
+		 * leader.
 		 */
-		t->exit_signal = -1;
+		if (t != p->group_leader)
+			t->exit_signal = -1;
 
 		sigaddset(&t->pending.signal, SIGKILL);
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);

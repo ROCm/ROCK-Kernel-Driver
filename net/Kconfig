@@ -83,6 +83,7 @@ config UNIX
 
 config NET_KEY
 	tristate "PF_KEY sockets"
+	select XFRM
 	---help---
 	  PF_KEYv2 socket family, compatible to KAME ones.
 	  They are required if you are going to use IPsec tools ported

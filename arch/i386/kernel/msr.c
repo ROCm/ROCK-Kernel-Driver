@@ -187,7 +187,7 @@ static loff_t msr_seek(struct file *file, loff_t offset, int orig)
   return ret;
 }
 
-static ssize_t msr_read(struct file * file, char * buf,
+static ssize_t msr_read(struct file * file, char __user * buf,
 			size_t count, loff_t *ppos)
 {
   u32 *tmp = (u32 *)buf;
@@ -212,7 +212,7 @@ static ssize_t msr_read(struct file * file, char * buf,
   return ((char *)tmp) - buf;
 }
 
-static ssize_t msr_write(struct file * file, const char * buf,
+static ssize_t msr_write(struct file * file, const char __user * buf,
 			 size_t count, loff_t *ppos)
 {
   const u32 *tmp = (const u32 *)buf;

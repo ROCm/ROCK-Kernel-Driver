@@ -395,6 +395,7 @@ unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 #define AGPSTAT			0x4
 #define AGPCMD			0x8
 #define AGPNISTAT		0xc
+#define AGPCTRL                 0x10
 #define AGPNEPG			0x16
 #define AGPNICMD		0x20
 

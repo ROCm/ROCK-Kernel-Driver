@@ -301,6 +301,12 @@ out:
 
 #define flush_write_buffers() 
 
+/* Disable vmerge for now. Need to fix the block layer code
+   to check for non iommu addresses first.
+   When the IOMMU is force it is safe to enable. */
+extern int force_iommu; 
+#define BIO_VERMGE_BOUNDARY (force_iommu ? 4096 : 0)
+
 #endif /* __KERNEL__ */
 
 #endif

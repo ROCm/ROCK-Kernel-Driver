@@ -1058,7 +1058,7 @@ static void do_fprem(FPU_REG *st0_ptr, u_char st0_tag, int round)
 	return;
       goto fprem_valid;
     }
-  else if ( (st0_tag == TAG_Empty) | (st1_tag == TAG_Empty) )
+  else if ( (st0_tag == TAG_Empty) || (st1_tag == TAG_Empty) )
     {
       FPU_stack_underflow();
       return;

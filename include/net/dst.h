@@ -247,8 +247,16 @@ static inline int dst_input(struct sk_buff *skb)
 extern void		dst_init(void);
 
 struct flowi;
+#ifndef CONFIG_XFRM
+static inline int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
+		       struct sock *sk, int flags)
+{
+	return 0;
+} 
+#else
 extern int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 		       struct sock *sk, int flags);
+#endif
 #endif
 
 #endif /* _NET_DST_H */

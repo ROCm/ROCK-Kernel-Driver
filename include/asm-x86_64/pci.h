@@ -8,9 +8,6 @@
 
 #include <linux/mm.h> /* for struct page */
 
-
-extern dma_addr_t bad_dma_address;
-
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes
    or architectures with incomplete PCI setup by the loader */
@@ -20,6 +17,8 @@ extern unsigned int pcibios_assign_all_busses(void);
 #else
 #define pcibios_assign_all_busses()	0
 #endif
+
+extern int no_iommu, force_iommu;
 
 extern unsigned long pci_mem_start;
 #define PCIBIOS_MIN_IO		0x1000
@@ -45,6 +44,9 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 struct pci_dev;
 
 extern int iommu_setup(char *opt);
+
+extern dma_addr_t bad_dma_address;
+#define pci_dma_error(x) ((x) == bad_dma_address)
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,
@@ -119,10 +121,16 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 
 /* The PCI address space does equal the physical memory
  * address space.  The networking and block device layers use
- * this boolean for bounce buffer decisions.
+ * this boolean for bounce buffer decisions
+ *
+ * On AMD64 it mostly equals, but we set it to zero to tell some subsystems
+ * that an IOMMU is available.
  */
-#define PCI_DMA_BUS_IS_PHYS	(0)
+#define PCI_DMA_BUS_IS_PHYS	(no_iommu ? 1 : 0) 
 
+/* We lie slightly when the IOMMU is forced to get the device to 
+   use SAC instead of DAC. */
+#define pci_dac_dma_supported(pci_dev, mask)	(force_iommu ? 0 : 1)
 
 #else
 static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
@@ -206,6 +214,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 
 #define PCI_DMA_BUS_IS_PHYS	1
 
+#define pci_dac_dma_supported(pci_dev, mask)	1
 #endif
 
 extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
@@ -220,21 +229,7 @@ extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  * only drive the low 24-bits during PCI bus mastering, then
  * you would pass 0x00ffffff as the mask to this function.
  */
-static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
-{
-        /*
-         * we fall back to GFP_DMA when the mask isn't all 1s,
-         * so we can't guarantee allocations that must be
-         * within a tighter range than GFP_DMA..
-         */
-        if(mask < 0x00ffffff)
-                return 0;
-
-	return 1;
-}
-
-/* This is always fine. */
-#define pci_dac_dma_supported(pci_dev, mask)	(1)
+extern int pci_dma_supported(struct pci_dev *hwdev, u64 mask);
 
 static __inline__ dma64_addr_t
 pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)

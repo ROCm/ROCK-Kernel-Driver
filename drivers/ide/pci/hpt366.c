@@ -440,7 +440,7 @@ static int hpt3xx_tune_chipset (ide_drive_t *drive, u8 speed)
 
 static void hpt3xx_tune_drive (ide_drive_t *drive, u8 pio)
 {
-	pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
+	pio = ide_get_best_pio_mode(drive, 255, pio, NULL);
 	(void) hpt3xx_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 

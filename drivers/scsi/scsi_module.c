@@ -33,7 +33,7 @@ static int __init init_this_scsi_driver(void)
 	INIT_LIST_HEAD(&sht->legacy_hosts);
 
 	sht->detect(sht);
-	if (!sht->present)
+	if (list_empty(&sht->legacy_hosts))
 		return -ENODEV;
 
 	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list) {

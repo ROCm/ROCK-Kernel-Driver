@@ -763,7 +763,10 @@ static int mixcom_write_proc(struct file *file, const char *buffer,
 		return -ENOMEM;
 	}
 
-	copy_from_user(page, buffer, count = min_t(unsigned long, count, PAGE_SIZE));
+	if (copy_from_user(page, buffer, count = min_t(unsigned long, count, PAGE_SIZE))) {
+		free_page((unsigned long)page);
+		return -EFAULT;
+	}
 	if (*(page + count - 1) == '\n') {
 		*(page + count - 1) = 0;
 	}

@@ -40,7 +40,6 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/ioport.h>
 #include <scsi/scsi.h>
 #include <linux/major.h>
@@ -102,7 +101,7 @@ typedef struct scsi_info_t {
     struct Scsi_Host	*host;
 } scsi_info_t;
 
-static void aha152x_release_cs(u_long arg);
+static void aha152x_release_cs(dev_link_t *link);
 static int aha152x_event(event_t event, int priority,
 			 event_callback_args_t *args);
 
@@ -126,9 +125,6 @@ static dev_link_t *aha152x_attach(void)
     if (!info) return NULL;
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
-    init_timer(&link->release);
-    link->release.function = &aha152x_release_cs;
-    link->release.data = (u_long)link;
 
     link->io.NumPorts1 = 0x20;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
@@ -181,9 +177,8 @@ static void aha152x_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG) {
-	aha152x_release_cs((u_long)link);
+	aha152x_release_cs(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -290,13 +285,12 @@ static void aha152x_config_cs(dev_link_t *link)
     
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
-    aha152x_release_cs((u_long)link);
+    aha152x_release_cs(link);
     return;
 }
 
-static void aha152x_release_cs(u_long arg)
+static void aha152x_release_cs(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	scsi_info_t *info = link->priv;
 
 	scsi_remove_host(info->host);
@@ -325,7 +319,7 @@ static int aha152x_event(event_t event, int priority,
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG)
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    aha152x_release_cs(link);
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;

@@ -549,14 +549,14 @@ void cpqfc_free_private_data(CPQFCHBA *hba, cpqfc_passthru_private_t *data)
 			hba->private_data_bits+(i/BITS_PER_LONG));
 }
 
-int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
+int cpqfcTS_ioctl( struct scsi_device *ScsiDev, int Cmnd, void *arg)
 {
   int result = 0;
   struct Scsi_Host *HostAdapter = ScsiDev->host;
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA *)HostAdapter->hostdata;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
   PFC_LOGGEDIN_PORT pLoggedInPort = NULL;
-  Scsi_Cmnd DumCmnd;
+  struct scsi_cmnd *DumCmnd;
   int i, j;
   VENDOR_IOCTL_REQ ioc;
   cpqfc_passthru_t *vendor_cmd;
@@ -723,13 +723,16 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 /* 	DumCmnd.target  = ScsiDev->id; */
 /* 	DumCmnd.lun     = ScsiDev->lun; */
 
-        DumCmnd.device = ScsiDev;
+	DumCmnd = scsi_get_command (ScsiDev, GFP_KERNEL);
+	if (!DumCmnd)
+		return -ENOMEM;
 	
 	pLoggedInPort = fcFindLoggedInPort( fcChip,
-		&DumCmnd, // search Scsi Nexus
+		DumCmnd, // search Scsi Nexus
 		0,        // DON'T search linked list for FC port id
 		NULL,     // DON'T search linked list for FC WWN
 		NULL);    // DON'T care about end of list
+	scsi_put_command (DumCmnd);
 	if (pLoggedInPort == NULL) {
 		result = -ENXIO;
 		break;
@@ -918,7 +921,8 @@ static int copy_info(struct info_str *info, char *fmt, ...)
 int cpqfcTS_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length, 
 		       int inout)
 {
-  Scsi_Cmnd DumCmnd;
+  struct scsi_cmnd *DumCmnd;
+  struct scsi_device *ScsiDev;
   int Chan, Targ, i;
   struct info_str info;
   CPQFCHBA *cpqfcHBA;
@@ -946,13 +950,21 @@ int cpqfcTS_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t
 
 #define DISPLAY_WWN_INFO
 #ifdef DISPLAY_WWN_INFO
+  ScsiDev = scsi_get_host_dev (host);
+  if (!ScsiDev) 
+    return -ENOMEM;
+  DumCmnd = scsi_get_command (ScsiDev, GFP_KERNEL);
+  if (!DumCmnd) {
+    scsi_free_host_dev (ScsiDev);
+    return -ENOMEM;
+  }
   copy_info(&info, "WWN database: (\"port_id: 000000\" means disconnected)\n");
   for ( Chan=0; Chan <= host->max_channel; Chan++) {
-    DumCmnd.channel = Chan;
+    DumCmnd->device->channel = Chan;
     for (Targ=0; Targ <= host->max_id; Targ++) {
-      DumCmnd.target = Targ;
+      DumCmnd->device->id = Targ;
       if ((pLoggedInPort = fcFindLoggedInPort( fcChip,
-	    			&DumCmnd, // search Scsi Nexus
+	    			DumCmnd,  // search Scsi Nexus
     				0,        // DON'T search list for FC port id
     				NULL,     // DON'T search list for FC WWN
     				NULL))){   // DON'T care about end of list
@@ -966,6 +978,9 @@ int cpqfcTS_proc_info (struct Scsi_Host *host, char *buffer, char **start, off_t
       }
     }
   }
+
+  scsi_put_command (DumCmnd);
+  scsi_free_host_dev (ScsiDev);
 #endif
 
 
@@ -1578,7 +1593,7 @@ int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev,
 // Scsi_Request, etc.
 // For now, so people don't fall into a hole...
 return -ENOTSUPP;
-
+/*
   // printk("   ENTERING cpqfcTS_TargetDeviceReset() - flag=%d \n",reset_flags);
 
   if (ScsiDev->host->eh_active) return FAILED;
@@ -1600,7 +1615,7 @@ return -ENOTSUPP;
 	SCpnt->request->CPQFC_WAITING = NULL;
   }
     
-/*
+
       if(driver_byte(SCpnt->result) != 0)
 	  switch(SCpnt->sense_buffer[2] & 0xf) {
 	case ILLEGAL_REQUEST:

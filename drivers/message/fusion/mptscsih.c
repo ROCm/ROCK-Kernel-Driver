@@ -1458,7 +1458,6 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 				sh->max_lun = MPT_LAST_LUN + 1;
 
 				sh->max_sectors = MPT_SCSI_MAX_SECTORS;
-				sh->highmem_io = 1;
 				sh->this_id = this->pfacts[portnum].PortSCSIID;
 
 				/* Required entry.

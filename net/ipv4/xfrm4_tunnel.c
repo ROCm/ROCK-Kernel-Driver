@@ -83,31 +83,8 @@ error_nolock:
 	return err;
 }
 
-static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff *skb)
-{
-	struct iphdr *inner_iph = skb->nh.iph;
-
-	if (INET_ECN_is_ce(outer_iph->tos) &&
-	    INET_ECN_is_not_ce(inner_iph->tos))
-		IP_ECN_set_ce(inner_iph);
-}
-
 static int ipip_xfrm_rcv(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
-	struct iphdr *outer_iph = skb->nh.iph;
-
-	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
-		return -EINVAL;
-	skb->mac.raw = skb->nh.raw;
-	skb->nh.raw = skb->data;
-	memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
-	dst_release(skb->dst);
-	skb->dst = NULL;
-	skb->protocol = htons(ETH_P_IP);
-	skb->pkt_type = PACKET_HOST;
-	ipip_ecn_decapsulate(outer_iph, skb);
-	netif_rx(skb);
-
 	return 0;
 }
 
@@ -149,46 +126,12 @@ int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler)
 static int ipip_rcv(struct sk_buff *skb)
 {
 	struct xfrm_tunnel *handler = ipip_handler;
-	struct xfrm_state *x = NULL;
-	int err;
 
 	/* Tunnel devices take precedence.  */
-	if (handler) {
-		err = handler->handler(skb);
-		if (!err)
-			goto out;
-	}
+	if (handler && handler->handler(skb) == 0)
+		return 0;
 
-	x = xfrm_state_lookup((xfrm_address_t *)&skb->nh.iph->daddr,
-			      skb->nh.iph->saddr,
-			      IPPROTO_IPIP, AF_INET);
-
-	if (!x)
-		goto drop;
-
-	spin_lock(&x->lock);
-
-	if (unlikely(x->km.state != XFRM_STATE_VALID))
-		goto drop_unlock;
-
-	err = ipip_xfrm_rcv(x, NULL, skb);
-	if (err)
-		goto drop_unlock;
-
-	x->curlft.bytes += skb->len;
-	x->curlft.packets++;
-	spin_unlock(&x->lock);
-	xfrm_state_put(x);
-out:	
-	return err;
-
-drop_unlock:
-	spin_unlock(&x->lock);
-	xfrm_state_put(x);
-drop:
-	err = NET_RX_DROP;
-	kfree_skb(skb);
-	goto out;
+	return xfrm4_rcv_encap(skb, 0);
 }
 
 static void ipip_err(struct sk_buff *skb, u32 info)

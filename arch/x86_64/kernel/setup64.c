@@ -131,14 +131,16 @@ void __init setup_per_cpu_areas(void)
 		size = PERCPU_ENOUGH_ROOM;
 #endif
 
-	/* We don't support CPU hotplug, so only allocate as much as needed here */
-
-	int maxi = max_t(unsigned, numnodes, num_online_cpus());
-
-	for (i = 0; i < maxi; i++) {
+	for (i = 0; i < NR_CPUS; i++) { 
+		unsigned char *ptr;
 		/* If possible allocate on the node of the CPU.
 		   In case it doesn't exist round-robin nodes. */
-		unsigned char *ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+		if (!NODE_DATA(i % numnodes)) { 
+			printk("cpu with no node %d, numnodes %d\n", i, numnodes);
+			ptr = alloc_bootmem(size);
+		} else { 
+			ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+		}
 		if (!ptr)
 			panic("Cannot allocate cpu data for CPU %d\n", i);
 		cpu_pda[i].data_offset = ptr - __per_cpu_start;
@@ -158,7 +160,6 @@ void pda_init(int cpu)
 	pda->me = pda;
 	pda->cpunumber = cpu; 
 	pda->irqcount = -1;
-	pda->data_offset = 0;
 	pda->kernelstack = 
 		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
 	pda->active_mm = &init_mm;
@@ -170,14 +171,14 @@ void pda_init(int cpu)
 		pda->irqstackptr = boot_cpu_stack; 
 		level4 = init_level4_pgt; 
 	} else {
+		level4 = (pml4_t *)__get_free_pages(GFP_ATOMIC, 0); 
+		if (!level4) 
+			panic("Cannot allocate top level page for cpu %d", cpu); 
 		pda->irqstackptr = (char *)
 			__get_free_pages(GFP_ATOMIC, IRQSTACK_ORDER);
 		if (!pda->irqstackptr)
-			panic("cannot allocate irqstack for cpu %d\n", cpu); 
-		level4 = (pml4_t *)__get_free_pages(GFP_ATOMIC, 0); 
+			panic("cannot allocate irqstack for cpu %d", cpu); 
 	}
-	if (!level4) 
-		panic("Cannot allocate top level page for cpu %d", cpu); 
 
 	pda->level4_pgt = (unsigned long *)level4; 
 	if (level4 != init_level4_pgt)

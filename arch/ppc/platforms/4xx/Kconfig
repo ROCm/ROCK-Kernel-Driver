@@ -70,16 +70,16 @@ config NP405H
 	depends on ASH
 	default y
 
-# All 405-based cores have this errata.  This leaves out the 403GCX
+# All 405-based cores up until the 405GPR and 405EP have this errata.
 config IBM405_ERR77
 	bool
-	depends on 40x && !403GCX
+	depends on 40x && !403GCX && !405GPR
 	default y
 
-# All 40x-based cores have this errata.
+# All 40x-based cores, up until the 405GPR and 405EP have this errata.
 config IBM405_ERR51
 	bool
-	depends on 40x
+	depends on 40x && !405GPR
 	default y
 
 config IBM_OCP

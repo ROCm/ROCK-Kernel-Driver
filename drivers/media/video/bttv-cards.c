@@ -1211,7 +1211,7 @@ struct tvcard bttv_tvcards[] = {
 	.tuner_type     = -1,
 	.pll            = PLL_28,
 	.muxsel         = { 2 },
-	gpiomask:       0
+	.gpiomask       = 0
 },{
         /* Tomasz Pyra <hellfire@sedez.iq.pl> */
         .name           = "Prolink Pixelview PV-BT878P+ (Rev.4C,8E)",
@@ -1298,7 +1298,7 @@ struct tvcard bttv_tvcards[] = {
 },{
         .name           = "Powercolor MTV878/ MTV878R/ MTV878F",
         .video_inputs   = 3,
-        audio_inputs:   2, 
+        .audio_inputs   = 2, 
 	.tuner		= 0,
         .svhs           = 2,
         .gpiomask       = 0x1C800F,  // Bit0-2: Audio select, 8-12:remote control 14:remote valid 15:remote reset
@@ -1338,7 +1338,7 @@ struct tvcard bttv_tvcards[] = {
 },{
         .name           = "Jetway TV/Capture JW-TV878-FBK, Kworld KW-TV878RF",
         .video_inputs   = 4,
-        audio_inputs:   3, 
+        .audio_inputs   = 3, 
         .tuner          = 0,
         .svhs           = 2,
         .gpiomask       = 7,
