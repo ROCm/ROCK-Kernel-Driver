@@ -12,18 +12,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  */
 
 #include <linux/delay.h>
@@ -43,7 +43,7 @@ MODULE_LICENSE("GPL");
 #define KBD98_KEY	0x7f
 #define KBD98_RELEASE	0x80
 
-static unsigned char kbd98_keycode[256] = {	 
+static unsigned char kbd98_keycode[256] = {
 	  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 43, 14, 15,
 	 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 41, 26, 28, 30, 31, 32,
 	 33, 34, 35, 36, 37, 38, 39, 40, 27, 44, 45, 46, 47, 48, 49, 50,
@@ -247,7 +247,7 @@ static int kbd98_command(struct kbd98 *kbd98, unsigned char *param, int command)
 	int i;
 
 	kbd98->cmdcnt = receive;
-	
+
 	if (command & 0xff)
 		if (kbd98_sendbyte(kbd98, command & 0xff))
 			return (kbd98->cmdcnt = 0) - 1;
@@ -262,7 +262,7 @@ static int kbd98_command(struct kbd98 *kbd98, unsigned char *param, int command)
 		for (i = 0; i < receive; i++)
 			param[i] = kbd98->cmdbuf[(receive - 1) - i];
 
-	if (kbd98->cmdcnt) 
+	if (kbd98->cmdcnt)
 		return (kbd98->cmdcnt = 0) - 1;
 
 	return 0;
@@ -322,7 +322,7 @@ void kbd98_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(kbd98, 0, sizeof(struct kbd98));
 	kbd98->emul.scancode = KBD98_KEY_UNKNOWN;
-	
+
 	kbd98->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
 	kbd98->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_KANA);
 
