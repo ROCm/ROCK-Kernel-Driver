@@ -219,7 +219,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, int kind)
  
 static int saa5249_probe(struct i2c_adapter *adap)
 {
-	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+	if (adap->class & I2C_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, saa5249_attach);
 	return 0;
 }

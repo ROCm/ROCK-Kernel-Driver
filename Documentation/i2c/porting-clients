@@ -62,9 +62,9 @@ Technical changes:
   patch to the Documentation/i2c/sysfs-interface file.
 
 * [Attach] For I2C drivers, the attach function should make sure
-  that the adapter's class has I2C_ADAP_CLASS_SMBUS, using the
+  that the adapter's class has I2C_CLASS_HWMON, using the
   following construct:
-  if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+  if (!(adapter->class & I2C_CLASS_HWMON))
           return 0;
   ISA-only drivers of course don't need this.
 

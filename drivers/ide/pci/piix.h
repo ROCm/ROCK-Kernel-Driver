@@ -70,7 +70,7 @@ static ide_pci_device_t piix_pci_info[] __devinitdata = {
 	/* 17 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_82801DB_10, "ICH4"),
 	/* 18 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_82801EB_1,  "ICH5-SATA"),
 	/* 19 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ESB_2,      "ICH5"),
-	/* 20 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ICH6_2,     "ICH6"),
+	/* 20 */ DECLARE_PIIX_DEV(PCI_DEVICE_ID_INTEL_ICH6_19,     "ICH6"),
 	{
 		.vendor		= 0,
 		.device		= 0,
