@@ -680,7 +680,7 @@ static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_i
 	char *string;
 	int retval = 0;
 	int i;
-	int num_ports;
+	int num_ports = 0;
 
 	dbg("%s", __FUNCTION__);
 
@@ -702,41 +702,50 @@ static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_i
 			__FUNCTION__, retval);
 		goto exit;
 	}
-		
-	connection_info = (struct visor_connection_info *)transfer_buffer;
 
-	le16_to_cpus(&connection_info->num_ports);
-	num_ports = connection_info->num_ports;
-	/* handle devices that report invalid stuff here */
-	if (num_ports > 2)
-		num_ports = 2;
-	dev_info(dev, "%s: Number of ports: %d\n", serial->type->name,
-		connection_info->num_ports);
+	if (retval == sizeof(*connection_info)) {
+	        connection_info = (struct visor_connection_info *)transfer_buffer;
 
-	for (i = 0; i < num_ports; ++i) {
-		switch (connection_info->connections[i].port_function_id) {
-			case VISOR_FUNCTION_GENERIC:
-				string = "Generic";
-				break;
-			case VISOR_FUNCTION_DEBUGGER:
-				string = "Debugger";
-				break;
-			case VISOR_FUNCTION_HOTSYNC:
-				string = "HotSync";
-				break;
-			case VISOR_FUNCTION_CONSOLE:
-				string = "Console";
-				break;
-			case VISOR_FUNCTION_REMOTE_FILE_SYS:
-				string = "Remote File System";
-				break;
-			default:
-				string = "unknown";
-				break;	
+		le16_to_cpus(&connection_info->num_ports);
+		num_ports = connection_info->num_ports;
+
+		for (i = 0; i < num_ports; ++i) {
+			switch (connection_info->connections[i].port_function_id) {
+				case VISOR_FUNCTION_GENERIC:
+					string = "Generic";
+					break;
+				case VISOR_FUNCTION_DEBUGGER:
+					string = "Debugger";
+					break;
+				case VISOR_FUNCTION_HOTSYNC:
+					string = "HotSync";
+					break;
+				case VISOR_FUNCTION_CONSOLE:
+					string = "Console";
+					break;
+				case VISOR_FUNCTION_REMOTE_FILE_SYS:
+					string = "Remote File System";
+					break;
+				default:
+					string = "unknown";
+					break;
+			}
+			dev_info(dev, "%s: port %d, is for %s use\n",
+				serial->type->name,
+				connection_info->connections[i].port, string);
 		}
-		dev_info(dev, "%s: port %d, is for %s use\n", serial->type->name,
-			 connection_info->connections[i].port, string);
 	}
+	/*
+	* Handle devices that report invalid stuff here.
+	*/
+	if (num_ports == 0 || num_ports > 2) {
+		dev_warn (dev, "%s: No valid connect info available\n",
+			serial->type->name);
+		num_ports = 2;
+	}
+  
+	dev_info(dev, "%s: Number of ports: %d\n", serial->type->name,
+		num_ports);
 
 	/*
 	 * save off our num_ports info so that we can use it in the
@@ -868,8 +877,7 @@ static int clie_3_5_startup (struct usb_serial *serial)
  
 static int treo_attach (struct usb_serial *serial)
 {
-	struct usb_serial_port *port;
-	int i;
+	struct usb_serial_port *swap_port;
 
 	/* Only do this endpoint hack for the Handspring devices with
 	 * interrupt in endpoints, which for now are the Treo devices. */
@@ -879,31 +887,28 @@ static int treo_attach (struct usb_serial *serial)
 
 	dbg("%s", __FUNCTION__);
 
-	/* Ok, this is pretty ugly, but these devices want to use the
-	 * interrupt endpoint as paired up with a bulk endpoint for a
-	 * "virtual serial port".  So let's force the endpoints to be
-	 * where we want them to be. */
-	for (i = serial->num_bulk_in; i < serial->num_ports; ++i) {
-		port = serial->port[i];
-		port->read_urb = serial->port[0]->read_urb;
-		port->bulk_in_endpointAddress = serial->port[0]->bulk_in_endpointAddress;
-		port->bulk_in_buffer = serial->port[0]->bulk_in_buffer;
-	}
+	/*
+	* It appears that Treos want to use the 1st interrupt endpoint to
+	* communicate with the 2nd bulk out endpoint, so let's swap the 1st
+	* and 2nd bulk in and interrupt endpoints.  Note that swapping the
+	* bulk out endpoints would break lots of apps that want to communicate
+	* on the second port.
+	*/
+#define COPY_PORT(dest, src)						\
+	dest->read_urb = src->read_urb;					\
+	dest->bulk_in_endpointAddress = src->bulk_in_endpointAddress;	\
+	dest->bulk_in_buffer = src->bulk_in_buffer;			\
+	dest->interrupt_in_urb = src->interrupt_in_urb;			\
+	dest->interrupt_in_endpointAddress = src->interrupt_in_endpointAddress;	\
+	dest->interrupt_in_buffer = src->interrupt_in_buffer;
 
-	for (i = serial->num_bulk_out; i < serial->num_ports; ++i) {
-		port = serial->port[i];
-		port->write_urb = serial->port[0]->write_urb;
-		port->bulk_out_size = serial->port[0]->bulk_out_size;
-		port->bulk_out_endpointAddress = serial->port[0]->bulk_out_endpointAddress;
-		port->bulk_out_buffer = serial->port[0]->bulk_out_buffer;
-	}
-
-	for (i = serial->num_interrupt_in; i < serial->num_ports; ++i) {
-		port = serial->port[i];
-		port->interrupt_in_urb = serial->port[0]->interrupt_in_urb;
-		port->interrupt_in_endpointAddress = serial->port[0]->interrupt_in_endpointAddress;
-		port->interrupt_in_buffer = serial->port[0]->interrupt_in_buffer;
-	}
+	swap_port = kmalloc(sizeof(*swap_port), GFP_KERNEL);
+	if (!swap_port)
+		return -ENOMEM;
+	COPY_PORT(swap_port, serial->port[0]);
+	COPY_PORT(serial->port[0], serial->port[1]);
+	COPY_PORT(serial->port[1], swap_port);
+	kfree(swap_port);
 
 	return 0;
 }

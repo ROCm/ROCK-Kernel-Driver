@@ -934,7 +934,7 @@ static void io_destroy(struct kioctx *ioctx)
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
  */
-asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t *ctxp)
+asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
@@ -1094,7 +1094,7 @@ out_put_req:
  *	fail with -ENOSYS if not implemented.
  */
 asmlinkage long sys_io_submit(aio_context_t ctx_id, long nr,
-			      struct iocb __user **iocbpp)
+			      struct iocb __user * __user *iocbpp)
 {
 	struct kioctx *ctx;
 	long ret = 0;

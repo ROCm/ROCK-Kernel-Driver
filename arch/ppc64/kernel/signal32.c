@@ -126,7 +126,7 @@ static inline void sigset_from_compat(sigset_t *set, compat_sigset_t *compat)
  * We only save the altivec registers if the process has used
  * altivec instructions at some point.
  */
-static int save_user_regs(struct pt_regs *regs, struct mcontext32 *frame, int sigret)
+static int save_user_regs(struct pt_regs *regs, struct mcontext32 __user *frame, int sigret)
 {
 	elf_greg_t64 *gregs = (elf_greg_t64 *)regs;
 	int i, err = 0;
@@ -344,8 +344,8 @@ long sys32_sigaction(int sig, struct old_sigaction32 *act,
  */
 
 
-long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
-		struct sigaction32 *oact, size_t sigsetsize)
+long sys32_rt_sigaction(int sig, const struct sigaction32 __user *act,
+		struct sigaction32 __user *oact, size_t sigsetsize)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -383,10 +383,11 @@ long sys32_rt_sigaction(int sig, const struct sigaction32 *act,
  * of a signed int (msr in 32-bit mode) and the register representation
  * of a signed int (msr in 64-bit mode) is performed.
  */
-long sys32_rt_sigprocmask(u32 how, compat_sigset_t *set,
-		compat_sigset_t *oset, size_t sigsetsize)
+long sys32_rt_sigprocmask(u32 how, compat_sigset_t __user *set,
+		compat_sigset_t __user *oset, size_t sigsetsize)
 {
 	sigset_t s;
+	sigset_t __user *up;
 	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
@@ -398,7 +399,9 @@ long sys32_rt_sigprocmask(u32 how, compat_sigset_t *set,
 	}
 	
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigprocmask((int)how, set ? &s : NULL, oset ? &s : NULL,
+	/* This is valid because of the set_fs() */
+	up = (sigset_t __user *) &s;
+	ret = sys_rt_sigprocmask((int)how, set ? up : NULL, oset ? up : NULL,
 				 sigsetsize); 
 	set_fs(old_fs);
 	if (ret)
@@ -411,7 +414,7 @@ long sys32_rt_sigprocmask(u32 how, compat_sigset_t *set,
 	return 0;
 }
 
-long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
+long sys32_rt_sigpending(compat_sigset_t __user *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -419,7 +422,8 @@ long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 	mm_segment_t old_fs = get_fs();
 
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigpending(&s, sigsetsize);
+	/* The __user pointer cast is valid because of the set_fs() */
+	ret = sys_rt_sigpending((sigset_t __user *) &s, sigsetsize);
 	set_fs(old_fs);
 	if (!ret) {
 		compat_from_sigset(&s32, &s);
@@ -430,7 +434,7 @@ long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 }
 
 
-static long copy_siginfo_to_user32(compat_siginfo_t *d, siginfo_t *s)
+static long copy_siginfo_to_user32(compat_siginfo_t __user *d, siginfo_t *s)
 {
 	long err;
 
@@ -481,8 +485,8 @@ static long copy_siginfo_to_user32(compat_siginfo_t *d, siginfo_t *s)
 	return err;
 }
 
-long sys32_rt_sigtimedwait(compat_sigset_t *uthese, compat_siginfo_t *uinfo,
-		struct compat_timespec *uts, compat_size_t sigsetsize)
+long sys32_rt_sigtimedwait(compat_sigset_t __user *uthese, compat_siginfo_t __user *uinfo,
+		struct compat_timespec __user *uts, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -497,7 +501,10 @@ long sys32_rt_sigtimedwait(compat_sigset_t *uthese, compat_siginfo_t *uinfo,
 	if (uts && get_compat_timespec(&t, uts))
 		return -EFAULT;
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
+	/* The __user pointer casts are valid because of the set_fs() */
+	ret = sys_rt_sigtimedwait((sigset_t __user *) &s,
+			uinfo ? (siginfo_t __user *) &info : NULL,
+			uts ? (struct timespec __user *) &t : NULL,
 			sigsetsize);
 	set_fs(old_fs);
 	if (ret >= 0 && uinfo) {
@@ -514,7 +521,7 @@ long sys32_rt_sigtimedwait(compat_sigset_t *uthese, compat_siginfo_t *uinfo,
  * (msr in 32-bit mode) and the register representation of a signed int
  * (msr in 64-bit mode) is performed.
  */
-long sys32_rt_sigqueueinfo(u32 pid, u32 sig, compat_siginfo_t *uinfo)
+long sys32_rt_sigqueueinfo(u32 pid, u32 sig, compat_siginfo_t __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
@@ -524,12 +531,13 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, compat_siginfo_t *uinfo)
 	    copy_from_user (info._sifields._pad, uinfo->_sifields._pad, SI_PAD_SIZE32))
 		return -EFAULT;
 	set_fs (KERNEL_DS);
-	ret = sys_rt_sigqueueinfo((int)pid, (int)sig, &info);
+	/* The __user pointer cast is valid becasuse of the set_fs() */
+	ret = sys_rt_sigqueueinfo((int)pid, (int)sig, (siginfo_t __user *) &info);
 	set_fs (old_fs);
 	return ret;
 }
 
-int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
+int sys32_rt_sigsuspend(compat_sigset_t __user * unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
@@ -607,8 +615,11 @@ int sys32_sigaltstack(u32 newstack, u32 oldstack, int r5,
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = do_sigaltstack(newstack ? &uss : NULL, oldstack ? &uoss : NULL,
-			sp);
+	/* The __user pointer casts are valid because of the set_fs() */
+	ret = do_sigaltstack(
+		newstack ? (stack_t __user *) &uss : NULL,
+		oldstack ? (stack_t __user *) &uoss : NULL,
+		sp);
 	set_fs(old_fs);
 	/* Copy the stack information to the user output buffer */
 	if (!ret && oldstack  &&
@@ -701,7 +712,7 @@ static long do_setcontext32(struct ucontext32 __user *ucp, struct pt_regs *regs,
 		return -EFAULT;
 	sigset_from_compat(&set, &c_set);
 	restore_sigmask(&set);
-	if (restore_user_regs(regs, (struct mcontext32 *)(u64)mcp, sig))
+	if (restore_user_regs(regs, (struct mcontext32 __user *)(u64)mcp, sig))
 		return -EFAULT;
 
 	return 0;
@@ -817,7 +828,7 @@ static void handle_signal32(unsigned long sig, struct k_sigaction *ka,
 	/* create a stack frame for the caller of the handler */
 	newsp -= __SIGNAL_FRAMESIZE32;
 
-	if (verify_area(VERIFY_WRITE, (void *) newsp, origsp - newsp))
+	if (verify_area(VERIFY_WRITE, (void __user *) newsp, origsp - newsp))
 		goto badframe;
 
 #if _NSIG != 64
@@ -881,7 +892,7 @@ long sys32_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3]) << 32);
 	restore_sigmask(&set);
 
-	sr = (struct mcontext32 *)(u64)sigctx.regs;
+	sr = (struct mcontext32 __user *)(u64)sigctx.regs;
 	if (verify_area(VERIFY_READ, sr, sizeof(*sr))
 	    || restore_user_regs(regs, sr, 1))
 		goto badframe;

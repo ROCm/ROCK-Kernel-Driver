@@ -297,12 +297,12 @@ static void collect_tscs(void *data)
 	rdtscll(cpu_tsc[smp_processor_id()]);
 } 
 
-static ssize_t mce_read(struct file *filp, char *ubuf, size_t usize, loff_t *off)
+static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize, loff_t *off)
 {
 	unsigned long cpu_tsc[NR_CPUS];
 	static DECLARE_MUTEX(mce_read_sem);
 	unsigned next;
-	char *buf = ubuf;
+	char __user *buf = ubuf;
 	int i, err;
 
 	down(&mce_read_sem); 
@@ -348,19 +348,20 @@ static ssize_t mce_read(struct file *filp, char *ubuf, size_t usize, loff_t *off
 
 static int mce_ioctl(struct inode *i, struct file *f,unsigned int cmd, unsigned long arg)
 {
+	int __user *p = (int __user *)arg;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM; 
 	switch (cmd) {
 	case MCE_GET_RECORD_LEN: 
-		return put_user(sizeof(struct mce), (int *)arg);
+		return put_user(sizeof(struct mce), p);
 	case MCE_GET_LOG_LEN:
-		return put_user(MCE_LOG_LEN, (int *)arg);		
+		return put_user(MCE_LOG_LEN, p);		
 	case MCE_GETCLEAR_FLAGS: {
 		unsigned flags;
 		do { 
 			flags = mcelog.flags;
 		} while (cmpxchg(&mcelog.flags, flags, 0) != flags); 
-		return put_user(flags, (int *)arg); 
+		return put_user(flags, p); 
 	}
 	default:
 		return -ENOTTY; 

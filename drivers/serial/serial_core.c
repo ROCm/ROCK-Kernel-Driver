@@ -460,7 +460,7 @@ __uart_put_char(struct uart_port *port, struct circ_buf *circ, unsigned char c)
 
 static inline int
 __uart_user_write(struct uart_port *port, struct circ_buf *circ,
-		  const unsigned char *buf, int count)
+		  const unsigned char __user *buf, int count)
 {
 	unsigned long flags;
 	int c, ret = 0;
@@ -546,9 +546,11 @@ uart_write(struct tty_struct *tty, int from_user, const unsigned char * buf,
 		return 0;
 
 	if (from_user)
-		ret = __uart_user_write(state->port, &state->info->xmit, buf, count);
+		ret = __uart_user_write(state->port, &state->info->xmit,
+				(const unsigned char __user *)buf, count);
 	else
-		ret = __uart_kern_write(state->port, &state->info->xmit, buf, count);
+		ret = __uart_kern_write(state->port, &state->info->xmit,
+					buf, count);
 
 	uart_start(tty);
 	return ret;
@@ -634,7 +636,8 @@ static void uart_unthrottle(struct tty_struct *tty)
 		uart_set_mctrl(port, TIOCM_RTS);
 }
 
-static int uart_get_info(struct uart_state *state, struct serial_struct *retinfo)
+static int uart_get_info(struct uart_state *state,
+			 struct serial_struct __user *retinfo)
 {
 	struct uart_port *port = state->port;
 	struct serial_struct tmp;
@@ -662,8 +665,8 @@ static int uart_get_info(struct uart_state *state, struct serial_struct *retinfo
 	return 0;
 }
 
-static int
-uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
+static int uart_set_info(struct uart_state *state,
+			 struct serial_struct __user *newinfo)
 {
 	struct serial_struct new_serial;
 	struct uart_port *port = state->port;
@@ -856,7 +859,8 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
  * uart_get_lsr_info - get line status register info.
  * Note: uart_ioctl protects us against hangups.
  */
-static int uart_get_lsr_info(struct uart_state *state, unsigned int *value)
+static int uart_get_lsr_info(struct uart_state *state,
+			     unsigned int __user *value)
 {
 	struct uart_port *port = state->port;
 	unsigned int result;
@@ -1035,8 +1039,8 @@ uart_wait_modem_status(struct uart_state *state, unsigned long arg)
  * NB: both 1->0 and 0->1 transitions are counted except for
  *     RI where only 0->1 is counted.
  */
-static int
-uart_get_count(struct uart_state *state, struct serial_icounter_struct *icnt)
+static int uart_get_count(struct uart_state *state,
+			  struct serial_icounter_struct __user *icnt)
 {
 	struct serial_icounter_struct icount;
 	struct uart_icount cnow;
@@ -1069,6 +1073,7 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	   unsigned long arg)
 {
 	struct uart_state *state = tty->driver_data;
+	void __user *uarg = (void __user *)arg;
 	int ret = -ENOIOCTLCMD;
 
 	BUG_ON(!kernel_locked());
@@ -1078,11 +1083,11 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	 */
 	switch (cmd) {
 	case TIOCGSERIAL:
-		ret = uart_get_info(state, (struct serial_struct *)arg);
+		ret = uart_get_info(state, uarg);
 		break;
 
 	case TIOCSSERIAL:
-		ret = uart_set_info(state, (struct serial_struct *)arg);
+		ret = uart_set_info(state, uarg);
 		break;
 
 	case TIOCSERCONFIG:
@@ -1112,7 +1117,7 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 		break;
 
 	case TIOCGICOUNT:
-		ret = uart_get_count(state, (struct serial_icounter_struct *)arg);
+		ret = uart_get_count(state, uarg);
 		break;
 	}
 
@@ -1132,7 +1137,7 @@ uart_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd,
 	 */
 	switch (cmd) {
 	case TIOCSERGETLSR: /* Get line status register */
-		ret = uart_get_lsr_info(state, (unsigned int *)arg);
+		ret = uart_get_lsr_info(state, uarg);
 		break;
 
 	default: {

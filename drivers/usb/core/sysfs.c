@@ -1,11 +1,11 @@
 /*
- * drivers/usb/core/driverfs.c
+ * drivers/usb/core/sysfs.c
  *
  * (C) Copyright 2002 David Brownell
  * (C) Copyright 2002 Greg Kroah-Hartman
  * (C) Copyright 2002 IBM Corp.
  *
- * All of the driverfs file attributes for usb devices and interfaces.
+ * All of the sysfs file attributes for usb devices and interfaces.
  *
  */
 
@@ -163,7 +163,7 @@ usb_descriptor_attr (bDeviceProtocol, "%02x\n")
 usb_descriptor_attr (bNumConfigurations, "%d\n")
 
 
-void usb_create_driverfs_dev_files (struct usb_device *udev)
+void usb_create_sysfs_dev_files (struct usb_device *udev)
 {
 	struct device *dev = &udev->dev;
 
@@ -217,7 +217,7 @@ usb_intf_attr (bInterfaceSubClass, "%02x\n")
 usb_intf_attr (bInterfaceProtocol, "%02x\n")
 usb_intf_attr (iInterface, "%02x\n")
 
-void usb_create_driverfs_intf_files (struct usb_interface *intf)
+void usb_create_sysfs_intf_files (struct usb_interface *intf)
 {
 	device_create_file (&intf->dev, &dev_attr_bInterfaceNumber);
 	device_create_file (&intf->dev, &dev_attr_bAlternateSetting);

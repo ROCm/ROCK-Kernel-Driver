@@ -819,7 +819,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
 
-asmlinkage long sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
+asmlinkage long sys_getresuid(uid_t __user *ruid, uid_t __user *euid, uid_t __user *suid)
 {
 	int retval;
 
@@ -868,7 +868,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 	return 0;
 }
 
-asmlinkage long sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
+asmlinkage long sys_getresgid(gid_t __user *rgid, gid_t __user *egid, gid_t __user *sgid)
 {
 	int retval;
 

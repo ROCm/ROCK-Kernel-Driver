@@ -206,7 +206,9 @@ struct csr1212_csr *csr1212_create_csr(struct csr1212_bus_ops *ops,
 void csr1212_init_local_csr(struct csr1212_csr *csr,
 			    const u_int32_t *bus_info_data, int max_rom)
 {
-	csr->max_rom = max_rom;
+	static const int mr_map[] = { 4, 64, 1024, 0 };
+
+	csr->max_rom = mr_map[max_rom];
 	memcpy(csr->bus_info_data, bus_info_data, csr->bus_info_len);
 }
 

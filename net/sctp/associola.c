@@ -271,7 +271,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->need_ecne = 0;
 
-	asoc->assoc_id = (sctp_assoc_t)-1;
+	asoc->assoc_id = (sctp_assoc_t)-1L;
 
 	/* Assume that peer would support both address types unless we are
 	 * told otherwise.
@@ -374,9 +374,9 @@ static void sctp_association_destroy(struct sctp_association *asoc)
 	sctp_endpoint_put(asoc->ep);
 	sock_put(asoc->base.sk);
 
-	if ((int)asoc->assoc_id != -1) {
+	if ((long)asoc->assoc_id != -1L) {
 		spin_lock_bh(&sctp_assocs_id_lock);
-		idr_remove(&sctp_assocs_id, (int)asoc->assoc_id);
+		idr_remove(&sctp_assocs_id, (long)asoc->assoc_id);
 		spin_unlock_bh(&sctp_assocs_id_lock);
 	}
 

@@ -147,7 +147,7 @@ static int evdev_open(struct inode * inode, struct file * file)
 	return 0;
 }
 
-static ssize_t evdev_write(struct file * file, const char * buffer, size_t count, loff_t *ppos)
+static ssize_t evdev_write(struct file * file, const char __user * buffer, size_t count, loff_t *ppos)
 {
 	struct evdev_list *list = file->private_data;
 	struct input_event event;
@@ -166,7 +166,7 @@ static ssize_t evdev_write(struct file * file, const char * buffer, size_t count
 	return retval;
 }
 
-static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
+static ssize_t evdev_read(struct file * file, char __user * buffer, size_t count, loff_t *ppos)
 {
 	struct evdev_list *list = file->private_data;
 	int retval;
@@ -209,6 +209,8 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
 	struct input_absinfo abs;
+	void __user *p = (void __user *)arg;
+	int __user *ip = (int __user *)arg;
 	int i, t, u, v;
 
 	if (!evdev->exist) return -ENODEV;
@@ -216,21 +218,21 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	switch (cmd) {
 
 		case EVIOCGVERSION:
-			return put_user(EV_VERSION, (int *) arg);
+			return put_user(EV_VERSION, ip);
 
 		case EVIOCGID:
-			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id)) ? -EFAULT : 0;
+			return copy_to_user(p, &dev->id, sizeof(struct input_id)) ? -EFAULT : 0;
 		
 		case EVIOCGKEYCODE:
-			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
+			if (get_user(t, ip)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
-			if (put_user(INPUT_KEYCODE(dev, t), ((int *) arg) + 1)) return -EFAULT;
+			if (put_user(INPUT_KEYCODE(dev, t), ip + 1)) return -EFAULT;
 			return 0;
 
 		case EVIOCSKEYCODE:
-			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
+			if (get_user(t, ip)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
-			if (get_user(v, ((int *) arg) + 1)) return -EFAULT;
+			if (get_user(v, ip + 1)) return -EFAULT;
 			u = SET_INPUT_KEYCODE(dev, t, v);
 			clear_bit(u, dev->keybit);
 			set_bit(v, dev->keybit);
@@ -244,10 +246,10 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				struct ff_effect effect;
 				int err;
 
-				if (copy_from_user((void*)(&effect), (void*)arg, sizeof(effect)))
+				if (copy_from_user(&effect, p, sizeof(effect)))
 					return -EFAULT;
 				err = dev->upload_effect(dev, &effect);
-				if (put_user(effect.id, &(((struct ff_effect*)arg)->id)))
+				if (put_user(effect.id, &(((struct ff_effect __user *)arg)->id)))
 					return -EFAULT;
 				return err;
 			}
@@ -260,7 +262,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			else return -ENOSYS;
 
 		case EVIOCGEFFECTS:
-			if (put_user(dev->ff_effects_max, (int*) arg))
+			if (put_user(dev->ff_effects_max, ip))
 				return -EFAULT;
 			return 0;
 
@@ -303,28 +305,28 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				}
 				len = NBITS(len) * sizeof(long);
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, bits, len) ? -EFAULT : len;
+				return copy_to_user(p, bits, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGKEY(0))) {
 				int len;
 				len = NBITS(KEY_MAX) * sizeof(long);
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->key, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->key, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGLED(0))) {
 				int len;
 				len = NBITS(LED_MAX) * sizeof(long);
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->led, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->led, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGSND(0))) {
 				int len;
 				len = NBITS(SND_MAX) * sizeof(long);
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->snd, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->snd, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGNAME(0))) {
@@ -332,7 +334,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				if (!dev->name) return -ENOENT;
 				len = strlen(dev->name) + 1;
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->name, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->name, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGPHYS(0))) {
@@ -340,7 +342,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				if (!dev->phys) return -ENOENT;
 				len = strlen(dev->phys) + 1;
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->phys, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->phys, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGUNIQ(0))) {
@@ -348,7 +350,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				if (!dev->uniq) return -ENOENT;
 				len = strlen(dev->uniq) + 1;
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				return copy_to_user((char *) arg, dev->uniq, len) ? -EFAULT : len;
+				return copy_to_user(p, dev->uniq, len) ? -EFAULT : len;
 			}
 
 			if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCGABS(0))) {
@@ -361,7 +363,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 				abs.fuzz = dev->absfuzz[t];
 				abs.flat = dev->absflat[t];
 
-				if (copy_to_user((void *) arg, &abs, sizeof(struct input_absinfo)))
+				if (copy_to_user(p, &abs, sizeof(struct input_absinfo)))
 					return -EFAULT;
 
 				return 0;
@@ -371,7 +373,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 				int t = _IOC_NR(cmd) & ABS_MAX;
 
-				if (copy_from_user(&abs, (void *) arg, sizeof(struct input_absinfo)))
+				if (copy_from_user(&abs, p, sizeof(struct input_absinfo)))
 					return -EFAULT;
 
 				dev->abs[t] = abs.value;

@@ -264,7 +264,7 @@ wdt_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "WDT driver for Advantech single board computer initialising.\n");
+	printk(KERN_INFO "WDT driver for the Winbond(TM) W83627HF Super I/O chip initialising.\n");
 
 	if (timeout < 1 || timeout > 63) {
 		timeout = WATCHDOG_TIMEOUT;

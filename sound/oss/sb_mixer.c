@@ -528,10 +528,11 @@ static int set_outmask(sb_devc * devc, int mask)
 	return devc->outmask;
 }
 
-static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int sb_mixer_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	sb_devc *devc = mixer_devs[dev]->devc;
 	int val, ret;
+	int __user *p = arg;
 
 	/*
 	 * Use ioctl(fd, SOUND_MIXER_AGC, &mode) to turn AGC off (0) or on (1).
@@ -541,7 +542,7 @@ static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	if (devc->model == MDL_SB16) {
 		if (cmd == SOUND_MIXER_AGC) 
 		{
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			sb_setmixer(devc, 0x43, (~val) & 0x01);
 			return 0;
@@ -552,14 +553,14 @@ static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			   At least my 4.13 havn't 3DSE, 4.16 has it. */
 			if (devc->minor < 15)
 				return -EINVAL;
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (val == 0 || val == 1)
 				sb_chgmixer(devc, AWE_3DSE, 0x01, val);
 			else if (val == 2)
 			{
 				ret = sb_getmixer(devc, AWE_3DSE)&0x01;
-				return put_user(ret, (int *)arg);
+				return put_user(ret, p);
 			}
 			else
 				return -EINVAL;
@@ -570,7 +571,7 @@ static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	{
 		if (_SIOC_DIR(cmd) & _SIOC_WRITE) 
 		{
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			switch (cmd & 0xff) 
 			{
@@ -625,7 +626,7 @@ static int sb_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 				ret = sb_mixer_get(devc, cmd & 0xff);
 				break;
 		}
-		return put_user(ret, (int *)arg); 
+		return put_user(ret, p); 
 	} else
 		return -EINVAL;
 }

@@ -31,6 +31,8 @@ static const char unknown[] = "UNKNOWN";
 #endif
 #define CONSTANTS (CONST_COMMAND | CONST_STATUS | CONST_SENSE | CONST_XSENSE \
 		   | CONST_CMND | CONST_MSG | CONST_HOST | CONST_DRIVER)
+#else
+#define CONSTANTS 0
 #endif
 
 #if (CONSTANTS & CONST_COMMAND)

@@ -181,8 +181,8 @@ static int alloc_targets(struct dm_table *t, unsigned int num)
 	/*
 	 * Allocate both the target array and offset array at once.
 	 */
-	n_highs = (sector_t *) dm_vcalloc(sizeof(struct dm_target) +
-					  sizeof(sector_t), num);
+	n_highs = (sector_t *) dm_vcalloc(num, sizeof(struct dm_target) +
+					  sizeof(sector_t));
 	if (!n_highs)
 		return -ENOMEM;
 

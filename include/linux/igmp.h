@@ -204,9 +204,9 @@ extern int ip_mc_source(int add, int omode, struct sock *sk,
 		struct ip_mreq_source *mreqs, int ifindex);
 extern int ip_mc_msfilter(struct sock *sk, struct ip_msfilter *msf,int ifindex);
 extern int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
-		struct ip_msfilter *optval, int *optlen);
+		struct ip_msfilter __user *optval, int __user *optlen);
 extern int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
-		struct group_filter *optval, int *optlen);
+		struct group_filter __user *optval, int __user *optlen);
 extern int ip_mc_sf_allow(struct sock *sk, u32 local, u32 rmt, int dif);
 extern void ip_mr_init(void);
 extern void ip_mc_init_dev(struct in_device *);

@@ -36,6 +36,8 @@
 #include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
+
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #ifdef CONFIG_PPC
@@ -900,6 +902,9 @@ adbdev_init(void)
 		printk(KERN_ERR "adb: unable to get major %d\n", ADB_MAJOR);
 		return;
 	}
+
+	devfs_mk_cdev(MKDEV(ADB_MAJOR, 0), S_IFCHR | S_IRUSR | S_IWUSR, "adb");
+
 	adb_dev_class = class_simple_create(THIS_MODULE, "adb");
 	if (IS_ERR(adb_dev_class)) {
 		return;

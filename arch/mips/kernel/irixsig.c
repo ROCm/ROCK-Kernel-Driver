@@ -549,7 +549,7 @@ out:
 #define P_PGID   2
 #define P_ALL    7
 
-extern int getrusage(struct task_struct *, int, struct rusage *);
+extern int getrusage(struct task_struct *, int, struct rusage __user *);
 
 #define W_EXITED     1
 #define W_TRAPPED    2

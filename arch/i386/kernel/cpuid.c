@@ -107,10 +107,10 @@ static loff_t cpuid_seek(struct file *file, loff_t offset, int orig)
 	return ret;
 }
 
-static ssize_t cpuid_read(struct file *file, char *buf,
+static ssize_t cpuid_read(struct file *file, char __user *buf,
 			  size_t count, loff_t * ppos)
 {
-	u32 *tmp = (u32 *) buf;
+	char __user *tmp = buf;
 	u32 data[4];
 	size_t rv;
 	u32 reg = *ppos;
@@ -123,11 +123,11 @@ static ssize_t cpuid_read(struct file *file, char *buf,
 		do_cpuid(cpu, reg, data);
 		if (copy_to_user(tmp, &data, 16))
 			return -EFAULT;
-		tmp += 4;
+		tmp += 16;
 		*ppos = reg++;
 	}
 
-	return ((char *)tmp) - buf;
+	return tmp - buf;
 }
 
 static int cpuid_open(struct inode *inode, struct file *file)

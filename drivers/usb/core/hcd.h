@@ -243,13 +243,13 @@ extern void usb_hc_died (struct usb_hcd *hcd);
 extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
 					struct usb_bus *, unsigned port);
 extern int usb_new_device(struct usb_device *dev);
-extern void usb_choose_address(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
+extern void usb_choose_address(struct usb_device *dev);
+extern void usb_release_address(struct usb_device *dev);
 
 /* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
-extern int usb_set_address(struct usb_device *dev);
 
 /* use these only before the device's address has been set */
 #define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
@@ -329,7 +329,7 @@ extern int usb_check_bandwidth (struct usb_device *dev, struct urb *urb);
 #define HS_USECS(bytes) NS_TO_US ( ((55 * 8 * 2083)/1000) \
 	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
 	+ USB2_HOST_DELAY)
-#define HS_USECS_ISO(bytes) NS_TO_US ( ((long)(38 * 8 * 2.083)) \
+#define HS_USECS_ISO(bytes) NS_TO_US ( ((38 * 8 * 2083)/1000) \
 	+ ((2083UL * (3167 + BitTime (bytes)))/1000) \
 	+ USB2_HOST_DELAY)
 

@@ -151,16 +151,17 @@ static int pcm_set_bits(int arg)
 	return pcm_bits;
 }
 
-static int pas_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int pas_audio_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
 	int val, ret;
+	int __user *p = arg;
 
 	DEB(printk("pas2_pcm.c: static int pas_audio_ioctl(unsigned int cmd = %X, unsigned int arg = %X)\n", cmd, arg));
 
 	switch (cmd) 
 	{
 	case SOUND_PCM_WRITE_RATE:
-		if (get_user(val, (int *)arg)) 
+		if (get_user(val, p)) 
 			return -EFAULT;
 		ret = pcm_set_speed(val);
 		break;
@@ -170,13 +171,13 @@ static int pas_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		break;
 		
 	case SNDCTL_DSP_STEREO:
-		if (get_user(val, (int *)arg)) 
+		if (get_user(val, p)) 
 			return -EFAULT;
 		ret = pcm_set_channels(val + 1) - 1;
 		break;
 
 	case SOUND_PCM_WRITE_CHANNELS:
-		if (get_user(val, (int *)arg)) 
+		if (get_user(val, p)) 
 			return -EFAULT;
 		ret = pcm_set_channels(val);
 		break;
@@ -186,7 +187,7 @@ static int pas_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		break;
 
 	case SNDCTL_DSP_SETFMT:
-		if (get_user(val, (int *)arg))
+		if (get_user(val, p))
 			return -EFAULT;
 		ret = pcm_set_bits(val);
 		break;
@@ -198,7 +199,7 @@ static int pas_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	default:
 		return -EINVAL;
 	}
-	return put_user(ret, (int *)arg);
+	return put_user(ret, p);
 }
 
 static void pas_audio_reset(int dev)

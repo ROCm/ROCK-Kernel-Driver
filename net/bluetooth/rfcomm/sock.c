@@ -637,7 +637,7 @@ out:
 	return copied ? : err;
 }
 
-static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen)
+static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
@@ -656,7 +656,7 @@ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, c
 	return err;
 }
 
-static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen)
+static int rfcomm_sock_getsockopt(struct socket *sock, int level, int optname, char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int len, err = 0; 

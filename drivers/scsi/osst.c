@@ -4725,6 +4725,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 	Scsi_Request * SRpnt = NULL;
 	OS_Scsi_Tape * STp   = file->private_data;
 	char         * name  = tape_name(STp);
+	void __user *p = (void __user *)arg;
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
@@ -4765,7 +4766,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 			goto out;
 		}
 
-		i = copy_from_user((char *) &mtc, (char *)arg, sizeof(struct mtop));
+		i = copy_from_user((char *) &mtc, p, sizeof(struct mtop));
 		if (i) {
 			retval = (-EFAULT);
 			goto out;
@@ -5003,8 +5004,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 		    STp->drv_buffer != 0)
 			mt_status.mt_gstat |= GMT_IM_REP_EN(0xffffffff);
 
-		i = copy_to_user((char *)arg, (char *)&mt_status,
-		      sizeof(struct mtget));
+		i = copy_to_user(p, &mt_status, sizeof(struct mtget));
 		if (i) {
 			retval = (-EFAULT);
 			goto out;
@@ -5031,7 +5031,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 			goto out;
 		}
 		mt_pos.mt_blkno = blk;
-		i = copy_to_user((char *)arg, (char *) (&mt_pos), sizeof(struct mtpos));
+		i = copy_to_user(p, &mt_pos, sizeof(struct mtpos));
 		if (i)
 			retval = -EFAULT;
 		goto out;
@@ -5040,7 +5040,7 @@ static int osst_ioctl(struct inode * inode,struct file * file,
 
 	up(&STp->lock);
 
-	return scsi_ioctl(STp->device, cmd_in, (void *) arg);
+	return scsi_ioctl(STp->device, cmd_in, p);
 
 out:
 	if (SRpnt) scsi_release_request(SRpnt);

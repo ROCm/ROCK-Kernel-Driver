@@ -114,7 +114,7 @@
 #define OSS_SUPPORT_LEVEL          0x1  /* just /dev/sequencer for now */
 
 #if    OSS_SUPPORT_LEVEL & OSS_SUPPORT_SEQ
-static int (*midi_load_patch) (int devno, int format, const char *addr,
+static int (*midi_load_patch) (int devno, int format, const char __user *addr,
 			       int offs, int count, int pmgr_flag) = NULL;
 #endif /* OSS_SUPPORT_SEQ */
 
@@ -996,7 +996,7 @@ wavefront_freemem (void)
 
 static int
 wavefront_send_sample (wavefront_patch_info *header,
-		       UINT16 *dataptr,
+		       UINT16 __user *dataptr,
 		       int data_is_unsigned)
 
 {
@@ -1512,7 +1512,7 @@ log2_2048(int n)
 }
 
 static int
-wavefront_load_gus_patch (int devno, int format, const char *addr,
+wavefront_load_gus_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
 	struct patch_info guspatch;
@@ -1636,7 +1636,7 @@ wavefront_load_gus_patch (int devno, int format, const char *addr,
 	/* Now ship it down */
 
 	wavefront_send_sample (&samp, 
-			       (unsigned short *) &(addr)[sizeof_patch],
+			       (unsigned short __user *) &(addr)[sizeof_patch],
 			       (guspatch.mode & WAVE_UNSIGNED) ? 1:0);
 	wavefront_send_patch (&pat);
 	wavefront_send_program (&prog);
@@ -1656,7 +1656,7 @@ wavefront_load_gus_patch (int devno, int format, const char *addr,
 }
 
 static int
-wavefront_load_patch (const char *addr)
+wavefront_load_patch (const char __user *addr)
 
 
 {
@@ -1680,7 +1680,7 @@ wavefront_load_patch (const char *addr)
 	case WF_ST_SAMPLE:  /* sample or sample_header, based on patch->size */
 
 		if (copy_from_user((unsigned char *) &header.hdr.s,
-				   (unsigned char *) header.hdrptr,
+				   (unsigned char __user *) header.hdrptr,
 				   sizeof (wavefront_sample)))
 			return -EFAULT;
 
@@ -1940,18 +1940,18 @@ wavefront_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 
 	case WFCTL_WFCMD:
-		if (copy_from_user(&wc, (void *) arg, sizeof (wc)))
+		if (copy_from_user(&wc, (void __user *) arg, sizeof (wc)))
 			return -EFAULT;
 		
 		if ((err = wavefront_synth_control (cmd, &wc)) == 0) {
-			if (copy_to_user ((void *) arg, &wc, sizeof (wc)))
+			if (copy_to_user ((void __user *) arg, &wc, sizeof (wc)))
 				return -EFAULT;
 		}
 
 		return err;
 		
 	case WFCTL_LOAD_SPP:
-		return wavefront_load_patch ((const char *) arg);
+		return wavefront_load_patch ((const char __user *) arg);
 		
 	default:
 		printk (KERN_WARNING LOGNAME "invalid ioctl %#x\n", cmd);
@@ -1998,7 +1998,7 @@ wavefront_oss_close (int devno)
 }
 
 static int
-wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
+wavefront_oss_ioctl (int devno, unsigned int cmd, void __user * arg)
 
 {
 	wavefront_control wc;
@@ -2006,8 +2006,7 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 
 	switch (cmd) {
 	case SNDCTL_SYNTH_INFO:
-		if(copy_to_user(&((char *) arg)[0], &wavefront_info,
-			sizeof (wavefront_info)))
+		if(copy_to_user(arg, &wavefront_info, sizeof (wavefront_info)))
 			return -EFAULT;
 		return 0;
 
@@ -2043,7 +2042,7 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 }
 
 int
-wavefront_oss_load_patch (int devno, int format, const char *addr,
+wavefront_oss_load_patch (int devno, int format, const char __user *addr,
 			  int offs, int count, int pmgr_flag)
 {
 

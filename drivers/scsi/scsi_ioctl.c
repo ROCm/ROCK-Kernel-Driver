@@ -42,14 +42,14 @@
  * (int *) arg
  */
 
-static int ioctl_probe(struct Scsi_Host *host, void *buffer)
+static int ioctl_probe(struct Scsi_Host *host, void __user *buffer)
 {
 	unsigned int len, slen;
 	const char *string;
 	int temp = host->hostt->present;
 
 	if (temp && buffer) {
-		if (get_user(len, (unsigned int *) buffer))
+		if (get_user(len, (unsigned int __user *) buffer))
 			return -EFAULT;
 
 		if (host->hostt->info)
@@ -204,11 +204,11 @@ int scsi_set_medium_removal(struct scsi_device *sdev, char state)
 #define OMAX_SB_LEN 16		/* Old sense buffer length */
 
 int scsi_ioctl_send_command(struct scsi_device *sdev,
-			    struct scsi_ioctl_command *sic)
+			    struct scsi_ioctl_command __user *sic)
 {
 	char *buf;
 	unsigned char cmd[MAX_COMMAND_SIZE];
-	char *cmd_in;
+	char __user *cmd_in;
 	struct scsi_request *sreq;
 	unsigned char opcode;
 	unsigned int inlen, outlen, cmdlen;
@@ -361,7 +361,7 @@ error:
  *                  device)
  *          any copy_to_user() error on failure there
  */
-static int scsi_ioctl_get_pci(struct scsi_device *sdev, void *arg)
+static int scsi_ioctl_get_pci(struct scsi_device *sdev, void __user *arg)
 {
 	struct device *dev = scsi_get_device(sdev->host);
 
@@ -376,7 +376,7 @@ static int scsi_ioctl_get_pci(struct scsi_device *sdev, void *arg)
  * not take a major/minor number as the dev field.  Rather, it takes
  * a pointer to a scsi_devices[] element, a structure. 
  */
-int scsi_ioctl(struct scsi_device *sdev, int cmd, void *arg)
+int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 {
 	char scsi_cmd[MAX_COMMAND_SIZE];
 
@@ -402,19 +402,18 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void *arg)
 			 + ((sdev->lun & 0xff) << 8)
 			 + ((sdev->channel & 0xff) << 16)
 			 + ((sdev->host->host_no & 0xff) << 24),
-			 &((struct scsi_idlun *)arg)->dev_id);
+			 &((struct scsi_idlun __user *)arg)->dev_id);
 		__put_user(sdev->host->unique_id,
-			 &((struct scsi_idlun *)arg)->host_unique_id);
+			 &((struct scsi_idlun __user *)arg)->host_unique_id);
 		return 0;
 	case SCSI_IOCTL_GET_BUS_NUMBER:
-		return put_user(sdev->host->host_no, (int *)arg);
+		return put_user(sdev->host->host_no, (int __user *)arg);
 	case SCSI_IOCTL_PROBE_HOST:
 		return ioctl_probe(sdev->host, arg);
 	case SCSI_IOCTL_SEND_COMMAND:
 		if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 			return -EACCES;
-		return scsi_ioctl_send_command(sdev,
-				(struct scsi_ioctl_command *)arg);
+		return scsi_ioctl_send_command(sdev, arg);
 	case SCSI_IOCTL_DOORLOCK:
 		return scsi_set_medium_removal(sdev, SCSI_REMOVAL_PREVENT);
 	case SCSI_IOCTL_DOORUNLOCK:
