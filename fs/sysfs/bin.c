@@ -17,8 +17,8 @@
 static int
 fill_read(struct dentry *dentry, char *buffer, loff_t off, size_t count)
 {
-	struct bin_attribute * attr = dentry->d_fsdata;
-	struct kobject * kobj = dentry->d_parent->d_fsdata;
+	struct bin_attribute * attr = to_bin_attr(dentry);
+	struct kobject * kobj = to_kobj(dentry->d_parent);
 
 	return attr->read(kobj, buffer, off, count);
 }
@@ -60,8 +60,8 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 static int
 flush_write(struct dentry *dentry, char *buffer, loff_t offset, size_t count)
 {
-	struct bin_attribute *attr = dentry->d_fsdata;
-	struct kobject *kobj = dentry->d_parent->d_fsdata;
+	struct bin_attribute *attr = to_bin_attr(dentry->d_parent);
+	struct kobject *kobj = to_kobj(dentry);
 
 	return attr->write(kobj, buffer, offset, count);
 }
@@ -95,7 +95,7 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 static int open(struct inode * inode, struct file * file)
 {
 	struct kobject *kobj = sysfs_get_kobject(file->f_dentry->d_parent);
-	struct bin_attribute * attr = file->f_dentry->d_fsdata;
+	struct bin_attribute * attr = to_bin_attr(file->f_dentry);
 	int error = -EINVAL;
 
 	if (!kobj || !attr)
@@ -130,8 +130,8 @@ static int open(struct inode * inode, struct file * file)
 
 static int release(struct inode * inode, struct file * file)
 {
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
-	struct bin_attribute * attr = file->f_dentry->d_fsdata;
+	struct kobject * kobj = to_kobj(file->f_dentry->d_parent);
+	struct bin_attribute * attr = to_bin_attr(file->f_dentry);
 	u8 * buffer = file->private_data;
 
 	if (kobj) 

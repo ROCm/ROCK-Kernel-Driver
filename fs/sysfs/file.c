@@ -67,7 +67,7 @@ struct sysfs_buffer {
 
 /**
  *	fill_read_buffer - allocate and fill buffer from object.
- *	@file:		file pointer.
+ *	@dentry:	dentry pointer.
  *	@buffer:	data buffer for file.
  *
  *	Allocate @buffer->page, if it hasn't been already, then call the
@@ -75,10 +75,10 @@ struct sysfs_buffer {
  *	data. 
  *	This is called only once, on the file's first read. 
  */
-static int fill_read_buffer(struct file * file, struct sysfs_buffer * buffer)
+static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer)
 {
-	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
+	struct attribute * attr = to_attr(dentry);
+	struct kobject * kobj = to_kobj(dentry->d_parent);
 	struct sysfs_ops * ops = buffer->ops;
 	int ret = 0;
 	ssize_t count;
@@ -150,7 +150,7 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 	ssize_t retval = 0;
 
 	if (!*ppos) {
-		if ((retval = fill_read_buffer(file,buffer)))
+		if ((retval = fill_read_buffer(file->f_dentry,buffer)))
 			return retval;
 	}
 	pr_debug("%s: count = %d, ppos = %lld, buf = %s\n",
@@ -197,10 +197,10 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t 
  */
 
 static int 
-flush_write_buffer(struct file * file, struct sysfs_buffer * buffer, size_t count)
+flush_write_buffer(struct dentry * dentry, struct sysfs_buffer * buffer, size_t count)
 {
-	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
+	struct attribute * attr = to_attr(dentry);
+	struct kobject * kobj = to_kobj(dentry->d_parent);
 	struct sysfs_ops * ops = buffer->ops;
 
 	return ops->store(kobj,attr,buffer->page,count);
@@ -231,7 +231,7 @@ sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t
 
 	count = fill_write_buffer(buffer,buf,count);
 	if (count > 0)
-		count = flush_write_buffer(file,buffer,count);
+		count = flush_write_buffer(file->f_dentry,buffer,count);
 	if (count > 0)
 		*ppos += count;
 	return count;
@@ -240,7 +240,7 @@ sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t
 static int check_perm(struct inode * inode, struct file * file)
 {
 	struct kobject *kobj = sysfs_get_kobject(file->f_dentry->d_parent);
-	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct attribute * attr = to_attr(file->f_dentry);
 	struct sysfs_buffer * buffer;
 	struct sysfs_ops * ops = NULL;
 	int error = 0;
@@ -321,8 +321,8 @@ static int sysfs_open_file(struct inode * inode, struct file * filp)
 
 static int sysfs_release(struct inode * inode, struct file * filp)
 {
-	struct kobject * kobj = filp->f_dentry->d_parent->d_fsdata;
-	struct attribute * attr = filp->f_dentry->d_fsdata;
+	struct kobject * kobj = to_kobj(filp->f_dentry->d_parent);
+	struct attribute * attr = to_attr(filp->f_dentry);
 	struct sysfs_buffer * buffer = filp->private_data;
 
 	if (kobj) 
