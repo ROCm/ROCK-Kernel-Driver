@@ -629,14 +629,20 @@ static int split_args(int *argc, char ***argvp, char *input)
 	return 0;
 }
 
-static void set_default_limits(struct io_restrictions *rs)
+static void check_for_valid_limits(struct io_restrictions *rs)
 {
-	rs->max_sectors = MAX_SECTORS;
-	rs->max_phys_segments = MAX_PHYS_SEGMENTS;
-	rs->max_hw_segments = MAX_HW_SEGMENTS;
-	rs->hardsect_size = 1 << SECTOR_SHIFT;
-	rs->max_segment_size = MAX_SEGMENT_SIZE;
-	rs->seg_boundary_mask = -1;
+	if (!rs->max_sectors)
+		rs->max_sectors = MAX_SECTORS;
+	if (!rs->max_phys_segments)
+		rs->max_phys_segments = MAX_PHYS_SEGMENTS;
+	if (!rs->max_hw_segments)
+		rs->max_hw_segments = MAX_HW_SEGMENTS;
+	if (!rs->hardsect_size)
+		rs->hardsect_size = 1 << SECTOR_SHIFT;
+	if (!rs->max_segment_size)
+		rs->max_segment_size = MAX_SEGMENT_SIZE;
+	if (!rs->seg_boundary_mask)
+		rs->seg_boundary_mask = -1;
 }
 
 int dm_table_add_target(struct dm_table *t, const char *type,
@@ -651,7 +657,6 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	tgt = t->targets + t->num_targets;
 	memset(tgt, 0, sizeof(*tgt));
-	set_default_limits(&tgt->limits);
 
 	if (!len) {
 		tgt->error = "zero-length target";
@@ -735,6 +740,8 @@ int dm_table_complete(struct dm_table *t)
 {
 	int r = 0;
 	unsigned int leaf_nodes;
+
+	check_for_valid_limits(&t->limits);
 
 	/* how many indexes will the btree have ? */
 	leaf_nodes = dm_div_up(t->num_targets, KEYS_PER_NODE);
