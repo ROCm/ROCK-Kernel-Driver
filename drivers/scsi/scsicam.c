@@ -78,15 +78,18 @@ int scsicam_bios_param(struct block_device *bdev, sector_t capacity, int *ip)
 	/* if something went wrong, then apparently we have to return
 	   a geometry with more than 1024 cylinders */
 	if (ret || ip[0] > 255 || ip[1] > 63) {
-		ip[0] = 64;
-		ip[1] = 32;
-		sector_div(capacity, ip[0] * ip[1]);
-		if (capacity > 65534) {
+		if ((capacity >> 11) > 65534) {
 			ip[0] = 255;
 			ip[1] = 63;
-			sector_div(capacity, ip[0] * ip[1]);
+		} else {
+			ip[0] = 64;
+			ip[1] = 32;
 		}
-		ip[2] = capacity;
+
+		if (capacity > 65535*63*255)
+			ip[2] = 65535;
+		else
+			ip[2] = (unsigned long)capacity / (ip[0] * ip[1]);
 	}
 
 	return 0;
