@@ -28,6 +28,7 @@
 #include <linux/smp.h>
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
+#include <linux/syscalls.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -80,6 +81,16 @@ int dirty_writeback_centisecs = 5 * 100;
  * The longest number of centiseconds for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
+
+/*
+ * Flag that makes the machine dump writes/reads and block dirtyings.
+ */
+int block_dump;
+
+/*
+ * Flag that puts the machine in "laptop mode".
+ */
+int laptop_mode;
 
 /* End of sysctl-exported parameters */
 
@@ -195,7 +206,19 @@ static void balance_dirty_pages(struct address_space *mapping)
 	if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
 		dirty_exceeded = 0;
 
-	if (!writeback_in_progress(bdi) && nr_reclaimable > background_thresh)
+	if (writeback_in_progress(bdi))
+		return;		/* pdflush is already working this queue */
+
+	/*
+	 * In laptop mode, we wait until hitting the higher threshold before
+	 * starting background writeout, and then write out all the way down
+	 * to the lower threshold.  So slow writers cause minimal disk activity.
+	 *
+	 * In normal mode, we start background writeout at the lower
+	 * background_thresh, to keep the amount of dirty memory low.
+	 */
+	if ((laptop_mode && pages_written) ||
+	     (!laptop_mode && (nr_reclaimable > background_thresh)))
 		pdflush_operation(background_writeout, 0);
 }
 
@@ -261,13 +284,13 @@ static void background_writeout(unsigned long _min_pages)
 			break;
 		wbc.encountered_congestion = 0;
 		wbc.nr_to_write = MAX_WRITEBACK_PAGES;
+		wbc.pages_skipped = 0;
 		writeback_inodes(&wbc);
 		min_pages -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
-		if (wbc.nr_to_write > 0) {
+		if (wbc.nr_to_write > 0 || wbc.pages_skipped > 0) {
 			/* Wrote less than expected */
-			if (wbc.encountered_congestion)
-				blk_congestion_wait(WRITE, HZ/10);
-			else
+			blk_congestion_wait(WRITE, HZ/10);
+			if (!wbc.encountered_congestion)
 				break;
 		}
 	}
@@ -289,7 +312,13 @@ int wakeup_bdflush(long nr_pages)
 	return pdflush_operation(background_writeout, nr_pages);
 }
 
-static struct timer_list wb_timer;
+static void wb_timer_fn(unsigned long unused);
+static void laptop_timer_fn(unsigned long unused);
+
+static struct timer_list wb_timer =
+			TIMER_INITIALIZER(wb_timer_fn, 0, 0);
+static struct timer_list laptop_mode_wb_timer =
+			TIMER_INITIALIZER(laptop_timer_fn, 0, 0);
 
 /*
  * Periodic writeback of "old" data.
@@ -368,7 +397,36 @@ static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
 		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
+}
 
+static void laptop_flush(unsigned long unused)
+{
+	sys_sync();
+}
+
+static void laptop_timer_fn(unsigned long unused)
+{
+	pdflush_operation(laptop_flush, 0);
+}
+
+/*
+ * We've spun up the disk and we're in laptop mode: schedule writeback
+ * of all dirty data a few seconds from now.  If the flush is already scheduled
+ * then push it back - the user is still using the disk.
+ */
+void laptop_io_completion(void)
+{
+	mod_timer(&laptop_mode_wb_timer, jiffies + laptop_mode * HZ);
+}
+
+/*
+ * We're in laptop mode and we've just synced. The sync's writes will have
+ * caused another writeback to be scheduled by laptop_io_completion.
+ * Nothing needs to be written back anymore, so we unschedule the writeback.
+ */
+void laptop_sync_completion(void)
+{
+	del_timer(&laptop_mode_wb_timer);
 }
 
 /*
@@ -429,18 +487,15 @@ void __init page_writeback_init(void)
 		vm_dirty_ratio *= correction;
 		vm_dirty_ratio /= 100;
 	}
-
-	init_timer(&wb_timer);
-	wb_timer.expires = jiffies + (dirty_writeback_centisecs * HZ) / 100;
-	wb_timer.data = 0;
-	wb_timer.function = wb_timer_fn;
-	add_timer(&wb_timer);
+	mod_timer(&wb_timer, jiffies + (dirty_writeback_centisecs * HZ) / 100);
 	set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
 }
 
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
+	if (wbc->nr_to_write <= 0)
+		return 0;
 	if (mapping->a_ops->writepages)
 		return mapping->a_ops->writepages(mapping, wbc);
 	return generic_writepages(mapping, wbc);
@@ -470,12 +525,8 @@ int write_one_page(struct page *page, int wait)
 	if (wait)
 		wait_on_page_writeback(page);
 
-	spin_lock(&mapping->page_lock);
-	list_del(&page->list);
-	if (test_clear_page_dirty(page)) {
-		list_add(&page->list, &mapping->locked_pages);
+	if (clear_page_dirty_for_io(page)) {
 		page_cache_get(page);
-		spin_unlock(&mapping->page_lock);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
@@ -484,8 +535,6 @@ int write_one_page(struct page *page, int wait)
 		}
 		page_cache_release(page);
 	} else {
-		list_add(&page->list, &mapping->clean_pages);
-		spin_unlock(&mapping->page_lock);
 		unlock_page(page);
 	}
 	return ret;
@@ -493,9 +542,8 @@ int write_one_page(struct page *page, int wait)
 EXPORT_SYMBOL(write_one_page);
 
 /*
- * For address_spaces which do not use buffers.  Just set the page's dirty bit
- * and move it to the dirty_pages list.  Also perform space reservation if
- * required.
+ * For address_spaces which do not use buffers.  Just tag the page as dirty in
+ * its radix tree.
  *
  * __set_page_dirty_nobuffers() may return -ENOSPC.  But if it does, the page
  * is still safe, as long as it actually manages to find some blocks at
@@ -513,15 +561,15 @@ int __set_page_dirty_nobuffers(struct page *page)
 		struct address_space *mapping = page->mapping;
 
 		if (mapping) {
-			spin_lock(&mapping->page_lock);
+			spin_lock_irq(&mapping->tree_lock);
 			if (page->mapping) {	/* Race with truncate? */
 				BUG_ON(page->mapping != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
-				list_del(&page->list);
-				list_add(&page->list, &mapping->dirty_pages);
+				radix_tree_tag_set(&mapping->page_tree,
+					page->index, PAGECACHE_TAG_DIRTY);
 			}
-			spin_unlock(&mapping->page_lock);
+			spin_unlock_irq(&mapping->tree_lock);
 			if (!PageSwapCache(page))
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);
@@ -530,6 +578,24 @@ int __set_page_dirty_nobuffers(struct page *page)
 	return ret;
 }
 EXPORT_SYMBOL(__set_page_dirty_nobuffers);
+
+/*
+ * If the mapping doesn't provide a set_page_dirty a_op, then
+ * just fall through and assume that it wants buffer_heads.
+ */
+int fastcall set_page_dirty(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+	int (*spd)(struct page *);
+
+	if (!mapping) {
+		SetPageDirty(page);
+		return 0;
+	}
+	spd = mapping->a_ops->set_page_dirty;
+	return spd? (*spd)(page): __set_page_dirty_buffers(page);
+}
+EXPORT_SYMBOL(set_page_dirty);
 
 /*
  * set_page_dirty() is racy if the caller has no reference against
@@ -558,13 +624,136 @@ EXPORT_SYMBOL(set_page_dirty_lock);
  */
 int test_clear_page_dirty(struct page *page)
 {
-	if (TestClearPageDirty(page)) {
-		struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page_mapping(page);
+	unsigned long flags;
 
-		if (mapping && !mapping->backing_dev_info->memory_backed)
-			dec_page_state(nr_dirty);
-		return 1;
+	if (mapping) {
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			if (!mapping->backing_dev_info->memory_backed)
+				dec_page_state(nr_dirty);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
 	}
-	return 0;
+	return TestClearPageDirty(page);
 }
 EXPORT_SYMBOL(test_clear_page_dirty);
+
+/*
+ * Clear a page's dirty flag, while caring for dirty memory accounting.
+ * Returns true if the page was previously dirty.
+ *
+ * This is for preparing to put the page under writeout.  We leave the page
+ * tagged as dirty in the radix tree so that a concurrent write-for-sync
+ * can discover it via a PAGECACHE_TAG_DIRTY walk.  The ->writepage
+ * implementation will run either set_page_writeback() or set_page_dirty(),
+ * at which stage we bring the page's dirty flag and radix-tree dirty tag
+ * back into sync.
+ *
+ * This incoherency between the page's dirty flag and radix-tree tag is
+ * unfortunate, but it only exists while the page is locked.
+ */
+int clear_page_dirty_for_io(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+
+	if (mapping) {
+		if (TestClearPageDirty(page)) {
+			if (!mapping->backing_dev_info->memory_backed)
+				dec_page_state(nr_dirty);
+			return 1;
+		}
+		return 0;
+	}
+	return TestClearPageDirty(page);
+}
+EXPORT_SYMBOL(clear_page_dirty_for_io);
+
+/*
+ * Clear a page's dirty flag while ignoring dirty memory accounting
+ */
+int __clear_page_dirty(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
+	}
+	return TestClearPageDirty(page);
+}
+
+int test_clear_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestClearPageWriteback(page);
+		if (ret)
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestClearPageWriteback(page);
+	}
+	return ret;
+}
+
+int test_set_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page_mapping(page);
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestSetPageWriteback(page);
+		if (!ret)
+			radix_tree_tag_set(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		if (!PageDirty(page))
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestSetPageWriteback(page);
+	}
+	return ret;
+
+}
+EXPORT_SYMBOL(test_set_page_writeback);
+
+/*
+ * Return true if any of the pages in the mapping are marged with the
+ * passed tag.
+ */
+int mapping_tagged(struct address_space *mapping, int tag)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&mapping->tree_lock, flags);
+	ret = radix_tree_tagged(&mapping->page_tree, tag);
+	spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL(mapping_tagged);

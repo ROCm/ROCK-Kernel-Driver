@@ -43,7 +43,7 @@
 #include <linux/swap.h>
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
-#include <linux/rmap-locking.h>
+#include <linux/rmap.h>
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -417,8 +417,8 @@ zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
 				if (!PageReserved(page)) {
 					if (pte_dirty(pte))
 						set_page_dirty(page);
-					if (page->mapping && pte_young(pte) &&
-							!PageSwapCache(page))
+					if (pte_young(pte) &&
+							page_mapping(page))
 						mark_page_accessed(page);
 					tlb->freed++;
 					page_remove_rmap(page, ptep);
@@ -491,9 +491,9 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 #define ZAP_BLOCK_SIZE	(256 * PAGE_SIZE)
 #endif
 
-/* No preempt: go for the best straight-line efficiency */
+/* No preempt: go for improved straight-line efficiency */
 #if !defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(~(0UL))
+#define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
 #endif
 
 /**
@@ -688,6 +688,32 @@ static inline struct page *get_page_map(struct page *page)
 }
 
 
+static inline int
+untouched_anonymous_page(struct mm_struct* mm, struct vm_area_struct *vma,
+			 unsigned long address)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+
+	/* Check if the vma is for an anonymous mapping. */
+	if (vma->vm_ops && vma->vm_ops->nopage)
+		return 0;
+
+	/* Check if page directory entry exists. */
+	pgd = pgd_offset(mm, address);
+	if (pgd_none(*pgd) || pgd_bad(*pgd))
+		return 1;
+
+	/* Check if page middle directory entry exists. */
+	pmd = pmd_offset(pgd, address);
+	if (pmd_none(*pmd) || pmd_bad(*pmd))
+		return 1;
+
+	/* There is a pte slot for 'address' in 'mm'. */
+	return 0;
+}
+
+
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,
 		struct page **pages, struct vm_area_struct **vmas)
@@ -750,6 +776,18 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			struct page *map;
 			int lookup_write = write;
 			while (!(map = follow_page(mm, start, lookup_write))) {
+				/*
+				 * Shortcut for anonymous pages. We don't want
+				 * to force the creation of pages tables for
+				 * insanly big anonymously mapped areas that
+				 * nobody touched so far. This is important
+				 * for doing a core dump for these mappings.
+				 */
+				if (!lookup_write &&
+				    untouched_anonymous_page(mm,vma,start)) {
+					map = ZERO_PAGE(start);
+					break;
+				}
 				spin_unlock(&mm->page_table_lock);
 				switch (handle_mm_fault(mm,vma,start,write)) {
 				case VM_FAULT_MINOR:

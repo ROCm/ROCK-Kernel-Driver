@@ -196,6 +196,11 @@ CONFIG_S390_TAPE_BLOCK=y
 CONFIG_S390_TAPE_34XX=m
 
 #
+# Cryptographic devices
+#
+CONFIG_Z90CRYPT=m
+
+#
 # Networking support
 #
 CONFIG_NET=y

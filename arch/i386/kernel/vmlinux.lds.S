@@ -16,6 +16,7 @@ SECTIONS
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x9090
@@ -105,7 +106,10 @@ SECTIONS
   /* freed after init ends here */
 	
   __bss_start = .;		/* BSS */
-  .bss : { *(.bss) }
+  .bss : {
+	*(.bss.page_aligned)
+	*(.bss)
+  }
   . = ALIGN(4);
   __bss_stop = .; 
 

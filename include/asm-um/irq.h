@@ -32,4 +32,9 @@ extern int um_request_irq(unsigned int irq, int fd, int type,
 			  void (*handler)(int, void *, struct pt_regs *),
 			  unsigned long irqflags,  const char * devname,
 			  void *dev_id);
+
+struct irqaction;
+struct pt_regs;
+int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
 #endif

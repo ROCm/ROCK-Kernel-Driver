@@ -169,12 +169,11 @@ extern struct rtas_t rtas;
 extern void enter_rtas(struct rtas_args *);
 extern int rtas_token(const char *service);
 extern long rtas_call(int token, int, int, unsigned long *, ...);
-extern void phys_call_rtas(int, int, int, ...);
-extern void phys_call_rtas_display_status(char);
 extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
+extern void rtas_os_term(char *str);
 extern int rtas_get_sensor(int sensor, int index, int *state);
 extern int rtas_get_power_level(int powerdomain, int *level);
 extern int rtas_set_power_level(int powerdomain, int level, int *setlevel);
@@ -198,7 +197,7 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 /* All the types and not flags */
 #define ERR_TYPE_MASK	(ERR_TYPE_RTAS_LOG | ERR_TYPE_KERNEL_PANIC)
 
-#define RTAS_ERR KERN_ERR "RTAS: "
+#define RTAS_DEBUG KERN_DEBUG "RTAS: "
  
 #define RTAS_ERROR_LOG_MAX 2048
  
@@ -218,6 +217,8 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 #define RTAS_DATA_BUF_SIZE 4096
 extern spinlock_t rtas_data_buf_lock;
 extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
+
+extern void rtas_stop_self(void);
 
 /* RMO buffer reserved for user-space RTAS use */
 extern unsigned long rtas_rmo_buf;

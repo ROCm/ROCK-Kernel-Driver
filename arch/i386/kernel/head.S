@@ -69,9 +69,22 @@ ENTRY(startup_32)
 	movl %eax,%gs
 
 /*
+ * Clear BSS first so that there are no surprises...
+ * No need to cld as DF is already clear from cld above...
+ */
+	xorl %eax,%eax
+	movl $__bss_start - __PAGE_OFFSET,%edi
+	movl $__bss_stop - __PAGE_OFFSET,%ecx
+	subl %edi,%ecx
+	shrl $2,%ecx
+	rep ; stosl
+
+/*
  * Initialize page tables.  This creates a PDE and a set of page
  * tables, which are located immediately beyond _end.  The variable
  * init_pg_tables_end is set up to point to the first "safe" location.
+ * Mappings are created both at virtual address 0 (identity mapping)
+ * and PAGE_OFFSET for up to _end+sizeof(page tables)+INIT_MAP_BEYOND_END.
  *
  * Warning: don't use %esi or the stack in this code.  However, %esp
  * can be used as a GPR if you really need it...
@@ -171,17 +184,6 @@ ENTRY(startup_32_smp)
 	jmp checkCPUtype
 1:
 #endif /* CONFIG_SMP */
-
-/*
- * Clear BSS first so that there are no surprises...
- * No need to cld as DF is already clear from cld above...
- */
-	xorl %eax,%eax
-	movl $__bss_start,%edi
-	movl $__bss_stop,%ecx
-	subl %edi,%ecx
-	shrl $2,%ecx
-	rep ; stosl
 
 /*
  * start system 32-bit setup. We need to re-do some of the things done
@@ -304,8 +306,6 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-ready:	.byte 0
-
 /*
  * We depend on ET to be correct. This checks for 287/387.
  */
@@ -353,13 +353,7 @@ rp_sidt:
 	jne rp_sidt
 	ret
 
-ENTRY(stack_start)
-	.long init_thread_union+THREAD_SIZE
-	.long __BOOT_DS
-
 /* This is the default interrupt "handler" :-) */
-int_msg:
-	.asciz "Unknown interrupt or fault at EIP %p %p %p\n"
 	ALIGN
 ignore_int:
 	cld
@@ -384,6 +378,35 @@ ignore_int:
 	popl %ecx
 	popl %eax
 	iret
+
+/*
+ * Real beginning of normal "text" segment
+ */
+ENTRY(stext)
+ENTRY(_stext)
+
+/*
+ * BSS section
+ */
+.section ".bss.page_aligned","w"
+ENTRY(swapper_pg_dir)
+	.fill 1024,4,0
+ENTRY(empty_zero_page)
+	.fill 4096,1,0
+
+/*
+ * This starts the data section.
+ */
+.data
+
+ENTRY(stack_start)
+	.long init_thread_union+THREAD_SIZE
+	.long __BOOT_DS
+
+ready:	.byte 0
+
+int_msg:
+	.asciz "Unknown interrupt or fault at EIP %p %p %p\n"
 
 /*
  * The IDT and GDT 'descriptors' are a strange 48-bit object
@@ -415,39 +438,6 @@ cpu_gdt_descr:
 	.long cpu_gdt_table
 
 	.fill NR_CPUS-1,8,0		# space for the other GDT descriptors
-
-/*
- * swapper_pg_dir is the main page directory, address 0x00101000
- *
- * This is initialized to create an identity-mapping at 0 (for bootup
- * purposes) and another mapping at virtual address PAGE_OFFSET.  The
- * values put here should be all invalid (zero); the valid
- * entries are created dynamically at boot time.
- *
- * The code creates enough page tables to map 0-_end, the page tables
- * themselves, plus INIT_MAP_BEYOND_END bytes; see comment at beginning.
- */
-.org 0x1000
-ENTRY(swapper_pg_dir)
-	.fill 1024,4,0
-
-.org 0x2000
-ENTRY(empty_zero_page)
-	.fill 4096,1,0
-
-.org 0x3000
-/*
- * Real beginning of normal "text" segment
- */
-ENTRY(stext)
-ENTRY(_stext)
-
-/*
- * This starts the data section. Note that the above is all
- * in the text section because it has alignment requirements
- * that we cannot fulfill any other way.
- */
-.data
 
 /*
  * The boot_gdt_table must mirror the equivalent in setup.S and is

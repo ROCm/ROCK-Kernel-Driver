@@ -146,6 +146,8 @@
 #define MO_INPUT_FORMAT     0x310104
 #define MO_AGC_BURST        0x31010c
 #define MO_CONTR_BRIGHT     0x310110
+#define MO_UV_SATURATION    0x310114
+#define MO_HUE              0x310118
 #define MO_HTOTAL           0x310120
 #define MO_HDELAY_EVEN      0x310124
 #define MO_HDELAY_ODD       0x310128
@@ -175,6 +177,7 @@
 #define MO_VBI_PACKET       0x310188 // vbi packet size / delay
 #define MO_FIELD_COUNT      0x310190 // field counter
 #define MO_VIP_CONFIG       0x310194
+#define MO_VBOS_CONTROL	    0x3101a8
 
 #define MO_AGC_BACK_VBI     0x310200
 #define MO_AGC_SYNC_TIP1    0x310208
@@ -406,7 +409,7 @@
 #define AUD_PDF_DDS_CNST_BYTE1   0x320d02
 #define AUD_PDF_DDS_CNST_BYTE0   0x320d03
 #define AUD_PHACC_FREQ_8MSB      0x320d2a
-#define AUD_PHACC_FREQ_8LSB      0x320d23
+#define AUD_PHACC_FREQ_8LSB      0x320d2b
 #define AUD_QAM_MODE             0x320d04
 
 

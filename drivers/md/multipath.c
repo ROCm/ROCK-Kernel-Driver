@@ -155,6 +155,27 @@ static int multipath_read_balance (multipath_conf_t *conf)
 	return 0;
 }
 
+static void unplug_slaves(mddev_t *mddev)
+{
+	multipath_conf_t *conf = mddev_to_conf(mddev);
+	int i;
+
+	for (i=0; i<mddev->raid_disks; i++) {
+		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
+		if (rdev && !rdev->faulty) {
+			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+
+			if (r_queue->unplug_fn)
+				r_queue->unplug_fn(r_queue);
+		}
+	}
+}
+static void multipath_unplug(request_queue_t *q)
+{
+	unplug_slaves(q->queuedata);
+}
+
+
 static int multipath_make_request (request_queue_t *q, struct bio * bio)
 {
 	mddev_t *mddev = q->queuedata;
@@ -418,6 +439,8 @@ static int multipath_run (mddev_t *mddev)
 		goto out_free_conf;
 	}
 	memset(conf->multipaths, 0, sizeof(struct multipath_info)*mddev->raid_disks);
+
+	mddev->queue->unplug_fn = multipath_unplug;
 
 	conf->working_disks = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {

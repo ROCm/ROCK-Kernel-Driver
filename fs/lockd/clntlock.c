@@ -228,7 +228,6 @@ restart:
 	}
 
 	host->h_reclaiming = 0;
-	wake_up(&host->h_gracewait);
 
 	/* Now, wake up all processes that sleep on a blocked lock */
 	for (block = nlm_blocked; block; block = block->b_next) {

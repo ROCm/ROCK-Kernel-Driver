@@ -1095,14 +1095,12 @@ osf_getrusage(int who, struct rusage32 *ru)
 		jiffies_to_timeval32(current->stime, &r.ru_stime);
 		r.ru_minflt = current->min_flt;
 		r.ru_majflt = current->maj_flt;
-		r.ru_nswap = current->nswap;
 		break;
 	case RUSAGE_CHILDREN:
 		jiffies_to_timeval32(current->cutime, &r.ru_utime);
 		jiffies_to_timeval32(current->cstime, &r.ru_stime);
 		r.ru_minflt = current->cmin_flt;
 		r.ru_majflt = current->cmaj_flt;
-		r.ru_nswap = current->cnswap;
 		break;
 	default:
 		jiffies_to_timeval32(current->utime + current->cutime,
@@ -1111,7 +1109,6 @@ osf_getrusage(int who, struct rusage32 *ru)
 				   &r.ru_stime);
 		r.ru_minflt = current->min_flt + current->cmin_flt;
 		r.ru_majflt = current->maj_flt + current->cmaj_flt;
-		r.ru_nswap = current->nswap + current->cnswap;
 		break;
 	}
 

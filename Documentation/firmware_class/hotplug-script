@@ -6,9 +6,9 @@
 
 HOTPLUG_FW_DIR=/usr/lib/hotplug/firmware/
 
-echo 1 > /sysfs/$DEVPATH/loading
+echo 1 > /sys/$DEVPATH/loading
 cat $HOTPLUG_FW_DIR/$FIRMWARE > /sysfs/$DEVPATH/data
-echo 0 > /sysfs/$DEVPATH/loading
+echo 0 > /sys/$DEVPATH/loading
 
 # To cancel the load in case of error:
 #

@@ -365,7 +365,7 @@ $unaligned:
 	andnot	t2, t6, t12	# E : dest mask for a single word copy
 	or	t8, t10, t5	# E : test for end-of-count too
 
-	cmpbge	zero, t2, t3	# E :
+	cmpbge	zero, t12, t3	# E :
 	cmoveq	a2, t5, t8	# E : Latency=2, extra map slot
 	nop			# E : keep with cmoveq
 	andnot	t8, t3, t8	# E : (stall)

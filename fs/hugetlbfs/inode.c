@@ -573,7 +573,7 @@ hugetlbfs_parse_options(char *options, struct hugetlbfs_config *pconfig)
 			unsigned long long size = memparse(value, &rest);
 			if (*rest == '%') {
 				size <<= HPAGE_SHIFT;
-				size *= htlbpage_max;
+				size *= max_huge_pages;
 				do_div(size, 100);
 				rest++;
 			}

@@ -237,8 +237,7 @@ scsi_cmd_stack_free(int ctlr)
 		printk( "cciss: %d scsi commands are still outstanding.\n",
 			CMD_STACK_SIZE - stk->top);
 		// BUG();
-		printk("WE HAVE A BUG HERE!!! stk=0x%08x\n", 
-			(unsigned int) stk);
+		printk("WE HAVE A BUG HERE!!! stk=0x%p\n", stk);
 	}
 	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * CMD_STACK_SIZE;
 

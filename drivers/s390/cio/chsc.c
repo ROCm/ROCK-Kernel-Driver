@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.105 $
+ *   $Revision: 1.107 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -819,8 +819,10 @@ s390_vary_chpid( __u8 chpid, int on)
 		struct schib schib;
 
 		sch = get_subchannel_by_schid(irq);
-		if (sch)
+		if (sch) {
+			put_device(&sch->dev);
 			continue;
+		}
 		if (stsch(irq, &schib))
 			/* We're through */
 			break;

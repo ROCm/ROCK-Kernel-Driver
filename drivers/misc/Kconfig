@@ -16,7 +16,9 @@ config IBM_ASM
 	  processor. The driver is meant to be used in conjunction with
 	  a user space API.
 	  The ibmasm driver also enables the OS to use the UART on the
-          service processor board as a regular serial port.
+	  service processor board as a regular serial port. To make use of
+	  this feature serial driver support (CONFIG_SERIAL_8250) must be
+	  enabled.
 	  
 
 	  If unsure, say N.

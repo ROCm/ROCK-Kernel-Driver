@@ -80,10 +80,30 @@ extern __inline int hard_smp_processor_id(void)
  * the real APIC ID <-> CPU # mapping.
  * AK: why is this volatile?
  */
-extern volatile char x86_apicid_to_cpu[NR_CPUS];
 extern volatile char x86_cpu_to_apicid[NR_CPUS];
 
-#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu[hard_smp_processor_id()])
+static inline char x86_apicid_to_cpu(char apicid)
+{
+	int i;
+
+	for (i = 0; i < NR_CPUS; ++i)
+		if (x86_cpu_to_apicid[i] == apicid)
+			return i;
+
+	return -1;
+}
+
+#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu(hard_smp_processor_id()))
+
+extern u8 bios_cpu_apicid[];
+
+static inline int cpu_present_to_apicid(int mps_cpu)
+{
+	if (mps_cpu < NR_CPUS)
+		return (int)bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
+}
 
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 #endif /* !ASSEMBLY */

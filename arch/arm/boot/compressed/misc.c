@@ -18,13 +18,28 @@
 
 unsigned int __machine_arch_type;
 
-#include <linux/kernel.h>
+#include <linux/string.h>
 
-#include <asm/uaccess.h>
 #include <asm/arch/uncompress.h>
 
 #ifdef STANDALONE_DEBUG
 #define puts printf
+#endif
+
+#ifdef CONFIG_DEBUG_ICEDCC
+#define puts icedcc_puts
+#define putc icedcc_putc
+
+extern void idedcc_putc(int ch);
+
+static void
+icedcc_puts(const char *ptr)
+{
+	for (; *ptr != '\0'; ptr++) {
+		icedcc_putc(*ptr);
+	}
+}
+
 #endif
 
 #define __ptr_t void *

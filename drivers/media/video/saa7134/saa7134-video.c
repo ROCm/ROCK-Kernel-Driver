@@ -30,14 +30,17 @@
 
 /* ------------------------------------------------------------------ */
 
-static unsigned int video_debug  = 0;
-static unsigned int gbuffers     = 8;
-static unsigned int gbufsize     = 768*576*4;
-static unsigned int gbufsize_max = 768*576*4;
+static unsigned int video_debug   = 0;
+static unsigned int gbuffers      = 8;
+static unsigned int noninterlaced = 0;
+static unsigned int gbufsize      = 768*576*4;
+static unsigned int gbufsize_max  = 768*576*4;
 MODULE_PARM(video_debug,"i");
 MODULE_PARM_DESC(video_debug,"enable debug messages [video]");
 MODULE_PARM(gbuffers,"i");
 MODULE_PARM_DESC(gbuffers,"number of capture buffers, range 2-32");
+MODULE_PARM(noninterlaced,"i");
+MODULE_PARM_DESC(noninterlaced,"video input is noninterlaced");
 
 #define dprintk(fmt, arg...)	if (video_debug) \
 	printk(KERN_DEBUG "%s/video: " fmt, dev->name , ## arg)
@@ -149,8 +152,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 	{
 		.name          = "PAL",
 		.id            = V4L2_STD_PAL,
-		.width         = 720,
-		.height        = 576,
 
 		.sync_control  = 0x18,
 		.luma_control  = 0x40,
@@ -169,8 +170,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 	},{
 		.name          = "NTSC",
 		.id            = V4L2_STD_NTSC,
-		.width         = 720,
-		.height        = 480,
 
 		.sync_control  = 0x59,
 		.luma_control  = 0x40,
@@ -189,8 +188,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 	},{
 		.name          = "SECAM",
 		.id            = V4L2_STD_SECAM,
-		.width         = 720,
-		.height        = 576,
 
 		.sync_control  = 0x18, /* old: 0x58, */
 		.luma_control  = 0x1b,
@@ -209,8 +206,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 	},{
 		.name          = "PAL-M",
 		.id            = V4L2_STD_PAL_M,
-		.width         = 720,
-		.height        = 480,
 
 		.sync_control  = 0x59,
 		.luma_control  = 0x40,
@@ -229,8 +224,6 @@ static struct saa7134_tvnorm tvnorms[] = {
 	},{
 		.name          = "PAL-Nc",
 		.id            = V4L2_STD_PAL_Nc,
-		.width         = 720,
-		.height        = 576,
 
 		.sync_control  = 0x18,
 		.luma_control  = 0x40,
@@ -437,15 +430,33 @@ void res_free(struct saa7134_dev *dev, struct saa7134_fh *fh, unsigned int bits)
 static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 {
 	struct video_channel c;
-	int luma_control,mux;
+	int luma_control,sync_control,mux;
 
 	dprintk("set tv norm = %s\n",norm->name);
 	dev->tvnorm = norm;
 
 	mux = card_in(dev,dev->ctl_input).vmux;
 	luma_control = norm->luma_control;
+	sync_control = norm->sync_control;
+
 	if (mux > 5)
 		luma_control |= 0x80; /* svideo */
+	if (noninterlaced)
+		sync_control |= 0x20;
+
+	/* setup cropping */
+	dev->crop_bounds.left    = norm->h_start;
+	dev->crop_defrect.left   = norm->h_start;
+	dev->crop_bounds.width   = norm->h_stop - norm->h_start +1;
+	dev->crop_defrect.width  = norm->h_stop - norm->h_start +1;
+
+	dev->crop_bounds.top     = (norm->vbi_v_stop+1)*2;
+	dev->crop_defrect.top    = norm->video_v_start*2;
+	dev->crop_bounds.height  = ((norm->id & V4L2_STD_525_60) ? 524 : 624)
+		- dev->crop_bounds.top;
+	dev->crop_defrect.height = (norm->video_v_stop - norm->video_v_start +1)*2;
+
+	dev->crop_current = dev->crop_defrect;
 
 	/* setup video decoder */
 	saa_writeb(SAA7134_INCR_DELAY,            0x08);
@@ -458,7 +469,7 @@ static void set_tvnorm(struct saa7134_dev *dev, struct saa7134_tvnorm *norm)
 	saa_writeb(SAA7134_HSYNC_STOP,            0xe0);
 	saa_writeb(SAA7134_SOURCE_TIMING1,        norm->src_timing);
 	
-	saa_writeb(SAA7134_SYNC_CTRL,             norm->sync_control);
+	saa_writeb(SAA7134_SYNC_CTRL,             sync_control);
 	saa_writeb(SAA7134_LUMA_CTRL,             luma_control);
 	saa_writeb(SAA7134_DEC_LUMA_BRIGHT,       dev->ctl_bright);
 	saa_writeb(SAA7134_DEC_LUMA_CONTRAST,     dev->ctl_contrast);
@@ -563,25 +574,30 @@ static void set_v_scale(struct saa7134_dev *dev, int task, int yscale)
 static void set_size(struct saa7134_dev *dev, int task,
 		     int width, int height, int interlace)
 {
-	struct saa7134_tvnorm *norm = dev->tvnorm;
 	int prescale,xscale,yscale,y_even,y_odd;
+	int h_start, h_stop, v_start, v_stop;
 	int div = interlace ? 2 : 1;
 
 	/* setup video scaler */
-	saa_writeb(SAA7134_VIDEO_H_START1(task), norm->h_start       &  0xff);
-	saa_writeb(SAA7134_VIDEO_H_START2(task), norm->h_start       >> 8);
-	saa_writeb(SAA7134_VIDEO_H_STOP1(task),  norm->h_stop        &  0xff);
-	saa_writeb(SAA7134_VIDEO_H_STOP2(task),  norm->h_stop        >> 8);
-	saa_writeb(SAA7134_VIDEO_V_START1(task), norm->video_v_start &  0xff);
-	saa_writeb(SAA7134_VIDEO_V_START2(task), norm->video_v_start >> 8);
-	saa_writeb(SAA7134_VIDEO_V_STOP1(task),  norm->video_v_stop  &  0xff);
-	saa_writeb(SAA7134_VIDEO_V_STOP2(task),  norm->video_v_stop  >> 8);
+	h_start = dev->crop_current.left;
+	v_start = dev->crop_current.top/2;
+	h_stop  = (dev->crop_current.left + dev->crop_current.width -1);
+	v_stop  = (dev->crop_current.top + dev->crop_current.height -1)/2;
 
-	prescale = norm->width / width;
+	saa_writeb(SAA7134_VIDEO_H_START1(task), h_start &  0xff);
+	saa_writeb(SAA7134_VIDEO_H_START2(task), h_start >> 8);
+	saa_writeb(SAA7134_VIDEO_H_STOP1(task),  h_stop  &  0xff);
+	saa_writeb(SAA7134_VIDEO_H_STOP2(task),  h_stop  >> 8);
+	saa_writeb(SAA7134_VIDEO_V_START1(task), v_start &  0xff);
+	saa_writeb(SAA7134_VIDEO_V_START2(task), v_start >> 8);
+	saa_writeb(SAA7134_VIDEO_V_STOP1(task),  v_stop  &  0xff);
+	saa_writeb(SAA7134_VIDEO_V_STOP2(task),  v_stop  >> 8);
+
+	prescale = dev->crop_defrect.width / width;
 	if (0 == prescale)
 		prescale = 1;
-	xscale = 1024 * norm->width / prescale / width;
-	yscale = 512 * div * norm->height / height;
+	xscale = 1024 * dev->crop_defrect.width / prescale / width;
+	yscale = 512 * div * dev->crop_defrect.height / height;
        	dprintk("prescale=%d xscale=%d yscale=%d\n",prescale,xscale,yscale);
 	set_h_prescale(dev,task,prescale);
 	saa_writeb(SAA7134_H_SCALE_INC1(task),      xscale &  0xff);
@@ -708,8 +724,8 @@ static int verify_preview(struct saa7134_dev *dev, struct v4l2_window *win)
 		return -EINVAL;
 
 	field = win->field;
-	maxw  = dev->tvnorm->width;
-	maxh  = dev->tvnorm->height;
+	maxw  = dev->crop_current.width;
+	maxh  = dev->crop_current.height;
 
 	if (V4L2_FIELD_ANY == field) {
                 field = (win->w.height > maxh/2)
@@ -895,8 +911,8 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		return -EINVAL;
 	if (fh->width  < 48 ||
 	    fh->height < 32 ||
-	    fh->width  > dev->tvnorm->width ||
-	    fh->height > dev->tvnorm->height)
+	    fh->width  > dev->crop_current.width ||
+	    fh->height > dev->crop_current.height)
 		return -EINVAL;
 	size = (fh->width * fh->height * fh->fmt->depth) >> 3;
 	if (0 != buf->vb.baddr  &&  buf->vb.bsize < size)
@@ -1393,8 +1409,8 @@ int saa7134_try_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 			return -EINVAL;
 
 		field = f->fmt.pix.field;
-		maxw  = dev->tvnorm->width;
-		maxh  = dev->tvnorm->height;
+		maxw  = dev->crop_current.width;
+		maxh  = dev->crop_current.height;
 		
 		if (V4L2_FIELD_ANY == field) {
 			field = (f->fmt.pix.height > maxh/2)
@@ -1482,7 +1498,6 @@ int saa7134_s_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 		}
 		up(&dev->lock);
 		return 0;
-		break;
 	case V4L2_BUF_TYPE_VBI_CAPTURE:
 		saa7134_vbi_fmt(dev,f);
 		return 0;
@@ -1671,6 +1686,74 @@ static int video_do_ioctl(struct inode *inode, struct file *file,
 		} else 
 			set_tvnorm(dev,&tvnorms[i]);
 		up(&dev->lock);
+		return 0;
+	}
+
+	case VIDIOC_CROPCAP:
+	{
+		struct v4l2_cropcap *cap = arg;
+
+		if (cap->type != V4L2_BUF_TYPE_VIDEO_CAPTURE &&
+		    cap->type != V4L2_BUF_TYPE_VIDEO_OVERLAY)
+			return -EINVAL;
+		cap->bounds  = dev->crop_bounds;
+		cap->defrect = dev->crop_defrect;
+		cap->pixelaspect.numerator   = 1;
+		cap->pixelaspect.denominator = 1;
+		if (dev->tvnorm->id & V4L2_STD_525_60) {
+			cap->pixelaspect.numerator   = 11;
+			cap->pixelaspect.denominator = 10;
+		}
+		if (dev->tvnorm->id & V4L2_STD_625_50) {
+			cap->pixelaspect.numerator   = 54;
+			cap->pixelaspect.denominator = 59;
+		}
+		return 0;
+	}
+
+	case VIDIOC_G_CROP:
+	{
+		struct v4l2_crop * crop = arg;
+
+		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE &&
+		    crop->type != V4L2_BUF_TYPE_VIDEO_OVERLAY)
+			return -EINVAL;
+		crop->c = dev->crop_current;
+		return 0;
+	}
+	case VIDIOC_S_CROP:
+	{
+		struct v4l2_crop *crop = arg;
+		struct v4l2_rect *b = &dev->crop_bounds;
+
+		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE &&
+		    crop->type != V4L2_BUF_TYPE_VIDEO_OVERLAY)
+			return -EINVAL;
+		if (crop->c.height < 0)
+			return -EINVAL;
+		if (crop->c.width < 0)
+			return -EINVAL;
+
+		if (res_locked(fh->dev,RESOURCE_OVERLAY))
+			return -EBUSY;
+		if (res_locked(fh->dev,RESOURCE_VIDEO))
+			return -EBUSY;
+
+		if (crop->c.top < b->top)
+			crop->c.top = b->top;
+		if (crop->c.top > b->top + b->height)
+			crop->c.top = b->top + b->height;
+		if (crop->c.height > b->top - crop->c.top + b->height)
+			crop->c.height = b->top - crop->c.top + b->height;
+
+		if (crop->c.left < b->left)
+			crop->c.top = b->left;
+		if (crop->c.left > b->left + b->width)
+			crop->c.top = b->left + b->width;
+		if (crop->c.width > b->left - crop->c.left + b->width)
+			crop->c.width = b->left - crop->c.left + b->width;
+
+		dev->crop_current = crop->c;
 		return 0;
 	}
 

@@ -2,24 +2,24 @@
  * arch/ppc64/kernel/iSeries_iommu.c
  *
  * Copyright (C) 2001 Mike Corrigan & Dave Engebretsen, IBM Corporation
- * 
- * Rewrite, cleanup: 
+ *
+ * Rewrite, cleanup:
  *
  * Copyright (C) 2004 Olof Johansson <olof@austin.ibm.com>, IBM Corporation
  *
  * Dynamic DMA mapping support, iSeries-specific parts.
  *
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
@@ -33,6 +33,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
@@ -43,37 +44,21 @@
 #include <asm/iommu.h>
 #include <asm/pci-bridge.h>
 #include <asm/iSeries/iSeries_pci.h>
-#include <asm/iSeries/vio.h>
 
 #include <asm/machdep.h>
 
 #include "pci.h"
 
 
-static struct iommu_table veth_iommu_table;	/* Tce table for virtual ethernet */
-static struct iommu_table vio_iommu_table;	/* Tce table for virtual I/O */
-
-static struct iSeries_Device_Node veth_dev_node = { .LogicalSlot = 0xFF, .iommu_table = &veth_iommu_table };
-static struct iSeries_Device_Node vio_dev_node  = { .LogicalSlot = 0xFF, .iommu_table = &vio_iommu_table };
-
-static struct pci_dev _veth_dev = { .sysdata = &veth_dev_node };
-static struct pci_dev _vio_dev  = { .sysdata = &vio_dev_node, .dev.bus = &pci_bus_type  };
-
-struct pci_dev *iSeries_veth_dev = &_veth_dev;
-struct device *iSeries_vio_dev = &_vio_dev.dev;
-
-EXPORT_SYMBOL(iSeries_veth_dev);
-EXPORT_SYMBOL(iSeries_vio_dev);
-
 extern struct list_head iSeries_Global_Device_List;
 
 
 static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
-			      unsigned long uaddr, int direction)
+		unsigned long uaddr, enum dma_data_direction direction)
 {
 	u64 rc;
 	union tce_entry tce;
-	
+
 	while (npages--) {
 		tce.te_word = 0;
 		tce.te_bits.tb_rpn = virt_to_abs(uaddr) >> PAGE_SHIFT;
@@ -82,17 +67,17 @@ static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
 			/* Virtual Bus */
 			tce.te_bits.tb_valid = 1;
 			tce.te_bits.tb_allio = 1;
-			if (direction != PCI_DMA_TODEVICE)
+			if (direction != DMA_TO_DEVICE)
 				tce.te_bits.tb_rdwr = 1;
 		} else {
 			/* PCI Bus */
 			tce.te_bits.tb_rdwr = 1; /* Read allowed */
-			if (direction != PCI_DMA_TODEVICE)
+			if (direction != DMA_TO_DEVICE)
 				tce.te_bits.tb_pciwr = 1;
 		}
-		
-		rc = HvCallXm_setTce((u64)tbl->it_index, 
-				     (u64)index, 
+
+		rc = HvCallXm_setTce((u64)tbl->it_index,
+				     (u64)index,
 				     tce.te_word);
 		if (rc)
 			panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", rc);
@@ -113,7 +98,7 @@ static void tce_free_iSeries(struct iommu_table *tbl, long index, long npages)
 				     (u64)index,
 				     tce.te_word);
 
-		if (rc) 
+		if (rc)
 			panic("PCI_DMA: HvCallXm_setTce failed, Rc: 0x%lx\n", rc);
 
 		index++;
@@ -121,50 +106,10 @@ static void tce_free_iSeries(struct iommu_table *tbl, long index, long npages)
 
 }
 
-void __init iommu_vio_init(void)
-{
-	struct iommu_table *t;
-	struct iommu_table_cb cb;
-	unsigned long cbp;
-
-	cb.itc_busno = 255;    /* Bus 255 is the virtual bus */
-	cb.itc_virtbus = 0xff; /* Ask for virtual bus */
-	
-	cbp = virt_to_abs(&cb);
-	HvCallXm_getTceTableParms(cbp);
-	
-	veth_iommu_table.it_size        = cb.itc_size / 2;
-	veth_iommu_table.it_busno       = cb.itc_busno;
-	veth_iommu_table.it_offset      = cb.itc_offset;
-	veth_iommu_table.it_index       = cb.itc_index;
-	veth_iommu_table.it_type        = TCE_VB;
-	veth_iommu_table.it_entrysize	= sizeof(union tce_entry);
-	veth_iommu_table.it_blocksize	= 1;
-
-	t = iommu_init_table(&veth_iommu_table);
-
-	if (!t)
-		printk("Virtual Bus VETH TCE table failed.\n");
-
-	vio_iommu_table.it_size         = cb.itc_size - veth_iommu_table.it_size;
-	vio_iommu_table.it_busno        = cb.itc_busno;
-	vio_iommu_table.it_offset       = cb.itc_offset +
-		veth_iommu_table.it_size * (PAGE_SIZE/sizeof(union tce_entry));
-	vio_iommu_table.it_index        = cb.itc_index;
-	vio_iommu_table.it_type         = TCE_VB; 
-	vio_iommu_table.it_entrysize	= sizeof(union tce_entry);
-	vio_iommu_table.it_blocksize	= 1;
-
-	t = iommu_init_table(&vio_iommu_table);
-
-	if (!t) 
-		printk("Virtual Bus VIO TCE table failed.\n");
-}
-
 
 /*
  * This function compares the known tables to find an iommu_table
- * that has already been built for hardware TCEs.                          
+ * that has already been built for hardware TCEs.
  */
 static struct iommu_table *iommu_table_find(struct iommu_table * tbl)
 {
@@ -172,26 +117,26 @@ static struct iommu_table *iommu_table_find(struct iommu_table * tbl)
 
 	for (dp =  (struct iSeries_Device_Node *)iSeries_Global_Device_List.next;
 	     dp != (struct iSeries_Device_Node *)&iSeries_Global_Device_List;
-	     dp =  (struct iSeries_Device_Node *)dp->Device_List.next) 
+	     dp =  (struct iSeries_Device_Node *)dp->Device_List.next)
 		if (dp->iommu_table                 != NULL &&
 		    dp->iommu_table->it_type        == TCE_PCI &&
 		    dp->iommu_table->it_offset      == tbl->it_offset &&
 		    dp->iommu_table->it_index       == tbl->it_index &&
-		    dp->iommu_table->it_size        == tbl->it_size) 
+		    dp->iommu_table->it_size        == tbl->it_size)
 			return dp->iommu_table;
-			
+
 
 	return NULL;
 }
 
 /*
  * Call Hv with the architected data structure to get TCE table info.
- * info. Put the returned data into the Linux representation of the   
- * TCE table data.                                                     
- * The Hardware Tce table comes in three flavors.                     
- * 1. TCE table shared between Buses.                                  
- * 2. TCE table per Bus.                                               
- * 3. TCE Table per IOA.                                               
+ * info. Put the returned data into the Linux representation of the
+ * TCE table data.
+ * The Hardware Tce table comes in three flavors.
+ * 1. TCE table shared between Buses.
+ * 2. TCE table per Bus.
+ * 3. TCE Table per IOA.
  */
 static void iommu_table_getparms(struct iSeries_Device_Node* dn,
 				 struct iommu_table* tbl)
@@ -200,7 +145,7 @@ static void iommu_table_getparms(struct iSeries_Device_Node* dn,
 
 	parms = (struct iommu_table_cb*)kmalloc(sizeof(*parms), GFP_KERNEL);
 
-	if (parms == NULL) 
+	if (parms == NULL)
 		panic("PCI_DMA: TCE Table Allocation failed.");
 
 	memset(parms, 0, sizeof(*parms));

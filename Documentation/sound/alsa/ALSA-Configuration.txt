@@ -30,8 +30,7 @@ isapnptools.
 Creating ALSA devices
 =====================
 
-Use the MAKEDEV.snd script located in the directory named scripts
-in the linux kernel tree.
+Use the /dev/MAKEDEV script to create the nessecary device nodes.
 
 
 Module parameters

@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.78 $"
+#define VERSION_QDIO_C "$Revision: 1.79 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -392,6 +392,11 @@ qdio_unmark_q(struct qdio_q *q)
 	if ((q->is_thinint_q)&&(q->is_input_q)) {
 		/* iQDIO */
 		spin_lock_irqsave(&ttiq_list_lock,flags);
+		/* in case cleanup has done this already and simultanously
+		 * qdio_unmark_q is called from the interrupt handler, we've
+		 * got to check this in this specific case again */
+		if ((!q->list_prev)||(!q->list_next))
+			goto out;
 		if (q->list_next==q) {
 			/* q was the only interesting q */
 			tiq_list=NULL;
@@ -404,6 +409,7 @@ qdio_unmark_q(struct qdio_q *q)
 			q->list_next=NULL;
 			q->list_prev=NULL;
 		}
+out:
 		spin_unlock_irqrestore(&ttiq_list_lock,flags);
 	}
 }

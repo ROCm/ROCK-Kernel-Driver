@@ -17,15 +17,6 @@
 
 #include <linux/config.h>
 
-struct serial8250_probe {
-	struct module	*owner;
-	int		(*pci_init_one)(struct pci_dev *dev);
-	void		(*pci_remove_one)(struct pci_dev *dev);
-	void		(*pnp_init)(void);
-};
-
-int serial8250_register_probe(struct serial8250_probe *probe);
-void serial8250_unregister_probe(struct serial8250_probe *probe);
 void serial8250_get_irq_map(unsigned int *map);
 void serial8250_suspend_port(int line);
 void serial8250_resume_port(int line);

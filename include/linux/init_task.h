@@ -49,6 +49,7 @@
 	.shared_pending	= { 				\
 		.list = LIST_HEAD_INIT(sig.shared_pending.list),	\
 		.signal =  {{0}}}, \
+	.posix_timers	 = LIST_HEAD_INIT(sig.posix_timers),		\
 }
 
 #define INIT_SIGHAND(sighand) {	\
@@ -107,7 +108,6 @@ extern struct group_info init_groups;
 		.list = LIST_HEAD_INIT(tsk.pending.list),		\
 		.signal = {{0}}},					\
 	.blocked	= {{0}},					\
-	.posix_timers	 = LIST_HEAD_INIT(tsk.posix_timers),		\
 	.alloc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\

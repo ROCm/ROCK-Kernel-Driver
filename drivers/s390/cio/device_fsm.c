@@ -101,7 +101,7 @@ ccw_device_set_timeout(struct ccw_device *cdev, int expires)
  * -EBUSY if an interrupt is expected (either from halt/clear or from a
  * status pending).
  */
-static int
+int
 ccw_device_cancel_halt_clear(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
@@ -438,10 +438,13 @@ ccw_device_nopath_notify(void *data)
 	ret = (sch->driver && sch->driver->notify) ?
 		sch->driver->notify(&sch->dev, CIO_NO_PATH) : 0;
 	if (!ret) {
-		/* Driver doesn't want to keep device. */
-		device_unregister(&sch->dev);
-		sch->schib.pmcw.intparm = 0;
-		cio_modify(sch);
+		if (get_device(&sch->dev)) {
+			/* Driver doesn't want to keep device. */
+			device_unregister(&sch->dev);
+			sch->schib.pmcw.intparm = 0;
+			cio_modify(sch);
+			put_device(&sch->dev);
+		}
 	} else {
 		ccw_device_set_timeout(cdev, 0);
 		cdev->private->state = DEV_STATE_DISCONNECTED;
@@ -710,9 +713,17 @@ ccw_device_online_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		cdev->private->state = DEV_STATE_TIMEOUT_KILL;
 		return;
 	}
-	if (ret == -ENODEV)
-		dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
-	else if (cdev->handler)
+	if (ret == -ENODEV) {
+		struct subchannel *sch;
+
+		sch = to_subchannel(cdev->dev.parent);
+		if (!sch->lpm) {
+			PREPARE_WORK(&cdev->private->kick_work,
+				     ccw_device_nopath_notify, (void *)cdev);
+			queue_work(ccw_device_work, &cdev->private->kick_work);
+		} else
+			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
+	} else if (cdev->handler)
 		cdev->handler(cdev, cdev->private->intparm,
 			      ERR_PTR(-ETIMEDOUT));
 }
@@ -808,8 +819,8 @@ ccw_device_killing_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 			PREPARE_WORK(&cdev->private->kick_work,
 				     ccw_device_nopath_notify, (void *)cdev);
 			queue_work(ccw_device_work, &cdev->private->kick_work);
-		}
-		dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
+		} else
+			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 		return;
 	}
 	//FIXME: Can we get here?
@@ -868,6 +879,7 @@ ccw_device_wait4io_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 	int ret;
 	struct subchannel *sch;
 
+	sch = to_subchannel(cdev->dev.parent);
 	ccw_device_set_timeout(cdev, 0);
 	ret = ccw_device_cancel_halt_clear(cdev);
 	if (ret == -EBUSY) {
@@ -876,16 +888,17 @@ ccw_device_wait4io_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 		return;
 	}
 	if (ret == -ENODEV) {
-		PREPARE_WORK(&cdev->private->kick_work,
-			     ccw_device_nopath_notify, (void *)cdev);
-		queue_work(ccw_device_work, &cdev->private->kick_work);
-		dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
+		if (!sch->lpm) {
+			PREPARE_WORK(&cdev->private->kick_work,
+				     ccw_device_nopath_notify, (void *)cdev);
+			queue_work(ccw_device_work, &cdev->private->kick_work);
+		} else
+			dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 		return;
 	}
 	if (cdev->handler)
 		cdev->handler(cdev, cdev->private->intparm,
 			      ERR_PTR(-ETIMEDOUT));
-	sch = to_subchannel(cdev->dev.parent);
 	if (!sch->lpm) {
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_nopath_notify, (void *)cdev);
@@ -1005,6 +1018,37 @@ ccw_device_change_cmfstate(struct ccw_device *cdev, enum dev_event dev_event)
 }
 
 
+static void
+ccw_device_quiesce_done(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	ccw_device_set_timeout(cdev, 0);
+	if (dev_event == DEV_EVENT_NOTOPER)
+		cdev->private->state = DEV_STATE_NOT_OPER;
+	else
+		cdev->private->state = DEV_STATE_OFFLINE;
+	wake_up(&cdev->private->wait_q);
+}
+
+static void
+ccw_device_quiesce_timeout(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	int ret;
+
+	ret = ccw_device_cancel_halt_clear(cdev);
+	switch (ret) {
+	case 0:
+		cdev->private->state = DEV_STATE_OFFLINE;
+		wake_up(&cdev->private->wait_q);
+		break;
+	case -ENODEV:
+		cdev->private->state = DEV_STATE_NOT_OPER;
+		wake_up(&cdev->private->wait_q);
+		break;
+	default:
+		ccw_device_set_timeout(cdev, HZ/10);
+	}
+}
+
 /*
  * No operation action. This is used e.g. to ignore a timeout event in
  * state offline.
@@ -1101,6 +1145,12 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_INTERRUPT]	ccw_device_wait4io_irq,
 		[DEV_EVENT_TIMEOUT]	ccw_device_wait4io_timeout,
 		[DEV_EVENT_VERIFY]	ccw_device_wait4io_verify,
+	},
+	[DEV_STATE_QUIESCE] {
+		[DEV_EVENT_NOTOPER]	ccw_device_quiesce_done,
+		[DEV_EVENT_INTERRUPT]	ccw_device_quiesce_done,
+		[DEV_EVENT_TIMEOUT]	ccw_device_quiesce_timeout,
+		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
 	/* special states for devices gone not operational */
 	[DEV_STATE_DISCONNECTED] {

@@ -502,7 +502,7 @@ static int mdacon_set_palette(struct vc_data *c, unsigned char *table)
 	return -EINVAL;
 }
 
-static int mdacon_blank(struct vc_data *c, int blank)
+static int mdacon_blank(struct vc_data *c, int blank, int mode_switch)
 {
 	if (mda_type == TYPE_MDA) {
 		if (blank) 

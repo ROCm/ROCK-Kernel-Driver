@@ -19,6 +19,7 @@
 #include <asm/processor.h>
 #include <asm/udbg.h>
 #include <asm/system.h>
+#include "nonstdio.h"
 
 #ifdef CONFIG_MAGIC_SYSRQ
 
@@ -63,9 +64,8 @@ xmon_read_poll(void)
 	return udbg_getc_poll();
 }
  
-void *xmon_stdin;
-void *xmon_stdout;
-void *xmon_stderr;
+FILE *xmon_stdin;
+FILE *xmon_stdout;
 
 int
 xmon_putc(int c, void *f)

@@ -107,44 +107,8 @@ static irq_info_t irq_table[NR_IRQS];
 
 ======================================================================*/
 
-static struct resource *resource_parent(unsigned long b, unsigned long n,
-					int flags, struct pci_dev *dev)
-{
-#ifdef CONFIG_PCI
-	struct resource res, *pr;
-
-	if (dev != NULL) {
-		res.start = b;
-		res.end = b + n - 1;
-		res.flags = flags;
-		pr = pci_find_parent_resource(dev, &res);
-		if (pr)
-			return pr;
-	}
-#endif /* CONFIG_PCI */
-	if (flags & IORESOURCE_MEM)
-		return &iomem_resource;
-	return &ioport_resource;
-}
-
-/* FIXME: Fundamentally racy. */
-static inline int check_io_resource(unsigned long b, unsigned long n,
-				    struct pci_dev *dev)
-{
-	struct resource *region;
-
-	region = __request_region(resource_parent(b, n, IORESOURCE_IO, dev),
-				  b, n, "check_io_resource");
-	if (!region)
-		return -EBUSY;
-
-	release_resource(region);
-	kfree(region);
-	return 0;
-}
-
-static struct resource *make_resource(unsigned long b, unsigned long n,
-				      int flags, char *name)
+static struct resource *
+make_resource(unsigned long b, unsigned long n, int flags, char *name)
 {
 	struct resource *res = kmalloc(sizeof(*res), GFP_KERNEL);
 
@@ -158,34 +122,34 @@ static struct resource *make_resource(unsigned long b, unsigned long n,
 	return res;
 }
 
-static int request_io_resource(unsigned long b, unsigned long n,
-			       char *name, struct pci_dev *dev)
+static struct resource *
+claim_region(struct pcmcia_socket *s, unsigned long base, unsigned long size,
+	     int type, char *name)
 {
-	struct resource *res = make_resource(b, n, IORESOURCE_IO, name);
-	struct resource *pr = resource_parent(b, n, IORESOURCE_IO, dev);
-	int err = -ENOMEM;
+	struct resource *res, *parent;
+
+	parent = type & IORESOURCE_MEM ? &iomem_resource : &ioport_resource;
+	res = make_resource(base, size, type | IORESOURCE_BUSY, name);
 
 	if (res) {
-		err = request_resource(pr, res);
-		if (err)
+#ifdef CONFIG_PCI
+		if (s && s->cb_dev)
+			parent = pci_find_parent_resource(s->cb_dev, res);
+#endif
+		if (!parent || request_resource(parent, res)) {
 			kfree(res);
+			res = NULL;
+		}
 	}
-	return err;
+	return res;
 }
 
-static int request_mem_resource(unsigned long b, unsigned long n,
-				char *name, struct pci_dev *dev)
+static void free_region(struct resource *res)
 {
-	struct resource *res = make_resource(b, n, IORESOURCE_MEM, name);
-	struct resource *pr = resource_parent(b, n, IORESOURCE_MEM, dev);
-	int err = -ENOMEM;
-
 	if (res) {
-		err = request_resource(pr, res);
-		if (err)
-			kfree(res);
+		release_resource(res);
+		kfree(res);
 	}
-	return err;
 }
 
 /*======================================================================
@@ -261,7 +225,7 @@ static int sub_interval(resource_map_t *map, u_long base, u_long num)
 #ifdef CONFIG_PCMCIA_PROBE
 static void do_io_probe(ioaddr_t base, ioaddr_t num)
 {
-    
+    struct resource *res;
     ioaddr_t i, j, bad, any;
     u_char *b, hole, most;
     
@@ -276,11 +240,13 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
     }   
     memset(b, 0, 256);
     for (i = base, most = 0; i < base+num; i += 8) {
-	if (check_io_resource(i, 8, NULL))
+	res = claim_region(NULL, i, 8, IORESOURCE_IO, "PCMCIA IO probe");
+	if (!res)
 	    continue;
 	hole = inb(i);
 	for (j = 1; j < 8; j++)
 	    if (inb(i+j) != hole) break;
+	free_region(res);
 	if ((j == 8) && (++b[hole] > b[most]))
 	    most = hole;
 	if (b[most] == 127) break;
@@ -289,10 +255,12 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 
     bad = any = 0;
     for (i = base; i < base+num; i += 8) {
-	if (check_io_resource(i, 8, NULL))
+	res = claim_region(NULL, i, 8, IORESOURCE_IO, "PCMCIA IO probe");
+	if (!res)
 	    continue;
 	for (j = 0; j < 8; j++)
 	    if (inb(i+j) != most) break;
+	free_region(res);
 	if (j < 8) {
 	    if (!any)
 		printk(" excluding");
@@ -389,18 +357,16 @@ cis_readable(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 	cisinfo_t info1, info2;
 	int ret = 0;
 
-	res1 = request_mem_region(base, size/2, "cs memory probe");
-	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+	res1 = claim_region(s, base, size/2, IORESOURCE_MEM, "cs memory probe");
+	res2 = claim_region(s, base + size/2, size/2, IORESOURCE_MEM, "cs memory probe");
 
 	if (res1 && res2) {
 		ret = readable(s, res1, &info1);
 		ret += readable(s, res2, &info2);
 	}
 
-	if (res2)
-		release_resource(res2);
-	if (res1)
-		release_resource(res1);
+	free_region(res2);
+	free_region(res1);
 
 	return (ret == 2) && (info1.Chains == info2.Chains);
 }
@@ -411,18 +377,16 @@ checksum_match(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 	struct resource *res1, *res2;
 	int a = -1, b = -1;
 
-	res1 = request_mem_region(base, size/2, "cs memory probe");
-	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+	res1 = claim_region(s, base, size/2, IORESOURCE_MEM, "cs memory probe");
+	res2 = claim_region(s, base + size/2, size/2, IORESOURCE_MEM, "cs memory probe");
 
 	if (res1 && res2) {
 		a = checksum(s, res1);
 		b = checksum(s, res2);
 	}
 
-	if (res2)
-		release_resource(res2);
-	if (res1)
-		release_resource(res1);
+	free_region(res2);
+	free_region(res1);
 
 	return (a == b) && (a >= 0);
 }
@@ -553,6 +517,68 @@ void validate_mem(struct pcmcia_socket *s)
 
 #endif /* CONFIG_PCMCIA_PROBE */
 
+struct pcmcia_align_data {
+	unsigned long	mask;
+	unsigned long	offset;
+	resource_map_t	*map;
+};
+
+static void
+pcmcia_common_align(void *align_data, struct resource *res,
+		    unsigned long size, unsigned long align)
+{
+	struct pcmcia_align_data *data = align_data;
+	unsigned long start;
+	/*
+	 * Ensure that we have the correct start address
+	 */
+	start = (res->start & ~data->mask) + data->offset;
+	if (start < res->start)
+		start += data->mask + 1;
+	res->start = start;
+}
+
+static void
+pcmcia_align(void *align_data, struct resource *res,
+	     unsigned long size, unsigned long align)
+{
+	struct pcmcia_align_data *data = align_data;
+	resource_map_t *m;
+
+	pcmcia_common_align(data, res, size, align);
+
+	for (m = data->map->next; m != data->map; m = m->next) {
+		unsigned long start = m->base;
+		unsigned long end = m->base + m->num;
+
+		/*
+		 * If the lower resources are not available, try aligning
+		 * to this entry of the resource database to see if it'll
+		 * fit here.
+		 */
+		if (res->start < start) {
+			res->start = start;
+			pcmcia_common_align(data, res, size, align);
+		}
+
+		/*
+		 * If we're above the area which was passed in, there's
+		 * no point proceeding.
+		 */
+		if (res->start >= res->end)
+			break;
+
+		if ((res->start + size) <= end)
+			break;
+	}
+
+	/*
+	 * If we failed to find something suitable, ensure we fail.
+	 */
+	if (m == data->map)
+		res->start = res->end;
+}
+
 /*======================================================================
 
     These find ranges of I/O ports or memory addresses that are not
@@ -566,69 +592,89 @@ void validate_mem(struct pcmcia_socket *s)
     
 ======================================================================*/
 
-int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
+int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
 		   char *name, struct pcmcia_socket *s)
 {
-    ioaddr_t try;
-    resource_map_t *m;
-    int ret = -1;
+	struct resource *res = make_resource(0, num, IORESOURCE_IO, name);
+	struct pcmcia_align_data data;
+	unsigned long min = *base;
+	int ret;
 
-    down(&rsrc_sem);
-    for (m = io_db.next; m != &io_db; m = m->next) {
-	try = (m->base & ~(align-1)) + *base;
-	for (try = (try >= m->base) ? try : try+align;
-	     (try >= m->base) && (try+num <= m->base+m->num);
-	     try += align) {
-	    if (request_io_resource(try, num, name, s->cb_dev) == 0) {
-		*base = try;
-		ret = 0;
-		goto out;
-	    }
-	    if (!align)
-		break;
+	if (align == 0)
+		align = 0x10000UL;
+
+	data.mask = align - 1;
+	data.offset = *base & data.mask;
+	data.map = &io_db;
+
+#ifdef CONFIG_PCI
+	if (s->cb_dev) {
+		ret = pci_bus_alloc_resource(s->cb_dev->bus, res, num, 1,
+					     min, 0, pcmcia_align, &data);
+	} else
+#endif
+	{
+		down(&rsrc_sem);
+		ret = allocate_resource(&ioport_resource, res, num, min, ~0UL, 0,
+					pcmcia_align, &data);
+		up(&rsrc_sem);
 	}
-    }
- out:
-    up(&rsrc_sem);
-    return ret;
+
+	if (ret != 0) {
+		kfree(res);
+	} else {
+		*base = res->start;
+	}
+	return ret;
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
 		    int low, char *name, struct pcmcia_socket *s)
 {
-    u_long try;
-    resource_map_t *m;
-    int ret = -1;
+	struct resource *res = make_resource(0, num, IORESOURCE_MEM, name);
+	struct pcmcia_align_data data;
+	unsigned long min, max;
+	int ret, i;
 
-    low = low || !(s->features & SS_CAP_PAGE_REGS);
+	low = low || !(s->features & SS_CAP_PAGE_REGS);
 
-    down(&rsrc_sem);
-    while (1) {
-	for (m = mem_db.next; m != &mem_db; m = m->next) {
-	    /* first pass >1MB, second pass <1MB */
-	    if ((low != 0) ^ (m->base < 0x100000))
-		continue;
+	data.mask = align - 1;
+	data.offset = *base & data.mask;
+	data.map = &mem_db;
 
-	    try = (m->base & ~(align-1)) + *base;
-	    for (try = (try >= m->base) ? try : try+align;
-		 (try >= m->base) && (try+num <= m->base+m->num);
-		 try += align) {
-		if (request_mem_resource(try, num, name, s->cb_dev) == 0) {
-		    *base = try;
-		    ret = 0;
-		    goto out;
+	for (i = 0; i < 2; i++) {
+		if (low) {
+			max = 0x100000UL;
+			min = *base < max ? *base : 0;
+		} else {
+			max = ~0UL;
+			min = 0x100000UL + *base;
 		}
-		if (!align)
-		    break;
-	    }
+
+#ifdef CONFIG_PCI
+		if (s->cb_dev) {
+			ret = pci_bus_alloc_resource(s->cb_dev->bus, res, num,
+						     1, min, 0,
+						     pcmcia_align, &data);
+		} else
+#endif
+		{
+			down(&rsrc_sem);
+			ret = allocate_resource(&iomem_resource, res, num, min,
+						max, 0, pcmcia_align, &data);
+			up(&rsrc_sem);
+		}
+		if (ret == 0 || low)
+			break;
+		low = 1;
 	}
-	if (low)
-	    break;
-	low++;
-    }
- out:
-    up(&rsrc_sem);
-    return ret;
+
+	if (ret != 0) {
+		kfree(res);
+	} else {
+		*base = res->start;
+	}
+	return ret;
 }
 
 /*======================================================================

@@ -1696,8 +1696,6 @@ static int sx_tiocmset(struct tty_struct *tty, struct file *file,
 		       unsigned int set, unsigned int clear)
 {
 	struct specialix_port *port = (struct specialix_port *)tty->driver_data;
-	int error;
-	unsigned int arg;
 	unsigned long flags;
 	struct specialix_board *bp;
 

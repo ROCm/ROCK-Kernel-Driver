@@ -1743,7 +1743,7 @@ static void run_service(struct lanai_dev *lanai)
 		read_lock(&vcc_sklist_lock);
 		vci_bitfield_iterate(lanai, lanai->transmit_ready,
 		    iter_transmit);
-		CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
+		bitmap_zero(lanai->transmit_ready, NUM_VCI);
 		read_unlock(&vcc_sklist_lock);
 	}
 }
@@ -2158,8 +2158,8 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	/* Basic device fields */
 	lanai->number = atmdev->number;
 	lanai->num_vci = NUM_VCI;
-	CLEAR_BITMAP(&lanai->backlog_vccs, NUM_VCI);
-	CLEAR_BITMAP(&lanai->transmit_ready, NUM_VCI);
+	bitmap_zero(lanai->backlog_vccs, NUM_VCI);
+	bitmap_zero(lanai->transmit_ready, NUM_VCI);
 	lanai->naal0 = 0;
 #ifdef USE_POWERDOWN
 	lanai->nbound = 0;

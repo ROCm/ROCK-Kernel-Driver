@@ -1,5 +1,5 @@
 /*
- * platform.c - platform 'psuedo' bus for legacy devices
+ * platform.c - platform 'pseudo' bus for legacy devices
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs

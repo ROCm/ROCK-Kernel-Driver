@@ -120,8 +120,6 @@ struct rpc_rqst {
 };
 #define rq_svec			rq_snd_buf.head
 #define rq_slen			rq_snd_buf.len
-#define rq_rvec			rq_rcv_buf.head
-#define rq_rlen			rq_rcv_buf.len
 
 #define XPRT_LAST_FRAG		(1 << 0)
 #define XPRT_COPY_RECM		(1 << 1)
@@ -218,12 +216,15 @@ void			xprt_connect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);
 void			xprt_sock_setbufsize(struct rpc_xprt *);
 
-#define XPRT_CONNECT	0
-#define XPRT_LOCKED	1
+#define XPRT_LOCKED	0
+#define XPRT_CONNECT	1
+#define XPRT_CONNECTING	2
 
 #define xprt_connected(xp)		(test_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_set_connected(xp)		(set_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_test_and_set_connected(xp)	(test_and_set_bit(XPRT_CONNECT, &(xp)->sockstate))
+#define xprt_test_and_clear_connected(xp) \
+					(test_and_clear_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_clear_connected(xp)	(clear_bit(XPRT_CONNECT, &(xp)->sockstate))
 
 #endif /* __KERNEL__*/

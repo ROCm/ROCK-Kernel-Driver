@@ -357,8 +357,9 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 #endif /* __KERNEL__ */
 
 /* generic pci stuff */
+#ifdef CONFIG_PCI
 #include <asm-generic/pci.h>
-
 #include <linux/dma-mapping.h>
+#endif
 
 #endif /* __x8664_PCI_H */

@@ -211,7 +211,7 @@ typedef struct physid_mask physid_mask_t;
 
 #define physids_and(dst, src1, src2)		bitmap_and((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
 #define physids_or(dst, src1, src2)		bitmap_or((dst).mask, (src1).mask, (src2).mask, MAX_APICS)
-#define physids_clear(map)			bitmap_clear((map).mask, MAX_APICS)
+#define physids_clear(map)			bitmap_zero((map).mask, MAX_APICS)
 #define physids_complement(map)			bitmap_complement((map).mask, MAX_APICS)
 #define physids_empty(map)			bitmap_empty((map).mask, MAX_APICS)
 #define physids_equal(map1, map2)		bitmap_equal((map1).mask, (map2).mask, MAX_APICS)

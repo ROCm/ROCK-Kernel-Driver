@@ -1051,7 +1051,7 @@ simrs_init (void)
 		if (state->type == PORT_UNKNOWN) continue;
 
 		if (!state->irq) {
-			state->irq = ia64_alloc_vector();
+			state->irq = assign_irq_vector(AUTO_ASSIGN);
 			ia64_ssc_connect_irq(KEYBOARD_INTR, state->irq);
 		}
 

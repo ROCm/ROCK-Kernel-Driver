@@ -30,7 +30,8 @@ static inline int freezeable(struct task_struct * p)
 	if ((p == current) || 
 	    (p->flags & PF_IOTHREAD) || 
 	    (p->state == TASK_ZOMBIE) ||
-	    (p->state == TASK_DEAD))
+	    (p->state == TASK_DEAD) ||
+	    (p->state == TASK_STOPPED))
 		return 0;
 	return 1;
 }
@@ -38,21 +39,19 @@ static inline int freezeable(struct task_struct * p)
 /* Refrigerator is place where frozen processes are stored :-). */
 void refrigerator(unsigned long flag)
 {
-	/* You need correct to work with real-time processes.
-	   OTOH, this way one process may see (via /proc/) some other
-	   process in stopped state (and thereby discovered we were
-	   suspended. We probably do not care. 
-	 */
+	/* Hmm, should we be allowed to suspend when there are realtime
+	   processes around? */
 	long save;
 	save = current->state;
-	current->state = TASK_STOPPED;
+	current->state = TASK_UNINTERRUPTIBLE;
 	pr_debug("%s entered refrigerator\n", current->comm);
 	printk("=");
 	current->flags &= ~PF_FREEZE;
-	if (flag)
-		flush_signals(current); /* We have signaled a kernel thread, which isn't normal behaviour
-					   and that may lead to 100%CPU sucking because those threads
-					   just don't manage signals. */
+
+	spin_lock_irq(&current->sighand->siglock);
+	recalc_sigpending(); /* We sent fake signal, clean it up */
+	spin_unlock_irq(&current->sighand->siglock);
+
 	current->flags |= PF_FROZEN;
 	while (current->flags & PF_FROZEN)
 		schedule();

@@ -50,7 +50,7 @@ static void stork_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 {
 	int i;
 
-        printk(__FUNCTION__ "\n");
+        printk("%s\n", __FUNCTION__);
 
         /* disable IRQs */
         sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
@@ -68,7 +68,7 @@ stork_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
         unsigned long levels = GPLR;
 
 	if (debug > 1)
-		printk(__FUNCTION__ " GPLR=%x IRQ[1:0]=%x\n", levels,
+		printk("%s GPLR=%x IRQ[1:0]=%x\n", __FUNCTION__, levels,
 			(levels & (GPIO_STORK_PCMCIA_A_RDY|GPIO_STORK_PCMCIA_B_RDY)));
 
 	switch (skt->nr) {

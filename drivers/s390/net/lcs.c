@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.72 $	 $Date: 2004/03/22 09:34:27 $
+ *    $Revision: 1.74 $	 $Date: 2004/04/05 00:01:04 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.72 $"
+#define VERSION_LCS_C  "$Revision: 1.74 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -206,6 +206,9 @@ lcs_alloc_card(void)
 		return NULL;
 	}
 
+#ifdef CONFIG_IP_MULTICAST
+	INIT_LIST_HEAD(&card->ipm_list);
+#endif
 	LCS_DBF_HEX(2, setup, &card, sizeof(void*));
 	return card;
 }
@@ -1967,7 +1970,8 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
 	if (ccwgdev->state == CCWGROUP_ONLINE) {
 		lcs_shutdown_device(ccwgdev);
 	}
-	unregister_netdev(card->dev);
+	if (card->dev)
+		unregister_netdev(card->dev);
 	sysfs_remove_group(&ccwgdev->dev.kobj, &lcs_attr_group);
 	lcs_cleanup_card(card);
 	lcs_free_card(card);

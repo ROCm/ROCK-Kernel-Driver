@@ -235,8 +235,6 @@
 #define	SPRN_IMMR	0x27E  	/* Internal Memory Map Register */
 #define	SPRN_L2CR	0x3F9	/* Level 2 Cache Control Regsiter */
 #define	SPRN_LR		0x008	/* Link Register */
-#define	SPRN_MMCR0	0x3B8	/* Monitor Mode Control Register 0 */
-#define	SPRN_MMCR1	0x3BC	/* Monitor Mode Control Register 1 */
 #define	SPRN_PBL1	0x3FC	/* Protection Bound Lower 1 */
 #define	SPRN_PBL2	0x3FE	/* Protection Bound Lower 2 */
 #define	SPRN_PBU1	0x3FD	/* Protection Bound Upper 1 */
@@ -244,10 +242,7 @@
 #define	SPRN_PID	0x3B1	/* Process ID */
 #define	SPRN_PIR	0x3FF	/* Processor Identification Register */
 #define	SPRN_PIT	0x3DB	/* Programmable Interval Timer */
-#define	SPRN_PMC1	0x3B9	/* Performance Counter Register 1 */
-#define	SPRN_PMC2	0x3BA	/* Performance Counter Register 2 */
-#define	SPRN_PMC3	0x3BD	/* Performance Counter Register 3 */
-#define	SPRN_PMC4	0x3BE	/* Performance Counter Register 4 */
+#define	SPRN_PURR	0x135	/* Processor Utilization of Resources Register */
 #define	SPRN_PVR	0x11F	/* Processor Version Register */
 #define	SPRN_RPA	0x3D6	/* Required Physical Address Register */
 #define	SPRN_SDA	0x3BF	/* Sampled Data Address Register */
@@ -307,16 +302,25 @@
 #define	    WRS_SYSTEM		3		/* WDT forced system reset */
 #define	  TSR_PIS		0x08000000	/* PIT Interrupt Status */
 #define	  TSR_FIS		0x04000000	/* FIT Interrupt Status */
-#define	SPRN_UMMCR0	0x3A8	/* User Monitor Mode Control Register 0 */
-#define	SPRN_UMMCR1	0x3AC	/* User Monitor Mode Control Register 0 */
-#define	SPRN_UPMC1	0x3A9	/* User Performance Counter Register 1 */
-#define	SPRN_UPMC2	0x3AA	/* User Performance Counter Register 2 */
-#define	SPRN_UPMC3	0x3AD	/* User Performance Counter Register 3 */
-#define	SPRN_UPMC4	0x3AE	/* User Performance Counter Register 4 */
 #define	SPRN_USIA	0x3AB	/* User Sampled Instruction Address Register */
 #define	SPRN_XER	0x001	/* Fixed Point Exception Register */
 #define	SPRN_ZPR	0x3B0	/* Zone Protection Register */
 #define SPRN_VRSAVE     0x100   /* Vector save */
+
+/* Performance monitor SPRs */
+#define SPRN_SIAR	780
+#define SPRN_SDAR	781
+#define SPRN_MMCRA	786
+#define SPRN_PMC1	787
+#define SPRN_PMC2	788
+#define SPRN_PMC3	789
+#define SPRN_PMC4	790
+#define SPRN_PMC5	791
+#define SPRN_PMC6	792
+#define SPRN_PMC7	793
+#define SPRN_PMC8	794
+#define SPRN_MMCR0	795
+#define SPRN_MMCR1	798
 
 /* Short-hand versions for a number of the above SPRNs */
 
@@ -343,6 +347,7 @@
 #define	__LR	SPRN_LR
 #define	PVR	SPRN_PVR	/* Processor Version */
 #define	PIR	SPRN_PIR	/* Processor ID */
+#define	PURR	SPRN_PURR	/* Processor Utilization of Resource Register */
 #define	RPA	SPRN_RPA	/* Required Physical Address Register */
 #define	SDR1	SPRN_SDR1      	/* MMU hash base register */
 #define	SPR0	SPRN_SPRG0	/* Supervisor Private Registers */

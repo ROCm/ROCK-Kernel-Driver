@@ -14,6 +14,6 @@ config DVB_TTUSB_DEC
 
 	  The DEC devices require firmware in order to boot into a mode in
 	  which they are slaves to the PC.  See
-	  linux/Documentation/dvb/ttusb-dec.txt for details.
+	  <file:Documentation/dvb/ttusb-dec.txt> for details.
 
 	  Say Y if you own such a device and want to use it.

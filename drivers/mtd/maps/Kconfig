@@ -94,7 +94,7 @@ config MTD_SBC_GXX
 	  By default the flash is split into 3 partitions which are accessed
 	  as separate MTD devices. This board utilizes Intel StrataFlash.
 	  More info at
-	  <http://www.arcomcontrols.com/products/icp/pc104/processors/>.
+	  <http://www.arcomcontrols.com/products/icp/pc104/processors/SBC_GX1.htm>.
 
 config MTD_ELAN_104NC
 	tristate "CFI Flash device mapped on Arcom ELAN-104NC"
@@ -104,7 +104,7 @@ config MTD_ELAN_104NC
 	  System's ELAN-104NC development board. By default the flash
 	  is split into 3 partitions which are accessed as separate MTD
 	  devices. This board utilizes Intel StrataFlash. More info at
-	  <http://www.arcomcontrols.com/products/icp/pc104/processors/>.
+	  <http://www.arcomcontrols.com/products/icp/pc104/processors/ELAN104NC.htm>.
 
 config MTD_LUBBOCK
 	tristate "CFI Flash device mapped on Intel Lubbock XScale eval board"
@@ -120,7 +120,7 @@ config MTD_OCTAGON
 	  This provides a 'mapping' driver which supports the way in which
 	  the flash chips are connected in the Octagon-5066 Single Board
 	  Computer. More information on the board is available at
-	  <http://www.octagonsystems.com/Products/5066/5066.html>.
+	  <http://www.octagonsystems.com/CPUpages/5066.html>.
 
 config MTD_VMAX
 	tristate "JEDEC Flash device mapped on Tempustech VMAX SBC301"
@@ -129,7 +129,7 @@ config MTD_VMAX
 	  This provides a 'mapping' driver which supports the way in which
 	  the flash chips are connected in the Tempustech VMAX SBC301 Single
 	  Board Computer. More information on the board is available at
-	  <http://www.tempustech.com/tt301.htm>.
+	  <http://www.tempustech.com/>.
 
 config MTD_SCx200_DOCFLASH
 	tristate "Flash device mapped with DOCCS on NatSemi SCx200"
@@ -215,8 +215,8 @@ config MTD_DILNETPC
 	depends on X86 && MTD_CONCAT && MTD_PARTITIONS && MTD_CFI_INTELEXT
 	help
 	  MTD map driver for SSV DIL/Net PC Boards "DNP" and "ADNP".
-	  For details, see http://www.ssv-embedded.de/ssv/pc104/p169.htm
- 	  and http://www.ssv-embedded.de/ssv/pc104/p170.htm
+	  For details, see <http://www.ssv-embedded.de/ssv/pc104/p169.htm>
+ 	  and <http://www.ssv-embedded.de/ssv/pc104/p170.htm>
 
 config MTD_DILNETPC_BOOTSIZE
 	hex "Size of DIL/Net PC flash boot partition"
@@ -253,7 +253,7 @@ config MTD_RPXLITE
 	  a strange sparse mapping. This 'mapping' driver supports that
 	  arrangement, allowing the CFI probe and command set driver code
 	  to communicate with the chips on the RPXLite board. More at
-	  <http://www.embeddedplanet.com/rpx_lite_specification_sheet.htm>.
+	  <http://www.embeddedplanet.com/>.
 
 config MTD_MBX860
 	tristate "System flash on MBX860 board"
@@ -394,7 +394,7 @@ config MTD_DC21285
 	help
 	  This provides a driver for the flash accessed using Intel's
 	  21285 bridge used with Intel's StrongARM processors. More info at
-	  <http://developer.intel.com/design/bridge/quicklist/dsc-21285.htm>.
+	  <http://www.intel.com/design/bridge/docs/21285_documentation.htm>.
 
 config MTD_IQ80310
 	tristate "CFI Flash device mapped on the XScale IQ80310 board"

@@ -6,6 +6,7 @@
 
 #include <linux/kernel.h>
 #include <linux/rwsem.h>
+#include <linux/init.h>
 #include <linux/module.h>
 
 extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
@@ -13,7 +14,7 @@ extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore
 extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *));
 extern struct rw_semaphore *FASTCALL(rwsem_downgrade_wake(struct rw_semaphore *));
 
-void __down_read(struct rw_semaphore *sem)
+void __sched __down_read(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __down_read\n"
@@ -72,7 +73,7 @@ int __down_read_trylock(struct rw_semaphore *sem)
 }
 EXPORT_SYMBOL(__down_read_trylock);
 
-void __down_write(struct rw_semaphore *sem)
+void __sched __down_write(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __down_write\n\t"

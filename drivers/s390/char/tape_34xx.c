@@ -113,6 +113,7 @@ tape_34xx_work_handler(void *data)
 	switch(p->op) {
 		case TO_MSEN:
 			tape_34xx_medium_sense(p->device);
+			break;
 		default:
 			DBF_EVENT(3, "T34XX: internal error: unknown work\n");
 	}
@@ -1342,7 +1343,7 @@ tape_34xx_init (void)
 {
 	int rc;
 
-	DBF_EVENT(3, "34xx init: $Revision: 1.19 $\n");
+	DBF_EVENT(3, "34xx init: $Revision: 1.20 $\n");
 	/* Register driver for 3480/3490 tapes. */
 	rc = ccw_driver_register(&tape_34xx_driver);
 	if (rc)
@@ -1361,7 +1362,7 @@ tape_34xx_exit(void)
 MODULE_DEVICE_TABLE(ccw, tape_34xx_ids);
 MODULE_AUTHOR("(C) 2001-2002 IBM Deutschland Entwicklung GmbH");
 MODULE_DESCRIPTION("Linux on zSeries channel attached 3480 tape "
-		   "device driver ($Revision: 1.19 $)");
+		   "device driver ($Revision: 1.20 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_34xx_init);

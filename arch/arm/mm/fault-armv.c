@@ -191,7 +191,7 @@ void __flush_dcache_page(struct page *page)
 
 	__cpuc_flush_dcache_page(page_address(page));
 
-	if (!page->mapping)
+	if (!page_mapping(page))
 		return;
 
 	/*
@@ -226,8 +226,10 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 {
 	struct list_head *l;
 	struct mm_struct *mm = vma->vm_mm;
-	unsigned long pgoff = (addr - vma->vm_start) >> PAGE_SHIFT;
+	unsigned long pgoff;
 	int aliases = 0;
+
+	pgoff = vma->vm_pgoff + ((addr - vma->vm_start) >> PAGE_SHIFT);
 
 	/*
 	 * If we have any shared mappings that are in the same mm
@@ -242,7 +244,7 @@ make_coherent(struct vm_area_struct *vma, unsigned long addr, struct page *page,
 
 		/*
 		 * If this VMA is not in our MM, we can ignore it.
-		 * Note that we intentionally don't mask out the VMA
+		 * Note that we intentionally mask out the VMA
 		 * that we are fixing up.
 		 */
 		if (mpnt->vm_mm != mm || mpnt == vma)
@@ -292,7 +294,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 	if (!pfn_valid(pfn))
 		return;
 	page = pfn_to_page(pfn);
-	if (page->mapping) {
+	if (page_mapping(page)) {
 		int dirty = test_and_clear_bit(PG_dcache_dirty, &page->flags);
 
 		if (dirty)

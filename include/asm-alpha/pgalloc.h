@@ -63,7 +63,10 @@ pte_free_kernel(pte_t *pte)
 static inline struct page *
 pte_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-	return virt_to_page(pte_alloc_one_kernel(mm, addr));
+	pte_t *pte = pte_alloc_one_kernel(mm, addr);
+	if (pte)
+		return virt_to_page(pte);
+	return 0;
 }
 
 static inline void

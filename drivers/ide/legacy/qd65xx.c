@@ -92,7 +92,7 @@
 
 static int timings[4]={-1,-1,-1,-1}; /* stores current timing for each timer */
 
-static void qd_write_reg (u8 content, u8 reg)
+static void qd_write_reg (u8 content, unsigned long reg)
 {
 	unsigned long flags;
 
@@ -101,7 +101,7 @@ static void qd_write_reg (u8 content, u8 reg)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-u8 __init qd_read_reg (u8 reg)
+u8 __init qd_read_reg (unsigned long reg)
 {
 	unsigned long flags;
 	u8 read;

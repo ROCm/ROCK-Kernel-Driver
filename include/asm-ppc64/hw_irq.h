@@ -75,9 +75,24 @@ static inline void __do_save_and_cli(unsigned long *flags)
 
 #endif /* CONFIG_PPC_ISERIES */
 
-#define mask_irq(irq) ({if (irq_desc[irq].handler && irq_desc[irq].handler->disable) irq_desc[irq].handler->disable(irq);})
-#define unmask_irq(irq) ({if (irq_desc[irq].handler && irq_desc[irq].handler->enable) irq_desc[irq].handler->enable(irq);})
-#define ack_irq(irq) ({if (irq_desc[irq].handler && irq_desc[irq].handler->ack) irq_desc[irq].handler->ack(irq);})
+#define mask_irq(irq)						\
+	({							\
+	 	irq_desc_t *desc = get_irq_desc(irq);		\
+		if (desc->handler && desc->handler->disable)	\
+			desc->handler->disable(irq);		\
+	})
+#define unmask_irq(irq)						\
+	({							\
+	 	irq_desc_t *desc = get_irq_desc(irq);		\
+		if (desc->handler && desc->handler->enable)	\
+			desc->handler->enable(irq);		\
+	})
+#define ack_irq(irq)						\
+	({							\
+	 	irq_desc_t *desc = get_irq_desc(irq);		\
+		if (desc->handler && desc->handler->ack)	\
+			desc->handler->ack(irq);		\
+	})
 
 /* Should we handle this via lost interrupts and IPIs or should we don't care like
  * we do now ? --BenH.

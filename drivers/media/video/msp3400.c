@@ -1384,34 +1384,30 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
 	struct msp3400c *msp  = i2c_get_clientdata(client);
         __u16           *sarg = arg;
-#if 0
-	int             *iarg = (int*)arg;
-#endif
+	int scart = 0;
 
 	switch (cmd) {
 
 	case AUDC_SET_INPUT:
-		/* scart switching
-		     - IN1 is often used for external input
-		     - Hauppauge uses IN2 for the radio */
 		dprintk(KERN_DEBUG "msp34xx: AUDC_SET_INPUT(%d)\n",*sarg);
 		if (*sarg == msp->input)
 			break;
 		msp->input = *sarg;
 		switch (*sarg) {
 		case AUDIO_RADIO:
+			/* Hauppauge uses IN2 for the radio */
 			msp->mode   = MSP_MODE_FM_RADIO;
-			msp->stereo = VIDEO_SOUND_STEREO;
-			msp3400c_set_scart(client,SCART_IN2,0);
-			msp3400c_write(client,I2C_MSP3400C_DFP,0x000d,0x1900);
-			msp3400c_setstereo(client,msp->stereo);
+			scart       = SCART_IN2;
 			break;
-		case AUDIO_EXTERN:
+		case AUDIO_EXTERN_1:
+			/* IN1 is often used for external input ... */
 			msp->mode   = MSP_MODE_EXTERN;
-			msp->stereo = VIDEO_SOUND_STEREO;
-			msp3400c_set_scart(client,SCART_IN1,0);
-			msp3400c_write(client,I2C_MSP3400C_DFP,0x000d,0x1900);
-			msp3400c_setstereo(client,msp->stereo);
+			scart       = SCART_IN1;
+			break;
+		case AUDIO_EXTERN_2:
+			/* ... sometimes it is IN2 through ;) */
+			msp->mode   = MSP_MODE_EXTERN;
+			scart       = SCART_IN2;
 			break;
 		case AUDIO_TUNER:
 			msp->mode   = -1;
@@ -1421,6 +1417,12 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			if (*sarg & AUDIO_MUTE)
 				msp3400c_set_scart(client,SCART_MUTE,0);
 			break;
+		}
+		if (scart) {
+			msp->stereo = VIDEO_SOUND_STEREO;
+			msp3400c_set_scart(client,scart,0);
+			msp3400c_write(client,I2C_MSP3400C_DFP,0x000d,0x1900);
+			msp3400c_setstereo(client,msp->stereo);
 		}
 		if (msp->active)
 			msp->restart = 1;
@@ -1487,12 +1489,15 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		if (msp->muted)
 			va->flags |= VIDEO_AUDIO_MUTE;
 		va->volume=max(msp->left,msp->right);
-		va->balance=(32768*min(msp->left,msp->right))/
-			(va->volume ? va->volume : 1);
-		va->balance=(msp->left<msp->right)?
-			(65535-va->balance) : va->balance;
-		if (0 == va->volume)
+
+		if (0 == va->volume) {
 			va->balance = 32768;
+		} else {
+			va->balance = (32768 * min(msp->left,msp->right))
+				/ va->volume;
+			va->balance = (msp->left<msp->right) ?
+				(65535 - va->balance) : va->balance;
+		}
 		va->bass = msp->bass;
 		va->treble = msp->treble;
 
@@ -1530,7 +1535,7 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	{
 		struct video_channel *vc = arg;
 		
-		dprintk(KERN_DEBUG "msp34xx: VIDIOCSCHAN\n");
+		dprintk(KERN_DEBUG "msp34xx: VIDIOCSCHAN (norm=%d)\n",vc->norm);
 		msp->norm = vc->norm;
 		break;
 	}

@@ -738,12 +738,15 @@ _GLOBAL(__flush_dcache_icache_phys)
 	blr
 
 /*
- * Clear a page using the dcbz instruction, which doesn't cause any
+ * Clear pages using the dcbz instruction, which doesn't cause any
  * memory traffic (except to write out any cache lines which get
  * displaced).  This only works on cacheable memory.
+ *
+ * void clear_pages(void *page, int order) ;
  */
-_GLOBAL(clear_page)
+_GLOBAL(clear_pages)
 	li	r0,4096/L1_CACHE_LINE_SIZE
+	slw	r0,r0,r4
 	mtctr	r0
 #ifdef CONFIG_8xx
 	li	r4, 0

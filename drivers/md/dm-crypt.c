@@ -668,7 +668,7 @@ static int crypt_map(struct dm_target *ti, struct bio *bio,
 
 		/* out of memory -> run queues */
 		if (remaining)
-			blk_run_queues();
+			blk_congestion_wait(bio_data_dir(clone), HZ/100);
 	}
 
 	/* drop reference, clones could have returned before we reach this */

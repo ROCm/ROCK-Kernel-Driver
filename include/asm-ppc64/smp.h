@@ -67,9 +67,14 @@ extern cpumask_t cpu_available_map;
 #endif
 #define PPC_MSG_DEBUGGER_BREAK  3
 
+extern cpumask_t irq_affinity[];
+
 void smp_init_iSeries(void);
 void smp_init_pSeries(void);
 
+extern int __cpu_disable(void);
+extern void __cpu_die(unsigned int cpu);
+extern void cpu_die(void) __attribute__((noreturn));
 #endif /* !(CONFIG_SMP) */
 
 #define get_hard_smp_processor_id(CPU) (paca[(CPU)].xHwProcNum)

@@ -32,7 +32,7 @@
 asmlinkage void dbginterrupt_c(struct frame *fp)
 {
 	extern void dump(struct pt_regs *fp);
-	printk("%s(%d): BUS ERROR TRAP\n", __FILE__, __LINE__);
+	printk(KERN_DEBUG "%s(%d): BUS ERROR TRAP\n", __FILE__, __LINE__);
 	dump((struct pt_regs *) fp);
 	asm("halt");
 }

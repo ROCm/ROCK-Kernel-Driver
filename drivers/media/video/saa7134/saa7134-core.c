@@ -101,7 +101,7 @@ unsigned int      saa7134_devcount;
 /* debug help functions                                               */
 
 static const char *v4l1_ioctls[] = {
-	"0", "CGAP", "GCHAN", "SCHAN", "GTUNER", "STUNER", "GPICT", "SPICT",
+	"0", "GCAP", "GCHAN", "SCHAN", "GTUNER", "STUNER", "GPICT", "SPICT",
 	"CCAPTURE", "GWIN", "SWIN", "GFBUF", "SFBUF", "KEY", "GFREQ",
 	"SFREQ", "GAUDIO", "SAUDIO", "SYNC", "MCAPTURE", "GMBUF", "GUNIT",
 	"GCAPTURE", "SCAPTURE", "SPLAYMODE", "SWRITEMODE", "GPLAYINFO",
@@ -466,7 +466,7 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 	}
 
 	/* audio capture -- dma 3 */
-	if (dev->oss.recording) {
+	if (dev->oss.dma_running) {
 		ctrl |= SAA7134_MAIN_CTRL_TE6;
 		irq  |= SAA7134_IRQ1_INTE_RA3_1 |
 			SAA7134_IRQ1_INTE_RA3_0;

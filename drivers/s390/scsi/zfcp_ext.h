@@ -31,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.45 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.49 $"
 
 #include "zfcp_def.h"
 
@@ -55,7 +55,9 @@ extern struct zfcp_unit *zfcp_get_unit_by_lun(struct zfcp_port *,
 extern struct zfcp_port *zfcp_get_port_by_wwpn(struct zfcp_adapter *,
 					       wwn_t wwpn);
 extern struct zfcp_adapter *zfcp_adapter_enqueue(struct ccw_device *);
+extern int    zfcp_adapter_debug_register(struct zfcp_adapter *);
 extern void   zfcp_adapter_dequeue(struct zfcp_adapter *);
+extern void   zfcp_adapter_debug_unregister(struct zfcp_adapter *);
 extern struct zfcp_port *zfcp_port_enqueue(struct zfcp_adapter *, wwn_t, u32);
 extern void   zfcp_port_dequeue(struct zfcp_port *);
 extern struct zfcp_unit *zfcp_unit_enqueue(struct zfcp_port *, fcp_lun_t);
@@ -154,11 +156,10 @@ extern int  zfcp_erp_unit_reopen(struct zfcp_unit *, int);
 extern int  zfcp_erp_unit_shutdown(struct zfcp_unit *, int);
 extern void zfcp_erp_unit_failed(struct zfcp_unit *);
 
-extern void zfcp_erp_scsi_low_mem_buffer_timeout_handler(unsigned long);
 extern int  zfcp_erp_thread_setup(struct zfcp_adapter *);
 extern int  zfcp_erp_thread_kill(struct zfcp_adapter *);
 extern int  zfcp_erp_wait(struct zfcp_adapter *);
-extern void zfcp_erp_fsf_req_handler(struct zfcp_fsf_req *);
+extern int  zfcp_erp_async_handler(struct zfcp_erp_action *, unsigned long);
 
 extern int  zfcp_test_link(struct zfcp_port *);
 

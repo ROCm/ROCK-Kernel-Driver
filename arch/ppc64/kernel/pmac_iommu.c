@@ -33,6 +33,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include <asm/prom.h>
@@ -141,7 +142,7 @@ static void dart_flush(struct iommu_table *tbl)
 
 static void dart_build_pmac(struct iommu_table *tbl, long index, 
 			    long npages, unsigned long uaddr,
-			    int direction)
+			    enum dma_data_direction direction)
 {
 	unsigned int *dp;
 	unsigned int rpn;

@@ -38,6 +38,7 @@
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/blkdev.h>
 #include <linux/sched.h>
 
 #include "swab.h"
@@ -456,7 +457,7 @@ void ufs_truncate (struct inode * inode)
 			break;
 		if (IS_SYNC(inode) && (inode->i_state & I_DIRTY))
 			ufs_sync_inode (inode);
-		blk_run_queues();
+		blk_run_address_space(inode->i_mapping);
 		yield();
 	}
 	offset = inode->i_size & uspi->s_fshift;

@@ -368,9 +368,8 @@ static inline void reset_page(struct mm_page *page)
 	page->biotail = & page->bio;
 }
 
-static void mm_unplug_device(void *data)
+static void mm_unplug_device(request_queue_t *q)
 {
-	request_queue_t *q = data;
 	struct cardinfo *card = q->queuedata;
 	unsigned long flags;
 

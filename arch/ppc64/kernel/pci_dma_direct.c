@@ -18,6 +18,7 @@
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/mm.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/sections.h>
 #include <asm/io.h>
@@ -49,18 +50,18 @@ static void pci_direct_free_consistent(struct pci_dev *hwdev, size_t size,
 }
 
 static dma_addr_t pci_direct_map_single(struct pci_dev *hwdev, void *ptr,
-				  size_t size, int direction)
+		size_t size, enum dma_data_direction direction)
 {
 	return virt_to_abs(ptr);
 }
 
 static void pci_direct_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-			      size_t size, int direction)
+		size_t size, enum dma_data_direction direction)
 {
 }
 
 static int pci_direct_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-		       int nents, int direction)
+		int nents, enum dma_data_direction direction)
 {
 	int i;
 
@@ -73,7 +74,7 @@ static int pci_direct_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 }
 
 static void pci_direct_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			  int nents, int direction)
+		int nents, enum dma_data_direction direction)
 {
 }
 

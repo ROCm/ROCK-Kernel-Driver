@@ -21,26 +21,7 @@
 #include <asm/linkage.h>
 #include <asm/asm-offsets.h>
 #include <asm/thread_info.h>
-			
-ENOSYS = 38
-
-LSIGTRAP = 5
-
-SOFTIRQ_PENDING = 0
-		
-/* the following macro is used when enabling interrupts */
-
-LER4	=	0
-LER5	=	4
-LER6	=	8
-LER3	=	12
-LER2	=	16
-LER1	=	20
-LORIG	=	24
-LCCR	=	28
-LER0	=	30
-LVEC	=	34
-LRET	=	38
+#include <asm/errno.h>
 
 	.h8300h
 
@@ -188,7 +169,7 @@ SYMBOL_NAME_LABEL(interrupt_entry)
 	mov.l	sp,er1
 	subs	#4,er1				/* adjust ret_pc */
 	jsr	@SYMBOL_NAME(process_int)
-	mov.l	@SYMBOL_NAME(irq_stat)+SOFTIRQ_PENDING,er0
+	mov.l	@SYMBOL_NAME(irq_stat)+CPUSTAT_SOFTIRQ_PENDING,er0
 	beq	1f
 	jsr	@SYMBOL_NAME(do_softirq)
 1:

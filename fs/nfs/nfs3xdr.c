@@ -515,7 +515,7 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 	}
 
 	pglen = rcvbuf->page_len;
-	recvd = req->rq_received - hdrlen;
+	recvd = rcvbuf->len - hdrlen;
 	if (pglen > recvd)
 		pglen = recvd;
 	page = rcvbuf->pages;
@@ -536,16 +536,16 @@ nfs3_xdr_readdirres(struct rpc_rqst *req, u32 *p, struct nfs3_readdirres *res)
 
 		if (res->plus) {
 			/* post_op_attr */
-			if (p > end)
+			if (p + 2 > end)
 				goto short_pkt;
 			if (*p++) {
 				p += 21;
-				if (p > end)
+				if (p + 1 > end)
 					goto short_pkt;
 			}
 			/* post_op_fh3 */
 			if (*p++) {
-				if (p > end)
+				if (p + 1 > end)
 					goto short_pkt;
 				len = ntohl(*p++);
 				if (len > NFS3_FHSIZE) {
@@ -758,7 +758,7 @@ nfs3_xdr_readlinkres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
 static int
 nfs3_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 {
-	struct iovec *iov = req->rq_rvec;
+	struct iovec *iov = req->rq_rcv_buf.head;
 	int	status, count, ocount, recvd, hdrlen;
 
 	status = ntohl(*p++);
@@ -789,7 +789,7 @@ nfs3_xdr_readres(struct rpc_rqst *req, u32 *p, struct nfs_readres *res)
 		xdr_shift_buf(&req->rq_rcv_buf, iov->iov_len - hdrlen);
 	}
 
-	recvd = req->rq_received - hdrlen;
+	recvd = req->rq_rcv_buf.len - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
 			"count %d > recvd %d\n", count, recvd);

@@ -310,7 +310,7 @@ beyond_if:
 	orig_thr_flags = current_thread_info()->flags;
 	current_thread_info()->flags |= _TIF_32BIT;
 
-	retval = setup_arg_pages(bprm);
+	retval = setup_arg_pages(bprm, EXSTACK_DEFAULT);
 	if (retval < 0) { 
 		current_thread_info()->flags = orig_thr_flags;
 

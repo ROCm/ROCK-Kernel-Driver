@@ -60,8 +60,6 @@ char phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;
 
-/* which CPU (physical APIC ID) maps to which logical CPU number */
-volatile char x86_apicid_to_cpu[NR_CPUS];
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile char x86_cpu_to_apicid[NR_CPUS];
 
@@ -580,8 +578,6 @@ static void __init do_boot_cpu (int apicid)
 		panic("failed fork for CPU %d", cpu);
 	wake_up_forked_process(idle);	
 	x86_cpu_to_apicid[cpu] = apicid;
-	x86_apicid_to_cpu[apicid] = cpu;
-
 
 	/*
 	 * We remove it from the pidhash and the runqueue
@@ -735,7 +731,7 @@ static void smp_tune_scheduling (void)
 
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
-	unsigned apicid, cpu;
+	unsigned apicid, cpu, bit, kicked;
 
 	nmi_watchdog_default();
 
@@ -820,11 +816,13 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	Dprintk("CPU present map: %lx\n", physids_coerce(phys_cpu_present_map));
 
-	for (apicid = 0; apicid < NR_CPUS; apicid++) {
+	kicked = 1;
+	for (bit = 0; kicked < NR_CPUS && bit < MAX_APICS; bit++) {
+		apicid = cpu_present_to_apicid(bit);
 		/*
 		 * Don't even attempt to start the boot CPU!
 		 */
-		if (apicid == boot_cpu_id)
+		if (apicid == boot_cpu_id || (apicid == BAD_APICID))
 			continue;
 
 		if (!cpu_isset(apicid, phys_cpu_present_map))
@@ -833,6 +831,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			continue;
 
 		do_boot_cpu(apicid);
+		++kicked;
 	}
 
 	/*

@@ -1,8 +1,8 @@
 #ifndef _PPC64_CACHEFLUSH_H
 #define _PPC64_CACHEFLUSH_H
 
-/* Keep includes the same across arches.  */
 #include <linux/mm.h>
+#include <asm/cputable.h>
 
 /*
  * No cache flushing is required when address mappings are
@@ -18,7 +18,7 @@
 #define flush_cache_vunmap(start, end)		do { } while (0)
 
 extern void flush_dcache_page(struct page *page);
-extern void flush_icache_range(unsigned long, unsigned long);
+extern void __flush_icache_range(unsigned long, unsigned long);
 extern void flush_icache_user_range(struct vm_area_struct *vma,
 				    struct page *page, unsigned long addr,
 				    int len);
@@ -34,5 +34,11 @@ do { memcpy(dst, src, len); \
 	memcpy(dst, src, len)
 
 extern void __flush_dcache_icache(void *page_va);
+
+static inline void flush_icache_range(unsigned long start, unsigned long stop)
+{
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE))
+		__flush_icache_range(start, stop);
+}
 
 #endif /* _PPC64_CACHEFLUSH_H */

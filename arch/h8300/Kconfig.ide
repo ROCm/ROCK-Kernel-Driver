@@ -14,7 +14,7 @@ config H8300_IDE_ALT
 	help
 	  IDE alternate registers address
 
-config H8300_IDE_IRQNO
+config H8300_IDE_IRQ
 	int "IDE IRQ no"
 	depends on IDE
 	help

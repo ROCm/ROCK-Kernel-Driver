@@ -380,9 +380,7 @@ static void shm_get_stat(unsigned long *rss, unsigned long *swp)
 
 		if (is_file_hugepages(shp->shm_file)) {
 			struct address_space *mapping = inode->i_mapping;
-			spin_lock(&mapping->page_lock);
 			*rss += (HPAGE_SIZE/PAGE_SIZE)*mapping->nrpages;
-			spin_unlock(&mapping->page_lock);
 		} else {
 			struct shmem_inode_info *info = SHMEM_I(inode);
 			spin_lock(&info->lock);

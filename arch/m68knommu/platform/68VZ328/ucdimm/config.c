@@ -99,11 +99,11 @@ void config_BSP(char *command, int len)
 {
 	unsigned char *p;
 
-	printk("\n68VZ328 DragonBallVZ support (c) 2001 Lineo, Inc.\n");
+	printk(KERN_INFO "\n68VZ328 DragonBallVZ support (c) 2001 Lineo, Inc.\n");
 
-	printk("uCdimm serial string [%s]\n",getserialnum());
+	printk(KERN_INFO "uCdimm serial string [%s]\n",getserialnum());
 	p = cs8900a_hwaddr = gethwaddr(0);
-	printk("uCdimm hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
+	printk(KERN_INFO "uCdimm hwaddr %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
 		p[0], p[1], p[2], p[3], p[4], p[5]);
 	p = getbenv("APPEND");
 	if (p) strcpy(p,command);

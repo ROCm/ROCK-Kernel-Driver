@@ -11,8 +11,8 @@ config CPU_FREQ
 	  fly. This is a nice method to save battery power on notebooks,
 	  because the lower the clock speed, the less power the CPU consumes.
 
-	  For more information, take a look at linux/Documentation/cpu-freq or
-	  at <http://www.codemonkey.org.uk/projects/cpufreq/>
+	  For more information, take a look at <file:Documentation/cpu-freq/>
+	  or at <http://www.codemonkey.org.uk/projects/cpufreq/>
 
 	  If in doubt, say N.
 
@@ -38,7 +38,7 @@ config X86_ACPI_CPUFREQ
 	  This driver adds a CPUFreq driver which utilizes the ACPI
 	  Processor Performance States.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -63,7 +63,7 @@ config ELAN_CPUFREQ
 	  parameter: elanfreq=maxspeed (in kHz) or as module
 	  parameter "max_freq".
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -74,7 +74,7 @@ config X86_POWERNOW_K6
 	  This adds the CPUFreq driver for mobile AMD K6-2+ and mobile
 	  AMD K6-3+ processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -84,7 +84,7 @@ config X86_POWERNOW_K7
 	help
 	  This adds the CPUFreq driver for mobile AMD K7 mobile processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -94,7 +94,7 @@ config X86_POWERNOW_K8
 	help
 	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -105,7 +105,7 @@ config X86_GX_SUSPMOD
 	 This add the CPUFreq driver for NatSemi Geode processors which
 	 support suspend modulation.
 
-	 For details, take a look at linux/Documentation/cpu-freq.
+	 For details, take a look at <file:Documentation/cpu-freq/>.
 
 	 If in doubt, say N.
 
@@ -116,7 +116,7 @@ config X86_SPEEDSTEP_CENTRINO
 	  This adds the CPUFreq driver for Enhanced SpeedStep enabled
 	  mobile CPUs.  This means Intel Pentium M (Centrino) CPUs.
 	  
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 	  
 	  If in doubt, say N.
 
@@ -129,7 +129,7 @@ config X86_SPEEDSTEP_ICH
 	  mobile Intel Pentium 4 P4-M on systems which have an Intel ICH2, 
 	  ICH3 or ICH4 southbridge.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -141,7 +141,7 @@ config X86_SPEEDSTEP_SMI
 	  (Coppermine), all mobile Intel Pentium III-M (Tualatin)  
 	  on systems which have an Intel 440BX/ZX/MX southbridge.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -152,7 +152,7 @@ config X86_P4_CLOCKMOD
 	  This adds the CPUFreq driver for Intel Pentium 4 / XEON
 	  processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -168,7 +168,7 @@ config X86_LONGRUN
 	  This adds the CPUFreq driver for Transmeta Crusoe processors which
 	  support LongRun.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 
@@ -180,7 +180,7 @@ config X86_LONGHAUL
 	  VIA Cyrix Samuel/C3, VIA Cyrix Ezra and VIA Cyrix Ezra-T 
 	  processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.
 

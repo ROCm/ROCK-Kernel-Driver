@@ -1779,9 +1779,9 @@ static int it8172_open(struct inode *inode, struct file *file)
     
 #ifdef IT8172_VERBOSE_DEBUG
 	if (file->f_flags & O_NONBLOCK)
-		dbg(__FUNCTION__ ": non-blocking");
+		dbg("%s: non-blocking", __FUNCTION__);
 	else
-		dbg(__FUNCTION__ ": blocking");
+		dbg("%s: blocking", __FUNCTION__);
 #endif
 	
 	for (list = devs.next; ; list = list->next) {

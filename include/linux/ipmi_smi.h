@@ -35,6 +35,8 @@
 #define __LINUX_IPMI_SMI_H
 
 #include <linux/ipmi_msgdefs.h>
+#include <linux/proc_fs.h>
+#include <linux/module.h>
 
 /* This files describes the interface for IPMI system management interface
    drivers to bind into the IPMI message handler. */
@@ -48,7 +50,7 @@ typedef struct ipmi_smi *ipmi_smi_t;
  * been received, it will report this same data structure back up to
  * the upper layer.  If an error occurs, it should fill in the
  * response with an error code in the completion code location. When
- * asyncronous data is received, one of these is allocated, the
+ * asynchronous data is received, one of these is allocated, the
  * data_size is set to zero and the response holds the data from the
  * get message or get event command that the interface initiated.
  * Note that it is the interfaces responsibility to detect
@@ -61,9 +63,6 @@ struct ipmi_smi_msg
 
 	long    msgid;
 	void    *user_data;
-
-	/* If 0, add to the end of the queue.  If 1, add to the beginning. */
-	int     prio;
 
 	int           data_size;
 	unsigned char data[IPMI_MAX_MSG_LENGTH];
@@ -133,5 +132,12 @@ static inline void ipmi_free_smi_msg(struct ipmi_smi_msg *msg)
 {
 	msg->done(msg);
 }
+
+/* Allow the lower layer to add things to the proc filesystem
+   directory for this interface.  Note that the entry will
+   automatically be dstroyed when the interface is destroyed. */
+int ipmi_smi_add_proc_entry(ipmi_smi_t smi, char *name,
+			    read_proc_t *read_proc, write_proc_t *write_proc,
+			    void *data, struct module *owner);
 
 #endif /* __LINUX_IPMI_SMI_H */

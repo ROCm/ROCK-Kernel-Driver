@@ -91,7 +91,7 @@ config PARIDE_PG
 	  driver. See <file:include/linux/pg.h>. for details.
 
 	  You can obtain the most recent version of cdrtools from
-	  <ftp://ftp.fokus.gmd.de/pub/unix/cdrecord/>. Versions 1.6.1a3 and
+	  <ftp://ftp.berlios.de/pub/cdrecord/>. Versions 1.6.1a3 and
 	  later fully support this driver.
 
 comment "Parallel IDE protocol modules"

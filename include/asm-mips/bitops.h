@@ -296,7 +296,7 @@ static inline int __test_and_clear_bit(unsigned long nr,
 }
 
 /*
- * test_and_change_bit - Change a bit and return its new value
+ * test_and_change_bit - Change a bit and return its old value
  * @nr: Bit to change
  * @addr: Address to count from
  *
@@ -567,7 +567,7 @@ static inline int __test_and_clear_bit(unsigned long nr,
 }
 
 /*
- * test_and_change_bit - Change a bit and return its new value
+ * test_and_change_bit - Change a bit and return its old value
  * @nr: Bit to change
  * @addr: Address to count from
  *

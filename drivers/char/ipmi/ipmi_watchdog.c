@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/ipmi.h>
 #include <linux/ipmi_smi.h>
 #include <linux/watchdog.h>
@@ -49,6 +50,8 @@
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
+
+#define IPMI_WATCHDOG_VERSION "v31"
 
 /*
  * The IPMI command/response information for the watchdog timer.
@@ -137,26 +140,41 @@ static int pretimeout = 0;
 /* Default action is to reset the board on a timeout. */
 static unsigned char action_val = WDOG_TIMEOUT_RESET;
 
-static char *action = "reset";
+static char action[16] = "reset";
 
 static unsigned char preaction_val = WDOG_PRETIMEOUT_NONE;
 
-static char *preaction = "pre_none";
+static char preaction[16] = "pre_none";
 
 static unsigned char preop_val = WDOG_PREOP_NONE;
 
-static char *preop = "preop_none";
+static char preop[16] = "preop_none";
 static spinlock_t ipmi_read_lock = SPIN_LOCK_UNLOCKED;
 static char data_to_read = 0;
 static DECLARE_WAIT_QUEUE_HEAD(read_q);
 static struct fasync_struct *fasync_q = NULL;
 static char pretimeout_since_last_heartbeat = 0;
 
-MODULE_PARM(timeout, "i");
-MODULE_PARM(pretimeout, "i");
-MODULE_PARM(action, "s");
-MODULE_PARM(preaction, "s");
-MODULE_PARM(preop, "s");
+/* If true, the driver will start running as soon as it is configured
+   and ready. */
+static int start_now = 0;
+
+module_param(timeout, int, 0);
+MODULE_PARM_DESC(timeout, "Timeout value in seconds.");
+module_param(pretimeout, int, 0);
+MODULE_PARM_DESC(pretimeout, "Pretimeout value in seconds.");
+module_param_string(action, action, sizeof(action), 0);
+MODULE_PARM_DESC(action, "Timeout action. One of: "
+		 "reset, none, power_cycle, power_off.");
+module_param_string(preaction, preaction, sizeof(preaction), 0);
+MODULE_PARM_DESC(preaction, "Pretimeout action.  One of: "
+		 "pre_none, pre_smi, pre_nmi, pre_int.");
+module_param_string(preop, preop, sizeof(preop), 0);
+MODULE_PARM_DESC(preop, "Pretimeout driver operation.  One of: "
+		 "preop_none, preop_panic, preop_give_data.");
+module_param(start_now, int, 0);
+MODULE_PARM_DESC(start_now, "Set to 1 to start the watchdog as"
+		 "soon as the driver is loaded.");
 
 /* Default state of the timer. */
 static unsigned char ipmi_watchdog_state = WDOG_TIMEOUT_NONE;
@@ -166,10 +184,6 @@ static int ipmi_ignore_heartbeat = 0;
 
 /* Is someone using the watchdog?  Only one user is allowed. */
 static int ipmi_wdog_open = 0;
-
-/* If true, the driver will start running as soon as it is configured
-   and ready. */
-static int start_now = 0;
 
 /* If set to 1, the heartbeat command will set the state to reset and
    start the timer.  The timer doesn't normally run when the driver is
@@ -260,6 +274,7 @@ static int i_ipmi_set_timeout(struct ipmi_smi_msg  *smi_msg,
 				      (struct ipmi_addr *) &addr,
 				      0,
 				      &msg,
+				      NULL,
 				      smi_msg,
 				      recv_msg,
 				      1);
@@ -435,6 +450,7 @@ static int ipmi_heartbeat(void)
 				      (struct ipmi_addr *) &addr,
 				      0,
 				      &msg,
+				      NULL,
 				      &heartbeat_smi_msg,
 				      &heartbeat_recv_msg,
 				      1);
@@ -483,6 +499,7 @@ static void panic_halt_ipmi_heartbeat(void)
 				 (struct ipmi_addr *) &addr,
 				 0,
 				 &msg,
+				 NULL,
 				 &panic_halt_heartbeat_smi_msg,
 				 &panic_halt_heartbeat_recv_msg,
 				 1);
@@ -903,6 +920,7 @@ static void ipmi_smi_gone(int if_num)
 
 static struct ipmi_smi_watcher smi_watcher =
 {
+	.owner    = THIS_MODULE,
 	.new_smi  = ipmi_new_smi,
 	.smi_gone = ipmi_smi_gone
 };
@@ -910,6 +928,9 @@ static struct ipmi_smi_watcher smi_watcher =
 static int __init ipmi_wdog_init(void)
 {
 	int rv;
+
+	printk(KERN_INFO "IPMI watchdog driver version "
+	       IPMI_WATCHDOG_VERSION "\n");
 
 	if (strcmp(action, "reset") == 0) {
 		action_val = WDOG_TIMEOUT_RESET;
@@ -999,14 +1020,10 @@ static int __init ipmi_wdog_init(void)
 	register_reboot_notifier(&wdog_reboot_notifier);
 	notifier_chain_register(&panic_notifier_list, &wdog_panic_notifier);
 
-	printk(KERN_INFO "IPMI watchdog by "
-	       "Corey Minyard (minyard@mvista.com)\n");
-
 	return 0;
 }
 
-#ifdef MODULE
-static void ipmi_unregister_watchdog(void)
+static __exit void ipmi_unregister_watchdog(void)
 {
 	int rv;
 
@@ -1034,6 +1051,7 @@ static void ipmi_unregister_watchdog(void)
 	   pointers to our buffers, we want to make sure they are done before
 	   we release our memory. */
 	while (atomic_read(&set_timeout_tofree)) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 	}
 
@@ -1056,76 +1074,6 @@ static void __exit ipmi_wdog_exit(void)
 	ipmi_unregister_watchdog();
 }
 module_exit(ipmi_wdog_exit);
-#else
-static int __init ipmi_wdog_setup(char *str)
-{
-	int  val;
-	int  rv;
-	char *option;
-
-	rv = get_option(&str, &val);
-	if (rv == 0)
-		return 1;
-	if (val > 0)
-		timeout = val;
-	if (rv == 1)
-		return 1;
-
-	rv = get_option(&str, &val);
-	if (rv == 0)
-		return 1;
-	if (val >= 0)
-		pretimeout = val;
-	if (rv == 1)
-		return 1;
-
-	while ((option = strsep(&str, ",")) != NULL) {
-		if (strcmp(option, "reset") == 0) {
-			action = "reset";
-		}
-		else if (strcmp(option, "none") == 0) {
-			action = "none";
-		}
-		else if (strcmp(option, "power_cycle") == 0) {
-			action = "power_cycle";
-		}
-		else if (strcmp(option, "power_off") == 0) {
-			action = "power_off";
-		}
-		else if (strcmp(option, "pre_none") == 0) {
-			preaction = "pre_none";
-		}
-		else if (strcmp(option, "pre_smi") == 0) {
-			preaction = "pre_smi";
-		}
-#ifdef HAVE_NMI_HANDLER
-		else if (strcmp(option, "pre_nmi") == 0) {
-			preaction = "pre_nmi";
-		}
-#endif
-		else if (strcmp(option, "pre_int") == 0) {
-			preaction = "pre_int";
-		}
-		else if (strcmp(option, "start_now") == 0) {
-			start_now = 1;
-		}
-		else if (strcmp(option, "preop_none") == 0) {
-			preop = "preop_none";
-		}
-		else if (strcmp(option, "preop_panic") == 0) {
-			preop = "preop_panic";
-		}
-		else if (strcmp(option, "preop_give_data") == 0) {
-			preop = "preop_give_data";
-		} else {
-		    printk("Unknown IPMI watchdog option: '%s'\n", option);
-		}
-	}
-
-	return 1;
-}
-__setup("ipmi_wdog=", ipmi_wdog_setup);
-#endif
 
 EXPORT_SYMBOL(ipmi_delayed_shutdown);
 

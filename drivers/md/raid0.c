@@ -25,6 +25,21 @@
 #define MD_DRIVER
 #define MD_PERSONALITY
 
+static void raid0_unplug(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+	raid0_conf_t *conf = mddev_to_conf(mddev);
+	mdk_rdev_t **devlist = conf->strip_zone[0].dev;
+	int i;
+
+	for (i=0; i<mddev->raid_disks; i++) {
+		request_queue_t *r_queue = bdev_get_queue(devlist[i]->bdev);
+
+		if (r_queue->unplug_fn)
+			r_queue->unplug_fn(r_queue);
+	}
+}
+
 static int create_strip_zones (mddev_t *mddev)
 {
 	int i, c, j;
@@ -202,6 +217,8 @@ static int create_strip_zones (mddev_t *mddev)
 			conf->hash_spacing = sz;
 	}
 
+	mddev->queue->unplug_fn = raid0_unplug;
+
 	printk("raid0: done.\n");
 	return 0;
  abort:
@@ -219,7 +236,7 @@ static int create_strip_zones (mddev_t *mddev)
 static int raid0_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_vec *biovec)
 {
 	mddev_t *mddev = q->queuedata;
-	sector_t sector = bio->bi_sector;
+	sector_t sector = bio->bi_sector + get_start_sect(bio->bi_bdev);
 	int max;
 	unsigned int chunk_sectors = mddev->chunk_size >> 9;
 	unsigned int bio_sectors = bio->bi_size >> 9;

@@ -13,6 +13,7 @@ SECTIONS
   .text : {
 	*(.head)
 	*(.text)
+	SCHED_TEXT
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x4e75

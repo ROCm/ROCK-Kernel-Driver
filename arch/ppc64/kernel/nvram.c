@@ -32,7 +32,7 @@
 #include <asm/prom.h>
 #include <asm/machdep.h>
 
-#define DEBUG_NVRAM
+#undef DEBUG_NVRAM
 
 static int nvram_scan_partitions(void);
 static int nvram_setup_partition(void);
@@ -199,7 +199,7 @@ static struct miscdevice nvram_dev = {
 };
 
 
-
+#ifdef DEBUG_NVRAM
 static void nvram_print_partitions(char * label)
 {
 	struct list_head * p;
@@ -215,6 +215,7 @@ static void nvram_print_partitions(char * label)
 		       tmp_part->header.name);
 	}
 }
+#endif
 
 
 static int nvram_write_header(struct nvram_partition * part)

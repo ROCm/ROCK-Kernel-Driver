@@ -160,6 +160,9 @@ video_fix_command(unsigned int cmd)
 	case VIDIOC_G_AUDOUT_OLD:
 		cmd = VIDIOC_G_AUDOUT;
 		break;
+	case VIDIOC_CROPCAP_OLD:
+		cmd = VIDIOC_CROPCAP;
+		break;
 	}
 	return cmd;
 }

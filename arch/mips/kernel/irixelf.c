@@ -688,7 +688,7 @@ static int load_irix_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	 * change some of these later.
 	 */
 	current->mm->rss = 0;
-	setup_arg_pages(bprm);
+	setup_arg_pages(bprm, EXSTACK_DEFAULT);
 	current->mm->start_stack = bprm->p;
 
 	/* At this point, we assume that the image should be loaded at

@@ -139,20 +139,20 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 
 /* stolen from fs/buffer.c */
 void reiserfs_unmap_buffer(struct buffer_head *bh) {
-  if (buffer_mapped(bh)) {
+    lock_buffer(bh) ;
     if (buffer_journaled(bh) || buffer_journal_dirty(bh)) {
       BUG() ;
     }
     clear_buffer_dirty(bh) ;
-    lock_buffer(bh) ;
     /* Remove the buffer from whatever list it belongs to. We are mostly
        interested in removing it from per-sb j_dirty_buffers list, to avoid
         BUG() on attempt to write not mapped buffer */
-    if ( !list_empty(&bh->b_assoc_buffers) && bh->b_page) {
+    if ( (!list_empty(&bh->b_assoc_buffers) || bh->b_private) && bh->b_page) {
 	struct inode *inode = bh->b_page->mapping->host;
 	struct reiserfs_journal *j = SB_JOURNAL(inode->i_sb);
 	spin_lock(&j->j_dirty_buffers_lock);
 	list_del_init(&bh->b_assoc_buffers);
+	reiserfs_free_jh(bh);
 	spin_unlock(&j->j_dirty_buffers_lock);
     }
     clear_buffer_mapped(bh) ;
@@ -160,7 +160,6 @@ void reiserfs_unmap_buffer(struct buffer_head *bh) {
     clear_buffer_new(bh);
     bh->b_bdev = NULL;
     unlock_buffer(bh) ;
-  }
 }
 
 static void
