@@ -9,7 +9,6 @@
 #include <linux/crypto.h>
 #include <linux/pfkeyv2.h>
 #include <linux/in6.h>
-#include <linux/slab.h>
 
 #include <net/sock.h>
 #include <net/dst.h>
@@ -539,7 +538,6 @@ struct sec_decap_state {
 
 struct sec_path
 {
-	kmem_cache_t		*pool;
 	atomic_t		refcnt;
 	int			len;
 	struct sec_decap_state	x[XFRM_MAX_DEPTH];
@@ -561,6 +559,8 @@ secpath_put(struct sec_path *sp)
 	if (sp && atomic_dec_and_test(&sp->refcnt))
 		__secpath_destroy(sp);
 }
+
+extern struct sec_path *secpath_dup(struct sec_path *src);
 
 static inline int
 __xfrm4_state_addr_cmp(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
@@ -818,8 +818,7 @@ extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy
 extern int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport);
 extern void km_policy_expired(struct xfrm_policy *pol, int dir, int hard);
 
-extern void xfrm4_input_init(void);
-extern void xfrm6_input_init(void);
+extern void xfrm_input_init(void);
 extern int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq);
 
 extern void xfrm_probe_algs(void);
