@@ -217,7 +217,7 @@ tapeblock_release(struct inode *inode, struct file *filp) {
 	s390irq_spin_lock_irqsave (ti->devinfo.irq, lockflags);
 	tapestate_set (ti, TS_UNUSED);
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
-	invalidate_buffers(inode->i_rdev);
+	invalidate_bdev(inode->i_bdev, 0);
 	return 0;
 }
 

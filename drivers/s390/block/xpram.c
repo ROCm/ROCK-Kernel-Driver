@@ -655,7 +655,7 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 
 	case BLKFLSBUF: /* flush, 0x1261 */
 		fsync_bdev(inode->i_bdev);
-		if ( capable(CAP_SYS_ADMIN) )invalidate_buffers(inode->i_rdev);
+		if ( capable(CAP_SYS_ADMIN) )invalidate_bdev(inode->i_bdev, 0);
 		return 0;
 
 	case BLKRRPART: /* re-read partition table: can't do it, 0x1259 */
