@@ -1566,16 +1566,8 @@ static int dump_rule(char *buffer,
 
 /* File offset is actually in records, not bytes. */
 static int ip_chain_procinfo(char *buffer, char **start,
-			     off_t offset, int length
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,29)
-			     , int reset
-#endif
-	)
+			     off_t offset, int length)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,29)
-	/* FIXME: No more `atomic' read and reset.  Wonderful 8-( --RR */
-	int reset = 0;
-#endif
 	struct ip_chain *i;
 	struct ip_fwkernel *j = ip_fw_chains->chain;
 	unsigned long flags;
@@ -1612,9 +1604,6 @@ static int ip_chain_procinfo(char *buffer, char **start,
 				len = last_len;
 				goto outside;
 			}
-			else if (reset)
-				memset(j->counters, 0,
-				       sizeof(struct ip_counters)*NUM_SLOTS);
 		}
 	}
 outside:
