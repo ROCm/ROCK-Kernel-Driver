@@ -826,49 +826,31 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	return dev;
 }
 
-// usbcore-internal ...
-// but usb_dec_dev_use() is #defined to this, and that's public!!
-// FIXME the public call should BUG() whenever count goes to zero,
-// the usbcore-internal one should do so _unless_ it does so...
+/**
+ * usb_free_dev - free a usb device structure (usbcore-internal)
+ * @dev: device that's been disconnected
+ * Context: !in_interrupt ()
+ *
+ * Used by hub and virtual root hub drivers.  The device is completely
+ * gone, everything is cleaned up, so it's time to get rid of these last
+ * records of this device.
+ */
 void usb_free_dev(struct usb_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt)) {
-		/* Normally only goes to zero in usb_disconnect(), from
-		 * khubd or from roothub shutdown (rmmod/apmd/... thread).
-		 * Abnormally, roothub init errors can happen, so HCDs
-		 * call this directly.
-		 *
-		 * Otherwise this is a nasty device driver bug, often in
-		 * disconnect processing.
+	if (in_interrupt ())
+		BUG ();
+	if (!atomic_dec_and_test (&dev->refcnt)) {
+		/* MUST go to zero here, else someone's hanging on to
+		 * a device that's supposed to have been cleaned up!!
 		 */
-		if (in_interrupt ())
-			BUG ();
-
-		dev->bus->op->deallocate(dev);
-		usb_destroy_configuration(dev);
-
-		usb_bus_put(dev->bus);
-
-		kfree(dev);
+		BUG ();
 	}
-}
 
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Device drivers should normally record such references in their
- * open() methods.
- * Drivers should then release them, using usb_dec_dev_use(), in their
- * close() methods.
- */
-void usb_inc_dev_use(struct usb_device *dev)
-{
-	atomic_inc(&dev->refcnt);
+	dev->bus->op->deallocate (dev);
+	usb_destroy_configuration (dev);
+	usb_bus_put (dev->bus);
+	kfree (dev);
 }
-
 
 /**
  * usb_alloc_urb - creates a new urb for a USB driver to use

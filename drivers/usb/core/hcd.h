@@ -181,6 +181,24 @@ extern int usb_hcd_pci_resume (struct pci_dev *dev);
 
 #endif /* CONFIG_PCI */
 
+/* -------------------------------------------------------------------------- */
+
+/* Enumeration is only for the hub driver, or HCD virtual root hubs */
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
+	struct usb_bus *);
+extern void usb_free_dev(struct usb_device *);
+extern int usb_new_device(struct usb_device *dev);
+extern void usb_connect(struct usb_device *dev);
+extern void usb_disconnect(struct usb_device **);
+
+#ifndef _LINUX_HUB_H
+/* exported to hub driver ONLY to support usb_reset_device () */
+extern int usb_get_configuration(struct usb_device *dev);
+extern void usb_set_maxpacket(struct usb_device *dev);
+extern void usb_destroy_configuration(struct usb_device *dev);
+extern int usb_set_address(struct usb_device *dev);
+#endif /* _LINUX_HUB_H */
+
 /*-------------------------------------------------------------------------*/
 
 /*

@@ -964,24 +964,6 @@ struct usb_tt {
 
 /* -------------------------------------------------------------------------- */
 
-/* Enumeration is only for the hub driver, or HCD virtual root hubs */
-extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
-	struct usb_bus *);
-extern void usb_free_dev(struct usb_device *);
-extern int usb_new_device(struct usb_device *dev);
-extern void usb_connect(struct usb_device *dev);
-extern void usb_disconnect(struct usb_device **);
-
-#ifndef _LINUX_HUB_H
-/* exported to hub driver ONLY to support usb_reset_device () */
-extern int usb_get_configuration(struct usb_device *dev);
-extern void usb_set_maxpacket(struct usb_device *dev);
-extern void usb_destroy_configuration(struct usb_device *dev);
-extern int usb_set_address(struct usb_device *dev);
-#endif /* _LINUX_HUB_H */
-
-/* -------------------------------------------------------------------------- */
-
 /* This is arbitrary.
  * From USB 2.0 spec Table 11-13, offset 7, a hub can
  * have up to 255 ports. The most yet reported is 10.
@@ -1050,9 +1032,49 @@ extern int usb_reset_device(struct usb_device *dev);
 /* for drivers using iso endpoints */
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
 
-/* drivers must track when they bind to a device's interfaces */
-extern void usb_inc_dev_use(struct usb_device *);
-#define usb_dec_dev_use usb_free_dev
+/**
+ * usb_inc_dev_use - record another reference to a device
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them usb_dec_dev_use(), in their disconnect() methods.
+ */
+static inline void usb_inc_dev_use (struct usb_device *dev)
+{
+	atomic_inc (&dev->refcnt);
+}
+
+/**
+ * usb_dec_dev_use - drop a reference to a device
+ * @dev: the device no longer being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Drivers for USB interfaces should normally release such references in
+ * their disconnect() methods, and record them in probe().
+ *
+ * Note that driver disconnect() methods must guarantee that when they
+ * return, all of their outstanding references to the device (and its
+ * interfaces) are cleaned up.  That means that all pending URBs from
+ * this driver must have completed, and that no more copies of the device
+ * handle are saved in driver records (including other kernel threads).
+ */
+static inline void usb_dec_dev_use (struct usb_device *dev)
+{
+	if (atomic_dec_and_test (&dev->refcnt)) {
+		/* May only go to zero when usbcore finishes
+		 * usb_disconnect() processing:  khubd or HCDs.
+		 *
+		 * If you hit this BUG() it's likely a problem
+		 * with some driver's disconnect() routine.
+		 */
+		BUG ();
+	}
+}
+
 
 /* used these for multi-interface device registration */
 extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
