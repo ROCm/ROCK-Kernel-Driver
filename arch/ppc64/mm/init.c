@@ -765,6 +765,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	pte_t *ptep;
 	int local = 0;
 	cpumask_t tmp;
+	unsigned long flags;
 
 	/* handle i-cache coherency */
 	if (!(cur_cpu_spec->cpu_features & CPU_FTR_COHERENT_ICACHE) &&
@@ -798,8 +799,10 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	if (cpus_equal(vma->vm_mm->cpu_vm_mask, tmp))
 		local = 1;
 
+	local_irq_save(flags);
 	__hash_page(ea, pte_val(pte) & (_PAGE_USER|_PAGE_RW), vsid, ptep,
 		    0x300, local);
+	local_irq_restore(flags);
 }
 
 void * reserve_phb_iospace(unsigned long size)
