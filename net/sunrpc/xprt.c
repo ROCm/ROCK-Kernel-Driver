@@ -147,7 +147,7 @@ __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 		dprintk("RPC: %4d TCP write queue full\n", task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
-		if (task->tk_rqstp->rq_nresend)
+		if (task->tk_rqstp && task->tk_rqstp->rq_nresend)
 			rpc_sleep_on(&xprt->resend, task, NULL, NULL);
 		else
 			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
