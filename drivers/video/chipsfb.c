@@ -562,7 +562,7 @@ static void __init init_chips(struct fb_info_chips *p)
 	}
 
 	printk("fb%d: Chips 65550 frame buffer (%dK RAM detected)\n",
-		GET_FB_IDX(p->info.node), p->fix.smem_len / 1024);
+		minor(p->info.node), p->fix.smem_len / 1024);
 
 	chips_hw_init(p);
 

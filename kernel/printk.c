@@ -560,6 +560,7 @@ void console_conditional_schedule(void)
 		schedule();
 	}
 }
+EXPORT_SYMBOL(console_conditional_schedule);
 
 void console_print(const char *s)
 {

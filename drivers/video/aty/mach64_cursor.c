@@ -11,8 +11,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-
 #ifdef __sparc__
 #include <asm/pbm.h>
 #include <asm/fbio.h>
@@ -20,11 +18,6 @@
 
 #include <video/mach64.h>
 #include "atyfb.h"
-
-
-#define DEFAULT_CURSOR_BLINK_RATE	(20)
-#define CURSOR_DRAW_DELAY		(2)
-
 
     /*
      *  Hardware Cursor support.
@@ -51,50 +44,48 @@ void aty_set_cursor_color(struct fb_info *info)
 	const u8 *red = cursor_color_map;
 	const u8 *green = cursor_color_map;
 	const u8 *blue = cursor_color_map;
-	int i;
+	u32 fg_color, bg_color;
 
 	if (!c)
 		return;
 
 #ifdef __sparc__
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
+	if (par->mmaped)
 		return;
 #endif
+	fg_color = (u32) red[0] << 24;
+	fg_color |= (u32) green[0] << 16;
+	fg_color |= (u32) blue[0] << 8;
+	fg_color |= (u32) pixel[0];
 
-	for (i = 0; i < 2; i++) {
-		c->color[i] = (u32) red[i] << 24;
-		c->color[i] |= (u32) green[i] << 16;
-		c->color[i] |= (u32) blue[i] << 8;
-		c->color[i] |= (u32) pixel[i];
-	}
+	bg_color = (u32) red[1] << 24;
+	bg_color |= (u32) green[1] << 16;
+	bg_color |= (u32) blue[1] << 8;
+	bg_color |= (u32) pixel[1];
 
 	wait_for_fifo(2, par);
-	aty_st_le32(CUR_CLR0, c->color[0], par);
-	aty_st_le32(CUR_CLR1, c->color[1], par);
+	aty_st_le32(CUR_CLR0, fg_color, par);
+	aty_st_le32(CUR_CLR1, bg_color, par);
 }
 
 void aty_set_cursor_shape(struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	struct fb_cursor *cursor = &info->cursor;
 	struct aty_cursor *c = par->cursor;
 	u8 *ram, m, b;
 	int x, y;
 
 	if (!c)
 		return;
-
 #ifdef __sparc__
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
+	if (par->mmaped)
 		return;
 #endif
 
 	ram = c->ram;
-	for (y = 0; y < c->size.y; y++) {
-		for (x = 0; x < c->size.x >> 2; x++) {
+	for (y = 0; y < cursor->image.height; y++) {
+		for (x = 0; x < cursor->image.width >> 2; x++) {
 			m = c->mask[x][y];
 			b = c->bits[x][y];
 			fb_writeb(cursor_mask_lookup[m >> 4] |
@@ -108,12 +99,13 @@ void aty_set_cursor_shape(struct fb_info *info)
 			fb_writeb(0xaa, ram++);
 		}
 	}
-	fb_memset(ram, 0xaa, (64 - c->size.y) * 16);
+	fb_memset(ram, 0xaa, (64 - cursor->image.height) * 16);
 }
 
-static void aty_set_cursor(struct fb_info *info, int on)
+static void aty_set_cursor(struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	struct fb_cursor *cursor = &info->cursor;
 	struct aty_cursor *c = par->cursor;
 	u16 xoff, yoff;
 	int x, y;
@@ -122,14 +114,12 @@ static void aty_set_cursor(struct fb_info *info, int on)
 		return;
 
 #ifdef __sparc__
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
+	if (par->mmaped)
 		return;
 #endif
 
-	if (on) {
-		x = c->pos.x - c->hot.x - info->var.xoffset;
+	if (cursor->enable) {
+		x = cursor->image.dx - cursor->hot.x - info->var.xoffset;
 		if (x < 0) {
 			xoff = -x;
 			x = 0;
@@ -137,7 +127,7 @@ static void aty_set_cursor(struct fb_info *info, int on)
 			xoff = 0;
 		}
 
-		y = c->pos.y - c->hot.y - info->var.yoffset;
+		y = cursor->image.dy - cursor->hot.y - info->var.yoffset;
 		if (y < 0) {
 			yoff = -y;
 			y = 0;
@@ -146,10 +136,10 @@ static void aty_set_cursor(struct fb_info *info, int on)
 		}
 
 		wait_for_fifo(4, par);
-		aty_st_le32(CUR_OFFSET, (c->offset >> 3) + (yoff << 1),
+		aty_st_le32(CUR_OFFSET, (info->fix.smem_len >> 3) + (yoff << 1),
 			    par);
 		aty_st_le32(CUR_HORZ_VERT_OFF,
-			    ((u32) (64 - c->size.y + yoff) << 16) | xoff,
+			    ((u32) (64 - cursor->image.height + yoff) << 16) | xoff,
 			    par);
 		aty_st_le32(CUR_HORZ_VERT_POSN, ((u32) y << 16) | x, par);
 		aty_st_le32(GEN_TEST_CNTL, aty_ld_le32(GEN_TEST_CNTL, par)
@@ -164,70 +154,25 @@ static void aty_set_cursor(struct fb_info *info, int on)
 		wait_for_idle(par);
 }
 
-static void aty_cursor_timer_handler(unsigned long dev_addr)
+int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	struct fb_info *info = (struct fb_info *) dev_addr;
-	struct atyfb_par *par = (struct atyfb_par *) info->par;
-
-	if (!par->cursor)
-		return;
-
-	if (!par->cursor->enable)
-		goto out;
-
-	if (par->cursor->vbl_cnt && --par->cursor->vbl_cnt == 0) {
-		par->cursor->on ^= 1;
-		aty_set_cursor(info, par->cursor->on);
-		par->cursor->vbl_cnt = par->cursor->blink_rate;
-	}
-
-      out:
-	par->cursor->timer->expires = jiffies + (HZ / 50);
-	add_timer(par->cursor->timer);
-}
-
-void atyfb_cursor(struct display *p, int mode, int x, int y)
-{
-	struct fb_info *info = p->fb_info;
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	struct aty_cursor *c = par->cursor;
 
 	if (!c)
-		return;
+		return -1;
 
 #ifdef __sparc__
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
+	if (par->mmaped)
 		return;
 #endif
 
-	x *= fontwidth(p);
-	y *= fontheight(p);
-	if (c->pos.x == x && c->pos.y == y
-	    && (mode == CM_ERASE) == !c->enable)
-		return;
+	aty_set_cursor(info);
+	cursor->image.dx = info->cursor.image.dx;
+	cursor->image.dy = info->cursor.image.dy;
 
-	c->enable = 0;
-	if (c->on)
-		aty_set_cursor(info, 0);
-	c->pos.x = x;
-	c->pos.y = y;
-
-	switch (mode) {
-	case CM_ERASE:
-		c->on = 0;
-		break;
-
-	case CM_DRAW:
-	case CM_MOVE:
-		if (c->on)
-			aty_set_cursor(info, 1);
-		else
-			c->vbl_cnt = CURSOR_DRAW_DELAY;
-		c->enable = 1;
-		break;
-	}
+	aty_set_cursor(info);
+	return 0;
 }
 
 struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
@@ -240,47 +185,31 @@ struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 		return 0;
 	memset(cursor, 0, sizeof(*cursor));
 
-	cursor->timer = kmalloc(sizeof(*cursor->timer), GFP_KERNEL);
-	if (!cursor->timer) {
-		kfree(cursor);
-		return 0;
-	}
-	memset(cursor->timer, 0, sizeof(*cursor->timer));
-
-	cursor->blink_rate = DEFAULT_CURSOR_BLINK_RATE;
 	info->fix.smem_len -= PAGE_SIZE;
-	cursor->offset = info->fix.smem_len;
 
 #ifdef __sparc__
-	addr = (unsigned long) info->screen_base - 0x800000 + cursor->offset;
+	addr = info->screen_base - 0x800000 + info->fix.smem_len;
 	cursor->ram = (u8 *) addr;
 #else
 #ifdef __BIG_ENDIAN
-	addr = info->fix.smem_start - 0x800000 + cursor->offset;
+	addr = info->fix.smem_start - 0x800000 + info->fix.smem_len;
 	cursor->ram = (u8 *) ioremap(addr, 1024);
 #else
-	addr = (unsigned long) info->screen_base + cursor->offset;
+	addr = (unsigned long) info->screen_base + info->fix.smem_len;
 	cursor->ram = (u8 *) addr;
 #endif
 #endif
-
 	if (!cursor->ram) {
 		kfree(cursor);
 		return NULL;
 	}
-
-	init_timer(cursor->timer);
-	cursor->timer->expires = jiffies + (HZ / 50);
-	cursor->timer->data = (unsigned long) info;
-	cursor->timer->function = aty_cursor_timer_handler;
-	add_timer(cursor->timer);
 	return cursor;
 }
 
-int atyfb_set_font(struct display *d, int width, int height)
+int atyfb_set_font(struct fb_info *info, int width, int height)
 {
-	struct fb_info *info = d->fb_info;
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	struct fb_cursor *cursor = &info->cursor;
 	struct aty_cursor *c = par->cursor;
 	int i, j;
 
@@ -290,10 +219,10 @@ int atyfb_set_font(struct display *d, int width, int height)
 			height = 16;
 		}
 
-		c->hot.x = 0;
-		c->hot.y = 0;
-		c->size.x = width;
-		c->size.y = height;
+		cursor->hot.x = 0;
+		cursor->hot.y = 0;
+		cursor->image.width = width;
+		cursor->image.height = height;
 
 		memset(c->bits, 0xff, sizeof(c->bits));
 		memset(c->mask, 0, sizeof(c->mask));
