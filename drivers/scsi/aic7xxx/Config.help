@@ -1,10 +1,13 @@
 CONFIG_SCSI_AIC7XXX
-  This driver supports all of Adaptec's PCI based SCSI controllers
-  (not the hardware RAID controllers though) as well as the aic7770
-  based EISA and VLB SCSI controllers (the 274x and 284x series).
-  This is an Adaptec sponsored driver written by Justin Gibbs.  It is
-  intended to replace the previous aic7xxx driver maintained by Doug
-  Ledford since Doug is no longer maintaining that driver.
+  This driver supports all of Adaptec's Fast through Ultra 160 PCI
+  based SCSI controllers as well as the aic7770 based EISA and VLB
+  SCSI controllers (the 274x and 284x series).  For AAA and ARO based
+  configurations, only SCSI functionality is provided.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called aic7xxx.o.
 
 CONFIG_AIC7XXX_CMDS_PER_DEVICE
   Specify the number of commands you would like to allocate per SCSI
@@ -16,10 +19,17 @@ CONFIG_AIC7XXX_CMDS_PER_DEVICE
   fixed maximum, the driver will eventually lock to this maximum
   and display a console message inidicating this value.
 
-  Note: Unless you experience some type of device failure, the default
-	value, no enforced limit, should work for you.
+  Due to resource allocation issues in the Linux SCSI mid-layer, using
+  a high number of commands per device may result in memory allocation
+  failures when many devices are attached to the system.  For this reason,
+  the default is set to 32.  Higher values may result in higer performance
+  on some devices.  The upper bound is 253.  0 disables tagged queueing.
 
-  Default: 253
+  Per device tag depth can be controlled via the kernel command line
+  "tag_info" option.  See drivers/scsi/aic7xxx/README.aic7xxx
+  for details.
+
+  Default: 32
 
 CONFIG_AIC7XXX_RESET_DELAY_MS
   The number of milliseconds to delay after an initial bus reset.
@@ -28,12 +38,112 @@ CONFIG_AIC7XXX_RESET_DELAY_MS
 
   Default: 15000 (15 seconds)
 
+CONFIG_AIC7XXX_ALLOW_MEMIO
+  Certain chipsets are not compatible with memory mapped I/O access
+  to aic7xxx controllers.  Memory mapped I/O does provide better
+  performance, but enabling this option may cause the aic7xxx driver
+  to fail in unpredictable ways on non-compliant chipsets.
+
+CONFIG_AIC7XXX_PROBE_EISA_VL
+   Probe for EISA and VLB Aic7xxx controllers.  In many newer systems,
+   the invasive probes necessary to detect these controllers can cause
+   other devices to fail.  For this reason, the non-PCI probe code is
+   disabled by default.  The current value of this option can be "toggled"
+   via the no_probe kernel command line option.
+
 CONFIG_AIC7XXX_BUILD_FIRMWARE
   This option should only be enabled if you are modifying the firmware
   source to the aic7xxx driver and wish to have the generated firmware
   include files updated during a normal kernel build.  The assembler
   for the firmware requires lex and yacc or their equivalents, as well
   as the db v1 library.  You may have to install additional packages
-  or modify the assembler make file or the files it includes if your
+  or modify the assembler Makefile or the files it includes if your
   build environment is different than that of the author.
 
+CONFIG_AIC7XXX_DEBUG_ENABLE
+  Compile in aic7xxx debugging code that can be useful in diagnosing
+  driver errors.
+
+CONFIG_AIC7XXX_DEBUG_MASK
+  Bit mask of debug options that is only valid if the
+  CONFIG_AIC7XXX_DEBUG_ENBLE option is enabled.  The bits in this mask
+  are defined in the drivers/scsi/aic7xxx/aic7xxx.h - search for the
+  variable ahc_debug in that file to find them.
+
+  Default: 0
+
+CONFIG_AIC7XXX_REG_PRETTY_PRINT
+  Compile in register value tables for the output of expanded register
+  contents in diagnostics.  This make it much easier to understand debug
+  output without having to refer to a data book and/or the aic7xxx.reg file.
+
+CONFIG_SCSI_AIC79XX
+  This driver supports all of Adaptec's Ultra 320 PCI-X based SCSI controllers.
+
+CONFIG_AIC79XX_CMDS_PER_DEVICE 32
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  This is an upper bound value for the number of tagged transactions
+  to be used for any device.  The aic7xxx driver will automatically
+  vary this number based on device behavior.  For devices with a
+  fixed maximum, the driver will eventually lock to this maximum
+  and display a console message inidicating this value.
+
+  Due to resource allocation issues in the Linux SCSI mid-layer, using
+  a high number of commands per device may result in memory allocation
+  failures when many devices are attached to the system.  For this reason,
+  the default is set to 32.  Higher values may result in higer performance
+  on some devices.  The upper bound is 253.  0 disables tagged queueing.
+
+  Per device tag depth can be controlled via the kernel command line
+  "tag_info" option.  See drivers/scsi/aic7xxx/README.aic79xx
+  for details.
+
+  Default: 32
+
+CONFIG_AIC79XX_RESET_DELAY_MS 15000
+  The number of milliseconds to delay after an initial bus reset.
+  The bus settle delay following all error recovery actions is
+  dictated by the SCSI layer and is not affected by this value.
+
+  Default: 15000 (15 seconds)
+
+CONFIG_AIC79XX_ALLOW_MEMIO
+  Certain chipsets are not compatible with memory mapped I/O access
+  to aic79xx controllers.  Memory mapped I/O does provide better
+  performance, but enabling this option may cause the aic79xx driver
+  to fail in unpredictable ways on non-compliant chipsets.
+
+CONFIG_AIC79XX_BUILD_FIRMWARE
+  This option should only be enabled if you are modifying the firmware
+  source to the aic7xxx driver and wish to have the generated firmware
+  include files updated during a normal kernel build.  The assembler
+  for the firmware requires lex and yacc or their equivalents, as well
+  as the db v1 library.  You may have to install additional packages
+  or modify the assembler Makefile or the files it includes if your
+  build environment is different than that of the author.
+
+CONFIG_AIC79XX_ENABLE_RD_STRM
+  Read Streaming is a U320 protocol option that should enhance performance.
+  Early U320 drive firmware actually performs slower with read streaming
+  enabled so it is disabled by default.  Read Streaming can be configured
+  in much the same way as tagged queueing using the "rd_strm" command line
+  option.  See drivers/scsi/aic7xxx/README.aic79xx for details.
+
+CONFIG_AIC79XX_DEBUG_ENABLE
+  Compile in aic79xx debugging code that can be useful in diagnosing
+  driver errors.
+
+CONFIG_AIC79XX_DEBUG_MASK
+  Bit mask of debug options that is only valid if the
+  CONFIG_AIC79XX_DEBUG_ENBLE option is enabled.  The bits in this mask
+  are defined in the drivers/scsi/aic7xxx/aic79xx.h - search for the
+  variable ahd_debug in that file to find them.
+
+  Default: 0
+
+CONFIG_AIC79XX_REG_PRETTY_PRINT
+  Compile in register value tables for the output of expanded register
+  contents in diagnostics.  This make it much easier to understand debug
+  output without having to refer to a data book and/or the aic7xxx.reg file.
