@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.56 $
+ * $Revision: 1.57 $
  */
 
 #ifndef DASD_INT_H
@@ -159,6 +159,7 @@ struct dasd_ccw_req {
 	struct ccw1 *cpaddr;		/* address of channel program */
 	char status;	        	/* status of this request */
 	short retries;			/* A retry counter */
+	unsigned long flags;        	/* flags of this request */
 
 	/* ... and how */
 	unsigned long starttime;	/* jiffies time of request start */
@@ -191,6 +192,9 @@ struct dasd_ccw_req {
 #define DASD_CQR_DONE     0x03	/* request is completed successfully */
 #define DASD_CQR_ERROR    0x04	/* request is completed with error */
 #define DASD_CQR_FAILED   0x05	/* request is finally failed */
+
+/* per dasd_ccw_req flags */
+#define DASD_CQR_FLAGS_USE_ERP   0	/* use ERP for this request */
 
 /* Signature for error recovery functions. */
 typedef struct dasd_ccw_req *(*dasd_erp_fn_t) (struct dasd_ccw_req *);
