@@ -98,6 +98,18 @@ UNUSUAL_DEV(  0x0451, 0x5409, 0x0001, 0x0001,
 		"Nex II Digital",
 		US_SC_SCSI, US_PR_BULK, NULL, US_FL_START_STOP),
 
+/* Patch submitted by Philipp Friedrich <philipp@void.at> */
+UNUSUAL_DEV(  0x0482, 0x0100, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam S3x",
+		US_SC_8070, US_PR_CB, NULL, US_FL_FIX_INQUIRY),
+
+/* Patch submitted by Philipp Friedrich <philipp@void.at> */
+UNUSUAL_DEV(  0x0482, 0x0101, 0x0100, 0x0100,
+		"Kyocera",
+		"Finecam S4",
+		US_SC_8070, US_PR_CB, NULL, US_FL_FIX_INQUIRY),
+
 /* Reported by Paul Stewart <stewart@wetlogic.net>
  * This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x04a4, 0x0004, 0x0001, 0x0001,
