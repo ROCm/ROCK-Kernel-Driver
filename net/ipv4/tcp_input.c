@@ -65,6 +65,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/sysctl.h>
 #include <net/tcp.h>
 #include <net/inet_common.h>
@@ -4089,3 +4090,10 @@ discard:
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(sysctl_tcp_ecn);
+EXPORT_SYMBOL(sysctl_tcp_reordering);
+EXPORT_SYMBOL(tcp_cwnd_application_limited);
+EXPORT_SYMBOL(tcp_parse_options);
+EXPORT_SYMBOL(tcp_rcv_established);
+EXPORT_SYMBOL(tcp_rcv_state_process);
