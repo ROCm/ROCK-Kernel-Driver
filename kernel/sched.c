@@ -331,6 +331,21 @@ static void enqueue_task(struct task_struct *p, prio_array_t *array)
 	p->array = array;
 }
 
+#ifdef CONFIG_SMP
+/*
+ * Used by the migration code - we pull tasks from the head of the
+ * remote queue so we want these tasks to show up at the head of the
+ * local queue:
+ */
+static inline void enqueue_task_head(struct task_struct *p, prio_array_t *array)
+{
+	list_add(&p->run_list, array->queue + p->prio);
+	__set_bit(p->prio, array->bitmap);
+	array->nr_active++;
+	p->array = array;
+}
+#endif
+
 /*
  * effective_prio - return the priority that is based on the static
  * priority but is modified by bonuses/penalties.
