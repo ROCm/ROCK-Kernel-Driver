@@ -1296,14 +1296,14 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
  */
 struct inode_operations reiserfs_dir_inode_operations = {
   //&reiserfs_dir_operations,	/* default_file_ops */
-    create:	reiserfs_create,
-    lookup:	reiserfs_lookup,
-    link:	reiserfs_link,
-    unlink:	reiserfs_unlink,
-    symlink:	reiserfs_symlink,
-    mkdir:	reiserfs_mkdir,
-    rmdir:	reiserfs_rmdir,
-    mknod:	reiserfs_mknod,
-    rename:	reiserfs_rename,
+    .create	= reiserfs_create,
+    .lookup	= reiserfs_lookup,
+    .link	= reiserfs_link,
+    .unlink	= reiserfs_unlink,
+    .symlink	= reiserfs_symlink,
+    .mkdir	= reiserfs_mkdir,
+    .rmdir	= reiserfs_rmdir,
+    .mknod	= reiserfs_mknod,
+    .rename	= reiserfs_rename,
 };
 

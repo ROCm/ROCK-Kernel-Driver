@@ -474,25 +474,25 @@ static void reiserfs_dirty_inode (struct inode * inode) {
 
 struct super_operations reiserfs_sops = 
 {
-  alloc_inode: reiserfs_alloc_inode,
-  destroy_inode: reiserfs_destroy_inode,
-  write_inode: reiserfs_write_inode,
-  dirty_inode: reiserfs_dirty_inode,
-  delete_inode: reiserfs_delete_inode,
-  put_super: reiserfs_put_super,
-  write_super: reiserfs_write_super,
-  write_super_lockfs: reiserfs_write_super_lockfs,
-  unlockfs: reiserfs_unlockfs,
-  statfs: reiserfs_statfs,
-  remount_fs: reiserfs_remount,
+  .alloc_inode = reiserfs_alloc_inode,
+  .destroy_inode = reiserfs_destroy_inode,
+  .write_inode = reiserfs_write_inode,
+  .dirty_inode = reiserfs_dirty_inode,
+  .delete_inode = reiserfs_delete_inode,
+  .put_super = reiserfs_put_super,
+  .write_super = reiserfs_write_super,
+  .write_super_lockfs = reiserfs_write_super_lockfs,
+  .unlockfs = reiserfs_unlockfs,
+  .statfs = reiserfs_statfs,
+  .remount_fs = reiserfs_remount,
 
 };
 
 static struct export_operations reiserfs_export_ops = {
-  encode_fh: reiserfs_encode_fh,
-  decode_fh: reiserfs_decode_fh,
-  get_parent: reiserfs_get_parent,
-  get_dentry: reiserfs_get_dentry,
+  .encode_fh = reiserfs_encode_fh,
+  .decode_fh = reiserfs_decode_fh,
+  .get_parent = reiserfs_get_parent,
+  .get_dentry = reiserfs_get_dentry,
 } ;
 
 /* this struct is used in reiserfs_getopt () for containing the value for those
