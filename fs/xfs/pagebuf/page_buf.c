@@ -798,6 +798,7 @@ pagebuf_get(				/* allocate a buffer		*/
 			PB_STATS_INC(pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
+			PB_TRACE(pb, "get_read_async", (unsigned long)flags);
 			/*
 			 * Read ahead call which is already satisfied,
 			 * drop the buffer
@@ -807,12 +808,13 @@ pagebuf_get(				/* allocate a buffer		*/
 			pagebuf_rele(pb);
 			return NULL;
 		} else {
+			PB_TRACE(pb, "get_read_done", (unsigned long)flags);
 			/* We do not want read in the flags */
 			pb->pb_flags &= ~PBF_READ;
 		}
+	} else {
+		PB_TRACE(pb, "get_write", (unsigned long)flags);
 	}
-
-	PB_TRACE(pb, "get_done", (unsigned long)flags);
 	return (pb);
 }
 
