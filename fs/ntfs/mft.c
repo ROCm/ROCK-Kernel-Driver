@@ -47,11 +47,11 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 	*(le16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
 	m->lsn = cpu_to_le64(0LL);
 	m->sequence_number = cpu_to_le16(1);
-	m->link_count = cpu_to_le16(0);
+	m->link_count = 0;
 	/* Aligned to 8-byte boundary. */
 	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
 			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
-	m->flags = cpu_to_le16(0);
+	m->flags = 0;
 	/*
 	 * Using attrs_offset plus eight bytes (for the termination attribute),
 	 * aligned to 8-byte boundary.
@@ -60,10 +60,10 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 			~7);
 	m->bytes_allocated = cpu_to_le32(size);
 	m->base_mft_record = cpu_to_le64((MFT_REF)0);
-	m->next_attr_instance = cpu_to_le16(0);
+	m->next_attr_instance = 0;
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	a->type = AT_END;
-	a->length = cpu_to_le32(0);
+	a->length = 0;
 }
 
 /**

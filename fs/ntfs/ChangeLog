@@ -54,6 +54,7 @@ ToDo/Notes:
 	- Fix a bug found by the new sparse bitwise warnings where the default
 	  upcase table was defined as a pointer to wchar_t rather than ntfschar
 	  in fs/ntfs/ntfs.h and super.c.
+	- Change {const_,}cpu_to_le{16,32}(0) to just 0 as suggested by Al Viro.
 
 2.1.18 - Fix scheduling latencies at mount time as well as an endianness bug.
 

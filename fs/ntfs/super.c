@@ -1114,9 +1114,9 @@ static BOOL load_and_init_quota(ntfs_volume *vol)
 	static const ntfschar Quota[7] = { const_cpu_to_le16('$'),
 			const_cpu_to_le16('Q'), const_cpu_to_le16('u'),
 			const_cpu_to_le16('o'), const_cpu_to_le16('t'),
-			const_cpu_to_le16('a'), const_cpu_to_le16(0) };
+			const_cpu_to_le16('a'), 0 };
 	static ntfschar Q[3] = { const_cpu_to_le16('$'),
-			const_cpu_to_le16('Q'), const_cpu_to_le16(0) };
+			const_cpu_to_le16('Q'), 0 };
 
 	ntfs_debug("Entering.");
 	/*
