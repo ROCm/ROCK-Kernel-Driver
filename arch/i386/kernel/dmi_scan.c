@@ -455,7 +455,7 @@ static __init int broken_pirq(struct dmi_blacklist *d)
 
 static __init int broken_toshiba_keyboard(struct dmi_blacklist *d)
 {
-	printk(KERN_WARNING "Toshiba with broken keyboard detected. If your keyboard sometimes generates 3 keypresses instead of one, contact pavel@ucw.cz\n");
+	printk(KERN_WARNING "Toshiba with broken keyboard detected. If your keyboard sometimes generates 3 keypresses instead of one, see http://davyd.ucc.asn.au/projects/toshiba/README\n");
 	return 0;
 }
 
@@ -467,6 +467,21 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 {
 	printk(KERN_WARNING "Toshiba with broken S1 detected.\n");
 	dmi_broken |= BROKEN_INIT_AFTER_S1;
+	return 0;
+}
+
+static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
+{
+	/* See acpi_wakeup.S */
+	extern long acpi_video_flags;
+	acpi_video_flags |= 2;
+	return 0;
+}
+
+static __init int reset_videobios_after_s3(struct dmi_blacklist *d)
+{
+	extern long acpi_video_flags;
+	acpi_video_flags |= 1;
 	return 0;
 }
 
@@ -740,6 +755,10 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
 	{ init_ints_after_s1, "Toshiba Satellite 4030cdt", { /* Reinitialization of 8259 is needed after S1 resume */
+			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
+			NO_MATCH, NO_MATCH, NO_MATCH
+			} },
+	{ reset_videomode_after_s3, "Toshiba Satellite 4030cdt", { /* Reset video mode after returning from ACPI S3 sleep */
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
