@@ -630,11 +630,11 @@ static int acm_probe (struct usb_interface *intf,
 
 		usb_fill_bulk_urb(acm->readurb, dev, usb_rcvbulkpipe(dev, epread->bEndpointAddress),
 			buf += ctrlsize, readsize, acm_read_bulk, acm);
-		acm->readurb->transfer_flags |= USB_NO_FSBR;
+		acm->readurb->transfer_flags |= URB_NO_FSBR;
 
 		usb_fill_bulk_urb(acm->writeurb, dev, usb_sndbulkpipe(dev, epwrite->bEndpointAddress),
 			buf += readsize, acm->writesize, acm_write_bulk, acm);
-		acm->writeurb->transfer_flags |= USB_NO_FSBR;
+		acm->writeurb->transfer_flags |= URB_NO_FSBR;
 
 		info("ttyACM%d: USB ACM device", minor);
 

@@ -1475,11 +1475,11 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	usb_fill_bulk_urb (urb, dev->udev,
 		usb_rcvbulkpipe (dev->udev, dev->driver_info->in),
 		skb->data, size, rx_complete, skb);
-	urb->transfer_flags |= USB_ASYNC_UNLINK;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
 #if 0
 	// Idle-but-posted reads with UHCI really chew up
 	// PCI bandwidth unless FSBR is disabled
-	urb->transfer_flags |= USB_NO_FSBR;
+	urb->transfer_flags |= URB_NO_FSBR;
 #endif
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);

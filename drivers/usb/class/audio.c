@@ -1049,7 +1049,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
@@ -1062,7 +1062,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
@@ -1076,7 +1076,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
@@ -1090,7 +1090,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
@@ -1416,7 +1416,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
@@ -1429,7 +1429,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
@@ -1443,7 +1443,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbout_sync_completed;
@@ -1457,7 +1457,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
-			urb->transfer_flags = USB_ISO_ASAP;
+			urb->transfer_flags = URB_ISO_ASAP;
 			urb->number_of_packets = SYNCFRAMES;
 			urb->context = as;
 			urb->complete = usbout_sync_completed;

@@ -408,7 +408,7 @@ static int konicawc_start_data(struct uvd *uvd)
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);
 		urb->interval = 1;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = uvd->sbuf[i].data;
 		urb->complete = konicawc_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;
@@ -423,7 +423,7 @@ static int konicawc_start_data(struct uvd *uvd)
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp-1);
 		urb->interval = 1;
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = cam->sts_buf[i];
 		urb->complete = konicawc_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;

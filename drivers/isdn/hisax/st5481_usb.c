@@ -409,7 +409,7 @@ fill_isoc_urb(struct urb *urb, struct usb_device *dev,
 	urb->actual_length = 0;
 	urb->complete=complete;
 	urb->context=context;
-	urb->transfer_flags=USB_ISO_ASAP;
+	urb->transfer_flags=URB_ISO_ASAP;
 	for (k = 0; k < num_packets; k++) {
 		urb->iso_frame_desc[k].offset = packet_size * k;
 		urb->iso_frame_desc[k].length = packet_size;

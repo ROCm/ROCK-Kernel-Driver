@@ -1110,7 +1110,7 @@ static int hcd_unlink_urb (struct urb *urb)
 	 */
 	spin_lock_irqsave (&urb->lock, flags);
 	spin_lock (&hcd_data_lock);
-	if (!urb->hcpriv || urb->transfer_flags & USB_TIMEOUT_KILLED) {
+	if (!urb->hcpriv || urb->transfer_flags & URB_TIMEOUT_KILLED) {
 		retval = -EINVAL;
 		goto done;
 	}
@@ -1182,13 +1182,13 @@ if (retval && urb->status == -ENOENT) err ("whoa! retval %d", retval);
 	}
 
     	/* block till giveback, if needed */
-	if (!(urb->transfer_flags & (USB_ASYNC_UNLINK|USB_TIMEOUT_KILLED))
+	if (!(urb->transfer_flags & (URB_ASYNC_UNLINK|URB_TIMEOUT_KILLED))
 			&& HCD_IS_RUNNING (hcd->state)
 			&& !retval) {
 		dbg ("%s: wait for giveback urb %p",
 			hcd->self.bus_name, urb);
 		wait_for_completion (&splice.done);
-	} else if ((urb->transfer_flags & USB_ASYNC_UNLINK) && retval == 0) {
+	} else if ((urb->transfer_flags & URB_ASYNC_UNLINK) && retval == 0) {
 		return -EINPROGRESS;
 	}
 	goto bye;

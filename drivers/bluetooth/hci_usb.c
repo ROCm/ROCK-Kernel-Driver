@@ -67,8 +67,8 @@
 #endif
 
 #ifndef CONFIG_BT_USB_ZERO_PACKET
-#undef  USB_ZERO_PACKET
-#define USB_ZERO_PACKET 0
+#undef  URB_ZERO_PACKET
+#define URB_ZERO_PACKET 0
 #endif
 
 static struct usb_driver hci_usb_driver; 
@@ -330,7 +330,7 @@ static inline int hci_usb_send_bulk(struct hci_usb *husb, struct sk_buff *skb)
         
 	usb_fill_bulk_urb(urb, husb->udev, pipe, skb->data, skb->len,
 	              hci_usb_tx_complete, skb);
-	urb->transfer_flags = USB_ZERO_PACKET;
+	urb->transfer_flags = URB_ZERO_PACKET;
 
 	BT_DBG("%s urb %p len %d", husb->hdev.name, urb, skb->len);
 

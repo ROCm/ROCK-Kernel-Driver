@@ -560,17 +560,15 @@ extern int usb_disabled(void);
 
 /*
  * urb->transfer_flags:
- *
- * FIXME should _all_ be URB_* flags
  */
 #define URB_SHORT_NOT_OK	0x0001	/* report short reads as errors */
-#define USB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
+#define URB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
 #define URB_NO_DMA_MAP		0x0004	/* urb->*_dma are valid on submit */
-#define USB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
-#define USB_NO_FSBR		0x0020	/* UHCI-specific */
-#define USB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
+#define URB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
+#define URB_NO_FSBR		0x0020	/* UHCI-specific */
+#define URB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
-#define USB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
+#define URB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
 
 struct usb_iso_packet_descriptor {
 	unsigned int offset;
@@ -674,7 +672,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
- * The USB_ASYNC_UNLINK transfer flag affects later invocations of
+ * The URB_ASYNC_UNLINK transfer flag affects later invocations of
  * the usb_unlink_urb() routine.
  *
  * All URBs must also initialize 
@@ -683,7 +681,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * to be treated as errors; that flag is invalid for write requests.
  *
  * Bulk URBs may
- * use the USB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
+ * use the URB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
  * should always terminate with a short packet, even if it means adding an
  * extra zero length packet.
  *
@@ -700,7 +698,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * endpoints, as well as high speed interrupt endpoints, the encoding of
  * the transfer interval in the endpoint descriptor is logarithmic.)
  *
- * Isochronous URBs normally use the USB_ISO_ASAP transfer flag, telling
+ * Isochronous URBs normally use the URB_ISO_ASAP transfer flag, telling
  * the host controller to schedule the transfer as soon as bandwidth
  * utilization allows, and then set start_frame to reflect the actual frame
  * selected during submission.  Otherwise drivers must specify the start_frame

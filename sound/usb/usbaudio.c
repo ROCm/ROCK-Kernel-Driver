@@ -82,7 +82,7 @@ MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 /* #define SND_USE_ASYNC_UNLINK */
 
 #ifdef SND_USB_ASYNC_UNLINK
-#define UNLINK_FLAGS	USB_ASYNC_UNLINK
+#define UNLINK_FLAGS	URB_ASYNC_UNLINK
 #else
 #define UNLINK_FLAGS	0
 #endif
@@ -867,7 +867,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 		}
 		u->urb->dev = subs->dev;
 		u->urb->pipe = subs->datapipe;
-		u->urb->transfer_flags = USB_ISO_ASAP | UNLINK_FLAGS;
+		u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
 		u->urb->number_of_packets = u->packets;
 		u->urb->context = u;
 		u->urb->complete = snd_complete_urb;
@@ -889,7 +889,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *run
 			u->urb->transfer_buffer_length = NRPACKS * 3;
 			u->urb->dev = subs->dev;
 			u->urb->pipe = subs->syncpipe;
-			u->urb->transfer_flags = USB_ISO_ASAP | UNLINK_FLAGS;
+			u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
 			u->urb->number_of_packets = u->packets;
 			u->urb->context = u;
 			u->urb->complete = snd_complete_sync_urb;

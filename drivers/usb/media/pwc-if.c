@@ -821,7 +821,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 		urb->interval = 1; // devik
 		urb->dev = udev;
 	        urb->pipe = usb_rcvisocpipe(udev, pdev->vendpoint);
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 	        urb->transfer_buffer = pdev->sbuf[i].data;
 	        urb->transfer_buffer_length = ISO_BUFFER_SIZE;
 	        urb->complete = pwc_isoc_handler;

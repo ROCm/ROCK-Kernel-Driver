@@ -324,7 +324,7 @@ int usb_sg_init (
 	if (!io->urbs)
 		goto nomem;
 
-	urb_flags = USB_ASYNC_UNLINK | URB_NO_DMA_MAP | URB_NO_INTERRUPT;
+	urb_flags = URB_ASYNC_UNLINK | URB_NO_DMA_MAP | URB_NO_INTERRUPT;
 	if (usb_pipein (pipe))
 		urb_flags |= URB_SHORT_NOT_OK;
 

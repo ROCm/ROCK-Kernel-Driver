@@ -534,7 +534,7 @@ static int rh_unlink_urb (struct urb * urb)
 		urb->hcpriv = NULL;
 		usb_put_dev (urb->dev);
 		urb->dev = NULL;
-		if (urb->transfer_flags & USB_ASYNC_UNLINK) {
+		if (urb->transfer_flags & URB_ASYNC_UNLINK) {
 			urb->status = -ECONNRESET;
 			if (urb->complete) {
 				urb->complete (urb);

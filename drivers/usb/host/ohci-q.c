@@ -575,7 +575,7 @@ static void td_submit_urb (
 			info |= TD_R;
 		td_fill (info, data, data_len, urb, cnt);
 		cnt++;
-		if ((urb->transfer_flags & USB_ZERO_PACKET)
+		if ((urb->transfer_flags & URB_ZERO_PACKET)
 				&& cnt < urb_priv->length) {
 			td_fill (info, 0, 0, urb, cnt);
 			cnt++;

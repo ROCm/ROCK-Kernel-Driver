@@ -259,7 +259,7 @@ static void CDCEther_tx_timeout( struct net_device *net )
 	warn("%s: Tx timed out.", net->name);
 	
 	// Tear the waiting frame off the list
-	ether_dev->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	ether_dev->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
 	usb_unlink_urb( ether_dev->tx_urb );
 	
 	// Update statistics

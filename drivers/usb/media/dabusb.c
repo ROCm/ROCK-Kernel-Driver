@@ -251,7 +251,7 @@ static int dabusb_alloc_buffers (pdabusb_t s)
 		b->purb->context = b;
 		b->purb->dev = s->usbdev;
 		b->purb->pipe = pipe;
-		b->purb->transfer_flags = USB_ISO_ASAP;
+		b->purb->transfer_flags = URB_ISO_ASAP;
 
 		for (i = 0; i < packets; i++) {
 			b->purb->iso_frame_desc[i].offset = i * pipesize;

@@ -3949,7 +3949,7 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 		urb->dev = ov->dev;
 		urb->context = &ov->sbuf[n];
 		urb->pipe = usb_rcvisocpipe(ov->dev, OV511_ENDPOINT_ADDRESS);
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		urb->transfer_buffer = ov->sbuf[n].data;
 		urb->complete = ov51x_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;
