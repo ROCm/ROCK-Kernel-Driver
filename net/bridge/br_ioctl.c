@@ -32,9 +32,10 @@ static inline unsigned long ticks_to_user(unsigned long tick)
 }
 
 /* Report time remaining in user HZ  */
-static unsigned long timer_residue(const struct br_timer *timer)
+static unsigned long timer_residue(const struct timer_list *timer)
 {
-	return ticks_to_user(timer->running ? (jiffies - timer->expires) : 0);
+	return ticks_to_user(timer_pending(timer) 
+			     ? (timer->expires - jiffies) : 0);
 }
 
 static int br_ioctl_device(struct net_bridge *br,
@@ -87,7 +88,6 @@ static int br_ioctl_device(struct net_bridge *br,
 		b.root_port = br->root_port;
 		b.stp_enabled = br->stp_enabled;
 		b.ageing_time = ticks_to_user(br->ageing_time);
-		b.gc_interval = ticks_to_user(br->gc_interval);
 		b.hello_timer_value = timer_residue(&br->hello_timer);
 		b.tcn_timer_value = timer_residue(&br->tcn_timer);
 		b.topology_change_timer_value = timer_residue(&br->topology_change_timer);
@@ -146,8 +146,7 @@ static int br_ioctl_device(struct net_bridge *br,
 		br->ageing_time = user_to_ticks(arg0);
 		return 0;
 
-	case BRCTL_SET_GC_INTERVAL:
-		br->gc_interval = user_to_ticks(arg0);
+	case BRCTL_SET_GC_INTERVAL:	 /* no longer used */
 		return 0;
 
 	case BRCTL_GET_PORT_INFO:

@@ -637,7 +637,7 @@ inet6_unregister_protosw(struct inet_protosw *p)
 		list_del_rcu(&p->list);
 		spin_unlock_bh(&inetsw6_lock);
 
-		synchronize_kernel();
+		synchronize_net();
 	}
 }
 

@@ -1188,12 +1188,9 @@ ip_ct_gather_frags(struct sk_buff *skb)
 	local_bh_enable();
 
 	if (!skb) {
-		if (sk) sock_put(sk);
+		if (sk)
+			sock_put(sk);
 		return skb;
-	} else if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC) != 0) {
-		kfree_skb(skb);
-		if (sk) sock_put(sk);
-		return NULL;
 	}
 
 	if (sk) {

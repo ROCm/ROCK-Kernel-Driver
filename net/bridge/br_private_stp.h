@@ -47,7 +47,6 @@ extern void br_configuration_update(struct net_bridge *);
 extern void br_port_state_selection(struct net_bridge *);
 extern void br_received_config_bpdu(struct net_bridge_port *p, struct br_config_bpdu *bpdu);
 extern void br_received_tcn_bpdu(struct net_bridge_port *p);
-extern void br_tick(unsigned long __data);
 extern void br_transmit_config(struct net_bridge_port *p);
 extern void br_transmit_tcn(struct net_bridge *br);
 extern void br_topology_change_detection(struct net_bridge *br);

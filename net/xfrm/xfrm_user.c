@@ -281,6 +281,11 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (x == NULL)
 		return -ESRCH;
 
+	if (xfrm_state_kern(x)) {
+		xfrm_state_put(x);
+		return -EPERM;
+	}
+
 	xfrm_state_delete(x);
 	xfrm_state_put(x);
 

@@ -1013,7 +1013,7 @@ void inet_register_protosw(struct inet_protosw *p)
 out:
 	spin_unlock_bh(&inetsw_lock);
 
-	synchronize_kernel();
+	synchronize_net();
 
 	return;
 
@@ -1040,7 +1040,7 @@ void inet_unregister_protosw(struct inet_protosw *p)
 		list_del_rcu(&p->list);
 		spin_unlock_bh(&inetsw_lock);
 
-		synchronize_kernel();
+		synchronize_net();
 	}
 }
 
