@@ -1,12 +1,16 @@
+/* Linux ISDN subsystem, PPP VJ header compression
+ *
+ * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ */
 
 #include "isdn_ppp_vj.h"
 #include "isdn_common.h"
 #include "isdn_net.h"
 #include "isdn_ppp.h"
-
-/* ====================================================================== */
-/* VJ header compression                                                  */
-/* ====================================================================== */
 
 struct slcompress *
 ippp_vj_alloc(void)

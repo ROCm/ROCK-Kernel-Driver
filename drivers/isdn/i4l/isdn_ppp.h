@@ -1,12 +1,10 @@
-/* $Id: isdn_ppp.h,v 1.17.6.1 2001/09/23 22:24:32 kai Exp $
- *
- * header for Linux ISDN subsystem, functions for synchronous PPP (linklevel).
+/* Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
  * Copyright 1995,96 by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #include <linux/ppp_defs.h>     /* for PPP_PROTOCOL */

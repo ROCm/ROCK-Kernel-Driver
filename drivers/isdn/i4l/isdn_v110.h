@@ -1,12 +1,9 @@
-/* $Id: isdn_v110.h,v 1.4.6.1 2001/09/23 22:24:32 kai Exp $
- *
- * Linux ISDN subsystem, V.110 related functions (linklevel).
+/* Linux ISDN subsystem, V.110 related functions
  *
  * Copyright by Thomas Pfeiffer (pfeiffer@pds.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #ifndef ISDN_V110_H

@@ -1,9 +1,49 @@
+/* Linux ISDN subsystem, PPP CCP support
+ *
+ * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
+ *           1995,96    by Thinking Objects Software GmbH Wuerzburg
+ *           1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ */
 
 #include "isdn_ppp_ccp.h"
 #include "isdn_common.h"
 #include "isdn_net.h"
 #include "isdn_ppp.h"
 #include <linux/ppp-comp.h>
+
+/* ====================================================================== */                                                                       
+enum ippp_ccp_reset_states {
+	CCPResetIdle,
+	CCPResetSentReq,
+	CCPResetRcvdReq,
+	CCPResetSentAck,
+	CCPResetRcvdAck
+};
+
+struct ippp_ccp_reset_state {
+	enum ippp_ccp_reset_states state;/* State of this transaction */
+	struct ippp_ccp *ccp;            /* Backlink */
+	unsigned char id;		 /* id index */
+	unsigned char ta:1;		 /* The timer is active (flag) */
+	unsigned char expra:1;		 /* We expect a ResetAck at all */
+	int dlen;			 /* Databytes stored in data */
+	struct timer_list timer;	 /* For timeouts/retries */
+	/* This is a hack but seems sufficient for the moment. We do not want
+	   to have this be yet another allocation for some bytes, it is more
+	   memory management overhead than the whole mess is worth. */
+	unsigned char data[IPPP_RESET_MAXDATABYTES];
+};
+
+/* The data structure keeping track of the currently outstanding CCP Reset
+   transactions. */
+struct ippp_ccp_reset {
+	struct ippp_ccp_reset_state *rs[256];	/* One per possible id */
+	unsigned char lastid;			/* Last id allocated */
+};
 
 /* In-kernel handling of CCP Reset-Request and Reset-Ack is necessary,
    but absolutely nontrivial. The most abstruse problem we are facing is

@@ -1,10 +1,19 @@
+/* Linux ISDN subsystem, PPP CCP support
+ *
+ * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
+ *           1995,96    by Thinking Objects Software GmbH Wuerzburg
+ *           1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ */
 
 #ifndef __ISDN_PPP_MP_H__
 #define __ISDN_PPP_MP_H__
 
 #include <linux/kernel.h>
 #include <linux/isdn.h>
-
 
 #ifdef CONFIG_ISDN_MPP
 

@@ -1,10 +1,9 @@
-/* $Id: isdn.h,v 1.111.6.9 2001/09/23 22:25:05 kai Exp $
- *
- * Main header for the Linux ISDN subsystem (linklevel).
+/* Linux ISDN subsystem, main header
  *
  * Copyright 1994,95,96 by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
  * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ * Copyright 2000-2002  by Kai Germaschewski (kai@germaschewski.name)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -441,9 +440,6 @@ typedef struct isdn_net_dev_s {
   u32                    mp_rxseq;     /* last seq no seen on this channel */
   struct ippp_ccp        *ccp;
   unsigned long          debug;
-
-  ippp_bundle * pb;		/* pointer to the common bundle structure
-   			         * with the per-bundle data */
 #endif
 #ifdef CONFIG_ISDN_X25
   struct concap_proto  *cprot; /* connection oriented encapsulation protocol */

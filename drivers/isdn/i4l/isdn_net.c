@@ -1,6 +1,4 @@
-/* $Id: isdn_net.c,v 1.140.6.11 2001/11/06 20:58:28 kai Exp $
- *
- * Linux ISDN subsystem, network interfaces and related functions (linklevel).
+/* Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
  * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
  *           1995,96    by Thinking Objects Software GmbH Wuerzburg
@@ -9,7 +7,9 @@
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
+ */
+
+/*
  * Data Over Voice (DOV) support added - Guy Ellis 23-Mar-02 
  *                                       guy@traverse.com.au
  * Outgoing calls - looks for a 'V' in first char of dialed number

@@ -1,5 +1,4 @@
-/*
- * Linux ISDN subsystem, Network interface configuration
+/* Linux ISDN subsystem, Network interface configuration
  *
  * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
  *           1995,96    by Thinking Objects Software GmbH Wuerzburg

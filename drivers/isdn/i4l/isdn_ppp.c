@@ -1,12 +1,10 @@
-/* $Id: isdn_ppp.c,v 1.85.6.9 2001/11/06 20:58:28 kai Exp $
+/* Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
- * Linux ISDN subsystem, functions for synchronous PPP (linklevel).
- *
- * Copyright 1995,96 by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #include <linux/module.h>
@@ -22,6 +20,10 @@
 #include "isdn_ppp_vj.h"
 #include "isdn_ppp_mp.h"
 #include "isdn_net.h"
+
+/* ====================================================================== */
+
+#define IPPP_MAX_RQ_LEN 8 /* max #frames queued for ipppd to read */
 
 static int
 isdn_ppp_set_compressor(isdn_net_dev *idev, struct isdn_ppp_comp_data *);

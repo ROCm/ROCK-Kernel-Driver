@@ -1,14 +1,12 @@
-/* $Id: isdn_net.h,v 1.19.6.4 2001/09/28 08:05:29 kai Exp $
- *
- * header for Linux ISDN subsystem, network related functions (linklevel).
+/* Linux ISDN subsystem, network related functions
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
- * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
- * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1995,96    by Thinking Objects Software GmbH Wuerzburg
+ *           1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
+ *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #include <linux/kernel.h>
@@ -38,6 +36,8 @@ void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
 int  isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
 isdn_net_dev *isdn_net_get_xmit_dev(isdn_net_local *mlp);
 void isdn_netif_rx(isdn_net_dev *idev, struct sk_buff *skb, u16 protocol);
+
+/* ====================================================================== */
 
 static inline int
 put_u8(unsigned char *p, u8 x)

@@ -1,16 +1,12 @@
-/* $Id: isdn_concap.c,v 1.8.6.1 2001/09/23 22:24:31 kai Exp $
- * 
- * Linux ISDN subsystem, protocol encapsulation
+/* Linux ISDN subsystem, protocol encapsulation
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 /* Stuff to support the concap_proto by isdn4linux. isdn4linux - specific
  * stuff goes here. Stuff that depends only on the concap protocol goes to
  * another -- protocol specific -- source file.
- *
  */
 
 

@@ -1,5 +1,4 @@
-/*
- * Linux ISDN subsystem, CISCO HDLC network interfaces
+/* Linux ISDN subsystem, CISCO HDLC network interfaces
  *
  * Copyright 1999-2002  by Kai Germaschewski <kai@germaschewski.name>
  *           2001       by Bjoern A. Zeeb <i4l@zabbadoz.net>

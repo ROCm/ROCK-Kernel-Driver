@@ -1,7 +1,4 @@
-/* $Id: isdn_common.h,v 1.21.6.1 2001/09/23 22:24:31 kai Exp $
- *
- * header for Linux ISDN subsystem
- * common used functions and debugging-switches (linklevel).
+/* Linux ISDN subsystem, common used functions and debugging-switches
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg

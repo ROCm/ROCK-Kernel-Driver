@@ -1,6 +1,4 @@
-/* $Id: isdn_common.c,v 1.114.6.16 2001/11/06 20:58:28 kai Exp $
- *
- * Linux ISDN subsystem, common used functions (linklevel).
+/* Linux ISDN subsystem, common used functions
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    Thinking Objects Software GmbH Wuerzburg
@@ -8,7 +6,6 @@
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #include <linux/config.h>
