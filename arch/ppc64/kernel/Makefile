@@ -22,7 +22,7 @@ obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o iomap.o $(pci-obj-y)
 
 obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 			     iSeries_VpdInfo.o XmPciLpEvent.o \
-			     HvCall.o HvLpConfig.o LparData.o mf_proc.o \
+			     HvCall.o HvLpConfig.o LparData.o \
 			     iSeries_setup.o ItLpQueue.o hvCall.o \
 			     mf.o HvLpEvent.o iSeries_proc.o iSeries_htab.o \
 			     iSeries_iommu.o

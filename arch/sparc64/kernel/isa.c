@@ -262,7 +262,7 @@ void __init isa_init(void)
 	device = PCI_DEVICE_ID_AL_M1533;
 
 	pdev = NULL;
-	while ((pdev = pci_find_device(vendor, device, pdev)) != NULL) {
+	while ((pdev = pci_get_device(vendor, device, pdev)) != NULL) {
 		struct pcidev_cookie *pdev_cookie;
 		struct pci_pbm_info *pbm;
 		struct sparc_isa_bridge *isa_br;

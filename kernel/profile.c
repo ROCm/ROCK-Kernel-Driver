@@ -34,6 +34,9 @@ struct profile_hit {
 #define NR_PROFILE_HIT		(PAGE_SIZE/sizeof(struct profile_hit))
 #define NR_PROFILE_GRP		(NR_PROFILE_HIT/PROFILE_GRPSZ)
 
+/* Oprofile timer tick hook */
+int (*timer_hook)(struct pt_regs *);
+
 static atomic_t *prof_buffer;
 static unsigned long prof_len, prof_shift;
 static int prof_on;
@@ -168,38 +171,24 @@ int profile_event_unregister(enum profile_type type, struct notifier_block * n)
 	return err;
 }
 
-static struct notifier_block * profile_listeners;
-static rwlock_t profile_lock = RW_LOCK_UNLOCKED;
- 
-int register_profile_notifier(struct notifier_block * nb)
+int register_timer_hook(int (*hook)(struct pt_regs *))
 {
-	int err;
-	write_lock_irq(&profile_lock);
-	err = notifier_chain_register(&profile_listeners, nb);
-	write_unlock_irq(&profile_lock);
-	return err;
+	if (timer_hook)
+		return -EBUSY;
+	timer_hook = hook;
+	return 0;
 }
 
-
-int unregister_profile_notifier(struct notifier_block * nb)
+void unregister_timer_hook(int (*hook)(struct pt_regs *))
 {
-	int err;
-	write_lock_irq(&profile_lock);
-	err = notifier_chain_unregister(&profile_listeners, nb);
-	write_unlock_irq(&profile_lock);
-	return err;
+	WARN_ON(hook != timer_hook);
+	timer_hook = NULL;
+	/* make sure all CPUs see the NULL hook */
+	synchronize_kernel();
 }
 
-
-void profile_hook(struct pt_regs * regs)
-{
-	read_lock(&profile_lock);
-	notifier_call_chain(&profile_listeners, 0, regs);
-	read_unlock(&profile_lock);
-}
-
-EXPORT_SYMBOL_GPL(register_profile_notifier);
-EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+EXPORT_SYMBOL_GPL(register_timer_hook);
+EXPORT_SYMBOL_GPL(unregister_timer_hook);
 EXPORT_SYMBOL_GPL(task_handoff_register);
 EXPORT_SYMBOL_GPL(task_handoff_unregister);
 
@@ -394,8 +383,8 @@ void profile_hit(int type, void *__pc)
 
 void profile_tick(int type, struct pt_regs *regs)
 {
-	if (type == CPU_PROFILING)
-		profile_hook(regs);
+	if (type == CPU_PROFILING && timer_hook)
+		timer_hook(regs);
 	if (!user_mode(regs) && cpu_isset(smp_processor_id(), prof_cpu_mask))
 		profile_hit(type, (void *)profile_pc(regs));
 }

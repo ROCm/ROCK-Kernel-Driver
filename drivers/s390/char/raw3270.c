@@ -65,7 +65,7 @@ static int raw3270_registered;
 
 /* Module parameters */
 static int tubxcorrect = 0;
-MODULE_PARM(tubxcorrect, "i");
+module_param(tubxcorrect, bool, 0);
 
 /*
  * Wait queue for device init/delete, view delete.

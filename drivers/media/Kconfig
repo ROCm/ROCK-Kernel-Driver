@@ -38,6 +38,9 @@ config VIDEO_TUNER
 config VIDEO_BUF
 	tristate
 
+config VIDEO_BUF_DVB
+	tristate
+
 config VIDEO_BTCX
 	tristate
 

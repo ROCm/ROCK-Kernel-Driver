@@ -1003,16 +1003,16 @@ static int cyber2000fb_blank(int blank, struct fb_info *info)
 	int i;
 
 	switch (blank) {
-	case 4:	/* powerdown - both sync lines down */
+	case FB_BLANK_POWERDOWN:	/* powerdown - both sync lines down */
 		sync = EXT_SYNC_CTL_VS_0 | EXT_SYNC_CTL_HS_0;
 		break;	
-	case 3:	/* hsync off */
+	case FB_BLANK_HSYNC_SUSPEND:	/* hsync off */
 		sync = EXT_SYNC_CTL_VS_NORMAL | EXT_SYNC_CTL_HS_0;
 		break;	
-	case 2:	/* vsync off */
+	case FB_BLANK_VSYNC_SUSPEND:	/* vsync off */
 		sync = EXT_SYNC_CTL_VS_0 | EXT_SYNC_CTL_HS_NORMAL;
 		break;
-	case 1:	/* soft blank */
+	case FB_BLANK_NORMAL:	        /* soft blank */
 	default: /* unblank */
 		break;
 	}

@@ -461,7 +461,7 @@ static int sctp_v6_cmp_addr(const union sctp_addr *addr1,
 		}
 		return 0;
 	}
-	if (ipv6_addr_cmp(&addr1->v6.sin6_addr, &addr2->v6.sin6_addr))
+	if (!ipv6_addr_equal(&addr1->v6.sin6_addr, &addr2->v6.sin6_addr))
 		return 0;
 	/* If this is a linklocal address, compare the scope_id. */
 	if (ipv6_addr_type(&addr1->v6.sin6_addr) & IPV6_ADDR_LINKLOCAL) {

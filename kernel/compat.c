@@ -484,7 +484,7 @@ static int put_compat_itimerspec(struct compat_itimerspec __user *dst,
 	return 0;
 } 
 
-long compat_timer_settime(timer_t timer_id, int flags, 
+long compat_sys_timer_settime(timer_t timer_id, int flags,
 			  struct compat_itimerspec __user *new, 
 			  struct compat_itimerspec __user *old)
 { 
@@ -507,7 +507,7 @@ long compat_timer_settime(timer_t timer_id, int flags,
 	return err;
 } 
 
-long compat_timer_gettime(timer_t timer_id,
+long compat_sys_timer_gettime(timer_t timer_id,
 		struct compat_itimerspec __user *setting)
 { 
 	long err;
@@ -524,7 +524,7 @@ long compat_timer_gettime(timer_t timer_id,
 	return err;
 } 
 
-long compat_clock_settime(clockid_t which_clock,
+long compat_sys_clock_settime(clockid_t which_clock,
 		struct compat_timespec __user *tp)
 {
 	long err;
@@ -541,7 +541,7 @@ long compat_clock_settime(clockid_t which_clock,
 	return err;
 } 
 
-long compat_clock_gettime(clockid_t which_clock,
+long compat_sys_clock_gettime(clockid_t which_clock,
 		struct compat_timespec __user *tp)
 {
 	long err;
@@ -558,7 +558,7 @@ long compat_clock_gettime(clockid_t which_clock,
 	return err;
 } 
 
-long compat_clock_getres(clockid_t which_clock,
+long compat_sys_clock_getres(clockid_t which_clock,
 		struct compat_timespec __user *tp)
 {
 	long err;
@@ -575,7 +575,7 @@ long compat_clock_getres(clockid_t which_clock,
 	return err;
 } 
 
-long compat_clock_nanosleep(clockid_t which_clock, int flags,
+long compat_sys_clock_nanosleep(clockid_t which_clock, int flags,
 			    struct compat_timespec __user *rqtp,
 			    struct compat_timespec __user *rmtp)
 {

@@ -889,7 +889,7 @@ pcibios_fixup_OF_interrupts(void)
 	 * should find the device node and apply the interrupt
 	 * obtained from the OF device-tree
 	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		struct device_node *node;
 		node = pci_device_to_OF_node(dev);
 		/* this is the node, see if it has interrupts */
@@ -989,7 +989,7 @@ pmac_pcibios_after_init(void)
 	 *
 	 * -- BenH
 	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		if ((dev->class >> 16) == PCI_BASE_CLASS_STORAGE)
 			pci_enable_device(dev);
 	}

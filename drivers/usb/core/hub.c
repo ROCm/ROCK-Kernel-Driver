@@ -1373,7 +1373,10 @@ static int hub_port_reset(struct usb_device *hdev, int port,
 			status = hub_port_wait_reset(hdev, port, udev, delay);
 
 		/* return on disconnect or reset */
-		if (status == -ENOTCONN || status == 0) {
+		switch (status) {
+		case 0:
+		case -ENOTCONN:
+		case -ENODEV:
 			clear_port_feature(hdev,
 				port + 1, USB_PORT_FEAT_C_RESET);
 			/* FIXME need disconnect() for NOTATTACHED device */
@@ -1524,7 +1527,7 @@ int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 	if (port < 0)
 		return port;
 
-	if (udev->dev.power.power_state
+	if (udev->state == USB_STATE_SUSPENDED
 			|| udev->state == USB_STATE_NOTATTACHED) {
 		return 0;
 	}
@@ -1595,16 +1598,16 @@ int __usb_suspend_device (struct usb_device *udev, int port, u32 state)
 	 */
 	if (!udev->parent) {
 		struct usb_bus	*bus = udev->bus;
-		if (bus && bus->op->hub_suspend)
+		if (bus && bus->op->hub_suspend) {
 			status = bus->op->hub_suspend (bus);
-		else
+			if (status == 0)
+				usb_set_device_state(udev,
+						USB_STATE_SUSPENDED);
+		} else
 			status = -EOPNOTSUPP;
 	} else
 		status = hub_port_suspend(udev->parent, port);
 
-	if (status == 0)
-		udev->dev.power.power_state = PM_SUSPEND_MEM;
-	up(&udev->serialize);
 	return status;
 }
 EXPORT_SYMBOL(__usb_suspend_device);
@@ -1652,7 +1655,6 @@ static int finish_port_resume(struct usb_device *udev)
 
 	/* caller owns the udev device lock */
 	dev_dbg(&udev->dev, "usb resume\n");
-	udev->dev.power.power_state = PM_SUSPEND_ON;
 
 	/* usb ch9 identifies four variants of SUSPENDED, based on what
 	 * state the device resumes to.  Linux currently won't see the
@@ -1809,14 +1811,15 @@ int usb_resume_device(struct usb_device *udev)
 	 */
 	if (!udev->parent) {
 		struct usb_bus	*bus = udev->bus;
-		if (bus && bus->op->hub_resume)
+		if (bus && bus->op->hub_resume) {
 			status = bus->op->hub_resume (bus);
-		else
+		} else
 			status = -EOPNOTSUPP;
 		if (status == 0) {
 			/* TRSMRCY = 10 msec */
 			msleep(10);
-			status = hub_resume (bus->root_hub
+			usb_set_device_state (udev, USB_STATE_CONFIGURED);
+			status = hub_resume (udev
 					->actconfig->interface[0]);
 		}
 	} else if (udev->state == USB_STATE_SUSPENDED) {
@@ -1824,7 +1827,6 @@ int usb_resume_device(struct usb_device *udev)
 		status = hub_port_resume(udev->parent, port);
 	} else {
 		status = 0;
-		udev->dev.power.power_state = PM_SUSPEND_ON;
 	}
 	if (status < 0) {
 		dev_dbg(&udev->dev, "can't resume, status %d\n",

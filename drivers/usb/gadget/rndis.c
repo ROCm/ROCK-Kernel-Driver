@@ -1275,7 +1275,7 @@ int rndis_rm_hdr (u8 *buf, u32 *length)
 
 #ifdef	CONFIG_USB_GADGET_DEBUG_FILES
 
-int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof, 
+static int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof, 
 		     void *data)
 {
 	char *out = page;
@@ -1320,7 +1320,7 @@ int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof,
 	return len;
 }
 
-int rndis_proc_write (struct file *file, const char __user *buffer, 
+static int rndis_proc_write (struct file *file, const char __user *buffer, 
 		      unsigned long count, void *data)
 {
 	rndis_params *p = data;

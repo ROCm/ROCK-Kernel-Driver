@@ -44,8 +44,8 @@ static int sol_compat = 0;		/* Solaris compatibility mode	*/
  * If you wish the device to operate as under Solaris,
  * omitting above features, set this parameter to non-zero.
  */
-MODULE_PARM
-	(sol_compat, "1i");
+module_param
+	(sol_compat, int, 0);
 MODULE_PARM_DESC
 	(sol_compat, 
 	 "Disables documented functionality omitted from Solaris driver");

@@ -745,9 +745,8 @@ fb_blank(struct fb_info *info, int blank)
 {	
 	int err = -EINVAL;
 	
-	/* Workaround for broken X servers */
-	if (blank > VESA_POWERDOWN)
-		blank = VESA_POWERDOWN;
+ 	if (blank > FB_BLANK_POWERDOWN)
+ 		blank = FB_BLANK_POWERDOWN;
 
 	if (info->fbops->fb_blank)
  		err = info->fbops->fb_blank(blank, info);

@@ -31,6 +31,7 @@
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 #include <asm/user32.h>
+#include <asm/ia32.h>
 
 #undef WARN_OLD
 #undef CORE_DUMP /* probably broken */

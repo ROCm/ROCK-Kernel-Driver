@@ -69,6 +69,25 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 }
 
 /**
+ * add a single device
+ * @dev: device to add
+ *
+ * This adds a single pci device to the global
+ * device list and adds sysfs and procfs entries
+ */
+void __devinit pci_bus_add_device(struct pci_dev *dev)
+{
+	device_add(&dev->dev);
+
+	spin_lock(&pci_bus_lock);
+	list_add_tail(&dev->global_list, &pci_devices);
+	spin_unlock(&pci_bus_lock);
+
+	pci_proc_attach_device(dev);
+	pci_create_sysfs_dev_files(dev);
+}
+
+/**
  * pci_bus_add_devices - insert newly discovered PCI devices
  * @bus: bus to check for new devices
  *
@@ -91,16 +110,7 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 		 */
 		if (!list_empty(&dev->global_list))
 			continue;
-
-		device_add(&dev->dev);
-
-		spin_lock(&pci_bus_lock);
-		list_add_tail(&dev->global_list, &pci_devices);
-		spin_unlock(&pci_bus_lock);
-
-		pci_proc_attach_device(dev);
-		pci_create_sysfs_dev_files(dev);
-
+		pci_bus_add_device(dev);
 	}
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -136,5 +146,6 @@ void pci_enable_bridges(struct pci_bus *bus)
 }
 
 EXPORT_SYMBOL(pci_bus_alloc_resource);
+EXPORT_SYMBOL_GPL(pci_bus_add_device);
 EXPORT_SYMBOL(pci_bus_add_devices);
 EXPORT_SYMBOL(pci_enable_bridges);

@@ -245,6 +245,13 @@ config VIDEO_SAA7134
 	  To compile this driver as a module, choose M here: the
 	  module will be called saa7134.
 
+config VIDEO_SAA7134_DVB
+	tristate "DVB Support for saa7134 based TV cards"
+	depends on VIDEO_SAA7134 && DVB_CORE && BROKEN
+	---help---
+	  This adds support for DVB cards based on the
+	  Philips saa7134 chip.
+
 config VIDEO_MXB
 	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
 	depends on VIDEO_DEV && PCI
@@ -308,12 +315,13 @@ config VIDEO_CX88
 	  To compile this driver as a module, choose M here: the
 	  module will be called cx8800
 
-#config VIDEO_CX88_DVB
-#	tristate "DVB Support for cx2388x based TV cards"
-#	depends on VIDEO_CX88 && DVB_CORE
-#	---help---
-#	  This adds support for DVB cards based on the
-#	  Connexant 2388x chip.
+config VIDEO_CX88_DVB
+	tristate "DVB Support for cx2388x based TV cards"
+	depends on VIDEO_CX88 && DVB_CORE && BROKEN
+	select VIDEO_BUF_DVB
+	---help---
+	  This adds support for DVB cards based on the
+	  Connexant 2388x chip.
 
 config VIDEO_OVCAMCHIP
 	tristate "OmniVision Camera Chip support"

@@ -21,6 +21,9 @@
 #define PPC_FEATURE_HAS_MMU		0x04000000
 #define PPC_FEATURE_HAS_4xxMAC		0x02000000
 #define PPC_FEATURE_UNIFIED_CACHE	0x01000000
+#define PPC_FEATURE_HAS_SPE		0x00800000
+#define PPC_FEATURE_HAS_EFP_SINGLE	0x00400000
+#define PPC_FEATURE_HAS_EFP_DOUBLE	0x00200000
 
 #ifdef __KERNEL__
 
@@ -45,6 +48,9 @@ struct cpu_spec {
 	/* cache line sizes */
 	unsigned int	icache_bsize;
 	unsigned int	dcache_bsize;
+
+	/* number of performance monitor counters */
+	unsigned int	num_pmcs;
 
 	/* this is called to initialize various CPU bits like L1 cache,
 	 * BHT, SPD, etc... from head.S before branching to identify_machine

@@ -696,7 +696,7 @@ static void __exit nwflash_exit(void)
 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(flashdebug, "i");
+module_param(flashdebug, bool, 0644);
 
 module_init(nwflash_init);
 module_exit(nwflash_exit);

@@ -212,7 +212,7 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 	int depth = fb_get_color_depth(info);
 	int color = 0;
 
-	if (!info->fbops->fb_blank && console_blanked) {
+	if (console_blanked) {
 		unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 
 		c = vc->vc_video_erase_char & charmask;
@@ -229,7 +229,7 @@ static inline int get_color(struct vc_data *vc, struct fb_info *info,
 		int fg = (info->fix.visual != FB_VISUAL_MONO01) ? 1 : 0;
 		int bg = (info->fix.visual != FB_VISUAL_MONO01) ? 0 : 1;
 
-		if (!info->fbops->fb_blank && console_blanked)
+		if (console_blanked)
 			fg = bg;
 
 		color = (is_fg) ? fg : bg;
@@ -503,6 +503,115 @@ static void set_blitting_type(struct vc_data *vc, struct fb_info *info,
 }
 #endif /* CONFIG_MISC_TILEBLITTING */
 
+
+static int con2fb_acquire_newinfo(struct vc_data *vc, struct fb_info *info,
+				  int unit, int oldidx)
+{
+	struct fbcon_ops *ops = NULL;
+	int err = 0;
+
+	if (!try_module_get(info->fbops->owner))
+		err = -ENODEV;
+
+	if (!err && info->fbops->fb_open &&
+	    info->fbops->fb_open(info, 0))
+		err = -ENODEV;
+
+	if (!err) {
+		ops = kmalloc(sizeof(struct fbcon_ops), GFP_KERNEL);
+		if (!ops)
+			err = -ENOMEM;
+	}
+
+	if (!err) {
+		memset(ops, 0, sizeof(struct fbcon_ops));
+		info->fbcon_par = ops;
+		set_blitting_type(vc, info, NULL);
+	}
+
+	if (err) {
+		con2fb_map[unit] = oldidx;
+		module_put(info->fbops->owner);
+	}
+
+	return err;
+}
+
+static int con2fb_release_oldinfo(struct vc_data *vc, struct fb_info *oldinfo,
+				  struct fb_info *newinfo, int unit,
+				  int oldidx, int found)
+{
+	struct fbcon_ops *ops = oldinfo->fbcon_par;
+	int err = 0;
+
+	if (oldinfo->fbops->fb_release &&
+	    oldinfo->fbops->fb_release(oldinfo, 0)) {
+		con2fb_map[unit] = oldidx;
+		if (!found && newinfo->fbops->fb_release)
+			newinfo->fbops->fb_release(newinfo, 0);
+		if (!found)
+			module_put(newinfo->fbops->owner);
+		err = -ENODEV;
+	}
+
+	if (!err) {
+		if (oldinfo->queue.func == fb_flashcursor)
+			del_timer_sync(&ops->cursor_timer);
+
+		kfree(ops->cursor_state.mask);
+		kfree(ops->cursor_data);
+		kfree(oldinfo->fbcon_par);
+		oldinfo->fbcon_par = NULL;
+		module_put(oldinfo->fbops->owner);
+	}
+
+	return err;
+}
+
+static void con2fb_init_newinfo(struct fb_info *info)
+{
+	if (!info->queue.func || info->queue.func == fb_flashcursor) {
+		struct fbcon_ops *ops = info->fbcon_par;
+
+		if (!info->queue.func)
+			INIT_WORK(&info->queue, fb_flashcursor, info);
+
+		init_timer(&ops->cursor_timer);
+		ops->cursor_timer.function = cursor_timer_handler;
+		ops->cursor_timer.expires = jiffies + HZ / 5;
+		ops->cursor_timer.data = (unsigned long ) info;
+		add_timer(&ops->cursor_timer);
+	}
+}
+
+static void con2fb_init_display(struct vc_data *vc, struct fb_info *info,
+				int unit, int show_logo)
+{
+	struct fbcon_ops *ops = info->fbcon_par;
+
+	ops->currcon = fg_console;
+
+	if (info->fbops->fb_set_par)
+		info->fbops->fb_set_par(info);
+
+	if (vc)
+		fbcon_set_disp(info, vc);
+	else
+		fbcon_preset_disp(info, unit);
+
+	if (show_logo) {
+		struct vc_data *fg_vc = vc_cons[fg_console].d;
+		struct fb_info *fg_info =
+			registered_fb[con2fb_map[fg_console]];
+
+		fbcon_prepare_logo(fg_vc, fg_info, fg_vc->vc_cols,
+				   fg_vc->vc_rows, fg_vc->vc_cols,
+				   fg_vc->vc_rows);
+	}
+
+	switch_screen(fg_console);
+}
+
 /**
  *	set_con2fb_map - map console to frame buffer device
  *	@unit: virtual console number to map
@@ -518,16 +627,15 @@ static int set_con2fb_map(int unit, int newidx, int user)
 	int oldidx = con2fb_map[unit];
 	struct fb_info *info = registered_fb[newidx];
 	struct fb_info *oldinfo = NULL;
-	struct fbcon_ops *ops;
-	int found;
+ 	int found, err = 0;
 
 	if (oldidx == newidx)
 		return 0;
 
 	if (!info)
-		return -EINVAL;
+ 		err =  -EINVAL;
 
-	if (!search_for_mapped_con()) {
+ 	if (!err && !search_for_mapped_con()) {
 		info_idx = newidx;
 		return fbcon_takeover(0);
 	}
@@ -539,109 +647,30 @@ static int set_con2fb_map(int unit, int newidx, int user)
 
 	acquire_console_sem();
 	con2fb_map[unit] = newidx;
+	if (!err && !found)
+ 		err = con2fb_acquire_newinfo(vc, info, unit, oldidx);
 
-	if (!found) {
-		int err = 0;
-
-		ops = NULL;
-
-		if (!try_module_get(info->fbops->owner)) {
-			err = -ENODEV;
-		}
-
-		if (!err && info->fbops->fb_open &&
-		    info->fbops->fb_open(info, 0)) {
-			err = -ENODEV;
-		}
-
-		if (!err) {
-			ops = kmalloc(sizeof(struct fbcon_ops), GFP_KERNEL);
-			if (!ops)
-				err = -ENOMEM;
-		}
-
-		if (!err) {
-			memset(ops, 0, sizeof(struct fbcon_ops));
-			info->fbcon_par = ops;
-			set_blitting_type(vc, info, NULL);
-		}
-
-		if (err) {
-			con2fb_map[unit] = oldidx;
-			module_put(info->fbops->owner);
-			release_console_sem();
-			return err;
-		}
-	}
 
 	/*
 	 * If old fb is not mapped to any of the consoles,
 	 * fbcon should release it.
 	 */
-	if (oldinfo && !search_fb_in_map(oldidx)) {
+ 	if (!err && oldinfo && !search_fb_in_map(oldidx))
+ 		err = con2fb_release_oldinfo(vc, oldinfo, info, unit, oldidx,
+ 					     found);
 
-		ops = oldinfo->fbcon_par;
+ 	if (!err) {
+ 		int show_logo = (fg_console == 0 && !user &&
+ 				 logo_shown != FBCON_LOGO_DONTSHOW);
 
-		if (oldinfo->fbops->fb_release &&
-		    oldinfo->fbops->fb_release(oldinfo, 0)) {
-			con2fb_map[unit] = oldidx;
-			if (!found && info->fbops->fb_release)
-				info->fbops->fb_release(info, 0);
-			if (!found)
-				module_put(info->fbops->owner);
-			release_console_sem();
-			return -ENODEV;
-		}
-
-		if (oldinfo->queue.func == fb_flashcursor)
-			del_timer_sync(&ops->cursor_timer);
-
-		kfree(ops->cursor_state.mask);
-		kfree(ops->cursor_data);
-		kfree(oldinfo->fbcon_par);
-		oldinfo->fbcon_par = NULL;
-		module_put(oldinfo->fbops->owner);
+ 		if (!found)
+ 			con2fb_init_newinfo(info);
+ 		con2fb_map_boot[unit] = newidx;
+ 		con2fb_init_display(vc, info, unit, show_logo);
 	}
 
-	if (!found) {
-		if (!info->queue.func || info->queue.func == fb_flashcursor) {
-
-			ops = info->fbcon_par;
-
-			if (!info->queue.func)
-				INIT_WORK(&info->queue, fb_flashcursor, info);
-
-			init_timer(&ops->cursor_timer);
-			ops->cursor_timer.function = cursor_timer_handler;
-			ops->cursor_timer.expires = jiffies + HZ / 5;
-			ops->cursor_timer.data = (unsigned long ) info;
-			add_timer(&ops->cursor_timer);
-		}
-	}
-
-	ops = info->fbcon_par;
-	ops->currcon = fg_console;
-	con2fb_map_boot[unit] = newidx;
-
-	if (info->fbops->fb_set_par)
-		info->fbops->fb_set_par(info);
-
-	if (vc)
-		fbcon_set_disp(info, vc);
-	else
-		fbcon_preset_disp(info, unit);
-
-	if (fg_console == 0 && !user && logo_shown != FBCON_LOGO_DONTSHOW) {
-		struct vc_data *vc = vc_cons[fg_console].d;
-		struct fb_info *fg_info = registered_fb[con2fb_map[fg_console]];
-
-		fbcon_prepare_logo(vc, fg_info, vc->vc_cols, vc->vc_rows,
-				   vc->vc_cols, vc->vc_rows);
-	}
-
-	switch_screen(fg_console);
 	release_console_sem();
-	return 0;
+ 	return err;
 }
 
 /*
@@ -1964,17 +1993,52 @@ static int fbcon_switch(struct vc_data *vc)
 	return 1;
 }
 
+static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
+				int blank)
+{
+	if (blank) {
+		if (info->fix.visual == FB_VISUAL_DIRECTCOLOR ||
+		    info->fix.visual == FB_VISUAL_PSEUDOCOLOR) {
+			struct fb_cmap cmap;
+			u16 *black;
+
+			black = kmalloc(sizeof(u16) * info->cmap.len,
+					GFP_KERNEL);
+			if (black) {
+				memset(black, 0, info->cmap.len * sizeof(u16));
+				cmap.red = cmap.green = cmap.blue = black;
+				cmap.transp = info->cmap.transp ? black : NULL;
+				cmap.start = info->cmap.start;
+				cmap.len = info->cmap.len;
+				fb_set_cmap(&cmap, info);
+			}
+
+			kfree(black);
+		} else {
+			unsigned short charmask = vc->vc_hi_font_mask ?
+				0x1ff : 0xff;
+			unsigned short oldc;
+
+			oldc = vc->vc_video_erase_char;
+			vc->vc_video_erase_char &= charmask;
+			fbcon_clear(vc, 0, 0, vc->vc_rows, vc->vc_cols);
+			vc->vc_video_erase_char = oldc;
+		}
+	} else {
+		if (info->fix.visual == FB_VISUAL_DIRECTCOLOR ||
+		    info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+			fb_set_cmap(&info->cmap, info);
+	}
+}
+
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 {
-	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
 	struct fbcon_ops *ops = info->fbcon_par;
-	struct display *p = &fb_display[vc->vc_num];
-	int retval = 0;
+	int active = !fbcon_is_inactive(vc, info);
 
 	if (mode_switch) {
 		struct fb_var_screeninfo var = info->var;
-
 /*
  * HACK ALERT: Some hardware will require reinitializion at this stage,
  *             others will require it to be done as late as possible.
@@ -1991,36 +2055,25 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 			var.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
 			fb_set_var(info, &var);
 		}
-
-		return 0;
 	}
 
-	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
-	ops->cursor_flash = (!blank);
+ 	if (active) {
+ 		int ret = -1;
 
-	if (!info->fbops->fb_blank) {
-		if (blank) {
-			unsigned short oldc;
-			u_int height;
-			u_int y_break;
+ 		fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
+ 		ops->cursor_flash = (!blank);
 
-			oldc = vc->vc_video_erase_char;
-			vc->vc_video_erase_char &= charmask;
-			height = vc->vc_rows;
-			y_break = p->vrows - p->yscroll;
-			if (height > y_break) {
-				fbcon_clear(vc, 0, 0, y_break, vc->vc_cols);
-				fbcon_clear(vc, y_break, 0, height - y_break,
-					    vc->vc_cols);
-			} else
-				fbcon_clear(vc, 0, 0, height, vc->vc_cols);
-			vc->vc_video_erase_char = oldc;
- 		} else if (!fbcon_is_inactive(vc, info))
-			update_screen(vc->vc_num);
-	} else if (vt_cons[vc->vc_num]->vc_mode == KD_TEXT)
- 		retval = info->fbops->fb_blank(blank, info);
+ 		if (info->fbops->fb_blank)
+ 			ret = info->fbops->fb_blank(blank, info);
 
-	return retval;
+ 		if (ret)
+ 			fbcon_generic_blank(vc, info, blank);
+
+ 		if (!blank)
+  			update_screen(vc->vc_num);
+ 	}
+
+ 	return 0;
 }
 
 static void fbcon_free_font(struct display *p)
@@ -2757,7 +2810,6 @@ module_exit(fb_console_exit);
  *  Visible symbols for modules
  */
 
-EXPORT_SYMBOL(fb_display);
 EXPORT_SYMBOL(fb_con);
 
 MODULE_LICENSE("GPL");

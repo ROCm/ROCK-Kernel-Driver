@@ -588,7 +588,7 @@ static void __qla1280_dump_buffer(char *, int);
 static char *qla1280;
 
 /* insmod qla1280 options=verbose" */
-MODULE_PARM(qla1280, "s");
+module_param(qla1280, charp, 0);
 #else
 __setup("qla1280=", qla1280_setup);
 #endif

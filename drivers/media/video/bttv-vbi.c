@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-vbi.c,v 1.6 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttv-vbi.c,v 1.7 2004/11/07 13:17:15 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
     vbi interface
@@ -37,9 +37,9 @@
 static unsigned int vbibufs = 4;
 static unsigned int vbi_debug = 0;
 
-MODULE_PARM(vbibufs,"i");
+module_param(vbibufs,   int, 0444);
+module_param(vbi_debug, int, 0644);
 MODULE_PARM_DESC(vbibufs,"number of vbi buffers, range 2-32, default 4");
-MODULE_PARM(vbi_debug,"i");
 MODULE_PARM_DESC(vbi_debug,"vbi code debug messages, default is 0 (no)");
 
 #ifdef dprintk
@@ -63,10 +63,10 @@ vbi_buffer_risc(struct bttv *btv, struct bttv_buffer *buf, int lines)
 	return 0;
 }
 
-static int vbi_buffer_setup(void *priv,
+static int vbi_buffer_setup(struct videobuf_queue *q,
 			    unsigned int *count, unsigned int *size)
 {
-	struct bttv_fh *fh = priv;
+	struct bttv_fh *fh = q->priv_data;
 	struct bttv *btv = fh->btv;
 
 	if (0 == *count)
@@ -76,12 +76,13 @@ static int vbi_buffer_setup(void *priv,
 	return 0;
 }
 
-static int vbi_buffer_prepare(void *priv, struct videobuf_buffer *vb,
+static int vbi_buffer_prepare(struct videobuf_queue *q,
+			      struct videobuf_buffer *vb,
 			      enum v4l2_field field)
 {
-	struct bttv_fh *fh = priv;
+	struct bttv_fh *fh = q->priv_data;
 	struct bttv *btv = fh->btv;
-	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
+	struct bttv_buffer *buf = container_of(vb,struct bttv_buffer,vb);
 	int rc;
 
 	buf->vb.size = fh->lines * 2 * 2048;
@@ -107,11 +108,11 @@ static int vbi_buffer_prepare(void *priv, struct videobuf_buffer *vb,
 }
 
 static void
-vbi_buffer_queue(void *priv, struct videobuf_buffer *vb)
+vbi_buffer_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct bttv_fh *fh = priv;
+	struct bttv_fh *fh = q->priv_data;
 	struct bttv *btv = fh->btv;
-	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
+	struct bttv_buffer *buf = container_of(vb,struct bttv_buffer,vb);
 
 	dprintk("queue %p\n",vb);
 	buf->vb.state = STATE_QUEUED;
@@ -122,11 +123,11 @@ vbi_buffer_queue(void *priv, struct videobuf_buffer *vb)
 	}
 }
 
-static void vbi_buffer_release(void *priv, struct videobuf_buffer *vb)
+static void vbi_buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct bttv_fh *fh = priv;
+	struct bttv_fh *fh = q->priv_data;
 	struct bttv *btv = fh->btv;
-	struct bttv_buffer *buf = (struct bttv_buffer*)vb;
+	struct bttv_buffer *buf = container_of(vb,struct bttv_buffer,vb);
 
 	dprintk("free %p\n",vb);
 	bttv_dma_free(fh->btv,buf);

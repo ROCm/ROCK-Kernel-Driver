@@ -86,15 +86,15 @@ static unsigned int pio_threshold = ESP_PIO_THRESHOLD;
 
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(irq, "1-8i");
-MODULE_PARM(divisor, "1-8i");
-MODULE_PARM(dma, "i");
-MODULE_PARM(rx_trigger, "i");
-MODULE_PARM(tx_trigger, "i");
-MODULE_PARM(flow_off, "i");
-MODULE_PARM(flow_on, "i");
-MODULE_PARM(rx_timeout, "i");
-MODULE_PARM(pio_threshold, "i");
+module_param_array(irq, int, NULL, 0);
+module_param_array(divisor, uint, NULL, 0);
+module_param(dma, uint, 0);
+module_param(rx_trigger, uint, 0);
+module_param(tx_trigger, uint, 0);
+module_param(flow_off, uint, 0);
+module_param(flow_on, uint, 0);
+module_param(rx_timeout, uint, 0);
+module_param(pio_threshold, uint, 0);
 
 /* END */
 

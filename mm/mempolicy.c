@@ -530,7 +530,7 @@ asmlinkage long sys_get_mempolicy(int __user *policy,
 
 #ifdef CONFIG_COMPAT
 
-asmlinkage long compat_get_mempolicy(int __user *policy,
+asmlinkage long compat_sys_get_mempolicy(int __user *policy,
 				     compat_ulong_t __user *nmask,
 				     compat_ulong_t maxnode,
 				     compat_ulong_t addr, compat_ulong_t flags)
@@ -558,7 +558,7 @@ asmlinkage long compat_get_mempolicy(int __user *policy,
 	return err;
 }
 
-asmlinkage long compat_set_mempolicy(int mode, compat_ulong_t __user *nmask,
+asmlinkage long compat_sys_set_mempolicy(int mode, compat_ulong_t __user *nmask,
 				     compat_ulong_t maxnode)
 {
 	long err = 0;
@@ -581,7 +581,7 @@ asmlinkage long compat_set_mempolicy(int mode, compat_ulong_t __user *nmask,
 	return sys_set_mempolicy(mode, nm, nr_bits+1);
 }
 
-asmlinkage long compat_mbind(compat_ulong_t start, compat_ulong_t len,
+asmlinkage long compat_sys_mbind(compat_ulong_t start, compat_ulong_t len,
 			     compat_ulong_t mode, compat_ulong_t __user *nmask,
 			     compat_ulong_t maxnode, compat_ulong_t flags)
 {

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-i2c.c,v 1.11 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttv-i2c.c,v 1.13 2004/11/07 13:17:15 kraxel Exp $
 
     bttv-i2c.c  --  all the i2c code is here
 
@@ -37,19 +37,15 @@ static struct i2c_adapter bttv_i2c_adap_sw_template;
 static struct i2c_adapter bttv_i2c_adap_hw_template;
 static struct i2c_client bttv_i2c_client_template;
 
-#ifndef I2C_PEC
-static void bttv_inc_use(struct i2c_adapter *adap);
-static void bttv_dec_use(struct i2c_adapter *adap);
-#endif
 static int attach_inform(struct i2c_client *client);
 static int detach_inform(struct i2c_client *client);
 
 static int i2c_debug = 0;
 static int i2c_hw = 0;
 static int i2c_scan = 0;
-MODULE_PARM(i2c_debug,"i");
-MODULE_PARM(i2c_hw,"i");
-MODULE_PARM(i2c_scan,"i");
+module_param(i2c_debug, int, 0644);
+module_param(i2c_hw,    int, 0444);
+module_param(i2c_scan,  int, 0444);
 MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 
 /* ----------------------------------------------------------------------- */
@@ -108,12 +104,7 @@ static struct i2c_algo_bit_data bttv_i2c_algo_bit_template = {
 };
 
 static struct i2c_adapter bttv_i2c_adap_sw_template = {
-#ifdef I2C_PEC
 	.owner             = THIS_MODULE,
-#else
-	.inc_use           = bttv_inc_use,
-	.dec_use           = bttv_dec_use,
-#endif
 #ifdef I2C_CLASS_TV_ANALOG
 	.class             = I2C_CLASS_TV_ANALOG,
 #endif
@@ -290,12 +281,7 @@ static struct i2c_algorithm bttv_algo = {
 };
 
 static struct i2c_adapter bttv_i2c_adap_hw_template = {
-#ifdef I2C_PEC
 	.owner         = THIS_MODULE,
-#else
-	.inc_use       = bttv_inc_use,
-	.dec_use       = bttv_dec_use,
-#endif
 #ifdef I2C_CLASS_TV_ANALOG
 	.class         = I2C_CLASS_TV_ANALOG,
 #endif
@@ -305,6 +291,9 @@ static struct i2c_adapter bttv_i2c_adap_hw_template = {
 	.client_register = attach_inform,
 	.client_unregister = detach_inform,
 };
+
+/* ----------------------------------------------------------------------- */
+/* I2C functions - common stuff                                            */
 
 static int attach_inform(struct i2c_client *client)
 {

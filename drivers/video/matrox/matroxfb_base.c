@@ -1183,11 +1183,11 @@ static int matroxfb_blank(int blank, struct fb_info *info)
 		return 1;
 
 	switch (blank) {
-		case 1:  seq = 0x20; crtc = 0x00; break; /* works ??? */
-		case 2:  seq = 0x20; crtc = 0x10; break;
-		case 3:  seq = 0x20; crtc = 0x20; break;
-		case 4:  seq = 0x20; crtc = 0x30; break;
-		default: seq = 0x00; crtc = 0x00; break;
+	case FB_BLANK_NORMAL:  seq = 0x20; crtc = 0x00; break; /* works ??? */
+	case FB_BLANK_VSYNC_SUSPEND:  seq = 0x20; crtc = 0x10; break;
+	case FB_BLANK_HSYNC_SUSPEND:  seq = 0x20; crtc = 0x20; break;
+	case FB_BLANK_POWERDOWN:  seq = 0x20; crtc = 0x30; break;
+	default: seq = 0x00; crtc = 0x00; break;
 	}
 
 	CRITBEGIN
@@ -1580,6 +1580,11 @@ static int initMatrox2(WPMINFO struct board* b){
 	unsigned int memsize;
 	int err;
 
+	static struct pci_device_id intel_82437[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437) },
+		{ },
+	};
+
 	DBG(__FUNCTION__)
 
 	/* set default values... */
@@ -1684,7 +1689,7 @@ static int initMatrox2(WPMINFO struct board* b){
 		mga_option |= MX_OPTION_BSWAP;
                 /* disable palette snooping */
                 cmd &= ~PCI_COMMAND_VGA_PALETTE;
-		if (pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437, NULL)) {
+		if (pci_dev_present(intel_82437)) {
 			if (!(mga_option & 0x20000000) && !ACCESS_FBINFO(devflags.nopciretry)) {
 				printk(KERN_WARNING "matroxfb: Disabling PCI retries due to i82437 present\n");
 			}

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-dvb.c,v 1.12 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88-dvb.c,v 1.19 2004/11/07 14:44:59 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * MPEG Transport Stream (DVB) routines
@@ -32,6 +32,8 @@
 
 #include "cx88.h"
 #include "cx22702.h"
+#include "mt352.h"
+#include "mt352_priv.h" /* FIXME */
 
 MODULE_DESCRIPTION("driver for cx2388x based DVB cards");
 MODULE_AUTHOR("Chris Pascoe <c.pascoe@itee.uq.edu.au>");
@@ -47,9 +49,10 @@ MODULE_PARM_DESC(debug,"enable debug messages [dvb]");
 
 /* ------------------------------------------------------------------ */
 
-static int dvb_buf_setup(void *priv, unsigned int *count, unsigned int *size)
+static int dvb_buf_setup(struct videobuf_queue *q,
+			 unsigned int *count, unsigned int *size)
 {
-	struct cx8802_dev *dev = priv;
+	struct cx8802_dev *dev = q->priv_data;
 
 	dev->ts_packet_size  = 188 * 4;
 	dev->ts_packet_count = 32;
@@ -59,22 +62,22 @@ static int dvb_buf_setup(void *priv, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static int dvb_buf_prepare(void *priv, struct videobuf_buffer *vb,
+static int dvb_buf_prepare(struct videobuf_queue *q, struct videobuf_buffer *vb,
 			   enum v4l2_field field)
 {
-	struct cx8802_dev *dev = priv;
+	struct cx8802_dev *dev = q->priv_data;
 	return cx8802_buf_prepare(dev, (struct cx88_buffer*)vb);
 }
 
-static void dvb_buf_queue(void *priv, struct videobuf_buffer *vb)
+static void dvb_buf_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx8802_dev *dev = priv;
+	struct cx8802_dev *dev = q->priv_data;
 	cx8802_buf_queue(dev, (struct cx88_buffer*)vb);
 }
 
-static void dvb_buf_release(void *priv, struct videobuf_buffer *vb)
+static void dvb_buf_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx8802_dev *dev = priv;
+	struct cx8802_dev *dev = q->priv_data;
 	cx88_free_buffer(dev->pci, (struct cx88_buffer*)vb);
 }
 
@@ -85,233 +88,141 @@ struct videobuf_queue_ops dvb_qops = {
 	.buf_release  = dvb_buf_release,
 };
 
-static int dvb_thread(void *data)
+/* ------------------------------------------------------------------ */
+
+static int dvico_fusionhdtv_demod_init(struct dvb_frontend* fe)
 {
-	struct cx8802_dev *dev = data;
-	struct videobuf_buffer *buf;
-	unsigned long flags;
-	int err;
+	static u8 clock_config []  = { CLOCK_CTL,  0x38, 0x39 };
+	static u8 reset []         = { RESET,      0x80 };
+	static u8 adc_ctl_1_cfg [] = { ADC_CTL_1,  0x40 };
+	static u8 agc_cfg []       = { AGC_TARGET, 0x24, 0x20 };
+	static u8 gpp_ctl_cfg []   = { GPP_CTL,    0x33 };
+	static u8 capt_range_cfg[] = { CAPT_RANGE, 0x32 };
 
-	dprintk(1,"dvb thread started\n");
-	videobuf_read_start(dev, &dev->dvbq);
+	mt352_write(fe, clock_config,   sizeof(clock_config));
+	udelay(200);
+	mt352_write(fe, reset,          sizeof(reset));
+	mt352_write(fe, adc_ctl_1_cfg,  sizeof(adc_ctl_1_cfg));
 
-	for (;;) {
-		/* fetch next buffer */
-		buf = list_entry(dev->dvbq.stream.next,
-				 struct videobuf_buffer, stream);
-		list_del(&buf->stream);
-		err = videobuf_waiton(buf,0,1);
-		BUG_ON(0 != err);
-
-		/* no more feeds left or stop_feed() asked us to quit */
-		if (0 == dev->nfeeds)
-			break;
-		if (kthread_should_stop())
-			break;
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
-
-		/* feed buffer data to demux */
-		if (buf->state == STATE_DONE)
-			dvb_dmx_swfilter(&dev->demux, buf->dma.vmalloc,
-					 buf->size);
-
-		/* requeue buffer */
-		list_add_tail(&buf->stream,&dev->dvbq.stream);
-		spin_lock_irqsave(dev->dvbq.irqlock,flags);
-		dev->dvbq.ops->buf_queue(dev,buf);
-		spin_unlock_irqrestore(dev->dvbq.irqlock,flags);
-
-		/* log errors if any */
-		if (dev->error_count || dev->stopper_count) {
-			printk("%s: error=%d stopper=%d\n",
-			       dev->core->name, dev->error_count,
-			       dev->stopper_count);
-			dev->error_count   = 0;
-			dev->stopper_count = 0;
-		}
-		if (debug && dev->timeout_count) {
-			printk("%s: timeout=%d (FE not locked?)\n",
-			       dev->core->name, dev->timeout_count);
-			dev->timeout_count = 0;
-		}
-	}
-
-	videobuf_read_stop(dev, &dev->dvbq);
-	dprintk(1,"dvb thread stopped\n");
-
-	/* Hmm, linux becomes *very* unhappy without this ... */
-	while (!kthread_should_stop()) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule();
-	}
+	mt352_write(fe, agc_cfg,        sizeof(agc_cfg));
+	mt352_write(fe, gpp_ctl_cfg,    sizeof(gpp_ctl_cfg));
+	mt352_write(fe, capt_range_cfg, sizeof(capt_range_cfg));
 	return 0;
 }
 
-/* ---------------------------------------------------------------------------- */
+#define IF_FREQUENCYx6 217    /* 6 * 36.16666666667MHz */
 
-static int dvb_start_feed(struct dvb_demux_feed *feed)
+static int lg_z201_pll_set(struct dvb_frontend* fe,
+			   struct dvb_frontend_parameters* params, u8* pllbuf)
 {
-	struct dvb_demux *demux = feed->demux;
-	struct cx8802_dev *dev = demux->priv;
-	int rc;
+	u32 div;
+	unsigned char cp = 0;
+	unsigned char bs = 0;
 
-	if (!demux->dmx.frontend)
-		return -EINVAL;
+	div = (((params->frequency + 83333) * 3) / 500000) + IF_FREQUENCYx6;
 
-	down(&dev->lock);
-	dev->nfeeds++;
-	rc = dev->nfeeds;
+	if (params->frequency < 542000000) cp = 0xbc;
+	else if (params->frequency < 830000000) cp = 0xf4;
+	else cp = 0xfc;
 
-	if (NULL != dev->dvb_thread)
-		goto out;
-	dev->dvb_thread = kthread_run(dvb_thread, dev, "%s dvb", dev->core->name);
-	if (IS_ERR(dev->dvb_thread)) {
-		rc = PTR_ERR(dev->dvb_thread);
-		dev->dvb_thread = NULL;
-	}
+	if (params->frequency == 0) bs = 0x03;
+	else if (params->frequency < 157500000) bs = 0x01;
+	else if (params->frequency < 443250000) bs = 0x02;
+	else bs = 0x04;
 
-out:
-	up(&dev->lock);
-	dprintk(2, "%s rc=%d\n",__FUNCTION__,rc);
-	return rc;
+	pllbuf[0] = 0xC2; /* Note: non-linux standard PLL I2C address */
+	pllbuf[1] = div >> 8;
+	pllbuf[2] = div & 0xff;
+	pllbuf[3] = cp;
+	pllbuf[4] = bs;
+
+	return 0;
 }
 
-static int dvb_stop_feed(struct dvb_demux_feed *feed)
+static int thomson_dtt7579_pll_set(struct dvb_frontend* fe,
+				   struct dvb_frontend_parameters* params,
+				   u8* pllbuf)
 {
-	struct dvb_demux *demux = feed->demux;
-	struct cx8802_dev *dev = demux->priv;
-	int err = 0;
+	u32 div;
+	unsigned char cp = 0;
+	unsigned char bs = 0;
 
-	dprintk(2, "%s\n",__FUNCTION__);
+	div = (((params->frequency + 83333) * 3) / 500000) + IF_FREQUENCYx6;
 
-	down(&dev->lock);
-	dev->nfeeds--;
-	if (0 == dev->nfeeds  &&  NULL != dev->dvb_thread) {
-		cx8802_cancel_buffers(dev);
-		err = kthread_stop(dev->dvb_thread);
-		dev->dvb_thread = NULL;
-	}
-	up(&dev->lock);
-	return err;
+	if (params->frequency < 542000000) cp = 0xb4;
+	else if (params->frequency < 771000000) cp = 0xbc;
+	else cp = 0xf4;
+
+        if (params->frequency == 0) bs = 0x03;
+	else if (params->frequency < 443250000) bs = 0x02;
+	else bs = 0x08;
+
+	pllbuf[0] = 0xc0; // Note: non-linux standard PLL i2c address
+	pllbuf[1] = div >> 8;
+   	pllbuf[2] = div & 0xff;
+   	pllbuf[3] = cp;
+   	pllbuf[4] = bs;
+
+	return 0;
 }
 
-static void dvb_unregister(struct cx8802_dev *dev)
-{
-#if 1 /* really needed? */
-	down(&dev->lock);
-	if (NULL != dev->dvb_thread) {
-		kthread_stop(dev->dvb_thread);
-		BUG();
-	}
-	up(&dev->lock);
-#endif
+struct mt352_config dvico_fusionhdtv_dvbt1 = {
+	.demod_address = 0x0F,
+	.demod_init    = dvico_fusionhdtv_demod_init,
+	.pll_set       = lg_z201_pll_set,
+};
 
-	dvb_net_release(&dev->dvbnet);
-	dev->demux.dmx.remove_frontend(&dev->demux.dmx, &dev->fe_mem);
-	dev->demux.dmx.remove_frontend(&dev->demux.dmx, &dev->fe_hw);
-	dvb_dmxdev_release(&dev->dmxdev);
-	dvb_dmx_release(&dev->demux);
-	if (dev->fe_handle)
-		dev->fe_release(dev->fe_handle);
-	dvb_unregister_adapter(dev->dvb_adapter);
-	return;
-}
+struct mt352_config dvico_fusionhdtv_dvbt_plus = {
+	.demod_address = 0x0F,
+	.demod_init    = dvico_fusionhdtv_demod_init,
+	.pll_set       = thomson_dtt7579_pll_set,
+};
 
 static int dvb_register(struct cx8802_dev *dev)
 {
-	int result;
+	/* init struct videobuf_dvb */
+	dev->dvb.name = dev->core->name;
 
-	/* adapter */
-	result = dvb_register_adapter(&dev->dvb_adapter, dev->core->name,
-				      THIS_MODULE);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: dvb_register_adapter failed (errno = %d)\n",
-		       dev->core->name, result);
-		goto fail1;
-	}
-
-	/* frontend */
+	/* init frontend */
 	switch (dev->core->board) {
 	case CX88_BOARD_HAUPPAUGE_DVB_T1:
 	case CX88_BOARD_CONEXANT_DVB_T1:
-		dev->fe_handle = cx22702_create(&dev->core->i2c_adap,
-						dev->dvb_adapter,
-						dev->core->pll_addr,
-						dev->core->pll_type,
-						dev->core->demod_addr);
-		dev->fe_release = cx22702_destroy;
+		dev->dvb.frontend = cx22702_create(&dev->core->i2c_adap,
+						   dev->core->pll_addr,
+						   dev->core->pll_type,
+						   dev->core->demod_addr);
+		break;
+	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T1:
+		dev->dvb.frontend = mt352_attach(&dvico_fusionhdtv_dvbt1,
+						 &dev->core->i2c_adap);
+		if (dev->dvb.frontend) {
+			dev->dvb.frontend->ops->info.frequency_min = 174000000;
+			dev->dvb.frontend->ops->info.frequency_max = 862000000;
+		}
+		break;
+	case CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS:
+		dev->dvb.frontend = mt352_attach(&dvico_fusionhdtv_dvbt_plus,
+						 &dev->core->i2c_adap);
+		if (dev->dvb.frontend) {
+			dev->dvb.frontend->ops->info.frequency_min = 174000000;
+			dev->dvb.frontend->ops->info.frequency_max = 862000000;
+		}
 		break;
 	default:
-		printk("%s: FIXME: frontend handing not here yet ...\n",
+		printk("%s: FIXME: frontend handling not here yet ...\n",
 		       dev->core->name);
 		break;
 	}
+	if (NULL == dev->dvb.frontend)
+		return -1;
 
-	/* demux */
-	dev->demux.dmx.capabilities =
-		DMX_TS_FILTERING | DMX_SECTION_FILTERING |
-		DMX_MEMORY_BASED_FILTERING;
-	dev->demux.priv       = dev;
-	dev->demux.filternum  = 256;
-	dev->demux.feednum    = 256;
-	dev->demux.start_feed = dvb_start_feed;
-	dev->demux.stop_feed  = dvb_stop_feed;
-	result = dvb_dmx_init(&dev->demux);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: dvb_dmx_init failed (errno = %d)\n",
-		       dev->core->name, result);
-		goto fail2;
-	}
+	/* Copy the board name into the DVB structure */
+	strlcpy(dev->dvb.frontend->ops->info.name,
+		cx88_boards[dev->core->board].name,
+		sizeof(dev->dvb.frontend->ops->info.name));
 
-	dev->dmxdev.filternum    = 256;
-	dev->dmxdev.demux        = &dev->demux.dmx;
-	dev->dmxdev.capabilities = 0;
-	result = dvb_dmxdev_init(&dev->dmxdev, dev->dvb_adapter);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: dvb_dmxdev_init failed (errno = %d)\n",
-		       dev->core->name, result);
-		goto fail3;
-	}
-
-	dev->fe_hw.source = DMX_FRONTEND_0;
-	result = dev->demux.dmx.add_frontend(&dev->demux.dmx, &dev->fe_hw);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: add_frontend failed (DMX_FRONTEND_0, errno = %d)\n",
-		       dev->core->name, result);
-		goto fail4;
-	}
-
-	dev->fe_mem.source = DMX_MEMORY_FE;
-	result = dev->demux.dmx.add_frontend(&dev->demux.dmx, &dev->fe_mem);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: add_frontend failed (DMX_MEMORY_FE, errno = %d)\n",
-		       dev->core->name, result);
-		goto fail5;
-	}
-
-	result = dev->demux.dmx.connect_frontend(&dev->demux.dmx, &dev->fe_hw);
-	if (result < 0) {
-		printk(KERN_WARNING "%s: connect_frontend failed (errno = %d)\n",
-		       dev->core->name, result);
-		goto fail6;
-	}
-
-	dvb_net_init(dev->dvb_adapter, &dev->dvbnet, &dev->demux.dmx);
-	return 0;
-
-fail6:
-	dev->demux.dmx.remove_frontend(&dev->demux.dmx, &dev->fe_mem);
-fail5:
-	dev->demux.dmx.remove_frontend(&dev->demux.dmx, &dev->fe_hw);
-fail4:
-	dvb_dmxdev_release(&dev->dmxdev);
-fail3:
-	dvb_dmx_release(&dev->demux);
-fail2:
-	dvb_unregister_adapter(dev->dvb_adapter);
-fail1:
-	return result;
+	/* register everything */
+	return videobuf_dvb_register(&dev->dvb);
 }
 
 /* ----------------------------------------------------------- */
@@ -346,13 +257,12 @@ static int __devinit dvb_probe(struct pci_dev *pci_dev,
 
 	/* dvb stuff */
 	printk("%s/2: cx2388x based dvb card\n", core->name);
-	videobuf_queue_init(&dev->dvbq, &dvb_qops,
+	videobuf_queue_init(&dev->dvb.dvbq, &dvb_qops,
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
 			    V4L2_FIELD_TOP,
-			    sizeof(struct cx88_buffer));
-	init_MUTEX(&dev->dvbq.lock);
-
+			    sizeof(struct cx88_buffer),
+			    dev);
 	err = dvb_register(dev);
 	if (0 != err)
 		goto fail_free;
@@ -370,7 +280,7 @@ static void __devexit dvb_remove(struct pci_dev *pci_dev)
         struct cx8802_dev *dev = pci_get_drvdata(pci_dev);
 
 	/* dvb */
-	dvb_unregister(dev);
+	videobuf_dvb_unregister(&dev->dvb);
 
 	/* common */
 	cx8802_fini_common(dev);
@@ -394,7 +304,7 @@ static struct pci_driver dvb_pci_driver = {
         .name     = "cx88-dvb",
         .id_table = cx8802_pci_tbl,
         .probe    = dvb_probe,
-        .remove   = dvb_remove,
+        .remove   = __devexit_p(dvb_remove),
 	.suspend  = cx8802_suspend_common,
 	.resume   = cx8802_resume_common,
 };
@@ -423,5 +333,6 @@ module_exit(dvb_fini);
 /*
  * Local variables:
  * c-basic-offset: 8
+ * compile-command: "make DVB=1"
  * End:
  */

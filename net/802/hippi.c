@@ -154,3 +154,92 @@ unsigned short hippi_type_trans(struct sk_buff *skb, struct net_device *dev)
 }
 
 EXPORT_SYMBOL(hippi_type_trans);
+
+static int hippi_change_mtu(struct net_device *dev, int new_mtu)
+{
+	/*
+	 * HIPPI's got these nice large MTUs.
+	 */
+	if ((new_mtu < 68) || (new_mtu > 65280))
+		return -EINVAL;
+	dev->mtu = new_mtu;
+	return(0);
+}
+
+/*
+ * For HIPPI we will actually use the lower 4 bytes of the hardware
+ * address as the I-FIELD rather than the actual hardware address.
+ */
+static int hippi_mac_addr(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr = p;
+	if (netif_running(dev))
+		return -EBUSY;
+	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+	return 0;
+}
+
+static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
+{
+	/* Never send broadcast/multicast ARP messages */
+	p->mcast_probes = 0;
+ 
+	/* In IPv6 unicast probes are valid even on NBMA,
+	* because they are encapsulated in normal IPv6 protocol.
+	* Should be a generic flag. 
+	*/
+	if (p->tbl->family != AF_INET6)
+		p->ucast_probes = 0;
+	return 0;
+}
+
+static void hippi_setup(struct net_device *dev)
+{
+	dev->set_multicast_list		= NULL;
+	dev->change_mtu			= hippi_change_mtu;
+	dev->hard_header		= hippi_header;
+	dev->rebuild_header 		= hippi_rebuild_header;
+	dev->set_mac_address 		= hippi_mac_addr;
+	dev->hard_header_parse		= NULL;
+	dev->hard_header_cache		= NULL;
+	dev->header_cache_update	= NULL;
+	dev->neigh_setup 		= hippi_neigh_setup_dev; 
+
+	/*
+	 * We don't support HIPPI `ARP' for the time being, and probably
+	 * never will unless someone else implements it. However we
+	 * still need a fake ARPHRD to make ifconfig and friends play ball.
+	 */
+	dev->type		= ARPHRD_HIPPI;
+	dev->hard_header_len 	= HIPPI_HLEN;
+	dev->mtu		= 65280;
+	dev->addr_len		= HIPPI_ALEN;
+	dev->tx_queue_len	= 25 /* 5 */;
+	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
+
+
+	/*
+	 * HIPPI doesn't support broadcast+multicast and we only use
+	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
+	 */
+	dev->flags = 0; 
+}
+
+/**
+ * alloc_hippi_dev - Register HIPPI device
+ * @sizeof_priv: Size of additional driver-private structure to be allocated
+ *	for this HIPPI device
+ *
+ * Fill in the fields of the device structure with HIPPI-generic values.
+ *
+ * Constructs a new net device, complete with a private data area of
+ * size @sizeof_priv.  A 32-byte (not bit) alignment is enforced for
+ * this private data area.
+ */
+
+struct net_device *alloc_hippi_dev(int sizeof_priv)
+{
+	return alloc_netdev(sizeof_priv, "hip%d", hippi_setup);
+}
+
+EXPORT_SYMBOL(alloc_hippi_dev);

@@ -96,7 +96,7 @@
 
 static int level_mask = LOG_ERROR;
 
-MODULE_PARM(level_mask, "i");
+module_param(level_mask, int, 0644);
 
 static int __init fas216_log_setup(char *str)
 {

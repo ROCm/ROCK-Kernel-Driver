@@ -814,7 +814,7 @@ static void ali_sound_dma_hack(struct pci_dev *pdev, int set_bit)
 	/* ALI sound chips generate 31-bits of DMA, a special register
 	 * determines what bit 31 is emitted as.
 	 */
-	ali_isa_bridge = pci_find_device(PCI_VENDOR_ID_AL,
+	ali_isa_bridge = pci_get_device(PCI_VENDOR_ID_AL,
 					 PCI_DEVICE_ID_AL_M1533,
 					 NULL);
 
@@ -824,6 +824,7 @@ static void ali_sound_dma_hack(struct pci_dev *pdev, int set_bit)
 	else
 		val &= ~0x01;
 	pci_write_config_byte(ali_isa_bridge, 0x7e, val);
+	pci_dev_put(ali_isa_bridge);
 }
 
 int pci_dma_supported(struct pci_dev *pdev, u64 device_mask)

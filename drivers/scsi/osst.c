@@ -82,13 +82,13 @@ MODULE_AUTHOR("Willem Riede");
 MODULE_DESCRIPTION("OnStream {DI-|FW-|SC-|USB}{30|50} Tape Driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(max_dev, "i");
+module_param(max_dev, int, 0);
 MODULE_PARM_DESC(max_dev, "Maximum number of OnStream Tape Drives to attach (4)");
 
-MODULE_PARM(write_threshold_kbs, "i");
+module_param(write_threshold_kbs, int, 0);
 MODULE_PARM_DESC(write_threshold_kbs, "Asynchronous write threshold (KB; 32)");
 
-MODULE_PARM(max_sg_segs, "i");
+module_param(max_sg_segs, int, 0);
 MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (9)");
 #else
 static struct osst_dev_parm {

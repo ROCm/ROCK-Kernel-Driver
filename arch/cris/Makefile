@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.20 2004/05/14 14:35:58 orjanf Exp $
+# $Id: Makefile,v 1.23 2004/10/19 13:07:34 starvik Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -80,7 +80,7 @@ compressed: zImage
 archmrproper:
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/$(ARCH)/boot
-	rm -f timage vmlinux.bin cramfs.img
+	rm -f timage vmlinux.bin decompress.bin rescue.bin cramfs.img
 	rm -rf $(LD_SCRIPT).tmp
 
 prepare: arch/$(ARCH)/.links include/asm-$(ARCH)/.arch \

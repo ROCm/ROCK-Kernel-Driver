@@ -757,11 +757,6 @@ config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
 	depends on 4xx || CPM2
 
-config SERIAL_CONSOLE_BAUD
-	int
-	depends on EV64260
-	default "115200"
-
 config PPCBUG_NVRAM
 	bool "Enable reading PPCBUG NVRAM during boot" if PPLUS || LOPEC
 	default y if PPC_PREP

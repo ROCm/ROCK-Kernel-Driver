@@ -150,14 +150,11 @@
  *
  * If we have an SA1111, the max IRQ is S1_BVD1_STSCHG+1.
  * If we have an LoCoMo, the max IRQ is IRQ_LOCOMO_SPI_TEND+1
- * If graphicsclient or graphicsmaster, we don't have a SA1111.
  * Otherwise, we have the standard IRQs only.
  */
 #ifdef CONFIG_SA1111
 #define NR_IRQS			(IRQ_S1_BVD1_STSCHG + 1)
-#elif defined(CONFIG_SA1100_GRAPHICSCLIENT) || \
-      defined(CONFIG_SA1100_GRAPHICSMASTER) || \
-      defined(CONFIG_SA1100_H3800)
+#elif defined(CONFIG_SA1100_H3800)
 #define NR_IRQS			(IRQ_BOARD_END)
 #elif defined(CONFIG_SHARP_LOCOMO)
 #define NR_IRQS			(IRQ_LOCOMO_SPI_TEND + 1)
@@ -172,10 +169,6 @@
 #define IRQ_NEPONSET_SMC9196	(IRQ_BOARD_START + 0)
 #define IRQ_NEPONSET_USAR	(IRQ_BOARD_START + 1)
 #define IRQ_NEPONSET_SA1111	(IRQ_BOARD_START + 2)
-
-/* PT Digital Board Interrupts (CONFIG_SA1100_PT_SYSTEM3) */
-#define IRQ_SYSTEM3_SA1111	(IRQ_BOARD_START + 0)
-#define IRQ_SYSTEM3_SMC9196	(IRQ_BOARD_START + 1)
 
 /* LoCoMo Interrupts (CONFIG_SHARP_LOCOMO) */
 #define IRQ_LOCOMO_KEY_BASE	(IRQ_BOARD_START + 0)

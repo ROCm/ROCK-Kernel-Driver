@@ -361,8 +361,8 @@ extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 #define TCP_IPV6_MATCH(__sk, __saddr, __daddr, __ports, __dif)	   \
 	(((*((__u32 *)&(inet_sk(__sk)->dport)))== (__ports))   	&& \
 	 ((__sk)->sk_family		== AF_INET6)		&& \
-	 !ipv6_addr_cmp(&inet6_sk(__sk)->daddr, (__saddr))	&& \
-	 !ipv6_addr_cmp(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
+	 ipv6_addr_equal(&inet6_sk(__sk)->daddr, (__saddr))	&& \
+	 ipv6_addr_equal(&inet6_sk(__sk)->rcv_saddr, (__daddr))	&& \
 	 (!((__sk)->sk_bound_dev_if) || ((__sk)->sk_bound_dev_if == (__dif))))
 
 /* These can have wildcards, don't try too hard. */
@@ -965,7 +965,9 @@ extern void tcp_reset_keepalive_timer(struct sock *, unsigned long);
 extern unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu);
 extern unsigned int tcp_current_mss(struct sock *sk, int large);
 
-extern const char timer_bug_msg[];
+#ifdef TCP_DEBUG
+extern const char tcp_timer_bug_msg[];
+#endif
 
 /* tcp_diag.c */
 extern void tcp_get_info(struct sock *, struct tcp_info *);
@@ -998,7 +1000,9 @@ static inline void tcp_clear_xmit_timer(struct sock *sk, int what)
 #endif
 		break;
 	default:
-		printk(timer_bug_msg);
+#ifdef TCP_DEBUG
+		printk(tcp_timer_bug_msg);
+#endif
 		return;
 	};
 
@@ -1033,7 +1037,9 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
 		break;
 
 	default:
-		printk(timer_bug_msg);
+#ifdef TCP_DEBUG
+		printk(tcp_timer_bug_msg);
+#endif
 	};
 }
 

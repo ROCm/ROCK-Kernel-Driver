@@ -172,13 +172,6 @@ static int handshake (void __iomem *ptr, u32 mask, u32 done, int usec)
 	return -ETIMEDOUT;
 }
 
-/*
- * hc states include: unknown, halted, ready, running
- * transitional states are messy just now
- * trying to avoid "running" unless urbs are active
- * a "ready" hc can be finishing prefetched work
- */
-
 /* force HC to halt state from unknown (EHCI spec section 2.3) */
 static int ehci_halt (struct ehci_hcd *ehci)
 {
@@ -480,8 +473,8 @@ static int ehci_start (struct usb_hcd *hcd)
 		ehci->async->hw_qtd_next = EHCI_LIST_END;
 		ehci->async->qh_state = QH_STATE_LINKED;
 		ehci->async->hw_alt_next = QTD_NEXT (ehci->async->dummy->qtd_dma);
-		writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
 	}
+	writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
 
 	/*
 	 * hcc_params controls whether ehci->regs->segment must (!!!)
@@ -540,7 +533,6 @@ done2:
 	}
 	udev->speed = USB_SPEED_HIGH;
 	udev->state = first ? USB_STATE_ATTACHED : USB_STATE_CONFIGURED;
-	udev->dev.power.power_state = PM_SUSPEND_ON;
 
 	/*
 	 * Start, enabling full USB 2.0 functionality ... usb 1.1 devices
@@ -663,20 +655,19 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
-	if (hcd->self.root_hub->dev.power.power_state)
-		return 0;
-
-	while (time_before (jiffies, ehci->next_statechange))
+	if (time_before (jiffies, ehci->next_statechange))
 		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub, state);
 #else
-	/* FIXME lock root hub */
+	usb_lock_device (hcd->self.root_hub);
 	(void) ehci_hub_suspend (hcd);
+	usb_unlock_device (hcd->self.root_hub);
 #endif
 
 	// save (PCI) FLADJ in case of Vaux power loss
+	// ... we'd only use it to handle clock skew
 
 	return 0;
 }
@@ -687,10 +678,11 @@ static int ehci_resume (struct usb_hcd *hcd)
 	unsigned		port;
 	struct usb_device	*root = hcd->self.root_hub;
 	int			retval = -EINVAL;
+	int			powerup = 0;
 
 	// maybe restore (PCI) FLADJ
 
-	while (time_before (jiffies, ehci->next_statechange))
+	if (time_before (jiffies, ehci->next_statechange))
 		msleep (100);
 
 	/* If any port is suspended, we know we can/must resume the HC. */
@@ -704,6 +696,8 @@ static int ehci_resume (struct usb_hcd *hcd)
 			up (&hcd->self.root_hub->serialize);
 			break;
 		}
+		if ((status & PORT_POWER) == 0)
+			powerup = 1;
 		if (!root->children [port])
 			continue;
 		dbg_port (ehci, __FUNCTION__, port + 1, status);
@@ -728,9 +722,20 @@ static int ehci_resume (struct usb_hcd *hcd)
 
 		/* restart; khubd will disconnect devices */
 		retval = ehci_start (hcd);
+
+		/* here we "know" root ports should always stay powered;
+		 * but some controllers may lost all power.
+		 */
+		if (powerup) {
+			ehci_dbg (ehci, "...powerup ports...\n");
+			for (port = HCS_N_PORTS (ehci->hcs_params); port > 0; )
+				(void) ehci_hub_control(hcd,
+					SetPortFeature, USB_PORT_FEAT_POWER,
+						port--, NULL, 0);
+			msleep(20);
+		}
 	}
-	if (retval == 0)
-		hcd->self.controller->power.power_state = 0;
+
 	return retval;
 }
 

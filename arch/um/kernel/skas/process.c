@@ -30,7 +30,7 @@
 
 int is_skas_winch(int pid, int fd, void *data)
 {
-	if(pid != getpid())
+	if(pid != os_getpid())
 		return(0);
 
 	register_winch_irq(-1, fd, -1, data);
