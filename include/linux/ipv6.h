@@ -189,6 +189,7 @@ struct ipv6_pinfo {
 		struct ipv6_txoptions *opt;
 		struct rt6_info	*rt;
 		struct flowi *fl;
+		int hop_limit;
 	} cork;
 };
 
