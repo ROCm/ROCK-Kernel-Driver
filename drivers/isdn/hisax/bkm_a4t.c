@@ -21,10 +21,10 @@
 #include "bkm_ax.h"
 
 extern const char *CardType[];
+// FIXME needs per card lock
 static spinlock_t bkm_a4t_lock = SPIN_LOCK_UNLOCKED;
 
 const char *bkm_a4t_revision = "$Revision: 1.13.6.6 $";
-
 
 static inline u8
 readreg(unsigned int ale, unsigned long adr, u8 off)
@@ -249,15 +249,57 @@ static struct card_ops bkm_a4t_ops = {
 	.irq_func = bkm_interrupt,
 };
 
+static int __init
+bkm_a4t_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	I20_REGISTER_FILE *pI20_Regs;
+	int rc;
+
+	printk(KERN_INFO "BKM A4T: defined at %#lx IRQ %u\n",
+	       pci_resource_start(pdev, 0), pdev->irq);
+	
+	rc = -EBUSY;
+	if (pci_enable_device(pdev))
+		goto err;
+			
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.avm.cfg_reg = pci_resource_start(pdev, 1);
+
+	cs->hw.ax.base = (unsigned long)request_mmio(&cs->rs, pci_resource_start(pdev, 0), 4096, "Telekom A4T");
+	if (!cs->hw.ax.base)
+		goto err;
+	
+	/* Check suspicious address */
+	// FIXME needs to use read[bl]
+	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
+	if ((pI20_Regs->i20IntStatus & 0x8EFFFFFF) != 0) {
+		printk(KERN_WARNING "HiSax: address %lx suspicious\n",
+		       cs->hw.ax.base);
+		goto err;
+	}
+	cs->hw.ax.isac_adr = cs->hw.ax.base + PO_OFFSET;
+	cs->hw.ax.jade_adr = cs->hw.ax.base + PO_OFFSET;
+	cs->hw.ax.isac_ale = GCS_1;
+	cs->hw.ax.jade_ale = GCS_3;
+
+	reset_bkm(cs);
+	cs->card_ops = &bkm_a4t_ops;
+	isac_setup(cs, &isac_ops);
+	jade_setup(cs, &jade_ops);
+	return 0;
+
+ err:
+	hisax_release_resources(cs);
+	return rc;
+}
+
 static struct pci_dev *dev_a4t __initdata = NULL;
 
 int __init
 setup_bkm_a4t(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u_int pci_memaddr = 0, found = 0;
-	I20_REGISTER_FILE *pI20_Regs;
 
 	strcpy(tmp, bkm_a4t_revision);
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
@@ -268,49 +310,13 @@ setup_bkm_a4t(struct IsdnCard *card)
 
 		sub_vendor = dev_a4t->subsystem_vendor;
 		sub_sys = dev_a4t->subsystem_device;
-		if ((sub_sys == PCI_DEVICE_ID_BERKOM_A4T) && (sub_vendor == PCI_VENDOR_ID_BERKOM)) {
-			if (pci_enable_device(dev_a4t))
-				return(0);
-			found = 1;
-			pci_memaddr = pci_resource_start(dev_a4t, 0);
-			cs->irq = dev_a4t->irq;
-			break;
+		if (sub_sys == PCI_DEVICE_ID_BERKOM_A4T && 
+		    sub_vendor == PCI_VENDOR_ID_BERKOM) {
+			if (bkm_a4t_probe(card->cs, dev_a4t))
+				return 0;
+			return 1;
 		}
 	}
-	if (!found) {
-		printk(KERN_WARNING "HiSax: %s: Card not found\n", CardType[card->typ]);
-		return (0);
-	}
-	if (!cs->irq) {		/* IRQ range check ?? */
-		printk(KERN_WARNING "HiSax: %s: No IRQ\n", CardType[card->typ]);
-		return (0);
-	}
-	cs->hw.ax.base = (unsigned long)request_mmio(&cs->rs,pci_memaddr, 4096, "Telekom A4T");
-	if (!cs->hw.ax.base) {
-		printk(KERN_WARNING "HiSax: %s: No Memory base address\n", CardType[card->typ]);
-		return (0);
-	}
-	
-	/* Check suspecious address */
-	pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-	if ((pI20_Regs->i20IntStatus & 0x8EFFFFFF) != 0) {
-		printk(KERN_WARNING "HiSax: %s address %lx-%lx suspecious\n",
-		       CardType[card->typ], cs->hw.ax.base, cs->hw.ax.base + 4096);
-		hisax_release_resources(cs);
-		return (0);
-	}
-	cs->hw.ax.isac_adr = cs->hw.ax.base + PO_OFFSET;
-	cs->hw.ax.jade_adr = cs->hw.ax.base + PO_OFFSET;
-	cs->hw.ax.isac_ale = GCS_1;
-	cs->hw.ax.jade_ale = GCS_3;
-
-	printk(KERN_INFO "HiSax: %s: Card configured at 0x%lX IRQ %d\n",
-	       CardType[card->typ], cs->hw.ax.base, cs->irq);
-
-	reset_bkm(cs);
-	cs->irq_flags |= SA_SHIRQ;
-	cs->card_ops = &bkm_a4t_ops;
-	isac_setup(cs, &isac_ops);
-	jade_setup(cs, &jade_ops);
-	return 1;
+	printk(KERN_WARNING "HiSax: %s: Card not found\n", CardType[card->typ]);
+	return 0;
 }

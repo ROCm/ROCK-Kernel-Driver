@@ -782,7 +782,6 @@ struct bkm_hw {
 
 struct gazel_hw {
 	unsigned int cfg_reg;
-	unsigned int pciaddr[2];
         signed   int ipac;
 	signed   int isac;
 	signed   int hscx[2];
@@ -1073,264 +1072,17 @@ hisax_release_resources(struct IsdnCardState *cs);
 #define  ISDN_CTYPE_COUNT	41
 
 
-#ifdef ISDN_CHIP_ISAC
-#undef ISDN_CHIP_ISAC
-#endif
-
-#ifdef	CONFIG_HISAX_16_0
-#define  CARD_TELES0 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_TELES0  0
-#endif
-
-#ifdef	CONFIG_HISAX_16_3
-#define  CARD_TELES3 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_TELES3  0
-#endif
-
-#ifdef	CONFIG_HISAX_TELESPCI
-#define  CARD_TELESPCI 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_TELESPCI  0
-#endif
-
-#ifdef	CONFIG_HISAX_AVM_A1
-#define  CARD_AVM_A1 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_AVM_A1  0
-#endif
-
-#ifdef	CONFIG_HISAX_AVM_A1_PCMCIA
-#define  CARD_AVM_A1_PCMCIA 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_AVM_A1_PCMCIA  0
-#endif
-
-#ifdef	CONFIG_HISAX_FRITZPCI
-#define  CARD_FRITZPCI 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_FRITZPCI  0
-#endif
-
-#ifdef	CONFIG_HISAX_ELSA
-#define  CARD_ELSA 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_ELSA  0
-#endif
-
-#ifdef	CONFIG_HISAX_IX1MICROR2
-#define	CARD_IX1MICROR2 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_IX1MICROR2 0
-#endif
-
-#ifdef  CONFIG_HISAX_DIEHLDIVA
-#define CARD_DIEHLDIVA 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_DIEHLDIVA 0
-#endif
-
-#ifdef  CONFIG_HISAX_ASUSCOM
-#define CARD_ASUSCOM 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_ASUSCOM 0
-#endif
-
-#ifdef  CONFIG_HISAX_TELEINT
-#define CARD_TELEINT 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_TELEINT 0
-#endif
-
-#ifdef  CONFIG_HISAX_SEDLBAUER
-#define CARD_SEDLBAUER 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_SEDLBAUER 0
-#endif
-
-#ifdef  CONFIG_HISAX_SPORTSTER
-#define CARD_SPORTSTER 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_SPORTSTER 0
-#endif
-
-#ifdef  CONFIG_HISAX_MIC
-#define CARD_MIC 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_MIC 0
-#endif
-
-#ifdef  CONFIG_HISAX_NETJET
-#define CARD_NETJET_S 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_NETJET_S 0
-#endif
-
-#ifdef	CONFIG_HISAX_HFCS
-#define  CARD_HFCS 1
-#else
-#define  CARD_HFCS 0
-#endif
-
-#ifdef	CONFIG_HISAX_HFC_PCI
-#define  CARD_HFC_PCI 1
-#else
-#define  CARD_HFC_PCI 0
-#endif
-
-#ifdef	CONFIG_HISAX_HFC_SX
-#define  CARD_HFC_SX 1
-#else
-#define  CARD_HFC_SX 0
-#endif
-
-#ifdef  CONFIG_HISAX_AMD7930
-#define CARD_AMD7930 1
-#else
-#define CARD_AMD7930 0
-#endif
-
-#ifdef	CONFIG_HISAX_NICCY
-#define	CARD_NICCY 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_NICCY 0
-#endif
-
-#ifdef	CONFIG_HISAX_ISURF
-#define	CARD_ISURF 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_ISURF 0
-#endif
-
-#ifdef	CONFIG_HISAX_S0BOX
-#define	CARD_S0BOX 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_S0BOX 0
-#endif
-
-#ifdef	CONFIG_HISAX_HSTSAPHIR
-#define	CARD_HSTSAPHIR 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_HSTSAPHIR 0
-#endif
-
 #ifdef	CONFIG_HISAX_TESTEMU
-#define	CARD_TESTEMU 1
 #define ISDN_CTYPE_TESTEMU 99
 #undef ISDN_CTYPE_COUNT
 #define  ISDN_CTYPE_COUNT ISDN_CTYPE_TESTEMU
-#else
-#define CARD_TESTEMU 0
-#endif
-
-#ifdef	CONFIG_HISAX_BKM_A4T
-#define	CARD_BKM_A4T 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_BKM_A4T 0
-#endif
-
-#ifdef	CONFIG_HISAX_SCT_QUADRO
-#define	CARD_SCT_QUADRO 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define CARD_SCT_QUADRO 0
-#endif
-
-#ifdef	CONFIG_HISAX_GAZEL
-#define  CARD_GAZEL 1
-#ifndef ISDN_CHIP_ISAC
-#define ISDN_CHIP_ISAC 1
-#endif
-#else
-#define  CARD_GAZEL  0
-#endif
-
-#ifdef	CONFIG_HISAX_W6692
-#define	CARD_W6692	1
-#ifndef	ISDN_CHIP_W6692
-#define	ISDN_CHIP_W6692	1
-#endif
-#else
-#define	CARD_W6692	0
 #endif
 
 #ifdef  CONFIG_HISAX_NETJET_U
-#define CARD_NETJET_U 1
-#ifndef ISDN_CHIP_ICC
-#define ISDN_CHIP_ICC 1
-#endif
 #ifndef HISAX_UINTERFACE
 #define HISAX_UINTERFACE 1
 #endif
 #else
-#define CARD_NETJET_U 0
-#endif
-
-#ifdef CONFIG_HISAX_ENTERNOW_PCI
-#define CARD_FN_ENTERNOW_PCI 1
 #endif
 
 #define TEI_PER_CARD 1
@@ -1402,7 +1154,7 @@ int jiftime(char *s, long mark);
 int HiSax_command(isdn_ctrl * ic);
 int HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb);
 void HiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, ...);
-void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, va_list args);
+void VHiSax_putstatus(struct IsdnCardState *cs, char *head, const char *fmt, va_list args);
 void HiSax_reportcard(int cardnr, int sel);
 int QuickHex(char *txt, u8 * p, int cnt);
 void LogFrame(struct IsdnCardState *cs, u8 * p, int size);

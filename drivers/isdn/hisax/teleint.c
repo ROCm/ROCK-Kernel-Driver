@@ -256,15 +256,9 @@ static struct card_ops teleint_ops = {
 	.irq_func = teleint_interrupt,
 };
 
-int __init
-setup_TeleInt(struct IsdnCard *card)
+static int __init
+teleint_probe(struct IsdnCardState *cs, struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
-	char tmp[64];
-
-	strcpy(tmp, TeleInt_revision);
-	printk(KERN_INFO "HiSax: TeleInt driver Rev. %s\n", HiSax_getrev(tmp));
-
 	cs->hw.hfc.addr = card->para[1] & 0x3fe;
 	cs->irq = card->para[0];
 	cs->hw.hfc.cirm = HFC_CIRM;
@@ -284,42 +278,54 @@ setup_TeleInt(struct IsdnCard *card)
 	byteout(cs->hw.hfc.addr, cs->hw.hfc.addr & 0xff);
 	byteout(cs->hw.hfc.addr | 1, ((cs->hw.hfc.addr & 0x300) >> 8) | 0x54);
 	switch (cs->irq) {
-		case 3:
-			cs->hw.hfc.cirm |= HFC_INTA;
-			break;
-		case 4:
-			cs->hw.hfc.cirm |= HFC_INTB;
-			break;
-		case 5:
-			cs->hw.hfc.cirm |= HFC_INTC;
-			break;
-		case 7:
-			cs->hw.hfc.cirm |= HFC_INTD;
-			break;
-		case 10:
-			cs->hw.hfc.cirm |= HFC_INTE;
-			break;
-		case 11:
-			cs->hw.hfc.cirm |= HFC_INTF;
-			break;
-		default:
-			printk(KERN_WARNING "TeleInt: wrong IRQ\n");
-			goto err;
+	case 3:
+		cs->hw.hfc.cirm |= HFC_INTA;
+		break;
+	case 4:
+		cs->hw.hfc.cirm |= HFC_INTB;
+		break;
+	case 5:
+		cs->hw.hfc.cirm |= HFC_INTC;
+		break;
+	case 7:
+		cs->hw.hfc.cirm |= HFC_INTD;
+		break;
+	case 10:
+		cs->hw.hfc.cirm |= HFC_INTE;
+		break;
+	case 11:
+		cs->hw.hfc.cirm |= HFC_INTF;
+		break;
+	default:
+		printk(KERN_WARNING "TeleInt: wrong IRQ\n");
+		goto err;
 	}
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.cirm);
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.ctmt);
 
-	printk(KERN_INFO
-	       "TeleInt: defined at 0x%x IRQ %d\n",
-	       cs->hw.hfc.addr,
-	       cs->irq);
+	printk(KERN_INFO "TeleInt: defined at 0x%x IRQ %d\n",
+	       cs->hw.hfc.addr, cs->irq);
 
 	cs->card_ops = &teleint_ops;
 	teleint_reset(cs);
 	isac_setup(cs, &isac_ops);
 	hfc_setup(cs, &hfc_ops);
-	return 1;
- err:
-	teleint_release(cs);
 	return 0;
+
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+int __init
+setup_TeleInt(struct IsdnCard *card)
+{
+	char tmp[64];
+
+	strcpy(tmp, TeleInt_revision);
+	printk(KERN_INFO "HiSax: TeleInt driver Rev. %s\n", HiSax_getrev(tmp));
+
+	if (teleint_probe(card->cs, card) < 0)
+		return 0;
+	return 1;
 }

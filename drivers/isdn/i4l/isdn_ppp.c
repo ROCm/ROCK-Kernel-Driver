@@ -867,7 +867,7 @@ isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto)
 		skb_pull(skb, 1);
 	} else {
 		if (skb->len < 2)
-			return -1;
+			return -EINVAL;
 		get_u16(skb->data, proto);
 		skb_pull(skb, 2);
 	}
@@ -1037,7 +1037,7 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
                 isdn_ppp_frame_log("xmit1", skb->data, skb->len, 32, ipppd->unit, -1);
 
 	ippp_push_proto(ind_ppp, skb, proto);
-	ippp_mp_xmit(idev, skb, proto);
+	ippp_mp_xmit(idev, skb);
 	return 0;
 
  drop:
