@@ -224,6 +224,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 		 cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 /* ISAR access routines
  * mode = 0 access with IRQ on
  * mode = 1 access with IRQ off
@@ -251,6 +256,11 @@ WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
 		byteout(cs->hw.sedl.hscx, value);
 	}
 }
+
+static struct bc_hw_ops isar_ops = {
+	.read_reg  = ReadISAR,
+	.write_reg = WriteISAR,
+};
 
 /*
  * fast interrupt HSCX stuff goes here
@@ -695,8 +705,7 @@ ready:
 	       cs->hw.sedl.cfg_reg + bytecnt,
 	       cs->irq);
 
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Sedl_card_msg;
 
@@ -783,8 +792,7 @@ ready:
 			cs->irq_func = &sedlbauer_interrupt_isar;
 			cs->auxcmd = &isar_auxcmd;
 			ISACVersion(cs, "Sedlbauer:");
-			cs->BC_Read_Reg = &ReadISAR;
-			cs->BC_Write_Reg = &WriteISAR;
+			cs->bc_hw_ops = &isar_ops;
 			cs->BC_Send_Data = &isar_fill_fifo;
 			ver = ISARVersion(cs, "Sedlbauer:");
 			if (ver < 0) {

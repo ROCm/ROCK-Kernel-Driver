@@ -149,6 +149,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 		 cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 /*
  * fast interrupt HSCX stuff goes here
  */
@@ -388,8 +393,7 @@ setup_asuscom(struct IsdnCard *card)
 	}
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Asus_card_msg;
 	val = readreg(cs->hw.asus.cfg_reg + ASUS_IPAC_ALE, 

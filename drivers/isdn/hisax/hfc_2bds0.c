@@ -64,6 +64,11 @@ WriteReg(struct IsdnCardState *cs, int data, u_char reg, u_char value)
 #endif
 }
 
+static struct bc_hw_ops hfcs_ops = {
+	.read_reg  = ReadReg,
+	.write_reg = WriteReg,
+};
+
 /* Interface functions */
 
 static u_char
@@ -85,8 +90,7 @@ set_cs_func(struct IsdnCardState *cs)
 	cs->writeisac = &writereghfcd;
 	cs->readisacfifo = &dummyf;
 	cs->writeisacfifo = &dummyf;
-	cs->BC_Read_Reg = &ReadReg;
-	cs->BC_Write_Reg = &WriteReg;
+	cs->bc_hw_ops = &hfcs_ops;
 }
 
 static inline int

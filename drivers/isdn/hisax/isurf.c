@@ -82,6 +82,11 @@ WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
 	writeb(value, cs->hw.isurf.isar + offset);mb();
 }
 
+static struct bc_hw_ops isar_ops = {
+	.read_reg  = ReadISAR,
+	.write_reg = WriteISAR,
+};
+
 static void
 isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -282,8 +287,7 @@ setup_isurf(struct IsdnCard *card)
 	reset_isurf(cs, ISURF_RESET);
 	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
 	ISACVersion(cs, "ISurf:");
-	cs->BC_Read_Reg = &ReadISAR;
-	cs->BC_Write_Reg = &WriteISAR;
+	cs->bc_hw_ops = &isar_ops;
 	cs->BC_Send_Data = &isar_fill_fifo;
 	ver = ISARVersion(cs, "ISurf:");
 	if (ver < 0) {

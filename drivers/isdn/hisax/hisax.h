@@ -348,6 +348,13 @@ struct l3_process {
 	 } prot;
 };
 
+struct IsdnCardState;
+
+struct bc_hw_ops {
+	u8     (*read_reg)  (struct IsdnCardState *, int, u8);
+	void   (*write_reg) (struct IsdnCardState *, int, u8, u8);
+};
+
 struct hscx_hw {
 	int hscx;
 	int rcvidx;
@@ -919,8 +926,7 @@ struct IsdnCardState {
 	void   (*writeisac) (struct IsdnCardState *, u_char, u_char);
 	void   (*readisacfifo) (struct IsdnCardState *, u_char *, int);
 	void   (*writeisacfifo) (struct IsdnCardState *, u_char *, int);
-	u_char (*BC_Read_Reg) (struct IsdnCardState *, int, u_char);
-	void   (*BC_Write_Reg) (struct IsdnCardState *, int, u_char, u_char);
+	struct bc_hw_ops *bc_hw_ops;
 	void   (*BC_Send_Data) (struct BCState *);
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
 	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);

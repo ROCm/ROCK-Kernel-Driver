@@ -248,6 +248,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 		 cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 static inline u_char
 readitac(struct IsdnCardState *cs, u_char off)
 {
@@ -1159,8 +1164,7 @@ setup_elsa(struct IsdnCard *card)
 		}
 		printk(KERN_INFO "Elsa: timer OK; resetting card\n");
 	}
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Elsa_card_msg;
 	reset_elsa(cs);

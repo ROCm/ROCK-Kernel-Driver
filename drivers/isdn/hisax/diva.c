@@ -204,6 +204,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 		cs->hw.diva.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 static u_char
 MemReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
@@ -241,6 +246,11 @@ MemWriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 {
 	memwritereg(cs->hw.diva.cfg_reg, offset + (hscx ? 0x40 : 0), value);
 }
+
+static struct bc_hw_ops mem_hscx_ops = {
+	.read_reg  = MemReadHSCX,
+	.write_reg = MemWriteHSCX,
+};
 
 /* IO-Functions for IPACX type cards */
 static u_char
@@ -282,6 +292,11 @@ MemWriteHSCX_IPACX(struct IsdnCardState *cs, int hscx, u_char offset, u_char val
 	memwritereg(cs->hw.diva.cfg_reg, offset + 
               (hscx ? IPACX_OFF_B2 : IPACX_OFF_B1), value);
 }
+
+static struct bc_hw_ops mem_ipacx_bc_ops = {
+	.read_reg  = MemReadHSCX_IPACX,
+	.write_reg = MemWriteHSCX_IPACX,
+};
 
 /*
  * fast interrupt HSCX stuff goes here
@@ -1064,8 +1079,7 @@ ready:
 		}
 	}
 	reset_diva(cs);
-	cs->BC_Read_Reg  = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
@@ -1081,8 +1095,7 @@ ready:
 		cs->writeisac = &MemWriteISAC_IPAC;
 		cs->readisacfifo  = &MemReadISACfifo_IPAC;
 		cs->writeisacfifo = &MemWriteISACfifo_IPAC;
-		cs->BC_Read_Reg  = &MemReadHSCX;
-		cs->BC_Write_Reg = &MemWriteHSCX;
+		cs->bc_hw_ops = &mem_hscx_ops;
 		cs->BC_Send_Data = &Memhscx_fill_fifo;
 		cs->irq_func = &diva_irq_ipac_pci;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
@@ -1092,8 +1105,7 @@ ready:
 		cs->writeisac = &MemWriteISAC_IPACX;
 		cs->readisacfifo  = &MemReadISACfifo_IPACX;
 		cs->writeisacfifo = &MemWriteISACfifo_IPACX;
-		cs->BC_Read_Reg  = &MemReadHSCX_IPACX;
-		cs->BC_Write_Reg = &MemWriteHSCX_IPACX;
+		cs->bc_hw_ops = &mem_ipacx_bc_ops;
 		cs->BC_Send_Data = &ipacx_fill_fifo;
 		cs->irq_func = &diva_irq_ipacx_pci;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 

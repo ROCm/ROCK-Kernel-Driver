@@ -59,7 +59,7 @@ ipacx_bc_read_reg(struct BCState *bcs, u8 addr)
 	struct IsdnCardState *cs = bcs->cs;
 	u8 hscx = bcs->hw.hscx.hscx;
 
-	return cs->BC_Read_Reg(cs, hscx, addr);
+	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
 }
 
 static inline void
@@ -68,7 +68,7 @@ ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
 	struct IsdnCardState *cs = bcs->cs;
 	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->BC_Write_Reg(cs, hscx, addr, val);
+	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
 }
 
 //----------------------------------------------------------
@@ -787,12 +787,12 @@ clear_pending_ints(struct IsdnCardState *cs)
   // all interrupts off
   cs->writeisac(cs, IPACX_MASK, 0xff);
   cs->writeisac(cs, IPACX_MASKD, 0xff);
-  cs->BC_Write_Reg(cs, 0, IPACX_MASKB, 0xff);
-  cs->BC_Write_Reg(cs, 1, IPACX_MASKB, 0xff);
+  cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, 0xff);
+  cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, 0xff);
   
   ista = cs->readisac(cs, IPACX_ISTA); 
-  if (ista &0x80) cs->BC_Read_Reg(cs, 0, IPACX_ISTAB);
-  if (ista &0x40) cs->BC_Read_Reg(cs, 1, IPACX_ISTAB);
+  if (ista &0x80) cs->bc_hw_ops->read_reg(cs, 0, IPACX_ISTAB);
+  if (ista &0x40) cs->bc_hw_ops->read_reg(cs, 1, IPACX_ISTAB);
   if (ista &0x10) cs->readisac(cs, IPACX_CIR0);
   if (ista &0x01) cs->readisac(cs, IPACX_ISTAD); 
 }
@@ -811,15 +811,15 @@ init_ipacx(struct IsdnCardState *cs, int part)
 		dch_init(cs);
 	}
 	if (part &2) {  // reenable all interrupts and start chip
-		cs->BC_Write_Reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
-		cs->BC_Write_Reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
+		cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
+		cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
 		cs->writeisac(cs, IPACX_MASKD, _MASKD_IMASK);
 		cs->writeisac(cs, IPACX_MASK, _MASK_IMASK); // global mask register
 
     // reset HDLC Transmitters/receivers
 		cs->writeisac(cs, IPACX_CMDRD, 0x41); 
-		cs->BC_Write_Reg(cs, 0, IPACX_CMDRB, 0x41);
-		cs->BC_Write_Reg(cs, 1, IPACX_CMDRB, 0x41);
+		cs->bc_hw_ops->write_reg(cs, 0, IPACX_CMDRB, 0x41);
+		cs->bc_hw_ops->write_reg(cs, 1, IPACX_CMDRB, 0x41);
 		ph_command(cs, IPACX_CMD_RES);
 	}
 }

@@ -129,6 +129,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 		 cs->hw.niccy.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 #define READHSCX(cs, nr, reg) readreg(cs->hw.niccy.hscx_ale, \
 		cs->hw.niccy.hscx, reg + (nr ? 0x40 : 0))
 #define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.niccy.hscx_ale, \
@@ -376,8 +381,7 @@ setup_niccy(struct IsdnCard *card)
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &niccy_card_msg;
 	cs->irq_func = &niccy_interrupt;

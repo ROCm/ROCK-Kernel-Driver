@@ -116,6 +116,11 @@ WriteJADE(struct IsdnCardState *cs, int jade, u_char offset, u_char value)
 	writereg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)), value);
 }
 
+static struct bc_hw_ops jade_ops = {
+	.read_reg  = ReadJADE,
+	.write_reg = WriteJADE,
+};
+
 /*
  * fast interrupt JADE stuff goes here
  */
@@ -331,8 +336,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadJADE;
-	cs->BC_Write_Reg = &WriteJADE;
+	cs->bc_hw_ops = &jade_ops;
 	cs->BC_Send_Data = &jade_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;
 	cs->irq_func = &bkm_interrupt;

@@ -27,7 +27,7 @@ hscx_read_reg(struct BCState *bcs, u8 addr)
 	struct IsdnCardState *cs = bcs->cs;
 	u8 hscx = bcs->hw.hscx.hscx;
 
-	return cs->BC_Read_Reg(cs, hscx, addr);
+	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
 }
 
 static inline void
@@ -36,7 +36,7 @@ hscx_write_reg(struct BCState *bcs, u8 addr, u8 val)
 	struct IsdnCardState *cs = bcs->cs;
 	u8 hscx = bcs->hw.hscx.hscx;
 
-	cs->BC_Write_Reg(cs, hscx, addr, val);
+	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
 }
 
 int __init
@@ -44,8 +44,8 @@ HscxVersion(struct IsdnCardState *cs, char *s)
 {
 	int verA, verB;
 
-	verA = cs->BC_Read_Reg(cs, 0, HSCX_VSTR) & 0xf;
-	verB = cs->BC_Read_Reg(cs, 1, HSCX_VSTR) & 0xf;
+	verA = cs->bc_hw_ops->read_reg(cs, 0, HSCX_VSTR) & 0xf;
+	verB = cs->bc_hw_ops->read_reg(cs, 1, HSCX_VSTR) & 0xf;
 	printk(KERN_INFO "%s HSCX version A: %s  B: %s\n", s,
 	       HSCXVer[verA], HSCXVer[verB]);
 	if ((verA == 0) | (verA == 0xf) | (verB == 0) | (verB == 0xf))

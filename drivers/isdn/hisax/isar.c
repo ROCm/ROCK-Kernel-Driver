@@ -33,13 +33,13 @@ static spinlock_t isar_lock = SPIN_LOCK_UNLOCKED;
 static inline u8
 isar_read_reg(struct IsdnCardState *cs, int mode, u8 addr)
 {
-	return cs->BC_Read_Reg(cs, mode, addr);
+	return cs->bc_hw_ops->read_reg(cs, mode, addr);
 }
 
 static inline void
 isar_write_reg(struct IsdnCardState *cs, int mode, u8 addr, u8 val)
 {
-	cs->BC_Write_Reg(cs, mode, addr, val);
+	cs->bc_hw_ops->write_reg(cs, mode, addr, val);
 }
 
 static inline int

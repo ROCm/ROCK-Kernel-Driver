@@ -162,6 +162,11 @@ WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 /*
  * fast interrupt HSCX stuff goes here
  */
@@ -274,8 +279,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_a1p_interrupt;

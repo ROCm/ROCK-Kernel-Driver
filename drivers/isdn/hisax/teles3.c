@@ -89,6 +89,11 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 	writereg(cs->hw.teles3.hscx[hscx], offset, value);
 }
 
+static struct bc_hw_ops hscx_ops = {
+	.read_reg  = ReadHSCX,
+	.write_reg = WriteHSCX,
+};
+
 /*
  * fast interrupt HSCX stuff goes here
  */
@@ -470,8 +475,7 @@ setup_teles3(struct IsdnCard *card)
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Teles_card_msg;
 	cs->irq_func = &teles3_interrupt;

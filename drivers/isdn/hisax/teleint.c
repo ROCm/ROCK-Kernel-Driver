@@ -166,6 +166,11 @@ WriteHFC(struct IsdnCardState *cs, int data, u_char reg, u_char value)
 		debugl1(cs, "hfc W%c %02x %02x", data ? 'D' : 'C', reg, value);
 }
 
+static struct bc_hw_ops hfc_ops = {
+	.read_reg  = ReadHFC,
+	.write_reg = WriteHFC,
+};
+
 static void
 TeleInt_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
@@ -323,8 +328,7 @@ setup_TeleInt(struct IsdnCard *card)
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHFC;
-	cs->BC_Write_Reg = &WriteHFC;
+	cs->bc_hw_ops = &hfc_ops;
 	cs->cardmsg = &TeleInt_card_msg;
 	cs->irq_func = &TeleInt_interrupt;
 	ISACVersion(cs, "TeleInt:");

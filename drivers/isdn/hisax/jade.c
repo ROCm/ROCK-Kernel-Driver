@@ -23,13 +23,13 @@ static spinlock_t jade_lock = SPIN_LOCK_UNLOCKED;
 static inline u8
 jade_read_reg(struct IsdnCardState *cs, int jade, u8 addr)
 {
-	return cs->BC_Read_Reg(cs, jade, addr);
+	return cs->bc_hw_ops->read_reg(cs, jade, addr);
 }
 
 static inline void
 jade_write_reg(struct IsdnCardState *cs, int jade, u8 addr, u8 val)
 {
-	cs->BC_Write_Reg(cs, jade, addr, val);
+	cs->bc_hw_ops->write_reg(cs, jade, addr, val);
 }
 
 int __init

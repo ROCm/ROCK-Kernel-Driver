@@ -23,13 +23,13 @@ static const char *hfcs_revision = "$Revision: 1.8.6.2 $";
 static inline u8
 hfcs_read_reg(struct IsdnCardState *cs, int data, u8 reg)
 {
-	return cs->BC_Read_Reg(cs, data, reg);
+	return cs->bc_hw_ops->read_reg(cs, data, reg);
 }
 
 static inline void
 hfcs_write_reg(struct IsdnCardState *cs, int data, u8 reg, u8 val)
 {
-	cs->BC_Write_Reg(cs, data, reg, val);
+	cs->bc_hw_ops->write_reg(cs, data, reg, val);
 }
 
 static void
