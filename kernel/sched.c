@@ -1694,8 +1694,7 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 		if (cpu_isset(busiest->push_cpu, sd->span))
 			break;
 	}
-
-	if (!sd->parent && !cpu_isset(busiest->push_cpu, sd->span)) {
+	if (!sd) {
 		WARN_ON(1);
 		return;
 	}
@@ -1709,20 +1708,20 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
  	do {
 		cpumask_t tmp;
 		runqueue_t *rq;
- 		int push_cpu = 0, nr = 0;
+ 		int push_cpu = 0;
 
  		if (group == busy_group)
  			goto next_group;
 
 		cpus_and(tmp, group->cpumask, cpu_online_map);
+		if (cpus_weight(tmp) == 0)
+			goto next_group;
+
  		for_each_cpu_mask(i, tmp) {
 			if (!idle_cpu(i))
 				goto next_group;
  			push_cpu = i;
- 			nr++;
  		}
- 		if (nr == 0)
- 			goto next_group;
 
 		rq = cpu_rq(push_cpu);
 		double_lock_balance(busiest, rq);
