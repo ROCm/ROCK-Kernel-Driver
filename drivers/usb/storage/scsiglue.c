@@ -563,8 +563,8 @@ int usb_stor_scsiSense10to6( Scsi_Cmnd* the10 )
 
 	  /* copy one byte */
 	  {
-		char *src = page_address(sg[sb].page) + sg[sb].offset + si;
-		char *dst = page_address(sg[db].page) + sg[db].offset + di;
+		char *src = sg_address(sg[sb]) + si;
+		char *dst = sg_address(sg[db]) + di;
 
 		 *dst = *src;
 	  }
@@ -605,7 +605,7 @@ int usb_stor_scsiSense10to6( Scsi_Cmnd* the10 )
 	      break;
 	    }
 
-	  *(char*)(page_address(sg[db].page) + sg[db].offset) = 0;
+	  *(char*)(sg_address(sg[db])) = 0;
 
 	  /* get next destination */
 	  if ( sg[db].length-1 == di )
@@ -756,8 +756,8 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 
 	  /* copy one byte */
 	  {
-		char *src = page_address(sg[sb].page) + sg[sb].offset + si;
-		char *dst = page_address(sg[db].page) + sg[db].offset + di;
+		char *src = sg_address(sg[sb]) + si;
+		char *dst = sg_address(sg[db]) + di;
 
 		 *dst = *src;
 	  }
@@ -798,7 +798,7 @@ int usb_stor_scsiSense6to10( Scsi_Cmnd* the6 )
 	    }
 
 	 {
-		 char *dst = page_address(sg[db].page) + sg[db].offset + di;
+		 char *dst = sg_address(sg[db]) + di;
 
 		 *dst = tempBuffer[element-USB_STOR_SCSI_SENSE_HDRSZ];
 	 }
@@ -852,17 +852,14 @@ void usb_stor_scsiSenseParseBuffer( Scsi_Cmnd* srb, Usb_Stor_Scsi_Sense_Hdr_u* t
 		  if ( element < USB_STOR_SCSI_SENSE_HDRSZ )
 		    {
 		      /* fill in the pointers for both header types */
-		      the6->array[element] = page_address(sg[i].page) +
-			      			sg[i].offset + j;
-		      the10->array[element] = page_address(sg[i].page) +
-						sg[i].offset + j;
+		      the6->array[element] = sg_address(sg[i]) + j;
+		      the10->array[element] = sg_address(sg[i]) + j;
 
 		    }
 		  else if ( element < USB_STOR_SCSI_SENSE_10_HDRSZ )
 		    {
 		      /* only the longer headers still cares now */
-		      the10->array[element] = page_address(sg[i].page) +
-						sg[i].offset + j;
+		      the10->array[element] = sg_address(sg[i]) + j;
 		       
 		    }
 		  /* increase element counter */

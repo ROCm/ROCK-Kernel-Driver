@@ -283,13 +283,13 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 	if (us->srb->use_sg) {
 		sg = (struct scatterlist *)us->srb->request_buffer;
 		for (i=0; i<us->srb->use_sg; i++)
-			memset(page_address(sg[i].page) + sg[i].offset, 0, sg[i].length);
+			memset(sg_address(sg[i]), 0, sg[i].length);
 		for (i=0, transferred=0; 
 				i<us->srb->use_sg && transferred < len;
 				i++) {
 			amt = sg[i].length > len-transferred ? 
 					len-transferred : sg[i].length;
-			memcpy(page_address(sg[i].page) + sg[i].offset, data+transferred, amt);
+			memcpy(sg_address(sg[i]), data+transferred, amt);
 			transferred -= amt;
 		}
 	} else {
@@ -724,8 +724,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		US_DEBUGP("Result from usb_set_configuration is %d\n", result);
 		if (result == -EPIPE) {
-			US_DEBUGP("-- clearing stall on control interface\n");
-			usb_clear_halt(dev, usb_sndctrlpipe(dev, 0));
+			US_DEBUGP("-- stall on control interface\n");
 		} else if (result != 0) {
 			/* it's not a stall, but another error -- time to bail */
 			US_DEBUGP("-- Unknown error.  Rejecting device\n");
@@ -825,7 +824,6 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		init_completion(&(ss->notify));
 		init_MUTEX_LOCKED(&(ss->ip_waitq));
 		init_MUTEX(&(ss->irq_urb_sem));
-		init_MUTEX(&(ss->current_urb_sem));
 		init_MUTEX_LOCKED(&(ss->dev_semaphore));
 
 		/* copy over the subclass and protocol data */

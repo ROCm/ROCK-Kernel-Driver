@@ -1091,25 +1091,23 @@ sddr09_read_map(struct us_data *us) {
 		return 0;
 
 	for (i=0; i<alloc_blocks; i++) {
-		if (i<alloc_blocks-1) {
-			char *vaddr = kmalloc(1 << 17, GFP_NOIO);
-			sg[i].page = virt_to_page(vaddr);
-			sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
-			sg[i].length = (1<<17);
-		} else {
-			char *vaddr = kmalloc(alloc_len, GFP_NOIO);
-			sg[i].page = virt_to_page(vaddr);
-			sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
-			sg[i].length = alloc_len;
-		}
-		alloc_len -= sg[i].length;
+		int alloc_req = (i < alloc_blocks-1 ? 1 << 17 : alloc_len);
+		char *vaddr = kmalloc(alloc_req, GFP_NOIO);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
+		sg[i].page = virt_to_page(vaddr);
+		sg[i].offset = ((unsigned long)vaddr & ~PAGE_MASK);
+#else
+		sg[i].address = vaddr;
+#endif
+		sg[i].length = alloc_req;
+		alloc_len -= alloc_req;
 	}
 
 	for (i=0; i<alloc_blocks; i++)
 		if (sg[i].page == NULL) {
 			for (i=0; i<alloc_blocks; i++)
 				if (sg[i].page != NULL)
-					kfree(page_address(sg[i].page) + sg[i].offset);
+					kfree(sg_address(sg[i]));
 			kfree(sg);
 			return 0;
 		}
@@ -1120,7 +1118,7 @@ sddr09_read_map(struct us_data *us) {
 				     (unsigned char *)sg, alloc_blocks);
 	if (result != USB_STOR_TRANSPORT_GOOD) {
 		for (i=0; i<alloc_blocks; i++)
-			kfree(page_address(sg[i].page) + sg[i].offset);
+			kfree(sg_address(sg[i]));
 		kfree(sg);
 		return -1;
 	}
@@ -1136,7 +1134,7 @@ sddr09_read_map(struct us_data *us) {
 		info->lba_to_pba = NULL;
 		info->pba_to_lba = NULL;
 		for (i=0; i<alloc_blocks; i++)
-			kfree(page_address(sg[i].page) + sg[i].offset);
+			kfree(sg_address(sg[i]));
 		kfree(sg);
 		return 0;
 	}
@@ -1144,7 +1142,7 @@ sddr09_read_map(struct us_data *us) {
 	for (i = 0; i < numblocks; i++)
 		info->lba_to_pba[i] = info->pba_to_lba[i] = UNDEF;
 
-	ptr = page_address(sg[0].page)+sg[0].offset;
+	ptr = sg_address(sg[0]);
 
 	/*
 	 * Define lba-pba translation table
@@ -1153,8 +1151,7 @@ sddr09_read_map(struct us_data *us) {
 	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
 	for (i=0; i<numblocks; i++) {
-		ptr = page_address(sg[i>>11].page) +
-			sg[i>>11].offset + ((i&0x7ff)<<6);
+		ptr = sg_address(sg[i>>11]) + ((i&0x7ff)<<6);
 
 		if (i == 0 || i == 1) {
 			info->pba_to_lba[i] = UNUSABLE;
@@ -1264,7 +1261,7 @@ sddr09_read_map(struct us_data *us) {
 	US_DEBUGP("Found %d LBA's\n", lbact);
 
 	for (i=0; i<alloc_blocks; i++)
-		kfree(page_address(sg[i].page) + sg[i].offset);
+		kfree(sg_address(sg[i]));
 	kfree(sg);
 	return 0;
 }

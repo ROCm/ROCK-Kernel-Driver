@@ -48,7 +48,7 @@
 #include <linux/kernel.h>
 #include <linux/blk.h>
 #include <linux/cdrom.h>
-#include "scsi.h"
+#include "usb.h"
 
 #define USB_STORAGE "usb-storage: "
 

@@ -148,11 +148,11 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 			if (transfer_amount - total_transferred >= 
 					sg[i].length) {
 				result = usb_stor_transfer_partial(us,
-						page_address(sg[i].page) + sg[i].offset, sg[i].length);
+						sg_address(sg[i]), sg[i].length);
 				total_transferred += sg[i].length;
 			} else {
 				result = usb_stor_transfer_partial(us,
-						page_address(sg[i].page) + sg[i].offset,
+						sg_address(sg[i]),
 						transfer_amount - total_transferred);
 				total_transferred += transfer_amount - total_transferred;
 			}
