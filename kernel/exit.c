@@ -755,8 +755,8 @@ static void exit_notify(struct task_struct *tsk)
 	 * Clear these here so that update_process_times() won't try to deliver
 	 * itimer, profile or rlimit signals to this task while it is in late exit.
 	 */
-	tsk->it_virt_value = 0;
-	tsk->it_prof_value = 0;
+	tsk->it_virt_value = cputime_zero;
+	tsk->it_prof_value = cputime_zero;
 
 	write_unlock_irq(&tasklist_lock);
 
@@ -1046,10 +1046,16 @@ static int wait_task_zombie(task_t *p, int noreap,
 		 * here reaping other children at the same time.
 		 */
 		spin_lock_irq(&p->parent->sighand->siglock);
-		p->parent->signal->cutime +=
-			p->utime + p->signal->utime + p->signal->cutime;
-		p->parent->signal->cstime +=
-			p->stime + p->signal->stime + p->signal->cstime;
+		p->parent->signal->cutime =
+			cputime_add(p->parent->signal->cutime,
+			cputime_add(p->utime,
+			cputime_add(p->signal->utime,
+				    p->signal->cutime)));
+		p->parent->signal->cstime =
+			cputime_add(p->parent->signal->cstime,
+			cputime_add(p->stime,
+			cputime_add(p->signal->stime,
+				    p->signal->cstime)));
 		p->parent->signal->cmin_flt +=
 			p->min_flt + p->signal->min_flt + p->signal->cmin_flt;
 		p->parent->signal->cmaj_flt +=

@@ -163,15 +163,15 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 		struct compat_tms tmp;
 		struct task_struct *tsk = current;
 		struct task_struct *t;
-		unsigned long utime, stime, cutime, cstime;
+		cputime_t utime, stime, cutime, cstime;
 
 		read_lock(&tasklist_lock);
 		utime = tsk->signal->utime;
 		stime = tsk->signal->stime;
 		t = tsk;
 		do {
-			utime += t->utime;
-			stime += t->stime;
+			utime = cputime_add(utime, t->utime);
+			stime = cputime_add(stime, t->stime);
 			t = next_thread(t);
 		} while (t != tsk);
 
@@ -190,10 +190,10 @@ asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 		spin_unlock_irq(&tsk->sighand->siglock);
 		read_unlock(&tasklist_lock);
 
-		tmp.tms_utime = compat_jiffies_to_clock_t(utime);
-		tmp.tms_stime = compat_jiffies_to_clock_t(stime);
-		tmp.tms_cutime = compat_jiffies_to_clock_t(cutime);
-		tmp.tms_cstime = compat_jiffies_to_clock_t(cstime);
+		tmp.tms_utime = compat_jiffies_to_clock_t(cputime_to_jiffies(utime));
+		tmp.tms_stime = compat_jiffies_to_clock_t(cputime_to_jiffies(stime));
+		tmp.tms_cutime = compat_jiffies_to_clock_t(cputime_to_jiffies(cutime));
+		tmp.tms_cstime = compat_jiffies_to_clock_t(cputime_to_jiffies(cstime));
 		if (copy_to_user(tbuf, &tmp, sizeof(tmp)))
 			return -EFAULT;
 	}

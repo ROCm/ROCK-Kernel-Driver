@@ -1215,16 +1215,16 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 		 * this and each other thread to finish dying after the
 		 * core dump synchronization phase.
 		 */
-		jiffies_to_timeval(p->utime + p->signal->utime,
+		cputime_to_timeval(cputime_add(p->utime, p->signal->utime),
 				   &prstatus->pr_utime);
-		jiffies_to_timeval(p->stime + p->signal->stime,
+		cputime_to_timeval(cputime_add(p->stime, p->signal->stime),
 				   &prstatus->pr_stime);
 	} else {
-		jiffies_to_timeval(p->utime, &prstatus->pr_utime);
-		jiffies_to_timeval(p->stime, &prstatus->pr_stime);
+		cputime_to_timeval(p->utime, &prstatus->pr_utime);
+		cputime_to_timeval(p->stime, &prstatus->pr_stime);
 	}
-	jiffies_to_timeval(p->signal->cutime, &prstatus->pr_cutime);
-	jiffies_to_timeval(p->signal->cstime, &prstatus->pr_cstime);
+	cputime_to_timeval(p->signal->cutime, &prstatus->pr_cutime);
+	cputime_to_timeval(p->signal->cstime, &prstatus->pr_cstime);
 }
 
 static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
