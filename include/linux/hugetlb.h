@@ -24,6 +24,10 @@ struct page *follow_huge_addr(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long address, int write);
 struct vm_area_struct *hugepage_vma(struct mm_struct *mm,
 					unsigned long address);
+struct page *follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+				pmd_t *pmd, int write);
+int pmd_huge(pmd_t pmd);
+
 extern int htlbpage_max;
 
 static inline void
@@ -51,6 +55,8 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define hugetlb_report_meminfo(buf)		0
 #define hugepage_vma(mm, addr)			0
 #define mark_mm_hugetlb(mm, vma)		do { } while (0)
+#define follow_huge_pmd(mm, addr, pmd, write)	0
+#define pmd_huge(x)	0
 
 #endif /* !CONFIG_HUGETLB_PAGE */
 

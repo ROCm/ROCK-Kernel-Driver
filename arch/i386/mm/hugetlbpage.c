@@ -150,6 +150,7 @@ back1:
 	return i;
 }
 
+#if 0	/* This is just for testing */
 struct page *
 follow_huge_addr(struct mm_struct *mm,
 	struct vm_area_struct *vma, unsigned long address, int write)
@@ -178,6 +179,50 @@ struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
 	}
 	return NULL;
 }
+
+int pmd_huge(pmd_t pmd)
+{
+	return 0;
+}
+
+struct page *
+follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+		pmd_t *pmd, int write)
+{
+	return NULL;
+}
+
+#else
+
+struct page *
+follow_huge_addr(struct mm_struct *mm,
+	struct vm_area_struct *vma, unsigned long address, int write)
+{
+	return NULL;
+}
+
+struct vm_area_struct *hugepage_vma(struct mm_struct *mm, unsigned long addr)
+{
+	return NULL;
+}
+
+int pmd_huge(pmd_t pmd)
+{
+	return !!(pmd_val(pmd) & _PAGE_PSE);
+}
+
+struct page *
+follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+		pmd_t *pmd, int write)
+{
+	struct page *page;
+
+	page = pte_page(*(pte_t *)pmd);
+	if (page)
+		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
+	return page;
+}
+#endif
 
 void free_huge_page(struct page *page)
 {

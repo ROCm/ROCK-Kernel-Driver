@@ -618,7 +618,11 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 		goto out;
 
 	pmd = pmd_offset(pgd, address);
-	if (pmd_none(*pmd) || pmd_bad(*pmd))
+	if (pmd_none(*pmd))
+		goto out;
+	if (pmd_huge(*pmd))
+		return follow_huge_pmd(mm, address, pmd, write);
+	if (pmd_bad(*pmd))
 		goto out;
 
 	ptep = pte_offset_map(pmd, address);
