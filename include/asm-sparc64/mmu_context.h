@@ -27,7 +27,7 @@
 #include <asm/system.h>
 #include <asm/spitfire.h>
 
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 
@@ -106,7 +106,7 @@ do { \
 extern void __flush_tlb_mm(unsigned long, unsigned long);
 
 /* Switch the current MM context. */
-static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, struct task_struct *tsk, int cpu)
+static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, struct task_struct *tsk)
 {
 	unsigned long ctx_valid;
 
@@ -125,7 +125,7 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 	}
 
 	{
-		unsigned long vm_mask = (1UL << cpu);
+		unsigned long vm_mask = (1UL << smp_processor_id());
 
 		/* Even if (mm == old_mm) we _must_ check
 		 * the cpu_vm_mask.  If we do not we could

@@ -495,7 +495,7 @@ void __init cpu_init (void)
 	current->active_mm = &init_mm;
 	if (current->mm)
 		BUG();
-	enter_lazy_tlb(&init_mm, current, cpu);
+	enter_lazy_tlb(&init_mm, current);
 
 	load_esp0(t, thread->esp0);
 	set_tss_desc(cpu,t);

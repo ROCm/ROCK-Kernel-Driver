@@ -646,9 +646,9 @@ static inline task_t * context_switch(runqueue_t *rq, task_t *prev, task_t *next
 	if (unlikely(!mm)) {
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
-		enter_lazy_tlb(oldmm, next, smp_processor_id());
+		enter_lazy_tlb(oldmm, next);
 	} else
-		switch_mm(oldmm, mm, next, smp_processor_id());
+		switch_mm(oldmm, mm, next);
 
 	if (unlikely(!prev->mm)) {
 		prev->active_mm = NULL;
@@ -2528,7 +2528,7 @@ void __init sched_init(void)
 	 * The boot idle thread does lazy MMU switching as well:
 	 */
 	atomic_inc(&init_mm.mm_count);
-	enter_lazy_tlb(&init_mm, current, smp_processor_id());
+	enter_lazy_tlb(&init_mm, current);
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

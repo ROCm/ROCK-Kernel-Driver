@@ -17,20 +17,21 @@ void destroy_context(struct mm_struct *mm);
 
 #ifdef CONFIG_SMP
 
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 	if (read_pda(mmu_state) == TLBSTATE_OK) 
 		write_pda(mmu_state, TLBSTATE_LAZY);
 }
 #else
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
+static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
 #endif
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, 
-			     struct task_struct *tsk, unsigned cpu)
+			     struct task_struct *tsk)
 {
+	unsigned cpu = smp_processor_id();
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
@@ -68,7 +69,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 } while(0)
 
 #define activate_mm(prev, next) \
-	switch_mm((prev),(next),NULL,smp_processor_id())
+	switch_mm((prev),(next),NULL)
 
 
 #endif

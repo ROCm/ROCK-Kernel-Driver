@@ -552,7 +552,7 @@ static void unuse_mm(struct mm_struct *mm)
 {
 	current->mm = NULL;
 	/* active_mm is still 'mm' */
-	enter_lazy_tlb(mm, current, smp_processor_id());
+	enter_lazy_tlb(mm, current);
 }
 
 /* Run on kevent's context.  FIXME: needs to be per-cpu and warn if an

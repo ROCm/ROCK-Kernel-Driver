@@ -283,7 +283,7 @@ get_mmu_context(struct mm_struct *mm)
 
 void 
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
-	  struct task_struct *tsk, int cpu)
+	  struct task_struct *tsk)
 {
 	/* make sure we have a context */
 
