@@ -171,9 +171,10 @@ static struct pxafb_mach_info toshiba_ltm035a776c __initdata = {
 
 static void __init mainstone_init(void)
 {
-	platform_add_device(&smc91x_device);
+	platform_device_register(&smc91x_device);
 
-	/* reading the BSR might be handy to select LCD type here */
+	/* reading Mainstone's "Virtual Configuration Register"
+	   might be handy to select LCD type here */
 	if (0)
 		set_pxa_fb_info(&toshiba_ltm04c380k);
 	else
