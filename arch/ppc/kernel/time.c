@@ -161,7 +161,7 @@ void timer_interrupt(struct pt_regs * regs)
 
 	irq_enter();
 
-	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) < 0) {
+	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) <= 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
 		
 		ppc_do_profile(regs);
