@@ -125,7 +125,11 @@ static int  mct_u232_ioctl	         (struct usb_serial_port *port,
 					  unsigned long arg);
 static void mct_u232_break_ctl	         (struct usb_serial_port *port,
 					  int break_state );
-
+static int  mct_u232_tiocmget		 (struct usb_serial_port *port,
+					  struct file *file);
+static int  mct_u232_tiocmset		 (struct usb_serial_port *port,
+					  struct file *file, unsigned int set,
+					  unsigned int clear);
 /*
  * All of the device info needed for the MCT USB-RS232 converter.
  */
@@ -165,6 +169,8 @@ static struct usb_serial_device_type mct_u232_device = {
 	.ioctl =	     mct_u232_ioctl,
 	.set_termios =	     mct_u232_set_termios,
 	.break_ctl =	     mct_u232_break_ctl,
+	.tiocmget =	     mct_u232_tiocmget,
+	.tiocmset =	     mct_u232_tiocmset,
 	.attach =	     mct_u232_startup,
 	.shutdown =	     mct_u232_shutdown,
 };
@@ -773,57 +779,55 @@ static void mct_u232_break_ctl( struct usb_serial_port *port, int break_state )
 } /* mct_u232_break_ctl */
 
 
-static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
-			   unsigned int cmd, unsigned long arg)
+static int mct_u232_tiocmget (struct usb_serial_port *port, struct file *file)
 {
-	struct usb_serial *serial = port->serial;
 	struct mct_u232_private *priv = usb_get_serial_port_data(port);
-	int mask;
 	unsigned long control_state;
 	unsigned long flags;
 	
-	dbg("%scmd=0x%x", __FUNCTION__, cmd);
+	dbg("%s", __FUNCTION__);
 
 	spin_lock_irqsave(&priv->lock, flags);
 	control_state = priv->control_state;
 	spin_unlock_irqrestore(&priv->lock, flags);
 
+	return control_state;
+}
+
+static int mct_u232_tiocmset (struct usb_serial_port *port, struct file *file,
+			      unsigned int set, unsigned int clear)
+{
+	struct usb_serial *serial = port->serial;
+	struct mct_u232_private *priv = usb_get_serial_port_data(port);
+	unsigned long control_state;
+	unsigned long flags;
+	
+	dbg("%s", __FUNCTION__);
+
+	spin_lock_irqsave(&priv->lock, flags);
+	control_state = priv->control_state;
+
+	if (set & TIOCM_RTS)
+		control_state |= TIOCM_RTS;
+	if (set & TIOCM_DTR)
+		control_state |= TIOCM_DTR;
+	if (clear & TIOCM_RTS)
+		control_state &= ~TIOCM_RTS;
+	if (clear & TIOCM_DTR)
+		control_state &= ~TIOCM_DTR;
+
+	priv->control_state = control_state;
+	spin_unlock_irqrestore(&priv->lock, flags);
+	return mct_u232_set_modem_ctrl(serial, control_state);
+}
+
+static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
+			   unsigned int cmd, unsigned long arg)
+{
+	dbg("%scmd=0x%x", __FUNCTION__, cmd);
+
 	/* Based on code from acm.c and others */
 	switch (cmd) {
-	case TIOCMGET:
-		return put_user(control_state, (unsigned long *) arg);
-		break;
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
-	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
-		if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_RTS)) {
-			/* RTS needs set */
-			if( ((cmd == TIOCMSET) && (mask & TIOCM_RTS)) ||
-			    (cmd == TIOCMBIS) )
-				control_state |=  TIOCM_RTS;
-			else
-				control_state &= ~TIOCM_RTS;
-		}
-
-		if ((cmd == TIOCMSET) || (mask & TIOCM_DTR)) {
-			/* DTR needs set */
-			if( ((cmd == TIOCMSET) && (mask & TIOCM_DTR)) ||
-			    (cmd == TIOCMBIS) )
-				control_state |=  TIOCM_DTR;
-			else
-				control_state &= ~TIOCM_DTR;
-		}
-		mct_u232_set_modem_ctrl(serial, control_state);
-
-		spin_lock_irqsave(&priv->lock, flags);
-		priv->control_state = control_state;
-		spin_unlock_irqrestore(&priv->lock, flags);
-		break;
-					
 	case TIOCMIWAIT:
 		/* wait for any of the 4 modem inputs (DCD,RI,DSR,CTS)*/
 		/* TODO */
