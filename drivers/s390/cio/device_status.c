@@ -348,7 +348,8 @@ ccw_device_accumulate_basic_sense(struct ccw_device *cdev, struct irb *irb)
 	     (irb->scsw.actl & SCSW_ACTL_SUSPENDED)))
 		ccw_device_path_notoper(cdev);
 
-	if (!(irb->scsw.dstat & DEV_STAT_UNIT_CHECK)) {
+	if (!(irb->scsw.dstat & DEV_STAT_UNIT_CHECK) &&
+	    (irb->scsw.dstat & DEV_STAT_CHN_END)) {
 		cdev->private->irb.esw.esw0.erw.cons = 1;
 		cdev->private->flags.dosense = 0;
 	}
