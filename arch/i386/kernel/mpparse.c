@@ -104,28 +104,12 @@ static struct mpc_config_translation *translation_table[MAX_MPC_ENTRY] __initdat
 
 void __init MP_processor_info (struct mpc_config_processor *m)
 {
- 	int ver, quad, logical_apicid;
+ 	int ver, apicid;
  	
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
 
-	logical_apicid = m->mpc_apicid;
-	if (clustered_apic_mode) {
-		quad = translation_table[mpc_record]->trans_quad;
-		logical_apicid = (quad << 4) + 
-			(m->mpc_apicid ? m->mpc_apicid << 1 : 1);
-		printk("Processor #%d %ld:%ld APIC version %d (quad %d, apic %d)\n",
-			m->mpc_apicid,
-		        (m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
-			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
-			m->mpc_apicver, quad, logical_apicid);
-	} else {
-		printk("Processor #%d %ld:%ld APIC version %d\n",
-			m->mpc_apicid,
-			(m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
-			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
-			m->mpc_apicver);
-	}
+	apicid = mpc_apic_id(m, translation_table[mpc_record]->trans_quad);
 
 	if (m->mpc_featureflag&(1<<0))
 		Dprintk("    Floating point unit present.\n");
@@ -178,7 +162,7 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
 		boot_cpu_physical_apicid = m->mpc_apicid;
-		boot_cpu_logical_apicid = logical_apicid;
+		boot_cpu_logical_apicid = apicid;
 	}
 
 	num_processors++;
@@ -191,11 +175,8 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	if (clustered_apic_mode) {
-		phys_cpu_present_map |= (logical_apicid&0xf) << (4*quad);
-	} else {
-		phys_cpu_present_map |= apicid_to_cpu_present(m->mpc_apicid);
-	}
+	phys_cpu_present_map |= apicid_to_cpu_present(apicid);
+	
 	/*
 	 * Validate version
 	 */

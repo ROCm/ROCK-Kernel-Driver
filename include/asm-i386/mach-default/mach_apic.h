@@ -57,9 +57,19 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 	return  mps_cpu;
 }
 
-static inline unsigned long apicid_to_cpu_present(int apicid)
+static inline unsigned long apicid_to_cpu_present(int phys_apicid)
 {
-	return (1ul << apicid);
+	return (1ul << phys_apicid);
+}
+
+static inline int mpc_apic_id(struct mpc_config_processor *m, int quad)
+{
+	printk("Processor #%d %ld:%ld APIC version %d\n",
+			m->mpc_apicid,
+			(m->mpc_cpufeature & CPU_FAMILY_MASK) >> 8,
+			(m->mpc_cpufeature & CPU_MODEL_MASK) >> 4,
+			m->mpc_apicver);
+	return (m->mpc_apicid);
 }
 
 #endif /* __ASM_MACH_APIC_H */
