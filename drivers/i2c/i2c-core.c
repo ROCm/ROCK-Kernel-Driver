@@ -57,7 +57,7 @@
 
 /**** lock for writing to global variables: the adapter & driver list */
 DECLARE_MUTEX(adap_lock);
-DECLARE_MUTEX(driver_lock);
+static DECLARE_MUTEX(driver_lock);
 
 /**** adapter list */
 static struct i2c_adapter *adapters[I2C_ADAP_MAX];
