@@ -492,7 +492,6 @@ struct speedo_private {
 	unsigned short partner;			/* Link partner caps. */
 	struct mii_if_info mii_if;		/* MII API hooks, info */
 	u32 msg_enable;				/* debug message level */
-	unsigned char intmask;			/* Saved interrupt mask bits */
 #ifdef CONFIG_PM
 	u32 pm_state[16];
 #endif
@@ -541,7 +540,6 @@ static void speedo_refill_rx_buffers(struct net_device *dev, int force);
 static int speedo_rx(struct net_device *dev);
 static void speedo_tx_buffer_gc(struct net_device *dev);
 static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-static void speedo_intrmask(void *dev, int onoff);
 static int speedo_close(struct net_device *dev);
 static struct net_device_stats *speedo_get_stats(struct net_device *dev);
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -1557,29 +1555,6 @@ static void speedo_tx_buffer_gc(struct net_device *dev)
 	sp->dirty_tx = dirty_tx;
 }
 
-/*
- * Interrupt mask control
- */
-static void
-speedo_intrmask(void *dev_instance, int onoff)
-{
-	struct net_device *dev = (struct net_device *)dev_instance;
-	struct speedo_private *sp;
-	long ioaddr;
-
-	sp = (struct speedo_private *)dev->priv;
-	ioaddr = dev->base_addr;
-
-	if (onoff) {
-		/* enable */
-		outb(sp->intmask, ioaddr + SCBIntmask);
-	} else {
-		/* disable */
-		sp->intmask = inb(ioaddr + SCBIntmask);
-		outw(SCBMaskAll, ioaddr + SCBCmd);
-	}
-}
-
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
 static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
@@ -1908,7 +1883,7 @@ speedo_close(struct net_device *dev)
 	/* Shut off the media monitoring timer. */
 	del_timer_sync(&sp->timer);
 
-	speedo_intrmask(dev, 0);
+	outw(SCBMaskAll, ioaddr + SCBCmd);
 
 	/* Shutting down the chip nicely fails to disable flow control. So.. */
 	outl(PortPartialReset, ioaddr + SCBPort);
