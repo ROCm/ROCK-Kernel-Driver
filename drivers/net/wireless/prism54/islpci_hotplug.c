@@ -36,6 +36,9 @@ MODULE_AUTHOR("[Intersil] R.Bastings and W.Termorshuizen, The prism54.org Develo
 MODULE_DESCRIPTION("The Prism54 802.11 Wireless LAN adapter");
 MODULE_LICENSE("GPL");
 
+static int	init_pcitm = 0;
+module_param(init_pcitm, int, 0);
+
 /* In this order: vendor, device, subvendor, subdevice, class, class_mask,
  * driver_data 
  * If you have an update for this please contact prism54-devel@prism54.org 
@@ -292,14 +295,14 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 *
 	 * 	Writing zero to both these two registers will disable both timeouts and
 	 * 	*can* solve problems caused by devices that are slow to respond.
+	 *	Make this configurable - MSW
 	 */
-	/*	I am taking these out, we should not be poking around in the
-	 *	programmable timers - MSW
-	*/
-/*	Do not zero the programmable timers
-	pci_write_config_byte(pdev, 0x40, 0);
-	pci_write_config_byte(pdev, 0x41, 0);
-*/
+	if ( init_pcitm >= 0 ) {
+		pci_write_config_byte(pdev, 0x40, (u8)init_pcitm);
+		pci_write_config_byte(pdev, 0x41, (u8)init_pcitm);
+	} else {
+		printk(KERN_INFO "PCI TRDY/RETRY unchanged\n");
+	}
 
 	/* request the pci device I/O regions */
 	rvalue = pci_request_regions(pdev, DRV_NAME);

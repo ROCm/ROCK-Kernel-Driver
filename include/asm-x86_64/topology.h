@@ -22,9 +22,9 @@ extern cpumask_t     node_to_cpumask[];
 
 static inline cpumask_t pcibus_to_cpumask(int bus)
 {
-	cpumask_t tmp;
-	cpus_and(tmp, mp_bus_to_cpumask[bus], cpu_online_map);
-	return tmp;
+	cpumask_t res;
+	cpus_and(res,  pci_bus_to_cpumask[bus], cpu_online_map);
+	return res;
 }
 
 #define NODE_BALANCE_RATE 30	/* CHECKME */ 
