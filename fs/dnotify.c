@@ -173,9 +173,7 @@ EXPORT_SYMBOL_GPL(dnotify_parent);
 static int __init dnotify_init(void)
 {
 	dn_cache = kmem_cache_create("dnotify_cache",
-		sizeof(struct dnotify_struct), 0, 0, NULL, NULL);
-	if (!dn_cache)
-		panic("cannot create dnotify slab cache");
+		sizeof(struct dnotify_struct), 0, SLAB_PANIC, NULL, NULL);
 	return 0;
 }
 

@@ -102,7 +102,7 @@
  * can map.
  */
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
-#define PMD_SIZE	(__IA64_UL(1) << PMD_SHIFT)
+#define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 #define PTRS_PER_PMD	(__IA64_UL(1) << (PAGE_SHIFT-3))
 
@@ -468,8 +468,6 @@ struct mmu_gather;
 extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
 	struct vm_area_struct * prev, unsigned long start, unsigned long end);
 #endif
-
-typedef pte_t *pte_addr_t;
 
 /*
  * IA-64 doesn't have any external MMU info: the page tables contain all the necessary

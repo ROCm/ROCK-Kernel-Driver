@@ -135,11 +135,11 @@
 			 SLAB_POISON | SLAB_HWCACHE_ALIGN | \
 			 SLAB_NO_REAP | SLAB_CACHE_DMA | \
 			 SLAB_MUST_HWCACHE_ALIGN | SLAB_STORE_USER | \
-			 SLAB_RECLAIM_ACCOUNT )
+			 SLAB_RECLAIM_ACCOUNT | SLAB_PANIC)
 #else
 # define CREATE_MASK	(SLAB_HWCACHE_ALIGN | SLAB_NO_REAP | \
 			 SLAB_CACHE_DMA | SLAB_MUST_HWCACHE_ALIGN | \
-			 SLAB_RECLAIM_ACCOUNT)
+			 SLAB_RECLAIM_ACCOUNT | SLAB_PANIC)
 #endif
 
 /*
@@ -1402,9 +1402,11 @@ next:
 	up(&cache_chain_sem);
 	unlock_cpu_hotplug();
 opps:
+	if (!cachep && (flags & SLAB_PANIC))
+		panic("kmem_cache_create(): failed to create slab `%s'\n",
+			name);
 	return cachep;
 }
-
 EXPORT_SYMBOL(kmem_cache_create);
 
 static inline void check_irq_off(void)

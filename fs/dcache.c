@@ -1570,10 +1570,8 @@ static void __init dcache_init(unsigned long mempages)
 	dentry_cache = kmem_cache_create("dentry_cache",
 					 sizeof(struct dentry),
 					 0,
-					 SLAB_RECLAIM_ACCOUNT,
+					 SLAB_RECLAIM_ACCOUNT|SLAB_PANIC,
 					 NULL, NULL);
-	if (!dentry_cache)
-		panic("Cannot create dentry cache");
 	
 	set_shrinker(DEFAULT_SEEKS, shrink_dcache_memory);
 
@@ -1638,17 +1636,11 @@ void __init vfs_caches_init(unsigned long mempages)
 	reserve = min((mempages - nr_free_pages()) * 3/2, mempages - 1);
 	mempages -= reserve;
 
-	names_cachep = kmem_cache_create("names_cache",
-			PATH_MAX, 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!names_cachep)
-		panic("Cannot create names SLAB cache");
+	names_cachep = kmem_cache_create("names_cache", PATH_MAX, 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
-	filp_cachep = kmem_cache_create("filp",
-			sizeof(struct file), 0,
-			SLAB_HWCACHE_ALIGN, filp_ctor, filp_dtor);
-	if(!filp_cachep)
-		panic("Cannot create filp SLAB cache");
+	filp_cachep = kmem_cache_create("filp", sizeof(struct file), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, filp_ctor, filp_dtor);
 
 	dcache_init(mempages);
 	inode_init(mempages);

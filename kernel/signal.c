@@ -2573,7 +2573,5 @@ void __init signals_init(void)
 		kmem_cache_create("sigqueue",
 				  sizeof(struct sigqueue),
 				  __alignof__(struct sigqueue),
-				  0, NULL, NULL);
-	if (!sigqueue_cachep)
-		panic("signals_init(): cannot create sigqueue SLAB cache");
+				  SLAB_PANIC, NULL, NULL);
 }

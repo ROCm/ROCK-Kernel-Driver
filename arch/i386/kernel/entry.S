@@ -876,9 +876,9 @@ ENTRY(sys_call_table)
 	.long sys_utimes
  	.long sys_fadvise64_64
 	.long sys_ni_syscall	/* sys_vserver */
-	.long sys_ni_syscall	/* sys_mbind */
-	.long sys_ni_syscall	/* 275 sys_get_mempolicy */
-	.long sys_ni_syscall	/* sys_set_mempolicy */
+	.long sys_mbind
+	.long sys_get_mempolicy
+	.long sys_set_mempolicy
 	.long sys_mq_open
 	.long sys_mq_unlink
 	.long sys_mq_timedsend

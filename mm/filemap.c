@@ -55,17 +55,19 @@
 /*
  * Lock ordering:
  *
- *  ->i_shared_sem		(vmtruncate)
+ *  ->i_mmap_lock		(vmtruncate)
  *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->tree_lock
  *
  *  ->i_sem
- *    ->i_shared_sem		(truncate->unmap_mapping_range)
+ *    ->i_mmap_lock		(truncate->unmap_mapping_range)
  *
  *  ->mmap_sem
- *    ->i_shared_sem		(various places)
+ *    ->i_mmap_lock
+ *      ->page_table_lock	(various places, mainly in mmap.c)
+ *        ->mapping->tree_lock	(arch-dependent flush_dcache_mmap_lock)
  *
  *  ->mmap_sem
  *    ->lock_page		(access_process_vm)
@@ -121,14 +123,13 @@ static inline int sync_page(struct page *page)
 {
 	struct address_space *mapping;
 
+	/*
+	 * FIXME, fercrissake.  What is this barrier here for?
+	 */
 	smp_mb();
 	mapping = page_mapping(page);
-	if (mapping) {
-		if (mapping->a_ops && mapping->a_ops->sync_page)
-			return mapping->a_ops->sync_page(page);
-	} else if (PageSwapCache(page)) {
-		swap_unplug_io_fn(NULL, page);
-	}
+	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
+		return mapping->a_ops->sync_page(page);
 	return 0;
 }
 
@@ -252,17 +253,15 @@ int add_to_page_cache(struct page *page, struct address_space *mapping,
 	int error = radix_tree_preload(gfp_mask & ~__GFP_HIGHMEM);
 
 	if (error == 0) {
-		page_cache_get(page);
 		spin_lock_irq(&mapping->tree_lock);
 		error = radix_tree_insert(&mapping->page_tree, offset, page);
 		if (!error) {
+			page_cache_get(page);
 			SetPageLocked(page);
 			page->mapping = mapping;
 			page->index = offset;
 			mapping->nrpages++;
 			pagecache_acct(1);
-		} else {
-			page_cache_release(page);
 		}
 		spin_unlock_irq(&mapping->tree_lock);
 		radix_tree_preload_end();

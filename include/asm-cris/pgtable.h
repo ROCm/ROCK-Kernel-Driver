@@ -337,6 +337,4 @@ extern inline void update_mmu_cache(struct vm_area_struct * vma,
 #define pte_to_pgoff(x)	(pte_val(x) >> 6)
 #define pgoff_to_pte(x)	__pte(((x) << 6) | _PAGE_FILE)
 
-typedef pte_t *pte_addr_t;
-
 #endif /* _CRIS_PGTABLE_H */

@@ -471,8 +471,6 @@ extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
 			int region_type);
 unsigned long im_free(void *addr);
 
-typedef pte_t *pte_addr_t;
-
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 			      unsigned long va, unsigned long prpn,
 			      int secondary, unsigned long hpteflags,

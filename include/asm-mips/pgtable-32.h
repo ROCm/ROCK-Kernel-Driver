@@ -216,10 +216,4 @@ static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
-#ifdef CONFIG_64BIT_PHYS_ADDR
-typedef u64 pte_addr_t;
-#else
-typedef pte_t *pte_addr_t;
-#endif
-
 #endif /* _ASM_PGTABLE_32_H */

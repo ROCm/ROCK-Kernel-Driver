@@ -27,6 +27,8 @@
 #define flush_cache_range(vma, start, end)	((void)0)
 #define flush_cache_page(vma, vmaddr)		((void)0)
 #define flush_dcache_page(page)			((void)0)
+#define flush_dcache_mmap_lock(mapping)		((void)0)
+#define flush_dcache_mmap_unlock(mapping)	((void)0)
 #define flush_cache_vmap(start, end)		((void)0)
 #define flush_cache_vunmap(start, end)		((void)0)
 

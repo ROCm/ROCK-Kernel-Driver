@@ -31,7 +31,6 @@
 #include <asm/tlb.h>
 #include <asm/hardirq.h>
 #include <linux/highmem.h>
-#include <asm/rmap.h>
 
 DEFINE_PER_CPU(struct ppc64_tlb_batch, ppc64_tlb_batch);
 
@@ -59,7 +58,8 @@ void hpte_update(pte_t *ptep, unsigned long pte, int wrprot)
 
 	ptepage = virt_to_page(ptep);
 	mm = (struct mm_struct *) ptepage->mapping;
-	addr = ptep_to_address(ptep);
+	addr = ptepage->index +
+		(((unsigned long)ptep & ~PAGE_MASK) * PTRS_PER_PTE);
 
 	if (REGION_ID(addr) == USER_REGION_ID)
 		context = mm->context.id;
