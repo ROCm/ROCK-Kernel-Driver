@@ -933,6 +933,10 @@ static
 #endif
 unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
 
+#ifdef CONFIG_CRASH_DUMP_MODULE
+EXPORT_SYMBOL(irq_affinity);
+#endif
+
 static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
 
 void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
