@@ -16,6 +16,14 @@ static inline void arch_idle(void)
 
 static inline void arch_reset(char mode)
 {
+#ifdef CONFIG_ARCH_IOP321
+    *IOP321_PCSR = 0x30;
+#endif
+
+#ifdef CONFIG_ARCH_IOP331
+    *IOP331_PCSR = 0x30;
+#endif
+
 	if ( 1 && mode == 's') {
 		/* Jump into ROM at address 0 */
 		cpu_reset(0);
