@@ -1323,7 +1323,7 @@ static inline int e100_tx_clean(struct nic *nic)
 static void e100_clean_cbs(struct nic *nic)
 {
 	if(nic->cbs) {
-		while(nic->cb_to_clean != nic->cb_to_use) {
+		while(nic->cbs_avail != nic->params.cbs.count) {
 			struct cb *cb = nic->cb_to_clean;
 			if(cb->skb) {
 				pci_unmap_single(nic->pdev,
@@ -1333,8 +1333,8 @@ static void e100_clean_cbs(struct nic *nic)
 				dev_kfree_skb(cb->skb);
 			}
 			nic->cb_to_clean = nic->cb_to_clean->next;
+			nic->cbs_avail++;
 		}
-		nic->cbs_avail = nic->params.cbs.count;
 		pci_free_consistent(nic->pdev,
 			sizeof(struct cb) * nic->params.cbs.count,
 			nic->cbs, nic->cbs_dma_addr);
