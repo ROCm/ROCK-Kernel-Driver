@@ -2846,7 +2846,7 @@ int __init qic02_tape_init(void)
 #endif
 	printk(TPQIC02_NAME ": DMA buffers: %u blocks\n", NR_BLK_BUF);
 	/* If we got this far, install driver functions */
-	if (devfs_register_chrdev
+	if (register_chrdev
 	    (QIC02_TAPE_MAJOR, TPQIC02_NAME, &qic02_tape_fops)) {
 		printk(TPQIC02_NAME ": Unable to get chrdev major %d\n",
 		       QIC02_TAPE_MAJOR);
@@ -2930,7 +2930,7 @@ void cleanup_module(void)
 	if (status_zombie == NO) {
 		qic02_release_resources();
 	}
-	devfs_unregister_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME);
+	unregister_chrdev(QIC02_TAPE_MAJOR, TPQIC02_NAME);
 	devfs_find_and_unregister(NULL, "ntpqic11", QIC02_TAPE_MAJOR, 2,
 				  DEVFS_SPECIAL_CHR, 0);
 	devfs_find_and_unregister(NULL, "tpqic11", QIC02_TAPE_MAJOR, 3,

@@ -379,12 +379,6 @@ int udma_new_table(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned int *table = ch->dmatable_cpu;
-#ifdef CONFIG_BLK_DEV_TRM290
-	unsigned int is_trm290_chipset = (ch->chipset == ide_trm290);
-#else
-	const int is_trm290_chipset = 0;
-#endif
-	unsigned int count = 0;
 	int i;
 	struct scatterlist *sg;
 
@@ -392,68 +386,29 @@ int udma_new_table(struct ata_device *drive, struct request *rq)
 	if (!i)
 		return 0;
 
+	BUG_ON(i > PRD_ENTRIES);
+
 	sg = ch->sg_table;
-	while (i) {
-		u32 cur_addr;
-		u32 cur_len;
+	while (i--) {
+		u32 cur_addr = sg_dma_address(sg);
+		u32 cur_len = sg_dma_len(sg) & 0xffff;
 
-		cur_addr = sg_dma_address(sg);
-		cur_len = sg_dma_len(sg);
+		/* Delete this test after linux ~2.5.35, as we care
+		   about performance in this loop. */
+		BUG_ON(cur_len > ch->max_segment_size);
 
-		/*
-		 * Fill in the dma table, without crossing any 64kB boundaries.
-		 * Most hardware requires 16-bit alignment of all blocks,
-		 * but the trm290 requires 32-bit alignment.
-		 */
-
-		while (cur_len) {
-			u32 xcount, bcount = 0x10000 - (cur_addr & 0xffff);
-
-			if (count++ >= PRD_ENTRIES) {
-				printk("ide-dma: count %d, sg_nents %d, cur_len %d, cur_addr %u\n",
-						count, ch->sg_nents, cur_len, cur_addr);
-				BUG();
-			}
-
-			if (bcount > cur_len)
-				bcount = cur_len;
-			*table++ = cpu_to_le32(cur_addr);
-			xcount = bcount & 0xffff;
-			if (is_trm290_chipset)
-				xcount = ((xcount >> 2) - 1) << 16;
-			if (xcount == 0x0000) {
-		        /*
-			 * Most chipsets correctly interpret a length of
-			 * 0x0000 as 64KB, but at least one (e.g. CS5530)
-			 * misinterprets it as zero (!). So here we break
-			 * the 64KB entry into two 32KB entries instead.
-			 */
-				if (count++ >= PRD_ENTRIES) {
-					pci_unmap_sg(ch->pci_dev, sg,
-						     ch->sg_nents,
-						     ch->sg_dma_direction);
-					return 0;
-				}
-
-				*table++ = cpu_to_le32(0x8000);
-				*table++ = cpu_to_le32(cur_addr + 0x8000);
-				xcount = 0x8000;
-			}
-			*table++ = cpu_to_le32(xcount);
-			cur_addr += bcount;
-			cur_len -= bcount;
-		}
+		*table++ = cpu_to_le32(cur_addr);
+		*table++ = cpu_to_le32(cur_len);
 
 		sg++;
-		i--;
 	}
 
-	if (!count)
-		printk(KERN_ERR "%s: empty DMA table?\n", ch->name);
-	else if (!is_trm290_chipset)
+#ifdef CONFIG_BLK_DEV_TRM290
+	if (ch->chipset == ide_trm290)
 		*--table |= cpu_to_le32(0x80000000);
+#endif
 
-	return count;
+	return ch->sg_nents;
 }
 
 /*

@@ -46,7 +46,7 @@ Common pitfalls:
 - If you mix devices on the same cable, please consider using similar devices
   in respect of the data transfer mode they support.
 
-- Even better tru to stick to the same vendor and device type on the same
+- Even better try to stick to the same vendor and device type on the same
   cable.
 
 ================================================================================
@@ -66,7 +66,8 @@ sixth..     ide5, usually PCI, probed
 To access devices on interfaces > ide0, device entries please make sure that
 device files for them are present in /dev.  If not, please create such
 entries, by simply running the included shell script:
-/usr/src/linux/scripts/MAKEDEV.ide
+
+	/usr/src/linux/scripts/MAKEDEV.ide
 
 This driver automatically probes for most IDE interfaces (including all PCI
 ones), for the drives/geometries attached to those interfaces, and for the IRQ
@@ -192,11 +193,10 @@ and still allows newer hardware to run on the 2nd/3rd/4th IDE ports
 under control of ide.c.   To have ide.c also "take over" the primary
 IDE port in this situation, use the "command line" parameter:  ide0=0x1f0
 
-The IDE driver is partly modularized.  The high level disk/cdrom/tape/floppy
+The IDE driver is modularized.  The high level disk/CD-ROM/tape/floppy
 drivers can always be compiled as loadable modules, the chipset drivers
 can only be compiled into the kernel, and the core code (ide.c) can be
-compiled as a loadable module provided no chipset support and no special
-partition table translations are needed.
+compiled as a loadable module provided no chipset support is needed.
 
 When using ide.c/ide-tape.c as modules in combination with kerneld, add:
 
@@ -214,8 +214,9 @@ driver using the "options=" keyword to insmod, while replacing any ',' with
 
 ================================================================================
 
-Summary of ide driver parameters for kernel "command line":
-----------------------------------------------------------
+Summary of ide driver parameters for kernel command line
+--------------------------------------------------------
+
  "hdx="  is recognized for all "x" from "a" to "h", such as "hdc".
  
  "idex=" is recognized for all "x" from "0" to "3", such as "ide1".

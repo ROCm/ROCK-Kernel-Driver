@@ -71,7 +71,7 @@ static struct file_operations usb_fops = {
 
 int usb_major_init(void)
 {
-	if (devfs_register_chrdev(USB_MAJOR, "usb", &usb_fops)) {
+	if (register_chrdev(USB_MAJOR, "usb", &usb_fops)) {
 		err("unable to get major %d for usb devices", USB_MAJOR);
 		return -EBUSY;
 	}
@@ -84,7 +84,7 @@ int usb_major_init(void)
 void usb_major_cleanup(void)
 {
 	devfs_unregister(usb_devfs_handle);
-	devfs_unregister_chrdev(USB_MAJOR, "usb");
+	unregister_chrdev(USB_MAJOR, "usb");
 }
 
 /**

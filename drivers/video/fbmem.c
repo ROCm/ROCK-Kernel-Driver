@@ -845,7 +845,7 @@ fbmem_init(void)
 	create_proc_read_entry("fb", 0, 0, fbmem_read_proc, NULL);
 
 	devfs_handle = devfs_mk_dir (NULL, "fb", NULL);
-	if (devfs_register_chrdev(FB_MAJOR,"fb",&fb_fops))
+	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
 
 #ifdef CONFIG_FB_OF

@@ -702,7 +702,7 @@ static int sr_init()
 		return 0;
 
 	if (!sr_registered) {
-		if (devfs_register_blkdev(MAJOR_NR, "sr", &sr_bdops)) {
+		if (register_blkdev(MAJOR_NR, "sr", &sr_bdops)) {
 			printk("Unable to get major %d for SCSI-CD\n", MAJOR_NR);
 			return 1;
 		}
@@ -714,7 +714,7 @@ static int sr_init()
 	sr_template.dev_max = sr_template.dev_noticed + SR_EXTRA_DEVS;
 	scsi_CDs = kmalloc(sr_template.dev_max * sizeof(Scsi_CD), GFP_ATOMIC);
 	if (!scsi_CDs)
-		goto cleanup_devfs;
+		goto cleanup_dev;
 	memset(scsi_CDs, 0, sr_template.dev_max * sizeof(Scsi_CD));
 
 	sr_sizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
@@ -725,8 +725,8 @@ static int sr_init()
 
 cleanup_cds:
 	kfree(scsi_CDs);
-cleanup_devfs:
-	devfs_unregister_blkdev(MAJOR_NR, "sr");
+cleanup_dev:
+	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
 	return 1;
 }
@@ -869,7 +869,7 @@ static int __init init_sr(void)
 static void __exit exit_sr(void)
 {
 	scsi_unregister_device(&sr_template);
-	devfs_unregister_blkdev(MAJOR_NR, "sr");
+	unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
 	if (scsi_CDs != NULL) {
 		kfree(scsi_CDs);

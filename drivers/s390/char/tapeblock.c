@@ -97,11 +97,7 @@ tapeblock_init(void) {
 	tape_dev_t* td;
 	tape_init();
 	/* Register the tape major number to the kernel */
-#ifdef CONFIG_DEVFS_FS
-	result = devfs_register_blkdev(tapeblock_major, "tBLK", &tapeblock_fops);
-#else
 	result = register_blkdev(tapeblock_major, "tBLK", &tapeblock_fops);
-#endif
 	if (result < 0) {
 		PRINT_WARN(KERN_ERR "tape: can't get major %d for block device\n", tapeblock_major);
 		result=-ENODEV;
@@ -149,11 +145,7 @@ out_undo_hardsect_size:
 out_undo_blk_size:
 	kfree(blk_size[tapeblock_major]);
 out_undo_bdev:
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister_blkdev(tapeblock_major, "tBLK");
-#else
 	unregister_blkdev(tapeblock_major, "tBLK");
-#endif
 	result=-ENOMEM;
 	blk_size[tapeblock_major]=
 	hardsect_size[tapeblock_major]=
@@ -181,11 +173,7 @@ tapeblock_uninit(void) {
 		max_sectors[tapeblock_major]=NULL;
 	}
 
-#ifdef CONFIG_DEVFS_FS
-	devfs_unregister_blkdev(tapeblock_major, "tBLK");
-#else
 	unregister_blkdev(tapeblock_major, "tBLK");
-#endif
 
 out:
 	return;

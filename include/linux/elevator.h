@@ -6,13 +6,14 @@ typedef int (elevator_merge_fn) (request_queue_t *, struct request **,
 
 typedef void (elevator_merge_cleanup_fn) (request_queue_t *, struct request *, int);
 
-typedef void (elevator_merge_req_fn) (struct request *, struct request *);
+typedef void (elevator_merge_req_fn) (request_queue_t *, struct request *, struct request *);
 
 typedef struct request *(elevator_next_req_fn) (request_queue_t *);
 
 typedef void (elevator_add_req_fn) (request_queue_t *, struct request *, struct list_head *);
 typedef int (elevator_queue_empty_fn) (request_queue_t *);
 typedef void (elevator_remove_req_fn) (request_queue_t *, struct request *);
+typedef struct list_head *(elevator_get_sort_head_fn) (request_queue_t *, struct request *);
 
 typedef int (elevator_init_fn) (request_queue_t *, elevator_t *);
 typedef void (elevator_exit_fn) (request_queue_t *, elevator_t *);
@@ -28,6 +29,7 @@ struct elevator_s
 	elevator_remove_req_fn *elevator_remove_req_fn;
 
 	elevator_queue_empty_fn *elevator_queue_empty_fn;
+	elevator_get_sort_head_fn *elevator_get_sort_head_fn;
 
 	elevator_init_fn *elevator_init_fn;
 	elevator_exit_fn *elevator_exit_fn;
@@ -45,6 +47,8 @@ extern int elv_merge(request_queue_t *, struct request **, struct bio *);
 extern void elv_merge_requests(request_queue_t *, struct request *,
 			       struct request *);
 extern void elv_remove_request(request_queue_t *, struct request *);
+extern int elv_queue_empty(request_queue_t *);
+extern inline struct list_head *elv_get_sort_head(request_queue_t *, struct request *);
 
 /*
  * noop I/O scheduler. always merges, always inserts new request at tail
@@ -72,6 +76,10 @@ typedef struct blkelv_ioctl_arg_s {
 
 extern int elevator_init(request_queue_t *, elevator_t *, elevator_t);
 extern void elevator_exit(request_queue_t *, elevator_t *);
+extern inline int bio_rq_in_between(struct bio *, struct request *, struct list_head *);
+extern inline int elv_rq_merge_ok(struct request *, struct bio *);
+extern inline int elv_try_merge(struct request *, struct bio *);
+extern inline int elv_try_last_merge(request_queue_t *, struct request **, struct bio *);
 
 /*
  * Return values from elevator merger
@@ -79,11 +87,5 @@ extern void elevator_exit(request_queue_t *, elevator_t *);
 #define ELEVATOR_NO_MERGE	0
 #define ELEVATOR_FRONT_MERGE	1
 #define ELEVATOR_BACK_MERGE	2
-
-/*
- * will change once we move to a more complex data structure than a simple
- * list for pending requests
- */
-#define elv_queue_empty(q)	list_empty(&(q)->queue_head)
 
 #endif

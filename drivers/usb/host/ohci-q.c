@@ -534,6 +534,8 @@ td_fill (unsigned int info,
 	/* aim for only one interrupt per urb.  mostly applies to control
 	 * and iso; other urbs rarely need more than one TD per urb.
 	 * this way, only final tds (or ones with an error) cause IRQs.
+	 * at least immediately; use DI=6 in case any control request is
+	 * tempted to die part way through.
 	 *
 	 * NOTE: could delay interrupts even for the last TD, and get fewer
 	 * interrupts ... increasing per-urb latency by sharing interrupts.
@@ -541,7 +543,7 @@ td_fill (unsigned int info,
 	 */
 	if (index != (urb_priv->length - 1)
 			|| (urb->transfer_flags & URB_NO_INTERRUPT))
-		info |= TD_DI_SET (7);
+		info |= TD_DI_SET (6);
 
 	/* use this td as the next dummy */
 	td_pt = urb_priv->td [index];
@@ -809,12 +811,16 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	ohci->hcca->done_head = 0;
 
 	while (td_list_hc) {		
+	    	int		cc;
+
 		td_list = dma_to_td (ohci, td_list_hc);
 
 		td_list->hwINFO |= cpu_to_le32 (TD_DONE);
 
-		if (TD_CC_GET (le32_to_cpup (&td_list->hwINFO))) {
+		cc = TD_CC_GET (le32_to_cpup (&td_list->hwINFO));
+		if (cc != TD_CC_NOERROR) {
 			urb_priv = (urb_priv_t *) td_list->urb->hcpriv;
+
 			/* Non-iso endpoints can halt on error; un-halt,
 			 * and dequeue any other TDs from this urb.
 			 * No other TD could have caused the halt.
@@ -822,12 +828,21 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
-#ifdef OHCI_VERBOSE_DEBUG
-					dbg ("urb %p TD %p (%d/%d), patch ED",
-						td_list->urb, td_list,
+					struct urb *urb = td_list->urb;
+
+					/* help for troubleshooting: */
+					dbg ("urb %p usb-%s-%s ep-%d-%s "
+						    "(td %d/%d), "
+						    "cc %d --> status %d",
+						td_list->urb,
+						urb->dev->bus->bus_name,
+						urb->dev->devpath,
+						usb_pipeendpoint (urb->pipe),
+						usb_pipein (urb->pipe)
+						    ? "IN" : "OUT",
 						1 + td_list->index,
-						urb_priv->length);
-#endif
+						urb_priv->length,
+						cc, cc_to_error [cc]);
 					td_list->ed->hwHeadP = 
 			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
 				    & __constant_cpu_to_le32 (TD_MASK))

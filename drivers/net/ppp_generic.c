@@ -785,7 +785,7 @@ int __init ppp_init(void)
 	int err;
 
 	printk(KERN_INFO "PPP generic driver version " PPP_VERSION "\n");
-	err = devfs_register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
+	err = register_chrdev(PPP_MAJOR, "ppp", &ppp_device_fops);
 	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
 	devfs_handle = devfs_register(NULL, "ppp", DEVFS_FL_DEFAULT,
@@ -2509,7 +2509,7 @@ static void __exit ppp_cleanup(void)
 	if (atomic_read(&ppp_unit_count) || atomic_read(&channel_count))
 		printk(KERN_ERR "PPP: removing module but units remain!\n");
 	cardmap_destroy(&all_ppp_units);
-	if (devfs_unregister_chrdev(PPP_MAJOR, "ppp") != 0)
+	if (unregister_chrdev(PPP_MAJOR, "ppp") != 0)
 		printk(KERN_ERR "PPP: failed to unregister PPP device\n");
 	devfs_unregister(devfs_handle);
 }

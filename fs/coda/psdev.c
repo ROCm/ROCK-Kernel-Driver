@@ -366,7 +366,7 @@ static devfs_handle_t devfs_handle;
 
 static int init_coda_psdev(void)
 {
-	if(devfs_register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
+	if(register_chrdev(CODA_PSDEV_MAJOR,"coda_psdev",
 				 &coda_psdev_fops)) {
               printk(KERN_ERR "coda_psdev: unable to get major %d\n", 
 		     CODA_PSDEV_MAJOR);
@@ -411,7 +411,7 @@ static int __init init_coda(void)
 	return 0;
 out:
 	devfs_unregister(devfs_handle);
-	devfs_unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
+	unregister_chrdev(CODA_PSDEV_MAJOR,"coda_psdev");
 	coda_sysctl_clean();
 out1:
 	coda_destroy_inodecache();
@@ -428,7 +428,7 @@ static void __exit exit_coda(void)
                 printk("coda: failed to unregister filesystem\n");
         }
 	devfs_unregister(devfs_handle);
-	devfs_unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
+	unregister_chrdev(CODA_PSDEV_MAJOR, "coda_psdev");
 	coda_sysctl_clean();
 	coda_destroy_inodecache();
 }

@@ -1934,7 +1934,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Register the Block Device Major Number for this DAC960 Controller.
   */
-  if (devfs_register_blkdev(MajorNumber, "dac960",
+  if (register_blkdev(MajorNumber, "dac960",
 			    &DAC960_BlockDeviceOperations) < 0)
     {
       DAC960_Error("UNABLE TO ACQUIRE MAJOR NUMBER %d - DETACHING\n",
@@ -1993,7 +1993,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Unregister the Block Device Major Number for this DAC960 Controller.
   */
-  devfs_unregister_blkdev(MajorNumber, "dac960");
+  unregister_blkdev(MajorNumber, "dac960");
   /*
     Remove the I/O Request Queue.
   */

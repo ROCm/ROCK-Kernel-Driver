@@ -1039,7 +1039,7 @@ static void cleanup(int level)
 	case 2:
 		release_region(mcd_port, 4);
 	case 1:
-		if (devfs_unregister_blkdev(MAJOR_NR, "mcd")) {
+		if (unregister_blkdev(MAJOR_NR, "mcd")) {
 			printk(KERN_WARNING "Can't unregister major mcd\n");
 			return;
 		}
@@ -1065,7 +1065,7 @@ int __init mcd_init(void)
 		return -EIO;
 	}
 
-	if (devfs_register_blkdev(MAJOR_NR, "mcd", &mcd_bdops) != 0) {
+	if (register_blkdev(MAJOR_NR, "mcd", &mcd_bdops) != 0) {
 		printk(KERN_ERR "mcd: Unable to get major %d for Mitsumi CD-ROM\n", MAJOR_NR);
 		return -EIO;
 	}

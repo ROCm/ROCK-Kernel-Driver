@@ -449,7 +449,7 @@ static int __init xpram_setup_blkdev(void)
 	/*
 	 * Register xpram major.
 	 */
-	rc = devfs_register_blkdev(XPRAM_MAJOR, XPRAM_NAME, &xpram_devops);
+	rc = register_blkdev(XPRAM_MAJOR, XPRAM_NAME, &xpram_devops);
 	if (rc < 0) {
 		PRINT_ERR("Can't get xpram major %d\n", XPRAM_MAJOR);
 		return rc;
@@ -489,7 +489,7 @@ static int __init xpram_setup_blkdev(void)
 static void __exit xpram_exit(void)
 {
 	blk_clear(XPRAM_MAJOR);
-	devfs_unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
+	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_unregister(xpram_devfs_handle);
 	unregister_sys_device(&xpram_sys_device);
 }
