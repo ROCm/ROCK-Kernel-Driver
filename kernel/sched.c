@@ -214,8 +214,7 @@ static inline runqueue_t *this_rq_lock(void)
 
 static inline void rq_unlock(runqueue_t *rq)
 {
-	spin_unlock(&rq->lock);
-	local_irq_enable();
+	spin_unlock_irq(&rq->lock);
 }
 
 /*
