@@ -41,7 +41,7 @@ static u32 nibbletab_cfb8[] = {
 
 void fbcon_cfb8_setup(struct display *p)
 {
-    p->next_line = p->line_length ? p->line_length : p->var.xres_virtual;
+    p->next_line = p->fb_info->fix.line_length ? p->fb_info->fix.line_length : p->var.xres_virtual;
     p->next_plane = 0;
 }
 
