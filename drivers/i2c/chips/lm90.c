@@ -127,19 +127,24 @@ SENSORS_INSMOD_5(lm90, adm1032, lm99, lm86, max6657);
 
 /*
  * Conversions and various macros
- * The LM90 uses signed 8-bit values for the local temperatures,
- * and signed 11-bit values for the remote temperatures (except
- * T_CRIT). Note that TEMP2_TO_REG does not round values, but
- * stick to the nearest lower value instead. Fixing it is just
- * not worth it.
+ * For local temperatures and limits, critical limits and the hysteresis
+ * value, the LM90 uses signed 8-bit values with LSB = 1 degree Celcius.
+ * For remote temperatures and limits, it uses signed 11-bit values with
+ * LSB = 0.125 degree Celcius, left-justified in 16-bit registers.
  */
 
-#define TEMP1_FROM_REG(val)	((val & 0x80 ? val-0x100 : val) * 1000)
-#define TEMP1_TO_REG(val)	((val < 0 ? val+0x100*1000 : val) / 1000)
-#define TEMP2_FROM_REG(val)	(((val & 0x8000 ? val-0x10000 : val) >> 5) * 125)
-#define TEMP2_TO_REG(val)	((((val / 125) << 5) + (val < 0 ? 0x10000 : 0)) & 0xFFE0)
-#define HYST_FROM_REG(val)	(val * 1000)
-#define HYST_TO_REG(val)	(val <= 0 ? 0 : val >= 31000 ? 31 : val / 1000)
+#define TEMP1_FROM_REG(val)	((val) * 1000)
+#define TEMP1_TO_REG(val)	((val) <= -128000 ? -128 : \
+				 (val) >= 127000 ? 127 : \
+				 (val) < 0 ? ((val) - 500) / 1000 : \
+				 ((val) + 500) / 1000)
+#define TEMP2_FROM_REG(val)	((val) / 32 * 125)
+#define TEMP2_TO_REG(val)	((val) <= -128000 ? 0x8000 : \
+				 (val) >= 127875 ? 0x7FE0 : \
+				 (val) < 0 ? ((val) - 62) / 125 * 32 : \
+				 ((val) + 62) / 125 * 32)
+#define HYST_TO_REG(val)	((val) <= 0 ? 0 : (val) >= 30500 ? 31 : \
+				 ((val) + 500) / 1000)
 
 /*
  * Functions declaration
@@ -176,9 +181,9 @@ struct lm90_data {
 	unsigned long last_updated; /* in jiffies */
 
 	/* registers values */
-	u8 temp_input1, temp_low1, temp_high1; /* local */
-	u16 temp_input2, temp_low2, temp_high2; /* remote, combined */
-	u8 temp_crit1, temp_crit2;
+	s8 temp_input1, temp_low1, temp_high1; /* local */
+	s16 temp_input2, temp_low2, temp_high2; /* remote, combined */
+	s8 temp_crit1, temp_crit2;
 	u8 temp_hyst;
 	u16 alarms; /* bitvector, combined */
 };
@@ -243,7 +248,7 @@ static ssize_t show_##value(struct device *dev, char *buf) \
 { \
 	struct lm90_data *data = lm90_update_device(dev); \
 	return sprintf(buf, "%d\n", TEMP1_FROM_REG(data->basereg) \
-		       - HYST_FROM_REG(data->temp_hyst)); \
+		       - TEMP1_FROM_REG(data->temp_hyst)); \
 }
 show_temp_hyst(temp_hyst1, temp_crit1);
 show_temp_hyst(temp_hyst2, temp_crit2);
