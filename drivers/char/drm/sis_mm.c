@@ -90,9 +90,10 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 {
 	drm_sis_mem_t fb;
 	struct sis_memreq req;
+	drm_sis_mem_t __user *argp = (void __user *)data;
 	int retval = 0;
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, argp, sizeof(fb));
 
 	req.size = fb.size;
 	sis_malloc(&req);
@@ -111,7 +112,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 		fb.free = 0;
 	}
 
-	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
+	DRM_COPY_TO_USER_IOCTL(argp, fb, sizeof(fb));
 
 	DRM_DEBUG("alloc fb, size = %d, offset = %d\n", fb.size, req.offset);
 
@@ -123,7 +124,7 @@ int sis_fb_free( DRM_IOCTL_ARGS )
 	drm_sis_mem_t fb;
 	int retval = 0;
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t __user *)data, sizeof(fb));
 
 	if (!fb.free)
 		return DRM_ERR(EINVAL);

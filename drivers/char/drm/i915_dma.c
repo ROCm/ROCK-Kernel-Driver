@@ -429,7 +429,7 @@ static int i915_dispatch_batchbuffer(drm_device_t * dev,
 				     drm_i915_batchbuffer_t * batch)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
-	drm_clip_rect_t *boxes = batch->cliprects;
+	drm_clip_rect_t __user *boxes = batch->cliprects;
 	int nbox = batch->num_cliprects;
 	int i = 0, count;
 	RING_LOCALS;
