@@ -247,6 +247,7 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 {
 	struct vm_area_struct *vma;
 	unsigned long addr;
+	struct mmu_gather *tlb;
 
 	if (mm->context.low_hpages)
 		return 0; /* The window is already open */
@@ -262,31 +263,38 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 
 	/* Clean up any leftover PTE pages in the region */
 	spin_lock(&mm->page_table_lock);
+	tlb = tlb_gather_mmu(mm, 0);
 	for (addr = TASK_HPAGE_BASE_32; addr < TASK_HPAGE_END_32;
 	     addr += PMD_SIZE) {
 		pgd_t *pgd = pgd_offset(mm, addr);
-		pmd_t *pmd = pmd_offset(pgd, addr);
+		pmd_t *pmd;
+		struct page *page;
+		pte_t *pte;
+		int i;
 
-		if (! pmd_none(*pmd)) {
-			struct page *page = pmd_page(*pmd);
-			pte_t *pte = (pte_t *)pmd_page_kernel(*pmd);
-			int i;
-
-			/* No VMAs, so there should be no PTEs, check
-			 * just in case. */
-			for (i = 0; i < PTRS_PER_PTE; i++) {
-				BUG_ON(! pte_none(*pte));
-				pte++;
-			}
-
+		if (pgd_none(*pgd))
+			continue;
+		pmd = pmd_offset(pgd, addr);
+		if (!pmd || pmd_none(*pmd))
+			continue;
+		if (pmd_bad(*pmd)) {
+			pmd_ERROR(*pmd);
 			pmd_clear(pmd);
-			pgtable_remove_rmap(page);
-			pte_free(page);
+			continue;
 		}
+		pte = (pte_t *)pmd_page_kernel(*pmd);
+		/* No VMAs, so there should be no PTEs, check just in case. */
+		for (i = 0; i < PTRS_PER_PTE; i++) {
+			BUG_ON(!pte_none(*pte));
+			pte++;
+		}
+		page = pmd_page(*pmd);
+		pmd_clear(pmd);
+		pgtable_remove_rmap(page);
+		pte_free_tlb(tlb, page);
 	}
+	tlb_finish_mmu(tlb, TASK_HPAGE_BASE_32, TASK_HPAGE_END_32);
 	spin_unlock(&mm->page_table_lock);
-
-	/* FIXME: do we need to scan for PTEs too? */
 
 	mm->context.low_hpages = 1;
 
