@@ -402,7 +402,7 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	/* P4M400 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_P4M400,
-		.chipset_name	= "PM400",
+		.chipset_name	= "P4M400",
 	},
 
 	{ }, /* dummy final entry, always present */
