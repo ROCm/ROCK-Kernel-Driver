@@ -284,14 +284,12 @@ long sys32_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 		schedule();
 		if (do_signal32(&saveset, regs))
 			/*
-			 * If a signal handler needs to be called,
-			 * do_signal32() has set R3 to the signal number (the
-			 * first argument of the signal handler), so don't
-			 * overwrite that with EINTR !
-			 * In the other cases, do_signal32() doesn't touch 
-			 * R3, so it's still set to -EINTR (see above).
+			 * Returning 0 means we return to userspace via
+			 * ret_from_except and thus restore all user
+			 * registers from *regs.  This is what we need
+			 * to do when a signal has been delivered.
 			 */
-			return regs->gpr[3];
+			return 0;
 	}
 }
 
@@ -587,14 +585,12 @@ int sys32_rt_sigsuspend(compat_sigset_t __user * unewset, size_t sigsetsize, int
 		schedule();
 		if (do_signal32(&saveset, regs))
 			/*
-			 * If a signal handler needs to be called,
-			 * do_signal32() has set R3 to the signal number (the
-			 * first argument of the signal handler), so don't
-			 * overwrite that with EINTR !
-			 * In the other cases, do_signal32() doesn't touch 
-			 * R3, so it's still set to -EINTR (see above).
+			 * Returning 0 means we return to userspace via
+			 * ret_from_except and thus restore all user
+			 * registers from *regs.  This is what we need
+			 * to do when a signal has been delivered.
 			 */
-			return regs->gpr[3];
+			return 0;
 	}
 }
 

@@ -265,16 +265,21 @@ _GLOBAL(save_nvgprs)
 _GLOBAL(ppc32_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc64_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys_rt_sigsuspend
-	b	syscall_exit
+	b	70f
 
 _GLOBAL(ppc32_rt_sigsuspend)
 	bl	.save_nvgprs
 	bl	.sys32_rt_sigsuspend
+	/* If sigsuspend() returns zero, we are going into a signal handler */
+70:	cmpdi	0,r3,0
+	beq	.ret_from_except
+	/* If it returned -EINTR, we need to return via syscall_exit to set
+	   the SO bit in cr0 and potentially stop for ptrace. */
 	b	syscall_exit
 
 _GLOBAL(ppc_fork)
