@@ -406,6 +406,14 @@ config SCSI_SATA
 
 	  If unsure, say N.
 
+config SCSI_SATA_AHCI
+	tristate "AHCI SATA support"
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
+	help
+	  This option enables support for AHCI Serial ATA.
+
+	  If unsure, say N.
+
 config SCSI_SATA_SVW
 	tristate "ServerWorks Frodo / Apple K2 SATA support (EXPERIMENTAL)"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
