@@ -1095,6 +1095,10 @@ static inline void show_string(struct usb_device *udev, char *id, int index)
 {}
 #endif
 
+#ifdef	CONFIG_USB_OTG
+#include "otg_whitelist.h"
+#endif
+
 /**
  * usb_new_device - perform initial device setup (usbcore-internal)
  * @udev: newly addressed device (in ADDRESS state)
@@ -1143,6 +1147,79 @@ int usb_new_device(struct usb_device *udev)
 	if (udev->descriptor.iSerialNumber)
 		show_string(udev, "SerialNumber",
 				udev->descriptor.iSerialNumber);
+
+#ifdef	CONFIG_USB_OTG
+	/*
+	 * OTG-aware devices on OTG-capable root hubs may be able to use SRP,
+	 * to wake us after we've powered off VBUS; and HNP, switching roles
+	 * "host" to "peripheral".  The OTG descriptor helps figure this out.
+	 */
+	if (!udev->bus->is_b_host
+			&& udev->config
+			&& udev->parent == udev->bus->root_hub) {
+		struct usb_otg_descriptor	*desc = 0;
+		struct usb_bus			*bus = udev->bus;
+
+		/* descriptor may appear anywhere in config */
+		if (__usb_get_extra_descriptor (udev->rawdescriptors[0],
+					udev->config[0].desc.wTotalLength,
+					USB_DT_OTG, (void **) &desc) == 0) {
+			if (desc->bmAttributes & USB_OTG_HNP) {
+				unsigned		port;
+				struct usb_device	*root = udev->parent;
+				
+				for (port = 0; port < root->maxchild; port++) {
+					if (root->children[port] == udev)
+						break;
+				}
+				port++;
+
+				dev_info(&udev->dev,
+					"Dual-Role OTG device on %sHNP port\n",
+					(port == bus->otg_port)
+						? "" : "non-");
+
+				/* enable HNP before suspend, it's simpler */
+				if (port == bus->otg_port)
+					bus->b_hnp_enable = 1;
+				err = usb_control_msg(udev,
+					usb_sndctrlpipe(udev, 0),
+					USB_REQ_SET_FEATURE, 0,
+					bus->b_hnp_enable
+						? USB_DEVICE_B_HNP_ENABLE
+						: USB_DEVICE_A_ALT_HNP_SUPPORT,
+					0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
+				if (err < 0) {
+					/* OTG MESSAGE: report errors here,
+					 * customize to match your product.
+					 */
+					dev_info(&udev->dev,
+						"can't set HNP mode; %d\n",
+						err);
+					bus->b_hnp_enable = 0;
+				}
+			}
+		}
+	}
+
+	if (!is_targeted(udev)) {
+
+		/* Maybe it can talk to us, though we can't talk to it.
+		 * (Includes HNP test device.)
+		 */
+		if (udev->bus->b_hnp_enable || udev->bus->is_b_host) {
+			static int __usb_suspend_device (struct usb_device *,
+						int port, u32 state);
+			err = __usb_suspend_device(udev,
+					udev->bus->otg_port - 1,
+					PM_SUSPEND_MEM);
+			if (err < 0)
+				dev_dbg(&udev->dev, "HNP fail, %d\n", err);
+		}
+		err = -ENODEV;
+		goto fail;
+	}
+#endif
 
 	/* put device-specific files into sysfs */
 	err = device_add (&udev->dev);
@@ -1934,6 +2011,10 @@ hub_port_init (struct usb_device *hdev, struct usb_device *udev, int port)
 			hdev->bus->b_hnp_enable = 0;
 	}
 
+	retval = clear_port_feature(hdev, port, USB_PORT_FEAT_SUSPEND);
+	if (retval < 0 && retval != -EPIPE)
+		dev_dbg(&udev->dev, "can't clear suspend; %d\n", retval);
+
 	/* Some low speed devices have problems with the quick delay, so */
 	/*  be a bit pessimistic with those devices. RHbug #23670 */
 	if (oldspeed == USB_SPEED_LOW)
@@ -2159,6 +2240,12 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 	if (hdev->children[port])
 		usb_disconnect(&hdev->children[port]);
 	clear_bit(port, hub->change_bits);
+
+#ifdef	CONFIG_USB_OTG
+	/* during HNP, don't repeat the debounce */
+	if (hdev->bus->is_b_host)
+		portchange &= ~USB_PORT_STAT_C_CONNECTION;
+#endif
 
 	if (portchange & USB_PORT_STAT_C_CONNECTION) {
 		status = hub_port_debounce(hdev, port);

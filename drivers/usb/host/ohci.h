@@ -360,6 +360,13 @@ struct ohci_hcd {
  	struct ed		*periodic [NUM_INTS];	/* shadow int_table */
 
 	/*
+	 * OTG controllers and transceivers need software interaction;
+	 * other external transceivers should be software-transparent 
+	 */
+	struct otg_transceiver	*transceiver;
+	unsigned		power_budget;
+
+	/*
 	 * memory management for queue data structures
 	 */
 	struct dma_pool		*td_cache;

@@ -290,6 +290,7 @@ sn_pci_fixup_slot(struct pci_dev *dev)
 			addr |= __IA64_UNCACHED_OFFSET;
 			dev->resource[idx].start = addr;
 			dev->resource[idx].end = addr + size;
+			dev->resource[idx].parent = &ioport_resource;
 		}
 
 		if (dev->resource[idx].flags & IORESOURCE_IO)
@@ -322,6 +323,7 @@ sn_pci_fixup_slot(struct pci_dev *dev)
 			addr |= __IA64_UNCACHED_OFFSET;
 			dev->resource[idx].start = addr;
 			dev->resource[idx].end = addr + size;
+			dev->resource[idx].parent = &iomem_resource;
 		}
 
 		if (dev->resource[idx].flags & IORESOURCE_MEM)
@@ -351,6 +353,7 @@ sn_pci_fixup_slot(struct pci_dev *dev)
                         addr |= __IA64_UNCACHED_OFFSET;
                         dev->resource[PCI_ROM_RESOURCE].start = addr;
                         dev->resource[PCI_ROM_RESOURCE].end = addr + size;
+			dev->resource[idx].parent = &iomem_resource;
                         if (dev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_MEM)
                                 cmd |= PCI_COMMAND_MEMORY;
                 }

@@ -911,6 +911,7 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	int result;
 
 	/* issue the command */
+	us->iobuf[0] = 0;
 	result = usb_stor_control_msg(us, us->recv_ctrl_pipe,
 				 US_BULK_GET_MAX_LUN, 
 				 USB_DIR_IN | USB_TYPE_CLASS | 
@@ -921,7 +922,7 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 		  result, us->iobuf[0]);
 
 	/* if we have a successful request, return the result */
-	if (result == 1)
+	if (result >= 0)
 		return us->iobuf[0];
 
 	/* 

@@ -14,10 +14,10 @@ Index
 4.  Module dependencies
 5.  Module loading
 6.  Module parameters
-7.  Device control through "sysfs"
+7.  Optional device control through "sysfs"
 8.  Supported devices
 9.  How to add support for new image sensors
-10. Note for V4L2 developers
+10. Notes for V4L2 application developers
 11. Contact information
 12. Credits
 
@@ -148,8 +148,8 @@ Default:        2
 -------------------------------------------------------------------------------
 
 
-7. Device control through "sysfs"
-=================================
+7. Optional device control through "sysfs"
+==========================================
 It is possible to read and write both the SN9C10[12] and the image sensor
 registers by using the "sysfs" filesystem interface.
 
@@ -206,7 +206,7 @@ Vendor ID  Product ID
 0xc45      0x6029
 0xc45      0x602a
 0xc45      0x602c
-0xc45      0x8001
+0xc45      0x6030
 
 The list above does NOT imply that all those devices work with this driver: up
 until now only the ones that mount the following image sensors are supported.
@@ -242,19 +242,27 @@ At the moment, not yet supported image sensors are: HV7131[D|E1] (VGA),
 MI03 (VGA), OV7620 (VGA).
 
 
-10. Note for V4L2 developers
-============================
+10. Notes for V4L2 application developers
+=========================================
 This driver follows the V4L2 API specifications. In particular, it enforces two
 rules:
 
-1) Exactly one I/O method, either "mmap" or "read", is associated with each
+- exactly one I/O method, either "mmap" or "read", is associated with each
 file descriptor. Once it is selected, the application must close and reopen the
-device to switch to the other I/O method.
+device to switch to the other I/O method;
 
-2) Previously mapped buffer memory must always be unmapped before calling any
-of the "VIDIOC_S_CROP", "VIDIOC_TRY_FMT" and "VIDIOC_S_FMT" ioctl's. In case,
-the same number of buffers as before will be allocated again to match the size
-of the new video frames, so you have to map them again before any I/O attempts.
+- previously mapped buffer memory must always be unmapped before calling any
+of the "VIDIOC_S_CROP", "VIDIOC_TRY_FMT" and "VIDIOC_S_FMT" ioctl's. The same
+number of buffers as before will be allocated again to match the size of the
+new video frames, so you have to map them again before any I/O attempts.
+
+Consistently with the hardware limits, this driver also supports image
+downscaling with arbitrary scaling factors from 1, 2 and 4 in both directions.
+However the V4L2 API specifications don't correctly define how the scaling
+factor can be choosen arbitrarily by the "negotiation" of the "source" and
+"target" rectangles. To work around this flaw, we have added the convention
+that, during the negotiation, whenever the "VIDIOC_S_CROP" ioctl is issued, the
+scaling factor is restored to 1.
 
 
 11. Contact information

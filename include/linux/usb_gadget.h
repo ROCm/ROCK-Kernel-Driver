@@ -767,12 +767,6 @@ usb_gadget_disconnect (struct usb_gadget *gadget)
  * the (remote) host can't do that any longer; or an error state might
  * be cleared, to make the device behave identically whether or not
  * power is maintained.
- *
- * If the OTG b_hnp_enabled flag is set during a suspend() call, the
- * device may use HNP to switch from "B-Peripheral" to "B-Host" mode
- * (or back from "A-Peripheral" mode to the original "A-Host") if
- * the gadget driver calls usb_gadget_disconnect() before the device
- * is resumed.
  */
 struct usb_gadget_driver {
 	char			*function;

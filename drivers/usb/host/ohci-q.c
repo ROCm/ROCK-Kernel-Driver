@@ -900,9 +900,6 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 /*-------------------------------------------------------------------------*/
 
-/* wrap-aware logic stolen from <linux/jiffies.h> */
-#define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
-
 /* there are some urbs/eds to unlink; called in_irq(), with HCD locked */
 static void
 finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)

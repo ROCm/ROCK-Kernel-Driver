@@ -248,7 +248,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 		 * unlink pending urbs so they won't rx/tx bad data.
 		 */
 		for (i = 0, found = 0; i < io->entries; i++) {
-			if (!io->urbs [i])
+			if (!io->urbs [i] || !io->urbs [i]->dev)
 				continue;
 			if (found) {
 				status = usb_unlink_urb (io->urbs [i]);
@@ -337,7 +337,7 @@ int usb_sg_init (
 	if (io->entries <= 0)
 		return io->entries;
 
-	io->count = 0;
+	io->count = io->entries;
 	io->urbs = kmalloc (io->entries * sizeof *io->urbs, mem_flags);
 	if (!io->urbs)
 		goto nomem;
@@ -347,7 +347,7 @@ int usb_sg_init (
 	if (usb_pipein (pipe))
 		urb_flags |= URB_SHORT_NOT_OK;
 
-	for (i = 0; i < io->entries; i++, io->count = i) {
+	for (i = 0; i < io->entries; i++) {
 		unsigned		len;
 
 		io->urbs [i] = usb_alloc_urb (0, mem_flags);
@@ -477,24 +477,19 @@ void usb_sg_wait (struct usb_sg_request *io)
 
 			/* fail any uncompleted urbs */
 		default:
-			spin_lock_irq (&io->lock);
-			io->count -= entries - i;
-			if (io->status == -EINPROGRESS)
-				io->status = retval;
-			if (io->count == 0)
-				complete (&io->complete);
-			spin_unlock_irq (&io->lock);
-
-			io->urbs[i]->dev = NULL;
+			io->urbs [i]->dev = NULL;
 			io->urbs [i]->status = retval;
 			dev_dbg (&io->dev->dev, "%s, submit --> %d\n",
 				__FUNCTION__, retval);
 			usb_sg_cancel (io);
 		}
 		spin_lock_irq (&io->lock);
-		if (retval && io->status == -ECONNRESET)
+		if (retval && (io->status == 0 || io->status == -ECONNRESET))
 			io->status = retval;
 	}
+	io->count -= entries - i;
+	if (io->count == 0)
+		complete (&io->complete);
 	spin_unlock_irq (&io->lock);
 
 	/* OK, yes, this could be packaged as non-blocking.
