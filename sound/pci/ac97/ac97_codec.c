@@ -2051,6 +2051,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 	snd_ac97_get_name(ac97, ac97->id, name, !ac97_is_audio(ac97));
 	snd_ac97_get_name(NULL, ac97->id, name, !ac97_is_audio(ac97));  // ac97->id might be changed in the special setup code
 	if (ac97_is_audio(ac97)) {
+		char comp[16];
 		if (card->mixername[0] == '\0') {
 			strcpy(card->mixername, name);
 		} else {
@@ -2059,7 +2060,8 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 				strcat(card->mixername, name);
 			}
 		}
-		if ((err = snd_component_add(card, "AC97a")) < 0) {
+		sprintf(comp, "AC97a:%08x", ac97->id);
+		if ((err = snd_component_add(card, comp)) < 0) {
 			snd_ac97_free(ac97);
 			return err;
 		}
@@ -2069,6 +2071,7 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 		}
 	}
 	if (ac97_is_modem(ac97)) {
+		char comp[16];
 		if (card->mixername[0] == '\0') {
 			strcpy(card->mixername, name);
 		} else {
@@ -2077,7 +2080,8 @@ int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97)
 				strcat(card->mixername, name);
 			}
 		}
-		if ((err = snd_component_add(card, "AC97m")) < 0) {
+		sprintf(comp, "AC97m:%08x", ac97->id);
+		if ((err = snd_component_add(card, comp)) < 0) {
 			snd_ac97_free(ac97);
 			return err;
 		}
