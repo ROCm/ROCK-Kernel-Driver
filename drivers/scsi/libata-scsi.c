@@ -167,7 +167,26 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 {
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
 	blk_queue_max_phys_segments(sdev->request_queue, LIBATA_MAX_PRD);
+
+	if (sdev->id < ATA_MAX_DEVICES) {
+		struct ata_port *ap;
+		struct ata_device *dev;
+
+		ap = (struct ata_port *) &sdev->host->hostdata[0];
+		dev = &ap->device[sdev->id];
+
+		/* TODO: 1024 is an arbitrary number, not the
+		 * hardware maximum.  This should be increased to
+		 * 65534 when Jens Axboe's patch for dynamically
+		 * determining max_sectors is merged.
+		 */
+		if (dev->flags & ATA_DFLAG_LBA48) {
+			sdev->host->max_sectors = 2048;
+			blk_queue_max_sectors(sdev->request_queue, 2048);
+		}
+	}
 
 	return 0;	/* scsi layer doesn't check return value, sigh */
 }
