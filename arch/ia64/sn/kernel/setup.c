@@ -226,7 +226,25 @@ sn_check_for_wars(void)
 			shub_1_1_found = 1;
 }
 
-
+/**
+ * sn_set_error_handling_features - Tell the SN prom how to handle certain
+ * error types.
+ */
+static void __init
+sn_set_error_handling_features(void)
+{
+	u64 ret;
+	u64 sn_ehf_bits[7];	/* see ia64_sn_set_error_handling_features */
+	memset(sn_ehf_bits, 0, sizeof(sn_ehf_bits));
+#define EHF(x) __set_bit(SN_SAL_EHF_ ## x, sn_ehf_bits)
+	EHF(MCA_SLV_TO_OS_INIT_SLV);
+	EHF(NO_RZ_TLBC);
+	// Uncomment once Jesse's code goes in - EHF(NO_RZ_IO_READ); 
+#undef	EHF
+	ret = ia64_sn_set_error_handling_features(sn_ehf_bits);
+	if (ret)
+		printk(KERN_ERR "%s: failed, return code %ld\n", __FUNCTION__, ret);
+}
 
 /**
  * sn_setup - SN platform setup routine
@@ -317,6 +335,9 @@ sn_setup(char **cmdline_p)
 		printk(KERN_DEBUG "sn_setup: setting master_node_bedrock_address to 0x%lx\n",
 		       master_node_bedrock_address);
 	}
+
+	/* Tell the prom how to handle certain error types */
+	sn_set_error_handling_features();
 
 	/*
 	 * we set the default root device to /dev/hda
