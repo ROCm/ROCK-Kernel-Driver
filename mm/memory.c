@@ -748,6 +748,7 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address,
 	acct_update_integrals();
 	spin_unlock(&mm->page_table_lock);
 }
+EXPORT_SYMBOL_GPL(zap_page_range);
 
 /*
  * Do a quick page-table lookup for a single page.

@@ -23,6 +23,7 @@
 #include <asm/tlbflush.h>
 
 unsigned int hpage_shift=HPAGE_SHIFT_DEFAULT;
+EXPORT_SYMBOL_GPL(hpage_shift);
 
 static pte_t *
 huge_pte_alloc (struct mm_struct *mm, unsigned long addr)

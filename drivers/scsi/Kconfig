@@ -1341,6 +1341,8 @@ config SCSI_QLOGICPTI
 
 source "drivers/scsi/qla2xxx/Kconfig"
 
+source "drivers/scsi/qla4xxx/Kconfig"
+
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
 	depends on X86 && ISA && SCSI && BROKEN
