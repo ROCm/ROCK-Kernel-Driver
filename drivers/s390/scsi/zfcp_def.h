@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.75 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.78 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -1125,32 +1125,6 @@ extern void _zfcp_hex_dump(char *, int);
 		if (ZFCP_LOG_CHECK(level)) { \
 			_zfcp_hex_dump(addr, count); \
 		}
-/*
- * Not yet optimal but useful:
- * Waits until the condition is met or the timeout occurs.
- * The condition may be a function call. This allows to
- * execute some additional instructions in addition
- * to a simple condition check.
- * The timeout is modified on exit and holds the remaining time.
- * Thus it is zero if a timeout ocurred, i.e. the condition was 
- * not met in the specified interval.
- */
-#define __ZFCP_WAIT_EVENT_TIMEOUT(timeout, condition) \
-do { \
-	set_current_state(TASK_UNINTERRUPTIBLE); \
-	while (!(condition) && timeout) \
-		timeout = schedule_timeout(timeout); \
-	current->state = TASK_RUNNING; \
-} while (0);
-
-#define ZFCP_WAIT_EVENT_TIMEOUT(waitqueue, timeout, condition) \
-do { \
-	wait_queue_t entry; \
-	init_waitqueue_entry(&entry, current); \
-	add_wait_queue(&waitqueue, &entry); \
-	__ZFCP_WAIT_EVENT_TIMEOUT(timeout, condition) \
-	remove_wait_queue(&waitqueue, &entry); \
-} while (0);
 
 #define zfcp_get_busid_by_adapter(adapter) (adapter->ccw_device->dev.bus_id)
 #define zfcp_get_busid_by_port(port) (zfcp_get_busid_by_adapter(port->adapter))
