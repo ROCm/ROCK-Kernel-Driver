@@ -1626,41 +1626,16 @@ static struct net_device_stats *sdla_stats(struct net_device *dev)
 
 static void setup_sdla(struct net_device *dev)
 {
+	struct frad_local *flp = dev->priv;
+
+	netdev_boot_setup_check(dev);
+
+	SET_MODULE_OWNER(dev);
 	dev->flags		= 0;
 	dev->type		= 0xFFFF;
 	dev->hard_header_len	= 0;
 	dev->addr_len		= 0;
 	dev->mtu		= SDLA_MAX_MTU;
-}
-
-static int frad_registered;
-
-struct net_device * __init sdla_init(void)
-{
-	struct net_device *dev;
-	struct frad_local *flp;
-	int err = -ENOMEM;
-
-	if (!frad_registered) {
-		err = register_frad(devname);
-		if (err) {
-			printk(KERN_ERR "%s: frad registration failed %d\n",
-			       devname, err);
-			return ERR_PTR(err);
-		}
-		frad_registered = 1;
-		printk("%s.\n", version);
-	}
-		
-
-	dev = alloc_netdev(sizeof(struct frad_local), "sdla0", setup_sdla);
-	if (!dev)
-		goto out;
-
-	SET_MODULE_OWNER(dev);
-	netdev_boot_setup_check(dev);
-
-	flp = dev->priv;
 
 	dev->open		= sdla_open;
 	dev->stop		= sdla_close;
@@ -1680,42 +1655,44 @@ struct net_device * __init sdla_init(void)
 	flp->timer.expires	= 1;
 	flp->timer.data		= (unsigned long) dev;
 	flp->timer.function	= sdla_poll;
-
-	err = register_netdev(dev);
-	if (err)
-		goto out1;
-	return dev;
-out1:
-	kfree(dev);
-out:
-	return ERR_PTR(err);
 }
 
-#ifdef MODULE
-static struct net_device *sdla0;
+static struct net_device *sdla;
 
 static int __init init_sdla(void)
 {
-	int result = 0;
+	int err;
 
-	sdla0 = sdla_init();
-	if (IS_ERR(sdla0))
-		result = PTR_ERR(sdla0);
+	printk("%s.\n", version);
+	err = register_frad(devname);
+	if (err) {
+		printk(KERN_ERR "%s: frad registration failed %d\n",
+		       devname, err);
+		return err;
+	}
 
-	return result;
+	sdla = alloc_netdev(sizeof(struct frad_local), "sdla0", setup_sdla);
+	if (!sdla) 
+		return -ENOMEM;
+
+	err = register_netdev(sdla);
+	if (err) 
+		kfree(sdla);
+
+	return err;
 }
 
 static void __exit exit_sdla(void)
 {
 	struct frad_local *flp;
 
-	unregister_netdev(sdla0);
-	if (sdla0->irq)
-		free_irq(sdla0->irq, sdla0);
+	unregister_netdev(sdla);
+	if (sdla->irq)
+		free_irq(sdla->irq, sdla);
 
-	flp = sdla0->priv;
+	flp = sdla->priv;
 	del_timer_sync(&flp->timer);
-	free_netdev(sdla0);
+	free_netdev(sdla);
 	
 	unregister_frad(devname);
 }
@@ -1724,4 +1701,3 @@ MODULE_LICENSE("GPL");
 
 module_init(init_sdla);
 module_exit(exit_sdla);
-#endif
