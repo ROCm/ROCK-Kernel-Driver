@@ -18,9 +18,9 @@ static int via_fetch_size(void)
 {
 	int i;
 	u8 temp;
-	struct aper_size_info_32 *values;
+	struct aper_size_info_16 *values;
 
-	values = A_SIZE_32(agp_bridge.aperture_sizes);
+	values = A_SIZE_16(agp_bridge.aperture_sizes);
 	pci_read_config_byte(agp_bridge.dev, VIA_AGP3_APSIZE, &temp);
 	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
@@ -35,15 +35,36 @@ static int via_fetch_size(void)
 
 static int via_configure(void)
 {
+	u32 temp;
+	struct aper_size_info_16 *current_size;
+    
+	current_size = A_SIZE_16(agp_bridge.current_size);
+
+	/* address to map too */
+	pci_read_config_dword(agp_bridge.dev, VIA_APBASE, &temp);
+	agp_bridge.gart_bus_addr = (temp & PCI_BASE_ADDRESS_MEM_MASK);
+
+	/* attbase - aperture GATT base */
+	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_ATTBASE,
+		agp_bridge.gatt_bus_addr & 0xfffff000);
 	return 0;
 }
 
 static void via_cleanup(void)
 {
+	struct aper_size_info_16 *previous_size;
+
+	previous_size = A_SIZE_16(agp_bridge.previous_size);
+	pci_write_config_byte(agp_bridge.dev, VIA_APSIZE, previous_size->size_value);
 }
 
 static void via_tlbflush(agp_memory * mem)
 {
+	u32 temp;
+
+	pci_read_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, &temp);
+	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, temp & ~(1<<7));
+	pci_write_config_dword(agp_bridge.dev, VIA_AGP3_GARTCTRL, temp);
 }
 
 static unsigned long via_mask_memory(unsigned long addr, int type)
@@ -53,7 +74,7 @@ static unsigned long via_mask_memory(unsigned long addr, int type)
 	return addr | agp_bridge.masks[0].mask;
 }
 
-static struct aper_size_info_32 via_generic_sizes[11] =
+static struct aper_size_info_16 via_generic_sizes[11] =
 {
 	{ 4,     1024,  0, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1|1<<0 },
 	{ 8,     2048,  1, 1<<11|1<<10|1<<9|1<<8|1<<5|1<<4|1<<3|1<<2|1<<1},
