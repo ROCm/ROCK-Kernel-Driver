@@ -178,7 +178,7 @@ xfs_revalidate_inode(
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_generation = ip->i_d.di_gen;
-	inode->i_size	= ip->i_d.di_size;
+	i_size_write(inode, ip->i_d.di_size);
 	inode->i_blocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 	inode->i_atime.tv_sec	= ip->i_d.di_atime.t_sec;

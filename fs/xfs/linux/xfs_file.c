@@ -180,7 +180,7 @@ linvfs_open(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;
 
-	if (!(filp->f_flags & O_LARGEFILE) && inode->i_size > MAX_NON_LFS)
+	if (!(filp->f_flags & O_LARGEFILE) && i_size_read(inode) > MAX_NON_LFS)
 		return -EFBIG;
 
 	ASSERT(vp);

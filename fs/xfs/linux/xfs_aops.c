@@ -133,7 +133,7 @@ map_blocks(
 	int			error, nmaps = 1;
 
 	if (((flags & (BMAP_DIRECT|BMAP_SYNC)) == BMAP_DIRECT) &&
-	    (offset >= inode->i_size))
+	    (offset >= i_size_read(inode)))
 		count = max_t(ssize_t, count, XFS_WRITE_IO_LOG);
 retry:
 	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
@@ -310,7 +310,7 @@ probe_unmapped_cluster(
 	struct buffer_head	*bh,
 	struct buffer_head	*head)
 {
-	unsigned long		tindex, tlast;
+	unsigned long		tindex, tlast, tloop;
 	unsigned int		len, total = 0;
 	struct address_space	*mapping = inode->i_mapping;
 
@@ -325,20 +325,22 @@ probe_unmapped_cluster(
 	 * following pages.
 	 */
 	if (bh == head) {
-		tlast = inode->i_size >> PAGE_CACHE_SHIFT;
+		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 		/* Prune this back to avoid pathological behavior */
-		tlast = min(tlast, startpage->index + 64);
-		for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
+		tloop = min(tlast, startpage->index + 64);
+		for (tindex = startpage->index + 1; tindex < tloop; tindex++) {
 			len = probe_unmapped_page(mapping, tindex,
 							PAGE_CACHE_SIZE);
 			if (!len)
-				break;
+				return total;
 			total += len;
 		}
-		if ((tindex == tlast) && (inode->i_size & ~PAGE_CACHE_MASK)) {
-			len = probe_unmapped_page(mapping, tindex,
-					inode->i_size & ~PAGE_CACHE_MASK);
-			total += len;
+		if (tindex == tlast) {
+			unsigned offset = i_size_read(inode) & (PAGE_CACHE_SIZE - 1);
+			if (offset) {
+				total += probe_unmapped_page(mapping,
+							tindex, offset);
+			}
 		}
 	}
 	return total;
@@ -455,12 +457,12 @@ map_unwritten(
 	 */
 	if (bh == head) {
 		struct address_space	*mapping = inode->i_mapping;
-		unsigned long		tindex, tlast, bs;
+		unsigned long		tindex, tloop, tlast, bs;
 		struct page		*page;
 
-		tlast = inode->i_size >> PAGE_CACHE_SHIFT;
-		tlast = min(tlast, start_page->index + pb->pb_page_count - 1);
-		for (tindex = start_page->index + 1; tindex < tlast; tindex++) {
+		tlast = i_size_read(inode) >> PAGE_CACHE_SHIFT;
+		tloop = min(tlast, start_page->index + pb->pb_page_count - 1);
+		for (tindex = start_page->index + 1; tindex < tloop; tindex++) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
 					PAGE_CACHE_SIZE, &bs);
 			if (!page)
@@ -470,9 +472,9 @@ map_unwritten(
 			convert_page(inode, page, mp, pb, 1, all_bh);
 		}
 
-		if ((tindex == tlast) && (inode->i_size & ~PAGE_CACHE_MASK)) {
+		if ((tindex == tlast) && (i_size_read(inode) & ~PAGE_CACHE_MASK)) {
 			page = probe_unwritten_page(mapping, tindex, mp, pb,
-					inode->i_size & ~PAGE_CACHE_MASK, &bs);
+					i_size_read(inode) & ~PAGE_CACHE_MASK, &bs);
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
@@ -549,11 +551,11 @@ convert_page(
 	int			i = 0, index = 0;
 	int			bbits = inode->i_blkbits;
 
-	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 	if (page->index < end_index) {
 		end = PAGE_CACHE_SIZE;
 	} else {
-		end = inode->i_size & (PAGE_CACHE_SIZE-1);
+		end = i_size_read(inode) & (PAGE_CACHE_SIZE-1);
 	}
 	bh = head = page_buffers(page);
 	do {
@@ -665,9 +667,9 @@ page_state_convert(
 
 
 	/* Are we off the end of the file ? */
-	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
-		unsigned remaining = inode->i_size & (PAGE_CACHE_SIZE-1);
+		unsigned remaining = i_size_read(inode) & (PAGE_CACHE_SIZE-1);
 		if ((page->index >= end_index+1) || !remaining) {
 			return -EIO;
 		}
@@ -675,8 +677,8 @@ page_state_convert(
 
 	offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
 	end_offset = offset + PAGE_CACHE_SIZE;
-	if (end_offset > inode->i_size)
-		end_offset = inode->i_size;
+	if (end_offset > i_size_read(inode))
+		end_offset = i_size_read(inode);
 
 	bh = head = page_buffers(page);
 	mp = NULL;
@@ -855,7 +857,7 @@ linvfs_get_block_core(
 	 */
 	if (blocks)
 		size = blocks << inode->i_blkbits;
-	else if (create && (offset >= inode->i_size))
+	else if (create && (offset >= i_size_read(inode)))
 		size = 1 << XFS_WRITE_IO_LOG;
 	else
 		size = 1 << inode->i_blkbits;
@@ -903,7 +905,7 @@ linvfs_get_block_core(
 	 */
 	if (create &&
 	    ((!buffer_mapped(bh_result) && !buffer_uptodate(bh_result)) ||
-	     (offset >= inode->i_size) || (pbmap.pbm_flags & PBMF_NEW))) {
+	     (offset >= i_size_read(inode)) || (pbmap.pbm_flags & PBMF_NEW))) {
 		set_buffer_new(bh_result);
 	}
 
