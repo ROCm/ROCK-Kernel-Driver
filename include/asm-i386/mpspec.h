@@ -34,13 +34,6 @@ extern void mp_register_ioapic (u8 id, u32 address, u32 gsi_base);
 extern void mp_override_legacy_irq (u8 bus_irq, u8 polarity, u8 trigger, u32 gsi);
 extern void mp_config_acpi_legacy_irqs (void);
 extern void mp_parse_prt (void);
-
-#ifdef CONFIG_X86_IO_APIC
-extern void mp_config_ioapic_for_sci(u32 gsi);
-#else
-static inline void mp_config_ioapic_for_sci(u32 gsi)
-{ }
-#endif
 #endif /*CONFIG_ACPI_BOOT*/
 
 #define PHYSID_ARRAY_SIZE	BITS_TO_LONGS(MAX_APICS)

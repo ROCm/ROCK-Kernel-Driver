@@ -39,7 +39,11 @@
 #define _COMPONENT		ACPI_BUS_COMPONENT
 ACPI_MODULE_NAME		("acpi_bus")
 
+#ifdef	CONFIG_X86_64
 extern void __init acpi_pic_sci_set_trigger(unsigned int irq);
+#elif	defined(CONFIG_X86)
+extern void __init acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger);
+#endif
 
 FADT_DESCRIPTOR			acpi_fadt;
 struct acpi_device		*acpi_root;
@@ -609,13 +613,25 @@ acpi_bus_init (void)
 		printk(KERN_ERR PREFIX "Unable to get the FADT\n");
 		goto error1;
 	}
-
-#ifdef CONFIG_X86
+#ifdef CONFIG_X86_64
 	/* Ensure the SCI is set to level-triggered, active-low */
 	if (acpi_ioapic)
 		mp_config_ioapic_for_sci(acpi_fadt.sci_int);
 	else
 		acpi_pic_sci_set_trigger(acpi_fadt.sci_int);
+#elif defined(CONFIG_X86)
+	if (!acpi_ioapic) {
+		extern acpi_interrupt_flags acpi_sci_flags;
+		/* Set PIC-mode SCI trigger type */
+		acpi_pic_sci_set_trigger(acpi_fadt.sci_int, acpi_sci_flags.trigger);
+	} else {
+		extern int acpi_sci_override_gsi;
+		/*
+		 * now that acpi_fadt is initialized,
+		 * update it with result from INT_SRC_OVR parsing
+		 */
+		acpi_fadt.sci_int = acpi_sci_override_gsi;
+	}
 #endif
 
 	status = acpi_enable_subsystem(ACPI_FULL_INITIALIZATION);

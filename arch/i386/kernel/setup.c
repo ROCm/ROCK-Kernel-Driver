@@ -79,6 +79,7 @@ EXPORT_SYMBOL(acpi_disabled);
 
 #ifdef	CONFIG_ACPI_BOOT
 int __initdata acpi_force = 0;
+extern acpi_interrupt_flags	acpi_sci_flags;
 #endif
 
 int MCA_bus;
@@ -595,6 +596,18 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		else if (!memcmp(from, "pci=noacpi", 10)) {
 			acpi_noirq_set();
 		}
+
+		else if (!memcmp(from, "acpi_sci=edge", 13))
+			acpi_sci_flags.trigger =  1;
+
+		else if (!memcmp(from, "acpi_sci=level", 14))
+			acpi_sci_flags.trigger = 3;
+
+		else if (!memcmp(from, "acpi_sci=high", 13))
+			acpi_sci_flags.polarity = 1;
+
+		else if (!memcmp(from, "acpi_sci=low", 12))
+			acpi_sci_flags.polarity = 3;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */

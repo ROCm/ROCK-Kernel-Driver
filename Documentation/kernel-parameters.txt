@@ -99,10 +99,8 @@ running once the system is up.
 
 			See also Documentation/pm.txt.
  
-	acpi_pic_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
-			Format: { level | edge }
-			level   Force PIC-mode SCI to Level Trigger (default)
-			edge    Force PIC-mode SCI to Edge Trigge
+	acpi_sci=	[HW,ACPI] ACPI System Control Interrupt trigger mode
+			Format: { level | edge |  high | low }
 
 	acpi_irq_balance	[HW,ACPI] ACPI will balance active IRQs
 				default in APIC mode
