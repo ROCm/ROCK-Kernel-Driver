@@ -2,7 +2,6 @@
 # Makefile for the Linux/SuperH kernel.
 #
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= io.o io_generic.o io_hd64465.o setup_hd64465.o sh_ksyms.o \
