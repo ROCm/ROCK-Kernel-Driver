@@ -84,7 +84,7 @@ extern struct net_device *cs89x0_probe(int unit);
 extern int hplance_probe(struct net_device *dev);
 extern int bagetlance_probe(struct net_device *);
 extern int mvme147lance_probe(struct net_device *dev);
-extern int tc515_probe(struct net_device *dev);
+extern struct net_device *tc515_probe(int unit);
 extern struct net_device *lance_probe(int unit);
 extern int mace_probe(struct net_device *dev);
 extern int macsonic_probe(struct net_device *dev);
@@ -201,13 +201,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_HP100 		/* ISA, EISA & PCI */
 	{hp100_probe, 0},
 #endif	
-#ifdef CONFIG_3C515
-	{tc515_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_3C515
+	{tc515_probe, 0},
+#endif
 #ifdef CONFIG_ULTRA 
 	{ultra_probe, 0},
 #endif
