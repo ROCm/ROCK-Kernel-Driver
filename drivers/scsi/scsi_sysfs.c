@@ -783,6 +783,7 @@ int scsi_sysfs_target_initialize(struct scsi_device *sdev)
 			 "target%d:%d:%d",
 			 shost->host_no, sdev->channel, sdev->id);
 		starget->id = sdev->id;
+		starget->channel = sdev->channel;
 		create = starget->create = 1;
 		/*
 		 * If there wasn't another lun already configured at

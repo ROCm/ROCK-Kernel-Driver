@@ -137,6 +137,7 @@ struct scsi_device {
 struct scsi_target {
 	struct scsi_device	*starget_sdev_user;
 	struct device		dev;
+	unsigned int		channel;
 	unsigned int		id; /* target id ... replace
 				     * scsi_device.id eventually */
 	struct class_device	transport_classdev;
