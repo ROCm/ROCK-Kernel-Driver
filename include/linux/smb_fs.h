@@ -10,6 +10,7 @@
 #define _LINUX_SMB_FS_H
 
 #include <linux/smb.h>
+#include <linux/smb_fs_i.h>
 
 /*
  * ioctl commands
@@ -28,6 +29,10 @@
 #include <linux/smb_mount.h>
 #include <asm/unaligned.h>
 
+static inline struct smb_inode_info *SMB_I(struct inode *inode)
+{
+	return list_entry(inode, struct smb_inode_info, vfs_inode);
+}
 
 /* macro names are short for word, double-word, long value (?) */
 #define WVAL(buf,pos) \
@@ -157,7 +162,7 @@ struct smb_cache_control {
 static inline int
 smb_is_open(struct inode *i)
 {
-	return (i->u.smbfs_i.open == server_from_inode(i)->generation);
+	return (SMB_I(i)->open == server_from_inode(i)->generation);
 }
 
 

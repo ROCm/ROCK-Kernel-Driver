@@ -53,7 +53,7 @@
     mm:			NULL,						\
     active_mm:		&init_mm,					\
     run_list:		LIST_HEAD_INIT(tsk.run_list),			\
-    time_slice:		NICE_TO_TIMESLICE(DEF_USER_NICE),		\
+    time_slice:		HZ,						\
     next_task:		&tsk,						\
     prev_task:		&tsk,						\
     p_opptr:		&tsk,						\

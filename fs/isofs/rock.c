@@ -365,9 +365,9 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	printk(KERN_WARNING "Attempt to read inode for relocated directory\n");
 	goto out;
       case SIG('C','L'):
-	inode->u.isofs_i.i_first_extent = isonum_733(rr->u.CL.location);
+	ISOFS_I(inode)->i_first_extent = isonum_733(rr->u.CL.location);
 	reloc = iget(inode->i_sb,
-		     (inode->u.isofs_i.i_first_extent <<
+		     (ISOFS_I(inode)->i_first_extent <<
 		      inode -> i_sb -> u.isofs_sb.s_log_zone_size));
 	if (!reloc)
 		goto out;
@@ -394,10 +394,10 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 				      printk(KERN_WARNING "isofs: Can't handle ZF block size of 2^%d\n", block_shift);
 			      } else {
 				/* Note: we don't change i_blocks here */
-				      inode->u.isofs_i.i_file_format = isofs_file_compressed;
+				      ISOFS_I(inode)->i_file_format = isofs_file_compressed;
 				/* Parameters to compression algorithm (header size, block size) */
-				      inode->u.isofs_i.i_format_parm[0] = isonum_711(&rr->u.ZF.parms[0]);
-				      inode->u.isofs_i.i_format_parm[1] = isonum_711(&rr->u.ZF.parms[1]);
+				      ISOFS_I(inode)->i_format_parm[0] = isonum_711(&rr->u.ZF.parms[0]);
+				      ISOFS_I(inode)->i_format_parm[1] = isonum_711(&rr->u.ZF.parms[1]);
 				      inode->i_size = isonum_733(rr->u.ZF.real_size);
 			      }
 		      } else {

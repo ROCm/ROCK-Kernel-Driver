@@ -652,13 +652,15 @@ magic_found:
 	uspi->s_fmask = fs32_to_cpu(sb, usb1->fs_fmask);
 	uspi->s_fshift = fs32_to_cpu(sb, usb1->fs_fshift);
 
-	if (uspi->s_bsize != 4096 && uspi->s_bsize != 8192 
-	  && uspi->s_bsize != 32768) {
-		printk("ufs_read_super: fs_bsize %u != {4096, 8192, 32768}\n", uspi->s_bsize);
+	/* block size must be a power-of-two between 4k and 32k */
+	if ((uspi->s_bsize & (uspi->s_bsize-1)) ||
+	    (uspi->s_bsize < 4096 || uspi->s_bsize > 32768)) {
+		printk("ufs_read_super: fs_bsize %u != {4096, 8192, 16384, 32768}\n", uspi->s_bsize);
 		goto failed;
 	}
-	if (uspi->s_fsize != 512 && uspi->s_fsize != 1024 
-	  && uspi->s_fsize != 2048 && uspi->s_fsize != 4096) {
+	/* fragment size must be a power-of-two between 512 and 4096 bytes */
+	if ((uspi->s_fsize & (uspi->s_fsize-1)) ||
+	    (uspi->s_fsize < 512 || uspi->s_fsize > 4096)) {
 		printk("ufs_read_super: fs_fsize %u != {512, 1024, 2048. 4096}\n", uspi->s_fsize);
 		goto failed;
 	}

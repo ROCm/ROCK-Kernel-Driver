@@ -1,3 +1,7 @@
+2002-01-24  David S. Miller  <davem@redhat.com>
+
+	* inode.c: Include linux/init.h
+
 Mon Jan 21 2001  Alexander Viro  <viro@math.psu.edu>
 	* ialloc.c (sysv_new_inode): zero SYSV_I(inode)->i_data out.
 	* i_vnode renamed to vfs_inode.  Sorry, but let's keep that

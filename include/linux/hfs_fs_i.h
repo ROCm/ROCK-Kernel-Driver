@@ -39,6 +39,7 @@ struct hfs_inode_info {
 
         /* for dentry cleanup */
         void (*d_drop_op)(struct dentry *, const ino_t);
+	struct inode vfs_inode;
 };
 
 #endif

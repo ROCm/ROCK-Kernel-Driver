@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.112 2002/01/15 06:25:50 davem Exp $
+# $Id: config.in,v 1.113 2002/01/24 22:14:44 davem Exp $
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #

@@ -940,6 +940,7 @@ static int
 smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 {
 	struct inode *ino = dentry->d_inode;
+	struct smb_inode_info *ei = SMB_I(ino);
 	int mode, read_write = 0x42, read_only = 0x40;
 	int res;
 	char *p;
@@ -990,12 +991,12 @@ smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 	}
 	/* We should now have data in vwv[0..6]. */
 
-	ino->u.smbfs_i.fileid = WVAL(server->packet, smb_vwv0);
-	ino->u.smbfs_i.attr   = WVAL(server->packet, smb_vwv1);
+	ei->fileid = WVAL(server->packet, smb_vwv0);
+	ei->attr   = WVAL(server->packet, smb_vwv1);
 	/* smb_vwv2 has mtime */
 	/* smb_vwv4 has size  */
-	ino->u.smbfs_i.access = (WVAL(server->packet, smb_vwv6) & SMB_ACCMASK);
-	ino->u.smbfs_i.open = server->generation;
+	ei->access = (WVAL(server->packet, smb_vwv6) & SMB_ACCMASK);
+	ei->open = server->generation;
 
 out:
 	return res;
@@ -1010,6 +1011,7 @@ smb_open(struct dentry *dentry, int wish)
 {
 	struct inode *inode = dentry->d_inode;
 	int result;
+	__u16 access;
 
 	result = -ENOENT;
 	if (!inode) {
@@ -1040,11 +1042,10 @@ smb_open(struct dentry *dentry, int wish)
 	 * Check whether the access is compatible with the desired mode.
 	 */
 	result = 0;
-	if (inode->u.smbfs_i.access != wish && 
-	    inode->u.smbfs_i.access != SMB_O_RDWR)
-	{
+	access = SMB_I(inode)->access;
+	if (access != wish && access != SMB_O_RDWR) {
 		PARANOIA("%s/%s access denied, access=%x, wish=%x\n",
-			 DENTRY_PATH(dentry), inode->u.smbfs_i.access, wish);
+			 DENTRY_PATH(dentry), access, wish);
 		result = -EACCES;
 	}
 out:
@@ -1073,6 +1074,7 @@ smb_proc_close(struct smb_sb_info *server, __u16 fileid, __u32 mtime)
 static int 
 smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 {
+	struct smb_inode_info *ei = SMB_I(ino);
 	int result = 0;
 	if (smb_is_open(ino))
 	{
@@ -1080,7 +1082,7 @@ smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 		 * We clear the open flag in advance, in case another
  		 * process observes the value while we block below.
 		 */
-		ino->u.smbfs_i.open = 0;
+		ei->open = 0;
 
 		/*
 		 * Kludge alert: SMB timestamps are accurate only to
@@ -1096,22 +1098,21 @@ smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 		 * update the time stamps to sync mtime and atime.
 		 */
 		if ((server->opt.protocol >= SMB_PROTOCOL_LANMAN2) &&
-		    !(ino->u.smbfs_i.access == SMB_O_RDONLY))
+		    !(ei->access == SMB_O_RDONLY))
 		{
 			struct smb_fattr fattr;
 			smb_get_inode_attr(ino, &fattr);
 			smb_proc_setattr_ext(server, ino, &fattr);
 		}
 
-		result = smb_proc_close(server, ino->u.smbfs_i.fileid,
-						ino->i_mtime);
+		result = smb_proc_close(server, ei->fileid, ino->i_mtime);
 		/*
 		 * Force a revalidation after closing ... some servers
 		 * don't post the size until the file has been closed.
 		 */
 		if (server->opt.protocol < SMB_PROTOCOL_NT1)
-			ino->u.smbfs_i.oldmtime = 0;
-		ino->u.smbfs_i.closed = jiffies;
+			ei->oldmtime = 0;
+		ei->closed = jiffies;
 	}
 	return result;
 }
@@ -1160,7 +1161,7 @@ smb_proc_read(struct inode *inode, off_t offset, int count, char *data)
 	smb_lock_server(server);
 	smb_setup_header(server, SMBread, 5, 0);
 	buf = server->packet;
-	WSET(buf, smb_vwv0, inode->u.smbfs_i.fileid);
+	WSET(buf, smb_vwv0, SMB_I(inode)->fileid);
 	WSET(buf, smb_vwv1, count);
 	DSET(buf, smb_vwv2, offset);
 	WSET(buf, smb_vwv4, 0);
@@ -1193,7 +1194,7 @@ smb_proc_read(struct inode *inode, off_t offset, int count, char *data)
 
 out:
 	VERBOSE("ino=%ld, fileid=%d, count=%d, result=%d\n",
-		inode->i_ino, inode->u.smbfs_i.fileid, count, result);
+		inode->i_ino, SMB_I(inode)->fileid, count, result);
 	smb_unlock_server(server);
 	return result;
 }
@@ -1204,10 +1205,10 @@ smb_proc_write(struct inode *inode, off_t offset, int count, const char *data)
 	struct smb_sb_info *server = server_from_inode(inode);
 	int result;
 	__u8 *p;
-	__u16 fileid = inode->u.smbfs_i.fileid;
+	__u16 fileid = SMB_I(inode)->fileid;
 
 	VERBOSE("ino=%ld, fileid=%d, count=%d@%ld, packet_size=%d\n",
-		inode->i_ino, inode->u.smbfs_i.fileid, count, offset,
+		inode->i_ino, SMB_I(inode)->fileid, count, offset,
 		server->packet_size);
 
 	smb_lock_server(server);
@@ -2291,10 +2292,10 @@ smb_proc_do_getattr(struct smb_sb_info *server, struct dentry *dir,
 	 */
 	if (server->mnt->flags & SMB_MOUNT_WIN95 &&
 	    inode &&
-	    inode->u.smbfs_i.flags & SMB_F_LOCALWRITE &&
+	    SMB_I(inode)->flags & SMB_F_LOCALWRITE &&
 	    smb_is_open(inode))
 	{
-		__u16 fileid = inode->u.smbfs_i.fileid;
+		__u16 fileid = SMB_I(inode)->fileid;
 		fattr->f_size = smb_proc_seek(server, fileid, 2, 0);
 	}
 
@@ -2395,7 +2396,7 @@ smb_proc_setattr_ext(struct smb_sb_info *server,
 
       retry:
 	smb_setup_header(server, SMBsetattrE, 7, 0);
-	WSET(server->packet, smb_vwv0, inode->u.smbfs_i.fileid);
+	WSET(server->packet, smb_vwv0, SMB_I(inode)->fileid);
 	/* We don't change the creation time */
 	WSET(server->packet, smb_vwv1, 0);
 	WSET(server->packet, smb_vwv2, 0);
@@ -2511,8 +2512,7 @@ smb_proc_settime(struct dentry *dentry, struct smb_fattr *fattr)
 	/* setting the time on a Win95 server fails (tridge) */
 	if (server->opt.protocol >= SMB_PROTOCOL_LANMAN2 && 
 	    !(server->mnt->flags & SMB_MOUNT_WIN95)) {
-		if (smb_is_open(inode) &&
-		    inode->u.smbfs_i.access != SMB_O_RDONLY)
+		if (smb_is_open(inode) && SMB_I(inode)->access != SMB_O_RDONLY)
 			result = smb_proc_setattr_ext(server, inode, fattr);
 		else
 			result = smb_proc_setattr_trans2(server, dentry, fattr);

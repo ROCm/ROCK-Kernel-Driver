@@ -140,8 +140,7 @@ extern spinlock_t mmlist_lock;
 typedef struct task_struct task_t;
 
 extern void sched_init(void);
-extern void init_idle(void);
-extern void idle_startup_done(void);
+extern void init_idle(task_t *idle, int cpu);
 extern void show_state(void);
 extern void cpu_init (void);
 extern void trap_init(void);
@@ -151,6 +150,8 @@ extern void update_one_process(struct task_struct *p, unsigned long user,
 extern void scheduler_tick(struct task_struct *p);
 extern void sched_task_migrated(struct task_struct *p);
 extern void smp_migrate_task(int cpu, task_t *task);
+extern unsigned long cache_decay_ticks;
+
 
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
@@ -256,7 +257,6 @@ struct task_struct {
 
 	unsigned int time_slice;
 
-	#define MAX_SLEEP_AVG (2*HZ)
 	unsigned long sleep_avg;
 	unsigned long sleep_timestamp;
 
@@ -418,11 +418,22 @@ struct task_struct {
 #define DEF_USER_NICE		0
 
 /*
- * Default timeslice is 90 msecs, maximum is 180 msecs.
+ * Default timeslice is 150 msecs, maximum is 300 msecs.
  * Minimum timeslice is 10 msecs.
+ *
+ * These are the 'tuning knobs' of the scheduler:
  */
 #define MIN_TIMESLICE		( 10 * HZ / 1000)
-#define MAX_TIMESLICE		(180 * HZ / 1000)
+#define MAX_TIMESLICE		(300 * HZ / 1000)
+#define CHILD_FORK_PENALTY	95
+#define PARENT_FORK_PENALTY	100
+#define EXIT_WEIGHT		3
+#define PRIO_INTERACTIVE_RATIO	20
+#define PRIO_CPU_HOG_RATIO	60
+#define PRIO_BONUS_RATIO	70
+#define INTERACTIVE_DELTA	3
+#define MAX_SLEEP_AVG		(2*HZ)
+#define STARVATION_LIMIT	(2*HZ)
 
 #define USER_PRIO(p)		((p)-MAX_RT_PRIO)
 #define MAX_USER_PRIO		(USER_PRIO(MAX_PRIO))

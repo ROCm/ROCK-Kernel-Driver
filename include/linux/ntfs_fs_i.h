@@ -88,4 +88,10 @@ struct ntfs_inode_info {
 	} u;	
 };
 
+/* this is a kludge */
+struct ntfs_i {
+	struct ntfs_inode_info n;
+	struct inode vfs_inode;
+};
+
 #endif

@@ -92,10 +92,82 @@ CONFIG_NUMA
   Access).  This option is for configuring high-end multiprocessor
   server machines.  If in doubt, say N.
 
+CONFIG_ALPHA_GENERIC
+  This is the system type of your hardware.  A "generic" kernel will
+  run on any supported Alpha system. However, if you configure a
+  kernel for your specific system, it will be faster and smaller.
+
+  To find out what type of Alpha system you have, you may want to
+  check out the Linux/Alpha FAQ, accessible on the WWW from
+  <http://www.alphalinux.org/>. In summary:
+
+  Alcor/Alpha-XLT     AS 600
+  Alpha-XL            XL-233, XL-266
+  AlphaBook1          Alpha laptop
+  Avanti              AS 200, AS 205, AS 250, AS 255, AS 300, AS 400
+  Cabriolet           AlphaPC64, AlphaPCI64
+  DP264               DP264
+  EB164               EB164 21164 evaluation board
+  EB64+               EB64+ 21064 evaluation board
+  EB66                EB66 21066 evaluation board
+  EB66+               EB66+ 21066 evaluation board
+  Jensen              DECpc 150, DEC 2000 model 300,
+                      DEC 2000 model 500
+  LX164               AlphaPC164-LX
+  Miata               Personal Workstation 433a, 433au, 500a,
+                      500au, 600a, or 600au
+  Mikasa              AS 1000
+  Noname              AXPpci33, UDB (Multia)
+  Noritake            AS 1000A, AS 600A, AS 800
+  PC164               AlphaPC164
+  Rawhide             AS 1200, AS 4000, AS 4100
+  Ruffian             RPX164-2, AlphaPC164-UX, AlphaPC164-BX
+  SX164               AlphaPC164-SX
+  Sable               AS 2000, AS 2100
+  Shark		      DS 20L
+  Takara              Takara
+  Titan               Privateer
+  Wildfire            AlphaServer GS 40/80/160/320
+
+  If you don't know what to do, choose "generic".
+
+CONFIG_ALPHA_ALCOR
+  For systems using the Digital ALCOR chipset: 5 chips (4, 64-bit data
+  slices (Data Switch, DSW) - 208-pin PQFP and 1 control (Control, I/O
+  Address, CIA) - a 383 pin plastic PGA).  It provides a DRAM
+  controller (256-bit memory bus) and a PCI interface.  It also does
+  all the work required to support an external Bcache and to maintain
+  memory coherence when a PCI device DMAs into (or out of) memory.
+
+CONFIG_ALPHA_XL
+  XL-233 and XL-266-based Alpha systems.
+
+CONFIG_ALPHA_BOOK1
+  Dec AlphaBook1/Burns Alpha-based laptops.
+
 CONFIG_ALPHA_AVANTI
   Avanti AS 200, AS 205, AS 250, AS 255, AS 300, and AS 400-based
   Alphas. Info at
   <http://www.unix-ag.org/Linux-Alpha/Architectures/Avanti.html>.
+
+CONFIG_ALPHA_CABRIOLET
+  Cabriolet AlphaPC64, AlphaPCI64 systems.  Derived from EB64+ but now
+  baby-AT with Flash boot ROM, no on-board SCSI or Ethernet. 3 ISA
+  slots, 4 PCI slots (one pair are on a shared slot), uses plug-in
+  Bcache SIMMs.  Requires power supply with 3.3V output.
+
+CONFIG_ALPHA_DP264
+  Various 21264 systems with the tsunami core logic chipset.
+  API Networks: 264DP, UP2000(+), CS20;
+  Compaq: DS10(E,L), XP900, XP1000, DS20(E), ES40.
+
+CONFIG_ALPHA_EB164
+  EB164 21164 evaluation board from DEC.  Uses 21164 and ALCOR.  Has
+  ISA and PCI expansion (3 ISA slots, 2 64-bit PCI slots (one is
+  shared with an ISA slot) and 2 32-bit PCI slots.  Uses plus-in
+  Bcache SIMMs. I/O sub-system provides SuperI/O (2S, 1P, FD), KBD,
+  MOUSE (PS2 style), RTC/NVRAM.  Boot ROM is Flash.  PC-AT-sized
+  motherboard.  Requires power supply with 3.3V output.
 
 CONFIG_ALPHA_EB64P
   Uses 21064 or 21064A and APECs.  Has ISA and PCI expansion (3 ISA,
@@ -105,6 +177,43 @@ CONFIG_ALPHA_EB64P
   SuperI/O (2S, 1P, FD), RTC/NVRAM. Boot ROM is EPROM.  PC-AT size.
   Runs from standard PC power supply.
 
+CONFIG_ALPHA_EB66
+  A Digital DS group board.  Uses 21066 or 21066A.  I/O sub-system is
+  identical to EB64+.  Baby PC-AT size.  Runs from standard PC power
+  supply.  The EB66 schematic was published as a marketing poster
+  advertising the 21066 as "the first microprocessor in the world with
+  embedded PCI".
+
+CONFIG_ALPHA_EB66P
+  Later variant of the EB66 board.
+
+CONFIG_ALPHA_EIGER
+  Apparently an obscure OEM single-board computer based on the
+  Typhoon/Tsunami chipset family. Information on it is scanty.
+
+CONFIG_ALPHA_JENSEN
+  DEC PC 150 AXP (aka Jensen): This is a very old Digital system - one
+  of the first-generation Alpha systems. A number of these systems
+  seem to be available on the second- hand market. The Jensen is a
+  floor-standing tower system which originally used a 150MHz 21064 It
+  used programmable logic to interface a 486 EISA I/O bridge to the
+  CPU.
+
+CONFIG_ALPHA_LX164
+  A technical overview of this board is available at
+  <http://www.unix-ag.org/Linux-Alpha/Architectures/LX164.html>.
+
+CONFIG_ALPHA_MIATA
+  The Digital PersonalWorkStation (PWS 433a, 433au, 500a, 500au, 600a,
+  or 600au).  There is an Installation HOWTO for this hardware at
+  <http://members.brabant.chello.nl/~s.vandereijk/miata.html>.
+
+CONFIG_ALPHA_MIKASA
+  AlphaServer 1000-based Alpha systems.
+
+CONFIG_ALPHA_NAUTILUS
+  Alpha systems based on the AMD 751 & ALI 1543C chipsets.
+
 CONFIG_ALPHA_NONAME
   The AXPpci33 (aka NoName), is based on the EB66 (includes the Multia
   UDB).  This design was produced by Digital's Technical OEM (TOEM)
@@ -113,6 +222,28 @@ CONFIG_ALPHA_NONAME
   5 ISA slots and 3 PCI slots (one pair are a shared slot). There are
   2 versions, with either PS/2 or large DIN connectors for the
   keyboard.
+
+CONFIG_ALPHA_NORITAKE
+  AlphaServer 1000A, AlphaServer 600A, and AlphaServer 800-based
+  systems.
+
+CONFIG_ALPHA_RAWHIDE
+  AlphaServer 1200, AlphaServer 4000 and AlphaServer 4100 machines.
+  See HOWTO at
+  <http://www.alphalinux.org/docs/rawhide/4100_install.shtml>.
+
+CONFIG_ALPHA_RUFFIAN
+  Samsung APC164UX.  There is a page on known problems and workarounds
+  at <http://www.alphalinux.org/faq/FAQ-11.html>.
+
+CONFIG_ALPHA_SABLE
+  Digital AlphaServer 2000 and 2100-based systems.
+
+CONFIG_ALPHA_TAKARA
+  Alpha 11164-based OEM single-board computer.
+
+CONFIG_ALPHA_WILDFIRE
+  AlphaServer GS 40/80/160/320 SMP based on the EV67 core.
 
 CONFIG_ALPHA_PRIMO
   Say Y if you have an AS 1000 5/xxx or an AS 1000A 5/xxx.
@@ -236,6 +367,29 @@ CONFIG_PCMCIA
   When compiled this way, there will be modules called pcmcia_core.o
   and ds.o.  If you want to compile it as a module, say M here and
   read <file:Documentation/modules.txt>.
+
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_KCORE_AOUT
+  Not necessary unless you're using a very out-of-date binutils
+  version.  You probably want KCORE_ELF.
 
 CONFIG_BINFMT_ELF
   ELF (Executable and Linkable Format) is a format for libraries and

@@ -378,10 +378,8 @@ struct set_mtrr_context
 static int arr3_protected;
 
 /*  Put the processor into a state where MTRRs can be safely set  */
-static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
+static void set_mtrr_prepare_save (struct set_mtrr_context *ctxt)
 {
-    unsigned long tmp;
-
     /*  Disable interrupts locally  */
     __save_flags (ctxt->flags); __cli ();
 
@@ -404,16 +402,27 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
     }
 
     if ( mtrr_if == MTRR_IF_INTEL ) {
-	/*  Disable MTRRs, and set the default type to uncached  */
+	/*  Save MTRR state */
 	rdmsr (MTRRdefType_MSR, ctxt->deftype_lo, ctxt->deftype_hi);
+    } else {
+	/* Cyrix ARRs - everything else were excluded at the top */
+	ctxt->ccr3 = getCx86 (CX86_CCR3);
+    }
+}   /*  End Function set_mtrr_prepare_save  */
+
+static void set_mtrr_cache_disable (struct set_mtrr_context *ctxt)
+{
+    if ( mtrr_if != MTRR_IF_INTEL && mtrr_if != MTRR_IF_CYRIX_ARR )
+	 return;
+
+    if ( mtrr_if == MTRR_IF_INTEL ) {
+	/*  Disable MTRRs, and set the default type to uncached  */
 	wrmsr (MTRRdefType_MSR, ctxt->deftype_lo & 0xf300UL, ctxt->deftype_hi);
     } else {
 	/* Cyrix ARRs - everything else were excluded at the top */
-	tmp = getCx86 (CX86_CCR3);
-	setCx86 (CX86_CCR3, (tmp & 0x0f) | 0x10);
-	ctxt->ccr3 = tmp;
+	setCx86 (CX86_CCR3, (ctxt->ccr3 & 0x0f) | 0x10);
     }
-}   /*  End Function set_mtrr_prepare  */
+}   /*  End Function set_mtrr_cache_disable  */
 
 /*  Restore the processor after a set_mtrr_prepare  */
 static void set_mtrr_done (struct set_mtrr_context *ctxt)
@@ -674,7 +683,10 @@ static void intel_set_mtrr_up (unsigned int reg, unsigned long base,
 {
     struct set_mtrr_context ctxt;
 
-    if (do_safe) set_mtrr_prepare (&ctxt);
+    if (do_safe) {
+	set_mtrr_prepare_save (&ctxt);
+	set_mtrr_cache_disable (&ctxt);
+	}
     if (size == 0)
     {
 	/* The invalid bit is kept in the mask, so we simply clear the
@@ -726,7 +738,10 @@ static void cyrix_set_arr_up (unsigned int reg, unsigned long base,
 	}
     }
 
-    if (do_safe) set_mtrr_prepare (&ctxt);
+    if (do_safe) {
+	set_mtrr_prepare_save (&ctxt);
+	set_mtrr_cache_disable (&ctxt);
+    }
     base <<= PAGE_SHIFT;
     setCx86(arr,    ((unsigned char *) &base)[3]);
     setCx86(arr+1,  ((unsigned char *) &base)[2]);
@@ -750,7 +765,10 @@ static void amd_set_mtrr_up (unsigned int reg, unsigned long base,
     u32 regs[2];
     struct set_mtrr_context ctxt;
 
-    if (do_safe) set_mtrr_prepare (&ctxt);
+    if (do_safe) {
+	set_mtrr_prepare_save (&ctxt);
+	set_mtrr_cache_disable (&ctxt);
+    }
     /*
      *	Low is MTRR0 , High MTRR 1
      */
@@ -788,7 +806,10 @@ static void centaur_set_mcr_up (unsigned int reg, unsigned long base,
     struct set_mtrr_context ctxt;
     unsigned long low, high;
 
-    if (do_safe) set_mtrr_prepare( &ctxt );
+    if (do_safe) {
+	set_mtrr_prepare_save (&ctxt);
+	set_mtrr_cache_disable (&ctxt);
+    }
     if (size == 0)
     {
         /*  Disable  */
@@ -985,6 +1006,7 @@ static unsigned long __init set_mtrr_state (struct mtrr_state *state,
 
 
 static atomic_t undone_count;
+static volatile int wait_barrier_cache_disable = FALSE;
 static volatile int wait_barrier_execute = FALSE;
 static volatile int wait_barrier_cache_enable = FALSE;
 
@@ -1003,18 +1025,21 @@ static void ipi_handler (void *info)
 {
     struct set_mtrr_data *data = info;
     struct set_mtrr_context ctxt;
-
-    set_mtrr_prepare (&ctxt);
+    set_mtrr_prepare_save (&ctxt);
     /*  Notify master that I've flushed and disabled my cache  */
     atomic_dec (&undone_count);
-    while (wait_barrier_execute) barrier ();
+    while (wait_barrier_cache_disable) { rep_nop(); barrier(); }
+    set_mtrr_cache_disable (&ctxt);
+    /*  Notify master that I've flushed and disabled my cache  */
+    atomic_dec (&undone_count);
+    while (wait_barrier_execute) { rep_nop(); barrier(); }
     /*  The master has cleared me to execute  */
     (*set_mtrr_up) (data->smp_reg, data->smp_base, data->smp_size,
 		    data->smp_type, FALSE);
     /*  Notify master CPU that I've executed the function  */
     atomic_dec (&undone_count);
     /*  Wait for master to clear me to enable cache and return  */
-    while (wait_barrier_cache_enable) barrier ();
+    while (wait_barrier_cache_enable) { rep_nop(); barrier(); }
     set_mtrr_done (&ctxt);
 }   /*  End Function ipi_handler  */
 
@@ -1028,6 +1053,7 @@ static void set_mtrr_smp (unsigned int reg, unsigned long base,
     data.smp_base = base;
     data.smp_size = size;
     data.smp_type = type;
+    wait_barrier_cache_disable = TRUE;
     wait_barrier_execute = TRUE;
     wait_barrier_cache_enable = TRUE;
     atomic_set (&undone_count, smp_num_cpus - 1);
@@ -1035,15 +1061,22 @@ static void set_mtrr_smp (unsigned int reg, unsigned long base,
     if (smp_call_function (ipi_handler, &data, 1, 0) != 0)
 	panic ("mtrr: timed out waiting for other CPUs\n");
     /* Flush and disable the local CPU's cache */
-    set_mtrr_prepare (&ctxt);
+    set_mtrr_prepare_save (&ctxt);
     /*  Wait for all other CPUs to flush and disable their caches  */
-    while (atomic_read (&undone_count) > 0) barrier ();
+    while (atomic_read (&undone_count) > 0) { rep_nop(); barrier(); }
+    /* Set up for completion wait and then release other CPUs to change MTRRs*/
+    atomic_set (&undone_count, smp_num_cpus - 1);
+    wait_barrier_cache_disable = FALSE;
+    set_mtrr_cache_disable (&ctxt);
+
+    /*  Wait for all other CPUs to flush and disable their caches  */
+    while (atomic_read (&undone_count) > 0) { rep_nop(); barrier(); }
     /* Set up for completion wait and then release other CPUs to change MTRRs*/
     atomic_set (&undone_count, smp_num_cpus - 1);
     wait_barrier_execute = FALSE;
     (*set_mtrr_up) (reg, base, size, type, FALSE);
     /*  Now wait for other CPUs to complete the function  */
-    while (atomic_read (&undone_count) > 0) barrier ();
+    while (atomic_read (&undone_count) > 0) { rep_nop(); barrier(); }
     /*  Now all CPUs should have finished the function. Release the barrier to
 	allow them to re-enable their caches and return from their interrupt,
 	then enable the local cache and return  */
@@ -1887,7 +1920,9 @@ static void __init cyrix_arr_init_secondary(void)
     struct set_mtrr_context ctxt;
     int i;
 
-    set_mtrr_prepare (&ctxt); /* flush cache and enable MAPEN */
+    /* flush cache and enable MAPEN */
+    set_mtrr_prepare_save (&ctxt);
+    set_mtrr_cache_disable (&ctxt);
 
      /* the CCRs are not contiguous */
     for(i=0; i<4; i++) setCx86(CX86_CCR0 + i, ccr_state[i]);
@@ -1924,7 +1959,9 @@ static void __init cyrix_arr_init(void)
     int i;
 #endif
 
-    set_mtrr_prepare (&ctxt); /* flush cache and enable MAPEN */
+    /* flush cache and enable MAPEN */
+    set_mtrr_prepare_save (&ctxt);
+    set_mtrr_cache_disable (&ctxt);
 
     /* Save all CCRs locally */
     ccr[0] = getCx86 (CX86_CCR0);
@@ -2073,7 +2110,8 @@ static void __init centaur_mcr_init(void)
 {
     struct set_mtrr_context ctxt;
 
-    set_mtrr_prepare (&ctxt);
+    set_mtrr_prepare_save (&ctxt);
+    set_mtrr_cache_disable (&ctxt);
 
     if(boot_cpu_data.x86_model==4)
     	centaur_mcr0_init();
@@ -2190,7 +2228,8 @@ static void __init intel_mtrr_init_secondary_cpu(void)
     /*  Note that this is not ideal, since the cache is only flushed/disabled
 	for this CPU while the MTRRs are changed, but changing this requires
 	more invasive changes to the way the kernel boots  */
-    set_mtrr_prepare (&ctxt);
+    set_mtrr_prepare_save (&ctxt);
+    set_mtrr_cache_disable (&ctxt);
     mask = set_mtrr_state (&smp_mtrr_state, &ctxt);
     set_mtrr_done (&ctxt);
     /*  Use the atomic bitops to update the global mask  */

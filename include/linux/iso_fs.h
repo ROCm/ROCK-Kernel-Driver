@@ -170,6 +170,12 @@ struct iso_directory_record {
 
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
+#include <linux/iso_fs_i.h>
+
+static inline struct iso_inode_info *ISOFS_I(struct inode *inode)
+{
+	return list_entry(inode, struct iso_inode_info, vfs_inode);
+}
 
 static inline int isonum_711(char *p)
 {

@@ -39,10 +39,13 @@ EXPORT_SYMBOL(fat_dir_empty);
 EXPORT_SYMBOL(fat_truncate);
 EXPORT_SYMBOL(fat_brelse);
 
+int __init fat_init_inodecache(void);
+void __exit fat_destroy_inodecache(void);
 static int __init init_fat_fs(void)
 {
 	fat_hash_init();
-	return 0;
+	return fat_init_inodecache();
 }
 
 module_init(init_fat_fs)
+module_exit(fat_destroy_inodecache)

@@ -2803,9 +2803,10 @@ void __init cpu_init (void)
 	load_TR(nr);
 	load_LDT(&init_mm);
 
-	/*
-	 * Clear all 6 debug registers:
-	 */
+	/* Clear %fs and %gs. */
+	asm volatile ("xorl %eax, %eax; movl %eax, %fs; movl %eax, %gs");
+
+	/* Clear all 6 debug registers: */
 
 #define CD(register) __asm__("movl %0,%%db" #register ::"r"(0) );
 

@@ -363,6 +363,16 @@ CONFIG_HISAX_ST5481
   This enables the driver for ST5481 based USB ISDN adapters,
   e.g. the BeWan Gazel 128 USB
 
+CONFIG_HISAX_FRITZ_PCIPNP
+  This enables the driver for the AVM Fritz!Card PCI, Fritz!Card PCI v2 
+  and Fritz!Card PnP.
+  (the latter also needs you to select "ISA Plug and Play support"
+  from the menu "Plug and Play configuration")
+
+CONFIG_HISAX_FRITZ_CLASSIC
+  This enables the driver for the AVM Fritz!Card classic, formerly
+  known as AVM A1.
+
 CONFIG_ISDN_DRV_PCBIT
   This enables support for the PCBIT ISDN-card.  This card is
   manufactured in Portugal by Octal.  For running this card,

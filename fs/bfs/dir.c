@@ -39,7 +39,7 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 
 	while (f->f_pos < dir->i_size) {
 		offset = f->f_pos & (BFS_BSIZE-1);
-		block = dir->iu_sblock + (f->f_pos >> BFS_BSIZE_BITS);
+		block = BFS_I(dir)->i_sblock + (f->f_pos >> BFS_BSIZE_BITS);
 		bh = sb_bread(dir->i_sb, block);
 		if (!bh) {
 			f->f_pos += BFS_BSIZE - offset;
@@ -97,8 +97,10 @@ static int bfs_create(struct inode * dir, struct dentry * dentry, int mode)
 	inode->i_fop = &bfs_file_operations;
 	inode->i_mapping->a_ops = &bfs_aops;
 	inode->i_mode = mode;
-	inode->i_ino = inode->iu_dsk_ino = ino;
-	inode->iu_sblock = inode->iu_eblock = 0;
+	inode->i_ino = ino;
+	BFS_I(inode)->i_dsk_ino = ino;
+	BFS_I(inode)->i_sblock = 0;
+	BFS_I(inode)->i_eblock = 0;
 	insert_inode_hash(inode);
         mark_inode_dirty(inode);
 	dump_imap("create",s);
@@ -262,8 +264,8 @@ static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int
 	if (namelen > BFS_NAMELEN)
 		return -ENAMETOOLONG;
 
-	sblock = dir->iu_sblock;
-	eblock = dir->iu_eblock;
+	sblock = BFS_I(dir)->i_sblock;
+	eblock = BFS_I(dir)->i_eblock;
 	for (block=sblock; block<=eblock; block++) {
 		bh = sb_bread(dir->i_sb, block);
 		if(!bh) 
@@ -313,7 +315,7 @@ static struct buffer_head * bfs_find_entry(struct inode * dir,
 	block = offset = 0;
 	while (block * BFS_BSIZE + offset < dir->i_size) {
 		if (!bh) {
-			bh = sb_bread(dir->i_sb, dir->iu_sblock + block);
+			bh = sb_bread(dir->i_sb, BFS_I(dir)->i_sblock + block);
 			if (!bh) {
 				block++;
 				continue;

@@ -392,6 +392,7 @@ repeat:
 		ei->i_flags &= ~(EXT2_IMMUTABLE_FL|EXT2_APPEND_FL);
 	ei->i_faddr = 0;
 	ei->i_frag_no = 0;
+	ei->i_frag_size = 0;
 	ei->i_osync = 0;
 	ei->i_file_acl = 0;
 	ei->i_dir_acl = 0;

@@ -77,7 +77,7 @@ addr_limit	= 12
 exec_domain	= 16
 need_resched	= 20
 tsk_ptrace	= 24
-processor	= 52
+cpu		= 32
 
 ENOSYS = 38
 

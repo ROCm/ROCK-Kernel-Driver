@@ -170,6 +170,29 @@ CONFIG_PCMCIA
   and ds.o.  If you want to compile it as a module, say M here and
   read <file:Documentation/modules.txt>.
 
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_KCORE_AOUT
+  Not necessary unless you're using a very out-of-date binutils
+  version.  You probably want KCORE_ELF.
+
 CONFIG_BINFMT_ELF
   ELF (Executable and Linkable Format) is a format for libraries and
   executables used across different architectures and operating
@@ -250,6 +273,26 @@ CONFIG_VGA_CONSOLE
   <ftp://ibiblio.org/pub/Linux/utils/console/>.
 
   Say Y.
+
+CONFIG_ARCH_ANAKIN
+  The Anakin is a StrongArm based SA110 - 2 DIN Vehicle Telematics Platform.
+  64MB SDRAM - 4 Mb Flash - Compact Flash Interface - 1 MB VRAM
+
+  On board peripherals:
+        * Front display: 400x234 16 bit TFT touchscreen
+        * External independent second screen interface
+        * CAN controller SJA1000
+        * USB host controller
+        * 6 channel video codec with hardware overlay
+        * Smartcard reader
+        * IrDa
+
+  Modules interfaced over the Multi Media Extension slots:
+        * A communication card
+                Wavecom GPRS modem
+                uBlock GPS
+                Bosch DAB module
+        * An audio card ( 4 * 40W, AC97 Codec, I2S)
 
 CONFIG_ARCH_CAMELOT
   This enables support for Altera's Excalibur XA10 development board.
@@ -453,6 +496,12 @@ CONFIG_ISDN
   want), say M here and read <file:Documentation/modules.txt>.  The
   module will be called isdn.o. If unsure, say N.
 
+CONFIG_ARCH_ARCA5K
+  This selects what ARM system you wish to build the kernel for. It
+  also selects to some extent the CPU type. If you are unsure what
+  to set this option to, please consult any information supplied with
+  your system.
+
 CONFIG_ARCH_A5K
   Say Y here to to support the Acorn A5000.  Linux can support the
   internal IDE disk and CD-ROM interface, serial and parallel port,
@@ -464,6 +513,16 @@ CONFIG_ARCH_ARC
   processor, released in 1987.  It supported 512K of RAM and 2 800K
   floppy disks.  Picture and more detailed specifications at
   <http://www.computingmuseum.com/museum/archi.htm>.
+
+CONFIG_ARCH_EBSA110
+  This is an evaluation board for the StrongARM processor available
+  from Digital. It has limited hardware on-board, including an onboard
+  Ethernet interface, two PCMCIA sockets, two serial ports and a
+  parallel port.
+
+CONFIG_ARCH_RPC
+  On the Acorn Risc-PC, Linux can support the internal IDE disk and
+  CD-ROM interface, serial and parallel port, and the floppy drive.
 
 CONFIG_PAGESIZE_16
   Say Y here if your Archimedes or A5000 system has only 2MB of
@@ -486,6 +545,16 @@ CONFIG_ARCH_EBSA285_HOST
   in host ("central function") mode.
 
   Saying N will reduce the size of the Footbridge kernel.
+
+CONFIG_ARCH_L7200
+  Say Y here if you intend to run this kernel on a LinkUp Systems
+  L7200 Software Development Board which uses an ARM720T processor.
+  Information on this board can be obtained at:
+
+  <http://www.linkupsys.com/>
+
+  If you have any questions or comments about the Linux kernel port
+  to this board, send e-mail to sjhill@cotw.com.
 
 CONFIG_ARCH_NETWINDER
   Say Y here if you intend to run this kernel on the Rebel.COM

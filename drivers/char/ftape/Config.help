@@ -79,6 +79,78 @@ CONFIG_FT_PROC_FS
   interface. Accessing `/proc/ftape' while the module is unloaded will
   result in a kernel Oops. This cannot be fixed from inside ftape.
 
+CONFIG_FT_NORMAL_DEBUG
+  This option controls the amount of debugging output the ftape driver
+  is ABLE to produce; it does not increase or diminish the debugging
+  level itself. If unsure, leave this at its default setting,
+  i.e. choose "Normal".
+
+  Ftape can print lots of debugging messages to the system console
+  resp. kernel log files. Reducing the amount of possible debugging
+  output reduces the size of the kernel module by some KB, so it might
+  be a good idea to use "None" for emergency boot floppies.
+
+  If you want to save memory then the following strategy is
+  recommended: leave this option at its default setting "Normal" until
+  you know that the driver works as expected, afterwards reconfigure
+  the kernel, this time specifying "Reduced" or "None" and recompile
+  and install the kernel as usual. Note that choosing "Excessive"
+  debugging output does not increase the amount of debugging output
+  printed to the console but only makes it possible to produce
+  "Excessive" debugging output.
+
+  Please read <file:Documentation/ftape.txt> for a short description
+  how to control the amount of debugging output.
+
+CONFIG_FT_FULL_DEBUG
+  Extremely verbose output for driver debugging purposes.
+
+CONFIG_FT_NO_TRACE
+  Reduced tape driver debugging output.
+
+CONFIG_FT_NO_TRACE_AT_ALL
+  Suppress all debugging output from the tape drive.
+
+CONFIG_FT_STD_FDC
+  Only change this setting if you have a special controller. If you
+  didn't plug any add-on card into your computer system but just
+  plugged the floppy tape cable into the already existing floppy drive
+  controller then you don't want to change the default setting,
+  i.e. choose "Standard".
+
+  Choose "MACH-2" if you have a Mountain Mach-2 controller.
+  Choose "FC-10/FC-20" if you have a Colorado FC-10 or FC-20
+  controller.
+  Choose "Alt/82078" if you have another controller that is located at
+  an IO base address different from the standard floppy drive
+  controller's base address of `0x3f0', or uses an IRQ (interrupt)
+  channel different from `6', or a DMA channel different from
+  `2'. This is necessary for any controller card that is based on
+  Intel's 82078 FDC such as Seagate's, Exabyte's and Iomega's "high
+  speed" controllers.
+
+  If you choose something other than "Standard" then please make
+  sure that the settings for the IO base address and the IRQ and DMA
+  channel in the configuration menus below are correct. Use the manual
+  of your tape drive to determine the correct settings!
+
+  If you are already successfully using your tape drive with another
+  operating system then you definitely should use the same settings
+  for the IO base, the IRQ and DMA channel that have proven to work
+  with that other OS.
+
+  Note that this menu lets you specify only the default setting for
+  the hardware setup. The hardware configuration can be changed at
+  boot time (when ftape is compiled into the kernel, i.e. if you
+  have said Y to "Floppy tape drive") or module load time (i.e. if you
+  have said M to "Floppy tape drive").
+
+  Please read also the file <file:Documentation/ftape.txt> which
+  contains a short description of the parameters that can be set at
+  boot or load time. If you want to use your floppy tape drive on a
+  PCI-bus based system, please read the file
+  <file:drivers/char/ftape/README.PCI>.
+
 CONFIG_FT_FDC_BASE
   You don't need to specify a value if the following default
   settings for the base IO address are correct:

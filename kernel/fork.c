@@ -647,11 +647,10 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	{
 		int i;
 
-		p->cpu = smp_processor_id();
-
 		/* ?? should we just memset this ?? */
 		for(i = 0; i < smp_num_cpus; i++)
-			p->per_cpu_utime[i] = p->per_cpu_stime[i] = 0;
+			p->per_cpu_utime[cpu_logical_map(i)] =
+				p->per_cpu_stime[cpu_logical_map(i)] = 0;
 		spin_lock_init(&p->sigmask_lock);
 	}
 #endif

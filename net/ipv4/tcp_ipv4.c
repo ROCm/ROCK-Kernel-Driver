@@ -69,8 +69,7 @@ extern int sysctl_ip_dynaddr;
 #define ICMP_MIN_LENGTH 8
 
 /* Socket used for sending RSTs */ 	
-static struct inode tcp_inode;
-static struct socket *tcp_socket=&tcp_inode.u.socket_i;
+static struct socket *tcp_socket;
 
 void tcp_v4_send_check(struct sock *sk, struct tcphdr *th, int len, 
 		       struct sk_buff *skb);
@@ -2194,20 +2193,8 @@ struct proto tcp_prot = {
 
 void __init tcp_v4_init(struct net_proto_family *ops)
 {
-	int err;
-
-	tcp_inode.i_mode = S_IFSOCK;
-	tcp_inode.i_sock = 1;
-	tcp_inode.i_uid = 0;
-	tcp_inode.i_gid = 0;
-	init_waitqueue_head(&tcp_inode.i_wait);
-	init_waitqueue_head(&tcp_inode.u.socket_i.wait);
-
-	tcp_socket->inode = &tcp_inode;
-	tcp_socket->state = SS_UNCONNECTED;
-	tcp_socket->type=SOCK_RAW;
-
-	if ((err=ops->create(tcp_socket, IPPROTO_TCP))<0)
+	int err = sock_create(PF_INET, SOCK_RAW, IPPROTO_TCP, &tcp_socket);
+	if (err < 0)
 		panic("Failed to create the TCP control socket.\n");
 	tcp_socket->sk->allocation=GFP_ATOMIC;
 	tcp_socket->sk->protinfo.af_inet.ttl = MAXTTL;

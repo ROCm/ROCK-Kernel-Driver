@@ -1175,6 +1175,8 @@ if (retval && urb->status == -ENOENT) err ("whoa! retval %d", retval);
 			dbg ("%s: wait for giveback urb %p",
 				hcd->bus_name, urb);
 		}
+	} else if ((urb->transfer_flags & USB_ASYNC_UNLINK) && retval == 0) {
+		return -EINPROGRESS;
 	}
 	goto bye;
 done:

@@ -146,9 +146,9 @@ adfs_dir_lookup_byname(struct inode *inode, struct qstr *name, struct object_inf
 	if (ret)
 		goto out;
 
-	if (inode->u.adfs_i.parent_id != dir.parent_id) {
+	if (ADFS_I(inode)->parent_id != dir.parent_id) {
 		adfs_error(sb, "parent directory changed under me! (%lx but got %lx)\n",
-			   inode->u.adfs_i.parent_id, dir.parent_id);
+			   ADFS_I(inode)->parent_id, dir.parent_id);
 		ret = -EIO;
 		goto free_out;
 	}

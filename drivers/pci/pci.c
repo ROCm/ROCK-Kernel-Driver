@@ -38,6 +38,8 @@
 LIST_HEAD(pci_root_buses);
 LIST_HEAD(pci_devices);
 
+extern struct device_driver pci_device_driver;
+
 /**
  * pci_find_slot - locate PCI device from a given PCI slot
  * @bus: number of PCI bus on which desired PCI device resides
@@ -1369,6 +1371,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 	dev0.bus = bus;
 	dev0.sysdata = bus->sysdata;
 	dev0.dev.parent = &bus->iobus;
+	dev0.dev.driver = &pci_device_driver;
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8) {

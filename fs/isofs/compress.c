@@ -72,8 +72,8 @@ static int zisofs_readpage(struct file *file, struct page *page)
 	unsigned long bufmask  = bufsize - 1;
 	int err = -EIO;
 	int i;
-	unsigned int header_size = inode->u.isofs_i.i_format_parm[0];
-	unsigned int zisofs_block_shift = inode->u.isofs_i.i_format_parm[1];
+	unsigned int header_size = ISOFS_I(inode)->i_format_parm[0];
+	unsigned int zisofs_block_shift = ISOFS_I(inode)->i_format_parm[1];
 	/* unsigned long zisofs_block_size = 1UL << zisofs_block_shift; */
 	unsigned int zisofs_block_page_shift = zisofs_block_shift-PAGE_CACHE_SHIFT;
 	unsigned long zisofs_block_pages = 1UL << zisofs_block_page_shift;

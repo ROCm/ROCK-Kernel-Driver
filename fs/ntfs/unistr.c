@@ -20,6 +20,7 @@
  */
 
 #include <linux/string.h>
+#include <linux/fs.h>
 #include <asm/byteorder.h>
 
 #include "unistr.h"

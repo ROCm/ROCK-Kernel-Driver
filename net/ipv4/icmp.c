@@ -181,8 +181,7 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
  *	all layers. All Socketless IP sends will soon be gone.
  */
 	
-struct inode icmp_inode;
-struct socket *icmp_socket = &icmp_inode.u.socket_i;
+struct socket *icmp_socket;
 
 /* ICMPv4 socket is only a bit non-reenterable (unlike ICMPv6,
    which is strongly non-reenterable). A bit later it will be made
@@ -979,20 +978,9 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1] = {
 
 void __init icmp_init(struct net_proto_family *ops)
 {
-	int err;
+	int err = sock_create(PF_INET, SOCK_RAW, IPPROTO_ICMP, &icmp_socket);
 
-	icmp_inode.i_mode = S_IFSOCK;
-	icmp_inode.i_sock = 1;
-	icmp_inode.i_uid = 0;
-	icmp_inode.i_gid = 0;
-	init_waitqueue_head(&icmp_inode.i_wait);
-	init_waitqueue_head(&icmp_inode.u.socket_i.wait);
-
-	icmp_socket->inode = &icmp_inode;
-	icmp_socket->state = SS_UNCONNECTED;
-	icmp_socket->type=SOCK_RAW;
-
-	if ((err=ops->create(icmp_socket, IPPROTO_ICMP))<0)
+	if (err < 0)
 		panic("Failed to create the ICMP control socket.\n");
 	icmp_socket->sk->allocation=GFP_ATOMIC;
 	icmp_socket->sk->sndbuf = SK_WMEM_MAX*2;

@@ -689,15 +689,17 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
 
 	/*
-	 * Restore %fs and %gs.
+	 * Restore %fs and %gs if needed.
 	 */
-	loadsegment(fs, next->fs);
-	loadsegment(gs, next->gs);
+	if (unlikely(prev->fs | prev->gs | next->fs | next->gs)) {
+		loadsegment(fs, next->fs);
+		loadsegment(gs, next->gs);
+	}
 
 	/*
 	 * Now maybe reload the debug registers
 	 */
-	if (next->debugreg[7]){
+	if (unlikely(next->debugreg[7])) {
 		loaddebug(next, 0);
 		loaddebug(next, 1);
 		loaddebug(next, 2);
@@ -707,7 +709,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loaddebug(next, 7);
 	}
 
-	if (prev->ioperm || next->ioperm) {
+	if (unlikely(prev->ioperm || next->ioperm)) {
 		if (next->ioperm) {
 			/*
 			 * 4 cachelines copy ... not good, but not that

@@ -4,19 +4,10 @@
  *
  */
 
-#include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/string.h>
 #include <linux/fs.h>
-#include <linux/blkdev.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>
-
-#if 0
-#  define PRINTK(x) printk x
-#else
-#  define PRINTK(x)
-#endif
 
 struct buffer_head *fat_bread(struct super_block *sb, int block)
 {

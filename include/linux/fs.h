@@ -287,17 +287,9 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 
 #include <linux/pipe_fs_i.h>
-#include <linux/ntfs_fs_i.h>
-#include <linux/msdos_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
-#include <linux/iso_fs_i.h>
 #include <linux/romfs_fs_i.h>
-#include <linux/smb_fs_i.h>
-#include <linux/hfs_fs_i.h>
-#include <linux/adfs_fs_i.h>
-#include <linux/bfs_fs_i.h>
 #include <linux/proc_fs_i.h>
-#include <linux/jffs2_fs_i.h>
 #include <linux/cramfs_fs_sb.h>
 
 /*
@@ -461,18 +453,10 @@ struct inode {
 	unsigned int		i_attr_flags;
 	__u32			i_generation;
 	union {
-		struct ntfs_inode_info		ntfs_i;
-		struct msdos_inode_info		msdos_i;
 		/* struct umsdos_inode_info	umsdos_i; */
-		struct iso_inode_info		isofs_i;
 		struct romfs_inode_info		romfs_i;
-		struct smb_inode_info		smbfs_i;
-		struct hfs_inode_info		hfs_i;
-		struct adfs_inode_info		adfs_i;
-		struct bfs_inode_info		bfs_i;
 		struct proc_inode_info		proc_i;
 		struct socket			socket_i;
-		struct jffs2_inode_info		jffs2_i;
 		void				*generic_ip;
 	} u;
 };

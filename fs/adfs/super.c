@@ -232,7 +232,51 @@ static int adfs_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
+static kmem_cache_t *adfs_inode_cachep;
+
+static struct inode *adfs_alloc_inode(struct super_block *sb)
+{
+	struct adfs_inode_info *ei;
+	ei = (struct adfs_inode_info *)kmem_cache_alloc(adfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void adfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(adfs_inode_cachep, ADFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct adfs_inode_info *ei = (struct adfs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	adfs_inode_cachep = kmem_cache_create("adfs_inode_cache",
+					     sizeof(struct adfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (adfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(adfs_inode_cachep))
+		printk(KERN_INFO "adfs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations adfs_sops = {
+	alloc_inode:	adfs_alloc_inode,
+	destroy_inode:	adfs_destroy_inode,
 	write_inode:	adfs_write_inode,
 	put_super:	adfs_put_super,
 	statfs:		adfs_statfs,
@@ -435,12 +479,23 @@ static DECLARE_FSTYPE_DEV(adfs_fs_type, "adfs", adfs_read_super);
 
 static int __init init_adfs_fs(void)
 {
-	return register_filesystem(&adfs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&adfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_adfs_fs(void)
 {
 	unregister_filesystem(&adfs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

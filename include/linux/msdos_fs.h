@@ -4,9 +4,7 @@
 /*
  * The MS-DOS filesystem constants/structures
  */
-#include <linux/fs.h>
-#include <linux/stat.h>
-#include <linux/fd.h>
+#include <linux/msdos_fs_i.h>
 
 #include <asm/byteorder.h>
 
@@ -56,7 +54,10 @@
 	/* valid file mode bits */
 
 #define MSDOS_SB(s) (&((s)->u.msdos_sb))
-#define MSDOS_I(i) (&((i)->u.msdos_i))
+static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
+{
+	return list_entry(inode, struct msdos_inode_info, vfs_inode);
+}
 
 #define MSDOS_NAME 11 /* maximum name length */
 #define MSDOS_LONGNAME 256 /* maximum name length */

@@ -27,6 +27,7 @@
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 #include <asm/byteorder.h>
 
 /* This is only called on sync() and umount(), when s_dirt=1. */

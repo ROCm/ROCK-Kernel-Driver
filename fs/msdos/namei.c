@@ -12,10 +12,6 @@
 
 #include <linux/sched.h>
 #include <linux/msdos_fs.h>
-#include <linux/errno.h>
-#include <linux/string.h>
-
-#include <asm/uaccess.h>
 
 #define MSDOS_DEBUG 0
 #define PRINTK(x)

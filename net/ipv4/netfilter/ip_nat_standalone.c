@@ -166,46 +166,6 @@ ip_nat_out(unsigned int hooknum,
 	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
-static int route_me_harder(struct sk_buff **pskb)
-{
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct rtable *rt;
-	struct rt_key key = { dst:iph->daddr,
-			      src:iph->saddr,
-			      oif:(*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
-			      tos:RT_TOS(iph->tos)|RTO_CONN,
-#ifdef CONFIG_IP_ROUTE_FWMARK
-			      fwmark:(*pskb)->nfmark
-#endif
-			    };
-
-	if (ip_route_output_key(&rt, &key) != 0) {
-		printk("route_me_harder: No more route.\n");
-		return -EINVAL;
-	}
-
-	/* Drop old route. */
-	dst_release((*pskb)->dst);
-
-	(*pskb)->dst = &rt->u.dst;
-
-	/* Change in oif may mean change in hh_len. */
-	if (skb_headroom(*pskb) < (*pskb)->dst->dev->hard_header_len) {
-		struct sk_buff *nskb;
-
-		nskb = skb_realloc_headroom(*pskb,
-					    (*pskb)->dst->dev
-					    ->hard_header_len);
-		if (!nskb)
-			return -ENOMEM;
-		if ((*pskb)->sk)
-			skb_set_owner_w(nskb, (*pskb)->sk);
-		kfree_skb(*pskb);
-		*pskb = nskb;
-	}
-	return 0;
-}
-
 static unsigned int
 ip_nat_local_fn(unsigned int hooknum,
 		struct sk_buff **pskb,

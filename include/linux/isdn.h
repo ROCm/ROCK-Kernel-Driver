@@ -631,7 +631,6 @@ typedef struct isdn_devt {
 #ifdef CONFIG_DEVFS_FS
 	devfs_handle_t devfs_handle_isdninfo;
 	devfs_handle_t devfs_handle_isdnctrl;
-	devfs_handle_t devfs_handle_isdnX[ISDN_MAX_CHANNELS];
 	devfs_handle_t devfs_handle_isdnctrlX[ISDN_MAX_CHANNELS];
 #ifdef CONFIG_ISDN_PPP
 	devfs_handle_t devfs_handle_ipppX[ISDN_MAX_CHANNELS];

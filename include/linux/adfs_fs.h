@@ -41,6 +41,7 @@ struct adfs_discrecord {
 #define ADFS_SUPER_MAGIC	 0xadf5
 
 #ifdef __KERNEL__
+#include <linux/adfs_fs_i.h>
 /*
  * Calculate the boot block checksum on an ADFS drive.  Note that this will
  * appear to be correct if the sector contains all zeros, so also check that
@@ -57,6 +58,11 @@ static inline int adfs_checkbblk(unsigned char *ptr)
 	} while (p != ptr);
 
 	return (result & 0xff) != ptr[511];
+}
+
+static inline struct adfs_inode_info *ADFS_I(struct inode *inode)
+{
+	return list_entry(inode, struct adfs_inode_info, vfs_inode);
 }
 
 #endif

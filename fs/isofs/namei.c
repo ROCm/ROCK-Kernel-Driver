@@ -65,7 +65,7 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 	unsigned int block, f_pos, offset;
 	struct buffer_head * bh = NULL;
 
-	if (!dir->u.isofs_i.i_first_extent)
+	if (!ISOFS_I(dir)->i_first_extent)
 		return 0;
   
 	f_pos = 0;

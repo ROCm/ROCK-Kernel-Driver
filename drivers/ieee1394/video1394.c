@@ -844,7 +844,7 @@ static void initialize_dma_it_ctx(struct dma_iso_ctx *d, int sync_tag,
 	reg_write(ohci, OHCI1394_IsoXmitIntMaskSet, 1<<d->ctx);
 }
 
-static int do_iso_mmap(struct ti_ohci *ohci, struct dma_iso_ctx *d, 
+static int do_iso_mmap(struct vm_area_struct *vma, struct ti_ohci *ohci, struct dma_iso_ctx *d, 
 		       const char *adr, unsigned long size)
 {
         unsigned long start=(unsigned long) adr;
@@ -865,7 +865,7 @@ static int do_iso_mmap(struct ti_ohci *ohci, struct dma_iso_ctx *d,
         pos=(unsigned long) d->buf;
         while (size > 0) {
                 page = kvirt_to_pa(pos);
-                if (remap_page_range(start, page, PAGE_SIZE, PAGE_SHARED))
+                if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
                         return -EAGAIN;
                 start+=PAGE_SIZE;
                 pos+=PAGE_SIZE;

@@ -86,7 +86,7 @@
 // #define EHCI_VERBOSE_DEBUG
 // #define have_iso
 
-#ifdef	DEBUG
+#ifdef	CONFIG_DEBUG_SLAB
 #	define	EHCI_SLAB_FLAGS		(SLAB_POISON)
 #else
 #	define	EHCI_SLAB_FLAGS		0

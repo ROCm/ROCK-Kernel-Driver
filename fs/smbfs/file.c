@@ -43,7 +43,7 @@ smb_fsync(struct file *file, struct dentry * dentry, int datasync)
 	 *       (should be ok with writepage_sync)
 	 */
 	smb_lock_server(server);
-	result = smb_proc_flush(server, dentry->d_inode->u.smbfs_i.fileid);
+	result = smb_proc_flush(server, SMB_I(dentry->d_inode)->fileid);
 	smb_unlock_server(server);
 	return result;
 }
@@ -126,7 +126,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 
 	offset += page->index << PAGE_CACHE_SHIFT;
 	VERBOSE("file ino=%ld, fileid=%d, count=%d@%ld, wsize=%d\n",
-		inode->i_ino, inode->u.smbfs_i.fileid, count, offset, wsize);
+		inode->i_ino, SMB_I(inode)->fileid, count, offset, wsize);
 
 	do {
 		if (count < wsize)
@@ -152,7 +152,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 		 * Update the inode now rather than waiting for a refresh.
 		 */
 		inode->i_mtime = inode->i_atime = CURRENT_TIME;
-		inode->u.smbfs_i.flags |= SMB_F_LOCALWRITE;
+		SMB_I(inode)->flags |= SMB_F_LOCALWRITE;
 		if (offset > inode->i_size)
 			inode->i_size = offset;
 	} while (count);
@@ -337,7 +337,7 @@ smb_file_open(struct inode *inode, struct file * file)
 	result = smb_open(dentry, smb_mode);
 	if (result)
 		goto out;
-	inode->u.smbfs_i.openers++;
+	SMB_I(inode)->openers++;
 out:
 	unlock_kernel();
 	return 0;
@@ -347,7 +347,7 @@ static int
 smb_file_release(struct inode *inode, struct file * file)
 {
 	lock_kernel();
-	if (!--inode->u.smbfs_i.openers) {
+	if (!--SMB_I(inode)->openers) {
 		/* We must flush any dirty pages now as we won't be able to
 		   write anything after close. mmap can trigger this.
 		   "openers" should perhaps include mmap'ers ... */

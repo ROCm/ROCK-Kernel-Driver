@@ -88,8 +88,12 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
 	if (maxlvt >= 4)
 		apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
-	apic_write(APIC_ESR, 0);
-	v = apic_read(APIC_ESR);
+	v = GET_APIC_VERSION(apic_read(APIC_LVR));
+	if (APIC_INTEGRATED(v)) {	/* !82489DX */
+		if (maxlvt > 3)
+			apic_write(APIC_ESR, 0);
+		apic_read(APIC_ESR);
+	}
 }
 
 void __init connect_bsp_APIC(void)
@@ -916,6 +920,26 @@ void __init setup_APIC_clocks (void)
 
 	/* and update all other cpus */
 	smp_call_function(setup_APIC_timer, (void *)calibration_result, 1, 1);
+}
+
+void __init disable_APIC_timer(void)
+{
+	if (using_apic_timer) {
+		unsigned long v;
+
+		v = apic_read(APIC_LVTT);
+		apic_write_around(APIC_LVTT, v | APIC_LVT_MASKED);
+	}
+}
+
+void enable_APIC_timer(void)
+{
+	if (using_apic_timer) {
+		unsigned long v;
+
+		v = apic_read(APIC_LVTT);
+		apic_write_around(APIC_LVTT, v & ~APIC_LVT_MASKED);
+	}
 }
 
 /*

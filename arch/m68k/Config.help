@@ -143,6 +143,29 @@ CONFIG_PCMCIA
   and ds.o.  If you want to compile it as a module, say M here and
   read <file:Documentation/modules.txt>.
 
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_KCORE_AOUT
+  Not necessary unless you're using a very out-of-date binutils
+  version.  You probably want KCORE_ELF.
+
 CONFIG_BINFMT_ELF
   ELF (Executable and Linkable Format) is a format for libraries and
   executables used across different architectures and operating
@@ -980,6 +1003,28 @@ CONFIG_BUSMOUSE
   inserted in and removed from the running kernel whenever you want).
   The module will be called busmouse.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_WATCHDOG
+  If you say Y here (and to one of the following options) and create a
+  character special file /dev/watchdog with major number 10 and minor
+  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
+  subsequently opening the file and then failing to write to it for
+  longer than 1 minute will result in rebooting the machine. This
+  could be useful for a networked machine that needs to come back
+  online as fast as possible after a lock-up. There's both a watchdog
+  implementation entirely in software (which can sometimes fail to
+  reboot the machine) and a driver for hardware watchdog boards, which
+  are more robust and can also keep track of the temperature inside
+  your computer. For details, read <file:Documentation/watchdog.txt>
+  in the kernel source.
+
+  The watchdog is usually used together with the watchdog daemon
+  which is available from
+  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
+  also monitor NFS connections and can reboot the machine when the process
+  table is full.
+
+  If unsure, say N.
 
 CONFIG_WATCHDOG_NOWAYOUT
   The default watchdog behaviour (which you get if you say N here) is

@@ -21,3 +21,18 @@ CONFIG_USB_EHCI_HCD
   The module will be called ehci-hcd.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+OHCI (most USB hosts except VIA, Intel PIIX) support
+CONFIG_USB_OHCI_HCD
+  The Open Host Controller Interface (OHCI) is a standard for accessing
+  USB 1.1 host controller hardware.  It does more in hardware than Intel's
+  UHCI specification.  If your USB host controller follows the OHCI spec,
+  say Y.  On most non-x86 systems, and on x86 hardware that's not using a
+  USB controller from Intel or VIA, this is appropriate.  If your host
+  controller doesn't use PCI, this is probably appropriate.  For a PCI
+  based system where you're not sure, the "lspci -v" entry will list the
+  right "prog-if" for your USB controller(s):  EHCI, OHCI, or UHCI.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ohci-hcd.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.

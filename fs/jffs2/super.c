@@ -59,9 +59,13 @@ void jffs2_write_super (struct super_block *);
 static int jffs2_statfs (struct super_block *, struct statfs *);
 int jffs2_remount_fs (struct super_block *, int *, char *);
 extern void jffs2_clear_inode (struct inode *);
-
+extern void jffs2_destroy_inode (struct inode *);
+extern struct inode *jffs2_alloc_inode (struct super_block *);
+ 
 static struct super_operations jffs2_super_operations =
 {
+	alloc_inode:	jffs2_alloc_inode,
+	destroy_inode:	jffs2_destroy_inode,
 	read_inode:	jffs2_read_inode,
 //	delete_inode:	jffs2_delete_inode,
 	put_super:	jffs2_put_super,
@@ -208,7 +212,7 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	c = JFFS2_SB_INFO(sb);
 	memset(c, 0, sizeof(*c));
 	
-	c->mtd = get_mtd_device(NULL, MINOR(sb->s_dev));
+	c->mtd = get_mtd_device(NULL, minor(sb->s_dev));
 	if (!c->mtd) {
 		D1(printk(KERN_DEBUG "jffs2: MTD device #%u doesn't appear to exist\n", MINOR(sb->s_dev)));
 		return NULL;
@@ -350,12 +354,6 @@ static int __init init_jffs2_fs(void)
 	if (sizeof(struct jffs2_sb_info) > sizeof (((struct super_block *)NULL)->u)) {
 		printk(KERN_ERR "JFFS2 error: struct jffs2_sb_info (%d bytes) doesn't fit in the super_block union (%d bytes)\n", 
 		       sizeof(struct jffs2_sb_info), sizeof (((struct super_block *)NULL)->u));
-		return -EIO;
-	}
-
-	if (sizeof(struct jffs2_inode_info) > sizeof (((struct inode *)NULL)->u)) {
-		printk(KERN_ERR "JFFS2 error: struct jffs2_inode_info (%d bytes) doesn't fit in the inode union (%d bytes)\n", 
-		       sizeof(struct jffs2_inode_info), sizeof (((struct inode *)NULL)->u));
 		return -EIO;
 	}
 #endif

@@ -8,15 +8,13 @@
  *
  */
  
-#include<linux/sched.h>
-#include<linux/fs.h>
-#include<linux/msdos_fs.h>
-#include<linux/msdos_fs_sb.h>
-#include<linux/string.h>
-#include<linux/fat_cvf.h>
-#include<linux/config.h>
+#include <linux/fs.h>
+#include <linux/msdos_fs.h>
+#include <linux/msdos_fs_sb.h>
+#include <linux/fat_cvf.h>
+#include <linux/config.h>
 #ifdef CONFIG_KMOD
-#include<linux/kmod.h>
+#include <linux/kmod.h>
 #endif
 
 #define MAX_CVF_FORMATS 3

@@ -59,6 +59,9 @@ static void release_task(struct task_struct * p)
 	current->time_slice += p->time_slice;
 	if (current->time_slice > MAX_TIMESLICE)
 		current->time_slice = MAX_TIMESLICE;
+	if (p->sleep_avg < current->sleep_avg)
+		current->sleep_avg = (current->sleep_avg * EXIT_WEIGHT +
+				p->sleep_avg) / (EXIT_WEIGHT + 1);
 	__restore_flags(flags);
 
 	p->pid = 0;

@@ -8,11 +8,6 @@
 
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/stat.h>
 
 #if 0
 #  define PRINTK(x)	printk x

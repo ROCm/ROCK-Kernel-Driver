@@ -14,17 +14,14 @@
 #define NTFS_SB(vol)		((struct super_block*)(vol)->sb)
 #define NTFS_SB2VOL(sb)         (&(sb)->u.ntfs_sb)
 #define NTFS_INO2VOL(ino)	(&((ino)->i_sb->u.ntfs_sb))
-#define NTFS_LINO2NINO(ino)     ((struct ntfs_inode_info*)(&((ino)->u.ntfs_i)))
+static inline struct ntfs_i *ntfs_i(struct inode *inode)
+{
+	return list_entry(inode, struct ntfs_i, vfs_inode);
+}
+#define NTFS_I(ino)     (&ntfs_i(ino)->n)
 static inline struct inode *VFS_I(struct ntfs_inode_info *ntfs_ino)
 {
-	struct inode *i = (struct inode*)((char*)ntfs_ino -
-			((char*)&(((struct inode*)NULL)->u.ntfs_i) -
-			(char*)NULL));
-#ifdef DEBUG
-	if ((char*)NTFS_LINO2NINO(i) != (char*)ntfs_ino)
-		BUG();
-#endif
-	return i;
+	return &list_entry(ntfs_ino, struct ntfs_i, n)->vfs_inode;
 }
 
 #define IS_MAGIC(a,b)		(*(int*)(a) == *(int*)(b))

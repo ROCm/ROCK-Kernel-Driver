@@ -82,6 +82,20 @@ CONFIG_PCI
   information about which PCI hardware does work under Linux and which
   doesn't.
 
+CONFIG_PCI_GOBIOS
+  On PCI systems, the BIOS can be used to detect the PCI devices and
+  determine their configuration. However, some old PCI motherboards
+  have BIOS bugs and may crash if this is done. Also, some embedded
+  PCI-based systems don't have any BIOS at all. Linux can also try to
+  detect the PCI hardware directly without using the BIOS.
+
+  With this option, you can specify how Linux should detect the PCI
+  devices. If you choose "BIOS", the BIOS will be used, if you choose
+  "Direct", the BIOS won't be used, and if you choose "Any", the
+  kernel will try the direct access method and falls back to the BIOS
+  if that doesn't work. If unsure, go with the default, which is
+  "Any".
+
 CONFIG_MCA
   MicroChannel Architecture is found in some IBM PS/2 machines and
   laptops.  It is a bus system similar to PCI or ISA. See
@@ -135,6 +149,29 @@ CONFIG_PCMCIA
   When compiled this way, there will be modules called pcmcia_core.o
   and ds.o.  If you want to compile it as a module, say M here and
   read <file:Documentation/modules.txt>.
+
+CONFIG_KCORE_ELF
+  If you enabled support for /proc file system then the file
+  /proc/kcore will contain the kernel core image. This can be used
+  in gdb:
+
+  $ cd /usr/src/linux ; gdb vmlinux /proc/kcore
+
+  You have two choices here: ELF and A.OUT. Selecting ELF will make
+  /proc/kcore appear in ELF core format as defined by the Executable
+  and Linking Format specification. Selecting A.OUT will choose the
+  old "a.out" format which may be necessary for some old versions
+  of binutils or on some architectures.
+
+  This is especially useful if you have compiled the kernel with the
+  "-g" option to preserve debugging information. It is mainly used
+  for examining kernel data structures on the live kernel so if you
+  don't understand what this means or are not a kernel hacker, just
+  leave it at its default value ELF.
+
+CONFIG_KCORE_AOUT
+  Not necessary unless you're using a very out-of-date binutils
+  version.  You probably want KCORE_ELF.
 
 CONFIG_BINFMT_ELF
   ELF (Executable and Linkable Format) is a format for libraries and
@@ -658,6 +695,102 @@ CONFIG_CF_ENABLER
   primary IDE drive (only tested for SanDisk).
 
   If in doubt, select 'N'.
+
+CONFIG_SH_GENERIC
+  Select Generic if configuring for a generic SuperH system.
+  The "generic" option compiles in *all* the possible hardware
+  support and relies on the sh_mv= kernel commandline option to choose
+  at runtime which routines to use.  "MV" stands for "machine vector";
+  each of the machines below is described by a machine vector.
+
+  Select SolutionEngine if configuring for a Hitachi SH7709
+  or SH7750/7750S evalutation board.
+
+  Select Overdrive if configuring for a ST407750 Overdrive board.
+  More information at
+  <http://linuxsh.sourceforge.net/docs/7750overdrive.php3>.
+
+  Select HP620 if configuring for a HP Jornada HP620.
+  More information (hardware only) at
+  <http://www.hp.com/jornada/>.
+
+  Select HP680 if configuring for a HP Jornada HP680.
+  More information (hardware only) at
+  <http://www.hp.com/jornada/products/680/>.
+
+  Select HP690 if configuring for a HP Jornada HP690.
+  More information (hardware only) at
+  <http://www.hp.com/jornada/products/680/>.
+
+  Select CqREEK if configuring for a CqREEK SH7708 or SH7750.
+  More information at
+  <http://sources.redhat.com/ecos/hardware.html#SuperH>.
+
+  Select DMIDA if configuring for a DataMyte 4000 Industrial
+  Digital Assistant. More information at <http://www.dmida.com/>.
+
+  Select EC3104 if configuring for a system with an Eclipse
+  International EC3104 chip, e.g. the Harris AD2000 or Compaq Aero 8000.
+
+  Select Dreamcast if configuring for a SEGA Dreamcast.
+  More information at
+  <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
+  Dreamcast project is at <http://linuxdc.sourceforge.net/>.
+
+  Select BareCPU if you know what this means, and it applies
+  to your system.
+
+CONFIG_SH_SOLUTION_ENGINE
+  Select SolutionEngine if configuring for a Hitachi SH7709
+  or SH7750 evalutation board.
+
+CONFIG_SH_7751_SOLUTION_ENGINE
+  Select 7751 SolutionEngine if configuring for a Hitachi SH7751
+  evalutation board.
+
+CONFIG_SH_HP620
+  Select HP620 if configuring for a HP jornada HP620.
+  More information (hardware only) at
+  <http://www.hp.com/jornada/>.
+
+CONFIG_SH_HP680
+  Select HP680 if configuring for a HP Jornada HP680.
+  More information (hardware only) at
+  <http://www.hp.com/jornada/products/680/>.
+
+CONFIG_SH_HP690
+  Select HP690 if configuring for a HP Jornada HP690.
+  More information (hardware only)
+  at <http://www.hp.com/jornada/products/680/>.
+
+CONFIG_SH_CQREEK
+  Select CqREEK if configuring for a CqREEK SH7708 or SH7750.
+  More information at
+  <http://sources.redhat.com/ecos/hardware.html#SuperH>.
+
+CONFIG_SH_DMIDA
+  Select DMIDA if configuring for a DataMyte 4000 Industrial
+  Digital Assistant. More information at <http://www.dmida.com/>.
+
+CONFIG_SH_EC3104
+  Select EC3104 if configuring for a system with an Eclipse
+  International EC3104 chip, e.g. the Harris AD2000.
+
+CONFIG_SH_DREAMCAST
+  Select Dreamcast if configuring for a SEGA Dreamcast.
+  More information at
+  <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
+  Dreamcast project is at <http://linuxdc.sourceforge.net/>.
+
+CONFIG_SH_UNKNOWN
+  "Bare CPU" aka "unknown" means an SH-based system which is not one
+  of the specific ones mentioned above, which means you need to enter
+  all sorts of stuff like CONFIG_MEMORY_START because the config
+  system doesn't already know what it is.  You get a machine vector
+  without any platform-specific code in it, so things like the RTC may
+  not work.
+
+  This option is for the early stages of porting to a new machine.
 
 CONFIG_CPU_SUBTYPE_SH7707
   Select the type of SuperH processor you have. This information is

@@ -73,8 +73,13 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 	/* Alloc jffs2_inode_info when that's split in 2.5 */
 
 	f = JFFS2_INODE_INFO(inode);
-	memset(f, 0, sizeof(*f));
-	init_MUTEX_LOCKED(&f->sem);
+	down(&f->sem);
+	f->highest_version = 0;
+	f->fraglist = NULL;
+	f->metadata = NULL;
+	f->dents = NULL;
+	f->flags = 0;
+	f->usercompr = 0;
 	f->inocache = ic;
 	inode->i_nlink = f->inocache->nlink = 1;
 	f->inocache->nodes = (struct jffs2_raw_node_ref *)f->inocache;

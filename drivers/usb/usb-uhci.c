@@ -723,8 +723,11 @@ _static int uhci_submit_control_urb (struct urb *urb)
 	destination = (urb->pipe & PIPE_DEVEP_MASK) | USB_PID_SETUP;
 
 	/* 3 errors */
-	status = (urb->pipe & TD_CTRL_LS) | TD_CTRL_ACTIVE |
-		(urb->transfer_flags & USB_DISABLE_SPD ? 0 : TD_CTRL_SPD) | (3 << 27);
+	status = TD_CTRL_ACTIVE
+		| (urb->transfer_flags & USB_DISABLE_SPD ? 0 : TD_CTRL_SPD)
+		| (3 << 27);
+	if (urb->dev->speed == USB_SPEED_LOW)
+		status |= TD_CTRL_LS;
 
 	/*  Build the TD for the control request, try forever, 8 bytes of data */
 	fill_td (td, status, destination | (7 << 21), urb_priv->setup_packet_dma);
@@ -799,7 +802,7 @@ _static int uhci_submit_control_urb (struct urb *urb)
 
 	//uhci_show_queue(qh);
 	/* Start it up... put low speed first */
-	if (urb->pipe & TD_CTRL_LS)
+	if (urb->dev->speed == USB_SPEED_LOW)
 		insert_qh (s, s->control_chain, qh, 0);
 	else
 		insert_qh (s, s->bulk_chain, qh, 0);
@@ -876,8 +879,11 @@ _static int uhci_submit_bulk_urb (struct urb *urb, struct urb *bulk_urb)
 	destination = (pipe & PIPE_DEVEP_MASK) | usb_packetid (pipe);
 
 	/* 3 errors */
-	status = (pipe & TD_CTRL_LS) | TD_CTRL_ACTIVE |
-		((urb->transfer_flags & USB_DISABLE_SPD) ? 0 : TD_CTRL_SPD) | (3 << 27);
+	status = TD_CTRL_ACTIVE
+		| ((urb->transfer_flags & USB_DISABLE_SPD) ? 0 : TD_CTRL_SPD)
+		| (3 << 27);
+	if (urb->dev->speed == USB_SPEED_LOW)
+		status |= TD_CTRL_LS;
 
 	/* Build the TDs for the bulk request */
 	len = urb->transfer_buffer_length;
@@ -1472,8 +1478,11 @@ _static int uhci_submit_int_urb (struct urb *urb)
 	if (alloc_td (s, &td, UHCI_PTR_DEPTH))
 		return -ENOMEM;
 
-	status = (pipe & TD_CTRL_LS) | TD_CTRL_ACTIVE | TD_CTRL_IOC |
-		(urb->transfer_flags & USB_DISABLE_SPD ? 0 : TD_CTRL_SPD) | (3 << 27);
+	status = TD_CTRL_ACTIVE | TD_CTRL_IOC
+		| (urb->transfer_flags & USB_DISABLE_SPD ? 0 : TD_CTRL_SPD)
+		| (3 << 27);
+	if (urb->dev->speed == USB_SPEED_LOW)
+		status |= TD_CTRL_LS;
 
 	destination = (urb->pipe & PIPE_DEVEP_MASK) | usb_packetid (urb->pipe) |
 		(((urb->transfer_buffer_length - 1) & 0x7ff) << 21);
@@ -2506,8 +2515,11 @@ _static int process_interrupt (uhci_t *s, struct urb *urb)
 					desc->hw.td.info |= cpu_to_le32((!usb_gettoggle (urb->dev, usb_pipeendpoint (urb->pipe),
 									     usb_pipeout (urb->pipe)) << TD_TOKEN_TOGGLE));
 				}
-				desc->hw.td.status= cpu_to_le32((urb->pipe & TD_CTRL_LS) | TD_CTRL_ACTIVE | TD_CTRL_IOC |
+				desc->hw.td.status= cpu_to_le32(TD_CTRL_ACTIVE | TD_CTRL_IOC |
 					(urb->transfer_flags & USB_DISABLE_SPD ? 0 : TD_CTRL_SPD) | (3 << 27));
+				if (urb->dev->speed == USB_SPEED_LOW)
+					desc->hw.td.status |=
+					    __constant_cpu_to_le32 (TD_CTRL_LS);
 				mb();
 			}
 			else {

@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.98 2002/01/05 01:13:43 davem Exp $
+/* $Id: sbus.c,v 1.100 2002/01/24 15:36:24 davem Exp $
  * sbus.c:  SBus support routines.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -284,7 +284,7 @@ extern void register_proc_sparc_ioport(void);
 extern void firetruck_init(void);
 extern void rs_init(void);
 
-void __init sbus_init(void)
+static int __init sbus_init(void)
 {
 	int nd, this_sbus, sbus_devs, topnd, iommund;
 	unsigned int sbus_clock;
@@ -297,7 +297,8 @@ void __init sbus_init(void)
 #endif
 
 #ifdef CONFIG_SUN4
-	return sun4_dvma_init();
+	sun4_dvma_init();
+	return 0;
 #endif
 
 	topnd = prom_getchild(prom_root_node);
@@ -316,7 +317,7 @@ void __init sbus_init(void)
 				firetruck_init();
 #endif
 			}
-			return;
+			return 0;
 #else
 			prom_printf("YEEE, UltraSparc sbus not found\n");
 			prom_halt();
@@ -337,7 +338,7 @@ void __init sbus_init(void)
                                 prom_printf("Neither SBUS nor PCI found.\n");
                                 prom_halt();
                         }
-                        return;
+                        return 0;
 #else
 			/* No reason to run further - the data access trap will occur. */
 			panic("sbus not found");
@@ -508,6 +509,8 @@ void __init sbus_init(void)
 		clock_probe();
 	}
 #endif
+
+	return 0;
 }
 
 subsys_initcall(sbus_init);

@@ -77,9 +77,9 @@ static void bfs_read_inode(struct inode * inode)
 	inode->i_atime = di->i_atime;
 	inode->i_mtime = di->i_mtime;
 	inode->i_ctime = di->i_ctime;
-	inode->iu_dsk_ino = di->i_ino; /* can be 0 so we store a copy */
-	inode->iu_sblock = di->i_sblock;
-	inode->iu_eblock = di->i_eblock;
+	BFS_I(inode)->i_dsk_ino = di->i_ino; /* can be 0 so we store a copy */
+	BFS_I(inode)->i_sblock = di->i_sblock;
+	BFS_I(inode)->i_eblock = di->i_eblock;
 
 	brelse(bh);
 }
@@ -121,8 +121,8 @@ static void bfs_write_inode(struct inode * inode, int unused)
 	di->i_atime = inode->i_atime;
 	di->i_mtime = inode->i_mtime;
 	di->i_ctime = inode->i_ctime;
-	di->i_sblock = inode->iu_sblock;
-	di->i_eblock = inode->iu_eblock;
+	di->i_sblock = BFS_I(inode)->i_sblock;
+	di->i_eblock = BFS_I(inode)->i_eblock;
 	di->i_eoffset = di->i_sblock * BFS_BSIZE + inode->i_size - 1;
 
 	mark_buffer_dirty(bh);
@@ -172,8 +172,8 @@ static void bfs_delete_inode(struct inode * inode)
 	/* if this was the last file, make the previous 
 	   block "last files last block" even if there is no real file there,
 	   saves us 1 gap */
-	if (s->su_lf_eblk == inode->iu_eblock) {
-		s->su_lf_eblk = inode->iu_sblock - 1;
+	if (s->su_lf_eblk == BFS_I(inode)->i_eblock) {
+		s->su_lf_eblk = BFS_I(inode)->i_sblock - 1;
 		mark_buffer_dirty(s->su_sbh);
 	}
 	unlock_kernel();
@@ -206,7 +206,51 @@ static void bfs_write_super(struct super_block *s)
 	s->s_dirt = 0;
 }
 
+static kmem_cache_t * bfs_inode_cachep;
+
+static struct inode *bfs_alloc_inode(struct super_block *sb)
+{
+	struct bfs_inode_info *bi;
+	bi = kmem_cache_alloc(bfs_inode_cachep, SLAB_KERNEL);
+	if (!bi)
+		return NULL;
+	return &bi->vfs_inode;
+}
+
+static void bfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(bfs_inode_cachep, BFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct bfs_inode_info *bi = foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&bi->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	bfs_inode_cachep = kmem_cache_create("bfs_inode_cache",
+					     sizeof(struct bfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (bfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(bfs_inode_cachep))
+		printk(KERN_INFO "bfs_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations bfs_sops = {
+	alloc_inode:	bfs_alloc_inode,
+	destroy_inode:	bfs_destroy_inode,
 	read_inode:	bfs_read_inode,
 	write_inode:	bfs_write_inode,
 	delete_inode:	bfs_delete_inode,
@@ -293,14 +337,14 @@ static struct super_block * bfs_read_super(struct super_block * s,
 	s->su_lf_ioff = 0;
 	for (i=BFS_ROOT_INO; i<=s->su_lasti; i++) {
 		inode = iget(s,i);
-		if (inode->iu_dsk_ino == 0)
+		if (BFS_I(inode)->i_dsk_ino == 0)
 			s->su_freei++;
 		else {
 			set_bit(i, s->su_imap);
 			s->su_freeb -= inode->i_blocks;
-			if (inode->iu_eblock > s->su_lf_eblk) {
-				s->su_lf_eblk = inode->iu_eblock;
-				s->su_lf_sblk = inode->iu_sblock;
+			if (BFS_I(inode)->i_eblock > s->su_lf_eblk) {
+				s->su_lf_eblk = BFS_I(inode)->i_eblock;
+				s->su_lf_sblk = BFS_I(inode)->i_sblock;
 				s->su_lf_ioff = BFS_INO2OFF(i);
 			}
 		}
@@ -322,12 +366,23 @@ static DECLARE_FSTYPE_DEV(bfs_fs_type, "bfs", bfs_read_super);
 
 static int __init init_bfs_fs(void)
 {
-	return register_filesystem(&bfs_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+        err = register_filesystem(&bfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_bfs_fs(void)
 {
 	unregister_filesystem(&bfs_fs_type);
+	destroy_inodecache();
 }
 
 module_init(init_bfs_fs)

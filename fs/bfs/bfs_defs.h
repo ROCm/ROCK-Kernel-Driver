@@ -9,9 +9,6 @@
 #define su_sbh		u.bfs_sb.si_sbh
 #define su_bfs_sb	u.bfs_sb.si_bfs_sb
 
-#define iu_dsk_ino	u.bfs_i.i_dsk_ino
-#define iu_sblock	u.bfs_i.i_sblock
-#define iu_eblock	u.bfs_i.i_eblock
-
 #define printf(format, args...) \
-	printk(KERN_ERR "BFS-fs: " __FUNCTION__ "(): " format, ## args)
+	printk(KERN_ERR "BFS-fs: %s(): " format, __FUNCTION__, ## args)
+

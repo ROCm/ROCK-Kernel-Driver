@@ -196,6 +196,12 @@ CONFIG_ISDN
   want), say M here and read <file:Documentation/modules.txt>.  The
   module will be called isdn.o. If unsure, say N.
 
+CONFIG_ETRAX100LX
+  Support version 1 of the Etrax 100LX.
+
+CONFIG_ETRAX100LX_V2
+  Support version 2 of the Etrax 100LX.
+
 CONFIG_SVINTO_SIM
   Support the xsim ETRAX Simulator.
 
@@ -204,6 +210,34 @@ CONFIG_ETRAX_DRAM_SIZE
 
 CONFIG_ETRAX_FLASH_BUSWIDTH
   Width in bytes of the Flash bus (1, 2 or 4). Is usually 2.
+
+CONFIG_ETRAX_PA_LEDS
+  The Etrax network driver is responsible for flashing LED's when
+  packets arrive and are sent.  It uses macros defined in
+  <file:include/asm-cris/io.h>, and those macros are defined after what
+  YOU choose in this option.  The actual bits used are configured
+  separately.  Select this if the LEDs are on port PA.  Some products
+  put the leds on PB or a memory-mapped latch (CSP0) instead.
+
+CONFIG_ETRAX_PB_LEDS
+  The Etrax network driver is responsible for flashing LED's when
+  packets arrive and are sent.  It uses macros defined in
+  <file:include/asm-cris/io.h>, and those macros are defined after what
+  YOU choose in this option.  The actual bits used are configured
+  separately.  Select this if the LEDs are on port PB.  Some products
+  put the leds on PA or a memory-mapped latch (CSP0) instead.
+
+CONFIG_ETRAX_CSP0_LEDS
+  The Etrax network driver is responsible for flashing LED's when
+  packets arrive and are sent. It uses macros defined in
+  <file:include/asm-cris/io.h>, and those macros are defined after what
+  YOU choose in this option.  The actual bits used are configured
+  separately.  Select this if the LEDs are on a memory-mapped latch
+  using chip select CSP0, this is mapped at 0x90000000.
+  Some products put the leds on PA or PB instead.
+
+CONFIG_ETRAX_NO_LEDS
+  Select this option if you don't have any LED at all.
 
 CONFIG_ETRAX_LED1G
   Bit to use for the first green LED.
@@ -381,4 +415,33 @@ CONFIG_ETRAX_DEF_R_PORT_PB_DATA
 CONFIG_ETRAX_WATCHDOG
   Enable the built-in watchdog timer support on Etrax100 embedded
   network computers.
+
+CONFIG_ETRAX_DEBUG_PORT0
+  Choose a serial port for the ETRAX debug console.  Default to
+  port 0.
+
+CONFIG_ETRAX_DEBUG_PORT1
+  Use serial port 1 for the console.
+
+CONFIG_ETRAX_DEBUG_PORT2
+  Use serial port 2 for the console.
+
+CONFIG_ETRAX_DEBUG_PORT3
+  Use serial port 3 for the console.
+
+CONFIG_ETRAX_DEBUG_PORT_NULL
+  Disable serial-port debugging.
+
+CONFIG_ETRAX_RESCUE_SER0
+  Select one of the four serial ports as a rescue port.  The default
+  is port 0.
+
+CONFIG_ETRAX_RESCUE_SER1
+  Use serial port 1 as the rescue port.
+
+CONFIG_ETRAX_RESCUE_SER2
+  Use serial port 2 as the rescue port.
+
+CONFIG_ETRAX_RESCUE_SER3
+  Use serial port 3 as the rescue port.
 

@@ -50,12 +50,16 @@ struct jffs2_inode_info {
 	//	struct jffs2_raw_node_ref *lastnode;
 	__u16 flags;
 	__u8 usercompr;
+	struct inode vfs_inode;
 };
 
 #ifdef JFFS2_OUT_OF_KERNEL
 #define JFFS2_INODE_INFO(i) ((struct jffs2_inode_info *) &(i)->u)
 #else
-#define JFFS2_INODE_INFO(i) (&i->u.jffs2_i)
+static inline struct jffs2_inode_info *JFFS2_INODE_INFO(struct inode *inode)
+{
+	return list_entry(inode, struct jffs2_inode_info, vfs_inode);
+}
 #endif
 
 #endif /* _JFFS2_FS_I */

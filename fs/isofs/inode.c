@@ -78,7 +78,51 @@ static void isofs_put_super(struct super_block *sb)
 static void isofs_read_inode(struct inode *);
 static int isofs_statfs (struct super_block *, struct statfs *);
 
+static kmem_cache_t *isofs_inode_cachep;
+
+static struct inode *isofs_alloc_inode(struct super_block *sb)
+{
+	struct iso_inode_info *ei;
+	ei = (struct iso_inode_info *)kmem_cache_alloc(isofs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void isofs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(isofs_inode_cachep, ISOFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct iso_inode_info *ei = (struct iso_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	isofs_inode_cachep = kmem_cache_create("isofs_inode_cache",
+					     sizeof(struct iso_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (isofs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(isofs_inode_cachep))
+		printk(KERN_INFO "iso_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations isofs_sops = {
+	alloc_inode:	isofs_alloc_inode,
+	destroy_inode:	isofs_destroy_inode,
 	read_inode:	isofs_read_inode,
 	put_super:	isofs_put_super,
 	statfs:		isofs_statfs,
@@ -871,6 +915,7 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 	unsigned int firstext;
 	unsigned long nextino;
 	int section, rv;
+	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	lock_kernel();
 
@@ -883,9 +928,9 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 	b_off = iblock;
 	
 	offset    = 0;
-	firstext  = inode->u.isofs_i.i_first_extent;
-	sect_size = inode->u.isofs_i.i_section_size >> ISOFS_BUFFER_BITS(inode);
-	nextino   = inode->u.isofs_i.i_next_section_ino;
+	firstext  = ei->i_first_extent;
+	sect_size = ei->i_section_size >> ISOFS_BUFFER_BITS(inode);
+	nextino   = ei->i_next_section_ino;
 	section   = 0;
 
 	while ( nblocks ) {
@@ -912,9 +957,9 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 				ninode = iget(inode->i_sb, nextino);
 				if (!ninode)
 					goto abort;
-				firstext  = ninode->u.isofs_i.i_first_extent;
-				sect_size = ninode->u.isofs_i.i_section_size;
-				nextino   = ninode->u.isofs_i.i_next_section_ino;
+				firstext  = ISOFS_I(ninode)->i_first_extent;
+				sect_size = ISOFS_I(ninode)->i_section_size;
+				nextino   = ISOFS_I(ninode)->i_next_section_ino;
 				iput(ninode);
 				
 				if (++section > 100) {
@@ -1020,9 +1065,10 @@ static int isofs_read_level3_size(struct inode * inode)
 	int i = 0;
 	int more_entries = 0;
 	struct iso_directory_record * tmpde = NULL;
+	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	inode->i_size = 0;
-	inode->u.isofs_i.i_next_section_ino = 0;
+	ei->i_next_section_ino = 0;
 
 	block = f_pos >> ISOFS_BUFFER_BITS(inode);
 	offset = f_pos & (bufsize-1);
@@ -1074,7 +1120,7 @@ static int isofs_read_level3_size(struct inode * inode)
 
 		inode->i_size += isonum_733(de->size);
 		if (i == 1)
-			inode->u.isofs_i.i_next_section_ino = f_pos;
+			ei->i_next_section_ino = f_pos;
 
 		more_entries = de->flags[-high_sierra] & 0x80;
 
@@ -1121,6 +1167,7 @@ static void isofs_read_inode(struct inode * inode)
 	unsigned int de_len;
 	unsigned long offset;
 	int volume_seq_no, i;
+	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	bh = sb_bread(inode->i_sb, block);
 	if (!bh)
@@ -1148,7 +1195,7 @@ static void isofs_read_inode(struct inode * inode)
 	}
 
 	/* Assume it is a normal-format file unless told otherwise */
-	inode->u.isofs_i.i_file_format = isofs_file_normal;
+	ei->i_file_format = isofs_file_normal;
 
 	if (de->flags[-high_sierra] & 2) {
 		inode->i_mode = S_IRUGO | S_IXUGO | S_IFDIR;
@@ -1175,11 +1222,15 @@ static void isofs_read_inode(struct inode * inode)
 	inode->i_gid = inode->i_sb->u.isofs_sb.s_gid;
 	inode->i_blocks = inode->i_blksize = 0;
 
+	ei->i_format_parm[0] = 0;
+	ei->i_format_parm[1] = 0;
+	ei->i_format_parm[2] = 0;
 
-	inode->u.isofs_i.i_section_size = isonum_733 (de->size);
+	ei->i_section_size = isonum_733 (de->size);
 	if(de->flags[-high_sierra] & 0x80) {
 		if(isofs_read_level3_size(inode)) goto fail;
 	} else {
+		ei->i_next_section_ino = 0;
 		inode->i_size = isonum_733 (de->size);
 	}
 
@@ -1233,7 +1284,7 @@ static void isofs_read_inode(struct inode * inode)
 	inode->i_mtime = inode->i_atime = inode->i_ctime =
 		iso_date(de->date, high_sierra);
 
-	inode->u.isofs_i.i_first_extent = (isonum_733 (de->extent) +
+	ei->i_first_extent = (isonum_733 (de->extent) +
 					   isonum_711 (de->ext_attr_length));
 
 	/* Set the number of blocks for stat() - should be done before RR */
@@ -1279,7 +1330,7 @@ static void isofs_read_inode(struct inode * inode)
 	{
 		if (S_ISREG(inode->i_mode)) {
 			inode->i_fop = &generic_ro_fops;
-			switch ( inode->u.isofs_i.i_file_format ) {
+			switch ( ei->i_file_format ) {
 #ifdef CONFIG_ZISOFS
 			case isofs_file_compressed:
 				inode->i_data.a_ops = &zisofs_aops;
@@ -1348,14 +1399,26 @@ static DECLARE_FSTYPE_DEV(iso9660_fs_type, "iso9660", isofs_read_super);
 
 static int __init init_iso9660_fs(void)
 {
+	int err = init_inodecache();
+	if (err)
+		goto out;
 #ifdef CONFIG_ZISOFS
-	int err;
-
 	err = zisofs_init();
-	if ( err )
-		return err;
+	if (err)
+		goto out1;
 #endif
-        return register_filesystem(&iso9660_fs_type);
+	err = register_filesystem(&iso9660_fs_type);
+	if (err)
+		goto out2;
+	return 0;
+out2:
+#ifdef CONFIG_ZISOFS
+	zisofs_cleanup();
+out1:
+#endif
+	destroy_inodecache();
+out:
+	return err;
 }
 
 static void __exit exit_iso9660_fs(void)
@@ -1364,6 +1427,7 @@ static void __exit exit_iso9660_fs(void)
 #ifdef CONFIG_ZISOFS
 	zisofs_cleanup();
 #endif
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

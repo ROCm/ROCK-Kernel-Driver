@@ -228,7 +228,7 @@ smb_dir_open(struct inode *dir, struct file *file)
 	lock_kernel();
 	server = server_from_dentry(dentry);
 	if (server->opt.protocol < SMB_PROTOCOL_LANMAN2) {
-		unsigned long age = jiffies - dir->u.smbfs_i.oldmtime;
+		unsigned long age = jiffies - SMB_I(dir)->oldmtime;
 		if (age > 2*HZ)
 			smb_invalid_dir_cache(dir);
 	}
@@ -454,9 +454,10 @@ smb_instantiate(struct dentry *dentry, __u16 fileid, int have_id)
 		goto out_no_inode;
 
 	if (have_id) {
-		inode->u.smbfs_i.fileid = fileid;
-		inode->u.smbfs_i.access = SMB_O_RDWR;
-		inode->u.smbfs_i.open = server->generation;
+		struct smb_inode_info *ei = SMB_I(inode);
+		ei->fileid = fileid;
+		ei->access = SMB_O_RDWR;
+		ei->open = server->generation;
 	}
 	d_instantiate(dentry, inode);
 out:

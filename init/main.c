@@ -274,27 +274,14 @@ static void __init smp_init(void)
 
 #else
 
-static unsigned long __initdata wait_init_idle;
-
-void __init idle_startup_done(void)
-{
-	clear_bit(smp_processor_id(), &wait_init_idle);
-	while (wait_init_idle) {
-		cpu_relax();
-		barrier();
-	}
-}
-
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
 {
 	/* Get other processors into their bootup holding patterns. */
 	smp_boot_cpus();
-	wait_init_idle = cpu_online_map;
 
 	smp_threads_ready=1;
 	smp_commence();
-	idle_startup_done();
 }
 
 #endif
@@ -391,7 +378,7 @@ asmlinkage void __init start_kernel(void)
 	check_bugs();
 	printk("POSIX conformance testing by UNIFIX\n");
 
-	init_idle();
+	init_idle(current, smp_processor_id());
 	/* 
 	 *	We count on the initial thread going ok 
 	 *	Like idlers init is an unlocked kernel thread, which will

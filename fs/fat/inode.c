@@ -11,23 +11,14 @@
  */
 
 #include <linux/module.h>
-#include <linux/msdos_fs.h>
-#include <linux/nls.h>
-#include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/bitops.h>
-#include <linux/major.h>
-#include <linux/blkdev.h>
-#include <linux/fs.h>
-#include <linux/stat.h>
 #include <linux/locks.h>
-#include <linux/fat_cvf.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
+#include <linux/msdos_fs.h>
+#include <linux/fat_cvf.h>
 
-#include <asm/uaccess.h>
+//#include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
 extern struct cvf_format default_cvf;
@@ -103,8 +94,7 @@ void fat_detach(struct inode *inode)
 {
 	spin_lock(&fat_inode_lock);
 	MSDOS_I(inode)->i_location = 0;
-	list_del(&MSDOS_I(inode)->i_fat_hash);
-	INIT_LIST_HEAD(&MSDOS_I(inode)->i_fat_hash);
+	list_del_init(&MSDOS_I(inode)->i_fat_hash);
 	spin_unlock(&fat_inode_lock);
 }
 
@@ -118,11 +108,11 @@ struct inode *fat_iget(struct super_block *sb, int i_pos)
 	spin_lock(&fat_inode_lock);
 	list_for_each(walk, p) {
 		i = list_entry(walk, struct msdos_inode_info, i_fat_hash);
-		if (i->i_fat_inode->i_sb != sb)
+		if (i->vfs_inode.i_sb != sb)
 			continue;
 		if (i->i_location != i_pos)
 			continue;
-		inode = igrab(i->i_fat_inode);
+		inode = igrab(&i->vfs_inode);
 		if (inode)
 			break;
 	}
@@ -172,7 +162,7 @@ void fat_clear_inode(struct inode *inode)
 	lock_kernel();
 	spin_lock(&fat_inode_lock);
 	fat_cache_inval_inode(inode);
-	list_del(&MSDOS_I(inode)->i_fat_hash);
+	list_del_init(&MSDOS_I(inode)->i_fat_hash);
 	spin_unlock(&fat_inode_lock);
 	unlock_kernel();
 }
@@ -397,9 +387,7 @@ static void fat_read_root(struct inode *inode)
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	INIT_LIST_HEAD(&MSDOS_I(inode)->i_fat_hash);
 	MSDOS_I(inode)->i_location = 0;
-	MSDOS_I(inode)->i_fat_inode = inode;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
@@ -533,7 +521,53 @@ int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
 	return 3;
 }
 
+static kmem_cache_t *fat_inode_cachep;
+
+static struct inode *fat_alloc_inode(struct super_block *sb)
+{
+	struct msdos_inode_info *ei;
+	ei = (struct msdos_inode_info *)kmem_cache_alloc(fat_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void fat_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(fat_inode_cachep, MSDOS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct msdos_inode_info *ei = (struct msdos_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		INIT_LIST_HEAD(&ei->i_fat_hash);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+int __init fat_init_inodecache(void)
+{
+	fat_inode_cachep = kmem_cache_create("fat_inode_cache",
+					     sizeof(struct msdos_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (fat_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+void __exit fat_destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(fat_inode_cachep))
+		printk(KERN_INFO "fat_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations fat_sops = { 
+	alloc_inode:	fat_alloc_inode,
+	destroy_inode:	fat_destroy_inode,
 	write_inode:	fat_write_inode,
 	delete_inode:	fat_delete_inode,
 	put_super:	fat_put_super,
@@ -872,9 +906,7 @@ static void fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	struct super_block *sb = inode->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	INIT_LIST_HEAD(&MSDOS_I(inode)->i_fat_hash);
 	MSDOS_I(inode)->i_location = 0;
-	MSDOS_I(inode)->i_fat_inode = inode;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;

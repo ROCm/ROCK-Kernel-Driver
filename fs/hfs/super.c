@@ -39,9 +39,53 @@ static void hfs_put_super(struct super_block *);
 static int hfs_statfs(struct super_block *, struct statfs *);
 static void hfs_write_super(struct super_block *);
 
+static kmem_cache_t * hfs_inode_cachep;
+
+static struct inode *hfs_alloc_inode(struct super_block *sb)
+{
+	struct hfs_inode_info *ei;
+	ei = (struct hfs_inode_info *)kmem_cache_alloc(hfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void hfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(hfs_inode_cachep, HFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct hfs_inode_info *ei = (struct hfs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	hfs_inode_cachep = kmem_cache_create("hfs_inode_cache",
+					     sizeof(struct hfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (hfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(hfs_inode_cachep))
+		printk(KERN_INFO "hfs_inode_cache: not all structures were freed\n");
+}
+
 /*================ Global variables ================*/
 
 static struct super_operations hfs_super_operations = { 
+	alloc_inode:	hfs_alloc_inode,
+	destroy_inode:	hfs_destroy_inode,
 	read_inode:	hfs_read_inode,
 	put_inode:	hfs_put_inode,
 	put_super:	hfs_put_super,
@@ -472,13 +516,25 @@ bail3:
 
 static int __init init_hfs_fs(void)
 {
+	int err = init_inodecache();
+	if (err)
+		goto out1;
         hfs_cat_init();
-	return register_filesystem(&hfs_fs);
+	err = register_filesystem(&hfs_fs);
+	if (err)
+		goto out;
+	return 0;
+out:
+	hfs_cat_free();
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_hfs_fs(void) {
 	hfs_cat_free();
 	unregister_filesystem(&hfs_fs);
+	destroy_inodecache();
 }
 
 module_init(init_hfs_fs)

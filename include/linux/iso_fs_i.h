@@ -16,6 +16,7 @@ struct iso_inode_info {
 	unsigned char i_format_parm[3];
 	unsigned long i_next_section_ino;
 	off_t i_section_size;
+	struct inode vfs_inode;
 };
 
 #endif

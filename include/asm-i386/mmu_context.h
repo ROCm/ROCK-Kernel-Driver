@@ -16,17 +16,19 @@
 # error update this function.
 #endif
 
-static inline int sched_find_first_zero_bit(unsigned long *b)
+static inline int sched_find_first_bit(unsigned long *b)
 {
-	unsigned int rt;
-
-	rt = b[0] & b[1] & b[2] & b[3];
-	if (unlikely(rt != 0xffffffff))
-		return find_first_zero_bit(b, MAX_RT_PRIO);
-
-	if (b[4] != ~0)
-		return ffz(b[4]) + MAX_RT_PRIO;
-	return ffz(b[5]) + 32 + MAX_RT_PRIO;
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (unlikely(b[3]))
+		return __ffs(b[3]) + 96;
+	if (b[4])
+		return __ffs(b[4]) + 128;
+	return __ffs(b[5]) + 32 + 128;
 }
 /*
  * possibly do the LDT unload here?
@@ -49,13 +51,13 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
-	if (prev != next) {
+	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
 		/*
 		 * Re-load LDT if necessary
 		 */
-		if (prev->context.segments != next->context.segments)
+		if (unlikely(prev->context.segments != next->context.segments))
 			load_LDT(next);
 #ifdef CONFIG_SMP
 		cpu_tlbstate[cpu].state = TLBSTATE_OK;

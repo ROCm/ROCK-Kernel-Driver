@@ -153,7 +153,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
  
 static int init_inodecache(void)
 {
-	reiserfs_inode_cachep = kmem_cache_create("reiserfs_inode_cache",
+	reiserfs_inode_cachep = kmem_cache_create("reiser_inode_cache",
 					     sizeof(struct reiserfs_inode_info),
 					     0, SLAB_HWCACHE_ALIGN,
 					     init_once, NULL);

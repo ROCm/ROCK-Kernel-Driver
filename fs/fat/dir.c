@@ -13,17 +13,10 @@
  *  Short name translation 1999, 2001 by Wolfram Pienkoss <wp@bszh.de>
  */
 
-#include <linux/fs.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
 #include <linux/msdos_fs.h>
-#include <linux/nls.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/stat.h>
-#include <linux/string.h>
-#include <linux/ioctl.h>
 #include <linux/dirent.h>
-#include <linux/mm.h>
-#include <linux/ctype.h>
 
 #include <asm/uaccess.h>
 

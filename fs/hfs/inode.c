@@ -233,7 +233,7 @@ static int hfs_readpage(struct file *file, struct page *page)
 static int hfs_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
 	return cont_prepare_write(page,from,to,hfs_get_block,
-		&page->mapping->host->u.hfs_i.mmu_private);
+		&HFS_I(page->mapping->host)->mmu_private);
 }
 static int hfs_bmap(struct address_space *mapping, long block)
 {
@@ -322,7 +322,13 @@ struct inode *hfs_iget(struct hfs_cat_entry *entry, ino_t type,
 		inode->i_uid = hsb->s_uid;
 		inode->i_gid = hsb->s_gid;
 
-		memset(HFS_I(inode), 0, sizeof(struct hfs_inode_info));
+		HFS_I(inode)->mmu_private = 0;
+		HFS_I(inode)->fork = NULL;
+		HFS_I(inode)->convert = 0;
+		HFS_I(inode)->file_type = 0;
+		HFS_I(inode)->dir_size = 0;
+		HFS_I(inode)->default_layout = NULL;
+		HFS_I(inode)->layout = NULL;
 		HFS_I(inode)->magic = HFS_INO_MAGIC;
 		HFS_I(inode)->entry = entry;
 		HFS_I(inode)->tz_secondswest = hfs_to_utc(0);
@@ -372,7 +378,7 @@ void hfs_cap_ifill(struct inode * inode, ino_t type, const int version)
 		inode->i_op = &hfs_file_inode_operations;
 		inode->i_fop = &hfs_file_operations;
 		inode->i_mapping->a_ops = &hfs_aops;
-		inode->u.hfs_i.mmu_private = inode->i_size;
+		HFS_I(inode)->mmu_private = inode->i_size;
 	} else { /* Directory */
 		struct hfs_dir *hdir = &entry->u.dir;
 
@@ -432,7 +438,7 @@ void hfs_dbl_ifill(struct inode * inode, ino_t type, const int version)
 		inode->i_op = &hfs_file_inode_operations;
 		inode->i_fop = &hfs_file_operations;
 		inode->i_mapping->a_ops = &hfs_aops;
-		inode->u.hfs_i.mmu_private = inode->i_size;
+		HFS_I(inode)->mmu_private = inode->i_size;
 	} else { /* Directory */
 		struct hfs_dir *hdir = &entry->u.dir;
 
@@ -478,7 +484,7 @@ void hfs_nat_ifill(struct inode * inode, ino_t type, const int version)
 		inode->i_op = &hfs_file_inode_operations;
 		inode->i_fop = &hfs_file_operations;
 		inode->i_mapping->a_ops = &hfs_aops;
-		inode->u.hfs_i.mmu_private = inode->i_size;
+		HFS_I(inode)->mmu_private = inode->i_size;
 	} else { /* Directory */
 		struct hfs_dir *hdir = &entry->u.dir;
 

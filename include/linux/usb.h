@@ -881,6 +881,7 @@ extern int usb_string(struct usb_device *dev, int index,
 	char *buf, size_t size);
 extern int usb_set_configuration(struct usb_device *dev, int configuration);
 extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
+extern int usb_make_path(struct usb_device *dev, char *buf, size_t size);
 
 /*
  * timeouts, in seconds, used for sending/receiving control messages
@@ -1096,7 +1097,7 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
  *  - endpoint number (4 bits)
  *  - current Data0/1 state (1 bit) [Historical; now gone]
  *  - direction (1 bit)
- *  - speed (1 bit)
+ *  - speed (1 bit) [Historical and specific to USB 1.1; now gone.]
  *  - max packet size (2 bits: 8, 16, 32 or 64) [Historical; now gone.]
  *  - pipe type (2 bits: control, interrupt, bulk, isochronous)
  *
@@ -1107,24 +1108,21 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
  * Let's not fall in that trap. We'll just encode it as a simple
  * unsigned int. The encoding is:
  *
- *  - max size:		bits 0-1	(00 = 8, 01 = 16, 10 = 32, 11 = 64) [Historical; now gone.]
- *  - direction:	bit 7		(0 = Host-to-Device [Out], 1 = Device-to-Host [In])
+ *  - max size:		bits 0-1	[Historical; now gone.]
+ *  - direction:	bit 7		(0 = Host-to-Device [Out],
+ *					 1 = Device-to-Host [In])
  *  - device:		bits 8-14
  *  - endpoint:		bits 15-18
  *  - Data0/1:		bit 19		[Historical; now gone. ]
- *  - speed:		bit 26		(0 = Full, 1 = Low Speed)
- *  - pipe type:	bits 30-31	(00 = isochronous, 01 = interrupt, 10 = control, 11 = bulk)
+ *  - lowspeed:		bit 26		[Historical; now gone. ]
+ *  - pipe type:	bits 30-31	(00 = isochronous, 01 = interrupt,
+ *					 10 = control, 11 = bulk)
  *
  * Why? Because it's arbitrary, and whatever encoding we select is really
  * up to us. This one happens to share a lot of bit positions with the UHCI
  * specification, so that much of the uhci driver can just mask the bits
  * appropriately.
- *
- * NOTE:  there's no encoding (yet?) for a "high speed" endpoint; treat them
- * like full speed devices.
  */
-
-// FIXME 2.5 get rid of usb_pipeslow(), just use dev->speed
 
 #define PIPE_ISOCHRONOUS		0
 #define PIPE_INTERRUPT			1
@@ -1139,9 +1137,7 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
 #define usb_pipeout(pipe)	((((pipe) >> 7) & 1) ^ 1)
 #define usb_pipein(pipe)	(((pipe) >> 7) & 1)
 #define usb_pipedevice(pipe)	(((pipe) >> 8) & 0x7f)
-#define usb_pipe_endpdev(pipe)	(((pipe) >> 8) & 0x7ff)
 #define usb_pipeendpoint(pipe)	(((pipe) >> 15) & 0xf)
-#define usb_pipeslow(pipe)	(((pipe) >> 26) & 1)
 #define usb_pipetype(pipe)	(((pipe) >> 30) & 3)
 #define usb_pipeisoc(pipe)	(usb_pipetype((pipe)) == PIPE_ISOCHRONOUS)
 #define usb_pipeint(pipe)	(usb_pipetype((pipe)) == PIPE_INTERRUPT)
@@ -1163,13 +1159,7 @@ const struct usb_device_id *usb_match_id(struct usb_device *dev,
 
 static inline unsigned int __create_pipe(struct usb_device *dev, unsigned int endpoint)
 {
-	return (dev->devnum << 8) | (endpoint << 15) |
-		((dev->speed == USB_SPEED_LOW) << 26);
-}
-
-static inline unsigned int __default_pipe(struct usb_device *dev)
-{
-	return ((dev->speed == USB_SPEED_LOW) << 26);
+	return (dev->devnum << 8) | (endpoint << 15);
 }
 
 /* Create various pipes... */
@@ -1181,8 +1171,8 @@ static inline unsigned int __default_pipe(struct usb_device *dev)
 #define usb_rcvbulkpipe(dev,endpoint)	((PIPE_BULK << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
 #define usb_sndintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint))
 #define usb_rcvintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | __create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30) | __default_pipe(dev))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | __default_pipe(dev) | USB_DIR_IN)
+#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
+#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | USB_DIR_IN)
 
 /* -------------------------------------------------------------------------- */
 

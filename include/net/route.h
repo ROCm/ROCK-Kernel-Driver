@@ -30,6 +30,7 @@
 #include <linux/in_route.h>
 #include <linux/rtnetlink.h>
 #include <linux/route.h>
+#include <linux/ip.h>
 #include <linux/cache.h>
 
 #ifndef __KERNEL__

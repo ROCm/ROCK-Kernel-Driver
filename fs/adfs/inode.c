@@ -65,7 +65,7 @@ static int adfs_readpage(struct file *file, struct page *page)
 static int adfs_prepare_write(struct file *file, struct page *page, unsigned int from, unsigned int to)
 {
 	return cont_prepare_write(page, from, to, adfs_get_block,
-		&page->mapping->host->u.adfs_i.mmu_private);
+		&ADFS_I(page->mapping->host)->mmu_private);
 }
 
 static int _adfs_bmap(struct address_space *mapping, long block)
@@ -87,8 +87,8 @@ adfs_filetype(struct inode *inode)
 {
 	unsigned int type;
 
-	if (inode->u.adfs_i.stamped)
-		type = (inode->u.adfs_i.loadaddr >> 8) & 0xfff;
+	if (ADFS_I(inode)->stamped)
+		type = (ADFS_I(inode)->loadaddr >> 8) & 0xfff;
 	else
 		type = (unsigned int) -1;
 
@@ -101,7 +101,7 @@ adfs_filetype(struct inode *inode)
 static umode_t
 adfs_atts2mode(struct super_block *sb, struct inode *inode)
 {
-	unsigned int filetype, attr = inode->u.adfs_i.attr;
+	unsigned int filetype, attr = ADFS_I(inode)->attr;
 	umode_t mode, rmask;
 
 	if (attr & ADFS_NDA_DIRECTORY) {
@@ -151,7 +151,7 @@ adfs_mode2atts(struct super_block *sb, struct inode *inode)
 
 	/* FIXME: should we be able to alter a link? */
 	if (S_ISLNK(inode->i_mode))
-		return inode->u.adfs_i.attr;
+		return ADFS_I(inode)->attr;
 
 	if (S_ISDIR(inode->i_mode))
 		attr = ADFS_NDA_DIRECTORY;
@@ -183,11 +183,11 @@ adfs_adfs2unix_time(struct inode *inode)
 {
 	unsigned int high, low;
 
-	if (inode->u.adfs_i.stamped == 0)
+	if (ADFS_I(inode)->stamped == 0)
 		return CURRENT_TIME;
 
-	high = inode->u.adfs_i.loadaddr << 24;
-	low  = inode->u.adfs_i.execaddr;
+	high = ADFS_I(inode)->loadaddr << 24;
+	low  = ADFS_I(inode)->execaddr;
 
 	high |= low >> 8;
 	low  &= 255;
@@ -216,14 +216,14 @@ adfs_unix2adfs_time(struct inode *inode, unsigned int secs)
 {
 	unsigned int high, low;
 
-	if (inode->u.adfs_i.stamped) {
+	if (ADFS_I(inode)->stamped) {
 		/* convert 32-bit seconds to 40-bit centi-seconds */
 		low  = (secs & 255) * 100;
 		high = (secs / 256) * 100 + (low >> 8) + 0x336e996a;
 
-		inode->u.adfs_i.loadaddr = (high >> 24) |
-				(inode->u.adfs_i.loadaddr & ~0xff);
-		inode->u.adfs_i.execaddr = (low & 255) | (high << 8);
+		ADFS_I(inode)->loadaddr = (high >> 24) |
+				(ADFS_I(inode)->loadaddr & ~0xff);
+		ADFS_I(inode)->execaddr = (low & 255) | (high << 8);
 	}
 }
 
@@ -263,11 +263,11 @@ adfs_iget(struct super_block *sb, struct object_info *obj)
 	 * for this file.  This will need special handling
 	 * for cross-directory renames.
 	 */
-	inode->u.adfs_i.parent_id = obj->parent_id;
-	inode->u.adfs_i.loadaddr  = obj->loadaddr;
-	inode->u.adfs_i.execaddr  = obj->execaddr;
-	inode->u.adfs_i.attr      = obj->attr;
-	inode->u.adfs_i.stamped	  = ((obj->loadaddr & 0xfff00000) == 0xfff00000);
+	ADFS_I(inode)->parent_id = obj->parent_id;
+	ADFS_I(inode)->loadaddr  = obj->loadaddr;
+	ADFS_I(inode)->execaddr  = obj->execaddr;
+	ADFS_I(inode)->attr      = obj->attr;
+	ADFS_I(inode)->stamped	  = ((obj->loadaddr & 0xfff00000) == 0xfff00000);
 
 	inode->i_mode	 = adfs_atts2mode(sb, inode);
 	inode->i_mtime	 =
@@ -281,7 +281,7 @@ adfs_iget(struct super_block *sb, struct object_info *obj)
 		inode->i_op	= &adfs_file_inode_operations;
 		inode->i_fop	= &adfs_file_operations;
 		inode->i_mapping->a_ops = &adfs_aops;
-		inode->u.adfs_i.mmu_private = inode->i_size;
+		ADFS_I(inode)->mmu_private = inode->i_size;
 	}
 
 	insert_inode_hash(inode);
@@ -335,7 +335,7 @@ adfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	if (ia_valid & ATTR_CTIME)
 		inode->i_ctime = attr->ia_ctime;
 	if (ia_valid & ATTR_MODE) {
-		inode->u.adfs_i.attr = adfs_mode2atts(sb, inode);
+		ADFS_I(inode)->attr = adfs_mode2atts(sb, inode);
 		inode->i_mode = adfs_atts2mode(sb, inode);
 	}
 
@@ -362,10 +362,10 @@ void adfs_write_inode(struct inode *inode, int unused)
 	lock_kernel();
 	obj.file_id	= inode->i_ino;
 	obj.name_len	= 0;
-	obj.parent_id	= inode->u.adfs_i.parent_id;
-	obj.loadaddr	= inode->u.adfs_i.loadaddr;
-	obj.execaddr	= inode->u.adfs_i.execaddr;
-	obj.attr	= inode->u.adfs_i.attr;
+	obj.parent_id	= ADFS_I(inode)->parent_id;
+	obj.loadaddr	= ADFS_I(inode)->loadaddr;
+	obj.execaddr	= ADFS_I(inode)->execaddr;
+	obj.attr	= ADFS_I(inode)->attr;
 	obj.size	= inode->i_size;
 
 	adfs_dir_update(sb, &obj);

@@ -259,9 +259,13 @@ void jffs2_read_inode (struct inode *inode)
 	f = JFFS2_INODE_INFO(inode);
 	c = JFFS2_SB_INFO(inode->i_sb);
 
-	memset(f, 0, sizeof(*f));
+	f->highest_version = 0;
+	f->fraglist = NULL;
+	f->metadata = NULL;
+	f->dents = NULL;
+	f->flags = 0;
+	f->usercompr = 0;
 	D2(printk(KERN_DEBUG "getting inocache\n"));
-	init_MUTEX(&f->sem);
 	f->inocache = jffs2_get_ino_cache(c, inode->i_ino);
 	D2(printk(KERN_DEBUG "jffs2_read_inode(): Got inocache at %p\n", f->inocache));
 
@@ -437,7 +441,7 @@ void jffs2_read_inode (struct inode *inode)
 	case S_IFSOCK:
 	case S_IFIFO:
 		inode->i_op = &jffs2_file_inode_operations;
-		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(MKDEV(rdev>>8, rdev&0xff)));
+		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(mk_kdev(rdev>>8, rdev&0xff)));
 		break;
 
 	default:

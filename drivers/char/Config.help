@@ -818,6 +818,28 @@ CONFIG_INTEL_RNG
 
   If unsure, say N.
 
+CONFIG_WATCHDOG
+  If you say Y here (and to one of the following options) and create a
+  character special file /dev/watchdog with major number 10 and minor
+  number 130 using mknod ("man mknod"), you will get a watchdog, i.e.:
+  subsequently opening the file and then failing to write to it for
+  longer than 1 minute will result in rebooting the machine. This
+  could be useful for a networked machine that needs to come back
+  online as fast as possible after a lock-up. There's both a watchdog
+  implementation entirely in software (which can sometimes fail to
+  reboot the machine) and a driver for hardware watchdog boards, which
+  are more robust and can also keep track of the temperature inside
+  your computer. For details, read <file:Documentation/watchdog.txt>
+  in the kernel source.
+
+  The watchdog is usually used together with the watchdog daemon
+  which is available from
+  <ftp://ibiblio.org/pub/Linux/system/daemons/watchdog/>. This daemon can
+  also monitor NFS connections and can reboot the machine when the process
+  table is full.
+
+  If unsure, say N.
+
 CONFIG_WATCHDOG_NOWAYOUT
   The default watchdog behaviour (which you get if you say N here) is
   to stop the timer if the process managing it closes the file

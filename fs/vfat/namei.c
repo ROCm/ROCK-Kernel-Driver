@@ -19,13 +19,7 @@
 
 #include <linux/sched.h>
 #include <linux/msdos_fs.h>
-#include <linux/nls.h>
-#include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/string.h>
 #include <linux/ctype.h>
-#include <linux/stat.h>
-#include <linux/mm.h>
 #include <linux/slab.h>
 
 #define DEBUG_LEVEL 0

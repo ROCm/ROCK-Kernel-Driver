@@ -68,7 +68,7 @@ static ssize_t ntfs_read(struct file *filp, char *buf, size_t count,loff_t *off)
 	int error;
 	ntfs_io io;
 	ntfs_attribute *attr;
-	ntfs_inode *ino = NTFS_LINO2NINO(filp->f_dentry->d_inode);
+	ntfs_inode *ino = NTFS_I(filp->f_dentry->d_inode);
 
 	/* Inode is not properly initialized. */
 	if (!ino)
@@ -107,7 +107,7 @@ static ssize_t ntfs_write(struct file *filp, const char *buf, size_t count,
 {
 	int err;
 	struct inode *vfs_ino = filp->f_dentry->d_inode;
-	ntfs_inode *ntfs_ino = NTFS_LINO2NINO(vfs_ino);
+	ntfs_inode *ntfs_ino = NTFS_I(vfs_ino);
 	ntfs_attribute *data;
 	ntfs_io io;
 	struct ntfs_getuser_update_vm_s param;
@@ -296,7 +296,7 @@ static int ntfs_readdir(struct file* filp, void *dirent, filldir_t filldir)
 		ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): Looking for next "
 				"file using ntfs_getdir_unsorted(), f_pos "
 				"0x%Lx.\n", (loff_t)(cb.ph << 16) | cb.pl);
-		err = ntfs_getdir_unsorted(NTFS_LINO2NINO(dir), &cb.ph, &cb.pl,
+		err = ntfs_getdir_unsorted(NTFS_I(dir), &cb.ph, &cb.pl,
 				ntfs_printcb, &cb);
 	} while (!err && !cb.ret_code && cb.ph < 0x7fff);
 	filp->f_pos = (loff_t)(cb.ph << 16) | cb.pl;
@@ -541,7 +541,7 @@ static struct dentry *ntfs_lookup(struct inode *dir, struct dentry *d)
 	/* ntfs_getdir will place the directory entry into item, and the first
 	 * long long is the MFT record number. */
 	walk.type = BY_NAME;
-	walk.dir = NTFS_LINO2NINO(dir);
+	walk.dir = NTFS_I(dir);
 	walk.result = item;
 	if (ntfs_getdir_byname(&walk))
 		res = iget(dir->i_sb, NTFS_GETU32(item));
@@ -582,8 +582,10 @@ static int ntfs_create(struct inode* dir, struct dentry *d, int mode)
 	}
 	ntfs_debug(DEBUG_OTHER, "ntfs_create %s\n", d->d_name.name);
 	vol = NTFS_INO2VOL(dir);
-	ino = NTFS_LINO2NINO(r);
-	error = ntfs_alloc_file(NTFS_LINO2NINO(dir), ino, (char*)d->d_name.name,
+	ino = NTFS_I(r);
+	ino->u.index.recordsize = 0;
+	ino->u.index.clusters_per_record = 0;
+	error = ntfs_alloc_file(NTFS_I(dir), ino, (char*)d->d_name.name,
 				d->d_name.len);
 	if (error) {
 		ntfs_error("ntfs_alloc_file FAILED: error = %i", error);
@@ -595,7 +597,7 @@ static int ntfs_create(struct inode* dir, struct dentry *d, int mode)
 	error = ntfs_update_inode(ino);
 	if (error)
 		goto fail;
-	error = ntfs_update_inode(NTFS_LINO2NINO(dir));
+	error = ntfs_update_inode(NTFS_I(dir));
 	if (error)
 		goto fail;
 	r->i_uid = vol->uid;
@@ -643,8 +645,8 @@ static int _linux_ntfs_mkdir(struct inode *dir, struct dentry* d, int mode)
 	if (!r)
 		goto out;
 	vol = NTFS_INO2VOL(dir);
-	ino = NTFS_LINO2NINO(r);
-	error = ntfs_mkdir(NTFS_LINO2NINO(dir), d->d_name.name, d->d_name.len,
+	ino = NTFS_I(r);
+	error = ntfs_mkdir(NTFS_I(dir), d->d_name.name, d->d_name.len,
 			   ino);
 	if (error)
 		goto out;
@@ -710,9 +712,9 @@ static void ntfs_read_inode(struct inode* inode)
 	case FILE_Mft:
 		if (!vol->mft_ino || ((vol->ino_flags & 1) == 0))
 			goto sys_file_error;
-		ntfs_memcpy(&inode->u.ntfs_i, vol->mft_ino, sizeof(ntfs_inode));
+		ntfs_memcpy(NTFS_I(inode), vol->mft_ino, sizeof(ntfs_inode));
 		ino = vol->mft_ino;
-		vol->mft_ino = &inode->u.ntfs_i;
+		vol->mft_ino = NTFS_I(inode);
 		vol->ino_flags &= ~1;
 		ntfs_free(ino);
 		ino = vol->mft_ino;
@@ -721,9 +723,9 @@ static void ntfs_read_inode(struct inode* inode)
 	case FILE_MftMirr:
 		if (!vol->mftmirr || ((vol->ino_flags & 2) == 0))
 			goto sys_file_error;
-		ntfs_memcpy(&inode->u.ntfs_i, vol->mftmirr, sizeof(ntfs_inode));
+		ntfs_memcpy(NTFS_I(inode), vol->mftmirr, sizeof(ntfs_inode));
 		ino = vol->mftmirr;
-		vol->mftmirr = &inode->u.ntfs_i;
+		vol->mftmirr = NTFS_I(inode);
 		vol->ino_flags &= ~2;
 		ntfs_free(ino);
 		ino = vol->mftmirr;
@@ -732,9 +734,9 @@ static void ntfs_read_inode(struct inode* inode)
 	case FILE_BitMap:
 		if (!vol->bitmap || ((vol->ino_flags & 4) == 0))
 			goto sys_file_error;
-		ntfs_memcpy(&inode->u.ntfs_i, vol->bitmap, sizeof(ntfs_inode));
+		ntfs_memcpy(NTFS_I(inode), vol->bitmap, sizeof(ntfs_inode));
 		ino = vol->bitmap;
-		vol->bitmap = &inode->u.ntfs_i;
+		vol->bitmap = NTFS_I(inode);
 		vol->ino_flags &= ~4;
 		ntfs_free(ino);
 		ino = vol->bitmap;
@@ -746,10 +748,10 @@ static void ntfs_read_inode(struct inode* inode)
 		ntfs_debug(DEBUG_OTHER, "Opening system file %i!\n",
 				inode->i_ino);
 	default:
-		ino = &inode->u.ntfs_i;
-		if (!ino || ntfs_init_inode(ino, NTFS_INO2VOL(inode),
-								inode->i_ino))
-		{
+		ino = NTFS_I(inode);
+		ino->u.index.recordsize = 0;
+		ino->u.index.clusters_per_record = 0;
+		if (ntfs_init_inode(ino, NTFS_INO2VOL(inode), inode->i_ino)) {
 			ntfs_debug(DEBUG_OTHER, "NTFS: Error loading inode "
 					"0x%x\n", (unsigned int)inode->i_ino);
 			return;
@@ -803,7 +805,7 @@ static void ntfs_write_inode(struct inode *ino, int unused)
 {
 	lock_kernel();
 	ntfs_debug(DEBUG_LINUX, "ntfs_write_inode 0x%x\n", ino->i_ino);
-	ntfs_update_inode(NTFS_LINO2NINO(ino));
+	ntfs_update_inode(NTFS_I(ino));
 	unlock_kernel();
 }
 #endif
@@ -823,7 +825,7 @@ static void _ntfs_clear_inode(struct inode *inode)
 	case FILE_Mft:
 		if (vol->mft_ino && ((vol->ino_flags & 1) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
-			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			ntfs_memcpy(ino, NTFS_I(inode), sizeof(ntfs_inode));
 			vol->mft_ino = ino;
 			vol->ino_flags |= 1;
 			goto unl_out;
@@ -832,7 +834,7 @@ static void _ntfs_clear_inode(struct inode *inode)
 	case FILE_MftMirr:
 		if (vol->mftmirr && ((vol->ino_flags & 2) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
-			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			ntfs_memcpy(ino, NTFS_I(inode), sizeof(ntfs_inode));
 			vol->mftmirr = ino;
 			vol->ino_flags |= 2;
 			goto unl_out;
@@ -841,7 +843,7 @@ static void _ntfs_clear_inode(struct inode *inode)
 	case FILE_BitMap:
 		if (vol->bitmap && ((vol->ino_flags & 4) == 0)) {
 			ino = (ntfs_inode*)ntfs_malloc(sizeof(ntfs_inode));
-			ntfs_memcpy(ino, &inode->u.ntfs_i, sizeof(ntfs_inode));
+			ntfs_memcpy(ino, NTFS_I(inode), sizeof(ntfs_inode));
 			vol->bitmap = ino;
 			vol->ino_flags |= 4;
 			goto unl_out;
@@ -850,7 +852,7 @@ static void _ntfs_clear_inode(struct inode *inode)
 	default:
 		/* Nothing. Just clear the inode and exit. */
 	}
-	ntfs_clear_inode(&inode->u.ntfs_i);
+	ntfs_clear_inode(NTFS_I(inode));
 unl_out:
 	unlock_kernel();
 	return;
@@ -914,7 +916,51 @@ static int ntfs_remount_fs(struct super_block *sb, int *flags, char *options)
 }
 
 /* Define the super block operation that are implemented */
+
+static kmem_cache_t * ntfs_inode_cachep;
+
+static struct inode *__ntfs_alloc_inode(struct super_block *sb)
+{
+	struct ntfs_i *ei;
+	ei = (struct ntfs_i *)kmem_cache_alloc(ntfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void ntfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(ntfs_inode_cachep, ntfs_i(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct ntfs_i *ei = (struct ntfs_i *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	ntfs_inode_cachep = kmem_cache_create("ntfs_inode_cache",
+					     sizeof(struct ntfs_i),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (ntfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(ntfs_inode_cachep))
+		printk(KERN_INFO "ntfs_inode_cache: not all structures were freed\n");
+}
 static struct super_operations ntfs_super_operations = {
+	alloc_inode:	__ntfs_alloc_inode,
+	destroy_inode:	ntfs_destroy_inode,
 	read_inode:	ntfs_read_inode,
 #ifdef CONFIG_NTFS_RW
 	write_inode:	ntfs_write_inode,
@@ -1112,6 +1158,7 @@ static DECLARE_FSTYPE_DEV(ntfs_fs_type, "ntfs", ntfs_read_super);
 
 static int __init init_ntfs_fs(void)
 {
+	int err;
 	/* Comment this if you trust klogd. There are reasons not to trust it */
 #if defined(DEBUG) && !defined(MODULE)
 	console_verbose();
@@ -1131,8 +1178,18 @@ static int __init init_ntfs_fs(void)
 			"]\n");
 	SYSCTL(1);
 	ntfs_debug(DEBUG_OTHER, "registering %s\n", ntfs_fs_type.name);
-	/* Add this filesystem to the kernel table of filesystems. */
-	return register_filesystem(&ntfs_fs_type);
+	err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&ntfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	SYSCTL(0);
+	return err;
 }
 
 static void __exit exit_ntfs_fs(void)
@@ -1140,6 +1197,7 @@ static void __exit exit_ntfs_fs(void)
 	SYSCTL(0);
 	ntfs_debug(DEBUG_OTHER, "unregistering %s\n", ntfs_fs_type.name);
 	unregister_filesystem(&ntfs_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

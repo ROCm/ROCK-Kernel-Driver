@@ -2169,11 +2169,6 @@ static void isdn_register_devfs(int k)
 {
 	char buf[11];
 
-	sprintf (buf, "isdn%d", k);
-	dev->devfs_handle_isdnX[k] =
-	    devfs_register (devfs_handle, buf, DEVFS_FL_DEFAULT,
-			    ISDN_MAJOR, k,0600 | S_IFCHR,
-			    &isdn_fops, NULL);
 	sprintf (buf, "isdnctrl%d", k);
 	dev->devfs_handle_isdnctrlX[k] =
 	    devfs_register (devfs_handle, buf, DEVFS_FL_DEFAULT,

@@ -449,6 +449,45 @@ CONFIG_ISDN
   want), say M here and read <file:Documentation/modules.txt>.  The
   module will be called isdn.o. If unsure, say N.
 
+CONFIG_ITANIUM
+  Select your IA64 processor type.  The default is Intel Itanium.
+
+CONFIG_MCKINLEY
+  Select this to configure for a McKinley processor.
+
+CONFIG_IA64_GENERIC
+  This selects the system type of your hardware.  A "generic" kernel
+  will run on any supported IA-64 system.  However, if you configure
+  a kernel for your specific system, it will be faster and smaller.
+
+  To find out what type of IA-64 system you have, you may want to
+  check the IA-64 Linux web site at <http://www.linux-ia64.org/>.
+  As of the time of this writing, most hardware is DIG compliant,
+  so the "DIG-compliant" option is usually the right choice.
+
+  HP-simulator   For the HP simulator
+                 (<http://software.hp.com/ia64linux/>).
+  SN1-simulator  For the SGI SN1 simulator.
+  DIG-compliant  For DIG ("Developer's Interface Guide") compliant
+                 system.
+
+  If you don't know what to do, choose "generic".
+
+CONFIG_IA64_PAGE_SIZE_4KB
+  This lets you select the page size of the kernel.  For best IA-64
+  performance, a page size of 8KB or 16KB is recommended.  For best
+  IA-32 compatibility, a page size of 4KB should be selected (the vast
+  majority of IA-32 binaries work perfectly fine with a larger page
+  size).  For Itanium systems, do NOT chose a page size larger than
+  16KB.
+
+  4KB                For best IA-32 compatibility
+  8KB                For best IA-64 performance
+  16KB               For best IA-64 performance
+  64KB               Not for Itanium.
+
+  If you don't know what to do, choose 8KB.
+
 CONFIG_ITANIUM_BSTEP_SPECIFIC
   Select this option to build a kernel for an Itanium prototype system
   with a B-step CPU.  You have a B-step CPU if the "revision" field in

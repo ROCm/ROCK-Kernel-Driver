@@ -216,32 +216,6 @@ static void ipq_destroy_queue(ipq_queue_t *q)
 	kfree(q);
 }
 
-/* With a chainsaw... */
-static int route_me_harder(struct sk_buff *skb)
-{
-	struct iphdr *iph = skb->nh.iph;
-	struct rtable *rt;
-
-	struct rt_key key = {
-				dst:iph->daddr, src:iph->saddr,
-				oif:skb->sk ? skb->sk->bound_dev_if : 0,
-				tos:RT_TOS(iph->tos)|RTO_CONN,
-#ifdef CONFIG_IP_ROUTE_FWMARK
-				fwmark:skb->nfmark
-#endif
-			};
-
-	if (ip_route_output_key(&rt, &key) != 0) {
-		printk("route_me_harder: No more route.\n");
-		return -EINVAL;
-	}
-
-	/* Drop old route. */
-	dst_release(skb->dst);
-	skb->dst = &rt->u.dst;
-	return 0;
-}
-
 static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 {
 	int diff;
@@ -287,7 +261,7 @@ static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 		if (!(iph->tos == e->rt_info.tos
 		      && iph->daddr == e->rt_info.daddr
 		      && iph->saddr == e->rt_info.saddr))
-			return route_me_harder(e->skb);
+			return route_me_harder(&e->skb);
 	}
 	return 0;
 }

@@ -8,17 +8,8 @@
 
 #include <linux/sched.h>
 #include <linux/locks.h>
-#include <linux/fs.h>
 #include <linux/msdos_fs.h>
-#include <linux/errno.h>
-#include <linux/fcntl.h>
-#include <linux/stat.h>
-#include <linux/string.h>
-#include <linux/pagemap.h>
 #include <linux/fat_cvf.h>
-
-#include <asm/uaccess.h>
-#include <asm/system.h>
 
 #define PRINTK(x)
 #define Printk(x) printk x

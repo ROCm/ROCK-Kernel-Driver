@@ -129,34 +129,6 @@ ipt_route_hook(unsigned int hook,
 	return ipt_do_table(pskb, hook, in, out, &packet_mangler, NULL);
 }
 
-/* FIXME: change in oif may mean change in hh_len.  Check and realloc
-   --RR */
-static int
-route_me_harder(struct sk_buff *skb)
-{
-	struct iphdr *iph = skb->nh.iph;
-	struct rtable *rt;
-	struct rt_key key = { dst:iph->daddr,
-			      src:iph->saddr,
-			      oif:skb->sk ? skb->sk->bound_dev_if : 0,
-			      tos:RT_TOS(iph->tos)|RTO_CONN,
-#ifdef CONFIG_IP_ROUTE_FWMARK
-			      fwmark:skb->nfmark
-#endif
-			    };
-
-	if (ip_route_output_key(&rt, &key) != 0) {
-		printk("route_me_harder: No more route.\n");
-		return -EINVAL;
-	}
-
-	/* Drop old route. */
-	dst_release(skb->dst);
-
-	skb->dst = &rt->u.dst;
-	return 0;
-}
-
 static unsigned int
 ipt_local_hook(unsigned int hook,
 		   struct sk_buff **pskb,
@@ -190,7 +162,7 @@ ipt_local_hook(unsigned int hook,
 		|| (*pskb)->nh.iph->daddr != daddr
 		|| (*pskb)->nfmark != nfmark
 		|| (*pskb)->nh.iph->tos != tos))
-		return route_me_harder(*pskb) == 0 ? ret : NF_DROP;
+		return route_me_harder(pskb) == 0 ? ret : NF_DROP;
 
 	return ret;
 }

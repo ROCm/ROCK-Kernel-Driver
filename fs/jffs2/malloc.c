@@ -49,6 +49,7 @@
 
 /* These are initialised to NULL in the kernel startup code.
    If you're porting to other operating systems, beware */
+static kmem_cache_t *jffs2_inode_cachep;
 static kmem_cache_t *full_dnode_slab;
 static kmem_cache_t *raw_dirent_slab;
 static kmem_cache_t *raw_inode_slab;
@@ -80,6 +81,31 @@ void jffs2_free_full_dirent_list(struct jffs2_full_dirent *fd)
 	}
 }
 
+struct inode *jffs2_alloc_inode(struct super_block *sb)
+{
+	struct jffs2_inode_info *ei;
+	ei = (struct jffs2_inode_info *)kmem_cache_alloc(jffs2_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+void jffs2_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(jffs2_inode_cachep, JFFS2_INODE_INFO(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct jffs2_inode_info *ei = (struct jffs2_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		init_MUTEX(&ei->sem);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+
 int __init jffs2_create_slab_caches(void)
 {
 	full_dnode_slab = kmem_cache_create("jffs2_full_dnode", sizeof(struct jffs2_full_dnode), 0, JFFS2_SLAB_POISON, NULL, NULL);
@@ -104,6 +130,13 @@ int __init jffs2_create_slab_caches(void)
 
 	node_frag_slab = kmem_cache_create("jffs2_node_frag", sizeof(struct jffs2_node_frag), 0, JFFS2_SLAB_POISON, NULL, NULL);
 	if (!node_frag_slab)
+		goto err;
+
+	jffs2_inode_cachep = kmem_cache_create("jffs2_inode_cache",
+					     sizeof(struct jffs2_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (!jffs2_inode_cachep)
 		goto err;
 
 	inode_cache_slab = kmem_cache_create("jffs2_inode_cache", sizeof(struct jffs2_inode_cache), 0, JFFS2_SLAB_POISON, NULL, NULL);
@@ -131,6 +164,8 @@ void jffs2_destroy_slab_caches(void)
 		kmem_cache_destroy(node_frag_slab);
 	if(inode_cache_slab)
 		kmem_cache_destroy(inode_cache_slab);
+	if(jffs2_inode_cachep)
+		kmem_cache_destroy(jffs2_inode_cachep);
 
 }
 
