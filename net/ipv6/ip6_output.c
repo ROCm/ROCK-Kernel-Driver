@@ -174,7 +174,7 @@ static inline int ip6_maybe_reroute(struct sk_buff *skb)
 		}
 	}
 #endif /* CONFIG_NETFILTER */
-	return skb->dst->output(skb);
+	return dst_output(skb);
 }
 
 /*
@@ -722,7 +722,7 @@ int ip6_call_ra_chain(struct sk_buff *skb, int sel)
 
 static inline int ip6_forward_finish(struct sk_buff *skb)
 {
-	return skb->dst->output(skb);
+	return dst_output(skb);
 }
 
 int ip6_forward(struct sk_buff *skb)

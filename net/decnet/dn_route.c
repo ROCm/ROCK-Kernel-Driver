@@ -389,7 +389,7 @@ static int dn_route_rx_packet(struct sk_buff *skb)
 	int err;
 
 	if ((err = dn_route_input(skb)) == 0)
-		return skb->dst->input(skb);
+		return dst_input(skb);
 
 	if (decnet_debug_level & 4) {
 		char *devname = skb->dev ? skb->dev->name : "???";

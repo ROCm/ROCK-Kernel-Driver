@@ -593,7 +593,7 @@ static __inline__ void dn_nsp_do_disc(struct sock *sk, unsigned char msgflg,
 	 * associations.
 	 */
 	skb->dst = dst_clone(dst);
-	skb->dst->output(skb);
+	dst_output(skb);
 }
 
 

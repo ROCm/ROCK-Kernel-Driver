@@ -1112,9 +1112,9 @@ static inline int ipmr_forward_finish(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 
 	if (skb->len <= dst_pmtu(dst))
-		return dst->output(skb);
+		return dst_output(skb);
 	else
-		return ip_fragment(skb, dst->output);
+		return ip_fragment(skb, dst_output);
 }
 
 /*
