@@ -654,7 +654,7 @@ static void __devinit rhine_reload_eeprom(long pioaddr, struct net_device *dev)
 
 	/* Turn off EEPROM-controlled wake-up (magic packet) */
 	if (rp->quirks & rqWOL)
-		iowrite8(ioread8(ioaddr + ConfigA) & 0xFE, ioaddr + ConfigA);
+		iowrite8(ioread8(ioaddr + ConfigA) & 0xFC, ioaddr + ConfigA);
 
 }
 
@@ -1905,8 +1905,14 @@ static void rhine_shutdown (struct device *gendev)
 	if (rp->quirks & rq6patterns)
 		iowrite8(0x04, ioaddr + 0xA7);
 
-	if (rp->wolopts & WAKE_MAGIC)
+	if (rp->wolopts & WAKE_MAGIC) {
 		iowrite8(WOLmagic, ioaddr + WOLcrSet);
+		/*
+		 * Turn EEPROM-controlled wake-up back on -- some hardware may
+		 * not cooperate otherwise.
+		 */
+		iowrite8(ioread8(ioaddr + ConfigA) | 0x03, ioaddr + ConfigA);
+	}
 
 	if (rp->wolopts & (WAKE_BCAST|WAKE_MCAST))
 		iowrite8(WOLbmcast, ioaddr + WOLcgSet);
@@ -1917,9 +1923,11 @@ static void rhine_shutdown (struct device *gendev)
 	if (rp->wolopts & WAKE_UCAST)
 		iowrite8(WOLucast, ioaddr + WOLcrSet);
 
-	/* Enable legacy WOL (for old motherboards) */
-	iowrite8(0x01, ioaddr + PwcfgSet);
-	iowrite8(ioread8(ioaddr + StickyHW) | 0x04, ioaddr + StickyHW);
+	if (rp->wolopts) {
+		/* Enable legacy WOL (for old motherboards) */
+		iowrite8(0x01, ioaddr + PwcfgSet);
+		iowrite8(ioread8(ioaddr + StickyHW) | 0x04, ioaddr + StickyHW);
+	}
 
 	/* Hit power state D3 (sleep) */
 	iowrite8(ioread8(ioaddr + StickyHW) | 0x03, ioaddr + StickyHW);
