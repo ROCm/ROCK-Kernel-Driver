@@ -278,7 +278,7 @@ void __init pidhash_init(void)
 
 	for (i = 0; i < PIDTYPE_MAX; i++) {
 		pid_hash[i] = alloc_bootmem(pidhash_size *
-					sizeof(struct list_head));
+					sizeof(*(pid_hash[i])));
 		if (!pid_hash[i])
 			panic("Could not alloc pidhash!\n");
 		for (j = 0; j < pidhash_size; j++)
