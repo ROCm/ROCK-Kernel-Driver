@@ -1062,7 +1062,6 @@ static int snd_rme32_playback_prepare(snd_pcm_substream_t * substream)
 	if (rme32->fullduplex_mode) {
 		memset(&rme32->playback_pcm, 0, sizeof(rme32->playback_pcm));
 		rme32->playback_pcm.hw_buffer_size = RME32_BUFFER_SIZE;
-		rme32->playback_pcm.hw_queue_size = RME32_BUFFER_SIZE / 2;
 		rme32->playback_pcm.sw_buffer_size = snd_pcm_lib_buffer_bytes(substream);
 	} else {
 		writel(0, rme32->iobase + RME32_IO_RESET_POS);
@@ -1110,9 +1109,10 @@ snd_rme32_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 			if (rme32->fullduplex_mode) {
 				/* remember the current DMA position */
 				if (s == rme32->playback_substream) {
+					rme32->playback_pcm.hw_io =
 					rme32->playback_pcm.hw_data = snd_rme32_pcm_byteptr(rme32);
-					s->ops->ack(s); /* prefill buffer */
 				} else {
+					rme32->capture_pcm.hw_io =
 					rme32->capture_pcm.hw_data = snd_rme32_pcm_byteptr(rme32);
 				}
 			}
@@ -1124,6 +1124,17 @@ snd_rme32_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 		snd_pcm_trigger_done(s, substream);
 	}
 	
+	/* prefill playback buffer */
+	if (cmd == SNDRV_PCM_TRIGGER_START) {
+		snd_pcm_group_for_each(pos, substream) {
+			s = snd_pcm_group_substream_entry(pos);
+			if (s == rme32->playback_substream) {
+				s->ops->ack(s);
+				break;
+			}
+		}
+	}
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		if (rme32->running && ! RME32_ISWORKING(rme32))
@@ -1174,7 +1185,17 @@ static void snd_rme32_pb_trans_copy(snd_pcm_substream_t *substream,
 static int snd_rme32_playback_fd_ack(snd_pcm_substream_t *substream)
 {
 	rme32_t *rme32 = snd_pcm_substream_chip(substream);
-	snd_pcm_indirect_playback_transfer(substream, &rme32->playback_pcm,
+	snd_pcm_indirect_t *rec, *cprec;
+	unsigned long flags;
+
+	rec = &rme32->playback_pcm;
+	cprec = &rme32->capture_pcm;
+	spin_lock_irqsave(&rme32->lock, flags);
+	rec->hw_queue_size = RME32_BUFFER_SIZE;
+	if (rme32->running & (1 << SNDRV_PCM_STREAM_CAPTURE))
+		rec->queue_size -= cprec->hw_ready;
+	spin_unlock_irqrestore(&rme32->lock, flags);
+	snd_pcm_indirect_playback_transfer(substream, rec,
 					   snd_rme32_pb_trans_copy);
 	return 0;
 }
