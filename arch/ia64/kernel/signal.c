@@ -43,7 +43,7 @@
 #endif
 
 long
-ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
+ia64_rt_sigsuspend (sigset_t __user *uset, size_t sigsetsize, struct sigscratch *scr)
 {
 	sigset_t oldset, set;
 
@@ -84,7 +84,7 @@ ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 }
 
 asmlinkage long
-sys_sigaltstack (const stack_t *uss, stack_t *uoss, long arg2, long arg3, long arg4,
+sys_sigaltstack (const stack_t __user *uss, stack_t __user *uoss, long arg2, long arg3, long arg4,
 		 long arg5, long arg6, long arg7, long stack)
 {
 	struct pt_regs *pt = (struct pt_regs *) &stack;
@@ -93,7 +93,7 @@ sys_sigaltstack (const stack_t *uss, stack_t *uoss, long arg2, long arg3, long a
 }
 
 static long
-restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
+restore_sigcontext (struct sigcontext __user *sc, struct sigscratch *scr)
 {
 	unsigned long ip, flags, nat, um, cfm;
 	long err;
@@ -155,7 +155,7 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 }
 
 int
-copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
+copy_siginfo_to_user (siginfo_t __user *to, siginfo_t *from)
 {
 	if (!access_ok(VERIFY_WRITE, to, sizeof(siginfo_t)))
 		return -EFAULT;
@@ -211,12 +211,12 @@ long
 ia64_rt_sigreturn (struct sigscratch *scr)
 {
 	extern char ia64_strace_leave_kernel, ia64_leave_kernel;
-	struct sigcontext *sc;
+	struct sigcontext __user *sc;
 	struct siginfo si;
 	sigset_t set;
 	long retval;
 
-	sc = &((struct sigframe *) (scr->pt.r12 + 16))->sc;
+	sc = &((struct sigframe __user *) (scr->pt.r12 + 16))->sc;
 
 	/*
 	 * When we return to the previously executing context, r8 and r10 have already
@@ -260,7 +260,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 	 * It is more difficult to avoid calling this function than to
 	 * call it and ignore errors.
 	 */
-	do_sigaltstack(&sc->sc_stack, 0, scr->pt.r12);
+	do_sigaltstack(&sc->sc_stack, NULL, scr->pt.r12);
 	return retval;
 
   give_sigsegv:
@@ -281,7 +281,7 @@ ia64_rt_sigreturn (struct sigscratch *scr)
  * trampoline starts.  Everything else is done at the user-level.
  */
 static long
-setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
+setup_sigcontext (struct sigcontext __user *sc, sigset_t *mask, struct sigscratch *scr)
 {
 	unsigned long flags = 0, ifs, cfm, nat;
 	long err;
@@ -335,7 +335,7 @@ setup_sigcontext (struct sigcontext *sc, sigset_t *mask, struct sigscratch *scr)
 		err |= __put_user(scr->pt.ar_ccv, &sc->sc_ar_ccv);		/* ar.ccv */
 		err |= __put_user(scr->pt.b7, &sc->sc_br[7]);			/* b7 */
 		err |= __put_user(scr->pt.r14, &sc->sc_gr[14]);			/* r14 */
-		err |= __copy_to_user(&scr->pt.ar_csd, &sc->sc_ar25, 2*8); /* ar.csd & ar.ssd */
+		err |= __copy_to_user(&sc->sc_ar25, &scr->pt.ar_csd, 2*8); /* ar.csd & ar.ssd */
 		err |= __copy_to_user(&sc->sc_gr[2], &scr->pt.r2, 2*8);		/* r2-r3 */
 		err |= __copy_to_user(&sc->sc_gr[16], &scr->pt.r16, 16*8);	/* r16-r31 */
 	}
@@ -352,7 +352,7 @@ rbs_on_sig_stack (unsigned long bsp)
 }
 
 static long
-force_sigsegv_info (int sig, void *addr)
+force_sigsegv_info (int sig, void __user *addr)
 {
 	unsigned long flags;
 	struct siginfo si;
@@ -387,14 +387,14 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 {
 	extern char __kernel_sigtramp[];
 	unsigned long tramp_addr, new_rbs = 0;
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 	long err;
 
-	frame = (void *) scr->pt.r12;
+	frame = (void __user *) scr->pt.r12;
 	tramp_addr = (unsigned long) __kernel_sigtramp;
 	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags((unsigned long) frame) == 0) {
-		frame = (void *) ((current->sas_ss_sp + current->sas_ss_size)
-				  & ~(STACK_ALIGN - 1));
+		frame = (void __user *) ((current->sas_ss_sp + current->sas_ss_size)
+					 & ~(STACK_ALIGN - 1));
 		/*
 		 * We need to check for the register stack being on the signal stack
 		 * separately, because it's switched separately (memory stack is switched
@@ -403,7 +403,7 @@ setup_frame (int sig, struct k_sigaction *ka, siginfo_t *info, sigset_t *set,
 		if (!rbs_on_sig_stack(scr->pt.ar_bspstore))
 			new_rbs = (current->sas_ss_sp + sizeof(long) - 1) & ~(sizeof(long) - 1);
 	}
-	frame = (void *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
+	frame = (void __user *) frame - ((sizeof(*frame) + STACK_ALIGN - 1) & ~(STACK_ALIGN - 1));
 
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return force_sigsegv_info(sig, frame);

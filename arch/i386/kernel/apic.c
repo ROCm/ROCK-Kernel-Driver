@@ -91,7 +91,7 @@ int get_physical_broadcast(void)
 	unsigned int lvr, version;
 	lvr = apic_read(APIC_LVR);
 	version = GET_APIC_VERSION(lvr);
-	if (version >= 0x14)
+	if (!APIC_INTEGRATED(version) || version >= 0x14)
 		return 0xff;
 	else
 		return 0xf;

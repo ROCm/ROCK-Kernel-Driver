@@ -391,7 +391,7 @@ static int pppoe_rcv(struct sk_buff *skb,
 
 	ph = (struct pppoe_hdr *) skb->nh.raw;
 
-	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
+	po = get_item((unsigned long) ph->sid, eth_hdr(skb)->h_source);
 	if (!po) 
 		goto drop;
 
@@ -440,7 +440,7 @@ static int pppoe_disc_rcv(struct sk_buff *skb,
 	if (ph->code != PADT_CODE)
 		goto abort;
 
-	po = get_item((unsigned long) ph->sid, skb->mac.ethernet->h_source);
+	po = get_item((unsigned long) ph->sid, eth_hdr(skb)->h_source);
 	if (po) {
 		struct sock *sk = po->sk;
 
