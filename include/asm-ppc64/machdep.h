@@ -58,7 +58,7 @@ struct machdep_calls {
 					    int local);
 	/* special for kexec, to be called in real mode, linar mapping is
 	 * destroyed as well */
-	void		(*htpe_clear_all)(void);
+	void		(*hpte_clear_all)(void);
 
 	void		(*tce_build)(struct iommu_table * tbl,
 				     long index,

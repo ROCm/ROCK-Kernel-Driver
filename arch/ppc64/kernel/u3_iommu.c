@@ -1,5 +1,5 @@
 /*
- * arch/ppc64/kernel/pmac_iommu.c
+ * arch/ppc64/kernel/u3_iommu.c
  *
  * Copyright (C) 2004 Olof Johansson <olof@austin.ibm.com>, IBM Corporation
  *
@@ -7,7 +7,7 @@
  * Copyright (C) 2001 Mike Corrigan & Dave Engebretsen, IBM Corporation
  * Copyright (C) 2004 Olof Johansson <olof@austin.ibm.com>, IBM Corporation
  *
- * Dynamic DMA mapping support, PowerMac G5 (DART)-specific parts.
+ * Dynamic DMA mapping support, Apple U3 & IBM CPC925 "DART" iommu.
  *
  * 
  * This program is free software; you can redistribute it and/or modify
@@ -89,7 +89,7 @@ static unsigned int *dart;
 /* Dummy val that entries are set to when unused */
 static unsigned int dart_emptyval;
 
-static struct iommu_table iommu_table_pmac;
+static struct iommu_table iommu_table_u3;
 static int dart_dirty;
 
 #define DBG(...)
@@ -141,9 +141,9 @@ static void dart_flush(struct iommu_table *tbl)
 	dart_dirty = 0;
 }
 
-static void dart_build_pmac(struct iommu_table *tbl, long index, 
-			    long npages, unsigned long uaddr,
-			    enum dma_data_direction direction)
+static void dart_build(struct iommu_table *tbl, long index, 
+		       long npages, unsigned long uaddr,
+		       enum dma_data_direction direction)
 {
 	unsigned int *dp;
 	unsigned int rpn;
@@ -152,7 +152,7 @@ static void dart_build_pmac(struct iommu_table *tbl, long index,
 
 	dp = ((unsigned int*)tbl->it_base) + index;
 	
-	/* On pmac, all memory is contigous, so we can move this
+	/* On U3, all memory is contigous, so we can move this
 	 * out of the loop.
 	 */
 	while (npages--) {
@@ -168,7 +168,7 @@ static void dart_build_pmac(struct iommu_table *tbl, long index,
 }
 
 
-static void dart_free_pmac(struct iommu_table *tbl, long index, long npages)
+static void dart_free(struct iommu_table *tbl, long index, long npages)
 {
 	unsigned int *dp;
 	
@@ -239,32 +239,32 @@ static int dart_init(struct device_node *dart_node)
 	/* Invalidate DART to get rid of possible stale TLBs */
 	dart_tlb_invalidate_all();
 
-	iommu_table_pmac.it_busno = 0;
+	iommu_table_u3.it_busno = 0;
 	
 	/* Units of tce entries */
-	iommu_table_pmac.it_offset = 0;
+	iommu_table_u3.it_offset = 0;
 	
 	/* Set the tce table size - measured in pages */
-	iommu_table_pmac.it_size = dart_tablesize >> PAGE_SHIFT;
+	iommu_table_u3.it_size = dart_tablesize >> PAGE_SHIFT;
 
 	/* Initialize the common IOMMU code */
-	iommu_table_pmac.it_base = (unsigned long)dart_vbase;
-	iommu_table_pmac.it_index = 0;
-	iommu_table_pmac.it_blocksize = 1;
-	iommu_table_pmac.it_entrysize = sizeof(u32);
-	iommu_init_table(&iommu_table_pmac);
+	iommu_table_u3.it_base = (unsigned long)dart_vbase;
+	iommu_table_u3.it_index = 0;
+	iommu_table_u3.it_blocksize = 1;
+	iommu_table_u3.it_entrysize = sizeof(u32);
+	iommu_init_table(&iommu_table_u3);
 
 	/* Reserve the last page of the DART to avoid possible prefetch
 	 * past the DART mapped area
 	 */
-	set_bit(iommu_table_pmac.it_mapsize - 1, iommu_table_pmac.it_map);
+	set_bit(iommu_table_u3.it_mapsize - 1, iommu_table_u3.it_map);
 
-	printk(KERN_INFO "U3-DART IOMMU initialized\n");
+	printk(KERN_INFO "U3/CPC925 DART IOMMU initialized\n");
 
 	return 0;
 }
 
-void iommu_setup_pmac(void)
+void iommu_setup_u3(void)
 {
 	struct pci_dev *dev = NULL;
 	struct device_node *dn;
@@ -275,8 +275,8 @@ void iommu_setup_pmac(void)
 		return;
 
 	/* Setup low level TCE operations for the core IOMMU code */
-	ppc_md.tce_build = dart_build_pmac;
-	ppc_md.tce_free  = dart_free_pmac;
+	ppc_md.tce_build = dart_build;
+	ppc_md.tce_free  = dart_free;
 	ppc_md.tce_flush = dart_flush;
 
 	/* Initialize the DART HW */
@@ -296,11 +296,11 @@ void iommu_setup_pmac(void)
 		 */
 		struct device_node *dn = pci_device_to_OF_node(dev);
 		if (dn)
-			dn->iommu_table = &iommu_table_pmac;
+			dn->iommu_table = &iommu_table_u3;
 	}
 }
 
-void __init pmac_iommu_alloc(void)
+void __init alloc_u3_dart_table(void)
 {
 	/* Only reserve DART space if machine has more than 2GB of RAM
 	 * or if requested with iommu=on on cmdline.

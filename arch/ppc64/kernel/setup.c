@@ -50,6 +50,7 @@
 #include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/rtas.h>
+#include <asm/iommu.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -404,6 +405,16 @@ void __init early_setup(unsigned long dt_ptr)
 	EARLY_DEBUG_INIT();
 
 	DBG("Found, Initializing memory management...\n");
+
+#ifdef CONFIG_U3_DART
+	/*
+	 * On U3, the DART (iommu) must be allocated now since it
+	 * has an impact on htab_initialize (due to the large page it
+	 * occupies having to be broken up so the DART itself is not
+	 * part of the cacheable linar mapping
+	 */
+	alloc_u3_dart_table();
+#endif /* CONFIG_U3_DART */
 
 	/*
 	 * Initialize stab / SLB management

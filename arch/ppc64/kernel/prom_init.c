@@ -423,13 +423,6 @@ static void __init early_cmdline_parse(void)
 		else if (!strncmp(opt, RELOC("force"), 5))
 			RELOC(iommu_force_on) = 1;
 	}
-
-#ifndef CONFIG_PMAC_DART
-	if (RELOC(of_platform) == PLATFORM_POWERMAC) {
-		RELOC(ppc64_iommu_off) = 1;
-		prom_printf("DART disabled on PowerMac !\n");
-	}
-#endif
 }
 
 /*
