@@ -343,6 +343,7 @@ static void xircom_tx_timeout(struct net_device *dev);
 static void xircom_init_ring(struct net_device *dev);
 static int xircom_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int xircom_rx(struct net_device *dev);
+static void xircom_media_change(struct net_device *dev);
 static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
 static int xircom_close(struct net_device *dev);
 static struct net_device_stats *xircom_get_stats(struct net_device *dev);
@@ -789,6 +790,9 @@ xircom_up(struct net_device *dev)
 	/* Tell the net layer we're ready */
 	netif_start_queue (dev);
 
+	/* Check current media state */
+	xircom_media_change(dev);
+
 	if (xircom_debug > 2) {
 		printk(KERN_DEBUG "%s: Done xircom_up(), CSR0 %8.8x, CSR5 %8.8x CSR6 %8.8x.\n",
 			   dev->name, inl(ioaddr + CSR0), inl(ioaddr + CSR5),
@@ -1013,6 +1017,7 @@ static void xircom_media_change(struct net_device *dev)
 		       dev->name,
 		       tp->speed100 ? "100" : "10",
 		       tp->full_duplex ? "full" : "half");
+		netif_carrier_on(dev);
 		newcsr6 = csr6 & ~FullDuplexBit;
 		if (tp->full_duplex)
 			newcsr6 |= FullDuplexBit;
@@ -1020,6 +1025,7 @@ static void xircom_media_change(struct net_device *dev)
 			outl_CSR6(newcsr6, ioaddr + CSR6);
 	} else {
 		printk(KERN_DEBUG "%s: Link is down\n", dev->name);
+		netif_carrier_off(dev);
 	}
 }
 
