@@ -1779,7 +1779,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
@@ -1790,7 +1790,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
 		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
-		if (put_user(amount, (unsigned int *)arg))
+		if (put_user(amount, (unsigned int __user *)arg))
 			return -EFAULT;
 		return 0;
 	}
