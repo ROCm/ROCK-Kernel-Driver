@@ -131,8 +131,9 @@ static int get_nodes(unsigned long *nodes, unsigned long *nmask,
 	unsigned long endmask;
 
 	bitmap_clear(nodes, MAX_NUMNODES);
-	if (--maxnode == 0) 
+	if (maxnode <= 1) 
 		return 0;
+	--maxnode;	
 
 	nlongs = BITS_TO_LONGS(maxnode);
 	if ((maxnode % BITS_PER_LONG) == 0)
