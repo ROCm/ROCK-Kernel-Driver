@@ -19,7 +19,7 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
-2.1.8 - WIP.
+2.1.8-WIP
 
 	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
 	- Modify fs/ntfs/time.c::ntfs2utc(), get_current_ntfs_time(), and
@@ -28,6 +28,8 @@ ToDo:
 	  time and only loosing up to 99 nano-seconds in the Linux UTC time.
 	- Move fs/ntfs/time.c to fs/ntfs/time.h and make the time functions
 	  static inline.
+	- Remove unused ntfs_dirty_inode().
+	- Cleanup super operations declaration in fs/ntfs/super.c.
 
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 

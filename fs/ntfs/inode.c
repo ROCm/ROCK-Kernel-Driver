@@ -381,7 +381,7 @@ inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
  * Search all file name attributes in the inode described by the attribute
  * search context @ctx and check if any of the names are in the $Extend system
  * directory.
- * 
+ *
  * Return values:
  *	   1: file is in $Extend directory
  *	   0: file is not in $Extend directory
@@ -1734,39 +1734,6 @@ err_out:
 	ntfs_error(sb, "Failed. Marking inode as bad.");
 	make_bad_inode(vi);
 	goto out_now;
-}
-
-/**
- * ntfs_dirty_inode - mark the inode's metadata dirty
- * @vi:		inode to mark dirty
- *
- * This is called from fs/inode.c::__mark_inode_dirty(), when the inode itself
- * is being marked dirty. An example is when update_atime() is invoked.
- *
- * We mark the inode dirty by setting both the page in which the mft record
- * resides and the buffer heads in that page which correspond to the mft record
- * dirty. This ensures that the changes will eventually be propagated to disk
- * when the inode is set dirty.
- *
- * FIXME: Can we do that with the buffer heads? I am not too sure. Because if we
- * do that we need to make sure that the kernel will not write out those buffer
- * heads or we are screwed as it will write corrupt data to disk. The only way
- * a mft record can be written correctly is by mst protecting it, writting it
- * synchronously and fast mst deprotecting it. During this period, obviously,
- * the mft record must be marked as not uptodate, be locked for writing or
- * whatever, so that nobody attempts anything stupid.
- *
- * FIXME: Do we need to check that the fs is not mounted read only? And what
- * about the inode? Anything else?
- *
- * FIXME: As we are only a read only driver it is safe to just return here for
- * the moment.
- */
-void ntfs_dirty_inode(struct inode *vi)
-{
-	ntfs_debug("Entering for inode 0x%lx.", vi->i_ino);
-	NInoSetDirty(NTFS_I(vi));
-	return;
 }
 
 /**
