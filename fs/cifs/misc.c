@@ -141,18 +141,8 @@ tconInfoFree(struct cifsTconInfo *buf_to_free)
 	kfree(buf_to_free);
 }
 
-void *
-kcalloc(size_t size, int type)
-{
-	void *addr;
-	addr = kmalloc(size, type);
-	if (addr)
-		memset(addr, 0, size);
-	return addr;
-}
-
 struct smb_hdr *
-buf_get(void)
+cifs_buf_get(void)
 {
 	struct smb_hdr *ret_buf;
 
@@ -173,11 +163,11 @@ buf_get(void)
 }
 
 void
-buf_release(void *buf_to_free)
+cifs_buf_release(void *buf_to_free)
 {
 
 	if (buf_to_free == NULL) {
-		cFYI(1, ("Null buffer passed to buf_release"));
+		cFYI(1, ("Null buffer passed to cifs_buf_release"));
 		return;
 	}
 	kmem_cache_free(cifs_req_cachep, buf_to_free);
@@ -269,7 +259,7 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 								buffer->Uid = ses->Suid;
 								break;
 							} else {
-								/* BB eventually call setup_session here */
+								/* BB eventually call cifs_setup_session here */
 								cFYI(1,("local UID found but smb sess with this server does not exist"));  
 							}
 						}

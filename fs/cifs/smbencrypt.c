@@ -43,9 +43,7 @@
 /* following came from the other byteorder.h to avoid include conflicts */
 #define CVAL(buf,pos) (((unsigned char *)(buf))[pos])
 #define SSVALX(buf,pos,val) (CVAL(buf,pos)=(val)&0xFF,CVAL(buf,pos+1)=(val)>>8)
-#define SIVALX(buf,pos,val) (SSVALX(buf,pos,val&0xFFFF),SSVALX(buf,pos+2,val>>16))
 #define SSVAL(buf,pos,val) SSVALX((buf),(pos),((__u16)(val)))
-#define SIVAL(buf,pos,val) SIVALX((buf),(pos),((__u32)(val)))
 
 /*The following definitions come from  lib/md4.c  */
 
@@ -290,24 +288,3 @@ SMBsesskeygen_ntv1(const unsigned char kr[16],
 {
 	mdfour((unsigned char *) sess_key, (unsigned char *) kr, 16);
 }
-
-/***********************************************************
- encode a password buffer.  The caller gets to figure out 
- what to put in it.
-************************************************************/
-int
-encode_pw_buffer(char buffer[516], char *new_pw, int new_pw_length)
-{
-	get_random_bytes(buffer, sizeof (buffer));
-
-	memcpy(&buffer[512 - new_pw_length], new_pw, new_pw_length);
-
-	/* 
-	 * The length of the new password is in the last 4 bytes of
-	 * the data buffer.
-	 */
-	SIVAL(buffer, 512, new_pw_length);
-
-	return TRUE;
-}
-

@@ -213,11 +213,12 @@ cifs_open(struct inode *inode, struct file *file)
 
 /* Try to reaquire byte range locks that were released when session */
 /* to server was lost */
-int relock_files(struct cifsFileInfo * cifsFile)
+static int cifs_relock_file(struct cifsFileInfo * cifsFile)
 {
 	int rc = 0;
 
-/* list all locks open on this file */
+/* BB list all locks open on this file and relock */
+
 	return rc;
 }
 
@@ -312,6 +313,7 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 				pCifsInode->clientCanCacheRead = FALSE;
 				pCifsInode->clientCanCacheAll =  FALSE;
 			}
+			cifs_relock_file(pCifsFile);
 		}
 	}
 
@@ -1022,7 +1024,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			break;
 		}
 		if(smb_read_data) {
-			buf_release(smb_read_data);
+			cifs_buf_release(smb_read_data);
 			smb_read_data = 0;
 		}
 		bytes_read = 0;

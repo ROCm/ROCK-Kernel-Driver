@@ -78,7 +78,7 @@ DeleteMidQEntry(struct mid_q_entry *midEntry)
 	list_del(&midEntry->qhead);
 	atomic_dec(&midCount);
 	spin_unlock(&GlobalMid_Lock);
-	buf_release(midEntry->resp_buf);
+	cifs_buf_release(midEntry->resp_buf);
 	kmem_cache_free(cifs_mid_cachep, midEntry);
 }
 

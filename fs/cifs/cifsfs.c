@@ -133,7 +133,7 @@ out_mount_failed:
 	return rc;
 }
 
-void
+static void
 cifs_put_super(struct super_block *sb)
 {
 	int rc = 0;
@@ -154,7 +154,7 @@ cifs_put_super(struct super_block *sb)
 	return;
 }
 
-int
+static int
 cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int xid, rc;
@@ -398,7 +398,7 @@ cifs_get_sb(struct file_system_type *fs_type,
 	return sb;
 }
 
-ssize_t
+static ssize_t
 cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
           loff_t * poffset)
 {
@@ -408,7 +408,7 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 		return cifs_read(file,read_data,read_size,poffset);	
 }
 
-ssize_t
+static ssize_t
 cifs_write_wrapper(struct file * file, const char *write_data,
            size_t write_size, loff_t * poffset) 
 {
@@ -501,7 +501,7 @@ cifs_init_once(void *inode, kmem_cache_t * cachep, unsigned long flags)
 	}
 }
 
-int
+static int
 cifs_init_inodecache(void)
 {
 	cifs_inode_cachep = kmem_cache_create("cifs_inode_cache",
@@ -514,14 +514,14 @@ cifs_init_inodecache(void)
 	return 0;
 }
 
-void
+static void
 cifs_destroy_inodecache(void)
 {
 	if (kmem_cache_destroy(cifs_inode_cachep))
 		printk(KERN_WARNING "cifs_inode_cache: error freeing\n");
 }
 
-int
+static int
 cifs_init_request_bufs(void)
 {
 	cifs_req_cachep = kmem_cache_create("cifs_request",
@@ -534,7 +534,7 @@ cifs_init_request_bufs(void)
 	return 0;
 }
 
-void
+static void
 cifs_destroy_request_bufs(void)
 {
 	if (kmem_cache_destroy(cifs_req_cachep))
@@ -542,7 +542,7 @@ cifs_destroy_request_bufs(void)
 		       "cifs_destroy_request_cache: error not all structures were freed\n");
 }
 
-int
+static int
 cifs_init_mids(void)
 {
 	cifs_mid_cachep = kmem_cache_create("cifs_mpx_ids",
@@ -561,7 +561,7 @@ cifs_init_mids(void)
 	return 0;
 }
 
-void
+static void
 cifs_destroy_mids(void)
 {
 	if (kmem_cache_destroy(cifs_mid_cachep))
