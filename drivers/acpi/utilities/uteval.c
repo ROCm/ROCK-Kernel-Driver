@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -205,8 +205,9 @@ acpi_ut_evaluate_object (
 			prefix_node, path, AE_TYPE);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-			"Type returned from %s was incorrect: %X\n",
-			path, ACPI_GET_OBJECT_TYPE (info.return_object)));
+			"Type returned from %s was incorrect: %s, expected Btypes: %X\n",
+			path, acpi_ut_get_object_type_name (info.return_object),
+			expected_return_btypes));
 
 		/* On error exit, we must delete the return object */
 
