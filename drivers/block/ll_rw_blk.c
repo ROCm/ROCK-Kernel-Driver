@@ -49,6 +49,9 @@ extern int mac_floppy_init(void);
  */
 static kmem_cache_t *request_cachep;
 
+/*
+ * plug management
+ */
 static struct list_head blk_plug_list;
 static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
@@ -794,18 +797,12 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
  * force the transfer to start only after we have put all the requests
  * on the list.
  *
- * This is called with interrupts off and no requests on the queue.
- * (and with the request spinlock acquired)
+ * This is called with interrupts off and no requests on the queue and
+ * with the queue lock held.
  */
 void blk_plug_device(request_queue_t *q)
 {
-	/*
-	 * common case
-	 */
-	if (!elv_queue_empty(q))
-		return;
-
-	if (!test_and_set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
+	if (!blk_queue_plugged(q)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
 		spin_unlock(&blk_plug_lock);
@@ -813,14 +810,27 @@ void blk_plug_device(request_queue_t *q)
 }
 
 /*
+ * remove the queue from the plugged list, if present. called with
+ * queue lock held and interrupts disabled.
+ */
+inline int blk_remove_plug(request_queue_t *q)
+{
+	if (blk_queue_plugged(q)) {
+		spin_lock(&blk_plug_lock);
+		list_del_init(&q->plug_list);
+		spin_unlock(&blk_plug_lock);
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
  * remove the plug and let it rip..
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-	/*
-	 * not plugged
-	 */
-	if (!test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags))
+	if (!blk_remove_plug(q))
 		return;
 
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
@@ -848,11 +858,10 @@ static inline void __generic_unplug_device(request_queue_t *q)
 void generic_unplug_device(void *data)
 {
 	request_queue_t *q = data;
-	unsigned long flags;
 
-	spin_lock_irqsave(q->queue_lock, flags);
+	spin_lock_irq(q->queue_lock);
 	__generic_unplug_device(q);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	spin_unlock_irq(q->queue_lock);
 }
 
 /**
@@ -895,17 +904,9 @@ void blk_stop_queue(request_queue_t *q)
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-
-	/*
-	 * remove from the plugged list, queue must not be called.
-	 */
-	if (test_and_clear_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags)) {
-		spin_lock(&blk_plug_lock);
-		list_del(&q->plug_list);
-		spin_unlock(&blk_plug_lock);
-	}
-
+	blk_remove_plug(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
+
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
 
@@ -941,12 +942,7 @@ void blk_run_queues(void)
 	while (!list_empty(&local_plug_list)) {
 		request_queue_t *q = blk_plug_entry(local_plug_list.next);
 
-		BUG_ON(test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags));
-
-		spin_lock_irq(q->queue_lock);
-		list_del(&q->plug_list);
-		__generic_unplug_device(q);
-		spin_unlock_irq(q->queue_lock);
+		q->unplug_fn(q);
 	}
 }
 
@@ -1089,6 +1085,7 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->front_merge_fn      	= ll_front_merge_fn;
 	q->merge_requests_fn	= ll_merge_requests_fn;
 	q->prep_rq_fn		= NULL;
+	q->unplug_fn		= generic_unplug_device;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
 
@@ -1386,10 +1383,12 @@ again:
 	req = NULL;
 	insert_here = q->queue_head.prev;
 
-	if (blk_queue_empty(q) || barrier) {
+	if (blk_queue_empty(q)) {
 		blk_plug_device(q);
 		goto get_rq;
 	}
+	if (barrier)
+		goto get_rq;
 
 	el_ret = elv_merge(q, &req, bio);
 	switch (el_ret) {
@@ -2011,6 +2010,8 @@ EXPORT_SYMBOL(blk_queue_bounce_limit);
 EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(generic_unplug_device);
+EXPORT_SYMBOL(blk_plug_device);
+EXPORT_SYMBOL(blk_remove_plug);
 EXPORT_SYMBOL(blk_attempt_remerge);
 EXPORT_SYMBOL(blk_max_low_pfn);
 EXPORT_SYMBOL(blk_max_pfn);
