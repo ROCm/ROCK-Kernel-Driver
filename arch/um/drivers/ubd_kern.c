@@ -480,36 +480,29 @@ static int ubd_open_dev(struct ubd *dev)
 	return(err);
 }
 
-static int ubd_new_disk(int major, u64 size, char *name, int unit,
+static int ubd_new_disk(int major, u64 size, int unit,
 			struct gendisk **disk_out)
 			
 {
-	char devfs_name[sizeof("ubd/nnnnnn\0")];
 	struct gendisk *disk;
-	int minor = unit << UBD_SHIFT;
 
 	disk = alloc_disk(1 << UBD_SHIFT);
-	if(disk == NULL)
-		return(-ENOMEM);
+	if (!disk)
+		return -ENOMEM;
 
 	disk->major = major;
-	disk->first_minor = minor;
+	disk->first_minor = unit << UBD_SHIFT;
 	disk->fops = &ubd_blops;
 	set_capacity(disk, size / 512);
-	/* needs to be ubd -> /dev/ubd/discX/disc */
 	sprintf(disk->disk_name, "ubd");
-	*disk_out = disk;
+	sprintf(disk->devfs_name, "ubd/disc%d", unit);
 
-	/* /dev/ubd/N style names */
-	sprintf(devfs_name, "ubd/%d", unit);
-	*handle_out = devfs_register(NULL, devfs_name,
-				     0, major, minor,
-				     S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
-				     S_IWGRP, &ubd_blops, NULL);
 	disk->private_data = &ubd_dev[unit];
 	disk->queue = &ubd_queue;
 	add_disk(disk);
-	return(0);
+
+	*disk_out = disk;
+	return 0;
 }
 
 static int ubd_add(int n)
@@ -530,12 +523,12 @@ static int ubd_add(int n)
 	if(err)
 		return(err);
 
-	err = ubd_new_disk(MAJOR_NR, dev->size, "ubd", n, &ubd_gendisk[n]);
+	err = ubd_new_disk(MAJOR_NR, dev->size, n, &ubd_gendisk[n]);
 	if(err) 
 		return(err);
  
 	if(fake_major)
-		ubd_new_disk(fake_major, dev->size, "ubd%d", n, 
+		ubd_new_disk(fake_major, dev->size, n, 
 			     &fake_gendisk[n]);
 
 	/* perhaps this should also be under the "if (fake_major)" above */
@@ -635,13 +628,11 @@ static int ubd_remove(char *str)
 	del_gendisk(ubd_gendisk[n]);
 	put_disk(ubd_gendisk[n]);
 	ubd_gendisk[n] = NULL;
-	devfs_remove("ubd/%d", n);
 
 	if(fake_gendisk[n] != NULL){
 		del_gendisk(fake_gendisk[n]);
 		put_disk(fake_gendisk[n]);
 		fake_gendisk[n] = NULL;
-		devfs_remove("ubd/%d", n);
 	}
 
 	*dev = ((struct ubd) DEFAULT_UBD);
