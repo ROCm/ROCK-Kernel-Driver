@@ -921,7 +921,6 @@ static int dscc4_open(struct net_device *dev)
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 	hdlc_device *hdlc = &dpriv->hdlc;
 	struct dscc4_pci_priv *ppriv;
-	u32 ioaddr;
 	int ret = -EAGAIN;
 
 	if ((dscc4_loopback_check(dpriv) < 0) || !dev->hard_start_xmit)
@@ -936,8 +935,6 @@ static int dscc4_open(struct net_device *dev)
 
 	if (dscc4_init_ring(dev))
 		goto err_out;
-
-	ioaddr = dev->base_addr + SCC_REG_START(dpriv);
 
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
@@ -1381,7 +1378,6 @@ try:
 	if (state_check(state, dpriv, dev, "Tx"))
 		return;
 
-	// state &= 0x0fffffff; /* Tracking the analyzed bits */
 	if (state & SccEvt) {
 		if (state & Alls) {
 			struct TxFD *tx_fd;
@@ -1441,13 +1437,13 @@ try:
 			/* Tx reset */
 			writel(MTFi | Rdt, 
 			       dev->base_addr + 0x0c*dpriv->dev_id + CH0CFG);
-			writel(0x00000001, dev->base_addr + GCMDR);
+			writel(Action, dev->base_addr + GCMDR);
 			return;
 		}
 		if (state & Xmr) {
 			/* Frame needs to be sent again - FIXME */
-			//dscc4_start_xmit(dpriv->tx_skbuff[dpriv->tx_dirty], dev);
-			if (!(state &= ~0x00002000)) /* DEBUG */
+			printk(KERN_ERR "%s: Xmr. Ask maintainer\n", DRV_NAME);
+			if (!(state &= ~Xmr)) /* DEBUG */
 				goto try;
 		}
 		if (state & Xpr) {
@@ -1694,11 +1690,11 @@ static int dscc4_init_ring(struct net_device *dev)
 	int i;
 
 	tx_fd = (struct TxFD *) pci_alloc_consistent(dpriv->pci_priv->pdev,
-		TX_RING_SIZE*sizeof(struct TxFD), &dpriv->tx_fd_dma);
+		TX_RING_SIZE*sizeof(*tx_fd), &dpriv->tx_fd_dma);
 	if (!tx_fd)
 		goto err_out;
 	rx_fd = (struct RxFD *) pci_alloc_consistent(dpriv->pci_priv->pdev,
-		RX_RING_SIZE*sizeof(struct RxFD), &dpriv->rx_fd_dma);
+		RX_RING_SIZE*sizeof(*rx_fd), &dpriv->rx_fd_dma);
 	if (!rx_fd)
 		goto err_free_dma_tx;
 
@@ -1732,11 +1728,11 @@ static int dscc4_init_ring(struct net_device *dev)
 	 */
 	struct sk_buff *skb;
 
-	skb = dev_alloc_skb(32);
+	skb = dev_alloc_skb(DUMMY_SKB_SIZE);
 	if (!skb)
 		goto err_free_dma_tx;
-	skb->len = 32;
-	memset(skb->data, 0xaa, 16);
+	skb->len = DUMMY_SKB_SIZE;
+	memcpy(skb->data, version, strlen(version)%DUMMY_SKB_SIZE);
 	tx_fd -= (TX_RING_SIZE - 1);
 	tx_fd->state = 0xc0000000;
 	tx_fd->state |= ((u32)(skb->len & TxSizeMax)) << 16;
