@@ -1746,7 +1746,6 @@ config VIA_VELOCITY
 	tristate "VIA Velocity support"
 	depends on NET_PCI && PCI
 	select CRC32
-	select CRC16
 	select MII
 	help
 	  If you have a VIA "Velocity" based network card say Y here.
