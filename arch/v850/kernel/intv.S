@@ -16,7 +16,7 @@
 #include <asm/machdep.h>
 #include <asm/entry.h>
 
-#ifdef CONFIG_V850E_MA1_HIGHRES_TIMER
+#ifdef CONFIG_V850E_HIGHRES_TIMER
 #include <asm/highres_timer.h>
 #endif
 
@@ -59,7 +59,7 @@
 	.section	.intv.mach, "ax"
 	.org	0x0
 
-#if defined (CONFIG_V850E_MA1_HIGHRES_TIMER) && defined (IRQ_INTCMD)
+#if defined (CONFIG_V850E_HIGHRES_TIMER) && defined (IRQ_INTCMD)
 
 	/* Interrupts before the highres timer interrupt.  */
 	.rept	IRQ_INTCMD (HIGHRES_TIMER_TIMER_D_UNIT)
