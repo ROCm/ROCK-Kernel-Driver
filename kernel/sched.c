@@ -4361,23 +4361,6 @@ static void __devinit arch_init_sched_domains(void)
 						&cpu_to_phys_group);
 	}
 
-        /* Initialize isolated CPU (physical) domains and groups */
-	for_each_cpu_mask(i, cpu_isolated_map) {
-		struct sched_domain *sd;
-		int group;
-
-		sd = &per_cpu(phys_domains, i);
-		group = cpu_to_phys_group(i);
-		*sd = SD_CPU_INIT;
-		cpu_set(i, sd->span);
-		sd->flags = 0;
-		sd->balance_interval = INT_MAX;
-		sd->groups = &sched_group_phys[group];
-		init_sched_build_groups(sched_group_phys, sd->span,
-						&cpu_to_phys_group);
-		sd->groups->cpu_power = SCHED_LOAD_SCALE;
-	}
-
 #ifdef CONFIG_NUMA
 	/* Set up node groups */
 	init_sched_build_groups(sched_group_nodes, cpu_default_map,
