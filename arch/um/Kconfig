@@ -33,10 +33,32 @@ config RWSEM_GENERIC_SPINLOCK
 config MODE_TT
 	bool
 	default y
+	help
+	This option controls whether tracing thread support is compiled
+	into UML.  Normally, this should be set to Y.  If you intend to
+	use only skas mode (and the host has the skas patch applied to it), 
+	then it is OK to say N here.
+
+config STATIC_LINK
+	bool
+	default n
+	depends on !MODE_TT
+	help
+	If CONFIG_MODE_TT is disabled, then this option gives you the ability
+	to force a static link of UML.  Normally, if only skas mode is built
+	in to UML, it will be linked as a shared binary.  This is inconvenient
+	for use in a chroot jail.  So, if you intend to run UML inside a 
+	chroot, and you disable CONFIG_MODE_TT, you probably want to say Y
+	here.
 
 config MODE_SKAS
 	bool
 	default y
+	This option controls whether skas (separate kernel address space)
+	support is compiled in.  If you have applied the skas patch to the
+	host, then you certainly want to say Y here (and consider saying N
+	to CONFIG_MODE_TT).  Otherwise, it is safe to say Y.  Disabling this
+	option will shrink the UML binary slightly.
 
 menu "Code maturity level options"
 

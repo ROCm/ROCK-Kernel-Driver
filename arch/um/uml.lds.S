@@ -110,7 +110,7 @@ SECTIONS
   .data.init : { *(.data.init) }
   .data    :
   {
-    . = ALIGN(16384);		/* init_task */
+    . = ALIGN(KERNEL_STACK_SIZE);		/* init_task */
     *(.data.init_task)
     *(.data)
     *(.gnu.linkonce.d*)
