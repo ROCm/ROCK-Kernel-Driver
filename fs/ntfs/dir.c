@@ -1196,7 +1196,7 @@ skip_index_root:
 	ia_mapping = vdir->i_mapping;
 	bmp_vi = ndir->itype.index.bmp_ino;
 	if (unlikely(!bmp_vi)) {
-		ntfs_debug("Inode %lu, regetting index bitmap.", vdir->i_ino);
+		ntfs_debug("Inode 0x%lx, regetting index bitmap.", vdir->i_ino);
 		bmp_vi = ntfs_attr_iget(vdir, AT_BITMAP, I30, 4);
 		if (unlikely(IS_ERR(bmp_vi))) {
 			ntfs_error(sb, "Failed to get bitmap attribute.");

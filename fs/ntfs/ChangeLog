@@ -32,6 +32,10 @@ ToDo:
 	  make sense with mst protected data and were they to write anything to
 	  such an attribute they would cause data corruption so we provide
 	  ntfs_mst_aops which does not have any write related operations set.
+	- Cleanup dirty ntfs inode handling (fs/ntfs/inode.[hc]) which also
+	  includes an adapted ntfs_commit_inode() and an implementation of
+	  ntfs_write_inode() which for now just cleans dirty inodes without
+	  writing them (it does emit a warning that this is happening).
 
 2.1.11 - Driver internal cleanups.
 

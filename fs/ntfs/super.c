@@ -763,7 +763,7 @@ static BOOL load_and_init_mft_mirror(ntfs_volume *vol)
 	/* The $MFTMirr, like the $MFT is multi sector transfer protected. */
 	NInoSetMstProtected(tmp_ni);
 	/*
-	 * Set up our little cheat allowing us to reuse the async io
+	 * Set up our little cheat allowing us to reuse the async read io
 	 * completion handler for directories.
 	 */
 	tmp_ni->itype.index.block_size = vol->mft_record_size;

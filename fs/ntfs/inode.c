@@ -1342,7 +1342,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	ni->name_len = 0;
 
 	/*
-	 * This sets up our little cheat allowing us to reuse the async io
+	 * This sets up our little cheat allowing us to reuse the async read io
 	 * completion handler for directories.
 	 */
 	ni->itype.index.block_size = vol->mft_record_size;
@@ -1706,18 +1706,6 @@ err_out:
 }
 
 /**
- * ntfs_commit_inode - write out a dirty inode
- * @ni:		inode to write out
- *
- */
-int ntfs_commit_inode(ntfs_inode *ni)
-{
-	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
-	NInoClearDirty(ni);
-	return 0;
-}
-
-/**
  * ntfs_put_inode - handler for when the inode reference count is decremented
  * @vi:		vfs inode
  *
@@ -1745,34 +1733,6 @@ void ntfs_put_inode(struct inode *vi)
 
 void __ntfs_clear_inode(ntfs_inode *ni)
 {
-	int err;
-
-	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
-	if (NInoDirty(ni)) {
-		err = ntfs_commit_inode(ni);
-		if (err) {
-			ntfs_error(ni->vol->sb, "Failed to commit dirty "
-					"inode synchronously.");
-			// FIXME: Do something!!!
-		}
-	}
-	/* Synchronize with ntfs_commit_inode(). */
-	down(&ni->mrec_lock);
-	up(&ni->mrec_lock);
-	if (NInoDirty(ni)) {
-		ntfs_error(ni->vol->sb, "Failed to commit dirty inode "
-				"asynchronously.");
-		// FIXME: Do something!!!
-	}
-	/* No need to lock at this stage as no one else has a reference. */
-	if (ni->nr_extents > 0) {
-		int i;
-
-		// FIXME: Handle dirty case for each extent inode!
-		for (i = 0; i < ni->nr_extents; i++)
-			ntfs_clear_extent_inode(ni->ext.extent_ntfs_inos[i]);
-		kfree(ni->ext.extent_ntfs_inos);
-	}
 	/* Free all alocated memory. */
 	down_write(&ni->run_list.lock);
 	if (ni->run_list.rl) {
@@ -1802,6 +1762,20 @@ void __ntfs_clear_inode(ntfs_inode *ni)
 
 void ntfs_clear_extent_inode(ntfs_inode *ni)
 {
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
+
+	BUG_ON(NInoAttr(ni));
+	BUG_ON(ni->nr_extents != -1);
+
+#ifdef NTFS_RW
+	if (NInoDirty(ni)) {
+		if (!is_bad_inode(VFS_I(ni->ext.base_ntfs_ino)))
+			ntfs_error(ni->vol->sb, "Clearing dirty extent inode!  "
+					"Losing data!  This is a BUG!!!");
+		// FIXME:  Do something!!!
+	}
+#endif /* NTFS_RW */
+
 	__ntfs_clear_inode(ni);
 
 	/* Bye, bye... */
@@ -1821,6 +1795,30 @@ void ntfs_clear_extent_inode(ntfs_inode *ni)
 void ntfs_clear_big_inode(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
+
+#ifdef NTFS_RW
+	if (NInoDirty(ni)) {
+		BOOL was_bad = (is_bad_inode(vi));
+
+		/* Committing the inode also commits all extent inodes. */
+		ntfs_commit_inode(vi);
+
+		if (!was_bad && (is_bad_inode(vi) || NInoDirty(ni))) {
+			ntfs_error(vi->i_sb, "Failed to commit dirty inode "
+					"0x%lx.  Losing data!", vi->i_ino);
+			// FIXME:  Do something!!!
+		}
+	}
+#endif /* NTFS_RW */
+
+	/* No need to lock at this stage as no one else has a reference. */
+	if (ni->nr_extents > 0) {
+		int i;
+
+		for (i = 0; i < ni->nr_extents; i++)
+			ntfs_clear_extent_inode(ni->ext.extent_ntfs_inos[i]);
+		kfree(ni->ext.extent_ntfs_inos);
+	}
 
 	__ntfs_clear_inode(ni);
 
@@ -1962,4 +1960,49 @@ trunc_err:
 	return err;
 }
 
-#endif
+void ntfs_write_inode(struct inode *vi, int sync)
+{
+	ntfs_inode *ni = NTFS_I(vi);
+
+	ntfs_debug("Entering for %sinode 0x%lx.", NInoAttr(ni) ? "attr " : "",
+			vi->i_ino);
+
+	/*
+	 * Dirty attribute inodes are written via their real inodes so just
+	 * clean them here.
+	 */
+	if (NInoAttr(ni)) {
+		NInoClearDirty(ni);
+		return;
+	}
+
+	/* Write this base mft record. */
+	if (NInoDirty(ni)) {
+		ntfs_warning(vi->i_sb, "Cleaning dirty inode 0x%lx without "
+				"writing to disk as this is not yet "
+				"implemented.", vi->i_ino);
+		NInoClearDirty(ni);
+	}
+
+	/* Write all attached extent mft records. */
+	down(&ni->extent_lock);
+	if (ni->nr_extents > 0) {
+		int i;
+		ntfs_inode **extent_nis = ni->ext.extent_ntfs_inos;
+
+		for (i = 0; i < ni->nr_extents; i++) {
+			ntfs_inode *tni = extent_nis[i];
+
+			if (NInoDirty(tni)) {
+				ntfs_warning(vi->i_sb, "Cleaning dirty extent "
+						"inode 0x%lx without writing "
+						"to disk as this is not yet "
+						"implemented.", tni->mft_no);
+				NInoClearDirty(tni);
+			}
+		}
+	}
+	up(&ni->extent_lock);
+}
+
+#endif /* NTFS_RW */
