@@ -80,14 +80,14 @@ would have a contended child and we had assumed that no object is its
 own descendent.  Moreover, there is exactly one cross-directory rename
 (see above).
 
-	Consider the object blocking the cross-directory rename.  One of
-its descendents is locked by cross-directory rename (otherwise we would again
-have an infinite set of of contended objects).  But that means that means
-that cross-directory rename is taking locks out of order.  Due to (2) the
-order hadn't changed since we had acquired filesystem lock.  But locking
-rules for cross-directory rename guarantee that we do not try to acquire
-lock on descendent before the lock on ancestor.  Contradiction.  I.e.
-deadlock is impossible.  Q.E.D.
+	Consider the object blocking the cross-directory rename.  One
+of its descendents is locked by cross-directory rename (otherwise we
+would again have an infinite set of of contended objects).  But that
+means that cross-directory rename is taking locks out of order.  Due
+to (2) the order hadn't changed since we had acquired filesystem lock.
+But locking rules for cross-directory rename guarantee that we do not
+try to acquire lock on descendent before the lock on ancestor.
+Contradiction.  I.e.  deadlock is impossible.  Q.E.D.
 
 
 	These operations are guaranteed to avoid loop creation.  Indeed,

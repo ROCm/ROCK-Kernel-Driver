@@ -69,7 +69,7 @@ Locking change: ->s_vfs_rename_sem is taken only by cross-directory renames.
 Most likely there is no need to change anything, but if you relied on
 global exclusion between renames for some internal purpose - you need to
 change your internal locking.  Otherwise exclusion warranties remain the
-same (i.e. parents are victim are locked, etc.).
+same (i.e. parents and victim are locked, etc.).
 
 ---
 [informational]
