@@ -43,26 +43,23 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 		     int (*callback)(struct device * dev, void * data))
 {
 	struct list_head * node;
-	struct device * prev = NULL;
 	int error = 0;
 
-	get_bus(bus);
-	down_write(&bus->rwsem);
-	list_for_each(node,&bus->devices) {
-		struct device * dev = get_device(to_dev(node));
-		if (dev) {
-			error = callback(dev,data);
-			if (prev)
-				put_device(prev);
-			prev = dev;
-			if (error)
-				break;
+	bus = get_bus(bus);
+	if (bus) {
+		down_read(&bus->rwsem);
+		list_for_each(node,&bus->devices) {
+			struct device * dev = get_device(to_dev(node));
+			if (dev) {
+				error = callback(dev,data);
+				put_device(dev);
+				if (error)
+					break;
+			}
 		}
+		up_read(&bus->rwsem);
+		put_bus(bus);
 	}
-	if (prev)
-		put_device(prev);
-	up_write(&bus->rwsem);
-	put_bus(bus);
 	return error;
 }
 
@@ -70,27 +67,23 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 		     int (*callback)(struct device_driver * drv, void * data))
 {
 	struct list_head * node;
-	struct device_driver * prev = NULL;
 	int error = 0;
 
-	/* pin bus in memory */
-	get_bus(bus);
-	down_write(&bus->rwsem);
-	list_for_each(node,&bus->drivers) {
-		struct device_driver * drv = get_driver(to_drv(node));
-		if (drv) {
-			error = callback(drv,data);
-			if (prev)
-				put_driver(prev);
-			prev = drv;
-			if (error)
-				break;
+	bus = get_bus(bus);
+	if (bus) {
+		down_read(&bus->rwsem);
+		list_for_each(node,&bus->drivers) {
+			struct device_driver * drv = get_driver(to_drv(node));
+			if (drv) {
+				error = callback(drv,data);
+				put_driver(drv);
+				if (error)
+					break;
+			}
 		}
+		up_read(&bus->rwsem);
+		put_bus(bus);
 	}
-	if (prev)
-		put_driver(prev);
-	up_write(&bus->rwsem);
-	put_bus(bus);
 	return error;
 }
 
