@@ -651,7 +651,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	int		lo_flags = 0;
 	int		error;
 
-	MOD_INC_USE_COUNT;
+	/* This is safe, since we have a reference from open(). */
+	__module_get(THIS_MODULE);
 
 	error = -EBUSY;
 	if (lo->lo_state != Lo_unbound)
@@ -751,7 +752,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
  out_putf:
 	fput(file);
  out:
-	MOD_DEC_USE_COUNT;
+	/* This is safe: open() is still holding a reference. */
+	module_put(THIS_MODULE);
 	return error;
 }
 
@@ -824,7 +826,8 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
-	MOD_DEC_USE_COUNT;
+	/* This is safe: open() is still holding a reference. */
+	module_put(THIS_MODULE);
 	return 0;
 }
 
