@@ -3099,6 +3099,7 @@ int snd_pcm_lib_mmap_iomem(snd_pcm_substream_t *substream, struct vm_area_struct
 	area->vm_page_prot = pgprot_noncached(area->vm_page_prot);
 #endif
 	area->vm_ops = &snd_pcm_vm_ops_data_mmio;
+	area->vm_private_data = substream;
 	area->vm_flags |= VM_IO;
 	size = area->vm_end - area->vm_start;
 	offset = area->vm_pgoff << PAGE_SHIFT;
