@@ -375,19 +375,6 @@ static int __devinit slc90e66_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-/**
- *	slc90e66_remove_one	-	called with an slc90e66 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an slc90e66 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void slc90e66_remove_one(struct pci_dev *dev)
-{
-	panic("slc90e66 removal not yet supported");
-}
-
 static struct pci_device_id slc90e66_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_EFAR, PCI_DEVICE_ID_EFAR_SLC90E66_1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -397,7 +384,6 @@ static struct pci_driver driver = {
 	name:		"SLC90e66 IDE",
 	id_table:	slc90e66_pci_tbl,
 	probe:		slc90e66_init_one,
-	remove:		__devexit_p(slc90e66_remove_one),
 };
 
 static int slc90e66_ide_init(void)

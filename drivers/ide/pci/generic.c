@@ -118,19 +118,6 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	generic_remove_one	-	called when PCI IDE is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an IDE device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void generic_remove_one(struct pci_dev *dev)
-{
-	panic("PCI IDE removal not yet supported");
-}
-
 static struct pci_device_id generic_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_NS,     PCI_DEVICE_ID_NS_87410,            PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_PCTECH, PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -148,7 +135,6 @@ static struct pci_driver driver = {
 	name:		"PCI IDE",
 	id_table:	generic_pci_tbl,
 	probe:		generic_init_one,
-	remove:		__devexit_p(generic_remove_one),
 };
 
 static int generic_ide_init(void)

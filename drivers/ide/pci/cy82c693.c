@@ -428,19 +428,6 @@ static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-/**
- *	cy82c693_remove_one	-	called with an Cypress is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an Cypress device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void cy82c693_remove_one(struct pci_dev *dev)
-{
-	panic("Cypress removal not yet supported");
-}
-
 static struct pci_device_id cy82c693_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -450,7 +437,6 @@ static struct pci_driver driver = {
 	name:		"Cypress IDE",
 	id_table:	cy82c693_pci_tbl,
 	probe:		cy82c693_init_one,
-	remove:		__devexit_p(cy82c693_remove_one),
 };
 
 static int cy82c693_ide_init(void)

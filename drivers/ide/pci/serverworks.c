@@ -787,19 +787,6 @@ static int __devinit svwks_init_one(struct pci_dev *dev, const struct pci_device
 	return 0;
 }
 
-/**
- *	svwks_remove_one	-	called when an OSB/CSB is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a SVWKS device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void svwks_remove_one(struct pci_dev *dev)
-{
-	panic("SVWKS removal not yet supported");
-}
-
 static struct pci_device_id svwks_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -812,7 +799,6 @@ static struct pci_driver driver = {
 	name:		"Serverworks IDE",
 	id_table:	svwks_pci_tbl,
 	probe:		svwks_init_one,
-	remove:		__devexit_p(svwks_remove_one),
 #if 0	/* FIXME: implement */
 	suspend:	,
 	resume:		,

@@ -308,19 +308,6 @@ static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_devic
 	return 0;
 }
 
-/**
- *	it8172_remove_one	-	called with an IT8172 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an IT8172 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void it8172_remove_one(struct pci_dev *dev)
-{
-	panic("IT8172 removal not yet supported");
-}
-
 static struct pci_device_id it8172_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_IT8172G, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -330,7 +317,6 @@ static struct pci_driver driver = {
 	name:		"IT8172IDE",
 	id_table:	it8172_pci_tbl,
 	probe:		it8172_init_one,
-	remove:		__devexit_p(it8172_remove_one),
 };
 
 static int it8172_ide_init(void)
