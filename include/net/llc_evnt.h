@@ -41,18 +41,14 @@ struct llc_stat_ev_prim_if {
 	u8 type; /* request, indicate, response, confirm */
 };
 
-struct llc_stat_ev_pdu_if {
-	u8 reason;
-};
-
 union llc_stat_ev_if {
 	struct llc_stat_ev_simple_if  a;	/* 'a' for simple, easy ... */
 	struct llc_stat_ev_prim_if    prim;
-	struct llc_stat_ev_pdu_if     pdu;
 };
 
 struct llc_station_state_ev {
 	u8		     type;
+	u8		     reason;
 	union llc_stat_ev_if data;
 	struct list_head     node; /* node in station->ev_q.list */
 };

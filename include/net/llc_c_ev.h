@@ -126,7 +126,6 @@ struct llc_conn_ev_prim_if {
 /* Event LLC_CONN_EV_TYPE_PDU interface */
 struct llc_conn_ev_pdu_if {
 	u8 ev;
-	u8 reason;
 };
 
 union llc_conn_ev_if {
@@ -137,6 +136,7 @@ union llc_conn_ev_if {
 
 struct llc_conn_state_ev {
 	u8			  type;
+	u8			  reason;
 	u8			  status;
 	u8			  flag;
 	struct llc_prim_if_block *ind_prim;
