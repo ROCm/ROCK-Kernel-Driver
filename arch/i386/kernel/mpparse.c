@@ -1112,8 +1112,10 @@ void __init mp_parse_prt (void)
 		}
 
 		/* Don't set up the ACPI SCI because it's already set up */
-		if (acpi_fadt.sci_int == irq)
+                if (acpi_fadt.sci_int == irq) {
+                        entry->irq = irq; /*we still need to set entry's irq*/
 			continue;
+                }
 	
 		ioapic = mp_find_ioapic(irq);
 		if (ioapic < 0)
