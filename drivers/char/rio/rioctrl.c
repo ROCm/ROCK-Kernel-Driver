@@ -203,7 +203,7 @@ int		su;
 	
 	func_enter ();
 	
-	/* Confuse teh compiler to think that we've initialized these */
+	/* Confuse the compiler to think that we've initialized these */
 	Host=0;
 	PortP = NULL;
 
