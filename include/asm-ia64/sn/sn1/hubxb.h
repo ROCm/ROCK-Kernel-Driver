@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_SN1_HUBXB_H
-#define _ASM_SN_SN1_HUBXB_H
+#ifndef _ASM_IA64_SN_SN1_HUBXB_H
+#define _ASM_IA64_SN_SN1_HUBXB_H
 
 /************************************************************************
  *                                                                      *
@@ -273,7 +272,7 @@
 
 
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /************************************************************************
  *                                                                      *
@@ -1247,7 +1246,7 @@ typedef union xb_first_error_clear_u {
 
 
 
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /************************************************************************
  *                                                                      *
@@ -1286,4 +1285,4 @@ typedef union xb_first_error_clear_u {
 
 
 
-#endif /* _ASM_SN_SN1_HUBXB_H */
+#endif /* _ASM_IA64_SN_SN1_HUBXB_H */

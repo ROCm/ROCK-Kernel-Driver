@@ -9,8 +9,8 @@
  *	no return value
  *
  * Copyright (C) 1999, 2001 Hewlett-Packard Co
- * Copyright (C) 1999 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 2001 David Mosberger <davidm@hpl.hp.com>
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger <davidm@hpl.hp.com>
  *
  * 4/06/01 davidm	Tuned to make it perform well both for cached and uncached copies.
  */

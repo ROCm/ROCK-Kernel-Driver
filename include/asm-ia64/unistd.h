@@ -4,7 +4,7 @@
 /*
  * IA-64 Linux syscall numbers and inline-functions.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -109,9 +109,9 @@
 #define __NR_syslog			1117
 #define __NR_setitimer			1118
 #define __NR_getitimer			1119
-#define __NR_old_stat			1120
-#define __NR_old_lstat			1121
-#define __NR_old_fstat			1122
+/* 1120 was __NR_old_stat */
+/* 1121 was __NR_old_lstat */
+/* 1122 was __NR_old_fstat */
 #define __NR_vhangup			1123
 #define __NR_lchown			1124
 #define __NR_vm86			1125
@@ -206,7 +206,19 @@
 #define __NR_getdents64			1214
 #define __NR_getunwind			1215
 #define __NR_readahead			1216
-#define __NR_tkill			1217
+#define __NR_setxattr			1217
+#define __NR_lsetxattr			1218
+#define __NR_fsetxattr			1219
+#define __NR_getxattr			1220
+#define __NR_lgetxattr			1221
+#define __NR_fgetxattr			1222
+#define __NR_listxattr			1223
+#define __NR_llistxattr			1224
+#define __NR_flistxattr			1225
+#define __NR_removexattr		1226
+#define __NR_lremovexattr		1227
+#define __NR_fremovexattr		1228
+#define __NR_tkill			1229
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 
@@ -281,6 +293,8 @@ name (type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5)			\
 }
 
 #ifdef __KERNEL_SYSCALLS__
+
+struct rusage;
 
 static inline _syscall0(int,sync)
 static inline _syscall0(pid_t,setsid)

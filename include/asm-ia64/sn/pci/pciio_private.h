@@ -4,11 +4,12 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIIO_PRIVATE_H
 #define _ASM_SN_PCI_PCIIO_PRIVATE_H
+
+#include <asm/sn/pci/pciio.h>
 
 /*
  * pciio_private.h -- private definitions for pciio
@@ -48,11 +49,6 @@ struct pciio_intr_s {
     devfs_handle_t            pi_dev;	/* associated pci card */
     device_desc_t	    pi_dev_desc;	/* override device descriptor */
     pciio_intr_line_t       pi_lines;	/* which interrupt line(s) */
-    intr_func_t             pi_func;	/* handler function (when connected) */
-    intr_arg_t              pi_arg;	/* handler parameter (when connected) */
-#ifdef LATER
-    thd_int_t               pi_tinfo;	/* Thread info (when connected) */
-#endif
     cpuid_t                 pi_mustruncpu; /* Where we must run. */
     int                     pi_irq;     /* IRQ assigned */
     int                     pi_cpu;     /* cpu assigned */
@@ -84,6 +80,8 @@ struct pciio_info_s {
 	pciio_space_t		w_space;
 	iopaddr_t		w_base;
 	size_t			w_size;
+        int                     w_devio_index;  /* DevIO[] register used to
+                                                   access this window */
     }			    c_window[6];
 
     unsigned		    c_rbase;	/* EXPANSION ROM base addr */

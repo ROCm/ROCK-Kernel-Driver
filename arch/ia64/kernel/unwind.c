@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 1999-2001 Hewlett-Packard Co
- * Copyright (C) 1999-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 /*
  * This file implements call frame unwind support for the Linux
@@ -72,6 +72,8 @@
 
 #define alloc_reg_state()	kmalloc(sizeof(struct unw_state_record), GFP_ATOMIC)
 #define free_reg_state(usr)	kfree(usr)
+#define alloc_labeled_state()	kmalloc(sizeof(struct unw_labeled_state), GFP_ATOMIC)
+#define free_labeled_state(usr)	kfree(usr)
 
 typedef unsigned long unw_word;
 typedef unsigned char unw_hash_index_t;
@@ -521,7 +523,7 @@ unw_access_pr (struct unw_frame_info *info, unsigned long *val, int write)
 }
 
 
-/* Unwind decoder routines */
+/* Routines to manipulate the state stack.  */
 
 static inline void
 push (struct unw_state_record *sr)
@@ -534,23 +536,59 @@ push (struct unw_state_record *sr)
 		return;
 	}
 	memcpy(rs, &sr->curr, sizeof(*rs));
-	rs->next = sr->stack;
-	sr->stack = rs;
+	sr->curr.next = rs;
 }
 
 static void
 pop (struct unw_state_record *sr)
 {
-	struct unw_reg_state *rs;
+	struct unw_reg_state *rs = sr->curr.next;
 
-	if (!sr->stack) {
-		printk ("unwind: stack underflow!\n");
+	if (!rs) {
+		printk("unwind: stack underflow!\n");
 		return;
 	}
-	rs = sr->stack;
-	sr->stack = rs->next;
+	memcpy(&sr->curr, rs, sizeof(*rs));
 	free_reg_state(rs);
 }
+
+/* Make a copy of the state stack.  Non-recursive to avoid stack overflows.  */
+static struct unw_reg_state *
+dup_state_stack (struct unw_reg_state *rs)
+{
+	struct unw_reg_state *copy, *prev = NULL, *first = NULL;
+
+	while (rs) {
+		copy = alloc_reg_state();
+		if (!copy) {
+			printk ("unwind.dup_state_stack: out of memory\n");
+			return NULL;
+		}
+		memcpy(copy, rs, sizeof(*copy));
+		if (first)
+			prev->next = copy;
+		else
+			first = copy;
+		rs = rs->next;
+		prev = copy;
+	}
+	return first;
+}
+
+/* Free all stacked register states (but not RS itself).  */
+static void
+free_state_stack (struct unw_reg_state *rs)
+{
+	struct unw_reg_state *p, *next;
+
+	for (p = rs->next; p != NULL; p = next) {
+		next = p->next;
+		free_reg_state(p);
+	}
+	rs->next = NULL;
+}
+
+/* Unwind decoder routines */
 
 static enum unw_register_index __attribute__((const))
 decode_abreg (unsigned char abreg, int memory)
@@ -689,7 +727,7 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 	sr->first_region = 0;
 
 	/* check if we're done: */
-	if (body && sr->when_target < sr->region_start + sr->region_len) {
+	if (sr->when_target < sr->region_start + sr->region_len) {
 		sr->done = 1;
 		return;
 	}
@@ -902,31 +940,36 @@ desc_epilogue (unw_word t, unw_word ecount, struct unw_state_record *sr)
 static inline void
 desc_copy_state (unw_word label, struct unw_state_record *sr)
 {
-	struct unw_reg_state *rs;
+	struct unw_labeled_state *ls;
 
-	for (rs = sr->reg_state_list; rs; rs = rs->next) {
-		if (rs->label == label) {
-			memcpy (&sr->curr, rs, sizeof(sr->curr));
+	for (ls = sr->labeled_states; ls; ls = ls->next) {
+		if (ls->label == label) {
+			free_state_stack(&sr->curr);
+			memcpy(&sr->curr, &ls->saved_state, sizeof(sr->curr));
+			sr->curr.next = dup_state_stack(ls->saved_state.next);
 			return;
 		}
 	}
-	printk("unwind: failed to find state labelled 0x%lx\n", label);
+	printk("unwind: failed to find state labeled 0x%lx\n", label);
 }
 
 static inline void
 desc_label_state (unw_word label, struct unw_state_record *sr)
 {
-	struct unw_reg_state *rs;
+	struct unw_labeled_state *ls;
 
-	rs = alloc_reg_state();
-	if (!rs) {
-		printk("unwind: cannot stack!\n");
+	ls = alloc_labeled_state();
+	if (!ls) {
+		printk("unwind.desc_label_state(): out of memory\n");
 		return;
 	}
-	memcpy(rs, &sr->curr, sizeof(*rs));
-	rs->label = label;
-	rs->next = sr->reg_state_list;
-	sr->reg_state_list = rs;
+	ls->label = label;
+	memcpy(&ls->saved_state, &sr->curr, sizeof(ls->saved_state));
+	ls->saved_state.next = dup_state_stack(sr->curr.next);
+
+	/* insert into list of labeled states: */
+	ls->next = sr->labeled_states;
+	sr->labeled_states = ls;
 }
 
 /*
@@ -1378,6 +1421,8 @@ lookup (struct unw_table *table, unsigned long rel_ip)
 		else
 			break;
 	}
+	if (rel_ip < e->start_offset || rel_ip >= e->end_offset)
+		return NULL;
 	return e;
 }
 
@@ -1388,9 +1433,9 @@ lookup (struct unw_table *table, unsigned long rel_ip)
 static inline struct unw_script *
 build_script (struct unw_frame_info *info)
 {
-	struct unw_reg_state *rs, *next;
 	const struct unw_table_entry *e = 0;
 	struct unw_script *script = 0;
+	struct unw_labeled_state *ls, *next;
 	unsigned long ip = info->ip;
 	struct unw_state_record sr;
 	struct unw_table *table;
@@ -1535,15 +1580,15 @@ build_script (struct unw_frame_info *info)
 	for (i = UNW_REG_BSP; i < UNW_NUM_REGS; ++i)
 		compile_reg(&sr, i, script);
 
-	/* free labelled register states & stack: */
+	/* free labeled register states & stack: */
 
 	STAT(parse_start = ia64_get_itc());
-	for (rs = sr.reg_state_list; rs; rs = next) {
-		next = rs->next;
-		free_reg_state(rs);
+	for (ls = sr.labeled_states; ls; ls = next) {
+		next = ls->next;
+		free_state_stack(&ls->saved_state);
+		free_labeled_state(ls);
 	}
-	while (sr.stack)
-		pop(&sr);
+	free_state_stack(&sr.curr);
 	STAT(unw.stat.script.parse_time += ia64_get_itc() - parse_start);
 
 	script_finalize(script, &sr);

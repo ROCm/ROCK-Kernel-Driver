@@ -2,7 +2,7 @@ CFLAGS	= -g -O2 -Wall $(CPPFLAGS)
 
 TARGET	= $(TOPDIR)/include/asm-ia64/offsets.h
 
-all: 
+all:
 
 mrproper:
 
@@ -34,7 +34,8 @@ offsets.h: print_offsets
 comma	:= ,
 
 print_offsets: print_offsets.c FORCE_RECOMPILE
-	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) print_offsets.c -o $@
+	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+		print_offsets.c -o $@
 
 FORCE_RECOMPILE:
 
@@ -44,7 +45,8 @@ offsets.h: print_offsets.s
 	$(AWK) -f print_offsets.awk $^ > $@
 
 print_offsets.s: print_offsets.c
-	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S print_offsets.c -o $@
+	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S \
+		print_offsets.c -o $@
 
 endif
 

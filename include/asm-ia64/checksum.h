@@ -89,11 +89,4 @@ csum_fold (unsigned int sum)
 	return ~sum;
 }
 
-#define _HAVE_ARCH_IPV6_CSUM
-extern unsigned short int csum_ipv6_magic (struct in6_addr *saddr,
-					   struct in6_addr *daddr,
-					   __u16 len,
-					   unsigned short proto,
-					   unsigned int sum);
-
 #endif /* _ASM_IA64_CHECKSUM_H */

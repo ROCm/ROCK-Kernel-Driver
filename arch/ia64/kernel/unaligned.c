@@ -1,9 +1,9 @@
 /*
  * Architecture-specific unaligned trap handling.
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
- * Copyright (C) 1999-2000 Stephane Eranian <eranian@hpl.hp.com>
- * Copyright (C) 2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1999-2002 Hewlett-Packard Co
+ *	Stephane Eranian <eranian@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 2001/10/11	Fix unaligned access to rotating registers in s/w pipelined loops.
  * 2001/08/13	Correct size of extended floats (float_fsz) from 16 to 10 bytes.
@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
+#include <linux/tty.h>
 
 #include <asm/uaccess.h>
 #include <asm/rse.h>
@@ -23,7 +24,7 @@ extern void die_if_kernel(char *str, struct pt_regs *regs, long err) __attribute
 #undef DEBUG_UNALIGNED_TRAP
 
 #ifdef DEBUG_UNALIGNED_TRAP
-# define DPRINT(a...)	do { printk("%s.%u: ", __FUNCTION__, __LINE__); printk (a); } while (0)
+# define DPRINT(a...)	do { printk("%s %u: ", __FUNCTION__, __LINE__); printk (a); } while (0)
 # define DDUMP(str,vp,len)	dump(str, vp, len)
 
 static void
@@ -650,7 +651,7 @@ emulate_load_updates (update_t type, load_store_t ld, struct pt_regs *regs, unsi
 	 * just in case.
 	 */
 	if (ld.x6_op == 1 || ld.x6_op == 3) {
-		printk(KERN_ERR __FUNCTION__": register update on speculative load, error\n");
+		printk("%s %s: register update on speculative load, error\n", KERN_ERR, __FUNCTION__);
 		die_if_kernel("unaligned reference on specualtive load with register update\n",
 			      regs, 30);
 	}
@@ -1080,8 +1081,8 @@ emulate_load_floatpair (unsigned long ifa, load_store_t ld, struct pt_regs *regs
 		 * For this reason we keep this sanity check
 		 */
 		if (ld.x6_op == 1 || ld.x6_op == 3)
-			printk(KERN_ERR __FUNCTION__": register update on speculative load pair, "
-			       "error\n");
+			printk("%s %s: register update on speculative load pair, "
+			       "error\n",KERN_ERR, __FUNCTION__);
 
 		setreg(ld.r3, ifa, 0, regs);
 	}
@@ -1488,6 +1489,9 @@ ia64_handle_unaligned (unsigned long ifa, struct pt_regs *regs)
 	si.si_errno = 0;
 	si.si_code = BUS_ADRALN;
 	si.si_addr = (void *) ifa;
+	si.si_flags = 0;
+	si.si_isr = 0;
+	si.si_imm = 0;
 	force_sig_info(SIGBUS, &si, current);
 	goto done;
 }

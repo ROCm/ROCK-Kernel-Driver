@@ -161,7 +161,7 @@ int show_interrupts(struct seq_file *p, void *v)
 
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
-		seq_putc('\n');
+		seq_putc(p, '\n');
 	}
 	seq_puts(p, "NMI: ");
 	for (j = 0; j < smp_num_cpus; j++)
@@ -287,10 +287,11 @@ static inline void wait_on_irq(void)
 		 * already executing in one..
 		 */
 		if (!irqs_running())
-			if (local_bh_count() || !spin_is_locked(&global_bh_lock))
+			if (really_local_bh_count() || !spin_is_locked(&global_bh_lock))
 				break;
 
 		/* Duh, we have to loop. Release the lock to avoid deadlocks */
+		smp_mb__before_clear_bit();	/* need barrier before releasing lock... */
 		clear_bit(0,&global_irq_lock);
 
 		for (;;) {
@@ -305,7 +306,7 @@ static inline void wait_on_irq(void)
 				continue;
 			if (global_irq_lock)
 				continue;
-			if (!local_bh_count() && spin_is_locked(&global_bh_lock))
+			if (!really_local_bh_count() && spin_is_locked(&global_bh_lock))
 				continue;
 			if (!test_and_set_bit(0,&global_irq_lock))
 				break;
@@ -378,14 +379,14 @@ void __global_cli(void)
 	__save_flags(flags);
 	if (flags & IA64_PSR_I) {
 		__cli();
-		if (!local_irq_count())
+		if (!really_local_irq_count())
 			get_irqlock();
 	}
 #else
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
 		__cli();
-		if (!local_irq_count())
+		if (!really_local_irq_count())
 			get_irqlock();
 	}
 #endif
@@ -393,7 +394,7 @@ void __global_cli(void)
 
 void __global_sti(void)
 {
-	if (!local_irq_count())
+	if (!really_local_irq_count())
 		release_irqlock(smp_processor_id());
 	__sti();
 }
@@ -422,7 +423,7 @@ unsigned long __global_save_flags(void)
 	retval = 2 + local_enabled;
 
 	/* check for global flags if we're not in an interrupt */
-	if (!local_irq_count()) {
+	if (!really_local_irq_count()) {
 		if (local_enabled)
 			retval = 1;
 		if (global_irq_holder == cpu)
@@ -529,7 +530,7 @@ void disable_irq(unsigned int irq)
 	disable_irq_nosync(irq);
 
 #ifdef CONFIG_SMP
-	if (!local_irq_count()) {
+	if (!really_local_irq_count()) {
 		do {
 			barrier();
 		} while (irq_desc(irq)->status & IRQ_INPROGRESS);
@@ -1009,6 +1010,11 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 		rand_initialize_irq(irq);
 	}
 
+	if (new->flags & SA_PERCPU_IRQ) {
+		desc->status |= IRQ_PER_CPU;
+		desc->handler = &irq_type_ia64_lsapic;
+	}
+
 	/*
 	 * The following block of code has to be executed atomically
 	 */
@@ -1089,13 +1095,25 @@ out:
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
 static unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+static char irq_redir [NR_IRQS]; // = { [0 ... NR_IRQS-1] = 1 };
+
+void set_irq_affinity_info(int irq, int hwid, int redir)
+{
+	unsigned long mask = 1UL<<cpu_logical_id(hwid);
+
+	if (irq >= 0 && irq < NR_IRQS) {
+		irq_affinity[irq] = mask;
+		irq_redir[irq] = (char) (redir & 0xff);
+	}
+}
 
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	if (count < HEX_DIGITS+1)
+	if (count < HEX_DIGITS+3)
 		return -EINVAL;
-	return sprintf (page, "%08lx\n", irq_affinity[(long)data]);
+	return sprintf (page, "%s%08lx\n", irq_redir[(long)data] ? "r " : "",
+			irq_affinity[(long)data]);
 }
 
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
@@ -1103,11 +1121,20 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 {
 	int irq = (long) data, full_count = count, err;
 	unsigned long new_value;
+	const char *buf = buffer;
+	int redir;
 
 	if (!irq_desc(irq)->handler->set_affinity)
 		return -EIO;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	if (buf[0] == 'r' || buf[0] == 'R') {
+		++buf;
+		while (*buf == ' ') ++buf;
+		redir = 1;
+	} else
+		redir = 0;
+
+	err = parse_hex_value(buf, count, &new_value);
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
@@ -1117,8 +1144,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
 
-	irq_affinity[irq] = new_value;
-	irq_desc(irq)->handler->set_affinity(irq, new_value);
+	irq_desc(irq)->handler->set_affinity(irq | (redir?(1<<31):0), new_value);
 
 	return full_count;
 }

@@ -1,16 +1,17 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_IOERROR_HANDLING_H
-#define _ASM_SN_IOERROR_HANDLING_H
+#ifndef _ASM_IA64_SN_IOERROR_HANDLING_H
+#define _ASM_IA64_SN_IOERROR_HANDLING_H
 
 #include <linux/config.h>
+#include <linux/types.h>
+#include <linux/devfs_fs_kernel.h>
+#include <asm/sn/sgi.h>
 
 #if __KERNEL__
 
@@ -264,7 +265,7 @@ error_skip_point_mark(devfs_handle_t  v)
 	 * one.								 
 	 */								 
 	if (v_error_skip_env_get(v, error_env) != GRAPH_SUCCESS) {	 
-		error_env = kmem_zalloc(sizeof(label_t), KM_NOSLEEP);	 
+		error_env = snia_kmem_zalloc(sizeof(label_t), KM_NOSLEEP);	 
 		/* Unable to allocate memory for jum buffer. This should 
 		 * be a very rare occurrence.				 
 		 */							 
@@ -302,4 +303,4 @@ extern boolean_t		is_device_shutdown(devfs_handle_t);
 #endif
 
 #endif /* __KERNEL__ */
-#endif /* _ASM_SN_IOERROR_HANDLING_H */
+#endif /* _ASM_IA64_SN_IOERROR_HANDLING_H */

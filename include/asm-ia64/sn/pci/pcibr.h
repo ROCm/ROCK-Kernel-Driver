@@ -4,8 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_SN_PCI_PCIBR_H
 #define _ASM_SN_PCI_PCIBR_H
@@ -13,7 +12,7 @@
 #if defined(__KERNEL__)
 
 #include <asm/sn/dmamap.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
 #include <asm/sn/pio.h>
 
 #include <asm/sn/pci/pciio.h>
@@ -31,7 +30,7 @@
 #define PCIBR_INTR_BLOCKED		0x40000000
 #define PCIBR_INTR_BUSY			0x80000000
 
-#if LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /* =====================================================================
  *    opaque types used by pcibr's xtalk bus provider
@@ -183,10 +182,7 @@ extern pcibr_intr_t	pcibr_intr_alloc(devfs_handle_t dev,
 
 extern void		pcibr_intr_free(pcibr_intr_t intr);
 
-extern int		pcibr_intr_connect(pcibr_intr_t intr,
-					   intr_func_t intr_func,
-					   intr_arg_t intr_arg,
-					   void *thread);
+extern int		pcibr_intr_connect(pcibr_intr_t intr);
 
 extern void		pcibr_intr_disconnect(pcibr_intr_t intr);
 
@@ -349,7 +345,7 @@ extern void		pcibr_hints_intr_bits(devfs_handle_t, pcibr_intr_bits_f *);
 
 extern int		pcibr_asic_rev(devfs_handle_t);
 
-#endif 	/* _LANGUAGE_C */
+#endif 	/* __ASSEMBLY__ */
 #endif	/* #if defined(__KERNEL__) */
 /* 
  * Some useful ioctls into the pcibr driver
@@ -390,9 +386,33 @@ extern int		pcibr_asic_rev(devfs_handle_t);
 /*
  * Structures for requesting PCI bridge information and receiving a response
  */
-typedef struct pcibr_slot_info_req_s *pcibr_slot_info_req_t;
+typedef struct pcibr_slot_req_s *pcibr_slot_req_t;
+typedef struct pcibr_slot_up_resp_s *pcibr_slot_up_resp_t;
+typedef struct pcibr_slot_down_resp_s *pcibr_slot_down_resp_t;
 typedef struct pcibr_slot_info_resp_s *pcibr_slot_info_resp_t;
 typedef struct pcibr_slot_func_info_resp_s *pcibr_slot_func_info_resp_t;
+
+#define L1_QSIZE                128      /* our L1 message buffer size */
+struct pcibr_slot_req_s {
+    int                      req_slot;
+    union {
+        pcibr_slot_up_resp_t     up;
+        pcibr_slot_down_resp_t   down;
+        pcibr_slot_info_resp_t   query;
+        void                    *any;
+    }                       req_respp;
+    int                     req_size;
+};
+
+struct pcibr_slot_up_resp_s {
+    int                     resp_sub_errno;
+    char                    resp_l1_msg[L1_QSIZE + 1];
+};
+
+struct pcibr_slot_down_resp_s {
+    int                     resp_sub_errno;
+    char                    resp_l1_msg[L1_QSIZE + 1];
+};
 
 struct pcibr_slot_info_req_s {
    int                      req_slot;
@@ -454,7 +474,40 @@ struct pcibr_slot_info_resp_s {
         int                     resp_f_att_det_error;
 
     } resp_func[8];
-
 };
+
+
+/*
+ * PCI specific errors, interpreted by pciconfig command
+ */
+
+/* EPERM                          1    */
+#define PCI_SLOT_ALREADY_UP       2     /* slot already up */
+#define PCI_SLOT_ALREADY_DOWN     3     /* slot already down */
+#define PCI_IS_SYS_CRITICAL       4     /* slot is system critical */
+/* EIO                            5    */
+/* ENXIO                          6    */
+#define PCI_L1_ERR                7     /* L1 console command error */
+#define PCI_NOT_A_BRIDGE          8     /* device is not a bridge */
+#define PCI_SLOT_IN_SHOEHORN      9     /* slot is in a shorhorn */
+#define PCI_NOT_A_SLOT           10     /* slot is invalid */
+#define PCI_RESP_AREA_TOO_SMALL  11     /* slot is invalid */
+/* ENOMEM                        12    */
+#define PCI_NO_DRIVER            13     /* no driver for device */
+/* EFAULT                        14    */
+#define PCI_EMPTY_33MHZ          15     /* empty 33 MHz bus */
+/* EBUSY                         16    */
+#define PCI_SLOT_RESET_ERR       17     /* slot reset error */
+#define PCI_SLOT_INFO_INIT_ERR   18     /* slot info init error */
+/* ENODEV                        19    */
+#define PCI_SLOT_ADDR_INIT_ERR   20     /* slot addr space init error */
+#define PCI_SLOT_DEV_INIT_ERR    21     /* slot device init error */
+/* EINVAL                        22    */
+#define PCI_SLOT_GUEST_INIT_ERR  23     /* slot guest info init error */
+#define PCI_SLOT_RRB_ALLOC_ERR   24     /* slot initial rrb alloc error */
+#define PCI_SLOT_DRV_ATTACH_ERR  25     /* driver attach error */
+#define PCI_SLOT_DRV_DETACH_ERR  26     /* driver detach error */
+/* ERANGE                        34    */
+/* EUNATCH                       42    */
 
 #endif				/* _ASM_SN_PCI_PCIBR_H */

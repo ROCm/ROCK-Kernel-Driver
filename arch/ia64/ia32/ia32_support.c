@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1999 Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 2000 Asit K. Mallick <asit.k.mallick@intel.com>
- * Copyright (C) 2001 Hewlett-Packard Co
+ * Copyright (C) 2001-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 06/16/00	A. Mallick	added csd/ssd/tssd for ia32 thread context
@@ -153,10 +153,12 @@ ia32_gdt_init (void)
 	/* We never change the TSS and LDT descriptors, so we can share them across all CPUs.  */
 	ldt_size = PAGE_ALIGN(IA32_LDT_ENTRIES*IA32_LDT_ENTRY_SIZE);
 	for (nr = 0; nr < NR_CPUS; ++nr) {
-		ia32_gdt[_TSS(nr)] = IA32_SEG_DESCRIPTOR(IA32_TSS_OFFSET, 235,
-							 0xb, 0, 3, 1, 1, 1, 0);
-		ia32_gdt[_LDT(nr)] = IA32_SEG_DESCRIPTOR(IA32_LDT_OFFSET, ldt_size - 1,
-							 0x2, 0, 3, 1, 1, 1, 0);
+		ia32_gdt[_TSS(nr) >> IA32_SEGSEL_INDEX_SHIFT]
+			= IA32_SEG_DESCRIPTOR(IA32_TSS_OFFSET, 235,
+					      0xb, 0, 3, 1, 1, 1, 0);
+		ia32_gdt[_LDT(nr) >> IA32_SEGSEL_INDEX_SHIFT]
+			= IA32_SEG_DESCRIPTOR(IA32_LDT_OFFSET, ldt_size - 1,
+					      0x2, 0, 3, 1, 1, 1, 0);
 	}
 }
 
@@ -172,6 +174,10 @@ ia32_bad_interrupt (unsigned long int_num, struct pt_regs *regs)
 
 	siginfo.si_signo = SIGTRAP;
 	siginfo.si_errno = int_num;	/* XXX is it OK to abuse si_errno like this? */
+	siginfo.si_flags = 0;
+	siginfo.si_isr = 0;
+	siginfo.si_addr = 0;
+	siginfo.si_imm = 0;
 	siginfo.si_code = TRAP_BRKPT;
 	force_sig_info(SIGTRAP, &siginfo, current);
 }

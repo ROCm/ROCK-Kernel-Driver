@@ -6,8 +6,7 @@
  *
  *  hcl - SGI's Hardware Graph compatibility layer.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2001 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -49,7 +48,6 @@ static unsigned int boot_options = OPTION_NONE;
 /*
  * Some Global definitions.
  */
-spinlock_t hcl_spinlock;
 devfs_handle_t hcl_handle = NULL;
 
 invplace_t invplace_none = {
@@ -142,6 +140,7 @@ int __init init_hcl(void)
 {
 	extern void string_table_init(struct string_table *);
 	extern struct string_table label_string_table;
+	extern int init_ifconfig_net(void);
 	int rv = 0;
 
 #if defined(CONFIG_HCL_DEBUG) && !defined(MODULE)
@@ -152,8 +151,6 @@ int __init init_hcl(void)
 	printk ("%s: hcl_debug: 0x%0x\n", HCL_NAME, hcl_debug);
 	printk ("\n%s: boot_options: 0x%0x\n", HCL_NAME, boot_options);
 #endif
-
-	spin_lock_init(&hcl_spinlock);
 
 	/*
 	 * Create the hwgraph_root on devfs.
@@ -191,6 +188,12 @@ int __init init_hcl(void)
 		panic("HCL: Unable to create hw/linux/busnum\n");
 		return(0);
 	}
+
+	/*
+	 * Initialize the ifconfgi_net driver that does network devices 
+	 * Persistent Naming.
+	 */
+	init_ifconfig_net();
 
 	return(0);
 
@@ -238,8 +241,7 @@ hwgraph_fastinfo_set(devfs_handle_t de, arbitrary_info_t fastinfo)
 {
 
 	if (hcl_debug) {
-		printk("HCL: hwgraph_fastinfo_set handle 0x%p fastinfo %ld\n",
-			de, fastinfo);
+		printk("HCL: hwgraph_fastinfo_set handle 0x%p fastinfo %ld\n", (void *)de, fastinfo);
 	}
 		
 	labelcl_info_replace_IDX(de, HWGRAPH_FASTINFO, fastinfo, NULL);
@@ -466,7 +468,7 @@ hwgraph_register(devfs_handle_t de, const char *name,
 		 * We need to clean up!
 		 */
 		printk(KERN_WARNING "HCL: Unable to set the connect point to it's parent 0x%p\n",
-			new_devfs_handle);
+			(void *)new_devfs_handle);
 	}
 
         /*
@@ -1044,30 +1046,6 @@ hwgraph_char_device_get(devfs_handle_t de)
 }
 
 /*
- * hwgraph_cdevsw_get - returns the fops of the given devfs entry.
- */
-struct file_operations *
-hwgraph_cdevsw_get(devfs_handle_t de)
-{
-	struct file_operations *fops = devfs_get_ops(de);
-
-	devfs_put_ops(de); /*  FIXME: this may need to be moved to callers  */
-	return(fops);
-}
-
-/*
- * hwgraph_bdevsw_get - returns the fops of the given devfs entry.
-*/
-struct file_operations *    /*  FIXME: shouldn't this be a blkdev?  */
-hwgraph_bdevsw_get(devfs_handle_t de)
-{
-	struct file_operations *fops = devfs_get_ops(de);
-
-	devfs_put_ops(de); /*  FIXME: this may need to be moved to callers  */
-	return(fops);
-}
-
-/*
 ** Inventory is now associated with a vertex in the graph.  For items that
 ** belong in the inventory but have no vertex 
 ** (e.g. old non-graph-aware drivers), we create a bogus vertex under the 
@@ -1550,6 +1528,4 @@ EXPORT_SYMBOL(hwgraph_path_to_vertex);
 EXPORT_SYMBOL(hwgraph_path_to_dev);
 EXPORT_SYMBOL(hwgraph_block_device_get);
 EXPORT_SYMBOL(hwgraph_char_device_get);
-EXPORT_SYMBOL(hwgraph_cdevsw_get);
-EXPORT_SYMBOL(hwgraph_bdevsw_get);
 EXPORT_SYMBOL(hwgraph_vertex_name_get);

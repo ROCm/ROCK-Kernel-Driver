@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
- * Copyright (C) 2001 Hewlett-Packard Co
+ * Copyright (C) 2001-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 #ifndef _ASM_IA64_SMP_H
@@ -27,7 +27,7 @@
 #define SMP_IRQ_REDIRECTION	(1 << 0)
 #define SMP_IPI_REDIRECTION	(1 << 1)
 
-#define smp_processor_id()	(current->processor)
+#define smp_processor_id()	(current_thread_info()->cpu)
 
 extern struct smp_boot_data {
 	int cpu_count;
@@ -110,17 +110,13 @@ hard_smp_processor_id (void)
 
 #define NO_PROC_ID		0xffffffff	/* no processor magic marker */
 
-/*
- * Extra overhead to move a task from one cpu to another (due to TLB and cache misses).
- * Expressed in "negative nice value" units (larger number means higher priority/penalty).
- */
-#define PROC_CHANGE_PENALTY	20
-
 extern void __init init_smp_config (void);
 extern void smp_do_timer (struct pt_regs *regs);
 
 extern int smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
 				     int retry, int wait);
+extern void smp_send_reschedule (int cpu);
+extern void smp_send_reschedule_all (void);
 
 
 #endif /* CONFIG_SMP */

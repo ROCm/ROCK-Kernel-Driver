@@ -724,7 +724,7 @@ tr_info(char *page)
 
 		status = ia64_pal_tr_read(j, i, tr_buffer, &tr_valid);
 		if (status != 0) {
-			printk(__FUNCTION__ " pal call failed on tr[%d:%d]=%ld\n", i, j, status);
+			printk("palinfo: pal call failed on tr[%d:%d]=%ld\n", i, j, status);
 			continue;
 		}
 
@@ -842,9 +842,8 @@ static void
 palinfo_smp_call(void *info)
 {
 	palinfo_smp_data_t *data = (palinfo_smp_data_t *)info;
-	/* printk(__FUNCTION__" called on CPU %d\n", smp_processor_id());*/
 	if (data == NULL) {
-		printk(KERN_ERR __FUNCTION__" data pointer is NULL\n");
+		printk("%s palinfo: data pointer is NULL\n", KERN_ERR);
 		data->ret = 0; /* no output */
 		return;
 	}
@@ -868,11 +867,10 @@ int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 	ptr.page = page;
 	ptr.ret  = 0; /* just in case */
 
-	/*printk(__FUNCTION__" calling CPU %d from CPU %d for function %d\n", f->req_cpu,smp_processor_id(), f->func_id);*/
 
 	/* will send IPI to other CPU and wait for completion of remote call */
 	if ((ret=smp_call_function_single(f->req_cpu, palinfo_smp_call, &ptr, 0, 1))) {
-		printk(__FUNCTION__" remote CPU call from %d to %d on function %d: error %d\n", smp_processor_id(), f->req_cpu, f->func_id, ret);
+		printk("palinfo: remote CPU call from %d to %d on function %d: error %d\n", smp_processor_id(), f->req_cpu, f->func_id, ret);
 		return 0;
 	}
 	return ptr.ret;
@@ -881,7 +879,7 @@ int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 static
 int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 {
-	printk(__FUNCTION__" should not be called with non SMP kernel\n");
+	printk("palinfo: should not be called with non SMP kernel\n");
 	return 0;
 }
 #endif /* CONFIG_SMP */

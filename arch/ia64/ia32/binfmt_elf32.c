@@ -142,10 +142,11 @@ ia64_elf32_init (struct pt_regs *regs)
 	/*
 	 * Setup GDTD.  Note: GDTD is the descrambled version of the pseudo-descriptor
 	 * format defined by Figure 3-11 "Pseudo-Descriptor Format" in the IA-32
-	 * architecture manual.
+	 * architecture manual. Also note that the only fields that are not ignored are
+	 * `base', `limit', 'G', `P' (must be 1) and `S' (must be 0).
 	 */
-	regs->r31 = IA32_SEG_UNSCRAMBLE(IA32_SEG_DESCRIPTOR(IA32_GDT_OFFSET, IA32_PAGE_SIZE - 1, 0,
-							    0, 0, 0, 0, 0, 0));
+	regs->r31 = IA32_SEG_UNSCRAMBLE(IA32_SEG_DESCRIPTOR(IA32_GDT_OFFSET, IA32_PAGE_SIZE - 1,
+							    0, 0, 0, 1, 0, 0, 0));
 	/* Setup the segment selectors */
 	regs->r16 = (__USER_DS << 16) | __USER_DS; /* ES == DS, GS, FS are zero */
 	regs->r17 = (__USER_DS << 16) | __USER_CS; /* SS, CS; ia32_load_state() sets TSS and LDT */
@@ -206,6 +207,7 @@ elf32_set_personality (void)
 	set_personality(PER_LINUX32);
 	current->thread.map_base  = IA32_PAGE_OFFSET/3;
 	current->thread.task_size = IA32_PAGE_OFFSET;	/* use what Linux/x86 uses... */
+	current->thread.flags |= IA64_THREAD_XSTACK;	/* data must be executable */
 	set_fs(USER_DS);				/* set addr limit for new TASK_SIZE */
 }
 

@@ -4,11 +4,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_VECTOR_H
-#define _ASM_SN_VECTOR_H
+#ifndef _ASM_IA64_SN_VECTOR_H
+#define _ASM_IA64_SN_VECTOR_H
 
 #include <linux/config.h>
 
@@ -37,7 +36,7 @@
 
 #endif /* RTL */
 
-#if defined(CONFIG_SGI_IP35) || defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
+#if defined(CONFIG_IA64_SGI_SN1) || defined(CONFIG_IA64_GENERIC)
 #define VECTOR_PARMS		LB_VECTOR_PARMS
 #define VECTOR_ROUTE		LB_VECTOR_ROUTE
 #define VECTOR_DATA		LB_VECTOR_DATA
@@ -66,19 +65,22 @@
 #define VS_ERROR_MASK		LVS_ERROR_MASK
 #endif
 
-#define NET_ERROR_NONE          0       /* No error             */
-#define NET_ERROR_HARDWARE     -1       /* Hardware error       */
-#define NET_ERROR_OVERRUN      -2       /* Extra response(s)    */
-#define NET_ERROR_REPLY        -3       /* Reply parms mismatch */
-#define NET_ERROR_ADDRESS      -4       /* Addr error response  */
-#define NET_ERROR_COMMAND      -5       /* Cmd error response   */
-#define NET_ERROR_PROT         -6       /* Prot error response  */
-#define NET_ERROR_TIMEOUT      -7       /* Too many retries     */
-#define NET_ERROR_VECTOR       -8       /* Invalid vector/path  */
-#define NET_ERROR_ROUTERLOCK   -9       /* Timeout locking rtr  */
-#define NET_ERROR_INVAL	       -10	/* Invalid vector request */
+#define NET_ERROR_NONE		0	/* No error		*/
+#define NET_ERROR_HARDWARE	(-1)	/* Hardware error	*/
+#define NET_ERROR_OVERRUN	(-2)	/* Extra response(s)	*/
+#define NET_ERROR_REPLY		(-3)	/* Reply parms mismatch */
+#define NET_ERROR_ADDRESS	(-4)	/* Addr error response	*/
+#define NET_ERROR_COMMAND	(-5)	/* Cmd error response	*/
+#define NET_ERROR_PROT		(-6)	/* Prot error response	*/
+#define NET_ERROR_TIMEOUT	(-7)	/* Too many retries	*/
+#define NET_ERROR_VECTOR	(-8)	/* Invalid vector/path	*/
+#define NET_ERROR_ROUTERLOCK	(-9)	/* Timeout locking rtr	*/
+#define NET_ERROR_INVAL		(-10)	/* Invalid vector request */
 
-#if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
+#ifndef __ASSEMBLY__
+#include <linux/types.h>
+#include <asm/sn/types.h>
+
 typedef uint64_t              net_reg_t;
 typedef uint64_t              net_vec_t;
 
@@ -114,6 +116,6 @@ int hub_vector_read(cnodeid_t cnode, net_vec_t vector, int writeid,
 	int addr, net_reg_t *value);
 #endif
 
-#endif /* _LANGUAGE_C || _LANGUAGE_C_PLUS_PLUS */
+#endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_SN_VECTOR_H */
+#endif /* _ASM_IA64_SN_VECTOR_H */

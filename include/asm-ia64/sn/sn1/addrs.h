@@ -4,19 +4,21 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
 
-#ifndef _ASM_SN_SN1_ADDRS_H
-#define _ASM_SN_SN1_ADDRS_H
+#ifndef _ASM_IA64_SN_SN1_ADDRS_H
+#define _ASM_IA64_SN_SN1_ADDRS_H
 
+#include <linux/config.h>
+
+#ifdef CONFIG_IA64_SGI_SN1
 /*
- * IP35 (on a TRex) Address map
+ * SN1 (on a TRex) Address map
  *
  * This file contains a set of definitions and macros which are used
  * to reference into the major address spaces (CAC, HSPEC, IO, MSPEC,
- * and UNCAC) used by the IP35 architecture.  It also contains addresses
+ * and UNCAC) used by the SN1 architecture.  It also contains addresses
  * for "major" statically locatable PROM/Kernel data structures, such as
  * the partition table, the configuration data structure, etc.
  * We make an implicit assumption that the processor using this file
@@ -32,7 +34,6 @@
  *	 appropriately.
  */
 
-#include <linux/config.h>
 
 /*
  * Some of the macros here need to be casted to appropriate types when used
@@ -40,22 +41,14 @@
  * use some new ANSI preprocessor stuff to paste these on where needed.
  */
 
-#if defined(_RUN_UNCACHED)
-#define CAC_BASE		0x9600000000000000
-#else
-#ifndef __ia64
-#define CAC_BASE		0xa800000000000000
-#else
 #define CAC_BASE                0xe000000000000000
-#endif
-#endif
-
 #define HSPEC_BASE              0xc0000b0000000000
 #define HSPEC_SWIZ_BASE         0xc000030000000000
 #define IO_BASE                 0xc0000a0000000000
 #define IO_SWIZ_BASE            0xc000020000000000
-#define MSPEC_BASE              0xc000000000000000
+#define MSPEC_BASE              0xc000090000000000
 #define UNCAC_BASE              0xc000000000000000
+#define TO_PHYS_MASK		0x000000ffffffffff
 
 #define TO_PHYS(x)		(	      ((x) & TO_PHYS_MASK))
 #define TO_CAC(x)		(CAC_BASE   | ((x) & TO_PHYS_MASK))
@@ -109,18 +102,14 @@
 #define NASID_GET(_pa)		(int) ((UINT64_CAST (_pa) >>		\
 					NASID_SHFT) & NASID_BITMASK)
 
-#if _LANGUAGE_C && !defined(_STANDALONE)
-#ifndef REAL_HARDWARE
-#define NODE_SWIN_BASE(nasid, widget) RAW_NODE_SWIN_BASE(nasid, widget)
-#else
+#ifndef __ASSEMBLY__
 #define NODE_SWIN_BASE(nasid, widget)					\
 	((widget == 0) ? NODE_BWIN_BASE((nasid), SWIN0_BIGWIN)		\
 	: RAW_NODE_SWIN_BASE(nasid, widget))
-#endif
 #else
 #define NODE_SWIN_BASE(nasid, widget) \
      (NODE_IO_BASE(nasid) + (UINT64_CAST (widget) << SWIN_SIZE_BITS))
-#endif /* _LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /*
  * The following definitions pertain to the IO special address
@@ -155,7 +144,7 @@
 
 /*
  * The following define the major position-independent aliases used
- * in IP27.
+ * in SN1.
  *	CALIAS -- Varies in size, points to the first n bytes of memory
  *		  	on the reader's node.
  */
@@ -169,11 +158,6 @@
 
 #define SN0_WIDGET_BASE(_nasid, _wid)	(NODE_SWIN_BASE((_nasid), (_wid)))
 
-#if _LANGUAGE_C
-#define KERN_NMI_ADDR(nasid, slice)					\
-                    TO_NODE_UNCAC((nasid), IP27_NMI_KREGS_OFFSET + 	\
-				  (IP27_NMI_KREGS_CPU_SIZE * (slice)))
-#endif /* _LANGUAGE_C */
 
 
 /*
@@ -197,7 +181,7 @@
 #define KL_UART_CMD	LOCAL_HSPEC(HSPEC_UART_0)	/* UART command reg */
 #define KL_UART_DATA	LOCAL_HSPEC(HSPEC_UART_1)	/* UART data reg */
 
-#if !_LANGUAGE_ASSEMBLY
+#if !__ASSEMBLY__
 /* Address 0x400 to 0x1000 ualias points to cache error eframe + misc
  * CACHE_ERR_SP_PTR could either contain an address to the stack, or
  * the stack could start at CACHE_ERR_SP_PTR
@@ -210,28 +194,9 @@
 #define CACHE_ERR_SP		(CACHE_ERR_SP_PTR - 16)
 #define CACHE_ERR_AREA_SIZE	(ARCS_SPB_OFFSET - CACHE_ERR_EFRAME)
 
-#endif	/* !_LANGUAGE_ASSEMBLY */
+#endif	/* !__ASSEMBLY__ */
 
-/* Each CPU accesses UALIAS at a different physaddr, on 32k boundaries
- * This determines the locations of the exception vectors
- */
-#define UALIAS_FLIP_BASE	UALIAS_BASE
-#define UALIAS_FLIP_SHIFT	15
-#define UALIAS_FLIP_ADDR(_x)	((_x) ^ (cputoslice(getcpuid())<<UALIAS_FLIP_SHIFT))
 
-#if !defined(CONFIG_IA64_SGI_SN1) && !defined(CONFIG_IA64_GENERIC)
-#define EX_HANDLER_OFFSET(slice) ((slice) << UALIAS_FLIP_SHIFT)
-#endif
-#define EX_HANDLER_ADDR(nasid, slice)					\
-	PHYS_TO_K0(NODE_OFFSET(nasid) | EX_HANDLER_OFFSET(slice))
-#define EX_HANDLER_SIZE		0x0400
-
-#if !defined(CONFIG_IA64_SGI_SN1) && !defined(CONFIG_IA64_GENERIC)
-#define EX_FRAME_OFFSET(slice)	((slice) << UALIAS_FLIP_SHIFT | 0x400)
-#endif
-#define EX_FRAME_ADDR(nasid, slice)					\
-	PHYS_TO_K0(NODE_OFFSET(nasid) | EX_FRAME_OFFSET(slice))
-#define EX_FRAME_SIZE		0x0c00
 
 #define _ARCSPROM
 
@@ -241,7 +206,7 @@
  * The PROM needs to pass the device base address and the
  * device pci cfg space address to the device drivers during
  * install. The COMPONENT->Key field is used for this purpose.
- * Macros needed by IP27 device drivers to convert the
+ * Macros needed by SN1 device drivers to convert the
  * COMPONENT->Key field to the respective base address.
  * Key field looks as follows:
  *
@@ -256,7 +221,7 @@
  * is in place.
  */
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 #define uchar unsigned char
 
@@ -301,8 +266,9 @@
 #define PUT_INSTALL_STATUS(c,s)		c->Revision = s
 #define GET_INSTALL_STATUS(c)		c->Revision
 
-#endif /* LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 #endif /* _STANDALONE */
+#endif /* CONFIG_IA64_SGI_SN1 */
 
-#endif /* _ASM_SN_SN1_ADDRS_H */
+#endif /* _ASM_IA64_SN_SN1_ADDRS_H */

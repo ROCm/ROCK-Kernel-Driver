@@ -4,15 +4,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000 Silicon Graphics, Inc.
- * Copyright (C) 2000 by Colin Ngam
+ * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PIO_H
-#define _ASM_SN_PIO_H
+#ifndef _ASM_IA64_SN_PIO_H
+#define _ASM_IA64_SN_PIO_H
 
 #include <linux/types.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/driver.h>
 
 /*
  * pioaddr_t	- The kernel virtual address that a PIO can be done upon.
@@ -143,7 +142,7 @@ extern void andw_rmw(volatile void*, unsigned int);
 #define LAN_RAM         2
 #define LAN_IO          3
 
-#define PIOREG_NULL	-1
+#define PIOREG_NULL	(-1)
 
 /* standard flags values for pio_map routines,
  * including {xtalk,pciio}_piomap calls.
@@ -156,4 +155,4 @@ extern void andw_rmw(volatile void*, unsigned int);
 
 #define	PIOMAP_FLAGS	0x7
 
-#endif	/* _ASM_SN_PIO_H */
+#endif	/* _ASM_IA64_SN_PIO_H */

@@ -5,7 +5,7 @@
 
 #ifdef CONFIG_IA32_SUPPORT
 
-#include <linux/param.h>
+#include <linux/binfmts.h>
 
 /*
  * 32 bit structures for IA32 support.
@@ -474,6 +474,8 @@ struct ia32_modify_ldt_ldt_s {
 	unsigned int seg_not_present:1;
 	unsigned int useable:1;
 };
+
+struct linux_binprm;
 
 extern void ia32_gdt_init (void);
 extern int ia32_setup_frame1 (int sig, struct k_sigaction *ka, siginfo_t *info,

@@ -1,21 +1,10 @@
 /*  labelcl - SGI's Hwgraph Compatibility Layer.
-
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Library General Public
-    License as published by the Free Software Foundation; either
-    version 2 of the License, or (at your option) any later version.
-
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-    Library General Public License for more details.
-
-    You should have received a copy of the GNU Library General Public
-    License along with this library; if not, write to the Free
-    Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
-    Colin Ngam may be reached by email at cngam@sgi.com
-
+ *
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Copyright (c) 2001 Silicon Graphics, Inc.  All rights reserved.
 */
 
 #include <linux/types.h>
@@ -286,7 +275,7 @@ labelcl_info_add_LBL(devfs_handle_t de,
 		if (!strcmp(info_name, old_label_list[i].name)) {
 			/* Not allowed to add duplicate labelled info names. */
 			kfree(new_label_list);
-			printk(KERN_WARNING "labelcl_info_add_LBL: Duplicate label name %s for vertex 0x%p\n", info_name, de);
+			printk(KERN_WARNING "labelcl_info_add_LBL: Duplicate label name %s for vertex 0x%p\n", info_name, (void *)de);
 			return(-1);
 		}
 		new_label_list[i] = old_label_list[i]; /* structure copy */

@@ -1,12 +1,12 @@
 /* 
  *
+ * SNI64 specific PCI support for SNI IO.
+ *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * SNI64 specific PCI support for SNI IO.
- *
- * Copyright (C) 1997, 1998, 2000 Colin Ngam
+ * Copyright (c) 1997, 1998, 2000-2001 Silicon Graphics, Inc.  All rights reserved.
  */
 #include <linux/init.h>
 #include <linux/types.h>
@@ -14,7 +14,8 @@
 #include <linux/pci.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
-#include <asm/sn/iobus.h>
+#include <asm/sn/io.h>
+#include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
 #include <asm/param.h>
 #include <asm/sn/pio.h>
@@ -237,10 +238,6 @@ sn1_pci_find_bios(void)
 
 	sgi_master_io_infr_init();
 
-#ifdef BRINGUP
-	if ( IS_RUNNING_ON_SIMULATOR() )
-		return;
-#endif
 	/* sn1_io_infrastructure_init(); */
 	pci_conf = snia64_pci_ops;
 }
@@ -250,8 +247,6 @@ pci_fixup_ioc3(struct pci_dev *d)
 {
         int 		i;
 	unsigned int 	size;
-
-	devfs_handle_t	bridge_vhdl = pci_bus_to_vertex(d->bus->number);
 
         /* IOC3 only decodes 0x20 bytes of the config space, reading
 	 * beyond that is relatively benign but writing beyond that
@@ -294,5 +289,12 @@ pci_fixup_ioc3(struct pci_dev *d)
         d->subsystem_device = 0;
 
 }
+
+#else
+void sn1_pci_find_bios(void) {}
+void pci_fixup_ioc3(struct pci_dev *d) {}
+struct list_head pci_root_buses;
+struct list_head pci_root_buses;
+struct list_head pci_devices;
 
 #endif /* CONFIG_PCI */

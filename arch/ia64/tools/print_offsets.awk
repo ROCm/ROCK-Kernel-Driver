@@ -12,7 +12,7 @@ BEGIN {
 	# PT_PTRACED == 1<<PT_PTRACED_BIT.
 	#
 	print "#define PT_PTRACED_BIT		0"
-	print "#define PT_TRACESYS_BIT		1"
+	print "#define PT_SYSCALLTRACE_BIT	1"
 }
 
 # look for .tab:

@@ -13,7 +13,9 @@
  *	ACPI 2.0 specification
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
+#include <linux/mm.h>
 
 #pragma	pack(1)
 #define ACPI_RSDP_SIG "RSD PTR " /* Trailing space required */
@@ -24,7 +26,7 @@ typedef struct {
 	char oem_id[6];
 	u8 revision;
 	u32 rsdt;
-	u32 lenth;
+	u32 length;
 	struct acpi_xsdt *xsdt;
 	u8 ext_checksum;
 	u8 reserved[3];
@@ -96,7 +98,7 @@ typedef struct {
 	struct acpi_rsdt *rsdt;
 } acpi_rsdp_t;
 
-typedef struct {
+typedef struct acpi_rsdt {
 	acpi_desc_table_hdr_t header;
 	u8 reserved[4];
 	unsigned long entry_ptrs[1];	/* Not really . . . */
@@ -151,15 +153,15 @@ typedef struct {
 #define MADT_PCAT_COMPAT	(1<<0)
 
 /* acpi 2.0 MADT structure types */
-#define ACPI20_ENTRY_LOCAL_APIC                 0
-#define ACPI20_ENTRY_IO_APIC                    1
-#define ACPI20_ENTRY_INT_SRC_OVERRIDE           2
-#define ACPI20_ENTRY_NMI_SOURCE                 3
-#define ACPI20_ENTRY_LOCAL_APIC_NMI             4
-#define ACPI20_ENTRY_LOCAL_APIC_ADDR_OVERRIDE   5
-#define ACPI20_ENTRY_IO_SAPIC                   6
-#define ACPI20_ENTRY_LOCAL_SAPIC                7
-#define ACPI20_ENTRY_PLATFORM_INT_SOURCE        8
+#define ACPI20_ENTRY_LOCAL_APIC			0
+#define ACPI20_ENTRY_IO_APIC			1
+#define ACPI20_ENTRY_INT_SRC_OVERRIDE		2
+#define ACPI20_ENTRY_NMI_SOURCE			3
+#define ACPI20_ENTRY_LOCAL_APIC_NMI		4
+#define ACPI20_ENTRY_LOCAL_APIC_ADDR_OVERRIDE	5
+#define ACPI20_ENTRY_IO_SAPIC			6
+#define ACPI20_ENTRY_LOCAL_SAPIC		7
+#define ACPI20_ENTRY_PLATFORM_INT_SOURCE	8
 
 typedef struct acpi20_entry_lsapic {
 	u8 type;
@@ -190,16 +192,132 @@ typedef struct {
 } acpi20_entry_platform_src_t;
 
 /* constants for interrupt routing API for device drivers */
-#define	ACPI20_ENTRY_PIS_PMI	1
-#define	ACPI20_ENTRY_PIS_INIT	2
-#define	ACPI20_ENTRY_PIS_CPEI	3
-#define	ACPI_MAX_PLATFORM_IRQS	4
+#define ACPI20_ENTRY_PIS_PMI	1
+#define ACPI20_ENTRY_PIS_INIT	2
+#define ACPI20_ENTRY_PIS_CPEI	3
+#define ACPI_MAX_PLATFORM_IRQS	4
+
+#define ACPI_SPCRT_SIG	"SPCR"
+#define ACPI_SPCRT_SIG_LEN 4
+
+#define ACPI_DBGPT_SIG	"DBGP"
+#define ACPI_DBGPT_SIG_LEN 4
 
 extern int acpi20_parse(acpi20_rsdp_t *);
+extern int acpi20_early_parse(acpi20_rsdp_t *);
 extern int acpi_parse(acpi_rsdp_t *);
 extern const char *acpi_get_sysname (void);
 extern int acpi_request_vector(u32 int_type);
-
 extern void (*acpi_idle) (void);	/* power-management idle function, if any */
+#ifdef CONFIG_NUMA
+extern cnodeid_t paddr_to_nid(unsigned long paddr);
+#endif
+
+/*
+ * ACPI 2.0 SRAT Table
+ * http://www.microsoft.com/HWDEV/design/SRAT.htm
+ */
+
+typedef struct acpi_srat {
+	acpi_desc_table_hdr_t header;
+	u32 table_revision;
+	u64 reserved;
+} acpi_srat_t;
+
+typedef struct srat_cpu_affinity {
+	u8 type;
+	u8 length;
+	u8 proximity_domain;
+	u8 apic_id;
+	u32 flags;
+	u8 local_sapic_eid;
+	u8 reserved[7];
+} srat_cpu_affinity_t;
+
+typedef struct srat_memory_affinity {
+	u8 type;
+	u8 length;
+	u8 proximity_domain;
+	u8 reserved[5];
+	u32 base_addr_lo;
+	u32 base_addr_hi;
+	u32 length_lo;
+	u32 length_hi;
+	u32 memory_type;
+	u32 flags;
+	u64 reserved2;
+} srat_memory_affinity_t;
+
+/* ACPI 2.0 SRAT structure */
+#define ACPI_SRAT_SIG "SRAT"
+#define ACPI_SRAT_SIG_LEN 4
+#define ACPI_SRAT_REVISION 1
+
+#define SRAT_CPU_STRUCTURE		0
+#define SRAT_MEMORY_STRUCTURE		1
+
+/* Only 1 flag for cpu affinity structure! */
+#define SRAT_CPU_FLAGS_ENABLED			0x00000001
+
+#define SRAT_MEMORY_FLAGS_ENABLED		0x00000001
+#define SRAT_MEMORY_FLAGS_HOTREMOVABLE		0x00000002
+
+/* ACPI 2.0 address range types */
+#define ACPI_ADDRESS_RANGE_MEMORY	1
+#define ACPI_ADDRESS_RANGE_RESERVED	2
+#define ACPI_ADDRESS_RANGE_ACPI		3
+#define ACPI_ADDRESS_RANGE_NVS		4
+
+#define NODE_ARRAY_INDEX(x)	((x) / 8)	/* 8 bits/char */
+#define NODE_ARRAY_OFFSET(x)	((x) % 8)	/* 8 bits/char */
+#define MAX_PXM_DOMAINS		(256)
+
+#ifdef CONFIG_DISCONTIGMEM
+/*
+ * List of node memory chunks. Filled when parsing SRAT table to
+ * obtain information about memory nodes.
+*/
+
+struct node_memory_chunk_s {
+	unsigned long start_paddr;
+	unsigned long size;
+	int pxm;			// proximity domain of node
+	int nid;			// which cnode contains this chunk?
+	int bank;			// which mem bank on this node
+};
+
+extern struct node_memory_chunk_s node_memory_chunk[PLAT_MAXCLUMPS];	// temporary?
+
+struct node_cpuid_s {
+	u16	phys_id;		/* id << 8 | eid */
+	int	pxm;			// proximity domain of cpu
+	int	nid;
+};
+extern struct node_cpuid_s node_cpuid[NR_CPUS];
+
+extern int pxm_to_nid_map[MAX_PXM_DOMAINS]; /* _PXM to logical node ID map */
+extern int nid_to_pxm_map[PLAT_MAX_COMPACT_NODES]; /* logical node ID to _PXM map */
+extern int numnodes;			/* total number of nodes in system */
+extern int num_memory_chunks;		/* total number of memory chunks */
+
+/*
+ * ACPI 2.0 SLIT Table
+ * http://devresource.hp.com/devresource/Docs/TechPapers/IA64/slit.pdf
+ */
+
+typedef struct acpi_slit {
+	acpi_desc_table_hdr_t header;
+	u64 localities;
+	u8 entries[1];			/* dummy, real size = locality^2 */
+} acpi_slit_t;
+
+extern u8 acpi20_slit[PLAT_MAX_COMPACT_NODES * PLAT_MAX_COMPACT_NODES];
+
+#define ACPI_SLIT_SIG "SLIT"
+#define ACPI_SLIT_SIG_LEN 4
+#define ACPI_SLIT_REVISION 1
+#define ACPI_SLIT_LOCAL 10
+#endif /* CONFIG_DISCONTIGMEM */
+
 #pragma	pack()
 #endif /* _ASM_IA64_ACPI_EXT_H */
