@@ -608,6 +608,12 @@ out:
 		mm->locked_vm += len >> PAGE_SHIFT;
 		make_pages_present(addr, addr + len);
 	}
+	if (flags & MAP_POPULATE) {
+		up_write(&mm->mmap_sem);
+		sys_remap_file_pages(addr, len, prot,
+					pgoff, flags & MAP_NONBLOCK);
+		down_write(&mm->mmap_sem);
+	}
 	return addr;
 
 unmap_and_free_vma:
