@@ -47,12 +47,12 @@
 #define CPUID_TCM	2
 #define CPUID_TLBTYPE	3
 
-#define read_cpuid(reg)					\
-	({						\
-		unsigned int __val;			\
-		asm("mrc p15, 0, %0, c0, c0, " #reg	\
-		    : "=r" (__val));			\
-		__val;					\
+#define read_cpuid(reg)							\
+	({								\
+		unsigned int __val;					\
+		asm("mrc%? p15, 0, %0, c0, c0, " __stringify(reg)	\
+		    : "=r" (__val));					\
+		__val;							\
 	})
 
 /*
