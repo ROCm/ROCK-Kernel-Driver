@@ -567,8 +567,6 @@ extern void node_nr_running_init(void);
 
 /* Move tasks off this (offline) CPU onto another. */
 extern void migrate_all_tasks(void);
-/* Try to move me here, if possible. */
-void migrate_to_cpu(int dest_cpu);
 extern void set_user_nice(task_t *p, long nice);
 extern int task_prio(task_t *p);
 extern int task_nice(task_t *p);

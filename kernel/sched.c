@@ -2891,9 +2891,6 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 	case CPU_ONLINE:
 		/* Strictly unneccessary, as first user will wake it. */
 		wake_up_process(cpu_rq(cpu)->migration_thread);
-		/* Make sure it's hit high prio before we return. */
-		while (!rt_task(cpu_rq(cpu)->migration_thread))
-			yield();
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
 	case CPU_UP_CANCELED:

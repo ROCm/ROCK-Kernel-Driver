@@ -166,7 +166,7 @@ int __devinit cpu_up(unsigned int cpu)
 	int ret;
 	void *hcpu = (void *)(long)cpu;
 
-	if ((ret = lock_cpu_hotplug_interruptible()) != 0)
+	if ((ret = down_interruptible(&cpucontrol)) != 0)
 		return ret;
 
 	if (cpu_online(cpu)) {
@@ -195,6 +195,6 @@ out_notify:
 	if (ret != 0)
 		notifier_call_chain(&cpu_chain, CPU_UP_CANCELED, hcpu);
 out:
-	unlock_cpu_hotplug();
+	up(&cpucontrol);
 	return ret;
 }

@@ -236,9 +236,6 @@ static unsigned int real_irq_to_virt(unsigned int real_irq)
 	return ptr - virt_irq_to_real_map;
 }
 
-/* XXX Fix this when we clean up large irq support */
-extern cpumask_t get_irq_affinity(unsigned int irq);
-
 static int get_irq_server(unsigned int irq)
 {
 	cpumask_t cpumask = irq_affinity[irq];
