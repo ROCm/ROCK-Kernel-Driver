@@ -140,7 +140,7 @@ void scsi_initialize_merge_fn(Scsi_Device * SDpnt)
 	 * Enable highmem I/O, if appropriate.
 	 */
 	bounce_limit = BLK_BOUNCE_HIGH;
-	if (SHpnt->highmem_io && (SDpnt->type == TYPE_DISK)) {
+	if (SHpnt->highmem_io) {
 		if (!PCI_DMA_BUS_IS_PHYS)
 			/* Platforms with virtual-DMA translation
  			 * hardware have no practical limit.
