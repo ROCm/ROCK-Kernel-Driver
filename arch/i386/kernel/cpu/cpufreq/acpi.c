@@ -1,5 +1,5 @@
 /*
- * acpi_processor_perf.c - ACPI Processor P-States Driver ($Revision: 71 $)
+ * acpi_processor_perf.c - ACPI Processor P-States Driver ($Revision: 1.3 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -51,7 +51,6 @@ MODULE_LICENSE("GPL");
 
 
 static struct acpi_processor_performance	*performance;
-static struct cpufreq_driver			acpi_cpufreq_driver;
 
 
 static int 
@@ -580,9 +579,7 @@ acpi_cpufreq_cpu_init (
 			policy->cpuinfo.transition_latency = perf->states[i].transition_latency;
 	}
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
-#ifdef CONFIG_CPU_FREQ_24_API
-	acpi_cpufreq_driver.cpu_cur_freq[policy->cpu] = perf->states[pr->limit.state.px].core_frequency * 1000;
-#endif
+	policy->cur = perf->states[pr->limit.state.px].core_frequency * 1000;
 
 	/* table init */
 	for (i=0; i<=perf->state_count; i++)

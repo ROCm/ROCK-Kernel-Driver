@@ -1,5 +1,5 @@
 /*
- *  $Id: longhaul.c,v 1.86 2003/02/12 13:59:11 davej Exp $
+ *  $Id: longhaul.c,v 1.87 2003/02/22 10:23:46 db Exp $
  *
  *  (C) 2001  Dave Jones. <davej@suse.de>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
@@ -582,15 +582,6 @@ static int longhaul_target (struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int longhaul_cpu_init (struct cpufreq_policy *policy);
-
-static struct cpufreq_driver longhaul_driver = {
-	.verify 	= longhaul_verify,
-	.target 	= longhaul_target,
-	.init		= longhaul_cpu_init,
-	.name		= "longhaul",
-};
-
 static int longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
@@ -648,12 +639,17 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
  	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
  	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
-#ifdef CONFIG_CPU_FREQ_24_API
-        longhaul_driver.cpu_cur_freq[0] = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
-#endif
+        policy->cur = (unsigned int) (longhaul_get_cpu_fsb() * longhaul_get_cpu_mult() * 100);
 
 	return cpufreq_frequency_table_cpuinfo(policy, longhaul_table);
 }
+
+static struct cpufreq_driver longhaul_driver = {
+	.verify 	= longhaul_verify,
+	.target 	= longhaul_target,
+	.init		= longhaul_cpu_init,
+	.name		= "longhaul",
+};
 
 static int __init longhaul_init (void)
 {

@@ -1,5 +1,5 @@
 /*
- *  $Id: powernow-k6.c,v 1.46 2003/01/20 17:31:47 db Exp $
+ *  $Id: powernow-k6.c,v 1.48 2003/02/22 10:23:46 db Exp $
  *  This file was part of Powertweak Linux (http://powertweak.sf.net)
  *  and is shared with the Linux Kernel module.
  *
@@ -25,7 +25,6 @@
 #define POWERNOW_IOPORT 0xfff0         /* it doesn't matter where, as long
 					  as it is unused */
 
-static struct cpufreq_driver		powernow_k6_driver;
 static unsigned int                     busfreq;   /* FSB, in 10 kHz */
 static unsigned int                     max_multiplier;
 
@@ -168,9 +167,7 @@ static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
 	/* cpuinfo and default policy values */
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-#ifdef CONFIG_CPU_FREQ_24_API
-	powernow_k6_driver.cpu_cur_freq[policy->cpu] = busfreq * max_multiplier;
-#endif
+	policy->cur = busfreq * max_multiplier;
 
 	return cpufreq_frequency_table_cpuinfo(policy, &clock_ratio[0]);
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: longrun.c,v 1.22 2003/02/10 17:31:50 db Exp $
+ *  $Id: longrun.c,v 1.25 2003/02/28 16:03:50 db Exp $
  *
  * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
  *
@@ -244,10 +244,6 @@ static int longrun_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	longrun_get_policy(policy);
 	
-#ifdef CONFIG_CPU_FREQ_24_API
-	longrun_driver.cpu_cur_freq[policy->cpu] = longrun_low_freq; /* dummy value */
-#endif
-
 	return 0;
 }
 

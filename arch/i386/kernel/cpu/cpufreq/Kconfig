@@ -18,20 +18,6 @@ config CPU_FREQ
 
 source "drivers/cpufreq/Kconfig"
 
-config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
-	depends on CPU_FREQ
-	help
-	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses a sysfs interface instead. Please note that some drivers do 
-	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
-	  so if in doubt, say N here.
-
-	  For details, take a look at linux/Documentation/cpufreq. 
-
-	  If in doubt, say N.
-
 config CPU_FREQ_TABLE
        tristate "CPU frequency table helpers"
        depends on CPU_FREQ

@@ -106,8 +106,6 @@
 #define PWRSVE_ISA             (1<<3)  /* stop ISA clock  */
 #define PWRSVE                 (1<<4)  /* active idle */
 
-static struct cpufreq_driver gx_suspmod_driver;
-
 struct gxfreq_params {
 	u8 on_duration;
 	u8 off_duration;
@@ -435,9 +433,7 @@ static int cpufreq_gx_cpu_init(struct cpufreq_policy *policy)
 	else
 		policy->min = maxfreq / POLICY_MIN_DIV;
 	policy->max = maxfreq;
-#ifdef CONFIG_CPU_FREQ_24_API
-	gx_suspmod_driver.cpu_cur_freq[policy->cpu] = curfreq;
-#endif
+	policy->cur = curfreq;
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.min_freq = maxfreq / max_duration;
 	policy->cpuinfo.max_freq = maxfreq;

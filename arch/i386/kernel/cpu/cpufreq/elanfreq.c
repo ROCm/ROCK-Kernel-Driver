@@ -31,8 +31,6 @@
 #define REG_CSCIR 0x22 		/* Chip Setup and Control Index Register    */
 #define REG_CSCDR 0x23		/* Chip Setup and Control Data  Register    */
 
-static struct cpufreq_driver elanfreq_driver;
-
 /* Module parameter */
 static int max_freq;
 
@@ -220,9 +218,7 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
 	/* cpuinfo and default policy values */
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-#ifdef CONFIG_CPU_FREQ_24_API
-	elanfreq_driver.cpu_cur_freq[policy->cpu] = elanfreq_get_cpu_frequency();
-#endif
+	policy->cur = elanfreq_get_cpu_frequency();
 
 	return cpufreq_frequency_table_cpuinfo(policy, &elanfreq_table[0]);;
 }
