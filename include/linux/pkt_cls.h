@@ -222,9 +222,6 @@ struct tc_u32_sel
 	unsigned char		flags;
 	unsigned char		offshift;
 	unsigned char		nkeys;
-#ifdef fix_u32_bug
-	unsigned char		fshift;  /* fold shift */
-#endif
 
 	__u16			offmask;
 	__u16			off;
