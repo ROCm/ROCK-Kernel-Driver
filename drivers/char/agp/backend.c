@@ -219,8 +219,6 @@ static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
 	return 0;
 }
 
-extern int agp_frontend_initialize(void);
-extern void agp_frontend_cleanup(void);
 
 static const drm_agp_t drm_agp = {
 	&agp_free_memory,

@@ -373,6 +373,14 @@ struct agp_driver {
 };
 
 
+/* Frontend routines. */
+int agp_frontend_initialize(void);
+void agp_frontend_cleanup(void);
+
+/* Backend routines. */
+int agp_register_driver (struct agp_driver *drv);
+int agp_unregister_driver(struct agp_driver *drv);
+
 /* Generic routines. */
 void agp_generic_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
@@ -388,8 +396,6 @@ int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
 int agp_num_entries(void);
-int agp_register_driver (struct agp_driver *drv);
-int agp_unregister_driver(struct agp_driver *drv);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
 int agp_3_0_node_enable(u32 mode, u32 minor);
