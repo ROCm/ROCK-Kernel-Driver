@@ -754,14 +754,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		if (!(ar))
 			goto args_error;
 
-		ata_taskfile(drive, ar, NULL);
-
-		if (((ar->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
-		     (ar->command_type == IDE_DRIVE_TASK_OUT)) &&
-				ar->prehandler && ar->handler)
-			return ar->prehandler(drive, rq);
-
-		return ide_started;
+		return ata_taskfile(drive, ar, NULL);
 	}
 
 	/* The normal way of execution is to pass and execute the request

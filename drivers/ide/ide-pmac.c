@@ -431,7 +431,7 @@ pmac_ide_do_setfeature(struct ata_device *drive, u8 command)
 		goto out;
 	}
 	udelay(10);
-	ata_irq_enale(drive, 0);
+	ata_irq_enable(drive, 0);
 	OUT_BYTE(command, IDE_NSECTOR_REG);
 	OUT_BYTE(SETFEATURES_XFER, IDE_FEATURE_REG);
 	OUT_BYTE(WIN_SETFEATURES, IDE_COMMAND_REG);
@@ -1577,9 +1577,9 @@ idepmac_wake_device(struct ata_device *drive, int used_dma)
 	 */
 	if (used_dma && !ide_spin_wait_hwgroup(drive)) {
 		/* Lock HW group */
-		set_bit(IDE_BUSY, &drive->channel->active);
+		set_bit(IDE_BUSY, drive->channel->active);
 		pmac_ide_check_dma(drive);
-		clear_bit(IDE_BUSY, &drive->channel->active);
+		clear_bit(IDE_BUSY, drive->channel->active);
 		spin_unlock_irq(drive->channel->lock);
 	}
 #endif
@@ -1626,7 +1626,7 @@ idepmac_sleep_drive(struct ata_device *drive, int idx, unsigned long base)
 		return;
 	else {
 		/* Lock HW group */
-		set_bit(IDE_BUSY, &drive->channel->active);
+		set_bit(IDE_BUSY, drive->channel->active);
 		/* Stop the device */
 		idepmac_sleep_device(drive, idx, base);
 		spin_unlock_irq(drive->channel->lock);
@@ -1656,7 +1656,7 @@ idepmac_wake_drive(struct ata_device *drive, unsigned long base)
 
 	/* We resume processing on the lock group */
 	spin_lock_irq(drive->channel->lock);
-	clear_bit(IDE_BUSY, &drive->channel->active);
+	clear_bit(IDE_BUSY, drive->channel->active);
 	if (!list_empty(&drive->queue.queue_head))
 		do_ide_request(&drive->queue);
 	spin_unlock_irq(drive->channel->lock);

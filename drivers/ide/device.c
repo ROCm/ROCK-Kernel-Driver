@@ -105,11 +105,12 @@ int ata_irq_enable(struct ata_device *drive, int on)
 	if (!ch->io_ports[IDE_CONTROL_OFFSET])
 		return 0;
 
+	/* 0x08 is for legacy ATA-1 devices */
 	if (on)
-		OUT_BYTE(0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
+		OUT_BYTE(0x08 | 0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
 	else {
 		if (!ch->intrproc)
-			OUT_BYTE(0x02, ch->io_ports[IDE_CONTROL_OFFSET]);
+			OUT_BYTE(0x08 | 0x02, ch->io_ports[IDE_CONTROL_OFFSET]);
 		else
 			ch->intrproc(drive);
 	}
@@ -131,9 +132,11 @@ void ata_reset(struct ata_channel *ch)
 		return;
 
 	printk("%s: reset\n", ch->name);
-	OUT_BYTE(0x04, ch->io_ports[IDE_CONTROL_OFFSET]);
+	/* 0x08 is for legacy ATA-1 devices */
+	OUT_BYTE(0x08 | 0x04, ch->io_ports[IDE_CONTROL_OFFSET]);
 	udelay(10);
-	OUT_BYTE(0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
+	/* 0x08 is for legacy ATA-1 devices */
+	OUT_BYTE(0x08 | 0x00, ch->io_ports[IDE_CONTROL_OFFSET]);
 	do {
 		mdelay(50);
 		stat = IN_BYTE(ch->io_ports[IDE_STATUS_OFFSET]);
