@@ -855,6 +855,217 @@ static void acpi_processor_ppc_exit(void) {
 	acpi_processor_ppc_is_init = 0;
 }
 
+/*
+ * when registering a cpufreq driver with this ACPI processor driver, the
+ * _PCT and _PSS structures are read out and written into struct
+ * acpi_processor_performance.
+ */
+
+static int 
+acpi_processor_get_performance_control (
+	struct acpi_processor *pr)
+{
+	int			result = 0;
+	acpi_status		status = 0;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*pct = NULL;
+	union acpi_object	obj = {0};
+	struct acpi_pct_register *reg = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_control");
+
+	status = acpi_evaluate_object(pr->handle, "_PCT", NULL, &buffer);
+	if(ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PCT\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	pct = (union acpi_object *) buffer.pointer;
+	if (!pct || (pct->type != ACPI_TYPE_PACKAGE) 
+		|| (pct->package.count != 2)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PCT data\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	/*
+	 * control_register
+	 */
+
+	obj = pct->package.elements[0];
+
+	if ((obj.type != ACPI_TYPE_BUFFER) 
+		|| (obj.buffer.length < sizeof(struct acpi_pct_register)) 
+		|| (obj.buffer.pointer == NULL)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid _PCT data (control_register)\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
+
+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unsupported address space [%d] (control_register)\n",
+			(u32) reg->space_id));
+		result = -EFAULT;
+		goto end;
+	}
+
+	pr->performance->control_register = (u16) reg->address;
+	pr->performance->control_register_bit_width = reg->bit_width;
+	/*
+	 * status_register
+	 */
+
+	obj = pct->package.elements[1];
+
+	if ((obj.type != ACPI_TYPE_BUFFER) 
+		|| (obj.buffer.length < sizeof(struct acpi_pct_register)) 
+		|| (obj.buffer.pointer == NULL)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+			"Invalid _PCT data (status_register)\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	reg = (struct acpi_pct_register *) (obj.buffer.pointer);
+
+	if (reg->space_id != ACPI_ADR_SPACE_SYSTEM_IO) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unsupported address space [%d] (status_register)\n",
+			(u32) reg->space_id));
+		result = -EFAULT;
+		goto end;
+	}
+
+	pr->performance->status_register = (u16) reg->address;
+	pr->performance->status_register_bit_width = reg->bit_width;
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		"control_register[0x%04x] status_register[0x%04x]\n",
+		pr->performance->control_register,
+		pr->performance->status_register));
+
+end:
+	acpi_os_free(buffer.pointer);
+
+	return_VALUE(result);
+}
+
+
+static int 
+acpi_processor_get_performance_states (
+	struct acpi_processor	*pr)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	format = {sizeof("NNNNNN"), "NNNNNN"};
+	struct acpi_buffer	state = {0, NULL};
+	union acpi_object 	*pss = NULL;
+	int			i = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
+
+	status = acpi_evaluate_object(pr->handle, "_PSS", NULL, &buffer);
+	if(ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PSS\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	pss = (union acpi_object *) buffer.pointer;
+	if (!pss || (pss->type != ACPI_TYPE_PACKAGE)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
+		result = -EFAULT;
+		goto end;
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %d performance states\n", 
+		pss->package.count));
+
+	if (pss->package.count > ACPI_PROCESSOR_MAX_PERFORMANCE) {
+		pr->performance->state_count = ACPI_PROCESSOR_MAX_PERFORMANCE;
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"Limiting number of states to max (%d)\n", 
+			ACPI_PROCESSOR_MAX_PERFORMANCE));
+	}
+	else
+		pr->performance->state_count = pss->package.count;
+
+	for (i = 0; i < pr->performance->state_count; i++) {
+
+		struct acpi_processor_px *px = &(pr->performance->states[i]);
+
+		state.length = sizeof(struct acpi_processor_px);
+		state.pointer = px;
+
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Extracting state %d\n", i));
+
+		status = acpi_extract_package(&(pss->package.elements[i]), 
+			&format, &state);
+		if (ACPI_FAILURE(status)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
+			result = -EFAULT;
+			goto end;
+		}
+
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"State [%d]: core_frequency[%d] power[%d] transition_latency[%d] bus_master_latency[%d] control[0x%x] status[0x%x]\n",
+			i, 
+			(u32) px->core_frequency, 
+			(u32) px->power, 
+			(u32) px->transition_latency, 
+			(u32) px->bus_master_latency,
+			(u32) px->control, 
+			(u32) px->status));
+
+		if (!px->core_frequency) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "core_frequency is 0\n"));
+			result = -EFAULT;
+			goto end;
+		}
+	}
+
+end:
+	acpi_os_free(buffer.pointer);
+
+	return_VALUE(result);
+}
+
+
+static int
+acpi_processor_get_performance_info (
+	struct acpi_processor	*pr)
+{
+	int			result = 0;
+	acpi_status		status = AE_OK;
+	acpi_handle		handle = NULL;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_info");
+
+	if (!pr || !pr->performance || !pr->handle)
+		return_VALUE(-EINVAL);
+
+	status = acpi_get_handle(pr->handle, "_PCT", &handle);
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+			"ACPI-based processor performance control unavailable\n"));
+		return_VALUE(-ENODEV);
+	}
+
+	result = acpi_processor_get_performance_control(pr);
+	if (result)
+		return_VALUE(result);
+
+	result = acpi_processor_get_performance_states(pr);
+	if (result)
+		return_VALUE(result);
+
+	return_VALUE(0);
+}
+
 
 int 
 acpi_processor_register_performance (
@@ -883,6 +1094,12 @@ acpi_processor_register_performance (
 
 	pr->performance = performance;
 	performance->pr = pr;
+
+	if (acpi_processor_get_performance_info(pr)) {
+		pr->performance = NULL;
+		up(&performance_sem);
+		return_VALUE(-EIO);
+	}
 
 	up(&performance_sem);
 	return_VALUE(0);
