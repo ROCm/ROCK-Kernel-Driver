@@ -444,6 +444,8 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
+%/:      scripts prepare FORCE
+	$(Q)$(MAKE) $(build)=$(@D)
 %.ko: scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.lst: %.c scripts FORCE
