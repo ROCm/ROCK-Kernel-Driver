@@ -416,7 +416,6 @@ struct fb_info {
 #define fb_writeb sbus_writeb
 #define fb_writew sbus_writew
 #define fb_writel sbus_writel
-#define fb_writeq sbus_writeq
 #define fb_memset sbus_memset_io
 
 #elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__)
