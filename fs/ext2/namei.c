@@ -39,13 +39,17 @@
 
 static inline void ext2_inc_count(struct inode *inode)
 {
+	lock_kernel();
 	inode->i_nlink++;
+	unlock_kernel();
 	mark_inode_dirty(inode);
 }
 
 static inline void ext2_dec_count(struct inode *inode)
 {
+	lock_kernel();
 	inode->i_nlink--;
+	unlock_kernel();
 	mark_inode_dirty(inode);
 }
 
@@ -73,17 +77,13 @@ static struct dentry *ext2_lookup(struct inode * dir, struct dentry *dentry)
 	if (dentry->d_name.len > EXT2_NAME_LEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	lock_kernel();
 	ino = ext2_inode_by_name(dir, dentry);
 	inode = NULL;
 	if (ino) {
 		inode = iget(dir->i_sb, ino);
-		if (!inode)  {
-			unlock_kernel();
+		if (!inode)
 			return ERR_PTR(-EACCES);
-		}
 	}
-	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
 }
@@ -105,9 +105,7 @@ static int ext2_create (struct inode * dir, struct dentry * dentry, int mode)
 		inode->i_fop = &ext2_file_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
 		mark_inode_dirty(inode);
-		lock_kernel();
 		err = ext2_add_nondir(dentry, inode);
-		unlock_kernel();
 	}
 	return err;
 }
@@ -300,8 +298,11 @@ static int ext2_rename (struct inode * old_dir, struct dentry * old_dentry,
 		ext2_inc_count(old_inode);
 		ext2_set_link(new_dir, new_de, new_page, old_inode);
 		new_inode->i_ctime = CURRENT_TIME;
-		if (dir_de)
+		if (dir_de) {
+			lock_kernel();
 			new_inode->i_nlink--;
+			unlock_kernel();
+		}
 		ext2_dec_count(new_inode);
 	} else {
 		if (dir_de) {

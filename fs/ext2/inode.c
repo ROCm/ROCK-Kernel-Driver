@@ -60,9 +60,7 @@ void ext2_delete_inode (struct inode * inode)
 	inode->i_size = 0;
 	if (inode->i_blocks)
 		ext2_truncate (inode);
-	lock_kernel();
 	ext2_free_inode (inode);
-	unlock_kernel();
 
 	return;
 no_delete:
