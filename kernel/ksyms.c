@@ -45,7 +45,6 @@
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
-#include <linux/completion.h>
 #include <linux/seq_file.h>
 #include <linux/binfmts.h>
 #include <linux/namei.h>
@@ -339,10 +338,6 @@ EXPORT_SYMBOL(prepare_to_wait_exclusive);
 EXPORT_SYMBOL(finish_wait);
 EXPORT_SYMBOL(autoremove_wake_function);
 
-/* completion handling */
-EXPORT_SYMBOL(wait_for_completion);
-EXPORT_SYMBOL(complete);
-
 /* The notion of irq probe/assignment is foreign to S/390 */
 
 #if !defined(CONFIG_ARCH_S390)
@@ -374,26 +369,10 @@ EXPORT_SYMBOL(iomem_resource);
 
 /* process management */
 EXPORT_SYMBOL(complete_and_exit);
-EXPORT_SYMBOL(default_wake_function);
-EXPORT_SYMBOL(__wake_up);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
 #endif
-EXPORT_SYMBOL(wake_up_process);
-EXPORT_SYMBOL(sleep_on);
-EXPORT_SYMBOL(sleep_on_timeout);
-EXPORT_SYMBOL(interruptible_sleep_on);
-EXPORT_SYMBOL(interruptible_sleep_on_timeout);
-EXPORT_SYMBOL(schedule);
-#ifdef CONFIG_PREEMPT
-EXPORT_SYMBOL(preempt_schedule);
-#endif
 EXPORT_SYMBOL(schedule_timeout);
-EXPORT_SYMBOL(yield);
-EXPORT_SYMBOL(io_schedule);
-EXPORT_SYMBOL(__cond_resched);
-EXPORT_SYMBOL(set_user_nice);
-EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
@@ -409,13 +388,6 @@ EXPORT_SYMBOL(do_gettimeofday);
 EXPORT_SYMBOL(do_settimeofday);
 #if (BITS_PER_LONG < 64)
 EXPORT_SYMBOL(get_jiffies_64);
-#endif
-#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
-EXPORT_SYMBOL(__might_sleep);
-#endif
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-EXPORT_SYMBOL(__preempt_spin_lock);
-EXPORT_SYMBOL(__preempt_write_lock);
 #endif
 #if !defined(__ia64__)
 EXPORT_SYMBOL(loops_per_jiffy);
