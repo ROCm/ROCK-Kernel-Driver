@@ -30,7 +30,7 @@ enum {
 	SINGLE_VIEW, SPLIT_VIEW, FULL_VIEW
 };
 
-static gint view_mode = SPLIT_VIEW;
+static gint view_mode = FULL_VIEW;
 static gboolean show_name = TRUE;
 static gboolean show_range = TRUE;
 static gboolean show_value = TRUE;
@@ -59,7 +59,8 @@ GtkTreeModel *model1, *model2;
 static GtkTreeIter *parents[256] = { 0 };
 static gint indent;
 
-static struct menu *current;
+static struct menu *current; // current node for SINGLE view
+static struct menu *browsed; // browsed node for SPLIT view
 
 enum {
 	COL_OPTION, COL_NAME, COL_NO, COL_MOD, COL_YES, COL_VALUE,
@@ -317,17 +318,33 @@ void init_left_tree(void)
 	GtkTreeView *view = GTK_TREE_VIEW(tree1_w);
 	GtkCellRenderer *renderer;
 	GtkTreeSelection *sel;
+	GtkTreeViewColumn *column;
 
 	gtk_tree_view_set_model(view, model1);
 	gtk_tree_view_set_headers_visible(view, TRUE);
 	gtk_tree_view_set_rules_hint(view, FALSE);
+	
+	column = gtk_tree_view_column_new();
+	gtk_tree_view_append_column(view, column);
+	gtk_tree_view_column_set_title(column, "Options");
 
+	renderer = gtk_cell_renderer_toggle_new();
+	gtk_tree_view_column_pack_start(GTK_TREE_VIEW_COLUMN(column),
+					renderer, FALSE);
+	gtk_tree_view_column_set_attributes(GTK_TREE_VIEW_COLUMN(column),
+					    renderer,
+					    "active", COL_BTNACT,
+					    "inconsistent", COL_BTNINC,
+					    "visible", COL_BTNVIS, 
+					    "radio", COL_BTNRAD, NULL);
 	renderer = gtk_cell_renderer_text_new();
-	gtk_tree_view_insert_column_with_attributes(view, -1,
-						    "Options", renderer,
-						    "text", COL_OPTION,
-						    "foreground-gdk",
-						    COL_COLOR, NULL);
+	gtk_tree_view_column_pack_start(GTK_TREE_VIEW_COLUMN(column),
+					renderer, FALSE);	
+	gtk_tree_view_column_set_attributes(GTK_TREE_VIEW_COLUMN(column),
+					    renderer,
+					    "text", COL_OPTION,
+					    "foreground-gdk",
+					    COL_COLOR, NULL);
 
 	sel = gtk_tree_view_get_selection(view);
 	gtk_tree_selection_set_mode(sel, GTK_SELECTION_SINGLE);
@@ -709,7 +726,7 @@ on_show_all_options1_activate(GtkMenuItem * menuitem, gpointer user_data)
 	show_all = GTK_CHECK_MENU_ITEM(menuitem)->active;
 
 	gtk_tree_store_clear(tree2);
-	display_tree(&rootmenu);	// instead of update_tree for speed reasons
+	display_tree(&rootmenu);	// instead of update_tree to speed-up
 }
 
 
@@ -923,7 +940,7 @@ static void change_sym_value(struct menu *menu, gint col)
 		if (view_mode == FULL_VIEW)
 			update_tree(&rootmenu, NULL);
 		else if (view_mode == SPLIT_VIEW) {
-			update_tree(current, NULL);
+			update_tree(browsed, NULL);
 			display_list();
 		}
 		else if (view_mode == SINGLE_VIEW)
@@ -952,7 +969,7 @@ static void toggle_sym_value(struct menu *menu)
 	if (view_mode == FULL_VIEW)
 		update_tree(&rootmenu, NULL);
 	else if (view_mode == SPLIT_VIEW) {
-		update_tree(current, NULL);
+		update_tree(browsed, NULL);
 		display_list();
 	}
 	else if (view_mode == SINGLE_VIEW)
@@ -1004,8 +1021,6 @@ static gint column2index(GtkTreeViewColumn * column)
 }
 
 
-//#define GTK_BUG_FIXED // uncomment it for GTK+ >= 2.1.4 (2.2)
-
 /* User click: update choice (full) or goes down (single) */
 gboolean
 on_treeview2_button_press_event(GtkWidget * widget,
@@ -1018,7 +1033,7 @@ on_treeview2_button_press_event(GtkWidget * widget,
 	struct menu *menu;
 	gint col;
 
-#ifdef GTK_BUG_FIXED
+#if GTK_CHECK_VERSION(2,1,4) // bug in ctree with earlier version of GTK
 	gint tx = (gint) event->x;
 	gint ty = (gint) event->y;
 	gint cx, cy;
@@ -1151,7 +1166,7 @@ on_treeview1_button_press_event(GtkWidget * widget,
 		current = menu;
 		display_tree_part();
 	} else {
-		current = menu;
+		browsed = menu;
 		display_tree_part();
 	}
 
@@ -1196,7 +1211,7 @@ static gchar **fill_row(struct menu *menu)
 	switch (ptype) {
 	case P_MENU:
 		row[COL_PIXBUF] = (gchar *) xpm_menu;
-		if (view_mode != FULL_VIEW)
+		if (view_mode == SINGLE_VIEW)
 			row[COL_PIXVIS] = GINT_TO_POINTER(TRUE);
 		row[COL_BTNVIS] = GINT_TO_POINTER(FALSE);
 		break;
@@ -1242,6 +1257,8 @@ static gchar **fill_row(struct menu *menu)
 	stype = sym_get_type(sym);
 	switch (stype) {
 	case S_BOOLEAN:
+		if(GPOINTER_TO_INT(row[COL_PIXVIS]) == FALSE)
+			row[COL_BTNVIS] = GINT_TO_POINTER(TRUE);
 		if (sym_is_choice(sym))
 			break;
 	case S_TRISTATE:
@@ -1491,6 +1508,7 @@ static void display_tree(struct menu *menu)
 			place_node(child, fill_row(child));
 #ifdef DEBUG
 		printf("%*c%s: ", indent, ' ', menu_get_prompt(child));
+		printf("%s", child->flags & MENU_ROOT ? "rootmenu | " : "");
 		dbg_print_ptype(ptype);
 		printf(" | ");
 		if (sym) {
@@ -1504,10 +1522,12 @@ static void display_tree(struct menu *menu)
 		if ((view_mode != FULL_VIEW) && (ptype == P_MENU)
 		    && (tree == tree2))
 			continue;
-
+/*
 		if (((menu != &rootmenu) && !(menu->flags & MENU_ROOT)) ||
 		    (view_mode == FULL_VIEW)
-		    || (view_mode == SPLIT_VIEW)) {
+		    || (view_mode == SPLIT_VIEW))*/
+		if ((view_mode == SINGLE_VIEW) && (menu->flags & MENU_ROOT) 
+		|| (view_mode == FULL_VIEW) || (view_mode == SPLIT_VIEW)) {
 			indent++;
 			display_tree(child);
 			indent--;
@@ -1520,7 +1540,10 @@ static void display_tree_part(void)
 {
 	if (tree2)
 		gtk_tree_store_clear(tree2);
-	display_tree(current);
+	if(view_mode == SINGLE_VIEW)
+		display_tree(current);
+ 	else if(view_mode == SPLIT_VIEW)
+		display_tree(browsed);
 	gtk_tree_view_expand_all(GTK_TREE_VIEW(tree2_w));
 }
 
@@ -1531,20 +1554,25 @@ static void display_list(void)
 		gtk_tree_store_clear(tree1);
 
 	tree = tree1;
-	display_tree(current = &rootmenu);
+	display_tree(&rootmenu);
 	gtk_tree_view_expand_all(GTK_TREE_VIEW(tree1_w));
 	tree = tree2;
 }
 
-static void fixup_rootmenu(struct menu *menu)
+void fixup_rootmenu(struct menu *menu)
 {
-	struct menu *child;
+        struct menu *child;
+        static int menu_cnt = 0;
 
-	if (!menu->prompt || menu->prompt->type != P_MENU)
-		return;
-	menu->flags |= MENU_ROOT;
-	for (child = menu->list; child; child = child->next)
-		fixup_rootmenu(child);
+        menu->flags |= MENU_ROOT;
+        for (child = menu->list; child; child = child->next) {
+                if (child->prompt && child->prompt->type == P_MENU) {
+                        menu_cnt++;
+                        fixup_rootmenu(child);
+                        menu_cnt--;
+                } else if (!menu_cnt)
+                        fixup_rootmenu(child);
+        }
 }
 
 
