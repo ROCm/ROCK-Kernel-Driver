@@ -823,9 +823,9 @@ static int usb_midi_open(struct inode *inode, struct file *file)
 
 	for(;;) {
 		down(&open_sem);
-		for (devs = mididevs.next; devs != &mididevs; devs = devs->next) {
+		list_for_each(devs, &mididevs) {
 			s = list_entry(devs, struct usb_midi_state, mididev);
-			for (mdevs = s->midiDevList.next; mdevs != &s->midiDevList; mdevs = mdevs->next) {
+			list_for_each(mdevs, &s->midiDevList) {
 				m = list_entry(mdevs, struct usb_mididev, list);
 				if ( !((m->dev_midi ^ minor) & ~0xf) )
 					goto device_found;
@@ -2018,7 +2018,7 @@ static void usb_midi_disconnect(struct usb_interface *intf)
 	s->usbdev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	for ( list = s->midiDevList.next; list != &s->midiDevList; list = list->next ) {
+	list_for_each(list, &s->midiDevList) {
 		m = list_entry(list, struct usb_mididev, list);
 		wake_up(&(m->min.ep->wait));
 		wake_up(&(m->mout.ep->wait));
