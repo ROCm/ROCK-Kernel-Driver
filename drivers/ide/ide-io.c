@@ -949,14 +949,14 @@ queue_next:
 		 * happens anyway when any interrupt comes in, IDE or otherwise
 		 *  -- the kernel masks the IRQ while it is being handled.
 		 */
-		if (masked_irq != IDE_NO_IRQ && hwif->irq != masked_irq)
+		if (hwif->irq != masked_irq)
 			disable_irq_nosync(hwif->irq);
 		spin_unlock(&ide_lock);
 		local_irq_enable();
 			/* allow other IRQs while we start this request */
 		startstop = start_request(drive, rq);
 		spin_lock_irq(&ide_lock);
-		if (masked_irq != IDE_NO_IRQ && hwif->irq != masked_irq)
+		if (hwif->irq != masked_irq)
 			enable_irq(hwif->irq);
 		if (startstop == ide_released)
 			goto queue_next;
