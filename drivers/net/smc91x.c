@@ -563,7 +563,15 @@ done:
  * any other concurrent access and C would always interrupt B. But life
  * isn't that easy in a SMP world...
  */
-#define smc_special_trylock(lock)	spin_trylock_irq(lock)
+#define smc_special_trylock(lock)					\
+({									\
+	int __ret;							\
+	local_irq_disable();						\
+	__ret = spin_trylock(lock);					\
+	if (!__ret)							\
+		local_irq_enable();					\
+	__ret;								\
+})
 #define smc_special_lock(lock)		spin_lock_irq(lock)
 #define smc_special_unlock(lock)	spin_unlock_irq(lock)
 #else
