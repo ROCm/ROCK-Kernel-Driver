@@ -1366,7 +1366,7 @@ char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
  *		return NULL;
  *	}
  */
-asmlinkage long sys_getcwd(char *buf, unsigned long size)
+asmlinkage long sys_getcwd(char __user *buf, unsigned long size)
 {
 	int error;
 	struct vfsmount *pwdmnt, *rootmnt;

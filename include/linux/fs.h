@@ -1024,7 +1024,7 @@ extern int do_truncate(struct dentry *, loff_t start);
 extern struct file *filp_open(const char *, int, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
 extern int filp_close(struct file *, fl_owner_t id);
-extern char * getname(const char *);
+extern char * getname(const char __user *);
 
 /* fs/dcache.c */
 extern void vfs_caches_init(unsigned long);

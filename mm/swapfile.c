@@ -995,7 +995,7 @@ int page_queue_congested(struct page *page)
 }
 #endif
 
-asmlinkage long sys_swapoff(const char * specialfile)
+asmlinkage long sys_swapoff(const char __user * specialfile)
 {
 	struct swap_info_struct * p = NULL;
 	unsigned short *swap_map;
@@ -1199,7 +1199,7 @@ __initcall(procswaps_init);
  *
  * The swapon system call
  */
-asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
+asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 {
 	struct swap_info_struct * p;
 	char *name = NULL;
