@@ -101,7 +101,7 @@ typedef struct {
 } sa1100_dram_regs_t;
 
 
-
+static struct cpufreq_driver sa1100_driver;
 
 static sa1100_dram_regs_t sa1100_dram_settings[] =
 {
@@ -176,60 +176,72 @@ static void sa1100_update_dram_timings(int current_speed, int new_speed)
 	}
 }
 
-static int sa1100_setspeed(struct cpufreq_policy *policy)
+static int sa1100_target(struct cpufreq_policy *policy,
+			 unsigned int target_freq,
+			 unsigned int relation)
 {
 	unsigned int cur = sa11x0_getspeed();
+	unsigned int new_ppcr;
+
 	struct cpufreq_freqs freqs;
+	switch(relation){
+	case CPUFREQ_RELATION_L:
+		new_ppcr = sa11x0_freq_to_ppcr(target_freq);
+		if (sa11x0_ppcr_to_freq(new_ppcr) > policy->max)
+			new_ppcr--;
+		break;
+	case CPUFREQ_RELATION_H:
+		new_ppcr = sa11x0_freq_to_ppcr(target_freq);
+		if ((sa11x0_ppcr_to_freq(new_ppcr) > target_freq) &&
+		    (sa11x0_ppcr_to_freq(new_ppcr - 1) >= policy->min))
+			mew_ppcr--;
+		break;
+	}
 
 	freqs.old = cur;
-	freqs.new = policy->max;
+	freqs.new = sa11x0_ppcr_to_freq(new_ppcr);
 	freqs.cpu = 0;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-	if (policy->max > cur)
-		sa1100_update_dram_timings(cur, policy->max);
+	if (freqs.new > cur)
+		sa1100_update_dram_timings(cur, freqs.new);
 
-	PPCR = sa11x0_freq_to_ppcr(policy->max);
+	PPCR = new_ppcr;
 
-	if (policy->max < cur)
-		sa1100_update_dram_timings(cur, policy->max);
+	if (freqs.new < cur)
+		sa1100_update_dram_timings(cur, freqs.new);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }
 
-static struct cpufreq_policy sa1100_policy = {
-	.cpu		= 0,
-	.policy		= CPUFREQ_POLICY_POWERSAVE,
-	.cpuinfo	= {
-		.max_freq		= 287000,
-		.min_freq		= 59000,
-		.transition_latency	= CPUFREQ_ETERNAL,
-	},
-};
+static int __init sa1100_cpu_init(struct cpufreq_policy *policy)
+{
+	if (policy->cpu != 0)
+		return -EINVAL;
+	sa1100_driver.cpu_cur_freq[policy->cpu] = policy->min = policy->max = sa11x0_getspeed();
+	policy->policy = CPUFREQ_POLICY_POWERSAVE;
+	policy->cpuinfo.min_freq = 59000;
+	policy->cpuinfo.max_freq = 287000;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+	return 0;
+}
 
 static struct cpufreq_driver sa1100_driver = {
 	.verify		= sa11x0_verify_speed,
-	.setpolicy	= sa1100_setspeed,
-	.policy		= &sa1100_policy,
+	.target		= sa1100_target,
+	.init		= sa1100_cpu_init,
 	.name		= "sa1100",
 };
 
 static int __init sa1100_dram_init(void)
 {
-	int ret = -ENODEV;
-
-	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID) {
-		sa1100_driver.cpu_cur_freq[0] =
-		sa1100_policy.min =
-		sa1100_policy.max = sa11x0_getspeed();
-
-		ret = cpufreq_register(&sa1100_driver);
-	}
-
-	return ret;
+	if ((processor_id & CPU_SA1100_MASK) == CPU_SA1100_ID)
+		return cpufreq_register_driver(&sa1100_driver);
+	else
+		return -ENODEV;
 }
 
 arch_initcall(sa1100_dram_init);

@@ -48,33 +48,48 @@ static const unsigned short cclk_frequency_100khz[NR_FREQS] = {
 	2802    /* 280.2 MHz */
 };
 
-#ifdef CONFIG_CPU_FREQ
+#if defined(CONFIG_CPU_FREQ_SA1100) || defined(CONFIG_CPU_FREQ_SA1110)
+/* rounds up(!)  */
 unsigned int sa11x0_freq_to_ppcr(unsigned int khz)
 {
 	int i;
 
 	khz /= 100;
 
-	for (i = NR_FREQS - 1; i > 0; i--)
-		if (cclk_frequency_100khz[i] <= khz)
+	for (i = 0; i < NR_FREQS; i++)
+		if (cclk_frequency_100khz[i] >= khz)
 			break;
 
 	return i;
 }
 
-/*
- * Validate the policy.  We aren't able to do any fancy in-kernel
- * scaling, so we force min=max, and set the policy to "performance".
- * If we can't generate the precise frequency requested, round it up.
+unsigned int sa11x0_ppcr_to_freq(unsigned int idx)
+{
+	if (idx >= NR_FREQS)
+		return 0;
+	else
+		return cclk_frequency_100khz[idx];
+}
+
+
+/* make sure that only the "userspace" governor is run -- anything else wouldn't make sense on
+ * this platform, anyway.
  */
 int sa11x0_verify_speed(struct cpufreq_policy *policy)
 {
-	if (policy->max > policy->cpuinfo.max_freq)
-		policy->max = policy->cpuinfo.max_freq;
+	unsigned int tmp;
+	if (policy->cpu)
+		return -EINVAL;
 
-	policy->max = cclk_frequency_100khz[sa11x0_freq_to_ppcr(policy->max)] * 100;
-	policy->min = policy->max;
-	policy->policy = CPUFREQ_POLICY_POWERSAVE;
+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq, policy->cpuinfo.max_freq);
+
+	/* make sure that at least one frequency is within the policy */
+	tmp = cclk_frequency_100khz[sa11x0_freq_to_ppcr(policy->min)] * 100;
+	if (tmp > policy->max)
+		policy->max = tmp;
+
+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq, policy->cpuinfo.max_freq);
+
 	return 0;
 }
 

@@ -336,6 +336,13 @@ static int cpufreq_add_dev (struct device * dev)
 	       &cpufreq_driver->policy[cpu], 
 	       sizeof(struct cpufreq_policy));
 
+	/* 2.4-API init for this CPU */
+#ifdef CONFIG_CPU_FREQ_24_API
+	cpu_min_freq[cpu] = cpufreq_driver->policy[cpu].cpuinfo.min_freq;
+	cpu_max_freq[cpu] = cpufreq_driver->policy[cpu].cpuinfo.max_freq;
+	cpu_cur_freq[cpu] = cpufreq_driver->cpu_cur_freq[cpu];
+#endif
+
 	if (cpufreq_driver->target)
 		cpufreq_governor(cpu, CPUFREQ_GOV_START);
 

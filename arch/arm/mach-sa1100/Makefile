@@ -9,15 +9,8 @@ obj-n :=
 obj-  :=
 led-y := leds.o
 
-# This needs to be cleaned up.  We probably need to have SA1100
-# and SA1110 config symbols.
-ifeq ($(CONFIG_CPU_FREQ),y)
-obj-$(CONFIG_SA1100_ASSABET)		+= cpu-sa1110.o
-obj-$(CONFIG_SA1100_CERF)		+= cpu-sa1110.o
-obj-$(CONFIG_SA1100_HACKKIT)		+= cpu-sa1110.o
-obj-$(CONFIG_SA1100_LART)		+= cpu-sa1100.o
-obj-$(CONFIG_SA1100_PT_SYSTEM3)		+= cpu-sa1110.o
-endif
+obj-$(CONFIG_CPU_FREQ_SA1100)		+= cpu-sa1100.o
+obj-$(CONFIG_CPU_FREQ_SA1110)		+= cpu-sa1110.o
 
 # Specific board support
 obj-$(CONFIG_SA1100_ADSBITSY)		+= adsbitsy.o
