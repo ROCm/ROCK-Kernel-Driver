@@ -3420,7 +3420,10 @@ static int tg3_abort_hw(struct tg3 *tp)
 	if (err)
 		goto out;
 
-	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
+	if (tp->hw_status)
+		memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
+	if (tp->hw_stats)
+		memset(tp->hw_stats, 0, sizeof(struct tg3_hw_stats));
 
 out:
 	return err;
@@ -7748,6 +7751,18 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		printk(KERN_ERR PFX "Could not obtain valid ethernet address, "
 		       "aborting.\n");
 		goto err_out_iounmap;
+	}
+
+	/*
+	 * Reset chip in case UNDI or EFI driver did not shutdown
+	 * DMA self test will enable WDMAC and we'll see (spurious)
+	 * pending DMA on the PCI bus at that point.
+	 */
+	if ((tr32(HOSTCC_MODE) & HOSTCC_MODE_ENABLE) ||
+	    (tr32(WDMAC_MODE) & WDMAC_MODE_ENABLE)) {
+		pci_save_state(tp->pdev, tp->pci_cfg_state);
+		tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
+		tg3_halt(tp);
 	}
 
 	err = tg3_test_dma(tp);
