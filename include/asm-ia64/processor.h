@@ -191,10 +191,12 @@ struct cpuinfo_ia64 {
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 
 /*
- * The "local" data pointer.  It points to the per-CPU data of the currently executing
+ * The "local" data variable.  It refers to the per-CPU data of the currently executing
  * CPU, much like "current" points to the per-task data of the currently executing task.
+ * Do not use the address of local_cpu_data, since it will be different from
+ * cpu_data(smp_processor_id())!
  */
-#define local_cpu_data		(&__get_cpu_var(cpu_info))
+#define local_cpu_data		(&__ia64_per_cpu_var(cpu_info))
 #define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
 
 extern void identify_cpu (struct cpuinfo_ia64 *);

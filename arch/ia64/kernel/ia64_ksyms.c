@@ -64,9 +64,10 @@ EXPORT_SYMBOL(ia64_pfn_valid);
 #endif
 
 #include <asm/processor.h>
-EXPORT_SYMBOL(cpu_info__per_cpu);
+EXPORT_SYMBOL(per_cpu__cpu_info);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(__per_cpu_offset);
+EXPORT_SYMBOL(per_cpu__local_per_cpu_offset);
 #endif
 EXPORT_SYMBOL(kernel_thread);
 

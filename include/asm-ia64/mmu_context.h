@@ -86,9 +86,9 @@ delayed_tlb_flush (void)
 {
 	extern void local_flush_tlb_all (void);
 
-	if (unlikely(__get_cpu_var(ia64_need_tlb_flush))) {
+	if (unlikely(__ia64_per_cpu_var(ia64_need_tlb_flush))) {
 		local_flush_tlb_all();
-		__get_cpu_var(ia64_need_tlb_flush) = 0;
+		__ia64_per_cpu_var(ia64_need_tlb_flush) = 0;
 	}
 }
 
