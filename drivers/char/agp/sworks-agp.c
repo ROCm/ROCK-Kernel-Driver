@@ -229,7 +229,6 @@ static int serverworks_configure(void)
 	struct aper_size_info_lvl2 *current_size;
 	u32 temp;
 	u8 enable_reg;
-	u32 cap_id;
 	u16 cap_reg;
 
 	current_size = A_SIZE_LVL2(agp_bridge.current_size);

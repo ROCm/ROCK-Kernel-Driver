@@ -48,6 +48,8 @@ int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
 int agp_num_entries(void);
+u32 agp_collect_device_status(u32 mode, u32 command);
+void agp_device_command(u32 command, int agp_v3);
 
 #define PFX "agpgart: "
 
