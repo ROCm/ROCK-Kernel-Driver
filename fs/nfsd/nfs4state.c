@@ -44,6 +44,7 @@
 #include <linux/mount.h>
 #include <linux/workqueue.h>
 #include <linux/smp_lock.h>
+#include <linux/kthread.h>
 #include <linux/nfs4.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
@@ -1310,6 +1311,101 @@ nfs4_file_downgrade(struct file *filp, unsigned int share_access)
 		filp->f_mode = (filp->f_mode | FMODE_READ) & ~FMODE_WRITE;
 	}
 }
+
+/*
+ * Recall a delegation
+ */
+static int
+do_recall(void *__dp)
+{
+	struct nfs4_delegation *dp = __dp;
+
+	daemonize("nfsv4-recall");
+
+	atomic_inc(&dp->dl_count);
+	nfsd4_cb_recall(dp);
+	return 0;
+}
+
+/*
+ * Spawn a thread to perform a recall on the delegation represented
+ * by the lease (file_lock)
+ *
+ * Called from break_lease() with lock_kernel() held,
+ *
+ */
+static
+void nfsd_break_deleg_cb(struct file_lock *fl)
+{
+	struct nfs4_delegation *dp=  (struct nfs4_delegation *)fl->fl_owner;
+	struct task_struct *t;
+
+	dprintk("NFSD nfsd_break_deleg_cb: dp %p fl %p\n",dp,fl);
+	if (!dp)
+		return;
+
+	/* schedule delegation for recall */
+	spin_lock(&recall_lock);
+	atomic_set(&dp->dl_state, NFS4_RECALL_IN_PROGRESS);
+	list_add_tail(&dp->dl_recall_lru, &del_recall_lru);
+	spin_unlock(&recall_lock);
+
+	/* only place dl_time is set. protected by lock_kernel*/
+	dp->dl_time = get_seconds();
+
+	/* XXX need to merge NFSD_LEASE_TIME with fs/locks.c:lease_break_time */
+	fl->fl_break_time = jiffies + NFSD_LEASE_TIME * HZ;
+
+	t = kthread_run(do_recall, dp, "%s", "nfs4_cb_recall");
+	if (IS_ERR(t)) {
+		struct nfs4_client *clp = dp->dl_client;
+
+		printk(KERN_INFO "NFSD: Callback thread failed for "
+			"for client (clientid %08x/%08x)\n",
+			clp->cl_clientid.cl_boot, clp->cl_clientid.cl_id);
+	}
+}
+
+/*
+ * The file_lock is being reapd.
+ *
+ * Called by locks_free_lock() with lock_kernel() held.
+ */
+static
+void nfsd_release_deleg_cb(struct file_lock *fl)
+{
+	struct nfs4_delegation *dp = (struct nfs4_delegation *)fl->fl_owner;
+
+	dprintk("NFSD nfsd_release_deleg_cb: fl %p dp %p dl_count %d, dl_state %d\n", fl,dp, atomic_read(&dp->dl_count), atomic_read(&dp->dl_state));
+
+	if (!(fl->fl_flags & FL_LEASE) || !dp)
+		return;
+	atomic_set(&dp->dl_state,NFS4_RECALL_COMPLETE);
+	dp->dl_flock = NULL;
+}
+
+/*
+ * Set the delegation file_lock back pointer.
+ *
+ * Called from __setlease() with lock_kernel() held.
+ */
+static
+void nfsd_copy_lock_deleg_cb(struct file_lock *new, struct file_lock *fl)
+{
+	struct nfs4_delegation *dp = (struct nfs4_delegation *)new->fl_owner;
+
+	dprintk("NFSD: nfsd_copy_lock_deleg_cb: new fl %p dp %p\n", new, dp);
+	if (!dp)
+		return;
+	dp->dl_flock = new;
+}
+
+struct lock_manager_operations nfsd_lease_mng_ops = {
+        .fl_break = nfsd_break_deleg_cb,
+        .fl_release_private = nfsd_release_deleg_cb,
+        .fl_copy_lock = nfsd_copy_lock_deleg_cb,
+};
+
 
 
 /*
