@@ -570,6 +570,7 @@ static u8 ide_dump_atapi_status(ide_drive_t *drive, const char *msg, u8 stat)
 	atapi_error_t error;
 
 	status.all = stat;
+	error.all = 0;
 	local_irq_set(flags);
 	printk("%s: %s: status=0x%02x { ", drive->name, msg, stat);
 	if (status.b.bsy)
@@ -584,7 +585,7 @@ static u8 ide_dump_atapi_status(ide_drive_t *drive, const char *msg, u8 stat)
 		if (status.b.check)	printk("Error ");
 	}
 	printk("}\n");
-	if ((status.all & (status.b.bsy|status.b.check)) == status.b.check) {
+	if (status.b.check && !status.b.bsy) {
 		error.all = HWIF(drive)->INB(IDE_ERROR_REG);
 		printk("%s: %s: error=0x%02x { ", drive->name, msg, error.all);
 		if (error.b.ili)	printk("IllegalLengthIndication ");
