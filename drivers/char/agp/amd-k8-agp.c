@@ -223,11 +223,6 @@ static void amd_8151_cleanup(void)
 }
 
 
-static struct gatt_mask amd_8151_masks[] =
-{
-	{ .mask = 1, .type = 0 }
-};
-
 struct agp_bridge_driver amd_8151_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= amd_8151_sizes,
@@ -238,7 +233,7 @@ struct agp_bridge_driver amd_8151_driver = {
 	.cleanup		= amd_8151_cleanup,
 	.tlb_flush		= amd_x86_64_tlbflush,
 	.mask_memory		= agp_generic_mask_memory,
-	.masks			= amd_8151_masks,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
