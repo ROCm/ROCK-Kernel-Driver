@@ -15,7 +15,6 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 
-#include <asm/leds.h>
 #include <asm/system.h>
 
 /*
@@ -42,15 +41,11 @@ int suspend(void)
 		goto resume_legacy;
 
 	local_irq_disable();
-	leds_event(led_stop);
-
 	sysdev_suspend(3);
 
 	ret = pm_do_suspend();
 
 	sysdev_resume();
-
-	leds_event(led_start);
 	local_irq_enable();
 
 	device_resume();
