@@ -55,7 +55,7 @@ static void *alloc_upcall(int opcode, int size)
         inp->ih.opcode = opcode;
 	inp->ih.pid = current->pid;
 	inp->ih.pgid = process_group(current);
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	memset(&inp->ih.cred, 0, sizeof(struct coda_cred));
 	inp->ih.cred.cr_fsuid = current->fsuid;
 #else
@@ -172,7 +172,7 @@ int venus_store(struct super_block *sb, struct CodaFid *fid, int flags,
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	struct coda_cred cred = { 0, };
 	cred.cr_fsuid = uid;
 #endif
@@ -180,7 +180,7 @@ int venus_store(struct super_block *sb, struct CodaFid *fid, int flags,
 	insize = SIZE(store);
 	UPARG(CODA_STORE);
 	
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
 #else
 	inp->ih.uid = uid;
@@ -219,7 +219,7 @@ int venus_close(struct super_block *sb, struct CodaFid *fid, int flags,
 	union inputArgs *inp;
 	union outputArgs *outp;
 	int insize, outsize, error;
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	struct coda_cred cred = { 0, };
 	cred.cr_fsuid = uid;
 #endif
@@ -227,7 +227,7 @@ int venus_close(struct super_block *sb, struct CodaFid *fid, int flags,
 	insize = SIZE(release);
 	UPARG(CODA_CLOSE);
 	
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
 #else
 	inp->ih.uid = uid;

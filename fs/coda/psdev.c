@@ -405,7 +405,7 @@ static int __init init_coda(void)
 	int status;
 	int i;
 	printk(KERN_INFO "Coda Kernel/Venus communications, "
-#ifdef CODA_FS_OLD_API
+#ifdef CONFIG_CODA_FS_OLD_API
 	       "v5.3.20"
 #else
 	       "v6.0.0"
