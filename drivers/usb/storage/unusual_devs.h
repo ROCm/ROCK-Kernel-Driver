@@ -681,3 +681,13 @@ UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999,
 		US_SC_SCSI, US_PR_SDDR55, NULL,
 		US_FL_SINGLE_LUN),
 #endif
+
+/* Aiptek PocketCAM 3Mega
+ * Nicolas DUPEUX <nicolas@dupeux.net> 
+ */
+UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
+	"AIPTEK",
+	"PocketCAM 3Mega",
+	US_SC_SCSI, US_PR_BULK, NULL,
+	US_FL_MODE_XLATE | US_FL_START_STOP),
+
