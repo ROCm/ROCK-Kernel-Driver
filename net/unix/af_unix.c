@@ -618,6 +618,9 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 		if (!u)
 			goto put_fail;
 
+		if (u->type == type)
+			UPDATE_ATIME(nd.dentry->d_inode);
+
 		path_release(&nd);
 
 		err=-EPROTOTYPE;
@@ -628,7 +631,12 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 	} else {
 		err = -ECONNREFUSED;
 		u=unix_find_socket_byname(sunname, len, type, hash);
-		if (!u)
+		if (u) {
+			struct dentry *dentry;
+			dentry = u->protinfo.af_unix.dentry;
+			if (dentry)
+				UPDATE_ATIME(dentry->d_inode);
+		} else
 			goto fail;
 	}
 	return u;
