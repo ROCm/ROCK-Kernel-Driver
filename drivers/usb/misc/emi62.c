@@ -97,7 +97,7 @@ static int emi62_load_firmware (struct usb_device *dev)
 	__u32 addr;	/* Address to write */
 	__u8 *buf;
 
-	printk("adi-emi: load_firmware\n");
+	dev_dbg(&dev->dev, "load_firmware\n");
 	buf = kmalloc(FW_LOAD_SIZE, GFP_KERNEL);
 	if (!buf) {
 		err( "%s - error loading firmware: error = %d", __FUNCTION__, -ENOMEM);
@@ -235,7 +235,7 @@ static int emi62_load_firmware (struct usb_device *dev)
 
 wraperr:
 	kfree(buf);
-	printk("adi-emi: Error\n");
+	dev_err(&dev->dev, "Error\n");
 	return err;
 }
 
@@ -249,7 +249,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 static int emi62_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	printk ("adi-emi: emi62_probe\n");
+	dev_dbg(&intf->dev, "emi62_probe\n");
 
 	info("%s start", __FUNCTION__); 
 
@@ -275,11 +275,11 @@ struct usb_driver emi62_driver = {
 
 static int __init emi62_init (void)
 {
-	if (usb_register (&emi62_driver) < 0) {
-		printk("adi-emi: registration failed\n");
-	} else {
-		return 0;
-	}
+	int retval;
+	retval = usb_register (&emi62_driver);
+	if (retval)
+		printk(KERN_ERR "adi-emi: registration failed\n");
+	return retval;
 }
 
 static void __exit emi62_exit (void)
