@@ -6,6 +6,7 @@
  * (C) 1998 Russell King
  * (C) 1998 Phil Blundell
  */
+#include <linux/config.h>
 #include <linux/ioport.h>
 #include <asm/irq.h>
 #include <asm/io.h>

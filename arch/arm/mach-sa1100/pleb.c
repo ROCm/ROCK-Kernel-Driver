@@ -28,7 +28,7 @@ fixup_pleb(struct machine_desc *desc, struct param_struct *params,
 	/* make it 1 if a 16MB memory card is used */
 	mi->nr_banks = 2; /* Default 32MB */
 
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0);
 	setup_ramdisk(1, 0, 0, 8192);
 	setup_initrd(0xc0400000, 4*1024*1024);
 }

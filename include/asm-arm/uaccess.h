@@ -32,7 +32,7 @@ struct exception_table_entry
 extern unsigned long search_exception_table(unsigned long);
 
 #define get_ds()	(KERNEL_DS)
-#define get_fs()	(current->addr_limit)
+#define get_fs()	(current_thread_info()->addr_limit)
 #define segment_eq(a,b)	((a) == (b))
 
 #include <asm/proc/uaccess.h>

@@ -32,23 +32,21 @@
 #endif
 
 #define OFF_TSK(n) (unsigned long)&(((struct task_struct *)0)->n)
+#define OFF_VMA(n) (unsigned long)&(((struct vm_area_struct *)0)->n)
 
 #define DEFN(name,off) asm("\n#define "name" %0" :: "I" (off))
 
 void func(void)
 {
-#error DEFN("TSK_SIGPENDING",		OFF_TSK(sigpending));
-DEFN("TSK_ADDR_LIMIT",		OFF_TSK(addr_limit));
-#error DEFN("TSK_NEED_RESCHED",	OFF_TSK(need_resched));
-#error DEFN("TSK_PTRACE",		OFF_TSK(ptrace));
 DEFN("TSK_USED_MATH",		OFF_TSK(used_math));
+DEFN("TSK_ACTIVE_MM",		OFF_TSK(active_mm));
 
-DEFN("TSS_SAVE",		OFF_TSK(thread.save));
-DEFN("TSS_FPESAVE",		OFF_TSK(thread.fpstate.soft.save));
+DEFN("VMA_VM_MM",		OFF_VMA(vm_mm));
+DEFN("VMA_VM_FLAGS",		OFF_VMA(vm_flags));
+
+DEFN("VM_EXEC",			VM_EXEC);
 
 #ifdef CONFIG_CPU_32
-DEFN("TSS_DOMAIN",		OFF_TSK(thread.domain));
-
 DEFN("HPTE_TYPE_SMALL",		PTE_TYPE_SMALL);
 DEFN("HPTE_AP_READ",		PTE_AP_READ);
 DEFN("HPTE_AP_WRITE",		PTE_AP_WRITE);

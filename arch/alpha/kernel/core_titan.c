@@ -279,7 +279,6 @@ static void __init
 titan_init_one_pachip_port(titan_pachip_port *port, int index)
 {
 	struct pci_controller *hose;
-	unsigned long sg_size;
 
 	hose = alloc_pci_controller();
 	if (index == 0)

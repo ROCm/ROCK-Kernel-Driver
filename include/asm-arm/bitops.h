@@ -302,6 +302,23 @@ static inline unsigned long ffz(unsigned long word)
 }
 
 /*
+ * ffz = Find First Zero in word. Undefined if no zero exists,
+ * so code should check against ~0UL first..
+ */
+static inline unsigned long __ffs(unsigned long word)
+{
+	int k;
+
+	k = 31;
+	if (word & 0x0000ffff) { k -= 16; word <<= 16; }
+	if (word & 0x00ff0000) { k -= 8;  word <<= 8;  }
+	if (word & 0x0f000000) { k -= 4;  word <<= 4;  }
+	if (word & 0x30000000) { k -= 2;  word <<= 2;  }
+	if (word & 0x40000000) { k -= 1; }
+        return k;
+}
+
+/*
  * ffs: find first bit set. This is defined the same way as
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).

@@ -18,7 +18,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -46,7 +45,7 @@ epxa10db_fixup(struct machine_desc *desc, struct param_struct *params,
         mi->bank[0].node  = 0;
 
 /*
-        ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+        ROOT_DEV = mk_kdev(RAMDISK_MAJOR,0);
         setup_ramdisk( 1, 0, 0, 8192 );
         setup_initrd(0xc0200000, 6*1024*1024);
 */

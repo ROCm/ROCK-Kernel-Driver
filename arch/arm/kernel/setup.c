@@ -38,6 +38,10 @@
 #define CONFIG_CMDLINE ""
 #endif
 
+#ifdef CONFIG_PREEMPT
+spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+#endif
+
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
 

@@ -19,6 +19,7 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/user.h>
+#include <linux/a.out.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/interrupt.h>
@@ -27,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/leds.h>
+#include <asm/processor.h>
 #include <asm/uaccess.h>
 
 /*
@@ -83,9 +85,7 @@ void (*pm_power_off)(void);
 void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
-	init_idle();
-	current->nice = 20;
-
+	preempt_disable();
 	while (1) {
 		void (*idle)(void) = pm_idle;
 		if (!idle)
@@ -228,51 +228,61 @@ void show_fpregs(struct user_fp *regs)
 /*
  * Task structure and kernel stack allocation.
  */
-static struct task_struct *task_struct_head;
-static unsigned int nr_task_struct;
+static unsigned long *thread_info_head;
+static unsigned int nr_thread_info;
 
 #ifdef CONFIG_CPU_32
 #define EXTRA_TASK_STRUCT	4
+#define ll_alloc_task_struct() ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
+#define ll_free_task_struct(p) free_pages((unsigned long)(p),1)
 #else
+extern unsigned long get_page_8k(int priority);
+extern void free_page_8k(unsigned long page);
+
 #define EXTRA_TASK_STRUCT	0
+#define ll_alloc_task_struct()	((struct task_struct *)get_page_8k(GFP_KERNEL))
+#define ll_free_task_struct(p)  free_page_8k((unsigned long)(p))
 #endif
 
-struct task_struct *alloc_task_struct(void)
+struct thread_info *alloc_thread_info(void)
 {
-	struct task_struct *tsk;
+	struct thread_info *thread = NULL;
 
-	if (EXTRA_TASK_STRUCT)
-		tsk = task_struct_head;
-	else
-		tsk = NULL;
+	if (EXTRA_TASK_STRUCT) {
+		unsigned long *p = thread_info_head;
 
-	if (tsk) {
-		task_struct_head = tsk->next_task;
-		nr_task_struct -= 1;
-	} else
-		tsk = ll_alloc_task_struct();
+		if (p) {
+			thread_info_head = (unsigned long *)p[0];
+			nr_thread_info -= 1;
+		}
+		thread = (struct thread_info *)p;
+	}
+
+	if (!thread)
+		thread = ll_alloc_task_struct();
 
 #ifdef CONFIG_SYSRQ
 	/*
 	 * The stack must be cleared if you want SYSRQ-T to
 	 * give sensible stack usage information
 	 */
-	if (tsk) {
-		char *p = (char *)tsk;
+	if (thread) {
+		char *p = (char *)thread;
 		memzero(p+KERNEL_STACK_SIZE, KERNEL_STACK_SIZE);
 	}
 #endif
-	return tsk;
+	return thread;
 }
 
-void __free_task_struct(struct task_struct *p)
+void free_thread_info(struct thread_info *thread)
 {
-	if (EXTRA_TASK_STRUCT && nr_task_struct < EXTRA_TASK_STRUCT) {
-		p->next_task = task_struct_head;
-		task_struct_head = p;
-		nr_task_struct += 1;
+	if (EXTRA_TASK_STRUCT && nr_thread_info < EXTRA_TASK_STRUCT) {
+		unsigned long *p = (unsigned long *)thread;
+		p[0] = (unsigned long)thread_info_head;
+		thread_info_head = p;
+		nr_thread_info += 1;
 	} else
-		ll_free_task_struct(p);
+		ll_free_task_struct(thread);
 }
 
 /*
@@ -284,10 +294,13 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-	memset(&current->thread.debug, 0, sizeof(struct debug_info));
-	memset(&current->thread.fpstate, 0, sizeof(union fp_state));
+	struct thread_info *thread = current_thread_info();
+	struct task_struct *tsk = current;
+
+	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
+	memset(&thread->fpstate, 0, sizeof(union fp_state));
+
 	current->used_math = 0;
-	current->flags &= ~PF_USEDFPU;
 }
 
 void release_thread(struct task_struct *dead_task)
@@ -300,21 +313,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	unsigned long unused,
 	struct task_struct * p, struct pt_regs * regs)
 {
-	struct pt_regs * childregs;
-	struct context_save_struct * save;
+	struct pt_regs *childregs;
+	struct cpu_context_save *save;
 
-	atomic_set(&p->thread.refcount, 1);
-
-	childregs = ((struct pt_regs *)((unsigned long)p + 8192)) - 1;
+	childregs = ((struct pt_regs *)((unsigned long)p->thread_info + THREAD_SIZE)) - 1;
 	*childregs = *regs;
 	childregs->ARM_r0 = 0;
 	childregs->ARM_sp = esp;
 
-	save = ((struct context_save_struct *)(childregs)) - 1;
+	save = ((struct cpu_context_save *)(childregs)) - 1;
 	*save = INIT_CSS;
 	save->pc |= (unsigned long)ret_from_fork;
 
-	p->thread.save = save;
+	p->thread_info->cpu_context = save;
 
 	return 0;
 }
@@ -324,10 +335,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
  */
 int dump_fpu (struct pt_regs *regs, struct user_fp *fp)
 {
-	if (current->used_math)
-		memcpy(fp, &current->thread.fpstate.soft, sizeof (*fp));
+	struct thread_info *thread = current_thread_info();
+	int used_math = current->used_math;
 
-	return current->used_math;
+	if (used_math)
+		memcpy(fp, &thread->fpstate.soft, sizeof (*fp));
+
+	return used_math;
 }
 
 /*
@@ -405,7 +419,7 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 
 	stack_page = 4096 + (unsigned long)p;
-	fp = get_css_fp(&p->thread);
+	fp = thread_saved_fp(p);
 	do {
 		if (fp < stack_page || fp > 4092+stack_page)
 			return 0;

@@ -460,6 +460,27 @@ found_middle:
 
 #ifdef __KERNEL__
 
+/*
+ * Every architecture must define this function. It's the fastest
+ * way of searching a 140-bit bitmap where the first 100 bits are
+ * unlikely to be set. It's guaranteed that at least one of the 140
+ * bits is set.
+ */
+static inline unsigned long
+sched_find_first_bit(unsigned long b[3])
+{
+	unsigned long b0 = b[0], b1 = b[1], b2 = b[2];
+	unsigned long ofs;
+
+	ofs = (b1 ? 64 : 128);
+	b1 = (b1 ? b1 : b2);
+	ofs = (b0 ? 0 : ofs);
+	b0 = (b0 ? b0 : b1);
+
+	return __ffs(b0) + ofs;
+}
+
+
 #define ext2_set_bit                 __test_and_set_bit
 #define ext2_clear_bit               __test_and_clear_bit
 #define ext2_test_bit                test_bit

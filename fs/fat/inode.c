@@ -625,6 +625,18 @@ fat_read_super(struct super_block *sb, void *data, int silent,
 	}
 
 	b = (struct fat_boot_sector *) bh->b_data;
+	if (!b->reserved) {
+		if (!silent)
+			printk("FAT: bogus number of reserved sectors\n");
+		brelse(bh);
+		goto out_invalid;
+	}
+	if (!b->fats) {
+		if (!silent)
+			printk("FAT: bogus number of FAT structure\n");
+		brelse(bh);
+		goto out_invalid;
+	}
 	if (!b->secs_track) {
 		if (!silent)
 			printk("FAT: bogus sectors-per-track value\n");

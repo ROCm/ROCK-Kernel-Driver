@@ -1162,7 +1162,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file,
 
 static int rme96xx_open(struct inode *in, struct file *f)
 {
-	int minor = MINOR(in->i_rdev);
+	int minor = minor(in->i_rdev);
 	struct list_head *list;
 	int devnum = ((minor-3)/16) % devices; /* default = 0 */
 	rme96xx_info *s;
@@ -1490,7 +1490,7 @@ static struct file_operations rme96xx_audio_fops = {
 
 static int rme96xx_mixer_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct list_head *list;
 	rme96xx_info *s;
 

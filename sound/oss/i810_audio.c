@@ -2958,7 +2958,7 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 	return -ENODEV;
 }
 
-static void __exit i810_remove(struct pci_dev *pci_dev)
+static void __devexit i810_remove(struct pci_dev *pci_dev)
 {
 	int i;
 	struct i810_card *card = pci_get_drvdata(pci_dev);
@@ -3118,7 +3118,7 @@ static struct pci_driver i810_pci_driver = {
 	name:		I810_MODULE_NAME,
 	id_table:	i810_pci_tbl,
 	probe:		i810_probe,
-	remove:		i810_remove,
+	remove:		__devexit_p(i810_remove),
 #ifdef CONFIG_PM
 	suspend:	i810_pm_suspend,
 	resume:		i810_pm_resume,

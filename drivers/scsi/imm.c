@@ -1007,7 +1007,7 @@ static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
 	    cmd->SCp.this_residual = cmd->request_bufflen;
 	    cmd->SCp.ptr = cmd->request_buffer;
 	}
-	cmd->SCp.buffers_residual = cmd->use_sg;
+	cmd->SCp.buffers_residual = cmd->use_sg - 1;
 	cmd->SCp.phase++;
 	if (cmd->SCp.this_residual & 0x01)
 	    cmd->SCp.this_residual++;

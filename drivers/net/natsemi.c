@@ -1925,6 +1925,8 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	/* get link status */
 	case ETHTOOL_GLINK: {
 		struct ethtool_value edata = {ETHTOOL_GLINK};
+		/* LSTATUS is latched low until a read - so read twice */
+		mdio_read(dev, 1, MII_BMSR);
 		edata.data = (mdio_read(dev, 1, MII_BMSR)&BMSR_LSTATUS) ? 1:0;
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
@@ -2504,7 +2506,7 @@ static struct pci_driver natsemi_driver = {
 	name:		DRV_NAME,
 	id_table:	natsemi_pci_tbl,
 	probe:		natsemi_probe1,
-	remove:		natsemi_remove1,
+	remove:		__devexit_p(natsemi_remove1),
 #ifdef CONFIG_PM
 	suspend:	natsemi_suspend,
 	resume:		natsemi_resume,

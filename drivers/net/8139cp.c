@@ -1371,7 +1371,7 @@ static struct pci_driver cp_driver = {
 	name:		DRV_NAME,
 	id_table:	cp_pci_tbl,
 	probe:		cp_init_one,
-	remove:		cp_remove_one,
+	remove:		__devexit_p(cp_remove_one),
 };
 
 static int __init cp_init (void)

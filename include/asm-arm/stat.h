@@ -42,8 +42,14 @@ struct stat {
  * insane amounts of padding around dev_t's.
  */
 struct stat64 {
-	unsigned short	st_dev;
-	unsigned char	__pad0[10];
+#if defined(__ARMEB__)
+	unsigned char   __pad0b[6];
+	unsigned short  st_dev;
+#else
+	unsigned short  st_dev;
+	unsigned char   __pad0b[6];
+#endif
+	unsigned char   __pad0[4];
 
 #define STAT64_HAS_BROKEN_ST_INO	1
 	unsigned long	__st_ino;
@@ -53,14 +59,25 @@ struct stat64 {
 	unsigned long	st_uid;
 	unsigned long	st_gid;
 
-	unsigned short	st_rdev;
-	unsigned char	__pad3[10];
+#if defined(__ARMEB__)
+	unsigned char   __pad3b[6];
+	unsigned short  st_rdev;
+#else /* Must be little */
+	unsigned short  st_rdev;
+	unsigned char   __pad3b[6];
+#endif
+	unsigned char   __pad3[4];
 
 	long long	st_size;
 	unsigned long	st_blksize;
 
-	unsigned long	st_blocks;	/* Number 512-byte blocks allocated. */
-	unsigned long	__pad4;		/* future possible st_blocks high bits */
+#if defined(__ARMEB__)
+	unsigned long   __pad4;		/* Future possible st_blocks hi bits */
+	unsigned long   st_blocks;	/* Number 512-byte blocks allocated. */
+#else /* Must be little */
+	unsigned long   st_blocks;	/* Number 512-byte blocks allocated. */
+	unsigned long   __pad4;		/* Future possible st_blocks hi bits */
+#endif
 
 	unsigned long	st_atime;
 	unsigned long	__pad5;

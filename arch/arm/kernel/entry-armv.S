@@ -15,6 +15,7 @@
  */
 #include <linux/config.h>
 #include "entry-header.S"
+#include <asm/thread_info.h>
 
 
 #ifdef IOC_BASE
@@ -690,8 +691,7 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		msr	cpsr_c, r9
 		mov	r2, sp
 		bl	SYMBOL_NAME(do_DataAbort)
-		mov	r0, #PSR_I_BIT | MODE_SVC
-		msr	cpsr_c, r0
+		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -705,16 +705,49 @@ __irq_svc:	sub	sp, sp, #S_FRAME_SIZE
 		add	r4, sp, #S_SP
 		mov	r6, lr
 		stmia	r4, {r5, r6, r7, r8, r9}	@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+#ifdef CONFIG_PREEMPT
+		get_thread_info r8
+		ldr	r9, [r8, #TI_PREEMPT]		@ get preempt count
+		add	r7, r9, #1			@ increment it
+		str	r7, [r8, #TI_PREEMPT]
+#endif
 1:		get_irqnr_and_base r0, r6, r5, lr
 		movne	r1, sp
 		@
 		@ routine called with r0 = irq number, r1 = struct pt_regs *
 		@
 		adrsvc	ne, lr, 1b
-		bne	do_IRQ
+		bne	asm_do_IRQ
+#ifdef CONFIG_PREEMPT
+		ldr	r0, [r8, #TI_FLAGS]		@ get flags
+		tst	r0, #_TIF_NEED_RESCHED
+		ldrne	r6, .LCirq_stat
+		blne	svc_preempt
+preempt_return:
+		ldr	r0, [r8, #TI_PREEMPT]		@ read preempt value
+		teq	r0, r7
+		strne	r0, [r0, -r0]			@ bug()
+		str	r9, [r8, #TI_PREEMPT]		@ restore preempt count
+#endif
 		ldr	r0, [sp, #S_PSR]		@ irqs are already disabled
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
+
+#ifdef CONFIG_PREEMPT
+svc_preempt:	teq	r9, #0
+		movne	pc, lr
+		ldr	r0, [r6, #4]			@ local_irq_count
+		ldr	r1, [r6, #8]			@ local_b_count
+		adds	r0, r0, r1
+		movne	pc, lr
+1:		set_cpsr_c r0, #MODE_SVC		@ enable IRQs
+		bl	SYMBOL_NAME(preempt_schedule)
+		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC	@ disable IRQs
+		ldr	r0, [r8, #TI_FLAGS]
+		tst	r0, #_TIF_NEED_RESCHED
+		bne	1b
+		b	preempt_return
+#endif
 
 		.align	5
 __und_svc:	sub	sp, sp, #S_FRAME_SIZE
@@ -733,8 +766,7 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r1, sp				@ struct pt_regs *regs
 		bl	SYMBOL_NAME(do_undefinstr)
 
-1:		mov	r0, #PSR_I_BIT | MODE_SVC
-		msr	cpsr_c, r0
+1:		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	lr, [sp, #S_PSR]		@ Get SVC cpsr
 		msr	spsr, lr
 		ldmia	sp, {r0 - pc}^			@ Restore SVC registers
@@ -755,8 +787,7 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		mov	r0, r2				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
-		mov	r0, #PSR_I_BIT | MODE_SVC
-		msr	cpsr_c, r0
+		set_cpsr_c r0, #PSR_I_BIT | MODE_SVC
 		ldr	r0, [sp, #S_PSR]
 		msr	spsr, r0
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
@@ -769,6 +800,9 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 .LCprocfns:	.word	SYMBOL_NAME(processor)
 #endif
 .LCfp:		.word	SYMBOL_NAME(fp_enter)
+#ifdef CONFIG_PREEMPT
+.LCirq_stat:	.word	SYMBOL_NAME(irq_stat)
+#endif
 
 		irq_prio_table
 
@@ -793,8 +827,7 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 #else
 		bl	cpu_data_abort
 #endif
-		mov	r2, #MODE_SVC
-		msr	cpsr_c, r2			@ Enable interrupts
+		set_cpsr_c r2, #MODE_SVC		@ Enable interrupts
 		mov	r2, sp
 		adrsvc	al, lr, ret_from_exception
 		b	SYMBOL_NAME(do_DataAbort)
@@ -809,15 +842,29 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 		stmdb	r8, {sp, lr}^
 		alignment_trap r4, r7, __temp_irq
 		zero_fp
+#ifdef CONFIG_PREEMPT
+		get_thread_info r8
+		ldr	r9, [r8, #TI_PREEMPT]		@ get preempt count
+		add	r7, r9, #1			@ increment it
+		str	r7, [r8, #TI_PREEMPT]
+#endif
 1:		get_irqnr_and_base r0, r6, r5, lr
 		movne	r1, sp
 		adrsvc	ne, lr, 1b
 		@
 		@ routine called with r0 = irq number, r1 = struct pt_regs *
 		@
-		bne	do_IRQ
+		bne	asm_do_IRQ
+#ifdef CONFIG_PREEMPT
+		ldr	r0, [r8, #TI_PREEMPT]
+		teq	r0, r7
+		strne	r0, [r0, -r0]
+		str	r9, [r8, #TI_PREEMPT]
+		mov	tsk, r8
+#else
+		get_thread_info tsk
+#endif
 		mov	why, #0
-		get_current_task tsk
 		b	ret_to_user
 
 		.align	5
@@ -833,15 +880,15 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
-call_fpe:	get_current_task r10
+call_fpe:	get_thread_info r10			@ get current thread
+		ldr	r4, [r10, #TI_TASK]		@ get current task
 		mov	r8, #1
-		strb	r8, [r10, #TSK_USED_MATH]	@ set current->used_math
+		strb	r8, [r4, #TSK_USED_MATH]	@ set current->used_math
 		ldr	r4, .LCfp
-		add	r10, r10, #TSS_FPESAVE		@ r10 = workspace
+		add	r10, r10, #TI_FPSTATE		@ r10 = workspace
 		ldr	pc, [r4]			@ Call FP module USR entry point
 
-fpundefinstr:	mov	r0, #MODE_SVC
-		msr	cpsr_c, r0			@ Enable interrupts
+fpundefinstr:	set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
 		mov	r0, lr
 		mov	r1, sp
 		adrsvc	al, lr, ret_from_exception
@@ -857,8 +904,7 @@ __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		stmdb	r8, {sp, lr}^			@ Save sp_usr lr_usr
 		alignment_trap r4, r7, __temp_abt
 		zero_fp
-		mov	r0, #MODE_SVC
-		msr	cpsr_c, r0			@ Enable interrupts
+		set_cpsr_c r0, #MODE_SVC		@ Enable interrupts
 		mov	r0, r5				@ address (pc)
 		mov	r1, sp				@ regs
 		bl	SYMBOL_NAME(do_PrefetchAbort)	@ call abort handler
@@ -867,7 +913,7 @@ __pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
  * This is the return code to user mode for abort handlers
  */
 ENTRY(ret_from_exception)
-		get_current_task tsk
+		get_thread_info tsk
 		mov	why, #0
 		b	ret_to_user
 
@@ -877,16 +923,16 @@ ENTRY(fp_enter)
 		.text
 /*
  * Register switch for ARMv3 and ARMv4 processors
- * r0 = previous, r1 = next, return previous.
+ * r0 = previous thread_info, r1 = next thread_info, return previous.
  * previous and next are guaranteed not to be the same.
  */
 ENTRY(__switch_to)
 		stmfd	sp!, {r4 - sl, fp, lr}		@ Store most regs on stack
 		mrs	ip, cpsr
 		str	ip, [sp, #-4]!			@ Save cpsr_SVC
-		str	sp, [r0, #TSS_SAVE]		@ Save sp_SVC
-		ldr	sp, [r1, #TSS_SAVE]		@ Get saved sp_SVC
-		ldr	r2, [r1, #TSS_DOMAIN]
+		str	sp, [r0, #TI_CPU_SAVE]		@ Save sp_SVC
+		ldr	sp, [r1, #TI_CPU_SAVE]		@ Get saved sp_SVC
+		ldr	r2, [r1, #TI_CPU_DOMAIN]
 		ldr	ip, [sp], #4
 		mcr	p15, 0, r2, c3, c0		@ Set domain register
 		msr	spsr, ip			@ Save tasks CPSR into SPSR for this return

@@ -12,6 +12,8 @@
 #ifndef __ASM_ARCH_ASSABET_H
 #define __ASM_ARCH_ASSABET_H
 
+#include <linux/config.h>
+
 /* System Configuration Register flags */
 
 #define ASSABET_SCR_SDRAM_LOW	(1<<2)	/* SDRAM size (low bit) */

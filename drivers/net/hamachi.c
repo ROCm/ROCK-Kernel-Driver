@@ -1978,7 +1978,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 }
 
 
-static void __exit hamachi_remove_one (struct pci_dev *pdev)
+static void __devexit hamachi_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
@@ -2008,7 +2008,7 @@ static struct pci_driver hamachi_driver = {
 	name:		DRV_NAME,
 	id_table:	hamachi_pci_tbl,
 	probe:		hamachi_init_one,
-	remove:		hamachi_remove_one,
+	remove:		__devexit_p(hamachi_remove_one),
 };
 
 static int __init hamachi_init (void)

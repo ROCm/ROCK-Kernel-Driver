@@ -48,7 +48,7 @@ fixup_victor(struct machine_desc *desc, struct param_struct *params,
 	SET_BANK( 0, 0xc0000000, 4*1024*1024 );
 	mi->nr_banks = 1;
 
-	ROOT_DEV = MKDEV( 60, 2 );
+	ROOT_DEV = mk_kdev( 60, 2 );
 
 	/* Get command line parameters passed from the loader (if any) */
 	if( *((char*)0xc0000000) )

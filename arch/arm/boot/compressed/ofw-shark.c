@@ -19,7 +19,7 @@
 asmlinkage void
 create_params (unsigned long *buffer)
 {
-	/* Is there a better address? Also change in mach-shark/arch.c */
+	/* Is there a better address? Also change in mach-shark/core.c */
 	struct tag *tag = (struct tag *) 0x08003000;
 	int j,i,m,k,nr_banks,size;
 	unsigned char *c;

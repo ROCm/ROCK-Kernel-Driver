@@ -491,7 +491,7 @@ ether3_timeout(struct net_device *dev)
 
 	del_timer(&priv->timer);
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 	printk(KERN_ERR "%s: transmit timed out, network cable problem?\n", dev->name);
 	printk(KERN_ERR "%s: state: { status=%04X cfg1=%04X cfg2=%04X }\n", dev->name,
 		ether3_inw(REG_STATUS), ether3_inw(REG_CONFIG1), ether3_inw(REG_CONFIG2));
@@ -501,7 +501,7 @@ ether3_timeout(struct net_device *dev)
 		priv->tx_head, priv->tx_tail);
 	ether3_setbuffer(dev, buffer_read, priv->tx_tail);
 	printk(KERN_ERR "%s: packet status = %08X\n", dev->name, ether3_readlong(dev));
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	priv->regs.config2 |= CFG2_CTRLO;
 	priv->stats.tx_errors += 1;
@@ -533,10 +533,10 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 
 	next_ptr = (priv->tx_head + 1) & 15;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 
 	if (priv->tx_tail == next_ptr) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return 1;	/* unable to queue */
 	}
 
@@ -565,7 +565,7 @@ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	next_ptr = (priv->tx_head + 1) & 15;
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	dev_kfree_skb(skb);
 

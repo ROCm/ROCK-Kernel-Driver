@@ -7,7 +7,6 @@
  *              (jonm@bluemug.com).
  */
  
-#include <linux/config.h>
 #include <asm/irq.h>
 #include <asm/hardware.h>
 

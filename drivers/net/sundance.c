@@ -1463,7 +1463,7 @@ static struct pci_driver sundance_driver = {
 	name:		DRV_NAME,
 	id_table:	sundance_pci_tbl,
 	probe:		sundance_probe1,
-	remove:		sundance_remove1,
+	remove:		__devexit_p(sundance_remove1),
 };
 
 static int __init sundance_init(void)

@@ -6,6 +6,8 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 
+struct thread_info;
+
 /* information about the system we're running on */
 extern unsigned int system_rev;
 extern unsigned int system_serial_low;
@@ -48,12 +50,13 @@ extern asmlinkage void __backtrace(void);
  * `prev' will never be the same as `next'.
  * The `mb' is to tell GCC not to cache `current' across this call.
  */
-extern struct task_struct *__switch_to(struct task_struct *prev, struct task_struct *next);
+struct thread_info;
+extern struct task_struct *__switch_to(struct thread_info *, struct thread_info *);
 
-#define switch_to(prev,next,last)		\
-	do {			 		\
-		last = __switch_to(prev,next);	\
-		mb();				\
+#define switch_to(prev,next,last)					\
+	do {			 					\
+		last = __switch_to(prev->thread_info,next->thread_info); \
+		mb();							\
 	} while (0)
 
 /* For spinlocks etc */

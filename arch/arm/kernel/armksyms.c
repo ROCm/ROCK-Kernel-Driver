@@ -21,6 +21,7 @@
 #include <linux/pm.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
+#include <linux/smp_lock.h>
 
 #include <asm/byteorder.h>
 #include <asm/elf.h>
@@ -273,3 +274,7 @@ EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
 
 EXPORT_SYMBOL(get_wchan);
+
+#ifdef CONFIG_PREEMPT
+EXPORT_SYMBOL(kernel_flag);
+#endif

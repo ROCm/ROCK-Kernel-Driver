@@ -3,7 +3,7 @@
  *
  * IOP310 architecture timex specifications
  */
-
+#include <linux/config.h>
 
 
 #ifdef CONFIG_ARCH_IQ80310

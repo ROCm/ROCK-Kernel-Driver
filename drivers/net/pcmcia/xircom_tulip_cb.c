@@ -1709,7 +1709,7 @@ static struct pci_driver xircom_driver = {
 	name:		DRV_NAME,
 	id_table:	xircom_pci_table,
 	probe:		xircom_init_one,
-	remove:		xircom_remove_one,
+	remove:		__devexit_p(xircom_remove_one),
 #ifdef CONFIG_PM
 	suspend:	xircom_suspend,
 	resume:		xircom_resume

@@ -941,7 +941,7 @@ static struct pci_driver synclink_pci_driver = {
 	name:		"synclink",
 	id_table:	synclink_pci_tbl,
 	probe:		synclink_init_one,
-	remove:		synclink_remove_one,
+	remove:		__devexit_p(synclink_remove_one),
 };
 
 static struct tty_driver serial_driver, callout_driver;
@@ -8220,7 +8220,7 @@ static int __init synclink_init_one (struct pci_dev *dev,
 	return 0;
 }
 
-static void __exit synclink_remove_one (struct pci_dev *dev)
+static void __devexit synclink_remove_one (struct pci_dev *dev)
 {
 }
 

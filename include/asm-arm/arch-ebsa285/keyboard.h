@@ -6,6 +6,7 @@
  * Copyright (C) 1998-2001 Russell King
  * (C) 1998 Phil Blundell
  */
+#include <linux/config.h>
 #include <linux/ioport.h>
 #include <asm/irq.h>
 #include <asm/system.h>

@@ -13,8 +13,6 @@
  * Added IOP310 chipset and IQ80310 board demuxing, masking code. - DS
  *
  */
-
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>

@@ -277,7 +277,7 @@ void __init attach_cs4232(struct address_info *hw_config)
 	}
 }
 
-void __exit unload_cs4232(struct address_info *hw_config)
+static void __exit unload_cs4232(struct address_info *hw_config)
 {
 	int base = hw_config->io_base, irq = hw_config->irq;
 	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
@@ -460,10 +460,12 @@ static int __init init_cs4232(void)
 	return 0;
 }
 
-int cs4232_isapnp_remove(struct pci_dev *dev, const struct isapnp_device_id *id)
+static int __exit cs4232_isapnp_remove(struct pci_dev *dev,
+			const struct isapnp_device_id *id)
 {
 	struct address_info *cfg = (struct address_info*)pci_get_drvdata(dev);
-	if (cfg) unload_cs4232(cfg);
+	if (cfg)
+		unload_cs4232(cfg);
 	pci_set_drvdata(dev,NULL);
 	dev->deactivate(dev);
 	return 0;

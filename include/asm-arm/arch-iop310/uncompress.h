@@ -1,6 +1,7 @@
 /*
  *  linux/include/asm-arm/arch-iop80310/uncompress.h
  */
+#include <linux/config.h>
 
 #ifdef CONFIG_ARCH_IQ80310
 #define UART1_BASE    ((volatile unsigned char *)0xfe800000)

@@ -121,8 +121,8 @@ static inline void _raw_write_lock(rwlock_t * lock)
 	"	bne	%1,6b\n"
 	"	br	1b\n"
 	".previous"
-	: "=m" (*(volatile int *)lock), "=&r" (regx)
-	: "0" (*(volatile int *)lock) : "memory");
+	: "=m" (*lock), "=&r" (regx)
+	: "0" (*lock) : "memory");
 }
 
 static inline void _raw_read_lock(rwlock_t * lock)
@@ -141,8 +141,8 @@ static inline void _raw_read_lock(rwlock_t * lock)
 	"	blbs	%1,6b\n"
 	"	br	1b\n"
 	".previous"
-	: "=m" (*(volatile int *)lock), "=&r" (regx)
-	: "m" (*(volatile int *)lock) : "memory");
+	: "=m" (*lock), "=&r" (regx)
+	: "m" (*lock) : "memory");
 }
 #endif /* CONFIG_DEBUG_RWLOCK */
 
@@ -164,8 +164,8 @@ static inline void _raw_read_unlock(rwlock_t * lock)
 	".subsection 2\n"
 	"6:	br	1b\n"
 	".previous"
-	: "=m" (*(volatile int *)lock), "=&r" (regx)
-	: "m" (*(volatile int *)lock) : "memory");
+	: "=m" (*lock), "=&r" (regx)
+	: "m" (*lock) : "memory");
 }
 
 #endif /* _ALPHA_SPINLOCK_H */

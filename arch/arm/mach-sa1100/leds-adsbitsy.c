@@ -28,7 +28,7 @@ void adsbitsy_leds_event(led_event_t evt)
 {
 	unsigned long flags;
 
-	save_flags_cli(flags);
+	local_irq_save(flags);
 
 	switch (evt) {
 	case led_start:
@@ -92,5 +92,5 @@ void adsbitsy_leds_event(led_event_t evt)
 		GPCR = hw_led_state ^ LED_MASK;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 }

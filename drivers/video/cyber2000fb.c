@@ -1683,7 +1683,7 @@ static struct pci_device_id cyberpro_pci_table[] __devinitdata = {
 static struct pci_driver cyberpro_driver = {
 	name:		"CyberPro",
 	probe:		cyberpro_probe,
-	remove:		cyberpro_remove,
+	remove:		__devexit_p(cyberpro_remove),
 	suspend:	cyberpro_suspend,
 	resume:		cyberpro_resume,
 	id_table:	cyberpro_pci_table

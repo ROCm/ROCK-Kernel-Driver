@@ -283,6 +283,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
 	    struct task_struct * p, struct pt_regs * regs)
 {
+	extern void ret_from_sys_call(void);
 	extern void ret_from_fork(void);
 
 	struct thread_info *childti = p->thread_info;
@@ -304,7 +305,11 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	stack = ((struct switch_stack *) regs) - 1;
 	childstack = ((struct switch_stack *) childregs) - 1;
 	*childstack = *stack;
+#ifdef CONFIG_SMP
 	childstack->r26 = (unsigned long) ret_from_fork;
+#else
+	childstack->r26 = (unsigned long) ret_from_sys_call;
+#endif
 	childti->pcb.usp = usp;
 	childti->pcb.ksp = (unsigned long) childstack;
 	childti->pcb.flags = 1;	/* set FEN, clear everything else */

@@ -180,7 +180,7 @@ static struct pci_driver pcigame_driver = {
 	name:		"pcigame",
 	id_table:	pcigame_id_table,
 	probe:		pcigame_probe,
-	remove:		pcigame_remove,
+	remove:		__devexit_p(pcigame_remove),
 };
 
 int __init pcigame_init(void)

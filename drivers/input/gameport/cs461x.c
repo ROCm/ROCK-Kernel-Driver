@@ -313,7 +313,7 @@ static struct pci_driver cs461x_pci_driver = {
         name:           "PCI Gameport",
         id_table:       cs461x_pci_tbl,
         probe:          cs461x_pci_probe,
-        remove:         cs461x_pci_remove,
+        remove:         __devexit_p(cs461x_pci_remove),
 };
 
 int __init js_cs461x_init(void)

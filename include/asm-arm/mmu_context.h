@@ -42,14 +42,34 @@ static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk, unsigned int cpu)
 {
-	if (prev != next) {
+	if (prev != next)
 		cpu_switch_mm(next->pgd, tsk);
-		clear_bit(cpu, &prev->cpu_vm_mask);
-	}
-	set_bit(cpu, &next->cpu_vm_mask);
 }
 
 #define activate_mm(prev, next) \
 	switch_mm((prev),(next),NULL,smp_processor_id())
+
+/*
+ * Find first bit set in a 168-bit bitmap, where the first
+ * 128 bits are unlikely to be set.
+ */
+static inline int sched_find_first_bit(unsigned long *b)
+{
+#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
+#error update this function
+#endif
+
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (unlikely(b[3]))
+		return __ffs(b[3]) + 96;
+	if (b[4])
+		return __ffs(b[4]) + MAX_RT_PRIO;
+	return __ffs(b[5]) + 32 + MAX_RT_PRIO;
+}
 
 #endif

@@ -8,8 +8,6 @@
  * Drive tuning added from Rebel.com's kernel sources
  *  -- Russell King (15/11/98) linux@arm.linux.org.uk
  */
-
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>

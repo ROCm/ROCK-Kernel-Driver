@@ -461,7 +461,7 @@ static struct miscdevice mwave_misc_dev = { MWAVE_MINOR, "mwave", &mwave_fops };
 * mwave_exit is called on module unload
 * mwave_exit is also used to clean up after an aborted mwave_init
 */
-static void __exit mwave_exit(void)
+static void mwave_exit(void)
 {
 	pMWAVE_DEVICE_DATA pDrvData = &mwave_s_mdd;
 
