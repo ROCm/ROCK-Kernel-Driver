@@ -137,7 +137,7 @@ static struct pci_device_id fm801_gp_id_table[] = {
 };
 
 static struct pci_driver fm801_gp_driver = {
-	.name =		"FM801 GP",
+	.name =		"FM801_gameport",
 	.id_table =	fm801_gp_id_table,
 	.probe =	fm801_gp_probe,
 	.remove =	__devexit_p(fm801_gp_remove),

@@ -166,7 +166,7 @@ static struct pci_device_id vortex_id_table[] =
  { 0 }};
 
 static struct pci_driver vortex_driver = {
-	.name =		"vortex",
+	.name =		"vortex_gameport",
 	.id_table =	vortex_id_table,
 	.probe =	vortex_probe,
 	.remove =	__devexit_p(vortex_remove),
