@@ -297,18 +297,18 @@ static struct notifier_block sc1200wdt_notifier =
 
 static struct file_operations sc1200wdt_fops =
 {
-	owner:		THIS_MODULE,
-	write:		sc1200wdt_write,
-	ioctl:		sc1200wdt_ioctl,
-	open:		sc1200wdt_open,
-	release:	sc1200wdt_release
+	.owner		= THIS_MODULE,
+	.write		= sc1200wdt_write,
+	.ioctl		= sc1200wdt_ioctl,
+	.open		= sc1200wdt_open,
+	.release	= sc1200wdt_release
 };
 
 static struct miscdevice sc1200wdt_miscdev =
 {
-	minor:		WATCHDOG_MINOR,
-	name:		"watchdog",
-	fops:		&sc1200wdt_fops,
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &sc1200wdt_fops,
 };
 
 
