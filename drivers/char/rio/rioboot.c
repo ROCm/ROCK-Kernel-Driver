@@ -80,6 +80,8 @@ static char *_rioboot_c_sccs_ = "@(#)rioboot.c	1.3";
 #include "cmdblk.h"
 #include "route.h"
 
+static int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP );
+
 static uchar
 RIOAtVec2Ctrl[] =
 {
@@ -802,7 +804,7 @@ struct PKT *PacketP;
 ** If booted by an RTA, HostP->Mapping[Rup].RtaUniqueNum is the booting RTA.
 ** RtaUniq is the booted RTA.
 */
-int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP )
+static int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP )
 {
 	struct Map	*MapP = NULL;
 	struct Map	*MapP2 = NULL;

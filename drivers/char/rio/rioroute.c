@@ -83,6 +83,12 @@ static char *_rioroute_c_sccs_ = "@(#)rioroute.c	1.3";
 #include "list.h"
 #include "sam.h"
 
+static int RIOCheckIsolated(struct rio_info *, struct Host *, uint);
+static int RIOIsolate(struct rio_info *, struct Host *, uint);
+static int RIOCheck(struct Host *, uint);
+static void RIOConCon(struct rio_info *, struct Host *, uint, uint, uint, uint, int);
+
+
 /*
 ** Incoming on the ROUTE_RUP
 ** I wrote this while I was tired. Forgive me.
@@ -717,7 +723,7 @@ uint unit;
 ** the world about it. This is done to ensure that the configurator
 ** only gets up-to-date information about what is going on.
 */
-int
+static int
 RIOCheckIsolated(p, HostP, UnitId)
 struct rio_info *	p;
 struct Host *HostP;
@@ -747,7 +753,7 @@ uint UnitId;
 ** all the units attached to it. This will mean that the entire
 ** subnet will re-introduce itself.
 */
-int
+static int
 RIOIsolate(p, HostP, UnitId)
 struct rio_info *	p;
 struct Host *		HostP;
@@ -782,7 +788,7 @@ uint UnitId;
 	return 1;
 }
 
-int
+static int
 RIOCheck(HostP, UnitId)
 struct Host *HostP;
 uint UnitId;
@@ -883,7 +889,7 @@ struct rio_info *	p;
 	return(0);
 }
 
-void
+static void
 RIOConCon(p, HostP, FromId, FromLink, ToId, ToLink, Change)
 struct rio_info *	p;
 struct Host *HostP;
@@ -966,7 +972,7 @@ int Change;
 ** Delete and RTA entry from the saved table given to us
 ** by the configuration program.
 */
-int
+static int
 RIORemoveFromSavedTable(struct rio_info *p, struct Map *pMap)
 {
     int		entry;
@@ -993,7 +999,7 @@ RIORemoveFromSavedTable(struct rio_info *p, struct Map *pMap)
 ** Scan the unit links to and return zero if the unit is completely
 ** disconnected.
 */
-int
+static int
 RIOFreeDisconnected(struct rio_info *p, struct Host *HostP, int unit)
 {
     int		link;

@@ -37,6 +37,7 @@ static char *_riotable_c_sccs_ = "@(#)riotable.c	1.2";
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
+#include <linux/string.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -276,7 +277,7 @@ struct rio_info *	p;
 						return -ENXIO;
 					}
 					rio_dprintk (RIO_DEBUG_TABLE, "RIONewTable: entering(9)\n"); 
-					if (RIOStrCmp(MapP->Name,
+					if (strcmp(MapP->Name,
 							p->RIOConnectTable[SubEnt].Name)==0 && !(MapP->Flags & RTA16_SECOND_SLOT)) { /* (9) */
 						rio_dprintk (RIO_DEBUG_TABLE, "RTA name %s used twice\n", MapP->Name);
 						p->RIOError.Error = NAME_USED_TWICE;
@@ -405,7 +406,7 @@ struct rio_info *	p;
 			for ( Host2=0; Host2<p->RIONumHosts; Host2++ ) {
 				if (Host2 == Host)
 					continue;
-				if (RIOStrCmp(p->RIOHosts[Host].Name, p->RIOHosts[Host2].Name)
+				if (strcmp(p->RIOHosts[Host].Name, p->RIOHosts[Host2].Name)
 									 == 0) {
 					NameIsUnique = 0;
 					Host1++;
@@ -938,20 +939,6 @@ struct Map *HostMapP;
 		PortP->Lock			= 0;
 		PortP->Store		= 0;
 		PortP->FirstOpen	= 1;
-
-		/*
-		** handle the xprint issues
-		*/
-#ifdef XPRINT_SUPPORT
-		PortP->Xprint.XpActive	= 0;
-		PortP->Xprint.XttyP = &riox_tty[SysPort];
-		/*				TO				FROM			MAXLEN */
-		RIOStrNCpy( PortP->Xprint.XpOn,	RIOConf.XpOn,	MAX_XP_CTRL_LEN );
-		RIOStrNCpy( PortP->Xprint.XpOff, RIOConf.XpOff, MAX_XP_CTRL_LEN );
-		PortP->Xprint.XpCps = RIOConf.XpCps;
-		PortP->Xprint.XpLen = RIOStrlen(PortP->Xprint.XpOn)+
-									RIOStrlen(PortP->Xprint.XpOff);
-#endif
 
 		/*
 		** Buffers 'n things
