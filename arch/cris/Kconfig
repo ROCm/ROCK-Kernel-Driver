@@ -556,15 +556,7 @@ source "drivers/block/Kconfig"
 
 source "drivers/md/Kconfig"
 
-
-menu "ATA/IDE/MFM/RLL support"
-
-config IDE
-	tristate "ATA/IDE/MFM/RLL support"
-
 source "drivers/ide/Kconfig"
-
-endmenu
 
 
 menu "SCSI support"
