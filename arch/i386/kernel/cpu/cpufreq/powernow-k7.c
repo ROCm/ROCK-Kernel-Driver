@@ -337,7 +337,8 @@ static int powernow_decode_bios (int maxfid, int startvid)
 				}
 			}
 			printk (KERN_INFO PFX "No PST tables match this cpuid (0x%x)\n", etuple);
-			printk ("This is indicative of a broken BIOS. Email davej@redhat.com\n");
+			printk (KERN_INFO PFX "This is indicative of a broken BIOS.\n");
+			printk (KERN_INFO PFX "See http://www.codemonkey.org.uk/projects/cpufreq/powernow-k7.shtml\n");
 			return -EINVAL;
 		}
 		p++;

@@ -935,10 +935,7 @@ powernowk8_verify(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
-#warning pol->policy is in undefined state here
-	res = find_match(&targ, &min, &max,
-			 pol->policy == CPUFREQ_POLICY_POWERSAVE ?
-			 SEARCH_DOWN : SEARCH_UP, 0, 0);
+	res = find_match(&targ, &min, &max, SEARCH_DOWN, 0, 0);
 	if (!res) {
 		pol->min = min * 1000;
 		pol->max = max * 1000;

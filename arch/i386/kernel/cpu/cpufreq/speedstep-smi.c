@@ -225,9 +225,10 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return -ENODEV;
 
 	result = speedstep_smi_ownership();
-
-	if (result)
+	if (result) {
 		dprintk(KERN_INFO "cpufreq: fails an aquiring ownership of a SMI interface.\n");
+		return -EINVAL;
+	}
 
 	/* detect low and high frequency */
 	result = speedstep_smi_get_freqs(&speedstep_freqs[SPEEDSTEP_LOW].frequency,
