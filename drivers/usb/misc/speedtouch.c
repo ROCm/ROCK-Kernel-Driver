@@ -997,11 +997,6 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 		PDEBUG ("disconnecting minor %d\n", i);
 
-		while (MOD_IN_USE > 1) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout (1);
-		}
-
 		kfree (instance);
 		minor_data[i] = NULL;
 
