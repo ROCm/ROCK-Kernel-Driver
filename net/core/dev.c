@@ -1411,11 +1411,12 @@ static __inline__ int handle_bridge(struct sk_buff *skb,
 
 
 #ifdef CONFIG_NET_DIVERT
-static inline void handle_diverter(struct sk_buff *skb)
+static inline int handle_diverter(struct sk_buff *skb)
 {
 	/* if diversion is supported on device, then divert */
 	if (skb->dev->divert && skb->dev->divert->divert)
 		divert_frame(skb);
+	return 0;
 }
 #endif   /* CONFIG_NET_DIVERT */
 
