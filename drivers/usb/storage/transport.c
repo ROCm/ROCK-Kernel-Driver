@@ -947,6 +947,7 @@ void usb_stor_abort_transport(struct us_data *us)
 void usb_stor_CBI_irq(struct urb *urb)
 {
 	struct us_data *us = (struct us_data *)urb->context;
+	int status;
 
 	US_DEBUGP("USB IRQ received for device on host %d\n", us->host_no);
 	US_DEBUGP("-- IRQ data length is %d\n", urb->actual_length);
@@ -960,13 +961,13 @@ void usb_stor_CBI_irq(struct urb *urb)
 		/* was this a wanted interrupt? */
 		if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 			US_DEBUGP("ERROR: Unwanted interrupt received!\n");
-			return;
+			goto exit;
 		}
 		US_DEBUGP("-- command aborted\n");
 
 		/* wake up the command thread */
 		up(&us->ip_waitq);
-		return;
+		goto exit;
 	}
 
 	/* is the device removed? */
@@ -988,19 +989,19 @@ void usb_stor_CBI_irq(struct urb *urb)
 	/* reject improper IRQs */
 	if (urb->actual_length != 2) {
 		US_DEBUGP("-- IRQ too short\n");
-		return;
+		goto exit;
 	}
 
 	/* was this a command-completion interrupt? */
 	if (us->irqbuf[0] && (us->subclass != US_SC_UFI)) {
 		US_DEBUGP("-- not a command-completion IRQ\n");
-		return;
+		goto exit;
 	}
 
 	/* was this a wanted interrupt? */
 	if (!test_and_clear_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("ERROR: Unwanted interrupt received!\n");
-		return;
+		goto exit;
 	}
 		
 	/* copy the valid data */
@@ -1009,6 +1010,13 @@ void usb_stor_CBI_irq(struct urb *urb)
 
 	/* wake up the command thread */
 	up(&(us->ip_waitq));
+
+exit:
+	/* resubmit the urb */
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
