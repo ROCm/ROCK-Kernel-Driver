@@ -832,22 +832,6 @@ walk_init_root(const char *name, struct nameidata *nd)
 	return 1;
 }
 
-/* SMP-safe */
-int path_init(const char *name, unsigned int flags, struct nameidata *nd)
-{
-	nd->last_type = LAST_ROOT; /* if there are only slashes... */
-	nd->old_mnt = NULL;
-	nd->old_dentry = NULL;
-	nd->flags = flags;
-	if (*name=='/')
-		return walk_init_root(name,nd);
-	read_lock(&current->fs->lock);
-	nd->mnt = mntget(current->fs->pwdmnt);
-	nd->dentry = dget(current->fs->pwd);
-	read_unlock(&current->fs->lock);
-	return 1;
-}
-
 int path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 {
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
