@@ -79,7 +79,6 @@ typedef struct siginfo {
  * si_code is non-zero and __ISR_VALID is set in si_flags.
  */
 #define si_isr		_sifields._sigfault._isr
-#define si_pfm_ovfl	_sifields._sigprof._pfm_ovfl_counters
 
 /*
  * Flag values for si_flags:

@@ -30,6 +30,7 @@
 
 #include <asm/bitops.h>
 #include <asm/delay.h>
+#include <asm/intrinsics.h>
 #include <asm/io.h>
 #include <asm/hw_irq.h>
 #include <asm/machvec.h>
@@ -93,8 +94,8 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 		 * because the register and the memory stack are not
 		 * switched atomically.
 		 */
-		asm ("mov %0=ar.bsp" : "=r"(bsp));
-		asm ("mov %0=sp" : "=r"(sp));
+		bsp = ia64_getreg(_IA64_REG_AR_BSP);
+		sp = ia64_getreg(_IA64_REG_AR_SP);
 
 		if ((sp - bsp) < 1024) {
 			static unsigned char count;
@@ -117,11 +118,11 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 	 * 16 (without this, it would be ~240, which could easily lead
 	 * to kernel stack overflows).
 	 */
-	saved_tpr = ia64_get_tpr();
+	saved_tpr = ia64_getreg(_IA64_REG_CR_TPR);
 	ia64_srlz_d();
 	while (vector != IA64_SPURIOUS_INT_VECTOR) {
 		if (!IS_RESCHEDULE(vector)) {
-			ia64_set_tpr(vector);
+			ia64_setreg(_IA64_REG_CR_TPR, vector);
 			ia64_srlz_d();
 
 			do_IRQ(local_vector_to_irq(vector), regs);
@@ -130,7 +131,7 @@ ia64_handle_irq (ia64_vector vector, struct pt_regs *regs)
 			 * Disable interrupts and send EOI:
 			 */
 			local_irq_disable();
-			ia64_set_tpr(saved_tpr);
+			ia64_setreg(_IA64_REG_CR_TPR, saved_tpr);
 		}
 		ia64_eoi();
 		vector = ia64_get_ivr();
@@ -193,7 +194,7 @@ ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect)
 #ifdef CONFIG_SMP
 	phys_cpu_id = cpu_physical_id(cpu);
 #else
-	phys_cpu_id = (ia64_get_lid() >> 16) & 0xffff;
+	phys_cpu_id = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 #endif
 
 	/*

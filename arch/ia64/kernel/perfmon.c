@@ -39,6 +39,7 @@
 
 #include <asm/bitops.h>
 #include <asm/errno.h>
+#include <asm/intrinsics.h>
 #include <asm/page.h>
 #include <asm/perfmon.h>
 #include <asm/processor.h>
@@ -671,39 +672,45 @@ static int pfm_end_notify_user(pfm_context_t *ctx);
 static inline void
 pfm_clear_psr_pp(void)
 {
-	__asm__ __volatile__ ("rsm psr.pp;; srlz.i;;"::: "memory");
+	ia64_rsm(IA64_PSR_PP);
+	ia64_srlz_i();
 }
 
 static inline void
 pfm_set_psr_pp(void)
 {
-	__asm__ __volatile__ ("ssm psr.pp;; srlz.i;;"::: "memory");
+	ia64_ssm(IA64_PSR_PP);
+	ia64_srlz_i();
 }
 
 static inline void
 pfm_clear_psr_up(void)
 {
-	__asm__ __volatile__ ("rsm psr.up;; srlz.i;;"::: "memory");
+	ia64_rsm(IA64_PSR_UP);
+	ia64_srlz_i();
 }
 
 static inline void
 pfm_set_psr_up(void)
 {
-	__asm__ __volatile__ ("ssm psr.up;; srlz.i;;"::: "memory");
+	ia64_ssm(IA64_PSR_UP);
+	ia64_srlz_i();
 }
 
 static inline unsigned long
 pfm_get_psr(void)
 {
 	unsigned long tmp;
-	__asm__ __volatile__ ("mov %0=psr;;": "=r"(tmp) :: "memory");
+	tmp = ia64_getreg(_IA64_REG_PSR);
+	ia64_srlz_i();
 	return tmp;
 }
 
 static inline void
 pfm_set_psr_l(unsigned long val)
 {
-	__asm__ __volatile__ ("mov psr.l=%0;; srlz.i;;"::"r"(val): "memory");
+	ia64_setreg(_IA64_REG_PSR_L, val);
+	ia64_srlz_i();
 }
 
 static inline void
@@ -970,7 +977,7 @@ pfm_restore_monitoring(struct task_struct *task)
 	 */
 	if (ctx->ctx_fl_system && (PFM_CPUINFO_GET() & PFM_CPUINFO_DCR_PP)) {
 		/* disable dcr pp */
-		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 		pfm_clear_psr_pp();
 	} else {
 		pfm_clear_psr_up();
@@ -1017,7 +1024,7 @@ pfm_restore_monitoring(struct task_struct *task)
 	 */
 	if (ctx->ctx_fl_system && (PFM_CPUINFO_GET() & PFM_CPUINFO_DCR_PP)) {
 		/* enable dcr pp */
-		ia64_set_dcr(ia64_get_dcr() | IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
 		ia64_srlz_i();
 	}
 	pfm_set_psr_l(psr);
@@ -1773,7 +1780,7 @@ pfm_syswide_force_stop(void *info)
 	/*
 	 * Update local PMU
 	 */
-	ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+	ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 	ia64_srlz_i();
 	/*
 	 * update local cpuinfo
@@ -3944,7 +3951,7 @@ pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 *
 		 * disable dcr pp
 		 */
-		ia64_set_dcr(ia64_get_dcr() & ~IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) & ~IA64_DCR_PP);
 		ia64_srlz_i();
 
 		/*
@@ -4034,7 +4041,7 @@ pfm_start(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		pfm_set_psr_pp();
 
 		/* enable dcr pp */
-		ia64_set_dcr(ia64_get_dcr()|IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, ia64_getreg(_IA64_REG_CR_DCR) | IA64_DCR_PP);
 		ia64_srlz_i();
 
 		return 0;
@@ -4199,7 +4206,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		current->pid, 
 		thread->pfm_context, ctx));
 
-	old = ia64_cmpxchg("acq", &thread->pfm_context, NULL, ctx, sizeof(pfm_context_t *));
+	old = ia64_cmpxchg(acq, &thread->pfm_context, NULL, ctx, sizeof(pfm_context_t *));
 	if (old != NULL) {
 		DPRINT(("load_pid [%d] already has a context\n", req->load_pid));
 		goto error_unres;
@@ -5459,13 +5466,13 @@ pfm_do_syst_wide_update_task(struct task_struct *task, unsigned long info, int i
 	 * if monitoring has started
 	 */
 	if (dcr_pp) {
-		dcr = ia64_get_dcr();
+		dcr = ia64_getreg(_IA64_REG_CR_DCR);
 		/*
 		 * context switching in?
 		 */
 		if (is_ctxswin) {
 			/* mask monitoring for the idle task */
-			ia64_set_dcr(dcr & ~IA64_DCR_PP);
+			ia64_setreg(_IA64_REG_CR_DCR, dcr & ~IA64_DCR_PP);
 			pfm_clear_psr_pp();
 			ia64_srlz_i();
 			return;
@@ -5477,7 +5484,7 @@ pfm_do_syst_wide_update_task(struct task_struct *task, unsigned long info, int i
 		 * Due to inlining this odd if-then-else construction generates
 		 * better code.
 		 */
-		ia64_set_dcr(dcr |IA64_DCR_PP);
+		ia64_setreg(_IA64_REG_CR_DCR, dcr |IA64_DCR_PP);
 		pfm_set_psr_pp();
 		ia64_srlz_i();
 	}
@@ -6257,7 +6264,7 @@ pfm_init_percpu (void)
 	if (smp_processor_id() == 0)
 		register_percpu_irq(IA64_PERFMON_VECTOR, &perfmon_irqaction);
 
-	ia64_set_pmv(IA64_PERFMON_VECTOR);
+	ia64_setreg(_IA64_REG_CR_PMV, IA64_PERFMON_VECTOR);
 	ia64_srlz_d();
 
 	/*
