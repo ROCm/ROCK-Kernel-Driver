@@ -53,10 +53,11 @@
 #include "xfs_rw.h"
 #include "xfs_iomap.h"
 #include <linux/mpage.h>
+#include <linux/writeback.h>
 
 STATIC void xfs_count_page_state(struct page *, int *, int *, int *);
-STATIC void xfs_convert_page(struct inode *, struct page *,
-				xfs_iomap_t *, void *, int, int);
+STATIC void xfs_convert_page(struct inode *, struct page *, xfs_iomap_t *,
+		struct writeback_control *wbc, void *, int, int);
 
 #if defined(XFS_RW_TRACE)
 void
@@ -440,6 +441,7 @@ xfs_map_unwritten(
 	unsigned long		p_offset,
 	int			block_bits,
 	xfs_iomap_t		*iomapp,
+	struct writeback_control *wbc,
 	int			startio,
 	int			all_bh)
 {
@@ -513,7 +515,7 @@ xfs_map_unwritten(
 				break;
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
-			xfs_convert_page(inode, page, iomapp, pb,
+			xfs_convert_page(inode, page, iomapp, wbc, pb,
 							startio, all_bh);
 			/* stop if converting the next page might add
 			 * enough blocks that the corresponding byte
@@ -530,7 +532,7 @@ xfs_map_unwritten(
 			if (page) {
 				nblocks += bs;
 				atomic_add(bs, &pb->pb_io_remaining);
-				xfs_convert_page(inode, page, iomapp, pb,
+				xfs_convert_page(inode, page, iomapp, wbc, pb,
 							startio, all_bh);
 				if (nblocks >= ((ULONG_MAX - PAGE_SIZE) >> block_bits))
 					goto enough;
@@ -598,6 +600,7 @@ xfs_convert_page(
 	struct inode		*inode,
 	struct page		*page,
 	xfs_iomap_t		*iomapp,
+	struct writeback_control *wbc,
 	void			*private,
 	int			startio,
 	int			all_bh)
@@ -640,8 +643,8 @@ xfs_convert_page(
 		 */
 		if (buffer_unwritten(bh) && !bh->b_end_io) {
 			ASSERT(tmp->iomap_flags & IOMAP_UNWRITTEN);
-			xfs_map_unwritten(inode, page, head, bh,
-					offset, bbits, tmp, startio, all_bh);
+			xfs_map_unwritten(inode, page, head, bh, offset,
+					bbits, tmp, wbc, startio, all_bh);
 		} else if (! (buffer_unwritten(bh) && buffer_locked(bh))) {
 			xfs_map_at_offset(page, bh, offset, bbits, tmp);
 			if (buffer_unwritten(bh)) {
@@ -660,6 +663,7 @@ xfs_convert_page(
 	} while (i++, (bh = bh->b_this_page) != head);
 
 	if (startio) {
+		wbc->nr_to_write--;
 		xfs_submit_page(page, bh_arr, index);
 	} else {
 		unlock_page(page);
@@ -675,6 +679,7 @@ xfs_cluster_write(
 	struct inode		*inode,
 	pgoff_t			tindex,
 	xfs_iomap_t		*iomapp,
+	struct writeback_control *wbc,
 	int			startio,
 	int			all_bh)
 {
@@ -686,7 +691,8 @@ xfs_cluster_write(
 		page = xfs_probe_delalloc_page(inode, tindex);
 		if (!page)
 			break;
-		xfs_convert_page(inode, page, iomapp, NULL, startio, all_bh);
+		xfs_convert_page(inode, page, iomapp, wbc, NULL,
+				startio, all_bh);
 	}
 }
 
@@ -713,6 +719,7 @@ STATIC int
 xfs_page_state_convert(
 	struct inode	*inode,
 	struct page	*page,
+	struct writeback_control *wbc,
 	int		startio,
 	int		unmapped) /* also implies page uptodate */
 {
@@ -776,7 +783,7 @@ xfs_page_state_convert(
 					err = xfs_map_unwritten(inode, page,
 							head, bh, p_offset,
 							inode->i_blkbits, iomp,
-							startio, unmapped);
+							wbc, startio, unmapped);
 					if (err) {
 						goto error;
 					}
@@ -863,8 +870,10 @@ xfs_page_state_convert(
 	if (startio)
 		xfs_submit_page(page, bh_arr, cnt);
 
-	if (iomp)
-		xfs_cluster_write(inode, page->index + 1, iomp, startio, unmapped);
+	if (iomp) {
+		xfs_cluster_write(inode, page->index + 1, iomp, wbc,
+				startio, unmapped);
+	}
 
 	return page_dirty;
 
@@ -1173,7 +1182,7 @@ linvfs_writepage(
 	 * Convert delayed allocate, unwritten or unmapped space
 	 * to real space and flush out to disk.
 	 */
-	error = xfs_page_state_convert(inode, page, 1, unmapped);
+	error = xfs_page_state_convert(inode, page, wbc, 1, unmapped);
 	if (error == -EAGAIN)
 		goto out_fail;
 	if (unlikely(error < 0))
@@ -1216,6 +1225,10 @@ linvfs_release_page(
 {
 	struct inode		*inode = page->mapping->host;
 	int			dirty, delalloc, unmapped, unwritten;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = 1,
+	};
 
 	xfs_page_trace(XFS_RELEASEPAGE_ENTER, inode, page, gfp_mask);
 
@@ -1238,7 +1251,7 @@ linvfs_release_page(
 	 * Never need to allocate space here - we will always
 	 * come back to writepage in that case.
 	 */
-	dirty = xfs_page_state_convert(inode, page, 0, 0);
+	dirty = xfs_page_state_convert(inode, page, &wbc, 0, 0);
 	if (dirty == 0 && !unwritten)
 		goto free_buffers;
 	return 0;
