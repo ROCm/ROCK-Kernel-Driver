@@ -779,15 +779,15 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 	Scsi_Device *dev;
 	extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #endif
-	save_flags(flags);
-	cli();
 
+	/* For now this is constant so we may walk it */
 	for (scsi_ptr = first_instance; scsi_ptr; scsi_ptr = scsi_ptr->next)
 		if (scsi_ptr->host_no == hostno)
 			break;
 	NCR5380_setup(scsi_ptr);
 	hostdata = (struct NCR5380_hostdata *) scsi_ptr->hostdata;
 
+	spin_lock_irqsave(scsi_ptr->host_lock, flags);
 	PRINTP("SCSI host number %d : %s\n" ANDP scsi_ptr->host_no ANDP scsi_ptr->hostt->name);
 	PRINTP("Generic NCR5380 driver version %d\n" ANDP GENERIC_NCR5380_PUBLIC_RELEASE);
 	PRINTP("NCR5380 core version %d\n" ANDP NCR5380_PUBLIC_RELEASE);
@@ -874,7 +874,7 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 	len -= offset;
 	if (len > length)
 		len = length;
-	restore_flags(flags);
+	spin_unlock_irqrestore(scsi_ptr->host_lock, flags);
 	return len;
 }
 
