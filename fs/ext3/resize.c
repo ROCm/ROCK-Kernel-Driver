@@ -285,8 +285,8 @@ exit_journal:
  * sequence of powers of 3, 5, and 7: 1, 3, 5, 7, 9, 25, 27, 49, 81, ...
  * For a non-sparse filesystem it will be every group: 1, 2, 3, 4, ...
  */
-unsigned ext3_list_backups(struct super_block *sb, unsigned *three,
-			   unsigned *five, unsigned *seven)
+static unsigned ext3_list_backups(struct super_block *sb, unsigned *three,
+				  unsigned *five, unsigned *seven)
 {
 	unsigned *min = three;
 	int mult = 3;

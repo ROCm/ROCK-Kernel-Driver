@@ -39,6 +39,8 @@
 #include "xattr.h"
 #include "acl.h"
 
+static int ext3_writepage_trans_blocks(struct inode *inode);
+
 /*
  * Test whether an inode is a fast symlink.
  */
@@ -2807,7 +2809,7 @@ err_out:
  * block and work out the exact number of indirects which are touched.  Pah.
  */
 
-int ext3_writepage_trans_blocks(struct inode *inode)
+static int ext3_writepage_trans_blocks(struct inode *inode)
 {
 	int bpp = ext3_journal_blocks_per_page(inode);
 	int indirects = (EXT3_NDIR_BLOCKS % bpp) ? 5 : 3;

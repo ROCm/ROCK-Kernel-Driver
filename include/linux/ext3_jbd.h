@@ -46,8 +46,6 @@
 					 EXT3_XATTR_TRANS_BLOCKS - 2 + \
 					 2*EXT3_QUOTA_TRANS_BLOCKS)
 
-extern int ext3_writepage_trans_blocks(struct inode *inode);
-
 /* Delete operations potentially hit one directory's namespace plus an
  * entire inode, plus arbitrary amounts of bitmap/indirection data.  Be
  * generous.  We can grow the delete transaction later if necessary. */
