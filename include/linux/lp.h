@@ -98,6 +98,9 @@
 
 #ifdef __KERNEL__
 
+#include <linux/wait.h>
+#include <asm/semaphore.h>
+
 /* Magic numbers for defining port-device mappings */
 #define LP_PARPORT_UNSPEC -4
 #define LP_PARPORT_AUTO -3

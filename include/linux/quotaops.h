@@ -13,9 +13,9 @@
 #include <linux/config.h>
 #include <linux/smp_lock.h>
 
-#if defined(CONFIG_QUOTA)
-
 #include <linux/fs.h>
+
+#if defined(CONFIG_QUOTA)
 
 /*
  * declaration of quota_function calls in kernel.

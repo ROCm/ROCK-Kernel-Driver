@@ -4,7 +4,7 @@
  *	Copyright (C) 1999,2000  Tigran Aivazian <tigran@veritas.com>
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/string.h>
 #include <linux/bfs_fs.h>
 #include <linux/locks.h>

@@ -8,7 +8,7 @@
  *  (C) 1991  Linus Torvalds - minix filesystem
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/affs_fs.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

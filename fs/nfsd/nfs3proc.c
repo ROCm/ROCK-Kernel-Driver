@@ -7,7 +7,7 @@
  */
 
 #include <linux/linkage.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/locks.h>
 #include <linux/fs.h>

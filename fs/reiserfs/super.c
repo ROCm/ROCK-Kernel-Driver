@@ -13,7 +13,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/smp_lock.h>

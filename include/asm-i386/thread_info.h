@@ -25,6 +25,7 @@ struct thread_info {
 	struct exec_domain	*exec_domain;	/* execution domain */
 	__u32			flags;		/* low level flags */
 	__u32			cpu;		/* current CPU */
+	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 
 	mm_segment_t		addr_limit;	/* thread address space:
 					 	   0-0xBFFFFFFF for user-thead
@@ -41,7 +42,8 @@ struct thread_info {
 #define TI_EXEC_DOMAIN	0x00000004
 #define TI_FLAGS	0x00000008
 #define TI_CPU		0x0000000C
-#define TI_ADDR_LIMIT	0x00000010
+#define TI_PRE_COUNT	0x00000010
+#define TI_ADDR_LIMIT	0x00000014
 
 #endif
 

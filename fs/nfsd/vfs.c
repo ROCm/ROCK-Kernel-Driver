@@ -18,7 +18,7 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/string.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/locks.h>
 #include <linux/fs.h>

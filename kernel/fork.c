@@ -22,6 +22,8 @@
 #include <linux/namespace.h>
 #include <linux/personality.h>
 #include <linux/file.h>
+#include <linux/binfmts.h>
+#include <linux/fs.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -650,6 +652,13 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	if (p->binfmt && p->binfmt->module)
 		__MOD_INC_USE_COUNT(p->binfmt->module);
 
+#ifdef CONFIG_PREEMPT
+	/*
+	 * schedule_tail drops this_rq()->lock so we compensate with a count
+	 * of 1.  Also, we want to start with kernel preemption disabled.
+	 */
+	p->thread_info->preempt_count = 1;
+#endif
 	p->did_exec = 0;
 	p->swappable = 0;
 	p->state = TASK_UNINTERRUPTIBLE;

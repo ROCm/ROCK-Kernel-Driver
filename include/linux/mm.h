@@ -13,6 +13,7 @@
 #include <linux/mmzone.h>
 #include <linux/swap.h>
 #include <linux/rbtree.h>
+#include <linux/fs.h>
 
 extern unsigned long max_mapnr;
 extern unsigned long num_physpages;

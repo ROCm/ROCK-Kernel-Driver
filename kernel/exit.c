@@ -18,6 +18,7 @@
 #include <linux/acct.h>
 #endif
 #include <linux/file.h>
+#include <linux/binfmts.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -390,8 +391,8 @@ static inline void __exit_mm(struct task_struct * tsk)
 		/* more a memory barrier than a real lock */
 		task_lock(tsk);
 		tsk->mm = NULL;
-		task_unlock(tsk);
 		enter_lazy_tlb(mm, current, smp_processor_id());
+		task_unlock(tsk);
 		mmput(mm);
 	}
 }

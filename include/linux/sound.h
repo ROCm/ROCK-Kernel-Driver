@@ -3,6 +3,8 @@
  * Minor numbers for the sound driver.
  */
 
+#include <linux/fs.h>
+
 #define SND_DEV_CTL		0	/* Control port /dev/mixer */
 #define SND_DEV_SEQ		1	/* Sequencer output /dev/sequencer (FM
 						synthesizer and MIDI output) */

@@ -7,7 +7,7 @@
  */
 
 #include <linux/types.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/nfs.h>
 
 #include <linux/sunrpc/xdr.h>

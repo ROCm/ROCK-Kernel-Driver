@@ -11,7 +11,7 @@
  */
 
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>

@@ -11,6 +11,7 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+#include <linux/fs.h>
 
 /*
  * smb fs inode data (in memory only)

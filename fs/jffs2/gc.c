@@ -39,7 +39,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/slab.h>
 #include <linux/jffs2.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
 #include <linux/crc32.h>

@@ -11,7 +11,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 

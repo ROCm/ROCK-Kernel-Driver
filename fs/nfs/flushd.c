@@ -28,7 +28,7 @@
 #include <linux/pagemap.h>
 #include <linux/file.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/clnt.h>

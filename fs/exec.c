@@ -35,6 +35,7 @@
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
 #include <linux/personality.h>
+#include <linux/binfmts.h>
 #define __NO_VERSION__
 #include <linux/module.h>
 
@@ -420,8 +421,8 @@ static int exec_mmap(void)
 		active_mm = current->active_mm;
 		current->mm = mm;
 		current->active_mm = mm;
-		task_unlock(current);
 		activate_mm(active_mm, mm);
+		task_unlock(current);
 		mm_release();
 		if (old_mm) {
 			if (active_mm != old_mm) BUG();

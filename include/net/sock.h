@@ -106,6 +106,8 @@ struct atm_vcc;
 #include <asm/atomic.h>
 #include <net/dst.h>
 
+#include <linux/fs.h>	/* just for inode - yeuch.*/
+
 
 /* The AF_UNIX specific socket options */
 struct unix_opt {

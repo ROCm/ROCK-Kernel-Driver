@@ -73,6 +73,8 @@
 #include <linux/ppp-comp.h>
 #undef   PACKETPTR
 
+#include <asm/byteorder.h>
+
 /*
  * PPP "BSD compress" compression
  *  The differences between this compression and the classic BSD LZW

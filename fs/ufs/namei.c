@@ -24,7 +24,7 @@
  *        David S. Miller (davem@caip.rutgers.edu), 1995
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/ufs_fs.h>
 

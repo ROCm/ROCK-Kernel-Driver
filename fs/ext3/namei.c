@@ -20,7 +20,7 @@
 
 #include <linux/fs.h>
 #include <linux/jbd.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
 #include <linux/fcntl.h>

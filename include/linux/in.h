@@ -19,6 +19,7 @@
 #define _LINUX_IN_H
 
 #include <linux/types.h>
+#include <linux/socket.h>
 
 /* Standard well-defined IP protocols.  */
 enum {

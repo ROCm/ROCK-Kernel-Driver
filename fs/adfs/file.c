@@ -23,7 +23,7 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/fcntl.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/stat.h>
 
 #include "adfs.h"

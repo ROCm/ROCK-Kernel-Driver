@@ -24,6 +24,7 @@
 #include <linux/mm.h>
 #include <linux/iobuf.h>
 #include <linux/compiler.h>
+#include <linux/fs.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>

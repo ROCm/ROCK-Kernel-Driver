@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 

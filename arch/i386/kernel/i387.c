@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/sched.h>
+#include <linux/spinlock.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/math_emu.h>
@@ -63,6 +64,7 @@ void save_init_fpu( struct task_struct *tsk )
 
 void kernel_fpu_begin(void)
 {
+	preempt_disable();
 	if (test_thread_flag(TIF_USEDFPU)) {
 		__save_init_fpu(current);
 		return;

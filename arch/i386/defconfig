@@ -7,17 +7,17 @@ CONFIG_ISA=y
 CONFIG_UID16=y
 
 #
+# Code maturity level options
+#
+# CONFIG_EXPERIMENTAL is not set
+
+#
 # General setup
 #
 CONFIG_NET=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
-
-#
-# Code maturity level options
-#
-# CONFIG_EXPERIMENTAL is not set
 
 #
 # Loadable module support
@@ -68,6 +68,7 @@ CONFIG_NOHIGHMEM=y
 # CONFIG_MATH_EMULATION is not set
 # CONFIG_MTRR is not set
 CONFIG_SMP=y
+# CONFIG_PREEMPT is not set
 # CONFIG_MULTIQUAD is not set
 CONFIG_HAVE_DEC_LOCK=y
 

@@ -120,7 +120,8 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/capability.h>
-#include <linux/sched.h>
+#include <linux/time.h>
+#include <linux/fs.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>

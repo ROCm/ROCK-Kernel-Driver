@@ -6,7 +6,8 @@
 extern unsigned long event;
 
 #include <linux/config.h>
-#include <linux/binfmts.h>
+#include <linux/capability.h>
+#include <linux/tqueue.h>
 #include <linux/threads.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -91,6 +92,7 @@ extern unsigned long nr_running(void);
 #define TASK_UNINTERRUPTIBLE	2
 #define TASK_ZOMBIE		4
 #define TASK_STOPPED		8
+#define PREEMPT_ACTIVE		0x4000000
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
@@ -508,14 +510,11 @@ extern void free_uid(struct user_struct *);
 extern unsigned long volatile jiffies;
 extern unsigned long itimer_ticks;
 extern unsigned long itimer_next;
-extern struct timeval xtime;
 extern void do_timer(struct pt_regs *);
 
 extern unsigned int * prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;
-
-#define CURRENT_TIME (xtime.tv_sec)
 
 extern void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr));
 extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr));

@@ -45,7 +45,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <asm/semaphore.h>
 
 #include <linux/vmalloc.h>

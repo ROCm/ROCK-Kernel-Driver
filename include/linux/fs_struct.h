@@ -2,6 +2,9 @@
 #define _LINUX_FS_STRUCT_H
 #ifdef __KERNEL__
 
+#include <linux/mount.h>
+#include <linux/dcache.h>
+
 struct fs_struct {
 	atomic_t count;
 	rwlock_t lock;

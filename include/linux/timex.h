@@ -51,6 +51,7 @@
 #ifndef _LINUX_TIMEX_H
 #define _LINUX_TIMEX_H
 
+#include <linux/time.h>
 #include <asm/param.h>
 
 /*

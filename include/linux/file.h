@@ -8,6 +8,7 @@
 #include <asm/atomic.h>
 #include <linux/posix_types.h>
 #include <linux/compiler.h>
+#include <linux/spinlock.h>
 
 /*
  * The default fd array needs to be at least BITS_PER_LONG,

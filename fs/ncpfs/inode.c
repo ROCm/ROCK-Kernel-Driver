@@ -15,7 +15,7 @@
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/string.h>

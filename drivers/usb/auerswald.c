@@ -25,6 +25,7 @@
 
 /* Standard Linux module include files */
 #include <asm/uaccess.h>
+#include <asm/byteorder.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/init.h>

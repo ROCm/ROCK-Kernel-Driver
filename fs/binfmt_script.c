@@ -13,6 +13,8 @@
 #include <linux/init.h>
 #include <linux/file.h>
 #include <linux/smp_lock.h>
+#include <linux/err.h>
+#include <linux/fs.h>
 
 static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 {

@@ -7,7 +7,7 @@
  *  (For directory without EMD file).
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
 #include <linux/errno.h>

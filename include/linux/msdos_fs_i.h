@@ -1,6 +1,8 @@
 #ifndef _MSDOS_FS_I
 #define _MSDOS_FS_I
 
+#include <linux/fs.h>
+
 /*
  * MS-DOS file system inode data in memory
  */

@@ -10,6 +10,7 @@
 #include <linux/efs_fs.h>
 #include <linux/efs_fs_sb.h>
 #include <linux/module.h>
+#include <linux/fs.h>
 
 
 extern int efs_get_block(struct inode *, sector_t, struct buffer_head *, int);

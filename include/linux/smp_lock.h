@@ -3,7 +3,7 @@
 
 #include <linux/config.h>
 
-#ifndef CONFIG_SMP
+#if !defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT)
 
 #define lock_kernel()				do { } while(0)
 #define unlock_kernel()				do { } while(0)

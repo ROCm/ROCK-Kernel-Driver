@@ -9,7 +9,7 @@
  * Please add a note about your changes to smbfs in the ChangeLog file.
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>

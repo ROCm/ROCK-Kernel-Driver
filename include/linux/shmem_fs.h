@@ -1,21 +1,11 @@
 #ifndef __SHMEM_FS_H
 #define __SHMEM_FS_H
 
+#include <linux/swap.h>
+
 /* inode in-kernel data */
 
 #define SHMEM_NR_DIRECT 16
-
-/*
- * A swap entry has to fit into a "unsigned long", as
- * the entry is hidden in the "index" field of the
- * swapper address space.
- *
- * We have to move it here, since not every user of fs.h is including
- * mm.h, but mm.h is including fs.h via sched .h :-/
- */
-typedef struct {
-	unsigned long val;
-} swp_entry_t;
 
 extern atomic_t shmem_nrpages;
 

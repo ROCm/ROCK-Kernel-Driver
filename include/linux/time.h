@@ -82,6 +82,10 @@ mktime (unsigned int year, unsigned int mon,
 	)*60 + sec; /* finally seconds */
 }
 
+extern struct timeval xtime;
+
+#define CURRENT_TIME (xtime.tv_sec)
+
 #endif /* __KERNEL__ */
 
 

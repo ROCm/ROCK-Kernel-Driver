@@ -63,6 +63,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/isapnp.h>
+#include <linux/delay.h>
 #include <linux/pm.h>
 #include "sound_config.h"
 

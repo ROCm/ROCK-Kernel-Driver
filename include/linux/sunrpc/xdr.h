@@ -10,6 +10,7 @@
 #ifdef __KERNEL__
 
 #include <linux/uio.h>
+#include <asm/byteorder.h>
 
 /*
  * Buffer adjustment
