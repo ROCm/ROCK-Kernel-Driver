@@ -549,7 +549,7 @@ struct aac_queue {
                   /* This is only valid for adapter to host command queues. */ 
 	spinlock_t	 	*lock;		/* Spinlock for this queue must take this lock before accessing the lock */
 	spinlock_t		lockdata;	/* Actual lock (used only on one side of the lock) */
-	u32 			SavedIrql;     	/* Previous IRQL when the spin lock is taken */
+	unsigned long		SavedIrql;     	/* Previous IRQL when the spin lock is taken */
 	u32			padding;	/* Padding - FIXME - can remove I believe */
 	struct aac_list_head 	cmdq;	   	/* A queue of FIBs which need to be prcessed by the FS thread. This is */
 //	struct list_head 	cmdq;	   	/* A queue of FIBs which need to be prcessed by the FS thread. This is */
