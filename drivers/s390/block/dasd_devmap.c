@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.27.2.1 $
+ * $Revision: 1.27.2.2 $
  */
 
 #include <linux/config.h>
@@ -42,7 +42,6 @@ struct dasd_devmap {
         unsigned int devindex;
         unsigned short features;
 	struct dasd_device *device;
-	struct ccw_device *cdev;
 };
 
 /*
@@ -331,7 +330,6 @@ dasd_add_busid(char *bus_id, int features)
 		strncpy(new->bus_id, bus_id, BUS_ID_SIZE);
 		new->features = features;
 		new->device = 0;
-		new->cdev = 0;
 		list_add(&new->list, &dasd_hashlists[hash]);
 		devmap = new;
 		new = 0;
@@ -388,8 +386,6 @@ dasd_forget_ranges(void)
 		list_for_each_entry_safe(devmap, n, &dasd_hashlists[i], list) {
 			if (devmap->device != NULL)
 				BUG();
-			if (devmap->cdev)
-				devmap->cdev->dev.driver_data = NULL;
 			list_del(&devmap->list);
 			kfree(devmap);
 		}
@@ -434,18 +430,9 @@ dasd_devmap_from_cdev(struct ccw_device *cdev)
 {
 	struct dasd_devmap *devmap;
 
-	if (cdev->dev.driver_data)
-		return (struct dasd_devmap *) cdev->dev.driver_data;
 	devmap = dasd_find_busid(cdev->dev.bus_id);
-	if (!IS_ERR(devmap)) {
-		cdev->dev.driver_data = devmap;
-		return devmap;
-	}
-	devmap = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT);
-	if (!IS_ERR(devmap)) {
-		cdev->dev.driver_data = devmap;
-		devmap->cdev = cdev;
-	}
+	if (IS_ERR(devmap)) 
+		devmap = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT);
 	return devmap;
 }
 
@@ -462,6 +449,7 @@ dasd_create_device(struct ccw_device *cdev)
 	devmap = dasd_devmap_from_cdev(cdev);
 	if (IS_ERR(devmap))
 		return (void *) devmap;
+	cdev->dev.driver_data = devmap;
 
 	device = dasd_alloc_device();
 	if (IS_ERR(device))
@@ -531,6 +519,9 @@ dasd_delete_device(struct dasd_device *device)
 	/* Disconnect dasd_device structure from ccw_device structure. */
 	cdev = device->cdev;
 	device->cdev = NULL;
+
+	/* Disconnect dasd_devmap structure from ccw_device structure. */
+	cdev->dev.driver_data = NULL;
 
 	/* Put ccw_device structure. */
 	put_device(&cdev->dev);
