@@ -605,14 +605,19 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 	rt->rt6i_dev	  = dev;
 	rt->rt6i_idev     = in6_dev_get(dev);
 	rt->rt6i_nexthop  = neigh;
-	rt->rt6i_expires  = 0;
-	rt->rt6i_flags    = RTF_LOCAL;
-	rt->rt6i_metric   = 0;
 	atomic_set(&rt->u.dst.__refcnt, 1);
 	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.output  = output;
+
+#if 0	/* there's no chance to use these for ndisc */
+	rt->u.dst.flags   = ipv6_addr_type(addr) & IPV6_ADDR_UNICAST 
+				? DST_HOST 
+				: 0;
+	ipv6_addr_copy(&rt->rt6i_dst.addr, addr);
+	rt->rt6i_dst.plen = 128;
+#endif
 
 	write_lock_bh(&rt6_lock);
 	rt->u.dst.next = ndisc_dst_gc_list;
