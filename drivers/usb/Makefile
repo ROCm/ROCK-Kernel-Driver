@@ -12,6 +12,7 @@ subdir-$(CONFIG_USB)		+= core
 subdir-$(CONFIG_USB_EHCI_HCD)		+= host
 subdir-$(CONFIG_USB_OHCI_HCD)		+= host
 subdir-$(CONFIG_USB_OHCI)		+= host
+subdir-$(CONFIG_USB_SL811HS)		+= host
 subdir-$(CONFIG_USB_UHCI_ALT)		+= host
 subdir-$(CONFIG_USB_UHCI_HCD_ALT)	+= host
 subdir-$(CONFIG_USB_UHCI_HCD)		+= host

@@ -13,5 +13,6 @@ obj-$(CONFIG_USB_UHCI_HCD_ALT)	+= uhci-hcd.o
 obj-$(CONFIG_USB_UHCI)		+= usb-uhci.o
 obj-$(CONFIG_USB_UHCI_ALT)	+= uhci.o
 obj-$(CONFIG_USB_OHCI)		+= usb-ohci.o
+obj-$(CONFIG_USB_SL811HS)	+= hc_sl811.o
 
 include $(TOPDIR)/Rules.make
