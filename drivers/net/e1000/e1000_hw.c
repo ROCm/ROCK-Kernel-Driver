@@ -5199,14 +5199,29 @@ e1000_set_d3_lplu_state(struct e1000_hw *hw,
          * Dx states where the power conservation is most important.  During
          * driver activity we should enable SmartSpeed, so performance is
          * maintained. */
-        ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, &phy_data);
-        if(ret_val)
-            return ret_val;
+        if (hw->smart_speed == e1000_smart_speed_on) {
+            ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+                                         &phy_data);
+            if(ret_val)
+                return ret_val;
 
-        phy_data |= IGP01E1000_PSCFR_SMART_SPEED;
-        ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG, phy_data);
-        if(ret_val)
-            return ret_val;
+            phy_data |= IGP01E1000_PSCFR_SMART_SPEED;
+            ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+                                          phy_data);
+            if(ret_val)
+                return ret_val;
+        } else if (hw->smart_speed == e1000_smart_speed_off) {
+            ret_val = e1000_read_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+                                         &phy_data);
+	    if (ret_val)
+                return ret_val;
+
+            phy_data &= ~IGP01E1000_PSCFR_SMART_SPEED;
+            ret_val = e1000_write_phy_reg(hw, IGP01E1000_PHY_PORT_CONFIG,
+                                          phy_data);
+            if(ret_val)
+                return ret_val;
+        }
 
     } else if((hw->autoneg_advertised == AUTONEG_ADVERTISE_SPEED_DEFAULT) ||
               (hw->autoneg_advertised == AUTONEG_ADVERTISE_10_ALL ) ||

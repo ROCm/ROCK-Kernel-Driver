@@ -168,6 +168,12 @@ typedef enum {
 } e1000_downshift;
 
 typedef enum {
+    e1000_smart_speed_default = 0,
+    e1000_smart_speed_on,
+    e1000_smart_speed_off
+} e1000_smart_speed;
+
+typedef enum {
     e1000_polarity_reversal_enabled = 0,
     e1000_polarity_reversal_disabled,
     e1000_polarity_reversal_undefined = 0xFF
@@ -1026,6 +1032,7 @@ struct e1000_hw {
     uint8_t perm_mac_addr[NODE_ADDRESS_SIZE];
     boolean_t disable_polarity_correction;
     boolean_t speed_downgraded;
+    e1000_smart_speed smart_speed;
     e1000_dsp_config dsp_config_state;
     boolean_t get_link_status;
     boolean_t serdes_link_down;
