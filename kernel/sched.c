@@ -435,17 +435,8 @@ static inline void context_switch(task_t *prev, task_t *next)
 		mmdrop(oldmm);
 	}
 
-	/*
-	 * Here we just switch the register state and the stack. There are
-	 * 3 processes affected by a context switch:
-	 *
-	 * prev ==> .... ==> (last => next)
-	 *
-	 * It's the 'much more previous' 'prev' that is on next's stack,
-	 * but prev is set to (the just run) 'last' process by switch_to().
-	 * This might sound slightly confusing but makes tons of sense.
-	 */
-	switch_to(prev, next, prev);
+	/* Here we just switch the register state and the stack. */
+	switch_to(prev, next);
 }
 
 unsigned long nr_running(void)
@@ -770,6 +761,7 @@ asmlinkage void schedule(void)
 
 	if (unlikely(in_interrupt()))
 		BUG();
+need_resched:
 	preempt_disable();
 	prev = current;
 	rq = this_rq();
@@ -777,15 +769,6 @@ asmlinkage void schedule(void)
 	release_kernel_lock(prev, smp_processor_id());
 	prev->sleep_timestamp = jiffies;
 	spin_lock_irq(&rq->lock);
-
-#ifdef CONFIG_PREEMPT
-	/*
-	 * if entering from preempt_schedule, off a kernel preemption,
-	 * go straight to picking the next task.
-	 */
-	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
-		goto pick_next_task;
-#endif
 
 	switch (prev->state) {
 	case TASK_INTERRUPTIBLE:
@@ -798,7 +781,7 @@ asmlinkage void schedule(void)
 	case TASK_RUNNING:
 		;
 	}
-#if CONFIG_SMP || CONFIG_PREEMPT
+#if CONFIG_SMP
 pick_next_task:
 #endif
 	if (unlikely(!rq->nr_running)) {
@@ -847,6 +830,8 @@ switch_tasks:
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
+	if (test_thread_flag(TIF_NEED_RESCHED))
+		goto need_resched;
 	return;
 }
 
@@ -856,12 +841,10 @@ switch_tasks:
  */
 asmlinkage void preempt_schedule(void)
 {
-	do {
-		current_thread_info()->preempt_count += PREEMPT_ACTIVE;
-		schedule();
-		current_thread_info()->preempt_count -= PREEMPT_ACTIVE;
-		barrier();
-	} while (test_thread_flag(TIF_NEED_RESCHED));
+	if (unlikely(preempt_get_count()))
+		return;
+	current->state = TASK_RUNNING;
+	schedule();
 }
 #endif /* CONFIG_PREEMPT */
 

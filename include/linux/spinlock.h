@@ -177,9 +177,8 @@ do { \
 do { \
 	--current_thread_info()->preempt_count; \
 	barrier(); \
-	if (unlikely(!(current_thread_info()->preempt_count) && \
-		test_thread_flag(TIF_NEED_RESCHED))) \
-			preempt_schedule(); \
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED))) \
+		preempt_schedule(); \
 } while (0)
 
 #define spin_lock(lock)	\
