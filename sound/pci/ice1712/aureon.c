@@ -189,6 +189,8 @@ static int aureon_ac97_init (ice1712_t *ice) {
 	memset(&ice->spec.stac9744, 0, sizeof(ice->spec.stac9744));
 	for (i=0; ac97_defaults[i] != (unsigned short)-1; i+=2)
 		ice->spec.stac9744[(ac97_defaults[i]) >> 1] = ac97_defaults[i+1];
+		
+	aureon_ac97_write(ice, AC97_MASTER, 0x0000); // Unmute AC'97 master volume permanently - muting is done by WM8770
 
 	return 0;
 }
@@ -403,6 +405,40 @@ static int aureon_mono_bool_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
 	uinfo->value.integer.min = 0;
 	uinfo->value.integer.max = 1;
 	return 0;
+}
+
+/*
+ * AC'97 master playback mute controls (Mute on WM8770 chip)
+ */
+#define aureon_ac97_mmute_info	aureon_mono_bool_info
+
+static int aureon_ac97_mmute_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+
+	down(&ice->gpio_mutex);
+
+	ucontrol->value.integer.value[0] = (wm_get(ice, WM_OUT_MUX1) >> 1) & 0x01;
+
+	up(&ice->gpio_mutex);
+	return 0;
+}
+
+static int aureon_ac97_mmute_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol) {
+	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned short ovol, nvol;
+	int change;
+	
+	snd_ice1712_save_gpio_status(ice);
+	
+	ovol = wm_get(ice, WM_OUT_MUX1);
+	nvol = (ovol & ~0x02) | (ucontrol->value.integer.value[0] ? 0x02 : 0x00);
+	if ((change = (ovol != nvol)))
+		wm_put(ice, WM_OUT_MUX1, nvol);
+		
+	snd_ice1712_restore_gpio_status(ice);
+
+	return change;
 }
 
 /*
@@ -920,9 +956,9 @@ static snd_kcontrol_new_t ac97_controls[] __devinitdata = {
  	{
  		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "AC97 Playback Switch",
-		.info = aureon_ac97_mute_info,
-		.get = aureon_ac97_mute_get,
-		.put = aureon_ac97_mute_put,
+		.info = aureon_ac97_mmute_info,
+		.get = aureon_ac97_mmute_get,
+		.put = aureon_ac97_mmute_put,
 		.private_value = AC97_MASTER
  	},
  	{
