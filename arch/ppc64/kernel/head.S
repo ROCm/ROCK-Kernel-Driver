@@ -1051,7 +1051,7 @@ _GLOBAL(do_slb_bolted)
 	slbmfee	r23,r22
 	rldicl  r23,r23,37,63
 	cmpwi   r23,0
-	beq     3f              /* Found an invalid entry              */
+	beq     4f              /* Found an invalid entry              */
 
 	addi	r22,r22,1
 	cmpldi	r22,64
@@ -1060,35 +1060,43 @@ _GLOBAL(do_slb_bolted)
 	/* No free entry - just take the next entry, round-robin */
 	/* XXX we should get the number of SLB entries from the naca */
 SLB_NUM_ENTRIES = 64
-	mfspr	r21,SPRG3
+2:	mfspr	r21,SPRG3
 	ld	r22,PACASTABRR(r21)
 	addi	r23,r22,1
 	cmpdi	r23,SLB_NUM_ENTRIES
-	blt	2f
+	blt	3f
 	li	r23,1
-2:	std	r23,PACASTABRR(r21)
+3:	std	r23,PACASTABRR(r21)
 
 	/* r20 = vsid, r22 = entry */
-3:
+
+	/* 
+	 * Never cast out the segment for our kernel stack. Since we
+	 * dont invalidate the ERAT we could have a valid translation
+	 * for the kernel stack during the first part of exception exit 
+	 * which gets invalidated due to a tlbie from another cpu at a
+	 * non recoverable point (after setting srr0/1) - Anton
+	 */
+	slbmfee	r23,r22
+	srdi	r23,r23,28
+	/*
+	 * This is incorrect (r1 is not the kernel stack) if we entered
+	 * from userspace but there is no critical window from userspace
+	 * so this should be OK. Also if we cast out the userspace stack
+	 * segment while in userspace we will fault it straight back in.
+	 */
+	srdi	r21,r1,28
+	cmpd	r21,r23
+	beq-	2b
+
 	/* Put together the vsid portion of the entry. */
-	li      r21,0
+4:	li      r21,0
 	rldimi  r21,r20,12,0
 	ori     r20,r21,1024
 	ori	r20,r20,128    /* set class bit for kernel region */
 #ifndef CONFIG_PPC_ISERIES
 	ori	r20,r20,256    /* map kernel region with large ptes */
 #endif
-
-	/*
-	 * XXX we should handle this in the exception exit path in 2.5,
-	 * we need to make this path quick - Anton
-	 */
-	/* Invalidate the old entry */
-	slbmfee	r21,r22
-	lis	r23,-2049
-	ori	r23,r23,65535
-	and	r21,r21,r23
-	slbie	r21
 
 	/* Put together the esid portion of the entry. */
 	mfspr	r21,DAR        /* Get the new esid                     */
