@@ -84,14 +84,15 @@ acpi_ex_create_alias (
 	alias_node = (struct acpi_namespace_node *) walk_state->operands[0];
 	target_node = (struct acpi_namespace_node *) walk_state->operands[1];
 
-	if (target_node->type == ACPI_TYPE_LOCAL_ALIAS) {
+	if ((target_node->type == ACPI_TYPE_LOCAL_ALIAS) ||
+		(target_node->type == ACPI_TYPE_LOCAL_METHOD_ALIAS)) {
 		/*
 		 * Dereference an existing alias so that we don't create a chain
 		 * of aliases.  With this code, we guarantee that an alias is
 		 * always exactly one level of indirection away from the
 		 * actual aliased name.
 		 */
-		target_node = (struct acpi_namespace_node *) target_node->object;
+		target_node = ACPI_CAST_PTR (struct acpi_namespace_node, target_node->object);
 	}
 
 	/*
@@ -114,6 +115,17 @@ acpi_ex_create_alias (
 		 * types, the object can change dynamically via a Store.
 		 */
 		alias_node->type = ACPI_TYPE_LOCAL_ALIAS;
+		alias_node->object = ACPI_CAST_PTR (union acpi_operand_object, target_node);
+		break;
+
+	case ACPI_TYPE_METHOD:
+
+		/*
+		 * The new alias has the type ALIAS and points to the original
+		 * NS node, not the object itself.  This is because for these
+		 * types, the object can change dynamically via a Store.
+		 */
+		alias_node->type = ACPI_TYPE_LOCAL_METHOD_ALIAS;
 		alias_node->object = ACPI_CAST_PTR (union acpi_operand_object, target_node);
 		break;
 

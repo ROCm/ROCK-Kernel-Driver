@@ -413,7 +413,7 @@ typedef u32                                     acpi_table_type;
  * of the ACPI object_type() operator (See the ACPI Spec). Therefore,
  * only add to the first group if the spec changes.
  *
- * Types must be kept in sync with the global acpi_ns_properties
+ * NOTE: Types must be kept in sync with the global acpi_ns_properties
  * and acpi_ns_type_names arrays.
  */
 typedef u32                                     acpi_object_type;
@@ -450,26 +450,27 @@ typedef u32                                     acpi_object_type;
 #define ACPI_TYPE_LOCAL_INDEX_FIELD     0x13
 #define ACPI_TYPE_LOCAL_REFERENCE       0x14  /* Arg#, Local#, Name, Debug, ref_of, Index */
 #define ACPI_TYPE_LOCAL_ALIAS           0x15
-#define ACPI_TYPE_LOCAL_NOTIFY          0x16
-#define ACPI_TYPE_LOCAL_ADDRESS_HANDLER 0x17
-#define ACPI_TYPE_LOCAL_RESOURCE        0x18
-#define ACPI_TYPE_LOCAL_RESOURCE_FIELD  0x19
-#define ACPI_TYPE_LOCAL_SCOPE           0x1A  /* 1 Name, multiple object_list Nodes */
+#define ACPI_TYPE_LOCAL_METHOD_ALIAS    0x16
+#define ACPI_TYPE_LOCAL_NOTIFY          0x17
+#define ACPI_TYPE_LOCAL_ADDRESS_HANDLER 0x18
+#define ACPI_TYPE_LOCAL_RESOURCE        0x19
+#define ACPI_TYPE_LOCAL_RESOURCE_FIELD  0x1A
+#define ACPI_TYPE_LOCAL_SCOPE           0x1B  /* 1 Name, multiple object_list Nodes */
 
-#define ACPI_TYPE_NS_NODE_MAX           0x1A  /* Last typecode used within a NS Node */
+#define ACPI_TYPE_NS_NODE_MAX           0x1B  /* Last typecode used within a NS Node */
 
 /*
  * These are special object types that never appear in
  * a Namespace node, only in an union acpi_operand_object
  */
-#define ACPI_TYPE_LOCAL_EXTRA           0x1B
-#define ACPI_TYPE_LOCAL_DATA            0x1C
+#define ACPI_TYPE_LOCAL_EXTRA           0x1C
+#define ACPI_TYPE_LOCAL_DATA            0x1D
 
-#define ACPI_TYPE_LOCAL_MAX             0x1C
+#define ACPI_TYPE_LOCAL_MAX             0x1D
 
 /* All types above here are invalid */
 
-#define ACPI_TYPE_INVALID               0x1D
+#define ACPI_TYPE_INVALID               0x1E
 #define ACPI_TYPE_NOT_FOUND             0xFF
 
 
@@ -511,9 +512,8 @@ typedef u32                                     acpi_object_type;
 #define ACPI_WRITE                      1
 #define ACPI_IO_MASK                    1
 
-
 /*
- * Acpi Event Types: Fixed & General Purpose
+ * Event Types: Fixed & General Purpose
  */
 typedef u32                                     acpi_event_type;
 
@@ -528,25 +528,8 @@ typedef u32                                     acpi_event_type;
 #define ACPI_EVENT_MAX                  4
 #define ACPI_NUM_FIXED_EVENTS           ACPI_EVENT_MAX + 1
 
-#define ACPI_GPE_INVALID                0xFF
-#define ACPI_GPE_MAX                    0xFF
-#define ACPI_NUM_GPE                    256
-
-#define ACPI_EVENT_LEVEL_TRIGGERED      1
-#define ACPI_EVENT_EDGE_TRIGGERED       2
-
 /*
- * Flags for GPE and Lock interfaces
- */
-#define ACPI_EVENT_WAKE_ENABLE          0x2
-#define ACPI_EVENT_WAKE_DISABLE         0x2
-
-#define ACPI_NOT_ISR                    0x1
-#define ACPI_ISR                        0x0
-
-
-/*
- * acpi_event Status:
+ * Event Status - Per event
  * -------------
  * The encoding of acpi_event_status is illustrated below.
  * Note that a set bit (1) indicates the property is TRUE
@@ -566,6 +549,45 @@ typedef u32                                     acpi_event_status;
 #define ACPI_EVENT_FLAG_ENABLED         (acpi_event_status) 0x01
 #define ACPI_EVENT_FLAG_WAKE_ENABLED    (acpi_event_status) 0x02
 #define ACPI_EVENT_FLAG_SET             (acpi_event_status) 0x04
+
+/*
+ * General Purpose Events (GPE)
+ */
+#define ACPI_GPE_INVALID                0xFF
+#define ACPI_GPE_MAX                    0xFF
+#define ACPI_NUM_GPE                    256
+
+/*
+ * GPE info flags - Per GPE
+ * +---------+-+-+-+
+ * |Bits 8:3 |2|1|0|
+ * +---------+-+-+-+
+ *          | | | |
+ *          | | | +- Edge or Level Triggered
+ *          | | +--- Type: Wake or Runtime
+ *          | +----- Enabled for wake?
+ *          +--------<Reserved>
+ */
+#define ACPI_GPE_XRUPT_TYPE_MASK        (u8) 1
+#define ACPI_GPE_LEVEL_TRIGGERED        (u8) 1
+#define ACPI_GPE_EDGE_TRIGGERED         (u8) 0
+
+#define ACPI_GPE_TYPE_MASK              (u8) 2
+#define ACPI_GPE_TYPE_WAKE              (u8) 2
+#define ACPI_GPE_TYPE_RUNTIME           (u8) 0       /* Default */
+
+#define ACPI_GPE_ENABLE_MASK            (u8) 4
+#define ACPI_GPE_ENABLED                (u8) 4
+#define ACPI_GPE_DISABLED               (u8) 0       /* Default */
+
+/*
+ * Flags for GPE and Lock interfaces
+ */
+#define ACPI_EVENT_WAKE_ENABLE          0x2
+#define ACPI_EVENT_WAKE_DISABLE         0x2
+
+#define ACPI_NOT_ISR                    0x1
+#define ACPI_ISR                        0x0
 
 
 /* Notify types */

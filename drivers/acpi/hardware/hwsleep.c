@@ -286,7 +286,11 @@ acpi_enter_sleep_state (
 		}
 	}
 
-	status = acpi_hw_disable_non_wakeup_gpes ();
+	/*
+	 * 1) Disable all runtime GPEs
+	 * 2) Enable all wakeup GPEs
+	 */
+	status = acpi_hw_prepare_gpes_for_sleep ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -415,7 +419,11 @@ acpi_enter_sleep_state_s4bios (
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_hw_disable_non_wakeup_gpes ();
+	/*
+	 * 1) Disable all runtime GPEs
+	 * 2) Enable all wakeup GPEs
+	 */
+	status = acpi_hw_prepare_gpes_for_sleep ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -528,10 +536,14 @@ acpi_leave_sleep_state (
 	if (ACPI_FAILURE (status) && status != AE_NOT_FOUND) {
 		ACPI_REPORT_ERROR (("Method _WAK failed, %s\n", acpi_format_exception (status)));
 	}
+	/* TBD: _WAK "sometimes" returns stuff - do we want to look at it? */
 
-	/* _WAK returns stuff - do we want to look at it? */
-
-	status = acpi_hw_enable_non_wakeup_gpes ();
+	/*
+	 * Restore the GPEs:
+	 * 1) Disable all wakeup GPEs
+	 * 2) Enable all runtime GPEs
+	 */
+	status = acpi_hw_restore_gpes_on_wake ();
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

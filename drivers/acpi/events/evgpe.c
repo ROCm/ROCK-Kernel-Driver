@@ -99,9 +99,8 @@ acpi_ev_get_gpe_event_info (
 		return (NULL);
 	}
 
-	/*
-	 * A Non-null gpe_device means this is a GPE Block Device.
-	 */
+	/* A Non-NULL gpe_device means this is a GPE Block Device */
+
 	obj_desc = acpi_ns_get_attached_object ((struct acpi_namespace_node *) gpe_device);
 	if (!obj_desc ||
 		!obj_desc->device.gpe_block) {
@@ -297,7 +296,7 @@ acpi_ev_asynch_execute_gpe_method (
 		}
 	}
 
-	if (local_gpe_event_info.flags & ACPI_EVENT_LEVEL_TRIGGERED) {
+	if ((local_gpe_event_info.flags & ACPI_GPE_XRUPT_TYPE_MASK) == ACPI_GPE_LEVEL_TRIGGERED) {
 		/*
 		 * GPE is level-triggered, we clear the GPE status bit after handling
 		 * the event.
@@ -346,7 +345,7 @@ acpi_ev_gpe_dispatch (
 	 * If edge-triggered, clear the GPE status bit now.  Note that
 	 * level-triggered events are cleared after the GPE is serviced.
 	 */
-	if (gpe_event_info->flags & ACPI_EVENT_EDGE_TRIGGERED) {
+	if ((gpe_event_info->flags & ACPI_GPE_XRUPT_TYPE_MASK) == ACPI_GPE_EDGE_TRIGGERED) {
 		status = acpi_hw_clear_gpe (gpe_event_info);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("acpi_ev_gpe_dispatch: Unable to clear GPE[%2X]\n",
@@ -369,7 +368,7 @@ acpi_ev_gpe_dispatch (
 
 		/* It is now safe to clear level-triggered events. */
 
-		if (gpe_event_info->flags & ACPI_EVENT_LEVEL_TRIGGERED) {
+		if ((gpe_event_info->flags & ACPI_GPE_XRUPT_TYPE_MASK) == ACPI_GPE_LEVEL_TRIGGERED) {
 			status = acpi_hw_clear_gpe (gpe_event_info);
 			if (ACPI_FAILURE (status)) {
 				ACPI_REPORT_ERROR ((
