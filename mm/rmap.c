@@ -315,8 +315,7 @@ static int fastcall try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		return SWAP_AGAIN;
 	}
 
-
-	/* During mremap, it's possible pages are not in a VMA. */
+	/* unmap_vmas drops page_table_lock with vma unlinked */
 	vma = find_vma(mm, address);
 	if (!vma) {
 		ret = SWAP_FAIL;
