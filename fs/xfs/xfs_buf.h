@@ -210,7 +210,7 @@ static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
 	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
-		pagebuf_run_task_queue(bp);
+		pagebuf_run_queues(bp);
 	return ret;
 }
 
@@ -265,7 +265,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
 	} else {
-		pagebuf_run_task_queue(pb);
+		pagebuf_run_queues(pb);
 		error = 0;
 	}
 

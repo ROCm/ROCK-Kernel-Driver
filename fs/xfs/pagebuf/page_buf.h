@@ -378,12 +378,10 @@ static __inline__ int __pagebuf_iorequest(page_buf_t *pb)
 	return pagebuf_iorequest(pb);
 }
 
-static __inline__ void pagebuf_run_task_queue(page_buf_t *pb)
+static __inline__ void pagebuf_run_queues(page_buf_t *pb)
 {
-	if (pb && (atomic_read(&pb->pb_io_remaining) == 0))
-		return;
-
-	blk_run_queues();
+	if (!pb || atomic_read(&pb->pb_io_remaining))
+		blk_run_queues();
 }
 
 #endif /* __PAGE_BUF_H__ */

@@ -113,7 +113,7 @@ pagebuf_lock(
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
 	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
-	pagebuf_run_task_queue(pb);
+	pagebuf_run_queues(pb);
 	down(&PBP(pb)->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
