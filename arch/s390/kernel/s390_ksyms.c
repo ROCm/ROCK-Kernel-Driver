@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
+#include <linux/syscalls.h>
 #include <linux/interrupt.h>
 #include <linux/ioctl32.h>
 #include <asm/checksum.h>

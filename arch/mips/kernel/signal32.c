@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
+#include <linux/syscalls.h>
 #include <linux/errno.h>
 #include <linux/wait.h>
 #include <linux/ptrace.h>
@@ -764,9 +765,6 @@ out:
 	return ret;
 }
 
-asmlinkage long sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset,
-				   size_t sigsetsize);
-
 asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set,
 	compat_sigset_t *oset, unsigned int sigsetsize)
 {
@@ -787,8 +785,6 @@ asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set,
 
 	return ret;
 }
-
-asmlinkage long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
 asmlinkage int sys32_rt_sigpending(compat_sigset_t *uset,
 	unsigned int sigsetsize)
@@ -897,8 +893,6 @@ asmlinkage int sys32_rt_sigtimedwait(compat_sigset_t *uthese,
 
 	return ret;
 }
-
-extern asmlinkage int sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 
 asmlinkage int sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 {

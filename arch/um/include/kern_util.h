@@ -45,7 +45,6 @@ extern int page_mask(void);
 extern int need_finish_fork(void);
 extern void free_stack(unsigned long stack, int order);
 extern void add_input_request(int op, void (*proc)(int), void *arg);
-extern int sys_execve(char *file, char **argv, char **env);
 extern char *current_cmd(void);
 extern void timer_handler(int sig, union uml_pt_regs *regs);
 extern int set_signals(int enable);

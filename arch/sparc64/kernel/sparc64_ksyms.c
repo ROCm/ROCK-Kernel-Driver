@@ -22,6 +22,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/socket.h>
+#include <linux/syscalls.h>
 #include <linux/percpu.h>
 #include <net/compat.h>
 
@@ -84,21 +85,13 @@ extern void syscall_trace(void);
 extern u32 sunos_sys_table[], sys_call_table32[];
 extern void tl0_solaris(void);
 extern void sys_sigsuspend(void);
-extern int sys_getppid(void);
-extern int sys_getpid(void);
-extern int sys_geteuid(void);
-extern int sys_getuid(void);
-extern int sys_getegid(void);
-extern int sys_getgid(void);
 extern int svr4_getcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int svr4_setcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
-extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
 extern long sparc32_open(const char * filename, int flags, int mode);
 extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
-extern long sys_close(unsigned int);
-                
+
 extern int __ashrdi3(int, int);
 
 extern void dump_thread(struct pt_regs *, struct user *);

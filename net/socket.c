@@ -78,6 +78,7 @@
 #include <linux/divert.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <linux/kmod.h>
 

@@ -16,6 +16,7 @@
 #include <linux/ptrace.h>
 #include <linux/sched.h>
 #include <linux/string.h>
+#include <linux/syscalls.h>
 #include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/utsname.h>

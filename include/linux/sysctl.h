@@ -734,7 +734,6 @@ enum
 
 #ifdef __KERNEL__
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args __user *);
 extern void sysctl_init(void);
 
 typedef struct ctl_table ctl_table;

@@ -2029,7 +2029,7 @@ int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
 #else /* CONFIG_SYSCTL */
 
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
+asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	return -ENOSYS;
 }

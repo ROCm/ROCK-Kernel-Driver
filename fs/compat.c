@@ -28,6 +28,7 @@
 #include <linux/init.h>
 #include <linux/sockios.h>	/* for SIOCDEVPRIVATE */
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
 #include <net/sock.h>		/* siocdevprivate_ioctl */
@@ -494,8 +495,6 @@ static int put_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
 }
 #endif
 
-extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
-
 asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 		unsigned long arg)
 {
@@ -559,8 +558,6 @@ asmlinkage long compat_sys_fcntl(unsigned int fd, unsigned int cmd,
 	return compat_sys_fcntl64(fd, cmd, arg);
 }
 
-extern asmlinkage long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
-
 asmlinkage long
 compat_sys_io_setup(unsigned nr_reqs, u32 *ctx32p)
 {
@@ -579,12 +576,6 @@ compat_sys_io_setup(unsigned nr_reqs, u32 *ctx32p)
 		ret = put_user((u32) ctx64, ctx32p);
 	return ret;
 }
-
-extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
-					  long min_nr,
-					  long nr,
-					  struct io_event *events,
-					  struct timespec *timeout);
 
 asmlinkage long
 compat_sys_io_getevents(aio_context_t ctx_id,
@@ -613,9 +604,6 @@ compat_sys_io_getevents(aio_context_t ctx_id,
 out:
 	return ret;
 }
-
-extern asmlinkage long sys_io_submit(aio_context_t, long, 
-				struct iocb __user **);
 
 static inline long
 copy_iocb(long nr, u32 *ptr32, u64 *ptr64)

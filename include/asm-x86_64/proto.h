@@ -24,7 +24,6 @@ extern void ia32_cstar_target(void);
 
 extern void calibrate_delay(void);
 extern void cpu_idle(void);
-extern void sys_ni_syscall(void);
 extern void config_acpi_tables(void);
 extern void ia32_syscall(void);
 extern void iommu_hole_init(void);

@@ -22,6 +22,7 @@
 #include <linux/config.h>
 #include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 #include <linux/string.h>
@@ -66,7 +67,6 @@ struct screen_info screen_info = {
 
 extern unsigned long trapbase;
 void (*prom_palette)(int);
-asmlinkage void sys_sync(void);	/* it's really int */
 
 /* Pretty sick eh? */
 void prom_sync_me(void)
@@ -390,7 +390,7 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on)
 {
 	return -EIO;
 }

@@ -59,6 +59,7 @@
 #include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
+#include <linux/syscalls.h>
 #include <linux/console.h>
 
 #include <asm/uaccess.h>
@@ -67,8 +68,6 @@
 #include <asm/io.h>
 
 #include "power.h"
-
-extern long sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
 

@@ -34,6 +34,7 @@
 #include <linux/swap.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
+#include <linux/syscalls.h>
 #include <linux/file.h>
 #include <linux/namei.h>
 #include <linux/mount.h>

@@ -23,6 +23,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/kmod.h>
 #include <linux/smp_lock.h>

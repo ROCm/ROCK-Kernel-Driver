@@ -16,6 +16,7 @@
 #include <linux/fcntl.h>
 #include <linux/net.h>
 #include <linux/in.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>

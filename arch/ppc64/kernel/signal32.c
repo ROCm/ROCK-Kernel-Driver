@@ -21,6 +21,7 @@
 #include <linux/smp_lock.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
+#include <linux/syscalls.h>
 #include <linux/errno.h>
 #include <linux/elf.h>
 #include <linux/compat.h>

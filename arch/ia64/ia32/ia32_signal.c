@@ -20,6 +20,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/wait.h>
 #include <linux/compat.h>
@@ -550,9 +551,6 @@ sys32_rt_sigaction (int sig, struct sigaction32 *act,
 }
 
 
-extern asmlinkage long sys_rt_sigprocmask (int how, sigset_t *set, sigset_t *oset,
-					   size_t sigsetsize);
-
 asmlinkage long
 sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsigned int sigsetsize)
 {
@@ -584,8 +582,6 @@ asmlinkage long
 sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		struct compat_timespec *uts, unsigned int sigsetsize)
 {
-	extern asmlinkage long sys_rt_sigtimedwait (const sigset_t *, siginfo_t *,
-						    const struct timespec *, size_t);
 	extern int copy_siginfo_to_user32 (siginfo_t32 *, siginfo_t *);
 	mm_segment_t old_fs = get_fs();
 	struct timespec t;
@@ -611,7 +607,6 @@ sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 asmlinkage long
 sys32_rt_sigqueueinfo (int pid, int sig, siginfo_t32 *uinfo)
 {
-	extern asmlinkage long sys_rt_sigqueueinfo (int, int, siginfo_t *);
 	extern int copy_siginfo_from_user32 (siginfo_t *to, siginfo_t32 *from);
 	mm_segment_t old_fs = get_fs();
 	siginfo_t info;

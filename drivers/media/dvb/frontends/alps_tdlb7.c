@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/delay.h>
 
