@@ -117,6 +117,7 @@ obj-$(CONFIG_SUN3_82586) += sun3_82586.o
 obj-$(CONFIG_SUN3LANCE) += sun3lance.o
 obj-$(CONFIG_DEFXX) += defxx.o
 obj-$(CONFIG_SGISEEQ) += sgiseeq.o
+obj-$(CONFIG_SGI_O2MACE_ETH) += meth.o
 obj-$(CONFIG_AT1700) += at1700.o
 obj-$(CONFIG_FMV18X) += fmv18x.o
 obj-$(CONFIG_EL1) += 3c501.o

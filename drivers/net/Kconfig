@@ -511,6 +511,10 @@ config SGI_IOC3_ETH
 	  the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
+config SGI_O2MACE_ETH
+	tristate "SGI O2 MACE Fast Ethernet support"
+	depends on NET_ETHERNET && SGI_IP32=y
+
 config STNIC
 	tristate "National DP83902AV  support"
 	depends on NET_ETHERNET && SUPERH
