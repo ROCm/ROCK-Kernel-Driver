@@ -1345,42 +1345,10 @@ isdnloop_command(isdn_ctrl * c, isdnloop_card * card)
 					card->l2_proto[a & 255] = (a >> 8);
 				}
 				break;
-		case ISDN_CMD_GETL2:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				if ((c->arg & 255) < ISDNLOOP_BCH)
-					return card->l2_proto[c->arg & 255];
-				else
-					return -ENODEV;
 		case ISDN_CMD_SETL3:
 				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
 					return -ENODEV;
 				return 0;
-		case ISDN_CMD_GETL3:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				if ((c->arg & 255) < ISDNLOOP_BCH)
-					return ISDN_PROTO_L3_TRANS;
-				else
-					return -ENODEV;
-		case ISDN_CMD_GETEAZ:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
-		case ISDN_CMD_SETSIL:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
-		case ISDN_CMD_GETSIL:
-				if (!card->flags & ISDNLOOP_FLAGS_RUNNING)
-					return -ENODEV;
-				break;
-		case ISDN_CMD_LOCK:
-				MOD_INC_USE_COUNT;
-				break;
-		case ISDN_CMD_UNLOCK:
-				MOD_DEC_USE_COUNT;
-				break;
 		default:
 				return -EINVAL;
 			}
@@ -1482,6 +1450,7 @@ isdnloop_initcard(char *id)
 		return (isdnloop_card *) 0;
 	}
 	memset((char *) card, 0, sizeof(isdnloop_card));
+	SET_MODULE_OWNER(&card->interface);
 	card->interface.channels = ISDNLOOP_BCH;
 	card->interface.hl_hdrlen  = 1; /* scratch area for storing ack flag*/ 
 	card->interface.maxbufsize = 4000;

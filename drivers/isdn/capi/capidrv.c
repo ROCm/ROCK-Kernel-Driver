@@ -1787,45 +1787,6 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 		bchan->msn[0] = 0;
 		return 0;
 
-	case ISDN_CMD_LOCK:
-		if (debugmode > 1)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_LOCK (%ld)\n", card->contrnr, c->arg);
-		MOD_INC_USE_COUNT;
-		break;
-
-	case ISDN_CMD_UNLOCK:
-		if (debugmode > 1)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_UNLOCK (%ld)\n",
-					card->contrnr, c->arg);
-		MOD_DEC_USE_COUNT;
-		break;
-
-/* never called */
-	case ISDN_CMD_GETL2:
-		if (debugmode)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_GETL2\n",
-					card->contrnr);
-		return -ENODEV;
-	case ISDN_CMD_GETL3:
-		if (debugmode)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_GETL3\n",
-					card->contrnr);
-		return -ENODEV;
-	case ISDN_CMD_GETEAZ:
-		if (debugmode)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_GETEAZ\n",
-					card->contrnr);
-		return -ENODEV;
-	case ISDN_CMD_SETSIL:
-		if (debugmode)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_SETSIL\n",
-					card->contrnr);
-		return -ENODEV;
-	case ISDN_CMD_GETSIL:
-		if (debugmode)
-			printk(KERN_DEBUG "capidrv-%d: ISDN_CMD_GETSIL\n",
-					card->contrnr);
-		return -ENODEV;
 	default:
 		printk(KERN_ERR "capidrv-%d: ISDN_CMD_%d, Huh?\n",
 					card->contrnr, c->command);

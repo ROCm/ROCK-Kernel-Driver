@@ -1441,42 +1441,10 @@ icn_command(isdn_ctrl * c, icn_card * card)
 				card->l2_proto[a & 255] = (a >> 8);
 			}
 			break;
-		case ISDN_CMD_GETL2:
-			if (!card->flags & ICN_FLAGS_RUNNING)
-				return -ENODEV;
-			if ((c->arg & 255) < ICN_BCH)
-				return card->l2_proto[c->arg & 255];
-			else
-				return -ENODEV;
 		case ISDN_CMD_SETL3:
 			if (!card->flags & ICN_FLAGS_RUNNING)
 				return -ENODEV;
 			return 0;
-		case ISDN_CMD_GETL3:
-			if (!card->flags & ICN_FLAGS_RUNNING)
-				return -ENODEV;
-			if ((c->arg & 255) < ICN_BCH)
-				return ISDN_PROTO_L3_TRANS;
-			else
-				return -ENODEV;
-		case ISDN_CMD_GETEAZ:
-			if (!card->flags & ICN_FLAGS_RUNNING)
-				return -ENODEV;
-			break;
-		case ISDN_CMD_SETSIL:
-			if (!card->flags & ICN_FLAGS_RUNNING)
-				return -ENODEV;
-			break;
-		case ISDN_CMD_GETSIL:
-			if (!card->flags & ICN_FLAGS_RUNNING)
-				return -ENODEV;
-			break;
-		case ISDN_CMD_LOCK:
-			MOD_INC_USE_COUNT;
-			break;
-		case ISDN_CMD_UNLOCK:
-			MOD_DEC_USE_COUNT;
-			break;
 		default:
 			return -EINVAL;
 	}
@@ -1577,6 +1545,7 @@ icn_initcard(int port, char *id)
 	}
 	memset((char *) card, 0, sizeof(icn_card));
 	card->port = port;
+	SET_MODULE_OWNER(&card->interface);
 	card->interface.hl_hdrlen = 1;
 	card->interface.channels = ICN_BCH;
 	card->interface.maxbufsize = 4000;

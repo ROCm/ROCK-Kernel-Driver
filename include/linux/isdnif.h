@@ -166,17 +166,8 @@ typedef struct
 #define ISDN_CMD_HANGUP   4       /* Hangup                                */
 #define ISDN_CMD_CLREAZ   5       /* Clear EAZ(s) of channel               */
 #define ISDN_CMD_SETEAZ   6       /* Set EAZ(s) of channel                 */
-#define ISDN_CMD_GETEAZ   7       /* Get EAZ(s) of channel                 */
-#define ISDN_CMD_SETSIL   8       /* Set Service-Indicator-List of channel */
-#define ISDN_CMD_GETSIL   9       /* Get Service-Indicator-List of channel */
 #define ISDN_CMD_SETL2   10       /* Set B-Chan. Layer2-Parameter          */
-#define ISDN_CMD_GETL2   11       /* Get B-Chan. Layer2-Parameter          */
 #define ISDN_CMD_SETL3   12       /* Set B-Chan. Layer3-Parameter          */
-#define ISDN_CMD_GETL3   13       /* Get B-Chan. Layer3-Parameter          */
-#define ISDN_CMD_LOCK    14       /* Signal usage by upper levels          */
-#define ISDN_CMD_UNLOCK  15       /* Release usage-lock                    */
-#define ISDN_CMD_SUSPEND 16       /* Suspend connection                    */
-#define ISDN_CMD_RESUME  17       /* Resume connection                     */
 #define ISDN_CMD_PROCEED 18       /* Proceed with call establishment       */
 #define ISDN_CMD_ALERT   19       /* Alert after Proceeding                */
 #define ISDN_CMD_REDIR   20       /* Redir a incoming call                 */
@@ -423,6 +414,8 @@ typedef struct {
  *
  */
 typedef struct {
+  struct module *owner;
+
   /* Number of channels supported by this driver
    */
   int channels;
