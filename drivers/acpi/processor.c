@@ -1091,6 +1091,113 @@ end:
 }
 
 
+#ifdef CONFIG_CPU_FREQ
+
+/* If a passive cooling situation is detected, primarily CPUfreq is used, as it
+ * offers (in most cases) voltage scaling in addition to frequency scaling, and
+ * thus a cubic (instead of linear) reduction of energy. Also, we allow for
+ * _any_ cpufreq driver and not only the acpi-cpufreq driver.
+ */
+
+static unsigned int cpufreq_thermal_reduction_pctg[NR_CPUS];
+static unsigned int acpi_thermal_cpufreq_is_init = 0;
+
+
+static int cpu_has_cpufreq(unsigned int cpu)
+{
+	struct cpufreq_policy policy;
+	if (!acpi_thermal_cpufreq_is_init)
+		return -ENODEV;
+	if (!cpufreq_get_policy(&policy, cpu))
+		return -ENODEV;
+	return 0;
+}
+
+
+static int acpi_thermal_cpufreq_increase(unsigned int cpu)
+{
+	if (!cpu_has_cpufreq)
+		return -ENODEV;
+
+	if (cpufreq_thermal_reduction_pctg[cpu] < 60) {
+		cpufreq_thermal_reduction_pctg[cpu] += 20;
+		cpufreq_update_policy(cpu);
+		return 0;
+	}
+
+	return -ERANGE;
+}
+
+
+static int acpi_thermal_cpufreq_decrease(unsigned int cpu)
+{
+	if (!cpu_has_cpufreq)
+		return -ENODEV;
+
+	if (cpufreq_thermal_reduction_pctg[cpu] >= 20) {
+		cpufreq_thermal_reduction_pctg[cpu] -= 20;
+		cpufreq_update_policy(cpu);
+		return 0;
+	}
+
+	return -ERANGE;
+}
+
+
+static int acpi_thermal_cpufreq_notifier(
+	struct notifier_block *nb,
+	unsigned long event,
+	void *data)
+{
+	struct cpufreq_policy *policy = data;
+	unsigned long max_freq = 0;
+
+	if (event != CPUFREQ_ADJUST)
+		goto out;
+
+	max_freq = (policy->cpuinfo.max_freq * (100 - cpufreq_thermal_reduction_pctg[policy->cpu])) / 100;
+
+	cpufreq_verify_within_limits(policy, 0, max_freq);
+
+ out:
+	return 0;
+}
+
+
+static struct notifier_block acpi_thermal_cpufreq_notifier_block = {
+	.notifier_call = acpi_thermal_cpufreq_notifier,
+};
+
+
+static void acpi_thermal_cpufreq_init(void) {
+	int i;
+
+	for (i=0; i<NR_CPUS; i++)
+		cpufreq_thermal_reduction_pctg[i] = 0;
+
+	i = cpufreq_register_notifier(&acpi_thermal_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
+	if (!i)
+		acpi_thermal_cpufreq_is_init = 1;
+}
+
+static void acpi_thermal_cpufreq_exit(void) {
+	if (acpi_thermal_cpufreq_is_init)
+		cpufreq_unregister_notifier(&acpi_thermal_cpufreq_notifier_block, CPUFREQ_POLICY_NOTIFIER);
+
+	acpi_thermal_cpufreq_is_init = 0;
+}
+
+#else /* ! CONFIG_CPU_FREQ */
+
+static void acpi_thermal_cpufreq_init(void) { return; }
+static void acpi_thermal_cpufreq_exit(void) { return; }
+static int acpi_thermal_cpufreq_increase(unsigned int cpu) { return -ENODEV; }
+static int acpi_thermal_cpufreq_decrease(unsigned int cpu) { return -ENODEV; }
+
+
+#endif
+
+
 int
 acpi_processor_set_thermal_limit (
 	acpi_handle		handle,
@@ -1099,7 +1206,6 @@ acpi_processor_set_thermal_limit (
 	int			result = 0;
 	struct acpi_processor	*pr = NULL;
 	struct acpi_device	*device = NULL;
-	int			px = 0;
 	int			tx = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_set_thermal_limit");
@@ -1116,12 +1222,7 @@ acpi_processor_set_thermal_limit (
 	if (!pr)
 		return_VALUE(-ENODEV);
 
-	if (!pr->flags.limit)
-		return_VALUE(-ENODEV);
-
 	/* Thermal limits are always relative to the current Px/Tx state. */
-	if (pr->flags.performance)
-		pr->limit.thermal.px = pr->performance->state;
 	if (pr->flags.throttling)
 		pr->limit.thermal.tx = pr->throttling.state;
 
@@ -1130,26 +1231,27 @@ acpi_processor_set_thermal_limit (
 	 * performance state.
 	 */
 
-	px = pr->limit.thermal.px;
 	tx = pr->limit.thermal.tx;
 
 	switch (type) {
 
 	case ACPI_PROCESSOR_LIMIT_NONE:
-		px = 0;
+		do {
+			result = acpi_thermal_cpufreq_decrease(pr->id);
+		} while (!result);
 		tx = 0;
 		break;
 
 	case ACPI_PROCESSOR_LIMIT_INCREMENT:
-		if (pr->flags.performance) {
-			if (px == (pr->performance->state_count - 1))
-				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+		/* if going up: P-states first, T-states later */
+
+		result = acpi_thermal_cpufreq_increase(pr->id);
+		if (!result)
+			goto end;
+		else if (result == -ERANGE)
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 					"At maximum performance state\n"));
-			else {
-				px++;
-				goto end;
-			}
-		}
+
 		if (pr->flags.throttling) {
 			if (tx == (pr->throttling.state_count - 1))
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
@@ -1160,37 +1262,41 @@ acpi_processor_set_thermal_limit (
 		break;
 
 	case ACPI_PROCESSOR_LIMIT_DECREMENT:
-		if (pr->flags.performance) {
-			if (px == pr->performance_platform_limit)
-				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
-					"At minimum performance state\n"));
-			else  {
-				px--;
-				goto end;
-			}
-		}
+		/* if going down: T-states first, P-states later */
+
 		if (pr->flags.throttling) {
 			if (tx == 0)
 				ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 					"At minimum throttling state\n"));
-			else
+			else {
 				tx--;
+				goto end;
+			}
 		}
+
+		result = acpi_thermal_cpufreq_decrease(pr->id);
+		if (result == -ERANGE)
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
+					"At minimum performance state\n"));
+
 		break;
 	}
 
 end:
-	pr->limit.thermal.px = px;
-	pr->limit.thermal.tx = tx;
+	if (pr->flags.throttling) {
+		pr->limit.thermal.px = 0;
+		pr->limit.thermal.tx = tx;
 
-	result = acpi_processor_apply_limit(pr);
-	if (result)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
-			"Unable to set thermal limit\n"));
+		result = acpi_processor_apply_limit(pr);
+		if (result)
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+					  "Unable to set thermal limit\n"));
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Thermal limit now (P%d:T%d)\n",
-		pr->limit.thermal.px,
-		pr->limit.thermal.tx));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Thermal limit now (P%d:T%d)\n",
+				  pr->limit.thermal.px,
+				  pr->limit.thermal.tx));
+	} else
+		result = 0;
 
 	return_VALUE(result);
 }
@@ -1813,6 +1919,8 @@ acpi_processor_init (void)
 		return_VALUE(-ENODEV);
 	}
 
+	acpi_thermal_cpufreq_init();
+
 	return_VALUE(0);
 }
 
@@ -1821,6 +1929,8 @@ static void __exit
 acpi_processor_exit (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_processor_exit");
+
+	acpi_thermal_cpufreq_exit();
 
 	acpi_bus_unregister_driver(&acpi_processor_driver);
 
