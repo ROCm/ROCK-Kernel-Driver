@@ -15,16 +15,6 @@ CONFIG_INPUT
   The module will be called input.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_INPUT_KEYBDEV
-  Say Y here if you want your keyboard to be able to serve as a system
-  keyboard. This is needed in most cases. The only exceptions are
-  headless and embedded systems.
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called keybdev.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
 CONFIG_INPUT_MOUSEDEV
   Say Y here if you want your mouse to be accessible as char devices
   13:32+ - /dev/input/mouseX and 13:63 - /dev/input/mice as an
@@ -98,12 +88,3 @@ CONFIG_INPUT_EVBUG
   inserted in and removed from the running kernel whenever you want).
   The module will be called joydev.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_INPUT_UINPUT
-  Say Y here if you want to support user level drivers for input
-  subsystem accessible under char device 10:223 - /dev/input/uinput.
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called uinput.o.  If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.	    

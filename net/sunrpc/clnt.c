@@ -138,19 +138,27 @@ out_no_auth:
 int
 rpc_shutdown_client(struct rpc_clnt *clnt)
 {
-	dprintk("RPC: shutting down %s client for %s\n",
-		clnt->cl_protname, clnt->cl_server);
-	while (atomic_read(&clnt->cl_users)) {
-#ifdef RPC_DEBUG
-		dprintk("RPC: rpc_shutdown_client: client %s, tasks=%d\n",
-			clnt->cl_protname, atomic_read(&clnt->cl_users));
-#endif
+	dprintk("RPC: shutting down %s client for %s, tasks=%d\n",
+			clnt->cl_protname, clnt->cl_server,
+			atomic_read(&clnt->cl_users));
+
+	while (atomic_read(&clnt->cl_users) > 0) {
 		/* Don't let rpc_release_client destroy us */
 		clnt->cl_oneshot = 0;
 		clnt->cl_dead = 0;
 		rpc_killall_tasks(clnt);
 		sleep_on_timeout(&destroy_wait, 1*HZ);
 	}
+
+	if (atomic_read(&clnt->cl_users) < 0) {
+		printk(KERN_ERR "RPC: rpc_shutdown_client clnt %p tasks=%d\n",
+				clnt, atomic_read(&clnt->cl_users));
+#ifdef RPC_DEBUG
+		rpc_show_tasks();
+#endif
+		BUG();
+	}
+
 	return rpc_destroy_client(clnt);
 }
 

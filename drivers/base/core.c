@@ -54,7 +54,8 @@ static int found_match(struct device * dev, struct device_driver * drv)
 	spin_lock(&device_lock);
 	list_add_tail(&dev->driver_list,&drv->devices);
 	spin_unlock(&device_lock);
-	
+	devclass_add_device(dev);
+
 	goto Done;
 
  ProbeFailed:
@@ -99,6 +100,7 @@ static void device_detach(struct device * dev)
 	struct device_driver * drv; 
 
 	if (dev->driver) {
+		devclass_remove_device(dev);
 		spin_lock(&device_lock);
 		drv = dev->driver;
 		dev->driver = NULL;
@@ -172,6 +174,7 @@ int device_register(struct device *dev)
 	INIT_LIST_HEAD(&dev->g_list);
 	INIT_LIST_HEAD(&dev->driver_list);
 	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->intf_list);
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 	

@@ -123,7 +123,7 @@ void device_remove_dir(struct device * dev)
 		driverfs_remove_dir(&dev->dir);
 }
 
-static int get_devpath_length(struct device * dev)
+int get_devpath_length(struct device * dev)
 {
 	int length = 1;
 	struct device * parent = dev;
@@ -138,7 +138,7 @@ static int get_devpath_length(struct device * dev)
 	return length;
 }
 
-static void fill_devpath(struct device * dev, char * path, int length)
+void fill_devpath(struct device * dev, char * path, int length)
 {
 	struct device * parent;
 	--length;

@@ -64,11 +64,6 @@
 #include <net/arp.h>
 #include <linux/pci.h>
 
-
-#ifndef MODULE
-#include <linux/string.h>
-#endif
-
 #include <linux/config.h>
 #include "sbni.h"
 

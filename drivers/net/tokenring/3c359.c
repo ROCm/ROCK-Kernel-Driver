@@ -51,7 +51,6 @@
 #include <linux/timer.h>
 #include <linux/in.h>
 #include <linux/ioport.h>
-#include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/proc_fs.h>
 #include <linux/ptrace.h>

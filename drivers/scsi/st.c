@@ -12,13 +12,13 @@
    Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Mon Jul 22 13:27:21 2002 by makisara
+   Last modified: Thu Aug 22 21:57:07 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20020722";
+static char *verstr = "20020822";
 
 #include <linux/module.h>
 
@@ -70,6 +70,9 @@ static char *verstr = "20020722";
 static int buffer_kbs;
 static int write_threshold_kbs;
 static int max_sg_segs;
+static int try_direct_io = TRY_DIRECT_IO;
+static int try_rdio = TRUE;
+static int try_wdio = TRUE;
 
 MODULE_AUTHOR("Kai Makisara");
 MODULE_DESCRIPTION("SCSI Tape Driver");
@@ -80,7 +83,15 @@ MODULE_PARM_DESC(buffer_kbs, "Default driver buffer size for fixed block mode (K
 MODULE_PARM(write_threshold_kbs, "i");
 MODULE_PARM_DESC(write_threshold_kbs, "Asynchronous write threshold (KB; 30)");
 MODULE_PARM(max_sg_segs, "i");
-MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (64)");
+MODULE_PARM_DESC(max_sg_segs, "Maximum number of scatter/gather segments to use (256)");
+MODULE_PARM(try_direct_io, "i");
+MODULE_PARM_DESC(try_direct_io, "Try direct I/O between user buffer and tape drive (1)");
+
+/* Extra parameters for testing */
+MODULE_PARM(try_rdio, "i");
+MODULE_PARM_DESC(try_rdio, "Try direct read i/o when possible");
+MODULE_PARM(try_wdio, "i");
+MODULE_PARM_DESC(try_wdio, "Try direct write i/o when possible");
 
 #ifndef MODULE
 static struct st_dev_parm {
@@ -95,7 +106,9 @@ static struct st_dev_parm {
 	},
 	{
 		"max_sg_segs", &max_sg_segs
-	}
+	},
+	{
+		"try_direct_io", &try_direct_io
 };
 #endif
 
@@ -145,6 +158,12 @@ static void normalize_buffer(ST_buffer *);
 static int append_to_buffer(const char *, ST_buffer *, int);
 static int from_buffer(ST_buffer *, char *, int);
 static void buf_to_sg(ST_buffer *, unsigned int);
+
+static int st_map_user_pages(struct scatterlist *, const unsigned int, 
+			     unsigned long, size_t, int, unsigned long);
+static int sgl_map_user_pages(struct scatterlist *, const unsigned int, 
+			      unsigned long, size_t, int);
+static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
 static int st_attach(Scsi_Device *);
 static int st_detect(Scsi_Device *);
@@ -362,9 +381,10 @@ static Scsi_Request *
 	if (SRpnt->sr_device->scsi_level <= SCSI_2)
 		cmd[1] |= (SRpnt->sr_device->lun << 5) & 0xe0;
 	init_completion(&STp->wait);
-	SRpnt->sr_use_sg = (bytes > (STp->buffer)->frp[0].length);
+	SRpnt->sr_use_sg = STp->buffer->do_dio || (bytes > (STp->buffer)->frp[0].length);
 	if (SRpnt->sr_use_sg) {
-		buf_to_sg(STp->buffer, bytes);
+		if (!STp->buffer->do_dio)
+			buf_to_sg(STp->buffer, bytes);
 		SRpnt->sr_use_sg = (STp->buffer)->sg_segs;
 		bp = (char *) &((STp->buffer)->sg[0]);
 	} else
@@ -952,7 +972,8 @@ static int st_open(struct inode *inode, struct file *filp)
 		STps->rw = ST_IDLE;
 	}
 	STp->recover_count = 0;
-	DEB( STp->nbr_waits = STp->nbr_finished = 0; )
+	DEB( STp->nbr_waits = STp->nbr_finished = 0;
+	     STp->nbr_requests = STp->nbr_dio = STp->nbr_pages = STp->nbr_combinable = 0; )
 
 	retval = check_tape(STp, filp);
 	if (retval < 0)
@@ -1013,6 +1034,10 @@ static int st_flush(struct file *filp)
 			result = result2;
 		goto out;
 	}
+
+	DEBC( if (STp->nbr_requests)
+		printk(KERN_WARNING "st%d: Number of r/w requests %d, dio used in %d, pages %d (%d).\n",
+		       dev, STp->nbr_requests, STp->nbr_dio, STp->nbr_pages, STp->nbr_combinable));
 
 	if (STps->rw == ST_WRITING && !(STp->device)->was_reset) {
 
@@ -1126,7 +1151,6 @@ static int st_release(struct inode *inode, struct file *filp)
 /* The checks common to both reading and writing */
 static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t *ppos)
 {
-	int bufsize;
 	ssize_t retval = 0;
 
 	/*
@@ -1184,33 +1208,69 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 	    (retval = update_partition(STp)) < 0)
 		goto out;
 
-	if (STp->block_size == 0) {
-		if (STp->max_block > 0 &&
-		    (count < STp->min_block || count > STp->max_block)) {
-			retval = (-EINVAL);
-			goto out;
-		}
-		if (count > (STp->buffer)->buffer_size &&
-		    !enlarge_buffer(STp->buffer, count, STp->restr_dma)) {
-			retval = (-EOVERFLOW);
-			goto out;
-		}
-	}
-	else {
-		/* Fixed block mode with too small buffer? */
-		bufsize = STp->block_size > st_fixed_buffer_size ?
-			STp->block_size : st_fixed_buffer_size;
-		if ((STp->buffer)->buffer_size < bufsize &&
-		    !enlarge_buffer(STp->buffer, bufsize, STp->restr_dma)) {
-			retval = (-EOVERFLOW);
-			goto out;
-		}
-		(STp->buffer)->buffer_blocks = bufsize / STp->block_size;
+	if (STp->block_size == 0 && STp->max_block > 0 &&
+	    (count < STp->min_block || count > STp->max_block)) {
+		retval = (-EINVAL);
+		goto out;
 	}
 
 	if (STp->do_auto_lock && STp->door_locked == ST_UNLOCKED &&
 	    !st_int_ioctl(STp, MTLOCK, 0))
 		STp->door_locked = ST_LOCKED_AUTO;
+
+ out:
+	return retval;
+}
+
+
+static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is_read)
+{
+	int i, bufsize, retval = 0;
+	ST_buffer *STbp = STp->buffer;
+
+	if (is_read)
+		i = STp->try_dio && try_rdio;
+	else
+		i = STp->try_dio && try_wdio;
+	if (i) {
+		i = st_map_user_pages(&(STbp->sg[0]), STbp->use_sg,
+				      (unsigned long)buf, count, (is_read ? READ : WRITE),
+				      STp->max_pfn);
+		if (i > 0) {
+			STbp->do_dio = i;
+			STbp->buffer_bytes = 0;   /* can be used as transfer counter */
+		}
+		else
+			STbp->do_dio = FALSE;  /* fall back to buffering with any error */
+		STbp->sg_segs = STbp->do_dio;
+		STbp->frp_sg_current = 0;
+		DEB(
+		     if (STbp->do_dio) {
+			STp->nbr_dio++;
+			STp->nbr_pages += STbp->do_dio;
+			for (i=1; i < STbp->do_dio; i++)
+				if (page_to_pfn(STbp->sg[i].page) == page_to_pfn(STbp->sg[i-1].page) + 1)
+					STp->nbr_combinable++;
+		     }
+		)
+	} else
+		STbp->do_dio = FALSE;
+	DEB( STp->nbr_requests++; )
+
+	if (!STbp->do_dio) {
+		if (STp->block_size)
+			bufsize = STp->block_size > st_fixed_buffer_size ?
+				STp->block_size : st_fixed_buffer_size;
+		else
+			bufsize = count;
+		if (bufsize > STbp->buffer_size &&
+		    !enlarge_buffer(STbp, bufsize, STp->restr_dma)) {
+			retval = (-EOVERFLOW);
+			goto out;
+		}
+		if (STp->block_size)
+			STbp->buffer_blocks = bufsize / STp->block_size;
+	}
 
  out:
 	return retval;
@@ -1312,11 +1372,16 @@ static ssize_t
 	/* Check the buffer readability in cases where copy_user might catch
 	   the problems after some tape movement. */
 	if (STp->block_size != 0 &&
+	    !STbp->do_dio &&
 	    (copy_from_user(&i, buf, 1) != 0 ||
 	     copy_from_user(&i, buf + count - 1, 1) != 0)) {
 		retval = (-EFAULT);
 		goto out;
 	}
+
+	retval = setup_buffering(STp, buf, count, FALSE);
+	if (retval)
+		goto out;
 
 	total = count;
 
@@ -1329,31 +1394,38 @@ static ssize_t
 	b_point = buf;
 	while (count > 0) {
 
-		if (STp->block_size == 0)
+		if (STbp->do_dio) {
 			do_count = count;
-		else {
-			do_count = STbp->buffer_blocks * STp->block_size -
-			    STbp->buffer_bytes;
-			if (do_count > count)
-				do_count = count;
 		}
+		else {
+			if (STp->block_size == 0)
+				do_count = count;
+			else {
+				do_count = STbp->buffer_blocks * STp->block_size -
+					STbp->buffer_bytes;
+				if (do_count > count)
+					do_count = count;
+			}
 
-		i = append_to_buffer(b_point, STbp, do_count);
-		if (i) {
-			retval = i;
-			goto out;
+			i = append_to_buffer(b_point, STbp, do_count);
+			if (i) {
+				retval = i;
+				goto out;
+			}
 		}
 		count -= do_count;
 		filp->f_pos += do_count;
 		b_point += do_count;
 
-		async_write = STm->do_async_writes && STps->eof < ST_EOM_OK;
+		async_write = !STbp->do_dio &&
+			STm->do_async_writes && STps->eof < ST_EOM_OK;
 		if (STp->block_size != 0)
 			async_write &= count == 0 &&
 				(!STm->do_buffer_writes ||
 				 STbp->buffer_bytes >= STp->write_threshold);
 
-		if (STp->block_size != 0 && STm->do_buffer_writes && STps->eof < ST_EOM_OK &&
+		if (STp->block_size != 0 && STm->do_buffer_writes &&
+		    !(STp->try_dio && try_wdio) && STps->eof < ST_EOM_OK &&
 		    STbp->buffer_bytes < STbp->buffer_size) {
 			STp->dirty = TRUE;
 			/* Don't write a buffer that is not full enough. */
@@ -1364,8 +1436,9 @@ static ssize_t
 		if (STp->block_size == 0)
 			blks = transfer = do_count;
 		else {
-			blks = STbp->buffer_bytes /
-			    STp->block_size;
+			if (!STbp->do_dio)
+				do_count = STbp->buffer_bytes;
+			blks = do_count / STp->block_size;
 			transfer = blks * STp->block_size;
 		}
 		cmd[2] = blks >> 16;
@@ -1467,6 +1540,11 @@ static ssize_t
  out:
 	if (SRpnt != NULL)
 		scsi_release_request(SRpnt);
+	STbp = STp->buffer;
+	if (STbp->do_dio) {
+		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, FALSE);
+		STbp->do_dio = 0;
+	}
 	up(&STp->lock);
 
 	return retval;
@@ -1482,6 +1560,7 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 	Scsi_Request *SRpnt;
 	ST_mode *STm;
 	ST_partstat *STps;
+	ST_buffer *STbp;
 	int dev = TAPE_NR(STp->devt);
 	int retval = 0;
 
@@ -1492,24 +1571,26 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 	STps = &(STp->ps[STp->partition]);
 	if (STps->eof == ST_FM_HIT)
 		return 1;
+	STbp = STp->buffer;
 
-	memset(cmd, 0, MAX_COMMAND_SIZE);
-	cmd[0] = READ_6;
-	cmd[1] = (STp->block_size != 0);
 	if (STp->block_size == 0)
 		blks = bytes = count;
 	else {
-		if (STm->do_read_ahead) {
+		if (!(STp->try_dio && try_rdio) && STm->do_read_ahead) {
 			blks = (STp->buffer)->buffer_blocks;
 			bytes = blks * STp->block_size;
 		} else {
 			bytes = count;
-			if (bytes > (STp->buffer)->buffer_size)
+			if (!STbp->do_dio && bytes > (STp->buffer)->buffer_size)
 				bytes = (STp->buffer)->buffer_size;
 			blks = bytes / STp->block_size;
 			bytes = blks * STp->block_size;
 		}
 	}
+
+	memset(cmd, 0, MAX_COMMAND_SIZE);
+	cmd[0] = READ_6;
+	cmd[1] = (STp->block_size != 0);
 	cmd[2] = blks >> 16;
 	cmd[3] = blks >> 8;
 	cmd[4] = blks;
@@ -1519,13 +1600,13 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 			   STp->timeout, MAX_RETRIES, TRUE);
 	*aSRpnt = SRpnt;
 	if (!SRpnt)
-		return (STp->buffer)->syscall_result;
+		return STbp->syscall_result;
 
-	(STp->buffer)->read_pointer = 0;
+	STbp->read_pointer = 0;
 	STps->at_sm = 0;
 
 	/* Something to check */
-	if ((STp->buffer)->syscall_result) {
+	if (STbp->syscall_result) {
 		retval = 1;
 		DEBC(printk(ST_DEB_MSG "st%d: Sense: %2x %2x %2x %2x %2x %2x %2x %2x\n",
                             dev,
@@ -1558,7 +1639,7 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 								STps->drv_block += 1;
 							return (-ENOMEM);
 						}
-						(STp->buffer)->buffer_bytes = bytes - transfer;
+						STbp->buffer_bytes = bytes - transfer;
 					} else {
 						scsi_release_request(SRpnt);
 						SRpnt = *aSRpnt = NULL;
@@ -1570,11 +1651,11 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 							return (-EIO);
 						}
 						/* We have some data, deliver it */
-						(STp->buffer)->buffer_bytes = (blks - transfer) *
+						STbp->buffer_bytes = (blks - transfer) *
 						    STp->block_size;
                                                 DEBC(printk(ST_DEB_MSG
                                                             "st%d: ILI but enough data received %ld %d.\n",
-                                                            dev, count, (STp->buffer)->buffer_bytes));
+                                                            dev, count, STbp->buffer_bytes));
 						if (STps->drv_block >= 0)
 							STps->drv_block += 1;
 						if (st_int_ioctl(STp, MTBSR, 1))
@@ -1586,26 +1667,26 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 					else
 						STps->eof = ST_EOD_2;
 					if (STp->block_size == 0)
-						(STp->buffer)->buffer_bytes = 0;
+						STbp->buffer_bytes = 0;
 					else
-						(STp->buffer)->buffer_bytes =
+						STbp->buffer_bytes =
 						    bytes - transfer * STp->block_size;
                                         DEBC(printk(ST_DEB_MSG
                                                     "st%d: EOF detected (%d bytes read).\n",
-                                                    dev, (STp->buffer)->buffer_bytes));
+                                                    dev, STbp->buffer_bytes));
 				} else if (SRpnt->sr_sense_buffer[2] & 0x40) {
 					if (STps->eof == ST_FM)
 						STps->eof = ST_EOD_1;
 					else
 						STps->eof = ST_EOM_OK;
 					if (STp->block_size == 0)
-						(STp->buffer)->buffer_bytes = bytes - transfer;
+						STbp->buffer_bytes = bytes - transfer;
 					else
-						(STp->buffer)->buffer_bytes =
+						STbp->buffer_bytes =
 						    bytes - transfer * STp->block_size;
 
                                         DEBC(printk(ST_DEB_MSG "st%d: EOM detected (%d bytes read).\n",
-                                                    dev, (STp->buffer)->buffer_bytes));
+                                                    dev, STbp->buffer_bytes));
 				}
 			}
 			/* end of EOF, EOM, ILI test */ 
@@ -1625,19 +1706,19 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 		}
 		/* End of extended sense test */ 
 		else {		/* Non-extended sense */
-			retval = (STp->buffer)->syscall_result;
+			retval = STbp->syscall_result;
 		}
 
 	}
 	/* End of error handling */ 
 	else			/* Read successful */
-		(STp->buffer)->buffer_bytes = bytes;
+		STbp->buffer_bytes = bytes;
 
 	if (STps->drv_block >= 0) {
 		if (STp->block_size == 0)
 			STps->drv_block++;
 		else
-			STps->drv_block += (STp->buffer)->buffer_bytes / STp->block_size;
+			STps->drv_block += STbp->buffer_bytes / STp->block_size;
 	}
 	return retval;
 }
@@ -1656,11 +1737,13 @@ static ssize_t
 	Scsi_Tape *STp;
 	ST_mode *STm;
 	ST_partstat *STps;
+	ST_buffer *STbp;
 	int dev = TAPE_NR(inode->i_rdev);
 
 	read_lock(&st_dev_arr_lock);
 	STp = scsi_tapes[dev];
 	read_unlock(&st_dev_arr_lock);
+	STbp = STp->buffer;
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
@@ -1686,10 +1769,14 @@ static ssize_t
         DEB(
 	if (debugging && STps->eof != ST_NOEOF)
 		printk(ST_DEB_MSG "st%d: EOF/EOM flag up (%d). Bytes %d\n", dev,
-		       STps->eof, (STp->buffer)->buffer_bytes);
+		       STps->eof, STbp->buffer_bytes);
         ) /* end DEB */
 
-	if ((STp->buffer)->buffer_bytes == 0 &&
+	retval = setup_buffering(STp, buf, count, TRUE);
+	if (retval)
+		goto out;
+
+	if (STbp->buffer_bytes == 0 &&
 	    STps->eof >= ST_EOD_1) {
 		if (STps->eof < ST_EOD) {
 			STps->eof += 1;
@@ -1700,14 +1787,16 @@ static ssize_t
 		goto out;
 	}
 
-	/* Check the buffer writability before any tape movement. Don't alter
-	   buffer data. */
-	if (copy_from_user(&i, buf, 1) != 0 ||
-	    copy_to_user(buf, &i, 1) != 0 ||
-	    copy_from_user(&i, buf + count - 1, 1) != 0 ||
-	    copy_to_user(buf + count - 1, &i, 1) != 0) {
-		retval = (-EFAULT);
-		goto out;
+	if (!STbp->do_dio) {
+		/* Check the buffer writability before any tape movement. Don't alter
+		   buffer data. */
+		if (copy_from_user(&i, buf, 1) != 0 ||
+		    copy_to_user(buf, &i, 1) != 0 ||
+		    copy_from_user(&i, buf + count - 1, 1) != 0 ||
+		    copy_to_user(buf + count - 1, &i, 1) != 0) {
+			retval = (-EFAULT);
+			goto out;
+		}
 	}
 
 	STps->rw = ST_READING;
@@ -1717,7 +1806,7 @@ static ssize_t
 	for (total = 0, special = 0; total < count && !special;) {
 
 		/* Get new data if the buffer is empty */
-		if ((STp->buffer)->buffer_bytes == 0) {
+		if (STbp->buffer_bytes == 0) {
 			special = read_tape(STp, count - total, &SRpnt);
 			if (special < 0) {	/* No need to continue read */
 				retval = special;
@@ -1726,20 +1815,22 @@ static ssize_t
 		}
 
 		/* Move the data from driver buffer to user buffer */
-		if ((STp->buffer)->buffer_bytes > 0) {
+		if (STbp->buffer_bytes > 0) {
                         DEB(
 			if (debugging && STps->eof != ST_NOEOF)
 				printk(ST_DEB_MSG
                                        "st%d: EOF up (%d). Left %d, needed %d.\n", dev,
-				       STps->eof, (STp->buffer)->buffer_bytes,
+				       STps->eof, STbp->buffer_bytes,
                                        count - total);
                         ) /* end DEB */
-			transfer = (STp->buffer)->buffer_bytes < count - total ?
-			    (STp->buffer)->buffer_bytes : count - total;
-			i = from_buffer(STp->buffer, buf, transfer);
-			if (i) {
-				retval = i;
-				goto out;
+			transfer = STbp->buffer_bytes < count - total ?
+			    STbp->buffer_bytes : count - total;
+			if (!STbp->do_dio) {
+				i = from_buffer(STbp, buf, transfer);
+				if (i) {
+					retval = i;
+					goto out;
+				}
 			}
 			filp->f_pos += transfer;
 			buf += transfer;
@@ -1774,6 +1865,11 @@ static ssize_t
 	if (SRpnt != NULL) {
 		scsi_release_request(SRpnt);
 		SRpnt = NULL;
+	}
+	if (STbp->do_dio) {
+		sgl_unmap_user_pages(&(STbp->sg[0]), STbp->do_dio, TRUE);
+		STbp->do_dio = 0;
+		STbp->buffer_bytes = 0;
 	}
 	up(&STp->lock);
 
@@ -3562,6 +3658,7 @@ static int st_attach(Scsi_Device * SDp)
 	ST_buffer *buffer;
 	int i, mode, dev_num;
 	char *stp;
+	u64 bounce_limit;
 
 	if (SDp->type != TYPE_TAPE)
 		return 1;
@@ -3647,7 +3744,7 @@ static int st_attach(Scsi_Device * SDp)
 	    /*  Rewind entry  */
 	    sprintf (name, "mt%s", formats[mode]);
 	    sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.name, name);
+		    SDp->sdev_driverfs_dev.bus_id, name);
 	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
@@ -3666,7 +3763,7 @@ static int st_attach(Scsi_Device * SDp)
 	    /*  No-rewind entry  */
 	    sprintf (name, "mt%sn", formats[mode]);
 	    sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
-		    SDp->sdev_driverfs_dev.name, name);
+		    SDp->sdev_driverfs_dev.bus_id, name);
 	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
@@ -3716,6 +3813,23 @@ static int st_attach(Scsi_Device * SDp)
 	tpnt->timeout = ST_TIMEOUT;
 	tpnt->long_timeout = ST_LONG_TIMEOUT;
 
+	tpnt->try_dio = try_direct_io && !SDp->host->unchecked_isa_dma;
+	bounce_limit = BLK_BOUNCE_HIGH; /* Borrowed from scsi_merge.c */
+	if (SDp->host->highmem_io) {
+		if (!PCI_DMA_BUS_IS_PHYS)
+			/* Platforms with virtual-DMA translation
+			 * hardware have no practical limit.
+			 */
+			bounce_limit = BLK_BOUNCE_ANY;
+		else if (SDp->host->pci_dev)
+			bounce_limit = SDp->host->pci_dev->dma_mask;
+	} else if (SDp->host->unchecked_isa_dma)
+		bounce_limit = BLK_BOUNCE_ISA;
+	bounce_limit >>= PAGE_SHIFT;
+	if (bounce_limit > ULONG_MAX)
+		bounce_limit = ULONG_MAX;
+	tpnt->max_pfn = bounce_limit;
+
 	for (i = 0; i < ST_NBR_MODES; i++) {
 		STm = &(tpnt->modes[i]);
 		STm->defined = FALSE;
@@ -3751,6 +3865,8 @@ static int st_attach(Scsi_Device * SDp)
 	printk(KERN_WARNING
 	"Attached scsi tape st%d at scsi%d, channel %d, id %d, lun %d\n",
 	       dev_num, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
+	printk(KERN_WARNING "st%d: try direct i/o: %s, max page reachable by HBA %lu\n",
+	       dev_num, tpnt->try_dio ? "yes" : "no", tpnt->max_pfn);
 
 	return 0;
 };
@@ -3779,7 +3895,7 @@ static void st_detach(Scsi_Device * SDp)
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
 						   &dev_attr_type);
 				device_remove_file(&tpnt->driverfs_dev_r[mode],
-						   &dev_attr_type);
+						   &dev_attr_kdev);
 				put_device(&tpnt->driverfs_dev_r[mode]);
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
@@ -3852,3 +3968,129 @@ static void __exit exit_st(void)
 
 module_init(init_st);
 module_exit(exit_st);
+
+
+/* Pin down user pages and put them into a scatter gather list. Returns <= 0 if
+   - mapping of all pages not successful
+   - any page is above max_pfn
+   (i.e., either completely successful or fails)
+*/
+static int st_map_user_pages(struct scatterlist *sgl, const unsigned int max_pages, 
+			     unsigned long uaddr, size_t count, int rw,
+			     unsigned long max_pfn)
+{
+	int i, nr_pages;
+
+	nr_pages = sgl_map_user_pages(sgl, max_pages, uaddr, count, rw);
+	if (nr_pages <= 0)
+		return nr_pages;
+
+	for (i=0; i < nr_pages; i++) {
+		if (page_to_pfn(sgl[i].page) > max_pfn)
+			goto out_unmap;
+	}
+	return nr_pages;
+
+ out_unmap:
+	sgl_unmap_user_pages(sgl, nr_pages, FALSE);
+	return 0;
+}
+
+
+/* The following functions may be useful for a larger audience. */
+static int sgl_map_user_pages(struct scatterlist *sgl, const unsigned int max_pages, 
+			      unsigned long uaddr, size_t count, int rw)
+{
+	int res, i, j;
+	unsigned int nr_pages;
+	struct page **pages;
+
+	nr_pages = ((uaddr & ~PAGE_MASK) + count - 1 + ~PAGE_MASK) >> PAGE_SHIFT;
+
+	/* User attempted Overflow! */
+	if ((uaddr + count) < uaddr)
+		return -EINVAL;
+
+	/* Too big */
+        if (nr_pages > max_pages)
+		return -ENOMEM;
+
+	/* Hmm? */
+	if (count == 0)
+		return 0;
+
+	if ((pages = kmalloc(max_pages * sizeof(*pages), GFP_ATOMIC)) == NULL)
+		return -ENOMEM;
+
+        /* Try to fault in all of the necessary pages */
+	down_read(&current->mm->mmap_sem);
+        /* rw==READ means read from drive, write into memory area */
+	res = get_user_pages(
+		current,
+		current->mm,
+		uaddr,
+		nr_pages,
+		rw == READ,
+		0, /* don't force */
+		pages,
+		NULL);
+	up_read(&current->mm->mmap_sem);
+
+	/* Errors and no page mapped should return here */
+	if (res < nr_pages)
+		goto out_unmap;
+
+        for (i=0; i < nr_pages; i++) {
+                /* FIXME: flush superflous for rw==READ,
+                 * probably wrong function for rw==WRITE
+                 */
+		flush_dcache_page(pages[i]);
+        }
+
+	/* Populate the scatter/gather list */
+	sgl[0].page = pages[0]; 
+	sgl[0].offset = uaddr & ~PAGE_MASK;
+	if (nr_pages > 1) {
+		sgl[0].length = PAGE_SIZE - sgl[0].offset;
+		count -= sgl[0].length;
+		for (i=1; i < nr_pages ; i++) {
+			sgl[i].offset = 0;
+			sgl[i].page = pages[i]; 
+			sgl[i].length = count < PAGE_SIZE ? count : PAGE_SIZE;
+			count -= PAGE_SIZE;
+		}
+	}
+	else {
+		sgl[0].length = count;
+	}
+
+	kfree(pages);
+	return nr_pages;
+
+ out_unmap:
+	if (res > 0) {
+		for (j=0; j < res; j++)
+			page_cache_release(pages[j]);
+	}
+	kfree(pages);
+	return res;
+}
+
+
+/* And unmap them... */
+static int sgl_unmap_user_pages(struct scatterlist *sgl, const unsigned int nr_pages,
+				int dirtied)
+{
+	int i;
+
+	for (i=0; i < nr_pages; i++) {
+		if (dirtied && !PageReserved(sgl[i].page))
+			SetPageDirty(sgl[i].page);
+		/* FIXME: cache flush missing for rw==READ
+		 * FIXME: call the correct reference counting function
+		 */
+		page_cache_release(sgl[i].page);
+	}
+
+	return 0;
+}

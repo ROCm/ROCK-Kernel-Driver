@@ -77,10 +77,6 @@ extern int __divdi3(int, int);
 
 extern void dump_thread(struct pt_regs *, struct user *);
 
-#ifdef CONFIG_SMP
-extern spinlock_t kernel_flag;
-#endif
-
 /* One thing to note is that the way the symbols of the mul/div
  * support routines are named is a mess, they all start with
  * a '.' which makes it a bitch to export, here is the trick:
@@ -130,9 +126,6 @@ EXPORT_SYMBOL_PRIVATE(_clear_bit);
 EXPORT_SYMBOL_PRIVATE(_change_bit);
 
 #ifdef CONFIG_SMP
-/* Kernel wide locking */
-EXPORT_SYMBOL(kernel_flag);
-
 /* IRQ implementation. */
 EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(synchronize_irq);

@@ -70,7 +70,6 @@ EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(kernel_flag);
 #endif /* CONFIG_SMP */
 
 EXPORT_SYMBOL(register_ioctl32_conversion);

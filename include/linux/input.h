@@ -570,6 +570,7 @@ struct input_absinfo {
 
 #define SND_CLICK		0x00
 #define SND_BELL		0x01
+#define SND_TONE		0x02
 #define SND_MAX			0x07
 
 /*
@@ -755,6 +756,9 @@ struct ff_effect {
 #define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
 #define BIT(x)	(1UL<<((x)%BITS_PER_LONG))
 #define LONG(x) ((x)/BITS_PER_LONG)
+
+#define INPUT_KEYCODE(dev, scancode) ((dev->keycodesize == 1) ? ((u8*)dev->keycode)[scancode] : \
+	((dev->keycodesize == 1) ? ((u16*)dev->keycode)[scancode] : (((u32*)dev->keycode)[scancode])))
 
 struct input_dev {
 

@@ -105,7 +105,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 			change_bit(code, dev->key);
 
-			if (test_bit(EV_REP, dev->evbit) && value) {
+			if (test_bit(EV_REP, dev->evbit) && dev->rep[REP_PERIOD] && value) {
 				dev->repeat_key = code;
 				mod_timer(&dev->timer, jiffies + dev->rep[REP_DELAY]);
 			}
@@ -165,10 +165,9 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 		case EV_SND:
 	
-			if (code > SND_MAX || !test_bit(code, dev->sndbit) || !!test_bit(code, dev->snd) == value)
+			if (code > SND_MAX || !test_bit(code, dev->sndbit))
 				return;
 
-			change_bit(code, dev->snd);
 			if (dev->event) dev->event(dev, type, code, value);	
 	
 			break;

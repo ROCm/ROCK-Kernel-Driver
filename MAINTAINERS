@@ -132,6 +132,12 @@ M:	A2232@gmx.net
 L:	linux-m68k@lists.linux-m68k.org
 S:	Maintained
 
+AIO
+P:	Benjamin LaHaise
+M:	bcrl@redhat.com
+L:	linux-aio@kvack.org
+S:	Supported
+
 ACENIC DRIVER
 P:	Jes Sorensen
 M:	jes@trained-monkey.org

@@ -50,6 +50,7 @@ enum {
 
 struct device;
 struct device_driver;
+struct device_class;
 
 struct bus_type {
 	char			* name;
@@ -106,12 +107,14 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
 struct device_driver {
 	char			* name;
 	struct bus_type		* bus;
+	struct device_class	* devclass;
 
 	rwlock_t		lock;
 	atomic_t		refcount;
 
-	list_t			bus_list;
-	list_t			devices;
+	struct list_head	bus_list;
+	struct list_head	class_list;
+	struct list_head	devices;
 
 	struct driver_dir_entry	dir;
 
@@ -160,12 +163,105 @@ struct driver_attribute driver_attr_##_name = { 		\
 extern int driver_create_file(struct device_driver *, struct driver_attribute *);
 extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
 
+
+/*
+ * device classes
+ */
+struct device_class {
+	char			* name;
+	u32			devnum;
+
+	struct list_head	node;
+	struct list_head	drivers;
+	struct list_head	intf_list;
+
+	struct driver_dir_entry	dir;
+	struct driver_dir_entry	driver_dir;
+	struct driver_dir_entry	device_dir;
+
+	int	(*add_device)(struct device *);
+	void	(*remove_device)(struct device *);
+};
+
+extern int devclass_register(struct device_class *);
+extern void devclass_unregister(struct device_class *);
+
+
+struct devclass_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device_class *, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device_class *, const char * buf, size_t count, loff_t off);
+};
+
+#define DEVCLASS_ATTR(_name,_str,_mode,_show,_store)	\
+struct devclass_attribute devclass_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int devclass_create_file(struct device_class *, struct devclass_attribute *);
+extern void devclass_remove_file(struct device_class *, struct devclass_attribute *);
+
+
+/*
+ * device interfaces
+ * These are the logical interfaces of device classes. 
+ * These entities map directly to specific userspace interfaces, like 
+ * device nodes.
+ * Interfaces are registered with the device class they belong to. When
+ * a device is registered with the class, each interface's add_device 
+ * callback is called. It is up to the interface to decide whether or not
+ * it supports the device.
+ */
+
+struct intf_data;
+
+struct device_interface {
+	char			* name;
+	struct device_class	* devclass;
+
+	struct list_head	node;
+	struct list_head	devices;
+	struct driver_dir_entry	dir;
+
+	u32			devnum;
+
+	int (*add_device)	(struct device *);
+	int (*remove_device)	(struct intf_data *);
+};
+
+extern int interface_register(struct device_interface *);
+extern void interface_unregister(struct device_interface *);
+
+
+/*
+ * intf_data - per-device data for an interface
+ * Each interface typically has a per-device data structure 
+ * that it allocates. It should embed one of these structures 
+ * in that structure and call interface_add_data() to add it
+ * to the device's list.
+ * That will also enumerate the device within the interface
+ * and create a driverfs symlink for it.
+ */
+struct intf_data {
+	struct list_head	node;
+	struct device_interface	* intf;
+	struct device		* dev;
+	u32			intf_num;
+};
+
+extern int interface_add_data(struct intf_data *);
+
+
+
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
 	struct list_head driver_list;
 	struct list_head children;
+	struct list_head intf_list;
 	struct device 	* parent;
 
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
@@ -183,6 +279,8 @@ struct device {
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*driver_data;	/* data private to the driver */
+
+	u32		class_num;	/* class-enumerated value */
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 

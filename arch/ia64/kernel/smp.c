@@ -53,14 +53,6 @@
 #include <asm/mca.h>
 
 /*
- * The Big Kernel Lock.  It's not supposed to be used for performance critical stuff
- * anymore.  But we still need to align it because certain workloads are still affected by
- * it.  For example, llseek() and various other filesystem related routines still use the
- * BKL.
- */
-spinlock_t kernel_flag __cacheline_aligned = SPIN_LOCK_UNLOCKED;
-
-/*
  * Structure and data for smp_call_function(). This is designed to minimise static memory
  * requirements. It also looks cleaner.
  */

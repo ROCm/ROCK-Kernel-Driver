@@ -51,6 +51,7 @@
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
 #include <linux/percpu.h>
+#include <linux/smp_lock.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -480,6 +481,9 @@ EXPORT_SYMBOL(task_nice);
 EXPORT_SYMBOL_GPL(idle_cpu);
 #if CONFIG_SMP
 EXPORT_SYMBOL_GPL(set_cpus_allowed);
+#endif
+#if CONFIG_SMP || CONFIG_PREEMPT
+EXPORT_SYMBOL(kernel_flag);
 #endif
 EXPORT_SYMBOL(jiffies);
 EXPORT_SYMBOL(jiffies_64);

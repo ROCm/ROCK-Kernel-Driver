@@ -52,9 +52,45 @@ struct pte_chain {
 };
 
 static kmem_cache_t	*pte_chain_cache;
-static inline struct pte_chain * pte_chain_alloc(void);
-static inline void pte_chain_free(struct pte_chain *, struct pte_chain *,
-		struct page *);
+
+/**
+ * pte_chain_alloc - allocate a pte_chain struct
+ *
+ * Returns a pointer to a fresh pte_chain structure. Allocates new
+ * pte_chain structures as required.
+ * Caller needs to hold the page's pte_chain_lock.
+ */
+static inline struct pte_chain *pte_chain_alloc(void)
+{
+	return kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
+}
+
+/**
+ * pte_chain_free - free pte_chain structure
+ * @pte_chain: pte_chain struct to free
+ * @prev_pte_chain: previous pte_chain on the list (may be NULL)
+ * @page: page this pte_chain hangs off (may be NULL)
+ *
+ * This function unlinks pte_chain from the singly linked list it
+ * may be on and adds the pte_chain to the free list. May also be
+ * called for new pte_chain structures which aren't on any list yet.
+ * Caller needs to hold the pte_chain_lock if the page is non-NULL.
+ */
+static inline void pte_chain_free(struct pte_chain * pte_chain,
+		struct pte_chain * prev_pte_chain, struct page * page)
+{
+	if (prev_pte_chain)
+		prev_pte_chain->next = pte_chain->next;
+	else if (page)
+		page->pte.chain = pte_chain->next;
+
+	kmem_cache_free(pte_chain_cache, pte_chain);
+}
+
+
+/**
+ ** VM stuff below this comment
+ **/
 
 /**
  * page_referenced - test if the page was referenced
@@ -357,41 +393,6 @@ give_up:
  ** No more VM stuff below this comment, only pte_chain helper
  ** functions.
  **/
-
-
-/**
- * pte_chain_free - free pte_chain structure
- * @pte_chain: pte_chain struct to free
- * @prev_pte_chain: previous pte_chain on the list (may be NULL)
- * @page: page this pte_chain hangs off (may be NULL)
- *
- * This function unlinks pte_chain from the singly linked list it
- * may be on and adds the pte_chain to the free list. May also be
- * called for new pte_chain structures which aren't on any list yet.
- * Caller needs to hold the pte_chain_lock if the page is non-NULL.
- */
-static inline void pte_chain_free(struct pte_chain * pte_chain,
-		struct pte_chain * prev_pte_chain, struct page * page)
-{
-	if (prev_pte_chain)
-		prev_pte_chain->next = pte_chain->next;
-	else if (page)
-		page->pte.chain = pte_chain->next;
-
-	kmem_cache_free(pte_chain_cache, pte_chain);
-}
-
-/**
- * pte_chain_alloc - allocate a pte_chain struct
- *
- * Returns a pointer to a fresh pte_chain structure. Allocates new
- * pte_chain structures as required.
- * Caller needs to hold the page's pte_chain_lock.
- */
-static inline struct pte_chain *pte_chain_alloc(void)
-{
-	return kmem_cache_alloc(pte_chain_cache, GFP_ATOMIC);
-}
 
 void __init pte_chain_init(void)
 {

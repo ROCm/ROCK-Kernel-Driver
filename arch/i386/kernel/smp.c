@@ -18,6 +18,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/mc146818rtc.h>
 #include <linux/cache.h>
+#include <linux/interrupt.h>
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
@@ -102,9 +103,6 @@
  *	or are signal timing bugs worked around in hardware and there's
  *	about nothing of note with C stepping upwards.
  */
-
-/* The 'big kernel lock' */
-spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 struct tlb_state cpu_tlbstate[NR_CPUS] __cacheline_aligned = {[0 ... NR_CPUS-1] = { &init_mm, 0, }};
 
