@@ -414,6 +414,8 @@ static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
  */
 static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 {
+	u32 origcmd=*cmd, origtmp=*tmp;
+
 	/* ARQSZ - Set the value to the maximum one.
 	 * Don't allow the mode register to override values. */
 	*cmd = ((*cmd & ~AGPSTAT_ARQSZ) |
@@ -467,7 +469,9 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		if ((*cmd & AGPSTAT3_4X) && (*tmp & AGPSTAT3_4X))
 			*cmd |= ~AGPSTAT3_4X;
 		else {
-			printk (KERN_INFO PFX "Badness. Don't know which AGP mode to set. [cmd:%x tmp:%x]\n", cmd, tmp);
+			printk (KERN_INFO PFX "Badness. Don't know which AGP mode to set. "
+							"[cmd:%x tmp:%x fell back to:- cmd:%x tmp:%x]\n",
+							origcmd, origtmp, *cmd, *tmp);
 			return;
 		}
 	}
