@@ -392,15 +392,15 @@ UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
  * That is the only reason this entry is needed.
  */
 UNUSUAL_DEV(  0x05e3, 0x0700, 0x0000, 0xffff,
-		"SIIG",
-		"CompactFlash Card Reader",
+		"Genesys Logic",
+		"USB to IDE Card Reader",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Submitted Alexander Oltu <alexander@all-2.com> */
 UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff, 
-		"", 
-		"USB TO IDE",
+		"Genesys Logic", 
+		"USB to IDE Optical",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ), 
 
@@ -411,16 +411,9 @@ UNUSUAL_DEV(  0x05e3, 0x0701, 0x0000, 0xffff,
  *
  * ST818 slim drives (rev 0.02) don't need special care.
 */
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0x0001,
-		"EagleTec",
-		"External Hard Disk",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_INQUIRY ),
-
-/* Reported by Henning Schild <henning@wh9.tu-dresden.de> */
-UNUSUAL_DEV(  0x05e3, 0x0702, 0x0113, 0x0113,
-		"EagleTec",
-		"External Hard Disk",
+UNUSUAL_DEV(  0x05e3, 0x0702, 0x0000, 0xffff,
+		"Genesys Logic",
+		"USB to IDE Disk",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
