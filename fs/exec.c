@@ -347,7 +347,7 @@ struct file *open_exec(const char *name)
 	struct file *file;
 	int err = 0;
 
-	if (path_init(name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, &nd))
+	if (path_init(name, LOOKUP_FOLLOW, &nd))
 		err = path_walk(name, &nd);
 	file = ERR_PTR(err);
 	if (!err) {

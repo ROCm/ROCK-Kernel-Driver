@@ -609,17 +609,12 @@ last_component:
 		}
 		err = -ENOENT;
 		if (!inode)
-			goto no_inode;
+			break;
 		if (lookup_flags & LOOKUP_DIRECTORY) {
 			err = -ENOTDIR; 
 			if (!inode->i_op || !inode->i_op->lookup)
 				break;
 		}
-		goto return_base;
-no_inode:
-		err = -ENOENT;
-		if (lookup_flags & (LOOKUP_POSITIVE|LOOKUP_DIRECTORY))
-			break;
 		goto return_base;
 lookup_parent:
 		nd->last = this;
@@ -691,7 +686,7 @@ void set_fs_altroot(void)
 		nd.mnt = mntget(current->fs->rootmnt);
 		nd.dentry = dget(current->fs->root);
 		read_unlock(&current->fs->lock);
-		nd.flags = LOOKUP_FOLLOW|LOOKUP_DIRECTORY|LOOKUP_POSITIVE;
+		nd.flags = LOOKUP_FOLLOW|LOOKUP_DIRECTORY;
 		if (path_walk(emul,&nd) == 0) {
 			mnt = nd.mnt;
 			dentry = nd.dentry;
@@ -1648,7 +1643,7 @@ asmlinkage long sys_link(const char * oldname, const char * newname)
 		struct nameidata nd, old_nd;
 
 		error = 0;
-		if (path_init(from, LOOKUP_POSITIVE, &old_nd))
+		if (path_init(from, 0, &old_nd))
 			error = path_walk(from, &old_nd);
 		if (error)
 			goto exit;

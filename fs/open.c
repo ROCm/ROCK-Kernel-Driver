@@ -368,7 +368,7 @@ asmlinkage long sys_chdir(const char * filename)
 		goto out;
 
 	error = 0;
-	if (path_init(name,LOOKUP_POSITIVE|LOOKUP_FOLLOW|LOOKUP_DIRECTORY,&nd))
+	if (path_init(name,LOOKUP_FOLLOW|LOOKUP_DIRECTORY,&nd))
 		error = path_walk(name, &nd);
 	putname(name);
 	if (error)
@@ -427,8 +427,7 @@ asmlinkage long sys_chroot(const char * filename)
 	if (IS_ERR(name))
 		goto out;
 
-	path_init(name, LOOKUP_POSITIVE | LOOKUP_FOLLOW |
-		      LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
+	path_init(name, LOOKUP_FOLLOW | LOOKUP_DIRECTORY | LOOKUP_NOALT, &nd);
 	error = path_walk(name, &nd);	
 	putname(name);
 	if (error)

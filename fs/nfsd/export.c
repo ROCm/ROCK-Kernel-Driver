@@ -239,7 +239,7 @@ exp_export(struct nfsctl_export *nxp)
 
 	/* Look up the dentry */
 	err = 0;
-	if (path_init(nxp->ex_path, LOOKUP_POSITIVE, &nd))
+	if (path_init(nxp->ex_path, 0, &nd))
 		err = path_walk(nxp->ex_path, &nd);
 	if (err)
 		goto out_unlock;
@@ -408,7 +408,7 @@ exp_rootfh(struct svc_client *clp, char *path, struct knfsd_fh *f, int maxsize)
 
 	err = -EPERM;
 	/* NB: we probably ought to check that it's NUL-terminated */
-	if (path_init(path, LOOKUP_POSITIVE, &nd) &&
+	if (path_init(path, 0, &nd) &&
 	    path_walk(path, &nd)) {
 		printk("nfsd: exp_rootfh path not found %s", path);
 		return err;

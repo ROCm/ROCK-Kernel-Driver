@@ -1273,7 +1273,6 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 #define LOOKUP_FOLLOW		(1)
 #define LOOKUP_DIRECTORY	(2)
 #define LOOKUP_CONTINUE		(4)
-#define LOOKUP_POSITIVE		(8)
 #define LOOKUP_PARENT		(16)
 #define LOOKUP_NOALT		(32)
 /*
@@ -1311,8 +1310,8 @@ extern int follow_down(struct vfsmount **, struct dentry **);
 extern int follow_up(struct vfsmount **, struct dentry **);
 extern struct dentry * lookup_one_len(const char *, struct dentry *, int);
 extern struct dentry * lookup_hash(struct qstr *, struct dentry *);
-#define user_path_walk(name,nd)	 __user_walk(name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, nd)
-#define user_path_walk_link(name,nd) __user_walk(name, LOOKUP_POSITIVE, nd)
+#define user_path_walk(name,nd)	 __user_walk(name, LOOKUP_FOLLOW, nd)
+#define user_path_walk_link(name,nd) __user_walk(name, 0, nd)
 
 extern void inode_init_once(struct inode *);
 extern void iput(struct inode *);

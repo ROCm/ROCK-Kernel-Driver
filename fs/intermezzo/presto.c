@@ -40,7 +40,7 @@ int presto_walk(const char *name, struct nameidata *nd)
            resolved pathname and not the symlink. SHP
            XXX: This code implies that direct symlinks do not work. SHP
         */
-        unsigned int flags = LOOKUP_POSITIVE;
+        unsigned int flags = 0;
 
         ENTRY;
         err = 0;

@@ -538,7 +538,7 @@ int lento_create(const char *name, int mode, struct lento_vfs_context *info)
         }
 
         /* this looks up the parent */
-//        if (path_init(pathname, LOOKUP_FOLLOW | LOOKUP_POSITIVE, &nd))
+//        if (path_init(pathname, LOOKUP_FOLLOW, &nd))
         if (path_init(pathname,  LOOKUP_PARENT, &nd))
                 error = path_walk(pathname, &nd);
         if (error) {
@@ -687,7 +687,7 @@ int lento_link(const char * oldname, const char * newname,
                 struct nameidata nd, old_nd;
 
                 error = 0;
-                if (path_init(from, LOOKUP_POSITIVE, &old_nd))
+                if (path_init(from, 0, &old_nd))
                         error = path_walk(from, &old_nd);
                 if (error)
                         goto exit;

@@ -603,8 +603,7 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 	int err = 0;
 	
 	if (sunname->sun_path[0]) {
-		if (path_init(sunname->sun_path, 
-			      LOOKUP_POSITIVE|LOOKUP_FOLLOW, &nd))
+		if (path_init(sunname->sun_path, LOOKUP_FOLLOW, &nd))
 			err = path_walk(sunname->sun_path, &nd);
 		if (err)
 			goto fail;

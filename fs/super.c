@@ -700,7 +700,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	/* What device it is? */
 	if (!dev_name || !*dev_name)
 		return ERR_PTR(-EINVAL);
-	if (path_init(dev_name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, &nd))
+	if (path_init(dev_name, LOOKUP_FOLLOW, &nd))
 		error = path_walk(dev_name, &nd);
 	if (error)
 		return ERR_PTR(error);
