@@ -956,7 +956,6 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 			smb_buf->smb_buf_length = 0x81000044;
 			rc = smb_send(*csocket, smb_buf, 0x44,
 				(struct sockaddr *)psin_server);
-			printk("cifs: rfc1001_send rc = %d\n",rc); /* BB removeme */
 			kfree(ses_init_buf);
 		}
 		/* else the negprot may still work without this 
