@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000-2003
+ *   Copyright (C) International Business Machines  Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -523,7 +523,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	goto resume;
 
       error_out:
-	updateSuper(sb, FM_DIRTY);
+	jfs_error(sb, "jfs_extendfs");
 
       resume:
 	/*

@@ -32,6 +32,10 @@ integrity	Default.  Commit metadata changes to the journal.  Use this
 		option to remount a volume where the nointegrity option was
 		previously specified in order to restore normal behavior.
 
+errors=continue		Keep going on a filesystem error.
+errors=remount-ro	Default. Remount the filesystem read-only on an error.
+errors=panic		Panic and halt the machine if an error occurs.
+
 JFS TODO list:
 
 Plans for our near term development items
