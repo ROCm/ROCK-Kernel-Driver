@@ -2459,10 +2459,10 @@ static int no_c2c3(struct dmi_system_id *id)
 	printk(KERN_INFO 
 	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor.c3=1\n\"",
 	       id->ident);
-	if (errata.c2 == -1) 
-		errata.c2 = 0;
-	if (errata.c3 == -1) 
-		errata.c3 = 0; 
+	if (c2 == -1) 
+		c2 = 0;
+	if (c3 == -1) 
+		c3 = 0; 
 	return 0;
 }
 
