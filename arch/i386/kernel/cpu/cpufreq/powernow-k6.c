@@ -83,7 +83,7 @@ static void powernow_k6_set_state (unsigned int best_i)
 
 	freqs.old = busfreq * powernow_k6_get_cpu_multiplier();
 	freqs.new = busfreq * clock_ratio[best_i];
-	freqs.cpu = CPUFREQ_ALL_CPUS; /* powernow-k6.c is UP only driver */
+	freqs.cpu = 0; /* powernow-k6.c is UP only driver */
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 

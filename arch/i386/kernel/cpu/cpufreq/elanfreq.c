@@ -124,7 +124,7 @@ static void elanfreq_set_cpu_state (unsigned int state) {
 
 	freqs.old = elanfreq_get_cpu_frequency();
 	freqs.new = elan_multiplier[state].clock;
-	freqs.cpu = CPUFREQ_ALL_CPUS; /* elanfreq.c is UP only driver */
+	freqs.cpu = 0; /* elanfreq.c is UP only driver */
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 

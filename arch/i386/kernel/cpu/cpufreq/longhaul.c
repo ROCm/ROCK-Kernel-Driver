@@ -315,7 +315,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index, unsigned int newf
 
 	freqs.old = longhaul_get_cpu_mult() * longhaul_get_cpu_fsb() * 100;
 	freqs.new = clock_ratio[clock_ratio_index] * newfsb * 100;
-	freqs.cpu = CPUFREQ_ALL_CPUS; /* longhaul.c is UP only driver */
+	freqs.cpu = 0; /* longhaul.c is UP only driver */
 	
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
