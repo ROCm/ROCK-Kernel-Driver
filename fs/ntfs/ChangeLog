@@ -33,9 +33,8 @@ ToDo:
 	- Add new mount option case_sensitive, to determine if the driver
 	  treats file names as case sensitive or not. If case sensitive, create
 	  file names in the POSIX namespace. Otherwise create file names in the
-	  LONG/WIN32 namespace. By default, or when case_sensitive is set to
-	  FALSE, files remain accessible via their short file name, if it
-	  exists.
+	  LONG/WIN32 namespace. Note, files remain accessible via their short
+	  file name, if it exists.
 	- Remove really dumb logic bug in boot sector recovery code.
 	- Fix dcache aliasing issues wrt short/long file names via changes
 	  to fs/ntfs/dir.c::ntfs_lookup_inode_by_name() and
@@ -44,6 +43,7 @@ ToDo:
 	  return information about the matching file name if the case is not
 	  matching or the match is a short file name. See comments above the
 	  function definition for details.
+	- Fix potential 1 byte overflow in fs/ntfs/unistr.c::ntfs_ucstonls().
 	- TODO: (AIA) Change ntfs_lookup()...
 
 2.0.7 - Minor cleanups and updates for changes in core kernel code.

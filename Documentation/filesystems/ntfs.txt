@@ -91,9 +91,9 @@ case_sensitive=<BOOL>	If case_sensitive is specified, treat all file names as
 			driver will never create short file names and will
 			remove them on rename/delete of the corresponding long
 			file name.
-			Note that by default / when case_sensitive is set to
-			FALSE, files remain accessible via their short file
-			name, if it exists.
+			Note that files remain accessible via their short file
+			name, if it exists. If case_sensitive, you will need to
+			provide the correct case of the short file name.
 
 errors=opt		What to do when critical file system errors are found.
 			Following values can be used for "opt":

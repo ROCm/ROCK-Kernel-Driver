@@ -200,7 +200,7 @@ found_it:
 						"and if that doesn't find any "
 						"errors please report you saw "
 						"this message to "
-						"linux-ntfs@lists.sf.net.");
+						"linux-ntfs-dev@lists.sf.net.");
 				goto dir_err_out;
 			}
 
@@ -456,7 +456,7 @@ found_it2:
 						"and if that doesn't find any "
 						"errors please report you saw "
 						"this message to "
-						"linux-ntfs@lists.sf.net.");
+						"linux-ntfs-dev@lists.sf.net.");
 				ntfs_unmap_page(page);
 				goto dir_err_out;
 			}
