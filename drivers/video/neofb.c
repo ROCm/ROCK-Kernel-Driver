@@ -1481,7 +1481,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	int s_pitch = (image->width * image->depth + 7) >> 3;
 	int scan_align = info->pixmap.scan_align - 1;
 	int buf_align = info->pixmap.buf_align - 1;
-	int bltCntl_flags, d_pitch, data_len, i;
+	int bltCntl_flags, d_pitch, data_len;
 
 	// The data is padded for the hardware
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
@@ -1533,8 +1533,7 @@ neo2200_imageblit(struct fb_info *info, const struct fb_image *image)
 	writel((image->height << 16) | (image->width & 0xffff),
 	       &par->neo2200->xyExt);
 
-	for (i = 0; i < data_len; i++)
-		writeb(image->data[i], par->mmio_vbase + 0x100000 + i);
+	memcpy_toio(par->mmio_vbase + 0x100000, image->data, data_len);
 }
 
 static void
