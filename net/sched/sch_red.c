@@ -396,16 +396,6 @@ static int red_init(struct Qdisc* sch, struct rtattr *opt)
 	return red_change(sch, opt);
 }
 
-
-int red_copy_xstats(struct sk_buff *skb, struct tc_red_xstats *st)
-{
-        RTA_PUT(skb, TCA_XSTATS, sizeof(*st), st);
-        return 0;
-
-rtattr_failure:
-        return 1;
-}
-
 static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct red_sched_data *q = qdisc_priv(sch);
@@ -425,14 +415,18 @@ static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 	RTA_PUT(skb, TCA_RED_PARMS, sizeof(opt), &opt);
 	rta->rta_len = skb->tail - b;
 
-	if (red_copy_xstats(skb, &q->st))
-		goto rtattr_failure;
-
 	return skb->len;
 
 rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
+}
+
+static int red_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
+{
+	struct red_sched_data *q = qdisc_priv(sch);
+
+	return gnet_stats_copy_app(d, &q->st, sizeof(q->st));
 }
 
 static struct Qdisc_ops red_qdisc_ops = {
@@ -448,6 +442,7 @@ static struct Qdisc_ops red_qdisc_ops = {
 	.reset		=	red_reset,
 	.change		=	red_change,
 	.dump		=	red_dump,
+	.dump_stats	=	red_dump_stats,
 	.owner		=	THIS_MODULE,
 };
 
