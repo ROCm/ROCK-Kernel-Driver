@@ -588,7 +588,7 @@ static int __init deadline_slab_setup(void)
 	return 0;
 }
 
-subsys_init(deadline_slab_setup);
+subsys_initcall(deadline_slab_setup);
 
 elevator_t iosched_deadline = {
 	.elevator_merge_fn = 		deadline_merge,
