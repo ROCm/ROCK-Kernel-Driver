@@ -1363,6 +1363,9 @@ static void emac_reset_configure(struct ocp_enet_private *fep)
 
 	/* set frame gap */
 	out_be32(&emacp->em0ipgvr, CONFIG_IBM_EMAC_FGAP);
+	
+	/* set VLAN Tag Protocol Identifier */
+	out_be32(&emacp->em0vtpid, 0x8100);
 
 	/* Init ring buffers */
 	emac_init_rings(fep->ndev);
