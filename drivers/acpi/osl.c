@@ -306,10 +306,10 @@ acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
  */
 
 void
-acpi_os_sleep(u32 sec, u32 ms)
+acpi_os_sleep(acpi_integer ms)
 {
 	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ * sec + (ms * HZ) / 1000);
+	schedule_timeout(((signed long) ms * HZ) / 1000);
 }
 
 void
