@@ -133,17 +133,6 @@ void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb)
 }
 
 /**
- *	llc_sap_send_pdu - Sends a frame to MAC layer for transmition
- *	@sap: pointer to SAP
- *	@skb: pdu that must be sent
- */
-void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
-{
-	mac_send_pdu(skb);
-	kfree_skb(skb);
-}
-
-/**
  *	llc_sap_next_state - finds transition, execs actions & change SAP state
  *	@sap: pointer to SAP
  *	@skb: happened event

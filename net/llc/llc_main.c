@@ -387,13 +387,9 @@ static void llc_station_send_pdus(struct llc_station *station)
 {
 	struct sk_buff *skb;
 
-	while ((skb = skb_dequeue(&station->mac_pdu_q)) != NULL) {
-		int rc = mac_send_pdu(skb);
-
-		kfree_skb(skb);
-		if (rc)
+	while ((skb = skb_dequeue(&station->mac_pdu_q)) != NULL)
+		if (dev_queue_xmit(skb))
 			break;
-	}
 }
 
 /**
