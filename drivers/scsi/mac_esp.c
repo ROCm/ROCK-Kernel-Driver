@@ -46,7 +46,7 @@
 #define mac_turnon_irq(x)	mac_enable_irq(x)
 #define mac_turnoff_irq(x)	mac_disable_irq(x)
 
-extern inline void esp_handle(struct NCR_ESP *esp);
+extern void esp_handle(struct NCR_ESP *esp);
 extern void mac_esp_intr(int irq, void *dev_id, struct pt_regs *pregs);
 
 static int  dma_bytes_sent(struct NCR_ESP * esp, int fifo_count);
