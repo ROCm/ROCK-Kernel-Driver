@@ -1,2 +1,2 @@
 obj-y			:= shutdown.o
-obj-$(CONFIG_PM)	+= suspend.o resume.o
+obj-$(CONFIG_PM)	+= main.o suspend.o resume.o

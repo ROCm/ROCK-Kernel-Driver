@@ -188,6 +188,15 @@ static inline void pm_dev_idle(struct pm_dev *dev) {}
 extern void (*pm_idle)(void);
 extern void (*pm_power_off)(void);
 
+
+struct dev_pm_info {
+#ifdef	CONFIG_PM
+	u32			power_state;
+	u8			* saved_state;
+	struct list_head	entry;
+#endif
+};
+
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_PM_H */
