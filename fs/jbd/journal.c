@@ -359,9 +359,10 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	int do_escape = 0;
 	char *mapped_data;
 	struct buffer_head *new_bh;
-	struct journal_head * new_jh;
+	struct journal_head *new_jh;
 	struct page *new_page;
 	unsigned int new_offset;
+	struct buffer_head *bh_in = jh2bh(jh_in);
 
 	/*
 	 * The buffer really shouldn't be locked: only the current committing
@@ -372,13 +373,16 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	 * also part of a shared mapping, and another thread has
 	 * decided to launch a writepage() against this buffer.
 	 */
-	J_ASSERT_JH(jh_in, buffer_jbddirty(jh2bh(jh_in)));
+	J_ASSERT_BH(bh_in, buffer_jbddirty(bh_in));
+
+	new_bh = alloc_buffer_head(GFP_NOFS|__GFP_NOFAIL);
 
 	/*
 	 * If a new transaction has already done a buffer copy-out, then
 	 * we use that version of the data for the commit.
 	 */
-
+	jbd_lock_bh_state(bh_in);
+repeat:
 	if (jh_in->b_frozen_data) {
 		done_copy_out = 1;
 		new_page = virt_to_page(jh_in->b_frozen_data);
@@ -388,12 +392,13 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 		new_offset = virt_to_offset(jh2bh(jh_in)->b_data);
 	}
 
-	mapped_data = ((char *) kmap(new_page)) + new_offset;
+	mapped_data = kmap_atomic(new_page, KM_USER0);
 
 	/*
 	 * Check for escaping
 	 */
-	if (* ((unsigned int *) mapped_data) == htonl(JFS_MAGIC_NUMBER)) {
+	if (*((unsigned int *)(mapped_data + new_offset)) ==
+				htonl(JFS_MAGIC_NUMBER)) {
 		need_copy_out = 1;
 		do_escape = 1;
 	}
@@ -401,38 +406,47 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	/*
 	 * Do we need to do a data copy?
 	 */
-
 	if (need_copy_out && !done_copy_out) {
 		char *tmp;
-		tmp = jbd_rep_kmalloc(jh2bh(jh_in)->b_size, GFP_NOFS);
+
+		kunmap_atomic(mapped_data, KM_USER0);
+		jbd_unlock_bh_state(bh_in);
+		tmp = jbd_rep_kmalloc(bh_in->b_size, GFP_NOFS);
+		jbd_lock_bh_state(bh_in);
+		if (jh_in->b_frozen_data) {
+			kfree(new_page);
+			goto repeat;
+		}
 
 		jh_in->b_frozen_data = tmp;
-		memcpy (tmp, mapped_data, jh2bh(jh_in)->b_size);
-		
+		mapped_data = kmap_atomic(new_page, KM_USER0);
+		memcpy(tmp, mapped_data + new_offset, jh2bh(jh_in)->b_size);
+
 		/* If we get to this path, we'll always need the new
 		   address kmapped so that we can clear the escaped
 		   magic number below. */
-		kunmap(new_page);
 		new_page = virt_to_page(tmp);
 		new_offset = virt_to_offset(tmp);
-		mapped_data = ((char *) kmap(new_page)) + new_offset;
-		
 		done_copy_out = 1;
 	}
 
 	/*
-	 * Right, time to make up the new buffer_head.
+	 * Did we need to do an escaping?  Now we've done all the
+	 * copying, we can finally do so.
 	 */
-	new_bh = alloc_buffer_head(GFP_NOFS|__GFP_NOFAIL);
+	if (do_escape)
+		*((unsigned int *)(mapped_data + new_offset)) = 0;
+	kunmap_atomic(mapped_data, KM_USER0);
 
 	/* keep subsequent assertions sane */
 	new_bh->b_state = 0;
 	init_buffer(new_bh, NULL, NULL);
 	atomic_set(&new_bh->b_count, 1);
-	new_jh = journal_add_journal_head(new_bh);
+	jbd_unlock_bh_state(bh_in);
+
+	new_jh = journal_add_journal_head(new_bh);	/* This sleeps */
 
 	set_bh_page(new_bh, new_page, new_offset);
-
 	new_jh->b_transaction = NULL;
 	new_bh->b_size = jh2bh(jh_in)->b_size;
 	new_bh->b_bdev = transaction->t_journal->j_dev;
@@ -442,15 +456,6 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 
 	*jh_out = new_jh;
 
-	/*
-	 * Did we need to do an escaping?  Now we've done all the
-	 * copying, we can finally do so.
-	 */
-
-	if (do_escape)
-		* ((unsigned int *) mapped_data) = 0;
-	kunmap(new_page);
-	
 	/*
 	 * The to-be-written buffer needs to get moved to the io queue,
 	 * and the original buffer whose contents we are shadowing or

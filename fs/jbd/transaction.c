@@ -502,7 +502,6 @@ do_get_write_access(handle_t *handle, struct journal_head *jh, int force_copy)
 	int error;
 	char *frozen_buffer = NULL;
 	int need_copy = 0;
-	int locked;
 
 	jbd_debug(5, "buffer_head %p, force_copy %d\n", jh, force_copy);
 
@@ -512,16 +511,9 @@ repeat:
 
 	/* @@@ Need to check for errors here at some point. */
 
-	locked = test_set_buffer_locked(bh);
-	if (locked) {
-		/* We can't reliably test the buffer state if we found
-		 * it already locked, so just wait for the lock and
-		 * retry. */
-		unlock_journal(journal);
-		wait_on_buffer(bh);
-		lock_journal(journal);
-		goto repeat;
-	}
+	lock_buffer(bh);
+	jbd_lock_bh_state(bh);
+	spin_lock(&journal_datalist_lock);
 
 	/* We now hold the buffer lock so it is safe to query the buffer
 	 * state.  Is the buffer dirty? 
@@ -537,7 +529,6 @@ repeat:
 	 * the buffer dirtied, ugh.)  */
 
 	if (buffer_dirty(bh)) {
-		spin_lock(&journal_datalist_lock);
 		/* First question: is this buffer already part of the
 		 * current transaction or the existing committing
 		 * transaction? */
@@ -552,17 +543,17 @@ repeat:
 			JBUFFER_TRACE(jh, "Unexpected dirty buffer");
 			jbd_unexpected_dirty_buffer(jh);
  		}
- 		spin_unlock(&journal_datalist_lock);
  	}
 
 	unlock_buffer(bh);
 
 	error = -EROFS;
-	if (is_handle_aborted(handle)) 
+	if (is_handle_aborted(handle)) {
+		spin_unlock(&journal_datalist_lock);
+		jbd_unlock_bh_state(bh);
 		goto out_unlocked;
+	}
 	error = 0;
-
-	spin_lock(&journal_datalist_lock);
 
 	/* The buffer is already part of this transaction if
 	 * b_transaction or b_next_transaction points to it. */
@@ -606,6 +597,7 @@ repeat:
 
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			spin_unlock(&journal_datalist_lock);
+			jbd_unlock_bh_state(bh);
 			unlock_journal(journal);
 			/* commit wakes up all shadow buffers after IO */
 			wqh = bh_waitq_head(jh2bh(jh));
@@ -633,16 +625,16 @@ repeat:
 			if (!frozen_buffer) {
 				JBUFFER_TRACE(jh, "allocate memory for buffer");
 				spin_unlock(&journal_datalist_lock);
-				unlock_journal(journal);
+				jbd_unlock_bh_state(bh);
 				frozen_buffer = jbd_kmalloc(jh2bh(jh)->b_size,
 							    GFP_NOFS);
-				lock_journal(journal);
 				if (!frozen_buffer) {
 					printk(KERN_EMERG
 					       "%s: OOM for frozen_buffer\n",
 					       __FUNCTION__);
 					JBUFFER_TRACE(jh, "oom!");
 					error = -ENOMEM;
+					jbd_lock_bh_state(bh);
 					spin_lock(&journal_datalist_lock);
 					goto done_locked;
 				}
@@ -672,7 +664,6 @@ repeat:
 	}
 	
 done_locked:
-	spin_unlock(&journal_datalist_lock);
 	if (need_copy) {
 		struct page *page;
 		int offset;
@@ -682,17 +673,16 @@ done_locked:
 			    "Possible IO failure.\n");
 		page = jh2bh(jh)->b_page;
 		offset = ((unsigned long) jh2bh(jh)->b_data) & ~PAGE_MASK;
-		source = kmap(page);
+		source = kmap_atomic(page, KM_USER0);
 		memcpy(jh->b_frozen_data, source+offset, jh2bh(jh)->b_size);
-		kunmap(page);
+		kunmap_atomic(source, KM_USER0);
 	}
-	
+	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 
 	/* If we are about to journal a buffer, then any revoke pending
            on it is no longer valid. */
-	lock_kernel();
 	journal_cancel_revoke(handle, jh);
-	unlock_kernel();
 
 out_unlocked:
 	if (frozen_buffer)
@@ -1070,8 +1060,9 @@ int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
 	if (is_handle_aborted(handle))
 		goto out_unlock;
 	
+	jbd_lock_bh_state(bh);
 	spin_lock(&journal_datalist_lock);
-	set_bit(BH_JBDDirty, &bh->b_state);
+	set_buffer_jbddirty(bh);
 
 	J_ASSERT_JH(jh, jh->b_transaction != NULL);
 	
@@ -1102,6 +1093,7 @@ int journal_dirty_metadata (handle_t *handle, struct buffer_head *bh)
 
 done_locked:
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 	JBUFFER_TRACE(jh, "exit");
 out_unlock:
 	unlock_journal(journal);
@@ -1168,6 +1160,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 	BUFFER_TRACE(bh, "entry");
 
 	lock_journal(journal);
+	jbd_lock_bh_state(bh);
 	spin_lock(&journal_datalist_lock);
 
 	if (!buffer_jbd(bh))
@@ -1181,7 +1174,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 		 * of this transaction, then we can just drop it from
 		 * the transaction immediately. */
 		clear_buffer_dirty(bh);
-		clear_bit(BH_JBDDirty, &bh->b_state);
+		clear_buffer_jbddirty(bh);
 
 		JBUFFER_TRACE(jh, "belongs to current transaction: unfile");
 		J_ASSERT_JH(jh, !jh->b_committed_data);
@@ -1208,6 +1201,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 			__brelse(bh);
 			if (!buffer_jbd(bh)) {
 				spin_unlock(&journal_datalist_lock);
+				jbd_unlock_bh_state(bh);
 				unlock_journal(journal);
 				__bforget(bh);
 				return;
@@ -1231,6 +1225,7 @@ void journal_forget (handle_t *handle, struct buffer_head *bh)
 
 not_jbd:
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(bh);
 	unlock_journal(journal);
 	__brelse(bh);
 	return;
@@ -1924,7 +1919,7 @@ void __journal_file_buffer(struct journal_head *jh,
 	struct buffer_head *bh = jh2bh(jh);
 
 	assert_spin_locked(&journal_datalist_lock);
-	
+
 #ifdef __SMP__
 	J_ASSERT (current->lock_depth >= 0);
 #endif
@@ -1990,9 +1985,11 @@ void __journal_file_buffer(struct journal_head *jh,
 void journal_file_buffer(struct journal_head *jh,
 				transaction_t *transaction, int jlist)
 {
+	jbd_lock_bh_state(jh2bh(jh));
 	spin_lock(&journal_datalist_lock);
 	__journal_file_buffer(jh, transaction, jlist);
 	spin_unlock(&journal_datalist_lock);
+	jbd_unlock_bh_state(jh2bh(jh));
 }
 
 /* 
@@ -2045,12 +2042,13 @@ void __journal_refile_buffer(struct journal_head *jh)
  */
 void journal_refile_buffer(struct journal_head *jh)
 {
-	struct buffer_head *bh;
+	struct buffer_head *bh = jh2bh(jh);
 
+	jbd_lock_bh_state(bh);
 	spin_lock(&journal_datalist_lock);
-	bh = jh2bh(jh);
 
 	__journal_refile_buffer(jh);
+	jbd_unlock_bh_state(bh);
 	journal_remove_journal_head(bh);
 
 	spin_unlock(&journal_datalist_lock);

@@ -210,8 +210,18 @@ write_out_data_locked:
 				wbuf[bufs++] = bh;
 			} else {
 				BUFFER_TRACE(bh, "writeout complete: unfile");
+				/*
+				 * We have a lock ranking problem..
+				 */
+				if (!jbd_trylock_bh_state(bh)) {
+					spin_unlock(&journal_datalist_lock);
+					schedule();
+					spin_lock(&journal_datalist_lock);
+					break;
+				}
 				__journal_unfile_buffer(jh);
 				jh->b_transaction = NULL;
+				jbd_unlock_bh_state(bh);
 				journal_remove_journal_head(bh);
 				__brelse(bh);
 			}
@@ -652,7 +662,6 @@ skip_commit: /* The journal should be unlocked by now. */
 			kfree(jh->b_frozen_data);
 			jh->b_frozen_data = NULL;
 		}
-		jbd_unlock_bh_state(jh2bh(jh));
 
 		spin_lock(&journal_datalist_lock);
 		cp_transaction = jh->b_cp_transaction;
@@ -687,11 +696,13 @@ skip_commit: /* The journal should be unlocked by now. */
 			__journal_insert_checkpoint(jh, commit_transaction);
 			JBUFFER_TRACE(jh, "refile for checkpoint writeback");
 			__journal_refile_buffer(jh);
+			jbd_unlock_bh_state(bh);
 		} else {
 			J_ASSERT_BH(bh, !buffer_dirty(bh));
 			J_ASSERT_JH(jh, jh->b_next_transaction == NULL);
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = 0;
+			jbd_unlock_bh_state(bh);
 			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
