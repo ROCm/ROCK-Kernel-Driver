@@ -121,7 +121,7 @@ static void usb_mouse_close(struct input_dev *dev)
 static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_id * id)
 {
 	struct usb_device * dev = interface_to_usbdev(intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_mouse *mouse;
 	int pipe, maxp;
@@ -130,10 +130,10 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 
 	interface = &intf->altsetting[intf->act_altsetting];
 
-	if (interface->bNumEndpoints != 1) 
+	if (interface->desc.bNumEndpoints != 1) 
 		return -ENODEV;
 
-	endpoint = interface->endpoint + 0;
+	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80)) 
 		return -ENODEV;
 	if ((endpoint->bmAttributes & 3) != 3) 

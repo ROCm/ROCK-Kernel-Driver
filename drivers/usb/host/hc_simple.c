@@ -219,7 +219,7 @@ static int hci_unlink_urb (struct urb * urb)
 	if (!list_empty (&urb->urb_list) && urb->status == -EINPROGRESS) {
 		/* URB active? */
 
-		if (urb->transfer_flags & (USB_ASYNC_UNLINK | USB_TIMEOUT_KILLED)) {
+		if (urb->transfer_flags & (URB_ASYNC_UNLINK | URB_TIMEOUT_KILLED)) {
 			/* asynchronous with callback */
 			/* relink the urb to the del list */
 			list_move (&urb->urb_list, &hci->del_list);
@@ -251,7 +251,7 @@ static int hci_unlink_urb (struct urb * urb)
 		/* hcd does not own URB but we keep the driver happy anyway */
 		spin_unlock_irqrestore (&usb_urb_lock, flags);
 
-		if (urb->complete && (urb->transfer_flags & USB_ASYNC_UNLINK)) {
+		if (urb->complete && (urb->transfer_flags & URB_ASYNC_UNLINK)) {
 			urb->status = -ENOENT;
 			urb->actual_length = 0;
 			urb->complete (urb);
@@ -388,7 +388,7 @@ static void qu_urb_timeout (unsigned long lurb)
 	struct urb *urb = (struct urb *) lurb;
 
 	DBGFUNC ("enter qu_urb_timeout\n");
-	urb->transfer_flags |= USB_TIMEOUT_KILLED;
+	urb->transfer_flags |= URB_TIMEOUT_KILLED;
 	hci_unlink_urb (urb);
 }
 #endif
@@ -472,7 +472,7 @@ static inline void qu_queue_active_urb (hci_t * hci, struct urb * urb, epd_t * e
 
 	case PIPE_BULK:
 		list_add (&urb->urb_list, &hci->bulk_list);
-		if ((urb->transfer_flags & USB_ZERO_PACKET)
+		if ((urb->transfer_flags & URB_ZERO_PACKET)
 		    && urb->transfer_buffer_length > 0
 		    &&
 		    ((urb->transfer_buffer_length %
@@ -523,7 +523,7 @@ static int qu_queue_urb (hci_t * hci, struct urb * urb)
 
 	/* for ISOC transfers calculate start frame index */
 
-	if (usb_pipeisoc (urb->pipe) && urb->transfer_flags & USB_ISO_ASAP) {
+	if (usb_pipeisoc (urb->pipe) && urb->transfer_flags & URB_ISO_ASAP) {
 		urb->start_frame = ((ed->pipe_head) ? (ed->last_iso + 1) : hci_get_current_frame_number (urb-> dev) + 1) & 0xffff;
 	}
 

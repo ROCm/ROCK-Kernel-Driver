@@ -29,7 +29,7 @@
  *
  * 2001/10/18 merge pmac cleanup (Benjamin Herrenschmidt) and bugfixes
  *	from post-2.4.5 patches.
- * 2001/09/20 USB_ZERO_PACKET support; hcca_dma portability, OPTi warning
+ * 2001/09/20 URB_ZERO_PACKET support; hcca_dma portability, OPTi warning
  * 2001/09/07 match PCI PM changes, errnos from Linus' tree
  * 2001/05/05 fork 2.4.5 version into "hcd" framework, cleanup, simplify;
  *	pbook pci quirks gone (please fix pbook pci sw!) (db)
@@ -185,7 +185,7 @@ static int ohci_urb_enqueue (
 			/* ... and maybe a zero length packet to wrap it up */
 			if (size == 0)
 				size++;
-			else if ((urb->transfer_flags & USB_ZERO_PACKET) != 0
+			else if ((urb->transfer_flags & URB_ZERO_PACKET) != 0
 				&& (urb->transfer_buffer_length
 					% usb_maxpacket (urb->dev, pipe,
 						usb_pipeout (pipe))) == 0)
@@ -239,7 +239,7 @@ static int ohci_urb_enqueue (
 			frame |= ed->branch;
 			urb->start_frame = frame;
 
-			/* yes, only USB_ISO_ASAP is supported, and
+			/* yes, only URB_ISO_ASAP is supported, and
 			 * urb->start_frame is never used as input.
 			 */
 		}

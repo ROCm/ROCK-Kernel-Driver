@@ -330,7 +330,7 @@ static int usb_write( struct midi_out_endpoint *ep, unsigned char *buf, int len 
 
 	d = ep->usbdev;
 	pipe = usb_sndbulkpipe(d, ep->endpoint);
-	FILL_BULK_URB( ep->urb, d, pipe, (unsigned char*)buf, len,
+	usb_fill_bulk_urb( ep->urb, d, pipe, (unsigned char*)buf, len,
 		       (usb_complete_t)usb_write_callback, ep );
 
 	status = usb_submit_urb(ep->urb, GFP_KERNEL);
@@ -1045,7 +1045,7 @@ static struct midi_in_endpoint *alloc_midi_in_endpoint( struct usb_device *d, in
 		kfree(ep);
 		return NULL;
 	}
-	FILL_BULK_URB( ep->urb, d, 
+	usb_fill_bulk_urb( ep->urb, d, 
 		       usb_rcvbulkpipe(d, endPoint),
 		       (unsigned char *)ep->recvBuf, bufSize,
 		       (usb_complete_t)usb_bulk_read, ep );
@@ -1519,7 +1519,7 @@ static int on_bits( unsigned short v )
 static int get_alt_setting( struct usb_device *d, int ifnum )
 {
 	int alts, alt=0;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *ep;
 	int epin, epout;
 	int i;
@@ -1531,8 +1531,8 @@ static int get_alt_setting( struct usb_device *d, int ifnum )
 		epin = -1;
 		epout = -1;
 
-		for ( i=0 ; i<interface->bNumEndpoints ; i++ ) {
-			ep = &interface->endpoint[i];
+		for ( i=0 ; i<interface->desc.bNumEndpoints ; i++ ) {
+			ep = &interface->endpoint[i].desc;
 			if ( (ep->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK ) {
 				continue;
 			}
@@ -1778,8 +1778,8 @@ static int alloc_usb_midi_device( struct usb_device *d, struct usb_midi_state *s
 
 static int detect_yamaha_device( struct usb_device *d, unsigned int ifnum, struct usb_midi_state *s)
 {
-	struct usb_config_descriptor    *c = d->actconfig;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_config *c = d->actconfig;
+	struct usb_host_interface *interface;
 	struct usb_midi_device *u;
 	unsigned char buf[USB_DT_CONFIG_SIZE], *buffer;
 	int bufSize;
@@ -1794,8 +1794,8 @@ static int detect_yamaha_device( struct usb_device *d, unsigned int ifnum, struc
 	for ( i=0 ; i < c->interface[ifnum].num_altsetting; i++ ) {
 		interface = c->interface[ifnum].altsetting + i;
 
-		if ( interface->bInterfaceClass != 255 ||
-		     interface->bInterfaceSubClass != 0 )
+		if ( interface->desc.bInterfaceClass != 255 ||
+		     interface->desc.bInterfaceSubClass != 0 )
 			continue;
 		alts = i;
 	}
@@ -1817,7 +1817,7 @@ static int detect_yamaha_device( struct usb_device *d, unsigned int ifnum, struc
  configfound:
 
 	/* this may not be necessary. */
-	if ( usb_set_configuration( d, c->bConfigurationValue ) < 0 ) {
+	if ( usb_set_configuration( d, c->desc.bConfigurationValue ) < 0 ) {
 		printk(KERN_INFO "usb-midi: Could not set config.\n");
 		return -EINVAL;
 	}
@@ -1892,8 +1892,8 @@ static int detect_vendor_specific_device( struct usb_device *d, unsigned int ifn
  **/
 static int detect_midi_subclass(struct usb_device *d, unsigned int ifnum, struct usb_midi_state *s)
 {
-	struct usb_config_descriptor    *c = d->actconfig;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_config *c = d->actconfig;
+	struct usb_host_interface *interface;
 	struct usb_midi_device *u;
 	unsigned char buf[USB_DT_CONFIG_SIZE], *buffer;
 	int bufSize;
@@ -1904,8 +1904,8 @@ static int detect_midi_subclass(struct usb_device *d, unsigned int ifnum, struct
 	for ( i=0 ; i < c->interface[ifnum].num_altsetting; i++ ) {
 		interface = c->interface[ifnum].altsetting + i;
 
-		if ( interface->bInterfaceClass != USB_CLASS_AUDIO ||
-		     interface->bInterfaceSubClass != USB_SUBCLASS_MIDISTREAMING )
+		if ( interface->desc.bInterfaceClass != USB_CLASS_AUDIO ||
+		     interface->desc.bInterfaceSubClass != USB_SUBCLASS_MIDISTREAMING )
 			continue;
 		alts = i;
 	}
@@ -1927,7 +1927,7 @@ static int detect_midi_subclass(struct usb_device *d, unsigned int ifnum, struct
  configfound:
 
 	/* this may not be necessary. */
-	if ( usb_set_configuration( d, c->bConfigurationValue ) < 0 ) {
+	if ( usb_set_configuration( d, c->desc.bConfigurationValue ) < 0 ) {
 		printk(KERN_INFO "usb-midi: Could not set config.\n");
 		return -EINVAL;
 	}
@@ -2025,7 +2025,7 @@ static int usb_midi_probe(struct usb_interface *intf,
 {
 	struct usb_midi_state *s;
 	struct usb_device *dev = interface_to_usbdev(intf);
-	int ifnum = intf->altsetting->bInterfaceNumber;
+	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 
 	s = (struct usb_midi_state *)kmalloc(sizeof(struct usb_midi_state), GFP_KERNEL);
 	if ( !s )

@@ -249,7 +249,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 		return -ENOMEM;
         }
 	
-	ep_irq_in = intf->altsetting[0].endpoint + 0;
+	ep_irq_in = &intf->altsetting[0].endpoint[0].desc;
 	
 	usb_fill_int_urb(xpad->irq_in, udev,
 			 usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),

@@ -220,7 +220,7 @@ static int cpia_usb_open(void *privdata)
 	urb->dev = ucpia->dev;
 	urb->context = ucpia;
 	urb->pipe = usb_rcvisocpipe(ucpia->dev, 1);
-	urb->transfer_flags = USB_ISO_ASAP;
+	urb->transfer_flags = URB_ISO_ASAP;
 	urb->transfer_buffer = ucpia->sbuf[0].data;
 	urb->complete = cpia_usb_complete;
 	urb->number_of_packets = FRAMES_PER_DESC;
@@ -242,7 +242,7 @@ static int cpia_usb_open(void *privdata)
 	urb->dev = ucpia->dev;
 	urb->context = ucpia;
 	urb->pipe = usb_rcvisocpipe(ucpia->dev, 1);
-	urb->transfer_flags = USB_ISO_ASAP;
+	urb->transfer_flags = URB_ISO_ASAP;
 	urb->transfer_buffer = ucpia->sbuf[1].data;
 	urb->complete = cpia_usb_complete;
 	urb->number_of_packets = FRAMES_PER_DESC;

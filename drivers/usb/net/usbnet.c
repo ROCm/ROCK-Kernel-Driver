@@ -532,7 +532,7 @@ static int genelink_init (struct usbnet *dev)
 	}
 
 	// fill irq urb
-	FILL_INT_URB (priv->irq_urb, dev->udev,
+	usb_fill_int_urb (priv->irq_urb, dev->udev,
 		usb_rcvintpipe (dev->udev, GENELINK_INTERRUPT_PIPE),
 		priv->irq_buf, INTERRUPT_BUFSIZE,
 		gl_interrupt_complete, 0,
@@ -1472,14 +1472,14 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	entry->state = rx_start;
 	entry->length = 0;
 
-	FILL_BULK_URB (urb, dev->udev,
+	usb_fill_bulk_urb (urb, dev->udev,
 		usb_rcvbulkpipe (dev->udev, dev->driver_info->in),
 		skb->data, size, rx_complete, skb);
-	urb->transfer_flags |= USB_ASYNC_UNLINK;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
 #if 0
 	// Idle-but-posted reads with UHCI really chew up
 	// PCI bandwidth unless FSBR is disabled
-	urb->transfer_flags |= USB_NO_FSBR;
+	urb->transfer_flags |= URB_NO_FSBR;
 #endif
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
@@ -1954,10 +1954,10 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	if ((length % EP_SIZE (dev)) == 0)
 		skb->len++;
 
-	FILL_BULK_URB (urb, dev->udev,
+	usb_fill_bulk_urb (urb, dev->udev,
 			usb_sndbulkpipe (dev->udev, info->out),
 			skb->data, skb->len, tx_complete, skb);
-	urb->transfer_flags |= USB_ASYNC_UNLINK;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
 	// FIXME urb->timeout = ... jiffies ... ;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);
@@ -2125,7 +2125,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
 	struct net_device 		*net;
-	struct usb_interface_descriptor	*interface;
+	struct usb_host_interface	*interface;
 	struct driver_info		*info;
 	struct usb_device		*xdev;
 
@@ -2135,8 +2135,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	interface = &udev->altsetting [udev->act_altsetting];
 
 	if (!(info->flags & FLAG_NO_SETINT)) {
-		if (usb_set_interface (xdev, interface->bInterfaceNumber,
-				interface->bAlternateSetting) < 0) {
+		if (usb_set_interface (xdev, interface->desc.bInterfaceNumber,
+				interface->desc.bAlternateSetting) < 0) {
 			err ("set_interface failed");
 			return -EIO;
 		}

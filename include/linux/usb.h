@@ -41,56 +41,36 @@ struct usb_device;
 /*-------------------------------------------------------------------------*/
 
 /*
- * Standard USB Descriptor support.
+ * Host-side wrappers for standard USB descriptors ... these are parsed
+ * from the data provided by devices.  Parsing turns them from a flat
+ * sequence of descriptors into a hierarchy:
+ *
+ *  - devices have one (usually) or more configs;
+ *  - configs have one (often) or more interfaces;
+ *  - interfaces have one (usually) or more settings;
+ *  - each interface setting has zero or (usually) more endpoints.
+ *
+ * And there might be other descriptors mixed in with those.
+ *
  * Devices may also have class-specific or vendor-specific descriptors.
  */
 
-/*
- * Descriptor sizes per descriptor type
- */
-#define USB_DT_DEVICE_SIZE		18
-#define USB_DT_CONFIG_SIZE		9
-#define USB_DT_INTERFACE_SIZE		9
-#define USB_DT_ENDPOINT_SIZE		7
-#define USB_DT_ENDPOINT_AUDIO_SIZE	9	/* Audio extension */
+/* host-side wrapper for parsed endpoint descriptors */
+struct usb_host_endpoint {
+	struct usb_endpoint_descriptor	desc;
 
-/* most of these maximums are arbitrary */
-#define USB_MAXCONFIG			8
-#define USB_ALTSETTINGALLOC		4
-#define USB_MAXALTSETTING		128	/* Hard limit */
-#define USB_MAXINTERFACES		32
-#define USB_MAXENDPOINTS		32	/* Hard limit */
-
-/* USB_DT_ENDPOINT: Endpoint descriptor */
-struct usb_endpoint_descriptor {
-	__u8  bLength		__attribute__ ((packed));
-	__u8  bDescriptorType	__attribute__ ((packed));
-	__u8  bEndpointAddress	__attribute__ ((packed));
-	__u8  bmAttributes	__attribute__ ((packed));
-	__u16 wMaxPacketSize	__attribute__ ((packed));
-	__u8  bInterval		__attribute__ ((packed));
-	__u8  bRefresh		__attribute__ ((packed));
-	__u8  bSynchAddress	__attribute__ ((packed));
-
-	/* the rest is internal to the Linux implementation */
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
 
-/* USB_DT_INTERFACE: Interface descriptor */
-struct usb_interface_descriptor {
-	__u8  bLength		__attribute__ ((packed));
-	__u8  bDescriptorType	__attribute__ ((packed));
-	__u8  bInterfaceNumber	__attribute__ ((packed));
-	__u8  bAlternateSetting	__attribute__ ((packed));
-	__u8  bNumEndpoints	__attribute__ ((packed));
-	__u8  bInterfaceClass	__attribute__ ((packed));
-	__u8  bInterfaceSubClass __attribute__ ((packed));
-	__u8  bInterfaceProtocol __attribute__ ((packed));
-	__u8  iInterface	__attribute__ ((packed));
+/* host-side wrapper for one interface setting's parsed descriptors */
+struct usb_host_interface {
+	struct usb_interface_descriptor	desc;
 
-	/* the rest is internal to the Linux implementation */
-	struct usb_endpoint_descriptor *endpoint;
+	/* array of desc.bNumEndpoint endpoints associated with this
+	 * interface setting.  these will be in no particular order.
+	 */
+	struct usb_host_endpoint *endpoint;
 
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
@@ -127,7 +107,10 @@ struct usb_interface_descriptor {
  * will use them in non-default settings.
  */
 struct usb_interface {
-	struct usb_interface_descriptor *altsetting;
+	/* array of alternate settings for this interface.
+	 * these will be in numeric order, 0..num_altsettting
+	 */
+	struct usb_host_interface *altsetting;
 
 	unsigned act_altsetting;	/* active alternate setting */
 	unsigned num_altsetting;	/* number of alternate settings */
@@ -148,17 +131,12 @@ struct usb_interface {
  * different depending on what speed they're currently running.  Only
  * devices with a USB_DT_DEVICE_QUALIFIER have an OTHER_SPEED_CONFIG.
  */
-struct usb_config_descriptor {
-	__u8  bLength		__attribute__ ((packed));
-	__u8  bDescriptorType	__attribute__ ((packed));
-	__u16 wTotalLength	__attribute__ ((packed));
-	__u8  bNumInterfaces	__attribute__ ((packed));
-	__u8  bConfigurationValue __attribute__ ((packed));
-	__u8  iConfiguration	__attribute__ ((packed));
-	__u8  bmAttributes	__attribute__ ((packed));
-	__u8  MaxPower		__attribute__ ((packed));
+struct usb_host_config {
+	struct usb_config_descriptor	desc;
 
-	/* the rest is internal to the Linux implementation */
+	/* the interfaces associated with this configuration
+	 * these will be in numeric order, 0..desc.bNumInterfaces
+	 */
 	struct usb_interface *interface;
 
 	unsigned char *extra;   /* Extra descriptors */
@@ -177,8 +155,6 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 		type,(void**)ptr)
 
 /* -------------------------------------------------------------------------- */
-
-/* Host Controller Driver (HCD) support */
 
 struct usb_operations;
 
@@ -248,8 +224,8 @@ struct usb_device {
 	struct device dev;		/* Generic device interface */
 
 	struct usb_device_descriptor descriptor;/* Descriptor */
-	struct usb_config_descriptor *config;	/* All of the configs */
-	struct usb_config_descriptor *actconfig;/* the active configuration */
+	struct usb_host_config *config;	/* All of the configs */
+	struct usb_host_config *actconfig;/* the active configuration */
 
 	char **rawdescriptors;		/* Raw descriptors for each config */
 
@@ -560,17 +536,15 @@ extern int usb_disabled(void);
 
 /*
  * urb->transfer_flags:
- *
- * FIXME should _all_ be URB_* flags
  */
 #define URB_SHORT_NOT_OK	0x0001	/* report short reads as errors */
-#define USB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
+#define URB_ISO_ASAP		0x0002	/* iso-only, urb->start_frame ignored */
 #define URB_NO_DMA_MAP		0x0004	/* urb->*_dma are valid on submit */
-#define USB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
-#define USB_NO_FSBR		0x0020	/* UHCI-specific */
-#define USB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
+#define URB_ASYNC_UNLINK	0x0008	/* usb_unlink_urb() returns asap */
+#define URB_NO_FSBR		0x0020	/* UHCI-specific */
+#define URB_ZERO_PACKET		0x0040	/* Finish bulk OUTs with short packet */
 #define URB_NO_INTERRUPT	0x0080	/* HINT: no non-error interrupt needed */
-#define USB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
+#define URB_TIMEOUT_KILLED	0x1000	/* only set by HCD! */
 
 struct usb_iso_packet_descriptor {
 	unsigned int offset;
@@ -674,7 +648,7 @@ typedef void (*usb_complete_t)(struct urb *);
  *
  * All URBs submitted must initialize dev, pipe,
  * transfer_flags (may be zero), complete, timeout (may be zero).
- * The USB_ASYNC_UNLINK transfer flag affects later invocations of
+ * The URB_ASYNC_UNLINK transfer flag affects later invocations of
  * the usb_unlink_urb() routine.
  *
  * All URBs must also initialize 
@@ -683,7 +657,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * to be treated as errors; that flag is invalid for write requests.
  *
  * Bulk URBs may
- * use the USB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
+ * use the URB_ZERO_PACKET transfer flag, indicating that bulk OUT transfers
  * should always terminate with a short packet, even if it means adding an
  * extra zero length packet.
  *
@@ -700,7 +674,7 @@ typedef void (*usb_complete_t)(struct urb *);
  * endpoints, as well as high speed interrupt endpoints, the encoding of
  * the transfer interval in the endpoint descriptor is logarithmic.)
  *
- * Isochronous URBs normally use the USB_ISO_ASAP transfer flag, telling
+ * Isochronous URBs normally use the URB_ISO_ASAP transfer flag, telling
  * the host controller to schedule the transfer as soon as bandwidth
  * utilization allows, and then set start_frame to reflect the actual frame
  * selected during submission.  Otherwise drivers must specify the start_frame
@@ -871,17 +845,6 @@ static inline void usb_fill_int_urb (struct urb *urb,
 		urb->interval = interval;
 	urb->start_frame = -1;
 }
-
-/*
- * old style macros to enable 2.4 and 2.2 drivers to build
- * properly.  Please do not use these for new USB drivers.
- */
-#define FILL_CONTROL_URB(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
-    usb_fill_control_urb(URB,DEV,PIPE,SETUP_PACKET,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT)
-#define FILL_BULK_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT) \
-    usb_fill_bulk_urb(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT)
-#define FILL_INT_URB(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL) \
-    usb_fill_int_urb(URB,DEV,PIPE,TRANSFER_BUFFER,BUFFER_LENGTH,COMPLETE,CONTEXT,INTERVAL)
 
 extern struct urb *usb_alloc_urb(int iso_packets, int mem_flags);
 extern void usb_free_urb(struct urb *urb);

@@ -33,14 +33,14 @@ show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
 		return 0;						\
 									\
 	udev = to_usb_device (dev);					\
-	return sprintf (buf, format_string, udev->actconfig->field);	\
+	return sprintf (buf, format_string, udev->actconfig->desc.field); \
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
 usb_actconfig_attr (bNumInterfaces, "%2d\n")
 usb_actconfig_attr (bConfigurationValue, "%2d\n")
 usb_actconfig_attr (bmAttributes, "%2x\n")
-usb_actconfig_attr (MaxPower, "%3dmA\n")
+usb_actconfig_attr (bMaxPower, "%3dmA\n")
 
 /* String fields */
 static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
@@ -157,7 +157,7 @@ void usb_create_driverfs_dev_files (struct usb_device *udev)
 	device_create_file (dev, &dev_attr_bNumInterfaces);
 	device_create_file (dev, &dev_attr_bConfigurationValue);
 	device_create_file (dev, &dev_attr_bmAttributes);
-	device_create_file (dev, &dev_attr_MaxPower);
+	device_create_file (dev, &dev_attr_bMaxPower);
 	device_create_file (dev, &dev_attr_idVendor);
 	device_create_file (dev, &dev_attr_idProduct);
 	device_create_file (dev, &dev_attr_bcdDevice);
@@ -188,7 +188,7 @@ show_##field (struct device *dev, char *buf, size_t count, loff_t off)	\
 	intf = to_usb_interface (dev);					\
 	alt = intf->act_altsetting;					\
 									\
-	return sprintf (buf, format_string, intf->altsetting[alt].field);	\
+	return sprintf (buf, format_string, intf->altsetting[alt].desc.field); \
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 

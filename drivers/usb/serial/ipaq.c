@@ -200,7 +200,7 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	port->bulk_out_size = port->write_urb->transfer_buffer_length = URBDATA_SIZE;
 	
 	/* Start reading from the device */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ipaq_read_bulk_callback, port);
@@ -308,7 +308,7 @@ static void ipaq_read_bulk_callback(struct urb *urb)
 	}
 
 	/* Continue trying to always read  */
-	FILL_BULK_URB(port->read_urb, serial->dev, 
+	usb_fill_bulk_urb(port->read_urb, serial->dev, 
 		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ipaq_read_bulk_callback, port);
@@ -429,7 +429,7 @@ static void ipaq_write_gather(struct usb_serial_port *port)
 	}
 
 	count = URBDATA_SIZE - room;
-	FILL_BULK_URB(port->write_urb, serial->dev, 
+	usb_fill_bulk_urb(port->write_urb, serial->dev, 
 		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
 		      port->write_urb->transfer_buffer, count, ipaq_write_bulk_callback,
 		      port);

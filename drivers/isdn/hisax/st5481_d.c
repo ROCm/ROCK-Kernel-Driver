@@ -358,7 +358,7 @@ static void usb_d_out(struct st5481_adapter *adapter, int buf_nr)
 
 	if (usb_submit_urb(urb, GFP_KERNEL) < 0) {
 		// There is another URB queued up
-		urb->transfer_flags = USB_ISO_ASAP;
+		urb->transfer_flags = URB_ISO_ASAP;
 		SUBMIT_URB(urb, GFP_KERNEL);
 	}	
 }
@@ -447,7 +447,7 @@ static void dout_start_xmit(struct FsmInst *fsm, int event, void *arg)
 
 	// Prepare the URB
 	urb->dev = adapter->usb_dev;
-	urb->transfer_flags = USB_ISO_ASAP;
+	urb->transfer_flags = URB_ISO_ASAP;
 
 	DBG_ISO_PACKET(0x20,urb);
 	SUBMIT_URB(urb, GFP_KERNEL);
@@ -652,8 +652,8 @@ static void ph_disconnect(struct st5481_adapter *adapter)
 static int __devinit st5481_setup_d_out(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
-	struct usb_interface_descriptor *altsetting;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_interface *altsetting;
+	struct usb_host_endpoint *endpoint;
 	struct st5481_d_out *d_out = &adapter->d_out;
 
 	DBG(2,"");
@@ -664,10 +664,10 @@ static int __devinit st5481_setup_d_out(struct st5481_adapter *adapter)
 	endpoint = &altsetting->endpoint[EP_D_OUT-1];
 
 	DBG(2,"endpoint address=%02x,packet size=%d",
-	    endpoint->bEndpointAddress,endpoint->wMaxPacketSize);
+	    endpoint->desc.bEndpointAddress,endpoint->desc.wMaxPacketSize);
 
 	return st5481_setup_isocpipes(d_out->urb, dev, 
-				      usb_sndisocpipe(dev, endpoint->bEndpointAddress),
+				      usb_sndisocpipe(dev, endpoint->desc.bEndpointAddress),
 				      NUM_ISO_PACKETS_D, SIZE_ISO_PACKETS_D_OUT,
 				      NUM_ISO_PACKETS_D * SIZE_ISO_PACKETS_D_OUT,
 				      usb_d_out_complete, adapter);

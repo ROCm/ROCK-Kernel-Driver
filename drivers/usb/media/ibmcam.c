@@ -3662,7 +3662,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 	struct uvd *uvd = NULL;
 	int i, nas, model=0, canvasX=0, canvasY=0;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
-	__u8 ifnum = intf->altsetting->bInterfaceNumber;
+	__u8 ifnum = intf->altsetting->desc.bInterfaceNumber;
 	unsigned char video_ep = 0;
 
 	if (debug >= 1)
@@ -3740,16 +3740,16 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 	}
 	/* Validate all alternate settings */
 	for (i=0; i < nas; i++) {
-		const struct usb_interface_descriptor *interface;
+		const struct usb_host_interface *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
 		interface = &dev->actconfig->interface[ifnum].altsetting[i];
-		if (interface->bNumEndpoints != 1) {
+		if (interface->desc.bNumEndpoints != 1) {
 			err("Interface %d. has %u. endpoints!",
-			    ifnum, (unsigned)(interface->bNumEndpoints));
+			    ifnum, (unsigned)(interface->desc.bNumEndpoints));
 			return -ENODEV;
 		}
-		endpoint = &interface->endpoint[0];
+		endpoint = &interface->endpoint[0].desc;
 		if (video_ep == 0)
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
