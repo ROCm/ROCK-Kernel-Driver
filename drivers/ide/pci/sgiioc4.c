@@ -332,17 +332,6 @@ sgiioc4_ide_dma_host_off(ide_drive_t * drive)
 }
 
 static int
-sgiioc4_ide_dma_verbose(ide_drive_t * drive)
-{
-	if (drive->using_dma == 1)
-		printk(", UDMA(16)");
-	else
-		printk(", PIO");
-
-	return 1;
-}
-
-static int
 sgiioc4_ide_dma_lostirq(ide_drive_t * drive)
 {
 	HWIF(drive)->resetproc(drive);
@@ -501,10 +490,7 @@ sgiioc4_build_dma_table(ide_drive_t * drive, struct request *rq, int ddir)
 	unsigned int count = 0, i = 1;
 	struct scatterlist *sg;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE)
-		hwif->sg_nents = i = ide_raw_build_sglist(drive, rq);
-	else
-		hwif->sg_nents = i = ide_build_sglist(drive, rq);
+	hwif->sg_nents = i = ide_build_sglist(drive, rq);
 
 	if (!i)
 		return 0;	/* sglist of length Zero */
@@ -623,7 +609,6 @@ ide_init_sgiioc4(ide_hwif_t * hwif)
 	hwif->ide_dma_test_irq = &sgiioc4_ide_dma_test_irq;
 	hwif->ide_dma_host_on = &sgiioc4_ide_dma_host_on;
 	hwif->ide_dma_host_off = &sgiioc4_ide_dma_host_off;
-	hwif->ide_dma_verbose = &sgiioc4_ide_dma_verbose;
 	hwif->ide_dma_lostirq = &sgiioc4_ide_dma_lostirq;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->INB = &sgiioc4_INB;
