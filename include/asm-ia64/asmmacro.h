@@ -60,12 +60,12 @@ name:
 #endif
 
 #ifdef CONFIG_MCKINLEY
-/* workaround for Itanium 2 Errata 7: */
-# define MCKINLEY_E7_WORKAROUND			\
+/* workaround for Itanium 2 Errata 9: */
+# define MCKINLEY_E9_WORKAROUND			\
 	br.call.sptk.many b7=1f;;		\
 1:
 #else
-# define MCKINLEY_E7_WORKAROUND
+# define MCKINLEY_E9_WORKAROUND
 #endif
 
 #endif /* _ASM_IA64_ASMMACRO_H */
