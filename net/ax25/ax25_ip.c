@@ -107,6 +107,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	ax25_address *src, *dst;
 	ax25_dev *ax25_dev;
 	ax25_route _route, *route = &_route;
+	ax25_cb *ax25;
 
 	dst = (ax25_address *)(bp + 1);
 	src = (ax25_address *)(bp + 8);
@@ -167,9 +168,14 @@ int ax25_rebuild_header(struct sk_buff *skb)
 			skb_pull(ourskb, AX25_HEADER_LEN - 1);	/* Keep PID */
 			ourskb->nh.raw = ourskb->data;
 
-			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c,
-&dst_c, route->digipeat, dev);
-
+			ax25=ax25_send_frame(
+			    ourskb, 
+			    ax25_dev->values[AX25_VALUES_PACLEN], 
+			    &src_c,
+			    &dst_c, route->digipeat, dev);
+			if (ax25) {
+				ax25_cb_put(ax25);
+			}
 			goto put;
 		}
 	}
