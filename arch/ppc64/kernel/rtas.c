@@ -66,42 +66,6 @@ spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
 
 void
-phys_call_rtas(int token, int nargs, int nret, ...)
-{
-	va_list list;
-	unsigned long offset = reloc_offset();
-	struct rtas_args *rtas = PTRRELOC(&(get_paca()->xRtas));
-	int i;
-
-	rtas->token = token;
-	rtas->nargs = nargs;
-	rtas->nret  = nret;
-	rtas->rets  = (rtas_arg_t *)PTRRELOC(&(rtas->args[nargs]));
-
-	va_start(list, nret);
-	for (i = 0; i < nargs; i++)
-	  rtas->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
-	va_end(list);
-
-        enter_rtas(rtas);	
-}
-
-void
-phys_call_rtas_display_status(char c)
-{
-	unsigned long offset = reloc_offset();
-	struct rtas_args *rtas = PTRRELOC(&(get_paca()->xRtas));
-
-	rtas->token = 10;
-	rtas->nargs = 1;
-	rtas->nret  = 1;
-	rtas->rets  = (rtas_arg_t *)PTRRELOC(&(rtas->args[1]));
-	rtas->args[0] = (int)c;
-
-	enter_rtas(rtas);	
-}
-
-void
 call_rtas_display_status(char c)
 {
 	struct rtas_args *rtas = &(get_paca()->xRtas);
