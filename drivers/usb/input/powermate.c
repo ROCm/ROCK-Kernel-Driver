@@ -433,14 +433,12 @@ static struct usb_driver powermate_driver = {
         .id_table =     powermate_devices,
 };
 
-int powermate_init(void)
+static int __init powermate_init(void)
 {
-	if (usb_register(&powermate_driver) < 0)
-		return -1;
-	return 0;
+	return usb_register(&powermate_driver);
 }
 
-void powermate_cleanup(void)
+static void __exit powermate_cleanup(void)
 {
 	usb_deregister(&powermate_driver);
 }

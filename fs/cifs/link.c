@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/link.c
  *
- *   Copyright (c) International Business Machines  Corp., 2002
+ *   Copyright (C) International Business Machines  Corp., 2002,2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -51,9 +51,12 @@ cifs_hardlink(struct dentry *old_file, struct inode *inode,
 	if (cifs_sb_target->tcon->ses->capabilities & CAP_UNIX)
 		rc = CIFSUnixCreateHardLink(xid, pTcon, fromName, toName,
 					    cifs_sb_target->local_nls);
-	else
+	else {
 		rc = CIFSCreateHardLink(xid, pTcon, fromName, toName,
 					cifs_sb_target->local_nls);
+		if(rc == -EIO)
+			rc = -EOPNOTSUPP;  
+	}
 
 /* if (!rc)     */
 	{

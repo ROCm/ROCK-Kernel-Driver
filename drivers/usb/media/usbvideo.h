@@ -17,14 +17,12 @@
 #define	usbvideo_h
 
 #include <linux/config.h>
-#include <linux/proc_fs.h>
 #include <linux/videodev.h>
 #include <linux/usb.h>
 
 /* Most helpful debugging aid */
 #define assert(expr) ((void) ((expr) ? 0 : (err("assert failed at line %d",__LINE__))))
 
-#define USES_PROC_FS	(defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS))
 #define USBVIDEO_REPORT_STATS	1	/* Set to 0 to block statistics on close */
 
 /* Bit flags (options) */
@@ -244,7 +242,6 @@ struct uvd {
 	struct video_capability vcap;		/* Video capabilities */
 	struct video_channel vchan;	/* May be used for tuner support */
 	struct usbvideo_statistics stats;
-	struct proc_dir_entry *procfs_vEntry;	/* /proc/video/MYDRIVER/video2 */
 	char videoName[32];		/* Holds name like "video7" */
 };
 
@@ -266,8 +263,6 @@ struct usbvideo_cb {
 	int (*getFPS)(struct uvd *);
 	int (*overlayHook)(struct uvd *, struct usbvideo_frame *);
 	int (*getFrame)(struct uvd *, int);
-	int (*procfs_read)(char *page,char **start,off_t off,int count,int *eof,void *data);
-	int (*procfs_write)(struct file *file,const char *buffer,unsigned long count,void *data);
 	int (*startDataPump)(struct uvd *uvd);
 	void (*stopDataPump)(struct uvd *uvd);
 	int (*setVideoMode)(struct uvd *uvd, struct video_window *vw);
@@ -281,8 +276,6 @@ struct usbvideo {
 	struct usbvideo_cb cb;		/* Table of callbacks (virtual methods) */
 	struct video_device vdt;	/* Video device template */
 	struct uvd *cam;			/* Array of camera structures */
-	int uses_procfs;		/* Non-zero if we create /proc entries */
-	struct proc_dir_entry *procfs_dEntry;	/* /proc/video/MYDRIVER */
 	struct module *md_module;	/* Minidriver module */
 };
 

@@ -2,7 +2,7 @@
  *
  *	IONSP.H		Definitions for I/O Networks Serial Protocol
  *
- *	Copyright (c) 1997-1998 Inside Out Networks, Inc.
+ *	Copyright (C) 1997-1998 Inside Out Networks, Inc.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by

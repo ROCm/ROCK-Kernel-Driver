@@ -1731,7 +1731,7 @@ static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 
 int __init amiga_floppy_init(void)
 {
-	int i;
+	int i, ret;
 
 	if (!AMIGAHW_PRESENT(AMI_FLOPPY))
 		return -ENXIO;
@@ -1743,41 +1743,39 @@ int __init amiga_floppy_init(void)
 	 *  We request DSKPTR, DSKLEN and DSKDATA only, because the other
 	 *  floppy registers are too spreaded over the custom register space
 	 */
+	ret = -EBUSY;
 	if (!request_mem_region(CUSTOM_PHYSADDR+0x20, 8, "amiflop [Paula]")) {
 		printk("fd: cannot get floppy registers\n");
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		return -EBUSY;
+		goto out_blkdev;
 	}
+
+	ret = -ENOMEM;
 	if ((raw_buf = (char *)amiga_chip_alloc (RAW_BUF_SIZE, "Floppy")) ==
 	    NULL) {
 		printk("fd: cannot get chip mem buffer\n");
-		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		return -ENOMEM;
+		goto out_memregion;
 	}
+
+	ret = -EBUSY;
 	if (request_irq(IRQ_AMIGA_DSKBLK, fd_block_done, 0, "floppy_dma", NULL)) {
 		printk("fd: cannot get irq for dma\n");
-		amiga_chip_free(raw_buf);
-		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		return -EBUSY;
+		goto out_irq;
 	}
+
 	if (request_irq(IRQ_AMIGA_CIAA_TB, ms_isr, 0, "floppy_timer", NULL)) {
 		printk("fd: cannot get irq for timer\n");
-		free_irq(IRQ_AMIGA_DSKBLK, NULL);
-		amiga_chip_free(raw_buf);
-		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		return -EBUSY;
+		goto out_irq2;
 	}
-	if (fd_probe_drives() < 1) { /* No usable drives */
-		free_irq(IRQ_AMIGA_CIAA_TB, NULL);
-		free_irq(IRQ_AMIGA_DSKBLK, NULL);
-		amiga_chip_free(raw_buf);
-		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		return -ENXIO;
-	}
+
+	ret = -ENOMEM;
+	floppy_queue = blk_init_queue(do_fd_request, &amiflop_lock);
+	if (!floppy_queue)
+		goto out_queue;
+
+	ret = -ENXIO;
+	if (fd_probe_drives() < 1) /* No usable drives */
+		goto out_probe;
+
 	blk_register_region(MKDEV(FLOPPY_MAJOR, 0), 256, THIS_MODULE,
 				floppy_find, NULL, NULL);
 
@@ -1804,17 +1802,6 @@ int __init amiga_floppy_init(void)
 	post_write_timer.data = 0;
 	post_write_timer.function = post_write;
   
-	floppy_queue = blk_init_queue(do_fd_request, &amiflop_lock);
-	if (!floppy_queue) {
-		free_irq(IRQ_AMIGA_CIAA_TB, NULL);
-		free_irq(IRQ_AMIGA_DSKBLK, NULL);
-		amiga_chip_free(raw_buf);
-		release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
-		unregister_blkdev(FLOPPY_MAJOR,"fd");
-		blk_unregister_region(MKDEV(FLOPPY_MAJOR, 0), 256);
-		return -ENOMEM;
-	}
-
 	for (i = 0; i < 128; i++)
 		mfmdecode[i]=255;
 	for (i = 0; i < 16; i++)
@@ -1826,6 +1813,20 @@ int __init amiga_floppy_init(void)
 	/* init ms timer */
 	ciaa.crb = 8; /* one-shot, stop */
 	return 0;
+
+out_probe:
+	blk_cleanup_queue(floppy_queue);
+out_queue:
+	free_irq(IRQ_AMIGA_CIAA_TB, NULL);
+out_irq2:
+	free_irq(IRQ_AMIGA_DSKBLK, NULL);
+out_irq:
+	amiga_chip_free(raw_buf);
+out_memregion:
+	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
+out_blkdev:
+	unregister_blkdev(FLOPPY_MAJOR,"fd");
+	return ret;
 }
 
 #ifdef MODULE

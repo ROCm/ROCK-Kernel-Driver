@@ -1013,10 +1013,22 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 		if (list_empty (&ed->td_list))
 			ed_deschedule (ohci, ed);
 		/* ... reenabling halted EDs only after fault cleanup */
-		else if (!(ed->hwINFO & ED_DEQUEUE)) {
+		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
-			if (!(td->hwINFO & TD_DONE))
+			if (!(td->hwINFO & TD_DONE)) {
 				ed->hwINFO &= ~ED_SKIP;
+				/* ... hc may need waking-up */
+				switch (ed->type) {
+				case PIPE_CONTROL:
+					writel (OHCI_CLF,
+						&ohci->regs->cmdstatus);   
+					break;
+				case PIPE_BULK:
+					writel (OHCI_BLF,
+						&ohci->regs->cmdstatus);   
+					break;
+				}
+			}
 		}
 
     		td = td_next;

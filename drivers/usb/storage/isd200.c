@@ -272,8 +272,9 @@ struct isd200_config {
 
 struct isd200_info {
 	struct inquiry_data InquiryData;
-	struct hd_driveid drive;
+	struct hd_driveid *id;
 	struct isd200_config ConfigData;
+	unsigned char *RegsBuf;
 	unsigned char ATARegs[8];
 	unsigned char DeviceHead;
 	unsigned char DeviceFlags;
@@ -473,7 +474,7 @@ static int isd200_action( struct us_data *us, int action,
 		ata.generic.RegisterSelect = REG_COMMAND;
 		ata.write.CommandByte = WIN_IDENTIFY;
 		srb->sc_data_direction = SCSI_DATA_READ;
-		srb->request_buffer = (void *)&info->drive;
+		srb->request_buffer = (void *) info->id;
 		srb->request_bufflen = sizeof(struct hd_driveid);
 		break;
 
@@ -513,11 +514,12 @@ int isd200_read_regs( struct us_data *us )
 	US_DEBUGP("Entering isd200_IssueATAReadRegs\n");
 
 	transferStatus = isd200_action( us, ACTION_READ_STATUS,
-				    info->ATARegs, sizeof(info->ATARegs) );
+				    info->RegsBuf, sizeof(info->ATARegs) );
 	if (transferStatus != ISD200_TRANSPORT_GOOD) {
 		US_DEBUGP("   Error reading ATA registers\n");
 		retStatus = ISD200_ERROR;
 	} else {
+		memcpy(info->ATARegs, info->RegsBuf, sizeof(info->ATARegs));
 		US_DEBUGP("   Got ATA Register[IDE_ERROR_OFFSET] = 0x%x\n", 
 			  info->ATARegs[IDE_ERROR_OFFSET]);
 	}
@@ -835,9 +837,9 @@ static int isd200_try_enum(struct us_data *us, unsigned char master_slave,
 			   int detect )
 {
 	int status = ISD200_GOOD;
-	unsigned char *regs = us->iobuf;
 	unsigned long endTime;
 	struct isd200_info *info = (struct isd200_info *)us->extra;
+	unsigned char *regs = info->RegsBuf;
 	int recheckAsMaster = FALSE;
 
 	if ( detect )
@@ -984,6 +986,7 @@ int isd200_get_inquiry_data( struct us_data *us )
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
 	int retStatus = ISD200_GOOD;
+	struct hd_driveid *id = info->id;
 
 	US_DEBUGP("Entering isd200_get_inquiry_data\n");
 
@@ -1000,7 +1003,7 @@ int isd200_get_inquiry_data( struct us_data *us )
 			/* this must be an ATA device */
 			/* perform an ATA Command Identify */
 			transferStatus = isd200_action( us, ACTION_IDENTIFY,
-							&info->drive, 
+							id, 
 							sizeof(struct hd_driveid) );
 			if (transferStatus != ISD200_TRANSPORT_GOOD) {
 				/* Error issuing ATA Command Identify */
@@ -1010,35 +1013,35 @@ int isd200_get_inquiry_data( struct us_data *us )
 				/* ATA Command Identify successful */
 				int i;
 				__u16 *src, *dest;
-				ide_fix_driveid(&info->drive);
+				ide_fix_driveid(id);
 
 				US_DEBUGP("   Identify Data Structure:\n");
-				US_DEBUGP("      config = 0x%x\n", info->drive.config);
-				US_DEBUGP("      cyls = 0x%x\n", info->drive.cyls);
-				US_DEBUGP("      heads = 0x%x\n", info->drive.heads);
-				US_DEBUGP("      track_bytes = 0x%x\n", info->drive.track_bytes);
-				US_DEBUGP("      sector_bytes = 0x%x\n", info->drive.sector_bytes);
-				US_DEBUGP("      sectors = 0x%x\n", info->drive.sectors);
-				US_DEBUGP("      serial_no[0] = 0x%x\n", info->drive.serial_no[0]);
-				US_DEBUGP("      buf_type = 0x%x\n", info->drive.buf_type);
-				US_DEBUGP("      buf_size = 0x%x\n", info->drive.buf_size);
-				US_DEBUGP("      ecc_bytes = 0x%x\n", info->drive.ecc_bytes);
-				US_DEBUGP("      fw_rev[0] = 0x%x\n", info->drive.fw_rev[0]);
-				US_DEBUGP("      model[0] = 0x%x\n", info->drive.model[0]);
-				US_DEBUGP("      max_multsect = 0x%x\n", info->drive.max_multsect);
-				US_DEBUGP("      dword_io = 0x%x\n", info->drive.dword_io);
-				US_DEBUGP("      capability = 0x%x\n", info->drive.capability);
-				US_DEBUGP("      tPIO = 0x%x\n", info->drive.tPIO);
-				US_DEBUGP("      tDMA = 0x%x\n", info->drive.tDMA);
-				US_DEBUGP("      field_valid = 0x%x\n", info->drive.field_valid);
-				US_DEBUGP("      cur_cyls = 0x%x\n", info->drive.cur_cyls);
-				US_DEBUGP("      cur_heads = 0x%x\n", info->drive.cur_heads);
-				US_DEBUGP("      cur_sectors = 0x%x\n", info->drive.cur_sectors);
-				US_DEBUGP("      cur_capacity = 0x%x\n", (info->drive.cur_capacity1 << 16) + info->drive.cur_capacity0 );
-				US_DEBUGP("      multsect = 0x%x\n", info->drive.multsect);
-				US_DEBUGP("      lba_capacity = 0x%x\n", info->drive.lba_capacity);
-				US_DEBUGP("      command_set_1 = 0x%x\n", info->drive.command_set_1);
-				US_DEBUGP("      command_set_2 = 0x%x\n", info->drive.command_set_2);
+				US_DEBUGP("      config = 0x%x\n", id->config);
+				US_DEBUGP("      cyls = 0x%x\n", id->cyls);
+				US_DEBUGP("      heads = 0x%x\n", id->heads);
+				US_DEBUGP("      track_bytes = 0x%x\n", id->track_bytes);
+				US_DEBUGP("      sector_bytes = 0x%x\n", id->sector_bytes);
+				US_DEBUGP("      sectors = 0x%x\n", id->sectors);
+				US_DEBUGP("      serial_no[0] = 0x%x\n", id->serial_no[0]);
+				US_DEBUGP("      buf_type = 0x%x\n", id->buf_type);
+				US_DEBUGP("      buf_size = 0x%x\n", id->buf_size);
+				US_DEBUGP("      ecc_bytes = 0x%x\n", id->ecc_bytes);
+				US_DEBUGP("      fw_rev[0] = 0x%x\n", id->fw_rev[0]);
+				US_DEBUGP("      model[0] = 0x%x\n", id->model[0]);
+				US_DEBUGP("      max_multsect = 0x%x\n", id->max_multsect);
+				US_DEBUGP("      dword_io = 0x%x\n", id->dword_io);
+				US_DEBUGP("      capability = 0x%x\n", id->capability);
+				US_DEBUGP("      tPIO = 0x%x\n", id->tPIO);
+				US_DEBUGP("      tDMA = 0x%x\n", id->tDMA);
+				US_DEBUGP("      field_valid = 0x%x\n", id->field_valid);
+				US_DEBUGP("      cur_cyls = 0x%x\n", id->cur_cyls);
+				US_DEBUGP("      cur_heads = 0x%x\n", id->cur_heads);
+				US_DEBUGP("      cur_sectors = 0x%x\n", id->cur_sectors);
+				US_DEBUGP("      cur_capacity = 0x%x\n", (id->cur_capacity1 << 16) + id->cur_capacity0 );
+				US_DEBUGP("      multsect = 0x%x\n", id->multsect);
+				US_DEBUGP("      lba_capacity = 0x%x\n", id->lba_capacity);
+				US_DEBUGP("      command_set_1 = 0x%x\n", id->command_set_1);
+				US_DEBUGP("      command_set_2 = 0x%x\n", id->command_set_2);
 
 				memset(&info->InquiryData, 0, sizeof(info->InquiryData));
 
@@ -1054,30 +1057,30 @@ int isd200_get_inquiry_data( struct us_data *us )
 				/* The length must be at least 36 (5 + 31) */
 				info->InquiryData.AdditionalLength = 0x1F;
 
-				if (info->drive.command_set_1 & COMMANDSET_MEDIA_STATUS) {
+				if (id->command_set_1 & COMMANDSET_MEDIA_STATUS) {
 					/* set the removable bit */
 					info->InquiryData.DeviceTypeModifier = DEVICE_REMOVABLE;
 					info->DeviceFlags |= DF_REMOVABLE_MEDIA;
 				}
 
 				/* Fill in vendor identification fields */
-				src = (__u16*)info->drive.model;
+				src = (__u16*)id->model;
 				dest = (__u16*)info->InquiryData.VendorId;
 				for (i=0;i<4;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)(info->drive.model+8);
+				src = (__u16*)(id->model+8);
 				dest = (__u16*)info->InquiryData.ProductId;
 				for (i=0;i<8;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)info->drive.fw_rev;
+				src = (__u16*)id->fw_rev;
 				dest = (__u16*)info->InquiryData.ProductRevisionLevel;
 				for (i=0;i<2;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
 				/* determine if it supports Media Status Notification */
-				if (info->drive.command_set_2 & COMMANDSET_MEDIA_STATUS) {
+				if (id->command_set_2 & COMMANDSET_MEDIA_STATUS) {
 					US_DEBUGP("   Device supports Media Status Notification\n");
 
 					/* Indicate that it is enabled, even though it is not
@@ -1101,11 +1104,9 @@ int isd200_get_inquiry_data( struct us_data *us )
 			US_DEBUGP("Protocol changed to: %s\n", us->protocol_name);
 	    
 			/* Free driver structure */	    
-			if (us->extra != NULL) {
-				kfree(us->extra);
-				us->extra = NULL;
-				us->extra_destructor = NULL;
-			}
+			us->extra_destructor(info);
+			us->extra = NULL;
+			us->extra_destructor = NULL;
 		}
 	}
 
@@ -1182,6 +1183,7 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		       union ata_cdb * ataCdb)
 {
 	struct isd200_info *info = (struct isd200_info *)us->extra;
+	struct hd_driveid *id = info->id;
 	int sendToTransport = TRUE;
 	unsigned char sectnum, head;
 	unsigned short cylinder;
@@ -1254,12 +1256,12 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 		US_DEBUGP("   ATA OUT - SCSIOP_READ_CAPACITY\n");
 
-		if (info->drive.capability & CAPABILITY_LBA ) {
-			capacity = info->drive.lba_capacity - 1;
+		if (id->capability & CAPABILITY_LBA ) {
+			capacity = id->lba_capacity - 1;
 		} else {
-			capacity = (info->drive.heads *
-				    info->drive.cyls *
-				    info->drive.sectors) - 1;
+			capacity = (id->heads *
+				    id->cyls *
+				    id->sectors) - 1;
 		}
 		readCapacityData.LogicalBlockAddress = cpu_to_be32(capacity);
 		readCapacityData.BytesPerBlock = cpu_to_be32(0x200);
@@ -1280,16 +1282,16 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		lba = cpu_to_be32(lba);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
-		if (info->drive.capability & CAPABILITY_LBA) {
+		if (id->capability & CAPABILITY_LBA) {
 			sectnum = (unsigned char)(lba);
 			cylinder = (unsigned short)(lba>>8);
 			head = ATA_ADDRESS_DEVHEAD_LBA_MODE | (unsigned char)(lba>>24 & 0x0F);
 		} else {
-			sectnum = (unsigned char)((lba % info->drive.sectors) + 1);
-			cylinder = (unsigned short)(lba / (info->drive.sectors *
-							   info->drive.heads));
-			head = (unsigned char)((lba / info->drive.sectors) %
-					       info->drive.heads);
+			sectnum = (unsigned char)((lba % id->sectors) + 1);
+			cylinder = (unsigned short)(lba / (id->sectors *
+							   id->heads));
+			head = (unsigned char)((lba / id->sectors) %
+					       id->heads);
 		}
 		ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 		ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
@@ -1313,14 +1315,14 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 		lba = cpu_to_be32(lba);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
-		if (info->drive.capability & CAPABILITY_LBA) {
+		if (id->capability & CAPABILITY_LBA) {
 			sectnum = (unsigned char)(lba);
 			cylinder = (unsigned short)(lba>>8);
 			head = ATA_ADDRESS_DEVHEAD_LBA_MODE | (unsigned char)(lba>>24 & 0x0F);
 		} else {
-			sectnum = (unsigned char)((lba % info->drive.sectors) + 1);
-			cylinder = (unsigned short)(lba / (info->drive.sectors * info->drive.heads));
-			head = (unsigned char)((lba / info->drive.sectors) % info->drive.heads);
+			sectnum = (unsigned char)((lba % id->sectors) + 1);
+			cylinder = (unsigned short)(lba / (id->sectors * id->heads));
+			head = (unsigned char)((lba / id->sectors) % id->heads);
 		}
 		ataCdb->generic.SignatureByte0 = info->ConfigData.ATAMajorCommand;
 		ataCdb->generic.SignatureByte1 = info->ConfigData.ATAMinorCommand;
@@ -1398,6 +1400,21 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 
 
 /**************************************************************************
+ * isd200_free_info
+ *
+ * Frees the driver structure.
+ */
+void isd200_free_info_ptrs(void *info_)
+{
+	struct isd200_info *info = (struct isd200_info *) info_;
+
+	if (info) {
+		kfree(info->id);
+		kfree(info->RegsBuf);
+	}
+}
+
+/**************************************************************************
  * isd200_init_info
  *									 
  * Allocates (if necessary) and initializes the driver structure.
@@ -1408,18 +1425,31 @@ int isd200_scsi_to_ata(Scsi_Cmnd *srb, struct us_data *us,
 int isd200_init_info(struct us_data *us)
 {
 	int retStatus = ISD200_GOOD;
+	struct isd200_info *info;
 
-	if (!us->extra) {
-		us->extra = (void *) kmalloc(sizeof(struct isd200_info), GFP_KERNEL);
-		if (!us->extra) {
-			US_DEBUGP("ERROR - kmalloc failure\n");
+	info = (struct isd200_info *)
+			kmalloc(sizeof(struct isd200_info), GFP_KERNEL);
+	if (!info)
+		retStatus = ISD200_ERROR;
+	else {
+		memset(info, 0, sizeof(struct isd200_info));
+		info->id = (struct hd_driveid *)
+				kmalloc(sizeof(struct hd_driveid), GFP_KERNEL);
+		info->RegsBuf = (unsigned char *)
+				kmalloc(sizeof(info->ATARegs), GFP_KERNEL);
+		if (!info->id || !info->RegsBuf) {
+			isd200_free_info_ptrs(info);
+			kfree(info);
 			retStatus = ISD200_ERROR;
-		}
+		} else
+			memset(info->id, 0, sizeof(struct hd_driveid));
 	}
 
 	if (retStatus == ISD200_GOOD) {
-		memset(us->extra, 0, sizeof(struct isd200_info));
-	}
+		us->extra = info;
+		us->extra_destructor = isd200_free_info_ptrs;
+	} else
+		US_DEBUGP("ERROR - kmalloc failure\n");
 
 	return(retStatus);
 }

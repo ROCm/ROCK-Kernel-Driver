@@ -2084,16 +2084,12 @@ static struct usb_driver usb_midi_driver = {
 
 /* ------------------------------------------------------------------------- */
 
-int __init usb_midi_init(void)
+static int __init usb_midi_init(void)
 {
-	if ( usb_register(&usb_midi_driver) < 0 )
-		return -1;
-
-	return 0;
-
+	return usb_register(&usb_midi_driver);
 }
 
-void __exit usb_midi_exit(void)
+static void __exit usb_midi_exit(void)
 {
 	usb_deregister(&usb_midi_driver);
 }
