@@ -90,6 +90,8 @@ enum {
 	EV_SLOT_STAT_CINF,
 	EV_SLOT_STAT_CAUSE,
 	EV_SLOT_STAT_DISPLAY,
+	EV_SLOT_STAT_FAXIND,
+	EV_SLOT_STAT_AUDIO,
 	EV_SLOT_DATA_REQ,
 	EV_SLOT_DATA_IND,
 };
@@ -114,6 +116,8 @@ static char *slot_ev_str[] = {
 	"EV_SLOT_STAT_CINF",
 	"EV_SLOT_STAT_CAUSE",
 	"EV_SLOT_STAT_DISPLAY",
+	"EV_SLOT_STAT_FAXIND",
+	"EV_SLOT_STAT_AUDIO",
 	"EV_SLOT_DATA_REQ",
 	"EV_SLOT_DATA_IND",
 };
@@ -152,12 +156,24 @@ slot_bind(struct fsm_inst *fi, int pr, void *arg)
 	return 0;
 }
 
+/* just pass through command */
 static int
 slot_command(struct fsm_inst *fi, int pr, void *arg)
 {
 	isdn_ctrl *ctrl = arg;
 
 	return isdn_command(ctrl);
+}
+
+/* just pass through status */
+static int
+slot_stat(struct fsm_inst *fi, int pr, void *arg)
+{
+	struct isdn_slot *slot = fi->userdata;
+	isdn_ctrl *ctrl = arg;
+
+	do_stat_cb(slot, ctrl);
+	return 0;
 }
 
 static int
@@ -410,6 +426,8 @@ static struct fsm_node slot_fn_tbl[] = {
 	{ ST_SLOT_ACTIVE,        EV_SLOT_CMD_HANGUP,  slot_actv_hangup },
 	{ ST_SLOT_ACTIVE,        EV_SLOT_STAT_BSENT,  slot_bsent       },
 	{ ST_SLOT_ACTIVE,        EV_SLOT_STAT_BHUP,   slot_bhup        },
+	{ ST_SLOT_ACTIVE,        EV_SLOT_STAT_FAXIND, slot_stat        },
+	{ ST_SLOT_ACTIVE,        EV_SLOT_STAT_AUDIO,  slot_stat        },
 
 	{ ST_SLOT_WAIT_BHUP,     EV_SLOT_STAT_BHUP,   slot_bhup        },
 
@@ -1168,6 +1186,10 @@ isdn_status_callback(isdn_ctrl * c)
 			return fsm_event(&slots[i].fi, EV_SLOT_STAT_CAUSE, c);
 		case ISDN_STAT_DISPLAY:
 			return fsm_event(&slots[i].fi, EV_SLOT_STAT_DISPLAY, c);
+		case ISDN_STAT_FAXIND:
+			return fsm_event(&slots[i].fi, EV_SLOT_STAT_FAXIND, c);
+		case ISDN_STAT_AUDIO:
+			return fsm_event(&slots[i].fi, EV_SLOT_STAT_AUDIO, c);
 #if 0
 		case ISDN_STAT_ICALL:
 			isdn_v110_stat_callback(&slots[i].iv110, c);
@@ -1309,16 +1331,6 @@ isdn_status_callback(isdn_ctrl * c)
 #endif
 		case CAPI_PUT_MESSAGE:
 			return(isdn_capi_rec_hl_msg(&c->parm.cmsg));
-#ifdef CONFIG_ISDN_TTY_FAX
-		case ISDN_STAT_FAXIND:
-//			isdn_tty_stat_callback(i, c); FIXME
-			break;
-#endif
-#ifdef CONFIG_ISDN_AUDIO
-		case ISDN_STAT_AUDIO:
-//			isdn_tty_stat_callback(i, c); FIXME
-			break;
-#endif
 	        case ISDN_STAT_PROT:
 	        case ISDN_STAT_REDIR:
                         if (divert_if)
