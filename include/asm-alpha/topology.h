@@ -22,17 +22,17 @@ static inline int cpu_to_node(int cpu)
 	return node;
 }
 
-static inline int node_to_cpumask(int node)
+static inline cpumask_t node_to_cpumask(int node)
 {
-	unsigned long node_cpu_mask = 0;
+	cpumask_t node_cpu_mask = CPU_MASK_NONE;
 	int cpu;
 
 	for(cpu = 0; cpu < NR_CPUS; cpu++) {
 		if (cpu_online(cpu) && (cpu_to_node(cpu) == node))
-			node_cpu_mask |= 1UL << cpu;
+			cpu_set(cpu, node_cpu_mask);
 	}
 
-#if DEBUG_NUMA
+#ifdef DEBUG_NUMA
 	printk("node %d: cpu_mask: %016lx\n", node, node_cpu_mask);
 #endif
 
@@ -41,6 +41,8 @@ static inline int node_to_cpumask(int node)
 
 /* Cross-node load balancing interval. */
 # define NODE_BALANCE_RATE 10
+
+#define pcibus_to_cpumask(bus)	(cpu_online_map)
 
 #else /* CONFIG_NUMA */
 # include <asm-generic/topology.h>
