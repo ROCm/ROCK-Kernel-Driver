@@ -25,6 +25,7 @@
 #include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/ioport.h>
 #include <sound/core.h>
 #include <sound/ad1848.h>
 

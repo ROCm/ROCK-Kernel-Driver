@@ -1,5 +1,14 @@
 # ALSA soundcard-configuration
 
+if [ "$CONFIG_X86_64" = "y" -a "$CONFIG_IA32_EMULATION" = "y" ]; then
+  dep_tristate '  Emulation for 32-bit applications' CONFIG_SND_BIT32_EMUL
+fi
+if [ "$CONFIG_PPC64" = "y" ]; then
+  dep_tristate '  Emulation for 32-bit applications' CONFIG_SND_BIT32_EMUL
+fi
+if [ "$CONFIG_SPARC64" = "y" ]; then
+  dep_tristate '  Emulation for 32-bit applications' CONFIG_SND_BIT32_EMUL
+fi
 dep_tristate '  Sequencer support' CONFIG_SND_SEQUENCER $CONFIG_SND
 if [ "$CONFIG_SND_SEQUENCER" != "n" ]; then
   dep_tristate '  Sequencer dummy client' CONFIG_SND_SEQ_DUMMY $CONFIG_SND_SEQUENCER

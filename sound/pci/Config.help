@@ -1,0 +1,75 @@
+CONFIG_SND_ALI5451
+  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
+
+CONFIG_SND_CS46XX
+  Say 'Y' or 'M' to include support for Cirrus Logic CS4610 / CS4612 /
+  CS4614 / CS4615 / CS4622 / CS4624 / CS4630 / CS4280 chips.
+
+CONFIG_SND_CS46XX_ACCEPT_VALID
+  Say 'Y' to allow sample resolution for mmap() transfers.
+
+CONFIG_SND_EMU10K1
+  Say 'Y' or 'M' to include support for Sound Blaster PCI 512, Live!,
+  Audigy and E-mu APS (partially supported).
+
+CONFIG_SND_KORG1212
+  Say 'Y' or 'M' to include support for Korg 1212IO.
+
+CONFIG_SND_NM256
+  Say 'Y' or 'M' to include support for NeoMagic NM256AV/ZX chips.
+
+CONFIG_SND_RME96
+  Say 'Y' or 'M' to include support for RME Digi96, Digi96/8 and
+  Digi96/8 PRO/PAD/PST.
+
+CONFIG_SND_RME9652
+  Say 'Y' or 'M' to include support for RME Hammerfall (RME Digi9652 /
+  Digi9636) soundcards.
+
+CONFIG_SND_TRIDENT
+
+CONFIG_SND_YMFPCI
+  Say 'Y' or 'M' to include support for Yamaha PCI audio chips - 
+  YMF724, YMF724F, YMF740, YMF740C, YMF744, YMF754.
+
+CONFIG_SND_ALS4000
+  Say 'Y' or 'M' to include support for Avance Logic ALS4000.
+
+CONFIG_SND_CMIPCI
+  Say 'Y' or 'M' to include support for C-Media CMI8338 and 8738 PCI
+  soundcards.
+
+CONFIG_SND_ENS1370
+  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1370.
+
+CONFIG_SND_ENS1371
+  Say 'Y' or 'M' to include support for Ensoniq AudioPCI ES1371 and
+  Sound Blaster PCI 64 or 128 soundcards.
+
+CONFIG_SND_ES1938
+  Say 'Y' or 'M' to include support for ESS Solo-1 (ES1938, ES1946)
+  soundcard.
+
+CONFIG_SND_ES1968
+  Say 'Y' or 'M' to include support for ESS Maestro 1/2/2E.
+
+CONFIG_SND_MAESTRO3
+  Say 'Y' or 'M' to include support for ESS Maestro 3 (Allegro) soundcard.
+
+CONFIG_SND_FM801
+  Say 'Y' or 'M' to include support for ForteMedia FM801 based soundcards.
+
+CONFIG_SND_ICE1712
+  Say 'Y' or 'M' to include support for ICE1712 (Envy24) based soundcards.
+
+CONFIG_SND_INTEL8X0
+  Say 'Y' or 'M' to include support for Intel8x0 based soundcards.
+
+CONFIG_SND_SONICVIBES
+  Say 'Y' or 'M' to include support for S3 SonicVibes based soundcards.
+
+CONFIG_SND_VIA686
+  Say 'Y' or 'M' to include support for VIA VT82C686A/B South Bridge.
+
+CONFIG_SND_VIA8233
+  Say 'Y' or 'M' to include support for VIA VT8233 South Bridge.

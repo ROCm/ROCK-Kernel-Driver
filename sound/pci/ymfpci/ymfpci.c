@@ -109,7 +109,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 	}
 
 	legacy_ctrl = 0;
-	legacy_ctrl2 = 0;
+	legacy_ctrl2 = 0x0800;	/* SMOD = 01 */
 
 	if (id->device >= 0x0010) { /* YMF 744/754 */
 		if (snd_fm_port[dev] < 0)

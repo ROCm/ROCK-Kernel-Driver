@@ -177,7 +177,7 @@ static struct isapnp_card_id snd_opl3sa2_pnpids[] __devinitdata = {
 	ISAPNP_OPL3SA2('Y','M','H',0x0020,0x0021),
 	/* Yamaha OPL3-SA3 (integrated on Intel's Pentium II AL440LX motherboard) */
 	ISAPNP_OPL3SA2('Y','M','H',0x0030,0x0021),
-	/* ??? */
+	/* Yamaha OPL3-SA2 */
 	ISAPNP_OPL3SA2('Y','M','H',0x0800,0x0021),
 	/* NeoMagic MagicWave 3DX */
 	ISAPNP_OPL3SA2('N','M','X',0x2200,0x2210),

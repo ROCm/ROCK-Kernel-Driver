@@ -1,0 +1,18 @@
+CONFIG_SND_DUMMY
+  Say 'Y' or 'M' to include dummy driver. This driver does nothing, but
+  emulates various mixer controls and PCM devices.
+  
+CONFIG_SND_VIRMIDI
+  Say 'Y' or 'M' to include virtual MIDI driver. This driver allows to
+  connect applications using raw MIDI devices to sequencer.
+
+CONFIG_SND_MTPAV
+  Say 'Y' or 'M' to include support for MOTU MidiTimePiece AV multiport
+  MIDI adapter.
+
+CONFIG_SND_SERIAL_U16550
+  Say 'Y' or 'M' to include support for MIDI serial port driver. It works
+  with serial UARTs 16550 and better.
+
+CONFIG_SND_MPU401
+  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
