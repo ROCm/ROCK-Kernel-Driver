@@ -1855,7 +1855,7 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  *				registered. In most cases, only one device
  *				will be present.
  * "hdx=scsi"		: the return of the ide-scsi flag, this is useful for
- *				allowwing ide-floppy, ide-tape, and ide-cdrom|writers
+ *				allowing ide-floppy, ide-tape, and ide-cdrom|writers
  *				to use ide-scsi emulation on a device specific option.
  * "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
  *				where "xx" is between 20 and 66 inclusive,
