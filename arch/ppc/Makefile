@@ -131,4 +131,6 @@ endif
 	@true
 
 CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
-		arch/$(ARCH)/kernel/asm-offsets.s
+		arch/$(ARCH)/kernel/asm-offsets.s \
+		$(TOUT)
+
