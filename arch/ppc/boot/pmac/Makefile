@@ -15,6 +15,8 @@ CHRP_LD_ARGS = -T ../ld.script -Ttext 0x01000000
 COMMONOBJS = start.o misc.o ../common/string.o ../common/ofcommon.o
 COFFOBJS = ../common/coffcrt0.o $(COMMONOBJS) coffmain.o
 CHRPOBJS = ../common/crt0.o $(COMMONOBJS) chrpmain.o
+
+EXTRA_TARGETS	:= $(COFFOBJS) $(CHRPOBJS)
 LIBS = $(TOPDIR)/lib/lib.a ../lib/zlib.a
 
 MKNOTE := ../utils/mknote

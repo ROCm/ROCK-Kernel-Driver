@@ -1272,7 +1272,11 @@ _GLOBAL(__setup_cpu_generic)
 setup_common_caches:
 	mfspr	r11,HID0
 	andi.	r0,r11,HID0_DCE
+#ifdef CONFIG_DCACHE_DISABLE
+	ori	r11,r11,HID0_ICE
+#else
 	ori	r11,r11,HID0_ICE|HID0_DCE
+#endif
 	ori	r8,r11,HID0_ICFI
 	bne	1f			/* don't invalidate the D-cache */
 	ori	r8,r8,HID0_DCI		/* unless it wasn't enabled */

@@ -2,7 +2,7 @@
 # MPC8260 Communication options
 #
 mainmenu_option next_comment
-comment 'MPC8260 Communication Options'
+comment 'MPC8260 CPM Options'
 bool 'Enable SCC Console' CONFIG_SCC_CONSOLE
 if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
   bool 'CPM SCC Ethernet' CONFIG_SCC_ENET
@@ -30,4 +30,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       fi
   fi
 fi
+
+comment 'Generic MPC8260 Options'
+bool 'Disable data cache' CONFIG_DCACHE_DISABLE
 endmenu
