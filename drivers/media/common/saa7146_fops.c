@@ -61,8 +61,14 @@ void saa7146_buffer_finish(struct saa7146_dev *dev,
 	}
 
 	DEB_EE(("dev:%p, dmaq:%p, state:%d\n", dev, q, state));
+	DEB_EE(("q->curr:%p\n",q->curr));
 
 	/* finish current buffer */
+	if (NULL == q->curr) {
+		DEB_D(("aiii. no current buffer\n"));
+		return;	
+	}
+			
 	q->curr->vb.state = state;
 	do_gettimeofday(&q->curr->vb.ts);
 	wake_up(&q->curr->vb.done);
@@ -221,9 +227,12 @@ static int fops_open(struct inode *inode, struct file *file)
 	fh->dev = dev;
 	fh->type = type;
 
-	saa7146_video_uops.open(dev,fh);
-	if( 0 != BOARD_CAN_DO_VBI(dev) ) {
+	if( fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
+		DEB_S(("initializing vbi...\n"));
 		saa7146_vbi_uops.open(dev,fh);
+	} else {
+		DEB_S(("initializing video...\n"));
+		saa7146_video_uops.open(dev,fh);
 	}
 
 	result = 0;
@@ -245,9 +254,10 @@ static int fops_release(struct inode *inode, struct file *file)
 	if (down_interruptible(&saa7146_devices_lock))
 		return -ERESTARTSYS;
 
-	saa7146_video_uops.release(dev,fh,file);
-	if( 0 != BOARD_CAN_DO_VBI(dev) ) {
+	if( fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
 		saa7146_vbi_uops.release(dev,fh,file);
+	} else {
+		saa7146_video_uops.release(dev,fh,file);
 	}
 
 	module_put(dev->ext->module);
@@ -332,11 +342,11 @@ static ssize_t fops_read(struct file *file, char *data, size_t count, loff_t *pp
 
 	switch (fh->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE: {
-		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, data:%p, count:%lun", file, data, (unsigned long)count));
+//		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, data:%p, count:%lun", file, data, (unsigned long)count));
 		return saa7146_video_uops.read(file,data,count,ppos);
 		}
 	case V4L2_BUF_TYPE_VBI_CAPTURE: {
-		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, data:%p, count:%lu\n", file, data, (unsigned long)count));
+//		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, data:%p, count:%lu\n", file, data, (unsigned long)count));
 		return saa7146_vbi_uops.read(file,data,count,ppos);
 		}
 		break;
@@ -443,7 +453,7 @@ int saa7146_register_device(struct video_device *vid, struct saa7146_dev* dev, c
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
-	DEB_EE(("dev:%p, name:'%s'\n",dev,name));
+	DEB_EE(("dev:%p, name:'%s', type:%d\n",dev,name,type));
  
  	*vid = device_template;
 	strlcpy(vid->name, name, sizeof(vid->name));
@@ -451,7 +461,7 @@ int saa7146_register_device(struct video_device *vid, struct saa7146_dev* dev, c
 
 	// fixme: -1 should be an insmod parameter *for the extension* (like "video_nr");
 	if (video_register_device(vid,type,-1) < 0) {
-		ERR(("cannot register vbi v4l2 device. skipping.\n"));
+		ERR(("cannot register v4l2 device. skipping.\n"));
 		return -1;
 	}
 
