@@ -159,10 +159,6 @@ EXPORT_SYMBOL(___change_bit);
 /* IRQ implementation. */
 EXPORT_SYMBOL(global_irq_holder);
 EXPORT_SYMBOL(synchronize_irq);
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 
 /* Misc SMP information */
 EXPORT_SYMBOL(__cpu_number_map);
