@@ -379,7 +379,7 @@ static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 
 	/* At boot time the cpus are already spinning in hold
 	 * loops, so nothing to do. */
- 	if (system_state == SYSTEM_BOOTING)
+ 	if (system_state < SYSTEM_RUNNING)
 		return 1;
 
 	pcpu = find_physical_cpu_to_start(get_hard_smp_processor_id(lcpu));
@@ -817,7 +817,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	int c;
 
 	/* At boot, don't bother with non-present cpus -JSCHOPP */
-	if (system_state == SYSTEM_BOOTING && !cpu_present(cpu))
+	if (system_state < SYSTEM_RUNNING && !cpu_present(cpu))
 		return -ENOENT;
 
 	paca[cpu].default_decr = tb_ticks_per_jiffy / decr_overclock;
@@ -849,7 +849,7 @@ int __devinit __cpu_up(unsigned int cpu)
 	 * use this value that I found through experimentation.
 	 * -- Cort
 	 */
-	if (system_state == SYSTEM_BOOTING)
+	if (system_state < SYSTEM_RUNNING)
 		for (c = 5000; c && !cpu_callin_map[cpu]; c--)
 			udelay(100);
 #ifdef CONFIG_HOTPLUG_CPU
