@@ -27,21 +27,14 @@ struct semaphore {
 	atomic_t count;
 	atomic_t waking;
 	wait_queue_head_t wait;
-#ifdef WAITQUEUE_DEBUG
-	long __magic;
-#endif
 };
 
-#ifdef WAITQUEUE_DEBUG
-# define __SEM_DEBUG_INIT(name) \
-		, (long)&(name).__magic
-#else
-# define __SEM_DEBUG_INIT(name)
-#endif
-
-#define __SEMAPHORE_INITIALIZER(name,count) \
-{ ATOMIC_INIT(count), ATOMIC_INIT(0), __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
-	__SEM_DEBUG_INIT(name) }
+#define __SEMAPHORE_INITIALIZER(name, n)				\
+{									\
+	.count		= ATOMIC_INIT(n),				\
+	.waking		= ATOMIC_INIT(0),				\
+	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
+}
 
 #define __MUTEX_INITIALIZER(name) \
 	__SEMAPHORE_INITIALIZER(name,1)
@@ -86,9 +79,6 @@ static inline void down(struct semaphore *sem)
 {
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 	__asm__ __volatile__(
 		"| atomic down operation\n\t"
@@ -109,9 +99,6 @@ static inline int down_interruptible(struct semaphore *sem)
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 	register int result __asm__ ("%d0");
 
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 	__asm__ __volatile__(
 		"| atomic interruptible down operation\n\t"
@@ -133,10 +120,6 @@ static inline int down_trylock(struct semaphore *sem)
 {
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
 	register int result __asm__ ("%d0");
-
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 
 	__asm__ __volatile__(
 		"| atomic down trylock operation\n\t"
@@ -163,10 +146,6 @@ static inline int down_trylock(struct semaphore *sem)
 static inline void up(struct semaphore *sem)
 {
 	register struct semaphore *sem1 __asm__ ("%a1") = sem;
-
-#ifdef WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 
 	__asm__ __volatile__(
 		"| atomic up operation\n\t"
