@@ -435,17 +435,8 @@ static inline void context_switch(task_t *prev, task_t *next)
 		mmdrop(oldmm);
 	}
 
-	/*
-	 * Here we just switch the register state and the stack. There are
-	 * 3 processes affected by a context switch:
-	 *
-	 * prev ==> .... ==> (last => next)
-	 *
-	 * It's the 'much more previous' 'prev' that is on next's stack,
-	 * but prev is set to (the just run) 'last' process by switch_to().
-	 * This might sound slightly confusing but makes tons of sense.
-	 */
-	switch_to(prev, next, prev);
+	/* Here we just switch the register state and the stack. */
+	switch_to(prev, next);
 }
 
 unsigned long nr_running(void)
