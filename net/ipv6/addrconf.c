@@ -3000,7 +3000,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 			ipv6_addr_prefix(&addr, &ifp->addr, ifp->prefix_len);
 			if (!ipv6_addr_any(&addr))
-				ipv6_dev_ac_dec(ifp->idev->dev, &addr);
+				__ipv6_dev_ac_dec(ifp->idev, &addr);
 		}
 		dst_hold(&ifp->rt->u.dst);
 		if (ip6_del_rt(ifp->rt, NULL, NULL))
