@@ -1082,7 +1082,7 @@ pcnet32_tx_timeout (struct net_device *dev)
 	pcnet32_restart(dev, 0x0042);
 
 	dev->trans_start = jiffies;
-	netif_start_queue(dev);
+	netif_wake_queue(dev);
 
 	spin_unlock_irqrestore(&lp->lock, flags);
 }
@@ -1108,9 +1108,10 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
      * interrupt when that option is available to us.
      */
     status = 0x8300;
+    entry = (lp->cur_tx - lp->dirty_tx) & TX_RING_MOD_MASK;
     if ((lp->ltint) &&
-	((lp->cur_tx - lp->dirty_tx == TX_RING_SIZE/2) ||
-	 (lp->cur_tx - lp->dirty_tx >= TX_RING_SIZE-2)))
+	((entry == TX_RING_SIZE/2) ||
+	 (entry >= TX_RING_SIZE-2)))
     {
 	/* Enable Successful-TxDone interrupt if we have
 	 * 1/2 of, or nearly all of, our ring buffer Tx'd
@@ -1125,7 +1126,7 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     /* Mask to ring buffer boundary. */
     entry = lp->cur_tx & TX_RING_MOD_MASK;
   
-    /* Caution: the write order is important here, set the base address
+    /* Caution: the write order is important here, set the status
        with the "ownership" bits last. */
 
     lp->tx_ring[entry].length = le16_to_cpu(-skb->len);
@@ -1147,7 +1148,7 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     dev->trans_start = jiffies;
 
     if (lp->tx_ring[(entry+1) & TX_RING_MOD_MASK].base == 0)
-	netif_start_queue(dev);
+	netif_wake_queue(dev);
     else {
 	lp->tx_full = 1;
 	netif_stop_queue(dev);
@@ -1194,8 +1195,9 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	if (csr0 & 0x0200) {		/* Tx-done interrupt */
 	    unsigned int dirty_tx = lp->dirty_tx;
+	    int delta;
 
-	    while (dirty_tx < lp->cur_tx) {
+	    while (dirty_tx != lp->cur_tx) {
 		int entry = dirty_tx & TX_RING_MOD_MASK;
 		int status = (short)le16_to_cpu(lp->tx_ring[entry].status);
 			
@@ -1249,15 +1251,17 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		dirty_tx++;
 	    }
 
-	    if (lp->cur_tx - dirty_tx >= TX_RING_SIZE) {
+	    delta = (lp->cur_tx - dirty_tx) & (TX_RING_MOD_MASK + TX_RING_SIZE);
+	    if (delta >= TX_RING_SIZE) {
 		printk(KERN_ERR "%s: out-of-sync dirty pointer, %d vs. %d, full=%d.\n",
 			dev->name, dirty_tx, lp->cur_tx, lp->tx_full);
 		dirty_tx += TX_RING_SIZE;
+		delta -= TX_RING_SIZE;
 	    }
 
 	    if (lp->tx_full &&
 		netif_queue_stopped(dev) &&
-		dirty_tx > lp->cur_tx - TX_RING_SIZE + 2) {
+		delta < TX_RING_SIZE - 2) {
 		/* The ring is no longer full, clear tbusy. */
 		lp->tx_full = 0;
 		netif_wake_queue (dev);
