@@ -227,6 +227,7 @@ fi
 tristate 'PPP (point-to-point protocol) support' CONFIG_PPP
 if [ ! "$CONFIG_PPP" = "n" ]; then
    dep_bool '  PPP multilink support (EXPERIMENTAL)' CONFIG_PPP_MULTILINK $CONFIG_EXPERIMENTAL
+   bool '  PPP filtering' CONFIG_PPP_FILTER
    dep_tristate '  PPP support for async serial ports' CONFIG_PPP_ASYNC $CONFIG_PPP
    dep_tristate '  PPP support for sync tty ports' CONFIG_PPP_SYNC_TTY $CONFIG_PPP
    dep_tristate '  PPP Deflate compression' CONFIG_PPP_DEFLATE $CONFIG_PPP

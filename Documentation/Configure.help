@@ -1617,6 +1617,27 @@ CONFIG_DDB5074
   This enables support for the VR5000-based NEC DDB Vrc-5074
   evaluation board.
 
+Support for NEC DDB Vrc-5476
+CONFIG_DDB5476
+  This enables support for the R5432-based NEC DDB Vrc-5476
+  evaluation board.
+
+  Features : kernel debugging, serial terminal, NFS root fs, on-board
+  ether port (with a patch to tulip driver), IDE controller, PS2 keyboard
+  PS2 mouse, etc.
+
+  TODO : USB, Compact-PCI interface.
+
+Support for MIPS Atlas board
+CONFIG_MIPS_ATLAS
+  This enables support for the QED R5231-based MIPS Atlas evaluation
+  board.
+
+Support for MIPS Malta board
+CONFIG_MIPS_MALTA
+  This enables support for the VR5000-based MIPS Malta evaluation
+  board.
+
 Support for Mips Magnum 4000
 CONFIG_MIPS_MAGNUM_4000
   This is a machine with a R4000 100 MHz CPU. To compile a Linux
@@ -1659,6 +1680,12 @@ CONFIG_JAZZ_ESP
   This is the driver for the onboard SCSI host adapter of MIPS Magnum
   4000, Acer PICA, Olivetti M700-10 and a few other identical OEM
   systems.
+
+Kernel floating-point instruction emulation
+CONFIG_MIPS_FPU_EMULATOR
+  This option enables the MIPS software floatingpoint support.  Due to the
+  way floatingpoint works you should always enable this option unless
+  you exactly know what you're doing.
 
 PCMCIA SCSI adapter support
 CONFIG_SCSI_PCMCIA
@@ -1756,6 +1783,10 @@ CONFIG_FILTER
   certain types of data to get through the socket. Linux Socket
   Filtering works on all socket types except TCP for now. See the text
   file Documentation/networking/filter.txt for more information.
+
+  You need to say Y here if you want to use PPP packet filtering
+  (see the CONFIG_PPP_FILTER option below).
+
   If unsure, say N.
 
 Network packet filtering
@@ -2415,7 +2446,7 @@ CONFIG_SERIAL_MULTIPORT
   of those special I/O ports.
 
 SGI PROM Console Support
-CONFIG_SGI_PROM_CONSOLE
+CONFIG_ARC_CONSOLE
   Say Y here if you want to use the PROMs for console I/O.
 
 SGI Zilog85C30 serial support
@@ -7084,6 +7115,17 @@ CONFIG_PPP_MULTILINK
 
   This has to be supported at the other end as well and you need a
   version of the pppd daemon which understands the multilink protocol.
+
+  If unsure, say N.
+
+PPP filtering (EXPERIMENTAL)
+CONFIG_PPP_FILTER
+  Say Y here if you want to be able to filter the packets passing over
+  PPP interfaces.  This allows you to control which packets count as
+  activity (i.e. which packets will reset the idle timer or bring up
+  a demand-dialled link) and which packets are to be dropped entirely.
+  You need to say Y here if you wish to use the pass-filter and
+  active-filter options to pppd.
 
   If unsure, say N.
 
@@ -12926,8 +12968,8 @@ CONFIG_PRINTER
   how to pass options to the kernel at boot time.) The syntax of the
   "lp" command line option can be found in drivers/char/lp.c.
 
-  If you have more than 3 printers, you need to increase the LP_NO
-  variable in lp.c.
+  If you have more than 8 printers, you need to increase the LP_NO
+  macro in lp.c and the PARPORT_MAX macro in parport.h.
 
 Support for console on line printer
 CONFIG_LP_CONSOLE
@@ -15515,10 +15557,10 @@ CONFIG_ISDN_DRV_AVMB1_T1PCI
   Enable support for the AVM T1 T1B card.
   Note: This is a PRI card and handle 30 B-channels.
 
-AVM C4 support
+AVM C4/C2 support
 CONFIG_ISDN_DRV_AVMB1_C4
-  Enable support for the AVM C4 PCI card.
-  This card handle 4 BRI ISDN lines (8 channels).
+  Enable support for the AVM C4/C2 PCI cards.
+  These cards handle 4/2 BRI ISDN lines (8/4 channels).
 
 Verbose reason code reporting (kernel size +=7K)
 CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON

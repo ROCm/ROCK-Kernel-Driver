@@ -31,14 +31,6 @@
 
 */
 
-/* These identify the driver base version and may not be removed. */
-static const char version1[] =
-"yellowfin.c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n";
-static const char version2[] =
-"  http://www.scyld.com/network/yellowfin.html\n";
-static const char version3[] =
-"  (unofficial 2.4.x port, LK1.1.2, January 11, 2001)\n";
-
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -114,6 +106,12 @@ static int gx_fix;
 #include <asm/unaligned.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
+
+/* These identify the driver base version and may not be removed. */
+static char version[] __devinitdata =
+KERN_INFO "yellowfin.c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.com>\n"
+KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
+KERN_INFO "  (unofficial 2.4.x port, LK1.1.2, January 11, 2001)\n";
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -391,6 +389,13 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	int i, option = find_cnt < MAX_UNITS ? options[find_cnt] : 0;
 	int drv_flags = pci_id_tbl[chip_idx].drv_flags;
 	
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
 	i = pci_enable_device(pdev);
 	if (i) return i;
 
@@ -1391,10 +1396,10 @@ static struct pci_driver yellowfin_driver = {
 
 static int __init yellowfin_init (void)
 {
-	if (debug)					/* Emit version even if no cards detected. */
-		printk(KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-		       version1, version2, version3);
-
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init (&yellowfin_driver);
 }
 

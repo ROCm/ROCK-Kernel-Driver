@@ -1,9 +1,12 @@
 /*
- * $Id: avmcard.h,v 1.8 2000/10/10 17:44:19 kai Exp $
+ * $Id: avmcard.h,v 1.8.6.1 2001/04/20 02:41:59 keil Exp $
  *
  * Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: avmcard.h,v $
+ * Revision 1.8.6.1  2001/04/20 02:41:59  keil
+ * changes from mainstream
+ *
  * Revision 1.8  2000/10/10 17:44:19  kai
  * changes from/for 2.2.18
  *
@@ -83,7 +86,8 @@ enum avmcardtype {
 	avm_m2,
 	avm_t1isa,
 	avm_t1pci,
-	avm_c4
+	avm_c4,
+	avm_c2
 };
 
 typedef struct avmcard_dmainfo {

@@ -27,16 +27,6 @@
 
 */
 
-static const char *version =
-"hamachi.c:v1.01 5/16/2000  Written by Donald Becker\n"
-"   Some modifications by Eric kasten <kasten@nscl.msu.edu>\n"
-"   Further modifications by Keith Underwood <keithu@parl.clemson.edu>\n"
-"   Support by many others\n"
-"   http://www.scyld.com/network/hamachi.html\n"
-"   or\n"
-"   http://www.parl.clemson.edu/~keithu/drivers/hamachi.html\n";
-
-
 /* A few user-configurable values. */
 
 static int debug = 1;		/* 1 normal messages, 0 quiet .. 7 verbose.  */
@@ -174,6 +164,12 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/delay.h>
+
+static char version[] __initdata =
+KERN_INFO "hamachi.c:v1.01 5/16/2000  Written by Donald Becker\n"
+KERN_INFO "   Some modifications by Eric kasten <kasten@nscl.msu.edu>\n"
+KERN_INFO "   Further modifications by Keith Underwood <keithu@parl.clemson.edu>\n";
+
 
 /* IP_MF appears to be only defined in <netinet/ip.h>, however,
    we need it for hardware checksumming support.  FYI... some of
@@ -548,7 +544,6 @@ static void set_rx_mode(struct net_device *dev);
 static int __init hamachi_init_one (struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
 {
-	static int did_version;			/* Already printed version info. */
 	struct hamachi_private *hmp;
 	int option, i, rx_int_var, tx_int_var, boguscnt;
 	int chip_id = ent->driver_data;
@@ -557,8 +552,12 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 	static int card_idx;
 	struct net_device *dev;
 
-	if (hamachi_debug > 0  &&  did_version++ == 0)
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
 		printk(version);
+#endif
 
 	if (pci_enable_device(pdev))
 		return -EIO;
@@ -1887,6 +1886,10 @@ static struct pci_driver hamachi_driver = {
 
 static int __init hamachi_init (void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	if (pci_register_driver(&hamachi_driver) > 0)
 		return 0;
 	pci_unregister_driver(&hamachi_driver);

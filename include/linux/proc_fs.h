@@ -117,6 +117,7 @@ extern struct file_operations ppc_htab_operations;
 /*
  * proc_tty.c
  */
+struct tty_driver;
 extern void proc_tty_init(void);
 extern void proc_tty_register_driver(struct tty_driver *driver);
 extern void proc_tty_unregister_driver(struct tty_driver *driver);

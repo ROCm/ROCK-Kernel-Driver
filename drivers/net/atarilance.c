@@ -375,8 +375,8 @@ static void *slow_memcpy( void *dst, const void *src, size_t len )
 
 int __init atarilance_probe( struct net_device *dev )
 {	
-    int i;
-	static int found = 0;
+	int i;
+	static int found;
 
 	SET_MODULE_OWNER(dev);
 
@@ -458,7 +458,7 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 	struct lance_private	*lp;
 	struct lance_ioreg		*IO;
 	int 					i;
-	static int 				did_version = 0;
+	static int 				did_version;
 	unsigned short			save1, save2;
 
 	PROBE_PRINT(( "Probing for Lance card at mem %#lx io %#lx\n",

@@ -535,13 +535,12 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
     pcnet32_dwio_reset(ioaddr);
     pcnet32_wio_reset(ioaddr);
 
-    /* Important to do the check for dwio mode first. */
-    if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
-        a = &pcnet32_dwio;
+    /* NOTE: 16-bit check is first, otherwise some older PCnet chips fail */
+    if (pcnet32_wio_read_csr (ioaddr, 0) == 4 && pcnet32_wio_check (ioaddr)) {
+	a = &pcnet32_wio;
     } else {
-        if (pcnet32_wio_read_csr(ioaddr, 0) == 4 && 
-	    pcnet32_wio_check(ioaddr)) {
-	    a = &pcnet32_wio;
+	if (pcnet32_dwio_read_csr (ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
+	    a = &pcnet32_dwio;
 	} else
 	    return -ENODEV;
     }
@@ -653,7 +652,13 @@ pcnet32_probe1(unsigned long ioaddr, unsigned char irq_line, int shared, int car
 	    promaddr[i] = inb(ioaddr + i);
 	}
 	if( memcmp( promaddr, dev->dev_addr, 6) )
-	    printk(" warning: PROM address does not match CSR address");
+	{
+	    printk(" warning PROM address does not match CSR address");
+#if defined(__i386__)
+	    printk(KERN_WARNING "%s: Probably a Compaq, using the PROM address of", dev->name);
+	    memcpy(dev->dev_addr, promaddr, 6);
+#endif
+	}	    	    
     }
     /* if the ethernet address is not valid, force to 00:00:00:00:00:00 */
     if( !is_valid_ether_addr(dev->dev_addr) )

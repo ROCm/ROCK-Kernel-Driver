@@ -38,12 +38,6 @@
 		descriptors. Remove cpu_to_le32, enable BE descriptors.
 */
 
-/* These identify the driver base version and may not be removed. */
-static const char version1[] =
-"winbond-840.c:v1.01 (2.4 port) 5/15/2000  Donald Becker <becker@scyld.com>\n";
-static const char version2[] =
-"  http://www.scyld.com/network/drivers.html\n";
-
 /* Automatically extracted configuration info:
 probe-func: winbond840_probe
 config-in: tristate 'Winbond W89c840 Ethernet support' CONFIG_WINBOND_840
@@ -131,6 +125,11 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+
+/* These identify the driver base version and may not be removed. */
+static char version[] __devinitdata =
+KERN_INFO "winbond-840.c:v1.01 (2.4 port) 5/15/2000  Donald Becker <becker@scyld.com>\n"
+KERN_INFO "  http://www.scyld.com/network/drivers.html\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Winbond W89c840 Ethernet driver");
@@ -1412,6 +1411,10 @@ static struct pci_driver w840_driver = {
 
 static int __init w840_init(void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init(&w840_driver);
 }
 

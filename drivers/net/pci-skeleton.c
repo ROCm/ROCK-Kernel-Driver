@@ -83,13 +83,6 @@ http://www.scyld.com/expert/NWay.html
 
 IVc. Errata
 
-1) The RTL-8139 has a serious problem with motherboards which do
-posted MMIO writes to PCI space.  This driver works around the
-problem by having an MMIO  register write be immediately followed by
-an MMIO register read.
-
-2) The RTL-8129 is only supported in Donald Becker's rtl8139 driver.
-
 */
 
 #include <linux/module.h>
@@ -102,12 +95,14 @@ an MMIO register read.
 #include <linux/delay.h>
 #include <asm/io.h>
 
-
 #define NETDRV_VERSION		"1.0.0"
 #define MODNAME			"netdrv"
 #define NETDRV_DRIVER_LOAD_MSG	"MyVendor Fast Ethernet driver " NETDRV_VERSION " loaded"
 #define PFX			MODNAME ": "
 
+static char version[] __devinitdata =
+KERN_INFO NETDRV_DRIVER_LOAD_MSG "\n"
+KERN_INFO "  Support available from http://foo.com/bar/baz.html\n";
 
 /* define to 1 to enable PIO instead of MMIO */
 #undef USE_IO_OPS
@@ -740,8 +735,14 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	int i, addr_len, option;
 	void *ioaddr = NULL;
 	static int board_idx = -1;
-	static int printed_version;
 	u8 tmp;
+
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
 
 	DPRINTK ("ENTER\n");
 
@@ -749,11 +750,6 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	assert (ent != NULL);
 
 	board_idx++;
-
-	if (!printed_version) {
-		printk (KERN_INFO NETDRV_DRIVER_LOAD_MSG "\n");
-		printed_version = 1;
-	}
 
 	i = netdrv_init_board (pdev, &dev, &ioaddr);
 	if (i < 0) {
@@ -1973,6 +1969,10 @@ static struct pci_driver netdrv_pci_driver = {
 
 static int __init netdrv_init_module (void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init (&netdrv_pci_driver);
 }
 

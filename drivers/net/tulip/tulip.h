@@ -83,6 +83,7 @@ enum chips {
 	COMPEX9881,
 	I21145,
 	DM910X,
+	CONEXANT,
 };
 
 

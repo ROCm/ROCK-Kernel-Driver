@@ -1,11 +1,14 @@
 /*
- * $Id: b1pci.c,v 1.29.6.2 2001/03/21 08:52:21 kai Exp $
+ * $Id: b1pci.c,v 1.29.6.3 2001/04/20 02:41:59 keil Exp $
  * 
  * Module for AVM B1 PCI-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1pci.c,v $
+ * Revision 1.29.6.3  2001/04/20 02:41:59  keil
+ * changes from mainstream
+ *
  * Revision 1.29.6.2  2001/03/21 08:52:21  kai
  * merge from main branch: fix buffer for revision string (calle)
  *
@@ -122,7 +125,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.29.6.2 $";
+static char *revision = "$Revision: 1.29.6.3 $";
 
 /* ------------------------------------------------------------- */
 

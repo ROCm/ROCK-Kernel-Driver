@@ -1674,10 +1674,11 @@ static int lvm_make_request_fn(request_queue_t *q,
 			       int rw,
 			       struct buffer_head *bh)
 {
-	int ret = lvm_map(bh, rw);
-	if (ret < 0)
-		buffer_IO_error(bh);
-	return ret;
+	if (lvm_map(bh, rw) >= 0)
+		return 1;
+
+	buffer_IO_error(bh);
+	return 0;
 }
 
 

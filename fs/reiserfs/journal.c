@@ -1814,16 +1814,14 @@ static void commit_flush_async(struct super_block *p_s_sb, int jindex) {
 ** then run the per filesystem commit task queue when we wakeup.
 */
 static int reiserfs_journal_commit_thread(void *nullp) {
-  exit_files(current);
-  exit_mm(current);
+
+  daemonize() ;
 
   spin_lock_irq(&current->sigmask_lock);
   sigfillset(&current->blocked);
   recalc_sigpending(current);
   spin_unlock_irq(&current->sigmask_lock);
 
-  current->session = 1;
-  current->pgrp = 1;
   sprintf(current->comm, "kreiserfsd") ;
   lock_kernel() ;
   while(1) {

@@ -244,11 +244,6 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		err = 0;
 		break;
 
-	case PPPIOCATTACH:
-	case PPPIOCDETACH:
-		err = ppp_channel_ioctl(&ap->chan, cmd, arg);
-		break;
-
 	default:
 		err = -ENOIOCTLCMD;
 	}

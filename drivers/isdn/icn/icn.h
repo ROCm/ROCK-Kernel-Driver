@@ -1,4 +1,4 @@
-/* $Id: icn.h,v 1.30.6.2 2001/02/16 16:43:31 kai Exp $
+/* $Id: icn.h,v 1.30.6.3 2001/04/20 02:42:01 keil Exp $
 
  * ISDN lowlevel-module for the ICN active ISDN-Card.
  *
@@ -187,6 +187,7 @@ typedef struct icn_card {
  * Main driver data
  */
 typedef struct icn_dev {
+	unsigned long memaddr;	/* Address of memory mapped buffers */
 	icn_shmem *shmem;       /* Pointer to memory-mapped-buffers */
 	int mvalid;             /* IO-shmem has been requested      */
 	int channel;            /* Currently mapped channel         */
@@ -210,7 +211,7 @@ static icn_dev dev;
  * integers.
  */
 static int portbase = ICN_BASEADDR;
-static int membase = ICN_MEMADDR;
+static unsigned long membase = ICN_MEMADDR;
 static char *icn_id = "\0";
 static char *icn_id2 = "\0";
 
@@ -218,7 +219,7 @@ static char *icn_id2 = "\0";
 MODULE_AUTHOR("Fritz Elfert");
 MODULE_PARM(portbase, "i");
 MODULE_PARM_DESC(portbase, "Port address of first card");
-MODULE_PARM(membase, "i");
+MODULE_PARM(membase, "l");
 MODULE_PARM_DESC(membase, "Shared memory address of all cards");
 MODULE_PARM(icn_id, "s");
 MODULE_PARM_DESC(icn_id, "ID-String of first card");
@@ -286,14 +287,6 @@ MODULE_PARM_DESC(icn_id2, "ID-String of first card, second S0 (4B only)");
 
 #define MIN(a,b) ((a<b)?a:b)
 #define MAX(a,b) ((a>b)?a:b)
-
-/* Hopefully, a separate resource-registration-scheme for shared-memory
- * will be introduced into the kernel. Until then, we use the normal
- * routines, designed for port-registration.
- */
-#define check_shmem   check_region
-#define release_shmem release_region
-#define request_shmem request_region
 
 #endif                          /* defined(__KERNEL__) || defined(__DEBUGVAR__) */
 #endif                          /* icn_h */

@@ -57,6 +57,14 @@
    Resource usage cleanups.
    Report driver version to user.
 
+   Tobias Ringstr÷m <zajbot@goteborg.utfors.se> :
+   Added additional proper locking
+   Rewrote the transmit code to actually use the ring buffer,
+   and to generate a lot fewer interrupts.
+
+   Frank Davis <fdavis112@juno.com>
+   Added SMP-safe locking mechanisms in addition to Andrew Morton's work
+
    TODO
 
    Implement pci_driver::suspend() and pci_driver::resume()
@@ -68,7 +76,7 @@
 
  */
 
-#define DMFE_VERSION "1.30 (June 11, 2000)"
+#define DMFE_VERSION "1.30p3 (April 17, 2001)"
 
 #include <linux/module.h>
 
@@ -88,11 +96,15 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 
 #include <asm/processor.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
+
+static char version[] __initdata =
+KERN_INFO "Davicom DM91xx net driver, version " DMFE_VERSION "\n";
 
 
 
@@ -108,6 +120,7 @@
 #define TX_MAX_SEND_CNT 0x1	/* Maximum tx packet per time */
 #define TX_DESC_CNT     0x10	/* Allocated Tx descriptors */
 #define RX_DESC_CNT     0x10	/* Allocated Rx descriptors */
+#define TX_IRQ_THR      12
 #define DESC_ALL_CNT    TX_DESC_CNT+RX_DESC_CNT
 #define TX_BUF_ALLOC    0x600
 #define RX_ALLOC_SIZE   0x620
@@ -187,7 +200,7 @@ struct dmfe_board_info {
 	u32 chip_id;		/* Chip vendor/Device ID */
 	u32 chip_revision;	/* Chip revision */
 	struct net_device *next_dev;	/* next device */
-
+	spinlock_t lock; /* Spinlock */
 	struct pci_dev *net_dev;	/* PCI device */
 
 	unsigned long ioaddr;		/* I/O base address */
@@ -207,8 +220,9 @@ struct dmfe_board_info {
 	struct rx_desc *first_rx_desc;
 	struct rx_desc *rx_insert_ptr;
 	struct rx_desc *rx_ready_ptr;	/* packet come pointer */
-	u32 tx_packet_cnt;	/* transmitted packet count */
-	u32 tx_queue_cnt;	/* wait to send packet count */
+	int tx_int_pkt_num;	/* number of packets to transmit until
+				 * a transmit interrupt is requested */
+	u32 tx_live_cnt;	/* number of used/live tx slots */
 	u32 rx_avail_cnt;	/* available rx descriptor count */
 	u32 interval_rx_cnt;	/* rx packet count a callback time */
 
@@ -220,7 +234,7 @@ struct dmfe_board_info {
 	u8 link_failed;		/* Ever link failed */
 	u8 wait_reset;		/* Hardware failed, need to reset */
 	u8 in_reset_state;	/* Now driver in reset routine */
-	u8 rx_error_cnt;	/* recievd abnormal case count */
+	u8 rx_error_cnt;	/* recieved abnormal case count */
 	u8 dm910x_chk_mode;	/* Operating mode check */
 	struct timer_list timer;
 	struct net_device_stats stats;	/* statistic counter */
@@ -240,13 +254,13 @@ enum dmfe_CR6_bits {
 };
 
 /* Global variable declaration ----------------------------- */
-static int dmfe_debug = 0;
+static int dmfe_debug;
 static unsigned char dmfe_media_mode = 8;
-static u32 dmfe_cr6_user_set = 0;
+static u32 dmfe_cr6_user_set;
 
 /* For module input parameter */
-static int debug = 0;
-static u32 cr6set = 0;
+static int debug;
+static u32 cr6set;
 static unsigned char mode = 8;
 static u8 chkmode = 1;
 
@@ -364,6 +378,13 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 	u32 dev_rev;
 	u16 pci_command;
 
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
 	DMFE_DBUG(0, "dmfe_probe()", 0);
 
 	/* Enable Master/IO access, Disable memory access */
@@ -380,14 +401,14 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 
 	/* Interrupt check */
 	if (pci_irqline == 0) {
-		printk(KERN_ERR "dmfe: Interrupt wrong : IRQ=%d\n",
-		       pci_irqline);
+		printk(KERN_ERR "dmfe(%s): Interrupt wrong : IRQ=%d\n",
+		       pdev->slot_name, pci_irqline);
 		goto err_out;
 	}
 
 	/* iobase check */
-	if (pci_iobase == 0) {
-		printk(KERN_ERR "dmfe: I/O base is zero\n");
+	if (pci_iobase == 0 || pci_resource_len(pdev, 0) == 0) {
+		printk(KERN_ERR "dmfe(%s): I/O base is zero\n", pdev->slot_name);
 		goto err_out;
 	}
 
@@ -404,20 +425,17 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 	pci_read_config_dword(pdev, PCI_REVISION_ID, &dev_rev);
 
 	/* Init network device */
-	dev = init_etherdev(NULL, sizeof(*db));
+	dev = alloc_etherdev(sizeof(*db));
 	if (dev == NULL)
 		goto err_out;
 	SET_MODULE_OWNER(dev);
 
-	/* IO range check */
-	if (!request_region(pci_iobase, CHK_IO_SIZE(pdev, dev_rev), dev->name)) {
-		printk(KERN_ERR "dmfe: I/O conflict : IO=%lx Range=%x\n",
-		       pci_iobase, CHK_IO_SIZE(pdev, dev_rev));
+	if (pci_request_regions(pdev, "dmfe"))
 		goto err_out_netdev;
-	}
 
 	db = dev->priv;
 	pci_set_drvdata(pdev, dev);
+	spin_lock_init(&db->lock);
 
 	db->chip_id = ent->driver_data;
 	db->ioaddr = pci_iobase;
@@ -438,14 +456,28 @@ static int __init dmfe_init_one (struct pci_dev *pdev,
 	for (i = 0; i < 64; i++)
 		((u16 *) db->srom)[i] = read_srom_word(pci_iobase, i);
 
+	printk(KERN_INFO "%s: Davicom DM%04lx at 0x%lx,",
+	       dev->name,
+	       ent->driver_data >> 16,
+	       pci_iobase);
+
 	/* Set Node address */
-	for (i = 0; i < 6; i++)
+	for (i = 0; i < 6; i++) {
 		dev->dev_addr[i] = db->srom[20 + i];
+		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
+	}
+
+	printk(", IRQ %d\n", pci_irqline);
+
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_res;
 
 	return 0;
 
+err_out_res:
+	pci_release_regions(pdev);
 err_out_netdev:
-	unregister_netdev(dev);
 	kfree(dev);
 err_out:
 	return -ENODEV;
@@ -462,7 +494,7 @@ static void __exit dmfe_remove_one (struct pci_dev *pdev)
 	db = dev->priv;
 
 	unregister_netdev(dev);
-	release_region(dev->base_addr, CHK_IO_SIZE(pdev, db->chip_revision));
+	pci_release_regions(pdev);
 	kfree(dev);	/* free board information */
 
 	pci_set_drvdata(pdev, NULL);
@@ -509,8 +541,8 @@ static int dmfe_open(struct net_device *dev)
 
 	/* system variable init */
 	db->cr6_data = CR6_DEFAULT | dmfe_cr6_user_set;
-	db->tx_packet_cnt = 0;
-	db->tx_queue_cnt = 0;
+	db->tx_int_pkt_num = TX_IRQ_THR;
+	db->tx_live_cnt = 0;
 	db->rx_avail_cnt = 0;
 	db->link_failed = 0;
 	db->wait_reset = 0;
@@ -552,7 +584,7 @@ static void dmfe_init_dm910x(struct net_device *dev)
 {
 	struct dmfe_board_info *db = dev->priv;
 	u32 ioaddr = db->ioaddr;
-
+	
 	DMFE_DBUG(0, "dmfe_init_dm910x()", 0);
 
 	/* Reset DM910x board : need 32 PCI clock to complete */
@@ -611,46 +643,41 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dmfe_board_info *db = dev->priv;
 	struct tx_desc *txptr;
+	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_start_xmit", 0);
- 
-	netif_stop_queue(dev);
+	spin_lock_irqsave(&db->lock, flags);
 	
-	/* Too large packet check */
-	if (skb->len > MAX_PACKET_SIZE) {
-		printk(KERN_ERR "%s: oversized frame (%d bytes) for transmit.\n", dev->name, (u16) skb->len);
-		dev_kfree_skb(skb);
-		return 0;
-	}
-	/* No Tx resource check, it never happen nromally */
-	if (db->tx_packet_cnt >= TX_FREE_DESC_CNT) {
-		return 1;
-	}
-
 	/* transmit this packet */
 	txptr = db->tx_insert_ptr;
 	memcpy((char *) txptr->tx_buf_ptr, (char *) skb->data, skb->len);
-	txptr->tdes1 = 0xe1000000 | skb->len;
-
-	/* Point to next transmit free descriptor */
-	db->tx_insert_ptr = (struct tx_desc *) txptr->next_tx_desc;
+	if (--db->tx_int_pkt_num < 0)
+	{
+		txptr->tdes1 = 0xe1000000 | skb->len;
+		db->tx_int_pkt_num = TX_IRQ_THR;
+	}
+	else
+		txptr->tdes1 = 0x61000000 | skb->len;
 
 	/* Transmit Packet Process */
-	if (db->tx_packet_cnt < TX_MAX_SEND_CNT) {
-		txptr->tdes0 = 0x80000000;	/* set owner bit to DM910X */
-		db->tx_packet_cnt++;	/* Ready to send count */
-		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
-	} else {
-		db->tx_queue_cnt++;	/* queue the tx packet */
-		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
-	}
+	txptr->tdes0 = 0x80000000;	/* set owner bit to DM910X */
+	outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
+	dev->trans_start = jiffies;     /* saved the time stamp */
 
-	/* Tx resource check */
-	if (db->tx_packet_cnt < TX_FREE_DESC_CNT)
-		netif_wake_queue(dev);
+	/* Point to next transmit free descriptor */
+	txptr = (struct tx_desc *)txptr->next_tx_desc;
+
+	if (txptr->tdes0 & 0x80000000)
+		netif_stop_queue(dev);
+
+	db->tx_insert_ptr = txptr;
+	db->tx_live_cnt++;
+
+	spin_unlock_irqrestore(&db->lock, flags);
 
 	/* free this SKB */
 	dev_kfree_skb(skb);
+
 	return 0;
 }
 
@@ -674,7 +701,7 @@ static int dmfe_stop(struct net_device *dev)
 
 	/* deleted timer */
 	del_timer_sync(&db->timer);
-
+	
 	/* free interrupt */
 	free_irq(dev->irq, dev);
 
@@ -710,6 +737,8 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	DMFE_DBUG(0, "dmfe_interrupt()", 0);
 
+	spin_lock_irq(&db->lock);
+
 	/* Disable all interrupt in CR7 to solve the interrupt edge problem */
 	outl(0, ioaddr + DCR7);
 
@@ -725,14 +754,15 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		netif_stop_queue(dev);
 		db->wait_reset = 1;		/* Need to RESET */
 		outl(0, ioaddr + DCR7);		/* disable all interrupt */
+		spin_unlock_irq(&db->lock);
 		return;
 	}
+
 	/* Free the transmitted descriptor */
 	txptr = db->tx_remove_ptr;
-	while (db->tx_packet_cnt) {
+	while (db->tx_live_cnt > 0 && (txptr->tdes0 & 0x80000000) == 0)
+	{
 		/* printk("tdes0=%x\n", txptr->tdes0); */
-		if (txptr->tdes0 & 0x80000000)
-			break;
 		db->stats.tx_packets++;
 		
 		if ((txptr->tdes0 & TDES0_ERR_MASK) && (txptr->tdes0 != 0x7fffffff)) {
@@ -748,21 +778,12 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				db->stats.tx_errors++;
 		}
 		txptr = (struct tx_desc *) txptr->next_tx_desc;
-		db->tx_packet_cnt--;
+		db->tx_live_cnt--;
 	}
 	/* Update TX remove pointer to next */
 	db->tx_remove_ptr = (struct tx_desc *) txptr;
 
-	/* Send the Tx packet in queue */
-	if ((db->tx_packet_cnt < TX_MAX_SEND_CNT) && db->tx_queue_cnt) {
-		txptr->tdes0 = 0x80000000;	/* set owner bit to DM910X */
-		db->tx_packet_cnt++;	/* Ready to send count */
-		outl(0x1, ioaddr + DCR1);	/* Issue Tx polling command */
-		dev->trans_start = jiffies;	/* saved the time stamp */
-		db->tx_queue_cnt--;
- 	}
-	/* Resource available check */
-	if (db->tx_packet_cnt < TX_FREE_DESC_CNT)
+	if ((db->tx_insert_ptr->tdes0 & 0x80000000) == 0)
 		netif_wake_queue(dev);
 
 	/* Received the coming packet */
@@ -786,6 +807,8 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	else
 		db->cr7_data = 0x1a2cd;
 	outl(db->cr7_data, ioaddr + DCR7);
+
+	spin_unlock_irq(&db->lock);
 }
 
 /*
@@ -902,6 +925,11 @@ static void dmfe_set_filter_mode(struct net_device *dev)
 /*
    Process the upper socket ioctl command
  */
+
+/* 
+ * The following function just returns 0. Shouldn't it do more? 
+ */
+
 static int dmfe_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	DMFE_DBUG(0, "dmfe_do_ioctl()", 0);
@@ -944,12 +972,14 @@ static void dmfe_timer(unsigned long data)
 
 	db->interval_rx_cnt = 0;
 
-	if (db->wait_reset | (db->tx_packet_cnt &&
-			      ((jiffies - dev->trans_start) > DMFE_TX_TIMEOUT)) | (db->rx_error_cnt > 3)) {
+	if (db->wait_reset ||
+	    (db->tx_live_cnt > 0 &&
+	     ((jiffies - dev->trans_start) > DMFE_TX_TIMEOUT)) ||
+	    (db->rx_error_cnt > 3)) {
 		/*
 		   printk("wait_reset %x, tx cnt %x, rx err %x, time %x\n", db->wait_reset, db->tx_packet_cnt, db->rx_error_cnt, jiffies-dev->trans_start);
 		 */
-		DMFE_DBUG(0, "Warn!! Warn!! Tx/Rx moniotr step1", db->tx_packet_cnt);
+		DMFE_DBUG(0, "Warn!! Warn!! Tx/Rx monitor step1", 0);
 		dmfe_dynamic_reset(dev);
 		db->timer.expires = jiffies + DMFE_TIMER_WUT;
 		add_timer(&db->timer);
@@ -1036,8 +1066,8 @@ static void dmfe_dynamic_reset(struct net_device *dev)
 	dmfe_free_rxbuffer(db);
 
 	/* system variable init */
-	db->tx_packet_cnt = 0;
-	db->tx_queue_cnt = 0;
+	db->tx_int_pkt_num = TX_IRQ_THR;
+	db->tx_live_cnt = 0;
 	db->rx_avail_cnt = 0;
 	db->link_failed = 0;
 	db->wait_reset = 0;
@@ -1203,14 +1233,23 @@ static void send_filter_frame(struct net_device *dev, int mc_cnt)
 	struct dmfe_board_info *db = dev->priv;
 	struct dev_mc_list *mcptr;
 	struct tx_desc *txptr;
+	unsigned long flags;
 	u16 *addrptr;
 	u32 *suptr;
 	int i;
 
-	DMFE_DBUG(0, "send_filetr_frame()", 0);
+	DMFE_DBUG(0, "send_filter_frame()", 0);
+	spin_lock_irqsave(&db->lock, flags);
 
 	txptr = db->tx_insert_ptr;
 	suptr = (u32 *) txptr->tx_buf_ptr;
+
+	if (txptr->tdes0 & 0x80000000) {
+		spin_unlock_irqrestore(&db->lock, flags);
+		printk(KERN_WARNING "%s: Too busy to send filter frame\n",
+		       dev->name);
+		return;
+	}
 
 	/* Node address */
 	addrptr = (u16 *) dev->dev_addr;
@@ -1231,26 +1270,21 @@ static void send_filter_frame(struct net_device *dev, int mc_cnt)
 		*suptr++ = addrptr[2];
 	}
 
-	for (; i < 14; i++) {
+	for (i=0; i < 14; i++) 
 		*suptr++ = 0xffff;
 		*suptr++ = 0xffff;
 		*suptr++ = 0xffff;
-	}
+	
 	/* prepare the setup frame */
 	db->tx_insert_ptr = (struct tx_desc *) txptr->next_tx_desc;
+	db->tx_live_cnt++;
 	txptr->tdes1 = 0x890000c0;
-	/* Resource Check and Send the setup packet */
-	if (!db->tx_packet_cnt) {
-		/* Resource Empty */
-		db->tx_packet_cnt++;
-		txptr->tdes0 = 0x80000000;
-		update_cr6(db->cr6_data | 0x2000, dev->base_addr);
-		outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
-		update_cr6(db->cr6_data, dev->base_addr);
-	} else {
-		/* Put into TX queue */
-		db->tx_queue_cnt++;
-	}
+	/* Send the setup packet */
+	txptr->tdes0 = 0x80000000;
+	update_cr6(db->cr6_data | 0x2000, dev->base_addr);
+	outl(0x1, dev->base_addr + DCR1);	/* Issue Tx polling command */
+	update_cr6(db->cr6_data, dev->base_addr);
+	spin_unlock_irqrestore(&db->lock, flags);
 }
 
 /*
@@ -1593,6 +1627,11 @@ static int __init dmfe_init_module(void)
 {
 	int rc;
 	
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
+
 	DMFE_DBUG(0, "init_module() ", debug);
 
 	if (debug)
@@ -1616,8 +1655,6 @@ static int __init dmfe_init_module(void)
 	if (rc < 0)
 		return rc;
 
-	printk (KERN_INFO "Davicom DM91xx net driver loaded, version "
-		DMFE_VERSION "\n");
 	return 0;
 }
 

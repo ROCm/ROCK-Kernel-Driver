@@ -32,7 +32,7 @@ static int affs_symlink_readpage(struct file *file, struct page *page)
 
 	err = -EIO;
 	lock_kernel();
-	bh = affs_bread(inode->i_dev,inode->i_ino,AFFS_I2BSIZE(inode));
+	bh = affs_bread(inode->i_sb, inode->i_ino);
 	unlock_kernel();
 	if (!bh)
 		goto fail;

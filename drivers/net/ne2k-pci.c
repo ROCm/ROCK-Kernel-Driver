@@ -25,12 +25,6 @@
 	Limited full-duplex support.
 */
 
-/* These identify the driver base version and may not be removed. */
-static const char version1[] =
-"ne2k-pci.c:v1.02 10/19/2000 D. Becker/P. Gortmaker\n";
-static const char version2[] =
-"  http://www.scyld.com/network/ne2k-pci.html\n";
-
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -59,6 +53,11 @@ static int options[MAX_UNITS];
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include "8390.h"
+
+/* These identify the driver base version and may not be removed. */
+static char version[] __devinitdata =
+KERN_INFO "ne2k-pci.c:v1.02 10/19/2000 D. Becker/P. Gortmaker\n"
+KERN_INFO "  http://www.scyld.com/network/ne2k-pci.html\n";
 
 #if defined(__powerpc__)
 #define inl_le(addr)  le32_to_cpu(inl(addr))
@@ -199,8 +198,14 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	long ioaddr;
 	int flags = pci_clone_list[chip_idx].flags;
 
-	if (fnd_cnt++ == 0)
-		printk(KERN_INFO "%s" KERN_INFO "%s", version1, version2);
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
+	fnd_cnt++;
 
 	i = pci_enable_device (pdev);
 	if (i)
@@ -593,6 +598,10 @@ static struct pci_driver ne2k_driver = {
 
 static int __init ne2k_pci_init(void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init (&ne2k_driver);
 }
 

@@ -1,11 +1,14 @@
 /*
- * $Id: c4.c,v 1.20.6.5 2001/03/21 08:52:21 kai Exp $
+ * $Id: c4.c,v 1.20.6.6 2001/04/20 02:41:59 keil Exp $
  * 
  * Module for AVM C4 card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: c4.c,v $
+ * Revision 1.20.6.6  2001/04/20 02:41:59  keil
+ * changes from mainstream
+ *
  * Revision 1.20.6.5  2001/03/21 08:52:21  kai
  * merge from main branch: fix buffer for revision string (calle)
  *
@@ -118,17 +121,22 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.5 $";
+static char *revision = "$Revision: 1.20.6.6 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
 
+/* ------------------------------------------------------------- */
+#ifndef PCI_DEVICE_ID_AVM_C2
+#define PCI_DEVICE_ID_AVM_C2	0x1100
+#endif
 /* ------------------------------------------------------------- */
 
 static int suppress_pollack;
 
 static struct pci_device_id c4_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_DEC,PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4 },
+	{ PCI_VENDOR_ID_DEC,PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C2 },
 	{ }			/* Terminating entry */
 };
 
@@ -614,7 +622,7 @@ static void c4_handle_rx(avmcard *card)
 		MsgLen = _get_slice(&p, card->msgbuf);
 		DataB3Len = _get_slice(&p, card->databuf);
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
-		if (cidx > 3) cidx = 0;
+		if (cidx >= card->nlogcontr) cidx = 0;
 		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
 		if (MsgLen < 30) { /* not CAPI 64Bit */
@@ -637,7 +645,7 @@ static void c4_handle_rx(avmcard *card)
 		ApplId = (unsigned) _get_word(&p);
 		MsgLen = _get_slice(&p, card->msgbuf);
 		cidx = CAPIMSG_CONTROLLER(card->msgbuf)-card->cardnr;
-		if (cidx > 3) cidx = 0;
+		if (cidx >= card->nlogcontr) cidx = 0;
 		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
 		if (!(skb = alloc_skb(MsgLen, GFP_ATOMIC))) {
@@ -655,7 +663,7 @@ static void c4_handle_rx(avmcard *card)
 		NCCI = _get_word(&p);
 		WindowSize = _get_word(&p);
 		cidx = (NCCI&0x7f) - card->cardnr;
-		if (cidx > 3) cidx = 0;
+		if (cidx >= card->nlogcontr) cidx = 0;
 		ctrl = card->ctrlinfo[cidx].capi_ctrl;
 
 		ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
@@ -669,13 +677,15 @@ static void c4_handle_rx(avmcard *card)
 
 		if (NCCI != 0xffffffff) {
 			cidx = (NCCI&0x7f) - card->cardnr;
-			if (cidx > 3) cidx = 0;
+			if (cidx >= card->nlogcontr) cidx = 0;
 			ctrl = card->ctrlinfo[cidx].capi_ctrl;
-			ctrl->free_ncci(ctrl, ApplId, NCCI);
+			if (ctrl)
+				ctrl->free_ncci(ctrl, ApplId, NCCI);
 		} else {
 			for (cidx=0; cidx < 4; cidx++) {
 				ctrl = card->ctrlinfo[cidx].capi_ctrl;
-				ctrl->appl_released(ctrl, ApplId);
+				if (ctrl)
+					ctrl->appl_released(ctrl, ApplId);
 			}
 		}
 		break;
@@ -688,20 +698,28 @@ static void c4_handle_rx(avmcard *card)
 			queue_pollack(card);
 		for (cidx=0; cidx < 4; cidx++) {
 			ctrl = card->ctrlinfo[cidx].capi_ctrl;
-			ctrl->resume_output(ctrl);
+			if (ctrl)
+				ctrl->resume_output(ctrl);
 		}
 		break;
 
 	case RECEIVE_STOP:
 		for (cidx=0; cidx < 4; cidx++) {
 			ctrl = card->ctrlinfo[cidx].capi_ctrl;
-			ctrl->suspend_output(ctrl);
+			if (ctrl)
+				ctrl->suspend_output(ctrl);
 		}
 		break;
 
 	case RECEIVE_INIT:
 
-	        cidx = card->nlogcontr++;
+	        cidx = card->nlogcontr;
+		if (cidx >= 4 || !card->ctrlinfo[cidx].capi_ctrl) {
+			printk(KERN_ERR "%s: card with %d controllers ??\n",
+					card->name, cidx+1);
+			break;
+		}
+	        card->nlogcontr++;
 	        cinfo = &card->ctrlinfo[cidx];
 		ctrl = cinfo->capi_ctrl;
 		cinfo->versionlen = _get_slice(&p, cinfo->versionbuf);
@@ -755,6 +773,8 @@ static void c4_handle_interrupt(avmcard *card)
 	if (status & DBELL_RESET_HOST) {
 		int i;
 		c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x0c);
+		if (card->nlogcontr == 0)
+			return;
 		printk(KERN_ERR "%s: unexpected reset\n", card->name);
                 for (i=0; i < 4; i++) {
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
@@ -762,6 +782,7 @@ static void c4_handle_interrupt(avmcard *card)
 			if (cinfo->capi_ctrl)
 				cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
 		}
+		card->nlogcontr = 0;
 		return;
 	}
 
@@ -993,6 +1014,7 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
 		if (cinfo->capi_ctrl)
 			cinfo->capi_ctrl->reseted(cinfo->capi_ctrl);
 	}
+	card->nlogcontr = 0;
 }
 
 static void c4_remove_ctr(struct capi_ctr *ctrl)
@@ -1145,6 +1167,7 @@ static int c4_read_proc(char *page, char **start, off_t off,
 	case avm_t1isa: s = "T1 ISA (HEMA)"; break;
 	case avm_t1pci: s = "T1 PCI"; break;
 	case avm_c4: s = "C4"; break;
+	case avm_c2: s = "C2"; break;
 	default: s = "???"; break;
 	}
 	len += sprintf(page+len, "%-16s %s\n", "type", s);
@@ -1192,7 +1215,9 @@ static int c4_read_proc(char *page, char **start, off_t off,
 
 /* ------------------------------------------------------------- */
 
-static int c4_add_card(struct capi_driver *driver, struct capicardparams *p)
+static int c4_add_card(struct capi_driver *driver,
+		       struct capicardparams *p,
+		       int nr)
 {
 	avmctrl_info *cinfo;
 	avmcard *card;
@@ -1231,11 +1256,11 @@ static int c4_add_card(struct capi_driver *driver, struct capicardparams *p)
 		cinfo = &card->ctrlinfo[i];
 		cinfo->card = card;
 	}
-	sprintf(card->name, "c4-%x", p->port);
+	sprintf(card->name, "%s-%x", driver->name, p->port);
 	card->port = p->port;
 	card->irq = p->irq;
 	card->membase = p->membase;
-	card->cardtype = avm_c4;
+	card->cardtype = nr == 4 ? avm_c4 : avm_c2;
 
 	if (check_region(card->port, AVMB1_PORTLEN)) {
 		printk(KERN_WARNING
@@ -1286,7 +1311,7 @@ static int c4_add_card(struct capi_driver *driver, struct capicardparams *p)
 		return -EBUSY;
 	}
 
-	for (i=0; i < 4; i++) {
+	for (i=0; i < nr ; i++) {
 		cinfo = &card->ctrlinfo[i];
 		cinfo->card = card;
 		cinfo->capi_ctrl = di->attach_ctr(driver, card->name, cinfo);
@@ -1313,13 +1338,30 @@ static int c4_add_card(struct capi_driver *driver, struct capicardparams *p)
 	skb_queue_head_init(&card->dma->send_queue);
 
 	printk(KERN_INFO
-		"%s: AVM C4 at i/o %#x, irq %d, mem %#lx\n",
-		driver->name, card->port, card->irq, card->membase);
+		"%s: AVM C%d at i/o %#x, irq %d, mem %#lx\n",
+		driver->name, nr, card->port, card->irq, card->membase);
 
 	return 0;
 }
 
 /* ------------------------------------------------------------- */
+
+static struct capi_driver c2_driver = {
+    name: "c2",
+    revision: "0.0",
+    load_firmware: c4_load_firmware,
+    reset_ctr: c4_reset_ctr,
+    remove_ctr: c4_remove_ctr,
+    register_appl: c4_register_appl,
+    release_appl: c4_release_appl,
+    send_message: c4_send_message,
+
+    procinfo: c4_procinfo,
+    ctr_read_proc: c4_read_proc,
+    driver_read_proc: 0,	/* use standard driver_read_proc */
+
+    add_card: 0, /* no add_card function */
+};
 
 static struct capi_driver c4_driver = {
     name: "c4",
@@ -1340,15 +1382,9 @@ static struct capi_driver c4_driver = {
 
 static int ncards = 0;
 
-static int __init c4_init(void)
+static int c4_attach_driver (struct capi_driver * driver)
 {
-	struct capi_driver *driver = &c4_driver;
-	struct pci_dev *dev = NULL;
 	char *p;
-	int retval;
-
-	MOD_INC_USE_COUNT;
-
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(driver->revision, p + 2, sizeof(driver->revision));
 		driver->revision[sizeof(driver->revision)-1] = 0;
@@ -1365,15 +1401,23 @@ static int __init c4_init(void)
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
+	return 0;
+}
+
+static int __init search_cards(struct capi_driver * driver,
+				int pci_id, int nr)
+{
+	struct pci_dev *	dev	= NULL;
+	int			retval	= 0;
 
 	while ((dev = pci_find_subsys(
 			PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285,
-			PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4, dev))) {
+			PCI_VENDOR_ID_AVM, pci_id, dev))) {
 		struct capicardparams param;
 
 		if (pci_enable_device(dev) < 0) {
-		        printk(KERN_ERR "%s: failed to enable AVM-C4\n",
-			       driver->name);
+		        printk(KERN_ERR "%s: failed to enable AVM-C%d\n",
+			       driver->name, nr);
 			continue;
 		}
 		pci_set_master(dev);
@@ -1383,31 +1427,69 @@ static int __init c4_init(void)
 		param.membase = pci_resource_start(dev, 0);
   
 		printk(KERN_INFO
-			"%s: PCI BIOS reports AVM-C4 at i/o %#x, irq %d, mem %#x\n",
-			driver->name, param.port, param.irq, param.membase);
-		retval = c4_add_card(driver, &param);
+			"%s: PCI BIOS reports AVM-C%d at i/o %#x, irq %d, mem %#x\n",
+			driver->name, nr, param.port, param.irq, param.membase);
+		retval = c4_add_card(driver, &param, nr);
 		if (retval != 0) {
 		        printk(KERN_ERR
-			"%s: no AVM-C4 at i/o %#x, irq %d detected, mem %#x\n",
-			driver->name, param.port, param.irq, param.membase);
+			"%s: no AVM-C%d at i/o %#x, irq %d detected, mem %#x\n",
+			driver->name, nr, param.port, param.irq, param.membase);
 			continue;
 		}
 		ncards++;
 	}
+	return retval;
+}
+
+static int __init c4_init(void)
+{
+	int retval;
+
+	MOD_INC_USE_COUNT;
+
+	retval = c4_attach_driver (&c4_driver);
+	if (retval) {
+		MOD_DEC_USE_COUNT;
+		return retval;
+	}
+
+	retval = c4_attach_driver (&c2_driver);
+	if (retval) {
+		MOD_DEC_USE_COUNT;
+		return retval;
+	}
+
+	retval = search_cards(&c4_driver, PCI_DEVICE_ID_AVM_C4, 4);
+	if (retval && ncards == 0) {
+    		detach_capi_driver(&c2_driver);
+    		detach_capi_driver(&c4_driver);
+		MOD_DEC_USE_COUNT;
+		return retval;
+	}
+	retval = search_cards(&c2_driver, PCI_DEVICE_ID_AVM_C2, 2);
+	if (retval && ncards == 0) {
+    		detach_capi_driver(&c2_driver);
+    		detach_capi_driver(&c4_driver);
+		MOD_DEC_USE_COUNT;
+		return retval;
+	}
+
 	if (ncards) {
-		printk(KERN_INFO "%s: %d C4 card(s) detected\n",
-				driver->name, ncards);
+		printk(KERN_INFO "%s: %d C4/C2 card(s) detected\n",
+				c4_driver.name, ncards);
 		MOD_DEC_USE_COUNT;
 		return 0;
 	}
-	printk(KERN_ERR "%s: NO C4 card detected\n", driver->name);
-	detach_capi_driver(driver);
+	printk(KERN_ERR "%s: NO C4/C2 card detected\n", c4_driver.name);
+	detach_capi_driver(&c4_driver);
+	detach_capi_driver(&c2_driver);
 	MOD_DEC_USE_COUNT;
 	return -ENODEV;
 }
 
 static void __exit c4_exit(void)
 {
+    detach_capi_driver(&c2_driver);
     detach_capi_driver(&c4_driver);
 }
 

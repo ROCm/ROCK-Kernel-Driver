@@ -910,7 +910,10 @@ static int bigmac_open(struct net_device *dev)
 		return ret;
 	}
 	init_timer(&bp->bigmac_timer);
-	return bigmac_init(bp, 0);
+	ret = bigmac_init(bp, 0);
+	if (ret)
+		free_irq(dev->irq, bp);
+	return ret;
 }
 
 static int bigmac_close(struct net_device *dev)
@@ -923,7 +926,7 @@ static int bigmac_close(struct net_device *dev)
 
 	bigmac_stop(bp);
 	bigmac_clean_rings(bp);
-	free_irq(dev->irq, (void *)bp);
+	free_irq(dev->irq, bp);
 	return 0;
 }
 
@@ -1249,7 +1252,7 @@ static int __init bigmac_probe(void)
 	struct net_device *dev = NULL;
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev = 0;
-	static int called = 0;
+	static int called;
 	int cards = 0, v;
 
 	root_bigmac_dev = NULL;

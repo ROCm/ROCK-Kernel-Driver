@@ -19,7 +19,7 @@
  * PPP driver, written by Michael Callahan and Al Longyear, and
  * subsequently hacked by Paul Mackerras.
  *
- * ==FILEVERSION 20000417==
+ * ==FILEVERSION 20000902==
  */
 
 #include <linux/config.h>
@@ -32,6 +32,7 @@
 #include <linux/netdevice.h>
 #include <linux/poll.h>
 #include <linux/ppp_defs.h>
+#include <linux/filter.h>
 #include <linux/if_ppp.h>
 #include <linux/ppp_channel.h>
 #include <linux/ppp-comp.h>
@@ -121,6 +122,10 @@ struct ppp {
 	struct sk_buff_head mrq;	/* MP: receive reconstruction queue */
 #endif /* CONFIG_PPP_MULTILINK */
 	struct net_device_stats stats;	/* statistics */
+#ifdef CONFIG_PPP_FILTER
+	struct sock_fprog pass_filter;	/* filter for packets to pass */
+	struct sock_fprog active_filter;/* filter for pkts to reset idle */
+#endif /* CONFIG_PPP_FILTER */
 };
 
 /*
@@ -621,6 +626,43 @@ static int ppp_ioctl(struct inode *inode, struct file *file,
 		err = 0;
 		break;
 
+#ifdef CONFIG_PPP_FILTER
+	case PPPIOCSPASS:
+	case PPPIOCSACTIVE:
+	{
+		struct sock_fprog uprog, *filtp;
+		struct sock_filter *code = NULL;
+		int len;
+
+		if (copy_from_user(&uprog, (void *) arg, sizeof(uprog)))
+			break;
+		if (uprog.len > 0) {
+			err = -ENOMEM;
+			len = uprog.len * sizeof(struct sock_filter);
+			code = kmalloc(len, GFP_KERNEL);
+			if (code == 0)
+				break;
+			err = -EFAULT;
+			if (copy_from_user(code, uprog.filter, len))
+				break;
+			err = sk_chk_filter(code, uprog.len);
+			if (err) {
+				kfree(code);
+				break;
+			}
+		}
+		filtp = (cmd == PPPIOCSPASS)? &ppp->pass_filter: &ppp->active_filter;
+		ppp_lock(ppp);
+		if (filtp->filter)
+			kfree(filtp->filter);
+		filtp->filter = code;
+		filtp->len = uprog.len;
+		ppp_unlock(ppp);
+		err = 0;
+		break;
+	}
+#endif /* CONFIG_PPP_FILTER */
+
 #ifdef CONFIG_PPP_MULTILINK
 	case PPPIOCSMRRU:
 		if (get_user(val, (int *) arg))
@@ -890,6 +932,33 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	int len;
 	unsigned char *cp;
 
+	if (proto < 0x8000) {
+#ifdef CONFIG_PPP_FILTER
+		/* check if we should pass this packet */
+		/* the filter instructions are constructed assuming
+		   a four-byte PPP header on each packet */
+		*skb_push(skb, 2) = 1;
+		if (ppp->pass_filter.filter
+		    && sk_run_filter(skb, ppp->pass_filter.filter,
+				     ppp->pass_filter.len) == 0) {
+			if (ppp->debug & 1) {
+				printk(KERN_DEBUG "PPP: outbound frame not passed\n");
+				kfree_skb(skb);
+				return;
+			}
+		}
+		/* if this packet passes the active filter, record the time */
+		if (!(ppp->active_filter.filter
+		      && sk_run_filter(skb, ppp->active_filter.filter,
+				       ppp->active_filter.len) == 0))
+			ppp->last_xmit = jiffies;
+		skb_pull(skb, 2);
+#else
+		/* for data packets, record the time */
+		ppp->last_xmit = jiffies;
+#endif /* CONFIG_PPP_FILTER */
+	}
+
 	++ppp->stats.tx_packets;
 	ppp->stats.tx_bytes += skb->len - 2;
 
@@ -961,10 +1030,6 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 			kfree_skb(new_skb);
 		}
 	}
-
-	/* for data packets, record the time */
-	if (proto < 0x8000)
-		ppp->last_xmit = jiffies;
 
 	/*
 	 * If we are waiting for traffic (demand dialling),
@@ -1400,7 +1465,29 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	} else {
 		/* network protocol frame - give it to the kernel */
+
+#ifdef CONFIG_PPP_FILTER
+		/* check if the packet passes the pass and active filters */
+		/* the filter instructions are constructed assuming
+		   a four-byte PPP header on each packet */
+		*skb_push(skb, 2) = 0;
+		if (ppp->pass_filter.filter
+		    && sk_run_filter(skb, ppp->pass_filter.filter,
+				     ppp->pass_filter.len) == 0) {
+			if (ppp->debug & 1)
+				printk(KERN_DEBUG "PPP: inbound frame not passed\n");
+			kfree_skb(skb);
+			return;
+		}
+		if (!(ppp->active_filter.filter
+		      && sk_run_filter(skb, ppp->active_filter.filter,
+				       ppp->active_filter.len) == 0))
+			ppp->last_recv = jiffies;
+		skb_pull(skb, 2);
+#else
 		ppp->last_recv = jiffies;
+#endif /* CONFIG_PPP_FILTER */
+
 		if ((ppp->dev->flags & IFF_UP) == 0
 		    || ppp->npmode[npi] != NPMODE_PASS) {
 			kfree_skb(skb);
@@ -1806,70 +1893,6 @@ ppp_output_wakeup(struct ppp_channel *chan)
 }
 
 /*
- * This is basically temporary compatibility stuff.
- */
-ssize_t
-ppp_channel_read(struct ppp_channel *chan, struct file *file,
-		 char *buf, size_t count)
-{
-	struct channel *pch = chan->ppp;
-
-	if (pch == 0)
-		return -ENXIO;
-	return ppp_file_read(&pch->file, file, buf, count);
-}
-
-ssize_t
-ppp_channel_write(struct ppp_channel *chan, const char *buf, size_t count)
-{
-	struct channel *pch = chan->ppp;
-
-	if (pch == 0)
-		return -ENXIO;
-	return ppp_file_write(&pch->file, buf, count);
-}
-
-/* No kernel lock - fine */
-unsigned int
-ppp_channel_poll(struct ppp_channel *chan, struct file *file, poll_table *wait)
-{
-	unsigned int mask;
-	struct channel *pch = chan->ppp;
-
-	mask = POLLOUT | POLLWRNORM;
-	if (pch != 0) {
-		poll_wait(file, &pch->file.rwait, wait);
-		if (skb_peek(&pch->file.rq) != 0)
-			mask |= POLLIN | POLLRDNORM;
-	}
-	return mask;
-}
-
-int ppp_channel_ioctl(struct ppp_channel *chan, unsigned int cmd,
-		      unsigned long arg)
-{
-	struct channel *pch = chan->ppp;
-	int err = -ENOTTY;
-	int unit;
-
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
-	if (pch == 0)
-		return -EINVAL;
-	switch (cmd) {
-	case PPPIOCATTACH:
-		if (get_user(unit, (int *) arg))
-			break;
-		err = ppp_connect_channel(pch, unit);
-		break;
-	case PPPIOCDETACH:
-		err = ppp_disconnect_channel(pch);
-		break;
-	}
-	return err;
-}
-
-/*
  * Compression control.
  */
 
@@ -2192,6 +2215,7 @@ ppp_create_interface(int unit, int *retp)
 	ppp->file.index = unit;
 	ppp->mru = PPP_MRU;
 	init_ppp_file(&ppp->file, INTERFACE);
+	ppp->file.hdrlen = PPP_HDRLEN - 2;	/* don't count proto bytes */
 	for (i = 0; i < NUM_NP; ++i)
 		ppp->npmode[i] = NPMODE_PASS;
 	INIT_LIST_HEAD(&ppp->channels);
@@ -2263,6 +2287,16 @@ static void ppp_destroy_interface(struct ppp *ppp)
 #ifdef CONFIG_PPP_MULTILINK
 	skb_queue_purge(&ppp->mrq);
 #endif /* CONFIG_PPP_MULTILINK */
+#ifdef CONFIG_PPP_FILTER
+	if (ppp->pass_filter.filter) {
+		kfree(ppp->pass_filter.filter);
+		ppp->pass_filter.filter = NULL;
+	}
+	if (ppp->active_filter.filter) {
+		kfree(ppp->active_filter.filter);
+		ppp->active_filter.filter = 0;
+	}
+#endif /* CONFIG_PPP_FILTER */
 	dev = ppp->dev;
 	ppp->dev = 0;
 	ppp_unlock(ppp);
@@ -2429,9 +2463,5 @@ EXPORT_SYMBOL(ppp_input_error);
 EXPORT_SYMBOL(ppp_output_wakeup);
 EXPORT_SYMBOL(ppp_register_compressor);
 EXPORT_SYMBOL(ppp_unregister_compressor);
-EXPORT_SYMBOL(ppp_channel_read);
-EXPORT_SYMBOL(ppp_channel_write);
-EXPORT_SYMBOL(ppp_channel_poll);
-EXPORT_SYMBOL(ppp_channel_ioctl);
 EXPORT_SYMBOL(all_ppp_units); /* for debugging */
 EXPORT_SYMBOL(all_channels); /* for debugging */

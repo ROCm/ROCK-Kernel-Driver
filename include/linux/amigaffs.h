@@ -1,8 +1,10 @@
 #ifndef AMIGAFFS_H
 #define AMIGAFFS_H
 
-#include <asm/byteorder.h>
 #include <linux/types.h>
+#include <linux/locks.h>
+
+#include <asm/byteorder.h>
 
 /* AmigaOS allows file names with up to 30 characters length.
  * Names longer than that will be silently truncated. If you
@@ -16,19 +18,83 @@
 
 #define GET_END_PTR(st,p,sz)		 ((st *)((char *)(p)+((sz)-sizeof(st))))
 #define AFFS_GET_HASHENTRY(data,hashkey) be32_to_cpu(((struct dir_front *)data)->hashtable[hashkey])
-#define AFFS_BLOCK(data,ino,blk)	 ((struct file_front *)data)->blocks[AFFS_I2HSIZE(ino)-1-(blk)]
+#define AFFS_BLOCK(sb, bh, blk)		(AFFS_HEAD(bh)->table[(sb)->u.affs_sb.s_hashsize-1-(blk)])
 
-#define FILE_END(p,i)	GET_END_PTR(struct file_end,p,AFFS_I2BSIZE(i))
-#define ROOT_END(p,i)	GET_END_PTR(struct root_end,p,AFFS_I2BSIZE(i))
-#define DIR_END(p,i)	GET_END_PTR(struct dir_end,p,AFFS_I2BSIZE(i))
-#define LINK_END(p,i)	GET_END_PTR(struct hlink_end,p,AFFS_I2BSIZE(i))
-#define ROOT_END_S(p,s)	GET_END_PTR(struct root_end,p,(s)->s_blocksize)
-#define DATA_FRONT(bh)	((struct data_front *)(bh)->b_data)
-#define DIR_FRONT(bh)	((struct dir_front *)(bh)->b_data)
+static inline void
+affs_set_blocksize(struct super_block *sb, int size)
+{
+	set_blocksize(sb->s_dev, size);
+	sb->s_blocksize = size;
+}
+static inline struct buffer_head *
+affs_bread(struct super_block *sb, int block)
+{
+	pr_debug(KERN_DEBUG "affs_bread: %d\n", block);
+	if (block >= AFFS_SB->s_reserved && block < AFFS_SB->s_partition_size)
+		return bread(sb->s_dev, block, sb->s_blocksize);
+	return NULL;
+}
+static inline struct buffer_head *
+affs_getblk(struct super_block *sb, int block)
+{
+	pr_debug(KERN_DEBUG "affs_getblk: %d\n", block);
+	if (block >= AFFS_SB->s_reserved && block < AFFS_SB->s_partition_size)
+		return getblk(sb->s_dev, block, sb->s_blocksize);
+	return NULL;
+}
+static inline struct buffer_head *
+affs_getzeroblk(struct super_block *sb, int block)
+{
+	struct buffer_head *bh;
+	pr_debug(KERN_DEBUG "affs_getzeroblk: %d\n", block);
+	if (block >= AFFS_SB->s_reserved && block < AFFS_SB->s_partition_size) {
+		bh = getblk(sb->s_dev, block, sb->s_blocksize);
+		wait_on_buffer(bh);
+		memset(bh->b_data, 0 , sb->s_blocksize);
+		mark_buffer_uptodate(bh, 1);
+		return bh;
+	}
+	return NULL;
+}
+static inline struct buffer_head *
+affs_getemptyblk(struct super_block *sb, int block)
+{
+	struct buffer_head *bh;
+	pr_debug(KERN_DEBUG "affs_getemptyblk: %d\n", block);
+	if (block >= AFFS_SB->s_reserved && block < AFFS_SB->s_partition_size) {
+		bh = getblk(sb->s_dev, block, sb->s_blocksize);
+		wait_on_buffer(bh);
+		mark_buffer_uptodate(bh, 1);
+		return bh;
+	}
+	return NULL;
+}
+static inline void
+affs_brelse(struct buffer_head *bh)
+{
+	if (bh)
+		pr_debug(KERN_DEBUG "affs_brelse: %ld\n", bh->b_blocknr);
+	brelse(bh);
+}
 
-/* Only for easier debugging if need be */
-#define affs_bread	bread
-#define affs_brelse	brelse
+static inline void
+affs_adjust_checksum(struct buffer_head *bh, u32 val)
+{
+	u32 tmp = be32_to_cpu(((u32 *)bh->b_data)[5]);
+	((u32 *)bh->b_data)[5] = cpu_to_be32(tmp - val);
+}
+static inline void
+affs_adjust_bitmapchecksum(struct buffer_head *bh, u32 val)
+{
+	u32 tmp = be32_to_cpu(((u32 *)bh->b_data)[0]);
+	((u32 *)bh->b_data)[0] = cpu_to_be32(tmp - val);
+}
+
+#define MIN(a, b) ({		\
+	typeof(a) _a = (a);	\
+	typeof(b) _b = (b);	\
+	_a < _b ? _a : _b;	\
+})	
 
 #ifdef __LITTLE_ENDIAN
 #define BO_EXBITS	0x18UL
@@ -63,133 +129,100 @@
 #define ST_SOFTLINK	3
 #define ST_LINKDIR	4
 
-struct root_front
-{
-  s32 primary_type;
-  s32 spare1[2];
-  s32 hash_size;
-  s32 spare2;
-  u32 checksum;
-  s32 hashtable[0];
+#define AFFS_ROOT_BMAPS		25
+
+#define AFFS_HEAD(bh)		((struct affs_head *)(bh)->b_data)
+#define AFFS_TAIL(sb, bh)	((struct affs_tail *)((bh)->b_data+(sb)->s_blocksize-sizeof(struct affs_tail)))
+#define AFFS_ROOT_HEAD(bh)	((struct affs_root_head *)(bh)->b_data)
+#define AFFS_ROOT_TAIL(sb, bh)	((struct affs_root_tail *)((bh)->b_data+(sb)->s_blocksize-sizeof(struct affs_root_tail)))
+#define AFFS_DATA_HEAD(bh)	((struct affs_data_head *)(bh)->b_data)
+#define AFFS_DATA(bh)		(((struct affs_data_head *)(bh)->b_data)->data)
+
+struct affs_date {
+	u32 days;
+	u32 mins;
+	u32 ticks;
 };
 
-struct root_end
-{
-  s32 bm_flag;
-  s32 bm_keys[25];
-  s32 bm_extend;
-  struct DateStamp dir_altered;
-  u8 disk_name[40];
-  struct DateStamp disk_altered;
-  struct DateStamp disk_made;
-  s32 spare1[3];
-  s32 secondary_type;
+struct affs_short_date {
+	u16 days;
+	u16 mins;
+	u16 ticks;
 };
 
-struct dir_front
-{
-  s32 primary_type;
-  s32 own_key;
-  s32 spare1[3];
-  u32 checksum;
-  s32 hashtable[0];
+struct affs_root_head {
+	u32 ptype;
+	u32 spare1;
+	u32 spare2;
+	u32 hash_size;
+	u32 spare3;
+	u32 checksum;
+	u32 hashtable[1];
 };
 
-struct dir_end
-{
-  s32 spare1;
-  s16 owner_uid;
-  s16 owner_gid;
-  u32 protect;
-  s32 spare2;
-  u8 comment[92];
-  struct DateStamp created;
-  u8 dir_name[32];
-  s32 spare3[2];
-  s32 link_chain;
-  s32 spare4[5];
-  s32 hash_chain;
-  s32 parent;
-  s32 spare5;
-  s32 secondary_type;
+struct affs_root_tail {
+	u32 bm_flag;
+	u32 bm_blk[AFFS_ROOT_BMAPS];
+	u32 bm_ext;
+	struct affs_date root_change;
+	u8 disk_name[32];
+	u32 spare1;
+	u32 spare2;
+	struct affs_date disk_change;
+	struct affs_date disk_create;
+	u32 spare3;
+	u32 spare4;
+	u32 dcache;
+	u32 stype;
 };
 
-struct file_front
-{
-  s32 primary_type;
-  s32 own_key;
-  s32 block_count;
-  s32 unknown1;
-  s32 first_data;
-  u32 checksum;
-  s32 blocks[0];
+struct affs_head {
+	u32 ptype;
+	u32 key;
+	u32 block_count;
+	u32 spare1;
+	u32 first_data;
+	u32 checksum;
+	u32 table[1];
 };
 
-struct file_end
-{
-  s32 spare1;
-  s16 owner_uid;
-  s16 owner_gid;
-  u32 protect;
-  s32 byte_size;
-  u8 comment[92];
-  struct DateStamp created;
-  u8 file_name[32];
-  s32 spare2;
-  s32 original;	/* not really in file_end */
-  s32 link_chain;
-  s32 spare3[5];
-  s32 hash_chain;
-  s32 parent;
-  s32 extension;
-  s32 secondary_type;
-};
-
-struct hlink_front
-{
-  s32 primary_type;
-  s32 own_key;
-  s32 spare1[3];
-  u32 checksum;
-};
-
-struct hlink_end
-{
-  s32 spare1;
-  s16 owner_uid;
-  s16 owner_gid;
-  u32 protect;
-  u8 comment[92];
-  struct DateStamp created;
-  u8 link_name[32];
-  s32 spare2;
-  s32 original;
-  s32 link_chain;
-  s32 spare3[5];
-  s32 hash_chain;
-  s32 parent;
-  s32 spare4;
-  s32 secondary_type;
+struct affs_tail {
+	u32 spare1;
+	u16 uid;
+	u16 gid;
+	u32 protect;
+	u32 size;
+	u8 comment[92];
+	struct affs_date change;
+	u8 name[32];
+	u32 spare2;
+	u32 original;
+	u32 link_chain;
+	u32 spare[5];
+	u32 hash_chain;
+	u32 parent;
+	u32 extension;
+	u32 stype;
 };
 
 struct slink_front
 {
-  s32 primary_type;
-  s32 own_key;
-  s32 spare1[3];
-  s32 checksum;
-  u8	symname[288];	/* depends on block size */
+	u32 ptype;
+	u32 key;
+	u32 spare1[3];
+	u32 checksum;
+	u8 symname[1];	/* depends on block size */
 };
 
-struct data_front
+struct affs_data_head
 {
-  s32 primary_type;
-  s32 header_key;
-  s32 sequence_number;
-  s32 data_size;
-  s32 next_data;
-  s32 checksum;
-  u8 data[488];	/* depends on block size */
+	u32 ptype;
+	u32 key;
+	u32 sequence;
+	u32 size;
+	u32 next;
+	u32 checksum;
+	u8 data[1];	/* depends on block size */
 };
 
 /* Permission bits */
@@ -203,26 +236,16 @@ struct data_front
 #define FIBF_GRP_EXECUTE	0x0200
 #define FIBF_GRP_DELETE		0x0100
 
+#define FIBF_HIDDEN		0x0080
 #define FIBF_SCRIPT		0x0040
 #define FIBF_PURE		0x0020		/* no use under linux */
-#define FIBF_ARCHIVE		0x0010		/* never set, always cleared on write */
-#define FIBF_READ		0x0008		/* 0 means allowed */
-#define FIBF_WRITE		0x0004		/* 0 means allowed */
-#define FIBF_EXECUTE		0x0002		/* 0 means allowed, ignored under linux */
-#define FIBF_DELETE		0x0001		/* 0 means allowed */
+#define FIBF_ARCHIVED		0x0010		/* never set, always cleared on write */
+#define FIBF_NOREAD		0x0008		/* 0 means allowed */
+#define FIBF_NOWRITE		0x0004		/* 0 means allowed */
+#define FIBF_NOEXECUTE		0x0002		/* 0 means allowed, ignored under linux */
+#define FIBF_NODELETE		0x0001		/* 0 means allowed */
 
 #define FIBF_OWNER		0x000F		/* Bits pertaining to owner */
-
-#define AFFS_UMAYWRITE(prot)	(((prot) & (FIBF_WRITE|FIBF_DELETE)) == (FIBF_WRITE|FIBF_DELETE))
-#define AFFS_UMAYREAD(prot)	((prot) & FIBF_READ)
-#define AFFS_UMAYEXECUTE(prot)	((prot) & FIBF_EXECUTE)
-#define AFFS_GMAYWRITE(prot)	(((prot)&(FIBF_GRP_WRITE|FIBF_GRP_DELETE))==\
-							(FIBF_GRP_WRITE|FIBF_GRP_DELETE))
-#define AFFS_GMAYREAD(prot)	((prot) & FIBF_GRP_READ)
-#define AFFS_GMAYEXECUTE(prot)	((prot) & FIBF_EXECUTE)
-#define AFFS_OMAYWRITE(prot)	(((prot)&(FIBF_OTR_WRITE|FIBF_OTR_DELETE))==\
-							(FIBF_OTR_WRITE|FIBF_OTR_DELETE))
-#define AFFS_OMAYREAD(prot)	((prot) & FIBF_OTR_READ)
-#define AFFS_OMAYEXECUTE(prot)	((prot) & FIBF_EXECUTE)
+#define FIBF_MASK		0xEE0E		/* Bits modified by Linux */
 
 #endif

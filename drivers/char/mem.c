@@ -646,9 +646,6 @@ int __init chr_dev_init(void)
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 	tapechar_init();
 #endif
-#if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
-	tapechar_init();
-#endif
 #if defined(CONFIG_ADB)
 	adbdev_init();
 #endif

@@ -309,14 +309,11 @@ void __init zap_low_mappings (void)
 	 * Zap initial low-memory mappings.
 	 *
 	 * Note that "pgd_clear()" doesn't do it for
-	 * us in this case, because pgd_clear() is a
-	 * no-op in the 2-level case (pmd_clear() is
-	 * the thing that clears the page-tables in
-	 * that case).
+	 * us, because pgd_clear() is a no-op on i386.
 	 */
 	for (i = 0; i < USER_PTRS_PER_PGD; i++)
 #if CONFIG_X86_PAE
-		pgd_clear(swapper_pg_dir+i);
+		set_pgd(swapper_pg_dir+i, __pgd(1 + __pa(empty_zero_page)));
 #else
 		set_pgd(swapper_pg_dir+i, __pgd(0));
 #endif

@@ -36,15 +36,6 @@
 	- Merge Becker version 1.03
 */
 
-/* These identify the driver base version and may not be removed. */
-static const char version1[] =
-"starfire.c:v1.03 7/26/2000  Written by Donald Becker <becker@scyld.com>\n";
-static const char version2[] =
-" Updates and info at http://www.scyld.com/network/starfire.html\n";
-
-static const char version3[] =
-" (unofficial 2.4.x kernel port, version 1.1.4, August 10, 2000)\n";
-
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
 
@@ -122,6 +113,12 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+
+/* These identify the driver base version and may not be removed. */
+static char version[] __devinitdata =
+KERN_INFO "starfire.c:v1.03 7/26/2000  Written by Donald Becker <becker@scyld.com>\n"
+KERN_INFO " Updates and info at http://www.scyld.com/network/starfire.html\n"
+KERN_INFO " (unofficial 2.4.x kernel port, version 1.1.4a, April 17, 2001)\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Adaptec Starfire Ethernet driver");
@@ -395,16 +392,18 @@ static int __devinit starfire_init_one (struct pci_dev *pdev,
 	int i, irq, option, chip_idx = ent->driver_data;
 	struct net_device *dev;
 	static int card_idx = -1;
-	static int printed_version;
 	long ioaddr;
 	int drv_flags, io_size = netdrv_tbl[chip_idx].io_size;
 
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
 	card_idx++;
 	option = card_idx < MAX_UNITS ? options[card_idx] : 0;
-
-	if (!printed_version++)
-		printk(KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-		       version1, version2, version3);
 
 	if (pci_enable_device (pdev))
 		return -EIO;
@@ -1390,6 +1389,10 @@ static struct pci_driver starfire_driver = {
 
 static int __init starfire_init (void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init (&starfire_driver);
 }
 

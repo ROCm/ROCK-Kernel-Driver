@@ -1,4 +1,4 @@
-/* $Id: icn.c,v 1.65.6.3 2001/02/16 16:43:31 kai Exp $
+/* $Id: icn.c,v 1.65.6.4 2001/04/20 02:42:01 keil Exp $
 
  * ISDN low-level module for the ICN active ISDN-Card.
  *
@@ -34,7 +34,7 @@
 #undef MAP_DEBUG
 
 static char
-*revision = "$Revision: 1.65.6.3 $";
+*revision = "$Revision: 1.65.6.4 $";
 
 static int icn_addcard(int, char *, char *);
 
@@ -838,23 +838,23 @@ icn_loadboot(u_char * buffer, icn_card * card)
 			card->other->rvalid = 1;
 	}
 	if (!dev.mvalid) {
-		if (check_shmem((ulong) dev.shmem, 0x4000)) {
+		if (check_mem_region(dev.memaddr, 0x4000)) {
 			printk(KERN_WARNING
-			       "icn: memory at 0x%08lx in use.\n",
-			       (ulong) dev.shmem);
+			       "icn: memory at 0x%08lx in use.\n", dev.memaddr);
 			restore_flags(flags);
 			return -EBUSY;
 		}
-		request_shmem((ulong) dev.shmem, 0x4000, "icn");
+		request_mem_region(dev.memaddr, 0x4000, "icn-isdn (all cards)");
+		dev.shmem = ioremap(dev.memaddr, 0x4000);
 		dev.mvalid = 1;
 	}
 	restore_flags(flags);
 	OUTB_P(0, ICN_RUN);     /* Reset Controller */
 	OUTB_P(0, ICN_MAPRAM);  /* Disable RAM      */
 	icn_shiftout(ICN_CFG, 0x0f, 3, 4);	/* Windowsize= 16k  */
-	icn_shiftout(ICN_CFG, (unsigned long) dev.shmem, 23, 10);	/* Set RAM-Addr.    */
+	icn_shiftout(ICN_CFG, dev.memaddr, 23, 10);	/* Set RAM-Addr.    */
 #ifdef BOOT_DEBUG
-	printk(KERN_DEBUG "shmem=%08lx\n", (ulong) dev.shmem);
+	printk(KERN_DEBUG "shmem=%08lx\n", dev.memaddr);
 #endif
 	SLEEP(1);
 #ifdef BOOT_DEBUG
@@ -1177,29 +1177,31 @@ icn_command(isdn_ctrl * c, icn_card * card)
 			memcpy(&a, c->parm.num, sizeof(ulong));
 			switch (c->arg) {
 				case ICN_IOCTL_SETMMIO:
-					if ((unsigned long) dev.shmem != (a & 0x0ffc000)) {
-						if (check_shmem((ulong) (a & 0x0ffc000), 0x4000)) {
+					if (dev.memaddr != (a & 0x0ffc000)) {
+						if (check_mem_region(a & 0x0ffc000, 0x4000)) {
 							printk(KERN_WARNING
 							       "icn: memory at 0x%08lx in use.\n",
-							       (ulong) (a & 0x0ffc000));
+							       a & 0x0ffc000);
 							return -EINVAL;
 						}
 						icn_stopallcards();
 						save_flags(flags);
 						cli();
-						if (dev.mvalid)
-							release_shmem((ulong) dev.shmem, 0x4000);
+						if (dev.mvalid) {
+							iounmap(dev.shmem);
+							release_mem_region(dev.memaddr, 0x4000);
+						}
 						dev.mvalid = 0;
-						dev.shmem = (icn_shmem *) (a & 0x0ffc000);
+						dev.memaddr = a & 0x0ffc000;
 						restore_flags(flags);
 						printk(KERN_INFO
 						       "icn: (%s) mmio set to 0x%08lx\n",
 						       CID,
-						       (unsigned long) dev.shmem);
+						       dev.memaddr);
 					}
 					break;
 				case ICN_IOCTL_GETMMIO:
-					return (long) dev.shmem;
+					return (long) dev.memaddr;
 				case ICN_IOCTL_SETPORT:
 					if (a == 0x300 || a == 0x310 || a == 0x320 || a == 0x330
 					    || a == 0x340 || a == 0x350 || a == 0x360 ||
@@ -1652,7 +1654,7 @@ icn_setup(char *line)
 	if (ints[0])
 		portbase = ints[1];
 	if (ints[0] > 1)
-		membase = ints[2];
+		membase = (unsigned long)ints[2];
 	if (str && *str) {
 		strcpy(sid, str);
 		icn_id = sid;
@@ -1673,7 +1675,7 @@ static int __init icn_init(void)
 	char rev[10];
 
 	memset(&dev, 0, sizeof(icn_dev));
-	dev.shmem = (icn_shmem *) ((unsigned long) membase & 0x0ffc000);
+	dev.memaddr = (membase & 0x0ffc000);
 	dev.channel = -1;
 	dev.mcard = NULL;
 	dev.firstload = 1;
@@ -1685,7 +1687,7 @@ static int __init icn_init(void)
 	} else
 		strcpy(rev, " ??? ");
 	printk(KERN_NOTICE "ICN-ISDN-driver Rev%smem=0x%08lx\n", rev,
-	       (ulong) dev.shmem);
+	       dev.memaddr);
 	return (icn_addcard(portbase, icn_id, icn_id2));
 }
 
@@ -1719,8 +1721,10 @@ static void __exit icn_exit(void)
 		card = card->next;
 		kfree(last);
 	}
-	if (dev.mvalid)
-		release_shmem((ulong) dev.shmem, 0x4000);
+	if (dev.mvalid) {
+		iounmap(dev.shmem);
+		release_mem_region(dev.memaddr, 0x4000);
+	}
 	printk(KERN_NOTICE "ICN-ISDN-driver unloaded\n");
 }
 

@@ -1,4 +1,4 @@
-/* $Id: isdn.h,v 1.111.6.1 2001/02/07 11:31:31 kai Exp $
+/* $Id: isdn.h,v 1.111.6.5 2001/04/20 02:40:48 keil Exp $
 
  * Main header for the Linux ISDN subsystem (linklevel).
  *
@@ -25,7 +25,9 @@
 #ifndef isdn_h
 #define isdn_h
 
+#ifdef __KERNEL__
 #include <linux/config.h>
+#endif
 #include <linux/ioctl.h>
 
 #define ISDN_TTY_MAJOR    43
@@ -37,8 +39,14 @@
  * the correspondent code in isdn.c
  */
 
+#ifdef USE_MINIMUM_MEM
+/* Save memory */
+#define ISDN_MAX_DRIVERS    2
+#define ISDN_MAX_CHANNELS   8
+#else
 #define ISDN_MAX_DRIVERS    32
 #define ISDN_MAX_CHANNELS   64
+#endif
 #define ISDN_MINOR_B        0
 #define ISDN_MINOR_BMAX     (ISDN_MAX_CHANNELS-1)
 #define ISDN_MINOR_CTRL     64
@@ -97,6 +105,12 @@
 #define IIOCDBGVAR  _IO('I',127)
 
 #define IIOCDRVCTL  _IO('I',128)
+
+/* cisco hdlck device private ioctls */
+#define SIOCGKEEPPERIOD	(SIOCDEVPRIVATE + 0)
+#define SIOCSKEEPPERIOD	(SIOCDEVPRIVATE + 1)
+#define SIOCGDEBSERINT	(SIOCDEVPRIVATE + 2)
+#define SIOCSDEBSERINT	(SIOCDEVPRIVATE + 3)
 
 /* Packet encapsulations for net-interfaces */
 #define ISDN_NET_ENCAP_ETHER      0
@@ -258,9 +272,9 @@ typedef struct {
                              ((x & ISDN_USAGE_MASK)==ISDN_USAGE_VOICE)     )
 
 /* Timer-delays and scheduling-flags */
-#define ISDN_TIMER_RES         3                         /* Main Timer-Resolution   */
-#define ISDN_TIMER_02SEC       (HZ/(ISDN_TIMER_RES+1)/5) /* Slow-Timer1 .2 sec      */
-#define ISDN_TIMER_1SEC        (HZ/(ISDN_TIMER_RES+1))   /* Slow-Timer2 1 sec       */
+#define ISDN_TIMER_RES         4                         /* Main Timer-Resolution   */
+#define ISDN_TIMER_02SEC       (HZ/ISDN_TIMER_RES/5)     /* Slow-Timer1 .2 sec      */
+#define ISDN_TIMER_1SEC        (HZ/ISDN_TIMER_RES)       /* Slow-Timer2 1 sec       */
 #define ISDN_TIMER_RINGING     5 /* tty RINGs = ISDN_TIMER_1SEC * this factor       */
 #define ISDN_TIMER_KEEPINT    10 /* Cisco-Keepalive = ISDN_TIMER_1SEC * this factor */
 #define ISDN_TIMER_MODEMREAD   1
@@ -269,13 +283,11 @@ typedef struct {
 #define ISDN_TIMER_MODEMXMIT   8
 #define ISDN_TIMER_NETDIAL    16 
 #define ISDN_TIMER_NETHANGUP  32
-#define ISDN_TIMER_KEEPALIVE 128 /* Cisco-Keepalive */
 #define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
 #define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
                               ISDN_TIMER_MODEMXMIT)
 #define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_NETHANGUP | \
-                              ISDN_TIMER_NETDIAL | ISDN_TIMER_KEEPALIVE | \
-                              ISDN_TIMER_CARRIER)
+                              ISDN_TIMER_NETDIAL | ISDN_TIMER_CARRIER)
 
 /* Timeout-Values for isdn_net_dial() */
 #define ISDN_TIMER_DTIMEOUT10 (10*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
@@ -397,9 +409,15 @@ typedef struct isdn_net_local_s {
 #ifdef CONFIG_ISDN_X25
   struct concap_device_ops *dops;      /* callbacks used by encapsulator   */
 #endif
-  int  cisco_loop;                     /* Loop counter for Cisco-SLARP     */
+  /* use an own struct for that in later versions */
   ulong cisco_myseq;                   /* Local keepalive seq. for Cisco   */
+  ulong cisco_mineseen;                /* returned keepalive seq. from remote */
   ulong cisco_yourseq;                 /* Remote keepalive seq. for Cisco  */
+  int cisco_keepalive_period;		/* keepalive period */
+  ulong cisco_last_slarp_in;		/* jiffie of last keepalive packet we received */
+  char cisco_line_state;		/* state of line according to keepalive packets */
+  char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
+  struct timer_list cisco_timer;
   struct tq_struct tqueue;
 } isdn_net_local;
 

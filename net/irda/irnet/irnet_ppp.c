@@ -476,7 +476,7 @@ dev_irnet_write(struct file *	file,
 
   /* If we are connected to ppp_generic, let it handle the job */
   if(ap->ppp_open)
-    return ppp_channel_write(&ap->chan, buf, count);
+    return -EAGAIN;
   else
     return irnet_ctrl_write(ap, buf, count);
 }
@@ -500,7 +500,7 @@ dev_irnet_read(struct file *	file,
 
   /* If we are connected to ppp_generic, let it handle the job */
   if(ap->ppp_open)
-    return ppp_channel_read(&ap->chan, file, buf, count);
+    return -EAGAIN;
   else
     return irnet_ctrl_read(ap, file, buf, count);
 }
@@ -523,9 +523,7 @@ dev_irnet_poll(struct file *	file,
   DABORT(ap == NULL, mask, FS_ERROR, "ap is NULL !!!\n");
 
   /* If we are connected to ppp_generic, let it handle the job */
-  if(ap->ppp_open)
-    mask |= ppp_channel_poll(&ap->chan, file, wait);
-  else
+  if(!ap->ppp_open)
     mask |= irnet_ctrl_poll(ap, file, wait);
 
   DEXIT(FS_TRACE, " - mask=0x%X\n", mask);
@@ -597,15 +595,6 @@ dev_irnet_ioctl(struct inode *	inode,
 	  ap->ppp_open = 0;
 	  err = 0;
 	}
-      break;
-
-      /* Attach this PPP instance to the PPP driver (set it active) */
-    case PPPIOCATTACH:
-    case PPPIOCDETACH:
-      if(ap->ppp_open)
-	err = ppp_channel_ioctl(&ap->chan, cmd, arg);
-      else
-	DERROR(FS_ERROR, "Channel not registered !\n");
       break;
 
       /* Query PPP channel and unit number */

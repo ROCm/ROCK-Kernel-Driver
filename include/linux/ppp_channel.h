@@ -22,7 +22,6 @@
 #include <linux/list.h>
 #include <linux/skbuff.h>
 #include <linux/poll.h>
-#include <asm/atomic.h>
 
 struct ppp_channel;
 
@@ -32,7 +31,6 @@ struct ppp_channel_ops {
 	int	(*start_xmit)(struct ppp_channel *, struct sk_buff *);
 	/* Handle an ioctl call that has come in via /dev/ppp. */
 	int	(*ioctl)(struct ppp_channel *, unsigned int, unsigned long);
-	
 };
 
 struct ppp_channel {
@@ -78,16 +76,6 @@ extern int ppp_unit_number(struct ppp_channel *);
  * in the start_xmit and ioctl routines for the channel by the time
  * that ppp_unregister_channel returns.
  */
-
-/* The following are temporary compatibility stuff */
-ssize_t ppp_channel_read(struct ppp_channel *chan, struct file *file,
-			 char *buf, size_t count);
-ssize_t ppp_channel_write(struct ppp_channel *chan, const char *buf,
-			  size_t count);
-unsigned int ppp_channel_poll(struct ppp_channel *chan, struct file *file,
-			      poll_table *wait);
-int ppp_channel_ioctl(struct ppp_channel *chan, unsigned int cmd,
-		      unsigned long arg);
 
 #endif /* __KERNEL__ */
 #endif

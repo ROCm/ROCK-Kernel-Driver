@@ -1121,8 +1121,8 @@ N: Richard Henderson
 E: rth@twiddle.net
 E: rth@cygnus.com
 D: Alpha hacker, kernel and userland
-S: 50 E. Middlefield #10
-S: Mountain View, California 94043
+S: 1668 California St.
+S: Mountain View, California 94041
 S: USA
 
 N: Benjamin Herrenschmidt
@@ -1483,8 +1483,9 @@ E: ajk@iehk.rwth-aachen.de
 D: 6pack driver for AX.25
 
 N: Harald Koerfgen
-E: harald@unix-ag.org
-D: DECstation port
+E: hkoerfg@web.de
+D: Linux/MIPS kernel hacks and fixes,
+D: DECstation port, Sharp Mobilon port
 S: D-50931 Koeln
 S: Germany
 

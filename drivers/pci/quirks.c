@@ -85,6 +85,29 @@ static void __init quirk_triton(struct pci_dev *dev)
 }
 
 /*
+ *	VIA Apollo KT133 needs PCI latency patch
+ *	Made according to a windows driver based patch by George E. Breese
+ *	see PCI Latency Adjust on http://www.viahardware.com/download/viatweak.shtm
+ */
+static void __init quirk_vialatency(struct pci_dev *dev)
+{
+	u8 r70;
+
+	printk(KERN_INFO "Applying VIA PCI latency patch.\n");
+	/*
+	 *    In register 0x70, mask off bit 2 (PCI Master read caching)
+	 *    and 1 (Delay Transaction)
+	 */
+	pci_read_config_byte(dev, 0x70, &r70);
+	r70 &= 0xf9;
+	pci_write_config_byte(dev, 0x70, r70);
+	/*
+	 *    Turn off PCI Latency timeout (set to 0 clocks)
+	 */
+	pci_write_config_byte(dev, 0x75, 0x80);
+}
+
+/*
  *	VIA Apollo VP3 needs ETBF on BT848/878
  */
  
@@ -289,6 +312,7 @@ static struct pci_fixup pci_fixups[] __initdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_INTEL, 	PCI_DEVICE_ID_INTEL_82443BX_2, 	quirk_natoma },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		quirk_nopcipci },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_496,		quirk_nopcipci },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	quirk_vialatency },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_viaetbf },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_vt82c598_id },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_vt82c586_acpi },

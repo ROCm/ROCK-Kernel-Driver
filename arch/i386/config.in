@@ -9,8 +9,6 @@ define_bool CONFIG_ISA y
 define_bool CONFIG_SBUS n
 
 define_bool CONFIG_UID16 y
-define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
-define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 
 mainmenu_option next_comment
 comment 'Code maturity level options'
@@ -52,6 +50,8 @@ if [ "$CONFIG_M386" = "y" ]; then
    define_bool CONFIG_X86_CMPXCHG n
    define_bool CONFIG_X86_XADD n
    define_int  CONFIG_X86_L1_CACHE_SHIFT 4
+   define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
+   define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 else
    define_bool CONFIG_X86_WP_WORKS_OK y
    define_bool CONFIG_X86_INVLPG y
@@ -59,6 +59,8 @@ else
    define_bool CONFIG_X86_XADD y
    define_bool CONFIG_X86_BSWAP y
    define_bool CONFIG_X86_POPAD_OK y
+   define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+   define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 fi
 if [ "$CONFIG_M486" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 4

@@ -13,6 +13,8 @@
 
 #ifdef __KERNEL__
 
+struct rwsem_waiter;
+
 struct rw_semaphore {
 	signed int count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
@@ -21,13 +23,13 @@ struct rw_semaphore {
 #define RWSEM_WAITING_BIAS		0xffff0000
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
 #define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
-	wait_queue_head_t wait;
-#define RWSEM_WAITING_FOR_READ	WQ_FLAG_CONTEXT_0	/* bits to use in wait_queue_t.flags */
-#define RWSEM_WAITING_FOR_WRITE	WQ_FLAG_CONTEXT_1
+	spinlock_t		wait_lock;
+	struct rwsem_waiter	*wait_front;
+	struct rwsem_waiter	**wait_back;
 };
 
 #define __RWSEM_INITIALIZER(name) \
-{ RWSEM_UNLOCKED_VALUE, __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) }
+{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, NULL, &(name).wait_front }
 
 #define DECLARE_RWSEM(name) \
 	struct rw_semaphore name = __RWSEM_INITIALIZER(name)

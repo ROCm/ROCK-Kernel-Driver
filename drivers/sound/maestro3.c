@@ -2307,6 +2307,8 @@ static int __init m3_codec_install(struct m3_card *card)
     codec->private_data = card;
     codec->codec_read = m3_ac97_read;
     codec->codec_write = m3_ac97_write;
+    /* someday we should support secondary codecs.. */
+    codec->id = 0;
 
     if (ac97_probe_codec(codec) == 0) {
         printk(KERN_ERR PFX "codec probe failed\n");
@@ -2934,6 +2936,7 @@ static int __init m3_init_module(void)
 
     if (!pci_register_driver(&m3_pci_driver)) {
         pci_unregister_driver(&m3_pci_driver);
+        unregister_reboot_notifier(&m3_reboot_nb);
         return -ENODEV;
     }
     return 0;

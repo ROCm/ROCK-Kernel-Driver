@@ -38,9 +38,11 @@
 
 #ifdef __KERNEL__
 
+#include <linux/types.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
-#include <linux/wait.h>
+
+struct rw_semaphore;
 
 /* defined contention handler functions for the generic case
  * - these are also used for the exchange-and-add based algorithm
@@ -60,8 +62,7 @@ extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *sem));
 
 #ifndef rwsemtrace
 #if RWSEM_DEBUG
-#include <asm/current.h>
-#define rwsemtrace(SEM,FMT) do { if ((SEM)->debug) printk("[%d] "FMT"(count=%08lx)\n",current->pid,(SEM)->count); } while(0)
+extern void FASTCALL(rwsemtrace(struct rw_semaphore *sem, const char *str));
 #else
 #define rwsemtrace(SEM,FMT)
 #endif

@@ -321,7 +321,19 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 					(tp->link_change)(dev, csr5);
 			}
 			if (csr5 & SytemError) {
-				printk(KERN_ERR "%s: (%lu) System Error occured\n", dev->name, tp->nir);
+				int error = (csr5 >> 23) & 7;
+				/* oops, we hit a PCI error.  The code produced corresponds
+				 * to the reason:
+				 *  0 - parity error
+				 *  1 - master abort
+				 *  2 - target abort
+				 * Note that on parity error, we should do a software reset
+				 * of the chip to get it back into a sane state (according
+				 * to the 21142/3 docs that is).
+				 *   -- rmk
+				 */
+				printk(KERN_ERR "%s: (%lu) System Error occured (%d)\n",
+					dev->name, tp->nir, error);
 			}
 			/* Clear all error sources, included undocumented ones! */
 			outl(0x0800f7ba, ioaddr + CSR5);

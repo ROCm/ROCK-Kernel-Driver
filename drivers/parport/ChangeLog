@@ -1,3 +1,18 @@
+2001-04-20  Paul Gortmaker  <p_gortmaker@yahoo.com>
+
+	* parport_pc.c: Cut down the size quite a bit (more than 4k off
+	the object, about 1k off the zImage) for the older non-PCI
+	machines which are typically resource starved anyway...
+
+2001-03-26  R Horn  <rjh@world.std.com>
+
+	* parport_pc.c: Some commentary changes.
+
+2001-04-19  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_probe_port): Remove __devinit
+	attribute.  Export unconditionally.
+
 2001-04-14  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	Merged:  2001-03-30  Tim Waugh  <twaugh@redhat.com>

@@ -8,7 +8,6 @@
  *  Please send bug reports to: hjw@zvw.de
  */
 
-#define DEBUG 0
 #include <stdarg.h>
 #include <linux/stat.h>
 #include <linux/sched.h>
@@ -26,169 +25,235 @@ static char ErrorBuffer[256];
  * Functions for accessing Amiga-FFS structures.
  */
 
-/* Set *NAME to point to the file name in a file header block in memory
-   pointed to by FH_DATA.  The length of the name is returned. */
 
-int
-affs_get_file_name(int bsize, void *fh_data, unsigned char **name)
-{
-	struct file_end *file_end;
-
-	file_end = GET_END_PTR(struct file_end, fh_data, bsize);
-	if (file_end->file_name[0] == 0
-	    || file_end->file_name[0] > 30) {
-		printk(KERN_WARNING "AFFS: bad filename (length=%d chars)\n",
-			file_end->file_name[0]);
-		*name = "***BAD_FILE***";
-		return 14;
-        }
-	*name = (unsigned char *)&file_end->file_name[1];
-        return file_end->file_name[0];
-}
-
-/* Insert a header block (file) into the directory (next).
- * This routine assumes that the caller has the superblock locked.
+/* Insert a header block bh into the directory dir
+ * caller must hold AFFS_DIR->i_hash_lock!
  */
 
 int
-affs_insert_hash(unsigned long next, struct buffer_head *file, struct inode *inode)
+affs_insert_hash(struct inode *dir, struct buffer_head *bh)
 {
-	struct buffer_head	*bh;
-	s32			 ino;
-	int			 offset;
+	struct super_block *sb = dir->i_sb;
+	struct buffer_head *dir_bh;
+	u32 ino, hash_ino;
+	int offset;
 
-	offset = affs_hash_name(FILE_END(file->b_data,inode)->file_name+1,
-				FILE_END(file->b_data,inode)->file_name[0],
-				AFFS_I2FSTYPE(inode),AFFS_I2HSIZE(inode)) + 6;
-	ino    = be32_to_cpu(((struct dir_front *)file->b_data)->own_key);
+	ino = bh->b_blocknr;
+	offset = affs_hash_name(sb, AFFS_TAIL(sb, bh)->name + 1, AFFS_TAIL(sb, bh)->name[0]);
 
-	pr_debug("AFFS: insert_hash(dir_ino=%lu,ino=%d)\n",next,ino);
+	pr_debug("AFFS: insert_hash(dir=%u, ino=%d)\n", (u32)dir->i_ino, ino);
 
-	FILE_END(file->b_data,inode)->parent = cpu_to_be32(next);
+	dir_bh = affs_bread(sb, dir->i_ino);
+	if (!dir_bh)
+		return -EIO;
 
-	while (1) {
-		if (!(bh = affs_bread(inode->i_dev,next,AFFS_I2BSIZE(inode))))
+	hash_ino = be32_to_cpu(AFFS_HEAD(dir_bh)->table[offset]);
+	while (hash_ino) {
+		affs_brelse(dir_bh);
+		dir_bh = affs_bread(sb, hash_ino);
+		if (!dir_bh)
 			return -EIO;
-		next = be32_to_cpu(((s32 *)bh->b_data)[offset]);
-		if (!next || next > ino)
-			break;
-		offset = AFFS_I2BSIZE(inode) / 4 - 4;
-		affs_brelse(bh);
+		hash_ino = be32_to_cpu(AFFS_TAIL(sb, dir_bh)->hash_chain);
 	}
+	AFFS_TAIL(sb, bh)->parent = cpu_to_be32(dir->i_ino);
+	AFFS_TAIL(sb, bh)->hash_chain = 0;
 
-	DIR_END(file->b_data,inode)->hash_chain = cpu_to_be32(next);
-	((s32 *)bh->b_data)[offset]             = cpu_to_be32(ino);
-	affs_fix_checksum(AFFS_I2BSIZE(inode),bh->b_data,5);
-	mark_buffer_dirty(bh);
-	affs_brelse(bh);
+	if (dir->i_ino == dir_bh->b_blocknr)
+		AFFS_HEAD(dir_bh)->table[offset] = cpu_to_be32(ino);
+	else
+		AFFS_TAIL(sb, dir_bh)->hash_chain = cpu_to_be32(ino);
+
+	affs_adjust_checksum(dir_bh, ino);
+	mark_buffer_dirty(dir_bh);
+	affs_brelse(dir_bh);
+
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_version = ++event;
+	mark_inode_dirty(dir);
 
 	return 0;
 }
-/* Remove a header block from its hash table (directory).
- * 'inode' may be any inode on the partition, it's only
- * used for calculating the block size and superblock
- * reference.
+
+/* Remove a header block from its directory.
+ * caller must hold AFFS_DIR->i_hash_lock!
  */
 
 int
-affs_remove_hash(struct buffer_head *dbh, struct inode *inode)
+affs_remove_hash(struct inode *dir, struct buffer_head *rem_bh)
 {
-	s32			 ownkey;
-	s32			 key;
-	s32			 ptype;
-	s32			 stype;
-	int			 offset;
-	int			 retval;
-	struct buffer_head	*bh;
+	struct super_block *sb;
+	struct buffer_head *bh;
+	u32 rem_ino, hash_ino, ino;
+	int offset, retval;
 
-	ownkey = be32_to_cpu(((struct dir_front *)dbh->b_data)->own_key);
-	key    = be32_to_cpu(FILE_END(dbh->b_data,inode)->parent);
-	offset = affs_hash_name(FILE_END(dbh->b_data,inode)->file_name+1,
-				FILE_END(dbh->b_data,inode)->file_name[0],
-				AFFS_I2FSTYPE(inode),AFFS_I2HSIZE(inode)) + 6;
-	pr_debug("AFFS: remove_hash(dir=%d, ino=%d, hashval=%d)\n",key,ownkey,offset-6);
+	sb = dir->i_sb;
+	rem_ino = rem_bh->b_blocknr;
+	offset = affs_hash_name(sb, AFFS_TAIL(sb, rem_bh)->name+1, AFFS_TAIL(sb, rem_bh)->name[0]);
+	pr_debug("AFFS: remove_hash(dir=%d, ino=%d, hashval=%d)\n", (u32)dir->i_ino, rem_ino, offset);
+
+	bh = affs_bread(sb, dir->i_ino);
+	if (!bh)
+		return -EIO;
+
 	retval = -ENOENT;
-
-	lock_super(inode->i_sb);
-	while (key) {
-		if (!(bh = affs_bread(inode->i_dev,key,AFFS_I2BSIZE(inode)))) {
-			retval = -EIO;
-			break;
-		}
-		if (affs_checksum_block(AFFS_I2BSIZE(inode),bh->b_data,&ptype,&stype)
-		    || ptype != T_SHORT || (stype != ST_FILE && stype != ST_USERDIR &&
-					    stype != ST_LINKFILE && stype != ST_LINKDIR &&
-					    stype != ST_ROOT && stype != ST_SOFTLINK)) {
-			affs_error(inode->i_sb,"affs_remove_hash",
-				"Bad block in hash chain (key=%d, ptype=%d, stype=%d, ownkey=%d)",
-				key,ptype,stype,ownkey);
-			affs_brelse(bh);
-			retval = -EINVAL;
-			break;
-		}
-		key = be32_to_cpu(((s32 *)bh->b_data)[offset]);
-		if (ownkey == key) {
-			((s32 *)bh->b_data)[offset] = FILE_END(dbh->b_data,inode)->hash_chain;
-			affs_fix_checksum(AFFS_I2BSIZE(inode),bh->b_data,5);
+	hash_ino = be32_to_cpu(AFFS_HEAD(bh)->table[offset]);
+	while (hash_ino) {
+		if (hash_ino == rem_ino) {
+			ino = AFFS_TAIL(sb, rem_bh)->hash_chain;
+			if (dir->i_ino == bh->b_blocknr)
+				AFFS_HEAD(bh)->table[offset] = ino;
+			else
+				AFFS_TAIL(sb, bh)->hash_chain = ino;
+			affs_adjust_checksum(bh, be32_to_cpu(ino) - hash_ino);
 			mark_buffer_dirty(bh);
-			affs_brelse(bh);
 			retval = 0;
 			break;
 		}
 		affs_brelse(bh);
-		offset = AFFS_I2BSIZE(inode) / 4 - 4;
+		bh = affs_bread(sb, hash_ino);
+		if (!bh)
+			return -EIO;
+		hash_ino = be32_to_cpu(AFFS_TAIL(sb, bh)->hash_chain);
 	}
-	unlock_super(inode->i_sb);
+
+	affs_brelse(bh);
+
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_version = ++event;
+	mark_inode_dirty(dir);
 
 	return retval;
 }
+
+static void
+affs_fix_dcache(struct dentry *dentry, u32 entry_ino)
+{
+	struct inode *inode = dentry->d_inode;
+	void *data = dentry->d_fsdata;
+	struct list_head *head, *next;
+
+	spin_lock(&dcache_lock);
+	head = &inode->i_dentry;
+	next = head->next;
+	while (next != head) {
+		dentry = list_entry(next, struct dentry, d_alias);
+		if (entry_ino == (u32)dentry->d_fsdata) {
+			dentry->d_fsdata = data;
+			break;
+		}
+		next = next->next;
+	}
+	spin_unlock(&dcache_lock);
+}
+
 
 /* Remove header from link chain */
 
-int
-affs_remove_link(struct buffer_head *dbh, struct inode *inode)
+static int
+affs_remove_link(struct dentry *dentry)
 {
-	int			 retval;
-	s32			 key;
-	s32			 ownkey;
-	s32			 ptype;
-	s32			 stype;
-	struct buffer_head	*bh;
+	struct inode *dir, *inode = dentry->d_inode;
+	struct super_block *sb = inode->i_sb;
+	struct buffer_head *bh = NULL, *link_bh = NULL;
+	u32 link_ino, ino;
+	int retval;
 
-	ownkey = be32_to_cpu((DIR_FRONT(dbh)->own_key));
-	key    = be32_to_cpu(FILE_END(dbh->b_data,inode)->original);
-	retval = -ENOENT;
+	pr_debug("AFFS: remove_link(key=%ld)\n", inode->i_ino);
+	down(&AFFS_INODE->i_link_lock);
+	retval = -EIO;
+	bh = affs_bread(sb, inode->i_ino);
+	if (!bh)
+		goto done;
 
-	pr_debug("AFFS: remove_link(link=%d, original=%d)\n",ownkey,key);
+	link_ino = (u32)dentry->d_fsdata;
+	if (inode->i_ino == link_ino) {
+		/* we can't remove the head of the link, as its blocknr is still used as ino,
+		 * so we remove the block of the first link instead.
+		 */ 
+		link_ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain);
+		link_bh = affs_bread(sb, link_ino);
+		if (!link_bh)
+			goto done;
 
-	lock_super(inode->i_sb);
-	while (key) {
-		if (!(bh = affs_bread(inode->i_dev,key,AFFS_I2BSIZE(inode)))) {
-			retval = -EIO;
-			break;
-		}
-		if (affs_checksum_block(AFFS_I2BSIZE(inode),bh->b_data,&ptype,&stype)) {
-			affs_error(inode->i_sb,"affs_remove_link","Checksum error (block %d)",key);
-			affs_brelse(bh);
-			retval = -EINVAL;
-			break;
-		}
-		key = be32_to_cpu(FILE_END(bh->b_data,inode)->link_chain);
-		if (ownkey == key) {
-			FILE_END(bh->b_data,inode)->link_chain =
-						FILE_END(dbh->b_data,inode)->link_chain;
-			affs_fix_checksum(AFFS_I2BSIZE(inode),bh->b_data,5);
+		dir = iget(sb, be32_to_cpu(AFFS_TAIL(sb, link_bh)->parent));
+		if (!dir)
+			goto done;
+
+		down(&AFFS_DIR->i_hash_lock);
+		affs_fix_dcache(dentry, link_ino);
+		retval = affs_remove_hash(dir, link_bh);
+		if (retval)
+			goto done;
+
+		memcpy(AFFS_TAIL(sb, bh)->name, AFFS_TAIL(sb, link_bh)->name, 32);
+		retval = affs_insert_hash(dir, bh);
+		if (retval)
+			goto done;
+
+		up(&AFFS_DIR->i_hash_lock);
+		iput(dir);
+	} else {
+		link_bh = affs_bread(sb, link_ino);
+		if (!link_bh)
+			goto done;
+	}
+
+	while ((ino = be32_to_cpu(AFFS_TAIL(sb, bh)->link_chain))) {
+		if (ino == link_ino) {
+			ino = AFFS_TAIL(sb, link_bh)->link_chain;
+			AFFS_TAIL(sb, bh)->link_chain = ino;
+			affs_adjust_checksum(bh, be32_to_cpu(ino) - link_ino);
 			mark_buffer_dirty(bh);
-			affs_brelse(bh);
 			retval = 0;
-			break;
+			/* Fix the link count, if bh is a normal header block without links */
+			switch (be32_to_cpu(AFFS_TAIL(sb, bh)->stype)) {
+			case ST_LINKDIR:
+			case ST_LINKFILE:
+				break;
+			default:
+				if (!AFFS_TAIL(sb, bh)->link_chain)
+					inode->i_nlink = 1;
+			}
+			affs_free_block(sb, link_ino);
+			goto done;
 		}
 		affs_brelse(bh);
+		bh = affs_bread(sb, ino);
+		if (!bh)
+			goto done;
 	}
-	unlock_super(inode->i_sb);
-
+	retval = -ENOENT;
+done:
+	affs_brelse(link_bh);
+	affs_brelse(bh);
+	up(&AFFS_INODE->i_link_lock);
 	return retval;
 }
+
+
+static int
+affs_empty_dir(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+	struct buffer_head *bh;
+	int retval, size;
+
+	retval = -EIO;
+	bh = affs_bread(sb, inode->i_ino);
+	if (!bh)
+		goto done;
+
+	retval = -ENOTEMPTY;
+	for (size = AFFS_SB->s_hashsize - 1; size >= 0; size--)
+		if (AFFS_HEAD(bh)->table[size])
+			goto not_empty;
+	retval = 0;
+not_empty:
+	affs_brelse(bh);
+done:
+	return retval;
+}
+
 
 /* Remove a filesystem object. If the object to be removed has
  * links to it, one of the links must be changed to inherit
@@ -200,86 +265,55 @@ affs_remove_link(struct buffer_head *dbh, struct inode *inode)
  */
 
 int
-affs_remove_header(struct buffer_head *bh, struct inode *inode)
+affs_remove_header(struct dentry *dentry)
 {
-	struct buffer_head	*link_bh;
-	struct inode		*dir;
-	unsigned long		 link_ino;
-	unsigned long		 orig_ino;
-	unsigned int		 dir_ino;
-	int			 error;
+	struct super_block *sb;
+	struct inode *inode, *dir;
+	struct buffer_head *bh = NULL;
+	int retval;
 
-	pr_debug("AFFS: remove_header(key=%ld)\n",be32_to_cpu(DIR_FRONT(bh)->own_key));
+	dir = dentry->d_parent->d_inode;
+	sb = dir->i_sb;
 
-	/* Mark directory as changed.  We do this before anything else,
-	 * as it must be done anyway and doesn't hurt even if an
-	 * error occurs later.
-	 */
-	dir = iget(inode->i_sb,be32_to_cpu(FILE_END(bh->b_data,inode)->parent));
-	if (!dir)
-		return -EIO;
-	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	dir->i_version++;
-	mark_inode_dirty(dir);
-	iput(dir);
+	retval = -ENOENT;
+	inode = dentry->d_inode;
+	if (!inode)
+		goto done;
 
-	orig_ino = be32_to_cpu(FILE_END(bh->b_data,inode)->original);
-	if (orig_ino) {		/* This is just a link. Nothing much to do. */
-		pr_debug("AFFS: Removing link.\n");
-		if ((error = affs_remove_link(bh,inode)))
-			return error;
-		if ((error = affs_remove_hash(bh,inode)))
-			return error;
-		affs_free_block(inode->i_sb,be32_to_cpu(DIR_FRONT(bh)->own_key));
-		return 1;
+	pr_debug("AFFS: remove_header(key=%ld)\n", inode->i_ino);
+	down(&AFFS_DIR->i_hash_lock);
+	if (S_ISDIR(inode->i_mode)) {
+		retval = affs_empty_dir(inode);
+		if (retval)
+			goto done_unlock;
 	}
-	
-	link_ino = be32_to_cpu(FILE_END(bh->b_data,inode)->link_chain);
-	if (link_ino) {		/* This is the complicated case. Yuck. */
-		pr_debug("AFFS: Removing original with links to it.\n");
-		/* Unlink the object and its first link from their directories. */
-		if ((error = affs_remove_hash(bh,inode)))
-			return error;
-		if (!(link_bh = affs_bread(inode->i_dev,link_ino,AFFS_I2BSIZE(inode))))
-			return -EIO;
-		if ((error = affs_remove_hash(link_bh,inode))) {
-			affs_brelse(link_bh);
-			return error;
-		}
-		/* Fix link chain. */
-		if ((error = affs_remove_link(link_bh,inode))) {
-			affs_brelse(link_bh);
-			return error;
-		}
-		/* Rename link to object. */
-		memcpy(FILE_END(bh->b_data,inode)->file_name,
-			FILE_END(link_bh->b_data,inode)->file_name,32);
-		/* Insert object into dir the link was in. */
-		dir_ino = be32_to_cpu(FILE_END(link_bh->b_data,inode)->parent);
-		if ((error = affs_insert_hash(dir_ino,bh,inode))) {
-			affs_brelse(link_bh);
-			return error;
-		}
-		affs_fix_checksum(AFFS_I2BSIZE(inode),bh->b_data,5);
-		mark_buffer_dirty(bh);
-		affs_brelse(link_bh);
-		affs_free_block(inode->i_sb,link_ino);
-		/* Mark the link's parent dir as changed, too. */
-		if (!(dir = iget(inode->i_sb,dir_ino)))
-			return -EIO;
-		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-		dir->i_version++;
-		mark_inode_dirty(dir);
-		iput(dir);
-		return 1;
-	}
-	/* Plain file/dir. This is the simplest case. */
-	pr_debug("AFFS: Removing plain file/dir.\n");
-	if ((error = affs_remove_hash(bh,inode)))
-		return error;
-	return 0;
+
+	retval = -EIO;
+	bh = affs_bread(sb, inode->i_ino);
+	if (!bh)
+		goto done;
+
+	retval = affs_remove_hash(dir, bh);
+	if (retval)
+		goto done_unlock;
+
+	up(&AFFS_DIR->i_hash_lock);
+
+	if (inode->i_nlink > 1)
+		retval = affs_remove_link(dentry);
+	else
+		inode->i_nlink = 0;
+	inode->i_ctime = CURRENT_TIME;
+	mark_inode_dirty(inode);
+
+done:
+	affs_brelse(bh);
+	return retval;
+
+done_unlock:
+	up(&AFFS_DIR->i_hash_lock);
+	goto done;
 }
-
 
 /* Checksum a block, do various consistency checks and optionally return
    the blocks type number.  DATA points to the block.  If their pointers
@@ -289,21 +323,15 @@ affs_remove_header(struct buffer_head *bh, struct inode *inode)
    Returns non-zero if the block is not consistent. */
 
 u32
-affs_checksum_block(int bsize, void *data, s32 *ptype, s32 *stype)
+affs_checksum_block(struct super_block *sb, struct buffer_head *bh)
 {
-	u32	 sum;
-	u32	*p;
+	u32 *ptr = (u32 *)bh->b_data;
+	u32 sum;
+	int bsize;
 
-	bsize /= 4;
-	if (ptype)
-		*ptype = be32_to_cpu(((s32 *)data)[0]);
-	if (stype)
-		*stype = be32_to_cpu(((s32 *)data)[bsize - 1]);
-
-	sum    = 0;
-	p      = data;
-	while (bsize--)
-		sum += be32_to_cpu(*p++);
+	sum = 0;
+	for (bsize = sb->s_blocksize / sizeof(u32); bsize > 0; bsize--)
+		sum += be32_to_cpu(*ptr++);
 	return sum;
 }
 
@@ -313,19 +341,21 @@ affs_checksum_block(int bsize, void *data, s32 *ptype, s32 *stype)
  */
 
 void
-affs_fix_checksum(int bsize, void *data, int cspos)
+affs_fix_checksum(struct super_block *sb, struct buffer_head *bh)
 {
-	u32	 ocs;
-	u32	 cs;
+	int cnt = sb->s_blocksize / sizeof(u32);
+	u32 *ptr = (u32 *)bh->b_data;
+	u32 checksum, *checksumptr;
 
-	cs   = affs_checksum_block(bsize,data,NULL,NULL);
-	ocs  = be32_to_cpu(((u32 *)data)[cspos]);
-	ocs -= cs;
-	((u32 *)data)[cspos] = be32_to_cpu(ocs);
+	checksumptr = ptr + 5;
+	*checksumptr = 0;
+	for (checksum = 0; cnt > 0; ptr++, cnt--)
+		checksum += be32_to_cpu(*ptr);
+	*checksumptr = cpu_to_be32(-checksum);
 }
 
 void
-secs_to_datestamp(time_t secs, struct DateStamp *ds)
+secs_to_datestamp(time_t secs, struct affs_date *ds)
 {
 	u32	 days;
 	u32	 minute;
@@ -338,59 +368,64 @@ secs_to_datestamp(time_t secs, struct DateStamp *ds)
 	minute  = secs / 60;
 	secs   -= minute * 60;
 
-	ds->ds_Days   = be32_to_cpu(days);
-	ds->ds_Minute = be32_to_cpu(minute);
-	ds->ds_Tick   = be32_to_cpu(secs * 50);
+	ds->days = be32_to_cpu(days);
+	ds->mins = be32_to_cpu(minute);
+	ds->ticks = be32_to_cpu(secs * 50);
 }
 
-int
+mode_t
 prot_to_mode(u32 prot)
 {
-	int	 mode = 0;
+	int mode = 0;
 
-	if (AFFS_UMAYWRITE(prot))
+	if (!(prot & FIBF_NOWRITE))
 		mode |= S_IWUSR;
-	if (AFFS_UMAYREAD(prot))
+	if (!(prot & FIBF_NOREAD))
 		mode |= S_IRUSR;
-	if (AFFS_UMAYEXECUTE(prot))
+	if (!(prot & FIBF_NOEXECUTE))
 		mode |= S_IXUSR;
-	if (AFFS_GMAYWRITE(prot))
+	if (prot & FIBF_GRP_WRITE)
 		mode |= S_IWGRP;
-	if (AFFS_GMAYREAD(prot))
+	if (prot & FIBF_GRP_READ)
 		mode |= S_IRGRP;
-	if (AFFS_GMAYEXECUTE(prot))
+	if (prot & FIBF_GRP_EXECUTE)
 		mode |= S_IXGRP;
-	if (AFFS_OMAYWRITE(prot))
+	if (prot & FIBF_OTR_WRITE)
 		mode |= S_IWOTH;
-	if (AFFS_OMAYREAD(prot))
+	if (prot & FIBF_OTR_READ)
 		mode |= S_IROTH;
-	if (AFFS_OMAYEXECUTE(prot))
+	if (prot & FIBF_OTR_EXECUTE)
 		mode |= S_IXOTH;
-	
+
 	return mode;
 }
 
-u32
-mode_to_prot(int mode)
+void
+mode_to_prot(struct inode *inode)
 {
-	u32	 prot = 0;
+	u32 prot = AFFS_INODE->i_protect;
+	mode_t mode = inode->i_mode;
 
-	if (mode & S_IXUSR)
-		prot |= FIBF_SCRIPT;
-	if (mode & S_IRUSR)
-		prot |= FIBF_READ;
-	if (mode & S_IWUSR)
-		prot |= FIBF_WRITE | FIBF_DELETE;
+	if (!(mode & S_IXUSR))
+		prot |= FIBF_NOEXECUTE;
+	if (!(mode & S_IRUSR))
+		prot |= FIBF_NOREAD;
+	if (!(mode & S_IWUSR))
+		prot |= FIBF_NOWRITE;
+	if (mode & S_IXGRP)
+		prot |= FIBF_GRP_EXECUTE;
 	if (mode & S_IRGRP)
 		prot |= FIBF_GRP_READ;
 	if (mode & S_IWGRP)
 		prot |= FIBF_GRP_WRITE;
+	if (mode & S_IXOTH)
+		prot |= FIBF_OTR_EXECUTE;
 	if (mode & S_IROTH)
 		prot |= FIBF_OTR_READ;
 	if (mode & S_IWOTH)
 		prot |= FIBF_OTR_WRITE;
-	
-	return prot;
+
+	AFFS_INODE->i_protect = prot;
 }
 
 void
@@ -402,12 +437,12 @@ affs_error(struct super_block *sb, const char *function, const char *fmt, ...)
 	vsprintf(ErrorBuffer,fmt,args);
 	va_end(args);
 
-	printk(KERN_CRIT "AFFS error (device %s): %s(): %s\n",kdevname(sb->s_dev),
+	printk(KERN_CRIT "AFFS error (device %s): %s(): %s\n", bdevname(sb->s_dev),
 		function,ErrorBuffer);
 	if (!(sb->s_flags & MS_RDONLY))
 		printk(KERN_WARNING "AFFS: Remounting filesystem read-only\n");
 	sb->s_flags |= MS_RDONLY;
-	sb->u.affs_sb.s_flags |= SF_READONLY;	/* Don't allow to remount rw */
+	AFFS_SB->s_flags |= SF_READONLY;	/* Don't allow to remount rw */
 }
 
 void
@@ -419,7 +454,7 @@ affs_warning(struct super_block *sb, const char *function, const char *fmt, ...)
 	vsprintf(ErrorBuffer,fmt,args);
 	va_end(args);
 
-	printk(KERN_WARNING "AFFS warning (device %s): %s(): %s\n",kdevname(sb->s_dev),
+	printk(KERN_WARNING "AFFS warning (device %s): %s(): %s\n", bdevname(sb->s_dev),
 		function,ErrorBuffer);
 }
 
@@ -454,15 +489,11 @@ affs_check_name(const unsigned char *name, int len)
  */
 
 int
-affs_copy_name(unsigned char *bstr, const unsigned char *name)
+affs_copy_name(unsigned char *bstr, struct dentry *dentry)
 {
-	int	 len;
+	int len = MIN(dentry->d_name.len, 30);
 
-	for (len = 0; len < 30; len++) {
-		bstr[len + 1] = name[len];
-		if (name[len] == '\0')
-			break;
-	}
-	bstr[0] = len;
+	*bstr++ = len;
+	memcpy(bstr, dentry->d_name.name, len);
 	return len;
 }

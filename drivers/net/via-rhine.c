@@ -131,10 +131,9 @@ static const int multicast_filter_limit = 32;
 #include <asm/irq.h>
 
 /* These identify the driver base version and may not be removed. */
-static char version1[] __devinitdata =
-"via-rhine.c:v1.08b-LK1.1.7  8/9/2000  Written by Donald Becker\n";
-static char version2[] __devinitdata =
-"  http://www.scyld.com/network/via-rhine.html\n";
+static char version[] __devinitdata =
+KERN_INFO "via-rhine.c:v1.08b-LK1.1.8  4/17/2000  Written by Donald Becker\n"
+KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
 
 
@@ -477,17 +476,17 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	int i, option;
 	int chip_id = (int) ent->driver_data;
 	static int card_idx = -1;
-	static int did_version;
 	long ioaddr;
 	int io_size;
 	int pci_flags;
 	
-	/* print version once and once only */
-	if (! did_version++) {
-		printk (KERN_INFO "%s", version1);
-		printk (KERN_INFO "%s", version2);
-	}
-	
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
+
 	card_idx++;
 	option = card_idx < MAX_UNITS ? options[card_idx] : 0;
 	io_size = via_rhine_chip_info[chip_id].io_size;
@@ -1499,6 +1498,10 @@ static struct pci_driver via_rhine_driver = {
 
 static int __init via_rhine_init (void)
 {
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 	return pci_module_init (&via_rhine_driver);
 }
 

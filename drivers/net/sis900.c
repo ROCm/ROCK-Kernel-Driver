@@ -47,7 +47,7 @@
 #include <linux/timer.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
@@ -62,8 +62,8 @@
 
 #include "sis900.h"
 
-static const char *version =
-"sis900.c: v1.07.11  4/10/2001\n";
+static char version[] __devinitdata =
+KERN_INFO "sis900.c: v1.07.11  4/10/2001\n";
 
 static int max_interrupt_work = 40;
 static int multicast_filter_limit = 128;
@@ -307,6 +307,13 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	int i, ret;
 	u8 revision;
 	char *card_name = card_names[pci_id->driver_data];
+
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
 
 	/* setup various bits in PCI command register */
 	ret = pci_enable_device(pci_dev);
@@ -1997,7 +2004,10 @@ static struct pci_driver sis900_pci_driver = {
 
 static int __init sis900_init_module(void)
 {
-	printk(KERN_INFO "%s", version);
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 
 	return pci_module_init(&sis900_pci_driver);
 }

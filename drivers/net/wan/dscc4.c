@@ -107,7 +107,7 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char * version = "$Id: dscc4.c,v 1.130 2001/02/25 15:27:34 romieu Exp $\n";
+static const char version[] = "$Id: dscc4.c,v 1.130 2001/02/25 15:27:34 romieu Exp $\n";
 static int debug;
 
 

@@ -1,15 +1,26 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
+
+use strict;
 
 ## Copyright (c) 1998 Michael Zucchi, All Rights Reserved        ##
-## Copyright (C) 2000  Tim Waugh <twaugh@redhat.com>             ##
+## Copyright (C) 2000, 1  Tim Waugh <twaugh@redhat.com>          ##
+## Copyright (C) 2001  Simon Huggins                             ##
 ## 								 ##
-## #define enhancements by Armin Kuster <akuster@mvista.com>	 ## 
-## Copyright (c) 2000 MontaVista Software, Inc.			 ##   
-##                                                               ##
+## #define enhancements by Armin Kuster <akuster@mvista.com>	 ##
+## Copyright (c) 2000 MontaVista Software, Inc.			 ##
+## 								 ##
 ## This software falls under the GNU General Public License.     ##
 ## Please read the COPYING file for more information             ##
 
 # w.o. 03-11-2000: added the '-filelist' option.
+
+# 18/01/2001 - 	Cleanups
+# 		Functions prototyped as foo(void) same as foo()
+# 		Stop eval'ing where we don't need to.
+# -- huggie@earth.li
+# Still to do:
+# 	- add perldoc documentation
+# 	- Look more closely at some of the scarier bits :)
 
 #
 # This will read a 'c' file and scan for embedded comments in the
@@ -87,53 +98,53 @@
 # '%CONST' - name of a constant.
 
 # match expressions used to find embedded type information
-$type_constant = "\\\%([-_\\w]+)";
-$type_func = "(\\w+)\\(\\)";
-$type_param = "\\\@(\\w+)";
-$type_struct = "\\\&((struct\\s*)?[_\\w]+)";
-$type_env = "(\\\$\\w+)";
+my $type_constant = '\%([-_\w]+)';
+my $type_func = '(\w+)\(\)';
+my $type_param = '\@(\w+)';
+my $type_struct = '\&((struct\s*)?[_\w]+)';
+my $type_env = '(\$\w+)';
 
 
 # Output conversion substitutions.
 #  One for each output format
 
 # these work fairly well
-%highlights_html = ( $type_constant, "<i>\$1</i>",
-		     $type_func, "<b>\$1</b>",
-		     $type_struct, "<i>\$1</i>",
-		     $type_param, "<tt><b>\$1</b></tt>" );
-$blankline_html = "<p>";
+my %highlights_html = ( $type_constant, "<i>\$1</i>",
+			$type_func, "<b>\$1</b>",
+			$type_struct, "<i>\$1</i>",
+			$type_param, "<tt><b>\$1</b></tt>" );
+my $blankline_html = "<p>";
 
 # sgml, docbook format
-%highlights_sgml = ( "([^=])\\\"([^\\\"<]+)\\\"", "\$1<quote>\$2</quote>",
-		     $type_constant, "<constant>\$1</constant>",
-		     $type_func, "<function>\$1</function>",
-		     $type_struct, "<structname>\$1</structname>",
-		     $type_env, "<envar>\$1</envar>",
-		     $type_param, "<parameter>\$1</parameter>" );
-$blankline_sgml = "</para><para>\n";
+my %highlights_sgml = ( "([^=])\\\"([^\\\"<]+)\\\"", "\$1<quote>\$2</quote>",
+			$type_constant, "<constant>\$1</constant>",
+			$type_func, "<function>\$1</function>",
+			$type_struct, "<structname>\$1</structname>",
+			$type_env, "<envar>\$1</envar>",
+			$type_param, "<parameter>\$1</parameter>" );
+my $blankline_sgml = "</para><para>\n";
 
 # gnome, docbook format
-%highlights_gnome = ( $type_constant, "<replaceable class=\"option\">\$1</replaceable>",
-		     $type_func, "<function>\$1</function>",
-		     $type_struct, "<structname>\$1</structname>",
-		     $type_env, "<envar>\$1</envar>",
-		     $type_param, "<parameter>\$1</parameter>" );
-$blankline_gnome = "</para><para>\n";
+my %highlights_gnome = ( $type_constant, "<replaceable class=\"option\">\$1</replaceable>",
+			 $type_func, "<function>\$1</function>",
+			 $type_struct, "<structname>\$1</structname>",
+			 $type_env, "<envar>\$1</envar>",
+			 $type_param, "<parameter>\$1</parameter>" );
+my $blankline_gnome = "</para><para>\n";
 
 # these are pretty rough
-%highlights_man = ( $type_constant, "\$1",
-		    $type_func, "\\\\fB\$1\\\\fP",
-		    $type_struct, "\\\\fI\$1\\\\fP",
-		    $type_param, "\\\\fI\$1\\\\fP" );
-$blankline_man = "";
+my %highlights_man = ( $type_constant, "\$1",
+		       $type_func, "\\\\fB\$1\\\\fP",
+		       $type_struct, "\\\\fI\$1\\\\fP",
+		       $type_param, "\\\\fI\$1\\\\fP" );
+my $blankline_man = "";
 
 # text-mode
-%highlights_text = ( $type_constant, "\$1",
-		     $type_func, "\$1",
-		     $type_struct, "\$1",
-		     $type_param, "\$1" );
-$blankline_text = "";
+my %highlights_text = ( $type_constant, "\$1",
+			$type_func, "\$1",
+			$type_struct, "\$1",
+			$type_param, "\$1" );
+my $blankline_text = "";
 
 
 sub usage {
@@ -149,16 +160,52 @@ if ($#ARGV==-1) {
     usage();
 }
 
-$verbose = 0;
-$output_mode = "man";
-%highlights = %highlights_man;
-$blankline = $blankline_man;
-$modulename = "API Documentation";
-$function_only = 0;
-$filelist = '';
+my $verbose = 0;
+my $output_mode = "man";
+my %highlights = %highlights_man;
+my $blankline = $blankline_man;
+my $modulename = "API Documentation";
+my $function_only = 0;
+
+# Essentially these are globals
+# They probably want to be tidied up made more localised or summat.
+# CAVEAT EMPTOR!  Some of the others I localised may not want to be which
+# could cause "use of undefined value" or other bugs.
+my ($function, %function_table,%parametertypes,$function_purpose);
+my ($type,$file,$function_name,$return_type);
+my ($newsection,$newcontents,$prototype,$filelist);
+
+my $lineprefix="";
+
+# states
+# 0 - normal code
+# 1 - looking for function name
+# 2 - scanning field start.
+# 3 - scanning prototype.
+my $state = 0;
+my $doc_special = "\@\%\$\&";
+
+my $doc_start = "^/\\*\\*\$";
+my $doc_end = "\\*/";
+my $doc_com = "\\s*\\*\\s*";
+my $doc_func = $doc_com."(\\w+):?";
+my $doc_sect = $doc_com."([".$doc_special."]?[\\w ]+):(.*)";
+my $doc_content = $doc_com."(.*)";
+my $doc_block = $doc_com."DOC:\\s*(.*)?";
+
+my %constants = ();
+my %parameters = ();
+my @parameterlist = ();
+my %sections = ();
+my @sectionlist = ();
+
+my $contents = "";
+my $section_default = "Description";	# default section
+my $section_intro = "Introduction";
+my $section = $section_default;
 
 while ($ARGV[0] =~ m/^-(.*)/) {
-    $cmd = shift @ARGV;
+    my $cmd = shift @ARGV;
     if ($cmd eq "-html") {
 	$output_mode = "html";
 	%highlights = %highlights_html;
@@ -201,8 +248,8 @@ while ($ARGV[0] =~ m/^-(.*)/) {
 
 # generate a sequence of code that will splice in highlighting information
 # using the s// operator.
-$dohighlight = "";
-foreach $pattern (keys %highlights) {
+my $dohighlight = "";
+foreach my $pattern (keys %highlights) {
 #    print "scanning pattern $pattern ($highlights{$pattern})\n";
     $dohighlight .=  "\$contents =~ s:$pattern:$highlights{$pattern}:gs;\n";
 }
@@ -211,7 +258,7 @@ foreach $pattern (keys %highlights) {
 # dumps section contents to arrays/hashes intended for that purpose.
 #
 sub dump_section {
-    my $name = shift @_;
+    my $name = shift;
     my $contents = join "\n", @_;
 
     if ($name =~ m/$type_constant/) {
@@ -240,11 +287,18 @@ sub dump_section {
 #  sections => %descriont descriptions
 #  
 
-sub output_highlight {
-    my $contents = join "\n", @_;
+sub output_highlight(@) {
+    my $contents = join "\n",@_;
     my $line;
 
+#	DEBUG
+#	if (!defined $contents) {
+#	    use Carp;
+#	    confess "output_highlight got called with no args?\n";
+#    }
+
     eval $dohighlight;
+    die $@ if $@;
     foreach $line (split "\n", $contents) {
 	if ($line eq ""){
 	    print $lineprefix, $blankline;
@@ -258,7 +312,7 @@ sub output_highlight {
 
 
 # output in html
-sub output_html {
+sub output_html(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -302,7 +356,7 @@ sub output_html {
 
 
 # output in html
-sub output_intro_html {
+sub output_intro_html(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -316,10 +370,8 @@ sub output_intro_html {
     print "<hr>\n";
 }
 
-
-
 # output in sgml DocBook
-sub output_sgml {
+sub output_sgml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -347,13 +399,6 @@ sub output_sgml {
     print "<function>".$args{'function'}." ";
     print "</function></funcdef>\n";
 
-#    print "<refsect1>\n";
-#    print " <title>Synopsis</title>\n";
-#    print "  <funcsynopsis>\n";
-#    print "   <funcdef>".$args{'functiontype'}." ";
-#    print "<function>".$args{'function'}." ";
-#    print "</function></funcdef>\n";
-
     $count = 0;
     if ($#{$args{'parameterlist'}} >= 0) {
 	foreach $parameter (@{$args{'parameterlist'}}) {
@@ -372,11 +417,9 @@ sub output_sgml {
     }
     print "  </funcsynopsis>\n";
     print "</refsynopsisdiv>\n";
-#    print "</refsect1>\n";
 
     # print parameters
     print "<refsect1>\n <title>Arguments</title>\n";
-#    print "<para>\nArguments\n";
     if ($#{$args{'parameterlist'}} >= 0) {
 	print " <variablelist>\n";
 	foreach $parameter (@{$args{'parameterlist'}}) {
@@ -396,12 +439,10 @@ sub output_sgml {
     $lineprefix="   ";
     foreach $section (@{$args{'sectionlist'}}) {
 	print "<refsect1>\n <title>$section</title>\n <para>\n";
-#	print "<para>\n$section\n";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "<example><para>\n";
 	}
 	output_highlight($args{'sections'}{$section});
-#	print "</para>";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "</para></example>\n";
 	}
@@ -412,25 +453,22 @@ sub output_sgml {
 }
 
 # output in sgml DocBook
-sub output_intro_sgml {
+sub output_intro_sgml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
-    my $id;
 
-    $id = $args{'module'};
+    my $id = $args{'module'};
     $id =~ s/[^A-Za-z0-9]/-/g;
 
     # print out each section
     $lineprefix="   ";
     foreach $section (@{$args{'sectionlist'}}) {
 	print "<refsect1>\n <title>$section</title>\n <para>\n";
-#	print "<para>\n$section\n";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "<example><para>\n";
 	}
 	output_highlight($args{'sections'}{$section});
-#	print "</para>";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "</para></example>\n";
 	}
@@ -453,8 +491,6 @@ sub output_gnome {
     print "<sect2>\n";
     print " <title id=\"$id\">".$args{'function'}."</title>\n";
 
-#    print "<simplesect>\n";
-#    print " <title>Synopsis</title>\n";
     print "  <funcsynopsis>\n";
     print "   <funcdef>".$args{'functiontype'}." ";
     print "<function>".$args{'function'}." ";
@@ -477,27 +513,6 @@ sub output_gnome {
 	print "  <void>\n";
     }
     print "  </funcsynopsis>\n";
-#    print "</simplesect>\n";
-#    print "</refsect1>\n";
-
-    # print parameters
-#    print "<simplesect>\n <title>Arguments</title>\n";
-#    if ($#{$args{'parameterlist'}} >= 0) {
-#	print " <variablelist>\n";
-#	foreach $parameter (@{$args{'parameterlist'}}) {
-#	    print "  <varlistentry>\n   <term><parameter>$parameter</parameter></term>\n";
-#	    print "   <listitem>\n    <para>\n";
-#	    $lineprefix="     ";
-#	    output_highlight($args{'parameters'}{$parameter});
-#	    print "    </para>\n   </listitem>\n  </varlistentry>\n";
-#	}
-#	print " </variablelist>\n";
-#    } else {
-#	print " <para>\n  None\n </para>\n";
-#    }
-#    print "</simplesect>\n";
-
-#    print "<simplesect>\n <title>Arguments</title>\n";
     if ($#{$args{'parameterlist'}} >= 0) {
 	print " <informaltable pgwide=\"1\" frame=\"none\" role=\"params\">\n";
 	print "<tgroup cols=\"2\">\n";
@@ -515,20 +530,17 @@ sub output_gnome {
     } else {
 	print " <para>\n  None\n </para>\n";
     }
-#    print "</simplesect>\n";
 
     # print out each section
     $lineprefix="   ";
     foreach $section (@{$args{'sectionlist'}}) {
 	print "<simplesect>\n <title>$section</title>\n";
-#	print "<para>\n$section\n";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "<example><programlisting>\n";
 	} else {
 	}
 	print "<para>\n";
 	output_highlight($args{'sections'}{$section});
-#	print "</para>";
 	print "</para>\n";
 	if ($section =~ m/EXAMPLE/i) {
 	    print "</programlisting></example>\n";
@@ -542,7 +554,7 @@ sub output_gnome {
 
 ##
 # output in man
-sub output_man {
+sub output_man(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -555,9 +567,9 @@ sub output_man {
     print ".SH SYNOPSIS\n";
     print ".B \"".$args{'functiontype'}."\" ".$args{'function'}."\n";
     $count = 0;
-    $parenth = "(";
-    $post = ",";
-    foreach $parameter (@{$args{'parameterlist'}}) {
+    my $parenth = "(";
+    my $post = ",";
+    foreach my $parameter (@{$args{'parameterlist'}}) {
 	if ($count == $#{$args{'parameterlist'}}) {
 	    $post = ");";
 	}
@@ -566,7 +578,7 @@ sub output_man {
 	    # pointer-to-function
 	    print ".BI \"".$parenth.$1."\" ".$parameter." \") (".$2.")".$post."\"\n";
 	} else {
-	    $type =~ s/([^\*])$/\1 /;
+	    $type =~ s/([^\*])$/$1 /;
 	    print ".BI \"".$parenth.$type."\" ".$parameter." \"".$post."\"\n";
 	}
 	$count++;
@@ -584,7 +596,7 @@ sub output_man {
     }
 }
 
-sub output_intro_man {
+sub output_intro_man(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -599,15 +611,15 @@ sub output_intro_man {
 
 ##
 # output in text
-sub output_text {
+sub output_text(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
 
     print "Function:\n\n";
-    $start=$args{'functiontype'}." ".$args{'function'}." (";
+    my $start=$args{'functiontype'}." ".$args{'function'}." (";
     print $start;
-    $count = 0;
-    foreach $parameter (@{$args{'parameterlist'}}) {
+    my $count = 0;
+    foreach my $parameter (@{$args{'parameterlist'}}) {
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
 	    # pointer-to-function
 	    print $1.$parameter.") (".$2;
@@ -634,7 +646,7 @@ sub output_text {
     print "\n\n";
 }
 
-sub output_intro_text {
+sub output_intro_text(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
 
@@ -649,24 +661,28 @@ sub output_intro_text {
 # generic output function - calls the right one based
 # on current output mode.
 sub output_function {
-#    output_html(@_);
-    eval "output_".$output_mode."(\@_);";
+    no strict 'refs';
+    my $func = "output_".$output_mode;
+    &$func(@_);
 }
 
 ##
 # generic output function - calls the right one based
 # on current output mode.
 sub output_intro {
-#    output_html(@_);
-    eval "output_intro_".$output_mode."(\@_);";
+    no strict 'refs';
+    my $func = "output_intro_".$output_mode;
+    &$func(@_);
 }
 
 
 ##
-# takes a function prototype and spits out all the details
-# stored in the global arrays/hashes.
-sub dump_function {
-    my $prototype = shift @_;
+# takes a function prototype and the name of the current file being
+# processed and spits out all the details stored in the global
+# arrays/hashes.
+sub dump_function($$) {
+    my $prototype = shift;
+    my $file = shift;
 
     $prototype =~ s/^static +//;
     $prototype =~ s/^extern +//;
@@ -706,15 +722,18 @@ sub dump_function {
 	$prototype =~ m/^(\w+\s+\w+\s+\w+\s*\*)\s*([a-zA-Z0-9_~:]+)\s*\(([^\{]*)\)/)  {
 	$return_type = $1;
 	$function_name = $2;
-	$args = $3;
+	my $args = $3;
+	my ($param);
 
-	# allow for up to fours args to function pointers
-	$args =~ s/(\([^\),]+),/\1#/g;
-	$args =~ s/(\([^\),]+),/\1#/g;
-	$args =~ s/(\([^\),]+),/\1#/g;
+	# allow for up to six args to function pointers
+	$args =~ s/(\([^\),]+),/$1#/g;
+	$args =~ s/(\([^\),]+),/$1#/g;
+	$args =~ s/(\([^\),]+),/$1#/g;
+	$args =~ s/(\([^\),]+),/$1#/g;
+	$args =~ s/(\([^\),]+),/$1#/g;
 #	print STDERR "ARGS = '$args'\n";
 
-	foreach $arg (split ',', $args) {
+	foreach my $arg (split ',', $args) {
 	    # strip leading/trailing spaces
 	    $arg =~ s/^\s*//;
 	    $arg =~ s/\s*$//;
@@ -725,12 +744,12 @@ sub dump_function {
 		$arg =~ m/[^\(]+\(\*([^\)]+)\)/;
 		$param = $1;
 		$type = $arg;
-		$type =~ s/([^\(]+\(\*)$param/\1/;
+		$type =~ s/([^\(]+\(\*)$param/$1/;
 	    } else {
 		# evil magic to get fixed array parameters to work
-		$arg =~ s/(.+\s+)(.+)\[.*/\1* \2/;
+		$arg =~ s/(.+\s+)(.+)\[.*/$1* $2/;
 #		print STDERR "SCAN ARG: '$arg'\n";
-		@args = split('\s', $arg);
+		my @args = split('\s', $arg);
 
 #		print STDERR " -> @args\n";
 		$param = pop @args;
@@ -748,15 +767,15 @@ sub dump_function {
 		$param="...";
 		$parameters{"..."} = "variable arguments";
 	    }
-	    elsif ($type eq "" && $param eq "")
+	    elsif ($type eq "" && ($param eq "" or $param eq "void"))
 	    {
 		$type="";
 		$param="void";
 		$parameters{void} = "no arguments";
 	    }
-            if ($type ne "" && $parameters{$param} eq "") {
+            if (defined $type && $type && !defined $parameters{$param}) {
 	        $parameters{$param} = "-- undescribed --";
-	        print STDERR "Warning($file:$lineno): Function parameter '$param' not described in '$function_name'\n";
+	        print STDERR "Warning($file:$.): Function parameter '$param' not described in '$function_name'\n";
 	    }
 
 	    push @parameterlist, $param;
@@ -764,7 +783,7 @@ sub dump_function {
 #	    print STDERR "param = '$param', type = '$type'\n";
 	}
     } else {
-	print STDERR "Error($lineno): cannot understand prototype: '$prototype'\n";
+	print STDERR "Error($.): cannot understand prototype: '$prototype'\n";
 	return;
     }
 
@@ -816,7 +835,9 @@ $section_default = "Description";	# default section
 $section_intro = "Introduction";
 $section = $section_default;
 
-if( $filelist ne '' ) {
+sub process_file($);
+
+if ($filelist) {
 	open(FLIST,"<$filelist") or die "Can't open file list $filelist";
 	while(<FLIST>) {
 		chop;
@@ -824,9 +845,9 @@ if( $filelist ne '' ) {
 	}
 }
 
-foreach $file (@ARGV) {
-    chomp($file);
-    process_file($file);
+foreach (@ARGV) {
+    chomp;
+    process_file($_);
 }
 
 sub process_file($) {
@@ -837,10 +858,7 @@ sub process_file($) {
 	return;
     }
 
-    $lineno = 0;
     while (<IN>) {
-	$lineno++;
-
 	if ($state == 0) {
 	    if (/$doc_start/o) {
 		$state = 1;		# next line is always the function name
@@ -864,10 +882,10 @@ sub process_file($) {
 		    $function_purpose = "";
 		}
 		if ($verbose) {
-		    print STDERR "Info($lineno): Scanning doc for $function\n";
+		    print STDERR "Info($.): Scanning doc for $function\n";
 		}
 	    } else {
-		print STDERR "WARN($lineno): Cannot understand $_ on line $lineno",
+		print STDERR "WARN($.): Cannot understand $_ on line $.",
 		" - I thought it was a doc line\n";
 		$state = 0;
 	    }
@@ -918,7 +936,7 @@ sub process_file($) {
 		}
 	    } else {
 		# i dont know - bad line?  ignore.
-		print STDERR "WARNING($lineno): bad line: $_"; 
+		print STDERR "WARNING($.): bad line: $_"; 
 	    }
 	} elsif ($state == 3) {	# scanning for function { (end of prototype)
 	    if (m#\s*/\*\s+MACDOC\s*#io) {
@@ -931,7 +949,7 @@ sub process_file($) {
 		$prototype =~ s@/\*.*?\*/@@gos;	# strip comments.
 		$prototype =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
 		$prototype =~ s@^ +@@gos; # strip leading spaces
-		dump_function($prototype);
+		dump_function($prototype,$file);
 
 		$function = "";
 		%constants = ();

@@ -225,5 +225,3 @@ extern inline void up(struct semaphore *sem)
 #endif
 
 #endif
-
-#endif

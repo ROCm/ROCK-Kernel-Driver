@@ -135,6 +135,7 @@ static inline unsigned int sk_filter_len(struct sk_filter *fp)
 #ifdef __KERNEL__
 extern int sk_run_filter(struct sk_buff *skb, struct sock_filter *filter, int flen);
 extern int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk);
+extern int sk_chk_filter(struct sock_filter *filter, int flen);
 #endif /* __KERNEL__ */
 
 #endif /* __LINUX_FILTER_H__ */

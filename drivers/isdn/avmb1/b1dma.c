@@ -1,11 +1,14 @@
 /*
- * $Id: b1dma.c,v 1.11.6.3 2001/03/21 08:52:21 kai Exp $
+ * $Id: b1dma.c,v 1.11.6.4 2001/04/20 02:41:59 keil Exp $
  * 
  * Common module for AVM B1 cards that support dma with AMCC
  * 
  * (c) Copyright 2000 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1dma.c,v $
+ * Revision 1.11.6.4  2001/04/20 02:41:59  keil
+ * changes from mainstream
+ *
  * Revision 1.11.6.3  2001/03/21 08:52:21  kai
  * merge from main branch: fix buffer for revision string (calle)
  *
@@ -71,7 +74,7 @@
 #include "capicmd.h"
 #include "capiutil.h"
 
-static char *revision = "$Revision: 1.11.6.3 $";
+static char *revision = "$Revision: 1.11.6.4 $";
 
 /* ------------------------------------------------------------- */
 
@@ -907,6 +910,7 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	case avm_t1isa: s = "T1 ISA (HEMA)"; break;
 	case avm_t1pci: s = "T1 PCI"; break;
 	case avm_c4: s = "C4"; break;
+	case avm_c2: s = "C2"; break;
 	default: s = "???"; break;
 	}
 	len += sprintf(page+len, "%-16s %s\n", "type", s);

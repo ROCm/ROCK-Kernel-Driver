@@ -23,7 +23,7 @@
 #include <asm/unaligned.h>
 
 static char version[] __devinitdata =
-	"Linux Tulip driver version 0.9.14d (April 3, 2001)\n";
+	"Linux Tulip driver version 0.9.14e (April 20, 2001)\n";
 
 
 /* A few user-configurable values. */
@@ -175,6 +175,11 @@ struct tulip_chip_table tulip_tbl[] = {
   { "Davicom DM9102/DM9102A", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | HAS_ACPI,
 	tulip_timer },
+
+  /* CONEXANT */
+  { "Conexant LANfinity", 0x100, 0x0001ebef,
+	HAS_MII | HAS_ACPI,
+	tulip_timer },
 };
 
 
@@ -203,7 +208,8 @@ static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
 	{ 0x1113, 0x1216, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1113, 0x1217, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98715 },
 	{ 0x1113, 0x9511, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
-	{0, }
+	{ 0x14f1, 0x1803, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CONEXANT },
+	{ } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, tulip_pci_tbl);
 
@@ -1117,12 +1123,11 @@ static void set_rx_mode(struct net_device *dev)
 static int __devinit tulip_init_one (struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
-	static int did_version;			/* Already printed version info. */
 	struct tulip_private *tp;
 	/* See note below on the multiport cards. */
 	static unsigned char last_phys_addr[6] = {0x00, 'L', 'i', 'n', 'u', 'x'};
 	static int last_irq;
-	static int multiport_cnt;		/* For four-port boards w/one EEPROM */
+	static int multiport_cnt;	/* For four-port boards w/one EEPROM */
 	u8 chip_rev;
 	int i, irq;
 	unsigned short sum;
@@ -1131,11 +1136,16 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	long ioaddr;
 	static int board_idx = -1;
 	int chip_idx = ent->driver_data;
+	int t2104x_mode = 0;
+	int eeprom_missing = 0;
 
-	board_idx++;
-
+#ifndef MODULE
+	static int did_version;		/* Already printed version info. */
 	if (tulip_debug > 0  &&  did_version++ == 0)
 		printk (KERN_INFO "%s", version);
+#endif
+
+	board_idx++;
 
 	/*
 	 *	Lan media wire a tulip chip to a wan interface. Needs a very
@@ -1195,7 +1205,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	irq = pdev->irq;
 
 	/* init_etherdev ensures aligned and zeroed private structures */
-	dev = init_etherdev (NULL, sizeof (*tp));
+	dev = alloc_etherdev (sizeof (*tp));
 	if (!dev) {
 		printk (KERN_ERR PFX "ether device alloc failed, aborting\n");
 		return -ENOMEM;
@@ -1203,36 +1213,23 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	if (pci_resource_len (pdev, 0) < tulip_tbl[chip_idx].io_size) {
 		printk (KERN_ERR PFX "%s: I/O region (0x%lx@0x%lx) too small, "
-			"aborting\n", dev->name, pci_resource_len (pdev, 0),
+			"aborting\n", pdev->slot_name,
+			pci_resource_len (pdev, 0),
 			pci_resource_start (pdev, 0));
 		goto err_out_free_netdev;
 	}
 
 	/* grab all resources from both PIO and MMIO regions, as we
 	 * don't want anyone else messing around with our hardware */
-	if (!request_region (pci_resource_start (pdev, 0),
-			     pci_resource_len (pdev, 0),
-			     dev->name)) {
-		printk (KERN_ERR PFX "%s: I/O region (0x%lx@0x%lx) unavailable, "
-			"aborting\n", dev->name, pci_resource_len (pdev, 0),
-			pci_resource_start (pdev, 0));
+	if (pci_request_regions (pdev, "tulip"))
 		goto err_out_free_netdev;
-	}
-	if (!request_mem_region (pci_resource_start (pdev, 1),
-				 pci_resource_len (pdev, 1),
-				 dev->name)) {
-		printk (KERN_ERR PFX "%s: MMIO region (0x%lx@0x%lx) unavailable, "
-			"aborting\n", dev->name, pci_resource_len (pdev, 1),
-			pci_resource_start (pdev, 1));
-		goto err_out_free_pio_res;
-	}
 
 	pci_set_master(pdev);
 
 	pci_read_config_byte (pdev, PCI_REVISION_ID, &chip_rev);
 
 	/*
-	 * initialize priviate data structure 'tp'
+	 * initialize private data structure 'tp'
 	 * it is zeroed and aligned in init_etherdev
 	 */
 	tp = dev->priv;
@@ -1242,7 +1239,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 					   sizeof(struct tulip_tx_desc) * TX_RING_SIZE,
 					   &tp->rx_ring_dma);
 	if (!tp->rx_ring)
-		goto err_out_free_mmio_res;
+		goto err_out_free_res;
 	tp->tx_ring = (struct tulip_tx_desc *)(tp->rx_ring + RX_RING_SIZE);
 	tp->tx_ring_dma = tp->rx_ring_dma + sizeof(struct tulip_rx_desc) * RX_RING_SIZE;
 
@@ -1257,10 +1254,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
-	pci_set_drvdata(pdev, dev);
-
-	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
-		   dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
 
 	/* bugfix: the ASIX must have a burst limit or horrible things happen. */
 	if (chip_idx == AX88140) {
@@ -1278,10 +1271,10 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	if (chip_idx == DC21041) {
 		if (inl(ioaddr + CSR9) & 0x8000) {
-			printk(" 21040 compatible mode,");
 			chip_idx = DC21040;
+			t2104x_mode = 1;
 		} else {
-			printk(" 21041 mode,");
+			t2104x_mode = 2;
 		}
 	}
 
@@ -1354,7 +1347,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	   Many PCI BIOSes also incorrectly report the IRQ line, so we correct
 	   that here as well. */
 	if (sum == 0  || sum == 6*0xff) {
-		printk(" EEPROM not present,");
+		eeprom_missing = 1;
 		for (i = 0; i < 5; i++)
 			dev->dev_addr[i] = last_phys_addr[i];
 		dev->dev_addr[i] = last_phys_addr[i] + 1;
@@ -1365,8 +1358,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	}
 
 	for (i = 0; i < 6; i++)
-		printk("%c%2.2X", i ? ':' : ' ', last_phys_addr[i] = dev->dev_addr[i]);
-	printk(", IRQ %d.\n", irq);
+		last_phys_addr[i] = dev->dev_addr[i];
 	last_irq = irq;
 
 	/* The lower four bits are the media type. */
@@ -1382,7 +1374,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		tp->default_port = dev->mem_start & MEDIA_MASK;
 	if (tp->default_port) {
 		printk(KERN_INFO "%s: Transceiver selection forced to %s.\n",
-		       dev->name, medianame[tp->default_port & MEDIA_MASK]);
+		       pdev->slot_name, medianame[tp->default_port & MEDIA_MASK]);
 		tp->medialock = 1;
 		if (tulip_media_cap[tp->default_port] & MediaAlwaysFD)
 			tp->full_duplex = 1;
@@ -1398,10 +1390,12 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	else
 		tp->to_advertise = 0x01e1;
 
-	/* This is logically part of _init_one(), but too complex to write inline. */
 	if (tp->flags & HAS_MEDIA_TABLE) {
 		memcpy(tp->eeprom, ee_data, sizeof(tp->eeprom));
+
+		sprintf(dev->name, "tulip%d", board_idx);	/* hack */
 		tulip_parse_eeprom(dev);
+		strcpy(dev->name, "eth%d");			/* un-hack */
 	}
 
 	if ((tp->flags & ALWAYS_CHECK_MII) ||
@@ -1433,15 +1427,15 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 				tp->advertising[phy_idx++] = reg4;
 				printk(KERN_INFO "%s:  MII transceiver #%d "
 					   "config %4.4x status %4.4x advertising %4.4x.\n",
-					   dev->name, phy, mii_reg0, mii_status, mii_advert);
+					   pdev->slot_name, phy, mii_reg0, mii_status, mii_advert);
 				/* Fixup for DLink with miswired PHY. */
 				if (mii_advert != reg4) {
 					printk(KERN_DEBUG "%s:  Advertising %4.4x on PHY %d,"
 						   " previously advertising %4.4x.\n",
-						   dev->name, reg4, phy, mii_advert);
+						   pdev->slot_name, reg4, phy, mii_advert);
 					printk(KERN_DEBUG "%s:  Advertising %4.4x (to advertise"
 						   " is %4.4x).\n",
-						   dev->name, reg4, tp->to_advertise);
+						   pdev->slot_name, reg4, tp->to_advertise);
 					tulip_mdio_write(dev, phy, 4, reg4);
 				}
 				/* Enable autonegotiation: some boards default to off. */
@@ -1453,7 +1447,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		tp->mii_cnt = phy_idx;
 		if (tp->mtable  &&  tp->mtable->has_mii  &&  phy_idx == 0) {
 			printk(KERN_INFO "%s: ***WARNING***: No MII transceiver found!\n",
-				   dev->name);
+			       pdev->slot_name);
 			tp->phys[0] = 1;
 		}
 	}
@@ -1467,6 +1461,23 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	dev->get_stats = tulip_get_stats;
 	dev->do_ioctl = private_ioctl;
 	dev->set_multicast_list = set_rx_mode;
+
+	if (register_netdev(dev))
+		goto err_out_mtable;
+
+	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
+	       dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
+	pci_set_drvdata(pdev, dev);
+
+	if (t2104x_mode == 1)
+		printk(" 21040 compatible mode,");
+	else if (t2104x_mode == 2)
+		printk(" 21041 mode,");
+	if (eeprom_missing)
+		printk(" EEPROM not present,");
+	for (i = 0; i < 6; i++)
+		printk("%c%2.2X", i ? ':' : ' ', dev->dev_addr[i]);
+	printk(", IRQ %d.\n", irq);
 
 	if ((tp->flags & HAS_NWAY)  || tp->chip_id == DC21041)
 		tp->link_change = t21142_lnk_change;
@@ -1535,12 +1546,11 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	return 0;
 
-err_out_free_mmio_res:
-	release_mem_region (pci_resource_start (pdev, 1),
-			    pci_resource_len (pdev, 1));
-err_out_free_pio_res:
-	release_region (pci_resource_start (pdev, 0),
-			pci_resource_len (pdev, 0));
+err_out_mtable:
+	if (tp->mtable)
+		kfree (tp->mtable);
+err_out_free_res:
+	pci_release_regions (pdev);
 err_out_free_netdev:
 	unregister_netdev (dev);
 	kfree (dev);
@@ -1552,7 +1562,7 @@ static void tulip_suspend (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
-	if (dev && netif_device_present (dev)) {
+	if (dev && netif_running (dev) && netif_device_present (dev)) {
 		netif_device_detach (dev);
 		tulip_down (dev);
 		/* pci_power_off(pdev, -1); */
@@ -1564,10 +1574,10 @@ static void tulip_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
+	if (dev && netif_running (dev) && !netif_device_present (dev)) {
 #if 1
-	pci_enable_device (pdev);
+		pci_enable_device (pdev);
 #endif
-	if (dev && !netif_device_present (dev)) {
 		/* pci_power_on(pdev); */
 		tulip_up (dev);
 		netif_device_attach (dev);
@@ -1589,14 +1599,10 @@ static void __devexit tulip_remove_one (struct pci_dev *pdev)
 			     sizeof (struct tulip_tx_desc) * TX_RING_SIZE,
 			     tp->rx_ring, tp->rx_ring_dma);
 	unregister_netdev (dev);
-	release_mem_region (pci_resource_start (pdev, 1),
-			    pci_resource_len (pdev, 1));
-	release_region (pci_resource_start (pdev, 0),
-			pci_resource_len (pdev, 0));
 	if (tp->mtable)
 		kfree (tp->mtable);
 	kfree (dev);
-
+	pci_release_regions (pdev);
 	pci_set_drvdata (pdev, NULL);
 
 	/* pci_power_off (pdev, -1); */
@@ -1615,6 +1621,10 @@ static struct pci_driver tulip_driver = {
 
 static int __init tulip_init (void)
 {
+#ifdef MODULE
+	printk (KERN_INFO "%s", version);
+#endif
+
 	/* copy module parms into globals */
 	tulip_rx_copybreak = rx_copybreak;
 	tulip_max_interrupt_work = max_interrupt_work;

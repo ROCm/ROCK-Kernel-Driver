@@ -1,5 +1,30 @@
 2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
+	* tulip_core.c: Now that dev->name is only available late
+	  in the probe, insert a hack to replace a not-evaluated
+	  "eth%d" string with an evaluated "tulip%d" string.
+	  Also, remove obvious comment and an indentation cleanup.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: If we are a module, always print out the
+	  version string.  If we are built into the kernel, only print
+	  the version string if at least one tulip is detected.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	Merged from Becker's tulip.c 0.92t:
+
+	* tulip_core.c: Add support for Conexant LANfinity.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c: Only suspend/resume if the interface
+	  is up and running.  Use alloc_etherdev and pci_request_regions.
+	  Spelling fix.
+
+2001-04-03  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
 	* tulip_core.c: Remove code that existed when one or more of
 	  the following defines existed.  These defines were never used
 	  by normal users in practice: TULIP_FULL_DUPLEX,

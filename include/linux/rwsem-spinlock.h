@@ -14,22 +14,24 @@
 
 #ifdef __KERNEL__
 
+#include <linux/types.h>
+
+struct rwsem_waiter;
+
 /*
  * the semaphore definition
  */
 struct rw_semaphore {
-	signed long			count;
+	signed long		count;
 #define RWSEM_UNLOCKED_VALUE		0x00000000
 #define RWSEM_ACTIVE_BIAS		0x00000001
 #define RWSEM_ACTIVE_MASK		0x0000ffff
 #define RWSEM_WAITING_BIAS		(-0x00010000)
 #define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
 #define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
-	spinlock_t		lock;
-#define RWSEM_SPINLOCK_OFFSET_STR	"4" /* byte offset of spinlock */
-	wait_queue_head_t	wait;
-#define RWSEM_WAITING_FOR_READ	WQ_FLAG_CONTEXT_0	/* bits to use in wait_queue_t.flags */
-#define RWSEM_WAITING_FOR_WRITE	WQ_FLAG_CONTEXT_1
+	spinlock_t		wait_lock;
+	struct rwsem_waiter	*wait_front;
+	struct rwsem_waiter	**wait_back;
 #if RWSEM_DEBUG
 	int			debug;
 #endif
@@ -55,8 +57,7 @@ struct rw_semaphore {
 #endif
 
 #define __RWSEM_INITIALIZER(name) \
-{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, \
-	__WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
+{ RWSEM_UNLOCKED_VALUE, SPIN_LOCK_UNLOCKED, NULL, &(name).wait_front \
 	__RWSEM_DEBUG_INIT __RWSEM_DEBUG_MINIT(name) }
 
 #define DECLARE_RWSEM(name) \
@@ -65,8 +66,9 @@ struct rw_semaphore {
 static inline void init_rwsem(struct rw_semaphore *sem)
 {
 	sem->count = RWSEM_UNLOCKED_VALUE;
-	spin_lock_init(&sem->lock);
-	init_waitqueue_head(&sem->wait);
+	spin_lock_init(&sem->wait_lock);
+	sem->wait_front = NULL;
+	sem->wait_back = &sem->wait_front;
 #if RWSEM_DEBUG
 	sem->debug = 0;
 #endif
@@ -83,10 +85,10 @@ static inline void init_rwsem(struct rw_semaphore *sem)
 static inline void __down_read(struct rw_semaphore *sem)
 {
 	int count;
-	spin_lock(&sem->lock);
+	spin_lock(&sem->wait_lock);
 	sem->count += RWSEM_ACTIVE_READ_BIAS;
 	count = sem->count;
-	spin_unlock(&sem->lock);
+	spin_unlock(&sem->wait_lock);
 	if (count<0)
 		rwsem_down_read_failed(sem);
 }
@@ -97,10 +99,10 @@ static inline void __down_read(struct rw_semaphore *sem)
 static inline void __down_write(struct rw_semaphore *sem)
 {
 	int count;
-	spin_lock(&sem->lock);
+	spin_lock(&sem->wait_lock);
 	count = sem->count;
 	sem->count += RWSEM_ACTIVE_WRITE_BIAS;
-	spin_unlock(&sem->lock);
+	spin_unlock(&sem->wait_lock);
 	if (count)
 		rwsem_down_write_failed(sem);
 }
@@ -111,10 +113,10 @@ static inline void __down_write(struct rw_semaphore *sem)
 static inline void __up_read(struct rw_semaphore *sem)
 {
 	int count;
-	spin_lock(&sem->lock);
+	spin_lock(&sem->wait_lock);
 	count = sem->count;
 	sem->count -= RWSEM_ACTIVE_READ_BIAS;
-	spin_unlock(&sem->lock);
+	spin_unlock(&sem->wait_lock);
 	if (count<0 && !((count-RWSEM_ACTIVE_READ_BIAS)&RWSEM_ACTIVE_MASK))
 		rwsem_wake(sem);
 }
@@ -125,41 +127,39 @@ static inline void __up_read(struct rw_semaphore *sem)
 static inline void __up_write(struct rw_semaphore *sem)
 {
 	int count;
-	spin_lock(&sem->lock);
+	spin_lock(&sem->wait_lock);
 	sem->count -= RWSEM_ACTIVE_WRITE_BIAS;
 	count = sem->count;
-	spin_unlock(&sem->lock);
+	spin_unlock(&sem->wait_lock);
 	if (count<0)
 		rwsem_wake(sem);
 }
 
 /*
  * implement exchange and add functionality
+ * - only called when spinlock is already held
  */
 static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 {
 	int count;
 
-	spin_lock(&sem->lock);
 	sem->count += delta;
 	count = sem->count;
-	spin_unlock(&sem->lock);
 
 	return count;
 }
 
 /*
  * implement compare and exchange functionality on the rw-semaphore count LSW
+ * - only called by __rwsem_do_wake(), so spinlock is already held when called
  */
 static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 old, __u16 new)
 {
 	__u16 prev;
 
-	spin_lock(&sem->lock);
 	prev = sem->count & RWSEM_ACTIVE_MASK;
 	if (prev==old)
 		sem->count = (sem->count & ~RWSEM_ACTIVE_MASK) | new;
-	spin_unlock(&sem->lock);
 
 	return prev;
 }

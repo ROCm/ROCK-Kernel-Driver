@@ -414,14 +414,17 @@ static int __devinit dfx_init_one_pci_or_eisa(struct pci_dev *pdev, long ioaddr)
 {
 	struct net_device *dev;
 	DFX_board_t	  *bp;			/* board pointer */
-	static int version_disp;
 	int err;
 
-	if (!version_disp)					/* display version info if adapter is found */
+#ifndef MODULE
+	static int version_disp;
+
+	if (!version_disp)	/* display version info if adapter is found */
 	{
-		version_disp = 1;				/* set display flag to TRUE so that */
-		printk(version);				/* we only display this string ONCE */
+		version_disp = 1;	/* set display flag to TRUE so that */
+		printk(version);	/* we only display this string ONCE */
 	}
+#endif
 
 	/*
 	 * init_fddidev() allocates a device structure with private data, clears the device structure and private data,
@@ -3384,6 +3387,11 @@ static void __exit dfx_eisa_cleanup(void)
 static int __init dfx_init(void)
 {
 	int rc_pci, rc_eisa;
+
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 
 	rc_pci = pci_module_init(&dfx_driver);
 	if (rc_pci >= 0) dfx_have_pci = 1;

@@ -169,9 +169,7 @@ startup_32:
 	rep
 	movsl
 1:
-#ifdef CONFIG_SMP
 checkCPUtype:
-#endif
 
 	movl $-1,X86_CPUID		#  -1 for no CPUID initially
 
@@ -244,9 +242,7 @@ is386:	pushl %ecx		# restore original EFLAGS
 	orl $2,%eax		# set MP
 2:	movl %eax,%cr0
 	call check_x87
-#ifdef CONFIG_SMP
 	incb ready
-#endif
 	lgdt gdt_descr
 	lidt idt_descr
 	ljmp $(__KERNEL_CS),$1f
@@ -278,9 +274,7 @@ L6:
 	jmp L6			# main should never return here, but
 				# just in case, we know what happens.
 
-#ifdef CONFIG_SMP
 ready:	.byte 0
-#endif
 
 /*
  * We depend on ET to be correct. This checks for 287/387.

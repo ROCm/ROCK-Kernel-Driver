@@ -233,31 +233,25 @@ ppp_sync_close(struct tty_struct *tty)
 }
 
 /*
- * Read a PPP frame, for compatibility until pppd is updated.
+ * Read does nothing - no data is ever available this way.
+ * Pppd reads and writes packets via /dev/ppp instead.
  */
 static ssize_t
 ppp_sync_read(struct tty_struct *tty, struct file *file,
 	       unsigned char *buf, size_t count)
 {
-	struct syncppp *ap = tty->disc_data;
-
-	if (ap == 0)
-		return -ENXIO;
-	return ppp_channel_read(&ap->chan, file, buf, count);
+	return -EAGAIN;
 }
 
 /*
- * Write a ppp frame, for compatibility until pppd is updated.
+ * Write on the tty does nothing, the packets all come in
+ * from the ppp generic stuff.
  */
 static ssize_t
 ppp_sync_write(struct tty_struct *tty, struct file *file,
 		const unsigned char *buf, size_t count)
 {
-	struct syncppp *ap = tty->disc_data;
-
-	if (ap == 0)
-		return -ENXIO;
-	return ppp_channel_write(&ap->chan, buf, count);
+	return -EAGAIN;
 }
 
 static int
@@ -308,30 +302,6 @@ ppp_synctty_ioctl(struct tty_struct *tty, struct file *file,
 		err = 0;
 		break;
 
-	/*
-	 * Compatibility calls until pppd is updated.
-	 */
-	case PPPIOCGFLAGS:
-	case PPPIOCSFLAGS:
-	case PPPIOCGASYNCMAP:
-	case PPPIOCSASYNCMAP:
-	case PPPIOCGRASYNCMAP:
-	case PPPIOCSRASYNCMAP:
-	case PPPIOCGXASYNCMAP:
-	case PPPIOCSXASYNCMAP:
-	case PPPIOCGMRU:
-	case PPPIOCSMRU:
-		err = -EPERM;
-		if (!capable(CAP_NET_ADMIN))
-			break;
-		err = ppp_sync_ioctl(&ap->chan, cmd, arg);
-		break;
-
-	case PPPIOCATTACH:
-	case PPPIOCDETACH:
-		err = ppp_channel_ioctl(&ap->chan, cmd, arg);
-		break;
-
 	default:
 		err = -ENOIOCTLCMD;
 	}
@@ -343,16 +313,7 @@ ppp_synctty_ioctl(struct tty_struct *tty, struct file *file,
 static unsigned int
 ppp_sync_poll(struct tty_struct *tty, struct file *file, poll_table *wait)
 {
-	struct syncppp *ap = tty->disc_data;
-	unsigned int mask;
-
-	mask = POLLOUT | POLLWRNORM;
-	/* compatibility for old pppd */
-	if (ap != 0)
-		mask |= ppp_channel_poll(&ap->chan, file, wait);
-	if (test_bit(TTY_OTHER_CLOSED, &tty->flags) || tty_hung_up_p(file))
-		mask |= POLLHUP;
-	return mask;
+	return 0;
 }
 
 static int

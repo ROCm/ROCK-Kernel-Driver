@@ -37,13 +37,6 @@
 
 */
 
-/* These identify the driver base version and may not be removed. */
-static const char version1[] =
-"natsemi.c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n";
-static const char version2[] =
-"  http://www.scyld.com/network/natsemi.html\n";
-static const char version3[] =
-"  (unofficial 2.4.x kernel port, version 1.0.4, February 26, 2001 Jeff Garzik, Tjeerd Mulder)\n";
 /* Updated to recommendations in pci-skeleton v2.03. */
 
 /* Automatically extracted configuration info:
@@ -124,6 +117,12 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+
+/* These identify the driver base version and may not be removed. */
+static char version[] __devinitdata =
+KERN_INFO "natsemi.c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n"
+KERN_INFO "  http://www.scyld.com/network/natsemi.html\n"
+KERN_INFO "  (unofficial 2.4.x kernel port, version 1.0.5, April 17, 2001 Jeff Garzik, Tjeerd Mulder)\n";
 
 /* Condensed operations for readability. */
 #define virt_to_le32desc(addr)  cpu_to_le32(virt_to_bus(addr))
@@ -368,15 +367,17 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	struct netdev_private *np;
 	int i, option, irq, chip_idx = ent->driver_data;
 	static int find_cnt = -1;
-	static int printed_version;
 	unsigned long ioaddr, iosize;
 	const int pcibar = 1; /* PCI base address register */
 	int prev_eedata;
 	u32 tmp;
 
-	if ((debug <= 1) && !printed_version++)
-		printk(KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-			version1, version2, version3);
+/* when built into the kernel, we only print version if device is found */
+#ifndef MODULE
+	static int printed_version;
+	if (!printed_version++)
+		printk(version);
+#endif
 
 	i = pci_enable_device(pdev);
 	if (i) return i;
@@ -1250,9 +1251,10 @@ static struct pci_driver natsemi_driver = {
 
 static int __init natsemi_init_mod (void)
 {
-	if (debug > 1)
-		printk(KERN_INFO "%s" KERN_INFO "%s" KERN_INFO "%s",
-			version1, version2, version3);
+/* when a module, this is printed whether or not devices are found in probe */
+#ifdef MODULE
+	printk(version);
+#endif
 
 	return pci_module_init (&natsemi_driver);
 }

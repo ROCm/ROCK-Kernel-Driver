@@ -98,8 +98,6 @@ static int is_tree_busy(struct vfsmount *topmnt, struct dentry *top)
 		 top, count));
 	this_parent = top;
 
-	count--;	/* top is passed in after being dgot */
-
 	if (is_autofs4_dentry(top)) {
 		count--;
 		DPRINTK(("is_tree_busy: autofs; count=%d\n", count));
@@ -168,8 +166,6 @@ static struct dentry *autofs4_expire(struct super_block *sb,
 	unsigned long timeout;
 	struct dentry *root = sb->s_root;
 	struct list_head *tmp;
-	struct dentry *d;
-	struct vfsmount *p;
 
 	if (!sbi->exp_timeout || !root)
 		return NULL;
@@ -208,23 +204,17 @@ static struct dentry *autofs4_expire(struct super_block *sb,
 			     attempts if expire fails the first time */
 			ino->last_used = now;
 		}
-		p = mntget(mnt);
-		d = dget_locked(dentry);
-
-		if (!is_tree_busy(p, d)) {
+		if (!is_tree_busy(mnt, dentry)) {
 			DPRINTK(("autofs_expire: returning %p %.*s\n",
 				 dentry, (int)dentry->d_name.len, dentry->d_name.name));
 			/* Start from here next time */
 			list_del(&root->d_subdirs);
 			list_add(&root->d_subdirs, &dentry->d_child);
+			dget(dentry);
 			spin_unlock(&dcache_lock);
 
-			dput(d);
-			mntput(p);
 			return dentry;
 		}
-		dput(d);
-		mntput(p);
 	}
 	spin_unlock(&dcache_lock);
 
@@ -251,6 +241,7 @@ int autofs4_expire_run(struct super_block *sb,
 	pkt.len = dentry->d_name.len;
 	memcpy(pkt.name, dentry->d_name.name, pkt.len);
 	pkt.name[pkt.len] = '\0';
+	dput(dentry);
 
 	if ( copy_to_user(pkt_p, &pkt, sizeof(struct autofs_packet_expire)) )
 		return -EFAULT;
@@ -278,6 +269,7 @@ int autofs4_expire_multi(struct super_block *sb, struct vfsmount *mnt,
 		de_info->flags |= AUTOFS_INF_EXPIRING;
 		ret = autofs4_wait(sbi, &dentry->d_name, NFY_EXPIRE);
 		de_info->flags &= ~AUTOFS_INF_EXPIRING;
+		dput(dentry);
 	}
 		
 	return ret;

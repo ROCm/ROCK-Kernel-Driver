@@ -113,7 +113,7 @@ static inline int do_getname(const char *filename, char *page)
 	if ((unsigned long) filename >= TASK_SIZE) {
 		if (!segment_eq(get_fs(), KERNEL_DS))
 			return -EFAULT;
-	} else if (TASK_SIZE - (unsigned long) filename < PAGE_SIZE)
+	} else if (TASK_SIZE - (unsigned long) filename < PATH_MAX + 1)
 		len = TASK_SIZE - (unsigned long) filename;
 
 	retval = strncpy_from_user((char *)page, filename, len);

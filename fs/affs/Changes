@@ -26,7 +26,30 @@ Known bugs:
   last allocated block is not cleared. Well,
   this fs never claimed to be Posix conformant.
 
-Please direct bug reports to: hjw@zvw.de
+Please direct bug reports to: zippel@linux-m68k.org
+
+Version 3.14
+------------
+
+- correctly cut off long file names for compares
+- correctly initialize s_last_bmap
+
+Version 3.13
+------------
+
+Major cleanup for 2.4 [Roman Zippel]
+- new extended block handling
+- new bitmap allocation functions
+- locking should be safe for the future
+- cleanup of some interfaces
+
+Version 3.12
+------------
+
+more 2.4 fixes: [Roman Zippel]
+- s_lock changes
+- increased getblock mess
+- clear meta blocks 
 
 Version 3.11
 ------------

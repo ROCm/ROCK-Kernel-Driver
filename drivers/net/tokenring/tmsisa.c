@@ -19,7 +19,7 @@
  *  TODO:
  *	1. Add support for Proteon TR ISA adapters (1392, 1392+)
  */
-static const char *version = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n";
+static const char version[] = "tmsisa.c: v1.00 14/01/2001 by Jochen Friedrich\n";
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -60,7 +60,7 @@ static int dmalist[] __initdata = {
 	0
 };
 
-static char *isa_cardname = "SK NET TR 4/16 ISA\0";
+static char isa_cardname[] = "SK NET TR 4/16 ISA\0";
 
 int tms_isa_probe(struct net_device *dev);
 static int tms_isa_open(struct net_device *dev);
@@ -271,6 +271,14 @@ int __init tms_isa_probe(struct net_device *dev)
 	{
 		/* Enlist in the card list */
 		card = kmalloc(sizeof(struct tms_isa_card), GFP_KERNEL);
+		if (!card) {
+			unregister_trdev(dev);
+			release_region(dev->base_addr, TMS_ISA_IO_EXTENT); 
+			free_irq(dev->irq, dev);
+			free_dma(dev->dma);
+			tmsdev_term(dev);
+			return -1;
+		}
 		card->next = tms_isa_card_list;
 		tms_isa_card_list = card;
 		card->dev = dev;

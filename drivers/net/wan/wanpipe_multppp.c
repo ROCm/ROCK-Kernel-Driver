@@ -719,8 +719,7 @@ static int if_init (netdevice_t* dev)
         dev->tx_queue_len = 100;
    
 	/* Initialize socket buffers */
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
-      #else
+      #if !defined(LINUX_2_1) && !defined(LINUX_2_4)
         for (i = 0; i < DEV_NUMBUFFS; ++i)
                 skb_queue_head_init(&dev->buffs[i]);
       #endif

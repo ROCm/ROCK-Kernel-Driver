@@ -1,4 +1,4 @@
-/*	$Id: if_ppp.h,v 1.19 1999/03/31 06:07:57 paulus Exp $	*/
+/*	$Id: if_ppp.h,v 1.21 2000/03/27 06:03:36 paulus Exp $	*/
 
 /*
  * if_ppp.h - Point-to-Point Protocol definitions.
@@ -21,7 +21,7 @@
  */
 
 /*
- *  ==FILEVERSION 20000324==
+ *  ==FILEVERSION 20000724==
  *
  *  NOTE TO MAINTAINERS:
  *     If you modify this file at all, please set the above date.
@@ -130,6 +130,8 @@ struct ifpppcstatsreq {
 #define PPPIOCSCOMPRESS	_IOW('t', 77, struct ppp_option_data)
 #define PPPIOCGNPMODE	_IOWR('t', 76, struct npioctl) /* get NP mode */
 #define PPPIOCSNPMODE	_IOW('t', 75, struct npioctl)  /* set NP mode */
+#define PPPIOCSPASS	_IOW('t', 71, struct sock_fprog) /* set pass filter */
+#define PPPIOCSACTIVE	_IOW('t', 70, struct sock_fprog) /* set active filt */
 #define PPPIOCGDEBUG	_IOR('t', 65, int)	/* Read debug level */
 #define PPPIOCSDEBUG	_IOW('t', 64, int)	/* Set debug level */
 #define PPPIOCGIDLE	_IOR('t', 63, struct ppp_idle) /* get idle time */

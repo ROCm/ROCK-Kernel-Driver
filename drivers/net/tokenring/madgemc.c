@@ -17,7 +17,7 @@
  *	16-Jan-00	AF	Created
  *
  */
-static const char *version = "madgemc.c: v0.91 23/01/2000 by Adam Fritzler\n";
+static const char version[] = "madgemc.c: v0.91 23/01/2000 by Adam Fritzler\n";
 
 #include <linux/module.h>
 #include <linux/mca.h>
