@@ -1706,6 +1706,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x0e11,
+		.device = 0x008a,
+		.name = "Compaq Evo W4000",	/* AD1885 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x0e11,
 		.device = 0x00b8,
 		.name = "Compaq Evo D510C",
 		.type = AC97_TUNE_HP_ONLY
