@@ -334,7 +334,6 @@ exp_export(struct nfsctl_export *nxp)
 		goto finish;
 	dprintk("nfsd: created export entry %p for client %p\n", exp, clp);
 
-	strcpy(exp->ex_path, nxp->ex_path);
 	exp->ex_client = clp;
 	exp->ex_mnt = mntget(nd.mnt);
 	exp->ex_dentry = dget(nd.dentry);
@@ -640,6 +639,7 @@ static int e_show(struct seq_file *m, void *p)
 {
 	struct svc_export *exp = p;
 	struct svc_client *clp;
+	char *pbuf;
 	int j, first = 0;
 
 	if (p == (void *)1) {
@@ -650,7 +650,10 @@ static int e_show(struct seq_file *m, void *p)
 
 	clp = exp->ex_client;
 
-	mangle(m, exp->ex_path);
+	pbuf = m->private;
+	mangle(m, d_path(exp->ex_dentry, exp->ex_mnt,
+			 pbuf, PAGE_SIZE));
+
 	seq_putc(m, '\t');
 	mangle(m, clp->cl_ident);
 	seq_putc(m, '(');
