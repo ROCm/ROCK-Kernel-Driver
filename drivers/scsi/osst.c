@@ -5325,17 +5325,17 @@ __setup("osst=", osst_setup);
 #endif
 
 /* Driverfs file support */
-static ssize_t osst_device_kdev_read(struct device *driverfs_dev, char *page, size_t count, loff_t off)
+static ssize_t osst_device_kdev_read(struct device *driverfs_dev, char *page)
 {
 	kdev_t kdev; 
 	kdev.value=(int)(long)driverfs_dev->driver_data;
-	return off ? 0 : sprintf(page, "%x\n",kdev.value);
+	return sprintf(page, "%x\n",kdev.value);
 }
 static DEVICE_ATTR(kdev,S_IRUGO,osst_device_kdev_read,NULL);
 
-static ssize_t osst_device_type_read(struct device *driverfs_dev, char *page, size_t count, loff_t off) 
+static ssize_t osst_device_type_read(struct device *driverfs_dev, char *page) 
 {
-	return off ? 0 : sprintf (page, "CHR\n");
+	return sprintf (page, "CHR\n");
 }
 static DEVICE_ATTR(type,S_IRUGO,osst_device_type_read,NULL);
 
