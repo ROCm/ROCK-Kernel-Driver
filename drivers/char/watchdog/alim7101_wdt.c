@@ -24,6 +24,7 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 #include <linux/pci.h>
 
 #include <asm/io.h>
