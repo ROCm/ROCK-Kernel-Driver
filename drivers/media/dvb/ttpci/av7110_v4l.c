@@ -162,7 +162,7 @@ static struct v4l2_audio msp3400_v4l2_audio = {
 	.capability = V4L2_AUDCAP_STEREO
 };
 
-int av7110_dvb_c_switch(struct saa7146_fh *fh)
+static int av7110_dvb_c_switch(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -227,7 +227,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 	return 0;
 }
 
-int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
+static int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct av7110 *av7110 = (struct av7110*) dev->ext_priv;
@@ -424,7 +424,7 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
  * INITIALIZATION
  ****************************************************************************/
 
-struct saa7146_extension_ioctls ioctls[] = {
+static struct saa7146_extension_ioctls ioctls[] = {
 	{ VIDIOC_ENUMINPUT,	SAA7146_EXCLUSIVE },
 	{ VIDIOC_G_INPUT,	SAA7146_EXCLUSIVE },
 	{ VIDIOC_S_INPUT,	SAA7146_EXCLUSIVE },
@@ -684,7 +684,7 @@ static struct saa7146_ext_vv av7110_vv_data_st = {
 	.flags		= 0,
 
 	.stds		= &standard[0],
-	.num_stds	= sizeof(standard) / sizeof(struct saa7146_standard),
+	.num_stds	= ARRAY_SIZE(standard),
 	.std_callback	= &std_callback,
 
 	.ioctls		= &ioctls[0],
@@ -698,7 +698,7 @@ static struct saa7146_ext_vv av7110_vv_data_c = {
 	.flags		= SAA7146_USE_PORT_B_FOR_VBI,
 
 	.stds		= &standard[0],
-	.num_stds	= sizeof(standard) / sizeof(struct saa7146_standard),
+	.num_stds	= ARRAY_SIZE(standard),
 	.std_callback	= &std_callback,
 
 	.ioctls		= &ioctls[0],

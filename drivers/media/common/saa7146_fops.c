@@ -1,4 +1,5 @@
 #include <media/saa7146_vv.h>
+#include <linux/version.h>
 
 #define BOARD_CAN_DO_VBI(dev)   (dev->revision != 0 && dev->vv_data->vbi_minor != -1) 
 
@@ -30,17 +31,6 @@ int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
 	DEB_D(("res: get 0x%02x, cur:0x%02x\n",bit,vv->resources));
 	up(&dev->lock);
 	return 1;
-}
-
-int saa7146_res_check(struct saa7146_fh *fh, unsigned int bit)
-{
-	return (fh->resources & bit);
-}
-
-int saa7146_res_locked(struct saa7146_dev *dev, unsigned int bit)
-{
-	struct saa7146_vv *vv = dev->vv_data;
-	return (vv->resources & bit);
 }
 
 void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits)

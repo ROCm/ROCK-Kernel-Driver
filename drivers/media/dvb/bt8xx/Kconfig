@@ -1,6 +1,8 @@
 config DVB_BT8XX
 	tristate "Nebula/Pinnacle PCTV/Twinhan PCI cards"
 	depends on DVB_CORE && PCI && VIDEO_BT848
+	select DVB_MT352
+	select DVB_SP887X
 	help
 	  Support for PCI cards based on the Bt8xx PCI bridge. Examples are
 	  the Nebula cards, the Pinnacle PCTV cards and Twinhan DST cards.

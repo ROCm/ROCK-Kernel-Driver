@@ -30,6 +30,7 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -141,7 +142,11 @@ static unsigned short dvb_net_eth_type_trans(struct sk_buff *skb,
 	
 	skb->mac.raw=skb->data;
 	skb_pull(skb,dev->hard_header_len);
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,8)
+	eth = skb->mac.ethernet;
+#else
 	eth = eth_hdr(skb);
+#endif
 	
 	if (*eth->h_dest & 1) {
 		if(memcmp(eth->h_dest,dev->broadcast, ETH_ALEN)==0)
@@ -1193,6 +1198,7 @@ void dvb_net_release (struct dvb_net *dvbnet)
 		dvb_net_remove_if(dvbnet, i);
 	}
 }
+EXPORT_SYMBOL(dvb_net_release);
 
 
 int dvb_net_init (struct dvb_adapter *adap, struct dvb_net *dvbnet,
@@ -1210,4 +1216,4 @@ int dvb_net_init (struct dvb_adapter *adap, struct dvb_net *dvbnet,
 
 	return 0;
 }
-
+EXPORT_SYMBOL(dvb_net_init);

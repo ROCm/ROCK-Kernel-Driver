@@ -130,7 +130,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 	return 0;
 }
 
-void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
+static void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
