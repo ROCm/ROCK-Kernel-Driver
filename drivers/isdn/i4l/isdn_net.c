@@ -206,7 +206,7 @@ static __inline__ void isdn_net_zero_frame_cnt(isdn_net_local *lp)
 
 int isdn_net_force_dial_lp(isdn_net_local *);
 static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
-static int do_dialout(isdn_net_local *lp);
+static void do_dialout(isdn_net_local *lp);
 
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
@@ -222,22 +222,14 @@ char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 static void
 isdn_net_unreachable(struct net_device *dev, struct sk_buff *skb, char *reason)
 {
-	if(skb) {
-
-		u_short proto = ntohs(skb->protocol);
-
-		printk(KERN_DEBUG "isdn_net: %s: %s, signalling dst_link_failure %s\n",
-		       dev->name,
-		       (reason != NULL) ? reason : "unknown",
-		       (proto != ETH_P_IP) ? "Protocol != ETH_P_IP" : "");
-		
-		dst_link_failure(skb);
-	}
-	else {  /* dial not triggered by rawIP packet */
-		printk(KERN_DEBUG "isdn_net: %s: %s\n",
-			   dev->name,
-			   (reason != NULL) ? reason : "reason unknown");
-	}
+	u_short proto = ntohs(skb->protocol);
+	
+	printk(KERN_DEBUG "isdn_net: %s: %s, signalling dst_link_failure %s\n",
+	       dev->name,
+	       (reason != NULL) ? reason : "unknown",
+	       (proto != ETH_P_IP) ? "Protocol != ETH_P_IP" : "");
+	
+	dst_link_failure(skb);
 }
 
 static void
@@ -491,7 +483,7 @@ isdn_net_dial_timer(unsigned long data)
 /* Initiate dialout. Set phone-number-pointer to first number
  * of interface.
  */
-static int
+static void
 init_dialout(isdn_net_local *lp)
 {
 	unsigned long flags;
@@ -505,7 +497,7 @@ init_dialout(isdn_net_local *lp)
 		printk(KERN_WARNING "%s: phone number deleted?\n",
 		       lp->name);
 		isdn_net_hangup(lp);
-		return 0;
+		return;
 	}
 	if (lp->dialtimeout > 0 &&
 	    (lp->dialstarted == 0 || 
@@ -514,83 +506,59 @@ init_dialout(isdn_net_local *lp)
 		lp->dialwait_timer = 0;
 	}
 	lp->dialretry = 0;
-	return do_dialout(lp);
+	do_dialout(lp);
 }
 
 /* Setup interface, dial current phone-number, switch to next number.
  * If list of phone-numbers is exhausted, increment
  * retry-counter.
  */
-static int
+static void
 do_dialout(isdn_net_local *lp)
 {
 	unsigned long flags;
+	struct dial_info dial = {
+		.l2_proto = lp->l2_proto,
+		.l3_proto = lp->l3_proto,
+		.si1      = 7,
+		.si2      = 0,
+		.msn      = lp->msn,
+		.phone    = lp->dial->num,
+	};
 
-	if(dev->global_flags & ISDN_GLOBAL_STOPPED || (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF)) {
-		char *s;
-		if (dev->global_flags & ISDN_GLOBAL_STOPPED)
-			s = "dial suppressed: isdn system stopped";
-		else
-			s = "dial suppressed: dialmode `off'";
-		isdn_net_unreachable(&lp->netdev->dev, 0, s);
-		isdn_net_hangup(lp);
-		return 0;
-	}
+	if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF)
+		return;
 
 	save_flags(flags);
 	cli();
-	if (!lp->dial) {
-		restore_flags(flags);
-		printk(KERN_WARNING "%s: phone number deleted?\n",
-		       lp->name);
-		isdn_net_hangup(lp);
-		return 0;
+	if(lp->dialtimeout > 0 &&
+	   time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
+		   restore_flags(flags);
+		   lp->dialwait_timer = jiffies + lp->dialwait;
+		   lp->dialstarted = 0;
+		   isdn_net_hangup(lp);
+		   return;
 	}
-	if (!strncmp(lp->dial->num, "LEASED", strlen("LEASED"))) {
-		restore_flags(flags);
-		lp->dialstate = ST_OUT_WAIT_DCONN;
-		printk(KERN_INFO "%s: Open leased line ...\n", lp->name);
-		return 1;
-	} else {
-		struct dial_info dial = {
-			.l2_proto = lp->l2_proto,
-			.l3_proto = lp->l3_proto,
-			.si1      = 7,
-			.si2      = 0,
-			.msn      = lp->msn,
-			.phone    = lp->dial->num,
-		};
-		if(lp->dialtimeout > 0) {
-			if (time_after(jiffies, lp->dialstarted + lp->dialtimeout)) {
-				restore_flags(flags);
+	/*
+	 * Switch to next number or back to start if at end of list.
+	 */
+	if (!(lp->dial = lp->dial->next)) {
+		lp->dial = lp->phone[1];
+		lp->dialretry++;
+		
+		if (lp->dialretry > lp->dialmax) {
+			restore_flags(flags);
+			if (lp->dialtimeout == 0) {
 				lp->dialwait_timer = jiffies + lp->dialwait;
 				lp->dialstarted = 0;
-				isdn_net_unreachable(&lp->netdev->dev, 0, "dial: timed out");
-				isdn_net_hangup(lp);
-				return 0;
 			}
+			isdn_net_hangup(lp);
+			return;
 		}
-		/*
-		 * Switch to next number or back to start if at end of list.
-		 */
-		if (!(lp->dial = (isdn_net_phone *) lp->dial->next)) {
-			lp->dial = lp->phone[1];
-			lp->dialretry++;
-			
-			if (lp->dialretry > lp->dialmax) {
-				restore_flags(flags);
-				if (lp->dialtimeout == 0) {
-					lp->dialwait_timer = jiffies + lp->dialwait;
-					lp->dialstarted = 0;
-					isdn_net_unreachable(&lp->netdev->dev, 0, "dial: tried all numbers dialmax times");
-				}
-				isdn_net_hangup(lp);
-				return 0;
-			}
-		}
-		restore_flags(flags);
-		isdn_slot_dial(lp->isdn_slot, &dial);
 	}
+	restore_flags(flags);
+	isdn_slot_dial(lp->isdn_slot, &dial);
+
 	lp->huptimer = 0;
 	lp->outgoing = 1;
 	if (lp->chargeint)
@@ -607,7 +575,6 @@ do_dialout(isdn_net_local *lp)
 	}
 	lp->dialstate = ST_OUT_WAIT_DCONN;
 	add_timer(&lp->dial_timer);
-	return 1;
 }
 
 /* For EV_NET_DIAL, returns 1 if timer callback is needed 
@@ -2114,7 +2081,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	int swapped;
 	int sidx = 0;
 	struct list_head *l;
-	isdn_net_phone *n;
+	struct isdn_net_phone *n;
 	ulong flags;
 	char nr[32];
 	char *my_eaz;
@@ -2148,7 +2115,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
                 return 0;
         }
 
-	n = (isdn_net_phone *) 0;
+	n = NULL;
 	ematch = wret = swapped = 0;
 	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
 		      isdn_slot_usage(idx));
@@ -2259,7 +2226,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				while (n) {
 					if (!isdn_msncmp(nr, n->num))
 						break;
-					n = (isdn_net_phone *) n->next;
+					n = n->next;
 				}
 			}
 			if (n || (!(lp->flags & ISDN_NET_SECURE))) {
@@ -2939,17 +2906,20 @@ int
 isdn_net_addphone(isdn_net_ioctl_phone * phone)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
-	isdn_net_phone *n;
+	struct isdn_net_phone *n;
 
-	if (p) {
-		if (!(n = (isdn_net_phone *) kmalloc(sizeof(isdn_net_phone), GFP_KERNEL)))
-			return -ENOMEM;
-		strcpy(n->num, phone->phone);
-		n->next = p->local.phone[phone->outgoing & 1];
-		p->local.phone[phone->outgoing & 1] = n;
-		return 0;
-	}
-	return -ENODEV;
+	if (!p)
+		return -ENODEV;
+
+	n = kmalloc(sizeof(*n), GFP_KERNEL);
+	if (!n)
+		return -ENOMEM;
+
+	strcpy(n->num, phone->phone);
+	n->next = p->local.phone[phone->outgoing & 1];
+	p->local.phone[phone->outgoing & 1] = n;
+
+	return 0;
 }
 
 /*
@@ -2963,7 +2933,7 @@ isdn_net_getphones(isdn_net_ioctl_phone * phone, char *phones)
 	int inout = phone->outgoing & 1;
 	int more = 0;
 	int count = 0;
-	isdn_net_phone *n;
+	struct isdn_net_phone *n;
 
 	if (!p)
 		return -ENODEV;
@@ -3019,34 +2989,33 @@ isdn_net_delphone(isdn_net_ioctl_phone * phone)
 {
 	isdn_net_dev *p = isdn_net_findif(phone->name);
 	int inout = phone->outgoing & 1;
-	isdn_net_phone *n;
-	isdn_net_phone *m;
+	struct isdn_net_phone *n, *m;
 	unsigned long flags;
 
-	if (p) {
-		save_flags(flags);
-		cli();
-		n = p->local.phone[inout];
-		m = NULL;
-		while (n) {
-			if (!strcmp(n->num, phone->phone)) {
-				if (p->local.dial == n)
-					p->local.dial = n->next;
-				if (m)
-					m->next = n->next;
-				else
-					p->local.phone[inout] = n->next;
-				kfree(n);
-				restore_flags(flags);
-				return 0;
-			}
-			m = n;
-			n = (isdn_net_phone *) n->next;
+	if (!p)
+		return -ENODEV;
+
+	save_flags(flags);
+	cli();
+	n = p->local.phone[inout];
+	m = NULL;
+	while (n) {
+		if (!strcmp(n->num, phone->phone)) {
+			if (p->local.dial == n)
+				p->local.dial = n->next;
+			if (m)
+				m->next = n->next;
+			else
+				p->local.phone[inout] = n->next;
+			kfree(n);
+			restore_flags(flags);
+			return 0;
 		}
-		restore_flags(flags);
-		return -EINVAL;
+		m = n;
+		n = n->next;
 	}
-	return -ENODEV;
+	restore_flags(flags);
+	return -EINVAL;
 }
 
 /*
@@ -3055,8 +3024,7 @@ isdn_net_delphone(isdn_net_ioctl_phone * phone)
 static int
 isdn_net_rmallphone(isdn_net_dev * p)
 {
-	isdn_net_phone *n;
-	isdn_net_phone *m;
+	struct isdn_net_phone *n, *m;
 	unsigned long flags;
 	int i;
 

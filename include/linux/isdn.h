@@ -265,10 +265,10 @@ typedef struct {
 #define ISDN_NET_MAGIC      0x49344C02 /* for paranoia-checking             */
 
 /* Phone-list-element */
-typedef struct {
-  void *next;
-  char num[ISDN_MSNLEN];
-} isdn_net_phone;
+struct isdn_net_phone {
+	struct isdn_net_phone *next;
+	char num[ISDN_MSNLEN];
+};
 
 /*
    Principles when extending structures for generic encapsulation protocol
@@ -334,10 +334,10 @@ typedef struct isdn_net_local_s {
   ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */
   int                    triggercps;   /* BogoCPS needed for trigger slave */
-  isdn_net_phone         *phone[2];    /* List of remote-phonenumbers      */
+  struct isdn_net_phone  *phone[2];    /* List of remote-phonenumbers      */
 				       /* phone[0] = Incoming Numbers      */
 				       /* phone[1] = Outgoing Numbers      */
-  isdn_net_phone         *dial;        /* Pointer to dialed number         */
+  struct isdn_net_phone  *dial;        /* Pointer to dialed number         */
   struct net_device      *master;      /* Ptr to Master device for slaves  */
   struct net_device      *slave;       /* Ptr to Slave device for masters  */
   struct isdn_net_local_s *next;       /* Ptr to next link in bundle       */
