@@ -27,6 +27,7 @@
  *	JHS: We should remove the CONFIG_NET_CLS_IND from here
  *	eventually when the meta match extension is made available
  *
+ *	nfmark match added by Catalin(ux aka Dino) BOIE <catab at umbrella.ro>
  */
 
 #include <asm/uaccess.h>
@@ -58,6 +59,13 @@
 #include <net/pkt_cls.h>
 
 
+struct tc_u32_mark
+{
+	__u32		val;
+	__u32		mask;
+	__u32		success;
+};
+
 struct tc_u_knode
 {
 	struct tc_u_knode	*next;
@@ -78,6 +86,9 @@ struct tc_u_knode
 	struct tc_u_hnode	*ht_down;
 #ifdef CONFIG_CLS_U32_PERF
 	struct tc_u32_pcnt	*pf;
+#endif
+#ifdef CONFIG_CLS_U32_MARK
+	struct tc_u32_mark	mark;
 #endif
 	struct tc_u32_sel	sel;
 };
@@ -139,6 +150,16 @@ next_knode:
 		n->pf->rcnt +=1;
 		j = 0;
 #endif
+
+#ifdef CONFIG_CLS_U32_MARK
+		if ((skb->nfmark & n->mark.mask) != n->mark.val) {
+			n = n->next;
+			goto next_knode;
+		} else {
+			n->mark.success++;
+		}
+#endif
+
 		for (i = n->sel.nkeys; i>0; i--, key++) {
 
 			if ((*(u32*)(ptr+key->off+(off2&key->offmask))^key->val)&key->mask) {
@@ -554,6 +575,7 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 	struct tc_u_hnode *ht;
 	struct tc_u_knode *n;
 	struct tc_u32_sel *s;
+	struct tc_u32_mark *mark;
 	struct rtattr *opt = tca[TCA_OPTIONS-1];
 	struct rtattr *tb[TCA_U32_MAX];
 	u32 htid;
@@ -657,6 +679,17 @@ static int u32_change(struct tcf_proto *tp, unsigned long base, u32 handle,
 	}
 	n->fshift = i;
 }
+
+#ifdef CONFIG_CLS_U32_MARK                                                                                                                                             
+	if (tb[TCA_U32_MARK-1]) {
+		if (RTA_PAYLOAD(tb[TCA_U32_MARK-1]) < sizeof(struct tc_u32_mark))
+			return -EINVAL;
+		mark = RTA_DATA(tb[TCA_U32_MARK-1]);
+		memcpy(&n->mark, mark, sizeof(struct tc_u32_mark));
+		n->mark.success = 0;
+	}                                                                                                                                                                
+#endif                                                                                                                                                                 
+
 	err = u32_set_parms(tp, base, ht, n, tb, tca[TCA_RATE-1]);
 	if (err == 0) {
 		struct tc_u_knode **ins;
@@ -744,6 +777,12 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 			RTA_PUT(skb, TCA_U32_CLASSID, 4, &n->res.classid);
 		if (n->ht_down)
 			RTA_PUT(skb, TCA_U32_LINK, 4, &n->ht_down->handle);
+
+#ifdef CONFIG_CLS_U32_MARK
+		if (n->mark.val || n->mark.mask)
+			RTA_PUT(skb, TCA_U32_MARK, sizeof(n->mark), &n->mark);
+#endif
+
 #ifdef CONFIG_NET_CLS_ACT
 		if (tcf_dump_act(skb, n->action, TCA_U32_ACT, TCA_U32_POLICE) < 0)
 			goto rtattr_failure;

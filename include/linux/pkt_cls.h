@@ -192,6 +192,7 @@ enum
 	TCA_U32_ACT,   
 	TCA_U32_INDEV,
 	TCA_U32_PCNT,
+	TCA_U32_MARK,
 	__TCA_U32_MAX
 };
 
