@@ -9,11 +9,11 @@
 */
 
 typedef struct _diva_um_idi_adapter_features {
-  dword type;
-  dword features;
-  dword channels;
-  dword serial_number;
-  char  name [128];
+	dword type;
+	dword features;
+	dword channels;
+	dword serial_number;
+	char name[128];
 } diva_um_idi_adapter_features_t;
 
 #define DIVA_UM_IDI_REQ_MASK			0x0000FFFF
@@ -30,29 +30,29 @@ typedef struct _diva_um_idi_adapter_features {
   data_length  bytes will follow this structure
 */
 typedef struct _diva_um_idi_req_hdr {
-  dword type;
-  dword Req;
-  dword ReqCh;
-  dword data_length;
+	dword type;
+	dword Req;
+	dword ReqCh;
+	dword data_length;
 } diva_um_idi_req_hdr_t;
 
 typedef struct _diva_um_idi_ind_parameters {
-  dword Ind;
-  dword IndCh;
+	dword Ind;
+	dword IndCh;
 } diva_um_idi_ind_parameters_t;
 
 typedef struct _diva_um_idi_rc_parameters {
-  dword Rc;
-  dword RcCh;
+	dword Rc;
+	dword RcCh;
 } diva_um_idi_rc_parameters_t;
 
 typedef union _diva_um_idi_ind {
-  diva_um_idi_adapter_features_t  features;
-  diva_um_idi_ind_parameters_t    ind;
-  diva_um_idi_rc_parameters_t     rc;
+	diva_um_idi_adapter_features_t features;
+	diva_um_idi_ind_parameters_t ind;
+	diva_um_idi_rc_parameters_t rc;
 } diva_um_idi_ind_t;
 
-#define DIVA_UM_IDI_IND_FEATURES  1  /* features indication */
+#define DIVA_UM_IDI_IND_FEATURES  1	/* features indication */
 #define DIVA_UM_IDI_IND           2
 #define DIVA_UM_IDI_IND_RC        3
 /*
@@ -60,10 +60,9 @@ typedef union _diva_um_idi_ind {
   this structure
 */
 typedef struct _diva_um_idi_ind_hdr {
-  dword type;
-  diva_um_idi_ind_t  hdr;
-  dword  data_length;
+	dword type;
+	diva_um_idi_ind_t hdr;
+	dword data_length;
 } diva_um_idi_ind_hdr_t;
 
 #endif
-
