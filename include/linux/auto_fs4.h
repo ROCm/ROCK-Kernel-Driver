@@ -23,6 +23,8 @@
 #define AUTOFS_MIN_PROTO_VERSION	3
 #define AUTOFS_MAX_PROTO_VERSION	4
 
+#define AUTOFS_PROTO_SUBVERSION         5
+
 /* Mask for expire behaviour */
 #define AUTOFS_EXP_IMMEDIATE		1
 #define AUTOFS_EXP_LEAVES		2
@@ -46,6 +48,7 @@ union autofs_packet_union {
 };
 
 #define AUTOFS_IOC_EXPIRE_MULTI _IOW(0x93,0x66,int)
+#define AUTOFS_IOC_PROTOSUBVER  _IOR(0x93,0x67,int)
 
 
 #endif /* _LINUX_AUTO_FS4_H */

@@ -348,7 +348,7 @@ int autofs4_expire_multi(struct super_block *sb, struct vfsmount *mnt,
 		/* This is synchronous because it makes the daemon a
                    little easier */
 		de_info->flags |= AUTOFS_INF_EXPIRING;
-		ret = autofs4_wait(sbi, &dentry->d_name, NFY_EXPIRE);
+		ret = autofs4_wait(sbi, dentry, NFY_EXPIRE);
 		de_info->flags &= ~AUTOFS_INF_EXPIRING;
 		dput(dentry);
 	}

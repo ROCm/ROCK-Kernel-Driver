@@ -3,6 +3,7 @@
  * linux/fs/autofs/waitq.c
  *
  *  Copyright 1997-1998 Transmeta Corporation -- All Rights Reserved
+ *  Copyright 2001-2003 Ian Kent <raven@themaw.net>
  *
  * This file is part of the Linux kernel and is made available under
  * the terms of the GNU General Public License, version 2, or at your
@@ -126,25 +127,64 @@ static void autofs4_notify_daemon(struct autofs_sb_info *sbi,
 		autofs4_catatonic_mode(sbi);
 }
 
-int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
+static int autofs4_getpath(struct autofs_sb_info *sbi,
+			   struct dentry *dentry, char **name)
+{
+	struct dentry *root = sbi->sb->s_root;
+	struct dentry *tmp;
+	char *buf = *name;
+	char *p;
+	int len = 0;
+
+	spin_lock(&dcache_lock);
+	for (tmp = dentry ; tmp != root ; tmp = tmp->d_parent)
+		len += tmp->d_name.len + 1;
+
+	if (--len > NAME_MAX) {
+		spin_unlock(&dcache_lock);
+		return 0;
+	}
+
+	*(buf + len) = '\0';
+	p = buf + len - dentry->d_name.len;
+	strncpy(p, dentry->d_name.name, dentry->d_name.len);
+
+	for (tmp = dentry->d_parent; tmp != root ; tmp = tmp->d_parent) {
+		*(--p) = '/';
+		p -= tmp->d_name.len;
+		strncpy(p, tmp->d_name.name, tmp->d_name.len);
+	}
+	spin_unlock(&dcache_lock);
+
+	return len;
+}
+
+int autofs4_wait(struct autofs_sb_info *sbi, struct dentry *dentry,
 		enum autofs_notify notify)
 {
 	struct autofs_wait_queue *wq;
-	int status;
+	char *name;
+	int len, status;
 
 	/* In catatonic mode, we don't wait for nobody */
 	if ( sbi->catatonic )
 		return -ENOENT;
 	
-	/* We shouldn't be able to get here, but just in case */
-	if ( name->len > NAME_MAX )
+	name = kmalloc(NAME_MAX + 1, GFP_KERNEL);
+	if (!name)
+		return -ENOMEM;
+
+	len = autofs4_getpath(sbi, dentry, &name);
+	if (!len) {
+		kfree(name);
 		return -ENOENT;
+	}
 
 	spin_lock(&waitq_lock);
-	for ( wq = sbi->queues ; wq ; wq = wq->next ) {
-		if ( wq->hash == name->hash &&
-		     wq->len == name->len &&
-		     wq->name && !memcmp(wq->name,name->name,name->len) )
+	for (wq = sbi->queues ; wq ; wq = wq->next) {
+		if (wq->hash == dentry->d_name.hash &&
+		    wq->len == len &&
+		    wq->name && !memcmp(wq->name, name, len))
 			break;
 	}
 	spin_unlock(&waitq_lock);
@@ -152,12 +192,8 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 	if ( !wq ) {
 		/* Create a new wait queue */
 		wq = kmalloc(sizeof(struct autofs_wait_queue),GFP_KERNEL);
-		if ( !wq )
-			return -ENOMEM;
-
-		wq->name = kmalloc(name->len,GFP_KERNEL);
-		if ( !wq->name ) {
-			kfree(wq);
+		if ( !wq ) {
+			kfree(name);
 			return -ENOMEM;
 		}
 
@@ -169,10 +205,10 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct qstr *name,
 		sbi->queues = wq;
 		spin_unlock(&waitq_lock);
 		init_waitqueue_head(&wq->queue);
-		wq->hash = name->hash;
-		wq->len = name->len;
+		wq->hash = dentry->d_name.hash;
+		wq->name = name;
+		wq->len = len;
 		wq->status = -EINTR; /* Status return if interrupted */
-		memcpy(wq->name, name->name, name->len);
 
 		DPRINTK(("autofs4_wait: new wait id = 0x%08lx, name = %.*s, nfy=%d\n",
 			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));

@@ -95,6 +95,7 @@ struct autofs_sb_info {
 	pid_t oz_pgrp;
 	int catatonic;
 	int version;
+	int sub_version;
 	unsigned long exp_timeout;
 	struct super_block *sb;
 	struct autofs_wait_queue *queues; /* Wait queue pointer */
@@ -127,6 +128,12 @@ static inline int autofs4_ispending(struct dentry *dentry)
 		(inf != NULL && inf->flags & AUTOFS_INF_EXPIRING);
 }
 
+static inline void autofs4_copy_atime(struct file *src, struct file *dst)
+{
+	dst->f_dentry->d_inode->i_atime = src->f_dentry->d_inode->i_atime;
+	return;
+}
+
 struct inode *autofs4_get_inode(struct super_block *, struct autofs_info *);
 struct autofs_info *autofs4_init_inf(struct autofs_sb_info *, mode_t mode);
 void autofs4_free_ino(struct autofs_info *);
@@ -143,6 +150,7 @@ int autofs4_expire_multi(struct super_block *, struct vfsmount *,
 extern struct inode_operations autofs4_symlink_inode_operations;
 extern struct inode_operations autofs4_dir_inode_operations;
 extern struct inode_operations autofs4_root_inode_operations;
+extern struct file_operations autofs4_dir_operations;
 extern struct file_operations autofs4_root_operations;
 
 /* Initializing function */
@@ -159,7 +167,7 @@ enum autofs_notify
 	NFY_EXPIRE
 };
 
-int autofs4_wait(struct autofs_sb_info *,struct qstr *, enum autofs_notify);
+int autofs4_wait(struct autofs_sb_info *,struct dentry *, enum autofs_notify);
 int autofs4_wait_release(struct autofs_sb_info *,autofs_wqt_t,int);
 void autofs4_catatonic_mode(struct autofs_sb_info *);
 
