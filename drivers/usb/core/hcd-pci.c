@@ -80,7 +80,8 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 		return -ENODEV;
 	
         if (!dev->irq) {
-        	err ("Found HC with no IRQ.  Check BIOS/PCI %s setup!",
+        	dev_err (&dev->dev,
+			"Found HC with no IRQ.  Check BIOS/PCI %s setup!\n",
 			pci_name(dev));
    	        return -ENODEV;
         }
@@ -90,16 +91,17 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 		resource = pci_resource_start (dev, 0);
 		len = pci_resource_len (dev, 0);
 		if (!request_mem_region (resource, len, driver->description)) {
-			dbg ("controller already in use");
+			dev_dbg (&dev->dev, "controller already in use\n");
 			return -EBUSY;
 		}
 		base = ioremap_nocache (resource, len);
 		if (base == NULL) {
-			dbg ("error mapping memory");
+			dev_dbg (&dev->dev, "error mapping memory\n");
 			retval = -EFAULT;
 clean_1:
 			release_mem_region (resource, len);
-			err ("init %s fail, %d", pci_name(dev), retval);
+			dev_err (&dev->dev, "init %s fail, %d\n",
+				pci_name(dev), retval);
 			return retval;
 		}
 
@@ -116,7 +118,7 @@ clean_1:
 				break;
 		}
 		if (region == PCI_ROM_RESOURCE) {
-			dbg ("no i/o regions available");
+			dev_dbg (&dev->dev, "no i/o regions available\n");
 			return -EBUSY;
 		}
 		base = (void *) resource;
@@ -127,7 +129,7 @@ clean_1:
 
 	hcd = driver->hcd_alloc ();
 	if (hcd == NULL){
-		dbg ("hcd alloc fail");
+		dev_dbg (&dev->dev, "hcd alloc fail\n");
 		retval = -ENOMEM;
 clean_2:
 		if (driver->flags & HCD_MEMORY) {
@@ -135,7 +137,8 @@ clean_2:
 			goto clean_1;
 		} else {
 			release_region (resource, len);
-			err ("init %s fail, %d", pci_name(dev), retval);
+			dev_err (&dev->dev, "init %s fail, %d\n",
+				pci_name(dev), retval);
 			return retval;
 		}
 	}

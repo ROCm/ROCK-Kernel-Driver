@@ -935,7 +935,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
-		warn("selecting invalid interface %d", interface);
+		dev_dbg(&dev->dev, "selecting invalid interface %d\n",
+			interface);
 		return -EINVAL;
 	}
 
@@ -953,8 +954,9 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	 * request if the interface only has one alternate setting.
 	 */
 	if (ret == -EPIPE && iface->num_altsetting == 1) {
-		dbg("manual set_interface for dev %d, iface %d, alt %d",
-			dev->devnum, interface, alternate);
+		dev_dbg(&dev->dev,
+			"manual set_interface for iface %d, alt %d\n",
+			interface, alternate);
 		manual = 1;
 	} else if (ret < 0)
 		return ret;
@@ -1233,18 +1235,20 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	if (!dev->have_langid) {
 		err = usb_get_string(dev, 0, 0, tbuf, 4);
 		if (err < 0) {
-			err("error getting string descriptor 0 (error=%d)", err);
+			dev_err (&dev->dev,
+				"string descriptor 0 read error: %d\n",
+				err);
 			goto errout;
 		} else if (err < 4 || tbuf[0] < 4) {
-			err("string descriptor 0 too short");
+			dev_err (&dev->dev, "string descriptor 0 too short\n");
 			err = -EINVAL;
 			goto errout;
 		} else {
 			dev->have_langid = -1;
 			dev->string_langid = tbuf[2] | (tbuf[3]<< 8);
 				/* always use the first langid listed */
-			dbg("USB device number %d default language ID 0x%x",
-				dev->devnum, dev->string_langid);
+			dev_dbg (&dev->dev, "default language 0x%04x\n",
+				dev->string_langid);
 		}
 	}
 

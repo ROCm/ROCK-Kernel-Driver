@@ -58,6 +58,8 @@ extern int usb_host_init(void);
 extern void usb_host_cleanup(void);
 
 
+const char *usbcore_name = "usbcore";
+
 int nousb;		/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
 
@@ -158,11 +160,12 @@ int usb_register(struct usb_driver *new_driver)
 	retval = driver_register(&new_driver->driver);
 
 	if (!retval) {
-		info("registered new driver %s", new_driver->name);
+		pr_info("%s: registered new driver %s\n",
+			usbcore_name, new_driver->name);
 		usbfs_update_special();
 	} else {
-		err("problem %d when registering driver %s",
-			retval, new_driver->name);
+		printk(KERN_ERR "%s: error %d registering driver %s\n",
+			usbcore_name, retval, new_driver->name);
 	}
 
 	return retval;
@@ -181,7 +184,7 @@ int usb_register(struct usb_driver *new_driver)
  */
 void usb_deregister(struct usb_driver *driver)
 {
-	info("deregistering driver %s", driver->name);
+	pr_info("%s: deregistering driver %s\n", usbcore_name, driver->name);
 
 	driver_unregister (&driver->driver);
 
@@ -587,10 +590,11 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	int i = 0;
 	int length = 0;
 
-	dbg ("%s", __FUNCTION__);
-
 	if (!dev)
 		return -ENODEV;
+
+	/* driver is often null here; dev_dbg() would oops */
+	pr_debug ("usb %s: hotplug\n", dev->bus_id);
 
 	/* Must check driver_data here, as on remove driver is always NULL */
 	if ((dev->driver == &usb_generic_driver) || 
@@ -601,11 +605,11 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	usb_dev = interface_to_usbdev (intf);
 	
 	if (usb_dev->devnum < 0) {
-		dbg ("device already deleted ??");
+		pr_debug ("usb %s: already deleted?\n", dev->bus_id);
 		return -ENODEV;
 	}
 	if (!usb_dev->bus) {
-		dbg ("bus already removed?");
+		pr_debug ("usb %s: bus removed?\n", dev->bus_id);
 		return -ENODEV;
 	}
 
@@ -827,14 +831,14 @@ static struct usb_device *match_device(struct usb_device *dev,
 	struct usb_device *ret_dev = NULL;
 	int child;
 
-	dbg("looking at vendor %d, product %d",
+	dev_dbg(&dev->dev, "check for vendor %04x, product %04x ...\n",
 	    dev->descriptor.idVendor,
 	    dev->descriptor.idProduct);
 
 	/* see if this device matches */
 	if ((dev->descriptor.idVendor == vendor_id) &&
 	    (dev->descriptor.idProduct == product_id)) {
-		dbg ("found the device!");
+		dev_dbg (&dev->dev, "matched this device!\n");
 		ret_dev = usb_get_dev(dev);
 		goto exit;
 	}
@@ -909,7 +913,8 @@ int usb_get_current_frame_number(struct usb_device *dev)
  * extra field of the interface and endpoint descriptor structs.
  */
 
-int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, void **ptr)
+int __usb_get_extra_descriptor(char *buffer, unsigned size,
+	unsigned char type, void **ptr)
 {
 	struct usb_descriptor_header *header;
 
@@ -917,7 +922,11 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
 		header = (struct usb_descriptor_header *)buffer;
 
 		if (header->bLength < 2) {
-			err("invalid descriptor length of %d", header->bLength);
+			printk(KERN_ERR
+				"%s: bogus descriptor, type %d length %d\n",
+				usbcore_name,
+				header->bDescriptorType, 
+				header->bLength);
 			return -1;
 		}
 
@@ -1568,7 +1577,7 @@ int usb_disabled(void)
 static int __init usb_init(void)
 {
 	if (nousb) {
-		info("USB support disabled\n");
+		pr_info ("%s: USB support disabled\n", usbcore_name);
 		return 0;
 	}
 
