@@ -548,15 +548,15 @@ __end_systemcfg:
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
-	.llong	0xc00000000	/* KERNELBASE ESID */
-	.llong	0x6a99b4b14	/* KERNELBASE VSID */
+	.llong	(KERNELBASE>>SID_SHIFT)
+	.llong	0x40bffffd5	/* KERNELBASE VSID */
 	/* We have to list the bolted VMALLOC segment here, too, so that it
 	 * will be restored on shared processor switch */
-	.llong	0xd00000000	/* VMALLOCBASE ESID */
-	.llong	0x08d12e6ab	/* VMALLOCBASE VSID */
+	.llong	(VMALLOCBASE>>SID_SHIFT)
+	.llong	0xb0cffffd1	/* VMALLOCBASE VSID */
 	.llong	8192		/* # pages to map (32 MB) */
 	.llong	0		/* Offset from start of loadarea to start of map */
-	.llong	0x0006a99b4b140000	/* VPN of first page to map */
+	.llong	0x40bffffd50000	/* VPN of first page to map */
 
 	. = 0x6100
 
@@ -1064,18 +1064,9 @@ _GLOBAL(do_stab_bolted)
 	rldimi	r10,r11,7,52	/* r10 = first ste of the group */
 
 	/* Calculate VSID */
-	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
-	rldic	r11,r11,15,36
-	ori	r11,r11,0xc
-
-	/* VSID_RANDOMIZER */
-	li	r9,9
-	sldi	r9,r9,32
-	oris	r9,r9,58231
-	ori	r9,r9,39831
-
-	mulld	r9,r11,r9
-	rldic	r9,r9,12,16	/* r9 = vsid << 12 */
+	/* This is a kernel address, so protovsid = ESID */
+	ASM_VSID_SCRAMBLE(r11, r9)
+	rldic	r9,r11,12,16	/* r9 = vsid << 12 */
 
 	/* Search the primary group for a free entry */
 1:	ld	r11,0(r10)	/* Test valid bit of the current ste	*/

@@ -212,17 +212,6 @@ extern int page_is_ram(unsigned long pfn);
 #define USER_REGION_ID     (0UL)
 #define REGION_ID(X)	   (((unsigned long)(X))>>REGION_SHIFT)
 
-/*
- * Define valid/invalid EA bits (for all ranges)
- */
-#define VALID_EA_BITS   (0x000001ffffffffffUL)
-#define INVALID_EA_BITS (~(REGION_MASK|VALID_EA_BITS))
-
-#define IS_VALID_REGION_ID(x) \
-        (((x) == USER_REGION_ID) || ((x) >= KERNEL_REGION_ID))
-#define IS_VALID_EA(x) \
-        ((!((x) & INVALID_EA_BITS)) && IS_VALID_REGION_ID(REGION_ID(x)))
-
 #define __bpn_to_ba(x) ((((unsigned long)(x))<<PAGE_SHIFT) + KERNELBASE)
 #define __ba_to_bpn(x) ((((unsigned long)(x)) & ~REGION_MASK) >> PAGE_SHIFT)
 

@@ -115,15 +115,11 @@ static int __ste_allocate(unsigned long ea, struct mm_struct *mm)
 	unsigned char stab_entry;
 	unsigned long offset;
 
-	/* Check for invalid effective addresses. */
-	if (!IS_VALID_EA(ea))
-		return 1;
-
 	/* Kernel or user address? */
 	if (ea >= KERNELBASE) {
 		vsid = get_kernel_vsid(ea);
 	} else {
-		if (! mm)
+		if ((ea >= TASK_SIZE_USER64) || (! mm))
 			return 1;
 
 		vsid = get_vsid(mm->context.id, ea);

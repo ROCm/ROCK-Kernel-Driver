@@ -253,24 +253,24 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 	int local = 0;
 	cpumask_t tmp;
 
-	/* Check for invalid addresses. */
-	if (!IS_VALID_EA(ea))
-		return 1;
-
  	switch (REGION_ID(ea)) {
 	case USER_REGION_ID:
 		user_region = 1;
 		mm = current->mm;
-		if (mm == NULL)
+		if ((ea > USER_END) || (! mm))
 			return 1;
 
 		vsid = get_vsid(mm->context.id, ea);
 		break;
 	case IO_REGION_ID:
+		if (ea > IMALLOC_END)
+			return 1;
 		mm = &ioremap_mm;
 		vsid = get_kernel_vsid(ea);
 		break;
 	case VMALLOC_REGION_ID:
+		if (ea > VMALLOC_END)
+			return 1;
 		mm = &init_mm;
 		vsid = get_kernel_vsid(ea);
 		break;
