@@ -83,13 +83,12 @@ void __init setup_per_cpu_areas(void)
 
 	for (i = 0; i < NR_CPUS; i++) { 
 		unsigned char *ptr;
-		/* If possible allocate on the node of the CPU.
-		   In case it doesn't exist round-robin nodes. */
-		if (!NODE_DATA(i % numnodes)) { 
+
+		if (!NODE_DATA(cpu_to_node(i))) {
 			printk("cpu with no node %d, numnodes %d\n", i, numnodes);
 			ptr = alloc_bootmem(size);
 		} else { 
-			ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+			ptr = alloc_bootmem_node(NODE_DATA(cpu_to_node(i)), size);
 		}
 		if (!ptr)
 			panic("Cannot allocate cpu data for CPU %d\n", i);

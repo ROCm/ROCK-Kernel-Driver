@@ -152,15 +152,12 @@ void __init numa_init_array(void)
 	   CPUs, as the number of CPUs is not known yet. 
 	   We round robin the existing nodes. */
 	rr = 0;
-	for (i = 0; i < MAX_NUMNODES; i++) {
-		if (node_online(i))
-			continue;
+	for (i = 0; i < NR_CPUS; i++) {
 		if (cpu_to_node[i] != NUMA_NO_NODE)
 			continue;
 		rr = next_node(rr, node_online_map);
 		if (rr == MAX_NUMNODES)
 			rr = first_node(node_online_map);
-		node_data[i] = node_data[rr];
 		cpu_to_node[i] = rr;
 		rr++; 
 	}
