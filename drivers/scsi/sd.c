@@ -1197,7 +1197,7 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 		return;
 	}
 
-	buffer = kmalloc(512, GFP_DMA);
+	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer) {
 		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation "
 		       "failure.\n");

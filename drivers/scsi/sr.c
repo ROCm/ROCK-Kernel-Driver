@@ -604,7 +604,7 @@ static void get_sectorsize(struct scsi_cd *cd)
 	struct scsi_request *SRpnt = NULL;
 	request_queue_t *queue;
 
-	buffer = kmalloc(512, GFP_DMA);
+	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
 		goto Enomem;
 	SRpnt = scsi_allocate_request(cd->device);
@@ -698,7 +698,7 @@ Enomem:
 	goto out;
 }
 
-void get_capabilities(struct scsi_cd *cd)
+static void get_capabilities(struct scsi_cd *cd)
 {
 	struct cdrom_generic_command cgc;
 	unsigned char *buffer;
@@ -716,9 +716,8 @@ void get_capabilities(struct scsi_cd *cd)
 		""
 	};
 
-	buffer = kmalloc(512, GFP_DMA);
-	if (!buffer)
-	{
+	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
+	if (!buffer) {
 		printk(KERN_ERR "sr: out of memory.\n");
 		return;
 	}
