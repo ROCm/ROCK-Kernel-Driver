@@ -124,7 +124,7 @@ struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra)
 
         h = kmalloc(sizeof(struct hpsb_host) + extra, SLAB_KERNEL);
         if (!h) return NULL;
-        memset(h, 0, sizeof(struct hpsb_host));
+        memset(h, 0, sizeof(struct hpsb_host) + extra);
 
 	h->hostdata = h + 1;
         h->driver = drv;

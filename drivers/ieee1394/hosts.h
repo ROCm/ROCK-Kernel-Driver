@@ -31,6 +31,7 @@ struct hpsb_host {
         u32 tlabel_pool[2];
         struct semaphore tlabel_count;
         spinlock_t tlabel_lock;
+	u32 tlabel_current;
 
         unsigned char iso_listen_count[64];
 

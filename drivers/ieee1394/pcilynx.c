@@ -2,6 +2,7 @@
  * ti_pcilynx.c - Texas Instruments PCILynx driver
  * Copyright (C) 1999,2000 Andreas Bombe <andreas.bombe@munich.netsurf.de>,
  *                         Stephan Linz <linz@mazet.de>
+ *                         Manfred Weihs <weihs@ict.tuwien.ac.at>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,6 +42,8 @@
 #include "highlevel.h"
 #include "pcilynx.h"
 
+#include <linux/i2c.h>
+#include <linux/i2c-algo-bit.h>
 
 /* print general (card independent) information */
 #define PRINT_G(level, fmt, args...) printk(level "pcilynx: " fmt "\n" , ## args)
@@ -56,8 +59,84 @@
 #endif
 
 
+/* Module Parameters */
+MODULE_PARM(skip_eeprom,"i");
+MODULE_PARM_DESC(skip_eeprom, "Do not try to read bus info block from serial eeprom, but user generic one (default = 0).");
+static int skip_eeprom = 0;
+
+
 static struct hpsb_host_driver *lynx_driver;
 static unsigned int card_id;
+
+
+
+/*
+ * I2C stuff
+ */
+
+/* the i2c stuff was inspired by i2c-philips-par.c */
+
+static void bit_setscl(void *data, int state)
+{
+	if (state) {
+		  ((struct ti_lynx *) data)->i2c_driven_state |= 0x00000040;
+	} else {
+		  ((struct ti_lynx *) data)->i2c_driven_state &= ~0x00000040;
+	}
+	reg_write((struct ti_lynx *) data, SERIAL_EEPROM_CONTROL, ((struct ti_lynx *) data)->i2c_driven_state);
+}
+
+static void bit_setsda(void *data, int state)
+{
+	if (state) {
+		  ((struct ti_lynx *) data)->i2c_driven_state |= 0x00000010;
+	} else {
+		  ((struct ti_lynx *) data)->i2c_driven_state &= ~0x00000010;
+	}
+	reg_write((struct ti_lynx *) data, SERIAL_EEPROM_CONTROL, ((struct ti_lynx *) data)->i2c_driven_state);
+}
+
+static int bit_getscl(void *data)
+{
+	return reg_read((struct ti_lynx *) data, SERIAL_EEPROM_CONTROL) & 0x00000040;
+}
+
+static int bit_getsda(void *data)
+{
+	return reg_read((struct ti_lynx *) data, SERIAL_EEPROM_CONTROL) & 0x00000010;
+}
+
+static int bit_reg(struct i2c_client *client)
+{
+	return 0;
+}
+
+static int bit_unreg(struct i2c_client *client)
+{
+	return 0;
+}
+
+static struct i2c_algo_bit_data bit_data = {
+	NULL,
+	bit_setsda,
+	bit_setscl,
+	bit_getsda,
+	bit_getscl,
+	5, 5, 100,		/*	waits, timeout */
+}; 
+
+static struct i2c_adapter bit_ops = {
+	"PCILynx I2C adapter",
+	0xAA, //FIXME: probably we should get an id in i2c-id.h
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	bit_reg,
+	bit_unreg,
+};
+
+
 
 /*
  * PCL handling functions.
@@ -880,7 +959,7 @@ static ssize_t mem_read(struct file *file, char *buffer, size_t count,
         retval = copy_to_user(buffer, md->lynx->mem_dma_buffer, count);
         up(&md->lynx->mem_dma_mutex);
 
-        if (retval) return -EFAULT;
+        if (retval < 0) return retval;
         *offset += count;
         return count;
 }
@@ -1232,6 +1311,11 @@ static int __devinit add_card(struct pci_dev *dev,
         int i;
         int error;
 
+        /* needed for i2c communication with serial eeprom */
+        struct i2c_adapter i2c_adapter;
+        struct i2c_algo_bit_data i2c_adapter_data;
+
+        int got_valid_bus_info_block = 0; /* set to 1, if we were able to get a valid bus info block from serial eeprom */
 
         error = -ENXIO;
 
@@ -1492,6 +1576,94 @@ static int __devinit add_card(struct pci_dev *dev,
                 if (i != -1) set_phy_reg(lynx, 4, i | 0x40);
         }
 
+
+        if (!skip_eeprom)
+        {
+                i2c_adapter = bit_ops;
+                i2c_adapter_data = bit_data;
+                i2c_adapter.algo_data = &i2c_adapter_data;
+                i2c_adapter_data.data = lynx;
+
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                PRINT(KERN_DEBUG, lynx->id,"original eeprom control: %d",reg_read(lynx,SERIAL_EEPROM_CONTROL));
+#endif
+
+        	/* reset hardware to sane state */
+        	lynx->i2c_driven_state = 0x00000070;
+        	reg_write(lynx, SERIAL_EEPROM_CONTROL, lynx->i2c_driven_state);
+
+        	if (i2c_bit_add_bus(&i2c_adapter) < 0)
+        	{
+	        	PRINT(KERN_ERR, lynx->id,  "unable to register i2c");
+        	}
+        	else
+        	{
+                        /* do i2c stuff */
+                        unsigned char i2c_cmd = 0x10;
+                        struct i2c_msg msg[2] = { { 0x50, 0, 1, &i2c_cmd }, 
+                                                  { 0x50, I2C_M_RD, 20, (unsigned char*) lynx->config_rom }
+                                                };
+
+
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                        union i2c_smbus_data data;
+
+                        if (i2c_smbus_xfer(&i2c_adapter, 80, 0, I2C_SMBUS_WRITE, 0, I2C_SMBUS_BYTE,NULL))
+                                PRINT(KERN_ERR, lynx->id,"eeprom read start has failed");
+                        else
+                        {
+                                u16 addr;
+                                for (addr=0x00; addr < 0x100; addr++) {
+                                        if (i2c_smbus_xfer(&i2c_adapter, 80, 0, I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE,& data)) {
+                                                PRINT(KERN_ERR, lynx->id, "unable to read i2c %x", addr);
+                                                break;
+                                        }
+                                        else
+                                                PRINT(KERN_DEBUG, lynx->id,"got serial eeprom data at %x: %x",addr, data.byte);
+                                }
+                        }
+#endif
+
+                        /* we use i2c_transfer, because i2c_smbus_read_block_data does not work properly and we
+                           do it more efficiently in one transaction rather then using several reads */
+                        if (i2c_transfer(&i2c_adapter, msg, 2) < 0) {
+                                PRINT(KERN_ERR, lynx->id, "unable to read bus info block from i2c");
+                        } else {
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                                int i;
+#endif
+                                PRINT(KERN_INFO, lynx->id, "got bus info block from serial eeprom");
+                                /* FIXME: probably we shoud rewrite the max_rec, max_ROM(1394a), generation(1394a) and link_spd(1394a) field
+                                   and recalculate the CRC */
+
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+                                for (i=0; i < 5 ; i++)
+                                        PRINT(KERN_DEBUG, lynx->id, "Businfo block quadlet %i: %08x",i, be32_to_cpu(lynx->config_rom[i]));
+#endif
+
+                                /* info_length, crc_length and 1394 magic number to check, if it is really a bus info block */
+                                if (((be32_to_cpu(lynx->config_rom[0]) & 0xffff0000) == 0x04040000) &&
+                                    (lynx->config_rom[1] == __constant_cpu_to_be32(0x31333934)))
+                                {
+                                        PRINT(KERN_DEBUG, lynx->id, "read a valid bus info block from");
+                                        got_valid_bus_info_block = 1;
+                                } else {
+                                        PRINT(KERN_WARNING, lynx->id, "read something from serial eeprom, but it does not seem to be a valid bus info block");
+                                }
+
+                        }
+
+                        i2c_bit_del_bus(&i2c_adapter);
+                }
+        }
+
+        if (got_valid_bus_info_block) {
+                memcpy(lynx->config_rom+5,lynx_csr_rom+5,sizeof(lynx_csr_rom)-20);
+        } else {
+                PRINT(KERN_INFO, lynx->id, "since we did not get a bus info block from serial eeprom, we use a generic one with a hard coded GUID");
+                memcpy(lynx->config_rom,lynx_csr_rom,sizeof(lynx_csr_rom));
+        }
+
         hpsb_add_host(host);
         lynx->state = is_host;
 
@@ -1503,7 +1675,8 @@ static int __devinit add_card(struct pci_dev *dev,
 
 static size_t get_lynx_rom(struct hpsb_host *host, const quadlet_t **ptr)
 {
-        *ptr = lynx_csr_rom;
+        struct ti_lynx *lynx = host->hostdata;
+        *ptr = lynx->config_rom;
         return sizeof(lynx_csr_rom);
 }
 
