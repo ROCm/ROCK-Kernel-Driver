@@ -615,12 +615,21 @@ show_fan_div_reg(struct device *dev, char *buf, int nr)
 		       (long) DIV_FROM_REG(data->fan_div[nr - 1]));
 }
 
+/* Note: we save and restore the fan minimum here, because its value is
+   determined in part by the fan divisor.  This follows the principle of
+   least suprise; the user doesn't expect the fan minimum to change just
+   because the divisor changed. */
 static ssize_t
 store_regs_fan_div_1(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct w83781d_data *data = i2c_get_clientdata(client);
-	u32 reg;
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[0],
+			   DIV_FROM_REG(data->fan_div[0]));
 
 	data->fan_div[0] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
 				      data->type);
@@ -636,6 +645,10 @@ store_regs_fan_div_1(struct device *dev, const char *buf, size_t count)
 		w83781d_write_value(client, W83781D_REG_VBAT, reg);
 	}
 
+	/* Restore fan_min */
+	data->fan_min[0] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[0]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(1), data->fan_min[0]);
+
 	return count;
 }
 
@@ -644,7 +657,12 @@ store_regs_fan_div_2(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct w83781d_data *data = i2c_get_clientdata(client);
-	u32 reg;
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[1],
+			   DIV_FROM_REG(data->fan_div[1]));
 
 	data->fan_div[1] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
 				      data->type);
@@ -660,6 +678,10 @@ store_regs_fan_div_2(struct device *dev, const char *buf, size_t count)
 		w83781d_write_value(client, W83781D_REG_VBAT, reg);
 	}
 
+	/* Restore fan_min */
+	data->fan_min[1] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[1]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(2), data->fan_min[1]);
+
 	return count;
 }
 
@@ -668,7 +690,12 @@ store_regs_fan_div_3(struct device *dev, const char *buf, size_t count)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct w83781d_data *data = i2c_get_clientdata(client);
-	u32 reg;
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[2],
+			   DIV_FROM_REG(data->fan_div[2]));
 
 	data->fan_div[2] = DIV_TO_REG(simple_strtoul(buf, NULL, 10),
 				      data->type);
@@ -683,6 +710,10 @@ store_regs_fan_div_3(struct device *dev, const char *buf, size_t count)
 		reg |= (data->fan_div[2] & 0x04) << 5;
 		w83781d_write_value(client, W83781D_REG_VBAT, reg);
 	}
+
+	/* Restore fan_min */
+	data->fan_min[2] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[2]));
+	w83781d_write_value(client, W83781D_REG_FAN_MIN(3), data->fan_min[2]);
 
 	return count;
 }
