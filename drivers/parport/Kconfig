@@ -102,7 +102,7 @@ config PARPORT_AMIGA
 
 config PARPORT_MFC3
 	tristate "Multiface III parallel port"
-	depends on AMIGA && ZORRO && PARPORT
+	depends on ZORRO && PARPORT
 	help
 	  Say Y here if you need parallel port support for the MFC3 card.
 	  This code is also available as a module (say M), called
