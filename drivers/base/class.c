@@ -148,9 +148,6 @@ static void class_device_driver_unlink(struct class_device * class_dev)
 }
 
 
-#define to_class_dev(obj) container_of(obj,struct class_device,kobj)
-#define to_class_dev_attr(_attr) container_of(_attr,struct class_device_attribute,attr)
-
 static ssize_t
 class_device_attr_show(struct kobject * kobj, struct attribute * attr,
 		       char * buf)
@@ -182,7 +179,15 @@ static struct sysfs_ops class_dev_sysfs_ops = {
 	.store	= class_device_attr_store,
 };
 
+static void class_dev_release(struct kobject * kobj)
+{
+	struct class_device *class_dev = to_class_dev(kobj);
+	if (class_dev->release)
+		class_dev->release(class_dev);
+}
+
 static struct kobj_type ktype_class_device = {
+	.release	= &class_dev_release,
 	.sysfs_ops	= &class_dev_sysfs_ops,
 };
 
