@@ -90,9 +90,9 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		if (!S_ISBLK(inode->i_mode)) {
 			if (hlist_unhashed(&inode->i_hash))
 				goto out;
-			if (inode->i_state & (I_FREEING|I_CLEAR))
-				goto out;
 		}
+		if (inode->i_state & (I_FREEING|I_CLEAR))
+			goto out;
 
 		/*
 		 * If the inode was already on s_dirty or s_io, don't
