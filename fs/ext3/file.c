@@ -58,8 +58,9 @@ static int ext3_open_file (struct inode * inode, struct file * filp)
  */
 
 static ssize_t
-ext3_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
+ext3_file_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
 {
+	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode;
 
 	/*
@@ -72,13 +73,15 @@ ext3_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (IS_SYNC(inode) || (file->f_flags & O_SYNC))
 		mark_inode_dirty(inode);
 
-	return generic_file_write(file, buf, count, ppos);
+	return generic_file_aio_write(iocb, buf, count, pos);
 }
 
 struct file_operations ext3_file_operations = {
 	.llseek		= generic_file_llseek,
-	.read		= generic_file_read,
-	.write		= ext3_file_write,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
+	.aio_read		= generic_file_aio_read,
+	.aio_write		= ext3_file_write,
 	.readv		= generic_file_readv,
 	.writev		= generic_file_writev,
 	.ioctl		= ext3_ioctl,

@@ -935,6 +935,7 @@ static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 
 	req->ki_user_obj = user_iocb;
 	req->ki_user_data = iocb->aio_data;
+	req->ki_pos = iocb->aio_offset;
 
 	buf = (char *)(unsigned long)iocb->aio_buf;
 
@@ -949,7 +950,7 @@ static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 		ret = -EINVAL;
 		if (file->f_op->aio_read)
 			ret = file->f_op->aio_read(req, buf,
-					iocb->aio_nbytes, iocb->aio_offset);
+					iocb->aio_nbytes, req->ki_pos);
 		break;
 	case IOCB_CMD_PWRITE:
 		ret = -EBADF;
@@ -961,7 +962,7 @@ static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 		ret = -EINVAL;
 		if (file->f_op->aio_write)
 			ret = file->f_op->aio_write(req, buf,
-					iocb->aio_nbytes, iocb->aio_offset);
+					iocb->aio_nbytes, req->ki_pos);
 		break;
 	case IOCB_CMD_FDSYNC:
 		ret = -EINVAL;
