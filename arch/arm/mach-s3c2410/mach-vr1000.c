@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-vr1000.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * Machine support for Thorcom VR1000 board. Designed for Thorcom by
@@ -18,9 +18,11 @@
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
  *     18-Oct-2004 BJD  Updated board struct
  *     04-Nov-2004 BJD  Clock and serial configuration update
+ *
  *     04-Jan-2005 BJD  Updated uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
  *     14-Jan-2005 BJD  Added clock init
+ *     15-Jan-2005 BJD  Add serial port device definition
 */
 
 #include <linux/kernel.h>
@@ -30,12 +32,19 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 
+#include <linux/serial.h>
+#include <linux/tty.h>
+#include <linux/serial_8250.h>
+#include <linux/serial_reg.h>
+
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
 #include <asm/arch/bast-map.h>
 #include <asm/arch/vr1000-map.h>
+#include <asm/arch/vr1000-irq.h>
+#include <asm/arch/vr1000-cpld.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -68,6 +77,10 @@ static struct map_desc vr1000_iodesc[] __initdata = {
 
   { S3C2410_VA_ISA_BYTE, PA_CS2(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
   { S3C2410_VA_ISA_WORD, PA_CS3(BAST_PA_ISAIO),	   SZ_16M, MT_DEVICE },
+
+  /* serial ports */
+
+  { VR1000_VA_SERIAL,	 VR1000_PA_SERIAL,	   SZ_1M, MT_DEVICE },
 
   /* we could possibly compress the next set down into a set of smaller tables
    * pagetables, but that would mean using an L2 section, and it still means
@@ -166,12 +179,68 @@ static struct s3c2410_uartcfg vr1000_uartcfgs[] = {
 	}
 };
 
+/* definitions for the vr1000 extra 16550 serial ports */
+
+#define VR1000_BAUDBASE (3692307)
+
+#define VR1000_SERIAL_MEMBASE(x) ((void __iomem *)VR1000_VA_SERIAL + 0x80 + ((x) << 5))
+#define VR1000_SERIAL_MAPBASE(x) (VR1000_PA_SERIAL + 0x80 + ((x) << 5))
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	[0] = {
+		.membase	= VR1000_SERIAL_MEMBASE(0),
+		.mapbase	= VR1000_SERIAL_MAPBASE(0),
+		.irq		= IRQ_VR1000_SERIAL + 0,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[1] = {
+		.membase	= VR1000_SERIAL_MEMBASE(1),
+		.mapbase	= VR1000_SERIAL_MAPBASE(1),
+		.irq		= IRQ_VR1000_SERIAL + 1,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[2] = {
+		.membase	= VR1000_SERIAL_MEMBASE(2),
+		.mapbase	= VR1000_SERIAL_MAPBASE(2),
+		.irq		= IRQ_VR1000_SERIAL + 2,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	[3] = {
+		.membase	= VR1000_SERIAL_MEMBASE(3),
+		.mapbase	= VR1000_SERIAL_MAPBASE(3),
+		.irq		= IRQ_VR1000_SERIAL + 3,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.iotype		= UPIO_MEM,
+		.regshift	= 0,
+		.uartclk	= VR1000_BAUDBASE,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
 static struct platform_device *vr1000_devices[] __initdata = {
 	&s3c_device_usb,
 	&s3c_device_lcd,
 	&s3c_device_wdt,
 	&s3c_device_i2c,
 	&s3c_device_iis,
+	&serial_device,
 };
 
 static struct clk *vr1000_clocks[] = {
