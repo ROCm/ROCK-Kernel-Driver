@@ -37,7 +37,7 @@
 
 static int verbose = 0;
 static int port = 0x91;
-static volatile int ticks = 10000;
+static int ticks = 10000;
 
 #define PFX			"cpu5wdt: "
 
@@ -61,7 +61,6 @@ static struct {
 	struct timer_list timer;
 	volatile int queue;
 	int default_ticks;
-	int min_ticks;
 	unsigned long inuse;
 } cpu5wdt_device;
 
@@ -92,9 +91,6 @@ static void cpu5wdt_trigger(unsigned long unused)
 
 static void cpu5wdt_reset(void)
 {
-	if ( ticks < cpu5wdt_device.min_ticks )
-		cpu5wdt_device.min_ticks = ticks;
-
 	ticks = cpu5wdt_device.default_ticks;
 
 	if ( verbose )
@@ -137,8 +133,8 @@ static int cpu5wdt_open(struct inode *inode, struct file *file)
 {
 	if ( test_and_set_bit(0, &cpu5wdt_device.inuse) )
 		return -EBUSY;
-	return 0;
 
+	return 0;
 }
 
 static int cpu5wdt_release(struct inode *inode, struct file *file)
@@ -195,8 +191,8 @@ static ssize_t cpu5wdt_write(struct file *file, const char *buf, size_t count, l
 		return -EIO;
 
 	cpu5wdt_reset();
-	return count;
 
+	return count;
 }
 
 static struct file_operations cpu5wdt_fops = {
@@ -242,7 +238,6 @@ static int __devinit cpu5wdt_init(void)
 
 	init_MUTEX_LOCKED(&cpu5wdt_device.stop);
 	cpu5wdt_device.queue = 0;
-	cpu5wdt_device.min_ticks = ticks;
 
 	clear_bit(0, &cpu5wdt_device.inuse);
 
