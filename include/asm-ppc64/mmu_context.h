@@ -175,8 +175,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 #define activate_mm(active_mm, mm) \
 	switch_mm(active_mm, mm, current);
 
-#define VSID_RANDOMIZER 42470972311
-#define VSID_MASK	0xfffffffff
+#define VSID_RANDOMIZER 42470972311UL
+#define VSID_MASK	0xfffffffffUL
 
 
 /* This is only valid for kernel (including vmalloc, imalloc and bolted) EA's
