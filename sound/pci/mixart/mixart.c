@@ -123,12 +123,8 @@ static int mixart_set_pipe_state(mixart_mgr_t *mgr, mixart_pipe_t* pipe, int sta
 	request.size = sizeof(group_state);
 
 	err = snd_mixart_send_msg(mgr, &request, sizeof(group_state_resp), &group_state_resp);
-	if(err) {
-		snd_printk(KERN_ERR "error MSG_STREAM_ST***_STREAM_GRP_PACKET\n");
-		return err;
-	}
-	if(group_state_resp.txx_status != 0) {
-		snd_printk(KERN_ERR "error status MSG_STREAM_ST***_STREAM_GRP_PACKET (%x)!\n", group_state_resp.txx_status);
+	if (err < 0 || group_state_resp.txx_status != 0) {
+		snd_printk(KERN_ERR "error MSG_STREAM_ST***_STREAM_GRP_PACKET err=%x stat=%x !\n", err, group_state_resp.txx_status);
 		return -EINVAL;
 	}
 
@@ -138,13 +134,9 @@ static int mixart_set_pipe_state(mixart_mgr_t *mgr, mixart_pipe_t* pipe, int sta
 		group_state.pipe_count = 0; /* in case of start same command once again with pipe_count=0 */
 
 		err = snd_mixart_send_msg(mgr, &request, sizeof(group_state_resp), &group_state_resp);
-		if(err)	{
-			snd_printk(KERN_ERR "error MSG_STREAM_START_STREAM_GRP_PACKET !\n");
-			return err;
-		}
-		if(group_state_resp.txx_status != 0) {
-			snd_printk(KERN_ERR "error status MSG_STREAM_START_STREAM_GRP_PACKET (%x)!\n", group_state_resp.txx_status);
-			return -EINVAL;
+		if (err < 0 || group_state_resp.txx_status != 0) {
+			snd_printk(KERN_ERR "error MSG_STREAM_START_STREAM_GRP_PACKET err=%x stat=%x !\n", err, group_state_resp.txx_status);
+ 			return -EINVAL;
 		}
 
 		/* in case of start send a synchro top */
@@ -155,12 +147,9 @@ static int mixart_set_pipe_state(mixart_mgr_t *mgr, mixart_pipe_t* pipe, int sta
 		request.size = 0;
 
 		err = snd_mixart_send_msg(mgr, &request, sizeof(stat), &stat);
-		if(err) {
-			snd_printk(KERN_ERR "error MSG_SYSTEM_SEND_SYNCHRO_CMD!\n");
-			return err;
-		}
-		if(stat) {
-			snd_printk(KERN_ERR "error MSG_SYSTEM_SEND_SYNCHRO_CMD stat=%x!\n", stat);
+		if (err < 0 || stat != 0) {
+			snd_printk(KERN_ERR "error MSG_SYSTEM_SEND_SYNCHRO_CMD err=%x stat=%x !\n", err, stat);
+			return -EINVAL;
 		}
 
 		pipe->status = PIPE_RUNNING;
@@ -176,6 +165,8 @@ static int mixart_set_clock(mixart_mgr_t *mgr, mixart_pipe_t *pipe, unsigned int
 {
 	mixart_msg_t request;
 	mixart_clock_properties_t clock_properties;
+	mixart_clock_properties_resp_t clock_prop_resp;
+	int err;
 
 	switch(pipe->status) {
 	case PIPE_CLOCK_SET:
@@ -206,13 +197,16 @@ static int mixart_set_clock(mixart_mgr_t *mgr, mixart_pipe_t *pipe, unsigned int
 	request.data = &clock_properties;
 	request.size = sizeof(clock_properties);
 
-	/* we are not allowed to wait for the response, so simply set rate */
-	/* TODO : error has to be handled later in the tasklet! */
+	err = snd_mixart_send_msg(mgr, &request, sizeof(clock_prop_resp), &clock_prop_resp);
+	if (err < 0 || clock_prop_resp.status != 0 || clock_prop_resp.clock_mode != CM_STANDALONE) {
+		snd_printk(KERN_ERR "error MSG_CLOCK_SET_PROPERTIES err=%x stat=%x mod=%x !\n", err, clock_prop_resp.status, clock_prop_resp.clock_mode);
+		return -EINVAL;
+	}
 
 	if(rate)  pipe->status = PIPE_CLOCK_SET;
 	else      pipe->status = PIPE_RUNNING;
 
-	return snd_mixart_send_msg_nonblock(mgr, &request);
+	return 0;
 }
 
 
@@ -295,7 +289,7 @@ mixart_pipe_t* snd_mixart_add_ref_pipe( mixart_t *chip, int pcm_number, int capt
 
 		err = snd_mixart_send_msg(chip->mgr, &request, sizeof(streaming_group_resp), &streaming_group_resp);
 		if((err < 0) || (streaming_group_resp.status != 0)) {
-			snd_printk(KERN_ERR "message MSG_STREAM_ADD_**PUT_GROUP return error: err(%x) status(%x)!\n", err, streaming_group_resp.status);
+			snd_printk(KERN_ERR "error MSG_STREAM_ADD_**PUT_GROUP err=%x stat=%x !\n", err, streaming_group_resp.status);
 			return NULL;
 		}
 
@@ -406,7 +400,6 @@ static int snd_mixart_trigger(snd_pcm_substream_t *subs, int cmd)
 
 		snd_printdd("SNDRV_PCM_TRIGGER_START\n");
 
-		// snd_printk(KERN_DEBUG "hw_avail = %d\n", snd_pcm_playback_hw_avail(subs->runtime));
 		/* START_STREAM */
 		if( mixart_set_stream_state(stream, 1) )
 			return -EINVAL;
@@ -420,7 +413,6 @@ static int snd_mixart_trigger(snd_pcm_substream_t *subs, int cmd)
 		if( mixart_set_stream_state(stream, 0) )
 			return -EINVAL;
 
-		/* TODO : mixart drains data transefered in advance -> mute stream ? */
 		stream->status = MIXART_STREAM_STATUS_OPEN;
 
 		snd_printdd("SNDRV_PCM_TRIGGER_STOP\n");
@@ -443,8 +435,24 @@ static int snd_mixart_trigger(snd_pcm_substream_t *subs, int cmd)
 	return 0;
 }
 
+static int mixart_sync_nonblock_events(mixart_mgr_t *mgr)
+{
+	int timeout = HZ;
+	while (atomic_read(&mgr->msg_processed) > 0) {
+		if (! timeout--) {
+			snd_printk(KERN_ERR "mixart: cannot process nonblock events!\n");
+			return -EBUSY;
+		}
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+	}
+	return 0;
+}
+
 /*
  *  prepare callback for all pcms
+ *
+ *  NOTE: this callback is non-atomic (pcm->info_flags |= SNDRV_PCM_INFO_NONATOMIC_OPS)
  */
 static int snd_mixart_prepare(snd_pcm_substream_t *subs)
 {
@@ -454,6 +462,8 @@ static int snd_mixart_prepare(snd_pcm_substream_t *subs)
 	/* TODO de façon non bloquante, réappliquer les hw_params (rate, bits, codec) */
 
 	snd_printdd("snd_mixart_prepare\n");
+
+	mixart_sync_nonblock_events(chip->mgr);
 
 	/* only the first stream can choose the sample rate */
 	/* the further opened streams will be limited to its frequency (see open) */
@@ -519,9 +529,8 @@ static int mixart_set_format(mixart_stream_t *stream, snd_pcm_format_t format)
 		stream_param.sample_size = 32;
 		break;
 	default:
-		snd_printk(KERN_DEBUG "error use default SNDRV_PCM_FORMAT_S16_LE\n");
-		stream_param.sample_type = ST_INTEGER_16LE;
-		stream_param.sample_size = 16;
+		snd_printk(KERN_ERR "error mixart_set_format() : unknown format\n");
+		return -EINVAL;
 	}
 
 	snd_printdd("set SNDRV_PCM_FORMAT sample_type(%d) sample_size(%d) freq(%d) channels(%d)\n",
@@ -544,7 +553,7 @@ static int mixart_set_format(mixart_stream_t *stream, snd_pcm_format_t format)
 
 	err = snd_mixart_send_msg(chip->mgr, &request, sizeof(resp), &resp);
 	if((err < 0) || resp.error_code) {
-		snd_printk(KERN_DEBUG "MSG_STREAM_SET_INPUT_STAGE_PARAM err=%x; resp=%x\n", err, resp.error_code);
+		snd_printk(KERN_ERR "MSG_STREAM_SET_INPUT_STAGE_PARAM err=%x; resp=%x\n", err, resp.error_code);
 		return -EINVAL;
 	}
 	return 0;
@@ -586,7 +595,6 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 	/* set the format to the board */
 	err = mixart_set_format(stream, format);
 	if(err < 0) {
-		snd_printk(KERN_DEBUG "mixart_set_format() returned error (%x)\n", err);
 		return err;
 	}
 
@@ -611,7 +619,9 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 
 static int snd_mixart_hw_free(snd_pcm_substream_t *subs)
 {
+	mixart_t *chip = snd_pcm_substream_chip(subs);
 	snd_pcm_lib_free_pages(subs);
+	mixart_sync_nonblock_events(chip->mgr);
 	return 0;
 }
 
@@ -916,7 +926,7 @@ static int snd_mixart_pcm_analog(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = 0;
+	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
@@ -947,7 +957,7 @@ static int snd_mixart_pcm_digital(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = 0;
+	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
@@ -1318,6 +1328,8 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 
 	mgr->msg_lock = SPIN_LOCK_UNLOCKED;
 	init_MUTEX(&mgr->msg_mutex);
+	init_waitqueue_head(&mgr->msg_sleep);
+	atomic_set(&mgr->msg_processed, 0);
 
 	/* init setup mutex*/
 	init_MUTEX(&mgr->setup_mutex);
