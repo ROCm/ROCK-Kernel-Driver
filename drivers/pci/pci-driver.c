@@ -90,7 +90,11 @@ static int pci_device_resume(struct device * dev, u32 level)
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 
 	if (pci_dev->driver) {
-		if (level == RESUME_POWER_ON && pci_dev->driver->resume)
+		/* We may not call PCI drivers resume at
+		   RESUME_POWER_ON because interrupts are not yet
+		   working at that point. Calling resume at
+		   RESUME_RESTORE_STATE seems like solution. */
+		if (level == RESUME_RESTORE_STATE && pci_dev->driver->resume)
 			pci_dev->driver->resume(pci_dev);
 	}
 	return 0;
