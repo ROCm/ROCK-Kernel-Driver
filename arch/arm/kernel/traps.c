@@ -528,7 +528,7 @@ EXPORT_SYMBOL(__bug);
 
 void __readwrite_bug(const char *fn)
 {
-	printk("%s called, but not implemented", fn);
+	printk("%s called, but not implemented\n", fn);
 	BUG();
 }
 EXPORT_SYMBOL(__readwrite_bug);
