@@ -18,6 +18,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/compiler.h>
 
 #if BITS_PER_LONG == 64
 
@@ -31,12 +32,12 @@
 
 #elif BITS_PER_LONG == 32
 
-extern uint32_t __div64_32(uint64_t *dividend, uint32_t divisor);
+extern uint32_t __div64_32(uint64_t *dividend, uint32_t divisor) __attribute_pure__;
 
 # define do_div(n,base) ({				\
 	uint32_t __base = (base);			\
 	uint32_t __rem;					\
-	if (((n) >> 32) == 0) {				\
+	if (likely(((n) >> 32) == 0)) {			\
 		__rem = (uint32_t)(n) % __base;		\
 		(n) = (uint32_t)(n) / __base;		\
 	} else 						\

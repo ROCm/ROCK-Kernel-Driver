@@ -56,6 +56,24 @@
 #define __attribute_used__	__attribute__((__unused__))
 #endif
 
+/*
+ * From the GCC manual:
+ *
+ * Many functions have no effects except the return value and their
+ * return value depends only on the parameters and/or global
+ * variables.  Such a function can be subject to common subexpression
+ * elimination and loop optimization just as an arithmetic operator
+ * would be.
+ * [...]
+ * The attribute `pure' is not implemented in GCC versions earlier
+ * than 2.96.
+ */
+#if (__GNUC__ == 2 && __GNUC_MINOR >= 96) || __GNUC__ > 2
+#define __attribute_pure__	__attribute__((pure))
+#else
+#define __attribute_pure__	/* unimplemented */
+#endif
+
 /* This macro obfuscates arithmetic on a variable address so that gcc
    shouldn't recognize the original var, and make assumptions about it */
 #define RELOC_HIDE(ptr, off)					\
