@@ -182,14 +182,14 @@ struct keyspan_usa90_portStatusMessage
 
 // MSR bits
 
-#define MSR_dCTS	  		0x01		// CTS has changed since last report	
-#define MSR_dDSR	  		0x02
-#define MSR_dRI				0x04
-#define MSR_dDCD	  		0x08
+#define USA_MSR_dCTS	  		0x01		// CTS has changed since last report	
+#define USA_MSR_dDSR	  		0x02
+#define USA_MSR_dRI			0x04
+#define USA_MSR_dDCD	  		0x08
 
-#define MSR_CTS				0x10	  	// current state of CTS
-#define MSR_DSR				0x20
-#define MSR_RI				0x40
+#define USA_MSR_CTS			0x10	  	// current state of CTS
+#define USA_MSR_DSR			0x20
+#define USA_USA_MSR_RI			0x40
 #define MSR_DCD				0x80
 
 // ie: the maximum length of an endpoint buffer
