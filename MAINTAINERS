@@ -1909,6 +1909,24 @@ P:	Jeff Garzik
 L:	linux-via@gtf.org
 S:	Odd fixes
 
+UCLINUX
+P:	Greg Ungerer
+M:	gerg@snapgear.com
+P:	David McCullough
+M:	davidm@snapgear.com
+P:	D. Jeff Dionne (created first uClinux port)
+M:	jeff@uclinux.org
+W:	http://www.uclinux.org/
+L:	uclinux-dev@uclinux.org
+S:	Maintained
+
+UCLINUX FOR NEC V850
+P:	Miles Bader
+M:	uclinux-v850@lsi.nec.co.jp
+W:	http://www.ic.nec.co.jp/micro/uclinux/eng/
+W:	http://www.ee.nec.de/uclinux/
+S:	Supported
+
 USB DIAMOND RIO500 DRIVER
 P:	Cesar Miquel
 M:	miquel@df.uba.ar
