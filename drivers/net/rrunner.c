@@ -1139,6 +1139,49 @@ static irqreturn_t rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	return IRQ_HANDLED;
 }
 
+static inline void rr_raz_tx(struct rr_private *rrpriv,
+			     struct net_device *dev)
+{
+	int i;
+
+	for (i = 0; i < TX_RING_ENTRIES; i++) {
+		struct sk_buff *skb = rrpriv->tx_skbuff[i];
+
+		if (skb) {
+			struct tx_desc *desc = &(rrpriv->tx_ring[i]);
+
+	        	pci_unmap_single(rrpriv->pci_dev, desc->addr.addrlo,
+				skb->len, PCI_DMA_TODEVICE);
+			desc->size = 0;
+			set_rraddr(&desc->addr, 0);
+			dev_kfree_skb(skb);
+			rrpriv->tx_skbuff[i] = NULL;
+		}
+	}
+}
+
+
+static inline void rr_raz_rx(struct rr_private *rrpriv,
+			     struct net_device *dev)
+{
+	int i;
+
+	for (i = 0; i < RX_RING_ENTRIES; i++) {
+		struct sk_buff *skb = rrpriv->rx_skbuff[i];
+
+		if (skb) {
+			struct rx_desc *desc = &(rrpriv->rx_ring[i]);
+
+	        	pci_unmap_single(rrpriv->pci_dev, desc->addr.addrlo,
+				dev->mtu + HIPPI_HLEN, PCI_DMA_FROMDEVICE);
+			desc->size = 0;
+			set_rraddr(&desc->addr, 0);
+			dev_kfree_skb(skb);
+			rrpriv->rx_skbuff[i] = NULL;
+		}
+	}
+}
+
 static void rr_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
@@ -1253,49 +1296,6 @@ static int rr_open(struct net_device *dev)
 	return ecode;
 }
 
-
-static inline void rr_raz_tx(struct rr_private *rrpriv, 
-			     struct net_device *dev)
-{
-	int i;
-
-	for (i = 0; i < TX_RING_ENTRIES; i++) {
-		struct sk_buff *skb = rrpriv->tx_skbuff[i];
-
-		if (skb) {
-			struct tx_desc *desc = &(rrpriv->tx_ring[i]);
-
-	        	pci_unmap_single(rrpriv->pci_dev, desc->addr.addrlo, 
-				skb->len, PCI_DMA_TODEVICE);
-			desc->size = 0;
-			set_rraddr(&desc->addr, 0);
-			dev_kfree_skb(skb);
-			rrpriv->tx_skbuff[i] = NULL;
-		}
-	}
-}
-
-
-static inline void rr_raz_rx(struct rr_private *rrpriv, 
-			     struct net_device *dev)
-{
-	int i;
-
-	for (i = 0; i < RX_RING_ENTRIES; i++) {
-		struct sk_buff *skb = rrpriv->rx_skbuff[i];
-
-		if (skb) {
-			struct rx_desc *desc = &(rrpriv->rx_ring[i]);
-
-	        	pci_unmap_single(rrpriv->pci_dev, desc->addr.addrlo, 
-				dev->mtu + HIPPI_HLEN, PCI_DMA_FROMDEVICE);
-			desc->size = 0;
-			set_rraddr(&desc->addr, 0);
-			dev_kfree_skb(skb);
-			rrpriv->rx_skbuff[i] = NULL;
-		}
-	}
-}
 
 static void rr_dump(struct net_device *dev)
 {
