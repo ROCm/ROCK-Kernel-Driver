@@ -106,75 +106,75 @@ $(obj)/mad_static.o: $(obj)/smp_access.h $(obj)/smp_types.h
 $(ib_cm-objs:%=$(obj)/%): $(obj)/cm_packet.h
 
 quiet_cmd_gendecode = GEN     $@
-      cmd_gendecode = $(PERL) $(src)/generate_pkt_access.pl $(FTYPE) \
+      cmd_gendecode = $(PERL) $(srctree)/$(src)/generate_pkt_access.pl $(FTYPE) \
                       $< > $@ || ( rm -f $@ && exit 1 )
 
 targets += smp_access.h
 $(obj)/smp_access.h: FTYPE := header
-smp_access.h: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_access.h: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += smp_types.h
 $(obj)/smp_types.h: FTYPE := type
-smp_types.h: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_types.h: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += smp_access.c
 $(obj)/smp_access.c: FTYPE := access
-smp_access.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_access.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += smp_conv.c
 $(obj)/smp_conv.c: FTYPE := conv
-smp_conv.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_conv.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += smp_print.c
 $(obj)/smp_print.c: FTYPE := print
-smp_print.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_print.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += smp_export.c
 $(obj)/smp_export.c: FTYPE := export
-smp_export.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/smp_export.c: $(src)/smp_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_access.h
 $(obj)/pm_access.h: FTYPE := header
-pm_access.h: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_access.h: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_types.h
 $(obj)/pm_types.h: FTYPE := type
-pm_types.h: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_types.h: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_access.c
 $(obj)/pm_access.c: FTYPE := access
-pm_access.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_access.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_conv.c
 $(obj)/pm_conv.c: FTYPE := conv
-pm_conv.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_conv.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_print.c
 $(obj)/pm_print.c: FTYPE := print
-pm_print.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_print.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 targets += pm_export.c
 $(obj)/pm_export.c: FTYPE := export
-pm_export.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
+$(obj)/pm_export.c: $(src)/pm_packet.desc $(src)/generate_pkt_access.pl FORCE
 	$(call if_changed,gendecode)
 
 quiet_cmd_gencmpkt = GEN     $@
-      cmd_gencmpkt = $(PERL) $(src)/generate_cm_packet.pl $(FTYPE) \
+      cmd_gencmpkt = $(PERL) $(srctree)/$(src)/generate_cm_packet.pl $(FTYPE) \
                      $(src)/cm_packet_type.desc > $@ || ( rm -f $@ && exit 1 )
 
 targets += cm_packet.h
-cm_packet.h: $(src)/generate_cm_packet.pl $(src)/cm_packet_type.desc FORCE
+$(obj)/cm_packet.h: $(src)/generate_cm_packet.pl $(src)/cm_packet_type.desc FORCE
 	$(call if_changed,gencmpkt)
 
 clean-files := \
