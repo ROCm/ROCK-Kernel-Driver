@@ -140,9 +140,6 @@ EXPORT_SYMBOL(get_user_pages);
 /* filesystem internal functions */
 EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
-EXPORT_SYMBOL(user_get_super);
-EXPORT_SYMBOL(get_super);
-EXPORT_SYMBOL(drop_super);
 EXPORT_SYMBOL(fput);
 EXPORT_SYMBOL(fget);
 EXPORT_SYMBOL(igrab);
@@ -202,16 +199,6 @@ EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(fd_install);
 EXPORT_SYMBOL(put_unused_fd);
-EXPORT_SYMBOL(get_sb_bdev);
-EXPORT_SYMBOL(kill_block_super);
-EXPORT_SYMBOL(get_sb_nodev);
-EXPORT_SYMBOL(get_sb_single);
-EXPORT_SYMBOL(kill_anon_super);
-EXPORT_SYMBOL(kill_litter_super);
-EXPORT_SYMBOL(generic_shutdown_super);
-EXPORT_SYMBOL(deactivate_super);
-EXPORT_SYMBOL(sget);
-EXPORT_SYMBOL(set_anon_super);
 EXPORT_SYMBOL(do_select);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
@@ -239,7 +226,6 @@ EXPORT_SYMBOL(tty_flip_buffer_push);
 /* filesystem registration */
 EXPORT_SYMBOL(register_filesystem);
 EXPORT_SYMBOL(unregister_filesystem);
-EXPORT_SYMBOL(kern_mount);
 EXPORT_SYMBOL(__mntput);
 EXPORT_SYMBOL(may_umount);
 
