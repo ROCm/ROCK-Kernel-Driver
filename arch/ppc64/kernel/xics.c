@@ -25,6 +25,7 @@
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/hvcall.h>
+#include <asm/machdep.h>
 
 #include "i8259.h"
 
