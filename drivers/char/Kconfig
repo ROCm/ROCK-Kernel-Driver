@@ -1002,6 +1002,7 @@ config RAW_DRIVER
 
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"
+	depends on X86_64 || X86
 	help
 	  The hangcheck-timer module detects when the system has gone
 	  out to lunch past a certain margin.  It can reboot the system
