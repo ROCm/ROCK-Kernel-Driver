@@ -289,7 +289,10 @@ export CPPFLAGS NOSTDINC_FLAGS OBJCOPYFLAGS LDFLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
-export MODVERDIR := .tmp_versions
+# When compiling out-of-tree modules, put MODVERDIR in the module source
+# tree rather than in the kernel source tree. The kernel source tree might
+# even be read-only.
+export MODVERDIR := $(shell D="$(firstword $(SUBDIRS))"; test "$${D:0:1}" = / -a "$${D\#$$PWD}" = "$$D" && echo "$$D/").tmp_versions
 
 # The temporary file to save gcc -MD generated dependencies must not
 # contain a comma
@@ -1041,12 +1044,13 @@ define filechk
 	@set -e;				\
 	echo '  CHK     $@';			\
 	mkdir -p $(dir $@);			\
-	$(filechk_$(1)) < $< > $@.tmp;		\
-	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
-		rm -f $@.tmp;			\
+	tmp=$$(/bin/mktemp /tmp/kbuild.XXXXXX);	\
+	$(filechk_$(1)) < $< > $$tmp;		\
+	if [ -r $@ ] && cmp -s $@ $$tmp; then	\
+		rm -f $$tmp;			\
 	else					\
 		echo '  UPD     $@';		\
-		mv -f $@.tmp $@;		\
+		mv -f $$tmp $@;		\
 	fi
 endef
 
