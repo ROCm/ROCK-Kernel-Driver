@@ -52,7 +52,8 @@ static unsigned int fib_hash_size;
 static unsigned int fib_info_cnt;
 
 #define DEVINDEX_HASHBITS 8
-static struct hlist_head fib_info_devhash[DEVINDEX_HASHBITS];
+#define DEVINDEX_HASHSIZE (1U << DEVINDEX_HASHBITS)
+static struct hlist_head fib_info_devhash[DEVINDEX_HASHSIZE];
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
@@ -229,7 +230,7 @@ static struct fib_info *fib_find_info(const struct fib_info *nfi)
 
 static inline unsigned int fib_devindex_hashfn(unsigned int val)
 {
-	unsigned int mask = ((1U << DEVINDEX_HASHBITS) - 1);
+	unsigned int mask = DEVINDEX_HASHSIZE - 1;
 
 	return (val ^
 		(val >> DEVINDEX_HASHBITS) ^
@@ -1040,9 +1041,7 @@ int fib_sync_down(u32 local, struct net_device *dev, int force)
 	if (force)
 		scope = -1;
 
-	BUG_ON(!fib_info_laddrhash);
-
-	if (local) {
+	if (local && fib_info_laddrhash) {
 		unsigned int hash = fib_laddr_hashfn(local);
 		struct hlist_head *head = &fib_info_laddrhash[hash];
 		struct hlist_node *node;
