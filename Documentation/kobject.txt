@@ -9,7 +9,7 @@ Patrick Mochel <mochel@osdl.org>
 
 The kobject infrastructure performs basic object management that larger
 data structures and subsystems can leverage, rather than reimplement
-similar functionality. This functionality consists primarily concerns:
+similar functionality. This functionality primarily concerns:
 
 - Object reference counting.
 - Maintaining lists (sets) of objects.
@@ -45,7 +45,7 @@ and allows kobjects and ksets to be used without being registered
 struct kobject is a simple data type that provides a foundation for
 more complex object types. It provides a set of basic fields that
 almost all complex data types share. kobjects are intended to be
-embedded in larger data structures and replace fields it duplicates. 
+embedded in larger data structures and replace fields they duplicate. 
 
 1.2 Defintion
 
@@ -77,7 +77,7 @@ using kobject_register() and kobject_unregister(). Registration
 includes inserting the kobject in the list of its dominant kset and
 creating a directory for it in sysfs.
 
-Alternatively, one may use a kobject without adding to its kset's list
+Alternatively, one may use a kobject without adding it to its kset's list
 or exporting it via sysfs, by simply calling kobject_init(). An
 initialized kobject may later be added to the object hierarchy by
 calling kobject_add(). An initialized kobject may be used for
@@ -87,8 +87,8 @@ Note: calling kobject_init(), then kobject_add() is functionally
 equivalent to calling kobject_register().
 
 When a kobject is unregistered, it is removed from its kset's list,
-removed from the sysfs filesystem, and its reference decremented. List
-and sysfs removal happen in kobject_del(), and may be called
+removed from the sysfs filesystem, and its reference count is decremented.
+List and sysfs removal happen in kobject_del(), and may be called
 manually. kobject_put() decrements the reference count, and may also
 be called manually. 
 
@@ -98,8 +98,8 @@ kobject_put(). An object's reference count may only be incremented if
 it is already positive. 
 
 When a kobject's reference count reaches 0, the method struct
-ktype::release() (which the kobject's kset points to) is called. This
-allows any memory allocated for the object to be freed.
+kobj_type::release() (which the kobject's kset points to) is called.
+This allows any memory allocated for the object to be freed.
 
 
 1.4 sysfs
@@ -118,7 +118,7 @@ happen for kobjects that are embedded in a struct subsystem.
 
 2. ksets
 
-2.1 Desecription
+2.1 Description
 
 A kset is a set of kobjects that are embedded in the same type. 
 
@@ -163,9 +163,9 @@ following code snippet illustrates how to properly express this.
 	 kset_register(&disk->kset);
 
 - The kset that the disk's embedded object belongs to is the
-  block_kset, and is pointed to disk->kset.kobj.kset. 
+  block_kset, and is pointed to by disk->kset.kobj.kset. 
 
-- The type of object of the disk's _subordinate_ list are partitions, 
+- The type of objects on the disk's _subordinate_ list are partitions, 
   and is set in disk->kset.ktype. 
 
 - The kset is then registered, which handles initializing and adding
@@ -218,13 +218,13 @@ the object-specific fields, which include:
 - sysfs_ops: Provides conversion functions for sysfs access. Please
   see the sysfs documentation for more information. 
 
-- default_attrs: Default attributes to exported via sysfs when the
+- default_attrs: Default attributes to be exported via sysfs when the
   object is registered. 
 
 
 Instances of struct kobj_type are not registered; only referenced by
 the kset. A kobj_type may be referenced by an arbitrary number of
-ksets, as their may be disparate sets of identical objects. 
+ksets, as there may be disparate sets of identical objects. 
 
 
 
