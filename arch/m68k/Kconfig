@@ -17,10 +17,6 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
-config GENERIC_ISA_DMA
-	bool
-	default y
-
 
 mainmenu "Linux/68k Kernel Configuration"
 
@@ -629,6 +625,11 @@ config ISA
 	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
 	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
 	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config GENERIC_ISA_DMA
+	bool
+	depends on Q40 || AMIGA_PCMCIA || GG2
+	default y
 
 source "drivers/pci/Kconfig"
 
