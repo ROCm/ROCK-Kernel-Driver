@@ -27,6 +27,7 @@
  *	v0.22 - probe only the control interface. if usbcore doesn't choose the
  *		config we want, sysadmin changes bConfigurationValue in sysfs.
  *	v0.23 - use softirq for rx processing, as needed by tty layer
+ *	v0.24 - change probe method to evaluate CDC union descriptor
  */
 
 /*
@@ -72,6 +73,8 @@
 static struct usb_driver acm_driver;
 static struct tty_driver *acm_tty_driver;
 static struct acm *acm_table[ACM_TTY_MINORS];
+
+static DECLARE_MUTEX(open_sem);
 
 #define ACM_READY(acm)	(acm && acm->dev && acm->used)
 
@@ -256,22 +259,23 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	tty->driver_data = acm;
 	acm->tty = tty;
 
-        lock_kernel();
+        down(&open_sem);
 
-	if (acm->used++) {
-                unlock_kernel();
-                return 0;
+	if (acm->used) {
+		goto done;
         }
 
-        unlock_kernel();
-
 	acm->ctrlurb->dev = acm->dev;
-	if (usb_submit_urb(acm->ctrlurb, GFP_KERNEL))
+	if (usb_submit_urb(acm->ctrlurb, GFP_KERNEL)) {
 		dbg("usb_submit_urb(ctrl irq) failed");
+		goto bail_out;
+	}
 
 	acm->readurb->dev = acm->dev;
-	if (usb_submit_urb(acm->readurb, GFP_KERNEL))
+	if (usb_submit_urb(acm->readurb, GFP_KERNEL)) {
 		dbg("usb_submit_urb(read bulk) failed");
+		goto bail_out_and_unlink;
+	}
 
 	acm_set_control(acm, acm->ctrlout = ACM_CTRL_DTR | ACM_CTRL_RTS);
 
@@ -279,7 +283,16 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	   otherwise it is scheduled, and with high data rates data can get lost. */
 	tty->low_latency = 1;
 
+done:
+	acm->used++;
+	up(&open_sem);
 	return 0;
+
+bail_out_and_unlink:
+	usb_unlink_urb(acm->ctrlurb);
+bail_out:
+	up(&open_sem);
+	return -EIO;
 }
 
 static void acm_tty_close(struct tty_struct *tty, struct file *filp)
@@ -289,6 +302,7 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	if (!acm || !acm->used)
 		return;
 
+	down(&open_sem);
 	if (!--acm->used) {
 		if (acm->dev) {
 			acm_set_control(acm, acm->ctrlout = 0);
@@ -304,6 +318,7 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 			kfree(acm);
 		}
 	}
+	up(&open_sem);
 }
 
 static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
