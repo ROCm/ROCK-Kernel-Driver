@@ -49,7 +49,8 @@
 static atomic_t fl_size = ATOMIC_INIT(0);
 static struct ip6_flowlabel *fl_ht[FL_HASH_MASK+1];
 
-static struct timer_list ip6_fl_gc_timer;
+static void ip6_fl_gc(unsigned long dummy);
+static struct timer_list ip6_fl_gc_timer = TIMER_INITIALIZER(ip6_fl_gc, 0, 0);
 
 /* FL hash table lock: it protects only of GC */
 
@@ -93,10 +94,12 @@ static void fl_free(struct ip6_flowlabel *fl)
 
 static void fl_release(struct ip6_flowlabel *fl)
 {
+	write_lock_bh(&ip6_fl_lock);
+
 	fl->lastuse = jiffies;
 	if (atomic_dec_and_test(&fl->users)) {
 		unsigned long ttd = fl->lastuse + fl->linger;
-		if ((long)(ttd - fl->expires) > 0)
+		if (time_after(ttd, fl->expires))
 			fl->expires = ttd;
 		ttd = fl->expires;
 		if (fl->opt && fl->share == IPV6_FL_S_EXCL) {
@@ -104,11 +107,12 @@ static void fl_release(struct ip6_flowlabel *fl)
 			fl->opt = NULL;
 			kfree(opt);
 		}
-		if (!del_timer(&ip6_fl_gc_timer) ||
-		    (long)(ip6_fl_gc_timer.expires - ttd) > 0)
-			ip6_fl_gc_timer.expires = ttd;
-		add_timer(&ip6_fl_gc_timer);
+		if (!timer_pending(&ip6_fl_gc_timer) ||
+		    time_after(ip6_fl_gc_timer.expires, ttd))
+			mod_timer(&ip6_fl_gc_timer, ttd);
 	}
+
+	write_unlock_bh(&ip6_fl_lock);
 }
 
 static void ip6_fl_gc(unsigned long dummy)
@@ -125,16 +129,16 @@ static void ip6_fl_gc(unsigned long dummy)
 		while ((fl=*flp) != NULL) {
 			if (atomic_read(&fl->users) == 0) {
 				unsigned long ttd = fl->lastuse + fl->linger;
-				if ((long)(ttd - fl->expires) > 0)
+				if (time_after(ttd, fl->expires))
 					fl->expires = ttd;
 				ttd = fl->expires;
-				if ((long)(now - ttd) >= 0) {
+				if (time_after_eq(now, ttd)) {
 					*flp = fl->next;
 					fl_free(fl);
 					atomic_dec(&fl_size);
 					continue;
 				}
-				if (!sched || (long)(ttd - sched) < 0)
+				if (!sched || time_before(ttd, sched))
 					sched = ttd;
 			}
 			flp = &fl->next;
@@ -263,11 +267,11 @@ static int fl6_renew(struct ip6_flowlabel *fl, unsigned linger, unsigned expires
 	if (!expires)
 		return -EPERM;
 	fl->lastuse = jiffies;
-	if (fl->linger < linger)
+	if (time_before(fl->linger, linger))
 		fl->linger = linger;
-	if (expires < fl->linger)
+	if (time_before(expires, fl->linger))
 		expires = fl->linger;
-	if ((long)(fl->expires - (fl->lastuse+expires)) < 0)
+	if (time_before(fl->expires, fl->lastuse + expires))
 		fl->expires = fl->lastuse + expires;
 	return 0;
 }
@@ -693,8 +697,6 @@ void ip6_flowlabel_init()
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *p;
 #endif
-	init_timer(&ip6_fl_gc_timer);
-	ip6_fl_gc_timer.function = ip6_fl_gc;
 #ifdef CONFIG_PROC_FS
 	p = create_proc_entry("ip6_flowlabel", S_IRUGO, proc_net);
 	if (p)
