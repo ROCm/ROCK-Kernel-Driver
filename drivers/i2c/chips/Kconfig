@@ -149,7 +149,7 @@ config SENSORS_LM80
 
 config SENSORS_LM83
 	tristate "National Semiconductor LM83"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for National Semiconductor
