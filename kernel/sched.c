@@ -4344,7 +4344,17 @@ static void sched_domain_debug(void)
 			printk(KERN_DEBUG);
 			for (j = 0; j < level + 1; j++)
 				printk(" ");
-			printk("domain %d: span %s\n", level, str);
+			printk("domain %d: ", level);
+
+			if (!(sd->flags & SD_LOAD_BALANCE)) {
+				printk("does not balance");
+				if (sd->parent)
+					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
+				printk("\n");
+				break;
+			}
+
+			printk("span %s\n", str);
 
 			if (!cpu_isset(i, sd->span))
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
