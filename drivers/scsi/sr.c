@@ -87,12 +87,12 @@ static struct Scsi_Device_Template sr_template =
 	init_command:sr_init_command
 };
 
-Scsi_CD *scsi_CDs;
+static Scsi_CD *scsi_CDs;
 static int *sr_sizes;
 
 static int sr_open(struct cdrom_device_info *, int);
-void get_sectorsize(int);
-void get_capabilities(int);
+static void get_sectorsize(Scsi_CD *);
+static void get_capabilities(Scsi_CD *);
 
 static int sr_media_change(struct cdrom_device_info *, int);
 static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *);
@@ -102,7 +102,7 @@ static void sr_release(struct cdrom_device_info *cdi)
 	Scsi_CD *cd = cdi->handle;
 
 	if (cd->device->sector_size > 2048)
-		sr_set_blocklength(minor(cdi->dev), 2048);
+		sr_set_blocklength(cd, 2048);
 	cd->device->access_count--;
 	if (cd->device->host->hostt->module)
 		__MOD_DEC_USE_COUNT(cd->device->host->hostt->module);
@@ -298,7 +298,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	s_size = cd->device->sector_size;
 	if (s_size > 2048) {
 		if (!in_interrupt())
-			sr_set_blocklength(DEVICE_NR(CURRENT->rq_dev), 2048);
+			sr_set_blocklength(cd, 2048);
 		else
 			printk("sr: can't switch blocksize: in interrupt\n");
 	}
@@ -402,9 +402,8 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
 	Scsi_CD *cd = cdi->handle;
 
-	if (minor(cdi->dev) >= sr_template.dev_max || !cd->device) {
+	if (!cd->device)
 		return -ENXIO;	/* No such device */
-	}
 	/*
 	 * If the device is in error recovery, wait until it is done.
 	 * If the device is offline, then disallow any access to it.
@@ -424,7 +423,7 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 	 */
 
 	if (cd->needs_sector_size)
-		get_sectorsize(minor(cdi->dev));
+		get_sectorsize(cd);
 
 	return 0;
 }
@@ -470,17 +469,16 @@ static int sr_attach(Scsi_Device * SDp)
 }
 
 
-void get_sectorsize(int i)
+static void get_sectorsize(Scsi_CD *cd)
 {
 	unsigned char cmd[10];
 	unsigned char *buffer;
 	int the_result, retries = 3;
 	int sector_size;
 	Scsi_Request *SRpnt = NULL;
-	Scsi_CD *cd;
 	request_queue_t *queue;
-
-	cd = &scsi_CDs[i];
+	int unit = cd - scsi_CDs; /* gack... we still need it for corresponding
+				     sr_sizes[] element access */
 
 	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer)
@@ -560,7 +558,7 @@ void get_sectorsize(int i)
 		 * what the device is capable of.
 		 */
 		cd->needs_sector_size = 0;
-		sr_sizes[i] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
+		sr_sizes[unit] = cd->capacity >> (BLOCK_SIZE_BITS - 9);
 	}
 
 	queue = &cd->device->request_queue;
@@ -578,9 +576,8 @@ Enomem:
 	goto out;
 }
 
-void get_capabilities(int i)
+void get_capabilities(Scsi_CD *cd)
 {
-	Scsi_CD *cd;
 	unsigned char cmd[6];
 	unsigned char *buffer;
 	int rc, n;
@@ -597,7 +594,6 @@ void get_capabilities(int i)
 		""
 	};
 
-	cd = &scsi_CDs[i];
 	buffer = kmalloc(512, GFP_DMA);
 	if (!buffer)
 	{
@@ -610,7 +606,7 @@ void get_capabilities(int i)
 	cmd[2] = 0x2a;
 	cmd[4] = 128;
 	cmd[3] = cmd[5] = 0;
-	rc = sr_do_ioctl(i, cmd, buffer, 128, 1, SCSI_DATA_READ, NULL);
+	rc = sr_do_ioctl(cd, cmd, buffer, 128, 1, SCSI_DATA_READ, NULL);
 
 	if (rc) {
 		/* failed, drive doesn't have capabilities mode page */
@@ -687,7 +683,7 @@ static int sr_packet(struct cdrom_device_info *cdi, struct cdrom_generic_command
 	if (device->scsi_level <= SCSI_2)
 		cgc->cmd[1] |= device->lun << 5;
 
-	cgc->stat = sr_do_ioctl(minor(cdi->dev), cgc->cmd, cgc->buffer, cgc->buflen, cgc->quiet, cgc->data_direction, cgc->sense);
+	cgc->stat = sr_do_ioctl(cdi->handle, cgc->cmd, cgc->buffer, cgc->buflen, cgc->quiet, cgc->data_direction, cgc->sense);
 
 	return cgc->stat;
 }
@@ -769,7 +765,7 @@ void sr_finish()
 		cd->device->changed = 1;	/* force recheck CD type */
 #if 0
 		/* seems better to leave this for later */
-		get_sectorsize(i);
+		get_sectorsize(cd);
 		printk("Scd sectorsize = %d bytes.\n", cd->sector_size);
 #endif
 		cd->use = 1;
@@ -789,7 +785,7 @@ void sr_finish()
 		 *	FIXME: someone needs to handle a get_capabilities
 		 *	failure properly ??
 		 */
-		get_capabilities(i);
+		get_capabilities(cd);
 		sr_vendor_init(cd);
 
 		sprintf(cd->cdi.cdrom_driverfs_dev.bus_id, "%s:cd",

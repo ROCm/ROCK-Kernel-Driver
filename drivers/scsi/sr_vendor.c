@@ -101,12 +101,11 @@ void sr_vendor_init(Scsi_CD *cd)
 /* small handy function for switching block length using MODE SELECT,
  * used by sr_read_sector() */
 
-int sr_set_blocklength(int minor, int blocklength)
+int sr_set_blocklength(Scsi_CD *cd, int blocklength)
 {
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	struct ccs_modesel_head *modesel;
-	Scsi_CD *cd = &scsi_CDs[minor];
 	int rc, density = 0;
 
 #ifdef CONFIG_BLK_DEV_SR_VENDOR
@@ -133,7 +132,7 @@ int sr_set_blocklength(int minor, int blocklength)
 	modesel->density = density;
 	modesel->block_length_med = (blocklength >> 8) & 0xff;
 	modesel->block_length_lo = blocklength & 0xff;
-	if (0 == (rc = sr_do_ioctl(minor, cmd, buffer, sizeof(*modesel), 0, SCSI_DATA_WRITE, NULL))) {
+	if (0 == (rc = sr_do_ioctl(cd, cmd, buffer, sizeof(*modesel), 0, SCSI_DATA_WRITE, NULL))) {
 		cd->device->sector_size = blocklength;
 	}
 #ifdef DEBUG
@@ -156,9 +155,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	unsigned long sector;
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
-	int rc, no_multi, minor;
+	int rc, no_multi;
 
-	minor = minor(cdi->dev);
 	if (cd->cdi.mask & CDC_MULTI_SESSION)
 		return 0;
 
@@ -179,7 +177,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		         (cd->device->lun << 5) : 0;
 		cmd[8] = 12;
 		cmd[9] = 0x40;
-		rc = sr_do_ioctl(minor, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
+		rc = sr_do_ioctl(cd, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
 		if (rc != 0)
 			break;
 		if ((buffer[0] << 8) + buffer[1] < 0x0a) {
@@ -205,12 +203,13 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			         (cd->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
 			cmd[2] = 0xb0;
-			rc = sr_do_ioctl(minor, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
+			rc = sr_do_ioctl(cd, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
 			if (rc != 0)
 				break;
 			if (buffer[14] != 0 && buffer[14] != 0xb0) {
 				printk(KERN_INFO "%s: Hmm, seems the cdrom "
-				       "doesn't support multisession CD's\n", cd->cdi.name);
+				       "doesn't support multisession CD's\n",
+				       cd->cdi.name);
 				no_multi = 1;
 				break;
 			}
@@ -231,10 +230,11 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			cmd[1] = (cd->device->scsi_level <= SCSI_2) ?
 			         (cd->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
-			rc = sr_do_ioctl(minor, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
+			rc = sr_do_ioctl(cd, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
 			if (rc == -EINVAL) {
 				printk(KERN_INFO "%s: Hmm, seems the drive "
-				       "doesn't support multisession CD's\n", cd->cdi.name);
+				       "doesn't support multisession CD's\n",
+				       cd->cdi.name);
 				no_multi = 1;
 				break;
 			}
@@ -246,7 +246,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			sector = min * CD_SECS * CD_FRAMES + sec * CD_FRAMES + frame;
 			if (sector)
 				sector -= CD_MSF_OFFSET;
-			sr_set_blocklength(minor, 2048);
+			sr_set_blocklength(cd, 2048);
 			break;
 		}
 
@@ -257,7 +257,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		         (cd->device->lun << 5) : 0;
 		cmd[8] = 0x04;
 		cmd[9] = 0x40;
-		rc = sr_do_ioctl(minor, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
+		rc = sr_do_ioctl(cd, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
 		if (rc != 0) {
 			break;
 		}
@@ -272,7 +272,7 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		cmd[6] = rc & 0x7f;	/* number of last session */
 		cmd[8] = 0x0c;
 		cmd[9] = 0x40;
-		rc = sr_do_ioctl(minor, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
+		rc = sr_do_ioctl(cd, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
 		if (rc != 0) {
 			break;
 		}
@@ -292,11 +292,11 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	}
 	cd->ms_offset = sector;
 	cd->xa_flag = 0;
-	if (CDS_AUDIO != sr_disk_status(cdi) && 1 == sr_is_xa(minor))
+	if (CDS_AUDIO != sr_disk_status(cdi) && 1 == sr_is_xa(cd))
 		cd->xa_flag = 1;
 
 	if (2048 != cd->device->sector_size) {
-		sr_set_blocklength(minor, 2048);
+		sr_set_blocklength(cd, 2048);
 	}
 	if (no_multi)
 		cdi->mask |= CDC_MULTI_SESSION;
