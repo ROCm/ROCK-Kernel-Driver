@@ -116,40 +116,84 @@ static void __init replace_pin_at_irq(unsigned int irq,
 	}
 }
 
-#define __DO_ACTION(R, ACTION, FINAL)					\
-									\
-{									\
-	int pin;							\
-	struct irq_pin_list *entry = irq_2_pin + irq;			\
-									\
-	for (;;) {							\
-		unsigned int reg;					\
-		pin = entry->pin;					\
-		if (pin == -1)						\
-			break;						\
-		reg = io_apic_read(entry->apic, 0x10 + R + pin*2);	\
-		reg ACTION;						\
-		io_apic_modify(entry->apic, 0x10 + R + pin*2, reg);	\
-		if (!entry->next)					\
-			break;						\
-		entry = irq_2_pin + entry->next;			\
-	}								\
-	FINAL;								\
+/* mask = 1 */
+static void __mask_IO_APIC_irq (unsigned int irq)
+{
+	int pin;
+	struct irq_pin_list *entry = irq_2_pin + irq;
+
+	for (;;) {
+		unsigned int reg;
+		pin = entry->pin;
+		if (pin == -1)
+			break;
+		reg = io_apic_read(entry->apic, 0x10 + pin*2);
+		io_apic_modify(entry->apic, 0x10 + pin*2, reg |= 0x00010000);
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
+	io_apic_sync(entry->apic);
 }
 
-#define DO_ACTION(name,R,ACTION, FINAL)					\
-									\
-	static void name##_IO_APIC_irq (unsigned int irq)		\
-	__DO_ACTION(R, ACTION, FINAL)
+/* mask = 0 */
+static void __unmask_IO_APIC_irq (unsigned int irq)
+{
+	int pin;
+	struct irq_pin_list *entry = irq_2_pin + irq;
 
-DO_ACTION( __mask,             0, |= 0x00010000, io_apic_sync(entry->apic) )
-						/* mask = 1 */
-DO_ACTION( __unmask,           0, &= 0xfffeffff, )
-						/* mask = 0 */
-DO_ACTION( __mask_and_edge,    0, = (reg & 0xffff7fff) | 0x00010000, )
-						/* mask = 1, trigger = 0 */
-DO_ACTION( __unmask_and_level, 0, = (reg & 0xfffeffff) | 0x00008000, )
-						/* mask = 0, trigger = 1 */
+	for (;;) {
+		unsigned int reg;
+		pin = entry->pin;
+		if (pin == -1)
+			break;
+		reg = io_apic_read(entry->apic, 0x10 + pin*2);
+		io_apic_modify(entry->apic, 0x10 + pin*2, reg &= 0xfffeffff);
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
+}
+
+/* mask = 1, trigger = 0 */
+static void __mask_and_edge_IO_APIC_irq (unsigned int irq)
+{
+	int pin;
+	struct irq_pin_list *entry = irq_2_pin + irq;
+
+	for (;;) {
+		unsigned int reg;
+		pin = entry->pin;
+		if (pin == -1)
+			break;
+		reg = io_apic_read(entry->apic, 0x10 + pin*2);
+		reg = (reg & 0xffff7fff) | 0x00010000;
+		io_apic_modify(entry->apic, 0x10 + pin*2, reg);
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
+}
+
+/* mask = 0, trigger = 1 */
+static void __unmask_and_level_IO_APIC_irq (unsigned int irq)
+{
+	int pin;
+	struct irq_pin_list *entry = irq_2_pin + irq;
+
+	for (;;) {
+		unsigned int reg;
+		pin = entry->pin;
+		if (pin == -1)
+			break;
+		reg = io_apic_read(entry->apic, 0x10 + pin*2);
+		reg = (reg & 0xfffeffff) | 0x00008000;
+		io_apic_modify(entry->apic, 0x10 + pin*2, reg);
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
+}
 
 static void mask_IO_APIC_irq (unsigned int irq)
 {
@@ -197,13 +241,23 @@ static void clear_IO_APIC (void)
 static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
 {
 	unsigned long flags;
+	int pin;
+	struct irq_pin_list *entry = irq_2_pin + irq;
 
 	/*
 	 * Only the first 8 bits are valid.
 	 */
 	mask = mask << 24;
 	spin_lock_irqsave(&ioapic_lock, flags);
-	__DO_ACTION(1, = mask, )
+	for (;;) {
+		pin = entry->pin;
+		if (pin == -1)
+			break;
+		io_apic_write(entry->apic, 0x10 + 1 + pin*2, mask);
+		if (!entry->next)
+			break;
+		entry = irq_2_pin + entry->next;
+	}
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
