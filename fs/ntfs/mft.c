@@ -459,7 +459,7 @@ map_err_out:
 		goto unm_err_out;
 	}
 	/* Attach extent inode to base inode, reallocating memory if needed. */
-	if (!(base_ni->nr_extents & ~3)) {
+	if (!(base_ni->nr_extents & 3)) {
 		ntfs_inode **tmp;
 		int new_size = (base_ni->nr_extents + 4) * sizeof(ntfs_inode *);
 

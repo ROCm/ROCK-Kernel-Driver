@@ -1146,9 +1146,10 @@ S:	Maintained
 
 NTFS FILESYSTEM
 P:	Anton Altaparmakov
-M:	aia21@cus.cam.ac.uk
+M:	aia21@cantab.net
 L:	linux-ntfs-dev@lists.sourceforge.net
 L:	linux-kernel@vger.kernel.org
+W:	http://linux-ntfs.sf.net/
 S:	Maintained
 
 NVIDIA (RIVA) FRAMEBUFFER DRIVER

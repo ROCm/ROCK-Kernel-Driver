@@ -27,6 +27,18 @@ ToDo:
 	  quite big. Modularising them a bit, e.g. a-la get_block(), will make
 	  them cleaner and make code reuse easier.
 
+2.0.5 - Major bugfix. Buffer overflow in extent inode handling.
+
+	- No need to set old blocksize in super.c::ntfs_fill_super() as the
+	  VFS does so via invocation of deactivate_super() calling
+	  fs->fill_super() calling block_kill_super() which does it.
+	- BKL moved from VFS into dir.c::ntfs_readdir(). (Linus Torvalds)
+	  -> Do we really need it? I don't think so as we have exclusion on
+	  the directory ntfs_inode rw_semaphore mrec_lock. We mmight have to
+	  move the ->f_pos accesses under the mrec_lock though. Check this...
+	- Fix really, really, really stupid buffer overflow in extent inode
+	  handling in mft.c::map_extent_mft_record().
+
 2.0.4 - Cleanups and updates for kernel 2.5.11.
 
 	- Add documentation on how to use the MD driver to be able to use NTFS
@@ -35,7 +47,7 @@ ToDo:
 	Remove all uses of kdev_t in favour of struct block_device *:
 	- Change compress.c::ntfs_file_read_compressed_block() to use
 	  sb_getblk() instead of getblk().
-	- Change super.c::ntfs_fill_suoer() to use bdev_hardsect_size() instead
+	- Change super.c::ntfs_fill_super() to use bdev_hardsect_size() instead
 	  of get_hardsect_size().
 	- No need to get old blocksize in super.c::ntfs_fill_super() as
 	  fs/super.c::get_sb_bdev() already does this.
