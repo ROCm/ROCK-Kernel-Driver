@@ -379,11 +379,6 @@ config RAM4MB
 	help
 	  Set RAM size to be 4MiB.
 
-config RAM4MB
-	bool "4MiB"
-	help
-	  Set RAM size to be 4MiB.
-
 config RAM8MB
 	bool "8MiB"
 	help
