@@ -254,7 +254,7 @@ struct uhci_td {
 #define skel_int2_qh		skelqh[6]
 #define skel_int1_qh		skelqh[7]
 #define skel_ls_control_qh	skelqh[8]
-#define skel_hs_control_qh	skelqh[9]
+#define skel_fs_control_qh	skelqh[9]
 #define skel_bulk_qh		skelqh[10]
 #define skel_term_qh		skelqh[11]
 

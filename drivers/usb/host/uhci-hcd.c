@@ -667,7 +667,7 @@ static void uhci_inc_fsbr(struct uhci_hcd *uhci, struct urb *urb)
 	if ((!(urb->transfer_flags & URB_NO_FSBR)) && !urbp->fsbr) {
 		urbp->fsbr = 1;
 		if (!uhci->fsbr++ && !uhci->fsbrtimeout)
-			uhci->skel_term_qh->link = cpu_to_le32(uhci->skel_hs_control_qh->dma_handle) | UHCI_PTR_QH;
+			uhci->skel_term_qh->link = cpu_to_le32(uhci->skel_fs_control_qh->dma_handle) | UHCI_PTR_QH;
 	}
 }
 
@@ -817,7 +817,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 	if (urb->dev->speed == USB_SPEED_LOW)
 		skelqh = uhci->skel_ls_control_qh;
 	else {
-		skelqh = uhci->skel_hs_control_qh;
+		skelqh = uhci->skel_fs_control_qh;
 		uhci_inc_fsbr(uhci, urb);
 	}
 
@@ -2164,8 +2164,8 @@ static int uhci_start(struct usb_hcd *hcd)
 			cpu_to_le32(uhci->skel_int1_qh->dma_handle) | UHCI_PTR_QH;
 	uhci->skel_int1_qh->link = cpu_to_le32(uhci->skel_ls_control_qh->dma_handle) | UHCI_PTR_QH;
 
-	uhci->skel_ls_control_qh->link = cpu_to_le32(uhci->skel_hs_control_qh->dma_handle) | UHCI_PTR_QH;
-	uhci->skel_hs_control_qh->link = cpu_to_le32(uhci->skel_bulk_qh->dma_handle) | UHCI_PTR_QH;
+	uhci->skel_ls_control_qh->link = cpu_to_le32(uhci->skel_fs_control_qh->dma_handle) | UHCI_PTR_QH;
+	uhci->skel_fs_control_qh->link = cpu_to_le32(uhci->skel_bulk_qh->dma_handle) | UHCI_PTR_QH;
 	uhci->skel_bulk_qh->link = cpu_to_le32(uhci->skel_term_qh->dma_handle) | UHCI_PTR_QH;
 
 	/* This dummy TD is to work around a bug in Intel PIIX controllers */
@@ -2276,15 +2276,15 @@ static void uhci_stop(struct usb_hcd *hcd)
 	 * At this point, we're guaranteed that no new connects can be made
 	 * to this bus since there are no more parents
 	 */
-	spin_lock_irq(&uhci->schedule_lock);
-	uhci_free_pending_qhs(uhci);
-	uhci_free_pending_tds(uhci);
-	uhci_remove_pending_urbps(uhci);
-	spin_unlock_irq(&uhci->schedule_lock);
 
 	reset_hc(uhci);
 
 	spin_lock_irq(&uhci->schedule_lock);
+	uhci_free_pending_qhs(uhci);
+	uhci_free_pending_tds(uhci);
+	uhci_remove_pending_urbps(uhci);
+	uhci_finish_completion(hcd, NULL);
+
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
 	spin_unlock_irq(&uhci->schedule_lock);

@@ -210,7 +210,7 @@ static const char *qh_names[] = {
   "skel_int32_qh", "skel_int16_qh",
   "skel_int8_qh", "skel_int4_qh",
   "skel_int2_qh", "skel_int1_qh",
-  "skel_ls_control_qh", "skel_hs_control_qh",
+  "skel_ls_control_qh", "skel_fs_control_qh",
   "skel_bulk_qh", "skel_term_qh"
 };
 
