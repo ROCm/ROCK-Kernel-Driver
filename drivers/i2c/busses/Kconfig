@@ -203,6 +203,16 @@ config I2C_SIS96X
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-sis96x.
 
+config I2C_VELLEMAN
+	tristate "Velleman K9000 adapter"
+	depends on I2C_ALGOBIT && ISA
+	help
+	  This supports the Velleman K9000 parallel-port I2C adapter.  Say Y
+	  if you own such an adapter.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-velleman.
+
 config I2C_VIA
 	tristate "VIA 82C58B"
 	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
