@@ -1044,6 +1044,8 @@ typedef struct hwif_s {
 	void		*hwif_data;	/* extra hwif data */
 
 	unsigned dma;
+
+	void (*led_act)(void *data, int rw);
 } ide_hwif_t;
 
 /*
