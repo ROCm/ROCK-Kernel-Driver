@@ -899,8 +899,10 @@ acpi_thermal_write_trip_points (
 	struct seq_file		*m = (struct seq_file *)file->private_data;
 	struct acpi_thermal	*tz = (struct acpi_thermal *)m->private;
 
-	char			limit_string[25] = {'\0'};
-	int			critical, hot, passive, active0, active1;
+	char			limit_string[65] = {'\0'};
+	int			num, critical, hot, passive;
+	int			active[ACPI_THERMAL_MAX_ACTIVE];
+	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_thermal_write_trip_points");
 
@@ -916,7 +918,11 @@ acpi_thermal_write_trip_points (
 	
 	limit_string[count] = '\0';
 
-	if (sscanf(limit_string, "%d:%d:%d:%d:%d", &critical, &hot, &passive, &active0, &active1) != 5) {
+	num = sscanf(limit_string, "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d:%d",
+				&critical, &hot, &passive,
+				&active[0], &active[1], &active[2], &active[3], &active[4],
+				&active[5], &active[6], &active[7], &active[8], &active[9]);
+	if(!(num >=5 && num < (ACPI_THERMAL_MAX_ACTIVE + 3))) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data format\n"));
 		return_VALUE(-EINVAL);
 	}
@@ -924,8 +930,11 @@ acpi_thermal_write_trip_points (
 	tz->trips.critical.temperature = CELSIUS_TO_KELVIN(critical);
 	tz->trips.hot.temperature = CELSIUS_TO_KELVIN(hot);
 	tz->trips.passive.temperature = CELSIUS_TO_KELVIN(passive);
-	tz->trips.active[0].temperature = CELSIUS_TO_KELVIN(active0);
-	tz->trips.active[1].temperature = CELSIUS_TO_KELVIN(active1);
+	for (i = 0; i < num - 3; i++) {
+		if (!(tz->trips.active[i].flags.valid))
+			break;
+		tz->trips.active[i].temperature = CELSIUS_TO_KELVIN(active[i]);
+	}
 	
 	return_VALUE(count);
 }
