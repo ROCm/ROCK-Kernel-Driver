@@ -3051,6 +3051,9 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 	struct sctp_bind_addr *bp;
 	struct sctp_association *asoc;
 	struct list_head *pos;
+	struct sctp_sockaddr_entry *addr;
+	rwlock_t *addr_lock;
+	unsigned long flags;
 	int cnt = 0;
 
 	if (len != sizeof(sctp_assoc_t))
@@ -3067,33 +3070,104 @@ static int sctp_getsockopt_local_addrs_num(struct sock *sk, int len,
 	 */
 	if (0 == id) {
 		bp = &sctp_sk(sk)->ep->base.bind_addr;
+		addr_lock = &sctp_sk(sk)->ep->base.addr_lock;
 	} else {
 		asoc = sctp_id2assoc(sk, id);
 		if (!asoc)
 			return -EINVAL;
 		bp = &asoc->base.bind_addr;
+		addr_lock = &asoc->base.addr_lock;
+	}
+
+	sctp_read_lock(addr_lock);
+
+	/* If the endpoint is bound to 0.0.0.0 or ::0, count the valid
+	 * addresses from the global local address list.
+	 */
+	if (sctp_list_single_entry(&bp->address_list)) {
+		addr = list_entry(bp->address_list.next,
+				  struct sctp_sockaddr_entry, list);
+		if (sctp_is_any(&addr->a)) {
+			sctp_spin_lock_irqsave(&sctp_local_addr_lock, flags);
+			list_for_each(pos, &sctp_local_addr_list) {
+				addr = list_entry(pos,
+						  struct sctp_sockaddr_entry,
+						  list);
+				if ((PF_INET == sk->sk_family) && 
+				    (AF_INET6 == addr->a.sa.sa_family))	
+					continue;
+				cnt++;
+			}
+			sctp_spin_unlock_irqrestore(&sctp_local_addr_lock,
+						    flags);
+		} else {
+			cnt = 1;
+		}
+		goto done;
 	}
 
 	list_for_each(pos, &bp->address_list) {
 		cnt ++;
 	}
 
+done:
+	sctp_read_unlock(addr_lock);
+	return cnt;
+}
+
+/* Helper function that copies local addresses to user and returns the number
+ * of addresses copied.
+ */
+static int sctp_copy_laddrs_to_user(struct sock *sk, __u16 port, int max_addrs,
+				    void __user *to)
+{
+	struct list_head *pos;
+	struct sctp_sockaddr_entry *addr;
+	unsigned long flags;
+	union sctp_addr temp;
+	int cnt = 0;
+	int addrlen;
+
+	sctp_spin_lock_irqsave(&sctp_local_addr_lock, flags);
+	list_for_each(pos, &sctp_local_addr_list) {
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
+		if ((PF_INET == sk->sk_family) && 
+		    (AF_INET6 == addr->a.sa.sa_family))
+			continue;
+		memcpy(&temp, &addr->a, sizeof(temp));
+		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sctp_sk(sk),
+								&temp);
+		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
+		temp.v4.sin_port = htons(port);
+		if (copy_to_user(to, &temp, addrlen)) {
+			sctp_spin_unlock_irqrestore(&sctp_local_addr_lock,
+						    flags);
+			return -EFAULT;
+		}
+		to += addrlen;
+		cnt ++;
+		if (cnt >= max_addrs) break;
+	}
+	sctp_spin_unlock_irqrestore(&sctp_local_addr_lock, flags);
+
 	return cnt;
 }
 
 static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
-					char __user *optval, int __user *optlen)
+				       char __user *optval, int __user *optlen)
 {
 	struct sctp_bind_addr *bp;
 	struct sctp_association *asoc;
 	struct list_head *pos;
 	int cnt = 0;
 	struct sctp_getaddrs getaddrs;
-	struct sctp_sockaddr_entry *from;
+	struct sctp_sockaddr_entry *addr;
 	void __user *to;
 	union sctp_addr temp;
 	struct sctp_opt *sp = sctp_sk(sk);
 	int addrlen;
+	rwlock_t *addr_lock;
+	int err = 0;
 
 	if (len != sizeof(struct sctp_getaddrs))
 		return -EINVAL;
@@ -3110,33 +3184,59 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	 */
 	if (0 == getaddrs.assoc_id) {
 		bp = &sctp_sk(sk)->ep->base.bind_addr;
+		addr_lock = &sctp_sk(sk)->ep->base.addr_lock;
 	} else {
 		asoc = sctp_id2assoc(sk, getaddrs.assoc_id);
 		if (!asoc)
 			return -EINVAL;
 		bp = &asoc->base.bind_addr;
+		addr_lock = &asoc->base.addr_lock;
 	}
 
 	to = getaddrs.addrs;
+
+	sctp_read_lock(addr_lock);
+
+	/* If the endpoint is bound to 0.0.0.0 or ::0, get the valid
+	 * addresses from the global local address list.
+	 */
+	if (sctp_list_single_entry(&bp->address_list)) {
+		addr = list_entry(bp->address_list.next,
+				  struct sctp_sockaddr_entry, list);
+		if (sctp_is_any(&addr->a)) {
+			cnt = sctp_copy_laddrs_to_user(sk, bp->port,
+						       getaddrs.addr_num, to);
+			if (cnt < 0) {
+				err = cnt;
+				goto unlock;
+			}
+			goto copy_getaddrs;		
+		}
+	}
+
 	list_for_each(pos, &bp->address_list) {
-		from = list_entry(pos,
-				struct sctp_sockaddr_entry,
-				list);
-		memcpy(&temp, &from->a, sizeof(temp));
+		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
+		memcpy(&temp, &addr->a, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
 		temp.v4.sin_port = htons(temp.v4.sin_port);
-		if (copy_to_user(to, &temp, addrlen))
-			return -EFAULT;
+		if (copy_to_user(to, &temp, addrlen)) {
+			err = -EFAULT;
+			goto unlock;
+		}
 		to += addrlen;
 		cnt ++;
 		if (cnt >= getaddrs.addr_num) break;
 	}
+
+copy_getaddrs:
 	getaddrs.addr_num = cnt;
 	if (copy_to_user(optval, &getaddrs, sizeof(struct sctp_getaddrs)))
-		return -EFAULT;
+		err = -EFAULT;
 
-	return 0;
+unlock:
+	sctp_read_unlock(addr_lock);
+	return err;
 }
 
 /* 7.1.10 Set Primary Address (SCTP_PRIMARY_ADDR)
