@@ -1132,6 +1132,8 @@ static int __init prom_find_machine_type(void)
 			if (strstr(p, RELOC("Power Macintosh")) ||
 			    strstr(p, RELOC("MacRISC4")))
 				return PLATFORM_POWERMAC;
+			if (strstr(p, RELOC("Momentum,Maple")))
+				return PLATFORM_MAPLE;
 			i += sl + 1;
 		}
 	}

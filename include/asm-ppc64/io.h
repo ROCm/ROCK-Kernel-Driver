@@ -205,7 +205,7 @@ extern void __iomem *ioremap(unsigned long address, unsigned long size);
 #define ioremap_nocache(addr, size)	ioremap((addr), (size))
 extern int iounmap_explicit(volatile void __iomem *addr, unsigned long size);
 extern void iounmap(volatile void __iomem *addr);
-extern void * reserve_phb_iospace(unsigned long size);
+extern void __iomem * reserve_phb_iospace(unsigned long size);
 
 /**
  *	virt_to_phys	-	map virtual addresses to physical

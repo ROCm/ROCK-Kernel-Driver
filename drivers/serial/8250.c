@@ -2001,13 +2001,6 @@ serial8250_register_ports(struct uart_driver *drv, struct device *dev)
 	for (i = 0; i < UART_NR; i++) {
 		struct uart_8250_port *up = &serial8250_ports[i];
 
-		/* Don't register "empty" ports, setting "ops" on them
-		 * makes the console driver "setup" routine to succeed,
-		 * which is wrong. --BenH.
-		 */
-		if (!up->port.iobase)
-			continue;
-
 		up->port.line = i;
 		up->port.ops = &serial8250_pops;
 		up->port.dev = dev;

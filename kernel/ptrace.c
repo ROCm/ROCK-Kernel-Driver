@@ -38,6 +38,12 @@ void __ptrace_link(task_t *child, task_t *new_parent)
 	SET_LINKS(child);
 }
  
+static inline int pending_resume_signal(struct sigpending *pending)
+{
+#define M(sig) (1UL << ((sig)-1))
+	return sigtestsetmask(&pending->signal, M(SIGCONT) | M(SIGKILL));
+}
+
 /*
  * unptrace a task: move it back to its original parent and
  * remove it from the ptrace list.
@@ -61,8 +67,16 @@ void __ptrace_unlink(task_t *child)
 		 * Turn a tracing stop into a normal stop now,
 		 * since with no tracer there would be no way
 		 * to wake it up with SIGCONT or SIGKILL.
+		 * If there was a signal sent that would resume the child,
+		 * but didn't because it was in TASK_TRACED, resume it now.
 		 */
+		spin_lock(&child->sighand->siglock);
 		child->state = TASK_STOPPED;
+		if (pending_resume_signal(&child->pending) ||
+		    pending_resume_signal(&child->signal->shared_pending)) {
+			signal_wake_up(child, 1);
+		}
+		spin_unlock(&child->sighand->siglock);
 	}
 }
 

@@ -75,11 +75,14 @@ extern void udbg_init_debug_lpar(void);
 extern void udbg_init_pmac_realmode(void);
 /* That's RTAS panel debug */
 extern void call_rtas_display_status_delay(unsigned char c);
+/* Here's maple real mode debug */
+extern void udbg_init_maple_realmode(void);
 
 #define EARLY_DEBUG_INIT() do {} while(0)
 
 #if 0
 #define EARLY_DEBUG_INIT() udbg_init_debug_lpar()
+#define EARLY_DEBUG_INIT() udbg_init_maple_realmode()
 #define EARLY_DEBUG_INIT() udbg_init_pmac_realmode()
 #define EARLY_DEBUG_INIT()						\
 	do { ppc_md.udbg_putc = call_rtas_display_status_delay; } while(0)
@@ -326,6 +329,7 @@ static void __init setup_cpu_maps(void)
 
 extern struct machdep_calls pSeries_md;
 extern struct machdep_calls pmac_md;
+extern struct machdep_calls maple_md;
 
 /* Ultimately, stuff them in an elf section like initcalls... */
 static struct machdep_calls __initdata *machines[] = {
@@ -335,6 +339,9 @@ static struct machdep_calls __initdata *machines[] = {
 #ifdef CONFIG_PPC_PMAC
 	&pmac_md,
 #endif /* CONFIG_PPC_PMAC */
+#ifdef CONFIG_PPC_MAPLE
+	&maple_md,
+#endif /* CONFIG_PPC_MAPLE */
 	NULL
 };
 
@@ -633,6 +640,7 @@ void __init setup_system(void)
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
 	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);
+	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
 	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);

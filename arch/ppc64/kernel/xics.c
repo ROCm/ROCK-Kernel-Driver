@@ -85,7 +85,7 @@ struct xics_ipl {
 	} qirr;
 };
 
-static struct xics_ipl *xics_per_cpu[NR_CPUS];
+static struct xics_ipl __iomem *xics_per_cpu[NR_CPUS];
 
 static int xics_irq_8259_cascade = 0;
 static int xics_irq_8259_cascade_real = 0;
@@ -116,22 +116,22 @@ typedef struct {
 
 static int pSeries_xirr_info_get(int n_cpu)
 {
-	return xics_per_cpu[n_cpu]->xirr.word;
+	return in_be32(&xics_per_cpu[n_cpu]->xirr.word);
 }
 
 static void pSeries_xirr_info_set(int n_cpu, int value)
 {
-	xics_per_cpu[n_cpu]->xirr.word = value;
+	out_be32(&xics_per_cpu[n_cpu]->xirr.word, value);
 }
 
 static void pSeries_cppr_info(int n_cpu, u8 value)
 {
-	xics_per_cpu[n_cpu]->xirr.bytes[0] = value;
+	out_8(&xics_per_cpu[n_cpu]->xirr.bytes[0], value);
 }
 
 static void pSeries_qirr_info(int n_cpu, u8 value)
 {
-	xics_per_cpu[n_cpu]->qirr.bytes[0] = value;
+	out_8(&xics_per_cpu[n_cpu]->qirr.bytes[0], value);
 }
 
 static xics_ops pSeries_ops = {
@@ -457,7 +457,7 @@ void xics_init_IRQ(void)
 	struct xics_interrupt_node {
 		unsigned long addr;
 		unsigned long size;
-	} inodes[NR_CPUS]; 
+	} intnodes[NR_CPUS]; 
 
 	ppc64_boot_msg(0x20, "XICS Init");
 
@@ -484,13 +484,13 @@ nextnode:
 		panic("xics_init_IRQ: can't find interrupt reg property");
 	
 	while (ilen) {
-		inodes[indx].addr = (unsigned long long)*ireg++ << 32;
+		intnodes[indx].addr = (unsigned long)*ireg++ << 32;
 		ilen -= sizeof(uint);
-		inodes[indx].addr |= *ireg++;
+		intnodes[indx].addr |= *ireg++;
 		ilen -= sizeof(uint);
-		inodes[indx].size = (unsigned long long)*ireg++ << 32;
+		intnodes[indx].size = (unsigned long)*ireg++ << 32;
 		ilen -= sizeof(uint);
-		inodes[indx].size |= *ireg++;
+		intnodes[indx].size |= *ireg++;
 		ilen -= sizeof(uint);
 		indx++;
 		if (indx >= NR_CPUS) break;
@@ -505,7 +505,8 @@ nextnode:
 	     np = of_find_node_by_type(np, "cpu")) {
 		ireg = (uint *)get_property(np, "reg", &ilen);
 		if (ireg && ireg[0] == hard_smp_processor_id()) {
-			ireg = (uint *)get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
+			ireg = (uint *)get_property(np, "ibm,ppc-interrupt-gserver#s",
+						    &ilen);
 			i = ilen / sizeof(int);
 			if (ireg && i > 0) {
 				default_server = ireg[0];
@@ -516,8 +517,8 @@ nextnode:
 	}
 	of_node_put(np);
 
-	intr_base = inodes[0].addr;
-	intr_size = (ulong)inodes[0].size;
+	intr_base = intnodes[0].addr;
+	intr_size = intnodes[0].size;
 
 	np = of_find_node_by_type(NULL, "interrupt-controller");
 	if (!np) {
@@ -538,16 +539,18 @@ nextnode:
 	if (systemcfg->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
 		for_each_cpu(i) {
+			int hard_id;
+
 			/* FIXME: Do this dynamically! --RR */
 			if (!cpu_present(i))
 				continue;
-			xics_per_cpu[i] = __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
-						    (ulong)inodes[get_hard_smp_processor_id(i)].size,
-						    _PAGE_NO_CACHE);
+
+			hard_id = get_hard_smp_processor_id(i);
+			xics_per_cpu[i] = ioremap(intnodes[hard_id].addr, 
+						  intnodes[hard_id].size);
 		}
 #else
-		xics_per_cpu[0] = __ioremap((ulong)intr_base, intr_size,
-					    _PAGE_NO_CACHE);
+		xics_per_cpu[0] = ioremap(intr_base, intr_size);
 #endif /* CONFIG_SMP */
 	} else if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 		ops = &pSeriesLP_ops;
