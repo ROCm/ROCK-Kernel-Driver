@@ -213,25 +213,25 @@ do_entArith(unsigned long summary, unsigned long write_mask,
 	    unsigned long a2, unsigned long a3, unsigned long a4,
 	    unsigned long a5, struct pt_regs regs)
 {
+	long si_code = FPE_FLTINV;
+	siginfo_t info;
+
 	if (summary & 1) {
 		/* Software-completion summary bit is set, so try to
-		   emulate the instruction.  */
-		if (!amask(AMASK_PRECISE_TRAP)) {
-			/* 21264 (except pass 1) has precise exceptions.  */
-			if (alpha_fp_emul(regs.pc - 4))
-				return;
-		} else {
-			if (alpha_fp_emul_imprecise(&regs, write_mask))
-				return;
-		}
+		   emulate the instruction.  If the processor supports
+		   precise exceptions, we don't have to search.  */
+		if (!amask(AMASK_PRECISE_TRAP))
+			si_code = alpha_fp_emul(regs.pc - 4);
+		else
+			si_code = alpha_fp_emul_imprecise(&regs, write_mask);
 	}
-
-#if 0
-	printk("%s: arithmetic trap at %016lx: %02lx %016lx\n",
-		current->comm, regs.pc, summary, write_mask);
-#endif
 	die_if_kernel("Arithmetic fault", &regs, 0, 0);
-	send_sig(SIGFPE, current, 1);
+
+	info.si_signo = SIGFPE;
+	info.si_errno = 0;
+	info.si_code = si_code;
+	info.si_addr = (void *) regs.pc;
+	send_sig_info(SIGFPE, &info, current);
 }
 
 asmlinkage void
@@ -239,6 +239,9 @@ do_entIF(unsigned long type, unsigned long a1,
 	 unsigned long a2, unsigned long a3, unsigned long a4,
 	 unsigned long a5, struct pt_regs regs)
 {
+	siginfo_t info;
+	int signo, code;
+
 	if (!opDEC_testing || type != 4) {
 		if (type == 1) {
 			const unsigned int *data
@@ -253,55 +256,99 @@ do_entIF(unsigned long type, unsigned long a1,
 
 	switch (type) {
 	      case 0: /* breakpoint */
+		info.si_signo = SIGTRAP;
+		info.si_errno = 0;
+		info.si_code = TRAP_BRKPT;
+		info.si_trapno = 0;
+		info.si_addr = (void *) regs.pc;
+
 		if (ptrace_cancel_bpt(current)) {
 			regs.pc -= 4;	/* make pc point to former bpt */
 		}
-		send_sig(SIGTRAP, current, 1);
+
+		send_sig_info(SIGTRAP, &info, current);
 		return;
 
 	      case 1: /* bugcheck */
-		send_sig(SIGTRAP, current, 1);
+		info.si_signo = SIGTRAP;
+		info.si_errno = 0;
+		info.si_code = __SI_FAULT;
+		info.si_addr = (void *) regs.pc;
+		info.si_trapno = 0;
+		send_sig_info(SIGTRAP, &info, current);
 		return;
-
+		
 	      case 2: /* gentrap */
-		/*
-		 * The exception code should be passed on to the signal
-		 * handler as the second argument.  Linux doesn't do that
-		 * yet (also notice that Linux *always* behaves like
-		 * DEC Unix with SA_SIGINFO off; see DEC Unix man page
-		 * for sigaction(2)).
-		 */
+		info.si_addr = (void *) regs.pc;
+		info.si_trapno = regs.r16;
 		switch ((long) regs.r16) {
-		      case GEN_INTOVF: case GEN_INTDIV: case GEN_FLTOVF:
-		      case GEN_FLTDIV: case GEN_FLTUND: case GEN_FLTINV:
-		      case GEN_FLTINE: case GEN_ROPRAND:
-			send_sig(SIGFPE, current, 1);
-			return;
+		case GEN_INTOVF:
+			signo = SIGFPE;
+			code = FPE_INTOVF;
+			break;
+		case GEN_INTDIV:
+			signo = SIGFPE;
+			code = FPE_INTDIV;
+			break;
+		case GEN_FLTOVF:
+			signo = SIGFPE;
+			code = FPE_FLTOVF;
+			break;
+		case GEN_FLTDIV:
+			signo = SIGFPE;
+			code = FPE_FLTDIV;
+			break;
+		case GEN_FLTUND:
+			signo = SIGFPE;
+			code = FPE_FLTUND;
+			break;
+		case GEN_FLTINV:
+			signo = SIGFPE;
+			code = FPE_FLTINV;
+			break;
+		case GEN_FLTINE:
+			signo = SIGFPE;
+			code = FPE_FLTRES;
+			break;
+		case GEN_ROPRAND:
+			signo = SIGFPE;
+			code = __SI_FAULT;
+			break;
 
-		      case GEN_DECOVF:
-		      case GEN_DECDIV:
-		      case GEN_DECINV:
-		      case GEN_ASSERTERR:
-		      case GEN_NULPTRERR:
-		      case GEN_STKOVF:
-		      case GEN_STRLENERR:
-		      case GEN_SUBSTRERR:
-		      case GEN_RANGERR:
-		      case GEN_SUBRNG:
-		      case GEN_SUBRNG1:
-		      case GEN_SUBRNG2:
-		      case GEN_SUBRNG3:
-		      case GEN_SUBRNG4:
-		      case GEN_SUBRNG5:
-		      case GEN_SUBRNG6:
-		      case GEN_SUBRNG7:
-			send_sig(SIGTRAP, current, 1);
-			return;
+		case GEN_DECOVF:
+		case GEN_DECDIV:
+		case GEN_DECINV:
+		case GEN_ASSERTERR:
+		case GEN_NULPTRERR:
+		case GEN_STKOVF:
+		case GEN_STRLENERR:
+		case GEN_SUBSTRERR:
+		case GEN_RANGERR:
+		case GEN_SUBRNG:
+		case GEN_SUBRNG1:
+		case GEN_SUBRNG2:
+		case GEN_SUBRNG3:
+		case GEN_SUBRNG4:
+		case GEN_SUBRNG5:
+		case GEN_SUBRNG6:
+		case GEN_SUBRNG7:
+		default:
+			signo = SIGTRAP;
+			code = __SI_FAULT;
+			break;
 		}
-		break;
+
+		info.si_signo = signo;
+		info.si_errno = 0;
+		info.si_code = code;
+		info.si_addr = (void *) regs.pc;
+		send_sig_info(signo, &info, current);
+		return;
 
 	      case 4: /* opDEC */
 		if (implver() == IMPLVER_EV4) {
+			long si_code;
+
 			/* The some versions of SRM do not handle
 			   the opDEC properly - they return the PC of the
 			   opDEC fault, not the instruction after as the
@@ -309,8 +356,7 @@ do_entIF(unsigned long type, unsigned long a1,
 			   We do this by intentionally causing an opDEC
 			   fault during the boot sequence and testing if
 			   we get the correct PC.  If not, we set a flag
-			   to correct it every time through.
-			*/
+			   to correct it every time through.  */
 			if (opDEC_testing) {
 				if (regs.pc == opDEC_test_pc) {
 					opDEC_fix = 4;
@@ -324,8 +370,17 @@ do_entIF(unsigned long type, unsigned long a1,
 			/* EV4 does not implement anything except normal
 			   rounding.  Everything else will come here as
 			   an illegal instruction.  Emulate them.  */
-			if (alpha_fp_emul(regs.pc-4))
+			si_code = alpha_fp_emul(regs.pc - 4);
+			if (si_code == 0)
 				return;
+			if (si_code > 0) {
+				info.si_signo = SIGFPE;
+				info.si_errno = 0;
+				info.si_code = si_code;
+				info.si_addr = (void *) regs.pc;
+				send_sig_info(SIGFPE, &info, current);
+				return;
+			}
 		}
 		break;
 
@@ -347,7 +402,12 @@ do_entIF(unsigned long type, unsigned long a1,
 	      default: /* unexpected instruction-fault type */
 		      ;
 	}
-	send_sig(SIGILL, current, 1);
+
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code = ILL_ILLOPC;
+	info.si_addr = regs.pc;
+	send_sig_info(SIGILL, &info, current);
 }
 
 /* There is an ifdef in the PALcode in MILO that enables a 
@@ -362,8 +422,15 @@ do_entDbg(unsigned long type, unsigned long a1,
 	  unsigned long a2, unsigned long a3, unsigned long a4,
 	  unsigned long a5, struct pt_regs regs)
 {
+	siginfo_t info;
+
 	die_if_kernel("Instruction fault", &regs, type, 0);
-	force_sig(SIGILL, current);
+
+	info.si_signo = SIGILL;
+	info.si_errno = 0;
+	info.si_code = ILL_ILLOPC;
+	info.si_addr = regs.pc;
+	force_sig_info(SIGILL, &info, current);
 }
 
 
@@ -720,6 +787,7 @@ do_entUnaUser(void * va, unsigned long opcode,
 
 	unsigned long tmp1, tmp2, tmp3, tmp4;
 	unsigned long fake_reg, *reg_addr = &fake_reg;
+	siginfo_t info;
 	long error;
 
 	/* Check the UAC bits to decide what the user wants us to do
@@ -984,12 +1052,34 @@ do_entUnaUser(void * va, unsigned long opcode,
 
 give_sigsegv:
 	regs->pc -= 4;  /* make pc point to faulting insn */
-	send_sig(SIGSEGV, current, 1);
+	info.si_signo = SIGSEGV;
+	info.si_errno = 0;
+
+	/* We need to replicate some of the logic in mm/fault.c,
+	   since we don't have access to the fault code in the
+	   exception handling return path.  */
+	if (!__access_ok((unsigned long)va, 0, USER_DS))
+		info.si_code = SEGV_ACCERR;
+	else {
+		struct mm_struct *mm = current->mm;
+		down_read(&mm->mmap_sem);
+		if (find_vma(mm, (unsigned long)va))
+			info.si_code = SEGV_ACCERR;
+		else
+			info.si_code = SEGV_MAPERR;
+		up_read(&mm->mmap_sem);
+	}
+	info.si_addr = va;
+	send_sig_info(SIGSEGV, &info, current);
 	return;
 
 give_sigbus:
 	regs->pc -= 4;
-	send_sig(SIGBUS, current, 1);
+	info.si_signo = SIGBUS;
+	info.si_errno = 0;
+	info.si_code = BUS_ADRALN;
+	info.si_addr = va;
+	send_sig_info(SIGBUS, &info, current);
 	return;
 }
 

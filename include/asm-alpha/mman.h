@@ -19,11 +19,13 @@
 #define _MAP_UNALIGNED	0x0800
 
 /* These are linux-specific */
-#define MAP_GROWSDOWN	0x1000		/* stack-like segment */
-#define MAP_DENYWRITE	0x2000		/* ETXTBSY */
-#define MAP_EXECUTABLE	0x4000		/* mark it as an executable */
-#define MAP_LOCKED	0x8000		/* lock the mapping */
+#define MAP_GROWSDOWN	0x01000		/* stack-like segment */
+#define MAP_DENYWRITE	0x02000		/* ETXTBSY */
+#define MAP_EXECUTABLE	0x04000		/* mark it as an executable */
+#define MAP_LOCKED	0x08000		/* lock the mapping */
 #define MAP_NORESERVE	0x10000		/* don't check for reservations */
+#define MAP_POPULATE	0x20000		/* populate (prefault) pagetables */
+#define MAP_NONBLOCK	0x40000		/* do not block on IO */
 
 #define MS_ASYNC	1		/* sync memory asynchronously */
 #define MS_SYNC		2		/* synchronous memory sync */

@@ -238,6 +238,8 @@ miata_init_pci(void)
 static void
 miata_kill_arch(int mode)
 {
+	cia_kill_arch(mode);
+
 	switch(mode) {
 	case LINUX_REBOOT_CMD_RESTART:
 		/* Who said DEC engineers have no sense of humor? ;-)  */ 

@@ -7,6 +7,7 @@
 #include <linux/mount.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/cache.h>
 #include <asm/page.h>			/* for BUG() */
 
 /*

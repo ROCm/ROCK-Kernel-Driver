@@ -590,7 +590,7 @@ handle_irq(int irq, struct pt_regs * regs)
 	}
 
 	irq_enter();
-	kstat_cpu(i).irqs[irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock_irq(&desc->lock); /* mask also the higher prio events */
 	desc->handler->ack(irq);
 	/*
