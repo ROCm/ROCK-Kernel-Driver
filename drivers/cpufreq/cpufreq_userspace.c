@@ -508,8 +508,9 @@ store_speed (struct cpufreq_policy *policy, const char *buf, size_t count)
 	return count;
 }
 
-static struct freq_attr freq_attr_scaling_setspeed = {
-	.attr = { .name = "scaling_setspeed", .mode = 0644 },
+static struct freq_attr freq_attr_scaling_setspeed = 
+{
+	.attr = { .name = "scaling_setspeed", .mode = 0644, .owner = THIS_MODULE },
 	.show = show_speed,
 	.store = store_speed,
 };
