@@ -768,6 +768,7 @@ static void enable_wol_mode(struct net_device *dev, int enable_intr);
 static int netdev_close(struct net_device *dev);
 static int netdev_get_regs(struct net_device *dev, u8 *buf);
 static int netdev_get_eeprom(struct net_device *dev, u8 *buf);
+static struct ethtool_ops ethtool_ops;
 
 static void move_int_phy(struct net_device *dev, int addr)
 {
@@ -926,6 +927,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = &natsemi_poll_controller;
 #endif
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	if (mtu)
 		dev->mtu = mtu;
@@ -2457,176 +2459,135 @@ static void set_rx_mode(struct net_device *dev)
 	spin_unlock_irq(&np->lock);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct netdev_private *np = netdev_priv(dev);
-	u32 cmd;
-
-	if (get_user(cmd, (u32 __user *)useraddr))
-		return -EFAULT;
-
-	switch (cmd) {
-	/* get driver info */
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
-		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
-		info.fw_version[0] = '\0';
-		strncpy(info.bus_info, pci_name(np->pci_dev),
-			ETHTOOL_BUSINFO_LEN);
-		info.eedump_len = NATSEMI_EEPROM_SIZE;
-		info.regdump_len = NATSEMI_REGS_SIZE;
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&np->lock);
-		netdev_get_ecmd(dev, &ecmd);
-		spin_unlock_irq(&np->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd ecmd;
-		int r;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&np->lock);
-		r = netdev_set_ecmd(dev, &ecmd);
-		spin_unlock_irq(&np->lock);
-		return r;
-	}
-	/* get wake-on-lan */
-	case ETHTOOL_GWOL: {
-		struct ethtool_wolinfo wol = {ETHTOOL_GWOL};
-		spin_lock_irq(&np->lock);
-		netdev_get_wol(dev, &wol.supported, &wol.wolopts);
-		netdev_get_sopass(dev, wol.sopass);
-		spin_unlock_irq(&np->lock);
-		if (copy_to_user(useraddr, &wol, sizeof(wol)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set wake-on-lan */
-	case ETHTOOL_SWOL: {
-		struct ethtool_wolinfo wol;
-		int r;
-		if (copy_from_user(&wol, useraddr, sizeof(wol)))
-			return -EFAULT;
-		spin_lock_irq(&np->lock);
-		netdev_set_wol(dev, wol.wolopts);
-		r = netdev_set_sopass(dev, wol.sopass);
-		spin_unlock_irq(&np->lock);
-		return r;
-	}
-	/* get registers */
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u8 regbuf[NATSEMI_REGS_SIZE];
-		int r;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-
-		if (regs.len > NATSEMI_REGS_SIZE) {
-			regs.len = NATSEMI_REGS_SIZE;
-		}
-		regs.version = NATSEMI_REGS_VER;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-
-		spin_lock_irq(&np->lock);
-		r = netdev_get_regs(dev, regbuf);
-		spin_unlock_irq(&np->lock);
-
-		if (r)
-			return r;
-		if (copy_to_user(useraddr, regbuf, regs.len))
-			return -EFAULT;
-		return 0;
-	}
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = np->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		np->msg_enable = edata.data;
-		return 0;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		int tmp;
-		int r = -EINVAL;
-		/* if autoneg is off, it's an error */
-		tmp = mdio_read(dev, MII_BMCR);
-		if (tmp & BMCR_ANENABLE) {
-			tmp |= (BMCR_ANRESTART);
-			mdio_write(dev, MII_BMCR, tmp);
-			r = 0;
-		}
-		return r;
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		/* LSTATUS is latched low until a read - so read twice */
-		mdio_read(dev, MII_BMSR);
-		edata.data = (mdio_read(dev, MII_BMSR)&BMSR_LSTATUS) ? 1:0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* get EEPROM */
-	case ETHTOOL_GEEPROM: {
-		struct ethtool_eeprom eeprom;
-		u8 eebuf[NATSEMI_EEPROM_SIZE];
-		int r;
-
-		if (copy_from_user(&eeprom, useraddr, sizeof(eeprom)))
-			return -EFAULT;
-
-		if (eeprom.offset > eeprom.offset+eeprom.len)
-			return -EINVAL;
-
-		if ((eeprom.offset+eeprom.len) > NATSEMI_EEPROM_SIZE) {
-			eeprom.len = NATSEMI_EEPROM_SIZE-eeprom.offset;
-		}
-		eeprom.magic = PCI_VENDOR_ID_NS | (PCI_DEVICE_ID_NS_83815<<16);
-		if (copy_to_user(useraddr, &eeprom, sizeof(eeprom)))
-			return -EFAULT;
-
-		useraddr += offsetof(struct ethtool_eeprom, data);
-
-		spin_lock_irq(&np->lock);
-		r = netdev_get_eeprom(dev, eebuf);
-		spin_unlock_irq(&np->lock);
-
-		if (r)
-			return r;
-		if (copy_to_user(useraddr, eebuf+eeprom.offset, eeprom.len))
-			return -EFAULT;
-		return 0;
-	}
-
-	}
-
-	return -EOPNOTSUPP;
+	strncpy(info->driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
+	strncpy(info->version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
+	strncpy(info->bus_info, pci_name(np->pci_dev), ETHTOOL_BUSINFO_LEN);
 }
+
+static int get_regs_len(struct net_device *dev)
+{
+	return NATSEMI_REGS_SIZE;
+}
+
+static int get_eeprom_len(struct net_device *dev)
+{
+	return NATSEMI_EEPROM_SIZE;
+}
+
+static int get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	spin_lock_irq(&np->lock);
+	netdev_get_ecmd(dev, ecmd);
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static int set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&np->lock);
+	res = netdev_set_ecmd(dev, ecmd);
+	spin_unlock_irq(&np->lock);
+	return res;
+}
+
+static void get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	spin_lock_irq(&np->lock);
+	netdev_get_wol(dev, &wol->supported, &wol->wolopts);
+	netdev_get_sopass(dev, wol->sopass);
+	spin_unlock_irq(&np->lock);
+}
+
+static int set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&np->lock);
+	netdev_set_wol(dev, wol->wolopts);
+	res = netdev_set_sopass(dev, wol->sopass);
+	spin_unlock_irq(&np->lock);
+	return res;
+}
+
+static void get_regs(struct net_device *dev, struct ethtool_regs *regs, void *buf)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	regs->version = NATSEMI_REGS_VER;
+	spin_lock_irq(&np->lock);
+	netdev_get_regs(dev, buf);
+	spin_unlock_irq(&np->lock);
+}
+
+static u32 get_msglevel(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return np->msg_enable;
+}
+
+static void set_msglevel(struct net_device *dev, u32 val)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	np->msg_enable = val;
+}
+
+static int nway_reset(struct net_device *dev)
+{
+	int tmp;
+	int r = -EINVAL;
+	/* if autoneg is off, it's an error */
+	tmp = mdio_read(dev, MII_BMCR);
+	if (tmp & BMCR_ANENABLE) {
+		tmp |= (BMCR_ANRESTART);
+		mdio_write(dev, MII_BMCR, tmp);
+		r = 0;
+	}
+	return r;
+}
+
+static u32 get_link(struct net_device *dev)
+{
+	/* LSTATUS is latched low until a read - so read twice */
+	mdio_read(dev, MII_BMSR);
+	return (mdio_read(dev, MII_BMSR)&BMSR_LSTATUS) ? 1:0;
+}
+
+static int get_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom, u8 *data)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	u8 eebuf[NATSEMI_EEPROM_SIZE];
+	int res;
+
+	eeprom->magic = PCI_VENDOR_ID_NS | (PCI_DEVICE_ID_NS_83815<<16);
+	spin_lock_irq(&np->lock);
+	res = netdev_get_eeprom(dev, eebuf);
+	spin_unlock_irq(&np->lock);
+	if (!res)
+		memcpy(data, eebuf+eeprom->offset, eeprom->len);
+	return res;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = get_drvinfo,
+	.get_regs_len = get_regs_len,
+	.get_eeprom_len = get_eeprom_len,
+	.get_settings = get_settings,
+	.set_settings = set_settings,
+	.get_wol = get_wol,
+	.set_wol = set_wol,
+	.get_regs = get_regs,
+	.get_msglevel = get_msglevel,
+	.set_msglevel = set_msglevel,
+	.nway_reset = nway_reset,
+	.get_link = get_link,
+	.get_eeprom = get_eeprom,
+};
 
 static int netdev_set_wol(struct net_device *dev, u32 newval)
 {
@@ -2976,8 +2937,6 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	struct netdev_private *np = netdev_priv(dev);
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = np->phy_addr_external;
