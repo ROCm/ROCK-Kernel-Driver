@@ -178,76 +178,76 @@ int __down_trylock(struct semaphore * sem)
  * value in some cases..
  */
 #ifdef CONFIG_CPU_26
-asm("	.align	5
-	.globl	__down_failed
-__down_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down
-	ldmfd	sp!, {r0 - r3, pc}^
-
-	.align	5
-	.globl	__down_interruptible_failed
-__down_interruptible_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down_interruptible
-	mov	ip, r0
-	ldmfd	sp!, {r0 - r3, pc}^
-
-	.align	5
-	.globl	__down_trylock_failed
-__down_trylock_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down_trylock
-	mov	ip, r0
-	ldmfd	sp!, {r0 - r3, pc}^
-
-	.align	5
-	.globl	__up_wakeup
-__up_wakeup:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__up
-	ldmfd	sp!, {r0 - r3, pc}^
+asm("	.align	5				\n\
+	.globl	__down_failed			\n\
+__down_failed:					\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down				\n\
+	ldmfd	sp!, {r0 - r3, pc}^		\n\
+						\n\
+	.align	5				\n\
+	.globl	__down_interruptible_failed	\n\
+__down_interruptible_failed:			\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down_interruptible		\n\
+	mov	ip, r0				\n\
+	ldmfd	sp!, {r0 - r3, pc}^		\n\
+						\n\
+	.align	5				\n\
+	.globl	__down_trylock_failed		\n\
+__down_trylock_failed:				\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down_trylock			\n\
+	mov	ip, r0				\n\
+	ldmfd	sp!, {r0 - r3, pc}^		\n\
+						\n\
+	.align	5				\n\
+	.globl	__up_wakeup			\n\
+__up_wakeup:					\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__up				\n\
+	ldmfd	sp!, {r0 - r3, pc}^		\n\
 	");
 
 #else
 /* 32 bit version */
-asm("	.align	5
-	.globl	__down_failed
-__down_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down
-	ldmfd	sp!, {r0 - r3, pc}
-
-	.align	5
-	.globl	__down_interruptible_failed
-__down_interruptible_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down_interruptible
-	mov	ip, r0
-	ldmfd	sp!, {r0 - r3, pc}
-
-	.align	5
-	.globl	__down_trylock_failed
-__down_trylock_failed:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__down_trylock
-	mov	ip, r0
-	ldmfd	sp!, {r0 - r3, pc}
-
-	.align	5
-	.globl	__up_wakeup
-__up_wakeup:
-	stmfd	sp!, {r0 - r3, lr}
-	mov	r0, ip
-	bl	__up
-	ldmfd	sp!, {r0 - r3, pc}
+asm("	.align	5				\n\
+	.globl	__down_failed			\n\
+__down_failed:					\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down				\n\
+	ldmfd	sp!, {r0 - r3, pc}		\n\
+						\n\
+	.align	5				\n\
+	.globl	__down_interruptible_failed	\n\
+__down_interruptible_failed:			\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down_interruptible		\n\
+	mov	ip, r0				\n\
+	ldmfd	sp!, {r0 - r3, pc}		\n\
+						\n\
+	.align	5				\n\
+	.globl	__down_trylock_failed		\n\
+__down_trylock_failed:				\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__down_trylock			\n\
+	mov	ip, r0				\n\
+	ldmfd	sp!, {r0 - r3, pc}		\n\
+						\n\
+	.align	5				\n\
+	.globl	__up_wakeup			\n\
+__up_wakeup:					\n\
+	stmfd	sp!, {r0 - r3, lr}		\n\
+	mov	r0, ip				\n\
+	bl	__up				\n\
+	ldmfd	sp!, {r0 - r3, pc}		\n\
 	");
 
 #endif
