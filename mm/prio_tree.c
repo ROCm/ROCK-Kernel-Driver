@@ -124,10 +124,8 @@ static inline struct prio_tree_node *prio_tree_replace(
 		node->parent = old->parent;
 		if (old->parent->left == old)
 			old->parent->left = node;
-		else {
-			BUG_ON(old->parent->right != old);
+		else
 			old->parent->right = node;
-		}
 	}
 
 	if (!prio_tree_left_empty(old)) {
@@ -271,10 +269,8 @@ void prio_tree_remove(struct prio_tree_root *root, struct prio_tree_node *node)
 
 	if (cur->parent->right == cur)
 		cur->parent->right = cur->parent;
-	else {
-		BUG_ON(cur->parent->left != cur);
+	else
 		cur->parent->left = cur->parent;
-	}
 
 	while (cur != node)
 		cur = prio_tree_replace(root, cur->parent, cur);
@@ -308,8 +304,16 @@ static inline struct prio_tree_node *__prio_tree_left(
 				iter->size_level++;
 		}
 		else {
-			iter->size_level = 1;
-			iter->mask = 1UL << (root->index_bits - 1);
+			if (iter->size_level) {
+				BUG_ON(!prio_tree_left_empty(iter->cur));
+				BUG_ON(!prio_tree_right_empty(iter->cur));
+				iter->size_level++;
+				iter->mask = ULONG_MAX;
+			}
+			else {
+				iter->size_level = 1;
+				iter->mask = 1UL << (root->index_bits - 1);
+			}
 		}
 		return iter->cur;
 	}
@@ -347,8 +351,16 @@ static inline struct prio_tree_node *__prio_tree_right(
 				iter->size_level++;
 		}
 		else {
-			iter->size_level = 1;
-			iter->mask = 1UL << (root->index_bits - 1);
+			if (iter->size_level) {
+				BUG_ON(!prio_tree_left_empty(iter->cur));
+				BUG_ON(!prio_tree_right_empty(iter->cur));
+				iter->size_level++;
+				iter->mask = ULONG_MAX;
+			}
+			else {
+				iter->size_level = 1;
+				iter->mask = 1UL << (root->index_bits - 1);
+			}
 		}
 		return iter->cur;
 	}
@@ -360,13 +372,15 @@ static inline struct prio_tree_node *__prio_tree_parent(
 	struct prio_tree_iter *iter)
 {
 	iter->cur = iter->cur->parent;
-	iter->mask <<= 1;
-	if (iter->size_level) {
-		if (iter->size_level == 1)
-			iter->mask = 1UL;
+	if (iter->mask == ULONG_MAX)
+		iter->mask = 1UL;
+	else if (iter->size_level == 1)
+		iter->mask = 1UL;
+	else
+		iter->mask <<= 1;
+	if (iter->size_level)
 		iter->size_level--;
-	}
-	else if (iter->value & iter->mask)
+	if (!iter->size_level && (iter->value & iter->mask))
 		iter->value ^= iter->mask;
 	return iter->cur;
 }
