@@ -562,7 +562,8 @@ ecard_dump_irq_state(ecard_t *ec)
 
 static void ecard_check_lockup(struct irqdesc *desc)
 {
-	static int last, lockup;
+	static unsigned long last;
+	static int lockup;
 	ecard_t *ec;
 
 	/*
