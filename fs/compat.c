@@ -17,6 +17,8 @@
 #include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/fcntl.h>
+#include <linux/namei.h>
+#include <linux/file.h>
 
 #include <asm/uaccess.h>
 
@@ -100,4 +102,59 @@ int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
 	err |= __put_user(kfl->l_len, &ufl->l_len);
 	err |= __put_user(kfl->l_pid, &ufl->l_pid);
 	return err;
+}
+
+static int put_compat_statfs(struct compat_statfs *ubuf, struct statfs *kbuf)
+{
+	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
+	    __put_user(kbuf->f_type, &ubuf->f_type) ||
+	    __put_user(kbuf->f_bsize, &ubuf->f_bsize) ||
+	    __put_user(kbuf->f_blocks, &ubuf->f_blocks) ||
+	    __put_user(kbuf->f_bfree, &ubuf->f_bfree) ||
+	    __put_user(kbuf->f_bavail, &ubuf->f_bavail) ||
+	    __put_user(kbuf->f_files, &ubuf->f_files) ||
+	    __put_user(kbuf->f_ffree, &ubuf->f_ffree) ||
+	    __put_user(kbuf->f_namelen, &ubuf->f_namelen) ||
+	    __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]) ||
+	    __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]))
+		return -EFAULT;
+	return 0;
+}
+
+/*
+ * The following statfs calls are copies of code from fs/open.c and
+ * should be checked against those from time to time
+ */
+asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
+{
+	struct nameidata nd;
+	int error;
+
+	error = user_path_walk(path, &nd);
+	if (!error) {
+		struct statfs tmp;
+		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
+		if (!error && put_compat_statfs(buf, &tmp))
+			error = -EFAULT;
+		path_release(&nd);
+	}
+	return error;
+}
+
+asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
+{
+	struct file * file;
+	struct statfs tmp;
+	int error;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+	error = vfs_statfs(file->f_dentry->d_inode->i_sb, &tmp);
+	if (!error && put_compat_statfs(buf, &tmp))
+		error = -EFAULT;
+	fput(file);
+out:
+	return error;
 }
