@@ -33,6 +33,7 @@ extern struct agp_bridge_data agp_bridge;
 
 /* Generic routines. */
 void agp_generic_agp_enable(u32 mode);
+int agp_generic_agp_3_0_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
 int agp_generic_free_gatt_table(void);
 agp_memory *agp_create_memory(int scratch_pages);
