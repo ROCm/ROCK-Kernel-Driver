@@ -114,7 +114,6 @@ struct snd_usb_midi_in_endpoint {
 	struct urb* urb;
 	struct usbmidi_in_port {
 		snd_rawmidi_substream_t* substream;
-		int active;
 	} ports[0x10];
 };
 
@@ -159,7 +158,12 @@ static void snd_usbmidi_input_packet(snd_usb_midi_in_endpoint_t* ep,
 	int cable = packet[0] >> 4;
 	usbmidi_in_port_t* port = &ep->ports[cable];
 
-	if (!port->active)
+	if (!port->substream) {
+		snd_printd("unexpected port %d!\n", cable);
+		return;
+	}
+	if (!port->substream->runtime ||
+	    !port->substream->runtime->trigger)
 		return;
 	snd_rawmidi_receive(port->substream, &packet[1],
 			    snd_usbmidi_cin_length[packet[0] & 0x0f]);
@@ -184,8 +188,10 @@ static void snd_usbmidi_in_urb_complete(struct urb* urb)
 			return;
 	}
 
-	urb->dev = ep->umidi->chip->dev;
-	snd_usbmidi_submit_urb(urb, GFP_ATOMIC);
+	if (usb_pipe_needs_resubmit(urb->pipe)) {
+		urb->dev = ep->umidi->chip->dev;
+		snd_usbmidi_submit_urb(urb, GFP_ATOMIC);
+	}
 }
 
 /*
@@ -451,20 +457,6 @@ static void snd_usbmidi_output_trigger(snd_rawmidi_substream_t* substream, int u
 
 static int snd_usbmidi_input_open(snd_rawmidi_substream_t* substream)
 {
-	snd_usb_midi_t* umidi = snd_magic_cast(snd_usb_midi_t, substream->rmidi->private_data, return -ENXIO);
-	usbmidi_in_port_t* port = NULL;
-	int i, j;
-
-	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
-		if (umidi->endpoints[i].in)
-			for (j = 0; j < 0x10; ++j)
-				if (umidi->endpoints[i].in->ports[j].substream == substream) {
-					port = &umidi->endpoints[i].in->ports[j];
-					break;
-				}
-	if (!port)
-		return -ENXIO;
-	substream->runtime->private_data = port;
 	return 0;
 }
 
@@ -475,9 +467,6 @@ static int snd_usbmidi_input_close(snd_rawmidi_substream_t* substream)
 
 static void snd_usbmidi_input_trigger(snd_rawmidi_substream_t* substream, int up)
 {
-	usbmidi_in_port_t* port = (usbmidi_in_port_t*)substream->runtime->private_data;
-
-	port->active = up;
 }
 
 static snd_rawmidi_ops_t snd_usbmidi_output_ops = {

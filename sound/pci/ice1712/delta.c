@@ -257,9 +257,12 @@ static int delta1010lt_ak4524_start(ice1712_t *ice, unsigned char *saved, int ch
 /*
  * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
-static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
+static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned int rate)
 {
 	unsigned char tmp, tmp2;
+
+	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
+		return;
 
 	/* check before reset ak4524 to avoid unnecessary clicks */
 	down(&ice->gpio_mutex);
@@ -267,7 +270,7 @@ static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
 	up(&ice->gpio_mutex);
 	tmp2 = tmp;
 	tmp2 &= ~ICE1712_DELTA_DFS; 
-	if (val == 15 || val == 11 || val == 7)
+	if (rate > 48000)
 		tmp2 |= ICE1712_DELTA_DFS;
 	if (tmp == tmp2)
 		return;
@@ -275,12 +278,9 @@ static void delta_ak4524_set_rate_val(ice1712_t *ice, unsigned char val)
 	/* do it again */
 	snd_ice1712_ak4524_reset(ice, 1);
 	down(&ice->gpio_mutex);
-	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
-	if (val == 15 || val == 11 || val == 7) {
+	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA) & ~ICE1712_DELTA_DFS;
+	if (rate > 48000)
 		tmp |= ICE1712_DELTA_DFS;
-	} else {
-		tmp &= ~ICE1712_DELTA_DFS;
-	}
 	snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp);
 	up(&ice->gpio_mutex);
 	snd_ice1712_ak4524_reset(ice, 0);

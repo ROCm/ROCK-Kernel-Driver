@@ -256,7 +256,7 @@ struct snd_ak4524 {
 	struct snd_ak4524_ops {
 		int (*start)(ice1712_t *, unsigned char *, int);
 		void (*stop)(ice1712_t *, unsigned char *);
-		void (*set_rate_val)(ice1712_t *, unsigned char);
+		void (*set_rate_val)(ice1712_t *, unsigned int);
 	} ops;
 };
 

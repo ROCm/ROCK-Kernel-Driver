@@ -85,7 +85,7 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 	snd_card_t *card;
 	trident_t *trident;
 	const char *str;
-	int err;
+	int err, pcm_dev = 0;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -106,21 +106,21 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_trident_pcm(trident, 0, NULL)) < 0) {
+	if ((err = snd_trident_pcm(trident, pcm_dev++, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:
 	case TRIDENT_DEVICE_ID_NX:
-		if ((err = snd_trident_foldback_pcm(trident, 1, NULL)) < 0) {
+		if ((err = snd_trident_foldback_pcm(trident, pcm_dev++, NULL)) < 0) {
 			snd_card_free(card);
 			return err;
 		}
 		break;
 	}
-	if (trident->device == TRIDENT_DEVICE_ID_NX) {
-		if ((err = snd_trident_spdif_pcm(trident, 2, NULL)) < 0) {
+	if (trident->device == TRIDENT_DEVICE_ID_NX || trident->device == TRIDENT_DEVICE_ID_SI7018) {
+		if ((err = snd_trident_spdif_pcm(trident, pcm_dev++, NULL)) < 0) {
 			snd_card_free(card);
 			return err;
 		}
