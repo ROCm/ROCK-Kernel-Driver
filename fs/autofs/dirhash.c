@@ -10,6 +10,8 @@
  *
  * ------------------------------------------------------------------------- */
 
+#include <linux/dcache.h>
+#include <linux/namei.h>
 #include "autofs_i.h"
 
 /* Functions for maintenance of expiry queue */

@@ -15,6 +15,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #define __NO_VERSION__
+#include <linux/namei.h>
 #include <linux/module.h>
 #include <asm/uaccess.h>
 

@@ -47,6 +47,7 @@
 #include <linux/completion.h>
 #include <linux/seq_file.h>
 #include <linux/binfmts.h>
+#include <linux/namei.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)

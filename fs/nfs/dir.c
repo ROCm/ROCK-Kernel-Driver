@@ -30,6 +30,7 @@
 #include <linux/nfs_mount.h>
 #include <linux/pagemap.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 
 #define NFS_PARANOIA 1
 /* #define NFS_DEBUG_VERBOSE 1 */

@@ -11,6 +11,7 @@
 #include <asm/uaccess.h>
 #include <linux/kernel.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 #ifdef CONFIG_QIFACE_COMPAT
 #include <linux/quotacompat.h>
 #endif

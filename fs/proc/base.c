@@ -24,6 +24,7 @@
 #include <linux/file.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#include <linux/namei.h>
 #include <linux/namespace.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>

@@ -29,6 +29,7 @@
 #include <linux/stat.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
+#include <linux/namei.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/device.h>
