@@ -544,9 +544,6 @@ smp_prepare_cpus(unsigned int max_cpus)
 	smp_tune_scheduling(boot_cpuid);
 	smp_setup_percpu_timer(boot_cpuid);
 
-	/* We have already have the boot CPU online.. */
-	set_bit(boot_cpuid, &cpu_online_map);
-
 	/* Nothing to do on a UP box, or when told not to.  */
 	if (smp_num_probed == 1 || max_cpus == 0) {
 		cpu_present_mask = 1UL << boot_cpuid;
@@ -574,7 +571,11 @@ smp_prepare_cpus(unsigned int max_cpus)
 void __devinit
 smp_prepare_boot_cpu(void)
 {
+	/*
+	 * Mark the boot cpu (current cpu) as both present and online
+	 */ 
 	set_bit(smp_processor_id(), &cpu_present_mask);
+	set_bit(smp_processor_id(), &cpu_online_map);
 }
 
 int __devinit

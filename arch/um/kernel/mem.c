@@ -27,6 +27,7 @@
 #include "init.h"
 #include "os.h"
 #include "mode_kern.h"
+#include "uml_uaccess.h"
 
 /* Changed during early boot */
 pgd_t swapper_pg_dir[1024];
@@ -231,11 +232,11 @@ static int setup_one_range(int fd, char *driver, unsigned long start,
 			panic("Failed to allocating mem_region");
 	}
 
-	*region = ((struct mem_region) { driver :	driver,
-					 start_pfn :	pfn,
-					 start :	start, 
-					 len :		len, 
-					 fd :		fd } );
+	*region = ((struct mem_region) { .driver 	= driver,
+					 .start_pfn 	= pfn,
+					 .start 	= start, 
+					 .len 		= len, 
+					 .fd 		= fd } );
 	regions[i] = region;
  out:
 	up(&regions_sem);
@@ -414,8 +415,28 @@ __uml_setup("mem=", uml_mem_setup,
 
 struct page *arch_validate(struct page *page, int mask, int order)
 {
-	return(CHOOSE_MODE_PROC(arch_validate_tt, arch_validate_skas, page, 
-				mask, order));
+	unsigned long addr, zero = 0;
+	int i;
+
+ again:
+	if(page == NULL) return(page);
+	if(PageHighMem(page)) return(page);
+
+	addr = (unsigned long) page_address(page);
+	for(i = 0; i < (1 << order); i++){
+		current->thread.fault_addr = (void *) addr;
+		if(__do_copy_to_user((void *) addr, &zero, 
+				     sizeof(zero),
+				     &current->thread.fault_addr,
+				     &current->thread.fault_catcher)){
+			if(!(mask & __GFP_WAIT)) return(NULL);
+			else break;
+		}
+		addr += PAGE_SIZE;
+	}
+	if(i == (1 << order)) return(page);
+	page = alloc_pages(mask, order);
+	goto again;
 }
 
 DECLARE_MUTEX(vm_reserved_sem);
@@ -423,15 +444,15 @@ static struct list_head vm_reserved = LIST_HEAD_INIT(vm_reserved);
 
 /* Static structures, linked in to the list in early boot */
 static struct vm_reserved head = {
-	list :		LIST_HEAD_INIT(head.list),
-	start :		0,
-	end :		0xffffffff
+	.list 		= LIST_HEAD_INIT(head.list),
+	.start 		= 0,
+	.end 		= 0xffffffff
 };
 
 static struct vm_reserved tail = {
-	list :		LIST_HEAD_INIT(tail.list),
-	start :		0,
-	end :		0xffffffff
+	.list 		= LIST_HEAD_INIT(tail.list),
+	.start 		= 0,
+	.end 		= 0xffffffff
 };
 
 void set_usable_vm(unsigned long start, unsigned long end)
@@ -467,9 +488,9 @@ int reserve_vm(unsigned long start, unsigned long end, void *e)
 		goto out;
 	}
 	*entry = ((struct vm_reserved) 
-		{ list :	LIST_HEAD_INIT(entry->list),
-		  start :	start,
-		  end :		end });
+		{ .list 	= LIST_HEAD_INIT(entry->list),
+		  .start 	= start,
+		  .end 		= end });
 	list_add(&entry->list, &prev->list);
 	err = 0;
  out:
@@ -539,9 +560,9 @@ struct iomem {
  */
 
 struct iomem iomem_regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] =
-					 { name : 	NULL,
-					   fd : 	-1,
-					   size :	0 } };
+					 { .name  	= NULL,
+					   .fd  	= -1,
+					   .size 	= 0 } };
 
 int num_iomem_regions = 0;
 
@@ -551,9 +572,9 @@ void add_iomem(char *name, int fd, unsigned long size)
 		return;
 	size = (size + PAGE_SIZE - 1) & PAGE_MASK;
 	iomem_regions[num_iomem_regions++] = 
-		((struct iomem) { name :	name,
-				  fd :		fd,
-				  size :	size } );
+		((struct iomem) { .name 	= name,
+				  .fd 		= fd,
+				  .size 	= size } );
 }
 
 int setup_iomem(void)

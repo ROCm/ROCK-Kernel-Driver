@@ -169,8 +169,12 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 void initial_thread_cb(void (*proc)(void *), void *arg)
 {
+	int save_kmalloc_ok = kmalloc_ok;
+
+	kmalloc_ok = 0;
 	CHOOSE_MODE_PROC(initial_thread_cb_tt, initial_thread_cb_skas, proc, 
 			 arg);
+	kmalloc_ok = save_kmalloc_ok;
 }
  
 unsigned long stack_sp(unsigned long page)
@@ -306,7 +310,11 @@ EXPORT_SYMBOL(not_implemented);
 
 int user_context(unsigned long sp)
 {
-	return((sp & (PAGE_MASK << 1)) != current->thread.kernel_stack);
+	unsigned long stack;
+
+	stack = sp & (PAGE_MASK << CONFIG_KERNEL_STACK_ORDER);
+	stack += 2 * PAGE_SIZE;
+	return(stack != current->thread.kernel_stack);
 }
 
 extern void remove_umid_dir(void);

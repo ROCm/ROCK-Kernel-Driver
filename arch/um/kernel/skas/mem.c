@@ -18,11 +18,6 @@ unsigned long set_task_sizes_skas(int arg, unsigned long *host_size_out,
 	return(((unsigned long) set_task_sizes_skas) & ~0xffffff);
 }
 
-struct page *arch_validate_skas(struct page *page, int mask, int order)
-{
-	return(page);
-}
-
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

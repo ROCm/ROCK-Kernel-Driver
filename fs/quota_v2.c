@@ -306,6 +306,7 @@ static uint find_free_dqentry(struct dquot *dquot, int *err)
 		blk = get_free_dqblk(filp, info);
 		if ((int)blk < 0) {
 			*err = blk;
+			freedqbuf(buf);
 			return 0;
 		}
 		memset(buf, 0, V2_DQBLKSIZE);

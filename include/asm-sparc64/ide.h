@@ -80,7 +80,7 @@ static __inline__ void ide_init_default_hwifs(void)
 #define ide_ack_intr(hwif)		(1)
 
 /* XXX Known to be broken.  Axboe will fix the problems this
- * XXX has by making seperate IN/OUT macros for IDE_DATA
+ * XXX has by making separate IN/OUT macros for IDE_DATA
  * XXX register and rest of IDE regs and also using
  * XXX ide_ioreg_t instead of u32 for ports. -DaveM
  */

@@ -3110,7 +3110,8 @@ static struct ecard_driver acornscsi_driver = {
 	.remove		= __devexit_p(acornscsi_remove),
 	.id_table	= acornscsi_cids,
 	.drv = {
-		.name	= "acornscsi",
+		.devclass	= &shost_devclass,
+		.name		= "acornscsi",
 	},
 };
 

@@ -3,8 +3,6 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := mixer_oss.o
-
 snd-mixer-oss-objs := mixer_oss.o
 
 snd-pcm-oss-objs := pcm_oss.o pcm_plugin.o \

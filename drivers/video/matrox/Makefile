@@ -2,11 +2,6 @@
 # 5 Aug 1999, James Simmons, <mailto:jsimmons@edgeglobal.com>
 # Rewritten to use lists instead of if-statements.
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs    :=  matroxfb_base.o matroxfb_accel.o matroxfb_DAC1064.o matroxfb_Ti3026.o matroxfb_misc.o g450_pll.o matroxfb_g450.o
-
 # Each configuration option enables a list of files.
 
 my-obj-$(CONFIG_FB_MATROX_G100)	  += g450_pll.o

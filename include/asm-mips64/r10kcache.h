@@ -25,7 +25,7 @@
 #define ic_lsize	64
 #define dc_lsize	32
 
-/* These are configuration dependant.  */
+/* These are configuration dependent.  */
 #define scache_size()	({						\
 	unsigned long __res;						\
 	__res = (read_32bit_cp0_register(CP0_CONFIG) >> 16) & 3;	\

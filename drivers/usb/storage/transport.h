@@ -55,8 +55,7 @@
 #define US_PR_SCM_ATAPI	0x80		/* SCM-ATAPI bridge */
 #endif
 #ifdef CONFIG_USB_STORAGE_SDDR09
-#define US_PR_EUSB_SDDR09	0x81	/* SCM-SCSI bridge for
-						SDDR-09 */
+#define US_PR_EUSB_SDDR09	0x81	/* SCM-SCSI bridge for SDDR-09 */
 #endif
 #ifdef CONFIG_USB_STORAGE_SDDR55
 #define US_PR_SDDR55	0x82		/* SDDR-55 (made up) */
@@ -64,15 +63,15 @@
 #define US_PR_DPCM_USB  0xf0		/* Combination CB/SDDR09 */
 
 #ifdef CONFIG_USB_STORAGE_FREECOM
-#define US_PR_FREECOM   0xf1            /* Freecom */
+#define US_PR_FREECOM   0xf1	    /* Freecom */
 #endif
 
 #ifdef CONFIG_USB_STORAGE_DATAFAB
-#define US_PR_DATAFAB   0xf2            /* Datafab chipsets */
+#define US_PR_DATAFAB   0xf2	    /* Datafab chipsets */
 #endif
 
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
-#define US_PR_JUMPSHOT  0xf3            /* Lexar Jumpshot */
+#define US_PR_JUMPSHOT  0xf3	    /* Lexar Jumpshot */
 #endif
 
 /*
@@ -118,10 +117,10 @@ struct bulk_cs_wrap {
  * usb_stor_bulk_transfer_xxx() return codes, in order of severity
  */
 
-#define USB_STOR_XFER_GOOD		0  /* good transfer                 */
-#define USB_STOR_XFER_SHORT		1  /* transfered less than expected */
-#define USB_STOR_XFER_STALLED		2  /* endpoint stalled		    */
-#define USB_STOR_XFER_ERROR		3  /* transfer died in the middle   */
+#define USB_STOR_XFER_GOOD	0	/* good transfer                 */
+#define USB_STOR_XFER_SHORT	1	/* transfered less than expected */
+#define USB_STOR_XFER_STALLED	2	/* endpoint stalled              */
+#define USB_STOR_XFER_ERROR	3	/* transfer died in the middle   */
 
 /*
  * Transport return codes

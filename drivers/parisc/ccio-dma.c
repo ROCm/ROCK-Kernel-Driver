@@ -852,7 +852,7 @@ ccio_fill_pdir(struct ioc *ioc, struct scatterlist *startsg, int nents,
 ** in the DMA stream. Allocates PDIR entries but does not fill them.
 ** Returns the number of DMA chunks.
 **
-** Doing the fill seperate from the coalescing/allocation keeps the
+** Doing the fill separate from the coalescing/allocation keeps the
 ** code simpler. Future enhancement could make one pass through
 ** the sglist do both.
 */
@@ -1553,38 +1553,6 @@ static int ccio_probe(struct parisc_device *dev)
 
 	ioc_count++;
 	return 0;
-}
-
-struct pci_dev * ccio_get_fake(const struct parisc_device *dev)
-{
-	struct ioc *ioc;
-
-	dev = find_pa_parent_type(dev, HPHW_IOA);
-	if(!dev)
-		return NULL;
-
-	ioc = ccio_find_ioc(dev->hw_path);
-	if(!ioc)
-		return NULL;
-
-	if(ioc->fake_pci_dev)
-		return ioc->fake_pci_dev;
-
-	ioc->fake_pci_dev = kmalloc(sizeof(struct pci_dev), GFP_KERNEL);
-	if(ioc->fake_pci_dev == NULL) {
-		printk(KERN_ERR MODULE_NAME ": memory allocation failure\n");
-		return NULL;
-	}
-	memset(ioc->fake_pci_dev, 0, sizeof(struct pci_dev));
-
-	ioc->fake_pci_dev->dev.platform_data = kmalloc(sizeof(struct pci_hba_data), GFP_KERNEL);
-	if(ioc->fake_pci_dev->dev.platform_data == NULL) {
-		printk(KERN_ERR MODULE_NAME ": memory allocation failure\n");
-		return NULL;
-	}
-
-	HBA_DATA(ioc->fake_pci_dev->dev.platform_data)->iommu = ioc;
-	return ioc->fake_pci_dev;
 }
 
 /* We *can't* support JAVA (T600). Venture there at your own risk. */

@@ -21,25 +21,25 @@
 /*
  * Returns the number of the node containing CPU 'cpu'
  */
-#define __cpu_to_node(cpu) (int)(cpu_to_node_map[cpu])
+#define cpu_to_node(cpu) (int)(cpu_to_node_map[cpu])
 
 /*
  * Returns a bitmask of CPUs on Node 'node'.
  */
-#define __node_to_cpu_mask(node) (node_to_cpu_mask[node])
+#define node_to_cpumask(node) (node_to_cpumask[node])
 
 #else
-#define __cpu_to_node(cpu) (0)
-#define __node_to_cpu_mask(node) (phys_cpu_present_map)
+#define cpu_to_node(cpu) (0)
+#define node_to_cpumask(node) (phys_cpu_present_map)
 #endif
 
 /*
  * Returns the number of the node containing MemBlk 'memblk'
  */
 #ifdef CONFIG_ACPI_NUMA
-#define __memblk_to_node(memblk) (node_memblk[memblk].nid)
+#define memblk_to_node(memblk) (node_memblk[memblk].nid)
 #else
-#define __memblk_to_node(memblk) (memblk)
+#define memblk_to_node(memblk) (memblk)
 #endif
 
 /*
@@ -47,18 +47,18 @@
  * Not implemented here. Multi-level hierarchies detected with
  * the help of node_distance().
  */
-#define __parent_node(nid) (nid)
+#define parent_node(nid) (nid)
 
 /*
  * Returns the number of the first CPU on Node 'node'.
  */
-#define __node_to_first_cpu(node) (__ffs(__node_to_cpu_mask(node)))
+#define node_to_first_cpu(node) (__ffs(node_to_cpumask(node)))
 
 /*
  * Returns the number of the first MemBlk on Node 'node'
  * Should be fixed when IA64 discontigmem goes in.
  */
-#define __node_to_memblk(node) (node)
+#define node_to_memblk(node) (node)
 
 /* Cross-node load balancing interval. */
 #define NODE_BALANCE_RATE 10

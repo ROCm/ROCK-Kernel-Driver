@@ -8,8 +8,6 @@ else
   EXTRA_TARGETS := sun3-head.o
 endif 
 
-export-objs	:= setup.o m68k_ksyms.o
-
 obj-y		:= entry.o process.o traps.o ints.o signal.o ptrace.o \
 			sys_m68k.o time.o semaphore.o setup.o m68k_ksyms.o
 

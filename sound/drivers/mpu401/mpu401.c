@@ -40,7 +40,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE;	/* Enable this card */
 static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* MPU-401 port number */
 static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* MPU-401 IRQ */
-#ifdef CONFIG_PC9800
+#ifdef CONFIG_X86_PC9800
 static int pc98ii[SNDRV_CARDS];				/* PC98-II dauther board */
 #endif
 
@@ -59,7 +59,7 @@ MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(irq, "IRQ # for MPU-401 device.");
 MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
-#ifdef CONFIG_PC9800
+#ifdef CONFIG_X86_PC9800
 MODULE_PARM(pc98ii, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(pc98ii, "Roland MPU-PC98II support.");
 MODULE_PARM_SYNTAX(pc98ii, SNDRV_BOOLEAN_FALSE_DESC);
@@ -85,7 +85,7 @@ static int __init snd_card_mpu401_probe(int dev)
 	if (card == NULL)
 		return -ENOMEM;
 	if (snd_mpu401_uart_new(card, 0,
-#ifdef CONFIG_PC9800
+#ifdef CONFIG_X86_PC9800
 				pc98ii[dev] ? MPU401_HW_PC98II :
 #endif
 				MPU401_HW_MPU401,
@@ -154,6 +154,9 @@ static int __init alsa_card_mpu401_setup(char *str)
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
+#ifdef CONFIG_X86_PC9800
+	       get_option(&str,&pc98ii[nr_dev]) == 2 &&
+#endif
 	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
 	       get_option(&str,&irq[nr_dev]) == 2);
 	nr_dev++;

@@ -142,6 +142,7 @@ static dev_link_t *aha152x_attach(void)
     if (!info) return NULL;
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
+    init_timer(&link->release);
     link->release.function = &aha152x_release_cs;
     link->release.data = (u_long)link;
 
@@ -350,7 +351,7 @@ static void aha152x_release_cs(u_long arg)
 
     DEBUG(0, "aha152x_release_cs(0x%p)\n", link);
 
-#warning This doesn't protect you.  You need some real fix for your races.
+#warning This does not protect you.  You need some real fix for your races.
 #if 0
     if (GET_USE_COUNT(driver_template.module) != 0) {
 	DEBUG(1, "aha152x_cs: release postponed, "

@@ -1703,7 +1703,7 @@ static int scc_net_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/*
 	 * Start transmission if the trx state is idle or
-	 * t_idle hasn't expired yet. Use dwait/persistance/slottime
+	 * t_idle hasn't expired yet. Use dwait/persistence/slottime
 	 * algorithm for normal halfduplex operation.
 	 */
 

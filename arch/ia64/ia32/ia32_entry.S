@@ -95,12 +95,19 @@ END(sys32_sigsuspend)
 GLOBAL_ENTRY(ia32_ret_from_clone)
 	PT_REGS_UNWIND_INFO(0)
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+{	/*
+	 * Some versions of gas generate bad unwind info if the first instruction of a
+	 * procedure doesn't go into the first slot of a bundle.  This is a workaround.
+	 */
+	nop.m 0
+	nop.i 0
 	/*
 	 * We need to call schedule_tail() to complete the scheduling process.
 	 * Called by ia64_switch_to after do_fork()->copy_thread().  r8 contains the
 	 * address of the previously executing task.
 	 */
 	br.call.sptk.many rp=ia64_invoke_schedule_tail
+}
 .ret1:
 #endif
 	adds r2=TI_FLAGS+IA64_TASK_SIZE,r13
@@ -264,7 +271,7 @@ ia32_syscall_table:
 	data8 sys_setreuid	/* 16-bit version */	  /* 70 */
 	data8 sys_setregid	/* 16-bit version */
 	data8 sys32_sigsuspend
-	data8 sys32_sigpending
+	data8 compat_sys_sigpending
 	data8 sys_sethostname
 	data8 sys32_setrlimit	  /* 75 */
 	data8 sys32_old_getrlimit
@@ -290,8 +297,8 @@ ia32_syscall_table:
 	data8 sys_getpriority
 	data8 sys_setpriority
 	data8 sys32_ni_syscall	  /* old profil syscall holder */
-	data8 sys32_statfs
-	data8 sys32_fstatfs	  /* 100 */
+	data8 compat_sys_statfs
+	data8 compat_sys_fstatfs	  /* 100 */
 	data8 sys32_ioperm
 	data8 sys32_socketcall
 	data8 sys_syslog
@@ -317,7 +324,7 @@ ia32_syscall_table:
 	data8 sys32_modify_ldt
 	data8 sys32_ni_syscall	/* adjtimex */
 	data8 sys32_mprotect	  /* 125 */
-	data8 sys32_sigprocmask
+	data8 compat_sys_sigprocmask
 	data8 sys32_ni_syscall	/* create_module */
 	data8 sys32_ni_syscall	/* init_module */
 	data8 sys32_ni_syscall	/* delete_module */

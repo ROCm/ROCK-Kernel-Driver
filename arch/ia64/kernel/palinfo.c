@@ -6,7 +6,7 @@
  * Intel IA-64 Architecture Software Developer's Manual v1.0.
  *
  *
- * Copyright (C) 2000-2001 Hewlett-Packard Co
+ * Copyright (C) 2000-2001, 2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
  * 05/26/2000	S.Eranian	initial release
@@ -225,15 +225,12 @@ cache_info(char *page)
 	int i,j, k;
 	s64 status;
 
-	if ((status=ia64_pal_cache_summary(&levels, &unique_caches)) != 0) {
-			printk("ia64_pal_cache_summary=%ld\n", status);
-			return 0;
+	if ((status = ia64_pal_cache_summary(&levels, &unique_caches)) != 0) {
+		printk(KERN_ERR "ia64_pal_cache_summary=%ld\n", status);
+		return 0;
 	}
 
-	p += sprintf(p, "Cache levels  : %ld\n" \
-			"Unique caches : %ld\n\n",
-			levels,
-			unique_caches);
+	p += sprintf(p, "Cache levels  : %ld\nUnique caches : %ld\n\n", levels, unique_caches);
 
 	for (i=0; i < levels; i++) {
 
@@ -308,8 +305,8 @@ vm_info(char *page)
 	int i, j;
 	s64 status;
 
-	if ((status=ia64_pal_vm_summary(&vm_info_1, &vm_info_2)) !=0) {
-		printk("ia64_pal_vm_summary=%ld\n", status);
+	if ((status = ia64_pal_vm_summary(&vm_info_1, &vm_info_2)) !=0) {
+		printk(KERN_ERR "ia64_pal_vm_summary=%ld\n", status);
 		return 0;
 	}
 
@@ -339,8 +336,8 @@ vm_info(char *page)
 	}
 	p += sprintf(p, "\n");
 
-	if ((status=ia64_pal_vm_page_size(&tr_pages, &vw_pages)) !=0) {
-		printk("ia64_pal_vm_page_size=%ld\n", status);
+	if ((status = ia64_pal_vm_page_size(&tr_pages, &vw_pages)) !=0) {
+		printk(KERN_ERR "ia64_pal_vm_page_size=%ld\n", status);
 		return 0;
 	}
 
@@ -360,7 +357,7 @@ vm_info(char *page)
 	p = bitvector_process(p, vw_pages);
 
 	if ((status=ia64_get_ptce(&ptce)) != 0) {
-		printk("ia64_get_ptce=%ld\n",status);
+		printk(KERN_ERR "ia64_get_ptce=%ld\n", status);
 		return 0;
 	}
 
@@ -710,8 +707,8 @@ tr_info(char *page)
 		u64 rv2:32;
 	} *rid_reg;
 
-	if ((status=ia64_pal_vm_summary(&vm_info_1, &vm_info_2)) !=0) {
-		printk("ia64_pal_vm_summary=%ld\n", status);
+	if ((status = ia64_pal_vm_summary(&vm_info_1, &vm_info_2)) !=0) {
+		printk(KERN_ERR "ia64_pal_vm_summary=%ld\n", status);
 		return 0;
 	}
 	max[0] = vm_info_1.pal_vm_info_1_s.max_itr_entry+1;
@@ -722,7 +719,8 @@ tr_info(char *page)
 
 		status = ia64_pal_tr_read(j, i, tr_buffer, &tr_valid);
 		if (status != 0) {
-			printk("palinfo: pal call failed on tr[%d:%d]=%ld\n", i, j, status);
+			printk(KERN_ERR "palinfo: pal call failed on tr[%d:%d]=%ld\n",
+			       i, j, status);
 			continue;
 		}
 
@@ -841,7 +839,7 @@ palinfo_smp_call(void *info)
 {
 	palinfo_smp_data_t *data = (palinfo_smp_data_t *)info;
 	if (data == NULL) {
-		printk("%s palinfo: data pointer is NULL\n", KERN_ERR);
+		printk(KERN_ERR "palinfo: data pointer is NULL\n");
 		data->ret = 0; /* no output */
 		return;
 	}
@@ -868,7 +866,8 @@ int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 
 	/* will send IPI to other CPU and wait for completion of remote call */
 	if ((ret=smp_call_function_single(f->req_cpu, palinfo_smp_call, &ptr, 0, 1))) {
-		printk("palinfo: remote CPU call from %d to %d on function %d: error %d\n", smp_processor_id(), f->req_cpu, f->func_id, ret);
+		printk(KERN_ERR "palinfo: remote CPU call from %d to %d on function %d: "
+		       "error %d\n", smp_processor_id(), f->req_cpu, f->func_id, ret);
 		return 0;
 	}
 	return ptr.ret;
@@ -877,7 +876,7 @@ int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 static
 int palinfo_handle_smp(pal_func_cpu_u_t *f, char *page)
 {
-	printk("palinfo: should not be called with non SMP kernel\n");
+	printk(KERN_ERR "palinfo: should not be called with non SMP kernel\n");
 	return 0;
 }
 #endif /* CONFIG_SMP */

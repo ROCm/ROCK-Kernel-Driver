@@ -201,7 +201,9 @@ struct mm_struct {
 	unsigned long swap_address;
 
 	unsigned dumpable:1;
-
+#ifdef CONFIG_HUGETLB_PAGE
+	int used_hugetlb;
+#endif
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
@@ -218,10 +220,21 @@ struct mm_struct {
 
 extern int mmlist_nr;
 
-struct signal_struct {
+struct sighand_struct {
 	atomic_t		count;
 	struct k_sigaction	action[_NSIG];
 	spinlock_t		siglock;
+};
+
+/*
+ * NOTE! "signal_struct" does not have it's own
+ * locking, because a shared signal_struct always
+ * implies a shared sighand_struct, so locking
+ * sighand_struct is always a proper superset of
+ * the locking of signal_struct.
+ */
+struct signal_struct {
+	atomic_t		count;
 
 	/* current thread group signal load-balancing target: */
 	task_t			*curr_target;
@@ -233,6 +246,9 @@ struct signal_struct {
 	int			group_exit;
 	int			group_exit_code;
 	struct task_struct	*group_exit_task;
+
+	/* thread group stop support, overloads group_exit_code too */
+	int			group_stop_count;
 };
 
 /*
@@ -343,7 +359,7 @@ struct task_struct {
 	unsigned long it_real_incr, it_prof_incr, it_virt_incr;
 	struct timer_list real_timer;
 	unsigned long utime, stime, cutime, cstime;
-	unsigned long start_time;
+	u64 start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
 	unsigned long min_flt, maj_flt, nswap, cmin_flt, cmaj_flt, cnswap;
 /* process credentials */
@@ -373,7 +389,8 @@ struct task_struct {
 /* namespace */
 	struct namespace *namespace;
 /* signal handlers */
-	struct signal_struct *sig;
+	struct signal_struct *signal;
+	struct sighand_struct *sighand;
 
 	sigset_t blocked, real_blocked;
 	struct sigpending pending;
@@ -400,6 +417,7 @@ struct task_struct {
 	struct backing_dev_info *backing_dev_info;
 
 	unsigned long ptrace_message;
+	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -440,6 +458,8 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PT_TRACE_VFORK	0x00000020
 #define PT_TRACE_CLONE	0x00000040
 #define PT_TRACE_EXEC	0x00000080
+#define PT_TRACE_VFORK_DONE	0x00000100
+#define PT_TRACE_EXIT	0x00000200
 
 #if CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -506,7 +526,6 @@ extern int in_egroup_p(gid_t);
 extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
-extern void sig_exit(int, int, struct siginfo *);
 extern int dequeue_signal(sigset_t *mask, siginfo_t *info);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
@@ -523,7 +542,7 @@ extern void do_notify_parent(struct task_struct *, int);
 extern void force_sig(int, struct task_struct *);
 extern void force_sig_specific(int, struct task_struct *);
 extern int send_sig(int, struct task_struct *, int);
-extern int __broadcast_thread_group(struct task_struct *p, int sig);
+extern void zap_other_threads(struct task_struct *p);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
@@ -585,8 +604,12 @@ extern void exit_thread(void);
 
 extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
+extern void exit_signal(struct task_struct *);
+extern void __exit_signal(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
+
+extern NORET_TYPE void do_group_exit(int);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
@@ -755,10 +778,12 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
-   callers must hold sig->siglock.  */
+   callers must hold sighand->siglock.  */
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);
+
+extern void signal_wake_up(struct task_struct *t, int resume_stopped);
 
 /*
  * Wrappers for p->thread_info->cpu access. No-op on UP.

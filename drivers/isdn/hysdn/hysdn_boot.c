@@ -78,7 +78,7 @@ DecryptBuf(struct boot_data *boot, int cnt)
 }				/* DecryptBuf */
 
 /********************************************************************************/
-/* pof_handle_data executes the required actions dependant on the active record */
+/* pof_handle_data executes the required actions dependent on the active record */
 /* id. If successful 0 is returned, a negative value shows an error.           */
 /********************************************************************************/
 static int

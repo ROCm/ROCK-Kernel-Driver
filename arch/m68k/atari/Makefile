@@ -2,8 +2,6 @@
 # Makefile for Linux arch/m68k/atari source directory
 #
 
-export-objs	:= atari_ksyms.o
-
 obj-y		:= config.o time.o debug.o ataints.o stdma.o \
 			atasound.o stram.o atari_ksyms.o
 

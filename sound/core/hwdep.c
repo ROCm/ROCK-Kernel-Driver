@@ -256,6 +256,19 @@ static snd_minor_t snd_hwdep_reg =
 	.f_ops =	&snd_hwdep_f_ops,
 };
 
+/**
+ * snd_hwdep_new - create a new hwdep instance
+ * @card: the card instance
+ * @id: the id string
+ * @device: the device index (zero-based)
+ * @rhwdep: the pointer to store the new hwdep instance
+ *
+ * Creates a new hwdep instance with the given index on the card.
+ * The callbacks (hwdep->ops) must be set on the returned instance
+ * after this call manually by the caller.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep)
 {
 	snd_hwdep_t *hwdep;
@@ -321,7 +334,7 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 	if ((err = snd_register_device(SNDRV_DEVICE_TYPE_HWDEP,
 				       hwdep->card, hwdep->device,
 				       &snd_hwdep_reg, name)) < 0) {
-		snd_printk(KERN_ERR "unable to register hardware dependant device %i:%i\n",
+		snd_printk(KERN_ERR "unable to register hardware dependent device %i:%i\n",
 			   hwdep->card->number, hwdep->device);
 		snd_hwdep_devices[idx] = NULL;
 		up(&register_mutex);

@@ -79,7 +79,7 @@ MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
 #endif
 
 /*
- *  Constants defination
+ *  Constants definition
  */
 
 #ifndef PCI_VENDOR_ID_ALI

@@ -31,6 +31,7 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/mach/pci.h>
@@ -119,7 +120,7 @@
  *              function = which function
  *		offset = configuration space register we are interested in
  *
- * description:	this routine will generate a platform dependant config
+ * description:	this routine will generate a platform dependent config
  *		address.
  *
  * calls:	none
@@ -295,7 +296,7 @@ static int v3_read_config(struct pci_bus *bus, unsigned int devfn, int where,
 		v = __raw_readw(addr);
 		break;
 
-	case 4:
+	default:
 		v = __raw_readl(addr);
 		break;
 	}

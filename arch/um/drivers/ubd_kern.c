@@ -77,9 +77,11 @@ static struct gendisk *ubd_gendisk[MAX_DEV];
 static struct gendisk *fake_gendisk[MAX_DEV];
  
 #ifdef CONFIG_BLK_DEV_UBD_SYNC
-#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 1, .c = 0 })
+#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 1, .c = 0, \
+					 .cl = 1 })
 #else
-#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 0, .c = 0 })
+#define OPEN_FLAGS ((struct openflags) { .r = 1, .w = 1, .s = 0, .c = 0, \
+					 .cl = 1 })
 #endif
 
 /* Not protected - changed only in ubd_setup_common and then only to
@@ -177,6 +179,8 @@ static void make_ide_entries(char *dev_name)
 	if(proc_ide_root == NULL) make_proc_ide();
 
 	dir = proc_mkdir(dev_name, proc_ide);
+	if(!dir) return;
+
 	ent = create_proc_entry("media", S_IFREG|S_IRUGO, dir);
 	if(!ent) return;
 	ent->nlink = 1;
@@ -405,7 +409,8 @@ static int io_pid = -1;
 
 void kill_io_thread(void)
 {
-	if(io_pid != -1) kill(io_pid, SIGKILL);
+	if(io_pid != -1) 
+		os_kill_process(io_pid, 1);
 }
 
 __uml_exitcall(kill_io_thread);
@@ -892,9 +897,9 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	struct ubd *dev = inode->i_bdev->bd_disk->private_data;
 	int err;
 	struct hd_driveid ubd_id = {
-		.cyls =		0,
-		.heads =	128,
-		.sectors =	32,
+		.cyls		= 0,
+		.heads		= 128,
+		.sectors	= 32,
 	};
 
 	switch (cmd) {

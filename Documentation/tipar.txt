@@ -12,7 +12,7 @@ INTRODUCTION:
 This is a driver for the very common home-made parallel link cable, a cable 
 designed for connecting TI8x/9x graphing calculators (handhelds) to a computer
 or workstation (Alpha, Sparc). Given that driver is built on parport, the 
-parallel port abstraction layer, this driver is independant of the platform.
+parallel port abstraction layer, this driver is independent of the platform.
 
 It can also be used with another device plugged on the same port (such as a
 ZIP drive). I have a 100MB ZIP and both of them work fine !
@@ -90,4 +90,4 @@ You can also mail JB at jb@jblache.org. He packaged these drivers for Debian.
 CREDITS:
 
 The code is based on tidev.c & parport.c.
-The driver has been developed independantly of Texas Instruments.
+The driver has been developed independently of Texas Instruments.

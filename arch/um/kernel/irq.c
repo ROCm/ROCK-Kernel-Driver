@@ -271,7 +271,7 @@ void enable_irq(unsigned int irq)
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-unsigned int do_IRQ(int irq, struct uml_pt_regs *regs)
+unsigned int do_IRQ(int irq, union uml_pt_regs *regs)
 {	
 	/* 
 	 * 0 return value means that this irq is already being

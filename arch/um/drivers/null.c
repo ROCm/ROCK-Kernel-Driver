@@ -32,16 +32,16 @@ void null_free(void *data)
 }
 
 struct chan_ops null_ops = {
-	type:		"null",
-	init:		null_init,
-	open:		null_open,
-	close:		generic_close,
-	read:		null_read,
-	write:		generic_write,
-	console_write:	generic_console_write,
-	window_size:	generic_window_size,
-	free:		null_free,
-	winch:		0,
+	.type		= "null",
+	.init		= null_init,
+	.open		= null_open,
+	.close		= generic_close,
+	.read		= null_read,
+	.write		= generic_write,
+	.console_write	= generic_console_write,
+	.window_size	= generic_window_size,
+	.free		= null_free,
+	.winch		= 0,
 };
 
 /*

@@ -1,9 +1,5 @@
 # Makefile for the kernel ISDN subsystem and device drivers.
 
-# Objects that export symbols.
-
-export-objs	:= isdn_common.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_ISDN)			+= isdn.o

@@ -10,10 +10,7 @@
 #include <sys/ioctl.h>
 #include "user_util.h"
 #include "mem_user.h"
-
-/* XXX All the __CONFIG_* stuff is broken because this file can't include
- * config.h
- */
+#include "uml-config.h"
 
 /* Had to steal this from linux/module.h because that file can't be included
  * since this includes various user-level headers.
@@ -36,7 +33,7 @@ struct module_symbol
 #define EXPORT_SYMBOL(var)	   error config_must_be_included_before_module
 #define EXPORT_SYMBOL_NOVERS(var)  error config_must_be_included_before_module
 
-#elif !defined(__CONFIG_MODULES__)
+#elif !defined(UML_CONFIG_MODULES)
 
 #define __EXPORT_SYMBOL(sym,str)
 #define EXPORT_SYMBOL(var)
@@ -51,7 +48,7 @@ const struct module_symbol __ksymtab_##sym 		\
 __attribute__((section("__ksymtab"))) =			\
 { (unsigned long)&sym, __kstrtab_##sym }
 
-#if defined(__MODVERSIONS__) || !defined(__CONFIG_MODVERSIONS__)
+#if defined(__MODVERSIONS__) || !defined(UML_CONFIG_MODVERSIONS)
 #define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(var))
 #else
 #define EXPORT_SYMBOL(var)  __EXPORT_SYMBOL(var, __MODULE_STRING(__VERSIONED_SYMBOL(var)))

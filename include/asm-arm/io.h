@@ -150,9 +150,17 @@ extern void _memset_io(unsigned long, int, size_t);
 #define readw(c) ({ unsigned int __v = le16_to_cpu(__raw_readw(__mem_pci(c))); __v; })
 #define readl(c) ({ unsigned int __v = le32_to_cpu(__raw_readl(__mem_pci(c))); __v; })
 
+#define readsb(p,d,l)		__raw_readsb((unsigned int)__mem_pci(p),d,l)
+#define readsw(p,d,l)		__raw_readsw((unsigned int)__mem_pci(p),d,l)
+#define readsl(p,d,l)		__raw_readsl((unsigned int)__mem_pci(p),d,l)
+
 #define writeb(v,c)		__raw_writeb(v,__mem_pci(c))
 #define writew(v,c)		__raw_writew(cpu_to_le16(v),__mem_pci(c))
 #define writel(v,c)		__raw_writel(cpu_to_le32(v),__mem_pci(c))
+
+#define writesb(p,d,l)		__raw_writesb((unsigned int)__mem_pci(p),d,l)
+#define writesw(p,d,l)		__raw_writesw((unsigned int)__mem_pci(p),d,l)
+#define writesl(p,d,l)		__raw_writesl((unsigned int)__mem_pci(p),d,l)
 
 #define memset_io(c,v,l)	_memset_io(__mem_pci(c),(v),(l))
 #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),__mem_pci(c),(l))

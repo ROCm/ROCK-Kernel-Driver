@@ -10,8 +10,6 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:=
-
 obj-$(CONFIG_ARCH_IQ80310) += iq80310-pci.o iq80310-irq.o
 
 ifneq ($(CONFIG_XSCALE_PMU_TIMER),y)

@@ -24,7 +24,7 @@
  * 01-3-11 Make nbd work with new Linux block layer code. It now supports
  *   plugging like all the other block devices. Also added in MSG_MORE to
  *   reduce number of partial TCP segments sent. <steve@chygwyn.com>
- * 01-12-6 Fix deadlock condition by making queue locks independant of
+ * 01-12-6 Fix deadlock condition by making queue locks independent of
  *   the transmit lock. <steve@chygwyn.com>
  * 02-10-11 Allow hung xmit to be aborted via SIGKILL & various fixes.
  *   <Paul.Clements@SteelEye.com> <James.Bottomley@SteelEye.com>
@@ -118,12 +118,12 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 	set_fs(get_ds());
 	/* Allow interception of SIGKILL only
 	 * Don't allow other signals to interrupt the transmission */
-	spin_lock_irqsave(&current->sig->siglock, flags);
+	spin_lock_irqsave(&current->sighand->siglock, flags);
 	oldset = current->blocked;
 	sigfillset(&current->blocked);
 	sigdelsetmask(&current->blocked, sigmask(SIGKILL));
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, flags);
+	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 
 
 	do {
@@ -146,11 +146,11 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 
 		if (signal_pending(current)) {
 			siginfo_t info;
-			spin_lock_irqsave(&current->sig->siglock, flags);
+			spin_lock_irqsave(&current->sighand->siglock, flags);
 			printk(KERN_WARNING "NBD (pid %d: %s) got signal %d\n",
 				current->pid, current->comm, 
 				dequeue_signal(&current->blocked, &info));
-			spin_unlock_irqrestore(&current->sig->siglock, flags);
+			spin_unlock_irqrestore(&current->sighand->siglock, flags);
 			result = -EINTR;
 			break;
 		}
@@ -166,10 +166,10 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 		buf += result;
 	} while (size > 0);
 
-	spin_lock_irqsave(&current->sig->siglock, flags);
+	spin_lock_irqsave(&current->sighand->siglock, flags);
 	current->blocked = oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sig->siglock, flags);
+	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 
 	set_fs(oldfs);
 	return result;

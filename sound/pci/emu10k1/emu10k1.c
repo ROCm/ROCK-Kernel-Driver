@@ -80,6 +80,7 @@ MODULE_PARM_SYNTAX(enable_ir, SNDRV_ENABLE_DESC);
 
 static struct pci_device_id snd_emu10k1_ids[] __devinitdata = {
 	{ 0x1102, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* EMU10K1 */
+	{ 0x1102, 0x0006, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* Dell OEM version (EMU10K1) */
 	{ 0x1102, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },	/* Audigy */
 	{ 0, }
 };
@@ -181,7 +182,7 @@ static int __devinit snd_card_emu10k1_probe(struct pci_dev *pci,
 		strcpy(card->driver, "EMU10K1");
 		strcpy(card->shortname, "Sound Blaster Live!");
 	}
-	sprintf(card->longname, "%s at 0x%lx, irq %i", card->shortname, emu->port, emu->irq);
+	sprintf(card->longname, "%s (rev.%d) at 0x%lx, irq %i", card->shortname, emu->revision, emu->port, emu->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -36,8 +37,6 @@
 #include <asm/ebus.h>
 #include <asm/isa.h>
 #include <asm/starfire.h>
-
-extern rwlock_t xtime_lock;
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -134,7 +133,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long ticks, pstate;
 
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 
 	do {
 #ifndef CONFIG_SMP
@@ -196,13 +195,13 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	timer_check_rtc();
 
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 #ifdef CONFIG_SMP
 void timer_tick_interrupt(struct pt_regs *regs)
 {
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 
 	do_timer(regs);
 
@@ -225,7 +224,7 @@ void timer_tick_interrupt(struct pt_regs *regs)
 
 	timer_check_rtc();
 
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 }
 #endif
 
@@ -665,7 +664,7 @@ void do_settimeofday(struct timeval *tv)
 	if (this_is_starfire)
 		return;
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	/*
 	 * This is revolting. We need to set "xtime" correctly. However, the
 	 * value in this location is the value at the most recent update of
@@ -686,7 +685,7 @@ void do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /* Ok, my cute asm atomicity trick doesn't work anymore.
@@ -696,18 +695,20 @@ void do_settimeofday(struct timeval *tv)
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 	unsigned long usec, sec;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = do_gettimeoffset();
-	{
-		unsigned long lost = jiffies - wall_jiffies;
-		if (lost)
-			usec += lost * (1000000 / HZ);
-	}
-	sec = xtime.tv_sec;
-	usec += (xtime.tv_nsec / 1000);
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		usec = do_gettimeoffset();
+		{
+			unsigned long lost = jiffies - wall_jiffies;
+			if (lost)
+				usec += lost * (1000000 / HZ);
+		}
+		sec = xtime.tv_sec;
+		usec += (xtime.tv_nsec / 1000);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;

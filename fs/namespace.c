@@ -287,7 +287,7 @@ void umount_tree(struct vfsmount *mnt)
 static int do_umount(struct vfsmount *mnt, int flags)
 {
 	struct super_block * sb = mnt->mnt_sb;
-	int retval = 0;
+	int retval;
 
 	retval = security_sb_umount(mnt, flags);
 	if (retval)

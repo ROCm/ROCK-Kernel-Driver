@@ -31,7 +31,7 @@ LDFLAGS_BLOB := -b binary --oformat elf32-little
 OBJCOPY_FLAGS_BLOB := -I binary -O elf32-little -B v850e
 
 
-HEAD := $(arch_dir)/kernel/head.o $(arch_dir)/kernel/init_task.o
+head-y := $(arch_dir)/kernel/head.o $(arch_dir)/kernel/init_task.o
 core-y += $(arch_dir)/kernel/
 libs-y += $(arch_dir)/lib/
 

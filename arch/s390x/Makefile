@@ -21,7 +21,7 @@ LDFLAGS_BLOB	:= --format binary --oformat elf64-s390
 
 CFLAGS += -pipe -fno-strength-reduce
 
-HEAD := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
+head-y := arch/$(ARCH)/kernel/head.o arch/$(ARCH)/kernel/init_task.o
 
 core-y		+= arch/$(ARCH)/mm/ arch/$(ARCH)/kernel/
 libs-y		+= arch/$(ARCH)/lib/
@@ -38,7 +38,6 @@ listing image: vmlinux
 install: vmlinux
 	$(call makeboot, $@)
 
-archmrproper:
 archclean:
 	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
 

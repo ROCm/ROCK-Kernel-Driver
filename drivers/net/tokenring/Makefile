@@ -2,8 +2,6 @@
 # Makefile for drivers/net/tokenring
 #
 
-export-objs := tms380tr.o
-
 obj-$(CONFIG_IBMTR) 	+= ibmtr.o
 obj-$(CONFIG_IBMOL) 	+= olympic.o
 obj-$(CONFIG_IBMLS) 	+= lanstreamer.o

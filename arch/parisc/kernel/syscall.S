@@ -425,30 +425,27 @@ sys_call_table:
 	/* I don't like this */
 	ENTRY_UHOH(sgetmask)
 	ENTRY_UHOH(ssetmask)
-	ENTRY_SAME(setreuid)	/* 70 */
+	ENTRY_SAME(setreuid)		/* 70 */
 	ENTRY_SAME(setregid)
 	ENTRY_SAME(mincore)
-	ENTRY_DIFF(sigpending)
+	ENTRY_COMP(sigpending)
 	ENTRY_SAME(sethostname)
 	/* Following 3 have linux-common-code structs containing longs -( */
-	ENTRY_DIFF(setrlimit)	/* 75 */
+	ENTRY_DIFF(setrlimit)		/* 75 */
 	ENTRY_DIFF(getrlimit)
 	ENTRY_DIFF(getrusage)
 	/* struct timeval and timezone are maybe?? consistent wide and narrow */
 	ENTRY_DIFF(gettimeofday)
 	ENTRY_DIFF(settimeofday)
-	ENTRY_SAME(getgroups)	/* 80 */
+	ENTRY_SAME(getgroups)		/* 80 */
 	ENTRY_SAME(setgroups)
 	/* struct socketaddr... */
 	ENTRY_SAME(sendto)
 	ENTRY_SAME(symlink)
 	/* see stat comment */
 	ENTRY_COMP(newlstat)
-	ENTRY_SAME(readlink)	/* 85 */
-	/* suspect we'll need some work for narrow shlibs on wide kernel */
-	/* NOTE this doesn't get used when I boot 32-bit userspace */
-	/* containing working shlib apps -- can this be nuked? */
-	ENTRY_UHOH(uselib)
+	ENTRY_SAME(readlink)		/* 85 */
+	ENTRY_SAME(ni_syscall)	/* was uselib */
 	ENTRY_SAME(swapon)
 	ENTRY_SAME(reboot)
 	ENTRY_SAME(mmap2)
@@ -461,17 +458,15 @@ sys_call_table:
 	ENTRY_SAME(getpriority)
 	ENTRY_SAME(setpriority)
 	ENTRY_SAME(recv)
-	ENTRY_DIFF(statfs)
-	ENTRY_DIFF(fstatfs)		/* 100 */
+	ENTRY_COMP(statfs)
+	ENTRY_COMP(fstatfs)		/* 100 */
 	ENTRY_SAME(stat64)
-	/* don't think hppa glibc even provides an entry pt for this
-	 * so disable for now */
-	ENTRY_UHOH(socketcall)
+	ENTRY_SAME(ni_syscall)	/* was socketcall */
 	ENTRY_SAME(syslog)
 	/* even though manpage says struct timeval contains longs, ours has
 	 * time_t and suseconds_t -- both of which are safe wide/narrow */
 	ENTRY_COMP(setitimer)
-	ENTRY_COMP(getitimer)	/* 105 */
+	ENTRY_COMP(getitimer)		/* 105 */
 	ENTRY_SAME(capget)
 	ENTRY_SAME(capset)
 	ENTRY_OURS(pread64)
@@ -494,10 +489,10 @@ sys_call_table:
 	ENTRY_SAME(recvfrom)
 	/* struct timex contains longs */
 	ENTRY_DIFF(adjtimex)
-	ENTRY_SAME(mprotect)	/* 125 */
+	ENTRY_SAME(mprotect)		/* 125 */
 	/* old_sigset_t forced to 32 bits.  Beware glibc sigset_t */
-	ENTRY_DIFF(sigprocmask)
-	ENTRY_SAME(ni_syscall)		/* create_module */
+	ENTRY_COMP(sigprocmask)
+	ENTRY_SAME(ni_syscall)	/* create_module */
 	ENTRY_SAME(init_module)
 	ENTRY_SAME(delete_module)
 	ENTRY_SAME(ni_syscall)		/* 130: get_kernel_syms */
@@ -547,13 +542,13 @@ sys_call_table:
 	ENTRY_COMP(nanosleep)
 	ENTRY_SAME(mremap)
 	ENTRY_SAME(setresuid)
-	ENTRY_SAME(getresuid)	/* 165 */
+	ENTRY_SAME(getresuid)		/* 165 */
 	ENTRY_DIFF(sigaltstack_wrapper)
 	ENTRY_SAME(ni_syscall)		/* query_module */
 	ENTRY_SAME(poll)
 	/* structs contain pointers and an in_addr... */
 	ENTRY_DIFF(nfsservctl)
-	ENTRY_SAME(setresgid)	/* 170 */
+	ENTRY_SAME(setresgid)		/* 170 */
 	ENTRY_SAME(getresgid)
 	ENTRY_SAME(prctl)
 	/* signals need a careful review */
@@ -594,15 +589,9 @@ sys_call_table:
 	ENTRY_OURS(ftruncate64)		/* 200 */
 	ENTRY_SAME(getdents64)
 	ENTRY_DIFF(fcntl64)
-#ifdef CONFIG_XFS_FS
-	ENTRY_SAME(attrctl)
-	ENTRY_SAME(acl_get)
-	ENTRY_SAME(acl_set)		/* 205 */
-#else
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)		/* 205 */
-#endif
 	ENTRY_SAME(gettid)             
 	ENTRY_SAME(readahead)          
 	ENTRY_SAME(ni_syscall)		/* tkill */

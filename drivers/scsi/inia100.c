@@ -459,8 +459,8 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
 
 	pSCB->SCB_Opcode = ORC_EXECSCSI;
 	pSCB->SCB_Flags = SCF_NO_DCHK;	/* Clear done bit               */
-	pSCB->SCB_Target = SCpnt->target;
-	pSCB->SCB_Lun = SCpnt->lun;
+	pSCB->SCB_Target = SCpnt->device->id;
+	pSCB->SCB_Lun = SCpnt->device->lun;
 	pSCB->SCB_Reserved0 = 0;
 	pSCB->SCB_Reserved1 = 0;
 	pSCB->SCB_SGLen = 0;
@@ -501,7 +501,7 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
 		printk("max cdb length= %x\b", SCpnt->cmd_len);
 		pSCB->SCB_CDBLen = IMAX_CDB;
 	}
-	pSCB->SCB_Ident = SCpnt->lun | DISC_ALLOW;
+	pSCB->SCB_Ident = SCpnt->device->lun | DISC_ALLOW;
 	if (SCpnt->device->tagged_supported) {	/* Tag Support                  */
 		pSCB->SCB_TagMsg = SIMPLE_QUEUE_TAG;	/* Do simple tag only   */
 	} else {
@@ -523,7 +523,7 @@ static int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	register ORC_SCB *pSCB;
 	ORC_HCS *pHCB;		/* Point to Host adapter control block */
 
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	SCpnt->scsi_done = done;
 	/* Get free SCSI control block  */
 	if ((pSCB = orc_alloc_scb(pHCB)) == NULL) {
@@ -549,7 +549,7 @@ static int inia100_abort(Scsi_Cmnd * SCpnt)
 {
 	ORC_HCS *hcsp;
 
-	hcsp = (ORC_HCS *) SCpnt->host->hostdata;
+	hcsp = (ORC_HCS *) SCpnt->device->host->hostdata;
 	return orc_abort_srb(hcsp, SCpnt);
 }
 
@@ -564,7 +564,7 @@ static int inia100_abort(Scsi_Cmnd * SCpnt)
 static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
 	return orc_reset_scsi_bus(pHCB);
 }
 
@@ -578,8 +578,8 @@ static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
 static int inia100_device_reset(Scsi_Cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
-	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
-	return orc_device_reset(pHCB, SCpnt, SCpnt->target);
+	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
+	return orc_device_reset(pHCB, SCpnt, SCpnt->device->id);
 
 }
 

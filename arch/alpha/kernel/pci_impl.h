@@ -71,6 +71,8 @@ struct pci_iommu_arena;
 
 #define IRONGATE_DEFAULT_MEM_BASE ((256*8-16)*1024*1024)
 
+#define DEFAULT_AGP_APER_SIZE	(64*1024*1024)
+
 /* 
  * A small note about bridges and interrupts.  The DECchip 21050 (and
  * later) adheres to the PCI-PCI bridge specification.  This says that
@@ -152,6 +154,8 @@ extern struct pci_controller *pci_isa_hose;
 
 /* Indicate that we trust the console to configure things properly.  */
 extern int pci_probe_only;
+
+extern unsigned long alpha_agpgart_size;
 
 extern void common_init_pci(void);
 extern u8 common_swizzle(struct pci_dev *, u8 *);

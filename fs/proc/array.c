@@ -190,16 +190,16 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 	sigemptyset(catch);
 
 	read_lock(&tasklist_lock);
-	if (p->sig) {
-		spin_lock_irq(&p->sig->siglock);
-		k = p->sig->action;
+	if (p->sighand) {
+		spin_lock_irq(&p->sighand->siglock);
+		k = p->sighand->action;
 		for (i = 1; i <= _NSIG; ++i, ++k) {
 			if (k->sa.sa_handler == SIG_IGN)
 				sigaddset(ign, i);
 			else if (k->sa.sa_handler != SIG_DFL)
 				sigaddset(catch, i);
 		}
-		spin_unlock_irq(&p->sig->siglock);
+		spin_unlock_irq(&p->sighand->siglock);
 	}
 	read_unlock(&tasklist_lock);
 }
@@ -301,7 +301,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	ppid = task->pid ? task->real_parent->pid : 0;
 	read_unlock(&tasklist_lock);
 	res = sprintf(buffer,"%d (%s) %c %d %d %d %d %d %lu %lu \
-%lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld %lu %lu %ld %lu %lu %lu %lu %lu \
+%lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld %llu %lu %ld %lu %lu %lu %lu %lu \
 %lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %lu\n",
 		task->pid,
 		task->comm,
@@ -324,7 +324,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		nice,
 		0UL /* removed */,
 		jiffies_to_clock_t(task->it_real_value),
-		jiffies_to_clock_t(task->start_time),
+		(unsigned long long) jiffies_64_to_clock_t(task->start_time),
 		vsize,
 		mm ? mm->rss : 0, /* you might want to shift this left 3 */
 		task->rlim[RLIMIT_RSS].rlim_cur,

@@ -2,7 +2,7 @@
  * This file contains the code that gets mapped at the upper end of each task's text
  * region.  For now, it contains the signal trampoline code only.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  * 	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -14,6 +14,87 @@
 #include <asm/page.h>
 
 	.section .text.gate, "ax"
+.start_gate:
+
+
+#if CONFIG_FSYS
+
+#include <asm/errno.h>
+
+/*
+ * On entry:
+ *	r11 = saved ar.pfs
+ *	r15 = system call #
+ *	b0  = saved return address
+ *	b6  = return address
+ * On exit:
+ *	r11 = saved ar.pfs
+ *	r15 = system call #
+ *	b0  = saved return address
+ *	all other "scratch" registers:	undefined
+ *	all "preserved" registers:	same as on entry
+ */
+GLOBAL_ENTRY(syscall_via_epc)
+	.prologue
+	.altrp b6
+	.body
+{
+	/*
+	 * Note: the kernel cannot assume that the first two instructions in this
+	 * bundle get executed.  The remaining code must be safe even if
+	 * they do not get executed.
+	 */
+	adds r17=-1024,r15
+	mov r10=0				// default to successful syscall execution
+	epc
+}
+	;;
+	rsm psr.be
+	movl r18=fsyscall_table
+
+	mov r16=IA64_KR(CURRENT)
+	mov r19=255
+	;;
+	shladd r18=r17,3,r18
+	cmp.geu p6,p0=r19,r17			// (syscall > 0 && syscall <= 1024+255)?
+	;;
+	srlz.d					// ensure little-endian byteorder is in effect
+(p6)	ld8 r18=[r18]
+	;;
+(p6)	mov b7=r18
+(p6)	br.sptk.many b7
+
+	mov r10=-1
+	mov r8=ENOSYS
+	MCKINLEY_E9_WORKAROUND
+	br.ret.sptk.many b6
+END(syscall_via_epc)
+
+GLOBAL_ENTRY(syscall_via_break)
+	.prologue
+	.altrp b6
+	.body
+	break 0x100000
+	br.ret.sptk.many b6
+END(syscall_via_break)
+
+GLOBAL_ENTRY(fsys_fallback_syscall)
+	/*
+	 * It would be better/fsyser to do the SAVE_MIN magic directly here, but for now
+	 * we simply fall back on doing a system-call via break.  Good enough
+	 * to get started.  (Note: we have to do this through the gate page again, since
+	 * the br.ret will switch us back to user-level privilege.)
+	 *
+	 * XXX Move this back to fsys.S after changing it over to avoid break 0x100000.
+	 */
+	movl r2=(syscall_via_break - .start_gate) + GATE_ADDR
+	;;
+	MCKINLEY_E9_WORKAROUND
+	mov b7=r2
+	br.ret.sptk.many b7
+END(fsys_fallback_syscall)
+
+#endif /* CONFIG_FSYS */
 
 #	define ARG0_OFF		(16 + IA64_SIGFRAME_ARG0_OFFSET)
 #	define ARG1_OFF		(16 + IA64_SIGFRAME_ARG1_OFFSET)
@@ -63,15 +144,18 @@
 	 * call stack.
 	 */
 
+#define SIGTRAMP_SAVES										\
+	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)	\
+	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF						\
+	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF						\
+	.savesp pr, PR_OFF+SIGCONTEXT_OFF							\
+	.savesp rp, RP_OFF+SIGCONTEXT_OFF							\
+	.vframesp SP_OFF+SIGCONTEXT_OFF
+
 GLOBAL_ENTRY(ia64_sigtramp)
 	// describe the state that is active when we get here:
 	.prologue
-	.unwabi @svr4, 's'		// mark this as a sigtramp handler (saves scratch regs)
-	.savesp ar.unat, UNAT_OFF+SIGCONTEXT_OFF
-	.savesp ar.fpsr, FPSR_OFF+SIGCONTEXT_OFF
-	.savesp pr, PR_OFF+SIGCONTEXT_OFF
-	.savesp rp, RP_OFF+SIGCONTEXT_OFF
-	.vframesp SP_OFF+SIGCONTEXT_OFF
+	SIGTRAMP_SAVES
 	.body
 
 	.label_state 1
@@ -156,10 +240,11 @@ back_from_restore_rbs:
 	ldf.fill f14=[base0],32
 	ldf.fill f15=[base1],32
 	mov r15=__NR_rt_sigreturn
+	.restore sp				// pop .prologue
 	break __BREAK_SYSCALL
 
-	.body
-	.copy_state 1
+	.prologue
+	SIGTRAMP_SAVES
 setup_rbs:
 	mov ar.rsc=0				// put RSE into enforced lazy mode
 	;;
@@ -171,6 +256,7 @@ setup_rbs:
 	;;
 	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	st8 [r14]=r16				// save sc_ar_rnat
+	.body
 	adds r14=(LOADRS_OFF+SIGCONTEXT_OFF),sp
 
 	mov.m r16=ar.bsp			// sc_loadrs <- (new bsp - new bspstore) << 16
@@ -182,10 +268,11 @@ setup_rbs:
 	;;
 	st8 [r14]=r15				// save sc_loadrs
 	mov ar.rsc=0xf				// set RSE into eager mode, pl 3
+	.restore sp				// pop .prologue
 	br.cond.sptk back_from_setup_rbs
 
 	.prologue
-	.copy_state 1
+	SIGTRAMP_SAVES
 	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
 	.body
 restore_rbs:

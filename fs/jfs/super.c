@@ -50,7 +50,7 @@ static pid_t jfsSyncThread;
 DECLARE_COMPLETION(jfsIOwait);
 
 #ifdef CONFIG_JFS_DEBUG
-int jfsloglevel = 1;
+int jfsloglevel = JFS_LOGLEVEL_WARN;
 MODULE_PARM(jfsloglevel, "i");
 MODULE_PARM_DESC(jfsloglevel, "Specify JFS loglevel (0, 1 or 2)");
 #endif
@@ -120,7 +120,7 @@ static int jfs_statfs(struct super_block *sb, struct statfs *buf)
 	s64 maxinodes;
 	struct inomap *imap = JFS_IP(sbi->ipimap)->i_imap;
 
-	jFYI(1, ("In jfs_statfs\n"));
+	jfs_info("In jfs_statfs");
 	buf->f_type = JFS_SUPER_MAGIC;
 	buf->f_bsize = sbi->bsize;
 	buf->f_blocks = sbi->bmap->db_mapsize;
@@ -151,11 +151,10 @@ static void jfs_put_super(struct super_block *sb)
 	struct jfs_sb_info *sbi = JFS_SBI(sb);
 	int rc;
 
-	jFYI(1, ("In jfs_put_super\n"));
+	jfs_info("In jfs_put_super");
 	rc = jfs_umount(sb);
-	if (rc) {
-		jERROR(1, ("jfs_umount failed with return code %d\n", rc));
-	}
+	if (rc)
+		jfs_err("jfs_umount failed with return code %d", rc);
 	unload_nls(sbi->nls_tab);
 	sbi->nls_tab = NULL;
 
@@ -259,7 +258,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	int rc;
 	s64 newLVSize = 0;
 
-	jFYI(1, ("In jfs_read_super: s_flags=0x%lx\n", sb->s_flags));
+	jfs_info("In jfs_read_super: s_flags=0x%lx", sb->s_flags);
 
 	sbi = kmalloc(sizeof (struct jfs_sb_info), GFP_KERNEL);
 	if (!sbi)
@@ -291,8 +290,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	rc = jfs_mount(sb);
 	if (rc) {
 		if (!silent) {
-			jERROR(1,
-			       ("jfs_mount failed w/return code = %d\n", rc));
+			jfs_err("jfs_mount failed w/return code = %d", rc);
 		}
 		goto out_kfree;
 	}
@@ -302,9 +300,8 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 		rc = jfs_mount_rw(sb, 0);
 		if (rc) {
 			if (!silent) {
-				jERROR(1,
-				       ("jfs_mount_rw failed w/return code = %d\n",
-					rc));
+				jfs_err("jfs_mount_rw failed, return code = %d",
+					rc);
 			}
 			goto out_no_rw;
 		}
@@ -335,14 +332,14 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	return 0;
 
 out_no_root:
-	jEVENT(1, ("jfs_read_super: get root inode failed\n"));
+	jfs_err("jfs_read_super: get root inode failed");
 	if (inode)
 		iput(inode);
 
 out_no_rw:
 	rc = jfs_umount(sb);
 	if (rc) {
-		jERROR(1, ("jfs_umount failed with return code %d\n", rc));
+		jfs_err("jfs_umount failed with return code %d", rc);
 	}
 out_kfree:
 	if (sbi->nls_tab)
@@ -370,8 +367,7 @@ static void jfs_unlockfs(struct super_block *sb)
 
 	if (!(sb->s_flags & MS_RDONLY)) {
 		if ((rc = lmLogInit(log)))
-			jERROR(1,
-			       ("jfs_unlock failed with return code %d\n", rc));
+			jfs_err("jfs_unlock failed with return code %d", rc);
 		else
 			txResume(sb);
 	}
@@ -458,7 +454,7 @@ static int __init init_jfs_fs(void)
 	 */
 	rc = metapage_init();
 	if (rc) {
-		jERROR(1, ("metapage_init failed w/rc = %d\n", rc));
+		jfs_err("metapage_init failed w/rc = %d", rc);
 		goto free_slab;
 	}
 
@@ -467,7 +463,7 @@ static int __init init_jfs_fs(void)
 	 */
 	rc = txInit();
 	if (rc) {
-		jERROR(1, ("txInit failed w/rc = %d\n", rc));
+		jfs_err("txInit failed w/rc = %d", rc);
 		goto free_metapage;
 	}
 
@@ -477,8 +473,7 @@ static int __init init_jfs_fs(void)
 	jfsIOthread = kernel_thread(jfsIOWait, 0,
 				    CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 	if (jfsIOthread < 0) {
-		jERROR(1,
-		       ("init_jfs_fs: fork failed w/rc = %d\n", jfsIOthread));
+		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsIOthread);
 		goto end_txmngr;
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
@@ -486,9 +481,7 @@ static int __init init_jfs_fs(void)
 	jfsCommitThread = kernel_thread(jfs_lazycommit, 0,
 					CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 	if (jfsCommitThread < 0) {
-		jERROR(1,
-		       ("init_jfs_fs: fork failed w/rc = %d\n",
-			jfsCommitThread));
+		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsCommitThread);
 		goto kill_iotask;
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
@@ -496,8 +489,7 @@ static int __init init_jfs_fs(void)
 	jfsSyncThread = kernel_thread(jfs_sync, 0,
 				      CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 	if (jfsSyncThread < 0) {
-		jERROR(1,
-		       ("init_jfs_fs: fork failed w/rc = %d\n", jfsSyncThread));
+		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsSyncThread);
 		goto kill_committask;
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
@@ -527,7 +519,7 @@ free_slab:
 
 static void __exit exit_jfs_fs(void)
 {
-	jFYI(1, ("exit_jfs_fs called\n"));
+	jfs_info("exit_jfs_fs called");
 
 	jfs_stop_threads = 1;
 	txExit();

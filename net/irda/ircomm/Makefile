@@ -2,8 +2,6 @@
 # Makefile for the Linux IrDA IrCOMM protocol layer.
 #
 
-export-objs := ircomm_core.o
-
 obj-$(CONFIG_IRCOMM) += ircomm.o ircomm-tty.o
 
 ircomm-objs := ircomm_core.o ircomm_event.o ircomm_lmp.o ircomm_ttp.o

@@ -69,7 +69,7 @@
                     (le16_to_cpu((P)->header.nextindex) > le16_to_cpu((P)->header.maxentry)) ||\
                     (le16_to_cpu((P)->header.maxentry) > (((BN)==0)?XTROOTMAXSLOT:PSIZE>>L2XTSLOTSIZE)))\
                 {\
-                        jERROR(1,("XT_GETPAGE: xtree page corrupt\n"));\
+                        jfs_err("XT_GETPAGE: xtree page corrupt");\
 			BT_PUTPAGE(MP);\
 			updateSuper((IP)->i_sb, FM_DIRTY);\
 			MP = NULL;\
@@ -169,9 +169,8 @@ int xtLookup(struct inode *ip, s64 lstart,
 		size = ((u64) ip->i_size + (JFS_SBI(ip->i_sb)->bsize - 1)) >>
 		    JFS_SBI(ip->i_sb)->l2bsize;
 		if (lstart >= size) {
-			jERROR(1,
-			       ("xtLookup: lstart (0x%lx) >= size (0x%lx)\n",
-				(ulong) lstart, (ulong) size));
+			jfs_err("xtLookup: lstart (0x%lx) >= size (0x%lx)",
+				(ulong) lstart, (ulong) size);
 			return 0;
 		}
 	}
@@ -181,7 +180,7 @@ int xtLookup(struct inode *ip, s64 lstart,
 	 */
 //search:
 	if ((rc = xtSearch(ip, lstart, &cmp, &btstack, 0))) {
-		jERROR(1, ("xtLookup: xtSearch returned %d\n", rc));
+		jfs_err("xtLookup: xtSearch returned %d", rc);
 		return rc;
 	}
 
@@ -198,10 +197,8 @@ int xtLookup(struct inode *ip, s64 lstart,
 	 * lstart is a page start address,
 	 * i.e., lstart cannot start in a hole;
 	 */
-	if (cmp) {
-		jFYI(1, ("xtLookup: cmp = %d\n", cmp));
+	if (cmp)
 		goto out;
-	}
 
 	/*
 	 * lxd covered by xad
@@ -211,10 +208,6 @@ int xtLookup(struct inode *ip, s64 lstart,
 	xlen = lengthXAD(xad);
 	xend = xoff + xlen;
 	xaddr = addressXAD(xad);
-
-	jEVENT(0,
-	       ("index = %d, xoff = 0x%lx, xlen = 0x%x, xaddr = 0x%lx\n",
-		index, (ulong) xoff, xlen, (ulong) xaddr));
 
 	/* initialize new pxd */
 	*pflag = xad->flag;
@@ -802,8 +795,7 @@ int xtInsert(tid_t tid,		/* transaction id */
 	struct tlock *tlck;
 	struct xtlock *xtlck;
 
-	jFYI(1,
-	     ("xtInsert: nxoff:0x%lx nxlen:0x%x\n", (ulong) xoff, xlen));
+	jfs_info("xtInsert: nxoff:0x%lx nxlen:0x%x", (ulong) xoff, xlen);
 
 	/*
 	 *      search for the entry location at which to insert:
@@ -1248,8 +1240,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 	if (rmp == NULL)
 		return EIO;
 
-	jEVENT(0,
-	       ("xtSplitPage: ip:0x%p smp:0x%p rmp:0x%p\n", ip, smp, rmp));
+	jfs_info("xtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
 	BT_MARK_DIRTY(rmp, ip);
 	/*
@@ -1324,7 +1315,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 
 		ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
 
-		jEVENT(0, ("xtSplitPage: sp:0x%p rp:0x%p\n", sp, rp));
+		jfs_info("xtSplitPage: sp:0x%p rp:0x%p", sp, rp);
 		return 0;
 	}
 
@@ -1440,7 +1431,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 
 	ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
 
-	jEVENT(0, ("xtSplitPage: sp:0x%p rp:0x%p\n", sp, rp));
+	jfs_info("xtSplitPage: sp:0x%p rp:0x%p", sp, rp);
 	return rc;
 }
 
@@ -1496,7 +1487,7 @@ xtSplitRoot(tid_t tid,
 	if (rmp == NULL)
 		return EIO;
 
-	jEVENT(0, ("xtSplitRoot: ip:0x%p rmp:0x%p\n", ip, rmp));
+	jfs_info("xtSplitRoot: ip:0x%p rmp:0x%p", ip, rmp);
 
 	/*
 	 * acquire a transaction lock on the new right page;
@@ -1581,7 +1572,7 @@ xtSplitRoot(tid_t tid,
 
 	ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
 
-	jEVENT(0, ("xtSplitRoot: sp:0x%p rp:0x%p\n", sp, rp));
+	jfs_info("xtSplitRoot: sp:0x%p rp:0x%p", sp, rp);
 	return 0;
 }
 
@@ -1615,8 +1606,7 @@ int xtExtend(tid_t tid,		/* transaction id */
 	struct xtlock *xtlck = 0;
 	int rootsplit = 0;
 
-	jFYI(1,
-	     ("xtExtend: nxoff:0x%lx nxlen:0x%x\n", (ulong) xoff, xlen));
+	jfs_info("xtExtend: nxoff:0x%lx nxlen:0x%x", (ulong) xoff, xlen);
 
 	/* there must exist extent to be extended */
 	if ((rc = xtSearch(ip, xoff - 1, &cmp, &btstack, XT_INSERT)))
@@ -1628,9 +1618,6 @@ int xtExtend(tid_t tid,		/* transaction id */
 
 	/* extension must be contiguous */
 	xad = &p->xad[index];
-	jFYI(0, ("xtExtend: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
-		 (ulong) offsetXAD(xad), lengthXAD(xad),
-		 (ulong) addressXAD(xad)));
 	assert((offsetXAD(xad) + lengthXAD(xad)) == xoff);
 
 	/*
@@ -1893,10 +1880,6 @@ printf("xtTailgate: xoff:0x%lx xlen:0x%x xaddr:0x%lx\n",
 			PXDlength(&pxdlock->pxd, rlen);
 			pxdlock->index = 1;
 		}
-		jEVENT(0,
-		       ("xtTailgate: free extent xaddr:0x%lx xlen:0x%x\n",
-			(ulong) addressPXD(&pxdlock->pxd),
-			lengthPXD(&pxdlock->pxd)));
 	} else
 		/* free from WMAP */
 		dbFree(ip, addressXAD(xad) + llen, (s64) rlen);
@@ -2408,9 +2391,8 @@ int xtAppend(tid_t tid,		/* transaction id */
 
 	xaddr = *xaddrp;
 	xlen = *xlenp;
-	jEVENT(0,
-	       ("xtAppend: xoff:0x%lx maxblocks:%d xlen:%d xaddr:0x%lx\n",
-		(ulong) xoff, maxblocks, xlen, (ulong) xaddr));
+	jfs_info("xtAppend: xoff:0x%lx maxblocks:%d xlen:%d xaddr:0x%lx",
+		 (ulong) xoff, maxblocks, xlen, (ulong) xaddr);
 
 	/*
 	 *      search for the entry location at which to insert:
@@ -2747,9 +2729,8 @@ xtDeleteUp(tid_t tid, struct inode *ip,
 			p->header.nextindex =
 			    cpu_to_le16(le16_to_cpu(p->header.nextindex) -
 					1);
-			jEVENT(0,
-			       ("xtDeleteUp(entry): 0x%lx[%d]\n",
-				(ulong) parent->bn, index));
+			jfs_info("xtDeleteUp(entry): 0x%lx[%d]",
+				 (ulong) parent->bn, index);
 		}
 
 		/* unpin the parent page */
@@ -2809,10 +2790,8 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	if (offset >= ip->i_size)
 		return ESTALE;	/* stale extent */
 
-	jEVENT(0,
-	       ("xtRelocate: xtype:%d xoff:0x%lx xlen:0x%x xaddr:0x%lx:0x%lx\n",
-		xtype, (ulong) xoff, xlen, (ulong) oxaddr,
-		(ulong) nxaddr));
+	jfs_info("xtRelocate: xtype:%d xoff:0x%lx xlen:0x%x xaddr:0x%lx:0x%lx",
+		 xtype, (ulong) xoff, xlen, (ulong) oxaddr, (ulong) nxaddr);
 
 	/*
 	 *      1. get and validate the parent xtpage/xad entry
@@ -2855,7 +2834,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		 */
 		xad = &pp->xad[index];
 	}
-	jEVENT(0, ("xtRelocate: parent xad entry validated.\n"));
+	jfs_info("xtRelocate: parent xad entry validated.");
 
 	/*
 	 *      2. relocate the extent
@@ -2926,7 +2905,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 		/* get back parent page */
 		rc = xtSearch(ip, xoff, &cmp, &btstack, 0);
 		XT_GETSEARCH(ip, btstack.top, bn, pmp, pp, index);
-		jEVENT(0, ("xtRelocate: target data extent relocated.\n"));
+		jfs_info("xtRelocate: target data extent relocated.");
 	} else {		/* (xtype  == XTPAGE) */
 
 		/*
@@ -3026,7 +3005,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 
 		/* unpin the target page to new homeward bound */
 		XT_PUTPAGE(mp);
-		jEVENT(0, ("xtRelocate: target xtpage relocated.\n"));
+		jfs_info("xtRelocate: target xtpage relocated.");
 	}
 
 	/*
@@ -3067,7 +3046,7 @@ xtRelocate(tid_t tid, struct inode * ip, xad_t * oxad,	/* old XAD */
 	 * update which will write LOG_REDOPAGE and update bmap for
 	 * allocation of XAD_NEW destination extent;
 	 */
-	jEVENT(0, ("xtRelocate: update parent xad entry.\n"));
+	jfs_info("xtRelocate: update parent xad entry.");
 	BT_MARK_DIRTY(pmp, ip);
 	tlck = txLock(tid, ip, pmp, tlckXTREE | tlckGROW);
 	xtlck = (struct xtlock *) & tlck->lock;

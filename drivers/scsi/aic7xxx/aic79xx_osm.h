@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#102 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#108 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -50,11 +50,9 @@
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
 #include <linux/version.h>
-#ifndef AHD_MODVERSION_FILE
-#define __NO_VERSION__
-#endif
 #include <linux/module.h>
 #include <asm/byteorder.h>
+#include <asm/io.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
@@ -72,7 +70,6 @@
 #define AIC_LIB_PREFIX ahd
 #include "scsi.h"
 #include "hosts.h"
-#include "aiclib.h"
 
 /* Name space conflict with BSD queue macros */
 #ifdef LIST_HEAD
@@ -83,6 +80,7 @@
 #include "queue.h"
 #include "scsi_message.h"
 #include "scsi_iu.h"
+#include "aiclib.h"
 
 /*********************************** Debugging ********************************/
 #ifdef CONFIG_AIC79XX_DEBUG_ENABLE
@@ -288,7 +286,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.0.BETA2"
+#define AIC79XX_DRIVER_VERSION "1.3.0"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -323,7 +321,7 @@ struct ahd_cmd {
 /*
  * A per probed device structure used to deal with some error recovery
  * scenarios that the Linux mid-layer code just doesn't know how to
- * handle.  The structure allocated for a device only becomes persistant
+ * handle.  The structure allocated for a device only becomes persistent
  * after a successfully completed inquiry command to the target when
  * that inquiry data indicates a lun is present.
  */
@@ -489,7 +487,7 @@ struct ahd_linux_target {
  * Per-SCB OSM storage.
  */
 typedef enum {
-	AHD_UP_EH_SEMAPHORE
+	AHD_UP_EH_SEMAPHORE = 0x1
 } ahd_linux_scb_flags;
 
 struct scb_platform_data {
@@ -543,6 +541,7 @@ struct ahd_platform_data {
 	struct semaphore	 dv_cmd_sem;	/* XXX This needs to be in
 						 * the target struct
 						 */
+	struct scsi_device	*dv_scsi_dev;
 	struct Scsi_Host        *host;		/* pointer to scsi host */
 #define AHD_LINUX_NOIRQ	((uint32_t)~0)
 	uint32_t		 irq;		/* IRQ for this adapter */

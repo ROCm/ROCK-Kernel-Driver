@@ -39,21 +39,21 @@ int xterm_fd(int socket, int *pid_out)
 
 	data = kmalloc(sizeof(*data), GFP_KERNEL);
 	if(data == NULL){
-		printk(KERN_ERR "xterm_fd - failed to allocate semaphore\n");
+		printk(KERN_ERR "xterm_fd : failed to allocate xterm_wait\n");
 		return(-ENOMEM);
 	}
 	*data = ((struct xterm_wait) 
-		{ sem : 	__SEMAPHORE_INITIALIZER(data->sem, 0),
-		  fd :		socket,
-		  pid :		-1,
-		  new_fd :	-1 });
+		{ .sem  	= __SEMAPHORE_INITIALIZER(data->sem, 0),
+		  .fd 		= socket,
+		  .pid 		= -1,
+		  .new_fd 	= -1 });
 
 	err = um_request_irq(XTERM_IRQ, socket, IRQ_READ, xterm_interrupt, 
 			     SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
 			     "xterm", data);
 	if(err){
-		printk(KERN_ERR "Failed to get IRQ for xterm, err = %d\n", 
-		       err);
+		printk(KERN_ERR "xterm_fd : failed to get IRQ for xterm, "
+		       "err = %d\n",  err);
 		return(err);
 	}
 	down(&data->sem);

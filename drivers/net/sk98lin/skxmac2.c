@@ -194,7 +194,7 @@
  *
  *	Revision 1.12  1998/10/14 14:45:04  malthoff
  *	Remove SKERR_SIRQ_E0xx and SKERR_SIRQ_E0xxMSG by
- *	SKERR_HWI_Exx and SKERR_HWI_E0xxMSG to be independant
+ *	SKERR_HWI_Exx and SKERR_HWI_E0xxMSG to be independent
  *	from the Sirq module.
  *
  *	Revision 1.11  1998/10/14 13:59:01  gklug
@@ -826,7 +826,7 @@ int		Port)		/* Port Index (MAC_1 + n) */
 	for (i = 0; i < 3; i++) {
 		/*
 		 * The following 2 statements are together endianess
-		 * independant. Remember this when changing.
+		 * independent. Remember this when changing.
 		 */
 		SK_IN16(IoC, (B2_MAC_2 + Port * 8 + i * 2), &SWord);
 		XM_OUT16(IoC, Port, (XM_SA + i * 2), SWord);

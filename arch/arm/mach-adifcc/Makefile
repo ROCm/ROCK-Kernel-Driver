@@ -9,4 +9,3 @@ obj-m			:=
 obj-n			:=
 obj-			:=
 
-export-objs		:=

@@ -14,20 +14,17 @@
 /* Action modifiers - doesn't change the zoning */
 #define __GFP_WAIT	0x10	/* Can wait and reschedule? */
 #define __GFP_HIGH	0x20	/* Should access emergency pools? */
-#define __GFP_IO	0x40	/* Can start low memory physical IO? */
-#define __GFP_HIGHIO	0x80	/* Can start high mem physical IO? */
-#define __GFP_FS	0x100	/* Can call down to low-level FS? */
-#define __GFP_COLD	0x200	/* Cache-cold page required */
-#define __GFP_NOWARN	0x400	/* Suppress page allocation failure warning */
+#define __GFP_IO	0x40	/* Can start physical IO? */
+#define __GFP_FS	0x80	/* Can call down to low-level FS? */
+#define __GFP_COLD	0x100	/* Cache-cold page required */
+#define __GFP_NOWARN	0x200	/* Suppress page allocation failure warning */
 
-#define GFP_NOHIGHIO	(             __GFP_WAIT | __GFP_IO)
-#define GFP_NOIO	(             __GFP_WAIT)
-#define GFP_NOFS	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO)
 #define GFP_ATOMIC	(__GFP_HIGH)
-#define GFP_USER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
-#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS | __GFP_HIGHMEM)
-#define GFP_KERNEL	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
-#define GFP_KSWAPD	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_NOIO	(__GFP_WAIT)
+#define GFP_NOFS	(__GFP_WAIT | __GFP_IO)
+#define GFP_KERNEL	(__GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_USER	(__GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_HIGHUSER	(__GFP_WAIT | __GFP_IO | __GFP_FS | __GFP_HIGHMEM)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

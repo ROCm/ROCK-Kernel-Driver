@@ -4,6 +4,8 @@
 #include <linux/major.h>
 #include <linux/genhd.h>
 #include <linux/list.h>
+#include <linux/timer.h>
+#include <linux/workqueue.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
 #include <linux/wait.h>
@@ -188,6 +190,14 @@ struct request_queue
 	unplug_fn		*unplug_fn;
 	merge_bvec_fn		*merge_bvec_fn;
 
+	/*
+	 * Auto-unplugging state
+	 */
+	struct timer_list	unplug_timer;
+	int			unplug_thresh;	/* After this many requests */
+	unsigned long		unplug_delay;	/* After this many jiffies */
+	struct work_struct	unplug_work;
+
 	struct backing_dev_info	backing_dev_info;
 
 	/*
@@ -287,12 +297,12 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
  * BLK_BOUNCE_ANY	: don't bounce anything
  * BLK_BOUNCE_ISA	: bounce pages above ISA DMA boundary
  */
-#define BLK_BOUNCE_HIGH		(blk_max_low_pfn << PAGE_SHIFT)
-#define BLK_BOUNCE_ANY		(blk_max_pfn << PAGE_SHIFT)
+#define BLK_BOUNCE_HIGH		((u64)blk_max_low_pfn << PAGE_SHIFT)
+#define BLK_BOUNCE_ANY		((u64)blk_max_pfn << PAGE_SHIFT)
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
 extern int init_emergency_isa_pool(void);
-inline void blk_queue_bounce(request_queue_t *q, struct bio **bio);
+extern void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\

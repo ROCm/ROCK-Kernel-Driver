@@ -174,7 +174,7 @@ struct _ISDN_ADAPTER {
  word                assign;         /* list of pending ASSIGNs  */
  word                head;           /* head of request queue    */
  word                tail;           /* tail of request queue    */
- ADAPTER             a ;             /* not a seperate structure */
+ ADAPTER             a ;             /* not a separate structure */
  void        (* out)(ADAPTER * a) ;
  byte        (* dpc)(ADAPTER * a) ;
  byte        (* tst_irq)(ADAPTER * a) ;

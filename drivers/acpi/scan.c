@@ -6,7 +6,7 @@
 #include <linux/acpi.h>
 
 #include "acpi_drivers.h"
-#include "include/acinterp.h"	/* for acpi_ex_eisa_id_to_string() */
+#include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
 
 
 #define _COMPONENT		ACPI_BUS_COMPONENT

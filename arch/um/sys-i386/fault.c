@@ -14,7 +14,7 @@ int arch_fixup(unsigned long address, void *sc_ptr)
 	struct sigcontext *sc = sc_ptr;
 	unsigned long fixup;
 
-	fixup = search_exception_table(address);
+	fixup = search_exception_tables(address);
 	if(fixup != 0){
 		sc->eip = fixup;
 		return(1);

@@ -223,6 +223,8 @@ ctl_table ipv4_table[] = {
 	 &sysctl_tcp_tw_reuse, sizeof(int), 0644, NULL, &proc_dointvec},
 	{NET_TCP_FRTO, "tcp_frto",
 	 &sysctl_tcp_frto, sizeof(int), 0644, NULL, &proc_dointvec},
+	{NET_TCP_LOW_LATENCY, "tcp_low_latency",
+	 &sysctl_tcp_low_latency, sizeof(int), 0644, NULL, &proc_dointvec},
 	{0}
 };
 

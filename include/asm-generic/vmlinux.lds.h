@@ -13,18 +13,32 @@
 	}								\
 									\
 	/* Kernel symbol table: Normal symbols */			\
-	__start___ksymtab = .;						\
 	__ksymtab         : AT(ADDR(__ksymtab) - LOAD_OFFSET) {		\
+		__start___ksymtab = .;					\
 		*(__ksymtab)						\
+		__stop___ksymtab = .;					\
 	}								\
-	__stop___ksymtab = .;						\
 									\
 	/* Kernel symbol table: GPL-only symbols */			\
-	__start___gpl_ksymtab = .;					\
-	__gpl_ksymtab     : AT(ADDR(__gpl_ksymtab) - LOAD_OFFSET) {	\
-		*(__gpl_ksymtab)					\
+	__ksymtab_gpl     : AT(ADDR(__ksymtab_gpl) - LOAD_OFFSET) {	\
+		__start___ksymtab_gpl = .;				\
+		*(__ksymtab_gpl)					\
+		__stop___ksymtab_gpl = .;				\
 	}								\
-	__stop___gpl_ksymtab = .;					\
+									\
+	/* Kernel symbol table: Normal symbols */			\
+	__kcrctab         : AT(ADDR(__kcrctab) - LOAD_OFFSET) {		\
+		__start___kcrctab = .;					\
+		*(__kcrctab)						\
+		__stop___kcrctab = .;					\
+	}								\
+									\
+	/* Kernel symbol table: GPL-only symbols */			\
+	__kcrctab_gpl     : AT(ADDR(__kcrctab_gpl) - LOAD_OFFSET) {	\
+		__start___kcrctab_gpl = .;				\
+		*(__kcrctab_gpl)					\
+		__stop___kcrctab_gpl = .;				\
+	}								\
 									\
 	/* Kernel symbol table: strings */				\
         __ksymtab_strings : AT(ADDR(__ksymtab_strings) - LOAD_OFFSET) {	\

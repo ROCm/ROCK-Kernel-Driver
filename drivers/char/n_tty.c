@@ -787,7 +787,7 @@ static void n_tty_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 int is_ignored(int sig)
 {
 	return (sigismember(&current->blocked, sig) ||
-	        current->sig->action[sig-1].sa.sa_handler == SIG_IGN);
+	        current->sighand->action[sig-1].sa.sa_handler == SIG_IGN);
 }
 
 static void n_tty_set_termios(struct tty_struct *tty, struct termios * old)

@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
 #include <linux/param.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/mm.h>		
 #include <linux/bcd.h>		
@@ -40,7 +41,6 @@
 static unsigned long ct_cur[NR_CPUS];	/* What counter should be at next timer irq */
 static long last_rtc_update;		/* Last time the rtc clock got updated */
 
-extern rwlock_t xtime_lock;
 extern volatile unsigned long wall_jiffies;
 
 
@@ -94,7 +94,7 @@ void rt_timer_interrupt(struct pt_regs *regs)
 	int cpuA = ((cputoslice(cpu)) == 0);
 	int irq = 7;				/* XXX Assign number */
 
-	write_lock(&xtime_lock);
+	write_seqlock(&xtime_lock);
 
 again:
 	LOCAL_HUB_S(cpuA ? PI_RT_PEND_A : PI_RT_PEND_B, 0);	/* Ack  */
@@ -145,7 +145,7 @@ again:
 		}
         }
 
-	write_unlock(&xtime_lock);
+	write_sequnlock(&xtime_lock);
 
 	if (softirq_pending(cpu))
 		do_softirq();
@@ -162,17 +162,20 @@ void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
 	unsigned long usec, sec;
+	unsigned long seq;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	usec = do_gettimeoffset();
-	{
-		unsigned long lost = jiffies - wall_jiffies;
-		if (lost)
-			usec += lost * (1000000 / HZ);
-	}
-	sec = xtime.tv_sec;
-	usec += xtime.tv_usec;
-	read_unlock_irqrestore(&xtime_lock, flags);
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+
+		usec = do_gettimeoffset();
+		{
+			unsigned long lost = jiffies - wall_jiffies;
+			if (lost)
+				usec += lost * (1000000 / HZ);
+		}
+		sec = xtime.tv_sec;
+		usec += xtime.tv_usec;
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -185,7 +188,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	tv->tv_usec -= do_gettimeoffset();
 	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
 
@@ -199,7 +202,7 @@ void do_settimeofday(struct timeval *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /* Includes for ioc3_init().  */

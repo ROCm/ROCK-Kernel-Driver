@@ -2,8 +2,6 @@
 # Makefile for the netfilter modules on top of IPv6.
 #
 
-export-objs := ip6_tables.o
-
 # Link order matters here.
 obj-$(CONFIG_IP6_NF_IPTABLES) += ip6_tables.o
 obj-$(CONFIG_IP6_NF_MATCH_LIMIT) += ip6t_limit.o

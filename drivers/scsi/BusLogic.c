@@ -3471,15 +3471,15 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
 			  void (*CompletionRoutine)(SCSI_Command_T *))
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
   BusLogic_TargetFlags_T *TargetFlags =
-    &HostAdapter->TargetFlags[Command->target];
+    &HostAdapter->TargetFlags[Command->device->id];
   BusLogic_TargetStatistics_T *TargetStatistics =
     HostAdapter->TargetStatistics;
   unsigned char *CDB = Command->cmnd;
   int CDB_Length = Command->cmd_len;
-  int TargetID = Command->target;
-  int LogicalUnit = Command->lun;
+  int TargetID = Command->device->id;
+  int LogicalUnit = Command->device->lun;
   void *BufferPointer = Command->request_buffer;
   int BufferLength = Command->request_bufflen;
   int SegmentCount = Command->use_sg;
@@ -3708,8 +3708,9 @@ int BusLogic_QueueCommand(SCSI_Command_T *Command,
 int BusLogic_AbortCommand(SCSI_Command_T *Command)
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
-  int TargetID = Command->target;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
+
+  int TargetID = Command->device->id;
   BusLogic_CCB_T *CCB;
   int Result;
   BusLogic_IncrementErrorCounter(
@@ -3835,7 +3836,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
   else
     {
       BusLogic_IncrementErrorCounter(
-	&HostAdapter->TargetStatistics[Command->target]
+	&HostAdapter->TargetStatistics[Command->device->id]
 		      .HostAdapterResetsRequested);
       HardReset = true;
     }
@@ -3845,7 +3846,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
   */
   if (ResetFlags & SCSI_RESET_ASYNCHRONOUS)
     {
-      TargetID = Command->target;
+      TargetID = Command->device->id;
       if (Command->serial_number != Command->serial_number_at_timeout)
 	{
 	  BusLogic_Warning("Unable to Reset Command to Target %d - "
@@ -3890,9 +3891,9 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
   else
     {
       BusLogic_Warning("Resetting %s due to Target %d\n", HostAdapter,
-		       HostAdapter->FullModelName, Command->target);
+		       HostAdapter->FullModelName, Command->device->id);
       BusLogic_IncrementErrorCounter(
-	&HostAdapter->TargetStatistics[Command->target]
+	&HostAdapter->TargetStatistics[Command->device->id]
 		      .HostAdapterResetsAttempted);
     }
   /*
@@ -3908,7 +3909,7 @@ static int BusLogic_ResetHostAdapter(BusLogic_HostAdapter_T *HostAdapter,
     }
   if (Command != NULL)
     BusLogic_IncrementErrorCounter(
-      &HostAdapter->TargetStatistics[Command->target]
+      &HostAdapter->TargetStatistics[Command->device->id]
 		    .HostAdapterResetsCompleted);
   /*
     Mark all currently executing CCBs as having been Reset.
@@ -3975,7 +3976,7 @@ static int BusLogic_SendBusDeviceReset(BusLogic_HostAdapter_T *HostAdapter,
 				       SCSI_Command_T *Command,
 				       unsigned int ResetFlags)
 {
-  int TargetID = Command->target;
+  int TargetID = Command->device->id;
   BusLogic_CCB_T *CCB, *XCCB;
   int Result = -1;
   BusLogic_IncrementErrorCounter(
@@ -4152,8 +4153,8 @@ Done:
 int BusLogic_ResetCommand(SCSI_Command_T *Command, unsigned int ResetFlags)
 {
   BusLogic_HostAdapter_T *HostAdapter =
-    (BusLogic_HostAdapter_T *) Command->host->hostdata;
-  int TargetID = Command->target;
+    (BusLogic_HostAdapter_T *) Command->device->host->hostdata;
+  int TargetID = Command->device->id;
   BusLogic_ErrorRecoveryStrategy_T
     ErrorRecoveryStrategy = HostAdapter->ErrorRecoveryStrategy[TargetID];
   /*

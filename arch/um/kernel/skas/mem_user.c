@@ -33,7 +33,7 @@ void map(int fd, unsigned long virt, unsigned long phys, unsigned long len,
 					 .fd		= region->fd,
 					 .offset	= phys_offset(phys)
 				       } } } );
-	n = os_write_file(fd, (char *) &map, sizeof(map));
+	n = os_write_file(fd, &map, sizeof(map));
 	if(n != sizeof(map)) 
 		printk("map : /proc/mm map failed, errno = %d\n", errno);
 }
@@ -48,7 +48,7 @@ int unmap(int fd, void *addr, int len)
 				       { .munmap	= 
 					 { .addr 	= (unsigned long) addr,
 					   .len		= len } } } );
-	n = os_write_file(fd, (char *) &unmap, sizeof(unmap));
+	n = os_write_file(fd, &unmap, sizeof(unmap));
 	if((n != 0) && (n != sizeof(unmap)))
 		return(-errno);
 	return(0);
@@ -70,7 +70,7 @@ int protect(int fd, unsigned long addr, unsigned long len, int r, int w,
 					   .len		= len,
 					   .prot	= prot } } } );
 
-	n = os_write_file(fd, (char *) &protect, sizeof(protect));
+	n = os_write_file(fd, &protect, sizeof(protect));
 	if((n != 0) && (n != sizeof(protect))){
 		if(must_succeed)
 			panic("protect failed, errno = %d", errno);

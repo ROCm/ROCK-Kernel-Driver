@@ -1,7 +1,7 @@
 /*
  * Simulated Ethernet Driver
  *
- * Copyright (C) 1999-2001 Hewlett-Packard Co
+ * Copyright (C) 1999-2001, 2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  */
 #include <linux/config.h>
@@ -116,7 +116,7 @@ simeth_probe (void)
 {
 	int r;
 
-	printk("simeth: v%s\n", simeth_version);
+	printk(KERN_INFO "simeth: v%s\n", simeth_version);
 
 	r = simeth_probe1();
 
@@ -235,7 +235,8 @@ simeth_probe1(void)
 	/* Fill in the fields of the device structure with ethernet-generic values. */
 	ether_setup(dev);
 
-	printk("%s: hosteth=%s simfd=%d, HwAddr", dev->name, simeth_device, local->simfd);
+	printk(KERN_INFO "%s: hosteth=%s simfd=%d, HwAddr",
+	       dev->name, simeth_device, local->simfd);
 	for(i = 0; i < ETH_ALEN; i++) {
 		printk(" %2.2x", dev->dev_addr[i]);
 	}
@@ -251,7 +252,7 @@ static int
 simeth_open(struct net_device *dev)
 {
 	if (request_irq(dev->irq, simeth_interrupt, 0, "simeth", dev)) {
-		printk ("simeth: unable to get IRQ %d.\n", dev->irq);
+		printk(KERN_WARNING "simeth: unable to get IRQ %d.\n", dev->irq);
 		return -EAGAIN;
 	}
 
@@ -312,11 +313,12 @@ simeth_device_event(struct notifier_block *this,unsigned long event, void *ptr)
 			if (strcmp(dev->name, ifa->ifa_label) == 0) break;
 	}
 	if ( ifa == NULL ) {
-		printk("simeth_open: can't find device %s's ifa\n", dev->name);
+		printk(KERN_ERR "simeth_open: can't find device %s's ifa\n", dev->name);
 		return NOTIFY_DONE;
 	}
 
-	printk("simeth_device_event: %s ipaddr=0x%x\n", dev->name, htonl(ifa->ifa_local));
+	printk(KERN_INFO "simeth_device_event: %s ipaddr=0x%x\n",
+	       dev->name, htonl(ifa->ifa_local));
 
 	/*
 	 * XXX Fix me
@@ -330,7 +332,8 @@ simeth_device_event(struct notifier_block *this,unsigned long event, void *ptr)
 		netdev_attach(local->simfd, dev->irq, htonl(ifa->ifa_local)):
 		netdev_detach(local->simfd);
 
-	printk("simeth: netdev_attach/detach: event=%s ->%d\n", event == NETDEV_UP ? "attach":"detach", r);
+	printk(KERN_INFO "simeth: netdev_attach/detach: event=%s ->%d\n",
+	       event == NETDEV_UP ? "attach":"detach", r);
 
 	return NOTIFY_DONE;
 }
@@ -460,7 +463,8 @@ simeth_rx(struct net_device *dev)
 		 */
 		len = netdev_read(local->simfd, skb->data, SIMETH_FRAME_SIZE);
 		if ( len == 0 ) {
-			if ( simeth_debug > 0 ) printk(KERN_WARNING "%s: count=%d netdev_read=0\n", dev->name, SIMETH_RECV_MAX-rcv_count);
+			if ( simeth_debug > 0 ) printk(KERN_WARNING "%s: count=%d netdev_read=0\n",
+						       dev->name, SIMETH_RECV_MAX-rcv_count);
 			break;
 		}
 #if 0

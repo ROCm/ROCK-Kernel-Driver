@@ -18,7 +18,7 @@
  * PTRACE_DETACH works more simple in 2.4.10
  *
  * Revision 1.6  2001/07/25 16:08:47  bjornw
- * PTRACE_ATTACH bulk moved into arch-independant code in 2.4.7
+ * PTRACE_ATTACH bulk moved into arch-independent code in 2.4.7
  *
  * Revision 1.5  2001/03/26 14:24:28  orjanf
  * * Changed loop condition.

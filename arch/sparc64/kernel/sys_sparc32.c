@@ -1681,7 +1681,7 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_times
 
 extern asmlinkage int sys_sigprocmask(int how, old_sigset_t *set, old_sigset_t *oset);
 
-asmlinkage int sys32_sigprocmask(int how, old_sigset_t32 *set, old_sigset_t32 *oset)
+asmlinkage int sys32_sigprocmask(int how, compat_old_sigset_t *set, compat_old_sigset_t *oset)
 {
 	old_sigset_t s;
 	int ret;
@@ -1698,15 +1698,15 @@ asmlinkage int sys32_sigprocmask(int how, old_sigset_t32 *set, old_sigset_t32 *o
 
 extern asmlinkage int sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset, size_t sigsetsize);
 
-asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset_t32 s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
 	if (set) {
-		if (copy_from_user (&s32, set, sizeof(sigset_t32)))
+		if (copy_from_user (&s32, set, sizeof(compat_sigset_t)))
 			return -EFAULT;
 		switch (_NSIG_WORDS) {
 		case 4: s.sig[3] = s32.sig[6] | (((long)s32.sig[7]) << 32);
@@ -1726,7 +1726,7 @@ asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, 
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (oset, &s32, sizeof(sigset_t32)))
+		if (copy_to_user (oset, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return 0;
@@ -1734,7 +1734,7 @@ asmlinkage int sys32_rt_sigprocmask(int how, sigset_t32 *set, sigset_t32 *oset, 
 
 extern asmlinkage int sys_sigpending(old_sigset_t *set);
 
-asmlinkage int sys32_sigpending(old_sigset_t32 *set)
+asmlinkage int sys32_sigpending(compat_old_sigset_t *set)
 {
 	old_sigset_t s;
 	int ret;
@@ -1749,10 +1749,10 @@ asmlinkage int sys32_sigpending(old_sigset_t32 *set)
 
 extern asmlinkage int sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
 
-asmlinkage int sys32_rt_sigpending(sigset_t32 *set, compat_size_t sigsetsize)
+asmlinkage int sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
-	sigset_t32 s32;
+	compat_sigset_t s32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 		
@@ -1766,19 +1766,19 @@ asmlinkage int sys32_rt_sigpending(sigset_t32 *set, compat_size_t sigsetsize)
 		case 2: s32.sig[3] = (s.sig[1] >> 32); s32.sig[2] = s.sig[1];
 		case 1: s32.sig[1] = (s.sig[0] >> 32); s32.sig[0] = s.sig[0];
 		}
-		if (copy_to_user (set, &s32, sizeof(sigset_t32)))
+		if (copy_to_user (set, &s32, sizeof(compat_sigset_t)))
 			return -EFAULT;
 	}
 	return ret;
 }
 
 asmlinkage int
-sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
+sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		      struct compat_timespec *uts, compat_size_t sigsetsize)
 {
 	int ret, sig;
 	sigset_t these;
-	sigset_t32 these32;
+	compat_sigset_t these32;
 	struct timespec ts;
 	siginfo_t info;
 	long timeout = 0;
@@ -1787,7 +1787,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 	if (sigsetsize != sizeof(sigset_t))
 		return -EINVAL;
 
-	if (copy_from_user (&these32, uthese, sizeof(sigset_t32)))
+	if (copy_from_user (&these32, uthese, sizeof(compat_sigset_t)))
 		return -EFAULT;
 
 	switch (_NSIG_WORDS) {
@@ -1812,7 +1812,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 			return -EINVAL;
 	}
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sig = dequeue_signal(&these, &info);
 	if (!sig) {
 		timeout = MAX_SCHEDULE_TIMEOUT;
@@ -1827,19 +1827,19 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 			current->real_blocked = current->blocked;
 			sigandsets(&current->blocked, &current->blocked, &these);
 			recalc_sigpending();
-			spin_unlock_irq(&current->sig->siglock);
+			spin_unlock_irq(&current->sighand->siglock);
 
 			current->state = TASK_INTERRUPTIBLE;
 			timeout = schedule_timeout(timeout);
 
-			spin_lock_irq(&current->sig->siglock);
+			spin_lock_irq(&current->sighand->siglock);
 			sig = dequeue_signal(&these, &info);
 			current->blocked = current->real_blocked;
 			siginitset(&current->real_blocked, 0);
 			recalc_sigpending();
 		}
 	}
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (sig) {
 		ret = sig;
@@ -2718,7 +2718,7 @@ asmlinkage int sys32_sigaction (int sig, struct old_sigaction32 *act, struct old
 	}
 
         if (act) {
-		old_sigset_t32 mask;
+		compat_old_sigset_t mask;
 		
 		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
 		ret |= __get_user((long)new_ka.sa.sa_restorer, &act->sa_restorer);
@@ -2748,10 +2748,10 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 {
         struct k_sigaction new_ka, old_ka;
         int ret;
-	sigset_t32 set32;
+	compat_sigset_t set32;
 
         /* XXX: Don't preclude handling different sized sigset_t's.  */
-        if (sigsetsize != sizeof(sigset_t32))
+        if (sigsetsize != sizeof(compat_sigset_t))
                 return -EINVAL;
 
 	/* All tasks which use RT signals (effectively) use
@@ -2762,7 +2762,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
         if (act) {
 		new_ka.ka_restorer = restorer;
 		ret = get_user((long)new_ka.sa.sa_handler, &act->sa_handler);
-		ret |= __copy_from_user(&set32, &act->sa_mask, sizeof(sigset_t32));
+		ret |= __copy_from_user(&set32, &act->sa_mask, sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6] | (((long)set32.sig[7]) << 32);
 		case 3: new_ka.sa.sa_mask.sig[2] = set32.sig[4] | (((long)set32.sig[5]) << 32);
@@ -2785,7 +2785,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 		case 1: set32.sig[1] = (old_ka.sa.sa_mask.sig[0] >> 32); set32.sig[0] = old_ka.sa.sa_mask.sig[0];
 		}
 		ret = put_user((long)old_ka.sa.sa_handler, &oact->sa_handler);
-		ret |= __copy_to_user(&oact->sa_mask, &set32, sizeof(sigset_t32));
+		ret |= __copy_to_user(&oact->sa_mask, &set32, sizeof(compat_sigset_t));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		ret |= __put_user((long)old_ka.sa.sa_restorer, &oact->sa_restorer);
 		if (ret)

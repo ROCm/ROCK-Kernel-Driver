@@ -14,8 +14,8 @@ struct arch_thread {
 	int debugregs_seq;
 };
 
-#define INIT_ARCH_THREAD { debugregs : 		{ [ 0 ... 7 ] = 0 }, \
-                           debugregs_seq :	0 }
+#define INIT_ARCH_THREAD { .debugregs  		= { [ 0 ... 7 ] = 0 }, \
+                           .debugregs_seq	= 0 }
 
 #include "asm/arch/user.h"
 

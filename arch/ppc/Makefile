@@ -36,15 +36,12 @@ ifdef CONFIG_MORE_COMPILE_OPTIONS
   CFLAGS += $(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
 endif
 
-head-y				:= head.o
-head-$(CONFIG_8xx)		:= head_8xx.o
-head-$(CONFIG_4xx)		:= head_4xx.o
-head-$(CONFIG_440)		:= head_44x.o
+head-y				:= arch/ppc/kernel/head.o
+head-$(CONFIG_8xx)		:= arch/ppc/kernel/head_8xx.o
+head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
+head-$(CONFIG_440)		:= arch/ppc/kernel/head_44x.o
 
-HEAD := arch/ppc/kernel/$(head-y)
-ifdef CONFIG_6xx
-  HEAD += arch/ppc/kernel/idle_6xx.o
-endif
+head-$(CONFIG_6xx)		+= arch/ppc/kernel/idle_6xx.o
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
@@ -59,7 +56,7 @@ drivers-$(CONFIG_OCP)		+= arch/ppc/ocp/
 
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
-.PHONY: $(BOOT_TARGETS) clean archclean archmrproper
+.PHONY: $(BOOT_TARGETS)
 
 all: zImage
 
@@ -77,8 +74,6 @@ $(BOOT_TARGETS): vmlinux
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
-
-archmrproper:
 
 prepare: include/asm-$(ARCH)/offsets.h checkbin
 

@@ -7,8 +7,6 @@ obj-y		+= amd.o
 obj-y		+= cyrix.o
 obj-y		+= centaur.o
 
-export-objs	:= main.o
-
 $(obj)/main.c: $(obj)/mtrr.h
 	@ln -sf ../../../i386/kernel/cpu/mtrr/main.c $(obj)/main.c
 $(obj)/if.c: $(obj)/mtrr.h

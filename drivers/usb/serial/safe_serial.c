@@ -256,7 +256,7 @@ static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 				}
 				tty_flip_buffer_push (port->tty);
 			} else {
-				err ("%s - inconsistant lengths %d:%d", __FUNCTION__,
+				err ("%s - inconsistent lengths %d:%d", __FUNCTION__,
 				     actual_length, length);
 			}
 		} else {

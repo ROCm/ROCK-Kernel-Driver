@@ -534,7 +534,7 @@ show_interrupts(struct seq_file *p, void *v)
 #else
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
-				seq_printf(p, "%10u ", kstat_cpu(i).irqs[j]);
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
 		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 		seq_printf(p, "  %c%s",

@@ -160,7 +160,7 @@ extern agp_memory *agp_allocate_memory(size_t, u32);
  * an u32 argument of the type of memory to be allocated.  
  * Every agp bridge device will allow you to allocate 
  * AGP_NORMAL_MEMORY which maps to physical ram.  Any other
- * type is device dependant.
+ * type is device dependent.
  * 
  * It returns NULL whenever memory is unavailable.
  * 

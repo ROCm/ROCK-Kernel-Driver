@@ -26,8 +26,11 @@
 #include <linux/mm.h>
 #include <linux/notifier.h>
 #include <linux/thread_info.h>
+#include <linux/time.h>
+#include <linux/jiffies.h>
 
 #include <asm/uaccess.h>
+#include <asm/div64.h>
 
 /*
  * per-CPU timer vector definitions:
@@ -758,7 +761,7 @@ unsigned long wall_jiffies;
  * This read-write spinlock protects us from races in SMP while
  * playing with xtime and avenrun.
  */
-rwlock_t xtime_lock __cacheline_aligned_in_smp = RW_LOCK_UNLOCKED;
+seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
 unsigned long last_time_offset;
 
 /*
@@ -799,7 +802,7 @@ static inline void update_times(void)
   
 /*
  * The 64-bit jiffies value is not atomic - you MUST NOT read it
- * without holding read_lock_irq(&xtime_lock).
+ * without sampling the sequence number in xtime_lock.
  * jiffies is defined in the linker script...
  */
 
@@ -1085,20 +1088,26 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 asmlinkage long sys_sysinfo(struct sysinfo *info)
 {
 	struct sysinfo val;
+	u64 uptime;
 	unsigned long mem_total, sav_total;
 	unsigned int mem_unit, bitcount;
+	unsigned long seq;
 
 	memset((char *)&val, 0, sizeof(struct sysinfo));
 
-	read_lock_irq(&xtime_lock);
-	val.uptime = jiffies / HZ;
+	do {
+		seq = read_seqbegin(&xtime_lock);
 
-	val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
+		uptime = jiffies_64;
+		do_div(uptime, HZ);
+		val.uptime = (unsigned long) uptime;
 
-	val.procs = nr_threads;
-	read_unlock_irq(&xtime_lock);
+		val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
+
+		val.procs = nr_threads;
+	} while (read_seqretry(&xtime_lock, seq));
 
 	si_meminfo(&val);
 	si_swapinfo(&val);
@@ -1143,7 +1152,7 @@ asmlinkage long sys_sysinfo(struct sysinfo *info)
 	val.totalhigh <<= bitcount;
 	val.freehigh <<= bitcount;
 
-out:
+ out:
 	if (copy_to_user(info, &val, sizeof(struct sysinfo)))
 		return -EFAULT;
 

@@ -697,7 +697,7 @@ void usb_stor_abort_transport(struct us_data *us)
 
 	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
-	host = us->srb->host;
+	host = us->srb->device->host;
 	scsi_unlock(host);
 
 	/* If the state machine is blocked waiting for an URB,
@@ -895,7 +895,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	bcb.Tag = srb->serial_number;
 	bcb.Lun = srb->cmnd[1] >> 5;
 	if (us->flags & US_FL_SCM_MULT_TARG)
-		bcb.Lun |= srb->target << 4;
+		bcb.Lun |= srb->device->id << 4;
 	bcb.Length = srb->cmd_len;
 
 	/* copy the command payload */

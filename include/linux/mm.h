@@ -208,23 +208,54 @@ struct page {
  * Also, many kernel routines increase the page count before a critical
  * routine so they can be sure the page doesn't go away from under them.
  */
-#define get_page(p)		atomic_inc(&(p)->count)
-#define __put_page(p)		atomic_dec(&(p)->count)
 #define put_page_testzero(p)				\
 	({						\
 		BUG_ON(page_count(page) == 0);		\
 		atomic_dec_and_test(&(p)->count);	\
 	})
+
 #define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
+#define __put_page(p)		atomic_dec(&(p)->count)
 
 extern void FASTCALL(__page_cache_release(struct page *));
+
+#ifdef CONFIG_HUGETLB_PAGE
+
+static inline void get_page(struct page *page)
+{
+	if (PageCompound(page))
+		page = (struct page *)page->lru.next;
+	atomic_inc(&page->count);
+}
+
+static inline void put_page(struct page *page)
+{
+	if (PageCompound(page)) {
+		page = (struct page *)page->lru.next;
+		if (page->lru.prev) {	/* destructor? */
+			(*(void (*)(struct page *))page->lru.prev)(page);
+			return;
+		}
+	}
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
+
+#else		/* CONFIG_HUGETLB_PAGE */
+
+static inline void get_page(struct page *page)
+{
+	atomic_inc(&page->count);
+}
 
 static inline void put_page(struct page *page)
 {
 	if (!PageReserved(page) && put_page_testzero(page))
 		__page_cache_release(page);
 }
+
+#endif		/* CONFIG_HUGETLB_PAGE */
 
 /*
  * Multiple processes may "see" the same page. E.g. for untouched
@@ -491,7 +522,9 @@ extern int do_munmap(struct mm_struct *, unsigned long, size_t);
 
 extern unsigned long do_brk(unsigned long, unsigned long);
 
-static inline void __vma_unlink(struct mm_struct * mm, struct vm_area_struct * vma, struct vm_area_struct * prev)
+static inline void
+__vma_unlink(struct mm_struct *mm, struct vm_area_struct *vma,
+		struct vm_area_struct *prev)
 {
 	prev->vm_next = vma->vm_next;
 	rb_erase(&vma->vm_rb, &mm->mm_rb);
@@ -499,7 +532,8 @@ static inline void __vma_unlink(struct mm_struct * mm, struct vm_area_struct * v
 		mm->mmap_cache = prev;
 }
 
-static inline int can_vma_merge(struct vm_area_struct * vma, unsigned long vm_flags)
+static inline int
+can_vma_merge(struct vm_area_struct *vma, unsigned long vm_flags)
 {
 	if (!vma->vm_file && vma->vm_flags == vm_flags)
 		return 1;

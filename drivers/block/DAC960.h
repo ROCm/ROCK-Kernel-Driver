@@ -2305,6 +2305,8 @@ typedef struct DAC960_Command
   unsigned int BlockNumber;
   unsigned int BlockCount;
   unsigned int SegmentCount;
+  int	DmaDirection;
+  struct scatterlist *cmd_sglist;
   IO_Request_T *Request;
   struct pci_dev *PciDevice;
   union {

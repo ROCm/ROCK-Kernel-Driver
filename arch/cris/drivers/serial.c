@@ -318,7 +318,7 @@ static char *serial_version = "$Revision: 1.3 $";
 
 #include <asm/svinto.h>
 
-/* non-arch dependant serial structures are in linux/serial.h */
+/* non-arch dependent serial structures are in linux/serial.h */
 #include <linux/serial.h>
 /* while we keep our own stuff (struct e100_serial) in a local .h file */
 #include "serial.h"

@@ -21,7 +21,7 @@
 #define MAP_LOCKED      0x100           /* lock the mapping */
 #define _MAP_NEW        0x80000000      /* Binary compatibility is fun... */
 
-#define MAP_GROWSDOWN	0x0100		/* stack-like segment */
+#define MAP_GROWSDOWN	0x0200		/* stack-like segment */
 #define MAP_DENYWRITE	0x0800		/* ETXTBSY */
 #define MAP_EXECUTABLE	0x1000		/* mark it as an executable */
 

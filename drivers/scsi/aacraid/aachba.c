@@ -392,8 +392,8 @@ static char *container_types[] = {
  * Arguments: [1] pointer to void [1] int
  *
  * Purpose: Sets SCSI inquiry data strings for vendor, product
- * and revision level. Allows strings to be set in platform dependant
- * files instead of in OS dependant driver source.
+ * and revision level. Allows strings to be set in platform dependent
+ * files instead of in OS dependent driver source.
  */
 
 static void setinqstr(int devtype, void *data, int tindex)
@@ -463,9 +463,9 @@ void set_sense(u8 *sense_buf, u8 sense_key, u8 sense_code,
 static void aac_io_done(Scsi_Cmnd * scsicmd)
 {
 	unsigned long cpu_flags;
-	spin_lock_irqsave(scsicmd->host->host_lock, cpu_flags);
+	spin_lock_irqsave(scsicmd->device->host->host_lock, cpu_flags);
 	scsicmd->scsi_done(scsicmd);
-	spin_unlock_irqrestore(scsicmd->host->host_lock, cpu_flags);
+	spin_unlock_irqrestore(scsicmd->device->host->host_lock, cpu_flags);
 }
 
 static void __aac_io_done(Scsi_Cmnd * scsicmd)
@@ -546,8 +546,8 @@ static void read_callback(void *context, struct fib * fibptr)
 
 	scsicmd = (Scsi_Cmnd *) context;
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
-	cid =TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+	cid =TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 	lba = ((scsicmd->cmnd[1] & 0x1F) << 16) | (scsicmd->cmnd[2] << 8) | scsicmd->cmnd[3];
 	dprintk((KERN_DEBUG "read_callback[cpu %d]: lba = %d, t = %ld.\n", smp_processor_id(), lba, jiffies));
@@ -591,8 +591,8 @@ static void write_callback(void *context, struct fib * fibptr)
 	u32 cid;
 
 	scsicmd = (Scsi_Cmnd *) context;
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
-	cid = TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
+	cid = TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 	lba = ((scsicmd->cmnd[1] & 0x1F) << 16) | (scsicmd->cmnd[2] << 8) | scsicmd->cmnd[3];
 	dprintk((KERN_DEBUG "write_callback[cpu %d]: lba = %d, t = %ld.\n", smp_processor_id(), lba, jiffies));
@@ -637,7 +637,7 @@ int aac_read(Scsi_Cmnd * scsicmd, int cid)
 	struct aac_dev *dev;
 	struct fib * cmd_fibcontext;
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	/*
 	 *	Get block address and transfer length
 	 */
@@ -746,7 +746,7 @@ static int aac_write(Scsi_Cmnd * scsicmd, int cid)
 	struct aac_dev *dev;
 	struct fib * cmd_fibcontext;
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	/*
 	 *	Get block address and transfer length
 	 */
@@ -861,25 +861,25 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 	struct fsa_scsi_hba *fsa_dev_ptr;
 	int cardtype;
 	int ret;
-	struct aac_dev *dev = (struct aac_dev *)scsicmd->host->hostdata;
+	struct aac_dev *dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	
 	cardtype = dev->cardtype;
 
-	fsa_dev_ptr = fsa_dev[scsicmd->host->unique_id];
+	fsa_dev_ptr = fsa_dev[scsicmd->device->host->unique_id];
 
 	/*
 	 *	If the bus, target or lun is out of range, return fail
 	 *	Test does not apply to ID 16, the pseudo id for the controller
 	 *	itself.
 	 */
-	if (scsicmd->target != scsicmd->host->this_id) {
-		if ((scsicmd->channel == 0) ){
-			if( (scsicmd->target >= AAC_MAX_TARGET) || (scsicmd->lun != 0)){ 
+	if (scsicmd->device->id != scsicmd->device->host->this_id) {
+		if ((scsicmd->device->channel == 0) ){
+			if( (scsicmd->device->id >= AAC_MAX_TARGET) || (scsicmd->device->lun != 0)){ 
 				scsicmd->result = DID_NO_CONNECT << 16;
 				__aac_io_done(scsicmd);
 				return 0;
 			}
-			cid = TARGET_LUN_TO_CONTAINER(scsicmd->target, scsicmd->lun);
+			cid = TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
 			/*
 			 *	If the target container doesn't exist, it may have
@@ -890,9 +890,9 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 				case SS_INQUIR:
 				case SS_RDCAP:
 				case SS_TEST:
-					spin_unlock_irq(scsicmd->host->host_lock);
+					spin_unlock_irq(scsicmd->device->host->host_lock);
 					probe_container(dev, cid);
-					spin_lock_irq(scsicmd->host->host_lock);
+					spin_lock_irq(scsicmd->device->host->host_lock);
 					if (fsa_dev_ptr->valid[cid] == 0) {
 						scsicmd->result = DID_NO_CONNECT << 16;
 						__aac_io_done(scsicmd);
@@ -944,7 +944,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 	{
 		struct inquiry_data *inq_data_ptr;
 
-		dprintk((KERN_DEBUG "INQUIRY command, ID: %d.\n", scsicmd->target));
+		dprintk((KERN_DEBUG "INQUIRY command, ID: %d.\n", scsicmd->device->id));
 		inq_data_ptr = (struct inquiry_data *)scsicmd->request_buffer;
 		memset(inq_data_ptr, 0, sizeof (struct inquiry_data));
 
@@ -959,7 +959,7 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 		 *	see: <vendor>.c i.e. aac.c
 		 */
 		setinqstr(cardtype, (void *) (inq_data_ptr->inqd_vid), fsa_dev_ptr->type[cid]);
-		if (scsicmd->target == scsicmd->host->this_id)
+		if (scsicmd->device->id == scsicmd->device->host->this_id)
 			inq_data_ptr->inqd_pdt = INQD_PDT_PROC;	/* Processor device */
 		else
 			inq_data_ptr->inqd_pdt = INQD_PDT_DA;	/* Direct/random access device */
@@ -1053,20 +1053,20 @@ int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
 			 *	containers to /dev/sd device names
 			 */
 			 
-			spin_unlock_irq(scsicmd->host->host_lock);
+			spin_unlock_irq(scsicmd->device->host->host_lock);
 			if  (scsicmd->request->rq_disk)
 				memcpy(fsa_dev_ptr->devname[cid],
 					scsicmd->request->rq_disk->disk_name,
 					8);
 			ret = aac_read(scsicmd, cid);
-			spin_lock_irq(scsicmd->host->host_lock);
+			spin_lock_irq(scsicmd->device->host->host_lock);
 			return ret;
 
 		case SS_WRITE:
 		case SM_WRITE:
-			spin_unlock_irq(scsicmd->host->host_lock);
+			spin_unlock_irq(scsicmd->device->host->host_lock);
 			ret = aac_write(scsicmd, cid);
-			spin_lock_irq(scsicmd->host->host_lock);
+			spin_lock_irq(scsicmd->device->host->host_lock);
 			return ret;
 		default:
 			/*
@@ -1202,7 +1202,7 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
 	Scsi_Cmnd *scsicmd;
 
 	scsicmd = (Scsi_Cmnd *) context;
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 
 	if (fibptr == NULL)
 		BUG();
@@ -1366,13 +1366,13 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 	u16 fibsize;
 	u32 flag;
 
-	if( scsicmd->target > 15 || scsicmd->lun > 7) {
+	if( scsicmd->device->id > 15 || scsicmd->device->lun > 7) {
 		scsicmd->result = DID_NO_CONNECT << 16;
 		__aac_io_done(scsicmd);
 		return 0;
 	}
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	switch(scsicmd->sc_data_direction){
 	case SCSI_DATA_WRITE:
 		flag = SRB_DataOut;
@@ -1402,9 +1402,9 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 
 	srbcmd = (struct aac_srb*) fib_data(cmd_fibcontext);
 	srbcmd->function = cpu_to_le32(SRBF_ExecuteScsi);
-	srbcmd->channel  = cpu_to_le32(aac_logical_to_phys(scsicmd->channel));
-	srbcmd->target   = cpu_to_le32(scsicmd->target);
-	srbcmd->lun      = cpu_to_le32(scsicmd->lun);
+	srbcmd->channel  = cpu_to_le32(aac_logical_to_phys(scsicmd->device->channel));
+	srbcmd->target   = cpu_to_le32(scsicmd->device->id);
+	srbcmd->lun      = cpu_to_le32(scsicmd->device->lun);
 	srbcmd->flags    = cpu_to_le32(flag);
 	srbcmd->timeout  = cpu_to_le32(0);  // timeout not used
 	srbcmd->retry_limit =cpu_to_le32(0); // Obsolete parameter
@@ -1468,7 +1468,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 	struct aac_dev *dev;
 	unsigned long byte_count = 0;
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	// Get rid of old data
 	psg->count = cpu_to_le32(0);
 	psg->sg[0].addr = cpu_to_le32(NULL);
@@ -1524,7 +1524,7 @@ static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
 	unsigned long byte_count = 0;
 	u64 le_addr;
 
-	dev = (struct aac_dev *)scsicmd->host->hostdata;
+	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	// Get rid of old data
 	psg->count = cpu_to_le32(0);
 	psg->sg[0].addr[0] = cpu_to_le32(NULL);

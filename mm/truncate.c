@@ -64,24 +64,25 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
  * ->page_lock.  That provides exclusion against the __set_page_dirty
  * functions.
  */
-static void
+static int
 invalidate_complete_page(struct address_space *mapping, struct page *page)
 {
 	if (page->mapping != mapping)
-		return;
+		return 0;
 
 	if (PagePrivate(page) && !try_to_release_page(page, 0))
-		return;
+		return 0;
 
 	write_lock(&mapping->page_lock);
 	if (PageDirty(page)) {
 		write_unlock(&mapping->page_lock);
-	} else {
-		__remove_from_page_cache(page);
-		write_unlock(&mapping->page_lock);
-		ClearPageUptodate(page);
-		page_cache_release(page);	/* pagecache ref */
+		return 0;
 	}
+	__remove_from_page_cache(page);
+	write_unlock(&mapping->page_lock);
+	ClearPageUptodate(page);
+	page_cache_release(page);	/* pagecache ref */
+	return 1;
 }
 
 /**
@@ -177,24 +178,29 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 }
 
 /**
- * invalidate_inode_pages - Invalidate all the unlocked pages of one inode
- * @inode: the inode which pages we want to invalidate
+ * invalidate_mapping_pages - Invalidate all the unlocked pages of one inode
+ * @inode: the address_space which holds the pages to invalidate
+ * @end: the index of the last page to invalidate (inclusive)
+ * @nr_pages: defines the pagecache span.  Invalidate up to @start + @nr_pages
  *
  * This function only removes the unlocked pages, if you want to
  * remove all the pages of one inode, you must call truncate_inode_pages.
  *
- * invalidate_inode_pages() will not block on IO activity. It will not
+ * invalidate_mapping_pages() will not block on IO activity. It will not
  * invalidate pages which are dirty, locked, under writeback or mapped into
  * pagetables.
  */
-void invalidate_inode_pages(struct address_space *mapping)
+unsigned long invalidate_mapping_pages(struct address_space *mapping,
+				pgoff_t start, pgoff_t end)
 {
 	struct pagevec pvec;
-	pgoff_t next = 0;
+	pgoff_t next = start;
+	unsigned long ret = 0;
 	int i;
 
 	pagevec_init(&pvec, 0);
-	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
+	while (next <= end &&
+			pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {
 		for (i = 0; i < pagevec_count(&pvec); i++) {
 			struct page *page = pvec.pages[i];
 
@@ -209,13 +215,19 @@ void invalidate_inode_pages(struct address_space *mapping)
 				goto unlock;
 			if (page_mapped(page))
 				goto unlock;
-			invalidate_complete_page(mapping, page);
+			ret += invalidate_complete_page(mapping, page);
 unlock:
 			unlock_page(page);
 		}
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+	return ret;
+}
+
+unsigned long invalidate_inode_pages(struct address_space *mapping)
+{
+	return invalidate_mapping_pages(mapping, 0, ~0UL);
 }
 
 /**

@@ -45,9 +45,6 @@ ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 
-export-objs			:= pagebuf/page_buf.o support/ktrace.o \
-				   linux/xfs_globals.o
-
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
 

@@ -1299,7 +1299,6 @@ pagebuf_iorequest(			/* start real I/O		*/
 	int			status = 0;
 	int			i, map_i, total_nr_pages, nr_pages;
 	struct bio		*bio;
-	struct bio_vec		*bvec;
 	int			offset = pb->pb_offset;
 	int			size = pb->pb_count_desired;
 	sector_t		sector = pb->pb_bn;
@@ -1335,13 +1334,8 @@ pagebuf_iorequest(			/* start real I/O		*/
 		bio->bi_sector = sector - (offset >> BBSHIFT);
 		bio->bi_end_io = bio_end_io_pagebuf;
 		bio->bi_private = pb;
-		bio->bi_vcnt++;
-		bio->bi_size = PAGE_CACHE_SIZE;
 
-		bvec = bio->bi_io_vec;
-		bvec->bv_page = pb->pb_pages[0];
-		bvec->bv_len = PAGE_CACHE_SIZE;
-		bvec->bv_offset = 0;
+		bio_add_page(bio, pb->pb_pages[0], PAGE_CACHE_SIZE, 0);
 
 		atomic_inc(&pb->pb_io_remaining);
 		submit_bio(READ, bio);
@@ -1389,9 +1383,7 @@ next_chunk:
 	bio->bi_end_io = bio_end_io_pagebuf;
 	bio->bi_private = pb;
 
-	bvec = bio->bi_io_vec;
-
-	for (; size && nr_pages; nr_pages--, bvec++, map_i++) {
+	for (; size && nr_pages; nr_pages--, map_i++) {
 		int	nbytes = PAGE_CACHE_SIZE - offset;
 
 		if (nbytes > size)
@@ -1589,10 +1581,10 @@ pagebuf_daemon(
 	daemonize();
 
 	/* Avoid signals */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	strcpy(current->comm, "pagebufd");
 	current->flags |= PF_MEMALLOC;

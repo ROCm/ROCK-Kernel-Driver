@@ -60,7 +60,7 @@ static void reset_all_channels(snd_midi_channel_set_t *chset);
 
 
 /*
- * Process an event in a driver independant way.  This means dealing
+ * Process an event in a driver independent way.  This means dealing
  * with RPN, NRPN, SysEx etc that are defined for common midi applications
  * such as GM, GS and XG.
  * There modes that this module will run in are:
@@ -258,7 +258,7 @@ note_off(snd_midi_op_t *ops, void *drv, snd_midi_channel_t *chan, int note, int 
 }
 
 /*
- * Do all driver independant operations for this controler and pass
+ * Do all driver independent operations for this controler and pass
  * events that need to take place immediately to the driver.
  */
 static void

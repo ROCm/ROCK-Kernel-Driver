@@ -44,7 +44,6 @@ extern void put_dirty_page (struct task_struct * tsk, struct page *page, unsigne
 
 static void elf32_set_personality (void);
 
-#define ELF_PLAT_INIT(_r)		ia64_elf32_init(_r)
 #define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
 #define elf_map				elf32_map
 

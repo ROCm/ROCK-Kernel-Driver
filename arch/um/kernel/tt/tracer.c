@@ -120,16 +120,6 @@ static int signal_tramp(void *arg)
 	return((*proc)(NULL));
 }
 
-static void last_ditch_exit(int sig)
-{
-	kmalloc_ok = 0;
-	signal(SIGINT, SIG_DFL);
-	signal(SIGTERM, SIG_DFL);
-	signal(SIGHUP, SIG_DFL);
-	uml_cleanup();
-	exit(1);
-}
-
 static void sleeping_process_signal(int pid, int sig)
 {
 	switch(sig){
@@ -214,9 +204,6 @@ int tracer(int (*init_proc)(void *), void *sp)
 
 	signal(SIGSEGV, (sighandler_t) tracer_segv);
 	signal(SIGUSR1, signal_usr1);
-	set_handler(SIGINT, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
-	set_handler(SIGTERM, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
-	set_handler(SIGHUP, last_ditch_exit, SA_ONESHOT | SA_NODEFER, -1);
 	if(debug_trace){
 		printf("Tracing thread pausing to be attached\n");
 		stop();

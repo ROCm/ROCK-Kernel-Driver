@@ -74,7 +74,7 @@
 #endif							       
 
 #define FCP_CMND(SCpnt) ((fcp_cmnd *)&(SCpnt->SCp))
-#define FC_SCMND(SCpnt) ((fc_channel *)(SCpnt->host->hostdata[0]))
+#define FC_SCMND(SCpnt) ((fc_channel *)(SCpnt->device->host->hostdata[0]))
 #define SC_FCMND(fcmnd) ((Scsi_Cmnd *)((long)fcmnd - (long)&(((Scsi_Cmnd *)0)->SCp)))
 
 static int fcp_scsi_queue_it(fc_channel *, Scsi_Cmnd *, fcp_cmnd *, int);
@@ -449,7 +449,7 @@ static inline void fcp_scsi_receive(fc_channel *fc, int token, int status, fc_hd
 	}
 
 	if (status_byte(rsp_status) == QUEUE_FULL) {
-		printk ("%s: (%d,%d) Received rsp_status 0x%x\n", fc->name, SCpnt->channel, SCpnt->target, rsp_status);
+		printk ("%s: (%d,%d) Received rsp_status 0x%x\n", fc->name, SCpnt->device->channel, SCpnt->device->id, rsp_status);
 	}	
 	
 	SCpnt->result = (host_status << 16) | (rsp_status & 0xff);
@@ -771,10 +771,10 @@ static void fcp_scsi_done (Scsi_Cmnd *SCpnt)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(SCpnt->host->host_lock, flags);
+	spin_lock_irqsave(SCpnt->device->host->host_lock, flags);
 	if (FCP_CMND(SCpnt)->done)
 		FCP_CMND(SCpnt)->done(SCpnt);
-	spin_unlock_irqrestore(SCpnt->host->host_lock, flags);
+	spin_unlock_irqrestore(SCpnt->device->host->host_lock, flags);
 }
 
 static int fcp_scsi_queue_it(fc_channel *fc, Scsi_Cmnd *SCpnt, fcp_cmnd *fcmd, int prepare)
@@ -799,8 +799,8 @@ static int fcp_scsi_queue_it(fc_channel *fc, Scsi_Cmnd *SCpnt, fcp_cmnd *fcmd, i
 		fc->cmd_slots[fcmd->token] = fcmd;
 
 		if (SCpnt->device->tagged_supported) {
-			if (jiffies - fc->ages[SCpnt->channel * fc->targets + SCpnt->target] > (5 * 60 * HZ)) {
-				fc->ages[SCpnt->channel * fc->targets + SCpnt->target] = jiffies;
+			if (jiffies - fc->ages[SCpnt->device->channel * fc->targets + SCpnt->device->id] > (5 * 60 * HZ)) {
+				fc->ages[SCpnt->device->channel * fc->targets + SCpnt->device->id] = jiffies;
 				fcp_cntl = FCP_CNTL_QTYPE_ORDERED;
 			} else
 				fcp_cntl = FCP_CNTL_QTYPE_SIMPLE;
@@ -916,9 +916,9 @@ int fcp_scsi_abort(Scsi_Cmnd *SCpnt)
 		unsigned long flags;
 
 		SCpnt->result = DID_ABORT;
-		spin_lock_irqsave(SCpnt->host->host_lock, flags);
+		spin_lock_irqsave(SCpnt->device->host->host_lock, flags);
 		fcmd->done(SCpnt);
-		spin_unlock_irqrestore(SCpnt->host->host_lock, flags);
+		spin_unlock_irqrestore(SCpnt->device->host->host_lock, flags);
 		printk("FC: soft abort\n");
 		return SUCCESS;
 	} else {
@@ -932,7 +932,7 @@ void fcp_scsi_reset_done(Scsi_Cmnd *SCpnt)
 	fc_channel *fc = FC_SCMND(SCpnt);
 
 	fc->rst_pkt->eh_state = SCSI_STATE_FINISHED;
-	up(fc->rst_pkt->host->eh_action);
+	up(fc->rst_pkt->device->host->eh_action);
 }
 
 #define FCP_RESET_TIMEOUT (2*HZ)
@@ -955,9 +955,7 @@ int fcp_scsi_dev_reset(Scsi_Cmnd *SCpnt)
 		cmd = fc->scsi_cmd_pool + 0;
 		FCD(("Preparing rst packet\n"))
 		fc->encode_addr (SCpnt, cmd->fcp_addr, fc, fcmd);
-		fc->rst_pkt->channel = SCpnt->channel;
-		fc->rst_pkt->target = SCpnt->target;
-		fc->rst_pkt->lun = 0;
+		fc->rst_pkt->device = SCpnt->device;
 		fc->rst_pkt->cmd_len = 0;
 		
 		fc->cmd_slots[0] = fcmd;
@@ -989,7 +987,7 @@ int fcp_scsi_dev_reset(Scsi_Cmnd *SCpnt)
 	 * Set up the semaphore so we wait for the command to complete.
 	 */
 
-	fc->rst_pkt->host->eh_action = &sem;
+	fc->rst_pkt->device->host->eh_action = &sem;
 	fc->rst_pkt->request->rq_status = RQ_SCSI_BUSY;
 
 	fc->rst_pkt->done = fcp_scsi_reset_done;
@@ -997,7 +995,7 @@ int fcp_scsi_dev_reset(Scsi_Cmnd *SCpnt)
 	
 	down(&sem);
 
-	fc->rst_pkt->host->eh_action = NULL;
+	fc->rst_pkt->device->host->eh_action = NULL;
 	del_timer(&fc->rst_pkt->eh_timeout);
 
 	/*

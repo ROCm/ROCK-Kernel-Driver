@@ -274,7 +274,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 
 static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 {
-	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->host->hostdata[0]);
+	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->device->host->hostdata[0]);
 	usb_complete_t usb_callback;
 	int res;
 
@@ -349,7 +349,7 @@ out:
 
 static int hpusbscsi_scsi_host_reset (Scsi_Cmnd *srb)
 {
-	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->host->hostdata[0]);
+	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->device->host->hostdata[0]);
 
 	printk(KERN_DEBUG"SCSI reset requested.\n");
 	//usb_reset_device(hpusbscsi->dev);
@@ -361,7 +361,7 @@ static int hpusbscsi_scsi_host_reset (Scsi_Cmnd *srb)
 
 static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb)
 {
-	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->host->hostdata[0]);
+	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->device->host->hostdata[0]);
 	printk(KERN_DEBUG"Requested is canceled.\n");
 
 	usb_unlink_urb(hpusbscsi->dataurb);

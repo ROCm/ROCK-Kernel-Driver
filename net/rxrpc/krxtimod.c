@@ -77,10 +77,10 @@ static int krxtimod(void *arg)
 	complete(&krxtimod_alive);
 
 	/* only certain signals are of interest */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv(&current->blocked,0);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* loop around looking for things to attend to */
  loop:

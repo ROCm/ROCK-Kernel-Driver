@@ -1,9 +1,5 @@
 # Makefile for the AVM ISDN device drivers
 
-# Objects that export symbols.
-
-export-objs	:= b1dma.o b1pcmcia.o b1.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_ISDN_DRV_AVMB1_B1ISA)	+= b1isa.o b1.o

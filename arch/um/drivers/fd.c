@@ -36,8 +36,8 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 		return(NULL);
 	}
 	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
-	*data = ((struct fd_chan) { fd : 	n,
-				    raw : 	opts->raw });
+	*data = ((struct fd_chan) { .fd  	= n,
+				    .raw  	= opts->raw });
 	return(data);
 }
 
@@ -72,16 +72,16 @@ int fd_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops fd_ops = {
-	type:		"fd",
-	init:		fd_init,
-	open:		fd_open,
-	close:		fd_close,
-	read:		generic_read,
-	write:		generic_write,
-	console_write:	fd_console_write,
-	window_size:	generic_window_size,
-	free:		generic_free,
-	winch:		1,
+	.type		= "fd",
+	.init		= fd_init,
+	.open		= fd_open,
+	.close		= fd_close,
+	.read		= generic_read,
+	.write		= generic_write,
+	.console_write	= fd_console_write,
+	.window_size	= generic_window_size,
+	.free		= generic_free,
+	.winch		= 1,
 };
 
 /*

@@ -3,4 +3,3 @@ obj-y		+= amd.o
 obj-y		+= cyrix.o
 obj-y		+= centaur.o
 
-export-objs	:= main.o

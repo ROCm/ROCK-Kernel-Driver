@@ -1,8 +1,6 @@
 #
 # Makefile for the PowerPC 4xx linux kernel.
 
-export-objs			:= ibm405lp.o
-
 obj-$(CONFIG_ASH)		+= ash.o
 obj-$(CONFIG_BEECH)		+= beech.o 
 obj-$(CONFIG_CEDAR)		+= cedar.o

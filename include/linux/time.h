@@ -25,6 +25,7 @@ struct timezone {
 #ifdef __KERNEL__
 
 #include <linux/spinlock.h>
+#include <linux/seqlock.h>
 
 /*
  * Change timeval to jiffies, trying to avoid the
@@ -120,7 +121,7 @@ mktime (unsigned int year, unsigned int mon,
 }
 
 extern struct timespec xtime;
-extern rwlock_t xtime_lock;
+extern seqlock_t xtime_lock;
 
 static inline unsigned long get_seconds(void)
 { 

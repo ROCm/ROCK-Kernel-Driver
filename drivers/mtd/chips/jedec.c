@@ -608,7 +608,7 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
 
    /* Poll the flash for erasure completion, specs say this can take as long
       as 480 seconds to do all the sectors (for a 2 meg flash). 
-      Erasure time is dependant on chip age, temp and wear.. */
+      Erasure time is dependent on chip age, temp and wear.. */
    
    /* This being a generic routine assumes a 32 bit bus. It does read32s
       and bundles interleved chips into the same grouping. This will work 

@@ -32,6 +32,7 @@ struct snd_sg_buf {
 	int pages;	/* allocated pages */
 	int tblsize;	/* allocated table size */
 	struct snd_sg_page *table;
+	struct page **page_table;
 	struct pci_dev *pci;
 };
 
@@ -53,15 +54,17 @@ static inline dma_addr_t snd_pcm_sgbuf_get_addr(struct snd_sg_buf *sgbuf, size_t
 	return sgbuf->table[offset >> PAGE_SHIFT].addr + offset % PAGE_SIZE;
 }
 
-int snd_pcm_sgbuf_init(snd_pcm_substream_t *substream, struct pci_dev *pci, int tblsize);
-int snd_pcm_sgbuf_delete(snd_pcm_substream_t *substream);
-int snd_pcm_sgbuf_alloc(snd_pcm_substream_t *substream, size_t size);
-int snd_pcm_sgbuf_free(snd_pcm_substream_t *substream);
+struct snd_sg_buf *snd_pcm_sgbuf_init(struct pci_dev *pci);
+void snd_pcm_sgbuf_delete(struct snd_sg_buf *sgbuf);
+void *snd_pcm_sgbuf_alloc_pages(struct snd_sg_buf *sgbuf, size_t size);
+int snd_pcm_sgbuf_free_pages(struct snd_sg_buf *sgbuf, void *vmaddr);
 
-int snd_pcm_sgbuf_ops_copy_playback(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count);
-int snd_pcm_sgbuf_ops_copy_capture(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, void *buf, snd_pcm_uframes_t count);
-int snd_pcm_sgbuf_ops_silence(snd_pcm_substream_t *substream, int channel, snd_pcm_uframes_t hwoff, snd_pcm_uframes_t count);
+int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci, snd_pcm_substream_t *substream);
+int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci, snd_pcm_t *pcm);
+
+#define _snd_pcm_substream_sgbuf(substream) ((substream)->dma_private)
+#define snd_pcm_substream_sgbuf(substream) snd_magic_cast(snd_pcm_sgbuf_t, _snd_pcm_substream_sgbuf(substream), return -ENXIO)
+
 struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset);
-
 
 #endif /* __SOUND_PCM_SGBUF_H */

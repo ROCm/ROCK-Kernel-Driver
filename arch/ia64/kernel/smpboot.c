@@ -1,7 +1,7 @@
 /*
  * SMP boot-related support
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 01/05/16 Rohit Seth <rohit.seth@intel.com>	Moved SMP booting functions from smp.c to here.
@@ -204,7 +204,7 @@ ia64_sync_itc (unsigned int master)
 	go[MASTER] = 1;
 
 	if (smp_call_function_single(master, sync_master, NULL, 1, 0) < 0) {
-		printk("sync_itc: failed to get attention of CPU %u!\n", master);
+		printk(KERN_ERR "sync_itc: failed to get attention of CPU %u!\n", master);
 		return;
 	}
 
@@ -244,8 +244,8 @@ ia64_sync_itc (unsigned int master)
 		       t[i].rt, t[i].master, t[i].diff, t[i].lat);
 #endif
 
-	printk("CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, maxerr %lu cycles)\n",
-	       smp_processor_id(), master, delta, rt);
+	printk(KERN_INFO "CPU %d: synchronized ITC with CPU %u (last diff %ld cycles, "
+	       "maxerr %lu cycles)\n", smp_processor_id(), master, delta, rt);
 }
 
 /*
@@ -265,14 +265,15 @@ smp_callin (void)
 	extern void ia64_init_itm(void);
 
 #ifdef CONFIG_PERFMON
-	extern void perfmon_init_percpu(void);
+	extern void pfm_init_percpu(void);
 #endif
 
 	cpuid = smp_processor_id();
 	phys_id = hard_smp_processor_id();
 
 	if (test_and_set_bit(cpuid, &cpu_online_map)) {
-		printk("huh, phys CPU#0x%x, CPU#0x%x already present??\n", phys_id, cpuid);
+		printk(KERN_ERR "huh, phys CPU#0x%x, CPU#0x%x already present??\n",
+		       phys_id, cpuid);
 		BUG();
 	}
 
@@ -300,7 +301,7 @@ smp_callin (void)
 #endif
 
 #ifdef CONFIG_PERFMON
-	perfmon_init_percpu();
+	pfm_init_percpu();
 #endif
 
 	local_irq_enable();
@@ -380,9 +381,7 @@ do_boot_cpu (int sapicid, int cpu)
 
 	if (test_bit(cpu, &cpu_callin_map)) {
 		/* number CPUs logically, starting from 1 (BSP is 0) */
-		printk("CPU%d: ", cpu);
-		/*print_cpu_info(&cpu_data[cpu]); */
-		printk("CPU has booted.\n");
+		printk(KERN_INFO "CPU%d: CPU has booted.\n", cpu);
 	} else {
 		printk(KERN_ERR "Processor 0x%x/0x%x is stuck.\n", cpu, sapicid);
 		ia64_cpu_to_sapicid[cpu] = -1;
@@ -399,7 +398,7 @@ smp_tune_scheduling (void)
 {
 	cache_decay_ticks = 10;	/* XXX base this on PAL info and cache-bandwidth estimate */
 
-	printk("task migration cache decay timeout: %ld msecs.\n",
+	printk(KERN_INFO "task migration cache decay timeout: %ld msecs.\n",
 	       (cache_decay_ticks + 1) * 1000 / HZ);
 }
 
@@ -491,7 +490,7 @@ smp_prepare_cpus (unsigned int max_cpus)
 	local_cpu_data->loops_per_jiffy = loops_per_jiffy;
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
 
-	printk("Boot processor id 0x%x/0x%x\n", 0, boot_cpu_id);
+	printk(KERN_INFO "Boot processor id 0x%x/0x%x\n", 0, boot_cpu_id);
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
@@ -526,7 +525,7 @@ smp_cpus_done (unsigned int dummy)
 		if (cpu_online(cpu))
 			bogosum += cpu_data(cpu)->loops_per_jiffy;
 
-	printk(KERN_INFO"Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
+	printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
 	       num_online_cpus(), bogosum/(500000/HZ), (bogosum/(5000/HZ))%100);
 }
 
@@ -552,7 +551,7 @@ __cpu_up (unsigned int cpu)
 }
 
 /*
- * Assume that CPU's have been discovered by some platform-dependant interface.  For
+ * Assume that CPU's have been discovered by some platform-dependent interface.  For
  * SoftSDV/Lion, that would be ACPI.
  *
  * Setup of the IPI irq handler is done in irq.c:init_IRQ_SMP().
@@ -571,5 +570,6 @@ init_smp_config(void)
 	sal_ret = ia64_sal_set_vectors(SAL_VECTOR_OS_BOOT_RENDEZ,
 				       __pa(ap_startup->fp), __pa(ap_startup->gp), 0, 0, 0, 0);
 	if (sal_ret < 0)
-		printk("SMP: Can't set SAL AP Boot Rendezvous: %s\n", ia64_sal_strerror(sal_ret));
+		printk(KERN_ERR "SMP: Can't set SAL AP Boot Rendezvous: %s\n",
+		       ia64_sal_strerror(sal_ret));
 }

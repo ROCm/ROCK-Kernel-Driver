@@ -1673,7 +1673,6 @@ typedef struct {
 	unsigned long remap_addr;
 	unsigned long size;
 	struct resource *resource;
-	void *proc_entry;
 } snd_cs46xx_region_t;
 
 struct _snd_cs46xx {
@@ -1726,7 +1725,6 @@ struct _snd_cs46xx {
 	spinlock_t reg_lock;
 	unsigned int midcr;
 	unsigned int uartm;
-	snd_info_entry_t *proc_entry;
 
 	int amplifier;
 	void (*amplifier_ctrl)(cs46xx_t *, int);

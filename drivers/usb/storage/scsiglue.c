@@ -50,23 +50,25 @@
 #include "transport.h"
 
 #include <linux/slab.h>
+#include <linux/module.h>
 
 
 /***********************************************************************
  * Host functions 
  ***********************************************************************/
 
-static const char* host_info(struct Scsi_Host *host)
+static const char* usb_storage_info(struct Scsi_Host *host)
 {
 	return "SCSI emulation for USB Mass Storage devices";
 }
 
+#if 0
 /* detect a virtual adapter (always works)
  * Synchronization: 2.4: with the io_request_lock
  * 			2.5: no locks.
  * fortunately we don't care.
  * */
-static int detect(struct SHT *sht)
+static int usb_storage_detect(struct SHT *sht)
 {
 	struct us_data *us;
 	char local_name[32];
@@ -109,7 +111,7 @@ static int detect(struct SHT *sht)
  * the driver and we're doing each virtual host in turn, not in parallel
  * Synchronization: BKL, no spinlock.
  */
-static int release(struct Scsi_Host *psh)
+static int usb_storage_release(struct Scsi_Host *psh)
 {
 	struct us_data *us = (struct us_data *)psh->hostdata[0];
 
@@ -132,20 +134,13 @@ static int release(struct Scsi_Host *psh)
 	/* we always have a successful release */
 	return 0;
 }
-
-/* run command */
-static int command( Scsi_Cmnd *srb )
-{
-	US_DEBUGP("Bad use of us_command\n");
-
-	return DID_BAD_TARGET << 16;
-}
+#endif
 
 /* queue a command */
 /* This is always called with scsi_lock(srb->host) held */
-static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
+static int usb_storage_queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 
 	US_DEBUGP("queuecommand() called\n");
 	srb->host_scribble = (unsigned char *)us;
@@ -168,9 +163,9 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 
 /* Command abort */
 /* This is always called with scsi_lock(srb->host) held */
-static int command_abort( Scsi_Cmnd *srb )
+static int usb_storage_command_abort( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 
 	US_DEBUGP("command_abort() called\n");
 
@@ -187,9 +182,9 @@ static int command_abort( Scsi_Cmnd *srb )
 /* This invokes the transport reset mechanism to reset the state of the
  * device */
 /* This is always called with scsi_lock(srb->host) held */
-static int device_reset( Scsi_Cmnd *srb )
+static int usb_storage_device_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
 	int result;
 
 	US_DEBUGP("device_reset() called\n" );
@@ -197,20 +192,19 @@ static int device_reset( Scsi_Cmnd *srb )
 
 	/* set the state and release the lock */
 	atomic_set(&us->sm_state, US_STATE_RESETTING);
-	scsi_unlock(srb->host);
+	scsi_unlock(srb->device->host);
 
 	/* lock the device pointers */
 	down(&(us->dev_semaphore));
 
-	/* if the device was removed, then we're already reset */
-	if (!(us->flags & US_FL_DEV_ATTACHED))
-		result = SUCCESS;
-	else
-		result = us->transport_reset(us);
+	/* do the reset */
+	result = us->transport_reset(us);
+
+	/* unlock */
 	up(&(us->dev_semaphore));
 
 	/* lock access to the state and clear it */
-	scsi_lock(srb->host);
+	scsi_lock(srb->device->host);
 	atomic_set(&us->sm_state, US_STATE_IDLE);
 	return result;
 }
@@ -219,43 +213,38 @@ static int device_reset( Scsi_Cmnd *srb )
  * disconnect/reconnect for all drivers which have claimed
  * interfaces, including ourself. */
 /* This is always called with scsi_lock(srb->host) held */
-static int bus_reset( Scsi_Cmnd *srb )
+
+/* FIXME: This needs to be re-examined in the face of the new
+ * hotplug system -- this will implicitly cause a detach/reattach of
+ * usb-storage, which is not what we want now.
+ *
+ * Can we just skip over usb-storage in the while loop?
+ */
+static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 {
-	struct us_data *us = (struct us_data *)srb->host->hostdata[0];
+	struct us_data *us;
 	int i;
 	int result;
-	struct usb_device *pusb_dev_save;
 
 	/* we use the usb_reset_device() function to handle this for us */
 	US_DEBUGP("bus_reset() called\n");
-
-	scsi_unlock(srb->host);
-
-	/* if the device has been removed, this worked */
-	down(&us->dev_semaphore);
-	if (!(us->flags & US_FL_DEV_ATTACHED)) {
-		US_DEBUGP("-- device removed already\n");
-		up(&us->dev_semaphore);
-		scsi_lock(srb->host);
-		return SUCCESS;
-	}
-	pusb_dev_save = us->pusb_dev;
-	up(&us->dev_semaphore);
+	scsi_unlock(srb->device->host);
+	us = (struct us_data *)srb->device->host->hostdata[0];
 
 	/* attempt to reset the port */
-	result = usb_reset_device(pusb_dev_save);
+	result = usb_reset_device(us->pusb_dev);
 	US_DEBUGP("usb_reset_device returns %d\n", result);
 	if (result < 0) {
-		scsi_lock(srb->host);
+		scsi_lock(srb->device->host);
 		return FAILED;
 	}
 
 	/* FIXME: This needs to lock out driver probing while it's working
 	 * or we can have race conditions */
 	/* This functionality really should be provided by the khubd thread */
-	for (i = 0; i < pusb_dev_save->actconfig->desc.bNumInterfaces; i++) {
+	for (i = 0; i < us->pusb_dev->actconfig->desc.bNumInterfaces; i++) {
  		struct usb_interface *intf =
-			&pusb_dev_save->actconfig->interface[i];
+			&us->pusb_dev->actconfig->interface[i];
 
 		/* if this is an unclaimed interface, skip it */
 		if (!intf->driver) {
@@ -270,16 +259,8 @@ static int bus_reset( Scsi_Cmnd *srb )
 		usb_device_probe (&intf->dev);
 	}
 	US_DEBUGP("bus_reset() complete\n");
-	scsi_lock(srb->host);
+	scsi_lock(srb->device->host);
 	return SUCCESS;
-}
-
-/* FIXME: This doesn't do anything right now */
-static int host_reset( Scsi_Cmnd *srb )
-{
-	printk(KERN_CRIT "usb-storage: host_reset() requested but not implemented\n" );
-	bus_reset(srb);
-	return FAILED;
 }
 
 /***********************************************************************
@@ -291,29 +272,23 @@ static int host_reset( Scsi_Cmnd *srb )
 #define SPRINTF(args...) \
 	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
 
-static int proc_info (char *buffer, char **start, off_t offset, int length,
-		int hostno, int inout)
+static int usb_storage_proc_info (char *buffer, char **start, off_t offset,
+		int length, int hostno, int inout)
 {
 	struct us_data *us;
 	char *pos = buffer;
+	struct Scsi_Host *hostptr;
 
 	/* if someone is sending us data, just throw it away */
 	if (inout)
 		return length;
 
-	/* lock the data structures */
-	down(&us_list_semaphore);
-
-	/* find our data from hostno */
-	us = us_list;
-	while (us) {
-		if (us->host_no == hostno)
-			break;
-		us = us->next;
+	/* find our data from the given hostno */
+	hostptr = scsi_host_hn_get(hostno);
+	if (!hostptr) {	 /* if we couldn't find it, we return an error */
+		return -ESRCH;
 	}
-
-	/* release our lock on the data structures */
-	up(&us_list_semaphore);
+	us = (struct us_data*)hostptr->hostdata[0];
 
 	/* if we couldn't find it, we return an error */
 	if (!us) {
@@ -332,10 +307,8 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
 	SPRINTF("     Protocol: %s\n", us->protocol_name);
 	SPRINTF("    Transport: %s\n", us->transport_name);
 
-	/* show the GUID of the device */
-	SPRINTF("         GUID: " GUID_FORMAT "\n", GUID_ARGS(us->guid));
-	SPRINTF("     Attached: %s\n", (us->flags & US_FL_DEV_ATTACHED ?
-			"Yes" : "No"));
+	/* release the reference count on this host */
+	scsi_host_put(hostptr);
 
 	/*
 	 * Calculate start of next buffer, and return value.
@@ -351,33 +324,69 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
 }
 
 /*
- * this defines our 'host'
+ * this defines our host template, with which we'll allocate hosts
  */
 
-Scsi_Host_Template usb_stor_host_template = {
-	.name =			"usb-storage",
-	.proc_info =		proc_info,
-	.info =			host_info,
+struct SHT usb_stor_host_template = {
+	/* basic userland interface stuff */
+	.name =				"usb-storage",
+	.proc_name =			"usb-storage",
+	.proc_info =			usb_storage_proc_info,
+	.proc_dir =			NULL,
+	.info =				usb_storage_info,
+	.ioctl =			NULL,
 
-	.detect =		detect,
-	.release =		release,
-	.command =		command,
-	.queuecommand =		queuecommand,
+	/* old-style detect and release */
+	.detect =			NULL,
+	.release =			NULL,
 
-	.eh_abort_handler =	command_abort,
-	.eh_device_reset_handler =device_reset,
-	.eh_bus_reset_handler =	bus_reset,
-	.eh_host_reset_handler =host_reset,
+	/* command interface -- queued only */
+	.command =			NULL,
+	.queuecommand =			usb_storage_queuecommand,
 
-	.can_queue =		1,
-	.this_id =		-1,
+	/* error and abort handlers */
+	.eh_abort_handler =		usb_storage_command_abort,
+	.eh_device_reset_handler =	usb_storage_device_reset,
+	.eh_bus_reset_handler =		usb_storage_bus_reset,
+	.eh_host_reset_handler =	NULL,
+	.eh_strategy_handler =		NULL,
 
-	.sg_tablesize =		SG_ALL,
-	.cmd_per_lun =		1,
-	.present =		0,
-	.unchecked_isa_dma =	FALSE,
-	.use_clustering =	TRUE,
-	.emulated =		TRUE
+	/* queue commands only, only one command per LUN */
+	.can_queue =			1,
+	.cmd_per_lun =			1,
+
+	/* unknown initiator id */
+	.this_id =			-1,
+
+	/* no limit on commands */
+	.max_sectors =			0,
+	
+	/* pre- and post- device scan functions */
+	.slave_alloc =			NULL,
+	.slave_configure =		NULL,
+	.slave_destroy =		NULL,
+
+	/* lots of sg segments can be handled */
+	.sg_tablesize =			SG_ALL,
+
+	/* use 32-bit address space for DMA */
+	.unchecked_isa_dma =		FALSE,
+	.highmem_io =			FALSE,
+
+	/* merge commands... this seems to help performance, but
+	 * periodically someone should test to see which setting is more
+	 * optimal.
+	 */
+	.use_clustering =		TRUE,
+
+	/* emulated HBA */
+	.emulated =			TRUE,
+
+	/* sorry, no BIOS to help us */
+	.bios_param =			NULL,
+
+	/* module management */
+	.module =			THIS_MODULE
 };
 
 /* For a device that is "Not Ready" */

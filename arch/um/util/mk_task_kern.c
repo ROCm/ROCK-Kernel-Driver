@@ -9,7 +9,7 @@ extern void print_tail(void);
 int main(int argc, char **argv)
 {
   print_head();
-  print_ptr("TASK_REGS", "struct uml_pt_regs", 
+  print_ptr("TASK_REGS", "union uml_pt_regs", 
 	    offsetof(struct task_struct, thread.regs));
   print("TASK_PID", "int", offsetof(struct task_struct, pid));
   print_tail();

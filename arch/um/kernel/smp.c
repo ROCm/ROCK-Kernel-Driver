@@ -13,6 +13,7 @@ unsigned long cpu_online_map = 1;
 #include "linux/sched.h"
 #include "linux/threads.h"
 #include "linux/interrupt.h"
+#include "linux/err.h"
 #include "asm/smp.h"
 #include "asm/processor.h"
 #include "asm/spinlock.h"
@@ -140,7 +141,7 @@ static struct task_struct *idle_thread(int cpu)
 
         current->thread.request.u.thread.proc = idle_proc;
         current->thread.request.u.thread.arg = (void *) cpu;
-	new_task = do_fork(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL);
+	new_task = do_fork(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL, NULL);
 	if(IS_ERR(new_task)) panic("do_fork failed in idle_thread");
 
 	cpu_tasks[cpu] = ((struct cpu_task) 
@@ -186,7 +187,7 @@ void smp_prepare_cpus(unsigned int maxcpus)
 	}
 }
 
-void __devinit smp_prepare_boot_cpu(void)
+void smp_prepare_boot_cpu(void)
 {
 	set_bit(smp_processor_id(), &cpu_online_map);
 }

@@ -18,6 +18,7 @@
 #include "asm/uaccess.h"
 #include "asm/unistd.h"
 #include "user_util.h"
+#include "asm/ucontext.h"
 #include "kern_util.h"
 #include "signal_kern.h"
 #include "signal_user.h"
@@ -28,18 +29,6 @@
 
 EXPORT_SYMBOL(block_signals);
 EXPORT_SYMBOL(unblock_signals);
-
-int probe_stack(unsigned long sp, int delta)
-{
-	int n;
-
-	if((get_user(n, (int *) sp) != 0) ||
-	   (put_user(n, (int *) sp) != 0) ||
-	   (get_user(n, (int *) (sp - delta)) != 0) ||
-	   (put_user(n, (int *) (sp - delta)) != 0))
-		return(-EFAULT);
-	return(0);
-}
 
 static void force_segv(int sig)
 {
@@ -106,12 +95,12 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked, &current->blocked, 
 			  &ka->sa.sa_mask);
 		sigaddset(&current->blocked, signr);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 
 	sp = PT_REGS_SP(regs);
@@ -197,11 +186,11 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -223,11 +212,11 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 		return -EFAULT;
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
@@ -237,45 +226,48 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 	}
 }
 
-static int copy_sc_from_user(struct pt_regs *to, void *from)
+static int copy_sc_from_user(struct pt_regs *to, void *from, 
+			     struct arch_frame_data *arch)
 {
 	int ret;
 
-	ret = CHOOSE_MODE(copy_sc_from_user_tt(to->regs.mode.tt, from, 
-					       &signal_frame_sc.arch),
+	ret = CHOOSE_MODE(copy_sc_from_user_tt(UPT_SC(&to->regs), from, arch),
 			  copy_sc_from_user_skas(&to->regs, from));
 	return(ret);
 }
 
 int sys_sigreturn(struct pt_regs regs)
 {
-	void *sc = sp_to_sc(PT_REGS_SP(&regs));
-	void *mask = sp_to_mask(PT_REGS_SP(&regs));
+	void *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
+	void *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	copy_from_user(&current->blocked.sig[0], sc_sigmask(sc), 
 		       sizeof(current->blocked.sig[0]));
 	copy_from_user(&current->blocked.sig[1], mask, sig_size);
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(&current->thread.regs, sc);
+	spin_unlock_irq(&current->sighand->siglock);
+	copy_sc_from_user(&current->thread.regs, sc, 
+			  &signal_frame_sc.common.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
 int sys_rt_sigreturn(struct pt_regs regs)
 {
-	void *sc = sp_to_rt_sc(PT_REGS_SP(&regs));
-	void *mask = sp_to_rt_mask(PT_REGS_SP(&regs));
+	struct ucontext *uc = sp_to_uc(PT_REGS_SP(&current->thread.regs));
+	void *fp;
 	int sig_size = _NSIG_WORDS * sizeof(unsigned long);
 
-	spin_lock_irq(&current->sig->siglock);
-	copy_from_user(&current->blocked, mask, sig_size);
+	spin_lock_irq(&current->sighand->siglock);
+	copy_from_user(&current->blocked, &uc->uc_sigmask, sig_size);
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
-	copy_sc_from_user(&current->thread.regs, sc);
+	spin_unlock_irq(&current->sighand->siglock);
+	fp = (void *) (((unsigned long) uc) + sizeof(struct ucontext));
+	copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext,
+			  &signal_frame_si.common.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 

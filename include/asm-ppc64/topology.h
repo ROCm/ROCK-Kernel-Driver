@@ -5,7 +5,7 @@
 
 #ifdef CONFIG_NUMA
 
-static inline int __cpu_to_node(int cpu)
+static inline int cpu_to_node(int cpu)
 {
 	int node;
 
@@ -19,7 +19,7 @@ static inline int __cpu_to_node(int cpu)
 	return node;
 }
 
-static inline int __node_to_first_cpu(int node)
+static inline int node_to_first_cpu(int node)
 {
 	int cpu;
 
@@ -31,7 +31,7 @@ static inline int __node_to_first_cpu(int node)
 	return -1;
 }
 
-static inline unsigned long __node_to_cpu_mask(int node)
+static inline unsigned long node_to_cpumask(int node)
 {
 	int cpu;
 	unsigned long mask = 0UL;
@@ -51,12 +51,7 @@ static inline unsigned long __node_to_cpu_mask(int node)
 
 #else /* !CONFIG_NUMA */
 
-#define __cpu_to_node(cpu)		(0)
-#define __memblk_to_node(memblk)	(0)
-#define __parent_node(nid)		(0)
-#define __node_to_first_cpu(node)	(0)
-#define __node_to_cpu_mask(node)	(cpu_online_map)
-#define __node_to_memblk(node)		(0)
+#include <asm-generic/topology.h>
 
 #endif /* CONFIG_NUMA */
 

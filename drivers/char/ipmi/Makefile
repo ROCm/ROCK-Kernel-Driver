@@ -2,8 +2,6 @@
 # Makefile for the ipmi drivers.
 #
 
-export-objs	:= ipmi_msghandler.o ipmi_watchdog.o
-
 ipmi_kcs_drv-objs := ipmi_kcs_sm.o ipmi_kcs_intf.o
 
 obj-$(CONFIG_IPMI_HANDLER) += ipmi_msghandler.o

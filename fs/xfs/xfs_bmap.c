@@ -5522,7 +5522,7 @@ xfs_getbmap(
 	int			prealloced;	/* this is a file with
 						 * preallocated data space */
 	int			sh_unwritten;	/* true, if unwritten */
-						/* extents listed seperately */
+						/* extents listed separately */
 	int			bmapi_flags;	/* flags for xfs_bmapi */
 	__int32_t		oflags;		/* getbmapx bmv_oflags field */
 

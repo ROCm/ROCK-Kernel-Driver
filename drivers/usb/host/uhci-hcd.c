@@ -1747,7 +1747,6 @@ static void stall_callback(unsigned long ptr)
 
 		tmp = tmp->next;
 
-		u->transfer_flags |= URB_TIMEOUT_KILLED;
 		uhci_urb_dequeue(hcd, u);
 	}
 

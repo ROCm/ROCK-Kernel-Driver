@@ -285,10 +285,10 @@ static int smbiod(void *unused)
 	MOD_INC_USE_COUNT;
 	daemonize();
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	strcpy(current->comm, "smbiod");
 

@@ -82,6 +82,7 @@ struct bt856 {
 	int contrast;
 	int hue;
 	int sat;
+	struct semaphore lock;
 };
 
 #define   I2C_BT856        0x88
@@ -89,11 +90,6 @@ struct bt856 {
 #define I2C_DELAY   10
 
 /* ----------------------------------------------------------------------- */
-
-static int bt856_probe(struct i2c_adapter *adap)
-{
-	return i2c_probe(adap, &addr_data , bt856_attach);
-}
 
 static int bt856_setbit(struct bt856 *dev, int subaddr, int bit, int data)
 {
@@ -134,7 +130,7 @@ static int bt856_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	encoder->norm = VIDEO_MODE_NTSC;
 	encoder->enable = 1;
 
-	DEBUG(printk(KERN_INFO "%s-bt856: attach\n", encoder->bus->name));
+	DEBUG(printk(KERN_INFO "%s-bt856: attach\n", encoder->client->name));
 
 	i2c_smbus_write_byte_data(client, 0xdc, 0x18);
 	encoder->reg[0xdc] = 0x18;
@@ -167,6 +163,10 @@ static int bt856_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	return 0;
 }
 
+static int bt856_probe(struct i2c_adapter *adap)
+{
+	return i2c_probe(adap, &addr_data , bt856_attach);
+}
 
 static int bt856_detach(struct i2c_client *client)
 {
@@ -299,21 +299,19 @@ static int bt856_command(struct i2c_client *client, unsigned int cmd,
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver i2c_driver_bt856 = {
-	"bt856",		/* name */
-	I2C_DRIVERID_BT856,	/* ID */
-	I2C_DF_NOTIFY,
-	bt856_probe,
-	bt856_detach,
-	bt856_command
+	.owner = THIS_MODULE,
+	.name = "bt856",		/* name */
+	.id = I2C_DRIVERID_BT856,	/* ID */
+	.flags = I2C_DF_NOTIFY,
+	.attach_adapter = bt856_probe,
+	.detach_client = bt856_detach,
+	.command = bt856_command
 };
 
 static struct i2c_client client_template = {
-	"bt856_client",
-	-1,
-	0,
-	0,
-	NULL,
-	&i2c_driver_bt856
+	.name = "bt856_client",
+	.id = -1,
+	.driver = &i2c_driver_bt856
 };
 
 static int bt856_init(void)
