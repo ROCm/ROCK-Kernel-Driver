@@ -906,8 +906,6 @@ static void sync_sbs(mddev_t * mddev)
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		mdp_super_t *this_sb;
 		
-		if (rdev->faulty || rdev->alias_device)
-			continue;
 		this_sb = rdev->sb;
 		if (this_sb != sb)
 			*this_sb = *sb;
@@ -953,16 +951,17 @@ repeat:
 		printk(KERN_INFO "md: ");
 		if (rdev->faulty)
 			printk("(skipping faulty ");
-		if (rdev->alias_device)
-			printk("(skipping alias ");
 
 		printk("%s ", bdev_partition_name(rdev->bdev));
-		if (!rdev->faulty && !rdev->alias_device) {
+		if (!rdev->faulty) {
 			printk("[events: %08lx]",
 				(unsigned long)rdev->sb->events_lo);
 			err += write_disk_sb(rdev);
 		} else
 			printk(")\n");
+		if (!err && mddev->level == LEVEL_MULTIPATH)
+			/* only need to write one superblock... */
+			break;
 	}
 	if (err) {
 		if (--count) {
@@ -1196,7 +1195,6 @@ static int analyze_sbs(mddev_t * mddev)
 	i = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		if (mddev->level == LEVEL_MULTIPATH) {
-			rdev->alias_device = !!i;
 			rdev->desc_nr = i++;
 			rdev->raid_disk = rdev->desc_nr;
 			rdev->in_sync = 1;
