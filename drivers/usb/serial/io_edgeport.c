@@ -2917,7 +2917,7 @@ static void load_application_firmware (struct edgeport_serial *edge_serial)
 		record = (struct edge_firmware_image_record *)firmware;
 		response = sram_write (edge_serial->serial, le16_to_cpu(record->ExtAddr), le16_to_cpu(record->Addr), le16_to_cpu(record->Len), &record->Data[0]);
 		if (response < 0) {
-			dev_err(&edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", le16_to_cpu(record->ExtAddr), le16_to_cpu(record->Addr), record->Len);
+			dev_err(&edge_serial->serial->dev->dev, "sram_write failed (%x, %x, %d)\n", le16_to_cpu(record->ExtAddr), le16_to_cpu(record->Addr), le16_to_cpu(record->Len));
 			break;
 		}
 		firmware += sizeof (struct edge_firmware_image_record) + le16_to_cpu(record->Len);
