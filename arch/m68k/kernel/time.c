@@ -71,15 +71,22 @@ static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
 	 * called as close as possible to 500 ms before the new second starts.
 	 */
+	/*
+	 * This code hopefully becomes obsolete in 2.5 or earlier
+	 * Should it ever be reenabled it must be serialized with
+	 * genrtc.c operation
+	 */
+#if 0
 	if ((time_status & STA_UNSYNC) == 0 &&
 	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) tick) / 2 &&
+	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) tick) / 2) {
 	  if (set_rtc_mmss(xtime.tv_sec) == 0)
 	    last_rtc_update = xtime.tv_sec;
 	  else
 	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
 	}
+#endif
 #ifdef CONFIG_HEARTBEAT
 	/* use power LED as a heartbeat instead -- much more useful
 	   for debugging -- based on the version for PReP by Cort */
@@ -116,7 +123,7 @@ void time_init(void)
 			time.tm_year += 100;
 		xtime.tv_sec = mktime(time.tm_year, time.tm_mon, time.tm_mday,
 				      time.tm_hour, time.tm_min, time.tm_sec);
-		xtime.tv_usec = 0;
+		xtime.tv_nsec = 0;
 	}
 
 	mach_sched_init(timer_interrupt);
@@ -139,7 +146,7 @@ void do_gettimeofday(struct timeval *tv)
 	if (lost)
 		usec += lost * (1000000/HZ);
 	sec = xtime.tv_sec;
-	usec += xtime.tv_usec;
+	usec += xtime.tv_nsec/1000;
 	read_unlock_irqrestore(&xtime_lock, flags);
 
 	while (usec >= 1000000) {
@@ -153,21 +160,25 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
+	extern unsigned long wall_jiffies;
+
 	write_lock_irq(&xtime_lock);
-	/* This is revolting. We need to set the xtime.tv_usec
+	/* This is revolting. We need to set the xtime.tv_nsec
 	 * correctly. However, the value in this location is
 	 * is value at the last tick.
 	 * Discover what correction gettimeofday
 	 * would have done, and then undo it!
 	 */
 	tv->tv_usec -= mach_gettimeoffset();
+	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
 
 	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = tv->tv_usec * 1000;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
