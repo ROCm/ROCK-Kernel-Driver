@@ -369,7 +369,7 @@ ac97_set_values (struct ac97_hwint *dev,
 }
 
 int
-ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd, caddr_t arg)
+ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd, void __user *arg)
 {
     int ret;
 
@@ -380,7 +380,7 @@ ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd, caddr_t arg)
 
     case SOUND_MIXER_WRITE_RECSRC:
 	{
-	    if (get_user (ret, (int *) arg))
+	    if (get_user (ret, (int __user *) arg))
 		ret = -EFAULT;
 	    else
 		ret = ac97_set_recmask (dev, ret);
@@ -414,7 +414,7 @@ ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd, caddr_t arg)
 		ret = 0;
 		if (dir & _SIOC_WRITE) {
 		    int val;
-		    if (get_user (val, (int *) arg) == 0)
+		    if (get_user (val, (int __user *) arg) == 0)
 			ret = ac97_set_mixer (dev, channel, val);
 		    else
 			ret = -EFAULT;
@@ -434,7 +434,7 @@ ac97_mixer_ioctl (struct ac97_hwint *dev, unsigned int cmd, caddr_t arg)
     if (ret < 0)
 	return ret;
     else
-	return put_user(ret, (int *) arg);
+	return put_user(ret, (int __user *) arg);
 }
 
 EXPORT_SYMBOL(ac97_init);

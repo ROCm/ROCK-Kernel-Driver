@@ -190,7 +190,7 @@ int ah6_output(struct sk_buff *skb)
 		memcpy(skb->nh.ipv6h, iph, hdr_len);
 		nexthdr = ipv6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_OUT);
 		if (nexthdr == 0)
-			goto error;
+			goto error_free_iph;
 
 		skb->nh.raw[nh_offset] = IPPROTO_AH;
 		skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
@@ -239,6 +239,8 @@ int ah6_output(struct sk_buff *skb)
 		goto error_nolock;
 	}
 	return NET_XMIT_BYPASS;
+error_free_iph:
+	kfree(iph);
 error:
 	spin_unlock_bh(&x->lock);
 error_nolock:

@@ -181,7 +181,7 @@ static unsigned int fw_confirm(unsigned int hooknum,
 
 extern int ip_fw_ctl(int optval, void *m, unsigned int len);
 
-static int sock_fn(struct sock *sk, int optval, void *user, unsigned int len)
+static int sock_fn(struct sock *sk, int optval, void __user *user, unsigned int len)
 {
 	/* MAX of:
 	   2.2: sizeof(struct ip_fwtest) (~14x4 + 3x4 = 17x4)

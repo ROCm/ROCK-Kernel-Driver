@@ -25,7 +25,7 @@ struct msg_msgseg {
 #define DATALEN_MSG	(PAGE_SIZE-sizeof(struct msg_msg))
 #define DATALEN_SEG	(PAGE_SIZE-sizeof(struct msg_msgseg))
 
-struct msg_msg *load_msg(void __user *src, int len)
+struct msg_msg *load_msg(const void __user *src, int len)
 {
 	struct msg_msg *msg;
 	struct msg_msgseg **pseg;
@@ -49,7 +49,7 @@ struct msg_msg *load_msg(void __user *src, int len)
 	}
 
 	len -= alen;
-	src = ((char *)src) + alen;
+	src = ((char __user *)src) + alen;
 	pseg = &msg->next;
 	while (len > 0) {
 		struct msg_msgseg *seg;
@@ -70,7 +70,7 @@ struct msg_msg *load_msg(void __user *src, int len)
 		}
 		pseg = &seg->next;
 		len -= alen;
-		src = ((char *)src) + alen;
+		src = ((char __user *)src) + alen;
 	}
 
 	err = security_msg_msg_alloc(msg);
@@ -96,7 +96,7 @@ int store_msg(void __user *dest, struct msg_msg *msg, int len)
 		return -1;
 
 	len -= alen;
-	dest = ((char *)dest) + alen;
+	dest = ((char __user *)dest) + alen;
 	seg = msg->next;
 	while (len > 0) {
 		alen = len;
@@ -105,7 +105,7 @@ int store_msg(void __user *dest, struct msg_msg *msg, int len)
 		if (copy_to_user(dest, seg + 1, alen))
 			return -1;
 		len -= alen;
-		dest = ((char *)dest) + alen;
+		dest = ((char __user *)dest) + alen;
 		seg = seg->next;
 	}
 	return 0;

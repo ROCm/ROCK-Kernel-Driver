@@ -43,7 +43,7 @@ typedef struct scsi_cd {
 	struct gendisk *disk;
 } Scsi_CD;
 
-int sr_do_ioctl(Scsi_CD *, struct cdrom_generic_command *);
+int sr_do_ioctl(Scsi_CD *, struct packet_command *);
 
 int sr_lock_door(struct cdrom_device_info *, int);
 int sr_tray_move(struct cdrom_device_info *, int);

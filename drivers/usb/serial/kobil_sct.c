@@ -21,6 +21,9 @@
  * Supported readers: USB TWIN, KAAN Standard Plus and SecOVID Reader Plus
  * (Adapter K), B1 Professional and KAAN Professional (Adapter B)
  * 
+ * (21/05/2004) tw
+ *      Fix bug with P'n'P readers
+ *
  * (28/05/2003) tw
  *      Add support for KAAN SIM
  *
@@ -59,7 +62,7 @@
 #include "usb-serial.h"
 
 /* Version Information */
-#define DRIVER_VERSION "28/05/2003"
+#define DRIVER_VERSION "21/05/2004"
 #define DRIVER_AUTHOR "KOBIL Systems GmbH - http://www.kobil.com"
 #define DRIVER_DESC "KOBIL USB Smart Card Terminal Driver (experimental)"
 
@@ -339,6 +342,12 @@ static int kobil_open (struct usb_serial_port *port, struct file *filp)
 			);
 		dbg("%s - port %d Send reset_all_queues URB returns: %i", __FUNCTION__, port->number, result);
 	}
+	if (priv->device_type == KOBIL_USBTWIN_PRODUCT_ID || priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID ||
+	    priv->device_type == KOBIL_KAAN_SIM_PRODUCT_ID) {
+		// start reading (Adapter B 'cause PNP string)
+		result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC  ); 
+		dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
+	}
 
 	kfree(transfer_buffer);
 	return 0;
@@ -456,6 +465,11 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	if ( ((priv->device_type != KOBIL_ADAPTER_B_PRODUCT_ID) && (priv->filled > 2) && (priv->filled >= (priv->buf[1] + 3))) || 
 	     ((priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) && (priv->filled > 3) && (priv->filled >= (priv->buf[2] + 4))) ) {
 		
+		// stop reading (except TWIN and KAAN SIM)
+		if ( (priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) || (priv->device_type == KOBIL_ADAPTER_K_PRODUCT_ID) ) {
+			usb_unlink_urb( port->interrupt_in_urb );
+		}
+
 		todo = priv->filled - priv->cur_pos;
 
 		while(todo > 0) {
@@ -463,25 +477,23 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 			length = (todo < 8) ? todo : 8;
 			// copy data to transfer buffer
 			memcpy(port->write_urb->transfer_buffer, priv->buf + priv->cur_pos, length );
-			
-			usb_fill_bulk_urb( port->write_urb,
-					   port->serial->dev,
-					   usb_sndbulkpipe( port->serial->dev, priv->write_int_endpoint_address),
-					   port->write_urb->transfer_buffer,
-					   length,
-					   kobil_write_callback,
-					   port
+			usb_fill_int_urb( port->write_urb,
+					  port->serial->dev,
+					  usb_sndintpipe(port->serial->dev, priv->write_int_endpoint_address),
+					  port->write_urb->transfer_buffer,
+					  length,
+					  kobil_write_callback,
+					  port,
+					  8
 				);
 
 			priv->cur_pos = priv->cur_pos + length;
-			result = usb_submit_urb( port->write_urb, GFP_ATOMIC );
+			result = usb_submit_urb( port->write_urb, GFP_NOIO );
 			dbg("%s - port %d Send write URB returns: %i", __FUNCTION__, port->number, result);
 			todo = priv->filled - priv->cur_pos;
 
 			if (todo > 0) {
-				//mdelay(16);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(24 * HZ / 1000);
+				msleep(24);
 			}
 
 		} // end while
@@ -492,9 +504,14 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		// someone sets the dev to 0 if the close method has been called
 		port->interrupt_in_urb->dev = port->serial->dev;
 		
-		// start reading
-		result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC ); 
-		dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
+		// start reading (except TWIN and KAAN SIM)
+		if ( (priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) || (priv->device_type == KOBIL_ADAPTER_K_PRODUCT_ID) ) {
+			// someone sets the dev to 0 if the close method has been called
+			port->interrupt_in_urb->dev = port->serial->dev;
+			
+			result = usb_submit_urb( port->interrupt_in_urb, GFP_NOIO ); 
+			dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
+		}
 	}
 	return count;
 }

@@ -234,12 +234,12 @@ out:	return read;
 
 EXPORT_SYMBOL(aci_rw_cmd);
 
-static int setvolume(caddr_t arg, 
+static int setvolume(int __user *arg, 
 		     unsigned char left_index, unsigned char right_index)
 {
 	int vol, ret, uservol, buf;
 
-	__get_user(uservol, (int *)arg);
+	__get_user(uservol, arg);
 
 	/* left channel */
 	vol = uservol & 0xff;
@@ -260,12 +260,12 @@ static int setvolume(caddr_t arg,
 		return buf;
 	ret |= SCALE(0x20, 100, vol) << 8;
  
-	__put_user(ret, (int *)arg);
+	__put_user(ret, arg);
 
 	return 0;
 }
 
-static int getvolume(caddr_t arg,
+static int getvolume(int __user *arg,
 		     unsigned char left_index, unsigned char right_index)
 {
 	int vol;
@@ -281,7 +281,7 @@ static int getvolume(caddr_t arg,
 		return buf;
 	vol |= SCALE(0x20, 100, buf < 0x20 ? 0x20-buf : 0) << 8;
 
-	__put_user(vol, (int *)arg);
+	__put_user(vol, arg);
 
 	return 0;
 }
@@ -318,13 +318,13 @@ static inline unsigned int eq_aci2oss(unsigned int vol)
 }
 
 
-static int setequalizer(caddr_t arg, 
+static int setequalizer(int __user *arg, 
 			unsigned char left_index, unsigned char right_index)
 {
 	int buf;
 	unsigned int vol;
 
-	__get_user(vol, (int *)arg);
+	__get_user(vol, arg);
 
 	/* left channel */
 	if ((buf=aci_write_cmd(left_index, eq_oss2aci(vol & 0xff)))<0)
@@ -338,7 +338,7 @@ static int setequalizer(caddr_t arg,
 	return 0;
 }
 
-static int getequalizer(caddr_t arg,
+static int getequalizer(int __user *arg,
 			unsigned char left_index, unsigned char right_index)
 {
 	int buf;
@@ -354,50 +354,51 @@ static int getequalizer(caddr_t arg,
 		return buf;
 	vol |= eq_aci2oss(buf) << 8;
 
-	__put_user(vol, (int *)arg);
+	__put_user(vol, arg);
 
 	return 0;
 }
 
-static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+static int aci_mixer_ioctl (int dev, unsigned int cmd, void __user * arg)
 {
 	int vol, buf;
+	int __user *p = arg;
 
 	switch (cmd) {
 	case SOUND_MIXER_WRITE_VOLUME:
-		return setvolume(arg, 0x01, 0x00);
+		return setvolume(p, 0x01, 0x00);
 	case SOUND_MIXER_WRITE_CD:
-		return setvolume(arg, 0x3c, 0x34);
+		return setvolume(p, 0x3c, 0x34);
 	case SOUND_MIXER_WRITE_MIC:
-		return setvolume(arg, 0x38, 0x30);
+		return setvolume(p, 0x38, 0x30);
 	case SOUND_MIXER_WRITE_LINE:
-		return setvolume(arg, 0x39, 0x31);
+		return setvolume(p, 0x39, 0x31);
 	case SOUND_MIXER_WRITE_SYNTH:
-		return setvolume(arg, 0x3b, 0x33);
+		return setvolume(p, 0x3b, 0x33);
 	case SOUND_MIXER_WRITE_PCM:
-		return setvolume(arg, 0x3a, 0x32);
+		return setvolume(p, 0x3a, 0x32);
 	case MIXER_WRITE(SOUND_MIXER_RADIO): /* fall through */
 	case SOUND_MIXER_WRITE_LINE1:  /* AUX1 or radio */
-		return setvolume(arg, 0x3d, 0x35);
+		return setvolume(p, 0x3d, 0x35);
 	case SOUND_MIXER_WRITE_LINE2:  /* AUX2 */
-		return setvolume(arg, 0x3e, 0x36);
+		return setvolume(p, 0x3e, 0x36);
 	case SOUND_MIXER_WRITE_BASS:   /* set band one and two */
 		if (aci_idcode[1]=='C') {
-			if ((buf=setequalizer(arg, 0x48, 0x40)) || 
-			    (buf=setequalizer(arg, 0x49, 0x41)));
+			if ((buf=setequalizer(p, 0x48, 0x40)) || 
+			    (buf=setequalizer(p, 0x49, 0x41)));
 			return buf;
 		}
 		break;
 	case SOUND_MIXER_WRITE_TREBLE: /* set band six and seven */
 		if (aci_idcode[1]=='C') {
-			if ((buf=setequalizer(arg, 0x4d, 0x45)) || 
-			    (buf=setequalizer(arg, 0x4e, 0x46)));
+			if ((buf=setequalizer(p, 0x4d, 0x45)) || 
+			    (buf=setequalizer(p, 0x4e, 0x46)));
 			return buf;
 		}
 		break;
 	case SOUND_MIXER_WRITE_IGAIN:  /* MIC pre-amp */
 		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
-			__get_user(vol, (int *)arg);
+			__get_user(vol, p);
 			vol = vol & 0xff;
 			if (vol > 100)
 				vol = 100;
@@ -407,13 +408,13 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 			aci_micpreamp = vol;
 			vol = SCALE(3, 100, vol);
 			vol |= (vol << 8);
-			__put_user(vol, (int *)arg);
+			__put_user(vol, p);
 			return 0;
 		}
 		break;
 	case SOUND_MIXER_WRITE_OGAIN:  /* Power-amp/line-out level */
 		if (aci_idcode[1]=='A' || aci_idcode[1]=='B') {
-			__get_user(buf, (int *)arg);
+			__get_user(buf, p);
 			buf = buf & 0xff;
 			if (buf > 50)
 				vol = 1;
@@ -426,13 +427,13 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 				buf = (100 || 100<<8);
 			else
 				buf = 0;
-			__put_user(buf, (int *)arg);
+			__put_user(buf, p);
 			return 0;
 		}
 		break;
 	case SOUND_MIXER_WRITE_RECSRC:
 		/* handle solo mode control */
-		__get_user(buf, (int *)arg);
+		__get_user(buf, p);
 		/* unset solo when RECSRC for PCM is requested */
 		if (aci_idcode[1]=='B' || aci_idcode[1]=='C') {
 			vol = !(buf & SOUND_MASK_PCM);
@@ -448,7 +449,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 			buf |= SOUND_MASK_LINE1;
 		if (!aci_solo)
 			buf |= SOUND_MASK_PCM;
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	case SOUND_MIXER_READ_DEVMASK:
 		buf = (SOUND_MASK_VOLUME | SOUND_MASK_CD    |
@@ -470,7 +471,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		default:
 			buf |= SOUND_MASK_LINE1;
 		}
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	case SOUND_MIXER_READ_STEREODEVS:
 		buf = (SOUND_MASK_VOLUME | SOUND_MASK_CD    |
@@ -485,7 +486,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		default:
 			buf |= SOUND_MASK_LINE1;
 		}
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	case SOUND_MIXER_READ_RECMASK:
 		buf = (SOUND_MASK_CD| SOUND_MASK_MIC| SOUND_MASK_LINE|
@@ -495,7 +496,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		else
 			buf |= SOUND_MASK_LINE1;
 
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	case SOUND_MIXER_READ_RECSRC:
 		buf = (SOUND_MASK_CD    | SOUND_MASK_MIC   | SOUND_MASK_LINE  |
@@ -523,36 +524,36 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 		else
 			buf |= SOUND_MASK_LINE1;
 
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	case SOUND_MIXER_READ_CAPS:
-		__put_user(0, (int *)arg);
+		__put_user(0, p);
 		return 0;
 	case SOUND_MIXER_READ_VOLUME:
-		return getvolume(arg, 0x04, 0x03);
+		return getvolume(p, 0x04, 0x03);
 	case SOUND_MIXER_READ_CD:
-		return getvolume(arg, 0x0a, 0x09);
+		return getvolume(p, 0x0a, 0x09);
 	case SOUND_MIXER_READ_MIC:
-		return getvolume(arg, 0x06, 0x05);
+		return getvolume(p, 0x06, 0x05);
 	case SOUND_MIXER_READ_LINE:
-		return getvolume(arg, 0x08, 0x07);
+		return getvolume(p, 0x08, 0x07);
 	case SOUND_MIXER_READ_SYNTH:
-		return getvolume(arg, 0x0c, 0x0b);
+		return getvolume(p, 0x0c, 0x0b);
 	case SOUND_MIXER_READ_PCM:
-		return getvolume(arg, 0x0e, 0x0d);
+		return getvolume(p, 0x0e, 0x0d);
 	case MIXER_READ(SOUND_MIXER_RADIO): /* fall through */
 	case SOUND_MIXER_READ_LINE1:  /* AUX1 */
-		return getvolume(arg, 0x11, 0x10);
+		return getvolume(p, 0x11, 0x10);
 	case SOUND_MIXER_READ_LINE2:  /* AUX2 */
-		return getvolume(arg, 0x13, 0x12);
+		return getvolume(p, 0x13, 0x12);
 	case SOUND_MIXER_READ_BASS:   /* get band one */
 		if (aci_idcode[1]=='C') {
-			return getequalizer(arg, 0x23, 0x22);
+			return getequalizer(p, 0x23, 0x22);
 		}
 		break;
 	case SOUND_MIXER_READ_TREBLE: /* get band seven */
 		if (aci_idcode[1]=='C') {
-			return getequalizer(arg, 0x2f, 0x2e);
+			return getequalizer(p, 0x2f, 0x2e);
 		}
 		break;
 	case SOUND_MIXER_READ_IGAIN:  /* MIC pre-amp */
@@ -567,7 +568,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 				buf=aci_micpreamp;
 			vol = SCALE(3, 100, buf <= 3 ? buf : 3);
 			vol |= vol << 8;
-			__put_user(vol, (int *)arg);
+			__put_user(vol, p);
 			return 0;
 		}
 		break;
@@ -576,7 +577,7 @@ static int aci_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
 			buf = (100 || 100<<8);
 		else
 			buf = 0;
-		__put_user(buf, (int *)arg);
+		__put_user(buf, p);
 		return 0;
 	}
 	return -EINVAL;

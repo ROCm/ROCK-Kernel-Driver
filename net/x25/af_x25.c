@@ -363,7 +363,7 @@ void x25_destroy_socket(struct sock *sk)
  */
 
 static int x25_setsockopt(struct socket *sock, int level, int optname,
-			  char *optval, int optlen)
+			  char __user *optval, int optlen)
 {
 	int opt;
 	struct sock *sk = sock->sk;
@@ -377,7 +377,7 @@ static int x25_setsockopt(struct socket *sock, int level, int optname,
 		goto out;
 
 	rc = -EFAULT;
-	if (get_user(opt, (int *)optval))
+	if (get_user(opt, (int __user *)optval))
 		goto out;
 
 	x25_sk(sk)->qbitincl = !!opt;
@@ -387,7 +387,7 @@ out:
 }
 
 static int x25_getsockopt(struct socket *sock, int level, int optname,
-			  char *optval, int *optlen)
+			  char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int val, len, rc = -ENOPROTOOPT;

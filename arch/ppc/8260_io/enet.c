@@ -612,7 +612,7 @@ static int __init scc_enet_init(void)
 {
 	struct net_device *dev;
 	struct scc_enet_private *cep;
-	int i, j;
+	int i, j, err;
 	unsigned char	*eap;
 	unsigned long	mem_addr;
 	bd_t		*bd;

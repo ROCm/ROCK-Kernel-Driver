@@ -899,7 +899,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 			goto out;
 	} else {
 		/* called from nfsd_proc_create */
-		dchild = resfhp->fh_dentry;
+		dchild = dget(resfhp->fh_dentry);
 		if (!fhp->fh_locked) {
 			/* not actually possible */
 			printk(KERN_ERR

@@ -12,7 +12,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 struct ipc_kludge {
-	struct msgbuf *msgp;
+	struct msgbuf __user *msgp;
 	long msgtyp;
 };
 

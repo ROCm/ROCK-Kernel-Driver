@@ -929,7 +929,7 @@ nm256_resetAC97 (struct ac97_hwint *dev)
  * mixer ioctl to the AC97 driver.
  */
 static int
-nm256_default_mixer_ioctl (int dev, unsigned int cmd, caddr_t arg)
+nm256_default_mixer_ioctl (int dev, unsigned int cmd, void __user *arg)
 {
     struct nm256_info *card = nm256_find_card_for_mixer (dev);
     if (card != NULL)
@@ -1418,7 +1418,7 @@ nm256_audio_close(int dev)
 
 /* Standard ioctl handler. */
 static int
-nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
+nm256_audio_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
     int ret;
     u32 oldinfo;
@@ -1442,7 +1442,7 @@ nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
     switch (cmd)
 	{
 	case SOUND_PCM_WRITE_RATE:
-	    if (get_user(ret, (int *) arg))
+	    if (get_user(ret, (int __user *) arg))
 		return -EFAULT;
 
 	    if (ret != 0) {
@@ -1461,7 +1461,7 @@ nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	    break;
 
 	case SNDCTL_DSP_STEREO:
-	    if (get_user(ret, (int *) arg))
+	    if (get_user(ret, (int __user *) arg))
 		return -EFAULT;
 
 	    card->sinfo[w].stereo = ret ? 1 : 0;
@@ -1472,7 +1472,7 @@ nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	    break;
 
 	case SOUND_PCM_WRITE_CHANNELS:
-	    if (get_user(ret, (int *) arg))
+	    if (get_user(ret, (int __user *) arg))
 		return -EFAULT;
 
 	    if (ret < 1 || ret > 3)
@@ -1490,7 +1490,7 @@ nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	    break;
 
 	case SNDCTL_DSP_SETFMT:
-	    if (get_user(ret, (int *) arg))
+	    if (get_user(ret, (int __user *) arg))
 		return -EFAULT;
 
 	    if (ret != 0) {
@@ -1511,7 +1511,7 @@ nm256_audio_ioctl(int dev, unsigned int cmd, caddr_t arg)
 	default:
 	    return -EINVAL;
 	}
-    return put_user(ret, (int *) arg);
+    return put_user(ret, (int __user *) arg);
 }
 
 /*

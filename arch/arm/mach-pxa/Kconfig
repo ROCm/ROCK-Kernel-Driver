@@ -1,21 +1,24 @@
 
 menu "Intel PXA2xx Implementations"
 
+choice
+	prompt "Select target board"
+	depends on ARCH_PXA
+
 config ARCH_LUBBOCK
 	bool "Intel DBPXA250 Development Platform"
-	depends on ARCH_PXA
 	select PXA25x
 
 config MACH_MAINSTONE
 	bool "Intel HCDDBBVA0 Development Platform"
-	depends on ARCH_PXA
 	select PXA27x
 	#select IWMMXT
 
 config ARCH_PXA_IDP
 	bool "Accelent Xscale IDP"
-	depends on ARCH_PXA
 	select PXA25x
+
+endchoice
 
 endmenu
 

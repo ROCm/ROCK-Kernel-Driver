@@ -292,6 +292,7 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 		}
 	}
 	if (rt->rt_src == 0) {
+		kfree_skb(skb);
 		ip_rt_put(rt);
 		return 0;
 	}
@@ -1912,7 +1913,7 @@ done:
 }
 
 int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
-	struct ip_msfilter *optval, int *optlen)
+	struct ip_msfilter __user *optval, int __user *optlen)
 {
 	int err, len, count, copycount;
 	struct ip_mreqn	imr;
@@ -1958,11 +1959,11 @@ int ip_mc_msfget(struct sock *sk, struct ip_msfilter *msf,
 	len = copycount * sizeof(psl->sl_addr[0]);
 	msf->imsf_numsrc = count;
 	if (put_user(IP_MSFILTER_SIZE(copycount), optlen) ||
-	    copy_to_user((void *)optval, msf, IP_MSFILTER_SIZE(0))) {
+	    copy_to_user(optval, msf, IP_MSFILTER_SIZE(0))) {
 		return -EFAULT;
 	}
 	if (len &&
-	    copy_to_user((void *)&optval->imsf_slist[0], psl->sl_addr, len))
+	    copy_to_user(&optval->imsf_slist[0], psl->sl_addr, len))
 		return -EFAULT;
 	return 0;
 done:
@@ -1971,7 +1972,7 @@ done:
 }
 
 int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
-	struct group_filter *optval, int *optlen)
+	struct group_filter __user *optval, int __user *optlen)
 {
 	int err, i, count, copycount;
 	struct sockaddr_in *psin;
@@ -2005,7 +2006,7 @@ int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
 	copycount = count < gsf->gf_numsrc ? count : gsf->gf_numsrc;
 	gsf->gf_numsrc = count;
 	if (put_user(GROUP_FILTER_SIZE(copycount), optlen) ||
-	    copy_to_user((void *)optval, gsf, GROUP_FILTER_SIZE(0))) {
+	    copy_to_user(optval, gsf, GROUP_FILTER_SIZE(0))) {
 		return -EFAULT;
 	}
 	for (i=0; i<copycount; i++) {
@@ -2016,7 +2017,7 @@ int ip_mc_gsfget(struct sock *sk, struct group_filter *gsf,
 		memset(&ss, 0, sizeof(ss));
 		psin->sin_family = AF_INET;
 		psin->sin_addr.s_addr = psl->sl_addr[i];
-		if (copy_to_user((void *)&optval->gf_slist[i], &ss, sizeof(ss)))
+		if (copy_to_user(&optval->gf_slist[i], &ss, sizeof(ss)))
 			return -EFAULT;
 	}
 	return 0;

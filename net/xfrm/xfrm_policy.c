@@ -1017,6 +1017,8 @@ static int stale_bundle(struct dst_entry *dst)
 
 static void xfrm_dst_destroy(struct dst_entry *dst)
 {
+	if (!dst->xfrm)
+		return;
 	xfrm_state_put(dst->xfrm);
 	dst->xfrm = NULL;
 }

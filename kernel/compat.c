@@ -23,14 +23,14 @@
 
 #include <asm/uaccess.h>
 
-int get_compat_timespec(struct timespec *ts, const struct compat_timespec *cts)
+int get_compat_timespec(struct timespec *ts, const struct compat_timespec __user *cts)
 {
 	return (verify_area(VERIFY_READ, cts, sizeof(*cts)) ||
 			__get_user(ts->tv_sec, &cts->tv_sec) ||
 			__get_user(ts->tv_nsec, &cts->tv_nsec)) ? -EFAULT : 0;
 }
 
-int put_compat_timespec(const struct timespec *ts, struct compat_timespec *cts)
+int put_compat_timespec(const struct timespec *ts, struct compat_timespec __user *cts)
 {
 	return (verify_area(VERIFY_WRITE, cts, sizeof(*cts)) ||
 			__put_user(ts->tv_sec, &cts->tv_sec) ||
@@ -40,7 +40,7 @@ int put_compat_timespec(const struct timespec *ts, struct compat_timespec *cts)
 static long compat_nanosleep_restart(struct restart_block *restart)
 {
 	unsigned long expire = restart->arg0, now = jiffies;
-	struct compat_timespec *rmtp;
+	struct compat_timespec __user *rmtp;
 
 	/* Did it expire while we handled signals? */
 	if (!time_after(expire, now))
@@ -51,7 +51,7 @@ static long compat_nanosleep_restart(struct restart_block *restart)
 	if (expire == 0)
 		return 0;
 
-	rmtp = (struct compat_timespec *)restart->arg1;
+	rmtp = (struct compat_timespec __user *)restart->arg1;
 	if (rmtp) {
 		struct compat_timespec ct;
 		struct timespec t;
@@ -66,8 +66,8 @@ static long compat_nanosleep_restart(struct restart_block *restart)
 	return -ERESTART_RESTARTBLOCK;
 }
 
-asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
-		struct compat_timespec *rmtp)
+asmlinkage long compat_sys_nanosleep(struct compat_timespec __user *rqtp,
+		struct compat_timespec __user *rmtp)
 {
 	struct timespec t;
 	struct restart_block *restart;
@@ -98,7 +98,7 @@ asmlinkage long compat_sys_nanosleep(struct compat_timespec *rqtp,
 }
 
 static inline long get_compat_itimerval(struct itimerval *o,
-		struct compat_itimerval *i)
+		struct compat_itimerval __user *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->it_interval.tv_sec, &i->it_interval.tv_sec) |
@@ -107,7 +107,7 @@ static inline long get_compat_itimerval(struct itimerval *o,
 		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
 }
 
-static inline long put_compat_itimerval(struct compat_itimerval *o,
+static inline long put_compat_itimerval(struct compat_itimerval __user *o,
 		struct itimerval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
@@ -117,7 +117,8 @@ static inline long put_compat_itimerval(struct compat_itimerval *o,
 		 __put_user(i->it_value.tv_usec, &o->it_value.tv_usec)));
 }
 
-asmlinkage long compat_sys_getitimer(int which, struct compat_itimerval *it)
+asmlinkage long compat_sys_getitimer(int which,
+		struct compat_itimerval __user *it)
 {
 	struct itimerval kit;
 	int error;
@@ -128,8 +129,9 @@ asmlinkage long compat_sys_getitimer(int which, struct compat_itimerval *it)
 	return error;
 }
 
-asmlinkage long compat_sys_setitimer(int which, struct compat_itimerval *in,
-		struct compat_itimerval *out)
+asmlinkage long compat_sys_setitimer(int which,
+		struct compat_itimerval __user *in,
+		struct compat_itimerval __user *out)
 {
 	struct itimerval kin, kout;
 	int error;
@@ -148,7 +150,7 @@ asmlinkage long compat_sys_setitimer(int which, struct compat_itimerval *in,
 	return 0;
 }
 
-asmlinkage long compat_sys_times(struct compat_tms *tbuf)
+asmlinkage long compat_sys_times(struct compat_tms __user *tbuf)
 {
 	/*
 	 *	In the SMP world we might just be unlucky and have one of
@@ -173,7 +175,7 @@ asmlinkage long compat_sys_times(struct compat_tms *tbuf)
  * types that can be passed to put_user()/get_user().
  */
 
-asmlinkage long compat_sys_sigpending(compat_old_sigset_t *set)
+asmlinkage long compat_sys_sigpending(compat_old_sigset_t __user *set)
 {
 	old_sigset_t s;
 	long ret;
@@ -187,8 +189,8 @@ asmlinkage long compat_sys_sigpending(compat_old_sigset_t *set)
 	return ret;
 }
 
-asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
-		compat_old_sigset_t *oset)
+asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t __user *set,
+		compat_old_sigset_t __user *oset)
 {
 	old_sigset_t s;
 	long ret;
@@ -207,8 +209,8 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
 }
 
 #ifdef CONFIG_FUTEX
-asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
-		struct compat_timespec *utime, u32 *uaddr2)
+asmlinkage long compat_sys_futex(u32 __user *uaddr, int op, int val,
+		struct compat_timespec __user *utime, u32 __user *uaddr2)
 {
 	struct timespec t;
 	unsigned long timeout = MAX_SCHEDULE_TIMEOUT;
@@ -227,7 +229,8 @@ asmlinkage long compat_sys_futex(u32 *uaddr, int op, int val,
 }
 #endif
 
-asmlinkage long compat_sys_setrlimit(unsigned int resource, struct compat_rlimit *rlim)
+asmlinkage long compat_sys_setrlimit(unsigned int resource,
+		struct compat_rlimit __user *rlim)
 {
 	struct rlimit r;
 	int ret;
@@ -253,7 +256,8 @@ asmlinkage long compat_sys_setrlimit(unsigned int resource, struct compat_rlimit
 
 #ifdef COMPAT_RLIM_OLD_INFINITY
 
-asmlinkage long compat_sys_old_getrlimit(unsigned int resource, struct compat_rlimit *rlim)
+asmlinkage long compat_sys_old_getrlimit(unsigned int resource,
+		struct compat_rlimit __user *rlim)
 {
 	struct rlimit r;
 	int ret;
@@ -279,7 +283,8 @@ asmlinkage long compat_sys_old_getrlimit(unsigned int resource, struct compat_rl
 
 #endif
 
-asmlinkage long compat_sys_getrlimit (unsigned int resource, struct compat_rlimit *rlim)
+asmlinkage long compat_sys_getrlimit (unsigned int resource,
+		struct compat_rlimit __user *rlim)
 {
 	struct rlimit r;
 	int ret;
@@ -302,7 +307,7 @@ asmlinkage long compat_sys_getrlimit (unsigned int resource, struct compat_rlimi
 	return ret;
 }
 
-static long put_compat_rusage (struct compat_rusage *ru, struct rusage *r)
+static long put_compat_rusage(struct compat_rusage __user *ru, struct rusage *r)
 {
 	if (!access_ok(VERIFY_WRITE, ru, sizeof(*ru)) ||
 	    __put_user(r->ru_utime.tv_sec, &ru->ru_utime.tv_sec) ||
@@ -327,7 +332,7 @@ static long put_compat_rusage (struct compat_rusage *ru, struct rusage *r)
 	return 0;
 }
 
-asmlinkage long compat_sys_getrusage(int who, struct compat_rusage *ru)
+asmlinkage long compat_sys_getrusage(int who, struct compat_rusage __user *ru)
 {
 	struct rusage r;
 	int ret;
@@ -347,8 +352,8 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage *ru)
 }
 
 asmlinkage long
-compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
-	struct compat_rusage *ru)
+compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
+	struct compat_rusage __user *ru)
 {
 	if (!ru) {
 		return sys_wait4(pid, stat_addr, options, NULL);
@@ -374,7 +379,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
 
 asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid, 
 					     unsigned int len,
-					     compat_ulong_t *user_mask_ptr)
+					     compat_ulong_t __user *user_mask_ptr)
 {
 	unsigned long kernel_mask;
 	mm_segment_t old_fs;
@@ -394,7 +399,7 @@ asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 }
 
 asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
-					    compat_ulong_t *user_mask_ptr)
+					   compat_ulong_t __user *user_mask_ptr)
 {
 	unsigned long kernel_mask;
 	mm_segment_t old_fs;
@@ -417,7 +422,7 @@ asmlinkage int compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 }
 
 static int get_compat_itimerspec(struct itimerspec *dst, 
-				 struct compat_itimerspec *src)
+				 struct compat_itimerspec __user *src)
 { 
 	if (get_compat_timespec(&dst->it_interval, &src->it_interval) ||
 	    get_compat_timespec(&dst->it_value, &src->it_value))
@@ -425,7 +430,7 @@ static int get_compat_itimerspec(struct itimerspec *dst,
 	return 0;
 } 
 
-static int put_compat_itimerspec(struct compat_itimerspec *dst, 
+static int put_compat_itimerspec(struct compat_itimerspec __user *dst, 
 				 struct itimerspec *src)
 { 
 	if (put_compat_timespec(&src->it_interval, &dst->it_interval) ||
@@ -435,8 +440,8 @@ static int put_compat_itimerspec(struct compat_itimerspec *dst,
 } 
 
 long compat_timer_settime(timer_t timer_id, int flags, 
-			  struct compat_itimerspec *new, 
-			  struct compat_itimerspec *old)
+			  struct compat_itimerspec __user *new, 
+			  struct compat_itimerspec __user *old)
 { 
 	long err;
 	mm_segment_t oldfs;
@@ -455,7 +460,8 @@ long compat_timer_settime(timer_t timer_id, int flags,
 	return err;
 } 
 
-long compat_timer_gettime(timer_t timer_id, struct compat_itimerspec *setting)
+long compat_timer_gettime(timer_t timer_id,
+		struct compat_itimerspec __user *setting)
 { 
 	long err;
 	mm_segment_t oldfs;
@@ -469,7 +475,8 @@ long compat_timer_gettime(timer_t timer_id, struct compat_itimerspec *setting)
 	return err;
 } 
 
-long compat_clock_settime(clockid_t which_clock,  struct compat_timespec *tp)
+long compat_clock_settime(clockid_t which_clock,
+		struct compat_timespec __user *tp)
 {
 	long err;
 	mm_segment_t oldfs;
@@ -483,7 +490,8 @@ long compat_clock_settime(clockid_t which_clock,  struct compat_timespec *tp)
 	return err;
 } 
 
-long compat_clock_gettime(clockid_t which_clock,  struct compat_timespec *tp)
+long compat_clock_gettime(clockid_t which_clock,
+		struct compat_timespec __user *tp)
 {
 	long err;
 	mm_segment_t oldfs;
@@ -497,7 +505,8 @@ long compat_clock_gettime(clockid_t which_clock,  struct compat_timespec *tp)
 	return err;
 } 
 
-long compat_clock_getres(clockid_t which_clock,  struct compat_timespec *tp)
+long compat_clock_getres(clockid_t which_clock,
+		struct compat_timespec __user *tp)
 {
 	long err;
 	mm_segment_t oldfs;

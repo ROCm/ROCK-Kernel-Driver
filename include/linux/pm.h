@@ -231,6 +231,7 @@ struct device;
 struct dev_pm_info {
 	u32			power_state;
 #ifdef	CONFIG_PM
+	u32			prev_state;
 	u8			* saved_state;
 	atomic_t		pm_users;
 	struct device		* pm_parent;

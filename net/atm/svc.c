@@ -459,7 +459,7 @@ int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 
 
 static int svc_setsockopt(struct socket *sock,int level,int optname,
-    char *optval,int optlen)
+    char __user *optval,int optlen)
 {
 	struct sock *sk = sock->sk;
 	struct atm_vcc *vcc;
@@ -483,7 +483,7 @@ out:
 
 
 static int svc_getsockopt(struct socket *sock,int level,int optname,
-    char *optval,int *optlen)
+    char __user *optval,int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	int error = 0, len;

@@ -1912,7 +1912,7 @@ static unsigned char set_arglen[SET_CMDID(IP_VS_SO_SET_MAX)+1] = {
 };
 
 static int
-do_ip_vs_set_ctl(struct sock *sk, int cmd, void *user, unsigned int len)
+do_ip_vs_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 {
 	int ret;
 	unsigned char arg[MAX_ARG_LEN];

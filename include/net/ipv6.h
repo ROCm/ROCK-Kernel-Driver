@@ -215,7 +215,7 @@ extern struct ipv6_txoptions	*fl6_merge_options(struct ipv6_txoptions * opt_spac
 						   struct ip6_flowlabel * fl,
 						   struct ipv6_txoptions * fopt);
 extern void			fl6_free_socklist(struct sock *sk);
-extern int			ipv6_flowlabel_opt(struct sock *sk, char *optval, int optlen);
+extern int			ipv6_flowlabel_opt(struct sock *sk, char __user *optval, int optlen);
 extern void			ip6_flowlabel_init(void);
 extern void			ip6_flowlabel_cleanup(void);
 
@@ -395,11 +395,13 @@ extern struct ipv6_txoptions *	ipv6_invert_rthdr(struct sock *sk,
  */
 
 extern int			ipv6_setsockopt(struct sock *sk, int level, 
-						int optname, char *optval, 
+						int optname,
+						char __user *optval, 
 						int optlen);
 extern int			ipv6_getsockopt(struct sock *sk, int level, 
-						int optname, char *optval, 
-						int *optlen);
+						int optname,
+						char __user *optval, 
+						int __user *optlen);
 
 extern void			ipv6_packet_init(void);
 

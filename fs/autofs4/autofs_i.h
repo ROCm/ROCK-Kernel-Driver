@@ -144,9 +144,10 @@ void autofs4_free_ino(struct autofs_info *);
 /* Expiration */
 int is_autofs4_dentry(struct dentry *);
 int autofs4_expire_run(struct super_block *, struct vfsmount *,
-			struct autofs_sb_info *, struct autofs_packet_expire *);
+			struct autofs_sb_info *,
+			struct autofs_packet_expire __user *);
 int autofs4_expire_multi(struct super_block *, struct vfsmount *,
-			struct autofs_sb_info *, int *);
+			struct autofs_sb_info *, int __user *);
 
 /* Operations structures */
 

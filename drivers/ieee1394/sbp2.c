@@ -876,9 +876,9 @@ alloc_fail:
 			SBP2_DMA_FREE("login FIFO DMA");
 		}
 
-		kfree(scsi_id);
-
 		list_del(&scsi_id->scsi_list);
+
+		kfree(scsi_id);
 
 		SBP2_ERR ("Could not allocate memory for scsi_id");
 

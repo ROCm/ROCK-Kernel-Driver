@@ -64,11 +64,11 @@ struct nf_sockopt_ops
 	/* Non-inclusive ranges: use 0/0/NULL to never get called. */
 	int set_optmin;
 	int set_optmax;
-	int (*set)(struct sock *sk, int optval, void *user, unsigned int len);
+	int (*set)(struct sock *sk, int optval, void __user *user, unsigned int len);
 
 	int get_optmin;
 	int get_optmax;
-	int (*get)(struct sock *sk, int optval, void *user, int *len);
+	int (*get)(struct sock *sk, int optval, void __user *user, int *len);
 
 	/* Number of users inside set() or get(). */
 	unsigned int use;
@@ -156,9 +156,9 @@ int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		 int (*okfn)(struct sk_buff *), int thresh);
 
 /* Call setsockopt() */
-int nf_setsockopt(struct sock *sk, int pf, int optval, char *opt, 
+int nf_setsockopt(struct sock *sk, int pf, int optval, char __user *opt, 
 		  int len);
-int nf_getsockopt(struct sock *sk, int pf, int optval, char *opt,
+int nf_getsockopt(struct sock *sk, int pf, int optval, char __user *opt,
 		  int *len);
 
 /* Packet queuing */

@@ -488,6 +488,11 @@ struct pci_dev {
 	/* These fields are used by common fixups */
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
+	/* keep track of device state */
+	unsigned int	is_enabled:1;	/* pci_enable_device has been called */
+	unsigned int	is_busmaster:1; /* device is busmaster */
+	
+	unsigned int 	saved_config_space[16]; /* config space saved at suspend time */
 #ifdef CONFIG_PCI_NAMES
 #define PCI_NAME_SIZE	96
 #define PCI_NAME_HALF	__stringify(43)	/* less than half to handle slop */

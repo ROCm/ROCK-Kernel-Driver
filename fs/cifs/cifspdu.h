@@ -1687,6 +1687,83 @@ struct data_blob {
 	void (*free) (struct data_blob * data_blob);
 };
 
+#ifdef CONFIG_CIFS_POSIX
+/* 
+	For better POSIX semantics from Linux client, (even better
+	than the existing CIFS Unix Extensions) we need updated PDUs for:
+	
+	1) PosixCreateX - to set and return the mode, inode#, device info and
+	perhaps add a CreateDevice - to create Pipes and other special .inodes
+	Also note POSIX open flags
+	2) Close - to return the last write time to do cache across close more safely
+	3) PosixQFSInfo - to return statfs info
+	4) FindFirst return unique inode number - what about resume key, two forms short (matches readdir) and full (enough info to cache inodes)
+	5) Mkdir - set mode
+	
+	And under consideration: 
+	6) FindClose2 (return nanosecond timestamp ??)
+	7) Use nanosecond timestamps throughout all time fields if 
+	   corresponding attribute flag is set
+	8) sendfile - handle based copy
+	9) Direct i/o
+	10) "POSIX ACL" support
+	11) Misc fcntls?
+	
+	what about fixing 64 bit alignment
+	
+	There are also various legacy SMB/CIFS requests used as is
+	
+	From existing Lanman and NTLM dialects:
+	--------------------------------------
+	NEGOTIATE
+	SESSION_SETUP_ANDX (BB which?)
+	TREE_CONNECT_ANDX (BB which wct?)
+	TREE_DISCONNECT (BB add volume timestamp on response)
+	LOGOFF_ANDX
+	DELETE (note delete open file behavior)
+	DELETE_DIRECTORY
+	READ_AND_X
+	WRITE_AND_X
+	LOCKING_AND_X (note posix lock semantics)
+	RENAME (note rename across dirs and open file rename posix behaviors)
+	NT_RENAME (for hardlinks) Is this good enough for all features?
+	FIND_CLOSE2
+	TRANSACTION2 (18 cases)
+		SMB_SET_FILE_END_OF_FILE_INFO2 SMB_SET_PATH_END_OF_FILE_INFO2
+		(BB verify that never need to set allocation size)
+		SMB_SET_FILE_BASIC_INFO2 (setting times - BB can it be done via Unix ext?)
+	
+	COPY (note support for copy across directories) - FUTURE, OPTIONAL
+	setting/getting OS/2 EAs - FUTURE (BB can this handle
+	        setting Linux xattrs perfectly)         - OPTIONAL
+    dnotify                                         - FUTURE, OPTIONAL
+    quota                                           - FUTURE, OPTIONAL
+			
+	Note that various requests implemented for NT interop such as 
+		NT_TRANSACT (IOCTL) QueryReparseInfo
+	are unneeded to servers compliant with the CIFS POSIX extensions
+	
+	From CIFS Unix Extensions:
+	-------------------------
+	T2 SET_PATH_INFO (SMB_SET_FILE_UNIX_LINK) for symlinks
+	T2 SET_PATH_INFO (SMB_SET_FILE_BASIC_INFO2)
+	T2 QUERY_PATH_INFO (SMB_QUERY_FILE_UNIX_LINK)
+	T2 QUERY_PATH_INFO (SMB_QUERY_FILE_UNIX_BASIC) - BB check for missing inode fields
+					Actually need QUERY_FILE_UNIX_INFO since has inode num
+					BB what about a) blksize/blkbits/blocks
+								  b) i_version
+								  c) i_rdev
+								  d) notify mask?
+								  e) generation
+								  f) size_seqcount
+	T2 FIND_FIRST/FIND_NEXT FIND_FILE_UNIX
+	TRANS2_GET_DFS_REFERRAL				  - OPTIONAL but recommended
+	T2_QFS_INFO QueryDevice/AttributeInfo - OPTIONAL
+	
+	
+ */
+#endif 
+
 #pragma pack()			/* resume default structure packing */
 
 #endif				/* _CIFSPDU_H */

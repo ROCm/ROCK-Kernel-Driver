@@ -34,9 +34,14 @@
 
 /*
  * MAX_REQ is the maximum number of requests that WE will send
- * on one NetBIOS handle concurently.
+ * on one socket concurently. It also matches the most common
+ * value of max multiplex returned by servers.  We may 
+ * eventually want to use the negotiated value (in case
+ * future servers can handle more) when we are more confident that
+ * we will not have problems oveloading the socket with pending
+ * write data.
  */
-#define MAX_REQ (10)
+#define CIFS_MAX_REQ 50 
 
 #define SERVER_NAME_LENGTH 15
 #define SERVER_NAME_LEN_WITH_NULL     (SERVER_NAME_LENGTH + 1)
@@ -110,7 +115,8 @@ struct TCP_Server_Info {
 		struct sockaddr_in sockAddr;
 		struct sockaddr_in6 sockAddr6;
 	} addr;
-	wait_queue_head_t response_q;
+	wait_queue_head_t response_q; 
+	wait_queue_head_t request_q; /* if more than maxmpx to srvr must block*/
 	struct list_head pending_mid_q;
 	void *Server_NlsInfo;	/* BB - placeholder for future NLS info  */
 	unsigned short server_codepage;	/* codepage for the server    */
@@ -119,7 +125,8 @@ struct TCP_Server_Info {
 	char versionMajor;
 	char versionMinor;
 	int svlocal:1;		/* local server or remote */
-	atomic_t socketUseCount;	/* indicates if the server has any open cifs sessions */
+	atomic_t socketUseCount; /* number of open cifs sessions on socket */
+	atomic_t inFlight;  /* number of requests on the wire to server */
 	enum statusEnum tcpStatus; /* what we think the status is */
 	struct semaphore tcpSem;
 	struct task_struct *tsk;
@@ -163,7 +170,7 @@ struct cifsSesInfo {
 	struct semaphore sesSem;
 	struct cifsUidInfo *uidInfo;	/* pointer to user info */
 	struct TCP_Server_Info *server;	/* pointer to server info */
-	atomic_t inUse;		/* # of CURRENT users of this ses */
+	atomic_t inUse; /* # of mounts (tree connections) on this ses */
 	enum statusEnum status;
 	__u32 sequence_number;  /* needed for CIFS PDU signature */
 	__u16 ipc_tid;		/* special tid for connection to IPC share */
@@ -195,6 +202,19 @@ struct cifsTconInfo {
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
 	atomic_t useCount;	/* how many mounts (explicit or implicit) to this share */
+#ifdef CONFIG_CIFS_STATS
+	atomic_t num_smbs_sent;
+	atomic_t num_writes;
+	atomic_t num_reads;
+	atomic_t num_oplock_brks;
+	atomic_t num_opens;
+	atomic_t num_deletes;
+	atomic_t num_mkdirs;
+	atomic_t num_rmdirs;
+	__u64    bytes_read;
+	__u64    bytes_written;
+	spinlock_t stat_lock;
+#endif
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
@@ -294,13 +314,6 @@ struct oplock_q_entry {
 #define   MID_RESPONSE_RECEIVED 4
 #define   MID_RETRY_NEEDED      8 /* session closed while this request out */
 
-struct servers_not_supported { /* @z4a */
-	struct servers_not_supported *next1;  /* @z4a */
-	char server_Name[SERVER_NAME_LEN_WITH_NULL]; /* @z4a */
-	/* Server Names in SMB protocol are 15 chars + X'20'  */
-	/*   in 16th byte...                      @z4a        */
-};
-
 /*
  *****************************************************************
  * All constants go here
@@ -397,5 +410,4 @@ GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent
 GLOBAL_EXTERN unsigned int ntlmv2_support;  /* better optional password hash */
 GLOBAL_EXTERN unsigned int sign_CIFS_PDUs;  /* enable smb packet signing */
 GLOBAL_EXTERN unsigned int linuxExtEnabled;  /* enable Linux/Unix CIFS extensions */
-
 

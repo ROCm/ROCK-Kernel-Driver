@@ -306,7 +306,7 @@ next:
 int autofs4_expire_run(struct super_block *sb,
 		      struct vfsmount *mnt,
 		      struct autofs_sb_info *sbi,
-		      struct autofs_packet_expire *pkt_p)
+		      struct autofs_packet_expire __user *pkt_p)
 {
 	struct autofs_packet_expire pkt;
 	struct dentry *dentry;
@@ -333,7 +333,7 @@ int autofs4_expire_run(struct super_block *sb,
 /* Call repeatedly until it returns -EAGAIN, meaning there's nothing
    more to be done */
 int autofs4_expire_multi(struct super_block *sb, struct vfsmount *mnt,
-			struct autofs_sb_info *sbi, int *arg)
+			struct autofs_sb_info *sbi, int __user *arg)
 {
 	struct dentry *dentry;
 	int ret = -EAGAIN;

@@ -1106,7 +1106,7 @@ copy_entries_to_user(unsigned int total_size,
 
 static int
 get_entries(const struct ip6t_get_entries *entries,
-	    struct ip6t_get_entries *uptr)
+	    struct ip6t_get_entries __user *uptr)
 {
 	int ret;
 	struct ip6t_table *t;
@@ -1133,7 +1133,7 @@ get_entries(const struct ip6t_get_entries *entries,
 }
 
 static int
-do_replace(void *user, unsigned int len)
+do_replace(void __user *user, unsigned int len)
 {
 	int ret;
 	struct ip6t_replace tmp;
@@ -1254,7 +1254,7 @@ add_counter_to_entry(struct ip6t_entry *e,
 }
 
 static int
-do_add_counters(void *user, unsigned int len)
+do_add_counters(void __user *user, unsigned int len)
 {
 	unsigned int i;
 	struct ip6t_counters_info tmp, *paddc;
@@ -1302,7 +1302,7 @@ do_add_counters(void *user, unsigned int len)
 }
 
 static int
-do_ip6t_set_ctl(struct sock *sk,	int cmd, void *user, unsigned int len)
+do_ip6t_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 {
 	int ret;
 
@@ -1327,7 +1327,7 @@ do_ip6t_set_ctl(struct sock *sk,	int cmd, void *user, unsigned int len)
 }
 
 static int
-do_ip6t_get_ctl(struct sock *sk, int cmd, void *user, int *len)
+do_ip6t_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	int ret;
 

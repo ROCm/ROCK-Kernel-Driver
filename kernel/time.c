@@ -49,7 +49,7 @@ EXPORT_SYMBOL(sys_tz);
  *
  * XXX This function is NOT 64-bit clean!
  */
-asmlinkage long sys_time(int * tloc)
+asmlinkage long sys_time(int __user * tloc)
 {
 	int i;
 	struct timeval tv;
@@ -71,7 +71,7 @@ asmlinkage long sys_time(int * tloc)
  * architectures that need it).
  */
  
-asmlinkage long sys_stime(time_t *tptr)
+asmlinkage long sys_stime(time_t __user *tptr)
 {
 	struct timespec tv;
 

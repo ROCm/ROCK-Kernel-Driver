@@ -45,7 +45,7 @@ static struct super_operations s_ops = {
 };
 
 
-ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_t * offset)
+ssize_t oprofilefs_str_to_user(char const * str, char __user * buf, size_t count, loff_t * offset)
 {
 	size_t len = strlen(str);
 
@@ -69,7 +69,7 @@ ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_
 
 #define TMPBUFSIZE 50
 
-ssize_t oprofilefs_ulong_to_user(unsigned long val, char * buf, size_t count, loff_t * offset)
+ssize_t oprofilefs_ulong_to_user(unsigned long val, char __user * buf, size_t count, loff_t * offset)
 {
 	char tmpbuf[TMPBUFSIZE];
 	size_t maxlen;
@@ -98,7 +98,7 @@ ssize_t oprofilefs_ulong_to_user(unsigned long val, char * buf, size_t count, lo
 }
 
 
-int oprofilefs_ulong_from_user(unsigned long * val, char const * buf, size_t count)
+int oprofilefs_ulong_from_user(unsigned long * val, char const __user * buf, size_t count)
 {
 	char tmpbuf[TMPBUFSIZE];
 
@@ -120,14 +120,14 @@ int oprofilefs_ulong_from_user(unsigned long * val, char const * buf, size_t cou
 }
 
 
-static ssize_t ulong_read_file(struct file * file, char * buf, size_t count, loff_t * offset)
+static ssize_t ulong_read_file(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
 	unsigned long * val = file->private_data;
 	return oprofilefs_ulong_to_user(*val, buf, count, offset);
 }
 
 
-static ssize_t ulong_write_file(struct file * file, char const * buf, size_t count, loff_t * offset)
+static ssize_t ulong_write_file(struct file * file, char const __user * buf, size_t count, loff_t * offset)
 {
 	unsigned long * value = file->private_data;
 	int retval;
@@ -211,7 +211,7 @@ int oprofilefs_create_ro_ulong(struct super_block * sb, struct dentry * root,
 }
 
 
-static ssize_t atomic_read_file(struct file * file, char * buf, size_t count, loff_t * offset)
+static ssize_t atomic_read_file(struct file * file, char __user * buf, size_t count, loff_t * offset)
 {
 	atomic_t * val = file->private_data;
 	return oprofilefs_ulong_to_user(atomic_read(val), buf, count, offset);

@@ -110,7 +110,7 @@ static void enter_4op_mode(void)
 	devc->v_alloc->max_voice = devc->nr_voice = 12;
 }
 
-static int opl3_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int opl3_ioctl(int dev, unsigned int cmd, void __user * arg)
 {
 	struct sbi_instrument ins;
 	

@@ -152,8 +152,9 @@ enum xfrm_attr_type_t {
 	XFRMA_ALG_COMP,		/* struct xfrm_algo */
 	XFRMA_ENCAP,		/* struct xfrm_algo + struct xfrm_encap_tmpl */
 	XFRMA_TMPL,		/* 1 or more struct xfrm_user_tmpl */
+	__XFRMA_MAX
 
-#define XFRMA_MAX XFRMA_TMPL
+#define XFRMA_MAX (__XFRMA_MAX - 1)
 };
 
 struct xfrm_usersa_info {

@@ -177,8 +177,9 @@ static unsigned long timer_get_time(int dev)
 	return curr_ticks;
 }
 
-static int timer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+static int timer_ioctl(int dev, unsigned int cmd, void __user *arg)
 {
+	int __user *p = arg;
 	int val;
 
 	switch (cmd) 
@@ -201,7 +202,7 @@ static int timer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			return 0;
 
 		case SNDCTL_TMR_TIMEBASE:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (val) 
 			{
@@ -215,7 +216,7 @@ static int timer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			break;
 
 		case SNDCTL_TMR_TEMPO:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (val) 
 			{
@@ -233,7 +234,7 @@ static int timer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 			break;
 
 		case SNDCTL_SEQ_CTRLRATE:
-			if (get_user(val, (int *)arg))
+			if (get_user(val, p))
 				return -EFAULT;
 			if (val != 0)	/* Can't change */
 				return -EINVAL;
@@ -248,7 +249,7 @@ static int timer_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		default:
 			return -EINVAL;
 	}
-	return put_user(val, (int *)arg);
+	return put_user(val, p);
 }
 
 static void timer_arm(int dev, long time)

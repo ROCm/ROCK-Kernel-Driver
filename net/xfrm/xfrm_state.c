@@ -795,7 +795,7 @@ void km_policy_expired(struct xfrm_policy *pol, int dir, int hard)
 		wake_up(&km_waitq);
 }
 
-int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
+int xfrm_user_policy(struct sock *sk, int optname, u8 __user *optval, int optlen)
 {
 	int err;
 	u8 *data;

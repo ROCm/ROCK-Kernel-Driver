@@ -1252,7 +1252,7 @@ free_interfaces:
 					ret);
 				continue;
 			}
-			usb_create_driverfs_intf_files (intf);
+			usb_create_sysfs_intf_files (intf);
 		}
 	}
 

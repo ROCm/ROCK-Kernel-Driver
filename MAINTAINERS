@@ -185,6 +185,11 @@ W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
 W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
 S:	Maintained
 
+ADT746X FAN DRIVER
+P:	Colin Leroy
+M:	colin@colino.net
+S:	Maintained
+
 ADVANSYS SCSI DRIVER
 P:	Bob Frey
 M:	linux@advansys.com
@@ -628,10 +633,9 @@ W:	http://www.debian.org/~dz/i8k/
 S:	Maintained
 
 DEVICE-MAPPER
-P:	Joe Thornber
-M:	dm@uk.sistina.com
-L:	linux-lvm@sistina.com
-W:	http://www.sistina.com/lvm
+P:	Alasdair Kergon
+L:	dm-devel@redhat.com
+W:	http://sources.redhat.com/dm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY

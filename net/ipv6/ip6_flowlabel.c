@@ -277,7 +277,7 @@ static int fl6_renew(struct ip6_flowlabel *fl, unsigned long linger, unsigned lo
 }
 
 static struct ip6_flowlabel *
-fl_create(struct in6_flowlabel_req *freq, char *optval, int optlen, int *err_p)
+fl_create(struct in6_flowlabel_req *freq, char __user *optval, int optlen, int *err_p)
 {
 	struct ip6_flowlabel *fl;
 	int olen;
@@ -407,7 +407,7 @@ static int ipv6_opt_cmp(struct ipv6_txoptions *o1, struct ipv6_txoptions *o2)
 	return 0;
 }
 
-int ipv6_flowlabel_opt(struct sock *sk, char *optval, int optlen)
+int ipv6_flowlabel_opt(struct sock *sk, char __user *optval, int optlen)
 {
 	int err;
 	struct ipv6_pinfo *np = inet6_sk(sk);
