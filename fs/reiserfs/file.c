@@ -10,6 +10,7 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/pagemap.h>
+#include <linux/swap.h>
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
@@ -648,12 +649,15 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
     int bh_per_page = PAGE_CACHE_SIZE / s->s_blocksize;
     struct reiserfs_transaction_handle th;
     th.t_trans_id = 0;
+    int ret = 0;
 
     blocksize = 1 << inode->i_blkbits;
 
     if (logit) {
 	reiserfs_write_lock(s);
-	journal_begin(&th, s, bh_per_page + 1);
+	ret = journal_begin(&th, s, bh_per_page + 1);
+	if (ret)
+	    goto drop_write_lock;
 	reiserfs_update_inode_transaction(inode);
     }
     for(bh = head = page_buffers(page), block_start = 0; 
@@ -685,7 +689,8 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 	}
     }
     if (logit) {
-	journal_end(&th, s, bh_per_page + 1);
+	ret = journal_end(&th, s, bh_per_page + 1);
+drop_write_lock:
 	reiserfs_write_unlock(s);
     }
     /*
@@ -696,7 +701,7 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
      */
     if (!partial)
 	SetPageUptodate(page);
-    return 0;
+    return ret;
 }
 
 
@@ -730,10 +735,6 @@ int reiserfs_submit_file_region_for_write(
 			     // we only remember error status to report it on
 			     // exit.
 	write_bytes-=count;
-	SetPageReferenced(page);
-	unlock_page(page); // We unlock the page as it was locked by earlier call
-			  // to grab_cache_page
-	page_cache_release(page);
     }
     /* now that we've gotten all the ordered buffers marked dirty,
      * we can safely update i_size and close any running transaction
@@ -772,6 +773,17 @@ int reiserfs_submit_file_region_for_write(
 	reiserfs_write_unlock(inode->i_sb);
     }
     th->t_trans_id = 0;
+
+    /* 
+     * we have to unlock the pages after updating i_size, otherwise
+     * we race with writepage
+     */
+    for ( i = 0; i < num_pages ; i++) {
+	struct page *page=prepared_pages[i];
+	unlock_page(page); 
+	mark_page_accessed(page);
+	page_cache_release(page);
+    }
     return retval;
 }
 

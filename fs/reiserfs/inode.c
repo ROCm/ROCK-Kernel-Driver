@@ -2284,7 +2284,11 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     if (checked) {
 	ClearPageChecked(page);
 	reiserfs_write_lock(s);
-	journal_begin(&th, s, bh_per_page + 1);
+	error = journal_begin(&th, s, bh_per_page + 1);
+	if (error) {
+	    reiserfs_write_unlock(s);
+	    goto fail;
+	}
 	reiserfs_update_inode_transaction(inode);
     }
     /* now go through and lock any dirty buffers on the page */
@@ -2321,8 +2325,10 @@ static int reiserfs_write_full_page(struct page *page, struct writeback_control 
     } while((bh = bh->b_this_page) != head);
 
     if (checked) {
-	journal_end(&th, s, bh_per_page + 1);
+	error = journal_end(&th, s, bh_per_page + 1);
 	reiserfs_write_unlock(s);
+	if (error)
+	    goto fail;
     }
     BUG_ON(PageWriteback(page));
     set_page_writeback(page);

@@ -629,9 +629,12 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     retval = reiserfs_add_entry (&th, dir, dentry->d_name.name, dentry->d_name.len, 
 				inode, 1/*visible*/);
     if (retval) {
+        int err;
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	journal_end(&th, dir->i_sb, jbegin_count) ;
+	err = journal_end(&th, dir->i_sb, jbegin_count) ;
+        if (err)
+            retval = err;
 	iput (inode);
 	goto out_failed;
     }
@@ -639,7 +642,7 @@ static int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode,
     reiserfs_update_inode_transaction(dir) ;
 
     d_instantiate(dentry, inode);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
 
 out_failed:
     if (locked)
@@ -703,15 +706,18 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     retval = reiserfs_add_entry (&th, dir, dentry->d_name.name, dentry->d_name.len, 
 				 inode, 1/*visible*/);
     if (retval) {
+        int err;
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	journal_end(&th, dir->i_sb, jbegin_count) ;
+	err = journal_end(&th, dir->i_sb, jbegin_count) ;
+        if (err)
+            retval = err;
 	iput (inode);
 	goto out_failed;
     }
 
     d_instantiate(dentry, inode);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
 
 out_failed:
     if (locked)
@@ -783,10 +789,13 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     retval = reiserfs_add_entry (&th, dir, dentry->d_name.name, dentry->d_name.len, 
 				inode, 1/*visible*/);
     if (retval) {
+        int err;
 	inode->i_nlink = 0;
 	DEC_DIR_INODE_NLINK(dir);
 	reiserfs_update_sd (&th, inode);
-	journal_end(&th, dir->i_sb, jbegin_count) ;
+	err = journal_end(&th, dir->i_sb, jbegin_count) ;
+        if (err)
+            retval = err;
 	iput (inode);
 	goto out_failed;
     }
@@ -795,7 +804,7 @@ static int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     reiserfs_update_sd (&th, dir);
 
     d_instantiate(dentry, inode);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
 out_failed:
     if (locked)
         reiserfs_write_unlock_xattrs (dir->i_sb);
@@ -818,7 +827,7 @@ static inline int reiserfs_empty_dir(struct inode *inode) {
 
 static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
 {
-    int retval;
+    int retval, err;
     struct inode * inode;
     struct reiserfs_transaction_handle th ;
     int jbegin_count; 
@@ -881,25 +890,25 @@ static int reiserfs_rmdir (struct inode * dir, struct dentry *dentry)
     /* prevent empty directory from getting lost */
     add_save_link (&th, inode, 0/* not truncate */);
 
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
 out_rmdir:
     reiserfs_write_unlock(dir->i_sb);
-    return 0;
+    return retval;
 	
  end_rmdir:
     /* we must release path, because we did not call
        reiserfs_cut_from_item, or reiserfs_cut_from_item does not
        release path if operation was not complete */
     pathrelse (&path);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    err = journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_write_unlock(dir->i_sb);
-    return retval;	
+    return err ? err : retval;	
 }
 
 static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
 {
-    int retval;
+    int retval, err;
     struct inode * inode;
     struct reiserfs_dir_entry de;
     INITIALIZE_PATH (path);
@@ -970,15 +979,17 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
        /* prevent file from getting lost */
        add_save_link (&th, inode, 0/* not truncate */);
 
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
     reiserfs_write_unlock(dir->i_sb);
-    return 0;
+    return retval;
 
  end_unlink:
     pathrelse (&path);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    err = journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_check_path(&path) ;
+    if (err)
+        retval = err;
 out_unlink:
     reiserfs_write_unlock(dir->i_sb);
     return retval;
@@ -1049,15 +1060,18 @@ static int reiserfs_symlink (struct inode * parent_dir,
     retval = reiserfs_add_entry (&th, parent_dir, dentry->d_name.name, 
                                  dentry->d_name.len, inode, 1/*visible*/);
     if (retval) {
+        int err;
 	inode->i_nlink--;
 	reiserfs_update_sd (&th, inode);
-	journal_end(&th, parent_dir->i_sb, jbegin_count) ;
+	err = journal_end(&th, parent_dir->i_sb, jbegin_count) ;
+        if (err)
+            retval = err;
 	iput (inode);
 	goto out_failed;
     }
 
     d_instantiate(dentry, inode);
-    journal_end(&th, parent_dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, parent_dir->i_sb, jbegin_count) ;
 out_failed:
     reiserfs_write_unlock(parent_dir->i_sb);
     return retval;
@@ -1098,10 +1112,11 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     reiserfs_update_inode_transaction(dir) ;
 
     if (retval) {
+        int err;
 	inode->i_nlink--;
-	journal_end(&th, dir->i_sb, jbegin_count) ;
+	err = journal_end(&th, dir->i_sb, jbegin_count) ;
 	reiserfs_write_unlock(dir->i_sb);
-	return retval;
+	return err ? err : retval;
     }
 
     inode->i_ctime = CURRENT_TIME;
@@ -1109,9 +1124,9 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
 
     atomic_inc(&inode->i_count) ;
     d_instantiate(dentry, inode);
-    journal_end(&th, dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, dir->i_sb, jbegin_count) ;
     reiserfs_write_unlock(dir->i_sb);
-    return 0;
+    return retval;
 }
 
 
@@ -1254,9 +1269,9 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 			    "vs-7050: new entry is found, new inode == 0\n");
 	}
     } else if (retval) {
-	journal_end(&th, old_dir->i_sb, jbegin_count) ;
+        int err = journal_end(&th, old_dir->i_sb, jbegin_count) ;
 	reiserfs_write_unlock(old_dir->i_sb);
-	return retval;
+	return err ? err : retval;
     }
 
     reiserfs_update_inode_transaction(old_dir) ;
@@ -1405,9 +1420,9 @@ static int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	reiserfs_update_sd (&th, new_dentry_inode);
     }
 
-    journal_end(&th, old_dir->i_sb, jbegin_count) ;
+    retval = journal_end(&th, old_dir->i_sb, jbegin_count) ;
     reiserfs_write_unlock(old_dir->i_sb);
-    return 0;
+    return retval;
 }
 
 /*
