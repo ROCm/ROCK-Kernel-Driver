@@ -419,6 +419,8 @@ static void __init intcp_init(void)
 	}
 }
 
+#define TIMER_CTRL_IE	(1 << 5)			/* Interrupt Enable */
+
 static void __init intcp_init_time(void)
 {
 	integrator_time_init(1000000 / HZ, TIMER_CTRL_IE);
