@@ -242,10 +242,12 @@ int fsync_bdev(struct block_device *bdev)
 }
 
 /*
- * sync everything.
+ * sync everything.  Start out by waking pdflush, because that writes back
+ * all queues in parallel.
  */
 asmlinkage long sys_sync(void)
 {
+	wakeup_bdflush(0);
 	sync_inodes(0);	/* All mappings and inodes, including block devices */
 	DQUOT_SYNC(NULL);
 	sync_supers();	/* Write the superblocks */
