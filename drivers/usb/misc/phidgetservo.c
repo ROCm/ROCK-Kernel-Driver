@@ -67,6 +67,13 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 	int retval;
 	unsigned char *buffer;
 
+	buffer = kmalloc(6, GFP_KERNEL);
+	if (!buffer) {
+		dev_err(&servo->udev->dev, "%s - out of memory\n",
+			__FUNCTION__);
+		return;
+	}
+
 	/*
 	 * pulse = 0 - 4095
 	 * angle = 0 - 180 degrees
@@ -76,13 +83,6 @@ change_position_v30(struct phidget_servo *servo, int servo_no, int degrees,
 	servo->pulse[servo_no] = ((degrees*60 + minutes)*106 + 2438*60)/600;	
 	servo->degrees[servo_no]= degrees;
 	servo->minutes[servo_no]= minutes;	
-
-	buffer = kmalloc(6, GFP_KERNEL);
-	if (!buffer) {
-		dev_err(&servo->udev->dev, "%s - out of memory\n",
-			__FUNCTION__);
-		return;
-	}
 
 	/* 
 	 * The PhidgetServo v3.0 is controlled by sending 6 bytes,
@@ -136,6 +136,13 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 	int retval;
 	unsigned char *buffer;
 
+	buffer = kmalloc(2, GFP_KERNEL);
+	if (!buffer) {
+		dev_err(&servo->udev->dev, "%s - out of memory\n",
+			__FUNCTION__);
+		return;
+	}
+
 	/*
 	 * angle = 0 - 180 degrees
 	 * pulse = angle + 23
@@ -143,13 +150,6 @@ change_position_v20(struct phidget_servo *servo, int servo_no, int degrees,
 	servo->pulse[servo_no]= degrees + 23;
 	servo->degrees[servo_no]= degrees;
 	servo->minutes[servo_no]= 0;
-
-	buffer = kmalloc(2, GFP_KERNEL);
-	if (!buffer) {
-		dev_err(&servo->udev->dev, "%s - out of memory\n",
-			__FUNCTION__);
-		return;
-	}
 
 	/*
 	 * The PhidgetServo v2.0 is controlled by sending two bytes. The
@@ -291,9 +291,6 @@ servo_disconnect(struct usb_interface *interface)
 
 	dev_info(&interface->dev, "USB %d-Motor PhidgetServo v%d.0 detached\n",
 		 dev->quad_servo ? 4 : 1, dev->version);
-
-	dev_info(&interface->dev,
-		 "WARNING: version 2.0 not tested. Please report if this works.\n");
 }
 
 static struct usb_driver servo_driver = {
