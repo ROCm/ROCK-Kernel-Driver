@@ -166,16 +166,6 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if ((m.status & MCI_STATUS_EN) == 0)
 			continue;
 
-		/* Did this bank cause the exception? */ 
-		/* Assume that the bank with uncorrectable errors did it,
-		   and that there is only a single one. */
-		if (m.status & MCI_STATUS_UC) { 
-			panicm = m; 
-		} else {
-			m.rip = 0;
-			m.cs = 0;
-		}
-
 		/* In theory _OVER could be a nowayout too, but 
 		   assume any overflowed errors were no fatal. */
 		nowayout |= !!(m.status & MCI_STATUS_PCC);
@@ -188,6 +178,17 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 			rdmsrl(MSR_IA32_MC0_ADDR + i*4, m.addr);
 
 		rdtscll(m.tsc);
+
+		/* Did this bank cause the exception? */ 
+		/* Assume that the bank with uncorrectable errors did it,
+		   and that there is only a single one. */
+		if (m.status & MCI_STATUS_UC) { 
+			panicm = m; 
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
+
 		wrmsrl(MSR_IA32_MC0_STATUS + i*4, 0);
 		mce_log(&m);
 	}
