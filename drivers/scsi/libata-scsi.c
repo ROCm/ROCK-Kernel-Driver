@@ -156,6 +156,7 @@ struct ata_queued_cmd *ata_scsi_qc_new(struct ata_port *ap,
 /**
  *	ata_to_sense_error - convert ATA error to SCSI error
  *	@qc: Command that we are erroring out
+ *	@drv_stat: value contained in ATA status register
  *
  *	Converts an ATA error into a SCSI error. While we are at it
  *	we decode and dump the ATA error for the user so that they
@@ -735,6 +736,7 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
 /**
  *	ata_scsi_rbuf_put - Unmap response buffer.
  *	@cmd: SCSI command containing buffer to be unmapped.
+ *	@buf: buffer to unmap
  *
  *	Unmaps response buffer contained within @cmd.
  *
@@ -1334,7 +1336,7 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 /**
  *	ata_scsi_find_dev - lookup ata_device from scsi_cmnd
  *	@ap: ATA port to which the device is attached
- *	@cmd: SCSI command to be sent to the device
+ *	@scsidev: SCSI device from which we derive the ATA device
  *
  *	Given various information provided in struct scsi_cmnd,
  *	map that onto an ATA bus, and using that mapping
