@@ -201,7 +201,8 @@ static int __init rtc_init(void)
 	    KL_CONFIG_CH_CONS_INFO(nid)->memory_base + IOC3_BYTEBUS_DEV0;
 
 	printk(KERN_INFO "Real Time Clock Driver v%s\n", RTC_VERSION);
-	misc_register(&rtc_dev);
+	if (misc_register(&rtc_dev))
+		return -ENODEV;
 	create_proc_read_entry ("rtc", 0, NULL, rtc_read_proc, NULL);
 
 	save_flags(flags);
