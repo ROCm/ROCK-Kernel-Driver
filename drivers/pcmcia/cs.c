@@ -399,8 +399,9 @@ static void shutdown_socket(struct pcmcia_socket *s)
 
 /*======================================================================
 
-    The central event handler.  Send_event() sends an event to all
-    valid clients.  Parse_events() interprets the event bits from
+    The central event handler.  Send_event() sends an event to the
+    16-bit subsystem, which then calls the relevant device drivers.
+    Parse_events() interprets the event bits from
     a card status change report.  Do_shutdown() handles the high
     priority stuff associated with a card removal.
     

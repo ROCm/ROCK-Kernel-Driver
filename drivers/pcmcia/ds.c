@@ -537,20 +537,47 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     
 ======================================================================*/
 
+struct send_event_data {
+	struct pcmcia_socket *skt;
+	event_t event;
+	int priority;
+};
+
+static int send_event_callback(struct device *dev, void * _data)
+{
+	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
+	struct send_event_data *data = _data;
+
+	/* we get called for all sockets, but may only pass the event
+	 * for drivers _on the affected socket_ */
+	if (p_dev->socket != data->skt)
+		return 0;
+
+	if (p_dev->client->state & (CLIENT_UNBOUND|CLIENT_STALE))
+		return 0;
+
+	if (p_dev->client->EventMask & data->event)
+		return EVENT(p_dev->client, data->event, data->priority);
+
+	return 0;
+}
+
 static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 {
 	int ret = 0;
-	client_t *client;
+	struct send_event_data private;
+	struct pcmcia_bus_socket *skt = pcmcia_get_bus_socket(s->pcmcia);
 
-	for (client = s->clients; client; client = client->next) {
-		if (client->state & (CLIENT_UNBOUND|CLIENT_STALE))
-			continue;
-		if (client->EventMask & event) {
-			ret = EVENT(client, event, priority);
-			if (ret != 0)
-				return ret;
-		}
-	}
+	if (!skt)
+		return 0;
+
+	private.skt = s;
+	private.event = event;
+	private.priority = priority;
+
+	ret = bus_for_each_dev(&pcmcia_bus_type, NULL, &private, send_event_callback);
+
+	pcmcia_put_bus_socket(skt);
 	return ret;
 } /* send_event */
 
