@@ -32,9 +32,21 @@ struct sha256_ctx {
 	u8 buf[128];
 };
 
-#define Ch(x,y,z)   ((x & y) ^ (~x & z))
-#define Maj(x,y,z)  ((x & y) ^ ( x & z) ^ (y & z))
-#define RORu32(x,y) ( ((x) >> (y)) | ((x) << (32-(y))) )
+static inline u32 Ch(u32 x, u32 y, u32 z)
+{
+	return ((x & y) ^ (~x & z));
+}
+
+static inline u32 Maj(u32 x, u32 y, u32 z)
+{
+	return ((x & y) ^ (x & z) ^ (y & z));
+}
+
+static inline u32 RORu32(u32 x, u32 y)
+{
+	return (x >> y) | (x << (32 - y));
+}
+
 #define e0(x)       (RORu32(x, 2) ^ RORu32(x,13) ^ RORu32(x,22))
 #define e1(x)       (RORu32(x, 6) ^ RORu32(x,11) ^ RORu32(x,25))
 #define s0(x)       (RORu32(x, 7) ^ RORu32(x,18) ^ (x >> 3))
@@ -49,41 +61,37 @@ struct sha256_ctx {
 #define H6         0x1f83d9ab
 #define H7         0x5be0cd19
 
-#define LOAD_OP(I)\
- {\
-  t1  = input[(4*I)  ] & 0xff; t1<<=8;\
-  t1 |= input[(4*I)+1] & 0xff; t1<<=8;\
-  t1 |= input[(4*I)+2] & 0xff; t1<<=8;\
-  t1 |= input[(4*I)+3] & 0xff;\
-  W[I] = t1;\
- }
+static inline void LOAD_OP(int I, u32 *W, const u8 *input)
+{
+	u32 t1 = input[(4 * I)] & 0xff;
 
-#define BLEND_OP(I) W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
+	t1 <<= 8;
+	t1 |= input[(4 * I) + 1] & 0xff;
+	t1 <<= 8;
+	t1 |= input[(4 * I) + 2] & 0xff;
+	t1 <<= 8;
+	t1 |= input[(4 * I) + 3] & 0xff;
+	W[I] = t1;
+}
+
+static inline void BLEND_OP(int I, u32 *W)
+{
+	W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
+}
 
 static void sha256_transform(u32 *state, const u8 *input)
 {
 	u32 a, b, c, d, e, f, g, h, t1, t2;
 	u32 W[64];
+	int i;
 
 	/* load the input */
-	LOAD_OP( 0);  LOAD_OP( 1);  LOAD_OP( 2);  LOAD_OP( 3);
-	LOAD_OP( 4);  LOAD_OP( 5);  LOAD_OP( 6);  LOAD_OP( 7);
-	LOAD_OP( 8);  LOAD_OP( 9);  LOAD_OP(10);  LOAD_OP(11);
-	LOAD_OP(12);  LOAD_OP(13);  LOAD_OP(14);  LOAD_OP(15);
+	for (i = 0; i < 16; i++)
+		LOAD_OP(i, W, input);
 
 	/* now blend */
-	BLEND_OP(16);  BLEND_OP(17);  BLEND_OP(18);  BLEND_OP(19);
-	BLEND_OP(20);  BLEND_OP(21);  BLEND_OP(22);  BLEND_OP(23);
-	BLEND_OP(24);  BLEND_OP(25);  BLEND_OP(26);  BLEND_OP(27);
-	BLEND_OP(28);  BLEND_OP(29);  BLEND_OP(30);  BLEND_OP(31);
-	BLEND_OP(32);  BLEND_OP(33);  BLEND_OP(34);  BLEND_OP(35);
-	BLEND_OP(36);  BLEND_OP(37);  BLEND_OP(38);  BLEND_OP(39);
-	BLEND_OP(40);  BLEND_OP(41);  BLEND_OP(42);  BLEND_OP(43);
-	BLEND_OP(44);  BLEND_OP(45);  BLEND_OP(46);  BLEND_OP(47);
-	BLEND_OP(48);  BLEND_OP(49);  BLEND_OP(50);  BLEND_OP(51);
-	BLEND_OP(52);  BLEND_OP(53);  BLEND_OP(54);  BLEND_OP(55);
-	BLEND_OP(56);  BLEND_OP(57);  BLEND_OP(58);  BLEND_OP(59);
-	BLEND_OP(60);  BLEND_OP(61);  BLEND_OP(62);  BLEND_OP(63);
+	for (i = 16; i < 64; i++)
+		BLEND_OP(i, W);
     
 	/* load the state into our registers */
 	a=state[0];  b=state[1];  c=state[2];  d=state[3];
