@@ -206,7 +206,7 @@ extern struct page * read_swap_cache_async(swp_entry_t, struct vm_area_struct *v
 					   unsigned long addr);
 
 /* linux/mm/swapfile.c */
-extern int total_swap_pages;
+extern long total_swap_pages;
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
 extern void si_swapinfo(struct sysinfo *);
