@@ -63,7 +63,6 @@ VERSION 1.6LK	<2004/04/14>
 
 #define RTL8169_VERSION "1.6LK"
 #define MODULENAME "r8169"
-#define RTL8169_DRIVER_NAME   MODULENAME " Gigabit Ethernet driver " RTL8169_VERSION
 #define PFX MODULENAME ": "
 
 #ifdef RTL8169_DEBUG
@@ -564,8 +563,8 @@ static void rtl8169_get_drvinfo(struct net_device *dev,
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 
-	strcpy(info->driver, RTL8169_DRIVER_NAME);
-	strcpy(info->version, RTL8169_VERSION );
+	strcpy(info->driver, MODULENAME);
+	strcpy(info->version, RTL8169_VERSION);
 	strcpy(info->bus_info, pci_name(tp->pci_dev));
 }
 
@@ -1282,7 +1281,8 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	board_idx++;
 
 	if (!printed_version) {
-		printk(KERN_INFO RTL8169_DRIVER_NAME " loaded\n");
+		printk(KERN_INFO "%s Gigabit Ethernet driver %s loaded\n",
+		       MODULENAME, RTL8169_VERSION);
 		printed_version = 1;
 	}
 
