@@ -194,7 +194,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 	shost->use_blk_tcq = sht->use_blk_tcq;
 	shost->highmem_io = sht->highmem_io;
 
-	if (!sht->max_host_blocked)
+	if (sht->max_host_blocked)
 		shost->max_host_blocked = sht->max_host_blocked;
 	else
 		shost->max_host_blocked = SCSI_DEFAULT_HOST_BLOCKED;
