@@ -1295,9 +1295,6 @@ int vfs_quota_off(struct super_block *sb, int type)
 	int cnt;
 	struct quota_info *dqopt = sb_dqopt(sb);
 
-	if (!sb)
-		goto out;
-
 	/* We need to serialize quota_off() for device */
 	down(&dqopt->dqonoff_sem);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
