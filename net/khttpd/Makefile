@@ -12,7 +12,11 @@ host-progs := make_times_h
 
 include $(TOPDIR)/Rules.make
 
+# Dependencies on generated files need to be listed explicitly
+
 rfc_time.o: times.h
 
+# Generated files
+
 times.h: make_times_h
-	./make_times_h
+	./$< >$@
