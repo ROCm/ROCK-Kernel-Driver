@@ -1450,8 +1450,8 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 		strcpy(pcm->name, chip->card->shortname);
 	chip->pcm[device] = pcm;
 
-	snd_pcm_lib_preallocate_pci_pages_for_all(chip->pci, pcm, rec->prealloc_size,
-						  rec->prealloc_max_size);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, chip->pci,
+					      rec->prealloc_size, rec->prealloc_max_size);
 
 	return 0;
 }
@@ -2132,7 +2132,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->bdbars) {
 		if (chip->fix_nocache)
 			fill_nocache(chip->bdbars, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, 0);
-		snd_free_pci_pages(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
+		pci_free_consistent(chip->pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, chip->bdbars, chip->bdbars_addr);
 	}
 	if (chip->remap_addr)
 		iounmap((void *) chip->remap_addr);
@@ -2524,9 +2524,10 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */
-	chip->bdbars = (u32 *)snd_malloc_pci_pages(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
+	chip->bdbars = (u32 *)pci_alloc_consistent(pci, chip->bdbars_count * sizeof(u32) * ICH_MAX_FRAGS * 2, &chip->bdbars_addr);
 	if (chip->bdbars == NULL) {
 		snd_intel8x0_free(chip);
+		snd_printk(KERN_ERR "intel8x0: cannot allocate buffer descriptors\n");
 		return -ENOMEM;
 	}
 	/* tables must be aligned to 8 bytes here, but the kernel pages
