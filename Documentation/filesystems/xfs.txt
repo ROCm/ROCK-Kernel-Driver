@@ -29,6 +29,11 @@ When mounting an XFS filesystem, the following options are accepted.
 	The preferred buffered I/O size can also be altered on an
 	individual file basis using the ioctl(2) system call.
 
+  ikeep
+	When inode clusters are emptied of inodes, keep them around
+	on the disk, this is the old XFS behavior. Default is now to
+	return the inode cluster to the free space pool.
+
   logbufs=value
 	Set the number of in-memory log buffers.  Valid numbers range
 	from 2-8 inclusive.
