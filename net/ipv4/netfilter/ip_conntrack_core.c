@@ -59,7 +59,10 @@
 
 DECLARE_RWLOCK(ip_conntrack_lock);
 DECLARE_RWLOCK(ip_conntrack_expect_tuple_lock);
-static atomic_t ip_conntrack_count = ATOMIC_INIT(0);
+
+/* ip_conntrack_standalone needs this */
+atomic_t ip_conntrack_count = ATOMIC_INIT(0);
+EXPORT_SYMBOL(ip_conntrack_count);
 
 void (*ip_conntrack_destroyed)(struct ip_conntrack *conntrack) = NULL;
 LIST_HEAD(ip_conntrack_expect_list);
