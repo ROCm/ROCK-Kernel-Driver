@@ -290,7 +290,7 @@ struct alpha_machine_vector sable_mv __initmv = {
 	DO_T2_IO,
 	DO_T2_BUS,
 	machine_check:		t2_machine_check,
-	max_dma_address:	ALPHA_SABLE_MAX_DMA_ADDRESS,
+	max_isa_dma_address:	ALPHA_SABLE_MAX_ISA_DMA_ADDRESS,
 	min_io_address:		EISA_DEFAULT_IO_BASE,
 	min_mem_address:	T2_DEFAULT_MEM_BASE,
 
@@ -322,7 +322,7 @@ struct alpha_machine_vector sable_gamma_mv __initmv = {
 	DO_T2_IO,
 	DO_T2_BUS,
 	machine_check:		t2_machine_check,
-	max_dma_address:	ALPHA_SABLE_MAX_DMA_ADDRESS,
+	max_isa_dma_address:	ALPHA_SABLE_MAX_ISA_DMA_ADDRESS,
 	min_io_address:		EISA_DEFAULT_IO_BASE,
 	min_mem_address:	T2_DEFAULT_MEM_BASE,
 

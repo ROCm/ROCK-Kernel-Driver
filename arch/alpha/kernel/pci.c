@@ -117,6 +117,18 @@ quirk_cypress(struct pci_dev *dev)
 	}
 }
 
+/* Called for each device after PCI setup is done. */
+static void __init
+pcibios_fixup_final(struct pci_dev *dev)
+{
+	unsigned int class = dev->class >> 8;
+
+	if (class == PCI_CLASS_BRIDGE_ISA || class == PCI_CLASS_BRIDGE_ISA) {
+		dev->dma_mask = MAX_ISA_DMA_ADDRESS - 1;
+		isa_bridge = dev;
+	}
+}
+
 struct pci_fixup pcibios_fixups[] __initdata = {
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82375,
 	  quirk_eisa_bridge },
@@ -126,6 +138,8 @@ struct pci_fixup pcibios_fixups[] __initdata = {
 	  quirk_ali_ide_ports },
 	{ PCI_FIXUP_HEADER, PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693,
 	  quirk_cypress },
+	{ PCI_FIXUP_FINAL,  PCI_ANY_ID,	PCI_ANY_ID,
+	  pcibios_fixup_final },
 	{ 0 }
 };
 

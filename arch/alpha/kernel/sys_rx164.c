@@ -203,7 +203,7 @@ struct alpha_machine_vector rx164_mv __initmv = {
 	DO_POLARIS_IO,
 	DO_POLARIS_BUS,
 	machine_check:		polaris_machine_check,
-	max_dma_address:	ALPHA_MAX_DMA_ADDRESS,
+	max_isa_dma_address:	ALPHA_MAX_ISA_DMA_ADDRESS,
 	min_io_address:		DEFAULT_IO_BASE,
 	min_mem_address:	DEFAULT_MEM_BASE,
 
