@@ -34,6 +34,24 @@ rtattr_failure:
 	return -1;
 }
 
+/**
+ * gnet_stats_start_copy_compat - start dumping procedure in compatibility mode
+ * @skb: socket buffer to put statistics TLVs into
+ * @type: TLV type for top level statistic TLV
+ * @tc_stats_type: TLV type for backward compatibility struct tc_stats TLV
+ * @xstats_type: TLV type for backward compatibility xstats TLV
+ * @lock: statistics lock
+ * @d: dumping handle
+ *
+ * Initializes the dumping handle, grabs the statistic lock and appends
+ * an empty TLV header to the socket buffer for use a container for all
+ * other statistic TLVS.
+ *
+ * The dumping handle is marked to be in backward compatibility mode telling
+ * all gnet_stats_copy_XXX() functions to fill a local copy of struct tc_stats.
+ *
+ * Returns 0 on success or -1 if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_start_copy_compat(struct sk_buff *skb, int type, int tc_stats_type,
 	int xstats_type, spinlock_t *lock, struct gnet_dump *d)
@@ -52,6 +70,19 @@ gnet_stats_start_copy_compat(struct sk_buff *skb, int type, int tc_stats_type,
 	return gnet_stats_copy(d, type, NULL, 0);
 }
 
+/**
+ * gnet_stats_start_copy_compat - start dumping procedure in compatibility mode
+ * @skb: socket buffer to put statistics TLVs into
+ * @type: TLV type for top level statistic TLV
+ * @lock: statistics lock
+ * @d: dumping handle
+ *
+ * Initializes the dumping handle, grabs the statistic lock and appends
+ * an empty TLV header to the socket buffer for use a container for all
+ * other statistic TLVS.
+ *
+ * Returns 0 on success or -1 if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_start_copy(struct sk_buff *skb, int type, spinlock_t *lock,
 	struct gnet_dump *d)
@@ -59,7 +90,17 @@ gnet_stats_start_copy(struct sk_buff *skb, int type, spinlock_t *lock,
 	return gnet_stats_start_copy_compat(skb, type, 0, 0, lock, d);
 }
 
-
+/**
+ * gnet_stats_copy_basic - copy basic statistics into statistic TLV
+ * @d: dumping handle
+ * @b: basic statistics
+ *
+ * Appends the basic statistics to the top level TLV created by
+ * gnet_stats_start_copy().
+ *
+ * Returns 0 on success or -1 with the statistic lock released
+ * if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_copy_basic(struct gnet_dump *d, struct gnet_stats_basic *b)
 {
@@ -71,6 +112,17 @@ gnet_stats_copy_basic(struct gnet_dump *d, struct gnet_stats_basic *b)
 	return gnet_stats_copy(d, TCA_STATS_BASIC, b, sizeof(*b));
 }
 
+/**
+ * gnet_stats_copy_rate_est - copy rate estimator statistics into statistics TLV
+ * @d: dumping handle
+ * @r: rate estimator statistics
+ *
+ * Appends the rate estimator statistics to the top level TLV created by
+ * gnet_stats_start_copy().
+ *
+ * Returns 0 on success or -1 with the statistic lock released
+ * if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_copy_rate_est(struct gnet_dump *d, struct gnet_stats_rate_est *r)
 {
@@ -82,6 +134,17 @@ gnet_stats_copy_rate_est(struct gnet_dump *d, struct gnet_stats_rate_est *r)
 	return gnet_stats_copy(d, TCA_STATS_RATE_EST, r, sizeof(*r));
 }
 
+/**
+ * gnet_stats_copy_queue - copy queue statistics into statistics TLV
+ * @d: dumping handle
+ * @q: queue statistics
+ *
+ * Appends the queue statistics to the top level TLV created by
+ * gnet_stats_start_copy().
+ *
+ * Returns 0 on success or -1 with the statistic lock released
+ * if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_copy_queue(struct gnet_dump *d, struct gnet_stats_queue *q)
 {
@@ -95,6 +158,19 @@ gnet_stats_copy_queue(struct gnet_dump *d, struct gnet_stats_queue *q)
 	return gnet_stats_copy(d, TCA_STATS_QUEUE, q, sizeof(*q));
 }
 
+/**
+ * gnet_stats_copy_app - copy application specific statistics into statistics TLV
+ * @d: dumping handle
+ * @st: application specific statistics data
+ * @len: length of data
+ *
+ * Appends the application sepecific statistics to the top level TLV created by
+ * gnet_stats_start_copy() and remembers the data for XSTATS if the dumping
+ * handle is in backward compatibility mode.
+ *
+ * Returns 0 on success or -1 with the statistic lock released
+ * if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_copy_app(struct gnet_dump *d, void *st, int len)
 {
@@ -103,6 +179,18 @@ gnet_stats_copy_app(struct gnet_dump *d, void *st, int len)
 	return gnet_stats_copy(d, TCA_STATS_APP, st, len);
 }
 
+/**
+ * gnet_stats_finish_copy - finish dumping procedure
+ * @d: dumping handle
+ *
+ * Corrects the length of the top level TLV to include all TLVs added
+ * by gnet_stats_copy_XXX() calls. Adds the backward compatibility TLVs
+ * if gnet_stats_start_copy_compat() was used and releases the statistics
+ * lock.
+ *
+ * Returns 0 on success or -1 with the statistic lock released
+ * if the room in the socket buffer was not sufficient.
+ */
 int
 gnet_stats_finish_copy(struct gnet_dump *d)
 {

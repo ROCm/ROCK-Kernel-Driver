@@ -274,6 +274,14 @@ UNUSUAL_DEV(  0x052b, 0x1801, 0x0100, 0x0100,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_IGNORE_RESIDUE ),
 
+/* Another Yakumo camera.
+ * Reported by Michele Alzetta <michele.alzetta@aliceposta.it> */
+UNUSUAL_DEV(  0x052b, 0x1804, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Iacopo Spalletti <avvisi@spalletti.it> */
 UNUSUAL_DEV(  0x052b, 0x1807, 0x0100, 0x0100,
 		"Tekom Technologies, Inc",
