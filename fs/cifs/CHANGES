@@ -1,7 +1,9 @@
 Version 1.22
 ------------
 Add config option to enable XATTR (extended attribute) support, mapping
-xattr names in the "user." namespace space to SMB/CIFS EAs.
+xattr names in the "user." namespace space to SMB/CIFS EAs. Lots of
+minor fixes pointed out by the Stanford SWAT checker (mostly missing
+or out of order NULL pointer checks in little used error paths).
 
 Version 1.21
 ------------
