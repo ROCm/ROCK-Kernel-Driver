@@ -511,7 +511,7 @@ void gs_start(struct tty_struct * tty)
 
 void gs_shutdown_port (struct gs_port *port)
 {
-	long flags;
+	unsigned long flags;
 
 	func_enter();
 	
