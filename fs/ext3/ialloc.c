@@ -25,6 +25,8 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
+#include "xattr.h"
+
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
  */
@@ -118,6 +120,7 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	 * as writing the quota to disk may need the lock as well.
 	 */
 	DQUOT_INIT(inode);
+	ext3_xattr_delete_inode(handle, inode);
 	DQUOT_FREE_INODE(inode);
 	DQUOT_DROP(inode);
 

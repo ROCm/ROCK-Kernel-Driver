@@ -36,6 +36,7 @@
 #include <linux/quotaops.h>
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
+#include "xattr.h"
 
 
 /*
@@ -1654,7 +1655,7 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	if (IS_DIRSYNC(dir))
 		handle->h_sync = 1;
 
-	inode = ext3_new_inode (handle, dir, S_IFDIR);
+	inode = ext3_new_inode (handle, dir, S_IFDIR | mode);
 	err = PTR_ERR(inode);
 	if (IS_ERR(inode))
 		goto out_stop;
@@ -1662,7 +1663,6 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	inode->i_op = &ext3_dir_inode_operations;
 	inode->i_fop = &ext3_dir_operations;
 	inode->i_size = EXT3_I(inode)->i_disksize = inode->i_sb->s_blocksize;
-	inode->i_blocks = 0;	
 	dir_block = ext3_bread (handle, inode, 0, 1, &err);
 	if (!dir_block) {
 		inode->i_nlink--; /* is this nlink == 0? */
@@ -1689,9 +1689,6 @@ static int ext3_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 	BUFFER_TRACE(dir_block, "call ext3_journal_dirty_metadata");
 	ext3_journal_dirty_metadata(handle, dir_block);
 	brelse (dir_block);
-	inode->i_mode = S_IFDIR | mode;
-	if (dir->i_mode & S_ISGID)
-		inode->i_mode |= S_ISGID;
 	ext3_mark_inode_dirty(handle, inode);
 	err = ext3_add_entry (handle, dentry, inode);
 	if (err) {
@@ -2068,7 +2065,7 @@ static int ext3_symlink (struct inode * dir,
 		goto out_stop;
 
 	if (l > sizeof (EXT3_I(inode)->i_data)) {
-		inode->i_op = &page_symlink_inode_operations;
+		inode->i_op = &ext3_symlink_inode_operations;
 		if (ext3_should_writeback_data(inode))
 			inode->i_mapping->a_ops = &ext3_writeback_aops;
 		else
@@ -2284,4 +2281,17 @@ struct inode_operations ext3_dir_inode_operations = {
 	.rmdir		= ext3_rmdir,
 	.mknod		= ext3_mknod,
 	.rename		= ext3_rename,
+	.setxattr	= ext3_setxattr,	
+	.getxattr	= ext3_getxattr,	
+	.listxattr	= ext3_listxattr,	
+	.removexattr	= ext3_removexattr,
 };
+
+struct inode_operations ext3_special_inode_operations = {
+	.setxattr	= ext3_setxattr,
+	.getxattr	= ext3_getxattr,
+	.listxattr	= ext3_listxattr,
+	.removexattr	= ext3_removexattr,
+};
+
+ 

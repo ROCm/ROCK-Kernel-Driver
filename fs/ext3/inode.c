@@ -42,6 +42,18 @@
  */
 #undef SEARCH_FROM_ZERO
 
+/*
+ * Test whether an inode is a fast symlink.
+ */
+static inline int ext3_inode_is_fast_symlink(struct inode *inode)
+{
+	int ea_blocks = EXT3_I(inode)->i_file_acl ?
+		(inode->i_sb->s_blocksize >> 9) : 0;
+
+	return (S_ISLNK(inode->i_mode) &&
+		inode->i_blocks - ea_blocks == 0);
+}
+
 /* The ext3 forget function must perform a revoke if we are freeing data
  * which has been journaled.  Metadata (eg. indirect blocks) must be
  * revoked in all cases. 
@@ -51,7 +63,7 @@
  * still needs to be revoked.
  */
 
-static int ext3_forget(handle_t *handle, int is_metadata,
+int ext3_forget(handle_t *handle, int is_metadata,
 		       struct inode *inode, struct buffer_head *bh,
 		       int blocknr)
 {
@@ -167,9 +179,7 @@ void ext3_delete_inode (struct inode * inode)
 {
 	handle_t *handle;
 	
-	if (is_bad_inode(inode) ||
-	    inode->i_ino == EXT3_ACL_IDX_INO ||
-	    inode->i_ino == EXT3_ACL_DATA_INO)
+	if (is_bad_inode(inode))
 		goto no_delete;
 
 	lock_kernel();
@@ -1979,6 +1989,8 @@ void ext3_truncate(struct inode * inode)
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 	    S_ISLNK(inode->i_mode)))
 		return;
+	if (ext3_inode_is_fast_symlink(inode))
+		return;
 	if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
 		return;
 
@@ -2130,8 +2142,6 @@ int ext3_get_inode_loc (struct inode *inode, struct ext3_iloc *iloc)
 	struct ext3_group_desc * gdp;
 		
 	if ((inode->i_ino != EXT3_ROOT_INO &&
-		inode->i_ino != EXT3_ACL_IDX_INO &&
-		inode->i_ino != EXT3_ACL_DATA_INO &&
 		inode->i_ino != EXT3_JOURNAL_INO &&
 		inode->i_ino < EXT3_FIRST_INO(inode->i_sb)) ||
 		inode->i_ino > le32_to_cpu(
@@ -2263,10 +2273,7 @@ void ext3_read_inode(struct inode * inode)
 
 	brelse (iloc.bh);
 
-	if (inode->i_ino == EXT3_ACL_IDX_INO ||
-	    inode->i_ino == EXT3_ACL_DATA_INO)
-		/* Nothing to do */ ;
-	else if (S_ISREG(inode->i_mode)) {
+	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
 		inode->i_fop = &ext3_file_operations;
 		if (ext3_should_writeback_data(inode))
@@ -2277,18 +2284,20 @@ void ext3_read_inode(struct inode * inode)
 		inode->i_op = &ext3_dir_inode_operations;
 		inode->i_fop = &ext3_dir_operations;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (!inode->i_blocks)
+		if (ext3_inode_is_fast_symlink(inode))
 			inode->i_op = &ext3_fast_symlink_inode_operations;
 		else {
-			inode->i_op = &page_symlink_inode_operations;
+			inode->i_op = &ext3_symlink_inode_operations;
 			if (ext3_should_writeback_data(inode))
 				inode->i_mapping->a_ops = &ext3_writeback_aops;
 			else
 				inode->i_mapping->a_ops = &ext3_aops;
 		}
-	} else 
+	} else {
+		inode->i_op = &ext3_special_inode_operations;
 		init_special_inode(inode, inode->i_mode,
 				   le32_to_cpu(iloc.raw_inode->i_block[0]));
+	}
 	if (ei->i_flags & EXT3_SYNC_FL)
 		inode->i_flags |= S_SYNC;
 	if (ei->i_flags & EXT3_APPEND_FL)

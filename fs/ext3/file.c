@@ -23,7 +23,7 @@
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
-#include <linux/smp_lock.h>
+#include "xattr.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -98,5 +98,9 @@ struct file_operations ext3_file_operations = {
 struct inode_operations ext3_file_inode_operations = {
 	.truncate	= ext3_truncate,
 	.setattr	= ext3_setattr,
+	.setxattr	= ext3_setxattr,
+	.getxattr	= ext3_getxattr,
+	.listxattr	= ext3_listxattr,
+	.removexattr	= ext3_removexattr,
 };
 

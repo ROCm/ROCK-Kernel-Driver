@@ -7,4 +7,10 @@ obj-$(CONFIG_EXT3_FS) += ext3.o
 ext3-objs    := balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o \
 		ioctl.o namei.o super.o symlink.o hash.o
 
+export-objs += xattr.o
+
+ifeq ($(CONFIG_EXT3_FS_XATTR),y)
+ext3-objs += xattr.o xattr_user.o
+endif
+
 include $(TOPDIR)/Rules.make

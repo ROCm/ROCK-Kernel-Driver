@@ -30,6 +30,7 @@
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <asm/uaccess.h>
+#include "xattr.h"
 
 #ifdef CONFIG_JBD_DEBUG
 static int ext3_ro_after; /* Make fs read-only after this many jiffies */
@@ -375,6 +376,7 @@ void ext3_put_super (struct super_block * sb)
 	struct ext3_super_block *es = sbi->s_es;
 	int i;
 
+	ext3_xattr_put_super(sb);
 	journal_destroy(sbi->s_journal);
 	if (!(sb->s_flags & MS_RDONLY)) {
 		EXT3_CLEAR_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
@@ -551,6 +553,13 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 			continue;
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
+#ifdef CONFIG_EXT3_FS_XATTR
+		if (!strcmp (this_char, "user_xattr"))
+			set_opt (sbi->s_mount_opt, XATTR_USER);
+		else if (!strcmp (this_char, "nouser_xattr"))
+			clear_opt (sbi->s_mount_opt, XATTR_USER);
+		else
+#endif
 		if (!strcmp (this_char, "bsddf"))
 			clear_opt (sbi->s_mount_opt, MINIX_DF);
 		else if (!strcmp (this_char, "nouid32")) {
@@ -1017,6 +1026,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		set_opt(sbi->s_mount_opt, GRPID);
 	if (def_mount_opts & EXT3_DEFM_UID16)
 		set_opt(sbi->s_mount_opt, NO_UID32);
+	if (def_mount_opts & EXT3_DEFM_XATTR_USER)
+		set_opt(sbi->s_mount_opt, XATTR_USER);
 	if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_DATA)
 		sbi->s_mount_opt |= EXT3_MOUNT_JOURNAL_DATA;
 	else if ((def_mount_opts & EXT3_DEFM_JMODE) == EXT3_DEFM_JMODE_ORDERED)
@@ -1840,7 +1851,10 @@ static struct file_system_type ext3_fs_type = {
 
 static int __init init_ext3_fs(void)
 {
-	int err = init_inodecache();
+	int err = init_ext3_xattr();
+	if (err)
+		return err;
+	err = init_inodecache();
 	if (err)
 		goto out1;
         err = register_filesystem(&ext3_fs_type);
@@ -1850,6 +1864,7 @@ static int __init init_ext3_fs(void)
 out:
 	destroy_inodecache();
 out1:
+ 	exit_ext3_xattr();
 	return err;
 }
 
@@ -1857,6 +1872,7 @@ static void __exit exit_ext3_fs(void)
 {
 	unregister_filesystem(&ext3_fs_type);
 	destroy_inodecache();
+	exit_ext3_xattr();
 }
 
 MODULE_AUTHOR("Remy Card, Stephen Tweedie, Andrew Morton, Andreas Dilger, Theodore Ts'o and others");
