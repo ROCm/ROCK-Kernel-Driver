@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#103 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#104 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2058,7 +2058,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0; target < AHD_NUM_TARGETS; target++)
+	for (target = 0; target < host->max_id; target++)
 		ahd_linux_alloc_target(ahd, 0, target);
 	ahd_intr_enable(ahd, TRUE);
 	ahd_linux_start_dv(ahd);
@@ -2883,6 +2883,23 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 				break;
 			}
 
+#ifdef AHD_DEBUG
+			if (ahd_debug & AHD_SHOW_DV) {
+				int i;
+
+				ahd_print_devinfo(ahd, devinfo);
+				printf("Inquiry buffer mismatch:");
+				for (i = 0; i < AHD_LINUX_DV_INQ_LEN; i++) {
+					if ((i & 0xF) == 0)
+						printf("\n        ");
+					printf("0x%x:0x0%x ",
+					       ((uint8_t *)targ->inq_data)[i], 
+					       targ->dv_buffer[i]);
+				}
+				printf("\n");
+			}
+#endif
+
 			if (ahd_linux_dv_fallback(ahd, devinfo) != 0) {
 				AHD_SET_DV_STATE(ahd, targ, AHD_DV_STATE_EXIT);
 				break;
@@ -3525,6 +3542,8 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 		targ->dv_next_narrow_period = MAX(period, AHD_SYNCRATE_ULTRA2);
 	if (targ->dv_next_wide_period == 0)
 		targ->dv_next_wide_period = period;
+	if (targ->dv_max_width == 0)
+		targ->dv_max_width = width;
 	if (targ->dv_max_ppr_options == 0)
 		targ->dv_max_ppr_options = ppr_options;
 	if (targ->dv_last_ppr_options == 0)
@@ -3619,7 +3638,7 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 				period++;
 			}
 		} else if ((ahd->features & AHD_WIDE) != 0
-			&& tinfo->user.width != 0
+			&& targ->dv_max_width != 0
 			&& wide_speed >= fallback_speed
 			&& (targ->dv_next_wide_period <= AHD_ASYNC_XFER_PERIOD
 			 || period >= AHD_ASYNC_XFER_PERIOD)) {
