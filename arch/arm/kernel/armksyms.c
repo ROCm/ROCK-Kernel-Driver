@@ -68,6 +68,7 @@ extern void __umoddi3(void);
 extern void __udivmoddi4(void);
 extern void __udivsi3(void);
 extern void __umodsi3(void);
+extern void abort(void);
 
 extern void ret_from_exception(void);
 extern void fpundefinstr(void);
