@@ -1131,8 +1131,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		if (retval > 0) {
 			/* quietly accept this device, but don't bind to a serial port
 			 * as it's about to disappear */
-			dev_set_drvdata (&interface->dev, serial);
-			return 0;
+			goto exit;
 		}
 	}
 
@@ -1151,8 +1150,9 @@ int usb_serial_probe(struct usb_interface *interface,
 
 	usb_serial_console_init (debug, minor);
 
+exit:
 	/* success */
-	dev_set_drvdata (&interface->dev, serial);
+	usb_set_intfdata (interface, serial);
 	return 0;
 
 
@@ -1189,14 +1189,14 @@ probe_error:
 
 void usb_serial_disconnect(struct usb_interface *interface)
 {
-	struct usb_serial *serial = dev_get_drvdata (&interface->dev);
+	struct usb_serial *serial = usb_get_intfdata (interface);
 	struct device *dev = &interface->dev;
 	struct usb_serial_port *port;
 	int i;
 
 	dbg ("%s", __FUNCTION__);
 
-	dev_set_drvdata (&interface->dev, NULL);
+	usb_set_intfdata (interface, NULL);
 	if (serial) {
 		/* fail all future close/read/write/ioctl/etc calls */
 		for (i = 0; i < serial->num_ports; ++i) {
