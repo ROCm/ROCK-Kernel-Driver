@@ -161,7 +161,7 @@ loop:
 		del_timer_sync(journal->j_commit_timer);
 		journal_commit_transaction(journal);
 		spin_lock(&journal->j_state_lock);
-		goto loop;
+		goto end_loop;
 	}
 
 	wake_up(&journal->j_wait_done_commit);
@@ -210,7 +210,7 @@ loop:
 		journal->j_commit_request = transaction->t_tid;
 		jbd_debug(1, "woke because of timeout\n");
 	}
-
+end_loop:
 	if (!(journal->j_flags & JFS_UNMOUNT))
 		goto loop;
 
@@ -230,12 +230,16 @@ static void journal_start_thread(journal_t *journal)
 
 static void journal_kill_thread(journal_t *journal)
 {
+	spin_lock(&journal->j_state_lock);
 	journal->j_flags |= JFS_UNMOUNT;
 
 	while (journal->j_task) {
 		wake_up(&journal->j_wait_commit);
+		spin_unlock(&journal->j_state_lock);
 		wait_event(journal->j_wait_done_commit, journal->j_task == 0);
+		spin_lock(&journal->j_state_lock);
 	}
+	spin_unlock(&journal->j_state_lock);
 }
 
 /*
