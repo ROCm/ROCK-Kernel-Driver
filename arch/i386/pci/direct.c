@@ -201,54 +201,84 @@ static int __devinit pci_sanity_check(struct pci_raw_ops *o)
 	return 0;
 }
 
-static int __init pci_direct_init(void)
+static int __init pci_check_type1(void)
 {
-	unsigned int tmp;
 	unsigned long flags;
+	unsigned int tmp;
+	int works = 0;
 
 	local_irq_save(flags);
 
-	/*
-	 * Check if configuration type 1 works.
-	 */
-	if (pci_probe & PCI_PROBE_CONF1) {
-		outb (0x01, 0xCFB);
-		tmp = inl (0xCF8);
-		outl (0x80000000, 0xCF8);
-		if (inl (0xCF8) == 0x80000000 &&
-		    pci_sanity_check(&pci_direct_conf1)) {
-			outl (tmp, 0xCF8);
-			local_irq_restore(flags);
-			printk(KERN_INFO "PCI: Using configuration type 1\n");
-			if (!request_region(0xCF8, 8, "PCI conf1"))
-				raw_pci_ops = NULL;
-			else
-				raw_pci_ops = &pci_direct_conf1;
-			return 0;
-		}
-		outl (tmp, 0xCF8);
+	outb(0x01, 0xCFB);
+	tmp = inl(0xCF8);
+	outl(0x80000000, 0xCF8);
+	if (inl(0xCF8) == 0x80000000 && pci_sanity_check(&pci_direct_conf1)) {
+		works = 1;
 	}
+	outl(tmp, 0xCF8);
+	local_irq_restore(flags);
 
-	/*
-	 * Check if configuration type 2 works.
-	 */
-	if (pci_probe & PCI_PROBE_CONF2) {
-		outb (0x00, 0xCFB);
-		outb (0x00, 0xCF8);
-		outb (0x00, 0xCFA);
-		if (inb (0xCF8) == 0x00 && inb (0xCFA) == 0x00 &&
-		    pci_sanity_check(&pci_direct_conf2)) {
-			local_irq_restore(flags);
-			printk(KERN_INFO "PCI: Using configuration type 2\n");
-			if (!request_region(0xCF8, 4, "PCI conf2"))
-				raw_pci_ops = NULL;
-			else
-				raw_pci_ops = &pci_direct_conf2;
-			return 0;
-		}
+	return works;
+}
+
+static int __init pci_check_type2(void)
+{
+	unsigned long flags;
+	int works = 0;
+
+	local_irq_save(flags);
+
+	outb(0x00, 0xCFB);
+	outb(0x00, 0xCF8);
+	outb(0x00, 0xCFA);
+	if (inb(0xCF8) == 0x00 && inb(0xCFA) == 0x00 &&
+	    pci_sanity_check(&pci_direct_conf2)) {
+		works = 1;
 	}
 
 	local_irq_restore(flags);
+
+	return works;
+}
+
+static int __init pci_direct_init(void)
+{
+	struct resource *region, *region2;
+
+	if ((pci_probe & PCI_PROBE_CONF1) == 0)
+		goto type2;
+	region = request_region(0xCF8, 8, "PCI conf1");
+	if (!region)
+		goto type2;
+
+	if (pci_check_type1()) {
+		printk(KERN_INFO "PCI: Using configuration type 1\n");
+		raw_pci_ops = &pci_direct_conf1;
+		return 0;
+	}
+	release_resource(region);
+
+ type2:
+	if ((!pci_probe & PCI_PROBE_CONF2) == 0)
+		goto out;
+	region = request_region(0xCF8, 4, "PCI conf2");
+	if (!region)
+		goto out;
+	region2 = request_region(0xC000, 0x1000, "PCI conf2");
+	if (!region2)
+		goto fail2;
+
+	if (pci_check_type2()) {
+		printk(KERN_INFO "PCI: Using configuration type 2\n");
+		raw_pci_ops = &pci_direct_conf2;
+		return 0;
+	}
+
+	release_resource(region2);
+ fail2:
+	release_resource(region);
+
+ out:
 	return 0;
 }
 
