@@ -127,6 +127,14 @@ static struct notifier_block module_load_nb = {
 };
 
  
+static void end_sync_timer(void)
+{
+	del_timer_sync(&sync_timer);
+	/* timer might have queued work, make sure it's completed. */
+	flush_scheduled_work();
+}
+
+
 int sync_start(void)
 {
 	int err;
@@ -158,7 +166,7 @@ out3:
 out2:
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
 out1:
-	del_timer_sync(&sync_timer);
+	end_sync_timer();
 	goto out;
 }
 
@@ -169,9 +177,7 @@ void sync_stop(void)
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 	profile_event_unregister(EXEC_UNMAP, &exec_unmap_nb);
-	del_timer_sync(&sync_timer);
-	/* timer might have queued work, make sure it's completed. */
-	flush_scheduled_work();
+	end_sync_timer();
 }
 
  
