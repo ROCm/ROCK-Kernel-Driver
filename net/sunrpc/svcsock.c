@@ -1443,7 +1443,7 @@ svc_makesock(struct svc_serv *serv, int protocol, unsigned short port)
 static void svc_revisit(struct cache_deferred_req *dreq, int too_many)
 {
 	struct svc_deferred_req *dr = container_of(dreq, struct svc_deferred_req, handle);
-	struct svc_serv *serv = dr->serv;
+	struct svc_serv *serv = dreq->owner;
 	struct svc_sock *svsk;
 
 	if (too_many) {
@@ -1481,7 +1481,7 @@ svc_defer(struct cache_req *req)
 		if (dr == NULL)
 			return NULL;
 
-		dr->serv = rqstp->rq_server;
+		dr->handle.owner = rqstp->rq_server;
 		dr->prot = rqstp->rq_prot;
 		dr->addr = rqstp->rq_addr;
 		dr->argslen = rqstp->rq_arg.len >> 2;

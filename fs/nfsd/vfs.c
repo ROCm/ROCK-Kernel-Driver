@@ -167,7 +167,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 				dput(mounts);
 				dput(dentry);
 				mntput(mnt);
-				goto out;
+				goto out_nfserr;
 			}
 			if (exp2 &&
 			    ((exp->ex_flags & NFSEXP_CROSSMNT)

@@ -218,7 +218,6 @@ static inline void svc_free_allpages(struct svc_rqst *rqstp)
 }
 
 struct svc_deferred_req {
-	struct svc_serv		*serv;
 	u32			prot;	/* protocol (UDP or TCP) */
 	struct sockaddr_in	addr;
 	struct svc_sock		*svsk;	/* where reply must go */
