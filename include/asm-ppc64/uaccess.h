@@ -111,6 +111,9 @@ extern unsigned long search_exception_table(unsigned long);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
+#define __get_user_unaligned __get_user
+#define __put_user_unaligned __put_user
+
 extern long __put_user_bad(void);
 
 #define __put_user_nocheck(x,ptr,size)				\

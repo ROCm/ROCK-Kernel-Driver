@@ -14,6 +14,7 @@
 #include <asm/asi.h>
 #include <asm/system.h>
 #include <asm/spitfire.h>
+#include <asm-generic/uaccess.h>
 #endif
 
 #ifndef __ASSEMBLY__

@@ -250,6 +250,9 @@ extern int __put_user_bad(void);
 
 extern int __get_user_bad(void);
 
+#define __put_user_unaligned __put_user
+#define __get_user_unaligned __get_user
+
 extern long __copy_to_user_asm(const void *from, long n, void __user *to);
 
 /**

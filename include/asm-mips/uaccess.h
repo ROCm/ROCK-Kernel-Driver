@@ -13,6 +13,7 @@
 #include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/thread_info.h>
+#include <asm-generic/uaccess.h>
 
 /*
  * The fs value determines whether argument validity checking should be

@@ -137,6 +137,9 @@ extern void __put_user_bad(void);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
+#define __get_user_unaligned __get_user
+#define __put_user_unaligned __put_user
+
 #define __put_user_nocheck(x,ptr,size)			\
 ({							\
 	int __pu_err;					\

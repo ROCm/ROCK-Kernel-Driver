@@ -981,19 +981,14 @@ static int compat_filldir64(void * __buf, const char * name, int namlen, loff_t 
 	dirent = buf->previous;
 
 	if (dirent) {
-		if (__put_user(offset, (u32 __user *)&dirent->d_off))
-			goto efault;
-		if (__put_user(offset >> 32,
-				((u32 __user *)&dirent->d_off) + 1))
+		if (__put_user_unaligned(offset, &dirent->d_off))
 			goto efault;
 	}
 	dirent = buf->current_dir;
-	if ((__put_user(ino, (u32 __user *)&dirent->d_ino))
-	 || (__put_user(ino >> 32, ((u32 __user *)&dirent->d_ino) + 1)))
+	if (__put_user_unaligned(ino, &dirent->d_ino))
 		goto efault;
 	off = 0;
-	if ((__put_user(off, (u32 __user *)&dirent->d_off))
-	 || (__put_user(off >> 32, ((u32 __user *)&dirent->d_off) + 1)))
+	if (__put_user_unaligned(off, &dirent->d_off))
 		goto efault;
 	if (__put_user(reclen, &dirent->d_reclen))
 		goto efault;
@@ -1042,8 +1037,7 @@ asmlinkage long compat_sys_getdents64(unsigned int fd,
 	lastdirent = buf.previous;
 	if (lastdirent) {
 		typeof(lastdirent->d_off) d_off = file->f_pos;
-		__put_user(d_off, (u32 __user *)&lastdirent->d_off);
-		__put_user(d_off >> 32, ((u32 __user *)&lastdirent->d_off) + 1);
+		__put_user_unaligned(d_off, &lastdirent->d_off);
 		error = count - buf.count;
 	}
 
