@@ -395,6 +395,15 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 	if (cred->cr_group_info == NULL)
 		return SVC_DROP; /* kmalloc failure - client must retry */
 
+	/* Find the program the client is going to use.
+	 * If there is none, the code in svc.c will later return
+	 * an error, so just pick the default program.
+	 */
+	while (prog && prog->pg_prog != rqstp->rq_prog)
+		prog = prog->pg_next;
+	if (prog == NULL)
+		prog = rqstp->rq_server->sv_program;
+
 	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
 		rv = SVC_OK;
 		goto accepted;
@@ -479,6 +488,15 @@ svcauth_unix_accept(struct svc_rqst *rqstp, u32 *authp)
 		*authp = rpc_autherr_badverf;
 		return SVC_DENIED;
 	}
+
+	/* Find the program the client is going to use.
+	 * If there is none, the code in svc.c will later return
+	 * an error, so just pick the default program.
+	 */
+	while (prog && prog->pg_prog != rqstp->rq_prog)
+		prog = prog->pg_next;
+	if (prog == NULL)
+		prog = rqstp->rq_server->sv_program;
 
 	if (prog->pg_need_auth && !prog->pg_need_auth(rqstp)) {
 		rv = SVC_OK;

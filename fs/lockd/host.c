@@ -41,9 +41,6 @@ int				(*nsm_unmonitor)(struct nlm_host *);
 
 static void			nlm_gc_hosts(void);
 
-static struct nsm_handle *	__nsm_find(const char *);
-static void			__nsm_release(struct nsm_handle *);
-
 /*
  * Find an NLM server handle in the cache. If there is none, create it.
  */
@@ -76,8 +73,9 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	struct nsm_handle *nsm = NULL;
 	int		hash;
 
-	dprintk("lockd: nlm_lookup_host(%08x, p=%d, v=%d, name=%s)\n",
+	dprintk("lockd: nlm_lookup_host(%08x, p=%d, v=%d, my role=%s, name=%s)\n",
 			(unsigned)(sin? ntohl(sin->sin_addr.s_addr) : 0), proto, version,
+			server? "server" : "client",
 			hostname? hostname : "<none>");
 
 	hash = NLM_ADDRHASH(sin->sin_addr.s_addr);
@@ -112,17 +110,15 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 		goto out;
 	}
 
-	dprintk("lockd: creating host entry\n");
-
 	/* Sadly, the host isn't in our hash table yet. See if
 	 * we have the name at least and grab the nsm handle.
 	 * If not, create it.
 	 */
-	if (!nsm && !(nsm = __nsm_find(hostname)))
+	if (!nsm && !(nsm = nsm_find(hostname)))
 		goto out;
 
 	if (!(host = (struct nlm_host *) kmalloc(sizeof(*host), GFP_KERNEL))) {
-		__nsm_release(nsm);
+		nsm_release(nsm);
 		goto out;
 	}
 	memset(host, 0, sizeof(*host));
@@ -431,71 +427,49 @@ nlm_gc_hosts(void)
  * Manage NSM handles
  */
 static LIST_HEAD(nsm_handles);
+static DECLARE_MUTEX(nsm_sema);
 
 struct nsm_handle *
-__nsm_find(const char *hostname)
+nsm_find(const char *hostname)
 {
-	struct nsm_handle *new = NULL, *result = NULL;
+	struct nsm_handle *nsm = NULL;
 	struct list_head *pos;
+	int hlen;
 
 	if (hostname == NULL)
 		return NULL;
 
 	if (strchr(hostname, '/') != NULL) {
-		printk(KERN_WARNING "Invalid hostname \"%s\" in NFS lock request\n",
+		if (printk_ratelimit()) {
+			printk(KERN_WARNING "Invalid hostname \"%s\" "
+					    "in NFS lock request\n",
 				hostname);
+		}
 		return NULL;
 	}
 
-again:
+	down(&nsm_sema);
 	list_for_each(pos, &nsm_handles) {
-		struct nsm_handle *nsm;
-
 		nsm = list_entry(pos, struct nsm_handle, sm_link);
 		if (!strcmp(nsm->sm_name, hostname)) {
-			if (new)
-				kfree(new);
-			result = nsm;
+			atomic_inc(&nsm->sm_count);
 			goto out;
 		}
 	}
 
-	if (new == NULL) {
-		int	hlen = strlen(hostname) + 1;
+	hlen = strlen(hostname) + 1;
 
-		/* Release the semaphore when calling kmalloc */
-		up(&nlm_host_sema);
+	nsm = (struct nsm_handle *) kmalloc(sizeof(*nsm) + hlen, GFP_KERNEL);
+	if (nsm != NULL) {
+		memset(nsm, 0, sizeof(*nsm));
+		nsm->sm_name = (char *) (nsm + 1);
+		strcpy(nsm->sm_name, hostname);
+		atomic_set(&nsm->sm_count, 1);
 
-		new = (struct nsm_handle *) kmalloc(sizeof(*new) + hlen, GFP_KERNEL);
-
-		down(&nlm_host_sema);
-		if (new == NULL)
-			return NULL;
-		goto again;
+		list_add(&nsm->sm_link, &nsm_handles);
 	}
 
-	result = new;
-
-	memset(new, 0, sizeof(*new));
-	INIT_LIST_HEAD(&new->sm_link);
-	new->sm_name = (char *) (new + 1);
-	strcpy(new->sm_name, hostname);
-	atomic_set(&new->sm_count, 0);
-
-	list_add(&new->sm_link, &nsm_handles);
-
-out:	atomic_inc(&result->sm_count);
-	return result;
-}
-
-struct nsm_handle *
-nsm_find(const char *hostname)
-{
-	struct nsm_handle *nsm;
-
-	down(&nlm_host_sema);
-	nsm = __nsm_find(hostname);
-	up(&nlm_host_sema);
+out:	up(&nsm_sema);
 	return nsm;
 }
 
@@ -503,19 +477,16 @@ nsm_find(const char *hostname)
  * Release an NSM handle
  */
 void
-__nsm_release(struct nsm_handle *nsm)
-{
-	if (nsm && atomic_dec_and_test(&nsm->sm_count)) {
-		list_del(&nsm->sm_link);
-		kfree(nsm);
-	}
-}
-
-void
 nsm_release(struct nsm_handle *nsm)
 {
-	down(&nlm_host_sema);
-	__nsm_release(nsm);
-	up(&nlm_host_sema);
+	if (!nsm)
+		return;
+	if (atomic_read(&nsm->sm_count) == 1) {
+		down(&nsm_sema);
+		if (atomic_dec_and_test(&nsm->sm_count)) {
+			list_del(&nsm->sm_link);
+			kfree(nsm);
+		}
+		up(&nsm_sema);
+	}
 }
-

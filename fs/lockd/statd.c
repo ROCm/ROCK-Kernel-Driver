@@ -241,10 +241,16 @@ __nsm_monitor(struct nlm_host *host)
 	dprintk("lockd: nsm_monitor(%s)\n", host->h_name);
 	if ((nsm = host->h_nsmhandle) == NULL)
 		BUG();
+	if (!nsm->sm_monitored) {
+		res = with_privilege(nsm_create, nsm->sm_name);
+		if (res >= 0) {
+			nsm->sm_monitored = 1;
+		} else {
+			dprintk(KERN_NOTICE "nsm_monitor(%s) failed: errno=%d\n",
+					nsm->sm_name, -res);
+		}
+	}
 
-	res = with_privilege(nsm_create, nsm->sm_name);
-	if (res >= 0)
-		nsm->sm_monitored = 1;
 	return res;
 }
 
@@ -271,7 +277,12 @@ __nsm_unmonitor(struct nlm_host *host)
 	 && nsm->sm_monitored && !nsm->sm_sticky) {
 		dprintk("lockd: nsm_unmonitor(%s)\n", host->h_name);
 
+		nsm->sm_monitored = 0;
 		res = with_privilege(nsm_unlink, nsm->sm_name);
+		if (res < 0) {
+			dprintk(KERN_NOTICE "nsm_unmonitor(%s) failed: errno=%d\n",
+					nsm->sm_name, -res);
+		}
 	}
 
 	nsm_release(nsm);
