@@ -20,6 +20,8 @@ extern void sysfs_drop_dentry(struct sysfs_dirent *sd, struct dentry *parent);
 extern int sysfs_follow_link(struct dentry *, struct nameidata *);
 extern void sysfs_put_link(struct dentry *, struct nameidata *);
 extern struct rw_semaphore sysfs_rename_sem;
+extern struct super_block * sysfs_sb;
+extern struct file_operations sysfs_dir_operations;
 
 struct sysfs_symlink {
 	char * link_name;
