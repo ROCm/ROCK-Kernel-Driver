@@ -68,7 +68,16 @@ unsigned int num_io_spaces;
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
 #ifdef CONFIG_PCI
-int pci_dma_bus_is_phys = 1;	/* default to direct mapping, unless we detect hw I/O MMU */
+/*
+ * The merge_mask variable needs to be set to (max(iommu_page_size(iommu)) - 1).  This
+ * mask specifies a mask of address bits that must be 0 in order for two buffers to be
+ * mergeable by the I/O MMU (i.e., the end address of the first buffer and the start
+ * address of the second buffer must be aligned to (merge_mask+1) in order to be
+ * mergeable).  By default, we assume there is no I/O MMU which can merge physically
+ * discontiguous buffers, so we set the merge_mask to ~0UL, which corresponds to a iommu
+ * page-size of 2^64.
+ */
+unsigned long ia64_max_iommu_merge_mask = ~0UL;
 #endif
 
 #define COMMAND_LINE_SIZE	512

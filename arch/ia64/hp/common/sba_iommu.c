@@ -1682,6 +1682,10 @@ ioc_init(u64 hpa, void *handle)
 	ioc_resource_init(ioc);
 	ioc_sac_init(ioc);
 
+	if ((long) ~IOVP_MASK > (long) ia64_max_iommu_merge_mask)
+		ia64_max_iommu_merge_mask = ~IOVP_MASK;
+	MAX_DMA_ADDRESS = ~0UL;
+
 	printk(KERN_INFO PFX
 		"%s %d.%d HPA 0x%lx IOVA space %dMb at 0x%lx\n",
 		ioc->name, (ioc->rev >> 4) & 0xF, ioc->rev & 0xF,
@@ -1933,9 +1937,6 @@ static struct acpi_driver acpi_sba_ioc_driver = {
 static int __init
 sba_init(void)
 {
-	pci_dma_bus_is_phys = 0;	/* suppress bounce buffer in block/net layers */
-	MAX_DMA_ADDRESS = ~0UL;
-
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
 
 #ifdef CONFIG_PCI
