@@ -83,9 +83,8 @@ static __inline__ void set_dec(int val)
 		if (cur_dec > val)
 			HvCall_setVirtualDecr();
 	} else
-#else
-		mtspr(SPRN_DEC, val);
 #endif
+		mtspr(SPRN_DEC, val);
 }
 
 extern __inline__ unsigned long tb_ticks_since(unsigned long tstamp) {
