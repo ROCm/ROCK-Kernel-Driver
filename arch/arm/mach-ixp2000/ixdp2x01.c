@@ -144,22 +144,22 @@ static struct map_desc ixdp2x01_io_desc __initdata = {
 
 static struct uart_port ixdp2x01_serial_ports[2] = {
 	{
-		.membase	= (char *)(IXDP2X01_UART1_VIRT_BASE + 3),
-		.mapbase	= IXDP2X01_UART1_PHYS_BASE + 3,
+		.membase	= (char *)(IXDP2X01_UART1_VIRT_BASE),
+		.mapbase	= (unsigned long)IXDP2X01_UART1_PHYS_BASE,
 		.irq		= IRQ_IXDP2X01_UART1,
 		.flags		= UPF_SKIP_TEST,
-		.iotype		= UPIO_MEM,
+		.iotype		= UPIO_MEM32,
 		.regshift	= 2,
 		.uartclk	= IXDP2X01_UART_CLK,
 		.line		= 1,
 		.type		= PORT_16550A,
 		.fifosize	= 16
 	}, {
-		.membase	= (char *)(IXDP2X01_UART2_VIRT_BASE + 3),
-		.mapbase	= IXDP2X01_UART2_PHYS_BASE + 3,
+		.membase	= (char *)(IXDP2X01_UART2_VIRT_BASE),
+		.mapbase	= (unsigned long)IXDP2X01_UART2_PHYS_BASE,
 		.irq		= IRQ_IXDP2X01_UART2,
 		.flags		= UPF_SKIP_TEST,
-		.iotype		= UPIO_MEM,
+		.iotype		= UPIO_MEM32,
 		.regshift	= 2,
 		.uartclk	= IXDP2X01_UART_CLK,
 		.line		= 2,
@@ -282,7 +282,7 @@ static int ixdp2x01_pci_setup(int nr, struct pci_sys_data *sys)
 	if (machine_is_ixdp2801())
 		sys->mem_offset -= ((*IXP2000_PCI_ADDR_EXT & 0xE000) << 16);
 
-	ixp2000_pci_setup(nr, sys);
+	return ixp2000_pci_setup(nr, sys);
 }
 
 struct hw_pci ixdp2x01_pci __initdata = {
