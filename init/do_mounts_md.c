@@ -12,10 +12,7 @@
  * The code for that is here.
  */
 
-struct {
-	int set;
-	int noautodetect;
-} raid_setup_args __initdata;
+static int __initdata raid_noautodetect;
 
 static struct {
 	char device_set [MAX_MD_DEVS];
@@ -104,6 +101,7 @@ static int __init md_setup(char *str)
 
 	return 1;
 }
+
 static void __init md_setup_drive(void)
 {
 	int minor, i;
@@ -133,7 +131,7 @@ static void __init md_setup_drive(void)
 				*p++ = 0;
 
 			dev = name_to_dev_t(devname);
-			if (strncmp(devname, "/dev/", 5))
+			if (strncmp(devname, "/dev/", 5) == 0)
 				devname += 5;
 			snprintf(comp_name, 63, "/dev/%s", devname);
 			if (sys_newstat(comp_name, &buf) == 0 &&
@@ -230,10 +228,9 @@ static int __init raid_setup(char *str)
 		else	wlen = (len-1)-pos;
 
 		if (!strncmp(str, "noautodetect", wlen))
-			raid_setup_args.noautodetect = 1;
+			raid_noautodetect = 1;
 		pos += wlen+1;
 	}
-	raid_setup_args.set = 1;
 	return 1;
 }
 
@@ -243,7 +240,7 @@ __setup("md=", md_setup);
 void __init md_run_setup(void)
 {
 	create_dev("/dev/md0", MKDEV(MD_MAJOR, 0), "md/0");
-	if (raid_setup_args.noautodetect)
+	if (raid_noautodetect)
 		printk(KERN_INFO "md: Skipping autodetection of RAID arrays. (raid=noautodetect)\n");
 	else {
 		int fd = open("/dev/md0", 0, 0);
