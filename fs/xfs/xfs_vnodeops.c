@@ -59,6 +59,7 @@
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_rtalloc.h"
@@ -76,10 +77,6 @@
  * bmapi.
  */
 #define SYMLINK_MAPS 2
-
-extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
-			int, unsigned int, unsigned long);
-
 
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
@@ -434,7 +431,7 @@ xfs_setattr(
 	}
 
 	/* boolean: are we the file owner? */
-	file_owner = (current->fsuid == ip->i_d.di_uid);
+	file_owner = (current_fsuid(credp) == ip->i_d.di_uid);
 
 	/*
 	 * Change various properties of a file.
@@ -1660,6 +1657,12 @@ xfs_release(
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
 		return 0;
 
+#ifdef HAVE_REFCACHE
+	/* If we are in the NFS reference cache then don't do this now */
+	if (ip->i_refcache)
+		return 0;
+#endif
+
 	mp = ip->i_mount;
 
 	if (ip->i_d.di_nlink != 0) {
@@ -2004,7 +2007,8 @@ xfs_create(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
@@ -2613,6 +2617,14 @@ xfs_remove(
 		goto std_return;
 	}
 
+	/*
+	 * Before we drop our extra reference to the inode, purge it
+	 * from the refcache if it is there.  By waiting until afterwards
+	 * to do the IRELE, we ensure that we won't go inactive in the
+	 * xfs_refcache_purge_ip routine (although that would be OK).
+	 */
+	xfs_refcache_purge_ip(ip);
+
 	vn_trace_exit(XFS_ITOV(ip), __FUNCTION__, (inst_t *)__return_address);
 
 	/*
@@ -2651,6 +2663,14 @@ xfs_remove(
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
 	xfs_trans_cancel(tp, cancel_flags);
+
+	/*
+	 * Before we drop our extra reference to the inode, purge it
+	 * from the refcache if it is there.  By waiting until afterwards
+	 * to do the IRELE, we ensure that we won't go inactive in the
+	 * xfs_refcache_purge_ip routine (although that would be OK).
+	 */
+	xfs_refcache_purge_ip(ip);
 
 	IRELE(ip);
 
@@ -2899,7 +2919,8 @@ xfs_mkdir(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
@@ -3456,7 +3477,8 @@ xfs_symlink(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
@@ -3743,7 +3765,14 @@ xfs_rwunlock(
 		return;
 	ip = XFS_BHVTOI(bdp);
 	if (locktype == VRWLOCK_WRITE) {
-		xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+		/*
+		 * In the write case, we may have added a new entry to
+		 * the reference cache.  This might store a pointer to
+		 * an inode to be released in this inode.  If it is there,
+		 * clear the pointer and release the inode after unlocking
+		 * this one.
+		 */
+		xfs_refcache_iunlock(ip, XFS_IOLOCK_EXCL);
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));
@@ -4738,7 +4767,9 @@ vnodeops_t xfs_vnodeops = {
 	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_XFS),
 	.vop_open		= xfs_open,
 	.vop_read		= xfs_read,
+#ifdef HAVE_SENDFILE
 	.vop_sendfile		= xfs_sendfile,
+#endif
 	.vop_write		= xfs_write,
 	.vop_ioctl		= xfs_ioctl,
 	.vop_getattr		= xfs_getattr,

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,43 +29,38 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include "xfs.h"
+#ifndef __XFS_REFCACHE_H__
+#define __XFS_REFCACHE_H__
 
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_dmapi.h"
-#include "xfs_mount.h"
+#ifdef HAVE_REFCACHE
+/*
+ * Maximum size (in inodes) for the NFS reference cache
+ */
+#define XFS_REFCACHE_SIZE_MAX	512
 
+struct xfs_inode;
+struct xfs_mount;
 
-STATIC struct xfs_dquot *
-xfs_dqvopchown_default(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*ip,
-	struct xfs_dquot	**dqp,
-	struct xfs_dquot	*dq)
-{
-	return NULL;
-}
+extern void xfs_refcache_insert(struct xfs_inode *);
+extern void xfs_refcache_purge_ip(struct xfs_inode *);
+extern void xfs_refcache_purge_mp(struct xfs_mount *);
+extern void xfs_refcache_purge_some(struct xfs_mount *);
+extern void xfs_refcache_resize(int);
+extern void xfs_refcache_destroy(void);
 
-xfs_qmops_t	xfs_qmcore_xfs = {
-	.xfs_qminit		= (xfs_qminit_t) fs_noerr,
-	.xfs_qmdone		= (xfs_qmdone_t) fs_noerr,
-	.xfs_qmmount		= (xfs_qmmount_t) fs_noerr,
-	.xfs_qmunmount		= (xfs_qmunmount_t) fs_noerr,
-	.xfs_dqrele		= (xfs_dqrele_t) fs_noerr,
-	.xfs_dqattach		= (xfs_dqattach_t) fs_noerr,
-	.xfs_dqdetach		= (xfs_dqdetach_t) fs_noerr,
-	.xfs_dqpurgeall		= (xfs_dqpurgeall_t) fs_noerr,
-	.xfs_dqvopalloc		= (xfs_dqvopalloc_t) fs_noerr,
-	.xfs_dqvopcreate	= (xfs_dqvopcreate_t) fs_noerr,
-	.xfs_dqvoprename	= (xfs_dqvoprename_t) fs_noerr,
-	.xfs_dqvopchown		= xfs_dqvopchown_default,
-	.xfs_dqvopchownresv	= (xfs_dqvopchownresv_t) fs_noerr,
-};
+extern void xfs_refcache_iunlock(struct xfs_inode *, uint);
+
+#else
+
+#define xfs_refcache_insert(ip)		do { } while (0)
+#define xfs_refcache_purge_ip(ip)	do { } while (0)
+#define xfs_refcache_purge_mp(mp)	do { } while (0)
+#define xfs_refcache_purge_some(mp)	do { } while (0)
+#define xfs_refcache_resize(size)	do { } while (0)
+#define xfs_refcache_destroy()		do { } while (0)
+
+#define xfs_refcache_iunlock(ip, flags)	xfs_iunlock(ip, flags)
+
+#endif
+
+#endif	/* __XFS_REFCACHE_H__ */

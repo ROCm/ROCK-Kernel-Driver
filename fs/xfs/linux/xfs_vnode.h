@@ -62,7 +62,7 @@
 struct uio;
 struct file;
 struct vattr;
-struct page_buf_bmap_s;
+struct xfs_iomap;
 struct attrlist_cursor_kern;
 
 /*
@@ -87,7 +87,7 @@ typedef struct vnode {
 	vn_bhv_head_t	v_bh;			/* behavior head */
 	spinlock_t	v_lock;			/* VN_LOCK/VN_UNLOCK */
 	struct inode	v_inode;		/* Linux inode */
-#ifdef CONFIG_XFS_VNODE_TRACING
+#ifdef XFS_VNODE_TRACE
 	struct ktrace	*v_trace;		/* trace header structure    */
 #endif
 } vnode_t;
@@ -226,7 +226,7 @@ typedef int	(*vop_release_t)(bhv_desc_t *);
 typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int,
-				struct page_buf_bmap_s *, int *);
+				struct xfs_iomap *, int *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
@@ -545,21 +545,17 @@ static inline int vn_count(struct vnode *vp)
 extern vnode_t	*vn_hold(struct vnode *);
 extern void	vn_rele(struct vnode *);
 
-#if defined(CONFIG_XFS_VNODE_TRACING)
-
+#if defined(XFS_VNODE_TRACE)
 #define VN_HOLD(vp)		\
-	((void)vn_hold(vp), \
+	((void)vn_hold(vp),	\
 	  vn_trace_hold(vp, __FILE__, __LINE__, (inst_t *)__return_address))
 #define VN_RELE(vp)		\
 	  (vn_trace_rele(vp, __FILE__, __LINE__, (inst_t *)__return_address), \
 	   iput(LINVFS_GET_IP(vp)))
-
-#else	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
-
+#else
 #define VN_HOLD(vp)		((void)vn_hold(vp))
 #define VN_RELE(vp)		(iput(LINVFS_GET_IP(vp)))
-
-#endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
+#endif
 
 /*
  * Vname handling macros.
@@ -591,6 +587,13 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 }
 
 /*
+ * Update modify/access/change times on the vnode
+ */
+#define VN_MTIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_mtime = *(tvp))
+#define VN_ATIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_atime = *(tvp))
+#define VN_CTIMESET(vp, tvp)	(LINVFS_GET_IP(vp)->i_ctime = *(tvp))
+
+/*
  * Some useful predicates.
  */
 #define VN_MAPPED(vp)	\
@@ -617,13 +620,12 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 #define FSYNC_INVAL	0x2	/* flush and invalidate cached data */
 #define FSYNC_DATA	0x4	/* synchronous fsync of data only */
 
-#if (defined(CONFIG_XFS_VNODE_TRACING))
+/*
+ * Tracking vnode activity.
+ */
+#if defined(XFS_VNODE_TRACE)
 
 #define	VNODE_TRACE_SIZE	16		/* number of trace entries */
-
-/*
- * Tracing entries.
- */
 #define	VNODE_KTRACE_ENTRY	1
 #define	VNODE_KTRACE_EXIT	2
 #define	VNODE_KTRACE_HOLD	3
@@ -635,18 +637,16 @@ extern void vn_trace_exit(struct vnode *, char *, inst_t *);
 extern void vn_trace_hold(struct vnode *, char *, int, inst_t *);
 extern void vn_trace_ref(struct vnode *, char *, int, inst_t *);
 extern void vn_trace_rele(struct vnode *, char *, int, inst_t *);
+
 #define	VN_TRACE(vp)		\
 	vn_trace_ref(vp, __FILE__, __LINE__, (inst_t *)__return_address)
-
-#else	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
-
+#else
 #define	vn_trace_entry(a,b,c)
 #define	vn_trace_exit(a,b,c)
 #define	vn_trace_hold(a,b,c,d)
 #define	vn_trace_ref(a,b,c,d)
 #define	vn_trace_rele(a,b,c,d)
 #define	VN_TRACE(vp)
-
-#endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
+#endif
 
 #endif	/* __XFS_VNODE_H__ */
