@@ -669,6 +669,67 @@ void __init scsi_host_init(void)
 	}
 }
 
+/*
+ * Function:    scsi_get_host_dev()
+ *
+ * Purpose:     Create a Scsi_Device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     The Scsi_Device or NULL
+ *
+ * Notes:
+ *	Attach a single Scsi_Device to the Scsi_Host - this should
+ *	be made to look like a "pseudo-device" that points to the
+ *	HA itself.  For the moment, we include it at the head of
+ *	the host_queue itself - I don't think we want to show this
+ *	to the HA in select_queue_depths(), as this would probably confuse
+ *	matters.
+ *
+ *	Note - this device is not accessible from any high-level
+ *	drivers (including generics), which is probably not
+ *	optimal.  We can add hooks later to attach 
+ */
+struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
+{
+	struct scsi_device *sdev;
+
+	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
+	if (sdev) {
+		scsi_build_commandblocks(sdev);
+		if (sdev->current_queue_depth == 0)
+			goto fail;
+		sdev->borken = 0;
+	}
+
+	return sdev;
+
+fail:
+	kfree(sdev);
+	return NULL;
+}
+
+/*
+ * Function:    scsi_free_host_dev()
+ *
+ * Purpose:     Free a scsi_device that points to the host adapter itself.
+ *
+ * Arguments:   SHpnt   - Host that needs a Scsi_Device
+ *
+ * Lock status: None assumed.
+ *
+ * Returns:     Nothing
+ *
+ * Notes:
+ */
+void scsi_free_host_dev(struct scsi_device *sdev)
+{
+	BUG_ON(sdev->id != sdev->host->this_id);
+	scsi_free_sdev(sdev);
+}
+
 void scsi_host_busy_inc(struct Scsi_Host *shost, Scsi_Device *sdev)
 {
 	unsigned long flags;
