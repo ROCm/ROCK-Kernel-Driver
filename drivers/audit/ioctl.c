@@ -33,6 +33,7 @@
 #include <linux/wait.h>
 #include <linux/slab.h>
 #include <linux/sys.h>
+#include <linux/syscalls.h>
 #include <linux/audit.h>
 #include <linux/ioctl.h>
 #include <linux/ioctl32.h>

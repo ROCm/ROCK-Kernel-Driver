@@ -169,9 +169,9 @@ kdba_db_trap(kdb_eframe_t ef, int error_unused)
 				KDB_STATE_CLEAR(DOING_SSB);
 				KDB_STATE_CLEAR(DOING_SS);
 			} else {
-				char *argv[] = {"ssb", NULL};
+				const char *argv[] = {"ssb", NULL};
 				rv = KDB_DB_SSB; /* Indicate ssb - dismiss immediately */
-				kdb_ss(0, (char **)argv, NULL, ef);
+				kdb_ss(0, argv, NULL, ef);
 			}
 		} else {
 			/*

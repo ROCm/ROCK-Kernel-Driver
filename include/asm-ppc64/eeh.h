@@ -22,6 +22,7 @@
 
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/device.h>
 
 struct pci_dev;
 
