@@ -594,6 +594,11 @@ modules_install: _modinst_ _modinst_post
 
 .PHONY: _modinst_
 _modinst_:
+	@if [ -z "`$(DEPMOD) -V | grep module-init-tools`" ]; then \
+		echo "Warning: you may need to install module-init-tools"; \
+		echo "See http://www.codemonkey.org.uk/post-halloween-2.5.txt";\
+		sleep 1; \
+	fi
 	@rm -rf $(MODLIB)/kernel
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
