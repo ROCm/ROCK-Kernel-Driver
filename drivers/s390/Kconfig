@@ -518,7 +518,13 @@ config HOTPLUG
 
 config LCS
 	tristate "Lan Channel Station Interface"
-	depends on NETDEVICES && (NET_ETHERNET || TR)
+	depends on NETDEVICES && (NET_ETHERNET || TR || FDDI)
+	help
+	   Select this option if you want to use LCS networking  on IBM S/390
+  	   or zSeries. This device driver supports Token Ring (IEEE 802.5),
+  	   FDDI (IEEE 802.7) and Ethernet. 
+	   This option is also available as a module which will be
+	   called lcs.o . If you do not know what it is, it's safe to say "Y".
 
 config CTC
 	tristate "CTC device support"
