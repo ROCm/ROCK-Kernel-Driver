@@ -689,7 +689,7 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
-		ata_qc_complete(qc, status, 0);
+		ata_qc_complete(qc, status);
 		handled = 1;
 
 	} else {
@@ -770,8 +770,7 @@ static inline void pdc_dma_complete (struct ata_port *ap,
 	u8 err_bit = have_err ? ATA_ERR : 0;
 
 	/* get drive status; clear intr; complete txn */
-	ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			ata_wait_idle(ap) | err_bit, 0);
+	ata_qc_complete(qc, ata_wait_idle(ap) | err_bit);
 }
 
 static void pdc_eng_timeout(struct ata_port *ap)
@@ -799,8 +798,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA:
 		printk(KERN_ERR "ata%u: DMA timeout\n", ap->id);
-		ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			        ata_wait_idle(ap) | ATA_ERR, 0);
+		ata_qc_complete(qc, ata_wait_idle(ap) | ATA_ERR);
 		break;
 
 	case ATA_PROT_NODATA:
@@ -809,7 +807,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 
 	default:
@@ -818,7 +816,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: unknown timeout, cmd 0x%x stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 	}
 

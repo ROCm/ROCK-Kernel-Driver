@@ -402,7 +402,7 @@ extern void ata_bmdma_start_mmio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_setup_pio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start_pio (struct ata_queued_cmd *qc);
 extern int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits);
-extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_late);
+extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat);
 extern void ata_eng_timeout(struct ata_port *ap);
 extern int ata_std_bios_param(struct scsi_device *sdev,
 			      struct block_device *bdev,

@@ -50,8 +50,7 @@ static unsigned int ata_busy_sleep (struct ata_port *ap,
 				    unsigned long tmout_pat,
 			    	    unsigned long tmout);
 static void __ata_dev_select (struct ata_port *ap, unsigned int device);
-static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
-			     unsigned int done_late);
+static void ata_dma_complete(struct ata_queued_cmd *qc, u8 host_stat);
 static void ata_host_set_pio(struct ata_port *ap);
 static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
@@ -2066,7 +2065,7 @@ static void ata_pio_complete (struct ata_port *ap)
 
 	ata_irq_on(ap);
 
-	ata_qc_complete(qc, drv_stat, 0);
+	ata_qc_complete(qc, drv_stat);
 }
 
 /**
@@ -2239,7 +2238,7 @@ void ata_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: DMA timeout, stat 0x%x\n",
 		       ap->id, host_stat);
 
-		ata_dma_complete(ap, host_stat, 1);
+		ata_dma_complete(qc, host_stat);
 		break;
 
 	case ATA_PROT_NODATA:
@@ -2248,7 +2247,7 @@ void ata_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 
 	default:
@@ -2257,7 +2256,7 @@ void ata_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: unknown timeout, cmd 0x%x stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 	}
 
@@ -2328,13 +2327,12 @@ struct ata_queued_cmd *ata_qc_new_init(struct ata_port *ap,
  *	ata_qc_complete -
  *	@qc:
  *	@drv_stat:
- *	@done_late:
  *
  *	LOCKING:
  *
  */
 
-void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_late)
+void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 {
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
@@ -2596,16 +2594,15 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 
 /**
  *	ata_dma_complete -
- *	@ap:
+ *	@qc:
  *	@host_stat:
- *	@done_late:
  *
  *	LOCKING:
  */
 
-static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
-			     unsigned int done_late)
+static void ata_dma_complete(struct ata_queued_cmd *qc, u8 host_stat)
 {
+	struct ata_port *ap = qc->ap;
 	VPRINTK("ENTER\n");
 
 	if (ap->flags & ATA_FLAG_MMIO) {
@@ -2636,8 +2633,7 @@ static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
 		ap->id, (u32) host_stat, (u32) ata_chk_status(ap));
 
 	/* get drive status; clear intr; complete txn */
-	ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			ata_wait_idle(ap), done_late);
+	ata_qc_complete(qc, ata_wait_idle(ap));
 }
 
 /**
@@ -2676,14 +2672,14 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 			break;
 		}
 
-		ata_dma_complete(ap, host_stat, 0);
+		ata_dma_complete(qc, host_stat);
 		handled = 1;
 		break;
 
 	case ATA_PROT_NODATA:	/* command completion, but no data xfer */
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
-		ata_qc_complete(qc, status, 0);
+		ata_qc_complete(qc, status);
 		handled = 1;
 		break;
 
@@ -2850,7 +2846,7 @@ static void atapi_packet_task(void *_data)
 	return;
 
 err_out:
-	ata_qc_complete(qc, ATA_ERR, 0);
+	ata_qc_complete(qc, ATA_ERR);
 }
 
 int ata_port_start (struct ata_port *ap)
