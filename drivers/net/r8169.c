@@ -2142,6 +2142,9 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	int status = 0;
 	int handled = 0;
 
+	if (unlikely(!netif_running(dev)))
+		goto out;
+
 	do {
 		status = RTL_R16(IntrStatus);
 
@@ -2196,6 +2199,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		/* Clear all interrupt sources. */
 		RTL_W16(IntrStatus, 0xffff);
 	}
+out:
 	return IRQ_RETVAL(handled);
 }
 
@@ -2258,6 +2262,8 @@ rtl8169_close(struct net_device *dev)
 
 	synchronize_irq(dev->irq);
 	free_irq(dev->irq, dev);
+
+	netif_poll_disable(dev);
 
 	rtl8169_tx_clear(tp);
 
