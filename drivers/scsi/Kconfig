@@ -1715,6 +1715,11 @@ config SCSI_PC980155
 	  If you have the NEC PC-9801-55 SCSI interface card or compatibles
 	  for NEC PC-9801/PC-9821, say Y.
 
+config WD33C93_PIO
+	bool
+	depends on SCSI_PC980155
+	default y
+
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 #      bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI
 endmenu
