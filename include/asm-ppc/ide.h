@@ -33,11 +33,11 @@ extern void __ide_mm_insl(unsigned long port, void *addr, u32 count);
 extern void __ide_mm_outsl(unsigned long port, void *addr, u32 count);
 
 struct ide_machdep_calls {
-        int         (*default_irq)(ide_ioreg_t base);
-        ide_ioreg_t (*default_io_base)(int index);
+        int         (*default_irq)(unsigned long base);
+        unsigned long (*default_io_base)(int index);
         void        (*ide_init_hwif)(hw_regs_t *hw,
-                                     ide_ioreg_t data_port,
-                                     ide_ioreg_t ctrl_port,
+                                     unsigned long data_port,
+                                     unsigned long ctrl_port,
                                      int *irq);
 };
 
@@ -46,14 +46,14 @@ extern struct ide_machdep_calls ppc_ide_md;
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
 
-static __inline__ int ide_default_irq(ide_ioreg_t base)
+static __inline__ int ide_default_irq(unsigned long base)
 {
 	if (ppc_ide_md.default_irq)
 		return ppc_ide_md.default_irq(base);
 	return 0;
 }
 
-static __inline__ ide_ioreg_t ide_default_io_base(int index)
+static __inline__ unsigned long ide_default_io_base(int index)
 {
 	if (ppc_ide_md.default_io_base)
 		return ppc_ide_md.default_io_base(index);
@@ -66,10 +66,10 @@ static __inline__ ide_ioreg_t ide_default_io_base(int index)
  * as the pmac IDE interfaces.
  */
 static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
-					   ide_ioreg_t data_port,
-					   ide_ioreg_t ctrl_port, int *irq)
+					   unsigned long data_port,
+					   unsigned long ctrl_port, int *irq)
 {
-	ide_ioreg_t reg = data_port;
+	unsigned long reg = data_port;
 	int i;
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
@@ -92,7 +92,7 @@ static __inline__ void ide_init_default_hwifs(void)
 #ifndef CONFIG_PCI
 	hw_regs_t hw;
 	int index;
-	ide_ioreg_t base;
+	unsigned long base;
 
 	for (index = 0; index < MAX_HWIFS; index++) {
 		base = ide_default_io_base(index);
