@@ -1136,7 +1136,7 @@ fail_unlink:
 
 #include <asm/sun4paddr.h>
 
-int __init esp_detect(Scsi_Host_Template *tpnt)
+static int __init esp_detect(Scsi_Host_Template *tpnt)
 {
 	static struct sbus_dev esp_dev;
 	int esps_in_use = 0;
@@ -1161,7 +1161,7 @@ int __init esp_detect(Scsi_Host_Template *tpnt)
 
 #else /* !CONFIG_SUN4 */
 
-int __init esp_detect(Scsi_Host_Template *tpnt)
+static int __init esp_detect(Scsi_Host_Template *tpnt)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *esp_dev, *sbdev_iter;
@@ -1385,8 +1385,8 @@ static int esp_host_info(struct esp *esp, char *ptr, off_t offset, int len)
 }
 
 /* ESP proc filesystem code. */
-int esp_proc_info(char *buffer, char **start, off_t offset, int length,
-		  int hostno, int inout)
+static int esp_proc_info(char *buffer, char **start, off_t offset,
+			 int length, int hostno, int inout)
 {
 	struct esp *esp;
 
@@ -1830,7 +1830,7 @@ after_nego_msg_built:
 }
 
 /* Queue a SCSI command delivered from the mid-level Linux SCSI code. */
-int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
 	struct esp *esp;
 
@@ -1867,7 +1867,7 @@ int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 }
 
 /* Only queuing supported in this ESP driver. */
-int esp_command(Scsi_Cmnd *SCpnt)
+static int esp_command(Scsi_Cmnd *SCpnt)
 {
 	struct esp *esp = (struct esp *) SCpnt->host->hostdata;
 
@@ -1932,7 +1932,7 @@ static void esp_dump_state(struct esp *esp)
 }
 
 /* Abort a command. */
-int esp_abort(Scsi_Cmnd *SCptr)
+static int esp_abort(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
 	unsigned long flags;
@@ -2068,7 +2068,7 @@ static int esp_do_resetbus(struct esp *esp)
 /* Reset ESP chip, reset hanging bus, then kill active and
  * disconnected commands for targets without soft reset.
  */
-int esp_reset(Scsi_Cmnd *SCptr)
+static int esp_reset(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
 	unsigned long flags;
@@ -4359,7 +4359,7 @@ static void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 }
 
-void esp_slave_detach(Scsi_Device* SDptr)
+static void esp_slave_detach(Scsi_Device* SDptr)
 {
 	struct esp *esp = (struct esp *) SDptr->host->hostdata;
 	esp->targets_present &= ~(1 << SDptr->id);
@@ -4368,7 +4368,27 @@ void esp_slave_detach(Scsi_Device* SDptr)
 	SDptr->hostdata = NULL;
 }
 
-static Scsi_Host_Template driver_template = SCSI_SPARC_ESP;
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp",
+	.proc_info		= esp_proc_info,
+	.name			= "Sun ESP 100/100a/200",
+	.detect			= esp_detect,
+	.slave_detach		= esp_slave_detach,
+	.info			= esp_info,
+	.command		= esp_command,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+/* Sparc32's iommu code cannot handle highmem pages yet. */
+#ifdef CONFIG_SPARC64
+	.highmem_io		= 1,
+#endif
+}
 
 #include "scsi_module.c"
-
