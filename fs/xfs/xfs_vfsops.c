@@ -459,7 +459,7 @@ xfs_mount(
 		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize, ss);
 	}
 	if (rtdev)
-		xfs_size_buftarg(mp->m_logdev_targp, mp->m_sb.sb_blocksize,
+		xfs_size_buftarg(mp->m_rtdev_targp, mp->m_sb.sb_blocksize,
 				 mp->m_sb.sb_blocksize);
 
 	error = xfs_mountfs(vfsp, mp, ddev->bd_dev, flags);
