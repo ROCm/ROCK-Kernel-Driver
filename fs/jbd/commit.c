@@ -686,30 +686,6 @@ skip_commit: /* The journal should be unlocked by now. */
 	if (err)
 		__journal_abort_hard(journal);
 
-	/*
-	 * Call any callbacks that had been registered for handles in this
-	 * transaction.  It is up to the callback to free any allocated
-	 * memory.
-	 *
-	 * The spinlocking (t_jcb_lock) here is surely unnecessary...
-	 */
-	spin_lock(&commit_transaction->t_jcb_lock);
-	if (!list_empty(&commit_transaction->t_jcb)) {
-		struct list_head *p, *n;
-		int error = is_journal_aborted(journal);
-
-		list_for_each_safe(p, n, &commit_transaction->t_jcb) {
-			struct journal_callback *jcb;
-
-			jcb = list_entry(p, struct journal_callback, jcb_list);
-			list_del(p);
-			spin_unlock(&commit_transaction->t_jcb_lock);
-			jcb->jcb_func(jcb, error);
-			spin_lock(&commit_transaction->t_jcb_lock);
-		}
-	}
-	spin_unlock(&commit_transaction->t_jcb_lock);
-
 	jbd_debug(3, "JBD: commit phase 7\n");
 
 	J_ASSERT(commit_transaction->t_sync_datalist == NULL);
