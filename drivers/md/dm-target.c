@@ -66,8 +66,6 @@ static void load_module(const char *name)
 
 	strcat(module_name, name);
 	request_module(module_name);
-
-	return;
 }
 
 struct target_type *dm_get_target_type(const char *name)
@@ -161,7 +159,6 @@ static int io_err_ctr(struct dm_target *ti, int argc, char **args)
 static void io_err_dtr(struct dm_target *ti)
 {
 	/* empty */
-	return;
 }
 
 static int io_err_map(struct dm_target *ti, struct bio *bio)
