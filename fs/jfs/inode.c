@@ -18,6 +18,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/mpage.h>
 #include <linux/buffer_head.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
@@ -271,9 +272,20 @@ static int jfs_writepage(struct page *page)
 	return block_write_full_page(page, jfs_get_block);
 }
 
+static int jfs_writepages(struct address_space *mapping, int *nr_to_write)
+{
+	return mpage_writepages(mapping, nr_to_write, jfs_get_block);
+}
+
 static int jfs_readpage(struct file *file, struct page *page)
 {
-	return block_read_full_page(page, jfs_get_block);
+	return mpage_readpage(page, jfs_get_block);
+}
+
+static int jfs_readpages(struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+	return mpage_readpages(mapping, pages, nr_pages, jfs_get_block);
 }
 
 static int jfs_prepare_write(struct file *file,
@@ -308,7 +320,9 @@ static int jfs_direct_IO(int rw, struct inode *inode, char *buf,
 
 struct address_space_operations jfs_aops = {
 	.readpage	= jfs_readpage,
+	.readpages	= jfs_readpages,
 	.writepage	= jfs_writepage,
+	.writepages	= jfs_writepages,
 	.sync_page	= block_sync_page,
 	.prepare_write	= jfs_prepare_write,
 	.commit_write	= generic_commit_write,
