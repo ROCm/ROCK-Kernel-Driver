@@ -469,28 +469,36 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 }
 
 /**
- *	cpufreq_restore - restore the CPU clock frequency after resume
+ *	cpufreq_resume - restore the CPU clock frequency after resume
  *
  *	Restore the CPU clock frequency so that our idea of the current
  *	frequency reflects the actual hardware.
  */
-static int cpufreq_restore(struct sys_device * sysdev)
+static int cpufreq_resume(struct sys_device * sysdev)
 {
 	int cpu = sysdev->id;
 	unsigned int ret = 0;
-	struct cpufreq_policy policy;
 	struct cpufreq_policy *cpu_policy;
 
 	if (!cpu_online(cpu))
 		return 0;
 
+	/* we may be lax here as interrupts are off. Nonetheless
+	 * we need to grab the correct cpu policy, as to check
+	 * whether we really run on this CPU.
+	 */
+
 	cpu_policy = cpufreq_cpu_get(cpu);
+	if (!cpu_policy)
+		return -EINVAL;
 
-	down(&cpu_policy->lock);
-	memcpy(&policy, cpu_policy, sizeof(struct cpufreq_policy));
-	up(&cpu_policy->lock);
-
-	ret = cpufreq_set_policy(&policy);
+	if (cpufreq_driver->setpolicy)
+		ret = cpufreq_driver->setpolicy(cpu_policy);
+	else
+	/* CPUFREQ_RELATION_H or CPUFREQ_RELATION_L have the same effect here, as cpu_policy->cur is known
+	 * to be a valid and exact target frequency
+	 */
+		ret = cpufreq_driver->target(cpu_policy, cpu_policy->cur, CPUFREQ_RELATION_H);
 
 	cpufreq_cpu_put(cpu_policy);
 
@@ -500,7 +508,7 @@ static int cpufreq_restore(struct sys_device * sysdev)
 static struct sysdev_driver cpufreq_sysdev_driver = {
 	.add		= cpufreq_add_dev,
 	.remove		= cpufreq_remove_dev,
-	.restore	= cpufreq_restore,
+	.resume		= cpufreq_resume,
 };
 
 
@@ -872,6 +880,10 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
  */
 void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 {
+	if (irqs_disabled())
+		return;   /* Only valid if we're in the resume process where
+			   * everyone knows what CPU frequency we are at */
+
 	down_read(&cpufreq_notifier_rwsem);
 	switch (state) {
 	case CPUFREQ_PRECHANGE:
