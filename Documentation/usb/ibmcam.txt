@@ -25,11 +25,18 @@ Supported controls:
 
 SUPPORTED CAMERAS:
 
-IBM "C-It" camera, also known as "Xirlink PC Camera"
+Xirlink "C-It" camera, also known as "IBM PC Camera".
 The device uses proprietary ASIC (and compression method);
 it is manufactured by Xirlink. See http://www.xirlink.com/
 http://www.ibmpccamera.com or http://www.c-itnow.com/ for
 details and pictures.
+
+This very chipset ("X Chip", as marked at the factory)
+is used in several other cameras, and they are supported
+as well:
+
+- IBM NetCamera
+- Veo Stingray
 
 The Linux driver was developed with camera with following
 model number (or FCC ID): KSX-XVP510. This camera has three
@@ -50,12 +57,30 @@ These cameras have two interfaces, one endpoint in each (iso, bulk).
 Such type of cameras is referred to as "model 2". They are supported
 (with exception of 352x288 native mode).
 
+Some IBM NetCameras (Model 4) are made to generate only compressed
+video streams. This is great for performance, but unfortunately
+nobody knows how to decompress the stream :-( Therefore, these
+cameras are *unsupported* and if you try to use one of those, all
+you get is random colored horizontal streaks, not the image!
+If you have one of those cameras, you probably should return it
+to the store and get something that is supported.
+
+Tell me more about all that "model" business
+--------------------------------------------
+
+I just invented model numbers to uniquely identify flavors of the
+hardware/firmware that were sold. It was very confusing to use
+brand names or some other internal numbering schemes. So I found
+by experimentation that all Xirlink chipsets fall into four big
+classes, and I called them "models". Each model is programmed in
+its own way, and each model sends back the video in its own way.
+
 Quirks of Model 2 cameras:
 -------------------------
 
 Model 2 does not have hardware contrast control. Corresponding V4L
-control is not used at the moment. It may be possible to implement
-contrast control in software, at cost of extra processor cycles.
+control is implemented in software, which is not very nice to your
+CPU, but at least it works.
 
 This driver provides 352x288 mode by switching the camera into
 quasi-352x288 RGB mode (800 Kbits per frame) essentially limiting
@@ -67,16 +92,23 @@ be good at one brightness and broken at another! I did not want to fix
 the frame rate at slowest setting, but I had to move it pretty much down
 the scale (so that framerate option barely matters). I also noticed that
 camera after first powering up produces frames slightly faster than during
-consecutive uses. All this means that if you use videosize=2 (which is
+consecutive uses. All this means that if you use 352x288 (which is
 default), be warned - you may encounter broken picture on first connect;
 try to adjust brightness - brighter image is slower, so USB will be able
 to send all data. However if you regularly use Model 2 cameras you may
-prefer videosize=1 which makes perfectly good I420, with no scaling and
+prefer 176x144 which makes perfectly good I420, with no scaling and
 lesser demands on USB (300 Kbits per second, or 26 frames per second).
+
+Another strange effect of 352x288 mode is the fine vertical grid visible
+on some colored surfaces. I am sure it is caused by me not understanding
+what the camera is trying to say. Blame trade secrets for that.
 
 The camera that I had also has a hardware quirk: if disconnected,
 it needs few minutes to "relax" before it can be plugged in again
 (poorly designed USB processor reset circuit?)
+
+[Veo Stingray with Product ID 0x800C is also Model 2, but I haven't
+observed this particular flaw in it.]
 
 Model 2 camera can be programmed for very high sensitivity (even starlight
 may be enough), this makes it convenient for tinkering with. The driver
@@ -98,12 +130,14 @@ or if you want to make changes to the code. Most distributions
 precompile all modules, so you can go directly to the next
 section "HOW TO USE THE DRIVER".
 
-The driver consists of two files in usb/ directory:
-ibmcam.c and ibmcam.h These files are included into the
-Linux kernel build process if you configure the kernel
-for CONFIG_USB_IBMCAM. Run "make xconfig" and in USB section
-you will find the IBM camera driver. Select it, save the
-configuration and recompile.
+The ibmcam driver uses usbvideo helper library (module),
+so if you are studying the ibmcam code you will be led there.
+
+The driver itself consists of only one file in usb/ directory:
+ibmcam.c. This file is included into the Linux kernel build
+process if you configure the kernel for CONFIG_USB_IBMCAM.
+Run "make xconfig" and in USB section you will find the IBM
+camera driver. Select it, save the configuration and recompile.
 
 HOW TO USE THE DRIVER:
 
@@ -111,6 +145,13 @@ I recommend to compile driver as a module. This gives you an
 easier access to its configuration. The camera has many more
 settings than V4L can operate, so some settings are done using
 module options.
+
+To begin with, on most modern Linux distributions the driver
+will be automatically loaded whenever you plug the supported
+camera in. Therefore, you don't need to do anything. However
+if you want to experiment with some module parameters then
+you can load and unload the driver manually, with camera
+plugged in or unplugged.
 
 Typically module is installed with command 'modprobe', like this:
 
@@ -138,7 +179,7 @@ init_color      Integer         0-255 [128]     init_color=130
 init_hue        Integer         0-255 [128]     init_hue=115
 lighting        Integer         0-2* [1]        lighting=2
 sharpness       Integer         0-6* [4]        sharpness=3
-videosize       Integer         0-2* [2]        videosize=1
+size            Integer         0-2* [2]        size=1
 
 Options for Model 2 only:
 
@@ -181,6 +222,11 @@ flags           This is a bit mask, and you can combine any number of
                                            this is a little faster but may
                                            produce flicker if frame rate is
                                            too high and Isoc data gets lost.
+                FLAGS_NO_DECODING      128 This flag turns the video stream
+                                           decoder off, and dumps the raw
+                                           Isoc data from the camera into
+                                           the reading process. Useful to
+                                           developers, but not to users.
 
 framerate       This setting controls frame rate of the camera. This is
                 an approximate setting (in terms of "worst" ... "best")
@@ -227,35 +273,38 @@ sharpness       This option controls smoothing (noise reduction)
                 be greeted with "snowy" image. Default is 4. Model 2
                 cameras do not support this feature.
 
-videosize       This setting chooses one if three image sizes that are
-                supported by this driver. Camera supports more, but
+size            This setting chooses one of several image sizes that are
+                supported by this driver. Cameras may support more, but
                 it's difficult to reverse-engineer all formats.
                 Following video sizes are supported:
 
-                videosize=0     128x96  (Model 1 only)
-                videosize=1     176x144
-                videosize=2     352x288
-                videosize=3     320x240 (Model 2 only)
-                videosize=4     352x240 (Model 2 only)
+                size=0     128x96  (Model 1 only)
+                size=1     160x120
+                size=2     176x144
+                size=3     320x240 (Model 2 only)
+                size=4     352x240 (Model 2 only)
+                size=5     352x288
+                size=6     640x480 (Model 3 only)
 
-                The last one (352x288) is the native size of the sensor
-                array, so it's the best resolution camera (Model 1) can
+                The 352x288 is the native size of the Model 1 sensor
+                array, so it's the best resolution the camera can
                 yield. The best resolution of Model 2 is 176x144, and
                 larger images are produced by stretching the bitmap.
+                Model 3 has sensor with 640x480 grid, and it works too,
+                but the frame rate will be exceptionally low (1-2 FPS);
+                it may be still OK for some applications, like security.
                 Choose the image size you need. The smaller image can
                 support faster frame rate. Default is 352x288.
 
+For more information and the Troubleshooting FAQ visit this URL:
+
+                http://www.linux-usb.org/ibmcam/
+
 WHAT NEEDS TO BE DONE:
 
-- The box freezes if camera is unplugged after being used (OHCI).
-  Workaround: remove usb-ohci module first.
-- On occasion camera (model 1) does not start properly (xawtv reports
-  errors), or camera produces negative image (funny colors.)
-  Workaround: reload the driver module. Reason: [1].
 - The button on the camera is not used. I don't know how to get to it.
   I know now how to read button on Model 2, but what to do with it?
 
-[1]
 - Camera reports its status back to the driver; however I don't know
   what returned data means. If camera fails at some initialization
   stage then something should be done, and I don't do that because
@@ -263,26 +312,13 @@ WHAT NEEDS TO BE DONE:
   concern because Model 2 uses different commands which do not return
   status (and seem to complete successfully every time).
 
-VIDEO SIZE AND IMAGE SIZE
-
-Camera produces picture X by Y pixels. This is camera-specific and can be
-altered by programming the camera accordingly. This image is placed onto
-larger (or equal) area W by H, this is V4L image. At this time the driver
-uses V4L image size (W by H) 352x288 pixels because many programs (such
-as xawtv) expect quite specific sizes and don't want to deal with arbitrary,
-camera-specific sizes. However this approach "hides" real image size, and
-application always sees the camera as producing only 352x288 image. It is
-possible to change the V4L image size to 128x96, and then if camera is
-switched to 128x96 mode then xawtv will correctly accept this image size. But
-many other popular sizes (such as 176x144) will not be welcomed. This is the
-reason why all camera images are at this time placed onto 352x288 "canvas",
-and size of that canvas (V4L) is reported to applications. It will be easy
-to add options to control the canvas size, but it will be application-
-specific because not all applications are ready to work with variety of
-camera-specific sizes.
+- Some flavors of Model 4 NetCameras produce only compressed video
+  streams, and I don't know how to decode them.
 
 CREDITS:
 
 The code is based in no small part on the CPiA driver by Johannes Erdfelt,
 Randy Dunlap, and others. Big thanks to them for their pioneering work on that
 and the USB stack.
+
+I also thank John Lightsey for his donation of the Veo Stingray camera.
