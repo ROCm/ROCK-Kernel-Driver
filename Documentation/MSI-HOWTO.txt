@@ -93,7 +93,7 @@ increase scalability.
 5. Configuring a driver to use MSI/MSI-X
 
 By default, the kernel will not enable MSI/MSI-X on all devices that
-support this capability. The CONFIG_PCI_USE_VECTOR kernel option
+support this capability. The CONFIG_PCI_MSI kernel option
 must be selected to enable MSI/MSI-X support.
 
 5.1 Including MSI/MSI-X support into the kernel
@@ -101,10 +101,10 @@ must be selected to enable MSI/MSI-X support.
 To allow MSI/MSI-X capable device drivers to selectively enable
 MSI/MSI-X (using pci_enable_msi()/pci_enable_msix() as described
 below), the VECTOR based scheme needs to be enabled by setting
-CONFIG_PCI_USE_VECTOR during kernel config.
+CONFIG_PCI_MSI during kernel config.
 
 Since the target of the inbound message is the local APIC, providing
-CONFIG_X86_LOCAL_APIC must be enabled as well as CONFIG_PCI_USE_VECTOR.
+CONFIG_X86_LOCAL_APIC must be enabled as well as CONFIG_PCI_MSI.
 
 5.2 Configuring for MSI support
 
@@ -410,7 +410,7 @@ system whether it runs when CONFIG_X86_LOCAL_APIC=y.
 In SMP environment, CONFIG_X86_LOCAL_APIC is automatically set;
 however, in UP environment, users must manually set
 CONFIG_X86_LOCAL_APIC. Once CONFIG_X86_LOCAL_APIC=y, setting
-CONFIG_PCI_USE_VECTOR enables the VECTOR based scheme and
+CONFIG_PCI_MSI enables the VECTOR based scheme and
 the option for MSI-capable device drivers to selectively enable
 MSI/MSI-X.
 
