@@ -34,17 +34,6 @@ static void inline lprintk(char *buf)
 	}
 }
 
-static int inline uhci_is_skeleton_td(struct uhci_hcd *uhci, struct uhci_td *td)
-{
-	int i;
-
-	for (i = 0; i < UHCI_NUM_SKELTD; i++)
-		if (td == uhci->skeltd[i])
-			return 1;
-
-	return 0;
-}
-
 static int inline uhci_is_skeleton_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	int i;
@@ -285,24 +274,19 @@ out:
 	return out - buf;
 }
 
-static const char *td_names[] = {"skel_int1_td", "skel_int2_td",
-				 "skel_int4_td", "skel_int8_td",
-				 "skel_int16_td", "skel_int32_td",
-				 "skel_int64_td", "skel_int128_td",
-				 "skel_int256_td", "skel_term_td" };
-static const char *qh_names[] = { "skel_ls_control_qh", "skel_hs_control_qh",
-				  "skel_bulk_qh", "skel_term_qh" };
+static const char *qh_names[] = {
+  "skel_int128_qh", "skel_int64_qh",
+  "skel_int32_qh", "skel_int16_qh",
+  "skel_int8_qh", "skel_int4_qh",
+  "skel_int2_qh", "skel_int1_qh",
+  "skel_ls_control_qh", "skel_hs_control_qh",
+  "skel_bulk_qh", "skel_term_qh"
+};
 
 #define show_frame_num()	\
 	if (!shown) {		\
 	  shown = 1;		\
 	  out += sprintf(out, "- Frame %d\n", i); \
-	}
-
-#define show_td_name()		\
-	if (!shown) {		\
-	  shown = 1;		\
-	  out += sprintf(out, "- %s\n", td_names[i]); \
 	}
 
 #define show_qh_name()		\
@@ -311,13 +295,134 @@ static const char *qh_names[] = { "skel_ls_control_qh", "skel_hs_control_qh",
 	  out += sprintf(out, "- %s\n", qh_names[i]); \
 	}
 
+static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp, char *buf, int len)
+{
+	struct list_head *tmp;
+	char *out = buf;
+	int count = 0;
+
+	if (len < 200)
+		return 0;
+
+	out += sprintf(out, "urb_priv [%p] ", urbp);
+	out += sprintf(out, "urb [%p] ", urbp->urb);
+	out += sprintf(out, "qh [%p] ", urbp->qh);
+	out += sprintf(out, "Dev=%d ", usb_pipedevice(urbp->urb->pipe));
+	out += sprintf(out, "EP=%x(%s) ", usb_pipeendpoint(urbp->urb->pipe), (usb_pipein(urbp->urb->pipe) ? "IN" : "OUT"));
+
+	switch (usb_pipetype(urbp->urb->pipe)) {
+	case PIPE_ISOCHRONOUS: out += sprintf(out, "ISO "); break;
+	case PIPE_INTERRUPT: out += sprintf(out, "INT "); break;
+	case PIPE_BULK: out += sprintf(out, "BLK "); break;
+	case PIPE_CONTROL: out += sprintf(out, "CTL "); break;
+	}
+
+	out += sprintf(out, "%s", (urbp->fsbr ? "FSBR " : ""));
+	out += sprintf(out, "%s", (urbp->fsbr_timeout ? "FSBR_TO " : ""));
+
+	if (urbp->status != -EINPROGRESS)
+		out += sprintf(out, "Status=%d ", urbp->status);
+	//out += sprintf(out, "Inserttime=%lx ",urbp->inserttime);
+	//out += sprintf(out, "FSBRtime=%lx ",urbp->fsbrtime);
+
+	spin_lock(&urbp->urb->lock);
+	count = 0;
+	list_for_each(tmp, &urbp->td_list)
+		count++;
+	spin_unlock(&urbp->urb->lock);
+	out += sprintf(out, "TDs=%d ",count);
+
+	if (urbp->queued)
+		out += sprintf(out, "queued\n");
+	else {
+		spin_lock(&uhci->frame_list_lock);
+		count = 0;
+		list_for_each(tmp, &urbp->queue_list)
+			count++;
+		spin_unlock(&uhci->frame_list_lock);
+		out += sprintf(out, "queued URBs=%d\n", count);
+	}
+
+	return out - buf;
+}
+
+static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
+{
+	char *out = buf;
+	unsigned long flags;
+	struct list_head *head, *tmp;
+	int count;
+
+	out += sprintf(out, "Main list URBs:");
+	spin_lock_irqsave(&uhci->urb_list_lock, flags);
+	if (list_empty(&uhci->urb_list))
+		out += sprintf(out, " Empty\n");
+	else {
+		out += sprintf(out, "\n");
+		count = 0;
+		head = &uhci->urb_list;
+		tmp = head->next;
+		while (tmp != head) {
+			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
+
+			out += sprintf(out, "  %d: ", ++count);
+			out += uhci_show_urbp(uhci, urbp, out, len - (out - buf));
+			tmp = tmp->next;
+		}
+	}
+	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
+
+	out += sprintf(out, "Remove list URBs:");
+	spin_lock_irqsave(&uhci->urb_remove_list_lock, flags);
+	if (list_empty(&uhci->urb_remove_list))
+		out += sprintf(out, " Empty\n");
+	else {
+		out += sprintf(out, "\n");
+		count = 0;
+		head = &uhci->urb_remove_list;
+		tmp = head->next;
+		while (tmp != head) {
+			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
+
+			out += sprintf(out, "  %d: ", ++count);
+			out += uhci_show_urbp(uhci, urbp, out, len - (out - buf));
+			tmp = tmp->next;
+		}
+	}
+	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
+
+	out += sprintf(out, "Complete list URBs:");
+	spin_lock_irqsave(&uhci->complete_list_lock, flags);
+	if (list_empty(&uhci->complete_list))
+		out += sprintf(out, " Empty\n");
+	else {
+		out += sprintf(out, "\n");
+		count = 0;
+		head = &uhci->complete_list;
+		tmp = head->next;
+		while (tmp != head) {
+			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, complete_list);
+
+			out += sprintf(out, "  %d: ", ++count);
+			out += uhci_show_urbp(uhci, urbp, out, len - (out - buf));
+			tmp = tmp->next;
+		}
+	}
+	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
+
+	return out - buf;
+}
+
 static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 {
+	unsigned long flags;
 	char *out = buf;
 	int i;
 	struct uhci_qh *qh;
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
+
+	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 
 	out += sprintf(out, "HC status\n");
 	out += uhci_show_status(uhci, out, len - (out - buf));
@@ -333,8 +438,6 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			show_frame_num();
 			out += sprintf(out, "    frame list does not match td->dma_handle!\n");
 		}
-		if (uhci_is_skeleton_td(uhci, td))
-			continue;
 		show_frame_num();
 
 		head = &td->fl_list;
@@ -344,67 +447,6 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			tmp = tmp->next;
 			out += uhci_show_td(td, out, len - (out - buf), 4);
 		} while (tmp != head);
-	}
-
-	out += sprintf(out, "Skeleton TD's\n");
-	for (i = UHCI_NUM_SKELTD - 1; i >= 0; i--) {
-		int shown = 0;
-
-		td = uhci->skeltd[i];
-
-		if (debug > 1) {
-			show_td_name();
-			out += uhci_show_td(td, out, len - (out - buf), 4);
-		}
-
-		if (list_empty(&td->fl_list)) {
-			/* TD 0 is the int1 TD and links to control_ls_qh */
-			if (!i) {
-				if (td->link !=
-				    (cpu_to_le32(uhci->skel_ls_control_qh->dma_handle) | UHCI_PTR_QH)) {
-					show_td_name();
-					out += sprintf(out, "    skeleton TD not linked to ls_control QH!\n");
-				}
-			} else if (i < 9) {
-				if (td->link != cpu_to_le32(uhci->skeltd[i - 1]->dma_handle)) {
-					show_td_name();
-					out += sprintf(out, "    skeleton TD not linked to next skeleton TD!\n");
-				}
-			} else {
-				show_td_name();
-
-				if (td->link != cpu_to_le32(td->dma_handle))
-					out += sprintf(out, "    skel_term_td does not link to self\n");
-
-				/* Don't show it twice */
-				if (debug <= 1)
-					out += uhci_show_td(td, out, len - (out - buf), 4);
-			}
-
-			continue;
-		}
-
-		show_td_name();
-
-		head = &td->fl_list;
-		tmp = head->next;
-
-		while (tmp != head) {
-			td = list_entry(tmp, struct uhci_td, fl_list);
-
-			tmp = tmp->next;
-
-			out += uhci_show_td(td, out, len - (out - buf), 4);
-		}
-
-		if (!i) {
-			if (td->link !=
-			    (cpu_to_le32(uhci->skel_ls_control_qh->dma_handle) | UHCI_PTR_QH))
-				out += sprintf(out, "    last TD not linked to ls_control QH!\n");
-		} else if (i < 9) {
-			if (td->link != cpu_to_le32(uhci->skeltd[i - 1]->dma_handle))
-				out += sprintf(out, "    last TD not linked to next skeleton!\n");
-		}
 	}
 
 	out += sprintf(out, "Skeleton QH's\n");
@@ -419,21 +461,19 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			out += uhci_show_qh(qh, out, len - (out - buf), 4);
 		}
 
-		/* QH 3 is the Terminating QH, it's different */
-		if (i == 3) {
-			if (qh->link != UHCI_PTR_TERM) {
-				show_qh_name();
+		/* Last QH is the Terminating QH, it's different */
+		if (i == UHCI_NUM_SKELQH - 1) {
+			if (qh->link != UHCI_PTR_TERM)
 				out += sprintf(out, "    bandwidth reclamation on!\n");
-			}
 
-			if (qh->element != cpu_to_le32(uhci->skel_term_td->dma_handle)) {
-				show_qh_name();
-				out += sprintf(out, "    skel_term_qh element is not set to skel_term_td\n");
-			}
+			if (qh->element != cpu_to_le32(uhci->term_td->dma_handle))
+				out += sprintf(out, "    skel_term_qh element is not set to term_td!\n");
+
+			continue;
 		}
 
 		if (list_empty(&qh->list)) {
-			if (i < 3) {
+			if (i < UHCI_NUM_SKELQH - 1) {
 				if (qh->link !=
 				    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH)) {
 					show_qh_name();
@@ -457,18 +497,23 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 			out += uhci_show_qh(qh, out, len - (out - buf), 4);
 		}
 
-		if (i < 3) {
+		if (i < UHCI_NUM_SKELQH - 1) {
 			if (qh->link !=
 			    (cpu_to_le32(uhci->skelqh[i + 1]->dma_handle) | UHCI_PTR_QH))
 				out += sprintf(out, "    last QH not linked to next skeleton!\n");
 		}
 	}
 
+	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
+
+	if (debug > 2)
+		out += uhci_show_lists(uhci, out, len - (out - buf));
+
 	return out - buf;
 }
 
 #ifdef CONFIG_PROC_FS
-#define MAX_OUTPUT	(PAGE_SIZE * 8)
+#define MAX_OUTPUT	(PAGE_SIZE * 16)
 
 static struct proc_dir_entry *uhci_proc_root = NULL;
 
@@ -483,7 +528,6 @@ static int uhci_proc_open(struct inode *inode, struct file *file)
 	const struct proc_dir_entry *dp = PDE(inode);
 	struct uhci_hcd *uhci = dp->data;
 	struct uhci_proc *up;
-	unsigned long flags;
 	int ret = -ENOMEM;
 
 	lock_kernel();
@@ -497,9 +541,7 @@ static int uhci_proc_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 
-	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 	up->size = uhci_sprint_schedule(uhci, up->data, MAX_OUTPUT);
-	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 
 	file->private_data = up;
 
