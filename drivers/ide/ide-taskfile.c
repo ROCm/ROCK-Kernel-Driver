@@ -433,13 +433,6 @@ ide_startstop_t pre_task_mulout_intr (ide_drive_t *drive, struct request *rq)
 			drive->addressing ? "MULTWRITE_EXT" : "MULTWRITE");
 		return startstop;
 	}
-	if (!(drive_is_ready(drive))) {
-		int i;
-		for (i=0; i<100; i++) {
-			if (drive_is_ready(drive))
-				break;
-		}
-	}
 
 	ide_set_handler(drive, &task_mulout_intr, WAIT_WORSTCASE, NULL);
 	task_buffer_multi_sectors(drive, rq, IDE_PIO_OUT);
