@@ -673,7 +673,7 @@ static int rs_ioctl (struct tty_struct * tty, struct file * filp,
 	case TIOCGSERIAL:
 		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
 		                      sizeof(struct serial_struct))) == 0)
-			gs_getserial(&port->gs, (struct serial_struct *) arg);
+			rc = gs_getserial(&port->gs, (struct serial_struct *) arg);
 		break;
 	case TIOCSSERIAL:
 		if ((rc = verify_area(VERIFY_READ, (void *) arg,

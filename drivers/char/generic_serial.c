@@ -143,9 +143,14 @@ int gs_write(struct tty_struct * tty, int from_user,
 		/* Can't copy more? break out! */
 		if (c <= 0) break;
 		if (from_user)
-			copy_from_user (port->xmit_buf + port->xmit_head, buf, c);
+			if (copy_from_user (port->xmit_buf + port->xmit_head, 
+					    buf, c)) {
+				up (& port->port_write_sem);
+				return -EFAULT;
+			}
+
 		else
-			memcpy         (port->xmit_buf + port->xmit_head, buf, c);
+			memcpy (port->xmit_buf + port->xmit_head, buf, c);
 
 		port -> xmit_cnt += c;
 		port -> xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE -1);
@@ -604,7 +609,7 @@ int gs_block_til_ready(void *port_, struct file * filp)
 	 * until it's done, and then try again.
 	 */
 	if (tty_hung_up_p(filp) || port->flags & ASYNC_CLOSING) {
-	  interruptible_sleep_on(&port->close_wait);
+		interruptible_sleep_on(&port->close_wait);
 		if (port->flags & ASYNC_HUP_NOTIFY)
 			return -EAGAIN;
 		else
@@ -1003,7 +1008,8 @@ int gs_setserial(struct gs_port *port, struct serial_struct *sp)
 {
 	struct serial_struct sio;
 
-	copy_from_user(&sio, sp, sizeof(struct serial_struct));
+	if (copy_from_user(&sio, sp, sizeof(struct serial_struct)))
+		return(-EFAULT);
 
 	if (!capable(CAP_SYS_ADMIN)) {
 		if ((sio.baud_base != port->baud_base) ||
@@ -1033,7 +1039,7 @@ int gs_setserial(struct gs_port *port, struct serial_struct *sp)
  *      Generate the serial struct info.
  */
 
-void gs_getserial(struct gs_port *port, struct serial_struct *sp)
+int gs_getserial(struct gs_port *port, struct serial_struct *sp)
 {
 	struct serial_struct    sio;
 
@@ -1055,7 +1061,10 @@ void gs_getserial(struct gs_port *port, struct serial_struct *sp)
 	if (port->rd->getserial)
 		port->rd->getserial (port, &sio);
 
-	copy_to_user(sp, &sio, sizeof(struct serial_struct));
+	if (copy_to_user(sp, &sio, sizeof(struct serial_struct)))
+		return -EFAULT;
+	return 0;
+
 }
 
 

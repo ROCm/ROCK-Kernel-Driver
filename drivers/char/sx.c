@@ -1160,7 +1160,8 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 				/* DCD went UP */
 				if( (~(port->gs.flags & ASYNC_NORMAL_ACTIVE) || 
 						 ~(port->gs.flags & ASYNC_CALLOUT_ACTIVE)) &&
-						(sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED)) {
+						(sx_read_channel_byte(port, hi_hstat) != HS_IDLE_CLOSED) &&
+						!(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					/* Are we blocking in open?*/
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD active, unblocking open\n");
 					wake_up_interruptible(&port->gs.open_wait);
@@ -1170,7 +1171,8 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 			} else {
 				/* DCD went down! */
 				if (!((port->gs.flags & ASYNC_CALLOUT_ACTIVE) &&
-				      (port->gs.flags & ASYNC_CALLOUT_NOHUP))) {
+				      (port->gs.flags & ASYNC_CALLOUT_NOHUP)) &&
+				    !(port->gs.tty->termios->c_cflag & CLOCAL) ) {
 					sx_dprintk (SX_DEBUG_MODEMSIGNALS, "DCD dropped. hanging up....\n");
 					tty_hangup (port->gs.tty);
 				} else {
@@ -1815,7 +1817,7 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 	case TIOCGSERIAL:
 		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
 		                      sizeof(struct serial_struct))) == 0)
-			gs_getserial(&port->gs, (struct serial_struct *) arg);
+			rc = gs_getserial(&port->gs, (struct serial_struct *) arg);
 		break;
 	case TIOCSSERIAL:
 		if ((rc = verify_area(VERIFY_READ, (void *) arg,
