@@ -58,6 +58,7 @@ obj-$(CONFIG_SCSI_AHA152X)	+= aha152x.o
 obj-$(CONFIG_SCSI_AHA1542)	+= aha1542.o
 obj-$(CONFIG_SCSI_AHA1740)	+= aha1740.o
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx/
+obj-$(CONFIG_SCSI_AIC79XX)	+= aic7xxx/
 obj-$(CONFIG_SCSI_AIC7XXX_OLD)	+= aic7xxx_old.o
 obj-$(CONFIG_SCSI_IPS)		+= ips.o
 obj-$(CONFIG_SCSI_FD_MCS)	+= fd_mcs.o
