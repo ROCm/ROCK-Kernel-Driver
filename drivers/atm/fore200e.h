@@ -830,17 +830,9 @@ typedef struct fore200e_bus {
 
 #if defined(CONFIG_ATM_FORE200E_SBA)
 #  if defined(CONFIG_ATM_FORE200E_PCA)
-#    if (PCI_DMA_BIDIRECTIONAL == SBUS_DMA_BIDIRECTIONAL) && \
-        (PCI_DMA_TODEVICE      == SBUS_DMA_TODEVICE)      && \
-        (PCI_DMA_FROMDEVICE    == SBUS_DMA_FROMDEVICE)
-#      define FORE200E_DMA_BIDIRECTIONAL PCI_DMA_BIDIRECTIONAL
-#      define FORE200E_DMA_TODEVICE      PCI_DMA_TODEVICE
-#      define FORE200E_DMA_FROMDEVICE    PCI_DMA_FROMDEVICE
-#    else
-       /* in that case, we'll need to add an extra indirection, e.g.
-	  fore200e->bus->dma_direction[ fore200e_dma_direction ] */
-#      error PCI and SBUS DMA direction flags have different values!
-#    endif
+#    define FORE200E_DMA_BIDIRECTIONAL PCI_DMA_BIDIRECTIONAL
+#    define FORE200E_DMA_TODEVICE      PCI_DMA_TODEVICE
+#    define FORE200E_DMA_FROMDEVICE    PCI_DMA_FROMDEVICE
 #  else
 #    define FORE200E_DMA_BIDIRECTIONAL SBUS_DMA_BIDIRECTIONAL
 #    define FORE200E_DMA_TODEVICE      SBUS_DMA_TODEVICE
