@@ -263,16 +263,6 @@ static void tc574_detach(dev_link_t *);
 
 static dev_link_t *dev_list;
 
-static void flush_stale_links(void)
-{
-	dev_link_t *link, *next;
-	for (link = dev_list; link; link = next) {
-		next = link->next;
-		if (link->state & DEV_STALE_LINK)
-			tc574_detach(link);
-	}
-}
-
 /*
 	tc574_attach() creates an "instance" of the driver, allocating
 	local data structures for one device.  The device is registered
@@ -288,7 +278,6 @@ static dev_link_t *tc574_attach(void)
 	int i, ret;
 
 	DEBUG(0, "3c574_attach()\n");
-	flush_stale_links();
 
 	/* Create the PC card device object. */
 	dev = alloc_etherdev(sizeof(struct el3_private));
@@ -375,10 +364,8 @@ static void tc574_detach(dev_link_t *link)
 
 	if (link->state & DEV_CONFIG) {
 		tc574_release(link);
-		if (link->state & DEV_STALE_CONFIG) {
-			link->state |= DEV_STALE_LINK;
+		if (link->state & DEV_STALE_CONFIG)
 			return;
-		}
 	}
 
 	if (link->handle)
@@ -583,7 +570,9 @@ static void tc574_release(dev_link_t *link)
 
 	link->state &= ~DEV_CONFIG;
 
-} /* tc574_release */
+	if (link->state & DEV_STALE_CONFIG)
+		tc574_detach(link);
+}
 
 /*
 	The card status event handler.  Mostly, this schedules other

@@ -139,24 +139,6 @@ typedef struct ibmtr_dev_t {
     struct tok_info	ti;
 } ibmtr_dev_t;
 
-/*======================================================================
-
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    ibmtr_detach(link);
-    }
-}
-
 static void netdev_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
@@ -184,7 +166,6 @@ static dev_link_t *ibmtr_attach(void)
     int i, ret;
     
     DEBUG(0, "ibmtr_attach()\n");
-    flush_stale_links();
 
     /* Create new token-ring device */
     dev = alloc_trdev(sizeof(*info));
@@ -273,10 +254,8 @@ static void ibmtr_detach(dev_link_t *link)
     }
     if (link->state & DEV_CONFIG) {
         ibmtr_release(link);
-        if (link->state & DEV_STALE_CONFIG) {
-            link->state |= DEV_STALE_LINK;
+        if (link->state & DEV_STALE_CONFIG)
             return;
-        }
     }
 
     if (link->handle)
@@ -446,7 +425,9 @@ static void ibmtr_release(dev_link_t *link)
 
     link->state &= ~DEV_CONFIG;
 
-} /* ibmtr_release */
+    if (link->state & DEV_STALE_CONFIG)
+	    ibmtr_detach(link);
+}
 
 /*======================================================================
 

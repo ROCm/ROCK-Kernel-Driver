@@ -431,15 +431,6 @@ found_port:
 
 static void avmcs_release(dev_link_t *link)
 {
-    /*
-       If the device is currently in use, we won't release until it
-       is actually closed.
-    */
-    if (link->open) {
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-
     b1pcmcia_delcard(link->io.BasePort1, link->irq.AssignedIRQ);
 
     /* Unlink the device chain */

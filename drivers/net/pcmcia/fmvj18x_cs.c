@@ -242,24 +242,6 @@ typedef struct local_info_t {
 #define BANK_1U              0x24 /* bank 1 (CONFIG_1) */
 #define BANK_2U              0x28 /* bank 2 (CONFIG_1) */
 
-/*======================================================================
-
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    fmvj18x_detach(link);
-    }
-}
-
 static dev_link_t *fmvj18x_attach(void)
 {
     local_info_t *lp;
@@ -269,7 +251,6 @@ static dev_link_t *fmvj18x_attach(void)
     int i, ret;
     
     DEBUG(0, "fmvj18x_attach()\n");
-    flush_stale_links();
 
     /* Make up a FMVJ18x specific data structure */
     dev = alloc_etherdev(sizeof(local_info_t));
@@ -353,10 +334,8 @@ static void fmvj18x_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	fmvj18x_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
 
     /* Break the link with Card Services */
@@ -762,8 +741,10 @@ static void fmvj18x_release(dev_link_t *link)
     CardServices(ReleaseIRQ, link->handle, &link->irq);
     
     link->state &= ~DEV_CONFIG;
-    
-} /* fmvj18x_release */
+
+    if (link->state & DEV_STALE_CONFIG)
+	    fmvj18x_detach(link);
+}
 
 /*====================================================================*/
 

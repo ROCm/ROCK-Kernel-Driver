@@ -147,24 +147,6 @@ typedef struct com20020_dev_t {
 
 /*======================================================================
 
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    com20020_detach(link);
-    }
-}
-
-/*======================================================================
-
     com20020_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered
     with Card Services.
@@ -181,7 +163,6 @@ static dev_link_t *com20020_attach(void)
     struct arcnet_local *lp;
     
     DEBUG(0, "com20020_attach()\n");
-    flush_stale_links();
 
     /* Create new network device */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
@@ -290,10 +271,8 @@ static void com20020_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
         com20020_release(link);
-        if (link->state & DEV_STALE_CONFIG) {
-            link->state |= DEV_STALE_LINK;
+        if (link->state & DEV_STALE_CONFIG)
             return;
-        }
     }
 
     if (link->handle)
@@ -484,7 +463,9 @@ static void com20020_release(dev_link_t *link)
 
     link->state &= ~(DEV_CONFIG | DEV_RELEASE_PENDING);
 
-} /* com20020_release */
+    if (link->state & DEV_STALE_CONFIG)
+	    com20020_detach(link);
+}
 
 /*======================================================================
 
