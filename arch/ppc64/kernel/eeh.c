@@ -397,12 +397,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		return val;
 	}
 
-        /* Make sure we aren't ISA */
-        if (!strcmp(dn->type, "isa")) {
-                pci_dev_put(dev);
-                return val;
-        }
-
 	if (!dn->eeh_config_addr) {
 		pci_dev_put(dev);
 		return val;
@@ -465,6 +459,7 @@ EXPORT_SYMBOL(eeh_check_failure);
 struct eeh_early_enable_info {
 	unsigned int buid_hi;
 	unsigned int buid_lo;
+	int force_off;
 };
 
 /* Enable eeh for the given device node. */
@@ -479,6 +474,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	u32 *regs;
 	int enable;
 
+	dn->eeh_mode = 0;
+
 	if (status && strcmp(status, "ok") != 0)
 		return NULL;	/* ignore devices with bad status */
 
@@ -491,6 +488,12 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 	    (*device_id == 0x0102 || *device_id == 0x008b ||
 	     *device_id == 0x0188 || *device_id == 0x0302))
 		return NULL;
+
+	/* There is nothing to check on PCI to ISA bridges */
+	if (dn->type && !strcmp(dn->type, "isa")) {
+		dn->eeh_mode |= EEH_MODE_NOCHECK;
+		return NULL;
+	}
 
 	/*
 	 * Now decide if we are going to "Disable" EEH checking
@@ -508,12 +511,12 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 				   enable)) {
 		if (enable) {
 			printk(KERN_WARNING "EEH: %s user requested to run "
-			       "without EEH.\n", dn->full_name);
+			       "without EEH checking.\n", dn->full_name);
 			enable = 0;
 		}
 	}
 
-	if (!enable) {
+	if (!enable || info->force_off) {
 		dn->eeh_mode = EEH_MODE_NOCHECK;
 		return NULL;
 	}
@@ -543,8 +546,8 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
 			       dn->full_name);
 #endif
 		} else {
-			printk(KERN_WARNING "EEH: %s: could not enable EEH, rtas_call failed.\n",
-			       dn->full_name);
+			printk(KERN_WARNING "EEH: %s: could not enable EEH, rtas_call failed; rc=%d\n",
+			       dn->full_name, ret);
 		}
 	} else {
 		printk(KERN_WARNING "EEH: %s: unable to get reg property.\n",
@@ -570,9 +573,17 @@ static void *early_enable_eeh(struct device_node *dn, void *data)
  */
 void __init eeh_init(void)
 {
-	struct device_node *phb;
+	struct device_node *phb, *np;
 	struct eeh_early_enable_info info;
 	char *eeh_force_off = strstr(saved_command_line, "eeh-force-off");
+
+	init_pci_config_tokens();
+
+	np = of_find_node_by_path("/rtas");
+	if (np == NULL) {
+		printk(KERN_WARNING "EEH: RTAS not found !\n");
+		return;
+	}
 
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
@@ -581,14 +592,14 @@ void __init eeh_init(void)
 	if (ibm_set_eeh_option == RTAS_UNKNOWN_SERVICE)
 		return;
 
+	info.force_off = 0;
 	if (eeh_force_off) {
 		printk(KERN_WARNING "EEH: WARNING: PCI Enhanced I/O Error "
 		       "Handling is user disabled\n");
-		return;
+		info.force_off = 1;
 	}
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
-	init_pci_config_tokens();
 	for (phb = of_find_node_by_name(NULL, "pci"); phb;
 	     phb = of_find_node_by_name(phb, "pci")) {
 		unsigned long buid;
@@ -602,8 +613,11 @@ void __init eeh_init(void)
 		traverse_pci_devices(phb, early_enable_eeh, NULL, &info);
 	}
 
-	if (eeh_subsystem_enabled)
+	if (eeh_subsystem_enabled) {
 		printk(KERN_INFO "EEH: PCI Enhanced I/O Error Handling Enabled\n");
+	} else {
+		printk(KERN_WARNING "EEH: disabled PCI Enhanced I/O Error Handling\n");
+	}
 }
 
 /**
@@ -743,10 +757,10 @@ static int proc_eeh_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_eeh_operations = {
-	.open		= proc_eeh_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
+	.open      = proc_eeh_open,
+	.read      = seq_read,
+	.llseek    = seq_lseek,
+	.release   = single_release,
 };
 
 static int __init eeh_init_proc(void)
@@ -759,7 +773,7 @@ static int __init eeh_init_proc(void)
 			e->proc_fops = &proc_eeh_operations;
 	}
 
-        return 0;
+	return 0;
 }
 __initcall(eeh_init_proc);
 
