@@ -13,19 +13,12 @@
  */
 
 /* 32bit compatibility types */
-typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
-typedef unsigned short	__kernel_uid_t32;
 typedef unsigned int	__kernel_uid32_t32;
-typedef unsigned short	__kernel_gid_t32;
 typedef unsigned int	__kernel_gid32_t32;
-typedef unsigned short	__kernel_dev_t32;
-typedef unsigned int	__kernel_ino_t32;
-typedef unsigned short	__kernel_mode_t32;
 typedef unsigned short	__kernel_umode_t32;
 typedef short		__kernel_nlink_t32;
 typedef int		__kernel_daddr_t32;
-typedef int		__kernel_off_t32;
 typedef unsigned int	__kernel_caddr_t32;
 typedef long		__kernel_loff_t32;
 typedef __kernel_fsid_t	__kernel_fsid_t32;
@@ -40,9 +33,9 @@ typedef __kernel_fsid_t	__kernel_fsid_t32;
 struct flock32 {
        short l_type;
        short l_whence;
-       __kernel_off_t32 l_start;
-       __kernel_off_t32 l_len;
-       __kernel_pid_t32 l_pid;
+       compat_off_t l_start;
+       compat_off_t l_len;
+       compat_pid_t l_pid;
 };
 
 #define F_GETLK64	12
@@ -203,29 +196,6 @@ struct ucontext_ia32 {
 	stack_ia32_t	  uc_stack;
 	struct sigcontext_ia32 uc_mcontext;
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
-};
-
-struct stat32 {
-       unsigned short st_dev;
-       unsigned short __pad1;
-       unsigned int st_ino;
-       unsigned short st_mode;
-       unsigned short st_nlink;
-       unsigned short st_uid;
-       unsigned short st_gid;
-       unsigned short st_rdev;
-       unsigned short __pad2;
-       unsigned int  st_size;
-       unsigned int  st_blksize;
-       unsigned int  st_blocks;
-       unsigned int  st_atime;
-       unsigned int  st_atime_nsec;
-       unsigned int  st_mtime;
-       unsigned int  st_mtime_nsec;
-       unsigned int  st_ctime;
-       unsigned int  st_ctime_nsec;
-       unsigned int  __unused4;
-       unsigned int  __unused5;
 };
 
 struct stat64 {

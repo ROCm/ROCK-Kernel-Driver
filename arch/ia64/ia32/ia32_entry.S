@@ -297,9 +297,9 @@ ia32_syscall_table:
 	data8 sys_syslog
 	data8 compat_sys_setitimer
 	data8 compat_sys_getitimer	  /* 105 */
-	data8 sys32_newstat
-	data8 sys32_newlstat
-	data8 sys32_newfstat
+	data8 compat_sys_newstat
+	data8 compat_sys_newlstat
+	data8 compat_sys_newfstat
 	data8 sys32_ni_syscall
 	data8 sys32_iopl		  /* 110 */
 	data8 sys_vhangup

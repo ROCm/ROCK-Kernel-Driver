@@ -174,8 +174,7 @@ sys32_execve (char *filename, unsigned int argv, unsigned int envp,
 	return r;
 }
 
-static inline int
-putstat (struct stat32 *ubuf, struct kstat *stat)
+int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
 {
 	int err;
 
@@ -202,42 +201,6 @@ putstat (struct stat32 *ubuf, struct kstat *stat)
 	err |= __put_user(stat->blksize, &ubuf->st_blksize);
 	err |= __put_user(stat->blocks, &ubuf->st_blocks);
 	return err;
-}
-
-asmlinkage long
-sys32_newstat (char *filename, struct stat32 *statbuf)
-{
-	struct kstat stat;
-	int ret = vfs_stat(filename, &stat);
-
-	if (!ret)
-		ret = putstat(statbuf, &stat);
-
-	return ret;
-}
-
-asmlinkage long
-sys32_newlstat (char *filename, struct stat32 *statbuf)
-{
-	struct kstat stat;
-	int ret = vfs_lstat(filename, &stat);
-
-	if (!ret)
-		ret = putstat(statbuf, &stat);
-
-	return ret;
-}
-
-asmlinkage long
-sys32_newfstat (unsigned int fd, struct stat32 *statbuf)
-{
-	struct kstat stat;
-	int ret = vfs_fstat(fd, &stat);
-
-	if (!ret)
-		ret = putstat(statbuf, &stat);
-
-	return ret;
 }
 
 #if PAGE_SHIFT > IA32_PAGE_SHIFT
@@ -1875,11 +1838,11 @@ struct msgbuf32 { s32 mtype; char mtext[1]; };
 
 struct ipc_perm32 {
 	key_t key;
-	__kernel_uid_t32 uid;
-	__kernel_gid_t32 gid;
-	__kernel_uid_t32 cuid;
-	__kernel_gid_t32 cgid;
-	__kernel_mode_t32 mode;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_uid_t cuid;
+	compat_gid_t cgid;
+	compat_mode_t mode;
 	unsigned short seq;
 };
 
@@ -1889,7 +1852,7 @@ struct ipc64_perm32 {
 	__kernel_gid32_t32 gid;
 	__kernel_uid32_t32 cuid;
 	__kernel_gid32_t32 cgid;
-	__kernel_mode_t32 mode;
+	compat_mode_t mode;
 	unsigned short __pad1;
 	unsigned short seq;
 	unsigned short __pad2;
@@ -1946,8 +1909,8 @@ struct msqid64_ds32 {
 	unsigned int msg_cbytes;
 	unsigned int msg_qnum;
 	unsigned int msg_qbytes;
-	__kernel_pid_t32 msg_lspid;
-	__kernel_pid_t32 msg_lrpid;
+	compat_pid_t msg_lspid;
+	compat_pid_t msg_lrpid;
 	unsigned int __unused4;
 	unsigned int __unused5;
 };
@@ -1972,8 +1935,8 @@ struct shmid64_ds32 {
 	unsigned int __unused2;
 	compat_time_t   shm_ctime;
 	unsigned int __unused3;
-	__kernel_pid_t32 shm_cpid;
-	__kernel_pid_t32 shm_lpid;
+	compat_pid_t shm_cpid;
+	compat_pid_t shm_lpid;
 	unsigned int shm_nattch;
 	unsigned int __unused4;
 	unsigned int __unused5;
@@ -3693,16 +3656,16 @@ out_error:
 struct ncp_mount_data32 {
 	int version;
 	unsigned int ncp_fd;
-	__kernel_uid_t32 mounted_uid;
+	compat_uid_t mounted_uid;
 	int wdog_pid;
 	unsigned char mounted_vol[NCP_VOLNAME_LEN + 1];
 	unsigned int time_out;
 	unsigned int retry_count;
 	unsigned int flags;
-	__kernel_uid_t32 uid;
-	__kernel_gid_t32 gid;
-	__kernel_mode_t32 file_mode;
-	__kernel_mode_t32 dir_mode;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_mode_t file_mode;
+	compat_mode_t dir_mode;
 };
 
 static void *
@@ -3724,11 +3687,11 @@ do_ncp_super_data_conv(void *raw_data)
 
 struct smb_mount_data32 {
 	int version;
-	__kernel_uid_t32 mounted_uid;
-	__kernel_uid_t32 uid;
-	__kernel_gid_t32 gid;
-	__kernel_mode_t32 file_mode;
-	__kernel_mode_t32 dir_mode;
+	compat_uid_t mounted_uid;
+	compat_uid_t uid;
+	compat_gid_t gid;
+	compat_mode_t file_mode;
+	compat_mode_t dir_mode;
 };
 
 static void *
@@ -3846,52 +3809,52 @@ sys32_mount(char *dev_name, char *dir_name, char *type,
 
 extern asmlinkage long sys_setreuid(uid_t ruid, uid_t euid);
 
-asmlinkage long sys32_setreuid(__kernel_uid_t32 ruid, __kernel_uid_t32 euid)
+asmlinkage long sys32_setreuid(compat_uid_t ruid, compat_uid_t euid)
 {
 	uid_t sruid, seuid;
 
-	sruid = (ruid == (__kernel_uid_t32)-1) ? ((uid_t)-1) : ((uid_t)ruid);
-	seuid = (euid == (__kernel_uid_t32)-1) ? ((uid_t)-1) : ((uid_t)euid);
+	sruid = (ruid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)ruid);
+	seuid = (euid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)euid);
 	return sys_setreuid(sruid, seuid);
 }
 
 extern asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid);
 
 asmlinkage long
-sys32_setresuid(__kernel_uid_t32 ruid, __kernel_uid_t32 euid,
-		__kernel_uid_t32 suid)
+sys32_setresuid(compat_uid_t ruid, compat_uid_t euid,
+		compat_uid_t suid)
 {
 	uid_t sruid, seuid, ssuid;
 
-	sruid = (ruid == (__kernel_uid_t32)-1) ? ((uid_t)-1) : ((uid_t)ruid);
-	seuid = (euid == (__kernel_uid_t32)-1) ? ((uid_t)-1) : ((uid_t)euid);
-	ssuid = (suid == (__kernel_uid_t32)-1) ? ((uid_t)-1) : ((uid_t)suid);
+	sruid = (ruid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)ruid);
+	seuid = (euid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)euid);
+	ssuid = (suid == (compat_uid_t)-1) ? ((uid_t)-1) : ((uid_t)suid);
 	return sys_setresuid(sruid, seuid, ssuid);
 }
 
 extern asmlinkage long sys_setregid(gid_t rgid, gid_t egid);
 
 asmlinkage long
-sys32_setregid(__kernel_gid_t32 rgid, __kernel_gid_t32 egid)
+sys32_setregid(compat_gid_t rgid, compat_gid_t egid)
 {
 	gid_t srgid, segid;
 
-	srgid = (rgid == (__kernel_gid_t32)-1) ? ((gid_t)-1) : ((gid_t)rgid);
-	segid = (egid == (__kernel_gid_t32)-1) ? ((gid_t)-1) : ((gid_t)egid);
+	srgid = (rgid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)rgid);
+	segid = (egid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)egid);
 	return sys_setregid(srgid, segid);
 }
 
 extern asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 
 asmlinkage long
-sys32_setresgid(__kernel_gid_t32 rgid, __kernel_gid_t32 egid,
-		__kernel_gid_t32 sgid)
+sys32_setresgid(compat_gid_t rgid, compat_gid_t egid,
+		compat_gid_t sgid)
 {
 	gid_t srgid, segid, ssgid;
 
-	srgid = (rgid == (__kernel_gid_t32)-1) ? ((gid_t)-1) : ((gid_t)rgid);
-	segid = (egid == (__kernel_gid_t32)-1) ? ((gid_t)-1) : ((gid_t)egid);
-	ssgid = (sgid == (__kernel_gid_t32)-1) ? ((gid_t)-1) : ((gid_t)sgid);
+	srgid = (rgid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)rgid);
+	segid = (egid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)egid);
+	ssgid = (sgid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)sgid);
 	return sys_setresgid(srgid, segid, ssgid);
 }
 
@@ -3913,27 +3876,27 @@ struct nfsctl_client32 {
 struct nfsctl_export32 {
 	s8			ex32_client[NFSCLNT_IDMAX+1];
 	s8			ex32_path[NFS_MAXPATHLEN+1];
-	__kernel_dev_t32	ex32_dev;
-	__kernel_ino_t32	ex32_ino;
+	compat_dev_t	ex32_dev;
+	compat_ino_t	ex32_ino;
 	s32			ex32_flags;
-	__kernel_uid_t32	ex32_anon_uid;
-	__kernel_gid_t32	ex32_anon_gid;
+	compat_uid_t	ex32_anon_uid;
+	compat_gid_t	ex32_anon_gid;
 };
 
 struct nfsctl_uidmap32 {
 	u32			ug32_ident;   /* char * */
-	__kernel_uid_t32	ug32_uidbase;
+	compat_uid_t	ug32_uidbase;
 	s32			ug32_uidlen;
 	u32			ug32_udimap;  /* uid_t * */
-	__kernel_uid_t32	ug32_gidbase;
+	compat_uid_t	ug32_gidbase;
 	s32			ug32_gidlen;
 	u32			ug32_gdimap;  /* gid_t * */
 };
 
 struct nfsctl_fhparm32 {
 	struct sockaddr		gf32_addr;
-	__kernel_dev_t32	gf32_dev;
-	__kernel_ino_t32	gf32_ino;
+	compat_dev_t	gf32_dev;
+	compat_ino_t	gf32_ino;
 	s32			gf32_version;
 };
 
@@ -4053,7 +4016,7 @@ nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 		return -ENOMEM;
 	for(i = 0; i < karg->ca_umap.ug_uidlen; i++)
 		err |= __get_user(karg->ca_umap.ug_udimap[i],
-			      &(((__kernel_uid_t32 *)A(uaddr))[i]));
+			      &(((compat_uid_t *)A(uaddr))[i]));
 	err |= __get_user(karg->ca_umap.ug_gidbase,
 		      &arg32->ca32_umap.ug32_gidbase);
 	err |= __get_user(karg->ca_umap.ug_uidlen,
@@ -4068,7 +4031,7 @@ nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 		return -ENOMEM;
 	for(i = 0; i < karg->ca_umap.ug_gidlen; i++)
 		err |= __get_user(karg->ca_umap.ug_gdimap[i],
-			      &(((__kernel_gid_t32 *)A(uaddr))[i]));
+			      &(((compat_gid_t *)A(uaddr))[i]));
 
 	return err;
 }
