@@ -1774,7 +1774,7 @@ void cpc_tx_timeout(struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
 	int ch = chan->channel;
 	uclong flags;
 	ucchar ilar;
@@ -1802,7 +1802,7 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
 	int ch = chan->channel;
 	uclong flags;
 #ifdef PC300_DEBUG_TX
@@ -1880,13 +1880,12 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-void cpc_net_rx(hdlc_device * hdlc)
+void cpc_net_rx(struct net_device *dev)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = &dev_to_hdlc(dev)->stats;
 	int ch = chan->channel;
 #ifdef PC300_DEBUG_RX
 	int i;
@@ -1975,7 +1974,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 	pc300_t *card = (pc300_t *)chan->card; 
 	int ch = chan->channel; 
 	volatile pcsca_bd_t * ptdescr; 
-	struct net_device_stats *stats = &dev->hdlc->stats; 
+	struct net_device_stats *stats = &dev_to_hdlc(dev->dev)->stats;
 
     /* Clean up descriptors from previous transmission */
 	ptdescr = (pcsca_bd_t *)(card->hw.rambase +
@@ -1999,7 +1998,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 	} else {
 #endif
 	/* Tell the upper layer we are ready to transmit more packets */
-		netif_wake_queue((struct net_device*)dev->hdlc);
+		netif_wake_queue(dev->dev);
 #ifdef CONFIG_PC300_MLPPP
 	}
 #endif
@@ -2017,8 +2016,8 @@ static void sca_intr(pc300_t * card)
 		for (ch = 0; ch < card->hw.nchan; ch++) {
 			pc300ch_t *chan = &card->chan[ch];
 			pc300dev_t *d = &chan->d;
-			hdlc_device *hdlc = d->hdlc;
-			struct net_device *dev = hdlc_to_dev(hdlc);
+			struct net_device *dev = d->dev;
+			hdlc_device *hdlc = dev_to_hdlc(dev);
 
 			spin_lock(&card->card_lock);
 
@@ -2049,7 +2048,7 @@ static void sca_intr(pc300_t * card)
 							if ((cpc_readb(scabase + DSR_RX(ch)) & DSR_DE)) {
 								rx_dma_stop(card, ch);
 							}
-							cpc_net_rx(hdlc);
+							cpc_net_rx(dev);
 							/* Discard invalid frames */
 							hdlc->stats.rx_errors++;
 							hdlc->stats.rx_over_errors++;
@@ -2073,10 +2072,10 @@ static void sca_intr(pc300_t * card)
 							/* verify if driver is TTY */
 							cpc_tty_receive(d);
 						} else {
-							cpc_net_rx(hdlc);
+							cpc_net_rx(dev);
 						}
 #else
-						cpc_net_rx(hdlc);
+						cpc_net_rx(dev);
 #endif
 						if (card->hw.type == PC300_TE) {
 							cpc_writeb(card->hw.falcbase +
@@ -2818,12 +2817,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static struct net_device_stats *cpc_get_stats(struct net_device *dev)
 {
-	pc300dev_t *d = (pc300dev_t *) dev->priv;
-
-	if (d)
-		return &d->hdlc->stats;
-	else
-		return NULL;
+	return &dev_to_hdlc(dev)->stats;
 }
 
 static int clock_rate_calc(uclong rate, uclong clock, int *br_io)
@@ -3359,17 +3353,15 @@ static void cpc_init_card(pc300_t * card)
 		d->line_on = 0;
 		d->line_off = 0;
 
-		d->hdlc = (hdlc_device *) kmalloc(sizeof(hdlc_device), GFP_KERNEL);
-		if (d->hdlc == NULL)
+		dev = (struct net_device *) kmalloc(sizeof(hdlc_device), GFP_KERNEL);
+		if (dev == NULL)
 			continue;
-		memset(d->hdlc, 0, sizeof(hdlc_device));
+		memset(dev, 0, sizeof(hdlc_device));
 
-		hdlc = d->hdlc;
+		hdlc = dev_to_hdlc(dev);
 		hdlc->xmit = cpc_queue_xmit;
 		hdlc->attach = cpc_attach;
-
-		dev = hdlc_to_dev(hdlc);
-
+		d->dev = dev;
 		dev->mem_start = card->hw.ramphys;
 		dev->mem_end = card->hw.ramphys + card->hw.ramsize - 1;
 		dev->irq = card->hw.irq;
@@ -3415,8 +3407,7 @@ static void cpc_init_card(pc300_t * card)
 		} else {
 			printk ("Dev%d on card(0x%08lx): unable to allocate i/f name.\n",
 				 i + 1, card->hw.ramphys);
-			*(dev->name) = 0;
-			kfree(d->hdlc);
+			kfree(dev);
 			continue;
 		}
 	}
@@ -3648,7 +3639,7 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 			   cpc_readw(card->hw.plxbase + card->hw.intctl_reg) & ~(0x0040));
 
 		for (i = 0; i < card->hw.nchan; i++) {
-			unregister_hdlc_device(card->chan[i].d.hdlc);
+			unregister_hdlc_device(dev_to_hdlc(card->chan[i].d.dev));
 		}
 		iounmap((void *) card->hw.plxbase);
 		iounmap((void *) card->hw.scabase);
