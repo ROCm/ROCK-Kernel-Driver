@@ -250,12 +250,12 @@ static int tsdev_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case TS_GET_CAL:
-		if (copy_to_user ((void *)arg, &tsdev->cal,
+		if (copy_to_user ((void __user *)arg, &tsdev->cal,
 				  sizeof (struct ts_calibration)))
 			retval = -EFAULT;
 		break;
 	case TS_SET_CAL:
-		if (copy_from_user (&tsdev->cal, (void *)arg,
+		if (copy_from_user (&tsdev->cal, (void __user *)arg,
 				    sizeof (struct ts_calibration)))
 			retval = -EFAULT;
 		break;
