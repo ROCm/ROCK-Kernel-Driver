@@ -51,15 +51,7 @@ static struct list_head *bysource;
 struct ip_nat_protocol *ip_nat_protos[MAX_IP_NAT_PROTO];
 
 
-/* We keep extra hashes for each conntrack, for fast searching. */
-static inline size_t
-hash_by_ipsproto(u_int32_t src, u_int32_t dst, u_int16_t proto)
-{
-	/* Modified src and dst, to ensure we don't create two
-           identical streams. */
-	return (src + dst + proto) % ip_nat_htable_size;
-}
-
+/* We keep an extra hash for each conntrack, for fast searching. */
 static inline size_t
 hash_by_src(const struct ip_conntrack_manip *manip, u_int16_t proto)
 {
@@ -71,7 +63,7 @@ hash_by_src(const struct ip_conntrack_manip *manip, u_int16_t proto)
 static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 {
 	struct ip_nat_info *info = &conn->nat.info;
-	unsigned int hs, hp;
+	unsigned int hs;
 
 	if (!info->initialized)
 		return;
@@ -79,11 +71,6 @@ static void ip_nat_cleanup_conntrack(struct ip_conntrack *conn)
 	hs = hash_by_src(&conn->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src,
 	                 conn->tuplehash[IP_CT_DIR_ORIGINAL]
 	                 .tuple.dst.protonum);
-
-	hp = hash_by_ipsproto(conn->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip,
-	                      conn->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip,
-	                      conn->tuplehash[IP_CT_DIR_REPLY]
-	                      .tuple.dst.protonum);
 
 	WRITE_LOCK(&ip_nat_lock);
 	list_del(&info->bysource);
@@ -336,15 +323,13 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	DUMP_TUPLE(&orig_tp);
 	DEBUGP("Range %p: ", mr);
 	for (i = 0; i < mr->rangesize; i++) {
-		DEBUGP("%u:%s%s%s %u.%u.%u.%u - %u.%u.%u.%u %u - %u\n",
+		DEBUGP("%u:%s%s %u.%u.%u.%u - %u.%u.%u.%u %u - %u\n",
 		       i,
 		       (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS)
 		       ? " MAP_IPS" : "",
 		       (mr->range[i].flags
 			& IP_NAT_RANGE_PROTO_SPECIFIED)
 		       ? " PROTO_SPECIFIED" : "",
-		       (mr->range[i].flags & IP_NAT_RANGE_FULL)
-		       ? " FULL" : "",
 		       NIPQUAD(mr->range[i].min_ip),
 		       NIPQUAD(mr->range[i].max_ip),
 		       mr->range[i].min.all,

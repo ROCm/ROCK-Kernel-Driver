@@ -16,8 +16,6 @@ enum ip_nat_manip_type
 
 #define IP_NAT_RANGE_MAP_IPS 1
 #define IP_NAT_RANGE_PROTO_SPECIFIED 2
-/* Used internally by get_unique_tuple(). */
-#define IP_NAT_RANGE_FULL 4
 
 /* NAT sequence number modifications */
 struct ip_nat_seq {
@@ -51,7 +49,7 @@ struct ip_nat_multi_range_compat
 };
 
 /* Worst case: local-out manip + 1 post-routing, and reverse dirn. */
-#define IP_NAT_MAX_MANIPS (2*3)
+#define IP_NAT_MAX_MANIPS (2*2)
 
 struct ip_nat_info_manip
 {
