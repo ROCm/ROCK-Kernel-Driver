@@ -1986,9 +1986,9 @@ fcc_restart(struct net_device *dev, int duplex)
 	fccp = fcp->fccp;
 
 	if (duplex)
-		fccp->fcc_fpsmr |= FCC_PSMR_FDE;
+		fccp->fcc_fpsmr |= FCC_PSMR_FDE | FCC_PSMR_LPB;
 	else
-		fccp->fcc_fpsmr &= ~FCC_PSMR_FDE;
+		fccp->fcc_fpsmr &= ~(FCC_PSMR_FDE | FCC_PSMR_LPB);
 
 	/* Enable transmit/receive */
 	fccp->fcc_gfmr |= FCC_GFMR_ENR | FCC_GFMR_ENT;
