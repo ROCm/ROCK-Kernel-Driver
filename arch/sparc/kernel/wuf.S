@@ -4,7 +4,6 @@
  * Copyright (C) 1995 David S. Miller
  */
 
-#include <asm/cprefix.h>
 #include <asm/contregs.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
@@ -135,8 +134,8 @@ fwin_from_user:
 	/* Branch to the architecture specific stack validation
 	 * routine.  They can be found below...
 	 */
-				.globl	C_LABEL(fwin_mmu_patchme)
-C_LABEL(fwin_mmu_patchme):	b	C_LABEL(sun4c_fwin_stackchk)
+	.globl	fwin_mmu_patchme
+fwin_mmu_patchme:	b	sun4c_fwin_stackchk
 				 andcc	%sp, 0x7, %g0
 
 #define STACK_OFFSET (THREAD_SIZE - TRACEREG_SZ - STACKFRAME_SZ)
@@ -190,7 +189,7 @@ fwin_user_stack_is_bolixed:
 
 	wr	%t_psr, PSR_ET, %psr			! enable traps
 	nop
-	call	C_LABEL(window_underflow_fault)
+	call	window_underflow_fault
 	 mov	%g4, %o0
 
 	b	ret_trap_entry
@@ -244,8 +243,8 @@ fwin_user_finish_up:
 	 */
 
 	.align	4
-	.globl	C_LABEL(sun4c_fwin_stackchk)
-C_LABEL(sun4c_fwin_stackchk):
+	.globl	sun4c_fwin_stackchk
+sun4c_fwin_stackchk:
 	/* LOCATION: Window 'W' */
 
 	/* Caller did 'andcc %sp, 0x7, %g0' */
@@ -295,8 +294,8 @@ sun4c_fwin_onepage:
 	/* A page had bad page permissions, losing... */
 	b,a	fwin_user_stack_is_bolixed
 
-	.globl	C_LABEL(srmmu_fwin_stackchk)
-C_LABEL(srmmu_fwin_stackchk):
+	.globl	srmmu_fwin_stackchk
+srmmu_fwin_stackchk:
 	/* LOCATION: Window 'W' */
 
 	/* Caller did 'andcc %sp, 0x7, %g0' */

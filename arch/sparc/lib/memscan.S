@@ -4,8 +4,6 @@
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
  */
 
-#include <asm/cprefix.h>
-
 /* In essence, this is just a fancy strlen. */
 
 #define LO_MAGIC 0x01010101
@@ -13,9 +11,9 @@
 
 	.text
 	.align	4
-	.globl	C_LABEL(__memscan_zero), C_LABEL(__memscan_generic)
-	.globl	C_LABEL(memscan)
-C_LABEL(__memscan_zero):
+	.globl	__memscan_zero, __memscan_generic
+	.globl	memscan
+__memscan_zero:
 	/* %o0 = addr, %o1 = size */
 	cmp	%o1, 0
 	bne,a	1f
@@ -114,8 +112,8 @@ mzero_found_it:
 	retl
 	 sub	%o0, 2, %o0
 
-C_LABEL(memscan):
-C_LABEL(__memscan_generic):
+memscan:
+__memscan_generic:
 	/* %o0 = addr, %o1 = c, %o2 = size */
 	cmp	%o2, 0
 	bne,a	0f

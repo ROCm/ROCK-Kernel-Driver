@@ -5,8 +5,6 @@
  * Copyright (C) 1996 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  */
 
-#include <asm/cprefix.h>
-
 #define LO_MAGIC 0x01010101
 #define HI_MAGIC 0x80808080
 
@@ -42,8 +40,8 @@
 	 mov	2, %o0
 
 	.align 4
-	.global C_LABEL(strlen)
-C_LABEL(strlen):
+	.global strlen
+strlen:
 	mov	%o0, %o1
 	andcc	%o0, 3, %g0
 	bne	0b

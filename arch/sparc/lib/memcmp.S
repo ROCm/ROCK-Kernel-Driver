@@ -1,10 +1,8 @@
-#include <asm/cprefix.h>
-
 	.text
 	.align 4
-	.global C_LABEL(__memcmp), C_LABEL(memcmp)
-C_LABEL(__memcmp):
-C_LABEL(memcmp):
+	.global __memcmp, memcmp
+__memcmp:
+memcmp:
 #if 1
 	cmp	%o2, 0
 	ble	L3
