@@ -55,7 +55,7 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 
 # export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
 
-c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
+c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
 
 cmd_cc_s_c = $(CC) $(c_flags) -S $< -o $@
 
@@ -78,7 +78,7 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 # the Makefiles to these standard rules.  -- rmk, mec
 ifdef USE_STANDARD_AS_RULE
 
-a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$@)
+a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 cmd_as_s_S = $(CPP) $(a_flags) $< > $@
 
