@@ -1,0 +1,85 @@
+# ===========================================================================
+# Module versions
+# ===========================================================================
+
+ifeq ($(strip $(export-objs)),)
+
+# If we don't export any symbols in this dir, just descend
+# ---------------------------------------------------------------------------
+
+fastdep: $(subdir-ym)
+	@:
+
+else
+
+# This sets version suffixes on exported symbols
+# ---------------------------------------------------------------------------
+
+MODVERDIR := include/linux/modules
+
+#
+# Added the SMP separator to stop module accidents between uniprocessor
+# and SMP Intel boxes - AC - from bits by Michael Chastain
+#
+
+ifdef CONFIG_SMP
+	genksyms_smp_prefix := -p smp_
+else
+	genksyms_smp_prefix := 
+endif
+
+#	Don't include modversions.h, we're just about to generate it here.
+
+CFLAGS_MODULE := $(filter-out -include linux/modversions.h,$(CFLAGS_MODULE))
+
+$(addprefix $(MODVERDIR)/,$(real-objs-y:.o=.ver)): modkern_cflags := $(CFLAGS_KERNEL)
+$(addprefix $(MODVERDIR)/,$(real-objs-m:.o=.ver)): modkern_cflags := $(CFLAGS_MODULE)
+$(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver)): export_flags   := -D__GENKSYMS__
+
+c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
+	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+	  $(export_flags) 
+
+# Our objects only depend on modversions.h, not on the individual .ver
+# files (fix-dep filters them), so touch modversions.h if any of the .ver
+# files changes
+
+quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$*.ver
+cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
+		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
+
+# Okay, let's explain what's happening in rule_make_cc_ver_c:
+# o echo the command
+# o execute the command
+# o If the $(CPP) fails, we won't notice because it's output is piped
+#   to $(GENKSYMS) which does not fail. We recognize this case by
+#   looking if the generated $(depfile) exists, though.
+# o If the .ver file changed, touch modversions.h, which is our maker
+#   of any changed .ver files.
+# o Move command line and deps into their normal .*.cmd place.  
+
+define rule_cc_ver_c
+	$(if $($(quiet)cmd_cc_ver_c),echo '  $($(quiet)cmd_cc_ver_c)';) \
+	$(cmd_cc_ver_c); \
+	if [ ! -r $(depfile) ]; then exit 1; fi; \
+	scripts/fixdep $(depfile) $@ '$(cmd_cc_ver_c)' > $(@D)/.$(@F).tmp; \
+	rm -f $(depfile); \
+	if [ ! -r $@ ] || cmp -s $@ $@.tmp; then \
+	  touch include/linux/modversions.h; \
+	fi; \
+	mv -f $@.tmp $@
+	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd
+endef
+
+$(MODVERDIR)/%.ver: %.c FORCE
+	@$(call if_changed_rule,cc_ver_c)
+
+targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
+
+fastdep: $(targets) $(subdir-ym)
+	@mkdir -p $(dir $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver)))
+	@touch $(addprefix .tmp_export-objs/modules/,$(export-objs:.o=.ver))
+
+endif # export-objs 
+

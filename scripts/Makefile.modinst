@@ -1,0 +1,17 @@
+# ==========================================================================
+# Installing modules
+# ==========================================================================
+
+quiet_cmd_modules_install = INSTALL $(obj-m)
+cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(obj); \
+		      cp $(obj-m) $(MODLIB)/kernel/$(obj)
+
+.PHONY: modules_install
+
+modules_install: $(subdir-ym)
+ifneq ($(obj-m),)
+	$(call cmd,modules_install)
+else
+	@:
+endif
+
