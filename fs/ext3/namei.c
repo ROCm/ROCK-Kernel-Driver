@@ -2243,7 +2243,26 @@ static int ext3_rename (struct inode * old_dir, struct dentry *old_dentry,
 	/*
 	 * ok, that's it
 	 */
-	ext3_delete_entry(handle, old_dir, old_de, old_bh);
+	retval = ext3_delete_entry(handle, old_dir, old_de, old_bh);
+	if (retval == -ENOENT) {
+		/*
+		 * old_de could have moved out from under us.
+		 */
+		struct buffer_head *old_bh2;
+		struct ext3_dir_entry_2 *old_de2;
+		
+		old_bh2 = ext3_find_entry(old_dentry, &old_de2);
+		if (old_bh2) {
+			retval = ext3_delete_entry(handle, old_dir,
+						   old_de2, old_bh2);
+			brelse(old_bh2);
+		}
+	}
+	if (retval) {
+		ext3_warning(old_dir->i_sb, "ext3_rename",
+				"Deleting old file (%lu), %d, error=%d",
+				old_dir->i_ino, old_dir->i_nlink, retval);
+	}
 
 	if (new_inode) {
 		new_inode->i_nlink--;
