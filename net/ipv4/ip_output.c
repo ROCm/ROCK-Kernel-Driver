@@ -1316,5 +1316,4 @@ void __init ip_init(void)
 #ifdef CONFIG_IP_MULTICAST
 	igmp_mc_proc_init();
 #endif
-	proc_net_create("mcfilter", 0, ip_mcf_procinfo);
 }

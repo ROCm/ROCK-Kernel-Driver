@@ -2247,74 +2247,177 @@ static struct file_operations igmp_mc_seq_fops = {
 	.llseek		=	seq_lseek,
 	.release	=	seq_release_private,
 };
-#endif
 
-int ip_mcf_procinfo(char *buffer, char **start, off_t offset, int length)
-{
-	off_t pos=0, begin=0;
-	int len=0;
-	int first = 1;
+struct igmp_mcf_iter_state {
 	struct net_device *dev;
+	struct in_device *idev;
+	struct ip_mc_list *im;
+};
 
-	read_lock(&dev_base_lock);
-	for(dev=dev_base; dev; dev=dev->next) {
-		struct in_device *in_dev = in_dev_get(dev);
-		struct ip_mc_list *imc;
+#define igmp_mcf_seq_private(seq)	((struct igmp_mcf_iter_state *)&seq->private)
 
-		if (in_dev == NULL)
+static inline struct ip_sf_list *igmp_mcf_get_first(struct seq_file *seq)
+{
+	struct ip_sf_list *psf = NULL;
+	struct ip_mc_list *im = NULL;
+	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
+
+	for (state->dev = dev_base, state->idev = NULL, state->im = NULL;
+	     state->dev; 
+	     state->dev = state->dev->next) {
+		struct in_device *idev;
+		idev = in_dev_get(state->dev);
+		if (unlikely(idev == NULL))
 			continue;
-
-		read_lock(&in_dev->lock);
-
-		for (imc=in_dev->mc_list; imc; imc=imc->next) {
-			struct ip_sf_list *psf;
-
-			spin_lock_bh(&imc->lock);
-			for (psf=imc->sources; psf; psf=psf->sf_next) {
-				if (first) {
-					len += sprintf(buffer+len, "%3s %6s "
-						"%10s %10s %6s %6s\n", "Idx",
-						"Device", "MCA", "SRC", "INC",
-						"EXC");
-					first = 0;
-				}
-				len += sprintf(buffer+len, "%3d %6.6s 0x%08x "
-					"0x%08x %6lu %6lu\n", dev->ifindex,
-					dev->name, ntohl(imc->multiaddr),
-					ntohl(psf->sf_inaddr),
-					psf->sf_count[MCAST_INCLUDE],
-					psf->sf_count[MCAST_EXCLUDE]);
-				pos=begin+len;
-				if(pos<offset)
-				{
-					len=0;
-					begin=pos;
-				}
-				if(pos>offset+length) {
-					spin_unlock_bh(&imc->lock);
-					read_unlock(&in_dev->lock);
-					in_dev_put(in_dev);
-					goto done;
-				}
+		read_lock_bh(&idev->lock);
+		im = idev->mc_list;
+		if (likely(im != NULL)) {
+			spin_lock_bh(&im->lock);
+			psf = im->sources;
+			if (likely(psf != NULL)) {
+				state->im = im;
+				state->idev = idev;
+				break;
 			}
-			spin_unlock_bh(&imc->lock);
+			spin_unlock_bh(&im->lock);
 		}
-		read_unlock(&in_dev->lock);
-		in_dev_put(in_dev);
+		read_unlock_bh(&idev->lock);
 	}
-done:
-	read_unlock(&dev_base_lock);
-
-	*start=buffer+(offset-begin);
-	len-=(offset-begin);
-	if(len>length)
-		len=length;
-	if(len<0)
-		len=0;
-	return len;
+	return psf;
 }
 
-#ifdef CONFIG_PROC_FS
+static struct ip_sf_list *igmp_mcf_get_next(struct seq_file *seq, struct ip_sf_list *psf)
+{
+	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
+
+	psf = psf->sf_next;
+	while (!psf) {
+		spin_unlock_bh(&state->im->lock);
+		state->im = state->im->next;
+		while (!state->im) {
+			if (likely(state->idev != NULL)) {
+				read_unlock_bh(&state->idev->lock);
+				in_dev_put(state->idev);
+			}
+			state->dev = state->dev->next;
+			if (!state->dev) {
+				state->idev = NULL;
+				goto out;
+			}
+			state->idev = in_dev_get(state->dev);
+			if (!state->idev)
+				continue;
+			read_lock_bh(&state->idev->lock);
+			state->im = state->idev->mc_list;
+		}
+		if (!state->im)
+			break;
+		spin_lock_bh(&state->im->lock);
+		psf = state->im->sources;
+	}
+out:
+	return psf;
+}
+
+static struct ip_sf_list *igmp_mcf_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct ip_sf_list *psf = igmp_mcf_get_first(seq);
+	if (psf)
+		while (pos && (psf = igmp_mcf_get_next(seq, psf)) != NULL)
+			--pos;
+	return pos ? NULL : psf;
+}
+
+static void *igmp_mcf_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&dev_base_lock);
+	return *pos ? igmp_mcf_get_idx(seq, *pos) : (void *)1;
+}
+
+static void *igmp_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct ip_sf_list *psf;
+	if (v == (void *)1)
+		psf = igmp_mcf_get_first(seq);
+	else
+		psf = igmp_mcf_get_next(seq, v);
+	++*pos;
+	return psf;
+}
+
+static void igmp_mcf_seq_stop(struct seq_file *seq, void *v)
+{
+	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
+	if (likely(state->im != NULL))
+		spin_unlock_bh(&state->im->lock);
+	if (likely(state->idev != NULL)) {
+		read_unlock_bh(&state->idev->lock);
+		in_dev_put(state->idev);
+	}
+	read_unlock(&dev_base_lock);
+}
+
+static int igmp_mcf_seq_show(struct seq_file *seq, void *v)
+{
+	struct ip_sf_list *psf = (struct ip_sf_list *)v;
+	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
+
+	if (v == (void *)1) {
+		seq_printf(seq, 
+			   "%3s %6s "
+			   "%10s %10s %6s %6s\n", "Idx",
+			   "Device", "MCA",
+			   "SRC", "INC", "EXC");
+	} else {
+		seq_printf(seq,
+			   "%3d %6.6s 0x%08x "
+			   "0x%08x %6lu %6lu\n", 
+			   state->dev->ifindex, state->dev->name, 
+			   ntohl(state->im->multiaddr),
+			   ntohl(psf->sf_inaddr),
+			   psf->sf_count[MCAST_INCLUDE],
+			   psf->sf_count[MCAST_EXCLUDE]);
+	}
+	return 0;
+}
+
+static struct seq_operations igmp_mcf_seq_ops = {
+	.start	=	igmp_mcf_seq_start,
+	.next	=	igmp_mcf_seq_next,
+	.stop	=	igmp_mcf_seq_stop,
+	.show	=	igmp_mcf_seq_show,
+};
+
+static int igmp_mcf_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct igmp_mcf_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	rc = seq_open(file, &igmp_mcf_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations igmp_mcf_seq_fops = {
+	.owner		=	THIS_MODULE,
+	.open		=	igmp_mcf_seq_open,
+	.read		=	seq_read,
+	.llseek		=	seq_lseek,
+	.release	=	seq_release_private,
+};
+
 int __init igmp_mc_proc_init(void)
 {
 	struct proc_dir_entry *p;
@@ -2322,6 +2425,10 @@ int __init igmp_mc_proc_init(void)
 	p = create_proc_entry("igmp", S_IRUGO, proc_net);
 	if (p)
 		p->proc_fops = &igmp_mc_seq_fops;
+
+	p = create_proc_entry("mcfilter", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &igmp_mcf_seq_fops;
 	return 0;
 }
 #endif
