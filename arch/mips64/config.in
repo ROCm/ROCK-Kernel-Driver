@@ -10,7 +10,7 @@ mainmenu_option next_comment
 comment 'Machine selection'
 choice 'Machine type'						\
 	"SGI-IP22,Indy/Indigo2 CONFIG_SGI_IP22			\
-	 SGI-IP27,Origin200/2000 CONFIG_SGI_IP27 SGI-IP27,Origin200/2000"
+	 SGI-IP27,Origin200/2000 CONFIG_SGI_IP27" SGI-IP27,Origin200/2000
 
 if [ "$CONFIG_SGI_IP27" = "y" ]; then
    bool '  IP27 N-Mode' CONFIG_SGI_SN0_N_MODE
