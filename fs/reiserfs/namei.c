@@ -15,6 +15,7 @@
 #include <linux/time.h>
 #include <linux/bitops.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 
 #define INC_DIR_INODE_NLINK(i) if (i->i_nlink != 1) { i->i_nlink++; if (i->i_nlink >= REISERFS_LINK_MAX) i->i_nlink=1; }
@@ -331,11 +332,24 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
     retval = reiserfs_find_entry (dir, dentry->d_name.name, dentry->d_name.len, &path_to_entry, &de);
     pathrelse (&path_to_entry);
     if (retval == NAME_FOUND) {
+        /* Hide the .reiserfs_priv directory */
+	if (reiserfs_xattrs (dir->i_sb) &&
+	    !old_format_only(dir->i_sb) &&
+            REISERFS_SB(dir->i_sb)->priv_root &&
+            REISERFS_SB(dir->i_sb)->priv_root->d_inode &&
+	    de.de_objectid == le32_to_cpu (INODE_PKEY(REISERFS_SB(dir->i_sb)->priv_root->d_inode)->k_objectid)) {
+	  return ERR_PTR (-EACCES);
+	}
+
 	inode = reiserfs_iget (dir->i_sb, (struct cpu_key *)&(de.de_dir_id));
 	if (!inode || IS_ERR(inode)) {
 	    reiserfs_write_unlock(dir->i_sb);
 	    return ERR_PTR(-EACCES);
         }
+
+	/* Propogate the priv_object flag so we know we're in the priv tree */
+	if (is_reiserfs_priv_object (dir))
+	    REISERFS_I(inode)->i_flags |= i_priv_object;
     }
     reiserfs_write_unlock(dir->i_sb);
     if ( retval == IO_ERROR ) {
@@ -630,6 +644,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
         goto out_failed;
     }
 
+    inode->i_op = &reiserfs_special_inode_operations;
     init_special_inode(inode, inode->i_mode, rdev) ;
 
     //FIXME: needed for block and char devices only
@@ -942,7 +957,7 @@ static int reiserfs_symlink (struct inode * parent_dir,
     reiserfs_update_inode_transaction(inode) ;
     reiserfs_update_inode_transaction(parent_dir) ;
 
-    inode->i_op = &page_symlink_inode_operations;
+    inode->i_op = &reiserfs_symlink_inode_operations;
     inode->i_mapping->a_ops = &reiserfs_address_space_operations;
 
     // must be sure this inode is written with this transaction
@@ -1318,5 +1333,42 @@ struct inode_operations reiserfs_dir_inode_operations = {
     .rmdir	= reiserfs_rmdir,
     .mknod	= reiserfs_mknod,
     .rename	= reiserfs_rename,
+    .setattr    = reiserfs_setattr,
+    .setxattr   = reiserfs_setxattr,
+    .getxattr   = reiserfs_getxattr,
+    .listxattr  = reiserfs_listxattr,
+    .removexattr = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
 };
+
+/*
+ * symlink operations.. same as page_symlink_inode_operations, with xattr
+ * stuff added
+ */
+struct inode_operations reiserfs_symlink_inode_operations = {
+    .readlink       = page_readlink,
+    .follow_link    = page_follow_link,
+    .setattr        = reiserfs_setattr,
+    .setxattr       = reiserfs_setxattr,
+    .getxattr       = reiserfs_getxattr,
+    .listxattr      = reiserfs_listxattr,
+    .removexattr    = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
+
+};
+
+
+/*
+ * special file operations.. just xattr/acl stuff
+ */
+struct inode_operations reiserfs_special_inode_operations = {
+    .setattr        = reiserfs_setattr,
+    .setxattr       = reiserfs_setxattr,
+    .getxattr       = reiserfs_getxattr,
+    .listxattr      = reiserfs_listxattr,
+    .removexattr    = reiserfs_removexattr,
+    .permission     = reiserfs_permission,
+
+};
+
 

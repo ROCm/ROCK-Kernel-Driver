@@ -287,7 +287,7 @@ struct unfm_nodeinfo {
 #define STAT_DATA_V2 1
 
 
-static inline struct reiserfs_inode_info *REISERFS_I(struct inode *inode)
+static inline struct reiserfs_inode_info *REISERFS_I(const struct inode *inode)
 {
 	return container_of(inode, struct reiserfs_inode_info, vfs_inode);
 }
@@ -1960,6 +1960,7 @@ void reiserfs_update_sd (struct reiserfs_transaction_handle *th, struct inode * 
 
 void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode );
 void i_attrs_to_sd_attrs( struct inode *inode, __u16 *sd_attrs );
+int reiserfs_setattr(struct dentry *dentry, struct iattr *attr);
 
 /* namei.c */
 void set_de_name_and_namelen (struct reiserfs_dir_entry * de);
@@ -2010,6 +2011,8 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 
 /* dir.c */
 extern struct inode_operations reiserfs_dir_inode_operations;
+extern struct inode_operations reiserfs_symlink_inode_operations;
+extern struct inode_operations reiserfs_special_inode_operations;
 extern struct file_operations reiserfs_dir_operations;
 
 /* tail_conversion.c */
@@ -2237,6 +2240,9 @@ int reiserfs_unpack (struct inode * inode, struct file * filp);
 #define reiserfs_write_lock( sb ) lock_kernel()
 #define reiserfs_write_unlock( sb ) unlock_kernel()
  			         
+/* xattr stuff */
+#define REISERFS_XATTR_DIR_SEM(s) (REISERFS_SB(s)->xattr_dir_sem)
+
 #endif /* _LINUX_REISER_FS_H */
 
 

@@ -6,6 +6,7 @@
 
 #ifdef __KERNEL__
 #include <linux/workqueue.h>
+#include <linux/rwsem.h>
 #endif
 
 typedef enum {
@@ -251,7 +252,6 @@ struct reiserfs_journal {
 
 #define JOURNAL_DESC_MAGIC "ReIsErLB" /* ick.  magic string to find desc blocks in the journal */
 
-
 typedef __u32 (*hashf_t) (const signed char *, int);
 
 struct reiserfs_bitmap_info
@@ -395,6 +395,10 @@ struct reiserfs_sb_info
     struct proc_dir_entry *procdir;
     int reserved_blocks; /* amount of blocks reserved for further allocations */
     spinlock_t bitmap_lock; /* this lock on now only used to protect reserved_blocks variable */
+    struct dentry *priv_root; /* root of /.reiserfs_priv */
+    struct dentry *xattr_root; /* root of /.reiserfs_priv/.xa */
+    struct rw_semaphore xattr_dir_sem;
+
 };
 
 /* Definitions of reiserfs on-disk properties: */
@@ -437,6 +441,8 @@ enum reiserfs_mount_options {
     REISERFS_NO_UNHASHED_RELOCATION,
     REISERFS_HASHED_RELOCATION,
     REISERFS_ATTRS,
+    REISERFS_XATTRS,
+    REISERFS_XATTRS_USER,
 
     REISERFS_TEST1,
     REISERFS_TEST2,
@@ -462,6 +468,9 @@ enum reiserfs_mount_options {
 #define reiserfs_data_log(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_LOG))
 #define reiserfs_data_ordered(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_ORDERED))
 #define reiserfs_data_writeback(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_DATA_WRITEBACK))
+#define reiserfs_xattrs(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS))
+#define reiserfs_xattrs_user(s) (REISERFS_SB(s)->s_mount_opt & (1 << REISERFS_XATTRS_USER))
+#define reiserfs_xattrs_optional(s) reiserfs_xattrs_user(s)
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
 extern struct file_system_type reiserfs_fs_type;

@@ -5,6 +5,7 @@
 
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/pagemap.h>
@@ -95,51 +96,6 @@ static int reiserfs_sync_file(
   reiserfs_commit_for_inode(p_s_inode) ;
   reiserfs_write_unlock(p_s_inode->i_sb);
   return ( n_err < 0 ) ? -EIO : 0;
-}
-
-static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
-    struct inode *inode = dentry->d_inode ;
-    int error ;
-    reiserfs_write_lock(inode->i_sb);
-    if (attr->ia_valid & ATTR_SIZE) {
-	/* version 2 items will be caught by the s_maxbytes check
-	** done for us in vmtruncate
-	*/
-	if (get_inode_item_key_version(inode) == KEY_FORMAT_3_5 &&
-	    attr->ia_size > MAX_NON_LFS) {
-	    error = -EFBIG ;
-	    goto out;
-	}
-	/* fill in hole pointers in the expanding truncate case. */
-        if (attr->ia_size > inode->i_size) {
-	    error = generic_cont_expand(inode, attr->ia_size) ;
-	    if (REISERFS_I(inode)->i_prealloc_count > 0) {
-		struct reiserfs_transaction_handle th ;
-		/* we're changing at most 2 bitmaps, inode + super */
-		journal_begin(&th, inode->i_sb, 4) ;
-		reiserfs_discard_prealloc (&th, inode);
-		journal_end(&th, inode->i_sb, 4) ;
-	    }
-	    if (error)
-	        goto out;
-	}
-    }
-
-    if ((((attr->ia_valid & ATTR_UID) && (attr->ia_uid & ~0xffff)) ||
-	 ((attr->ia_valid & ATTR_GID) && (attr->ia_gid & ~0xffff))) &&
-	(get_inode_sd_version (inode) == STAT_DATA_V1)) {
-		/* stat data of format v3.5 has 16 bit uid and gid */
-	    error = -EINVAL;
-	    goto out;	
-	}
-
-    error = inode_change_ok(inode, attr) ;
-    if (!error)
-        inode_setattr(inode, attr) ;
-
-out:
-    reiserfs_write_unlock(inode->i_sb);
-    return error ;
 }
 
 /* I really do not want to play with memory shortage right now, so
@@ -1321,6 +1277,11 @@ struct file_operations reiserfs_file_operations = {
 struct  inode_operations reiserfs_file_inode_operations = {
     .truncate	= reiserfs_vfs_truncate_file,
     .setattr    = reiserfs_setattr,
+    .setxattr   = reiserfs_setxattr,
+    .getxattr   = reiserfs_getxattr,
+    .listxattr  = reiserfs_listxattr,
+    .removexattr = reiserfs_removexattr,
+    .permission = reiserfs_permission,
 };
 
 

@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
@@ -357,7 +358,17 @@ static void reiserfs_put_super (struct super_block * s)
 {
   int i;
   struct reiserfs_transaction_handle th ;
+
+  if (REISERFS_SB(s)->xattr_root) {
+    d_invalidate (REISERFS_SB(s)->xattr_root);
+    dput (REISERFS_SB(s)->xattr_root);
+  }
   
+  if (REISERFS_SB(s)->priv_root) {
+    d_invalidate (REISERFS_SB(s)->priv_root);
+    dput (REISERFS_SB(s)->priv_root);
+  }
+
   /* change file system state to current state if it was mounted with read-write permissions */
   if (!(s->s_flags & MS_RDONLY)) {
     journal_begin(&th, s, 10) ;
@@ -669,6 +680,8 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"conv", 0, 0, 1<<REISERFS_CONVERT, 0},
 	{"attrs", 0, 0, 1<<REISERFS_ATTRS, 0},
 	{"noattrs", 0, 0, 0, 1<<REISERFS_ATTRS},
+	{"user_xattr", 0, 0, 1<<REISERFS_XATTRS_USER, 0},
+	{"nouser_xattr", 0, 0, 0, 1<<REISERFS_XATTRS_USER},
 	{"nolog", 0, 0, 0, 0}, /* This is unsupported */
 	{"replayonly", 0, 0, 1<<REPLAYONLY, 0},
 	{"block-allocator", 'a', balloc, 0, 0},
@@ -813,6 +826,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   safe_mask |= 1 << REISERFS_HASHED_RELOCATION;
   safe_mask |= 1 << REISERFS_TEST4;
   safe_mask |= 1 << REISERFS_ATTRS;
+  safe_mask |= 1 << REISERFS_XATTRS_USER;
 
   /* Update the bitmask, taking care to keep
    * the bits we're not allowed to change here */
@@ -836,6 +850,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   }
 
   if (*mount_flags & MS_RDONLY) {
+    reiserfs_xattr_init (s, *mount_flags);
     /* remount read-only */
     if (s->s_flags & MS_RDONLY)
       /* it is read-only already */
@@ -852,8 +867,10 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
   } else {
     /* remount read-write */
-    if (!(s->s_flags & MS_RDONLY))
+    if (!(s->s_flags & MS_RDONLY)) {
+	reiserfs_xattr_init (s, *mount_flags);
 	return 0; /* We are read-write already */
+    }
 
     handle_data_mode(s, mount_options);
     REISERFS_SB(s)->s_mount_state = sb_umount_state(rs) ;
@@ -874,8 +891,10 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   journal_end(&th, s, 10) ;
   s->s_dirt = 0;
 
-  if (!( *mount_flags & MS_RDONLY ) )
+  if (!( *mount_flags & MS_RDONLY ) ) {
     finish_unfinished( s );
+    reiserfs_xattr_init (s, *mount_flags);
+  }
 
   return 0;
 }
@@ -1305,6 +1324,8 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     REISERFS_SB(s)->s_alloc_options.preallocmin = 4;
     /* Preallocate by 16 blocks (17-1) at once */
     REISERFS_SB(s)->s_alloc_options.preallocsize = 17;
+    /* Initialize the rwsem for xattr dir */
+    init_rwsem(&REISERFS_SB(s)->xattr_dir_sem);
 
     jdev_name = NULL;
     if (reiserfs_parse_options (s, (char *) data, &(sbi->s_mount_opt), &blocks, &jdev_name, &commit_max_age) == 0) {
@@ -1449,12 +1470,24 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
 
 	journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
 	journal_end(&th, s, 1) ;
-	
+
+	if (reiserfs_xattr_init (s, s->s_flags)) {
+	    dput (s->s_root);
+	    s->s_root = NULL;
+	    goto error;
+	}
+
 	/* look for files which were to be removed in previous session */
 	finish_unfinished (s);
     } else {
 	if ( old_format_only(s) && !silent) {
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
+	}
+
+	if (reiserfs_xattr_init (s, s->s_flags)) {
+	    dput (s->s_root);
+	    s->s_root = NULL;
+	    goto error;
 	}
     }
     // mark hash in super block: it could be unset. overwrite should be ok
@@ -1523,6 +1556,9 @@ init_reiserfs_fs ( void )
 		return ret;
 	}
 
+        if ((ret = reiserfs_xattr_register_handlers ()))
+            goto failed_reiserfs_xattr_register_handlers;
+
 	reiserfs_proc_info_global_init ();
 	reiserfs_proc_register_global ("version", reiserfs_global_version_in_proc);
 
@@ -1532,6 +1568,9 @@ init_reiserfs_fs ( void )
 		return 0;
 	}
 
+        reiserfs_xattr_unregister_handlers ();
+
+failed_reiserfs_xattr_register_handlers:
 	reiserfs_proc_unregister_global ("version");
 	reiserfs_proc_info_global_done ();
 	destroy_inodecache ();
@@ -1542,6 +1581,7 @@ init_reiserfs_fs ( void )
 static void __exit
 exit_reiserfs_fs ( void )
 {
+        reiserfs_xattr_unregister_handlers ();
 	reiserfs_proc_unregister_global ("version");
 	reiserfs_proc_info_global_done ();
         unregister_filesystem (& reiserfs_fs_type);
