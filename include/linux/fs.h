@@ -695,6 +695,7 @@ extern int posix_lock_file_wait(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
+extern int flock_lock_file_wait(struct file *filp, struct file_lock *fl);
 extern int __break_lease(struct inode *inode, unsigned int flags);
 extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
@@ -912,6 +913,7 @@ struct file_operations {
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 	int (*check_flags)(int);
 	int (*dir_notify)(struct file *filp, unsigned long arg);
+	int (*flock) (struct file *, int, struct file_lock *);
 };
 
 struct inode_operations {
