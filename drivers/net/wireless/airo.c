@@ -3163,11 +3163,12 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 			} else
 				hdrlen = ETH_ALEN * 2;
 
-			skb = dev_alloc_skb( len + hdrlen + 2 );
+			skb = dev_alloc_skb( len + hdrlen + 2 + 2 );
 			if ( !skb ) {
 				apriv->stats.rx_dropped++;
 				goto badrx;
 			}
+			skb_reserve(skb, 2); /* This way the IP header is aligned */
 			buffer = (u16*)skb_put (skb, len + hdrlen);
 			if (test_bit(FLAG_802_11, &apriv->flags)) {
 				buffer[0] = fc;
