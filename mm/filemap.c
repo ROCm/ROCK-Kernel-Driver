@@ -21,6 +21,7 @@
 #include <linux/iobuf.h>
 #include <linux/hash.h>
 #include <linux/writeback.h>
+#include <linux/pagevec.h>
 #include <linux/security.h>
 /*
  * This is needed for the following functions:
@@ -52,7 +53,6 @@
 /*
  * Lock ordering:
  *
- *  pagemap_lru_lock
  *  ->i_shared_lock		(vmtruncate)
  *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->swap_list_lock
@@ -61,7 +61,7 @@
  *      ->inode_lock		(__mark_inode_dirty)
  *        ->sb_lock		(fs/fs-writeback.c)
  */
-spinlock_t pagemap_lru_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
+spinlock_t _pagemap_lru_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
 /*
  * Remove a page from the page cache and free it. Caller has to make
@@ -117,10 +117,10 @@ void invalidate_inode_pages(struct inode * inode)
 	struct list_head *head, *curr;
 	struct page * page;
 	struct address_space *mapping = inode->i_mapping;
+	struct pagevec lru_pvec;
 
 	head = &mapping->clean_pages;
-
-	spin_lock(&pagemap_lru_lock);
+	pagevec_init(&lru_pvec);
 	write_lock(&mapping->page_lock);
 	curr = head->next;
 
@@ -142,10 +142,10 @@ void invalidate_inode_pages(struct inode * inode)
 		if (page_count(page) != 1)
 			goto unlock;
 
-		__lru_cache_del(page);
 		__remove_from_page_cache(page);
 		unlock_page(page);
-		page_cache_release(page);
+		if (!pagevec_add(&lru_pvec, page))
+			__pagevec_lru_del(&lru_pvec);
 		continue;
 unlock:
 		unlock_page(page);
@@ -153,7 +153,7 @@ unlock:
 	}
 
 	write_unlock(&mapping->page_lock);
-	spin_unlock(&pagemap_lru_lock);
+	pagevec_lru_del(&lru_pvec);
 }
 
 static int do_invalidatepage(struct page *page, unsigned long offset)
@@ -173,16 +173,14 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
 }
 
 /*
- * If truncate can remove the fs-private metadata from the page, it
- * removes the page from the LRU immediately.  This because some other thread
- * of control (eg, sendfile) may have a reference to the page.  But dropping
- * the final reference to an LRU page in interrupt context is illegal - it may
- * deadlock over pagemap_lru_lock.
+ * If truncate cannot remove the fs-private metadata from the page, the page
+ * becomes anonymous.  It will be left on the LRU and may even be mapped into
+ * user pagetables if we're racing with filemap_nopage().
  */
 static void truncate_complete_page(struct page *page)
 {
-	if (!PagePrivate(page) || do_invalidatepage(page, 0))
-		lru_cache_del(page);
+	if (PagePrivate(page))
+		do_invalidatepage(page, 0);
 
 	ClearPageDirty(page);
 	ClearPageUptodate(page);
@@ -203,8 +201,10 @@ static int truncate_list_pages(struct address_space *mapping,
 	struct list_head *curr;
 	struct page * page;
 	int unlocked = 0;
+	struct pagevec release_pvec;
 
- restart:
+	pagevec_init(&release_pvec);
+restart:
 	curr = head->next;
 	while (curr != head) {
 		unsigned long offset;
@@ -224,18 +224,17 @@ static int truncate_list_pages(struct address_space *mapping,
 				list_add_tail(head, curr);
 				write_unlock(&mapping->page_lock);
 				wait_on_page_writeback(page);
-				page_cache_release(page);
+				if (!pagevec_add(&release_pvec, page))
+					__pagevec_release(&release_pvec);
 				unlocked = 1;
 				write_lock(&mapping->page_lock);
 				goto restart;
 			}
 
 			list_del(head);
-			if (!failed)
-				/* Restart after this page */
+			if (!failed)		/* Restart after this page */
 				list_add(head, curr);
-			else
-				/* Restart on this page */
+			else			/* Restart on this page */
 				list_add_tail(head, curr);
 
 			write_unlock(&mapping->page_lock);
@@ -245,24 +244,26 @@ static int truncate_list_pages(struct address_space *mapping,
 				if (*partial && (offset + 1) == start) {
 					truncate_partial_page(page, *partial);
 					*partial = 0;
-				} else 
+				} else {
 					truncate_complete_page(page);
-
+				}
 				unlock_page(page);
-			} else
+			} else {
  				wait_on_page_locked(page);
-
-			page_cache_release(page);
-
-			if (need_resched()) {
-				__set_current_state(TASK_RUNNING);
-				schedule();
 			}
-
+			if (!pagevec_add(&release_pvec, page))
+				__pagevec_release(&release_pvec);
+			cond_resched();
 			write_lock(&mapping->page_lock);
 			goto restart;
 		}
 		curr = curr->next;
+	}
+	if (pagevec_count(&release_pvec)) {
+		write_unlock(&mapping->page_lock);
+		pagevec_release(&release_pvec);
+		write_lock(&mapping->page_lock);
+		unlocked = 1;
 	}
 	return unlocked;
 }
@@ -361,8 +362,10 @@ static int invalidate_list_pages2(struct address_space * mapping,
 	struct list_head *curr;
 	struct page * page;
 	int unlocked = 0;
+	struct pagevec release_pvec;
 
- restart:
+	pagevec_init(&release_pvec);
+restart:
 	curr = head->prev;
 	while (curr != head) {
 		page = list_entry(curr, struct page, list);
@@ -379,7 +382,8 @@ static int invalidate_list_pages2(struct address_space * mapping,
 				goto restart;
 			}
 
-			__unlocked = invalidate_this_page2(mapping, page, curr, head);
+			__unlocked = invalidate_this_page2(mapping,
+						page, curr, head);
 			unlock_page(page);
 			unlocked |= __unlocked;
 			if (!__unlocked) {
@@ -397,14 +401,17 @@ static int invalidate_list_pages2(struct address_space * mapping,
 			wait_on_page_locked(page);
 		}
 
-		page_cache_release(page);
-		if (need_resched()) {
-			__set_current_state(TASK_RUNNING);
-			schedule();
-		}
-
+		if (!pagevec_add(&release_pvec, page))
+			__pagevec_release(&release_pvec);
+		cond_resched();
 		write_lock(&mapping->page_lock);
 		goto restart;
+	}
+	if (pagevec_count(&release_pvec)) {
+		write_unlock(&mapping->page_lock);
+		pagevec_release(&release_pvec);
+		write_lock(&mapping->page_lock);
+		unlocked = 1;
 	}
 	return unlocked;
 }
@@ -530,24 +537,35 @@ int filemap_fdatawait(struct address_space * mapping)
  * In the case of swapcache, try_to_swap_out() has already locked the page, so
  * SetPageLocked() is ugly-but-OK there too.  The required page state has been
  * set up by swap_out_add_to_swap_cache().
+ *
+ * This function does not add the page to the LRU.  The caller must do that.
  */
 int add_to_page_cache(struct page *page,
-		struct address_space *mapping, unsigned long offset)
+		struct address_space *mapping, pgoff_t offset)
 {
 	int error;
 
+	page_cache_get(page);
 	write_lock(&mapping->page_lock);
 	error = radix_tree_insert(&mapping->page_tree, offset, page);
 	if (!error) {
 		SetPageLocked(page);
 		ClearPageDirty(page);
 		___add_to_page_cache(page, mapping, offset);
-		page_cache_get(page);
+	} else {
+		page_cache_release(page);
 	}
 	write_unlock(&mapping->page_lock);
-	if (!error)
-		lru_cache_add(page);
 	return error;
+}
+
+int add_to_page_cache_lru(struct page *page,
+		struct address_space *mapping, pgoff_t offset)
+{
+	int ret = add_to_page_cache(page, mapping, offset);
+	if (ret == 0)
+		lru_cache_add(page);
+	return ret;
 }
 
 /*
@@ -565,7 +583,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
 	if (!page)
 		return -ENOMEM;
 
-	error = add_to_page_cache(page, mapping, offset);
+	error = add_to_page_cache_lru(page, mapping, offset);
 	if (!error) {
 		error = mapping->a_ops->readpage(file, page);
 		page_cache_release(page);
@@ -796,7 +814,7 @@ repeat:
 			if (!cached_page)
 				return NULL;
 		}
-		err = add_to_page_cache(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping, index);
 		if (!err) {
 			page = cached_page;
 			cached_page = NULL;
@@ -829,7 +847,7 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		return NULL;
 	}
 	page = alloc_pages(mapping->gfp_mask & ~__GFP_FS, 0);
-	if (page && add_to_page_cache(page, mapping, index)) {
+	if (page && add_to_page_cache_lru(page, mapping, index)) {
 		page_cache_release(page);
 		page = NULL;
 	}
@@ -993,7 +1011,7 @@ no_cached_page:
 				break;
 			}
 		}
-		error = add_to_page_cache(cached_page, mapping, index);
+		error = add_to_page_cache_lru(cached_page, mapping, index);
 		if (error) {
 			if (error == -EEXIST)
 				goto find_page;
@@ -1703,7 +1721,7 @@ repeat:
 			if (!cached_page)
 				return ERR_PTR(-ENOMEM);
 		}
-		err = add_to_page_cache(cached_page, mapping, index);
+		err = add_to_page_cache_lru(cached_page, mapping, index);
 		if (err == -EEXIST)
 			goto repeat;
 		if (err < 0) {
@@ -1763,8 +1781,14 @@ retry:
 	return page;
 }
 
-static inline struct page * __grab_cache_page(struct address_space *mapping,
-				unsigned long index, struct page **cached_page)
+/*
+ * If the page was newly created, increment its refcount and add it to the
+ * caller's lru-buffering pagevec.  This function is specifically for
+ * generic_file_write().
+ */
+static inline struct page *
+__grab_cache_page(struct address_space *mapping, unsigned long index,
+			struct page **cached_page, struct pagevec *lru_pvec)
 {
 	int err;
 	struct page *page;
@@ -1781,6 +1805,9 @@ repeat:
 			goto repeat;
 		if (err == 0) {
 			page = *cached_page;
+			page_cache_get(page);
+			if (!pagevec_add(lru_pvec, page))
+				__pagevec_lru_add(lru_pvec);
 			*cached_page = NULL;
 		}
 	}
@@ -1827,6 +1854,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 	int		err;
 	unsigned	bytes;
 	time_t		time_now;
+	struct pagevec	lru_pvec;
 
 	if (unlikely((ssize_t)count < 0))
 		return -EINVAL;
@@ -1837,6 +1865,8 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 	pos = *ppos;
 	if (unlikely(pos < 0))
 		return -EINVAL;
+
+	pagevec_init(&lru_pvec);
 
 	if (unlikely(file->f_error)) {
 		err = file->f_error;
@@ -1971,7 +2001,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 			__get_user(dummy, buf+bytes-1);
 		}
 
-		page = __grab_cache_page(mapping, index, &cached_page);
+		page = __grab_cache_page(mapping, index, &cached_page, &lru_pvec);
 		if (!page) {
 			status = -ENOMEM;
 			break;
@@ -2033,6 +2063,7 @@ ssize_t generic_file_write_nolock(struct file *file, const char *buf,
 out_status:	
 	err = written ? written : status;
 out:
+	pagevec_lru_add(&lru_pvec);
 	return err;
 }
 

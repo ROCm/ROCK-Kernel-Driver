@@ -119,7 +119,7 @@ void fbcon_vga_planes_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	height *= fontheight(p);
 
 	if (dy < sy || (dy == sy && dx < sx)) {
-		line_ofs = p->fb_info.fix.line_length - width;
+		line_ofs = p->fb_info->fix.line_length - width;
 		dest = p->fb_info->screen_base + dx + dy * p->fb_info->fix.line_length;
 		src = p->fb_info->screen_base + sx + sy * p->fb_info->fix.line_length;
 		while (height--) {

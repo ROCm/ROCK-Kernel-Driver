@@ -12,6 +12,7 @@
 #include <linux/mm.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
+#include <linux/pagevec.h>
 
 struct backing_dev_info default_backing_dev_info = {
 	.ra_pages	= (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
@@ -36,6 +37,9 @@ read_pages(struct file *file, struct address_space *mapping,
 		struct list_head *pages, unsigned nr_pages)
 {
 	unsigned page_idx;
+	struct pagevec lru_pvec;
+
+	pagevec_init(&lru_pvec);
 
 	if (mapping->a_ops->readpages)
 		return mapping->a_ops->readpages(mapping, pages, nr_pages);
@@ -43,10 +47,15 @@ read_pages(struct file *file, struct address_space *mapping,
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
-		if (!add_to_page_cache(page, mapping, page->index))
+		if (!add_to_page_cache(page, mapping, page->index)) {
+			if (!pagevec_add(&lru_pvec, page))
+				__pagevec_lru_add(&lru_pvec);
 			mapping->a_ops->readpage(file, page);
-		page_cache_release(page);
+		} else {
+			page_cache_release(page);
+		}
 	}
+	pagevec_lru_add(&lru_pvec);
 	return 0;
 }
 

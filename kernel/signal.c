@@ -774,7 +774,7 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	int why, status;
 
 	/* is the thread detached? */
-	if (sig == -1 || tsk->exit_signal == -1)
+	if (sig == -1)
 		BUG();
 
 	info.si_signo = sig;

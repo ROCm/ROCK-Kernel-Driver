@@ -265,7 +265,7 @@ static int bus_reset( Scsi_Cmnd *srb )
 		US_DEBUGPX("simulating disconnect/reconnect.\n");
 		down(&intf->driver->serialize);
 		intf->driver->disconnect(pusb_dev_save, intf->private_data);
-		id = usb_match_id(pusb_dev_save, intf, intf->driver->id_table);
+		id = usb_match_id(intf, intf->driver->id_table);
 		intf->driver->probe(pusb_dev_save, i, id);
 		up(&intf->driver->serialize);
 	}

@@ -244,9 +244,10 @@ typedef union {
 char 			*acsi_buffer;
 unsigned long 	phys_acsi_buffer;
 
-static int				NDevices = 0;
-static struct hd_struct	acsi_part[MAX_DEV<<4] = { {0,0}, };
-static int 				access_count[MAX_DEV] = { 0, };
+static int NDevices;
+static struct hd_struct	acsi_part[MAX_DEV<<4];
+static char acsi_names[MAX_DEV*4];
+static int access_count[MAX_DEV];
 
 static int				CurrentNReq;
 static int				CurrentNSect;
@@ -1345,14 +1346,8 @@ static int acsi_mode_sense( int target, int lun, SENSE_DATA *sd )
 
 extern struct block_device_operations acsi_fops;
 
-static struct gendisk acsi_gendisk = {
-	major:		MAJOR_NR,
-	major_name:	"ad",
-	minor_shift:	4,
-	part:		acsi_part,
-	fops:		&acsi_fops,
-};
-	
+static struct gendisk acsi_gendisk[MAX_DEV];
+
 #define MAX_SCSI_DEVICE_CODE 10
 
 static const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
@@ -1700,12 +1695,22 @@ static void acsi_geninit(void)
 			NDevices, n_slm );
 #endif
 					 
-	for( i = 0; i < NDevices; ++i )
-		register_disk(&acsi_gendisk, mk_kdev(MAJOR_NR,i<<4),
-				(acsi_info[i].type==HARDDISK)?1<<4:1,
-				&acsi_fops,
+	for( i = 0; i < NDevices; ++i ) {
+		struct gendisk *disk = acsi_gendisk + i;
+		sprintf(acsi_names + 4*i, "ad%c", 'a'+i);
+		disk->major = MAJOR_NR;
+		disk->first_minor = i << 4;
+		disk->major_name = acsi_names + 4*i;
+		disk->minor_shift = (acsi_info[i].type==HARDDISK)?4:0;
+		disk->part = acsi_part + (i<<4);
+		disk->fops = &acsi_fops;
+		disk->nr_real = 1;
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+				1<<disk->minor_shift,
+				disk->fops,
 				acsi_info[i].size);
-	acsi_gendisk.nr_real = NDevices;
+	}
 }
 
 #ifdef CONFIG_ATARI_SLM_MODULE
@@ -1744,8 +1749,6 @@ int acsi_init( void )
 	STramMask = ATARIHW_PRESENT(EXTD_DMA) ? 0x00000000 : 0xff000000;
 	
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_acsi_request, &acsi_lock);
-	add_gendisk(&acsi_gendisk);
-
 #ifdef CONFIG_ATARI_SLM
 	err = slm_init();
 #endif
@@ -1771,6 +1774,7 @@ int init_module(void)
 
 void cleanup_module(void)
 {
+	int i;
 	del_timer( &acsi_timer );
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	atari_stram_free( acsi_buffer );
@@ -1778,7 +1782,8 @@ void cleanup_module(void)
 	if (unregister_blkdev( MAJOR_NR, "ad" ) != 0)
 		printk( KERN_ERR "acsi: cleanup_module failed\n");
 
-	del_gendisk(&acsi_gendisk);
+	for (i = 0; i < NDevices; i++)
+		del_gendisk(acsi_gendisk + i);
 }
 #endif
 
