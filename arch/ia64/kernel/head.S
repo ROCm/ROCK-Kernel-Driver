@@ -797,6 +797,25 @@ GLOBAL_ENTRY(ia64_switch_mode_virt)
 	br.ret.sptk.many rp
 END(ia64_switch_mode_virt)
 
+GLOBAL_ENTRY(ia64_delay_loop)
+	.prologue
+{	nop 0			// work around GAS unwind info generation bug...
+	.save ar.lc,r2
+	mov r2=ar.lc
+	.body
+	;;
+	mov ar.lc=r32
+}
+	;;
+	// force loop to be 32-byte aligned (GAS bug means we cannot use .align
+	// inside function body without corrupting unwind info).
+{	nop 0 }
+1:	br.cloop.sptk.few 1b
+	;;
+	mov ar.lc=r2
+	br.ret.sptk.many rp
+END(ia64_delay_loop)
+
 #ifdef CONFIG_IA64_BRL_EMU
 
 /*

@@ -99,4 +99,6 @@ extern ia64_mv_dma_supported		sn_dma_supported;
 #define platform_dma_sync_sg		sn_dma_sync_sg
 #define platform_dma_supported		sn_dma_supported
 
+#include <asm/sn/sn2/io.h>
+
 #endif /* _ASM_IA64_MACHVEC_SN2_H */
