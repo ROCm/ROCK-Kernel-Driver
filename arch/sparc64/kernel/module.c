@@ -138,7 +138,9 @@ void *module_alloc(unsigned long size)
 /* Free memory returned from module_core_alloc/module_init_alloc */
 void module_free(struct module *mod, void *module_region)
 {
+	write_lock(&vmlist_lock);
 	module_unmap(module_region);
+	write_unlock(&vmlist_lock);
 	/* FIXME: If module_region == mod->init_region, trim exception
            table entries. */
 }

@@ -260,6 +260,7 @@ struct vm_struct *remove_vm_area(void *addr)
 	return NULL;
 
 found:
+	unmap_vm_area(tmp);
 	*p = tmp->next;
 	write_unlock(&vmlist_lock);
 	return tmp;
@@ -283,8 +284,6 @@ void __vunmap(void *addr, int deallocate_pages)
 				addr);
 		return;
 	}
-
-	unmap_vm_area(area);
 	
 	if (deallocate_pages) {
 		int i;
