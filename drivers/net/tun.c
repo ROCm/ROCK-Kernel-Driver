@@ -513,12 +513,10 @@ static int tun_chr_fasync(int fd, struct file *file, int on)
 		return ret; 
  
 	if (on) {
+		ret = f_setown(file, current->pid, 0);
+		if (ret)
+			return ret;
 		tun->flags |= TUN_FASYNC;
-		if (!file->f_owner.pid) {
-			file->f_owner.pid  = current->pid;
-			file->f_owner.uid  = current->uid;
-			file->f_owner.euid = current->euid;
-		}
 	} else 
 		tun->flags &= ~TUN_FASYNC;
 

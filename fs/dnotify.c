@@ -68,7 +68,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	struct dnotify_struct **prev;
 	struct inode *inode;
 	fl_owner_t id = current->files;
-	int error;
+	int error = 0;
 
 	if ((arg & ~DN_MULTISHOT) == 0) {
 		dnotify_flush(filp, id);
@@ -89,21 +89,15 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 			odn->dn_fd = fd;
 			odn->dn_mask |= arg;
 			inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
-			kmem_cache_free(dn_cache, dn);
-			goto out;
+			goto out_free;
 		}
 		prev = &odn->dn_next;
 	}
 
-	error = security_ops->file_set_fowner(filp);
-	if (error) {
-		write_unlock(&dn_lock);
-		return error;
-	}
+	error = f_setown(filp, current->pid, 1);
+	if (error)
+		goto out_free;
 
-	filp->f_owner.pid = current->pid;
-	filp->f_owner.uid = current->uid;
-	filp->f_owner.euid = current->euid;
 	dn->dn_mask = arg;
 	dn->dn_fd = fd;
 	dn->dn_filp = filp;
@@ -113,7 +107,10 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	inode->i_dnotify = dn;
 out:
 	write_unlock(&dn_lock);
-	return 0;
+	return error;
+out_free:
+	kmem_cache_free(dn_cache, dn);
+	goto out;
 }
 
 void __inode_dir_notify(struct inode *inode, unsigned long event)
@@ -131,8 +128,7 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 			continue;
 		}
 		fown = &dn->dn_filp->f_owner;
-		if (fown->pid)
-		        send_sigio(fown, dn->dn_fd, POLL_MSG);
+		send_sigio(fown, dn->dn_fd, POLL_MSG);
 		if (dn->dn_mask & DN_MULTISHOT)
 			prev = &dn->dn_next;
 		else {

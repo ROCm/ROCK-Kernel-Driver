@@ -12,7 +12,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <linux/init.h>
 #include <linux/config.h>
 #include "hisax.h"

@@ -1686,7 +1686,7 @@ printk("sym_user_command: data=%ld\n", uc->data);
 	if (len)
 		return -EINVAL;
 	else {
-		long flags;
+		unsigned long flags;
 
 		SYM_LOCK_HCB(np, flags);
 		sym_exec_user_command (np, uc);

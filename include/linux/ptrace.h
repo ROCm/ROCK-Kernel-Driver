@@ -24,6 +24,7 @@
 #define PTRACE_SYSCALL		  24
 
 #include <asm/ptrace.h>
+#include <linux/sched.h>
 
 extern int ptrace_readdata(struct task_struct *tsk, unsigned long src, char *dst, int len);
 extern int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int len);

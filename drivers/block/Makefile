@@ -8,8 +8,8 @@
 # In the future, some of these should be built conditionally.
 #
 
-export-objs	:= elevator.o ll_rw_blk.o blkpg.o loop.o genhd.o \
-		   block_ioctl.o acsi.o
+export-objs	:= elevator.o ll_rw_blk.o loop.o genhd.o acsi.o \
+		   block_ioctl.o
 
 obj-y	:= elevator.o ll_rw_blk.o blkpg.o genhd.o block_ioctl.o
 

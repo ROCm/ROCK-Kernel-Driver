@@ -12,7 +12,6 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
-#define __NO_VERSION__
 #include "hisax.h"
 #include "w6692.h"
 #include "isdnl1.h"

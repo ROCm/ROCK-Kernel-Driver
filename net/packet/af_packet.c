@@ -1463,15 +1463,11 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			int pid;
 			if (get_user(pid, (int *) arg))
 				return -EFAULT; 
-			if (current->pid != pid && current->pgrp != -pid && 
-			    !capable(CAP_NET_ADMIN))
-				return -EPERM;
-			sk->proc = pid;
-			break;
+			return f_setown(sock->file, pid, 1);
 		}
 		case FIOGETOWN:
 		case SIOCGPGRP:
-			return put_user(sk->proc, (int *)arg);
+			return put_user(sock->file->f_owner.pid, (int *)arg);
 		case SIOCGSTAMP:
 			if(sk->stamp.tv_sec==0)
 				return -ENOENT;
