@@ -1,5 +1,5 @@
 /**
- * $Id: phram.c,v 1.10 2004/12/10 17:53:13 joern Exp $
+ * $Id: phram.c,v 1.11 2005/01/05 18:05:13 dwmw2 Exp $
  *
  * Copyright (c) ????		Jochen Schäuble <psionic@psionic.de>
  * Copyright (c) 2003-2004	Jörn Engel <joern@wh.fh-wedel.de>
@@ -39,7 +39,7 @@ static LIST_HEAD(phram_list);
 
 static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (instr->addr + instr->len > mtd->size)
 		return -EINVAL;
@@ -61,7 +61,7 @@ static int phram_erase(struct mtd_info *mtd, struct erase_info *instr)
 static int phram_point(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char **mtdbuf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (from + len > mtd->size)
 		return -EINVAL;
@@ -78,7 +78,7 @@ static void phram_unpoint(struct mtd_info *mtd, u_char *addr, loff_t from, size_
 static int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 		size_t *retlen, u_char *buf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (from + len > mtd->size)
 		return -EINVAL;
@@ -92,7 +92,7 @@ static int phram_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int phram_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
-	u_char *start = (u_char *)mtd->priv;
+	u_char *start = mtd->priv;
 
 	if (to + len > mtd->size)
 		return -EINVAL;

@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.29 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.30 2005/01/05 18:05:13 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -113,7 +113,7 @@ static struct mtd_info *pmc551list;
 
 static int pmc551_erase (struct mtd_info *mtd, struct erase_info *instr)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -176,7 +176,7 @@ out:
 
 static int pmc551_point (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char **mtdbuf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi;
         u32 soff_lo;
 
@@ -217,7 +217,7 @@ static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr, loff_t from, siz
 
 static int pmc551_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -279,7 +279,7 @@ out:
 
 static int pmc551_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -820,7 +820,7 @@ static void __exit cleanup_pmc551(void)
 	struct mypriv *priv;
 
 	while((mtd=pmc551list)) {
-		priv = (struct mypriv *)mtd->priv;
+		priv = mtd->priv;
 		pmc551list = priv->nextpmc551;
 		
 		if(priv->start) {

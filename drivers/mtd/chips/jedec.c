@@ -11,7 +11,7 @@
  * not going to guess how to send commands to them, plus I expect they will
  * all speak CFI..
  *
- * $Id: jedec.c,v 1.21 2004/08/09 13:19:43 dwmw2 Exp $
+ * $Id: jedec.c,v 1.22 2005/01/05 18:05:11 dwmw2 Exp $
  */
 
 #include <linux/init.h>
@@ -529,7 +529,7 @@ static int jedec_probe32(struct map_info *map,unsigned long base,
 static int jedec_read(struct mtd_info *mtd, loff_t from, size_t len, 
 		      size_t *retlen, u_char *buf)
 {
-   struct map_info *map = (struct map_info *)mtd->priv;
+   struct map_info *map = mtd->priv;
    
    map_copy_from(map, buf, from, len);
    *retlen = len;
@@ -541,8 +541,8 @@ static int jedec_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int jedec_read_banked(struct mtd_info *mtd, loff_t from, size_t len, 
 			     size_t *retlen, u_char *buf)
 {
-   struct map_info *map = (struct map_info *)mtd->priv;
-   struct jedec_private *priv = (struct jedec_private *)map->fldrv_priv;
+   struct map_info *map = mtd->priv;
+   struct jedec_private *priv = map->fldrv_priv;
 
    *retlen = 0;
    while (len > 0)
@@ -593,8 +593,8 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
    unsigned long NoTime = 0;
    unsigned long start = instr->addr, len = instr->len;
    unsigned int I;
-   struct map_info *map = (struct map_info *)mtd->priv;
-   struct jedec_private *priv = (struct jedec_private *)map->fldrv_priv;
+   struct map_info *map = mtd->priv;
+   struct jedec_private *priv = map->fldrv_priv;
 
    // Verify the arguments..
    if (start + len > mtd->size ||
@@ -800,8 +800,8 @@ static int flash_write(struct mtd_info *mtd, loff_t start, size_t len,
    #define flread(x) map_read8(map,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
    #define flwrite(v,x) map_write8(map,v,base+(off&((1<<chip->addrshift)-1))+((x)<<chip->addrshift))
    
-   struct map_info *map = (struct map_info *)mtd->priv;
-   struct jedec_private *priv = (struct jedec_private *)map->fldrv_priv;
+   struct map_info *map = mtd->priv;
+   struct jedec_private *priv = map->fldrv_priv;
    unsigned long base;
    unsigned long off;
    size_t save_len = len;
