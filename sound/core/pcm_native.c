@@ -888,7 +888,8 @@ static int snd_pcm_do_suspend(snd_pcm_substream_t *substream, int state)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	if (runtime->trigger_master != substream)
 		return 0;
-	if (runtime->status->suspended_state != SNDRV_PCM_STATE_RUNNING)
+	if (runtime->status->suspended_state != SNDRV_PCM_STATE_RUNNING &&
+	    runtime->status->suspended_state != SNDRV_PCM_STATE_DRAINING)
 		return 0;
 	return substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_SUSPEND);
 }
@@ -962,7 +963,8 @@ static int snd_pcm_do_resume(snd_pcm_substream_t *substream, int state)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	if (runtime->trigger_master != substream)
 		return 0;
-	if (runtime->status->suspended_state != SNDRV_PCM_STATE_RUNNING)
+	if (runtime->status->suspended_state != SNDRV_PCM_STATE_RUNNING &&
+	    runtime->status->suspended_state != SNDRV_PCM_STATE_DRAINING)
 		return 0;
 	return substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_RESUME);
 }
@@ -1243,7 +1245,9 @@ static int snd_pcm_playback_drain(snd_pcm_substream_t * substream)
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
 		snd_pcm_stream_unlock_irq(substream);
+		snd_power_unlock(card);
 		tout = schedule_timeout(10 * HZ);
+		snd_power_lock(card);
 		snd_pcm_stream_lock_irq(substream);
 		if (tout == 0) {
 			state = runtime->status->state == SNDRV_PCM_STATE_SUSPENDED ? SUSPENDED : EXPIRED;
