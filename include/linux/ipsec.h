@@ -1,69 +1,57 @@
-/*
- *	Definitions for the SECurity layer
- *
- *	Author:
- *		Robert Muchsel <muchsel@acm.org>
- *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
- */
- 
 #ifndef _LINUX_IPSEC_H
 #define _LINUX_IPSEC_H
 
-#include <linux/config.h>
-#include <linux/socket.h>
-#include <net/sock.h>
-#include <linux/skbuff.h>
+/* The definitions, required to talk to KAME racoon IKE. */
 
-/* Values for the set/getsockopt calls */
+#include <linux/pfkeyv2.h>
 
-/* These defines are compatible with NRL IPv6, however their semantics
-   is different */
+#define IPSEC_PORT_ANY		0
+#define IPSEC_ULPROTO_ANY	255
+#define IPSEC_PROTO_ANY		255
 
-#define IPSEC_LEVEL_NONE	-1	/* send plaintext, accept any */
-#define IPSEC_LEVEL_DEFAULT	0	/* encrypt/authenticate if possible */
-					/* the default MUST be 0, because a */
-					/* socket is initialized with 0's */
-#define IPSEC_LEVEL_USE		1	/* use outbound, don't require inbound */
-#define IPSEC_LEVEL_REQUIRE	2	/* require both directions */
-#define IPSEC_LEVEL_UNIQUE	2	/* for compatibility only */
+enum {
+	IPSEC_MODE_ANY		= 0,	/* We do not support this for SA */
+	IPSEC_MODE_TRANSPORT	= 1,
+	IPSEC_MODE_TUNNEL	= 2
+};
+
+enum {
+	IPSEC_DIR_ANY		= 0,
+	IPSEC_DIR_INBOUND	= 1,
+	IPSEC_DIR_OUTBOUND	= 2,
+	IPSEC_DIR_FWD		= 3,	/* It is our own */
+	IPSEC_DIR_MAX		= 4,
+	IPSEC_DIR_INVALID	= 5
+};
+
+enum {
+	IPSEC_POLICY_DISCARD	= 0,
+	IPSEC_POLICY_NONE	= 1,
+	IPSEC_POLICY_IPSEC	= 2,
+	IPSEC_POLICY_ENTRUST	= 3,
+	IPSEC_POLICY_BYPASS	= 4
+};
+
+enum {
+	IPSEC_LEVEL_DEFAULT	= 0,
+	IPSEC_LEVEL_USE		= 1,
+	IPSEC_LEVEL_REQUIRE	= 2,
+	IPSEC_LEVEL_UNIQUE	= 3
+};
+
+#define IPSEC_MANUAL_REQID_MAX	0x3fff
+
+#define IPSEC_REPLAYWSIZE  32
 
 #ifdef __KERNEL__
-
-/* skb bit flags set on packet input processing */
-
-#define RCV_SEC			0x0f	/* options on receive */
-#define RCV_AUTH		0x01	/* was authenticated */
-#define RCV_CRYPT		0x02	/* was encrypted */
-#define RCV_TUNNEL		0x04	/* was tunneled */
-#define SND_SEC			0xf0	/* options on send, these are */
-#define SND_AUTH		0x10	/* currently unused */
-#define SND_CRYPT		0x20
-#define SND_TUNNEL		0x40
-
-/*
- *	FIXME: ignores network encryption for now..
- */
- 
-#ifdef CONFIG_NET_SECURITY
-static __inline__ int ipsec_sk_policy(struct sock *sk, struct sk_buff *skb)
-{
-	return ((sk->authentication < IPSEC_LEVEL_REQUIRE) ||
-		(skb->security & RCV_AUTH)) &&
-		((sk->encryption < IPSEC_LEVEL_REQUIRE) ||
-		(skb->security & RCV_CRYPT));
-}
-
-#else
+struct sock;
+struct sk_buff;
 
 static __inline__ int ipsec_sk_policy(struct sock *sk, struct sk_buff *skb)
 {
 	return 1;
 }
-#endif /* CONFIG */
+#endif
 
-#endif	/* __KERNEL__ */
+
 #endif	/* _LINUX_IPSEC_H */

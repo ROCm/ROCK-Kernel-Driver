@@ -53,6 +53,7 @@ extern __u32 sysctl_rmem_max;
 #include <linux/inet.h>
 #include <linux/mroute.h>
 #include <linux/igmp.h>
+#include <net/xfrm.h>
 
 extern struct net_proto_family inet_family_ops;
 
@@ -281,6 +282,43 @@ EXPORT_SYMBOL(ip_statistics);
 extern int (*dlci_ioctl_hook)(unsigned int, void *);
 EXPORT_SYMBOL(dlci_ioctl_hook);
 #endif
+
+EXPORT_SYMBOL(xfrm_policy_alloc);
+EXPORT_SYMBOL(__xfrm_policy_destroy);
+EXPORT_SYMBOL(xfrm_policy_lookup);
+EXPORT_SYMBOL(xfrm_bundle_create);
+EXPORT_SYMBOL(xfrm_lookup);
+EXPORT_SYMBOL(__xfrm_policy_check);
+EXPORT_SYMBOL(__xfrm_route_forward);
+EXPORT_SYMBOL(xfrm_state_alloc);
+EXPORT_SYMBOL(__xfrm_state_destroy);
+EXPORT_SYMBOL(xfrm_state_find);
+EXPORT_SYMBOL(xfrm_state_insert);
+EXPORT_SYMBOL(xfrm_state_check_expire);
+EXPORT_SYMBOL(xfrm_state_check_space);
+EXPORT_SYMBOL(xfrm_state_lookup);
+EXPORT_SYMBOL(xfrm_replay_check);
+EXPORT_SYMBOL(xfrm_replay_advance);
+EXPORT_SYMBOL(xfrm_check_selectors);
+EXPORT_SYMBOL(xfrm4_rcv);
+EXPORT_SYMBOL(xfrm_register_type);
+EXPORT_SYMBOL(xfrm_unregister_type);
+EXPORT_SYMBOL(xfrm_get_type);
+EXPORT_SYMBOL(inet_peer_idlock);
+EXPORT_SYMBOL(xfrm_register_km);
+EXPORT_SYMBOL(xfrm_unregister_km);
+EXPORT_SYMBOL(xfrm_state_delete);
+EXPORT_SYMBOL(xfrm_state_walk);
+EXPORT_SYMBOL(xfrm_find_acq_byseq);
+EXPORT_SYMBOL(xfrm_find_acq);
+EXPORT_SYMBOL(xfrm_alloc_spi);
+EXPORT_SYMBOL(xfrm_state_flush);
+EXPORT_SYMBOL(xfrm_policy_kill);
+EXPORT_SYMBOL(xfrm_policy_delete);
+EXPORT_SYMBOL(xfrm_policy_insert);
+EXPORT_SYMBOL(xfrm_policy_walk);
+EXPORT_SYMBOL(xfrm_policy_flush);
+EXPORT_SYMBOL(xfrm_policy_byid);
 
 
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_IP_SCTP_MODULE)

@@ -155,6 +155,53 @@ void __init flow_cache_init(void)
 	memset(flow_table, 0, PAGE_SIZE<<order);
 }
 
+static struct xfrm_type *xfrm_type_map[256];
+static rwlock_t xfrm_type_lock = RW_LOCK_UNLOCKED;
+
+int xfrm_register_type(struct xfrm_type *type)
+{
+	int err = 0;
+
+	write_lock(&xfrm_type_lock);
+	if (xfrm_type_map[type->proto] == NULL)
+		xfrm_type_map[type->proto] = type;
+	else
+		err = -EEXIST;
+	write_unlock(&xfrm_type_lock);
+	return err;
+}
+
+int xfrm_unregister_type(struct xfrm_type *type)
+{
+	int err = 0;
+
+	write_lock(&xfrm_type_lock);
+	if (xfrm_type_map[type->proto] != type)
+		err = -ENOENT;
+	else
+		xfrm_type_map[type->proto] = NULL;
+	write_unlock(&xfrm_type_lock);
+	return err;
+}
+
+struct xfrm_type *xfrm_get_type(u8 proto)
+{
+	struct xfrm_type *type;
+
+	read_lock(&xfrm_type_lock);
+	type = xfrm_type_map[proto];
+	if (type && !try_inc_mod_count(type->owner))
+		type = NULL;
+	write_unlock(&xfrm_type_lock);
+	return type;
+}
+
+void xfrm_put_type(struct xfrm_type *type)
+{
+	if (type->owner)
+		__MOD_DEC_USE_COUNT(type->owner);
+}
+
 
 /* Allocate xfrm_policy. Not used here, it is supposed to be used by pfkeyv2
  * SPD calls.
@@ -203,6 +250,10 @@ void xfrm_policy_kill(struct xfrm_policy *policy)
 	struct dst_entry *dst;
 	int i;
 
+	write_lock_bh(&policy->lock);
+	if (policy->dead)
+		goto out;
+
 	policy->dead = 1;
 
 	for (i=0; i<policy->xfrm_nr; i++) {
@@ -216,6 +267,128 @@ void xfrm_policy_kill(struct xfrm_policy *policy)
 		policy->bundles = dst->next;
 		dst_free(dst);
 	}
+
+out:
+	write_unlock_bh(&policy->lock);
+}
+
+int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
+{
+	struct xfrm_policy *pol, **p;
+
+	write_lock_bh(&xfrm_policy_lock);
+	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
+		if (memcmp(&policy->selector, &pol->selector, sizeof(pol->selector)) == 0) {
+			if (excl) {
+				write_unlock_bh(&xfrm_policy_lock);
+				return -EEXIST;
+			}
+			break;
+		}
+	}
+	atomic_inc(&policy->refcnt);
+	policy->next = pol ? pol->next : NULL;
+	*p = policy;
+	xfrm_policy_genid++;
+	write_unlock_bh(&xfrm_policy_lock);
+
+	if (pol) {
+		xfrm_policy_kill(pol);
+		xfrm_pol_put(pol);
+	}
+	return 0;
+}
+
+struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel)
+{
+	struct xfrm_policy *pol, **p;
+
+	write_lock_bh(&xfrm_policy_lock);
+	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
+		if (memcmp(sel, &pol->selector, sizeof(*sel)) == 0) {
+			*p = pol->next;
+			break;
+		}
+	}
+	if (pol)
+		xfrm_policy_genid++;
+	write_unlock_bh(&xfrm_policy_lock);
+	return pol;
+}
+
+struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
+{
+	struct xfrm_policy *pol, **p;
+
+	write_lock_bh(&xfrm_policy_lock);
+	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
+		if (pol->index == id) {
+			if (delete)
+				*p = pol->next;
+			break;
+		}
+	}
+	if (pol) {
+		if (delete)
+			xfrm_policy_genid++;
+		else
+			atomic_inc(&pol->refcnt);
+	}
+	write_unlock_bh(&xfrm_policy_lock);
+	return pol;
+}
+
+void xfrm_policy_flush()
+{
+	struct xfrm_policy *xp;
+	int dir;
+
+	write_lock_bh(&xfrm_policy_lock);
+	for (dir = 0; dir < XFRM_POLICY_MAX; dir++) {
+		while ((xp = xfrm_policy_list[dir]) != NULL) {
+			xfrm_policy_list[dir] = xp->next;
+			write_unlock_bh(&xfrm_policy_lock);
+
+			xfrm_policy_kill(xp);
+			xfrm_pol_put(xp);
+
+			write_lock_bh(&xfrm_policy_lock);
+		}
+	}
+	xfrm_policy_genid++;
+	write_unlock_bh(&xfrm_policy_lock);
+}
+
+int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
+		     void *data)
+{
+	struct xfrm_policy *xp;
+	int dir;
+	int count = 0;
+	int error = 0;
+
+	read_lock(&xfrm_policy_lock);
+	for (dir = 0; dir < XFRM_POLICY_MAX; dir++) {
+		for (xp = xfrm_policy_list[dir]; xp; xp = xp->next)
+			count++;
+	}
+
+	if (count == 0) {
+		error = -ENOENT;
+		goto out;
+	}
+
+	for (dir = 0; dir < XFRM_POLICY_MAX; dir++) {
+		for (xp = xfrm_policy_list[dir]; xp; xp = xp->next) {
+			error = func(xp, dir, --count, data);
+			if (error)
+				goto out;
+		}
+	}
+
+out:
+	read_unlock(&xfrm_policy_lock);
+	return error;
 }
 
 
@@ -224,14 +397,13 @@ void xfrm_policy_kill(struct xfrm_policy *policy)
 struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl)
 {
 	struct xfrm_policy *pol;
-	unsigned long now = xtime.tv_sec;
+	// Not now :-) u64 now = (unsigned long)xtime.tv_sec;
 
 	read_lock(&xfrm_policy_lock);
 	for (pol = xfrm_policy_list[dir]; pol; pol = pol->next) {
 		struct xfrm_selector *sel = &pol->selector;
 
-		if (xfrm4_selector_match(sel, fl) && now < pol->expires) {
-			pol->lastuse = now;
+		if (xfrm4_selector_match(sel, fl) /* XXX && XXX now < pol->validtime */) {
 			atomic_inc(&pol->refcnt);
 			break;
 		}
@@ -261,7 +433,7 @@ xfrm_tmpl_resolve(struct xfrm_policy *policy, struct flowi *fl,
 			xfrm[i] = tmpl->resolved;
 			atomic_inc(&tmpl->resolved->refcnt);
 		} else {
-			xfrm[i] = xfrm_state_find(daddr, fl, tmpl);
+			xfrm[i] = xfrm_state_find(daddr, fl, tmpl, policy);
 			if (xfrm[i] == NULL) {
 				error = -ENOMEM;
 				goto fail;
@@ -269,11 +441,11 @@ xfrm_tmpl_resolve(struct xfrm_policy *policy, struct flowi *fl,
 			if (xfrm[i]->km.state == XFRM_STATE_VALID)
 				continue;
 
-			i++;
 			if (xfrm[i]->km.state == XFRM_STATE_ERROR)
 				error = -EINVAL;
 			else
 				error = -EAGAIN;
+			i++;
 			goto fail;
 		}
 	}
@@ -539,7 +711,7 @@ xfrm_state_ok(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
 	return	x->id.proto == tmpl->id.proto &&
 		(x->id.spi == tmpl->id.spi || !tmpl->id.spi) &&
 		x->props.mode == tmpl->mode &&
-		(tmpl->algos & (1<<x->props.algo)) &&
+		(tmpl->aalgos & (1<<x->props.aalgo)) &&
 		(!x->props.mode || !tmpl->saddr.xfrm4_addr ||
 		 tmpl->saddr.xfrm4_addr == x->props.saddr.xfrm4_addr);
 }
@@ -798,5 +970,4 @@ void __init xfrm_init(void)
 
 	xfrm_state_init();
 	xfrm_input_init();
-	ah4_init();
 }

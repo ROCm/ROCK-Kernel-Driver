@@ -348,5 +348,19 @@ config SYN_COOKIES
 
 	  If unsure, say N.
 
+config INET_AH
+	bool "IP: AH transformation"
+	---help---
+	  Support for IPsec AH.
+
+	  If unsure, say Y.
+
+config INET_ESP
+	bool "IP: ESP transformation"
+	---help---
+	  Support for IPsec ESP.
+
+	  If unsure, say Y.
+
 source "net/ipv4/netfilter/Kconfig"
 

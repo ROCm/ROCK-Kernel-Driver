@@ -3,6 +3,7 @@
 #include <linux/list.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/crypto.h>
 
 #include <net/dst.h>
 #include <net/route.h>
@@ -113,6 +114,38 @@ struct xfrm_selector
 	void	*owner;
 };
 
+struct xfrm_lifetime_cfg
+{
+	u64	soft_byte_limit;
+	u64	hard_byte_limit;
+	u64	soft_packet_limit;
+	u64	hard_packet_limit;
+	u64	soft_add_expires_seconds;
+	u64	hard_add_expires_seconds;
+	u64	soft_use_expires_seconds;
+	u64	hard_use_expires_seconds;
+};
+
+struct xfrm_lifetime_cur
+{
+	u64	bytes;
+	u64	packets;
+	u64	add_time;
+	u64	use_time;
+};
+
+struct xfrm_replay_state
+{
+	u32	oseq;
+	u32	seq;
+	u32	bitmap;
+};
+
+struct xfrm_algo {
+	char	alg_name[CRYPTO_MAX_ALG_NAME];
+	int	alg_key_len;    /* in bits */
+	char	alg_key[0];
+};
 
 /* Full description of state of transformer. */
 struct xfrm_state
@@ -130,39 +163,38 @@ struct xfrm_state
 	struct {
 		int		state;
 		u32		seq;
-		u32		warn_bytes;
+		u64		warn_bytes;
 	} km;
 
 	/* Parameters of this state. */
 	struct {
 		u8		mode;
-		u8		algo;
+		u8		replay_window;
+		u8		aalgo, ealgo, calgo;
+		u16		reqid;
 		xfrm_address_t	saddr;
 		int		header_len;
 		int		trailer_len;
-		u32		hard_byte_limit;
-		u32		soft_byte_limit;
-		u32		replay_window;
-		/* More... */
 	} props;
 
+	struct xfrm_lifetime_cfg lft;
+
+	/* Data for transformer */
+	struct xfrm_algo	*aalg;
+	struct xfrm_algo	*ealg;
+	struct xfrm_algo	*calg;
+
 	/* State for replay detection */
-	struct {
-		u32		oseq;
-		u32		seq;
-		u32		bitmap;
-	} replay;
+	struct xfrm_replay_state replay;
 
 	/* Statistics */
 	struct {
-		unsigned long	lastuse;
-		unsigned long	expires;
-		u32		bytes;
 		u32		replay_window;
 		u32		replay;
 		u32		integrity_failed;
-		/* More... */
 	} stats;
+
+	struct xfrm_lifetime_cur curlft;
 
 	/* Reference to data common to all the instances of this
 	 * transformer. */
@@ -182,14 +214,12 @@ enum {
 	XFRM_STATE_DEAD
 };
 
-#define XFRM_DST_HSIZE		1024
 
 struct xfrm_type
 {
 	char			*description;
-	atomic_t		refcnt;
+	struct module		*owner;
 	__u8			proto;
-	__u8			algo;
 
 	int			(*init_state)(struct xfrm_state *x, void *args);
 	void			(*destructor)(struct xfrm_state *);
@@ -198,6 +228,11 @@ struct xfrm_type
 	/* Estimate maximal size of result of transformation of a dgram */
 	u32			(*get_max_size)(struct xfrm_state *, int size);
 };
+
+extern int xfrm_register_type(struct xfrm_type *type);
+extern int xfrm_unregister_type(struct xfrm_type *type);
+extern struct xfrm_type *xfrm_get_type(u8 proto);
+extern void xfrm_put_type(struct xfrm_type *type);
 
 struct xfrm_tmpl
 {
@@ -212,6 +247,8 @@ struct xfrm_tmpl
 /* Source address of tunnel. Ignored, if it is not a tunnel. */
 	xfrm_address_t		saddr;
 
+	__u16			reqid;
+
 /* Mode: transport/tunnel */
 	__u8			mode;
 
@@ -219,7 +256,9 @@ struct xfrm_tmpl
 	__u8			share;
 
 /* Bit mask of algos allowed for acquisition */
-	__u32			algos;
+	__u32			aalgos;
+	__u32			ealgos;
+	__u32			calgos;
 
 /* If template statically resolved, hold ref here */
 	struct xfrm_state      *resolved;
@@ -238,8 +277,8 @@ enum
 enum
 {
 	XFRM_POLICY_IN	= 0,
-	XFRM_POLICY_FWD	= 1,
-	XFRM_POLICY_OUT	= 2,
+	XFRM_POLICY_OUT	= 1,
+	XFRM_POLICY_FWD	= 2,
 	XFRM_POLICY_MAX	= 3
 };
 
@@ -254,8 +293,8 @@ struct xfrm_policy
 	u32			priority;
 	u32			index;
 	struct xfrm_selector	selector;
-	unsigned long		expires;
-	unsigned long		lastuse;
+	struct xfrm_lifetime_cfg lft;
+	struct xfrm_lifetime_cur curlft;
 	struct dst_entry       *bundles;
 	__u8			action;
 #define XFRM_POLICY_ALLOW	0
@@ -266,6 +305,18 @@ struct xfrm_policy
 	__u8			xfrm_nr;
 	struct xfrm_tmpl       	xfrm_vec[XFRM_MAX_DEPTH];
 };
+
+struct xfrm_mgr
+{
+	struct list_head	list;
+	char			*id;
+	int			(*notify)(struct xfrm_state *x, int event);
+	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp, int dir);
+};
+
+extern int xfrm_register_km(struct xfrm_mgr *km);
+extern int xfrm_unregister_km(struct xfrm_mgr *km);
+
 
 extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX];
 
@@ -366,21 +417,36 @@ static inline int xfrm_route_forward(struct sk_buff *skb)
 
 extern void xfrm_state_init(void);
 extern void xfrm_input_init(void);
+extern int xfrm_state_walk(u8 proto, int (*func)(struct xfrm_state *, int, void*), void *);
 extern struct xfrm_state *xfrm_state_alloc(void);
-extern struct xfrm_state *xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl);
+extern struct xfrm_state *xfrm_state_find(u32 daddr, struct flowi *fl, struct xfrm_tmpl *tmpl, struct xfrm_policy *pol);
 extern int xfrm_state_check_expire(struct xfrm_state *x);
 extern void xfrm_state_insert(struct xfrm_state *x);
 extern int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb);
-extern struct xfrm_state * xfrm_state_lookup(u32 daddr, u32 spi, u8 proto);
-extern struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl);
+extern struct xfrm_state *xfrm_state_lookup(u32 daddr, u32 spi, u8 proto);
+extern struct xfrm_state *xfrm_find_acq_byseq(u32 seq);
+extern void xfrm_state_delete(struct xfrm_state *x);
+extern void xfrm_state_flush(u8 proto);
 extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
 extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
 extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
 extern int xfrm4_rcv(struct sk_buff *skb);
 
+struct xfrm_policy *xfrm_policy_alloc(void);
+extern int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*), void *);
+struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl);
+int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl);
+struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
+struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
+void xfrm_policy_flush(void);
+int xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm,
+		   struct flowi *fl, struct dst_entry **dst_p);
+void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
+struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr);
+extern void xfrm_policy_flush(void);
+extern void xfrm_policy_kill(struct xfrm_policy *);
 
 extern wait_queue_head_t *km_waitq;
-extern void km_notify(struct xfrm_state *x, int event);
-extern int km_query(struct xfrm_state *x);
-
-extern int ah4_init(void);
+extern void km_warn_expired(struct xfrm_state *x);
+extern void km_expired(struct xfrm_state *x);
+extern int km_query(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *pol);
