@@ -766,8 +766,8 @@ EXPORT_SYMBOL(cpufreq_set_policy);
  * per-CPU loops_per_jiffy value wherever possible.
  */
 #ifndef CONFIG_SMP
-static unsigned long l_p_j_ref = 0;
-static unsigned int  l_p_j_ref_freq = 0;
+static unsigned long l_p_j_ref;
+static unsigned int  l_p_j_ref_freq;
 
 static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 {

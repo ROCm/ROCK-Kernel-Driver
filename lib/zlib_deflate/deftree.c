@@ -228,7 +228,7 @@ static void send_bits(
  */
 static void tr_static_init(void)
 {
-    static int static_init_done = 0;
+    static int static_init_done;
     int n;        /* iterates over tree elements */
     int bits;     /* bit counter */
     int length;   /* length value */
