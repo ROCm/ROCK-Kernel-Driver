@@ -648,9 +648,38 @@ typedef struct {
 	u16 currentXmitRate;
 	u16 apDevExtensions;
 	u16 normalizedSignalStrength;
-	u16 _reserved1;
+	u16 shortPreamble;
 	u8 apIP[4];
-	u16 _reserved[7];
+	u8 noisePercent; /* Noise percent in last second */
+	u8 noisedBm; /* Noise dBm in last second */
+	u8 noiseAvePercent; /* Noise percent in last minute */
+	u8 noiseAvedBm; /* Noise dBm in last minute */
+	u8 noiseMaxPercent; /* Highest noise percent in last minute */
+	u8 noiseMaxdBm; /* Highest noise dbm in last minute */
+	u16 load;
+	u8 carrier[4];
+	u16 assocStatus;
+#define STAT_NOPACKETS 0
+#define STAT_NOCARRIERSET 10
+#define STAT_GOTCARRIERSET 11
+#define STAT_WRONGSSID 20
+#define STAT_BADCHANNEL 25
+#define STAT_BADBITRATES 30
+#define STAT_BADPRIVACY 35
+#define STAT_APFOUND 40
+#define STAT_APREJECTED 50
+#define STAT_AUTHENTICATING 60
+#define STAT_DEAUTHENTICATED 61
+#define STAT_AUTHTIMEOUT 62
+#define STAT_ASSOCIATING 70
+#define STAT_DEASSOCIATED 71
+#define STAT_ASSOCTIMEOUT 72
+#define STAT_NOTAIROAP 73
+#define STAT_ASSOCIATED 80
+#define STAT_LEAPING 90
+#define STAT_LEAPFAILED 91
+#define STAT_LEAPTIMEDOUT 92
+#define STAT_LEAPCOMPLETE 93
 } StatusRid;
 
 typedef struct {
@@ -1193,8 +1222,10 @@ static int readStatusRid(struct airo_info*ai, StatusRid *statr) {
 	statr->len = le16_to_cpu(statr->len);
 	for(s = &statr->mode; s <= &statr->SSIDlen; s++) *s = le16_to_cpu(*s);
 
-	for(s = &statr->beaconPeriod; s <= &statr->_reserved[9]; s++)
+	for(s = &statr->beaconPeriod; s <= &statr->shortPreamble; s++)
 		*s = le16_to_cpu(*s);
+	statr->load = le16_to_cpu(statr->load);
+	statr->assocStatus = le16_to_cpu(statr->assocStatus);
 
 	return rc;
 }
