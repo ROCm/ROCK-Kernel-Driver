@@ -61,7 +61,7 @@ void hci_acl_connect(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 	struct inquiry_entry *ie;
-	struct create_conn_cp cp;
+	struct hci_cp_create_conn cp;
 
 	BT_DBG("%p", conn);
 
@@ -90,7 +90,7 @@ void hci_acl_connect(struct hci_conn *conn)
 
 void hci_acl_disconn(struct hci_conn *conn, __u8 reason)
 {
-	struct disconnect_cp cp;
+	struct hci_cp_disconnect cp;
 
 	BT_DBG("%p", conn);
 
@@ -104,7 +104,7 @@ void hci_acl_disconn(struct hci_conn *conn, __u8 reason)
 void hci_add_sco(struct hci_conn *conn, __u16 handle)
 {
 	struct hci_dev *hdev = conn->hdev;
-	struct add_sco_cp cp;
+	struct hci_cp_add_sco cp;
 
 	BT_DBG("%p", conn);
 
@@ -166,7 +166,7 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
 	hci_dev_hold(hdev);
 
 	tasklet_disable(&hdev->tx_task);
-	conn_hash_add(hdev, conn);
+	hci_conn_hash_add(hdev, conn);
 	tasklet_enable(&hdev->tx_task);
 
 	return conn;
@@ -196,7 +196,7 @@ int hci_conn_del(struct hci_conn *conn)
 	}
 
 	tasklet_disable(&hdev->tx_task);
-	conn_hash_del(hdev, conn);
+	hci_conn_hash_del(hdev, conn);
 	tasklet_enable(&hdev->tx_task);
 
 	skb_queue_purge(&conn->data_q);
@@ -255,7 +255,7 @@ struct hci_conn * hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst)
 
 	BT_DBG("%s dst %s", hdev->name, batostr(dst));
 
-	if (!(acl = conn_hash_lookup_ba(hdev, ACL_LINK, dst))) {
+	if (!(acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst))) {
 		if (!(acl = hci_conn_add(hdev, ACL_LINK, dst)))
 			return NULL;
 	}
@@ -268,7 +268,7 @@ struct hci_conn * hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst)
 	if (type == SCO_LINK) {
 		struct hci_conn *sco;
 
-		if (!(sco = conn_hash_lookup_ba(hdev, SCO_LINK, dst))) {
+		if (!(sco = hci_conn_hash_lookup_ba(hdev, SCO_LINK, dst))) {
 			if (!(sco = hci_conn_add(hdev, SCO_LINK, dst))) {
 				hci_conn_put(acl);
 				return NULL;
@@ -298,7 +298,7 @@ int hci_conn_auth(struct hci_conn *conn)
 		return 1;
 	
 	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
-		struct auth_requested_cp cp;
+		struct hci_cp_auth_requested cp;
 		cp.handle = __cpu_to_le16(conn->handle);
 		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_AUTH_REQUESTED, sizeof(cp), &cp);
 	}
@@ -317,7 +317,7 @@ int hci_conn_encrypt(struct hci_conn *conn)
 		return 0;
 
 	if (hci_conn_auth(conn)) {
-		struct set_conn_encrypt_cp cp;
+		struct hci_cp_set_conn_encrypt cp;
 		cp.handle  = __cpu_to_le16(conn->handle);
 		cp.encrypt = 1; 
 		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_SET_CONN_ENCRYPT, sizeof(cp), &cp);
@@ -328,7 +328,7 @@ int hci_conn_encrypt(struct hci_conn *conn)
 /* Drop all connection on the device */
 void hci_conn_hash_flush(struct hci_dev *hdev)
 {
-	struct conn_hash *h = &hdev->conn_hash;
+	struct hci_conn_hash *h = &hdev->conn_hash;
         struct list_head *p;
 
 	BT_DBG("hdev %s", hdev->name);
@@ -411,7 +411,7 @@ int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg)
 		return -EFAULT;
 
 	hci_dev_lock_bh(hdev);
-	conn = conn_hash_lookup_ba(hdev, req.type, &req.bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, req.type, &req.bdaddr);
 	if (conn) {
 		bacpy(&ci.bdaddr, &conn->dst);
 		ci.handle = conn->handle;

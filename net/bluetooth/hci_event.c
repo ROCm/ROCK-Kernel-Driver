@@ -75,7 +75,7 @@ static void hci_cc_link_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 static void hci_cc_link_policy(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb)
 {
 	struct hci_conn *conn;
-	struct role_discovery_rp *rd;
+	struct hci_rp_role_discovery *rd;
 
 	BT_DBG("%s ocf 0x%x", hdev->name, ocf);
 
@@ -88,7 +88,7 @@ static void hci_cc_link_policy(struct hci_dev *hdev, __u16 ocf, struct sk_buff *
 		
 		hci_dev_lock(hdev);
 	
-		conn = conn_hash_lookup_handle(hdev, __le16_to_cpu(rd->handle));
+		conn = hci_conn_hash_lookup_handle(hdev, __le16_to_cpu(rd->handle));
 		if (conn) {
 			if (rd->role)
 				conn->link_mode &= ~HCI_LM_MASTER;
@@ -219,15 +219,15 @@ static void hci_cc_host_ctl(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb
 /* Command Complete OGF INFO_PARAM  */
 static void hci_cc_info_param(struct hci_dev *hdev, __u16 ocf, struct sk_buff *skb)
 {
-	struct read_local_features_rp *lf;
-	struct read_buffer_size_rp *bs;
-	struct read_bd_addr_rp *ba;
+	struct hci_rp_read_loc_features *lf;
+	struct hci_rp_read_buffer_size *bs;
+	struct hci_rp_read_bd_addr *ba;
 
 	BT_DBG("%s ocf 0x%x", hdev->name, ocf);
 
 	switch (ocf) {
 	case OCF_READ_LOCAL_FEATURES:
-		lf = (struct read_local_features_rp *) skb->data;
+		lf = (struct hci_rp_read_loc_features *) skb->data;
 
 		if (lf->status) {
 			BT_DBG("%s READ_LOCAL_FEATURES failed %d", hdev->name, lf->status);
@@ -255,7 +255,7 @@ static void hci_cc_info_param(struct hci_dev *hdev, __u16 ocf, struct sk_buff *s
 		break;
 
 	case OCF_READ_BUFFER_SIZE:
-		bs = (struct read_buffer_size_rp *) skb->data;
+		bs = (struct hci_rp_read_buffer_size *) skb->data;
 
 		if (bs->status) {
 			BT_DBG("%s READ_BUFFER_SIZE failed %d", hdev->name, bs->status);
@@ -273,7 +273,7 @@ static void hci_cc_info_param(struct hci_dev *hdev, __u16 ocf, struct sk_buff *s
 		break;
 
 	case OCF_READ_BD_ADDR:
-		ba = (struct read_bd_addr_rp *) skb->data;
+		ba = (struct hci_rp_read_bd_addr *) skb->data;
 
 		if (!ba->status) {
 			bacpy(&hdev->bdaddr, &ba->bdaddr);
@@ -294,14 +294,14 @@ static void hci_cc_info_param(struct hci_dev *hdev, __u16 ocf, struct sk_buff *s
 static inline void hci_cs_create_conn(struct hci_dev *hdev, __u8 status)
 {
 	struct hci_conn *conn;
-	struct create_conn_cp *cp = hci_sent_cmd_data(hdev, OGF_LINK_CTL, OCF_CREATE_CONN);
+	struct hci_cp_create_conn *cp = hci_sent_cmd_data(hdev, OGF_LINK_CTL, OCF_CREATE_CONN);
 
 	if (!cp)
 		return;
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_ba(hdev, ACL_LINK, &cp->bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &cp->bdaddr);
 
 	BT_DBG("%s status 0x%x bdaddr %s conn %p", hdev->name,
 			status, batostr(&cc->bdaddr), conn);
@@ -338,7 +338,7 @@ static void hci_cs_link_ctl(struct hci_dev *hdev, __u16 ocf, __u8 status)
 	case OCF_ADD_SCO:
 		if (status) {
 			struct hci_conn *acl, *sco;
-			struct add_sco_cp *cp = hci_sent_cmd_data(hdev, OGF_LINK_CTL, OCF_ADD_SCO);
+			struct hci_cp_add_sco *cp = hci_sent_cmd_data(hdev, OGF_LINK_CTL, OCF_ADD_SCO);
 			__u16 handle;
 
 			if (!cp)
@@ -350,7 +350,7 @@ static void hci_cs_link_ctl(struct hci_dev *hdev, __u16 ocf, __u8 status)
 
 			hci_dev_lock(hdev);
 	
-			acl = conn_hash_lookup_handle(hdev, handle);
+			acl = hci_conn_hash_lookup_handle(hdev, handle);
 			if (acl && (sco = acl->link)) {
 				sco->state = BT_CLOSED;
 
@@ -442,7 +442,7 @@ static inline void hci_inquiry_result_evt(struct hci_dev *hdev, struct sk_buff *
 /* Connect Request */
 static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_conn_request *ev = (struct evt_conn_request *) skb->data;
+	struct hci_ev_conn_request *ev = (struct hci_ev_conn_request *) skb->data;
 	int mask = hdev->link_mode;
 
 	BT_DBG("%s Connection request: %s type 0x%x", hdev->name,
@@ -453,10 +453,10 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 	if (mask & HCI_LM_ACCEPT) {
 		/* Connection accepted */
 		struct hci_conn *conn;
-		struct accept_conn_req_cp cp;
+		struct hci_cp_accept_conn_req cp;
 
 		hci_dev_lock(hdev);
-		conn = conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
+		conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
 		if (!conn) {
 			if (!(conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr))) {
 				BT_ERR("No memmory for new connection");
@@ -477,7 +477,7 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 		hci_send_cmd(hdev, OGF_LINK_CTL, OCF_ACCEPT_CONN_REQ, sizeof(cp), &cp);
 	} else {
 		/* Connection rejected */
-		struct reject_conn_req_cp cp;
+		struct hci_cp_reject_conn_req cp;
 
 		bacpy(&cp.bdaddr, &ev->bdaddr);
 		cp.reason = 0x0f;
@@ -488,14 +488,14 @@ static inline void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *sk
 /* Connect Complete */
 static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_conn_complete *ev = (struct evt_conn_complete *) skb->data;
+	struct hci_ev_conn_complete *ev = (struct hci_ev_conn_complete *) skb->data;
 	struct hci_conn *conn = NULL;
 
 	BT_DBG("%s", hdev->name);
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
 	if (!conn) {
 		hci_dev_unlock(hdev);
 		return;
@@ -514,7 +514,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 
 		/* Set link policy */
 		if (conn->type == ACL_LINK && hdev->link_policy) {
-			struct write_link_policy_cp cp;
+			struct hci_cp_write_link_policy cp;
 			cp.handle = ev->handle;
 			cp.policy = __cpu_to_le16(hdev->link_policy);
 			hci_send_cmd(hdev, OGF_LINK_POLICY, OCF_WRITE_LINK_POLICY, sizeof(cp), &cp);
@@ -522,7 +522,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 
 		/* Set packet type for incomming connection */
 		if (!conn->out) {
-			struct change_conn_ptype_cp cp;
+			struct hci_cp_change_conn_ptype cp;
 			cp.handle = ev->handle;
 			cp.pkt_type = (conn->type == ACL_LINK) ? 
 				__cpu_to_le16(hdev->pkt_type & ACL_PTYPE_MASK):
@@ -555,7 +555,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 /* Disconnect Complete */
 static inline void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_disconn_complete *ev = (struct evt_disconn_complete *) skb->data;
+	struct hci_ev_disconn_complete *ev = (struct hci_ev_disconn_complete *) skb->data;
 	struct hci_conn *conn = NULL;
 	__u16 handle = __le16_to_cpu(ev->handle);
 
@@ -566,7 +566,7 @@ static inline void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_handle(hdev, handle);
+	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		conn->state = BT_CLOSED;
 		hci_proto_disconn_ind(conn, ev->reason);
@@ -579,7 +579,7 @@ static inline void hci_disconn_complete_evt(struct hci_dev *hdev, struct sk_buff
 /* Number of completed packets */
 static inline void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_num_comp_pkts *ev = (struct evt_num_comp_pkts *) skb->data;
+	struct hci_ev_num_comp_pkts *ev = (struct hci_ev_num_comp_pkts *) skb->data;
 	__u16 *ptr;
 	int i;
 
@@ -601,7 +601,7 @@ static inline void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *s
 		handle = __le16_to_cpu(get_unaligned(ptr++));
 		count  = __le16_to_cpu(get_unaligned(ptr++));
 
-		conn = conn_hash_lookup_handle(hdev, handle);
+		conn = hci_conn_hash_lookup_handle(hdev, handle);
 		if (conn) {
 			conn->sent -= count;
 
@@ -622,7 +622,7 @@ static inline void hci_num_comp_pkts_evt(struct hci_dev *hdev, struct sk_buff *s
 /* Role Change */
 static inline void hci_role_change_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_role_change *ev = (struct evt_role_change *) skb->data;
+	struct hci_ev_role_change *ev = (struct hci_ev_role_change *) skb->data;
 	struct hci_conn *conn = NULL;
 
 	BT_DBG("%s status %d", hdev->name, ev->status);
@@ -632,7 +632,7 @@ static inline void hci_role_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_ba(hdev, ACL_LINK, &ev->bdaddr);
+	conn = hci_conn_hash_lookup_ba(hdev, ACL_LINK, &ev->bdaddr);
 	if (conn) {
 		if (ev->role)
 			conn->link_mode &= ~HCI_LM_MASTER;
@@ -646,7 +646,7 @@ static inline void hci_role_change_evt(struct hci_dev *hdev, struct sk_buff *skb
 /* Authentication Complete */
 static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_auth_complete *ev = (struct evt_auth_complete *) skb->data;
+	struct hci_ev_auth_complete *ev = (struct hci_ev_auth_complete *) skb->data;
 	struct hci_conn *conn = NULL;
 	__u16 handle = __le16_to_cpu(ev->handle);
 
@@ -654,7 +654,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_handle(hdev, handle);
+	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		if (!ev->status)
 			conn->link_mode |= HCI_LM_AUTH;
@@ -664,7 +664,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 		
 		if (test_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend)) {
 			if (!ev->status) {
-				struct set_conn_encrypt_cp cp;
+				struct hci_cp_set_conn_encrypt cp;
 				cp.handle  = __cpu_to_le16(conn->handle);
 				cp.encrypt = 1;
 				hci_send_cmd(conn->hdev, OGF_LINK_CTL,
@@ -683,7 +683,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 /* Encryption Change */
 static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *skb)
 {
-	struct evt_encrypt_change *ev = (struct evt_encrypt_change *) skb->data;
+	struct hci_ev_encrypt_change *ev = (struct hci_ev_encrypt_change *) skb->data;
 	struct hci_conn *conn = NULL;
 	__u16 handle = __le16_to_cpu(ev->handle);
 
@@ -691,7 +691,7 @@ static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *
 
 	hci_dev_lock(hdev);
 	
-	conn = conn_hash_lookup_handle(hdev, handle);
+	conn = hci_conn_hash_lookup_handle(hdev, handle);
 	if (conn) {
 		if (!ev->status) {
 		       	if (ev->encrypt)
@@ -710,8 +710,8 @@ static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *
 void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct hci_event_hdr *hdr = (struct hci_event_hdr *) skb->data;
-	struct evt_cmd_complete *ec;
-	struct evt_cmd_status *cs;
+	struct hci_ev_cmd_complete *ec;
+	struct hci_ev_cmd_status *cs;
 	u16 opcode, ocf, ogf;
 
 	skb_pull(skb, HCI_EVENT_HDR_SIZE);
@@ -719,49 +719,49 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 	BT_DBG("%s evt 0x%x", hdev->name, hdr->evt);
 
 	switch (hdr->evt) {
-	case EVT_NUM_COMP_PKTS:
+	case HCI_EV_NUM_COMP_PKTS:
 		hci_num_comp_pkts_evt(hdev, skb);
 		break;
 
-	case EVT_INQUIRY_COMPLETE:
+	case HCI_EV_INQUIRY_COMPLETE:
 		hci_inquiry_complete_evt(hdev, skb);
 		break;
 
-	case EVT_INQUIRY_RESULT:
+	case HCI_EV_INQUIRY_RESULT:
 		hci_inquiry_result_evt(hdev, skb);
 		break;
 
-	case EVT_CONN_REQUEST:
+	case HCI_EV_CONN_REQUEST:
 		hci_conn_request_evt(hdev, skb);
 		break;
 
-	case EVT_CONN_COMPLETE:
+	case HCI_EV_CONN_COMPLETE:
 		hci_conn_complete_evt(hdev, skb);
 		break;
 
-	case EVT_DISCONN_COMPLETE:
+	case HCI_EV_DISCONN_COMPLETE:
 		hci_disconn_complete_evt(hdev, skb);
 		break;
 
-	case EVT_ROLE_CHANGE:
+	case HCI_EV_ROLE_CHANGE:
 		hci_role_change_evt(hdev, skb);
 		break;
 
-	case EVT_AUTH_COMPLETE:
+	case HCI_EV_AUTH_COMPLETE:
 		hci_auth_complete_evt(hdev, skb);
 		break;
 
-	case EVT_ENCRYPT_CHANGE:
+	case HCI_EV_ENCRYPT_CHANGE:
 		hci_encrypt_change_evt(hdev, skb);
 		break;
 
-	case EVT_CMD_STATUS:
-		cs = (struct evt_cmd_status *) skb->data;
+	case HCI_EV_CMD_STATUS:
+		cs = (struct hci_ev_cmd_status *) skb->data;
 		skb_pull(skb, sizeof(cs));
 				
 		opcode = __le16_to_cpu(cs->opcode);
-		ogf = cmd_opcode_ogf(opcode);
-		ocf = cmd_opcode_ocf(opcode);
+		ogf = hci_opcode_ogf(opcode);
+		ocf = hci_opcode_ocf(opcode);
 
 		switch (ogf) {
 		case OGF_INFO_PARAM:
@@ -792,13 +792,13 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 		}
 		break;
 
-	case EVT_CMD_COMPLETE:
-		ec = (struct evt_cmd_complete *) skb->data;
+	case HCI_EV_CMD_COMPLETE:
+		ec = (struct hci_ev_cmd_complete *) skb->data;
 		skb_pull(skb, sizeof(*ec));
 
 		opcode = __le16_to_cpu(ec->opcode);
-		ogf = cmd_opcode_ogf(opcode);
-		ocf = cmd_opcode_ocf(opcode);
+		ogf = hci_opcode_ogf(opcode);
+		ocf = hci_opcode_ocf(opcode);
 
 		switch (ogf) {
 		case OGF_INFO_PARAM:
@@ -838,7 +838,7 @@ void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb)
 void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 {
 	struct hci_event_hdr *hdr;
-	struct evt_stack_internal *ev;
+	struct hci_ev_stack_internal *ev;
 	struct sk_buff *skb;
 
 	skb = bt_skb_alloc(HCI_EVENT_HDR_SIZE + sizeof(*ev) + dlen, GFP_ATOMIC);
@@ -846,7 +846,7 @@ void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 		return;
 
 	hdr = (void *) skb_put(skb, HCI_EVENT_HDR_SIZE);
-       	hdr->evt  = EVT_STACK_INTERNAL;
+       	hdr->evt  = HCI_EV_STACK_INTERNAL;
 	hdr->plen = sizeof(*ev) + dlen;
 
 	ev  = (void *) skb_put(skb, sizeof(*ev) + dlen);

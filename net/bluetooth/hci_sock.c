@@ -114,9 +114,9 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 			if (!test_bit(evt, flt->event_mask))
 				continue;
 
-			if (flt->opcode && ((evt == EVT_CMD_COMPLETE && 
+			if (flt->opcode && ((evt == HCI_EV_CMD_COMPLETE && 
 					flt->opcode != *(__u16 *)(skb->data + 3)) ||
-					(evt == EVT_CMD_STATUS && 
+					(evt == HCI_EV_CMD_STATUS && 
 					flt->opcode != *(__u16 *)(skb->data + 4))))
 				continue;
 		}
@@ -394,8 +394,8 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 
 		if (skb->pkt_type == HCI_COMMAND_PKT) {
 			u16 opcode = __le16_to_cpu(*(__u16 *)skb->data);
-			u16 ogf = cmd_opcode_ogf(opcode) - 1;
-			u16 ocf = cmd_opcode_ocf(opcode) & HCI_FLT_OCF_BITS;
+			u16 ogf = hci_opcode_ogf(opcode) - 1;
+			u16 ocf = hci_opcode_ocf(opcode) & HCI_FLT_OCF_BITS;
 
 			if (ogf > HCI_SFLT_MAX_OGF ||
 					!test_bit(ocf, hci_sec_filter.ocf_mask[ogf]))
@@ -584,14 +584,14 @@ static int hci_sock_create(struct socket *sock, int protocol)
 static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 	struct hci_dev *hdev = (struct hci_dev *) ptr;
-	struct evt_si_device ev;
+	struct hci_ev_si_device ev;
 	
 	BT_DBG("hdev %s event %ld", hdev->name, event);
 
 	/* Send event to sockets */
 	ev.event  = event;
 	ev.dev_id = hdev->id;
-	hci_si_event(NULL, EVT_SI_DEVICE, sizeof(ev), &ev);
+	hci_si_event(NULL, HCI_EV_SI_DEVICE, sizeof(ev), &ev);
 	
 	if (event == HCI_DEV_UNREG) {
 		struct sock *sk;

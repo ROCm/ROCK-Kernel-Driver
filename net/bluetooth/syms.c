@@ -56,7 +56,6 @@ EXPORT_SYMBOL(hci_dev_get);
 EXPORT_SYMBOL(hci_conn_auth);
 EXPORT_SYMBOL(hci_conn_encrypt);
 
-EXPORT_SYMBOL(hci_recv_frame);
 EXPORT_SYMBOL(hci_send_acl);
 EXPORT_SYMBOL(hci_send_sco);
 EXPORT_SYMBOL(hci_send_raw);
