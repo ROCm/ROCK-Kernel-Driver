@@ -20,7 +20,11 @@
 #include "br_private_stp.h"
 
 static const char *br_port_state_names[] = {
-	"disabled", "learning", "forwarding", "blocking",
+	[BR_STATE_DISABLED] = "disabled", 
+	[BR_STATE_LISTENING] = "listening",
+	[BR_STATE_LEARNING] = "learning", 
+	[BR_STATE_FORWARDING] = "forwarding", 
+	[BR_STATE_BLOCKING] = "blocking",
 };
 
 void br_log_state(const struct net_bridge_port *p)
@@ -289,22 +293,20 @@ static inline void br_topology_change_acknowledged(struct net_bridge *br)
 /* called under bridge lock */
 void br_topology_change_detection(struct net_bridge *br)
 {
-	if (!(br->dev->flags & IFF_UP))
-		return;
+	int isroot = br_is_root_bridge(br);
 
-	pr_info("%s: topology change detected", br->dev->name);
-	if (br_is_root_bridge(br)) {
-		printk(", propagating");
+	pr_info("%s: topology change detected, %s\n", br->dev->name,
+		isroot ? "propgating" : "sending tcn bpdu");
+
+	if (isroot) {
 		br->topology_change = 1;
 		mod_timer(&br->topology_change_timer, jiffies
 			  + br->bridge_forward_delay + br->bridge_max_age);
 	} else if (!br->topology_change_detected) {
-		printk(", sending tcn bpdu");
 		br_transmit_tcn(br);
 		mod_timer(&br->tcn_timer, jiffies + br->bridge_hello_time);
 	}
 
-	printk("\n");
 	br->topology_change_detected = 1;
 }
 
