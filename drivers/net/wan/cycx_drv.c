@@ -67,8 +67,8 @@ MODULE_DESCRIPTION("Cyclom 2x Sync Card Driver");
 MODULE_LICENSE("GPL");
 
 /* Hardware-specific functions */
-static int load_cyc2x(cycxhw_t *hw, struct cycx_firmware *cfm, u32 len);
-static void cycx_bootcfg(cycxhw_t *hw);
+static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len);
+static void cycx_bootcfg(struct cycx_hw *hw);
 
 static int reset_cyc2x(u32 addr);
 static int detect_cyc2x(u32 addr);
@@ -135,7 +135,7 @@ void cycx_drv_cleanup(void)
  * Return:	0	ok.
  *		< 0	error */
 EXPORT_SYMBOL(cycx_setup);
-int cycx_setup(cycxhw_t *hw, void *cfm, u32 len)
+int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 {
 	unsigned long dpmbase = hw->dpmbase;
 	int err;
@@ -179,7 +179,7 @@ int cycx_setup(cycxhw_t *hw, void *cfm, u32 len)
 }
 
 EXPORT_SYMBOL(cycx_down);
-int cycx_down(cycxhw_t *hw)
+int cycx_down(struct cycx_hw *hw)
 {
 	iounmap((u32 *)hw->dpmbase);
 
@@ -188,14 +188,14 @@ int cycx_down(cycxhw_t *hw)
 
 /* Enable interrupt generation.  */
 EXPORT_SYMBOL(cycx_inten);
-void cycx_inten(cycxhw_t *hw)
+void cycx_inten(struct cycx_hw *hw)
 {
 	writeb(0, hw->dpmbase);
 }
 
 /* Generate an interrupt to adapter's CPU. */
 EXPORT_SYMBOL(cycx_intr);
-void cycx_intr(cycxhw_t *hw)
+void cycx_intr(struct cycx_hw *hw)
 {
 	writew(0, hw->dpmbase + GEN_CYCX_INTR);
 }
@@ -222,7 +222,7 @@ int cycx_exec(u32 addr)
 /* Read absolute adapter memory.
  * Transfer data from adapter's memory to data buffer. */
 EXPORT_SYMBOL(cycx_peek);
-int cycx_peek(cycxhw_t *hw, u32 addr, void *buf, u32 len)
+int cycx_peek(struct cycx_hw *hw, u32 addr, void *buf, u32 len)
 {
 	if (len == 1)
 		*(u8*)buf = readb(hw->dpmbase + addr);
@@ -235,7 +235,7 @@ int cycx_peek(cycxhw_t *hw, u32 addr, void *buf, u32 len)
 /* Write Absolute Adapter Memory.
  * Transfer data from data buffer to adapter's memory. */
 EXPORT_SYMBOL(cycx_poke);
-int cycx_poke(cycxhw_t *hw, u32 addr, void *buf, u32 len)
+int cycx_poke(struct cycx_hw *hw, u32 addr, void *buf, u32 len)
 {
 	if (len == 1)
 		writeb(*(u8*)buf, hw->dpmbase + addr);
@@ -385,7 +385,7 @@ static int cycx_code_boot(u32 addr, u8 *code, u32 len)
 /* Load adapter from the memory image of the CYCX firmware module.
  * o verify firmware integrity and compatibility
  * o start adapter up */
-static int load_cyc2x(cycxhw_t *hw, struct cycx_firmware *cfm, u32 len)
+static int load_cyc2x(struct cycx_hw *hw, struct cycx_firmware *cfm, u32 len)
 {
 	int i, j;
 	struct cycx_fw_header *img_hdr;
@@ -514,7 +514,7 @@ reset_loaded:
    - As of now, only static buffers are available to the user.
      So, the bit VD_RXDIRC must be set in 'valid'. That means that user
      wants to use the static transmission and reception buffers. */
-static void cycx_bootcfg(cycxhw_t *hw)
+static void cycx_bootcfg(struct cycx_hw *hw)
 {
 	/* use fixed buffers */
 	writeb(FIXED_BUFFERS, hw->dpmbase + CONF_OFFSET);
