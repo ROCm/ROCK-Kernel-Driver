@@ -2062,8 +2062,13 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	host->unique_id = ha->instance;
 	host->max_id = ha->max_targets;
 
-	if (request_irq(host->irq, qla2x00_intr_handler, SA_INTERRUPT|SA_SHIRQ,
-	    ha->brd_info->drv_name, ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		ret = request_irq(host->irq, qla2100_intr_handler,
+		    SA_INTERRUPT|SA_SHIRQ, ha->brd_info->drv_name, ha);
+	else
+		ret = request_irq(host->irq, qla2300_intr_handler,
+		    SA_INTERRUPT|SA_SHIRQ, ha->brd_info->drv_name, ha);
+	if (ret != 0) {
 		qla_printk(KERN_WARNING, ha,
 		    "Failed to reserve interrupt %d already in use.\n",
 		    host->irq);
