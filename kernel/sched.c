@@ -361,12 +361,17 @@ repeat_lock_task:
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
 	if (!p->array) {
-		if (unlikely(sync && (rq->curr != p))) {
-			if (p->thread_info->cpu != smp_processor_id()) {
-				p->thread_info->cpu = smp_processor_id();
-				task_rq_unlock(rq, &flags);
-				goto repeat_lock_task;
-			}
+		/*
+		 * Fast-migrate the task if it's not running or runnable
+		 * currently. Do not violate hard affinity.
+		 */
+		if (unlikely(sync && (rq->curr != p) &&
+			(p->thread_info->cpu != smp_processor_id()) &&
+			(p->cpus_allowed & (1UL << smp_processor_id())))) {
+
+			p->thread_info->cpu = smp_processor_id();
+			task_rq_unlock(rq, &flags);
+			goto repeat_lock_task;
 		}
 		if (old_state == TASK_UNINTERRUPTIBLE)
 			rq->nr_uninterruptible--;
