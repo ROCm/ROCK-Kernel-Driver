@@ -889,7 +889,7 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 		       "HiSax: Card Type %d out of range\n", card->typ);
 		goto outf_cs;
 	}
-	SET_MODULE_OWNER(&cs->iif);
+	cs->iif.owner = THIS_MODULE;
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;
 	cs->iif.maxbufsize = MAX_DATA_SIZE;

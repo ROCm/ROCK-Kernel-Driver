@@ -400,7 +400,7 @@ static struct inet_protocol ipcomp4_protocol = {
 
 static int __init ipcomp4_init(void)
 {
-	SET_MODULE_OWNER(&ipcomp_type);
+	ipcomp_type.owner = THIS_MODULE;
 	if (xfrm_register_type(&ipcomp_type, AF_INET) < 0) {
 		printk(KERN_INFO "ipcomp init: can't add xfrm type\n");
 		return -EAGAIN;

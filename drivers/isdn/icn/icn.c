@@ -1545,7 +1545,7 @@ icn_initcard(int port, char *id)
 	}
 	memset((char *) card, 0, sizeof(icn_card));
 	card->port = port;
-	SET_MODULE_OWNER(&card->interface);
+	card->interface.owner = THIS_MODULE;
 	card->interface.hl_hdrlen = 1;
 	card->interface.channels = ICN_BCH;
 	card->interface.maxbufsize = 4000;

@@ -578,7 +578,7 @@ int __init esp4_init(void)
 		decap_data_too_small();
 	}
 
-	SET_MODULE_OWNER(&esp_type);
+	esp_type.owner = THIS_MODULE;
 	if (xfrm_register_type(&esp_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip esp init: can't add xfrm type\n");
 		return -EAGAIN;

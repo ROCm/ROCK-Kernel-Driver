@@ -111,7 +111,7 @@ static int b1pci_probe(struct capicardparams *p, struct pci_dev *pdev)
 	cinfo->capi_ctrl.procinfo      = b1pci_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1ctl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+	cinfo->capi_ctrl.owner = THIS_MODULE;
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
@@ -249,7 +249,7 @@ static int b1pciv4_probe(struct capicardparams *p, struct pci_dev *pdev)
 	cinfo->capi_ctrl.procinfo      = b1pciv4_procinfo;
 	cinfo->capi_ctrl.ctr_read_proc = b1dmactl_read_proc;
 	strcpy(cinfo->capi_ctrl.name, card->name);
-	SET_MODULE_OWNER(&cinfo->capi_ctrl);
+	cinfo->capi_ctrl.owner = THIS_MODULE;
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {

@@ -757,7 +757,7 @@ int __init i8k_init(void)
 	return -ENOENT;
     }
     proc_i8k->proc_fops = &i8k_fops;
-    SET_MODULE_OWNER(proc_i8k);
+    proc_i8k->owner = THIS_MODULE;
 
     printk(KERN_INFO
 	   "Dell laptop SMM driver v%s Massimo Dal Zotto (dz@debian.org)\n",
