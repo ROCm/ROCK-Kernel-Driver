@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/i2c-sensor.h>
+#include "lm75.h"
 
 
 /* Addresses to scan */
@@ -43,13 +44,6 @@ SENSORS_INSMOD_1(lm75);
 #define LM75_REG_CONF		0x01
 #define LM75_REG_TEMP_HYST	0x02
 #define LM75_REG_TEMP_OS	0x03
-
-/* Conversions. Rounding and limit checking is only done on the TO_REG
-   variants. Note that you should be a bit careful with which arguments
-   these macros are called: arguments may be evaluated more than once.
-   Fixing this is just not worth it. */
-#define TEMP_FROM_REG(val)	((((val & 0x7fff) >> 7) * 5) | ((val & 0x8000)?-256:0))
-#define TEMP_TO_REG(val)	(SENSORS_LIMIT((val<0?(0x200+((val)/5))<<7:(((val) + 2) / 5) << 7),0,0xffff))
 
 /* Each client has this additional data */
 struct lm75_data {
@@ -83,15 +77,12 @@ static struct i2c_driver lm75_driver = {
 static int lm75_id = 0;
 
 #define show(value)	\
-static ssize_t show_##value(struct device *dev, char *buf)	\
-{								\
-	struct i2c_client *client = to_i2c_client(dev);		\
-	struct lm75_data *data = i2c_get_clientdata(client);	\
-	int temp;						\
-								\
-	lm75_update_client(client);				\
-	temp = TEMP_FROM_REG(data->value);			\
-	return sprintf(buf, "%d\n", temp * 100);		\
+static ssize_t show_##value(struct device *dev, char *buf)		\
+{									\
+	struct i2c_client *client = to_i2c_client(dev);			\
+	struct lm75_data *data = i2c_get_clientdata(client);		\
+	lm75_update_client(client);					\
+	return sprintf(buf, "%d\n", LM75_TEMP_FROM_REG(data->value));	\
 }
 show(temp_max);
 show(temp_hyst);
@@ -102,9 +93,8 @@ static ssize_t set_##value(struct device *dev, const char *buf, size_t count)	\
 {								\
 	struct i2c_client *client = to_i2c_client(dev);		\
 	struct lm75_data *data = i2c_get_clientdata(client);	\
-	int temp = simple_strtoul(buf, NULL, 10) / 100;		\
-								\
-	data->value = TEMP_TO_REG(temp);			\
+	int temp = simple_strtoul(buf, NULL, 10);		\
+	data->value = LM75_TEMP_TO_REG(temp);			\
 	lm75_write_value(client, reg, data->value);		\
 	return count;						\
 }
