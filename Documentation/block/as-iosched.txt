@@ -132,7 +132,7 @@ a combination of IO behavior from all those devices.
 Tuning the anticipatory IO scheduler
 ------------------------------------
 When using 'as', the anticipatory IO scheduler there are 5 parameters under
-/sys/block/*/iosched/. All are units of milliseconds.
+/sys/block/*/queue/iosched/. All are units of milliseconds.
 
 The parameters are:
 * read_expire

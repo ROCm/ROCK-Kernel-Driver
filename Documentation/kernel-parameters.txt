@@ -404,7 +404,8 @@ running once the system is up.
 
 	elevator=	[IOSCHED]
 			Format: {"as"|"cfq"|"deadline"|"noop"}
-			See Documentation/as-iosched.txt for details
+			See Documentation/block/as-iosched.txt
+			and Documentation/block/deadline-iosched.txt for details.
 
 	es1370=		[HW,OSS]
 			Format: <lineout>[,<micbias>]
