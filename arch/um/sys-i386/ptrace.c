@@ -169,11 +169,12 @@ static inline unsigned long twd_fxsr_to_i387( struct i387_fxsave_struct *fxsave 
 }
 
 /*
-b * FXSR floating point environment conversions.
+ * FXSR floating point environment conversions.
  */
 
-static inline int convert_fxsr_to_user(struct _fpstate *buf, 
-				       struct pt_regs *regs)
+#ifdef CONFIG_MODE_TT
+static inline int convert_fxsr_to_user_tt(struct _fpstate *buf, 
+					  struct pt_regs *regs)
 {
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	unsigned long env[7];
@@ -200,9 +201,17 @@ static inline int convert_fxsr_to_user(struct _fpstate *buf,
 	}
 	return 0;
 }
+#endif
 
-static inline int convert_fxsr_from_user(struct pt_regs *regs,
-					 struct _fpstate *buf)
+static inline int convert_fxsr_to_user(struct _fpstate *buf, 
+				       struct pt_regs *regs)
+{
+	return(CHOOSE_MODE(convert_fxsr_to_user_tt(buf, regs), 0));
+}
+
+#ifdef CONFIG_MODE_TT
+static inline int convert_fxsr_from_user_tt(struct pt_regs *regs,
+					    struct _fpstate *buf)
 {
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	unsigned long env[7];
@@ -230,6 +239,13 @@ static inline int convert_fxsr_from_user(struct pt_regs *regs,
 	}
 	return 0;
 }
+#endif
+
+static inline int convert_fxsr_from_user(struct pt_regs *regs, 
+					 struct _fpstate *buf)
+{
+	return(CHOOSE_MODE(convert_fxsr_from_user_tt(regs, buf), 0));
+}
 
 int get_fpregs(unsigned long buf, struct task_struct *child)
 {
@@ -251,7 +267,8 @@ int set_fpregs(unsigned long buf, struct task_struct *child)
 	else return(0);
 }
 
-int get_fpxregs(unsigned long buf, struct task_struct *tsk)
+#ifdef CONFIG_MODE_TT
+int get_fpxregs_tt(unsigned long buf, struct task_struct *tsk)
 {
 	struct pt_regs *regs = &tsk->thread.regs;
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
@@ -262,8 +279,15 @@ int get_fpxregs(unsigned long buf, struct task_struct *tsk)
 	if(err) return -EFAULT;
 	else return 0;
 }
+#endif
 
-int set_fpxregs(unsigned long buf, struct task_struct *tsk)
+int get_fpxregs(unsigned long buf, struct task_struct *tsk)
+{
+	return(CHOOSE_MODE(get_fpxregs_tt(buf, tsk), 0));
+}
+
+#ifdef CONFIG_MODE_TT
+int set_fpxregs_tt(unsigned long buf, struct task_struct *tsk)
 {
 	struct pt_regs *regs = &tsk->thread.regs;
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
@@ -273,6 +297,12 @@ int set_fpxregs(unsigned long buf, struct task_struct *tsk)
 			       sizeof(struct user_fxsr_struct) );
 	if(err) return -EFAULT;
 	else return 0;
+}
+#endif
+
+int set_fpxregs(unsigned long buf, struct task_struct *tsk)
+{
+	return(CHOOSE_MODE(set_fpxregs_tt(buf, tsk), 0));
 }
 
 #ifdef notdef
@@ -291,8 +321,10 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 	return(1);
 }
 #endif
-static inline void copy_fpu_fxsave(struct pt_regs *regs,
-				   struct user_i387_struct *buf)
+
+#ifdef CONFIG_MODE_TT
+static inline void copy_fpu_fxsave_tt(struct pt_regs *regs,
+				      struct user_i387_struct *buf)
 {
 	struct i387_fxsave_struct *fpu = SC_FXSR_ENV(PT_REGS_SC(regs));
 	unsigned short *to;
@@ -306,6 +338,13 @@ static inline void copy_fpu_fxsave(struct pt_regs *regs,
 	for ( i = 0 ; i < 8 ; i++, to += 5, from += 8 ) {
 		memcpy( to, from, 5 * sizeof(unsigned short) );
 	}
+}
+#endif
+
+static inline void copy_fpu_fxsave(struct pt_regs *regs,
+				   struct user_i387_struct *buf)
+{
+	(void) CHOOSE_MODE(copy_fpu_fxsave_tt(regs, buf), 0);
 }
 
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu )

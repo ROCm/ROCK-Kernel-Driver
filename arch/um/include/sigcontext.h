@@ -9,8 +9,6 @@
 #include "sysdep/sigcontext.h"
 
 extern int sc_size(void *data);
-extern int copy_sc_to_user(void *to_ptr, void *from_ptr, void *data);
-extern int copy_sc_from_user(void *to_ptr, void *from_ptr, void *data);
 extern void sc_to_sc(void *to_ptr, void *from_ptr);
 
 #endif

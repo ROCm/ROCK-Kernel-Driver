@@ -34,17 +34,21 @@
 #include "initrd.h"
 #include "init.h"
 #include "os.h"
+#include "choose-mode.h"
+#include "mode_kern.h"
+#include "mode.h"
 
 #define DEFAULT_COMMAND_LINE "root=6200"
 
 struct cpuinfo_um boot_cpu_data = { 
-	.loops_per_jiffy = 	0,
-	.ipi_pipe = 		{ -1, -1 }
+	.loops_per_jiffy	= 0,
+	.ipi_pipe		= { -1, -1 }
 };
 
 unsigned long thread_saved_pc(struct task_struct *task)
 {
-	return(os_process_pc(task->thread.extern_pid));
+	return(os_process_pc(CHOOSE_MODE_PROC(thread_pid_tt, thread_pid_skas,
+					      task)));
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)
@@ -93,47 +97,11 @@ pte_t * __bad_pagetable(void)
 	return(NULL);
 }
 
-extern void start_kernel(void);
-
-extern int debug;
-extern int debug_stop;
-
-static int start_kernel_proc(void *unused)
-{
-	int pid;
-
-	block_signals();
-	pid = os_getpid();
-
-	cpu_tasks[0].pid = pid;
-	cpu_tasks[0].task = current;
-#ifdef CONFIG_SMP
- 	cpu_online_map = 1;
-#endif
-	if(debug) os_stop_process(pid);
-	start_kernel();
-	return(0);
-}
-
-#ifdef CONFIG_HOST_2G_2G
-#define TOP 0x80000000
-#else
-#define TOP 0xc0000000
-#endif
-
-#define SIZE ((CONFIG_NEST_LEVEL + CONFIG_KERNEL_HALF_GIGS) * 0x20000000)
-#define START (TOP - SIZE)
-
-/* Set in main */
+/* Set in linux_main */
 unsigned long host_task_size;
 unsigned long task_size;
 
-void set_task_sizes(int arg)
-{
-	/* Round up to the nearest 4M */
-	host_task_size = ROUND_4M((unsigned long) &arg);
-	task_size = START;
-}
+unsigned long uml_start;
 
 /* Set in early boot */
 unsigned long uml_physmem;
@@ -156,7 +124,8 @@ long physmem_size = 32 * 1024 * 1024;
 void set_cmdline(char *cmd)
 {
 	char *umid, *ptr;
-	if(honeypot) return;
+
+	if(CHOOSE_MODE(honeypot, 0)) return;
 
 	umid = get_umid(1);
 	if(umid != NULL){
@@ -215,10 +184,47 @@ static int __init uml_ncpus_setup(char *line, int *add)
 
 __uml_setup("ncpus=", uml_ncpus_setup,
 "ncpus=<# of desired CPUs>\n"
-"    This tells an SMP kernel how many virtual processors to start.\n"
-"    Currently, this has no effect because SMP isn't enabled.\n\n" 
+"    This tells an SMP kernel how many virtual processors to start.\n\n" 
 );
 #endif
+
+int force_tt = 0;
+
+#if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
+#define DEFAULT_TT 0
+
+static int __init mode_tt_setup(char *line, int *add)
+{
+	force_tt = 1;
+	return(0);
+}
+
+__uml_setup("mode=tt", mode_tt_setup,
+"mode=tt\n"
+"    When both CONFIG_MODE_TT and CONFIG_MODE_SKAS are enabled, this option\n"
+"    forces UML to run in tt (tracing thread) mode.  It is not the default\n"
+"    because it's slower and less secure than skas mode.\n\n"
+);
+
+#else
+#ifdef CONFIG_MODE_SKAS
+
+#define DEFAULT_TT 0
+
+#else
+#ifdef CONFIG_MODE_TT
+
+#define DEFAULT_TT 1
+
+#else
+
+#error Either CONFIG_MODE_TT or CONFIG_MODE_SKAS must be enabled
+
+#endif
+#endif
+#endif
+
+int mode_tt = DEFAULT_TT;
 
 static int __init Usage(char *line, int *add)
 {
@@ -267,8 +273,6 @@ static void __init uml_postsetup(void)
 	return;
 }
 
-extern int debug_trace;
-
 /* Set during early boot */
 unsigned long brk_start;
 static struct vm_reserved kernel_vm_reserved;
@@ -280,7 +284,6 @@ int linux_main(int argc, char **argv)
 	unsigned long avail;
 	unsigned long virtmem_size, max_physmem;
 	unsigned int i, add, err;
-	void *sp;
 
 	for (i = 1; i < argc; i++){
 		if((i == 1) && (argv[i][0] == ' ')) continue;
@@ -290,13 +293,14 @@ int linux_main(int argc, char **argv)
 	}
 	if(have_root == 0) add_arg(saved_command_line, DEFAULT_COMMAND_LINE);
 
-	if(!jail || debug)
-		remap_data(ROUND_DOWN(&_stext), ROUND_UP(&_etext), 1);
-	remap_data(ROUND_DOWN(&_sdata), ROUND_UP(&_edata), 1);
-	brk_start = (unsigned long) sbrk(0);
-	remap_data(ROUND_DOWN(&__bss_start), ROUND_UP(brk_start), 1);
+	mode_tt = force_tt ? 1 : !can_do_skas();
+	uml_start = CHOOSE_MODE_PROC(set_task_sizes_tt, set_task_sizes_skas, 0,
+				     &host_task_size, &task_size);
 
-	uml_physmem = START;
+	brk_start = (unsigned long) sbrk(0);
+	CHOOSE_MODE_PROC(before_mem_tt, before_mem_skas, brk_start);
+
+	uml_physmem = uml_start;
 
 	/* Reserve up to 4M after the current brk */
 	uml_reserved = ROUND_4M(brk_start) + (1 << 22);
@@ -331,8 +335,10 @@ int linux_main(int argc, char **argv)
 		       virtmem_size);
 
 	err = reserve_vm(high_physmem, end_vm, &kernel_vm_reserved);
-	if(err)	
-		tracer_panic("Failed to reserve VM area for kernel VM\n");
+	if(err){
+		printf("Failed to reserve VM area for kernel VM\n");
+		exit(1);
+	}
 
   	uml_postsetup();
 
@@ -340,9 +346,8 @@ int linux_main(int argc, char **argv)
 		2 * PAGE_SIZE;
 
 	task_protections((unsigned long) &init_thread_info);
-	sp = (void *) init_task.thread.kernel_stack + 2 * PAGE_SIZE - 
-		sizeof(unsigned long);
-	return(signals(start_kernel_proc, sp));
+
+	return(CHOOSE_MODE(start_uml_tt(), start_uml_skas()));
 }
 
 static int panic_exit(struct notifier_block *self, unsigned long unused1,
