@@ -22,6 +22,14 @@ config SND_ATIIXP
 	help
 	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250/300 AC97 controller.
 
+config SND_ATIIXP_MODEM
+	tristate "ATI IXP 150/200/250 Modem"
+	depends on SND
+	select SND_AC97_CODEC
+	help
+	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250 AC97 modem
+	  controller.
+
 config SND_AU8810
         tristate "Aureal Advantage"
         depends on SND
