@@ -255,7 +255,7 @@ static void end_request(struct bio *bio)
 	 * this branch is our 'one mirror IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error(r1_bio->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
+		md_error(r1_bio->mddev, bio->bi_bdev);
 	else
 		/*
 		 * Set R1BIO_Uptodate in our master bio, so that
@@ -947,7 +947,7 @@ static void end_sync_read(struct bio *bio)
 	 * We don't do much here, just schedule handling by raid1d
 	 */
 	if (!uptodate)
-		md_error (r1_bio->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
+		md_error (r1_bio->mddev, bio->bi_bdev);
 	else
 		set_bit(R1BIO_Uptodate, &r1_bio->state);
 	reschedule_retry(r1_bio);
@@ -961,7 +961,7 @@ static void end_sync_write(struct bio *bio)
 	int i;
 
 	if (!uptodate)
-		md_error(mddev, to_kdev_t(bio->bi_bdev->bd_dev));
+		md_error(mddev, bio->bi_bdev);
 
 	for (i = 0; i < MD_SB_DISKS; i++)
 		if (r1_bio->write_bios[i] == bio) {

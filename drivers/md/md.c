@@ -2556,9 +2556,14 @@ static int unprotect_array(mddev_t * mddev)
 
 static int set_disk_faulty(mddev_t *mddev, kdev_t dev)
 {
+	mdk_rdev_t *rdev;
 	int ret;
 
-	ret = md_error(mddev, dev);
+	rdev = find_rdev(mddev, dev);
+	if (!rdev)
+		return 0;
+
+	ret = md_error(mddev, rdev->bdev);
 	return ret;
 }
 
@@ -3035,9 +3040,10 @@ void md_recover_arrays(void)
 }
 
 
-int md_error(mddev_t *mddev, kdev_t rdev)
+int md_error(mddev_t *mddev, struct block_device *bdev)
 {
 	mdk_rdev_t * rrdev;
+	kdev_t rdev = to_kdev_t(bdev->bd_dev);
 
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
 		major(dev),minor(dev),major(rdev),minor(rdev),

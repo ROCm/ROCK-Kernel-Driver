@@ -198,7 +198,7 @@ void multipath_end_request(struct bio *bio)
 	 * this branch is our 'one multipath IO has finished' event handler:
 	 */
 	if (!uptodate)
-		md_error (mp_bh->mddev, to_kdev_t(bio->bi_bdev->bd_dev));
+		md_error (mp_bh->mddev, bio->bi_bdev);
 	else
 		/*
 		 * Set MPBH_Uptodate in our master buffer_head, so that
