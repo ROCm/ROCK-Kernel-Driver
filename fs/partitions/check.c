@@ -213,7 +213,6 @@ static void driverfs_remove_partitions(struct gendisk *hd)
 static void check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	devfs_handle_t de = NULL;
-	dev_t dev = bdev->bd_dev;
 	char buf[64];
 	struct parsed_partitions *state;
 	int i;
@@ -254,7 +253,7 @@ static void check_partition(struct gendisk *hd, struct block_device *bdev)
 #if CONFIG_BLK_DEV_MD
 			if (!state->parts[j-1].flags)
 				continue;
-			md_autodetect_dev(dev+j);
+			md_autodetect_dev(bdev->bd_dev+j);
 #endif
 		}
 		return;
