@@ -2706,6 +2706,7 @@ int __init ip_rt_init(void)
 	rt_flush_timer.function = rt_run_flush;
 	init_timer(&rt_periodic_timer);
 	rt_periodic_timer.function = rt_check_expire;
+	init_timer(&rt_secret_timer);
 	rt_secret_timer.function = rt_secret_rebuild;
 
 	/* All the timers, started at system startup tend
