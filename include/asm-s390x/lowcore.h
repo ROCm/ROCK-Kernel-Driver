@@ -116,7 +116,7 @@ struct _lowcore
 	__u8         pad3[0xc8-0xc4];          /* 0x0c4 */
 	__u32        stfl_fac_list;            /* 0x0c8 */
 	__u8         pad4[0xe8-0xcc];          /* 0x0cc */
-	__u32        mcck_interuption_code[2]; /* 0x0e8 */
+	__u32        mcck_interruption_code[2]; /* 0x0e8 */
 	__u8         pad5[0xf4-0xf0];          /* 0x0f0 */
 	__u32        external_damage_code;     /* 0x0f4 */
 	addr_t       failing_storage_address;  /* 0x0f8 */

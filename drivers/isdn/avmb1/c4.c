@@ -1,11 +1,17 @@
 /*
- * $Id: c4.c,v 1.20.6.1 2000/11/28 12:02:45 kai Exp $
+ * $Id: c4.c,v 1.20.6.3 2001/02/16 16:43:23 kai Exp $
  * 
  * Module for AVM C4 card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: c4.c,v $
+ * Revision 1.20.6.3  2001/02/16 16:43:23  kai
+ * Changes from -ac16, little bug fixes, typos and the like
+ *
+ * Revision 1.20.6.2  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
  * Revision 1.20.6.1  2000/11/28 12:02:45  kai
  * MODULE_DEVICE_TABLE for 2.4
  *
@@ -75,7 +81,7 @@
  * - fixed problem with memory mapping if address is not aligned
  *
  * Revision 1.3  2000/01/25 14:37:39  calle
- * new message after successfull detection including card revision and
+ * new message after successful detection including card revision and
  * used resources.
  *
  * Revision 1.2  2000/01/21 20:52:58  keil
@@ -106,7 +112,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.1 $";
+static char *revision = "$Revision: 1.20.6.3 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
@@ -1330,7 +1336,6 @@ static struct capi_driver c4_driver = {
 
     add_card: 0, /* no add_card function */
 };
-
 
 static int ncards = 0;
 

@@ -7,11 +7,11 @@
  * Original copyright follow. See wavelan_cs.h for details.
  *
  * This file contain the declarations of the Wavelan hardware. Note that
- * the Pcmcia Wavelan include a i82593 controler (see definitions in
+ * the Pcmcia Wavelan include a i82593 controller (see definitions in
  * file i82593.h).
  *
  * The main difference between the pcmcia hardware and the ISA one is
- * the Ethernet Controler (i82593 instead of i82586). The i82593 allow
+ * the Ethernet Controller (i82593 instead of i82586). The i82593 allow
  * only one send buffer. The PSA (Parameter Storage Area : EEprom for
  * permanent storage of various info) is memory mapped, but not the
  * MMI (Modem Management Interface).

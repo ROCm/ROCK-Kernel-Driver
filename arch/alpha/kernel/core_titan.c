@@ -83,7 +83,7 @@ static int
 mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
 	     unsigned char *type1)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr;
 	u8 bus = dev->bus->number;
 	u8 device_fn = dev->devfn;
@@ -200,7 +200,7 @@ struct pci_ops titan_pci_ops =
 
 
 void
-titan_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+titan_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	titan_pachip *pachip = 
 	  (hose->index & 1) ? TITAN_pachip1 : TITAN_pachip0;
@@ -243,7 +243,7 @@ titan_query_agp(titan_pachip_port *port)
 
 }
 static void __init
-titan_init_agp(titan_pachip_port *port, struct pci_controler *hose)
+titan_init_agp(titan_pachip_port *port, struct pci_controller *hose)
 {
 	union TPAchipPCTL pctl;
 
@@ -276,9 +276,9 @@ titan_init_agp(titan_pachip_port *port, struct pci_controler *hose)
 static void __init
 titan_init_one_pachip_port(titan_pachip_port *port, int index)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
-	hose = alloc_pci_controler();
+	hose = alloc_pci_controller();
 	if (index == 0)
 		pci_isa_hose = hose;
 	hose->io_space = alloc_resource();

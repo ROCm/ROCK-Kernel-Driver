@@ -1,4 +1,4 @@
-// $Id: icc.c,v 1.5 2000/11/24 17:05:37 kai Exp $
+// $Id: icc.c,v 1.5.6.1 2001/02/16 16:43:27 kai Exp $
 //-----------------------------------------------------------------------------
 //
 // ICC specific routines
@@ -7,10 +7,10 @@
 //              www.traverse.com.au
 //
 // 1999.6.25 Initial implementation of routines for Siemens ISDN
-// Communication Controler PEB 2070 based on the ISAC routines
+// Communication Controller PEB 2070 based on the ISAC routines
 // written by Karsten Keil.
 //
-// This file is (c) under GNU PUBLIC LICENSE
+// This file is (c) under GNU General Public License
 //
 //-----------------------------------------------------------------------------
 

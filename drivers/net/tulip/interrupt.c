@@ -23,7 +23,7 @@ unsigned int tulip_max_interrupt_work;
 
 
 
-static int tulip_refill_rx(struct net_device *dev)
+int tulip_refill_rx(struct net_device *dev)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	int entry;
@@ -49,6 +49,14 @@ static int tulip_refill_rx(struct net_device *dev)
 			refilled++;
 		}
 		tp->rx_ring[entry].status = cpu_to_le32(DescOwned);
+	}
+	if(tp->chip_id == LC82C168) {
+		if(((inl(dev->base_addr + CSR5)>>17)&0x07) == 4) {
+			/* Rx stopped due to out of buffers,
+			 * restart it
+			 */
+			outl(0x01, dev->base_addr + CSR2);
+		}
 	}
 	return refilled;
 }
@@ -332,7 +340,11 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
                      /* Josip Loncaric at ICASE did extensive experimentation
 			to develop a good interrupt mitigation setting.*/
                                 outl(0x8b240000, ioaddr + CSR11);
-                        } else {
+                        } else if (tp->chip_id == LC82C168) {
+				/* the LC82C168 doesn't have a hw timer.*/
+				outl(0x00, ioaddr + CSR7);
+				mod_timer(&tp->timer, RUN_AT(HZ/50));
+			} else {
                           /* Mask all interrupting sources, set timer to
 				re-enable. */
                                 outl(((~csr5) & 0x0001ebef) | AbnormalIntr | TimerInt, ioaddr + CSR7);
@@ -355,14 +367,19 @@ void tulip_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	if (tp->rx_buffers[entry].skb == NULL) {
 		if (tulip_debug > 1)
 			printk(KERN_WARNING "%s: in rx suspend mode: (%lu) (tp->cur_rx = %u, ttimer = %d, rx = %d) go/stay in suspend mode\n", dev->name, tp->nir, tp->cur_rx, tp->ttimer, rx);
-		if (tp->ttimer == 0 || (inl(ioaddr + CSR11) & 0xffff) == 0) {
-			if (tulip_debug > 1)
-				printk(KERN_WARNING "%s: in rx suspend mode: (%lu) set timer\n", dev->name, tp->nir);
-			outl(tulip_tbl[tp->chip_id].valid_intrs | TimerInt,
-				ioaddr + CSR7);
-			outl(TimerInt, ioaddr + CSR5);
-			outl(12, ioaddr + CSR11);
-			tp->ttimer = 1;
+		if (tp->chip_id == LC82C168) {
+			outl(0x00, ioaddr + CSR7);
+			mod_timer(&tp->timer, RUN_AT(HZ/50));
+		} else {
+			if (tp->ttimer == 0 || (inl(ioaddr + CSR11) & 0xffff) == 0) {
+				if (tulip_debug > 1)
+					printk(KERN_WARNING "%s: in rx suspend mode: (%lu) set timer\n", dev->name, tp->nir);
+				outl(tulip_tbl[tp->chip_id].valid_intrs | TimerInt,
+					ioaddr + CSR7);
+				outl(TimerInt, ioaddr + CSR5);
+				outl(12, ioaddr + CSR11);
+				tp->ttimer = 1;
+			}
 		}
 	}
 

@@ -51,12 +51,16 @@ int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {
   int windex ;
   struct reiserfs_transaction_handle th ;
 
+  lock_kernel();
+
   journal_begin(&th, dentry->d_inode->i_sb, 1) ;
   windex = push_journal_writer("dir_fsync") ;
   reiserfs_prepare_for_journal(th.t_super, SB_BUFFER_WITH_SB(th.t_super), 1) ;
   journal_mark_dirty(&th, dentry->d_inode->i_sb, SB_BUFFER_WITH_SB (dentry->d_inode->i_sb)) ;
   pop_journal_writer(windex) ;
   journal_end_sync(&th, dentry->d_inode->i_sb, 1) ;
+
+  unlock_kernel();
 
   return ret ;
 }

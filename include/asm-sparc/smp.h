@@ -51,6 +51,7 @@ extern unsigned long cpu_offset[NR_CPUS];
 extern int smp_found_cpus;
 extern unsigned char boot_cpu_id;
 extern unsigned long cpu_present_map;
+#define cpu_online_map cpu_present_map
 
 typedef void (*smpfunc_t)(unsigned long, unsigned long, unsigned long,
 		       unsigned long, unsigned long);

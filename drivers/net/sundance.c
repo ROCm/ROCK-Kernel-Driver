@@ -314,6 +314,7 @@ enum desc_status_bits {
 #define PRIV_ALIGN	15 	/* Required alignment mask */
 /* Use  __attribute__((aligned (L1_CACHE_BYTES)))  to maintain alignment
    within the structure. */
+#define MII_CNT		4
 struct netdev_private {
 	/* Descriptor rings first for alignment. */
 	struct netdev_desc rx_ring[RX_RING_SIZE];
@@ -346,7 +347,7 @@ struct netdev_private {
 	/* MII transceiver section. */
 	int mii_cnt;						/* MII device addresses. */
 	u16 advertising;					/* NWay media advertisement */
-	unsigned char phys[2];				/* MII device addresses. */
+	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
 };
 
 /* The station address location in the EEPROM. */
@@ -379,7 +380,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	struct netdev_private *np;
 	static int card_idx;
 	int chip_idx = ent->driver_data;
-	int irq = pdev->irq;
+	int irq;
 	int i, option = card_idx < MAX_UNITS ? options[card_idx] : 0;
 	long ioaddr;
 
@@ -387,19 +388,20 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		return -EIO;
 	pci_set_master(pdev);
 
+	irq = pdev->irq;
+
 	dev = init_etherdev(NULL, sizeof(*np));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
 
+	if (pci_request_regions(pdev, dev->name))
+		goto err_out_netdev;
+
 #ifdef USE_IO_OPS
 	ioaddr = pci_resource_start(pdev, 0);
-	if (!request_region(ioaddr, pci_id_tbl[chip_idx].io_size, dev->name))
-		goto err_out_netdev;
 #else
 	ioaddr = pci_resource_start(pdev, 1);
-	if (!request_mem_region(ioaddr, pci_id_tbl[chip_idx].io_size, dev->name))
-		goto err_out_netdev;
 	ioaddr = (long) ioremap (ioaddr, pci_id_tbl[chip_idx].io_size);
 	if (!ioaddr)
 		goto err_out_iomem;
@@ -456,7 +458,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	if (1) {
 		int phy, phy_idx = 0;
 		np->phys[0] = 1;		/* Default setting */
-		for (phy = 0; phy < 32 && phy_idx < 4; phy++) {
+		for (phy = 0; phy < 32 && phy_idx < MII_CNT; phy++) {
 			int mii_status = mdio_read(dev, phy, 1);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				np->phys[phy_idx++] = phy;
@@ -485,8 +487,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 
 #ifndef USE_IO_OPS
 err_out_iomem:
-	release_mem_region(pci_resource_start(pdev, 1),
-			   pci_id_tbl[chip_idx].io_size);
+	pci_release_regions(pdev);
 #endif
 err_out_netdev:
 	unregister_netdev (dev);
@@ -735,7 +736,9 @@ static void tx_timeout(struct net_device *dev)
 
 	dev->trans_start = jiffies;
 	np->stats.tx_errors++;
-	return;
+
+	if (!np->tx_full)
+		netif_wake_queue(dev);
 }
 
 
@@ -1233,11 +1236,8 @@ static void __devexit sundance_remove1 (struct pci_dev *pdev)
 	while (dev) {
 		struct netdev_private *np = (void *)(dev->priv);
 		unregister_netdev(dev);
-#ifdef USE_IO_OPS
-		release_region(dev->base_addr, pci_id_tbl[np->chip_id].io_size);
-#else
-		release_mem_region(pci_resource_start(pdev, 1),
-				   pci_id_tbl[np->chip_id].io_size);
+		pci_release_regions(pdev);
+#ifndef USE_IO_OPS
 		iounmap((char *)(dev->base_addr));
 #endif
 		kfree(dev);

@@ -219,11 +219,19 @@ static struct hpsb_highlevel_ops guid_ops = {
         host_reset:  host_reset,
 };
 
+static struct hpsb_highlevel *hl;
+
 void init_ieee1394_guid(void)
 {
         atomic_set(&outstanding_requests, 0);
 
-        if (!hpsb_register_highlevel("GUID manager", &guid_ops)) {
+        hl = hpsb_register_highlevel("GUID manager", &guid_ops);
+        if (!hl) {
                 HPSB_ERR("out of memory during ieee1394 initialization");
         }
+}
+
+void cleanup_ieee1394_guid(void)
+{
+        hpsb_unregister_highlevel(hl);
 }

@@ -21,7 +21,7 @@ struct vm_area_struct;
 struct linux_hose_info;
 struct pci_dev;
 struct pci_ops;
-struct pci_controler;
+struct pci_controller;
 
 struct alpha_machine_vector
 {
@@ -40,7 +40,7 @@ struct alpha_machine_vector
 	unsigned long min_io_address;
 	unsigned long min_mem_address;
 
-	void (*mv_pci_tbi)(struct pci_controler *hose,
+	void (*mv_pci_tbi)(struct pci_controller *hose,
 			   dma_addr_t start, dma_addr_t end);
 
 	unsigned int (*mv_inb)(unsigned long);

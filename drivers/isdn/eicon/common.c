@@ -3,9 +3,6 @@
  *
  * Copyright (C) Eicon Technology Corporation, 2000.
  *
- * This source file is supplied for the exclusive use with Eicon
- * Technology Corporation's range of DIVA Server Adapters.
- *
  * Eicon File Revision :    1.15  
  *
  * This program is free software; you can redistribute it and/or modify
@@ -101,7 +98,6 @@ void    DIVA_DIDD_Read( DESCRIPTOR *table, int tablelength )
 	return;
 }
 
-static
 void 	DIVA_DIDD_Write(DESCRIPTOR *table, int tablelength)
 {
         if (tablelength > sizeof(DIDD_Table))

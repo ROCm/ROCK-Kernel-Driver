@@ -92,7 +92,7 @@ void irda_unregister_compressor ( struct compressor *cp)
 /*
  * Function irda_set_compression (self, proto)
  *
- *    The the compression protocol to be used by this session
+ *    The compression protocol to be used by this session
  *
  */
 int irda_set_compression( struct irlap_cb *self, int proto)

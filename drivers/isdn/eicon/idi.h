@@ -3,9 +3,6 @@
  *
  * Copyright (C) Eicon Technology Corporation, 2000.
  *
- * This source file is supplied for the exclusive use with Eicon
- * Technology Corporation's range of DIVA Server Adapters.
- *
  * Eicon File Revision :    1.0  
  *
  * This program is free software; you can redistribute it and/or modify
@@ -65,7 +62,7 @@ struct get_serial_s {
 struct postcall_s {
   word        command;         /* command = 0x0300 */
   word        dummy;           /* not used */
-  IDI_CALL    callback;        /* routine adress to call back */
+  IDI_CALL    callback;        /* routine address to call back */
   ENTITY      *contxt;         /* ptr to entity to use */
 };
 

@@ -4,7 +4,7 @@
     
     Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
 
-    3c589_cs.c 1.154 2000/09/30 17:39:04
+    3c589_cs.c 1.156 2001/02/07 00:19:41
 
     The network driver code is based on Donald Becker's 3c589 code:
     
@@ -117,7 +117,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"3c589_cs.c 1.154 2000/09/30 17:39:04 (David Hinds)";
+"3c589_cs.c 1.156 2001/02/07 00:19:41 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -993,8 +993,9 @@ static int el3_rx(struct net_device *dev)
 		skb->protocol = eth_type_trans(skb, dev);
 		
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
-		lp->stats.rx_bytes += skb->len;
+		lp->stats.rx_bytes += pkt_len;
 	    } else {
 		DEBUG(1, "%s: couldn't allocate a sk_buff of"
 		      " size %d.\n", dev->name, pkt_len);

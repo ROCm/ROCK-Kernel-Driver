@@ -1,3 +1,54 @@
+2001-02-20  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* media.c (tulip_select_media): No need to initialize
+	new_csr6, all cases initialize it properly.
+
+2001-02-18  Manfred Spraul  <manfred@colorfullife.com>
+
+	* interrupt.c (tulip_refill_rx): Make public.
+	If PNIC chip stops due to lack of Rx buffers, restart it.
+	(tulip_interrupt): PNIC doesn't have a h/w timer, emulate
+	with software timers.
+	* pnic.c (pnic_check_duplex): New function, PNIC-specific
+	version of tulip_check_duplex.
+	(pnic_lnk_change): Call pnic_check_duplex.  If we use an
+	external MII, then we mustn't use the internal negotiation.
+	(pnic_timer): Support Rx refilling on work overflow in
+	interrupt handler, as PNIC doesn't support a h/w timer.
+	* tulip_core.c (tulip_tbl[]): Modify default csr6
+
+2001-02-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_init_one): Call pci_enable_device
+	to ensure wakeup/resource assignment before checking those
+	values.
+	(tulip_init_one): Replace PCI ids with constants from pci_id.h.
+	(tulip_suspend, tulip_resume, tulip_remove_one): Call
+	pci_power_on/off (commented out for now).
+
+2001-02-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip.h: Add CFDD_xxx bits for Tulip power management
+	* tulip_core.c (tulip_set_power_state): New function,
+	manipulating Tulip chip power state where supported.
+	(tulip_up, tulip_down, tulip_init_one): Use it.
+
+2001-02-10  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_tx_timeout): Call netif_wake_queue
+	to ensure the next Tx is always sent to us.
+
+2001-01-27  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core.c (tulip_remove_one): Fix mem leak by freeing
+	tp->media_tbl.  Add check for !dev, reformat code appropriately.
+
+2001-01-27  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_tbl[]: Comment all entries to make order and chip_id
+	relationship more clear.
+	* tulip_pci_tbl[]: Add new Accton PCI id (COMET chipset).
+
 2001-01-16  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* tulip_core.c: static vars no longer explicitly

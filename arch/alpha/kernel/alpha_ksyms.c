@@ -235,3 +235,4 @@ EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(memset);
 
 EXPORT_SYMBOL(get_wchan);
+EXPORT_SYMBOL(flush_tlb_page);

@@ -1,4 +1,4 @@
-/* $Id: eicon_io.c,v 1.13 2000/05/07 08:51:04 armin Exp $
+/* $Id: eicon_io.c,v 1.13.6.1 2001/02/16 09:09:50 armin Exp $
  *
  * ISDN low-level module for Eicon active ISDN-Cards.
  * Code for communicating with hardware.
@@ -6,7 +6,7 @@
  * Copyright 1999,2000  by Armin Schindler (mac@melware.de)
  * Copyright 1999,2000  Cytronics & Melware (info@melware.de)
  *
- * Thanks to	Eicon Technology GmbH & Co. oHG for 
+ * Thanks to	Eicon Networks for 
  *		documents, informations and hardware. 
  *
  * This program is free software; you can redistribute it and/or modify

@@ -141,7 +141,7 @@ hysdn_sched_tx(hysdn_card * card, uchar * buf, word volatile *len, word volatile
 
 
 /*****************************************************************************/
-/* send one config line to the card and return 0 if successfull, otherwise a */
+/* send one config line to the card and return 0 if successful, otherwise a */
 /* negative error code.                                                      */
 /* The function works with timeouts perhaps not giving the greatest speed    */
 /* sending the line, but this should be meaningless beacuse only some lines  */

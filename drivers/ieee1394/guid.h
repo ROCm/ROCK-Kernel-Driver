@@ -49,6 +49,6 @@ int hpsb_guid_fill_packet(hpsb_guid_t handle, struct hpsb_packet *pkt);
 
 
 void init_ieee1394_guid(void);
-
+void cleanup_ieee1394_guid(void);
 
 #endif /* _IEEE1394_GUID_H */

@@ -546,7 +546,7 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 		break;
 	case SLOT_TIMER_EXPIRED:
 		/*
-		 * Wait a little longer if we detect an incomming frame. This
+		 * Wait a little longer if we detect an incoming frame. This
 		 * is not mentioned in the spec, but is a good thing to do, 
 		 * since we want to work even with devices that violate the
 		 * timing requirements.

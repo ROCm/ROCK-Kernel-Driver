@@ -1,4 +1,4 @@
-/* $Id: capi.c,v 1.9 2000/11/12 16:32:06 kai Exp $
+/* $Id: capi.c,v 1.9.6.1 2001/02/16 16:43:23 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000.
  *        CAPI encoder/decoder
@@ -124,7 +124,7 @@ actcapi_chkhdr(act2000_card * card, actcapi_msghdr *hdr)
 	        m->hdr.cmd.cmd = c; \
 	        m->hdr.cmd.subcmd = s; \
 	        m->hdr.msgnum = actcapi_nextsmsg(card); \
-	} \
+	} else m = NULL;\
 }
 
 #define ACTCAPI_CHKSKB if (!skb) { \

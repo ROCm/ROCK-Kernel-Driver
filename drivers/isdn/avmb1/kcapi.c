@@ -1,11 +1,14 @@
 /*
- * $Id: kcapi.c,v 1.21.6.1 2000/12/10 23:39:19 kai Exp $
+ * $Id: kcapi.c,v 1.21.6.2 2001/02/13 11:43:29 kai Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: kcapi.c,v $
+ * Revision 1.21.6.2  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
  * Revision 1.21.6.1  2000/12/10 23:39:19  kai
  * in 2.4 we don't have tq_scheduler anymore.
  * also add one supported card to hfc_pci.c
@@ -136,7 +139,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.21.6.1 $";
+static char *revision = "$Revision: 1.21.6.2 $";
 
 /* ------------------------------------------------------------- */
 
@@ -814,7 +817,7 @@ static void controllercb_appl_released(struct capi_ctr * card, __u16 appl)
 	}
 }
 /*
- * ncci managment
+ * ncci management
  */
 
 static void controllercb_new_ncci(struct capi_ctr * card,

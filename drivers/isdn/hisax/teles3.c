@@ -1,4 +1,4 @@
-/* $Id: teles3.c,v 2.17 2000/11/24 17:05:38 kai Exp $
+/* $Id: teles3.c,v 2.17.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * teles3.c     low level stuff for Teles 16.3 & PNP isdn cards
  *
@@ -10,7 +10,7 @@
  *              Fritz Elfert
  *              Beat Doebeli
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -21,7 +21,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *teles3_revision = "$Revision: 2.17 $";
+const char *teles3_revision = "$Revision: 2.17.6.1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

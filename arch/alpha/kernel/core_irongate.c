@@ -367,7 +367,7 @@ again:
 void __init
 irongate_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	IRONGATE0->stat_cmd = IRONGATE0->stat_cmd & ~0x100;
 	irongate_pci_clr_err();
@@ -377,7 +377,7 @@ irongate_init_arch(void)
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

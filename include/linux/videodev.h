@@ -6,13 +6,12 @@
 
 #ifdef __KERNEL__
 
-#if LINUX_VERSION_CODE >= 0x020100
 #include <linux/poll.h>
-#endif
 #include <linux/devfs_fs_kernel.h>
 
 struct video_device
 {
+	struct module *owner;
 	char name[32];
 	int type;
 	int hardware;

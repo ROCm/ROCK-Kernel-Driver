@@ -1,4 +1,4 @@
-/* $Id: netjet.c,v 1.24.6.2 2000/12/17 22:45:11 kai Exp $
+/* $Id: netjet.c,v 1.24.6.4 2001/02/16 16:43:28 kai Exp $
  *
  * netjet.c     low level stuff for Traverse Technologie NETJet ISDN cards
  *
@@ -6,7 +6,7 @@
  *
  * Thanks to Traverse Technologie Australia for documents and informations
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 
@@ -22,7 +22,7 @@
 #include <asm/io.h>
 #include "netjet.h"
 
-const char *NETjet_revision = "$Revision: 1.24.6.2 $";
+const char *NETjet_revision = "$Revision: 1.24.6.4 $";
 
 /* Interface functions */
 

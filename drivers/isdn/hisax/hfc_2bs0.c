@@ -1,10 +1,10 @@
-/* $Id: hfc_2bs0.c,v 1.17 2000/11/24 17:05:37 kai Exp $
+/* $Id: hfc_2bs0.c,v 1.17.6.1 2001/02/16 16:43:27 kai Exp $
  *
  *  specific routines for CCD's HFC 2BS0
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

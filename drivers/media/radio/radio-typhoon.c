@@ -260,7 +260,6 @@ static int typhoon_open(struct video_device *dev, int flags)
 	if (typhoon->users)
 		return -EBUSY;
 	typhoon->users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -268,7 +267,6 @@ static void typhoon_close(struct video_device *dev)
 {
 	struct typhoon_device *typhoon = dev->priv;
 	typhoon->users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct typhoon_device typhoon_unit =
@@ -280,6 +278,7 @@ static struct typhoon_device typhoon_unit =
 
 static struct video_device typhoon_radio =
 {
+	owner:		THIS_MODULE,
 	name:		"Typhoon Radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TYPHOON,

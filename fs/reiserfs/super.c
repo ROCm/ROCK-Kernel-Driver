@@ -1,5 +1,14 @@
 /*
  * Copyright 2000 by Hans Reiser, licensing governed by reiserfs/README
+ *
+ * Trivial changes by Alan Cox to add the LFS fixes
+ *
+ * Trivial Changes:
+ * Rights granted to Hans Reiser to redistribute under other terms providing
+ * he accepts all liability including but not limited to patent, fitness
+ * for purpose, and direct or indirect claims arising from failure to perform.
+ *
+ * NO WARRANTY
  */
 
 #ifdef __KERNEL__
@@ -483,6 +492,7 @@ static int read_super_block (struct super_block * s, int size)
     SB_BUFFER_WITH_SB (s) = bh;
     SB_DISK_SUPER_BLOCK (s) = rs;
     s->s_op = &reiserfs_sops;
+    s->s_maxbytes = 0xFFFFFFFF;	/* 4Gig */
     return 0;
 }
 

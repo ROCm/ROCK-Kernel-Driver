@@ -330,7 +330,6 @@ static inline _syscall1(int,_exit,int,exitcode)
 static inline _syscall1(int,delete_module,const char *,name)
 static inline _syscall2(long,stat,char *,filename,struct stat *,statbuf)
 
-extern int sys_wait4(int, int *, int, struct rusage *);
 static inline pid_t waitpid(int pid, int * wait_stat, int flags)
 {
         return sys_wait4(pid, wait_stat, flags, NULL);

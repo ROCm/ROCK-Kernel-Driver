@@ -1,11 +1,11 @@
-/* $Id: isdnl1.c,v 2.41.6.1 2000/12/10 22:01:04 kai Exp $
+/* $Id: isdnl1.c,v 2.41.6.2 2001/02/16 16:43:27 kai Exp $
  *
  * isdnl1.c     common low level stuff for Siemens Chipsetbased isdn cards
  *              based on the teles driver from Jan den Ouden
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -15,7 +15,7 @@
  *
  */
 
-const char *l1_revision = "$Revision: 2.41.6.1 $";
+const char *l1_revision = "$Revision: 2.41.6.2 $";
 
 #define __NO_VERSION__
 #include <linux/init.h>

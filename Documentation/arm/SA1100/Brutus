@@ -3,7 +3,7 @@ For more details, see:
 
 http://developer.intel.com/design/strong/applnots/sa1100lx/getstart.htm
 
-To compile for Brutus, you must issue the following comands:
+To compile for Brutus, you must issue the following commands:
 
 	make brutus_config
 	make config

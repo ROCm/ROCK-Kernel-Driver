@@ -47,12 +47,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef MODULE
-#error This file must be compiled as a module.
-#endif
-
 #include <linux/module.h>
-
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/types.h>
@@ -919,7 +915,7 @@ static struct isdn_ppp_compressor ippp_bsd_compress = {
  * Module support routines
  *************************************************************/
 
-int init_module(void)
+static int __init isdn_bsdcomp_init(void)
 {
 	int answer = isdn_ppp_register_compressor (&ippp_bsd_compress);
 	if (answer == 0)
@@ -927,7 +923,10 @@ int init_module(void)
 	return answer;
 }
 
-void cleanup_module(void)
+static void __exit isdn_bsdcomp_exit(void)
 {
 	isdn_ppp_unregister_compressor (&ippp_bsd_compress);
 }
+
+module_init(isdn_bsdcomp_init);
+module_exit(isdn_bsdcomp_exit);

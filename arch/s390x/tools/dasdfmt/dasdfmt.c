@@ -477,7 +477,7 @@ do_format_dasd(char *dev_name,format_data_t format_params,int testmode,
 
 	rc=stat(dev_name,&stat_buf);
 	if (rc) {
-		ERRMSG_EXIT(EXIT_FAILURE,"%s: error occured during stat: " \
+		ERRMSG_EXIT(EXIT_FAILURE,"%s: error occurred during stat: " \
 			"%s\n",prog_name,strerror(errno));
 	} else {
 		if (!S_ISBLK(stat_buf.st_mode))

@@ -352,11 +352,6 @@ return (to);
 
 #ifdef CONFIG_X86_USE_3DNOW
 
-#include <linux/spinlock.h>
-#include <asm/system.h>
-#include <asm/ptrace.h>
-#include <linux/smp.h>
-#include <linux/interrupt.h>
 #include <asm/mmx.h>
 
 /*
@@ -365,14 +360,14 @@ return (to);
 
 static inline void * __constant_memcpy3d(void * to, const void * from, size_t len)
 {
-	if(len<512 || in_interrupt())
+	if (len < 512)
 		return __memcpy_c(to, from, len);
 	return _mmx_memcpy(to, from, len);
 }
 
 static inline void *__memcpy3d(void *to, const void *from, size_t len)
 {
-	if(len<512 || in_interrupt())
+	if(len < 512)
 		return __memcpy_g(to, from, len);
 	return _mmx_memcpy(to, from, len);
 }

@@ -1,4 +1,4 @@
-/* $Id: isdn_v110.c,v 1.5.6.1 2001/01/23 17:45:02 kai Exp $
+/* $Id: isdn_v110.c,v 1.5.6.3 2001/02/16 16:43:23 kai Exp $
 
  * Linux ISDN subsystem, V.110 related functions (linklevel).
  *
@@ -30,7 +30,7 @@
 
 #undef ISDN_V110_DEBUG
 
-char *isdn_v110_revision = "$Revision: 1.5.6.1 $";
+char *isdn_v110_revision = "$Revision: 1.5.6.3 $";
 
 #define V110_38400 255
 #define V110_19200  15
@@ -70,7 +70,7 @@ static unsigned char V110_OffMatrix_38400[] =
  * FlipBits reorders sequences of keylen bits in one byte.
  * E.g. source order 7654321 will be converted to 45670123 when keylen = 4,
  * and to 67452301 when keylen = 2. This is necessary because ordering on
- * the isdn line is the the other way.
+ * the isdn line is the other way.
  */
 static __inline unsigned char
 FlipBits(unsigned char c, int keylen)
@@ -600,7 +600,7 @@ isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 					case ISDN_PROTO_L2_V11038:
 						dev->v110[idx] = isdn_v110_open(V110_38400, hdrlen, maxsize);
 						break;
-					default:
+					default:;
 				}
 				if ((v = dev->v110[idx])) {
 					while (v->SyncInit) {

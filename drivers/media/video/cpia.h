@@ -62,7 +62,7 @@ struct cpia_camera_ops
 	/* transferCmd sends commands to the camera.  command MUST point to
 	 * an  8 byte buffer in kernel space. data can be NULL if no extra
 	 * data is needed.  The size of the data is given by the last 2
-	 * bytes of comand.  data must also point to memory in kernel space.
+	 * bytes of command.  data must also point to memory in kernel space.
 	 * Returns negative value on error, otherwise 0.
 	 */
 	int (*transferCmd)(void *privdata, u8 *command, u8 *data);

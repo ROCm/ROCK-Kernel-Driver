@@ -1,11 +1,14 @@
 /*
- * $Id: b1.c,v 1.20 2000/11/23 20:45:14 kai Exp $
+ * $Id: b1.c,v 1.20.6.1 2001/02/13 11:43:29 kai Exp $
  * 
  * Common module for AVM B1 cards.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1.c,v $
+ * Revision 1.20.6.1  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
  * Revision 1.20  2000/11/23 20:45:14  kai
  * fixed module_init/exit stuff
  * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
@@ -117,7 +120,7 @@
 #include "capicmd.h"
 #include "capiutil.h"
 
-static char *revision = "$Revision: 1.20 $";
+static char *revision = "$Revision: 1.20.6.1 $";
 
 /* ------------------------------------------------------------- */
 

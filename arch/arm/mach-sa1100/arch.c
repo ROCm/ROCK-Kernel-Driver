@@ -54,7 +54,7 @@ fixup_sa1100(struct machine_desc *desc, struct param_struct *params,
 	if (machine_is_assabet()) {
 		/* 
 		 * On Assabet, we must probe for the Neponset board *before*
-		 * paging_init() has occured to actually determine the amount
+		 * paging_init() has occurred to actually determine the amount
 		 * of RAM available.
 		 */
 		extern void map_sa1100_gpio_regs(void);

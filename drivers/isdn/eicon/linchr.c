@@ -3,9 +3,6 @@
  *
  * Copyright (C) Eicon Technology Corporation, 2000.
  *
- * This source file is supplied for the exclusive use with Eicon
- * Technology Corporation's range of DIVA Server Adapters.
- *
  * Eicon File Revision :    1.12  
  *
  * This program is free software; you can redistribute it and/or modify
@@ -24,6 +21,8 @@
  *
  */
 
+#define __NO_VERSION__
+#include <linux/module.h>
 
 #include <linux/kernel.h>
 #include <linux/poll.h>
@@ -240,14 +239,12 @@ ssize_t do_read(struct file *pFile, char *pUserBuffer, size_t BufferSize, loff_t
 
 	return 0;
 }
-int private_usage_count;
-extern void mod_inc_use_count(void);
-extern void mod_dec_use_count(void);
+static int private_usage_count;
 
 int do_open(struct inode *pInode, struct file *pFile)
 {
-#if defined(MODULE)
-	mod_inc_use_count();
+	MOD_INC_USE_COUNT;
+#ifdef MODULE
 	private_usage_count++;
 #endif
 	return 0;
@@ -255,8 +252,8 @@ int do_open(struct inode *pInode, struct file *pFile)
 
 int do_release(struct inode *pInode, struct file *pFile)
 {
-#if defined(MODULE)
-	mod_dec_use_count();
+	MOD_DEC_USE_COUNT;
+#ifdef MODULE
 	private_usage_count--;
 #endif
 	return 0;
@@ -267,8 +264,6 @@ void UnlockDivas(void)
 	while (private_usage_count > 0)
 	{
 		private_usage_count--;
-#if defined(MODULE)
-		mod_dec_use_count();
-#endif
+		MOD_DEC_USE_COUNT;
 	}
 }

@@ -162,7 +162,7 @@ int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib)
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
 	ASSERT(attrib != NULL, return -1;);
 
-	/* Remove atribute from object */
+	/* Remove attribute from object */
 	node = hashbin_remove(obj->attribs, 0, attrib->name);
 	if (!node)
 		return 0; /* Already removed or non-existent */

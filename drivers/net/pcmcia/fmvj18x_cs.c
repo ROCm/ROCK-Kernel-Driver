@@ -1,5 +1,5 @@
 /*======================================================================
-    fmvj18x_cs.c,v 2.0 2000/10/01  03:13:53 root Exp
+    fmvj18x_cs.c 2.2 2001/01/07
 
     A fmvj18x (and its compatibles) PCMCIA client driver
 
@@ -19,7 +19,7 @@
     Director, National Security Agency.
     
     This software may be used and distributed according to the terms
-    of the GNU Public License, incorporated herein by reference.
+    of the GNU General Public License, incorporated herein by reference.
     
     The author may be reached as becker@CESDIS.gsfc.nasa.gov, or C/O
     Center of Excellence in Space Data and Information Sciences
@@ -87,8 +87,7 @@ MODULE_PARM(sram_config, "i");
    driver version infomation 
  */
 #ifdef PCMCIA_DEBUG
-static char *version =
- "fmvj18x_cs.c,v 2.0 2000/10/01 03:13:53 root Exp";
+static char *version = "fmvj18x_cs.c 2.2 2001/01/07";
 #endif
 
 /*====================================================================*/
@@ -96,6 +95,7 @@ static char *version =
     PCMCIA event handlers
  */
 static void fmvj18x_config(dev_link_t *link);
+static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id);
 static void fmvj18x_release(u_long arg);
 static int fmvj18x_event(event_t event, int priority,
 			  event_callback_args_t *args);
@@ -103,7 +103,7 @@ static dev_link_t *fmvj18x_attach(void);
 static void fmvj18x_detach(dev_link_t *);
 
 /*
-    LAN controler(MBH86960A) specific routines
+    LAN controller(MBH86960A) specific routines
  */
 static int fjn_config(struct net_device *dev, struct ifmap *map);
 static int fjn_open(struct net_device *dev);
@@ -122,7 +122,9 @@ static dev_link_t *dev_list = NULL;
 /*
     card type
  */
-typedef enum { MBH10302, MBH10304, TDK, CONTEC, LA501, UNGERMANN } cardtype_t;
+typedef enum { MBH10302, MBH10304, TDK, CONTEC, LA501, UNGERMANN, 
+	       XXX10304
+} cardtype_t;
 
 #define MANFID_UNGERMANN 0x02c0
 
@@ -223,8 +225,8 @@ typedef struct local_info_t {
 #define RECV_ALL             0x03 /* (RX_MODE) */
 #define CONFIG0_DFL          0x5a /* 16bit bus, 4K x 2 Tx queues */
 #define CONFIG0_DFL_1        0x5e /* 16bit bus, 8K x 2 Tx queues */
-#define CONFIG0_RST          0xda /* Data Link Controler off (CONFIG_0) */
-#define CONFIG0_RST_1        0xde /* Data Link Controler off (CONFIG_0) */
+#define CONFIG0_RST          0xda /* Data Link Controller off (CONFIG_0) */
+#define CONFIG0_RST_1        0xde /* Data Link Controller off (CONFIG_0) */
 #define BANK_0               0xa0 /* bank 0 (CONFIG_1) */
 #define BANK_1               0xa4 /* bank 1 (CONFIG_1) */
 #define BANK_2               0xa8 /* bank 2 (CONFIG_1) */
@@ -235,8 +237,8 @@ typedef struct local_info_t {
 #define MANU_MODE            0x03 /* Stop and skip packet on 16 col */
 #define TDK_AUTO_MODE        0x47 /* Auto skip packet on 16 col detected */
 #define TDK_MANU_MODE        0x43 /* Stop and skip packet on 16 col */
-#define INTR_OFF             0x0d /* LAN controler ignores interrupts */
-#define INTR_ON              0x1d /* LAN controler will catch interrupts */
+#define INTR_OFF             0x0d /* LAN controller ignores interrupts */
+#define INTR_ON              0x1d /* LAN controller will catch interrupts */
 
 #define TX_TIMEOUT		((400*HZ)/1000)
 
@@ -321,8 +323,10 @@ static dev_link_t *fmvj18x_attach(void)
     ether_setup(dev);
     dev->open = &fjn_open;
     dev->stop = &fjn_close;
+#ifdef HAVE_TX_TIMEOUT
     dev->tx_timeout = fjn_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
+#endif
     
     /* Register with Card Services */
     link->next = dev_list;
@@ -438,6 +442,12 @@ static void fmvj18x_config(dev_link_t *link)
 	switch (le16_to_cpu(buf[0])) {
 	case MANFID_TDK:
 	    cardtype = TDK;
+	    if (le16_to_cpu(buf[1]) == PRODID_TDK_CF010) {
+		cs_status_t status;
+		CardServices(GetStatus, handle, &status);
+		if (status.CardState & CS_EVENT_3VCARD)
+		    link->conf.Vcc = 33; /* inserted in 3.3V slot */
+	    }
 	    break;
 	case MANFID_CONTEC:
 	    cardtype = CONTEC;
@@ -461,6 +471,15 @@ static void fmvj18x_config(dev_link_t *link)
 	else
 	    buf[0] = 0xffff;
 	switch (le16_to_cpu(buf[0])) {
+	case MANFID_FUJITSU:
+	    if (le16_to_cpu(buf[1]) == PRODID_FUJITSU_MBH10304) {
+		cardtype = XXX10304;    /* MBH10304 with buggy CIS */
+	        link->conf.ConfigIndex = 0x20;
+	    } else {
+		cardtype = MBH10302;
+		link->conf.ConfigIndex = 1;
+	    }
+	    break;
 	case MANFID_UNGERMANN:
 	    cardtype = UNGERMANN;
 	    /*
@@ -505,7 +524,7 @@ req_irq:
     else
 	outb(BANK_0, ioaddr + CONFIG_1);
 
-    /* Reset controler */
+    /* Reset controller */
     if( sram_config == 0 ) 
 	outb(CONFIG0_RST, ioaddr + CONFIG_0);
     else
@@ -550,6 +569,19 @@ req_irq:
 	    dev->dev_addr[i] = inb(ioaddr + UNGERMANN_MAC_ID + i);
 	card_name = "Access/CARD";
 	break;
+    case XXX10304:
+	/* Read MACID from Buggy CIS */
+	if (fmvj18x_get_hwinfo(link, tuple.TupleData) == -1) {
+	    printk(KERN_NOTICE "fmvj18x_cs: unable to read hardware net 
+		address.");
+	    unregister_netdev(dev);
+	    goto failed;
+	}
+	for (i = 0 ; i < 6; i++) {
+	    dev->dev_addr[i] = tuple.TupleData[i];
+	}
+	card_name = "FMV-J182";
+	break;
     case MBH10302:
     default:
 	/* Read MACID from register */
@@ -580,7 +612,60 @@ failed:
     fmvj18x_release((u_long)link);
 
 } /* fmvj18x_config */
- 
+/*====================================================================*/
+
+static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id)
+{
+    win_req_t req;
+    memreq_t mem;
+    u_char *base;
+    int i, j;
+
+    /* Allocate a small memory window */
+    req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
+    req.Base = 0; req.Size = 0;
+    req.AccessSpeed = 0;
+    link->win = (window_handle_t)link->handle;
+    i = CardServices(RequestWindow, &link->win, &req);
+    if (i != CS_SUCCESS) {
+	cs_error(link->handle, RequestWindow, i);
+	return -1;
+    }
+
+    base = ioremap(req.Base, req.Size);
+    mem.Page = 0;
+    mem.CardOffset = 0;
+    CardServices(MapMemPage, link->win, &mem);
+
+    /*
+     *  MBH10304 CISTPL_FUNCE_LAN_NODE_ID format
+     *  22 0d xx xx xx 04 06 yy yy yy yy yy yy ff
+     *  'xx' is garbage.
+     *  'yy' is MAC address.
+    */ 
+    for (i = 0; i < 0x200; i++) {
+	if (readb(base+i*2) == 0x22) {	
+	    if (readb(base+(i-1)*2) == 0xff
+	     && readb(base+(i+5)*2) == 0x04
+	     && readb(base+(i+6)*2) == 0x06
+	     && readb(base+(i+13)*2) == 0xff) 
+		break;
+	}
+    }
+
+    if (i != 0x200) {
+	for (j = 0 ; j < 6; j++,i++) {
+	    node_id[j] = readb(base+(i+7)*2);
+	}
+    }
+
+    iounmap(base);
+    j = CardServices(ReleaseWindow, link->win);
+    if (j != CS_SUCCESS)
+	cs_error(link->handle, ReleaseWindow, j);
+    return (i != 0x200) ? 0 : -1;
+
+} /* fmvj18x_get_hwinfo */
 /*====================================================================*/
 
 static void fmvj18x_release(u_long arg)
@@ -775,7 +860,7 @@ static void fjn_tx_timeout(struct net_device *dev)
     lp->sent = 0;
     lp->open_time = jiffies;
     sti();
-    netif_start_queue(dev);
+    netif_wake_queue(dev);
 }
 
 static int fjn_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -923,7 +1008,7 @@ static void fjn_reset(struct net_device *dev)
     outb(D_TX_INTR, ioaddr + TX_INTR);
     outb(D_RX_INTR, ioaddr + RX_INTR);
 
-    /* Turn on interrupts from LAN card controler */
+    /* Turn on interrupts from LAN card controller */
     if( lp->cardtype != TDK ) 
 		outb(INTR_ON, ioaddr + LAN_CTRL);
 } /* fjn_reset */
@@ -995,8 +1080,9 @@ static void fjn_rx(struct net_device *dev)
 #endif
 
 	    netif_rx(skb);
+	    dev->last_rx = jiffies;
 	    lp->stats.rx_packets++;
-	    lp->stats.rx_bytes += skb->len;
+	    lp->stats.rx_bytes += pkt_len;
 	}
 	if (--boguscount <= 0)
 	    break;

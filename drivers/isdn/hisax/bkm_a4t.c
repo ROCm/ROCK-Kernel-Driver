@@ -1,4 +1,4 @@
-/* $Id: bkm_a4t.c,v 1.13.6.2 2000/11/29 16:00:14 kai Exp $
+/* $Id: bkm_a4t.c,v 1.13.6.4 2001/02/16 16:43:25 kai Exp $
  * bkm_a4t.c    low level stuff for T-Berkom A4T
  *              derived from the original file sedlbauer.c
  *              derived from the original file niccy.c
@@ -6,7 +6,7 @@
  *
  * Author       Roland Klabunde (R.Klabunde@Berkom.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 
@@ -24,7 +24,7 @@
 
 extern const char *CardType[];
 
-const char *bkm_a4t_revision = "$Revision: 1.13.6.2 $";
+const char *bkm_a4t_revision = "$Revision: 1.13.6.4 $";
 
 
 static inline u_char

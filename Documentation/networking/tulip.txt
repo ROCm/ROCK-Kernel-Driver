@@ -148,6 +148,17 @@ tulip_core.c	- Driver core (a.k.a. where "everything else" goes)
 
 Version history
 ===============
+0.9.14 (February 20, 2000):
+* Fix PNIC problems (Manfred Spraul)
+* Add new PCI id for Accton comet
+* Support Davicom tulips
+* Fix oops in eeprom parsing
+* Enable workarounds for early PCI chipsets
+* IA64, hppa csr0 support
+* Support media types 5, 6
+* Interpret a bit more of the 21142 SROM extended media type 3
+* Add missing delay in eeprom reading
+
 0.9.11 (November 3, 2000):
 * Eliminate extra bus accesses when sharing interrupts (prumpf)
 * Barrier following ownership descriptor bit flip (prumpf)

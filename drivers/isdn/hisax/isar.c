@@ -1,10 +1,10 @@
-/* $Id: isar.c,v 1.17 2000/11/24 17:05:37 kai Exp $
+/* $Id: isar.c,v 1.17.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * isar.c   ISAR (Siemens PSB 7110) specific routines
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

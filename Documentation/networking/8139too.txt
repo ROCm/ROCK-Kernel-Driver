@@ -180,6 +180,52 @@ suggestions welcome)  (WIP)
 Change History
 --------------
 
+Version 0.9.15 - February 20, 2001
+
+* Call pci_enable_device to wake up/assign resource to device,
+  before actually using it.
+* Support wacky clone PCI ids (report from Norival Toniato Junior)
+* Text spelling corrections
+* Make sure tp->phys[] is signed
+* Always wake queue after hw restart, in tx_timeout
+* Record time of last received packet
+
+
+Version 0.9.14 - January 11, 2001
+
+* Merge some changes from Becker version 1.13:
+	* Add DFE 538TX PCI id
+	* MII read/write functions updated
+	* Cfg93[45]6 lock/unlock fix
+	* RTL-8129 (MII) support
+* Clean up spinlocking
+
+
+Version 0.9.13 - December, 2000
+
+* Clear blocked signals, avoid buffer overrun setting current->comm
+* Remove bogus PCI BAR length assertions
+* Remove unused 'debug' module parameter
+
+
+Version 0.9.12 - November 23, 2000
+
+* Kill major Tx stop/wake queue race
+* Use SET_MODULE_OWNER and fix module unload race
+* Fix cable length ("Twister") tuning
+* Proper media[] array length checking
+* Replace timer with kernel thread for twister tuning state machine
+  and media checking.  Fixes mdio_xxx locking, now mdio_xxx is always
+  protected by rtnl_lock semaphore.
+* Correct some sledgehammer a.k.a. overzealous spin-locks
+* Performance: Eliminate atomic_t for Tx counters, we don't need it
+* Performance: Don't copy Tx buffer if the rare case occurs where it
+  is aligned perfectly for us.
+* Eliminate needless casting of dev->priv
+* PIO mode selection and Twister tuning are now CONFIG_xxx options
+  (though purposefully not in net/Config.in... yet)
+
+
 Version 0.9.11 - October 28, 2000
 
 * Do not fail when PIO and MMIO region lengths do not match.

@@ -1352,7 +1352,6 @@ static int bttv_open(struct video_device *dev, int flags)
 	if (bttv_debug)
 		printk("bttv%d: open called\n",btv->nr);
 
-	MOD_INC_USE_COUNT;
 	down(&btv->lock);
 	if (btv->user)
 		goto out_unlock;
@@ -1378,7 +1377,6 @@ static int bttv_open(struct video_device *dev, int flags)
 
  out_unlock:
 	up(&btv->lock);
-	MOD_DEC_USE_COUNT;
 	return ret;
 }
 
@@ -1423,7 +1421,6 @@ static void bttv_close(struct video_device *dev)
 		rvfree((void *) btv->fbuffer, gbuffers*gbufsize);
 	btv->fbuffer=0;
 	up(&btv->lock);
-	MOD_DEC_USE_COUNT;  
 }
 
 
@@ -2053,6 +2050,7 @@ static int bttv_mmap(struct video_device *dev, const char *adr, unsigned long si
 
 static struct video_device bttv_template=
 {
+	owner:		THIS_MODULE,
 	name:		"UNSET",
 	type:		VID_TYPE_TUNER|VID_TYPE_CAPTURE|VID_TYPE_OVERLAY|VID_TYPE_TELETEXT,
 	hardware:	VID_HARDWARE_BT848,
@@ -2140,7 +2138,6 @@ static int vbi_open(struct video_device *dev, int flags)
 	struct bttv *btv=(struct bttv *)(dev-2);
  	unsigned long irq_flags;
 
-	MOD_INC_USE_COUNT;
         down(&btv->lock);
 	if (btv->needs_restart)
 		bt848_restart(btv);
@@ -2164,7 +2161,6 @@ static void vbi_close(struct video_device *dev)
 	btv->vbi_on = 0;
 	bt848_set_risc_jmps(btv,-1);
 	spin_unlock_irqrestore(&btv->s_lock, irq_flags);
-	MOD_DEC_USE_COUNT;  
 }
 
 static int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
@@ -2202,6 +2198,7 @@ static int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 
 static struct video_device vbi_template=
 {
+	owner:		THIS_MODULE,
 	name:		"bttv vbi",
 	type:		VID_TYPE_CAPTURE|VID_TYPE_TELETEXT,
 	hardware:	VID_HARDWARE_BT848,
@@ -2220,7 +2217,6 @@ static int radio_open(struct video_device *dev, int flags)
 	struct bttv *btv = (struct bttv *)(dev-1);
 	unsigned long v;
 
-	MOD_INC_USE_COUNT;
         down(&btv->lock);
 	if (btv->user)
 		goto busy_unlock;
@@ -2237,7 +2233,6 @@ static int radio_open(struct video_device *dev, int flags)
 
  busy_unlock:
 	up(&btv->lock);
-	MOD_DEC_USE_COUNT;
 	return -EBUSY;
 }
 
@@ -2249,7 +2244,6 @@ static void radio_close(struct video_device *dev)
 	btv->user--;
 	btv->radio = 0;
 	up(&btv->lock);
-	MOD_DEC_USE_COUNT;  
 }
 
 static long radio_read(struct video_device *v, char *buf, unsigned long count, int nonblock)
@@ -2320,6 +2314,7 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 
 static struct video_device radio_template=
 {
+	owner:		THIS_MODULE,
 	name:		"bttv radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_BT848,

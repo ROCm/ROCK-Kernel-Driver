@@ -279,7 +279,7 @@ struct pci_ops lca_pci_ops =
 };
 
 void
-lca_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+lca_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	wmb();
 	*(vip)LCA_IOC_TBIA = 0;
@@ -289,13 +289,13 @@ lca_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
 void __init
 lca_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	/*
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

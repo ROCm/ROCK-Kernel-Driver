@@ -148,7 +148,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
 	struct mediatable *mtable = tp->mtable;
-	u32 new_csr6=0;
+	u32 new_csr6;
 	int i;
 
 	if (mtable) {

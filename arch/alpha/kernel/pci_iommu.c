@@ -43,7 +43,7 @@ calc_npages(long bytes)
 }
 
 struct pci_iommu_arena *
-iommu_arena_new(struct pci_controler *hose, dma_addr_t base,
+iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 		unsigned long window_size, unsigned long align)
 {
 	unsigned long mem_size;
@@ -147,7 +147,7 @@ iommu_arena_free(struct pci_iommu_arena *arena, long ofs, long n)
 dma_addr_t
 pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 {
-	struct pci_controler *hose = pdev ? pdev->sysdata : pci_isa_hose;
+	struct pci_controller *hose = pdev ? pdev->sysdata : pci_isa_hose;
 	dma_addr_t max_dma = pdev ? pdev->dma_mask : 0x00ffffff;
 	struct pci_iommu_arena *arena;
 	long npages, dma_ofs, i;
@@ -215,7 +215,7 @@ void
 pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 		 int direction)
 {
-	struct pci_controler *hose = pdev ? pdev->sysdata : pci_isa_hose;
+	struct pci_controller *hose = pdev ? pdev->sysdata : pci_isa_hose;
 	struct pci_iommu_arena *arena;
 	long dma_ofs, npages;
 
@@ -454,7 +454,7 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	   int direction)
 {
 	struct scatterlist *start, *end, *out;
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 	dma_addr_t max_dma;
 
@@ -528,7 +528,7 @@ void
 pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	     int direction)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 	struct scatterlist *end;
 	dma_addr_t max_dma;
@@ -596,7 +596,7 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 int
 pci_dma_supported(struct pci_dev *pdev, dma_addr_t mask)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 
 #if !DEBUG_NODIRECT

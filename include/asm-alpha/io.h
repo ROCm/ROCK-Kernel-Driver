@@ -455,6 +455,23 @@ out:
 #define isa_memcpy_fromio(a,b,c)	memcpy_fromio((a),__ioremap(b),(c))
 #define isa_memcpy_toio(a,b,c)		memcpy_toio(__ioremap(a),(b),(c))
 
+static inline int
+isa_check_signature(unsigned long io_addr, const unsigned char *signature,
+		int length)
+{
+	int retval = 0;
+	do {
+		if (isa_readb(io_addr) != *signature)
+			goto out;
+		io_addr++;
+		signature++;
+		length--;
+	} while (length);
+	retval = 1;
+out:
+	return retval;
+}
+
 
 /*
  * The Alpha Jensen hardware for some rather strange reason puts

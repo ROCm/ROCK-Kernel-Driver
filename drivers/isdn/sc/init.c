@@ -1,3 +1,5 @@
+#include <linux/module.h>
+#include <linux/init.h>
 #include "includes.h"
 #include "hardware.h"
 #include "card.h"
@@ -37,23 +39,12 @@ int irq_supported(int irq_x)
 	return 0;
 }
 
-#ifdef MODULE
 MODULE_PARM(io, "1-4i");
 MODULE_PARM(irq, "1-4i");
 MODULE_PARM(ram, "1-4i");
 MODULE_PARM(do_reset, "i");
-#define init_sc init_module
-#else
-/*
-Initialization code for non-module version to be included
 
-void sc_setup(char *str, int *ints)
-{
-}
-*/
-#endif
-
-int init_sc(void)
+static int __init sc_init(void)
 {
 	int b = -1;
 	int i, j;
@@ -410,8 +401,7 @@ int init_sc(void)
 	return status;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit sc_exit(void)
 {
 	int i, j;
 
@@ -463,7 +453,6 @@ void cleanup_module(void)
 	}
 	pr_info("SpellCaster ISA ISDN Adapter Driver Unloaded.\n");
 }
-#endif
 
 int identify_board(unsigned long rambase, unsigned int iobase) 
 {
@@ -579,3 +568,6 @@ int identify_board(unsigned long rambase, unsigned int iobase)
 		
 	return -1;
 }
+
+module_init(sc_init);
+module_exit(sc_exit);

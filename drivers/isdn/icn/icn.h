@@ -1,4 +1,4 @@
-/* $Id: icn.h,v 1.30 2000/11/13 22:51:48 kai Exp $
+/* $Id: icn.h,v 1.30.6.2 2001/02/16 16:43:31 kai Exp $
 
  * ISDN lowlevel-module for the ICN active ISDN-Card.
  *
@@ -217,9 +217,9 @@ static char *icn_id2 = "\0";
 #ifdef MODULE
 MODULE_AUTHOR("Fritz Elfert");
 MODULE_PARM(portbase, "i");
-MODULE_PARM_DESC(portbase, "Port adress of first card");
+MODULE_PARM_DESC(portbase, "Port address of first card");
 MODULE_PARM(membase, "i");
-MODULE_PARM_DESC(membase, "Shared memory adress of all cards");
+MODULE_PARM_DESC(membase, "Shared memory address of all cards");
 MODULE_PARM(icn_id, "s");
 MODULE_PARM_DESC(icn_id, "ID-String of first card");
 MODULE_PARM(icn_id2, "s");

@@ -308,20 +308,19 @@ static int rt_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void rt_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct rt_device rtrack_unit;
 
 static struct video_device rtrack_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"RadioTrack radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK,

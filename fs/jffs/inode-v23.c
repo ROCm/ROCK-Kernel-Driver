@@ -10,8 +10,8 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * $Id: inode-v23.c,v 1.43 2000/08/22 08:00:22 dwmw2 Exp $
- *
+ * $Id: inode-v23.c,v 1.43.2.6 2001/01/09 00:32:48 dwmw2 Exp $
+ * + sb_maxbytes / generic_file_open() fixes for 2.4.0-ac4
  *
  * Ported to Linux 2.3.x and MTD:
  * Copyright (C) 2000  Alexander Larsson (alex@cendio.se), Cendio Systems AB
@@ -84,6 +84,7 @@ jffs_read_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->u.generic_sbp = (void *) 0;
+	sb->s_maxbytes = 0xFFFFFFFF;
 
 	/* Build the file system.  */
 	if (jffs_build_fs(sb) < 0) {

@@ -1,10 +1,10 @@
-/* $Id: l3_1tr6.c,v 2.13 2000/11/19 17:02:48 kai Exp $
+/* $Id: l3_1tr6.c,v 2.13.6.1 2001/02/16 16:43:27 kai Exp $
  *
  *  German 1TR6 D-channel protocol
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -17,7 +17,7 @@
 #include <linux/ctype.h>
 
 extern char *HiSax_getrev(const char *revision);
-const char *l3_1tr6_revision = "$Revision: 2.13 $";
+const char *l3_1tr6_revision = "$Revision: 2.13.6.1 $";
 
 #define MsgHead(ptr, cref, mty, dis) \
 	*ptr++ = dis; \

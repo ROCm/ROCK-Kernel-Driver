@@ -12,10 +12,9 @@ export-objs	:= Divas_mod.o eicon_mod.o
 
 list-multi	:= eicon.o divas.o
 eicon-objs	:= eicon_mod.o eicon_isa.o eicon_pci.o eicon_idi.o \
-		   eicon_io.o fcheck.o
+		   eicon_io.o
 divas-objs	:= common.o idi.o bri.o pri.o log.o xlog.o kprintf.o fpga.o \
-		   fourbri.o lincfg.o linchr.o linsys.o linio.o fcheck.o \
-		   Divas_mod.o
+		   fourbri.o lincfg.o linchr.o linsys.o linio.o Divas_mod.o
 
 # Optional parts of multipart objects.
 

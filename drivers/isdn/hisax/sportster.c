@@ -1,4 +1,4 @@
-/* $Id: sportster.c,v 1.14 2000/11/24 17:05:38 kai Exp $
+/* $Id: sportster.c,v 1.14.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * sportster.c     low level stuff for USR Sportster internal TA
  *
@@ -6,7 +6,7 @@
  *
  * Thanks to Christian "naddy" Weisgerber (3Com, US Robotics) for documentation
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -17,7 +17,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *sportster_revision = "$Revision: 1.14 $";
+const char *sportster_revision = "$Revision: 1.14.6.1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

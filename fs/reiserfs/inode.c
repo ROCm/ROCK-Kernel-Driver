@@ -771,6 +771,7 @@ int reiserfs_get_block (struct inode * inode, long block,
 	    ** flush unbh before the transaction commits
 	    */
 	    reiserfs_add_page_to_flush_list(&th, inode, unbh) ;
+	    mark_buffer_dirty(unbh) ;
 		  
 	    //inode->i_blocks += inode->i_sb->s_blocksize / 512;
 	    //mark_tail_converted (inode);

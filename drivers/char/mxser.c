@@ -120,7 +120,7 @@
 #define CI104J_ASIC_ID  5
 
 enum {
-	MXSER_BOARD_C168_ISA = 0,
+	MXSER_BOARD_C168_ISA = 1,
 	MXSER_BOARD_C104_ISA,
 	MXSER_BOARD_CI104J,
 	MXSER_BOARD_C168_PCI,
@@ -617,16 +617,18 @@ int mxser_init(void)
 			pdev = pci_find_device(mxser_pcibrds[b].vendor_id,
 					       mxser_pcibrds[b].device_id, pdev);
 			if (!pdev)
-				break;
+			{
+				b++;
+				continue;
+			}
 			if (pci_enable_device(pdev))
 				continue;
-			b++;
 			hwconf.pdev = pdev;
 			printk("Found MOXA %s board(BusNo=%d,DevNo=%d)\n",
 				mxser_brdname[mxser_pcibrds[b].board_type - 1],
 				pdev->bus->number, PCI_SLOT(pdev->devfn >> 3));
 			if (m >= MXSER_BOARDS) {
-				printk("Too many Smartio family boards find (maximum %d),board not configured\n", MXSER_BOARDS);
+				printk("Too many Smartio family boards found (maximum %d),board not configured\n", MXSER_BOARDS);
 			} else {
 				retval = mxser_get_PCI_conf(pdev,
 				   mxser_pcibrds[b].board_type, &hwconf);
@@ -1457,7 +1459,9 @@ static inline void mxser_transmit_chars(struct mxser_struct *info)
 
 	if (info->xmit_cnt < WAKEUP_CHARS) {
 		set_bit(MXSER_EVENT_TXLOW, &info->event);
-		schedule_task(&info->tqueue);
+		MOD_INC_USE_COUNT;
+		if (schedule_task(&info->tqueue) == 0)
+		    MOD_DEC_USE_COUNT;
 	}
 	if (info->xmit_cnt <= 0) {
 		info->IER &= ~UART_IER_THRI;
@@ -1486,8 +1490,9 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
 			   (info->flags & ASYNC_CALLOUT_NOHUP)))
 			set_bit(MXSER_EVENT_HANGUP, &info->event);
-		schedule_task(&info->tqueue);
-
+		MOD_INC_USE_COUNT;
+		if (schedule_task(&info->tqueue) == 0)
+		    MOD_DEC_USE_COUNT;
 	}
 	if (info->flags & ASYNC_CTS_FLOW) {
 		if (info->tty->hw_stopped) {
@@ -1671,7 +1676,7 @@ static int mxser_startup(struct mxser_struct *info)
 	 */
 	if (inb(info->base + UART_LSR) == 0xff) {
 		restore_flags(flags);
-		if (suser()) {
+		if (capable(CAP_SYS_ADMIN)) {
 			if (info->tty)
 				set_bit(TTY_IO_ERROR, &info->tty->flags);
 			return (0);
@@ -2188,8 +2193,7 @@ static int mxser_get_lsr_info(struct mxser_struct *info, unsigned int *value)
 	status = inb(info->base + UART_LSR);
 	restore_flags(flags);
 	result = ((status & UART_LSR_TEMT) ? TIOCSER_TEMT : 0);
-	put_user(result, value);
-	return (0);
+	return put_user(result, value);
 }
 
 /*
@@ -2229,8 +2233,7 @@ static int mxser_get_modem_info(struct mxser_struct *info,
 	    ((status & UART_MSR_RI) ? TIOCM_RNG : 0) |
 	    ((status & UART_MSR_DSR) ? TIOCM_DSR : 0) |
 	    ((status & UART_MSR_CTS) ? TIOCM_CTS : 0);
-	put_user(result, value);
-	return (0);
+	return put_user(result, value);
 }
 
 static int mxser_set_modem_info(struct mxser_struct *info, unsigned int cmd,

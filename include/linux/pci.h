@@ -539,6 +539,9 @@ void pdev_sort_resources(struct pci_dev *, struct resource_list *, u32);
 unsigned long pci_bridge_check_io(struct pci_dev *);
 void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
 		    int (*)(struct pci_dev *, u8, u8));
+#define HAVE_PCI_REQ_REGIONS 1
+int pci_request_regions(struct pci_dev *, char *);
+void pci_release_regions(struct pci_dev *);
 
 /* New-style probing supporting hot-pluggable devices */
 int pci_register_driver(struct pci_driver *);

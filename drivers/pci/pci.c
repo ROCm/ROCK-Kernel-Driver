@@ -39,10 +39,12 @@ LIST_HEAD(pci_devices);
 /**
  * pci_find_slot - locate PCI device from a given PCI slot
  * @bus: number of PCI bus on which desired PCI device resides
- * @devfn:  number of PCI slot in which desired PCI device resides
+ * @devfn: encodes number of PCI slot in which the desired PCI 
+ * device resides and the logical device number within that slot 
+ * in case of multi-function devices.
  *
- * Given a PCI bus and slot number, the desired PCI device is
- * located in system global list of PCI devices.  If the device
+ * Given a PCI bus and slot/function number, the desired PCI device 
+ * is located in system global list of PCI devices.  If the device
  * is found, a pointer to its data structure is returned.  If no 
  * device is found, %NULL is returned.
  */
@@ -58,7 +60,20 @@ pci_find_slot(unsigned int bus, unsigned int devfn)
 	return NULL;
 }
 
-
+/**
+ * pci_find_subsys - begin or continue searching for a PCI device by vendor/subvendor/device/subdevice id
+ * @vendor: PCI vendor id to match, or %PCI_ANY_ID to match all vendor ids
+ * @device: PCI device id to match, or %PCI_ANY_ID to match all vendor ids
+ * @ss_vendor: PCI subsystem vendor id to match, or %PCI_ANY_ID to match all vendor ids
+ * @ss_device: PCI subsystem device id to match, or %PCI_ANY_ID to match all vendor ids
+ * @from: Previous PCI device found in search, or %NULL for new search.
+ *
+ * Iterates through the list of known PCI devices.  If a PCI device is
+ * found with a matching @vendor, @device, @ss_vendor and @ss_device, a pointer to its
+ * device structure is returned.  Otherwise, %NULL is returned.
+ * A new search is initiated by passing %NULL to the @from argument.
+ * Otherwise if @from is not %NULL, searches continue from next device on the global list.
+ */
 struct pci_dev *
 pci_find_subsys(unsigned int vendor, unsigned int device,
 		unsigned int ss_vendor, unsigned int ss_device,
@@ -88,9 +103,8 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
  * Iterates through the list of known PCI devices.  If a PCI device is
  * found with a matching @vendor and @device, a pointer to its device structure is
  * returned.  Otherwise, %NULL is returned.
- *
  * A new search is initiated by passing %NULL to the @from argument.
- * Otherwise if @from is not null, searches continue from that point.
+ * Otherwise if @from is not %NULL, searches continue from next device on the global list.
  */
 struct pci_dev *
 pci_find_device(unsigned int vendor, unsigned int device, const struct pci_dev *from)
@@ -107,9 +121,8 @@ pci_find_device(unsigned int vendor, unsigned int device, const struct pci_dev *
  * Iterates through the list of known PCI devices.  If a PCI device is
  * found with a matching @class, a pointer to its device structure is
  * returned.  Otherwise, %NULL is returned.
- *
  * A new search is initiated by passing %NULL to the @from argument.
- * Otherwise if @from is not null, searches continue from that point.
+ * Otherwise if @from is not %NULL, searches continue from next device on the global list.
  */
 struct pci_dev *
 pci_find_class(unsigned int class, const struct pci_dev *from)
@@ -125,7 +138,28 @@ pci_find_class(unsigned int class, const struct pci_dev *from)
 	return NULL;
 }
 
-
+/**
+ * pci_find_capability - query for devices' capabilities 
+ * @dev: PCI device to query
+ * @cap: capability code
+ *
+ * Tell if a device supports a given PCI capability.
+ * Returns the address of the requested capability structure within the device's PCI 
+ * configuration space or 0 in case the device does not support it.
+ * Possible values for @flags:
+ *
+ *  %PCI_CAP_ID_PM           Power Management 
+ *
+ *  %PCI_CAP_ID_AGP          Accelerated Graphics Port 
+ *
+ *  %PCI_CAP_ID_VPD          Vital Product Data 
+ *
+ *  %PCI_CAP_ID_SLOTID       Slot Identification 
+ *
+ *  %PCI_CAP_ID_MSI          Message Signalled Interrupts
+ *
+ *  %PCI_CAP_ID_CHSWP        CompactPCI HotSwap 
+ */
 int
 pci_find_capability(struct pci_dev *dev, int cap)
 {
@@ -274,12 +308,93 @@ pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge)
 	return pin;
 }
 
+/**
+ *	pci_release_regions - Release reserved PCI I/O and memory resources
+ *	@pdev: PCI device whose resources were previously reserved by pci_request_regions
+ *
+ *	Releases all PCI I/O and memory resources previously reserved by a
+ *	successful call to pci_request_regions.  Call this function only
+ *	after all use of the PCI regions has ceased.
+ */
+void pci_release_regions(struct pci_dev *pdev)
+{
+	int i;
+	
+	for (i = 0; i < 6; i++) {
+		if (pci_resource_len(pdev, i) == 0)
+			continue;
+
+		if (pci_resource_flags(pdev, i) & IORESOURCE_IO)
+			release_region(pci_resource_start(pdev, i),
+				       pci_resource_len(pdev, i));
+
+		else if (pci_resource_flags(pdev, i) & IORESOURCE_MEM)
+			release_mem_region(pci_resource_start(pdev, i),
+					   pci_resource_len(pdev, i));
+	}
+}
+
+/**
+ *	pci_request_regions - Reserved PCI I/O and memory resources
+ *	@pdev: PCI device whose resources are to be reserved
+ *
+ *	Mark all PCI regions associated with PCI device @pdev as
+ *	being reserved by owner @res_name.  Do not access any
+ *	address inside the PCI regions unless this call returns
+ *	successfully.
+ *
+ *	Returns 0 on success, or %EBUSY on error.  A warning
+ *	message is also printed on failure.
+ */
+int pci_request_regions(struct pci_dev *pdev, char *res_name)
+{
+	int i;
+	
+	for (i = 0; i < 6; i++) {
+		if (pci_resource_len(pdev, i) == 0)
+			continue;
+
+		if (pci_resource_flags(pdev, i) & IORESOURCE_IO) {
+			if (!request_region(pci_resource_start(pdev, i),
+					    pci_resource_len(pdev, i), res_name))
+				goto err_out;
+		}
+		
+		else if (pci_resource_flags(pdev, i) & IORESOURCE_MEM) {
+			if (!request_mem_region(pci_resource_start(pdev, i),
+					        pci_resource_len(pdev, i), res_name))
+				goto err_out;
+		}
+	}
+	
+	return 0;
+
+err_out:
+	printk (KERN_WARNING "PCI: Unable to reserve %s region #%d:%lx@%lx for device %s\n",
+		pci_resource_flags(pdev, i) & IORESOURCE_IO ? "I/O" : "mem",
+		i + 1, /* PCI BAR # */
+		pci_resource_len(pdev, i), pci_resource_start(pdev, i),
+		pdev->slot_name);
+	pci_release_regions(pdev);
+	return -EBUSY;
+}
+
+
 /*
  *  Registration of PCI drivers and handling of hot-pluggable devices.
  */
 
 static LIST_HEAD(pci_drivers);
 
+/**
+ * pci_match_device - Tell if a PCI device structure has a matching PCI device
+ * @ids: array of PCI device id structures to search in
+ * @dev: the PCI device structure to match against
+ *
+ * Used by a driver to check whether a PCI device present in the
+ * system is in its list of supported devices.Returns the matching
+ * pci_device_id structure or %NULL if there is no match.
+ */
 const struct pci_device_id *
 pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev)
 {
@@ -320,6 +435,14 @@ out:
 	return ret;
 }
 
+/**
+ * pci_register_driver - register a new pci driver
+ * @drv: the driver structure to register
+ * 
+ * Adds the driver structure to the list of registered drivers
+ * Returns the number of pci devices which were claimed by the driver
+ * during registration.
+ */
 int
 pci_register_driver(struct pci_driver *drv)
 {
@@ -333,6 +456,15 @@ pci_register_driver(struct pci_driver *drv)
 	}
 	return count;
 }
+
+/**
+ * pci_unregister_driver - unregister a pci driver
+ * @drv: the driver structure to unregister
+ * 
+ * Deletes the driver structure from the list of registered PCI drivers,
+ * gives it a chance to clean up and marks the devices for which it
+ * was responsible as driverless.
+ */
 
 void
 pci_unregister_driver(struct pci_driver *drv)
@@ -395,6 +527,13 @@ run_sbin_hotplug(struct pci_dev *pdev, int insert)
 	call_usermodehelper (argv [0], argv, envp);
 }
 
+/**
+ * pci_insert_device - insert a hotplug device
+ * @dev: the device to insert
+ * @bus: where to insert it
+ *
+ * Add a new device to the device lists and notify userspace (/sbin/hotplug).
+ */
 void
 pci_insert_device(struct pci_dev *dev, struct pci_bus *bus)
 {
@@ -427,6 +566,13 @@ pci_free_resources(struct pci_dev *dev)
 	}
 }
 
+/**
+ * pci_remove_device - remove a hotplug device
+ * @dev: the device to remove
+ *
+ * Delete the device structure from the device lists and 
+ * notify userspace (/sbin/hotplug).
+ */
 void
 pci_remove_device(struct pci_dev *dev)
 {
@@ -452,6 +598,13 @@ static struct pci_driver pci_compat_driver = {
 	name: "compat"
 };
 
+/**
+ * pci_dev_driver - get the pci_driver of a device
+ * @dev: the device to query
+ *
+ * Returns the appropriate pci_driver structure or %NULL if there is no 
+ * registered driver for the device.
+ */
 struct pci_driver *
 pci_dev_driver(const struct pci_dev *dev)
 {
@@ -503,7 +656,13 @@ PCI_OP(write, byte, u8)
 PCI_OP(write, word, u16)
 PCI_OP(write, dword, u32)
 
-
+/**
+ * pci_set_master - enables bus-mastering for device dev
+ * @dev: the PCI device to enable
+ *
+ * Enables bus-mastering on the device and calls pcibios_set_master()
+ * to do the needed arch specific settings.
+ */
 void
 pci_set_master(struct pci_dev *dev)
 {
@@ -837,8 +996,15 @@ static void pci_read_irq(struct pci_dev *dev)
 	dev->irq = irq;
 }
 
-/*
- * Fill in class and map information of a device
+/**
+ * pci_setup_device - fill in class and map information of a device
+ * @dev: the device structure to fill
+ *
+ * Initialize the device structure with information about the device's 
+ * vendor,class,memory and IO-space addresses,IRQ lines etc.
+ * Called at initialisation of the PCI subsystem and by CardBus services.
+ * Returns 0 on success and -1 if unknown type of device (not normal, bridge
+ * or CardBus).
  */
 int pci_setup_device(struct pci_dev * dev)
 {

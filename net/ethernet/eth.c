@@ -30,6 +30,7 @@
  *		Alan Cox	: Protect against forwarding explosions with
  *				  older network drivers and IFF_ALLMULTI.
  *	Christer Weinigel	: Better rebuild header message.
+ *             Andrew Morton    : 26Feb01: kill ether_setup() - use netdev_boot_setup().
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -60,31 +61,9 @@
 #include <asm/system.h>
 #include <asm/checksum.h>
 
-static int __init eth_setup(char *str)
-{
-	int ints[5];
-	struct ifmap map;
+extern int __init netdev_boot_setup(char *str);
 
-	str = get_options(str, ARRAY_SIZE(ints), ints);
-	if (!str || !*str)
-		return 0;
-
- 	/* Save settings */
- 	memset(&map, -1, sizeof(map));
-	if (ints[0] > 0)
-		map.irq = ints[1];
-	if (ints[0] > 1)
-		map.base_addr = ints[2];
-	if (ints[0] > 2)
-		map.mem_start = ints[3];
-	if (ints[0] > 3)
-		map.mem_end = ints[4];
-
-	/* Add new entry to the list */
-	return netdev_boot_setup_add(str, &map);
-}
-
-__setup("ether=", eth_setup);
+__setup("ether=", netdev_boot_setup);
 
 /*
  *	 Create the Ethernet MAC header for an arbitrary protocol layer 

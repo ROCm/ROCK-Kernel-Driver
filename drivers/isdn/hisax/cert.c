@@ -1,8 +1,8 @@
-/* $Id: cert.c,v 2.3 2000/06/26 08:59:12 keil Exp $
+/* $Id: cert.c,v 2.3.6.1 2001/02/16 16:43:25 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *

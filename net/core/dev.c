@@ -349,7 +349,7 @@ int netdev_boot_setup_check(struct net_device *dev)
 /*
  * Saves at boot time configured settings for any netdevice.
  */
-static int __init netdev_boot_setup(char *str)
+int __init netdev_boot_setup(char *str)
 {
 	int ints[5];
 	struct ifmap map;
@@ -359,7 +359,7 @@ static int __init netdev_boot_setup(char *str)
 		return 0;
 
 	/* Save settings */
-	memset(&map, -1, sizeof(map));
+	memset(&map, 0, sizeof(map));
 	if (ints[0] > 0)
 		map.irq = ints[1];
 	if (ints[0] > 1)

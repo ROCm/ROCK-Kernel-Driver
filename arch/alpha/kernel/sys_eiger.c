@@ -177,7 +177,7 @@ eiger_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 static u8 __init
 eiger_swizzle(struct pci_dev *dev, u8 *pinp)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int slot, pin = *pinp;
 	int bridge_count = 0;
 

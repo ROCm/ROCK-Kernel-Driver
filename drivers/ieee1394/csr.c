@@ -403,31 +403,30 @@ static int write_fcp(struct hpsb_host *host, int nodeid, quadlet_t *data,
 }
 
 
-struct hpsb_highlevel_ops csr_ops = {
+static struct hpsb_highlevel_ops csr_ops = {
         add_host: add_host,
         host_reset: host_reset,
 };
 
 
-struct hpsb_address_ops map_ops = {
+static struct hpsb_address_ops map_ops = {
         read: read_maps,
 };
 
-struct hpsb_address_ops fcp_ops = {
+static struct hpsb_address_ops fcp_ops = {
         write: write_fcp,
 };
 
-struct hpsb_address_ops reg_ops = {
+static struct hpsb_address_ops reg_ops = {
         read: read_regs,
         write: write_regs,
         lock: lock_regs,
 };
 
+static struct hpsb_highlevel *hl;
 
 void init_csr(void)
 {
-        struct hpsb_highlevel *hl;
-
         hl = hpsb_register_highlevel("standard registers", &csr_ops);
         if (hl == NULL) {
                 HPSB_ERR("out of memory during ieee1394 initialization");
@@ -448,4 +447,9 @@ void init_csr(void)
         hpsb_register_addrspace(hl, &map_ops,
                                 CSR_REGISTER_BASE + CSR_SPEED_MAP,
                                 CSR_REGISTER_BASE + CSR_SPEED_MAP_END);
+}
+
+void cleanup_csr(void)
+{
+        hpsb_unregister_highlevel(hl);
 }

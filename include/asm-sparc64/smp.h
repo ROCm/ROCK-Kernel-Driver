@@ -60,6 +60,7 @@ extern struct cpuinfo_sparc cpu_data[NR_CPUS];
  
 extern unsigned char boot_cpu_id;
 extern unsigned long cpu_present_map;
+#define cpu_online_map cpu_present_map
 
 /*
  *	General functions that each host system must provide.

@@ -672,7 +672,7 @@ static void initialize_cs4341(struct saa7146 *saa)
 		/* auto mute off, power on, no de-emphasis */
 		/* I2S data up to 24-bit 64xFs internal SCLK */
 		I2CWrite(&(saa->i2c), 0x22, 0x01, 0x11, 2);
-		/* ATAPI mixer setings */
+		/* ATAPI mixer settings */
 		I2CWrite(&(saa->i2c), 0x22, 0x02, 0x49, 2);
 		/* attenuation left 3db */
 		I2CWrite(&(saa->i2c), 0x22, 0x03, 0x00, 2);
@@ -1988,6 +1988,7 @@ static void saa_close(struct video_device *dev)
 /* template for video_device-structure */
 static struct video_device saa_template =
 {
+	owner:		THIS_MODULE,
 	name:		"SAA7146A",
 	type:		VID_TYPE_CAPTURE | VID_TYPE_OVERLAY,
 	hardware:	VID_HARDWARE_SAA7146,

@@ -1,11 +1,11 @@
-/* $Id: l3dss1.c,v 2.30 2000/11/19 17:02:48 kai Exp $
+/* $Id: l3dss1.c,v 2.30.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * EURO/DSS1 D-channel protocol
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -22,7 +22,7 @@
 #include <linux/config.h>
 
 extern char *HiSax_getrev(const char *revision);
-const char *dss1_revision = "$Revision: 2.30 $";
+const char *dss1_revision = "$Revision: 2.30.6.1 $";
 
 #define EXT_BEARER_CAPS 1
 
@@ -426,9 +426,9 @@ l3dss1_parse_facility(struct PStack *st, struct l3_process *pc,
 #undef FOO1
 
 			}
-#else  not HISAX_DE_AOC
+#else  /* not HISAX_DE_AOC */
                         l3_debug(st, "invoke break");
-#endif not HISAX_DE_AOC 
+#endif /* not HISAX_DE_AOC */
 			break;
 		case 2:	/* return result */
 			 /* if no process available handle separately */ 
@@ -438,12 +438,12 @@ l3dss1_parse_facility(struct PStack *st, struct l3_process *pc,
                            return; 
                          }   
                         if ((pc->prot.dss1.invoke_id) && (pc->prot.dss1.invoke_id == id))
-                          { /* Diversion successfull */
+                          { /* Diversion successful */
                             free_invoke_id(st,pc->prot.dss1.invoke_id);
                             pc->prot.dss1.remote_result = 0; /* success */     
                             pc->prot.dss1.invoke_id = 0;
                             pc->redir_result = pc->prot.dss1.remote_result; 
-                            st->l3.l3l4(st, CC_REDIR | INDICATION, pc);                                  } /* Diversion successfull */
+                            st->l3.l3l4(st, CC_REDIR | INDICATION, pc);                                  } /* Diversion successful */
                         else
                           l3_debug(st,"return error unknown identifier");
 			break;
@@ -2112,7 +2112,7 @@ static void l3dss1_redir_req(struct l3_process *pc, u_char pr, void *arg)
         MsgHead(p, pc->callref, MT_FACILITY);
 
         for (subp = pc->chan->setup.phone; (*subp) && (*subp != '.'); subp++) len_phone++; /* len of phone number */
-        if (*subp++ == '.') len_sub = strlen(subp) + 2; /* length including info subadress element */ 
+        if (*subp++ == '.') len_sub = strlen(subp) + 2; /* length including info subaddress element */ 
 
 	*p++ = 0x1c;   /* Facility info element */
         *p++ = len_phone + len_sub + 2 + 2 + 8 + 3 + 3; /* length of element */
@@ -2138,7 +2138,7 @@ static void l3dss1_redir_req(struct l3_process *pc, u_char pr, void *arg)
 	 *p++ = pc->chan->setup.phone[l];
 
         if (len_sub)
-	  { *p++ = 0x04; /* called party subadress */
+	  { *p++ = 0x04; /* called party subaddress */
             *p++ = len_sub - 2;
             while (*subp) *p++ = *subp++;
           }

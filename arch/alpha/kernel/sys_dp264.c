@@ -404,13 +404,13 @@ dp264_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	};
 	const long min_idsel = 5, max_idsel = 10, irqs_per_slot = 5;
 
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int irq = COMMON_TABLE_LOOKUP;
 
 	if (irq > 0) {
 		irq += 16 * hose->index;
 	} else {
-		/* ??? The Contaq IDE controler on the ISA bridge uses
+		/* ??? The Contaq IDE controller on the ISA bridge uses
 		   "legacy" interrupts 14 and 15.  I don't know if anything
 		   can wind up at the same slot+pin on hose1, so we'll
 		   just have to trust whatever value the console might
@@ -455,7 +455,7 @@ monet_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 static u8 __init
 monet_swizzle(struct pci_dev *dev, u8 *pinp)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int slot, pin = *pinp;
 
 	if (hose->first_busno == dev->bus->number) {
@@ -521,7 +521,7 @@ clipper_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	};
 	const long min_idsel = 1, max_idsel = 7, irqs_per_slot = 5;
 
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int irq = COMMON_TABLE_LOOKUP;
 
 	if (irq > 0)

@@ -489,6 +489,12 @@ struct super_block * ufs_read_super (struct super_block * sb, void * data,
 	if (!uspi)
 		goto failed;
 
+	/* Set a 2Gig file limit. Some UFS variants need to override 
+	   this but as I don't know which I'll let those in the know loosen
+	   the rules */
+	   
+	sb->s_maxbytes = MAX_NON_LFS;
+
 	switch (sb->u.ufs_sb.s_mount_opt & UFS_MOUNT_UFSTYPE) {
 	case UFS_MOUNT_UFSTYPE_44BSD:
 		UFSD(("ufstype=44bsd\n"))

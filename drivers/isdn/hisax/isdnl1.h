@@ -1,8 +1,8 @@
-/* $Id: isdnl1.h,v 2.9 2000/06/26 08:59:13 keil Exp $
+/* $Id: isdnl1.h,v 2.9.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * Layer 1 defines
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

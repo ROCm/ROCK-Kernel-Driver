@@ -220,7 +220,7 @@ int ircomm_connect_request(struct ircomm_cb *self, __u8 dlsap_sel,
 /*
  * Function ircomm_connect_indication (self, qos, skb)
  *
- *    Notify user layer about the incomming connection
+ *    Notify user layer about the incoming connection
  *
  */
 void ircomm_connect_indication(struct ircomm_cb *self, struct sk_buff *skb,

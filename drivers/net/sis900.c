@@ -18,6 +18,7 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm
 
+   Rev 1.07.09 Feb.  9 2001 Dave Jones <davej@suse.de> PCI enable cleanup
    Rev 1.07.08 Jan.  8 2001 Lei-Chun Chang added RTL8201 PHY support
    Rev 1.07.07 Nov. 29 2000 Lei-Chun Chang added kernel-doc extractable documentation and 630 workaround fix
    Rev 1.07.06 Nov.  7 2000 Jeff Garzik <jgarzik@mandrakesoft.com> some bug fix and cleaning
@@ -60,7 +61,7 @@
 #include "sis900.h"
 
 static const char *version =
-"sis900.c: v1.07.08  1/8/2001\n";
+"sis900.c: v1.07.09  2/9/2001\n";
 
 static int max_interrupt_work = 20;
 static int multicast_filter_limit = 128;
@@ -252,10 +253,10 @@ static int __devinit sis630e_get_mac_addr(struct pci_dev * pci_dev, struct net_d
 static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
 	struct sis900_private *sis_priv;
-	long ioaddr = pci_resource_start(pci_dev, 0);
+	long ioaddr;
 	struct net_device *net_dev;
-	int irq = pci_dev->irq;
-	int i, ret = 0;
+	int irq;
+	int i, ret;
 	u8 revision;
 	char *card_name = card_names[pci_id->driver_data];
 
@@ -266,9 +267,13 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	}
 
 	/* setup various bits in PCI command register */
-	if (pci_enable_device (pci_dev))
-		return -ENODEV;
+	ret = pci_enable_device (pci_dev);
+	if (ret) return ret;
+
 	pci_set_master(pci_dev);
+
+	irq = pci_dev->irq;
+	ioaddr = pci_resource_start(pci_dev, 0);
 
 	net_dev = init_etherdev(NULL, sizeof(struct sis900_private));
 	if (!net_dev)
@@ -1469,14 +1474,14 @@ static void sis900_finish_xmit (struct net_device *net_dev)
 		tx_status = sis_priv->tx_ring[entry].cmdsts;
 
 		if (tx_status & OWN) {
-			/* The packet is not transmited yet (owned by hardware) !
+			/* The packet is not transmitted yet (owned by hardware) !
 			   Note: the interrupt is generated only when Tx Machine
 			   is idle, so this is an almost impossible case */
 			break;
 		}
 
 		if (tx_status & (ABORT | UNDERRUN | OWCOLL)) {
-			/* packet unsuccessfully transmited */
+			/* packet unsuccessfully transmitted */
 			if (sis900_debug > 3)
 				printk(KERN_INFO "%s: Transmit "
 				       "error, Tx status %8.8x.\n",
@@ -1491,7 +1496,7 @@ static void sis900_finish_xmit (struct net_device *net_dev)
 			if (tx_status & OWCOLL)
 				sis_priv->stats.tx_window_errors++;
 		} else {
-			/* packet successfully transmited */
+			/* packet successfully transmitted */
 			sis_priv->stats.collisions += (tx_status & COLCNT) >> 16;
 			sis_priv->stats.tx_bytes += tx_status & DSIZE;
 			sis_priv->stats.tx_packets++;

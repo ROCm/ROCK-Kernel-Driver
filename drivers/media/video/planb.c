@@ -2037,6 +2037,7 @@ static int planb_mmap(struct video_device *dev, const char *adr, unsigned long s
 
 static struct video_device planb_template=
 {
+	owner:		THIS_MODULE,
 	name:		PLANB_DEVICE_NAME,
 	type:		VID_TYPE_OVERLAY,
 	hardware:	VID_HARDWARE_PLANB,

@@ -399,6 +399,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_magic = SMB_SUPER_MAGIC;
 	sb->s_flags = 0;
 	sb->s_op = &smb_sops;
+	sb->s_maxbytes = MAX_NON_LFS;	/* client support missing */
 
 	sb->u.smbfs_sb.mnt = NULL;
 	sb->u.smbfs_sb.sock_file = NULL;

@@ -59,7 +59,7 @@ typedef struct ccw_req_t {
 #define CQR_STATUS_FILLED   0x01	/* request is ready to be preocessed */
 #define CQR_STATUS_QUEUED   0x02	/* request is queued to be processed */
 #define CQR_STATUS_IN_IO    0x03	/* request is currently in IO */
-#define CQR_STATUS_DONE     0x04	/* request is completed sucessfully */
+#define CQR_STATUS_DONE     0x04	/* request is completed successfully */
 #define CQR_STATUS_ERROR    0x05	/* request is completed with error */
 #define CQR_STATUS_FAILED   0x06	/* request is finally failed */
 

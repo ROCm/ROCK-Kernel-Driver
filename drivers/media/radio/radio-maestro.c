@@ -69,6 +69,7 @@ static void radio_close(struct video_device *);
 
 static struct video_device maestro_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"Maestro radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,
@@ -282,14 +283,12 @@ static int radio_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void radio_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 

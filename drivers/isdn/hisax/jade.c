@@ -1,10 +1,10 @@
-/* $Id: jade.c,v 1.6 2000/11/24 17:05:38 kai Exp $
+/* $Id: jade.c,v 1.6.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * jade.c   JADE stuff (derived from original hscx.c)
  *
  * Author   Roland Klabunde (R.Klabunde@Berkom.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

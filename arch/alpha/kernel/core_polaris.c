@@ -178,7 +178,7 @@ struct pci_ops polaris_pci_ops =
 void __init
 polaris_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	/* May need to initialize error reporting (see PCICTL0/1), but
 	 * for now assume that the firmware has done the right thing
@@ -192,7 +192,7 @@ polaris_init_arch(void)
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

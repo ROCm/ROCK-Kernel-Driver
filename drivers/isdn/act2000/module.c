@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.14 2000/11/12 16:32:06 kai Exp $
+/* $Id: module.c,v 1.14.6.2 2000/12/18 22:14:10 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000.
  *
@@ -24,6 +24,7 @@
 #include "act2000.h"
 #include "act2000_isa.h"
 #include "capi.h"
+#include <linux/init.h>
 
 static unsigned short act2000_isa_ports[] =
 {
@@ -820,12 +821,7 @@ act2000_addcard(int bus, int port, int irq, char *id)
 
 #define DRIVERNAME "IBM Active 2000 ISDN driver"
 
-#ifdef MODULE
-#define act2000_init init_module
-#endif
-
-int
-act2000_init(void)
+static int __init act2000_init(void)
 {
         printk(KERN_INFO "%s\n", DRIVERNAME);
         if (!cards)
@@ -837,9 +833,7 @@ act2000_init(void)
         return 0;
 }
 
-#ifdef MODULE
-void
-cleanup_module(void)
+static void __exit act2000_exit(void)
 {
         act2000_card *card = cards;
         act2000_card *last;
@@ -858,34 +852,5 @@ cleanup_module(void)
         printk(KERN_INFO "%s unloaded\n", DRIVERNAME);
 }
 
-#else
-void
-act2000_setup(char *str, int *ints)
-{
-        int i, j, argc, port, irq, bus;
-	
-        argc = ints[0];
-        i = 1;
-        if (argc)
-                while (argc) {
-                        port = irq = -1;
-			bus = 0;
-                        if (argc) {
-                                bus = ints[i];
-                                i++;
-                                argc--;
-                        }
-                        if (argc) {
-                                port = ints[i];
-                                i++;
-                                argc--;
-                        }
-                        if (argc) {
-                                irq = ints[i];
-                                i++;
-                                argc--;
-                        }
-			act2000_addcard(bus, port, irq, act_id);
-		}
-}
-#endif
+module_init(act2000_init);
+module_exit(act2000_exit);

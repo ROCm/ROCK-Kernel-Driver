@@ -27,6 +27,7 @@
 #include <asm/mmx.h>
 #include <asm/desc.h>
 #include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
 extern spinlock_t rtc_lock;
@@ -134,6 +135,9 @@ EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
 EXPORT_SYMBOL(smp_call_function);
+
+/* TLB flushing */
+EXPORT_SYMBOL(flush_tlb_page);
 #endif
 
 #ifdef CONFIG_MCA

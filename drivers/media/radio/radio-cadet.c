@@ -16,6 +16,10 @@
  * 2000-04-29	Russell Kroll <rkroll@exploits.org>
  *		Added ISAPnP detection for Linux 2.3/2.4
  *
+ * 2001-01-10	Russell Kroll <rkroll@exploits.org>
+ *		Removed dead CONFIG_RADIO_CADET_PORT code
+ *		PnP detection on load is now default (no args necessary)
+ *
 */
 
 #include <linux/module.h>	/* Modules 			*/
@@ -25,16 +29,12 @@
 #include <asm/io.h>		/* outb, outb_p			*/
 #include <asm/uaccess.h>	/* copy to/from user		*/
 #include <linux/videodev.h>	/* kernel radio structs		*/
-#include <linux/config.h>	/* CONFIG_RADIO_CADET_PORT 	*/
 #include <linux/param.h>
 #include <linux/isapnp.h>
 
-#ifndef CONFIG_RADIO_CADET_PORT
-#define CONFIG_RADIO_CADET_PORT 0x330
-#endif
 #define RDS_BUFFER 256
 
-static int io=CONFIG_RADIO_CADET_PORT; 
+static int io=-1;		/* default to isapnp activation */
 static int users=0;
 static int curtuner=0;
 static int tunestat=0;
@@ -518,7 +518,6 @@ static int cadet_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	init_waitqueue_head(&readq);
 	return 0;
 }
@@ -530,12 +529,12 @@ static void cadet_close(struct video_device *dev)
 		rdsstat=0;
 	}
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 
 static struct video_device cadet_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"Cadet radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_CADET,
@@ -587,6 +586,11 @@ static int cadet_probe(void)
 	return -1;
 }
 
+	/* 
+	 * io should only be set if the user has used something like
+	 * isapnp (the userspace program) to initialize this card for us
+	 */
+
 static int __init cadet_init(void)
 {
 	/*
@@ -626,6 +630,14 @@ MODULE_AUTHOR("Fred Gleason, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, S
 MODULE_DESCRIPTION("A driver for the ADS Cadet AM/FM/RDS radio card.");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of Cadet card (0x330,0x332,0x334,0x336,0x338,0x33a,0x33c,0x33e)");
+
+static struct isapnp_device_id id_table[] __devinitdata = {
+	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
+		ISAPNP_VENDOR('M','S','M'), ISAPNP_FUNCTION(0x0c24), 0 },
+	{0}
+};
+
+MODULE_DEVICE_TABLE(isapnp, id_table);
 
 EXPORT_NO_SYMBOLS;
 

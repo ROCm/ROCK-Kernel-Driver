@@ -450,7 +450,7 @@ int irlmp_connect_request(struct lsap_cb *self, __u8 dlsap_sel,
 /*
  * Function irlmp_connect_indication (self)
  *
- *    Incomming connection
+ *    Incoming connection
  *
  */
 void irlmp_connect_indication(struct lsap_cb *self, struct sk_buff *skb) 

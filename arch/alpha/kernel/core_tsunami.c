@@ -90,7 +90,7 @@ static int
 mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
 	     unsigned char *type1)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr;
 	u8 bus = dev->bus->number;
 	u8 device_fn = dev->devfn;
@@ -206,7 +206,7 @@ struct pci_ops tsunami_pci_ops =
 };
 
 void
-tsunami_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+tsunami_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	tsunami_pchip *pchip = hose->index ? TSUNAMI_pchip1 : TSUNAMI_pchip0;
 	volatile unsigned long *csr;
@@ -280,12 +280,12 @@ tsunami_probe_write(volatile unsigned long *vaddr)
 static void __init
 tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	if (tsunami_probe_read(&pchip->pctl.csr) == 0)
 		return;
 
-	hose = alloc_pci_controler();
+	hose = alloc_pci_controller();
 	if (index == 0)
 		pci_isa_hose = hose;
 	hose->io_space = alloc_resource();

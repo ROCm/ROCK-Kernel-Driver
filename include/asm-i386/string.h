@@ -287,13 +287,6 @@ __asm__ __volatile__( \
 
 #ifdef CONFIG_X86_USE_3DNOW
 
-/* All this just for in_interrupt() ... */
-
-#include <asm/system.h>
-#include <asm/ptrace.h>
-#include <linux/smp.h>
-#include <linux/spinlock.h>
-#include <linux/interrupt.h>
 #include <asm/mmx.h>
 
 /*
@@ -302,14 +295,14 @@ __asm__ __volatile__( \
 
 static inline void * __constant_memcpy3d(void * to, const void * from, size_t len)
 {
-	if(len<512 || in_interrupt())
+	if (len < 512)
 		return __constant_memcpy(to, from, len);
 	return _mmx_memcpy(to, from, len);
 }
 
 extern __inline__ void *__memcpy3d(void *to, const void *from, size_t len)
 {
-	if(len<512 || in_interrupt())
+	if (len < 512)
 		return __memcpy(to, from, len);
 	return _mmx_memcpy(to, from, len);
 }

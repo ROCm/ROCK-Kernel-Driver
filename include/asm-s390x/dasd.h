@@ -203,7 +203,7 @@ struct request;
 typedef ccw_req_t *(*dasd_erp_action_fn_t) (ccw_req_t * cqr);
 typedef ccw_req_t *(*dasd_erp_postaction_fn_t) (ccw_req_t * cqr);
 
-typedef int (*dasd_ck_id_fn_t) (dev_info_t *);
+typedef int (*dasd_ck_id_fn_t) (s390_dev_info_t *);
 typedef int (*dasd_ck_characteristics_fn_t) (struct dasd_device_t *);
 typedef int (*dasd_fill_geometry_fn_t) (struct dasd_device_t *, struct hd_geometry *);
 typedef ccw_req_t *(*dasd_format_fn_t) (struct dasd_device_t *, struct format_data_t *);
@@ -269,7 +269,7 @@ typedef struct dasd_profile_info_t {
 } dasd_profile_info_t;
 
 typedef struct dasd_device_t {
-	dev_info_t devinfo;
+	s390_dev_info_t devinfo;
 	dasd_discipline_t *discipline;
 	int level;
         int open_count;

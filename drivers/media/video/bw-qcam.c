@@ -696,13 +696,11 @@ long qc_capture(struct qcam_device * q, char *buf, unsigned long len)
 
 static int qcam_open(struct video_device *dev, int flags)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void qcam_close(struct video_device *dev)
 {
-	MOD_DEC_USE_COUNT;
 }
 
 static long qcam_write(struct video_device *v, const char *buf, unsigned long count, int noblock)
@@ -918,6 +916,7 @@ static long qcam_read(struct video_device *v, char *buf, unsigned long count,  i
  
 static struct video_device qcam_template=
 {
+	owner:		THIS_MODULE,
 	name:		"Connectix Quickcam",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_QCAM_BW,

@@ -12,6 +12,7 @@
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <asm/compiler.h>	/* __builtin_expect */
+#include <linux/wait.h>
 
 #define DEBUG_SEMAPHORE 0
 #define DEBUG_RW_SEMAPHORE 0

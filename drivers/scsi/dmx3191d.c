@@ -68,18 +68,17 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 	while ((pdev = pci_find_device(PCI_VENDOR_ID_DOMEX,
 			PCI_DEVICE_ID_DOMEX_DMX3191D, pdev))) {
 
-		unsigned long port = pci_resource_start (pdev, 0);
-
+		unsigned long port;
 		if (pci_enable_device(pdev))
 			continue;
 
-		if (check_region(port, DMX3191D_REGION)) {
+		port = pci_resource_start (pdev, 0);
+		
+		if (!request_region(port, DMX3191D_REGION, DMX3191D_DRIVER_NAME)) {
 			dmx3191d_printk("region 0x%lx-0x%lx already reserved\n",
 				port, port + DMX3191D_REGION);
 			continue;
 		}
-
-		request_region(port, DMX3191D_REGION, DMX3191D_DRIVER_NAME);
 
 		instance = scsi_register(tmpl, sizeof(struct NCR5380_hostdata));
 		if(instance == NULL)

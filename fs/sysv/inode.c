@@ -365,6 +365,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 		panic("sysv fs: bad i-node size");
 	set_blocksize(dev,BLOCK_SIZE);
 	sb->sv_block_base = 0;
+	sb->s_maxbytes = MAX_NON_LFS;
 
 	/* Try to read Xenix superblock */
 	if ((bh = bread(dev, 1, BLOCK_SIZE)) != NULL) {

@@ -139,7 +139,7 @@ hysdn_log_write(struct file *file, const char *buf, size_t count, loff_t * off)
 		return (-ESPIPE);
 
 	if ((retval = pof_boot_write(card, buf, count)) < 0)
-		retval = -EFAULT;	/* an error occured */
+		retval = -EFAULT;	/* an error occurred */
 
 	return (retval);
 }				/* hysdn_log_write */

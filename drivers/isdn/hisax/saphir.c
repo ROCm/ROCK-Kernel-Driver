@@ -1,4 +1,4 @@
-/* $Id: saphir.c,v 1.8 2000/11/24 17:05:38 kai Exp $
+/* $Id: saphir.c,v 1.8.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * saphir.c low level stuff for HST Saphir 1
  *
@@ -6,7 +6,7 @@
  *
  * Thanks to    HST High Soft Tech GmbH
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 
@@ -19,7 +19,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-static char *saphir_rev = "$Revision: 1.8 $";
+static char *saphir_rev = "$Revision: 1.8.6.1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

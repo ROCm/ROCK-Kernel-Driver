@@ -814,28 +814,6 @@ opps:
 	return cachep;
 }
 
-/*
- * This check if the kmem_cache_t pointer is chained in the cache_cache
- * list. -arca
- */
-static int is_chained_kmem_cache(kmem_cache_t * cachep)
-{
-	struct list_head *p;
-	int ret = 0;
-
-	/* Find the cache in the chain of caches. */
-	down(&cache_chain_sem);
-	list_for_each(p, &cache_chain) {
-		if (p == &cachep->next) {
-			ret = 1;
-			break;
-		}
-	}
-	up(&cache_chain_sem);
-
-	return ret;
-}
-
 #ifdef CONFIG_SMP
 /*
  * Waits for all CPUs to execute func().
@@ -938,7 +916,7 @@ static int __kmem_cache_shrink(kmem_cache_t *cachep)
  */
 int kmem_cache_shrink(kmem_cache_t *cachep)
 {
-	if (!cachep || in_interrupt() || !is_chained_kmem_cache(cachep))
+	if (!cachep || in_interrupt())
 		BUG();
 
 	return __kmem_cache_shrink(cachep);

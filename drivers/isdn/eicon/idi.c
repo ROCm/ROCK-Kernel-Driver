@@ -3,9 +3,6 @@
  *
  * Copyright (C) Eicon Technology Corporation, 2000.
  *
- * This source file is supplied for the exclusive use with Eicon
- * Technology Corporation's range of DIVA Server Adapters.
- *
  * Eicon File Revision :    1.8  
  *
  * This program is free software; you can redistribute it and/or modify
@@ -248,13 +245,13 @@ void	next_req(ADAPTER * a)
 /*
  * IDI request function for active cards
  */
-
 static
 void	request(card_t *card, ENTITY *e)
 {
 	word	*special_req;
 	int		i;
 	int		ipl;
+
 
 	if (card->log_types & DIVAS_LOG_IDI)
 	{

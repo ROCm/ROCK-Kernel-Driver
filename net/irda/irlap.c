@@ -51,6 +51,7 @@
 hashbin_t *irlap = NULL;
 int sysctl_slot_timeout = SLOT_TIMEOUT * 1000 / HZ;
 
+extern void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 static void __irlap_close(struct irlap_cb *self);
 
 static char *lap_reasons[] = {
@@ -241,7 +242,7 @@ void irlap_connect_indication(struct irlap_cb *self, struct sk_buff *skb)
 /*
  * Function irlap_connect_response (self, skb)
  *
- *    Service user has accepted incomming connection
+ *    Service user has accepted incoming connection
  *
  */
 void irlap_connect_response(struct irlap_cb *self, struct sk_buff *skb) 

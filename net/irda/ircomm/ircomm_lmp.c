@@ -219,7 +219,7 @@ int ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 /*
  * Function ircomm_lmp_data_indication (instance, sap, skb)
  *
- *    Incomming data which we must deliver to the state machine, to check
+ *    Incoming data which we must deliver to the state machine, to check
  *    we are still connected.
  */
 int ircomm_lmp_data_indication(void *instance, void *sap,

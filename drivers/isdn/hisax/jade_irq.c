@@ -1,10 +1,10 @@
-/* $Id: jade_irq.c,v 1.5 2000/11/19 17:02:48 kai Exp $
+/* $Id: jade_irq.c,v 1.5.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * jade_irq.c   Low level JADE IRQ stuff (derived from original hscx_irq.c)
  *
  * Author   Roland Klabunde (R.Klabunde@Berkom.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

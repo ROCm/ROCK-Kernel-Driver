@@ -321,10 +321,10 @@ privateer_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 }
 
 #ifdef CONFIG_VGA_HOSE
-static struct pci_controler * __init
-privateer_vga_hose_select(struct pci_controler *h1, struct pci_controler *h2)
+static struct pci_controller * __init
+privateer_vga_hose_select(struct pci_controller *h1, struct pci_controller *h2)
 {
-	struct pci_controler *hose = h1;
+	struct pci_controller *hose = h1;
 	int agp1, agp2;
 
 	/* which hose(s) are agp? */

@@ -1106,7 +1106,7 @@ void ircomm_tty_check_modem_status(struct ircomm_tty_cb *self)
 /*
  * Function ircomm_tty_data_indication (instance, sap, skb)
  *
- *    Handle incomming data, and deliver it to the line discipline
+ *    Handle incoming data, and deliver it to the line discipline
  *
  */
 static int ircomm_tty_data_indication(void *instance, void *sap,
@@ -1155,7 +1155,7 @@ static int ircomm_tty_data_indication(void *instance, void *sap,
 /*
  * Function ircomm_tty_control_indication (instance, sap, skb)
  *
- *    Parse all incomming parameters (easy!)
+ *    Parse all incoming parameters (easy!)
  *
  */
 static int ircomm_tty_control_indication(void *instance, void *sap,

@@ -470,7 +470,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 	lsap = (struct lsap_cb *) hashbin_get_first(queue);
 	while (lsap != NULL) {
 		/* 
-		 *  If this is an incomming connection, then the destination 
+		 *  If this is an incoming connection, then the destination 
 		 *  LSAP selector may have been specified as LM_ANY so that 
 		 *  any client can connect. In that case we only need to check
 		 *  if the source LSAP (in our view!) match!

@@ -1,8 +1,8 @@
-/* $Id: l3dss1.h,v 1.10 2000/06/26 08:59:14 keil Exp $
+/* $Id: l3dss1.h,v 1.10.6.1 2001/02/16 16:43:28 kai Exp $
  *
  *  DSS1 (Euro) D-channel protocol defines
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

@@ -672,13 +672,11 @@ static int pms_capture(struct pms_device *dev, char *buf, int rgb555, int count)
 
 static int pms_open(struct video_device *dev, int flags)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void pms_close(struct video_device *dev)
 {
-	MOD_DEC_USE_COUNT;
 }
 
 static long pms_write(struct video_device *v, const char *buf, unsigned long count, int noblock)
@@ -902,6 +900,7 @@ static long pms_read(struct video_device *v, char *buf, unsigned long count,  in
  
 struct video_device pms_template=
 {
+	owner:		THIS_MODULE,
 	name:		"Mediavision PMS",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_PMS,
@@ -935,14 +934,15 @@ static int init_mediavision(void)
 		0xE4
 	};
 	
-	if(check_region(0x9A01,1))
+	if (!request_region(0x9A01, 1, "Mediavision PMS config"))
 	{
 		printk(KERN_WARNING "mediavision: unable to detect: 0x9A01 in use.\n");
 		return -EBUSY;
 	}
-	if(check_region(io_port,3))
+	if (!request_region(io_port, 3, "Mediavision PMS"))
 	{
 		printk(KERN_WARNING "mediavision: I/O port %d in use.\n", io_port);
+		release_region(0x9A01, 1);
 		return -EBUSY;
 	}
 	outb(0xB8, 0x9A01);		/* Unlock */
@@ -961,16 +961,16 @@ static int init_mediavision(void)
 	else 
 		idec=0;
 
-	printk(KERN_INFO "PMS type is %d\n", idec);		
-	if(idec==0)
-		return -ENODEV;	
+	printk(KERN_INFO "PMS type is %d\n", idec);
+	if(idec == 0) {
+		release_region(io_port, 3);
+		release_region(0x9A01, 1);
+		return -ENODEV;
+	}
 
 	/*
 	 *	Ok we have a PMS of some sort
 	 */
-	 
-	request_region(io_port,3, "Mediavision PMS");
-	request_region(0x9A01, 1, "Mediavision PMS config");
 	
 	mvv_write(0x04, mem_base>>12);	/* Set the memory area */
 	

@@ -1,4 +1,4 @@
-/* $Id: capi.h,v 1.6 2000/11/12 16:32:06 kai Exp $
+/* $Id: capi.h,v 1.6.6.1 2001/02/16 16:43:23 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000.
  *
@@ -44,7 +44,7 @@ typedef struct actcapi_msgdsc {
 	char *description;
 } actcapi_msgdsc;
 
-/* CAPI Adress */
+/* CAPI Address */
 typedef struct actcapi_addr {
 	__u8 len;                            /* Length of element            */
 	__u8 tnp;                            /* Type/Numbering Plan          */

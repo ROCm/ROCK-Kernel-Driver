@@ -141,7 +141,7 @@ void interrupt_handler(int interrupt, void * cardptr, struct pt_regs *regs ) {
 			}
 			else if(callid>=0x0000 && callid<=0x7FFF)
 			{
-				pr_debug("%s: Got Incomming Call\n", adapter[card]->devicename);	
+				pr_debug("%s: Got Incoming Call\n", adapter[card]->devicename);	
 				strcpy(setup.phone,&(rcvmsg.msg_data.byte_array[4]));
 				strcpy(setup.eazmsn,adapter[card]->channel[rcvmsg.phy_link_no-1].dn);
 				setup.si1 = 7;

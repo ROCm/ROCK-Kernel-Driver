@@ -1,4 +1,4 @@
-$Id: INTERFACE,v 1.15 1999/08/25 20:02:13 werner Exp $
+$Id: INTERFACE,v 1.15.8.1 2001/02/16 16:43:22 kai Exp $
 
 Description of the Interface between Linklevel and Hardwarelevel
   of isdn4linux:

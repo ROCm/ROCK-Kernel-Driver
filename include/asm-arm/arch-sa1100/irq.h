@@ -134,7 +134,7 @@ static void sa1100_unmask_GPIO11_27_irq(unsigned int irq)
 	int mask = (1 << GPIO_11_27_IRQ(irq));
 	if (GPIO_11_27_spurious & mask) {
 		/* 
-		 * We don't want to miss an interrupt that would have occured
+		 * We don't want to miss an interrupt that would have occurred
 		 * while it was masked.  Simulate it if it is the case.
 		 */
 		int state = GPLR;

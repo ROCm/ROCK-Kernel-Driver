@@ -124,12 +124,12 @@ jensen_init_irq(void)
 static void __init
 jensen_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	/* Create a hose so that we can report i/o base addresses to
 	   userland.  */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

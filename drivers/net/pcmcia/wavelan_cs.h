@@ -96,7 +96,7 @@
  *
  * wavelan.h :		Description of the hardware interface & structs
  *
- * i82593.h :		Description if the Ethernet controler
+ * i82593.h :		Description if the Ethernet controller
  */
 
 /* --------------------------- HISTORY --------------------------- */
@@ -225,7 +225,7 @@
  *	- wavelan_set_multicast_list : avoid reset
  *	- add wireless extensions (ioctl & get_wireless_stats)
  *	  get/set nwid/frequency on fly, info for /proc/net/wireless
- *	- Supress useless stuff from lp (net_local), but add link
+ *	- Suppress useless stuff from lp (net_local), but add link
  *	- More inlines
  *	- Lot of others minor details & cleanups
  *
@@ -315,7 +315,7 @@
  *		o Rename wavelan_release to wv_pcmcia_release & move up
  *		o move unregister_netdev to wavelan_detach()
  *		o wavelan_release() no longer call wavelan_detach()
- *		o Supress "release" timer
+ *		o Suppress "release" timer
  *		o Other cleanups & fixes
  *	- New MAC address in the probe
  *	- Reorg PSA_CRC code (endian neutral & cleaner)
@@ -430,14 +430,14 @@
 #undef DEBUG_CONFIG_INFO	/* What's going on... */
 #define DEBUG_CONFIG_ERRORS	/* Errors on configuration */
 #undef DEBUG_TX_TRACE		/* Transmission calls */
-#undef DEBUG_TX_INFO		/* Header of the transmited packet */
+#undef DEBUG_TX_INFO		/* Header of the transmitted packet */
 #undef DEBUG_TX_FAIL		/* Normal failure conditions */
 #define DEBUG_TX_ERROR		/* Unexpected conditions */
 #undef DEBUG_RX_TRACE		/* Transmission calls */
-#undef DEBUG_RX_INFO		/* Header of the transmited packet */
+#undef DEBUG_RX_INFO		/* Header of the transmitted packet */
 #undef DEBUG_RX_FAIL		/* Normal failure conditions */
 #define DEBUG_RX_ERROR		/* Unexpected conditions */
-#undef DEBUG_PACKET_DUMP	32	/* Dump packet on the screen */
+#undef DEBUG_PACKET_DUMP	/* Dump packet on the screen */
 #undef DEBUG_IOCTL_TRACE	/* Misc call by Linux */
 #undef DEBUG_IOCTL_INFO		/* Various debug info */
 #define DEBUG_IOCTL_ERROR	/* What's going wrong */
@@ -557,7 +557,7 @@ struct net_local
   en_stats	stats;		/* Ethernet interface statistics */
   int		nresets;	/* Number of hw resets */
   u_char	configured;	/* If it is configured */
-  u_char	reconfig_82593;	/* Need to reconfigure the controler */
+  u_char	reconfig_82593;	/* Need to reconfigure the controller */
   u_char	promiscuous;	/* Promiscuous mode */
   u_char	allmulticast;	/* All Multicast mode */
   int		mc_count;	/* Number of multicast addresses */
@@ -669,7 +669,7 @@ static int
 		     char *,
 		     int);
 static inline void
-	wv_82593_reconfig(device *);	/* Reconfigure the controler */
+	wv_82593_reconfig(device *);	/* Reconfigure the controller */
 /* ------------------- DEBUG & INFO SUBROUTINES ------------------- */
 static inline void
 	wv_init_info(device *);	/* display startup info */

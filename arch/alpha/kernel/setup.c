@@ -201,7 +201,7 @@ reserve_std_resources(void)
 	long i;
 
 	if (hose_head) {
-		struct pci_controler *hose;
+		struct pci_controller *hose;
 		for (hose = hose_head; hose; hose = hose->next)
 			if (hose->index == 0) {
 				io = hose->io_space;

@@ -1,5 +1,5 @@
 /* 
- * $Id: divert_init.c,v 1.5 2000/11/13 22:51:47 kai Exp $
+ * $Id: divert_init.c,v 1.5.6.2 2001/01/24 22:18:17 kai Exp $
  *
  * Module init for DSS1 diversion services for i4l.
  *
@@ -23,6 +23,7 @@
 
 #include <linux/module.h>
 #include <linux/version.h>
+#include <linux/init.h>
 #include "isdn_divert.h"
 
 /********************/
@@ -46,7 +47,7 @@ isdn_divert_if divert_if =
 /* Module interface code */
 /* no cmd line parms     */
 /*************************/
-int init_module(void)
+static int __init divert_init(void)
 { int i;
 
   if (divert_dev_init())
@@ -63,12 +64,12 @@ int init_module(void)
 #endif
   printk(KERN_INFO "dss1_divert module successfully installed\n");
   return(0);
-} /* init_module */
+}
 
 /**********************/
 /* Module deinit code */
 /**********************/
-void cleanup_module(void)
+static void __exit divert_exit(void)
 { int flags;
   int i;
 
@@ -89,6 +90,8 @@ void cleanup_module(void)
   deleterule(-1); /* delete all rules and free mem */
   deleteprocs();
   printk(KERN_INFO "dss1_divert module successfully removed \n");
-} /* cleanup_module */
+}
 
+module_init(divert_init);
+module_exit(divert_exit);
 

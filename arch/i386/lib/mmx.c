@@ -3,6 +3,7 @@
 #include <linux/sched.h>
 
 #include <asm/i387.h>
+#include <asm/hardirq.h> 
 
 /*
  *	MMX 3DNow! library helper functions
@@ -25,8 +26,14 @@
  
 void *_mmx_memcpy(void *to, const void *from, size_t len)
 {
-	void *p=to;
-	int i= len >> 6;	/* len/64 */
+	void *p;
+	int i;
+
+	if (in_interrupt())
+		return __memcpy(to, from, len);
+
+	p = to;
+	i = len >> 6; /* len/64 */
 
 	kernel_fpu_begin();
 

@@ -682,6 +682,8 @@ static void unlock_rdev (mdk_rdev_t *rdev)
 	rdev->bdev = NULL;
 }
 
+void md_autodetect_dev (kdev_t dev);
+
 static void export_rdev (mdk_rdev_t * rdev)
 {
 	printk("export_rdev(%s)\n",partition_name(rdev->dev));
@@ -696,6 +698,7 @@ static void export_rdev (mdk_rdev_t * rdev)
 		md_list_del(&rdev->pending);
 		MD_INIT_LIST_HEAD(&rdev->pending);
 	}
+	md_autodetect_dev(rdev->dev);
 	rdev->dev = 0;
 	rdev->faulty = 0;
 	kfree(rdev);
@@ -3584,7 +3587,7 @@ struct {
 static int detected_devices[128] md__initdata;
 static int dev_cnt;
 
-void md_autodetect_dev(kdev_t dev)
+void md_autodetect_dev (kdev_t dev)
 {
 	if (dev_cnt >= 0 && dev_cnt < 127)
 		detected_devices[dev_cnt++] = dev;
@@ -3598,7 +3601,7 @@ static void autostart_arrays (void)
 
 	printk(KERN_INFO "autodetecting RAID arrays\n");
 
-	for (i=0; i<dev_cnt; i++) {
+	for (i = 0; i < dev_cnt; i++) {
 		kdev_t dev = detected_devices[i];
 
 		if (md_import_device(dev,1)) {
@@ -3620,6 +3623,7 @@ static void autostart_arrays (void)
 		}
 		md_list_add(&rdev->pending, &pending_raid_disks);
 	}
+	dev_cnt = 0;
 
 	autorun_devices(-1);
 }
@@ -3656,7 +3660,7 @@ static int md__init md_setup(char *str)
 	kdev_t device;
 	char *devnames, *pername = "";
 
-	if(get_option(&str, &minor) != 2) {	/* MD Number */
+	if (get_option(&str, &minor) != 2) {	/* MD Number */
 		printk("md: Too few arguments supplied to md=.\n");
 		return 0;
 	}
@@ -3667,7 +3671,7 @@ static int md__init md_setup(char *str)
 		printk ("md: Warning - md=%d,... has been specified twice;\n"
 			"    will discard the first definition.\n", minor);
 	}
-	switch(get_option(&str, &level)) {	/* RAID Personality */
+	switch (get_option(&str, &level)) {	/* RAID Personality */
 	case 2: /* could be 0 or -1.. */
 		if (level == 0 || level == -1) {
 			if (get_option(&str, &factor) != 2 ||	/* Chunk Size */
@@ -3820,7 +3824,6 @@ int md__init md_run_setup(void)
 		printk(KERN_INFO "skipping autodetection of RAID arrays\n");
 	else
 		autostart_arrays();
-	dev_cnt = -1; /* make sure further calls to md_autodetect_dev are ignored */
 	md_setup_drive();
 	return 0;
 }

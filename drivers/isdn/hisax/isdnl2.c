@@ -1,9 +1,9 @@
-/* $Id: isdnl2.c,v 2.25 2000/11/24 17:05:38 kai Exp $
+/* $Id: isdnl2.c,v 2.25.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -16,7 +16,7 @@
 #include "hisax.h"
 #include "isdnl2.h"
 
-const char *l2_revision = "$Revision: 2.25 $";
+const char *l2_revision = "$Revision: 2.25.6.1 $";
 
 static void l2m_debug(struct FsmInst *fi, char *fmt, ...);
 

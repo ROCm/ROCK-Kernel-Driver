@@ -162,7 +162,7 @@ static void irlan_provider_connect_indication(void *instance, void *sap,
 /*
  * Function irlan_provider_connect_response (handle)
  *
- *    Accept incomming connection
+ *    Accept incoming connection
  *
  */
 void irlan_provider_connect_response(struct irlan_cb *self,
@@ -371,7 +371,7 @@ void irlan_provider_send_reply(struct irlan_cb *self, int command,
 /*
  * Function irlan_provider_register(void)
  *
- *    Register provider support so we can accept incomming connections.
+ *    Register provider support so we can accept incoming connections.
  * 
  */
 int irlan_provider_open_ctrl_tsap(struct irlan_cb *self)

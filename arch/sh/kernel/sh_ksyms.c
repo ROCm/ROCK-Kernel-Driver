@@ -77,3 +77,4 @@ DECLARE_EXPORT(__ashldi3);
 /* needed by some modules */
 EXPORT_SYMBOL(flush_dcache_page);
 #endif
+EXPORT_SYMBOL(flush_tlb_page);

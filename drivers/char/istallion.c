@@ -213,12 +213,8 @@ static struct tty_struct	*stli_txcooktty;
  *	at 9600 baud, 8 data bits, no parity, 1 stop bit.
  */
 static struct termios		stli_deftermios = {
-	0,
-	0,
-	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
-	0,
-	0,
-	INIT_C_CC
+	c_cflag:	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
+	c_cc:		INIT_C_CC,
 };
 
 /*

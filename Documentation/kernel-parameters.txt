@@ -188,8 +188,10 @@ running once the system is up.
 
 	es1371=		[HW,SOUND]
  
-	ether=		[HW,NET] Ethernet cards parameters (iomem, irq,
-			dev_name).
+	ether=		[HW,NET] Ethernet cards parameters (irq,
+			base_io_addr, mem_start, mem_end, name.
+			(mem_start is often overloaded to mean something
+			different and driver-specific).
 
 	fd_mcs=		[HW,SCSI]
 
@@ -328,7 +330,11 @@ running once the system is up.
 
 	ncr53c8xx=	[HW,SCSI]
 
-	netdev=		[NET]
+	netdev=		[NET] Ethernet cards parameters (irq,
+			base_io_addr, mem_start, mem_end, name.
+			(mem_start is often overloaded to mean something
+			different and driver-specific).
+			(cf: ether=)
  
 	nfsaddrs=	[NFS]
 

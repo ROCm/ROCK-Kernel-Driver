@@ -1,4 +1,4 @@
-/* $Id: hysdn_boot.c,v 1.4 2000/11/13 22:51:47 kai Exp $
+/* $Id: hysdn_boot.c,v 1.4.6.2 2001/02/16 16:43:30 kai Exp $
 
  * Linux driver for HYSDN cards, specific routines for booting and pof handling.
  *
@@ -49,7 +49,7 @@ struct boot_data {
 	uchar pof_state;	/* actual state of read handler */
 	uchar is_crypted;	/* card data is crypted */
 	int BufSize;		/* actual number of bytes bufferd */
-	int last_error;		/* last occured error */
+	int last_error;		/* last occurred error */
 	word pof_recid;		/* actual pof recid */
 	ulong pof_reclen;	/* total length of pof record data */
 	ulong pof_recoffset;	/* actual offset inside pof record */
@@ -62,7 +62,7 @@ struct boot_data {
 };
 
 /*****************************************************/
-/*  start decryption of sucessive POF file chuncks.  */
+/*  start decryption of successive POF file chuncks.  */
 /*                                                   */
 /*  to be called at start of POF file reading,       */
 /*  before starting any decryption on any POF record. */
@@ -93,7 +93,7 @@ DecryptBuf(struct boot_data *boot, int cnt)
 
 /********************************************************************************/
 /* pof_handle_data executes the required actions dependant on the active record */
-/* id. If successfull 0 is returned, a negative value shows an error.           */
+/* id. If successful 0 is returned, a negative value shows an error.           */
 /********************************************************************************/
 static int
 pof_handle_data(hysdn_card * card, int datlen)
@@ -182,7 +182,7 @@ pof_handle_data(hysdn_card * card, int datlen)
 /* number of data bytes. The number delivered is additionally supplied for    */
 /* verification. The functions handles the data and returns the needed number */
 /* of bytes for the next action. If the returned value is 0 or less an error  */
-/* occured and booting must be aborted.                                       */
+/* occurred and booting must be aborted.                                       */
 /******************************************************************************/
 int
 pof_write_buffer(hysdn_card * card, int datlen)
@@ -253,7 +253,7 @@ pof_write_buffer(hysdn_card * card, int datlen)
 				break;
 			}
 			if ((boot->last_error = pof_handle_data(card, datlen)) < 0)
-				return (boot->last_error);	/* an error occured */
+				return (boot->last_error);	/* an error occurred */
 			boot->pof_recoffset += datlen;
 			if (boot->pof_recoffset >= boot->pof_reclen) {
 				boot->pof_state = POF_READ_TAG_HEAD;	/* now start with single tags */
@@ -346,7 +346,7 @@ pof_write_close(hysdn_card * card)
 
 /*********************************************************************************/
 /* EvalSysrTokData checks additional records delivered with the Sysready Message */
-/* when POF has been booted. A return value of 0 is used if no error occured.    */
+/* when POF has been booted. A return value of 0 is used if no error occurred.    */
 /*********************************************************************************/
 int
 EvalSysrTokData(hysdn_card * card, uchar * cp, int len)

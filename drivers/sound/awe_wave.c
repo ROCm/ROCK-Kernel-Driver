@@ -206,7 +206,7 @@ static awe_chan_info channels[AWE_MAX_CHANNELS];
 int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
 int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
 #if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
-static int isapnp = 1;
+static int isapnp = -1;
 #else
 static int isapnp = 0;
 #endif
@@ -4843,10 +4843,12 @@ awe_detect(void)
 	if (isapnp) {
 		if (awe_probe_isapnp(&io) < 0) {
 			printk(KERN_ERR "AWE32: No ISAPnP cards found\n");
-			return 0;
+			if (isapnp != -1)
+			  return 0;
+		} else {
+			setup_ports(io, 0, 0);
+			return 1;
 		}
-		setup_ports(io, 0, 0);
-		return 1;
 	}
 #endif /* isapnp */
 

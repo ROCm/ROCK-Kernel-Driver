@@ -165,12 +165,8 @@ static DECLARE_MUTEX(stl_tmpwritesem);
  *	at 9600, 8 data bits, 1 stop bit.
  */
 static struct termios		stl_deftermios = {
-	0,
-	0,
-	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
-	0,
-	0,
-	INIT_C_CC
+	c_cflag:	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
+	c_cc:		INIT_C_CC,
 };
 
 /*

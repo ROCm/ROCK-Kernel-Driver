@@ -139,7 +139,7 @@ void s390_do_machine_check( void )
 #endif
 
 	memcpy( &mcic,
-	        &S390_lowcore.mcck_interuption_code,
+	        &S390_lowcore.mcck_interruption_code,
 	        sizeof(__u64));
  		
 	if ( mcic.mcc.mcd.cp )	// CRW pending ?

@@ -382,7 +382,6 @@ CONFIG_EEPRO100=y
 # CONFIG_NE3210 is not set
 # CONFIG_ES3210 is not set
 # CONFIG_8139TOO is not set
-# CONFIG_RTL8129 is not set
 # CONFIG_SIS900 is not set
 # CONFIG_EPIC100 is not set
 # CONFIG_SUNDANCE is not set

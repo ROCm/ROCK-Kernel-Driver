@@ -89,7 +89,7 @@
 
 static unsigned int
 conf_read(unsigned long addr, unsigned char type1,
-	  struct pci_controler *hose)
+	  struct pci_controller *hose)
 {
 	unsigned long flags;
 	unsigned long mid = MCPCIA_HOSE2MID(hose->index);
@@ -137,7 +137,7 @@ conf_read(unsigned long addr, unsigned char type1,
 
 static void
 conf_write(unsigned long addr, unsigned int value, unsigned char type1,
-	   struct pci_controler *hose)
+	   struct pci_controller *hose)
 {
 	unsigned long flags;
 	unsigned long mid = MCPCIA_HOSE2MID(hose->index);
@@ -171,7 +171,7 @@ conf_write(unsigned long addr, unsigned int value, unsigned char type1,
 }
 
 static int
-mk_conf_addr(struct pci_dev *dev, int where, struct pci_controler *hose,
+mk_conf_addr(struct pci_dev *dev, int where, struct pci_controller *hose,
 	     unsigned long *pci_addr, unsigned char *type1)
 {
 	u8 bus = dev->bus->number;
@@ -199,7 +199,7 @@ mk_conf_addr(struct pci_dev *dev, int where, struct pci_controler *hose,
 static int
 mcpcia_read_config_byte(struct pci_dev *dev, int where, u8 *value)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr, w;
 	unsigned char type1;
 
@@ -215,7 +215,7 @@ mcpcia_read_config_byte(struct pci_dev *dev, int where, u8 *value)
 static int
 mcpcia_read_config_word(struct pci_dev *dev, int where, u16 *value)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr, w;
 	unsigned char type1;
 
@@ -231,7 +231,7 @@ mcpcia_read_config_word(struct pci_dev *dev, int where, u16 *value)
 static int
 mcpcia_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr;
 	unsigned char type1;
 
@@ -246,7 +246,7 @@ mcpcia_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 static int
 mcpcia_write_config(struct pci_dev *dev, int where, u32 value, long mask)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr;
 	unsigned char type1;
 
@@ -288,7 +288,7 @@ struct pci_ops mcpcia_pci_ops =
 };
 
 void
-mcpcia_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+mcpcia_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	wmb();
 	*(vuip)MCPCIA_SG_TBIA(MCPCIA_HOSE2MID(hose->index)) = 0;
@@ -333,11 +333,11 @@ mcpcia_probe_hose(int h)
 static void __init
 mcpcia_new_hose(int h)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct resource *io, *mem, *hae_mem;
 	int mid = MCPCIA_HOSE2MID(h);
 
-	hose = alloc_pci_controler();
+	hose = alloc_pci_controller();
 	if (h == 0)
 		pci_isa_hose = hose;
 	io = alloc_resource();
@@ -386,7 +386,7 @@ mcpcia_pci_clr_err(int mid)
 }
 
 static void __init
-mcpcia_startup_hose(struct pci_controler *hose)
+mcpcia_startup_hose(struct pci_controller *hose)
 {
 	int mid = MCPCIA_HOSE2MID(hose->index);
 	unsigned int tmp;
@@ -464,7 +464,7 @@ mcpcia_init_arch(void)
 void __init
 mcpcia_init_hoses(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	int hose_count;
 	int h;
 
@@ -561,7 +561,7 @@ static void
 mcpcia_print_system_area(unsigned long la_ptr)
 {
 	struct el_common *frame;
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	struct IOD_subpacket {
 	  unsigned long base;
@@ -638,7 +638,7 @@ mcpcia_machine_check(unsigned long vector, unsigned long la_ptr,
 	    {
 		/* FIXME: how do we figure out which hose the
 		   error was on?  */	
-		struct pci_controler *hose;
+		struct pci_controller *hose;
 		for (hose = hose_head; hose; hose = hose->next)
 			mcpcia_pci_clr_err(MCPCIA_HOSE2MID(hose->index));
 		break;

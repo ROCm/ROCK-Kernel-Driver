@@ -259,20 +259,19 @@ static int az_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void az_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct az_device aztech_unit;
 
 static struct video_device aztech_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"Aztech radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_AZTECH,

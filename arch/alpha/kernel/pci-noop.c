@@ -14,17 +14,17 @@
 
 
 /*
- * The PCI controler list.
+ * The PCI controller list.
  */
 
-struct pci_controler *hose_head, **hose_tail = &hose_head;
-struct pci_controler *pci_isa_hose;
+struct pci_controller *hose_head, **hose_tail = &hose_head;
+struct pci_controller *pci_isa_hose;
 
 
-struct pci_controler * __init
-alloc_pci_controler(void)
+struct pci_controller * __init
+alloc_pci_controller(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	hose = alloc_bootmem(sizeof(*hose));
 
@@ -47,7 +47,7 @@ alloc_resource(void)
 asmlinkage long
 sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_dev *dev;
 
 	/* from hose or from bus.devfn */

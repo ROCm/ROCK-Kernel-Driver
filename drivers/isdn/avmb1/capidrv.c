@@ -1,11 +1,17 @@
 /*
- * $Id: capidrv.c,v 1.39 2000/11/23 20:45:14 kai Exp $
+ * $Id: capidrv.c,v 1.39.6.2 2001/02/13 11:43:29 kai Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
  * Copyright 1997 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: capidrv.c,v $
+ * Revision 1.39.6.2  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
+ * Revision 1.39.6.1  2001/02/10 14:41:20  kai
+ * Changes from kernel tree
+ *
  * Revision 1.39  2000/11/23 20:45:14  kai
  * fixed module_init/exit stuff
  * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
@@ -219,7 +225,7 @@
 #include "capicmd.h"
 #include "capidrv.h"
 
-static char *revision = "$Revision: 1.39 $";
+static char *revision = "$Revision: 1.39.6.2 $";
 static int debugmode = 0;
 
 MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
@@ -488,7 +494,7 @@ static inline __u8 cip2si2(__u16 cipval)
 }
 
 
-/* -------- controller managment ------------------------------------- */
+/* -------- controller management ------------------------------------- */
 
 static inline capidrv_contr *findcontrbydriverid(int driverid)
 {

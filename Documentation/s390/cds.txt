@@ -241,7 +241,7 @@ The device driver may use these commands as appropriate.
 
 The get_dev_info_by_irq() / get_dev_info_by_devno() functions return:
 
-      0 - sucessful completion
+      0 - successful completion
 -ENODEV - irq or devno don't specify a known subchannel or device
           number.
 -EINVAL - invalid devinfo value.
@@ -317,7 +317,7 @@ The read_dev_chars() function returns :
       0 - successful completion
 -ENODEV - irq doesn't specify a valid subchannel number
 -EINVAL - an invalid parameter was detected
--EBUSY  - an irrecoverable I/O error occured or the device is not
+-EBUSY  - an irrecoverable I/O error occurred or the device is not
           operational.
 
 Usage Notes :
@@ -568,7 +568,7 @@ CCW_FLAG_SUSPEND   - suspend
 
 The do_IO() function returns :
 
-      0 - successful completion or request successfuly initiated
+      0 - successful completion or request successfully initiated
 -EBUSY  - the do_io() function was caled out of sequence. The
           device is currently processing a previous I/O request
 -ENODEV - irq doesn't specify a valid subchannel, the device is
@@ -777,7 +777,7 @@ flag    : 0 (zero) or DOIO_WAIT_FOR_INTERRUPT
 
 The halt_IO() function returns :
 
-      0 - successful completion or request successfuly initiated
+      0 - successful completion or request successfully initiated
 -EBUSY  - the device is currently performing a synchronous I/O
           operation : do_IO() with flag DOIO_WAIT_FOR_INTERRUPT
           or an error was encountered and the device is currently

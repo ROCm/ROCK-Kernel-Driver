@@ -523,7 +523,7 @@ irda_irnet_destroy(irnet_socket *	self)
 /*
  * The IrNET service is composed of one server socket and a variable
  * number of regular IrNET sockets. The server socket is supposed to
- * handle incomming connections and redirect them to one IrNET sockets.
+ * handle incoming connections and redirect them to one IrNET sockets.
  * It's a superset of the regular IrNET socket, but has a very distinct
  * behaviour...
  */
@@ -662,7 +662,7 @@ irnet_find_socket(irnet_socket *	self)
 /*
  * Function irda_connect_socket (self)
  *
- *    Connect an incomming connection to the socket
+ *    Connect an incoming connection to the socket
  *
  */
 static inline int
@@ -721,7 +721,7 @@ irnet_connect_socket(irnet_socket *	self,
 /*
  * Function irda_disconnect_server (self)
  *
- *    Cleanup the server socket when the incomming connection abort
+ *    Cleanup the server socket when the incoming connection abort
  *
  */
 static inline void
@@ -1097,7 +1097,7 @@ irnet_status_indication(void *	instance,
 /*
  * Function irnet_connect_indication(instance, sap, qos, max_sdu_size, userdata)
  *
- *    Incomming connection
+ *    Incoming connection
  *
  * In theory, this function is called only on the server socket.
  * Some other node is attempting to connect to the IrNET service, and has

@@ -324,7 +324,7 @@ struct pci_ops t2_pci_ops =
 void __init
 t2_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	unsigned int i;
 
 	for (i = 0; i < NR_CPUS; i++) {
@@ -384,7 +384,7 @@ t2_init_arch(void)
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

@@ -8,7 +8,7 @@
 
     Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
 
-    smc91c92_cs.c 1.104 2000/08/31 21:25:13
+    smc91c92_cs.c 1.106 2001/02/07 00:19:58
     
     This driver contains code written by Donald Becker
     (becker@cesdis.gsfc.nasa.gov), Rowan Hughes (x-csrdh@jcu.edu.au),
@@ -231,7 +231,7 @@ enum RxCfg { RxAllMulti = 0x0004, RxPromisc = 0x0002,
 	     RxEnable = 0x0100, RxStripCRC = 0x0200};
 #define  RCR_SOFTRESET	0x8000 	/* resets the chip */
 #define	 RCR_STRIP_CRC	0x200	/* strips CRC */
-#define  RCR_ENABLE	0x100	/* IFF this is set, we can recieve packets */
+#define  RCR_ENABLE	0x100	/* IFF this is set, we can receive packets */
 #define  RCR_ALMUL	0x4 	/* receive all multicast packets */
 #define	 RCR_PROMISC	0x2	/* enable promiscuous mode */
 
@@ -1617,8 +1617,9 @@ static void smc_rx(struct net_device *dev)
 	
 	skb->dev = dev;
 	netif_rx(skb);
+	dev->last_rx = jiffies;
 	smc->stats.rx_packets++;
-	smc->stats.rx_bytes += skb->len;
+	smc->stats.rx_bytes += packet_length;
 	if (rx_status & RS_MULTICAST)
 	    smc->stats.multicast++;
     } else {

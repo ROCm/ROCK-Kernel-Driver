@@ -11,8 +11,7 @@ export-objs	:= isdn_common.o
 # Multipart objects.
 
 list-multi	:= isdn.o
-isdn-objs	:= isdn_net.o isdn_tty.o isdn_cards.o isdn_v110.o \
-		   isdn_common.o
+isdn-objs	:= isdn_net.o isdn_tty.o isdn_v110.o isdn_common.o
 
 # Optional parts of multipart objects.
 

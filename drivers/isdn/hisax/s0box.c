@@ -1,10 +1,10 @@
-/* $Id: s0box.c,v 2.4 2000/11/24 17:05:38 kai Exp $
+/* $Id: s0box.c,v 2.4.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * s0box.c      low level stuff for Creatix S0BOX
  *
  * Author       S0BOX specific stuff: Enrik Berkhan (enrik@starfleet.inka.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -15,7 +15,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *s0box_revision = "$Revision: 2.4 $";
+const char *s0box_revision = "$Revision: 2.4.6.1 $";
 
 static inline void
 writereg(unsigned int padr, signed int addr, u_char off, u_char val) {

@@ -124,7 +124,7 @@ struct _lowcore
         __u8         pad3[0xD8-0xC4];          /* 0x0c4 */
 	__u32        cpu_timer_save_area[2];   /* 0x0d8 */
 	__u32        clock_comp_save_area[2];  /* 0x0e0 */
-	__u32        mcck_interuption_code[2]; /* 0x0e8 */
+	__u32        mcck_interruption_code[2]; /* 0x0e8 */
 	__u8         pad4[0xf4-0xf0];          /* 0x0f0 */
 	__u32        external_damage_code;     /* 0x0f4 */
 	__u32        failing_storage_address;  /* 0x0f8 */

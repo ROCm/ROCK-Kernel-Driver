@@ -616,7 +616,7 @@ root_found:
 #ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
 	  if (isonum_723 (h_pri->volume_set_size) != 1)
 		goto out_no_support;
-#endif IGNORE_WRONG_MULTI_VOLUME_SPECS
+#endif /* IGNORE_WRONG_MULTI_VOLUME_SPECS */
 	  s->u.isofs_sb.s_nzones = isonum_733 (h_pri->volume_space_size);
 	  s->u.isofs_sb.s_log_zone_size = isonum_723 (h_pri->logical_block_size);
 	  s->u.isofs_sb.s_max_size = isonum_733(h_pri->volume_space_size);
@@ -625,7 +625,7 @@ root_found:
 #ifndef IGNORE_WRONG_MULTI_VOLUME_SPECS
 	  if (isonum_723 (pri->volume_set_size) != 1)
 		goto out_no_support;
-#endif IGNORE_WRONG_MULTI_VOLUME_SPECS
+#endif /* IGNORE_WRONG_MULTI_VOLUME_SPECS */
 	  s->u.isofs_sb.s_nzones = isonum_733 (pri->volume_space_size);
 	  s->u.isofs_sb.s_log_zone_size = isonum_723 (pri->logical_block_size);
 	  s->u.isofs_sb.s_max_size = isonum_733(pri->volume_space_size);
@@ -662,6 +662,11 @@ root_found:
 	   Rock Ridge extensions) */
 
 	s->s_flags |= MS_RDONLY /* | MS_NODEV | MS_NOSUID */;
+
+	/* Set this for reference. Its not currently used except on write
+	   which we don't have .. */
+	   
+	s->s_maxbytes = MAX_NON_LFS;
 
 	/* RDE: data zone now byte offset! */
 

@@ -1,9 +1,9 @@
-/* $Id: config.c,v 2.57.6.6 2000/12/10 23:39:19 kai Exp $
+/* $Id: config.c,v 2.57.6.10 2001/02/16 16:43:25 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #include <linux/types.h>
@@ -11,7 +11,6 @@
 #include <linux/timer.h>
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/pci.h>
 #include "hisax.h"
 #include <linux/module.h>
 #include <linux/kernel_stat.h>
@@ -1195,7 +1194,12 @@ checkcard(int cardnr, char *id, int *busy_flag)
 		return (0);
 	}
 	init_tei(cs, cs->protocol);
-	CallcNewChan(cs);
+	ret = CallcNewChan(cs);
+	if (ret) {
+		closecard(cardnr);
+		restore_flags(flags);
+		return 0;
+	}
 	/* ISAR needs firmware download first */
 	if (!test_bit(HW_ISAR, &cs->HW_Flags))
 		ll_run(cs, 0);
@@ -1326,8 +1330,7 @@ HiSax_reportcard(int cardnr, int sel)
 #endif
 }
 
-int __init
-HiSax_init(void)
+static int __init HiSax_init(void)
 {
 	int i,j;
 	int nzproto = 0;
@@ -1497,11 +1500,7 @@ HiSax_init(void)
 	}
 }
 
-#ifdef MODULE
-int init_module(void) { return HiSax_init(); }
-
-void
-cleanup_module(void)
+static void __exit HiSax_exit(void)
 {
 	int cardnr = nrcards -1;
 	long flags;
@@ -1518,7 +1517,6 @@ cleanup_module(void)
 	restore_flags(flags);
 	printk(KERN_INFO "HiSax module removed\n");
 }
-#endif
 
 #ifdef CONFIG_HISAX_ELSA
 int elsa_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
@@ -1707,6 +1705,8 @@ int __devinit hisax_init_pcmcia(void *pcm_iob, int *busy_flag, struct IsdnCard *
 	return (ret);
 }
 
+#include <linux/pci.h>
+
 static struct pci_device_id hisax_pci_tbl[] __initdata = {
 #ifdef CONFIG_HISAX_FRITZPCI
 	{PCI_VENDOR_ID_AVM,      PCI_DEVICE_ID_AVM_A1,          PCI_ANY_ID, PCI_ANY_ID},
@@ -1770,3 +1770,6 @@ static struct pci_device_id hisax_pci_tbl[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, hisax_pci_tbl);
+
+module_init(HiSax_init);
+module_exit(HiSax_exit);

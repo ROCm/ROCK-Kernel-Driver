@@ -259,6 +259,9 @@ static struct super_block *minix_read_super(struct super_block *s, void *data,
 
 	minix_set_bit(0,s->u.minix_sb.s_imap[0]->b_data);
 	minix_set_bit(0,s->u.minix_sb.s_zmap[0]->b_data);
+
+	s->s_maxbytes = MAX_NON_LFS;
+
 	/* set up enough so that it can read an inode */
 	s->s_op = &minix_sops;
 	root_inode = iget(s, MINIX_ROOT_INO);

@@ -1,10 +1,10 @@
-/* $Id: isurf.c,v 1.10 2000/11/24 17:05:38 kai Exp $
+/* $Id: isurf.c,v 1.10.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * isurf.c  low level stuff for Siemens I-Surf/I-Talk cards
  *
  * Author     Karsten Keil (keil@isdn4linux.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 
@@ -17,7 +17,7 @@
 
 extern const char *CardType[];
 
-static const char *ISurf_revision = "$Revision: 1.10 $";
+static const char *ISurf_revision = "$Revision: 1.10.6.1 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

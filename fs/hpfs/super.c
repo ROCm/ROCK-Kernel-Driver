@@ -427,6 +427,7 @@ struct super_block *hpfs_read_super(struct super_block *s, void *options,
 	s->s_blocksize = 512;
 	s->s_blocksize_bits = 9;
 	s->s_op = &hpfs_sops;
+	s->s_maxbytes = MAX_NON_LFS;
 
 	s->s_hpfs_root = superblock->root;
 	s->s_hpfs_fs_size = superblock->n_sectors;

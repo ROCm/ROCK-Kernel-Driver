@@ -125,7 +125,7 @@ enum xirc_esr {
 enum xirc_isr {
     TxBufOvr = 0x01,	/* TX Buffer Overflow */
     PktTxed  = 0x02,	/* Packet Transmitted */
-    MACIntr  = 0x04,	/* MAC Interrupt occured */
+    MACIntr  = 0x04,	/* MAC Interrupt occurred */
     TxResGrant = 0x08,	/* Tx Reservation Granted */
     RxFullPkt = 0x20,	/* Rx Full Packet */
     RxPktRej  = 0x40,	/* Rx Packet Rejected */
@@ -381,6 +381,7 @@ static void do_reset(struct net_device *dev, int full);
 static int init_mii(struct net_device *dev);
 static void do_powerdown(struct net_device *dev);
 static int do_stop(struct net_device *dev);
+
 
 /*=============== Helper functions =========================*/
 static void
@@ -1350,7 +1351,6 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	     * packets */
 	    lp->stats.rx_dropped++;
 	    DEBUG(2, "%s: RX drop, too much done\n", dev->name);
-	    PutWord(XIRCREG0_DO, 0x8000); /* issue cmd: skip_rx_packet */
 	} else if (rsr & PktRxOk) {
 	    struct sk_buff *skb;
 
@@ -1420,13 +1420,13 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		skb->protocol = eth_type_trans(skb, dev);
 		skb->dev = dev;
 		netif_rx(skb);
+		dev->last_rx = jiffies;
 		lp->stats.rx_packets++;
 		lp->stats.rx_bytes += pktlen;
 		if (!(rsr & PhyPkt))
 		    lp->stats.multicast++;
 	    }
-	    PutWord(XIRCREG0_DO, 0x8000); /* issue cmd: skip_rx_packet */
-	} else {
+	} else { /* bad packet */
 	    DEBUG(5, "rsr=%#02x\n", rsr);
 	}
 	if (rsr & PktTooLong) {
@@ -1441,6 +1441,9 @@ xirc2ps_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    lp->stats.rx_fifo_errors++; /* okay ? */
 	    DEBUG(3, "%s: Alignment error\n", dev->name);
 	}
+	
+	/* clear the received/dropped/error packet */
+	PutWord(XIRCREG0_DO, 0x8000); /* issue cmd: skip_rx_packet */
 
 	/* get the new ethernet status */
 	eth_status = GetByte(XIRCREG_ESR);

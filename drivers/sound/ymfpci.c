@@ -95,34 +95,6 @@ static struct pci_device_id ymf_id_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, ymf_id_tbl);
 
 /*
- * Mindlessly copied from cs46xx XXX
- */
-static inline unsigned ld2(unsigned int x)
-{
-	unsigned r = 0;
-	
-	if (x >= 0x10000) {
-		x >>= 16;
-		r += 16;
-	}
-	if (x >= 0x100) {
-		x >>= 8;
-		r += 8;
-	}
-	if (x >= 0x10) {
-		x >>= 4;
-		r += 4;
-	}
-	if (x >= 4) {
-		x >>= 2;
-		r += 2;
-	}
-	if (x >= 2)
-		r++;
-	return r;
-}
-
-/*
  *  common I/O routines
  */
 
@@ -347,7 +319,6 @@ static int prog_dmabuf(struct ymf_state *state, int rec)
 {
 	struct ymf_dmabuf *dmabuf;
 	int w_16;
-	unsigned bytepersec;
 	unsigned bufsize;
 	unsigned long flags;
 	int redzone;
@@ -367,20 +338,16 @@ static int prog_dmabuf(struct ymf_state *state, int rec)
 		if ((ret = alloc_dmabuf(dmabuf)))
 			return ret;
 
-	bytepersec = state->format.rate << state->format.shift;
-
 	/*
 	 * Create fake fragment sizes and numbers for OSS ioctls.
+	 * Import what Doom might have set with SNDCTL_DSP_SETFRAGMENT.
 	 */
 	bufsize = PAGE_SIZE << dmabuf->buforder;
-	if (dmabuf->ossfragshift) {
-		if ((1000 << dmabuf->ossfragshift) < bytepersec)
-			dmabuf->fragshift = ld2(bytepersec/1000);
-		else
-			dmabuf->fragshift = dmabuf->ossfragshift;
-	} else {
-		/* lets hand out reasonable big ass buffers by default */
-		dmabuf->fragshift = (dmabuf->buforder + PAGE_SHIFT -2);
+	/* lets hand out reasonable big ass buffers by default */
+	dmabuf->fragshift = (dmabuf->buforder + PAGE_SHIFT -2);
+	if (dmabuf->ossfragshift > 3 &&
+	    dmabuf->ossfragshift < dmabuf->fragshift) {
+		dmabuf->fragshift = dmabuf->ossfragshift;
 	}
 	dmabuf->numfrag = bufsize >> dmabuf->fragshift;
 	while (dmabuf->numfrag < 4 && dmabuf->fragshift > 3) {
@@ -390,9 +357,6 @@ static int prog_dmabuf(struct ymf_state *state, int rec)
 	dmabuf->fragsize = 1 << dmabuf->fragshift;
 	dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
 
-	/*
-	 * Import what Doom might have set with SNDCTL_DSD_SETFRAGMENT.
-	 */
 	if (dmabuf->ossmaxfrags >= 2 && dmabuf->ossmaxfrags < dmabuf->numfrag) {
 		dmabuf->numfrag = dmabuf->ossmaxfrags;
 		dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
@@ -1726,8 +1690,6 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 			dmabuf->ossfragshift = 4;
 		if (dmabuf->ossfragshift > 15)
 			dmabuf->ossfragshift = 15;
-		if (dmabuf->ossmaxfrags < 4)
-			dmabuf->ossmaxfrags = 4;
 		return 0;
 
 	case SNDCTL_DSP_GETOSPACE:
@@ -2370,9 +2332,9 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 
 	int err;
 
-	if (pci_enable_device(pcidev) < 0) {
+	if ((err = pci_enable_device(pcidev)) != 0) {
 		printk(KERN_ERR "ymfpci: pci_enable_device failed\n");
-		return -ENODEV;
+		return err;
 	}
 
 	if ((codec = kmalloc(sizeof(ymfpci_t), GFP_KERNEL)) == NULL) {

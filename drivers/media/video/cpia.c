@@ -2499,9 +2499,6 @@ static int cpia_open(struct video_device *dev, int flags)
 	cam->mmap_kludge = 0;
 	
 	++cam->open_count;
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -2554,9 +2551,6 @@ static void cpia_close(struct video_device *dev)
 	}
 	
 
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	return;
 }
 
@@ -3031,6 +3025,7 @@ int cpia_video_init(struct video_device *vdev)
 }
 
 static struct video_device cpia_template = {
+	owner:		THIS_MODULE,
 	name:		"CPiA Camera",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_CPIA,      /* FIXME */

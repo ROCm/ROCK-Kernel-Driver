@@ -1,4 +1,4 @@
-/* $Id: eicon.h,v 1.23 2000/06/21 11:28:42 armin Exp $
+/* $Id: eicon.h,v 1.23.6.2 2001/02/13 11:43:30 kai Exp $
  *
  * ISDN low-level module for Eicon active ISDN-Cards.
  *
@@ -150,7 +150,6 @@ typedef struct {
 
 #include <linux/isdn.h>
 #include <linux/isdnif.h>
-
 
 typedef struct {
   __u16 length __attribute__ ((packed)); /* length of data/parameter field */

@@ -179,7 +179,7 @@ unsigned short get_fpu_twd( struct task_struct *tsk )
 
 unsigned short get_fpu_mxcsr( struct task_struct *tsk )
 {
-	if ( cpu_has_fxsr ) {
+	if ( cpu_has_xmm ) {
 		return tsk->thread.i387.fxsave.mxcsr;
 	} else {
 		return 0x1f80;

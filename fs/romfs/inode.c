@@ -110,6 +110,9 @@ romfs_read_super(struct super_block *s, void *data, int silent)
 	set_blocksize(dev, ROMBSIZE);
 	s->s_blocksize = ROMBSIZE;
 	s->s_blocksize_bits = ROMBSBITS;
+	s->u.generic_sbp = (void *) 0;
+	s->s_maxbytes = 0xFFFFFFFF;
+
 	bh = bread(dev, 0, ROMBSIZE);
 	if (!bh) {
 		/* XXX merge with other printk? */

@@ -1437,7 +1437,7 @@ tape34xx_default_handler (tape_info_t * tape)
     debug_text_event (tape_debug_area,6,"xdefhandle");
 #endif /* TAPE_DEBUG */
 	tapestate_set (tape, TS_FAILED);
-	PRINT_ERR ("TAPE34XX: An unexpected Unit Check occured.\n");
+	PRINT_ERR ("TAPE34XX: An unexpected Unit Check occurred.\n");
 	PRINT_ERR ("TAPE34XX: Please read Documentation/s390/TAPE and report it!\n");
 	PRINT_ERR ("TAPE34XX: Current state is: %s",
 		   (((tapestate_get (tape) < TS_SIZE) && (tapestate_get (tape) >= 0)) ?
@@ -1804,7 +1804,7 @@ tape34xx_rew_release_init_error (tape_info_t * tape)
 		tape->wanna_wakeup=1;
 		wake_up (&tape->wq);
 	} else {
-		PRINT_ERR ("TAPE34XX: An unexpected Unit Check occured.\n");
+		PRINT_ERR ("TAPE34XX: An unexpected Unit Check occurred.\n");
 		PRINT_ERR ("TAPE34XX: Please send the following 20 lines of output to cotte@de.ibm.com\n");
 		PRINT_ERR ("TAPE34XX: Current state is: %s",
 			   (((tapestate_get (tape) < TS_SIZE) && (tapestate_get (tape) >= 0)) ?

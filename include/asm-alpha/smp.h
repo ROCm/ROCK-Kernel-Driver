@@ -57,6 +57,7 @@ extern int __cpu_logical_map[NR_CPUS];
 #define smp_processor_id()	(current->processor)
 
 extern unsigned long cpu_present_mask;
+#define cpu_online_map cpu_present_mask
 
 #endif /* CONFIG_SMP */
 

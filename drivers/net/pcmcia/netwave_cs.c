@@ -1463,16 +1463,16 @@ static int netwave_rx(struct net_device *dev) {
 	skb->protocol = eth_type_trans(skb,dev);
 	/* Queue packet for network layer */
 	netif_rx(skb);
-		
+
+	dev->last_rx = jiffies;
+	priv->stats.rx_packets++;
+	priv->stats.rx_bytes += rcvLen;
+
 	/* Got the packet, tell the adapter to skip it */
 	wait_WOC(iobase);
 	writeb(NETWAVE_CMD_SRP, ramBase + NETWAVE_EREG_CB + 0);
 	writeb(NETWAVE_CMD_EOC, ramBase + NETWAVE_EREG_CB + 1);
 	DEBUG(3, "Packet reception ok\n");
-		
-	priv->stats.rx_packets++;
-
-	priv->stats.rx_bytes += skb->len;
     }
     return 0;
 }

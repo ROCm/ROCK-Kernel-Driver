@@ -203,13 +203,11 @@ static void vino_setup(struct vino_device *v)
 
 static int vino_open(struct video_device *dev, int flags)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void vino_close(struct video_device *dev)
 {
-	MOD_DEC_USE_COUNT;
 }
 
 static int vino_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
@@ -224,6 +222,7 @@ static int vino_mmap(struct video_device *dev, const char *adr,
 }
 
 static struct video_device vino_dev = {
+	owner:		THIS_MODULE,
 	name:		"Vino IndyCam/TV",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_VINO,

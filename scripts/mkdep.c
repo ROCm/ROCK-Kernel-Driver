@@ -2,7 +2,7 @@
  * Originally by Linus Torvalds.
  * Smart CONFIG_* processing by Werner Almesberger, Michael Chastain.
  *
- * Usage: mkdep file ...
+ * Usage: mkdep cflags -- file ...
  * 
  * Read source files and output makefile dependency lines for them.
  * I make simple dependency lines for #include <*.h> and #include "*.h".
@@ -22,10 +22,17 @@
  * 2.3.99-pre1, Andrew Morton <andrewm@uow.edu.au>
  * - Changed so that 'filename.o' depends upon 'filename.[cS]'.  This is so that
  *   missing source files are noticed, rather than silently ignored.
+ *
+ * 2.4.2-pre3, Keith Owens <kaos@ocs.com.au>
+ * - Accept cflags followed by '--' followed by filenames.  mkdep extracts -I
+ *   options from cflags and looks in the specified directories as well as the
+ *   defaults.   Only -I is supported, no attempt is made to handle -idirafter,
+ *   -isystem, -I- etc.
  */
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,11 +51,10 @@ int hasdep;
 
 struct path_struct {
 	int len;
-	char buffer[256-sizeof(int)];
-} path_array[2] = {
-	{  0, "" },
-	{  0, "" }
+	char *buffer;
 };
+struct path_struct *path_array;
+int paths;
 
 
 /* Current input file */
@@ -181,9 +187,10 @@ void define_precious(const char * filename)
 /*
  * Handle an #include line.
  */
-void handle_include(int type, const char * name, int len)
+void handle_include(int start, const char * name, int len)
 {
-	struct path_struct *path = path_array+type;
+	struct path_struct *path;
+	int i;
 
 	if (len == 14 && !memcmp(name, "linux/config.h", len))
 		return;
@@ -191,13 +198,58 @@ void handle_include(int type, const char * name, int len)
 	if (len >= 7 && !memcmp(name, "config/", 7))
 		define_config(name+7, len-7-2);
 
-	memcpy(path->buffer+path->len, name, len);
-	path->buffer[path->len+len] = '\0';
-	if (access(path->buffer, F_OK) != 0)
-		return;
+	for (i = start, path = path_array+start; i < paths; ++i, ++path) {
+		memcpy(path->buffer+path->len, name, len);
+		path->buffer[path->len+len] = '\0';
+		if (access(path->buffer, F_OK) == 0) {
+			do_depname();
+			printf(" \\\n   %s", path->buffer);
+			return;
+		}
+	}
 
-	do_depname();
-	printf(" \\\n   %s", path->buffer);
+}
+
+
+
+/*
+ * Add a path to the list of include paths.
+ */
+void add_path(const char * name)
+{
+	struct path_struct *path;
+	char resolved_path[PATH_MAX+1];
+	const char *name2;
+
+	if (strcmp(name, ".")) {
+		name2 = realpath(name, resolved_path);
+		if (!name2) {
+			fprintf(stderr, "realpath(%s) failed, %m\n", name);
+			exit(1);
+		}
+	}
+	else {
+		name2 = "";
+	}
+
+	path_array = realloc(path_array, (++paths)*sizeof(*path_array));
+	if (!path_array) {
+		fprintf(stderr, "cannot expand path_arry\n");
+		exit(1);
+	}
+
+	path = path_array+paths-1;
+	path->len = strlen(name2);
+	path->buffer = malloc(path->len+1+256+1);
+	if (!path->buffer) {
+		fprintf(stderr, "cannot allocate path buffer\n");
+		exit(1);
+	}
+	strcpy(path->buffer, name2);
+	if (path->len && *(path->buffer+path->len-1) != '/') {
+		*(path->buffer+path->len) = '/';
+		*(path->buffer+(++(path->len))) = '\0';
+	}
 }
 
 
@@ -210,7 +262,7 @@ void use_config(const char * name, int len)
 	char *pc;
 	int i;
 
-	pc = path_array[0].buffer + path_array[0].len;
+	pc = path_array[paths-1].buffer + path_array[paths-1].len;
 	memcpy(pc, "config/", 7);
 	pc += 7;
 
@@ -228,7 +280,7 @@ void use_config(const char * name, int len)
 	define_config(pc, len);
 
 	do_depname();
-	printf(" \\\n   $(wildcard %s.h)", path_array[0].buffer);
+	printf(" \\\n   $(wildcard %s.h)", path_array[paths-1].buffer);
 }
 
 
@@ -387,7 +439,7 @@ pound_include_dquote:
 	GETNEXT
 	CASE('\n', start);
 	NOTCASE('"', pound_include_dquote);
-	handle_include(1, map_dot, next - map_dot - 1);
+	handle_include(0, map_dot, next - map_dot - 1);
 	goto start;
 
 /* #\s*include\s*<(.*)> */
@@ -395,7 +447,7 @@ pound_include_langle:
 	GETNEXT
 	CASE('\n', start);
 	NOTCASE('>', pound_include_langle);
-	handle_include(0, map_dot, next - map_dot - 1);
+	handle_include(1, map_dot, next - map_dot - 1);
 	goto start;
 
 /* #\s*d */
@@ -524,7 +576,7 @@ void do_depend(const char * filename, const char * command)
 int main(int argc, char **argv)
 {
 	int len;
-	char *hpath;
+	const char *hpath;
 
 	hpath = getenv("HPATH");
 	if (!hpath) {
@@ -532,12 +584,26 @@ int main(int argc, char **argv)
 		      "Don't bypass the top level Makefile.\n", stderr);
 		return 1;
 	}
-	len = strlen(hpath);
-	memcpy(path_array[0].buffer, hpath, len);
-	if (len && hpath[len-1] != '/')
-		path_array[0].buffer[len++] = '/';
-	path_array[0].buffer[len] = '\0';
-	path_array[0].len = len;
+
+	add_path(".");		/* for #include "..." */
+
+	while (++argv, --argc > 0) {
+		if (strncmp(*argv, "-I", 2) == 0) {
+			if (*((*argv)+2)) {
+				add_path((*argv)+2);
+			}
+			else {
+				++argv;
+				--argc;
+				add_path(*argv);
+			}
+		}
+		else if (strcmp(*argv, "--") == 0) {
+			break;
+		}
+	}
+
+	add_path(hpath);	/* must be last entry, for config files */
 
 	while (--argc > 0) {
 		const char * filename = *++argv;

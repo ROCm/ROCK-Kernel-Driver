@@ -64,10 +64,10 @@ unsigned long wildfire_mem_mask;
 void __init
 wildfire_init_hose(int qbbno, int hoseno)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	wildfire_pci *pci;
 
-	hose = alloc_pci_controler();
+	hose = alloc_pci_controller();
 	hose->io_space = alloc_resource();
 	hose->mem_space = alloc_resource();
 
@@ -346,7 +346,7 @@ wildfire_kill_arch(int mode)
 }
 
 void
-wildfire_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+wildfire_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	int qbbno = hose->index >> 3;
 	int hoseno = hose->index & 7;
@@ -360,7 +360,7 @@ static int
 mk_conf_addr(struct pci_dev *dev, int where, unsigned long *pci_addr,
 	     unsigned char *type1)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long addr;
 	u8 bus = dev->bus->number;
 	u8 device_fn = dev->devfn;

@@ -1,11 +1,17 @@
 /*
- * $Id: capi.c,v 1.44.6.3 2000/12/17 22:45:08 kai Exp $
+ * $Id: capi.c,v 1.44.6.5 2001/02/13 11:43:29 kai Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
  * Copyright 1996 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: capi.c,v $
+ * Revision 1.44.6.5  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
+ * Revision 1.44.6.4  2001/02/10 14:41:20  kai
+ * Changes from kernel tree
+ *
  * Revision 1.44.6.3  2000/12/17 22:45:08  kai
  * That's hopefully it for test13-4
  *
@@ -253,7 +259,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.44.6.3 $";
+static char *revision = "$Revision: 1.44.6.5 $";
 
 MODULE_AUTHOR("Carsten Paeth (calle@calle.in-berlin.de)");
 
@@ -1317,7 +1323,6 @@ capinc_raw_open(struct inode *inode, struct file *file)
 #ifdef _DEBUG_REFCOUNT
 	printk(KERN_DEBUG "capi_raw_open %d\n", GET_USE_COUNT(THIS_MODULE));
 #endif
-
 	mp->datahandle = 0;
 	mp->file = file;
 	file->private_data = (void *)mp;

@@ -280,20 +280,19 @@ static int tt_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void tt_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct tt_device terratec_unit;
 
 static struct video_device terratec_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"TerraTec ActiveRadio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TERRATEC,

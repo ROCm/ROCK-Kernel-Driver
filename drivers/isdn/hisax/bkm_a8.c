@@ -1,4 +1,4 @@
-/* $Id: bkm_a8.c,v 1.14.6.2 2000/11/29 16:00:14 kai Exp $
+/* $Id: bkm_a8.c,v 1.14.6.4 2001/02/16 16:43:25 kai Exp $
  * bkm_a8.c     low level stuff for Scitel Quadro (4*S0, passive)
  *              derived from the original file sedlbauer.c
  *              derived from the original file niccy.c
@@ -6,7 +6,7 @@
  *
  * Author       Roland Klabunde (R.Klabunde@Berkom.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -27,7 +27,7 @@
 
 extern const char *CardType[];
 
-const char sct_quadro_revision[] = "$Revision: 1.14.6.2 $";
+const char sct_quadro_revision[] = "$Revision: 1.14.6.4 $";
 
 static const char *sct_quadro_subtypes[] =
 {

@@ -1,4 +1,4 @@
-/* $Id: teles0.c,v 2.13 2000/11/24 17:05:38 kai Exp $
+/* $Id: teles0.c,v 2.13.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * teles0.c     low level stuff for Teles Memory IO isdn cards
  *              based on the teles driver from Jan den Ouden
@@ -9,7 +9,7 @@
  *              Fritz Elfert
  *              Beat Doebeli
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -21,7 +21,7 @@
 
 extern const char *CardType[];
 
-const char *teles0_revision = "$Revision: 2.13 $";
+const char *teles0_revision = "$Revision: 2.13.6.1 $";
 
 #define TELES_IOMEM_SIZE	0x400
 #define byteout(addr,val) outb(val,addr)

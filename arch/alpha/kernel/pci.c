@@ -43,11 +43,11 @@ const char pci_hae0_name[] = "HAE0";
 
 
 /*
- * The PCI controler list.
+ * The PCI controller list.
  */
 
-struct pci_controler *hose_head, **hose_tail = &hose_head;
-struct pci_controler *pci_isa_hose;
+struct pci_controller *hose_head, **hose_tail = &hose_head;
+struct pci_controller *pci_isa_hose;
 
 /*
  * Quirks.
@@ -136,7 +136,7 @@ void
 pcibios_align_resource(void *data, struct resource *res, unsigned long size)
 {
 	struct pci_dev *dev = data;
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	unsigned long alignto;
 	unsigned long start = res->start;
 
@@ -224,7 +224,7 @@ void __init
 pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus)
 {
 	/* Update device resources.  */
-	struct pci_controler *hose = (struct pci_controler *)bus->sysdata;
+	struct pci_controller *hose = (struct pci_controller *)bus->sysdata;
 	int i;
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -244,7 +244,7 @@ pcibios_fixup_bus(struct pci_bus *bus)
 {
 	/* Propogate hose info into the subordinate devices.  */
 
-	struct pci_controler *hose = bus->sysdata;
+	struct pci_controller *hose = bus->sysdata;
 	struct list_head *ln;
 	struct pci_dev *dev = bus->self;
 
@@ -284,7 +284,7 @@ void
 pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 			struct resource *res, int resource)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int where;
 	u32 reg;
 
@@ -328,7 +328,7 @@ pcibios_update_irq(struct pci_dev *dev, int irq)
 u8 __init
 common_swizzle(struct pci_dev *dev, u8 *pinp)
 {
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 
 	if (dev->bus->number != hose->first_busno) {
 		u8 pin = *pinp;
@@ -349,7 +349,7 @@ void __init
 pcibios_fixup_pbus_ranges(struct pci_bus * bus,
 			  struct pbus_set_ranges_data * ranges)
 {
-	struct pci_controler *hose = (struct pci_controler *)bus->sysdata;
+	struct pci_controller *hose = (struct pci_controller *)bus->sysdata;
 
 	ranges->io_start -= hose->io_space->start;
 	ranges->io_end -= hose->io_space->start;
@@ -383,11 +383,11 @@ pcibios_set_master(struct pci_dev *dev)
 void __init
 common_init_pci(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_bus *bus;
 	int next_busno;
 
-	/* Scan all of the recorded PCI controlers.  */
+	/* Scan all of the recorded PCI controllers.  */
 	for (next_busno = 0, hose = hose_head; hose; hose = hose->next) {
 		hose->first_busno = next_busno;
 		hose->last_busno = 0xff;
@@ -402,10 +402,10 @@ common_init_pci(void)
 }
 
 
-struct pci_controler * __init
-alloc_pci_controler(void)
+struct pci_controller * __init
+alloc_pci_controller(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	hose = alloc_bootmem(sizeof(*hose));
 
@@ -432,7 +432,7 @@ alloc_resource(void)
 asmlinkage long
 sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	struct pci_dev *dev;
 
 	/* from hose or from bus.devfn */

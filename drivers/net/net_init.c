@@ -390,23 +390,6 @@ void ltalk_setup(struct net_device *dev)
 
 #endif /* CONFIG_ATALK || CONFIG_ATALK_MODULE */
 
-int ether_config(struct net_device *dev, struct ifmap *map)
-{
-	if (map->mem_start != (u_long)(-1))
-		dev->mem_start = map->mem_start;
-	if (map->mem_end != (u_long)(-1))
-		dev->mem_end = map->mem_end;
-	if (map->base_addr != (u_short)(-1))
-		dev->base_addr = map->base_addr;
-	if (map->irq != (u_char)(-1))
-		dev->irq = map->irq;
-	if (map->dma != (u_char)(-1))
-		dev->dma = map->dma;
-	if (map->port != (u_char)(-1))
-		dev->if_port = map->port;
-	return 0;
-}
-
 int register_netdev(struct net_device *dev)
 {
 	int err;

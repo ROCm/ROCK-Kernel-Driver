@@ -194,9 +194,9 @@ static struct super_block * cramfs_read_super(struct super_block *sb, void *data
 
 	/* Set it all up.. */
 	sb->s_op	= &cramfs_ops;
-	sb->s_root = d_alloc_root(get_cramfs_inode(sb, &super.root));
+	sb->s_root 	= d_alloc_root(get_cramfs_inode(sb, &super.root));
+	sb->s_maxbytes = MAX_NON_LFS;
 	retval = sb;
-
 out:
 	return retval;
 }

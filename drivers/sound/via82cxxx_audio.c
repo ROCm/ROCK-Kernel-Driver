@@ -15,7 +15,7 @@
  */
 
 
-#define VIA_VERSION	"1.1.14a"
+#define VIA_VERSION	"1.1.14b"
 
 
 #include <linux/config.h>
@@ -282,6 +282,8 @@ struct via_info {
 
 	unsigned rev_h : 1;
 
+	int locked_rate : 1;
+
 	struct semaphore syscall_sem;
 	struct semaphore open_sem;
 
@@ -508,9 +510,15 @@ static void via_stop_everything (struct via_info *card)
 static int via_set_rate (struct ac97_codec *ac97,
 			 struct via_channel *chan, unsigned rate)
 {
+	struct via_info *card = ac97->private_data;
 	int rate_reg;
 
 	DPRINTK ("ENTER, rate = %d\n", rate);
+
+	if (card->locked_rate) {
+		chan->rate = 48000;
+		goto out;
+	}
 
 	if (rate > 48000)		rate = 48000;
 	if (rate < 4000) 		rate = 4000;
@@ -535,6 +543,13 @@ static int via_set_rate (struct ac97_codec *ac97,
 	 */
 	chan->rate = via_ac97_read_reg (ac97, rate_reg);
 
+	if (chan->rate == 0) {
+		card->locked_rate = 1;
+		chan->rate = 48000;
+		printk (KERN_WARNING PFX "Codec rate locked at 48Khz\n");
+	}
+
+out:
 	DPRINTK ("EXIT, returning rate %d Hz\n", chan->rate);
 	return chan->rate;
 }
@@ -1421,15 +1436,19 @@ static int __init via_ac97_reset (struct via_info *card)
 	/* WARNING: this line is magic.  Remove this
 	 * and things break. */
 	/* enable variable rate, variable rate MIC ADC */
-	tmp16 = via_ac97_read_reg (&card->ac97, 0x2A);
-	via_ac97_write_reg (&card->ac97, 0x2A, tmp16 | (1<<0));
-
-	pci_read_config_byte (pdev, VIA_ACLINK_CTRL, &tmp8);
-	if ((tmp8 & (VIA_CR41_AC97_ENABLE | VIA_CR41_AC97_RESET)) == 0) {
-		printk (KERN_ERR PFX "cannot enable AC97 controller, aborting\n");
-		DPRINTK ("EXIT, tmp8=%X, returning -ENODEV\n", tmp8);
-		return -ENODEV;
-	}
+ 	/*
+ 	 * If we cannot enable VRA, we have a locked-rate codec.
+ 	 * We try again to enable VRA before assuming so, however.
+ 	 */
+ 	tmp16 = via_ac97_read_reg (&card->ac97, AC97_EXTENDED_STATUS);
+ 	if ((tmp16 & 1) == 0) {
+ 		via_ac97_write_reg (&card->ac97, AC97_EXTENDED_STATUS, tmp16 | 1);
+ 		tmp16 = via_ac97_read_reg (&card->ac97, AC97_EXTENDED_STATUS);
+ 		if ((tmp16 & 1) == 0) {
+ 			card->locked_rate = 1;
+ 			printk (KERN_WARNING PFX "Codec rate locked at 48Khz\n");
+ 		}
+ 	}
 
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;
@@ -1478,8 +1497,8 @@ static int __init via_ac97_init (struct via_info *card)
 	}
 
 	/* enable variable rate, variable rate MIC ADC */
-	tmp16 = via_ac97_read_reg (&card->ac97, 0x2A);
-	via_ac97_write_reg (&card->ac97, 0x2A, tmp16 | (1<<0));
+	tmp16 = via_ac97_read_reg (&card->ac97, AC97_EXTENDED_STATUS);
+	via_ac97_write_reg (&card->ac97, AC97_EXTENDED_STATUS, tmp16 | 1);
 
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;

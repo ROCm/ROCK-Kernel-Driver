@@ -178,20 +178,19 @@ static int pcm20_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void pcm20_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct pcm20_device pcm20_unit;
 
 static struct video_device pcm20_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"Miro PCM 20 radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_RTRACK,

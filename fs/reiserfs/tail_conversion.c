@@ -32,6 +32,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
     struct super_block * sb = inode->i_sb;
     struct buffer_head *up_to_date_bh ;
     struct item_head * p_le_ih = PATH_PITEM_HEAD (path);
+    unsigned long total_tail = 0 ;
     struct cpu_key end_key;  /* Key to search for the last byte of the
 				converted item. */
     struct item_head ind_ih; /* new indirect item to be inserted or
@@ -121,10 +122,19 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	n_retval = reiserfs_delete_item (th, path, &end_key, inode, 
 	                                 up_to_date_bh) ;
 
+	total_tail += n_retval ;
 	if (tail_size == n_retval)
 	    // done: file does not have direct items anymore
 	    break;
 
+    }
+    /* if we've copied bytes from disk into the page, we need to zero
+    ** out the unused part of the block (it was not up to date before)
+    ** the page is still kmapped (by whoever called reiserfs_get_block)
+    */
+    if (up_to_date_bh) {
+        unsigned pgoff = (tail_offset + total_tail - 1) & (PAGE_CACHE_SIZE - 1);
+	memset(page_address(unbh->b_page) + pgoff, 0, n_blk_size - total_tail) ;
     }
 
     inode->u.reiserfs_i.i_first_direct_byte = U32_MAX;

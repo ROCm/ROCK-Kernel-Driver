@@ -1,4 +1,4 @@
-// $Id: l3ni1.h,v 2.3 2000/11/16 13:50:43 keil Exp $
+// $Id: l3ni1.h,v 2.3.6.1 2001/02/16 16:43:28 kai Exp $
 //-----------------------------------------------------------------------------
 //
 // NI1 D-channel protocol
@@ -12,7 +12,7 @@
 // code provided by Ragnar Paulson.
 //
 //
-// This file is (c) under GNU PUBLIC LICENSE
+// This file is (c) under GNU General Public License
 //
 //-----------------------------------------------------------------------------
 

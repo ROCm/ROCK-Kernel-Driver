@@ -50,5 +50,6 @@ struct csr_control {
 
 
 void init_csr(void);
+void cleanup_csr(void);
 
 #endif /* _IEEE1394_CSR_H */

@@ -94,7 +94,7 @@
 #ifdef CONFIG_SMP
 #define LOOPS_PER_TICK cpu_data[smp_processor_id()].loops_per_jiffy
 #else
-#define LOOPS_PER_TICK	loops_per_sec
+#define LOOPS_PER_TICK	loops_per_jiffy
 #endif
 #endif
 
@@ -693,7 +693,7 @@ wavefront_cmd (int cmd, unsigned char *rbuf, unsigned char *wbuf)
 /***********************************************************************
 WaveFront: data munging   
 
-Things here are wierd. All data written to the board cannot 
+Things here are weird. All data written to the board cannot 
 have its most significant bit set. Any data item with values 
 potentially > 0x7F (127) must be split across multiple bytes.
 
@@ -702,7 +702,7 @@ the x86 side as 8-32 bit values. Sometimes, we need to munge data
 that is represented on the x86 side as an array of bytes. The most
 efficient approach to handling both cases seems to be to use 2
 different functions for munging and 2 for de-munging. This avoids
-wierd casting and worrying about bit-level offsets.
+weird casting and worrying about bit-level offsets.
 
 **********************************************************************/
 
@@ -1213,7 +1213,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 	shptr = munge_int32 (*((UINT32 *) &header->hdr.s.sampleEndOffset),
 			     shptr, 4);
 	
-	/* This one is truly wierd. What kind of wierdo decided that in
+	/* This one is truly weird. What kind of weirdo decided that in
 	   a system dominated by 16 and 32 bit integers, they would use
 	   a just 12 bits ?
 	*/
@@ -3069,7 +3069,7 @@ wffx_ioctl (wavefront_fx_info *r)
    This code was developed using DOSEMU. The Turtle Beach SETUPSND
    utility was run with I/O tracing in DOSEMU enabled, and a reconstruction
    of the port I/O done, using the Yamaha faxback document as a guide
-   to add more logic to the code. Its really pretty wierd.
+   to add more logic to the code. Its really pretty weird.
 
    There was an alternative approach of just dumping the whole I/O
    sequence as a series of port/value pairs and a simple loop

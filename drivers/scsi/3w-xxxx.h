@@ -289,7 +289,7 @@ typedef struct TAG_TW_Device_Extension {
 	unsigned short		aen_queue[TW_Q_LENGTH];
 	unsigned char		aen_head;
 	unsigned char		aen_tail;
-	u32			flags;
+	long			flags; /* long req'd for set_bit --RR */
 } TW_Device_Extension;
 
 /* Function prototypes */

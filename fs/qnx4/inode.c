@@ -369,6 +369,7 @@ static struct super_block *qnx4_read_super(struct super_block *s,
 	}
 	s->s_op = &qnx4_sops;
 	s->s_magic = QNX4_SUPER_MAGIC;
+	s->s_maxbytes = MAX_NON_LFS;
 #ifndef CONFIG_QNX4FS_RW
 	s->s_flags |= MS_RDONLY;	/* Yup, read-only yet */
 #endif

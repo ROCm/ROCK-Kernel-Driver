@@ -41,7 +41,7 @@ static int users = 0;
 static struct semaphore lock;
 
 /* freq is in 1/16 kHz to internal number, hw precision is 50 kHz */
-/* It is only usefull to give freq in intervall of 800 (=0.05Mhz),
+/* It is only useful to give freq in intervall of 800 (=0.05Mhz),
  * other bits will be truncated, e.g 92.7400016 -> 92.7, but 
  * 92.7400017 -> 92.75
  */
@@ -262,20 +262,19 @@ static int fmi_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void fmi_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct fmi_device fmi_unit;
 
 static struct video_device fmi_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"SF16FMx radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_SF16MI,

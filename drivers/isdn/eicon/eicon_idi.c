@@ -1,4 +1,4 @@
-/* $Id: eicon_idi.c,v 1.41 2000/08/12 18:00:47 armin Exp $
+/* $Id: eicon_idi.c,v 1.41.6.1 2001/02/10 14:44:09 kai Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
  *        IDI interface 
@@ -36,7 +36,7 @@
 
 #undef EICON_FULL_SERVICE_OKTETT
 
-char *eicon_idi_revision = "$Revision: 1.41 $";
+char *eicon_idi_revision = "$Revision: 1.41.6.1 $";
 
 eicon_manifbuf *manbuf;
 
@@ -2506,7 +2506,7 @@ idi_handle_ind(eicon_card *ccard, struct sk_buff *skb)
 						case ISDN_PROTO_L2_TRANS:
 							idi_do_req(ccard, chan, N_CONNECT, 1);
 							break;
-						default:
+						default:;
 							/* On most incoming calls we use automatic connect */
 							/* idi_do_req(ccard, chan, N_CONNECT, 1); */
 					}

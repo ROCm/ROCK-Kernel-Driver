@@ -1,9 +1,9 @@
-/* $Id: jade.h,v 1.3 2000/06/26 08:59:14 keil Exp $
+/* $Id: jade.h,v 1.3.6.1 2001/02/16 16:43:27 kai Exp $
  * jade.h   JADE specific defines
  *
  * Author   Roland Klabunde (R.Klabunde@Berkom.de)
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

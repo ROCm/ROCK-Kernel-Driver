@@ -166,6 +166,9 @@ static int video_open(struct inode *inode, struct file *file)
 		goto error_out;
 	}
 	vfl->busy=1;		/* In case vfl->open sleeps */
+	
+	if(vfl->owner)
+		__MOD_INC_USE_COUNT(vfl->owner);
 	unlock_kernel();
 	
 	if(vfl->open)
@@ -174,6 +177,9 @@ static int video_open(struct inode *inode, struct file *file)
 		if(err)
 		{
 			vfl->busy=0;
+			if(vfl->owner)
+				__MOD_DEC_USE_COUNT(vfl->owner);
+			
 			return err;
 		}
 	}
@@ -195,6 +201,8 @@ static int video_release(struct inode *inode, struct file *file)
 	if(vfl->close)
 		vfl->close(vfl);
 	vfl->busy=0;
+	if(vfl->owner)
+		__MOD_DEC_USE_COUNT(vfl->owner);
 	unlock_kernel();
 	return 0;
 }

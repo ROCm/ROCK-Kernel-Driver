@@ -1,8 +1,8 @@
-/* $Id: elsa_ser.c,v 2.10 2000/11/19 17:02:47 kai Exp $
+/* $Id: elsa_ser.c,v 2.10.6.1 2001/02/16 16:43:26 kai Exp $
  *
  * stuff for the serial modem on ELSA cards
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #include <linux/config.h>

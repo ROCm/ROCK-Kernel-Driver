@@ -1,4 +1,4 @@
-/* $Id: hscx_irq.c,v 1.16 2000/11/19 17:02:47 kai Exp $
+/* $Id: hscx_irq.c,v 1.16.6.1 2001/02/16 16:43:27 kai Exp $
  *
  * hscx_irq.c     low level b-channel stuff for Siemens HSCX
  *
@@ -6,7 +6,7 @@
  *
  * This is an include file for fast inline IRQ stuff
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 

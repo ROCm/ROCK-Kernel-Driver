@@ -788,7 +788,6 @@ static int zoran_open(struct video_device *dev, int flags)
 	/* do the common part of all open's */
 	zoran_common_open(ztv, flags);
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -820,7 +819,6 @@ void zoran_close(struct video_device* dev)
 		kfree( ztv->overinfo.overlay );
 	ztv->overinfo.overlay = 0;
 
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -1482,6 +1480,7 @@ int zoran_mmap(struct video_device* dev, const char* adr, unsigned long size)
 
 static struct video_device zr36120_template=
 {
+	owner:		THIS_MODULE,
 	name:		"UNSET",
 	type:		VID_TYPE_TUNER|VID_TYPE_CAPTURE|VID_TYPE_OVERLAY,
 	hardware:	VID_HARDWARE_ZR36120,
@@ -1541,7 +1540,6 @@ int vbi_open(struct video_device *dev, int flags)
 	/* start read-ahead */
 	zoran_cap(ztv, 1);
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1573,7 +1571,6 @@ void vbi_close(struct video_device *dev)
 		item->memadr = 0;
 	}
 
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -1819,6 +1816,7 @@ int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 
 static struct video_device vbi_template=
 {
+	owner:		THIS_MODULE,
 	name:		"UNSET",
 	type:		VID_TYPE_CAPTURE|VID_TYPE_TELETEXT,
 	hardware:	VID_HARDWARE_ZR36120,

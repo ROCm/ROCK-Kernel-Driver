@@ -235,20 +235,19 @@ static int gemtek_open(struct video_device *dev, int flags)
 	if(users)
 		return -EBUSY;
 	users++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 static void gemtek_close(struct video_device *dev)
 {
 	users--;
-	MOD_DEC_USE_COUNT;
 }
 
 static struct gemtek_device gemtek_unit;
 
 static struct video_device gemtek_radio=
 {
+	owner:		THIS_MODULE,
 	name:		"GemTek radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_GEMTEK,

@@ -724,7 +724,7 @@ pgm_no_sv:
         stosm   48(%r15),0x03     # reenable interrupts
 	lghi    %r3,0x7f
         nr      %r3,%r8           # clear per-event-bit & move to r3
-        je      pgm_dn            # none of Martins exceptions occured bypass
+        je      pgm_dn            # none of Martins exceptions occurred bypass
         sll     %r3,3
         larl    %r9,pgm_check_table
         lg      %r9,0(%r3,%r9)    # load address of handler routine

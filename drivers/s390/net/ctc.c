@@ -884,7 +884,7 @@ static void inline ccw_check_unit_check (net_device *dev, char sense)
                 if (sense & 0x01) 
                         printk(KERN_DEBUG "%s: Interface disconnect or Selective reset occurred (remote side)\n", dev->name);
                 else 
-                        printk(KERN_DEBUG "%s: System reset occured (remote side)\n", dev->name);
+                        printk(KERN_DEBUG "%s: System reset occurred (remote side)\n", dev->name);
 #endif
         } else if (sense & 0x20) {
                 if (sense & 0x04)

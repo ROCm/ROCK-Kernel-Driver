@@ -9,7 +9,7 @@
  * what's in there...
  *
  * Note : as most part of the Linux kernel, this module is available
- * under the GNU Public License (GPL).
+ * under the GNU General Public License (GPL).
  */
 
 #ifndef IRNET_H
@@ -52,14 +52,14 @@
  *	o multipoint operation (limited by IrLAP specification)
  *	o information in /proc/net/irda/irnet
  *	o IrNET events on /dev/irnet (for user space daemon)
- *	o IrNET deamon (irnetd) to automatically handle incomming requests
+ *	o IrNET deamon (irnetd) to automatically handle incoming requests
  *	o Windows 2000 compatibility (tested, but need more work)
  * Currently missing :
  *	o Lot's of testing (that's your job)
  *	o Connection retries (may be too hard to do)
  *	o Check pppd persist mode
- *	o User space deamon (to automatically handle incomming requests)
- *	o A registered device number (comming, waiting from an answer) 
+ *	o User space deamon (to automatically handle incoming requests)
+ *	o A registered device number (coming, waiting from an answer) 
  *	o Final integration in Linux-IrDA (up to Dag) 
  *
  * The setup is not currently the most easy, but this should get much
@@ -109,16 +109,16 @@
  * and allow to offer the event channel, useful for other stuff like debug.
  *
  * On the other hand, this require a loose coordination between the
- * present module and irnetd. One critical area is how incomming request
+ * present module and irnetd. One critical area is how incoming request
  * are handled.
- * When irnet receive an incomming request, it send an event to irnetd and
- * drop the incomming IrNET socket.
+ * When irnet receive an incoming request, it send an event to irnetd and
+ * drop the incoming IrNET socket.
  * irnetd start a pppd instance, which create a new IrNET socket. This new
  * socket is then connected in the originating node to the pppd instance.
  * At this point, in the originating node, the first socket is closed.
  *
  * I admit, this is a bit messy and waste some ressources. The alternative
- * is caching incomming socket, and that's also quite messy and waste
+ * is caching incoming socket, and that's also quite messy and waste
  * ressources.
  * We also make connection time slower. For example, on a 115 kb/s link it
  * adds 60ms to the connection time (770 ms). However, this is slower than

@@ -1,11 +1,14 @@
 /*
- * $Id: t1pci.c,v 1.13.6.1 2000/11/28 12:02:45 kai Exp $
+ * $Id: t1pci.c,v 1.13.6.2 2001/02/13 11:43:29 kai Exp $
  * 
  * Module for AVM T1 PCI-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: t1pci.c,v $
+ * Revision 1.13.6.2  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
  * Revision 1.13.6.1  2000/11/28 12:02:45  kai
  * MODULE_DEVICE_TABLE for 2.4
  *
@@ -88,7 +91,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.13.6.1 $";
+static char *revision = "$Revision: 1.13.6.2 $";
 
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG

@@ -199,7 +199,7 @@ pg_data_t sa1100_node_data[4] =
   
 /*
  * On Assabet, we must probe for the Neponset board *before* paging_init() 
- * has occured to actually determine the amount of RAM available.  To do so, 
+ * has occurred to actually determine the amount of RAM available.  To do so, 
  * we map the appropriate IO section in the page table here in order to 
  * access GPIO registers.
  */

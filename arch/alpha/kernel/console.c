@@ -21,8 +21,8 @@
 unsigned long __vga_hose_io_base = 0;	/* base for default hose */
 unsigned long __vga_hose_mem_base = 0;	/* base for default hose */
 
-static struct pci_controler * __init 
-default_vga_hose_select(struct pci_controler *h1, struct pci_controler *h2)
+static struct pci_controller * __init 
+default_vga_hose_select(struct pci_controller *h1, struct pci_controller *h2)
 {
 	if (h2->index < h1->index)
 		return h2;
@@ -31,7 +31,7 @@ default_vga_hose_select(struct pci_controler *h1, struct pci_controler *h2)
 }
 
 void __init 
-set_vga_hose(struct pci_controler *hose)
+set_vga_hose(struct pci_controller *hose)
 {
 	if (hose) {
 		__vga_hose_io_base = hose->io_space->start;
@@ -42,7 +42,7 @@ set_vga_hose(struct pci_controler *hose)
 void __init 
 locate_and_init_vga(void *(*sel_func)(void *, void *))
 {
-	struct pci_controler *hose = NULL;
+	struct pci_controller *hose = NULL;
 	struct pci_dev *dev = NULL;
 
 	if (!sel_func) sel_func = (void *)default_vga_hose_select;

@@ -139,7 +139,7 @@ rawhide_srm_device_interrupt(unsigned long vector, struct pt_regs * regs)
 static void __init
 rawhide_init_irq(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	long i;
 
 	mcpcia_init_hoses();
@@ -204,7 +204,7 @@ rawhide_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	};
 	const long min_idsel = 1, max_idsel = 5, irqs_per_slot = 5;
 
-	struct pci_controler *hose = dev->sysdata;
+	struct pci_controller *hose = dev->sysdata;
 	int irq = COMMON_TABLE_LOOKUP;
 	if (irq >= 0)
 		irq += 24 * hose->index;

@@ -687,7 +687,7 @@ pgm_no_sv:
         lr      %r3,%r8
         la      %r0,0x7f
         nr      %r3,%r0           # clear per-event-bit
-        be      BASED(pgm_dn)     # none of Martins exceptions occured bypass
+        be      BASED(pgm_dn)     # none of Martins exceptions occurred bypass
         l       %r9,BASED(.Ljump_table)
         sll     %r3,2
         l       %r9,0(%r3,%r9)    # load address of handler routine

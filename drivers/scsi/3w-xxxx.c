@@ -1573,6 +1573,8 @@ int tw_scsi_biosparam(Disk *disk, kdev_t dev, int geom[])
 /* This function will find and initialize any cards */
 int tw_scsi_detect(Scsi_Host_Template *tw_host)
 {
+	int ret;
+	
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_detect()\n");
 
 	/* Check if the kernel has PCI interface compiled in */
@@ -1581,7 +1583,11 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 		return 0;
 	}
 
-	return(tw_findcards(tw_host));
+	spin_unlock_irq(&io_request_lock);
+	ret = tw_findcards(tw_host);
+	spin_lock_irq(&io_request_lock);
+	
+	return ret;
 } /* End tw_scsi_detect() */
 
 /* This is the new scsi eh abort function */

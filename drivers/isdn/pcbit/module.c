@@ -4,7 +4,7 @@
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
  *
  * This software may be used and distributed according to the terms of 
- * the GNU Public License, incorporated herein by reference.
+ * the GNU General Public License, incorporated herein by reference.
  */
 
 /*        
@@ -12,7 +12,7 @@
  */
 
 #include <linux/module.h>
-
+#include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -26,21 +26,12 @@ static int mem[MAX_PCBIT_CARDS] = {0, };
 static int irq[MAX_PCBIT_CARDS] = {0, };
 
 static int num_boards;
-struct pcbit_dev * dev_pcbit[MAX_PCBIT_CARDS] = {0, 0, 0, 0};
-
-int init_module(void);
-void cleanup_module(void);
+struct pcbit_dev * dev_pcbit[MAX_PCBIT_CARDS] = {0, };
 
 extern void pcbit_terminate(int board);
 extern int pcbit_init_dev(int board, int mem_base, int irq);
 
-#ifdef MODULE
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
-#define pcbit_init init_module
-#endif
-
-int pcbit_init(void)
+static int __init pcbit_init(void)
 {
 	int board;
 
@@ -83,15 +74,10 @@ int pcbit_init(void)
 		else
 			return -EIO;
 	}
-
-	/* No symbols to export, hide all symbols */
-	EXPORT_NO_SYMBOLS;
-
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit pcbit_exit(void)
 {
 	int board;
 
@@ -101,9 +87,8 @@ void cleanup_module(void)
 	       "PCBIT-D module unloaded\n");
 }
 
-#else
+#ifndef MODULE
 #define MAX_PARA	(MAX_PCBIT_CARDS * 2)
-#include <linux/init.h>
 static int __init pcbit_setup(char *line)
 {
 	int i, j, argc;
@@ -134,5 +119,9 @@ static int __init pcbit_setup(char *line)
 __setup("pcbit=", pcbit_setup);
 #endif
 
+MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
+MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_PCBIT_CARDS) "i");
 
+module_init(pcbit_init);
+module_exit(pcbit_exit);
 

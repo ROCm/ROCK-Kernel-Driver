@@ -1,4 +1,4 @@
-/* $Id: icn.c,v 1.65 2000/11/13 22:51:48 kai Exp $
+/* $Id: icn.c,v 1.65.6.3 2001/02/16 16:43:31 kai Exp $
 
  * ISDN low-level module for the ICN active ISDN-Card.
  *
@@ -21,6 +21,7 @@
  */
 
 #include "icn.h"
+#include <linux/init.h>
 
 /*
  * Verbose bootcode- and protocol-downloading.
@@ -33,7 +34,7 @@
 #undef MAP_DEBUG
 
 static char
-*revision = "$Revision: 1.65 $";
+*revision = "$Revision: 1.65.6.3 $";
 
 static int icn_addcard(int, char *, char *);
 
@@ -867,7 +868,7 @@ icn_loadboot(u_char * buffer, icn_card * card)
 	SLEEP(1);
 	memcpy_toio(dev.shmem, codebuf, ICN_CODE_STAGE1);	/* Copy code        */
 #ifdef BOOT_DEBUG
-	printk(KERN_DEBUG "Bootloader transfered\n");
+	printk(KERN_DEBUG "Bootloader transferred\n");
 #endif
 	if (card->doubleS0) {
 		SLEEP(1);
@@ -883,7 +884,7 @@ icn_loadboot(u_char * buffer, icn_card * card)
 		SLEEP(1);
 		memcpy_toio(dev.shmem, codebuf, ICN_CODE_STAGE1);	/* Copy code        */
 #ifdef BOOT_DEBUG
-		printk(KERN_DEBUG "Bootloader transfered\n");
+		printk(KERN_DEBUG "Bootloader transferred\n");
 #endif
 	}
 	kfree(codebuf);
@@ -1638,10 +1639,7 @@ icn_addcard(int port, char *id1, char *id2)
 	return 0;
 }
 
-#ifdef MODULE
-#define icn_init init_module
-#else
-#include <linux/init.h>
+#ifndef MODULE
 static int __init
 icn_setup(char *line)
 {
@@ -1667,10 +1665,9 @@ icn_setup(char *line)
 	return(1);
 }
 __setup("icn=", icn_setup);
-#endif /* MODULES */
+#endif /* MODULE */
 
-int
-icn_init(void)
+static int __init icn_init(void)
 {
 	char *p;
 	char rev[10];
@@ -1680,9 +1677,6 @@ icn_init(void)
 	dev.channel = -1;
 	dev.mcard = NULL;
 	dev.firstload = 1;
-
-	/* No symbols to export, hide all symbols */
-	EXPORT_NO_SYMBOLS;
 
 	if ((p = strchr(revision, ':'))) {
 		strcpy(rev, p + 1);
@@ -1695,9 +1689,7 @@ icn_init(void)
 	return (icn_addcard(portbase, icn_id, icn_id2));
 }
 
-#ifdef MODULE
-void
-cleanup_module(void)
+static void __exit icn_exit(void)
 {
 	isdn_ctrl cmd;
 	icn_card *card = cards;
@@ -1731,4 +1723,6 @@ cleanup_module(void)
 		release_shmem((ulong) dev.shmem, 0x4000);
 	printk(KERN_NOTICE "ICN-ISDN-driver unloaded\n");
 }
-#endif
+
+module_init(icn_init);
+module_exit(icn_exit);

@@ -156,7 +156,7 @@ int ircomm_ttp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
 /*
  * Function ircomm_ttp_data_indication (instance, sap, skb)
  *
- *    Incomming data
+ *    Incoming data
  *
  */
 int ircomm_ttp_data_indication(void *instance, void *sap,

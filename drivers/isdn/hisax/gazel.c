@@ -1,11 +1,11 @@
-/* $Id: gazel.c,v 2.11.6.2 2000/11/29 16:00:14 kai Exp $
+/* $Id: gazel.c,v 2.11.6.4 2001/02/16 16:43:26 kai Exp $
  *
  * gazel.c     low level stuff for Gazel isdn cards
  *
  * Author       BeWan Systems
  *              based on source code from Karsten Keil
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  */
 #include <linux/config.h>
@@ -19,7 +19,7 @@
 #include <linux/pci.h>
 
 extern const char *CardType[];
-const char *gazel_revision = "$Revision: 2.11.6.2 $";
+const char *gazel_revision = "$Revision: 2.11.6.4 $";
 
 #define R647      1
 #define R685      2

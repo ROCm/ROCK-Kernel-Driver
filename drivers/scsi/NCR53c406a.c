@@ -184,13 +184,13 @@ static  int  irq_probe(void);
 /* ================================================================= */
 
 #if USE_BIOS
-static void *bios_base = (void *)0;
+static void *bios_base;
 #endif
 
 #if PORT_BASE
 static int   port_base = PORT_BASE;
 #else
-static int   port_base = 0;
+static int   port_base;
 #endif
 
 #if IRQ_LEV
@@ -200,16 +200,16 @@ static int   irq_level = -1; /* 0 is 'no irq', so use -1 for 'uninitialized'*/
 #endif
 
 #if USE_DMA
-static int   dma_chan = 0;
+static int   dma_chan;
 #endif
 
 #if USE_PIO
 static int   fast_pio = USE_FAST_PIO;
 #endif
 
-static Scsi_Cmnd         *current_SC       = NULL;
-static volatile int internal_done_flag = 0;
-static volatile int internal_done_errcode = 0;
+static Scsi_Cmnd         *current_SC;
+static volatile int internal_done_flag;
+static volatile int internal_done_errcode;
 static char info_msg[256];
 
 /* ================================================================= */
@@ -484,17 +484,17 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
 #endif USE_BIOS
     
 #ifdef PORT_BASE
-    if (check_region(port_base, 0x10)) /* ports already snatched */
+    if (!request_region(port_base, 0x10, "NCR53c406a")) /* ports already snatched */
         port_base = 0;
     
 #else  /* autodetect */
     if (port_base) {		/* LILO override */
-        if (check_region(port_base, 0x10))
+        if (!request_region(port_base, 0x10, "NCR53c406a"))
             port_base = 0;
     }
     else {
         for(i=0;  i<PORT_COUNT && !port_base; i++){
-            if(check_region(ports[i], 0x10)){
+            if(!request_region(ports[i], 0x10, "NCR53c406a")){
                 DEB(printk("NCR53c406a: port %x in use\n", ports[i]));
             }
             else {
@@ -503,9 +503,10 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
                 if(   (inb(ports[i] + 0x0e) ^ inb(ports[i] + 0x0e)) == 7
                    && (inb(ports[i] + 0x0e) ^ inb(ports[i] + 0x0e)) == 7
                    && (inb(ports[i] + 0x0e) & 0xf8) == 0x58 ) {
+                    port_base = ports[i];
                     VDEB(printk("NCR53c406a: Sig register valid\n"));
                     VDEB(printk("port_base=%x\n", port_base));
-                    port_base = ports[i];
+                    break;
                 }
             }
         }
@@ -527,18 +528,17 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
         irq_level=irq_probe();
         if (irq_level < 0) {		/* Trouble */
             printk("NCR53c406a: IRQ problem, irq_level=%d, giving up\n", irq_level);
-            return 0;
+            goto err_release;
         }
     }
 #endif
     
     DEB(printk("NCR53c406a: using port_base %x\n", port_base));
-    request_region(port_base, 0x10, "NCR53c406a");
     
     if(irq_level > 0) {
         if(request_irq(irq_level, do_NCR53c406a_intr, 0, "NCR53c406a", NULL)){
             printk("NCR53c406a: unable to allocate IRQ %d\n", irq_level);
-            return 0;
+            goto err_release;
         }
         tpnt->can_queue = 1;
         DEB(printk("NCR53c406a: allocated IRQ %d\n", irq_level));
@@ -548,19 +548,19 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
         DEB(printk("NCR53c406a: No interrupts detected\n"));
 #if USE_DMA
         printk("NCR53c406a: No interrupts found and DMA mode defined. Giving up.\n");
-        return 0;
+        goto err_release;
 #endif USE_DMA
     }
     else {
         DEB(printk("NCR53c406a: Shouldn't get here!\n"));
-        return 0;
+        goto err_free_irq;
     }
     
 #if USE_DMA
     dma_chan = DMA_CHAN;
     if(request_dma(dma_chan, "NCR53c406a") != 0){
         printk("NCR53c406a: unable to allocate DMA channel %d\n", dma_chan);
-        return 0;
+        goto err_release;
     }
     
     DEB(printk("Allocated DMA channel %d\n", dma_chan));
@@ -570,6 +570,10 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
     tpnt->proc_name = "NCR53c406a";
     
     shpnt = scsi_register(tpnt, 0);
+    if (!shpnt) {
+            printk("NCR53c406a: Unable to register host, giving up.\n");
+            goto err_free_dma;
+    }
     shpnt->irq = irq_level;
     shpnt->io_port = port_base;
     shpnt->n_io_port = 0x10;
@@ -586,6 +590,17 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
 #endif
     
     return (tpnt->present);
+
+
+ err_free_dma:
+#if USE_DMA
+    free_dma(dma_chan);
+#endif
+ err_free_irq:
+    free_irq(irq_level, do_NCR53c406a_intr);
+ err_release:
+    release_region(port_base, 0x10);
+    return 0;
 }
 
 /* called from init/main.c */

@@ -146,7 +146,7 @@ static void irda_disconnect_indication(void *instance, void *sap,
 
 	/* Close our TSAP.
 	 * If we leave it open, IrLMP put it back into the list of
-	 * unconnected LSAPs. The problem is that any incomming request
+	 * unconnected LSAPs. The problem is that any incoming request
 	 * can then be matched to this socket (and it will be, because
 	 * it is at the head of the list). This would prevent any
 	 * listening socket waiting on the same TSAP to get those requests.
@@ -229,7 +229,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 /*
  * Function irda_connect_indication(instance, sap, qos, max_sdu_size, userdata)
  *
- *    Incomming connection
+ *    Incoming connection
  *
  */
 static void irda_connect_indication(void *instance, void *sap, 
@@ -285,7 +285,7 @@ static void irda_connect_indication(void *instance, void *sap,
 /*
  * Function irda_connect_response (handle)
  *
- *    Accept incomming connection
+ *    Accept incoming connection
  *
  */
 void irda_connect_response(struct irda_sock *self)
@@ -836,7 +836,7 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 /*
  * Function irda_accept (sock, newsock, flags)
  *
- *    Wait for incomming connection
+ *    Wait for incoming connection
  *
  */
 static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
@@ -1995,6 +1995,9 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	if (get_user(len, optlen))
 		return -EFAULT;
 
+	if(optlen < 0)
+		return -EINVAL;
+		
 	switch (optname) {
 	case IRLMP_ENUMDEVICES:
 		/* Ask lmp for the current discovery log */

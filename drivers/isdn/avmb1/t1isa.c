@@ -1,11 +1,17 @@
 /*
- * $Id: t1isa.c,v 1.16 2000/11/23 20:45:14 kai Exp $
+ * $Id: t1isa.c,v 1.16.6.2 2001/02/16 16:43:24 kai Exp $
  * 
  * Module for AVM T1 HEMA-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: t1isa.c,v $
+ * Revision 1.16.6.2  2001/02/16 16:43:24  kai
+ * Changes from -ac16, little bug fixes, typos and the like
+ *
+ * Revision 1.16.6.1  2001/02/13 11:43:29  kai
+ * more compatility changes for 2.2.19
+ *
  * Revision 1.16  2000/11/23 20:45:14  kai
  * fixed module_init/exit stuff
  * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
@@ -33,7 +39,7 @@
  * - fixed problem with memory mapping if address is not aligned
  *
  * Revision 1.9  2000/01/25 14:37:39  calle
- * new message after successfull detection including card revision and
+ * new message after successful detection including card revision and
  * used resources.
  *
  * Revision 1.8  1999/11/05 16:38:01  calle
@@ -104,7 +110,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.16 $";
+static char *revision = "$Revision: 1.16.6.2 $";
 
 /* ------------------------------------------------------------- */
 

@@ -388,7 +388,7 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 
 #if CONFIG_X86_IO_APIC
 
-int nmi_watchdog = 1;
+int nmi_watchdog = 0;
 
 static int __init setup_nmi_watchdog(char *str)
 {

@@ -1,5 +1,5 @@
 /* 
- * $Id: isdn_divert.c,v 1.6.6.1 2001/02/07 11:31:31 kai Exp $
+ * $Id: isdn_divert.c,v 1.6.6.2 2001/02/16 16:43:25 kai Exp $
  *
  * DSS1 main diversion supplementary handling for i4l.
  *
@@ -290,7 +290,7 @@ int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 /* insert a new rule before idx */
 /********************************/
 int insertrule(int idx, divert_rule *newrule)
-{ struct deflect_struc *ds,*ds1;
+{ struct deflect_struc *ds,*ds1=NULL;
   int flags;
 
   if (!(ds = (struct deflect_struc *) kmalloc(sizeof(struct deflect_struc), 

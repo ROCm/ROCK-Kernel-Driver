@@ -114,15 +114,13 @@
 	Minimum interval is 1 jiffy, maximum interval is 24 hours.
 
 	* In order to unload the i810_rng module, you must first
-	disable the hardware via sysctl i810_hw_enabled, as shown above,
+	disable the hardware via sysctl i810_rng_timer, as shown above,
 	and make sure all users of the character device have closed
 
 	* The timer and the character device may be used simultaneously,
 	if desired.
 
-	* FIXME: support poll()
-
-	* FIXME: should we be crazy and support mmap()?
+	* FIXME: support poll(2)
 
 	* FIXME: It is possible for the timer function to read,
 	and shove into the kernel entropy pool, 2499 bytes of data
@@ -134,6 +132,9 @@
 
 	* FIXME: module unload is racy.  To fix this, struct ctl_table
 	needs an owner member a la struct file_operations.
+
+	* FIXME: Timer interval should not be in jiffies, but in a more
+	user-understandable value like milliseconds.
 
 	* Since the RNG is accessed from a timer as well as normal
 	kernel code, but not from interrupts, we use spin_lock_bh
@@ -179,6 +180,15 @@
 	Version 0.9.2:
 	* Simplify open blocking logic
 
+	Version 0.9.3:
+	* Clean up rng_read a bit.
+	* Update i810_rng driver Web site URL.
+	* Increase default timer interval to 4 samples per second.
+	* Abort if mem region is not available.
+	* BSS zero-initialization cleanup.
+	* Call misc_register() from rng_init_one.
+	* Fix O_NONBLOCK to occur before we schedule.
+
  */
 
 
@@ -202,7 +212,7 @@
 /*
  * core module and version information
  */
-#define RNG_VERSION "0.9.2"
+#define RNG_VERSION "0.9.3"
 #define RNG_MODULE_NAME "i810_rng"
 #define RNG_DRIVER_NAME   RNG_MODULE_NAME " hardware driver " RNG_VERSION
 #define PFX RNG_MODULE_NAME ": "
@@ -249,6 +259,9 @@ static void rng_run_fips_test (void);
 #define		RNG_DATA_PRESENT	0x01
 #define RNG_DATA			2
 
+/*
+ * Magic address at which Intel PCI bridges locate the RNG
+ */
 #define RNG_ADDR			0xFFBC015F
 #define RNG_ADDR_LEN			3
 
@@ -259,9 +272,9 @@ static void rng_run_fips_test (void);
 
 /*
  * Frequency that data is added to kernel entropy pool
- * HZ>>1 == every half-second
+ * HZ>>1 == every quarter-second
  */
-#define RNG_DEF_TIMER_LEN		(HZ >> 1)
+#define RNG_DEF_TIMER_LEN		(HZ >> 2)
 
 
 /*
@@ -283,7 +296,6 @@ static int rng_enabled_sysctl;		/* sysctl for enabling/disabling RNG */
 static unsigned int rng_entropy = 8;	/* number of entropy bits we submit to /dev/random */
 static unsigned int rng_entropy_sysctl;	/* sysctl for changing entropy bits */
 static unsigned int rng_interval_sysctl; /* sysctl for changing timer interval */
-static int rng_have_mem_region;		/* did we grab RNG region via request_mem_region? */
 static unsigned int rng_fips_counter;	/* size of internal FIPS test data pool */
 static unsigned int rng_timer_len = RNG_DEF_TIMER_LEN; /* timer interval, in jiffies */
 static void *rng_mem;			/* token to our ioremap'd RNG register area */
@@ -622,12 +634,10 @@ static void rng_sysctl (int add)
 
 static int rng_dev_open (struct inode *inode, struct file *filp)
 {
-	int rc = -EINVAL;
-
 	if ((filp->f_mode & FMODE_READ) == 0)
-		return rc;
+		return -EINVAL;
 	if (filp->f_mode & FMODE_WRITE)
-		return rc;
+		return -EINVAL;
 
 	/* wait for device to become free */
 	if (filp->f_flags & O_NONBLOCK) {
@@ -639,15 +649,11 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 	}
 
 	if (rng_enable (1)) {
-		rc = -EIO;
-		goto err_out;
+		up (&rng_open_sem);
+		return -EIO;
 	}
 
 	return 0;
-
-err_out:
-	up (&rng_open_sem);
-	return rc;
 }
 
 
@@ -686,18 +692,33 @@ static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
 			ret++;
 		}
 
+		if (filp->f_flags & O_NONBLOCK)
+			return ret ? : -EAGAIN;
+
 		if (current->need_resched)
 			schedule ();
 
 		if (signal_pending (current))
 			return ret ? : -ERESTARTSYS;
-
-		if (filp->f_flags & O_NONBLOCK)
-			return ret ? : -EAGAIN;
 	}
 
 	return ret;
 }
+
+
+static struct file_operations rng_chrdev_ops = {
+	owner:		THIS_MODULE,
+	open:		rng_dev_open,
+	release:	rng_dev_release,
+	read:		rng_dev_read,
+};
+
+
+static struct miscdevice rng_miscdev = {
+	RNG_MISCDEV_MINOR,
+	RNG_MODULE_NAME,
+	&rng_chrdev_ops,
+};
 
 
 /*
@@ -713,16 +734,25 @@ static int __init rng_init_one (struct pci_dev *dev)
 	if (pci_enable_device (dev))
 		return -EIO;
 
-	/* XXX currently fails, investigate who has our mem region */
-	if (request_mem_region (RNG_ADDR, RNG_ADDR_LEN, RNG_MODULE_NAME))
-		rng_have_mem_region = 1;
+	if (!request_mem_region (RNG_ADDR, RNG_ADDR_LEN, RNG_MODULE_NAME)) {
+		printk (KERN_ERR PFX "cannot reserve RNG region\n");
+		DPRINTK ("EXIT, returning -EBUSY\n");
+		return -EBUSY;
+	}
+
+	rc = misc_register (&rng_miscdev);
+	if (rc) {
+		printk (KERN_ERR PFX "cannot register misc device\n");
+		DPRINTK ("EXIT, returning %d\n", rc);
+		goto err_out_free_res;
+	}
 
 	rng_mem = ioremap (RNG_ADDR, RNG_ADDR_LEN);
 	if (rng_mem == NULL) {
 		printk (KERN_ERR PFX "cannot ioremap RNG Memory\n");
 		DPRINTK ("EXIT, returning -EBUSY\n");
 		rc = -EBUSY;
-		goto err_out_free_res;
+		goto err_out_free_miscdev;
 	}
 
 	/* Check for Intel 82802 */
@@ -756,9 +786,10 @@ static int __init rng_init_one (struct pci_dev *dev)
 
 err_out_free_map:
 	iounmap (rng_mem);
+err_out_free_miscdev:
+	misc_deregister (&rng_miscdev);
 err_out_free_res:
-	if (rng_have_mem_region)
-		release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
+	release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
 	return rc;
 }
 
@@ -786,21 +817,6 @@ MODULE_PARM(rng_entropy, "1i");
 MODULE_PARM_DESC(rng_entropy, "Bits of entropy to add to random pool per RNG byte (range: 0-8, default 8)");
 
 
-static struct file_operations rng_chrdev_ops = {
-	owner:		THIS_MODULE,
-	open:		rng_dev_open,
-	release:	rng_dev_release,
-	read:		rng_dev_read,
-};
-
-
-static struct miscdevice rng_miscdev = {
-	RNG_MISCDEV_MINOR,
-	RNG_MODULE_NAME,
-	&rng_chrdev_ops,
-};
-
-
 /*
  * rng_init - initialize RNG module
  */
@@ -826,15 +842,6 @@ match:
 	if (rc)
 		return rc;
 
-	rc = misc_register (&rng_miscdev);
-	if (rc) {
-		iounmap (rng_mem);
-		if (rng_have_mem_region)
-			release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
-		DPRINTK ("EXIT, returning %d\n", rc);
-		return rc;
-	}
-
 	printk (KERN_INFO RNG_DRIVER_NAME " loaded\n");
 
 	rng_pdev = pdev;
@@ -859,8 +866,9 @@ static void __exit rng_cleanup (void)
 	rng_sysctl (0);
 
 	iounmap (rng_mem);
-	if (rng_have_mem_region)
-		release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
+	release_mem_region (RNG_ADDR, RNG_ADDR_LEN);
+
+	rng_pdev = NULL;
 
 	DPRINTK ("EXIT\n");
 }
@@ -892,8 +900,8 @@ module_exit (rng_cleanup);
 *  random as random :)
 */
 
-static int poker[16] = { 0, }, runs[12] = { 0, };
-static int ones = 0, rlength = -1, current_bit = 0, rng_test = 0;
+static int poker[16], runs[12];
+static int ones, rlength = -1, current_bit, rng_test;
 
 
 /*

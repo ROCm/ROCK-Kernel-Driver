@@ -339,7 +339,7 @@ static inline int try_to_wake_up(struct task_struct * p, int synchronous)
 	if (task_on_runqueue(p))
 		goto out;
 	add_to_runqueue(p);
-	if (!synchronous)
+	if (!synchronous || !(p->cpus_allowed & (1 << smp_processor_id())))
 		reschedule_idle(p);
 	success = 1;
 out:
@@ -473,7 +473,7 @@ needs_resched:
 			goto out_unlock;
 
 		spin_lock_irqsave(&runqueue_lock, flags);
-		if (prev->state == TASK_RUNNING)
+		if ((prev->state == TASK_RUNNING) && !prev->has_cpu)
 			reschedule_idle(prev);
 		spin_unlock_irqrestore(&runqueue_lock, flags);
 		goto out_unlock;

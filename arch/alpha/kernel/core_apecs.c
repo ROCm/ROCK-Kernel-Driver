@@ -357,7 +357,7 @@ struct pci_ops apecs_pci_ops =
 };
 
 void
-apecs_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+apecs_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	wmb();
 	*(vip)APECS_IOC_TBIA = 0;
@@ -367,13 +367,13 @@ apecs_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
 void __init
 apecs_init_arch(void)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 
 	/*
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

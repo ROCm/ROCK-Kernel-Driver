@@ -16,10 +16,10 @@ struct pci_bus;
 struct resource;
 struct pci_iommu_arena;
 
-/* A controler.  Used to manage multiple PCI busses.  */
+/* A controller.  Used to manage multiple PCI busses.  */
 
-struct pci_controler {
-	struct pci_controler *next;
+struct pci_controller {
+	struct pci_controller *next;
         struct pci_bus *bus;
 	struct resource *io_space;
 	struct resource *mem_space;

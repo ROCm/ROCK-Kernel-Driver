@@ -1,4 +1,4 @@
-/* $Id: isdnloop.c,v 1.11 2000/11/13 22:51:50 kai Exp $
+/* $Id: isdnloop.c,v 1.11.6.2 2001/02/16 16:43:32 kai Exp $
 
  * ISDN low-level module implementing a dummy loop driver.
  *
@@ -21,10 +21,12 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
+#include <linux/init.h>
 #include "isdnloop.h"
 
 static char
-*revision = "$Revision: 1.11 $";
+*revision = "$Revision: 1.11.6.2 $";
 
 static int isdnloop_addcard(char *);
 
@@ -975,7 +977,7 @@ isdnloop_parse_cmd(isdnloop_card * card)
  *   user = flag: 1 = called form userlevel, 0 called from kernel.
  *   card = pointer to card struct.
  * Return:
- *   number of bytes transfered (currently always equals len).
+ *   number of bytes transferred (currently always equals len).
  */
 static int
 isdnloop_writecmd(const u_char * buf, int len, int user, isdnloop_card * card)
@@ -1534,22 +1536,7 @@ isdnloop_addcard(char *id1)
 	return 0;
 }
 
-#ifdef MODULE
-#define isdnloop_init init_module
-#else
-void
-isdnloop_setup(char *str, int *ints)
-{
-	static char sid[20];
-
-	if (strlen(str)) {
-		strcpy(sid, str);
-		isdnloop_id = sid;
-	}
-}
-#endif
-
-int
+static int __init
 isdnloop_init(void)
 {
 	char *p;
@@ -1568,9 +1555,8 @@ isdnloop_init(void)
 	return (isdnloop_addcard(isdnloop_id));
 }
 
-#ifdef MODULE
-void
-cleanup_module(void)
+static void __exit
+isdnloop_exit(void)
 {
 	isdn_ctrl cmd;
 	isdnloop_card *card = cards;
@@ -1598,4 +1584,6 @@ cleanup_module(void)
 	}
 	printk(KERN_NOTICE "isdnloop-ISDN-driver unloaded\n");
 }
-#endif
+
+module_init(isdnloop_init);
+module_exit(isdnloop_exit);

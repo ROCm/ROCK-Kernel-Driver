@@ -1,9 +1,9 @@
-/* $Id: callc.c,v 2.51 2000/11/24 17:05:37 kai Exp $
+/* $Id: callc.c,v 2.51.6.1 2001/02/16 16:43:25 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -20,7 +20,7 @@
 #define MOD_USE_COUNT ( GET_USE_COUNT (&__this_module))
 #endif	/* MODULE */
 
-const char *lli_revision = "$Revision: 2.51 $";
+const char *lli_revision = "$Revision: 2.51.6.1 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
@@ -337,7 +337,7 @@ lli_go_active(struct FsmInst *fi, int event, void *arg)
  * RESUME
  */
 
-/* incomming call */
+/* incoming call */
 
 static void
 lli_deliver_call(struct FsmInst *fi, int event, void *arg)
@@ -1026,9 +1026,11 @@ dummy_pstack(struct PStack *st, int pr, void *arg) {
 	printk(KERN_WARNING"call to dummy_pstack pr=%04x arg %lx\n", pr, (long)arg);
 }
 
-static void
+static int
 init_PStack(struct PStack **stp) {
 	*stp = kmalloc(sizeof(struct PStack), GFP_ATOMIC);
+	if (!*stp)
+		return -ENOMEM;
 	(*stp)->next = NULL;
 	(*stp)->l1.l1l2 = dummy_pstack;
 	(*stp)->l1.l1hw = dummy_pstack;
@@ -1041,16 +1043,20 @@ init_PStack(struct PStack **stp) {
 	(*stp)->l3.l3l4 = dummy_pstack;
 	(*stp)->lli.l4l3 = dummy_pstack;
 	(*stp)->ma.layer = dummy_pstack;
+	return 0;
 }
 
-static void
+static int
 init_d_st(struct Channel *chanp)
 {
 	struct PStack *st;
 	struct IsdnCardState *cs = chanp->cs;
 	char tmp[16];
+	int err;
 
-	init_PStack(&chanp->d_st);
+	err = init_PStack(&chanp->d_st);
+	if (err)
+		return err;
 	st = chanp->d_st;
 	st->next = NULL;
 	HiSax_addlist(cs, st);
@@ -1075,6 +1081,8 @@ init_d_st(struct Channel *chanp)
 	st->lli.userdata = chanp;
 	st->lli.l2writewakeup = NULL;
 	st->l3.l3l4 = dchan_l3l4;
+
+	return 0;
 }
 
 static void
@@ -1090,10 +1098,11 @@ callc_debug(struct FsmInst *fi, char *fmt, ...)
 	va_end(args);
 }
 
-static void
+static int
 init_chan(int chan, struct IsdnCardState *csta)
 {
 	struct Channel *chanp = csta->channel + chan;
+	int err;
 
 	chanp->cs = csta;
 	chanp->bcs = csta->bcs + chan;
@@ -1102,7 +1111,9 @@ init_chan(int chan, struct IsdnCardState *csta)
 	chanp->debug = 0;
 	chanp->Flags = 0;
 	chanp->leased = 0;
-	init_PStack(&chanp->b_st);
+	err = init_PStack(&chanp->b_st);
+	if (err)
+		return err;
 	chanp->b_st->l1.delay = DEFAULT_B_DELAY;
 	chanp->fi.fsm = &callcfsm;
 	chanp->fi.state = ST_NULL;
@@ -1112,31 +1123,41 @@ init_chan(int chan, struct IsdnCardState *csta)
 	FsmInitTimer(&chanp->fi, &chanp->dial_timer);
 	FsmInitTimer(&chanp->fi, &chanp->drel_timer);
 	if (!chan || (test_bit(FLG_TWO_DCHAN, &csta->HW_Flags) && chan < 2)) {
-		init_d_st(chanp);
+		err = init_d_st(chanp);
+		if (err)
+			return err;
 	} else {
 		chanp->d_st = csta->channel->d_st;
 	}
 	chanp->data_open = 0;
+	return 0;
 }
 
 int
 CallcNewChan(struct IsdnCardState *csta) {
-	int i;
+	int i, err;
 
 	chancount += 2;
-	init_chan(0, csta);
-	init_chan(1, csta);
+	err = init_chan(0, csta);
+	if (err)
+		return err;
+	err = init_chan(1, csta);
+	if (err)
+		return err;
 	printk(KERN_INFO "HiSax: 2 channels added\n");
 
-	for (i = 0; i < MAX_WAITING_CALLS; i++) 
-		init_chan(i+2,csta);
+	for (i = 0; i < MAX_WAITING_CALLS; i++) { 
+		err = init_chan(i+2,csta);
+		if (err)
+			return err;
+	}
 	printk(KERN_INFO "HiSax: MAX_WAITING_CALLS added\n");
 	if (test_bit(FLG_PTP, &csta->channel->d_st->l2.flag)) {
 		printk(KERN_INFO "LAYER2 WATCHING ESTABLISH\n");
 		csta->channel->d_st->lli.l4l3(csta->channel->d_st,
 			DL_ESTABLISH | REQUEST, NULL);
 	}
-	return (2);
+	return (0);
 }
 
 static void

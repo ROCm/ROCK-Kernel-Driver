@@ -11,7 +11,7 @@
 
     Copyright (C) 1999 David A. Hinds -- dahinds@users.sourceforge.net
 
-    pcnet_cs.c 1.126 2000/10/02 20:38:23
+    pcnet_cs.c 1.132 2001/02/09 03:13:29
     
     The network driver code is based on Donald Becker's NE2000 code:
 
@@ -72,7 +72,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"pcnet_cs.c 1.126 2000/10/02 20:38:23 (David Hinds)";
+"pcnet_cs.c 1.132 2001/02/09 03:13:29 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -137,7 +137,7 @@ typedef struct hw_info_t {
 #define HAS_IBM_MISC	0x08
 #define IS_DL10019	0x10
 #define IS_DL10022	0x20
-#define IS_AX88190	0x40
+#define HAS_MII		0x40
 #define USE_SHMEM	0x80	/* autodetected */
 
 static hw_info_t hw_info[] = {
@@ -204,8 +204,8 @@ static hw_info_t hw_info[] = {
 #define NR_INFO		(sizeof(hw_info)/sizeof(hw_info_t))
 
 static hw_info_t default_info = { 0, 0, 0, 0, 0 };
-static hw_info_t dl10019_info = { 0, 0, 0, 0, IS_DL10019 };
-static hw_info_t dl10022_info = { 0, 0, 0, 0, IS_DL10019|IS_DL10022 };
+static hw_info_t dl10019_info = { 0, 0, 0, 0, IS_DL10019|HAS_MII };
+static hw_info_t dl10022_info = { 0, 0, 0, 0, IS_DL10022|HAS_MII };
 
 typedef struct pcnet_dev_t {
     struct net_device	dev;	/* so &dev == &pcnet_dev_t */
@@ -507,10 +507,10 @@ static hw_info_t *get_ax88190(dev_link_t *link)
     if (link->conf.ConfigBase != 0x03c0)
 	return NULL;
 
-    outb_p(0x01, EN0_DCFG);	/* Set word-wide access. */
-    outb_p(0x00, EN0_RSARLO);	/* DMA starting at 0x0400. */
-    outb_p(0x04, EN0_RSARHI);
-    outb_p(E8390_RREAD+E8390_START, E8390_CMD);
+    outb_p(0x01, ioaddr + EN0_DCFG);	/* Set word-wide access. */
+    outb_p(0x00, ioaddr + EN0_RSARLO);	/* DMA starting at 0x0400. */
+    outb_p(0x04, ioaddr + EN0_RSARHI);
+    outb_p(E8390_RREAD+E8390_START, ioaddr + E8390_CMD);
 
     for (i = 0; i < 6; i += 2) {
 	j = inw(ioaddr + PCNET_DATAPORT);
@@ -718,6 +718,7 @@ static void pcnet_config(dev_link_t *link)
     info->flags |= (delay_output) ? DELAY_OUTPUT : 0;
     if ((manfid == MANFID_SOCKET) &&
 	((prodid == PRODID_SOCKET_LPE) ||
+	 (prodid == PRODID_SOCKET_LPE_CF) ||
 	 (prodid == PRODID_SOCKET_EIO)))
 	info->flags &= ~USE_BIG_BUF;
     if (!use_big_buf)
@@ -746,13 +747,11 @@ static void pcnet_config(dev_link_t *link)
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
 
-    if (info->flags & IS_DL10019) {
+    if (info->flags & (IS_DL10019|IS_DL10022)) {
 	dev->do_ioctl = &do_ioctl;
 	printk(KERN_INFO "%s: NE2000 (DL100%d rev %02x): ",
 	       dev->name, ((info->flags & IS_DL10022) ? 22 : 19),
 	       inb(dev->base_addr + 0x1a));
-    } else if (info->flags & IS_AX88190) {
-	printk(KERN_INFO "%s: NE2000 (AX88190): ", dev->name);
     } else
 	printk(KERN_INFO "%s: NE2000 Compatible: ", dev->name);
     printk("io %#3lx, irq %d,", dev->base_addr, dev->irq);
@@ -1024,6 +1023,8 @@ static void pcnet_reset_8390(struct net_device *dev)
 
     ei_status.txing = ei_status.dmaing = 0;
 
+    outb_p(E8390_NODMA+E8390_PAGE0+E8390_STOP, nic_base + E8390_CMD);
+
     outb(inb(nic_base + PCNET_RESET), nic_base + PCNET_RESET);
 
     for (i = 0; i < 100; i++) {
@@ -1092,10 +1093,17 @@ static void ei_watchdog(u_long arg)
 	return;
     }
 
-    if (!(info->flags & IS_DL10019))
+    if (!(info->flags & HAS_MII))
 	goto reschedule;
 
-    link = mdio_read(dev->base_addr + DLINK_GPIO, 0, 1) & 0x0004;
+    link = mdio_read(dev->base_addr + DLINK_GPIO, 0, 1);
+    if (!link || (link == 0xffff)) {
+	printk(KERN_INFO "%s: MII is missing!\n", dev->name);
+	info->flags &= ~HAS_MII;
+	goto reschedule;
+    }
+
+    link &= 0x0004;
     if (link != info->link_status) {
 	u_short p = mdio_read(dev->base_addr + DLINK_GPIO, 0, 5);
 	printk(KERN_INFO "%s: %s link beat\n", dev->name,

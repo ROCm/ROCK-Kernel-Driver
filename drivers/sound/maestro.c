@@ -1427,7 +1427,7 @@ ess_play_setup(struct ess_state *ess, int mode, u32 rate, void *buffer, int size
 			apu_set_register(ess, channel, 10, 0x8F08);
 	}
 	
-	/* clear WP interupts */
+	/* clear WP interrupts */
 	outw(1, ess->card->iobase+0x04);
 	/* enable WP ints */
 	outw(inw(ess->card->iobase+0x18)|4, ess->card->iobase+0x18);
@@ -1559,7 +1559,7 @@ ess_rec_setup(struct ess_state *ess, int mode, u32 rate, void *buffer, int size)
 		apu_set_register(ess, channel, 11, route);
 	}
 	
-	/* clear WP interupts */
+	/* clear WP interrupts */
 	outw(1, ess->card->iobase+0x04);
 	/* enable WP ints */
 	outw(inw(ess->card->iobase+0x18)|4, ess->card->iobase+0x18);
@@ -3446,10 +3446,10 @@ maestro_install(struct pci_dev *pcidev, int card_type)
 		printk(KERN_INFO "maestro: not attempting power management.\n");
 	else {
 		if(!parse_power(card,pcidev)) 
-			printk(KERN_INFO "maestro: no PCI power managment interface found.\n");
+			printk(KERN_INFO "maestro: no PCI power management interface found.\n");
 		else {
 			pci_read_config_dword(pcidev, card->power_regs, &n);
-			printk(KERN_INFO "maestro: PCI power managment capability: 0x%x\n",n>>16);
+			printk(KERN_INFO "maestro: PCI power management capability: 0x%x\n",n>>16);
 		}	
 	}
 

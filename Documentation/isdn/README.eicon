@@ -100,17 +100,6 @@ Just use "eiconctrl isdnlog on" and the driver will generate
 the necessary D-Channel traces for isdnlog.
 
 
-FILECHECK:
-A part of the eicon driver source code files are provided
-by Eicon Technology. In order to get the best support from Eicon,
-these files are tested with a checksum, just to know if the files
-were modified. This does *not* mean, you are not allowed to modify the
-driver. If you want to improve the driver or you fix a bug, please do
-so and let me (or Eicon) know, about the necessary changes. So
-every user knows, if the driver he uses is modified or checked with
-Eicon files. When the driver has been loaded, in the syslog you will
-find something like "verified" or "modified" right after the version.
-
 
 Thanks to 
 	Deutsche Mailbox Saar-Lor-Lux GmbH

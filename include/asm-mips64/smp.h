@@ -40,6 +40,7 @@ extern int __cpu_logical_map[NR_CPUS];
 
 /* Good enough for toy^Wupto 64 CPU Origins.  */
 extern unsigned long cpu_present_mask;
+#define cpu_online_map cpu_present_mask
 
 #endif
 

@@ -299,7 +299,7 @@ struct pci_ops cia_pci_ops =
  */
 
 void
-cia_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
+cia_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 {
 	wmb();
 	*(vip)CIA_IOC_PCI_TBIA = 3;	/* Flush all locked and unlocked.  */
@@ -314,7 +314,7 @@ cia_pci_tbi(struct pci_controler *hose, dma_addr_t start, dma_addr_t end)
  */
 
 static void
-cia_pci_tbi_try1(struct pci_controler *hose,
+cia_pci_tbi_try1(struct pci_controller *hose,
 		 dma_addr_t start, dma_addr_t end)
 {
 	wmb();
@@ -359,7 +359,7 @@ cia_enable_broken_tbi_try2(void)
 }
 
 static void
-cia_pci_tbi_try2(struct pci_controler *hose,
+cia_pci_tbi_try2(struct pci_controller *hose,
 		 dma_addr_t start, dma_addr_t end)
 {
 	unsigned long flags;
@@ -595,7 +595,7 @@ failed:
 static void __init
 do_init_arch(int is_pyxis)
 {
-	struct pci_controler *hose;
+	struct pci_controller *hose;
 	int temp;
 	int cia_rev;
 
@@ -628,7 +628,7 @@ do_init_arch(int is_pyxis)
 	*(vip)CIA_IOC_HAE_IO = 0;
 
 	/* For PYXIS, we always use BWX bus and i/o accesses.  To that end,
-	   make sure they're enabled on the controler.  */
+	   make sure they're enabled on the controller.  */
 	if (is_pyxis) {
 		temp = *(vip)CIA_IOC_CIA_CNFG;
 		temp |= CIA_CNFG_IOA_BWEN;
@@ -643,7 +643,7 @@ do_init_arch(int is_pyxis)
 	 * Create our single hose.
 	 */
 
-	pci_isa_hose = hose = alloc_pci_controler();
+	pci_isa_hose = hose = alloc_pci_controller();
 	hose->io_space = &ioport_resource;
 	hose->mem_space = &iomem_resource;
 	hose->index = 0;

@@ -269,7 +269,7 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
         }
 
         /* set self mapping */
-        for (i = nodecount - 1; i; i--) {
+        for (i = 0; i < nodecount; i++) {
                 map[64*i + i] = speedcap[i];
         }
 
@@ -802,6 +802,12 @@ int init_module(void)
         init_ieee1394_guid();
 
         return 0;
+}
+
+void cleanup_module(void)
+{
+        cleanup_ieee1394_guid();
+        cleanup_csr();
 }
 
 #endif

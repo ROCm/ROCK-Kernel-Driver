@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.c,v 1.94 2000/11/25 17:00:59 kai Exp $
+/* $Id: isdn_tty.c,v 1.94.6.1 2001/02/16 16:43:22 kai Exp $
 
  * Linux ISDN subsystem, tty functions and AT-command emulator (linklevel).
  *
@@ -66,7 +66,7 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.94 $";
+char *isdn_tty_revision = "$Revision: 1.94.6.1 $";
 
 
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()
@@ -3773,7 +3773,7 @@ isdn_tty_parse_at(modem_info * info)
                                                 sprintf(ds, "\r\n%d", info->emu.charge);
                                                 isdn_tty_at_cout(ds, info);
                                                 break;
-					default:
+					default:;
 				}
 				break;
 #ifdef DUMMY_HAYES_AT

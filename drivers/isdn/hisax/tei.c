@@ -1,9 +1,9 @@
-/* $Id: tei.c,v 2.17 2000/11/24 17:05:38 kai Exp $
+/* $Id: tei.c,v 2.17.6.1 2001/02/16 16:43:29 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
  *
- *		This file is (c) under GNU PUBLIC LICENSE
+ *		This file is (c) under GNU General Public License
  *		For changes and modifications please read
  *		../../../Documentation/isdn/HiSax.cert
  *
@@ -17,7 +17,7 @@
 #include <linux/init.h>
 #include <linux/random.h>
 
-const char *tei_revision = "$Revision: 2.17 $";
+const char *tei_revision = "$Revision: 2.17.6.1 $";
 
 #define ID_REQUEST	1
 #define ID_ASSIGNED	2

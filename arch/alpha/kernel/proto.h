@@ -10,14 +10,14 @@
 struct pt_regs;
 struct task_struct;
 struct pci_dev;
-struct pci_controler;
+struct pci_controller;
 
 /* core_apecs.c */
 extern struct pci_ops apecs_pci_ops;
 extern void apecs_init_arch(void);
 extern void apecs_pci_clr_err(void);
 extern void apecs_machine_check(u64, u64, struct pt_regs *);
-extern void apecs_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void apecs_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_cia.c */
 extern struct pci_ops cia_pci_ops;
@@ -25,7 +25,7 @@ extern void cia_init_pci(void);
 extern void cia_init_arch(void);
 extern void pyxis_init_arch(void);
 extern void cia_machine_check(u64, u64, struct pt_regs *);
-extern void cia_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void cia_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_irongate.c */
 extern struct pci_ops irongate_pci_ops;
@@ -38,14 +38,14 @@ extern void irongate_machine_check(u64, u64, struct pt_regs *);
 extern struct pci_ops lca_pci_ops;
 extern void lca_init_arch(void);
 extern void lca_machine_check(u64, u64, struct pt_regs *);
-extern void lca_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void lca_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_mcpcia.c */
 extern struct pci_ops mcpcia_pci_ops;
 extern void mcpcia_init_arch(void);
 extern void mcpcia_init_hoses(void);
 extern void mcpcia_machine_check(u64, u64, struct pt_regs *);
-extern void mcpcia_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void mcpcia_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_polaris.c */
 extern struct pci_ops polaris_pci_ops;
@@ -66,21 +66,21 @@ extern struct pci_ops titan_pci_ops;
 extern void titan_init_arch(void);
 extern void titan_kill_arch(int);
 extern void titan_machine_check(u64, u64, struct pt_regs *);
-extern void titan_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void titan_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_tsunami.c */
 extern struct pci_ops tsunami_pci_ops;
 extern void tsunami_init_arch(void);
 extern void tsunami_kill_arch(int);
 extern void tsunami_machine_check(u64, u64, struct pt_regs *);
-extern void tsunami_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void tsunami_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* core_wildfire.c */
 extern struct pci_ops wildfire_pci_ops;
 extern void wildfire_init_arch(void);
 extern void wildfire_kill_arch(int);
 extern void wildfire_machine_check(u64, u64, struct pt_regs *);
-extern void wildfire_pci_tbi(struct pci_controler *, dma_addr_t, dma_addr_t);
+extern void wildfire_pci_tbi(struct pci_controller *, dma_addr_t, dma_addr_t);
 
 /* setup.c */
 extern unsigned long srm_hae;

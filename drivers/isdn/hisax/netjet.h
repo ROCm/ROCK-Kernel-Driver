@@ -1,4 +1,4 @@
-// $Id: netjet.h,v 2.5.6.1 2000/11/28 12:02:46 kai Exp $
+// $Id: netjet.h,v 2.5.6.2 2001/02/16 16:43:28 kai Exp $
 //-----------------------------------------------------------------------------
 //
 // NETjet common header file
@@ -6,7 +6,7 @@
 // Author       Kerstern Keil repackaged by
 //              Matt Henderson - Traverse Technologies P/L www.traverse.com.au
 //
-// This file is (c) under GNU PUBLIC LICENSE
+// This file is (c) under GNU General Public License
 //
 //-----------------------------------------------------------------------------
 

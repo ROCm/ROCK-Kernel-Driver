@@ -28,7 +28,7 @@
 #include <asm/unaligned.h>
 
 static char version[] __devinitdata =
-	"Linux Tulip driver version 0.9.13a (January 20, 2001)\n";
+	"Linux Tulip driver version 0.9.14 (February 20, 2001)\n";
 
 
 /* A few user-configurable values. */
@@ -120,37 +120,63 @@ int tulip_debug = 1;
  */
 
 struct tulip_chip_table tulip_tbl[] = {
+  /* DC21040 */
   { "Digital DC21040 Tulip", 128, 0x0001ebef, 0, tulip_timer },
+
+  /* DC21041 */
   { "Digital DC21041 Tulip", 128, 0x0001ebef,
 	HAS_MEDIA_TABLE | HAS_NWAY, tulip_timer },
+
+  /* DC21140 */
   { "Digital DS21140 Tulip", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, tulip_timer },
+
+  /* DC21142, DC21143 */
   { "Digital DS21143 Tulip", 128, 0x0801fbff,
 	HAS_MII | HAS_MEDIA_TABLE | ALWAYS_CHECK_MII | HAS_ACPI | HAS_NWAY
 	| HAS_INTR_MITIGATION, t21142_timer },
-  { "Lite-On 82c168 PNIC", 256, 0x0001ebef,
+
+  /* LC82C168 */
+  { "Lite-On 82c168 PNIC", 256, 0x0001fbef,
 	HAS_MII | HAS_PNICNWAY, pnic_timer },
+
+  /* MX98713 */
   { "Macronix 98713 PMAC", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, mxic_timer },
+
+  /* MX98715 */
   { "Macronix 98715 PMAC", 256, 0x0001ebef,
 	HAS_MEDIA_TABLE, mxic_timer },
+
+  /* MX98725 */
   { "Macronix 98725 PMAC", 256, 0x0001ebef,
 	HAS_MEDIA_TABLE, mxic_timer },
+
+  /* AX88140 */
   { "ASIX AX88140", 128, 0x0001fbff,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | MC_HASH_ONLY | IS_ASIX, tulip_timer },
+
+  /* PNIC2 */
   { "Lite-On PNIC-II", 256, 0x0801fbff,
 	HAS_MII | HAS_NWAY | HAS_8023X, t21142_timer },
+
+  /* COMET */
   { "ADMtek Comet", 256, 0x0001abef,
 	MC_HASH_ONLY, comet_timer },
+
+  /* COMPEX9881 */
   { "Compex 9881 PMAC", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM, mxic_timer },
+
+  /* I21145 */
   { "Intel DS21145 Tulip", 128, 0x0801fbff,
 	HAS_MII | HAS_MEDIA_TABLE | ALWAYS_CHECK_MII | HAS_ACPI | HAS_NWAY,
 	t21142_timer },
+
+  /* DM910X */
   { "Davicom DM9102/DM9102A", 128, 0x0001ebef,
 	HAS_MII | HAS_MEDIA_TABLE | CSR12_IN_SROM | HAS_ACPI,
 	tulip_timer },
-  {0},
 };
 
 
@@ -176,6 +202,7 @@ static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
 	{ 0x8086, 0x0039, PCI_ANY_ID, PCI_ANY_ID, 0, 0, I21145 },
 	{ 0x1282, 0x9100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },
 	{ 0x1282, 0x9102, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },
+	{ 0x1113, 0x1216, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x1113, 0x1217, PCI_ANY_ID, PCI_ANY_ID, 0, 0, MX98715 },
 	{0, }
 };
@@ -212,6 +239,24 @@ static void set_rx_mode(struct net_device *dev);
 
 
 
+static void tulip_set_power_state (struct tulip_private *tp,
+				   int sleep, int snooze)
+{
+	if (tp->flags & HAS_ACPI) {
+		u32 tmp, newtmp;
+		pci_read_config_dword (tp->pdev, CFDD, &tmp);
+		newtmp = tmp & ~(CFDD_Sleep | CFDD_Snooze);
+		if (sleep)
+			newtmp |= CFDD_Sleep;
+		else if (snooze)
+			newtmp |= CFDD_Snooze;
+		if (tmp != newtmp)
+			pci_write_config_dword (tp->pdev, CFDD, newtmp);
+	}
+	
+}
+
+
 static void tulip_up(struct net_device *dev)
 {
 	struct tulip_private *tp = (struct tulip_private *)dev->priv;
@@ -222,8 +267,7 @@ static void tulip_up(struct net_device *dev)
 	DPRINTK("ENTER\n");
 
 	/* Wake the chip from sleep/snooze mode. */
-	if (tp->flags & HAS_ACPI)
-		pci_write_config_dword(tp->pdev, 0x40, 0);
+	tulip_set_power_state (tp, 0, 0);
 
 	/* On some chip revs we must set the MII/SYM port before the reset!? */
 	if (tp->mii_cnt  ||  (tp->mtable  &&  tp->mtable->has_mii))
@@ -532,8 +576,9 @@ static void tulip_tx_timeout(struct net_device *dev)
 	tp->stats.tx_errors++;
 
 out:
-	dev->trans_start = jiffies;
 	spin_unlock_irqrestore (&tp->lock, flags);
+	dev->trans_start = jiffies;
+	netif_wake_queue (dev);
 }
 
 
@@ -670,8 +715,7 @@ static void tulip_down (struct net_device *dev)
 	dev->if_port = tp->saved_if_port;
 
 	/* Leave the driver in snooze, not sleep, mode. */
-	if (tp->flags & HAS_ACPI)
-		pci_write_config_dword (tp->pdev, 0x40, 0x40000000);
+	tulip_set_power_state (tp, 0, 1);
 }
 
 
@@ -1049,7 +1093,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	 *	different driver (lmc driver)
 	 */
 	 
-        if( pdev->subsystem_vendor == 0x1376 ){
+        if (pdev->subsystem_vendor == PCI_VENDOR_ID_LMC) {
 		printk (KERN_ERR PFX "skipping LMC card.\n");
 		return -ENODEV;
 	}
@@ -1080,16 +1124,24 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	   thankfully its an old 486 chipset.
 	*/
 	
-	if (pci_find_device(PCI_VENDOR_ID_INTEL, 0x0483, NULL))
+	if (pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82424, NULL))
 		csr0 = 0x00A04800;
 	/* The dreaded SiS496 486 chipset. Same workaround as above. */
-	if (pci_find_device(PCI_VENDOR_ID_SI, 0x0496, NULL))
+	if (pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_496, NULL))
 		csr0 = 0x00A04800;
 		
 	/*
 	 *	And back to business
 	 */
  
+	i = pci_enable_device(pdev);
+	if (i) {
+		printk (KERN_ERR PFX
+			"Cannot enable tulip board #%d, aborting\n",
+			board_idx);
+		return i;
+	}
+
 	ioaddr = pci_resource_start (pdev, 0);
 	irq = pdev->irq;
 
@@ -1124,12 +1176,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 			"aborting\n", dev->name, pci_resource_len (pdev, 1),
 			pci_resource_start (pdev, 1));
 		goto err_out_free_pio_res;
-	}
-
-	if (pci_enable_device(pdev)) {
-		printk (KERN_ERR PFX "%s: Cannot enable PCI device, aborting\n",
-			dev->name);
-		goto err_out_free_mmio_res;
 	}
 
 	pci_set_master(pdev);
@@ -1443,8 +1489,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	}
 
 	/* put the chip in snooze mode until opened */
-	if (tulip_tbl[chip_idx].flags & HAS_ACPI)
-		pci_write_config_dword(pdev, 0x40, 0x40000000);
+	tulip_set_power_state (tp, 0, 1);
 
 	return 0;
 
@@ -1468,8 +1513,8 @@ static void tulip_suspend (struct pci_dev *pdev)
 	if (dev && netif_device_present (dev)) {
 		netif_device_detach (dev);
 		tulip_down (dev);
+		/* pci_power_off(pdev, -1); */
 	}
-//	pci_set_power_state(pdev, 3);
 }
 
 
@@ -1477,8 +1522,11 @@ static void tulip_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 
-	pci_enable_device(pdev);
+#if 1
+	pci_enable_device (pdev);
+#endif
 	if (dev && !netif_device_present (dev)) {
+		/* pci_power_on(pdev); */
 		tulip_up (dev);
 		netif_device_attach (dev);
 	}
@@ -1487,24 +1535,29 @@ static void tulip_resume(struct pci_dev *pdev)
 
 static void __devexit tulip_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct net_device *dev = pci_get_drvdata (pdev);
+	struct tulip_private *tp;
 
-	if (dev) {
-		struct tulip_private *tp = (struct tulip_private *)dev->priv;
-		pci_free_consistent(pdev,
-				    sizeof(struct tulip_rx_desc) * RX_RING_SIZE +
-				    sizeof(struct tulip_tx_desc) * TX_RING_SIZE,
-				    tp->rx_ring,
-				    tp->rx_ring_dma);
-		unregister_netdev(dev);
-		release_mem_region (pci_resource_start (pdev, 1),
-				    pci_resource_len (pdev, 1));
-		release_region (pci_resource_start (pdev, 0),
-				pci_resource_len (pdev, 0));
-		kfree(dev);
+	if (!dev)
+		return;
 
-		pci_set_drvdata(pdev, NULL);
-	}
+	tp = dev->priv;
+	pci_free_consistent (pdev,
+			     sizeof (struct tulip_rx_desc) * RX_RING_SIZE +
+			     sizeof (struct tulip_tx_desc) * TX_RING_SIZE,
+			     tp->rx_ring, tp->rx_ring_dma);
+	unregister_netdev (dev);
+	release_mem_region (pci_resource_start (pdev, 1),
+			    pci_resource_len (pdev, 1));
+	release_region (pci_resource_start (pdev, 0),
+			pci_resource_len (pdev, 0));
+	if (tp->mtable)
+		kfree (tp->mtable);
+	kfree (dev);
+
+	pci_set_drvdata (pdev, NULL);
+
+	/* pci_power_off (pdev, -1); */
 }
 
 

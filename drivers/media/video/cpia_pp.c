@@ -34,9 +34,7 @@
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
 
-#ifdef CONFIG_KMOD
 #include <linux/kmod.h>
-#endif
 
 /* #define _CPIA_DEBUG_		define for verbose debug output */
 #include "cpia.h"
@@ -502,9 +500,6 @@ static int cpia_pp_open(void *privdata)
 	
 	++cam->open_count;
 	
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -535,9 +530,6 @@ static int cpia_pp_registerCallback(void *privdata, void (*cb)(void *cbdata), vo
 static int cpia_pp_close(void *privdata)
 {
 	struct pp_cam_entry *cam = privdata;
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	if (--cam->open_count == 0) {
 		parport_release(cam->pdev);
 	}

@@ -223,6 +223,11 @@ struct unixware_disklabel {
 
 #endif /* CONFIG_UNIXWARE_DISKLABEL */
 
+#ifdef CONFIG_MINIX_SUBPARTITION
+#   define MINIX_PARTITION         0x81  /* Minix Partition ID */
+#   define MINIX_NR_SUBPARTITIONS  4
+#endif /* CONFIG_MINIX_SUBPARTITION */
+
 #ifdef __KERNEL__
 extern struct gendisk *gendisk_head;	/* linked list of disks */
 

@@ -151,7 +151,7 @@ static int ircomm_state_waiti(struct ircomm_cb *self, IRCOMM_EVENT event,
 /*
  * Function ircomm_state_waitr (self, event, skb)
  *
- *    IrCOMM has received an incomming connection request and is awaiting
+ *    IrCOMM has received an incoming connection request and is awaiting
  *    response from the user
  */
 static int ircomm_state_waitr(struct ircomm_cb *self, IRCOMM_EVENT event, 

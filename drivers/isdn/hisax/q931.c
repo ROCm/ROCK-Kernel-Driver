@@ -1,10 +1,10 @@
-/* $Id: q931.c,v 1.10 2000/06/26 08:59:14 keil Exp $
+/* $Id: q931.c,v 1.10.6.1 2001/02/16 16:43:28 kai Exp $
  *
  * q931.c       code to decode ITU Q.931 call control messages
  *
  * Author       Jan den Ouden
  *
- * This file is (c) under GNU PUBLIC LICENSE
+ * This file is (c) under GNU General Public License
  *
  * Changelog
  *
@@ -1228,7 +1228,7 @@ dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir)
 				finish = 1;
 			}
 		} else if (sapi == TEI_SAPI) {
-			dp += sprintf(dp, "tei managment\n");
+			dp += sprintf(dp, "tei management\n");
 			finish = 1;
 		} else {
 			dp += sprintf(dp, "unknown sapi %d broadcast\n", sapi);
