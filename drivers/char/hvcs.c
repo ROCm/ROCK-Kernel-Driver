@@ -110,7 +110,7 @@ static struct termios hvcs_tty_termios = {
 static int hvcs_parm_num_devs = -1;
 module_param(hvcs_parm_num_devs, int, 0);
 
-static const char hvcs_driver_name[] = "hvcs";
+static char hvcs_driver_name[] = "hvcs";
 static const char hvcs_device_node[] = "hvcs";
 static const char hvcs_driver_string[]
 	= "IBM hvcs (Hypervisor Virtual Console Server) Driver";
@@ -154,7 +154,7 @@ struct hvcs_struct {
 
 static struct list_head hvcs_structs = LIST_HEAD_INIT(hvcs_structs);
 
-static void hvcs_read_task(unsigned long data);
+static void hvcs_read_task(void *data);
 static void hvcs_unthrottle(struct tty_struct *tty);
 static void hvcs_throttle(struct tty_struct *tty);
 static irqreturn_t hvcs_handle_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
@@ -185,7 +185,7 @@ static void hvcs_create_driver_attrs(void);
 static void hvcs_remove_driver_attrs(void);
 
 static int __devinit hvcs_probe(struct vio_dev *dev, const struct vio_device_id *id);
-static void __devexit hvcs_remove(struct vio_dev *dev);
+static int __devexit hvcs_remove(struct vio_dev *dev);
 static int __init hvcs_module_init(void);
 static void __exit hvcs_module_exit(void);
 
@@ -195,7 +195,7 @@ static void __exit hvcs_module_exit(void);
  * throttle and we want to be able to reschedule ourselves to run AFTER a
  * push is scheduled so that we know when the tty is properly throttled.
  */
-static void hvcs_read_task(unsigned long data)
+static void hvcs_read_task(void *data)
 {
 	struct hvcs_struct *hvcsd = (struct hvcs_struct *)data;
 	unsigned int unit_address = hvcsd->vdev->unit_address;
@@ -295,7 +295,7 @@ static int __devinit hvcs_probe(
 
 	if (!dev || !id) {
 		printk(KERN_ERR "HVCS: driver probed with invalid parm.\n");
-		return;
+		return -EPERM;
 	}
 
 	printk(KERN_INFO "HVCS: Added vty-server@%X.\n", dev->unit_address);
@@ -319,7 +319,7 @@ static int __devinit hvcs_probe(
 
 	hvcsd->index = ++hvcs_struct_count;
 
-	INIT_WORK(&hvcsd->read_work, hvcs_read_task, (unsigned long)hvcsd);
+	INIT_WORK(&hvcsd->read_work, hvcs_read_task, hvcsd);
 
 	hvcsd->enabled = 0;
 
@@ -345,12 +345,12 @@ static int __devinit hvcs_probe(
 	return 0;
 }
 
-static void __devexit hvcs_remove(struct vio_dev *dev)
+static int __devexit hvcs_remove(struct vio_dev *dev)
 {
 	struct hvcs_struct *hvcsd = (struct hvcs_struct *)dev->driver_data;
 
 	if (!hvcsd)
-		return;
+		return -ENODEV;
 
 	printk(KERN_INFO "HVCS: Removing vty-server@%X.\n", dev->unit_address);
 
@@ -379,10 +379,11 @@ static void __devexit hvcs_remove(struct vio_dev *dev)
 	 * which would probably be tty_hangup.
 	 */
 	kobject_put (&hvcsd->kobj);
+	return 0;
 };
 
 static struct vio_driver hvcs_vio_driver = {
-	.name		= &hvcs_driver_name,
+	.name		= hvcs_driver_name,
 	.id_table	= hvcs_driver_table,
 	.probe		= hvcs_probe,
 	.remove		= __devexit_p(hvcs_remove),
