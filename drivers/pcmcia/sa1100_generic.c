@@ -955,6 +955,11 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 
 	cpu_clock = cpufreq_get(0);
 
+	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
+		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+		memset(skt, 0, sizeof(*skt));
+	}
+
 	/*
 	 * We initialize the MECR to default values here, because we are
 	 * not guaranteed to see a SetIOMap operation at runtime.
@@ -962,11 +967,14 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 	for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
-		if (!request_mem_region(_PCMCIA(i), PCMCIASp, "PCMCIA")) {
-			ret = -EBUSY;
-			goto out_err;
-		}
+		skt->res.start	= _PCMCIA(i);
+		skt->res.end	= _PCMCIA(i) + PCMCIASp - 1;
+		skt->res.name	= "PCMCIA";
+		skt->res.flags	= IORESOURCE_MEM;
 
+		ret = request_resource(&iomem_resource, &skt->res);
+		if (ret)
+			goto out_err;
 
 		skt->nr		= i;
 		skt->ops	= ops;
@@ -1011,10 +1019,10 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 		iounmap(skt->virt_io);
 		skt->virt_io = NULL;
-		release_mem_region(_PCMCIA(i), PCMCIASp);
+		if (skt->res.start)
+			release_resource(&skt->res);
 	}
 
- shutdown:
 	ops->shutdown();
 
  out:
@@ -1050,7 +1058,7 @@ void sa1100_unregister_pcmcia(struct pcmcia_low_level *ops, struct device *dev)
 		iounmap(skt->virt_io);
 		skt->virt_io = NULL;
 		
-		release_mem_region(_PCMCIA(i), PCMCIASp);
+		release_resource(&skt->res);
 	}
 
 	ops->shutdown();
