@@ -74,6 +74,8 @@ void sysdev_remove_file(struct sys_device * s, struct sysdev_attribute * a)
 	sysfs_remove_file(&s->kobj,&a->attr);
 }
 
+EXPORT_SYMBOL(sysdev_create_file);
+EXPORT_SYMBOL(sysdev_remove_file);
 
 /* 
  * declare system_subsys 
