@@ -2470,6 +2470,8 @@ static int snd_es1968_free(es1968_t *chip)
 		outw(0, chip->io_port + ESM_PORT_HOST_IRQ); /* disable IRQ */
 	}
 
+	if (chip->irq >= 0)
+		free_irq(chip->irq, (void *)chip);
 #ifdef SUPPORT_JOYSTICK
 	if (chip->res_joystick) {
 		gameport_unregister_port(&chip->gameport);
@@ -2484,8 +2486,6 @@ static int snd_es1968_free(es1968_t *chip)
 		release_resource(chip->res_io_port);
 		kfree_nocheck(chip->res_io_port);
 	}
-	if (chip->irq >= 0)
-		free_irq(chip->irq, (void *)chip);
 	snd_magic_kfree(chip);
 	return 0;
 }
