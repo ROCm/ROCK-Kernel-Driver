@@ -5,7 +5,9 @@ Patrick Mochel <mochel@osdl.org>
 30 October 2002
 
 
-kobjects
+1. kobjects
+
+1.1 Description
 
 struct kobject introduces a simple, intregral datatype and a simple
 set of semantics for operating on the device. kobjects are intended to
@@ -13,8 +15,8 @@ be embedded in larger data structures and replace fields it
 duplicates. A set of library functions has been developed to assist in
 the manipulation of kobjects.
 
-struct kobject looks like this:
 
+1.2 Defintion
 
 struct kobject {
 	char			name[16];
@@ -26,21 +28,29 @@ struct kobject {
 };
 
 void kobject_init(struct kobject *);
+int kobject_add(struct kobject *);
 int kobject_register(struct kobject *);
+
+void kobject_del(struct kobject *);
+void kobject_cleanup(struct kobject *);
 void kobject_unregister(struct kobject *);
+
 struct kobject * kobject_get(struct kobject *);
 void kobject_put(struct kobject *);
 
 
 
-subsystems
+2. subsystems
+
+2.1 Description
 
 struct subsystem is introduced to describe a collection of objects of
 a certain type. subsystems are kobjects themselves, though they
 contain lists of kobjects that belong to that subsystem. Objects of a
 subsystem (the embedder objects in which kobjects live) are all of the
-same type. The interface looks like:
+same type. 
 
+2.2 Definition
 
 struct subsystem {
 	struct kobject		kobj;
@@ -59,6 +69,95 @@ void subsystem_unregister(struct subsystem *);
 struct subsystem * subsys_get(struct subsystem * s);
 void subsys_put(struct subsystem * s);
 
+
+3. The Interface
+
+The kobject API provides a symmeticral interface that may be used in
+one of two ways: by using the default front-end registration
+interface, or by directly using the backend helpers the registration
+interface uses. 
+
+3.1 Default Usage
+
+The default usage is to use kobjet_register() to add a device to the
+object hierarchy, and kobject_unregister() to remove it. 
+
+kobject_register() will call kobject_init() and kobject_add()
+consecutively. kobject_init() will initialize the object and increment
+the reference count of the subsystem the object belongs to. It will
+leave the reference count of the object at 1.
+
+kobject_add() will insert it into the object hierarchy and create
+a sysfs directory for the object. This will increment the reference
+count of the object, leaving it at 2.
+
+kobject_unregister() will call kobject_del() and kobject_put()
+consecutively. kobject_del() will remove the object from the hierarchy
+and the sysfs directory for the object. It will decrement the
+reference count for the object. Assuming there are no other users of
+the object, it will be left at 1.
+
+kobject_put() will decrement the reference count of the object, and
+when it reaches 0, call kobject_cleanup(). This will happen
+immediately if there are no other users of the object. 
+kobject_cleanup() will call  the subsystem's release() method
+for the object, and decrement the subsystem's reference count. 
+
+Because kobject_unregister() calls kobject_put(), instead of
+kobject_cleanup() directly, when an object is unregistered, the
+pointer to the object is guaranteed to remain valid until the last
+reference to the object has gone away.
+
+Users of objects should call kobject_get() to obtain a reference to
+the object that they are using. If the object passed to it is a valid
+object (i.e. still present in the system), it will return a pointer to
+the object. Otherwise, it will return NULL.
+
+When users are done using an object, they should call kobject_put() to
+decrement the reference count on the object. As explained above, when
+the reference count for the object reaches 0, kobject_cleanup() will
+be called for the object.
+
+
+3.2 Backend Usage
+
+Users of the kobject infrastructure may use the backend functions
+directly. In order to maintain consistency and reduce confusion, users
+of the interface should use only the front end registration-oriented
+interface, or the backend helpers. 
+
+Using the backend helpers allows code to use the kobjects solely for
+the reference counting and garbage collection mechanisms, and
+optionally adding them to the object hierarchy or exporting them via
+sysfs. 
+
+To take advantage of this side of the interface, users should call
+kobject_init() to initialize the object. As stated above, this will
+leave the reference count of the object at 1, and will enable the
+subsystem to use the reference count of the object.
+
+When the life of the object is ending, the kobject_put() should be
+called to decrement the reference count of the object. Just like
+above, this will call kobject_cleanup() when the reference count
+reaches 0, and release() method of the object's subsystem will be
+called. 
+
+During the lifetime of the object, kobject_add() and kobject_del() may
+be called to add the object to the hierarchy and export it via
+sysfs. kobject_del() must always be called if kobject_add() has
+previously been called. Care should be taken to ensure kobject_del()
+is called before the final kobject_put() is called, though not doing
+so will not cause catastrophe, only confusion when reading the source
+code. Fatal results are avoided by having kobject_add() increment the
+reference count of the object, for kobject_del() to decrement. 
+
+
+3.3 Summary
+
+Using either interface, users should obtain the same results. The
+registration interface does the same actions as the backend interface,
+though it guarantees that initialization and addition, and deletion
+and cleanup, happen consecutively.
 
 
 Familial Relations
@@ -133,22 +232,4 @@ Most subsystems have a set of default attributes associated with an
 object that registers with them. A subsystem definition may contain a
 NULL-terminated array of attributes that will be exported when an
 object is registered with the subsystem. 
-
-
-Reference Counting
-
-All objects contain reference counts. All functions accessing objects
-should increment the reference count until they are finished, and
-decrement the reference count. When an object is initialized, it
-receives a reference count of 1. When a device is unregistered, the
-reference is decremented. When the reference counts reaches 0, the
-subsystem's ->release() callback for that object type (remember
-subsystems control only one type of device each) is called; and the
-reference counts of the kobject's subsystem and parent are
-decremented. 
-
-The ->release() callback is the opportunity for the subsystem to free
-memory allocated for the object. It is the notification that
-absolutely no one is using the structure any more (and can't acquire a
-reference to it), so it is safe to free it.
 

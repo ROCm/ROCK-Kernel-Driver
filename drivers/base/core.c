@@ -5,7 +5,7 @@
  *		 2002 Open Source Development Lab
  */
 
-#define DEBUG 0
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/err.h>
@@ -134,7 +134,7 @@ int device_add(struct device *dev)
 	devclass_add_device(dev);
  register_done:
 	if (error) {
-		up(&device_sem);
+		down(&device_sem);
 		list_del_init(&dev->g_list);
 		list_del_init(&dev->node);
 		up(&device_sem);

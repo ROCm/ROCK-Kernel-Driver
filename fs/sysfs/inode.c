@@ -23,6 +23,8 @@
  * Please see Documentation/filesystems/sysfs.txt for more information.
  */
 
+#undef DEBUG 
+
 #include <linux/list.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
@@ -173,16 +175,10 @@ static ssize_t
 sysfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = NULL;
-	struct kobject * kobj;
+	struct sysfs_ops * ops = file->private_data;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	unsigned char *page;
 	ssize_t retval = 0;
-
-	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj && kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
-	if (!ops || !ops->show)
-		return 0;
 
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
@@ -234,16 +230,11 @@ static ssize_t
 sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct attribute * attr = file->f_dentry->d_fsdata;
-	struct sysfs_ops * ops = NULL;
-	struct kobject * kobj;
+	struct sysfs_ops * ops = file->private_data;
+	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
 	ssize_t retval = 0;
 	char * page;
 
-	kobj = file->f_dentry->d_parent->d_fsdata;
-	if (kobj && kobj->subsys)
-		ops = kobj->subsys->sysfs_ops;
-	if (!ops || !ops->store)
-		return -EINVAL;
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -275,19 +266,70 @@ sysfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	return retval;
 }
 
-static int sysfs_open_file(struct inode * inode, struct file * filp)
+static int check_perm(struct inode * inode, struct file * file)
 {
-	struct kobject * kobj;
+	struct kobject * kobj = kobject_get(file->f_dentry->d_parent->d_fsdata);
+	struct attribute * attr = file->f_dentry->d_fsdata;
+	struct sysfs_ops * ops = NULL;
 	int error = 0;
 
-	kobj = filp->f_dentry->d_parent->d_fsdata;
-	if ((kobj = kobject_get(kobj))) {
-		struct attribute * attr = filp->f_dentry->d_fsdata;
-		if (!attr)
-			error = -EINVAL;
-	} else
-		error = -EINVAL;
+	if (!kobj || !attr)
+		goto Einval;
+	
+	if (kobj->subsys)
+		ops = kobj->subsys->sysfs_ops;
+
+	/* No sysfs operations, either from having no subsystem,
+	 * or the subsystem have no operations.
+	 */
+	if (!ops)
+		goto Eaccess;
+
+	/* File needs write support.
+	 * The inode's perms must say it's ok, 
+	 * and we must have a store method.
+	 */
+	if (file->f_mode & FMODE_WRITE) {
+
+		if (!(inode->i_mode & S_IWUGO))
+			goto Eperm;
+		if (!ops->store)
+			goto Eaccess;
+
+	}
+
+	/* File needs read support.
+	 * The inode's perms must say it's ok, and we there
+	 * must be a show method for it.
+	 */
+	if (file->f_mode & FMODE_READ) {
+		if (!(inode->i_mode & S_IRUGO))
+			goto Eperm;
+		if (!ops->show)
+			goto Eaccess;
+	}
+
+	/* No error? Great, store the ops in file->private_data
+	 * for easy access in the read/write functions.
+	 */
+	file->private_data = ops;
+	goto Done;
+
+ Einval:
+	error = -EINVAL;
+	goto Done;
+ Eaccess:
+	error = -EACCES;
+	goto Done;
+ Eperm:
+	error = -EPERM;
+ Done:
 	return error;
+}
+
+static int sysfs_open_file(struct inode * inode, struct file * filp)
+{
+	return check_perm(inode,filp);
 }
 
 static int sysfs_release(struct inode * inode, struct file * filp)

@@ -3,7 +3,7 @@
  *
  */
 
-#define DEBUG 0
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -118,6 +118,7 @@ int driver_register(struct device_driver * drv)
 	INIT_LIST_HEAD(&drv->devices);
 	drv->present = 1;
 	bus_add_driver(drv);
+	devclass_add_driver(drv);
 	put_driver(drv);
 	return 0;
 }
@@ -128,6 +129,9 @@ void driver_unregister(struct device_driver * drv)
 	drv->present = 0;
 	spin_unlock(&device_lock);
 	pr_debug("driver %s:%s: unregistering\n",drv->bus->name,drv->name);
+	bus_remove_driver(drv);
+	devclass_remove_driver(drv);
+	kobject_unregister(&drv->kobj);
 	put_driver(drv);
 }
 
