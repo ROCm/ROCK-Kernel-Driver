@@ -1,21 +1,23 @@
 /*
- * BK Id: SCCS/s.fcc_enet.c 1.7 05/17/01 18:14:20 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Fast Ethernet Controller (FCC) driver for Motorola MPC8260.
  * Copyright (c) 2000 MontaVista Software, Inc.   Dan Malek (dmalek@jlc.net)
  *
  * This version of the driver is a combination of the 8xx fec and
- * 8260 SCC Ethernet drivers.  People seem to be choosing common I/O
- * configurations, so this driver will work on the EST8260 boards and
- * others yet to be announced.
+ * 8260 SCC Ethernet drivers.  This version has some additional
+ * configuration options, which should probably be moved out of
+ * here.  This driver currently works for the EST SBC8260,
+ * SBS Diablo/BCM, Embedded Planet RPX6, TQM8260, and others.
  *
  * Right now, I am very watseful with the buffers.  I allocate memory
  * pages and then divide them into 2K frame buffers.  This way I know I
  * have buffers large enough to hold one frame within one buffer descriptor.
  * Once I get this working, I will use 64 or 128 byte CPM buffers, which
  * will be much more memory efficient and will easily handle lots of
- * small packets.
+ * small packets.  Since this is a cache coherent processor and CPM,
+ * I could also preallocate SKB's and use them directly on the interface.
  *
  */
 
@@ -48,6 +50,56 @@
  */
 #define TX_TIMEOUT	(2*HZ)
 
+#ifdef	CONFIG_USE_MDIO
+/* Forward declarations of some structures to support different PHYs */
+
+typedef struct {
+	uint mii_data;
+	void (*funct)(uint mii_reg, struct net_device *dev);
+} phy_cmd_t;
+
+typedef struct {
+	uint id;
+	char *name;
+
+	const phy_cmd_t *config;
+	const phy_cmd_t *startup;
+	const phy_cmd_t *ack_int;
+	const phy_cmd_t *shutdown;
+} phy_info_t;
+
+/* Register definitions for the PHY. */
+
+#define MII_REG_CR          0  /* Control Register                         */
+#define MII_REG_SR          1  /* Status Register                          */
+#define MII_REG_PHYIR1      2  /* PHY Identification Register 1            */
+#define MII_REG_PHYIR2      3  /* PHY Identification Register 2            */
+#define MII_REG_ANAR        4  /* A-N Advertisement Register               */
+#define MII_REG_ANLPAR      5  /* A-N Link Partner Ability Register        */
+#define MII_REG_ANER        6  /* A-N Expansion Register                   */
+#define MII_REG_ANNPTR      7  /* A-N Next Page Transmit Register          */
+#define MII_REG_ANLPRNPR    8  /* A-N Link Partner Received Next Page Reg. */
+
+/* values for phy_status */
+
+#define PHY_CONF_ANE	0x0001  /* 1 auto-negotiation enabled */
+#define PHY_CONF_LOOP	0x0002  /* 1 loopback mode enabled */
+#define PHY_CONF_SPMASK	0x00f0  /* mask for speed */
+#define PHY_CONF_10HDX	0x0010  /* 10 Mbit half duplex supported */
+#define PHY_CONF_10FDX	0x0020  /* 10 Mbit full duplex supported */
+#define PHY_CONF_100HDX	0x0040  /* 100 Mbit half duplex supported */
+#define PHY_CONF_100FDX	0x0080  /* 100 Mbit full duplex supported */
+
+#define PHY_STAT_LINK	0x0100  /* 1 up - 0 down */
+#define PHY_STAT_FAULT	0x0200  /* 1 remote fault */
+#define PHY_STAT_ANC	0x0400  /* 1 auto-negotiation complete	*/
+#define PHY_STAT_SPMASK	0xf000  /* mask for speed */
+#define PHY_STAT_10HDX	0x1000  /* 10 Mbit half duplex selected	*/
+#define PHY_STAT_10FDX	0x2000  /* 10 Mbit full duplex selected	*/
+#define PHY_STAT_100HDX	0x4000  /* 100 Mbit half duplex selected */
+#define PHY_STAT_100FDX	0x8000  /* 100 Mbit full duplex selected */
+#endif	/* CONFIG_USE_MDIO */
+
 /* The number of Tx and Rx buffers.  These are allocated from the page
  * pool.  The code may assume these are power of two, so it is best
  * to keep them that size.
@@ -77,12 +129,12 @@
 static int fcc_enet_open(struct net_device *dev);
 static int fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static int fcc_enet_rx(struct net_device *dev);
-static void fcc_enet_mii(struct net_device *dev);
 static	void fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs);
 static int fcc_enet_close(struct net_device *dev);
 static struct net_device_stats *fcc_enet_get_stats(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
-static void restart_fcc(struct net_device *dev);
+static void fcc_restart(struct net_device *dev, int duplex);
+static int fcc_enet_set_mac_address(struct net_device *dev, void *addr);
 
 /* These will be configurable for the FCC choice.
  * Multiple ports can be configured.  There is little choice among the
@@ -166,8 +218,14 @@ static void restart_fcc(struct net_device *dev);
 
 /* MII status/control serial interface.
 */
-#define PC_MDIO		((uint)0x00400000)
-#define PC_MDCK		((uint)0x00200000)
+#ifdef	CONFIG_TQM8260
+/* TQM8260 has MDIO and MDCK on PC30 and PC31 respectively */
+#define PC_MDIO		((uint)0x00000002)
+#define PC_MDCK		((uint)0x00000001)
+#else
+#define PC_MDIO		((uint)0x00000004)
+#define PC_MDCK		((uint)0x00000020)
+#endif
 
 /* A table of information for supporting FCCs.  This does two things.
  * First, we know how many FCCs we have and they are always externally
@@ -191,17 +249,31 @@ static fcc_info_t fcc_ports[] = {
 #ifdef CONFIG_FCC1_ENET
 	{ 0, CPM_CR_FCC1_SBLOCK, CPM_CR_FCC1_PAGE, PROFF_FCC1, SIU_INT_FCC1,
 		(PC_F1RXCLK | PC_F1TXCLK), CMX1_CLK_ROUTE, CMX1_CLK_MASK,
+# if defined(CONFIG_TQM8260)
 		PC_MDIO, PC_MDCK },
+# else
+		0x00000004, 0x00000100 },
+# endif
 #endif
 #ifdef CONFIG_FCC2_ENET
 	{ 1, CPM_CR_FCC2_SBLOCK, CPM_CR_FCC2_PAGE, PROFF_FCC2, SIU_INT_FCC2,
 		(PC_F2RXCLK | PC_F2TXCLK), CMX2_CLK_ROUTE, CMX2_CLK_MASK,
+# if defined(CONFIG_TQM8260)
 		PC_MDIO, PC_MDCK },
+# elif defined(CONFIG_EST8260) || defined(CONFIG_ADS8260)
+		0x00400000, 0x00200000 },
+# else
+		0x00000002, 0x00000080 },
+# endif
 #endif
 #ifdef CONFIG_FCC3_ENET
 	{ 2, CPM_CR_FCC3_SBLOCK, CPM_CR_FCC3_PAGE, PROFF_FCC3, SIU_INT_FCC3,
 		(PC_F3RXCLK | PC_F3TXCLK), CMX3_CLK_ROUTE, CMX3_CLK_MASK,
+# if defined(CONFIG_TQM8260)
 		PC_MDIO, PC_MDCK },
+# else
+		0x00000001, 0x00000040 },
+# endif
 #endif
 };
 
@@ -230,9 +302,23 @@ struct fcc_enet_private {
 	struct	net_device_stats stats;
 	uint	tx_full;
 	spinlock_t lock;
-	uint	phy_address;
-	uint	phy_type;
-	uint	phy_duplex;
+
+#ifdef	CONFIG_USE_MDIO
+	uint	phy_id;
+	uint	phy_id_done;
+	uint	phy_status;
+	phy_info_t	*phy;
+	struct tq_struct phy_task;
+
+	uint	sequence_done;
+
+	uint	phy_addr;
+#endif	/* CONFIG_USE_MDIO */
+
+	int	link;
+	int	old_link;
+	int	full_duplex;
+
 	fcc_info_t	*fip;
 };
 
@@ -244,48 +330,20 @@ static void init_fcc_ioports(fcc_info_t *fip, volatile iop8260_t *io,
 static void init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	volatile immap_t *immap);
 
-/* MII processing.  We keep this as simple as possible.  Requests are
- * placed on the list (if there is room).  When the request is finished
- * by the MII, an optional function may be called.
- */
-typedef struct mii_list {
-	uint	mii_regval;
-	void	(*mii_func)(uint val, struct net_device *dev);
-	struct	mii_list *mii_next;
-} mii_list_t;
-
-#define		NMII	20
-mii_list_t	mii_cmds[NMII];
-mii_list_t	*mii_free;
-mii_list_t	*mii_head;
-mii_list_t	*mii_tail;
-
-static	int	phyaddr;
-static	uint	phytype;
-
-static int	mii_queue(int request, void (*func)(uint, struct net_device *));
-static void	mii_startup_cmds(void);
+#ifdef	CONFIG_USE_MDIO
+static int	mii_queue(struct net_device *dev, int request, void (*func)(uint, struct net_device *));
 static uint	mii_send_receive(fcc_info_t *fip, uint cmd);
+
+static void	fcc_stop(struct net_device *dev);
 
 /* Make MII read/write commands for the FCC.
 */
-
-#define mk_mii_phyaddr(ADDR)	(0x60020000 | ((ADDR) << 23) | (2 << 18))
-
-#define mk_mii_read(REG)	(0x60020000 | ((phyaddr << 23) | \
-						(REG & 0x1f) << 18))
-
-#define mk_mii_write(REG, VAL)	(0x50020000 | ((phyaddr << 23) | \
-						(REG & 0x1f) << 18) | \
+#define mk_mii_read(REG)	(0x60020000 | ((REG & 0x1f) << 18))
+#define mk_mii_write(REG, VAL)	(0x50020000 | ((REG & 0x1f) << 18) | \
 						(VAL & 0xffff))
+#define mk_mii_end	0
+#endif	/* CONFIG_USE_MDIO */
 
-
-static int
-fcc_enet_open(struct net_device *dev)
-{
-	netif_start_queue(dev);
-	return 0;					/* Always succeed */
-}
 
 static int
 fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -293,6 +351,10 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct fcc_enet_private *cep = (struct fcc_enet_private *)dev->priv;
 	volatile cbd_t	*bdp;
 
+	if (!cep->link) {
+		/* Link is down or autonegotiation is in progress. */
+		return 1;
+	}
 
 	/* Fill in a Tx ring entry */
 	bdp = cep->cur_tx;
@@ -307,24 +369,20 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 #endif
 
-	/* Clear all of the status flags.
-	 */
+	/* Clear all of the status flags. */
 	bdp->cbd_sc &= ~BD_ENET_TX_STATS;
 
-	/* If the frame is short, tell CPM to pad it.
-	*/
+	/* If the frame is short, tell CPM to pad it. */
 	if (skb->len <= ETH_ZLEN)
 		bdp->cbd_sc |= BD_ENET_TX_PAD;
 	else
 		bdp->cbd_sc &= ~BD_ENET_TX_PAD;
 
-	/* Set buffer length and buffer pointer.
-	*/
+	/* Set buffer length and buffer pointer. */
 	bdp->cbd_datlen = skb->len;
 	bdp->cbd_bufaddr = __pa(skb->data);
 
-	/* Save skb pointer.
-	*/
+	/* Save skb pointer. */
 	cep->tx_skbuff[cep->skb_cur] = skb;
 
 	cep->stats.tx_bytes += skb->len;
@@ -338,14 +396,12 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	bdp->cbd_sc |= (BD_ENET_TX_READY | BD_ENET_TX_INTR | BD_ENET_TX_LAST | BD_ENET_TX_TC);
 
 #if 0
-	/* Errata says don't do this.
-	*/
+	/* Errata says don't do this. */
 	cep->fccp->fcc_ftodr = 0x8000;
 #endif
 	dev->trans_start = jiffies;
 
-	/* If this was the last BD in the ring, start at the beginning again.
-	*/
+	/* If this was the last BD in the ring, start at the beginning again. */
 	if (bdp->cbd_sc & BD_ENET_TX_WRAP)
 		bdp = cep->tx_bd_base;
 	else
@@ -398,8 +454,7 @@ fcc_enet_timeout(struct net_device *dev)
 		netif_wake_queue(dev);
 }
 
-/* The interrupt handler.
- */
+/* The interrupt handler. */
 static void
 fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
@@ -469,13 +524,11 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		if (bdp->cbd_sc & BD_ENET_TX_DEF)
 			cep->stats.collisions++;
 
-		/* Free the sk buffer associated with this last transmit.
-		*/
+		/* Free the sk buffer associated with this last transmit. */
 		dev_kfree_skb_irq(cep->tx_skbuff[cep->skb_dirty]);
 		cep->skb_dirty = (cep->skb_dirty + 1) & TX_RING_MOD_MASK;
 
-		/* Update pointer to next buffer descriptor to be transmitted.
-		*/
+		/* Update pointer to next buffer descriptor to be transmitted. */
 		if (bdp->cbd_sc & BD_ENET_TX_WRAP)
 			bdp = cep->tx_bd_base;
 		else
@@ -510,8 +563,13 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 		 * down.  We now issue a restart transmit.  Since the
 		 * errors close the BD and update the pointers, the restart
 		 * _should_ pick up without having to reset any of our
-		 * pointers either.
+		 * pointers either.  Also, To workaround 8260 device erratum 
+		 * CPM37, we must disable and then re-enable the transmitter
+		 * following a Late Collision, Underrun, or Retry Limit error.
 		 */
+		cep->fccp->fcc_gfmr &= ~FCC_GFMR_ENT;
+		udelay(10); /* wait a few microseconds just on principle */
+		cep->fccp->fcc_gfmr |=  FCC_GFMR_ENT;
 
 		cp = cpmp;
 		cp->cp_cpcr =
@@ -564,8 +622,7 @@ for (;;) {
 			printk("CPM ENET: rcv is not first+last\n");
 #endif
 
-	/* Frame too long or too short.
-	*/
+	/* Frame too long or too short. */
 	if (bdp->cbd_sc & (BD_ENET_RX_LG | BD_ENET_RX_SH))
 		cep->stats.rx_length_errors++;
 	if (bdp->cbd_sc & BD_ENET_RX_NO)	/* Frame alignment */
@@ -574,28 +631,22 @@ for (;;) {
 		cep->stats.rx_crc_errors++;
 	if (bdp->cbd_sc & BD_ENET_RX_OV)	/* FIFO overrun */
 		cep->stats.rx_crc_errors++;
-
-	/* Report late collisions as a frame error.
-	 * On this error, the BD is closed, but we don't know what we
-	 * have in the buffer.  So, just drop this frame on the floor.
-	 */
-	if (bdp->cbd_sc & BD_ENET_RX_CL) {
+	if (bdp->cbd_sc & BD_ENET_RX_CL)	/* Late Collision */
 		cep->stats.rx_frame_errors++;
-	}
-	else {
 
-		/* Process the incoming frame.
-		*/
+	if (!(bdp->cbd_sc &
+	      (BD_ENET_RX_LG | BD_ENET_RX_SH | BD_ENET_RX_NO | BD_ENET_RX_CR
+	       | BD_ENET_RX_OV | BD_ENET_RX_CL)))
+	{
+		/* Process the incoming frame. */
 		cep->stats.rx_packets++;
-		pkt_len = bdp->cbd_datlen;
+
+		/* Remove the FCS from the packet length. */
+		pkt_len = bdp->cbd_datlen - 4;
 		cep->stats.rx_bytes += pkt_len;
 
-		/* This does 16 byte alignment, much more than we need.
-		 * The packet length includes FCS, but we don't want to
-		 * include that when passing upstream as it messes up
-		 * bridging applications.
-		 */
-		skb = dev_alloc_skb(pkt_len-4);
+		/* This does 16 byte alignment, much more than we need. */
+		skb = dev_alloc_skb(pkt_len);
 
 		if (skb == NULL) {
 			printk("%s: Memory squeeze, dropping packet.\n", dev->name);
@@ -603,25 +654,22 @@ for (;;) {
 		}
 		else {
 			skb->dev = dev;
-			skb_put(skb,pkt_len-4);	/* Make room */
+			skb_put(skb,pkt_len);	/* Make room */
 			eth_copy_and_sum(skb,
 				(unsigned char *)__va(bdp->cbd_bufaddr),
-				pkt_len-4, 0);
+				pkt_len, 0);
 			skb->protocol=eth_type_trans(skb,dev);
 			netif_rx(skb);
 		}
 	}
 
-	/* Clear the status flags for this buffer.
-	*/
+	/* Clear the status flags for this buffer. */
 	bdp->cbd_sc &= ~BD_ENET_RX_STATS;
 
-	/* Mark the buffer empty.
-	*/
+	/* Mark the buffer empty. */
 	bdp->cbd_sc |= BD_ENET_RX_EMPTY;
 
-	/* Update BD pointer to next entry.
-	*/
+	/* Update BD pointer to next entry. */
 	if (bdp->cbd_sc & BD_ENET_RX_WRAP)
 		bdp = cep->rx_bd_base;
 	else
@@ -636,8 +684,7 @@ for (;;) {
 static int
 fcc_enet_close(struct net_device *dev)
 {
-	/* Don't know what to do yet.
-	*/
+	/* Don't know what to do yet. */
 	netif_stop_queue(dev);
 
 	return 0;
@@ -650,339 +697,526 @@ static struct net_device_stats *fcc_enet_get_stats(struct net_device *dev)
 	return &cep->stats;
 }
 
-/* The MII is simulated from the 8xx FEC implementation.  The FCC
- * is not responsible for the MII control/status interface.
+#ifdef	CONFIG_USE_MDIO
+
+/* NOTE: Most of the following comes from the FEC driver for 860. The
+ * overall structure of MII code has been retained (as it's proved stable
+ * and well-tested), but actual transfer requests are processed "at once"
+ * instead of being queued (there's no interrupt-driven MII transfer
+ * mechanism, one has to toggle the data/clock bits manually).
  */
-static void
-fcc_enet_mii(struct net_device *dev)
-{
-	struct	fcc_enet_private *fep;
-	mii_list_t	*mip;
-	uint		mii_reg;
-
-	fep = (struct fcc_enet_private *)dev->priv;
-#if 0
-	ep = &(((immap_t *)IMAP_ADDR)->im_cpm.cp_fec);
-	mii_reg = ep->fec_mii_data;
-#endif
-	
-	if ((mip = mii_head) == NULL) {
-		printk("MII and no head!\n");
-		return;
-	}
-
-	if (mip->mii_func != NULL)
-		(*(mip->mii_func))(mii_reg, dev);
-
-	mii_head = mip->mii_next;
-	mip->mii_next = mii_free;
-	mii_free = mip;
-
-#if 0
-	if ((mip = mii_head) != NULL)
-		ep->fec_mii_data = mip->mii_regval;
-#endif
-}
-
 static int
-mii_queue(int regval, void (*func)(uint, struct net_device *))
+mii_queue(struct net_device *dev, int regval, void (*func)(uint, struct net_device *))
 {
-	unsigned long	flags;
-	mii_list_t	*mip;
-	int		retval;
+	struct fcc_enet_private *fep;
+	int		retval, tmp;
+
+	/* Add PHY address to register command. */
+	fep = dev->priv;
+	regval |= fep->phy_addr << 23;
 
 	retval = 0;
 
-	save_flags(flags);
-	cli();
+	tmp = mii_send_receive(fep->fip, regval);
+	if (func)
+		func(tmp, dev);
 
-	if ((mip = mii_free) != NULL) {
-		mii_free = mip->mii_next;
-		mip->mii_regval = regval;
-		mip->mii_func = func;
-		mip->mii_next = NULL;
-		if (mii_head) {
-			mii_tail->mii_next = mip;
-			mii_tail = mip;
-		}
-		else {
-			mii_head = mii_tail = mip;
-#if 0
-			(&(((immap_t *)IMAP_ADDR)->im_cpm.cp_fec))->fec_mii_data = regval;
-#endif
-		}
-	}
-	else {
-		retval = 1;
-	}
-
-	restore_flags(flags);
-
-	return(retval);
+	return retval;
 }
 
-static	volatile uint	full_duplex;
-
-static void
-mii_status(uint mii_reg, struct net_device *dev)
+static void mii_do_cmd(struct net_device *dev, const phy_cmd_t *c)
 {
-	volatile uint	prev_duplex;
+	int k;
 
-	if (((mii_reg >> 18) & 0x1f) == 1) {
-		/* status register.
-		*/
-		printk("fec: ");
-		if (mii_reg & 0x0004)
-			printk("link up");
+	if(!c)
+		return;
+
+	for(k = 0; (c+k)->mii_data != mk_mii_end; k++)
+		mii_queue(dev, (c+k)->mii_data, (c+k)->funct);
+}
+
+static void mii_parse_sr(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_STAT_LINK | PHY_STAT_FAULT | PHY_STAT_ANC);
+
+	if (mii_reg & 0x0004)
+		s |= PHY_STAT_LINK;
+	if (mii_reg & 0x0010)
+		s |= PHY_STAT_FAULT;
+	if (mii_reg & 0x0020)
+		s |= PHY_STAT_ANC;
+
+	fep->phy_status = s;
+	fep->link = (s & PHY_STAT_LINK) ? 1 : 0;
+}
+
+static void mii_parse_cr(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_CONF_ANE | PHY_CONF_LOOP);
+
+	if (mii_reg & 0x1000)
+		s |= PHY_CONF_ANE;
+	if (mii_reg & 0x4000)
+		s |= PHY_CONF_LOOP;
+
+	fep->phy_status = s;
+}
+
+static void mii_parse_anar(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_CONF_SPMASK);
+
+	if (mii_reg & 0x0020)
+		s |= PHY_CONF_10HDX;
+	if (mii_reg & 0x0040)
+		s |= PHY_CONF_10FDX;
+	if (mii_reg & 0x0080)
+		s |= PHY_CONF_100HDX;
+	if (mii_reg & 0x00100)
+		s |= PHY_CONF_100FDX;
+
+	fep->phy_status = s;
+}
+/* ------------------------------------------------------------------------- */
+/* The Level one LXT970 is used by many boards				     */
+
+#ifdef CONFIG_FCC_LXT970
+
+#define MII_LXT970_MIRROR    16  /* Mirror register           */
+#define MII_LXT970_IER       17  /* Interrupt Enable Register */
+#define MII_LXT970_ISR       18  /* Interrupt Status Register */
+#define MII_LXT970_CONFIG    19  /* Configuration Register    */
+#define MII_LXT970_CSR       20  /* Chip Status Register      */
+
+static void mii_parse_lxt970_csr(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_STAT_SPMASK);
+
+	if (mii_reg & 0x0800) {
+		if (mii_reg & 0x1000)
+			s |= PHY_STAT_100FDX;
 		else
-			printk("link down");
-
-		if (mii_reg & 0x0010)
-			printk(",remote fault");
-		if (mii_reg & 0x0020)
-			printk(",auto complete");
-		printk("\n");
+			s |= PHY_STAT_100HDX;
+	} else {
+		if (mii_reg & 0x1000)
+			s |= PHY_STAT_10FDX;
+		else
+			s |= PHY_STAT_10HDX;
 	}
-	if (((mii_reg >> 18) & 0x1f) == 0x14) {
-		/* Extended chip status register.
-		*/
-		prev_duplex = full_duplex;
-		printk("fec: ");
-		if (mii_reg & 0x0800)
-			printk("100 Mbps");
-		else
-			printk("10 Mbps");
 
-		if (mii_reg & 0x1000) {
-			printk(", Full-Duplex\n");
-			full_duplex = 1;
-		}
-		else {
-			printk(", Half-Duplex\n");
-			full_duplex = 0;
-		}
+	fep->phy_status = s;
+}
+
+static phy_info_t phy_info_lxt970 = {
+	0x07810000,
+	"LXT970",
+
+	(const phy_cmd_t []) {  /* config */
 #if 0
-		if (prev_duplex != full_duplex)
-			restart_fec(dev);
-#endif
-	}
-	if (((mii_reg >> 18) & 0x1f) == 31) {
-		/* QS6612 PHY Control/Status.
-		 * OK, now we have it all, so figure out what is going on.
+//		{ mk_mii_write(MII_REG_ANAR, 0x0021), NULL },
+
+		/* Set default operation of 100-TX....for some reason
+		 * some of these bits are set on power up, which is wrong.
 		 */
-		prev_duplex = full_duplex;
-		printk("fec: ");
-
-		mii_reg = (mii_reg >> 2) & 7;
-
-		if (mii_reg & 1)
-			printk("10 Mbps");
-		else
-			printk("100 Mbps");
-
-		if (mii_reg > 4) {
-			printk(", Full-Duplex\n");
-			full_duplex = 1;
-		}
-		else {
-			printk(", Half-Duplex\n");
-			full_duplex = 0;
-		}
-
-#if 0
-		if (prev_duplex != full_duplex)
-			restart_fec(dev);
+		{ mk_mii_write(MII_LXT970_CONFIG, 0), NULL },
 #endif
+		{ mk_mii_read(MII_REG_CR), mii_parse_cr },
+		{ mk_mii_read(MII_REG_ANAR), mii_parse_anar },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* startup - enable interrupts */
+		{ mk_mii_write(MII_LXT970_IER, 0x0002), NULL },
+		{ mk_mii_write(MII_REG_CR, 0x1200), NULL }, /* autonegotiate */
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) { /* ack_int */
+		/* read SR and ISR to acknowledge */
+
+		{ mk_mii_read(MII_REG_SR), mii_parse_sr },
+		{ mk_mii_read(MII_LXT970_ISR), NULL },
+
+		/* find out the current status */
+
+		{ mk_mii_read(MII_LXT970_CSR), mii_parse_lxt970_csr },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* shutdown - disable interrupts */
+		{ mk_mii_write(MII_LXT970_IER, 0x0000), NULL },
+		{ mk_mii_end, }
+	},
+};
+
+#endif /* CONFIG_FEC_LXT970 */
+
+/* ------------------------------------------------------------------------- */
+/* The Level one LXT971 is used on some of my custom boards                  */
+
+#ifdef CONFIG_FCC_LXT971
+
+/* register definitions for the 971 */
+
+#define MII_LXT971_PCR       16  /* Port Control Register     */
+#define MII_LXT971_SR2       17  /* Status Register 2         */
+#define MII_LXT971_IER       18  /* Interrupt Enable Register */
+#define MII_LXT971_ISR       19  /* Interrupt Status Register */
+#define MII_LXT971_LCR       20  /* LED Control Register      */
+#define MII_LXT971_TCR       30  /* Transmit Control Register */
+
+/*
+ * I had some nice ideas of running the MDIO faster...
+ * The 971 should support 8MHz and I tried it, but things acted really
+ * weird, so 2.5 MHz ought to be enough for anyone...
+ */
+
+static void mii_parse_lxt971_sr2(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_STAT_SPMASK);
+
+	if (mii_reg & 0x4000) {
+		if (mii_reg & 0x0200)
+			s |= PHY_STAT_100FDX;
+		else
+			s |= PHY_STAT_100HDX;
+	} else {
+		if (mii_reg & 0x0200)
+			s |= PHY_STAT_10FDX;
+		else
+			s |= PHY_STAT_10HDX;
+	}
+	if (mii_reg & 0x0008)
+		s |= PHY_STAT_FAULT;
+
+	fep->phy_status = s;
+}
+
+static phy_info_t phy_info_lxt971 = {
+	0x0001378e,
+	"LXT971",
+
+	(const phy_cmd_t []) {  /* config */
+//		{ mk_mii_write(MII_REG_ANAR, 0x021), NULL }, /* 10  Mbps, HD */
+		{ mk_mii_read(MII_REG_CR), mii_parse_cr },
+		{ mk_mii_read(MII_REG_ANAR), mii_parse_anar },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* startup - enable interrupts */
+		{ mk_mii_write(MII_LXT971_IER, 0x00f2), NULL },
+		{ mk_mii_write(MII_REG_CR, 0x1200), NULL }, /* autonegotiate */
+
+		/* Somehow does the 971 tell me that the link is down
+		 * the first read after power-up.
+		 * read here to get a valid value in ack_int */
+
+		{ mk_mii_read(MII_REG_SR), mii_parse_sr },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) { /* ack_int */
+		/* find out the current status */
+
+		{ mk_mii_read(MII_REG_SR), mii_parse_sr },
+		{ mk_mii_read(MII_LXT971_SR2), mii_parse_lxt971_sr2 },
+
+		/* we only need to read ISR to acknowledge */
+
+		{ mk_mii_read(MII_LXT971_ISR), NULL },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* shutdown - disable interrupts */
+		{ mk_mii_write(MII_LXT971_IER, 0x0000), NULL },
+		{ mk_mii_end, }
+	},
+};
+
+#endif /* CONFIG_FEC_LXT970 */
+
+
+/* ------------------------------------------------------------------------- */
+/* The Quality Semiconductor QS6612 is used on the RPX CLLF                  */
+
+#ifdef CONFIG_FCC_QS6612
+
+/* register definitions */
+
+#define MII_QS6612_MCR       17  /* Mode Control Register      */
+#define MII_QS6612_FTR       27  /* Factory Test Register      */
+#define MII_QS6612_MCO       28  /* Misc. Control Register     */
+#define MII_QS6612_ISR       29  /* Interrupt Source Register  */
+#define MII_QS6612_IMR       30  /* Interrupt Mask Register    */
+#define MII_QS6612_PCR       31  /* 100BaseTx PHY Control Reg. */
+
+static void mii_parse_qs6612_pcr(uint mii_reg, struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	s &= ~(PHY_STAT_SPMASK);
+
+	switch((mii_reg >> 2) & 7) {
+	case 1: s |= PHY_STAT_10HDX;  break;
+	case 2: s |= PHY_STAT_100HDX; break;
+	case 5: s |= PHY_STAT_10FDX;  break;
+	case 6: s |= PHY_STAT_100FDX; break;
+	}
+
+	fep->phy_status = s;
+}
+
+static phy_info_t phy_info_qs6612 = {
+	0x00181440,
+	"QS6612",
+
+	(const phy_cmd_t []) {  /* config */
+//	{ mk_mii_write(MII_REG_ANAR, 0x061), NULL }, /* 10  Mbps */
+
+		/* The PHY powers up isolated on the RPX,
+		 * so send a command to allow operation.
+		 */
+
+		{ mk_mii_write(MII_QS6612_PCR, 0x0dc0), NULL },
+
+		/* parse cr and anar to get some info */
+
+		{ mk_mii_read(MII_REG_CR), mii_parse_cr },
+		{ mk_mii_read(MII_REG_ANAR), mii_parse_anar },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* startup - enable interrupts */
+		{ mk_mii_write(MII_QS6612_IMR, 0x003a), NULL },
+		{ mk_mii_write(MII_REG_CR, 0x1200), NULL }, /* autonegotiate */
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) { /* ack_int */
+
+		/* we need to read ISR, SR and ANER to acknowledge */
+
+		{ mk_mii_read(MII_QS6612_ISR), NULL },
+		{ mk_mii_read(MII_REG_SR), mii_parse_sr },
+		{ mk_mii_read(MII_REG_ANER), NULL },
+
+		/* read pcr to get info */
+
+		{ mk_mii_read(MII_QS6612_PCR), mii_parse_qs6612_pcr },
+		{ mk_mii_end, }
+	},
+	(const phy_cmd_t []) {  /* shutdown - disable interrupts */
+		{ mk_mii_write(MII_QS6612_IMR, 0x0000), NULL },
+		{ mk_mii_end, }
+	},
+};
+
+
+#endif /* CONFIG_FEC_QS6612 */
+
+
+static phy_info_t *phy_info[] = {
+
+#ifdef CONFIG_FCC_LXT970
+	&phy_info_lxt970,
+#endif /* CONFIG_FEC_LXT970 */
+
+#ifdef CONFIG_FCC_LXT971
+	&phy_info_lxt971,
+#endif /* CONFIG_FEC_LXT971 */
+
+#ifdef CONFIG_FCC_QS6612
+	&phy_info_qs6612,
+#endif /* CONFIG_FEC_LXT971 */
+
+	NULL
+};
+
+static void mii_display_status(struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	if (!fep->link && !fep->old_link) {
+		/* Link is still down - don't print anything */
+		return;
+	}
+
+	printk("%s: status: ", dev->name);
+
+	if (!fep->link) {
+		printk("link down");
+	} else {
+		printk("link up");
+
+		switch(s & PHY_STAT_SPMASK) {
+		case PHY_STAT_100FDX: printk(", 100 Mbps Full Duplex"); break;
+		case PHY_STAT_100HDX: printk(", 100 Mbps Half Duplex"); break;
+		case PHY_STAT_10FDX:  printk(", 10 Mbps Full Duplex");  break;
+		case PHY_STAT_10HDX:  printk(", 10 Mbps Half Duplex");  break;
+		default:
+			printk(", Unknown speed/duplex");
+		}
+
+		if (s & PHY_STAT_ANC)
+			printk(", auto-negotiation complete");
+	}
+
+	if (s & PHY_STAT_FAULT)
+		printk(", remote fault");
+
+	printk(".\n");
+}
+
+static void mii_display_config(struct net_device *dev)
+{
+	volatile struct fcc_enet_private *fep = dev->priv;
+	uint s = fep->phy_status;
+
+	printk("%s: config: auto-negotiation ", dev->name);
+
+	if (s & PHY_CONF_ANE)
+		printk("on");
+	else
+		printk("off");
+
+	if (s & PHY_CONF_100FDX)
+		printk(", 100FDX");
+	if (s & PHY_CONF_100HDX)
+		printk(", 100HDX");
+	if (s & PHY_CONF_10FDX)
+		printk(", 10FDX");
+	if (s & PHY_CONF_10HDX)
+		printk(", 10HDX");
+	if (!(s & PHY_CONF_SPMASK))
+		printk(", No speed/duplex selected?");
+
+	if (s & PHY_CONF_LOOP)
+		printk(", loopback enabled");
+
+	printk(".\n");
+
+	fep->sequence_done = 1;
+}
+
+static void mii_relink(struct net_device *dev)
+{
+	struct fcc_enet_private *fep = dev->priv;
+	int duplex;
+
+	fep->link = (fep->phy_status & PHY_STAT_LINK) ? 1 : 0;
+	mii_display_status(dev);
+	fep->old_link = fep->link;
+
+	if (fep->link) {
+		duplex = 0;
+		if (fep->phy_status
+		    & (PHY_STAT_100FDX | PHY_STAT_10FDX))
+			duplex = 1;
+		fcc_restart(dev, duplex);
+	} else {
+		fcc_stop(dev);
 	}
 }
 
-static	uint	phyno;
+static void mii_queue_relink(uint mii_reg, struct net_device *dev)
+{
+	struct fcc_enet_private *fep = dev->priv;
 
+	fep->phy_task.routine = (void *)mii_relink;
+	fep->phy_task.data = dev;
+	schedule_task(&fep->phy_task);
+}
+
+static void mii_queue_config(uint mii_reg, struct net_device *dev)
+{
+	struct fcc_enet_private *fep = dev->priv;
+
+	fep->phy_task.routine = (void *)mii_display_config;
+	fep->phy_task.data = dev;
+	schedule_task(&fep->phy_task);
+}
+
+
+
+phy_cmd_t phy_cmd_relink[] = { { mk_mii_read(MII_REG_CR), mii_queue_relink },
+			       { mk_mii_end, } };
+phy_cmd_t phy_cmd_config[] = { { mk_mii_read(MII_REG_CR), mii_queue_config },
+			       { mk_mii_end, } };
+
+
+/* Read remainder of PHY ID.
+*/
 static void
 mii_discover_phy3(uint mii_reg, struct net_device *dev)
 {
-	phytype <<= 16;
-	phytype |= (mii_reg & 0xffff);
-	printk("fec: Phy @ 0x%x, type 0x%08x\n", phyno, phytype);
-	mii_startup_cmds();
+	struct fcc_enet_private *fep;
+	int	i;
+
+	fep = dev->priv;
+	fep->phy_id |= (mii_reg & 0xffff);
+
+	for(i = 0; phy_info[i]; i++)
+		if(phy_info[i]->id == (fep->phy_id >> 4))
+			break;
+
+	if(!phy_info[i])
+		panic("%s: PHY id 0x%08x is not supported!\n",
+		      dev->name, fep->phy_id);
+
+	fep->phy = phy_info[i];
+
+	printk("%s: Phy @ 0x%x, type %s (0x%08x)\n",
+		dev->name, fep->phy_addr, fep->phy->name, fep->phy_id);
 }
 
+/* Scan all of the MII PHY addresses looking for someone to respond
+ * with a valid ID.  This usually happens quickly.
+ */
 static void
 mii_discover_phy(uint mii_reg, struct net_device *dev)
 {
-	if (phyno < 32) {
-		if ((phytype = (mii_reg & 0xffff)) != 0xffff) {
-			phyaddr = phyno;
-			mii_queue(mk_mii_read(3), mii_discover_phy3);
+	struct fcc_enet_private *fep;
+	uint	phytype;
+
+	fep = dev->priv;
+
+	if ((phytype = (mii_reg & 0xfff)) != 0xfff) {
+
+		/* Got first part of ID, now get remainder. */
+		fep->phy_id = phytype << 16;
+		mii_queue(dev, mk_mii_read(MII_REG_PHYIR2), mii_discover_phy3);
+	} else {
+		fep->phy_addr++;
+		if (fep->phy_addr < 32) {
+			mii_queue(dev, mk_mii_read(MII_REG_PHYIR1),
+							mii_discover_phy);
+		} else {
+			printk("fec: No PHY device found.\n");
 		}
-		else {
-			phyno++;
-			mii_queue(mk_mii_phyaddr(phyno), mii_discover_phy);
-		}
-	}
-	else {
-		printk("FEC: No PHY device found.\n");
 	}
 }
 
+/* This interrupt occurs when the PHY detects a link change. */
 static void
-mii_discover_phy_poll(fcc_info_t *fip)
+mii_link_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 {
-	uint	rv;
-	int	i;
+	struct	net_device *dev = dev_id;
+	struct fcc_enet_private *fep = dev->priv;
 
-	for (i=0; i<32; i++) {
-		rv = mii_send_receive(fip, mk_mii_phyaddr(i));
-		if ((phytype = (rv & 0xffff)) != 0xffff) {
-			phyaddr = i;
-			rv = mii_send_receive(fip, mk_mii_read(3));
-			phytype <<= 16;
-			phytype |= (rv & 0xffff);
-			printk("fec: Phy @ 0x%x, type 0x%08x\n", phyaddr, phytype);
-		}
-	}
+	mii_do_cmd(dev, fep->phy->ack_int);
+	mii_do_cmd(dev, phy_cmd_relink);  /* restart and display status */
 }
 
-static	void
-mii_startup_cmds(void)
-{
-
-#if 1
-	/* Level One PHY.
-	*/
-
-	/* Read status registers to clear any pending interrupt.
-	*/
-	mii_queue(mk_mii_read(1), mii_status);
-	mii_queue(mk_mii_read(18), mii_status);
-
-	/* Read extended chip status register.
-	*/
-	mii_queue(mk_mii_read(0x14), mii_status);
-
-	/* Set default operation of 100-TX....for some reason
-	 * some of these bits are set on power up, which is wrong.
-	 */
-	mii_queue(mk_mii_write(0x13, 0), NULL);
-
-	/* Enable Link status change interrupts.
-	*/
-	mii_queue(mk_mii_write(0x11, 0x0002), NULL);
-
-	/* Don't advertize Full duplex.
-	mii_queue(mk_mii_write(0x04, 0x0021), NULL);
-	*/
-#endif
-
-}
-
-/* This supports the mii_link interrupt below.
- * We should get called three times.  Once for register 1, once for
- * register 18, and once for register 20.
- */
-static	uint mii_saved_reg1;
-
-static void
-mii_relink(uint mii_reg, struct net_device *dev)
-{
-	volatile uint	prev_duplex;
-	unsigned long	flags;
-
-	if (((mii_reg >> 18) & 0x1f) == 1) {
-		/* Just save the status register and get out.
-		*/
-		mii_saved_reg1 = mii_reg;
-		return;
-	}
-	if (((mii_reg >> 18) & 0x1f) == 18) {
-		/* Not much here, but has to be read to clear the
-		 * interrupt condition.
-		 */
-		if ((mii_reg & 0x8000) == 0)
-			printk("fec: re-link and no IRQ?\n");
-		if ((mii_reg & 0x4000) == 0)
-			printk("fec: no PHY power?\n");
-	}
-	if (((mii_reg >> 18) & 0x1f) == 20) {
-		/* Extended chip status register.
-		 * OK, now we have it all, so figure out what is going on.
-		 */
-		prev_duplex = full_duplex;
-		printk("fec: ");
-		if (mii_saved_reg1 & 0x0004)
-			printk("link up");
-		else
-			printk("link down");
-
-		if (mii_saved_reg1 & 0x0010)
-			printk(", remote fault");
-		if (mii_saved_reg1 & 0x0020)
-			printk(", auto complete");
-
-		if (mii_reg & 0x0800)
-			printk(", 100 Mbps");
-		else
-			printk(", 10 Mbps");
-
-		if (mii_reg & 0x1000) {
-			printk(", Full-Duplex\n");
-			full_duplex = 1;
-		}
-		else {
-			printk(", Half-Duplex\n");
-			full_duplex = 0;
-		}
-		if (prev_duplex != full_duplex) {
-			save_flags(flags);
-			cli();
-#if 0
-			restart_fec(dev);
-#endif
-			restore_flags(flags);
-		}
-	}
-	if (((mii_reg >> 18) & 0x1f) == 31) {
-		/* QS6612 PHY Control/Status.
-		 * OK, now we have it all, so figure out what is going on.
-		 */
-		prev_duplex = full_duplex;
-		printk("fec: ");
-		if (mii_saved_reg1 & 0x0004)
-			printk("link up");
-		else
-			printk("link down");
-
-		if (mii_saved_reg1 & 0x0010)
-			printk(", remote fault");
-		if (mii_saved_reg1 & 0x0020)
-			printk(", auto complete");
-
-		mii_reg = (mii_reg >> 2) & 7;
-
-		if (mii_reg & 1)
-			printk(", 10 Mbps");
-		else
-			printk(", 100 Mbps");
-
-		if (mii_reg > 4) {
-			printk(", Full-Duplex\n");
-			full_duplex = 1;
-		}
-		else {
-			printk(", Half-Duplex\n");
-			full_duplex = 0;
-		}
-
-#if 0
-		if (prev_duplex != full_duplex) {
-			save_flags(flags);
-			cli();
-			restart_fec(dev);
-			restore_flags(flags);
-		}
-#endif
-	}
-}
+#endif	/* CONFIG_USE_MDIO */
 
 /* Set or clear the multicast filter for this adaptor.
  * Skeleton taken from sunlance driver.
@@ -1062,6 +1296,33 @@ return;
 	}
 }
 
+
+/* Set the individual MAC address.
+ */
+int fcc_enet_set_mac_address(struct net_device *dev, void *p)
+{
+	struct sockaddr *addr= (struct sockaddr *) p;
+	struct fcc_enet_private *cep;
+	volatile fcc_enet_t *ep;
+	unsigned char *eap;
+	int i;
+
+	cep = (struct fcc_enet_private *)(dev->priv);
+	ep = cep->ep;
+	
+        if (netif_running(dev))
+                return -EBUSY;
+
+        memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
+	
+	eap = (unsigned char *) &(ep->fen_paddrh);
+	for (i=5; i>=0; i--)
+		*eap++ = addr->sa_data[i];
+
+        return 0;
+}
+
+
 /* Initialize the CPM Ethernet on FCC.
  */
 int __init fec_enet_init(void)
@@ -1113,19 +1374,22 @@ int __init fec_enet_init(void)
 		dev->stop = fcc_enet_close;
 		dev->get_stats = fcc_enet_get_stats;
 		dev->set_multicast_list = set_multicast_list;
+		dev->set_mac_address = fcc_enet_set_mac_address;
 
 		init_fcc_startup(fip, dev);
 
-		printk("%s: FCC ENET Version 0.2, ", dev->name);
+		printk("%s: FCC ENET Version 0.3, ", dev->name);
 		for (i=0; i<5; i++)
 			printk("%02x:", dev->dev_addr[i]);
 		printk("%02x\n", dev->dev_addr[5]);
 
-		/* This is just a hack for now that works only on the EST
-		 * board, or anything else that has MDIO/CK configured.
-		 * It is mainly to test the MII software clocking.
-		 */
-		mii_discover_phy_poll(fip);
+#ifdef	CONFIG_USE_MDIO
+		/* Queue up command to detect the PHY and initialize the
+	 	* remainder of the interface.
+	 	*/
+		cep->phy_addr = 0;
+		mii_queue(dev, mk_mii_read(MII_REG_PHYIR1), mii_discover_phy);
+#endif	/* CONFIG_USE_MDIO */
 
 		fip++;
 	}
@@ -1200,12 +1464,14 @@ init_fcc_ioports(fcc_info_t *fip, volatile iop8260_t *io,
 	io->iop_pdirc &= ~(fip->fc_trxclocks);
 	io->iop_pparc |= fip->fc_trxclocks;
 
+#ifdef	CONFIG_USE_MDIO
 	/* ....and the MII serial clock/data.
 	*/
 	io->iop_pdatc |= (fip->fc_mdio | fip->fc_mdck);
-	io->iop_podrc |= fip->fc_mdio;
+	io->iop_podrc &= ~(fip->fc_mdio | fip->fc_mdck);
 	io->iop_pdirc |= (fip->fc_mdio | fip->fc_mdck);
 	io->iop_pparc &= ~(fip->fc_mdio | fip->fc_mdck);
+#endif	/* CONFIG_USE_MDIO */
 
 	/* Configure Serial Interface clock routing.
 	 * First, clear all FCC bits to zero,
@@ -1446,6 +1712,12 @@ init_fcc_startup(fcc_info_t *fip, struct net_device *dev)
 							"fenet", dev) < 0)
 		printk("Can't get FCC IRQ %d\n", fip->fc_interrupt);
 
+#ifdef	CONFIG_USE_MDIO
+	if (request_8xxirq(PHY_INTERRUPT, mii_link_interrupt, 0,
+							"mii", dev) < 0)
+		printk("Can't get MII IRQ %d\n", fip->fc_interrupt);
+#endif	/* CONFIG_USE_MDIO */
+
 	/* Set GFMR to enable Ethernet operating mode.
 	 */
 	fccp->fcc_gfmr = (FCC_GFMR_TCI | FCC_GFMR_MODE_ENET);
@@ -1460,11 +1732,25 @@ init_fcc_startup(fcc_info_t *fip, struct net_device *dev)
 	 */
 	fccp->fcc_fpsmr = FCC_PSMR_ENCRC;
 
-	/* And last, enable the transmit and receive processing.
+#ifdef CONFIG_ADS8260
+	/* Enable the PHY.
 	*/
-	fccp->fcc_gfmr |= (FCC_GFMR_ENR | FCC_GFMR_ENT);
+	ads_csr_addr[1] |= BCSR1_FETH_RST;	/* Remove reset */
+	ads_csr_addr[1] &= ~BCSR1_FETHIEN;	/* Enable */
+#endif
+
+#if defined(CONFIG_USE_MDIO) || defined(CONFIG_TQM8260)
+	/* start in full duplex mode, and negotiate speed
+	 */
+	fcc_restart (dev, 1);
+#else
+	/* start in half duplex mode
+	 */
+	fcc_restart (dev, 0);
+#endif
 }
 
+#ifdef	CONFIG_USE_MDIO
 /* MII command/status interface.
  * I'm not going to describe all of the details.  You can find the
  * protocol definition in many other places, including the data sheet
@@ -1472,136 +1758,153 @@ init_fcc_startup(fcc_info_t *fip, struct net_device *dev)
  * I wonder what "they" were thinking (maybe weren't) when they leave
  * the I2C in the CPM but I have to toggle these bits......
  */
+
+#define FCC_PDATC_MDIO(bit)					\
+	if (bit)						\
+		io->iop_pdatc |= fip->fc_mdio;			\
+	else							\
+		io->iop_pdatc &= ~fip->fc_mdio;
+
+#define FCC_PDATC_MDC(bit)					\
+	if (bit)						\
+		io->iop_pdatc |= fip->fc_mdck;			\
+	else							\
+		io->iop_pdatc &= ~fip->fc_mdck;
+
 static uint
 mii_send_receive(fcc_info_t *fip, uint cmd)
 {
-	unsigned long	flags;
 	uint		retval;
-	int		read_op, i;
+	int		read_op, i, off;
 	volatile	immap_t		*immap;
 	volatile	iop8260_t	*io;
 
 	immap = (immap_t *)IMAP_ADDR;
 	io = &immap->im_ioport;
 
-	/* When we get here, both clock and data are high, outputs.
-	 * Output is open drain.
-	 * Data transitions on high->low clock, is valid on low->high clock.
-	 * Spec says edge transitions no closer than 160 nSec, minimum clock
-	 * cycle 400 nSec.  I could only manage about 500 nSec edges with
-	 * an XOR loop, so I won't worry about delays yet.
-	 * I disable interrupts during bit flipping to ensure atomic
-	 * updates of the registers.  I do lots of interrupt disable/enable
-	 * to ensure we don't hang out too long with interrupts disabled.
-	 */
-	
-	/* First, crank out 32 1-bits as preamble.
-	 * This is 64 transitions to clock the bits, with clock/data
-	 * left high.
-	 */
-	save_flags(flags);
-	cli();
-	for (i=0; i<64; i++) {
-		io->iop_pdatc ^= fip->fc_mdck;
-		udelay(0);
-	}
-	restore_flags(flags);
+	io->iop_pdirc |= (fip->fc_mdio | fip->fc_mdck);
 
 	read_op = ((cmd & 0xf0000000) == 0x60000000);
 
-	/* We return the command word on a write op, or the command portion
-	 * plus the new data on a read op.  This is what the 8xx FEC does,
-	 * and it allows the functions to simply look at the returned value
-	 * and know the PHY/register as well.
+	/* Write preamble
 	 */
-	if (read_op)
-		retval = cmd;
-	else
-		retval = (cmd >> 16);
-
-	/* Clock out the first 16 MS bits of the command.
-	*/
-	save_flags(flags);
-	cli();
-	for (i=0; i<16; i++) {
-		io->iop_pdatc &= ~(fip->fc_mdck);
-		if (cmd & 0x80000000)
-			io->iop_pdatc |= fip->fc_mdio;
-		else
-			io->iop_pdatc &= ~(fip->fc_mdio);
-		cmd <<= 1;
-		io->iop_pdatc |= fip->fc_mdck;
-		udelay(0);
+	for (i = 0; i < 32; i++)
+	{
+		FCC_PDATC_MDC(0);
+		FCC_PDATC_MDIO(1);
+		udelay(1);
+		FCC_PDATC_MDC(1);
+		udelay(1);
 	}
 
-	/* Do the turn-around.  If read op, we make the IO and input.
-	 * If write op, do the 1/0 thing.
+	/* Write data
 	 */
-	io->iop_pdatc &= ~(fip->fc_mdck);
+	for (i = 0, off = 31; i < (read_op ? 14 : 32); i++, --off)
+	{
+		FCC_PDATC_MDC(0);
+		FCC_PDATC_MDIO((cmd >> off) & 0x00000001);
+		udelay(1);
+		FCC_PDATC_MDC(1);
+		udelay(1);
+	}
+
+	retval = cmd;
+
 	if (read_op)
-		io->iop_pdirc &= ~(fip->fc_mdio);
-	else
-		io->iop_pdatc |= fip->fc_mdio;
-	io->iop_pdatc |= fip->fc_mdck;
+	{
+		retval >>= 16;
 
-	/* I do this mainly to get just a little delay.
-	*/
-	restore_flags(flags);
-	save_flags(flags);
-	cli();
-	io->iop_pdatc &= ~(fip->fc_mdck);
-	io->iop_pdirc &= ~(fip->fc_mdio);
-	io->iop_pdatc |= fip->fc_mdck;
+		FCC_PDATC_MDC(0);
+		io->iop_pdirc &= ~fip->fc_mdio;
+		udelay(1);
+		FCC_PDATC_MDC(1);
+		udelay(1);
+		FCC_PDATC_MDC(0);
+		udelay(1);
 
-	restore_flags(flags);
-	save_flags(flags);
-	cli();
-
-	/* For read, clock in 16 bits.  For write, clock out
-	 * rest of command.
-	 */
-	if (read_op) {
-		io->iop_pdatc &= ~(fip->fc_mdck);
-		udelay(0);
-		for (i=0; i<16; i++) {
-			io->iop_pdatc |= fip->fc_mdck;
-			udelay(0);
+		for (i = 0, off = 15; i < 16; i++, off--)
+		{
+			FCC_PDATC_MDC(1);
 			retval <<= 1;
 			if (io->iop_pdatc & fip->fc_mdio)
-				retval |= 1;
-			io->iop_pdatc &= ~(fip->fc_mdck);
-			udelay(0);
+				retval++;
+			udelay(1);
+			FCC_PDATC_MDC(0);
+			udelay(1);
 		}
 	}
-	else {
-		for (i=0; i<16; i++) {
-			io->iop_pdatc &= ~(fip->fc_mdck);
-			if (cmd & 0x80000000)
-				io->iop_pdatc |= fip->fc_mdio;
-			else
-				io->iop_pdatc &= ~(fip->fc_mdio);
-			cmd <<= 1;
-			io->iop_pdatc |= fip->fc_mdck;
-			udelay(0);
-		}
-		io->iop_pdatc &= ~(fip->fc_mdck);
+
+	io->iop_pdirc |= (fip->fc_mdio | fip->fc_mdck);
+
+	for (i = 0; i < 32; i++)
+	{
+		FCC_PDATC_MDC(0);
+		FCC_PDATC_MDIO(1);
+		udelay(1);
+		FCC_PDATC_MDC(1);
+		udelay(1);
 	}
-	restore_flags(flags);
 
-	/* Some diagrams show two 1 bits for "idle".  I don't know if
-	 * this is really necessary or if it was just to indicate nothing
-	 * is going to happen for a while.
-	 * Make the data pin an output, set the data high, and clock it.
-	 */
-	save_flags(flags);
-	cli();
-	io->iop_pdatc |= fip->fc_mdio;
-	io->iop_pdirc |= fip->fc_mdio;
-	for (i=0; i<3; i++)
-		io->iop_pdatc ^= fip->fc_mdck;
-	restore_flags(flags);
-
-	/* We exit with the same conditions as entry.
-	*/
-	return(retval);
+	return retval;
 }
+
+static void
+fcc_stop(struct net_device *dev)
+{
+	volatile fcc_t	*fccp;
+	struct fcc_enet_private	*fcp;
+
+	fcp = (struct fcc_enet_private *)(dev->priv);
+	fccp = fcp->fccp;
+
+	/* Disable transmit/receive */
+	fccp->fcc_gfmr &= ~(FCC_GFMR_ENR | FCC_GFMR_ENT);
+}
+#endif	/* CONFIG_USE_MDIO */
+	
+static void
+fcc_restart(struct net_device *dev, int duplex)
+{
+	volatile fcc_t	*fccp;
+	struct fcc_enet_private	*fcp;
+
+	fcp = (struct fcc_enet_private *)(dev->priv);
+	fccp = fcp->fccp;
+
+	if (duplex)
+		fccp->fcc_fpsmr |= FCC_PSMR_FDE;
+	else
+		fccp->fcc_fpsmr &= ~FCC_PSMR_FDE;
+
+	/* Enable transmit/receive */
+	fccp->fcc_gfmr |= FCC_GFMR_ENR | FCC_GFMR_ENT;
+}
+
+static int
+fcc_enet_open(struct net_device *dev)
+{
+	struct fcc_enet_private *fep = dev->priv;
+
+#ifdef	CONFIG_USE_MDIO
+	fep->sequence_done = 0;
+	fep->link = 0;
+
+	if (fep->phy) {
+		mii_do_cmd(dev, fep->phy->ack_int);
+		mii_do_cmd(dev, fep->phy->config);
+		mii_do_cmd(dev, phy_cmd_config);  /* display configuration */
+		while(!fep->sequence_done)
+			schedule();
+
+		mii_do_cmd(dev, fep->phy->startup);
+		netif_start_queue(dev);
+		return 0;		/* Success */
+	}
+	return -ENODEV;		/* No PHY we understand */
+#else
+	fep->link = 1;
+	netif_start_queue(dev);
+	return 0;					/* Always succeed */
+#endif	/* CONFIG_USE_MDIO */
+}
+

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.config.c 1.12 09/18/01 11:19:06 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #define m68k_debug_device debug_device
 
@@ -28,7 +28,6 @@
 #ifdef CONFIG_ZORRO
 #include <linux/zorro.h>
 #endif
-#include <linux/seq_file.h>
 
 #include <asm/bootinfo.h>
 #include <asm/setup.h>
@@ -92,7 +91,6 @@ extern void amiga_enable_irq (unsigned int);
 extern void amiga_disable_irq (unsigned int);
 static void amiga_get_model(char *model);
 static int amiga_get_hardware_list(char *buffer);
-extern int show_amiga_interrupts (struct seq_file *, void *);
 /* amiga specific timer functions */
 static unsigned long amiga_gettimeoffset (void);
 static void a3000_gettod (int *, int *, int *, int *, int *, int *);
@@ -412,8 +410,8 @@ void __init config_amiga(void)
   mach_keyb_init       = amiga_keyb_init;
   mach_kbdrate         = amiga_kbdrate;
   mach_init_IRQ        = amiga_init_IRQ;
-  mach_default_handler = &amiga_default_handler;
 #ifndef CONFIG_APUS
+  mach_default_handler = &amiga_default_handler;
   mach_request_irq     = amiga_request_irq;
   mach_free_irq        = amiga_free_irq;
   enable_irq           = amiga_enable_irq;
@@ -421,7 +419,6 @@ void __init config_amiga(void)
 #endif
   mach_get_model       = amiga_get_model;
   mach_get_hardware_list = amiga_get_hardware_list;
-  mach_get_irq_list    = show_amiga_interrupts;
   mach_gettimeoffset   = amiga_gettimeoffset;
   if (AMIGAHW_PRESENT(A3000_CLK)){
     mach_gettod  = a3000_gettod;

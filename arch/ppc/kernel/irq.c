@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.irq.c 1.32 08/24/01 20:07:37 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  arch/ppc/kernel/irq.c
@@ -51,20 +51,15 @@
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
-#include <asm/hydra.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
-#include <asm/gg2.h>
 #include <asm/cache.h>
 #include <asm/prom.h>
-#include <asm/amigaints.h>
-#include <asm/amigahw.h>
-#include <asm/amigappc.h>
 #include <asm/ptrace.h>
 
-#include "local_irq.h"
+#define NR_MASK_WORDS	((NR_IRQS + 31) / 32)
 
 extern atomic_t ipi_recv;
 extern atomic_t ipi_sent;
@@ -190,9 +185,6 @@ setup_irq(unsigned int irq, struct irqaction * new)
  * now, this is what I need. -- Dan
  */
 #define request_irq	request_8xxirq
-#elif defined(CONFIG_APUS)
-#define request_irq	request_sysirq
-#define free_irq	sys_free_irq
 #endif
 
 void free_irq(unsigned int irq, void* dev_id)
@@ -374,15 +366,12 @@ void enable_irq(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-#ifdef CONFIG_APUS
-	return show_apus_interrupts(p, v);
-#else
 	int i, j;
 	struct irqaction * action;
 
 	seq_puts(p, "           ");
 	for (j=0; j<smp_num_cpus; j++)
-		seq_printf(p, "CPU%d       ",j);
+		seq_printf(p, "CPU%d       ", j);
 	seq_putc(p, '\n');
 
 	for (i = 0 ; i < NR_IRQS ; i++) {
@@ -393,38 +382,35 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifdef CONFIG_SMP
 		for (j = 0; j < smp_num_cpus; j++)
 			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+				   kstat.irqs[cpu_logical_map(j)][i]);
 #else		
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
-		if ( irq_desc[i].handler )		
-			seq_printf(p, " %s ", irq_desc[i].handler->typename );
+		if (irq_desc[i].handler)		
+			seq_printf(p, " %s ", irq_desc[i].handler->typename);
 		else
 			seq_puts(p, "  None      ");
 		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
-		seq_printf(p, "    %s",action->name);
-		for (action=action->next; action; action = action->next) {
+		seq_printf(p, "    %s", action->name);
+		for (action = action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
-		}
 		seq_putc(p, '\n');
 	}
 #ifdef CONFIG_TAU_INT
 	if (tau_initialized){
 		seq_puts(p, "TAU: ");
 		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-					tau_interrupts(j));
+			seq_printf(p, "%10u ", tau_interrupts(j));
 		seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
 	}
 #endif
 #ifdef CONFIG_SMP
 	/* should this be per processor send/receive? */
 	seq_printf(p, "IPI (recv/sent): %10u/%u\n",
-		       atomic_read(&ipi_recv), atomic_read(&ipi_sent));
+		   atomic_read(&ipi_recv), atomic_read(&ipi_sent));
 #endif		
 	seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
 	return 0;
-#endif /* CONFIG_APUS */
 }
 
 static inline void
@@ -535,31 +521,35 @@ out:
 	spin_unlock(&desc->lock);
 }
 
+#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_pic.c */
 int do_IRQ(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
-	int irq;
-        hardirq_enter(cpu);
+	int irq, first = 1;
+        hardirq_enter( cpu );
 
-	/* every arch is required to have a get_irq -- Cort */
-	irq = ppc_md.get_irq(regs);
-
-	if (irq >= 0) {
-		ppc_irq_dispatch_handler( regs, irq );
-	} else if (irq != -2) {
-		/* -2 means ignore, already handled */
-		if (ppc_spurious_interrupts < 10)
-			printk(KERN_DEBUG "Bogus interrupt %d from PC = %lx\n",
-			       irq, regs->nip);
+	/*
+	 * Every platform is required to implement ppc_md.get_irq.
+	 * This function will either return an irq number or -1 to
+	 * indicate there are no more pending.  But the first time
+	 * through the loop this means there wasn't and IRQ pending.
+	 * The value -2 is for buggy hardware and means that this IRQ
+	 * has already been handled. -- Tom
+	 */
+	while ((irq = ppc_md.get_irq(regs)) >= 0) {
+		ppc_irq_dispatch_handler(regs, irq);
+		first = 0;
+	}
+	if (irq != -2 && first)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
-	}
         hardirq_exit( cpu );
 
 	if (softirq_pending(cpu))
 		do_softirq();
 	return 1; /* lets ret_from_int know we can do checks */
 }
+#endif /* CONFIG_PPC_ISERIES */
 
 unsigned long probe_irq_on (void)
 {
@@ -591,7 +581,6 @@ void __init init_IRQ(void)
 #ifdef CONFIG_SMP
 unsigned char global_irq_holder = NO_PROC_ID;
 unsigned volatile long global_irq_lock; /* pendantic :long for set_bit--RR*/
-atomic_t global_irq_count;
 
 atomic_t global_bh_count;
 
@@ -602,8 +591,7 @@ static void show(char * str)
 	int cpu = smp_processor_id();
 
 	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  %d [%d %d]\n",
-	       atomic_read(&global_irq_count),
+	printk("irq:  [%d %d]\n",
 	       local_irq_count(0),
 	       local_irq_count(1));
 	printk("bh:   %d [%d %d]\n",
@@ -643,11 +631,9 @@ static inline void wait_on_irq(int cpu)
 		 * for bottom half handlers unless we're
 		 * already executing in one..
 		 */
-		if (!atomic_read(&global_irq_count)) {
-			if (local_bh_count(cpu)
-			    || !atomic_read(&global_bh_count))
-				break;
-		}
+		if (!irqs_running())
+			if (local_bh_count(cpu) || !spin_is_locked(&global_bh_lock))
+					break;
 
 		/* Duh, we have to loop. Release the lock to avoid deadlocks */
 		clear_bit(0,&global_irq_lock);
@@ -658,16 +644,19 @@ static inline void wait_on_irq(int cpu)
 				count = ~0;
 			}
 			__sti();
-			/* don't worry about the lock race Linus found
-			 * on intel here. -- Cort
+			/* 
+			 * We have to allow irqs to arrive between __sti and __cli
+			 * Some cpus apparently won't cause the interrupt
+			 * for several instructions. We hope that isync will
+			 * catch this --Troy
 			 */
+			__asm__ __volatile__ ("isync");
 			__cli();
-			if (atomic_read(&global_irq_count))
+			if (irqs_running())
 				continue;
 			if (global_irq_lock)
 				continue;
-			if (!local_bh_count(cpu)
-			    && atomic_read(&global_bh_count))
+			if (!local_bh_count(cpu) && spin_is_locked(&global_bh_lock))
 				continue;
 			if (!test_and_set_bit(0,&global_irq_lock))
 				break;
@@ -698,7 +687,7 @@ void synchronize_bh(void)
  */
 void synchronize_irq(void)
 {
-	if (atomic_read(&global_irq_count)) {
+	if (irqs_running()) {
 		/* Stupid approach */
 		cli();
 		sti();

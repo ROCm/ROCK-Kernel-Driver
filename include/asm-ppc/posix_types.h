@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.posix_types.h 1.5 05/17/01 18:14:25 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _PPC_POSIX_TYPES_H
 #define _PPC_POSIX_TYPES_H
@@ -11,7 +11,7 @@
  */
 
 typedef unsigned int	__kernel_dev_t;
-typedef unsigned int	__kernel_ino_t;
+typedef unsigned long	__kernel_ino_t;
 typedef unsigned int	__kernel_mode_t;
 typedef unsigned short	__kernel_nlink_t;
 typedef long		__kernel_off_t;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.bitops.c 1.7 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Copyright (C) 1996 Paul Mackerras.
@@ -21,8 +21,9 @@ void set_bit(int nr, volatile void * addr)
 	
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%3 \n\
-	or	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	or	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=m" (*p)
@@ -38,8 +39,9 @@ void clear_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%3 \n\
-	andc	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	andc	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=m" (*p)
@@ -55,8 +57,9 @@ void change_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%3 \n\
-	xor	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	xor	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=m" (*p)
@@ -72,8 +75,9 @@ int test_and_set_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	or	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	or	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)
@@ -91,8 +95,9 @@ int test_and_clear_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	andc	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	andc	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)
@@ -110,8 +115,9 @@ int test_and_change_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	xor	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	xor	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)

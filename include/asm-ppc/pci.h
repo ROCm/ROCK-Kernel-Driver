@@ -1,9 +1,18 @@
 /*
- * BK Id: SCCS/s.pci.h 1.16 10/15/01 22:51:33 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef __PPC_PCI_H
 #define __PPC_PCI_H
 #ifdef __KERNEL__
+
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+#include <linux/mm.h>
+#include <asm/scatterlist.h>
+#include <asm/io.h>
+
+struct pci_dev;
 
 /* Values for the `which' argument to sys_pciconfig_iobase syscall.  */
 #define IOBASE_BRIDGE_NUMBER	0
@@ -12,8 +21,13 @@
 #define IOBASE_ISA_IO		3
 #define IOBASE_ISA_MEM		4
 
+/*
+ * Set this to 1 if you want the kernel to re-assign all PCI
+ * bus numbers
+ */
+extern int pci_assign_all_busses;
 
-extern int pcibios_assign_all_busses(void);
+#define pcibios_assign_all_busses()	(pci_assign_all_busses)
 
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
@@ -159,7 +173,6 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 	for (i = 0; i < nents; i++) {
 		if (!sg[i].page)
 			BUG();
-
 		sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
 	}
 
@@ -250,14 +263,6 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 {
 	/* Nothing to do. */
 }
-
-/* These macros should be used after a pci_map_sg call has been done
- * to get bus addresses of each of the SG entries and their lengths.
- * You should only work with the number of sg entries pci_map_sg
- * returns.
- */
-#define sg_dma_address(sg)	((sg)->dma_address)
-#define sg_dma_len(sg)		((sg)->length)
 
 /* Return the index of the PCI controller for device PDEV. */
 extern int pci_controller_num(struct pci_dev *pdev);

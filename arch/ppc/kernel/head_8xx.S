@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head_8xx.S 1.23 09/16/01 19:32:54 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  arch/ppc/kernel/except_8xx.S
@@ -24,14 +24,16 @@
  *	
  */
 
-#include "ppc_asm.h"
+#include <linux/config.h>
 #include <asm/processor.h>
 #include <asm/page.h>
-#include <linux/config.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
+#include <asm/ppc_asm.h>
+#include "ppc_defs.h"
 
 	.text
 	.globl	_stext
@@ -334,7 +336,7 @@ InstructionTLBMiss:
 	beq	2f		/* If zero, don't try to find a pte */
 
 	/* We have a pte table, so load the MI_TWC with the attributes
-	 * for this page, which has only bit 31 set.
+	 * for this "segment."
 	 */
 	tophys(r21,r21)
 	ori	r21,r21,1		/* Set valid bit */
@@ -343,7 +345,7 @@ InstructionTLBMiss:
 	stw	r3, 12(r0)
 	lwz	r3, 12(r0)
 #endif
-	mtspr	MI_TWC, r21	/* Set page attributes */
+	mtspr	MI_TWC, r21	/* Set segment attributes */
 #ifdef CONFIG_8xx_CPU6
 	li	r3, 0x3b80
 	stw	r3, 12(r0)
@@ -362,8 +364,6 @@ InstructionTLBMiss:
 	 * set.  All other Linux PTE bits control the behavior
 	 * of the MMU.
 	 */
-	li	r21, 0x0600
-	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
 	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
 
@@ -456,8 +456,6 @@ DataStoreTLBMiss:
 	 * set.  All other Linux PTE bits control the behavior
 	 * of the MMU.
 	 */
-	li	r21, 0x0600
-	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
 	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
 
@@ -521,6 +519,34 @@ DataTLBError:
 	andis.	r21, r20, 0x0200	/* If set, indicates store op */
 	beq	2f
 
+	/* The EA of a data TLB miss is automatically stored in the MD_EPN 
+	 * register.  The EA of a data TLB error is automatically stored in 
+	 * the DAR, but not the MD_EPN register.  We must copy the 20 most 
+	 * significant bits of the EA from the DAR to MD_EPN before we 
+	 * start walking the page tables.  We also need to copy the CASID 
+	 * value from the M_CASID register.
+	 * Addendum:  The EA of a data TLB error is _supposed_ to be stored 
+	 * in DAR, but it seems that this doesn't happen in some cases, such 
+	 * as when the error is due to a dcbi instruction to a page with a 
+	 * TLB that doesn't have the changed bit set.  In such cases, there 
+	 * does not appear to be any way  to recover the EA of the error 
+	 * since it is neither in DAR nor MD_EPN.  As a workaround, the 
+	 * _PAGE_HWWRITE bit is set for all kernel data pages when the PTEs 
+	 * are initialized in mapin_ram().  This will avoid the problem, 
+	 * assuming we only use the dcbi instruction on kernel addresses.
+	 */
+	mfspr	r20, DAR
+	rlwinm	r21, r20, 0, 0, 19
+	ori	r21, r21, MD_EVALID
+	mfspr	r20, M_CASID
+	rlwimi	r21, r20, 0, 28, 31
+#ifdef CONFIG_8xx_CPU6
+	li	r3, 0x3780
+	stw	r3, 12(r0)
+	lwz	r3, 12(r0)
+#endif
+	mtspr	MD_EPN, r21
+
 	mfspr	r20, M_TWB	/* Get level 1 table entry address */
 
 	/* If we are faulting a kernel address, we have to use the
@@ -564,8 +590,6 @@ DataTLBError:
 	 * set.  All other Linux PTE bits control the behavior
 	 * of the MMU.
 	 */
-	li	r21, 0x0600
-	andc	r20, r20, r21		/* Clear 21, 22 */
 	li	r21, 0x00f0
 	rlwimi	r20, r21, 0, 24, 28	/* Set 24-27, clear 28 */
 
@@ -659,9 +683,9 @@ transfer_to_handler:
  */
 stack_ovf:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_task_union@ha
-	addi	r1,r1,init_task_union@l
-	addi	r1,r1,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
+	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	lis	r24,StackOverflow@ha
 	addi	r24,r24,StackOverflow@l
 	li	r20,MSR_KERNEL
@@ -685,8 +709,8 @@ _GLOBAL(__setup_cpu_8xx)
 start_here:
 
 	/* ptr to current */
-	lis	r2,init_task_union@h
-	ori	r2,r2,init_task_union@l
+	lis	r2,init_task@h
+	ori	r2,r2,init_task@l
 
 	/* ptr to phys current thread */
 	tophys(r4,r2)
@@ -696,9 +720,10 @@ start_here:
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
 
 	/* stack */
-	addi	r1,r2,TASK_UNION_SIZE
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
 	li	r0,0
-	stwu	r0,-STACK_FRAME_OVERHEAD(r1)
+	stwu	r0,THREAD_SIZE-STACK_FRAME_OVERHEAD(r1)
 
 	bl	early_init	/* We have to do this with MMU on */
 
@@ -769,16 +794,31 @@ start_here:
  * kernel initialization.  This maps the first 8 MBytes of memory 1:1
  * virtual to physical.  Also, set the cache mode since that is defined
  * by TLB entries and perform any additional mapping (like of the IMMR).
+ * If configured to pin some TLBs, we pin the first 8 Mbytes of kernel,
+ * 24 Mbytes of data, and the 8M IMMR space.  Anything not covered by
+ * these mappings is mapped by page tables.
  */
 initial_mmu:
 	tlbia			/* Invalidate all TLB entries */
+#ifdef CONFIG_PIN_TLB
+	lis	r8, MI_RSV4I@h
+	ori	r8, r8, 0x1c00
+#else
 	li	r8, 0
-	mtspr	MI_CTR, r8	/* Set instruction control to zero */
-	lis	r8, MD_RESETVAL@h
-#ifndef CONFIG_8xx_COPYBACK
-	oris	r8, r8, MD_WTDEF@h
 #endif
-	mtspr	MD_CTR, r8	/* Set data TLB control */
+	mtspr	MI_CTR, r8	/* Set instruction MMU control */
+
+#ifdef CONFIG_PIN_TLB
+	lis	r10, (MD_RSV4I | MD_RESETVAL)@h
+	ori	r10, r10, 0x1c00
+	mr	r8, r10
+#else
+	lis	r10, MD_RESETVAL@h
+#endif
+#ifndef CONFIG_8xx_COPYBACK
+	oris	r10, r10, MD_WTDEF@h
+#endif
+	mtspr	MD_CTR, r10	/* Set data TLB control */
 
 	/* Now map the lower 8 Meg into the TLBs.  For this quick hack,
 	 * we can load the instruction and data TLB registers with the
@@ -802,6 +842,10 @@ initial_mmu:
 	/* Map another 8 MByte at the IMMR to get the processor
 	 * internal registers (among other things).
 	 */
+#ifdef CONFIG_PIN_TLB
+	addi	r10, r10, 0x0100
+	mtspr	MD_CTR, r10
+#endif
 	mfspr	r9, 638			/* Get current IMMR */
 	andis.	r9, r9, 0xff80		/* Get 8Mbyte boundary */
 
@@ -814,6 +858,30 @@ initial_mmu:
 	mr	r8, r9			/* Create paddr for TLB */
 	ori	r8, r8, MI_BOOTINIT|0x2 /* Inhibit cache -- Cort */
 	mtspr	MD_RPN, r8
+
+#ifdef CONFIG_PIN_TLB
+	/* Map two more 8M kernel data pages.
+	*/
+	addi	r10, r10, 0x0100
+	mtspr	MD_CTR, r10
+
+	lis	r8, KERNELBASE@h	/* Create vaddr for TLB */
+	addis	r8, r8, 0x0080		/* Add 8M */
+	ori	r8, r8, MI_EVALID	/* Mark it valid */
+	mtspr	MD_EPN, r8
+	li	r9, MI_PS8MEG		/* Set 8M byte page */
+	ori	r9, r9, MI_SVALID	/* Make it valid */
+	mtspr	MD_TWC, r9
+	li	r11, MI_BOOTINIT	/* Create RPN for address 0 */
+	addis	r11, r11, 0x0080	/* Add 8M */
+	mtspr	MD_RPN, r8
+
+	addis	r8, r8, 0x0080		/* Add 8M */
+	mtspr	MD_EPN, r8
+	mtspr	MD_TWC, r9
+	addis	r11, r11, 0x0080	/* Add 8M */
+	mtspr	MD_RPN, r8
+#endif
 
 	/* Since the cache is enabled according to the information we
 	 * just loaded into the TLB, invalidate and enable the caches here.
@@ -903,6 +971,10 @@ set_dec_cpu6:
 	.data
 	.globl	sdata
 sdata:
+	.globl	init_thread_union
+init_thread_union:
+	.space	8192
+
 	.globl	empty_zero_page
 empty_zero_page:
 	.space	4096

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.qspan_pci.c 1.5 05/17/01 18:14:22 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * QSpan pci routines.
@@ -29,8 +29,7 @@
 #include <asm/mpc8xx.h>
 #include <asm/system.h>
 #include <asm/machdep.h>
-
-#include "pci.h"
+#include <asm/pci-bridge.h>
 
 
 /*

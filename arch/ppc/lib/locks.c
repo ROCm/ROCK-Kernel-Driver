@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.locks.c 1.11 08/19/01 22:27:32 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Locks for smp ppc 
@@ -35,8 +35,9 @@ static unsigned long __spin_trylock(volatile unsigned long *lock)
 	__asm__ __volatile__ ("\n\
 1:	lwarx	%0,0,%1\n\
 	cmpwi	0,%0,0\n\
-	bne	2f\n\
-	stwcx.	%2,0,%1\n\
+	bne	2f\n"
+	PPC405_ERR77(0,%1)
+"	stwcx.	%2,0,%1\n\
 	bne-	1b\n\
 	isync\n\
 2:"

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.uart.c 1.6 05/17/01 18:14:20 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  UART driver for MPC8260 CPM SCC or SMC
@@ -53,12 +53,21 @@
 #ifdef CONFIG_SERIAL_CONSOLE
 #include <linux/console.h>
 
+/* SCC Console configuration.  Not quite finished.  The SCC_CONSOLE
+ * should be the number of the SCC to use, but only SCC1 will
+ * work at this time.
+ */
+#ifdef CONFIG_SCC_CONSOLE
+#define SCC_CONSOLE 1
+#endif
+
 /* this defines the index into rs_table for the port to use
 */
 #ifndef CONFIG_SERIAL_CONSOLE_PORT
 #define CONFIG_SERIAL_CONSOLE_PORT	0
 #endif
 #endif
+#define CONFIG_SERIAL_CONSOLE_PORT	0
 
 #define TX_WAKEUP	ASYNC_SHARE_IRQ
 
@@ -105,6 +114,18 @@ static int serial_console_setup(struct console *co, char *options);
  */
 #define smc_scc_num	hub6
 
+/* The choice of serial port to use for KGDB.  If the system has
+ * two ports, you can use one for console and one for KGDB (which
+ * doesn't make sense to me, but people asked for it).
+ */
+#ifdef CONFIG_KGDB_TTYS1
+#define KGDB_SER_IDX 1		/* SCC2/SMC2 */
+#else
+#define KGDB_SER_IDX 0		/* SCC1/SMC1 */
+#endif
+
+#ifndef SCC_CONSOLE
+
 /* SMC2 is sometimes used for low performance TDM interfaces.  Define
  * this as 1 if you want SMC2 as a serial port UART managed by this driver.
  * Define this as 0 if you wish to use SMC2 for something else.
@@ -129,9 +150,25 @@ static struct serial_state rs_table[] = {
 #if USE_SMC2
 	{ 0,     0, PROFF_SMC2, SIU_INT_SMC2,   0,    1 },    /* SMC2 ttyS1 */
 #endif
-	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE},    /* SCC2 ttyS2 */
-	{ 0,     0, PROFF_SCC3, SIU_INT_SCC3,   0, SCC_NUM_BASE + 1},    /* SCC3 ttyS3 */
+#ifndef CONFIG_SCC1_ENET
+	{ 0,     0, PROFF_SCC1, SIU_INT_SCC1,   0, SCC_NUM_BASE},    /* SCC1 ttyS2 */
+#endif
+#ifndef CONFIG_SCC2_ENET
+	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE + 1},    /* SCC2 ttyS3 */
+#endif
 };
+
+#else /* SCC_CONSOLE */
+#define SCC_NUM_BASE	0	/* SCC base tty "number" */
+#define SCC_IDX_BASE	0	/* table index */
+static struct serial_state rs_table[] = {
+	/* UART CLK   PORT          IRQ      FLAGS  NUM   */
+	{ 0,     0, PROFF_SCC1, SIU_INT_SCC1,   0, SCC_NUM_BASE},    /* SCC1 ttyS2 */
+	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE + 1},    /* SCC2 ttyS3 */
+};
+#endif /* SCC_CONSOLE */
+
+#define PORT_NUM(P)	(((P) < (SCC_NUM_BASE)) ? (P) : (P)-(SCC_NUM_BASE))
 
 #define NR_PORTS	(sizeof(rs_table)/sizeof(struct serial_state))
 
@@ -349,6 +386,13 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 		i = bdp->cbd_datlen;
 		cp = (unsigned char *)__va(bdp->cbd_bufaddr);
 		status = bdp->cbd_sc;
+#ifdef CONFIG_KGDB
+		if (info->state->smc_scc_num == KGDB_SER_IDX) {
+			if (*cp == 0x03 || *cp == '$')
+				breakpoint();
+			return;
+		}
+#endif
 
 		/* Check to see if there is room in the tty buffer for
 		 * the characters in our BD buffer.  If not, we exit
@@ -775,7 +819,10 @@ static void shutdown(ser_info_t * info)
 	else {
 		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
 		sccp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
-		sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+#ifdef CONFIG_SERIAL_CONSOLE
+		if (idx != CONFIG_SERIAL_CONSOLE_PORT)
+			sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+#endif
 	}
 	
 	if (info->tty)
@@ -1736,7 +1783,7 @@ static void rs_8xx_wait_until_sent(struct tty_struct *tty, int timeout)
 		schedule_timeout(char_time);
 		if (signal_pending(current))
 			break;
-		if (timeout && ((orig_jiffies + timeout) < jiffies))
+		if (timeout && time_after(jiffies, orig_jiffies + timeout))
 			break;
 		bdp = info->tx_cur;
 	} while (bdp->cbd_sc & BD_SC_READY);
@@ -2006,7 +2053,7 @@ static int inline line_info(char *buf, struct serial_state *state)
 	ret = sprintf(buf, "%d: uart:%s port:%X irq:%d",
 		      state->line,
 		      (state->smc_scc_num < SCC_NUM_BASE) ? "SMC" : "SCC",
-		      state->port, state->irq);
+		      (unsigned int)(state->port), state->irq);
 
 	if (!state->port || (state->type == PORT_UNKNOWN)) {
 		ret += sprintf(buf+ret, "\n");
@@ -2129,8 +2176,11 @@ static _INLINE_ void show_serial_version(void)
 /*
  * Print a string to the serial port trying not to disturb any possible
  * real use of the port...
+ * These funcitons work equally well for SCC, even though they are
+ * designed for SMC.  Our only interests are the transmit/receive
+ * buffers, which are identically mapped for either the SCC or SMC.
  */
-static void serial_console_write(struct console *c, const char *s,
+static void my_console_write(int idx, const char *s,
 				unsigned count)
 {
 	struct		serial_state	*ser;
@@ -2140,7 +2190,7 @@ static void serial_console_write(struct console *c, const char *s,
 	volatile	smc_uart_t	*up;
 	volatile	u_char		*cp;
 
-	ser = rs_table + c->index;
+	ser = rs_table + idx;
 
 	/* If the port has been initialized for general use, we have
 	 * to use the buffer descriptors allocated there.  Otherwise,
@@ -2177,8 +2227,15 @@ static void serial_console_write(struct console *c, const char *s,
 		 * that, not that it is ready for us to send.
 		 */
 		while (bdp->cbd_sc & BD_SC_READY);
-		/* Send the character out. */
-		cp = __va(bdp->cbd_bufaddr);
+
+		/* Send the character out.
+		 * If the buffer address is in the CPM DPRAM, don't
+		 * convert it.
+		 */
+		if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
+			cp = (u_char *)(bdp->cbd_bufaddr);
+		else
+			cp = __va(bdp->cbd_bufaddr);
 		*cp = *s;
 		
 		bdp->cbd_datlen = 1;
@@ -2216,9 +2273,196 @@ static void serial_console_write(struct console *c, const char *s,
 		info->tx_cur = (cbd_t *)bdp;
 }
 
+static void serial_console_write(struct console *c, const char *s,
+				unsigned count)
+{
+#if defined(CONFIG_KGDB) && !defined(CONFIG_USE_SERIAL2_KGDB)
+	/* Try to let stub handle output. Returns true if it did. */ 
+	if (kgdb_output_string(s, count))
+		return;
+#endif
+	my_console_write(c->index, s, count);
+}
+
+#ifdef CONFIG_XMON
+int
+xmon_8xx_write(const char *s, unsigned count)
+{
+	my_console_write(KGDB_SER_IDX, s, count);
+	return(count);
+}
+#endif
+
+#ifdef CONFIG_KGDB
+void
+putDebugChar(char ch)
+{
+	my_console_write(KGDB_SER_IDX, &ch, 1);
+}
+#endif
+
+#if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
+/*
+ * Receive character from the serial port.  This only works well
+ * before the port is initialize for real use.
+ */
+static int my_console_wait_key(int idx, int xmon, char *obuf)
+{
+	struct serial_state		*ser;
+	u_char				c, *cp;
+	ser_info_t			*info;
+	volatile	cbd_t		*bdp;
+	volatile	smc_uart_t	*up;
+	int				i;
+
+	ser = rs_table + idx;
+
+	/* Pointer to UART in parameter ram.
+	*/
+	up = (smc_uart_t *)&immr->im_dprambase[ser->port];
+
+	/* Get the address of the host memory buffer.
+	 * If the port has been initialized for general use, we must
+	 * use information from the port structure.
+	 */
+	if ((info = (ser_info_t *)ser->info))
+		bdp = info->rx_cur;
+	else
+		bdp = (cbd_t *)&immr->im_dprambase[up->smc_rbase];
+
+	/*
+	 * We need to gracefully shut down the receiver, disable
+	 * interrupts, then read the input.
+	 * XMON just wants a poll.  If no character, return -1, else
+	 * return the character.
+	 */
+	if (!xmon) {
+		while (bdp->cbd_sc & BD_SC_EMPTY);
+	}
+	else {
+		if (bdp->cbd_sc & BD_SC_EMPTY)
+			return -1;
+	}
+
+	/* If the buffer address is in the CPM DPRAM, don't
+	 * convert it.
+	 */
+	if ((uint)(bdp->cbd_bufaddr) > (uint)IMAP_ADDR)
+		cp = (u_char *)(bdp->cbd_bufaddr);
+	else
+		cp = __va(bdp->cbd_bufaddr);
+
+	if (obuf) {
+		i = c = bdp->cbd_datlen;
+		while (i-- > 0)
+			*obuf++ = *cp++;
+	}
+	else {
+		c = *cp;
+	}
+	bdp->cbd_sc |= BD_SC_EMPTY;
+
+	if (info) {
+		if (bdp->cbd_sc & BD_SC_WRAP) {
+			bdp = info->rx_bd_base;
+		}
+		else {
+			bdp++;
+		}
+		info->rx_cur = (cbd_t *)bdp;
+	}
+
+	return((int)c);
+}
+#endif /* CONFIG_XMON || CONFIG_KGDB */
+
+#ifdef CONFIG_XMON
+int
+xmon_8xx_read_poll(void)
+{
+	return(my_console_wait_key(KGDB_SER_IDX, 1, NULL));
+}
+
+int
+xmon_8xx_read_char(void)
+{
+	return(my_console_wait_key(KGDB_SER_IDX, 0, NULL));
+}
+#endif
+
+#ifdef CONFIG_KGDB
+static char kgdb_buf[RX_BUF_SIZE], *kgdp;
+static int kgdb_chars;
+
+char
+getDebugChar(void)
+{
+	if (kgdb_chars <= 0) {
+		kgdb_chars = my_console_wait_key(KGDB_SER_IDX, 0, kgdb_buf);
+		kgdp = kgdb_buf;
+	}
+	kgdb_chars--;
+
+	return(*kgdp++);
+}
+
+void kgdb_interruptible(int yes)
+{
+	volatile smc_t	*smcp;
+
+	smcp = &immr->im_smc[KGDB_SER_IDX];
+
+	if (yes == 1)
+		smcp->smc_smcm |= SMCM_RX;
+	else
+		smcp->smc_smcm &= ~SMCM_RX;
+}
+
+void kgdb_map_scc(void)
+{
+	ushort		serbase;
+	uint		mem_addr;
+	volatile	cbd_t		*bdp;
+	volatile	smc_uart_t	*up;
+
+	/* The serial port has already been initialized before
+	 * we get here.  We have to assign some pointers needed by
+	 * the kernel, and grab a memory location in the CPM that will
+	 * work until the driver is really initialized.
+	 */
+	immr = (immap_t *)IMAP_ADDR;
+
+	/* Right now, assume we are using SMCs.
+	*/
+#ifdef USE_KGDB_SMC2
+	*(ushort *)(&immr->im_dprambase[PROFF_SMC2_BASE]) = serbase = PROFF_SMC2;
+#else
+	*(ushort *)(&immr->im_dprambase[PROFF_SMC1_BASE]) = serbase = PROFF_SMC1;
+#endif
+	up = (smc_uart_t *)&immr->im_dprambase[serbase];
+
+	/* Allocate space for an input FIFO, plus a few bytes for output.
+	 * Allocate bytes to maintain word alignment.
+	 */
+	mem_addr = (uint)(&immr->im_dprambase[0x1000]);
+
+	/* Set the physical address of the host memory buffers in
+	 * the buffer descriptors.
+	 */
+	bdp = (cbd_t *)&immr->im_dprambase[up->smc_rbase];
+	bdp->cbd_bufaddr = mem_addr;
+
+	bdp = (cbd_t *)&immr->im_dprambase[up->smc_tbase];
+	bdp->cbd_bufaddr = mem_addr+RX_BUF_SIZE;
+
+	up->smc_mrblr = RX_BUF_SIZE;		/* receive buffer length */
+	up->smc_maxidl = RX_BUF_SIZE;
+}
+#endif
+
 static kdev_t serial_console_device(struct console *c)
 {
-	return MKDEV(TTYAUX_MAJOR, 64 + c->index);
+	return MKDEV(TTY_MAJOR, 64 + c->index);
 }
 
 
@@ -2276,7 +2520,11 @@ int __init rs_8xx_init(void)
 	__clear_user(&serial_driver,sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
 	serial_driver.driver_name = "serial";
+#ifdef CONFIG_DEVFS_FS
+	serial_driver.name = "tts/%d";
+#else
 	serial_driver.name = "ttyS";
+#endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
 	serial_driver.num = NR_PORTS;
@@ -2314,7 +2562,11 @@ int __init rs_8xx_init(void)
 	 * major number and the subtype code.
 	 */
 	callout_driver = serial_driver;
+#ifdef CONFIG_DEVFS_FS
+	callout_driver.name = "cua/%d";
+#else
 	callout_driver.name = "cua";
+#endif
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 	callout_driver.read_proc = 0;
@@ -2340,6 +2592,7 @@ int __init rs_8xx_init(void)
 	 * Configure SMCs Tx/Rx.  SMC1 is only on Port D, SMC2 is
 	 * only on Port A.  You either pick 'em, or not.
 	 */
+#ifndef SCC_CONSOLE
 	io->iop_ppard |= 0x00c00000;
 	io->iop_pdird |= 0x00400000;
 	io->iop_pdird &= ~0x00800000;
@@ -2375,6 +2628,27 @@ int __init rs_8xx_init(void)
 	 */
 	immap->im_cpmux.cmx_scr &= ~0x00ffff00;
 	immap->im_cpmux.cmx_scr |= 0x00121b00;
+#else
+	io->iop_pparb |= 0x008b0000;
+	io->iop_pdirb |= 0x00880000;
+	io->iop_psorb |= 0x00880000;
+	io->iop_pdirb &= ~0x00030000;
+	io->iop_psorb &= ~0x00030000;
+
+	/* Use Port D for SCC1 instead of other functions.
+	*/
+	io->iop_ppard |= 0x00000003;
+	io->iop_psord &= ~0x00000001;	/* Rx */
+	io->iop_psord |= 0x00000002;	/* Tx */
+	io->iop_pdird &= ~0x00000001;	/* Rx */
+	io->iop_pdird |= 0x00000002;	/* Tx */
+
+	/* Connect SCC1, SCC2, SCC3 to NMSI.  Connect BRG1 to SCC1,
+	 * BRG2 to SCC2, BRG3 to SCC3.
+	 */
+	immap->im_cpmux.cmx_scr &= ~0xffffff00;
+	immap->im_cpmux.cmx_scr |= 0x00091200;
+#endif
 
 	for (i = 0, state = rs_table; i < NR_PORTS; i++,state++) {
 		state->magic = SSTATE_MAGIC;
@@ -2390,9 +2664,12 @@ int __init rs_8xx_init(void)
 		state->icount.rx = state->icount.tx = 0;
 		state->icount.frame = state->icount.parity = 0;
 		state->icount.overrun = state->icount.brk = 0;
-		printk(KERN_INFO "ttyS%02d at 0x%04x is a %s\n",
-		       i, state->port,
-		       (state->smc_scc_num < SCC_NUM_BASE) ? "SMC" : "SCC");
+ 		printk (KERN_INFO "ttyS%d on %s%d at 0x%04x, BRG%d\n",
+ 			i,
+ 			(state->smc_scc_num < SCC_NUM_BASE) ? "SMC" : "SCC",
+ 			PORT_NUM(state->smc_scc_num) + 1,
+ 			(unsigned int)(state->port),
+ 			state->smc_scc_num + 1);
 #ifdef CONFIG_SERIAL_CONSOLE
 		/* If we just printed the message on the console port, and
 		 * we are about to initialize it for general use, we have
@@ -2400,7 +2677,7 @@ int __init rs_8xx_init(void)
 		 * make it out of the transmit buffer.
 		 */
 		if (i == CONFIG_SERIAL_CONSOLE_PORT)
-			mdelay(2);
+			mdelay(300);
 #endif
 		info = kmalloc(sizeof(ser_info_t), GFP_KERNEL);
 		if (info) {
@@ -2452,6 +2729,7 @@ int __init rs_8xx_init(void)
 			else {
 				scp = &immap->im_scc[idx - SCC_IDX_BASE];
 				sup = (scc_uart_t *)&immap->im_dprambase[state->port];
+				scp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 				sup->scc_genscc.scc_rbase = dp_addr;
 			}
 
@@ -2555,6 +2833,22 @@ int __init rs_8xx_init(void)
 
 				/* Send the CPM an initialize command.
 				*/
+#ifdef SCC_CONSOLE
+				switch (state->smc_scc_num) {
+				case 0:
+					page = CPM_CR_SCC1_PAGE;
+					sblock = CPM_CR_SCC1_SBLOCK;
+					break;
+				case 1:
+					page = CPM_CR_SCC2_PAGE;
+					sblock = CPM_CR_SCC2_SBLOCK;
+					break;
+				case 2:
+					page = CPM_CR_SCC3_PAGE;
+					sblock = CPM_CR_SCC3_SBLOCK;
+					break;
+				}
+#else
 				if (state->smc_scc_num == 2) {
 					page = CPM_CR_SCC2_PAGE;
 					sblock = CPM_CR_SCC2_SBLOCK;
@@ -2563,6 +2857,7 @@ int __init rs_8xx_init(void)
 					page = CPM_CR_SCC3_PAGE;
 					sblock = CPM_CR_SCC3_SBLOCK;
 				}
+#endif
 
 				cp->cp_cpcr = mk_cr_cmd(page, sblock, 0,
 						CPM_CR_INIT_TRX) | CPM_CR_FLG;
@@ -2596,8 +2891,12 @@ int __init rs_8xx_init(void)
 			/* If the port is the console, enable Rx and Tx.
 			*/
 #ifdef CONFIG_SERIAL_CONSOLE
-			if (i == CONFIG_SERIAL_CONSOLE_PORT)
-				sp->smc_smcmr |= SMCMR_REN | SMCMR_TEN;
+			if (i == CONFIG_SERIAL_CONSOLE_PORT) {
+				if (idx < SCC_NUM_BASE)
+					sp->smc_smcmr |= SMCMR_REN | SMCMR_TEN;
+				else
+					scp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+			}
 #endif
 		}
 	}
@@ -2614,8 +2913,12 @@ static int __init serial_console_setup(struct console *co, char *options)
 	volatile	cbd_t		*bdp;
 	volatile	cpm8260_t	*cp;
 	volatile	immap_t		*immap;
+#ifndef SCC_CONSOLE
 	volatile	smc_t		*sp;
 	volatile	smc_uart_t	*up;
+#endif
+	volatile	scc_t		*scp;
+	volatile	scc_uart_t	*sup;
 	volatile	iop8260_t	*io;
 	bd_t				*bd;
 
@@ -2630,11 +2933,25 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	ser = rs_table + co->index;
 
-	
 	immap = immr;
 	cp = &immap->im_cpm;
 	io = &immap->im_ioport;
 
+#ifdef SCC_CONSOLE
+	scp = (scc_t *)&(immap->im_scc[SCC_CONSOLE-1]);
+	sup = (scc_uart_t *)&immap->im_dprambase[PROFF_SCC1 + ((SCC_CONSOLE-1) << 8)];
+	scp->scc_sccm &= ~(UART_SCCM_TX | UART_SCCM_RX);
+	scp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+
+	/* Use Port D for SCC1 instead of other functions.
+	*/
+	io->iop_ppard |= 0x00000003;
+	io->iop_psord &= ~0x00000001;	/* Rx */
+	io->iop_psord |= 0x00000002;	/* Tx */
+	io->iop_pdird &= ~0x00000001;	/* Rx */
+	io->iop_pdird |= 0x00000002;	/* Tx */
+
+#else
 	/* This should have been done long ago by the early boot code,
 	 * but do it again to make sure.
 	 */
@@ -2662,6 +2979,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	io->iop_pdird |= 0x00400000;
 	io->iop_pdird &= ~0x00800000;
 	io->iop_psord &= ~0x00c00000;
+#endif
 
 	/* Allocate space for two buffer descriptors in the DP ram.
 	*/
@@ -2686,6 +3004,68 @@ static int __init serial_console_setup(struct console *co, char *options)
 
 	/* Set up the uart parameters in the parameter ram.
 	*/
+#ifdef SCC_CONSOLE
+	sup->scc_genscc.scc_rbase = dp_addr;
+	sup->scc_genscc.scc_tbase = dp_addr + sizeof(cbd_t);
+
+	/* Set up the uart parameters in the
+	 * parameter ram.
+	 */
+	sup->scc_genscc.scc_rfcr = CPMFCR_GBL | CPMFCR_EB;
+	sup->scc_genscc.scc_tfcr = CPMFCR_GBL | CPMFCR_EB;
+
+	sup->scc_genscc.scc_mrblr = 1;
+	sup->scc_maxidl = 0;
+	sup->scc_brkcr = 1;
+	sup->scc_parec = 0;
+	sup->scc_frmec = 0;
+	sup->scc_nosec = 0;
+	sup->scc_brkec = 0;
+	sup->scc_uaddr1 = 0;
+	sup->scc_uaddr2 = 0;
+	sup->scc_toseq = 0;
+	sup->scc_char1 = 0x8000;
+	sup->scc_char2 = 0x8000;
+	sup->scc_char3 = 0x8000;
+	sup->scc_char4 = 0x8000;
+	sup->scc_char5 = 0x8000;
+	sup->scc_char6 = 0x8000;
+	sup->scc_char7 = 0x8000;
+	sup->scc_char8 = 0x8000;
+	sup->scc_rccm = 0xc0ff;
+
+	/* Send the CPM an initialize command.
+	*/
+	cp->cp_cpcr = mk_cr_cmd(CPM_CR_SCC1_PAGE, CPM_CR_SCC1_SBLOCK, 0,
+			CPM_CR_INIT_TRX) | CPM_CR_FLG;
+	while (cp->cp_cpcr & CPM_CR_FLG);
+
+	/* Set UART mode, 8 bit, no parity, one stop.
+	 * Enable receive and transmit.
+	 */
+	scp->scc_gsmrh = 0;
+	scp->scc_gsmrl = 
+		(SCC_GSMRL_MODE_UART | SCC_GSMRL_TDCR_16 | SCC_GSMRL_RDCR_16);
+
+	/* Disable all interrupts and clear all pending
+	 * events.
+	 */
+	scp->scc_sccm = 0;
+	scp->scc_scce = 0xffff;
+	scp->scc_dsr = 0x7e7e;
+	scp->scc_pmsr = 0x3000;
+
+	/* Wire BRG1 to SCC1.  The serial init will take care of
+	 * others.
+	 */
+	immap->im_cpmux.cmx_scr = 0;
+
+	/* Set up the baud rate generator.
+	*/
+	m8260_cpm_setbrg(ser->smc_scc_num, bd->bi_baudrate);
+
+	scp->scc_gsmrl |= (SCC_GSMRL_ENR | SCC_GSMRL_ENT);
+#else
 	up->smc_rbase = dp_addr;	/* Base of receive buffer desc. */
 	up->smc_tbase = dp_addr+sizeof(cbd_t);	/* Base of xmt buffer desc. */
 	up->smc_rfcr = CPMFCR_GBL | CPMFCR_EB;
@@ -2714,6 +3094,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	/* And finally, enable Rx and Tx.
 	*/
 	sp->smc_smcmr |= SMCMR_REN | SMCMR_TEN;
+#endif
 
 	return 0;
 }

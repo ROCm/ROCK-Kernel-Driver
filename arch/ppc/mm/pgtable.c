@@ -35,8 +35,6 @@
 
 #include "mmu_decl.h"
 
-unsigned long ram_phys_base;
-
 unsigned long ioremap_base;
 unsigned long ioremap_bot;
 int io_bat_index;
@@ -199,25 +197,25 @@ void __init mapin_ram(void)
 #endif /* HAVE_BATS */
 
 	v = KERNELBASE;
-	p = ram_phys_base;
+	p = PPC_MEMSTART;
 	for (s = 0; s < total_lowmem; s += PAGE_SIZE) {
 		/* On the MPC8xx, we want the page shared so we
 		 * don't get ASID compares on kernel space.
 		 */
-		f = _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_SHARED;
+		f = _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_SHARED | _PAGE_HWEXEC;
 #if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
 		/* Allows stub to set breakpoints everywhere */
-		f |= _PAGE_RW | _PAGE_DIRTY;
-#else
+		f |= _PAGE_WRENABLE;
+#else	/* !CONFIG_KGDB && !CONFIG_XMON */
 		if ((char *) v < _stext || (char *) v >= etext)
-			f |= _PAGE_RW | _PAGE_DIRTY;
+			f |= _PAGE_WRENABLE;
 #ifdef CONFIG_PPC_STD_MMU
 		else
 			/* On the powerpc (not all), no user access
 			   forces R/W kernel access */
 			f |= _PAGE_USER;
 #endif /* CONFIG_PPC_STD_MMU */
-#endif /* CONFIG_KGDB */
+#endif /* CONFIG_KGDB || CONFIG_XMON */
 		map_page(v, p, f);
 		v += PAGE_SIZE;
 		p += PAGE_SIZE;

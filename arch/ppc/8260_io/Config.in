@@ -1,6 +1,9 @@
 #
 # MPC8260 Communication options
 #
+mainmenu_option next_comment
+comment 'MPC8260 Communication Options'
+bool 'Enable SCC Console' CONFIG_SCC_CONSOLE
 if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
   mainmenu_option next_comment
   comment 'MPC8260 Communication Options'
@@ -20,6 +23,13 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
     bool 'Ethernet on FCC1' CONFIG_FCC1_ENET
     bool 'Ethernet on FCC2' CONFIG_FCC2_ENET
     bool 'Ethernet on FCC3' CONFIG_FCC3_ENET
+    bool 'Use MDIO for PHY configuration' CONFIG_USE_MDIO
+    if [ "$CONFIG_USE_MDIO" = "y" ]; then
+      choice 'Type of PHY'	\
+	"LXT970		CONFIG_FCC_LXT970	\
+	 LXT971		CONFIG_FCC_LXT971	\
+	 QS6612		CONFIG_FCC_QS6612"	CONFIG_FCC_LXT971
+      fi
   fi
-  endmenu
 fi
+endmenu

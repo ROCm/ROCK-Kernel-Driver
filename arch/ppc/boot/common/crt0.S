@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.crt0.S 1.12 08/09/01 17:09:10 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*    Copyright (c) 1997 Paul Mackerras <paulus@cs.anu.edu.au>
  *      Initial Power Macintosh COFF version.
@@ -22,7 +22,7 @@
  */
 
 #include <linux/config.h>
-#include "../../kernel/ppc_asm.tmpl"
+#include <asm/ppc_asm.h>
 
 	.text
 

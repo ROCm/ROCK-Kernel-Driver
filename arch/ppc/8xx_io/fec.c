@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fec.c 1.20 10/11/01 11:55:47 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Fast Ethernet Controller (FEC) driver for Motorola MPC8xx.
@@ -163,7 +163,12 @@ struct fec_enet_private {
 	cbd_t	*tx_bd_base;
 	cbd_t	*cur_rx, *cur_tx;		/* The next free ring entry */
 	cbd_t	*dirty_tx;	/* The ring entries to be free()ed. */
-	scc_t	*sccp;
+
+	/* Virtual addresses for the receive buffers because we can't
+	 * do a __va() on them anymore.
+	 */
+	unsigned char *rx_vaddr[RX_RING_SIZE];
+
 	struct	net_device_stats stats;
 	uint	tx_full;
 	spinlock_t lock;
@@ -688,7 +693,7 @@ while (!(bdp->cbd_sc & BD_ENET_RX_EMPTY)) {
 	fep->stats.rx_packets++;
 	pkt_len = bdp->cbd_datlen;
 	fep->stats.rx_bytes += pkt_len;
-	data = (__u8*)__va(bdp->cbd_bufaddr);
+	data = fep->rx_vaddr[bdp - fep->rx_bd_base];
 
 #ifdef CONFIG_FEC_PACKETHOOK
 	/* Packet hook ... */
@@ -724,9 +729,7 @@ while (!(bdp->cbd_sc & BD_ENET_RX_EMPTY)) {
 	} else {
 		skb->dev = dev;
 		skb_put(skb,pkt_len-4);	/* Make room */
-		eth_copy_and_sum(skb,
-				 (unsigned char *)__va(bdp->cbd_bufaddr),
-				 pkt_len-4, 0);
+		eth_copy_and_sum(skb, data, pkt_len-4, 0);
 		skb->protocol=eth_type_trans(skb,dev);
 		netif_rx(skb);
 	}
@@ -1504,10 +1507,9 @@ int __init fec_enet_init(void)
 {
 	struct net_device *dev;
 	struct fec_enet_private *fep;
-	int i, j;
-	unsigned char	*eap, *iap;
+	int i, j, k;
+	unsigned char	*eap, *iap, *ba;
 	unsigned long	mem_addr;
-	pte_t		*pte;
 	volatile	cbd_t	*bdp;
 	cbd_t		*cbd_base;
 	volatile	immap_t	*immap;
@@ -1578,14 +1580,7 @@ int __init fec_enet_init(void)
 		printk("FEC initialization failed.\n");
 		return 1;
 	}
-	mem_addr = __get_free_page(GFP_KERNEL);
-	cbd_base = (cbd_t *)mem_addr;
-
-	/* Make it uncached.
-	*/
-	pte = va_to_pte(mem_addr);
-	pte_val(*pte) |= _PAGE_NO_CACHE;
-	flush_tlb_page(init_mm.mmap, mem_addr);
+	cbd_base = (cbd_t *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
 
 	/* Set receive and transmit descriptor base.
 	*/
@@ -1597,24 +1592,21 @@ int __init fec_enet_init(void)
 	/* Initialize the receive buffer descriptors.
 	*/
 	bdp = fep->rx_bd_base;
+	k = 0;
 	for (i=0; i<FEC_ENET_RX_PAGES; i++) {
 
 		/* Allocate a page.
 		*/
-		mem_addr = __get_free_page(GFP_KERNEL);
-
-		/* Make it uncached.
-		*/
-		pte = va_to_pte(mem_addr);
-		pte_val(*pte) |= _PAGE_NO_CACHE;
-		flush_tlb_page(init_mm.mmap, mem_addr);
+		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
 
 		/* Initialize the BD for every fragment in the page.
 		*/
 		for (j=0; j<FEC_ENET_RX_FRPPG; j++) {
 			bdp->cbd_sc = BD_ENET_RX_EMPTY;
-			bdp->cbd_bufaddr = __pa(mem_addr);
+			bdp->cbd_bufaddr = mem_addr;
+			fep->rx_vaddr[k++] = ba;
 			mem_addr += FEC_ENET_RX_FRSIZE;
+			ba += FEC_ENET_RX_FRSIZE;
 			bdp++;
 		}
 	}
@@ -1776,8 +1768,8 @@ fec_restart(struct net_device *dev, int duplex)
 
 	/* Set receive and transmit descriptor base.
 	*/
-	fecp->fec_r_des_start = __pa((uint)(fep->rx_bd_base));
-	fecp->fec_x_des_start = __pa((uint)(fep->tx_bd_base));
+	fecp->fec_r_des_start = iopa((uint)(fep->rx_bd_base));
+	fecp->fec_x_des_start = iopa((uint)(fep->tx_bd_base));
 
 	fep->dirty_tx = fep->cur_tx = fep->tx_bd_base;
 	fep->cur_rx = fep->rx_bd_base;

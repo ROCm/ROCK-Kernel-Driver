@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mk_defs.c 1.11 08/19/01 22:43:23 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * This program is used to generate definitions needed by
@@ -27,6 +27,14 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
+
+#ifdef CONFIG_PPC_ISERIES
+#include <asm/iSeries/Paca.h>
+#include <asm/iSeries/ItLpPaca.h>
+#include <asm/iSeries/ItLpQueue.h>
+#include <asm/iSeries/HvLpEvent.h>
+#endif /* CONFIG_PPC_ISERIES */
 
 #define DEFINE(sym, val) \
 	asm volatile("\n#define\t" #sym "\t%0" : : "i" (val))
@@ -34,12 +42,10 @@
 int
 main(void)
 {
-	/*DEFINE(KERNELBASE, KERNELBASE);*/
+	DEFINE(THREAD_SIZE, THREAD_SIZE);
+	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
+	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(STATE, offsetof(struct task_struct, state));
-	DEFINE(NEXT_TASK, offsetof(struct task_struct, next_task));
-	DEFINE(COUNTER, offsetof(struct task_struct, counter));
-	DEFINE(PROCESSOR, offsetof(struct task_struct, processor));
-#error	DEFINE(SIGPENDING, offsetof(struct task_struct, sigpending));
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
 	DEFINE(MM, offsetof(struct task_struct, mm));
 	DEFINE(ACTIVE_MM, offsetof(struct task_struct, active_mm));
@@ -48,10 +54,8 @@ main(void)
 	DEFINE(PGDIR, offsetof(struct thread_struct, pgdir));
 	DEFINE(LAST_SYSCALL, offsetof(struct thread_struct, last_syscall));
 	DEFINE(PT_REGS, offsetof(struct thread_struct, regs));
-	DEFINE(PT_TRACESYS, PT_TRACESYS);
 	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
-#error	DEFINE(TASK_PTRACE, offsetof(struct task_struct, ptrace));
-#error	DEFINE(NEED_RESCHED, offsetof(struct task_struct, need_resched));
+	DEFINE(THREAD_FPEXC_MODE, offsetof(struct thread_struct, fpexc_mode));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
 #ifdef CONFIG_ALTIVEC
@@ -60,7 +64,6 @@ main(void)
 	DEFINE(THREAD_VSCR, offsetof(struct thread_struct, vscr));
 #endif /* CONFIG_ALTIVEC */
 	/* Interrupt register frame */
-	DEFINE(TASK_UNION_SIZE, sizeof(union task_union));
 	DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
 	DEFINE(INT_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs));
 	/* in fact we only use gpr0 - gpr9 and gpr20 - gpr23 */
@@ -126,6 +129,35 @@ main(void)
 	DEFINE(CPU_SPEC_PVR_VALUE, offsetof(struct cpu_spec, pvr_value));
 	DEFINE(CPU_SPEC_FEATURES, offsetof(struct cpu_spec, cpu_features));
 	DEFINE(CPU_SPEC_SETUP, offsetof(struct cpu_spec, cpu_setup));
+
+#ifdef CONFIG_PPC_ISERIES
+	DEFINE(PACAPROCENABLED, offsetof(struct Paca, xProcEnabled));
+	DEFINE(PACAPACAINDEX, offsetof(struct Paca, xPacaIndex));
+	DEFINE(PACAPROCSTART, offsetof(struct Paca, xProcStart));
+	DEFINE(PACAKSAVE, offsetof(struct Paca, xKsave));
+	DEFINE(PACASAVEDMSR, offsetof(struct Paca, xSavedMsr));
+	DEFINE(PACASAVEDLR, offsetof(struct Paca, xSavedLr));
+	DEFINE(PACACONTEXTOVERFLOW, offsetof(struct Paca, xContextOverflow));
+	DEFINE(PACAR21, offsetof(struct Paca, xR21));
+	DEFINE(PACAR22, offsetof(struct Paca, xR22));
+	DEFINE(PACALPQUEUE, offsetof(struct Paca, lpQueuePtr));
+	DEFINE(PACALPPACA, offsetof(struct Paca, xLpPaca));
+	DEFINE(PACA_STRUCT_SIZE, sizeof(struct Paca));
+	DEFINE(LPREGSAV, offsetof(struct Paca, xRegSav));
+	DEFINE(PACADEFAULTDECR, offsetof(struct Paca, default_decr));
+	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xRsvd));
+	DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
+	DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
+	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xDecrInt));
+	DEFINE(LPPACAIPIINT, offsetof(struct ItLpPaca, xIpiCnt));
+	DEFINE(LPQCUREVENTPTR, offsetof(struct ItLpQueue, xSlicCurEventPtr));
+	DEFINE(LPQOVERFLOW, offsetof(struct ItLpQueue, xPlicOverflowIntPending));
+	DEFINE(LPQINUSEWORD, offsetof(struct ItLpQueue, xInUseWord));
+	DEFINE(LPEVENTFLAGS, offsetof(struct HvLpEvent, xFlags));
+	DEFINE(CONTEXT, offsetof(struct mm_struct, context));
+	DEFINE(_SOFTE, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, mq));
+	DEFINE(PACA_EXT_INTS, offsetof(struct Paca, ext_ints));
+#endif /* CONFIG_PPC_ISERIES */
 
 	DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28);
 	return 0;

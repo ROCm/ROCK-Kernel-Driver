@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.cache.h 1.10 10/18/01 15:02:09 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * include/asm-ppc/cache.h
@@ -15,15 +15,15 @@
 #if defined(CONFIG_8xx) || defined(CONFIG_403GCX)
 #define	L1_CACHE_LINE_SIZE	16
 #define LG_L1_CACHE_LINE_SIZE	4
-#define MAX_L1_COPY_PREFETCH	1
+#define MAX_COPY_PREFETCH	1
 #elif defined(CONFIG_PPC64BRIDGE)
 #define L1_CACHE_LINE_SIZE	128
 #define LG_L1_CACHE_LINE_SIZE	7
-#define MAX_L1_COPY_PREFETCH	1
+#define MAX_COPY_PREFETCH	1
 #else
 #define	L1_CACHE_LINE_SIZE  32
 #define LG_L1_CACHE_LINE_SIZE	5
-#define MAX_L1_COPY_PREFETCH	4
+#define MAX_COPY_PREFETCH	4
 #endif
 
 #define	L1_CACHE_BYTES L1_CACHE_LINE_SIZE
@@ -41,7 +41,10 @@
 #endif
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+extern void clean_dcache_range(unsigned long start, unsigned long stop);
 extern void flush_dcache_range(unsigned long start, unsigned long stop);
+extern void invalidate_dcache_range(unsigned long start, unsigned long stop);
+extern void flush_dcache_all(void);
 
 #endif /* __ASSEMBLY__ */
 

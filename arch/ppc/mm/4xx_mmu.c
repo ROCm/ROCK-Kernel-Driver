@@ -93,6 +93,6 @@ void __init MMU_init_hw(void)
 	 * vectors and the kernel live in real-mode.
 	 */
 
-        mtspr(SPRN_DCCR, 0x80000000);	/* 128 MB of data space at 0x0. */
-        mtspr(SPRN_ICCR, 0x80000000);	/* 128 MB of instr. space at 0x0. */
+        mtspr(SPRN_DCCR, 0xF0000000);	/* 512 MB of data space at 0x0. */
+        mtspr(SPRN_ICCR, 0xF0000000);	/* 512 MB of instr. space at 0x0. */
 }

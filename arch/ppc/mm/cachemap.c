@@ -52,12 +52,19 @@
 
 extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
+/* This function will allocate the requested contiguous pages and
+ * map them into the kernel's vmalloc() space.  This is done so we
+ * get unique mapping for these pages, outside of the kernel's 1:1
+ * virtual:physical mapping.  This is necessary so we can cover large
+ * portions of the kernel with single large page TLB entries, and
+ * still get unique uncached pages for consistent DMA.
+ */
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
-	int order, rsize;
-	unsigned long page;
-	void *ret;
-	pte_t	*pte;
+	int order, err, i;
+	unsigned long page, va, pa, flags;
+	struct vm_struct *area;
+	void	 *ret;
 
 	if (in_interrupt())
 		BUG();
@@ -79,23 +86,29 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 	 */
 	invalidate_dcache_range(page, page + size);
 
-	ret = (void *)page;
-	*dma_handle = virt_to_bus(ret);
-
-	/* Chase down all of the PTEs and mark them uncached.
+	/* Allocate some common virtual space to map the new pages.
 	*/
-	rsize = (int)size;
-	while (rsize > 0) {
-		if (get_pteptr(&init_mm, page, &pte)) {
-			pte_val(*pte) |= _PAGE_NO_CACHE | _PAGE_GUARDED;
-			flush_tlb_page(find_vma(&init_mm,page),page);
-		}
-		else {
-			BUG();
-			return NULL;
-		}
-		page += PAGE_SIZE;
-		rsize -= PAGE_SIZE;
+	area = get_vm_area(size, VM_ALLOC);
+	if (area == 0) {
+		free_pages(page, order);
+		return NULL;
+	}
+	va = VMALLOC_VMADDR(area->addr);
+	ret = (void *)va;
+
+	/* This gives us the real physical address of the first page.
+	*/
+	*dma_handle = pa = virt_to_bus(page);
+
+	flags = _PAGE_KERNEL | _PAGE_NO_CACHE;
+
+	err = 0;
+	for (i = 0; i < size && err == 0; i += PAGE_SIZE)
+		err = map_page(va+i, pa+i, flags);
+	
+	if (err) {
+		vfree((void *)va);
+		return NULL;
 	}
 
 	return ret;
@@ -103,42 +116,12 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 
 /*
  * free page(s) as defined by the above mapping.
- * The caller has to tell us the size so we can free the proper number
- * of pages.  We can't vmalloc() a new space for these pages and simply
- * call vfree() like some other architectures because we could end up
- * with aliased cache lines (or at least a cache line with the wrong
- * attributes).  This can happen when the PowerPC speculative loads
- * across page boundaries.
  */
-void consistent_free(void *vaddr, size_t size)
+void consistent_free(void *vaddr)
 {
-	int order, rsize;
-	unsigned long addr;
-	pte_t	*pte;
-
 	if (in_interrupt())
 		BUG();
-
-	size = PAGE_ALIGN(size);
-	order = get_order(size);
-
-	/* Chase down all of the PTEs and mark them cached again.
-	*/
-	addr = (unsigned long)vaddr;
-	rsize = (int)size;
-	while (rsize > 0) {
-		if (get_pteptr(&init_mm, addr, &pte)) {
-			pte_val(*pte) &= ~(_PAGE_NO_CACHE | _PAGE_GUARDED);
-			flush_tlb_page(find_vma(&init_mm,addr),addr);
-		}
-		else {
-			BUG();
-			return;
-		}
-		addr += PAGE_SIZE;
-		rsize -= PAGE_SIZE;
-	}
-	free_pages((unsigned long)vaddr, order);
+	vfree(vaddr);
 }
 
 /*
@@ -162,4 +145,18 @@ void consistent_sync(void *vaddr, size_t size, int direction)
 		flush_dcache_range(start, end);
 		break;
 	}
+}
+
+/*
+ * consistent_sync_page make a page are consistent. identical
+ * to consistent_sync, but takes a struct page instead of a virtual address
+ */
+
+void consistent_sync_page(struct page *page, unsigned long offset,
+size_t size, int direction)
+{
+	unsigned long start;
+
+	start = (unsigned long)(page->virtual) + offset; 
+	consistent_sync(start, size, direction);
 }

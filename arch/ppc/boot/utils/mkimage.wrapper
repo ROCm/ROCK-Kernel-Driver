@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#
+# Build PPCBoot image when `mkimage' tool is available.
+#
+
+MKIMAGE=$(type -path mkimage)
+
+if [ -z "${MKIMAGE}" ]; then
+	# Doesn't exist
+	echo '"mkimage" command not found - PPCBoot images will not be built' >&2
+	exit 0;
+fi
+
+# Call "mkimage" to create PPCBoot image
+${MKIMAGE} "$@"

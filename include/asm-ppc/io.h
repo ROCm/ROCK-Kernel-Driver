@@ -1,12 +1,14 @@
 /*
- * BK Id: SCCS/s.io.h 1.14 10/16/01 15:58:42 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
+
 #ifdef __KERNEL__
 #ifndef _PPC_IO_H
 #define _PPC_IO_H
 
 #include <linux/config.h>
 #include <linux/types.h>
+
 #include <asm/page.h>
 #include <asm/byteorder.h>
 
@@ -25,24 +27,40 @@
 #define PREP_PCI_DRAM_OFFSET 	0x80000000
 
 #if defined(CONFIG_4xx)
-#include <asm/ppc4xx.h>
+#include <asm/ibm4xx.h>
 #elif defined(CONFIG_8xx)
 #include <asm/mpc8xx.h>
 #elif defined(CONFIG_8260)
 #include <asm/mpc8260.h>
 #elif defined(CONFIG_APUS)
-#define _IO_BASE 0
-#define _ISA_MEM_BASE 0
+#define _IO_BASE	0
+#define _ISA_MEM_BASE	0
 #define PCI_DRAM_OFFSET 0
 #else /* Everyone else */
-extern unsigned long isa_io_base;
-extern unsigned long isa_mem_base;
-extern unsigned long pci_dram_offset;
 #define _IO_BASE	isa_io_base
 #define _ISA_MEM_BASE	isa_mem_base
 #define PCI_DRAM_OFFSET	pci_dram_offset
 #endif /* Platform-dependant I/O */
 
+extern unsigned long isa_io_base;
+extern unsigned long isa_mem_base;
+extern unsigned long pci_dram_offset;
+
+#if defined(CONFIG_PPC_ISERIES)
+#include <asm/iSeries.h>
+#if defined(CONFIG_PCI)
+  #include <asm/iSeries/iSeries_io.h>
+  #endif  /* defined(CONFIG_PCI) */
+#endif /* CONFIG_PPC_ISERIES */
+
+#if defined(CONFIG_PPC_ISERIES) && defined(CONFIG_PCI)
+#define readb(addr)	     iSeries_Readb((u32*)(addr))
+#define readw(addr)	     iSeries_Readw((u32*)(addr))
+#define readl(addr)	     iSeries_Readl((u32*)(addr))
+#define writeb(data, addr)   iSeries_Writeb(data,(u32*)(addr))
+#define writew(data, addr)   iSeries_Writew(data,(u32*)(addr))
+#define writel(data, addr)   iSeries_Writel(data,(u32*)(addr))
+#else
 #define readb(addr) in_8((volatile u8 *)(addr))
 #define writeb(b,addr) out_8((volatile u8 *)(addr), (b))
 #if defined(CONFIG_APUS)
@@ -56,6 +74,7 @@ extern unsigned long pci_dram_offset;
 #define writew(b,addr) out_le16((volatile u16 *)(addr),(b))
 #define writel(b,addr) out_le32((volatile u32 *)(addr),(b))
 #endif
+#endif  /* CONFIG_PPC_ISERIES && defined(CONFIG_PCI) */
 
 
 #define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
@@ -80,9 +99,22 @@ extern unsigned long pci_dram_offset;
 
 #ifdef CONFIG_ALL_PPC
 /*
- * We have to handle possible machine checks here on powermacs
- * and potentially some CHRPs -- paulus.
+ * On powermacs, we will get a machine check exception if we
+ * try to read data from a non-existent I/O port.  Because the
+ * machine check is an asynchronous exception, it isn't
+ * well-defined which instruction SRR0 will point to when the
+ * exception occurs.
+ * With the sequence below (twi; isync; nop), we have found that
+ * the machine check occurs on one of the three instructions on
+ * all PPC implementations tested so far.  The twi and isync are
+ * needed on the 601 (in fact twi; sync works too), the isync and
+ * nop are needed on 604[e|r], and any of twi, sync or isync will
+ * work on 603[e], 750, 74x0.
+ * The twi creates an explicit data dependency on the returned
+ * value which seems to be needed to make the 601 wait for the
+ * load to finish.
  */
+
 #define __do_in_asm(name, op)				\
 extern __inline__ unsigned int name(unsigned int port)	\
 {							\
@@ -137,6 +169,14 @@ __do_out_asm(outl, "stwbrx")
 #define inl(port)		in_be32((u32 *)((port)+_IO_BASE))
 #define outl(val, port)		out_be32((u32 *)((port)+_IO_BASE), (val))
 
+#elif defined(CONFIG_PPC_ISERIES) && defined(CONFIG_PCI)
+#define inb(addr)	     iSeries_Readb((u32*)(addr))
+#define inw(addr)	     iSeries_Readw((u32*)(addr))
+#define inl(addr)	     iSeries_Readl((u32*)(addr))
+#define outb(data,addr)	     iSeries_Writeb(data,(u32*)(addr))
+#define outw(data,addr)	     iSeries_Writew(data,(u32*)(addr))
+#define outl(data,addr)	     iSeries_Writel(data,(u32*)(addr))
+
 #else /* not APUS or ALL_PPC */
 #define inb(port)		in_8((u8 *)((port)+_IO_BASE))
 #define outb(val, port)		out_8((u8 *)((port)+_IO_BASE), (val))
@@ -178,8 +218,13 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 #define IO_SPACE_LIMIT ~0
 
 #define memset_io(a,b,c)       memset((void *)(a),(b),(c))
+#ifdef CONFIG_PPC_ISERIES
+#define memcpy_fromio(a,b,c) iSeries_memcpy_fromio((void *)(a), (void *)(b), (c))
+#define memcpy_toio(a,b,c) iSeries_memcpy_toio((void *)(a), (void *)(b), (c))
+#else
 #define memcpy_fromio(a,b,c)   memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
+#endif
 
 #ifdef __KERNEL__
 /*
@@ -265,7 +310,7 @@ extern inline void eieio(void)
 	__asm__ __volatile__ ("eieio" : : : "memory");
 }
 
-/* Enforce in-order execution of data I/O. 
+/* Enforce in-order execution of data I/O.
  * No distinction between read/write on PPC; use eieio for all three.
  */
 #define iobarrier_rw() eieio()

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.scatterlist.h 1.9 10/15/01 22:51:33 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifdef __KERNEL__
 #ifndef _PPC_SCATTERLIST_H
@@ -8,11 +8,10 @@
 #include <asm/dma.h>
 
 struct scatterlist {
-	struct page * page;
-	unsigned int offset;
-
-	dma_addr_t dma_address;	/* phys/bus dma address		 */
-	unsigned int length;	/* length			 */
+	struct page	*page;
+	unsigned int	offset;
+	dma_addr_t	dma_address;
+	unsigned int	length;
 };
 
 /*

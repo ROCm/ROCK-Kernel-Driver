@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.c 1.26 10/05/01 08:29:42 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Common time routines among all ppc machines.
@@ -87,6 +87,11 @@ unsigned tb_last_stamp;
 
 extern unsigned long wall_jiffies;
 
+#ifdef CONFIG_PPC_ISERIES
+extern u64 get_tb64(void);
+extern u64 next_jiffy_update_tb[];
+#endif
+
 static long time_offset;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -105,6 +110,8 @@ static inline int tb_delta(unsigned *jiffy_stamp) {
 	}
 	return delta;
 }
+
+#ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_time.c */
 
 extern unsigned long prof_cpu_mask;
 extern unsigned int * prof_buffer;
@@ -181,7 +188,7 @@ int timer_interrupt(struct pt_regs * regs)
 		 * We should have an rtc call that only sets the minutes and
 		 * seconds like on Intel to avoid problems with non UTC clocks.
 		 */
-		if ( (time_status & STA_UNSYNC) == 0 &&
+		if ( ppc_md.set_rtc_time && (time_status & STA_UNSYNC) == 0 &&
 		     xtime.tv_sec - last_rtc_update >= 659 &&
 		     abs(xtime.tv_usec - (1000000-1000000/HZ)) < 500000/HZ &&
 		     jiffies - wall_jiffies == 1) {
@@ -211,6 +218,7 @@ int timer_interrupt(struct pt_regs * regs)
 
 	return 1; /* lets ret_from_int know we can do checks */
 }
+#endif /* CONFIG_PPC_ISERIES */
 
 /*
  * This version of gettimeofday has microsecond resolution.
@@ -223,7 +231,11 @@ void do_gettimeofday(struct timeval *tv)
 	read_lock_irqsave(&xtime_lock, flags);
 	sec = xtime.tv_sec;
 	usec = xtime.tv_usec;
+#ifdef CONFIG_PPC_ISERIES
+	delta = tb_ticks_per_jiffy - ( next_jiffy_update_tb[0] - get_tb64() );
+#else
 	delta = tb_ticks_since(tb_last_stamp);
+#endif
 #ifdef CONFIG_SMP
 	/* As long as timebases are not in sync, gettimeofday can only
 	 * have jiffy resolution on SMP.
@@ -354,11 +366,10 @@ void __init time_init(void)
         }
 }
 
-#define TICK_SIZE tick
-#define FEBRUARY	2
-#define	STARTOFTIME	1970
-#define SECDAY		86400L
-#define SECYR		(SECDAY * 365)
+#define FEBRUARY		2
+#define	STARTOFTIME		1970
+#define SECDAY			86400L
+#define SECYR			(SECDAY * 365)
 #define	leapyear(year)		((year) % 4 == 0)
 #define	days_in_year(a) 	(leapyear(a) ? 366 : 365)
 #define	days_in_month(a) 	(month_days[(a) - 1])
@@ -367,55 +378,12 @@ static int month_days[12] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
-/*
- * This only works for the Gregorian calendar - i.e. after 1752 (in the UK)
- */
-void GregorianDay(struct rtc_time * tm)
-{
-	int leapsToDate;
-	int lastYear;
-	int day;
-	int MonthOffset[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
-
-	lastYear=tm->tm_year-1;
-
-	/*
-	 * Number of leap corrections to apply up to end of last year
-	 */
-	leapsToDate = lastYear/4 - lastYear/100 + lastYear/400;
-
-	/*
-	 * This year is a leap year if it is divisible by 4 except when it is
-	 * divisible by 100 unless it is divisible by 400
-	 *
-	 * e.g. 1904 was a leap year, 1900 was not, 1996 is, and 2000 will be
-	 */
-	if((tm->tm_year%4==0) &&
-	   ((tm->tm_year%100!=0) || (tm->tm_year%400==0)) &&
-	   (tm->tm_mon>2))
-	{
-		/*
-		 * We are past Feb. 29 in a leap year
-		 */
-		day=1;
-	}
-	else
-	{
-		day=0;
-	}
-
-	day += lastYear*365 + leapsToDate + MonthOffset[tm->tm_mon-1] +
-		   tm->tm_mday;
-
-	tm->tm_wday=day%7;
-}
-
 void to_tm(int tim, struct rtc_time * tm)
 {
-	register int    i;
-	register long   hms, day;
+	register int i;
+	register long hms, day, gday;
 
-	day = tim / SECDAY;
+	gday = day = tim / SECDAY;
 	hms = tim % SECDAY;
 
 	/* Hours, minutes, seconds are easy */
@@ -440,9 +408,9 @@ void to_tm(int tim, struct rtc_time * tm)
 	tm->tm_mday = day + 1;
 
 	/*
-	 * Determine the day of week
+	 * Determine the day of week. Jan. 1, 1970 was a Thursday.
 	 */
-	GregorianDay(tm);
+	tm->tm_wday = (gday + 4) % 7;
 }
 
 /* Auxiliary function to compute scaling factors */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.open_pic_defs.h 1.8 08/20/01 22:33:28 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *  linux/openpic.h -- OpenPIC definitions
@@ -207,6 +207,14 @@ extern volatile struct OpenPIC *OpenPIC;
 #define OPENPIC_CONFIG_RESET			0x80000000
 #define OPENPIC_CONFIG_8259_PASSTHROUGH_DISABLE	0x20000000
 #define OPENPIC_CONFIG_BASE_MASK		0x000fffff
+
+    /*
+     *  Global Configuration Register 1
+     *  This is the EICR on EPICs.
+     */
+
+#define OPENPIC_EICR_S_CLK_MASK			0x70000000
+#define OPENPIC_EICR_SIE			0x08000000
 
     /*
      *  Vendor Identification Register

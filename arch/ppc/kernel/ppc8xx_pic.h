@@ -1,11 +1,11 @@
 /*
- * BK Id: SCCS/s.ppc8xx_pic.h 1.7 05/17/01 18:14:21 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _PPC_KERNEL_PPC8xx_H
 #define _PPC_KERNEL_PPC8xx_H
 
 #include <linux/config.h>
-#include "local_irq.h"
+#include <linux/irq.h>
 
 extern struct hw_interrupt_type ppc8xx_pic;
 
@@ -15,7 +15,7 @@ void m8xx_do_IRQ(struct pt_regs *regs,
 int m8xx_get_irq(struct pt_regs *regs);
 
 #ifdef CONFIG_MBX
-#include "i8259.h"
+#include <asm/i8259.h>
 #include <asm/io.h>
 void mbx_i8259_action(int cpl, void *dev_id, struct pt_regs *regs);
 #endif
