@@ -922,6 +922,8 @@ EXPORT_SYMBOL(wanrouter_type_trans);
 EXPORT_SYMBOL(lock_adapter_irq);
 EXPORT_SYMBOL(unlock_adapter_irq);
 
+MODULE_LICENSE("GPL");
+
 /*
  *	End
  */
