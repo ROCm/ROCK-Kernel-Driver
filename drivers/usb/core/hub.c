@@ -1282,9 +1282,16 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 	/* Disconnect any existing devices under this port */
 	if (hub->children[port])
 		usb_disconnect(&hub->children[port]);
- 
+
 	/* Return now if nothing is connected */
 	if (!(portstatus & USB_PORT_STAT_CONNECTION)) {
+
+		/* maybe switch power back on (e.g. root hub was reset) */
+		if ((hubstate->descriptor->wHubCharacteristics
+					& HUB_CHAR_LPSM) < 2
+				&& !(portstatus & (1 << USB_PORT_FEAT_POWER)))
+			set_port_feature(hub, port + 1, USB_PORT_FEAT_POWER);
+ 
 		if (portstatus & USB_PORT_STAT_ENABLE)
   			goto done;
 		return;
