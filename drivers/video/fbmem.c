@@ -1038,7 +1038,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case FBIOGETCMAP:
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
-		return (fb_copy_cmap(&info->cmap, &cmap, 0));
+		return (fb_copy_cmap(&info->cmap, &cmap, 2));
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
