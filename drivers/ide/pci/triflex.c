@@ -173,7 +173,7 @@ static int triflex_config_drive_xfer_rate(ide_drive_t *drive)
 	struct hd_driveid *id	= drive->id;
 	
 	if (id && (id->capability & 1) && drive->autodma) {
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			goto tune_pio;
 		if (id->field_valid & 2) {
 			if ((id->dma_mword & hwif->mwdma_mask) ||

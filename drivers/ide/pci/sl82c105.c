@@ -158,7 +158,7 @@ static int sl82c105_check_drive (ide_drive_t *drive)
 			break;
 
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			break;
 
 		if (id->field_valid & 2) {
@@ -167,7 +167,7 @@ static int sl82c105_check_drive (ide_drive_t *drive)
 				return hwif->ide_dma_on(drive);
 		}
 
-		if (hwif->ide_dma_good_drive(drive))
+		if (__ide_dma_good_drive(drive))
 			return hwif->ide_dma_on(drive);
 	} while (0);
 

@@ -180,7 +180,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	if (mate->present) {
 		struct hd_driveid *mateid = mate->id;
 		if (mateid && (mateid->capability & 1) &&
-		    !hwif->ide_dma_bad_drive(mate)) {
+		    !__ide_dma_bad_drive(mate)) {
 			if ((mateid->field_valid & 4) &&
 			    (mateid->dma_ultra & 7))
 				udma_ok = 1;
@@ -197,7 +197,7 @@ static int cs5530_config_dma (ide_drive_t *drive)
 	 * selecting UDMA only if the mate said it was ok.
 	 */
 	if (id && (id->capability & 1) && drive->autodma &&
-	    !hwif->ide_dma_bad_drive(drive)) {
+	    !__ide_dma_bad_drive(drive)) {
 		if (udma_ok && (id->field_valid & 4) && (id->dma_ultra & 7)) {
 			if      (id->dma_ultra & 4)
 				mode = XFER_UDMA_2;

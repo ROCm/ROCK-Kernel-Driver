@@ -413,7 +413,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 
 	if ((id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
+		if (__ide_dma_bad_drive(drive))
 			return hwif->ide_dma_off(drive);
 
 		/*
@@ -432,7 +432,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 				return hwif->ide_dma_on(drive);
 
 		/* Consult the list of known "good" drives */
-		if (hwif->ide_dma_good_drive(drive))
+		if (__ide_dma_good_drive(drive))
 			return hwif->ide_dma_on(drive);
 	}
 //	if (hwif->tuneproc != NULL) hwif->tuneproc(drive, 255);
@@ -1084,10 +1084,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)
 		hwif->ide_dma_test_irq = &__ide_dma_test_irq;
-	if (!hwif->ide_dma_bad_drive)
-		hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
-	if (!hwif->ide_dma_good_drive)
-		hwif->ide_dma_good_drive = &__ide_dma_good_drive;
 	if (!hwif->ide_dma_verbose)
 		hwif->ide_dma_verbose = &__ide_dma_verbose;
 	if (!hwif->ide_dma_timeout)
