@@ -636,7 +636,7 @@ ixgb_read_phy_reg(struct ixgb_hw * hw,
     **************************************************************/
 
 	for (i = 0; i < 10; i++) {
-		usec_delay(10);
+		udelay(10);
 
 		command = IXGB_READ_REG(hw, MSCA);
 
@@ -662,7 +662,7 @@ ixgb_read_phy_reg(struct ixgb_hw * hw,
     **************************************************************/
 
 	for (i = 0; i < 10; i++) {
-		usec_delay(10);
+		udelay(10);
 
 		command = IXGB_READ_REG(hw, MSCA);
 
@@ -727,7 +727,7 @@ ixgb_write_phy_reg(struct ixgb_hw *hw,
     **************************************************************/
 
 	for (i = 0; i < 10; i++) {
-		usec_delay(10);
+		udelay(10);
 
 		command = IXGB_READ_REG(hw, MSCA);
 
@@ -753,7 +753,7 @@ ixgb_write_phy_reg(struct ixgb_hw *hw,
     **************************************************************/
 
 	for (i = 0; i < 10; i++) {
-		usec_delay(10);
+		udelay(10);
 
 		command = IXGB_READ_REG(hw, MSCA);
 
@@ -1024,7 +1024,7 @@ ixgb_link_reset(struct ixgb_hw * hw)
 			       IXGB_READ_REG(hw, CTRL0) | IXGB_CTRL0_LRST);
 
 		do {
-			usec_delay(IXGB_DELAY_USECS_AFTER_LINK_RESET);
+			udelay(IXGB_DELAY_USECS_AFTER_LINK_RESET);
 			link_status =
 			    ((IXGB_READ_REG(hw, STATUS) & IXGB_STATUS_LU)
 			     && (IXGB_READ_REG(hw, XPCSS) &

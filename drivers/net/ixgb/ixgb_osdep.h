@@ -39,16 +39,13 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 
-#define usec_delay(x) udelay(x)
+/* FIXME: eliminate me */
 #define msec_delay(x)	do { if(in_interrupt()) { \
 	                	mdelay(x); \
 			} else { \
 				set_current_state(TASK_UNINTERRUPTIBLE); \
 				schedule_timeout((x * HZ)/1000); \
 			} } while(0)
-
-#define PCI_COMMAND_REGISTER   PCI_COMMAND
-#define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
 
 typedef enum {
 	FALSE = 0,
@@ -83,7 +80,5 @@ typedef enum {
 
 #define IXGB_READ_REG_ARRAY(a, reg, offset) ( \
     readl((a)->hw_addr + IXGB_##reg + ((offset) << 2)))
-
-#define IXGB_MEMCPY memcpy
 
 #endif				/* IXGB_OSDEP_H */

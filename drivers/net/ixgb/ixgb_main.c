@@ -31,7 +31,7 @@
 
 char ixgb_driver_name[] = "ixgb";
 char ixgb_driver_string[] = "Intel(R) PRO/10GbE Network Driver";
-char ixgb_driver_version[] = "1.0.47-k1";
+char ixgb_driver_version[] = "1.0.47-k1jg";
 char ixgb_copyright[] = "Copyright (c) 2001-2003 Intel Corporation.";
 
 /* ixgb_pci_tbl - PCI Device ID Table
@@ -104,7 +104,7 @@ static int ixgb_set_mac(struct net_device *netdev, void *p);
 static void ixgb_update_stats(struct ixgb_adapter *adapter);
 static inline void ixgb_irq_disable(struct ixgb_adapter *adapter);
 static inline void ixgb_irq_enable(struct ixgb_adapter *adapter);
-static void ixgb_intr(int irq, void *data, struct pt_regs *regs);
+static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs);
 static void ixgb_clean_tx_irq(struct ixgb_adapter *adapter);
 #ifdef CONFIG_IXGB_NAPI
 static int ixgb_poll(struct net_device *netdev, int *budget);
@@ -500,13 +500,13 @@ ixgb_sw_init(struct ixgb_adapter *adapter)
 
 	/* PCI config space info */
 
-	pci_read_config_word(pdev, PCI_VENDOR_ID, &hw->vendor_id);
-	pci_read_config_word(pdev, PCI_DEVICE_ID, &hw->device_id);
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &hw->revision_id);
-	pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID,
-			     &hw->subsystem_vendor_id);
-	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &hw->subsystem_id);
-	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
+	/* FIXME: do not store, instead directly use struct pci_dev
+	 * where needed
+	 */
+	hw->vendor_id = pdev->vendor;
+	hw->device_id = pdev->device;
+	hw->subsystem_vendor_id = pdev->subsystem_vendor;
+	hw->subsystem_id = pdev->subsystem_device;
 
 	adapter->rx_buffer_len = IXGB_RXBUFFER_2048;
 
@@ -1715,7 +1715,7 @@ ixgb_irq_enable(struct ixgb_adapter *adapter)
  * @param regs CPU registers structure
  **/
 
-static void
+static irqreturn_t
 ixgb_intr(int irq, void *data, struct pt_regs *regs)
 {
 	struct net_device *netdev = (struct net_device *) data;
@@ -1725,13 +1725,18 @@ ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		ixgb_irq_disable(adapter);
 		__netif_rx_schedule(netdev);
 	}
+
+	return IRQ_HANDLED; /* FIXME: check for shared interrupts */
 #else
 	struct ixgb_hw *hw = &adapter->hw;
 	u32 icr;
 	uint i = IXGB_MAX_INTR;
 	boolean_t rxdmt0 = FALSE;
+	int handled = 0;
 
 	while (i && (icr = IXGB_READ_REG(hw, ICR))) {
+		handled = 1;
+
 		if (icr & IXGB_INT_RXDMT0)
 			rxdmt0 = TRUE;
 
@@ -1755,6 +1760,8 @@ ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		/* now restart it, h/w will decide if its necessary */
 		IXGB_WRITE_REG(hw, IMS, IXGB_INT_RXDMT0);
 	}
+
+	return IRQ_RETVAL(handled);
 #endif				// NAPI else
 }
 

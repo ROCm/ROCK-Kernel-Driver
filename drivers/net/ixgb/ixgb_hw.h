@@ -498,10 +498,8 @@ struct ixgb_hw {
 	boolean_t adapter_stopped;	/* State of adapter                 */
 	u16 device_id;	/* device id from PCI configuration space */
 	u16 vendor_id;	/* vendor id from PCI configuration space */
-	u8 revision_id;	/* revision id from PCI configuration space */
 	u16 subsystem_vendor_id;	/* subsystem vendor id from PCI configuration space */
 	u16 subsystem_id;	/* subsystem id from PCI configuration space */
-	u16 pci_cmd_word;	/* PCI command register id from PCI configuration space */
 	u16 eeprom[IXGB_EEPROM_SIZE];	/* EEPROM contents read at init time  */
 	uint64_t io_base;	/* Our I/O mapped location */
 	u32 lastLFC;

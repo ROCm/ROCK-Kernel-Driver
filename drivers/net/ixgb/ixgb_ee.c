@@ -52,7 +52,7 @@ ixgb_raise_clock(struct ixgb_hw *hw, u32 * eecd_reg)
 	 */
 	*eecd_reg = *eecd_reg | IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, *eecd_reg);
-	usec_delay(50);
+	udelay(50);
 	return;
 }
 
@@ -70,7 +70,7 @@ ixgb_lower_clock(struct ixgb_hw *hw, u32 * eecd_reg)
 	 */
 	*eecd_reg = *eecd_reg & ~IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, *eecd_reg);
-	usec_delay(50);
+	udelay(50);
 	return;
 }
 
@@ -107,7 +107,7 @@ ixgb_shift_out_bits(struct ixgb_hw *hw, u16 data, u16 count)
 
 		IXGB_WRITE_REG(hw, EECD, eecd_reg);
 
-		usec_delay(50);
+		udelay(50);
 
 		ixgb_raise_clock(hw, &eecd_reg);
 		ixgb_lower_clock(hw, &eecd_reg);
@@ -202,22 +202,22 @@ ixgb_standby_eeprom(struct ixgb_hw *hw)
 	/*  Deselct EEPROM  */
 	eecd_reg &= ~(IXGB_EECD_CS | IXGB_EECD_SK);
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 
 	/*  Clock high  */
 	eecd_reg |= IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 
 	/*  Select EEPROM  */
 	eecd_reg |= IXGB_EECD_CS;
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 
 	/*  Clock low  */
 	eecd_reg &= ~IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 	return;
 }
 
@@ -236,12 +236,12 @@ ixgb_clock_eeprom(struct ixgb_hw *hw)
 	/*  Rising edge of clock  */
 	eecd_reg |= IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 
 	/*  Falling edge of clock  */
 	eecd_reg &= ~IXGB_EECD_SK;
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
-	usec_delay(50);
+	udelay(50);
 	return;
 }
 
@@ -297,7 +297,7 @@ ixgb_wait_eeprom_command(struct ixgb_hw *hw)
 		if (eecd_reg & IXGB_EECD_DO)
 			return (TRUE);
 
-		usec_delay(50);
+		udelay(50);
 	}
 	ASSERT(0);
 	return (FALSE);
