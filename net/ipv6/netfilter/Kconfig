@@ -3,7 +3,7 @@
 #
 
 menu "IPv6: Netfilter Configuration"
-	depends on INET && IPV6!=n && NETFILTER
+	depends on INET && IPV6 && NETFILTER
 
 #tristate 'Connection tracking (required for masq/NAT)' CONFIG_IP6_NF_CONNTRACK
 #if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then
