@@ -587,7 +587,6 @@ EXPORT_SYMBOL(ip_route_me_harder);
 
 EXPORT_SYMBOL(register_gifconf);
 
-EXPORT_SYMBOL(net_call_rx_atomic);
 EXPORT_SYMBOL(softnet_data);
 
 #if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
