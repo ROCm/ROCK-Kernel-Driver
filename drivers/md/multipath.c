@@ -389,8 +389,8 @@ static int multipath_run (mddev_t *mddev)
 	struct list_head *tmp;
 
 	if (mddev->level != LEVEL_MULTIPATH) {
-		printk("multipath: md%d: raid level not set to multipath IO (%d)\n",
-		       mdidx(mddev), mddev->level);
+		printk("multipath: %s: raid level not set to multipath IO (%d)\n",
+		       mdname(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -403,8 +403,8 @@ static int multipath_run (mddev_t *mddev)
 	mddev->private = conf;
 	if (!conf) {
 		printk(KERN_ERR 
-			"multipath: couldn't allocate memory for md%d\n",
-			mdidx(mddev));
+			"multipath: couldn't allocate memory for %s\n",
+			mdname(mddev));
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
@@ -413,8 +413,8 @@ static int multipath_run (mddev_t *mddev)
 				   GFP_KERNEL);
 	if (!conf->multipaths) {
 		printk(KERN_ERR 
-			"multipath: couldn't allocate memory for md%d\n",
-			mdidx(mddev));
+			"multipath: couldn't allocate memory for %s\n",
+			mdname(mddev));
 		goto out_free_conf;
 	}
 	memset(conf->multipaths, 0, sizeof(struct multipath_info)*mddev->raid_disks);
@@ -448,8 +448,8 @@ static int multipath_run (mddev_t *mddev)
 	conf->device_lock = SPIN_LOCK_UNLOCKED;
 
 	if (!conf->working_disks) {
-		printk(KERN_ERR "multipath: no operational IO paths for md%d\n",
-			mdidx(mddev));
+		printk(KERN_ERR "multipath: no operational IO paths for %s\n",
+			mdname(mddev));
 		goto out_free_conf;
 	}
 	mddev->degraded = conf->raid_disks = conf->working_disks;
@@ -459,25 +459,23 @@ static int multipath_run (mddev_t *mddev)
 				    NULL);
 	if (conf->pool == NULL) {
 		printk(KERN_ERR 
-			"multipath: couldn't allocate memory for md%d\n",
-			mdidx(mddev));
+			"multipath: couldn't allocate memory for %s\n",
+			mdname(mddev));
 		goto out_free_conf;
 	}
 
 	{
-		const char * name = "md%d_multipath";
-
-		mddev->thread = md_register_thread(multipathd, mddev, name);
+		mddev->thread = md_register_thread(multipathd, mddev, "%s_multipath");
 		if (!mddev->thread) {
 			printk(KERN_ERR "multipath: couldn't allocate thread"
-				" for md%d\n", mdidx(mddev));
+				" for %s\n", mdname(mddev));
 			goto out_free_conf;
 		}
 	}
 
 	printk(KERN_INFO 
-		"multipath: array md%d active with %d out of %d IO paths\n",
-		mdidx(mddev), conf->working_disks, mddev->raid_disks);
+		"multipath: array %s active with %d out of %d IO paths\n",
+		mdname(mddev), conf->working_disks, mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
 	 */

@@ -240,8 +240,8 @@ static int raid0_run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
-	printk("md%d: setting max_sectors to %d, segment boundary to %d\n",
-	       mdidx(mddev),
+	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
+	       mdname(mddev),
 	       mddev->chunk_size >> 9,
 	       (mddev->chunk_size>>1)-1);
 	blk_queue_max_sectors(mddev->queue, mddev->chunk_size >> 9);

@@ -1485,7 +1485,7 @@ static int run (mddev_t *mddev)
 	struct list_head *tmp;
 
 	if (mddev->level != 5 && mddev->level != 4) {
-		printk("raid5: md%d: raid level not set to 4/5 (%d)\n", mdidx(mddev), mddev->level);
+		printk("raid5: %s: raid level not set to 4/5 (%d)\n", mdname(mddev), mddev->level);
 		return -EIO;
 	}
 
@@ -1511,7 +1511,7 @@ static int run (mddev_t *mddev)
 
 	mddev->queue->unplug_fn = raid5_unplug_device;
 
-	PRINTK("raid5: run(md%d) called.\n", mdidx(mddev));
+	PRINTK("raid5: run(%s) called.\n", mdname(mddev));
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		raid_disk = rdev->raid_disk;
@@ -1543,37 +1543,37 @@ static int run (mddev_t *mddev)
 	conf->max_nr_stripes = NR_STRIPES;
 
 	if (!conf->chunk_size || conf->chunk_size % 4) {
-		printk(KERN_ERR "raid5: invalid chunk size %d for md%d\n",
-			conf->chunk_size, mdidx(mddev));
+		printk(KERN_ERR "raid5: invalid chunk size %d for %s\n",
+			conf->chunk_size, mdname(mddev));
 		goto abort;
 	}
 	if (conf->algorithm > ALGORITHM_RIGHT_SYMMETRIC) {
 		printk(KERN_ERR 
-			"raid5: unsupported parity algorithm %d for md%d\n",
-			conf->algorithm, mdidx(mddev));
+			"raid5: unsupported parity algorithm %d for %s\n",
+			conf->algorithm, mdname(mddev));
 		goto abort;
 	}
 	if (mddev->degraded > 1) {
-		printk(KERN_ERR "raid5: not enough operational devices for md%d"
+		printk(KERN_ERR "raid5: not enough operational devices for %s"
 			" (%d/%d failed)\n",
-			mdidx(mddev), conf->failed_disks, conf->raid_disks);
+			mdname(mddev), conf->failed_disks, conf->raid_disks);
 		goto abort;
 	}
 
 	if (mddev->degraded == 1 &&
 	    mddev->recovery_cp != MaxSector) {
 		printk(KERN_ERR 
-			"raid5: cannot start dirty degraded array for md%d\n",
-			mdidx(mddev));
+			"raid5: cannot start dirty degraded array for %s\n",
+			mdname(mddev));
 		goto abort;
 	}
 
 	{
-		mddev->thread = md_register_thread(raid5d, mddev, "md%d_raid5");
+		mddev->thread = md_register_thread(raid5d, mddev, "%s_raid5");
 		if (!mddev->thread) {
 			printk(KERN_ERR 
-				"raid5: couldn't allocate thread for md%d\n",
-				mdidx(mddev));
+				"raid5: couldn't allocate thread for %s\n",
+				mdname(mddev));
 			goto abort;
 		}
 	}
@@ -1586,18 +1586,18 @@ memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 		md_unregister_thread(mddev->thread);
 		goto abort;
 	} else
-		printk(KERN_INFO "raid5: allocated %dkB for md%d\n",
-			memory, mdidx(mddev));
+		printk(KERN_INFO "raid5: allocated %dkB for %s\n",
+			memory, mdname(mddev));
 
 	if (mddev->degraded == 0)
-		printk("raid5: raid level %d set md%d active with %d out of %d"
-			" devices, algorithm %d\n", conf->level, mdidx(mddev), 
+		printk("raid5: raid level %d set %s active with %d out of %d"
+			" devices, algorithm %d\n", conf->level, mdname(mddev), 
 			mddev->raid_disks-mddev->degraded, mddev->raid_disks,
 			conf->algorithm);
 	else
-		printk(KERN_ALERT "raid5: raid level %d set md%d active with %d"
+		printk(KERN_ALERT "raid5: raid level %d set %s active with %d"
 			" out of %d devices, algorithm %d\n", conf->level,
-			mdidx(mddev), mddev->raid_disks - mddev->degraded,
+			mdname(mddev), mddev->raid_disks - mddev->degraded,
 			mddev->raid_disks, conf->algorithm);
 
 	print_raid5_conf(conf);
@@ -1624,7 +1624,7 @@ abort:
 		kfree(conf);
 	}
 	mddev->private = NULL;
-	printk(KERN_ALERT "raid5: failed to run raid set md%d\n", mdidx(mddev));
+	printk(KERN_ALERT "raid5: failed to run raid set %s\n", mdname(mddev));
 	return -EIO;
 }
 

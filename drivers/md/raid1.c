@@ -1052,8 +1052,8 @@ static int run(mddev_t *mddev)
 	struct list_head *tmp;
 
 	if (mddev->level != 1) {
-		printk("raid1: md%d: raid level not set to mirroring (%d)\n",
-		       mdidx(mddev), mddev->level);
+		printk("raid1: %s: raid level not set to mirroring (%d)\n",
+		       mdname(mddev), mddev->level);
 		goto out;
 	}
 	/*
@@ -1064,16 +1064,16 @@ static int run(mddev_t *mddev)
 	conf = kmalloc(sizeof(conf_t), GFP_KERNEL);
 	mddev->private = conf;
 	if (!conf) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n",
-			mdidx(mddev));
+		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n",
+			mdname(mddev));
 		goto out;
 	}
 	memset(conf, 0, sizeof(*conf));
 	conf->mirrors = kmalloc(sizeof(struct mirror_info)*mddev->raid_disks, 
 				 GFP_KERNEL);
 	if (!conf->mirrors) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n",
-		       mdidx(mddev));
+		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n",
+		       mdname(mddev));
 		goto out_free_conf;
 	}
 	memset(conf->mirrors, 0, sizeof(struct mirror_info)*mddev->raid_disks);
@@ -1081,8 +1081,8 @@ static int run(mddev_t *mddev)
 	conf->r1bio_pool = mempool_create(NR_RAID1_BIOS, r1bio_pool_alloc,
 						r1bio_pool_free, mddev);
 	if (!conf->r1bio_pool) {
-		printk(KERN_ERR "raid1: couldn't allocate memory for md%d\n", 
-			mdidx(mddev));
+		printk(KERN_ERR "raid1: couldn't allocate memory for %s\n", 
+			mdname(mddev));
 		goto out_free_conf;
 	}
 
@@ -1121,8 +1121,8 @@ static int run(mddev_t *mddev)
 	init_waitqueue_head(&conf->wait_resume);
 
 	if (!conf->working_disks) {
-		printk(KERN_ERR "raid1: no operational mirrors for md%d\n",
-			mdidx(mddev));
+		printk(KERN_ERR "raid1: no operational mirrors for %s\n",
+			mdname(mddev));
 		goto out_free_conf;
 	}
 
@@ -1150,17 +1150,17 @@ static int run(mddev_t *mddev)
 
 
 	{
-		mddev->thread = md_register_thread(raid1d, mddev, "md%d_raid1");
+		mddev->thread = md_register_thread(raid1d, mddev, "%s_raid1");
 		if (!mddev->thread) {
 			printk(KERN_ERR 
-				"raid1: couldn't allocate thread for md%d\n", 
-				mdidx(mddev));
+				"raid1: couldn't allocate thread for %s\n", 
+				mdname(mddev));
 			goto out_free_conf;
 		}
 	}
 	printk(KERN_INFO 
-		"raid1: raid set md%d active with %d out of %d mirrors\n",
-		mdidx(mddev), mddev->raid_disks - mddev->degraded, 
+		"raid1: raid set %s active with %d out of %d mirrors\n",
+		mdname(mddev), mddev->raid_disks - mddev->degraded, 
 		mddev->raid_disks);
 	/*
 	 * Ok, everything is just fine now
