@@ -392,6 +392,9 @@ static void smc_enable(struct net_device *dev)
 	SMC_SET_TCR(lp->tcr_cur_mode);
 	SMC_SET_RCR(lp->rcr_cur_mode);
 
+	SMC_SELECT_BANK(1);
+	SMC_SET_MAC_ADDR(dev->dev_addr);
+
 	/* now, enable interrupts */
 	mask = IM_EPH_INT|IM_RX_OVRN_INT|IM_RCV_INT;
 	if (lp->version >= (CHIP_91100 << 4))
@@ -1423,7 +1426,6 @@ static int
 smc_open(struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
-	unsigned long ioaddr = dev->base_addr;
 
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
 
@@ -1455,9 +1457,6 @@ smc_open(struct net_device *dev)
 	/* reset the hardware */
 	smc_reset(dev);
 	smc_enable(dev);
-
-	SMC_SELECT_BANK(1);
-	SMC_SET_MAC_ADDR(dev->dev_addr);
 
 	/* Configure the PHY, initialize the link state */
 	if (lp->phy_type != 0)
@@ -2115,15 +2114,12 @@ static int smc_drv_resume(struct device *dev, u32 level)
 
 	if (ndev && level == RESUME_ENABLE) {
 		struct smc_local *lp = netdev_priv(ndev);
-		unsigned long ioaddr = ndev->base_addr;
 
 		if (pdev->num_resources == 3)
 			smc_enable_device(pdev->resource[2].start);
 		if (netif_running(ndev)) {
 			smc_reset(ndev);
 			smc_enable(ndev);
-			SMC_SELECT_BANK(1);
-			SMC_SET_MAC_ADDR(ndev->dev_addr);
 			if (lp->phy_type != 0)
 				smc_phy_configure(ndev);
 			netif_device_attach(ndev);
