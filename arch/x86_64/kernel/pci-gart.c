@@ -195,7 +195,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	   uses the normal dma_mask for alloc_consistent. */
 	dma_mask &= hwdev->dma_mask;
 
-#if 1
+#if 0
 	/* workaround */
 	dma_mask &= 0xffffffff;
 #endif
