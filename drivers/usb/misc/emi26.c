@@ -13,6 +13,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/usb.h>
 
 #define MAX_INTEL_HEX_RECORD_LENGTH 16
