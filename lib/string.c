@@ -55,6 +55,8 @@ int strnicmp(const char *s1, const char *s2, size_t len)
 	}
 	return (int)c1 - (int)c2;
 }
+
+EXPORT_SYMBOL(strnicmp);
 #endif
 
 #ifndef __HAVE_ARCH_STRCPY
@@ -325,6 +327,8 @@ size_t strspn(const char *s, const char *accept)
 
 	return count;
 }
+
+EXPORT_SYMBOL(strspn);
 #endif
 
 /**
@@ -396,6 +400,8 @@ char * strsep(char **s, const char *ct)
 
 	return sbegin;
 }
+
+EXPORT_SYMBOL(strsep);
 #endif
 
 #ifndef __HAVE_ARCH_MEMSET

@@ -8,11 +8,15 @@
  */ 
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/security.h>
 #include <asm/uaccess.h>
 
 unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
 kernel_cap_t cap_bset = CAP_INIT_EFF_SET;
+
+EXPORT_SYMBOL(securebits);
+EXPORT_SYMBOL(cap_bset);
 
 /*
  * This global lock protects task->cap_* for all tasks including current.

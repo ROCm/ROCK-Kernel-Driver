@@ -417,7 +417,7 @@ ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		return NET_RX_DROP;
 
-	if (!pskb_may_pull(skb, sizeof(arphdr)))
+	if (!pskb_may_pull(skb, sizeof(struct arphdr)))
 		goto drop;
 
 	/* Basic sanity checks can be done without the lock.  */
@@ -438,7 +438,7 @@ ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 		goto drop;
 
 	if (!pskb_may_pull(skb,
-			   sizeof(arphdr) +
+			   sizeof(struct arphdr) +
 			   (2 * dev->addr_len) +
 			   (2 * 4)))
 		goto drop;
@@ -855,7 +855,7 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 	if (b->udph.source != htons(67) || b->udph.dest != htons(68))
 		goto drop;
 
-	if (ntohs(h->tot_len) < ntohs(b->udhp.len) + sizeof(struct iphdr))
+	if (ntohs(h->tot_len) < ntohs(b->udph.len) + sizeof(struct iphdr))
 		goto drop;
 
 	len = ntohs(b->udph.len) - sizeof(struct udphdr);

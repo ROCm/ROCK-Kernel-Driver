@@ -20,6 +20,7 @@
  */
 
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
 #include <linux/interrupt.h>
 #include <linux/percpu.h>
 #include <linux/init.h>
@@ -207,6 +208,8 @@ repeat:
 	return ret;
 }
 
+EXPORT_SYMBOL(__mod_timer);
+
 /***
  * add_timer_on - start a timer on a particular CPU
  * @timer: the timer to be added
@@ -265,6 +268,8 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	return __mod_timer(timer, expires);
 }
 
+EXPORT_SYMBOL(mod_timer);
+
 /***
  * del_timer - deactive a timer.
  * @timer: the timer to be deactivated
@@ -298,6 +303,8 @@ repeat:
 
 	return 1;
 }
+
+EXPORT_SYMBOL(del_timer);
 
 #ifdef CONFIG_SMP
 /***
@@ -344,8 +351,9 @@ del_again:
 
 	return ret;
 }
-#endif
 
+EXPORT_SYMBOL(del_timer_sync);
+#endif
 
 static int cascade(tvec_base_t *base, tvec_t *tv, int index)
 {
@@ -440,6 +448,8 @@ unsigned long tick_nsec = TICK_NSEC;		/* ACTHZ period (nsec) */
  */
 struct timespec xtime __attribute__ ((aligned (16)));
 struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
+
+EXPORT_SYMBOL(xtime);
 
 /* Don't completely fail for HZ > 500.  */
 int tickadj = 500/HZ ? : 1;		/* microsecs */
@@ -779,6 +789,8 @@ unsigned long wall_jiffies = INITIAL_JIFFIES;
  */
 #ifndef ARCH_HAVE_XTIME_LOCK
 seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
+
+EXPORT_SYMBOL(xtime_lock);
 #endif
 
 /*
@@ -1031,6 +1043,8 @@ signed long schedule_timeout(signed long timeout)
  out:
 	return timeout < 0 ? 0 : timeout;
 }
+
+EXPORT_SYMBOL(schedule_timeout);
 
 /* Thread ID - the internal kernel "pid" */
 asmlinkage long sys_gettid(void)

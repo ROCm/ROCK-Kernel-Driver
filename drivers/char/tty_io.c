@@ -117,6 +117,8 @@ struct termios tty_std_termios = {	/* for the benefit of tty drivers  */
 	.c_cc = INIT_C_CC
 };
 
+EXPORT_SYMBOL(tty_std_termios);
+
 LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 struct tty_ldisc ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
@@ -2032,6 +2034,8 @@ void tty_flip_buffer_push(struct tty_struct *tty)
 		schedule_delayed_work(&tty->flip.work, 1);
 }
 
+EXPORT_SYMBOL(tty_flip_buffer_push);
+
 /*
  * This subroutine initializes a tty structure.
  */
@@ -2311,6 +2315,8 @@ int tty_register_driver(struct tty_driver *driver)
 	return 0;
 }
 
+EXPORT_SYMBOL(tty_register_driver);
+
 /*
  * Called by a tty driver to unregister itself.
  */
@@ -2356,6 +2362,8 @@ int tty_unregister_driver(struct tty_driver *driver)
 	cdev_del(&driver->cdev);
 	return 0;
 }
+
+EXPORT_SYMBOL(tty_unregister_driver);
 
 
 /*

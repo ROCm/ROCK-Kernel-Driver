@@ -27,6 +27,7 @@
  */
 
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/threads.h>
 #include <linux/kernel_stat.h>
 #include <linux/signal.h>
@@ -214,6 +215,8 @@ void free_irq(unsigned int irq, void* dev_id)
 	return;
 }
 
+EXPORT_SYMBOL(free_irq);
+
 int request_irq(unsigned int irq,
 	irqreturn_t (*handler)(int, void *, struct pt_regs *),
 	unsigned long irqflags, const char * devname, void *dev_id)
@@ -251,6 +254,8 @@ int request_irq(unsigned int irq,
 
 	return 0;
 }
+
+EXPORT_SYMBOL(request_irq);
 
 /*
  * Generic enable/disable code: this just calls
@@ -530,10 +535,14 @@ unsigned long probe_irq_on (void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off (unsigned long irqs)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 unsigned int probe_irq_mask(unsigned long irqs)
 {

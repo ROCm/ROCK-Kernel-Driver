@@ -11,6 +11,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -216,6 +217,8 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	if (irq >= INTERNAL_IRQS) {
@@ -233,6 +236,8 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	*(volatile unsigned long *)0xfffff304 |= 1<<irq;
 }
+
+EXPORT_SYMBOL(free_irq);
 
 #if 0
 /*

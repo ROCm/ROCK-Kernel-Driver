@@ -261,11 +261,15 @@ extern spinlock_t swaplock;
 #define lookup_swap_cache(swp)			NULL
 #define valid_swaphandles(swp, off)		0
 #define can_share_swap_page(p)			0
-#define remove_exclusive_swap_page(p)		0
 #define move_to_swap_cache(p, swp)		1
 #define move_from_swap_cache(p, i, m)		1
 #define __delete_from_swap_cache(p)		/*NOTHING*/
 #define delete_from_swap_cache(p)		/*NOTHING*/
+
+static inline int remove_exclusive_swap_page(struct page *p)
+{
+	return 0;
+}
 
 static inline swp_entry_t get_swap_page(void)
 {

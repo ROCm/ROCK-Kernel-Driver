@@ -12,6 +12,7 @@
 #define __KERNEL_SYSCALLS__
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/kernel.h>
@@ -165,6 +166,10 @@ static int __init obsolete_checksetup(char *line)
    still work even if initially too large, it will just take slightly longer */
 unsigned long loops_per_jiffy = (1<<12);
 
+#ifndef __ia64__
+EXPORT_SYMBOL(loops_per_jiffy);
+#endif
+
 /* This is the number of bits of precision for the loops_per_jiffy.  Each
    bit takes on average 1.5/HZ seconds.  This (like the original) is a little
    better than 1% */
@@ -306,6 +311,8 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 
 #ifdef __GENERIC_PER_CPU
 unsigned long __per_cpu_offset[NR_CPUS];
+
+EXPORT_SYMBOL(__per_cpu_offset);
 
 static void __init setup_per_cpu_areas(void)
 {

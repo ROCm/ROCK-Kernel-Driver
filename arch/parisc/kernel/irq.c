@@ -25,6 +25,7 @@
 #include <linux/eisa.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
@@ -652,6 +653,8 @@ int request_irq(unsigned int irq,
 	return 0;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	struct irqaction *action, **p;
@@ -693,6 +696,8 @@ void free_irq(unsigned int irq, void *dev_id)
 	spin_unlock(&irq_lock);
 	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
 }
+
+EXPORT_SYMBOL(free_irq);
 
 
 #ifdef CONFIG_SMP
@@ -787,6 +792,8 @@ unsigned long probe_irq_on(void)
 	return val;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 /*
  * Return the one interrupt that triggered (this can
  * handle any interrupt source).
@@ -845,6 +852,8 @@ int probe_irq_off(unsigned long val)
 		irq_found = -irq_found;
 	return irq_found;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 unsigned int probe_irq_mask(unsigned long irqs)
 {

@@ -43,8 +43,5 @@ extern int rpc_rmdir(char *);
 extern struct dentry *rpc_mkpipe(char *, void *, struct rpc_pipe_ops *, int flags);
 extern int rpc_unlink(char *);
 
-void __rpc_purge_current_upcall(struct file *);
-void __rpc_purge_one_upcall(struct file *filp, struct rpc_pipe_msg *target);
-
 #endif
 #endif

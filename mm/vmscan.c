@@ -12,6 +12,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
@@ -112,6 +113,8 @@ struct shrinker *set_shrinker(int seeks, shrinker_t theshrinker)
 	return shrinker;
 }
 
+EXPORT_SYMBOL(set_shrinker);
+
 /*
  * Remove one
  */
@@ -122,6 +125,8 @@ void remove_shrinker(struct shrinker *shrinker)
 	up(&shrinker_sem);
 	kfree(shrinker);
 }
+
+EXPORT_SYMBOL(remove_shrinker);
  
 #define SHRINK_BATCH 128
 /*

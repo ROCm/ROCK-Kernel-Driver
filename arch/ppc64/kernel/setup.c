@@ -228,16 +228,22 @@ void machine_restart(char *cmd)
 {
 	ppc_md.restart(cmd);
 }
+
+EXPORT_SYMBOL(machine_restart);
   
 void machine_power_off(void)
 {
 	ppc_md.power_off();
 }
+
+EXPORT_SYMBOL(machine_power_off);
   
 void machine_halt(void)
 {
 	ppc_md.halt();
 }
+
+EXPORT_SYMBOL(machine_halt);
 
 unsigned long ppc_proc_freq;
 unsigned long ppc_tb_freq;

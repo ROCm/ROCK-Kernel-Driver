@@ -224,7 +224,6 @@ EXPORT_SYMBOL(svr4_setcontext);
 EXPORT_SYMBOL(svr4_getcontext);
 EXPORT_SYMBOL(_sigpause_common);
 
-/* Should really be in linux/kernel/ksyms.c */
 EXPORT_SYMBOL(dump_thread);
 
 /* prom symbols */

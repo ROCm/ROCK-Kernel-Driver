@@ -323,6 +323,8 @@ void daemonize(const char *name, ...)
 	reparent_to_init();
 }
 
+EXPORT_SYMBOL(daemonize);
+
 static inline void close_files(struct files_struct * files)
 {
 	int i, j;
@@ -418,6 +420,8 @@ void exit_fs(struct task_struct *tsk)
 	__exit_fs(tsk);
 }
 
+EXPORT_SYMBOL_GPL(exit_fs);
+
 /*
  * Turn us into a lazy TLB process if we
  * aren't already..
@@ -454,6 +458,8 @@ void exit_mm(struct task_struct *tsk)
 {
 	__exit_mm(tsk);
 }
+
+EXPORT_SYMBOL(exit_mm);
 
 static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_reaper)
 {
@@ -741,6 +747,8 @@ NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 	do_exit(code);
 }
 
+EXPORT_SYMBOL(complete_and_exit);
+
 asmlinkage long sys_exit(int error_code)
 {
 	do_exit((error_code&0xff)<<8);
@@ -764,6 +772,8 @@ task_t *next_thread(task_t *p)
 
 	return pid_task(tmp, PIDTYPE_TGID);
 }
+
+EXPORT_SYMBOL(next_thread);
 
 /*
  * Take down every thread in the group.  This is called by fatal signals

@@ -3,6 +3,7 @@
  * Licensed under the GPL
  */
 
+#include "linux/module.h"
 #include "linux/sched.h"
 #include "user_util.h"
 #include "kern_util.h"
@@ -46,6 +47,8 @@ void machine_restart(char * __unused)
 	CHOOSE_MODE(reboot_tt(), reboot_skas());
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_power_off(void)
 {
 	do_uml_exitcalls();
@@ -53,10 +56,14 @@ void machine_power_off(void)
 	CHOOSE_MODE(halt_tt(), halt_skas());
 }
 
+EXPORT_SYMBOL(machine_power_off);
+
 void machine_halt(void)
 {
 	machine_power_off();
 }
+
+EXPORT_SYMBOL(machine_halt);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

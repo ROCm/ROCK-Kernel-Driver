@@ -69,6 +69,8 @@
 /* XXX false sharing with below? */
 u64 jiffies_64 = INITIAL_JIFFIES;
 
+EXPORT_SYMBOL(jiffies_64);
+
 unsigned long disarm_decr[NR_CPUS];
 
 extern struct timezone sys_tz;
@@ -239,6 +241,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, new_sec = tv->tv_sec;
@@ -292,6 +296,8 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 /* This function is only called on the boot processor */
 void __init time_init(void)

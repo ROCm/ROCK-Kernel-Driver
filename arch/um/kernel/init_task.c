@@ -5,6 +5,7 @@
 
 #include "linux/config.h"
 #include "linux/mm.h"
+#include "linux/module.h"
 #include "linux/sched.h"
 #include "linux/init_task.h"
 #include "linux/version.h"
@@ -18,6 +19,8 @@ struct mm_struct init_mm = INIT_MM(init_mm);
 static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 
+EXPORT_SYMBOL(init_mm);
+
 /*
  * Initial task structure.
  *
@@ -25,6 +28,8 @@ static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
  */
 
 struct task_struct init_task = INIT_TASK(init_task);
+
+EXPORT_SYMBOL(init_task);
 
 /*
  * Initial thread structure.

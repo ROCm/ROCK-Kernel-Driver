@@ -1,3 +1,4 @@
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/ctype.h>
 #include <linux/fd.h>
@@ -22,6 +23,8 @@ static char __initdata saved_root_name[64];
 
 /* this is initialized in init/main.c */
 dev_t ROOT_DEV;
+
+EXPORT_SYMBOL(ROOT_DEV);
 
 static int __init load_ramdisk(char *str)
 {

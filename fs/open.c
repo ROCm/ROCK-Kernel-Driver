@@ -42,6 +42,8 @@ int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 	return retval;
 }
 
+EXPORT_SYMBOL(vfs_statfs);
+
 static int vfs_statfs_native(struct super_block *sb, struct statfs *buf)
 {
 	struct kstatfs st;
@@ -753,6 +755,8 @@ struct file *filp_open(const char * filename, int flags, int mode)
 	return ERR_PTR(error);
 }
 
+EXPORT_SYMBOL(filp_open);
+
 struct file *dentry_open(struct dentry *dentry, struct vfsmount *mnt, int flags)
 {
 	struct file * f;
@@ -811,6 +815,8 @@ cleanup_dentry:
 	mntput(mnt);
 	return ERR_PTR(error);
 }
+
+EXPORT_SYMBOL(dentry_open);
 
 /*
  * Find an empty file descriptor entry, and mark it busy.
@@ -874,6 +880,8 @@ out:
 	return error;
 }
 
+EXPORT_SYMBOL(get_unused_fd);
+
 static inline void __put_unused_fd(struct files_struct *files, unsigned int fd)
 {
 	__FD_CLR(fd, files->open_fds);
@@ -888,6 +896,8 @@ void put_unused_fd(unsigned int fd)
 	__put_unused_fd(files, fd);
 	spin_unlock(&files->file_lock);
 }
+
+EXPORT_SYMBOL(put_unused_fd);
 
 /*
  * Install a file pointer in the fd array.  
@@ -911,6 +921,8 @@ void fd_install(unsigned int fd, struct file * file)
 	files->fd[fd] = file;
 	spin_unlock(&files->file_lock);
 }
+
+EXPORT_SYMBOL(fd_install);
 
 asmlinkage long sys_open(const char __user * filename, int flags, int mode)
 {
@@ -985,6 +997,8 @@ int filp_close(struct file *filp, fl_owner_t id)
 	return retval;
 }
 
+EXPORT_SYMBOL(filp_close);
+
 /*
  * Careful here! We test whether the file pointer is NULL before
  * releasing the fd. This ensures that one clone task can't release
@@ -1011,6 +1025,8 @@ out_unlock:
 	spin_unlock(&files->file_lock);
 	return -EBADF;
 }
+
+EXPORT_SYMBOL(sys_close);
 
 /*
  * This routine simulates a hangup on the tty, to arrange that users

@@ -14,6 +14,7 @@
  *     of fds to overcome nfds < 16390 descriptors limit (Tigran Aivazian).
  */
 
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/poll.h>
@@ -62,6 +63,8 @@ void poll_initwait(struct poll_wqueues *pwq)
 	pwq->table = NULL;
 }
 
+EXPORT_SYMBOL(poll_initwait);
+
 void poll_freewait(struct poll_wqueues *pwq)
 {
 	struct poll_table_page * p = pwq->table;
@@ -80,6 +83,8 @@ void poll_freewait(struct poll_wqueues *pwq)
 		free_page((unsigned long) old);
 	}
 }
+
+EXPORT_SYMBOL(poll_freewait);
 
 void __pollwait(struct file *filp, wait_queue_head_t *wait_address, poll_table *_p)
 {
@@ -265,6 +270,8 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 	*timeout = __timeout;
 	return retval;
 }
+
+EXPORT_SYMBOL(do_select);
 
 static void *select_bits_alloc(int size)
 {

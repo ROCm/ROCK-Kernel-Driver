@@ -20,6 +20,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
@@ -229,6 +230,8 @@ task_t *find_task_by_pid(int nr)
 		return NULL;
 	return pid_task(pid->task_list.next, PIDTYPE_PID);
 }
+
+EXPORT_SYMBOL(find_task_by_pid);
 
 /*
  * This function switches the PIDs if a non-leader thread calls
