@@ -988,14 +988,13 @@ static void bluetooth_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 static void bluetooth_softint(void *private)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)private, __FUNCTION__);
-	struct tty_struct *tty;
 
 	dbg("%s", __FUNCTION__);
 
 	if (!bluetooth)
 		return;
 
-	tty_wakeup(&bluetooth->tty);
+	tty_wakeup(bluetooth->tty);
 }
 
 
