@@ -543,7 +543,7 @@ struct sa1111_dev {
 #define SA1111_DEV(_d)	container_of((_d), struct sa1111_dev, dev)
 
 #define sa1111_get_drvdata(d)	dev_get_drvdata(&(d)->dev)
-#define sa1111_set_drvdata(d,p)	dev_get_drvdata(&(d)->dev, p)
+#define sa1111_set_drvdata(d,p)	dev_set_drvdata(&(d)->dev, p)
 
 struct sa1111_driver {
 	struct device_driver	drv;
@@ -557,11 +557,6 @@ struct sa1111_driver {
 #define SA1111_DRV(_d)	container_of((_d), struct sa1111_driver, drv)
 
 #define SA1111_DRIVER_NAME(_sadev) ((_sadev)->dev.driver->name)
-
-/*
- * Probe for a SA1111 chip.
- */
-extern int sa1111_init(unsigned long phys, unsigned int irq);
 
 /*
  * These frob the SKPCR register.
