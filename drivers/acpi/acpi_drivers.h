@@ -122,11 +122,6 @@
 #define ACPI_EC_DEVICE_NAME		"Embedded Controller"
 #define ACPI_EC_FILE_INFO		"info"
 
-#ifdef CONFIG_ACPI_EC
-int acpi_ec_ecdt_probe (void);
-#endif
-
-
 /* --------------------------------------------------------------------------
                                        Fan
    -------------------------------------------------------------------------- */

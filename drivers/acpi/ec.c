@@ -723,7 +723,7 @@ acpi_ec_stop (
 }
 
 
-int __init
+static int __init
 acpi_ec_ecdt_probe (void)
 {
 	acpi_status		status;
@@ -790,18 +790,23 @@ static int __init acpi_ec_init (void)
 	if (acpi_disabled)
 		return_VALUE(0);
 
-	result = acpi_bus_register_driver(&acpi_ec_driver);
-	if (result < 0) {
-		remove_proc_entry(ACPI_EC_CLASS, acpi_root_dir);
-		return_VALUE(-ENODEV);
-	}
+	/*
+	 * ACPI 2.0 requires the EC driver to be loaded and work before
+	 * the EC device is found in the namespace. This is accomplished
+	 * by looking for the ECDT table, and getting the EC parameters out
+	 * of that.
+	 */
+	result = acpi_ec_ecdt_probe();
 
-	return_VALUE(0);
+	/* Now register the driver for the EC */
+	if (!result) 
+		result = acpi_bus_register_driver(&acpi_ec_driver);
+	return_VALUE(result);
 }
 
 subsys_initcall(acpi_ec_init);
 
-void __exit
+static void __exit
 acpi_ec_ecdt_exit (void)
 {
 	if (!ec_ecdt)
@@ -815,7 +820,7 @@ acpi_ec_ecdt_exit (void)
 	kfree(ec_ecdt);
 }
 
-void __exit
+static void __exit
 acpi_ec_exit (void)
 {
 	int			result = 0;
