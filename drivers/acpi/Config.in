@@ -13,7 +13,6 @@ if [ "$CONFIG_X86" = "y" ]; then
       fi
 
       define_bool CONFIG_ACPI_BOOT y
-      define_bool CONFIG_ACPI_SLEEP n
 
       if [ "$CONFIG_ACPI_HT_ONLY" != "y" ]; then
 	 bool     '  Sleep States' CONFIG_ACPI_SLEEP
