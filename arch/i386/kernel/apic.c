@@ -1058,7 +1058,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 /*
  * Local APIC timer interrupt. This is the most natural way for doing
  * local interrupts, but local timer interrupts can be emulated by
- * broadcast interrupts too. [in case the hw doesnt support APIC timers]
+ * broadcast interrupts too. [in case the hw doesn't support APIC timers]
  *
  * [ if a single-CPU system runs an SMP kernel then we call the local
  *   interrupt as well. Thus we cannot inline the local irq ... ]

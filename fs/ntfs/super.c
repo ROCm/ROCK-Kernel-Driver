@@ -2,7 +2,7 @@
  * super.c - NTFS kernel super block handling. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2001,2002 Richard Russon.
+ * Copyright (c) 2001,2002 Richard Russon.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -413,7 +413,7 @@ not_ntfs:
 }
 
 /**
- * read_boot_sector - read the NTFS boot sector of a device
+ * read_ntfs_boot_sector - read the NTFS boot sector of a device
  * @sb:		super block of device to read the boot sector from
  * @silent:	if true, suppress all output
  *
@@ -613,6 +613,20 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	}
 	vol->nr_clusters = ll;
 	ntfs_debug("vol->nr_clusters = 0x%Lx", (long long)vol->nr_clusters);
+	/*
+	 * On an architecture where unsigned long is 32-bits, we restrict the
+	 * volume size to 2TiB (2^41). On a 64-bit architecture, the compiler
+	 * will hopefully optimize the whole check away.
+	 */
+	if (sizeof(unsigned long) < 8) {
+		if ((ll << vol->cluster_size_bits) >= (1ULL << 41)) {
+			ntfs_error(vol->sb, "Volume size (%LuTiB) is too large "
+					"for this architecture. Maximim "
+					"supported is 2TiB. Sorry.",
+					ll >> (40 - vol->cluster_size_bits));
+			return FALSE;
+		}
+	}
 	ll = sle64_to_cpu(b->mft_lcn);
 	if (ll >= vol->nr_clusters) {
 		ntfs_error(vol->sb, "MFT LCN is beyond end of volume. Weird.");

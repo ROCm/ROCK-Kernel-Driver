@@ -28,6 +28,7 @@
 #include <sound/driver.h>
 #include <linux/pci.h>
 #include <linux/time.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/cs46xx.h>
 #define SNDRV_GET_ID

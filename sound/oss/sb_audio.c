@@ -851,7 +851,7 @@ sb16_copy_from_user(int dev,
 	{
 		if (copy_from_user(localbuf + localoffs,
 				   userbuf + useroffs, len))
-			return -EFAULT;
+			return;
 		*used = len;
 		*returned = len;
 	}
@@ -874,7 +874,7 @@ sb16_copy_from_user(int dev,
 			if (copy_from_user(lbuf16,
 					   userbuf + useroffs + (p << 1),
 					   locallen << 1))
-				return -EFAULT;
+				return;
 			for (i = 0; i < locallen; i++)
 			{
 				buf8[p+i] = ~((lbuf16[i] >> 8) & 0xff) ^ 0x80;
@@ -904,7 +904,7 @@ sb16_copy_from_user(int dev,
 			if (copy_from_user(lbuf8,
 					   userbuf+useroffs + p,
 					   locallen))
-				return -EFAULT;
+				return;
 			for (i = 0; i < locallen; i++)
 			{
 				buf16[p+i] = (~lbuf8[i] ^ 0x80) << 8;

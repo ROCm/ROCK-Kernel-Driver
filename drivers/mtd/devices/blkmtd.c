@@ -222,7 +222,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
     return err;
   }
 
-  /* Pre 2.4.4 doesnt have space for the block list in the kiobuf */ 
+  /* Pre 2.4.4 doesn't have space for the block list in the kiobuf */ 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
   blocks = kmalloc(KIO_MAX_SECTORS * sizeof(unsigned long));
   if(blocks == NULL) {
@@ -316,7 +316,7 @@ static int write_queue_task(void *data)
     return 0;
   }
 
-  /* Pre 2.4.4 doesnt have space for the block list in the kiobuf */ 
+  /* Pre 2.4.4 doesn't have space for the block list in the kiobuf */ 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
   blocks = kmalloc(KIO_MAX_SECTORS * sizeof(unsigned long));
   if(blocks == NULL) {
@@ -355,7 +355,7 @@ static int write_queue_task(void *data)
       int sectorcnt = item->pagecnt << (PAGE_SHIFT - item->rawdevice->sector_bits);
       int max_sectors = KIO_MAX_SECTORS >> (item->rawdevice->sector_bits - 9);
 
-      /* If we are writing to the last page on the device and it doesnt end
+      /* If we are writing to the last page on the device and it doesn't end
        * on a page boundary, subtract the number of sectors that dont exist.
        */
       if(item->rawdevice->partial_last_page && 

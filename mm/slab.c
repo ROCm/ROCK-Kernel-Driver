@@ -2019,7 +2019,7 @@ static int s_show(struct seq_file *m, void *p)
 	return 0;
 }
 
-/**
+/*
  * slabinfo_op - iterator that generates /proc/slabinfo
  *
  * Output layout:

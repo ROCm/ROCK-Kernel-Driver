@@ -66,7 +66,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 	smp_send_stop();
 #endif
 
-	notifier_call_chain(&panic_notifier_list, 0, NULL);
+       notifier_call_chain(&panic_notifier_list, 0, buf);
 
 	if (panic_timeout > 0)
 	{

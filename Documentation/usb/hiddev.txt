@@ -18,7 +18,7 @@ normalised event interface - see Documentation/input/input.txt
 The data flow for a HID event produced by a device is something like
 the following :
 
- usb.c ---> hid-core.c  ----> input.c ----> [keyboard/mouse/joystick/event]
+ usb.c ---> hid-core.c  ----> hid-input.c ----> [keyboard/mouse/joystick/event]
                          |
                          |
                           --> hiddev.c ----> POWER / MONITOR CONTROL 
@@ -106,6 +106,15 @@ returns -1. You can find out beforehand how many application
 collections the device has from the num_applications field from the
 hiddev_devinfo structure. 
 
+HIDIOCGCOLLECTIONINFO - struct hiddev_collection_info (read/write)
+This returns a superset of the information above, providing not only
+application collections, but all the collections the device has.  It
+also returns the level the collection lives in the hierarchy.
+The user passes in a hiddev_collection_info struct with the index 
+field set to the index that should be returned.  The ioctl fills in 
+the other fields.  If the index is larger than the last collection 
+index, the ioctl returns -1 and sets errno to -EINVAL.
+
 HIDIOCGDEVINFO - struct hiddev_devinfo (read)
 Gets a hiddev_devinfo structure which describes the device.
 
@@ -171,6 +180,10 @@ HIDIOCSUSAGE - struct hiddev_usage_ref (write)
 Sets the value of a usage in an output report.  The user fills in
 the hiddev_usage_ref structure as above, but additionally fills in
 the value field.
+
+HIDIOGCOLLECTIONINDEX - struct hiddev_usage_ref (write)
+Returns the collection index associated with this usage.  This
+indicates where in the collection hierarchy this usage sits.
 
 HIDIOCGFLAG - int (read)
 HIDIOCSFLAG - int (write)

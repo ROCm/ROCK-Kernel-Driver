@@ -21,11 +21,38 @@
 
 #include "ntfs.h"
 
+/**
+ * ntfs_file_open - called when an inode is about to be opened
+ * @vi:		inode to be opened
+ * @filp:	file structure describing the inode
+ *
+ * Limit file size to the page cache limit on architectures where unsigned long
+ * is 32-bits. This is the most we can do for now without overflowing the page
+ * cache page index. Doing it this way means we don't run into problems because
+ * of existing too large files. It would be better to allow the user to read
+ * the beginning of the file but I doubt very much anyone is going to hit this
+ * check on a 32-bit architecture, so there is no point in adding the extra
+ * complexity required to support this.
+ *
+ * On 64-bit architectures, the check is hopefully optimized away by the
+ * compiler.
+ *
+ * After the check passes, just call generic_file_open() to do its work.
+ */
+static int ntfs_file_open(struct inode *vi, struct file *filp)
+{
+	if (sizeof(unsigned long) < 8) {
+		if (vi->i_size > MAX_LFS_FILESIZE)
+			return -EFBIG;
+	}
+	return generic_file_open(vi, filp);
+}
+
 struct file_operations ntfs_file_ops = {
-	llseek:			generic_file_llseek,	/* Seek inside file. */
-	read:			generic_file_read,	/* Read from file. */
-	mmap:			generic_file_mmap,	/* Mmap file. */
-	open:			generic_file_open,	/* Open file. */
+	llseek:		generic_file_llseek,	/* Seek inside file. */
+	read:		generic_file_read,	/* Read from file. */
+	mmap:		generic_file_mmap,	/* Mmap file. */
+	open:		ntfs_file_open,		/* Open file. */
 };
 
 struct inode_operations ntfs_file_inode_ops = {};

@@ -352,12 +352,6 @@ static void __attribute__((unused)) hid_dump_device(struct hid_device *device) {
 	unsigned i,k;
 	static char *table[] = {"INPUT", "OUTPUT", "FEATURE"};
 	
-	for (i = 0; i < device->maxapplication; i++) {
-		printk("Application(");
-		resolv_usage(device->application[i]);
-		printk(")\n");
-	}
-
 	for (i = 0; i < HID_REPORT_TYPES; i++) {
 		report_enum = device->report_enum + i;
 		list = report_enum->report_list.next;

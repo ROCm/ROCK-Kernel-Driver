@@ -11,6 +11,9 @@
 /*
  * OHCI Endpoint Descriptor (ED) ... holds TD queue
  * See OHCI spec, section 4.2
+ *
+ * This is a "Queue Head" for those transfers, which is why
+ * both EHCI and UHCI call similar structures a "QH".
  */
 struct ed {
 	/* first fields are hardware-specified, le32 */
@@ -74,8 +77,8 @@ struct td {
 	/* these two bits are available for definition/use by HCDs in both
 	 * general and iso tds ... others are available for only one type
 	 */
-//#define TD____	    0x00020000
-#define TD_ISO	    0x00010000			/* copy of ED_ISO */
+#define TD_DONE     0x00020000			/* retired to donelist */
+#define TD_ISO      0x00010000			/* copy of ED_ISO */
 
 	/* hwINFO bits for general tds: */
 #define TD_EC       0x0C000000			/* error count */
@@ -349,12 +352,14 @@ struct ohci_hcd {
         struct device		*parent_dev;
 
 	/*
-	 * I/O memory used to communicate with the HC (uncached);
+	 * I/O memory used to communicate with the HC (dma-consistent)
 	 */
 	struct ohci_regs	*regs;
 
 	/*
-	 * main memory used to communicate with the HC (uncached)
+	 * main memory used to communicate with the HC (dma-consistent).
+	 * hcd adds to schedule for a live hc any time, but removals finish
+	 * only at the start of the next frame.
 	 */
 	struct ohci_hcca	*hcca;
 	dma_addr_t		hcca_dma;
@@ -365,6 +370,9 @@ struct ohci_hcd {
 	struct ed		*ed_controltail;	/* last in ctrl list */
  	struct ed		*ed_isotail;		/* last in iso list */
 
+	/*
+	 * memory management for queue data structures
+	 */
 	struct pci_pool		*td_cache;
 	struct pci_pool		*ed_cache;
 	struct hash_list_t	td_hash [TD_HASH_SIZE];
@@ -380,6 +388,7 @@ struct ohci_hcd {
 
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
+	// there are also chip quirks/bugs in init logic
 
 	/*
 	 * framework state

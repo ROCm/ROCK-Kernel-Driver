@@ -1996,7 +1996,8 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 		sprintf(dev_name,
 			"Generic audio codec (%s)", devc->chip_name);
 
-	request_region(devc->base, 4, devc->name);
+	if (!request_region(devc->base, 4, devc->name))
+		return -1;
 
 	conf_printf2(dev_name, devc->base, devc->irq, dma_playback, dma_capture);
 
@@ -2012,8 +2013,10 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 	}
 
 	portc = (ad1848_port_info *) kmalloc(sizeof(ad1848_port_info), GFP_KERNEL);
-	if(portc==NULL)
+	if(portc==NULL) {
+		release_region(devc->base, 4);
 		return -1;
+	}
 
 	if ((my_dev = sound_install_audiodrv(AUDIO_DRIVER_VERSION,
 					     dev_name,
@@ -2025,8 +2028,8 @@ int ad1848_init (char *name, int io_base, int irq, int dma_playback,
 					     dma_playback,
 					     dma_capture)) < 0)
 	{
+		release_region(devc->base, 4);
 		kfree(portc);
-		portc=NULL;
 		return -1;
 	}
 	

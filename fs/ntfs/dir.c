@@ -1370,9 +1370,35 @@ err_out:
 	return err;
 }
 
+/**
+ * ntfs_dir_open - called when an inode is about to be opened
+ * @vi:		inode to be opened
+ * @filp:	file structure describing the inode
+ *
+ * Limit directory size to the page cache limit on architectures where unsigned
+ * long is 32-bits. This is the most we can do for now without overflowing the
+ * page cache page index. Doing it this way means we don't run into problems
+ * because of existing too large directories. It would be better to allow the
+ * user to read the accessible part of the directory but I doubt very much
+ * anyone is going to hit this check on a 32-bit architecture, so there is no
+ * point in adding the extra complexity required to support this.
+ *
+ * On 64-bit architectures, the check is hopefully optimized away by the
+ * compiler.
+ */
+static int ntfs_dir_open(struct inode *vi, struct file *filp)
+{
+	if (sizeof(unsigned long) < 8) {
+		if (vi->i_size > MAX_LFS_FILESIZE)
+			return -EFBIG;
+	}
+	return 0;
+}
+
 struct file_operations ntfs_dir_ops = {
 	llseek:		generic_file_llseek,	/* Seek inside directory. */
 	read:		generic_read_dir,	/* Return -EISDIR. */
 	readdir:	ntfs_readdir,		/* Read directory contents. */
+	open:		ntfs_dir_open,		/* Open directory. */
 };
 
