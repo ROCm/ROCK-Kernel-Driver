@@ -284,13 +284,25 @@ static struct inode *hostfs_alloc_inode(struct super_block *sb)
 	return(&hi->vfs_inode);
 }
 
+static void hostfs_delete_inode(struct inode *inode)
+{
+	if(HOSTFS_I(inode)->fd != -1) {
+		close_file(&HOSTFS_I(inode)->fd);
+		printk("Closing host fd in .delete_inode\n");
+		HOSTFS_I(inode)->fd = -1;
+	}
+	clear_inode(inode);
+}
+
 static void hostfs_destroy_inode(struct inode *inode)
 {
 	if(HOSTFS_I(inode)->host_filename)
 		kfree(HOSTFS_I(inode)->host_filename);
 
-	if(HOSTFS_I(inode)->fd != -1)
+	if(HOSTFS_I(inode)->fd != -1) {
 		close_file(&HOSTFS_I(inode)->fd);
+		printk("Closing host fd in .destroy_inode\n");
+	}
 
 	kfree(HOSTFS_I(inode));
 }
@@ -302,6 +314,8 @@ static void hostfs_read_inode(struct inode *inode)
 
 static struct super_operations hostfs_sbops = {
 	.alloc_inode	= hostfs_alloc_inode,
+	.drop_inode	= generic_delete_inode,
+	.delete_inode   = hostfs_delete_inode,
 	.destroy_inode	= hostfs_destroy_inode,
 	.read_inode	= hostfs_read_inode,
 	.statfs		= hostfs_statfs,
