@@ -185,9 +185,9 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
  * We should really eliminate virt_to_bus() here - it's deprecated.
  */
 #ifndef __arch_page_to_dma
-#define page_to_dma(dev, page)		((dma_addr_t)__virt_to_bus(page_address(page)))
+#define page_to_dma(dev, page)		((dma_addr_t)__virt_to_bus((unsigned long)page_address(page)))
 #define dma_to_virt(dev, addr)		(__bus_to_virt(addr))
-#define virt_to_dma(dev, addr)		(__virt_to_bus(addr))
+#define virt_to_dma(dev, addr)		(__virt_to_bus((unsigned long)(addr)))
 #else
 #define page_to_dma(dev, page)		(__arch_page_to_dma(dev, page))
 #define dma_to_virt(dev, addr)		(__arch_dma_to_virt(dev, addr))
