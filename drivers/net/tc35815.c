@@ -40,7 +40,7 @@ static const char *version =
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
