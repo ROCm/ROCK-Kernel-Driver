@@ -118,10 +118,10 @@ error_out:
 	return err;
 }
 
-static int ipcomp6_output(struct sk_buff *skb)
+static int ipcomp6_output(struct sk_buff **pskb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct ipv6hdr *tmp_iph = NULL, *iph, *top_iph;
 	int hdr_len = 0;
@@ -132,54 +132,55 @@ static int ipcomp6_output(struct sk_buff *skb)
 	int plen, dlen;
 	u8 *start, *scratch = ipcd->scratch;
 
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
+	if ((*pskb)->ip_summed == CHECKSUM_HW) {
+		err = skb_checksum_help(pskb, 0);
+		if (err)
+			goto error_nolock;
 	}
 
 	spin_lock_bh(&x->lock);
 
-	err = xfrm_check_output(x, skb, AF_INET6);
+	err = xfrm_check_output(x, *pskb, AF_INET6);
 	if (err)
 		goto error;
 
 	if (x->props.mode) {
 		hdr_len = sizeof(struct ipv6hdr);
 		nexthdr = IPPROTO_IPV6;
-		iph = skb->nh.ipv6h;
-		top_iph = (struct ipv6hdr *)skb_push(skb, sizeof(struct ipv6hdr));
+		iph = (*pskb)->nh.ipv6h;
+		top_iph = (struct ipv6hdr *)skb_push(*pskb, sizeof(struct ipv6hdr));
 		top_iph->version = 6;
 		top_iph->priority = iph->priority;
 		top_iph->flow_lbl[0] = iph->flow_lbl[0];
 		top_iph->flow_lbl[1] = iph->flow_lbl[1];
 		top_iph->flow_lbl[2] = iph->flow_lbl[2];
 		top_iph->nexthdr = IPPROTO_IPV6; /* initial */
-		top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
+		top_iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
 		top_iph->hop_limit = iph->hop_limit;
 		memcpy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr, sizeof(struct in6_addr));
 		memcpy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr, sizeof(struct in6_addr));
-		skb->nh.raw = skb->data; /* == top_iph */
-		skb->h.raw = skb->nh.raw + hdr_len;
+		(*pskb)->nh.raw = (*pskb)->data; /* == top_iph */
+		(*pskb)->h.raw = (*pskb)->nh.raw + hdr_len;
 	} else {
-		hdr_len = ip6_find_1stfragopt(skb, &prevhdr);
+		hdr_len = ip6_find_1stfragopt(*pskb, &prevhdr);
 		nexthdr = *prevhdr;
 	}
 
 	/* check whether datagram len is larger than threshold */
-	if ((skb->len - hdr_len) < ipcd->threshold) {
+	if (((*pskb)->len - hdr_len) < ipcd->threshold) {
 		goto out_ok;
 	}
 
-	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
-		skb_linearize(skb, GFP_ATOMIC) != 0) {
+	if ((skb_is_nonlinear(*pskb) || skb_cloned(*pskb)) &&
+		skb_linearize(*pskb, GFP_ATOMIC) != 0) {
 		err = -ENOMEM;
 		goto error;
 	}
 
 	/* compression */
-	plen = skb->len - hdr_len;
+	plen = (*pskb)->len - hdr_len;
 	dlen = IPCOMP_SCRATCH_SIZE;
-	start = skb->data + hdr_len;
+	start = (*pskb)->data + hdr_len;
 
 	err = crypto_comp_compress(ipcd->tfm, start, plen, scratch, &dlen);
 	if (err) {
@@ -189,7 +190,7 @@ static int ipcomp6_output(struct sk_buff *skb)
 		goto out_ok;
 	}
 	memcpy(start, scratch, dlen);
-	pskb_trim(skb, hdr_len+dlen);
+	pskb_trim(*pskb, hdr_len+dlen);
 
 	/* insert ipcomp header and replace datagram */
 	tmp_iph = kmalloc(hdr_len, GFP_ATOMIC);
@@ -197,16 +198,16 @@ static int ipcomp6_output(struct sk_buff *skb)
 		err = -ENOMEM;
 		goto error;
 	}
-	memcpy(tmp_iph, skb->nh.raw, hdr_len);
-	top_iph = (struct ipv6hdr*)skb_push(skb, sizeof(struct ipv6_comp_hdr));
+	memcpy(tmp_iph, (*pskb)->nh.raw, hdr_len);
+	top_iph = (struct ipv6hdr*)skb_push(*pskb, sizeof(struct ipv6_comp_hdr));
 	memcpy(top_iph, tmp_iph, hdr_len);
 	kfree(tmp_iph);
 
 	if (x->props.mode && (x->props.flags & XFRM_STATE_NOECN))
 		IP6_ECN_clear(top_iph);
-	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
-	skb->nh.raw = skb->data; /* top_iph */
-	ip6_find_1stfragopt(skb, &prevhdr); 
+	top_iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
+	(*pskb)->nh.raw = (*pskb)->data; /* top_iph */
+	ip6_find_1stfragopt(*pskb, &prevhdr); 
 	*prevhdr = IPPROTO_COMP;
 
 	ipch = (struct ipv6_comp_hdr *)((unsigned char *)top_iph + hdr_len);
@@ -214,13 +215,13 @@ static int ipcomp6_output(struct sk_buff *skb)
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
 
-	skb->h.raw = (unsigned char*)ipch;
+	(*pskb)->h.raw = (unsigned char*)ipch;
 out_ok:
-	x->curlft.bytes += skb->len;
+	x->curlft.bytes += (*pskb)->len;
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
 
-	if ((skb->dst = dst_pop(dst)) == NULL) {
+	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
@@ -231,7 +232,7 @@ out_exit:
 error:
 	spin_unlock_bh(&x->lock);
 error_nolock:
-	kfree_skb(skb);
+	kfree_skb(*pskb);
 	goto out_exit;
 }
 

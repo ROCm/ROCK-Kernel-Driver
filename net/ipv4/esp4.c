@@ -20,10 +20,10 @@ struct esp_decap_data {
 	__u8		proto;
 };
 
-int esp_output(struct sk_buff *skb)
+int esp_output(struct sk_buff **pskb)
 {
 	int err;
-	struct dst_entry *dst = skb->dst;
+	struct dst_entry *dst = (*pskb)->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *iph, *top_iph;
 	struct ip_esp_hdr *esph;
@@ -42,28 +42,28 @@ int esp_output(struct sk_buff *skb)
 		char 		buf[60];
 	} tmp_iph;
 
-	/* First, if the skb is not checksummed, complete checksum. */
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
-		err = -EINVAL;
-		goto error_nolock;
+	if ((*pskb)->ip_summed == CHECKSUM_HW) {
+		err = skb_checksum_help(pskb, 0);
+		if (err)
+			goto error_nolock;
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, skb, AF_INET);
+	err = xfrm_check_output(x, *pskb, AF_INET);
 	if (err)
 		goto error;
 	err = -ENOMEM;
 
 	/* Strip IP header in transport mode. Save it. */
 	if (!x->props.mode) {
-		iph = skb->nh.iph;
+		iph = (*pskb)->nh.iph;
 		memcpy(&tmp_iph, iph, iph->ihl*4);
-		__skb_pull(skb, iph->ihl*4);
+		__skb_pull(*pskb, iph->ihl*4);
 	}
 	/* Now skb is pure payload to encrypt */
 
 	/* Round to block size */
-	clen = skb->len;
+	clen = (*pskb)->len;
 
 	esp = x->data;
 	alen = esp->auth.icv_trunc_len;
@@ -73,23 +73,23 @@ int esp_output(struct sk_buff *skb)
 	if (esp->conf.padlen)
 		clen = (clen + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	if ((nfrags = skb_cow_data(skb, clen-skb->len+alen, &trailer)) < 0)
+	if ((nfrags = skb_cow_data(*pskb, clen-(*pskb)->len+alen, &trailer)) < 0)
 		goto error;
 
 	/* Fill padding... */
 	do {
 		int i;
-		for (i=0; i<clen-skb->len - 2; i++)
+		for (i=0; i<clen-(*pskb)->len - 2; i++)
 			*(u8*)(trailer->tail + i) = i+1;
 	} while (0);
-	*(u8*)(trailer->tail + clen-skb->len - 2) = (clen - skb->len)-2;
-	pskb_put(skb, trailer, clen - skb->len);
+	*(u8*)(trailer->tail + clen-(*pskb)->len - 2) = (clen - (*pskb)->len)-2;
+	pskb_put(*pskb, trailer, clen - (*pskb)->len);
 
 	encap = x->encap;
 
-	iph = skb->nh.iph;
+	iph = (*pskb)->nh.iph;
 	if (x->props.mode) {
-		top_iph = (struct iphdr*)skb_push(skb, x->props.header_len);
+		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
 		esph = (struct ip_esp_hdr*)(top_iph+1);
 		if (encap && encap->encap_type) {
 			switch (encap->encap_type) {
@@ -121,7 +121,7 @@ int esp_output(struct sk_buff *skb)
 		top_iph->tos = iph->tos;	/* DS disclosed */
 		if (x->props.flags & XFRM_STATE_NOECN)
 			IP_ECN_clear(top_iph);
-		top_iph->tot_len = htons(skb->len + alen);
+		top_iph->tot_len = htons((*pskb)->len + alen);
 		top_iph->frag_off = iph->frag_off&htons(IP_DF);
 		if (!(top_iph->frag_off))
 			ip_select_ident(top_iph, dst, 0);
@@ -129,10 +129,10 @@ int esp_output(struct sk_buff *skb)
 		top_iph->check = 0;
 		top_iph->saddr = x->props.saddr.a4;
 		top_iph->daddr = x->id.daddr.a4;
-		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
+		memset(&(IPCB(*pskb)->opt), 0, sizeof(struct ip_options));
 	} else {
-		esph = (struct ip_esp_hdr*)skb_push(skb, x->props.header_len);
-		top_iph = (struct iphdr*)skb_push(skb, iph->ihl*4);
+		esph = (struct ip_esp_hdr*)skb_push(*pskb, x->props.header_len);
+		top_iph = (struct iphdr*)skb_push(*pskb, iph->ihl*4);
 		memcpy(top_iph, &tmp_iph, iph->ihl*4);
 		if (encap && encap->encap_type) {
 			switch (encap->encap_type) {
@@ -159,7 +159,7 @@ int esp_output(struct sk_buff *skb)
 		} else
 			top_iph->protocol = IPPROTO_ESP;
 		iph = &tmp_iph.iph;
-		top_iph->tot_len = htons(skb->len + alen);
+		top_iph->tot_len = htons((*pskb)->len + alen);
 		top_iph->check = 0;
 		top_iph->frag_off = iph->frag_off;
 		*(u8*)(trailer->tail - 1) = iph->protocol;
@@ -169,7 +169,7 @@ int esp_output(struct sk_buff *skb)
 	if (encap && uh) {
 		uh->source = encap->encap_sport;
 		uh->dest = encap->encap_dport;
-		uh->len = htons(skb->len + alen - sizeof(struct iphdr));
+		uh->len = htons((*pskb)->len + alen - sizeof(struct iphdr));
 		uh->check = 0;
 	}
 
@@ -188,7 +188,7 @@ int esp_output(struct sk_buff *skb)
 			if (!sg)
 				goto error;
 		}
-		skb_to_sgvec(skb, sg, esph->enc_data+esp->conf.ivlen-skb->data, clen);
+		skb_to_sgvec(*pskb, sg, esph->enc_data+esp->conf.ivlen-(*pskb)->data, clen);
 		crypto_cipher_encrypt(tfm, sg, sg, clen);
 		if (unlikely(sg != sgbuf))
 			kfree(sg);
@@ -200,19 +200,19 @@ int esp_output(struct sk_buff *skb)
 	}
 
 	if (esp->auth.icv_full_len) {
-		esp->auth.icv(esp, skb, (u8*)esph-skb->data,
+		esp->auth.icv(esp, *pskb, (u8*)esph-(*pskb)->data,
 		              sizeof(struct ip_esp_hdr) + esp->conf.ivlen+clen, trailer->tail);
-		pskb_put(skb, trailer, alen);
+		pskb_put(*pskb, trailer, alen);
 	}
 
 	ip_send_check(top_iph);
 
-	skb->nh.raw = skb->data;
+	(*pskb)->nh.raw = (*pskb)->data;
 
-	x->curlft.bytes += skb->len;
+	x->curlft.bytes += (*pskb)->len;
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
-	if ((skb->dst = dst_pop(dst)) == NULL) {
+	if (((*pskb)->dst = dst_pop(dst)) == NULL) {
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
@@ -221,7 +221,7 @@ int esp_output(struct sk_buff *skb)
 error:
 	spin_unlock_bh(&x->lock);
 error_nolock:
-	kfree_skb(skb);
+	kfree_skb(*pskb);
 	return err;
 }
 
