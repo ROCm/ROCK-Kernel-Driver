@@ -30,8 +30,18 @@ config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
+menu "Code maturity level options"
+
+config EXPERIMENTAL
+	bool "Prompt for development and/or incomplete code/drivers"
+
+endmenu
+
+
+menu "General Setup"
+
 config MODE_TT
-	bool
+	bool "Tracing thread support"
 	default y
 	help
 	This option controls whether tracing thread support is compiled
@@ -40,7 +50,7 @@ config MODE_TT
 	then it is OK to say N here.
 
 config STATIC_LINK
-	bool
+	bool "Force a static link"
 	default n
 	depends on !MODE_TT
 	help
@@ -52,23 +62,14 @@ config STATIC_LINK
 	here.
 
 config MODE_SKAS
-	bool
+	bool "Separate Kernel Address Space support"
 	default y
+	help
 	This option controls whether skas (separate kernel address space)
 	support is compiled in.  If you have applied the skas patch to the
 	host, then you certainly want to say Y here (and consider saying N
 	to CONFIG_MODE_TT).  Otherwise, it is safe to say Y.  Disabling this
 	option will shrink the UML binary slightly.
-
-menu "Code maturity level options"
-
-config EXPERIMENTAL
-	bool "Prompt for development and/or incomplete code/drivers"
-
-endmenu
-
-
-menu "General Setup"
 
 config NET
 	bool "Networking support"
@@ -253,6 +254,10 @@ config DEBUGSYM
 
         If you're truly short on disk space or don't expect to report any
         bugs back to the UML developers, say N, otherwise say Y.
+
+config FRAME_POINTER
+	bool
+	default y if DEBUGSYM
 
 config PT_PROXY
 	bool "Enable ptrace proxy"

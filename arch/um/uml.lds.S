@@ -9,15 +9,17 @@ SECTIONS
 
   . = ALIGN(4096);
   __binary_start = .;
+#ifdef MODE_TT
   .thread_private : {
     __start_thread_private = .;
     errno = .;
     . += 4;
-    arch/um/kernel/unmap_fin.o (.data)
+    arch/um/kernel/tt/unmap_fin.o (.data)
     __end_thread_private = .;
   }
   . = ALIGN(4096);
-  .remap : { arch/um/kernel/unmap_fin.o (.text) }
+  .remap : { arch/um/kernel/tt/unmap_fin.o (.text) }
+#endif
 
   . = ALIGN(4096);		/* Init code and data */
   _stext = .;
