@@ -323,6 +323,7 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 	};
 
 	event = sctp_skb2event(f_frag);
+	SCTP_INC_STATS(SctpReasmUsrMsgs);
 
 	return event;
 }

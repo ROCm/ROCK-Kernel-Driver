@@ -1181,6 +1181,9 @@ int sctp_datachunks_from_user(sctp_association_t *asoc,
 	over = msg_len % max;
 	offset = 0;
 
+	if (whole && over)
+		SCTP_INC_STATS_USER(SctpFragUsrMsgs);
+
 	/* Create chunks for all the full sized DATA chunks. */
 	for (i=0, len=first_len; i < whole; i++) {
 		frag = SCTP_DATA_MIDDLE_FRAG;
