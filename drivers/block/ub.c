@@ -318,6 +318,7 @@ static int ub_sync_read_cap(struct ub_dev *sc, struct ub_capacity *ret);
 static struct usb_device_id ub_usb_ids[] = {
 	// { USB_DEVICE_VER(0x0781, 0x0002, 0x0009, 0x0009) },	/* SDDR-31 */
 	{ USB_INTERFACE_INFO(USB_CLASS_MASS_STORAGE, US_SC_SCSI, US_PR_BULK) },
+	{ }
 };
 
 MODULE_DEVICE_TABLE(usb, ub_usb_ids);
