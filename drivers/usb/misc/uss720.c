@@ -553,7 +553,7 @@ static int uss720_probe(struct usb_interface *intf,
 	i = usb_set_interface(usbdev, intf->altsetting->desc.bInterfaceNumber, 2);
 	printk(KERN_DEBUG "uss720: set inteface result %d\n", i);
 
-	interface = &intf->altsetting[2];
+	interface = intf->cur_altsetting;
 
 	/*
 	 * Allocate parport interface 
