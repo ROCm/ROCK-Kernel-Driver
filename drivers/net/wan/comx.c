@@ -942,8 +942,7 @@ static struct dentry *comx_lookup(struct inode *dir, struct dentry *dentry)
 	lock_kernel();
 	if ((de = PDE(dir)) != NULL) {
 		for (de = de->subdir ; de ; de = de->next) {
-			if ((de && de->low_ino) && 
-			    (de->namelen == dentry->d_name.len) &&
+			if ((de->namelen == dentry->d_name.len) &&
 			    (memcmp(dentry->d_name.name, de->name, 
 			    de->namelen) == 0))	{
 			 	if ((inode = proc_get_inode(dir->i_sb, 

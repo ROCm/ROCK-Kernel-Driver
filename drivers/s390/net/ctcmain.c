@@ -77,16 +77,7 @@
 #define FREE_IRQ free_irq
 #endif
 
-#if LINUX_VERSION_CODE >= 0x020213
-#  include <asm/idals.h>
-#else
-#  define set_normalized_cda(ccw, addr) ((ccw)->cda = (addr),0)
-#  define clear_normalized_cda(ccw)
-#endif
-#if LINUX_VERSION_CODE < 0x020400
-#  define s390_dev_info_t dev_info_t
-#  define dev_kfree_skb_irq(a) dev_kfree_skb(a)
-#endif
+#include <asm/idals.h>
 
 #include <asm/irq.h>
 
@@ -319,9 +310,7 @@ static int activated;
 
 typedef struct ctc_priv_t {
 	struct net_device_stats stats;
-#if LINUX_VERSION_CODE >= 0x02032D
 	unsigned long           tbusy;
-#endif
 	/**
 	 * The finite state machine of this interface.
 	 */
@@ -351,20 +340,6 @@ typedef struct ll_header_t {
  * Compatibility macros for busy handling
  * of network devices.
  */
-#if LINUX_VERSION_CODE < 0x02032D
-static __inline__ void ctc_clear_busy(net_device *dev)
-{
-	clear_bit(0 ,(void *)&dev->tbusy);
-	mark_bh(NET_BH);
-}
-
-static __inline__ int ctc_test_and_set_busy(net_device *dev)
-{
-	return(test_and_set_bit(0, (void *)&dev->tbusy));
-}
-
-#define SET_DEVICE_START(device, value) dev->start = value
-#else
 static __inline__ void ctc_clear_busy(net_device *dev)
 {
 	clear_bit(0, &(((ctc_priv *)dev->priv)->tbusy));
@@ -378,7 +353,6 @@ static __inline__ int ctc_test_and_set_busy(net_device *dev)
 }
 
 #define SET_DEVICE_START(device, value)
-#endif
 
 /**
  * Print Banner.
@@ -1351,11 +1325,7 @@ static void ch_action_start(fsm_instance *fi, int event, void *arg)
 		       dev->name, 
 		       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
 
-#if LINUX_VERSION_CODE >= 0x020400
 	INIT_LIST_HEAD(&ch->tq.list);
-#else
-	ch->tq.next = NULL;
-#endif
 	ch->tq.sync    = 0;
 	ch->tq.routine = (void *)(void *)ctc_bh;
 	ch->tq.data    = ch;
@@ -2695,7 +2665,7 @@ static struct net_device_stats *ctc_stats(net_device *dev) {
  * procfs related structures and routines
  *****************************************************************************/
 
-static net_device *find_netdev_by_ino(unsigned long ino)
+static net_device *find_netdev_by_ino(struct proc_dir_entry *pde)
 {
 	channel *ch = channels;
 	net_device *dev = NULL;
@@ -2706,28 +2676,14 @@ static net_device *find_netdev_by_ino(unsigned long ino)
 			dev = ch->netdev;
 			privptr = (ctc_priv *)dev->priv;
 
-			if ((privptr->proc_ctrl_entry->low_ino == ino) ||
-			    (privptr->proc_stat_entry->low_ino == ino))
+			if ((privptr->proc_ctrl_entry == pde) ||
+			    (privptr->proc_stat_entry == pde))
 				return dev;
 		}
 		ch = ch->next;
 	}
 	return NULL;
 }
-
-#if LINUX_VERSION_CODE < 0x020363
-/**
- * Lock the module, if someone changes into
- * our proc directory.
- */
-static void ctc_fill_inode(struct inode *inode, int fill)
-{
-	if (fill) {
-		MOD_INC_USE_COUNT;
-	} else
-		MOD_DEC_USE_COUNT;
-}
-#endif
 
 #define CTRL_BUFSIZE 40
 
@@ -2750,14 +2706,14 @@ static int ctc_ctrl_close(struct inode *inode, struct file *file)
 static ssize_t ctc_ctrl_write(struct file *file, const char *buf, size_t count,
 			   loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	net_device   *dev;
 	ctc_priv     *privptr;
 	char         *e;
 	int          bs1;
 	char         tmp[40];
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -2795,7 +2751,7 @@ static ssize_t ctc_ctrl_write(struct file *file, const char *buf, size_t count,
 static ssize_t ctc_ctrl_read(struct file *file, char *buf, size_t count,
 			  loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	char *sbuf = (char *)file->private_data;
 	net_device *dev;
 	ctc_priv *privptr;
@@ -2803,7 +2759,7 @@ static ssize_t ctc_ctrl_read(struct file *file, char *buf, size_t count,
 	char *p = sbuf;
 	int l;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -2847,11 +2803,11 @@ static int ctc_stat_close(struct inode *inode, struct file *file)
 static ssize_t ctc_stat_write(struct file *file, const char *buf, size_t count,
 			      loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	net_device *dev;
 	ctc_priv *privptr;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	privptr = (ctc_priv *)dev->priv;
 	privptr->channel[WRITE]->prof.maxmulti = 0;
@@ -2866,7 +2822,7 @@ static ssize_t ctc_stat_write(struct file *file, const char *buf, size_t count,
 static ssize_t ctc_stat_read(struct file *file, char *buf, size_t count,
 			      loff_t *off)
 {
-	unsigned int ino = ((struct inode *)file->f_dentry->d_inode)->i_ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	char *sbuf = (char *)file->private_data;
 	net_device *dev;
 	ctc_priv *privptr;
@@ -2874,7 +2830,7 @@ static ssize_t ctc_stat_read(struct file *file, char *buf, size_t count,
 	char *p = sbuf;
 	int l;
 
-	if (!(dev = find_netdev_by_ino(ino)))
+	if (!(dev = find_netdev_by_ino(pde)))
 		return -ENODEV;
 	if (off != &file->f_pos)
 		return -ESPIPE;
@@ -2928,74 +2884,7 @@ static struct file_operations ctc_ctrl_fops = {
 	release: ctc_ctrl_close,
 };
 
-static struct inode_operations ctc_stat_iops = {
-#if LINUX_VERSION_CODE < 0x020363
-	default_file_ops: &ctc_stat_fops
-#endif
-};
-static struct inode_operations ctc_ctrl_iops = {
-#if LINUX_VERSION_CODE < 0x020363
-	default_file_ops: &ctc_ctrl_fops
-#endif
-};
-
-static struct proc_dir_entry stat_entry = {
-	0,                           /* low_ino */
-	10,                          /* namelen */
-	"statistics",                /* name    */
-	S_IFREG | S_IRUGO | S_IWUSR, /* mode    */
-	1,                           /* nlink   */
-	0,                           /* uid     */
-	0,                           /* gid     */
-	0,                           /* size    */
-	&ctc_stat_iops               /* ops     */
-};
-
-static struct proc_dir_entry ctrl_entry = {
-	0,                           /* low_ino */
-	10,                          /* namelen */
-	"buffersize",                /* name    */
-	S_IFREG | S_IRUSR | S_IWUSR, /* mode    */
-	1,                           /* nlink   */
-	0,                           /* uid     */
-	0,                           /* gid     */
-	0,                           /* size    */
-	&ctc_ctrl_iops               /* ops     */
-};
-
-#if LINUX_VERSION_CODE < 0x020363
-static struct proc_dir_entry ctc_dir = {
-	0,                           /* low_ino  */
-	3,                           /* namelen  */
-	"ctc",                       /* name     */
-	S_IFDIR | S_IRUGO | S_IXUGO, /* mode     */
-	2,                           /* nlink    */
-	0,                           /* uid      */
-	0,                           /* gid      */
-	0,                           /* size     */
-	0,                           /* ops      */
-	0,                           /* get_info */
-	ctc_fill_inode               /* fill_ino (for locking) */
-};
-
-static struct proc_dir_entry ctc_template =
-{
-	0,                           /* low_ino  */
-	0,                           /* namelen  */
-	"",                          /* name     */
-	S_IFDIR | S_IRUGO | S_IXUGO, /* mode     */
-	2,                           /* nlink    */
-	0,                           /* uid      */
-	0,                           /* gid      */
-	0,                           /* size     */
-	0,                           /* ops      */
-	0,                           /* get_info */
-	ctc_fill_inode               /* fill_ino (for locking) */
-};
-#else
 static struct proc_dir_entry *ctc_dir = NULL;
-static struct proc_dir_entry *ctc_template = NULL;
-#endif
 
 /**
  * Create the driver's main directory /proc/net/ctc
@@ -3004,13 +2893,8 @@ static void ctc_proc_create_main(void) {
 	/**
 	 * If not registered, register main proc dir-entry now
 	 */
-#if LINUX_VERSION_CODE > 0x020362
 	if (!ctc_dir)
 		ctc_dir = proc_mkdir("ctc", proc_net);
-#else
-	if (ctc_dir.low_ino == 0)
-		proc_net_register(&ctc_dir);
-#endif
 }
 
 #ifdef MODULE
@@ -3018,11 +2902,7 @@ static void ctc_proc_create_main(void) {
  * Destroy /proc/net/ctc
  */
 static void ctc_proc_destroy_main(void) {
-#if LINUX_VERSION_CODE > 0x020362
 	remove_proc_entry("ctc", proc_net);
-#else
-	proc_net_unregister(ctc_dir.low_ino);
-#endif
 }
 #endif MODULE
 
@@ -3037,27 +2917,17 @@ static void ctc_proc_destroy_main(void) {
 static void ctc_proc_create_sub(net_device *dev) {
 	ctc_priv *privptr = dev->priv;
 
-#if LINUX_VERSION_CODE > 0x020362
 	privptr->proc_dentry = proc_mkdir(dev->name, ctc_dir);
 	privptr->proc_stat_entry =
 		create_proc_entry("statistics",
 				  S_IFREG | S_IRUSR | S_IWUSR,
 				  privptr->proc_dentry);
 	privptr->proc_stat_entry->proc_fops = &ctc_stat_fops;
-	privptr->proc_stat_entry->proc_iops = &ctc_stat_iops;
 	privptr->proc_ctrl_entry =
 		create_proc_entry("buffersize",
 				  S_IFREG | S_IRUSR | S_IWUSR,
 				  privptr->proc_dentry);
 	privptr->proc_ctrl_entry->proc_fops = &ctc_ctrl_fops;
-	privptr->proc_ctrl_entry->proc_iops = &ctc_ctrl_iops;
-#else
-	privptr->proc_dentry->name = dev->name;
-	privptr->proc_dentry->namelen = strlen(dev->name);
-	proc_register(&ctc_dir, privptr->proc_dentry);
-	proc_register(privptr->proc_dentry, privptr->proc_stat_entry);
-	proc_register(privptr->proc_dentry, privptr->proc_ctrl_entry);
-#endif
 	privptr->proc_registered = 1;
 }
 
@@ -3070,18 +2940,9 @@ static void ctc_proc_create_sub(net_device *dev) {
 static void ctc_proc_destroy_sub(ctc_priv *privptr) {
 	if (!privptr->proc_registered)
 		return;
-#if LINUX_VERSION_CODE > 0x020362
 	remove_proc_entry("statistics", privptr->proc_dentry);
 	remove_proc_entry("buffersize", privptr->proc_dentry);
 	remove_proc_entry(privptr->proc_dentry->name, ctc_dir);
-#else
-	proc_unregister(privptr->proc_dentry,
-			privptr->proc_stat_entry->low_ino);
-	proc_unregister(privptr->proc_dentry,
-			privptr->proc_ctrl_entry->low_ino);
-	proc_unregister(&ctc_dir,
-			privptr->proc_dentry->low_ino);
-#endif
 	privptr->proc_registered = 0;
 }
 
@@ -3263,14 +3124,8 @@ static param *find_param(char *name) {
    static void ctc_setup(char *setup)
 #  define ctc_setup_return return
 #else MODULE
-#  if LINUX_VERSION_CODE < 0x020300
-     __initfunc(void ctc_setup(char *setup, int *ints))
-#    define ctc_setup_return return
-#    define ints local_ints
-#  else
      static int __init ctc_setup(char *setup)
 #    define ctc_setup_return return(1)
-#  endif
 #endif MODULE
 {
 	int write_dev;
@@ -3368,9 +3223,7 @@ static param *find_param(char *name) {
 	ctc_setup_return;
 }
 
-#if LINUX_VERSION_CODE >= 0x020300
 __setup("ctc=", ctc_setup);
-#endif
 #endif /* !CTC_CHANDEV */
 
 
@@ -3443,17 +3296,12 @@ ctc_init_netdevice(net_device *dev, int alloc_device)
 	ctc_priv *privptr;
 	int      priv_size;
 	if (alloc_device) {
-		dev = kmalloc(sizeof(net_device)
-#if LINUX_VERSION_CODE < 0x020300
-			      + 11 /* name + zero */
-#endif
-			      , GFP_KERNEL);
+		dev = kmalloc(sizeof(net_device), GFP_KERNEL);
 		if (!dev)
 			return NULL;
 		memset(dev, 0, sizeof(net_device));
 	}
-	priv_size = sizeof(ctc_priv) + sizeof(ctc_template) +
-		sizeof(stat_entry) + sizeof(ctrl_entry);
+	priv_size = sizeof(ctc_priv);
 	dev->priv = kmalloc(priv_size, GFP_KERNEL);
 	if (dev->priv == NULL) {
 		if (alloc_device)
@@ -3462,17 +3310,6 @@ ctc_init_netdevice(net_device *dev, int alloc_device)
 	}
         memset(dev->priv, 0, priv_size);
         privptr = (ctc_priv *)dev->priv;
-        privptr->proc_dentry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(ctc_priv));
-        privptr->proc_stat_entry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(ctc_priv) +
-		 sizeof(ctc_template));
-        privptr->proc_ctrl_entry = (struct proc_dir_entry *)
-		(((char *)privptr) + sizeof(ctc_priv) +
-		 sizeof(ctc_template) + sizeof(stat_entry));
-	memcpy(privptr->proc_dentry, &ctc_template, sizeof(ctc_template));
-	memcpy(privptr->proc_stat_entry, &stat_entry, sizeof(stat_entry));
-	memcpy(privptr->proc_ctrl_entry, &ctrl_entry, sizeof(ctrl_entry));
 	privptr->fsm = init_fsm("ctcdev", dev_state_names,
 			dev_event_names, NR_DEV_STATES, NR_DEV_EVENTS,
 			dev_fsm, DEV_FSM_LEN, GFP_KERNEL);
@@ -3890,9 +3727,6 @@ int ctc_init(void) {
 				ret = -ENOMEM;
 				break;
 			}
-#if LINUX_VERSION_CODE < 0x020300
-			dev->name = (unsigned char *)dev + sizeof(net_device);
-#endif
 			if (par && par->name) {
 				char *p;
 				int  n;
@@ -3989,9 +3823,7 @@ int ctc_init(void) {
 }
 
 #ifndef MODULE
-#if (LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0))
 __initcall(ctc_init);
-#endif /* LINUX_VERSION_CODE */
 #endif /* MODULE */
 
 /* --- This is the END my friend --- */

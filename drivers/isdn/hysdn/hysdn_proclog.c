@@ -207,7 +207,7 @@ hysdn_log_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
 	struct log_data *inf;
 	int len;
-	word ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	struct procdata *pd = NULL;
 	hysdn_card *card;
 
@@ -216,11 +216,10 @@ hysdn_log_read(struct file *file, char *buf, size_t count, loff_t * off)
 			return (-EAGAIN);
 
 		/* sorry, but we need to search the card */
-		ino = file->f_dentry->d_inode->i_ino & 0xFFFF;	/* low-ino */
 		card = card_root;
 		while (card) {
 			pd = card->proclog;
-			if (pd->log->low_ino == ino)
+			if (pd->log == pde)
 				break;
 			card = card->next;	/* search next entry */
 		}
@@ -258,7 +257,7 @@ hysdn_log_open(struct inode *ino, struct file *filep)
 	card = card_root;
 	while (card) {
 		pd = card->proclog;
-		if (pd->log->low_ino == (ino->i_ino & 0xFFFF))
+		if (pd->log == PDE(ino))
 			break;
 		card = card->next;	/* search next entry */
 	}
@@ -323,7 +322,7 @@ hysdn_log_close(struct inode *ino, struct file *filep)
 			card = card_root;
 			while (card) {
 				pd = card->proclog;
-				if (pd->log->low_ino == (ino->i_ino & 0xFFFF))
+				if (pd->log == PDE(ino))
 					break;
 				card = card->next;	/* search next entry */
 			}
@@ -359,7 +358,7 @@ static unsigned int
 hysdn_log_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask = 0;
-	word ino;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	hysdn_card *card;
 	struct procdata *pd = NULL;
 
@@ -367,11 +366,10 @@ hysdn_log_poll(struct file *file, poll_table * wait)
 		return (mask);	/* no polling for write supported */
 
 	/* we need to search the card */
-	ino = file->f_dentry->d_inode->i_ino & 0xFFFF;	/* low-ino */
 	card = card_root;
 	while (card) {
 		pd = card->proclog;
-		if (pd->log->low_ino == ino)
+		if (pd->log == pde)
 			break;
 		card = card->next;	/* search next entry */
 	}
