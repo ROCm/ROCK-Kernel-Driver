@@ -714,15 +714,14 @@ request_synchronous (int host, int target) {
     }
     hostdata = (struct NCR53c7x0_hostdata *)h->hostdata[0];
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     if (hostdata->initiate_sdtr & (1 << target)) {
-	restore_flags(flags);
+	local_irq_restore(flags);
 	printk (KERN_ALERT "target %d already doing SDTR\n", target);
 	return -1;
     } 
     hostdata->initiate_sdtr |= (1 << target);
-    restore_flags(flags);
+    local_irq_restore(flags);
     return 0;
 }
 #endif
@@ -1589,11 +1588,10 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 
     /* The NCR chip _must_ be idle to run the test scripts */
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     if (!hostdata->idle) {
 	printk ("scsi%d : chip not idle, aborting tests\n", host->host_no);
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return -1;
     }
 
@@ -1617,7 +1615,7 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 	    NCR53c7x0_write8 (DCNTL_REG, hostdata->saved_dcntl | DCNTL_SSM |
 						DCNTL_STD);
 	printk (" started\n");
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	/* 
 	 * This is currently a .5 second timeout, since (in theory) no slow 
@@ -1656,7 +1654,7 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 		hostdata->script, start);
 	    printk ("scsi%d : DSPS = 0x%x\n", host->host_no,
 		NCR53c7x0_read32(DSPS_REG));
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 	    return -1;
 	}
     	hostdata->test_running = 0;
@@ -1691,10 +1689,10 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 	    if (!hostdata->valid_ids[i])
 		continue;
 #endif
-	    cli();
+	    local_irq_disable();
 	    if (!hostdata->idle) {
 		printk ("scsi%d : chip not idle, aborting tests\n", host->host_no);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return -1;
 	    }
 
@@ -1710,7 +1708,7 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 	    if (hostdata->options & OPTION_DEBUG_TRACE)
 	        NCR53c7x0_write8 (DCNTL_REG, hostdata->saved_dcntl |
 				DCNTL_SSM | DCNTL_STD);
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 
 	    timeout = jiffies + 5 * HZ;	/* arbitrary */
 	    while ((hostdata->test_completed == -1) && time_before(jiffies, timeout))
@@ -1732,19 +1730,19 @@ NCR53c7xx_run_tests (struct Scsi_Host *host) {
 		    host->host_no, i);
 		if (!hostdata->idle) {
 		    printk("scsi%d : not idle\n", host->host_no);
-		    restore_flags(flags);
+		    local_irq_restore(flags);
 		    return -1;
 		}
 	    } else if (hostdata->test_completed == -1) {
 		printk ("scsi%d : test 2 timed out\n", host->host_no);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return -1;
 	    } 
 	    hostdata->test_running = 0;
 	}
     }
 
-    restore_flags(flags);
+    local_irq_restore(flags);
     return 0;
 }
 
@@ -1827,8 +1825,7 @@ static volatile int process_issue_queue_running = 0;
 static __inline__ void 
 run_process_issue_queue(void) {
     unsigned long flags;
-    save_flags (flags);
-    cli();
+    local_irq_save(flags);
     if (!process_issue_queue_running) {
 	process_issue_queue_running = 1;
         process_issue_queue(flags);
@@ -1838,7 +1835,7 @@ run_process_issue_queue(void) {
 	 * interrupts disabled.
 	 */
     }
-    restore_flags (flags);
+    local_irq_restore(flags);
 }
 
 /*
@@ -1872,8 +1869,7 @@ abnormal_finished (struct NCR53c7x0_cmd *cmd, int result) {
     printk ("scsi%d: abnormal finished\n", host->host_no);
 #endif
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     found = 0;
     /* 
      * Traverse the NCR issue array until we find a match or run out 
@@ -1956,7 +1952,7 @@ abnormal_finished (struct NCR53c7x0_cmd *cmd, int result) {
     c->result = result;
     c->scsi_done(c);
 
-    restore_flags(flags);
+    local_irq_restore(flags);
     run_process_issue_queue();
 }
 
@@ -1991,8 +1987,7 @@ intr_break (struct Scsi_Host *host, struct
      * dump the appropriate debugging information to standard 
      * output.  
      */
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     dsp = (u32 *) bus_to_virt(NCR53c7x0_read32(DSP_REG));
     for (bp = hostdata->breakpoints; bp && bp->address != dsp; 
     	bp = bp->next);
@@ -2014,7 +2009,7 @@ intr_break (struct Scsi_Host *host, struct
      * instruction in bytes.
      */
 
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 /*
  * Function : static void print_synchronous (const char *prefix, 
@@ -2920,8 +2915,7 @@ NCR53c7x0_soft_reset (struct Scsi_Host *host) {
 	host->hostdata[0];
     NCR53c7x0_local_setup(host);
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 
     /* Disable scsi chip and s/w level 7 ints */
 
@@ -3022,7 +3016,7 @@ NCR53c7x0_soft_reset (struct Scsi_Host *host) {
     }
 #endif
     /* Anything needed for your hardware? */
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 
@@ -3123,19 +3117,17 @@ allocate_cmd (Scsi_Cmnd *cmd) {
 	tmp->real = (void *)real;
 	tmp->size = size;			
 	tmp->free = ((void (*)(void *, int)) my_free_page);
-	save_flags (flags);
-	cli();
+	local_irq_save(flags);
 	tmp->next = hostdata->free;
 	hostdata->free = tmp;
-	restore_flags (flags);
+	local_irq_restore(flags);
     }
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     tmp = (struct NCR53c7x0_cmd *) hostdata->free;
     if (tmp) {
 	hostdata->free = tmp->next;
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
     if (!tmp)
 	printk ("scsi%d : can't allocate command for target %d lun %d\n",
 	    host->host_no, cmd->target, cmd->lun);
@@ -3354,19 +3346,17 @@ create_cmd (Scsi_Cmnd *cmd) {
 	memcpy ((void *) (tmp->select + 1), (void *) wdtr_message,
 	    sizeof(wdtr_message));
     	patch_dsa_32(tmp->dsa, dsa_msgout, 0, 1 + sizeof(wdtr_message));
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	hostdata->initiate_wdtr &= ~(1 << cmd->target);
-	restore_flags(flags);
+	local_irq_restore(flags);
     } else if (hostdata->initiate_sdtr & (1 << cmd->target)) {
 	memcpy ((void *) (tmp->select + 1), (void *) sdtr_message, 
 	    sizeof(sdtr_message));
     	patch_dsa_32(tmp->dsa, dsa_msgout, 0, 1 + sizeof(sdtr_message));
 	tmp->flags |= CMD_FLAG_SDTR;
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	hostdata->initiate_sdtr &= ~(1 << cmd->target);
-	restore_flags(flags);
+	local_irq_restore(flags);
     
     }
 #if 1
@@ -3623,8 +3613,7 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
     }
 #endif
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     if ((hostdata->options & (OPTION_DEBUG_INIT_ONLY|OPTION_DEBUG_PROBE_ONLY)) 
 	|| ((hostdata->options & OPTION_DEBUG_TARGET_LIMIT) &&
 	    !(hostdata->debug_lun_limit[cmd->target] & (1 << cmd->lun))) 
@@ -3639,7 +3628,7 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
 	    cmd->target, cmd->lun);
 	cmd->result = (DID_BAD_TARGET << 16);
 	done(cmd);
-	restore_flags (flags);
+	local_irq_restore(flags);
 	return 0;
     }
 
@@ -3648,7 +3637,7 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
 	printk("scsi%d : maximum commands exceeded\n", host->host_no);
 	cmd->result = (DID_BAD_TARGET << 16);
 	done(cmd);
-	restore_flags (flags);
+	local_irq_restore(flags);
 	return 0;
     }
 
@@ -3660,7 +3649,7 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
 		host->host_no);
 	    cmd->result = (DID_BAD_TARGET << 16);
 	    done(cmd);
-	    restore_flags (flags);
+	    local_irq_restore(flags);
 	    return 0;
 	}
     }
@@ -3687,7 +3676,7 @@ NCR53c7xx_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *)) {
 		tmp = (Scsi_Cmnd *) tmp->SCp.ptr);
 	tmp->SCp.ptr = (unsigned char *) cmd;
     }
-    restore_flags (flags);
+    local_irq_restore(flags);
     run_process_issue_queue();
     return 0;
 }
@@ -3727,8 +3716,7 @@ to_schedule_list (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
 	virt_to_bus(hostdata->dsa), hostdata->dsa);
 #endif
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     
     /* 
      * Work around race condition : if an interrupt fired and we 
@@ -3741,7 +3729,7 @@ to_schedule_list (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
 	cmd->next = (struct NCR53c7x0_cmd *) hostdata->free;
 	hostdata->free = cmd;
 	tmp->scsi_done(tmp);
-	restore_flags (flags);
+	local_irq_restore(flags);
 	return;
     }
 
@@ -3771,7 +3759,7 @@ to_schedule_list (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
 	cmd->next = (struct NCR53c7x0_cmd *) hostdata->free;
 	hostdata->free = cmd;
 	tmp->scsi_done(tmp);
-	restore_flags (flags);
+	local_irq_restore(flags);
 	return;
     }
 
@@ -3792,7 +3780,7 @@ to_schedule_list (struct Scsi_Host *host, struct NCR53c7x0_hostdata *hostdata,
 	NCR53c7x0_write8(hostdata->istat, ISTAT_10_SIGP);
     }
 
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 /*
@@ -3850,12 +3838,12 @@ process_issue_queue (unsigned long flags) {
      */
 
     do {
-	cli(); /* Freeze request queues */
+	local_irq_disable(); /* Freeze request queues */
 	done = 1;
 	for (host = first_host; host && host->hostt == the_template;
 	    host = host->next) {
 	    hostdata = (struct NCR53c7x0_hostdata *) host->hostdata[0];
-	    cli();
+	    local_irq_disable();
 	    if (hostdata->issue_queue) {
 	    	if (hostdata->state == STATE_DISABLED) {
 		    tmp = (Scsi_Cmnd *) hostdata->issue_queue;
@@ -3905,7 +3893,7 @@ process_issue_queue (unsigned long flags) {
 			} /* if target/lun is not busy */
 	    } /* if hostdata->issue_queue */
 	    if (!done)
-		restore_flags (flags);
+		local_irq_restore(flags);
     	} /* for host */
     } while (!done);
     process_issue_queue_running = 0;
@@ -4172,8 +4160,7 @@ NCR53c7x0_intfly (struct Scsi_Host *host)
     * completion.
     */
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 restart:
     for (cmd_prev_ptr = (struct NCR53c7x0_cmd **)&(hostdata->running_list),
 	cmd = (struct NCR53c7x0_cmd *) hostdata->running_list; cmd ;
@@ -4227,7 +4214,7 @@ restart:
 	tmp->scsi_done(tmp);
 	goto restart;
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
 
     if (!search_found)  {
 	printk ("scsi%d : WARNING : INTFLY with no completed commands.\n",
@@ -4907,13 +4894,12 @@ intr_dma (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
 	    /* Don't print instr. until we write DSP at end of intr function */
 	} else if (hostdata->options & OPTION_DEBUG_SINGLE) {
 	    print_insn (host, dsp, "s ", 0);
-	    save_flags(flags);
-	    cli();
+	    local_irq_save(flags);
 /* XXX - should we do this, or can we get away with writing dsp? */
 
 	    NCR53c7x0_write8 (DCNTL_REG, (NCR53c7x0_read8(DCNTL_REG) & 
     	    	~DCNTL_SSM) | DCNTL_STD);
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 	} else {
 	    printk(KERN_ALERT "scsi%d : unexpected single step interrupt at\n"
 		   "         ", host->host_no);
@@ -5191,8 +5177,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
 	return SCSI_ABORT_BUSY;
     }
 	
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 #if 0
     if (cache_pid == cmd->pid) 
 	panic ("scsi%d : bloody fetus %d\n", host->host_no, cmd->pid);
@@ -5227,7 +5212,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
 	cmd->scsi_done(cmd);
 	printk ("scsi%d : found command %ld in Linux issue queue\n", 
 	    host->host_no, me->pid);
-	restore_flags(flags);
+	local_irq_restore(flags);
     	run_process_issue_queue();
 	return SCSI_ABORT_SUCCESS;
     }
@@ -5253,12 +5238,12 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
 	    cmd->scsi_done(cmd);
 	printk ("scsi%d : found finished command %ld in running list\n", 
 	    host->host_no, cmd->pid);
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 	    return SCSI_ABORT_NOT_RUNNING;
 	} else {
 	    printk ("scsi%d : DANGER : command running, can not abort.\n",
 		cmd->host->host_no);
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 	    return SCSI_ABORT_BUSY;
 	}
     }
@@ -5290,7 +5275,7 @@ NCR53c7xx_abort (Scsi_Cmnd *cmd) {
  */
         --hostdata->busy[cmd->target][cmd->lun];
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
     cmd->scsi_done(cmd);
 
 /* 
@@ -5338,8 +5323,7 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
     	(struct NCR53c7x0_hostdata *) host->hostdata[0];
 
     NCR53c7x0_local_setup(host);
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     ncr_halt (host);
     print_lots (host);
     dump_events (host, 30);
@@ -5373,13 +5357,13 @@ NCR53c7xx_reset (Scsi_Cmnd *cmd, unsigned int reset_flags) {
 	disable(host);
     else if (hostdata->resets != -1)
 	--hostdata->resets;
-    restore_flags(flags);
+    local_irq_restore(flags);
     for (; nuke_list; nuke_list = tmp) {
 	tmp = (Scsi_Cmnd *) nuke_list->SCp.buffer;
     	nuke_list->result = DID_RESET << 16;
 	nuke_list->scsi_done (nuke_list);
     }
-    restore_flags(flags);
+    local_irq_restore(flags);
     return SCSI_RESET_SUCCESS;
 }
 
@@ -5608,8 +5592,7 @@ print_queues (struct Scsi_Host *host) {
 	    left >= 0 && cmd; 
 	    cmd = next_cmd) {
 	next_cmd = (Scsi_Cmnd *) cmd->SCp.ptr;
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	if (cmd->host_scribble) {
 	    if (check_address ((unsigned long) (cmd->host_scribble), 
 		sizeof (cmd->host_scribble)) == -1)
@@ -5622,7 +5605,7 @@ print_queues (struct Scsi_Host *host) {
 	} else 
 	    printk ("scsi%d : scsi pid %ld for target %d lun %d has no NCR53c7x0_cmd\n",
 		host->host_no, cmd->pid, cmd->target, cmd->lun);
-	restore_flags(flags);
+	local_irq_restore(flags);
     }
 
     if (left <= 0) {
@@ -5654,8 +5637,7 @@ print_queues (struct Scsi_Host *host) {
 	dsa = bus_to_virt (hostdata->reconnect_dsa_head);
 	left >= 0 && dsa; 
 	dsa = next_dsa) {
-	save_flags (flags);
-	cli();
+	local_irq_save(flags);
 	if (check_address ((unsigned long) dsa, sizeof(dsa)) == -1) {
 	    printk ("scsi%d: bad DSA pointer 0x%p", host->host_no,
 		dsa);
@@ -5666,7 +5648,7 @@ print_queues (struct Scsi_Host *host) {
 	    next_dsa = bus_to_virt(dsa[hostdata->dsa_next / sizeof(u32)]);
 	    print_dsa (host, dsa, "");
 	}
-	restore_flags(flags);
+	local_irq_restore(flags);
     }
     printk ("scsi%d : end reconnect_dsa_head\n", host->host_no);
     if (left < 0)
@@ -5756,15 +5738,14 @@ shutdown (struct Scsi_Host *host) {
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
 	host->hostdata[0];
     NCR53c7x0_local_setup(host);
-    save_flags (flags);
-    cli();
+    local_irq_save(flags);
 /* Get in a state where we can reset the SCSI bus */
     ncr_halt (host);
     ncr_scsi_reset (host);
     hostdata->soft_reset(host);
 
     disable (host);
-    restore_flags (flags);
+    local_irq_restore(flags);
     return 0;
 }
 
@@ -5779,12 +5760,11 @@ ncr_scsi_reset (struct Scsi_Host *host) {
     NCR53c7x0_local_declare();
     unsigned long flags;
     NCR53c7x0_local_setup(host);
-    save_flags (flags);
-    cli();
+    local_irq_save(flags);
     NCR53c7x0_write8(SCNTL1_REG, SCNTL1_RST);
     udelay(25);	/* Minimum amount of time to assert RST */
     NCR53c7x0_write8(SCNTL1_REG, 0);
-    restore_flags (flags);
+    local_irq_restore(flags);
 }
 
 /* 
@@ -5797,13 +5777,12 @@ hard_reset (struct Scsi_Host *host) {
     struct NCR53c7x0_hostdata *hostdata = (struct NCR53c7x0_hostdata *)
 	host->hostdata[0];
     unsigned long flags;
-    save_flags (flags);
-    cli();
+    local_irq_save(flags);
     ncr_scsi_reset(host);
     NCR53c7x0_driver_init (host);
     if (hostdata->soft_reset)
 	hostdata->soft_reset (host);
-    restore_flags(flags);
+    local_irq_restore(flags);
 }
 
 
@@ -5899,14 +5878,13 @@ disable (struct Scsi_Host *host) {
 	host->hostdata[0];
     unsigned long flags;
     Scsi_Cmnd *nuke_list, *tmp;
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     if (hostdata->state != STATE_HALTED)
 	ncr_halt (host);
     nuke_list = return_outstanding_commands (host, 1 /* free */, 1 /* issue */);
     hard_reset (host);
     hostdata->state = STATE_DISABLED;
-    restore_flags(flags);
+    local_irq_restore(flags);
     printk ("scsi%d : nuking commands\n", host->host_no);
     for (; nuke_list; nuke_list = tmp) {
 	    tmp = (Scsi_Cmnd *) nuke_list->SCp.buffer;
@@ -5939,8 +5917,7 @@ ncr_halt (struct Scsi_Host *host) {
     int stage;
     NCR53c7x0_local_setup(host);
 
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
     /* Stage 0 : eat all interrupts
        Stage 1 : set ABORT
        Stage 2 : eat all but abort interrupts
@@ -5975,7 +5952,7 @@ ncr_halt (struct Scsi_Host *host) {
 	}
     }
     hostdata->state = STATE_HALTED;
-    restore_flags(flags);
+    local_irq_restore(flags);
 #if 0
     print_lots (host);
 #endif
@@ -6023,14 +6000,13 @@ dump_events (struct Scsi_Host *host, int count) {
 	    count = hostdata->event_size;
 	for (i = hostdata->event_index; count > 0; 
 	    i = (i ? i - 1 : hostdata->event_size -1), --count) {
-	    save_flags(flags);
 /*
  * By copying the event we're currently examining with interrupts
  * disabled, we can do multiple printk(), etc. operations and 
  * still be guaranteed that they're happening on the same 
  * event structure.
  */
-	    cli();
+	    local_irq_save(flags);
 #if 0
 	    event = hostdata->events[i];
 #else
@@ -6038,7 +6014,7 @@ dump_events (struct Scsi_Host *host, int count) {
 		sizeof(event));
 #endif
 
-	    restore_flags(flags);
+	    local_irq_restore(flags);
 	    printk ("scsi%d : %s event %d at %ld secs %ld usecs target %d lun %d\n",
 		host->host_no, event_name (event.event), count,
 		(long) event.time.tv_sec, (long) event.time.tv_usec,

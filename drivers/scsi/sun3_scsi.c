@@ -402,10 +402,9 @@ void sun3_sun3_debug (void)
 	NCR5380_local_declare();
 
 	if (default_instance) {
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			NCR5380_print_status(default_instance);
-			restore_flags(flags);
+			local_irq_restore(flags);
 	}
 }
 #endif

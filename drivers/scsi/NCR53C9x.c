@@ -1853,8 +1853,7 @@ static int esp_do_data(struct NCR_ESP *esp, struct ESP_regs *eregs)
 				ESPDATA(( /*"\n"*/ "\r"));
 #endif
 #if 0
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 #endif
 			if(thisphase == in_datain) {
 				/* 'go' ... */ 
@@ -1945,7 +1944,7 @@ static int esp_do_data(struct NCR_ESP *esp, struct ESP_regs *eregs)
 				ESPDATA(("done! \n"));
 
 #if 0
-			restore_flags(flags);
+			local_irq_restore(flags);
 #endif
 
 			/* check new bus phase */

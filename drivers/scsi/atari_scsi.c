@@ -508,12 +508,11 @@ static int falcon_dont_release = 0;
 static void
 falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 		
 	if (IS_A_TT()) return;
 	
-	save_flags(oldflags);
-	cli();
+	local_irq_save(flags);
 
 	if (falcon_got_lock &&
 		!hostdata->disconnected_queue &&
@@ -524,7 +523,7 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 #if 0
 			printk("WARNING: Lock release not allowed. Ignored\n");
 #endif
-			restore_flags(oldflags);
+			local_irq_restore(flags);
 			return;
 		}
 		falcon_got_lock = 0;
@@ -532,7 +531,7 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 		wake_up( &falcon_fairness_wait );
 	}
 
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 }
 
 /* This function manages the locking of the ST-DMA.
@@ -552,12 +551,11 @@ falcon_release_lock_if_possible( struct NCR5380_hostdata * hostdata )
 
 static void falcon_get_lock( void )
 {
-	unsigned long	oldflags;
+	unsigned long flags;
 
 	if (IS_A_TT()) return;
 
-	save_flags(oldflags);
-	cli();
+	local_irq_save(flags);
 
 	while( !in_interrupt() && falcon_got_lock && stdma_others_waiting() )
 		sleep_on( &falcon_fairness_wait );
@@ -577,7 +575,7 @@ static void falcon_get_lock( void )
 		}
 	}	
 
-	restore_flags(oldflags);
+	local_irq_restore(flags);
 	if (!falcon_got_lock)
 		panic("Falcon SCSI: someone stole the lock :-(\n");
 }
