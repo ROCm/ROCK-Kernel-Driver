@@ -443,7 +443,6 @@ snd_seq_midisynth_unregister_port(snd_seq_device_t *dev)
 		up(&register_mutex);
 		return -ENODEV;
 	}
-	snd_seq_event_port_detach(client->seq_client, client->ports[device]->seq_port);
 	ports = client->ports_per_device[device];
 	client->ports_per_device[device] = 0;
 	msynth = client->ports[device];
