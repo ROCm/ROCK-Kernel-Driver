@@ -798,7 +798,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	LOCK_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int timeout = 0;
-	__u64 temp;
+	__u16 count;
 
 	cFYI(1, ("In CIFSSMBLock - timeout %d numLock %d",waitFlag,numLock));
 	rc = smb_init(SMB_COM_LOCKING_ANDX, 8, tcon, (void **) &pSMB,
@@ -825,19 +825,17 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	if((numLock != 0) || (numUnlock != 0)) {
 		pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
 		/* BB where to store pid high? */
-		temp = cpu_to_le64(len);
-		pSMB->Locks[0].LengthLow = (__u32)(temp & 0xFFFFFFFF);
-		pSMB->Locks[0].LengthHigh =  (__u32)(temp>>32);
-		temp = cpu_to_le64(offset);
-		pSMB->Locks[0].OffsetLow = (__u32)(temp & 0xFFFFFFFF);
-		pSMB->Locks[0].OffsetHigh = (__u32)(temp>>32);
-		pSMB->ByteCount = sizeof (LOCKING_ANDX_RANGE);
+		pSMB->Locks[0].LengthLow = cpu_to_le32((u32)len);
+		pSMB->Locks[0].LengthHigh = cpu_to_le32((u32)(len>>32));
+		pSMB->Locks[0].OffsetLow = cpu_to_le32((u32)offset)
+		pSMB->Locks[0].OffsetHigh = cpu_to_le32((u32)(offset>>32));
+		count = sizeof(LOCKING_ANDX_RANGE);
 	} else {
 		/* oplock break */
-		pSMB->ByteCount = 0;
+		count = 0;
 	}
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, timeout);
