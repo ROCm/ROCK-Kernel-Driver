@@ -187,8 +187,9 @@ nlmclnt_recovery(struct nlm_host *host, u32 newstate)
 	} else {
 		nlmclnt_prepare_reclaim(host, newstate);
 		nlm_get_host(host);
-		MOD_INC_USE_COUNT;
-		kernel_thread(reclaimer, host, CLONE_KERNEL);
+		__module_get(THIS_MODULE);
+		if (kernel_thread(reclaimer, host, CLONE_KERNEL))
+			module_put(THIS_MODULE);
 	}
 }
 
@@ -244,7 +245,5 @@ restart:
 	nlm_release_host(host);
 	lockd_down();
 	unlock_kernel();
-	MOD_DEC_USE_COUNT;
-
-	return 0;
+	module_put_and_exit(0);
 }

@@ -375,7 +375,7 @@ shortname_info_to_lcase(struct shortname_info *base,
 }
 
 static inline int to_shortname_char(struct nls_table *nls,
-				    char *buf, int buf_size, wchar_t *src,
+				    unsigned char *buf, int buf_size, wchar_t *src,
 				    struct shortname_info *info)
 {
 	int len;
