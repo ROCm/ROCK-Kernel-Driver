@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-s3c2410/s3c2410.c
  *
  * Copyright (c) 2003,2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
  *
@@ -16,6 +16,7 @@
  *     18-Jan-2004 BJD  Added serial port configuration
  *     21-Aug-2004 BJD  Added new struct s3c2410_board handler
  *     28-Sep-2004 BJD  Updates for new serial port bits
+ *     04-Nov-2004 BJD  Updated UART configuration process
 */
 
 #include <linux/kernel.h>
@@ -42,10 +43,6 @@
 #include "clock.h"
 
 int s3c2410_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
-
-/* serial port setup */
-
-struct s3c2410_uartcfg *s3c2410_uartcfgs;
 
 /* Initial IO mappings */
 
@@ -141,12 +138,10 @@ void __init s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
 	struct platform_device *platdev;
 	int uart;
 
-	s3c2410_uartcfgs = cfg;		/* compatibility */
-
 	for (uart = 0; uart < no; uart++, cfg++) {
 		platdev = uart_devices[cfg->hwport];
 
-		s3c2410_uart_devices[uart] = platdev;
+		s3c24xx_uart_devs[uart] = platdev;
 		platdev->dev.platform_data = cfg;
 	}
 
@@ -199,10 +194,7 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 
 int __init s3c2410_init(void)
 {
-	int ret;
-
 	printk("S3C2410: Initialising architecture\n");
 
-	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
-	return ret;
+	return platform_add_devices(s3c24xx_uart_devs, s3c2410_uart_count);
 }
