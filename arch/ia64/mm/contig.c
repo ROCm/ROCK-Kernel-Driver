@@ -269,7 +269,6 @@ paging_init (void)
 		vmem_map = (struct page *) 0;
 		free_area_init_node(0, &contig_page_data, zones_size, 0,
 				    zholes_size);
-		mem_map = contig_page_data.node_mem_map;
 	} else {
 		unsigned long map_size;
 
@@ -280,11 +279,10 @@ paging_init (void)
 		vmem_map = (struct page *) vmalloc_end;
 		efi_memmap_walk(create_mem_map_page_table, 0);
 
-		contig_page_data.node_mem_map = vmem_map;
+		mem_map = contig_page_data.node_mem_map = vmem_map;
 		free_area_init_node(0, &contig_page_data, zones_size,
 				    0, zholes_size);
 
-		mem_map = contig_page_data.node_mem_map;
 		printk("Virtual mem_map starts at 0x%p\n", mem_map);
 	}
 #else /* !CONFIG_VIRTUAL_MEM_MAP */
