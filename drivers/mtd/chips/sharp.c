@@ -116,8 +116,10 @@ struct mtd_info *sharp_probe(struct map_info *map)
 		return NULL;
 
 	sharp = kmalloc(sizeof(*sharp), GFP_KERNEL);
-	if(!sharp)
+	if(!sharp) {
+		kfree(mtd);
 		return NULL;
+	}
 
 	memset(mtd, 0, sizeof(*mtd));
 

@@ -174,6 +174,7 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 		if (!mtd->eraseregions) { 
 			printk(KERN_WARNING "Failed to allocate memory for MTD erase region info\n");
 			kfree(cfi->cmdset_priv);
+			kfree(mtd);
 			return NULL;
 		}
 			
@@ -197,6 +198,7 @@ static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
 			printk(KERN_WARNING "Sum of regions (%lx) != total size of set of interleaved chips (%lx)\n", offset, devsize);
 			kfree(mtd->eraseregions);
 			kfree(cfi->cmdset_priv);
+			kfree(mtd);
 			return NULL;
 		}
 #if 0

@@ -311,8 +311,10 @@ static void videodev_proc_create_dev (struct video_device *vfd, char *name)
 		return;
 
 	p = create_proc_entry(name, S_IFREG|S_IRUGO|S_IWUSR, video_dev_proc_entry);
-	if (!p)
+	if (!p) {
+		kfree(d);
 		return;
+	}
 	p->data = vfd;
 	p->read_proc = videodev_proc_read;
 

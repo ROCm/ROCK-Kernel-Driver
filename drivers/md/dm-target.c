@@ -122,6 +122,8 @@ int dm_register_target(struct target_type *t)
 		list_add(&ti->list, &_targets);
 
 	up_write(&_lock);
+	if (rv)
+		kfree(ti);
 	return rv;
 }
 
