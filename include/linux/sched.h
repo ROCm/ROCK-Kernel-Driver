@@ -27,6 +27,7 @@
 #include <linux/compiler.h>
 #include <linux/completion.h>
 #include <linux/pid.h>
+#include <linux/percpu.h>
 
 struct exec_domain;
 
@@ -87,6 +88,8 @@ extern unsigned long avenrun[];		/* Load averages */
 
 extern int nr_threads;
 extern int last_pid;
+DECLARE_PER_CPU(unsigned long, process_counts);
+extern int nr_processes(void);
 extern unsigned long nr_running(void);
 extern unsigned long nr_uninterruptible(void);
 extern unsigned long nr_iowait(void);

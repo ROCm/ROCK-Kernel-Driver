@@ -41,6 +41,8 @@ static struct dentry * __unhash_process(struct task_struct *p)
 	if (thread_group_leader(p)) {
 		detach_pid(p, PIDTYPE_PGID);
 		detach_pid(p, PIDTYPE_SID);
+		if (p->pid)
+			per_cpu(process_counts, smp_processor_id())--;
 	}
 
 	REMOVE_LINKS(p);
