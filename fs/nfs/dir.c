@@ -1123,12 +1123,16 @@ nfs_permission(struct inode *inode, int mask)
 	    && error != -EACCES)
 		goto out;
 
+	lock_kernel();
+
 	error = NFS_PROTO(inode)->access(inode, mask, 0);
 
 	if (error == -EACCES && NFS_CLIENT(inode)->cl_droppriv &&
 	    current->uid != 0 && current->gid != 0 &&
 	    (current->fsuid != current->uid || current->fsgid != current->gid))
 		error = NFS_PROTO(inode)->access(inode, mask, 1);
+
+	unlock_kernel();
 
  out:
 	return error;

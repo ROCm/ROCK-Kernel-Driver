@@ -12,7 +12,7 @@ obj-y  = csum-partial.o csum-copy.o csum-wrappers.o delay.o \
 	thunk.o io.o clear_page.o copy_page.o
 obj-y += memcpy.o
 obj-y += memmove.o
-#obj-y += memset.o
+obj-y += memset.o
 obj-y += copy_user.o
 
 export-objs := io.o csum-wrappers.o csum-partial.o

@@ -993,10 +993,13 @@ print_sense_internal(const char * devclass,
 	}
     
 #if !(CONSTANTS & CONST_SENSE)
+	{
+		int i;
 	printk("Raw sense data:");
 	for (i = 0; i < s; ++i) 
 		printk("0x%02x ", sense_buffer[i]);
 	printk("\n");
+	}
 #endif
 }
 

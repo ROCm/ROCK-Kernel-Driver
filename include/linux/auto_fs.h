@@ -45,7 +45,8 @@
  * If so, 32-bit user-space code should be backwards compatible.
  */
 
-#if defined(__sparc__) || defined(__mips__) || defined(__x86_64__) || defined(__powerpc__)
+#if defined(__sparc__) || defined(__mips__) || defined(__x86_64) \
+ || defined(__powerpc__) || defined(__s390__)
 typedef unsigned int autofs_wqt_t;
 #else
 typedef unsigned long autofs_wqt_t;

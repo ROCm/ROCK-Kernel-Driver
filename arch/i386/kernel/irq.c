@@ -360,8 +360,9 @@ void __global_cli(void)
 
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
-		int cpu = smp_processor_id();
+		int cpu;
 		__cli();
+		cpu = smp_processor_id();
 		if (!local_irq_count(cpu))
 			get_irqlock(cpu);
 	}
@@ -369,11 +370,12 @@ void __global_cli(void)
 
 void __global_sti(void)
 {
-	int cpu = smp_processor_id();
+	int cpu = get_cpu();
 
 	if (!local_irq_count(cpu))
 		release_irqlock(cpu);
 	__sti();
+	put_cpu();
 }
 
 /*

@@ -147,20 +147,25 @@ exit:
 
 int coda_permission(struct inode *inode, int mask)
 {
-        int error;
+        int error = 0;
  
 	if (!mask)
 		return 0; 
 
+	lock_kernel();
+
 	coda_vfs_stat.permission++;
 
 	if (coda_cache_check(inode, mask))
-		return 0; 
+		goto out; 
 
         error = venus_access(inode->i_sb, coda_i2f(inode), mask);
     
 	if (!error)
 		coda_cache_enter(inode, mask);
+
+ out:
+	unlock_kernel();
 
         return error; 
 }

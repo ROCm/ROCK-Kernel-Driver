@@ -24,6 +24,7 @@
 
 #include <linux/timex.h>
 
+u64 jiffies_64;
 
 static inline int set_rtc_mmss(unsigned long nowtime)
 {

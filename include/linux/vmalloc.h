@@ -13,6 +13,7 @@ struct vm_struct {
 	unsigned long flags;
 	void * addr;
 	unsigned long size;
+	unsigned long phys_addr;
 	struct vm_struct * next;
 };
 
@@ -23,6 +24,8 @@ extern long vread(char *buf, char *addr, unsigned long count);
 extern void vmfree_area_pages(unsigned long address, unsigned long size);
 extern int vmalloc_area_pages(unsigned long address, unsigned long size,
                               int gfp_mask, pgprot_t prot);
+extern struct vm_struct *remove_kernel_area(void *addr);
+
 /*
  * Various ways to allocate pages.
  */

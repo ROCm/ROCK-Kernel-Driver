@@ -33,6 +33,8 @@
 #ifndef __func_h_def
 #define __func_h_def
 
+#include <linux/kdev_t.h>
+
 #ifdef SCCS_LABELS
 #ifndef lint
 static char *_func_h_sccs_ = "@(#)func.h	1.3";

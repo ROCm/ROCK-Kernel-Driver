@@ -204,13 +204,8 @@ int vfs_permission(struct inode * inode, int mask)
 
 int permission(struct inode * inode,int mask)
 {
-	if (inode->i_op && inode->i_op->permission) {
-		int retval;
-		lock_kernel();
-		retval = inode->i_op->permission(inode, mask);
-		unlock_kernel();
-		return retval;
-	}
+	if (inode->i_op && inode->i_op->permission)
+		return inode->i_op->permission(inode, mask);
 	return vfs_permission(inode, mask);
 }
 
@@ -833,22 +828,6 @@ walk_init_root(const char *name, struct nameidata *nd)
 	}
 	nd->mnt = mntget(current->fs->rootmnt);
 	nd->dentry = dget(current->fs->root);
-	read_unlock(&current->fs->lock);
-	return 1;
-}
-
-/* SMP-safe */
-int path_init(const char *name, unsigned int flags, struct nameidata *nd)
-{
-	nd->last_type = LAST_ROOT; /* if there are only slashes... */
-	nd->old_mnt = NULL;
-	nd->old_dentry = NULL;
-	nd->flags = flags;
-	if (*name=='/')
-		return walk_init_root(name,nd);
-	read_lock(&current->fs->lock);
-	nd->mnt = mntget(current->fs->pwdmnt);
-	nd->dentry = dget(current->fs->pwd);
 	read_unlock(&current->fs->lock);
 	return 1;
 }

@@ -9,116 +9,28 @@ This file contains the documentation for the sysctl files in
 /proc/sys/vm and is valid for Linux kernel version 2.2.
 
 The files in this directory can be used to tune the operation
-of the virtual memory (VM) subsystem of the Linux kernel, and
-one of the files (bdflush) also has a little influence on disk
-usage.
+of the virtual memory (VM) subsystem of the Linux kernel and
+the writeout of dirty data to disk.
 
 Default values and initialization routines for most of these
 files can be found in mm/swap.c.
 
 Currently, these files are in /proc/sys/vm:
-- bdflush
-- buffermem
-- freepages
 - kswapd
 - overcommit_memory
 - page-cluster
-- pagecache
-- pagetable_cache
+- dirty_async_ratio
+- dirty_background_ratio
+- dirty_expire_centisecs
+- dirty_sync_ratio
+- dirty_writeback_centisecs
 
 ==============================================================
 
-bdflush:
+dirty_async_ratio, dirty_background_ratio, dirty_expire_centisecs,
+dirty_sync_ratio dirty_writeback_centisecs:
 
-This file controls the operation of the bdflush kernel
-daemon. The source code to this struct can be found in
-linux/fs/buffer.c. It currently contains 9 integer values,
-of which 4 are actually used by the kernel.
-
-From linux/fs/buffer.c:
---------------------------------------------------------------
-union bdflush_param {
-	struct {
-		int nfract;	/* Percentage of buffer cache dirty to 
-				   activate bdflush */
-		int dummy1;	/* old "ndirty" */
-		int dummy2;	/* old "nrefill" */
-		int dummy3;	/* unused */
-		int interval;	/* jiffies delay between kupdate flushes */
-		int age_buffer;	/* Time for normal buffer to age */
-		int nfract_sync;/* Percentage of buffer cache dirty to 
-				   activate bdflush synchronously */
-		int dummy4;	/* unused */
-		int dummy5;	/* unused */
-	} b_un;
-	unsigned int data[N_PARAM];
-} bdf_prm = {{30, 64, 64, 256, 5*HZ, 30*HZ, 60, 0, 0}};
---------------------------------------------------------------
-
-int nfract:
-The first parameter governs the maximum number of dirty
-buffers in the buffer cache. Dirty means that the contents
-of the buffer still have to be written to disk (as opposed
-to a clean buffer, which can just be forgotten about).
-Setting this to a high value means that Linux can delay disk
-writes for a long time, but it also means that it will have
-to do a lot of I/O at once when memory becomes short. A low
-value will spread out disk I/O more evenly, at the cost of
-more frequent I/O operations.  The default value is 30%,
-the minimum is 0%, and the maximum is 100%.
-
-int interval:
-The fifth parameter, interval, is the minimum rate at
-which kupdate will wake and flush.  The value is expressed in
-jiffies (clockticks), the number of jiffies per second is
-normally 100 (Alpha is 1024). Thus, x*HZ is x seconds.  The
-default value is 5 seconds, the minimum is 0 seconds, and the
-maximum is 600 seconds.
-
-int age_buffer:
-The sixth parameter, age_buffer, governs the maximum time
-Linux waits before writing out a dirty buffer to disk.  The
-value is in jiffies.  The default value is 30 seconds,
-the minimum is 1 second, and the maximum 6,000 seconds.
-
-int nfract_sync:
-The seventh parameter, nfract_sync, governs the percentage
-of buffer cache that is dirty before bdflush activates
-synchronously.  This can be viewed as the hard limit before
-bdflush forces buffers to disk.  The default is 60%, the
-minimum is 0%, and the maximum is 100%.
- 
-==============================================================
-buffermem:
-
-The three values in this file correspond to the values in
-the struct buffer_mem. It controls how much memory should
-be used for buffer memory. The percentage is calculated
-as a percentage of total system memory.
-
-The values are:
-min_percent	-- this is the minimum percentage of memory
-		   that should be spent on buffer memory
-borrow_percent  -- UNUSED
-max_percent     -- UNUSED
-
-==============================================================
-freepages:
-
-This file contains the values in the struct freepages. That
-struct contains three members: min, low and high.
-
-The meaning of the numbers is:
-
-freepages.min	When the number of free pages in the system
-		reaches this number, only the kernel can
-		allocate more memory.
-freepages.low	If the number of free pages gets below this
-		point, the kernel starts swapping aggressively.
-freepages.high	The kernel tries to keep up to this amount of
-		memory free; if memory comes below this point,
-		the kernel gently starts swapping in the hopes
-		that it never has to do real aggressive swapping.
+See Documentation/filesystems/proc.txt
 
 ==============================================================
 
@@ -179,39 +91,4 @@ is dependent on the amount of memory in your machine.
 The number of pages the kernel reads in at once is equal to
 2 ^ page-cluster. Values above 2 ^ 5 don't make much sense
 for swap because we only cluster swap data in 32-page groups.
-
-==============================================================
-
-pagecache:
-
-This file does exactly the same as buffermem, only this
-file controls the struct page_cache, and thus controls
-the amount of memory used for the page cache.
-
-In 2.2, the page cache is used for 3 main purposes:
-- caching read() data from files
-- caching mmap()ed data and executable files
-- swap cache
-
-When your system is both deep in swap and high on cache,
-it probably means that a lot of the swapped data is being
-cached, making for more efficient swapping than possible
-with the 2.0 kernel.
-
-==============================================================
-
-pagetable_cache:
-
-The kernel keeps a number of page tables in a per-processor
-cache (this helps a lot on SMP systems). The cache size for
-each processor will be between the low and the high value.
-
-On a low-memory, single CPU system you can safely set these
-values to 0 so you don't waste the memory. On SMP systems it
-is used so that the system can do fast pagetable allocations
-without having to acquire the kernel memory lock.
-
-For large systems, the settings are probably OK. For normal
-systems they won't hurt a bit. For small systems (<16MB ram)
-it might be advantageous to set both values to 0.
 

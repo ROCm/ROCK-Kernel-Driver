@@ -352,7 +352,7 @@ do_more:
 #ifdef CONFIG_JBD_DEBUG
 		{
 			struct buffer_head *debug_bh;
-			debug_bh = sb_get_hash_table(sb, block + i);
+			debug_bh = sb_find_get_block(sb, block + i);
 			if (debug_bh) {
 				BUFFER_TRACE(debug_bh, "Deleted!");
 				if (!bh2jh(bitmap_bh)->b_committed_data)
@@ -701,7 +701,7 @@ got_block:
 		struct buffer_head *debug_bh;
 
 		/* Record bitmap buffer state in the newly allocated block */
-		debug_bh = sb_get_hash_table(sb, tmp);
+		debug_bh = sb_find_get_block(sb, tmp);
 		if (debug_bh) {
 			BUFFER_TRACE(debug_bh, "state when allocated");
 			BUFFER_TRACE2(debug_bh, bh, "bitmap state");

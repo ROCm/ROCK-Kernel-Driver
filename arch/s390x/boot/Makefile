@@ -24,8 +24,6 @@ image: $(TOPDIR)/vmlinux \
 listing: ../../../vmlinux
 	$(OBJDUMP) --disassemble --disassemble-all --disassemble-zeroes --reloc $(TOPDIR)/vmlinux > listing
 
-dep:
-
 clean:
 	rm -f image listing iplfba.boot ipleckd.boot ipldump.boot
 

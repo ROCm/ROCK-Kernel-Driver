@@ -15,7 +15,7 @@ extern int printk(const char * fmt, ...)
 
 typedef struct {
 	volatile unsigned int lock;
-#ifdef CONFIG_DEBUG_SPINLOCK
+#if SPINLOCK_DEBUG
 	unsigned magic;
 #endif
 } spinlock_t;
@@ -39,7 +39,7 @@ typedef struct {
  * We make no fairness assumptions. They have a cost.
  */
 
-#define spin_is_locked(x)	(*(volatile char *)(&(x)->lock) <= 0)
+#define spin_is_locked(x)	(*(volatile signed char *)(&(x)->lock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 
 #define spin_lock_string \
@@ -62,7 +62,7 @@ typedef struct {
 
 static inline int _raw_spin_trylock(spinlock_t *lock)
 {
-	char oldval;
+	signed char oldval;
 	__asm__ __volatile__(
 		"xchgb %b0,%1"
 		:"=q" (oldval), "=m" (lock->lock)

@@ -195,6 +195,7 @@ struct vm_struct * get_vm_area(unsigned long size, unsigned long flags)
 		if (addr > VMALLOC_END-size)
 			goto out;
 	}
+	area->phys_addr = 0;
 	area->flags = flags;
 	area->addr = (void *)addr;
 	area->size = size;
@@ -209,9 +210,25 @@ out:
 	return NULL;
 }
 
-void vfree(void * addr)
+struct vm_struct *remove_kernel_area(void *addr) 
 {
 	struct vm_struct **p, *tmp;
+	write_lock(&vmlist_lock);
+	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
+		if (tmp->addr == addr) {
+			*p = tmp->next;
+			write_unlock(&vmlist_lock);
+			return tmp;
+		}
+
+	}
+	write_unlock(&vmlist_lock);
+	return NULL;
+} 
+
+void vfree(void * addr)
+{
+	struct vm_struct *tmp;
 
 	if (!addr)
 		return;
@@ -219,17 +236,12 @@ void vfree(void * addr)
 		printk(KERN_ERR "Trying to vfree() bad address (%p)\n", addr);
 		return;
 	}
-	write_lock(&vmlist_lock);
-	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
-		if (tmp->addr == addr) {
-			*p = tmp->next;
+	tmp = remove_kernel_area(addr); 
+	if (tmp) { 
 			vmfree_area_pages(VMALLOC_VMADDR(tmp->addr), tmp->size);
-			write_unlock(&vmlist_lock);
 			kfree(tmp);
 			return;
 		}
-	}
-	write_unlock(&vmlist_lock);
 	printk(KERN_ERR "Trying to vfree() nonexistent vm area (%p)\n", addr);
 }
 

@@ -30,16 +30,16 @@
 
 struct mtrr_sentry
 {
-    unsigned long base;    /*  Base address     */
-    unsigned long size;    /*  Size of region   */
+    __u64 base;    /*  Base address     */
+    __u32 size;    /*  Size of region   */
     unsigned int type;     /*  Type of region   */
 };
 
 struct mtrr_gentry
 {
+    __u64 base;    /*  Base address     */
+    __u32 size;    /*  Size of region   */
     unsigned int regnum;   /*  Register number  */
-    unsigned long base;    /*  Base address     */
-    unsigned long size;    /*  Size of region   */
     unsigned int type;     /*  Type of region   */
 };
 
@@ -81,46 +81,38 @@ static char *mtrr_strings[MTRR_NUM_TYPES] =
 #ifdef __KERNEL__
 
 /*  The following functions are for use by other drivers  */
-# ifdef CONFIG_MTRR
-extern int mtrr_add (unsigned long base, unsigned long size,
-		     unsigned int type, char increment);
-extern int mtrr_add_page (unsigned long base, unsigned long size,
-		     unsigned int type, char increment);
-extern int mtrr_del (int reg, unsigned long base, unsigned long size);
-extern int mtrr_del_page (int reg, unsigned long base, unsigned long size);
-extern void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi);
-#  else
-static __inline__ int mtrr_add (unsigned long base, unsigned long size,
+#ifdef CONFIG_MTRR
+extern int mtrr_add (__u64 base, __u32 size, unsigned int type, char increment);
+extern int mtrr_add_page (__u64 base, __u32 size, unsigned int type, char increment);
+extern int mtrr_del (int reg, __u64 base, __u32 size);
+extern int mtrr_del_page (int reg, __u64 base, __u32 size);
+#else
+static __inline__ int mtrr_add (__u64 base, __u32 size,
 				unsigned int type, char increment)
 {
     return -ENODEV;
 }
-static __inline__ int mtrr_add_page (unsigned long base, unsigned long size,
+static __inline__ int mtrr_add_page (__u64 base, __u32 size,
 				unsigned int type, char increment)
 {
     return -ENODEV;
 }
-static __inline__ int mtrr_del (int reg, unsigned long base,
-				unsigned long size)
+static __inline__ int mtrr_del (int reg, __u64 base, __u32 size)
 {
     return -ENODEV;
 }
-static __inline__ int mtrr_del_page (int reg, unsigned long base,
-				unsigned long size)
+static __inline__ int mtrr_del_page (int reg, __u64 base, __u32 size)
 {
     return -ENODEV;
 }
-
-static __inline__ void mtrr_centaur_report_mcr(int mcr, u32 lo, u32 hi) {;}
-
-#  endif
+#endif
 
 /*  The following functions are for initialisation: don't use them!  */
 extern int mtrr_init (void);
-#  if defined(CONFIG_SMP) && defined(CONFIG_MTRR)
+#if defined(CONFIG_SMP) && defined(CONFIG_MTRR)
 extern void mtrr_init_boot_cpu (void);
 extern void mtrr_init_secondary_cpu (void);
-#  endif
+#endif
 
 #endif
 

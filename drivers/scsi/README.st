@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai M{kisara (email
 Kai.Makisara@metla.fi)
 
-Last modified: Tue Jan 22 21:08:57 2002 by makisara
+Last modified: Tue Jun 18 18:13:50 2002 by makisara
 
 
 BASICS
@@ -105,15 +105,19 @@ The default is BSD semantics.
 
 BUFFERING
 
-The driver uses tape buffers allocated either at system initialization
-or at run-time when needed. One buffer is used for each open tape
-device. The size of the buffers is selectable at compile and/or boot
-time. The buffers are used to store the data being transferred to/from
-the SCSI adapter. The following buffering options are selectable at
-compile time and/or at run time (via ioctl):
+The driver uses tape buffers allocated at run-time when needed and it
+is freed when the device file is closed. One buffer is used for each
+open tape device. 
 
-Buffering of data across write calls in fixed block mode (define
-ST_BUFFER_WRITES).
+The size of the buffers is always at least one tape block. In fixed
+block mode, the minimum buffer size is defined (in 1024 byte units) by
+ST_FIXED_BUFFER_BLOCKS. With small block size this allows buffering of
+several blocks and using one SCSI read or write to transfer all of the
+blocks. Buffering of data across write calls in fixed block mode is
+allowed if ST_BUFFER_WRITES is non-zero. Buffer allocation uses chunks of
+memory having sizes 2^n * (page size). Because of this the actual
+buffer size may be larger than the minimum allowable buffer size.
+
 
 Asynchronous writing. Writing the buffer contents to the tape is
 started and the write call returns immediately. The status is checked
@@ -127,30 +131,6 @@ Read ahead for fixed block mode (ST_READ_AHEAD). Filling the buffer is
 attempted even if the user does not want to get all of the data at
 this read command. Should be disabled for those drives that don't like
 a filemark to truncate a read request or that don't like backspacing.
-
-The buffer size is defined (in 1024 byte units) by ST_BUFFER_BLOCKS or
-at boot time. If this size is not large enough, the driver tries to
-temporarily enlarge the buffer. Buffer allocation uses chunks of
-memory having sizes 2^n * (page size). Because of this the actual
-buffer size may be larger than the buffer size specified with
-ST_BUFFER_BLOCKS.
-
-A small number of buffers are allocated at driver initialisation. The
-maximum number of these buffers is defined by ST_MAX_BUFFERS. The
-maximum can be changed with kernel or module startup options. One
-buffer is allocated for each drive detected when the driver is
-initialized up to the maximum.
-
-The driver tries to allocate new buffers at run-time if
-necessary. These buffers are freed after use. If the maximum number of
-initial buffers is set to zero, all buffer allocation is done at
-run-time. The advantage of run-time allocation is that memory is not
-wasted for buffers not being used. The disadvantage is that there may
-not be memory available at the time when a buffer is needed for the
-first time (once a buffer is allocated, it is not released). This risk
-should not be big if the tape drive is connected to a PCI adapter that
-supports scatter/gather (the allocation is not limited to "DMA memory"
-and the buffer can be composed of several fragments).
 
 The threshold for triggering asynchronous write in fixed block mode
 is defined by ST_WRITE_THRESHOLD. This may be optimized for each

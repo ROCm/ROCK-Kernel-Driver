@@ -82,47 +82,6 @@ extern unsigned long wall_jiffies;
  */
 #define MSR_USERCHANGE	(MSR_FE0 | MSR_FE1)
 
-/* In order to reduce some races, while at the same time doing additional
- * checking and hopefully speeding things up, we copy filenames to the
- * kernel data space before using them..
- *
- * POSIX.1 2.4: an empty pathname is invalid (ENOENT).
- */
-static inline int do_getname32(const char *filename, char *page)
-{
-	int retval;
-
-	/* 32bit pointer will be always far below TASK_SIZE :)) */
-	retval = strncpy_from_user((char *)page, (char *)filename, PAGE_SIZE);
-	if (retval > 0) {
-		if (retval < PAGE_SIZE)
-			return 0;
-		return -ENAMETOOLONG;
-	} else if (!retval)
-		retval = -ENOENT;
-	return retval;
-}
-
-char * getname32(const char *filename)
-{
-	char *tmp, *result;
-
-	result = ERR_PTR(-ENOMEM);
-  tmp =  __getname();
-	if (tmp)  {
-		int retval = do_getname32(filename, tmp);
-
-		result = tmp;
-		if (retval < 0) {
-			putname(tmp);
-			result = ERR_PTR(retval);
-		}
-	}
-	return result;
-}
-
-
-
 extern asmlinkage long sys_utime(char * filename, struct utimbuf * times);
 
 struct utimbuf32 {
@@ -142,7 +101,7 @@ asmlinkage long sys32_utime(char * filename, struct utimbuf32 *times)
 		return sys_utime(filename, NULL);
 	if (get_user(t.actime, &times->actime) || __get_user(t.modtime, &times->modtime))
 		return -EFAULT;
-	filenam = getname32(filename);
+	filenam = getname(filename);
 
 	ret = PTR_ERR(filenam);
 	if (!IS_ERR(filenam)) {
@@ -937,7 +896,7 @@ asmlinkage long sys32_statfs(const char * path, struct statfs32 *buf)
 	
 	PPCDBG(PPCDBG_SYS32X, "sys32_statfs - entered - pid=%ld current=%lx comm=%s\n", current->pid, current, current->comm);
 	
-	pth = getname32 (path);
+	pth = getname (path);
 	ret = PTR_ERR(pth);
 	if (!IS_ERR(pth)) {
 		set_fs (KERNEL_DS);

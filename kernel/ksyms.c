@@ -120,7 +120,7 @@ EXPORT_SYMBOL(vmtruncate);
 EXPORT_SYMBOL(find_vma);
 EXPORT_SYMBOL(get_unmapped_area);
 EXPORT_SYMBOL(init_mm);
-EXPORT_SYMBOL(create_bounce);
+EXPORT_SYMBOL(blk_queue_bounce);
 #ifdef CONFIG_HIGHMEM
 EXPORT_SYMBOL(kmap_high);
 EXPORT_SYMBOL(kunmap_high);
@@ -388,9 +388,7 @@ EXPORT_SYMBOL(add_timer);
 EXPORT_SYMBOL(del_timer);
 EXPORT_SYMBOL(request_irq);
 EXPORT_SYMBOL(free_irq);
-#if !defined(CONFIG_ARCH_S390)
-EXPORT_SYMBOL(irq_stat);	/* No separate irq_stat for s390, it is part of PSA */
-#endif
+EXPORT_SYMBOL(irq_stat);
 
 /* waitqueue handling */
 EXPORT_SYMBOL(add_wait_queue);
@@ -551,7 +549,7 @@ EXPORT_SYMBOL(file_fsync);
 EXPORT_SYMBOL(fsync_buffers_list);
 EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(init_special_inode);
-EXPORT_SYMBOL(__get_hash_table);
+EXPORT_SYMBOL(__find_get_block);
 EXPORT_SYMBOL(new_inode);
 EXPORT_SYMBOL(__insert_inode_hash);
 EXPORT_SYMBOL(remove_inode_hash);
@@ -559,7 +557,6 @@ EXPORT_SYMBOL(buffer_insert_list);
 EXPORT_SYMBOL(make_bad_inode);
 EXPORT_SYMBOL(is_bad_inode);
 EXPORT_SYMBOL(event);
-EXPORT_SYMBOL(brw_page);
 
 #ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);

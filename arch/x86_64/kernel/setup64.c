@@ -91,6 +91,9 @@ void pda_init(int cpu)
 	pda->me = pda;
 	pda->cpudata_offset = 0;
 
+	pda->active_mm = &init_mm;
+	pda->mmu_state = 0;
+	
 	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0)); 
 	wrmsrl(MSR_GS_BASE, cpu_pda + cpu);
 } 
