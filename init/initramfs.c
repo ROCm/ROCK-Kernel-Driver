@@ -248,7 +248,6 @@ static int __init do_name(void)
 		next_state = Reset;
 		return 0;
 	}
-	printk(KERN_INFO "-> %s\n", collected);
 	if (S_ISREG(mode)) {
 		if (maybe_link() >= 0) {
 			wfd = sys_open(collected, O_WRONLY|O_CREAT, mode);
