@@ -65,7 +65,7 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout);
  * This routine is used by the interrupt handler to schedule processing in
  * the software interrupt portion of the driver.
  */
-void uart_event(struct uart_port *port, int event)
+void uart_write_wakeup(struct uart_port *port)
 {
 	struct uart_info *info = port->info;
 
@@ -2453,7 +2453,7 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	up(&port_sem);
 }
 
-EXPORT_SYMBOL(uart_event);
+EXPORT_SYMBOL(uart_write_wakeup);
 EXPORT_SYMBOL(uart_register_driver);
 EXPORT_SYMBOL(uart_unregister_driver);
 EXPORT_SYMBOL(uart_register_port);

@@ -247,8 +247,6 @@ struct uart_info {
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS		256
 
-#define EVT_WRITE_WAKEUP	0
-
 struct module;
 struct tty_driver;
 
@@ -269,7 +267,7 @@ struct uart_driver {
 	struct tty_driver	*tty_driver;
 };
 
-void uart_event(struct uart_port *port, int event);
+void uart_write_wakeup(struct uart_port *port);
 struct uart_port *uart_get_console(struct uart_port *ports, int nr,
 				   struct console *c);
 void uart_parse_options(char *options, int *baud, int *parity, int *bits,
@@ -380,7 +378,7 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
 			if (status) {
 				tty->hw_stopped = 0;
 				port->ops->start_tx(port, 0);
-				uart_event(port, EVT_WRITE_WAKEUP);
+				uart_write_wakeup(port);
 			}
 		} else {
 			if (!status) {

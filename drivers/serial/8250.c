@@ -839,7 +839,7 @@ static _INLINE_ void transmit_chars(struct uart_8250_port *up)
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&up->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&up->port);
 
 	DEBUG_INTR("THRE...");
 

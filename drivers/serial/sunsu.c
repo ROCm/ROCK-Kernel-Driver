@@ -431,7 +431,7 @@ static _INLINE_ void transmit_chars(struct uart_sunsu_port *up)
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&up->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&up->port);
 
 	if (uart_circ_empty(xmit))
 		sunsu_stop_tx(&up->port, 0);

@@ -266,7 +266,7 @@ static void transmit_chars(struct uart_sunsab_port *up,
 	writeb(SAB82532_CMDR_XF, &up->regs->w.cmdr);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&up->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&up->port);
 
 	if (uart_circ_empty(xmit))
 		sunsab_stop_tx(&up->port, 0);

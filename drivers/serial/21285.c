@@ -171,7 +171,7 @@ static void serial21285_tx_chars(int irq, void *dev_id, struct pt_regs *regs)
 	} while (--count > 0 && !(*CSR_UARTFLG & 0x20));
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(port);
 
 	if (uart_circ_empty(xmit))
 		serial21285_stop_tx(port, 0);

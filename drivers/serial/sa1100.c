@@ -305,7 +305,7 @@ static void sa1100_tx_chars(struct sa1100_port *sport)
 	}
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-		uart_event(&sport->port, EVT_WRITE_WAKEUP);
+		uart_write_wakeup(&sport->port);
 
 	if (uart_circ_empty(xmit))
 		sa1100_stop_tx(&sport->port, 0);
