@@ -222,10 +222,10 @@ cmd_link_vmlinux = $(LD) $(LINKFLAGS) $(HEAD) $(INIT) \
 
 define rule_link_vmlinux
 	set -e
-	echo Generating build number
+	echo '  Generating build number'
 	. scripts/mkversion > .tmpversion
 	mv -f .tmpversion .version
-	$(MAKE) -C init
+	+$(MAKE) -C init
 	$(call cmd,cmd_link_vmlinux)
 	$(cmd_link_vmlinux)
 	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
@@ -243,14 +243,14 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): .hdepend prepare include/config/MARKER
+$(SUBDIRS): .hdepend prepare
 	@$(MAKE) -C $@
 
 #	Things we need done before we descend to build or make
 #	module versions are listed in "prepare"
 
 .PHONY: prepare
-prepare: include/linux/version.h include/asm
+prepare: include/linux/version.h include/asm include/config/MARKER
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -273,13 +273,13 @@ prepare: include/linux/version.h include/asm
 #	before switching between archs anyway.
 
 include/asm:
-	@echo 'Making asm->asm-$(ARCH) symlink'
+	@echo '  Making asm->asm-$(ARCH) symlink'
 	@ln -s asm-$(ARCH) $@
 
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	@echo 'Splitting include/linux/autoconf.h -> include/config'
+	@echo '  SPLIT  include/linux/autoconf.h -> include/config/*'
 	@scripts/split-include include/linux/autoconf.h include/config
 	@touch $@
 
@@ -306,7 +306,7 @@ include/linux/version.h: Makefile
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi;
-	@echo -n 'Generating $@'
+	@echo -n '  Generating $@'
 	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
@@ -349,11 +349,11 @@ ifdef CONFIG_MODVERSIONS
 include/linux/modversions.h: scripts/fixdep prepare FORCE
 	@rm -rf .tmp_export-objs
 	@$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS))
-	@echo -n 'Generating $@'
+	@echo -n '  Generating $@'
 	@( echo "#ifndef _LINUX_MODVERSIONS_H";\
 	   echo "#define _LINUX_MODVERSIONS_H"; \
 	   echo "#include <linux/modsetver.h>"; \
-	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print`; do \
+	   for f in `cd .tmp_export-objs; find modules -name \*.ver -print | sort`; do \
 	     echo "#include <linux/$${f}>"; \
 	   done; \
 	   echo "#endif"; \
@@ -574,9 +574,8 @@ make_with_config: .config
 
 #	files removed with 'make clean'
 CLEAN_FILES += \
-	kernel/ksyms.lst include/linux/compile.h \
+	include/linux/compile.h \
 	vmlinux System.map \
-	.tmp* \
 	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
@@ -616,9 +615,11 @@ MRPROPER_FILES += \
 	.hdepend scripts/split-include scripts/docproc \
 	scripts/fixdep $(TOPDIR)/include/linux/modversions.h \
 	tags TAGS kernel.spec \
+	.tmpversion
 
 # 	directories removed with 'make mrproper'
 MRPROPER_DIRS += \
+	.tmp_export-objs \
 	include/config \
 	$(TOPDIR)/include/linux/modules
 
@@ -631,7 +632,7 @@ clean:	archclean
 	@find . \( -name \*.[oas] -o -name core -o -name .\*.cmd -o \
 		   -name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
-	@rm -rf $(CLEAN_FILES)
+	@rm -f $(CLEAN_FILES)
 	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
