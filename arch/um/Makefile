@@ -4,7 +4,7 @@ OS := $(shell uname -s)
 include $(ARCH_DIR)/Makefile-$(SUBARCH)
 include $(ARCH_DIR)/Makefile-os-$(OS)
 
-EXTRAVERSION := $(EXTRAVERSION)-1um
+EXTRAVERSION := $(EXTRAVERSION)-2um
 include/linux/version.h: arch/$(ARCH)/Makefile
 
 # Recalculate MODLIB to reflect the EXTRAVERSION changes (via KERNELRELEASE)
