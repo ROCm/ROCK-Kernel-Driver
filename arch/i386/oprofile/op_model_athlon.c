@@ -104,10 +104,11 @@ static int athlon_check_ctrs(unsigned int const cpu,
 		if (CTR_OVERFLOWED(low)) {
 			oprofile_add_sample(eip, is_kernel, i, cpu);
 			CTR_WRITE(reset_value[i], msrs, i);
-			return 1;
 		}
 	}
-	return 0;
+
+	/* See op_model_ppro.c */
+	return 1;
 }
 
  
