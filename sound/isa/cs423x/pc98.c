@@ -400,7 +400,7 @@ static int __init snd_card_pc98_probe(int dev)
 		chip->port,
 		irq[dev],
 		dma1[dev]);
-	if (dma1[dev] >= 0)
+	if (dma2[dev] >= 0)
 		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
