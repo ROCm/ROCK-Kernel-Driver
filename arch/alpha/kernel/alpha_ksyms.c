@@ -40,7 +40,6 @@
 
 extern struct hwrpb_struct *hwrpb;
 extern void dump_thread(struct pt_regs *, struct user *);
-extern int dump_fpu(struct pt_regs *, elf_fpregset_t *);
 extern spinlock_t rtc_lock;
 
 /* these are C runtime functions with special calling conventions: */
@@ -144,7 +143,9 @@ EXPORT_SYMBOL(pci_dac_dma_to_offset);
 #endif
 
 EXPORT_SYMBOL(dump_thread);
-EXPORT_SYMBOL(dump_fpu);
+EXPORT_SYMBOL(dump_elf_thread);
+EXPORT_SYMBOL(dump_elf_task);
+EXPORT_SYMBOL(dump_elf_task_fp);
 EXPORT_SYMBOL(hwrpb);
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(alpha_read_fp_reg);

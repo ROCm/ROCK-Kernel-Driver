@@ -43,6 +43,9 @@ static inline int node_to_cpumask(int node)
 # define node_to_memblk(node)		(node)
 # define memblk_to_node(memblk)	(memblk)
 
+/* Cross-node load balancing interval. */
+# define NODE_BALANCE_RATE 10
+
 #else /* CONFIG_NUMA */
 # include <asm-generic/topology.h>
 #endif /* !CONFIG_NUMA */
