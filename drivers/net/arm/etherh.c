@@ -551,14 +551,14 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	etherh_banner();
 
-	dev = init_etherdev(NULL, sizeof(struct etherh_priv));
+	dev = alloc_etherdev(sizeof(struct etherh_priv));
 	if (!dev) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
 	/*
-	 * init_etherdev allocs and zeros dev->priv
+	 * alloc_etherdev allocs and zeros dev->priv
 	 */
 	eh = dev->priv;
 
@@ -694,17 +694,19 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	etherh_reset(dev);
 	NS8390_init(dev, 0);
 
+	ret = register_netdev(dev);
+	if (ret)
+		goto release;
+
 	ecard_set_drvdata(ec, dev);
 
 	return 0;
 
-release:
+ release:
 	release_region(dev->base_addr, 16);
-free:
-	unregister_netdev(dev);
-	kfree(dev->priv);
+ free:
 	kfree(dev);
-out:
+ out:
 	return ret;
 }
 

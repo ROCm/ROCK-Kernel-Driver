@@ -94,7 +94,7 @@ static char *version = DRV_NAME ".c " DRV_VERSION " 2002/03/23";
 static void fmvj18x_config(dev_link_t *link);
 static int fmvj18x_get_hwinfo(dev_link_t *link, u_char *node_id);
 static int fmvj18x_setup_mfc(dev_link_t *link);
-static void fmvj18x_release(u_long arg);
+static void fmvj18x_release(dev_link_t *link);
 static int fmvj18x_event(event_t event, int priority,
 			  event_callback_args_t *args);
 static dev_link_t *fmvj18x_attach(void);
@@ -279,10 +279,6 @@ static dev_link_t *fmvj18x_attach(void)
     link = &lp->link;
     link->priv = dev;
 
-    init_timer(&link->release);
-    link->release.function = &fmvj18x_release;
-    link->release.data = (u_long)link;
-
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 32;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
@@ -355,9 +351,8 @@ static void fmvj18x_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	fmvj18x_release((u_long)link);
+	fmvj18x_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -638,7 +633,7 @@ cs_failed:
     /* All Card Services errors end up here */
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    fmvj18x_release((u_long)link);
+    fmvj18x_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
 
 } /* fmvj18x_config */
@@ -742,9 +737,8 @@ static int fmvj18x_setup_mfc(dev_link_t *link)
 }
 /*====================================================================*/
 
-static void fmvj18x_release(u_long arg)
+static void fmvj18x_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
 
     DEBUG(0, "fmvj18x_release(0x%p)\n", link);
 
@@ -784,7 +778,7 @@ static int fmvj18x_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    fmvj18x_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -1306,7 +1300,7 @@ static int fjn_close(struct net_device *dev)
 
     link->open--;
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	    fmvj18x_release(link);
 
     return 0;
 } /* fjn_close */

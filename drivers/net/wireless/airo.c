@@ -299,6 +299,7 @@ static int do8bitIO = 0;
 #define CMD_DEALLOCATETX 0x000c
 #define NOP		0x0010
 #define CMD_WORKAROUND	0x0011
+#define CMD_ALLOCATEAUX 0x0020
 #define CMD_ACCESS	0x0021
 #define CMD_PCIBAP	0x0022
 #define CMD_PCIAUX	0x0023
@@ -403,6 +404,7 @@ static int do8bitIO = 0;
 #define EV_ALLOC 0x08
 #define EV_LINK 0x80
 #define EV_AWAKE 0x100
+#define EV_TXCPY 0x400
 #define EV_UNKNOWN 0x800
 #define EV_MIC 0x1000 /* Message Integrity Check Interrupt */
 #define STATUS_INTS ( EV_AWAKE | EV_LINK | EV_TXEXC | EV_TX | EV_RX | EV_MIC )
@@ -633,7 +635,7 @@ typedef struct {
 	u16 SSIDlen;
 	char SSID[32];
 	char apName[16];
-	char bssid[4][ETH_ALEN];
+	u8 bssid[4][ETH_ALEN];
 	u16 beaconPeriod;
 	u16 dimPeriod;
 	u16 atimDuration;
@@ -1041,11 +1043,15 @@ struct airo_info {
 	struct iw_statistics	wstats;		// wireless stats
 	unsigned long		scan_timestamp;	/* Time started to scan */
 	struct work_struct	event_task;
+#if WIRELESS_EXT > 15
+	struct iw_spy_data	spy_data;
+#else /* WIRELESS_EXT > 15 */
 #ifdef WIRELESS_SPY
 	int			spy_number;
 	u_char			spy_address[IW_MAX_SPY][ETH_ALEN];
 	struct iw_quality	spy_stat[IW_MAX_SPY];
 #endif /* WIRELESS_SPY */
+#endif /* WIRELESS_EXT > 15 */
 #endif /* WIRELESS_EXT */
 	/* MIC stuff */
 	mic_module		mod[2];
@@ -1197,12 +1203,12 @@ static int writeConfigRid(struct airo_info*ai, int lock) {
 
 	ai->need_commit = 0;
 	checkThrottle(ai);
+	cfgr = ai->config;
+
 	if ((cfgr.opmode & 0xFF) == MODE_STA_IBSS)
 		ai->flags |= FLAG_ADHOC;
 	else
 		ai->flags &= ~FLAG_ADHOC;
-
-	cfgr = ai->config;
 
 	for(s = &cfgr.len; s <= &cfgr.rtsThres; s++) *s = cpu_to_le16(*s);
 
@@ -1602,13 +1608,10 @@ static void del_airo_dev( struct net_device *dev );
 void stop_airo_card( struct net_device *dev, int freeres )
 {
 	struct airo_info *ai = dev->priv;
-	flush_scheduled_work();
 	disable_interrupts(ai);
 	free_irq( dev->irq, dev );
-	if (ai->flash)
-		kfree(ai->flash);
-	if (ai->rssi)
-		kfree(ai->rssi);
+	if (auto_wep)
+		del_timer_sync(&ai->timer);
 	takedown_proc_entry( dev, ai );
 	if (ai->registered) {
 		unregister_netdev( dev );
@@ -1619,7 +1622,11 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		}
 		ai->registered = 0;
 	}
-	if (auto_wep) del_timer_sync(&ai->timer);
+	flush_scheduled_work();
+	if (ai->flash)
+		kfree(ai->flash);
+	if (ai->rssi)
+		kfree(ai->rssi);
 	if (freeres) {
 		/* PCMCIA frees this stuff, so only for PCI and ISA */
 	        release_region( dev->base_addr, 64 );
@@ -2111,7 +2118,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				}
 			}
 			if (len) {
-#if 0 && WIRELESS_EXT > 15
+#if WIRELESS_EXT > 15
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
 				if (apriv->spy_data.spy_number > 0) {
 					char *sa;
@@ -2383,7 +2390,7 @@ static u16 setup_card(struct airo_info *ai, u8 *mac)
 		ai->config.opmode = adhoc ? MODE_STA_IBSS : MODE_STA_ESS;
 
 #ifdef MICSUPPORT
-		if ((cap_rid.len==sizeof(cap_rid)) && (cap_rid.extSoftCap&1)) {
+		if ((cap_rid.len>=sizeof(cap_rid)) && (cap_rid.extSoftCap&1)) {
 			ai->config.opmode |= MODE_MIC;
 			ai->flags |= FLAG_MIC_CAPABLE;
 			micsetup(ai);
@@ -5190,7 +5197,7 @@ static int airo_get_aplist(struct net_device *dev,
 			      & status_rid.bssid[i][2]
 			      & status_rid.bssid[i][3]
 			      & status_rid.bssid[i][4]
-			      & status_rid.bssid[i][5])!=-1 &&
+			      & status_rid.bssid[i][5])!=0xff &&
 			     (status_rid.bssid[i][0]
 			      | status_rid.bssid[i][1]
 			      | status_rid.bssid[i][2]
@@ -5284,7 +5291,7 @@ static inline char *airo_translate_scan(struct net_device *dev,
 	capabilities = le16_to_cpu(list->cap);
 	if(capabilities & (CAP_ESS | CAP_IBSS)) {
 		if(capabilities & CAP_ESS)
-			iwe.u.mode = IW_MODE_INFRA;
+			iwe.u.mode = IW_MODE_MASTER;
 		else
 			iwe.u.mode = IW_MODE_ADHOC;
 		current_ev = iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_UINT_LEN);
