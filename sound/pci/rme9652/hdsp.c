@@ -635,6 +635,7 @@ static inline int hdsp_playback_to_output_key (hdsp_t *hdsp, int in, int out)
 	case 0xa:
 		return (64 * out) + (32 + (in));
 	case 0x96:
+	case 0x97:
 		return (32 * out) + (16 + (in));
 	default:
 		return (52 * out) + (26 + (in));
@@ -647,6 +648,7 @@ static inline int hdsp_input_to_output_key (hdsp_t *hdsp, int in, int out)
 	case 0xa:
 		return (64 * out) + in;
 	case 0x96:
+	case 0x97:
 		return (32 * out) + in;
 	default:
 		return (52 * out) + in;
@@ -5019,6 +5021,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 		is_9652 = 1;
 		break;
 	case 0x96:
+	case 0x97:
 		hdsp->card_name = "RME HDSP 9632";
 		hdsp->max_channels = 16;
 		is_9632 = 1;
