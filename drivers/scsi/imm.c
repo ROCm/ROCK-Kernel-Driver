@@ -41,7 +41,8 @@ typedef struct {
 	unsigned failed:1;	/* Failure flag                 */
 	unsigned dp:1;		/* Data phase present           */
 	unsigned rd:1;		/* Read data in data phase      */
-	unsigned p_busy:1;	/* Parport sharing busy flag    */
+	unsigned wanted:1;	/* Parport sharing busy flag    */
+	wait_queue_head_t *waiting;
 } imm_struct;
 
 static void imm_reset_pulse(unsigned int base);
@@ -62,33 +63,55 @@ static inline imm_struct *imm_dev(struct Scsi_Host *host)
 	return &imm_hosts[host->unique_id];
 }
 
+static spinlock_t arbitration_lock = SPIN_LOCK_UNLOCKED;
+
+static void got_it(imm_struct *dev)
+{
+	dev->base = dev->dev->port->base;
+	if (dev->cur_cmd)
+		dev->cur_cmd->SCp.phase = 1;
+	else
+		wake_up(dev->waiting);
+}
+
 static void imm_wakeup(void *ref)
 {
 	imm_struct *dev = (imm_struct *) ref;
+	unsigned long flags;
 
-	if (!dev->p_busy)
-		return;
-
-	if (parport_claim(dev->dev)) {
-		printk("imm: bug in imm_wakeup\n");
-		return;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	if (dev->wanted) {
+		parport_claim(dev->dev);
+		got_it(dev);
+		dev->wanted = 0;
 	}
-	dev->p_busy = 0;
-	dev->base = dev->dev->port->base;
-	if (dev->cur_cmd)
-		dev->cur_cmd->SCp.phase++;
-	return;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
 }
 
 static int imm_pb_claim(imm_struct *dev)
 {
-	if (parport_claim(dev->dev)) {
-		dev->p_busy = 1;
-		return 1;
+	unsigned long flags;
+	int res = 1;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	if (parport_claim(dev->dev) == 0) {
+		got_it(dev);
+		res = 0;
 	}
-	if (dev->cur_cmd)
-		dev->cur_cmd->SCp.phase++;
-	return 0;
+	dev->wanted = res;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
+	return res;
+}
+
+static void imm_pb_dismiss(imm_struct *dev)
+{
+	unsigned long flags;
+	int wanted;
+	spin_lock_irqsave(&arbitration_lock, flags);
+	wanted = dev->wanted;
+	dev->wanted = 0;
+	spin_unlock_irqrestore(&arbitration_lock, flags);
+	if (!wanted)
+		parport_release(dev->dev);
 }
 
 static inline void imm_pb_release(imm_struct *dev)
@@ -105,10 +128,13 @@ static Scsi_Host_Template imm_template;
 static int imm_probe(imm_struct *dev, struct parport *pb)
 {
 	struct Scsi_Host *host;
+	DECLARE_WAIT_QUEUE_HEAD(waiting);
+	DEFINE_WAIT(wait);
 	int ports;
 	int modes, ppb;
 	int err;
 
+	init_waitqueue_head(&waiting);
 	dev->dev = parport_register_device(pb, "imm", NULL, imm_wakeup,
 						NULL, 0, dev);
 
@@ -119,19 +145,21 @@ static int imm_probe(imm_struct *dev, struct parport *pb)
 	 * registers. [ CTR and ECP ]
 	 */
 	err = -EBUSY;
-	if (imm_pb_claim(dev)) {
-		unsigned long now = jiffies;
-		while (dev->p_busy) {
-			schedule();	/* We are safe to schedule here */
-			if (time_after(jiffies, now + 3 * HZ)) {
-				printk(KERN_ERR
-				       "imm%d: failed to claim parport because a "
-				       "pardevice is owning the port for too longtime!\n",
-				       dev - imm_hosts);
-				goto out;
-			}
-		}
+	dev->waiting = &waiting;
+	prepare_to_wait(&waiting, &wait, TASK_UNINTERRUPTIBLE);
+	if (imm_pb_claim(dev))
+		schedule_timeout(3 * HZ);
+	if (dev->wanted) {
+		printk(KERN_ERR "imm%d: failed to claim parport because "
+			"a pardevice is owning the port for too long "
+			"time!\n", dev - imm_hosts);
+		imm_pb_dismiss(dev);
+		dev->waiting = NULL;
+		finish_wait(&waiting, &wait);
+		goto out;
 	}
+	dev->waiting = NULL;
+	finish_wait(&waiting, &wait);
 	ppb = dev->base = dev->dev->port->base;
 	dev->base_hi = dev->dev->port->base_hi;
 	w_ctr(ppb, 0x0c);
@@ -867,8 +895,8 @@ static void imm_interrupt(void *data)
 
 	if (cmd->SCp.phase > 1)
 		imm_disconnect(dev);
-	if (cmd->SCp.phase > 0)
-		imm_pb_release(dev);
+
+	imm_pb_dismiss(dev);
 
 	spin_lock_irqsave(host->host_lock, flags);
 	dev->cur_cmd = 0;
@@ -891,7 +919,7 @@ static int imm_engine(imm_struct *dev, Scsi_Cmnd *cmd)
 
 	switch (cmd->SCp.phase) {
 	case 0:		/* Phase 0 - Waiting for parport */
-		if ((jiffies - dev->jstart) > HZ) {
+		if (time_after(jiffies, dev->jstart + HZ)) {
 			/*
 			 * We waited more than a second
 			 * for parport to call us
@@ -1033,10 +1061,10 @@ static int imm_queuecommand(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	cmd->result = DID_ERROR << 16;	/* default return code */
 	cmd->SCp.phase = 0;	/* bus free */
 
-	imm_pb_claim(dev);
-
 	INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
 	schedule_work(&dev->imm_tq);
+
+	imm_pb_claim(dev);
 
 	return 0;
 }
