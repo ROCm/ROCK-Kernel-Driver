@@ -295,6 +295,13 @@ static struct cpufreq_driver speedstep_driver = {
  */
 static int __init speedstep_init(void)
 {
+    struct cpuinfo_x86 *c = cpu_data;
+
+    if (c->x86_vendor != X86_VENDOR_INTEL) {
+		printk (KERN_INFO "speedstep-smi: No Intel CPU detected.\n");
+		return -ENODEV;
+	}
+
 	dprintk("speedstep-smi: signature:0%.8lx, command:0lx%.8lx, event:0x%.8lx, perf_level:0x%.8lx.\n", 
 		ist_info.signature, ist_info.command, ist_info.event, ist_info.perf_level);
 
