@@ -82,7 +82,7 @@ struct usb_kbd {
 	dma_addr_t leds_dma;
 };
 
-static void usb_kbd_irq(struct urb *urb)
+static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_kbd *kbd = urb->context;
 	int i;
@@ -156,7 +156,7 @@ int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, i
 	return 0;
 }
 
-static void usb_kbd_led(struct urb *urb)
+static void usb_kbd_led(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_kbd *kbd = urb->context;
 

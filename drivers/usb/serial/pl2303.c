@@ -73,6 +73,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(ELCOM_VENDOR_ID, ELCOM_PRODUCT_ID) },
 	{ USB_DEVICE(ITEGNO_VENDOR_ID, ITEGNO_PRODUCT_ID) },
 	{ USB_DEVICE(MA620_VENDOR_ID, MA620_PRODUCT_ID) },
+	{ USB_DEVICE(RATOC_VENDOR_ID, RATOC_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -114,9 +115,9 @@ static void pl2303_set_termios (struct usb_serial_port *port,
 				struct termios *old);
 static int pl2303_ioctl (struct usb_serial_port *port, struct file *file,
 			 unsigned int cmd, unsigned long arg);
-static void pl2303_read_int_callback (struct urb *urb);
-static void pl2303_read_bulk_callback (struct urb *urb);
-static void pl2303_write_bulk_callback (struct urb *urb);
+static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs);
+static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
+static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static int pl2303_write (struct usb_serial_port *port, int from_user,
 			 const unsigned char *buf, int count);
 static void pl2303_break_ctl(struct usb_serial_port *port,int break_state);
@@ -587,7 +588,7 @@ static void pl2303_shutdown (struct usb_serial *serial)
 }
 
 
-static void pl2303_read_int_callback (struct urb *urb)
+static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
@@ -625,7 +626,7 @@ exit:
 }
 
 
-static void pl2303_read_bulk_callback (struct urb *urb)
+static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
@@ -690,7 +691,7 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 
 
 
-static void pl2303_write_bulk_callback (struct urb *urb)
+static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	int result;

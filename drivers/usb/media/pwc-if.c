@@ -598,7 +598,7 @@ static int pwc_set_palette(struct pwc_device *pdev, int pal)
 /* This gets called for the Isochronous pipe (video). This is done in
  * interrupt time, so it has to be fast, not crash, and not stall. Neat.
  */
-static void pwc_isoc_handler(struct urb *urb)
+static void pwc_isoc_handler(struct urb *urb, struct pt_regs *regs)
 {
 	struct pwc_device *pdev;
 	int i, fst, flen;

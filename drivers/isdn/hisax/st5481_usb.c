@@ -123,7 +123,7 @@ void st5481_ph_command(struct st5481_adapter *adapter, unsigned int command)
  * Call the user provided completion routine and try
  * to send the next request.
  */
-static void usb_ctrl_complete(struct urb *urb)
+static void usb_ctrl_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct st5481_adapter *adapter = urb->context;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
@@ -176,7 +176,7 @@ static void usb_ctrl_complete(struct urb *urb)
  * Decode the register values and schedule a private event.
  * Called at interrupt.
  */
-static void usb_int_complete(struct urb *urb)
+static void usb_int_complete(struct urb *urb, struct pt_regs *regs)
 {
 	u_char *data = urb->transfer_buffer;
 	u_char irqbyte;

@@ -570,7 +570,7 @@ struct udsl_cb {
 	struct atm_vcc *vcc;
 };
 
-static void udsl_usb_send_data_complete (struct urb *urb)
+static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct udsl_usb_send_data_context *ctx = (struct udsl_usb_send_data_context *) urb->context;
 	struct udsl_instance_data *instance = ctx->instance;
@@ -596,7 +596,7 @@ static void udsl_usb_send_data_complete (struct urb *urb)
 		       instance->usb_dev,
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
 		       (unsigned char *) ctx->skb->data,
-		       ctx->skb->len, (usb_complete_t) udsl_usb_send_data_complete, ctx);
+		       ctx->skb->len, udsl_usb_send_data_complete, ctx);
 
 	err = usb_submit_urb (urb, GFP_KERNEL);
 
@@ -678,7 +678,7 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 		       usb_sndbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_OUT),
 		       (unsigned char *) skb->data,
 		       skb->len,
-		       (usb_complete_t) udsl_usb_send_data_complete, &(instance->send_ctx[i])
+		       udsl_usb_send_data_complete, &(instance->send_ctx[i])
 	    );
 
 	err = usb_submit_urb (urb, GFP_KERNEL);
@@ -691,7 +691,7 @@ int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_vcc *vcc
 }
 
 /********* receive *******/
-void udsl_usb_data_receive (struct urb *urb)
+void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 {
 	struct udsl_data_ctx *ctx;
 	struct udsl_instance_data *instance;
@@ -746,7 +746,7 @@ void udsl_usb_data_receive (struct urb *urb)
 		       instance->usb_dev,
 		       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 		       (unsigned char *) ctx->skb->data,
-		       UDSL_RECEIVE_BUFFER_SIZE, (usb_complete_t) udsl_usb_data_receive, ctx);
+		       UDSL_RECEIVE_BUFFER_SIZE, udsl_usb_data_receive, ctx);
 	usb_submit_urb (urb, GFP_KERNEL);
 	return;
 };
@@ -795,7 +795,7 @@ int udsl_usb_data_init (struct udsl_instance_data *instance)
 			       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 			       (unsigned char *) ctx->skb->data,
 			       UDSL_RECEIVE_BUFFER_SIZE,
-			       (usb_complete_t) udsl_usb_data_receive, ctx);
+			       udsl_usb_data_receive, ctx);
 
 
 		ctx->instance = instance;

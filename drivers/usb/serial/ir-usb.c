@@ -111,8 +111,8 @@ static int  ir_startup (struct usb_serial *serial);
 static int  ir_open (struct usb_serial_port *port, struct file *filep);
 static void ir_close (struct usb_serial_port *port, struct file *filep);
 static int  ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
-static void ir_write_bulk_callback (struct urb *urb);
-static void ir_read_bulk_callback (struct urb *urb);
+static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
+static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void ir_set_termios (struct usb_serial_port *port, struct termios *old_termios);
 
 static u8 ir_baud = 0;
@@ -406,7 +406,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 	return result;
 }
 
-static void ir_write_bulk_callback (struct urb *urb)
+static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
@@ -429,7 +429,7 @@ static void ir_write_bulk_callback (struct urb *urb)
 	schedule_work(&port->work);
 }
 
-static void ir_read_bulk_callback (struct urb *urb)
+static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
