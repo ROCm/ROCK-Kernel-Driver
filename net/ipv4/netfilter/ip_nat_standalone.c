@@ -124,7 +124,16 @@ ip_nat_fn(unsigned int hooknum,
 		WRITE_LOCK(&ip_nat_lock);
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
-		if (!(info->initialized & (1 << maniptype))) {
+		if (!(info->initialized & (1 << maniptype))
+#ifndef CONFIG_IP_NF_NAT_LOCAL
+		    /* If this session has already been confirmed we must not
+		     * touch it again even if there is no mapping set up.
+		     * Can only happen on local->local traffic with
+		     * CONFIG_IP_NF_NAT_LOCAL disabled.
+		     */
+		    && !(ct->status & IPS_CONFIRMED)
+#endif
+		    ) {
 			unsigned int ret;
 
 			if (ct->master
