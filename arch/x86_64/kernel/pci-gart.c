@@ -195,6 +195,10 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	   uses the normal dma_mask for alloc_consistent. */
 	dma_mask &= hwdev->dma_mask;
 
+#if 1 /* workaround for bug for now */
+	dma_mask &= 0xffffffff;
+#endif
+
 	memory = (void *)__get_free_pages(gfp, get_order(size));
 	if (memory == NULL) {
 		return NULL; 
