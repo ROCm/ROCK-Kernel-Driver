@@ -53,7 +53,6 @@
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
-#include <linux/dma-mapping.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -64,7 +63,6 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
-#include <linux/rtnetlink.h>
 #include <linux/reboot.h>
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
