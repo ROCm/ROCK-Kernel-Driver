@@ -739,8 +739,8 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
  * to poll for transfers.  After the URB has been submitted, the interval
  * field reflects how the transfer was actually scheduled.
  * The polling interval may be more frequent than requested.
- * For example, some controllers have a maximum interval of 32 microseconds,
- * while others support intervals of up to 1024 microseconds.
+ * For example, some controllers have a maximum interval of 32 milliseconds,
+ * while others support intervals of up to 1024 milliseconds.
  * Isochronous URBs also have transfer intervals.  (Note that for isochronous
  * endpoints, as well as high speed interrupt endpoints, the encoding of
  * the transfer interval in the endpoint descriptor is logarithmic.
