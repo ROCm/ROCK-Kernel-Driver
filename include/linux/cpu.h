@@ -29,6 +29,7 @@ struct cpu {
 };
 
 extern int register_cpu(struct cpu *, int, struct node *);
+extern struct class cpu_class;
 
 /* Stop CPUs going up and down. */
 extern struct semaphore cpucontrol;
