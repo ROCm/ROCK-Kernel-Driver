@@ -691,7 +691,7 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 			break;
 		case NFS4_CREATE_EXCLUSIVE:
 			READ_BUF(8);
-			COPYMEM(open->op_verf, 8);
+			COPYMEM(open->op_verf.data, 8);
 			break;
 		default:
 			goto xdr_error;
@@ -798,7 +798,7 @@ nfsd4_decode_readdir(struct nfsd4_compoundargs *argp, struct nfsd4_readdir *read
 
 	READ_BUF(24);
 	READ64(readdir->rd_cookie);
-	COPYMEM(readdir->rd_verf, sizeof(nfs4_verifier));
+	COPYMEM(readdir->rd_verf.data, sizeof(readdir->rd_verf.data));
 	READ32(readdir->rd_dircount);    /* just in case you needed a useless field... */
 	READ32(readdir->rd_maxcount);
 	if ((status = nfsd4_decode_bitmap(argp, readdir->rd_bmval)))
@@ -873,7 +873,7 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 	DECODE_HEAD;
 
 	READ_BUF(12);
-	COPYMEM(setclientid->se_verf, 8);
+	COPYMEM(setclientid->se_verf.data, 8);
 	READ32(setclientid->se_namelen);
 
 	READ_BUF(setclientid->se_namelen + 8);
@@ -1740,7 +1740,7 @@ nfsd4_encode_commit(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_com
 
 	if (!nfserr) {
 		RESERVE_SPACE(8);
-		WRITEMEM(commit->co_verf, 8);
+		WRITEMEM(commit->co_verf.data, 8);
 		ADJUST_ARGS();
 	}
 }
@@ -2224,7 +2224,7 @@ nfsd4_encode_write(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_writ
 		RESERVE_SPACE(16);
 		WRITE32(write->wr_bytes_written);
 		WRITE32(write->wr_how_written);
-		WRITEMEM(write->wr_verifier, 8);
+		WRITEMEM(write->wr_verifier.data, 8);
 		ADJUST_ARGS();
 	}
 }

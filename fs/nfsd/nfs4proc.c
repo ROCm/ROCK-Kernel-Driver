@@ -78,7 +78,7 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 		status = nfsd_create_v3(rqstp, current_fh, open->op_fname.data,
 					open->op_fname.len, &open->op_iattr,
 					&resfh, open->op_createmode,
-					(u32 *)open->op_verf, &open->op_truncate);
+					(u32 *)open->op_verf.data, &open->op_truncate);
 	}
 	else {
 		status = nfsd_lookup(rqstp, current_fh,
@@ -204,7 +204,7 @@ nfsd4_access(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_acc
 static inline int
 nfsd4_commit(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_commit *commit)
 {
-	u32 *p = (u32 *)commit->co_verf;
+	u32 *p = (u32 *)commit->co_verf.data;
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
@@ -522,7 +522,7 @@ zero_stateid:
 	nfs4_unlock_state();
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
-	p = (u32 *)write->wr_verifier;
+	p = (u32 *)write->wr_verifier.data;
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 

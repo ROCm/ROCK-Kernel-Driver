@@ -46,11 +46,12 @@
 
 static spinlock_t		state_spinlock = SPIN_LOCK_UNLOCKED;
 
-nfs4_stateid zero_stateid =
-	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+nfs4_stateid zero_stateid;
 
+#if 0
 nfs4_stateid one_stateid =
 	{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+#endif
 
 static LIST_HEAD(nfs4_clientid_list);
 
@@ -228,7 +229,7 @@ nfs4_alloc_open_state(void)
 		return NULL;
 	state->pid = current->pid;
 	state->state = 0;
-	memset(state->stateid, 0, sizeof(state->stateid));
+	memset(state->stateid.data, 0, sizeof(state->stateid.data));
 	atomic_set(&state->count, 1);
 	return state;
 }

@@ -54,8 +54,7 @@
 extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo nfs4_procedures[];
 
-static nfs4_stateid zero_stateid =
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+extern nfs4_stateid zero_stateid;
 
 static spinlock_t renew_lock = SPIN_LOCK_UNLOCKED;
 
@@ -336,7 +335,7 @@ nfs4_setup_readdir(struct nfs4_compound *cp, u64 cookie, u32 *verifier,
 
 	BUG_ON(bufsize < 80);
 	readdir->rd_cookie = (cookie > 2) ? cookie : 0;
-	memcpy(readdir->rd_req_verifier, verifier, sizeof(nfs4_verifier));
+	memcpy(&readdir->rd_req_verifier, verifier, sizeof(readdir->rd_req_verifier));
 	readdir->rd_count = bufsize;
 	readdir->rd_bmval[0] = FATTR4_WORD0_FILEID;
 	readdir->rd_bmval[1] = 0;
@@ -464,7 +463,7 @@ nfs4_setup_setclientid(struct nfs4_compound *cp, u32 program, unsigned short por
 	u32 *p;
 
 	tv = CURRENT_TIME;
- 	p = (u32 *)setclientid->sc_verifier;
+ 	p = (u32 *)setclientid->sc_verifier.data;
 	*p++ = tv.tv_sec;
 	*p++ = tv.tv_nsec;
 	setclientid->sc_name = server->ip_addr;
@@ -606,7 +605,7 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 		goto out;
 	}
 	if (o_arg.createmode & NFS4_CREATE_EXCLUSIVE){
-		u32 *p = (u32 *) o_arg.u.verifier;
+		u32 *p = (u32 *) o_arg.u.verifier.data;
 		p[0] = jiffies;
 		p[1] = current->pid;
 	} else if (o_arg.createmode == NFS4_CREATE_UNCHECKED) {
@@ -648,14 +647,14 @@ nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *satt
 			.rpc_cred	= cred,
 		};
 
-		memcpy(oc_arg.stateid, o_res.stateid, sizeof(nfs4_stateid));
+		memcpy(&oc_arg.stateid, &o_res.stateid, sizeof(oc_arg.stateid));
 		status = rpc_call_sync(server->client, &msg, 0);
 		if (status)
 			goto out_up;
 		nfs4_increment_seqid(status, sp);
-		memcpy(state->stateid, oc_res.stateid, sizeof(state->stateid));
+		memcpy(&state->stateid, &oc_res.stateid, sizeof(state->stateid));
 	} else
-		memcpy(state->stateid, o_res.stateid, sizeof(state->stateid));
+		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
 	state->state |= flags & (FMODE_READ|FMODE_WRITE);
 	state->pid = current->pid;
 
@@ -703,9 +702,9 @@ nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
         fattr->valid = 0;
 
 	if (state)
-		memcpy(arg.stateid, state->stateid, sizeof(arg.stateid));
+		memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
         else
-		memcpy(arg.stateid, zero_stateid, sizeof(arg.stateid));
+		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
 
         return(rpc_call_sync(server->client, &msg, 0));
 }
@@ -738,7 +737,7 @@ nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 		.rpc_resp	= &res,
 	};
 
-	memcpy(arg.stateid, state->stateid, sizeof(arg.stateid));
+	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
 	/* Serialization for the sequence id */
 	arg.seqid = sp->so_seqid,
 	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
@@ -1034,7 +1033,6 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	int flags = rdata->flags;
 	struct inode *inode = rdata->inode;
 	struct nfs_fattr *fattr = rdata->res.fattr;
-	nfs4_stateid *stateid = &rdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_READ],
@@ -1054,9 +1052,9 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		memcpy(stateid, state->stateid, sizeof(stateid));
+		memcpy(&rdata->args.stateid, &state->stateid, sizeof(rdata->args.stateid));
 	} else
-		memcpy(stateid, zero_stateid, sizeof(stateid));
+		memcpy(&rdata->args.stateid, &zero_stateid, sizeof(rdata->args.stateid));
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
@@ -1076,7 +1074,6 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	int rpcflags = wdata->flags;
 	struct inode *inode = wdata->inode;
 	struct nfs_fattr *fattr = wdata->res.fattr;
-	nfs4_stateid *stateid = &wdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
@@ -1095,9 +1092,9 @@ nfs4_proc_write(struct nfs_write_data *wdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		memcpy(stateid, state->stateid, sizeof(stateid));
+		memcpy(&wdata->args.stateid, &state->stateid, sizeof(wdata->args.stateid));
 	} else
-		memcpy(stateid, zero_stateid, sizeof(stateid));
+		memcpy(&wdata->args.stateid, &zero_stateid, sizeof(wdata->args.stateid));
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, rpcflags);
@@ -1476,9 +1473,9 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	data->timestamp   = jiffies;
 
 	if (req->wb_state)
-		memcpy(data->args.stateid, req->wb_state->stateid, sizeof(data->args.stateid));
+		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
 	else
-		memcpy(data->args.stateid, zero_stateid, sizeof(data->args.stateid));
+		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
@@ -1555,9 +1552,9 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	data->timestamp   = jiffies;
 
 	if (req->wb_state)
-		memcpy(data->args.stateid, req->wb_state->stateid, sizeof(data->args.stateid));
+		memcpy(&data->args.stateid, &req->wb_state->stateid, sizeof(data->args.stateid));
 	else
-		memcpy(data->args.stateid, zero_stateid, sizeof(data->args.stateid));
+		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
