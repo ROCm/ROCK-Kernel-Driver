@@ -491,7 +491,7 @@ snd_seq_oss_midi_reset(seq_oss_devinfo_t *dp, int dev)
 			}
 		}
 	}
-	snd_seq_oss_midi_close(dp, dev);
+	// snd_seq_oss_midi_close(dp, dev);
 	snd_use_lock_free(&mdev->use_lock);
 }
 

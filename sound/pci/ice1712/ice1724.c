@@ -237,6 +237,18 @@ static irqreturn_t snd_vt1724_interrupt(int irq, void *dev_id, struct pt_regs *r
 				if (ice->capture_pro_substream)
 					snd_pcm_period_elapsed(ice->capture_pro_substream);
 			}
+			if (mtstat & VT1724_MULTI_PDMA1) {
+				if (ice->playback_con_substream_ds[0])
+					snd_pcm_period_elapsed(ice->playback_con_substream_ds[0]);
+			}
+			if (mtstat & VT1724_MULTI_PDMA2) {
+				if (ice->playback_con_substream_ds[1])
+					snd_pcm_period_elapsed(ice->playback_con_substream_ds[1]);
+			}
+			if (mtstat & VT1724_MULTI_PDMA3) {
+				if (ice->playback_con_substream_ds[2])
+					snd_pcm_period_elapsed(ice->playback_con_substream_ds[2]);
+			}
 			if (mtstat & VT1724_MULTI_PDMA4) {
 				if (ice->playback_con_substream)
 					snd_pcm_period_elapsed(ice->playback_con_substream);
@@ -282,16 +294,6 @@ static snd_pcm_hw_constraint_list_t hw_constraints_rates_192 = {
 	.mask = 0,
 };
 
-static unsigned int hw_channels[] = {
-	2, 4, 6, 8
-};
-
-static snd_pcm_hw_constraint_list_t hw_constraints_channels = {
-	.count = ARRAY_SIZE(hw_channels),
-	.list = hw_channels,
-	.mask = 0,
-};
-
 static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 {
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
@@ -300,21 +302,16 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	struct list_head *pos;
 	snd_pcm_substream_t *s;
 
+	what = 0;
+	snd_pcm_group_for_each(pos, substream) {
+		s = snd_pcm_group_substream_entry(pos);
+		what |= (unsigned long)(s->runtime->private_data);
+		snd_pcm_trigger_done(s, substream);
+	}
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		what = 0;
-		snd_pcm_group_for_each(pos, substream) {
-			s = snd_pcm_group_substream_entry(pos);
-			if (s == ice->playback_pro_substream)
-				what |= VT1724_PDMA0_PAUSE;
-			else if (s == ice->capture_pro_substream)
-				what |= VT1724_RDMA0_PAUSE;
-			else if (s == ice->playback_con_substream)
-				what |= VT1724_PDMA4_PAUSE;
-			else if (s == ice->capture_con_substream)
-				what |= VT1724_RDMA1_PAUSE;
-		}
 		spin_lock(&ice->reg_lock);
 		old = inb(ICEMT1724(ice, DMA_PAUSE));
 		if (cmd == SNDRV_PCM_TRIGGER_PAUSE_PUSH)
@@ -327,24 +324,6 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_STOP:
-		what = 0;
-		s = substream;
-		snd_pcm_group_for_each(pos, substream) {
-			s = snd_pcm_group_substream_entry(pos);
-			if (s == ice->playback_pro_substream) {
-				what |= VT1724_PDMA0_START;
-				snd_pcm_trigger_done(s, substream);
-			} else if (s == ice->capture_pro_substream) {
-				what |= VT1724_RDMA0_START;
-				snd_pcm_trigger_done(s, substream);
-			} else if (s == ice->playback_con_substream) {
-				what |= VT1724_PDMA4_START;
-				snd_pcm_trigger_done(s, substream);
-			} else if (s == ice->capture_con_substream) {
-				what |= VT1724_RDMA1_START;
-				snd_pcm_trigger_done(s, substream);
-			}
-		}
 		spin_lock(&ice->reg_lock);
 		old = inb(ICEMT1724(ice, DMA_CONTROL));
 		if (cmd == SNDRV_PCM_TRIGGER_START)
@@ -364,8 +343,10 @@ static int snd_vt1724_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 /*
  */
 
-#define DMA_STARTS	(VT1724_RDMA0_START|VT1724_PDMA0_START|VT1724_RDMA1_START|VT1724_PDMA4_START)
-#define DMA_PAUSES	(VT1724_RDMA0_PAUSE|VT1724_PDMA0_PAUSE|VT1724_RDMA1_PAUSE|VT1724_PDMA4_PAUSE)
+#define DMA_STARTS	(VT1724_RDMA0_START|VT1724_PDMA0_START|VT1724_RDMA1_START|\
+	VT1724_PDMA1_START|VT1724_PDMA2_START|VT1724_PDMA3_START|VT1724_PDMA4_START)
+#define DMA_PAUSES	(VT1724_RDMA0_PAUSE|VT1724_PDMA0_PAUSE|VT1724_RDMA1_PAUSE|\
+	VT1724_PDMA1_PAUSE|VT1724_PDMA2_PAUSE|VT1724_PDMA3_PAUSE|VT1724_PDMA4_PAUSE)
 
 static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force)
 {
@@ -448,13 +429,52 @@ static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
 				    snd_pcm_hw_params_t * hw_params)
 {
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	int i, chs;
 
+	chs = params_channels(hw_params);
+	down(&ice->open_mutex);
+	/* mark surround channels */
+	if (substream == ice->playback_pro_substream) {
+		chs = chs / 2 - 1;
+		for (i = 0; i < chs; i++) {
+			if (ice->pcm_reserved[i] && ice->pcm_reserved[i] != substream) {
+				up(&ice->open_mutex);
+				return -EBUSY;
+			}
+			ice->pcm_reserved[i] = substream;
+		}
+		for (; i < 3; i++) {
+			if (ice->pcm_reserved[i] == substream)
+				ice->pcm_reserved[i] = NULL;
+		}
+	} else {
+		for (i = 0; i < 3; i++) {
+			if (ice->playback_con_substream_ds[i] == substream) {
+				if (ice->pcm_reserved[i] && ice->pcm_reserved[i] != substream) {
+					up(&ice->open_mutex);
+					return -EBUSY;
+				}
+				ice->pcm_reserved[i] = substream;
+				break;
+			}
+		}
+	}
+	up(&ice->open_mutex);
 	snd_vt1724_set_pro_rate(ice, params_rate(hw_params), 0);
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 }
 
 static int snd_vt1724_pcm_hw_free(snd_pcm_substream_t * substream)
 {
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	int i;
+
+	down(&ice->open_mutex);
+	/* unmark surround channels */
+	for (i = 0; i < 3; i++)
+		if (ice->pcm_reserved[i] == substream)
+			ice->pcm_reserved[i] = NULL;
+	up(&ice->open_mutex);
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -593,14 +613,14 @@ static snd_pcm_hardware_t snd_vt1724_playback_pro =
 	.rate_max =		192000,
 	.channels_min =		2,
 	.channels_max =		8,
-	.buffer_bytes_max =	(1UL << 21),	/* 18bits dword */
+	.buffer_bytes_max =	(1UL << 21),	/* 19bits dword */
 	.period_bytes_min =	8 * 4 * 2,	/* FIXME: constraints needed */
 	.period_bytes_max =	(1UL << 21),
-	.periods_min =		1,
+	.periods_min =		2,
 	.periods_max =		1024,
 };
 
-static snd_pcm_hardware_t snd_vt1724_capture_pro =
+static snd_pcm_hardware_t snd_vt1724_2ch_stereo =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
@@ -612,10 +632,10 @@ static snd_pcm_hardware_t snd_vt1724_capture_pro =
 	.rate_max =		192000,
 	.channels_min =		2,
 	.channels_max =		2,
-	.buffer_bytes_max =	(256*1024),
+	.buffer_bytes_max =	(1UL << 18),	/* 16bits dword */
 	.period_bytes_min =	2 * 4 * 2,
-	.period_bytes_max =	(256*1024),
-	.periods_min =		1,
+	.period_bytes_max =	(1UL << 18),
+	.periods_min =		2,
 	.periods_max =		1024,
 };
 
@@ -628,7 +648,9 @@ static int snd_vt1724_playback_pro_open(snd_pcm_substream_t * substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	int chs;
 
+	runtime->private_data = (void*)VT1724_PDMA0_START; /* irq/status/trigger bit */
 	ice->playback_pro_substream = substream;
 	runtime->hw = snd_vt1724_playback_pro;
 	snd_pcm_set_sync(substream);
@@ -639,7 +661,17 @@ static int snd_vt1724_playback_pro_open(snd_pcm_substream_t * substream)
 	else
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
 
-	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels);
+	down(&ice->open_mutex);
+	/* calculate the currently available channels */
+	for (chs = 0; chs < 3; chs++) {
+		if (ice->pcm_reserved[chs])
+			break;
+	}
+	chs = (chs + 1) * 2;
+	runtime->hw.channels_max = chs;
+	if (chs > 2) /* channels must be even */
+		snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+	up(&ice->open_mutex);
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
 				   VT1724_BUFFER_ALIGN);
 	snd_pcm_hw_constraint_step(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
@@ -652,8 +684,9 @@ static int snd_vt1724_capture_pro_open(snd_pcm_substream_t * substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
+	runtime->private_data = (void*)VT1724_RDMA0_START; /* irq/status/trigger bit */
 	ice->capture_pro_substream = substream;
-	runtime->hw = snd_vt1724_capture_pro;
+	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	if ((ice->eeprom.data[ICE_EEP2_ACLINK] & 0x80) &&
@@ -735,25 +768,6 @@ static int __devinit snd_vt1724_pcm_profi(ice1712_t * ice, int device)
  * SPDIF PCM
  */
 
-static snd_pcm_hardware_t snd_vt1724_playback_spdif =
-{
-	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
-				 SNDRV_PCM_INFO_MMAP_VALID |
-				 SNDRV_PCM_INFO_PAUSE | SNDRV_PCM_INFO_SYNC_START),
-	.formats =		SNDRV_PCM_FMTBIT_S32_LE,
-	.rates =		SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_192000,
-	.rate_min =		4000,
-	.rate_max =		192000,
-	.channels_min =		2,
-	.channels_max =		2,
-	.buffer_bytes_max =	(256*1024),
-	.period_bytes_min =	2 * 4 * 2,
-	.period_bytes_max =	(256*1024),
-	.periods_min =		1,
-	.periods_max =		1024,
-};
-
 const static struct vt1724_pcm_reg vt1724_playback_spdif_reg = {
 	.addr = VT1724_MT_PDMA4_ADDR,
 	.size = VT1724_MT_PDMA4_SIZE,
@@ -795,8 +809,9 @@ static int snd_vt1724_playback_spdif_open(snd_pcm_substream_t *substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
+	runtime->private_data = (void*)VT1724_PDMA4_START; /* irq/status/trigger bit */
 	ice->playback_con_substream = substream;
-	runtime->hw = snd_vt1724_playback_spdif;
+	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 
@@ -820,8 +835,9 @@ static int snd_vt1724_capture_spdif_open(snd_pcm_substream_t *substream)
 	ice1712_t *ice = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
+	runtime->private_data = (void*)VT1724_RDMA1_START; /* irq/status/trigger bit */
 	ice->capture_con_substream = substream;
-	runtime->hw = snd_vt1724_playback_spdif;
+	runtime->hw = snd_vt1724_2ch_stereo;
 	snd_pcm_set_sync(substream);
 	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_96);
@@ -897,6 +913,127 @@ static int __devinit snd_vt1724_pcm_spdif(ice1712_t * ice, int device)
 	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 64*1024);
 
 	ice->pcm = pcm;
+
+	return 0;
+}
+
+
+/*
+ * independent surround PCMs
+ */
+
+const static struct vt1724_pcm_reg vt1724_playback_dma_regs[3] = {
+	{
+		.addr = VT1724_MT_PDMA1_ADDR,
+		.size = VT1724_MT_PDMA1_SIZE,
+		.count = VT1724_MT_PDMA1_COUNT,
+		.start = VT1724_PDMA1_START,
+		.pause = VT1724_PDMA1_PAUSE,
+	},
+	{
+		.addr = VT1724_MT_PDMA2_ADDR,
+		.size = VT1724_MT_PDMA2_SIZE,
+		.count = VT1724_MT_PDMA2_COUNT,
+		.start = VT1724_PDMA2_START,
+		.pause = VT1724_PDMA2_PAUSE,
+	},
+	{
+		.addr = VT1724_MT_PDMA3_ADDR,
+		.size = VT1724_MT_PDMA3_SIZE,
+		.count = VT1724_MT_PDMA3_COUNT,
+		.start = VT1724_PDMA3_START,
+		.pause = VT1724_PDMA3_PAUSE,
+	},
+};
+
+static int snd_vt1724_playback_indep_prepare(snd_pcm_substream_t * substream)
+{
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	unsigned char val;
+
+	spin_lock(&ice->reg_lock);
+	val = 3 - substream->number;
+	if (inb(ICEMT1724(ice, BURST)) < val)
+		outb(val, ICEMT1724(ice, BURST));
+	spin_unlock(&ice->reg_lock);
+	return snd_vt1724_pcm_prepare(substream, &vt1724_playback_dma_regs[substream->number]);
+}
+
+static snd_pcm_uframes_t snd_vt1724_playback_indep_pointer(snd_pcm_substream_t * substream)
+{
+	return snd_vt1724_pcm_pointer(substream, &vt1724_playback_dma_regs[substream->number]);
+}
+
+static int snd_vt1724_playback_indep_open(snd_pcm_substream_t *substream)
+{
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	down(&ice->open_mutex);
+	/* already used by PDMA0? */
+	if (ice->pcm_reserved[substream->number]) {
+		up(&ice->open_mutex);
+		return -EBUSY; /* FIXME: should handle blocking mode properly */
+	}
+	up(&ice->open_mutex);
+	runtime->private_data = (void*)(1 << (substream->number + 4));
+	ice->playback_con_substream_ds[substream->number] = substream;
+	runtime->hw = snd_vt1724_2ch_stereo;
+	snd_pcm_set_sync(substream);
+	snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
+
+	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_192);
+	return 0;
+}
+
+static int snd_vt1724_playback_indep_close(snd_pcm_substream_t * substream)
+{
+	ice1712_t *ice = snd_pcm_substream_chip(substream);
+
+	if (PRO_RATE_RESET)
+		snd_vt1724_set_pro_rate(ice, PRO_RATE_DEFAULT, 0);
+	ice->playback_con_substream_ds[substream->number] = NULL;
+	ice->pcm_reserved[substream->number] = NULL;
+
+	return 0;
+}
+
+static snd_pcm_ops_t snd_vt1724_playback_indep_ops = {
+	.open =		snd_vt1724_playback_indep_open,
+	.close =	snd_vt1724_playback_indep_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_vt1724_pcm_hw_params,
+	.hw_free =	snd_vt1724_pcm_hw_free,
+	.prepare =	snd_vt1724_playback_indep_prepare,
+	.trigger =	snd_vt1724_pcm_trigger,
+	.pointer =	snd_vt1724_playback_indep_pointer,
+};
+
+
+static int __devinit snd_vt1724_pcm_indep(ice1712_t * ice, int device)
+{
+	snd_pcm_t *pcm;
+	int play;
+	int err;
+
+	play = ice->num_total_dacs / 2 - 1;
+	if (play <= 0)
+		return 0;
+
+	err = snd_pcm_new(ice->card, "ICE1724 Surrounds", device, play, 0, &pcm);
+	if (err < 0)
+		return err;
+
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK,
+			&snd_vt1724_playback_indep_ops);
+
+	pcm->private_data = ice;
+	pcm->info_flags = 0;
+	strcpy(pcm->name, "ICE1724 Surround PCM");
+
+	snd_pcm_lib_preallocate_pci_pages_for_all(ice->pci, pcm, 64*1024, 64*1024);
+
+	ice->pcm_ds = pcm;
 
 	return 0;
 }
@@ -1808,6 +1945,7 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 	ice->vt1724 = 1;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
+	init_MUTEX(&ice->open_mutex);
 	ice->gpio.set_mask = snd_vt1724_set_gpio_mask;
 	ice->gpio.set_dir = snd_vt1724_set_gpio_dir;
 	ice->gpio.set_data = snd_vt1724_set_gpio_data;
@@ -1932,6 +2070,11 @@ static int __devinit snd_vt1724_probe(struct pci_dev *pci,
 		return err;
 	}
 	
+	if ((err = snd_vt1724_pcm_indep(ice, pcm_dev++)) < 0) {
+		snd_card_free(card);
+		return err;
+	}
+
 	if ((err = snd_vt1724_ac97_mixer(ice)) < 0) {
 		snd_card_free(card);
 		return err;

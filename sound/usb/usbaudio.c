@@ -45,7 +45,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/usb.h>
-#include <linux/usb_ch9.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
@@ -117,7 +116,7 @@ struct audioformat {
 	struct list_head list;
 	snd_pcm_format_t format;	/* format type */
 	unsigned int channels;		/* # channels */
-	unsigned int nonaudio: 1;	/* non-audio (type II) */
+	unsigned int fmt_type;		/* USB audio format type (1-3) */
 	unsigned int frame_size;	/* samples per frame for non-audio */
 	int iface;			/* interface number */
 	unsigned char altsetting;	/* corresponding alternate setting */
@@ -171,7 +170,7 @@ struct snd_usb_substream {
 	unsigned int curpacksize;	/* current packet size in bytes (for capture) */
 	unsigned int curframesize;	/* current packet size in frames (for capture) */
 	unsigned int fill_max: 1;	/* fill max packet size always */
-	unsigned int nonaudio: 1;	/* Type II format (MPEG, AC3) */
+	unsigned int fmt_type;		/* USB audio format type (1-3) */
 
 	unsigned int running: 1;	/* running status */
 
@@ -201,6 +200,7 @@ struct snd_usb_stream {
 	snd_usb_audio_t *chip;
 	snd_pcm_t *pcm;
 	int pcm_index;
+	unsigned int fmt_type;		/* USB audio format type (1-3) */
 	snd_usb_substream_t substream[2];
 	struct list_head list;
 };
@@ -477,7 +477,7 @@ static int prepare_playback_urb(snd_usb_substream_t *subs,
 		subs->transfer_sched += counts;
 		if (subs->transfer_sched >= runtime->period_size) {
 			subs->transfer_sched -= runtime->period_size;
-			if (subs->nonaudio) {
+			if (subs->fmt_type == USB_FORMAT_TYPE_II) {
 				if (subs->transfer_sched > 0) {
 					/* FIXME: fill-max mode is not supported yet */
 					offs -= subs->transfer_sched;
@@ -894,7 +894,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 		u->subs = subs;
 		u->transfer = 0;
 		u->packets = npacks[i];
-		if (subs->nonaudio)
+		if (subs->fmt_type == USB_FORMAT_TYPE_II)
 			u->packets++; /* for transfer delimiter */
 		if (! is_playback) {
 			/* allocate a capture buffer per urb */
@@ -1588,7 +1588,7 @@ static int setup_hw_info(snd_pcm_runtime_t *runtime, snd_usb_substream_t *subs)
 			runtime->hw.channels_min = fp->channels;
 		if (runtime->hw.channels_max < fp->channels)
 			runtime->hw.channels_max = fp->channels;
-		if (fp->nonaudio && fp->frame_size > 0) {
+		if (fp->fmt_type == USB_FORMAT_TYPE_II && fp->frame_size > 0) {
 			/* FIXME: there might be more than one audio formats... */
 			runtime->hw.period_bytes_min = runtime->hw.period_bytes_max =
 				fp->frame_size;
@@ -1895,7 +1895,7 @@ static void init_substream(snd_usb_stream_t *as, int stream, struct audioformat 
 	subs->formats |= 1ULL << fp->format;
 	subs->endpoint = fp->endpoint;
 	subs->num_formats++;
-	subs->nonaudio = fp->nonaudio;
+	subs->fmt_type = fp->fmt_type;
 }
 
 
@@ -1954,17 +1954,12 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 
 	list_for_each(p, &chip->pcm_list) {
 		as = list_entry(p, snd_usb_stream_t, list);
+		if (as->fmt_type != fp->fmt_type)
+			continue;
 		subs = &as->substream[stream];
 		if (! subs->endpoint)
-			break;
+			continue;
 		if (subs->endpoint == fp->endpoint) {
-			if (fp->nonaudio) {
-				if (!subs->nonaudio || subs->formats != (1ULL << fp->format))
-					continue; /* non-linear formats are handled exclusively */
-			} else {
-				if (subs->nonaudio)
-					continue;
-			}
 			list_add_tail(&fp->list, &subs->fmt_list);
 			subs->num_formats++;
 			subs->formats |= 1ULL << fp->format;
@@ -1974,6 +1969,8 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	/* look for an empty stream */
 	list_for_each(p, &chip->pcm_list) {
 		as = list_entry(p, snd_usb_stream_t, list);
+		if (as->fmt_type != fp->fmt_type)
+			continue;
 		subs = &as->substream[stream];
 		if (subs->endpoint)
 			continue;
@@ -1991,6 +1988,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	memset(as, 0, sizeof(*as));
 	as->pcm_index = chip->pcm_devs;
 	as->chip = chip;
+	as->fmt_type = fp->fmt_type;
 	err = snd_pcm_new(chip->card, "USB Audio", chip->pcm_devs,
 			  stream == SNDRV_PCM_STREAM_PLAYBACK ? 1 : 0,
 			  stream == SNDRV_PCM_STREAM_PLAYBACK ? 0 : 1,
@@ -2216,7 +2214,6 @@ static int parse_audio_format_ii(struct usb_device *dev, struct audioformat *fp,
 		break;
 	}
 	fp->channels = 1;
-	fp->nonaudio = 1;
 	brate = combine_word(&fmt[4]); 	/* fmt[4,5] : wMaxBitRate (in kbps) */
 	framesize = combine_word(&fmt[6]); /* fmt[6,7]: wSamplesPerFrame */
 	snd_printd(KERN_INFO "found format II with max.bitrate = %d, frame size=%d\n", brate, framesize);
@@ -2242,6 +2239,7 @@ static int parse_audio_format(struct usb_device *dev, struct audioformat *fp,
 			   dev->devnum, fp->iface, fp->altsetting, fmt[3]);
 		return -1;
 	}
+	fp->fmt_type = fmt[3];
 	if (err < 0)
 		return err;
 #if 1

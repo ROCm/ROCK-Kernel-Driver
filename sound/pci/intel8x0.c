@@ -143,6 +143,9 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x300}},dialog
 #ifndef PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO
 #define PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO	0x00da
 #endif
+#ifndef PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO
+#define PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO	0x00ea
+#endif
 
 enum { DEVICE_INTEL, DEVICE_INTEL_ICH4, DEVICE_SIS, DEVICE_ALI, DEVICE_NFORCE };
 
@@ -443,6 +446,7 @@ static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE */
 	{ 0x10de, 0x006a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE2 */
 	{ 0x10de, 0x00da, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE3 */
+	{ 0x10de, 0x00ea, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* CK8S */
 	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0x10b9, 0x5455, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_ALI },   /* Ali5455 */
@@ -804,10 +808,19 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
-		if (status)
+		static int err_count = 10;
+		if (status) {
+			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
+			status ^= igetdword(chip, chip->int_sta_reg);
+		}
 		spin_unlock(&chip->reg_lock);
-		return IRQ_NONE;
+		if (status && err_count) {
+			err_count--;
+			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
+				   status, chip->int_sta_mask);
+		}
+		return IRQ_RETVAL(status);
 	}
 
 	for (i = 0; i < chip->bdbars_count; i++) {
@@ -1017,6 +1030,7 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	ichdev_t *ichdev = get_ichdev(substream);
+	unsigned long flags;
 	size_t ptr1, ptr;
 
 	ptr1 = igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << chip->pcm_pos_shift;
@@ -1024,7 +1038,9 @@ static snd_pcm_uframes_t snd_intel8x0_pcm_pointer(snd_pcm_substream_t * substrea
 		ptr = ichdev->fragsize1 - ptr1;
 	else
 		ptr = 0;
+	spin_lock_irqsave(&chip->reg_lock, flags);
 	ptr += ichdev->position;
+	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	if (ptr >= ichdev->size)
 		return 0;
 	return bytes_to_frames(substream->runtime, ptr);
@@ -1079,21 +1095,12 @@ static int snd_intel8x0_pcm_open(snd_pcm_substream_t * substream, ichdev_t *ichd
 {
 	intel8x0_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	static unsigned int i, rates[] = {
-		/* ATTENTION: these values depend on the definition in pcm.h! */
-		5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000
-	};
 	int err;
 
 	ichdev->substream = substream;
 	runtime->hw = snd_intel8x0_stream;
 	runtime->hw.rates = ichdev->pcm->rates;
-	for (i = 0; i < ARRAY_SIZE(rates); i++) {
-		if (runtime->hw.rates & (1 << i)) {
-			runtime->hw.rate_min = rates[i];
-			break;
-		}
-	}
+	snd_pcm_limit_hw_rates(runtime);
 	if (chip->device_type == DEVICE_SIS) {
 		runtime->hw.buffer_bytes_max = 64*1024;
 		runtime->hw.period_bytes_max = 64*1024;
@@ -1738,6 +1745,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4856,
+		.name = "Intel D845WN (82801BA)",
+		.type = AC97_TUNE_SWAP_HP
 	},
 	{
 		.vendor = 0x8086,
@@ -2567,6 +2580,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP3_AUDIO, "NVidia nForce3" },
+	{ PCI_DEVICE_ID_NVIDIA_CK8S_AUDIO, "NVidia CK8S" },
 	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0x5455, "ALi M5455" },

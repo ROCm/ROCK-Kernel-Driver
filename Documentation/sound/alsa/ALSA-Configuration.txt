@@ -692,6 +692,15 @@ Module parameters
 
     The power-management is supported.
 
+  Module snd-mixart
+  -----------------
+
+    Module for Digigram miXart8 soundcards.
+
+    Module supports multiple cards.
+    Note: One miXart8 board will be represented as 4 alsa cards.
+          See MIXART.txt for details.
+
   Module snd-mpu401
   -----------------
 
@@ -1169,6 +1178,16 @@ Module parameters
     Module supports autoprobe and multiple chips (max 8).
 
     The power-management is supported.
+
+  Module snd-pdaudiocf
+  --------------------
+
+    Module for Sound Core PDAudioCF soundcard.
+
+    irq_mask	  - IRQ mask (PCMCIA type)
+    irq_list	  - List of available interrupts for this soundcard
+
+    Note: the driver is build only when CONFIG_ISA is set.
 
 
 Configuring Non-ISAPNP Cards

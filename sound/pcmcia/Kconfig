@@ -15,4 +15,10 @@ config SND_VXP440
 	help
 	  Say 'Y' or 'M' to include support for Digigram VXpocket 440 soundcard.
 
+config SND_PDAUDIOCF
+	tristate "Sound Core PDAudioCF"
+	depends on SND && PCMCIA && ISA
+	help
+	  Say 'Y' or 'M' to include support for Sound Core PDAudioCF soundcard.
+
 endmenu
