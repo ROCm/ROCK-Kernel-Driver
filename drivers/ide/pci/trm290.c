@@ -413,9 +413,9 @@ static struct pci_device_id trm290_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"TRM290 IDE",
-	id_table:	trm290_pci_tbl,
-	probe:		trm290_init_one,
+	.name		= "TRM290 IDE",
+	.id_table	= trm290_pci_tbl,
+	.probe		= trm290_init_one,
 };
 
 static int trm290_ide_init(void)

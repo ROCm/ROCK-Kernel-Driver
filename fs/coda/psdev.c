@@ -353,13 +353,13 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 
 
 static struct file_operations coda_psdev_fops = {
-	owner:		THIS_MODULE,
-	read:		coda_psdev_read,
-	write:		coda_psdev_write,
-	poll:		coda_psdev_poll,
-	ioctl:		coda_psdev_ioctl,
-	open:		coda_psdev_open,
-	release:	coda_psdev_release,
+	.owner		= THIS_MODULE,
+	.read		= coda_psdev_read,
+	.write		= coda_psdev_write,
+	.poll		= coda_psdev_poll,
+	.ioctl		= coda_psdev_ioctl,
+	.open		= coda_psdev_open,
+	.release	= coda_psdev_release,
 };
 
 static devfs_handle_t devfs_handle;

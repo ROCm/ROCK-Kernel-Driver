@@ -855,9 +855,9 @@ static struct pci_device_id siimage_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"SiI IDE",
-	id_table:	siimage_pci_tbl,
-	probe:		siimage_init_one,
+	.name		= "SiI IDE",
+	.id_table	= siimage_pci_tbl,
+	.probe		= siimage_init_one,
 };
 
 static int siimage_ide_init(void)

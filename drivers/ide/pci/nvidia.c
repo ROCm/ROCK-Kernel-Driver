@@ -353,9 +353,9 @@ static struct pci_device_id nforce_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"nForce IDE",
-	id_table:	nforce_pci_tbl,
-	probe:		nforce_init_one,
+	.name		= "nForce IDE",
+	.id_table	= nforce_pci_tbl,
+	.probe		= nforce_init_one,
 };
 
 static int nforce_ide_init(void)

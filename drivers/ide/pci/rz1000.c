@@ -73,9 +73,9 @@ static struct pci_device_id rz1000_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"RZ1000 IDE",
-	id_table:	rz1000_pci_tbl,
-	probe:		rz1000_init_one,
+	.name		= "RZ1000 IDE",
+	.id_table	= rz1000_pci_tbl,
+	.probe		= rz1000_init_one,
 };
 
 static int rz1000_ide_init(void)

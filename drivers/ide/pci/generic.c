@@ -123,9 +123,9 @@ static struct pci_device_id generic_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"PCI IDE",
-	id_table:	generic_pci_tbl,
-	probe:		generic_init_one,
+	.name		= "PCI IDE",
+	.id_table	= generic_pci_tbl,
+	.probe		= generic_init_one,
 };
 
 static int generic_ide_init(void)

@@ -1604,8 +1604,6 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	return retval;
 }
 
-#ifdef CONFIG_PROC_FS
-
 static const char *uart_type(struct uart_port *port)
 {
 	const char *str = NULL;
@@ -1618,6 +1616,8 @@ static const char *uart_type(struct uart_port *port)
 
 	return str;
 }
+
+#ifdef CONFIG_PROC_FS
 
 static int uart_line_info(char *buf, struct uart_driver *drv, int i)
 {

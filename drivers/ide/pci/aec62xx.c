@@ -544,9 +544,9 @@ static struct pci_device_id aec62xx_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"AEC62xx IDE",
-	id_table:	aec62xx_pci_tbl,
-	probe:		aec62xx_init_one,
+	.name		= "AEC62xx IDE",
+	.id_table	= aec62xx_pci_tbl,
+	.probe		= aec62xx_init_one,
 };
 
 static int aec62xx_ide_init(void)

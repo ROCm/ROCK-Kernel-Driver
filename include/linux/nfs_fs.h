@@ -323,6 +323,14 @@ extern void nfs_complete_unlink(struct dentry *);
 extern int  nfs_writepage(struct page *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
+extern void nfs_writeback_done(struct rpc_task *task, int stable,
+			       unsigned int arg_count, unsigned int res_count);
+extern void nfs_writedata_release(struct rpc_task *task);
+
+#if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
+extern void nfs_commit_done(struct rpc_task *);
+#endif
+
 /*
  * Try to write back everything synchronously (but check the
  * return value!)
@@ -462,28 +470,7 @@ extern void * nfs_root_data(void);
 	__retval;							\
 })
 
-#ifdef CONFIG_NFS_V3
-
 #define NFS_JUKEBOX_RETRY_TIME (5 * HZ)
-static inline int
-nfs_async_handle_jukebox(struct rpc_task *task)
-{
-	if (task->tk_status != -EJUKEBOX)
-		return 0;
-	task->tk_status = 0;
-	rpc_restart_call(task);
-	rpc_delay(task, NFS_JUKEBOX_RETRY_TIME);
-	return 1;
-}
-
-#else
-
-static inline int
-nfs_async_handle_jukebox(struct rpc_task *task)
-{
-	return 0;
-}
-#endif /* CONFIG_NFS_V3 */
 
 #endif /* __KERNEL__ */
 

@@ -652,9 +652,9 @@ static struct pci_device_id via_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"VIA IDE",
-	id_table:	via_pci_tbl,
-	probe:		via_init_one,
+	.name 		= "VIA IDE",
+	.id_table 	= via_pci_tbl,
+	.probe 		= via_init_one,
 };
 
 static int via_ide_init(void)

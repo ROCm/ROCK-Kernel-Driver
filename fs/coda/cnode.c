@@ -26,9 +26,9 @@ inline int coda_isnullfid(ViceFid *fid)
 }
 
 static struct inode_operations coda_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	setattr:	coda_setattr,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setattr	= coda_setattr,
 };
 
 /* cnode.c */

@@ -315,9 +315,9 @@ static struct pci_device_id it8172_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"IT8172IDE",
-	id_table:	it8172_pci_tbl,
-	probe:		it8172_init_one,
+	.name		= "IT8172IDE",
+	.id_table	= it8172_pci_tbl,
+	.probe		= it8172_init_one,
 };
 
 static int it8172_ide_init(void)

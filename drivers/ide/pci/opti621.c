@@ -381,9 +381,9 @@ static struct pci_device_id opti621_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"Opti621 IDE",
-	id_table:	opti621_pci_tbl,
-	probe:		opti621_init_one,
+	.name		= "Opti621 IDE",
+	.id_table	= opti621_pci_tbl,
+	.probe		= opti621_init_one,
 };
 
 static int opti621_ide_init(void)

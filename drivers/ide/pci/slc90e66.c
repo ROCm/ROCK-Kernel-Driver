@@ -382,9 +382,9 @@ static struct pci_device_id slc90e66_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"SLC90e66 IDE",
-	id_table:	slc90e66_pci_tbl,
-	probe:		slc90e66_init_one,
+	.name		= "SLC90e66 IDE",
+	.id_table	= slc90e66_pci_tbl,
+	.probe		= slc90e66_init_one,
 };
 
 static int slc90e66_ide_init(void)

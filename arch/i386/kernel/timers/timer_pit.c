@@ -6,6 +6,7 @@
 #include <linux/spinlock.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <asm/mpspec.h>
 #include <asm/timer.h>
 #include <asm/io.h>
 

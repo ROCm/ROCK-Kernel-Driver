@@ -1615,9 +1615,9 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 
 
 static struct address_space_operations jffs_address_operations = {
-	readpage: jffs_readpage,
-	prepare_write: jffs_prepare_write,
-	commit_write: jffs_commit_write,
+	.readpage	= jffs_readpage,
+	.prepare_write	= jffs_prepare_write,
+	.commit_write	= jffs_commit_write,
 };
 
 static int jffs_fsync(struct file *f, struct dentry *d, int datasync)
@@ -1634,41 +1634,41 @@ extern loff_t generic_file_llseek(struct file *, loff_t, int) __attribute__((wea
 
 static struct file_operations jffs_file_operations =
 {
-	open:		generic_file_open,
-	llseek:		generic_file_llseek,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	ioctl:		jffs_ioctl,
-	mmap:		generic_file_mmap,
-	fsync:		jffs_fsync,
-	sendfile:	generic_file_sendfile,
+	.open		= generic_file_open,
+	.llseek		= generic_file_llseek,
+	.read		= generic_file_read,
+	.write		= generic_file_write,
+	.ioctl		= jffs_ioctl,
+	.mmap		= generic_file_mmap,
+	.fsync		= jffs_fsync,
+	.sendfile	= generic_file_sendfile,
 };
 
 
 static struct inode_operations jffs_file_inode_operations =
 {
-	lookup:  jffs_lookup,          /* lookup */
-	setattr: jffs_setattr,
+	.lookup		= jffs_lookup,          /* lookup */
+	.setattr	= jffs_setattr,
 };
 
 
 static struct file_operations jffs_dir_operations =
 {
-	readdir:	jffs_readdir,
+	.readdir	= jffs_readdir,
 };
 
 
 static struct inode_operations jffs_dir_inode_operations =
 {
-	create:   jffs_create,
-	lookup:   jffs_lookup,
-	unlink:   jffs_unlink,
-	symlink:  jffs_symlink,
-	mkdir:    jffs_mkdir,
-	rmdir:    jffs_rmdir,
-	mknod:    jffs_mknod,
-	rename:   jffs_rename,
-	setattr:  jffs_setattr,
+	.create		= jffs_create,
+	.lookup		= jffs_lookup,
+	.unlink		= jffs_unlink,
+	.symlink	= jffs_symlink,
+	.mkdir		= jffs_mkdir,
+	.rmdir		= jffs_rmdir,
+	.mknod		= jffs_mknod,
+	.rename		= jffs_rename,
+	.setattr	= jffs_setattr,
 };
 
 
@@ -1768,11 +1768,11 @@ jffs_write_super(struct super_block *sb)
 
 static struct super_operations jffs_ops =
 {
-	read_inode:   jffs_read_inode,
-	delete_inode: jffs_delete_inode,
-	put_super:    jffs_put_super,
-	write_super:  jffs_write_super,
-	statfs:       jffs_statfs,
+	.read_inode	= jffs_read_inode,
+	.delete_inode 	= jffs_delete_inode,
+	.put_super	= jffs_put_super,
+	.write_super	= jffs_write_super,
+	.statfs		= jffs_statfs,
 };
 
 static struct super_block *jffs_get_sb(struct file_system_type *fs_type,
@@ -1782,11 +1782,11 @@ static struct super_block *jffs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type jffs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"jffs",
-	get_sb:		jffs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "jffs",
+	.get_sb		= jffs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init

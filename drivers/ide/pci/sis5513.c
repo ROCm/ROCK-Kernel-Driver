@@ -1040,9 +1040,9 @@ static struct pci_device_id sis5513_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"SIS IDE",
-	id_table:	sis5513_pci_tbl,
-	probe:		sis5513_init_one,
+	.name		= "SIS IDE",
+	.id_table	= sis5513_pci_tbl,
+	.probe		= sis5513_init_one,
 };
 
 static int sis5513_ide_init(void)

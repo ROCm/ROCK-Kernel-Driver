@@ -705,9 +705,9 @@ static struct pci_device_id piix_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"PIIX IDE",
-	id_table:	piix_pci_tbl,
-	probe:		piix_init_one,
+	.name		= "PIIX IDE",
+	.id_table	= piix_pci_tbl,
+	.probe		= piix_init_one,
 };
 
 static int piix_ide_init(void)
