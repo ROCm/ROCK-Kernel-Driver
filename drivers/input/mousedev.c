@@ -492,18 +492,8 @@ static struct miscdevice psaux_mouse = {
 };
 #endif
 
-static struct device_interface mousedev_intf = {
-	.name		= "mouse",
-	.devclass	= &input_devclass,
-};
-
 static int __init mousedev_init(void)
 {
-	int retval;
-
-	if((retval = interface_register(&mousedev_intf)) < 0)
-		return retval;
-
 	input_register_handler(&mousedev_handler);
 
 	memset(&mousedev_mix, 0, sizeof(struct mousedev));
@@ -532,7 +522,6 @@ static void __exit mousedev_exit(void)
 #endif
 	devfs_remove("input/mice");
 	input_unregister_handler(&mousedev_handler);
-	interface_unregister(&mousedev_intf);
 }
 
 module_init(mousedev_init);

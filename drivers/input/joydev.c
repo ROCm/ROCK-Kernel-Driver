@@ -493,19 +493,8 @@ static struct input_handler joydev_handler = {
 	.id_table =	joydev_ids,
 };
 
-static struct device_interface joydev_intf = {
-	.name		= "joystick",
-	.devclass	= &input_devclass,
-};
-
 static int __init joydev_init(void)
 {
-	int retval;
-
-	retval = interface_register(&joydev_intf);
-	if(retval < 0)
-		return retval;
-
 	input_register_handler(&joydev_handler);
 	return 0;
 }
@@ -513,7 +502,6 @@ static int __init joydev_init(void)
 static void __exit joydev_exit(void)
 {
 	input_unregister_handler(&joydev_handler);
-	interface_unregister(&joydev_intf);
 }
 
 module_init(joydev_init);

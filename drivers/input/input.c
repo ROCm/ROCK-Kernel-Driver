@@ -38,7 +38,7 @@ EXPORT_SYMBOL(input_close_device);
 EXPORT_SYMBOL(input_accept_process);
 EXPORT_SYMBOL(input_flush_device);
 EXPORT_SYMBOL(input_event);
-EXPORT_SYMBOL(input_devclass);
+EXPORT_SYMBOL(input_class);
 
 #define INPUT_MAJOR	13
 #define INPUT_DEVICES	256
@@ -667,7 +667,7 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 
 #endif
 
-struct device_class input_devclass = {
+struct class input_class = {
 	.name		= "input",
 };
 
@@ -675,7 +675,7 @@ static int __init input_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	devclass_register(&input_devclass);
+	class_register(&input_class);
 
 #ifdef CONFIG_PROC_FS
 	proc_bus_input_dir = proc_mkdir("input", proc_bus);
@@ -705,7 +705,7 @@ static void __exit input_exit(void)
 	devfs_remove("input");
         if (unregister_chrdev(INPUT_MAJOR, "input"))
                 printk(KERN_ERR "input: can't unregister char major %d", INPUT_MAJOR);
-	devclass_unregister(&input_devclass);
+	class_unregister(&input_class);
 }
 
 subsys_initcall(input_init);
