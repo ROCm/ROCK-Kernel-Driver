@@ -84,9 +84,9 @@ DECLARE_RWLOCK_EXTERN(ip_nat_lock);
 struct ip_nat_info
 {
 	/* Set to zero when conntrack created: bitmask of maniptypes */
-	int initialized;
+	u_int16_t initialized;
 
-	unsigned int num_manips;
+	u_int16_t num_manips;
 
 	/* Manipulations to be done on this conntrack. */
 	struct ip_nat_info_manip manips[IP_NAT_MAX_MANIPS];
