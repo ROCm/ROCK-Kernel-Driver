@@ -176,6 +176,13 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	unsigned long excess = 0;
 	int split = 0;
 
+	/*
+	 * We'd prefer to avoid failure later on in do_munmap:
+	 * which may split one vma into three before unmapping.
+	 */
+	if (mm->map_count >= sysctl_max_map_count - 3)
+		return -ENOMEM;
+
 	new_pgoff = vma->vm_pgoff + ((old_addr - vma->vm_start) >> PAGE_SHIFT);
 	new_vma = copy_vma(vma, new_addr, new_len, new_pgoff);
 	if (!new_vma)
