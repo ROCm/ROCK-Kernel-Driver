@@ -84,7 +84,7 @@
  */
 
 #define DRIVER_DESC		"Ethernet Gadget"
-#define DRIVER_VERSION		"St Patrick's Day 2004"
+#define DRIVER_VERSION		"Equinox 2004"
 
 static const char shortname [] = "ether";
 static const char driver_desc [] = DRIVER_DESC;
@@ -391,7 +391,7 @@ eth_config = {
 	.bConfigurationValue =	DEV_CONFIG_VALUE,
 	.iConfiguration =	STRING_CDC,
 	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
-	.bMaxPower =		1,
+	.bMaxPower =		50,
 };
 
 #ifdef	CONFIG_USB_ETH_RNDIS
@@ -405,7 +405,7 @@ rndis_config = {
 	.bConfigurationValue =  DEV_RNDIS_CONFIG_VALUE,
 	.iConfiguration =       STRING_RNDIS,
 	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
-	.bMaxPower =            1,
+	.bMaxPower =            50,
 };
 #endif
 
@@ -1202,13 +1202,20 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 		result = -EINVAL;
 		/* FALL THROUGH */
 	case 0:
-		return result;
+		break;
 	}
 
-	if (result)
-		eth_reset_config (dev);
-	else {
+	if (result) {
+		if (number)
+			eth_reset_config (dev);
+		usb_gadget_vbus_draw(dev->gadget,
+				dev->gadget->is_otg ? 8 : 100);
+	} else {
 		char *speed;
+		unsigned power;
+
+		power = 2 * eth_config.bMaxPower;
+		usb_gadget_vbus_draw(dev->gadget, power);
 
 		switch (gadget->speed) {
 		case USB_SPEED_FULL:	speed = "full"; break;
@@ -1219,8 +1226,8 @@ eth_set_config (struct eth_dev *dev, unsigned number, int gfp_flags)
 		}
 
 		dev->config = number;
-		INFO (dev, "%s speed config #%d: %s, using %s\n",
-				speed, number, driver_desc,
+		INFO (dev, "%s speed config #%d: %d mA, %s, using %s\n",
+				speed, number, power, driver_desc,
 				dev->rndis
 					? "RNDIS"
 					: (dev->cdc
@@ -1379,8 +1386,9 @@ static void eth_setup_complete (struct usb_ep *ep, struct usb_request *req)
 static void rndis_response_complete (struct usb_ep *ep, struct usb_request *req)
 {
 	if (req->status || req->actual != req->length)
-		DEBUG (dev, "rndis response complete --> %d, %d/%d\n",
-		       req->status, req->actual, req->length);
+		DEBUG ((struct eth_dev *) ep->driver_data,
+			"rndis response complete --> %d, %d/%d\n",
+			req->status, req->actual, req->length);
 
 	/* done sending after CDC_GET_ENCAPSULATED_RESPONSE */
 }
@@ -2102,11 +2110,13 @@ static void rndis_send_media_state (struct eth_dev *dev, int connect)
 	}
 }
 
-static void rndis_control_ack_complete (struct usb_ep *ep, struct usb_request *req)
+static void
+rndis_control_ack_complete (struct usb_ep *ep, struct usb_request *req)
 {
 	if (req->status || req->actual != req->length)
-		DEBUG (dev, "rndis control ack complete --> %d, %d/%d\n",
-		       req->status, req->actual, req->length);
+		DEBUG ((struct eth_dev *) ep->driver_data,
+			"rndis control ack complete --> %d, %d/%d\n",
+			req->status, req->actual, req->length);
 
 	usb_ep_free_buffer(ep, req->buf, req->dma, 8);
 	usb_ep_free_request(ep, req);
@@ -2472,8 +2482,10 @@ autoconf_fail:
 	if (gadget->is_otg) {
 		otg_descriptor.bmAttributes |= USB_OTG_HNP,
 		eth_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		eth_config.bMaxPower = 4;
 #ifdef	CONFIG_USB_ETH_RNDIS
 		rndis_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		rndis_config.bMaxPower = 4;
 #endif
 	}
 
