@@ -1310,7 +1310,6 @@ cleanup_mem:
 	sd_gendisks = NULL;
 	if (sd) vfree(sd);
 	sd = NULL;
-	sd_blocksizes = NULL;
 	if (sd_sizes) vfree(sd_sizes);
 	sd_sizes = NULL;
 	if (sd_dsk_arr) {
