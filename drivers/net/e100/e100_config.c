@@ -60,7 +60,7 @@ static const u8 def_config[] = {
  * All other init functions will only set values that are
  * different from the 82557 default.
  */
-static void __devinit
+void __devinit
 e100_config_init_82557(struct e100_private *bdp)
 {
 	/* initialize config block */

@@ -13,6 +13,7 @@ config NET_TULIP
 config DE2104X
 	tristate "Early DECchip Tulip (dc2104x) PCI support (EXPERIMENTAL)"
 	depends on NET_TULIP && PCI && EXPERIMENTAL
+	select CRC32
 	---help---
 	  This driver is developed for the SMC EtherPower series Ethernet
 	  cards and also works with cards based on the DECchip
@@ -30,6 +31,7 @@ config DE2104X
 config TULIP
 	tristate "DECchip Tulip (dc2114x) PCI support"
 	depends on NET_TULIP && PCI
+	select CRC32
 	---help---
 	  This driver is developed for the SMC EtherPower series Ethernet
 	  cards and also works with cards based on the DECchip 
@@ -69,6 +71,7 @@ config TULIP_MMIO
 config DE4X5
 	tristate "Generic DECchip & DIGITAL EtherWORKS PCI/EISA"
 	depends on NET_TULIP && (PCI || EISA)
+	select CRC32
 	---help---
 	  This is support for the DIGITAL series of PCI/EISA Ethernet cards.
 	  These include the DE425, DE434, DE435, DE450 and DE500 models.  If
@@ -85,6 +88,8 @@ config DE4X5
 config WINBOND_840
 	tristate "Winbond W89c840 Ethernet support"
 	depends on NET_TULIP && PCI
+	select CRC32
+	select MII
 	help
 	  This driver is for the Winbond W89c840 chip.  It also works with 
 	  the TX9882 chip on the Compex RL100-ATX board.
@@ -94,6 +99,7 @@ config WINBOND_840
 config DM9102
 	tristate "Davicom DM910x/DM980x support"
 	depends on NET_TULIP && PCI
+	select CRC32
 	---help---
 	  This driver is for DM9102(A)/DM9132/DM9801 compatible PCI cards from
 	  Davicom (<http://www.davicom.com.tw/>).  If you have such a network
@@ -120,6 +126,7 @@ config PCMCIA_XIRCOM
 config PCMCIA_XIRTULIP
 	tristate "Xircom Tulip-like CardBus support (old driver)"
 	depends on NET_TULIP && CARDBUS && BROKEN_ON_SMP
+	select CRC32
 	---help---
 	  This driver is for the Digital "Tulip" Ethernet CardBus adapters.
 	  It should work with most DEC 21*4*-based chips/ethercards, as well

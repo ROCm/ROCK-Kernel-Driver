@@ -84,6 +84,7 @@ config USB_LCD
 config USB_SPEEDTOUCH
 	tristate "Alcatel Speedtouch USB support"
 	depends on USB && ATM
+	select CRC32
 	help
 	  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
 	  modem.  In order to use your modem you will need to install some user

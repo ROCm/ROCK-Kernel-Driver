@@ -46,7 +46,13 @@
 
 /* Change Log
  * 
- * 2.3.18       07/08/03
+ * 2.3.30       09/21/03
+ * o Bug fix (Bugzilla 97908): Loading e100 was causing crash on Itanium2
+ *   with HP chipset
+ * o Bug fix (Bugzilla 101583): e100 can't pass traffic with ipv6
+ * o Bug fix (Bugzilla 101360): PRO/10+ can't pass traffic
+ * 
+ * 2.3.27       08/08/03
  * o Bug fix: read skb->len after freeing skb
  *   [Andrew Morton] akpm@zip.com.au
  * o Bug fix: 82557 (with National PHY) timeout during init
@@ -54,24 +60,6 @@
  * o Feature add: allow to change Wake On LAN when EEPROM disabled
  * 
  * 2.3.13       05/08/03
- * o Feature remove: /proc/net/PRO_LAN_Adapters support gone completely
- * o Feature remove: IDIAG support (use ethtool -t instead)
- * o Cleanup: fixed spelling mistakes found by community
- * o Feature add: ethtool cable diag test
- * o Feature add: ethtool parameter support (ring size, xsum, flow ctrl)
- * o Cleanup: move e100_asf_enable under CONFIG_PM to avoid warning
- *   [Stephen Rothwell (sfr@canb.auug.org.au)]
- * o Bug fix: don't call any netif_carrier_* until netdev registered.
- *   [Andrew Morton (akpm@digeo.com)]
- * o Cleanup: replace (skb->len - skb->data_len) with skb_headlen(skb)
- *   [jmorris@intercode.com.au]
- * o Bug fix: cleanup of Tx skbs after running ethtool diags
- * o Bug fix: incorrect reporting of ethtool diag overall results
- * o Bug fix: must hold xmit_lock before stopping queue in ethtool
- *   operations that require reset h/w and driver structures.
- * o Bug fix: statistic command failure would stop statistic collection.
- * 
- * 2.2.21	02/11/03
  */
  
 #include <linux/config.h>
@@ -137,7 +125,7 @@ static void e100_non_tx_background(unsigned long);
 static inline void e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
-char e100_driver_version[]="2.3.18-k1";
+char e100_driver_version[]="2.3.30-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -584,10 +572,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	pci_set_drvdata(pcid, dev);
 	SET_NETDEV_DEV(dev, &pcid->dev);
 
-	if ((rc = e100_alloc_space(bdp)) != 0) {
-		goto err_dev;
-	}
-
 	bdp->flags = 0;
 	bdp->ifs_state = 0;
 	bdp->ifs_value = 0;
@@ -604,7 +588,11 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	bdp->watchdog_timer.function = (void *) &e100_watchdog;
 
 	if ((rc = e100_pci_setup(pcid, bdp)) != 0) {
-		goto err_dealloc;
+		goto err_dev;
+	}
+
+	if ((rc = e100_alloc_space(bdp)) != 0) {
+		goto err_pci;
 	}
 
 	if (((bdp->pdev->device > 0x1030)
@@ -645,11 +633,11 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	dev->do_ioctl = &e100_ioctl;
 
 	if (bdp->flags & USE_IPCB)
-	dev->features = NETIF_F_SG | NETIF_F_HW_CSUM |
+	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM |
 			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 		
 	if ((rc = register_netdev(dev)) != 0) {
-		goto err_pci;
+		goto err_dealloc;
 	}
 
 	e100_check_options(e100nics, bdp);
@@ -700,12 +688,12 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 err_unregister_netdev:
 	unregister_netdev(dev);
+err_dealloc:
+	e100_dealloc_space(bdp);
 err_pci:
 	iounmap(bdp->scb);
 	pci_release_regions(pcid);
 	pci_disable_device(pcid);
-err_dealloc:
-	e100_dealloc_space(bdp);
 err_dev:
 	pci_set_drvdata(pcid, NULL);
 	kfree(dev);
@@ -1404,6 +1392,9 @@ e100_hw_init(struct e100_private *bdp)
 		bdp->flags |= DF_UCODE_LOADED;
 	}
 
+	if ((u8) bdp->rev_id < D101A4_REV_ID)
+		e100_config_init_82557(bdp);
+		
 	if (!e100_config(bdp))
 		goto err;
 
