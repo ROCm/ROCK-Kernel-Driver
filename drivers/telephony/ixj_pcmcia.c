@@ -38,7 +38,7 @@ typedef struct ixj_info_t {
 static dev_link_t *ixj_attach(void);
 static void ixj_detach(dev_link_t *);
 static void ixj_config(dev_link_t * link);
-static void ixj_cs_release(u_long arg);
+static void ixj_cs_release(dev_link_t * link);
 static int ixj_event(event_t event, int priority, event_callback_args_t * args);
 static dev_info_t dev_info = "ixj_cs";
 static dev_link_t *dev_list = NULL;
@@ -54,9 +54,6 @@ static dev_link_t *ixj_attach(void)
 	if (!link)
 		return NULL;
 	memset(link, 0, sizeof(struct dev_link_t));
-	init_timer(&link->release);
-	link->release.function = &ixj_cs_release;
-	link->release.data = (u_long) link;
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.Attributes2 = IO_DATA_PATH_WIDTH_8;
 	link->io.IOAddrLines = 3;
@@ -97,10 +94,9 @@ static void ixj_detach(dev_link_t * link)
 			break;
 	if (*linkp == NULL)
 		return;
-	del_timer_sync(&link->release);
 	link->state &= ~DEV_RELEASE_PENDING;
 	if (link->state & DEV_CONFIG)
-		ixj_cs_release((u_long) link);
+		ixj_cs_release(link);
 	if (link->handle) {
 		ret = CardServices(DeregisterClient, link->handle);
 		if (ret != CS_SUCCESS)
@@ -251,12 +247,11 @@ static void ixj_config(dev_link_t * link)
 	return;
       cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
-	ixj_cs_release((u_long) link);
+	ixj_cs_release(link);
 }
 
-static void ixj_cs_release(u_long arg)
+static void ixj_cs_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *) arg;
 	ixj_info_t *info = link->priv;
 	DEBUG(0, "ixj_cs_release(0x%p)\n", link);
 	info->ndev = 0;
@@ -274,9 +269,8 @@ static int ixj_event(event_t event, int priority, event_callback_args_t * args)
 	case CS_EVENT_CARD_REMOVAL:
 		link->state &= ~DEV_PRESENT;
 		if (link->state & DEV_CONFIG) {
-			link->release.expires = jiffies + (HZ / 20);
 			link->state |= DEV_RELEASE_PENDING;
-			add_timer(&link->release);
+			ixj_cs_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:

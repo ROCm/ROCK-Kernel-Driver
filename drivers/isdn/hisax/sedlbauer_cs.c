@@ -107,7 +107,7 @@ extern int sedl_init_pcmcia(int, int, int*, int);
 */
 
 static void sedlbauer_config(dev_link_t *link);
-static void sedlbauer_release(u_long arg);
+static void sedlbauer_release(dev_link_t *link);
 static int sedlbauer_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
@@ -205,10 +205,6 @@ static dev_link_t *sedlbauer_attach(void)
     memset(local, 0, sizeof(local_info_t));
     link = &local->link; link->priv = local;
     
-    /* Initialize the dev_link_t structure */
-    link->release.function = &sedlbauer_release;
-    link->release.data = (u_long)link;
-
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
@@ -523,7 +519,7 @@ static void sedlbauer_config(dev_link_t *link)
 
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
-    sedlbauer_release((u_long)link);
+    sedlbauer_release(link);
 
 } /* sedlbauer_config */
 
@@ -535,10 +531,8 @@ cs_failed:
     
 ======================================================================*/
 
-static void sedlbauer_release(u_long arg)
+static void sedlbauer_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
-
     DEBUG(0, "sedlbauer_release(0x%p)\n", link);
 
     /*
@@ -601,7 +595,7 @@ static int sedlbauer_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    ((local_info_t *)link->priv)->stop = 1;
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    sedlbauer_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -655,7 +649,7 @@ static void __exit exit_sedlbauer_cs(void)
 	while (dev_list != NULL) {
 		del_timer(&dev_list->release);
 		if (dev_list->state & DEV_CONFIG)
-			sedlbauer_release((u_long)dev_list);
+			sedlbauer_release(dev_list);
 		sedlbauer_detach(dev_list);
 	}
 }

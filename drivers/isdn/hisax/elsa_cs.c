@@ -107,7 +107,7 @@ extern int elsa_init_pcmcia(int, int, int*, int);
 */
 
 static void elsa_cs_config(dev_link_t *link);
-static void elsa_cs_release(u_long arg);
+static void elsa_cs_release(dev_link_t *link);
 static int elsa_cs_event(event_t event, int priority,
                           event_callback_args_t *args);
 
@@ -198,10 +198,6 @@ static dev_link_t *elsa_cs_attach(void)
     memset(local, 0, sizeof(local_info_t));
     link = &local->link; link->priv = local;
 
-    /* Initialize the dev_link_t structure */
-    link->release.function = &elsa_cs_release;
-    link->release.data = (u_long)link;
-
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
     link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID|IRQ_SHARE_ID;
@@ -272,9 +268,8 @@ static void elsa_cs_detach(dev_link_t *link)
     if (*linkp == NULL)
         return;
 
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG)
-        elsa_cs_release((u_long)link);
+        elsa_cs_release(link);
 
     /*
        If the device is currently configured and active, we won't
@@ -431,7 +426,7 @@ static void elsa_cs_config(dev_link_t *link)
     return;
 cs_failed:
     cs_error(link->handle, last_fn, i);
-    elsa_cs_release((u_long)link);
+    elsa_cs_release(link);
 } /* elsa_cs_config */
 
 /*======================================================================
@@ -442,9 +437,8 @@ cs_failed:
 
 ======================================================================*/
 
-static void elsa_cs_release(u_long arg)
+static void elsa_cs_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
 
     DEBUG(0, "elsa_cs_release(0x%p)\n", link);
 
@@ -503,7 +497,7 @@ static int elsa_cs_event(event_t event, int priority,
         link->state &= ~DEV_PRESENT;
         if (link->state & DEV_CONFIG) {
             ((local_info_t*)link->priv)->busy = 1;
-            mod_timer(&link->release, jiffies + HZ/20);
+	    elsa_cs_release(link);
         }
         break;
     case CS_EVENT_CARD_INSERTION:
