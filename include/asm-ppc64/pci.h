@@ -16,11 +16,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 
-static inline int pcibios_assign_all_busses(void)
-{
-	return 0;
-}
-
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		0x10000000
 
@@ -36,7 +31,18 @@ static inline void pcibios_penalize_isa_irq(int irq)
 
 struct pci_dev;
 
-extern char* pci_card_location(struct pci_dev*);
+#define HAVE_ARCH_PCI_MWI 1
+static inline int pcibios_prep_mwi(struct pci_dev *dev)
+{
+	/* 
+	 * pSeries firmware sets cacheline size and hardware treats
+	 * MWI the same as memory write, so we dont change cacheline size
+	 * or the MWI bit.
+	 */
+	return 1;
+}
+
+extern unsigned int pcibios_assign_all_busses(void);
 
 extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				  dma_addr_t *dma_handle);
@@ -51,8 +57,6 @@ extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
                       int nents, int direction);
 extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
                          int nents, int direction);
-
-extern void pSeries_pcibios_init_early(void);
 
 static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
@@ -122,9 +126,10 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
  */
 #define PCI_DMA_BUS_IS_PHYS	(0)
 	
-#endif	/* __KERNEL__ */
+extern void
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			struct resource *res);
 
-/* generic pci stuff */
-#include <asm-generic/pci.h>
+#endif	/* __KERNEL__ */
 
 #endif /* __PPC64_PCI_H */

@@ -40,7 +40,7 @@ struct pci_controller {
 	void *io_base_virt;
 	unsigned long io_base_phys;
 
-	/* Some machines (PReP) have a non 1:1 mapping of
+	/* Some machines have a non 1:1 mapping of
 	 * the PCI memory space in the CPU bus space
 	 */
 	unsigned long pci_mem_offset;
