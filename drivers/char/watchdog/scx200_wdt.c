@@ -19,6 +19,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
@@ -41,11 +42,11 @@ MODULE_LICENSE("GPL");
 #endif
 
 static int margin = 60;		/* in seconds */
-MODULE_PARM(margin, "i");
+module_param(margin, int, 0);
 MODULE_PARM_DESC(margin, "Watchdog margin in seconds");
 
 static int nowayout = CONFIG_WATCHDOG_NOWAYOUT;
-MODULE_PARM(nowayout, "i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Disable watchdog shutdown on close");
 
 static u16 wdto_restart;

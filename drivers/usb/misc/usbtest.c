@@ -471,7 +471,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 		 * they're ordered meaningfully in this array
 		 */
 		if (iface->altsetting [i].desc.bAlternateSetting != i) {
-			dbg ("%s, illegal alt [%d].bAltSetting = %d",
+			dbg ("%s, invalid alt [%d].bAltSetting = %d",
 					dev->id, i, 
 					iface->altsetting [i].desc
 						.bAlternateSetting);

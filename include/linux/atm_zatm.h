@@ -21,9 +21,6 @@
 						/* get statistics and zero */
 #define ZATM_SETPOOL	_IOW('a',ATMIOC_SARPRV+3,struct atmif_sioc)
 						/* set pool parameters */
-#define ZATM_GETTHIST	_IOW('a',ATMIOC_SARPRV+4,struct atmif_sioc)
-						/* get a history of timer
-						   differences */
 
 struct zatm_pool_info {
 	int ref_count;			/* free buffer pool usage counters */

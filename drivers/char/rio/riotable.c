@@ -208,7 +208,7 @@ struct rio_info *	p;
 				return -ENXIO;
 			}
 			if ( MapP->ID > MAX_RUP ) {
-				rio_dprintk (RIO_DEBUG_TABLE, "RIO: RTA %s has been allocated an illegal ID %d\n",
+				rio_dprintk (RIO_DEBUG_TABLE, "RIO: RTA %s has been allocated an invalid ID %d\n",
 							MapP->Name, MapP->ID);
 				p->RIOError.Error = ID_NUMBER_OUT_OF_RANGE;
 				p->RIOError.Entry = Entry;

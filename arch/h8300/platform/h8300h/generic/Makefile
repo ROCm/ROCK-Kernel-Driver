@@ -6,7 +6,8 @@
 # unless it's something special (ie not a .c file).
 #
 
-obj-y := timer.o crt0_$(MODEL).o
+obj-y := timer.o
+extra-y =  crt0_$(MODEL).o
 
 clean:
 	rm -f *.[oa]

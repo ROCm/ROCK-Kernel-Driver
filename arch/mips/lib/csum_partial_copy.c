@@ -1,18 +1,10 @@
 /*
- * INET		An implementation of the TCP/IP protocol suite for the LINUX
- *		operating system.  INET is implemented using the  BSD Socket
- *		interface as the means of communication with the user level.
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- *		MIPS specific IP/TCP/UDP checksumming routines
- *
- * Authors:	Ralf Baechle, <ralf@waldorf-gmbh.de>
- *		Lots of code moved from tcp.c and ip.c; see those files
- *		for more names.
- *
- *		This program is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
+ * Copyright (C) 1994, 1995 Waldorf Electronics GmbH
+ * Copyright (C) 1998, 1999 Ralf Baechle
  */
 #include <net/checksum.h>
 #include <linux/types.h>

@@ -1,5 +1,5 @@
 #
-# Character device configuration
+# Watchdog device configuration
 #
 
 menu "Watchdog Cards"
@@ -68,22 +68,6 @@ config WDT
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called wdt.
 
-config WDTPCI
-	tristate "WDT PCI Watchdog timer"
-	depends on WATCHDOG
-	---help---
-	  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
-	  N.  It is not possible to probe for this board, which means that you
-	  have to inform the kernel about the IO port and IRQ using the "wdt="
-	  kernel option (try "man bootparam" or see the documentation of your
-	  boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt_pci.
-
 config WDT_501
 	bool "WDT501 features"
 	depends on WDT
@@ -101,6 +85,33 @@ config WDT_501_FAN
 	help
 	  Enable the Fan Tachometer on the WDT501. Only do this if you have a
 	  fan tachometer actually set up.
+
+config WDTPCI
+	tristate "WDT PCI Watchdog timer"
+	depends on WATCHDOG
+	---help---
+	  If you have a PCI WDT500/501 watchdog board, say Y here, otherwise
+	  N.  It is not possible to probe for this board, which means that you
+	  have to inform the kernel about the IO port and IRQ using the "wdt="
+	  kernel option (try "man bootparam" or see the documentation of your
+	  boot loader (lilo or loadlin) about how to pass options to the
+	  kernel at boot time).
+
+	  If you want to compile this as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called wdt_pci.
+
+config WDT_501_PCI
+	bool "WDT501-PCI features"
+	depends on WDTPCI
+	help
+	  Saying Y here and creating a character special file /dev/temperature
+	  with major number 10 and minor number 131 ("man mknod") will give
+	  you a thermometer inside your computer: reading from
+	  /dev/temperature yields one byte, the temperature in degrees
+	  Fahrenheit. This works only if you have a WDT501P watchdog board
+	  installed.
 
 config PCWATCHDOG
 	tristate "Berkshire Products PC Watchdog"
@@ -132,7 +143,7 @@ config ACQUIRE_WDT
 	  This driver is like the WDT501 driver but for different hardware.
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called pscwdt.  If you want to compile it as a
+	  The module is called acquirewdt.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
@@ -179,7 +190,7 @@ config SA1100_WATCHDOG
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt. The module will be called sa1100_wdt.
+	  <file:Documentation/modules.txt>. The module will be called sa1100_wdt.
 
 config EUROTECH_WDT
 	tristate "Eurotech CPU-1220/1410 Watchdog Timer"
@@ -203,14 +214,14 @@ config IB700_WDT
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module is called ib700wdt. If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt. Most people
+	  module, say M here and read <file:Documentation/modules.txt>. Most people
 	  will say N.
 
 config I810_TCO
-	tristate "Intel i810 TCO timer / Watchdog"
+	tristate "Intel i8xx TCO timer / Watchdog"
 	depends on WATCHDOG
 	---help---
-	  Hardware driver for the TCO timer built into the Intel i810 and i815
+	  Hardware driver for the TCO timer built into the Intel i8xx
 	  chipset family.  The TCO (Total Cost of Ownership) timer is a
 	  watchdog timer that will reboot the machine after its second
 	  expiration. The expiration time can be configured by commandline
@@ -277,7 +288,7 @@ config W83877F_WDT
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called mixcomwd.  If you want to compile it as a
+	  The module is called w83877f_wdt.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
@@ -295,10 +306,6 @@ config MACHZ_WDT
 	  inserted in and removed from the running kernel whenever you want).
 	  The module is called machzwd.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
-
-config W83877F_WDT
-	tristate "W83877F Computer Watchdog"
-	depends on WATCHDOG
 
 config SC520_WDT
 	tristate "AMD Elan SC520 processor Watchdog"
@@ -336,7 +343,7 @@ config ALIM7101_WDT
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module is called alim7101_wdt.  If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt.  Most
+	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
 config SC1200_WDT
@@ -351,7 +358,7 @@ config SC1200_WDT
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module is called sc1200wdt.  If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt.  Most
+	  module, say M here and read <file:Documentation/modules.txt>.  Most
 	  people will say N.
 
 config WAFER_WDT
@@ -364,8 +371,8 @@ config WAFER_WDT
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
-	  Documentation/modules.txt. The module will be called
-	  wafer5823wdt.o
+	  <file:Documentation/modules.txt>. The module will be called
+	  wafer5823wdt.
 
 config CPU5_WDT
 	tristate "SMA CPU5 Watchdog"
@@ -374,7 +381,7 @@ config CPU5_WDT
 	  TBD.
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module is called cpu5wdt.o.  If you want to compile it as a
+	  The module is called cpu5wdt.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 endmenu

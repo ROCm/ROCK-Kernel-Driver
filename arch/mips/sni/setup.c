@@ -5,9 +5,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 2000 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 1998, 2000, 2003 by Ralf Baechle
  */
-#include <asm/ptrace.h>
 #include <linux/config.h>
 #include <linux/hdreg.h>
 #include <linux/ioport.h>
@@ -19,17 +18,18 @@
 #include <linux/mc146818rtc.h>
 #include <linux/console.h>
 #include <linux/fb.h>
-#include <linux/pc_keyb.h>
 #include <linux/ide.h>
 
 #include <asm/bcache.h>
 #include <asm/bootinfo.h>
-#include <asm/keyboard.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/processor.h>
+#include <asm/ptrace.h>
 #include <asm/reboot.h>
 #include <asm/sni.h>
+#include <asm/time.h>
+#include <asm/traps.h>
 
 extern void sni_machine_restart(char *command);
 extern void sni_machine_halt(void);
@@ -37,11 +37,8 @@ extern void sni_machine_power_off(void);
 
 extern struct ide_ops std_ide_ops;
 extern struct rtc_ops std_rtc_ops;
-extern struct kbd_ops std_kbd_ops;
 
-void (*board_time_init)(struct irqaction *irq);
-
-static void __init sni_rm200_pci_time_init(struct irqaction *irq)
+static void __init sni_rm200_pci_timer_setup(struct irqaction *irq)
 {
 	/* set the clock to 100 Hz */
 	outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
@@ -50,7 +47,7 @@ static void __init sni_rm200_pci_time_init(struct irqaction *irq)
 	setup_irq(0, irq);
 }
 
-unsigned char aux_device_present;
+
 extern unsigned char sni_map_isa_cache;
 
 /*
@@ -80,14 +77,16 @@ void __init sni_rm200_pci_setup(void)
 	sni_pcimt_detect();
 	sni_pcimt_sc_init();
 
-	mips_io_port_base = SNI_PORT_BASE;
+	set_io_port_base(SNI_PORT_BASE);
 
 	/*
 	 * Setup (E)ISA I/O memory access stuff
 	 */
 	isa_slot_offset = 0xb0000000;
 	// sni_map_isa_cache = 0;
+#ifdef CONFIG_EISA
 	EISA_bus = 1;
+#endif
 
 	request_region(0x00,0x20,"dma1");
 	request_region(0x40,0x20,"timer");
@@ -95,13 +94,11 @@ void __init sni_rm200_pci_setup(void)
 	request_region(0x70,0x10,"rtc");
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
-	board_time_init = sni_rm200_pci_time_init;
+	board_timer_setup = sni_rm200_pci_timer_setup;
 
 	_machine_restart = sni_machine_restart;
 	_machine_halt = sni_machine_halt;
 	_machine_power_off = sni_machine_power_off;
-
-	aux_device_present = 0xaa;
 
 	/*
 	 * Some cluefull person has placed the PCI config data directly in
@@ -127,8 +124,4 @@ void __init sni_rm200_pci_setup(void)
 	};
 
 	rtc_ops = &std_rtc_ops;
-	kbd_ops = &std_kbd_ops;
-#ifdef CONFIG_PSMOUSE
-	aux_device_present = 0xaa;
-#endif
 }

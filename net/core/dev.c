@@ -1657,6 +1657,7 @@ job_done:
 	*budget -= work;
 
 	list_del(&backlog_dev->poll_list);
+	smp_mb__before_clear_bit();
 	clear_bit(__LINK_STATE_RX_SCHED, &backlog_dev->state);
 
 	if (queue->throttle) {

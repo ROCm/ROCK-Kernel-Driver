@@ -264,11 +264,10 @@ extern void ip22_be_interrupt(int irq, struct pt_regs *regs);
 
 void indy_buserror_irq(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq = SGI_BUSERR_IRQ;
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	ip22_be_interrupt(irq, regs);
 	irq_exit();
 }

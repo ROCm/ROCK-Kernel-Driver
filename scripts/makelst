@@ -28,4 +28,4 @@ if [ -n "$t1" ]; then
 else
   t7=0
 fi
-$3 --source --adjust-vma=$t7 $1
+$3 -r --source --adjust-vma=$t7 $1

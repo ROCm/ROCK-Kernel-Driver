@@ -171,14 +171,6 @@ static void flush_stale_links(void)
 
 ======================================================================*/
 
-static void com20020cs_open_close(struct net_device *dev, bool open)
-{
-    if (open)
-	MOD_INC_USE_COUNT;
-    else
-	MOD_DEC_USE_COUNT;
-}
-
 static dev_link_t *com20020_attach(void)
 {
     client_reg_t client_reg;
@@ -237,7 +229,7 @@ static dev_link_t *com20020_attach(void)
     lp->backplane = backplane;
     lp->clockp = clockp;
     lp->clockm = clockm & 3;
-    lp->hw.open_close_ll = com20020cs_open_close;
+    lp->hw.owner = THIS_MODULE;
 
     link->irq.Instance = info->dev = dev;
     link->priv = info;

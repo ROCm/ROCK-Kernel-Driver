@@ -13,7 +13,7 @@ serial console (to see what you're doing).  No other devices have been
 enabled.
 
 To build, do a "make menuconfig" (or xmenuconfig) and select Itsy support.
-Disable Flash and LCD support. and then do a make dep and a make zImage.
+Disable Flash and LCD support. and then do a make zImage.
 Finally, you will need to cd to arch/arm/boot/tools and execute a make there
 to build the params-itsy program used to boot the kernel.
 

@@ -710,7 +710,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
   struct page **pages;
   int pagecnt = 0;
   char b[BDEVNAME_SIZE];
-21 e3 
+
   *retlen = 0;
   DEBUG(2, "blkmtd: write: dev = `%s' to = %ld len = %d buf = %p\n",
 	bdevname(rawdevice->binding, b), (long int)to, len, buf);
@@ -1189,6 +1189,7 @@ static int __init init_blkmtd(void)
   INIT_LIST_HEAD(&mtd_rawdevice->as.locked_pages);
   mtd_rawdevice->as.host = NULL;
   init_MUTEX(&(mtd_rawdevice->as.i_shared_sem));
+  atomic_set(&(mtd_rawdevice->as.truncate_count), 0);
 
   mtd_rawdevice->as.a_ops = &blkmtd_aops;
   INIT_LIST_HEAD(&mtd_rawdevice->as.i_mmap);

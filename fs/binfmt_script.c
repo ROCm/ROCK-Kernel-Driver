@@ -69,7 +69,7 @@ static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 	 * user environment and arguments are stored.
 	 */
 	remove_arg_zero(bprm);
-	retval = copy_strings_kernel(1, &bprm->filename, bprm);
+	retval = copy_strings_kernel(1, &bprm->interp, bprm);
 	if (retval < 0) return retval; 
 	bprm->argc++;
 	if (i_arg) {
@@ -80,6 +80,8 @@ static int load_script(struct linux_binprm *bprm,struct pt_regs *regs)
 	retval = copy_strings_kernel(1, &i_name, bprm);
 	if (retval) return retval; 
 	bprm->argc++;
+	bprm->interp = interp;
+
 	/*
 	 * OK, now restart the process with the interpreter's dentry.
 	 */

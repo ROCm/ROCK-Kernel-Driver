@@ -57,7 +57,7 @@ static struct _snd_timer_hardware rtc_hw = {
 	.stop =		rtctimer_stop,
 };
 
-int rtctimer_freq = RTC_FREQ;		/* frequency */
+static int rtctimer_freq = RTC_FREQ;		/* frequency */
 static snd_timer_t *rtctimer;
 static atomic_t rtc_inc = ATOMIC_INIT(0);
 static rtc_task_t rtc_task;
@@ -181,5 +181,17 @@ MODULE_PARM(rtctimer_freq, "i");
 MODULE_PARM_DESC(rtctimer_freq, "timer frequency in Hz");
 
 MODULE_LICENSE("GPL");
+
+#ifndef MODULE
+/* format is: snd-rtctimer=freq */
+
+static int __init rtctimer_setup(char *str)
+{
+	(void)(get_option(&str,&rtctimer_freq) == 2);
+	return 1;
+}
+
+__setup("snd-rtctimer=", rtctimer_setup);
+#endif /* ifndef MODULE */
 
 #endif /* CONFIG_RTC || CONFIG_RTC_MODULE */

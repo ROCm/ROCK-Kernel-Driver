@@ -1,5 +1,4 @@
-/* $Id: floppy-jazz.c,v 1.2 1998/10/18 13:18:25 tsbogend Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -16,7 +15,6 @@
 #include <asm/addrspace.h>
 #include <asm/jazz.h>
 #include <asm/jazzdma.h>
-#include <asm/keyboard.h>
 #include <asm/pgtable.h>
 #include <asm/floppy.h>
 
@@ -108,9 +106,9 @@ static unsigned long jazz_fd_dma_mem_alloc(unsigned long size)
 
 static void jazz_fd_dma_mem_free(unsigned long addr,
                                         unsigned long size)
-{       
+{
 	vdma_free(vdma_phys2log(PHYSADDR(addr)));
-	free_pages(addr, get_order(size));	
+	free_pages(addr, get_order(size));
 }
 
 static unsigned long jazz_fd_drive_type(unsigned long n)

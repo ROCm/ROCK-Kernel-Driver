@@ -2554,10 +2554,10 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		case SIOCGPC300CONF:
 #ifdef CONFIG_PC300_MLPPP
 			if (conf->proto != PC300_PROTO_MLPPP) {
-				conf->proto = hdlc->proto;
+				conf->proto = hdlc->proto.id;
 			}
 #else
-			conf->proto = hdlc->proto;
+			conf->proto = hdlc->proto.id;
 #endif
 			memcpy(&conf_aux.conf, conf, sizeof(pc300chconf_t));
 			memcpy(&conf_aux.hw, &card->hw, sizeof(pc300hw_t));
@@ -2590,12 +2590,12 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					}
 				} else {
 					memcpy(conf, &conf_aux.conf, sizeof(pc300chconf_t));
-					hdlc->proto = conf->proto;
+					hdlc->proto.id = conf->proto;
 				}
 			}
 #else
 			memcpy(conf, &conf_aux.conf, sizeof(pc300chconf_t));
-			hdlc->proto = conf->proto;
+			hdlc->proto.id = conf->proto;
 #endif
 			return 0;
 		case SIOCGPC300STATUS:
@@ -3153,12 +3153,12 @@ int cpc_open(struct net_device *dev)
 	printk("pc300: cpc_open");
 #endif
 
-	if (hdlc->proto == IF_PROTO_PPP) {
+	if (hdlc->proto.id == IF_PROTO_PPP) {
 		d->if_ptr = &hdlc->state.ppp.pppdev;
 	}
 
 	result = hdlc_open(hdlc);
-	if (hdlc->proto == IF_PROTO_PPP) {
+	if (hdlc->proto.id == IF_PROTO_PPP) {
 		dev->priv = d;
 	}
 	if (result) {
@@ -3191,7 +3191,7 @@ int cpc_close(struct net_device *dev)
 	CPC_UNLOCK(card, flags);
 
 	hdlc_close(hdlc);
-	if (hdlc->proto == IF_PROTO_PPP) {
+	if (hdlc->proto.id == IF_PROTO_PPP) {
 		d->if_ptr = NULL;
 	}
 #ifdef CONFIG_PC300_MLPPP

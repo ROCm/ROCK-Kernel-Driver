@@ -2,16 +2,15 @@
  *
  * Name:	sklm80.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.17 $
- * Date:	$Date: 1999/11/22 13:35:51 $
+ * Version:	$Revision: 1.20 $
+ * Date:	$Date: 2002/08/13 09:16:27 $
  * Purpose:	Funktions to access Voltage and Temperature Sensor (LM80)
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998,1999 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -27,6 +26,16 @@
  * History:
  *
  *	$Log: sklm80.c,v $
+ *	Revision 1.20  2002/08/13 09:16:27  rschmidt
+ *	Changed return value for SkLm80ReadSensor() back to 'int'
+ *	Editorial changes
+ *	
+ *	Revision 1.19  2002/08/06 09:43:31  jschmalz
+ *	Extensions and changes for Yukon
+ *	
+ *	Revision 1.18  2002/08/02 12:26:57  rschmidt
+ *	Editorial changes
+ *	
  *	Revision 1.17  1999/11/22 13:35:51  cgoos
  *	Changed license header to GPL.
  *	
@@ -93,7 +102,7 @@
 	LM80 functions
 */
 static const char SysKonnectFileId[] =
-	"$Id: sklm80.c,v 1.17 1999/11/22 13:35:51 cgoos Exp $" ;
+	"$Id: sklm80.c,v 1.20 2002/08/13 09:16:27 rschmidt Exp $" ;
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/lm80.h"
@@ -107,15 +116,15 @@ static const char SysKonnectFileId[] =
 
 #ifdef	SK_DIAG
 /*
- * read the regeister 'reg' from the device 'device'
+ * read the register 'Reg' from the device 'Dev'
  *
  * return 	read error	-1
  *		success		the read value
  */
 int	SkLm80RcvReg(
 SK_IOC	IoC,		/* Adapter Context */
-int	Dev,		/* I2C device address */
-int	Reg)		/* register to read */
+int		Dev,		/* I2C device address */
+int		Reg)		/* register to read */
 {
 	int	Val = 0;
 	int	TempExt;
@@ -134,9 +143,9 @@ int	Reg)		/* register to read */
 		return(-1);
 	}
 
-	switch(Reg) {
+	switch (Reg) {
 	case LM80_TEMP_IN:
-		Val = (int)SkI2cRcvByte(IoC, 1) ;
+		Val = (int)SkI2cRcvByte(IoC, 1);
 
 		/* First: correct the value: it might be negative */
 		if ((Val & 0x80) != 0) {
@@ -145,7 +154,9 @@ int	Reg)		/* register to read */
 		}
 		Val = Val * SK_LM80_TEMP_LSB;
 		SkI2cStop(IoC);
-		TempExt = (int) SkLm80RcvReg(IoC,LM80_ADDR,LM80_TEMP_CTRL);
+		
+		TempExt = (int)SkLm80RcvReg(IoC, LM80_ADDR, LM80_TEMP_CTRL);
+		
 		if (Val > 0) {
 			Val += ((TempExt >> 7) * SK_LM80_TEMPEXT_LSB);
 		}
@@ -158,10 +169,11 @@ int	Reg)		/* register to read */
 	case LM80_VT1_IN:
 	case LM80_VT2_IN:
 	case LM80_VT3_IN:
-		Val = (int) SkI2cRcvByte(IoC, 1) * SK_LM80_VT_LSB;
+		Val = (int)SkI2cRcvByte(IoC, 1) * SK_LM80_VT_LSB;
 		break;
+	
 	default:
-		Val = (int) SkI2cRcvByte(IoC, 1);
+		Val = (int)SkI2cRcvByte(IoC, 1);
 		break;
 	}
 
@@ -173,30 +185,32 @@ int	Reg)		/* register to read */
 /*
  * read a sensors value (LM80 specific)
  *
- * This function reads a sensors value from the I2c sensor chip LM80. The
- * sensor is defined by its index into the sensors database in the struct
+ * This function reads a sensors value from the I2C sensor chip LM80.
+ * The sensor is defined by its index into the sensors database in the struct
  * pAC points to.
  *
  * Returns	1 if the read is completed
- *		0 if the read must be continued (I2c Bus still allocated)
+ *		0 if the read must be continued (I2C Bus still allocated)
  */
-int	SkLm80ReadSensor(
+int SkLm80ReadSensor(
 SK_AC		*pAC,	/* Adapter Context */
-SK_IOC		IoC,	/* IoContext needed in level 1 and 2 */
+SK_IOC		IoC,	/* I/O Context needed in level 1 and 2 */
 SK_SENSOR	*pSen)	/* Sensor to be read */
 {
 	SK_I32		Value;
 
-	switch(pSen->SenState) {
+	switch (pSen->SenState) {
 	case SK_SEN_IDLE:
 		/* Send address to ADDR register */
-		SK_I2C_CTL(IoC,I2C_READ,pSen->SenDev,pSen->SenReg,0);
+		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, pSen->SenReg, 0);
 
 		pSen->SenState = SK_SEN_VALUE ;
-		BREAK_OR_WAIT(pAC, IoC, I2C_READ) ;
+		BREAK_OR_WAIT(pAC, IoC, I2C_READ);
+	
 	case SK_SEN_VALUE:
 		/* Read value from data register */
-		SK_IN32(IoC,B2_I2C_DATA, ((SK_U32 *)&Value));
+		SK_IN32(IoC, B2_I2C_DATA, ((SK_U32 *)&Value));
+		
 		Value &= 0xff; /* only least significant byte is valid */
 
 		/* Do NOT check the Value against the thresholds */
@@ -228,10 +242,9 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 			Value = Value - 256;
 		}
 
-		/* We have a temperature sensor and need to get the signed
-		 * extension. For now we get the extension from the last
-		 * reading, so in the normal case we won't see flickering
-		 * temperatures.
+		/* We have a temperature sensor and need to get the signed extension.
+		 * For now we get the extension from the last reading, so in the normal
+		 * case we won't see flickering temperatures.
 		 */
 		pSen->SenValue = (Value * SK_LM80_TEMP_LSB) +
 			(pSen->SenValue % SK_LM80_TEMP_LSB);
@@ -240,32 +253,34 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
 		SK_I2C_CTL(IoC, I2C_READ, pSen->SenDev, LM80_TEMP_CTRL, 0);
 
 		pSen->SenState = SK_SEN_VALEXT ;
-		BREAK_OR_WAIT(pAC, IoC, I2C_READ) ;
+		BREAK_OR_WAIT(pAC, IoC, I2C_READ);
+	
 	case SK_SEN_VALEXT:
 		/* Read value from data register */
-		SK_IN32(IoC,B2_I2C_DATA,((SK_U32 *)&Value));
+		SK_IN32(IoC, B2_I2C_DATA, ((SK_U32 *)&Value));
 		Value &= LM80_TEMP_LSB_9; /* only bit 7 is valid */
 
 		/* cut the LSB bit */
 		pSen->SenValue = ((pSen->SenValue / SK_LM80_TEMP_LSB) *
-			SK_LM80_TEMP_LSB) ;
+			SK_LM80_TEMP_LSB);
 
 		if (pSen->SenValue < 0) {
 			/* Value negative: The bit value must be subtracted */
 			pSen->SenValue -= ((Value >> 7) * SK_LM80_TEMPEXT_LSB);
-		} else {
+		}
+		else {
 			/* Value positive: The bit value must be added */
 			pSen->SenValue += ((Value >> 7) * SK_LM80_TEMPEXT_LSB);
 		}
 
 		pSen->SenState = SK_SEN_IDLE ;
 		return(1);
+	
 	default:
-		SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E007,
-			SKERR_I2C_E007MSG) ;
+		SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E007, SKERR_I2C_E007MSG);
 		return(1);
 	}
 
 	/* Not completed */
-	return(0) ;
+	return(0);
 }

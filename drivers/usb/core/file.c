@@ -93,7 +93,7 @@ static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
 	struct usb_interface *intf = class_dev_to_usb_interface(class_dev);
 	dev_t dev = MKDEV(USB_MAJOR, intf->minor);
-	return sprintf(buf, "%04x\n", dev);
+	return print_dev_t(buf, dev);
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
 

@@ -979,7 +979,8 @@ linvfs_direct_IO(
 	if (error)
 		return -error;
 
-        return blockdev_direct_IO(rw, iocb, inode, pbmap.pbm_target->pbr_bdev,
+        return blockdev_direct_IO(rw, iocb, inode,
+		pbmap.pbm_target->pbr_bdev,
 		iov, offset, nr_segs,
 		linvfs_get_blocks_direct,
 		linvfs_unwritten_convert_direct);

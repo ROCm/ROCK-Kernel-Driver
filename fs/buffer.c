@@ -91,6 +91,7 @@ void wake_up_buffer(struct buffer_head *bh)
 {
 	wait_queue_head_t *wq = bh_waitq_head(bh);
 
+	smp_mb();
 	if (waitqueue_active(wq))
 		wake_up_all(wq);
 }
@@ -414,6 +415,9 @@ __find_get_block_slow(struct block_device *bdev, sector_t block, int unused)
 		bh = bh->b_this_page;
 	} while (bh != head);
 	buffer_error();
+	printk("block=%llu, b_blocknr=%llu\n",
+		(unsigned long long)block, (unsigned long long)bh->b_blocknr);
+	printk("b_state=0x%08lx, b_size=%u\n", bh->b_state, bh->b_size);
 out_unlock:
 	spin_unlock(&bd_mapping->private_lock);
 	page_cache_release(page);
@@ -502,7 +506,8 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 		set_buffer_uptodate(bh);
 	} else {
 		clear_buffer_uptodate(bh);
-		buffer_io_error(bh);
+		if (!(current->flags & PF_READAHEAD))
+			buffer_io_error(bh);
 		SetPageError(page);
 	}
 

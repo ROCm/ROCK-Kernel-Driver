@@ -274,7 +274,6 @@ void __init xfrm6_init(void)
 {
 	xfrm6_policy_init();
 	xfrm6_state_init();
-	xfrm6_input_init();
 }
 
 void __exit xfrm6_fini(void)

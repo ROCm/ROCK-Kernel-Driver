@@ -141,14 +141,14 @@ void disable_lapic_nmi_watchdog(void)
 	/* tell do_nmi() and others that we're not active any more */
 	nmi_watchdog = 0;
 }
+
 void enable_lapic_nmi_watchdog(void)
-  {
+{
 	if (nmi_active < 0) {
 		nmi_watchdog = NMI_LOCAL_APIC;
 		setup_apic_nmi_watchdog();
 	}
-  }
-
+}
 
 void disable_timer_nmi_watchdog(void)
 {
@@ -172,8 +172,6 @@ void enable_timer_nmi_watchdog(void)
 }
 
 #ifdef CONFIG_PM
-
-#include <linux/device.h>
 
 static int nmi_pm_active; /* nmi_active before suspend */
 

@@ -376,7 +376,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    if ( is_direntry_le_ih (B_N_PITEM_HEAD (tbS0, item_pos))) {
 
 			RFALSE( zeros_num,
-				"PAP-12090: illegal parameter in case of a directory");
+				"PAP-12090: invalid parameter in case of a directory");
 			/* directory item */
 			if ( tb->lbytes > pos_in_item ) {
 			    /* new directory entry falls into L[0] */
@@ -646,7 +646,7 @@ static int balance_leaf (struct tree_balance * tb,
 			int entry_count;
 
 			RFALSE( zeros_num,
-				"PAP-12145: illegal parametr in case of a directory");
+				"PAP-12145: invalid parameter in case of a directory");
 			entry_count = I_ENTRY_COUNT(B_N_PITEM_HEAD(tbS0, item_pos));
 			if ( entry_count - tb->rbytes < pos_in_item )
 			    /* new directory entry falls into R[0] */

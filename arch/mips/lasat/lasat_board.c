@@ -71,19 +71,19 @@ static void init_flash_sizes(void)
 	ls[LASAT_MTD_NORMAL] = 0x100000;
 
 	if (mips_machtype == MACH_LASAT_100) {
-		lasat_board_info.li_flash_base = KSEG1ADDR(0x1e000000);
+		lasat_board_info.li_flash_base = 0x1e000000;
 		
-		lb[LASAT_MTD_BOOTLOADER] = KSEG1ADDR(0x1e400000);
+		lb[LASAT_MTD_BOOTLOADER] = 0x1e400000;
 
 		if (lasat_board_info.li_flash_size > 0x200000) {
 			ls[LASAT_MTD_CONFIG] = 0x100000;
 			ls[LASAT_MTD_FS] = 0x500000;
 		}
 	} else {
-		lasat_board_info.li_flash_base = KSEG1ADDR(0x10000000);
+		lasat_board_info.li_flash_base = 0x10000000;
 
 		if (lasat_board_info.li_flash_size < 0x1000000) {
-			lb[LASAT_MTD_BOOTLOADER] = KSEG1ADDR(0x10000000);
+			lb[LASAT_MTD_BOOTLOADER] = 0x10000000;
 			ls[LASAT_MTD_CONFIG] = 0x100000;
 			if (lasat_board_info.li_flash_size >= 0x400000) {
 				ls[LASAT_MTD_FS] = lasat_board_info.li_flash_size - 0x300000;

@@ -1,14 +1,12 @@
 /*
- * Linux ioctl() stuff.
- *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 2001 by Ralf Baechle
+ * Copyright (C) 1995, 96, 99, 2001 Ralf Baechle
  */
-#ifndef __ASM_MIPS_IOCTL_H
-#define __ASM_MIPS_IOCTL_H
+#ifndef _ASM_IOCTL_H
+#define _ASM_IOCTL_H
 
 /*
  * The original linux ioctl numbering scheme was just a general
@@ -38,6 +36,11 @@
 #define _IOC_TYPESHIFT	(_IOC_NRSHIFT+_IOC_NRBITS)
 #define _IOC_SIZESHIFT	(_IOC_TYPESHIFT+_IOC_TYPEBITS)
 #define _IOC_DIRSHIFT	(_IOC_SIZESHIFT+_IOC_SIZEBITS)
+
+/*
+ * We to additionally limit parameters to a maximum 255 bytes.
+ */
+#define _IOC_SLMASK	0xff
 
 /*
  * Direction bits _IOC_NONE could be 0, but OSF/1 gives it a bit.
@@ -82,4 +85,4 @@
 #define IOCSIZE_MASK	(_IOC_SIZEMASK << _IOC_SIZESHIFT)
 #define IOCSIZE_SHIFT	(_IOC_SIZESHIFT)
 
-#endif /* __ASM_MIPS_IOCTL_H */
+#endif /* _ASM_IOCTL_H */

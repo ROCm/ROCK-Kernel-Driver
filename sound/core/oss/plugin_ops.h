@@ -323,7 +323,7 @@ get_s16_1234_xxC3: sample = swab16(as_u32(src) ^ 0x80); goto GET_S16_END;
 
 #ifdef PUT_S16_LABELS
 /* dst_wid dst_endswap unsigned */
-static void *put_s16_labels[4 * 2 * 2 * 4 * 2] = {
+static void *put_s16_labels[4 * 2 * 2] = {
 	&&put_s16_xx12_xxx1,	 /* 16h ->  8h */
 	&&put_s16_xx12_xxx9,	 /* 16h ^>  8h */
 	&&put_s16_xx12_xxx1,	 /* 16h ->  8s */

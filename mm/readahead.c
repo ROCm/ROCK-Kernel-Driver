@@ -96,8 +96,6 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 	struct pagevec lru_pvec;
 	int ret = 0;
 
-	current->flags |= PF_READAHEAD;
-
 	if (mapping->a_ops->readpages) {
 		ret = mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
 		goto out;
@@ -118,7 +116,6 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 	}
 	pagevec_lru_add(&lru_pvec);
 out:
-	current->flags &= ~PF_READAHEAD;
 	return ret;
 }
 
@@ -263,8 +260,8 @@ out:
  * Chunk the readahead into 2 megabyte units, so that we don't pin too much
  * memory at once.
  */
-int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
-			unsigned long offset, unsigned long nr_to_read)
+int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
+		unsigned long offset, unsigned long nr_to_read)
 {
 	int ret = 0;
 
@@ -287,6 +284,27 @@ int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 		ret += err;
 		offset += this_chunk;
 		nr_to_read -= this_chunk;
+	}
+	return ret;
+}
+
+/*
+ * This version skips the IO if the queue is read-congested, and will tell the
+ * block layer to abandon the readahead if request allocation would block.
+ *
+ * force_page_cache_readahead() will ignore queue congestion and will block on
+ * request queues.
+ */
+int do_page_cache_readahead(struct address_space *mapping, struct file *filp,
+			unsigned long offset, unsigned long nr_to_read)
+{
+	int ret = 0;
+
+	if (!bdi_read_congested(mapping->backing_dev_info)) {
+		current->flags |= PF_READAHEAD;
+		ret = __do_page_cache_readahead(mapping, filp,
+						offset, nr_to_read);
+		current->flags &= ~PF_READAHEAD;
 	}
 	return ret;
 }

@@ -26,6 +26,7 @@
 #include <asm/mipsregs.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/sections.h>
 #include <asm/dec/machtype.h>
 #include <asm/dec/ioasic.h>
 #include <asm/dec/ioasic_addrs.h>
@@ -342,10 +343,9 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (!user_mode(regs)) {
 		if (prof_buffer && current->pid) {
-			extern int _stext;
 			unsigned long pc = regs->cp0_epc;
 
-			pc -= (unsigned long) &_stext;
+			pc -= (unsigned long) _stext;
 			pc >>= prof_shift;
 			/*
 			 * Dont ignore out-of-bounds pc values silently,

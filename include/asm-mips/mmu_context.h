@@ -28,9 +28,16 @@
  */
 #define TLBMISS_HANDLER_SETUP_PGD(pgd) \
 	pgd_current[smp_processor_id()] = (unsigned long)(pgd)
+#ifdef CONFIG_MIPS32
 #define TLBMISS_HANDLER_SETUP() \
 	write_c0_context((unsigned long) smp_processor_id() << (23 + 3)); \
 	TLBMISS_HANDLER_SETUP_PGD(swapper_pg_dir)
+#endif
+#ifdef CONFIG_MIPS64
+#define TLBMISS_HANDLER_SETUP() \
+	write_c0_context((unsigned long) smp_processor_id() << 23); \
+	TLBMISS_HANDLER_SETUP_PGD(swapper_pg_dir)
+#endif
 extern unsigned long pgd_current[];
 
 #if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
@@ -94,8 +101,8 @@ init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
                              struct task_struct *tsk)
 {
+	unsigned int cpu = smp_processor_id();
 	unsigned long flags;
-	unsigned cpu = smp_processor_id();
 
 	local_irq_save(flags);
 
@@ -144,7 +151,7 @@ activate_mm(struct mm_struct *prev, struct mm_struct *next)
 	write_c0_entryhi(cpu_context(cpu, next));
 	TLBMISS_HANDLER_SETUP_PGD(next->pgd);
 
-	/* mark mmu ownership change */	
+	/* mark mmu ownership change */
 	clear_bit(cpu, &prev->cpu_vm_mask);
 	set_bit(cpu, &next->cpu_vm_mask);
 

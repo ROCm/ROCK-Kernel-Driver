@@ -216,8 +216,8 @@ more details, with real examples.
 
 --- 3.5 Library file goals - lib-y
 
-	Objects listed with obj-* is used for modules or
-	are combined in a built-in.o for that specific directory.
+	Objects listed with obj-* are used for modules or
+	combined in a built-in.o for that specific directory.
 	There is also the possibility to list objects that will
 	be included in a library, lib.a.
 	All objects listed with lib-y are combined in a single

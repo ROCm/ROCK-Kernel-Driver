@@ -40,7 +40,6 @@ int main(void)
 	DEFINE(THREAD_KSP, offsetof(struct thread_struct, ksp));
 	DEFINE(THREAD_USP, offsetof(struct thread_struct, usp));
 	DEFINE(THREAD_CCR, offsetof(struct thread_struct, ccr));
-	DEFINE(THREAD_VFORK, offsetof(struct thread_struct, vfork_ret));
 
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(PT_DTRACE, PT_DTRACE);

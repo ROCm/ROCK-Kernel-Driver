@@ -114,32 +114,37 @@ Valid options:
 
 __setup("noexec32=", nonx32_setup); 
 
-#ifndef  __GENERIC_PER_CPU
-
-unsigned long __per_cpu_offset[NR_CPUS];
-
+/*
+ * Great future plan:
+ * Declare PDA itself and support (irqstack,tss,pml4) as per cpu data.
+ * Always point %gs to its beginning
+ */
 void __init setup_per_cpu_areas(void)
 { 
-	unsigned long size, i;
-	unsigned char *ptr;
+	int i;
+	unsigned long size;
 
 	/* Copy section for each CPU (we discard the original) */
 	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
-	if (!size)
-		return;
+#ifdef CONFIG_MODULES
+	if (size < PERCPU_ENOUGH_ROOM)
+		size = PERCPU_ENOUGH_ROOM;
+#endif
 
-	ptr = alloc_bootmem(size * NR_CPUS);
+	/* We don't support CPU hotplug, so only allocate as much as needed here */
 
-	for (i = 0; i < NR_CPUS; i++, ptr += size) {
-		/* hide this from the compiler to avoid problems */ 
-		unsigned long offset;
-		asm("subq %[b],%0" : "=r" (offset) : "0" (ptr), [b] "r" (&__per_cpu_start));
-		__per_cpu_offset[i] = offset;
-		cpu_pda[i].cpudata_offset = offset;
-		memcpy(ptr, __per_cpu_start, size);
+	int maxi = max_t(unsigned, numnodes, num_online_cpus());
+
+	for (i = 0; i < maxi; i++) {
+		/* If possible allocate on the node of the CPU.
+		   In case it doesn't exist round-robin nodes. */
+		unsigned char *ptr = alloc_bootmem_node(NODE_DATA(i % numnodes), size);
+		if (!ptr)
+			panic("Cannot allocate cpu data for CPU %d\n", i);
+		cpu_pda[i].data_offset = ptr - __per_cpu_start;
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
 	}
 } 
-#endif
 
 void pda_init(int cpu)
 { 
@@ -153,7 +158,7 @@ void pda_init(int cpu)
 	pda->me = pda;
 	pda->cpunumber = cpu; 
 	pda->irqcount = -1;
-	pda->cpudata_offset = 0;
+	pda->data_offset = 0;
 	pda->kernelstack = 
 		(unsigned long)stack_thread_info() - PDA_STACKOFFSET + THREAD_SIZE; 
 	pda->active_mm = &init_mm;

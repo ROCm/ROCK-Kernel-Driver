@@ -56,6 +56,57 @@
 #include "i810.h"
 #include "i810_main.h"
 
+/* PCI */
+static const char *i810_pci_list[] __initdata = {
+	"Intel(R) 810 Framebuffer Device"                                 ,
+	"Intel(R) 810-DC100 Framebuffer Device"                           ,
+	"Intel(R) 810E Framebuffer Device"                                ,
+	"Intel(R) 815 (Internal Graphics 100Mhz FSB) Framebuffer Device"  ,
+	"Intel(R) 815 (Internal Graphics only) Framebuffer Device"        ,
+	"Intel(R) 815 (Internal Graphics with AGP) Framebuffer Device"
+};
+
+static struct pci_device_id i810fb_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG1,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1  },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810E_IG,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2 },
+	/* mvo: added i815 PCI-ID */
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_100,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3 },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_NOAGP,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4 },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_CGC,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5 },
+	{ 0 },
+};
+
+static struct pci_driver i810fb_driver = {
+	.name     =	"i810fb",
+	.id_table =	i810fb_pci_tbl,
+	.probe    =	i810fb_init_pci,
+	.remove   =	__exit_p(i810fb_remove_pci),
+	.suspend  =     i810fb_suspend,
+	.resume   =     i810fb_resume,
+};
+
+static int vram       __initdata = 4;
+static int bpp        __initdata = 8;
+static int mtrr       __initdata = 0;
+static int accel      __initdata = 0;
+static int hsync1     __initdata = 0;
+static int hsync2     __initdata = 0;
+static int vsync1     __initdata = 0;
+static int vsync2     __initdata = 0;
+static int xres       __initdata = 640;
+static int yres       __initdata = 480;
+static int vyres      __initdata = 0;
+static int sync       __initdata = 0;
+static int ext_vga    __initdata = 0;
+static int dcolor     __initdata = 0;
+
 /*------------------------------------------------------------*/
 
 /**************************************************************

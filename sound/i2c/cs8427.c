@@ -75,7 +75,7 @@ int snd_cs8427_detect(snd_i2c_bus_t *bus, unsigned char addr)
 	return res;
 }
 
-static int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned char val)
+int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, unsigned char val)
 {
 	int err;
 	unsigned char buf[2];
@@ -89,7 +89,7 @@ static int snd_cs8427_reg_write(snd_i2c_device_t *device, unsigned char reg, uns
 	return 0;
 }
 
-static int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg)
+int snd_cs8427_reg_read(snd_i2c_device_t *device, unsigned char reg)
 {
 	int err;
 	unsigned char buf;
@@ -561,6 +561,8 @@ int snd_cs8427_iec958_pcm(snd_i2c_device_t *cs8427, unsigned int rate)
 EXPORT_SYMBOL(snd_cs8427_detect);
 EXPORT_SYMBOL(snd_cs8427_create);
 EXPORT_SYMBOL(snd_cs8427_reset);
+EXPORT_SYMBOL(snd_cs8427_reg_write);
+EXPORT_SYMBOL(snd_cs8427_reg_read);
 EXPORT_SYMBOL(snd_cs8427_iec958_build);
 EXPORT_SYMBOL(snd_cs8427_iec958_active);
 EXPORT_SYMBOL(snd_cs8427_iec958_pcm);

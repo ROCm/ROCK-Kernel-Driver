@@ -11,7 +11,7 @@ config	IP_VS
 	  IP Virtual Server support will let you build a high-performance
 	  virtual server based on cluster of two or more real servers. This
 	  option must be enabled for at least one of the clustered computers
-	  that will take care of intercepting incomming connections to a
+	  that will take care of intercepting incoming connections to a
 	  single IP address and scheduling them to real servers.
 
 	  Three request dispatching techniques are implemented, they are

@@ -41,7 +41,7 @@ void snd_akm4xxx_write(akm4xxx_t *ak, int chip, unsigned char reg, unsigned char
 
 	/* save the data */
 	if (ak->type == SND_AK4524 || ak->type == SND_AK4528) {
-		if ((reg != 0x04 && reg != 0x05) || (reg & 0x80) == 0)
+		if ((reg != 0x04 && reg != 0x05) || (val & 0x80) == 0)
 			snd_akm4xxx_set(ak, chip, reg, val);
 		else
 			snd_akm4xxx_set_ipga(ak, chip, reg, val);

@@ -2696,24 +2696,24 @@ void __init dmasound_setup(char *str, int *ints)
 	switch (ints[0]) {
 	case 3:
 		if ((ints[3] < 0) || (ints[3] > MAX_CATCH_RADIUS))
-			printk("dmasound_setup: illegal catch radius, using default = %d\n", catchRadius);
+			printk("dmasound_setup: invalid catch radius, using default = %d\n", catchRadius);
 		else
 			catchRadius = ints[3];
 		/* fall through */
 	case 2:
 		if (ints[1] < MIN_BUFFERS)
-			printk("dmasound_setup: illegal number of buffers, using default = %d\n", numBufs);
+			printk("dmasound_setup: invalid number of buffers, using default = %d\n", numBufs);
 		else
 			numBufs = ints[1];
 		if (ints[2] < MIN_BUFSIZE || ints[2] > MAX_BUFSIZE)
-			printk("dmasound_setup: illegal buffer size, using default = %d\n", bufSize);
+			printk("dmasound_setup: invalid buffer size, using default = %d\n", bufSize);
 		else
 			bufSize = ints[2];
 		break;
 	case 0:
 		break;
 	default:
-		printk("dmasound_setup: illegal number of arguments\n");
+		printk("dmasound_setup: invalid number of arguments\n");
 	}
 }
 

@@ -666,7 +666,7 @@ S:	Maintained
 ETHERNET BRIDGE
 P:	Stephen Hemminger
 M:	shemminger@osdl.org
-L:	bridge@math.leidenuniv.nl
+L:	bridge@osdl.org
 W:	http://bridge.sourceforge.net/
 S:	Maintained
 
@@ -1173,6 +1173,14 @@ P:	Philip Blundell
 M:	philb@gnu.org
 W:	http://www.tazenda.demon.co.uk/phil/linux-hp
 S:	Maintained
+
+MARVELL YUKON / SYSKONNECT DRIVER
+P:	Mirko Lindner
+M: 	mlindner@syskonnect.de
+P:	Ralph Roesler
+M: 	rroesler@syskonnect.de
+W: 	http://www.syskonnect.com
+S: 	Supported
 
 MAESTRO PCI SOUND DRIVERS
 P:	Zach Brown

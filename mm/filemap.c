@@ -871,7 +871,8 @@ do_readahead(struct address_space *mapping, struct file *filp,
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
-	do_page_cache_readahead(mapping, filp, index, max_sane_readahead(nr));
+	force_page_cache_readahead(mapping, filp, index,
+					max_sane_readahead(nr));
 	return 0;
 }
 
@@ -997,7 +998,8 @@ retry_find:
 			goto no_cached_page;
 
 		did_readaround = 1;
-		do_page_cache_readahead(mapping, file, pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
+		do_page_cache_readahead(mapping, file,
+				pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
 		goto retry_find;
 	}
 
@@ -1231,7 +1233,7 @@ static int filemap_populate(struct vm_area_struct *vma,
 	int err;
 
 	if (!nonblock)
-		do_page_cache_readahead(mapping, vma->vm_file,
+		force_page_cache_readahead(mapping, vma->vm_file,
 					pgoff, len >> PAGE_CACHE_SHIFT);
 
 repeat:
@@ -1770,10 +1772,8 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		if (unlikely(copied != bytes))
 			if (status >= 0)
 				status = -EFAULT;
-
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
 		unlock_page(page);
+		mark_page_accessed(page);
 		page_cache_release(page);
 		if (status < 0)
 			break;

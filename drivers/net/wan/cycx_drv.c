@@ -142,7 +142,7 @@ int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 
 	/* Verify IRQ configuration options */
 	if (!get_option_index(cycx_2x_irq_options, hw->irq)) {
-		printk(KERN_ERR "%s: IRQ %d is illegal!\n", modname, hw->irq);
+		printk(KERN_ERR "%s: IRQ %d is invalid!\n", modname, hw->irq);
 		return -EINVAL;
 	}
 
@@ -152,7 +152,7 @@ int cycx_setup(struct cycx_hw *hw, void *cfm, u32 len)
 				modname);
  		return -EINVAL;
 	} else if (!get_option_index(cyc2x_dpmbase_options, hw->dpmbase)) {
-		printk(KERN_ERR "%s: memory address 0x%lX is illegal!\n",
+		printk(KERN_ERR "%s: memory address 0x%lX is invalid!\n",
 				modname, dpmbase);
 		return -EINVAL;
 	}

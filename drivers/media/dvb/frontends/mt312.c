@@ -41,6 +41,9 @@
 #define MT312_SYS_CLK		90000000UL	/* 90 MHz */
 #define MT312_PLL_CLK		10000000UL	/* 10 MHz */
 
+/* number of active frontends */
+static int mt312_count = 0;
+
 static struct dvb_frontend_info mt312_info = {
 	.name = "Zarlink MT312",
 	.type = FE_QPSK,
@@ -78,7 +81,7 @@ static int mt312_read(struct dvb_i2c_bus *i2c,
 
 	ret = i2c->xfer(i2c, msg, 2);
 
-	if (ret != 2) {
+	if ((ret != 2) && (mt312_count != 0)) {
 		printk(KERN_ERR "%s: ret == %d\n", __FUNCTION__, ret);
 		return -EREMOTEIO;
 	}
@@ -722,13 +725,21 @@ static int mt312_attach(struct dvb_i2c_bus *i2c)
 	if ((id != ID_VP310) && (id != ID_MT312))
 		return -ENODEV;
 
-	return dvb_register_frontend(mt312_ioctl, i2c, (void *) (long) id,
-				     &mt312_info);
+	if ((ret = dvb_register_frontend(mt312_ioctl, i2c,
+				(void *)(long)id, &mt312_info)) < 0)
+		return ret;
+
+	mt312_count++;
+
+	return 0;
 }
 
 static void mt312_detach(struct dvb_i2c_bus *i2c)
 {
 	dvb_unregister_frontend(mt312_ioctl, i2c);
+
+	if (mt312_count)
+		mt312_count--;
 }
 
 static int __init mt312_module_init(void)

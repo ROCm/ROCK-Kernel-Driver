@@ -38,7 +38,6 @@ typedef struct snd_info_buffer snd_info_buffer_t;
 
 #define SNDRV_INFO_CONTENT_TEXT		0
 #define SNDRV_INFO_CONTENT_DATA		1
-#define SNDRV_INFO_CONTENT_DEVICE		2
 
 struct snd_info_entry;
 
@@ -118,10 +117,6 @@ snd_info_entry_t *snd_info_create_card_entry(snd_card_t * card,
 					     const char *name,
 					     snd_info_entry_t * parent);
 void snd_info_free_entry(snd_info_entry_t * entry);
-snd_info_entry_t *snd_info_create_device(const char *name,
-					 unsigned int number,
-					 unsigned int mode);
-void snd_info_free_device(snd_info_entry_t * entry);
 int snd_info_store_text(snd_info_entry_t * entry);
 int snd_info_restore_text(snd_info_entry_t * entry);
 
@@ -163,10 +158,6 @@ static inline char *snd_info_get_str(char *dest, char *src, int len) { return NU
 static inline snd_info_entry_t *snd_info_create_module_entry(struct module * module, const char *name, snd_info_entry_t * parent) { return NULL; }
 static inline snd_info_entry_t *snd_info_create_card_entry(snd_card_t * card, const char *name, snd_info_entry_t * parent) { return NULL; }
 static inline void snd_info_free_entry(snd_info_entry_t * entry) { ; }
-static inline snd_info_entry_t *snd_info_create_device(const char *name,
-						       unsigned int number,
-						       unsigned int mode) { return NULL; }
-static inline void snd_info_free_device(snd_info_entry_t * entry) { ; }
 
 static inline int snd_info_card_create(snd_card_t * card) { return 0; }
 static inline int snd_info_card_register(snd_card_t * card) { return 0; }

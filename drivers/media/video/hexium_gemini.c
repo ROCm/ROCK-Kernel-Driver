@@ -25,12 +25,12 @@
 
 #include <media/saa7146_vv.h>
 
-static int debug = 255;
+static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "debug verbosity");
 
 /* global variables */
-int hexium_num = 0;
+static int hexium_num = 0;
 
 #include "hexium_gemini.h"
 
@@ -388,7 +388,7 @@ static struct saa7146_extension hexium_extension = {
 	.irq_func = NULL,
 };
 
-int __init hexium_init_module(void)
+static int __init hexium_init_module(void)
 {
 	if (0 != saa7146_register_extension(&hexium_extension)) {
 		DEB_S(("failed to register extension.\n"));
@@ -398,7 +398,7 @@ int __init hexium_init_module(void)
 	return 0;
 }
 
-void __exit hexium_cleanup_module(void)
+static void __exit hexium_cleanup_module(void)
 {
 	saa7146_unregister_extension(&hexium_extension);
 }

@@ -1,0 +1,68 @@
+/*
+ * An access vector table (avtab) is a hash table
+ * of access vectors and transition types indexed
+ * by a type pair and a class.  An access vector
+ * table is used to represent the type enforcement
+ * tables.
+ *
+ *  Author : Stephen Smalley, <sds@epoch.ncsc.mil>
+ */
+#ifndef _SS_AVTAB_H_
+#define _SS_AVTAB_H_
+
+struct avtab_key {
+	u32 source_type;	/* source type */
+	u32 target_type;	/* target type */
+	u32 target_class;	/* target object class */
+};
+
+struct avtab_datum {
+#define AVTAB_ALLOWED     1
+#define AVTAB_AUDITALLOW  2
+#define AVTAB_AUDITDENY   4
+#define AVTAB_AV         (AVTAB_ALLOWED | AVTAB_AUDITALLOW | AVTAB_AUDITDENY)
+#define AVTAB_TRANSITION 16
+#define AVTAB_MEMBER     32
+#define AVTAB_CHANGE     64
+#define AVTAB_TYPE       (AVTAB_TRANSITION | AVTAB_MEMBER | AVTAB_CHANGE)
+	u32 specified;	/* what fields are specified */
+	u32 data[3];	/* access vectors or types */
+#define avtab_allowed(x) (x)->data[0]
+#define avtab_auditdeny(x) (x)->data[1]
+#define avtab_auditallow(x) (x)->data[2]
+#define avtab_transition(x) (x)->data[0]
+#define avtab_change(x) (x)->data[1]
+#define avtab_member(x) (x)->data[2]
+};
+
+struct avtab_node {
+	struct avtab_key key;
+	struct avtab_datum datum;
+	struct avtab_node *next;
+};
+
+struct avtab {
+	struct avtab_node **htable;
+	u32 nel;	/* number of elements */
+};
+
+int avtab_init(struct avtab *);
+int avtab_insert(struct avtab *h, struct avtab_key *k, struct avtab_datum *d);
+struct avtab_datum *avtab_search(struct avtab *h, struct avtab_key *k, int specified);
+void avtab_destroy(struct avtab *h);
+int avtab_map(struct avtab *h,
+	      int (*apply) (struct avtab_key *k,
+			    struct avtab_datum *d,
+			    void *args),
+	      void *args);
+void avtab_hash_eval(struct avtab *h, char *tag);
+int avtab_read(struct avtab *a, void *fp, u32 config);
+
+#define AVTAB_HASH_BITS 15
+#define AVTAB_HASH_BUCKETS (1 << AVTAB_HASH_BITS)
+#define AVTAB_HASH_MASK (AVTAB_HASH_BUCKETS-1)
+
+#define AVTAB_SIZE AVTAB_HASH_BUCKETS
+
+#endif	/* _SS_AVTAB_H_ */
+

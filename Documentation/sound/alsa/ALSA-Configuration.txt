@@ -27,6 +27,13 @@ the card supports).  You don't need to configure the PnP via
 isapnptools.
 
 
+Creating ALSA devices
+=====================
+
+Use the MAKEDEV.snd script located in the directory named scripts
+in the linux kernel tree.
+
+
 Module parameters
 =================
 
@@ -92,7 +99,7 @@ Module parameters
     amidi_map	- MIDI device number maps assigned to the 2st OSS device.
 		  (default: 1)
 
-  Global parameters for top soundcard modules
+  Common parameters for top soundcard modules
   -------------------------------------------
 
     Each of top-level soundcard module takes some general options,
@@ -518,6 +525,15 @@ Module parameters
 
     Module supports up to 8 cards.
 
+    Note: you need to load the firmware via hdsploader utility included
+          in alsa-tools package.
+
+    Note: snd-page-alloc module does the job which snd-hammerfall-mem
+          module did formerly.  It will allocate the buffers in advance
+          when any HDSP cards are found.  To make the buffer
+          allocation sure, load snd-page-alloc module in the early
+          stage of boot sequence.
+
   Module snd-ice1712
   ------------------
 
@@ -549,6 +565,7 @@ Module parameters
     Module for Envy24HT (VT/ICE1724) based PCI soundcards.
 			* MidiMan M Audio Revolution 7.1
 			* AMP Ltd AUDIO2000
+			* TerraTec Aureon Sky-5.1, Space-7.1
 
     Module supports up to 8 cards and autoprobe.
 
@@ -790,6 +807,12 @@ Module parameters
 
     Module supports up to 8 cards.
 
+    Note: snd-page-alloc module does the job which snd-hammerfall-mem
+          module did formerly.  It will allocate the buffers in advance
+          when any RME9652 cards are found.  To make the buffer
+          allocation sure, load snd-page-alloc module in the early
+          stage of boot sequence.
+
   Module snd-sa11xx-uda1341 (on arm only)
   ---------------------------------------
 
@@ -983,12 +1006,15 @@ Module parameters
     
     Note: VIA8233/5 (not VIA8233A) can support DXS (direct sound)
 	  channels as the first PCM.  With this device, up to 4
-	  streams can be played at the same time.  If the playback on
-	  this PCM is noisy, try to specify dxs_channels option to 2
-	  or 3.
+	  streams can be played at the same time.  On some motherboards,
+	  these channels don't work properly due to the bug of BIOS.
+	  If you experience that the playback on this PCM is noisy,
+	  try to specify dxs_support option to 2 or 3.  In most cases
+	  dxs_support=3 would suffice, so you can keep the multi-play
+	  capability.
 
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
-	  additonally.
+	  additonally.  The mpu_port option is for VIA686 chips only.
 
   Module snd-virmidi
   ------------------
@@ -1284,6 +1310,9 @@ Proc interfaces (/proc/asound)
 	  - direct    don't use plugins
 	  - block     force block mode (rvplayer)
 	  - non-block force non-block mode
+	  - whole-frag  write only whole fragments (optimization affecting
+			playback only)
+	  - no-silence  do not fill silence ahead to avoid clicks
 
   Example: echo "x11amp 128 16384" > /proc/asound/card0/pcm0p/oss
            echo "squake 0 0 disable" > /proc/asound/card0/pcm0c/oss

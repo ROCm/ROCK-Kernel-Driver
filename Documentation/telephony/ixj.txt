@@ -363,7 +363,7 @@ modules.  The command string for the final compile looks like this:
     1.  cp .config /tmp
     2.  make mrproper
     3.  cp /tmp/.config .
-    4.	make dep;make clean;make bzImage;make modules;make modules_install
+    4.	make clean;make bzImage;make modules;make modules_install
 
 This rebuilds both the kernel and all the modules and makes sure they all 
 have the same linkages.  This generally solves the problem once the new 

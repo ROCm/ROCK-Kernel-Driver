@@ -1,10 +1,27 @@
 #include <asm-generic/vmlinux.lds.h>
 
+#undef mips		/* CPP really sucks for this job  */
+#define mips mips
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
-jiffies = JIFFIES32;
+jiffies = JIFFIES;
 SECTIONS
 {
+#ifdef CONFIG_BOOT_ELF64
+  /* Read-only sections, merged into text segment: */
+  /* . = 0xc000000000000000; */
+
+  /* This is the value for an Origin kernel, taken from an IRIX kernel.  */
+  /* . = 0xc00000000001c000; */
+
+  /* Set the vaddr for the text segment to a value 
+        >= 0xa800 0000 0001 9000 if no symmon is going to configured
+        >= 0xa800 0000 0030 0000 otherwise  */
+
+  /* . = 0xa800000000300000; */
+  /* . = 0xa800000000300000; */
+  . = 0xffffffff80300000;
+#endif
   . = LOADADDR;
   /* read-only */
   _text = .;			/* Text and read-only data */
@@ -64,7 +81,13 @@ SECTIONS
 
   _edata =  .;			/* End of data section */
 
+#ifdef CONFIG_MIPS32
   . = ALIGN(8192);		/* init_task */
+#endif
+#ifdef CONFIG_MIPS64
+  . = ALIGN(16384);		/* init_task */
+#endif
+  . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
   .data.init_task : { *(.data.init_task) }
 
   /* will be freed after init */

@@ -1,5 +1,4 @@
-/* $Id: sni.h,v 1.2 1998/09/19 19:19:39 ralf Exp $
- *
+/*
  * SNI specific definitions
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -8,10 +7,10 @@
  *
  * Copyright (C) 1997, 1998 by Ralf Baechle
  */
-#ifndef __ASM_MIPS_SNI_H 
-#define __ASM_MIPS_SNI_H 
+#ifndef __ASM_SNI_H
+#define __ASM_SNI_H
 
-#define SNI_PORT_BASE	0xb4000000
+#define SNI_PORT_BASE		0xb4000000
 
 /*
  * ASIC PCI registers for little endian configuration.
@@ -102,4 +101,4 @@
 /* PCI EISA Interrupt acknowledge  */
 #define PCIMT_INT_ACKNOWLEDGE	0xba000000
 
-#endif /* __ASM_MIPS_SNI_H */
+#endif /* __ASM_SNI_H */

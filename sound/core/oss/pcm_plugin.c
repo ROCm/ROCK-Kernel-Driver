@@ -56,6 +56,17 @@ static int snd_pcm_plugin_dst_channels_mask(snd_pcm_plugin_t *plugin,
 	return 0;
 }
 
+/*
+ *  because some cards might have rates "very close", we ignore
+ *  all "resampling" requests within +-5%
+ */
+static int rate_match(unsigned int src_rate, unsigned int dst_rate)
+{
+	unsigned int low = (src_rate * 95) / 100;
+	unsigned int high = (src_rate * 105) / 100;
+	return dst_rate >= low && dst_rate <= high;
+}
+
 static int snd_pcm_plugin_alloc(snd_pcm_plugin_t *plugin, snd_pcm_uframes_t frames)
 {
 	snd_pcm_plugin_format_t *format;
@@ -80,11 +91,14 @@ static int snd_pcm_plugin_alloc(snd_pcm_plugin_t *plugin, snd_pcm_uframes_t fram
 		plugin->buf = vmalloc(size);
 		plugin->buf_frames = frames;
 	}
-	if (!plugin->buf)
+	if (!plugin->buf) {
+		plugin->buf_frames = 0;
 		return -ENOMEM;
+	}
 	c = plugin->buf_channels;
 	if (plugin->access == SNDRV_PCM_ACCESS_RW_INTERLEAVED) {
 		for (channel = 0; channel < format->channels; channel++, c++) {
+			c->frames = frames;
 			c->enabled = 1;
 			c->wanted = 0;
 			c->area.addr = plugin->buf;
@@ -95,6 +109,7 @@ static int snd_pcm_plugin_alloc(snd_pcm_plugin_t *plugin, snd_pcm_uframes_t fram
 		snd_assert((size % format->channels) == 0,);
 		size /= format->channels;
 		for (channel = 0; channel < format->channels; channel++, c++) {
+			c->frames = frames;
 			c->enabled = 1;
 			c->wanted = 0;
 			c->area.addr = plugin->buf + (channel * size);
@@ -420,7 +435,7 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 
 	/* Format change (linearization) */
 	if ((srcformat.format != dstformat.format ||
-	     srcformat.rate != dstformat.rate ||
+	     !rate_match(srcformat.rate, dstformat.rate) ||
 	     srcformat.channels != dstformat.channels) &&
 	    !snd_pcm_format_linear(srcformat.format)) {
 		if (snd_pcm_format_linear(dstformat.format))
@@ -468,7 +483,7 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 				ttable[v * sv + v] = FULL;
 		}
 		tmpformat.channels = dstformat.channels;
-		if (srcformat.rate == dstformat.rate &&
+		if (rate_match(srcformat.rate, dstformat.rate) &&
 		    snd_pcm_format_linear(dstformat.format))
 			tmpformat.format = dstformat.format;
 		err = snd_pcm_plugin_build_route(plug,
@@ -490,7 +505,7 @@ int snd_pcm_plug_format_plugins(snd_pcm_plug_t *plug,
 	}
 
 	/* rate resampling */
-	if (srcformat.rate != dstformat.rate) {
+	if (!rate_match(srcformat.rate, dstformat.rate)) {
 		tmpformat.rate = dstformat.rate;
 		if (srcformat.channels == dstformat.channels &&
 		    snd_pcm_format_linear(dstformat.format))

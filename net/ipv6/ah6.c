@@ -26,6 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <net/inet_ecn.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/ah.h>
@@ -220,6 +221,8 @@ int ah6_output(struct sk_buff *skb)
 		skb->nh.ipv6h->flow_lbl[0] = iph->flow_lbl[0];
 		skb->nh.ipv6h->flow_lbl[1] = iph->flow_lbl[1];
 		skb->nh.ipv6h->flow_lbl[2] = iph->flow_lbl[2];
+		if (x->props.flags & XFRM_STATE_NOECN)
+			IP6_ECN_clear(skb->nh.ipv6h);
 	} else {
 		memcpy(skb->nh.ipv6h, iph, hdr_len);
 		skb->nh.raw[nh_offset] = IPPROTO_AH;

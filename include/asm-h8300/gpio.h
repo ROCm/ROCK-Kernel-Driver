@@ -7,11 +7,17 @@
 #define H8300_GPIO_P4 3
 #define H8300_GPIO_P5 4
 #define H8300_GPIO_P6 5
-/*#define H8300_GPIO_P7 6*/
+#define H8300_GPIO_P7 6
 #define H8300_GPIO_P8 7
 #define H8300_GPIO_P9 8
 #define H8300_GPIO_PA 9
 #define H8300_GPIO_PB 10
+#define H8300_GPIO_PC 11
+#define H8300_GPIO_PD 12
+#define H8300_GPIO_PE 13
+#define H8300_GPIO_PF 14
+#define H8300_GPIO_PG 15
+#define H8300_GPIO_PH 16
 
 #define H8300_GPIO_B7 0x80
 #define H8300_GPIO_B6 0x40
@@ -32,10 +38,10 @@
         h8300_free_gpio(port, bits)
 
 #define H8300_GPIO_DDR(port, bit, dir) \
-        h8300_set_gpio_dir(((port) << 8) | bit, dir)
+        h8300_set_gpio_dir(((port) << 8) | (bit), dir)
 
 #define H8300_GPIO_GETDIR(port, bit) \
-        h8300_get_gpio_dir(((port) << 8) | bit)
+        h8300_get_gpio_dir(((port) << 8) | (bit))
 
 extern int h8300_reserved_gpio(int port, int bits);
 extern int h8300_free_gpio(int port, int bits);

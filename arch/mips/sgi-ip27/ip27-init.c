@@ -360,7 +360,6 @@ void per_cpu_init(void)
 	int cpu = smp_processor_id();
 	cnodeid_t cnode = get_compact_nodeid();
 
-	TLBMISS_HANDLER_SETUP();
 #if 0
 	intr_init();
 #endif
@@ -472,7 +471,7 @@ static int __init do_boot_cpu(int cpu, int num_cpus)
 	LAUNCH_SLAVE(cputonasid(num_cpus),cputoslice(num_cpus),
 		(launch_proc_t)MAPPED_KERN_RW_TO_K0(smp_bootstrap),
 		0, (void *)((unsigned long)idle->thread_info +
-		KERNEL_STACK_SIZE - 32), (void *)idle);
+		THREAD_SIZE - 32), (void *)idle);
 
 	/*
 	 * Now optimistically set the mapping arrays. We

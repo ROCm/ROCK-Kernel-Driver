@@ -9,7 +9,8 @@
  */
 
 /*
- * uClinux H8/300 support by Yoshinori Sato
+ * uClinux H8/300 support by Yoshinori Sato <ysato@users.sourceforge.jp>
+ *                and David McCullough <davidm@snapgear.com>
  *
  * Based on
  * Linux/m68k by Hamish Macdonald
@@ -151,26 +152,29 @@ sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 
 struct sigframe
 {
+	long dummy_er0;
+	long dummy_vector;
+#if defined(CONFIG_CPU_H8S)
+	short dummy_exr;
+#endif
 	char *pretcode;
-	int sig;
-	int code;
-	struct sigcontext *psc;
-	char retcode[6];
+	unsigned char retcode[8];
 	unsigned long extramask[_NSIG_WORDS-1];
 	struct sigcontext sc;
-};
+} __attribute__((aligned(2),packed));
 
 struct rt_sigframe
 {
+	long dummy_er0;
+	long dummy_vector;
+#if defined(CONFIG_CPU_H8S)
+	short dummy_exr;
+#endif
 	char *pretcode;
-	int sig;
-	struct siginfo *pinfo;
-	void *puc;
-	char retcode[6];
+	unsigned char retcode[8];
 	struct siginfo info;
 	struct ucontext uc;
-};
-
+} __attribute__((aligned(2),packed));
 
 static inline int
 restore_sigcontext(struct pt_regs *regs, struct sigcontext *usc, void *fp,
@@ -200,8 +204,7 @@ badframe:
 }
 
 static inline int
-rt_restore_ucontext(struct pt_regs *regs, struct switch_stack *sw,
-		    struct ucontext *uc, int *pd0)
+rt_restore_ucontext(struct pt_regs *regs, struct ucontext *uc, int *pd0)
 {
 	int temp;
 	greg_t *gregs = uc->uc_mcontext.gregs;
@@ -216,9 +219,9 @@ rt_restore_ucontext(struct pt_regs *regs, struct switch_stack *sw,
 	err |= __get_user(regs->er1, &gregs[1]);
 	err |= __get_user(regs->er2, &gregs[2]);
 	err |= __get_user(regs->er3, &gregs[3]);
-	err |= __get_user(sw->er4, &gregs[4]);
-	err |= __get_user(sw->er5, &gregs[5]);
-	err |= __get_user(sw->er6, &gregs[6]);
+	err |= __get_user(regs->er4, &gregs[4]);
+	err |= __get_user(regs->er5, &gregs[5]);
+	err |= __get_user(regs->er6, &gregs[6]);
 	err |= __get_user(usp, &gregs[7]);
 	wrusp(usp);
 	err |= __get_user(regs->pc, &gregs[8]);
@@ -238,8 +241,7 @@ badframe:
 
 asmlinkage int do_sigreturn(unsigned long __unused,...)
 {
-	struct switch_stack *sw = (struct switch_stack *) &__unused;
-	struct pt_regs *regs = (struct pt_regs *) (sw + 1);
+	struct pt_regs *regs = (struct pt_regs *) &__unused;
 	unsigned long usp = rdusp();
 	struct sigframe *frame = (struct sigframe *)(usp - 4);
 	sigset_t set;
@@ -270,8 +272,7 @@ badframe:
 
 asmlinkage int do_rt_sigreturn(unsigned long __unused,...)
 {
-	struct switch_stack *sw = (struct switch_stack *) &__unused;
-	struct pt_regs *regs = (struct pt_regs *) (sw + 1);
+	struct pt_regs *regs = (struct pt_regs *) &__unused;
 	unsigned long usp = rdusp();
 	struct rt_sigframe *frame = (struct rt_sigframe *)(usp - 4);
 	sigset_t set;
@@ -288,7 +289,7 @@ asmlinkage int do_rt_sigreturn(unsigned long __unused,...)
 	recalc_sigpending();
 	spin_lock_irq(&current->sighand->siglock);
 	
-	if (rt_restore_ucontext(regs, sw, &frame->uc, &er0))
+	if (rt_restore_ucontext(regs, &frame->uc, &er0))
 		goto badframe;
 	return er0;
 
@@ -312,7 +313,6 @@ static void setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 
 static inline int rt_setup_ucontext(struct ucontext *uc, struct pt_regs *regs)
 {
-	struct switch_stack *sw = (struct switch_stack *)regs - 1;
 	greg_t *gregs = uc->uc_mcontext.gregs;
 	int err = 0;
 
@@ -321,9 +321,9 @@ static inline int rt_setup_ucontext(struct ucontext *uc, struct pt_regs *regs)
 	err |= __put_user(regs->er1, &gregs[1]);
 	err |= __put_user(regs->er2, &gregs[2]);
 	err |= __put_user(regs->er3, &gregs[3]);
-	err |= __put_user(sw->er4, &gregs[4]);
-	err |= __put_user(sw->er5, &gregs[5]);
-	err |= __put_user(sw->er6, &gregs[6]);
+	err |= __put_user(regs->er4, &gregs[4]);
+	err |= __put_user(regs->er5, &gregs[5]);
+	err |= __put_user(regs->er6, &gregs[6]);
 	err |= __put_user(rdusp(), &gregs[7]);
 	err |= __put_user(regs->pc, &gregs[8]);
 	err |= __put_user(regs->ccr, &gregs[9]);
@@ -355,15 +355,6 @@ static void setup_frame (int sig, struct k_sigaction *ka,
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
-	err |= __put_user((current_thread_info()->exec_domain
-			   && current_thread_info()->exec_domain->signal_invmap
-			   && sig < 32
-			   ? current_thread_info()->exec_domain->signal_invmap[sig]
-			   : sig),
-			  &frame->sig);
-
-	err |= __put_user(&frame->sc, &frame->psc);
-
 	if (_NSIG_WORDS > 1)
 		err |= copy_to_user(frame->extramask, &set->sig[1],
 				    sizeof(frame->extramask));
@@ -376,8 +367,8 @@ static void setup_frame (int sig, struct k_sigaction *ka,
 
 	/* sub.l er0,er0; mov.b #__NR_sigreturn,r0l; trapa #0 */
 	err != __put_user(0x1a80f800 + (__NR_sigreturn & 0xff),
-			(long *)(frame->retcode + 0));
-	err |= __put_user(0x5700, (short *)(frame->retcode + 4));
+			(unsigned long *)(frame->retcode + 0));
+	err |= __put_user(0x5700, (unsigned short *)(frame->retcode + 4));
 
 
 	if (err)
@@ -386,6 +377,12 @@ static void setup_frame (int sig, struct k_sigaction *ka,
 	/* Set up registers for signal handler */
 	wrusp ((unsigned long) frame);
 	regs->pc = (unsigned long) ka->sa.sa_handler;
+	regs->er0 = (current_thread_info()->exec_domain
+			   && current_thread_info()->exec_domain->signal_invmap
+			   && sig < 32
+			   ? current_thread_info()->exec_domain->signal_invmap[sig]
+		          : sig);
+	regs->er1 = (unsigned long)&(frame->sc);
 
 	return;
 
@@ -403,14 +400,6 @@ static void setup_rt_frame (int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
-	err |= __put_user((current_thread_info()->exec_domain
-			   && current_thread_info()->exec_domain->signal_invmap
-			   && sig < 32
-			   ? current_thread_info()->exec_domain->signal_invmap[sig]
-			   : sig),
-			  &frame->sig);
-	err |= __put_user(&frame->info, &frame->pinfo);
-	err |= __put_user(&frame->uc, &frame->puc);
 	err |= copy_siginfo_to_user(&frame->info, info);
 
 	/* Create the ucontext.  */
@@ -438,7 +427,14 @@ static void setup_rt_frame (int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Set up registers for signal handler */
 	wrusp ((unsigned long) frame);
-	regs->pc = (unsigned long) ka->sa.sa_handler;
+	regs->pc  = (unsigned long) ka->sa.sa_handler;
+	regs->er0 = (current_thread_info()->exec_domain
+		     && current_thread_info()->exec_domain->signal_invmap
+		     && sig < 32
+		     ? current_thread_info()->exec_domain->signal_invmap[sig]
+		     : sig);
+	regs->er1 = (unsigned long)&(frame->info);
+	regs->er2 = (unsigned long)&frame->uc;
 
 	return;
 

@@ -2,8 +2,6 @@
 # Makefile for the Linux network (ATM) device drivers.
 #
 
-EXTRA_CFLAGS := -g
-
 fore_200e-objs	:= fore200e.o
 host-progs	:= fore200e_mkfirm
 

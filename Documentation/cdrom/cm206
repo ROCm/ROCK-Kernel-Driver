@@ -56,7 +56,7 @@ Compiling the kernel
 
 2) then do a 
 	
-	make dep; make clean; make zImage; make modules
+	make clean; make zImage; make modules
 
 3) do the usual things to install a new image (backup the old one, run
    `rdev -R zImage 1', copy the new image in place, run lilo).  Might

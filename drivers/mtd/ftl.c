@@ -188,7 +188,7 @@ static int scan_header(partition_t *part)
 	printk(KERN_NOTICE "ftl_cs: FTL header not found.\n");
 	return -ENOENT;
     }
-    if ((le16_to_cpu(header.NumEraseUnits) > 65536) || header.BlockSize != 9 ||
+    if (header.BlockSize != 9 ||
 	(header.EraseUnitSize < 10) || (header.EraseUnitSize > 31) ||
 	(header.NumTransferUnits >= le16_to_cpu(header.NumEraseUnits))) {
 	printk(KERN_NOTICE "ftl_cs: FTL header corrupt!\n");

@@ -123,11 +123,11 @@ out:
 }
 
 /*
- *	__jfs_permission()
+ *	jfs_permission()
  *
  * modified vfs_permission to check posix acl
  */
-static int __jfs_permission(struct inode * inode, int mask, int have_sem)
+int jfs_permission(struct inode * inode, int mask, struct nameidata *nd)
 {
 	umode_t mode = inode->i_mode;
 	struct jfs_inode_info *ji = JFS_IP(inode);
@@ -161,11 +161,7 @@ static int __jfs_permission(struct inode * inode, int mask, int have_sem)
 	if (ji->i_acl == JFS_ACL_NOT_CACHED) {
 		struct posix_acl *acl;
 
-		if (!have_sem)
-			down(&inode->i_sem);
 		acl = jfs_get_acl(inode, ACL_TYPE_ACCESS);
-		if (!have_sem)
-			up(&inode->i_sem);
 
 		if (IS_ERR(acl))
 			return PTR_ERR(acl);
@@ -207,14 +203,6 @@ check_capabilities:
 			return 0;
 
 	return -EACCES;
-}
-int jfs_permission(struct inode * inode, int mask, struct nameidata *nd)
-{
-	return __jfs_permission(inode, mask, 0);
-}
-int jfs_permission_have_sem(struct inode * inode, int mask)
-{
-	return __jfs_permission(inode, mask, 1);
 }
 
 int jfs_init_acl(struct inode *inode, struct inode *dir)

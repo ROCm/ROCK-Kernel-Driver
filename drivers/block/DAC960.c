@@ -2484,6 +2484,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
 	struct gendisk *disk = Controller->disks[n];
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
+	sprintf(disk->devfs_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	disk->major = MajorNumber;
 	disk->first_minor = n << DAC960_MaxPartitionsBits;
 	disk->fops = &DAC960_BlockDeviceOperations;

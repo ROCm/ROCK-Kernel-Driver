@@ -4,9 +4,20 @@
  * Needs:
  *	void check_bugs(void);
  */
-#ifndef __ASM_BUGS_H
-#define __ASM_BUGS_H
+#ifndef _ASM_BUGS_H
+#define _ASM_BUGS_H
 
-extern void check_bugs(void);
+#include <linux/config.h>
 
-#endif /* __ASM_BUGS_H */
+extern void check_bugs32(void);
+extern void check_bugs64(void);
+
+static inline void check_bugs(void)
+{
+	check_bugs32();
+#ifdef CONFIG_MIPS64
+	check_bugs64();
+#endif
+}
+
+#endif /* _ASM_BUGS_H */

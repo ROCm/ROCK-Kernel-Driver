@@ -44,8 +44,7 @@ MODULE_LICENSE("GPL");
  */
 void snd_vx_delay(vx_core_t *chip, int xmsec)
 {
-	if (! (chip->chip_status & VX_STAT_IN_SUSPEND) && ! in_interrupt() &&
-	    xmsec >= 1000 / HZ) {
+	if (! in_interrupt() && xmsec >= 1000 / HZ) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((xmsec * HZ + 999) / 1000);
 	} else {
@@ -632,6 +631,9 @@ static void vx_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	snd_iprintf(buffer, "Frequency: %d\n", chip->freq);
 	snd_iprintf(buffer, "Detected Frequency: %d\n", chip->freq_detected);
 	snd_iprintf(buffer, "Detected UER type: %s\n", uer_type[chip->uer_detected]);
+	snd_iprintf(buffer, "Min/Max/Cur IBL: %d/%d/%d (granularity=%d)\n",
+		    chip->ibl.min_size, chip->ibl.max_size, chip->ibl.size,
+		    chip->ibl.granularity);
 }
 
 static void vx_proc_init(vx_core_t *chip)

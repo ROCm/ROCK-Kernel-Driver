@@ -2626,15 +2626,15 @@ S: 75019 Paris
 S: France
 
 N: Rik van Riel
-E: riel@conectiva.com.br
+E: riel@redhat.com
 W: http://www.surriel.com/
 D: Linux-MM site, Documentation/sysctl/*, swap/mm readaround
-D: clustering contributor, kswapd fixes, random kernel hacker,
+D: kswapd fixes, random kernel hacker, rmap VM,
 D: nl.linux.org administrator, minor scheduler additions
-S: Conectiva S.A.
-S: R. Tocantins, 89 - Cristo Rei
-S: 80050-430 - Curitiba - Paraná
-S: Brazil
+S: Red Hat Boston
+S: 3 Lan Drive
+S: Westford, MA 01886
+S: USA
 
 N: Pekka Riikonen
 E: priikone@poseidon.pspt.fi
@@ -2980,6 +2980,14 @@ D: LanMedia Corp. Device WAN card device driver
 S: #102, 686 W. Maude Ave
 S: Sunyvale, CA 94086
 S: USA
+
+N: Michael Still
+E: mikal@stillhq.com
+W: http://www.stillhq.com
+D: Various janitorial patches
+D: mandocs and mandocs_install build targets
+S: (Email me and ask)
+S: Australia
 
 N: Henrik Storner
 E: storner@image.dk

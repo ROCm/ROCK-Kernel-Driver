@@ -3,7 +3,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 96, 98, 2000 by Ralf Baechle
+ * Copyright (C) 1995, 96, 98, 99, 2000 by Ralf Baechle
+ * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_RESOURCE_H
 #define _ASM_RESOURCE_H
@@ -21,17 +22,24 @@
 #define RLIMIT_RSS 7			/* max resident set size */
 #define RLIMIT_NPROC 8			/* max number of processes */
 #define RLIMIT_MEMLOCK 9		/* max locked-in-memory address space */
-#define RLIMIT_LOCKS	10		/* maximum file locks held */
+#define RLIMIT_LOCKS 10			/* maximum file locks held */
 
 #define RLIM_NLIMITS 11			/* Number of limit flavors.  */
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
+
 /*
  * SuS says limits have to be unsigned.
  * Which makes a ton more sense anyway.
  */
+#ifdef CONFIG_MIPS32
 #define RLIM_INFINITY	0x7fffffffUL
+#endif
+#ifdef CONFIG_MIPS64
+#define RLIM_INFINITY	(~0UL)
+#endif
 
 #define INIT_RLIMITS					\
 {							\

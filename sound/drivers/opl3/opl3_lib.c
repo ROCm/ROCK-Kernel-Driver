@@ -538,7 +538,7 @@ int snd_opl3_hwdep_new(opl3_t * opl3,
 	hw->ops.release = snd_opl3_release;
 
 	opl3->seq_dev_num = seq_device;
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	if (snd_seq_device_new(card, seq_device, SNDRV_SEQ_DEV_ID_OPL3,
 			       sizeof(opl3_t*), &opl3->seq_dev) >= 0) {
 		strcpy(opl3->seq_dev->name, hw->name);

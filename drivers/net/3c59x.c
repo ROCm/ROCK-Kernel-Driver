@@ -291,8 +291,6 @@ MODULE_PARM(global_full_duplex, "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(hw_checksums, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(flow_ctrl, "1-" __MODULE_STRING(8) "i");
-MODULE_PARM(global_enable_wol, "i");
-MODULE_PARM(enable_wol, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(compaq_ioaddr, "i");
@@ -306,8 +304,6 @@ MODULE_PARM_DESC(full_duplex, "3c59x full duplex setting(s) (1)");
 MODULE_PARM_DESC(global_full_duplex, "3c59x: same as full_duplex, but applies to all NICs if options is unset");
 MODULE_PARM_DESC(hw_checksums, "3c59x Hardware checksum checking by adapter(s) (0-1)");
 MODULE_PARM_DESC(flow_ctrl, "3c59x 802.3x flow control usage (PAUSE only) (0-1)");
-MODULE_PARM_DESC(enable_wol, "3c59x: Turn on Wake-on-LAN for adapter(s) (0-1)");
-MODULE_PARM_DESC(global_enable_wol, "3c59x: same as enable_wol, but applies to all NICs if options is unset");
 MODULE_PARM_DESC(rx_copybreak, "3c59x copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(max_interrupt_work, "3c59x maximum events handled per interrupt");
 MODULE_PARM_DESC(compaq_ioaddr, "3c59x PCI I/O base address (Compaq BIOS problem workaround)");
@@ -484,10 +480,8 @@ static struct vortex_chip_info {
 } vortex_info_tbl[] __devinitdata = {
 	{"3c590 Vortex 10Mbps",
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
-#define EISA_3C592_OFFSET 1		/* Offset of this entry for vortex_eisa_init */
 	{"3c592 EISA 10Mbps Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
-#define EISA_3C597_OFFSET 2		/* Offset of this entry for vortex_eisa_init */
 	{"3c597 EISA Fast Demon/Vortex",					/* AKPM: from Don's 3c59x_cb.c 0.49H */
 	 PCI_USES_IO|PCI_USES_MASTER, IS_VORTEX, 32, },
 	{"3c595 Vortex 100baseTx",
@@ -819,7 +813,6 @@ struct vortex_private {
 		flow_ctrl:1,					/* Use 802.3x flow control (PAUSE only) */
 		partner_flow_ctrl:1,			/* Partner supports flow control */
 		has_nway:1,
-		enable_wol:1,					/* Wake-on-LAN is enabled */
 		pm_state_valid:1,				/* power_state[] has sane contents */
 		open:1,
 		medialock:1,
@@ -915,10 +908,8 @@ static int options[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1,};
 static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int hw_checksums[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int flow_ctrl[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int enable_wol[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 static int global_options = -1;
 static int global_full_duplex = -1;
-static int global_enable_wol = -1;
 
 /* #define dev_alloc_skb dev_alloc_skb_debug */
 
@@ -960,8 +951,8 @@ static int vortex_resume (struct pci_dev *pdev)
 
 #ifdef CONFIG_EISA
 static struct eisa_device_id vortex_eisa_ids[] = {
-	{ "TCM5920", EISA_3C592_OFFSET },
-	{ "TCM5970", EISA_3C597_OFFSET },
+	{ "TCM5920", CH_3C592 },
+	{ "TCM5970", CH_3C597 },
 	{ "" }
 };
 
@@ -1138,8 +1129,6 @@ static int __devinit vortex_probe1(struct device *gendev,
 			vortex_debug = 7;
 		if (option & 0x4000)
 			vortex_debug = 2;
-		if (option & 0x0400)
-			vp->enable_wol = 1;
 	}
 
 	print_info = (vortex_debug > 1);
@@ -1227,16 +1216,12 @@ static int __devinit vortex_probe1(struct device *gendev,
 
 	if (global_full_duplex > 0)
 		vp->full_duplex = 1;
-	if (global_enable_wol > 0)
-		vp->enable_wol = 1;
 
 	if (card_idx < MAX_UNITS) {
 		if (full_duplex[card_idx] > 0)
 			vp->full_duplex = 1;
 		if (flow_ctrl[card_idx] > 0)
 			vp->flow_ctrl = 1;
-		if (enable_wol[card_idx] > 0)
-			vp->enable_wol = 1;
 	}
 
 	vp->force_fd = vp->full_duplex;
@@ -1379,7 +1364,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 	} else
 		dev->if_port = vp->default_media;
 
-	if ((vp->available_media & 0x4b) || (vci->drv_flags & HAS_NWAY) ||
+	if ((vp->available_media & 0x40) || (vci->drv_flags & HAS_NWAY) ||
 		dev->if_port == XCVR_MII || dev->if_port == XCVR_NWAY) {
 		int phy, phy_idx = 0;
 		EL3WINDOW(4);
@@ -1463,7 +1448,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 	dev->set_multicast_list = set_rx_mode;
 	dev->tx_timeout = vortex_tx_timeout;
 	dev->watchdog_timeo = (watchdog * HZ) / 1000;
-	if (pdev && vp->enable_wol) {
+	if (pdev) {
 		vp->pm_state_valid = 1;
  		pci_save_state(VORTEX_PCI(vp), vp->power_state);
  		acpi_set_WOL(dev);
@@ -1520,7 +1505,7 @@ vortex_up(struct net_device *dev)
 	unsigned int config;
 	int i;
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (VORTEX_PCI(vp)) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
 		pci_restore_state(VORTEX_PCI(vp), vp->power_state);
 	}
@@ -2669,7 +2654,7 @@ vortex_down(struct net_device *dev)
 	if (vp->full_bus_master_tx)
 		outl(0, ioaddr + DownListPtr);
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (VORTEX_PCI(vp)) {
 		pci_save_state(VORTEX_PCI(vp), vp->power_state);
 		acpi_set_WOL(dev);
 	}
@@ -3059,7 +3044,7 @@ static void __devexit vortex_remove_one (struct pci_dev *pdev)
 	/* Should really use issue_and_wait() here */
 	outw(TotalReset|0x14, dev->base_addr + EL3_CMD);
 
-	if (VORTEX_PCI(vp) && vp->enable_wol) {
+	if (VORTEX_PCI(vp)) {
 		pci_set_power_state(VORTEX_PCI(vp), 0);	/* Go active */
 		if (vp->pm_state_valid)
 			pci_restore_state(VORTEX_PCI(vp), vp->power_state);

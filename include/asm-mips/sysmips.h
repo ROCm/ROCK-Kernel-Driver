@@ -7,8 +7,8 @@
  *
  * Copyright (C) 1995 by Ralf Baechle
  */
-#ifndef __ASM_MIPS_SYSMIPS_H
-#define __ASM_MIPS_SYSMIPS_H
+#ifndef _ASM_SYSMIPS_H
+#define _ASM_SYSMIPS_H
 
 /*
  * Commands for the sysmips(2) call
@@ -22,4 +22,4 @@
 #define MIPS_RDNVRAM              10	/* read NVRAM */
 #define MIPS_ATOMIC_SET		2001	/* atomically set variable       */
 
-#endif /* __ASM_MIPS_SYSMIPS_H */
+#endif /* _ASM_SYSMIPS_H */

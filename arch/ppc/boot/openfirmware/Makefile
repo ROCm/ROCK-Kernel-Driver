@@ -50,7 +50,7 @@ endif
 
 $(images)/ramdisk.image.gz:
 	@echo '  MISSING $@'
-	@echo '          RAM disk image must be provided seperatly'
+	@echo '          RAM disk image must be provided separately'
 	@/bin/false
 
 objcpxmon-$(CONFIG_XMON) := --add-section=.sysmap=System.map \

@@ -1,0 +1,66 @@
+#! /bin/bash 
+# extracts .config info from a [b]zImage file
+# uses: binoffset (new), dd, zcat, strings, grep
+# $arg1 is [b]zImage filename
+
+TMPFILE=""
+
+usage()
+{
+	echo "  usage: extract-ikconfig [b]zImage_filename"
+}
+
+clean_up()
+{
+	if [ -z $ISCOMP ]
+	then
+		rm -f $TMPFILE
+	fi
+}
+
+if [ $# -lt 1 ]
+then
+	usage
+	exit
+fi
+
+image=$1
+
+# There are two gzip headers, as well as arches which don't compress their
+# kernel.
+GZHDR="0x1f 0x8b 0x08 0x00"
+if [ `binoffset $image $GZHDR >/dev/null 2>&1 ; echo $?` -ne 0 ]
+then
+	GZHDR="0x1f 0x8b 0x08 0x08"
+	if [ `binoffset $image $GZHDR >/dev/null 2>&1 ; echo $?` -ne 0 ]
+	then
+		ISCOMP=0
+	fi
+fi
+
+PID=$$
+
+# Extract and uncompress the kernel image if necessary
+if [ -z $ISCOMP ]
+then
+	TMPFILE="/tmp/`basename $image`.vmlin.$PID"
+	dd if=$image bs=1 skip=`binoffset $image $GZHDR` 2> /dev/null | zcat > $TMPFILE
+else
+	TMPFILE=$image
+fi
+
+# Look for strings.
+strings $TMPFILE | grep "CONFIG_BEGIN=n" > /dev/null
+if [ $? -eq 0 ]
+then
+	strings $TMPFILE | awk "/CONFIG_BEGIN=n/,/CONFIG_END=n/" > $image.oldconfig.$PID
+else
+	echo "ERROR: Unable to extract kernel configuration information."
+	echo "       This kernel image may not have the config info."
+	clean_up
+	exit 1
+fi
+
+echo "Kernel configuration written to $image.oldconfig.$PID"
+clean_up
+exit 0

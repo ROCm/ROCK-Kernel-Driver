@@ -38,6 +38,7 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 
 #include <asm/io.h>
@@ -79,7 +80,7 @@ static int nowayout = 1;
 static int nowayout = 0;
 #endif
  
-MODULE_PARM(nowayout,"i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*

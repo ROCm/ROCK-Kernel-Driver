@@ -79,33 +79,3 @@ void r3k_copy_page(void * to, void * from)
 		: "0" (to), "1" (from),
 		  "I" (PAGE_SIZE));
 }
-
-/*
- * Initialize new page directory with pointers to invalid ptes
- */
-void pgd_init(unsigned long page)
-{
-	unsigned long dummy1, dummy2;
-
-	/*
-	 * The plain and boring version for the R3000.  No cache flushing
-	 * stuff is implemented since the R3000 has physical caches.
-	 */
-	__asm__ __volatile__(
-		".set\tnoreorder\n"
-		"1:\tsw\t%2, (%0)\n\t"
-		"sw\t%2, 4(%0)\n\t"
-		"sw\t%2, 8(%0)\n\t"
-		"sw\t%2, 12(%0)\n\t"
-		"sw\t%2, 16(%0)\n\t"
-		"sw\t%2, 20(%0)\n\t"
-		"sw\t%2, 24(%0)\n\t"
-		"sw\t%2, 28(%0)\n\t"
-		"subu\t%1, 1\n\t"
-		"bnez\t%1, 1b\n\t"
-		"addiu\t%0, 32\n\t"
-		".set\treorder"
-		:"=r" (dummy1), "=r" (dummy2)
-		:"r" ((unsigned long) invalid_pte_table), "0" (page),
-		 "1" (USER_PTRS_PER_PGD / 8));
-}

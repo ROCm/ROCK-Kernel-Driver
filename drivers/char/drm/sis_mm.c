@@ -28,8 +28,9 @@
  * 
  */
 
+#include <linux/config.h>
 #include "sis.h"
-#include <linux/sisfb.h>
+#include "video/sisfb.h"
 #include "drmP.h"
 #include "sis_drm.h"
 #include "sis_drv.h"

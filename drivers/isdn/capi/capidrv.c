@@ -1596,7 +1596,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
                         rc = FVteln2capi20(bchan->num, AdditionalInfo);
 			isleasedline = (rc == 0);
 			if (rc < 0)
-				printk(KERN_ERR "capidrv-%d: WARNING: illegal leased linedefinition \"%s\"\n", card->contrnr, bchan->num);
+				printk(KERN_ERR "capidrv-%d: WARNING: invalid leased linedefinition \"%s\"\n", card->contrnr, bchan->num);
 
 			if (isleasedline) {
 				calling[0] = 0;

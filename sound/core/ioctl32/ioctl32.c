@@ -419,13 +419,13 @@ extern struct ioctl32_mapper pcm_mappers[];
 extern struct ioctl32_mapper rawmidi_mappers[];
 extern struct ioctl32_mapper timer_mappers[];
 extern struct ioctl32_mapper hwdep_mappers[];
-#ifdef CONFIG_SND_SEQUENCER
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 extern struct ioctl32_mapper seq_mappers[];
 #endif
 
 static void snd_ioctl32_done(void)
 {
-#ifdef CONFIG_SND_SEQUENCER
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	snd_ioctl32_unregister(seq_mappers);
 #endif
 	snd_ioctl32_unregister(hwdep_mappers);
@@ -442,7 +442,7 @@ static int __init snd_ioctl32_init(void)
 	snd_ioctl32_register(rawmidi_mappers);
 	snd_ioctl32_register(timer_mappers);
 	snd_ioctl32_register(hwdep_mappers);
-#ifdef CONFIG_SND_SEQUENCER
+#if defined(CONFIG_SND_SEQUENCER) || (defined(MODULE) && defined(CONFIG_SND_SEQUENCER_MODULE))
 	snd_ioctl32_register(seq_mappers);
 #endif
 	return 0;

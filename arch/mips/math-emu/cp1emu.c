@@ -170,20 +170,16 @@ static int isBranchInstr(mips_instruction * i)
 
 #define SIFROMREG(si,x)	((si) = \
 			(xcp->cp0_status & FR_BIT) || !(x & 1) ? \
-			(int)ctx->regs[x] : \
-			(int)(ctx->regs[x & ~1] >> 32 ))
-#define SITOREG(si,x)	(ctx->regs[x & ~((xcp->cp0_status & FR_BIT) == 0)] = \
+			(int)ctx->fpr[x] : \
+			(int)(ctx->fpr[x & ~1] >> 32 ))
+#define SITOREG(si,x)	(ctx->fpr[x & ~((xcp->cp0_status & FR_BIT) == 0)] = \
 			(xcp->cp0_status & FR_BIT) || !(x & 1) ? \
-			ctx->regs[x & ~1] >> 32 << 32 | (u32)(si) : \
-			ctx->regs[x & ~1] << 32 >> 32 | (u64)(si) << 32)
+			ctx->fpr[x & ~1] >> 32 << 32 | (u32)(si) : \
+			ctx->fpr[x & ~1] << 32 >> 32 | (u64)(si) << 32)
 
 #define DIFROMREG(di,x)	((di) = \
-			ctx->regs[x & ~((xcp->cp0_status & FR_BIT) == 0)])
-#define DITOREG(di,x)	(ctx->regs[x & ~((xcp->cp0_status & FR_BIT) == 0)] \
-			= (di))
-#define DIFROMREG(di,x)	((di) = \
-			ctx->regs[x & ~((xcp->cp0_status & FR_BIT) == 0)])
-#define DITOREG(di,x)	(ctx->regs[x & ~((xcp->cp0_status & FR_BIT) == 0)] \
+			ctx->fpr[x & ~((xcp->cp0_status & FR_BIT) == 0)])
+#define DITOREG(di,x)	(ctx->fpr[x & ~((xcp->cp0_status & FR_BIT) == 0)] \
 			= (di))
 
 #define SPFROMREG(sp,x)	SIFROMREG((sp).bits,x)
@@ -371,7 +367,7 @@ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
 				return do_dsemulret(xcp);
 			}
 			if (MIPSInst_RD(ir) == FPCREG_CSR) {
-				value = ctx->sr;
+				value = ctx->fcr31;
 #ifdef CSRTRACE
 				printk("%p gpr[%d]<-csr=%08x\n",
 					REG_TO_VA(xcp->cp0_epc),
@@ -404,13 +400,13 @@ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
 					REG_TO_VA(xcp->cp0_epc),
 					MIPSInst_RT(ir), value);
 #endif
-				ctx->sr = value;
+				ctx->fcr31 = value;
 				/* copy new rounding mode and
 				   flush bit to ieee library state! */
-				ieee754_csr.nod = (ctx->sr & 0x1000000) != 0;
+				ieee754_csr.nod = (ctx->fcr31 & 0x1000000) != 0;
 				ieee754_csr.rm = ieee_rm[value & 0x3];
 			}
-			if ((ctx->sr >> 5) & ctx->sr & FPU_CSR_ALL_E) {
+			if ((ctx->fcr31 >> 5) & ctx->fcr31 & FPU_CSR_ALL_E) {
 				return SIGFPE;
 			}
 			break;
@@ -423,9 +419,9 @@ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
 				return SIGILL;
 
 #if __mips >= 4
-			cond = ctx->sr & fpucondbit[MIPSInst_RT(ir) >> 2];
+			cond = ctx->fcr31 & fpucondbit[MIPSInst_RT(ir) >> 2];
 #else
-			cond = ctx->sr & FPU_CSR_COND;
+			cond = ctx->fcr31 & FPU_CSR_COND;
 #endif
 			switch (MIPSInst_RT(ir) & 3) {
 			case bcfl_op:
@@ -531,7 +527,7 @@ static int cop1Emulate(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx)
 		if (MIPSInst_FUNC(ir) != movc_op)
 			return SIGILL;
 		cond = fpucondbit[MIPSInst_RT(ir) >> 2];
-		if (((ctx->sr & cond) != 0) != ((MIPSInst_RT(ir) & 1) != 0))
+		if (((ctx->fcr31 & cond) != 0) != ((MIPSInst_RT(ir) & 1) != 0))
 			return 0;
 		xcp->regs[MIPSInst_RD(ir)] = xcp->regs[MIPSInst_RS(ir)];
 		break;
@@ -701,12 +697,12 @@ static int fpux_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 			if (ieee754_cxtest(IEEE754_INVALID_OPERATION))
 				rcsr |= FPU_CSR_INV_X | FPU_CSR_INV_S;
 
-			ctx->sr = (ctx->sr & ~FPU_CSR_ALL_X) | rcsr;
+			ctx->fcr31 = (ctx->fcr31 & ~FPU_CSR_ALL_X) | rcsr;
 			if (ieee754_csr.nod)
-				ctx->sr |= 0x1000000;
-			if ((ctx->sr >> 5) & ctx->sr & FPU_CSR_ALL_E) {
+				ctx->fcr31 |= 0x1000000;
+			if ((ctx->fcr31 >> 5) & ctx->fcr31 & FPU_CSR_ALL_E) {
 				/*printk ("SIGFPE: fpu csr = %08x\n",
-				   ctx->sr); */
+				   ctx->fcr31); */
 				return SIGFPE;
 			}
 
@@ -853,7 +849,7 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 #if __mips >= 4
 		case fmovc_op:
 			cond = fpucondbit[MIPSInst_FT(ir) >> 2];
-			if (((ctx->sr & cond) != 0) !=
+			if (((ctx->fcr31 & cond) != 0) !=
 				((MIPSInst_FT(ir) & 1) != 0))
 				return 0;
 			SPFROMREG(rv.s, MIPSInst_FS(ir));
@@ -1043,7 +1039,7 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 #if __mips >= 4
 		case fmovc_op:
 			cond = fpucondbit[MIPSInst_FT(ir) >> 2];
-			if (((ctx->sr & cond) != 0) !=
+			if (((ctx->fcr31 & cond) != 0) !=
 				((MIPSInst_FT(ir) & 1) != 0))
 				return 0;
 			DPFROMREG(rv.d, MIPSInst_FS(ir));
@@ -1211,12 +1207,12 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 		switch (MIPSInst_FUNC(ir)) {
 		case fcvts_op:
 			/* convert long to single precision real */
-			rv.s = ieee754sp_flong(ctx->regs[MIPSInst_FS(ir)]);
+			rv.s = ieee754sp_flong(ctx->fpr[MIPSInst_FS(ir)]);
 			rfmt = s_fmt;
 			goto copcsr;
 		case fcvtd_op:
 			/* convert long to double precision real */
-			rv.d = ieee754dp_flong(ctx->regs[MIPSInst_FS(ir)]);
+			rv.d = ieee754dp_flong(ctx->fpr[MIPSInst_FS(ir)]);
 			rfmt = d_fmt;
 			goto copcsr;
 		default:
@@ -1237,9 +1233,9 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 	 * Note: cause exception bits do not accumulate, they are rewritten
 	 * for each op; only the flag/sticky bits accumulate.
 	 */
-	ctx->sr = (ctx->sr & ~FPU_CSR_ALL_X) | rcsr;
-	if ((ctx->sr >> 5) & ctx->sr & FPU_CSR_ALL_E) {
-		/*printk ("SIGFPE: fpu csr = %08x\n",ctx->sr); */
+	ctx->fcr31 = (ctx->fcr31 & ~FPU_CSR_ALL_X) | rcsr;
+	if ((ctx->fcr31 >> 5) & ctx->fcr31 & FPU_CSR_ALL_E) {
+		/*printk ("SIGFPE: fpu csr = %08x\n",ctx->fcr31); */
 		return SIGFPE;
 	}
 
@@ -1254,9 +1250,9 @@ static int fpu_emu(struct pt_regs *xcp, struct mips_fpu_soft_struct *ctx,
 		cond = FPU_CSR_COND;
 #endif
 		if (rv.w)
-			ctx->sr |= cond;
+			ctx->fcr31 |= cond;
 		else
-			ctx->sr &= ~cond;
+			ctx->fcr31 &= ~cond;
 		break;
 	}
 #ifndef SINGLE_ONLY_FPU
@@ -1302,9 +1298,9 @@ int fpu_emulator_cop1Handler(int xcptno, struct pt_regs *xcp,
 		else {
 			/* Update ieee754_csr. Only relevant if we have a
 			   h/w FPU */
-			ieee754_csr.nod = (ctx->sr & 0x1000000) != 0;
-			ieee754_csr.rm = ieee_rm[ctx->sr & 0x3];
-			ieee754_csr.cx = (ctx->sr >> 12) & 0x1f;
+			ieee754_csr.nod = (ctx->fcr31 & 0x1000000) != 0;
+			ieee754_csr.rm = ieee_rm[ctx->fcr31 & 0x3];
+			ieee754_csr.cx = (ctx->fcr31 >> 12) & 0x1f;
 			sig = cop1Emulate(xcp, ctx);
 		}
 

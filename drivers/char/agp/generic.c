@@ -40,6 +40,8 @@
 __u32 *agp_gatt_table; 
 int agp_memory_reserved;
 
+EXPORT_SYMBOL(agp_memory_reserved);
+
 /* 
  * Generic routines for handling agp_memory structures -
  * They use the basic page allocation routines to do the brunt of the work.

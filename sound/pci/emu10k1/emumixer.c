@@ -423,6 +423,36 @@ static void snd_emu10k1_mixer_free_ac97(ac97_t *ac97)
 	emu->ac97 = NULL;
 }
 
+/*
+ */
+static int remove_ctl(snd_card_t *card, const char *name)
+{
+	snd_ctl_elem_id_t id;
+	memset(&id, 0, sizeof(id));
+	strcpy(id.name, name);
+	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+	return snd_ctl_remove_id(card, &id);
+}
+
+static snd_kcontrol_t *ctl_find(snd_card_t *card, const char *name)
+{
+	snd_ctl_elem_id_t sid;
+	memset(&sid, 0, sizeof(sid));
+	strcpy(sid.name, name);
+	sid.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+	return snd_ctl_find_id(card, &sid);
+}
+
+static int rename_ctl(snd_card_t *card, const char *src, const char *dst)
+{
+	snd_kcontrol_t *kctl = ctl_find(card, src);
+	if (kctl) {
+		strcpy(kctl->id.name, dst);
+		return 0;
+	}
+	return -ENOENT;
+}
+
 int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 {
 	ac97_t ac97;
@@ -430,7 +460,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 	snd_kcontrol_t *kctl;
 	snd_card_t *card = emu->card;
 
-	if (!emu->APS) {
+	if (!emu->no_ac97) {
 		memset(&ac97, 0, sizeof(ac97));
 		ac97.write = snd_emu10k1_ac97_write;
 		ac97.read = snd_emu10k1_ac97_read;
@@ -438,8 +468,33 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		ac97.private_free = snd_emu10k1_mixer_free_ac97;
 		if ((err = snd_ac97_mixer(emu->card, &ac97, &emu->ac97)) < 0)
 			return err;
+		if (emu->audigy && emu->revision == 4) {
+			/* Master/PCM controls on ac97 of Audigy2 has no effect */
+			/* FIXME: keep master volume/switch to be sure.
+			 * once after we check that they play really no roles,
+			 * they shall be removed.
+			 */
+			rename_ctl(card, "Master Playback Switch", "AC97 Master Playback Switch");
+			rename_ctl(card, "Master Playback Volume", "AC97 Master Playback Volume");
+			/* pcm controls are removed */
+			remove_ctl(card, "PCM Playback Switch");
+			remove_ctl(card, "PCM Playback Volume");
+		}
 	} else {
-		strcpy(emu->card->mixername, "EMU APS");
+		if (emu->APS)
+			strcpy(emu->card->mixername, "EMU APS");
+		else if (emu->audigy)
+			strcpy(emu->card->mixername, "SB Audigy");
+		else
+			strcpy(emu->card->mixername, "Emu10k1");
+	}
+
+	if (emu->audigy && emu->revision == 4) {
+		/* Audigy2 and Audigy2 EX */
+		/* use the conventional names */
+		rename_ctl(card, "Wave Playback Volume", "PCM Playback Volume");
+		rename_ctl(card, "Wave Playback Volume", "PCM Capture Volume");
+		rename_ctl(card, "Wave Master Playback Volume", "Master Playback Volume");
 	}
 
 	if ((kctl = emu->ctl_send_routing = snd_ctl_new1(&snd_emu10k1_send_routing_control, emu)) == NULL)
@@ -455,6 +510,7 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 	if ((err = snd_ctl_add(card, kctl)))
 		return err;
 
+	/* intiailize the routing and volume table for each pcm playback stream */
 	for (pcm = 0; pcm < 32; pcm++) {
 		emu10k1_pcm_mixer_t *mix;
 		int v;
@@ -474,21 +530,25 @@ int __devinit snd_emu10k1_mixer(emu10k1_t *emu)
 		mix->attn[0] = mix->attn[1] = mix->attn[2] = 0xffff;
 	}
 	
-	if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_mask_control, emu)) == NULL)
-		return -ENOMEM;
-	if ((err = snd_ctl_add(card, kctl)))
-		return err;
-	if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_control, emu)) == NULL)
-		return -ENOMEM;
-	if ((err = snd_ctl_add(card, kctl)))
-		return err;
+	if (! emu->APS) { /* FIXME: APS has these controls? */
+		/* sb live! and audigy */
+		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_mask_control, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+		if ((kctl = snd_ctl_new1(&snd_emu10k1_spdif_control, emu)) == NULL)
+			return -ENOMEM;
+		if ((err = snd_ctl_add(card, kctl)))
+			return err;
+	}
 
 	if (emu->audigy) {
 		if ((kctl = snd_ctl_new1(&snd_audigy_shared_spdif, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))
 			return err;
-	} else {
+	} else if (! emu->APS) {
+		/* sb live! */
 		if ((kctl = snd_ctl_new1(&snd_emu10k1_shared_spdif, emu)) == NULL)
 			return -ENOMEM;
 		if ((err = snd_ctl_add(card, kctl)))

@@ -25,9 +25,6 @@
 
 /* For R3000 cores with R4000 style caches */
 static unsigned long icache_size, dcache_size;		/* Size in bytes */
-static unsigned long icache_way_size, dcache_way_size;	/* Size divided by ways */
-#define scache_size 0
-#define scache_way_size 0
 
 #include <asm/r4kcache.h>
 
@@ -474,15 +471,15 @@ void __init ld_mmu_tx39(void)
 		break;
 	}
 
-	icache_way_size = icache_size / current_cpu_data.icache.ways;
-	dcache_way_size = dcache_size / current_cpu_data.dcache.ways;
+	current_cpu_data.icache.waysize = icache_size / current_cpu_data.icache.ways;
+	current_cpu_data.dcache.waysize = dcache_size / current_cpu_data.dcache.ways;
 
 	current_cpu_data.icache.sets =
-		icache_way_size / current_cpu_data.icache.linesz;
+		current_cpu_data.icache.waysize / current_cpu_data.icache.linesz;
 	current_cpu_data.dcache.sets =
-		dcache_way_size / current_cpu_data.dcache.linesz;
+		current_cpu_data.dcache.waysize / current_cpu_data.dcache.linesz;
 
-	if (dcache_way_size > PAGE_SIZE)
+	if (current_cpu_data.dcache.waysize > PAGE_SIZE)
 		current_cpu_data.dcache.flags |= MIPS_CACHE_ALIASES;
 
 	current_cpu_data.icache.waybit = 0;

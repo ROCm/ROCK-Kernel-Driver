@@ -3,7 +3,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (C) 1994, 1995, 1996 by Ralf Baechle
+# Copyright (C) 1994, 95, 96, 2003 by Ralf Baechle
 # DECStation modifications by Paul M. Antoine, 1996
 # Copyright (C) 2002  Maciej W. Rozycki
 #
@@ -16,15 +16,26 @@
 # Select the object file format to substitute into the linker script.
 #
 ifdef CONFIG_CPU_LITTLE_ENDIAN
-tool-prefix	= mipsel-linux-
-JIFFIES32	= jiffies_64
+32bit-tool-prefix	= mips64el-linux-
+64bit-tool-prefix	= mips64el-linux-
+32bit-bfd		= elf32-tradlittlemips
+64bit-bfd		= elf64-tradlittlemips
 else
-tool-prefix	= mips-linux-
-JIFFIES32	= jiffies_64 + 4
+32bit-tool-prefix	= mips64-linux-
+64bit-tool-prefix	= mips64-linux-
+32bit-bfd		= elf32-tradbigmips
+64bit-bfd		= elf64-tradbigmips
+endif
+
+ifdef CONFIG_MIPS32
+tool-prefix		= $(32bit-tool-prefix)
+endif
+ifdef CONFIG_MIPS64
+tool-prefix		= $(64bit-tool-prefix)
 endif
 
 ifdef CONFIG_CROSSCOMPILE
-CROSS_COMPILE	:= $(tool-prefix)
+CROSS_COMPILE		:= $(tool-prefix)
 endif
 
 #
@@ -39,44 +50,83 @@ endif
 #
 cflags-y			:= -I $(TOPDIR)/include/asm/gcc
 cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
-LDFLAGS_vmalinux		+= -G 0 -static # -N
+cflags-$(CONFIG_MIPS32)		+= $(call check_gcc, -mabi=32,)
+cflags-$(CONFIG_MIPS64)		+= -mabi=64
+LDFLAGS_vmlinux			+= -G 0 -static # -N
 MODFLAGS			+= -mlong-calls
 
 cflags-$(CONFIG_KGDB)		+= -g
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= -mno-sched-prolog -fno-omit-frame-pointer
 
 check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
+check_warning = $(shell if $(CC) $(1) -c -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
 
 #
 # CPU-dependent compiler/assembler options for optimization.
+# This is done in several steps:
 #
-cflags-$(CONFIG_CPU_R3000)	+= -mcpu=r3000 -mips1
-cflags-$(CONFIG_CPU_TX39XX)	+= -mcpu=r3000 -mips1
-cflags-$(CONFIG_CPU_R6000)	+= -mcpu=r6000 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_R4300)	+= -mcpu=r4300 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_VR41XX)	+= -mcpu=r4600 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_R4X00)	+= -mcpu=r4600 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_TX49XX)	+= -mcpu=r4600 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_MIPS32)	+= -mcpu=r4600 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_MIPS64)	+= -mcpu=r4600 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_R5000)	+= -mcpu=r5000 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_R5432)	+= -mcpu=r5000 -mips2 -Wa,--trap
-# Cannot use -mmad with currently recommended tools
-cflags-$(CONFIG_CPU_NEVADA)	+= -mcpu=r5000 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_RM7000)	+= -mcpu=r5000 -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_RM7000)	+= $(call check_gcc, -mcpu=r7000, -mcpu=r5000) \
-				   -mips2 -Wa,--trap
-cflags-$(CONFIG_CPU_SB1)	+= $(call check_gcc, -mcpu=sb1, -mcpu=r8000) \
-				   -mips2 -Wa,--trap
+#  - cflags-y    contains the options which select for which processor to
+#                optimize the code for.  The options should not contain any
+#                options that change the ISA level but only compiler flags to
+#                tune performance of the generated code.
+#  - 32bit-isa-y contains the options which select the ISA for 32-bit kernels.
+#                A kernel built those options will only work on hardware which
+#                actually supports this ISA.
+#  - 64bit-isa-y contains the options which select the ISA for 64-bit kernels.
+#                A kernel built those options will only work on hardware which
+#                actually supports this ISA.
+#
+cflags-$(CONFIG_CPU_R3000)	+= -mcpu=r3000
+32bit-isa-$(CONFIG_CPU_R3000)	+= -mips1
+64bit-isa-$(CONFIG_CPU_R3000)	+= -mboom
+cflags-$(CONFIG_CPU_TX39XX)	+= -mcpu=r3000
+32bit-isa-$(CONFIG_CPU_TX39XX)	+= -mips1
+64bit-isa-$(CONFIG_CPU_TX39XX)	+= -mboom
+cflags-$(CONFIG_CPU_R6000)	+= -mcpu=r6000
+32bit-isa-$(CONFIG_CPU_R6000)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R6000)	+= -mboom -Wa,--trap
+cflags-$(CONFIG_CPU_R4300)	+= -mcpu=r4300
+32bit-isa-$(CONFIG_CPU_R4300)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R4300)	+= -mips3 -Wa,--trap
+cflags-$(CONFIG_CPU_VR41XX)	+= -mcpu=r4600
+32bit-isa-$(CONFIG_CPU_VR41XX)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_VR41XX)	+= -mips3 -Wa,--trap
+cflags-$(CONFIG_CPU_R4X00)	+= -mcpu=r4600
+32bit-isa-$(CONFIG_CPU_R4X00)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R4X00)	+= -mips3 -Wa,--trap
+cflags-$(CONFIG_CPU_MIPS32)	+= $(call check_gcc, -mtune=mips32, -mcpu=r4600)
+32bit-isa-$(CONFIG_CPU_MIPS32)	+= $(call check_gcc, -mips32 -mabi=32, -mips2) -Wa,--trap
+64bit-isa-$(CONFIG_CPU_MIPS32)	+= -mboom
+cflags-$(CONFIG_CPU_MIPS64)	+= 
+32bit-isa-$(CONFIG_CPU_MIPS64)	+= $(call check_gcc, -mips32, -mips2) -Wa,--trap
+64bit-isa-$(CONFIG_CPU_MIPS64)	+= $(call check_gcc, -mips64, -mips4) -Wa,--trap
+cflags-$(CONFIG_CPU_R5000)	+= -mcpu=r8000
+32bit-isa-$(CONFIG_CPU_R5000)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R5000)	+= -mips4 -Wa,--trap
+cflags-$(CONFIG_CPU_R5432)	+= -mcpu=r5000
+32bit-isa-$(CONFIG_CPU_R5432)	+= -mips1 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R5432)	+= -mips3 -Wa,--trap
+cflags-$(CONFIG_CPU_NEVADA)	+= -mcpu=r8000 -mmad
+32bit-isa-$(CONFIG_CPU_NEVADA)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_NEVADA)	+= -mips3 -Wa,--trap
+cflags-$(CONFIG_CPU_RM7000)	+= $(call check_gcc, -mcpu=r7000, -mcpu=r5000)
+32bit-isa-$(CONFIG_CPU_RM7000)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_RM7000)	+= -mips4 -Wa,--trap
+cflags-$(CONFIG_CPU_SB1)	+= $(call check_gcc, -mcpu=sb1, -mcpu=r8000)
+32bit-isa-$(CONFIG_CPU_SB1)	+= $(call check_gcc, -mips32, -mips2) -Wa,--trap
+64bit-isa-$(CONFIG_CPU_SB1)	+= $(call check_gcc, -mips64, -mips4) -Wa,--trap
+cflags-$(CONFIG_CPU_R8000)	+= -mcpu=r8000
+32bit-isa-$(CONFIG_CPU_R8000)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R8000)	+= -mips4 -Wa,--trap
+cflags-$(CONFIG_CPU_R10000)	+= -mcpu=r8000
+32bit-isa-$(CONFIG_CPU_R10000)	+= -mips2 -Wa,--trap
+64bit-isa-$(CONFIG_CPU_R10000)	+= -mips4 -Wa,--trap
+
 ifdef CONFIG_CPU_SB1
 ifdef CONFIG_SB1_PASS_1_WORKAROUNDS
 MODFLAGS	+= -msb1-pass1-workarounds
 endif
 endif
-
-AFLAGS		+= $(cflags-y)
-CFLAGS		+= $(cflags-y)
-
 
 #
 # ramdisk/initrd support
@@ -175,7 +225,7 @@ load-$(CONFIG_MIPS_ATLAS)	+= 0x80100000
 # MIPS Malta board
 #
 core-$(CONFIG_MIPS_MALTA)	+= arch/mips/mips-boards/malta/
-load-$(CONFIG_MIPS_MALTA)	:= 0x80100000
+load-$(CONFIG_MIPS_MALTA)	+= 0x80100000
 
 #
 # MIPS SEAD board
@@ -286,11 +336,50 @@ load-$(CONFIG_TANBAC_TB0229)	+= 0x80000000
 # SGI IP22 (Indy/Indigo2)
 #
 # Set the load address to >= 0x88069000 if you want to leave space for symmon,
-# 0x88002000 for production kernels.  Note that the value must be 8kb aligned
-# or the handling of the current variable will break.
+# 0x80002000 for production kernels.  Note that the value must be aligned to
+# a multiple of the kernel stack size or the handling of the current variable
+# will break so for 64-bit kernels we have to raise the start address by 8kb.
 #
 core-$(CONFIG_SGI_IP22)		+= arch/mips/sgi-ip22/
+ifdef CONFIG_MIPS32
 load-$(CONFIG_SGI_IP22)		+= 0x88002000
+endif
+ifdef CONFIG_MIPS64
+load-$(CONFIG_SGI_IP22)		+= 0x88004000
+endif
+
+#
+# SGI-IP27 (Origin200/2000)
+#
+# Set the load address to >= 0xc000000000300000 if you want to leave space for
+# symmon, 0xc00000000001c000 for production kernels.  Note that the value
+# must be 16kb aligned or the handling of the current variable will break.
+#
+ifdef CONFIG_SGI_IP27
+core-$(CONFIG_SGI_IP27)		+= arch/mips/sgi-ip27/
+#load-$(CONFIG_SGI_IP27)	+= 0xa80000000001c000
+ifdef CONFIG_MAPPED_KERNEL
+load-$(CONFIG_SGI_IP27)		+= 0xc001c000
+else
+load-$(CONFIG_SGI_IP27)		+= 0x8001c000
+endif
+endif
+
+#
+# SGI-IP32 (O2)
+#
+# Set the load address to >= 0x????????? if you want to leave space for symmon,
+# 0x80002000 for production kernels.  Note that the value must be aligned to
+# a multiple of the kernel stack size or the handling of the current variable
+# will break so for 64-bit kernels we have to raise the start address by 8kb.
+#
+core-$(CONFIG_SGI_IP32)		+= arch/mips/sgi-ip32/
+ifdef CONFIG_MIPS32
+load-$(CONFIG_SGI_IP32)		+= 0x88002000
+endif
+ifdef CONFIG_MIPS64
+load-$(CONFIG_SGI_IP32)		+= 0x88004000
+endif
 
 #
 # Sibyte SB1250 SOC
@@ -339,12 +428,52 @@ load-$(CONFIG_TOSHIBA_JMR3927)	+= 0x80050000
 # Toshiba RBTX4927 board or
 # Toshiba RBTX4937 board
 #
-core-$(CONFIG_TOSHIBA_RBTX4927)	+= arch/mips/tx4927/toshiba_rbtx4927/ 
+core-$(CONFIG_TOSHIBA_RBTX4927)	+= arch/mips/tx4927/toshiba_rbtx4927/
 core-$(CONFIG_TOSHIBA_RBTX4927)	+= arch/mips/tx4927/common/
-load-$(CONFIG_TOSHIBA_RBTX4927)	:= 0x80020000
+load-$(CONFIG_TOSHIBA_RBTX4927)	+= 0x80020000
 
 drivers-$(CONFIG_PCI)		+= arch/mips/pci/
 
+ifdef CONFIG_MIPS32
+build-bfd		= $(32bit-bfd)
+cflags-y		+= $(32bit-isa-y)
+endif
+ifdef CONFIG_MIPS64
+build-bfd		= $(64bit-bfd)
+cflags-y		+= $(64bit-isa-y)
+endif
+
+ifdef CONFIG_MIPS32
+ifdef CONFIG_CPU_LITTLE_ENDIAN
+JIFFIES			= jiffies_64
+else
+JIFFIES			= jiffies_64 + 4
+endif
+else
+JIFFIES			= jiffies_64
+endif
+
+#
+# Some machines like the Indy need 32-bit ELF binaries for booting purposes.
+# Other need ECOFF, so we build a 32-bit ELF binary for them which we then
+# convert to ECOFF using elf2ecoff.
+#
+# The 64-bit ELF tools are pretty broken so at this time we generate 64-bit
+# ELF files from 32-bit files by conversion.
+#
+#AS += -64
+#LDFLAGS += -m elf64bmip
+
+ifdef CONFIG_MIPS64
+#
+# We use an unusual code model for building 64-bit kernels.  64-bit ELF,
+# squeezed into 32-bit ELF files.  Later version of gas throw silly warnings
+# which requires the use of -mgp64 which not all gas versions have ...
+#
+GRRR=-Wa,-mgp64
+cflags-$(CONFIG_BOOT_ELF32)	+= -Wa,-32 $(call check_warning, $(GRRR),)
+cflags-$(CONFIG_BOOT_ELF64)	+= -Wa,-32 $(call check_warning, $(GRRR),)
+endif
 
 #
 # Choosing incompatible machines durings configuration will result in
@@ -352,12 +481,25 @@ drivers-$(CONFIG_PCI)		+= arch/mips/pci/
 # none has been choosen above.
 #
 
-AFLAGS_vmlinux.lds.o := -D"LOADADDR=$(load-y)" -D"JIFFIES32=$(JIFFIES32)"
+AFLAGS_vmlinux.lds.o := \
+	-D"LOADADDR=$(load-y)" \
+	-D"JIFFIES=$(JIFFIES)" \
+	-imacros $(srctree)/include/asm-$(ARCH)/sn/mapped_kernel.h
+
+AFLAGS		+= $(cflags-y)
+CFLAGS		+= $(cflags-y)
+
+LDFLAGS			+= --oformat $(32bit-bfd)
 
 head-y := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
 
-libs-y		+= arch/mips/lib/
-core-y		+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/
+libs-y			+= arch/mips/lib/
+libs-$(CONFIG_MIPS32)	+= arch/mips/lib-32/
+libs-$(CONFIG_MIPS64)	+= arch/mips/lib-64/
+
+core-y			+= arch/mips/kernel/ arch/mips/mm/ arch/mips/math-emu/
+core-$(CONFIG_MIPS32)	+= arch/mips/mm-32/
+core-$(CONFIG_MIPS64)	+= arch/mips/mm-64/
 
 ifdef CONFIG_BAGET_MIPS
 
@@ -371,6 +513,14 @@ endif
 ifdef CONFIG_LASAT
 rom.bin rom.sw: vmlinux
 	$(call descend,arch/mips/lasat/image,$@)
+endif
+
+ifdef CONFIG_MAPPED_KERNEL
+vmlinux.64: vmlinux
+	$(OBJCOPY) -O $(64bit-bfd) --change-addresses=0xbfffffff40000000 $< $@
+else
+vmlinux.64: vmlinux
+	$(OBJCOPY) -O $(64bit-bfd) --change-addresses=0xa7ffffff80000000 $< $@
 endif
 
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/mips/boot $(1)
@@ -394,8 +544,6 @@ archclean:
 	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/baget
 	@$(MAKE) -f scripts/Makefile.clean obj=arch/mips/lasat
 
-archmrproper:
-
 # Generate <asm/offset.h 
 #
 # The default rule is suffering from funny problems on MIPS so we using our
@@ -405,8 +553,8 @@ archmrproper:
 
 define filechk_gen-asm-offset.h
 	(set -e; \
-	 echo "#ifndef __ASM_OFFSET_H"; \
-	 echo "#define __ASM_OFFSET_H"; \
+	 echo "#ifndef _ASM_OFFSET_H"; \
+	 echo "#define _ASM_OFFSET_H"; \
 	 echo "/*"; \
 	 echo " * DO NOT MODIFY."; \
 	 echo " *"; \
@@ -415,16 +563,36 @@ define filechk_gen-asm-offset.h
 	 echo " */"; \
 	 echo ""; \
 	 sed -ne "/^@@@/s///p"; \
-	 echo "#endif /* __ASM_OFFSET_H */" )
+	 echo "#endif /* _ASM_OFFSET_H */" )
 endef
 
-prepare: include/asm-$(ARCH)/offset.h
+define filechk_gen-asm-reg.h
+	(set -e; \
+	 echo "#ifndef _ASM_REG_H"; \
+	 echo "#define _ASM_REG_H"; \
+	 echo "/*"; \
+	 echo " * DO NOT MODIFY."; \
+	 echo " *"; \
+	 echo " * This file was generated by arch/$(ARCH)/Makefile"; \
+	 echo " *"; \
+	 echo " */"; \
+	 echo ""; \
+	 sed -ne "/^@@@/s///p"; \
+	 echo "#endif /* _ASM_REG_H */" )
+endef
+
+prepare: include/asm-$(ARCH)/offset.h \
+	 include/asm-$(ARCH)/reg.h
 
 arch/$(ARCH)/kernel/offset.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
 include/asm-$(ARCH)/offset.h: arch/$(ARCH)/kernel/offset.s
 	$(call filechk,gen-asm-offset.h)
+include/asm-$(ARCH)/reg.h: arch/$(ARCH)/kernel/reg.s
+	$(call filechk,gen-asm-reg.h)
 
 CLEAN_FILES += include/asm-$(ARCH)/offset.h.tmp \
-	       include/asm-$(ARCH)/offset.h
+	       include/asm-$(ARCH)/offset.h \
+	       include/asm-$(ARCH)/reg.h.tmp \
+	       include/asm-$(ARCH)/reg.h

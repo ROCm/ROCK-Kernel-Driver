@@ -1811,7 +1811,6 @@ void ext3_write_super (struct super_block * sb)
 	if (down_trylock(&sb->s_lock) == 0)
 		BUG();
 	sb->s_dirt = 0;
-	journal_start_commit(EXT3_SB(sb)->s_journal, NULL);
 }
 
 static int ext3_sync_fs(struct super_block *sb, int wait)

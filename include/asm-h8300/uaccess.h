@@ -14,16 +14,17 @@
 #define VERIFY_WRITE	1
 
 /* We let the MMU do all checking */
-extern inline int access_ok(int type, const void * addr, unsigned long size)
+#define access_ok(type, addr, size) __access_ok((unsigned long)addr,size)
+static inline int __access_ok(unsigned long addr, unsigned long size)
 {
 #define	RANGE_CHECK_OK(addr, size, lower, upper) \
 	(((addr) >= (lower)) && (((addr) + (size)) < (upper)))
 
 	extern unsigned long _ramend;
-	return(RANGE_CHECK_OK((unsigned long) addr, size, 0L, (unsigned long)&_ramend));
+	return(RANGE_CHECK_OK(addr, size, 0L, (unsigned long)&_ramend));
 }
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void *addr, unsigned long size)
 {
 	return access_ok(type,addr,size)?0:-EFAULT;
 }

@@ -1,32 +1,23 @@
 /******************************************************************************
  *
  * Name:	skhwt.h
- * Project:	Genesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.4 $
- * Date:	$Date: 1998/08/19 09:50:58 $
+ * Project:	Gigabit Ethernet Adapters, Schedule-Modul
+ * Version:	$Revision: 1.6 $
+ * Date:	$Date: 2003/05/13 17:57:48 $
  * Purpose:	Defines for the hardware timer functions
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1989-1998 SysKonnect,
- *	a business unit of Schneider & Koch & Co. Datensysteme GmbH.
- *	All Rights Reserved
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
- *	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF SYSKONNECT
- *	The copyright notice above does not evidence any
- *	actual or intended publication of such source code.
+ *	This program is free software; you can redistribute it and/or modify
+ *	it under the terms of the GNU General Public License as published by
+ *	the Free Software Foundation; either version 2 of the License, or
+ *	(at your option) any later version.
  *
- *	This Module contains Proprietary Information of SysKonnect
- *	and should be treated as Confidential.
- *
- *	The information in this file is provided for the exclusive use of
- *	the licensees of SysKonnect.
- *	Such users have the right to use, modify, and incorporate this code
- *	into products for purposes authorized by the license agreement
- *	provided they include this notice and the associated copyright notice
- *	with any such product.
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
@@ -36,6 +27,12 @@
  * History:
  *
  *	$Log: skgehwt.h,v $
+ *	Revision 1.6  2003/05/13 17:57:48  mkarl
+ *	Editorial changes.
+ *	
+ *	Revision 1.5  1999/11/22 13:54:24  cgoos
+ *	Changed license header to GPL.
+ *	
  *	Revision 1.4  1998/08/19 09:50:58  gklug
  *	fix: remove struct keyword from c-code (see CCC) add typedefs
  *	

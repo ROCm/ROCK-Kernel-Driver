@@ -1123,7 +1123,7 @@ static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				if (macstatus & (1<<3))
 					printk(KERN_WARNING "eint error: Internal watchdog timer expired \n") ;
 				if (macstatus & (1<<2))
-					printk(KERN_WARNING "aint error: Host tried to perform illegal operation \n") ; 
+					printk(KERN_WARNING "aint error: Host tried to perform invalid operation \n") ; 
 				printk(KERN_WARNING "Instatus = %02x, macstatus = %02x\n",intstatus,macstatus) ; 
 				printk(KERN_WARNING "%s: Resetting hardware: \n", dev->name); 
 				netif_stop_queue(dev) ;

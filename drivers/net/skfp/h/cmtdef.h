@@ -721,21 +721,21 @@ void	dump_hex() ;
 #endif
 
 #define	SMT_E0100	SMT_EBASE + 0
-#define	SMT_E0100_MSG	"cfm FSM: illegal ce_type"
+#define	SMT_E0100_MSG	"cfm FSM: invalid ce_type"
 #define	SMT_E0101	SMT_EBASE + 1
 #define	SMT_E0101_MSG	"CEM: case ???"
 #define	SMT_E0102	SMT_EBASE + 2
-#define	SMT_E0102_MSG	"CEM A: illegal state"
+#define	SMT_E0102_MSG	"CEM A: invalid state"
 #define	SMT_E0103	SMT_EBASE + 3
-#define	SMT_E0103_MSG	"CEM B: illegal state"
+#define	SMT_E0103_MSG	"CEM B: invalid state"
 #define	SMT_E0104	SMT_EBASE + 4
-#define	SMT_E0104_MSG	"CEM M: illegal state"
+#define	SMT_E0104_MSG	"CEM M: invalid state"
 #define	SMT_E0105	SMT_EBASE + 5
-#define	SMT_E0105_MSG	"CEM S: illegal state"
+#define	SMT_E0105_MSG	"CEM S: invalid state"
 #define	SMT_E0106	SMT_EBASE + 6
-#define	SMT_E0106_MSG	"CFM : illegal state"
+#define	SMT_E0106_MSG	"CFM : invalid state"
 #define	SMT_E0107	SMT_EBASE + 7
-#define	SMT_E0107_MSG	"ECM : illegal state"
+#define	SMT_E0107_MSG	"ECM : invalid state"
 #define	SMT_E0108	SMT_EBASE + 8
 #define	SMT_E0108_MSG	"prop_actions : NAC in DAS CFM"
 #define	SMT_E0109	SMT_EBASE + 9
@@ -757,21 +757,21 @@ void	dump_hex() ;
 #define	SMT_E0117	SMT_EBASE + 17
 #define	SMT_E0117_MSG	"E_SMT_001: RxD count for receive queue 1 = 0"
 #define	SMT_E0118	SMT_EBASE + 18
-#define	SMT_E0118_MSG	"PCM : illegal state"
+#define	SMT_E0118_MSG	"PCM : invalid state"
 #define	SMT_E0119	SMT_EBASE + 19
 #define	SMT_E0119_MSG	"smt_add_para"
 #define	SMT_E0120	SMT_EBASE + 20
 #define	SMT_E0120_MSG	"smt_set_para"
 #define	SMT_E0121	SMT_EBASE + 21
-#define	SMT_E0121_MSG	"illegal event in dispatcher"
+#define	SMT_E0121_MSG	"invalid event in dispatcher"
 #define	SMT_E0122	SMT_EBASE + 22
-#define	SMT_E0122_MSG	"RMT : illegal state"
+#define	SMT_E0122_MSG	"RMT : invalid state"
 #define	SMT_E0123	SMT_EBASE + 23
-#define	SMT_E0123_MSG	"SBA: state machine has illegal state"
+#define	SMT_E0123_MSG	"SBA: state machine has invalid state"
 #define	SMT_E0124	SMT_EBASE + 24
 #define	SMT_E0124_MSG	"sba_free_session() called with NULL pointer"
 #define	SMT_E0125	SMT_EBASE + 25
-#define	SMT_E0125_MSG	"SBA : illegal session pointer"
+#define	SMT_E0125_MSG	"SBA : invalid session pointer"
 #define	SMT_E0126	SMT_EBASE + 26
 #define	SMT_E0126_MSG	"smt_free_mbuf() called with NULL pointer\n"
 #define	SMT_E0127	SMT_EBASE + 27

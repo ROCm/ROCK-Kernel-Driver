@@ -13,7 +13,12 @@
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_MIPS32
 typedef unsigned short umode_t;
+#endif
+#ifdef CONFIG_MIPS64
+typedef unsigned int umode_t;
+#endif
 
 /*
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
@@ -77,13 +82,17 @@ typedef unsigned long long u64;
 
 #endif
 
-#if defined(CONFIG_HIGHMEM) && defined(CONFIG_64BIT_PHYS_ADDR)
+#if (defined(CONFIG_HIGHMEM) && defined(CONFIG_64BIT_PHYS_ADDR)) \
+    || defined(CONFIG_MIPS64)
 typedef u64 dma_addr_t;
 #else
 typedef u32 dma_addr_t;
 #endif
 typedef u64 dma64_addr_t;
 
+/*
+ * Don't use phys_t.  You've been warned.
+ */
 #ifdef CONFIG_64BIT_PHYS_ADDR
 typedef unsigned long long phys_t;
 #else

@@ -201,6 +201,7 @@ static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *
 	x->props.reqid = p->reqid;
 	x->props.family = p->family;
 	x->props.saddr = p->saddr;
+	x->props.flags = p->flags;
 }
 
 static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
@@ -305,6 +306,7 @@ static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 	p->replay_window = x->props.replay_window;
 	p->reqid = x->props.reqid;
 	p->family = x->props.family;
+	p->flags = x->props.flags;
 	p->seq = x->km.seq;
 }
 

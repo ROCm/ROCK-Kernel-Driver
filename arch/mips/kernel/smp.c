@@ -162,7 +162,7 @@ void smp_send_reschedule(int cpu)
 	core_send_ipi(cpu, SMP_RESCHEDULE_YOURSELF);
 }
 
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t smp_call_lock = SPIN_LOCK_UNLOCKED;
 
 struct call_data_struct *call_data;
 
@@ -197,12 +197,12 @@ int smp_call_function (void (*func) (void *info), void *info, int retry,
 	if (wait)
 		atomic_set(&data.finished, 0);
 
-	spin_lock(&call_lock);
+	spin_lock(&smp_call_lock);
 	call_data = &data;
 
 	/* Send a message to all other CPUs and wait for them to respond */
 	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(cpu) && cpu != smp_processor_id())
+		if (cpu_online(cpu) && i != cpu)
 			core_send_ipi(i, SMP_CALL_FUNCTION);
 
 	/* Wait for response */
@@ -213,7 +213,7 @@ int smp_call_function (void (*func) (void *info), void *info, int retry,
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
 			barrier();
-	spin_unlock(&call_lock);
+	spin_unlock(&smp_call_lock);
 
 	return 0;
 }
@@ -224,7 +224,6 @@ void smp_call_function_interrupt(void)
 	void *info = call_data->info;
 	int wait = call_data->wait;
 
-	irq_enter();
 	/*
 	 * Notify initiating CPU that I've grabbed the data and am
 	 * about to execute the function.

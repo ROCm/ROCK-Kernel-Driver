@@ -139,7 +139,15 @@ struct sgint_regs {
 #define SGINT_TCWORD_CRBCK	0xc0	/* Readback command */
 };
 
-#define SGINT_TCSAMP_COUNTER	10255
+/*
+ * The timer is the good old 8254.  Unlike in PCs it's clocked at exactly 1MHz
+ */
+#define SGINT_TIMER_CLOCK	1000000
+
+/*
+ * This is the constant we're using for calibrating the counter.
+ */
+#define SGINT_TCSAMP_COUNTER	((SGINT_TIMER_CLOCK / HZ) + 255)
 
 /* We need software copies of these because they are write only. */
 extern u8 sgi_ioc_reset, sgi_ioc_write;
@@ -201,6 +209,24 @@ struct sgioc_regs {
 #define SGIOC_WRITE_MHI		0x80	/* 1=5.25V 0=+5V */
 	u32 _unused6;
 	struct sgint_regs int3;
+	u32 _unused7[16];
+	volatile u32 extio;		/* FullHouse only */
+#define EXTIO_S0_IRQ_3		0x8000	/* S0: vid.vsync */
+#define EXTIO_S0_IRQ_2		0x4000	/* S0: gfx.fifofull */
+#define EXTIO_S0_IRQ_1		0x2000	/* S0: gfx.int */
+#define EXTIO_S0_RETRACE	0x1000
+#define EXTIO_SG_IRQ_3		0x0800	/* SG: vid.vsync */
+#define EXTIO_SG_IRQ_2		0x0400	/* SG: gfx.fifofull */
+#define EXTIO_SG_IRQ_1		0x0200	/* SG: gfx.int */
+#define EXTIO_SG_RETRACE	0x0100
+#define EXTIO_GIO_33MHZ		0x0080
+#define EXTIO_EISA_BUSERR	0x0040
+#define EXTIO_MC_BUSERR		0x0020
+#define EXTIO_HPC3_BUSERR	0x0010
+#define EXTIO_S0_STAT_1		0x0008
+#define EXTIO_S0_STAT_0		0x0004
+#define EXTIO_SG_STAT_1		0x0002
+#define EXTIO_SG_STAT_0		0x0001
 };
 
 extern struct sgioc_regs *sgioc;

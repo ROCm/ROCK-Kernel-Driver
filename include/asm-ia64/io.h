@@ -420,6 +420,7 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
  * SPECweb-like workloads on zx1-based machines.  Thus, for now we favor I/O MMU bypassing
  * over BIO-level virtual merging.
  */
+extern unsigned long ia64_max_iommu_merge_mask;
 #if 1
 #define BIO_VMERGE_BOUNDARY	0
 #else
@@ -433,7 +434,6 @@ extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
  *
  * which is precisely what we want.
  */
-extern unsigned long ia64_max_iommu_merge_mask;
 #define BIO_VMERGE_BOUNDARY	(ia64_max_iommu_merge_mask + 1)
 #endif
 

@@ -37,8 +37,8 @@ void hook_irq_handler(int int_cause, int bit_num, void *isr_ptr);
  * the interrupt service routine is called.
  *
  * Inputs :
- * int_cause - The interrupt cause number. In EVB64120 two parameters 
- *             are declared, INT_CAUSE_MAIN and INT_CAUSE_HIGH. 
+ * int_cause - The interrupt cause number. In EVB64120 two parameters
+ *             are declared, INT_CAUSE_MAIN and INT_CAUSE_HIGH.
  * bit_num   - Indicates which bit number in the cause register
  * isr_ptr   - Pointer to the interrupt service routine
  */
@@ -52,7 +52,7 @@ void hook_irq_handler(int int_cause, int bit_num, void *isr_ptr)
  * Enables the IRQ on Galileo Chip
  *
  * Inputs :
- * int_cause - The interrupt cause number. In EVB64120 two parameters 
+ * int_cause - The interrupt cause number. In EVB64120 two parameters
  *             are declared, INT_CAUSE_MAIN and INT_CAUSE_HIGH.
  * bit_num   - Indicates which bit number in the cause register
  *
@@ -76,7 +76,7 @@ int enable_galileo_irq(int int_cause, int bit_num)
  * Disables the IRQ on Galileo Chip
  *
  * Inputs :
- * int_cause - The interrupt cause number. In EVB64120 two parameters 
+ * int_cause - The interrupt cause number. In EVB64120 two parameters
  *             are declared, INT_CAUSE_MAIN and INT_CAUSE_HIGH.
  * bit_num   - Indicates which bit number in the cause register
  *

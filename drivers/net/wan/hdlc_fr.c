@@ -800,7 +800,7 @@ static int fr_lmi_recv(hdlc_device *hdlc, struct sk_buff *skb)
 
 
 
-static void fr_rx(struct sk_buff *skb)
+static int fr_rx(struct sk_buff *skb)
 {
 	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
 	fr_hdr *fh = (fr_hdr*)skb->data;
@@ -826,7 +826,7 @@ static void fr_rx(struct sk_buff *skb)
 				hdlc->state.fr.request = 0;
 				hdlc->state.fr.last_poll = jiffies;
 				dev_kfree_skb_any(skb);
-				return;
+				return NET_RX_SUCCESS;
 			}
 		}
 
@@ -842,7 +842,7 @@ static void fr_rx(struct sk_buff *skb)
 		       hdlc_to_name(hdlc), dlci);
 #endif
 		dev_kfree_skb_any(skb);
-		return;
+		return NET_RX_DROP;
 	}
 
 	if (pvc->state.fecn != fh->fecn) {
@@ -861,6 +861,11 @@ static void fr_rx(struct sk_buff *skb)
 		pvc->state.becn ^= 1;
 	}
 
+
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
+		hdlc->stats.rx_dropped++;
+		return NET_RX_DROP;
+	}
 
 	if (data[3] == NLPID_IP) {
 		skb_pull(skb, 4); /* Remove 4-byte header (hdr, UI, NLPID) */
@@ -896,13 +901,13 @@ static void fr_rx(struct sk_buff *skb)
 			printk(KERN_INFO "%s: Unsupported protocol, OUI=%x "
 			       "PID=%x\n", hdlc_to_name(hdlc), oui, pid);
 			dev_kfree_skb_any(skb);
-			return;
+			return NET_RX_DROP;
 		}
 	} else {
 		printk(KERN_INFO "%s: Unsupported protocol, NLPID=%x "
 		       "length = %i\n", hdlc_to_name(hdlc), data[3], skb->len);
 		dev_kfree_skb_any(skb);
-		return;
+		return NET_RX_DROP;
 	}
 
 	if (dev) {
@@ -913,14 +918,16 @@ static void fr_rx(struct sk_buff *skb)
 			stats->rx_compressed++;
 		skb->dev = dev;
 		netif_rx(skb);
-	} else
+		return NET_RX_SUCCESS;
+	} else {
 		dev_kfree_skb_any(skb);
-
-	return;
+		return NET_RX_DROP;
+	}
 
  rx_error:
 	hdlc->stats.rx_errors++; /* Mark error */
 	dev_kfree_skb_any(skb);
+	return NET_RX_DROP;
 }
 
 

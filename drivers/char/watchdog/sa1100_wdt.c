@@ -19,6 +19,7 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -208,9 +209,11 @@ module_exit(sa1100dog_exit);
 
 MODULE_AUTHOR("Oleg Drokin <green@crimea.edu>");
 MODULE_DESCRIPTION("SA1100 Watchdog");
-MODULE_PARM(margin,"i");
+
+module_param(margin, int, 0);
 MODULE_PARM_DESC(margin, "Watchdog margin in seconds (default 60s)");
 
-MODULE_PARM(nowayout, "i");
+module_param(nowayout, int, 0);
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started");
+
 MODULE_LICENSE("GPL");

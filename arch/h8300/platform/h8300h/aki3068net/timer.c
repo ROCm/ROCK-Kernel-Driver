@@ -14,29 +14,32 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/interrupt.h>
+#include <linux/init.h>
+#include <linux/timex.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/regs306x.h>
 
-#include <linux/timex.h>
-
-#define TMR8CMA2 0x00ffff94
-#define TMR8TCSR2 0x00ffff92
-#define TMR8TCNT2 0x00ffff90
 #define CMFA 6
 
-int platform_timer_setup(void (*timer_int)(int, void *, struct pt_regs *))
+extern int request_irq_boot(unsigned int,
+		             irqreturn_t (*handler)(int, void *, struct pt_regs *),
+		             unsigned long, const char *, void *);
+
+void __init platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	outb(CONFIG_CLK_FREQ*10/8192,TMR8CMA2);
-	outb(0x00,TMR8TCSR2);
-	request_irq(40,timer_int,0,"timer",0);
-	outb(0x40|0x08|0x03,TMR8TCNT2);
+	outb(H8300_TIMER_COUNT_DATA,TCORA2);
+	outb(0x00,_8TCSR2);
+	request_irq_boot(40,timer_int,0,"timer",0);
+	outb(0x40|0x08|0x03,_8TCR2);
 }
 
 void platform_timer_eoi(void)
 {
-	*(unsigned char *)TMR8TCSR2 &= ~(1 << CMFA);
+	*(volatile unsigned char *)_8TCSR2 &= ~(1 << CMFA);
 }
 
 void platform_gettod(int *year, int *mon, int *day, int *hour,
