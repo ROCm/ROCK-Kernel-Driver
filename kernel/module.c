@@ -892,7 +892,7 @@ static struct module *load_module(void *umod,
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
-		if (sechdrs[i].sh_type == SHT_SYMTAB || i == hdr->e_shstrndx)
+		if (sechdrs[i].sh_type == SHT_SYMTAB || i == strindex)
 			sechdrs[i].sh_flags |= SHF_ALLOC;
 #endif
 #ifndef CONFIG_MODULE_UNLOAD
@@ -1165,7 +1165,14 @@ static const char *get_ksymbol(struct module *mod,
 			       unsigned long *size,
 			       unsigned long *offset)
 {
-	unsigned int i, next = 0, best = 0;
+	unsigned int i, best = 0;
+	unsigned long nextval;
+
+	/* At worse, next value is at end of module */
+	if (inside_core(mod, addr))
+		nextval = (unsigned long)mod->module_core+mod->core_size;
+	else 
+		nextval = (unsigned long)mod->module_init+mod->init_size;
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
@@ -1177,22 +1184,14 @@ static const char *get_ksymbol(struct module *mod,
 		    && mod->symtab[i].st_value > mod->symtab[best].st_value)
 			best = i;
 		if (mod->symtab[i].st_value > addr
-		    && mod->symtab[i].st_value < mod->symtab[next].st_value)
-			next = i;
+		    && mod->symtab[i].st_value < nextval)
+			nextval = mod->symtab[i].st_value;
 	}
 
 	if (!best)
 		return NULL;
 
-	if (!next) {
-		/* Last symbol?  It ends at the end of the module then. */
-		if (inside_core(mod, addr))
-			*size = mod->module_core+mod->core_size - (void*)addr;
-		else
-			*size = mod->module_init+mod->init_size - (void*)addr;
-	} else
-		*size = mod->symtab[next].st_value - addr;
-
+	*size = nextval - mod->symtab[best].st_value;
 	*offset = addr - mod->symtab[best].st_value;
 	return mod->strtab + mod->symtab[best].st_name;
 }
