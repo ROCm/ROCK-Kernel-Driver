@@ -855,7 +855,7 @@ extern void	   journal_brelse_array(struct buffer_head *b[], int n);
 
 extern int	log_space_left (journal_t *); /* Called with journal locked */
 extern tid_t	log_start_commit (journal_t *, transaction_t *);
-extern void	log_wait_commit (journal_t *, tid_t);
+extern int	log_wait_commit (journal_t *, tid_t);
 extern int	log_do_checkpoint (journal_t *, int);
 
 extern void	log_wait_for_space(journal_t *, int nblocks);

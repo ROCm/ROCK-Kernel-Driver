@@ -580,8 +580,10 @@ out:
  * Wait for a specified commit to complete.
  * The caller may not hold the journal lock.
  */
-void log_wait_commit (journal_t *journal, tid_t tid)
+int log_wait_commit (journal_t *journal, tid_t tid)
 {
+	int err = 0;
+
 	lock_kernel();
 #ifdef CONFIG_JBD_DEBUG
 	lock_journal(journal);
@@ -598,7 +600,14 @@ void log_wait_commit (journal_t *journal, tid_t tid)
 		wake_up(&journal->j_wait_commit);
 		sleep_on(&journal->j_wait_done_commit);
 	}
+
+	if (unlikely(is_journal_aborted(journal))) {
+		printk(KERN_EMERG "journal commit I/O error\n");
+		err = -EIO;
+	}
+
 	unlock_kernel();
+	return err;
 }
 
 /*

@@ -1402,7 +1402,7 @@ int journal_stop(handle_t *handle)
 		 * to wait for the commit to complete.  
 		 */
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
-			log_wait_commit(journal, tid);
+			err = log_wait_commit(journal, tid);
 	}
 	jbd_free_handle(handle);
 	return err;
@@ -1418,7 +1418,7 @@ int journal_stop(handle_t *handle)
 int journal_force_commit(journal_t *journal)
 {
 	handle_t *handle;
-	int ret = 0;
+	int ret;
 
 	lock_kernel();
 	handle = journal_start(journal, 1);
@@ -1427,7 +1427,7 @@ int journal_force_commit(journal_t *journal)
 		goto out;
 	}
 	handle->h_sync = 1;
-	journal_stop(handle);
+	ret = journal_stop(handle);
 out:
 	unlock_kernel();
 	return ret;

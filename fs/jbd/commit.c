@@ -73,7 +73,7 @@ void journal_commit_transaction(journal_t *journal)
 #endif
 
 	lock_kernel();
-	
+
 	J_ASSERT (journal->j_running_transaction != NULL);
 	J_ASSERT (journal->j_committing_transaction == NULL);
 
@@ -173,6 +173,7 @@ void journal_commit_transaction(journal_t *journal)
 	 * on the transaction lists.  Data blocks go first.
 	 */
 
+	err = 0;
 	/*
 	 * Whenever we unlock the journal and sleep, things can get added
 	 * onto ->t_datalist, so we have to keep looping back to write_out_data
@@ -251,9 +252,13 @@ write_out_data_locked:
 		jh = jh->b_tprev;	/* Wait on the last written */
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
+			get_bh(bh);
 			spin_unlock(&journal_datalist_lock);
 			unlock_journal(journal);
 			wait_on_buffer(bh);
+			if (unlikely(!buffer_uptodate(bh)))
+				err = -EIO;
+			put_bh(bh);
 			/* the journal_head may have been removed now */
 			lock_journal(journal);
 			goto write_out_data;
@@ -446,7 +451,10 @@ start_journal_io:
 
 	jbd_debug(3, "JBD: commit phase 4\n");
 
-	/* akpm: these are BJ_IO, and journal_datalist_lock is not needed */
+	/*
+	 * akpm: these are BJ_IO, and journal_datalist_lock is not needed.
+	 * See __journal_try_to_free_buffer.
+	 */
  wait_for_iobuf:
 	while (commit_transaction->t_iobuf_list != NULL) {
 		struct buffer_head *bh;
@@ -455,6 +463,8 @@ start_journal_io:
 		if (buffer_locked(bh)) {
 			unlock_journal(journal);
 			wait_on_buffer(bh);
+			if (unlikely(!buffer_uptodate(bh)))
+				err = -EIO;
 			lock_journal(journal);
 			goto wait_for_iobuf;
 		}
@@ -516,6 +526,8 @@ start_journal_io:
 		if (buffer_locked(bh)) {
 			unlock_journal(journal);
 			wait_on_buffer(bh);
+			if (unlikely(!buffer_uptodate(bh)))
+				err = -EIO;
 			lock_journal(journal);
 			goto wait_for_ctlbuf;
 		}
@@ -563,7 +575,9 @@ start_journal_io:
 		struct buffer_head *bh = jh2bh(descriptor);
 		set_buffer_uptodate(bh);
 		sync_dirty_buffer(bh);
-		__brelse(bh);		/* One for getblk() */
+		if (unlikely(!buffer_uptodate(bh)))
+			err = -EIO;
+		put_bh(bh);		/* One for getblk() */
 		journal_unlock_journal_head(descriptor);
 	}
 
@@ -574,6 +588,12 @@ start_journal_io:
 
 skip_commit: /* The journal should be unlocked by now. */
 
+	if (err) {
+		lock_journal(journal);
+		__journal_abort_hard(journal);
+		unlock_journal(journal);
+	}
+	
 	/* Call any callbacks that had been registered for handles in this
 	 * transaction.  It is up to the callback to free any allocated
 	 * memory.
