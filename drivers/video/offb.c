@@ -246,7 +246,7 @@ static int offb_blank(int blank, struct fb_info *info)
 
 int __init offb_init(void)
 {
-	struct device_node *dp, *boot_disp = NULL;
+	struct device_node *dp = NULL, *boot_disp = NULL;
 #if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	struct device_node *macos_display = NULL;
 #endif
