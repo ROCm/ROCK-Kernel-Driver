@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 2002/01/21 15:21:23 bjornw Exp $
+# $Id: Makefile,v 1.15 2003/07/04 12:47:53 tobiasa Exp $
 # cris/Makefile
 #
 # This file is included by the global makefile so that you can add your own
@@ -13,37 +13,40 @@
 # A bug in ld prevents us from having a (constant-value) symbol in a
 # "ORIGIN =" or "LENGTH =" expression.
 
-LD = $(CROSS_COMPILE)ld -mcrislinux
+arch-y := v10
+arch-$(CONFIG_ETRAX_ARCH_V10) := v10
 
-# objcopy is used to make binary images from the resulting linked file
+# No config avaiable for make clean etc
+ifneq ($(arch-y),)
+SARCH := arch-$(arch-y)
+else
+SARCH :=
+endif
+
+LD = $(CROSS_COMPILE)ld -mcrislinux
+LDFLAGS_BLOB	:= --format binary --oformat elf32-cris \
+		   -T arch/cris/$(SARCH)/output_arch.ld
 
 OBJCOPYFLAGS := -O binary -R .note -R .comment -S
 
-# -mlinux enables -march=v10, -fno-underscores, -D__linux__ among others
+AFLAGS_vmlinux.lds.o = -DDRAM_VIRTUAL_BASE=0x$(CONFIG_ETRAX_DRAM_VIRTUAL_BASE)
+AFLAGS += -mlinux
 
-CFLAGS := $(CFLAGS) -mlinux -pipe
+CFLAGS := $(CFLAGS) -mlinux -march=$(arch-y) -pipe
 
 ifdef CONFIG_ETRAX_KGDB
 CFLAGS := $(subst -fomit-frame-pointer,,$(CFLAGS)) -g
 CFLAGS += -fno-omit-frame-pointer
 endif
 
-AFLAGS += -mlinux
+HEAD := arch/$(ARCH)/$(SARCH)/kernel/head.o
 
-HEAD := arch/cris/kernel/head.o
-
-ifdef CONFIG_ETRAX_AXISFLASHMAP
-# only build this if axis flash map is used, because they depend on
-# each others config options
-SUBDIRS += arch/cris/boot/rescue
-endif
 LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 
-core-y		+= arch/cris/kernel/   arch/cris/mm/
-drivers-y	+= arch/cris/drivers/
-libs-y		+= arch/cris/lib/lib.a $(LIBGCC)
-
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+core-y		+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/
+core-y		+= arch/$(ARCH)/$(SARCH)/kernel/ arch/$(ARCH)/$(SARCH)/mm/
+drivers-y	+= arch/$(ARCH)/$(SARCH)/drivers/
+libs-y		+= arch/$(ARCH)/$(SARCH)/lib/ $(LIBGCC)
 
 vmlinux.bin: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux.bin
@@ -65,20 +68,43 @@ cramfs:
 clinux: vmlinux.bin decompress.bin rescue.bin
 
 decompress.bin: FORCE
-	@make -C arch/cris/boot/compressed decompress.bin
+	@make -C arch/$(ARCH)/boot/compressed decompress.bin
 
 rescue.bin: FORCE
-	@make -C arch/cris/boot/rescue rescue.bin
+	@make -C arch/$(ARCH)/boot/rescue rescue.bin
 
-zImage: vmlinux.bin
+zImage: vmlinux.bin rescue.bin
 ## zImage     - Compressed kernel (gzip)
-	@$(MAKEBOOT) zImage
+	@make -C arch/$(ARCH)/boot/ zImage
 
 compressed: zImage
 
+archmrproper:
 archclean:
-	@$(MAKEBOOT) clean
+	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot	
 	rm -f timage vmlinux.bin cramfs.img
 	rm -rf $(LD_SCRIPT).tmp
 
-archmrproper:
+prepare: arch/$(ARCH)/.links include/asm-$(ARCH)/.arch \
+	 include/asm-$(ARCH)/$(SARCH)/offset.h
+
+# Create some links to make all tools happy
+arch/$(ARCH)/.links:
+	@ln -sfn $(SARCH)/drivers arch/$(ARCH)/drivers
+	@ln -sfn $(SARCH)/boot arch/$(ARCH)/boot
+	@ln -sfn $(SARCH)/lib arch/$(ARCH)/lib
+	@ln -sfn $(SARCH)/vmlinux.lds.S arch/$(ARCH)/vmlinux.lds.S
+	@touch $@
+
+# Create link to sub arch includes
+include/asm-$(ARCH)/.arch: $(wildcard include/config/arch/*.h)
+	@echo '  Making asm-$(ARCH)/arch -> asm-$(ARCH)/$(SARCH) symlink'
+	@rm -f include/asm-$(ARCH)/arch
+	@ln -sf $(SARCH) include/asm-$(ARCH)/arch
+	@touch $@
+
+arch/$(ARCH)/$(SARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+					include/config/MARKER
+
+include/asm-$(ARCH)/$(SARCH)/offset.h: arch/$(ARCH)/$(SARCH)/kernel/asm-offsets.s
+	$(call filechk,gen-asm-offsets)

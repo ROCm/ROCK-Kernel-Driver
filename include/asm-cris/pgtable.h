@@ -1,104 +1,14 @@
-/* CRIS pgtable.h - macros and functions to manipulate page tables
- *
- * HISTORY:
- *
- * $Log: pgtable.h,v $
- * Revision 1.14  2001/12/10 03:08:50  bjornw
- * Added pgtable_cache_init dummy
- *
- * Revision 1.13  2001/11/12 18:05:38  pkj
- * Added declaration of paging_init().
- *
- * Revision 1.12  2001/08/11 00:28:00  bjornw
- * PAGE_CHG_MASK and PAGE_NONE had somewhat untraditional values
- *
- * Revision 1.11  2001/04/04 14:38:36  bjornw
- * Removed bad_pagetable handling and the _kernel functions
- *
- * Revision 1.10  2001/03/23 07:46:42  starvik
- * Corrected according to review remarks
- *
- * Revision 1.9  2000/11/22 14:57:53  bjornw
- * * extern inline -> static inline
- * * include asm-generic/pgtable.h
- *
- * Revision 1.8  2000/11/21 13:56:16  bjornw
- * Use CONFIG_CRIS_LOW_MAP for the low VM map instead of explicit CPU type
- *
- * Revision 1.7  2000/10/06 15:05:32  bjornw
- * VMALLOC area changed in memory mapping change
- *
- * Revision 1.6  2000/10/04 16:59:14  bjornw
- * Changed comments
- *
- * Revision 1.5  2000/09/13 14:39:53  bjornw
- * New macros
- *
- * Revision 1.4  2000/08/17 15:38:48  bjornw
- * 2.4.0-test6 modifications:
- *   * flush_dcache_page added
- *   * MAP_NR removed
- *   * virt_to_page added
- *
- * Plus some comments and type-clarifications.
- *
- * Revision 1.3  2000/08/15 16:33:35  bjornw
- * pmd_bad should recognize both kernel and user page-tables
- *
- * Revision 1.2  2000/07/10 17:06:01  bjornw
- * Fixed warnings
- *
- * Revision 1.1.1.1  2000/07/10 16:32:31  bjornw
- * CRIS architecture, working draft
- *
- *
- * Revision 1.11  2000/05/29 14:55:56  bjornw
- * Small tweaks of pte_mk routines
- *
- * Revision 1.10  2000/01/27 01:49:06  bjornw
- * * Ooops. The physical frame number in a PTE entry needs to point to the
- *   DRAM directly, not to what the kernel thinks is DRAM (due to KSEG mapping).
- *   Hence we need to strip bit 31 so 0xcXXXXXXX -> 0x4XXXXXXX.
- *
- * Revision 1.9  2000/01/26 16:25:50  bjornw
- * Fixed PAGE_KERNEL bits
- *
- * Revision 1.8  2000/01/23 22:53:22  bjornw
- * Correct flush_tlb_* macros and externs
- *
- * Revision 1.7  2000/01/18 16:22:55  bjornw
- * Use PAGE_MASK instead of PFN_MASK.
- *
- * Revision 1.6  2000/01/17 02:42:53  bjornw
- * Added the pmd_set macro.
- *
- * Revision 1.5  2000/01/16 19:53:42  bjornw
- * Removed VMALLOC_OFFSET. Changed definitions of swapper_pg_dir and zero_page.
- *
- * Revision 1.4  2000/01/14 16:38:20  bjornw
- * PAGE_DIRTY -> PAGE_SILENT_WRITE, removed PAGE_COW from PAGE_COPY.
- *
- * Revision 1.3  1999/12/04 20:12:21  bjornw
- * * PTE bits have moved to asm/mmu.h
- * * Fixed definitions of the higher level page protection bits
- * * Added the pte_* functions, including dirty/accessed SW simulation
- *   (these are exactly the same as for the MIPS port)
- *
- * Revision 1.2  1999/12/04 00:41:54  bjornw
- * * Fixed page table offsets, sizes and shifts
- * * Removed reference to i386 SMP stuff
- * * Added stray comments about Linux/CRIS mm design
- * * Include asm/mmu.h which will contain MMU details
- *
- * Revision 1.1  1999/12/03 15:04:02  bjornw
- * Copied from include/asm-etrax100. For the new CRIS architecture.
+/*
+ * CRIS pgtable.h - macros and functions to manipulate page tables.
  */
 
 #ifndef _CRIS_PGTABLE_H
 #define _CRIS_PGTABLE_H
 
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <asm/mmu.h>
+#include <asm/arch/pgtable.h>
 
 /*
  * The Linux memory management assumes a three-level page table setup. On
@@ -113,49 +23,6 @@
  */
 
 extern void paging_init(void);
-
-/* The cache doesn't need to be flushed when TLB entries change because 
- * the cache is mapped to physical memory, not virtual memory
- */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_dcache_page(page)                 do { } while (0)
-#define flush_icache_range(start, end)          do { } while (0)
-#define flush_icache_page(vma,pg)               do { } while (0)
-#define flush_icache_user_range(vma,pg,adr,len) do { } while (0)
-
-/*
- * TLB flushing (implemented in arch/cris/mm/tlb.c):
- *
- *  - flush_tlb() flushes the current mm struct TLBs
- *  - flush_tlb_all() flushes all processes TLBs
- *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
- *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(vma, start, end) flushes a range of pages
- *
- */
-
-extern void flush_tlb_all(void);
-extern void flush_tlb_mm(struct mm_struct *mm);
-extern void flush_tlb_page(struct vm_area_struct *vma, 
-			   unsigned long addr);
-extern void flush_tlb_range(struct vm_area_struct *vma,
-			    unsigned long start,
-			    unsigned long end);
-
-static inline void flush_tlb_pgtables(struct mm_struct *mm,
-                                      unsigned long start, unsigned long end)
-{
-        /* CRIS does not keep any page table caches in TLB */
-}
-
-
-static inline void flush_tlb(void) 
-{
-	flush_tlb_mm(current->mm);
-}
 
 /* Certain architectures need to do special things when pte's
  * within a page table are directly modified.  Thus, the following
@@ -204,63 +71,6 @@ static inline void flush_tlb(void)
 #define USER_PTRS_PER_PGD       (TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR       0
 
-/*
- * Kernels own virtual memory area. 
- */
-
-#ifdef CONFIG_CRIS_LOW_MAP
-#define VMALLOC_START     KSEG_7
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END       KSEG_8
-#else
-#define VMALLOC_START     KSEG_D
-#define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END       KSEG_E
-#endif
-
-/* Define some higher level generic page attributes. The PTE bits are
- * defined in asm-cris/mmu.h, and these are just combinations of those.
- */
-
-#define __READABLE      (_PAGE_READ | _PAGE_SILENT_READ | _PAGE_ACCESSED)
-#define __WRITEABLE     (_PAGE_WRITE | _PAGE_SILENT_WRITE | _PAGE_MODIFIED)
-
-#define _PAGE_TABLE     (_PAGE_PRESENT | __READABLE | __WRITEABLE)
-#define _PAGE_CHG_MASK  (PAGE_MASK | _PAGE_ACCESSED | _PAGE_MODIFIED)
-
-#define PAGE_NONE       __pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
-#define PAGE_SHARED     __pgprot(_PAGE_PRESENT | __READABLE | _PAGE_WRITE | \
-				 _PAGE_ACCESSED)
-#define PAGE_COPY       __pgprot(_PAGE_PRESENT | __READABLE)  // | _PAGE_COW
-#define PAGE_READONLY   __pgprot(_PAGE_PRESENT | __READABLE)
-#define PAGE_KERNEL     __pgprot(_PAGE_GLOBAL | _PAGE_KERNEL | \
-				 _PAGE_PRESENT | __READABLE | __WRITEABLE)
-#define _KERNPG_TABLE   (_PAGE_TABLE | _PAGE_KERNEL)
-
-/*
- * CRIS can't do page protection for execute, and considers read the same.
- * Also, write permissions imply read permissions. This is the closest we can
- * get..
- */
-
-#define __P000	PAGE_NONE
-#define __P001	PAGE_READONLY
-#define __P010	PAGE_COPY
-#define __P011	PAGE_COPY
-#define __P100	PAGE_READONLY
-#define __P101	PAGE_READONLY
-#define __P110	PAGE_COPY
-#define __P111	PAGE_COPY
-
-#define __S000	PAGE_NONE
-#define __S001	PAGE_READONLY
-#define __S010	PAGE_SHARED
-#define __S011	PAGE_SHARED
-#define __S100	PAGE_READONLY
-#define __S101	PAGE_READONLY
-#define __S110	PAGE_SHARED
-#define __S111	PAGE_SHARED
-
 /* zero page used for uninitialized stuff */
 extern unsigned long empty_zero_page;
 #define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
@@ -299,53 +109,54 @@ extern unsigned long empty_zero_page;
  * setup: the pgd is never bad, and a pmd always exists (as it's folded
  * into the pgd entry)
  */
-static inline int pgd_none(pgd_t pgd)		{ return 0; }
-static inline int pgd_bad(pgd_t pgd)		{ return 0; }
-static inline int pgd_present(pgd_t pgd)	{ return 1; }
-static inline void pgd_clear(pgd_t * pgdp)	{ }
+extern inline int pgd_none(pgd_t pgd)		{ return 0; }
+extern inline int pgd_bad(pgd_t pgd)		{ return 0; }
+extern inline int pgd_present(pgd_t pgd)	{ return 1; }
+extern inline void pgd_clear(pgd_t * pgdp)	{ }
 
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
 
-static inline int pte_read(pte_t pte)           { return pte_val(pte) & _PAGE_READ; }
-static inline int pte_write(pte_t pte)          { return pte_val(pte) & _PAGE_WRITE; }
-static inline int pte_exec(pte_t pte)           { return pte_val(pte) & _PAGE_READ; }
-static inline int pte_dirty(pte_t pte)          { return pte_val(pte) & _PAGE_MODIFIED; }
-static inline int pte_young(pte_t pte)          { return pte_val(pte) & _PAGE_ACCESSED; }
+extern inline int pte_read(pte_t pte)           { return pte_val(pte) & _PAGE_READ; }
+extern inline int pte_write(pte_t pte)          { return pte_val(pte) & _PAGE_WRITE; }
+extern inline int pte_exec(pte_t pte)           { return pte_val(pte) & _PAGE_READ; }
+extern inline int pte_dirty(pte_t pte)          { return pte_val(pte) & _PAGE_MODIFIED; }
+extern inline int pte_young(pte_t pte)          { return pte_val(pte) & _PAGE_ACCESSED; }
+extern inline int pte_file(pte_t pte)           { return pte_val(pte) & _PAGE_FILE; }
 
-static inline pte_t pte_wrprotect(pte_t pte)
+extern inline pte_t pte_wrprotect(pte_t pte)
 {
         pte_val(pte) &= ~(_PAGE_WRITE | _PAGE_SILENT_WRITE);
         return pte;
 }
 
-static inline pte_t pte_rdprotect(pte_t pte)
+extern inline pte_t pte_rdprotect(pte_t pte)
 {
         pte_val(pte) &= ~(_PAGE_READ | _PAGE_SILENT_READ);
 	return pte;
 }
 
-static inline pte_t pte_exprotect(pte_t pte)
+extern inline pte_t pte_exprotect(pte_t pte)
 {
         pte_val(pte) &= ~(_PAGE_READ | _PAGE_SILENT_READ);
 	return pte;
 }
 
-static inline pte_t pte_mkclean(pte_t pte)
+extern inline pte_t pte_mkclean(pte_t pte)
 {
 	pte_val(pte) &= ~(_PAGE_MODIFIED | _PAGE_SILENT_WRITE); 
 	return pte; 
 }
 
-static inline pte_t pte_mkold(pte_t pte)
+extern inline pte_t pte_mkold(pte_t pte)
 {
 	pte_val(pte) &= ~(_PAGE_ACCESSED | _PAGE_SILENT_READ);
 	return pte;
 }
 
-static inline pte_t pte_mkwrite(pte_t pte)
+extern inline pte_t pte_mkwrite(pte_t pte)
 {
         pte_val(pte) |= _PAGE_WRITE;
         if (pte_val(pte) & _PAGE_MODIFIED)
@@ -353,7 +164,7 @@ static inline pte_t pte_mkwrite(pte_t pte)
         return pte;
 }
 
-static inline pte_t pte_mkread(pte_t pte)
+extern inline pte_t pte_mkread(pte_t pte)
 {
         pte_val(pte) |= _PAGE_READ;
         if (pte_val(pte) & _PAGE_ACCESSED)
@@ -361,7 +172,7 @@ static inline pte_t pte_mkread(pte_t pte)
         return pte;
 }
 
-static inline pte_t pte_mkexec(pte_t pte)
+extern inline pte_t pte_mkexec(pte_t pte)
 {
         pte_val(pte) |= _PAGE_READ;
         if (pte_val(pte) & _PAGE_ACCESSED)
@@ -369,7 +180,7 @@ static inline pte_t pte_mkexec(pte_t pte)
         return pte;
 }
 
-static inline pte_t pte_mkdirty(pte_t pte)
+extern inline pte_t pte_mkdirty(pte_t pte)
 {
         pte_val(pte) |= _PAGE_MODIFIED;
         if (pte_val(pte) & _PAGE_WRITE)
@@ -377,7 +188,7 @@ static inline pte_t pte_mkdirty(pte_t pte)
         return pte;
 }
 
-static inline pte_t pte_mkyoung(pte_t pte)
+extern inline pte_t pte_mkyoung(pte_t pte)
 {
         pte_val(pte) |= _PAGE_ACCESSED;
         if (pte_val(pte) & _PAGE_READ)
@@ -401,7 +212,7 @@ static inline pte_t pte_mkyoung(pte_t pte)
  * addresses (the 0xc0xxxxxx's) goes as void *'s.
  */
 
-static inline pte_t __mk_pte(void * page, pgprot_t pgprot)
+extern inline pte_t __mk_pte(void * page, pgprot_t pgprot)
 {
 	pte_t pte;
 	/* the PTE needs a physical address */
@@ -419,7 +230,7 @@ static inline pte_t __mk_pte(void * page, pgprot_t pgprot)
         __pte;                                                          \
 })
 
-static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot); return pte; }
 
 
@@ -428,7 +239,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * pte_pagenr refers to the page-number counted starting from the virtual DRAM start
  */
 
-static inline unsigned long __pte_page(pte_t pte)
+extern inline unsigned long __pte_page(pte_t pte)
 {
 	/* the PTE contains a physical address */
 	return (unsigned long)__va(pte_val(pte) & PAGE_MASK);
@@ -446,17 +257,17 @@ static inline unsigned long __pte_page(pte_t pte)
  * don't need the __pa and __va transformations.
  */
 
-static inline unsigned long pmd_page(pmd_t pmd)
-{ return pmd_val(pmd) & PAGE_MASK; }
-
-static inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
+extern inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 { pmd_val(*pmdp) = _PAGE_TABLE | (unsigned long) ptep; }
+
+#define pmd_page(pmd)		(pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
+#define pmd_page_kernel(pmd)	((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 
 /* to find an entry in a page-table-directory */
-static inline pgd_t * pgd_offset(struct mm_struct * mm, unsigned long address)
+extern inline pgd_t * pgd_offset(struct mm_struct * mm, unsigned long address)
 {
 	return mm->pgd + pgd_index(address);
 }
@@ -465,16 +276,24 @@ static inline pgd_t * pgd_offset(struct mm_struct * mm, unsigned long address)
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 /* Find an entry in the second-level page table.. */
-static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
+extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 {
 	return (pmd_t *) dir;
 }
 
-/* Find an entry in the third-level page table.. */ 
-static inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
-{
-	return (pte_t *) pmd_page(*dir) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
-}
+/* Find an entry in the third-level page table.. */
+#define __pte_offset(address) \
+	(((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+#define pte_offset_kernel(dir, address) \
+	((pte_t *) pmd_page_kernel(*(dir)) +  __pte_offset(address))
+#define pte_offset_map(dir, address) \
+	((pte_t *)page_address(pmd_page(*(dir))) + __pte_offset(address))
+#define pte_offset_map_nested(dir, address) pte_offset_map(dir, address)
+
+#define pte_unmap(pte) do { } while (0)
+#define pte_unmap_nested(pte) do { } while (0)
+#define pte_pfn(x)		((unsigned long)(__va((x).pte)) >> PAGE_SHIFT)
+#define pfn_pte(pfn, prot)	__pte((__pa((pfn) << PAGE_SHIFT)) | pgprot_val(prot))
 
 #define pte_ERROR(e) \
         printk("%s:%d: bad pte %p(%08lx).\n", __FILE__, __LINE__, &(e), pte_val(e))
@@ -482,6 +301,7 @@ static inline pte_t * pte_offset(pmd_t * dir, unsigned long address)
         printk("%s:%d: bad pmd %p(%08lx).\n", __FILE__, __LINE__, &(e), pmd_val(e))
 #define pgd_ERROR(e) \
         printk("%s:%d: bad pgd %p(%08lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
+
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD]; /* defined in head.S */
 
@@ -491,7 +311,7 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD]; /* defined in head.S */
  * 
  * Actually I am not sure on what this could be used for.
  */
-static inline void update_mmu_cache(struct vm_area_struct * vma,
+extern inline void update_mmu_cache(struct vm_area_struct * vma,
 	unsigned long address, pte_t pte)
 {
 }
@@ -513,6 +333,9 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
  * No page table caches to initialise
  */
 #define pgtable_cache_init()   do { } while (0)
+
+#define pte_to_pgoff(x)	(pte_val(x) >> 6)
+#define pgoff_to_pte(x)	__pte(((x) << 6) | _PAGE_FILE)
 
 typedef pte_t *pte_addr_t;
 
