@@ -1,4 +1,4 @@
-#ifdef __EARLY_PRINTK_H_X86_64_
+#ifndef __EARLY_PRINTK_H_X86_64_
 #define __EARLY_PRINTK_H_X86_64_
 
 #define VGABASE	0xffffffff800b8000UL
