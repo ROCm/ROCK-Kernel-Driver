@@ -92,9 +92,7 @@ static struct usb_busmap busmap;
 DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
 
 /* used when updating hcd data */
-spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
-
-struct usb_operations hcd_operations;
+static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
 
 /*-------------------------------------------------------------------------*/
 
@@ -571,8 +569,14 @@ void usb_bus_put (struct usb_bus *bus)
 
 /*-------------------------------------------------------------------------*/
 
-/* shared initialization code */
-void usb_init_bus (struct usb_bus *bus)
+/**
+ * usb_bus_init - shared initialization code
+ * @bus: the bus structure being initialized
+ *
+ * This code is used to initialize a usb_bus structure, memory for which is
+ * separately managed.
+ */
+void usb_bus_init (struct usb_bus *bus)
 {
 	memset (&bus->devmap, 0, sizeof(struct usb_devmap));
 
@@ -591,6 +595,7 @@ void usb_init_bus (struct usb_bus *bus)
 
 	atomic_set (&bus->refcnt, 1);
 }
+EXPORT_SYMBOL (usb_bus_init);
 
 /**
  * usb_alloc_bus - creates a new USB host controller structure
@@ -611,7 +616,7 @@ struct usb_bus *usb_alloc_bus (struct usb_operations *op)
 	bus = kmalloc (sizeof *bus, GFP_KERNEL);
 	if (!bus)
 		return NULL;
-	usb_init_bus (bus);
+	usb_bus_init (bus);
 	bus->op = op;
 	return bus;
 }
@@ -1226,13 +1231,21 @@ static int hcd_free_dev (struct usb_device *udev)
 	return 0;
 }
 
-struct usb_operations hcd_operations = {
+/**
+ * usb_hcd_operations - adapts usb_bus framework to HCD framework (bus glue)
+ *
+ * When registering a USB bus through the HCD framework code, use this
+ * usb_operations vector.  The PCI glue layer does so automatically; only
+ * bus glue for non-PCI system busses will need to use this.
+ */
+struct usb_operations usb_hcd_operations = {
 	allocate:		hcd_alloc_dev,
 	get_frame_number:	hcd_get_frame_number,
 	submit_urb:		hcd_submit_urb,
 	unlink_urb:		hcd_unlink_urb,
 	deallocate:		hcd_free_dev,
 };
+EXPORT_SYMBOL (usb_hcd_operations);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1272,3 +1285,70 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	usb_put_urb (urb);
 }
 EXPORT_SYMBOL (usb_hcd_giveback_urb);
+
+/*-------------------------------------------------------------------------*/
+
+/**
+ * usb_hcd_irq - hook IRQs to HCD framework (bus glue)
+ * @irq: the IRQ being raised
+ * @__hcd: pointer to the HCD whose IRQ is beinng signaled
+ * @r: saved hardware registers (not passed to HCD)
+ *
+ * When registering a USB bus through the HCD framework code, use this
+ * to handle interrupts.  The PCI glue layer does so automatically; only
+ * bus glue for non-PCI system busses will need to use this.
+ */
+void usb_hcd_irq (int irq, void *__hcd, struct pt_regs * r)
+{
+	struct usb_hcd		*hcd = __hcd;
+	int			start = hcd->state;
+
+	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
+		return;
+
+	hcd->driver->irq (hcd);
+	if (hcd->state != start && hcd->state == USB_STATE_HALT)
+		usb_hc_died (hcd);
+}
+EXPORT_SYMBOL (usb_hcd_irq);
+
+/*-------------------------------------------------------------------------*/
+
+/**
+ * usb_hc_died - report abnormal shutdown of a host controller (bus glue)
+ * @hcd: pointer to the HCD representing the controller
+ *
+ * This is called by bus glue to report a USB host controller that died
+ * while operations may still have been pending.  It's called automatically
+ * by the PCI glue, so only glue for non-PCI busses should need to call it. 
+ */
+void usb_hc_died (struct usb_hcd *hcd)
+{
+	struct list_head	*devlist, *urblist;
+	struct hcd_dev		*dev;
+	struct urb		*urb;
+	unsigned long		flags;
+	
+	/* flag every pending urb as done */
+	spin_lock_irqsave (&hcd_data_lock, flags);
+	list_for_each (devlist, &hcd->dev_list) {
+		dev = list_entry (devlist, struct hcd_dev, dev_list);
+		list_for_each (urblist, &dev->urb_list) {
+			urb = list_entry (urblist, struct urb, urb_list);
+			dbg ("shutdown %s urb %p pipe %x, current status %d",
+				hcd->self.bus_name, urb, urb->pipe, urb->status);
+			if (urb->status == -EINPROGRESS)
+				urb->status = -ESHUTDOWN;
+		}
+	}
+	urb = (struct urb *) hcd->rh_timer.data;
+	if (urb)
+		urb->status = -ESHUTDOWN;
+	spin_unlock_irqrestore (&hcd_data_lock, flags);
+
+	if (urb)
+		usb_rh_status_dequeue (hcd, urb);
+	hcd->driver->stop (hcd);
+}
+EXPORT_SYMBOL (usb_hc_died);
+

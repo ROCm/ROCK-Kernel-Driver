@@ -1,10 +1,4 @@
 /*
- * (C) Copyright Linus Torvalds 1999
- * (C) Copyright Johannes Erdfelt 1999-2001
- * (C) Copyright Andreas Gal 1999
- * (C) Copyright Gregory P. Smith 1999
- * (C) Copyright Deti Fliegl 1999
- * (C) Copyright Randy Dunlap 2000
  * (C) Copyright David Brownell 2000-2002
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -39,8 +33,6 @@
 
 /* PCI-based HCs are normal, but custom bus glue should be ok */
 
-static void hcd_irq (int irq, void *__hcd, struct pt_regs *r);
-static void hc_died (struct usb_hcd *hcd);
 
 /*-------------------------------------------------------------------------*/
 
@@ -156,7 +148,7 @@ clean_2:
 #else
 	bufp = __irq_itoa(dev->irq);
 #endif
-	if (request_irq (dev->irq, hcd_irq, SA_SHIRQ, hcd->description, hcd)
+	if (request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ, hcd->description, hcd)
 			!= 0) {
 		err ("request interrupt %s failed", bufp);
 		retval = -EBUSY;
@@ -171,8 +163,8 @@ clean_2:
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		base);
 
-	usb_init_bus (&hcd->self);
-	hcd->self.op = &hcd_operations;
+	usb_bus_init (&hcd->self);
+	hcd->self.op = &usb_hcd_operations;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = dev->slot_name;
 	hcd->product_desc = dev->name;
@@ -336,7 +328,7 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	retval = hcd->driver->resume (hcd);
 	if (!HCD_IS_RUNNING (hcd->state)) {
 		dbg ("resume %s failure, retval %d", hcd->self.bus_name, retval);
-		hc_died (hcd);
+		usb_hc_died (hcd);
 // FIXME:  recover, reset etc.
 	} else {
 		// FIXME for all connected devices, root-to-leaf:
@@ -351,51 +343,5 @@ done:
 EXPORT_SYMBOL (usb_hcd_pci_resume);
 
 #endif	/* CONFIG_PM */
-
-/*-------------------------------------------------------------------------*/
-
-static void hcd_irq (int irq, void *__hcd, struct pt_regs * r)
-{
-	struct usb_hcd		*hcd = __hcd;
-	int			start = hcd->state;
-
-	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
-		return;
-
-	hcd->driver->irq (hcd);
-	if (hcd->state != start && hcd->state == USB_STATE_HALT)
-		hc_died (hcd);
-}
-
-/*-------------------------------------------------------------------------*/
-
-static void hc_died (struct usb_hcd *hcd)
-{
-	struct list_head	*devlist, *urblist;
-	struct hcd_dev		*dev;
-	struct urb		*urb;
-	unsigned long		flags;
-	
-	/* flag every pending urb as done */
-	spin_lock_irqsave (&hcd_data_lock, flags);
-	list_for_each (devlist, &hcd->dev_list) {
-		dev = list_entry (devlist, struct hcd_dev, dev_list);
-		list_for_each (urblist, &dev->urb_list) {
-			urb = list_entry (urblist, struct urb, urb_list);
-			dbg ("shutdown %s urb %p pipe %x, current status %d",
-				hcd->self.bus_name, urb, urb->pipe, urb->status);
-			if (urb->status == -EINPROGRESS)
-				urb->status = -ESHUTDOWN;
-		}
-	}
-	urb = (struct urb *) hcd->rh_timer.data;
-	if (urb)
-		urb->status = -ESHUTDOWN;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
-
-	if (urb)
-		usb_rh_status_dequeue (hcd, urb);
-	hcd->driver->stop (hcd);
-}
 
 
