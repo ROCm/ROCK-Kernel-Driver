@@ -430,7 +430,7 @@ static int __init init_timer_sysfs(void)
 {
 	int error = sysdev_class_register(&timer_sysclass);
 	if (!error)
-		error = sys_device_register(&device_timer);
+		error = sysdev_register(&device_timer);
 	return error;
 }
 

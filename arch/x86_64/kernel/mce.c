@@ -448,7 +448,7 @@ static __init int mce_init_device(void)
 		return -EIO;
 	err = sysdev_class_register(&mce_sysclass);
 	if (!err)
-		err = sys_device_register(&device_mce);
+		err = sysdev_register(&device_mce);
 	if (!err) { 
 		/* could create per CPU objects, but is not worth it. */
 		sysdev_create_file(&device_mce, &attr_disabled_banks); 
