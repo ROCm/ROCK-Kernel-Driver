@@ -197,13 +197,14 @@ static struct net_device_stats *nr_get_stats(struct net_device *dev)
 	return (struct net_device_stats *)dev->priv;
 }
 
-int nr_init(struct net_device *dev)
+void nr_setup(struct net_device *dev)
 {
 	SET_MODULE_OWNER(dev);
 	dev->mtu		= NR_MAX_PACKET_SIZE;
 	dev->hard_start_xmit	= nr_xmit;
 	dev->open		= nr_open;
 	dev->stop		= nr_close;
+	dev->destructor		= (void (*)(struct net_device *))kfree;
 
 	dev->hard_header	= nr_header;
 	dev->hard_header_len	= NR_NETWORK_LEN + NR_TRANSPORT_LEN;
@@ -216,12 +217,5 @@ int nr_init(struct net_device *dev)
 	/* New-style flags. */
 	dev->flags		= 0;
 
-	if ((dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL)) == NULL)
-		return -ENOMEM;
-
-	memset(dev->priv, 0, sizeof(struct net_device_stats));
-
-	dev->get_stats = nr_get_stats;
-
-	return 0;
-};
+	dev->get_stats 		= nr_get_stats;
+}

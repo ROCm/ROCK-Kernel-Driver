@@ -183,7 +183,7 @@ extern void nr_destroy_socket(struct sock *);
 
 /* nr_dev.c */
 extern int  nr_rx_ip(struct sk_buff *, struct net_device *);
-extern int  nr_init(struct net_device *);
+extern void nr_setup(struct net_device *);
 
 /* nr_in.c */
 extern int  nr_process_rx_frame(struct sock *, struct sk_buff *);

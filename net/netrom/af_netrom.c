@@ -1341,7 +1341,7 @@ static struct notifier_block nr_dev_notifier = {
 	.notifier_call	=	nr_device_event,
 };
 
-static struct net_device *dev_nr;
+static struct net_device **dev_nr;
 
 static char banner[] __initdata = KERN_INFO "G4KLX NET/ROM for Linux. Version 0.7 for AX25.037 Linux 2.4\n";
 
@@ -1354,21 +1354,39 @@ static int __init nr_proto_init(void)
 		return -1;
 	}
 
-	if ((dev_nr = kmalloc(nr_ndevs * sizeof(struct net_device), GFP_KERNEL)) == NULL) {
-		printk(KERN_ERR "NET/ROM: nr_proto_init - unable to allocate device structure\n");
+	dev_nr = kmalloc(nr_ndevs * sizeof(struct net_device *), GFP_KERNEL);
+	if (dev_nr == NULL) {
+		printk(KERN_ERR "NET/ROM: nr_proto_init - unable to allocate device array\n");
 		return -1;
 	}
 
-	memset(dev_nr, 0x00, nr_ndevs * sizeof(struct net_device));
+	memset(dev_nr, 0x00, nr_ndevs * sizeof(struct net_device *));
 
 	for (i = 0; i < nr_ndevs; i++) {
-		sprintf(dev_nr[i].name, "nr%d", i);
-		dev_nr[i].base_addr = i;
-		dev_nr[i].init = nr_init;
-		register_netdev(&dev_nr[i]);
+		char name[IFNAMSIZ];
+		struct net_device *dev;
+
+		sprintf(name, "nr%d", i);
+		dev = alloc_netdev(sizeof(struct net_device_stats), name,
+					  nr_setup);
+		if (!dev) {
+			printk(KERN_ERR "NET/ROM: nr_proto_init - unable to allocate device structure\n");
+			goto fail;
+		}
+		
+		dev->base_addr = i;
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "NET/ROM: nr_proto_init - unable to register network device\n");
+			goto fail;
+		}
+		dev_nr[i] = dev;
 	}
 
-	sock_register(&nr_family_ops);
+	if (sock_register(&nr_family_ops)) {
+		printk(KERN_ERR "NET/ROM: nr_proto_init - unable to register socket family\n");
+		goto fail;
+	}
+		
 	register_netdevice_notifier(&nr_dev_notifier);
 	printk(banner);
 
@@ -1385,6 +1403,11 @@ static int __init nr_proto_init(void)
 	proc_net_create("nr_neigh", 0, nr_neigh_get_info);
 	proc_net_create("nr_nodes", 0, nr_nodes_get_info);
 	return 0;
+ fail:
+	while (--i >= 0)
+		unregister_netdev(dev_nr[i]);
+	kfree(dev_nr);
+	return -1;
 }
 
 module_init(nr_proto_init);
@@ -1420,11 +1443,9 @@ static void __exit nr_exit(void)
 	sock_unregister(PF_NETROM);
 
 	for (i = 0; i < nr_ndevs; i++) {
-		if (dev_nr[i].priv != NULL) {
-			unregister_netdev(&dev_nr[i]);
-			kfree(dev_nr[i].priv);
-			dev_nr[i].priv = NULL;
-		}
+		struct net_device *dev = dev_nr[i];
+		if (dev) 
+			unregister_netdev(dev);
 	}
 
 	kfree(dev_nr);
