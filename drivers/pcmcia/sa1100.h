@@ -150,6 +150,7 @@ static inline unsigned int sa1100_pcmcia_cmd_time(unsigned int cpu_clock_khz,
  */
 #define SA1100_PCMCIA_POLL_PERIOD    (2*HZ)
 
+struct pcmcia_low_level;
 
 /* This structure encapsulates per-socket state which we might need to
  * use when responding to a Card Services query of some kind.
@@ -158,6 +159,7 @@ struct sa1100_pcmcia_socket {
   /*
    * Core PCMCIA state
    */
+  int			nr;
   socket_state_t        cs_state;
   pccard_io_map         io_map[MAX_IO_WIN];
   pccard_mem_map        pc_mem_map[MAX_WIN];
@@ -173,6 +175,7 @@ struct sa1100_pcmcia_socket {
    * Info from low level handler
    */
   unsigned int          irq;
+  struct pcmcia_low_level *ops;
 };
 
 

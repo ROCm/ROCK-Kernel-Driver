@@ -110,59 +110,76 @@ sa1100_pcmcia_default_mecr_timing(unsigned int sock, unsigned int cpu_speed,
  * Call board specific BS value calculation to allow boards
  * to tweak the BS values.
  */
-static int sa1100_pcmcia_set_mecr(int sock, unsigned int cpu_clock)
+static int
+sa1100_pcmcia_set_mecr(struct sa1100_pcmcia_socket *skt, unsigned int cpu_clock)
 {
-	struct sa1100_pcmcia_socket *skt;
 	u32 mecr;
 	unsigned long flags;
 	unsigned int bs;
 
-	if (sock < 0 || sock > SA1100_PCMCIA_MAX_SOCK)
-		return -1;
-
-	skt = PCMCIA_SOCKET(sock);
-
 	local_irq_save(flags);
 
-	bs = pcmcia_low_level->socket_get_timing(sock, cpu_clock, skt->speed_io);
+	bs = skt->ops->socket_get_timing(skt->nr, cpu_clock, skt->speed_io);
 
 	mecr = MECR;
-	MECR_FAST_SET(mecr, sock, 0);
-	MECR_BSIO_SET(mecr, sock, bs );
-	MECR_BSA_SET(mecr, sock, bs );
-	MECR_BSM_SET(mecr, sock, bs );
+	MECR_FAST_SET(mecr, skt->nr, 0);
+	MECR_BSIO_SET(mecr, skt->nr, bs );
+	MECR_BSA_SET(mecr, skt->nr, bs );
+	MECR_BSM_SET(mecr, skt->nr, bs );
 	MECR = mecr;
 
 	local_irq_restore(flags);
 
-	DEBUG(4, "%s(): FAST%u %X  BSM%u %X  BSA%u %X  BSIO%u %X\n",
-	      __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
-	      MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
-	      sock, MECR_BSIO_GET(mecr, sock));
+	DEBUG(4, "%s(): sock %u FAST %X  BSM %X  BSA %X  BSIO %X\n",
+	      __FUNCTION__, skt->nr, MECR_FAST_GET(mecr, skt->nr),
+	      MECR_BSM_GET(mecr, skt->nr), MECR_BSA_GET(mecr, skt->nr),
+	      MECR_BSIO_GET(mecr, skt->nr));
 
 	return 0;
 }
 
 /*
- * sa1100_pcmcia_state_to_config
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ * sa1100_pcmcia_config_skt
+ * ^^^^^^^^^^^^^^^^^^^^^^^^
  *
  * Convert PCMCIA socket state to our socket configure structure.
  */
-static struct pcmcia_configure
-sa1100_pcmcia_state_to_config(unsigned int sock, socket_state_t *state)
+static int
+sa1100_pcmcia_config_skt(struct sa1100_pcmcia_socket *skt, socket_state_t *state)
 {
-  struct pcmcia_configure conf;
+	struct pcmcia_configure conf;
+	int ret;
 
-  conf.sock    = sock;
-  conf.vcc     = state->Vcc;
-  conf.vpp     = state->Vpp;
-  conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
-  conf.speaker = state->flags & SS_SPKR_ENA ? 1 : 0;
-  conf.reset   = state->flags & SS_RESET ? 1 : 0;
-  conf.irq     = state->io_irq != 0;
+	conf.sock    = skt->nr;
+	conf.vcc     = state->Vcc;
+	conf.vpp     = state->Vpp;
+	conf.output  = state->flags & SS_OUTPUT_ENA ? 1 : 0;
+	conf.speaker = state->flags & SS_SPKR_ENA ? 1 : 0;
+	conf.reset   = state->flags & SS_RESET ? 1 : 0;
+	conf.irq     = state->io_irq != 0;
 
-  return conf;
+	ret = skt->ops->configure_socket(&conf);
+	if (ret == 0) {
+		/*
+		 * This really needs a better solution.  The IRQ
+		 * may or may not be claimed by the driver.
+		 */
+		if (skt->irq_state != 1 && state->io_irq) {
+			skt->irq_state = 1;
+			set_irq_type(skt->irq, IRQT_FALLING);
+		} else if (skt->irq_state == 1 && state->io_irq == 0) {
+		  	skt->irq_state = 0;
+			set_irq_type(skt->irq, IRQT_NOEDGE);
+		}
+
+		skt->cs_state = *state;
+	}
+
+	if (ret < 0)
+		printk(KERN_ERR "sa1100_pcmcia: unable to configure "
+		       "socket %d\n", skt->nr);
+
+	return ret;
 }
 
 /* sa1100_pcmcia_sock_init()
@@ -177,17 +194,12 @@ sa1100_pcmcia_state_to_config(unsigned int sock, socket_state_t *state)
 static int sa1100_pcmcia_sock_init(unsigned int sock)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
 
   DEBUG(2, "%s(): initializing socket %u\n", __FUNCTION__, sock);
 
-  skt->cs_state = dead_socket;
+  sa1100_pcmcia_config_skt(skt, &dead_socket);
 
-  conf = sa1100_pcmcia_state_to_config(sock, &dead_socket);
-
-  pcmcia_low_level->configure_socket(&conf);
-
-  return pcmcia_low_level->socket_init(sock);
+  return skt->ops->socket_init(skt->nr);
 }
 
 
@@ -203,19 +215,14 @@ static int sa1100_pcmcia_sock_init(unsigned int sock)
 static int sa1100_pcmcia_suspend(unsigned int sock)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
   int ret;
 
-  DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, skt->nr);
 
-  conf = sa1100_pcmcia_state_to_config(sock, &dead_socket);
+  ret = sa1100_pcmcia_config_skt(skt, &dead_socket);
 
-  ret = pcmcia_low_level->configure_socket(&conf);
-
-  if (ret == 0) {
-    skt->cs_state = dead_socket;
-    ret = pcmcia_low_level->socket_suspend(sock);
-  }
+  if (ret == 0)
+    ret = skt->ops->socket_suspend(skt->nr);
 
   return ret;
 }
@@ -427,7 +434,7 @@ sa1100_pcmcia_inquire_socket(unsigned int sock, socket_cap_t *cap)
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   int ret = -1;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   if (sock < sa1100_pcmcia_socket_count) {
     cap->features  = SS_CAP_PAGE_REGS | SS_CAP_STATIC_MAP | SS_CAP_PCCARD;
@@ -467,7 +474,7 @@ sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
   struct pcmcia_state_array state_array;
   unsigned int stat;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   state_array.size = sa1100_pcmcia_socket_count;
   state_array.state = state;
@@ -530,7 +537,7 @@ sa1100_pcmcia_get_socket(unsigned int sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   *state = skt->cs_state;
 
@@ -551,9 +558,8 @@ static int
 sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_configure conf;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n",
 	(state->csc_mask==0)?"<NONE>":"",
@@ -571,16 +577,7 @@ sa1100_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
   DEBUG(3, "\tVcc %d  Vpp %d  irq %d\n",
 	state->Vcc, state->Vpp, state->io_irq);
 
-  conf = sa1100_pcmcia_state_to_config(sock, state);
-
-  if (pcmcia_low_level->configure_socket(&conf) < 0) {
-    printk(KERN_ERR "sa1100_pcmcia: unable to configure socket %d\n", sock);
-    return -1;
-  }
-
-  skt->cs_state = *state;
-  
-  return 0;
+  return sa1100_pcmcia_config_skt(skt, state);
 }  /* sa1100_pcmcia_set_socket() */
 
 
@@ -623,7 +620,7 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmap %u  speed %u\n\tstart 0x%08x  stop 0x%08x\n",
 	map->map, map->speed, map->start, map->stop);
@@ -647,7 +644,7 @@ sa1100_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
     if ( map->speed == 0)
        map->speed = SA1100_PCMCIA_IO_ACCESS;
 
-	sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
+	sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
   }
 
   if (map->stop == 1)
@@ -704,7 +701,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   unsigned long start;
 
-  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, sock);
+  DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
   DEBUG(3, "\tmap %u speed %u sys_start %08lx sys_stop %08lx card_start %08x\n",
 	map->map, map->speed, map->sys_start, map->sys_stop, map->card_start);
@@ -736,7 +733,7 @@ sa1100_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 			  map->speed = SA1100_PCMCIA_5V_MEM_ACCESS;
 	  }
 
-	  sa1100_pcmcia_set_mecr(sock, cpufreq_get(0));
+	  sa1100_pcmcia_set_mecr(skt, cpufreq_get(0));
 
   }
 
@@ -767,9 +764,8 @@ static int
 sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
 			  int count, int *eof, void *data)
 {
-  unsigned int sock = (unsigned int)data;
+  struct sa1100_pcmcia_socket *skt = data;
   unsigned int clock = cpufreq_get(0);
-  struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
   unsigned long mecr = MECR;
   char *p = buf;
 
@@ -815,13 +811,13 @@ sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
   p+=sprintf(p, "IRQ      : %d\n", skt->cs_state.io_irq);
 
   p+=sprintf(p, "I/O      : %u (%u)\n", skt->speed_io,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSIO_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSIO_GET(mecr, skt->nr)));
 
   p+=sprintf(p, "attribute: %u (%u)\n", skt->speed_attr,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSA_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSA_GET(mecr, skt->nr)));
 
   p+=sprintf(p, "common   : %u (%u)\n", skt->speed_mem,
-	     sa1100_pcmcia_cmd_time(clock, MECR_BSM_GET(mecr, sock)));
+	     sa1100_pcmcia_cmd_time(clock, MECR_BSM_GET(mecr, skt->nr)));
 
   return p-buf;
 }
@@ -846,7 +842,7 @@ sa1100_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
   }
 
   entry->read_proc = sa1100_pcmcia_proc_status;
-  entry->data = (void *)sock;
+  entry->data = PCMCIA_SOCKET(sock);
 }
 
 #endif  /* defined(CONFIG_PROC_FS) */
@@ -881,8 +877,10 @@ static void sa1100_pcmcia_update_mecr(unsigned int clock)
 {
 	unsigned int sock;
 
-	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock)
-		sa1100_pcmcia_set_mecr(sock, clock);
+	for (sock = 0; sock < SA1100_PCMCIA_MAX_SOCK; ++sock) {
+		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
+		sa1100_pcmcia_set_mecr(skt, clock);
+	}
 }
 
 /* sa1100_pcmcia_notifier()
@@ -956,8 +954,8 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	 * set default MECR calculation if the board specific
 	 * code did not specify one...
 	 */
-	if (!pcmcia_low_level->socket_get_timing)
-		pcmcia_low_level->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
+	if (!ops->socket_get_timing)
+		ops->socket_get_timing = sa1100_pcmcia_default_mecr_timing;
 
 	pcmcia_init.handler = sa1100_pcmcia_interrupt;
 	ret = ops->init(&pcmcia_init);
@@ -1002,6 +1000,8 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		if (ret < 0)
 			printk(KERN_ERR "Unable to get IRQ for socket %u (%d)\n", i, ret);
 
+		skt->nr		= i;
+		skt->ops	= ops;
 		skt->irq        = irq_info.irq;
 		skt->k_state    = state[i];
 		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
@@ -1016,7 +1016,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 			goto out_err;
 		}
 
-		sa1100_pcmcia_set_mecr(i, cpu_clock);
+		sa1100_pcmcia_set_mecr(skt, cpu_clock);
 	}
 
 
