@@ -309,7 +309,7 @@ repeat_alloc:
 	 * No luck. First, kick the VM so it doesnt idle around while
 	 * we are using up our emergency rations.
 	 */
-	wakeup_bdflush(0);
+	wakeup_bdflush();
 
 	/*
 	 * Try to allocate from the emergency pool.
@@ -347,7 +347,7 @@ repeat_alloc:
 	 * No luck. First, kick the VM so it doesnt idle around while
 	 * we are using up our emergency rations.
 	 */
-	wakeup_bdflush(0);
+	wakeup_bdflush();
 
 	/*
 	 * Try to allocate from the emergency pool.

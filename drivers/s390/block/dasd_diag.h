@@ -29,9 +29,9 @@ typedef struct dasd_diag_characteristics_t {
 	u8 rdev_type;
 	u8 rdev_model;
 	u8 rdev_features;
-} __attribute__             ((packed, aligned (4))) 
+} __attribute__ ((packed, aligned (4)))
 
-dasd_diag_characteristics_t;
+    dasd_diag_characteristics_t;
 
 typedef struct diag_bio_t {
 	u8 type;
@@ -40,9 +40,9 @@ typedef struct diag_bio_t {
 	u32 block_number;
 	u32 alet;
 	u32 buffer;
-} __attribute__ ((packed, aligned (8))) 
+} __attribute__ ((packed, aligned (8)))
 
-diag_bio_t;
+    diag_bio_t;
 
 typedef struct diag_init_io_t {
 	u16 dev_nr;
@@ -52,9 +52,9 @@ typedef struct diag_init_io_t {
 	u32 start_block;
 	u32 end_block;
 	u32 spare2[6];
-} __attribute__ ((packed, aligned (8))) 
+} __attribute__ ((packed, aligned (8)))
 
-diag_init_io_t;
+    diag_init_io_t;
 
 typedef struct diag_rw_io_t {
 	u16 dev_nr;
@@ -67,9 +67,9 @@ typedef struct diag_rw_io_t {
 	u32 bio_list;
 	u32 interrupt_params;
 	u32 spare3[5];
-} __attribute__ ((packed, aligned (8))) 
+} __attribute__ ((packed, aligned (8)))
 
-diag_rw_io_t;
+    diag_rw_io_t;
 
 int dasd_diag_init (void);
-void dasd_diag_cleanup(void);
+void dasd_diag_cleanup (void);

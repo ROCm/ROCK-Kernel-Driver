@@ -47,10 +47,16 @@
 #define TUNER_TEMIC_4046FM5             22  /* you must actively select B/G, D/K, I, L, L` !  */
 #define TUNER_PHILIPS_PAL_DK		23
 #define TUNER_PHILIPS_FQ1216ME		24  /* you must actively select B/G/D/K, I, L, L` */
+#define TUNER_LG_PAL_I_FM	25
+#define TUNER_LG_PAL_I		26
+#define TUNER_LG_NTSC_FM	27
+#define TUNER_LG_PAL_FM		28
+#define TUNER_LG_PAL		29
+#define TUNER_TEMIC_4009FN5_MULTI_PAL_FM	30  /* B/G, I and D/K autodetected */
 
 
 #define NOTUNER 0
-#define PAL     1
+#define PAL     1	/* PAL_BG */
 #define PAL_I   2
 #define NTSC    3
 #define SECAM   4
@@ -60,6 +66,7 @@
 #define TEMIC   2
 #define Sony    3
 #define Alps    4
+#define LGINNOTEK 5
 
 #define TUNER_SET_TYPE               _IOW('t',1,int)    /* set tuner type */
 #define TUNER_SET_TVFREQ             _IOW('t',2,int)    /* set tv freq */

@@ -273,24 +273,26 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	int count=sizeof(*mpc);
 	unsigned char *mpt=((unsigned char *)mpc)+count;
 
-	if (memcmp(mpc->mpc_signature,MPC_SIGNATURE,4))
-	{
+	if (memcmp(mpc->mpc_signature,MPC_SIGNATURE,4)) {
 		panic("SMP mptable: bad signature [%c%c%c%c]!\n",
 			mpc->mpc_signature[0],
 			mpc->mpc_signature[1],
 			mpc->mpc_signature[2],
 			mpc->mpc_signature[3]);
-		return 1;
+		return 0;
 	}
-	if (mpf_checksum((unsigned char *)mpc,mpc->mpc_length))
-	{
+	if (mpf_checksum((unsigned char *)mpc,mpc->mpc_length)) {
 		panic("SMP mptable: checksum error!\n");
-		return 1;
+		return 0;
 	}
-	if (mpc->mpc_spec!=0x01 && mpc->mpc_spec!=0x04)
-	{
-		printk("Bad Config Table version (%d)!!\n",mpc->mpc_spec);
-		return 1;
+	if (mpc->mpc_spec!=0x01 && mpc->mpc_spec!=0x04) {
+		printk(KERN_ERR "SMP mptable: bad table version (%d)!!\n",
+			mpc->mpc_spec);
+		return 0;
+	}
+	if (!mpc->mpc_lapic) {
+		printk(KERN_ERR "SMP mptable: null local APIC address!\n");
+		return 0;
 	}
 	memcpy(str,mpc->mpc_oem,8);
 	str[8]=0;
@@ -358,6 +360,8 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 			}
 		}
 	}
+	if (!num_processors)
+		printk(KERN_ERR "SMP mptable: no processors registered!\n");
 	return num_processors;
 }
 
@@ -508,8 +512,12 @@ void __init get_smp_config (void)
 		 * Read the physical hardware table.  Anything here will
 		 * override the defaults.
 		 */
-		smp_read_mpc((void *)mpf->mpf_physptr);
-
+		if (!smp_read_mpc((void *)mpf->mpf_physptr)) {
+			smp_found_config = 0;
+			printk(KERN_ERR "BIOS bug, MP table errors detected!...\n");
+			printk(KERN_ERR "... disabling SMP support. (tell your hw vendor)\n");
+			return;
+		}
 		/*
 		 * If there are no explicit MP IRQ entries, then we are
 		 * broken.  We set up most of the low 16 IO-APIC pins to

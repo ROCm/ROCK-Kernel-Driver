@@ -92,42 +92,58 @@ static void __init quirk_triton(struct pci_dev *dev)
  *	see PCI Latency Adjust on http://www.viahardware.com/download/viatweak.shtm
  *      Also see http://home.tiscalinet.de/au-ja/review-kt133a-1-en.html for
  *      the info on which Mr Breese based his work.
+ *
+ *	Updated based on further information from the site and also on
+ *	information provided by VIA 
  */
 static void __init quirk_vialatency(struct pci_dev *dev)
 {
-	u8 r70;
+	struct pci_dev *p;
 	u8 rev;
-	struct pci_dev *vt82c686;
-   
-   
-	/* we want to look for a VT82C686 south bridge, and then apply the via latency
-	 * patch if we find that it's a 686B (by revision) <cpbotha@ieee.org>
+	u8 busarb;
+	/* Ok we have a potential problem chipset here. Now see if we have
+	   a buggy southbridge */
+	   
+	p=pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, NULL);
+	if(p!=NULL)
+	{
+		pci_read_config_byte(p, PCI_CLASS_REVISION, &rev);
+		/* 0x40 - 0x4f == 686B, 0x10 - 0x2f == 686A; thanks Dan Hollis */
+		/* Check for buggy part revisions */
+		if (rev < 0x40 || rev > 0x42) 
+			return;
+	}
+	else
+	{
+		p = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231, NULL);
+		if(p==NULL)	/* No problem parts */
+			return;
+		pci_read_config_byte(p, PCI_CLASS_REVISION, &rev);
+		/* Check for buggy part revisions */
+		if (rev < 0x10 || rev > 0x12) 
+			return;
+	}
+	
+	/*
+	 *	Ok we have the problem. Now set the PCI master grant to 
+	 *	occur every master grant. The apparent bug is that under high
+	 *	PCI load (quite common in Linux of course) you can get data
+	 *	loss when the CPU is held off the bus for 3 bus master requests
+	 *	This happens to include the IDE controllers....
+	 *
+	 *	VIA only apply this fix when an SB Live! is present but under
+	 *	both Linux and Windows this isnt enough, and we have seen
+	 *	corruption without SB Live! but with things like 3 UDMA IDE
+	 *	controllers. So we ignore that bit of the VIA recommendation..
 	 */
-	vt82c686 = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, NULL);
-	if (vt82c686)   
-     	{
-		pci_read_config_byte(vt82c686, PCI_CLASS_REVISION, &rev);
-        	/* 0x40 - 0x4f == 686B, 0x10 - 0x2f == 686A; thanks Dan Hollis */
-		if (rev >= 0x40 && rev <= 0x4f)
-		{
-        		printk(KERN_INFO "Applying VIA PCI latency patch (found VT82C686B).\n");
-			/*
-	 		 *    In register 0x70, mask off bit 2 (PCI Master read caching)
-	 		 *    and 1 (Delay Transaction)
-	 		 */
-			pci_read_config_byte(dev, 0x70, &r70);
-			r70 &= 0xf9;
-			pci_write_config_byte(dev, 0x70, r70);
-			/*
-	 	 	 *    Turn off PCI Latency timeout (set to 0 clocks)
-	 	 	 */
-			pci_write_config_byte(dev, 0x75, 0x80);
-		}
-		else
-		{
-			printk(KERN_INFO "Found VT82C686A, not applying VIA latency patch.\n");
-		}
-	} /* if (vt82c686) ... */
+
+	pci_read_config_byte(dev, 0x76, &busarb);
+	/* Set bit 4 and bi 5 of byte 76 to 0x01 
+	   "Master priority rotation on every PCI master grant */
+	busarb &= ~(1<<5);
+	busarb |= (1<<4);
+	pci_write_config_byte(dev, 0x76, busarb);
+	printk(KERN_INFO "Applying VIA southbridge workaround.\n");
 }
 
 /*
@@ -416,6 +432,8 @@ static struct pci_fixup pci_fixups[] __initdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		quirk_nopcipci },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_496,		quirk_nopcipci },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	quirk_vialatency },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8371_1,	quirk_vialatency },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	0x3112	/* Not out yet ? */,	quirk_vialatency },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_viaetbf },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C597_0,	quirk_vt82c598_id },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_vt82c586_acpi },

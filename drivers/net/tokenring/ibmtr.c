@@ -228,7 +228,7 @@ static void __devinit PrtChanID(char *pcid, short stride)
 	printk("\n");
 }
 
-static void __devinit HWPrtChanID(__u32 pcid, short stride)
+static void __devinit HWPrtChanID(void * pcid, short stride)
 {
 	short i, j;
 	for (i = 0, j = 0; i < 24; i++, j += stride)
@@ -330,7 +330,6 @@ int __devinit ibmtr_probe(struct net_device *dev)
 	for (i = 0; ibmtr_portlist[i]; i++) {
 		int ioaddr = ibmtr_portlist[i];
 
-		if (check_region(ioaddr, IBMTR_IO_EXTENT)) continue;
 		if (!ibmtr_probe1(dev, ioaddr)) return 0;
 	}
 	return -ENODEV;
@@ -342,9 +341,9 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 {
 
 	unsigned char segment, intr=0, irq=0, i, j, cardpresent=NOTOK, temp=0;
-	__u32 t_mmio = 0;
+	void * t_mmio = 0;
 	struct tok_info *ti = 0;
-	__u32 cd_chanid;
+	void *cd_chanid;
 	unsigned char *tchanid, ctemp;
 #ifndef PCMCIA
 	unsigned char t_irq=0;
@@ -355,6 +354,8 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 #ifndef MODULE
 #ifndef PCMCIA
 	dev = init_trdev(dev, 0);
+	if (!dev)
+		return -ENOMEM;
 #endif
 #endif
 
@@ -377,14 +378,14 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	 *    Compute the linear base address of the MMIO area
 	 *    as LINUX doesn't care about segments
 	 */
-	t_mmio = (u32)ioremap(((__u32) (segment & 0xfc) << 11) + 0x80000,2048);
+	t_mmio = ioremap(((__u32) (segment & 0xfc) << 11) + 0x80000,2048);
 	if (!t_mmio) { 
 		DPRINTK("Cannot remap mmiobase memory area") ; 
 		return -ENODEV ; 
 	} 
 	intr = segment & 0x03;	/* low bits is coded interrupt # */
 	if (ibmtr_debug_trace & TRC_INIT)
-		DPRINTK("PIOaddr: %4hx seg/intr: %2x mmio base: %08X intr: %d\n"
+		DPRINTK("PIOaddr: %4hx seg/intr: %2x mmio base: %p intr: %d\n"
 				, PIOaddr, (int) segment, t_mmio, (int) intr);
 
 	/*
@@ -392,8 +393,9 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	 *    what we is there to learn of ISA/MCA or not TR card
 	 */
 #ifdef PCMCIA
+	iounmap(t_mmio);
 	ti = dev->priv;		/*BMS moved up here */
-	t_mmio = ti->mmio;	/*BMS to get virtual address */
+	t_mmio = (void *)ti->mmio;	/*BMS to get virtual address */
 	irq = ti->irq;		/*BMS to display the irq!   */
 #endif
 	cd_chanid = (CHANNEL_ID + t_mmio);	/* for efficiency */
@@ -424,7 +426,12 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	if (cardpresent == TR_ISA && (readb(AIPFID + t_mmio) == 0x0e))
 		cardpresent = TR_ISAPNP;
 	if (cardpresent == NOTOK) {	/* "channel_id" did not match, report */
-		if (!(ibmtr_debug_trace & TRC_INIT)) return -ENODEV;
+		if (!(ibmtr_debug_trace & TRC_INIT)) {
+#ifndef PCMCIA
+			iounmap(t_mmio);
+#endif
+			return -ENODEV;
+		}
 		DPRINTK( "Channel ID string not found for PIOaddr: %4hx\n",
 								PIOaddr);
 		DPRINTK("Expected for ISA: ");
@@ -442,7 +449,10 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	   waste the memory, just use the existing structure */
 #ifndef PCMCIA
 	ti = (struct tok_info *) kmalloc(sizeof(struct tok_info), GFP_KERNEL);
-	if (ti == NULL) return -ENOMEM;
+	if (ti == NULL) {
+		iounmap(t_mmio);
+		return -ENOMEM;
+	}
 	memset(ti, 0, sizeof(struct tok_info));
 	ti->mmio = t_mmio;
 	dev->priv = ti;		/* this seems like the logical use of the
@@ -459,7 +469,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 		ti->turbo=1;
 		t_irq=turbo_irq[i];
         }
-#endif
+#endif /* !PCMCIA */
 	ti->readlog_pending = 0;
 	init_waitqueue_head(&ti->wait_for_reset);
 
@@ -496,6 +506,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 		while (!readb(ti->mmio + ACA_OFFSET + ACA_RW + RRR_EVEN)){
 			if (!time_after(jiffies, timeout)) continue;
 			DPRINTK( "Hardware timeout during initialization.\n");
+			iounmap(t_mmio);
 			kfree(ti);
 			return -ENODEV;
 		}
@@ -510,7 +521,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 		DPRINTK("irq=%d", irq);
 		printk(", sram_virt=0x%x", ti->sram_virt);
 		if(ibmtr_debug_trace&TRC_INITV){ /* full chat in verbose only */
-			DPRINTK(", ti->mmio=%08X", ti->mmio);
+			DPRINTK(", ti->mmio=%p", ti->mmio);
 			printk(", segment=%02X", segment);
 		}
 		printk(".\n");
@@ -609,6 +620,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 		default:
 			DPRINTK("Unknown shared ram paging info %01X\n",
 							ti->shared_ram_paging);
+			iounmap(t_mmio); 
 			kfree(ti);
 			return -ENODEV;
 			break;
@@ -638,6 +650,7 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 			DPRINTK("Shared RAM for this adapter (%05x) exceeds "
 			"driver limit (%05x), adapter not started.\n",
 			chk_base, ibmtr_mem_base + IBMTR_SHARED_RAM_SIZE);
+			iounmap(t_mmio);
 			kfree(ti);
 			return -ENODEV;
 		} else { /* seems cool, record what we have figured out */
@@ -652,16 +665,24 @@ static int __devinit ibmtr_probe1(struct net_device *dev, int PIOaddr)
 	if (request_irq(dev->irq = irq, &tok_interrupt, 0, "ibmtr", dev) != 0) {
 		DPRINTK("Could not grab irq %d.  Halting Token Ring driver.\n",
 					irq);
+		iounmap(t_mmio);
 		kfree(ti);
 		return -ENODEV;
 	}
 	/*?? Now, allocate some of the PIO PORTs for this driver.. */
 	/* record PIOaddr range as busy */
-	request_region(PIOaddr, IBMTR_IO_EXTENT, "ibmtr");
+	if (!request_region(PIOaddr, IBMTR_IO_EXTENT, "ibmtr")) {
+		DPRINTK("Could not grab PIO range. Halting driver.\n");
+		free_irq(dev->irq, dev);
+		iounmap(t_mmio);
+		kfree(ti);
+		return -EBUSY;
+	}
+
 	if (!version_printed++) {
 		printk(version);
 	}
-#endif
+#endif /* !PCMCIA */
 	DPRINTK("%s %s found\n",
 		channel_def[cardpresent - 1], adapter_def(ti->adapter_type));
 	DPRINTK("using irq %d, PIOaddr %hx, %dK shared RAM.\n",

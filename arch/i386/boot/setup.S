@@ -44,7 +44,6 @@
  *
  */
 
-#define __ASSEMBLY__
 #include <linux/config.h>
 #include <asm/segment.h>
 #include <linux/version.h>

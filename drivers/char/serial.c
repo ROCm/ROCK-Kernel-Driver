@@ -5432,6 +5432,10 @@ static int __init rs_init(void)
 			state->io_type = SERIAL_IO_HUB6;
 		if (state->port && check_region(state->port,8))
 			continue;
+#ifdef CONFIG_MCA			
+		if ((state->flags & ASYNC_BOOT_ONLYMCA) && !MCA_bus)
+			continue;
+#endif			
 		if (state->flags & ASYNC_BOOT_AUTOCONF)
 			autoconfig(state);
 	}

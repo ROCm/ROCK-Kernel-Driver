@@ -1866,10 +1866,10 @@ static int __init riscom8_setup(char *str)
 __setup("riscom8=", riscom8_setup);
 #endif
 
-static const char banner[] __initdata =
+static char banner[] __initdata =
 	KERN_INFO "rc: SDL RISCom/8 card driver v1.1, (c) D.Gorodchanin "
 		  "1994-1996.\n";
-static const char no_boards_msg[] __initdata =
+static char no_boards_msg[] __initdata =
 	KERN_INFO "rc: No RISCom/8 boards detected.\n";
 
 /* 

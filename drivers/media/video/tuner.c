@@ -36,12 +36,16 @@ static int type  = -1; /* insmod parameter */
 static int addr  =  0;
 static char *pal =  "b";
 static int this_adap;
+static int tv_range[2]    = { 44, 958 };
+static int radio_range[2] = { 65, 108 };
 
 #define dprintk     if (debug) printk
 
 MODULE_PARM(debug,"i");
 MODULE_PARM(type,"i");
 MODULE_PARM(addr,"i");
+MODULE_PARM(tv_range,"2i");
+MODULE_PARM(radio_range,"2i");
 MODULE_PARM(pal,"s");
 
 struct tuner
@@ -173,7 +177,20 @@ static struct tunertype tuners[] = {
 	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
 
 	{ "Philips PAL/SECAM multi (FQ1216ME)", Philips, PAL,
-	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623}
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+	{ "LG PAL_I+FM (TAPC-I001D)", LGINNOTEK, PAL_I,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+	{ "LG PAL_I (TAPC-I701D)", LGINNOTEK, PAL_I,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+	{ "LG NTSC+FM (TPI8NSR01F)", LGINNOTEK, NTSC,
+	  16*210.00,16*497.00,0xa0,0x90,0x30,0x8e,732},
+
+	{ "LG PAL_BG+FM (TPI8PSB01D)", LGINNOTEK, PAL,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+	{ "LG PAL_BG (TPI8PSB11D)", LGINNOTEK, PAL,
+	  16*170.00,16*450.00,0xa0,0x90,0x30,0x8e,623},
+	{ "Temic PAL* auto + FM (4009 FN5)", TEMIC, PAL,
+	  16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623}
 };
 #define TUNERS (sizeof(tuners)/sizeof(struct tunertype))
 
@@ -234,13 +251,13 @@ static void set_tv_freq(struct i2c_client *c, int freq)
         unsigned char buffer[4];
 	int rc;
 
-	if (freq < 45*16 || freq > 890*16) {
+	if (freq < tv_range[0]*16 || freq > tv_range[1]*16) {
 		/* FIXME: better do that chip-specific, but
 		   right now we don't have that in the config
 		   struct and this way is still better than no
 		   check at all */
-		printk("tuner: TV freq out of range\n");
-		return;
+		printk("tuner: TV freq (%d.%02d) out of range (%d-%d)\n",
+		       freq/16,freq%16*100/16,tv_range[0],tv_range[1]);
 	}
 
 	if (t->type == -1) {
@@ -357,8 +374,10 @@ static void set_radio_freq(struct i2c_client *c, int freq)
         unsigned char buffer[4];
 	int rc;
 
-	if (freq < 76*16 || freq > 108*16) {
-		printk("tuner: radio freq out of range\n");
+	if (freq < radio_range[0]*16 || freq > radio_range[1]*16) {
+		printk("tuner: radio freq (%d.%02d) out of range (%d-%d)\n",
+		       freq/16,freq%16*100/16,
+		       radio_range[0],radio_range[1]);
 		return;
 	}
 	if (t->type == -1) {
@@ -410,7 +429,7 @@ static int tuner_attach(struct i2c_adapter *adap, int addr,
         client_template.adapter = adap;
         client_template.addr = addr;
 
-        printk("tuner: chip found @ 0x%x\n",addr);
+        printk("tuner: chip found @ 0x%x\n", addr<<1);
 
         if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)))
                 return -ENOMEM;

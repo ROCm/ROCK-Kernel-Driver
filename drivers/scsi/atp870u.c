@@ -11,7 +11,7 @@
  *		   enable 32 bit fifo transfer
  *		   support cdrom & remove device run ultra speed
  *		   fix disconnect bug  2000/12/21
- *		   support atp880 chip lvd u160 2001/05/15
+ *		   support atp880 chip lvd u160 2001/05/15 (7.1)
  */
 
 #include <linux/module.h>
@@ -65,8 +65,10 @@ struct atp_unit
 	unsigned short wide_idu;
 	unsigned short active_idu;
 	unsigned short ultra_map;
+	unsigned short async;
 	unsigned short deviceid;
 	unsigned char ata_cdbu[16];
+	unsigned char sp[16];
 	Scsi_Cmnd *querequ[qcnt];
 	struct atp_id
 	{
@@ -1694,8 +1696,9 @@ void is880(unsigned long host, unsigned int wkport)
 	static unsigned char satn[9] =	{0, 0, 0, 0, 0, 0, 0, 6, 6};
 	static unsigned char inqd[9] =	{0x12, 0, 0, 0, 0x24, 0, 0, 0x24, 6};
 	static unsigned char synn[6] =	{0x80, 1, 3, 1, 0x19, 0x0e};
-	static unsigned char synu[6] =	{0x80, 1, 3, 1, 0x0a, 0x0e};
-	static unsigned char synw[6] =	{0x80, 1, 3, 1, 0x0a, 0x0e};
+	unsigned char synu[6] =  {0x80, 1, 3, 1, 0x0a, 0x0e};
+	static unsigned char synw[6] =	{0x80, 1, 3, 1, 0x19, 0x0e};
+	unsigned char synuw[6] =  {0x80, 1, 3, 1, 0x0a, 0x0e};
 	static unsigned char wide[6] =	{0x80, 1, 2, 3, 1, 0};
 	static unsigned char u3[9] = { 0x80,1,6,4,0x09,00,0x0e,0x01,0x02 };
 	struct atp_unit *dev = &atp_unit[host];
@@ -1834,17 +1837,18 @@ inq_ok:
 		if ((mbuf[7] & 0x60) == 0) {
 			goto not_wide;
 		}
-		if ((dev->global_map & 0x20) == 0) {
+		if ((i < 8) && ((dev->global_map & 0x20) == 0)) {
 			goto not_wide;
 		}
 		if (lvdmode == 0)
 		{
 		   goto chg_wide;
 		}
-		if ((mbuf[2] & 0x07) < 0x03)	      // force u2
+		if (dev->sp[i] != 0x04) 	 // force u2
 		{
 		   goto chg_wide;
 		}
+
 		tmport = wkport + 0x5b;
 		outb(0x01, tmport);
 		tmport = wkport + 0x43;
@@ -2129,10 +2133,28 @@ not_wide:
 		if ((dev->id[i].devtypeu == 0x00) || (dev->id[i].devtypeu == 0x07) ||
 		    ((dev->id[i].devtypeu == 0x05) && ((n & 0x10) != 0)))
 		{
-			goto set_sync;
+			m = 1;
+			m = m << i;
+			if ((dev->async & m) != 0)
+			{
+			   goto set_sync;
+			}
 		}
 		continue;
 set_sync:
+		if (dev->sp[i] == 0x02)
+		{
+		   synu[4]=0x0c;
+		   synuw[4]=0x0c;
+		}
+		else
+		{
+		   if (dev->sp[i] >= 0x03)
+		   {
+		      synu[4]=0x0a;
+		      synuw[4]=0x0a;
+		   }
+		}
 		tmport = wkport + 0x5b;
 		j = 0;
 		if ((m & dev->wide_idu) != 0) {
@@ -2175,7 +2197,11 @@ try_sync:
 			if ((inb(tmport) & 0x01) != 0) {
 				tmport -= 0x06;
 				if ((m & dev->wide_idu) != 0) {
-					outb(synw[j++], tmport);
+					if ((m & dev->ultra_map) != 0) {
+						outb(synuw[j++], tmport);
+					} else {
+						outb(synw[j++], tmport);
+					}
 				} else {
 					if ((m & dev->ultra_map) != 0) {
 						outb(synu[j++], tmport);
@@ -2321,13 +2347,13 @@ tar_dcons:
 /* return non-zero on detection */
 int atp870u_detect(Scsi_Host_Template * tpnt)
 {
-	unsigned char irq, h, k;
+	unsigned char irq, h, k, m;
 	unsigned long flags;
 	unsigned int base_io, error, tmport;
 	unsigned short index = 0;
 	struct pci_dev *pdev[3];
 	unsigned char chip_ver[3], host_id;
-	unsigned short dev_id[3];
+	unsigned short dev_id[3], n;
 	struct Scsi_Host *shpnt = NULL;
 	int tmpcnt = 0;
 	int count = 0;
@@ -2368,6 +2394,7 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		}
 		for (k = 0; k < 16; k++) {
 			dev->id[k].curr_req = 0;
+			dev->sp[k] = 0x04;
 		}
 	}
 	h = 0;
@@ -2500,7 +2527,7 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		   host_id = inb(base_io + 0x39);
 		   host_id >>= 0x04;
 
-		   printk(KERN_INFO "   ACARD AEC-67160 PCI Ultra3 LVD Host Adapter: %d    IO:%x, IRQ:%d.\n"
+		   printk(KERN_INFO "   ACARD AEC-67160 PCI Ultra160 LVD/SE SCSI Adapter: %d    IO:%x, IRQ:%d.\n"
 			  ,h, base_io, irq);
 		   dev->ioport = base_io + 0x40;
 		   dev->pciport = base_io + 0x28;
@@ -2515,11 +2542,67 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		   dev->global_map = inb(tmport);
 		   tmport += 0x07;
 		   dev->ultra_map = inw(tmport);
-		   if (dev->ultra_map == 0) {
-			   dev->scam_on = 0x00;
-			   dev->global_map = 0x20;
-			   dev->ultra_map = 0xffff;
+
+		   n=0x3f09;
+next_fblk:
+		   if (n >= 0x4000)
+		   {
+		      goto flash_ok;
 		   }
+		   m=0;
+		   outw(n,base_io + 0x34);
+		   n += 0x0002;
+		   if (inb(base_io + 0x30) == 0xff)
+		   {
+		      goto flash_ok;
+		   }
+		   dev->sp[m++]=inb(base_io + 0x30);
+		   dev->sp[m++]=inb(base_io + 0x31);
+		   dev->sp[m++]=inb(base_io + 0x32);
+		   dev->sp[m++]=inb(base_io + 0x33);
+		   outw(n,base_io + 0x34);
+		   n += 0x0002;
+		   dev->sp[m++]=inb(base_io + 0x30);
+		   dev->sp[m++]=inb(base_io + 0x31);
+		   dev->sp[m++]=inb(base_io + 0x32);
+		   dev->sp[m++]=inb(base_io + 0x33);
+		   outw(n,base_io + 0x34);
+		   n += 0x0002;
+		   dev->sp[m++]=inb(base_io + 0x30);
+		   dev->sp[m++]=inb(base_io + 0x31);
+		   dev->sp[m++]=inb(base_io + 0x32);
+		   dev->sp[m++]=inb(base_io + 0x33);
+		   outw(n,base_io + 0x34);
+		   n += 0x0002;
+		   dev->sp[m++]=inb(base_io + 0x30);
+		   dev->sp[m++]=inb(base_io + 0x31);
+		   dev->sp[m++]=inb(base_io + 0x32);
+		   dev->sp[m++]=inb(base_io + 0x33);
+		   n += 0x0018;
+		   goto next_fblk;
+flash_ok:
+		   outw(0,base_io + 0x34);
+		   dev->ultra_map=0;
+		   dev->async = 0;
+		   for (k=0; k < 16; k++)
+		   {
+		       n=1;
+		       n = n << k;
+		       if (dev->sp[k] > 1)
+		       {
+			  dev->ultra_map |= n;
+		       }
+		       else
+		       {
+			  if (dev->sp[k] == 0)
+			  {
+			     dev->async |= n;
+			  }
+		       }
+		   }
+		   dev->async = ~(dev->async);
+		   outb(dev->global_map,base_io + 0x35);
+
 		   shpnt = scsi_register(tpnt, 4);
 		   if(shpnt==NULL)
 			   return count;
@@ -2557,6 +2640,7 @@ int atp870u_detect(Scsi_Host_Template * tpnt)
 		   tmport = base_io + 0x51;
 		   outb(0x20, tmport);
 
+		   tscam(h);
 		   is880(h, base_io);
 		   tmport = base_io + 0x38;
 		   outb(0xb0, tmport);
@@ -2646,7 +2730,7 @@ find_adp:
 		{
 		    printk(" %2x ",workrequ->cmnd[k]);
 		}
-		printk(" last_lenu= %lx ",dev->id[j].last_lenu);
+		printk(" last_lenu= %x ",dev->id[j].last_lenu);
 	   }
 	}
 	return (SCSI_ABORT_SNOOZE);
@@ -2680,7 +2764,7 @@ const char *atp870u_info(struct Scsi_Host *notused)
 {
 	static char buffer[128];
 
-	strcpy(buffer, "ACARD AEC-6710/6712/67160 PCI Ultra/W/LVD SCSI-3 Adapter Driver V2.4+ac ");
+	strcpy(buffer, "ACARD AEC-6710/6712/67160 PCI Ultra/W/LVD SCSI-3 Adapter Driver V2.5+ac ");
 
 	return buffer;
 }
@@ -2725,7 +2809,7 @@ int atp870u_proc_info(char *buffer, char **start, off_t offset, int length,
 	if (offset == 0) {
 		memset(buff, 0, sizeof(buff));
 	}
-	size += sprintf(BLS, "ACARD AEC-671X Driver Version: 2.4+ac\n");
+	size += sprintf(BLS, "ACARD AEC-671X Driver Version: 2.5+ac\n");
 	len += size;
 	pos = begin + len;
 	size = 0;
@@ -2791,4 +2875,3 @@ int atp870u_release (struct Scsi_Host *pshost)
 
 static Scsi_Host_Template driver_template = ATP870U;
 #include "scsi_module.c"
-

@@ -20,7 +20,7 @@
 
 
 #define DAC960_DriverVersion			"2.4.10"
-#define DAC960_DriverDate			"1 February 2001"
+#define DAC960_DriverDate			"23 July 2001"
 
 
 #include <linux/version.h>
@@ -28,6 +28,7 @@
 #include <linux/types.h>
 #include <linux/blk.h>
 #include <linux/blkdev.h>
+#include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/hdreg.h>
 #include <linux/interrupt.h>
@@ -40,7 +41,6 @@
 #include <linux/spinlock.h>
 #include <linux/timer.h>
 #include <linux/pci.h>
-#include <linux/completion.h>
 #include <asm/io.h>
 #include <asm/segment.h>
 #include <asm/uaccess.h>
@@ -485,14 +485,14 @@ static void DAC960_PD_QueueCommand(DAC960_Command_T *Command)
 static void DAC960_ExecuteCommand(DAC960_Command_T *Command)
 {
   DAC960_Controller_T *Controller = Command->Controller;
-  DECLARE_COMPLETION(Wait);
+  DECLARE_COMPLETION(Completion);
   unsigned long ProcessorFlags;
-  Command->Waiting = &Wait;
+  Command->Completion = &Completion;
   DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
   DAC960_QueueCommand(Command);
   DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
   if (in_interrupt()) return;
-  wait_for_completion(&Wait);
+  wait_for_completion(&Completion);
 }
 
 
@@ -1317,7 +1317,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 						 *Controller)
 {
   DAC960_V1_DCDB_T DCDBs[DAC960_V1_MaxChannels], *DCDB;
-  Completion_T Wait[DAC960_V1_MaxChannels], *wait;
+  Completion_T Completions[DAC960_V1_MaxChannels], *Completion;
   unsigned long ProcessorFlags;
   int Channel, TargetID;
   for (TargetID = 0; TargetID < Controller->Targets; TargetID++)
@@ -1328,12 +1328,12 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DAC960_SCSI_Inquiry_T *InquiryStandardData =
 	    &Controller->V1.InquiryStandardData[Channel][TargetID];
 	  InquiryStandardData->PeripheralDeviceType = 0x1F;
-	  wait = &Wait[Channel];
-	  init_completion(wait);
+	  Completion = &Completions[Channel];
+	  init_completion(Completion);
 	  DCDB = &DCDBs[Channel];
 	  DAC960_V1_ClearCommand(Command);
 	  Command->CommandType = DAC960_ImmediateCommand;
-	  Command->Waiting = wait;
+	  Command->Completion = Completion;
 	  Command->V1.CommandMailbox.Type3.CommandOpcode = DAC960_V1_DCDB;
 	  Command->V1.CommandMailbox.Type3.BusAddress = Virtual_to_Bus32(DCDB);
 	  DCDB->Channel = Channel;
@@ -1364,11 +1364,11 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DAC960_SCSI_Inquiry_UnitSerialNumber_T *InquiryUnitSerialNumber =
 	    &Controller->V1.InquiryUnitSerialNumber[Channel][TargetID];
 	  InquiryUnitSerialNumber->PeripheralDeviceType = 0x1F;
-	  wait = &Wait[Channel];
-	  wait_for_completion(wait);
+	  Completion = &Completions[Channel];
+	  wait_for_completion(Completion);
 	  if (Command->V1.CommandStatus != DAC960_V1_NormalCompletion)
 	    continue;
-	  Command->Waiting = wait;
+	  Command->Completion = Completion;
 	  DCDB = &DCDBs[Channel];
 	  DCDB->TransferLength = sizeof(DAC960_SCSI_Inquiry_UnitSerialNumber_T);
 	  DCDB->BusAddress = Virtual_to_Bus32(InquiryUnitSerialNumber);
@@ -1382,7 +1382,7 @@ static boolean DAC960_V1_ReadDeviceConfiguration(DAC960_Controller_T
 	  DAC960_AcquireControllerLock(Controller, &ProcessorFlags);
 	  DAC960_QueueCommand(Command);
 	  DAC960_ReleaseControllerLock(Controller, &ProcessorFlags);
-	  wait_for_completion(wait);
+	  wait_for_completion(Completion);
 	}
     }
   return true;
@@ -2769,7 +2769,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   if (Request->cmd == READ)
     Command->CommandType = DAC960_ReadCommand;
   else Command->CommandType = DAC960_WriteCommand;
-  Command->Waiting = Request->waiting;
+  Command->Completion = Request->waiting;
   Command->LogicalDriveNumber = DAC960_LogicalDriveNumber(Request->rq_dev);
   Command->BlockNumber =
     Request->sector
@@ -2922,13 +2922,10 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DAC960_ProcessCompletedBuffer(BufferHeader, true);
 	      BufferHeader = NextBufferHeader;
 	    }
-	  /*
-	    Wake up requestor for swap file paging requests.
-	  */
-	  if (Command->Waiting)
+	  if (Command->Completion != NULL)
 	    {
-	      complete(Command->Waiting);
-	      Command->Waiting = NULL;
+	      complete(Command->Completion);
+	      Command->Completion = NULL;
 	    }
 	  add_blkdev_randomness(DAC960_MAJOR + Controller->ControllerNumber);
 	}
@@ -2970,10 +2967,10 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DAC960_ProcessCompletedBuffer(BufferHeader, false);
 	      BufferHeader = NextBufferHeader;
 	    }
-	  if (Command->Waiting)
+	  if (Command->Completion != NULL)
 	    {
-	      complete(Command->Waiting);
-	      Command->Waiting = NULL;
+	      complete(Command->Completion);
+	      Command->Completion = NULL;
 	    }
 	}
     }
@@ -3587,8 +3584,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
     }
   if (CommandType == DAC960_ImmediateCommand)
     {
-      complete(Command->Waiting);
-      Command->Waiting = NULL;
+      complete(Command->Completion);
+      Command->Completion = NULL;
       return;
     }
   if (CommandType == DAC960_QueuedCommand)
@@ -3929,10 +3926,10 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DAC960_ProcessCompletedBuffer(BufferHeader, true);
 	      BufferHeader = NextBufferHeader;
 	    }
-	  if (Command->Waiting)
+	  if (Command->Completion != NULL)
 	    {
-	      complete(Command->Waiting);
-	      Command->Waiting = NULL;
+	      complete(Command->Completion);
+	      Command->Completion = NULL;
 	    }
 	  add_blkdev_randomness(DAC960_MAJOR + Controller->ControllerNumber);
 	}
@@ -3974,10 +3971,10 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      DAC960_ProcessCompletedBuffer(BufferHeader, false);
 	      BufferHeader = NextBufferHeader;
 	    }
-	  if (Command->Waiting)
+	  if (Command->Completion != NULL)
 	    {
-	      complete(Command->Waiting);
-	      Command->Waiting = NULL;
+	      complete(Command->Completion);
+	      Command->Completion = NULL;
 	    }
 	}
     }
@@ -4531,8 +4528,8 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
     }
   if (CommandType == DAC960_ImmediateCommand)
     {
-      complete(Command->Waiting);
-      Command->Waiting = NULL;
+      complete(Command->Completion);
+      Command->Completion = NULL;
       return;
     }
   if (CommandType == DAC960_QueuedCommand)

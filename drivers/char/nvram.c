@@ -113,7 +113,7 @@ static int nvram_open_mode;		/* special open modes */
 #define	NVRAM_EXCL		2		/* opened with O_EXCL */
 
 #define	RTC_FIRST_BYTE		14	/* RTC register number of first NVRAM byte */
-#define	NVRAM_BYTES			128	/* number of NVRAM bytes */
+#define	NVRAM_BYTES			128-RTC_FIRST_BYTE	/* number of NVRAM bytes */
 
 
 static int mach_check_checksum( void );

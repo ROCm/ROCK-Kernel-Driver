@@ -3,7 +3,7 @@
       By: YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>
  
   This software may be used and distributed according to the terms of
-  the GNU General Public License.
+  the GNU Public License.
 
   */
 

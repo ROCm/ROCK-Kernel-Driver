@@ -31,7 +31,9 @@
 #else
 #define RS_TABLE_SIZE
 #endif
-	
+
+#define MCA_COM_FLAGS	(STD_COM_FLAGS|ASYNC_BOOT_ONLYMCA)
+
 /*
  * The following define the access methods for the HUB6 card. All
  * access is through two ports for all 24 possible chips. The card is
@@ -113,12 +115,12 @@
 
 #ifdef CONFIG_MCA
 #define MCA_SERIAL_PORT_DFNS			\
-	{ 0, BASE_BAUD, 0x3220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x3228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x4228, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5220, 3, STD_COM_FLAGS },	\
-	{ 0, BASE_BAUD, 0x5228, 3, STD_COM_FLAGS },
+	{ 0, BASE_BAUD, 0x3220, 3, MCA_COM_FLAGS },	\
+	{ 0, BASE_BAUD, 0x3228, 3, MCA_COM_FLAGS },	\
+	{ 0, BASE_BAUD, 0x4220, 3, MCA_COM_FLAGS },	\
+	{ 0, BASE_BAUD, 0x4228, 3, MCA_COM_FLAGS },	\
+	{ 0, BASE_BAUD, 0x5220, 3, MCA_COM_FLAGS },	\
+	{ 0, BASE_BAUD, 0x5228, 3, MCA_COM_FLAGS },
 #else
 #define MCA_SERIAL_PORT_DFNS
 #endif

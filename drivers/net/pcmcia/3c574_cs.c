@@ -233,7 +233,7 @@ static void mdio_sync(ioaddr_t ioaddr, int bits);
 static int mdio_read(ioaddr_t ioaddr, int phy_id, int location);
 static void mdio_write(ioaddr_t ioaddr, int phy_id, int location, int value);
 static u_short read_eeprom(ioaddr_t ioaddr, int index);
-static void wait_for_completion(struct net_device *dev, int cmd);
+static void tc574_wait_for_completion(struct net_device *dev, int cmd);
 
 static void tc574_reset(struct net_device *dev);
 static void media_check(u_long arg);
@@ -515,8 +515,8 @@ static void tc574_config(dev_link_t *link)
 		outw(0x8040, ioaddr + Wn3_Options);
 		mdelay(1);
 		outw(0xc040, ioaddr + Wn3_Options);
-		wait_for_completion(dev, TxReset);
-		wait_for_completion(dev, RxReset);
+		tc574_wait_for_completion(dev, TxReset);
+		tc574_wait_for_completion(dev, RxReset);
 		mdelay(1);
 		outw(0x8040, ioaddr + Wn3_Options);
 		
@@ -656,7 +656,7 @@ static void dump_status(struct net_device *dev)
 /*
   Use this for commands that may take time to finish
 */
-static void wait_for_completion(struct net_device *dev, int cmd)
+static void tc574_wait_for_completion(struct net_device *dev, int cmd)
 {
     int i = 1500;
     outw(cmd, dev->base_addr + EL3_CMD);
@@ -764,7 +764,7 @@ static void tc574_reset(struct net_device *dev)
 	struct el3_private *lp = (struct el3_private *)dev->priv;
 	int i, ioaddr = dev->base_addr;
 
-	wait_for_completion(dev, TotalReset|0x10);
+	tc574_wait_for_completion(dev, TotalReset|0x10);
 
 	/* Clear any transactions in progress. */
 	outw(0, ioaddr + RunnerWrCtrl);
@@ -787,8 +787,8 @@ static void tc574_reset(struct net_device *dev)
 	outw(0x8040, ioaddr + Wn3_Options);
 	mdelay(1);
 	outw(0xc040, ioaddr + Wn3_Options);
-	wait_for_completion(dev, TxReset);
-	wait_for_completion(dev, RxReset);
+	tc574_wait_for_completion(dev, TxReset);
+	tc574_wait_for_completion(dev, RxReset);
 	mdelay(1);
 	outw(0x8040, ioaddr + Wn3_Options);
 
@@ -859,7 +859,7 @@ static void el3_tx_timeout(struct net_device *dev)
 	lp->stats.tx_errors++;
 	dev->trans_start = jiffies;
 	/* Issue TX_RESET and TX_START commands. */
-	wait_for_completion(dev, TxReset);
+	tc574_wait_for_completion(dev, TxReset);
 	outw(TxEnable, ioaddr + EL3_CMD);
 	netif_wake_queue(dev);
 }
@@ -876,7 +876,7 @@ static void pop_tx_status(struct net_device *dev)
 		if (!(tx_status & 0x84)) break;
 		/* reset transmitter on jabber error or underrun */
 		if (tx_status & 0x30)
-			wait_for_completion(dev, TxReset);
+			tc574_wait_for_completion(dev, TxReset);
 		if (tx_status & 0x38) {
 			DEBUG(1, "%s: transmit error: status 0x%02x\n",
 				  dev->name, tx_status);
@@ -968,12 +968,12 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 					   " register %04x.\n", dev->name, fifo_diag);
 				if (fifo_diag & 0x0400) {
 					/* Tx overrun */
-					wait_for_completion(dev, TxReset);
+					tc574_wait_for_completion(dev, TxReset);
 					outw(TxEnable, ioaddr + EL3_CMD);
 				}
 				if (fifo_diag & 0x2000) {
 					/* Rx underrun */
-					wait_for_completion(dev, RxReset);
+					tc574_wait_for_completion(dev, RxReset);
 					set_rx_mode(dev);
 					outw(RxEnable, ioaddr + EL3_CMD);
 				}
@@ -1175,7 +1175,7 @@ static int el3_rx(struct net_device *dev, int worklimit)
 				lp->stats.rx_dropped++;
 			}
 		}
-		wait_for_completion(dev, RxDiscard);
+		tc574_wait_for_completion(dev, RxDiscard);
 	}
 
 	return worklimit;

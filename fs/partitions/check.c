@@ -77,11 +77,23 @@ static int (*check_part[])(struct gendisk *hd, kdev_t dev, unsigned long first_s
 };
 
 /*
+ *	This is ucking fugly but its probably the best thing for 2.4.x
+ *	Take it as a clear reminder than we should put the device name
+ *	generation in the object kdev_t points to in 2.5.
+ */
+ 
+#ifdef CONFIG_ARCH_S390
+int (*genhd_dasd_name)(char*,int,int,struct gendisk*) = NULL;
+EXPORT_SYMBOL(genhd_dasd_name);
+#endif
+
+/*
  * disk_name() is used by partition check code and the md driver.
  * It formats the devicename of the indicated disk into
  * the supplied buffer (of size at least 32), and returns
  * a pointer to that same buffer (for convenience).
  */
+
 char *disk_name (struct gendisk *hd, int minor, char *buf)
 {
 	unsigned int part;
@@ -96,6 +108,12 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 		if (pos >= 0)
 			return buf + pos;
 	}
+
+#ifdef CONFIG_ARCH_S390
+	if (genhd_dasd_name
+	    && genhd_dasd_name (buf, unit - 'a', part, hd) == 0)
+		return buf;
+#endif
 	/*
 	 * IDE devices use multiple major numbers, but the drives
 	 * are named as:  {hda,hdb}, {hdc,hdd}, {hde,hdf}, {hdg,hdh}..

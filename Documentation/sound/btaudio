@@ -1,0 +1,81 @@
+
+Intro
+=====
+
+people start bugging me about this with questions, looks like I
+should write up some documentation for this beast.  That way I
+don't have to answer that much mails I hope.  Yes, I'm lazy...
+
+
+You might have noticed that the bt878 grabber cards have actually
+_two_ PCI functions:
+
+$ lspci
+[ ... ]
+00:0a.0 Multimedia video controller: Brooktree Corporation Bt878 (rev 02)
+00:0a.1 Multimedia controller: Brooktree Corporation Bt878 (rev 02)
+[ ... ]
+
+The first does video, it is backward compatible to the bt848.  The second
+does audio.  btaudio is a driver for the second function.  It's a sound
+driver which can be used for recording sound (and _only_ recording, no
+playback).  As most TV cards come with a short cable which can be plugged
+into your sound card's line-in you probably don't need this driver if all
+you want to do is just watching TV...
+
+
+Driver Status
+=============
+
+Still somewhat experimental.  The driver should work stable, i.e. it
+should'nt crash your box.  It might not work as expected, have bugs,
+not being fully OSS API compilant, ...
+
+
+Digital audio mode
+==================
+
+The chip knows different modes.  Right now you have to pick the one you
+want to use at insmod time.  Digital audio mode is the default.  The
+chip gives you 16 bit stereo sound with ~32 kHz sample rate.  According
+to the specs it should be possible to get up to 48 kHz, but I havn't
+figured out yet how this works.  The specs are not very verbose :-(
+
+Lower sample rates are possible too, but the code isn't written yet.
+For now you are limited to the fixed 32 kHz.  Mono works throuth, the
+driver will do that in software for you.
+
+With my Hauppauge I get clear sound, but I got also reports saying that
+digital audio mode does'nt work.  Guess Hauppauge connected the msp34xx
+output to the bt878's I2S digital audio input port.
+
+
+analog mode (A/D)
+=================
+
+You can tell the driver to use this mode with the insmod option "analog=1".
+The chip has three analog inputs.  Consequently you'll get a mixer device
+to control these.
+
+The analog mode supports mono only.  Both 8 + 16 bit.  Both are _signed_
+int, which is uncommon for the 8 bit case.  Sample rate range is 119 kHz
+to 448 kHz.  Yes, the number of digits is correct.  The driver supports
+downsampling by powers of two, so you can ask for more usual sample rates
+like 44 kHz too.
+
+With my Hauppauge I get noisy sound on the second input (mapped to line2
+by the mixer device).  Others get a useable signal on line1.
+
+
+more hints
+==========
+
+/me uses "sox -w -r 32000 -t ossdsp /dev/dsp2 -t ossdsp /dev/dsp"
+to dump audio data from btaudio (dsp2) to es1730 (dsp,dsp1).
+
+Have fun,
+
+  Gerd
+
+-- 
+Gerd Knorr <kraxel@bytesex.org>

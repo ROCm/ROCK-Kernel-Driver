@@ -274,7 +274,7 @@ static int rtnetlink_done(struct netlink_callback *cb)
 
 /* Process one rtnetlink message. */
 
-extern __inline__ int
+static __inline__ int
 rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 {
 	struct rtnetlink_link *link;

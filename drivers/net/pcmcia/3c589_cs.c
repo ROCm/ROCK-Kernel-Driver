@@ -528,7 +528,7 @@ static int tc589_event(event_t event, int priority,
 /*
   Use this for commands that may take time to finish
 */
-static void wait_for_completion(struct net_device *dev, int cmd)
+static void tc589_wait_for_completion(struct net_device *dev, int cmd)
 {
     int i = 100;
     outw(cmd, dev->base_addr + EL3_CMD);
@@ -686,7 +686,7 @@ static void el3_tx_timeout(struct net_device *dev)
     lp->stats.tx_errors++;
     dev->trans_start = jiffies;
     /* Issue TX_RESET and TX_START commands. */
-    wait_for_completion(dev, TxReset);
+    tc589_wait_for_completion(dev, TxReset);
     outw(TxEnable, ioaddr + EL3_CMD);
     netif_wake_queue(dev);
 }
@@ -703,7 +703,7 @@ static void pop_tx_status(struct net_device *dev)
 	if (!(tx_status & 0x84)) break;
 	/* reset transmitter on jabber error or underrun */
 	if (tx_status & 0x30)
-	    wait_for_completion(dev, TxReset);
+	    tc589_wait_for_completion(dev, TxReset);
 	if (tx_status & 0x38) {
 	    DEBUG(1, "%s: transmit error: status 0x%02x\n",
 		  dev->name, tx_status);
@@ -796,12 +796,12 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		       " register %04x.\n", dev->name, fifo_diag);
 		if (fifo_diag & 0x0400) {
 		    /* Tx overrun */
-		    wait_for_completion(dev, TxReset);
+		    tc589_wait_for_completion(dev, TxReset);
 		    outw(TxEnable, ioaddr + EL3_CMD);
 		}
 		if (fifo_diag & 0x2000) {
 		    /* Rx underrun */
-		    wait_for_completion(dev, RxReset);
+		    tc589_wait_for_completion(dev, RxReset);
 		    set_multicast_list(dev);
 		    outw(RxEnable, ioaddr + EL3_CMD);
 		}
@@ -1003,7 +1003,7 @@ static int el3_rx(struct net_device *dev)
 	    }
 	}
 	/* Pop the top of the Rx FIFO */
-	wait_for_completion(dev, RxDiscard);
+	tc589_wait_for_completion(dev, RxDiscard);
     }
     if (worklimit == 0)
 	printk(KERN_NOTICE "%s: too much work in el3_rx!\n", dev->name);

@@ -53,11 +53,19 @@ bttv.o
   card=51 - Eagle Wireless Capricorn2 (bt878A)
   card=52 - Pinnacle PCTV Studio Pro
   card=53 - Typhoon TView RDS / FM Stereo
-  card=54 - Livetec 9415 TV
+  card=54 - Lifetec LT 9415 TV
   card=55 - BESTBUY Easy TV
   card=56 - FlyVideo '98/FM
   card=57 - GrandTec 'Grand Video Capture'
   card=58 - Phoebe TV Master Only (No FM)
+  card=59 - TV Capturer
+  card=60 - MM100PCTV
+  card=61 - AG Electronics GMV1
+  card=62 - BESTBUY Easy TV (bt878)
+  card=63 - ATI TV-Wonder
+  card=64 - ATI TV-Wonder VE
+  card=65 - FlyVideo 2000S
+  card=66 - Terratec TValueRadio
 
 tuner.o
   type=0 - Temic PAL (4002 FH5)
@@ -85,3 +93,9 @@ tuner.o
   type=22 - Temic PAL/SECAM multi (4046 FM5)
   type=23 - Philips PAL_DK
   type=24 - Philips PAL/SECAM multi (FQ1216ME)
+  type=25 - LG PAL_I+FM (TAPC-I001D)
+  type=26 - LG PAL_I (TAPC-I701D)
+  type=27 - LG NTSC+FM (TPI8NSR01F)
+  type=28 - LG PAL_BG+FM (TPI8PSB01D)
+  type=29 - LG PAL_BG (TPI8PSB11D)
+  type=30 - Temic PAL* auto + FM (4009 FN5)

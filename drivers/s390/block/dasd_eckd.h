@@ -10,6 +10,7 @@
 #define DASD_ECKD_CCW_READ_HOME_ADDRESS 0x0a
 #define DASD_ECKD_CCW_WRITE_KD 0x0d
 #define DASD_ECKD_CCW_READ_KD 0x0e
+#define DASD_ECKD_CCW_ERASE 0x11
 #define DASD_ECKD_CCW_READ_COUNT 0x12
 #define DASD_ECKD_CCW_WRITE_RECORD_ZERO 0x15
 #define DASD_ECKD_CCW_READ_RECORD_ZERO 0x16
@@ -26,52 +27,51 @@
 #define DASD_ECKD_CCW_WRITE_CKD_MT 0x9d
 #define DASD_ECKD_CCW_RESERVE 0xB4
 
-
-typedef 
-struct eckd_count_t {
+typedef
+    struct eckd_count_t {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
 	__u8 kl;
 	__u16 dl;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-eckd_count_t;
+    eckd_count_t;
 
 typedef
-struct ch_t {
+    struct ch_t {
 	__u16 cyl;
 	__u16 head;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-ch_t;
+    ch_t;
 
 typedef
-struct chs_t {
+    struct chs_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-chs_t;
+    chs_t;
 
 typedef
-struct chr_t {
+    struct chr_t {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-chr_t;
+    chr_t;
 
 typedef
-struct geom_t {
+    struct geom_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-geom_t;
+    geom_t;
 
 typedef struct eckd_home_t {
 	__u8 skip_control[14];
@@ -82,12 +82,12 @@ typedef struct eckd_home_t {
 	__u8 reserved;
 	__u8 key_length;
 	__u8 reserved2[2];
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-eckd_home_t;
+    eckd_home_t;
 
 typedef
-struct DE_eckd_data_t {
+    struct DE_eckd_data_t {
 	struct {
 		unsigned char perm:2;	/* Permissions on this extent */
 		unsigned char reserved:1;
@@ -108,12 +108,12 @@ struct DE_eckd_data_t {
 	__u8 reserved;
 	ch_t beg_ext;
 	ch_t end_ext;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-DE_eckd_data_t;
+    DE_eckd_data_t;
 
 typedef
-struct LO_eckd_data_t {
+    struct LO_eckd_data_t {
 	struct {
 		unsigned char orientation:2;
 		unsigned char operation:6;
@@ -129,12 +129,12 @@ struct LO_eckd_data_t {
 	chr_t search_arg;
 	__u8 sector;
 	__u16 length;
-} __attribute__ ((packed)) 
+} __attribute__ ((packed))
 
-LO_eckd_data_t;
+    LO_eckd_data_t;
 
 typedef
-struct dasd_eckd_characteristics_t {
+    struct dasd_eckd_characteristics_t {
 	__u16 cu_type;
 	struct {
 		unsigned char support:2;
@@ -204,9 +204,9 @@ struct dasd_eckd_characteristics_t {
 	__u8 factor8;
 	__u8 reserved2[3];
 	__u8 reserved3[10];
-} __attribute__             ((packed)) 
+} __attribute__ ((packed))
 
-dasd_eckd_characteristics_t;
+    dasd_eckd_characteristics_t;
 
 typedef struct dasd_eckd_confdata_t {
 	struct {
@@ -323,10 +323,10 @@ typedef struct dasd_eckd_confdata_t {
 		__u8 log_dev_address;
 		unsigned char reserved2[12];
 	} __attribute__ ((packed)) neq;
-} __attribute__      ((packed)) 
+} __attribute__ ((packed))
 
-dasd_eckd_confdata_t;
+    dasd_eckd_confdata_t;
 
 int dasd_eckd_init (void);
-void dasd_eckd_cleanup(void);
+void dasd_eckd_cleanup (void);
 #endif				/* DASD_ECKD_H */

@@ -69,6 +69,7 @@ static unsigned int irq_debug = 0;
 static unsigned int gbuffers = 2;
 static unsigned int gbufsize = BTTV_MAX_FBUF;
 static unsigned int combfilter = 0;
+static unsigned int lumafilter = 0;
 static int video_nr = -1;
 static int radio_nr = -1;
 static int vbi_nr = -1;
@@ -96,6 +97,7 @@ MODULE_PARM_DESC(gbuffers,"number of capture buffers, default is 2 (64 max)");
 MODULE_PARM(gbufsize,"i");
 MODULE_PARM_DESC(gbufsize,"size of the capture buffers, default is 0x208000");
 MODULE_PARM(combfilter,"i");
+MODULE_PARM(lumafilter,"i");
 
 MODULE_PARM(video_nr,"i");
 MODULE_PARM(radio_nr,"i");
@@ -699,7 +701,7 @@ static int  make_prisctab(struct bttv *btv, unsigned int *ro,
 		 vadr+=bl;
 		 if((rcmd&(15<<28))==BT848_RISC_WRITE123)
 		 {
-		 	*((*rp)++)=(kvirt_to_bus(cbadr));
+		 	*((*rp)++)=cpu_to_le32(kvirt_to_bus(cbadr));
 		 	cbadr+=blcb;
 		 	*((*rp)++)=cpu_to_le32(kvirt_to_bus(cradr));
 		 	cradr+=blcr;
@@ -1175,7 +1177,7 @@ static int vgrab(struct bttv *btv, struct video_mmap *mp)
 	if(btv->gbuf[mp->frame].stat != GBUFFER_UNUSED)
 		return -EBUSY;
 		
-	if(mp->height < 32 || mp->width < 32)
+	if(mp->height < 32 || mp->width < 48)
 		return -EINVAL;
 	if (mp->format >= PALETTEFMT_MAX)
 		return -EINVAL;
@@ -1391,10 +1393,16 @@ static void bttv_close(struct video_device *dev)
 {
 	struct bttv *btv=(struct bttv *)dev;
  	unsigned long irq_flags;
+	int need_wait;
 
 	down(&btv->lock);
 	btv->user--;
 	spin_lock_irqsave(&btv->s_lock, irq_flags);
+	need_wait = (-1 != btv->gq_grab);
+	btv->gq_start = 0;
+	btv->gq_in = 0;
+	btv->gq_out = 0;
+	btv->gq_grab = -1;
 	btv->scr_on = 0;
 	btv->risc_cap_odd = 0;
 	btv->risc_cap_even = 0;
@@ -1410,7 +1418,7 @@ static void bttv_close(struct video_device *dev)
 
 	btread(BT848_I2C); 	/* This fixes the PCI posting delay */
 	
-	if (-1 != btv->gq_grab) {
+	if (need_wait) {
 		/*
 		 *	This is sucky but right now I can't find a good way to
 		 *	be sure its safe to free the buffer. We wait 5-6 fields
@@ -1504,7 +1512,7 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		b.audios = bttv_tvcards[btv->type].audio_inputs;
 		b.maxwidth = tvnorms[btv->win.norm].swidth;
 		b.maxheight = tvnorms[btv->win.norm].sheight;
-		b.minwidth = 32;
+		b.minwidth = 48;
 		b.minheight = 32;
 		if(copy_to_user(arg,&b,sizeof(b)))
 			return -EFAULT;
@@ -1717,13 +1725,11 @@ static int bttv_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	case VIDIOCGWIN:
 	{
 		struct video_window vw;
-		/* Oh for a COBOL move corresponding .. */
+		memset(&vw,0,sizeof(vw));
 		vw.x=btv->win.x;
 		vw.y=btv->win.y;
 		vw.width=btv->win.width;
 		vw.height=btv->win.height;
-		vw.chromakey=0;
-		vw.flags=0;
 		if(btv->win.interlace)
 			vw.flags|=VIDEO_WINDOW_INTERLACE;
 		if(copy_to_user(arg,&vw,sizeof(vw)))
@@ -2196,6 +2202,10 @@ static int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 	case VIDIOCGFREQ:
 	case VIDIOCSFREQ:
+	case VIDIOCGTUNER:
+	case VIDIOCSTUNER:
+	case VIDIOCGCHAN:
+	case VIDIOCSCHAN:
 	case BTTV_VERSION:
 		return bttv_ioctl(dev-2,cmd,arg);
 	case BTTV_VBISIZE:
@@ -2290,8 +2300,11 @@ static int radio_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 		if(v.tuner||btv->channel)	/* Only tuner 0 */
 			return -EINVAL;
 		strcpy(v.name, "Radio");
-		v.rangelow=(int)(76*16);	/* jp: 76.0MHz - 89.9MHz  */
-		v.rangehigh=(int)(108*16);	/* eu: 87.5MHz - 108.0MHz */
+		/* japan:          76.0 MHz -  89.9 MHz
+		   western europe: 87.5 MHz - 108.0 MHz
+		   russia:         65.0 MHz - 108.0 MHz */
+		v.rangelow=(int)(65*16);
+		v.rangehigh=(int)(108*16);
 		v.flags= 0; /* XXX */
 		v.mode = 0; /* XXX */
 		bttv_call_i2c_clients(btv,cmd,&v);
@@ -2441,20 +2454,22 @@ static void bt848_set_risc_jmps(struct bttv *btv, int flags)
 		bt848_dma(btv, 0);
 }
 
+# define do_video_register(dev,type,nr) video_register_device(dev,type,nr)
+
 static int __devinit init_video_dev(struct bttv *btv)
 {
 	audio(btv, AUDIO_MUTE, 1);
         
-	if(video_register_device(&btv->video_dev,VFL_TYPE_GRABBER,video_nr)<0)
+	if(do_video_register(&btv->video_dev,VFL_TYPE_GRABBER,video_nr)<0)
 		return -1;
-	if(video_register_device(&btv->vbi_dev,VFL_TYPE_VBI,vbi_nr)<0) 
+	if(do_video_register(&btv->vbi_dev,VFL_TYPE_VBI,vbi_nr)<0) 
         {
 	        video_unregister_device(&btv->video_dev);
 		return -1;
 	}
 	if (btv->has_radio)
 	{
-		if(video_register_device(&btv->radio_dev, VFL_TYPE_RADIO, radio_nr)<0) 
+		if(do_video_register(&btv->radio_dev, VFL_TYPE_RADIO, radio_nr)<0) 
                 {
 		        video_unregister_device(&btv->vbi_dev);
 		        video_unregister_device(&btv->video_dev);
@@ -2491,8 +2506,8 @@ static int __devinit init_bt848(struct bttv *btv)
 	btv->win.interlace=1;
 	btv->win.x=0;
 	btv->win.y=0;
-	btv->win.width=768; /* 640 */
-	btv->win.height=576; /* 480 */
+	btv->win.width=320;
+	btv->win.height=240;
 	btv->win.bpp=2;
 	btv->win.depth=16;
 	btv->win.color_fmt=BT848_COLOR_FMT_RGB16;
@@ -2542,9 +2557,6 @@ static int __devinit init_bt848(struct bttv *btv)
 
 	btv->fbuffer=NULL;
 
-	bt848_muxsel(btv, 1);
-	bt848_set_winsize(btv);
-
 /*	btwrite(0, BT848_TDEC); */
         btwrite(0x10, BT848_COLOR_CTL);
 	btwrite(0x00, BT848_CAP_CTL);
@@ -2574,8 +2586,13 @@ static int __devinit init_bt848(struct bttv *btv)
 	btwrite(/*BT848_ADC_SYNC_T|*/
 		BT848_ADC_RESERVED|BT848_ADC_CRUSH, BT848_ADC);
 
-	btwrite(BT848_CONTROL_LDEC, BT848_E_CONTROL);
-	btwrite(BT848_CONTROL_LDEC, BT848_O_CONTROL);
+	if (lumafilter) {
+		btwrite(0, BT848_E_CONTROL);
+		btwrite(0, BT848_O_CONTROL);
+	} else {
+		btwrite(BT848_CONTROL_LDEC, BT848_E_CONTROL);
+		btwrite(BT848_CONTROL_LDEC, BT848_O_CONTROL);
+	}
 
 	btv->picture.colour=254<<7;
 	btv->picture.brightness=128<<8;
@@ -2599,6 +2616,8 @@ static int __devinit init_bt848(struct bttv *btv)
 		BT848_INT_FMTCHG|BT848_INT_HLOCK,
 		BT848_INT_MASK);
 
+	bt848_muxsel(btv, 1);
+	bt848_set_winsize(btv);
 	make_vbitab(btv);
 	spin_lock_irqsave(&btv->s_lock, irq_flags);
 	bt848_set_risc_jmps(btv,-1);
@@ -2749,7 +2768,7 @@ static void bttv_irq(int irq, void *dev_id, struct pt_regs * regs)
 				wake_up_interruptible(&btv->capq);
 				break;
 			}
-			if (stat&(8<<28)) 
+			if (stat&(8<<28) && btv->gq_start) 
 			{
 				spin_lock(&btv->s_lock);
 				btv->gq_start = 0;

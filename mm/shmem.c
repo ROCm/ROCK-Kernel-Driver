@@ -754,18 +754,8 @@ static int shmem_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_type = TMPFS_MAGIC;
 	buf->f_bsize = PAGE_CACHE_SIZE;
 	spin_lock (&sb->u.shmem_sb.stat_lock);
-	if (sb->u.shmem_sb.max_blocks == ULONG_MAX) {
-		/*
-		 * This is only a guestimate and not honoured.
-		 * We need it to make some programs happy which like to
-		 * test the free space of a file system.
-		 */
-		buf->f_bavail = buf->f_bfree = nr_free_pages() + nr_swap_pages + atomic_read(&buffermem_pages);
-		buf->f_blocks = buf->f_bfree + ULONG_MAX - sb->u.shmem_sb.free_blocks;
-	} else {
-		buf->f_blocks = sb->u.shmem_sb.max_blocks;
-		buf->f_bavail = buf->f_bfree = sb->u.shmem_sb.free_blocks;
-	}
+	buf->f_blocks = sb->u.shmem_sb.max_blocks;
+	buf->f_bavail = buf->f_bfree = sb->u.shmem_sb.free_blocks;
 	buf->f_files = sb->u.shmem_sb.max_inodes;
 	buf->f_ffree = sb->u.shmem_sb.free_inodes;
 	spin_unlock (&sb->u.shmem_sb.stat_lock);
@@ -1013,17 +1003,11 @@ static int shmem_parse_options(char *options, int *mode, unsigned long * blocks,
 	return 0;
 }
 
-static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)
+static int shmem_set_size(struct shmem_sb_info *info,
+			  unsigned long max_blocks, unsigned long max_inodes)
 {
 	int error;
-	unsigned long max_blocks, blocks;
-	unsigned long max_inodes, inodes;
-	struct shmem_sb_info *info = &sb->u.shmem_sb;
-
-	max_blocks = info->max_blocks;
-	max_inodes = info->max_inodes;
-	if (shmem_parse_options (data, NULL, &max_blocks, &max_inodes))
-		return -EINVAL;
+	unsigned long blocks, inodes;
 
 	spin_lock(&info->stat_lock);
 	blocks = info->max_blocks - info->free_blocks;
@@ -1043,6 +1027,17 @@ out:
 	return error;
 }
 
+static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)
+{
+	struct shmem_sb_info *info = &sb->u.shmem_sb;
+	unsigned long max_blocks = info->max_blocks;
+	unsigned long max_inodes = info->max_inodes;
+
+	if (shmem_parse_options (data, NULL, &max_blocks, &max_inodes))
+		return -EINVAL;
+	return shmem_set_size(info, max_blocks, max_inodes);
+}
+
 int shmem_sync_file(struct file * file, struct dentry *dentry, int datasync)
 {
 	return 0;
@@ -1053,9 +1048,16 @@ static struct super_block *shmem_read_super(struct super_block * sb, void * data
 {
 	struct inode * inode;
 	struct dentry * root;
-	unsigned long blocks = ULONG_MAX;	/* unlimited */
-	unsigned long inodes = ULONG_MAX;	/* unlimited */
+	unsigned long blocks, inodes;
 	int mode   = S_IRWXUGO | S_ISVTX;
+	struct sysinfo si;
+
+	/*
+	 * Per default we only allow half of the physical ram per
+	 * tmpfs instance
+	 */
+	si_meminfo(&si);
+	blocks = inodes = si.totalram / 2;
 
 #ifdef CONFIG_TMPFS
 	if (shmem_parse_options (data, &mode, &blocks, &inodes)) {
@@ -1179,6 +1181,10 @@ static int __init init_shmem_fs(void)
 		unregister_filesystem(&tmpfs_fs_type);
 		return PTR_ERR(res);
 	}
+
+	/* The internal instance should not do size checking */
+	if ((error = shmem_set_size(&res->mnt_sb->u.shmem_sb, ULONG_MAX, ULONG_MAX)))
+		printk (KERN_ERR "could not set limits on internal tmpfs\n");
 
 	return 0;
 }

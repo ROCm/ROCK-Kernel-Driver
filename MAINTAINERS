@@ -106,6 +106,13 @@ M:	p_gortmaker@yahoo.com
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+A2232 SERIAL BOARD DRIVER
+P:      Enver Haase
+M:      ehaase@inf.fu-berlin.de
+M:      A2232@gmx.net
+L:      linux-m68k@lists.linux-m68k.org
+S:      Maintained
+
 ACENIC DRIVER
 P:	Jes Sorensen
 M:	jes@trained-monkey.org

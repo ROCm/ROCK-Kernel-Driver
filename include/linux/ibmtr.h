@@ -169,7 +169,7 @@ typedef enum {	CLOSED,	OPEN } open_state;
 
 struct tok_info {
 	unsigned char irq;
-	__u32 mmio;
+	void *mmio;
 	unsigned char hw_address[32];
 	unsigned char adapter_type;
 	unsigned char data_rate;

@@ -1,7 +1,7 @@
 /*
- * $Id: usbkbd.c,v 1.16 2000/08/14 21:05:26 vojtech Exp $
+ * $Id: usbkbd.c,v 1.20 2001/04/26 08:34:49 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  USB HIDBP Keyboard support
  *
@@ -249,7 +249,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 			
 	input_register_device(&kbd->dev);
 
-	printk(KERN_INFO "input%d: %s on on usb%d:%d.%d\n",
+	printk(KERN_INFO "input%d: %s on usb%d:%d.%d\n",
 		 kbd->dev.number, kbd->name, dev->bus->busnum, dev->devnum, ifnum);
 
 	return kbd;

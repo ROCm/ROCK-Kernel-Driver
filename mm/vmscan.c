@@ -641,7 +641,7 @@ page_active:
 		/* We only do a few "out of order" flushes. */
 		maxlaunder = MAX_LAUNDER;
 		/* Kflushd takes care of the rest. */
-		wakeup_bdflush(0);
+		wakeup_bdflush();
 		goto dirty_page_rescan;
 	}
 

@@ -6,7 +6,8 @@
  */
 
 #include <asm/ccwcache.h>
-#include <asm/dasd.h>
+#include "dasd_int.h"
+#include "dasd_9336_erp.h"
 
 #ifdef PRINTK_HEADER
 #undef PRINTK_HEADER
@@ -29,15 +30,12 @@
  *   dasd_era_fatal     for all fatal (unrecoverable errors)
  *   dasd_era_recover   for all others.
  */
-dasd_era_t
-dasd_9336_erp_examine (ccw_req_t * cqr, devstat_t * stat)
+dasd_era_t dasd_9336_erp_examine (ccw_req_t * cqr, devstat_t * stat)
 {
-	char *sense = stat->ii.sense.data;
-
 	/* check for successful execution first */
 	if (stat->cstat == 0x00 &&
 	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
-		return dasd_era_none;
+		    return dasd_era_none;
 
 	/* examine the 24 byte sense data */
 	return dasd_era_recover;

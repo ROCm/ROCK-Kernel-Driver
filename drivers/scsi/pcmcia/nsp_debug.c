@@ -3,10 +3,10 @@
       By: YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>
 
     This software may be used and distributed according to the terms of
-    the GNU General Public License.
+    the GNU Public License.
 =========================================================================*/
 
-/* $Id: nsp_debug.c,v 1.5 2001/02/08 08:08:58 elca Exp $ */
+/* $Id: nsp_debug.c,v 1.6 2001/07/04 14:43:53 elca Exp $ */
 
 /*
  * Show the command data of a command
@@ -193,3 +193,16 @@ static void show_busphase(unsigned char stat)
 		break;
 	}
 }
+
+static void show_message(nsp_hw_data *data)
+{
+	int i;
+
+	printk(KERN_DEBUG "msg:");
+	for(i=0; i < data->MsgLen; i++) {
+		printk(" %02x", data->MsgBuffer[i]);
+	}
+	printk("\n");
+}
+
+/* end */

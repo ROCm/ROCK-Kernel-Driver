@@ -884,8 +884,6 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 	if (!tty || !info->xmit_buf || !mxvar_tmp_buf)
 		return (0);
 
-	if (from_user)
-		down(&mxvar_tmp_buf_sem);
 	save_flags(flags);
 	if (from_user) {
 		down(&mxvar_tmp_buf_sem);

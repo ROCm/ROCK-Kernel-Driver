@@ -351,5 +351,6 @@
 
 #define BT878_DEVCTRL 0x40
 #define BT878_EN_TBFX 0x02
+#define BT878_EN_VSFX 0x04
 
 #endif

@@ -21,8 +21,7 @@ CONFIG_I2C=m
 CONFIG_I2C_ALGOBIT=m
 CONFIG_VIDEO_DEV=m
 
-The latest bttv version is available here:
-	http://www.strusel007.de/linux/bttv/
+The latest bttv version is available from http://bytesex.org/bttv/
 
 You'll find Ralphs original (mostly outdated) documentation in the
 ralphs-doc subdirectory.

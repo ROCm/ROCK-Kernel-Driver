@@ -762,8 +762,17 @@ static int sd_init_onedisk(int i)
 	 */
 
 	SRpnt = scsi_allocate_request(rscsi_disks[i].device);
+	if (!SRpnt) {
+		printk(KERN_WARNING "(sd_init_onedisk:) Request allocation failure.\n");
+		return i;
+	}
 
 	buffer = (unsigned char *) scsi_malloc(512);
+	if (!buffer) {
+		printk(KERN_WARNING "(sd_init_onedisk:) Memory allocation failure.\n");
+		scsi_release_request(SRpnt);
+		return i;
+	}
 
 	spintime = 0;
 

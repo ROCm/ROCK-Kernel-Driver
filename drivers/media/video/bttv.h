@@ -72,9 +72,15 @@
 #define BTTV_EAGLE         0x33
 #define BTTV_PINNACLEPRO   0x34
 #define BTTV_TVIEW_RDS_FM  0x35
-#define BTTV_LIVETEC_9415  0x36
+#define BTTV_LIFETEC_9415  0x36
 #define BTTV_BESTBUY_EASYTV 0x37
 #define BTTV_FLYVIDEO_98FM 0x38
+#define BTTV_GMV1          0x3d
+#define BTTV_BESTBUY_EASYTV2 0x3e
+#define BTTV_ATI_TVWONDER  0x3f
+#define BTTV_ATI_TVWONDERVE 0x40
+#define BTTV_FLYVIDEO2000   0x41
+#define BTTV_TERRATVALUER   0x42
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -190,15 +196,12 @@ extern wait_queue_head_t* bttv_get_gpio_queue(unsigned int card);
 
 /* i2c */
 #define I2C_CLIENTS_MAX 8
-extern struct i2c_algo_bit_data bttv_i2c_algo_template;
-extern struct i2c_adapter bttv_i2c_adap_template;
-extern struct i2c_client bttv_i2c_client_template;
 extern void bttv_bit_setscl(void *data, int state);
 extern void bttv_bit_setsda(void *data, int state);
 extern void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg);
 extern int bttv_I2CRead(struct bttv *btv, unsigned char addr, char *probe_for);
 extern int bttv_I2CWrite(struct bttv *btv, unsigned char addr, unsigned char b1,
-	     unsigned char b2, int both);
+			 unsigned char b2, int both);
 extern void bttv_readee(struct bttv *btv, unsigned char *eedata, int addr);
 
 #endif /* _BTTV_H_ */

@@ -49,7 +49,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/module.h>
@@ -361,7 +361,7 @@ static void ibmtr_config(dev_link_t *link)
     mem.CardOffset = mmiobase;
     mem.Page = 0;
     CS_CHECK(MapMemPage, link->win, &mem);
-    ti->mmio = (u_long)ioremap(req.Base, req.Size);
+    ti->mmio = ioremap(req.Base, req.Size);
 
     /* Allocate the SRAM memory window */
     req.Attributes = WIN_DATA_WIDTH_16|WIN_MEMORY_TYPE_CM|WIN_ENABLE;

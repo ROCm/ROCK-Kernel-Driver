@@ -27,7 +27,7 @@
 #include <linux/netdevice.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <linux/serial_reg.h>
@@ -331,8 +331,8 @@ static int ali_ircc_open(int i, chipio_t *info)
 	self->tx_buff.head = (__u8 *) kmalloc(self->tx_buff.truesize, 
 					      GFP_KERNEL|GFP_DMA); 
 	if (self->tx_buff.head == NULL) {
-		kfree(self);
 		kfree(self->rx_buff.head);
+		kfree(self);
 		return -ENOMEM;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);

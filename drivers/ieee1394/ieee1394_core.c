@@ -353,7 +353,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         }
 
         if (ackcode != ACK_PENDING || !packet->expect_response) {
-                packet->state = complete;
+                packet->state = completed;
                 up(&packet->state_change);
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -506,7 +506,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
                 break;
         }
 
-        packet->state = complete;
+        packet->state = completed;
         up(&packet->state_change);
         run_task_queue(&packet->complete_tq);
 }
@@ -726,7 +726,7 @@ void abort_requests(struct hpsb_host *host)
         while (lh != &llist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
                 lh = lh->next;
-                packet->state = complete;
+                packet->state = completed;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);
@@ -771,7 +771,7 @@ void abort_timedouts(struct hpsb_host *host)
         while (lh != &expiredlist) {
                 packet = list_entry(lh, struct hpsb_packet, list);
                 lh = lh->next;
-                packet->state = complete;
+                packet->state = completed;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
                 run_task_queue(&packet->complete_tq);

@@ -1034,7 +1034,7 @@ static void main_command_interrupt(void)
 }
 
 /* waits for a delay (spinup or select) to pass */
-static int wait_for_completion(unsigned long delay, timeout_fn function)
+static int fd_wait_for_completion(unsigned long delay, timeout_fn function)
 {
 	if (FDCS->reset){
 		reset_fdc(); /* do the reset during sleep to win time
@@ -1392,7 +1392,7 @@ static int fdc_dtr(void)
 	 * Pause 5 msec to avoid trouble. (Needs to be 2 jiffies)
 	 */
 	FDCS->dtr = raw_cmd->rate & 3;
-	return(wait_for_completion(jiffies+2UL*HZ/100,
+	return(fd_wait_for_completion(jiffies+2UL*HZ/100,
 				   (timeout_fn) floppy_ready));
 } /* fdc_dtr */
 
@@ -1509,7 +1509,7 @@ static void setup_rw_floppy(void)
 			function = (timeout_fn) setup_rw_floppy;
 
 		/* wait until the floppy is spinning fast enough */
-		if (wait_for_completion(ready_date,function))
+		if (fd_wait_for_completion(ready_date,function))
 			return;
 	}
 	dflags = DRS->flags;
@@ -1939,7 +1939,7 @@ static int start_motor(void (*function)(void) )
 	set_dor(fdc, mask, data);
 
 	/* wait_for_completion also schedules reset if needed. */
-	return(wait_for_completion(DRS->select_date+DP->select_delay,
+	return(fd_wait_for_completion(DRS->select_date+DP->select_delay,
 				   (timeout_fn) function));
 }
 

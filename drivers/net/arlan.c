@@ -1435,7 +1435,7 @@ extern inline void arlan_queue_retransmit(struct net_device *dev)
 	ARLAN_DEBUG_EXIT("arlan_queue_retransmit");
 };
 
-extern inline void RetryOrFail(struct net_device *dev)
+static inline void RetryOrFail(struct net_device *dev)
 {
 	struct arlan_private *priv = ((struct arlan_private *) dev->priv);
 

@@ -118,9 +118,9 @@ static unsigned int addresses[7] __initdata =
 static int irqs[4] __initdata = {3, 4, 5, 9};
 
 /* From the D-Link ADF file: */
-static unsigned int dlink_addresses[4]=
+static unsigned int dlink_addresses[4] __initdata =
                 {0x300, 0x320, 0x340, 0x360};
-static int dlink_irqs[8] = {3, 4, 5, 9, 10, 11, 14, 15};
+static int dlink_irqs[8] __initdata = {3, 4, 5, 9, 10, 11, 14, 15};
 
 struct ne2_adapters_t {
 	unsigned int	id;
@@ -165,7 +165,7 @@ static void ne_block_output(struct net_device *dev, const int count,
  *
  */
 
-static void dlink_put_eeprom(unsigned char value, unsigned int addr)
+static void __init dlink_put_eeprom(unsigned char value, unsigned int addr)
 {
 	int z;
 	unsigned char v1, v2;
@@ -186,7 +186,7 @@ static void dlink_put_eeprom(unsigned char value, unsigned int addr)
 	}
 }
 
-static void dlink_send_eeprom_bit(unsigned int bit, unsigned int addr)
+static void __init dlink_send_eeprom_bit(unsigned int bit, unsigned int addr)
 {
 	/* shift data bit into correct position */
 
@@ -200,7 +200,7 @@ static void dlink_send_eeprom_bit(unsigned int bit, unsigned int addr)
 	dlink_put_eeprom(0x09 | bit, addr);
 }
 
-static void dlink_send_eeprom_word(unsigned int value, unsigned int len, unsigned int addr)
+static void __init dlink_send_eeprom_word(unsigned int value, unsigned int len, unsigned int addr)
 {
 	int z;
 
@@ -216,7 +216,7 @@ static void dlink_send_eeprom_word(unsigned int value, unsigned int len, unsigne
 	}
 }
 
-static unsigned int dlink_get_eeprom(unsigned int eeaddr, unsigned int addr)
+static unsigned int __init dlink_get_eeprom(unsigned int eeaddr, unsigned int addr)
 {
 	int z;
 	unsigned int value = 0;

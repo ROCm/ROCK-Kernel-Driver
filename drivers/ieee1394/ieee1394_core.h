@@ -24,11 +24,11 @@ struct hpsb_packet {
         /* Okay, this is core internal and a no care for hosts.
          * queued   = queued for sending
          * pending  = sent, waiting for response
-         * complete = processing completed, successful or not
+         * completed = processing completed, successful or not
          * incoming = incoming packet
          */
         enum { 
-                unused, queued, pending, complete, incoming 
+                unused, queued, pending, completed, incoming 
         } __attribute__((packed)) state;
 
         /* These are core internal. */

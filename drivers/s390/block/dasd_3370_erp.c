@@ -6,8 +6,9 @@
  */
 
 #include <asm/ccwcache.h>
-#include <asm/dasd.h>
 
+#include "dasd_int.h"
+#include "dasd_3370_erp.h"
 #ifdef PRINTK_HEADER
 #undef PRINTK_HEADER
 #define PRINTK_HEADER "dasd_erp(3370)"
@@ -29,7 +30,7 @@
  *   dasd_era_fatal     for all fatal (unrecoverable errors)
  *   dasd_era_recover   for all others.
  */
-dasd_era_t
+dasd_era_t 
 dasd_3370_erp_examine (ccw_req_t * cqr, devstat_t * stat)
 {
 	char *sense = stat->ii.sense.data;
@@ -37,7 +38,7 @@ dasd_3370_erp_examine (ccw_req_t * cqr, devstat_t * stat)
 	/* check for successful execution first */
 	if (stat->cstat == 0x00 &&
 	    stat->dstat == (DEV_STAT_CHN_END | DEV_STAT_DEV_END))
-		return dasd_era_none;
+		    return dasd_era_none;
 	if (sense[0] & 0x80) {	/* CMD reject */
 		return dasd_era_fatal;
 	}

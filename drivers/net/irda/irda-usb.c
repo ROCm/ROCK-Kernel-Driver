@@ -33,7 +33,7 @@
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/rtnetlink.h>
 #include <linux/usb.h>
 

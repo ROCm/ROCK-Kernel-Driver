@@ -1775,8 +1775,8 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					Ivec[hwcfg.irq].used = 1;
 			}
 
-			if (hwcfg.vector_latch) {
-				if (!request_region(Vector_Latch, 1, "scc vector latch"))
+			if (hwcfg.vector_latch && !Vector_Latch) {
+				if (!request_region(hwcfg.vector_latch, 1, "scc vector latch"))
 					printk(KERN_WARNING "z8530drv: warning, cannot reserve vector latch port 0x%lx\n, disabled.", hwcfg.vector_latch);
 				else
 					Vector_Latch = hwcfg.vector_latch;

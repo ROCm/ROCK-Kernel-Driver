@@ -109,6 +109,29 @@ out =	_out_put bits of the data register (BT848_GPIO_DATA),
 in  = 	_in_put bits of the data register,
 	i.e. BT848_GPIO_DATA & ~BT848_GPIO_OUT_EN
 
+
+
+Other elements of the tvcards array
+===================================
+
+If you are trying to make a new card work you might find it useful to
+know what the other elements in the tvcards array are good for:
+
+video_inputs    - # of video inputs the card has
+audio_inputs    - historical cruft, not used any more.
+tuner           - which input is the tuner
+svhs            - which input is svhs (all others are labled composite)
+muxsel          - video mux, input->registervalue mapping
+pll             - same as pll= insmod option
+tuner_type      - same as tuner= insmod option
+*_modulename    - hint whenever some card needs this or that audio
+                  module loaded to work properly.
+
+If some config item is specified both from the tvcards array and as
+insmod option, the insmod option takes precedence.
+
+
+
 Good luck,
 
   Gerd
@@ -117,4 +140,4 @@ Good luck,
 PS: If you have a new working entry, mail it to me.
 
 -- 
-Gerd Knorr <kraxel@goldbach.in-berlin.de>
+Gerd Knorr <kraxel@bytesex.org>

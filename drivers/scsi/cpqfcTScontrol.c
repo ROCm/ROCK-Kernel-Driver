@@ -42,11 +42,7 @@
 #include <linux/unistd.h>
 #include <asm/io.h>  // struct pt_regs for IRQ handler & Port I/O
 #include <asm/irq.h>
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,18)
-#include <asm/spinlock.h>
-#else
 #include <linux/spinlock.h>
-#endif
 
 #include "sd.h"
 #include "hosts.h"   // Scsi_Host definition for INT handler

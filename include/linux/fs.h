@@ -1316,7 +1316,7 @@ static inline void bforget(struct buffer_head *buf)
 }
 extern void set_blocksize(kdev_t, int);
 extern struct buffer_head * bread(kdev_t, int, int);
-extern void wakeup_bdflush(int wait);
+extern void wakeup_bdflush(void);
 
 extern int brw_page(int, struct page *, kdev_t, int [], int);
 
@@ -1342,7 +1342,7 @@ extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, read_actor_t);
-
+extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
 
 extern struct file_operations generic_ro_fops;

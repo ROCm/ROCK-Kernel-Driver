@@ -180,7 +180,7 @@ extern int * max_segments[MAX_BLKDEV];
 #define PageAlignSize(size) (((size) + PAGE_SIZE -1) & PAGE_MASK)
 
 /* read-ahead in pages.. */
-#define MAX_READAHEAD	127
+#define MAX_READAHEAD	31
 #define MIN_READAHEAD	3
 
 #define blkdev_entry_to_request(entry) list_entry((entry), struct request, queue)

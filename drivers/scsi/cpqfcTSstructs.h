@@ -29,9 +29,9 @@
                          for( wait_time=jiffies + (secs*HZ); \
 		         wait_time > jiffies ;) ; }
 #define CPQFCTS_DRIVER_VER(maj,min,submin) ((maj<<16)|(min<<8)|(submin))
-#define VER_MAJOR 1
-#define VER_MINOR 3
-#define VER_SUBMINOR 4
+#define VER_MAJOR 2
+#define VER_MINOR 0
+#define VER_SUBMINOR 2
 
 // Macros for kernel (esp. SMP) tracing using a PCI analyzer
 // (e.g. x86).
@@ -225,6 +225,7 @@ typedef __u8 BOOLEAN;
 #define ELS_RJT 0x1000000
 #define SCSI_REPORT_LUNS 0x0A0
 #define REPORT_LUNS 0xA0 // SCSI-3 command op-code
+#define FCP_TARGET_RESET 0x200
 
 #define ELS_LILP_FRAME 0x00000711 // 1st payload word of LILP frame
 

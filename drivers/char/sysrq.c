@@ -26,7 +26,6 @@
 
 #include <asm/ptrace.h>
 
-extern void wakeup_bdflush(int);
 extern void reset_vc(unsigned int);
 extern struct list_head super_blocks;
 
@@ -99,12 +98,12 @@ void handle_sysrq(int key, struct pt_regs *pt_regs,
 	case 's':					    /* S -- emergency sync */
 		printk("Emergency Sync\n");
 		emergency_sync_scheduled = EMERG_SYNC;
-		wakeup_bdflush(0);
+		wakeup_bdflush();
 		break;
 	case 'u':					    /* U -- emergency remount R/O */
 		printk("Emergency Remount R/O\n");
 		emergency_sync_scheduled = EMERG_REMOUNT;
-		wakeup_bdflush(0);
+		wakeup_bdflush();
 		break;
 	case 'p':					    /* P -- show PC */
 		printk("Show Regs\n");

@@ -141,7 +141,8 @@ struct serial_uart_config {
 					     --- no longer used */
 #define ASYNC_CONS_FLOW		0x00800000 /* flow control for console  */
 
-#define ASYNC_INTERNAL_FLAGS	0xFF800000 /* Internal flags */
+#define ASYNC_BOOT_ONLYMCA	0x00400000 /* Probe only if MCA bus */
+#define ASYNC_INTERNAL_FLAGS	0xFFC00000 /* Internal flags */
 
 /*
  * Multiport serial configuration structure --- external structure

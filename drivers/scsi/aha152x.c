@@ -624,7 +624,7 @@ static void msgi_end(struct Scsi_Host *shpnt);
 static void parerr_run(struct Scsi_Host *shpnt);
 static void rsti_run(struct Scsi_Host *shpnt);
 
-static void complete(struct Scsi_Host *shpnt);
+static void is_complete(struct Scsi_Host *shpnt);
 
 /*
  * driver states
@@ -1869,7 +1869,7 @@ static void run(void)
 		struct Scsi_Host *shpnt = aha152x_host[i];
 		if (shpnt && HOSTDATA(shpnt)->service) {
 			HOSTDATA(shpnt)->service=0;
-			complete(shpnt);
+			is_complete(shpnt);
 		}
 	}
 }
@@ -2935,7 +2935,7 @@ static void rsti_run(struct Scsi_Host *shpnt)
  * bottom-half handler
  *
  */
-static void complete(struct Scsi_Host *shpnt)
+static void is_complete(struct Scsi_Host *shpnt)
 {
 	int dataphase;
 	unsigned long flags;

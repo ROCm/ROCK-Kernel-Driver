@@ -80,7 +80,7 @@ Each entry consists of:
 	class_mask	of the class are honored during the comparison.
 	driver_data	Data private to the driver.
 
-When the driver exits, it just calls pci_deregister_driver() and the PCI layer
+When the driver exits, it just calls pci_unregister_driver() and the PCI layer
 automatically calls the remove hook for all devices handled by the driver.
 
 Please mark the initialization and cleanup functions where appropriate

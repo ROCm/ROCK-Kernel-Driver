@@ -6,11 +6,11 @@
     Ver 0.1 : Initial version.
 
     This software may be used and distributed according to the terms of
-    the GNU General Public License.
+    the GNU Public License.
 
 =========================================================*/
 
-/* $Id: nsp_cs.h,v 1.18 2001/02/09 04:42:19 elca Exp $ */
+/* $Id: nsp_cs.h,v 1.21 2001/07/04 14:45:31 elca Exp $ */
 
 #ifndef  __nsp_cs__
 #define  __nsp_cs__
@@ -37,6 +37,8 @@
 
 /* SCSI initiator must be 7 */
 #define SCSI_INITIATOR_ID  7
+
+#define NSP_SELTIMEOUT 200
 
 /* base register */
 #define	IRQCONTROL	0x00
@@ -239,9 +241,9 @@ typedef struct _nsp_data {
 	Scsi_Cmnd    *CurrentSC;
 
 	int           FifoCount;
-#if (KERNEL_VERSION(2,4,0) > LINUX_VERSION_CODE)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 	int           Residual;
-#define RESID nsp_data.Residual
+#define RESID data->Residual
 #else
 #define RESID SCpnt->resid
 #endif
@@ -256,21 +258,30 @@ typedef struct _nsp_data {
 } nsp_hw_data;
 
 
-static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt);
-static void nsp_start_timer(Scsi_Cmnd *SCpnt, int time);
+static unsigned int nsphw_start_selection(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
+static void nsp_start_timer(Scsi_Cmnd *SCpnt, nsp_hw_data *data, int time);
 
+static int nsp_eh_abort(Scsi_Cmnd * SCpnt);
+static int nsp_eh_device_reset(Scsi_Cmnd *SCpnt);
 static int nsp_eh_bus_reset(Scsi_Cmnd *SCpnt);
+static int nsp_eh_host_reset(Scsi_Cmnd *SCpnt);
 
 static int nsp_fifo_count(Scsi_Cmnd *SCpnt);
-static void nsp_pio_read(Scsi_Cmnd *SCpnt);
-static int nsp_nexus(Scsi_Cmnd *SCpnt);
+static void nsp_pio_read(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
+static int nsp_nexus(Scsi_Cmnd *SCpnt, nsp_hw_data *data);
 
 #ifdef PCMCIA_DEBUG
 # ifdef DBG_SHOWCOMMAND
 static void show_command(Scsi_Cmnd *ptr);
 static void show_phase(Scsi_Cmnd *SCpnt);
 static void show_busphase(unsigned char stat);
+static void show_message(nsp_hw_data *data);
 # endif /* DBG_SHOWCOMMAND */
+#else
+# define show_command(ptr)   /* */
+# define show_phase(SCpnt)   /* */
+# define show_busphase(stat) /* */
+# define show_message(data)  /* */
 #endif
 
 /*
@@ -297,6 +308,11 @@ enum _data_in_out {
 };
 
 
-#define NSP_SELTIMEOUT 200
+/* SCSI messaage */
+#define MSG_COMMAND_COMPLETE 0x00
+#define MSG_EXTENDED         0x01
+#define MSG_NO_OPERATION     0x08
+
+#define MSG_EXT_SDTR         0x01
 
 #endif  /*__nsp_cs__*/

@@ -13,6 +13,9 @@ bttv.o
 		triton1=0/1     for Triton1 compatibility
 				Triton1 is automatically recognized
 				but this might also help with other chipsets
+		vsfx=0/1	yet another chipset bug compatibility flag
+				(bt878 docs mentiones via+sis, but no
+				specific chipsets with that problem).
 		bigendian=n	Set the endianness of the gfx framebuffer.
 				Default is native endian.
 		fieldnr=0/1	Count fields.  Some TV descrambling software

@@ -292,8 +292,8 @@ drm_agp_head_t *drm_agp_init(void)
 		case ALI_M1651: 	head->chipset = "ALi M1651";	 break;
 		case SVWRKS_GENERIC:	head->chipset = "Serverworks Generic";
 			break;
-		case SVWRKS_HE: 	head->chipset = "Serverworks HE";
-		case SVWRKS_LE: 	head->chipset = "Serverworks LE";
+		case SVWRKS_HE: 	head->chipset = "Serverworks HE"; break;
+		case SVWRKS_LE: 	head->chipset = "Serverworks LE"; break;
 
 		default:		head->chipset = "Unknown";       break;
 		}

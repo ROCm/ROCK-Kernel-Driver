@@ -1337,21 +1337,10 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 		cmd->segment_cnt = cpu_to_le16(1); /* Shouldn't this be 0? */
 	}
 
-	switch (Cmnd->cmnd[0]) {
-	case TEST_UNIT_READY:
-	case START_STOP:
-	        break;
-	case WRITE_10:
-	case WRITE_6:
-	case WRITE_BUFFER:
-	case MODE_SELECT:
+	if (Cmnd->sc_data_direction == SCSI_DATA_WRITE)
 		cmd->control_flags = cpu_to_le16(CFLAG_WRITE);
-		break;
-	default:
+	else 
 		cmd->control_flags = cpu_to_le16(CFLAG_READ);
-		break;
-	}
-
 
 	if (Cmnd->device->tagged_supported) {
 		if ((jiffies - hostdata->tag_ages[Cmnd->target]) > (2 * SCSI_TIMEOUT)) {
@@ -1870,6 +1859,11 @@ static int isp2x00_reset_hardware(struct Scsi_Host *host)
 
 	hostdata = (struct isp2x00_hostdata *) host->hostdata;
 
+	/*
+	 *	This cannot be right - PCI writes are posted
+	 *	(apparently this is hardware design flaw not software ?)
+	 */
+	 
 	outw(0x01, host->io_port + ISP_CTRL_STATUS);
 	udelay(100);
 	outw(HCCR_RESET, host->io_port + HOST_HCCR);

@@ -5,6 +5,8 @@
  * This driver will not complain if used with any 
  * other i2c device with the same address.
  *
+ * Muting and tone control by Jonathan Isom <jisom@ematic.com>
+ *
  * Copyright (c) 2000 Eric Sandeen <eric_sandeen@bigfoot.com>
  * This code is placed under the terms of the GNU General Public License
  * Based on tda9855.c by Steve VanDeBogart (vandebo@uclink.berkeley.edu)
@@ -16,18 +18,21 @@
  *
  * loudness - set between 0 and 15 for varying degrees of loudness effect
  *
- * TODO:
- *  Implement tone controls
  *
+ *
+ *  Revision: 0.6 - added tone controls
+ *  Revision: 0.5 - Fixed odd balance problem
+ *  Revision: 0.4 - added muting
  *  Revision: 0.3 - Fixed silly reversed volume controls.  :)
  *  Revision: 0.2 - Cleaned up #defines
  *			fixed volume control
- *                  Added I2C_DRIVERID_TDA7432
+ *          Added I2C_DRIVERID_TDA7432
  *			added loudness insmod control
  *  Revision: 0.1 - initial version
  */
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
@@ -75,7 +80,7 @@ struct tda7432 {
 	int addr;
 	int input;
 	int volume;
-	int tone;
+	int bass, treble;
 	int lf, lr, rf, rr;
 	int loud;
 	struct i2c_client c;
@@ -121,7 +126,7 @@ static struct i2c_client client_template;
 /* Bits 0,1,2 control input:
  * 0x00 - Stereo input
  * 0x02 - Mono input
- * 0x03 - Mute
+ * 0x03 - Mute  (Using Attenuators Plays better with modules)
  * Mono probably isn't used - I'm guessing only the stereo
  * input is connected on most cards, so we'll set it to stereo.
  * 
@@ -133,7 +138,6 @@ static struct i2c_client client_template;
  
 #define TDA7432_STEREO_IN	0
 #define TDA7432_MONO_IN		2	/* Probably won't be used */
-#define TDA7432_MUTE		3	/* Probably won't be used */
 #define TDA7432_BASS_SYM	1 << 3
 #define TDA7432_BASS_NORM	1 << 4
 
@@ -178,7 +182,7 @@ static struct i2c_client client_template;
 #define TDA7432_TREBLE_0DB		0xf 
 #define TDA7432_TREBLE			7
 #define TDA7432_TREBLE_GAIN		1 << 3
-#define TDA7432_BASS_0DB		0xf << 4
+#define TDA7432_BASS_0DB		0xf
 #define TDA7432_BASS			7 << 4
 #define TDA7432_BASS_GAIN		1 << 7
 
@@ -200,6 +204,7 @@ static struct i2c_client client_template;
  */
 
 #define TDA7432_ATTEN_0DB	0x00
+#define TDA7432_MUTE        0x1 << 5
 
 
 /* Subaddress 0x07 - Loudness Control */
@@ -257,18 +262,19 @@ static int tda7432_set(struct i2c_client *client)
 	d2printk("tda7432: In tda7432_set\n");
 	
 	dprintk(KERN_INFO 
-		"tda7432: 7432_set(0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x)\n",
-		t->input,t->volume,t->tone,t->lf,t->lr,t->rf,t->rr,t->loud);
+		"tda7432: 7432_set(0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x)\n",
+		t->input,t->volume,t->bass,t->treble,t->lf,t->lr,t->rf,t->rr,t->loud);
 	buf[0]  = TDA7432_IN;
 	buf[1]  = t->input;
 	buf[2]  = t->volume;
-	buf[3]  = t->tone;
-	buf[4]  = t->lf;
-	buf[5]  = t->lr;
-	buf[6]  = t->rf;
-	buf[7]  = t->rr;
-	buf[8]  = t->loud;
-	if (9 != i2c_master_send(client,buf,9)) {
+	buf[3]  = t->bass;
+	buf[4]	= t->treble;
+	buf[5]  = t->lf;
+	buf[6]  = t->lr;
+	buf[7]  = t->rf;
+	buf[8]  = t->rr;
+	buf[9]  = t->loud;
+	if (10 != i2c_master_send(client,buf,10)) {
 		printk(KERN_WARNING "tda7432: I/O error, trying tda7432_set\n");
 		return -1;
 	}
@@ -287,8 +293,8 @@ static void do_tda7432_init(struct i2c_client *client)
 	t->volume = TDA7432_VOL_0DB;	 /* 0dB Volume            */
 	if (loudness)			 /* Turn loudness on?     */
 		t->volume |= TDA7432_LD_ON;	
-	t->tone   = TDA7432_TREBLE_0DB | /* 0dB Treble            */
-		    TDA7432_BASS_0DB; 	 /* 0dB Bass              */
+	t->treble   = TDA7432_TREBLE_0DB; /* 0dB Treble            */
+	t->bass		= TDA7432_BASS_0DB; 	 /* 0dB Bass              */
 	t->lf     = TDA7432_ATTEN_0DB;	 /* 0dB attenuation       */
 	t->lr     = TDA7432_ATTEN_0DB;	 /* 0dB attenuation       */
 	t->rf     = TDA7432_ATTEN_0DB;	 /* 0dB attenuation       */
@@ -353,9 +359,6 @@ static int tda7432_command(struct i2c_client *client,
 {
 	struct tda7432 *t = client->data;
 	d2printk("tda7432: In tda7432_command\n");
-#if 0
-	__u16 *sarg = arg;
-#endif
 
 	switch (cmd) {
 	/* --- v4l ioctls --- */
@@ -371,7 +374,7 @@ static int tda7432_command(struct i2c_client *client,
 		va->flags |= VIDEO_AUDIO_VOLUME |
 			VIDEO_AUDIO_BASS |
 			VIDEO_AUDIO_TREBLE;
-
+		va->mode |= VIDEO_SOUND_STEREO;
 		/* Master volume control
 		 * V4L volume is min 0, max 65535
 		 * TDA7432 Volume: 
@@ -389,18 +392,24 @@ static int tda7432_command(struct i2c_client *client,
 		 * attenuation exists for lf, lr, rf, rr
 		 * we use only lf and rf (front channels)
 		 */
-		 
+		
 		if ( (t->lf) < (t->rf) )
 			/* right is attenuated, balance shifted left */
 			va->balance = (32768 - 1057*(t->rf));
 		else
 			/* left is attenuated, balance shifted right */
 			va->balance = (32768 + 1057*(t->lf));
-
-		/* Bass/treble */
-		va->bass = 32768;   /* brain hurts... set to middle for now */
-		va->treble = 32768; /* brain hurts... set to middle for now */
 		
+		/* Bass/treble */	
+		va->bass=t->bass;
+		if(va->bass >= 0x8)
+				va->bass = ~(va->bass - 0x8) & 0xf;
+		va->bass = va->bass << 12;
+		va->treble=t->treble;
+		if(va->treble >= 0x8)
+				va->treble = ~(va->treble - 0x8) & 0xf;
+		va->treble = va->treble << 12;
+								
 		break; /* VIDIOCGAUDIO case */
 	}
 
@@ -415,26 +424,65 @@ static int tda7432_command(struct i2c_client *client,
 		if (loudness)		/* Turn on the loudness bit */
 			t->volume |= TDA7432_LD_ON;
 		
-		if (va->balance < 32768) {
+		if(va->flags & VIDEO_AUDIO_BASS)
+		{
+			t->bass = va->bass >> 12;
+			if(t->bass>= 0x8)
+					t->bass = (~t->bass & 0xf) + 0x8 ;
+			t->bass = t->bass | 0x10;
+		}
+		if(va->flags & VIDEO_AUDIO_TREBLE)
+		{
+			t->treble= va->treble >> 12;
+			if(t->treble>= 0x8)
+					t->treble = (~t->treble & 0xf) + 0x8 ;
+						
+		}
+		
+		if (va->balance < 32768) 
+		{
 			/* shifted to left, attenuate right */
 			t->rr = (32768 - va->balance)/1057;
 			t->rf = t->rr;
+			t->lr = TDA7432_ATTEN_0DB;
+			t->lf = TDA7432_ATTEN_0DB;	
 		}
-		else {
+		else if(va->balance > 32769)
+		{
 			/* shifted to right, attenuate left */
 			t->lf = (va->balance - 32768)/1057;
 			t->lr = t->lf;
+			t->rr = TDA7432_ATTEN_0DB;
+			t->rf = TDA7432_ATTEN_0DB;		
 		}
-		
-		/* t->tone = 0xff; */ /* Brain hurts - no tone control for now... */
-
+		else 
+		{
+			/* centered */		
+			t->rr = TDA7432_ATTEN_0DB;
+			t->rf = TDA7432_ATTEN_0DB;
+			t->lf = TDA7432_ATTEN_0DB;
+			t->lr = TDA7432_ATTEN_0DB;
+		}
+					
+		tda7432_write(client,TDA7432_TN, (t->bass << 4)| t->treble );		
 		tda7432_write(client,TDA7432_VL, t->volume);
-		/* tda7432_write(client,TDA7432_TN, t->tone); */
-		tda7432_write(client,TDA7432_LF, t->lf);
-		tda7432_write(client,TDA7432_LR, t->lr);
-		tda7432_write(client,TDA7432_RF, t->rf);
-		tda7432_write(client,TDA7432_RR, t->rr);
-
+		
+		if (va->flags & VIDEO_AUDIO_MUTE)
+		{
+			/* Mute & update balance*/	
+			tda7432_write(client,TDA7432_LF, t->lf | TDA7432_MUTE);
+			tda7432_write(client,TDA7432_LR, t->lr | TDA7432_MUTE);
+			tda7432_write(client,TDA7432_RF, t->rf | TDA7432_MUTE);
+			tda7432_write(client,TDA7432_RR, t->rr | TDA7432_MUTE);
+		}
+		else
+		{	
+			tda7432_write(client,TDA7432_LF, t->lf);
+			tda7432_write(client,TDA7432_LR, t->lr);
+			tda7432_write(client,TDA7432_RF, t->rf);
+			tda7432_write(client,TDA7432_RR, t->rr);
+		}
+							
 		break;
 
 	} /* end of VIDEOCSAUDIO case */
@@ -469,11 +517,7 @@ static struct i2c_client client_template =
         &driver
 };
 
-#ifdef MODULE
-int init_module(void)
-#else
 int tda7432_init(void)
-#endif
 {
 
 	if ( (loudness < 0) || (loudness > 15) )
@@ -482,17 +526,17 @@ int tda7432_init(void)
 		return -EINVAL;
 	}
 
-
 	i2c_add_driver(&driver);
 	return 0;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+void tda7432_fini(void)
 {
 	i2c_del_driver(&driver);
 }
-#endif
+
+module_init(tda7432_init);
+module_exit(tda7432_fini);
 
 /*
  * Local variables:
