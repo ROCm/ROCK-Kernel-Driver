@@ -105,10 +105,9 @@ static struct miscdevice misc; /* used with misc_register for dynamic */
 extern u64 master_node_bedrock_address;
 extern void early_sn_setup(void);
 
-static int sn_debug_printf(const char *fmt, ...);
-
 #undef DEBUG
 #ifdef DEBUG
+static int sn_debug_printf(const char *fmt, ...);
 #define DPRINTF(x...) sn_debug_printf(x)
 #else
 #define DPRINTF(x...) do { } while (0)
@@ -489,6 +488,8 @@ static struct uart_ops sn_console_ops = {
 
 /* End of uart struct functions and defines */
 
+#ifdef DEBUG
+
 /**
  * sn_debug_printf - close to hardware debugging printf
  * @fmt: printf format
@@ -520,6 +521,7 @@ sn_debug_printf(const char *fmt, ...)
 	va_end(args);
 	return printed_len;
 }
+#endif	/* DEBUG */
 
 /*
  * Interrupt handling routines.
@@ -654,7 +656,7 @@ sn_transmit_chars(struct sn_cons_port *port, int raw)
 				    port->sc_ops->sal_puts(start, xmit_count);
 #ifdef DEBUG
 			if (!result)
-				sn_debug_printf("`");
+				DPRINTF("`");
 #endif
 			if (result > 0) {
 				xmit_count -= result;
@@ -971,6 +973,7 @@ module_exit(sn_sal_module_exit);
 
 /**
  * puts_raw_fixed - sn_sal_console_write helper for adding \r's as required
+ * @puts_raw : puts function to do the writing
  * @s: input string
  * @count: length
  *
@@ -978,19 +981,19 @@ module_exit(sn_sal_module_exit);
  * ia64_sn_console_putb (what sal_puts_raw below actually does).
  *
  */
-static void puts_raw_fixed(const char *s, int count)
+
+static void puts_raw_fixed(int (*puts_raw) (const char *s, int len), const char *s, int count)
 {
 	const char *s1;
-	struct sn_cons_port *port = &sal_console_port;
 
 	/* Output '\r' before each '\n' */
 	while ((s1 = memchr(s, '\n', count)) != NULL) {
-		port->sc_ops->sal_puts_raw(s, s1 - s);
-		port->sc_ops->sal_puts_raw("\r\n", 2);
+		puts_raw(s, s1 - s);
+		puts_raw("\r\n", 2);
 		count -= s1 + 1 - s;
 		s = s1 + 1;
 	}
-	port->sc_ops->sal_puts_raw(s, count);
+	puts_raw(s, count);
 }
 
 /**
@@ -1072,7 +1075,7 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 				/* fell thru */
 				stole_lock = 1;
 			}
-			puts_raw_fixed(s, count);
+			puts_raw_fixed(port->sc_ops->sal_puts_raw, s, count);
 		}
 		else {
 			stole_lock = 0;
@@ -1081,12 +1084,12 @@ sn_sal_console_write(struct console *co, const char *s, unsigned count)
 			sn_transmit_chars(port, 1);
 			spin_unlock_irqrestore(&port->sc_port.lock, flags);
 
-			puts_raw_fixed(s, count);
+			puts_raw_fixed(port->sc_ops->sal_puts_raw, s, count);
 		}
 	}
 	else {
 		/* Not yet registered with serial core - simple case */
-		puts_raw_fixed(s, count);
+		puts_raw_fixed(port->sc_ops->sal_puts_raw, s, count);
 	}
 }
 
@@ -1123,7 +1126,7 @@ sn_sal_console_setup(struct console *co, char *options)
 static void __init
 sn_sal_console_write_early(struct console *co, const char *s, unsigned count)
 {
-	sal_console_port.sc_ops->sal_puts(s, count);
+	puts_raw_fixed(sal_console_port.sc_ops->sal_puts_raw, s, count);
 }
 
 /* Used for very early console printing - again, before

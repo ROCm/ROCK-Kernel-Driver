@@ -1,6 +1,7 @@
 #ifndef	_SPARC64_OPENPROMIO_H
 #define	_SPARC64_OPENPROMIO_H
 
+#include <linux/compiler.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
