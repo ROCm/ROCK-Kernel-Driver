@@ -71,6 +71,13 @@ static int tftp_help(struct sk_buff *skb,
 		DUMP_TUPLE(&exp.mask);
 		ip_conntrack_expect_related(ct, &exp);
 		break;
+	case TFTP_OPCODE_DATA:
+	case TFTP_OPCODE_ACK:
+		DEBUGP("Data/ACK opcode\n");
+		break;
+	case TFTP_OPCODE_ERROR:
+		DEBUGP("Error opcode\n");
+		break;
 	default:
 		DEBUGP("Unknown opcode\n");
 	}
