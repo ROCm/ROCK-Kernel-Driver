@@ -550,6 +550,32 @@ struct net_device *dev_getbyhwaddr(unsigned short type, char *ha)
 	return dev;
 }
 
+struct net_device *__dev_getfirstbyhwtype(unsigned short type)
+{
+	struct net_device *dev;
+
+	for (dev = dev_base; dev; dev = dev->next)
+		if (dev->type == type)
+			break;
+	return dev;
+}
+
+EXPORT_SYMBOL(__dev_getfirstbyhwtype);
+
+struct net_device *dev_getfirstbyhwtype(unsigned short type)
+{
+	struct net_device *dev;
+
+	rtnl_lock();
+	dev = __dev_getfirstbyhwtype(type);
+	if (dev)
+		dev_hold(dev);
+	rtnl_unlock();
+	return dev;
+}
+
+EXPORT_SYMBOL(dev_getfirstbyhwtype);
+
 /**
  *	dev_get_by_flags - find any device with given flags
  *	@if_flags: IFF_* values

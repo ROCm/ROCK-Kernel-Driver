@@ -44,15 +44,12 @@ static struct sock *llc_get_sk_idx(loff_t pos)
 		read_lock_bh(&sap->sk_list.lock);
 		sk_for_each(sk, node, &sap->sk_list.list) {
 			if (!pos)
-				break;
+				goto found;
 			--pos;
 		}
 		read_unlock_bh(&sap->sk_list.lock);
-		if (!pos) {
-			if (node)
-				goto found;
+		if (!pos)
 			break;
-		}
 	}
 	sk = NULL;
 found:
@@ -105,7 +102,7 @@ out:
 
 static void llc_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v) {
+	if (v && v != SEQ_START_TOKEN) {
 		struct sock *sk = v;
 		struct llc_opt *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
@@ -128,18 +125,16 @@ static int llc_seq_socket_show(struct seq_file *seq, void *v)
 	sk = v;
 	llc = llc_sk(sk);
 
-	seq_printf(seq, "%2X  %2X ", sk->sk_type,
-		   !llc_mac_null(llc->addr.sllc_mmac));
+	/* FIXME: check if the address is multicast */
+	seq_printf(seq, "%2X  %2X ", sk->sk_type, 0);
 
-	if (llc->dev && llc_mac_null(llc->addr.sllc_mmac))
+	if (llc->dev)
 		llc_ui_format_mac(seq, llc->dev->dev_addr);
-	else if (!llc_mac_null(llc->addr.sllc_mmac))
-		llc_ui_format_mac(seq, llc->addr.sllc_mmac);
 	else
 		seq_printf(seq, "00:00:00:00:00:00");
 	seq_printf(seq, "@%02X ", llc->sap->laddr.lsap);
-	llc_ui_format_mac(seq, llc->addr.sllc_dmac);
-	seq_printf(seq, "@%02X %8d %8d %2d %3d %4d\n", llc->addr.sllc_dsap,
+	llc_ui_format_mac(seq, llc->daddr.mac);
+	seq_printf(seq, "@%02X %8d %8d %2d %3d %4d\n", llc->daddr.lsap,
 		   atomic_read(&sk->sk_wmem_alloc),
 		   atomic_read(&sk->sk_rmem_alloc),
 		   sk->sk_state,

@@ -249,6 +249,7 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	if (!iface)
 		goto out;
 
+	memset(iface, 0, sizeof(*iface));
 	dev_hold(dev);
 	iface->dev = dev;
 	dev->atalk_ptr = iface;
@@ -580,6 +581,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 		retval = -ENOBUFS;
 		if (!rt)
 			goto out;
+		memset(rt, 0, sizeof(*rt));
 
 		rt->next = atalk_routes;
 		atalk_routes = rt;
@@ -937,9 +939,13 @@ static unsigned long atalk_sum_partial(const unsigned char *data,
 {
 	/* This ought to be unwrapped neatly. I'll trust gcc for now */
 	while (len--) {
-		sum += *data++;
+		sum += *data;
 		sum <<= 1;
-		sum = ((sum >> 16) + sum) & 0xFFFF;
+		if (sum & 0x10000) {
+			sum++;
+			sum &= 0xffff;
+		}
+		data++;
 	}
 	return sum;
 }
@@ -1048,6 +1054,7 @@ static int atalk_create(struct socket *sock, int protocol)
 	at = at_sk(sk) = kmalloc(sizeof(*at), GFP_KERNEL);
 	if (!at)
 		goto outsk;
+	memset(at, 0, sizeof(*at));
 	rc = 0;
 	sock->ops = &atalk_dgram_ops;
 	sock_init_data(sock, sk);
