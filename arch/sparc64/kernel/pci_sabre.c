@@ -1113,10 +1113,9 @@ static void __init sabre_base_address_update(struct pci_dev *pdev, int resource)
 
 static void __init apb_init(struct pci_controller_info *p, struct pci_bus *sabre_bus)
 {
-	struct list_head *walk = &sabre_bus->devices;
+	struct pci_dev *pdev;
 
-	for (walk = walk->next; walk != &sabre_bus->devices; walk = walk->next) {
-		struct pci_dev *pdev = pci_dev_b(walk);
+	list_for_each_entry(pdev, &sabre_bus->devices, bus_list) {
 
 		if (pdev->vendor == PCI_VENDOR_ID_SUN &&
 		    pdev->device == PCI_DEVICE_ID_SUN_SIMBA) {
@@ -1178,10 +1177,9 @@ static struct pcidev_cookie *alloc_bridge_cookie(struct pci_pbm_info *pbm)
 static void __init sabre_scan_bus(struct pci_controller_info *p)
 {
 	static int once;
-	struct pci_bus *sabre_bus;
+	struct pci_bus *sabre_bus, *pbus;
 	struct pci_pbm_info *pbm;
 	struct pcidev_cookie *cookie;
-	struct list_head *walk;
 	int sabres_scanned;
 
 	/* The APB bridge speaks to the Sabre host PCI bridge
@@ -1217,9 +1215,7 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 
 	sabres_scanned = 0;
 
-	walk = &sabre_bus->children;
-	for (walk = walk->next; walk != &sabre_bus->children; walk = walk->next) {
-		struct pci_bus *pbus = pci_bus_b(walk);
+	list_for_each_entry(pbus, &sabre_bus->children, node) {
 
 		if (pbus->number == p->pbm_A.pci_first_busno) {
 			pbm = &p->pbm_A;
