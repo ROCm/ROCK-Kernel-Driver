@@ -276,6 +276,8 @@ kmem_cache_t *tcp_timewait_cachep;
 
 atomic_t tcp_orphan_count = ATOMIC_INIT(0);
 
+int sysctl_tcp_default_win_scale = 7;
+
 int sysctl_tcp_mem[3];
 int sysctl_tcp_wmem[3] = { 4 * 1024, 16 * 1024, 128 * 1024 };
 int sysctl_tcp_rmem[3] = { 4 * 1024, 87380, 87380 * 2 };
@@ -1480,6 +1482,9 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 			break;
 	}
 	tp->copied_seq = seq;
+
+	tcp_rcv_space_adjust(sk);
+
 	/* Clean up data we have read: This will do ACK frames. */
 	if (copied)
 		cleanup_rbuf(sk, copied);
@@ -1739,6 +1744,8 @@ do_prequeue:
 		*seq += used;
 		copied += used;
 		len -= used;
+
+		tcp_rcv_space_adjust(sk);
 
 skip_copy:
 		if (tp->urg_data && after(tp->copied_seq, tp->urg_seq)) {
@@ -2675,10 +2682,6 @@ void __init tcp_init(void)
 	sysctl_tcp_mem[0] =  768 << order;
 	sysctl_tcp_mem[1] = 1024 << order;
 	sysctl_tcp_mem[2] = 1536 << order;
-	if (sysctl_tcp_mem[2] - sysctl_tcp_mem[1] > 512)
-		sysctl_tcp_mem[1] = sysctl_tcp_mem[2] - 512;
-	if (sysctl_tcp_mem[1] - sysctl_tcp_mem[0] > 512)
-		sysctl_tcp_mem[0] = sysctl_tcp_mem[1] - 512;
 
 	if (order < 3) {
 		sysctl_tcp_wmem[2] = 64 * 1024;

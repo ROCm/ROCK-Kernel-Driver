@@ -610,6 +610,7 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
+extern int sysctl_tcp_default_win_scale;
 
 extern atomic_t tcp_memory_allocated;
 extern atomic_t tcp_sockets_allocated;
@@ -799,6 +800,8 @@ extern int			tcp_rcv_established(struct sock *sk,
 						    struct sk_buff *skb,
 						    struct tcphdr *th, 
 						    unsigned len);
+
+extern void			tcp_rcv_space_adjust(struct sock *sk);
 
 enum tcp_ack_state_t
 {
@@ -1751,6 +1754,9 @@ static inline void tcp_select_initial_window(int __space, __u32 mss,
 		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
 		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
 			(*rcv_wscale)--;
+
+		*rcv_wscale = max((__u8)sysctl_tcp_default_win_scale,
+				  *rcv_wscale);
 	}
 
 	/* Set initial window to value enough for senders,

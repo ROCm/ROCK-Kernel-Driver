@@ -348,7 +348,7 @@ enum
 	IFA_MULTICAST
 };
 
-#define IFA_MAX IFA_CACHEINFO
+#define IFA_MAX IFA_MULTICAST
 
 /* ifa_flags */
 

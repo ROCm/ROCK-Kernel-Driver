@@ -340,6 +340,11 @@ tcp_bic_fast_convergence - BOOLEAN
 	more rapidly.
 	Default: 1
 
+tcp_default_win_scale - INTEGER
+	Sets the minimum window scale TCP will negotiate for on all
+	conections.
+	Default: 7
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 
