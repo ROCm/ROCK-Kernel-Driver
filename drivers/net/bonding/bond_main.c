@@ -3295,10 +3295,10 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *dev)
 static struct net_device_stats *bond_get_stats(struct net_device *dev)
 {
 	bonding_t *bond = dev->priv;
-	struct net_device_stats *stats = bond->stats, *sstats;
+	struct net_device_stats *stats = &(bond->stats), *sstats;
 	slave_t *slave;
 
-	memset(bond->stats, 0, sizeof(struct net_device_stats));
+	memset(stats, 0, sizeof(struct net_device_stats));
 
 	read_lock_bh(&bond->lock);
 
@@ -3493,9 +3493,7 @@ static int __init bond_init(struct net_device *dev)
 	/* initialize rwlocks */
 	rwlock_init(&bond->lock);
 	rwlock_init(&bond->ptrlock);
-	
-	/* space is reserved for stats in alloc_netdev call. */
-	bond->stats = (struct net_device_stats *)(bond + 1);
+
 	bond->next = bond->prev = (slave_t *)bond;
 	bond->current_slave = NULL;
 	bond->current_arp_slave = NULL;
@@ -3868,8 +3866,7 @@ static int __init bonding_init(void)
 
 		snprintf(name, IFNAMSIZ, "bond%d", no);
 
-		dev = alloc_netdev(sizeof(bonding_t) 
-				   + sizeof(struct net_device_stats),
+		dev = alloc_netdev(sizeof(struct bonding),
 				   name, ether_setup);
 		if (!dev)
 			return -ENOMEM;
