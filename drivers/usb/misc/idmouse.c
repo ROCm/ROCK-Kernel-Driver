@@ -41,7 +41,7 @@
 #define USB_IDMOUSE_PRODUCT_ID 0x0005
 
 /* we still need a minor number */
-#define USB_IDMOUSE_MINOR_BASE 0xFA
+#define USB_IDMOUSE_MINOR_BASE 132
 
 static struct usb_device_id idmouse_table[] = {
 	{USB_DEVICE(USB_IDMOUSE_VENDOR_ID, USB_IDMOUSE_PRODUCT_ID)},
