@@ -1621,7 +1621,7 @@ int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
 	free_irq(req->AssignedIRQ, req->Instance);
     }
 
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
     if (req->AssignedIRQ != s->cap.pci_irq)
 	undo_irq(req->Attributes, req->AssignedIRQ);
 #endif
@@ -1883,7 +1883,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
     if (!s->cap.irq_mask) {
 	irq = s->cap.pci_irq;
 	ret = (irq) ? 0 : CS_IN_USE;
-#ifdef CONFIG_ISA
+#ifdef CONFIG_PCMCIA_PROBE
     } else if (s->irq.AssignedIRQ != 0) {
 	/* If the interrupt is already assigned, it must match */
 	irq = s->irq.AssignedIRQ;
