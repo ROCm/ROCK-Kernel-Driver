@@ -582,7 +582,7 @@ exit_minor:
 
 exit:
 	if (dev) {
-		dev_set_drvdata (&interface->dev, dev);
+		usb_set_intfdata (interface, dev);
 		return 0;
 	}
 	return -ENODEV;
@@ -599,8 +599,8 @@ static void skel_disconnect(struct usb_interface *interface)
 	struct usb_skel *dev;
 	int minor;
 
-	dev = dev_get_drvdata (&interface->dev);
-	dev_set_drvdata (&interface->dev, NULL);
+	dev = usb_get_intfdata (interface);
+	usb_set_intfdata (interface, NULL);
 
 	if (!dev)
 		return;
