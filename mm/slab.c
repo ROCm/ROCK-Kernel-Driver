@@ -459,7 +459,6 @@ static kmem_cache_t cache_cache = {
 
 /* Guard access to the cache-chain. */
 static struct semaphore	cache_chain_sem;
-static rwlock_t cache_chain_lock = RW_LOCK_UNLOCKED;
 
 struct list_head cache_chain;
 
@@ -1054,9 +1053,7 @@ next:
 	}
 
 	/* cache setup completed, link it into the list */
-	write_lock_bh(&cache_chain_lock);
 	list_add(&cachep->next, &cache_chain);
-	write_unlock_bh(&cache_chain_lock);
 	up(&cache_chain_sem);
 opps:
 	return cachep;
@@ -1190,19 +1187,17 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 
 	/* Find the cache in the chain of caches. */
 	down(&cache_chain_sem);
-	/* the chain is never empty, cache_cache is never destroyed */
-	write_lock_bh(&cache_chain_lock);
+	/*
+	 * the chain is never empty, cache_cache is never destroyed
+	 */
 	list_del(&cachep->next);
-	write_unlock_bh(&cache_chain_lock);
 	up(&cache_chain_sem);
 
 	if (__cache_shrink(cachep)) {
 		printk(KERN_ERR "kmem_cache_destroy: Can't free all objects %p\n",
 		       cachep);
 		down(&cache_chain_sem);
-		write_lock_bh(&cache_chain_lock);
 		list_add(&cachep->next,&cache_chain);
-		write_unlock_bh(&cache_chain_lock);
 		up(&cache_chain_sem);
 		return 1;
 	}
@@ -1956,9 +1951,12 @@ static void enable_cpucache (kmem_cache_t *cachep)
  * cache_reap - Reclaim memory from caches.
  *
  * Called from a timer, every few seconds
- * Purpuse:
+ * Purpose:
  * - clear the per-cpu caches for this CPU.
  * - return freeable pages to the main free memory pool.
+ *
+ * If we cannot acquire the cache chain semaphore then just give up - we'll
+ * try again next timer interrupt.
  */
 static inline void cache_reap (void)
 {
@@ -1968,7 +1966,8 @@ static inline void cache_reap (void)
 	BUG_ON(!in_interrupt());
 	BUG_ON(in_irq());
 #endif
-	read_lock(&cache_chain_lock);
+	if (down_trylock(&cache_chain_sem))
+		return;
 
 	list_for_each(walk, &cache_chain) {
 		kmem_cache_t *searchp;
@@ -2038,8 +2037,7 @@ next_irqon:
 next:
 	}
 	check_irq_on();
-
-	read_unlock(&cache_chain_lock);
+	up(&cache_chain_sem);
 }
 
 /*
