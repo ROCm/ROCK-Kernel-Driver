@@ -56,7 +56,7 @@ static inline const char *slot_name(const struct pci_pool *pool)
 	if (pdev == 0)
 		return "[0]";
 
-	else if (dev_is_sa1111(pdev))
+	else if (pcidev_is_sa1111(pdev))
 		return "[SA-1111]";
 	else
 		return pdev->slot_name;

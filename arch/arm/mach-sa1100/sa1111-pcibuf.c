@@ -124,7 +124,7 @@ destroy_safe_buffer_pools(void)
 
 /* allocate a 'safe' buffer and keep track of it */
 static struct safe_buffer *
-alloc_safe_buffer(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
+alloc_safe_buffer(void *ptr, size_t size, int direction)
 {
 	struct safe_buffer *buf;
 	struct pci_pool *pool;
@@ -254,7 +254,7 @@ static void print_map_stats(void)
 #endif
 
 static dma_addr_t
-map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
+map_single(void *ptr, size_t size, int direction)
 {
 	dma_addr_t dma_addr;
 
@@ -267,7 +267,7 @@ map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 
 		DO_STATS ( bounce_count++ ) ;
 
-		buf = alloc_safe_buffer(hwdev, ptr, size, direction);
+		buf = alloc_safe_buffer(ptr, size, direction);
 		if (buf == 0) {
 			printk(KERN_ERR
 			       "%s: unable to map unsafe buffer %p!\n",
@@ -302,8 +302,7 @@ map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 }
 
 static void
-unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-	     size_t size, int direction)
+unmap_single(dma_addr_t dma_addr, size_t size, int direction)
 {
 	struct safe_buffer *buf;
 
@@ -332,8 +331,7 @@ unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 }
 
 static void
-sync_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-		       size_t size, int direction)
+sync_single(dma_addr_t dma_addr, size_t size, int direction)
 {
 	struct safe_buffer *buf;
 
@@ -381,20 +379,19 @@ sync_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
  * (basically move the buffer from an unsafe area to a safe one)
  */
 dma_addr_t
-sa1111_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
+sa1111_map_single(void *ptr, size_t size, int direction)
 {
 	unsigned long flags;
 	dma_addr_t dma_addr;
 
-	DPRINTK("%s(hwdev=%p,ptr=%p,size=%d,dir=%x)\n",
-	       __func__, hwdev, ptr, size, direction);
+	DPRINTK("%s(ptr=%p,size=%d,dir=%x)\n",
+	       __func__, ptr, size, direction);
 
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	local_irq_save(flags);
 
-	dma_addr = map_single(hwdev, ptr, size, direction);
+	dma_addr = map_single(ptr, size, direction);
 
 	local_irq_restore(flags);
 
@@ -409,35 +406,31 @@ sa1111_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
  */
 
 void
-sa1111_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-		    size_t size, int direction)
+sa1111_unmap_single(dma_addr_t dma_addr, size_t size, int direction)
 {
 	unsigned long flags;
 
-	DPRINTK("%s(hwdev=%p,ptr=%p,size=%d,dir=%x)\n",
-		__func__, hwdev, (void *) dma_addr, size, direction);
+	DPRINTK("%s(ptr=%p,size=%d,dir=%x)\n",
+		__func__, (void *) dma_addr, size, direction);
 
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	local_irq_save(flags);
 
-	unmap_single(hwdev, dma_addr, size, direction);
+	unmap_single(dma_addr, size, direction);
 
 	local_irq_restore(flags);
 }
 
 int
-sa1111_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-	      int nents, int direction)
+sa1111_map_sg(struct scatterlist *sg, int nents, int direction)
 {
 	unsigned long flags;
 	int i;
 
-	DPRINTK("%s(hwdev=%p,sg=%p,nents=%d,dir=%x)\n",
-		__func__, hwdev, sg, nents, direction);
+	DPRINTK("%s(sg=%p,nents=%d,dir=%x)\n",
+		__func__, sg, nents, direction);
 
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	local_irq_save(flags);
@@ -449,7 +442,7 @@ sa1111_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 		void *ptr = page_address(page) + offset;
 
 		sg->dma_address =
-			map_single(hwdev, ptr, length, direction);
+			map_single(ptr, length, direction);
 	}
 
 	local_irq_restore(flags);
@@ -458,16 +451,14 @@ sa1111_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 }
 
 void
-sa1111_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents,
-	     int direction)
+sa1111_unmap_sg(struct scatterlist *sg, int nents, int direction)
 {
 	unsigned long flags;
 	int i;
 
-	DPRINTK("%s(hwdev=%p,sg=%p,nents=%d,dir=%x)\n",
-		__func__, hwdev, sg, nents, direction);
+	DPRINTK("%s(sg=%p,nents=%d,dir=%x)\n",
+		__func__, sg, nents, direction);
 
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	local_irq_save(flags);
@@ -476,41 +467,36 @@ sa1111_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents,
 		dma_addr_t dma_addr = sg->dma_address;
 		unsigned int length = sg->length;
 
-		unmap_single(hwdev, dma_addr, length, direction);
+		unmap_single(dma_addr, length, direction);
 	}
 
 	local_irq_restore(flags);
 }
 
 void
-sa1111_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-		       size_t size, int direction)
+sa1111_dma_sync_single(dma_addr_t dma_addr, size_t size, int direction)
 {
 	unsigned long flags;
 
-	DPRINTK("%s(hwdev=%p,ptr=%p,size=%d,dir=%x)\n",
-		__func__, hwdev, (void *) dma_addr, size, direction);
-
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
+	DPRINTK("%s(ptr=%p,size=%d,dir=%x)\n",
+		__func__, (void *) dma_addr, size, direction);
 
 	local_irq_save(flags);
 
-	sync_single(hwdev, dma_addr, size, direction);
+	sync_single(dma_addr, size, direction);
 
 	local_irq_restore(flags);
 }
 
 void
-sa1111_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-		   int nents, int direction)
+sa1111_dma_sync_sg(struct scatterlist *sg, int nents, int direction)
 {
 	unsigned long flags;
 	int i;
 
-	DPRINTK("%s(hwdev=%p,sg=%p,nents=%d,dir=%x)\n",
-		__func__, hwdev, sg, nents, direction);
+	DPRINTK("%s(sg=%p,nents=%d,dir=%x)\n",
+		__func__, sg, nents, direction);
 
-	BUG_ON(hwdev != SA1111_FAKE_PCIDEV);
 	BUG_ON(direction == PCI_DMA_NONE);
 
 	local_irq_save(flags);
@@ -519,7 +505,7 @@ sa1111_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 		dma_addr_t dma_addr = sg->dma_address;
 		unsigned int length = sg->length;
 
-		sync_single(hwdev, dma_addr, length, direction);
+		sync_single(dma_addr, length, direction);
 	}
 
 	local_irq_restore(flags);
