@@ -150,7 +150,10 @@ xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 			task->tk_pid, xprt->snd_task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
-		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
+		if (task->tk_rqstp->rq_nresend)
+			rpc_sleep_on(&xprt->resend, task, NULL, NULL);
+		else
+			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
 	}
 	retval = xprt->snd_task == task;
 	spin_unlock_bh(&xprt->sock_lock);
@@ -166,9 +169,12 @@ __xprt_lock_write_next(struct rpc_xprt *xprt)
 		return;
 	if (!xprt->nocong && RPCXPRT_CONGESTED(xprt))
 		return;
-	task = rpc_wake_up_next(&xprt->sending);
-	if (!task)
-		return;
+	task = rpc_wake_up_next(&xprt->resend);
+	if (!task) {
+		task = rpc_wake_up_next(&xprt->sending);
+		if (!task)
+			return;
+	}
 	if (xprt->nocong || __xprt_get_cong(xprt, task))
 		xprt->snd_task = task;
 }
@@ -1346,6 +1352,7 @@ xprt_setup(struct socket *sock, int proto,
 
 	INIT_RPC_WAITQ(&xprt->pending, "xprt_pending");
 	INIT_RPC_WAITQ(&xprt->sending, "xprt_sending");
+	INIT_RPC_WAITQ(&xprt->resend, "xprt_resend");
 	INIT_RPC_WAITQ(&xprt->backlog, "xprt_backlog");
 
 	/* initialize free list */
@@ -1477,6 +1484,7 @@ xprt_shutdown(struct rpc_xprt *xprt)
 {
 	xprt->shutdown = 1;
 	rpc_wake_up(&xprt->sending);
+	rpc_wake_up(&xprt->resend);
 	rpc_wake_up(&xprt->pending);
 	rpc_wake_up(&xprt->backlog);
 	if (waitqueue_active(&xprt->cong_wait))
