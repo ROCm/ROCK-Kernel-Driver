@@ -84,27 +84,24 @@ static inline void *phys_to_virt(unsigned long x)
 
 #define PHYS_TO_NID(addr)	(0)
 
-#else
+#else /* CONFIG_DISCONTIGMEM */
+
 /*
  * This is more complex.  We have a set of mem_map arrays spread
  * around in memory.
  */
-#include <asm/numnodes.h>
-#define NUM_NODES	(1 << NODES_SHIFT)
+#include <linux/numa.h>
 
 #define page_to_pfn(page)					\
 	(( (page) - page_zone(page)->zone_mem_map)		\
 	  + page_zone(page)->zone_start_pfn)
-
 #define pfn_to_page(pfn)					\
 	(PFN_TO_MAPBASE(pfn) + LOCAL_MAP_NR((pfn) << PAGE_SHIFT))
-
-#define pfn_valid(pfn)		(PFN_TO_NID(pfn) < NUM_NODES)
+#define pfn_valid(pfn)		(PFN_TO_NID(pfn) < MAX_NUMNODES)
 
 #define virt_to_page(kaddr)					\
 	(ADDR_TO_MAPBASE(kaddr) + LOCAL_MAP_NR(kaddr))
-
-#define virt_addr_valid(kaddr)	(KVADDR_TO_NID(kaddr) < NUM_NODES)
+#define virt_addr_valid(kaddr)	(KVADDR_TO_NID(kaddr) < MAX_NUMNODES)
 
 /*
  * Common discontigmem stuff.
@@ -112,9 +109,7 @@ static inline void *phys_to_virt(unsigned long x)
  */
 #define PHYS_TO_NID(addr)	PFN_TO_NID((addr) >> PAGE_SHIFT)
 
-#undef NUM_NODES
-
-#endif
+#endif /* !CONFIG_DISCONTIGMEM */
 
 /*
  * For BIO.  "will die".  Kill me when bio_to_phys() and bvec_to_phys() die.

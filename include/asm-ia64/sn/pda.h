@@ -10,7 +10,7 @@
 
 #include <linux/config.h>
 #include <linux/cache.h>
-#include <linux/mmzone.h>
+#include <linux/numa.h>
 #include <asm/percpu.h>
 #include <asm/system.h>
 #include <asm/processor.h>

@@ -10,14 +10,8 @@
 #include <linux/wait.h>
 #include <linux/cache.h>
 #include <linux/threads.h>
+#include <linux/numa.h>
 #include <asm/atomic.h>
-#ifdef CONFIG_DISCONTIGMEM
-#include <asm/numnodes.h>
-#endif
-#ifndef NODES_SHIFT
-#define NODES_SHIFT	0
-#endif
-#define MAX_NUMNODES	(1 << NODES_SHIFT)
 
 /* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
@@ -313,12 +307,19 @@ extern struct pglist_data contig_page_data;
 #else /* CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
+
+#if BITS_PER_LONG == 32
 /*
- * page->zone is currently 8 bits
- * there are 3 zones (2 bits)
- * this leaves 8-2=6 bits for nodes
+ * with 32 bit flags field, page->zone is currently 8 bits.
+ * there are 3 zones (2 bits) and this leaves 8-2=6 bits for nodes.
  */
 #define MAX_NODES_SHIFT		6
+#elif BITS_PER_LONG == 64
+/*
+ * with 64 bit flags field, there's plenty of room.
+ */
+#define MAX_NODES_SHIFT		10
+#endif
 
 #endif /* !CONFIG_DISCONTIGMEM */
 
