@@ -182,9 +182,10 @@ resubmit:
 		if (!raw_sk) {
 			IP6_INC_STATS_BH(Ip6InUnknownProtos);
 			icmpv6_param_prob(skb, ICMPV6_UNK_NEXTHDR, nhoff);
-		} else
+		} else {
 			IP6_INC_STATS_BH(Ip6InDelivers);
-		kfree_skb(skb);
+			kfree_skb(skb);
+		}
 	}
 
 	return 0;
