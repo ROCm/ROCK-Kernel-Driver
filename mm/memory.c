@@ -935,9 +935,19 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
 	struct pte_chain *pte_chain = NULL;
+	int ret;
 
-	if (!pfn_valid(pfn))
-		goto bad_wp_page;
+	if (unlikely(!pfn_valid(pfn))) {
+		/*
+		 * This should really halt the system so it can be debugged or
+		 * at least the kernel stops what it's doing before it corrupts
+		 * data, but for the moment just pretend this is OOM.
+		 */
+		pte_unmap(page_table);
+		printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n",
+				address);
+		goto oom;
+	}
 	old_page = pfn_to_page(pfn);
 
 	if (!TestSetPageLocked(old_page)) {
@@ -945,10 +955,11 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		unlock_page(old_page);
 		if (reuse) {
 			flush_cache_page(vma, address);
-			establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
+			establish_pte(vma, address, page_table,
+				pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
 			pte_unmap(page_table);
-			spin_unlock(&mm->page_table_lock);
-			return VM_FAULT_MINOR;
+			ret = VM_FAULT_MINOR;
+			goto out;
 		}
 	}
 	pte_unmap(page_table);
@@ -959,11 +970,13 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	page_cache_get(old_page);
 	spin_unlock(&mm->page_table_lock);
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain)
+		goto no_mem;
 	new_page = alloc_page(GFP_HIGHUSER);
 	if (!new_page)
 		goto no_mem;
 	copy_cow_page(old_page,new_page,address);
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
 
 	/*
 	 * Re-check the pte - we dropped the lock
@@ -982,25 +995,19 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		new_page = old_page;
 	}
 	pte_unmap(page_table);
-	spin_unlock(&mm->page_table_lock);
 	page_cache_release(new_page);
 	page_cache_release(old_page);
-	pte_chain_free(pte_chain);
-	return VM_FAULT_MINOR;
+	ret = VM_FAULT_MINOR;
+	goto out;
 
-bad_wp_page:
-	pte_unmap(page_table);
-	spin_unlock(&mm->page_table_lock);
-	printk(KERN_ERR "do_wp_page: bogus page at address %08lx\n", address);
-	/*
-	 * This should really halt the system so it can be debugged or
-	 * at least the kernel stops what it's doing before it corrupts
-	 * data, but for the moment just pretend this is OOM.
-	 */
-	return VM_FAULT_OOM;
 no_mem:
 	page_cache_release(old_page);
-	return VM_FAULT_OOM;
+oom:
+	ret = VM_FAULT_OOM;
+out:
+	spin_unlock(&mm->page_table_lock);
+	pte_chain_free(pte_chain);
+	return ret;
 }
 
 static void vmtruncate_list(struct list_head *head, unsigned long pgoff)
@@ -1295,6 +1302,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	struct page * new_page;
 	pte_t entry;
 	struct pte_chain *pte_chain;
+	int ret;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
 		return do_anonymous_page(mm, vma, page_table,
@@ -1310,6 +1318,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (new_page == NOPAGE_OOM)
 		return VM_FAULT_OOM;
 
+	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain)
+		goto oom;
+
 	/*
 	 * Should we do an early C-O-W break?
 	 */
@@ -1317,7 +1329,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct page * page = alloc_page(GFP_HIGHUSER);
 		if (!page) {
 			page_cache_release(new_page);
-			return VM_FAULT_OOM;
+			goto oom;
 		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
@@ -1325,7 +1337,6 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		new_page = page;
 	}
 
-	pte_chain = pte_chain_alloc(GFP_KERNEL);
 	spin_lock(&mm->page_table_lock);
 	page_table = pte_offset_map(pmd, address);
 
@@ -1355,15 +1366,20 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
-		pte_chain_free(pte_chain);
-		return VM_FAULT_MINOR;
+		ret = VM_FAULT_MINOR;
+		goto out;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
 	spin_unlock(&mm->page_table_lock);
+	ret = VM_FAULT_MAJOR;
+	goto out;
+oom:
+	ret = VM_FAULT_OOM;
+out:
 	pte_chain_free(pte_chain);
-	return VM_FAULT_MAJOR;
+	return ret;
 }
 
 /*

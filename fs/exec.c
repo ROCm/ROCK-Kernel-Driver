@@ -300,6 +300,8 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 
 	pgd = pgd_offset(tsk->mm, address);
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
+	if (!pte_chain)
+		goto out_sig;
 	spin_lock(&tsk->mm->page_table_lock);
 	pmd = pmd_alloc(tsk->mm, pgd, address);
 	if (!pmd)
@@ -325,6 +327,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 	return;
 out:
 	spin_unlock(&tsk->mm->page_table_lock);
+out_sig:
 	__free_page(page);
 	force_sig(SIGKILL, tsk);
 	pte_chain_free(pte_chain);
