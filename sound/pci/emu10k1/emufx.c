@@ -1009,13 +1009,16 @@ static void snd_emu10k1_del_controls(emu10k1_t *emu, emu10k1_fx8010_code_t *icod
 	unsigned int i;
 	snd_ctl_elem_id_t *_id, id;
 	snd_emu10k1_fx8010_ctl_t *ctl;
+	snd_card_t *card = emu->card;
 	
 	for (i = 0, _id = icode->gpr_del_controls;
 	     i < icode->gpr_del_control_count; i++, _id++) {
 	     	snd_runtime_check(copy_from_user(&id, _id, sizeof(id)) == 0, continue);
+		down_write(&card->controls_rwsem);
 		ctl = snd_emu10k1_look_for_ctl(emu, &id);
-		snd_runtime_check(ctl == NULL, continue);
-		snd_ctl_remove(emu->card, ctl->kcontrol);
+		if (ctl)
+			snd_ctl_remove(card, ctl->kcontrol);
+		up_write(&card->controls_rwsem);
 	}
 }
 
