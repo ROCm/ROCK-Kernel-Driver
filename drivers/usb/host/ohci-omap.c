@@ -335,7 +335,6 @@ int usb_hcd_omap_probe (const struct hc_driver *driver,
 	hcd->self.bus_name = pdev->dev.bus_id;
 	hcd->product_desc = "OMAP OHCI";
 
-	INIT_LIST_HEAD (&hcd->dev_list);
 	usb_register_bus (&hcd->self);
 
 	if ((retval = driver->start (hcd)) < 0) 

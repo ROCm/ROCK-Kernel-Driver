@@ -646,8 +646,6 @@ static void usb_release_dev(struct device *dev)
 
 	udev = to_usb_device(dev);
 
-	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
-		udev->bus->op->deallocate(udev);
 	usb_destroy_configuration(udev);
 	usb_bus_put(udev->bus);
 	kfree (udev);
@@ -729,13 +727,6 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
 	INIT_LIST_HEAD(&dev->filelist);
 
 	init_MUTEX(&dev->serialize);
-
-	if (dev->bus->op->allocate)
-		if (dev->bus->op->allocate(dev)) {
-			usb_bus_put(bus);
-			kfree(dev);
-			return NULL;
-		}
 
 	return dev;
 }

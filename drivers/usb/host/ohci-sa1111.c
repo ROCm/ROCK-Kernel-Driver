@@ -199,8 +199,6 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 	hcd->self.bus_name = "sa1111";
 	hcd->product_desc = "SA-1111 OHCI";
 
-	INIT_LIST_HEAD (&hcd->dev_list);
-
 	usb_register_bus (&hcd->self);
 
 	if ((retval = driver->start (hcd)) < 0) 

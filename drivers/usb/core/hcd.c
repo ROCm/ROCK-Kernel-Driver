@@ -1018,40 +1018,6 @@ EXPORT_SYMBOL (usb_release_bandwidth);
 
 /*-------------------------------------------------------------------------*/
 
-/* called from khubd, or root hub init threads for hcd-private init */
-static int hcd_alloc_dev (struct usb_device *udev)
-{
-	struct hcd_dev		*dev;
-	struct usb_hcd		*hcd;
-	unsigned long		flags;
-
-	if (!udev || udev->hcpriv)
-		return -EINVAL;
-	if (!udev->bus || !udev->bus->hcpriv)
-		return -ENODEV;
-	hcd = udev->bus->hcpriv;
-	if (hcd->state == USB_STATE_QUIESCING)
-		return -ENOLINK;
-
-	dev = (struct hcd_dev *) kmalloc (sizeof *dev, GFP_KERNEL);
-	if (dev == NULL)
-		return -ENOMEM;
-	memset (dev, 0, sizeof *dev);
-
-	INIT_LIST_HEAD (&dev->dev_list);
-	INIT_LIST_HEAD (&dev->urb_list);
-
-	spin_lock_irqsave (&hcd_data_lock, flags);
-	list_add (&dev->dev_list, &hcd->dev_list);
-	// refcount is implicit
-	udev->hcpriv = dev;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
-
-	return 0;
-}
-
-/*-------------------------------------------------------------------------*/
-
 static void urb_unlink (struct urb *urb)
 {
 	unsigned long		flags;
@@ -1463,44 +1429,6 @@ EXPORT_SYMBOL (usb_bus_start_enum);
 
 /*-------------------------------------------------------------------------*/
 
-/* called by khubd, rmmod, apmd, or other thread for hcd-private cleanup.
- * we're guaranteed that the device is fully quiesced.  also, that each
- * endpoint has been hcd_endpoint_disabled.
- */
-
-static int hcd_free_dev (struct usb_device *udev)
-{
-	struct hcd_dev		*dev;
-	struct usb_hcd		*hcd;
-	unsigned long		flags;
-
-	if (!udev || !udev->hcpriv)
-		return -EINVAL;
-
-	if (!udev->bus || !udev->bus->hcpriv)
-		return -ENODEV;
-
-	// should udev->devnum == -1 ??
-
-	dev = udev->hcpriv;
-	hcd = udev->bus->hcpriv;
-
-	/* device driver problem with refcounts? */
-	if (!list_empty (&dev->urb_list)) {
-		dev_dbg (hcd->self.controller, "free busy dev, %s devnum %d (bug!)\n",
-			hcd->self.bus_name, udev->devnum);
-		return -EINVAL;
-	}
-
-	spin_lock_irqsave (&hcd_data_lock, flags);
-	list_del (&dev->dev_list);
-	udev->hcpriv = NULL;
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
-
-	kfree (dev);
-	return 0;
-}
-
 /*
  * usb_hcd_operations - adapts usb_bus framework to HCD framework (bus glue)
  *
@@ -1509,11 +1437,9 @@ static int hcd_free_dev (struct usb_device *udev)
  * bus glue for non-PCI system busses will need to use this.
  */
 struct usb_operations usb_hcd_operations = {
-	.allocate =		hcd_alloc_dev,
 	.get_frame_number =	hcd_get_frame_number,
 	.submit_urb =		hcd_submit_urb,
 	.unlink_urb =		hcd_unlink_urb,
-	.deallocate =		hcd_free_dev,
 	.buffer_alloc =		hcd_buffer_alloc,
 	.buffer_free =		hcd_buffer_free,
 	.disable =		hcd_endpoint_disable,

@@ -151,8 +151,6 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
 	hcd->self.bus_name = "lh7a404";
 	hcd->product_desc = "LH7A404 OHCI";
 
-	INIT_LIST_HEAD (&hcd->dev_list);
-
 	usb_register_bus (&hcd->self);
 
 	if ((retval = driver->start (hcd)) < 0)

@@ -195,8 +195,6 @@ clean_3:
 	hcd->self.hcpriv = (void *) hcd;
 	init_timer (&hcd->rh_timer);
 
-	INIT_LIST_HEAD (&hcd->dev_list);
-
 	usb_register_bus (&hcd->self);
 
 	if ((retval = driver->start (hcd)) < 0) {
