@@ -279,12 +279,6 @@ struct device {
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
-	spinlock_t	lock;		/* lock for the device to ensure two
-					   different layers don't access it at
-					   the same time. */
-	atomic_t	refcount;	/* refcount to make sure the device
-					 * persists for the right amount of time */
-
 	struct bus_type	* bus;		/* type of bus device is on */
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
@@ -296,7 +290,6 @@ struct device {
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
-	enum device_state state;
 	u32		power_state;  /* Current operating state. In
 					   ACPI-speak, this is D0-D3, D0
 					   being fully functional, and D3
@@ -369,24 +362,6 @@ extern int (*platform_notify)(struct device * dev);
 
 extern int (*platform_notify_remove)(struct device * dev);
 
-static inline int device_present(struct device * dev)
-{
-	return (dev && (dev->state == DEVICE_INITIALIZED || dev->state == DEVICE_REGISTERED));
-}
-
-/* device and bus locking helpers.
- *
- * FIXME: Is there anything else we need to do?
- */
-static inline void lock_device(struct device * dev)
-{
-	spin_lock(&dev->lock);
-}
-
-static inline void unlock_device(struct device * dev)
-{
-	spin_unlock(&dev->lock);
-}
 
 /**
  * get_device - atomically increment the reference count for the device.

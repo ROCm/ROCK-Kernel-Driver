@@ -69,14 +69,41 @@ static struct sysfs_ops dev_sysfs_ops = {
 	.store	= dev_attr_store,
 };
 
+
+/**
+ *	device_release - free device structure.
+ *	@kobj:	device's kobject.
+ *
+ *	This is called once the reference count for the object
+ *	reaches 0. We forward the call to the device's release
+ *	method, which should handle actually freeing the structure.
+ */
+static void device_release(struct kobject * kobj)
+{
+	struct device * dev = to_dev(kobj);
+	if (dev->release)
+		dev->release(dev);
+}
+
+
+/**
+ *	device_subsys - structure to be registered with kobject core.
+ */
 struct subsystem device_subsys = {
 	.kobj		= {
 		.name	= "devices",
 	},
+	.release	= device_release,
 	.sysfs_ops	= &dev_sysfs_ops,
 	.default_attrs	= dev_default_attrs,
 };
 
+
+/**
+ *	device_create_file - create sysfs attribute file for device.
+ *	@dev:	device.
+ *	@attr:	device attribute descriptor.
+ */
 
 int device_create_file(struct device * dev, struct device_attribute * attr)
 {
@@ -88,6 +115,12 @@ int device_create_file(struct device * dev, struct device_attribute * attr)
 	return error;
 }
 
+/**
+ *	device_remove_file - remove sysfs attribute file.
+ *	@dev:	device.
+ *	@attr:	device attribute descriptor.
+ */
+
 void device_remove_file(struct device * dev, struct device_attribute * attr)
 {
 	if (get_device(dev)) {
@@ -96,31 +129,71 @@ void device_remove_file(struct device * dev, struct device_attribute * attr)
 	}
 }
 
+
+/**
+ *	device_initialize - init device structure.
+ *	@dev:	device.
+ *
+ *	This prepares the device for use by other layers,
+ *	including adding it to the device hierarchy. 
+ *	It is the first half of device_register(), if called by
+ *	that, though it can also be called separately, so one
+ *	may use @dev's fields (e.g. the refcount).
+ */
+
+void device_initialize(struct device *dev)
+{
+	kobject_init(&dev->kobj);
+	INIT_LIST_HEAD(&dev->node);
+	INIT_LIST_HEAD(&dev->children);
+	INIT_LIST_HEAD(&dev->g_list);
+	INIT_LIST_HEAD(&dev->driver_list);
+	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->intf_list);
+//	spin_lock_init(&dev->lock);
+}
+
+/**
+ *	device_add - add device to device hierarchy.
+ *	@dev:	device.
+ *
+ *	This is part 2 of device_register(), though may be called 
+ *	separately _iff_ device_initialize() has been called separately.
+ *
+ *	This adds it to the kobject hierarchy via kobject_add(), adds it
+ *	to the global and sibling lists for the device, then
+ *	adds it to the other relevant subsystems of the driver model.
+ */
 int device_add(struct device *dev)
 {
+	struct device * parent;
 	int error;
-
+	
 	if (!dev || !strlen(dev->bus_id))
 		return -EINVAL;
 
-	down(&device_sem);
-	dev->state = DEVICE_REGISTERED;
-	if (dev->parent) {
-		list_add_tail(&dev->g_list,&dev->parent->g_list);
-		list_add_tail(&dev->node,&dev->parent->children);
-	} else
-		list_add_tail(&dev->g_list,&global_device_list);
-	up(&device_sem);
+	parent = get_device(dev->parent);
 
 	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
 		 dev->bus_id, dev->name);
 
+	/* first, register with generic layer. */
 	strncpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
-	if (dev->parent)
-		dev->kobj.parent = &dev->parent->kobj;
 	dev->kobj.subsys = &device_subsys;
-	if ((error = kobject_register(&dev->kobj)))
+	if (parent)
+		dev->kobj.parent = &parent->kobj;
+
+	if ((error = kobject_add(&dev->kobj)))
 		goto register_done;
+
+	/* now take care of our own registration */
+	down(&device_sem);
+	if (parent) {
+		list_add_tail(&dev->g_list,&dev->parent->g_list);
+		list_add_tail(&dev->node,&parent->children);
+	} else
+		list_add_tail(&dev->g_list,&global_device_list);
+	up(&device_sem);
 
 	bus_add_device(dev);
 
@@ -133,94 +206,78 @@ int device_add(struct device *dev)
 
 	devclass_add_device(dev);
  register_done:
-	if (error) {
-		down(&device_sem);
-		list_del_init(&dev->g_list);
-		list_del_init(&dev->node);
-		up(&device_sem);
-	}
+	if (error && parent)
+		put_device(parent);
 	return error;
 }
 
-void device_initialize(struct device *dev)
-{
-	kobject_init(&dev->kobj);
-	INIT_LIST_HEAD(&dev->node);
-	INIT_LIST_HEAD(&dev->children);
-	INIT_LIST_HEAD(&dev->g_list);
-	INIT_LIST_HEAD(&dev->driver_list);
-	INIT_LIST_HEAD(&dev->bus_list);
-	INIT_LIST_HEAD(&dev->intf_list);
-	spin_lock_init(&dev->lock);
-	atomic_set(&dev->refcount,1);
-	dev->state = DEVICE_INITIALIZED;
-	if (dev->parent)
-		get_device(dev->parent);
-}
 
 /**
- * device_register - register a device
- * @dev:	pointer to the device structure
+ *	device_register - register a device with the system.
+ *	@dev:	pointer to the device structure
  *
- * First, make sure that the device has a parent, create
- * a directory for it, then add it to the parent's list of
- * children.
- *
- * Maintains a global list of all devices, in depth-first ordering.
- * The head for that list is device_root.g_list.
+ *	This happens in two clean steps - initialize the device
+ *	and add it to the system. The two steps can be called 
+ *	separately, but this is the easiest and most common. 
+ *	I.e. you should only call the two helpers separately if 
+ *	have a clearly defined need to use and refcount the device
+ *	before it is added to the hierarchy.
  */
+
 int device_register(struct device *dev)
 {
-	int error;
-
-	if (!dev || !strlen(dev->bus_id))
-		return -EINVAL;
-
 	device_initialize(dev);
-	if (dev->parent)
-		get_device(dev->parent);
-	error = device_add(dev);
-	if (error && dev->parent)
-		put_device(dev->parent);
-	return error;
+	return device_add(dev);
 }
+
+
+/**
+ *	get_device - increment reference count for device.
+ *	@dev:	device.
+ *
+ *	This simply forwards the call to kobject_get(), though
+ *	we do take care to provide for the case that we get a NULL
+ *	pointer passed in.
+ */
 
 struct device * get_device(struct device * dev)
 {
-	struct device * ret = dev;
-	down(&device_sem);
-	if (device_present(dev) && atomic_read(&dev->refcount) > 0)
-		atomic_inc(&dev->refcount);
-	else
-		ret = NULL;
-	up(&device_sem);
-	return ret;
+	return dev ? to_dev(kobject_get(&dev->kobj)) : NULL;
 }
 
+
 /**
- * put_device - decrement reference count, and clean up when it hits 0
- * @dev:	device in question
+ *	put_device - decrement reference count.
+ *	@dev:	device in question.
  */
 void put_device(struct device * dev)
 {
-	down(&device_sem);
-	if (!atomic_dec_and_test(&dev->refcount)) {
-		up(&device_sem);
-		return;
-	}
-	list_del_init(&dev->node);
-	list_del_init(&dev->g_list);
-	up(&device_sem);
-
-	WARN_ON(dev->state == DEVICE_REGISTERED);
-
-	if (dev->state == DEVICE_GONE)
-		device_del(dev);
+	kobject_put(&dev->kobj);
 }
+
+
+/**
+ *	device_del - delete device from system.
+ *	@dev:	device.
+ *
+ *	This is the first part of the device unregistration 
+ *	sequence. This removes the device from the lists we control
+ *	from here, has it removed from the other driver model 
+ *	subsystems it was added to in device_add(), and removes it
+ *	from the kobject hierarchy.
+ *
+ *	NOTE: this should be called manually _iff_ device_add() was 
+ *	also called manually.
+ */
 
 void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
+
+	down(&device_sem);
+	list_del_init(&dev->node);
+	list_del_init(&dev->g_list);
+	up(&device_sem);
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
@@ -233,31 +290,29 @@ void device_del(struct device * dev)
 
 	bus_remove_device(dev);
 
-	if (dev->release)
-		dev->release(dev);
+	kobject_del(&dev->kobj);
 
 	if (parent)
 		put_device(parent);
+
 }
 
 /**
- * device_unregister - unlink device
- * @dev:	device going away
+ *	device_unregister - unregister device from system.
+ *	@dev:	device going away.
  *
- * The device has been removed from the system, so we disavow knowledge
- * of it. It might not be the final reference to the device, so we mark
- * it as !present, so no more references to it can be acquired.
- * In the end, we decrement the final reference count for it.
+ *	We do this in two parts, like we do device_register(). First,
+ *	we remove it from all the subsystems with device_del(), then
+ *	we decrement the reference count via put_device(). If that
+ *	is the final reference count, the device will be cleaned up
+ *	via device_release() above. Otherwise, the structure will 
+ *	stick around until the final reference to the device is dropped.
  */
 void device_unregister(struct device * dev)
 {
-	down(&device_sem);
-	dev->state = DEVICE_GONE;
-	up(&device_sem);
-
 	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
 		 dev->bus_id,dev->name);
-	kobject_unregister(&dev->kobj);
+	device_del(dev);
 	put_device(dev);
 }
 
@@ -268,7 +323,11 @@ static int __init device_subsys_init(void)
 
 core_initcall(device_subsys_init);
 
+EXPORT_SYMBOL(device_initialize);
+EXPORT_SYMBOL(device_add);
 EXPORT_SYMBOL(device_register);
+
+EXPORT_SYMBOL(device_del);
 EXPORT_SYMBOL(device_unregister);
 EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);
