@@ -92,7 +92,8 @@ struct ctlr_info {
 
 	void *vaddr;
 	unsigned long paddr;
-	unsigned long ioaddr;
+	unsigned long io_mem_addr;
+	unsigned long io_mem_length;
 	int	intr;
 	int	usage_count;
 	drv_info_t	drv[NWD];
