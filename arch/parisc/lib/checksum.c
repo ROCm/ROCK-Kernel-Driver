@@ -113,7 +113,7 @@ EXPORT_SYMBOL(csum_partial);
 /*
  * copy while checksumming, otherwise like csum_partial
  */
-unsigned int csum_partial_copy_nocheck(const char *src, char *dst, 
+unsigned int csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst,
 				       int len, unsigned int sum)
 {
 	/*
@@ -131,7 +131,7 @@ EXPORT_SYMBOL(csum_partial_copy_nocheck);
  * Copy from userspace and compute checksum.  If we catch an exception
  * then zero the rest of the buffer.
  */
-unsigned int csum_partial_copy_from_user (const char *src, char *dst,
+unsigned int csum_partial_copy_from_user (const unsigned char *src, unsigned char *dst,
                                           int len, unsigned int sum,
                                           int *err_ptr)
 {
