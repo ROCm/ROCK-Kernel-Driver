@@ -40,8 +40,14 @@
 #define clear_page(page)	memset ((void *)(page), 0, PAGE_SIZE)
 #define copy_page(to, from)	memcpy ((void *)(to), (void *)from, PAGE_SIZE)
 
-#define clear_user_page(page, vaddr, pg)	clear_page (page)
-#define copy_user_page(to, from, vaddr,pg)	copy_page (to, from)
+#define clear_user_page(addr, vaddr, page)	\
+	do { 	clear_page(addr);		\
+		flush_dcache_page(page);	\
+	} while (0)
+#define copy_user_page(to, from, vaddr, page)	\
+	do {	copy_page(to, from);		\
+		flush_dcache_page(page);	\
+	} while (0)
 
 #ifdef STRICT_MM_TYPECHECKS
 /*

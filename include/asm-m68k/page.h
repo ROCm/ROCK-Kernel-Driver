@@ -79,8 +79,14 @@ static inline void clear_page(void *page)
 #define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
 #endif
 
-#define clear_user_page(page, vaddr, pg)	clear_page(page)
-#define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
+#define clear_user_page(addr, vaddr, page)	\
+	do { 	clear_page(addr);		\
+		flush_dcache_page(page);	\
+	} while (0)
+#define copy_user_page(to, from, vaddr, page)	\
+	do {	copy_page(to, from);		\
+		flush_dcache_page(page);	\
+	} while (0)
 
 /*
  * These are used to make use of C type-checking..

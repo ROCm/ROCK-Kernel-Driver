@@ -71,13 +71,6 @@
 					 ((unsigned long)start) + size, 0);
 
 /*
- * This is an obsolete interface; the functionality that was provided by this
- * function is now merged into our flush_dcache_page, flush_icache_page,
- * copy_user_page and clear_user_page functions.
- */
-#define flush_page_to_ram(page)	do { } while (0)
-
-/*
  * flush_dcache_page is used when the kernel has written to the page
  * cache page at virtual address page->virtual.
  *

@@ -62,7 +62,6 @@ extern void nb85e_cache_flush_icache_user_range (struct vm_area_struct *vma,
 						 unsigned long adr, int len);
 extern void nb85e_cache_flush_sigtramp (unsigned long addr);
 
-#define flush_page_to_ram(x)	((void)0)
 #define flush_cache_all		nb85e_cache_flush_all
 #define flush_cache_mm		nb85e_cache_flush_mm
 #define flush_cache_range	nb85e_cache_flush_range

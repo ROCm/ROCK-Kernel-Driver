@@ -1008,11 +1008,9 @@ retry_find:
 
 success:
 	/*
-	 * Found the page and have a reference on it, need to check sharing
-	 * and possibly copy it over to another page..
+	 * Found the page and have a reference on it.
 	 */
 	mark_page_accessed(page);
-	flush_page_to_ram(page);
 	return page;
 
 no_cached_page:
@@ -1124,12 +1122,9 @@ retry_find:
 
 success:
 	/*
-	 * Found the page and have a reference on it, need to check sharing
-	 * and possibly copy it over to another page..
+	 * Found the page and have a reference on it.
 	 */
 	mark_page_accessed(page);
-	flush_page_to_ram(page);
-
 	return page;
 
 no_cached_page:
