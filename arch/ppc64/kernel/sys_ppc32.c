@@ -3603,10 +3603,8 @@ asmlinkage int sys32_sched_rr_get_interval(u32 pid, struct compat_timespec *inte
 	set_fs (KERNEL_DS);
 	ret = sys_sched_rr_get_interval((int)pid, &t);
 	set_fs (old_fs);
-	if (put_user (t.tv_sec, &interval->tv_sec) ||
-	    __put_user (t.tv_nsec, &interval->tv_nsec))
+	if (put_compat_timespec(&t, interval))
 		return -EFAULT;
-	
 	return ret;
 }
 
