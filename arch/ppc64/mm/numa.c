@@ -216,7 +216,7 @@ static int numa_setup_cpu(unsigned long lcpu)
 
 	numa_domain = of_node_numa_domain(cpu);
 
-	if (numa_domain >= numnodes) {
+	if (numa_domain >= num_online_nodes()) {
 		/*
 		 * POWER4 LPAR uses 0xffff as invalid node,
 		 * dont warn in this case.
@@ -384,7 +384,8 @@ new_range:
 			goto new_range;
 	}
 
-	numnodes = max_domain + 1;
+	for (i = 0; i <= max_domain; i++)
+		node_set_online(i);
 
 	return 0;
 }
@@ -430,11 +431,8 @@ static void __init dump_numa_topology(void)
 	if (min_common_depth == -1 || !numa_enabled)
 		return;
 
-	for (node = 0; node < MAX_NUMNODES; node++) {
+	for_each_online_node(node) {
 		unsigned long i;
-
-		if (!node_online(node))
-			continue;
 
 		printk(KERN_INFO "Node %d Memory:", node);
 
@@ -519,7 +517,7 @@ void __init do_init_bootmem(void)
 
 	register_cpu_notifier(&ppc64_numa_nb);
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		unsigned long start_paddr, end_paddr;
 		int i;
 		unsigned long bootmem_paddr;
@@ -619,7 +617,7 @@ void __init paging_init(void)
 	memset(zones_size, 0, sizeof(zones_size));
 	memset(zholes_size, 0, sizeof(zholes_size));
 
-	for (nid = 0; nid < numnodes; nid++) {
+	for_each_online_node(nid) {
 		unsigned long start_pfn;
 		unsigned long end_pfn;
 
