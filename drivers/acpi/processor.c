@@ -1607,17 +1607,21 @@ acpi_processor_get_info (
 
 	if (!object.processor.pblk_address)
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No PBLK (NULL address)\n"));
-	else if (object.processor.pblk_length < 6)
+	else if (object.processor.pblk_length < 4)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid PBLK length [%d]\n",
 			object.processor.pblk_length));
 	else {
 		pr->throttling.address = object.processor.pblk_address;
 		pr->throttling.duty_offset = acpi_fadt.duty_offset;
 		pr->throttling.duty_width = acpi_fadt.duty_width;
-		pr->power.states[ACPI_STATE_C2].address =
-			object.processor.pblk_address + 4;
-		pr->power.states[ACPI_STATE_C3].address =
-			object.processor.pblk_address + 5;
+
+		if (object.processor.pblk_length >= 5)
+			pr->power.states[ACPI_STATE_C2].address =
+				object.processor.pblk_address + 4;
+
+		if (object.processor.pblk_length >= 6)
+			pr->power.states[ACPI_STATE_C3].address =
+				object.processor.pblk_address + 5;
 	}
 
 	acpi_processor_get_power_info(pr);
