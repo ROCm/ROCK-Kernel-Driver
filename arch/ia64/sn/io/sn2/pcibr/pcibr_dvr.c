@@ -31,9 +31,9 @@
  *   -pcibr_debug_slot is the pci slot you want to trace.
  */
 uint32_t pcibr_debug_mask = 0x0;	/* 0x00000000 to disable */
-char      *pcibr_debug_module = "all";		/* 'all' for all modules */
-int	   pcibr_debug_widget = -1;		/* '-1' for all widgets  */
-int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
+static char      *pcibr_debug_module = "all";		/* 'all' for all modules */
+static int	   pcibr_debug_widget = -1;		/* '-1' for all widgets  */
+static int	   pcibr_debug_slot = -1;		/* '-1' for all slots    */
 
 /* kbrick widgetnum-to-bus layout */
 int p_busnum[MAX_PORT_NUM] = {                  /* widget#      */
