@@ -40,6 +40,7 @@
  *    Jon Grimm <jgrimm@us.ibm.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Ardelle Fan <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -690,6 +691,9 @@ int sctp_init(void)
 
 	/* Valid.Cookie.Life        - 60  seconds */
 	sctp_proto.valid_cookie_life	= 60 * HZ;
+
+	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	sctp_proto.cookie_preserve_enable = 1;
 
 	/* Max.Burst		    - 4 */
 	sctp_proto.max_burst = SCTP_MAX_BURST;

@@ -2,6 +2,7 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 Intel Corp.
  * Copyright (c) 2002      Nokia Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -502,6 +503,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 	sctp_chunk_t *repl;
 	sctp_ulpevent_t *ev;
 	int error = 0;
+	sctp_chunk_t *err_chk_p;
 
 	/* If the packet is an OOTB packet which is temporarily on the
 	 * control endpoint, responding with an ABORT.
@@ -521,7 +523,8 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 	 * "Z" will reply with a COOKIE ACK chunk after building a TCB
 	 * and moving to the ESTABLISHED state.
 	 */
-	new_asoc = sctp_unpack_cookie(ep, asoc, chunk, GFP_ATOMIC, &error);
+	new_asoc = sctp_unpack_cookie(ep, asoc, chunk, GFP_ATOMIC, &error,
+				      &err_chk_p);
 
 	/* FIXME:
 	 * If the re-build failed, what is the proper error path
@@ -536,6 +539,11 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 		switch (error) {
 		case -SCTP_IERROR_NOMEM:
 			goto nomem;
+
+		case -SCTP_IERROR_STALE_COOKIE:
+			sctp_send_stale_cookie_err(ep, asoc, chunk, commands,
+						   err_chk_p);
+			return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 		case -SCTP_IERROR_BAD_SIG:
 		default:
@@ -1562,6 +1570,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 	sctp_association_t *new_asoc;
 	int error = 0;
 	char action;
+	sctp_chunk_t *err_chk_p;
 
 	/* "Decode" the chunk.  We have no optional parameters so we
 	 * are in good shape.
@@ -1575,7 +1584,8 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 	 * current association, consider the State Cookie valid even if
 	 * the lifespan is exceeded.
 	 */
-	new_asoc = sctp_unpack_cookie(ep, asoc, chunk, GFP_ATOMIC, &error);
+	new_asoc = sctp_unpack_cookie(ep, asoc, chunk, GFP_ATOMIC, &error,
+				      &err_chk_p);
 
 	/* FIXME:
 	 * If the re-build failed, what is the proper error path
@@ -1591,6 +1601,12 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 		case -SCTP_IERROR_NOMEM:
 			goto nomem;
 
+		case -SCTP_IERROR_STALE_COOKIE:
+			sctp_send_stale_cookie_err(ep, asoc, chunk, commands,
+						   err_chk_p);
+			return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+
+			break;
 		case -SCTP_IERROR_BAD_SIG:
 		default:
 			return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
@@ -1706,7 +1722,47 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_abort(const sctp_endpoint_t *ep,
 	return sctp_sf_shutdown_sent_abort(ep, asoc, type, arg, commands);
 }
 
-#if 0
+/*
+ * Handle an Error received in COOKIE_ECHOED state.
+ *
+ * Only handle the error type of stale COOKIE Error, the other errors will
+ * be ignored.
+ *
+ * Inputs
+ * (endpoint, asoc, chunk)
+ *
+ * Outputs
+ * (asoc, reply_msg, msg_up, timers, counters)
+ *
+ * The return value is the disposition of the chunk.
+ */
+sctp_disposition_t sctp_sf_cookie_echoed_err(const sctp_endpoint_t *ep,
+					     const sctp_association_t *asoc,
+					     const sctp_subtype_t type,
+					     void *arg,
+					     sctp_cmd_seq_t *commands)
+{
+	sctp_chunk_t *chunk = arg;
+	sctp_errhdr_t *err;
+
+	/* If we have gotten too many failures, give up.  */
+	if (1 + asoc->counters[SCTP_COUNTER_INIT_ERROR] >
+					 asoc->max_init_attempts) {
+		/* INIT_FAILED will issue an ulpevent.  */
+		sctp_add_cmd_sf(commands, SCTP_CMD_INIT_FAILED, SCTP_NULL());
+		return SCTP_DISPOSITION_DELETE_TCB;
+	}
+	err = (sctp_errhdr_t *)(chunk->skb->data);
+
+	/* Process the error here */
+	switch (err->cause) {
+	case SCTP_ERROR_STALE_COOKIE:
+		return sctp_sf_do_5_2_6_stale(ep, asoc, type, arg, commands);
+	default:
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+	}
+}
+
 /*
  * Handle a Stale COOKIE Error
  *
@@ -1732,47 +1788,30 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_abort(const sctp_endpoint_t *ep,
  *
  * The return value is the disposition of the chunk.
  */
-sctp_disposition_t do_5_2_6_stale(const sctp_endpoint_t *ep,
-				  const sctp_association_t *asoc,
-				  const sctp_subtype_t type,
-				  void *arg,
-				  sctp_cmd_seq_t *commands)
+sctp_disposition_t sctp_sf_do_5_2_6_stale(const sctp_endpoint_t *ep,
+					  const sctp_association_t *asoc,
+					  const sctp_subtype_t type,
+					  void *arg,
+					  sctp_cmd_seq_t *commands)
 {
 	sctp_chunk_t *chunk = arg;
+	time_t stale;
+	sctp_cookie_preserve_param_t bht;
+	sctp_errhdr_t *err;
+	struct list_head *pos;
+	sctp_transport_t *t;
+	sctp_chunk_t *reply;
+	sctp_bind_addr_t *bp;
+	int attempts;
 
-	/* This is not a real chunk type.  It is a subtype of the
-	 * ERROR chunk type.  The ERROR chunk processing will bring us
-	 * here.
-	 */
-	sctp_chunk_t *in_packet;
-	stp_chunk_t *reply;
-	sctp_inithdr_t initack;
-	__u8 *addrs;
-	int addrs_len;
-	time_t rtt;
-	struct sctpCookiePreserve bht;
+	attempts = asoc->counters[SCTP_COUNTER_INIT_ERROR] + 1;
 
-	/* If we have gotten too many failures, give up.  */
-	if (1 + asoc->counters[SctpCounterInits] > asoc->max_init_attempts) {
-		/* FIXME: Move to new ulpevent.  */
-		retval->event_up = sctp_make_ulp_init_timeout(asoc);
-		if (!retval->event_up)
-			goto nomem;
-		sctp_add_cmd_sf(retval->commands, SCTP_CMD_DELETE_TCB,
-				SCTP_NULL());
+	if (attempts >= asoc->max_init_attempts) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_INIT_FAILED, SCTP_NULL());
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
 
-	retval->counters[0] = SCTP_COUNTER_INCR;
-	retval->counters[0] = SctpCounterInits;
-	retval->counters[1] = 0;
-	retval->counters[1] = 0;
-
-	/* Calculate the RTT in ms.  */
-	/* BUG--we should get the send time of the HEARTBEAT REQUEST.  */
-	in_packet = chunk;
-	rtt = 1000 * timeval_sub(in_packet->skb->stamp,
-				 asoc->c.state_timestamp);
+	err = (sctp_errhdr_t *)(chunk->skb->data);
 
 	/* When calculating the time extension, an implementation
 	 * SHOULD use the RTT information measured based on the
@@ -1780,28 +1819,48 @@ sctp_disposition_t do_5_2_6_stale(const sctp_endpoint_t *ep,
 	 * more than 1 second beyond the measured RTT, due to long
 	 * State Cookie lifetimes making the endpoint more subject to
 	 * a replay attack.
+	 * Measure of Staleness's unit is usec. (1/1000000 sec)
+	 * Suggested Cookie Life-span Increment's unit is msec.
+	 * (1/1000 sec)
+	 * In general, if you use the suggested cookie life, the value
+	 * found in the field of measure of staleness should be doubled
+	 * to give ample time to retransmit the new cookie and thus
+	 * yield a higher probability of success on the reattempt.
 	 */
-	bht.p = {SCTP_COOKIE_PRESERVE, 8};
-	bht.extraTime = htonl(rtt + 1000);
+	stale = ntohl(*(suseconds_t *)((u8 *)err + sizeof(sctp_errhdr_t)));
+	stale = stale << 1 / 1000;
 
-	initack.init_tag		= htonl(asoc->c.my_vtag);
-	initack.a_rwnd 		        = htonl(atomic_read(&asoc->rnwd));
-	initack.num_outbound_streams    = htons(asoc->streamoutcnt);
-	initack.num_inbound_streams     = htons(asoc->streamincnt);
-	initack.initial_tsn             = htonl(asoc->c.initSeqNumber);
-
-	sctp_get_my_addrs(asoc, &addrs, &addrs_len);
+	bht.param_hdr.type = SCTP_PARAM_COOKIE_PRESERVATIVE;
+	bht.param_hdr.length = htons(sizeof(bht));
+	bht.lifespan_increment = htonl(stale);
 
 	/* Build that new INIT chunk.  */
-	reply = sctp_make_chunk(SCTP_INITIATION, 0,
-				sizeof(initack)
-				+ sizeof(bht)
-				+ addrs_len);
+	bp = (sctp_bind_addr_t *) &asoc->base.bind_addr;
+	reply = sctp_make_init(asoc, bp, GFP_ATOMIC, sizeof(bht));
 	if (!reply)
 		goto nomem;
-	sctp_addto_chunk(reply, sizeof(initack), &initack);
+
 	sctp_addto_chunk(reply, sizeof(bht), &bht);
-	sctp_addto_chunk(reply, addrs_len, addrs);
+
+	/* Cast away the const modifier, as we want to just
+	 * rerun it through as a sideffect.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_INC,
+			SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
+
+	/* If we've sent any data bundled with COOKIE-ECHO we need to resend. */
+	list_for_each(pos, &asoc->peer.transport_addr_list) {
+		t = list_entry(pos, sctp_transport_t, transports);
+		sctp_add_cmd_sf(commands, SCTP_CMD_RETRAN, SCTP_TRANSPORT(t));
+	}
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
+	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
+			SCTP_STATE(SCTP_STATE_COOKIE_WAIT));
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_START,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
+
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
 
 	return SCTP_DISPOSITION_CONSUME;
@@ -1809,7 +1868,6 @@ sctp_disposition_t do_5_2_6_stale(const sctp_endpoint_t *ep,
 nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
-#endif /* 0 */
 
 /*
  * Process an ABORT.
@@ -3220,7 +3278,7 @@ sctp_disposition_t sctp_sf_do_prm_asoc(const sctp_endpoint_t *ep,
 	 * 1 to 4294967295 (see 5.3.1 for Tag value selection). ...
 	 */
 
-	repl = sctp_make_init(asoc, bp, GFP_ATOMIC);
+	repl = sctp_make_init(asoc, bp, GFP_ATOMIC, 0);
 	if (!repl)
 		goto nomem;
 
@@ -3992,7 +4050,7 @@ sctp_disposition_t sctp_sf_t1_timer_expire(const sctp_endpoint_t *ep,
 		switch (timer) {
 		case SCTP_EVENT_TIMEOUT_T1_INIT:
 			bp = (sctp_bind_addr_t *) &asoc->base.bind_addr;
-			repl = sctp_make_init(asoc, bp, GFP_ATOMIC);
+			repl = sctp_make_init(asoc, bp, GFP_ATOMIC, 0);
 			break;
 
 		case SCTP_EVENT_TIMEOUT_T1_COOKIE:
@@ -4333,4 +4391,26 @@ void sctp_ootb_pkt_free(sctp_packet_t *packet)
 {
 	sctp_transport_free(packet->transport);
 	sctp_packet_free(packet);
+}
+
+/* Send a stale cookie error when a invalid COOKIE ECHO chunk is found  */
+void sctp_send_stale_cookie_err(const sctp_endpoint_t *ep,
+				const sctp_association_t *asoc,
+				const sctp_chunk_t *chunk,
+				sctp_cmd_seq_t *commands,
+				sctp_chunk_t *err_chunk)
+{
+	sctp_packet_t *packet;
+
+	if (err_chunk) {
+		packet = sctp_ootb_pkt_new(asoc, chunk);
+		if (packet) {
+			/* Set the skb to the belonging sock for accounting. */
+			err_chunk->skb->sk = ep->base.sk;
+			sctp_packet_append_chunk(packet, err_chunk);
+			sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
+					SCTP_PACKET(packet));
+		} else
+			sctp_free_chunk (err_chunk);
+	}
 }

@@ -42,6 +42,7 @@
  *    Hui Huang <hui.huang@nokia.com>
  *    Daisy Chang <daisyc@us.ibm.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
+ *    Ardelle Fan <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -279,6 +280,7 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 {
 	sctp_chunkhdr_t *ch;
 	__u8 *ch_end;
+	sctp_errhdr_t *err;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
 
@@ -308,8 +310,9 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 			goto discard;
 
 		if (ch->type == SCTP_CID_ERROR) {
-			/* FIXME - Need to check the "Stale cookie" ERROR. */
-			goto discard;
+			err = (sctp_errhdr_t *)(ch + sizeof(sctp_chunkhdr_t));
+			if (SCTP_ERROR_STALE_COOKIE == err->cause)
+				goto discard;
 		}
 
 		ch = (sctp_chunkhdr_t *) ch_end;

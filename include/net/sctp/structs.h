@@ -42,6 +42,7 @@
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Dajiang Zhang         <dajiang.zhang@nokia.com>
+ *    Ardelle Fan           <ardelle.fan@intel.com> 
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -182,6 +183,9 @@ struct SCTP_protocol {
 
 	/* Valid.Cookie.Life        - 60  seconds  */
 	int valid_cookie_life;
+	
+	/* Whether Cookie Preservative is enabled(1) or not(0) */ 
+	int cookie_preserve_enable;
 
 	/* Association.Max.Retrans  - 10 attempts
 	 * Path.Max.Retrans         - 5  attempts (per destination address)
@@ -1278,7 +1282,6 @@ struct SCTP_association {
 
 	/* The cookie life I award for any cookie.  */
 	struct timeval cookie_life;
-	__u32 cookie_preserve;
 
 	/* Overall     : The overall association error count.
 	 * Error Count : [Clear this any time I get something.]

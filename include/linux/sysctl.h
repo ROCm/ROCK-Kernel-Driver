@@ -543,7 +543,8 @@ enum {
 	NET_SCTP_PATH_MAX_RETRANS        =  8,
 	NET_SCTP_MAX_INIT_RETRANSMITS    =  9,
 	NET_SCTP_HB_INTERVAL             = 10,
-	NET_SCTP_MAX_BURST               = 11,
+	NET_SCTP_PRESERVE_ENABLE         = 11,
+	NET_SCTP_MAX_BURST               = 12,
 };
 
 /* CTL_PROC names: */

@@ -163,7 +163,7 @@ void  sctp_init_cause(sctp_chunk_t *chunk, __u16 cause_code,
  */
 sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 			     const sctp_bind_addr_t *bp,
-			     int priority)
+			     int priority, int vparam_len)
 {
 	sctp_inithdr_t init;
 	union sctp_params addrs;
@@ -192,6 +192,7 @@ sctp_chunk_t *sctp_make_init(const sctp_association_t *asoc,
 
 	chunksize = sizeof(init) + addrs_len + SCTP_SAT_LEN;
 	chunksize += sizeof(ecap_param);
+	chunksize += vparam_len;
 
 	/* RFC 2960 3.3.2 Initiation (INIT) (1)
 	 *
@@ -1337,7 +1338,7 @@ nodata:
 sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 				       const sctp_association_t *asoc,
 				       sctp_chunk_t *chunk, int priority,
-				       int *error)
+				       int *error, sctp_chunk_t **err_chk_p)
 {
 	sctp_association_t *retval = NULL;
 	sctp_signed_cookie_t *cookie;
@@ -1394,7 +1395,29 @@ sctp_association_t *sctp_unpack_cookie(const sctp_endpoint_t *ep,
 	 * for init collision case of lost COOKIE ACK.
 	 */
 	if (!asoc && tv_lt(bear_cookie->expiration, chunk->skb->stamp)) {
-		*error = -SCTP_IERROR_STALE_COOKIE;
+		/*
+		 * Section 3.3.10.3 Stale Cookie Error (3)
+		 *
+		 * Cause of error
+		 * ---------------
+		 * Stale Cookie Error:  Indicates the receipt of a valid State
+		 * Cookie that has expired.
+		 */
+		*err_chk_p = sctp_make_op_error_space(asoc, chunk,
+						ntohs(chunk->chunk_hdr->length));
+		if (*err_chk_p) {
+			suseconds_t usecs = (chunk->skb->stamp.tv_sec -
+				bear_cookie->expiration.tv_sec) * 1000000L +
+				chunk->skb->stamp.tv_usec -
+				bear_cookie->expiration.tv_usec;
+
+			usecs = htonl(usecs);
+			sctp_init_cause(*err_chk_p, SCTP_ERROR_STALE_COOKIE,
+					&usecs, sizeof(usecs));
+			*error = -SCTP_IERROR_STALE_COOKIE;
+		} else
+			*error = -SCTP_IERROR_NOMEM;
+
 		goto fail;
 	}
 
@@ -1751,6 +1774,7 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 	__u16 sat;
 	int retval = 1;
 	sctp_scope_t scope;
+	time_t stale;
 
 	/* We maintain all INIT parameters in network byte order all the
 	 * time.  This allows us to not worry about whether the parameters
@@ -1770,8 +1794,16 @@ int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
 		break;
 
 	case SCTP_PARAM_COOKIE_PRESERVATIVE:
-		asoc->cookie_preserve =
-			ntohl(param.life->lifespan_increment);
+		if (!sctp_proto.cookie_preserve_enable)
+			break;
+
+		stale = ntohl(param.life->lifespan_increment);
+
+		/* Suggested Cookie Life span increment's unit is msec,
+		 * (1/1000sec).
+		 */
+		asoc->cookie_life.tv_sec += stale / 1000;
+		asoc->cookie_life.tv_usec += (stale % 1000) * 1000;
 		break;
 
 	case SCTP_PARAM_HOST_NAME_ADDRESS:

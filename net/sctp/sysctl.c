@@ -1,5 +1,6 @@
 /* SCTP kernel reference Implementation 
  * Copyright (c) 2002 International Business Machines Corp.
+ * Copyright (c) 2002 Intel Corp.
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
@@ -32,6 +33,7 @@
  * Written or modified by: 
  *    Mingqin Liu           <liuming@us.ibm.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
+ *    Ardelle Fan           <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -69,6 +71,9 @@ static ctl_table sctp_table[] = {
 	  &proc_dointvec },
 	{ NET_SCTP_HB_INTERVAL, "hb_interval",
 	  &sctp_proto.hb_interval, sizeof(int), 0644, NULL,
+	  &proc_dointvec_jiffies, &sysctl_jiffies },
+	{ NET_SCTP_PRESERVE_ENABLE, "cookie_preserve_enable",
+	  &sctp_proto.cookie_preserve_enable, sizeof(int), 0644, NULL,
 	  &proc_dointvec_jiffies, &sysctl_jiffies },
 	{ NET_SCTP_RTO_ALPHA, "rto_alpha_exp_divisor",
 	  &sctp_proto.rto_alpha, sizeof(int), 0644, NULL,
