@@ -451,7 +451,8 @@ cifs_filldir2(char * pfindEntry, struct file *file,
 	} else {
 		fill_in_inode(tmp_inode,(FILE_DIRECTORY_INFO *)pfindEntry,&obj_type);
 	}
-	rc = filldir(direntry,qstring.name,qstring.len,file->f_pos,inum,obj_type);
+	
+	rc = filldir(direntry,qstring.name,qstring.len,file->f_pos,tmp_inode->i_ino,obj_type);
 	if(rc) {
 		cFYI(1,("filldir rc = %d",rc));
 	}
