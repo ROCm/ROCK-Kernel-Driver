@@ -319,8 +319,8 @@ extern void device_release_driver(struct device * dev);
 
 struct device_attribute {
 	struct attribute	attr;
-	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
-	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+	ssize_t (*show)(struct device * dev, char * buf);
+	ssize_t (*store)(struct device * dev, const char * buf);
 };
 
 #define DEVICE_ATTR(_name,_mode,_show,_store) \

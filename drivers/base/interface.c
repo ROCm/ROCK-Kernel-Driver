@@ -10,21 +10,21 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 
-static ssize_t device_read_name(struct device * dev, char * buf, size_t count, loff_t off)
+static ssize_t device_read_name(struct device * dev, char * buf)
 {
-	return off ? 0 : sprintf(buf,"%s\n",dev->name);
+	return sprintf(buf,"%s\n",dev->name);
 }
 
 static DEVICE_ATTR(name,S_IRUGO,device_read_name,NULL);
 
 static ssize_t
-device_read_power(struct device * dev, char * page, size_t count, loff_t off)
+device_read_power(struct device * dev, char * page)
 {
-	return off ? 0 : sprintf(page,"%d\n",dev->power_state);
+	return sprintf(page,"%d\n",dev->power_state);
 }
 
 static ssize_t
-device_write_power(struct device * dev, const char * buf, size_t count, loff_t off)
+device_write_power(struct device * dev, const char * buf)
 {
 	char	str_command[20];
 	char	str_level[20];
@@ -32,9 +32,6 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	u32	state;
 	u32	int_level;
 	int	error = 0;
-
-	if (off)
-		return 0;
 
 	if (!dev->driver)
 		goto done;
@@ -83,7 +80,7 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 			error = 0;
 	}
  done:
-	return error < 0 ? error : count;
+	return error < 0 ? error : strlen(buf);
 }
 
 static DEVICE_ATTR(power,S_IWUSR | S_IRUGO,
