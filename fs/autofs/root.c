@@ -468,7 +468,7 @@ static int autofs_root_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 /* Get/set timeout ioctl() operation */
 static inline int autofs_get_set_timeout(struct autofs_sb_info *sbi,
-					 unsigned long *p)
+					 unsigned long __user *p)
 {
 	unsigned long ntimeout;
 
@@ -485,7 +485,7 @@ static inline int autofs_get_set_timeout(struct autofs_sb_info *sbi,
 }
 
 /* Return protocol version */
-static inline int autofs_get_protover(int *p)
+static inline int autofs_get_protover(int __user *p)
 {
 	return put_user(AUTOFS_PROTO_VERSION, p);
 }
@@ -494,7 +494,7 @@ static inline int autofs_get_protover(int *p)
 static inline int autofs_expire_run(struct super_block *sb,
 				    struct autofs_sb_info *sbi,
 				    struct vfsmount *mnt,
-				    struct autofs_packet_expire *pkt_p)
+				    struct autofs_packet_expire __user *pkt_p)
 {
 	struct autofs_dir_ent *ent;
 	struct autofs_packet_expire pkt;
@@ -526,6 +526,7 @@ static int autofs_root_ioctl(struct inode *inode, struct file *filp,
 			     unsigned int cmd, unsigned long arg)
 {
 	struct autofs_sb_info *sbi = autofs_sbi(inode->i_sb);
+	void __user *argp = (void __user *)arg;
 
 	DPRINTK(("autofs_ioctl: cmd = 0x%08x, arg = 0x%08lx, sbi = %p, pgrp = %u\n",cmd,arg,sbi,process_group(current)));
 
@@ -545,12 +546,12 @@ static int autofs_root_ioctl(struct inode *inode, struct file *filp,
 		autofs_catatonic_mode(sbi);
 		return 0;
 	case AUTOFS_IOC_PROTOVER: /* Get protocol version */
-		return autofs_get_protover((int *)arg);
+		return autofs_get_protover(argp);
 	case AUTOFS_IOC_SETTIMEOUT:
-		return autofs_get_set_timeout(sbi,(unsigned long *)arg);
+		return autofs_get_set_timeout(sbi, argp);
 	case AUTOFS_IOC_EXPIRE:
 		return autofs_expire_run(inode->i_sb, sbi, filp->f_vfsmnt,
-					 (struct autofs_packet_expire *)arg);
+					 argp);
 	default:
 		return -ENOSYS;
 	}
