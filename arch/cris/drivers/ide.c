@@ -687,7 +687,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 /*
  * etrax_dma_intr() is the handler for disk read/write DMA interrupts
  */
-static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
+static ide_startstop_t etrax_dma_intr (struct ata_device *drive, struct request *rq)
 {
 	int i, dma_stat;
 	byte stat;
@@ -699,11 +699,9 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
-			struct request *rq;
-			rq = HWGROUP(drive)->rq;
 			for (i = rq->nr_sectors; i > 0;) {
 				i -= rq->current_nr_sectors;
-				ide_end_request(drive, 1);
+				ide_end_request(drive, rq, 1);
 			}
 			return ide_stopped;
 		}

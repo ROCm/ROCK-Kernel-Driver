@@ -12,39 +12,19 @@
 #include <linux/mm.h>
 #include <linux/blkdev.h>
 
-/*
- * The readahead logic manages two readahead windows.  The "current"
- * and the "ahead" windows.
- *
- * VM_MAX_READAHEAD specifies, in kilobytes, the maximum size of
- * each of the two windows.  So the amount of readahead which is
- * in front of the file pointer varies between VM_MAX_READAHEAD and
- * VM_MAX_READAHEAD * 2.
- *
- * VM_MAX_READAHEAD only applies if the underlying request queue
- * has a zero value of ra_sectors.
- */
+unsigned long default_ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 
 /*
  * Return max readahead size for this inode in number-of-pages.
  */
-static int get_max_readahead(struct inode *inode)
+static inline unsigned long get_max_readahead(struct file *file)
 {
-	unsigned blk_ra_kbytes = 0;
-
-	if (inode->i_sb->s_bdev) {
-		blk_ra_kbytes = blk_get_readahead(inode->i_sb->s_bdev) / 2;
-	}
-	return blk_ra_kbytes >> (PAGE_CACHE_SHIFT - 10);
+	return file->f_ra.ra_pages;
 }
 
-static int get_min_readahead(struct inode *inode)
+static inline unsigned long get_min_readahead(struct file *file)
 {
-	int ret = VM_MIN_READAHEAD / PAGE_CACHE_SIZE;
-
-	if (ret < 2)
-		ret = 2;
-	return ret;
+	return (VM_MIN_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 }
 
 /*
@@ -173,7 +153,7 @@ void do_page_cache_readahead(struct file *file,
 	}
 
 	/*
-	 * Do this now, rather than at the next wait_on_page().
+	 * Do this now, rather than at the next wait_on_page_locked().
 	 */
 	run_task_queue(&tq_disk);
 
@@ -189,7 +169,6 @@ void do_page_cache_readahead(struct file *file,
  */
 void page_cache_readahead(struct file *file, unsigned long offset)
 {
-	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 	struct file_ra_state *ra = &file->f_ra;
 	unsigned long max;
 	unsigned long min;
@@ -206,10 +185,10 @@ void page_cache_readahead(struct file *file, unsigned long offset)
 			goto out;
 	}
 
-	max = get_max_readahead(inode);
+	max = get_max_readahead(file);
 	if (max == 0)
 		goto out;	/* No readahead */
-	min = get_min_readahead(inode);
+	min = get_min_readahead(file);
 
 	if (ra->next_size == 0 && offset == 0) {
 		/*
@@ -309,9 +288,9 @@ out:
  */
 void page_cache_readaround(struct file *file, unsigned long offset)
 {
+	const unsigned long min = get_min_readahead(file) * 2;
 	unsigned long target;
 	unsigned long backward;
-	const int min = get_min_readahead(file->f_dentry->d_inode->i_mapping->host) * 2;
 
 	if (file->f_ra.next_size < min)
 		file->f_ra.next_size = min;
@@ -338,8 +317,7 @@ void page_cache_readaround(struct file *file, unsigned long offset)
  */
 void handle_ra_thrashing(struct file *file)
 {
-	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
-	const unsigned long min = get_min_readahead(mapping->host);
+	const unsigned long min = get_min_readahead(file);
 
 	file->f_ra.next_size -= 3;
 	if (file->f_ra.next_size < min)

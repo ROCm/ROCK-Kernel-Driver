@@ -96,10 +96,8 @@ void rw_swap_page(int rw, struct page *page)
 		PAGE_BUG(page);
 	if (!PageSwapCache(page))
 		PAGE_BUG(page);
-	if (page->mapping != &swapper_space)
-		PAGE_BUG(page);
 	if (!rw_swap_page_base(rw, entry, page))
-		UnlockPage(page);
+		unlock_page(page);
 }
 
 /*
@@ -113,14 +111,15 @@ void rw_swap_page_nolock(int rw, swp_entry_t entry, char *buf)
 	
 	if (!PageLocked(page))
 		PAGE_BUG(page);
-	if (PageSwapCache(page))
-		PAGE_BUG(page);
 	if (page->mapping)
 		PAGE_BUG(page);
 	/* needs sync_page to wait I/O completation */
 	page->mapping = &swapper_space;
 	if (!rw_swap_page_base(rw, entry, page))
-		UnlockPage(page);
-	wait_on_page(page);
+		unlock_page(page);
+	if (rw == WRITE)
+		wait_on_page_writeback(page);
+	else
+		wait_on_page_locked(page);
 	page->mapping = NULL;
 }

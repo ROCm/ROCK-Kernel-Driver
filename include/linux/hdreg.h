@@ -34,6 +34,7 @@
 #define ECC_STAT		0x04	/* Corrected error */
 #define DRQ_STAT		0x08
 #define SEEK_STAT		0x10
+#define SERVICE_STAT		SEEK_STAT
 #define WRERR_STAT		0x20
 #define READY_STAT		0x40
 #define BUSY_STAT		0x80
@@ -48,6 +49,13 @@
 #define ECC_ERR			0x40	/* Uncorrectable ECC error */
 #define BBD_ERR			0x80	/* pre-EIDE meaning:  block marked bad */
 #define ICRC_ERR		0x80	/* new meaning:  CRC error during transfer */
+
+/*
+ * sector count bits
+ */
+#define NSEC_CD			0x01
+#define NSEC_IO			0x02
+#define NSEC_REL		0x04
 
 /*
  * Command Header sizes for IOCTL commands

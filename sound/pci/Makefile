@@ -3,10 +3,9 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := pci.o
+O_TARGET     := _pci.o
 
-subdir-y     := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
-subdir-m     := $(subdir-y)
+mod-subdirs  := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
 
 snd-als4000-objs := als4000.o
 snd-cmipci-objs := cmipci.o
@@ -42,5 +41,18 @@ obj-$(CONFIG_SND_RME96) += snd-rme96.o
 obj-$(CONFIG_SND_SONICVIBES) += snd-sonicvibes.o
 obj-$(CONFIG_SND_VIA686) += snd-via686.o
 obj-$(CONFIG_SND_VIA8233) += snd-via8233.o
+
+subdir-$(CONFIG_SND) += ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
+ifeq ($(CONFIG_SND),y)
+  obj-y += ac97/_ac97.o \
+	   ali5451/_ali5451.o \
+	   cs46xx/_cs46xx.o \
+	   emu10k1/_emu10k1.o \
+	   korg1212/_korg1212.o \
+	   nm256/_nm256.o \
+	   rme9652/_rme9652.o \
+	   trident/_trident.o \
+	   ymfpci/_ymfpci.o
+endif
 
 include $(TOPDIR)/Rules.make

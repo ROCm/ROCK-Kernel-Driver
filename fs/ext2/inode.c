@@ -403,7 +403,7 @@ static int ext2_alloc_branch(struct inode *inode,
 		branch[n].bh = bh;
 		branch[n].p = (u32*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		mark_buffer_dirty_inode(bh, inode);
 		/* We used to sync bh here if IS_SYNC(inode).
@@ -552,7 +552,7 @@ out:
 	if (ext2_splice_branch(inode, iblock, chain, partial, left) < 0)
 		goto changed;
 
-	bh_result->b_state |= (1UL << BH_New);
+	set_buffer_new(bh_result);
 	goto got_it;
 
 changed:

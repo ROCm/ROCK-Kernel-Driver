@@ -164,7 +164,7 @@ static int zisofs_readpage(struct file *file, struct page *page)
 				flush_dcache_page(page);
 				SetPageUptodate(page);
 				kunmap(page);
-				UnlockPage(page);
+				unlock_page(page);
 				if ( fpage == xpage )
 					err = 0; /* The critical page */
 				else
@@ -282,7 +282,7 @@ static int zisofs_readpage(struct file *file, struct page *page)
 					flush_dcache_page(page);
 					SetPageUptodate(page);
 					kunmap(page);
-					UnlockPage(page);
+					unlock_page(page);
 					if ( fpage == xpage )
 						err = 0; /* The critical page */
 					else
@@ -313,7 +313,7 @@ eio:
 			if ( fpage == xpage )
 				SetPageError(page);
 			kunmap(page);
-			UnlockPage(page);
+			unlock_page(page);
 			if ( fpage != xpage )
 				page_cache_release(page);
 		}

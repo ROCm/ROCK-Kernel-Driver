@@ -3,7 +3,7 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := oss.o
+O_TARGET     := _oss.o
 
 export-objs  := mixer_oss.o
 

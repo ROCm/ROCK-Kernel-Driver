@@ -750,7 +750,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -771,7 +771,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -789,7 +789,7 @@ no_dma_set:
 
 		config_chipset_for_pio(drive);
 	}
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, NULL);
 }
 
 /*
@@ -798,7 +798,7 @@ no_dma_set:
  * This is specific to the HPT366 UDMA bios chipset
  * by HighPoint|Triones Technologies, Inc.
  */
-int hpt366_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int hpt366_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	byte reg50h = 0, reg52h = 0, reg5ah = 0, dma_stat = 0;
 	unsigned long dma_base = drive->channel->dma_base;
@@ -829,10 +829,10 @@ int hpt366_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		default:
 			break;
 	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 
-int hpt370_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int hpt370_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
@@ -883,7 +883,7 @@ int hpt370_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		default:
 			break;
 	}
-	return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+	return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -1185,9 +1185,9 @@ void __init ide_init_hpt366(struct ata_channel *hwif)
 			pci_read_config_byte(hwif->pci_dev, 0x5a, &reg5ah);
 			if (reg5ah & 0x10)	/* interrupt force enable */
 				pci_write_config_byte(hwif->pci_dev, 0x5a, reg5ah & ~0x10);
-			hwif->dmaproc = &hpt370_dmaproc;
+			hwif->udma = hpt370_dmaproc;
 		} else {
-			hwif->dmaproc = &hpt366_dmaproc;
+			hwif->udma = hpt366_dmaproc;
 		}
 		if (!noautodma)
 			hwif->autodma = 1;

@@ -29,6 +29,8 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/sched.h>
+#include <linux/errno.h>
 #include <sound/core.h>
 #include <sound/mpu401.h>
 

@@ -24,7 +24,7 @@
 static int swap_writepage(struct page *page)
 {
 	if (remove_exclusive_swap_page(page)) {
-		UnlockPage(page);
+		unlock_page(page);
 		return 0;
 	}
 	rw_swap_page(WRITE, page);
@@ -36,12 +36,23 @@ static struct address_space_operations swap_aops = {
 	sync_page: block_sync_page,
 };
 
+/*
+ * swapper_inode is needed only for for i_bufferlist_lock. This
+ * avoid special-casing in other parts of the kernel.
+ */
+static struct inode swapper_inode = {
+	i_bufferlist_lock:	SPIN_LOCK_UNLOCKED,
+	i_mapping:		&swapper_space,
+};
+
 struct address_space swapper_space = {
 	page_tree:	RADIX_TREE_INIT(GFP_ATOMIC),
 	page_lock:	RW_LOCK_UNLOCKED,
 	clean_pages:	LIST_HEAD_INIT(swapper_space.clean_pages),
 	dirty_pages:	LIST_HEAD_INIT(swapper_space.dirty_pages),
+	io_pages:	LIST_HEAD_INIT(swapper_space.io_pages),
 	locked_pages:	LIST_HEAD_INIT(swapper_space.locked_pages),
+	host:		&swapper_inode,
 	a_ops:		&swap_aops,
 	i_shared_lock:	SPIN_LOCK_UNLOCKED,
 };
@@ -159,10 +170,11 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 
 		/* Add it to the swap cache */
 		*pslot = page;
-		page->flags = ((page->flags & ~(1 << PG_uptodate | 1 << PG_error
-						| 1 << PG_dirty  | 1 << PG_referenced
-						| 1 << PG_arch_1 | 1 << PG_checked))
-			       | (1 << PG_locked));
+		page->flags &= ~(1 << PG_uptodate | 1 << PG_error
+				| 1 << PG_referenced | 1 << PG_arch_1
+				| 1 << PG_checked);
+		SetPageLocked(page);
+		ClearPageDirty(page);
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
@@ -207,7 +219,7 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 				 1 << PG_referenced | 1 << PG_arch_1 |
 				 1 << PG_checked);
-		page->flags |= (1 << PG_dirty);
+		SetPageDirty(page);
 		___add_to_page_cache(page, mapping, index);
 	}
 
@@ -232,9 +244,9 @@ void free_page_and_swap_cache(struct page *page)
 	 * exclusive_swap_page() _with_ the lock. 
 	 * 					- Marcelo
 	 */
-	if (PageSwapCache(page) && !TryLockPage(page)) {
+	if (PageSwapCache(page) && !TestSetPageLocked(page)) {
 		remove_exclusive_swap_page(page);
-		UnlockPage(page);
+		unlock_page(page);
 	}
 	page_cache_release(page);
 }

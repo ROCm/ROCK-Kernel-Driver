@@ -645,7 +645,8 @@ smb_notify_change(struct dentry *dentry, struct iattr *attr)
 			DENTRY_PATH(dentry),
 			(long) inode->i_size, (long) attr->ia_size);
 
-		filemap_fdatasync(inode->i_mapping);
+		filemap_fdatawait(inode->i_mapping);
+		filemap_fdatawrite(inode->i_mapping);
 		filemap_fdatawait(inode->i_mapping);
 
 		error = smb_open(dentry, O_WRONLY);

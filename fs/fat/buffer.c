@@ -75,7 +75,10 @@ void default_fat_set_uptodate (
 	struct buffer_head *bh,
 	int val)
 {
-	mark_buffer_uptodate(bh, val);
+	if (val)
+		set_buffer_uptodate(bh);
+	else
+		clear_buffer_uptodate(bh);
 }
 
 int default_fat_is_uptodate (struct super_block *sb, struct buffer_head *bh)

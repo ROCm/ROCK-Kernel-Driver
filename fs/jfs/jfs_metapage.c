@@ -267,7 +267,7 @@ static int direct_get_block(struct inode *ip, sector_t lblock,
 			    struct buffer_head *bh_result, int create)
 {
 	if (create)
-		bh_result->b_state |= (1UL << BH_New);
+		set_buffer_new(bh_result);
 
 	map_bh(bh_result, ip->i_sb, lblock);
 
@@ -349,7 +349,7 @@ metapage_t *__get_metapage(struct inode *inode,
 		page_index = lblock >> l2BlocksPerPage;
 		page_offset = (lblock - (page_index << l2BlocksPerPage)) <<
 		    l2bsize;
-		if ((page_offset + size) > PAGE_SIZE) {
+		if ((page_offset + size) > PAGE_CACHE_SIZE) {
 			spin_unlock(&meta_lock);
 			jERROR(1, ("MetaData crosses page boundary!!\n"));
 			return NULL;
@@ -394,8 +394,10 @@ metapage_t *__get_metapage(struct inode *inode,
 				__free_metapage(mp);
 				spin_unlock(&meta_lock);
 				return NULL;
-			} else
+			} else {
 				INCREMENT(mpStat.pagealloc);
+				unlock_page(mp->page);
+			}
 		} else {
 			jFYI(1,
 			     ("__get_metapage: Calling read_cache_page\n"));
@@ -412,7 +414,6 @@ metapage_t *__get_metapage(struct inode *inode,
 				return NULL;
 			} else
 				INCREMENT(mpStat.pagealloc);
-			lock_page(mp->page);
 		}
 		mp->data = (void *) (kmap(mp->page) + page_offset);
 	}
@@ -459,6 +460,7 @@ static void __write_metapage(metapage_t * mp)
 	page_offset =
 	    (mp->index - (page_index << l2BlocksPerPage)) << l2bsize;
 
+	lock_page(mp->page);
 	rc = mp->mapping->a_ops->prepare_write(NULL, mp->page, page_offset,
 					       page_offset +
 					       mp->logical_size);
@@ -466,6 +468,7 @@ static void __write_metapage(metapage_t * mp)
 		jERROR(1, ("prepare_write return %d!\n", rc));
 		ClearPageUptodate(mp->page);
 		kunmap(mp->page);
+		unlock_page(mp->page);
 		clear_bit(META_dirty, &mp->flag);
 		return;
 	}
@@ -476,6 +479,7 @@ static void __write_metapage(metapage_t * mp)
 		jERROR(1, ("commit_write returned %d\n", rc));
 	}
 
+	unlock_page(mp->page);
 	clear_bit(META_dirty, &mp->flag);
 
 	jFYI(1, ("__write_metapage done\n"));
@@ -489,12 +493,10 @@ static inline void sync_metapage(metapage_t *mp)
 	lock_page(page);
 
 	/* we're done with this page - no need to check for errors */
-	if (page_has_buffers(page)) {
-		writeout_one_page(page);
-		waitfor_one_page(page);
-	}
-
-	UnlockPage(page);
+	if (page_has_buffers(page))
+		write_one_page(page, 1);
+	else
+		unlock_page(page);
 	page_cache_release(page);
 }
 
@@ -527,7 +529,6 @@ void release_metapage(metapage_t * mp)
 			mp->data = 0;
 			if (test_bit(META_dirty, &mp->flag))
 				__write_metapage(mp);
-			UnlockPage(mp->page);
 			if (test_bit(META_sync, &mp->flag)) {
 				sync_metapage(mp);
 				clear_bit(META_sync, &mp->flag);
@@ -536,7 +537,7 @@ void release_metapage(metapage_t * mp)
 			if (test_bit(META_discard, &mp->flag)) {
 				lock_page(mp->page);
 				block_flushpage(mp->page, 0);
-				UnlockPage(mp->page);
+				unlock_page(mp->page);
 			}
 
 			page_cache_release(mp->page);
@@ -587,13 +588,15 @@ void invalidate_metapages(struct inode *ip, unsigned long addr,
 			/*
 			 * If in the metapage cache, we've got the page locked
 			 */
+			lock_page(mp->page);
 			block_flushpage(mp->page, 0);
+			unlock_page(mp->page);
 		} else {
 			spin_unlock(&meta_lock);
 			page = find_lock_page(mapping, lblock>>l2BlocksPerPage);
 			if (page) {
 				block_flushpage(page, 0);
-				UnlockPage(page);
+				unlock_page(page);
 			}
 		}
 	}
@@ -610,7 +613,6 @@ void invalidate_inode_metapages(struct inode *inode)
 		clear_bit(META_dirty, &mp->flag);
 		set_bit(META_discard, &mp->flag);
 		kunmap(mp->page);
-		UnlockPage(mp->page);
 		page_cache_release(mp->page);
 		INCREMENT(mpStat.pagefree);
 		mp->data = 0;

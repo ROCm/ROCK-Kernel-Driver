@@ -327,7 +327,7 @@ icside_set_speed(ide_drive_t *drive, byte speed)
 /*
  * dma_intr() is the handler for disk read/write DMA interrupts
  */
-static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
+static ide_startstop_t icside_dmaintr(struct ata_device *drive, struct request *rq)
 {
 	int i;
 	byte stat, dma_stat;
@@ -336,15 +336,13 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 	stat = GET_STAT();			/* get drive status */
 	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
-			struct request *rq = HWGROUP(drive)->rq;
-			rq = HWGROUP(drive)->rq;
 			for (i = rq->nr_sectors; i > 0;) {
 				i -= rq->current_nr_sectors;
 				ide_end_request(drive, 1);
 			}
 			return ide_stopped;
 		}
-		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
+		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
 		       drive->name, dma_stat);
 	}
 	return ide_error(drive, "dma_intr", stat);
@@ -443,8 +441,7 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		if (drive->type != ATA_DISK)
 			return 0;
 
-		BUG_ON(HWGROUP(drive)->handler);
-		ide_set_handler(drive, &icside_dmaintr, WAIT_CMD, NULL);
+		ide_set_handler(drive, icside_dmaintr, WAIT_CMD, NULL);
 		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA,
 			 IDE_COMMAND_REG);
 

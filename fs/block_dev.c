@@ -84,7 +84,7 @@ int set_blocksize(kdev_t dev, int size)
 
 	/* Ok, we're actually changing the blocksize.. */
 	bdev = bdget(kdev_t_to_nr(dev));
-	sync_buffers(bdev, 2);
+	sync_blockdev(bdev);
 	blksize_size[major(dev)][minor(dev)] = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
@@ -119,7 +119,7 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 
 	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
-	bh->b_state |= 1UL << BH_Mapped;
+	set_buffer_mapped(bh);
 	return 0;
 }
 
@@ -180,22 +180,6 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-
-static int __block_fsync(struct inode * inode)
-{
-	int ret, err;
-
-	ret = filemap_fdatasync(inode->i_mapping);
-	err = sync_buffers(inode->i_bdev, 1);
-	if (err && !ret)
-		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
-	if (err && !ret)
-		ret = err;
-
-	return ret;
-}
-
 /*
  *	Filp may be NULL when we are called by an msync of a vma
  *	since the vma has no handle.
@@ -205,7 +189,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 
-	return __block_fsync(inode);
+	return sync_blockdev(inode->i_bdev);
 }
 
 /*
@@ -349,6 +333,8 @@ struct block_device *bdget(dev_t dev)
 		struct inode *inode = new_inode(bd_mnt->mnt_sb);
 		if (inode) {
 			kdev_t kdev = to_kdev_t(dev);
+			unsigned long *ra_pages;
+
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
@@ -360,6 +346,10 @@ struct block_device *bdget(dev_t dev)
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
+			ra_pages = blk_get_ra_pages(kdev);
+			if (ra_pages == NULL)
+				ra_pages = &default_ra_pages;
+			inode->i_data.ra_pages = ra_pages;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {
@@ -698,10 +688,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 	lock_kernel();
 	switch (kind) {
 	case BDEV_FILE:
-		__block_fsync(bd_inode);
-		break;
 	case BDEV_FS:
-		fsync_no_super(bdev);
+		sync_blockdev(bd_inode->i_bdev);
 		break;
 	}
 	if (!--bdev->bd_openers)
@@ -753,6 +741,8 @@ struct address_space_operations def_blk_aops = {
 	sync_page: block_sync_page,
 	prepare_write: blkdev_prepare_write,
 	commit_write: blkdev_commit_write,
+	writeback_mapping: generic_writeback_mapping,
+	vm_writeback: generic_vm_writeback,
 	direct_IO: blkdev_direct_IO,
 };
 

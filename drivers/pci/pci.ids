@@ -5097,9 +5097,11 @@
 	244b  82820 820 (Camino 2) Chipset IDE U100
 	244c  82820 820 (Camino 2) Chipset ISA Bridge (ICH2-M)
 	244e  82820 820 (Camino 2) Chipset PCI
+	245b  82801E C-ICH IDE
 	2485  AC'97 Audio Controller
 	248a  82801CAM ICH3-M IDE
 	248b  82801CA ICH3 IDE
+	24cb  82801DB ICH4 IDE
 	2500  82820 820 (Camino) Chipset Host Bridge (MCH)
 		1043 801c  P3C-2000 system chipset
 	2501  82820 820 (Camino) Chipset Host Bridge (MCH)

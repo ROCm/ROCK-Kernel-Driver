@@ -133,7 +133,7 @@ enum
 	VM_SWAPCTL=1,		/* struct: Set vm swapping control */
 	VM_SWAPOUT=2,		/* int: Linear or sqrt() swapout for hogs */
 	VM_FREEPG=3,		/* struct: Set free page thresholds */
-	VM_BDFLUSH=4,		/* struct: Control buffer cache flushing */
+	VM_BDFLUSH_UNUSED=4,	/* Spare */
 	VM_OVERCOMMIT_MEMORY=5,	/* Turn off the virtual memory safety limit */
 	VM_BUFFERMEM=6,		/* struct: Set buffer memory thresholds */
 	VM_PAGECACHE=7,		/* struct: Set cache memory thresholds */

@@ -272,7 +272,7 @@ do_it:
 	}
 	unlock_kernel();
 out:
-	UnlockPage(page);
+	unlock_page(page);
 	return err; 
 }
 

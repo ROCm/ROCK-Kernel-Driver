@@ -7,15 +7,13 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
+O_TARGET = _dmasound.o
+
 export-objs := dmasound_core.o
 
 obj-$(CONFIG_DMASOUND_ATARI)  += dmasound_core.o dmasound_atari.o
 obj-$(CONFIG_DMASOUND_AWACS)  += dmasound_core.o dmasound_awacs.o
 obj-$(CONFIG_DMASOUND_PAULA)  += dmasound_core.o dmasound_paula.o
 obj-$(CONFIG_DMASOUND_Q40)    += dmasound_core.o dmasound_q40.o
-
-ifeq ($(CONFIG_DMASOUND),y)
-  O_TARGET = dmasound.o
-endif
 
 include $(TOPDIR)/Rules.make

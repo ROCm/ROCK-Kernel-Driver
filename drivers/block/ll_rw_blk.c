@@ -109,46 +109,21 @@ inline request_queue_t *blk_get_queue(kdev_t dev)
 }
 
 /**
- * blk_set_readahead - set a queue's readahead tunable
- * @dev:	device
- * @sectors:	readahead, in 512 byte sectors
- *
- * Returns zero on success, else negative errno
- */
-int blk_set_readahead(struct block_device *bdev, unsigned sectors)
-{
-	int ret = -EINVAL;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
-
-	if (q) {
-		q->ra_sectors = sectors;
-		blk_put_queue(q);
-		ret = 0;
-	}
-	return ret;
-}
-
-/**
- * blk_get_readahead - query a queue's readahead tunable
+ * blk_get_ra_pages - get the address of a queue's readahead tunable
  * @dev:	device
  *
- * Locates the passed device's request queue and returns its
+ * Locates the passed device's request queue and returns the address of its
  * readahead setting.
  *
- * The returned value is in units of 512 byte sectors.
- *
- * Will return zero if the queue has never had its readahead
- * setting altered.
+ * Will return NULL if the request queue cannot be located.
  */
-unsigned blk_get_readahead(struct block_device *bdev)
+unsigned long *blk_get_ra_pages(kdev_t dev)
 {
-	unsigned ret = 0;
-	request_queue_t *q = blk_get_queue(to_kdev_t(bdev->bd_dev));
+	unsigned long *ret = NULL;
+	request_queue_t *q = blk_get_queue(dev);
 
-	if (q) {
-		ret = q->ra_sectors;
-		blk_put_queue(q);
-	}
+	if (q)
+		ret = &q->ra_pages;
 	return ret;
 }
 
@@ -187,7 +162,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
-	q->ra_sectors = VM_MAX_READAHEAD << (10 - 9);	/* kbytes->sectors */
+	q->ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 
@@ -1430,11 +1405,16 @@ int submit_bh(int rw, struct buffer_head * bh)
 {
 	struct bio *bio;
 
-	BUG_ON(!test_bit(BH_Lock, &bh->b_state));
+	BUG_ON(!buffer_locked(bh));
 	BUG_ON(!buffer_mapped(bh));
 	BUG_ON(!bh->b_end_io);
 
-	set_bit(BH_Req, &bh->b_state);
+	if ((rw == READ || rw == READA) && buffer_uptodate(bh))
+		printk("%s: read of uptodate buffer\n", __FUNCTION__);
+	if (rw == WRITE && !buffer_uptodate(bh))
+		printk("%s: write of non-uptodate buffer\n", __FUNCTION__);
+		
+	set_buffer_req(bh);
 
 	/*
 	 * from here on down, it's all bio -- do the initial mapping,
@@ -1490,6 +1470,7 @@ int submit_bh(int rw, struct buffer_head * bh)
  *  a multiple of the current approved size for the device.
  *
  **/
+
 void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 {
 	unsigned int major;
@@ -1526,7 +1507,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		struct buffer_head *bh = bhs[i];
 
 		/* Only one thread can actually submit the I/O. */
-		if (test_and_set_bit(BH_Lock, &bh->b_state))
+		if (test_set_buffer_locked(bh))
 			continue;
 
 		/* We have the buffer lock */
@@ -1535,10 +1516,9 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 		switch(rw) {
 		case WRITE:
-			if (!atomic_set_buffer_clean(bh))
+			if (!test_clear_buffer_dirty(bh))
 				/* Hmmph! Nothing to write */
 				goto end_io;
-			__mark_buffer_clean(bh);
 			break;
 
 		case READA:
@@ -1550,7 +1530,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 		default:
 			BUG();
 	end_io:
-			bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
+			bh->b_end_io(bh, buffer_uptodate(bh));
 			continue;
 		}
 
@@ -1561,7 +1541,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 sorry:
 	/* Make sure we don't get infinite dirty retries.. */
 	for (i = 0; i < nr; i++)
-		mark_buffer_clean(bhs[i]);
+		clear_buffer_dirty(bhs[i]);
 }
 
 #ifdef CONFIG_STRAM_SWAP

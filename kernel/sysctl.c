@@ -43,7 +43,6 @@
 /* External variables not in a header file. */
 extern int panic_timeout;
 extern int C_A_D;
-extern int bdf_prm[], bdflush_min[], bdflush_max[];
 extern int sysctl_overcommit_memory;
 extern int max_threads;
 extern atomic_t nr_queued_signals;
@@ -259,9 +258,6 @@ static ctl_table kern_table[] = {
 };
 
 static ctl_table vm_table[] = {
-	{VM_BDFLUSH, "bdflush", &bdf_prm, 9*sizeof(int), 0644, NULL,
-	 &proc_dointvec_minmax, &sysctl_intvec, NULL,
-	 &bdflush_min, &bdflush_max},
 	{VM_OVERCOMMIT_MEMORY, "overcommit_memory", &sysctl_overcommit_memory,
 	 sizeof(sysctl_overcommit_memory), 0644, NULL, &proc_dointvec},
 	{VM_PAGERDAEMON, "kswapd",

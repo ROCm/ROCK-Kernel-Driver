@@ -17,6 +17,7 @@
 #include <linux/time.h>
 #include <linux/msdos_fs.h>
 #include <linux/dirent.h>
+#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -363,13 +364,16 @@ static int fat_readdirx(struct inode *inode, struct file *filp, void *dirent,
 	unsigned short opt_shortname = MSDOS_SB(sb)->options.shortname;
 	int ino, inum, chi, chl, i, i2, j, last, last_u, dotoffset = 0;
 	loff_t cpos;
+	int ret = 0;
+	
+	lock_kernel();
 
 	cpos = filp->f_pos;
 /* Fake . and .. for the root directory. */
 	if (inode->i_ino == MSDOS_ROOT_INO) {
 		while (cpos < 2) {
 			if (filldir(dirent, "..", cpos+1, cpos, MSDOS_ROOT_INO, DT_DIR) < 0)
-				return 0;
+				goto out;
 			cpos++;
 			filp->f_pos++;
 		}
@@ -379,8 +383,10 @@ static int fat_readdirx(struct inode *inode, struct file *filp, void *dirent,
 			cpos = 0;
 		}
 	}
-	if (cpos & (sizeof(struct msdos_dir_entry)-1))
-		return -ENOENT;
+	if (cpos & (sizeof(struct msdos_dir_entry)-1)) {
+		ret = -ENOENT;
+		goto out;
+	}
 
  	bh = NULL;
 GetNew:
@@ -414,7 +420,8 @@ GetNew:
 			if (!unicode) {
 				filp->f_pos = cpos;
 				fat_brelse(sb, bh);
-				return -ENOMEM;
+				ret = -ENOMEM;
+				goto out;
 			}
 		}
 ParseLong:
@@ -580,7 +587,9 @@ FillFailed:
 	if (unicode) {
 		free_page((unsigned long) unicode);
 	}
-	return 0;
+out:
+	unlock_kernel();
+	return ret;
 }
 
 int fat_readdir(struct file *filp, void *dirent, filldir_t filldir)

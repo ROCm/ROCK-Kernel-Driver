@@ -62,8 +62,6 @@ int ext3_sync_file(struct file * file, struct dentry *dentry, int datasync)
 	 * we'll end up waiting on them in commit.
 	 */
 	ret = fsync_inode_buffers(inode);
-	ret |= fsync_inode_data_buffers(inode);
-
 	ext3_force_commit(inode->i_sb);
 
 	return ret;

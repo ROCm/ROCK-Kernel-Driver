@@ -97,18 +97,20 @@ static int capifs_root_readdir(struct file *filp, void *dirent, filldir_t filldi
 	off_t nr;
 	char numbuf[32];
 
+	lock_kernel();
+
 	nr = filp->f_pos;
 
 	switch(nr)
 	{
 	case 0:
 		if (filldir(dirent, ".", 1, nr, inode->i_ino, DT_DIR) < 0)
-			return 0;
+			goto out;
 		filp->f_pos = ++nr;
 		/* fall through */
 	case 1:
 		if (filldir(dirent, "..", 2, nr, inode->i_ino, DT_DIR) < 0)
-			return 0;
+			goto out;
 		filp->f_pos = ++nr;
 		/* fall through */
 	default:
@@ -120,13 +122,15 @@ static int capifs_root_readdir(struct file *filp, void *dirent, filldir_t filldi
 				if (np->type) *p++ = np->type;
 				sprintf(p, "%u", np->num);
 				if ( filldir(dirent, numbuf, strlen(numbuf), nr, nr, DT_UNKNOWN) < 0 )
-					return 0;
+					goto out;
 			}
 			filp->f_pos = ++nr;
 		}
 		break;
 	}
 
+out:
+	unlock_kernel();
 	return 0;
 }
 

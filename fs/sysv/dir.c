@@ -13,9 +13,9 @@
  *  SystemV/Coherent directory handling functions
  */
 
-#include <linux/fs.h>
-#include <linux/sysv_fs.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
+#include "sysv.h"
 
 static int sysv_readdir(struct file *, void *, filldir_t);
 
@@ -42,13 +42,10 @@ static int dir_commit_chunk(struct page *page, unsigned from, unsigned to)
 	int err = 0;
 
 	page->mapping->a_ops->commit_write(NULL, page, from, to);
-	if (IS_SYNC(dir)) {
-		int err2;
-		err = writeout_one_page(page);
-		err2 = waitfor_one_page(page);
-		if (err == 0)
-			err = err2;
-	}
+	if (IS_SYNC(dir))
+		err = write_one_page(page, 1);
+	else
+		unlock_page(page);
 	return err;
 }
 
@@ -58,9 +55,9 @@ static struct page * dir_get_page(struct inode *dir, unsigned long n)
 	struct page *page = read_cache_page(mapping, n,
 				(filler_t*)mapping->a_ops->readpage, NULL);
 	if (!IS_ERR(page)) {
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		kmap(page);
-		if (!Page_Uptodate(page))
+		if (!PageUptodate(page))
 			goto fail;
 	}
 	return page;
@@ -78,6 +75,8 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 	unsigned offset = pos & ~PAGE_CACHE_MASK;
 	unsigned long n = pos >> PAGE_CACHE_SHIFT;
 	unsigned long npages = dir_pages(inode);
+
+	lock_kernel();
 
 	pos = (pos + SYSV_DIRSIZE-1) & ~(SYSV_DIRSIZE-1);
 	if (pos >= inode->i_size)
@@ -104,7 +103,8 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 
 			over = filldir(dirent, name, strnlen(name,SYSV_NAMELEN),
 					(n<<PAGE_CACHE_SHIFT) | offset,
-					fs16_to_cpu(sb, de->inode), DT_UNKNOWN);
+					fs16_to_cpu(SYSV_SB(sb), de->inode),
+					DT_UNKNOWN);
 			if (over) {
 				dir_put_page(page);
 				goto done;
@@ -116,6 +116,7 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 done:
 	filp->f_pos = (n << PAGE_CACHE_SHIFT) | offset;
 	UPDATE_ATIME(inode);
+	unlock_kernel();
 	return 0;
 }
 
@@ -228,16 +229,17 @@ got_it:
 		goto out_unlock;
 	memcpy (de->name, name, namelen);
 	memset (de->name + namelen, 0, SYSV_DIRSIZE - namelen - 2);
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	err = dir_commit_chunk(page, from, to);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
-out_unlock:
-	UnlockPage(page);
 out_page:
 	dir_put_page(page);
 out:
 	return err;
+out_unlock:
+	unlock_page(page);
+	goto out_page;
 }
 
 int sysv_delete_entry(struct sysv_dir_entry *de, struct page *page)
@@ -255,7 +257,6 @@ int sysv_delete_entry(struct sysv_dir_entry *de, struct page *page)
 		BUG();
 	de->inode = 0;
 	err = dir_commit_chunk(page, from, to);
-	UnlockPage(page);
 	dir_put_page(page);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);
@@ -273,22 +274,23 @@ int sysv_make_empty(struct inode *inode, struct inode *dir)
 	if (!page)
 		return -ENOMEM;
 	err = mapping->a_ops->prepare_write(NULL, page, 0, 2 * SYSV_DIRSIZE);
-	if (err)
+	if (err) {
+		unlock_page(page);
 		goto fail;
+	}
 
 	base = (char*)page_address(page);
 	memset(base, 0, PAGE_CACHE_SIZE);
 
 	de = (struct sysv_dir_entry *) base;
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	strcpy(de->name,".");
 	de++;
-	de->inode = cpu_to_fs16(inode->i_sb, dir->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), dir->i_ino);
 	strcpy(de->name,"..");
 
 	err = dir_commit_chunk(page, 0, 2 * SYSV_DIRSIZE);
 fail:
-	UnlockPage(page);
 	page_cache_release(page);
 	return err;
 }
@@ -321,7 +323,8 @@ int sysv_empty_dir(struct inode * inode)
 			if (de->name[0] != '.')
 				goto not_empty;
 			if (!de->name[1]) {
-				if (de->inode == cpu_to_fs16(sb, inode->i_ino))
+				if (de->inode == cpu_to_fs16(SYSV_SB(sb),
+							inode->i_ino))
 					continue;
 				goto not_empty;
 			}
@@ -350,9 +353,8 @@ void sysv_set_link(struct sysv_dir_entry *de, struct page *page,
 	err = page->mapping->a_ops->prepare_write(NULL, page, from, to);
 	if (err)
 		BUG();
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	err = dir_commit_chunk(page, from, to);
-	UnlockPage(page);
 	dir_put_page(page);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
@@ -377,7 +379,7 @@ ino_t sysv_inode_by_name(struct dentry *dentry)
 	ino_t res = 0;
 	
 	if (de) {
-		res = fs16_to_cpu(dentry->d_sb, de->inode);
+		res = fs16_to_cpu(SYSV_SB(dentry->d_sb), de->inode);
 		dir_put_page(page);
 	}
 	return res;

@@ -82,7 +82,7 @@ static void ns87415_selectproc (ide_drive_t *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int ns87415_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int ns87415_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	byte		dma_stat;
@@ -98,16 +98,16 @@ static int ns87415_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_write:
 		case ide_dma_read:
 			ns87415_prepare_drive(drive, 1);	/* select DMA xfer */
-			if (!ide_dmaproc(func, drive))		/* use standard DMA stuff */
+			if (!ide_dmaproc(func, drive, rq))		/* use standard DMA stuff */
 				return 0;
 			ns87415_prepare_drive(drive, 0);	/* DMA failed: select PIO xfer */
 			return 1;
 		case ide_dma_check:
 			if (drive->type != ATA_DISK)
-				return ide_dmaproc(ide_dma_off_quietly, drive);
+				return ide_dmaproc(ide_dma_off_quietly, drive, rq);
 			/* Fallthrough... */
 		default:
-			return ide_dmaproc(func, drive);	/* use standard DMA stuff */
+			return ide_dmaproc(func, drive, rq);	/* use standard DMA stuff */
 	}
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -206,7 +206,7 @@ void __init ide_init_ns87415(struct ata_channel *hwif)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base)
-		hwif->dmaproc = &ns87415_dmaproc;
+		hwif->udma = ns87415_dmaproc;
 #endif
 
 	hwif->selectproc = &ns87415_selectproc;

@@ -139,8 +139,8 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 			(filler_t*)mapping->a_ops->readpage, NULL);
 	if (IS_ERR(page))
 		goto sync_fail;
-	wait_on_page(page);
-	if (!Page_Uptodate(page))
+	wait_on_page_locked(page);
+	if (!PageUptodate(page))
 		goto async_fail;
 	p = (struct umsdos_dirent*)(kmap(page)+offs);
 
@@ -165,8 +165,8 @@ int umsdos_emd_dir_readentry (struct dentry *demd, loff_t *pos, struct umsdos_di
 			page = page2;
 			goto sync_fail;
 		}
-		wait_on_page(page2);
-		if (!Page_Uptodate(page2)) {
+		wait_on_page_locked(page2);
+		if (!PageUptodate(page2)) {
 			kunmap(page);
 			page_cache_release(page2);
 			goto async_fail;
@@ -276,7 +276,7 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 			goto out_unlock3;
 		ret = mapping->a_ops->commit_write(NULL,page,offs,
 					PAGE_CACHE_SIZE);
-		UnlockPage(page2);
+		unlock_page(page2);
 		page_cache_release(page2);
 		if (ret)
 			goto out_unlock;
@@ -292,7 +292,7 @@ int umsdos_writeentry (struct dentry *parent, struct umsdos_info *info,
 		if (ret)
 			goto out_unlock;
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 		
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -304,13 +304,13 @@ out:
 	Printk (("umsdos_writeentry /mn/: returning %d...\n", ret));
 	return ret;
 out_unlock3:
-	UnlockPage(page2);
+	unlock_page(page2);
 	page_cache_release(page2);
 out_unlock2:
 	ClearPageUptodate(page);
 	kunmap(page);
 out_unlock:
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	printk ("UMSDOS:  problem with EMD file:  can't write\n");
 	goto out_dput;
@@ -392,8 +392,8 @@ static int umsdos_find (struct dentry *demd, struct umsdos_info *info)
 			page = read_cache_page(mapping,index,readpage,NULL);
 			if (IS_ERR(page))
 				goto sync_fail;
-			wait_on_page(page);
-			if (!Page_Uptodate(page))
+			wait_on_page_locked(page);
+			if (!PageUptodate(page))
 				goto async_fail;
 			p = kmap(page);
 		}
@@ -441,8 +441,8 @@ static int umsdos_find (struct dentry *demd, struct umsdos_info *info)
 				page = next_page;
 				goto sync_fail;
 			}
-			wait_on_page(next_page);
-			if (!Page_Uptodate(next_page)) {
+			wait_on_page_locked(next_page);
+			if (!PageUptodate(next_page)) {
 				page_cache_release(page);
 				page = next_page;
 				goto async_fail;

@@ -71,7 +71,7 @@ static int udf_adinicb_readpage(struct file *file, struct page * page)
 	SetPageUptodate(page);
 out:
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 
@@ -102,7 +102,7 @@ static int udf_adinicb_writepage(struct page *page)
 	SetPageUptodate(page);
 out:
 	kunmap(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return err;
 }
 

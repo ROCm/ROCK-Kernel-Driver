@@ -328,7 +328,6 @@ restart:
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = NULL;
 			__journal_remove_journal_head(bh);
-			refile_buffer(bh);
 			__brelse(bh);
 			goto restart;
 		}
@@ -455,17 +454,15 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	 * Right, time to make up the new buffer_head.
 	 */
 	do {
-		new_bh = get_unused_buffer_head(0);
+		new_bh = alloc_buffer_head(0);
 		if (!new_bh) {
 			printk (KERN_NOTICE __FUNCTION__
-				": ENOMEM at get_unused_buffer_head, "
+				": ENOMEM at alloc_buffer_head, "
 				"trying again.\n");
 			yield();
 		}
 	} while (!new_bh);
 	/* keep subsequent assertions sane */
-	new_bh->b_prev_free = 0;
-	new_bh->b_next_free = 0;
 	new_bh->b_state = 0;
 	init_buffer(new_bh, NULL, NULL);
 	atomic_set(&new_bh->b_count, 1);
@@ -477,7 +474,8 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	new_bh->b_size = jh2bh(jh_in)->b_size;
 	new_bh->b_bdev = transaction->t_journal->j_dev;
 	new_bh->b_blocknr = blocknr;
-	new_bh->b_state |= (1 << BH_Mapped) | (1 << BH_Dirty);
+	set_buffer_mapped(new_bh);
+	set_buffer_dirty(new_bh);
 
 	*jh_out = new_jh;
 
@@ -889,7 +887,7 @@ int journal_create (journal_t *journal)
 		BUFFER_TRACE(bh, "marking dirty");
 		mark_buffer_dirty(bh);
 		BUFFER_TRACE(bh, "marking uptodate");
-		mark_buffer_uptodate(bh, 1);
+		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
 		__brelse(bh);
 	}

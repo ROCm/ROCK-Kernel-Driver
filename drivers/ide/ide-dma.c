@@ -5,7 +5,7 @@
  *  May be copied or modified under the terms of the GNU General Public License
  *
  *  Special Thanks to Mark for his Six years of work.
-*
+ *
  * This module provides support for the bus-master IDE DMA functions
  * of various PCI chipsets, including the Intel PIIX (i82371FB for
  * the 430 FX chipset), the PIIX3 (i82371SB for the 430 HX/VX and
@@ -194,17 +194,14 @@ const char *bad_dma_drives[] = {"WDC AC11000H",
 /*
  * dma_intr() is the handler for disk read/write DMA interrupts
  */
-ide_startstop_t ide_dma_intr (ide_drive_t *drive)
+ide_startstop_t ide_dma_intr(struct ata_device *drive, struct request *rq)
 {
 	byte stat, dma_stat;
 
-	dma_stat = drive->channel->dmaproc(ide_dma_end, drive);
-	stat = GET_STAT();			/* get drive status */
-	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
+	dma_stat = drive->channel->udma(ide_dma_end, drive, rq);
+	if (OK_STAT(stat = GET_STAT(),DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
 		if (!dma_stat) {
-			struct request *rq = HWGROUP(drive)->rq;
-
-			__ide_end_request(drive, 1, rq->nr_sectors);
+			__ide_end_request(drive, rq, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
 		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n",
@@ -461,38 +458,39 @@ static int config_drive_for_dma (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && hwif->autodma && config_allows_dma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive))
-			return hwif->dmaproc(ide_dma_off, drive);
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL))
+			return hwif->udma(ide_dma_off, drive, NULL);
 
 		/* Enable DMA on any drive that has UltraDMA (mode 6/7/?) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
 			if ((id->dma_ultra & (id->dma_ultra >> 14) & 2))
-				return hwif->dmaproc(ide_dma_on, drive);
+				return hwif->udma(ide_dma_on, drive, NULL);
 		/* Enable DMA on any drive that has UltraDMA (mode 3/4/5) enabled */
 		if ((id->field_valid & 4) && (eighty_ninty_three(drive)))
 			if ((id->dma_ultra & (id->dma_ultra >> 11) & 7))
-				return hwif->dmaproc(ide_dma_on, drive);
+				return hwif->udma(ide_dma_on, drive, NULL);
 		/* Enable DMA on any drive that has UltraDMA (mode 0/1/2) enabled */
 		if (id->field_valid & 4)	/* UltraDMA */
 			if ((id->dma_ultra & (id->dma_ultra >> 8) & 7))
-				return hwif->dmaproc(ide_dma_on, drive);
+				return hwif->udma(ide_dma_on, drive, NULL);
 		/* Enable DMA on any drive that has mode2 DMA (multi or single) enabled */
 		if (id->field_valid & 2)	/* regular DMA */
 			if ((id->dma_mword & 0x404) == 0x404 || (id->dma_1word & 0x404) == 0x404)
-				return hwif->dmaproc(ide_dma_on, drive);
+				return hwif->udma(ide_dma_on, drive, NULL);
 		/* Consult the list of known "good" drives */
-		if (ide_dmaproc(ide_dma_good_drive, drive))
-			return hwif->dmaproc(ide_dma_on, drive);
+		if (ide_dmaproc(ide_dma_good_drive, drive, NULL))
+			return hwif->udma(ide_dma_on, drive, NULL);
 	}
-	return hwif->dmaproc(ide_dma_off_quietly, drive);
+	return hwif->udma(ide_dma_off_quietly, drive, NULL);
 }
 
 /*
  * 1 dma-ing, 2 error, 4 intr
  */
-static int dma_timer_expiry(ide_drive_t *drive)
+static int dma_timer_expiry(struct ata_device *drive, struct request *__rq)
 {
-	byte dma_stat = inb(drive->channel->dma_base+2);
+	/* FIXME: What's that? */
+	u8 dma_stat = inb(drive->channel->dma_base+2);
 
 #ifdef DEBUG
 	printk("%s: dma_timer_expiry: dma status == 0x%02x\n", drive->name, dma_stat);
@@ -503,7 +501,7 @@ static int dma_timer_expiry(ide_drive_t *drive)
 #endif
 
 	if (dma_stat & 2) {	/* ERROR */
-		byte stat = GET_STAT();
+		u8 stat = GET_STAT();
 		return ide_error(drive, "dma_timer_expiry", stat);
 	}
 	if (dma_stat & 1)	/* DMAing */
@@ -526,7 +524,7 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
 }
 
 /*
- * ide_dmaproc() initiates/aborts DMA read/write operations on a drive.
+ * This initiates/aborts DMA read/write operations on a drive.
  *
  * The caller is assumed to have selected the drive and programmed the drive's
  * sector address using CHS or LBA.  All that remains is to prepare for DMA
@@ -541,7 +539,7 @@ static void ide_toggle_bounce(ide_drive_t *drive, int on)
  * the caller should revert to PIO for the current request.
  * May also be invoked from trm290.c
  */
-int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
+int ide_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned long dma_base = hwif->dma_base;
@@ -579,11 +577,9 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			if (drive->type != ATA_DISK)
 				return 0;
 
-			BUG_ON(HWGROUP(drive)->handler);
-			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
-			    (drive->addressing == 1)) {
-				struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+			ide_set_handler(drive, ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
+			if ((rq->flags & REQ_DRIVE_ACB) && (drive->addressing == 1)) {
+				struct ata_taskfile *args = rq->special;
 
 				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 			} else if (drive->addressing) {
@@ -591,7 +587,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			} else {
 				OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 			}
-			return drive->channel->dmaproc(ide_dma_begin, drive);
+			return drive->channel->udma(ide_dma_begin, drive, NULL);
 		case ide_dma_begin:
 			/* Note that this is done *after* the cmd has
 			 * been issued to the drive, as per the BM-IDE spec.
@@ -685,7 +681,7 @@ void ide_setup_dma(struct ata_channel *hwif, unsigned long dma_base, unsigned in
 		goto dma_alloc_failure;
 	}
 
-	hwif->dmaproc = &ide_dmaproc;
+	hwif->udma = ide_dmaproc;
 
 	if (hwif->chipset != ide_trm290) {
 		byte dma_stat = inb(dma_base+2);

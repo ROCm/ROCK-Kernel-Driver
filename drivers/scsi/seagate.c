@@ -1285,8 +1285,8 @@ static int internal_command (unsigned char target, unsigned char lun,
 							/* Test for any data here at all. */
 							"orl %%ecx, %%ecx\n\t"
 							"jz 2f\n\t" "cld\n\t"
-/*                    "movl " SYMBOL_NAME_STR(st0x_cr_sr) ", %%ebx\n\t"  */
-/*                    "movl " SYMBOL_NAME_STR(st0x_dr) ", %%edi\n\t"  */
+/*                    "movl st0x_cr_sr, %%ebx\n\t"  */
+/*                    "movl st0x_dr, %%edi\n\t"  */
 							"1:\t"
 							"movb (%%ebx), %%al\n\t"
 							/* Test for BSY */
@@ -1461,8 +1461,8 @@ static int internal_command (unsigned char target, unsigned char lun,
 							/* Test for room to read */
 							"orl %%ecx, %%ecx\n\t"
 							"jz 2f\n\t" "cld\n\t"
-/*                "movl " SYMBOL_NAME_STR(st0x_cr_sr) ", %%esi\n\t"  */
-/*                "movl " SYMBOL_NAME_STR(st0x_dr) ", %%ebx\n\t"  */
+/*                "movl st0x_cr_sr, %%esi\n\t"  */
+/*                "movl st0x_dr, %%ebx\n\t"  */
 							"1:\t"
 							"movb (%%esi), %%al\n\t"
 							/* Test for BSY */

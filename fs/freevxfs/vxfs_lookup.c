@@ -262,8 +262,10 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 
 	pos = fp->f_pos - 2;
 	
-	if (pos > VXFS_DIRROUND(ip->i_size))
+	if (pos > VXFS_DIRROUND(ip->i_size)) {
+		unlock_kernel();
 		return 0;
+	}
 
 	npages = dir_pages(ip);
 	nblocks = dir_blocks(ip);
@@ -322,5 +324,6 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 done:
 	fp->f_pos = ((page << PAGE_CACHE_SHIFT) | offset) + 2;
 out:
+	unlock_kernel();
 	return 0;
 }

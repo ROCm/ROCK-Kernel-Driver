@@ -193,14 +193,14 @@ static int c4_peek(avmcard *card,  unsigned long off, unsigned long *valuep)
 
 static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 {
-	__u32 val;
+	u32 val;
 	unsigned char *dp;
 	int left, retval;
-	__u32 loadoff = 0;
+	u32 loadoff = 0;
 
 	dp = t4file->data;
 	left = t4file->len;
-	while (left >= sizeof(__u32)) {
+	while (left >= sizeof(u32)) {
 	        if (t4file->user) {
 			retval = copy_from_user(&val, dp, sizeof(val));
 			if (retval)
@@ -213,9 +213,9 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 					card->name);
 			return -EIO;
 		}
-		left -= sizeof(__u32);
-		dp += sizeof(__u32);
-		loadoff += sizeof(__u32);
+		left -= sizeof(u32);
+		dp += sizeof(u32);
+		loadoff += sizeof(u32);
 	}
 	if (left) {
 		val = 0;
@@ -237,16 +237,16 @@ static int c4_load_t4file(avmcard *card, capiloaddatapart * t4file)
 
 /* ------------------------------------------------------------- */
 
-static inline void _put_byte(void **pp, __u8 val)
+static inline void _put_byte(void **pp, u8 val)
 {
-	__u8 *s = *pp;
+	u8 *s = *pp;
 	*s++ = val;
 	*pp = s;
 }
 
-static inline void _put_word(void **pp, __u32 val)
+static inline void _put_word(void **pp, u32 val)
 {
-	__u8 *s = *pp;
+	u8 *s = *pp;
 	*s++ = val & 0xff;
 	*s++ = (val >> 8) & 0xff;
 	*s++ = (val >> 16) & 0xff;
@@ -262,19 +262,19 @@ static inline void _put_slice(void **pp, unsigned char *dp, unsigned int len)
 		_put_byte(pp, *dp++);
 }
 
-static inline __u8 _get_byte(void **pp)
+static inline u8 _get_byte(void **pp)
 {
-	__u8 *s = *pp;
-	__u8 val;
+	u8 *s = *pp;
+	u8 val;
 	val = *s++;
 	*pp = s;
 	return val;
 }
 
-static inline __u32 _get_word(void **pp)
+static inline u32 _get_word(void **pp)
 {
-	__u8 *s = *pp;
-	__u32 val;
+	u8 *s = *pp;
+	u32 val;
 	val = *s++;
 	val |= (*s++ << 8);
 	val |= (*s++ << 16);
@@ -283,7 +283,7 @@ static inline __u32 _get_word(void **pp)
 	return val;
 }
 
-static inline __u32 _get_slice(void **pp, unsigned char *dp)
+static inline u32 _get_slice(void **pp, unsigned char *dp)
 {
 	unsigned int len, i;
 
@@ -411,9 +411,9 @@ static void c4_dispatch_tx(avmcard *card)
 	avmcard_dmainfo *dma = card->dma;
 	unsigned long flags;
 	struct sk_buff *skb;
-	__u8 cmd, subcmd;
-	__u16 len;
-	__u32 txlen;
+	u8 cmd, subcmd;
+	u16 len;
+	u32 txlen;
 	void *p;
 	
 	save_flags(flags);
@@ -442,7 +442,7 @@ static void c4_dispatch_tx(avmcard *card)
 		p = dma->sendbuf.dmabuf;
 
 		if (CAPICMD(cmd, subcmd) == CAPI_DATA_B3_REQ) {
-			__u16 dlen = CAPIMSG_DATALEN(skb->data);
+			u16 dlen = CAPIMSG_DATALEN(skb->data);
 			_put_byte(&p, SEND_DATA_B3_REQ);
 			_put_slice(&p, skb->data, len);
 			_put_slice(&p, skb->data + len, dlen);
@@ -450,7 +450,7 @@ static void c4_dispatch_tx(avmcard *card)
 			_put_byte(&p, SEND_MESSAGE);
 			_put_slice(&p, skb->data, len);
 		}
-		txlen = (__u8 *)p - (__u8 *)dma->sendbuf.dmabuf;
+		txlen = (u8 *)p - (u8 *)dma->sendbuf.dmabuf;
 #ifdef CONFIG_C4_DEBUG
 		printk(KERN_DEBUG "%s: tx put msg len=%d\n", card->name, txlen);
 #endif
@@ -496,7 +496,7 @@ static void queue_pollack(avmcard *card)
 	_put_byte(&p, 0);
 	_put_byte(&p, 0);
 	_put_byte(&p, SEND_POLLACK);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	c4_dispatch_tx(card);
@@ -511,9 +511,9 @@ static void c4_handle_rx(avmcard *card)
 	avmctrl_info *cinfo;
 	struct sk_buff *skb;
 	void *p = dma->recvbuf.dmabuf;
-	__u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
-	__u8 b1cmd =  _get_byte(&p);
-	__u32 cidx;
+	u32 ApplId, MsgLen, DataB3Len, NCCI, WindowSize;
+	u8 b1cmd =  _get_byte(&p);
+	u32 cidx;
 
 
 #ifdef CONFIG_C4_DEBUG
@@ -674,7 +674,7 @@ static void c4_handle_rx(avmcard *card)
 
 static void c4_handle_interrupt(avmcard *card)
 {
-	__u32 status = c4inmeml(card->mbase+DOORBELL);
+	u32 status = c4inmeml(card->mbase+DOORBELL);
 
 	if (status & DBELL_RESET_HOST) {
 		int i;
@@ -760,13 +760,13 @@ static void c4_send_init(avmcard *card)
 	_put_word(&p, CAPI_MAXAPPL);
 	_put_word(&p, AVM_NCCI_PER_CHANNEL*30);
 	_put_word(&p, card->cardnr - 1);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	c4_dispatch_tx(card);
 }
 
-static int queue_sendconfigword(avmcard *card, __u32 val)
+static int queue_sendconfigword(avmcard *card, u32 val)
 {
 	struct sk_buff *skb;
 	void *p;
@@ -782,7 +782,7 @@ static int queue_sendconfigword(avmcard *card, __u32 val)
 	_put_byte(&p, 0);
 	_put_byte(&p, SEND_CONFIG);
 	_put_word(&p, val);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	c4_dispatch_tx(card);
@@ -808,7 +808,7 @@ static int queue_sendconfig(avmcard *card, char cval[4])
 	_put_byte(&p, cval[1]);
 	_put_byte(&p, cval[2]);
 	_put_byte(&p, cval[3]);
-	skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+	skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 	skb_queue_tail(&card->dma->send_queue, skb);
 	c4_dispatch_tx(card);
@@ -817,7 +817,7 @@ static int queue_sendconfig(avmcard *card, char cval[4])
 
 static int c4_send_config(avmcard *card, capiloaddatapart * config)
 {
-	__u8 val[4];
+	u8 val[4];
 	unsigned char *dp;
 	int left, retval;
 	
@@ -828,7 +828,7 @@ static int c4_send_config(avmcard *card, capiloaddatapart * config)
 
 	dp = config->data;
 	left = config->len;
-	while (left >= sizeof(__u32)) {
+	while (left >= sizeof(u32)) {
 	        if (config->user) {
 			retval = copy_from_user(val, dp, sizeof(val));
 			if (retval)
@@ -954,7 +954,7 @@ static void c4_remove_ctr(struct capi_ctr *ctrl)
 
 
 void c4_register_appl(struct capi_ctr *ctrl,
-				__u16 appl,
+				u16 appl,
 				capi_register_params *rp)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
@@ -985,7 +985,7 @@ void c4_register_appl(struct capi_ctr *ctrl,
 		_put_word(&p, nconn);
 		_put_word(&p, rp->datablkcnt);
 		_put_word(&p, rp->datablklen);
-		skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+		skb_put(skb, (u8 *)p - (u8 *)skb->data);
 
 		skb_queue_tail(&card->dma->send_queue, skb);
 		c4_dispatch_tx(card);
@@ -996,7 +996,7 @@ void c4_register_appl(struct capi_ctr *ctrl,
 
 /* ------------------------------------------------------------- */
 
-void c4_release_appl(struct capi_ctr *ctrl, __u16 appl)
+void c4_release_appl(struct capi_ctr *ctrl, u16 appl)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
@@ -1016,7 +1016,7 @@ void c4_release_appl(struct capi_ctr *ctrl, __u16 appl)
 		_put_byte(&p, SEND_RELEASE);
 		_put_word(&p, appl);
 
-		skb_put(skb, (__u8 *)p - (__u8 *)skb->data);
+		skb_put(skb, (u8 *)p - (u8 *)skb->data);
 		skb_queue_tail(&card->dma->send_queue, skb);
 		c4_dispatch_tx(card);
 	}
@@ -1056,7 +1056,7 @@ static int c4_read_proc(char *page, char **start, off_t off,
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	__u8 flag;
+	u8 flag;
 	int len = 0;
 	char *s;
 
@@ -1085,7 +1085,7 @@ static int c4_read_proc(char *page, char **start, off_t off,
 	   len += sprintf(page+len, "%-16s %s\n", "ver_serial", s);
 
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[3];
+        	flag = ((u8 *)(ctrl->profile.manu))[3];
         	if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s%s%s%s\n",
 			"protocol",
@@ -1099,7 +1099,7 @@ static int c4_read_proc(char *page, char **start, off_t off,
 			);
 	}
 	if (card->cardtype != avm_m1) {
-        	flag = ((__u8 *)(ctrl->profile.manu))[5];
+        	flag = ((u8 *)(ctrl->profile.manu))[5];
 		if (flag)
 			len += sprintf(page+len, "%-16s%s%s%s%s\n",
 			"linetype",

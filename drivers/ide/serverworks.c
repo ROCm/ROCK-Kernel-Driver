@@ -438,7 +438,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 
 	if (id && (id->capability & 1) && drive->channel->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+		if (ide_dmaproc(ide_dma_bad_drive, drive, NULL)) {
 			dma_func = ide_dma_off;
 			goto fast_ata_pio;
 		}
@@ -460,7 +460,7 @@ try_dma_modes:
 				if (dma_func != ide_dma_on)
 					goto no_dma_set;
 			}
-		} else if (ide_dmaproc(ide_dma_good_drive, drive)) {
+		} else if (ide_dmaproc(ide_dma_good_drive, drive, NULL)) {
 			if (id->eide_dma_time > 150) {
 				goto no_dma_set;
 			}
@@ -477,10 +477,10 @@ fast_ata_pio:
 no_dma_set:
 		config_chipset_for_pio(drive);
 	}
-	return drive->channel->dmaproc(dma_func, drive);
+	return drive->channel->udma(dma_func, drive, NULL);
 }
 
-static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+static int svwks_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
 	switch (func) {
 		case ide_dma_check:
@@ -489,10 +489,10 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		{
 			struct ata_channel *hwif = drive->channel;
 			unsigned long dma_base		= hwif->dma_base;
-	
+
 			if(inb(dma_base+0x02)&1)
 			{
-#if 0		
+#if 0
 				int i;
 				printk(KERN_ERR "Curious - OSB4 thinks the DMA is still running.\n");
 				for(i=0;i<10;i++)
@@ -504,18 +504,18 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 					}
 					udelay(5);
 				}
-#endif		
+#endif
 				printk(KERN_CRIT "Serverworks OSB4 in impossible state.\n");
 				printk(KERN_CRIT "Disable UDMA or if you are using Seagate then try switching disk types\n");
 				printk(KERN_CRIT "on this controller. Please report this event to osb4-bug@ide.cabal.tm\n");
-#if 0		
+#if 0
 				/* Panic might sys_sync -> death by corrupt disk */
 				panic("OSB4: continuing might cause disk corruption.\n");
 #else
 				printk(KERN_CRIT "OSB4: continuing might cause disk corruption.\n");
 				while(1)
 					cpu_relax();
-#endif				
+#endif
 			}
 			/* and drop through */
 		}
@@ -523,7 +523,7 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			break;
 	}
 	/* Other cases are done by generic IDE-DMA code. */
-	return ide_dmaproc(func, drive);
+	return ide_dmaproc(func, drive, rq);
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
@@ -645,7 +645,7 @@ void __init ide_init_svwks(struct ata_channel *hwif)
 		if (!noautodma)
 			hwif->autodma = 1;
 #endif
-		hwif->dmaproc = &svwks_dmaproc;
+		hwif->udma = svwks_dmaproc;
 		hwif->highmem = 1;
 	} else {
 		hwif->autodma = 0;

@@ -48,7 +48,6 @@
 #define		HERMES_PDA_LEN_MAX		(1024)	/* in bytes, from EK */
 #define		HERMES_SCANRESULT_MAX		(35)
 #define		HERMES_CHINFORESULT_MAX		(8)
-#define		HERMES_FRAME_LEN_MAX		(2304)
 #define		HERMES_MAX_MULTICAST		(16)
 #define		HERMES_MAGIC			(0x7d1f)
 
@@ -138,7 +137,7 @@
 
 /*--- Regulate Commands --------------------------*/
 #define		HERMES_CMD_NOTIFY		(0x0010)
-#define		HERMES_CMD_INQ			(0x0011)
+#define		HERMES_CMD_INQUIRE		(0x0011)
 
 /*--- Configure Commands --------------------------*/
 #define		HERMES_CMD_ACCESS		(0x0021)
@@ -150,126 +149,160 @@
 #define		HERMES_MONITOR_DISABLE		(0x000f)
 
 /*
- * Configuration RIDs
- */
-
-#define		HERMES_RID_CNF_PORTTYPE		(0xfc00)
-#define		HERMES_RID_CNF_MACADDR		(0xfc01)
-#define		HERMES_RID_CNF_DESIRED_SSID	(0xfc02)
-#define		HERMES_RID_CNF_CHANNEL		(0xfc03)
-#define		HERMES_RID_CNF_OWN_SSID		(0xfc04)
-#define		HERMES_RID_CNF_SYSTEM_SCALE	(0xfc06)
-#define		HERMES_RID_CNF_MAX_DATA_LEN	(0xfc07)
-#define		HERMES_RID_CNF_PM_ENABLE	(0xfc09)
-#define		HERMES_RID_CNF_PM_MCAST_RX	(0xfc0b)
-#define		HERMES_RID_CNF_PM_PERIOD	(0xfc0c)
-#define		HERMES_RID_CNF_PM_HOLDOVER	(0xfc0d)
-#define		HERMES_RID_CNF_NICKNAME		(0xfc0e)
-#define		HERMES_RID_CNF_WEP_ON		(0xfc20)
-#define		HERMES_RID_CNF_MWO_ROBUST	(0xfc25)
-#define		HERMES_RID_CNF_MULTICAST_LIST	(0xfc80)
-#define		HERMES_RID_CNF_CREATEIBSS	(0xfc81)
-#define		HERMES_RID_CNF_FRAG_THRESH	(0xfc82)
-#define		HERMES_RID_CNF_RTS_THRESH	(0xfc83)
-#define		HERMES_RID_CNF_TX_RATE_CTRL	(0xfc84)
-#define		HERMES_RID_CNF_PROMISCUOUS	(0xfc85)
-#define		HERMES_RID_CNF_KEYS		(0xfcb0)
-#define		HERMES_RID_CNF_TX_KEY		(0xfcb1)
-#define		HERMES_RID_CNF_TICKTIME		(0xfce0)
-
-#define		HERMES_RID_CNF_INTERSIL_WEP_ON	(0xfc28)
-#define		HERMES_RID_CNF_INTERSIL_TX_KEY	(0xfc23)
-#define		HERMES_RID_CNF_INTERSIL_KEY0	(0xfc24)
-#define		HERMES_RID_CNF_INTERSIL_KEY1	(0xfc25)
-#define		HERMES_RID_CNF_INTERSIL_KEY2	(0xfc26)
-#define		HERMES_RID_CNF_INTERSIL_KEY3	(0xfc27)
-#define		HERMES_RID_CNF_SYMBOL_MANDATORY_BSSID	(0xfc21)
-#define		HERMES_RID_CNF_SYMBOL_AUTH_TYPE		(0xfc2A)
-#define		HERMES_RID_CNF_SYMBOL_BASIC_RATES	(0xfc8A)
-#define		HERMES_RID_CNF_SYMBOL_PREAMBLE		(0xfc8C)
-
-/*
- * Information RIDs
- */
-#define		HERMES_RID_CHANNEL_LIST		(0xfd10)
-#define		HERMES_RID_STAIDENTITY		(0xfd20)
-#define		HERMES_RID_CURRENT_SSID		(0xfd41)
-#define		HERMES_RID_CURRENT_BSSID	(0xfd42)
-#define		HERMES_RID_COMMSQUALITY		(0xfd43)
-#define 	HERMES_RID_CURRENT_TX_RATE	(0xfd44)
-#define 	HERMES_RID_SHORT_RETRY_LIMIT	(0xfd48)
-#define 	HERMES_RID_LONG_RETRY_LIMIT	(0xfd49)
-#define 	HERMES_RID_MAX_TX_LIFETIME	(0xfd4A)
-#define		HERMES_RID_WEP_AVAIL		(0xfd4f)
-#define		HERMES_RID_CURRENT_CHANNEL	(0xfdc1)
-#define		HERMES_RID_DATARATES		(0xfdc6)
-#define		HERMES_RID_SYMBOL_SECONDARY_VER	(0xfd24)
-#define		HERMES_RID_SYMBOL_KEY_LENGTH	(0xfc2B)
-
-/*
  * Frame structures and constants
  */
 
-typedef struct hermes_frame_desc {
-	/* Hermes - i.e. little-endian byte-order */
+#define HERMES_DESCRIPTOR_OFFSET	0
+#define HERMES_802_11_OFFSET		(14)
+#define HERMES_802_3_OFFSET		(14+32)
+#define HERMES_802_2_OFFSET		(14+32+14)
+
+struct hermes_rx_descriptor {
 	u16 status;
-	u16 res1, res2;
-	u16 q_info;
-	u16 res3, res4;
-	u16 tx_ctl;
-} __attribute__ ((packed)) hermes_frame_desc_t;
+	u32 time;
+	u8 silence;
+	u8 signal;
+	u8 rate;
+	u8 rxflow;
+	u32 reserved;
+} __attribute__ ((packed));
 
-#define		HERMES_RXSTAT_ERR		(0x0003)
-#define		HERMES_RXSTAT_MACPORT		(0x0700)
-#define		HERMES_RXSTAT_MSGTYPE		(0xE000)
+#define HERMES_RXSTAT_ERR		(0x0003)
+#define	HERMES_RXSTAT_BADCRC		(0x0001)
+#define	HERMES_RXSTAT_UNDECRYPTABLE	(0x0002)
+#define	HERMES_RXSTAT_MACPORT		(0x0700)
+#define	HERMES_RXSTAT_MSGTYPE		(0xE000)
+#define	HERMES_RXSTAT_1042		(0x2000)	/* RFC-1042 frame */
+#define	HERMES_RXSTAT_TUNNEL		(0x4000)	/* bridge-tunnel encoded frame */
+#define	HERMES_RXSTAT_WMP		(0x6000)	/* Wavelan-II Management Protocol frame */
 
-#define		HERMES_RXSTAT_BADCRC		(0x0001)
-#define		HERMES_RXSTAT_UNDECRYPTABLE	(0x0002)
+struct hermes_tx_descriptor {
+	u16 status;
+	u16 reserved1;
+	u16 reserved2;
+	u32 sw_support;
+	u8 retry_count;
+	u8 tx_rate;
+	u16 tx_control;	
+} __attribute__ ((packed));
 
-/* RFC-1042 encoded frame */
-#define		HERMES_RXSTAT_1042		(0x2000)
-/* Bridge-tunnel encoded frame */
-#define		HERMES_RXSTAT_TUNNEL		(0x4000)
-/* Wavelan-II Management Protocol frame */
-#define		HERMES_RXSTAT_WMP		(0x6000)
+#define HERMES_TXSTAT_RETRYERR		(0x0001)
+#define HERMES_TXSTAT_AGEDERR		(0x0002)
+#define HERMES_TXSTAT_DISCON		(0x0004)
+#define HERMES_TXSTAT_FORMERR		(0x0008)
+
+#define HERMES_TXCTRL_TX_OK		(0x0002)	/* ?? interrupt on Tx complete */
+#define HERMES_TXCTRL_TX_EX		(0x0004)	/* ?? interrupt on Tx exception */
+#define HERMES_TXCTRL_802_11		(0x0008)	/* We supply 802.11 header */
+#define HERMES_TXCTRL_ALT_RTRY		(0x0020)
+
+/* Inquiry constants and data types */
+
+#define HERMES_INQ_TALLIES		(0xF100)
+#define HERMES_INQ_SCAN			(0xF101)
+#define HERMES_INQ_LINKSTATUS		(0xF200)
+
+struct hermes_tallies_frame {
+	u16 TxUnicastFrames;
+	u16 TxMulticastFrames;
+	u16 TxFragments;
+	u16 TxUnicastOctets;
+	u16 TxMulticastOctets;
+	u16 TxDeferredTransmissions;
+	u16 TxSingleRetryFrames;
+	u16 TxMultipleRetryFrames;
+	u16 TxRetryLimitExceeded;
+	u16 TxDiscards;
+	u16 RxUnicastFrames;
+	u16 RxMulticastFrames;
+	u16 RxFragments;
+	u16 RxUnicastOctets;
+	u16 RxMulticastOctets;
+	u16 RxFCSErrors;
+	u16 RxDiscards_NoBuffer;
+	u16 TxDiscardsWrongSA;
+	u16 RxWEPUndecryptable;
+	u16 RxMsgInMsgFragments;
+	u16 RxMsgInBadMsgFragments;
+	/* Those last are probably not available in very old firmwares */
+	u16 RxDiscards_WEPICVError;
+	u16 RxDiscards_WEPExcluded;
+} __attribute__ ((packed));
+
+/* Grabbed from wlan-ng - Thanks Mark... - Jean II
+ * This is the result of a scan inquiry command */
+/* Structure describing info about an Access Point */
+struct hermes_scan_apinfo {
+	u16 channel;		/* Channel where the AP sits */
+	u16 noise;		/* Noise level */
+	u16 level;		/* Signal level */
+	u8 bssid[ETH_ALEN];	/* MAC address of the Access Point */
+	u16 beacon_interv;	/* Beacon interval ? */
+	u16 capabilities;	/* Capabilities ? */
+	u8 essid[32];		/* ESSID of the network */
+	u8 rates[10];		/* Bit rate supported */
+	u16 proberesp_rate;	/* ???? */
+} __attribute__ ((packed));
+/* Container */
+struct hermes_scan_frame {
+	u16 rsvd;                   /* ??? */
+	u16 scanreason;             /* ??? */
+	struct hermes_scan_apinfo aps[35];        /* Scan result */
+} __attribute__ ((packed));
+
+// #define HERMES_DEBUG_BUFFER 1
+#define HERMES_DEBUG_BUFSIZE 4096
+struct hermes_debug_entry {
+	int bap;
+	u16 id, offset;
+	int cycles;
+};
 
 #ifdef __KERNEL__
 
+/* Timeouts */
+#define HERMES_BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
+
 /* Basic control structure */
 typedef struct hermes {
-	uint iobase;
+	ulong iobase;
+	int io_space; /* 1 if we IO-mapped IO, 0 for memory-mapped IO? */
+#define HERMES_IO	1
+#define HERMES_MEM	0
+	int reg_spacing;
+#define HERMES_16BIT_REGSPACING	0
+#define HERMES_32BIT_REGSPACING	1
 
 	u16 inten; /* Which interrupts should be enabled? */
+
+#ifdef HERMES_DEBUG_BUFFER
+	struct hermes_debug_entry dbuf[HERMES_DEBUG_BUFSIZE];
+	unsigned long dbufp;
+	unsigned long profile[HERMES_BAP_BUSY_TIMEOUT+1];
+#endif
 } hermes_t;
 
 typedef struct hermes_response {
 	u16 status, resp0, resp1, resp2;
 } hermes_response_t;
 
-/* "ID" structure - used for ESSID and station nickname */
-typedef struct hermes_id {
-	u16 len;
-	u16 val[16];
-} __attribute__ ((packed)) hermes_id_t;
-
-typedef struct hermes_multicast {
-	u8 addr[HERMES_MAX_MULTICAST][ETH_ALEN];
-} __attribute__ ((packed)) hermes_multicast_t;
-
 /* Register access convenience macros */
-#define hermes_read_reg(hw, off) (inw((hw)->iobase + (off)))
-#define hermes_write_reg(hw, off, val) (outw_p((val), (hw)->iobase + (off)))
+#define hermes_read_reg(hw, off) ((hw)->io_space ? \
+	inw((hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
+	readw((hw)->iobase + ( (off) << (hw)->reg_spacing )))
+#define hermes_write_reg(hw, off, val) ((hw)->io_space ? \
+	outw_p((val), (hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
+	writew((val), (hw)->iobase + ( (off) << (hw)->reg_spacing )))
 
 #define hermes_read_regn(hw, name) (hermes_read_reg((hw), HERMES_##name))
 #define hermes_write_regn(hw, name, val) (hermes_write_reg((hw), HERMES_##name, (val)))
 
 /* Function prototypes */
-void hermes_struct_init(hermes_t *hw, uint io);
+void hermes_struct_init(hermes_t *hw, ulong address, int io_space, int reg_spacing);
 int hermes_reset(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp);
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid);
 
-int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset);
 int hermes_bap_pread(hermes_t *hw, int bap, void *buf, int len,
 		       u16 id, u16 offset);
 int hermes_bap_pwrite(hermes_t *hw, int bap, const void *buf, int len,
@@ -300,26 +333,62 @@ static inline void hermes_set_irqmask(hermes_t *hw, u16 events)
 
 static inline int hermes_enable_port(hermes_t *hw, int port)
 {
-	hermes_response_t resp;
-
 	return hermes_docmd_wait(hw, HERMES_CMD_ENABLE | (port << 8),
-				 0, &resp);
+				 0, NULL);
 }
 
 static inline int hermes_disable_port(hermes_t *hw, int port)
 {
-	hermes_response_t resp;
+	return hermes_docmd_wait(hw, HERMES_CMD_DISABLE | (port << 8), 
+				 0, NULL);
+}
 
-	return hermes_docmd_wait(hw, HERMES_CMD_ENABLE | (port << 8), 
-				 0, &resp);
+/* Initiate an INQUIRE command (tallies or scan).  The result will come as an
+ * information frame in __orinoco_ev_info() */
+static inline int hermes_inquire(hermes_t *hw, u16 rid)
+{
+	return hermes_docmd_wait(hw, HERMES_CMD_INQUIRE, rid, NULL);
 }
 
 #define HERMES_BYTES_TO_RECLEN(n) ( ((n) % 2) ? (((n)+1)/2)+1 : ((n)/2)+1 )
 #define HERMES_RECLEN_TO_BYTES(n) ( ((n)-1) * 2 )
 
 /* Note that for the next two, the count is in 16-bit words, not bytes */
-#define hermes_read_words(hw, off, buf, count) (insw((hw)->iobase + (off), (buf), (count)))
-#define hermes_write_words(hw, off, buf, count) (outsw((hw)->iobase + (off), (buf), (count)))
+static inline void hermes_read_words(struct hermes *hw, int off, void *buf, int count)
+{
+	off = off << hw->reg_spacing;;
+
+	if (hw->io_space) {
+		insw(hw->iobase + off, buf, count);
+	} else {
+		int i;
+		u16 *p;
+
+		/* This need to *not* byteswap (like insw()) but
+		 * readw() does byteswap hence the conversion */
+		for (i = 0, p = buf; i < count; i++) {
+			*p++ = cpu_to_le16(readw(hw->iobase + off));
+		}
+	}
+}
+
+static inline void hermes_write_words(struct hermes *hw, int off, const void *buf, int count)
+{
+	off = off << hw->reg_spacing;;
+
+	if (hw->io_space) {
+		outsw(hw->iobase + off, buf, count);
+	} else {
+		int i;
+		const u16 *p;
+
+		/* This need to *not* byteswap (like outsw()) but
+		 * writew() does byteswap hence the conversion */
+		for (i = 0, p = buf; i < count; i++) {
+			writew(le16_to_cpu(*p++), hw->iobase + off);
+		}
+	}
+}
 
 #define HERMES_READ_RECORD(hw, bap, rid, buf) \
 	(hermes_read_ltv((hw),(bap),(rid), sizeof(*buf), NULL, (buf)))

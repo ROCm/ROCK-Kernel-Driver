@@ -45,6 +45,7 @@
 #include <linux/jffs2_fs_i.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/time.h>
+#include <linux/smp_lock.h>
 #include "nodelist.h"
 
 static int jffs2_readdir (struct file *, void *, filldir_t);
@@ -143,6 +144,8 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
 	D1(printk(KERN_DEBUG "jffs2_readdir() for dir_i #%lu\n", filp->f_dentry->d_inode->i_ino));
 
+	lock_kernel();
+
 	f = JFFS2_INODE_INFO(inode);
 	c = JFFS2_SB_INFO(inode->i_sb);
 
@@ -186,6 +189,7 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	up(&f->sem);
  out:
 	filp->f_pos = offset;
+	unlock_kernel();
 	return 0;
 }
 

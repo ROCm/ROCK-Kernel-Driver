@@ -129,14 +129,16 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	struct sysinfo i;
 	int len;
 	int pg_size ;
+	struct page_state ps;
 
+	get_page_state(&ps);
 /*
  * display in kilobytes.
  */
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 	si_meminfo(&i);
 	si_swapinfo(&i);
-	pg_size = atomic_read(&page_cache_size) - i.bufferram ;
+	pg_size = get_page_cache_size() - i.bufferram ;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -155,7 +157,9 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"LowTotal:     %8lu kB\n"
 		"LowFree:      %8lu kB\n"
 		"SwapTotal:    %8lu kB\n"
-		"SwapFree:     %8lu kB\n",
+		"SwapFree:     %8lu kB\n"
+		"Dirty:        %8lu kB\n"
+		"Locked:       %8lu kB\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -169,7 +173,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(i.totalram-i.totalhigh),
 		K(i.freeram-i.freehigh),
 		K(i.totalswap),
-		K(i.freeswap));
+		K(i.freeswap),
+		K(ps.nr_dirty),
+		K(ps.nr_locked)
+		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);
 #undef K

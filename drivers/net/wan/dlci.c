@@ -96,6 +96,8 @@ int register_frad(const char *name)
 	return(0);
 }
 
+EXPORT_SYMBOL(register_frad);
+
 int unregister_frad(const char *name)
 {
 	int i;

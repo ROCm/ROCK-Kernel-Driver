@@ -21,6 +21,7 @@
 #include <linux/init.h>
 #include <linux/highmem.h>
 #include <linux/file.h>
+#include <linux/writeback.h>
 #include <linux/compiler.h>
 
 #include <asm/pgalloc.h>
@@ -33,6 +34,11 @@
  * during a normal aging round.
  */
 #define DEF_PRIORITY (6)
+
+static inline int is_page_cache_freeable(struct page * page)
+{
+	return page_count(page) - !!PagePrivate(page) == 1;
+}
 
 /*
  * On the swap_out path, the radix-tree node allocations are performing
@@ -86,8 +92,11 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	if (!memclass(page_zone(page), classzone))
 		return 0;
 
-	if (TryLockPage(page))
+	if (TestSetPageLocked(page))
 		return 0;
+
+	if (PageWriteback(page))
+		goto out_unlock;
 
 	/* From this point on, the odds are that we're going to
 	 * nuke this pte, so read and clear the pte.  This hook
@@ -113,7 +122,7 @@ set_swap_pte:
 		set_pte(page_table, swp_entry_to_pte(entry));
 drop_pte:
 		mm->rss--;
-		UnlockPage(page);
+		unlock_page(page);
 		{
 			int freeable = page_count(page) -
 				!!PagePrivate(page) <= 2;
@@ -180,7 +189,8 @@ drop_pte:
 	/* No swap space left */
 preserve:
 	set_pte(page_table, pte);
-	UnlockPage(page);
+out_unlock:
+	unlock_page(page);
 	return 0;
 }
 
@@ -415,38 +425,61 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 		 * The page is locked. IO in progress?
 		 * Move it to the back of the list.
 		 */
-		if (unlikely(TryLockPage(page))) {
+		if (unlikely(PageWriteback(page))) {
 			if (PageLaunder(page) && (gfp_mask & __GFP_FS)) {
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
-				wait_on_page(page);
+				wait_on_page_writeback(page);
 				page_cache_release(page);
 				spin_lock(&pagemap_lru_lock);
 			}
 			continue;
 		}
 
+		if (TestSetPageLocked(page))
+			continue;
+
+		if (PageWriteback(page)) {	/* The non-racy check */
+			unlock_page(page);
+			continue;
+		}
+
 		mapping = page->mapping;
 
-		if (PageDirty(page) && is_page_cache_freeable(page) && mapping) {
+		if (PageDirty(page) && is_page_cache_freeable(page) &&
+				page->mapping && (gfp_mask & __GFP_FS)) {
 			/*
 			 * It is not critical here to write it only if
 			 * the page is unmapped beause any direct writer
-			 * like O_DIRECT would set the PG_dirty bitflag
+			 * like O_DIRECT would set the page's dirty bitflag
 			 * on the phisical page after having successfully
 			 * pinned it and after the I/O to the page is finished,
 			 * so the direct writes to the page cannot get lost.
 			 */
+			struct address_space_operations *a_ops;
+			int (*writeback)(struct page *, int *);
 			int (*writepage)(struct page *);
 
-			writepage = mapping->a_ops->writepage;
-			if ((gfp_mask & __GFP_FS) && writepage) {
-				ClearPageDirty(page);
+			/*
+			 * There's no guarantee that writeback() will actually
+			 * start I/O against *this* page.  Which is broken if we're
+			 * trying to free memory in a particular zone.  FIXME.
+			 */
+			a_ops = mapping->a_ops;
+			writeback = a_ops->vm_writeback;
+			writepage = a_ops->writepage;
+			if (writeback || writepage) {
 				SetPageLaunder(page);
 				page_cache_get(page);
 				spin_unlock(&pagemap_lru_lock);
+				ClearPageDirty(page);
 
-				writepage(page);
+				if (writeback) {
+					int nr_to_write = WRITEOUT_PAGES;
+					writeback(page, &nr_to_write);
+				} else {
+					writepage(page);
+				}
 				page_cache_release(page);
 
 				spin_lock(&pagemap_lru_lock);
@@ -474,7 +507,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 					 * taking the lru lock
 					 */
 					spin_lock(&pagemap_lru_lock);
-					UnlockPage(page);
+					unlock_page(page);
 					__lru_cache_del(page);
 
 					/* effectively free the page here */
@@ -495,7 +528,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 				}
 			} else {
 				/* failed to drop the buffers so stop here */
-				UnlockPage(page);
+				unlock_page(page);
 				page_cache_release(page);
 
 				spin_lock(&pagemap_lru_lock);
@@ -512,7 +545,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 				goto page_freeable;
 			write_unlock(&mapping->page_lock);
 		}
-		UnlockPage(page);
+		unlock_page(page);
 page_mapped:
 		if (--max_mapped >= 0)
 			continue;
@@ -532,7 +565,7 @@ page_freeable:
 		 */
 		if (PageDirty(page)) {
 			write_unlock(&mapping->page_lock);
-			UnlockPage(page);
+			unlock_page(page);
 			continue;
 		}
 
@@ -549,7 +582,7 @@ page_freeable:
 		}
 
 		__lru_cache_del(page);
-		UnlockPage(page);
+		unlock_page(page);
 
 		/* effectively free the page here */
 		page_cache_release(page);
@@ -581,7 +614,7 @@ static void refill_inactive(int nr_pages)
 
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
-		if (PageTestandClearReferenced(page)) {
+		if (TestClearPageReferenced(page)) {
 			list_del(&page->lru);
 			list_add(&page->lru, &active_list);
 			continue;

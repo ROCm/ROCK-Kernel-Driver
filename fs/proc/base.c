@@ -26,6 +26,7 @@
 #include <linux/seq_file.h>
 #include <linux/namespace.h>
 #include <linux/mm.h>
+#include <linux/smp_lock.h>
 
 /*
  * For hysterical raisins we keep the same inumbers as in the old procfs.
@@ -571,6 +572,8 @@ static int proc_pid_readlink(struct dentry * dentry, char * buffer, int buflen)
 	struct dentry *de;
 	struct vfsmount *mnt = NULL;
 
+	lock_kernel();
+
 	if (current->fsuid != inode->i_uid && !capable(CAP_DAC_OVERRIDE))
 		goto out;
 	error = proc_check_root(inode);
@@ -585,6 +588,7 @@ static int proc_pid_readlink(struct dentry * dentry, char * buffer, int buflen)
 	dput(de);
 	mntput(mnt);
 out:
+	unlock_kernel();
 	return error;
 }
 
@@ -665,38 +669,49 @@ static int proc_base_readdir(struct file * filp,
 	int pid;
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct pid_entry *p;
+	int ret = 0;
+
+	lock_kernel();
 
 	pid = proc_task(inode)->pid;
-	if (!pid)
-		return -ENOENT;
+	if (!pid) {
+		ret = -ENOENT;
+		goto out;
+	}
 	i = filp->f_pos;
 	switch (i) {
 		case 0:
 			if (filldir(dirent, ".", 1, i, inode->i_ino, DT_DIR) < 0)
-				return 0;
+				goto out;
 			i++;
 			filp->f_pos++;
 			/* fall through */
 		case 1:
 			if (filldir(dirent, "..", 2, i, PROC_ROOT_INO, DT_DIR) < 0)
-				return 0;
+				goto out;
 			i++;
 			filp->f_pos++;
 			/* fall through */
 		default:
 			i -= 2;
-			if (i>=sizeof(base_stuff)/sizeof(base_stuff[0]))
-				return 1;
+			if (i>=sizeof(base_stuff)/sizeof(base_stuff[0])) {
+				ret = 1;
+				goto out;
+			}
 			p = base_stuff + i;
 			while (p->name) {
 				if (filldir(dirent, p->name, p->len, filp->f_pos,
 					    fake_ino(pid, p->type), p->mode >> 12) < 0)
-					return 0;
+					goto out;
 				filp->f_pos++;
 				p++;
 			}
 	}
-	return 1;
+
+	ret = 1;
+out:
+	unlock_kernel();
+	return ret;
 }
 
 /* building an inode */

@@ -103,15 +103,16 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (!VALID_PAGE(page))
 		BUG();
-	if (PageSwapCache(page))
-		BUG();
 	if (PageLocked(page))
 		BUG();
 	if (PageLRU(page))
 		BUG();
 	if (PageActive(page))
 		BUG();
-	page->flags &= ~((1<<PG_referenced) | (1<<PG_dirty));
+	if (PageWriteback(page))
+		BUG();
+	ClearPageDirty(page);
+	page->flags &= ~(1<<PG_referenced);
 
 	if (current->flags & PF_FREE_PAGES)
 		goto local_freelist;
@@ -296,8 +297,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 						BUG();
 					if (!VALID_PAGE(page))
 						BUG();
-					if (PageSwapCache(page))
-						BUG();
 					if (PageLocked(page))
 						BUG();
 					if (PageLRU(page))
@@ -305,6 +304,8 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 					if (PageActive(page))
 						BUG();
 					if (PageDirty(page))
+						BUG();
+					if (PageWriteback(page))
 						BUG();
 
 					break;
@@ -394,12 +395,15 @@ rebalance:
 			if (page)
 				return page;
 		}
+nopage:
+		printk("%s: page allocation failure. order:%d, mode:0x%x\n",
+			current->comm, order, gfp_mask);
 		return NULL;
 	}
 
 	/* Atomic allocations - we can't balance anything */
 	if (!(gfp_mask & __GFP_WAIT))
-		return NULL;
+		goto nopage;
 
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
@@ -422,7 +426,7 @@ rebalance:
 
 	/* Don't let big-order allocations loop */
 	if (order > 3)
-		return NULL;
+		goto nopage;
 
 	/* Yield for kswapd, and try again */
 	__set_current_state(TASK_RUNNING);
@@ -521,6 +525,33 @@ unsigned int nr_free_buffer_pages (void)
 	return sum;
 }
 
+/*
+ * Amount of free RAM allocatable as pagecache memory:
+ */
+unsigned int nr_free_pagecache_pages(void)
+{
+	pg_data_t *pgdat = pgdat_list;
+	unsigned int sum = 0;
+
+	do {
+		zonelist_t *zonelist = pgdat->node_zonelists +
+				(GFP_HIGHUSER & GFP_ZONEMASK);
+		zone_t **zonep = zonelist->zones;
+		zone_t *zone;
+
+		for (zone = *zonep++; zone; zone = *zonep++) {
+			unsigned long size = zone->size;
+			unsigned long high = zone->pages_high;
+			if (size > high)
+				sum += size - high;
+		}
+
+		pgdat = pgdat->node_next;
+	} while (pgdat);
+
+	return sum;
+}
+
 #if CONFIG_HIGHMEM
 unsigned int nr_free_highpages (void)
 {
@@ -534,6 +565,45 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 #endif
+
+unsigned long nr_buffermem_pages(void)
+{
+	return atomic_read(&buffermem_pages);
+}
+
+/*
+ * Accumulate the page_state information across all CPUs.
+ * The result is unavoidably approximate - it can change
+ * during and after execution of this function.
+ */
+struct page_state page_states[NR_CPUS] __cacheline_aligned;
+EXPORT_SYMBOL(page_states);
+
+void get_page_state(struct page_state *ret)
+{
+	int pcpu;
+
+	ret->nr_dirty = 0;
+	ret->nr_locked = 0;
+	ret->nr_pagecache = 0;
+
+	for (pcpu = 0; pcpu < smp_num_cpus; pcpu++) {
+		struct page_state *ps;
+
+		ps = &page_states[cpu_logical_map(pcpu)];
+		ret->nr_dirty += ps->nr_dirty;
+		ret->nr_locked += ps->nr_locked;
+		ret->nr_pagecache += ps->nr_pagecache;
+	}
+}
+
+unsigned long get_page_cache_size(void)
+{
+	struct page_state ps;
+
+	get_page_state(&ps);
+	return ps.nr_pagecache;
+}
 
 #define K(x) ((x) << (PAGE_SHIFT-10))
 
@@ -814,7 +884,7 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			struct page *page = mem_map + offset + i;
 			set_page_zone(page, nid * MAX_NR_ZONES + j);
 			set_page_count(page, 0);
-			__SetPageReserved(page);
+			SetPageReserved(page);
 			memlist_init(&page->list);
 			if (j != ZONE_HIGHMEM)
 				set_page_address(page, __va(zone_start_paddr));

@@ -138,19 +138,21 @@ static int msync_interval(struct vm_area_struct * vma,
 
 		if (!ret && (flags & (MS_SYNC|MS_ASYNC))) {
 			struct inode * inode = file->f_dentry->d_inode;
+			int err;
 
 			down(&inode->i_sem);
-			ret = filemap_fdatasync(inode->i_mapping);
+			ret = filemap_fdatawait(inode->i_mapping);
+			err = filemap_fdatawrite(inode->i_mapping);
+			if (!ret)
+				ret = err;
 			if (flags & MS_SYNC) {
-				int err;
-
 				if (file->f_op && file->f_op->fsync) {
 					err = file->f_op->fsync(file, file->f_dentry, 1);
 					if (err && !ret)
 						ret = err;
 				}
 				err = filemap_fdatawait(inode->i_mapping);
-				if (err && !ret)
+				if (!ret)
 					ret = err;
 			}
 			up(&inode->i_sem);
