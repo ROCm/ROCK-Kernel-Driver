@@ -402,7 +402,17 @@ extern void sys_device_unregister(struct sys_device *);
 extern struct bus_type system_bus_type;
 
 /* drivers/base/platform.c */
-extern struct bus_type platform_bus;
+
+struct platform_device {
+	char		* name;
+	u32		id;
+	struct device	dev;
+};
+
+extern int platform_device_register(struct platform_device *);
+extern void platform_device_unregister(struct platform_device *);
+
+extern struct bus_type platform_bus_type;
 
 /* drivers/base/power.c */
 extern int device_suspend(u32 state, u32 level);

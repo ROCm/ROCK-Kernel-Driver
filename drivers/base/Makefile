@@ -7,6 +7,6 @@ obj-y		:= core.o sys.o interface.o power.o bus.o \
 obj-y		+= fs/
 
 export-objs	:= core.o power.o sys.o bus.o driver.o \
-			class.o intf.o cpu.o
+			class.o intf.o platform.o cpu.o 
 
 include $(TOPDIR)/Rules.make

@@ -4220,7 +4220,7 @@ static int __init floppy_setup(char *str)
 
 static int have_no_fdc= -ENODEV;
 
-static struct sys_device floppy_device = {
+static struct platform_device floppy_device = {
 	.name		= "floppy",
 	.id		= 0,
 	.dev		= {
@@ -4379,7 +4379,7 @@ int __init floppy_init(void)
 		add_disk(disks + drive);
 	}
 
-	sys_device_register(&floppy_device);
+	platform_device_register(&floppy_device);
 
 	return have_no_fdc;
 }
@@ -4563,7 +4563,7 @@ void cleanup_module(void)
 {
 	int drive;
 		
-	sys_device_unregister(&floppy_device);
+	platform_device_unregister(&floppy_device);
 	devfs_unregister (devfs_handle);
 	unregister_blkdev(MAJOR_NR, "fd");
 	blk_set_probe(MAJOR_NR, NULL);
