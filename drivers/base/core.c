@@ -259,34 +259,22 @@ struct device * get_device(struct device * dev)
  */
 void put_device(struct device * dev)
 {
-	struct device * parent;
 	if (!atomic_dec_and_lock(&dev->refcount,&device_lock))
 		return;
-	parent = dev->parent;
-	dev->parent = NULL;
-	spin_unlock(&device_lock);
-
-	BUG_ON(dev->present);
-
-	if (dev->release)
-		dev->release(dev);
-
-	if (parent)
-		put_device(parent);
-}
-
-void device_del(struct device * dev)
-{
-	spin_lock(&device_lock);
-	dev->present = 0;
 	list_del_init(&dev->node);
 	list_del_init(&dev->g_list);
 	list_del_init(&dev->bus_list);
 	list_del_init(&dev->driver_list);
 	spin_unlock(&device_lock);
 
-	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
-		 dev->bus_id,dev->name);
+	BUG_ON(dev->present);
+
+	device_del(dev);
+}
+
+void device_del(struct device * dev)
+{
+	struct device * parent = dev->parent;
 
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
@@ -302,6 +290,12 @@ void device_del(struct device * dev)
 
 	/* remove the driverfs directory */
 	device_remove_dir(dev);
+
+	if (dev->release)
+		dev->release(dev);
+
+	if (parent)
+		put_device(parent);
 }
 
 /**
@@ -315,21 +309,14 @@ void device_del(struct device * dev)
  */
 void device_unregister(struct device * dev)
 {
-	device_del(dev);
+	spin_lock(&device_lock);
+	dev->present = 0;
+	spin_unlock(&device_lock);
+
+	pr_debug("DEV: Unregistering device. ID = '%s', name = '%s'\n",
+		 dev->bus_id,dev->name);
 	put_device(dev);
 }
-
-static int __init device_init(void)
-{
-	int error;
-
-	error = init_driverfs_fs();
-	if (error)
-		panic("DEV: could not initialize driverfs");
-	return 0;
-}
-
-core_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(device_unregister);
