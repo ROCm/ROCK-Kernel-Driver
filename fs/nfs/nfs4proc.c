@@ -635,6 +635,8 @@ static int _nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
 
         fattr->valid = 0;
 
+	if (state != NULL)
+		msg.rpc_cred = state->owner->so_cred;
 	if (sattr->ia_valid & ATTR_SIZE)
 		nfs4_copy_stateid(&arg.stateid, state, NULL);
 	else
@@ -681,6 +683,7 @@ static int _nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_CLOSE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
+		.rpc_cred	= sp->so_cred,
 	};
 
 	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
@@ -734,6 +737,7 @@ static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mod
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_OPEN_DOWNGRADE],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
+		.rpc_cred	= sp->so_cred,
 	};
 
 	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
