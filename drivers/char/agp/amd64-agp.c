@@ -73,7 +73,7 @@ static void amd64_tlbflush(struct agp_memory *temp)
 static int amd64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
-	long tmp;
+	long long tmp;
 	u32 pte;
 
 	num_entries = agp_num_entries();
