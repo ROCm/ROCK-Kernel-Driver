@@ -45,8 +45,9 @@ SP_R15       =  STACK_FRAME_OVERHEAD + PT_GPR15
 SP_AREGS     =  STACK_FRAME_OVERHEAD + PT_ACR0
 SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 /* Now the additional entries */
-SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
-SP_SIZE      =  (SP_TRAP+4)
+SP_ILC       =  (SP_ORIG_R2+GPR_SIZE)
+SP_TRAP      =  (SP_ILC+2)
+SP_SIZE      =  (SP_TRAP+2)
 
 _TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
 _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
@@ -98,7 +99,8 @@ entry_base:
         stam    %a0,%a15,SP_AREGS(%r15)   # store access registers to kst.
         mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+12 # store ac. regs
         mvc     SP_PSW(8,%r15),\psworg    # move user PSW to stack
-	mvc	SP_TRAP(4,%r15),BASED(.L\psworg) # store trap indication
+	mvc	SP_ILC(2,%r15),__LC_SVC_ILC      # store instruction length
+	mvc	SP_TRAP(2,%r15),BASED(.L\psworg) # store trap indication
         xc      0(4,%r15),0(%r15)         # clear back chain
         .endm
 
@@ -670,11 +672,11 @@ restart_go:
 .Lc_pactive:   .long  PREEMPT_ACTIVE
 .Lc0xff:       .long  0xff
 .Lnr_syscalls: .long  NR_syscalls
-.L0x018:       .long  0x018
-.L0x020:       .long  0x020
-.L0x028:       .long  0x028
-.L0x030:       .long  0x030
-.L0x038:       .long  0x038
+.L0x018:       .word  0x018
+.L0x020:       .word  0x020
+.L0x028:       .word  0x028
+.L0x030:       .word  0x030
+.L0x038:       .word  0x038
 
 /*
  * Symbol constants
