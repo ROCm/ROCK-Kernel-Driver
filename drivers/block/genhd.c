@@ -174,6 +174,10 @@ static int show_partition(struct seq_file *part, void *v)
 	if (sgp == gendisk_head)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
+	/* Don't show non-partitionable devices or empty devices */
+	if (!sgp->minor_shift || !get_capacity(sgp))
+		return 0;
+
 	/* show the full disk and all non-0 size partitions of it */
 	seq_printf(part, "%4d  %4d %10ld %s\n",
 		sgp->major, sgp->first_minor,
