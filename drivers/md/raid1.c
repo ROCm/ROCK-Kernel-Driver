@@ -459,17 +459,17 @@ static int raid1_issue_flush(request_queue_t *q, struct gendisk *disk,
 	int i, ret = 0;
 
 	spin_lock_irqsave(&conf->device_lock, flags);
-	for (i=0; i<mddev->raid_disks; i++) {
+	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
 		if (rdev && !rdev->faulty) {
 			struct block_device *bdev = rdev->bdev;
 			request_queue_t *r_queue = bdev_get_queue(bdev);
 
-			if (r_queue->issue_flush_fn) {
-				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-				if (ret)
-					break;
-			}
+			if (!r_queue->issue_flush_fn)
+				ret = -EOPNOTSUPP;
+			else
+				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
+							      error_sector);
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);

@@ -219,20 +219,17 @@ static int multipath_issue_flush(request_queue_t *q, struct gendisk *disk,
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i, ret = 0;
 
-	for (i=0; i<mddev->raid_disks; i++) {
+	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
 		if (rdev && !rdev->faulty) {
 			struct block_device *bdev = rdev->bdev;
 			request_queue_t *r_queue = bdev_get_queue(bdev);
 
-			if (!r_queue->issue_flush_fn) {
+			if (!r_queue->issue_flush_fn)
 				ret = -EOPNOTSUPP;
-				break;
-			}
-
-			ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-			if (ret)
-				break;
+			else
+				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
+							      error_sector);
 		}
 	}
 	return ret;

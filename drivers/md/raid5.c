@@ -1347,27 +1347,17 @@ static int raid5_issue_flush(request_queue_t *q, struct gendisk *disk,
 	raid5_conf_t *conf = mddev_to_conf(mddev);
 	int i, ret = 0;
 
-	for (i=0; i<mddev->raid_disks; i++) {
+	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->disks[i].rdev;
 		if (rdev && !rdev->faulty) {
 			struct block_device *bdev = rdev->bdev;
-			request_queue_t *r_queue;
+			request_queue_t *r_queue = bdev_get_queue(bdev);
 
-			if (!bdev)
-				continue;
-
-			r_queue = bdev_get_queue(bdev);
-			if (!r_queue)
-				continue;
-
-			if (!r_queue->issue_flush_fn) {
+			if (!r_queue->issue_flush_fn)
 				ret = -EOPNOTSUPP;
-				break;
-			}
-
-			ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-			if (ret)
-				break;
+			else
+				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
+							      error_sector);
 		}
 	}
 	return ret;
