@@ -85,9 +85,8 @@ extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
 
 struct task_struct;
-#define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next,last) _switch_to((prev),(next))
-extern void _switch_to(struct task_struct *, struct task_struct *);
+extern void __switch_to(struct task_struct *, struct task_struct *);
+#define switch_to(prev, next, last) __switch_to((prev), (next))
 
 #define prepare_arch_schedule(prev)		do { } while(0)
 #define finish_arch_schedule(prev)		do { } while(0)
