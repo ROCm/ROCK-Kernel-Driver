@@ -1040,7 +1040,7 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 		return;
 
 	if ((sy <= p->cursor_y) && (p->cursor_y < sy + height) &&
-	    (sx <= p->cursor_x) && (p->cursor_x < sx + width)) {
+	    (sx <= vc->vc_x) && (vc->vc_x < sx + width)) {
 		cursor_undrawn();
 		redraw_cursor = 1;
 	}
@@ -1073,7 +1073,7 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
 
-	if ((p->cursor_x == xpos) && (p->cursor_y == ypos)) {
+	if ((vc->vc_x == xpos) && (p->cursor_y == ypos)) {
 		cursor_undrawn();
 		redraw_cursor = 1;
 	}
@@ -1099,8 +1099,8 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	if (vt_cons[unit]->vc_mode != KD_TEXT)
 		return;
 
-	if ((p->cursor_y == ypos) && (xpos <= p->cursor_x) &&
-	    (p->cursor_x < (xpos + count))) {
+	if ((p->cursor_y == ypos) && (xpos <= vc->vc_x) &&
+	    (vc->vc_x < (xpos + count))) {
 		cursor_undrawn();
 		redraw_cursor = 1;
 	}
@@ -1137,7 +1137,6 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 
 	p->cursor_x = vc->vc_x;
 	p->cursor_y = y;
-	p->cursor_pos = vc->vc_pos;
 
 	switch (mode) {
 	case CM_ERASE:
@@ -1146,7 +1145,7 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	case CM_MOVE:
 	case CM_DRAW:
 		if (cursor_drawn)
-			accel_cursor(vc, p, FB_CUR_SETCUR, p->cursor_x,
+			accel_cursor(vc, p, FB_CUR_SETCUR, vc->vc_x,
 					  real_y(p, p->cursor_y));
 		vbl_cursor_cnt = CURSOR_DRAW_DELAY;
 		cursor_on = 1;
@@ -1627,9 +1626,9 @@ static void fbcon_bmove(struct vc_data *vc, int sy, int sx, int dy, int dx,
 		return;
 
 	if (((sy <= p->cursor_y) && (p->cursor_y < sy + height) &&
-	     (sx <= p->cursor_x) && (p->cursor_x < sx + width)) ||
+	     (sx <= vc->vc_x) && (vc->vc_x < sx + width)) ||
 	    ((dy <= p->cursor_y) && (p->cursor_y < dy + height) &&
-	     (dx <= p->cursor_x) && (p->cursor_x < dx + width)))
+	     (dx <= vc->vc_x) && (vc->vc_x < dx + width)))
 		fbcon_cursor(vc, CM_ERASE | CM_SOFTBACK);
 
 	/*  Split blits that cross physical y_wrap case.

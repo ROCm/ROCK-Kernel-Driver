@@ -31,7 +31,6 @@ struct display {
     int vrows;                      /* number of virtual rows */
     unsigned short cursor_x;        /* current cursor position */
     unsigned short cursor_y;
-    unsigned long cursor_pos;
     char fontname[40];              /* Font associated to this display */	
     u_char *fontdata;
     int userfont;                   /* != 0 if fontdata kmalloc()ed */
