@@ -546,7 +546,8 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 	if (ret != 0)
 		return ret;
 
-	if ((longhaul_version==TYPE_LONGHAUL_V2) && (dont_scale_voltage==0))
+	if ((longhaul_version==TYPE_LONGHAUL_V2 || longhaul_version==TYPE_POWERSAVER) &&
+		 (dont_scale_voltage==0))
 		longhaul_setup_voltagescaling();
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
