@@ -295,8 +295,8 @@ struct isd200_info {
  */
 
 struct read_capacity_data {
-	unsigned long LogicalBlockAddress;
-	unsigned long BytesPerBlock;
+	__u32 LogicalBlockAddress;
+	__u32 BytesPerBlock;
 };
 
 /*
@@ -1221,8 +1221,7 @@ static int isd200_scsi_to_ata(struct scsi_cmnd *srb, struct us_data *us,
 	case READ_10:
 		US_DEBUGP("   ATA OUT - SCSIOP_READ\n");
 
-		lba = *(unsigned long *)&srb->cmnd[2]; 
-		lba = cpu_to_be32(lba);
+		lba = be32_to_cpu(*(__be32 *)&srb->cmnd[2]);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
 		if (id->capability & CAPABILITY_LBA) {
@@ -1254,8 +1253,7 @@ static int isd200_scsi_to_ata(struct scsi_cmnd *srb, struct us_data *us,
 	case WRITE_10:
 		US_DEBUGP("   ATA OUT - SCSIOP_WRITE\n");
 
-		lba = *(unsigned long *)&srb->cmnd[2]; 
-		lba = cpu_to_be32(lba);
+		lba = be32_to_cpu(*(__be32 *)&srb->cmnd[2]);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
 		if (id->capability & CAPABILITY_LBA) {
