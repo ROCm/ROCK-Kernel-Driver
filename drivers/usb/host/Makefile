@@ -7,7 +7,6 @@ export-objs := usb-ohci.o
 
 obj-$(CONFIG_USB_EHCI_HCD)	+= ehci-hcd.o
 obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
-obj-$(CONFIG_USB_UHCI_HCD)	+= usb-uhci-hcd.o
 obj-$(CONFIG_USB_UHCI_HCD_ALT)	+= uhci-hcd.o
 
 obj-$(CONFIG_USB_OHCI)		+= usb-ohci.o usb-ohci-pci.o
