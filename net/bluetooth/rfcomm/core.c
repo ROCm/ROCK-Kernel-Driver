@@ -203,6 +203,7 @@ static void rfcomm_dlc_clear_state(struct rfcomm_dlc *d)
 
 	d->state      = BT_OPEN;
 	d->flags      = 0;
+	d->mscex      = 0;
 	d->mtu        = RFCOMM_DEFAULT_MTU;
 	d->v24_sig    = RFCOMM_V24_RTC | RFCOMM_V24_RTR | RFCOMM_V24_DV;
 
@@ -1288,11 +1289,11 @@ static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb
 
 	BT_DBG("dlci %d cr %d v24 0x%x", dlci, cr, msc->v24_sig);
 
-	if (!cr)
+	d = rfcomm_dlc_get(s, dlci);
+	if (!d) 
 		return 0;
 
-	d = rfcomm_dlc_get(s, dlci);
-	if (d) {
+	if (cr) {
 		if (msc->v24_sig & RFCOMM_V24_FC && !d->credits)
 			set_bit(RFCOMM_TX_THROTTLED, &d->flags);
 		else
@@ -1304,7 +1305,11 @@ static int rfcomm_recv_msc(struct rfcomm_session *s, int cr, struct sk_buff *skb
 		rfcomm_dlc_unlock(d);
 		
 		rfcomm_send_msc(s, 0, dlci, msc->v24_sig);
-	}
+
+		d->mscex |= RFCOMM_MSCEX_RX;
+	} else 
+		d->mscex |= RFCOMM_MSCEX_TX;
+
 	return 0;
 }
 
@@ -1528,7 +1533,8 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
 			continue;
 		}
 
-		if (d->state == BT_CONNECTED || d->state == BT_DISCONN)
+		if ((d->state == BT_CONNECTED || d->state == BT_DISCONN) &&
+				d->mscex == RFCOMM_MSCEX_OK)
 			rfcomm_process_tx(d);
 	}
 }
