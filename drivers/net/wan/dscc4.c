@@ -750,7 +750,7 @@ static int __devinit dscc4_init_one(struct pci_dev *pdev,
 	if (rc < 0)
 	        goto err_iounmap_3;
 
-	priv = (struct dscc4_pci_priv *)pci_get_drvdata(pdev);
+	priv = pci_get_drvdata(pdev);
 
 	rc = request_irq(pdev->irq, dscc4_irq, SA_SHIRQ, DRV_NAME, priv->root);
 	if (rc < 0) {
@@ -892,8 +892,7 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 	struct dscc4_dev_priv *root;
 	int i, ret = -ENOMEM;
 
-	root = (struct dscc4_dev_priv *)
-		kmalloc(dev_per_card*sizeof(*root), GFP_KERNEL);
+	root = kmalloc(dev_per_card*sizeof(*root), GFP_KERNEL);
 	if (!root) {
 		printk(KERN_ERR "%s: can't allocate data\n", DRV_NAME);
 		goto err_out;
@@ -906,7 +905,7 @@ static int dscc4_found1(struct pci_dev *pdev, void __iomem *ioaddr)
 			goto err_free_dev;
 	}
 
-	ppriv = (struct dscc4_pci_priv *) kmalloc(sizeof(*ppriv), GFP_KERNEL);
+	ppriv = kmalloc(sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
 		printk(KERN_ERR "%s: can't allocate private data\n", DRV_NAME);
 		goto err_free_dev;
