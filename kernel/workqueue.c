@@ -57,6 +57,20 @@ struct workqueue_struct {
 	struct cpu_workqueue_struct cpu_wq[NR_CPUS];
 };
 
+/* Preempt must be disabled. */
+static void __queue_work(struct cpu_workqueue_struct *cwq,
+			 struct work_struct *work)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cwq->lock, flags);
+	work->wq_data = cwq;
+	list_add_tail(&work->entry, &cwq->worklist);
+	cwq->insert_sequence++;
+	wake_up(&cwq->more_work);
+	spin_unlock_irqrestore(&cwq->lock, flags);
+}
+
 /*
  * Queue work on a workqueue. Return non-zero if it was successfully
  * added.
@@ -66,19 +80,11 @@ struct workqueue_struct {
  */
 int queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
-	unsigned long flags;
 	int ret = 0, cpu = get_cpu();
-	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
 
 	if (!test_and_set_bit(0, &work->pending)) {
 		BUG_ON(!list_empty(&work->entry));
-		work->wq_data = cwq;
-
-		spin_lock_irqsave(&cwq->lock, flags);
-		list_add_tail(&work->entry, &cwq->worklist);
-		cwq->insert_sequence++;
-		wake_up(&cwq->more_work);
-		spin_unlock_irqrestore(&cwq->lock, flags);
+		__queue_work(wq->cpu_wq + cpu, work);
 		ret = 1;
 	}
 	put_cpu();
@@ -88,39 +94,29 @@ int queue_work(struct workqueue_struct *wq, struct work_struct *work)
 static void delayed_work_timer_fn(unsigned long __data)
 {
 	struct work_struct *work = (struct work_struct *)__data;
-	struct cpu_workqueue_struct *cwq = work->wq_data;
-	unsigned long flags;
+	struct workqueue_struct *wq = work->wq_data;
 
-	/*
-	 * Do the wakeup within the spinlock, so that flushing
-	 * can be done in a guaranteed way.
-	 */
-	spin_lock_irqsave(&cwq->lock, flags);
-	list_add_tail(&work->entry, &cwq->worklist);
-	cwq->insert_sequence++;
-	wake_up(&cwq->more_work);
-	spin_unlock_irqrestore(&cwq->lock, flags);
+	__queue_work(wq->cpu_wq + smp_processor_id(), work);
 }
 
 int queue_delayed_work(struct workqueue_struct *wq,
 			struct work_struct *work, unsigned long delay)
 {
-	int ret = 0, cpu = get_cpu();
+	int ret = 0;
 	struct timer_list *timer = &work->timer;
-	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
 
 	if (!test_and_set_bit(0, &work->pending)) {
 		BUG_ON(timer_pending(timer));
 		BUG_ON(!list_empty(&work->entry));
 
-		work->wq_data = cwq;
+		/* This stores wq for the moment, for the timer_fn */
+		work->wq_data = wq;
 		timer->expires = jiffies + delay;
 		timer->data = (unsigned long)work;
 		timer->function = delayed_work_timer_fn;
 		add_timer(timer);
 		ret = 1;
 	}
-	put_cpu();
 	return ret;
 }
 
