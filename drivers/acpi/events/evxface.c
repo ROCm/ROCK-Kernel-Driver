@@ -473,7 +473,7 @@ acpi_install_gpe_handler (
 	void                            *context)
 {
 	acpi_status                     status;
-	u32                             gpe_number_index;
+	struct acpi_gpe_number_info     *gpe_number_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_gpe_handler");
@@ -487,8 +487,8 @@ acpi_install_gpe_handler (
 
 	/* Ensure that we have a valid GPE number */
 
-	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
-	if (gpe_number_index == ACPI_GPE_INVALID) {
+	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
+	if (!gpe_number_info) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -499,16 +499,16 @@ acpi_install_gpe_handler (
 
 	/* Make sure that there isn't a handler there already */
 
-	if (acpi_gbl_gpe_number_info[gpe_number_index].handler) {
+	if (gpe_number_info->handler) {
 		status = AE_ALREADY_EXISTS;
 		goto cleanup;
 	}
 
 	/* Install the handler */
 
-	acpi_gbl_gpe_number_info[gpe_number_index].handler = handler;
-	acpi_gbl_gpe_number_info[gpe_number_index].context = context;
-	acpi_gbl_gpe_number_info[gpe_number_index].type = (u8) type;
+	gpe_number_info->handler = handler;
+	gpe_number_info->context = context;
+	gpe_number_info->type  = (u8) type;
 
 	/* Clear the GPE (of stale events), the enable it */
 
@@ -545,7 +545,7 @@ acpi_remove_gpe_handler (
 	acpi_gpe_handler                handler)
 {
 	acpi_status                     status;
-	u32                             gpe_number_index;
+	struct acpi_gpe_number_info     *gpe_number_info;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_handler");
@@ -559,8 +559,8 @@ acpi_remove_gpe_handler (
 
 	/* Ensure that we have a valid GPE number */
 
-	gpe_number_index = acpi_ev_get_gpe_number_index (gpe_number);
-	if (gpe_number_index == ACPI_GPE_INVALID) {
+	gpe_number_info = acpi_ev_get_gpe_number_info (gpe_number);
+	if (!gpe_number_info) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
@@ -578,7 +578,7 @@ acpi_remove_gpe_handler (
 
 	/* Make sure that the installed handler is the same */
 
-	if (acpi_gbl_gpe_number_info[gpe_number_index].handler != handler) {
+	if (gpe_number_info->handler != handler) {
 		(void) acpi_hw_enable_gpe (gpe_number);
 		status = AE_BAD_PARAMETER;
 		goto cleanup;
@@ -586,8 +586,8 @@ acpi_remove_gpe_handler (
 
 	/* Remove the handler */
 
-	acpi_gbl_gpe_number_info[gpe_number_index].handler = NULL;
-	acpi_gbl_gpe_number_info[gpe_number_index].context = NULL;
+	gpe_number_info->handler = NULL;
+	gpe_number_info->context = NULL;
 
 
 cleanup:

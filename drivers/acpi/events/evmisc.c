@@ -67,27 +67,53 @@ acpi_ev_is_notify_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_get_gpe_register_index
+ * FUNCTION:    acpi_ev_get_gpe_register_info
  *
  * PARAMETERS:  gpe_number      - Raw GPE number
  *
- * RETURN:      None.
+ * RETURN:      Pointer to the info struct for this GPE register.
  *
  * DESCRIPTION: Returns the register index (index into the GPE register info
  *              table) associated with this GPE.
  *
  ******************************************************************************/
 
-u32
-acpi_ev_get_gpe_register_index (
+struct acpi_gpe_register_info *
+acpi_ev_get_gpe_register_info (
 	u32                             gpe_number)
 {
 
 	if (gpe_number > acpi_gbl_gpe_number_max) {
-		return (ACPI_GPE_INVALID);
+		return (NULL);
 	}
 
-	return (ACPI_DIV_8 (acpi_gbl_gpe_number_to_index[gpe_number].number_index));
+	return (&acpi_gbl_gpe_register_info [ACPI_DIV_8 (acpi_gbl_gpe_number_to_index[gpe_number].number_index)]);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_ev_get_gpe_number_info
+ *
+ * PARAMETERS:  gpe_number      - Raw GPE number
+ *
+ * RETURN:      None.
+ *
+ * DESCRIPTION: Returns the number index (index into the GPE number info table)
+ *              associated with this GPE.
+ *
+ ******************************************************************************/
+
+struct acpi_gpe_number_info *
+acpi_ev_get_gpe_number_info (
+	u32                             gpe_number)
+{
+
+	if (gpe_number > acpi_gbl_gpe_number_max) {
+		return (NULL);
+	}
+
+	return (&acpi_gbl_gpe_number_info [acpi_gbl_gpe_number_to_index[gpe_number].number_index]);
 }
 
 

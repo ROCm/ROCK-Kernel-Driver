@@ -72,8 +72,12 @@ acpi_status
 acpi_ev_init_global_lock_handler (
 	void);
 
-u32
-acpi_ev_get_gpe_register_index (
+struct acpi_gpe_register_info *
+acpi_ev_get_gpe_register_info (
+	u32                             gpe_number);
+
+struct acpi_gpe_number_info *
+acpi_ev_get_gpe_number_info (
 	u32                             gpe_number);
 
 u32
