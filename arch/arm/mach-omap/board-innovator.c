@@ -30,21 +30,18 @@
 #include <asm/arch/gpio.h>
 #include <asm/arch/fpga.h>
 #include <asm/arch/usb.h>
-#include <asm/arch/serial.h>
 
 #include "common.h"
 
-#ifdef CONFIG_ARCH_OMAP1510
+static int __initdata innovator_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
 
-extern int omap_gpio_init(void);
+#ifdef CONFIG_ARCH_OMAP1510
 
 /* Only FPGA needs to be mapped here. All others are done with ioremap */
 static struct map_desc innovator1510_io_desc[] __initdata = {
 { OMAP1510_FPGA_BASE, OMAP1510_FPGA_START, OMAP1510_FPGA_SIZE,
 	MT_DEVICE },
 };
-
-static int __initdata innovator_serial_ports[OMAP_MAX_NR_PORTS] = {1, 1, 1};
 
 static struct resource innovator1510_smc91x_resources[] = {
 	[0] = {
@@ -81,8 +78,8 @@ static struct resource innovator1610_smc91x_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= 0,				/* Really GPIO 0 */
-		.end	= 0,
+		.start	= OMAP_GPIO_IRQ(0),
+		.end	= OMAP_GPIO_IRQ(0),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -100,15 +97,31 @@ static struct platform_device *innovator1610_devices[] __initdata = {
 
 #endif /* CONFIG_ARCH_OMAP16XX */
 
+static void __init innovator_init_smc91x(void)
+{
+	if (cpu_is_omap1510()) {
+		fpga_write(fpga_read(OMAP1510_FPGA_RST) & ~1,
+			   OMAP1510_FPGA_RST);
+		udelay(750);
+	} else {
+		if ((omap_request_gpio(0)) < 0) {
+			printk("Error requesting gpio 0 for smc91x irq\n");
+			return;
+		}
+		omap_set_gpio_edge_ctrl(0, OMAP_GPIO_RISING_EDGE);
+	}
+}
+
 void innovator_init_irq(void)
 {
 	omap_init_irq();
+	omap_gpio_init();
 #ifdef CONFIG_ARCH_OMAP1510
 	if (cpu_is_omap1510()) {
-		omap_gpio_init();
 		omap1510_fpga_init_irq();
 	}
 #endif
+	innovator_init_smc91x();
 }
 
 #ifdef CONFIG_ARCH_OMAP1510

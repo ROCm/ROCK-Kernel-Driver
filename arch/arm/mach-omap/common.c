@@ -30,8 +30,6 @@
 #include <asm/arch/board.h>
 #include <asm/arch/mux.h>
 #include <asm/arch/fpga.h>
-#include <asm/arch/serial.h>
-
 
 #include "clock.h"
 
@@ -307,14 +305,14 @@ void omap_map_io(void)
 		_omap_map_io();
 }
 
-static inline unsigned int omap_serial_in(struct plat_serial8250_port *up, 
+static inline unsigned int omap_serial_in(struct plat_serial8250_port *up,
 					  int offset)
 {
 	offset <<= up->regshift;
 	return (unsigned int)__raw_readb(up->membase + offset);
 }
 
-static inline void omap_serial_outp(struct plat_serial8250_port *p, int offset, 
+static inline void omap_serial_outp(struct plat_serial8250_port *p, int offset,
 				    int value)
 {
 	offset <<= p->regshift;
@@ -323,12 +321,14 @@ static inline void omap_serial_outp(struct plat_serial8250_port *p, int offset,
 
 /*
  * Internal UARTs need to be initialized for the 8250 autoconfig to work
- * properly.
+ * properly. Note that the TX watermark initialization may not be needed
+ * once the 8250.c watermark handling code is merged.
  */
 static void __init omap_serial_reset(struct plat_serial8250_port *p)
 {
-	omap_serial_outp(p, UART_OMAP_MDR1, 0x07); /* disable UART */
-	omap_serial_outp(p, UART_OMAP_MDR1, 0x00); /* enable UART */
+	omap_serial_outp(p, UART_OMAP_MDR1, 0x07);	/* disable UART */
+	omap_serial_outp(p, UART_OMAP_SCR, 0x08);	/* TX watermark */
+	omap_serial_outp(p, UART_OMAP_MDR1, 0x00);	/* enable UART */
 
 	if (!cpu_is_omap1510()) {
 		omap_serial_outp(p, UART_OMAP_SYSC, 0x01);

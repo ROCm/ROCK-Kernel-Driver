@@ -81,6 +81,12 @@ void omap_pm_idle(void)
 	mask32 = omap_readl(ARM_SYSST);
 	local_fiq_enable();
 	local_irq_enable();
+
+#if defined(CONFIG_OMAP_32K_TIMER) && defined(CONFIG_NO_IDLE_HZ)
+	/* Override timer to use VST for the next cycle */
+	omap_32k_timer_next_vst_interrupt();
+#endif
+
 	if ((mask32 & DSP_IDLE) == 0) {
 		__asm__ volatile ("mcr	p15, 0, r0, c7, c0, 4");
 	} else {
@@ -508,7 +514,7 @@ static void omap_pm_init_proc(void)
  */
 //#include <asm/arch/hardware.h>
 
-static int omap_pm_prepare(u32 state)
+static int omap_pm_prepare(suspend_state_t state)
 {
 	int error = 0;
 
@@ -535,7 +541,7 @@ static int omap_pm_prepare(u32 state)
  *
  */
 
-static int omap_pm_enter(u32 state)
+static int omap_pm_enter(suspend_state_t state)
 {
 	switch (state)
 	{
@@ -563,7 +569,7 @@ static int omap_pm_enter(u32 state)
  *	failed).
  */
 
-static int omap_pm_finish(u32 state)
+static int omap_pm_finish(suspend_state_t state)
 {
 	return 0;
 }
