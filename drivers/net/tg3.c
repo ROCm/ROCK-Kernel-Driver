@@ -4866,9 +4866,8 @@ static void __tg3_set_mac_addr(struct tg3 *tp)
 		tw32(MAC_ADDR_0_LOW + (i * 8), addr_low);
 	}
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701 &&
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
 		for (i = 0; i < 12; i++) {
 			tw32(MAC_EXTADDR_0_HIGH + (i * 8), addr_high);
 			tw32(MAC_EXTADDR_0_LOW + (i * 8), addr_low);
@@ -4914,7 +4913,8 @@ static void tg3_set_bdinfo(struct tg3 *tp, u32 bdinfo_addr,
 		      (bdinfo_addr + TG3_BDINFO_MAXLEN_FLAGS),
 		       maxlen_flags);
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) &&
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5750))
 		tg3_write_mem(tp,
 			      (bdinfo_addr + TG3_BDINFO_NIC_ADDR),
 			      nic_addr);
@@ -7577,9 +7577,8 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		    tp->pdev->subsystem_vendor == PCI_VENDOR_ID_DELL)
 			tp->led_ctrl = LED_CTRL_MODE_PHY_2;
 
-		if (((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) ||
-		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) ||
-		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)) &&
+		if ((GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700) &&
+		    (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701) &&
 		    (nic_cfg & NIC_SRAM_DATA_CFG_EEPROM_WP))
 			tp->tg3_flags |= TG3_FLAG_EEPROM_WRITE_PROT;
 
