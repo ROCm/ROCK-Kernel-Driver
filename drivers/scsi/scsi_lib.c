@@ -498,19 +498,17 @@ void scsi_run_host_queues(struct Scsi_Host *shost)
 /*
  * Function:    scsi_end_request()
  *
- * Purpose:     Post-processing of completed commands called from interrupt
- *              handler or a bottom-half handler.
+ * Purpose:     Post-processing of completed commands (usually invoked at end
+ *		of upper level post-processing and scsi_io_completion).
  *
  * Arguments:   cmd	 - command that is complete.
- *              uptodate - 1 if I/O indicates success, 0 for I/O error.
- *              sectors  - number of sectors we want to mark.
+ *              uptodate - 1 if I/O indicates success, <= 0 for I/O error.
+ *              bytes    - number of bytes of completed I/O
  *		requeue  - indicates whether we should requeue leftovers.
- *		frequeue - indicates that if we release the command block
- *			   that the queue request function should be called.
  *
  * Lock status: Assumed that lock is not held upon entry.
  *
- * Returns:     Nothing
+ * Returns:     cmd if requeue done or required, NULL otherwise
  *
  * Notes:       This is called for block device requests in order to
  *              mark some number of sectors as complete.
@@ -696,6 +694,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	struct request *req = cmd->request;
 	int clear_errors = 1;
 	struct scsi_sense_hdr sshdr;
+	int sense_valid = 0;
+	int sense_deferred = 0;
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
@@ -714,11 +714,16 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		kfree(cmd->buffer);
 	}
 
+	if (result) {
+		sense_valid = scsi_command_normalize_sense(cmd, &sshdr);
+		if (sense_valid)
+			sense_deferred = scsi_sense_is_deferred(&sshdr);
+	}
 	if (blk_pc_request(req)) { /* SG_IO ioctl from block level */
 		req->errors = result;
 		if (result) {
 			clear_errors = 0;
-			if (scsi_command_normalize_sense(cmd, &sshdr)) {
+			if (sense_valid) {
 				/*
 				 * SG_IO wants current and deferred errors
 				 */
@@ -779,52 +784,37 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	 * sense buffer.  We can extract information from this, so we
 	 * can choose a block to remap, etc.
 	 */
-	if (driver_byte(result) != 0) {
-		if (scsi_command_normalize_sense(cmd, &sshdr) &&
-				!scsi_sense_is_deferred(&sshdr)) {
-			/*
-			 * If the device is in the process of becoming ready,
-			 * retry.
-			 */
-			if (sshdr.asc == 0x04 && sshdr.ascq == 0x01) {
+	if (sense_valid && !sense_deferred) {
+		switch (sshdr.sense_key) {
+		case UNIT_ATTENTION:
+			if (cmd->device->removable) {
+				/* detected disc change.  set a bit 
+				 * and quietly refuse further access.
+				 */
+				cmd->device->changed = 1;
+				cmd = scsi_end_request(cmd, 0,
+						this_count, 1);
+				return;
+			} else {
+				/*
+				* Must have been a power glitch, or a
+				* bus reset.  Could not have been a
+				* media change, so we just retry the
+				* request and see what happens.  
+				*/
 				scsi_requeue_command(q, cmd);
 				return;
 			}
-			if (sshdr.sense_key == UNIT_ATTENTION) {
-				if (cmd->device->removable) {
-					/* detected disc change.  set a bit 
-					 * and quietly refuse further access.
-		 			 */
-					cmd->device->changed = 1;
-					cmd = scsi_end_request(cmd, 0,
-							this_count, 1);
-					return;
-				} else {
-					/*
-				 	* Must have been a power glitch, or a
-				 	* bus reset.  Could not have been a
-				 	* media change, so we just retry the
-				 	* request and see what happens.  
-				 	*/
-					scsi_requeue_command(q, cmd);
-					return;
-				}
-			}
-		}
-		/*
-		 * If we had an ILLEGAL REQUEST returned, then we may have
-		 * performed an unsupported command.  The only thing this
-		 * should be would be a ten byte read where only a six byte
-		 * read was supported.  Also, on a system where READ CAPACITY
-		 * failed, we may have read past the end of the disk.
-		 */
-
-		/*
-		 * XXX: Following is probably broken since deferred errors
-		 *	fall through [dpg 20040827]
-		 */
-		switch (sshdr.sense_key) {
+			break;
 		case ILLEGAL_REQUEST:
+			/*
+		 	* If we had an ILLEGAL REQUEST returned, then we may
+		 	* have performed an unsupported command.  The only
+		 	* thing this should be would be a ten byte read where
+			* only a six byte read was supported.  Also, on a
+			* system where READ CAPACITY failed, we may have read
+			* past the end of the disk.
+		 	*/
 			if (cmd->device->use_10_for_rw &&
 			    (cmd->cmnd[0] == READ_10 ||
 			     cmd->cmnd[0] == WRITE_10)) {
@@ -841,6 +831,14 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			}
 			break;
 		case NOT_READY:
+			/*
+			 * If the device is in the process of becoming ready,
+			 * retry.
+			 */
+			if (sshdr.asc == 0x04 && sshdr.ascq == 0x01) {
+				scsi_requeue_command(q, cmd);
+				return;
+			}
 			printk(KERN_INFO "Device %s not ready.\n",
 			       req->rq_disk ? req->rq_disk->disk_name : "");
 			cmd = scsi_end_request(cmd, 0, this_count, 1);
