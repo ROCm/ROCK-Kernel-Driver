@@ -26,8 +26,8 @@
 */
 
 #define DRV_NAME	"ne2k-pci"
-#define DRV_VERSION	"1.02"
-#define DRV_RELDATE	"10/19/2000"
+#define DRV_VERSION	"1.03"
+#define DRV_RELDATE	"9/22/2003"
 
 
 /* The user-configurable values.
@@ -380,21 +380,48 @@ err_out_free_res:
 
 }
 
+/* 
+ * Magic incantation sequence for full duplex on the supported cards.
+ */
+static inline int set_realtek_fdx(struct net_device *dev)
+{
+	long ioaddr = dev->base_addr;
+
+	outb(0xC0 + E8390_NODMA, ioaddr + NE_CMD); /* Page 3 */
+	outb(0xC0, ioaddr + 0x01); /* Enable writes to CONFIG3 */
+	outb(0x40, ioaddr + 0x06); /* Enable full duplex */
+	outb(0x00, ioaddr + 0x01); /* Disable writes to CONFIG3 */
+	outb(E8390_PAGE0 + E8390_NODMA, ioaddr + NE_CMD); /* Page 0 */
+	return 0;
+}
+
+static inline int set_holtek_fdx(struct net_device *dev)
+{
+	long ioaddr = dev->base_addr;
+
+	outb(inb(ioaddr + 0x20) | 0x80, ioaddr + 0x20);
+	return 0;
+}
+
+static int ne2k_pci_set_fdx(struct net_device *dev)
+{
+	if (ei_status.ne2k_flags & REALTEK_FDX) 
+		return set_realtek_fdx(dev);
+	else if (ei_status.ne2k_flags & HOLTEK_FDX)
+		return set_holtek_fdx(dev);
+
+	return -EOPNOTSUPP;
+}
+
 static int ne2k_pci_open(struct net_device *dev)
 {
 	int ret = request_irq(dev->irq, ei_interrupt, SA_SHIRQ, dev->name, dev);
 	if (ret)
 		return ret;
 
-	/* Set full duplex for the chips that we know about. */
-	if (ei_status.ne2k_flags & FORCE_FDX) {
-		long ioaddr = dev->base_addr;
-		if (ei_status.ne2k_flags & REALTEK_FDX) {
-			outb(0xC0 + E8390_NODMA, ioaddr + NE_CMD); /* Page 3 */
-			outb(inb(ioaddr + 0x20) | 0x80, ioaddr + 0x20);
-		} else if (ei_status.ne2k_flags & HOLTEK_FDX)
-			outb(inb(ioaddr + 0x20) | 0x80, ioaddr + 0x20);
-	}
+	if (ei_status.ne2k_flags & FORCE_FDX)
+		ne2k_pci_set_fdx(dev);
+
 	ei_open(dev);
 	return 0;
 }
