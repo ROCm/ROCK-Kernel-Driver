@@ -31,6 +31,7 @@
  *                            made timeout (the emulated heartbeat) a module_param
  *                            made the keepalive ping an internal subroutine
  *                            made wdt_stop and wdt_start module params
+ *                            added extra printk's for startup problems
  *                            added MODULE_AUTHOR and MODULE_DESCRIPTION info
  *
  *
@@ -239,7 +240,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	switch(cmd)
 	{
 		default:
-			return -ENOTTY;
+			return -ENOIOCTLCMD;
 		case WDIOC_GETSUPPORT:
 			return copy_to_user((struct watchdog_info *)arg, &ident, sizeof(ident))?-EFAULT:0;
 		case WDIOC_GETSTATUS:
@@ -364,6 +365,7 @@ static int __init sbc60xxwdt_init(void)
 		{
 			printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
 				wdt_stop);
+			rc = -EIO;
 			goto err_out_region1;
 		}
 	}
