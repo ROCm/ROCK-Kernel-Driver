@@ -30,65 +30,65 @@ const char *teles0_revision = "$Revision: 2.15.2.4 $";
 #define bytein(addr) inb(addr)
 
 static inline u_char
-readisac(unsigned long adr, u_char off)
+readisac(void __iomem *adr, u_char off)
 {
 	return readb(adr + ((off & 1) ? 0x2ff : 0x100) + off);
 }
 
 static inline void
-writeisac(unsigned long adr, u_char off, u_char data)
+writeisac(void __iomem *adr, u_char off, u_char data)
 {
 	writeb(data, adr + ((off & 1) ? 0x2ff : 0x100) + off); mb();
 }
 
 
 static inline u_char
-readhscx(unsigned long adr, int hscx, u_char off)
+readhscx(void __iomem *adr, int hscx, u_char off)
 {
 	return readb(adr + (hscx ? 0x1c0 : 0x180) +
 		     ((off & 1) ? 0x1ff : 0) + off);
 }
 
 static inline void
-writehscx(unsigned long adr, int hscx, u_char off, u_char data)
+writehscx(void __iomem *adr, int hscx, u_char off, u_char data)
 {
 	writeb(data, adr + (hscx ? 0x1c0 : 0x180) +
 	       ((off & 1) ? 0x1ff : 0) + off); mb();
 }
 
 static inline void
-read_fifo_isac(unsigned long adr, u_char * data, int size)
+read_fifo_isac(void __iomem *adr, u_char * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *)adr + 0x100;
+	register u_char __iomem *ad = adr + 0x100;
 	for (i = 0; i < size; i++)
 		data[i] = readb(ad);
 }
 
 static inline void
-write_fifo_isac(unsigned long adr, u_char * data, int size)
+write_fifo_isac(void __iomem *adr, u_char * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *)adr + 0x100;
+	register u_char __iomem *ad = adr + 0x100;
 	for (i = 0; i < size; i++) {
 		writeb(data[i], ad); mb();
 	}
 }
 
 static inline void
-read_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+read_fifo_hscx(void __iomem *adr, int hscx, u_char * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *) (adr + (hscx ? 0x1c0 : 0x180));
+	register u_char __iomem *ad = adr + (hscx ? 0x1c0 : 0x180);
 	for (i = 0; i < size; i++)
 		data[i] = readb(ad);
 }
 
 static inline void
-write_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+write_fifo_hscx(void __iomem *adr, int hscx, u_char * data, int size)
 {
 	int i;
-	register u_char *ad = (u_char *) (adr + (hscx ? 0x1c0 : 0x180));
+	register u_char __iomem *ad = adr + (hscx ? 0x1c0 : 0x180);
 	for (i = 0; i < size; i++) {
 		writeb(data[i], ad); mb();
 	}
@@ -188,7 +188,7 @@ release_io_teles0(struct IsdnCardState *cs)
 {
 	if (cs->hw.teles0.cfg_reg)
 		release_region(cs->hw.teles0.cfg_reg, 8);
-	iounmap((unsigned char *)cs->hw.teles0.membase);
+	iounmap(cs->hw.teles0.membase);
 	release_mem_region(cs->hw.teles0.phymem, TELES_IOMEM_SIZE);
 }
 
@@ -336,10 +336,9 @@ setup_teles0(struct IsdnCard *card)
 			release_region(cs->hw.teles0.cfg_reg, 8);
 		return (0);
 	}
-	cs->hw.teles0.membase =
-		(unsigned long) ioremap(cs->hw.teles0.phymem, TELES_IOMEM_SIZE);
+	cs->hw.teles0.membase = ioremap(cs->hw.teles0.phymem, TELES_IOMEM_SIZE);
 	printk(KERN_INFO
-	       "HiSax: %s config irq:%d mem:0x%lX cfg:0x%X\n",
+	       "HiSax: %s config irq:%d mem:%p cfg:0x%X\n",
 	       CardType[cs->typ], cs->irq,
 	       cs->hw.teles0.membase, cs->hw.teles0.cfg_reg);
 	if (reset_teles0(cs)) {

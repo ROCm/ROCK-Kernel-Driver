@@ -580,7 +580,7 @@ struct teles3_hw {
 
 struct teles0_hw {
 	unsigned int cfg_reg;
-	unsigned long membase;
+	void __iomem *membase;
 	unsigned long phymem;
 };
 
