@@ -1844,8 +1844,10 @@ isdn_ppp_dev_ioctl_stats(int slot, struct ifreq *ifr, struct net_device *dev)
 	memset(&t, 0, sizeof(struct ppp_stats));
 	if (dev->flags & IFF_UP) {
 		t.p.ppp_ipackets = lp->stats.rx_packets;
+		t.p.ppp_ibytes = lp->stats.rx_bytes;
 		t.p.ppp_ierrors = lp->stats.rx_errors;
 		t.p.ppp_opackets = lp->stats.tx_packets;
+		t.p.ppp_obytes = lp->stats.tx_bytes;
 		t.p.ppp_oerrors = lp->stats.tx_errors;
 #ifdef CONFIG_ISDN_PPP_VJ
 		if (slot >= 0 && ippp_table[slot]->slcomp) {
