@@ -272,6 +272,17 @@ void global_cache_flush(void);
 void get_agp_version(struct agp_bridge_data *bridge);
 unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 
+/* generic routines for agp>=3 */
+int agp3_generic_fetch_size(void);
+void agp3_generic_tlbflush(struct agp_memory *mem);
+int agp3_generic_configure(void);
+void agp3_generic_cleanup(void);
+
+/* aperture sizes have been standardised since v3 */
+#define AGP_GENERIC_SIZES_ENTRIES 11
+extern struct aper_size_info_16 agp3_generic_sizes[];
+
+
 extern int agp_off;
 extern int agp_try_unsupported_boot;
 
@@ -281,14 +292,18 @@ extern int agp_try_unsupported_boot;
 #define AGPSTAT		0x4
 #define AGPCMD		0x8
 #define AGPNISTAT	0xc
-#define AGPCTRL                 0x10
+#define AGPCTRL		0x10
+#define AGPAPSIZE	0x14
 #define AGPNEPG		0x16
+#define AGPGARTLO	0x18
+#define AGPGARTHI	0x1c
 #define AGPNICMD	0x20
 
 #define AGP_MAJOR_VERSION_SHIFT	(20)
 #define AGP_MINOR_VERSION_SHIFT	(16)
 
 #define AGPSTAT_RQ_DEPTH	(0xff000000)
+#define AGPSTAT_RQ_DEPTH_SHIFT	24
 
 #define AGPSTAT_CAL_MASK	(1<<12|1<<11|1<<10)
 #define AGPSTAT_ARQSZ		(1<<15|1<<14|1<<13)
@@ -306,5 +321,8 @@ extern int agp_try_unsupported_boot;
 #define AGPSTAT3_RSVD		(1<<2)
 #define AGPSTAT3_8X		(1<<1)
 #define AGPSTAT3_4X		(1)
+
+#define AGPCTRL_APERENB		(1<<8)
+#define AGPCTRL_GTLBEN		(1<<7)
 
 #endif	/* _AGP_BACKEND_PRIV_H */
