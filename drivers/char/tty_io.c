@@ -766,6 +766,17 @@ ssize_t redirected_tty_write(struct file * file, const char __user * buf, size_t
 	return tty_write(file, buf, count, ppos);
 }
 
+static char ptychar[] = "pqrstuvwxyzabcde";
+
+static inline void pty_line_name(struct tty_driver *driver, int index, char *p)
+{
+	int i = index + driver->name_base;
+	/* ->name is initialized to "ttyp", but "tty" is expected */
+	sprintf(p, "%s%c%x",
+			driver->subtype == PTY_TYPE_SLAVE ? "tty" : driver->name,
+			ptychar[i >> 4 & 0xf], i & 0xf);
+}
+
 static inline void tty_line_name(struct tty_driver *driver, int index, char *p)
 {
 	sprintf(p, "%s%d", driver->name, index + driver->name_base);
@@ -2170,6 +2181,7 @@ static struct class_simple *tty_class;
 void tty_register_device(struct tty_driver *driver, unsigned index,
 			 struct device *device)
 {
+	char name[64];
 	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
 
 	if (index >= driver->num) {
@@ -2181,13 +2193,11 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 	devfs_mk_cdev(dev, S_IFCHR | S_IRUSR | S_IWUSR,
 			"%s%d", driver->devfs_name, index + driver->name_base);
 
-	/* we don't care about the ptys */
-	/* how nice to hide this behind some crappy interface.. */
-	if (driver->type != TTY_DRIVER_TYPE_PTY) {
-		char name[64];
+	if (driver->type == TTY_DRIVER_TYPE_PTY)
+		pty_line_name(driver, index, name);
+	else
 		tty_line_name(driver, index, name);
-		class_simple_device_add(tty_class, dev, device, name);
-	}
+	class_simple_device_add(tty_class, dev, device, name);
 }
 
 /**
