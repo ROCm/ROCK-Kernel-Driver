@@ -808,7 +808,7 @@ prep_setup_arch(void)
 	{
 	case _PREP_IBM:
 		reg = inb(PREP_IBM_PLANAR);
-		printk(KERN_INFO "IBM planar ID: %08x", reg);
+		printk(KERN_INFO "IBM planar ID: %02x", reg);
 		switch (reg) {
 			case PREP_IBM_SANDALFOOT:
 				prep_gen_enable_l2();
