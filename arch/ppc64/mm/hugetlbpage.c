@@ -555,6 +555,7 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+	retry:
 		page = find_get_page(mapping, idx);
 		if (!page) {
 			/* charge the fs quota first */
@@ -569,10 +570,13 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				goto out;
 			}
 			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-			unlock_page(page);
+			if (!ret)
+				unlock_page(page);
 			if (ret) {
 				hugetlb_put_quota(mapping);
-				free_huge_page(page);
+				huge_page_release(page);
+				if (ret == -EEXIST)
+					goto retry;
 				goto out;
 			}
 		}
@@ -999,11 +1003,17 @@ int hugetlb_report_meminfo(char *buf)
 			HPAGE_SIZE/1024);
 }
 
+/* dummy right now. Fix when you have real NUMA policy here. */
+int __is_hugepage_mem_enough(struct mempolicy *pol, size_t size)
+{
+	return is_hugepage_mem_enough(size);
+}
+
 /* This is advisory only, so we can get away with accesing
  * htlbpage_free without taking the lock. */
 int is_hugepage_mem_enough(size_t size)
 {
-	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= htlbpage_free;
+	return size/HPAGE_SIZE <= htlbpage_free;
 }
 
 /* Return the number pages of memory we physically have, in PAGE_SIZE units. */
