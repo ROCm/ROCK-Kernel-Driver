@@ -311,7 +311,6 @@ void __init iSeries_init_early(void)
 	iSeries_recal_titan = HvCallXm_loadTod();
 
 	ppc_md.setup_arch = iSeries_setup_arch;
-	ppc_md.setup_residual = iSeries_setup_residual;
 	ppc_md.get_cpuinfo = iSeries_get_cpuinfo;
 	ppc_md.init_IRQ = iSeries_init_IRQ;
 	ppc_md.get_irq = iSeries_get_irq;
@@ -724,29 +723,6 @@ void __init iSeries_setup_arch(void)
 			tbFreqMhzHundreths);
 	systemcfg->processor = xIoHriProcessorVpd[procIx].xPVR;
 	printk("Processor version = %x\n", systemcfg->processor);
-}
-
-/*
- * int as400_setup_residual()
- *
- * Description:
- *   This routine pretty-prints CPU information gathered from the VPD    
- *   for use in /proc/cpuinfo                               
- *
- * Input(s):
- *  *buffer - Buffer into which CPU data is to be printed.             
- *
- * Output(s):
- *  *buffer - Buffer with CPU data.
- */
-void iSeries_setup_residual(struct seq_file *m, int cpu_id)
-{
-	seq_printf(m, "clock\t\t: %lu.%02luMhz\n", procFreqMhz,
-			procFreqMhzHundreths);
-	seq_printf(m, "time base\t: %lu.%02luMHz\n", tbFreqMhz,
-			tbFreqMhzHundreths);
-	seq_printf(m, "i-cache\t\t: %d\n", systemcfg->iCacheL1LineSize);
-	seq_printf(m, "d-cache\t\t: %d\n", systemcfg->dCacheL1LineSize);
 }
 
 void iSeries_get_cpuinfo(struct seq_file *m)

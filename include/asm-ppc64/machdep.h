@@ -65,8 +65,6 @@ struct machdep_calls {
 
 	void		(*setup_arch)(void);
 	/* Optional, may be NULL. */
-	void		(*setup_residual)(struct seq_file *m, int cpu_id);
-	/* Optional, may be NULL. */
 	void		(*get_cpuinfo)(struct seq_file *m);
 
 	void		(*init_IRQ)(void);
