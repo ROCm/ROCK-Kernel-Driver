@@ -395,6 +395,8 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 					set_bit(X86_FEATURE_CX8, c->x86_capability);
 					set_bit(X86_FEATURE_3DNOW, c->x86_capability);
 
+				case 9:	/* Nehemiah */
+				default:
 					get_model_name(c);
 					display_cacheinfo(c);
 					break;

@@ -136,6 +136,7 @@ config M386
 	  - "Winchip-2" for IDT Winchip 2.
 	  - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
 	  - "CyrixIII/VIA C3" for VIA Cyrix III or VIA C3.
+	  - "VIA C3-2 for VIA C3-2 "Nehemiah" (model 9 and above).
 
 	  If you don't know what to do, choose "386".
 
@@ -174,7 +175,7 @@ config M686
 	  against the f00f bug found in earlier Pentiums.
 
 config MPENTIUMII
-       bool "Pentium-II/Celeron(pre-Coppermine)"
+	bool "Pentium-II/Celeron(pre-Coppermine)"
 	help
 	  Select this for Intel chips based on the Pentium-II and
 	  pre-Coppermine Celeron core.  This option enables an unaligned
@@ -260,6 +261,16 @@ config MCYRIXIII
 	  treat this chip as a generic 586. Whilst the CPU is 686 class,
 	  it lacks the cmov extension which gcc assumes is present when
 	  generating 686 code.
+	  Note, that Nehemiah (Model 9) and above will not boot with this
+	  kernel due to them lacking the 3dnow instructions used in earlier
+	  incarnations of the CPU.
+
+config MVIAC3_2
+	bool "VIA C3-2 (Nehemiah)"
+	help
+	  Select this for a VIA C3 "Nehemiah". Selecting this enables usage of SSE
+	  and tells gcc to treat the CPU as a 686.
+	  Note, this kernel will not boot on older (pre model 9) C3s.
 
 endchoice
 
@@ -278,8 +289,8 @@ config X86_XADD
 
 config X86_L1_CACHE_SHIFT
 	int
-	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586
 	default "4" if MELAN || M486 || M386
+	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
 	default "6" if MK7 || MK8
 	default "7" if MPENTIUM4
 
@@ -325,12 +336,12 @@ config X86_POPAD_OK
 
 config X86_ALIGNMENT_16
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2
 	default y
 
 config X86_TSC
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8
+	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2
 	default y
 
 config X86_GOOD_APIC
@@ -345,7 +356,7 @@ config X86_INTEL_USERCOPY
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || MK8
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2
 	default y
 
 config X86_USE_3DNOW
@@ -360,7 +371,7 @@ config X86_OOSTORE
 
 config X86_PREFETCH
 	bool
-	depends on MPENTIUMIII || MPENTIUM4
+	depends on MPENTIUMIII || MPENTIUM4 || MVIAC3_2
 	default y
 
 config X86_SSE2
