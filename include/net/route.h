@@ -102,7 +102,11 @@ struct rt_cache_stat
         unsigned int gc_ignored;
         unsigned int gc_goal_miss;
         unsigned int gc_dst_overflow;
-} ____cacheline_aligned_in_smp;
+};
+
+extern struct rt_cache_stat *rt_cache_stat;
+#define RT_CACHE_STAT_INC(field)					  \
+		(per_cpu_ptr(rt_cache_stat, smp_processor_id())->field++)
 
 extern struct ip_rt_acct *ip_rt_acct;
 

@@ -196,7 +196,7 @@ static struct rt_hash_bucket 	*rt_hash_table;
 static unsigned			rt_hash_mask;
 static int			rt_hash_log;
 
-struct rt_cache_stat rt_cache_stat[NR_CPUS];
+struct rt_cache_stat *rt_cache_stat;
 
 static int rt_intern_hash(unsigned hash, struct rtable *rth,
 				struct rtable **res);
@@ -318,24 +318,26 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
 	int len = 0;
 
 	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
-			       rt_cache_stat[i].in_hit,
-			       rt_cache_stat[i].in_slow_tot,
-			       rt_cache_stat[i].in_slow_mc,
-			       rt_cache_stat[i].in_no_route,
-			       rt_cache_stat[i].in_brd,
-			       rt_cache_stat[i].in_martian_dst,
-			       rt_cache_stat[i].in_martian_src,
+			       per_cpu_ptr(rt_cache_stat, i)->in_hit,
+			       per_cpu_ptr(rt_cache_stat, i)->in_slow_tot,
+			       per_cpu_ptr(rt_cache_stat, i)->in_slow_mc,
+			       per_cpu_ptr(rt_cache_stat, i)->in_no_route,
+			       per_cpu_ptr(rt_cache_stat, i)->in_brd,
+			       per_cpu_ptr(rt_cache_stat, i)->in_martian_dst,
+			       per_cpu_ptr(rt_cache_stat, i)->in_martian_src,
 
-			       rt_cache_stat[i].out_hit,
-			       rt_cache_stat[i].out_slow_tot,
-			       rt_cache_stat[i].out_slow_mc, 
+			       per_cpu_ptr(rt_cache_stat, i)->out_hit,
+			       per_cpu_ptr(rt_cache_stat, i)->out_slow_tot,
+			       per_cpu_ptr(rt_cache_stat, i)->out_slow_mc, 
 
-			       rt_cache_stat[i].gc_total,
-			       rt_cache_stat[i].gc_ignored,
-			       rt_cache_stat[i].gc_goal_miss,
-			       rt_cache_stat[i].gc_dst_overflow
+			       per_cpu_ptr(rt_cache_stat, i)->gc_total,
+			       per_cpu_ptr(rt_cache_stat, i)->gc_ignored,
+			       per_cpu_ptr(rt_cache_stat, i)->gc_goal_miss,
+			       per_cpu_ptr(rt_cache_stat, i)->gc_dst_overflow
 
 			);
 	}
@@ -591,11 +593,11 @@ static int rt_garbage_collect(void)
 	 * do not make it too frequently.
 	 */
 
-	rt_cache_stat[smp_processor_id()].gc_total++;
+	RT_CACHE_STAT_INC(gc_total);
 
 	if (now - last_gc < ip_rt_gc_min_interval &&
 	    atomic_read(&ipv4_dst_ops.entries) < ip_rt_max_size) {
-		rt_cache_stat[smp_processor_id()].gc_ignored++;
+		RT_CACHE_STAT_INC(gc_ignored);
 		goto out;
 	}
 
@@ -663,7 +665,7 @@ static int rt_garbage_collect(void)
 		     We will not spin here for long time in any case.
 		 */
 
-		rt_cache_stat[smp_processor_id()].gc_goal_miss++;
+		RT_CACHE_STAT_INC(gc_goal_miss);
 
 		if (expire == 0)
 			break;
@@ -682,7 +684,7 @@ static int rt_garbage_collect(void)
 		goto out;
 	if (net_ratelimit())
 		printk(KERN_WARNING "dst cache overflow\n");
-	rt_cache_stat[smp_processor_id()].gc_dst_overflow++;
+	RT_CACHE_STAT_INC(gc_dst_overflow);
 	return 1;
 
 work_done:
@@ -1400,7 +1402,7 @@ static int ip_route_input_mc(struct sk_buff *skb, u32 daddr, u32 saddr,
 	if (!LOCAL_MCAST(daddr) && IN_DEV_MFORWARD(in_dev))
 		rth->u.dst.input = ip_mr_input;
 #endif
-	rt_cache_stat[smp_processor_id()].in_slow_mc++;
+	RT_CACHE_STAT_INC(in_slow_mc);
 
 	in_dev_put(in_dev);
 	hash = rt_hash_code(daddr, saddr ^ (dev->ifindex << 5), tos);
@@ -1485,7 +1487,7 @@ int ip_route_input_slow(struct sk_buff *skb, u32 daddr, u32 saddr,
 	}
 	free_res = 1;
 
-	rt_cache_stat[smp_processor_id()].in_slow_tot++;
+	RT_CACHE_STAT_INC(in_slow_tot);
 
 #ifdef CONFIG_IP_ROUTE_NAT
 	/* Policy is applied before mapping destination,
@@ -1642,7 +1644,7 @@ brd_input:
 	}
 	flags |= RTCF_BROADCAST;
 	res.type = RTN_BROADCAST;
-	rt_cache_stat[smp_processor_id()].in_brd++;
+	RT_CACHE_STAT_INC(in_brd);
 
 local_input:
 	rth = dst_alloc(&ipv4_dst_ops);
@@ -1687,7 +1689,7 @@ local_input:
 	goto intern;
 
 no_route:
-	rt_cache_stat[smp_processor_id()].in_no_route++;
+	RT_CACHE_STAT_INC(in_no_route);
 	spec_dst = inet_select_addr(dev, 0, RT_SCOPE_UNIVERSE);
 	res.type = RTN_UNREACHABLE;
 	goto local_input;
@@ -1696,7 +1698,7 @@ no_route:
 	 *	Do not cache martian addresses: they should be logged (RFC1812)
 	 */
 martian_destination:
-	rt_cache_stat[smp_processor_id()].in_martian_dst++;
+	RT_CACHE_STAT_INC(in_martian_dst);
 #ifdef CONFIG_IP_ROUTE_VERBOSE
 	if (IN_DEV_LOG_MARTIANS(in_dev) && net_ratelimit())
 		printk(KERN_WARNING "martian destination %u.%u.%u.%u from "
@@ -1713,7 +1715,7 @@ e_nobufs:
 
 martian_source:
 
-	rt_cache_stat[smp_processor_id()].in_martian_src++;
+	RT_CACHE_STAT_INC(in_martian_src);
 #ifdef CONFIG_IP_ROUTE_VERBOSE
 	if (IN_DEV_LOG_MARTIANS(in_dev) && net_ratelimit()) {
 		/*
@@ -1763,7 +1765,7 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			rth->u.dst.lastuse = jiffies;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
-			rt_cache_stat[smp_processor_id()].in_hit++;
+			RT_CACHE_STAT_INC(in_hit);
 			rcu_read_unlock();
 			skb->dst = (struct dst_entry*)rth;
 			return 0;
@@ -2060,7 +2062,7 @@ make_route:
 
 	rth->u.dst.output=ip_output;
 
-	rt_cache_stat[smp_processor_id()].out_slow_tot++;
+	RT_CACHE_STAT_INC(out_slow_tot);
 
 	if (flags & RTCF_LOCAL) {
 		rth->u.dst.input = ip_local_deliver;
@@ -2070,7 +2072,7 @@ make_route:
 		rth->rt_spec_dst = fl.fl4_src;
 		if (flags & RTCF_LOCAL && !(dev_out->flags & IFF_LOOPBACK)) {
 			rth->u.dst.output = ip_mc_output;
-			rt_cache_stat[smp_processor_id()].out_slow_mc++;
+			RT_CACHE_STAT_INC(out_slow_mc);
 		}
 #ifdef CONFIG_IP_MROUTE
 		if (res.type == RTN_MULTICAST) {
@@ -2129,7 +2131,7 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 			rth->u.dst.lastuse = jiffies;
 			dst_hold(&rth->u.dst);
 			rth->u.dst.__use++;
-			rt_cache_stat[smp_processor_id()].out_hit++;
+			RT_CACHE_STAT_INC(out_hit);
 			rcu_read_unlock();
 			*rp = rth;
 			return 0;
@@ -2650,6 +2652,11 @@ int __init ip_rt_init(void)
 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
+	rt_cache_stat = kmalloc_percpu(sizeof (struct rt_cache_stat),
+					GFP_KERNEL);
+	if (!rt_cache_stat) 
+		goto out_enomem1;
+
 	devinet_init();
 	ip_fib_init();
 
@@ -2675,6 +2682,8 @@ int __init ip_rt_init(void)
 out:
 	return rc;
 out_enomem:
+	kfree_percpu(rt_cache_stat);
+out_enomem1:
 	rc = -ENOMEM;
 	goto out;
 }
