@@ -163,6 +163,16 @@ A partial list of the supported mount options follows:
   ro		mount network share read-only
   version	used to distinguish different versions of the
 		mount helper utility (not typically needed)
+  sep		if first mount option (after the -o), overrides
+		the comma as the separator between the mount
+		parms. e.g.
+			-o user=myname,password=mypassword,domain=mydom
+		could be passed instead with period as the separator by
+			-o sep=.user=myname.password=mypassword.domain=mydom
+		this might be useful when comma is contained within username
+		or password or domain. This option is less important
+		when the cifs mount helper cifs.mount (version 1.1 or later)
+		is used.
 
 Misc /proc/fs/cifs Flags and Debug Info
 =======================================

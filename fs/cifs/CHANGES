@@ -1,3 +1,12 @@
+Version 1.02
+------------
+Fix caching problem when files opened by multiple clients in which 
+page cache could contain stale data, and write through did
+not occur often enough while file was still open when read ahead
+(read oplock) not allowed.  Treat "sep=" when first mount option
+as an overrride of comma as the default separator between mount
+options. 
+
 Version 1.01
 ------------
 Allow passwords longer than 16 bytes. Allow null password string.

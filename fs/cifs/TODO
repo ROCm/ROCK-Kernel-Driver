@@ -1,4 +1,4 @@
-version 0.8.1 July 4th, 2003
+version 1.0.2 January 29, 2004
 
 A Partial List of Known Problems and Missing Features
 =====================================================
@@ -27,16 +27,14 @@ used (Kerberos or NTLMSSP). Signing alreadyimplemented for NTLM
 f) Directory entry caching relies on a 1 second timer, rather than 
 using FindNotify or equivalent.  - (started)
 
-g) There may be a few additional changes that could be done to take advantage
-of recent 2.5 kernel improvements in byte-range locking
+g) A few byte range testcases fail due to POSIX vs. Windows/CIFS
+style byte range lock differences
 
 h) quota support
 
 i) support for the Linux 2.5 kernel new feature get_xattr and set_xattr
 which will allow us to expose dos attributes as well as real
 ACLs
-
-j) finish off the mount helper, mount.cifs - (started)
 
 k) finish writepages support (multi-page write behind for improved
 performance) and syncpage
@@ -56,17 +54,15 @@ p) Improve performance of readpages by sending more than one read
 at a time when 8 pages or more are requested.
 
 
-KNOWN BUGS (updated July 4th, 2003)
+KNOWN BUGS (updated January 30, 2004)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
 support the CIFS Unix extensions but Samba has a bug currently handling
 symlink text beginning with slash
-2) delete of file with read-only attribute set will fail (may be ok)
-3) mount helper syntax not quite matching man page
-4) follow_link and readdir code does not follow dfs junctions
+2) follow_link and readdir code does not follow dfs junctions
 but recognizes them
-5) create of new files to FAT partitions on Windows servers can
+3) create of new files to FAT partitions on Windows servers can
 succeed but still return access denied (appears to be Windows 
 not client problem).  NTFS partitions do not have this problem.
 

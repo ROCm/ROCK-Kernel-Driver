@@ -402,6 +402,13 @@ static ssize_t
 cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
           loff_t * poffset)
 {
+	if(file == NULL)
+		return -EIO;
+	else if(file->f_dentry == NULL)
+		return -EIO;
+	else if(file->f_dentry->d_inode == NULL)
+		return -EIO;
+
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead)
 		return generic_file_read(file,read_data,read_size,poffset);
 	else
@@ -412,10 +419,30 @@ static ssize_t
 cifs_write_wrapper(struct file * file, const char *write_data,
            size_t write_size, loff_t * poffset) 
 {
-	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)    /* check caching for write */
+	ssize_t written;
+
+	if(file == NULL)
+		return -EIO;
+	else if(file->f_dentry == NULL)
+		return -EIO;
+	else if(file->f_dentry->d_inode == NULL)
+		return -EIO;
+
+	/* check whether we can cache writes locally */
+	/* if not then check whether we can use the page cache at all */
+	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)  
 		return generic_file_write(file,write_data, write_size,poffset);
-	else
+
+	else if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
+		written = generic_file_write(file,write_data, write_size,poffset);
+		/* since we can not cache writes, need to sync the data */
+		if(file->f_dentry->d_inode->i_mapping == NULL)
+			return -EIO;
+		filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
+		return written;
+	} else {
 		return cifs_write(file,write_data,write_size,poffset);
+	}
 }
 
 
@@ -472,8 +499,8 @@ struct inode_operations cifs_symlink_inode_ops = {
 };
 
 struct file_operations cifs_file_ops = {
-	.read = generic_file_read,
-	.write = generic_file_write, 
+	.read = cifs_read_wrapper,
+	.write = cifs_write_wrapper, 
 	.open = cifs_open,
 	.release = cifs_close,
 	.lock = cifs_lock,
