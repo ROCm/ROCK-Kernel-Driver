@@ -25,11 +25,8 @@
  *					518, 520, 531, 532
  *
  * This driver is supported by LSI Logic, with assistance from Red Hat, Dell,
- * and others. Please send updates to the public mailing list
- * linux-megaraid-devel@dell.com, and subscribe to and read archives of this
- * list at http://lists.us.dell.com/.
- *
- * For history of changes, see ChangeLog.megaraid.
+ * and others. Please send updates to the mailing list
+ * linux-scsi@vger.kernel.org .
  *
  */
 
