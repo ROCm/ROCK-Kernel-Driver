@@ -51,6 +51,7 @@ int llc_mac_hdr_init(struct sk_buff *skb, unsigned char *sa, unsigned char *da)
 		if (da) {
 			memcpy(trh->daddr, da, dev->addr_len);
 			tr_source_route(skb, trh, dev);
+			skb->mac.raw = skb->data;
 		}
 		break;
 	}
