@@ -25,6 +25,10 @@
  *
  * Version history:
  * 
+ * 2003_04_03 al borchers
+ *  - fixed a bug (that shows up with dosemu) where the tty struct is
+ *    used in a callback after it has been freed
+ *
  * 2.3 2002_03_08 greg kroah-hartman
  *	- fixed bug when multiple devices were attached at the same time.
  *
@@ -918,7 +922,7 @@ static void edge_bulk_out_data_callback (struct urb *urb, struct pt_regs *regs)
 
 	tty = edge_port->port->tty;
 
-	if (tty) {
+	if (tty && edge_port->open) {
 		/* let the tty driver wakeup if it has a special write_wakeup function */
 		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
 			(tty->ldisc.write_wakeup)(tty);
@@ -975,7 +979,7 @@ static void edge_bulk_out_cmd_callback (struct urb *urb, struct pt_regs *regs)
 	tty = edge_port->port->tty;
 
 	/* tell the tty driver that something has changed */
-	if (tty)
+	if (tty && edge_port->open)
 		wake_up_interruptible(&tty->write_wait);
 
 	/* we have completed the command */

@@ -2750,6 +2750,10 @@ E: wsalamon@tislabs.com
 E: wsalamon@nai.com
 D: portions of the Linux Security Module (LSM) framework and security modules
 
+N: Robert Sanders
+E: gt8134b@prism.gatech.edu
+D: Dosemu
+
 N: Duncan Sands
 E: duncan.sands@wanadoo.fr
 W: http://topo.math.u-psud.fr/~sands
@@ -2757,10 +2761,6 @@ D: Alcatel SpeedTouch USB driver
 S: 69 rue Dunois
 S: 75013 Paris
 S: France
-
-N: Robert Sanders
-E: gt8134b@prism.gatech.edu
-D: Dosemu
 
 N: Hannu Savolainen
 E: hannu@opensound.com

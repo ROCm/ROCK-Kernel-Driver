@@ -77,6 +77,9 @@
 #define NEC_VENDOR_ID		0x0409
 #define NEC_PRODUCT_ID		0x00d5
 
+#define ASUS_VENDOR_ID		0x0b05
+#define ASUS_A600_PRODUCT_ID	0x4201
+
 /*
  * Since we can't queue our bulk write urbs (don't know why - it just
  * doesn't work), we can send down only one write urb at a time. The simplistic

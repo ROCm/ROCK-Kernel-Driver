@@ -598,7 +598,7 @@ static struct kobj_type ktype_edd = {
 	.default_attrs	= def_attrs,
 };
 
-static decl_subsys(edd,&ktype_edd);
+static decl_subsys(edd,&ktype_edd,NULL);
 
 
 /**

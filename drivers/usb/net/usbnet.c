@@ -122,6 +122,11 @@
  * 		cleanups and stubbed PXA-250 support (db), fix for framing
  * 		issues on Z, net1080, and gl620a (Toby Milne)
  *
+ * 31-mar-2003	Use endpoint descriptors:  high speed support, simpler sa1100
+ * 		vs pxa25x, and CDC Ethernet.  Throttle down log floods on
+ * 		disconnect; other cleanups. (db)  Flush net1080 fifos
+ * 		after several sequential framing errors. (Johannes Erdfelt)
+ *
  *-------------------------------------------------------------------------*/
 
 #include <linux/config.h>
@@ -155,16 +160,17 @@
 /* minidrivers _could_ be individually configured */
 #define	CONFIG_USB_AN2720
 #define	CONFIG_USB_BELKIN
+#undef	CONFIG_USB_CDCETHER
+//#define	CONFIG_USB_CDCETHER		/* NYET */
 #define	CONFIG_USB_EPSON2888
 #define	CONFIG_USB_GENESYS
 #define	CONFIG_USB_NET1080
 #define	CONFIG_USB_PL2301
-// #define	CONFIG_USB_PXA
-#define	CONFIG_USB_SA1100
+#define	CONFIG_USB_ARMLINUX
 #define	CONFIG_USB_ZAURUS
 
 
-#define DRIVER_VERSION		"18-Oct-2002"
+#define DRIVER_VERSION		"31-Mar-2003"
 
 /*-------------------------------------------------------------------------*/
 
@@ -176,11 +182,11 @@
  * Ethernet packets (so queues should be bigger).
  */
 #ifdef REALLY_QUEUE
-#define	RX_QLEN		4
-#define	TX_QLEN		4
+#define	RX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
+#define	TX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
 #else
-#define	RX_QLEN		1
-#define	TX_QLEN		1
+#define	RX_QLEN(dev)		1
+#define	TX_QLEN(dev)		1
 #endif
 
 // packets are always ethernet inside
@@ -191,6 +197,10 @@
 // reawaken network queue this soon after stopping; else watchdog barks
 #define TX_TIMEOUT_JIFFIES	(5*HZ)
 
+// throttle rx/tx briefly after some faults, so khubd might disconnect()
+// us (it polls at HZ/4 usually) before we report too many false errors.
+#define THROTTLE_JIFFIES	(HZ/8)
+
 // for vendor-specific control operations
 #define	CONTROL_TIMEOUT_MS	(500)			/* msec */
 #define CONTROL_TIMEOUT_JIFFIES ((CONTROL_TIMEOUT_MS * HZ)/1000)
@@ -199,10 +209,6 @@
 #define UNLINK_TIMEOUT_JIFFIES ((3  /*ms*/ * HZ)/1000)
 
 /*-------------------------------------------------------------------------*/
-
-// list of all devices we manage
-static DECLARE_MUTEX (usbnet_mutex);
-static LIST_HEAD (usbnet_list);
 
 // randomly generated ethernet address
 static u8	node_id [ETH_ALEN];
@@ -213,17 +219,18 @@ struct usbnet {
 	struct usb_device	*udev;
 	struct driver_info	*driver_info;
 	struct semaphore	mutex;
-	struct list_head	dev_list;
 	wait_queue_head_t	*wait;
+
+	// i/o info: pipes etc
+	unsigned		in, out;
+	unsigned		maxpacket;
+	struct timer_list	delay;
 
 	// protocol/interface state
 	struct net_device	net;
 	struct net_device_stats	stats;
 	int			msg_level;
-
-#ifdef CONFIG_USB_NET1080
-	u16			packet_id;
-#endif
+	unsigned long		data [5];
 
 	// various kinds of pending driver work
 	struct sk_buff_head	rxq;
@@ -231,7 +238,7 @@ struct usbnet {
 	struct sk_buff_head	done;
 	struct tasklet_struct	bh;
 
-	struct work_struct			kevent;
+	struct work_struct	kevent;
 	unsigned long		flags;
 #		define EVENT_TX_HALT	0
 #		define EVENT_RX_HALT	1
@@ -243,10 +250,18 @@ struct driver_info {
 	char		*description;
 
 	int		flags;
+/* framing is CDC Ethernet, not writing ZLPs (hw issues), or optionally: */
 #define FLAG_FRAMING_NC	0x0001		/* guard against device dropouts */ 
 #define FLAG_FRAMING_GL	0x0002		/* genelink batches packets */
 #define FLAG_FRAMING_Z	0x0004		/* zaurus adds a trailer */
+
 #define FLAG_NO_SETINT	0x0010		/* device can't set_interface() */
+
+	/* init device ... can sleep, or cause probe() failure */
+	int	(*bind)(struct usbnet *, struct usb_interface *);
+
+	/* cleanup device ... can sleep, but can't fail */
+	void	(*unbind)(struct usbnet *, struct usb_interface *);
 
 	/* reset device ... can sleep */
 	int	(*reset)(struct usbnet *);
@@ -263,14 +278,12 @@ struct driver_info {
 
 	// FIXME -- also an interrupt mechanism
 	// useful for at least PL2301/2302 and GL620USB-A
+	// and CDC use them to report 'is it connected' changes
 
-	/* framework currently "knows" bulk EPs talk packets */
+	/* for new devices, use the descriptor-reading code instead */
 	int		in;		/* rx endpoint */
 	int		out;		/* tx endpoint */
-	int		epsize;
 };
-
-#define EP_SIZE(usbnet)	((usbnet)->driver_info->epsize)
 
 // we record the state for each of our queued skbs
 enum skb_state {
@@ -300,14 +313,6 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 #define	RUN_CONTEXT (in_irq () ? "in_irq" \
 			: (in_interrupt () ? "in_interrupt" : "can sleep"))
 
-/* mostly for PDA style devices, which are always present */
-static int always_connected (struct usbnet *dev)
-{
-	return 0;
-}
-
-/*-------------------------------------------------------------------------*/
-
 #ifdef DEBUG
 #define devdbg(usbnet, fmt, arg...) \
 	printk(KERN_DEBUG "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
@@ -315,10 +320,75 @@ static int always_connected (struct usbnet *dev)
 #define devdbg(usbnet, fmt, arg...) do {} while(0)
 #endif
 
+#define deverr(usbnet, fmt, arg...) \
+	printk(KERN_ERR "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+#define devwarn(usbnet, fmt, arg...) \
+	printk(KERN_WARNING "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+
 #define devinfo(usbnet, fmt, arg...) \
 	do { if ((usbnet)->msg_level >= 1) \
 	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name, ## arg); \
 	} while (0)
+
+/*-------------------------------------------------------------------------*/
+
+/* mostly for PDA style devices, which are always connected if present */
+static int always_connected (struct usbnet *dev)
+{
+	return 0;
+}
+
+/* handles CDC Ethernet and many other network "bulk data" interfaces */
+static int
+get_endpoints (struct usbnet *dev, struct usb_interface *intf)
+{
+	int				tmp;
+	struct usb_host_interface	*alt;
+	struct usb_host_endpoint	*in, *out;
+
+	for (tmp = 0; tmp < intf->max_altsetting; tmp++) {
+		unsigned	ep;
+
+		in = out = 0;
+		alt = intf->altsetting + tmp;
+
+		/* take the first altsetting with in-bulk + out-bulk;
+		 * ignore other endpoints and altsetttings.
+		 */
+		for (ep = 0; ep < alt->desc.bNumEndpoints; ep++) {
+			struct usb_host_endpoint	*e;
+
+			e = alt->endpoint + ep;
+			if (e->desc.bmAttributes != USB_ENDPOINT_XFER_BULK)
+				continue;
+			if (e->desc.bEndpointAddress & USB_DIR_IN) {
+				if (!in)
+					in = e;
+			} else {
+				if (!out)
+					out = e;
+			}
+			if (in && out)
+				goto found;
+		}
+	}
+	return -EINVAL;
+
+found:
+	if (alt->desc.bAlternateSetting != 0
+			|| !(dev->driver_info->flags & FLAG_NO_SETINT)) {
+		tmp = usb_set_interface (dev->udev, alt->desc.bInterfaceNumber,
+				alt->desc.bAlternateSetting);
+		if (tmp < 0)
+			return tmp;
+	}
+	
+	dev->in = usb_rcvbulkpipe (dev->udev,
+			in->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+	dev->out = usb_sndbulkpipe (dev->udev,
+			out->desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK);
+	return 0;
+}
 
 
 #ifdef	CONFIG_USB_AN2720
@@ -340,7 +410,6 @@ static const struct driver_info	an2720_info = {
 	// no check_connect available!
 
 	.in = 2, .out = 2,		// direction distinguishes these
-	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_AN2720 */
@@ -359,12 +428,223 @@ static const struct driver_info	an2720_info = {
 
 static const struct driver_info	belkin_info = {
 	.description =	"Belkin, eTEK, or compatible",
-
-	.in = 1, .out = 1,		// direction distinguishes these
-	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_BELKIN */
+
+
+
+#if	defined (CONFIG_USB_CDCETHER) || defined (CONFIG_USB_ZAURUS)
+
+/*-------------------------------------------------------------------------
+ *
+ * Communications Device Class, Ethernet Control model
+ * 
+ * Takes two interfaces.  The DATA interface is inactive till an altsetting
+ * is selected.  Configuration data includes class descriptors.
+ *
+ * Zaurus uses nonstandard framing, but is otherwise CDC Ether.
+ *
+ *-------------------------------------------------------------------------*/
+
+/* "Header Functional Descriptor" from CDC spec  5.2.3.1 */
+struct header_desc {
+	u8	bLength;
+	u8	bDescriptorType;
+	u8	bDescriptorSubType;
+
+	u16	bcdCDC;
+} __attribute__ ((packed));
+
+/* "Union Functional Descriptor" from CDC spec 5.2.3.X */
+struct union_desc {
+	u8	bLength;
+	u8	bDescriptorType;
+	u8	bDescriptorSubType;
+
+	u8	bMasterInterface0;
+	u8	bSlaveInterface0;
+	/* ... and there could be other slave interfaces */
+} __attribute__ ((packed));
+
+/* "Ethernet Networking Functional Descriptor" from CDC spec 5.2.3.16 */
+struct ether_desc {
+	u8	bLength;
+	u8	bDescriptorType;
+	u8	bDescriptorSubType;
+
+	u8	iMACAddress;
+	u32	bmEthernetStatistics;
+	u16	wMaxSegmentSize;
+	u16	wNumberMCFilters;
+	u8	bNumberPowerFilters;
+} __attribute__ ((packed));
+
+struct cdc_info {
+	struct header_desc	*header;
+	struct union_desc	*u;
+	struct ether_desc	*ether;
+	struct usb_interface	*control;
+	struct usb_interface	*data;
+};
+
+#include <linux/ctype.h>
+
+static u8 nibble (unsigned char c)
+{
+	if (likely (isdigit (c)))
+		return c - '0';
+	c = toupper (c);
+	if (likely (isxdigit (c)))
+		return 10 + c - 'A';
+	return 0;
+}
+
+static inline int get_ethernet_addr (struct usbnet *dev, struct ether_desc *e)
+{
+	int 		tmp, i;
+	unsigned char	buf [13];
+
+	tmp = usb_string (dev->udev, e->iMACAddress, buf, sizeof buf);
+	if (tmp < 0)
+		return tmp;
+	else if (tmp != 12)
+		return -EINVAL;
+	for (i = tmp = 0; i < 6; i++, tmp += 2)
+		dev->net.dev_addr [i] =
+			 (nibble (buf [tmp]) << 4) + nibble (buf [tmp + 1]);
+	return 0;
+}
+
+static struct usb_driver usbnet_driver;
+
+static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
+{
+	u8				*buf = intf->altsetting->extra;
+	int				len = intf->altsetting->extralen;
+	struct usb_interface_descriptor	*d;
+	struct cdc_info			*info = (void *) &dev->data;
+	int				status;
+
+	if (sizeof dev->data < sizeof *info)
+		return -EDOM;
+
+	/* expect strict spec conformance for the descriptors */
+	memset (info, 0, sizeof *info);
+	info->control = intf;
+	while (len > 3) {
+		/* ignore bDescriptorType != CS_INTERFACE */
+		if (buf [1] != 0x24)
+			goto next_desc;
+
+		/* bDescriptorSubType identifies three "must have" descriptors;
+		 * save them for later.
+		 */
+		switch (buf [2]) {
+		case 0x00:		/* Header, mostly useless */
+			if (info->header)
+				goto bad_desc;
+			info->header = (void *) buf;
+			if (info->header->bLength != sizeof *info->header)
+				goto bad_desc;
+			break;
+		case 0x06:		/* Union (groups interfaces) */
+			if (info->u)
+				goto bad_desc;
+			info->u = (void *) buf;
+			if (info->u->bLength != sizeof *info->u)
+				goto bad_desc;
+			d = &intf->altsetting->desc;
+			if (info->u->bMasterInterface0 != d->bInterfaceNumber)
+				goto bad_desc;
+			info->data = dev->udev->actconfig->interface;
+			if (intf != (info->data + info->u->bMasterInterface0))
+				goto bad_desc;
+
+			/* a data interface altsetting does the real i/o */
+			info->data += info->u->bSlaveInterface0;
+			d = &info->data->altsetting->desc;
+			if (info->u->bSlaveInterface0 != d->bInterfaceNumber
+				    || d->bInterfaceClass != USB_CLASS_CDC_DATA)
+				goto bad_desc;
+			if (usb_interface_claimed (info->data))
+				return -EBUSY;
+			break;
+		case 0x0F:		/* Ethernet Networking */
+			if (info->ether)
+				goto bad_desc;
+			info->ether = (void *) buf;
+			if (info->ether->bLength != sizeof *info->ether)
+				goto bad_desc;
+			break;
+		}
+next_desc:
+		len -= buf [0];	/* bLength */
+		buf += buf [0];
+	}
+	if (!info->header || !info ->u || !info->ether)
+		goto bad_desc;
+
+	status = get_ethernet_addr (dev, info->ether);
+	if (status < 0)
+		return status;
+
+	/* claim data interface and set it up ... with side effects.
+	 * network traffic can't flow until an altsetting is enabled.
+	 */
+	usb_driver_claim_interface (&usbnet_driver, info->data, dev);
+	status = get_endpoints (dev, info->data);
+	if (status < 0) {
+		usb_driver_release_interface (&usbnet_driver, info->data);
+		return status;
+	}
+
+	/* FIXME cdc-ether has some multicast code too, though it complains
+	 * in routine cases.  info->ether describes the multicast support.
+	 */
+
+	dev->net.mtu = cpu_to_le16p (&info->ether->wMaxSegmentSize)
+		- ETH_HLEN;
+	if ((dev->driver_info->flags & FLAG_FRAMING_Z) == 0)
+		strcpy (dev->net.name, "eth%d");
+	return 0;
+
+bad_desc:
+	// devdbg (dev, "bad CDC descriptors");
+	return -ENODEV;
+}
+
+static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
+{
+	struct cdc_info			*info = (void *) &dev->data;
+
+	/* disconnect master --> disconnect slave */
+	if (intf == info->control && info->data) {
+		usb_driver_release_interface (&usbnet_driver, info->data);
+		info->data = 0;
+	}
+
+	/* and vice versa (just in case) */
+	else if (intf == info->data && info->control) {
+		usb_driver_release_interface (&usbnet_driver, info->control);
+		info->control = 0;
+	}
+
+}
+
+#endif	/* CONFIG_USB_ZAURUS || CONFIG_USB_CDCETHER */
+
+
+#ifdef	CONFIG_USB_CDCETHER
+
+static const struct driver_info	cdc_info = {
+	.description =	"CDC Ethernet Device",
+	// .check_connect = cdc_check_connect,
+	.bind =		cdc_bind,
+	.unbind =	cdc_unbind,
+};
+
+#endif	/* CONFIG_USB_CDCETHER */
 
 
 
@@ -386,7 +666,6 @@ static const struct driver_info	epson2888_info = {
 	.check_connect = always_connected,
 
 	.in = 4, .out = 3,
-	.epsize = 64,
 };
 
 #endif	/* CONFIG_USB_EPSON2888 */
@@ -704,7 +983,7 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 	*packet_len = length;
 
 	// add padding byte
-	if ((skb->len % EP_SIZE (dev)) == 0)
+	if ((skb->len % dev->maxpacket) == 0)
 		skb_put (skb, 1);
 
 	return skb;
@@ -717,7 +996,6 @@ static const struct driver_info	genelink_info = {
 	.tx_fixup =	genelink_tx_fixup,
 
 	.in = 1, .out = 2,
-	.epsize =64,
 
 #ifdef	GENELINK_ACK
 	.check_connect =genelink_check_connect,
@@ -736,6 +1014,9 @@ static const struct driver_info	genelink_info = {
  * Used in LapLink cables
  *
  *-------------------------------------------------------------------------*/
+
+#define dev_packet_id	data[0]
+#define frame_errors	data[1]
 
 /*
  * NetChip framing of ethernet packets, supporting additional error
@@ -1064,6 +1345,60 @@ static int net1080_check_connect (struct usbnet *dev)
 	return 0;
 }
 
+static void nc_flush_complete (struct urb *urb, struct pt_regs *regs)
+{
+	kfree (urb->context);
+	usb_free_urb(urb);
+}
+
+static void nc_ensure_sync (struct usbnet *dev)
+{
+	dev->frame_errors++;
+	if (dev->frame_errors > 5) {
+		struct urb		*urb;
+		struct usb_ctrlrequest	*req;
+		int			status;
+
+		/* Send a flush */
+		urb = usb_alloc_urb (0, SLAB_ATOMIC);
+		if (!urb)
+			return;
+
+		req = kmalloc (sizeof *req, GFP_ATOMIC);
+		if (!req) {
+			usb_free_urb (urb);
+			return;
+		}
+
+		req->bRequestType = USB_DIR_OUT
+			| USB_TYPE_VENDOR
+			| USB_RECIP_DEVICE;
+		req->bRequest = REQUEST_REGISTER;
+		req->wValue = cpu_to_le16 (USBCTL_FLUSH_THIS
+				| USBCTL_FLUSH_OTHER);
+		req->wIndex = cpu_to_le16 (REG_USBCTL);
+		req->wLength = cpu_to_le16 (0);
+
+		/* queue an async control request, we don't need
+		 * to do anything when it finishes except clean up.
+		 */
+		usb_fill_control_urb (urb, dev->udev,
+			usb_sndctrlpipe (dev->udev, 0),
+			(unsigned char *) req,
+			NULL, 0,
+			nc_flush_complete, req);
+		status = usb_submit_urb (urb, GFP_ATOMIC);
+		if (status) {
+			kfree (req);
+			usb_free_urb (urb);
+			return;
+		}
+
+		devdbg (dev, "flush net1080; too many framing errors");
+		dev->frame_errors = 0;
+	}
+}
+
 static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 {
 	struct nc_header	*header;
@@ -1076,6 +1411,7 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 		dbg ("rx framesize %d range %d..%d mtu %d", skb->len,
 			(int)MIN_FRAMED, (int)FRAMED_SIZE (dev->net.mtu),
 			dev->net.mtu);
+		nc_ensure_sync (dev);
 		return 0;
 	}
 
@@ -1085,15 +1421,18 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 	if (FRAMED_SIZE (header->packet_len) > MAX_PACKET) {
 		dev->stats.rx_frame_errors++;
 		dbg ("packet too big, %d", header->packet_len);
+		nc_ensure_sync (dev);
 		return 0;
 	} else if (header->hdr_len < MIN_HEADER) {
 		dev->stats.rx_frame_errors++;
 		dbg ("header too short, %d", header->hdr_len);
+		nc_ensure_sync (dev);
 		return 0;
 	} else if (header->hdr_len > MIN_HEADER) {
 		// out of band data for us?
 		dbg ("header OOB, %d bytes",
 			header->hdr_len - MIN_HEADER);
+		nc_ensure_sync (dev);
 		// switch (vendor/product ids) { ... }
 	}
 	skb_pull (skb, header->hdr_len);
@@ -1114,6 +1453,7 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 		dev->stats.rx_frame_errors++;
 		dbg ("bad packet len %d (expected %d)",
 			skb->len, header->packet_len);
+		nc_ensure_sync (dev);
 		return 0;
 	}
 	if (header->packet_id != get_unaligned (&trailer->packet_id)) {
@@ -1126,6 +1466,7 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 	devdbg (dev, "frame <rx h %d p %d id %d", header->hdr_len,
 		header->packet_len, header->packet_id);
 #endif
+	dev->frame_errors = 0;
 	return 1;
 }
 
@@ -1143,11 +1484,13 @@ net1080_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 
 		if ((padlen + sizeof (struct nc_trailer)) <= tailroom
 			    && sizeof (struct nc_header) <= headroom)
+			/* There's enough head and tail room */
 			return skb;
 
 		if ((sizeof (struct nc_header) + padlen
 					+ sizeof (struct nc_trailer)) <
 				(headroom + tailroom)) {
+			/* There's enough total room, so just readjust */
 			skb->data = memmove (skb->head
 						+ sizeof (struct nc_header),
 					    skb->data, skb->len);
@@ -1155,6 +1498,8 @@ net1080_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 			return skb;
 		}
 	}
+
+	/* Create a new skb to use with the correct size */
 	skb2 = skb_copy_expand (skb,
 				sizeof (struct nc_header),
 				sizeof (struct nc_trailer) + padlen,
@@ -1170,9 +1515,6 @@ static const struct driver_info	net1080_info = {
 	.check_connect =net1080_check_connect,
 	.rx_fixup =	net1080_rx_fixup,
 	.tx_fixup =	net1080_tx_fixup,
-
-	.in = 1, .out = 1,		// direction distinguishes these
-	.epsize =64,
 };
 
 #endif /* CONFIG_USB_NET1080 */
@@ -1237,37 +1579,13 @@ static const struct driver_info	prolific_info = {
 	.flags =	FLAG_NO_SETINT,
 		/* some PL-2302 versions seem to fail usb_set_interface() */
 	.reset =	pl_reset,
-
-	.in = 3, .out = 2,
-	.epsize =64,
 };
 
 #endif /* CONFIG_USB_PL2301 */
 
 
 
-#ifdef	CONFIG_USB_PXA
-
-/*-------------------------------------------------------------------------
- *
- * PXA250 and PXA210 use XScale cores (ARM v5TE) with better USB support,
- * and different USB endpoint numbering than the SA1100 devices.
- *
- *-------------------------------------------------------------------------*/
-
-static const struct driver_info	pxa_info = {
-	.description =	"PXA-250 Linux Device",
-	.check_connect = always_connected,
-
-	.in = 1, .out = 2,
-	.epsize = 64,
-};
-
-#endif	/* CONFIG_USB_PXA */
-
-
-
-#ifdef	CONFIG_USB_SA1100
+#ifdef	CONFIG_USB_ARMLINUX
 
 /*-------------------------------------------------------------------------
  *
@@ -1279,25 +1597,24 @@ static const struct driver_info	pxa_info = {
  * This describes the driver currently in standard ARM Linux kernels.
  * The Zaurus uses a different driver (see later).
  *
+ * PXA25x and PXA210 use XScale cores (ARM v5TE) with better USB support
+ * and different USB endpoint numbering than the SA1100 devices.  The
+ * mach-pxa/usb-eth.c driver re-uses the device ids from mach-sa1100
+ * so we rely on the endpoint descriptors.
+ *
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	linuxdev_info = {
-	.description =	"SA-1100 Linux Device",
+	.description =	"Linux Device",
 	.check_connect = always_connected,
-
-	.in = 2, .out = 1,
-	.epsize = 64,
 };
 
 static const struct driver_info	yopy_info = {
 	.description =	"Yopy",
 	.check_connect = always_connected,
-
-	.in = 2, .out = 1,
-	.epsize = 64,
 };
 
-#endif	/* CONFIG_USB_SA1100 */
+#endif	/* CONFIG_USB_ARMLINUX */
 
 
 #ifdef CONFIG_USB_ZAURUS
@@ -1349,10 +1666,9 @@ static const struct driver_info	zaurus_sl5x00_info = {
 	.description =	"Sharp Zaurus SL-5x00",
 	.flags =	FLAG_FRAMING_Z,
 	.check_connect = always_connected,
+	.bind =		cdc_bind,
+	.unbind =	cdc_unbind,
 	.tx_fixup = 	zaurus_tx_fixup,
-
-	.in = 2, .out = 1,
-	.epsize = 64,
 };
 static const struct driver_info	zaurus_sla300_info = {
 	.description =	"Sharp Zaurus SL-A300",
@@ -1361,7 +1677,6 @@ static const struct driver_info	zaurus_sla300_info = {
 	.tx_fixup = 	zaurus_tx_fixup,
 
 	.in = 1, .out = 2,
-	.epsize = 64,
 };
 static const struct driver_info	zaurus_slb500_info = {
 	/* Japanese B500 ~= US SL-5600 */
@@ -1371,7 +1686,6 @@ static const struct driver_info	zaurus_slb500_info = {
 	.tx_fixup = 	zaurus_tx_fixup,
 
 	.in = 1, .out = 2,
-	.epsize = 64,
 };
 
 // SL-5600 and C-700 are PXA based; should resemble A300
@@ -1403,7 +1717,7 @@ static int usbnet_change_mtu (struct net_device *net, int new_mtu)
 		return -EINVAL;
 #endif
 	// no second zero-length packet read wanted after mtu-sized packets
-	if (((new_mtu + sizeof (struct ethhdr)) % EP_SIZE (dev)) == 0)
+	if (((new_mtu + sizeof (struct ethhdr)) % dev->maxpacket) == 0)
 		return -EDOM;
 	net->mtu = new_mtu;
 	return 0;
@@ -1444,10 +1758,9 @@ static void defer_kevent (struct usbnet *dev, int work)
 {
 	set_bit (work, &dev->flags);
 	if (!schedule_work (&dev->kevent))
-		err ("%s: kevent %d may have been dropped",
-			dev->net.name, work);
+		deverr (dev, "kevent %d may have been dropped", work);
 	else
-		dbg ("%s: kevent %d scheduled", dev->net.name, work);
+		devdbg (dev, "kevent %d scheduled", work);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1480,7 +1793,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 		size = (sizeof (struct ethhdr) + dev->net.mtu);
 
 	if ((skb = alloc_skb (size, flags)) == 0) {
-		dbg ("no rx skb");
+		devdbg (dev, "no rx skb");
 		defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
 		return;
@@ -1492,14 +1805,14 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 	entry->state = rx_start;
 	entry->length = 0;
 
-	usb_fill_bulk_urb (urb, dev->udev,
-		usb_rcvbulkpipe (dev->udev, dev->driver_info->in),
+	usb_fill_bulk_urb (urb, dev->udev, dev->in,
 		skb->data, size, rx_complete, skb);
 	urb->transfer_flags |= URB_ASYNC_UNLINK;
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
 
 	if (netif_running (&dev->net)
+			&& netif_device_present (&dev->net)
 			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)){ 
 		case -EPIPE:
@@ -1508,15 +1821,19 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 		case -ENOMEM:
 			defer_kevent (dev, EVENT_RX_MEMORY);
 			break;
+		case -ENODEV:
+			devdbg (dev, "device gone");
+			netif_device_detach (&dev->net);
+			break;
 		default:
-			dbg ("%s rx submit, %d", dev->net.name, retval);
+			devdbg (dev, "rx submit, %d", retval);
 			tasklet_schedule (&dev->bh);
 			break;
 		case 0:
 			__skb_queue_tail (&dev->rxq, skb);
 		}
 	} else {
-		dbg ("rx: stopped");
+		devdbg (dev, "rx: stopped");
 		retval = -ENOLINK;
 	}
 	spin_unlock_irqrestore (&dev->rxq.lock, lockflags);
@@ -1553,7 +1870,7 @@ static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 		if (status != NET_RX_SUCCESS)
 			devdbg (dev, "netif_rx status %d", status);
 	} else {
-		dbg ("drop");
+		devdbg (dev, "drop");
 error:
 		dev->stats.rx_errors++;
 		skb_queue_tail (&dev->done, skb);
@@ -1580,7 +1897,7 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 			entry->state = rx_cleanup;
 			dev->stats.rx_errors++;
 			dev->stats.rx_length_errors++;
-			dbg ("rx length %d", skb->len);
+			devdbg (dev, "rx length %d", skb->len);
 		}
 		break;
 
@@ -1589,15 +1906,31 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 	    // we avoid the highspeed version of the ETIMEOUT/EILSEQ
 	    // storm, recovering as needed.
 	    case -EPIPE:
+		dev->stats.rx_errors++;
 		defer_kevent (dev, EVENT_RX_HALT);
 		// FALLTHROUGH
 
 	    // software-driven interface shutdown
-	    case -ECONNRESET:		// according to API spec
-	    case -ECONNABORTED:		// some (now fixed?) UHCI bugs
-		dbg ("%s rx shutdown, code %d", dev->net.name, urb_status);
+	    case -ECONNRESET:		// async unlink
+	    case -ESHUTDOWN:		// hardware gone
+#ifdef	VERBOSE
+		devdbg (dev, "rx shutdown, code %d", urb_status);
+#endif
+		goto block;
+
+	    // we get controller i/o faults during khubd disconnect() delays.
+	    // throttle down resubmits, to avoid log floods; just temporarily,
+	    // so we still recover when the fault isn't a khubd delay.
+	    case -EPROTO:		// ehci
+	    case -ETIMEDOUT:		// ohci
+	    case -EILSEQ:		// uhci
+		dev->stats.rx_errors++;
+		if (!timer_pending (&dev->delay)) {
+			mod_timer (&dev->delay, jiffies + THROTTLE_JIFFIES);
+			devdbg (dev, "rx throttle %d", urb_status);
+		}
+block:
 		entry->state = rx_cleanup;
-		// do urb frees only in the tasklet (UHCI has oopsed ...)
 		entry->urb = urb;
 		urb = 0;
 		break;
@@ -1608,12 +1941,9 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 		// FALLTHROUGH
 	    
 	    default:
-		// on unplug we get ETIMEDOUT (ohci) or EILSEQ (uhci)
-		// until khubd sees its interrupt and disconnects us.
-		// that can easily be hundreds of passes through here.
 		entry->state = rx_cleanup;
 		dev->stats.rx_errors++;
-		dbg ("%s rx: status %d", dev->net.name, urb_status);
+		devdbg (dev, "rx status %d", urb_status);
 		break;
 	}
 
@@ -1628,7 +1958,7 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 		usb_free_urb (urb);
 	}
 #ifdef	VERBOSE
-	dbg ("no read resubmitted");
+	devdbg (dev, "no read resubmitted");
 #endif /* VERBOSE */
 }
 
@@ -1636,7 +1966,7 @@ static void rx_complete (struct urb *urb, struct pt_regs *regs)
 
 // unlink pending rx/tx; completion handlers do all other cleanup
 
-static int unlink_urbs (struct sk_buff_head *q)
+static int unlink_urbs (struct usbnet *dev, struct sk_buff_head *q)
 {
 	unsigned long		flags;
 	struct sk_buff		*skb, *skbnext;
@@ -1656,7 +1986,7 @@ static int unlink_urbs (struct sk_buff_head *q)
 		// these (async) unlinks complete immediately
 		retval = usb_unlink_urb (urb);
 		if (retval != -EINPROGRESS && retval != 0)
-			dbg ("unlink urb err, %d", retval);
+			devdbg (dev, "unlink urb err, %d", retval);
 		else
 			count++;
 	}
@@ -1688,7 +2018,7 @@ static int usbnet_stop (struct net_device *net)
 	// ensure there are no more active urbs
 	add_wait_queue (&unlink_wakeup, &wait);
 	dev->wait = &unlink_wakeup;
-	temp = unlink_urbs (&dev->txq) + unlink_urbs (&dev->rxq);
+	temp = unlink_urbs (dev, &dev->txq) + unlink_urbs (dev, &dev->rxq);
 
 	// maybe wait for deletions to finish.
 	while (skb_queue_len (&dev->rxq)
@@ -1696,10 +2026,15 @@ static int usbnet_stop (struct net_device *net)
 			&& skb_queue_len (&dev->done)) {
 		set_current_state (TASK_UNINTERRUPTIBLE);
 		schedule_timeout (UNLINK_TIMEOUT_JIFFIES);
-		dbg ("waited for %d urb completions", temp);
+		devdbg (dev, "waited for %d urb completions", temp);
 	}
 	dev->wait = 0;
 	remove_wait_queue (&unlink_wakeup, &wait); 
+
+	// deferred work (task, timer, softirq) must also stop
+	flush_scheduled_work ();
+	del_timer_sync (&dev->delay);
+	tasklet_kill (&dev->bh);
 
 	mutex_unlock (&dev->mutex);
 	return 0;
@@ -1738,7 +2073,7 @@ static int usbnet_open (struct net_device *net)
 	if (dev->msg_level >= 2)
 		devinfo (dev, "open: enable queueing "
 				"(rx %d, tx %d) mtu %d %s framing",
-			RX_QLEN, TX_QLEN, dev->net.mtu,
+			RX_QLEN (dev), TX_QLEN (dev), dev->net.mtu,
 			(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
 			    ? ((info->flags & FLAG_FRAMING_NC)
 				? "NetChip"
@@ -1755,7 +2090,8 @@ done:
 
 /*-------------------------------------------------------------------------*/
 
-static int usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
+static inline int
+usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
 {
 	struct usbnet	*dev = (struct usbnet *) net->priv;
 	u32		cmd;
@@ -1829,9 +2165,8 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 
 /* work that cannot be done in interrupt context uses keventd.
  *
- * NOTE:  "uhci" and "usb-uhci" may have trouble with this since they don't
- * queue control transfers to individual devices, and other threads could
- * trigger control requests concurrently.  hope that's rare.
+ * NOTE:  with 2.5 we could do more of this using completion callbacks,
+ * especially now that control transfers can be queued.
  */
 static void
 kevent (void *data)
@@ -1841,24 +2176,22 @@ kevent (void *data)
 
 	/* usb_clear_halt() needs a thread context */
 	if (test_bit (EVENT_TX_HALT, &dev->flags)) {
-		unlink_urbs (&dev->txq);
-		status = usb_clear_halt (dev->udev,
-			usb_sndbulkpipe (dev->udev, dev->driver_info->out));
+		unlink_urbs (dev, &dev->txq);
+		status = usb_clear_halt (dev->udev, dev->out);
 		if (status < 0)
-			err ("%s: can't clear tx halt, status %d",
-				dev->net.name, status);
+			deverr (dev, "can't clear tx halt, status %d",
+				status);
 		else {
 			clear_bit (EVENT_TX_HALT, &dev->flags);
 			netif_wake_queue (&dev->net);
 		}
 	}
 	if (test_bit (EVENT_RX_HALT, &dev->flags)) {
-		unlink_urbs (&dev->rxq);
-		status = usb_clear_halt (dev->udev,
-			usb_rcvbulkpipe (dev->udev, dev->driver_info->in));
+		unlink_urbs (dev, &dev->rxq);
+		status = usb_clear_halt (dev->udev, dev->in);
 		if (status < 0)
-			err ("%s: can't clear rx halt, status %d",
-				dev->net.name, status);
+			deverr (dev, "can't clear rx halt, status %d",
+				status);
 		else {
 			clear_bit (EVENT_RX_HALT, &dev->flags);
 			tasklet_schedule (&dev->bh);
@@ -1881,8 +2214,8 @@ kevent (void *data)
 	}
 
 	if (dev->flags)
-		dbg ("%s: kevent done, flags = 0x%lx",
-			dev->net.name, dev->flags);
+		devdbg (dev, "kevent done, flags = 0x%lx",
+			dev->flags);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1893,8 +2226,35 @@ static void tx_complete (struct urb *urb, struct pt_regs *regs)
 	struct skb_data		*entry = (struct skb_data *) skb->cb;
 	struct usbnet		*dev = entry->dev;
 
-	if (urb->status == -EPIPE)
-		defer_kevent (dev, EVENT_TX_HALT);
+	if (urb->status == 0) {
+		dev->stats.tx_packets++;
+		dev->stats.tx_bytes += entry->length;
+	} else {
+		dev->stats.tx_errors++;
+
+		switch (urb->status) {
+		case -EPIPE:
+			defer_kevent (dev, EVENT_TX_HALT);
+			break;
+
+		// like rx, tx gets controller i/o faults during khubd delays
+		// and so it uses the same throttling mechanism.
+		case -EPROTO:		// ehci
+		case -ETIMEDOUT:	// ohci
+		case -EILSEQ:		// uhci
+			if (!timer_pending (&dev->delay)) {
+				mod_timer (&dev->delay,
+					jiffies + THROTTLE_JIFFIES);
+				devdbg (dev, "tx throttle %d", urb->status);
+			}
+			netif_stop_queue (&dev->net);
+			break;
+		default:
+			devdbg (dev, "tx err %d", entry->urb->status);
+			break;
+		}
+	}
+
 	urb->dev = 0;
 	entry->state = tx_done;
 	defer_bh (dev, skb);
@@ -1906,7 +2266,7 @@ static void usbnet_tx_timeout (struct net_device *net)
 {
 	struct usbnet		*dev = (struct usbnet *) net->priv;
 
-	unlink_urbs (&dev->txq);
+	unlink_urbs (dev, &dev->txq);
 	tasklet_schedule (&dev->bh);
 
 	// FIXME: device recovery -- reset?
@@ -1933,14 +2293,14 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	if (info->tx_fixup) {
 		skb = info->tx_fixup (dev, skb, GFP_ATOMIC);
 		if (!skb) {
-			dbg ("can't tx_fixup skb");
+			devdbg (dev, "can't tx_fixup skb");
 			goto drop;
 		}
 	}
 	length = skb->len;
 
 	if (!(urb = usb_alloc_urb (0, GFP_ATOMIC))) {
-		dbg ("no urb");
+		devdbg (dev, "no urb");
 		goto drop;
 	}
 
@@ -1965,20 +2325,24 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	} else
 #endif	/* CONFIG_USB_NET1080 */
 
-	/* don't assume the hardware handles USB_ZERO_PACKET */
-	if ((length % EP_SIZE (dev)) == 0)
-		skb->len++;
-
-	usb_fill_bulk_urb (urb, dev->udev,
-			usb_sndbulkpipe (dev->udev, info->out),
+	usb_fill_bulk_urb (urb, dev->udev, dev->out,
 			skb->data, skb->len, tx_complete, skb);
 	urb->transfer_flags |= URB_ASYNC_UNLINK;
+
+	/* don't assume the hardware handles USB_ZERO_PACKET
+	 * NOTE:  strictly conforming cdc-ether devices should expect
+	 * the ZLP here, but ignore the one-byte packet.
+	 *
+	 * FIXME zero that byte, if it doesn't require a new skb.
+	 */
+	if ((length % dev->maxpacket) == 0)
+		urb->transfer_buffer_length++;
 
 	spin_lock_irqsave (&dev->txq.lock, flags);
 
 #ifdef	CONFIG_USB_NET1080
 	if (info->flags & FLAG_FRAMING_NC) {
-		header->packet_id = cpu_to_le16 (dev->packet_id++);
+		header->packet_id = cpu_to_le16 ((u16)dev->dev_packet_id++);
 		put_unaligned (header->packet_id, &trailer->packet_id);
 #if 0
 		devdbg (dev, "frame >tx h %d p %d id %d",
@@ -1994,12 +2358,12 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		defer_kevent (dev, EVENT_TX_HALT);
 		break;
 	default:
-		dbg ("%s tx: submit urb err %d", net->name, retval);
+		devdbg (dev, "tx: submit urb err %d", retval);
 		break;
 	case 0:
 		net->trans_start = jiffies;
 		__skb_queue_tail (&dev->txq, skb);
-		if (dev->txq.qlen >= TX_QLEN)
+		if (dev->txq.qlen >= TX_QLEN (dev))
 			netif_stop_queue (net);
 	}
 	spin_unlock_irqrestore (&dev->txq.lock, flags);
@@ -2024,7 +2388,7 @@ drop:
 
 /*-------------------------------------------------------------------------*/
 
-// tasklet ... work that avoided running in_irq()
+// tasklet (work deferred from completions, in_irq) or timer
 
 static void usbnet_bh (unsigned long param)
 {
@@ -2040,23 +2404,12 @@ static void usbnet_bh (unsigned long param)
 			rx_process (dev, skb);
 			continue;
 		    case tx_done:
-			if (entry->urb->status) {
-				// can this statistic become more specific?
-				dev->stats.tx_errors++;
-				dbg ("%s tx: err %d", dev->net.name,
-					entry->urb->status);
-			} else {
-				dev->stats.tx_packets++;
-				dev->stats.tx_bytes += entry->length;
-			}
-			// FALLTHROUGH:
 		    case rx_cleanup:
 			usb_free_urb (entry->urb);
 			dev_kfree_skb (skb);
 			continue;
 		    default:
-			dbg ("%s: bogus skb state %d",
-				dev->net.name, entry->state);
+			devdbg (dev, "bogus skb state %d", entry->state);
 		}
 	}
 
@@ -2068,23 +2421,28 @@ static void usbnet_bh (unsigned long param)
 
 	// or are we maybe short a few urbs?
 	} else if (netif_running (&dev->net)
+			&& netif_device_present (&dev->net)
+			&& !timer_pending (&dev->delay)
 			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		int	temp = dev->rxq.qlen;
+		int	qlen = RX_QLEN (dev);
 
-		if (temp < RX_QLEN) {
+		if (temp < qlen) {
 			struct urb	*urb;
 			int		i;
-			for (i = 0; i < 3 && dev->rxq.qlen < RX_QLEN; i++) {
+
+			// don't refill the queue all at once
+			for (i = 0; i < 10 && dev->rxq.qlen < qlen; i++) {
 				if ((urb = usb_alloc_urb (0, GFP_ATOMIC)) != 0)
 					rx_submit (dev, urb, GFP_ATOMIC);
 			}
 			if (temp != dev->rxq.qlen)
 				devdbg (dev, "rxqlen %d --> %d",
 						temp, dev->rxq.qlen);
-			if (dev->rxq.qlen < RX_QLEN)
+			if (dev->rxq.qlen < qlen)
 				tasklet_schedule (&dev->bh);
 		}
-		if (dev->txq.qlen < TX_QLEN)
+		if (dev->txq.qlen < TX_QLEN (dev))
 			netif_wake_queue (&dev->net);
 	}
 }
@@ -2117,13 +2475,8 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	
 	unregister_netdev (&dev->net);
 
-	mutex_lock (&usbnet_mutex);
-	mutex_lock (&dev->mutex);
-	list_del (&dev->dev_list);
-	mutex_unlock (&usbnet_mutex);
-
-	// assuming we used keventd, it must quiesce too
-	flush_scheduled_work ();
+	if (dev->driver_info->unbind)
+		dev->driver_info->unbind (dev, intf);
 
 	kfree (dev);
 	usb_put_dev (xdev);
@@ -2142,19 +2495,11 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	struct usb_host_interface	*interface;
 	struct driver_info		*info;
 	struct usb_device		*xdev;
+	int				status;
 
 	info = (struct driver_info *) prod->driver_info;
-
 	xdev = interface_to_usbdev (udev);
 	interface = &udev->altsetting [udev->act_altsetting];
-
-	if (!(info->flags & FLAG_NO_SETINT)) {
-		if (usb_set_interface (xdev, interface->desc.bInterfaceNumber,
-				interface->desc.bAlternateSetting) < 0) {
-			err ("set_interface failed");
-			return -EIO;
-		}
-	}
 
 	// set up our own records
 	if (!(dev = kmalloc (sizeof *dev, GFP_KERNEL))) {
@@ -2168,13 +2513,15 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	dev->udev = xdev;
 	dev->driver_info = info;
 	dev->msg_level = msg_level;
-	INIT_LIST_HEAD (&dev->dev_list);
 	skb_queue_head_init (&dev->rxq);
 	skb_queue_head_init (&dev->txq);
 	skb_queue_head_init (&dev->done);
 	dev->bh.func = usbnet_bh;
 	dev->bh.data = (unsigned long) dev;
 	INIT_WORK (&dev->kevent, kevent, dev);
+	dev->delay.function = usbnet_bh;
+	dev->delay.data = (unsigned long) dev;
+	init_timer (&dev->delay);
 
 	// set up network interface records
 	net = &dev->net;
@@ -2200,31 +2547,41 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	net->tx_timeout = usbnet_tx_timeout;
 	net->do_ioctl = usbnet_ioctl;
 
+	// allow device-specific bind/init procedures
+	// NOTE net->name still not usable ...
+	if (info->bind)
+		status = info->bind (dev, udev);
+	else if (!info->in || info->out)
+		status = get_endpoints (dev, udev);
+	else {
+		dev->in = usb_rcvbulkpipe (xdev, info->in);
+		dev->out = usb_sndbulkpipe (xdev, info->out);
+		if (!(info->flags & FLAG_NO_SETINT))
+			status = usb_set_interface (xdev,
+				interface->desc.bInterfaceNumber,
+				interface->desc.bAlternateSetting);
+		else
+			status = 0;
+
+	}
+	if (status < 0) {
+		kfree (dev);
+		return status;
+	}
+	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
+
 	register_netdev (&dev->net);
-	devinfo (dev, "register usbnet usb-%s-%s, %s",
+	devinfo (dev, "register usbnet at usb-%s-%s, %s",
 		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 
-#ifdef CONFIG_USB_ZAURUS
-	if (dev->driver_info == &zaurus_sl5x00_info) {
-		int	status;
-		status = usb_set_configuration (xdev, 1);
-		devinfo (dev, "set config --> %d", status);
-		status = usb_set_interface (xdev, 1, 1);
-		devinfo (dev, "set altsetting --> %d", status);
-	}
-#endif
-
 	// ok, it's ready to go.
-	usb_set_intfdata(udev, dev);
-	mutex_lock (&usbnet_mutex);
-	list_add (&dev->dev_list, &usbnet_list);
+	usb_set_intfdata (udev, dev);
 	mutex_unlock (&dev->mutex);
 
 	// start as if the link is up
 	netif_device_attach (&dev->net);
 
-	mutex_unlock (&usbnet_mutex);
 	return 0;
 }
 
@@ -2298,28 +2655,19 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
-#ifdef	CONFIG_USB_PXA
-/*
- * PXA250 or PXA210 ...  these use a "usb-eth" driver much like
- * the sa1100 one.
- */
-{
-	// Compaq "Itsy" vendor/product id, version "2.0"
-	USB_DEVICE_VER (0x049F, 0x505A, 0x0200, 0x0200),
-	.driver_info =	(unsigned long) &pxa_info,
-}, 
-#endif
-
-#ifdef	CONFIG_USB_SA1100
+#ifdef	CONFIG_USB_ARMLINUX
 /*
  * SA-1100 using standard ARM Linux kernels, or compatible.
  * Often used when talking to Linux PDAs (iPaq, Yopy, etc).
  * The sa-1100 "usb-eth" driver handles the basic framing.
+ *
+ * PXA25x or PXA210 ...  these use a "usb-eth" driver much like
+ * the sa1100 one, but hardware uses different endpoint numbers.
  */
 {
 	// 1183 = 0x049F, both used as hex values?
-	// Compaq "Itsy" vendor/product id, version "0.0"
-	USB_DEVICE_VER (0x049F, 0x505A, 0, 0),
+	// Compaq "Itsy" vendor/product id
+	USB_DEVICE (0x049F, 0x505A),
 	.driver_info =	(unsigned long) &linuxdev_info,
 }, {
 	USB_DEVICE (0x0E7E, 0x1001),	// G.Mate "Yopy"
@@ -2337,9 +2685,10 @@ static const struct usb_device_id	products [] = {
 			  | USB_DEVICE_ID_MATCH_DEVICE, 
 	.idVendor		= 0x04DD,
 	.idProduct		= 0x8004,
-	.bInterfaceClass	= 0x0a,
-	.bInterfaceSubClass	= 0x00,
-	.bInterfaceProtocol	= 0x00,
+	/* match the master interface */
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
+	.bInterfaceProtocol	= 0,
 	.driver_info =  (unsigned long) &zaurus_sl5x00_info,
 }, {
 	.match_flags	=   USB_DEVICE_ID_MATCH_INT_INFO
@@ -2359,6 +2708,24 @@ static const struct usb_device_id	products [] = {
 	.bInterfaceSubClass	= 0x0a,
 	.bInterfaceProtocol	= 0x00,
 	.driver_info =  (unsigned long) &zaurus_slb500_info,
+},
+#endif
+
+#ifdef	CONFIG_USB_CDCETHER
+{
+	/* CDC Ether uses two interfaces, not necessarily consecutive.
+	 * We match the main interface, ignoring the optional device
+	 * class so we could handle devices that aren't exclusively
+	 * CDC ether.
+	 *
+	 * NOTE:  this match must come AFTER entries working around
+	 * bugs/quirks in a given product (like Zaurus, above).
+	 */
+	.match_flags		= USB_DEVICE_ID_MATCH_INT_INFO,
+	.bInterfaceClass	= USB_CLASS_COMM,
+	.bInterfaceSubClass	= 6 /* Ethernet model */,
+	.bInterfaceProtocol	= 0,
+	.driver_info = (unsigned long) &cdc_info,
 },
 #endif
 
