@@ -488,6 +488,7 @@ int cpu_is_hotpluggable(struct cpu *cpu)
 	 */
 	if (systemcfg->platform != PLATFORM_PSERIES_LPAR)
 		return 0;
+	return 1;
 }
 #else /* ... CONFIG_HOTPLUG_CPU */
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
