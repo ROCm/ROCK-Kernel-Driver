@@ -1,5 +1,5 @@
 /*
- * $Id: ixp4xx.c,v 1.3 2004/07/12 22:38:29 dwmw2 Exp $
+ * $Id: ixp4xx.c,v 1.4 2004/08/31 22:55:51 dsaxena Exp $
  *
  * drivers/mtd/maps/ixp4xx.c
  *
@@ -88,6 +88,7 @@ static int ixp4xx_flash_remove(struct device *_dev)
 	struct platform_device *dev = to_platform_device(_dev);
 	struct flash_platform_data *plat = dev->dev.platform_data;
 	struct ixp4xx_flash_info *info = dev_get_drvdata(&dev->dev);
+	map_word d;
 
 	dev_set_drvdata(&dev->dev, NULL);
 
@@ -97,7 +98,8 @@ static int ixp4xx_flash_remove(struct device *_dev)
 	/*
 	 * This is required for a soft reboot to work.
 	 */
-	ixp4xx_write16(&info->map, 0xff, 0x55 * 0x2);
+	d.x[0] = 0xff;
+	ixp4xx_write16(&info->map, d, 0x55 * 0x2);
 
 	if (info->mtd) {
 		del_mtd_partitions(info->mtd);
