@@ -32,7 +32,6 @@
 #include <asm/unaligned.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irlap.h>
 #include <net/irda/irlmp.h>
 #include <net/irda/parameters.h>
@@ -107,8 +106,7 @@ int __init irttp_init(void)
  *    Called by module destruction/cleanup code
  *
  */
-#ifdef MODULE
-void irttp_cleanup(void)
+void __exit irttp_cleanup(void) 
 {
 	/* Check for main structure */
 	ASSERT(irttp != NULL, return;);
@@ -126,7 +124,6 @@ void irttp_cleanup(void)
 
 	irttp = NULL;
 }
-#endif
 
 /*************************** SUBROUTINES ***************************/
 

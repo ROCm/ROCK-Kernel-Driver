@@ -35,7 +35,6 @@
 
 #include <net/irda/irda.h>
 #include <net/irda/irttp.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irlmp.h>
 #include <net/irda/irias_object.h>
 #include <net/irda/iriap_event.h>
@@ -142,7 +141,7 @@ int __init iriap_init(void)
  *    Initializes the IrIAP layer, called by the module cleanup code in
  *    irmod.c
  */
-void iriap_cleanup(void)
+void __exit iriap_cleanup(void)
 {
 	irlmp_unregister_service(service_handle);
 

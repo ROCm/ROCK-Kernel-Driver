@@ -89,7 +89,7 @@ int __init irlap_init(void)
 	return 0;
 }
 
-void irlap_cleanup(void)
+void __exit irlap_cleanup(void)
 {
 	ASSERT(irlap != NULL, return;);
 

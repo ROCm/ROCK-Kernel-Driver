@@ -29,7 +29,6 @@
 #include <linux/init.h>
 
 #include <net/irda/irda.h>
-#include <net/irda/irmod.h>
 #include <net/irda/irda_device.h>
 #include <net/irda/irtty.h>
 
@@ -79,7 +78,7 @@ int __init girbil_init(void)
 	return irda_device_register_dongle(&dongle);
 }
 
-void girbil_cleanup(void)
+void __exit girbil_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }
@@ -231,7 +230,6 @@ static int girbil_reset(struct irda_task *task)
 	return ret;
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Greenwich GIrBIL dongle driver");
 MODULE_LICENSE("GPL");
@@ -243,10 +241,7 @@ MODULE_LICENSE("GPL");
  *    Initialize Girbil module
  *
  */
-int init_module(void)
-{
-	return girbil_init();
-}
+module_init(girbil_init);
 
 /*
  * Function cleanup_module (void)
@@ -254,8 +249,5 @@ int init_module(void)
  *    Cleanup Girbil module
  *
  */
-void cleanup_module(void)
-{
-        girbil_cleanup();
-}
-#endif /* MODULE */
+module_exit(girbil_cleanup);
+
