@@ -782,7 +782,6 @@ struct bkm_hw {
 
 struct gazel_hw {
 	unsigned int cfg_reg;
-	unsigned int pciaddr[2];
         signed   int ipac;
 	signed   int isac;
 	signed   int hscx[2];

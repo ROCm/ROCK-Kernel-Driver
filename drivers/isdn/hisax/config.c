@@ -814,12 +814,6 @@ static void ll_unload(struct IsdnCardState *cs)
 	ic.command = ISDN_STAT_UNLOAD;
 	ic.driver = cs->myid;
 	cs->iif.statcallb(&ic);
-	if (cs->status_buf)
-		kfree(cs->status_buf);
-	cs->status_read = NULL;
-	cs->status_write = NULL;
-	cs->status_end = NULL;
-	kfree(cs->dlog);
 }
 
 static void closecard(int cardnr)
@@ -893,59 +887,97 @@ static int __devinit init_card(struct IsdnCardState *cs)
 	return 3;
 }
 
+static struct IsdnCardState *
+alloc_IsdnCardState(void)
+{
+	struct IsdnCardState *cs;
+
+	cs = kmalloc(sizeof(*cs), GFP_ATOMIC); // FIXME
+	if (!cs)
+		goto err;
+
+	memset(cs, 0, sizeof(*cs));
+
+	cs->dlog = kmalloc(MAX_DLOG_SPACE, GFP_ATOMIC);
+	if (!cs->dlog)
+		goto err_cs;
+
+	cs->status_buf = kmalloc(HISAX_STATUS_BUFSIZE, GFP_ATOMIC);
+	if (!cs->status_buf)
+		goto err_dlog;
+
+	cs->rcvbuf = kmalloc(MAX_DFRAME_LEN_L1, GFP_ATOMIC);
+	if (!cs->rcvbuf)
+		goto err_status_buf;
+
+	cs->chanlimit = 2;	/* maximum B-channel number */
+	cs->debug = L1_DEB_WARN;
+	cs->irq_flags = I4L_IRQ_FLAG;
+	cs->stlist = NULL;
+	cs->status_read = cs->status_buf;
+	cs->status_write = cs->status_buf;
+	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
+	cs->rcvidx = 0;
+	cs->tx_skb = NULL;
+	cs->tx_cnt = 0;
+	cs->event = 0;
+
+	skb_queue_head_init(&cs->rq);
+	skb_queue_head_init(&cs->sq);
+
+	spin_lock_init(&cs->lock);
+	resources_init(&cs->rs);
+	return cs;
+
+ err_status_buf:
+	kfree(cs->status_buf);
+ err_dlog:
+	kfree(cs->dlog);
+ err_cs:
+	kfree(cs);
+ err:
+	return NULL;
+}
+
+static void
+free_IsdnCardState(struct IsdnCardState *cs)
+{
+	kfree(cs->rcvbuf);
+	kfree(cs->status_buf);
+	kfree(cs->dlog);
+	kfree(cs);
+}
+
 static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 {
 	int ret = 0;
 	struct IsdnCard *card = cards + cardnr;
 	struct IsdnCardState *cs;
 
-	cs = kmalloc(sizeof(struct IsdnCardState), GFP_ATOMIC);
+	cs = alloc_IsdnCardState();
 	if (!cs) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for IsdnCardState(card %d)\n",
 		       cardnr + 1);
 		goto out;
 	}
-	memset(cs, 0, sizeof(struct IsdnCardState));
 	card->cs = cs;
-	cs->chanlimit = 2;	/* maximum B-channel number */
-	cs->logecho = 0;	/* No echo logging */
-	cs->cardnr = cardnr;
-	cs->debug = L1_DEB_WARN;
-	cs->HW_Flags = 0;
-	cs->busy_flag = busy_flag;
-	cs->irq_flags = I4L_IRQ_FLAG;
 #if TEI_PER_CARD
 	if (card->protocol == ISDN_PTYPE_NI1)
 		test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
 #else
 	test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
 #endif
+	cs->cardnr = cardnr;
 	cs->protocol = card->protocol;
+	cs->typ = card->typ;
+	cs->busy_flag = busy_flag;
 
 	if (card->typ <= 0 || card->typ > ISDN_CTYPE_COUNT) {
 		printk(KERN_WARNING
 		       "HiSax: Card Type %d out of range\n", card->typ);
 		goto outf_cs;
 	}
-	if (!(cs->dlog = kmalloc(MAX_DLOG_SPACE, GFP_ATOMIC))) {
-		printk(KERN_WARNING
-		       "HiSax: No memory for dlog(card %d)\n", cardnr + 1);
-		goto outf_cs;
-	}
-	if (!(cs->status_buf = kmalloc(HISAX_STATUS_BUFSIZE, GFP_ATOMIC))) {
-		printk(KERN_WARNING
-		       "HiSax: No memory for status_buf(card %d)\n",
-		       cardnr + 1);
-		goto outf_dlog;
-	}
-	cs->stlist = NULL;
-	cs->status_read = cs->status_buf;
-	cs->status_write = cs->status_buf;
-	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
-	cs->typ = card->typ;
-	spin_lock_init(&cs->lock);
-	resources_init(&cs->rs);
 	SET_MODULE_OWNER(&cs->iif);
 	strcpy(cs->iif.id, id);
 	cs->iif.channels = 2;
@@ -1156,19 +1188,6 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 		ll_unload(cs);
 		goto outf_cs;
 	}
-	if (!(cs->rcvbuf = kmalloc(MAX_DFRAME_LEN_L1, GFP_ATOMIC))) {
-		printk(KERN_WARNING "HiSax: No memory for isac rcvbuf\n");
-		ll_unload(cs);
-		goto outf_cs;
-	}
-	cs->rcvidx = 0;
-	cs->tx_skb = NULL;
-	cs->tx_cnt = 0;
-	cs->event = 0;
-
-	skb_queue_head_init(&cs->rq);
-	skb_queue_head_init(&cs->sq);
-
 	init_bcstate(cs, 0);
 	init_bcstate(cs, 1);
 
@@ -1201,10 +1220,8 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 	ret = 1;
 	goto out;
 
- outf_dlog:
-	kfree(cs->dlog);
  outf_cs:
-	kfree(cs);
+	free_IsdnCardState(cs);
 	card->cs = NULL;
  out:
 	return ret;
@@ -1253,8 +1270,8 @@ int __devinit HiSax_inithardware(int *busy_flag)
 			i++;
 		} else {
 			printk(KERN_WARNING
-			       "HiSax: Card %s not installed !\n",
-			       CardType[cards[i].typ]);
+			       "HiSax: Card type %d not installed !\n",
+			       cards[i].typ);
 			HiSax_shiftcards(i);
 			nrcards--;
 		}
