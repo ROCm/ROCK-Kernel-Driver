@@ -54,6 +54,7 @@ o  binutils               2.9.5.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.25                    # tune2fs
+o  jfsutils               1.0.14                  # fsck.jfs -V
 o  reiserfsprogs          3.x.0j                  # reiserfsck 2>&1|grep reiserfsprogs
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
@@ -106,8 +107,8 @@ assembling the 16-bit boot code, removing the need for as86 to compile
 your kernel.  This change does, however, mean that you need a recent
 release of binutils.
 
-System utilities
-================
+System utililities
+==================
 
 Architectural changes
 ---------------------
@@ -164,6 +165,16 @@ E2fsprogs
 
 The latest version of e2fsprogs fixes several bugs in fsck and
 debugfs.  Obviously, it's a good idea to upgrade.
+
+JFSutils
+--------
+
+The jfsutils package contains the utilities for the file system.
+The following utilities are available:
+o fsck.jfs - initiate replay of the transaction log, and check
+  and repair a JFS formatted partition.
+o mkfs.jfs - create a JFS formatted partition.
+o other file system utilities are also available in this package.
 
 Reiserfsprogs
 -------------
@@ -302,6 +313,10 @@ o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/>
 E2fsprogs
 ---------
 o  <http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.25.tar.gz>
+
+JFSutils
+--------
+o  <http://oss.software.ibm.com/jfs>
 
 Reiserfsprogs
 -------------
