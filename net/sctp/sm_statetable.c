@@ -783,7 +783,7 @@ sctp_sm_table_entry_t other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STA
 	/* SCTP_STATE_ESTABLISHED */ \
 	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_timer_ignore, .name = "sctp_sf_timer_ignore"}, \
+	{.fn = sctp_sf_t5_timer_expire, .name = "sctp_sf_t5_timer_expire"}, \
 	/* SCTP_STATE_SHUTDOWN_SENT */ \
 	{.fn = sctp_sf_t5_timer_expire, .name = "sctp_sf_t5_timer_expire"}, \
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
