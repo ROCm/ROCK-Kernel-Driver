@@ -82,7 +82,7 @@
 #define OPTIONS PCI_OPT CB_OPT PM_OPT
 #endif
 
-static const char *release = "Linux Kernel Card Services " CS_RELEASE;
+static const char *release = "Linux Kernel Card Services";
 static const char *options = "options: " OPTIONS;
 
 /*====================================================================*/
@@ -90,8 +90,7 @@ static const char *options = "options: " OPTIONS;
 /* Module parameters */
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
-MODULE_DESCRIPTION("Linux Kernel Card Services " CS_RELEASE
-		   "\n  options:" OPTIONS);
+MODULE_DESCRIPTION("Linux Kernel Card Services\noptions:" OPTIONS);
 MODULE_LICENSE("Dual MPL/GPL");	  
 
 #define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")

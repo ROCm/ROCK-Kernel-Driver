@@ -946,7 +946,7 @@ static int __init sa11xx_pcmcia_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "SA11xx PCMCIA (CS release %s)\n", CS_RELEASE);
+	printk(KERN_INFO "SA11xx PCMCIA\n");
 
 	ret = cpufreq_register_notifier(&sa1100_pcmcia_notifier_block,
 					CPUFREQ_TRANSITION_NOTIFIER);
