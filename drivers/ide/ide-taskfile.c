@@ -611,19 +611,6 @@ int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		case TASKFILE_IN_DMA:
 			err = ide_diag_taskfile(drive, &args, taskin, inbuf);
 			break;
-		case TASKFILE_IN_OUT:
-#if 0
-			args.prehandler = &pre_task_out_intr;
-			args.handler = &task_out_intr;
-			err = ide_diag_taskfile(drive, &args, taskout, outbuf);
-			args.prehandler = NULL;
-			args.handler = &task_in_intr;
-			err = ide_diag_taskfile(drive, &args, taskin, inbuf);
-			break;
-#else
-			err = -EFAULT;
-			goto abort;
-#endif
 		case TASKFILE_MULTI_OUT:
 			if (!drive->mult_count) {
 				/* (hs): give up if multcount is not set */
