@@ -146,7 +146,7 @@ HTB_CMAGIC            0xFEFAFEF1  htb_class         net/sched/sch_htb.c
 NMI_MAGIC             0x48414d4d455201 nmi_s        include/asm-mips64/sn/nmi.h
 
 Note that there are also defined special per-driver magic numbers in sound
-memory managment. See include/sound/sndmagic.h for complete list of them. Many
+memory management. See include/sound/sndmagic.h for complete list of them. Many
 OSS sound drivers have their magic numbers constructed from the soundcard PCI
 ID - these are not listed here as well.
 

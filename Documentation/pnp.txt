@@ -96,7 +96,7 @@ The Unified Plug and Play Layer
 	All Plug and Play drivers, protocols, and services meet at a central location 
 called the Plug and Play Layer.  This layer is responsible for the exchange of 
 information between PnP drivers and PnP protocols.  Thus it automatically 
-forwards commands to the proper protocol.  This makes writting PnP drivers 
+forwards commands to the proper protocol.  This makes writing PnP drivers 
 significantly easier.
 
 The following functions are available from the Plug and Play Layer:

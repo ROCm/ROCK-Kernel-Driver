@@ -75,7 +75,7 @@
  * to the board.  
  *
  * The files dpti_ioctl.h dptsig.h osd_defs.h osd_util.h sys_info.h are part of the
- * interface files for Adaptecs managment routines.  These define the structures used
+ * interface files for Adaptec's management routines.  These define the structures used
  * in the ioctls.  They are written to be portable.  They are hard to read, but I need
  * to use them 'as is' or I can miss changes in the interface.
  *

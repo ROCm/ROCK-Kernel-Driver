@@ -48,11 +48,11 @@ resuid=n		The user ID which may use the reserved blocks.
 
 sb=n			Use alternate superblock at this location.
 
-data=journal		All data are commited into the journal prior 
+data=journal		All data are committed into the journal prior 
 			to being written into the main file system.
 		
 data=ordered	(*)	All data are forced directly out to the main file 
-			system prior to its metadata being commited to 
+			system prior to its metadata being committed to 
 			the journal.
 		
 data=writeback  	Data ordering is not preserved, data may be 

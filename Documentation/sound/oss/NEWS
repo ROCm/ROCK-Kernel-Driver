@@ -19,7 +19,7 @@ and its driver(s) so I can try to get isapnp working for it.
 
 Before Linux 2.4 you had to specify the resources for sounddrivers
 statically linked into the kernel at compile time
-(in make config/menuconfig/xconfig). In Linux 2.4 the ressources are
+(in make config/menuconfig/xconfig). In Linux 2.4 the resources are
 now specified at the boot-time kernel commandline (e.g. the lilo
 'append=' line or everything that's after the kernel name in grub).
 Read the Configure.help entry for your card for the parameters.

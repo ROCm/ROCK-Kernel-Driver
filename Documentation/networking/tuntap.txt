@@ -40,7 +40,7 @@ Copyright (C) 1999-2000 Maxim Krasnyansky <max_mk@yahoo.com>
   
   Set permissions:
      e.g. chmod 0700 /dev/net/tun
-     if you want the device only accesible by root. Giving regular users the
+     if you want the device only accessible by root. Giving regular users the
      right to assign network devices is NOT a good idea. Users could assign
      bogus network interfaces to trick firewalls or administrators.
 

@@ -22,12 +22,12 @@ pss_cdrom_port
 	This parameter takes a port address as its parameter.  Any available port 
 address can be specified to enable the CDROM port, except for 0x0 and -1 as 
 these values would leave the port disabled.  Like the joystick port, the cdrom 
-port will require that an appropiate CDROM driver be loaded before you can make 
+port will require that an appropriate CDROM driver be loaded before you can make 
 use of the newly enabled CDROM port.  Like the joystick port option above, 
 remember to load the CDROM driver AFTER the pss sound driver.  While it may 
 differ on some PSS sound cards, all the PSS sound cards that I have seen have a 
 builtin Wearnes CDROM port.  If this is the case with your PSS sound card you 
-should load aztcd with the appropiate port option that matches the port you 
+should load aztcd with the appropriate port option that matches the port you 
 assigned to the CDROM port when you loaded your pss sound driver.  (ex. 
 modprobe pss pss_cdrom_port=0x340 && modprobe aztcd aztcd=0x340)  The default 
 setting of this parameter leaves the CDROM port disabled to maintain full 
@@ -44,7 +44,7 @@ just configure non-sound components.  0 configures all components, a non-0
 value will only attept to configure the CDROM and joystick ports.  This 
 parameter can be used by a user who only wished to use the builtin joystick 
 and/or CDROM port(s) of his PSS sound card.  If this driver is loaded with this 
-parameter and with the paramter below set to true then a user can safely unload 
+parameter and with the parameter below set to true then a user can safely unload 
 this driver with the following command "rmmod pss && rmmod ad1848 && rmmod 
 mpu401 && rmmod sound && rmmod soundcore" and retain the full functionality of 
 his CDROM and/or joystick port(s) while gaining back the memory previously used 

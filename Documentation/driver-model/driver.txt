@@ -36,7 +36,7 @@ Initialization
 ~~~~~~~~~~~~~~
 
 The driver must initialize at least the name and bus fields. It should
-also initalize the devclass field (when it arrives), so it may obtain
+also initialize the devclass field (when it arrives), so it may obtain
 the proper linkage internally. It should also initialize as many of
 the callbacks as possible, though each is optional.
 
@@ -93,7 +93,7 @@ static struct pci_driver eepro100_driver = {
        },
 };
 
-Some may find the syntax of embedded struct intialization awkward or
+Some may find the syntax of embedded struct initialization awkward or
 even a bit ugly. So far, it's the best way we've found to do what we want...
 
 Registration
@@ -198,7 +198,7 @@ it into a supported low-power state.
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 
 suspend is called to put the device in a low power state. There are
-several stages to sucessfully suspending a device, which is denoted in
+several stages to successfully suspending a device, which is denoted in
 the @level parameter. Breaking the suspend transition into several
 stages affords the platform flexibility in performing device power
 management based on the requirements of the system and the
@@ -206,7 +206,7 @@ user-defined policy.
 
 SUSPEND_NOTIFY notifies the device that a suspend transition is about
 to happen. This happens on system power state transition to verify
-that all devices can sucessfully suspend.
+that all devices can successfully suspend.
 
 A driver may choose to fail on this call, which should cause the
 entire suspend transition to fail. A driver should fail only if it

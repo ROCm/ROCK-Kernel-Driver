@@ -326,7 +326,7 @@ it doesn't fit in your computer, bring back the card.
 
 
   Fixed bugs and restrictions:
-       - During intialization, interrupts are blindly turned on.
+       - During initialization, interrupts are blindly turned on.
             Having a shadow variable would cause an extra memory
             access on every IO instruction. 
        - The interrupt (on the card) should be disabled when we

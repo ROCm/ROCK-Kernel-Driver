@@ -110,4 +110,4 @@ not introduce a cycle will leave it a tree and link() fails for directories).
 	Notice that "directory" in the above == "anything that might have
 children", so if we are going to introduce hybrid objects we will need
 either to make sure that link(2) doesn't work for them or to make changes
-in is_subdir() that would make it work even in presense of such beasts.
+in is_subdir() that would make it work even in presence of such beasts.

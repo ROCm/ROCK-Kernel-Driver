@@ -56,7 +56,7 @@ How it works
 Operational issues (essential reading)
 
 Instructions for the impatient
-Permissions persistence accross reboots
+Permissions persistence across reboots
 Dealing with drivers without devfs support
 All the way with Devfs
 Other Issues

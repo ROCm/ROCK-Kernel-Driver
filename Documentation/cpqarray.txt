@@ -49,9 +49,9 @@ EISA Controllers:
 -----------------
 
 If you want to use an EISA controller you'll have to supply some
-insmod/lilo paramaters.  If the driver is compiled into the kernel, must
+insmod/lilo parameters.  If the driver is compiled into the kernel, must
 give it the controller's IO port address at boot time (it is no longer
-necessary to specifiy the IRQ).  For example, if you had two SMART-2/E
+necessary to specify the IRQ).  For example, if you had two SMART-2/E
 controllers, in EISA slots 1 and 2 you'd give it a boot argument like
 this:
 

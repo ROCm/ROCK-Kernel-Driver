@@ -243,7 +243,7 @@ Chapter 6. Known Problems and Bugs
 Chapter 7. Revision History
 
      * November 13, 2000, Revision 1.07, seventh release, 630E problem
-       fixed and furthur clean up.
+       fixed and further clean up.
      * November 4, 1999, Revision 1.06, Second release, lots of clean up
        and optimization.
      * August 8, 1999, Revision 1.05, Initial Public Release

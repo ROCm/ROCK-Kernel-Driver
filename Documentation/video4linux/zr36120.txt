@@ -146,10 +146,10 @@ found in the kernel, but it doesn't need it.
 The consequence is that, when loading the driver as a module,
 the module may tell you it's out of memory, but 'free' says
 otherwise. The reason is simple; the modules wants its memory
-contingious, not fragmented, and after a long uptime there
+contiguous, not fragmented, and after a long uptime there
 probably isn't a fragment of memory large enough...
 
-The driver uses a double buffering scheme, which should realy
+The driver uses a double buffering scheme, which should really
 be an n-way buffer, depending on the size of allocated framebuffer
 and the requested grab-size/format.
 This current version also fixes a dead-lock situation during irq

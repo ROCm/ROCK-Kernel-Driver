@@ -810,9 +810,9 @@
       commandline parameter is added, called 'activity'.
    2) Added the READ_CONTROL bit for test_unit_ready SCSI-command.
    3) Added some suppress_exception bits to read_device_capacity and
-      all device_inquiry occurences in the driver code.
+      all device_inquiry occurrences in the driver code.
    4) Complaints about the various KERNEL_VERSION implementations are
-      taken into account. Every local_LinuxKernelVersion occurence is
+      taken into account. Every local_LinuxKernelVersion occurrence is
       now replaced by KERNEL_VERSION, defined in linux/version.h. 
       Corresponding changes were applied to ibmmca.h, too. This was a
       contribution to all kernel-parts by Philipp Hahn.
@@ -866,7 +866,7 @@
    2) Adapter-information and autoadaption to address-space is done.
    3) Auto-probing for maximum synchronous SCSI transfer rate is working.
    4) Optimization to some embedded function calls is applied.
-   5) Added some comment for the user to wait for SCSI-devices beeing probed.
+   5) Added some comment for the user to wait for SCSI-devices being probed.
    6) Finished version 3.2 for Kernel 2.4.0. It least, I thought it is but...
    - Michael Lang
    
@@ -966,7 +966,7 @@
 		                ------DA
 				
 		    where '-' stays dark, 'D' shows the SCSI-device id
-		    and 'A' shows the SCSI hostindex, beeing currently 
+		    and 'A' shows the SCSI hostindex, being currently 
 		    accessed. During boottime, this will give the message
 		    
 		                SCSIini*
@@ -1091,7 +1091,7 @@
 	now. Normally you really won't need to activate this flag in the
 	kernel configuration, as all post 1989 SCSI-devices should accept
 	the reset-signal, when the computer is switched on. The SCSI-
-	subsystem generates this reset while beeing initialized. This flag
+	subsystem generates this reset while being initialized. This flag
 	is really reserved for users with very old, very strange or self-made
 	SCSI-devices.
      Q: Why is the SCSI-order of my drives mirrored to the device-order

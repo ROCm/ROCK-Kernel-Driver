@@ -41,7 +41,7 @@ the driver now re-sizes buffers based on MTU settings as well.
 message_level: Controls level of messages created by the driver. Defaults to 0:
 which only displays start-up and critical messages.  Presently any non-zero 
 value will display all soft messages as well.  NB This does not turn 
-debuging messages on, that must be done by modified the source code.
+debugging messages on, that must be done by modified the source code.
 
 Variable MTU size:
 

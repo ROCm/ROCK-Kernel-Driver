@@ -27,9 +27,9 @@ fps
    Specifies the desired framerate. Is an integer in the range of 4-30.
 
 fbufs
-   This paramter specifies the number of internal buffers to use for storing 
+   This parameter specifies the number of internal buffers to use for storing 
    frames from the cam. This will help if the process that reads images from 
-   the cam is a bit slow or momentarely busy. However, on slow machines it 
+   the cam is a bit slow or momentarily busy. However, on slow machines it
    only introduces lag, so choose carefully. The default is 3, which is 
    reasonable. You can set it between 2 and 5.
 

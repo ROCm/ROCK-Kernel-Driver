@@ -15,7 +15,7 @@ Sat Apr 7 19:30 2001 Gerard Roudier (groudier@club-internet.fr)
 	- In ncr_soft_reset(), only try to ABORT the current operation 
 	  for chips that support SRUN bit in ISTAT1 and if SCRIPTS are 
 	  currently running, as 896 and 1010 manuals suggest.
-	- In the CCB abort path, donnot assume that the CCB is currently 
+	- In the CCB abort path, do not assume that the CCB is currently 
 	  queued to SCRIPTS. This is not always true, notably after a 
 	  QUEUE FULL status or when using untagged commands.
 
@@ -562,7 +562,7 @@ Tue Oct 20 22H00 1998 Gerard Roudier (groudier@club-internet.fr)
 	* version pre-sym53c8xx-0.10
 	- Add the 53c876 description to the chip table. This is only useful 
 	  for printing the right name of the controller.
-	- Add additionnal checking of INQUIRY data:
+	- Add additional checking of INQUIRY data:
 	  Check INQUIRY data received length is at least 7. Byte 7 of 
 	  inquiry data contains device features bits and the driver might 
 	  be confused by garbage. Also check peripheral qualifier.
