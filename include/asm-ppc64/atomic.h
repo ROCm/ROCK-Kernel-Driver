@@ -54,6 +54,8 @@ static __inline__ int atomic_add_return(int a, atomic_t *v)
 	return t;
 }
 
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
+
 static __inline__ void atomic_sub(int a, atomic_t *v)
 {
 	int t;

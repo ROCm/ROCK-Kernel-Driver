@@ -33,6 +33,8 @@ extern void atomic_set(atomic_t *, int);
 #define atomic_inc_return(v)	(__atomic_add_return(        1, (v)))
 #define atomic_dec_return(v)	(__atomic_add_return(       -1, (v)))
 
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
+
 #define atomic_dec_and_test(v) (atomic_dec_return(v) == 0)
 
 /* This is the old 24-bit implementation.  It's still used internally

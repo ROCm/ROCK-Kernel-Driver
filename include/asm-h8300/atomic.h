@@ -25,6 +25,7 @@ static __inline__ int atomic_add_return(int i, atomic_t *v)
 }
 
 #define atomic_add(i, v) atomic_add_return(i, v)
+#define atomic_add_negative(a, v)	(atomic_add_return((a), (v)) < 0)
 
 static __inline__ int atomic_sub_return(int i, atomic_t *v)
 {
