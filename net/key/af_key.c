@@ -2636,7 +2636,7 @@ static int pfkey_send_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, 
 	addr->sadb_address_len = 
 		(sizeof(struct sadb_address)+sockaddr_size)/
 			sizeof(uint64_t);
-	addr->sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+	addr->sadb_address_exttype = SADB_EXT_ADDRESS_DST;
 	addr->sadb_address_proto = 0;
 	addr->sadb_address_reserved = 0;
 	if (x->props.family == AF_INET) {
