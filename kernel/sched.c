@@ -941,7 +941,7 @@ void fastcall sched_fork(task_t *p, unsigned long clone_flags)
 	p->first_time_slice = 1;
 	current->time_slice >>= 1;
 	p->timestamp = sched_clock();
-	if (!current->time_slice) {
+	if (unlikely(!current->time_slice)) {
 		/*
 		 * This case is rare, it happens when the parent has only
 		 * a single jiffy left from its timeslice. Taking the
@@ -1048,18 +1048,16 @@ void fastcall sched_exit(task_t * p)
 	unsigned long flags;
 	runqueue_t *rq;
 
-	local_irq_save(flags);
-	if (p->first_time_slice) {
-		p->parent->time_slice += p->time_slice;
-		if (unlikely(p->parent->time_slice > MAX_TIMESLICE))
-			p->parent->time_slice = MAX_TIMESLICE;
-	}
-	local_irq_restore(flags);
 	/*
 	 * If the child was a (relative-) CPU hog then decrease
 	 * the sleep_avg of the parent as well.
 	 */
 	rq = task_rq_lock(p->parent, &flags);
+	if (p->first_time_slice) {
+		p->parent->time_slice += p->time_slice;
+		if (unlikely(p->parent->time_slice > MAX_TIMESLICE))
+			p->parent->time_slice = MAX_TIMESLICE;
+	}
 	if (p->sleep_avg < p->parent->sleep_avg)
 		p->parent->sleep_avg = p->parent->sleep_avg /
 		(EXIT_WEIGHT + 1) * EXIT_WEIGHT + p->sleep_avg /
@@ -1159,7 +1157,7 @@ unsigned long nr_running(void)
 {
 	unsigned long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		sum += cpu_rq(i)->nr_running;
 
 	return sum;
@@ -2313,7 +2311,7 @@ switch_tasks:
 
 	reacquire_kernel_lock(current);
 	preempt_enable_no_resched();
-	if (test_thread_flag(TIF_NEED_RESCHED))
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
 		goto need_resched;
 }
 
