@@ -33,7 +33,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 		return -ENOMEM;
 	}
 	SetPageReserved(virt_to_page(page_map->real));
-	CACHE_FLUSH();
+	global_cache_flush();
 	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
 					    PAGE_SIZE);
 	if (page_map->remapped == NULL) {
@@ -42,7 +42,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 		page_map->real = NULL;
 		return -ENOMEM;
 	}
-	CACHE_FLUSH();
+	global_cache_flush();
 
 	for(i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
 		page_map->remapped[i] = agp_bridge->scratch_page;
@@ -75,6 +75,7 @@ static void amd_free_gatt_pages(void)
 		}
 	}
 	kfree(tables);
+	amd_irongate_private.gatt_pages = NULL;
 }
 
 static int amd_create_gatt_pages(int nr_tables)
@@ -184,8 +185,8 @@ static int amd_irongate_fetch_size(void)
 
 	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
 	temp = (temp & 0x0000000e);
-	values = A_SIZE_LVL2(agp_bridge->aperture_sizes);
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	values = A_SIZE_LVL2(agp_bridge->driver->aperture_sizes);
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -274,7 +275,7 @@ static unsigned long amd_irongate_mask_memory(unsigned long addr, int type)
 {
 	/* Only type 0 is supported by the irongate */
 
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static int amd_insert_memory(agp_memory * mem,
@@ -297,14 +298,13 @@ static int amd_insert_memory(agp_memory * mem,
 	while (j < (pg_start + mem->page_count)) {
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
-		if (!PGE_EMPTY(cur_gatt[GET_GATT_OFF(addr)])) {
+		if (!PGE_EMPTY(agp_bridge, cur_gatt[GET_GATT_OFF(addr)]))
 			return -EBUSY;
-		}
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -312,9 +312,9 @@ static int amd_insert_memory(agp_memory * mem,
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_bridge->mask_memory(mem->memory[i], mem->type);
+			amd_irongate_mask_memory(mem->memory[i], mem->type);
 	}
-	agp_bridge->tlb_flush(mem);
+	amd_irongate_tlbflush(mem);
 	return 0;
 }
 
@@ -335,7 +335,7 @@ static int amd_remove_memory(agp_memory * mem, off_t pg_start,
 			(unsigned long) agp_bridge->scratch_page;
 	}
 
-	agp_bridge->tlb_flush(mem);
+	amd_irongate_tlbflush(mem);
 	return 0;
 }
 
@@ -355,115 +355,104 @@ static struct gatt_mask amd_irongate_masks[] =
 	{.mask = 0x00000001, .type = 0}
 };
 
-static int __init amd_irongate_setup (struct pci_dev *pdev)
-{
-	agp_bridge->masks = amd_irongate_masks;
-	agp_bridge->aperture_sizes = (void *) amd_irongate_sizes;
-	agp_bridge->size_type = LVL2_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 7;
-	agp_bridge->dev_private_data = (void *) &amd_irongate_private;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = amd_irongate_configure;
-	agp_bridge->fetch_size = amd_irongate_fetch_size;
-	agp_bridge->cleanup = amd_irongate_cleanup;
-	agp_bridge->tlb_flush = amd_irongate_tlbflush;
-	agp_bridge->mask_memory = amd_irongate_mask_memory;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = amd_create_gatt_table;
-	agp_bridge->free_gatt_table = amd_free_gatt_table;
-	agp_bridge->insert_memory = amd_insert_memory;
-	agp_bridge->remove_memory = amd_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-	return 0;
-}
+struct agp_bridge_driver amd_irongate_driver = {
+	.owner			= THIS_MODULE,
+	.masks			= amd_irongate_masks,
+	.aperture_sizes		= amd_irongate_sizes,
+	.size_type		= LVL2_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= amd_irongate_configure,
+	.fetch_size		= amd_irongate_fetch_size,
+	.cleanup		= amd_irongate_cleanup,
+	.tlb_flush		= amd_irongate_tlbflush,
+	.mask_memory		= amd_irongate_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= amd_create_gatt_table,
+	.free_gatt_table	= amd_free_gatt_table,
+	.insert_memory		= amd_insert_memory,
+	.remove_memory		= amd_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
 
 struct agp_device_ids amd_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
-		.chipset	= AMD_IRONGATE,
 		.chipset_name	= "Irongate",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700E,
-		.chipset	= AMD_761,
 		.chipset_name	= "761",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700C,
-		.chipset	= AMD_762,
 		.chipset_name	= "760MP",
 	},
 	{ }, /* dummy final entry, always present */
 };
 
-
-/* scan table above for supported devices */
-static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
+static int __init agp_amdk7_probe(struct pci_dev *pdev,
+				  const struct pci_device_id *ent)
 {
-	int j=0;
-	struct agp_device_ids *devs;
-	
-	devs = amd_agp_device_ids;
+	struct agp_device_ids *devs = amd_agp_device_ids;
+	struct agp_bridge_data *bridge;
+	u8 cap_ptr;
+	int j;
 
-	while (devs[j].chipset_name != NULL) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected AMD %s chipset\n", devs[j].chipset_name);
-			agp_bridge->type = devs[j].chipset;
-
-			if (devs[j].chipset_setup != NULL)
-				return devs[j].chipset_setup(pdev);
-			else
-				return amd_irongate_setup(pdev);
-		}
-		j++;
-	}
-
-	/* try init anyway, if user requests it */
-	if (agp_try_unsupported) {
-		printk(KERN_WARNING PFX "Trying generic AMD routines"
-		       " for device id: %04x\n", pdev->device);
-		agp_bridge->type = AMD_GENERIC;
-		return amd_irongate_setup(pdev);
-	}
-
-	printk(KERN_ERR PFX "Unsupported AMD chipset (device id: %04x),"
-		" you might want to try agp_try_unsupported=1.\n", pdev->device);
-	return -ENODEV;
-}
-
-
-static struct agp_driver amd_k7_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
-/* Supported Device Scanning routine */
-
-static int __init agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_id *ent)
-{
-	u8 cap_ptr = 0;
-
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
+	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr)
 		return -ENODEV;
 
-	if (agp_lookup_host_bridge(dev) != -ENODEV) {
-		agp_bridge->dev = dev;
-		agp_bridge->capndx = cap_ptr;
-		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
-		amd_k7_agp_driver.dev = dev;
-		agp_register_driver(&amd_k7_agp_driver);
-		return 0;
+	for (j = 0; devs[j].chipset_name; j++) {
+		if (pdev->device == devs[j].device_id) {
+			printk (KERN_INFO PFX "Detected AMD %s chipset\n",
+					devs[j].chipset_name);
+			goto found;
+		}
 	}
-	return -ENODEV;
+
+	if (!agp_try_unsupported) {
+		printk(KERN_ERR PFX
+		    "Unsupported AMD chipset (device id: %04x),"
+		    " you might want to try agp_try_unsupported=1.\n",
+		    pdev->device);
+		return -ENODEV;
+	}
+
+	printk(KERN_WARNING PFX "Trying generic AMD routines"
+	       " for device id: %04x\n", pdev->device);
+
+found:
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->driver = &amd_irongate_driver;
+	bridge->dev_private_data = &amd_irongate_private,
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
+
+	/* Fill in the mode register */
+	pci_read_config_dword(pdev,
+			bridge->capndx+PCI_AGP_STATUS,
+			&bridge->mode);
+
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
+}
+
+static void __devexit agp_amdk7_remove(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_amdk7_pci_table[] __initdata = {
@@ -484,22 +473,16 @@ static struct __initdata pci_driver agp_amdk7_pci_driver = {
 	.name		= "agpgart-amdk7",
 	.id_table	= agp_amdk7_pci_table,
 	.probe		= agp_amdk7_probe,
+	.remove		= agp_amdk7_remove,
 };
 
 static int __init agp_amdk7_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_amdk7_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	return ret_val;
+	return pci_module_init(&agp_amdk7_pci_driver);
 }
 
 static void __exit agp_amdk7_cleanup(void)
 {
-	agp_unregister_driver(&amd_k7_agp_driver);
 	pci_unregister_driver(&agp_amdk7_pci_driver);
 }
 
@@ -508,4 +491,3 @@ module_exit(agp_amdk7_cleanup);
 
 MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");
-
