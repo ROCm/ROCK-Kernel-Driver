@@ -109,13 +109,13 @@ xfs_qm_showargs(
 
 	if (mp->m_qflags & XFS_UQUOTA_ACCT) {
 		(mp->m_qflags & XFS_UQUOTA_ENFD) ?
-			seq_puts(m, "," MNTOPT_UQUOTA) :
+			seq_puts(m, "," MNTOPT_USRQUOTA) :
 			seq_puts(m, "," MNTOPT_UQUOTANOENF);
 	}
 
 	if (mp->m_qflags & XFS_GQUOTA_ACCT) {
 		(mp->m_qflags & XFS_GQUOTA_ENFD) ?
-			seq_puts(m, "," MNTOPT_GQUOTA) :
+			seq_puts(m, "," MNTOPT_GRPQUOTA) :
 			seq_puts(m, "," MNTOPT_GQUOTANOENF);
 	}
 
