@@ -165,6 +165,7 @@ static int change_limit(struct Qdisc *q, u32 limit)
 		return -ENOMEM;
 
 	rta->rta_type = RTM_NEWQDISC;
+	rta->rta_len = RTA_LENGTH(sizeof(struct tc_fifo_qopt));
 	((struct tc_fifo_qopt *)RTA_DATA(rta))->limit = limit;
 	ret = q->ops->change(q, rta);
 	kfree(rta);
