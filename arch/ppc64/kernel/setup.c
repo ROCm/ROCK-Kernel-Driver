@@ -285,6 +285,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	pvr = paca[cpu_id].pvr;
 
 	switch (PVR_VER(pvr)) {
+	case PV_NORTHSTAR:
+		seq_printf(m, "RS64-II (northstar)\n");
+		break;
 	case PV_PULSAR:
 		seq_printf(m, "RS64-III (pulsar)\n");
 		break;
