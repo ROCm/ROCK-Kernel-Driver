@@ -67,6 +67,11 @@ void snd_wrapper_vfree(void *obj)
 
 #include <linux/pci.h>
 
+/* to be sure... */
+#ifdef HACK_PCI_ALLOC_CONSISTENT
+#error pci_alloc_consistent hack is already defined!!
+#endif
+
 /*
  * A dirty hack... when the kernel code is fixed this should be removed.
  *
@@ -93,13 +98,19 @@ void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	rmask = ~((unsigned long)dma_mask);
 	hwdev->dma_mask = 0xffffffff; /* do without masking */
 	ret = pci_alloc_consistent(hwdev, size, dma_handle);
-	if (ret && ((*dma_handle + size - 1) & rmask)) {
-		pci_free_consistent(hwdev, size, ret, *dma_handle);
-		ret = 0;
-	}
 	hwdev->dma_mask = dma_mask; /* restore */
-	if (! ret)
-		ret = pci_alloc_consistent(hwdev, size, dma_handle);
+	if (ret) {
+		/* obtained address is out of range? */
+		if (((unsigned long)*dma_handle + size - 1) & rmask) {
+			/* reallocate with the proper mask */
+			pci_free_consistent(hwdev, size, ret, *dma_handle);
+			ret = pci_alloc_consistent(hwdev, size, dma_handle);
+		}
+	} else {
+		/* wish to success now with the proper mask... */
+		if (dma_mask != 0xffffffff)
+			ret = pci_alloc_consistent(hwdev, size, dma_handle);
+	}
 	return ret;
 }
 

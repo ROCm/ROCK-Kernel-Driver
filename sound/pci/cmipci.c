@@ -205,9 +205,9 @@ MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x
 #define CM_SFILENB		0x00001000
 #define CM_MMODE_MASK		0x00000E00
 #define CM_SPDIF_SELECT2	0x00000100	/* for model > 039 ? */
-#define CM_ENCENTER		0x00000080	/* shared with FLINKON? */
-#define CM_FLINKON		0x00000080
-#define CM_FLINKOFF		0x00000040
+#define CM_ENCENTER		0x00000080
+#define CM_FLINKON		0x00000040
+#define CM_FLINKOFF		0x00000020
 #define CM_MIDSMP		0x00000010
 #define CM_UPDDMA_MASK		0x0000000C
 #define CM_TWAIT_MASK		0x00000003
@@ -625,7 +625,7 @@ static int snd_cmipci_pcm_prepare(cmipci_t *cm, cmipci_pcm_t *rec,
 	/* program sample counts */
 	reg = rec->ch ? CM_REG_CH1_FRAME2 : CM_REG_CH0_FRAME2;
 	snd_cmipci_write_w(cm, reg, rec->dma_size - 1);
-	snd_cmipci_write_w(cm, reg + 2, rec->period_size - 1);
+	snd_cmipci_write_w(cm, reg + 2, rec->period_size); /* FIXME: or period_size-1 ?? */
 
 	/* set adc/dac flag */
 	val = rec->ch ? CM_CHADC1 : CM_CHADC0;
@@ -1088,7 +1088,7 @@ static void restore_mixer_state(cmipci_t *cm)
 }
 
 /* spinlock held! */
-static void setup_ac3(cmipci_t *cm, int do_ac3, int rate)
+static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int rate)
 {
 	cm->channel[CM_CH_PLAY].ac3_shift = 0;
 	cm->spdif_counter = 0;
@@ -1112,7 +1112,7 @@ static void setup_ac3(cmipci_t *cm, int do_ac3, int rate)
 			/* set 176K sample rate to fix 033 HW bug */
 			if (cm->chip_version == 33) {
 				if (rate >= 48000) {
-					snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_176K);
+					snd_cmipci_set_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_SRATE_176K);
 				} else {
 					snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_SRATE_176K);
 				}
@@ -1153,7 +1153,7 @@ static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up
 		/* snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_SPDO2DAC); */
 		if (cm->spdif_playback_enabled)
 			snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
-		setup_ac3(cm, do_ac3, rate);
+		setup_ac3(cm, subs, do_ac3, rate);
 
 		if (rate == 48000)
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_SPDIF48K | CM_SPDF_AC97);
@@ -1165,7 +1165,7 @@ static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up
 		/* snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT); */
 		/* snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_SPDO2DAC); */
 		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_PLAYBACK_SPDF);
-		setup_ac3(cm, 0, 0);
+		setup_ac3(cm, subs, 0, 0);
 	}
 	spin_unlock_irqrestore(&cm->reg_lock, flags);
 }
@@ -1286,7 +1286,7 @@ static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static snd_pcm_hardware_t snd_cmipci_playback =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
 	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
@@ -1306,7 +1306,7 @@ static snd_pcm_hardware_t snd_cmipci_playback =
 static snd_pcm_hardware_t snd_cmipci_capture =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
 	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
@@ -1326,7 +1326,7 @@ static snd_pcm_hardware_t snd_cmipci_capture =
 static snd_pcm_hardware_t snd_cmipci_playback2 =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		SNDRV_PCM_FMTBIT_S16_LE,
 	.rates =		SNDRV_PCM_RATE_5512 | SNDRV_PCM_RATE_8000_48000,
@@ -1346,7 +1346,7 @@ static snd_pcm_hardware_t snd_cmipci_playback2 =
 static snd_pcm_hardware_t snd_cmipci_playback_spdif =
 {
 	.info =			(SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER),
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE),
 	.formats =		SNDRV_PCM_FMTBIT_S16_LE /*| SNDRV_PCM_FMTBIT_S32_LE*/,
 	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
 	.rate_min =		44100,
@@ -1365,7 +1365,7 @@ static snd_pcm_hardware_t snd_cmipci_playback_spdif =
 static snd_pcm_hardware_t snd_cmipci_capture_spdif =
 {
 	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				 SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_PAUSE |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =	        SNDRV_PCM_FMTBIT_S16_LE,
 	.rates =		SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,

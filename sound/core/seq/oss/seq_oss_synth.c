@@ -179,7 +179,7 @@ snd_seq_oss_synth_unregister(snd_seq_device_t *dev)
 	}
 	spin_unlock_irqrestore(&register_lock, flags);
 	if (rec->seq_device < SNDRV_CARDS)
-		snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, rec->seq_device, NULL);
+		snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_SYNTH, rec->seq_device);
 
 	snd_use_lock_sync(&rec->use_lock);
 	kfree(rec);

@@ -1430,7 +1430,7 @@ static int __devinit snd_intel8x0_ali_ac97spdif(intel8x0_t *chip, int device, sn
 
 	if (rpcm)
 		*rpcm = NULL;
-	err = snd_pcm_new(chip->card, "ALI - AC97 IEC958", device, 0, 1, &pcm);
+	err = snd_pcm_new(chip->card, "ALI - AC97 IEC958", device, 1, 0, &pcm);
 	if (err < 0)
 		return err;
 
@@ -1550,6 +1550,16 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		ac97.read = snd_intel8x0_ali_codec_read;
 		channels = 6;
 		codecs = 1;
+		/* detect the secondary codec */
+		for (i = 0; i < 100; i++) {
+			unsigned int reg = igetdword(chip, ICHREG(ALI_RTSR));
+			if (reg & 0x40) {
+				codecs = 2;
+				break;
+			}
+			iputdword(chip, ICHREG(ALI_RTSR), reg | 0x40);
+			udelay(1);
+		}
 	}
 	if ((err = snd_ac97_mixer(chip->card, &ac97, &x97)) < 0)
 		return err;
@@ -1567,9 +1577,6 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	/* make sure, that we have DACs at right slot for rev2.2 */
 	if (ac97_is_rev22(x97))
 		snd_ac97_update_bits(x97, AC97_EXTENDED_ID, AC97_EI_DACS_SLOT_MASK, 0);
-	/* can we have more AC'97 codecs with ALI chipset? */
-	if (chip->device_type == DEVICE_ALI)
-		goto __end;
 	/* AnalogDevices CNR boards uses special codec chaining */
 	/* skip standard test method for secondary codecs in this case */
 	if (x97->flags & AC97_AD_MULTI) {
@@ -1586,24 +1593,28 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			break;
 		}
 		chip->ac97[i] = x97;
-		if (chip->device_type == DEVICE_INTEL_ICH4 && chip->ichd[ICHD_PCM2IN].ac97 == NULL)
-			chip->ichd[ICHD_PCM2IN].ac97 = x97;
-		if (x97->ext_id & AC97_EI_VRM) {
-			if (chip->ichd[ICHD_MIC].ac97 == NULL)
-				chip->ichd[ICHD_MIC].ac97 = x97;
-			else if (chip->device_type == DEVICE_INTEL_ICH4 &&
-				 chip->ichd[ICHD_MIC2].ac97 == NULL &&
-				 chip->ichd[ICHD_PCM2IN].ac97 == x97)
-				chip->ichd[ICHD_MIC2].ac97 = x97;
-		}
-		if (x97->ext_id & AC97_EI_SPDIF) {
-			if (chip->device_type != DEVICE_ALI) {
+		switch (chip->device_type) {
+		case DEVICE_INTEL_ICH4:
+			if (chip->ichd[ICHD_PCM2IN].ac97 == NULL)
+				chip->ichd[ICHD_PCM2IN].ac97 = x97;
+			if (x97->ext_id & AC97_EI_VRM) {
+				if (chip->ichd[ICHD_MIC].ac97 == NULL)
+					chip->ichd[ICHD_MIC].ac97 = x97;
+				else if (chip->ichd[ICHD_MIC2].ac97 == NULL &&
+					 chip->ichd[ICHD_PCM2IN].ac97 == x97)
+					chip->ichd[ICHD_MIC2].ac97 = x97;
+			}
+			if (x97->ext_id & AC97_EI_SPDIF) {
 				if (chip->ichd[ICHD_SPBAR].ac97 == NULL)
 					chip->ichd[ICHD_SPBAR].ac97 = x97;
-			} else {
-				if (chip->ichd[ALID_AC97SPDIFOUT].ac97 == NULL)
-					chip->ichd[ALID_AC97SPDIFOUT].ac97 = x97;
 			}
+			break;
+		default:
+			if (x97->ext_id & AC97_EI_VRM) {
+				if (chip->ichd[ICHD_MIC].ac97 == NULL)
+					chip->ichd[ICHD_MIC].ac97 = x97;
+			}
+			break;
 		}
 	}
 	
@@ -1672,7 +1683,6 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 			}
 		}
 	}
-      __end:
 	chip->in_ac97_init = 0;
 	return 0;
 }
@@ -2147,11 +2157,11 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->pci = pci;
 	chip->irq = -1;
 	snd_intel8x0_proc_init(chip);
-	if (chip->device_type == DEVICE_INTEL_ICH4 &&
-	    (pci_resource_flags(pci, 2) & IORESOURCE_MEM)) {	/* ICH4 and higher */
-		chip->mmio = chip->bm_mmio = 1;
+	sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
+	sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
+		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
 		if ((chip->res = request_mem_region(chip->addr, 512, chip->ac97_name)) == NULL) {
 			snd_intel8x0_free(chip);
 			snd_printk("unable to grab I/O memory 0x%lx-0x%lx\n", chip->addr, chip->addr + 512 - 1);
@@ -2163,7 +2173,16 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 			snd_printk("AC'97 space ioremap problem\n");
 			return -EIO;
 		}
-		sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
+	} else {
+		chip->addr = pci_resource_start(pci, 0);
+		if ((chip->res = request_region(chip->addr, 256, chip->ac97_name)) == NULL) {
+			snd_intel8x0_free(chip);
+			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->addr, chip->addr + 256 - 1);
+			return -EBUSY;
+		}
+	}
+	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
+		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
 		if ((chip->res_bm = request_mem_region(chip->bmaddr, 256, chip->ctrl_name)) == NULL) {
 			snd_intel8x0_free(chip);
@@ -2177,14 +2196,6 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 			return -EIO;
 		}
 	} else {
-		chip->addr = pci_resource_start(pci, 0);
-		sprintf(chip->ac97_name, "%s - AC'97", card->shortname);
-		if ((chip->res = request_region(chip->addr, 256, chip->ac97_name)) == NULL) {
-			snd_intel8x0_free(chip);
-			snd_printk("unable to grab ports 0x%lx-0x%lx\n", chip->addr, chip->addr + 256 - 1);
-			return -EBUSY;
-		}
-		sprintf(chip->ctrl_name, "%s - Controller", card->shortname);
 		chip->bmaddr = pci_resource_start(pci, 1);
 		if ((chip->res_bm = request_region(chip->bmaddr, 64, chip->ctrl_name)) == NULL) {
 			snd_intel8x0_free(chip);

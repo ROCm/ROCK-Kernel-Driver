@@ -998,7 +998,12 @@ static int snd_cs4231_probe(cs4231_t *chip)
 		rev = snd_cs4231_in(chip, CS4231_VERSION) & 0xe7;
 		snd_printdd("CS4231: VERSION (I25) = 0x%x\n", rev);
 		if (rev == 0x80) {
-			chip->hardware = CS4231_HW_CS4231;
+			unsigned char tmp = snd_cs4231_in(chip, 23);
+			snd_cs4231_out(chip, 23, ~tmp);
+			if (snd_cs4231_in(chip, 23) != tmp)
+				chip->hardware = CS4231_HW_AD1845;
+			else
+				chip->hardware = CS4231_HW_CS4231;
 		} else if (rev == 0xa0) {
 			chip->hardware = CS4231_HW_CS4231A;
 		} else if (rev == 0xa2) {
@@ -1382,6 +1387,7 @@ const char *snd_cs4231_chip_id(cs4231_t *chip)
 	case CS4231_HW_CS4239:	return "CS4239";
 	case CS4231_HW_INTERWAVE: return "AMD InterWave";
 	case CS4231_HW_OPL3SA2: return chip->card->shortname;
+	case CS4231_HW_AD1845: return "AD1845";
 	default: return "???";
 	}
 }

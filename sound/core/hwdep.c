@@ -338,10 +338,8 @@ static int snd_hwdep_dev_register(snd_device_t *device)
 						    &snd_hwdep_reg, hwdep->oss_dev) < 0) {
 				snd_printk(KERN_ERR "unable to register OSS compatibility device %i:%i\n",
 					   hwdep->card->number, hwdep->device);
-			} else {
-				snd_oss_info_register(SNDRV_OSS_INFO_DEV_SYNTH, hwdep->card->number, hwdep->name);
+			} else
 				hwdep->ossreg = 1;
-			}
 		}
 	}
 #endif
@@ -362,10 +360,8 @@ static int snd_hwdep_dev_unregister(snd_device_t *device)
 		return -EINVAL;
 	}
 #ifdef CONFIG_SND_OSSEMUL
-	if (hwdep->ossreg) {
+	if (hwdep->ossreg)
 		snd_unregister_oss_device(hwdep->oss_type, hwdep->card, hwdep->device);
-		snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_SYNTH, hwdep->card->number);
-	}
 #endif
 	snd_unregister_device(SNDRV_DEVICE_TYPE_HWDEP, hwdep->card, hwdep->device);
 	snd_hwdep_devices[idx] = NULL;

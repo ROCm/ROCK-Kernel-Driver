@@ -101,6 +101,9 @@ ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o
 endif
 obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd.o
+ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
+obj-$(CONFIG_SND_USB_AUDIO) += snd-rawmidi.o
+endif
 
 obj-m := $(sort $(obj-m))
 

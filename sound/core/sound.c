@@ -367,6 +367,9 @@ static void __exit alsa_sound_exit(void)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 		master = devfs_find_handle(NULL, controlname, strlen(controlname), 0, 0, DEVFS_SPECIAL_CHR, 0);
 		devfs_unregister(master);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+		master = devfs_find_handle(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
+		devfs_unregister(master);
 #else
 		devfs_find_and_unregister(NULL, controlname, 0, 0, DEVFS_SPECIAL_CHR, 0);
 #endif

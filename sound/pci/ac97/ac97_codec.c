@@ -119,7 +119,8 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x43525948, 0xfffffff8, "CS4201",		NULL },
 { 0x43525958, 0xfffffff8, "CS4205",		patch_cirrus_spdif },
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
-{ 0x43585429, 0xffffffff, "Cx20468",		patch_conexant },
+{ 0x43585421, 0xffffffff, "HSD11246",		NULL },	// SmartMC II
+{ 0x43585428, 0xfffffff8, "Cx20468",		patch_conexant }, // SmartAMC fixme: the mask might be different
 { 0x454d4328, 0xffffffff, "28028",		NULL },  // same as TR28028?
 { 0x45838308, 0xffffffff, "ESS1988",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
@@ -1668,6 +1669,9 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 	id |= snd_ac97_read(ac97, AC97_VENDOR_ID2);
 	snd_ac97_get_name(NULL, id, name);
 	snd_iprintf(buffer, "%d-%d/%d: %s\n\n", ac97->addr, ac97->num, subidx, name);
+	if ((ac97->scaps & AC97_SCAP_AUDIO) == 0)
+		goto __modem;
+
 	val = snd_ac97_read(ac97, AC97_RESET);
 	snd_iprintf(buffer, "Capabilities     :%s%s%s%s%s%s\n",
 	    	    val & AC97_BC_DEDICATED_MIC ? " -dedicated MIC PCM IN channel-" : "",
@@ -1788,7 +1792,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 	if (mext == 0)
 		return;
 	
-	snd_iprintf(buffer, "Extended modem ID: codec=%i %s%s%s%s%s\n",
+	snd_iprintf(buffer, "Extended modem ID: codec=%i%s%s%s%s%s\n",
 			(mext & AC97_MEI_ADDR_MASK) >> AC97_MEI_ADDR_SHIFT,
 			mext & AC97_MEI_CID2 ? " CID2" : "",
 			mext & AC97_MEI_CID1 ? " CID1" : "",

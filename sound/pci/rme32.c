@@ -859,6 +859,10 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 	spin_unlock_irqrestore(&rme32->lock, flags);
 
 	runtime->hw = snd_rme32_capture_spdif_info;
+	if (RME32_PRO_WITH_8414(rme32)) {
+		runtime->hw.rates |= SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000;
+		runtime->hw.rate_max = 96000;
+	}
 
 	snd_pcm_hw_constraint_minmax(runtime,
 				     SNDRV_PCM_HW_PARAM_BUFFER_BYTES,

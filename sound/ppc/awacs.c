@@ -82,9 +82,18 @@ snd_pmac_awacs_write_noreg(pmac_t *chip, int reg, int val)
 	snd_pmac_awacs_write(chip, val | (reg << 12));
 }
 
+static void do_mdelay(int msec, int can_schedule)
+{
+	if (can_schedule) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout((msec * HZ + 999) / 1000);
+	} else
+		mdelay(msec);
+}
+
 #ifdef CONFIG_PMAC_PBOOK
 /* Recalibrate chip */
-static void screamer_recalibrate(pmac_t *chip)
+static void screamer_recalibrate(pmac_t *chip, int can_schedule)
 {
 	if (chip->model != PMAC_SCREAMER)
 		return;
@@ -92,15 +101,15 @@ static void screamer_recalibrate(pmac_t *chip)
 	/* Sorry for the horrible delays... I hope to get that improved
 	 * by making the whole PM process asynchronous in a future version
 	 */
-	mdelay(750);
+	do_mdelay(750, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1,
 				   chip->awacs_reg[1] | MASK_RECALIBRATE | MASK_CMUTE | MASK_AMUTE);
-	mdelay(1000);
+	do_mdelay(1000, can_schedule);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
 }
 
 #else
-#define screamer_recalibrate(chip) /* NOP */
+#define screamer_recalibrate(chip, can_schedule) /* NOP */
 #endif
 
 
@@ -609,7 +618,7 @@ static int build_mixers(pmac_t *chip, int nums, snd_kcontrol_new_t *mixers)
 /*
  * restore all registers
  */
-static void awacs_restore_all_regs(pmac_t *chip)
+static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
 {
 	snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
 	snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -617,7 +626,7 @@ static void awacs_restore_all_regs(pmac_t *chip)
 	snd_pmac_awacs_write_noreg(chip, 4, chip->awacs_reg[4]);
 	if (chip->model == PMAC_SCREAMER) {
 		snd_pmac_awacs_write_noreg(chip, 5, chip->awacs_reg[5]);
-		mdelay(100);
+		do_mdelay(100, can_schedule);
 		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
 		mdelay(2);
 		snd_pmac_awacs_write_noreg(chip, 1, chip->awacs_reg[1]);
@@ -629,8 +638,8 @@ static void awacs_restore_all_regs(pmac_t *chip)
 #ifdef CONFIG_PMAC_PBOOK
 static void snd_pmac_awacs_resume(pmac_t *chip)
 {
-	awacs_restore_all_regs(chip);
-	screamer_recalibrate(chip);
+	awacs_restore_all_regs(chip, 0);
+	screamer_recalibrate(chip, 0);
 #ifdef PMAC_AMP_AVAIL
 	if (chip->mixer_data) {
 		awacs_amp_t *amp = chip->mixer_data;
@@ -738,8 +747,8 @@ snd_pmac_awacs_init(pmac_t *chip)
 		chip->awacs_reg[7] = 0;
 	}
 
-	awacs_restore_all_regs(chip);
-	screamer_recalibrate(chip);
+	awacs_restore_all_regs(chip, 1);
+	screamer_recalibrate(chip, 1);
 
 	chip->revision = (in_le32(&chip->awacs->codec_stat) >> 12) & 0xf;
 #ifdef PMAC_AMP_AVAIL
@@ -849,6 +858,10 @@ snd_pmac_awacs_init(pmac_t *chip)
 	chip->update_automute = snd_pmac_awacs_update_automute;
 	snd_pmac_awacs_update_automute(chip, 0); /* update the status only */
 #endif
+	if (chip->model == PMAC_SCREAMER) {
+		snd_pmac_awacs_write_noreg(chip, 6, chip->awacs_reg[6]);
+		snd_pmac_awacs_write_noreg(chip, 0, chip->awacs_reg[0]);
+	}
 
 	return 0;
 }

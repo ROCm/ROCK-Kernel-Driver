@@ -325,6 +325,7 @@ static void ews88_setup_spdif(ice1712_t *ice, snd_pcm_substream_t * substream)
 static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 {
 	int err;
+	ak4524_t *ak;
 
 	/* set the analog DACs */
 	switch (ice->eeprom.subvendor) {
@@ -400,7 +401,7 @@ static int __devinit snd_ice1712_ews_init(ice1712_t *ice)
 	}
 
 	/* analog section */
-	ak4524_t *ak = &ice->ak4524;
+	ak = &ice->ak4524;
 	switch (ice->eeprom.subvendor) {
 	case ICE1712_SUBDEVICE_EWS88MT:
 		ak->num_adcs = ak->num_dacs = 8;
