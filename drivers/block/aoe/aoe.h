@@ -26,7 +26,6 @@ enum {
 	AOECCMD_FSET,
 
 	AOE_HVER = 0x10,
-	ETH_P_AOE = 0x88a2,
 };
 
 struct aoe_hdr {
