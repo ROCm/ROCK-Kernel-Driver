@@ -2888,7 +2888,6 @@ static int is_quattro_p(struct pci_dev *pdev)
 static void find_eth_addr_in_vpd(void *rom_base, int len, int index, unsigned char *dev_addr)
 {
 	int this_offset;
-	int orig_index = index;
 
 	for (this_offset = 0x20; this_offset < len; this_offset++) {
 		void *p = rom_base + this_offset;
@@ -2906,11 +2905,6 @@ static void find_eth_addr_in_vpd(void *rom_base, int len, int index, unsigned ch
 
 		if (index == 0) {
 			int i;
-
-			printk("MAC(%d): [%02x %02x %02x %02x %02x %02x]\n",
-			       orig_index,
-			       readb(p + 0), readb(p + 1), readb(p + 2),
-			       readb(p + 3), readb(p + 4), readb(p + 5));
 
 			for (i = 0; i < 6; i++)
 				dev_addr[i] = readb(p + i);
@@ -3274,12 +3268,18 @@ static void __exit happy_meal_cleanup_module(void)
 	while (root_happy_dev) {
 		struct happy_meal *hp = root_happy_dev;
 		struct happy_meal *next = root_happy_dev->next_module;
+		struct net_device *dev = hp->dev;
+
+		/* Unregister netdev before unmapping registers as this
+		 * call can end up trying to access those registers.
+		 */
+		unregister_netdev(dev);
 
 #ifdef CONFIG_SBUS
 		if (!(hp->happy_flags & HFLAG_PCI)) {
 			if (hp->happy_flags & HFLAG_QUATTRO) {
 				if (hp->qfe_parent != last_seen_qfe) {
-					free_irq(hp->dev->irq, hp->qfe_parent);
+					free_irq(dev->irq, hp->qfe_parent);
 					last_seen_qfe = hp->qfe_parent;
 				}
 			}
@@ -3304,10 +3304,32 @@ static void __exit happy_meal_cleanup_module(void)
 			iounmap((void *)hp->gregs);
 		}
 #endif
-		unregister_netdev(hp->dev);
-		kfree(hp->dev);
+		kfree(dev);
+
 		root_happy_dev = next;
 	}
+
+	/* Now cleanup the quattro lists. */
+#ifdef CONFIG_SBUS
+	while (qfe_sbus_list) {
+		struct quattro *qfe = qfe_sbus_list;
+		struct quattro *next = qfe->next;
+
+		kfree(qfe);
+
+		qfe_sbus_list = next;
+	}
+#endif
+#ifdef CONFIG_PCI
+	while (qfe_pci_list) {
+		struct quattro *qfe = qfe_pci_list;
+		struct quattro *next = qfe->next;
+
+		kfree(qfe);
+
+		qfe_pci_list = next;
+	}
+#endif
 }
 
 module_init(happy_meal_probe);
