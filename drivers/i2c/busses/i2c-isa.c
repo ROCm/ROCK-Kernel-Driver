@@ -42,9 +42,7 @@ static struct i2c_adapter isa_adapter = {
 	.id		= I2C_ALGO_ISA | I2C_HW_ISA,
 	.class          = I2C_ADAP_CLASS_SMBUS,
 	.algo		= &isa_algorithm,
-	.dev		= {
-		.name	= "ISA main adapter",
-	},
+	.name		= "ISA main adapter",
 };
 
 static int __init i2c_isa_init(void)

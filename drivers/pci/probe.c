@@ -69,7 +69,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 	for(pos=0; pos<howmany; pos = next) {
 		next = pos+1;
 		res = &dev->resource[pos];
-		res->name = dev->dev.name;
+		res->name = pci_name(dev);
 		reg = PCI_BASE_ADDRESS_0 + (pos << 2);
 		pci_read_config_dword(dev, reg, &l);
 		pci_write_config_dword(dev, reg, ~0);
@@ -120,7 +120,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 	if (rom) {
 		dev->rom_base_reg = rom;
 		res = &dev->resource[PCI_ROM_RESOURCE];
-		res->name = dev->dev.name;
+		res->name = pci_name(dev);
 		pci_read_config_dword(dev, rom, &l);
 		pci_write_config_dword(dev, rom, ~PCI_ROM_ADDRESS_ENABLE);
 		pci_read_config_dword(dev, rom, &sz);
@@ -153,7 +153,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		return;
 
 	if (dev->transparent) {
-		printk("Transparent bridge - %s\n", dev->dev.name);
+		printk("Transparent bridge - %s\n", pci_name(dev));
 		for(i = 0; i < PCI_BUS_NUM_RESOURCES; i++)
 			child->resource[i] = child->parent->resource[i];
 		return;
@@ -406,8 +406,6 @@ static int pci_setup_device(struct pci_dev * dev)
 	dev->slot_name = dev->dev.bus_id;
 	sprintf(pci_name(dev), "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
 		dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	sprintf(dev->dev.name, "PCI device %04x:%04x",
-		dev->vendor, dev->device);
 
 	INIT_LIST_HEAD(&dev->pools);
 
@@ -663,7 +661,6 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 	memset(b->dev,0,sizeof(*(b->dev)));
 	b->dev->parent = parent;
 	sprintf(b->dev->bus_id,"pci%04x:%02x", pci_domain_nr(b), bus);
-	strcpy(b->dev->name,"Host/PCI Bridge");
 	device_register(b->dev);
 
 	b->number = b->secondary = bus;

@@ -19,6 +19,7 @@ obj-$(CONFIG_SMC_IRCC_OLD)	+= smc-ircc.o	irport.o
 obj-$(CONFIG_SMC_IRCC_FIR)	+= smsc-ircc2.o
 obj-$(CONFIG_ALI_FIR)		+= ali-ircc.o
 obj-$(CONFIG_VLSI_FIR)		+= vlsi_ir.o
+obj-$(CONFIG_VIA_FIR)		+= via-ircc.o
 # Old dongle drivers for old SIR drivers
 obj-$(CONFIG_ESI_DONGLE_OLD)		+= esi.o
 obj-$(CONFIG_TEKRAM_DONGLE_OLD)	+= tekram.o
