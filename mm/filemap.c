@@ -1109,7 +1109,7 @@ static int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned
 	return written;
 }
 
-ssize_t generic_file_sendfile(struct file *in_file, struct file *out_file,
+ssize_t generic_file_sendfile(struct file *out_file, struct file *in_file,
 			      loff_t *ppos, size_t count)
 {
 	read_descriptor_t desc;
