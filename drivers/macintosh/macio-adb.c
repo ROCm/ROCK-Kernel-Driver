@@ -63,7 +63,7 @@ static spinlock_t macio_lock = SPIN_LOCK_UNLOCKED;
 
 static int macio_probe(void);
 static int macio_init(void);
-static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs);
+static irqreturn_t macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs);
 static int macio_send_request(struct adb_request *req, int sync);
 static int macio_adb_autopoll(int devs);
 static void macio_adb_poll(void);
@@ -198,7 +198,8 @@ static int macio_send_request(struct adb_request *req, int sync)
 	return 0;
 }
 
-static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
+static irqreturn_t macio_adb_interrupt(int irq, void *arg,
+				       struct pt_regs *regs)
 {
 	int i, n, err;
 	struct adb_request *req;
@@ -206,9 +207,11 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 	int ibuf_len = 0;
 	int complete = 0;
 	int autopoll = 0;
-	
+	int handled = 0;
+
 	spin_lock(&macio_lock);
 	if (in_8(&adb->intr.r) & TAG) {
+		handled = 1;
 		if ((req = current_req) != 0) {
 			/* put the current request in */
 			for (i = 0; i < req->nbytes; ++i)
@@ -229,6 +232,7 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 	}
 
 	if (in_8(&adb->intr.r) & DFB) {
+		handled = 1;
 		err = in_8(&adb->error.r);
 		if (current_req && current_req->sent) {
 			/* this is the response to a command */
@@ -266,6 +270,8 @@ static void macio_adb_interrupt(int irq, void *arg, struct pt_regs *regs)
 	}
 	if (ibuf_len)
 		adb_input(ibuf, ibuf_len, regs, autopoll);
+
+	return IRQ_RETVAL(handled);
 }
 
 static void macio_adb_poll(void)
