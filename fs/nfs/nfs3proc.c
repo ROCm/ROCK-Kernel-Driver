@@ -423,6 +423,9 @@ exit:
 		if (!inode)
 			goto out;
 		status = nfs3_set_default_acl(dir, inode, mode);
+		if (status)
+			goto out;
+		return inode;
 	}
 out:
 	return ERR_PTR(status);
