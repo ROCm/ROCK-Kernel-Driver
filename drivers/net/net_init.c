@@ -307,6 +307,52 @@ static int hippi_mac_addr(struct net_device *dev, void *p)
 	return 0;
 }
 
+static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
+{
+	/* Never send broadcast/multicast ARP messages */
+	p->mcast_probes = 0;
+ 
+	/* In IPv6 unicast probes are valid even on NBMA,
+	* because they are encapsulated in normal IPv6 protocol.
+	* Should be a generic flag. 
+	*/
+	if (p->tbl->family != AF_INET6)
+		p->ucast_probes = 0;
+	return 0;
+}
+
+static void hippi_setup(struct net_device *dev)
+{
+	dev->set_multicast_list	= NULL;
+	dev->change_mtu			= hippi_change_mtu;
+	dev->hard_header		= hippi_header;
+	dev->rebuild_header 		= hippi_rebuild_header;
+	dev->set_mac_address 		= hippi_mac_addr;
+	dev->hard_header_parse		= NULL;
+	dev->hard_header_cache		= NULL;
+	dev->header_cache_update	= NULL;
+	dev->neigh_setup 		= hippi_neigh_setup_dev; 
+
+	/*
+	 * We don't support HIPPI `ARP' for the time being, and probably
+	 * never will unless someone else implements it. However we
+	 * still need a fake ARPHRD to make ifconfig and friends play ball.
+	 */
+	dev->type		= ARPHRD_HIPPI;
+	dev->hard_header_len 	= HIPPI_HLEN;
+	dev->mtu		= 65280;
+	dev->addr_len		= HIPPI_ALEN;
+	dev->tx_queue_len	= 25 /* 5 */;
+	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
+
+
+	/*
+	 * HIPPI doesn't support broadcast+multicast and we only use
+	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
+	 */
+	dev->flags = 0; 
+}
+
 /**
  * alloc_hippi_dev - Register HIPPI device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
@@ -325,20 +371,6 @@ struct net_device *alloc_hippi_dev(int sizeof_priv)
 }
 
 EXPORT_SYMBOL(alloc_hippi_dev);
-
-static int hippi_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p)
-{
-	/* Never send broadcast/multicast ARP messages */
-	p->mcast_probes = 0;
- 
-	/* In IPv6 unicast probes are valid even on NBMA,
-	* because they are encapsulated in normal IPv6 protocol.
-	* Should be a generic flag. 
-	*/
-	if (p->tbl->family != AF_INET6)
-		p->ucast_probes = 0;
-	return 0;
-}
 
 #endif /* CONFIG_HIPPI */
 
@@ -395,40 +427,6 @@ void fddi_setup(struct net_device *dev)
 EXPORT_SYMBOL(fddi_setup);
 
 #endif /* CONFIG_FDDI */
-
-#ifdef CONFIG_HIPPI
-static void hippi_setup(struct net_device *dev)
-{
-	dev->set_multicast_list	= NULL;
-	dev->change_mtu			= hippi_change_mtu;
-	dev->hard_header		= hippi_header;
-	dev->rebuild_header 		= hippi_rebuild_header;
-	dev->set_mac_address 		= hippi_mac_addr;
-	dev->hard_header_parse		= NULL;
-	dev->hard_header_cache		= NULL;
-	dev->header_cache_update	= NULL;
-	dev->neigh_setup 		= hippi_neigh_setup_dev; 
-
-	/*
-	 * We don't support HIPPI `ARP' for the time being, and probably
-	 * never will unless someone else implements it. However we
-	 * still need a fake ARPHRD to make ifconfig and friends play ball.
-	 */
-	dev->type		= ARPHRD_HIPPI;
-	dev->hard_header_len 	= HIPPI_HLEN;
-	dev->mtu		= 65280;
-	dev->addr_len		= HIPPI_ALEN;
-	dev->tx_queue_len	= 25 /* 5 */;
-	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
-
-
-	/*
-	 * HIPPI doesn't support broadcast+multicast and we only use
-	 * static ARP tables. ARP is disabled by hippi_neigh_setup_dev. 
-	 */
-	dev->flags = 0; 
-}
-#endif /* CONFIG_HIPPI */
 
 #if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE)
 
