@@ -1672,10 +1672,6 @@ discard_it:
 	kfree_skb(skb);
 	return 0;
 
-discard_and_relse:
-	sock_put(sk);
-	goto discard_it;
-
 do_time_wait:
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
