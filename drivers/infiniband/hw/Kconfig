@@ -1,0 +1,7 @@
+config INFINIBAND_MELLANOX_HCA
+	tristate "Mellanox HCA support"
+	depends on PCI && INFINIBAND
+	---help---
+	  This driver supports Mellanox InfiniHost host channel
+	  adapters, including the MT23108 PCI-X HCA and the MT25208
+	  PCI Express HCA.

@@ -50,3 +50,4 @@ obj-$(CONFIG_MCA)		+= mca/
 obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
 obj-$(CONFIG_CRASH_DUMP)	+= dump/
+obj-$(CONFIG_INFINIBAND)	+= infiniband/
