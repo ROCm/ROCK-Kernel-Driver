@@ -553,6 +553,7 @@ static int hdlcdrv_open(struct net_device *dev)
 	/*
 	 * initialise some variables
 	 */
+	s->opened = 1;
 	s->hdlcrx.hbuf.rd = s->hdlcrx.hbuf.wr = 0;
 	s->hdlcrx.in_hdlc_rx = 0;
 	s->hdlcrx.rx_state = 0;
@@ -592,6 +593,7 @@ static int hdlcdrv_close(struct net_device *dev)
 	if (s->skb)
 		dev_kfree_skb(s->skb);
 	s->skb = NULL;
+	s->opened = 0;
 	return i;
 }
 
@@ -844,7 +846,7 @@ void hdlcdrv_unregister(struct net_device *dev)
 
 	BUG_ON(s->magic != HDLCDRV_MAGIC);
 
-	if (s->ops->close)
+	if (s->opened && s->ops->close)
 		s->ops->close(dev);
 	unregister_netdev(dev);
 	
