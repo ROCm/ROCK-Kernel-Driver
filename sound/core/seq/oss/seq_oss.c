@@ -22,7 +22,6 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
-#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/initval.h>
@@ -41,7 +40,7 @@ MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_SEQUENCER);
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_MUSIC);
 
 #ifdef SNDRV_SEQ_OSS_DEBUG
-module_param(seq_oss_debug, int, 0444);
+MODULE_PARM(seq_oss_debug, "i");
 MODULE_PARM_DESC(seq_oss_debug, "debug option");
 int seq_oss_debug = 0;
 #endif

@@ -41,6 +41,8 @@
 
 #define VORTEX_GAME_DWAIT	20	/* 20 ms */
 
+static struct gameport gameport;
+
 static unsigned char vortex_game_read(struct gameport *gameport)
 {
 	vortex_t *vortex = gameport->driver;
@@ -95,10 +97,8 @@ static int vortex_game_open(struct gameport *gameport, int mode)
 
 static int vortex_gameport_register(vortex_t * vortex)
 {
-	if ((vortex->gameport = snd_kcalloc(sizeof(struct gameport), GFP_KERNEL)) == NULL) {
-		return -1;
-	};
-	
+	vortex->gameport = &gameport;
+
 	vortex->gameport->driver = vortex;
 	vortex->gameport->fuzz = 64;
 
@@ -117,10 +117,8 @@ static int vortex_gameport_register(vortex_t * vortex)
 
 static int vortex_gameport_unregister(vortex_t * vortex)
 {
-	if (vortex->gameport != NULL) {
+	if (vortex->gameport != NULL)
 		gameport_unregister_port(vortex->gameport);
-		kfree(vortex->gameport);
-	}
 	return 0;
 }
 

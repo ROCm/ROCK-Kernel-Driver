@@ -51,13 +51,13 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/gameport.h>
-#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/ac97_codec.h>
 #include <sound/mpu401.h>
+#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #if 0
@@ -84,32 +84,31 @@ static int joystick[SNDRV_CARDS];
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int dxs_support[SNDRV_CARDS];
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for VIA 82xx bridge.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-module_param_array(id, charp, boot_devs, 0444);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
 MODULE_PARM_DESC(id, "ID string for VIA 82xx bridge.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-module_param_array(enable, bool, boot_devs, 0444);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable audio part of VIA 82xx bridge.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-module_param_array(mpu_port, long, boot_devs, 0444);
+MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(mpu_port, "MPU-401 port. (VT82C686x only)");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
 #ifdef SUPPORT_JOYSTICK
-module_param_array(joystick, bool, boot_devs, 0444);
+MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick, "Enable joystick. (VT82C686x only)");
 MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLE_DESC "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
-module_param_array(ac97_clock, int, boot_devs, 0444);
+MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
-module_param_array(ac97_quirk, int, boot_devs, 0444);
+MODULE_PARM(ac97_quirk, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 MODULE_PARM_SYNTAX(ac97_quirk, SNDRV_ENABLED ",allows:{{-1,4}},dialog:list,default:-1");
-module_param_array(dxs_support, int, boot_devs, 0444);
+MODULE_PARM(dxs_support, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(dxs_support, "Support for DXS channels (0 = auto, 1 = enable, 2 = disable, 3 = 48k only, 4 = no VRA)");
 MODULE_PARM_SYNTAX(dxs_support, SNDRV_ENABLED ",allows:{{0,4}},dialog:list");
 
@@ -1585,12 +1584,6 @@ static struct ac97_quirk ac97_quirks[] = {
 		.name = "Mitac Mobo",
 		.type = AC97_TUNE_ALC_JACK
 	},
-	{
-		.vendor = 0x161f,
-		.device = 0x202b,
-		.name = "Arima Notebook",
-		.type = AC97_TUNE_HP_ONLY,
-	},
 	{ } /* terminator */
 };
 
@@ -2032,7 +2025,6 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ .vendor = 0x1462, .device = 0x5901, .action = VIA_DXS_NO_VRA }, /* MSI KT6 Delta-SR */
 		{ .vendor = 0x1584, .device = 0x8120, .action = VIA_DXS_ENABLE }, /* Gericom/Targa/Vobis/Uniwill laptop */
-		{ .vendor = 0x161f, .device = 0x202b, .action = VIA_DXS_NO_VRA }, /* Amira Note book */
 		{ .vendor = 0x1631, .device = 0xe004, .action = VIA_DXS_ENABLE }, /* Easy Note 3174, Packard Bell */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
 		{ .vendor = 0x1849, .device = 0x3059, .action = VIA_DXS_NO_VRA }, /* ASRock K7VM2 */
@@ -2190,7 +2182,15 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_via82xx_init(void)
 {
-	return pci_module_init(&driver);
+	int err;
+
+	if ((err = pci_module_init(&driver)) < 0) {
+#ifdef MODULE
+		printk(KERN_ERR "VIA 82xx soundcard not found or device busy\n");
+#endif
+		return err;
+	}
+	return 0;
 }
 
 static void __exit alsa_card_via82xx_exit(void)
@@ -2200,3 +2200,33 @@ static void __exit alsa_card_via82xx_exit(void)
 
 module_init(alsa_card_via82xx_init)
 module_exit(alsa_card_via82xx_exit)
+
+#ifndef MODULE
+
+/* format is: snd-via82xx=enable,index,id,
+			  mpu_port,joystick,
+			  ac97_quirk,ac97_clock,dxs_support */
+
+static int __init alsa_card_via82xx_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+#ifdef SUPPORT_JOYSTICK
+	       get_option(&str,&joystick[nr_dev]) == 2 &&
+#endif
+	       get_option(&str,&ac97_quirk[nr_dev]) == 2 &&
+	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
+	       get_option(&str,&dxs_support[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-via82xx=", alsa_card_via82xx_setup);
+
+#endif /* ifndef MODULE */

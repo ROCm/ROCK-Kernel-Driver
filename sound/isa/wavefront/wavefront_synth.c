@@ -27,7 +27,6 @@
 #include <linux/delay.h>
 #include <linux/time.h>
 #include <linux/wait.h>
-#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/snd_wavefront.h>
 #include <sound/initval.h>
@@ -84,25 +83,25 @@ int ramcheck_time = 20;    /* time in seconds to wait while ROM code
 int osrun_time = 10;       /* time in seconds we wait for the OS to
 			      start running.
 			   */
-module_param(wf_raw, int, 0444);
+MODULE_PARM(wf_raw,"i");
 MODULE_PARM_DESC(wf_raw, "if non-zero, assume that we need to boot the OS");
-module_param(fx_raw, int, 0444);
+MODULE_PARM(fx_raw,"i");
 MODULE_PARM_DESC(fx_raw, "if non-zero, assume that the FX process needs help");
-module_param(debug_default, int, 0444);
+MODULE_PARM(debug_default,"i");
 MODULE_PARM_DESC(debug_default, "debug parameters for card initialization");
-module_param(wait_usecs, int, 0444);
+MODULE_PARM(wait_usecs,"i");
 MODULE_PARM_DESC(wait_usecs, "how long to wait without sleeping, usecs");
-module_param(sleep_interval, int, 0444);
+MODULE_PARM(sleep_interval,"i");
 MODULE_PARM_DESC(sleep_interval, "how long to sleep when waiting for reply");
-module_param(sleep_tries, int, 0444);
+MODULE_PARM(sleep_tries,"i");
 MODULE_PARM_DESC(sleep_tries, "how many times to try sleeping during a wait");
-module_param(ospath, charp, 0444);
+MODULE_PARM(ospath,"s");
 MODULE_PARM_DESC(ospath, "full pathname to processed ICS2115 OS firmware");
-module_param(reset_time, int, 0444);
+MODULE_PARM(reset_time,"i");
 MODULE_PARM_DESC(reset_time, "how long to wait for a reset to take effect");
-module_param(ramcheck_time, int, 0444);
+MODULE_PARM(ramcheck_time,"i");
 MODULE_PARM_DESC(ramcheck_time, "how many seconds to wait for the RAM test");
-module_param(osrun_time, int, 0444);
+MODULE_PARM(osrun_time,"i");
 MODULE_PARM_DESC(osrun_time, "how many seconds to wait for the ICS2115 OS");
 
 /* if WF_DEBUG not defined, no run-time debugging messages will

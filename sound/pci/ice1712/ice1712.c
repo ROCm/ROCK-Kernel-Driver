@@ -41,9 +41,6 @@
  *  2003.02.20  Taksahi Iwai <tiwai@suse.de>
  *	Split vt1724 part to an independent driver.
  *	The GPIO is accessed through the callback functions now.
- *
- * 2004.03.31 Doug McLain <nostar@comcast.net>
- *    Added support for Event Electronics EZ8 card to hoontech.c.
  */
 
 
@@ -54,11 +51,11 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
-#include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/cs8427.h>
 #include <sound/info.h>
 #include <sound/mpu401.h>
+#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <sound/asoundef.h>
@@ -84,29 +81,24 @@ MODULE_DEVICES("{"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;		/* Enable this card */
-static int omni[SNDRV_CARDS];	/* Delta44 & 66 Omni I/O support */
+static int omni[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};	/* Delta44 & 66 Omni I/O support */
 static int cs8427_timeout[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 500}; /* CS8427 S/PDIF transciever reset timeout value in msec */
-static int ez8[SNDRV_CARDS];	/* EZ8 card */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for ICE1712 soundcard.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-module_param_array(id, charp, boot_devs, 0444);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
 MODULE_PARM_DESC(id, "ID string for ICE1712 soundcard.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-module_param_array(enable, bool, boot_devs, 0444);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable ICE1712 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-module_param_array(omni, bool, boot_devs, 0444);
+MODULE_PARM(omni, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(omni, "Enable Midiman M-Audio Delta Omni I/O support.");
 MODULE_PARM_SYNTAX(omni, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
-module_param_array(cs8427_timeout, int, boot_devs, 0444);
+MODULE_PARM(cs8427_timeout, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(cs8427_timeout, "Define reset timeout for cs8427 chip in msec resolution.");
 MODULE_PARM_SYNTAX(cs8427_timeout, SNDRV_ENABLED ", allows:{{1,1000}},default=500,skill:advanced");
-module_param_array(ez8, bool, boot_devs, 0444);
-MODULE_PARM_DESC(ez8, "Enable Event Electronics EZ8 support.");
-MODULE_PARM_SYNTAX(ez8, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 #ifndef PCI_VENDOR_ID_ICE
 #define PCI_VENDOR_ID_ICE		0x1412
@@ -2417,7 +2409,6 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 					struct pci_dev *pci,
 					int omni,
 					int cs8427_timeout,
-					int ez8,
 					ice1712_t ** r_ice1712)
 {
 	ice1712_t *ice;
@@ -2446,7 +2437,6 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 		cs8427_timeout = 1;
 	else if (cs8427_timeout > 1000)
 		cs8427_timeout = 1000;
-	ice->ez8 = ez8 ? 1 : 0;
 	ice->cs8427_timeout = cs8427_timeout;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
@@ -2567,7 +2557,7 @@ static int __devinit snd_ice1712_probe(struct pci_dev *pci,
 	strcpy(card->driver, "ICE1712");
 	strcpy(card->shortname, "ICEnsemble ICE1712");
 	
-	if ((err = snd_ice1712_create(card, pci, omni[dev], cs8427_timeout[dev], ez8[dev], &ice)) < 0) {
+	if ((err = snd_ice1712_create(card, pci, omni[dev], cs8427_timeout[dev], &ice)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -2669,7 +2659,15 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_ice1712_init(void)
 {
-	return pci_module_init(&driver);
+	int err;
+
+	if ((err = pci_module_init(&driver)) < 0) {
+#ifdef MODULE
+		printk(KERN_ERR "ICE1712 soundcard not found or device busy\n");
+#endif
+		return err;
+	}
+	return 0;
 }
 
 static void __exit alsa_card_ice1712_exit(void)
@@ -2679,3 +2677,24 @@ static void __exit alsa_card_ice1712_exit(void)
 
 module_init(alsa_card_ice1712_init)
 module_exit(alsa_card_ice1712_exit)
+
+#ifndef MODULE
+
+/* format is: snd-ice1712=enable,index,id */
+
+static int __init alsa_card_ice1712_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-ice1712=", alsa_card_ice1712_setup);
+
+#endif /* ifndef MODULE */

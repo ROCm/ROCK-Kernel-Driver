@@ -27,7 +27,6 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
-#include <linux/moduleparam.h>
 
 #include <sound/core.h>
 #include <sound/control.h>
@@ -36,6 +35,7 @@
 #include <sound/asoundef.h>
 #include <sound/rawmidi.h>
 #include <sound/hwdep.h>
+#define SNDRV_GET_ID
 #include <sound/initval.h>
 #include <sound/hdsp.h>
 
@@ -48,21 +48,20 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int precise_ptr[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* Enable precise pointer */
 static int line_outs_monitor[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Send all inputs/playback to line outs */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for RME Hammerfall DSP interface.");
 MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
-module_param_array(id, charp, boot_devs, 0444);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
 MODULE_PARM_DESC(id, "ID string for RME Hammerfall DSP interface.");
 MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
-module_param_array(enable, bool, boot_devs, 0444);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable/disable specific Hammerfall DSP soundcards.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
-module_param_array(precise_ptr, bool, boot_devs, 0444);
+MODULE_PARM(precise_ptr, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(precise_ptr, "Enable precise pointer (doesn't work reliably).");
 MODULE_PARM_SYNTAX(precise_ptr, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
-module_param_array(line_outs_monitor, bool, boot_devs, 0444);
+MODULE_PARM(line_outs_monitor,"1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(line_outs_monitor, "Send all input and playback streams to line outs by default.");
 MODULE_PARM_SYNTAX(line_outs_monitor, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 MODULE_AUTHOR("Paul Davis <paul@linuxaudiosystems.com>, Marcus Andersson, Thomas Charbonnel <thomas@undata.org>");
@@ -5199,7 +5198,14 @@ static struct pci_driver driver = {
 
 static int __init alsa_card_hdsp_init(void)
 {
-	return pci_module_init(&driver);
+	if (pci_module_init(&driver) < 0) {
+#ifdef MODULE
+		printk(KERN_ERR "RME Hammerfall-DSP: no cards found\n");
+#endif
+		return -ENODEV;
+	}
+
+	return 0;
 }
 
 static void __exit alsa_card_hdsp_exit(void)
@@ -5209,3 +5215,24 @@ static void __exit alsa_card_hdsp_exit(void)
 
 module_init(alsa_card_hdsp_init)
 module_exit(alsa_card_hdsp_exit)
+
+#ifndef MODULE
+
+/* format is: snd-hdsp=enable,index,id */
+
+static int __init alsa_card_hdsp_setup(char *str)
+{
+	static unsigned __initdata nr_dev = 0;
+
+	if (nr_dev >= SNDRV_CARDS)
+		return 0;
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2);
+	nr_dev++;
+	return 1;
+}
+
+__setup("snd-hdsp=", alsa_card_hdsp_setup);
+
+#endif /* ifndef MODULE */

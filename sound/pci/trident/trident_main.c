@@ -50,8 +50,7 @@ static int snd_trident_pcm_mixer_build(trident_t *trident, snd_trident_voice_t *
 static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t * voice, snd_pcm_substream_t *substream);
 static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_PM
-static int snd_trident_suspend(snd_card_t *card, unsigned int state);
-static int snd_trident_resume(snd_card_t *card, unsigned int state);
+static int snd_trident_set_power_state(snd_card_t *card, unsigned int power_state);
 #endif
 static int snd_trident_sis_reset(trident_t *trident);
 
@@ -3647,8 +3646,10 @@ int __devinit snd_trident_create(snd_card_t * card,
 
 	snd_trident_enable_eso(trident);
 
-	
-	snd_card_set_pm_callback(card, snd_trident_suspend, snd_trident_resume, trident);
+#ifdef CONFIG_PM
+	card->set_power_state = snd_trident_set_power_state;
+	card->power_state_private_data = trident;
+#endif
 
 	snd_trident_proc_init(trident);
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, trident, &ops)) < 0) {
@@ -3948,21 +3949,19 @@ void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigne
 }
 
 #ifdef CONFIG_PM
-static int snd_trident_suspend(snd_card_t *card, unsigned int state)
-{
-	trident_t *trident = snd_magic_cast(trident_t, card->pm_private_data, return -EINVAL);
 
+void snd_trident_suspend(trident_t *trident)
+{
+	snd_card_t *card = trident->card;
+
+	if (card->power_state == SNDRV_CTL_POWER_D3hot)
+		return;
 	trident->in_suspend = 1;
 	snd_pcm_suspend_all(trident->pcm);
 	if (trident->foldback)
 		snd_pcm_suspend_all(trident->foldback);
 	if (trident->spdif)
 		snd_pcm_suspend_all(trident->spdif);
-
-	snd_ac97_suspend(trident->ac97);
-	if (trident->ac97_sec)
-		snd_ac97_suspend(trident->ac97_sec);
-
 	switch (trident->device) {
 	case TRIDENT_DEVICE_ID_DX:
 	case TRIDENT_DEVICE_ID_NX:
@@ -3971,12 +3970,14 @@ static int snd_trident_suspend(snd_card_t *card, unsigned int state)
 		break;
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
-	return 0;
 }
 
-static int snd_trident_resume(snd_card_t *card, unsigned int state)
+void snd_trident_resume(trident_t *trident)
 {
-	trident_t *trident = snd_magic_cast(trident_t, card->pm_private_data, return -EINVAL);
+	snd_card_t *card = trident->card;
+
+	if (card->power_state == SNDRV_CTL_POWER_D0)
+		return;
 
 	pci_enable_device(trident->pci);
 	if (pci_set_dma_mask(trident->pci, 0x3fffffff) < 0 ||
@@ -3997,8 +3998,6 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state)
 	}
 
 	snd_ac97_resume(trident->ac97);
-	if (trident->ac97_sec)
-		snd_ac97_resume(trident->ac97_sec);
 
 	/* restore some registers */
 	outl(trident->musicvol_wavevol, TRID_REG(trident, T4D_MUSICVOL_WAVEVOL));
@@ -4007,8 +4006,28 @@ static int snd_trident_resume(snd_card_t *card, unsigned int state)
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 	trident->in_suspend = 0;
-	return 0;
 }
+
+static int snd_trident_set_power_state(snd_card_t *card, unsigned int power_state)
+{
+	trident_t *chip = snd_magic_cast(trident_t, card->power_state_private_data, return -ENXIO);
+        
+	switch (power_state) {
+        case SNDRV_CTL_POWER_D0:
+        case SNDRV_CTL_POWER_D1:
+        case SNDRV_CTL_POWER_D2:
+        	snd_trident_resume(chip);
+                break;
+	case SNDRV_CTL_POWER_D3hot:
+        case SNDRV_CTL_POWER_D3cold:
+		snd_trident_suspend(chip);
+		break;
+        default:
+	        return -EINVAL;
+        }
+        return 0;
+}
+
 #endif /* CONFIG_PM */
 
 EXPORT_SYMBOL(snd_trident_alloc_voice);

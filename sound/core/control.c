@@ -995,31 +995,6 @@ static int snd_ctl_subscribe_events(snd_ctl_file_t *file, int *ptr)
 	return 0;
 }
 
-/*
- * change the power state
- */
-static int snd_ctl_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		if (card->power_state != power_state)
-			/* FIXME: pass the correct state value */
-			card->pm_resume(card, 0);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		if (card->power_state != power_state)
-			/* FIXME: pass the correct state value */
-			card->pm_suspend(card, 0);
-		break;
-	default:
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			 unsigned int cmd, unsigned long arg)
 {
@@ -1063,9 +1038,9 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 #ifdef CONFIG_PM
-		if (card->pm_suspend && card->pm_resume) {
+		if (card->set_power_state) {
 			snd_power_lock(card);
-			snd_ctl_set_power_state(card, err);
+			err = card->set_power_state(card, err);
 			snd_power_unlock(card);
 		} else
 #endif
