@@ -44,102 +44,30 @@ module_param(init_pcitm, int, 0);
  * If you have an update for this please contact prism54-devel@prism54.org 
  * The latest list can be found at http://prism54.org/supported_cards.php */
 static const struct pci_device_id prism54_id_tbl[] = {
+	/* Intersil PRISM Duette/Prism GT Wireless LAN adapter */
+	{
+	 0x1260, 0x3890,
+	 PCI_ANY_ID, PCI_ANY_ID,
+	 0, 0, 0
+	},
+
 	/* 3COM 3CRWE154G72 Wireless LAN adapter */
 	{
-	 PCIVENDOR_3COM, PCIDEVICE_3COM6001,
-	 PCIVENDOR_3COM, PCIDEVICE_3COM6001,
-	 0, 0, 0
-	},
-
-	/* D-Link Air Plus Xtreme G A1 - DWL-g650 A1 */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_DLINK, 0x3202UL, 
-	 0, 0, 0
-	},
-
-	/* I-O Data WN-G54/CB - WN-G54/CB */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_IODATA, 0xd019UL, 
-	 0, 0, 0
-	},
-
-	/* Netgear WG511 */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_NETGEAR, 0x4800UL,
-	 0, 0, 0
-	},
-
-	/* Tekram Technology clones, Allnet, Netcomm, Zyxel */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_TTL, 0x1605UL,
-	 0, 0, 0
-	},
-
-	/* SMC2802W */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_SMC, 0x2802UL,
-	 0, 0, 0
-	},
-
-	/* SMC2835W */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_SMC, 0x2835UL,
-	 0, 0, 0
-	},
-
-	/* Corega CG-WLCB54GT */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_ATI, 0xc104UL,
-	 0, 0, 0
-	},
-
-	/* I4 Z-Com XG-600 */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_I4, 0x0014UL,
-	 0, 0, 0
-	},
-
-	/* I4 Z-Com XG-900  and clones Macer, Ovislink, Planex, Peabird, */
-	/* Sitecom, Xterasys */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_I4, 0x0020UL,
-	 0, 0, 0
-	},
-
-	/* SMC 2802W V2 */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_ACCTON, 0xee03UL,
-	 0, 0, 0
-	},
-
-	/* SMC 2835W V2 */
-	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
-	 PCIVENDOR_SMC, 0xa835UL,
+	 0x10b7, 0x6001,
+	 PCI_ANY_ID, PCI_ANY_ID,
 	 0, 0, 0
 	},
 
 	/* Intersil PRISM Indigo Wireless LAN adapter */
 	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3877,
+	 0x1260, 0x3877,
 	 PCI_ANY_ID, PCI_ANY_ID,
 	 0, 0, 0
 	},
 
-	/* Intersil PRISM Duette/Prism GT Wireless LAN adapter */
-	/* Default */
+	/* Intersil PRISM Javelin/Xbow Wireless LAN adapter */
 	{
-	 PCIVENDOR_INTERSIL, PCIDEVICE_ISL3890,
+	 0x1260, 0x3886,
 	 PCI_ANY_ID, PCI_ANY_ID,
 	 0, 0, 0
 	},
@@ -165,85 +93,6 @@ static struct pci_driver prism54_driver = {
 	.resume = prism54_resume,
 	/* .enable_wake ; we don't support this yet */
 };
-
-static void
-prism54_get_card_model(struct net_device *ndev)
-{
-	islpci_private	*priv;
-	char		*modelp;
-	int		notwork = 0;
-
-	priv = netdev_priv(ndev);
-	switch (priv->pdev->subsystem_device) {
-	case PCIDEVICE_ISL3877:
-		modelp = "PRISM Indigo";
-		break;
-	case PCIDEVICE_ISL3886:
-		modelp = "PRISM Javelin / Xbow";
-		break;
-	case PCIDEVICE_3COM6001:
-		modelp = "3COM 3CRWE154G72";
-		break;
-	case 0x3202UL:
-		modelp = "D-Link DWL-g650 A1";
-		break;
-	case 0xd019UL:
-		modelp = "WN-G54/CB";
-		break;
-	case 0x4800UL:
-		modelp = "Netgear WG511";
-		break;
-	case 0x2802UL:
-		modelp = "SMC2802W";
-		break;
-	case 0xee03UL:
-		modelp = "SMC2802W V2";
-		notwork = 1;
-		break;
-	case 0x2835UL:
-		modelp = "SMC2835W";
-		break;
-	case 0xa835UL:
-		modelp = "SMC2835W V2";
-		notwork = 1;
-		break;
-	case 0xc104UL:
-		modelp = "CG-WLCB54GT";
-		break;
-	case 0x1605UL:
-		modelp = "Tekram Technology clone";
-		break;
-	/* Let's leave this one out for now since it seems bogus/wrong 
-	 * Even if the manufacturer did use 0x0000UL it may not be correct
-	 * by their part, therefore deserving no name ;) */
-	/*      case 0x0000UL: 
-	 *              modelp = "SparkLAN WL-850F";
-	 *              break;*/
-
-	/* We have two reported for the one below :( */
-	case 0x0014UL:
-		modelp = "I4 Z-Com XG-600 and clones";
-		break;
-	case 0x0020UL:
-		modelp = "I4 Z-Com XG-900 and clones";
-		break;
-/* Default it */
-/*
-	case PCIDEVICE_ISL3890:
-		modelp = "PRISM Duette/GT";
-		break;
-*/
-	default:
-		modelp = "PRISM Duette/GT";
-	}
-	printk(KERN_DEBUG "%s: %s driver detected card model: %s\n",
-			ndev->name, DRV_NAME, modelp);
-	if ( notwork ) {
-		printk(KERN_DEBUG "%s: %s Warning - This may not work\n",
-			ndev->name, DRV_NAME);
-	}
-	return;
-}
 
 /******************************************************************************
     Module initialization functions
@@ -353,9 +202,6 @@ prism54_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* firmware upload is triggered in islpci_open */
-
-	/* Pretty card model discovery output */
-	prism54_get_card_model(ndev);
 
 	return 0;
 
