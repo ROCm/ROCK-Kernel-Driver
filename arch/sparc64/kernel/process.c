@@ -573,18 +573,15 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 			     struct pt_regs *regs,
 			     unsigned long stack_size)
 {
-	unsigned long parent_tid_ptr = 0;
-	unsigned long child_tid_ptr = 0;
+	unsigned long parent_tid_ptr, child_tid_ptr;
 
 	clone_flags &= ~CLONE_IDLETASK;
 
-	if (clone_flags & (CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID)) {
-		parent_tid_ptr = regs->u_regs[UREG_G2];
-		child_tid_ptr = regs->u_regs[UREG_G3];
-		if (test_thread_flag(TIF_32BIT)) {
-			parent_tid_ptr &= 0xffffffff;
-			child_tid_ptr &= 0xffffffff;
-		}
+	parent_tid_ptr = regs->u_regs[UREG_I2];
+	child_tid_ptr = regs->u_regs[UREG_I4];
+	if (test_thread_flag(TIF_32BIT)) {
+		parent_tid_ptr &= 0xffffffff;
+		child_tid_ptr &= 0xffffffff;
 	}
 
 	return do_fork(clone_flags, stack_start,
@@ -667,6 +664,9 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	/* Set the second return value for the parent. */
 	regs->u_regs[UREG_I1] = 0;
+
+	if (clone_flags & CLONE_SETTLS)
+		childregs->u_regs[UREG_G7] = regs->u_regs[UREG_I3];
 
 	return 0;
 }
