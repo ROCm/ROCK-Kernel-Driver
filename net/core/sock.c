@@ -917,6 +917,31 @@ void __release_sock(struct sock *sk)
 	} while((skb = sk->sk_backlog.head) != NULL);
 }
 
+/**
+ * sk_wait_data - wait for data to arrive at sk_receive_queue
+ * sk - sock to wait on
+ * timeo - for how long
+ *
+ * Now socket state including sk->sk_err is changed only under lock,
+ * hence we may omit checks after joining wait queue.
+ * We check receive queue before schedule() only as optimization;
+ * it is very likely that release_sock() added new data.
+ */
+int sk_wait_data(struct sock *sk, long *timeo)
+{
+	int rc;
+	DEFINE_WAIT(wait);
+
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
+	rc = sk_wait_event(sk, timeo, !skb_queue_empty(&sk->sk_receive_queue));
+	clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
+	finish_wait(sk->sk_sleep, &wait);
+	return rc;
+}
+
+EXPORT_SYMBOL(sk_wait_data);
+
 /*
  * Set of default routines for initialising struct proto_ops when
  * the protocol does not support a particular function. In certain
