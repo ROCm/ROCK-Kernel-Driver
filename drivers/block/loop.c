@@ -154,16 +154,25 @@ struct loop_func_table *xfer_funcs[MAX_LO_CRYPT] = {
 	&xor_funcs  
 };
 
-#define MAX_DISK_SIZE 1024*1024*1024
-
-static void figure_loop_size(struct loop_device *lo)
+static int figure_loop_size(struct loop_device *lo)
 {
-	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_size;
-	set_capacity(disks[lo->lo_number], (size - lo->lo_offset) >> 9);
+	loff_t size = lo->lo_backing_file->f_dentry->d_inode->i_mapping->host->i_size;
+	sector_t x;
+	/*
+	 * Unfortunately, if we want to do I/O on the device,
+	 * the number of 512-byte sectors has to fit into a sector_t.
+	 */
+	size = (size - lo->lo_offset) >> 9;
+	x = (sector_t)size;
+	if ((loff_t)x != size)
+		return -EFBIG;
+
+	set_capacity(disks[lo->lo_number], size);
+	return 0;					
 }
 
 static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-				 char *lbuf, int size, int rblock)
+				 char *lbuf, int size, sector_t rblock)
 {
 	if (!lo->transfer)
 		return 0;
