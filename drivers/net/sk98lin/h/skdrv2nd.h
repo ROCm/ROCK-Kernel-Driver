@@ -53,60 +53,6 @@
 #include "h/skrlmt.h"
 #include "h/skgedrv.h"
 
-#define SK_PCI_ISCOMPLIANT(result, pdev) {     \
-    result = SK_FALSE; /* default */     \
-    /* 3Com (0x10b7) */     \
-    if (pdev->vendor == 0x10b7) {     \
-        /* Gigabit Ethernet Adapter (0x1700) */     \
-        if ((pdev->device == 0x1700) || \
-            (pdev->device == 0x80eb)) { \
-            result = SK_TRUE;     \
-        }     \
-    /* SysKonnect (0x1148) */     \
-    } else if (pdev->vendor == 0x1148) {     \
-        /* SK-98xx Gigabit Ethernet Server Adapter (0x4300) */     \
-        /* SK-98xx V2.0 Gigabit Ethernet Adapter (0x4320) */     \
-        if ((pdev->device == 0x4300) || \
-            (pdev->device == 0x4320)) { \
-            result = SK_TRUE;     \
-        }     \
-    /* D-Link (0x1186) */     \
-    } else if (pdev->vendor == 0x1186) {     \
-        /* Gigabit Ethernet Adapter (0x4c00) */     \
-        if ((pdev->device == 0x4c00)) { \
-            result = SK_TRUE;     \
-        }     \
-    /* Marvell (0x11ab) */     \
-    } else if (pdev->vendor == 0x11ab) {     \
-        /* Gigabit Ethernet Adapter (0x4320) */     \
-        /* Gigabit Ethernet Adapter (0x4360) */     \
-        /* Gigabit Ethernet Adapter (0x4361) */     \
-        /* Belkin (0x5005) */     \
-        if ((pdev->device == 0x4320) || \
-            (pdev->device == 0x4360) || \
-            (pdev->device == 0x4361) || \
-            (pdev->device == 0x5005)) { \
-            result = SK_TRUE;     \
-        }     \
-    /* CNet (0x1371) */     \
-    } else if (pdev->vendor == 0x1371) {     \
-        /* GigaCard Network Adapter (0x434e) */     \
-        if ((pdev->device == 0x434e)) { \
-            result = SK_TRUE;     \
-        }     \
-    /* Linksys (0x1737) */     \
-    } else if (pdev->vendor == 0x1737) {     \
-        /* Gigabit Network Adapter (0x1032) */     \
-        /* Gigabit Network Adapter (0x1064) */     \
-        if ((pdev->device == 0x1032) || \
-            (pdev->device == 0x1064)) { \
-            result = SK_TRUE;     \
-        }     \
-    } else {     \
-        result = SK_FALSE;     \
-    }     \
-}
-
 
 extern SK_MBUF		*SkDrvAllocRlmtMbuf(SK_AC*, SK_IOC, unsigned);
 extern void		SkDrvFreeRlmtMbuf(SK_AC*, SK_IOC, SK_MBUF*);
