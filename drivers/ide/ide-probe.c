@@ -1008,8 +1008,8 @@ static void ide_init_queue(ide_drive_t *drive)
 	 *	do not.
 	 */
 	 
-	q->queuedata = HWGROUP(drive);
 	blk_init_queue(q, do_ide_request, &ide_lock);
+	q->queuedata = HWGROUP(drive);
 	drive->queue_setup = 1;
 	blk_queue_segment_boundary(q, 0xffff);
 
