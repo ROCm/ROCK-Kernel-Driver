@@ -16,6 +16,7 @@ obj-n		:=
 obj-		:=
 
 obj-$(CONFIG_APM)		+= apm.o
+obj-$(CONFIG_PM)		+= pm.o
 obj-$(CONFIG_ARCH_ACORN)	+= ecard.o time-acorn.o
 obj-$(CONFIG_ARCH_CLPS7500)	+= time-acorn.o
 obj-$(CONFIG_FOOTBRIDGE)	+= isa.o

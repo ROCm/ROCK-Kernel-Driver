@@ -482,23 +482,6 @@ etherh_close(struct net_device *dev)
 	return 0;
 }
 
-static int
-etherh_set_mac_address(struct net_device *dev, void *p)
-{
-	struct sockaddr *addr = p;
-
-	if (netif_running(dev))
-		return -EBUSY;
-
-	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
-
-	/*
-	 * We'll set the MAC address on the chip when we open it.
-	 */
-
-	return 0;
-}
-
 /*
  * Initialisation
  */
@@ -585,7 +568,6 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	dev->open		= etherh_open;
 	dev->stop		= etherh_close;
-	dev->set_mac_address	= etherh_set_mac_address;
 	dev->set_config		= etherh_set_config;
 	dev->irq		= ec->irq;
 	dev->base_addr		= ecard_address(ec, ECARD_MEMC, 0);

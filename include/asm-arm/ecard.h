@@ -267,6 +267,7 @@ extern struct bus_type ecard_bus_type;
 struct ecard_driver {
 	int			(*probe)(struct expansion_card *, const struct ecard_id *id);
 	void			(*remove)(struct expansion_card *);
+	void			(*shutdown)(struct expansion_card *);
 	const struct ecard_id	*id_table;
 	unsigned int		id;
 	struct device_driver	drv;

@@ -131,7 +131,10 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 /*
  * Return the index of the PCI controller for device PDEV.
  */
-#define pci_controller_num(PDEV)	(0)
+static inline int pci_controller_num(struct pci_dev *dev)
+{
+	return 0;
+}
 
 
 #if defined(CONFIG_SA1111) && !defined(CONFIG_PCI)
