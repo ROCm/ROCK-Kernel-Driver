@@ -743,7 +743,7 @@ int usbat_handle_read10(struct us_data *us,
 				if (len - amount >= 
 					  sg[sg_segment].length-sg_offset) {
 				  memcpy(page_address(sg[sg_segment].page) +
-					 sg[sg_sgement].offset + sg_offset,
+					 sg[sg_segment].offset + sg_offset,
 					 buffer + amount,
 					 sg[sg_segment].length - sg_offset);
 				  amount += 
