@@ -298,7 +298,7 @@ struct fb_image {
  * hardware cursor control
  */
 
-#define FB_CUR_SETCUR   0x01
+#define FB_CUR_SETIMAGE 0x01
 #define FB_CUR_SETPOS   0x02
 #define FB_CUR_SETHOT   0x04
 #define FB_CUR_SETCMAP  0x08
@@ -317,9 +317,6 @@ struct fb_cursor {
 	const char *mask;	/* cursor mask bits */
 	struct fbcurpos hot;	/* cursor hot spot */
 	struct fb_image	image;	/* Cursor image */
-/* all fields below are for fbcon use only */
-	int   flash;            /* cursor blink */
-	char  *data;             /* copy of bitmap */
 };
 
 #ifdef __KERNEL__
@@ -671,7 +668,6 @@ struct fb_info {
 	struct fb_var_screeninfo var;	/* Current var */
 	struct fb_fix_screeninfo fix;	/* Current fix */
 	struct fb_monspecs monspecs;	/* Current Monitor specs */
-	struct fb_cursor cursor;	/* Current cursor */	
 	struct work_struct queue;	/* Framebuffer event queue */
 	struct timer_list cursor_timer; /* Cursor timer */
 	struct fb_pixmap pixmap;	/* Image hardware mapper */
@@ -787,7 +783,6 @@ extern void fb_sysmove_buf_unaligned(struct fb_info *info, struct fb_pixmap *buf
 extern void fb_sysmove_buf_aligned(struct fb_info *info, struct fb_pixmap *buf,
 				u8 *dst, u32 d_pitch, u8 *src, u32 s_pitch,
 				u32 height);
-extern void fb_load_cursor_image(struct fb_info *);
 extern void fb_set_suspend(struct fb_info *info, int state);
 extern int fb_get_color_depth(struct fb_info *info);
 extern int fb_get_options(char *name, char **option);

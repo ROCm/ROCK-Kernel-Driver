@@ -652,116 +652,6 @@ static void try_to_load(int fb)
 }
 #endif /* CONFIG_KMOD */
 
-void
-fb_load_cursor_image(struct fb_info *info)
-{
-	unsigned int width = (info->cursor.image.width + 7) >> 3;
-	u8 *data = (u8 *) info->cursor.image.data;
-
-	if (info->sprite.outbuf)
-	    info->sprite.outbuf(info, info->sprite.addr, data,
-				width);
-	else
-	    memcpy(info->sprite.addr, data, width);
-}
-
-int
-fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
-{
-	struct fb_cursor_user cursor_user;
-	struct fb_cursor cursor;
-	char *data = NULL, *mask = NULL, *info_mask = NULL;
-	u16 *red = NULL, *green = NULL, *blue = NULL, *transp = NULL;
-	int err = -EINVAL;
-	
-	if (copy_from_user(&cursor_user, sprite, sizeof(struct fb_cursor_user)))
-		return -EFAULT;
-
-	memcpy(&cursor, &cursor_user, sizeof(cursor_user));
-	cursor.mask = info->cursor.mask;
-	cursor.image.data = info->cursor.image.data;
-	cursor.image.cmap.red = info->cursor.image.cmap.red;
-	cursor.image.cmap.green = info->cursor.image.cmap.green;
-	cursor.image.cmap.blue = info->cursor.image.cmap.blue;
-	cursor.image.cmap.transp = info->cursor.image.cmap.transp;
-	cursor.data = NULL;
-	cursor.flash = 0;
-
-	if (cursor.set & FB_CUR_SETCUR)
-		info->cursor.enable = 1;
-	
-	if (cursor.set & FB_CUR_SETCMAP) {
-		unsigned len = cursor.image.cmap.len;
-		if ((int)len <= 0)
-			goto out;
-		len *= 2;
-		err = -ENOMEM;
-		red = kmalloc(len, GFP_USER);
-		green = kmalloc(len, GFP_USER);
-		blue = kmalloc(len, GFP_USER);
-		if (!red || !green || !blue)
-			goto out;
-		if (cursor_user.image.cmap.transp) {
-			transp = kmalloc(len, GFP_USER);
-			if (!transp)
-				goto out;
-		}
-		err = -EFAULT;
-		if (copy_from_user(red, cursor_user.image.cmap.red, len))
-			goto out;
-		if (copy_from_user(green, cursor_user.image.cmap.green, len))
-			goto out;
-		if (copy_from_user(blue, cursor_user.image.cmap.blue, len))
-			goto out;
-		if (transp) {
-			if (copy_from_user(transp,
-					   cursor_user.image.cmap.transp, len))
-				goto out;
-		}
-		cursor.image.cmap.red = red;
-		cursor.image.cmap.green = green;
-		cursor.image.cmap.blue = blue;
-		cursor.image.cmap.transp = transp;
-	}
-	
-	if (cursor.set & FB_CUR_SETSHAPE) {
-		int size = ((cursor.image.width + 7) >> 3) * cursor.image.height;		
-
-		if ((cursor.image.height != info->cursor.image.height) ||
-		    (cursor.image.width != info->cursor.image.width))
-			cursor.set |= FB_CUR_SETSIZE;
-		
-		err = -ENOMEM;
-		data = kmalloc(size, GFP_USER);
-		mask = kmalloc(size, GFP_USER);
-		if (!mask || !data)
-			goto out;
-		
-		err = -EFAULT;
-		if (copy_from_user(data, cursor_user.image.data, size) ||
-		    copy_from_user(mask, cursor_user.mask, size))
-			goto out;
-		
-		cursor.image.data = data;
-		cursor.mask = mask;
-		info_mask = (char *) info->cursor.mask;
-		info->cursor.mask = mask;
-	}
-	info->cursor.set = cursor.set;
-	info->cursor.rop = cursor.rop;
-	err = info->fbops->fb_cursor(info, &cursor);
-out:
-	kfree(data);
-	kfree(mask);
-	kfree(red);
-	kfree(green);
-	kfree(blue);
-	kfree(transp);
-	if (info_mask)
-		info->cursor.mask = info_mask;
-	return err;
-}
-
 int
 fb_pan_display(struct fb_info *info, struct fb_var_screeninfo *var)
 {
@@ -936,10 +826,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			return -EFAULT;
 		return 0;
 	case FBIO_CURSOR:
-		acquire_console_sem();
-		i = fb_cursor(info, argp);
-		release_console_sem();
-		return i;
+		return -EINVAL;
 	case FBIOGET_CON2FBMAP:
 		if (copy_from_user(&con2fb, argp, sizeof(con2fb)))
 			return -EFAULT;
@@ -1177,18 +1064,6 @@ register_framebuffer(struct fb_info *fb_info)
 	}	
 	fb_info->pixmap.offset = 0;
 
-	if (fb_info->sprite.addr == NULL) {
-		fb_info->sprite.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
-		if (fb_info->sprite.addr) {
-			fb_info->sprite.size = FBPIXMAPSIZE;
-			fb_info->sprite.buf_align = 1;
-			fb_info->sprite.scan_align = 1;
-			fb_info->sprite.access_align = 4;
-			fb_info->sprite.flags = FB_PIXMAP_DEFAULT;
-		}
-	}
-	fb_info->sprite.offset = 0;
-
 	if (!fb_info->modelist.prev ||
 	    !fb_info->modelist.next ||
 	    list_empty(&fb_info->modelist)) {
@@ -1232,8 +1107,6 @@ unregister_framebuffer(struct fb_info *fb_info)
 
 	if (fb_info->pixmap.addr && (fb_info->pixmap.flags & FB_PIXMAP_DEFAULT))
 		kfree(fb_info->pixmap.addr);
-	if (fb_info->sprite.addr && (fb_info->sprite.flags & FB_PIXMAP_DEFAULT))
-		kfree(fb_info->sprite.addr);
 	fb_destroy_modelist(&fb_info->modelist);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
@@ -1403,7 +1276,6 @@ EXPORT_SYMBOL(fb_iomove_buf_unaligned);
 EXPORT_SYMBOL(fb_iomove_buf_aligned);
 EXPORT_SYMBOL(fb_sysmove_buf_unaligned);
 EXPORT_SYMBOL(fb_sysmove_buf_aligned);
-EXPORT_SYMBOL(fb_load_cursor_image);
 EXPORT_SYMBOL(fb_set_suspend);
 EXPORT_SYMBOL(fb_register_client);
 EXPORT_SYMBOL(fb_unregister_client);

@@ -60,6 +60,10 @@ struct fbcon_ops {
 			      int bottom_only);
 	void (*cursor)(struct vc_data *vc, struct fb_info *info,
 		       struct display *p, int mode, int fg, int bg);
+
+	struct fb_cursor cursor_state;
+	int    cursor_flash;
+	char  *cursor_data;
 };
     /*
      *  Attribute Decoding

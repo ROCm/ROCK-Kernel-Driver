@@ -245,14 +245,15 @@ static void fb_flashcursor(void *private)
 		vc = vc_cons[info->currcon].d;
 
 	if (info->state != FBINFO_STATE_RUNNING ||
-	    !vc || !CON_IS_VISIBLE(vc) || !info->cursor.flash ||
+	    !vc || !CON_IS_VISIBLE(vc) ||
 	    vt_cons[vc->vc_num]->vc_mode != KD_TEXT ||
  	    registered_fb[(int) con2fb_map[vc->vc_num]] != info)
 		return;
+	acquire_console_sem();
 	p = &fb_display[vc->vc_num];
 	c = scr_readw((u16 *) vc->vc_pos);
-	acquire_console_sem();
-	mode = (info->cursor.enable) ? CM_ERASE : CM_DRAW;
+	mode = (!ops->cursor_flash || ops->cursor_state.enable) ?
+		CM_ERASE : CM_DRAW;
 	ops->cursor(vc, info, p, mode, get_color(vc, info, c, 1),
 		    get_color(vc, info, c, 0));
 	release_console_sem();
@@ -533,6 +534,7 @@ static int set_con2fb_map(int unit, int newidx, int user)
 		}
 
 		if (!err) {
+			memset(ops, 0, sizeof(struct fbcon_ops));
 			info->fbcon_par = ops;
 			set_blitting_type(vc, info, NULL);
 		}
@@ -550,6 +552,8 @@ static int set_con2fb_map(int unit, int newidx, int user)
 	 * fbcon should release it.
 	 */
 	if (oldinfo && !search_fb_in_map(oldidx)) {
+		struct fbcon_ops *ops = (struct fbcon_ops *) oldinfo->fbcon_par;
+
 		if (oldinfo->fbops->fb_release &&
 		    oldinfo->fbops->fb_release(oldinfo, 0)) {
 			con2fb_map[unit] = oldidx;
@@ -564,6 +568,8 @@ static int set_con2fb_map(int unit, int newidx, int user)
 		if (oldinfo->queue.func == fb_flashcursor)
 			del_timer_sync(&oldinfo->cursor_timer);
 
+		kfree(ops->cursor_state.mask);
+		kfree(ops->cursor_data);
 		kfree(oldinfo->fbcon_par);
 		module_put(oldinfo->fbops->owner);
 	}
@@ -692,6 +698,7 @@ static const char *fbcon_startup(void)
 		return NULL;
 	}
 
+	memset(ops, 0, sizeof(struct fbcon_ops));
 	info->fbcon_par = ops;
 	set_blitting_type(vc, info, NULL);
 
@@ -1024,13 +1031,13 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
 	int y = real_y(p, vc->vc_y);
  	int c = scr_readw((u16 *) vc->vc_pos);
 
-	info->cursor.flash = 1;
+	ops->cursor_flash = 1;
 	if (mode & CM_SOFTBACK) {
 		mode &= ~CM_SOFTBACK;
 		if (softback_lines) {
 			if (y + softback_lines >= vc->vc_rows) {
 				mode = CM_ERASE;
-				info->cursor.flash = 0;
+				ops->cursor_flash = 0;
 			}
 			else
 				y += softback_lines;
@@ -1932,6 +1939,7 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 {
 	unsigned short charmask = vc->vc_hi_font_mask ? 0x1ff : 0xff;
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
+	struct fbcon_ops *ops = (struct fbcon_ops *) info->fbcon_par;
 	struct display *p = &fb_display[vc->vc_num];
 
 	if (mode_switch) {
@@ -1961,7 +1969,7 @@ static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
 	}
 
 	fbcon_cursor(vc, blank ? CM_ERASE : CM_DRAW);
-	info->cursor.flash = (!blank);
+	ops->cursor_flash = (!blank);
 
 	if (!info->fbops->fb_blank) {
 		if (blank) {
