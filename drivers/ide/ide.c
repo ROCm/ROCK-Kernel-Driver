@@ -673,8 +673,8 @@ void ide_unregister (unsigned int index)
 		blk_cleanup_queue(&drive->queue);
 	}
 	if (hwif->next == hwif) {
-		kfree(hwgroup);
 		BUG_ON(hwgroup->hwif != hwif);
+		kfree(hwgroup);
 	} else {
 		/* There is another interface in hwgroup.
 		 * Unlink us, and set hwgroup->drive and ->hwif to
