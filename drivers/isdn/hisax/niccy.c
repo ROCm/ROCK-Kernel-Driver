@@ -199,6 +199,70 @@ static struct card_ops niccy_ops = {
 	.irq_func = niccy_interrupt,
 };
 
+static int __init
+niccy_probe(struct IsdnCardState *cs)
+{
+	printk(KERN_INFO "HiSax: %s %s config irq:%d data:0x%X ale:0x%X\n",
+	       CardType[cs->typ], (cs->subtyp==1) ? "PnP":"PCI",
+	       cs->irq, cs->hw.niccy.isac, cs->hw.niccy.isac_ale);
+	cs->card_ops = &niccy_ops;
+	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
+		return -EBUSY;
+	return 0;
+}
+
+static int __init
+niccy_pnp_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+{
+	cs->subtyp = NICCY_PNP;
+	cs->irq = card->para[0];
+	cs->hw.niccy.isac = card->para[1] + ISAC_PNP;
+	cs->hw.niccy.hscx = card->para[1] + HSCX_PNP;
+	cs->hw.niccy.isac_ale = card->para[2] + ISAC_PNP;
+	cs->hw.niccy.hscx_ale = card->para[2] + HSCX_PNP;
+	cs->hw.niccy.cfg_reg = 0;
+
+	if (!request_io(&cs->rs, cs->hw.niccy.isac, 2, "niccy data"))
+		goto err;
+	if (!request_io(&cs->rs, cs->hw.niccy.isac_ale, 2, "niccy addr"))
+		goto err;
+	if (niccy_probe(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
+static int __init
+niccy_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
+{
+	u32 pci_ioaddr;
+
+	if (pci_enable_device(pdev))
+		goto err;
+
+	cs->subtyp = NICCY_PCI;
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.niccy.cfg_reg = pci_resource_start(pdev, 0);
+	pci_ioaddr = pci_resource_start(pdev, 1);
+	cs->hw.niccy.isac = pci_ioaddr + ISAC_PCI_DATA;
+	cs->hw.niccy.isac_ale = pci_ioaddr + ISAC_PCI_ADDR;
+	cs->hw.niccy.hscx = pci_ioaddr + HSCX_PCI_DATA;
+	cs->hw.niccy.hscx_ale = pci_ioaddr + HSCX_PCI_ADDR;
+	if (!request_io(&cs->rs, cs->hw.niccy.isac, 4, "niccy"))
+		goto err;
+	if (!request_io(&cs->rs, cs->hw.niccy.cfg_reg, 0x40, "niccy pci"))
+		goto err;
+	if (niccy_probe(cs) < 0)
+		goto err;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 static struct pci_dev *niccy_dev __initdata = NULL;
 #ifdef __ISAPNP__
 static struct pnp_card *pnp_c __devinitdata = NULL;
@@ -207,7 +271,6 @@ static struct pnp_card *pnp_c __devinitdata = NULL;
 int __init
 setup_niccy(struct IsdnCard *card)
 {
-	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
 	strcpy(tmp, niccy_revision);
@@ -252,66 +315,18 @@ setup_niccy(struct IsdnCard *card)
 	}
 #endif
 	if (card->para[1]) {
-		cs->hw.niccy.isac = card->para[1] + ISAC_PNP;
-		cs->hw.niccy.hscx = card->para[1] + HSCX_PNP;
-		cs->hw.niccy.isac_ale = card->para[2] + ISAC_PNP;
-		cs->hw.niccy.hscx_ale = card->para[2] + HSCX_PNP;
-		cs->hw.niccy.cfg_reg = 0;
-		cs->subtyp = NICCY_PNP;
-		cs->irq = card->para[0];
-		if (!request_io(&cs->rs, cs->hw.niccy.isac, 2, "niccy data"))
-			goto err;
-		if (!request_io(&cs->rs, cs->hw.niccy.isac_ale, 2, "niccy addr"))
-			goto err;
+		if (niccy_pnp_probe(card->cs, card) < 0)
+			return 0;
+		return 1;
 	} else {
 #if CONFIG_PCI
-		u_int pci_ioaddr;
-		cs->subtyp = 0;
 		if ((niccy_dev = pci_find_device(PCI_VENDOR_ID_SATSAGEM,
 			PCI_DEVICE_ID_SATSAGEM_NICCY, niccy_dev))) {
-			if (pci_enable_device(niccy_dev))
-				return(0);
-			/* get IRQ */
-			if (!niccy_dev->irq) {
-				printk(KERN_WARNING "Niccy: No IRQ for PCI card found\n");
-				return(0);
-			}
-			cs->irq = niccy_dev->irq;
-			cs->hw.niccy.cfg_reg = pci_resource_start(niccy_dev, 0);
-			if (!cs->hw.niccy.cfg_reg) {
-				printk(KERN_WARNING "Niccy: No IO-Adr for PCI cfg found\n");
-				return(0);
-			}
-			pci_ioaddr = pci_resource_start(niccy_dev, 1);
-			if (!pci_ioaddr) {
-				printk(KERN_WARNING "Niccy: No IO-Adr for PCI card found\n");
-				return(0);
-			}
-			cs->subtyp = NICCY_PCI;
-		} else {
-			printk(KERN_WARNING "Niccy: No PCI card found\n");
-			return(0);
+			if (niccy_pci_probe(card->cs, niccy_dev) < 0)
+				return 0;
+			return 1;
 		}
-		cs->irq_flags |= SA_SHIRQ;
-		cs->hw.niccy.isac = pci_ioaddr + ISAC_PCI_DATA;
-		cs->hw.niccy.isac_ale = pci_ioaddr + ISAC_PCI_ADDR;
-		cs->hw.niccy.hscx = pci_ioaddr + HSCX_PCI_DATA;
-		cs->hw.niccy.hscx_ale = pci_ioaddr + HSCX_PCI_ADDR;
-
-		if (!request_io(&cs->rs, cs->hw.niccy.isac, 4, "niccy"))
-			goto err;
-		if (!request_io(&cs->rs, cs->hw.niccy.cfg_reg, 0x40, "niccy pci"))
-			goto err;
 #endif /* CONFIG_PCI */
 	}
-	printk(KERN_INFO "HiSax: %s %s config irq:%d data:0x%X ale:0x%X\n",
-		CardType[cs->typ], (cs->subtyp==1) ? "PnP":"PCI",
-		cs->irq, cs->hw.niccy.isac, cs->hw.niccy.isac_ale);
-	cs->card_ops = &niccy_ops;
-	if (hscxisac_setup(cs, &isac_ops, &hscx_ops))
-		goto err;
-	return 1;
- err:
-	niccy_release(cs);
 	return 0;
 }

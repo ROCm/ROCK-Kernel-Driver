@@ -62,8 +62,10 @@
  */
 typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
-#endif
 
+extern initcall_t __con_initcall_start, __con_initcall_end;
+#endif
+  
 #ifndef MODULE
 
 #ifndef __ASSEMBLY__
@@ -90,6 +92,9 @@ typedef void (*exitcall_t)(void);
 
 #define __exitcall(fn)							\
 	static exitcall_t __exitcall_##fn __exit_call = fn
+
+#define console_initcall(fn) \
+	static initcall_t __initcall_##fn __attribute__ ((unused,__section__ (".con_initcall.init")))=fn
 
 struct obs_kernel_param {
 	const char *str;

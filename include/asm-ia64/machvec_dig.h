@@ -3,8 +3,6 @@
 
 extern ia64_mv_setup_t dig_setup;
 extern ia64_mv_irq_init_t dig_irq_init;
-extern ia64_mv_pci_fixup_t iosapic_pci_fixup;
-extern ia64_mv_map_nr_t map_nr_dense;
 
 /*
  * This stuff has dual use!

@@ -2455,6 +2455,7 @@ extern asmlinkage long sys_sysctl(struct __sysctl_args *args);
 asmlinkage long
 sys32_sysctl (struct sysctl32 *args)
 {
+#ifdef CONFIG_SYSCTL
 	struct sysctl32 a32;
 	mm_segment_t old_fs = get_fs ();
 	void *oldvalp, *newvalp;
@@ -2492,6 +2493,9 @@ sys32_sysctl (struct sysctl32 *args)
 		return -EFAULT;
 
 	return ret;
+#else
+	return -ENOSYS;
+#endif
 }
 
 asmlinkage long
@@ -2737,8 +2741,12 @@ struct sysinfo32 {
 	u32 bufferram;
 	u32 totalswap;
 	u32 freeswap;
-	unsigned short procs;
-	char _f[22];
+	u16 procs;
+	u16 pad;
+	u32 totalhigh;
+	u32 freehigh;
+	u32 mem_unit;
+	char _f[8];
 };
 
 asmlinkage long
@@ -2767,6 +2775,9 @@ sys32_sysinfo (struct sysinfo32 *info)
 	err |= __put_user(s.totalswap, &info->totalswap);
 	err |= __put_user(s.freeswap, &info->freeswap);
 	err |= __put_user(s.procs, &info->procs);
+	err |= __put_user (s.totalhigh, &info->totalhigh);
+	err |= __put_user (s.freehigh, &info->freehigh);
+	err |= __put_user (s.mem_unit, &info->mem_unit);
 	if (err)
 		return -EFAULT;
 	return ret;

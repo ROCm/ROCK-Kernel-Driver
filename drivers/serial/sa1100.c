@@ -835,11 +835,12 @@ static struct console sa1100_console = {
 	.index		= -1,
 };
 
-void __init sa1100_rs_console_init(void)
+static void __init sa1100_rs_console_init(void)
 {
 	sa1100_init_ports();
 	register_console(&sa1100_console);
 }
+console_initcall(sa1100_rs_console_init);
 
 #define SA1100_CONSOLE	&sa1100_console
 #else

@@ -51,7 +51,6 @@ static char *_riotty_c_sccs_ = "@(#)riotty.c	1.3";
 
 #include <linux/serial.h>
 
-#include <linux/compatmac.h>
 #include <linux/generic_serial.h>
 
 

@@ -78,20 +78,6 @@ static int __init find_device_prom_node(struct pci_pbm_info *pbm,
 	return 0;
 }
 
-/* Remove a PCI device from the device trees, then
- * free it up.  Note that this must run before
- * the device's resources are registered because we
- * do not handle unregistering them here.
- */
-static void pci_device_delete(struct pci_dev *pdev)
-{
-	list_del(&pdev->global_list);
-	list_del(&pdev->bus_list);
-
-	/* Ok, all references are gone, free it up. */
-	kfree(pdev);
-}
-
 /* Older versions of OBP on PCI systems encode 64-bit MEM
  * space assignments incorrectly, this fixes them up.  We also
  * take the opportunity here to hide other kinds of bogus
@@ -164,7 +150,7 @@ static void __init pdev_cookie_fillin(struct pci_pbm_info *pbm,
 		 * second EBUS/HappyMeal pair if the external
 		 * connector for it is not present.
 		 */
-		pci_device_delete(pdev);
+		pci_remove_bus_device(pdev);
 		return;
 	}
 

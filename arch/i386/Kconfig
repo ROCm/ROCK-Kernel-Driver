@@ -488,7 +488,7 @@ config NR_CPUS
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation Support"
-	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY)))
+	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))) || X86_PC
 
 config DISCONTIGMEM
 	bool

@@ -26,7 +26,7 @@
 /*
  * Returns a bitmask of CPUs on Node 'node'.
  */
-#define node_to_cpumask(node) (node_to_cpumask[node])
+#define node_to_cpumask(node) (node_to_cpu_mask[node])
 
 #else
 #define cpu_to_node(cpu) (0)

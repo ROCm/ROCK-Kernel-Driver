@@ -232,11 +232,11 @@ do_page_fault(unsigned long address, unsigned long mmcsr,
 	else {
 		/* Synchronize this task's top level page-table
 		   with the "reference" page table from init.  */
-		long offset = __pgd_offset(address);
+		long index = pgd_index(address);
 		pgd_t *pgd, *pgd_k;
 
-		pgd = current->active_mm->pgd + offset;
-		pgd_k = swapper_pg_dir + offset;
+		pgd = current->active_mm->pgd + index;
+		pgd_k = swapper_pg_dir + index;
 		if (!pgd_present(*pgd) && pgd_present(*pgd_k)) {
 			pgd_val(*pgd) = pgd_val(*pgd_k);
 			return;

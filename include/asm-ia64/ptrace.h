@@ -289,8 +289,8 @@ struct pt_all_user_regs {
  * not overlap with any of the number assigned in <linux/ptrace.h>.
  */
 #define PTRACE_SINGLEBLOCK	12	/* resume execution until next branch */
-#define PTRACE_GETSIGINFO	13	/* get child's siginfo structure */
-#define PTRACE_SETSIGINFO	14	/* set child's siginfo structure */
+#define PTRACE_OLD_GETSIGINFO	13	/* (replaced by PTRACE_GETSIGINFO in <linux/ptrace.h>)  */
+#define PTRACE_OLD_SETSIGINFO	14	/* (replaced by PTRACE_SETSIGINFO in <linux/ptrace.h>)  */
 #define PTRACE_GETREGS		18	/* get all registers (pt_all_user_regs) in one shot */
 #define PTRACE_SETREGS		19	/* set all registers (pt_all_user_regs) in one shot */
 

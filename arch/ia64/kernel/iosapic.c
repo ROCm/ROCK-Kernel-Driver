@@ -29,6 +29,9 @@
  * 02/07/29	T. Kochi	Allocate interrupt vectors dynamically
  * 02/08/04	T. Kochi	Cleaned up terminology (irq, global system interrupt, vector, etc.)
  * 02/09/20	D. Mosberger	Simplified by taking advantage of ACPI's pci_irq code.
+ * 03/02/19	B. Helgaas	Make pcat_compat system-wide, not per-IOSAPIC.
+ *				Remove iosapic_address & gsi_base from external interfaces.
+ *				Rationalize __init/__devinit attributes.
  */
 /*
  * Here is what the interrupt logic between a PCI device and the kernel looks like:
@@ -111,16 +114,17 @@ static struct iosapic {
 	char		*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
-	unsigned char	pcat_compat;	/* 8259 compatibility flag */
-} iosapic_lists[256] __devinitdata;
+} iosapic_lists[256];
 
-static int num_iosapic = 0;
+static int num_iosapic;
+
+static unsigned char pcat_compat __initdata;	/* 8259 compatibility flag */
 
 
 /*
  * Find an IOSAPIC associated with a GSI
  */
-static inline int __devinit
+static inline int
 find_iosapic (unsigned int gsi)
 {
 	int i;
@@ -423,7 +427,7 @@ iosapic_version (char *addr)
  * if the given vector is already owned by other,
  *  assign a new vector for the other and make the vector available
  */
-static void
+static void __init
 iosapic_reassign_vector (int vector)
 {
 	int new_vector;
@@ -443,50 +447,36 @@ iosapic_reassign_vector (int vector)
 
 static void
 register_intr (unsigned int gsi, int vector, unsigned char delivery,
-	       unsigned long polarity, unsigned long edge_triggered,
-	       unsigned int gsi_base, char *iosapic_address)
+	       unsigned long polarity, unsigned long trigger)
 {
 	irq_desc_t *idesc;
 	struct hw_interrupt_type *irq_type;
 	int rte_index;
+	int index;
+	unsigned long gsi_base;
+	char *iosapic_address;
+
+	index = find_iosapic(gsi);
+	if (index < 0) {
+		printk(KERN_WARNING "%s: No IOSAPIC for GSI 0x%x\n", __FUNCTION__, gsi);
+		return;
+	}
+
+	iosapic_address = iosapic_lists[index].addr;
+	gsi_base = iosapic_lists[index].gsi_base;
 
 	rte_index = gsi - gsi_base;
 	iosapic_intr_info[vector].rte_index = rte_index;
-	iosapic_intr_info[vector].polarity = polarity ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW;
+	iosapic_intr_info[vector].polarity = polarity;
 	iosapic_intr_info[vector].dmode    = delivery;
+	iosapic_intr_info[vector].addr     = iosapic_address;
+	iosapic_intr_info[vector].gsi_base = gsi_base;
+	iosapic_intr_info[vector].trigger  = trigger;
 
-	/*
-	 * In override, it may not provide addr/gsi_base.  GSI is enough to
-	 * locate iosapic addr, gsi_base and rte_index by examining
-	 * gsi_base and num_rte of registered iosapics (tbd)
-	 */
-#ifndef	OVERRIDE_DEBUG
-	if (iosapic_address) {
-		iosapic_intr_info[vector].addr = iosapic_address;
-		iosapic_intr_info[vector].gsi_base = gsi_base;
-	}
-#else
-	if (iosapic_address) {
-		if (iosapic_intr_info[vector].addr && (iosapic_intr_info[vector].addr != iosapic_address))
-			printk(KERN_WARNING "warning: register_intr: diff IOSAPIC ADDRESS for "
-			       "GSI 0x%x, vector %d\n", gsi, vector);
-		iosapic_intr_info[vector].addr = iosapic_address;
-		if (iosapic_intr_info[vector].gsi_base && (iosapic_intr_info[vector].gsi_base != gsi_base)) {
-			printk(KERN_WARNING "warning: register_intr: diff GSI base 0x%x for "
-			       "GSI 0x%x, vector %d\n", gsi_base, gsi, vector);
-		}
-		iosapic_intr_info[vector].gsi_base = gsi_base;
-	} else if (!iosapic_intr_info[vector].addr)
-		printk(KERN_WARNING "warning: register_intr: invalid override for GSI 0x%x, "
-		       "vector %d\n", gsi, vector);
-#endif
-	if (edge_triggered) {
-		iosapic_intr_info[vector].trigger = IOSAPIC_EDGE;
+	if (trigger == IOSAPIC_EDGE)
 		irq_type = &irq_type_iosapic_edge;
-	} else {
-		iosapic_intr_info[vector].trigger = IOSAPIC_LEVEL;
+	else
 		irq_type = &irq_type_iosapic_level;
-	}
 
 	idesc = irq_desc(vector);
 	if (idesc->handler != irq_type) {
@@ -504,8 +494,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
  */
 int
 iosapic_register_intr (unsigned int gsi,
-		       unsigned long polarity, unsigned long edge_triggered,
-		       unsigned int gsi_base, char *iosapic_address)
+		       unsigned long polarity, unsigned long trigger)
 {
 	int vector;
 	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
@@ -515,11 +504,11 @@ iosapic_register_intr (unsigned int gsi,
 		vector = ia64_alloc_vector();
 
 	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
-		      polarity, edge_triggered, gsi_base, iosapic_address);
+		      polarity, trigger);
 
 	printk(KERN_INFO "GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
-	       gsi, (polarity ? "high" : "low"),
-	       (edge_triggered ? "edge" : "level"), dest, vector);
+	       gsi, (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
+	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -530,11 +519,10 @@ iosapic_register_intr (unsigned int gsi,
  * ACPI calls this when it finds an entry for a platform interrupt.
  * Note that the irq_base and IOSAPIC address must be set in iosapic_init().
  */
-int
+int __init
 iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 				int iosapic_vector, u16 eid, u16 id,
-				unsigned long polarity, unsigned long edge_triggered,
-				unsigned int gsi_base, char *iosapic_address)
+				unsigned long polarity, unsigned long trigger)
 {
 	unsigned char delivery;
 	int vector;
@@ -564,11 +552,11 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
 	}
 
 	register_intr(gsi, vector, delivery, polarity,
-		      edge_triggered, gsi_base, iosapic_address);
+		      trigger);
 
 	printk(KERN_INFO "PLATFORM int 0x%x: GSI 0x%x(%s,%s) -> CPU 0x%04x vector %d\n",
-	       int_type, gsi, (polarity ? "high" : "low"),
-	       (edge_triggered ? "edge" : "level"), dest, vector);
+	       int_type, gsi, (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
+	       (trigger == IOSAPIC_EDGE ? "edge" : "level"), dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
@@ -580,54 +568,36 @@ iosapic_register_platform_intr (u32 int_type, unsigned int gsi,
  * ACPI calls this when it finds an entry for a legacy ISA IRQ override.
  * Note that the gsi_base and IOSAPIC address must be set in iosapic_init().
  */
-void
+void __init
 iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 			  unsigned long polarity,
-			  unsigned long edge_triggered)
+			  unsigned long trigger)
 {
-	int index, vector;
-	unsigned int gsi_base;
-	char *addr;
+	int vector;
 	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
 
-	index = find_iosapic(gsi);
-
-	if (index < 0) {
-		printk(KERN_ERR "ISA: No corresponding IOSAPIC found : ISA IRQ %u -> GSI 0x%x\n",
-		       isa_irq, gsi);
-		return;
-	}
-
 	vector = isa_irq_to_vector(isa_irq);
-	addr = iosapic_lists[index].addr;
-	gsi_base = iosapic_lists[index].gsi_base;
 
-	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, edge_triggered,
-		      gsi_base, addr);
+	register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, polarity, trigger);
 
 	DBG("ISA: IRQ %u -> GSI 0x%x (%s,%s) -> CPU 0x%04x vector %d\n",
 	    isa_irq, gsi,
-	    polarity ? "high" : "low", edge_triggered ? "edge" : "level",
+	    polarity == IOSAPIC_POL_HIGH ? "high" : "low", trigger == IOSAPIC_EDGE ? "edge" : "level",
 	    dest, vector);
 
 	/* program the IOSAPIC routing table */
 	set_rte(vector, dest);
 }
 
-void __devinit
-iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
+void __init
+iosapic_system_init (int system_pcat_compat)
 {
-	int num_rte, vector;
-	unsigned int isa_irq, ver;
-	char *addr;
-	static int first_time = 1;
+	int vector;
 
-	if (first_time) {
-		first_time = 0;
-		for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
-			iosapic_intr_info[vector].rte_index = -1;	/* mark as unused */
-	}
+	for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
+		iosapic_intr_info[vector].rte_index = -1;	/* mark as unused */
 
+	pcat_compat = system_pcat_compat;
 	if (pcat_compat) {
 		/*
 		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support
@@ -637,6 +607,14 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 		outb(0xff, 0xA1);
 		outb(0xff, 0x21);
 	}
+}
+
+void __init
+iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
+{
+	int num_rte;
+	unsigned int isa_irq, ver;
+	char *addr;
 
 	addr = ioremap(phys_addr, 0);
 	ver = iosapic_version(addr);
@@ -649,7 +627,6 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	num_rte = ((ver >> 16) & 0xff) + 1;
 
 	iosapic_lists[num_iosapic].addr = addr;
-	iosapic_lists[num_iosapic].pcat_compat = pcat_compat;
 	iosapic_lists[num_iosapic].gsi_base = gsi_base;
 	iosapic_lists[num_iosapic].num_rte = num_rte;
 	num_iosapic++;
@@ -658,30 +635,18 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
 
 	if ((gsi_base == 0) && pcat_compat) {
-		unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
 
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may
 		 * get reprogrammed later on with data from the ACPI Interrupt Source
 		 * Override table.
 		 */
-		for (isa_irq = 0; isa_irq < 16; ++isa_irq) {
-			vector = isa_irq_to_vector(isa_irq);
-
-			register_intr(isa_irq, vector, IOSAPIC_LOWEST_PRIORITY,
-				     /* IOSAPIC_POL_HIGH, IOSAPIC_EDGE */
-				     1, 1, gsi_base, addr);
-
-			DBG("ISA: IRQ %u -> GSI 0x%x (high,edge) -> CPU 0x%04x vector %d\n",
-			    isa_irq, isa_irq, dest, vector);
-
-			/* program the IOSAPIC routing table: */
-			set_rte(vector, dest);
-		}
+		for (isa_irq = 0; isa_irq < 16; ++isa_irq)
+			iosapic_override_isa_irq(isa_irq, isa_irq, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 }
 
-static void
+static void __init
 fixup_vector (int vector, unsigned int gsi, const char *pci_id)
 {
 	struct hw_interrupt_type *irq_type = &irq_type_iosapic_level;
@@ -731,10 +696,9 @@ iosapic_parse_prt (void)
 {
 	struct acpi_prt_entry *entry;
 	struct list_head *node;
-	unsigned int gsi, gsi_base;
-	int index, vector, pcat_compat;
+	unsigned int gsi;
+	int vector;
 	char pci_id[16];
-	char *addr;
 
 	list_for_each(node, &acpi_prt.entries) {
 		entry = list_entry(node, struct acpi_prt_entry, node);
@@ -748,23 +712,13 @@ iosapic_parse_prt (void)
 		vector = gsi_to_vector(gsi);
 		if (vector < 0) {
 			/* allocate a vector for this interrupt line */
-			index = find_iosapic(gsi);
-
-			if (index < 0) {
-				printk(KERN_WARNING "IOSAPIC: GSI 0x%x has no IOSAPIC!\n", gsi);
-				continue;
-			}
-			addr = iosapic_lists[index].addr;
-			gsi_base = iosapic_lists[index].gsi_base;
-			pcat_compat = iosapic_lists[index].pcat_compat;
-
 			if (pcat_compat && (gsi < 16))
 				vector = isa_irq_to_vector(gsi);
 			else
 				/* new GSI; allocate a vector for it */
 				vector = ia64_alloc_vector();
 
-			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, 0, 0, gsi_base, addr);
+			register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
 		}
 		snprintf(pci_id, sizeof(pci_id), "%02x:%02x:%02x[%c]",
 			 entry->id.segment, entry->id.bus, entry->id.device, 'A' + entry->pin);

@@ -346,11 +346,12 @@ struct console hvc_con_driver = {
 	.index		= -1,
 };
 
-int __init hvc_console_init(void)
+static int __init hvc_console_init(void)
 {
 	register_console(&hvc_con_driver);
 	return 0;
 }
+console_initcall(hvc_console_init);
 
 module_init(hvc_init);
 module_exit(hvc_exit);

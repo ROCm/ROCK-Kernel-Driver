@@ -2445,7 +2445,7 @@ dasd_3990_erp_in_erp(dasd_ccw_req_t * cqr)
  *     - exit with permanent error
  *
  * PARAMETER
- *   erp		ERP which is in progress wiht no retry left
+ *   erp		ERP which is in progress with no retry left
  *
  * RETURN VALUES
  *   erp		modified/additional ERP

@@ -747,8 +747,10 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 	screenbuf_size = new_screen_size;
 
 	err = resize_screen(currcons, new_cols, new_rows);
-	if (err)
+	if (err) {
+		kfree(newscreen);
 		return err;
+	}
 
 	rlth = min(old_row_size, new_row_size);
 	rrem = new_row_size - rlth;
@@ -2443,7 +2445,7 @@ static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols,
 struct tty_driver console_driver;
 static int console_refcount;
 
-void __init con_init(void)
+static int __init con_init(void)
 {
 	const char *display_desc = NULL;
 	unsigned int currcons = 0;
@@ -2452,7 +2454,7 @@ void __init con_init(void)
 		display_desc = conswitchp->con_startup();
 	if (!display_desc) {
 		fg_console = 0;
-		return;
+		return 0;
 	}
 
 	init_timer(&console_timer);
@@ -2491,7 +2493,9 @@ void __init con_init(void)
 #ifdef CONFIG_VT_CONSOLE
 	register_console(&vt_console_driver);
 #endif
+	return 0;
 }
+console_initcall(con_init);
 
 int __init vty_init(void)
 {

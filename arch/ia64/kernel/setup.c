@@ -363,7 +363,7 @@ setup_arch (char **cmdline_p)
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
-	acpi_table_init(*cmdline_p);
+	acpi_table_init();
 # ifdef CONFIG_ACPI_NUMA
 	acpi_numa_init();
 # endif
@@ -422,7 +422,7 @@ setup_arch (char **cmdline_p)
 	cpu_init();	/* initialize the bootstrap CPU */
 
 #ifdef CONFIG_ACPI_BOOT
-	acpi_boot_init(*cmdline_p);
+	acpi_boot_init();
 #endif
 #ifdef CONFIG_SERIAL_HCDP
 	if (efi.hcdp) {

@@ -34,6 +34,5 @@ void __init time_init(void)
 	xtime.tv_sec = 0;
 
 	timer_irq.handler = timer_interrupt;
-	timer_irq.flags = SA_INTERRUPT; /* FIXME: really? */
 	setup_irq(IRQ_TIMER, &timer_irq);
 }

@@ -69,7 +69,7 @@ static inline void pgd_clear (pgd_t * pgd) { }
 
 /* Find an entry in the second-level page table.. */
 #define pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + \
-			__pmd_offset(address))
+			pmd_index(address))
 
 static inline pte_t ptep_get_and_clear(pte_t *ptep)
 {

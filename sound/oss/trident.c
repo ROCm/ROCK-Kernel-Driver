@@ -221,7 +221,7 @@
 #define TRIDENT_STATE_MAGIC	0x63657373 /* "cess" */
 
 #define TRIDENT_DMA_MASK	0x3fffffff /* DMA buffer mask for pci_alloc_consist */
-#define ALI_DMA_MASK		0xffffffff /* ALI Tridents lack the 30-bit limitation */
+#define ALI_DMA_MASK		0x7fffffff /* ALI Tridents have 31-bit DMA. Wow. */
 
 #define NR_HW_CH		32
 

@@ -58,6 +58,7 @@
 #include "isdn_net.h"
 #include "isdn_ppp.h"
 #include "isdn_ciscohdlck.h"
+#include "isdn_concap.h"
 
 #define ISDN_NET_TX_TIMEOUT (20*HZ) 
 

@@ -55,84 +55,47 @@ pci_claim_resource(struct pci_dev *dev, int resource)
 	return err;
 }
 
-/*
- * Given the PCI bus a device resides on, try to
- * find an acceptable resource allocation for a
- * specific device resource..
- */
-static int pci_assign_bus_resource(const struct pci_bus *bus,
-	struct pci_dev *dev,
-	struct resource *res,
-	unsigned long size,
-	unsigned long min,
-	unsigned int type_mask,
-	int resno)
+int pci_assign_resource(struct pci_dev *dev, int resno)
 {
-	unsigned long align;
-	int i;
-
-	type_mask |= IORESOURCE_IO | IORESOURCE_MEM;
-	for (i = 0 ; i < PCI_BUS_NUM_RESOURCES; i++) {
-		struct resource *r = bus->resource[i];
-		if (!r)
-			continue;
-
-		/* type_mask must match */
-		if ((res->flags ^ r->flags) & type_mask)
-			continue;
-
-		/* We cannot allocate a non-prefetching resource
-		   from a pre-fetching area */
-		if ((r->flags & IORESOURCE_PREFETCH) &&
-		    !(res->flags & IORESOURCE_PREFETCH))
-			continue;
-
-		/* The bridge resources are special, as their
-		   size != alignment. Sizing routines return
-		   required alignment in the "start" field. */
-		align = (resno < PCI_BRIDGE_RESOURCES) ? size : res->start;
-
-		/* Ok, try it out.. */
-		if (allocate_resource(r, res, size, min, -1, align,
-				      pcibios_align_resource, dev) < 0)
-			continue;
-
-		/* Update PCI config space.  */
-		pcibios_update_resource(dev, r, res, resno);
-		return 0;
-	}
-	return -EBUSY;
-}
-
-int 
-pci_assign_resource(struct pci_dev *dev, int i)
-{
-	const struct pci_bus *bus = dev->bus;
-	struct resource *res = dev->resource + i;
-	unsigned long size, min;
+	struct pci_bus *bus = dev->bus;
+	struct resource *res = dev->resource + resno;
+	unsigned long size, min, align;
+	int ret;
 
 	size = res->end - res->start + 1;
 	min = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
+	/* The bridge resources are special, as their
+	   size != alignment. Sizing routines return
+	   required alignment in the "start" field. */
+	align = (resno < PCI_BRIDGE_RESOURCES) ? size : res->start;
 
 	/* First, try exact prefetching match.. */
-	if (pci_assign_bus_resource(bus, dev, res, size, min, IORESOURCE_PREFETCH, i) < 0) {
+	ret = pci_bus_alloc_resource(bus, res, size, align, min,
+				     IORESOURCE_PREFETCH,
+				     pcibios_align_resource, dev);
+
+	if (ret < 0 && (res->flags & IORESOURCE_PREFETCH)) {
 		/*
 		 * That failed.
 		 *
 		 * But a prefetching area can handle a non-prefetching
 		 * window (it will just not perform as well).
 		 */
-		if (!(res->flags & IORESOURCE_PREFETCH) || pci_assign_bus_resource(bus, dev, res, size, min, 0, i) < 0) {
-			printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
-			       i, res->start, res->end, dev->slot_name);
-			return -EBUSY;
-		}
+		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
+					     pcibios_align_resource, dev);
 	}
 
-	DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n", res->start,
-						res->end, i, dev->dev.name));
+	if (ret) {
+		printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
+		       resno, res->start, res->end, dev->slot_name);
+	} else {
+		DBGC((KERN_ERR "  got res[%lx:%lx] for resource %d of %s\n",
+		      res->start, res->end, i, dev->dev.name));
+		/* Update PCI config space.  */
+		pcibios_update_resource(dev, res->parent, res, resno);
+	}
 
-	return 0;
+	return ret;
 }
 
 /* Sort resources by alignment */

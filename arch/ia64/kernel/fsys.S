@@ -3,11 +3,16 @@
  *
  * Copyright (C) 2003 Hewlett-Packard Co
  * 	David Mosberger-Tang <davidm@hpl.hp.com>
+ *
+ * 18-Feb-03 louisk	Implement fsys_gettimeofday().
+ * 28-Feb-03 davidm	Fixed several bugs in fsys_gettimeofday().  Tuned it some more,
+ *			probably broke it along the way... ;-)
  */
 
 #include <asm/asmmacro.h>
 #include <asm/errno.h>
 #include <asm/offsets.h>
+#include <asm/percpu.h>
 #include <asm/thread_info.h>
 
 /*
@@ -123,6 +128,183 @@ ENTRY(fsys_set_tid_address)
 	br.ret.sptk.many b6
 END(fsys_set_tid_address)
 
+/*
+ * Note 1: This routine uses floating-point registers, but only with registers that
+ *	   operate on integers.  Because of that, we don't need to set ar.fpsr to the
+ *	   kernel default value.
+ *
+ * Note 2: For now, we will assume that all CPUs run at the same clock-frequency.
+ *	   If that wasn't the case, we would have to disable preemption (e.g.,
+ *	   by disabling interrupts) between reading the ITC and reading
+ *	   local_cpu_data->nsec_per_cyc.
+ *
+ * Note 3: On platforms where the ITC-drift bit is set in the SAL feature vector,
+ *	   we ought to either skip the ITC-based interpolation or run an ntp-like
+ *	   daemon to keep the ITCs from drifting too far apart.
+ */
+ENTRY(fsys_gettimeofday)
+	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
+	movl r3=THIS_CPU(cpu_info)
+
+	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now		(35 cyc)
+	movl r19=xtime			// xtime is a timespec struct
+	;;
+
+#ifdef CONFIG_SMP
+	movl r10=__per_cpu_offset
+	;;
+	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
+	movl r21=cpu_info__per_cpu
+	;;
+	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
+#else
+	mov r10=r3
+#endif
+	ld4 r9=[r9]
+	movl r17=xtime_lock
+	;;
+
+	// r32, r33 should contain the 2 args of gettimeofday
+	adds r21=IA64_CPUINFO_ITM_NEXT_OFFSET, r10
+	mov r2=-1
+	tnat.nz p6,p7=r32		// guard against NaT args
+	;;
+
+	adds r10=IA64_CPUINFO_ITM_DELTA_OFFSET, r10
+(p7)	tnat.nz p6,p0=r33
+(p6)	br.cond.spnt.few .fail
+
+	adds r8=IA64_CPUINFO_NSEC_PER_CYC_OFFSET, r3
+	movl r24=2361183241434822607	// for division hack (only for / 1000)
+	;;
+
+	ldf8 f7=[r10]			// f7 now contains itm_delta
+	setf.sig f11=r2
+	adds r10=8, r32
+
+	adds r20=IA64_TIMESPEC_TV_NSEC_OFFSET, r19	// r20 = &xtime->tv_nsec
+	movl r26=jiffies
+
+	setf.sig f9=r24			// f9 is used for division hack
+	movl r27=wall_jiffies
+
+	and r9=TIF_ALLWORK_MASK,r9
+	movl r25=last_nsec_offset
+	;;
+
+	/*
+	 * Verify that we have permission to write to struct timeval.  Note:
+	 * Another thread might unmap the mapping before we actually get
+	 * to store the result.  That's OK as long as the stores are also
+	 * protect by EX().
+	 */
+EX(.fail, probe.w.fault r32, 3)		// this must come _after_ NaT-check
+EX(.fail, probe.w.fault r10, 3)		// this must come _after_ NaT-check
+	nop 0
+
+	ldf8 f10=[r8]			// f10 <- local_cpu_data->nsec_per_cyc value
+	cmp.ne p8, p0=0, r9
+(p8)	br.spnt.many fsys_fallback_syscall
+	;;
+.retry:	// *** seq = read_seqbegin(&xtime_lock); ***
+	ld4.acq r23=[r17]		// since &xtime_lock == &xtime_lock->sequence
+	ld8 r14=[r25]			// r14 (old) = last_nsec_offset
+
+	ld8 r28=[r26]			// r28 = jiffies
+	ld8 r29=[r27]			// r29 = wall_jiffies
+	;;
+
+	ldf8 f8=[r21]			// f8 now contains itm_next
+	sub r28=r29, r28, 1		// r28 now contains "-(lost + 1)"
+	tbit.nz p9, p10=r23, 0		// p9 <- is_odd(r23), p10 <- is_even(r23)
+	;;
+
+	ld8 r2=[r19]			// r2 = sec = xtime.tv_sec
+	ld8 r29=[r20]			// r29 = nsec = xtime.tv_nsec
+
+	setf.sig f6=r28			// f6 <- -(lost + 1)				(6 cyc)
+	;;
+
+	mf
+	xma.l f8=f6, f7, f8	// f8 (last_tick) <- -(lost + 1)*itm_delta + itm_next	(5 cyc)
+	nop 0
+
+	setf.sig f12=r31		// f12 <- ITC					(6 cyc)
+	// *** if (unlikely(read_seqretry(&xtime_lock, seq))) continue; ***
+	ld4 r24=[r17]			// r24 = xtime_lock->sequence (re-read)
+	nop 0
+	;;
+
+	mov r31=ar.itc			// re-read ITC in case we .retry		(35 cyc)
+	xma.l f8=f11, f8, f12	// f8 (elapsed_cycles) <- (-1*last_tick + now) = (now - last_tick)
+	nop 0
+	;;
+
+	getf.sig r18=f8			// r18 <- (now - last_tick)
+	xmpy.l f8=f8, f10		// f8 <- elapsed_cycles*nsec_per_cyc (5 cyc)
+	add r3=r29, r14			// r3 = (nsec + old)
+	;;
+
+	cmp.lt p7, p8=r18, r0		// if now < last_tick, set p7 = 1, p8 = 0
+	getf.sig r18=f8			// r18 = elapsed_cycles*nsec_per_cyc		(6 cyc)
+	nop 0
+	;;
+
+(p10)	cmp.ne p9, p0=r23, r24		// if xtime_lock->sequence != seq, set p9
+	shr.u r18=r18, IA64_NSEC_PER_CYC_SHIFT	// r18 <- offset
+(p9)	br.spnt.many .retry
+	;;
+
+	mov ar.ccv=r14			// ar.ccv = old					(1 cyc)
+	cmp.leu p7, p8=r18, r14		// if (offset <= old), set p7 = 1, p8 = 0
+	;;
+
+(p8)	cmpxchg8.rel r24=[r25], r18, ar.ccv	// compare-and-exchange (atomic!)
+(p8)	add r3=r29, r18			// r3 = (nsec + offset)
+	;;
+	shr.u r3=r3, 3			// initiate dividing r3 by 1000
+	;;
+	setf.sig f8=r3			//						(6 cyc)
+	mov r10=1000000			// r10 = 1000000
+	;;
+(p8)	cmp.ne.unc p9, p0=r24, r14
+	xmpy.hu f6=f8, f9		//						(5 cyc)
+(p9)	br.spnt.many .retry
+	;;
+
+	getf.sig r3=f6			//						(6 cyc)
+	;;
+	shr.u r3=r3, 4			// end of division, r3 is divided by 1000 (=usec)
+	;;
+
+1:	cmp.geu p7, p0=r3, r10		// while (usec >= 1000000)
+	;;
+(p7)	sub r3=r3, r10			// usec -= 1000000
+(p7)	adds r2=1, r2			// ++sec
+(p7)	br.spnt.many 1b
+
+	// finally: r2 = sec, r3 = usec
+EX(.fail, st8 [r32]=r2)
+	adds r9=8, r32
+	mov r8=r0			// success
+	;;
+EX(.fail, st8 [r9]=r3)			// store them in the timeval struct
+	mov r10=0
+	MCKINLEY_E9_WORKAROUND
+	br.ret.sptk.many b6		// return to caller
+	/*
+	 * Note: We are NOT clearing the scratch registers here.  Since the only things
+	 *	 in those registers are time-related variables and some addresses (which
+	 *	 can be obtained from System.map), none of this should be security-sensitive
+	 *	 and we should be fine.
+	 */
+
+.fail:	adds r8=EINVAL, r0		// r8 = EINVAL
+	adds r10=-1, r0			// r10 = -1
+	MCKINLEY_E9_WORKAROUND
+	br.ret.spnt.many b6		// return with r8 set to EINVAL
+END(fsys_gettimeofday)
+
 	.rodata
 	.align 8
 	.globl fsyscall_table
@@ -190,7 +372,7 @@ fsyscall_table:
 	data8 fsys_fallback_syscall	// setrlimit
 	data8 fsys_fallback_syscall	// getrlimit		// 1085
 	data8 fsys_fallback_syscall	// getrusage
-	data8 fsys_fallback_syscall	// gettimeofday
+	data8 fsys_gettimeofday		// gettimeofday
 	data8 fsys_fallback_syscall	// settimeofday
 	data8 fsys_fallback_syscall	// select
 	data8 fsys_fallback_syscall	// poll			// 1090

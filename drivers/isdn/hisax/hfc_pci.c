@@ -1382,6 +1382,62 @@ static struct card_ops hfcpci_ops = {
 };
 
 
+static int __init
+niccy_pci_probe(struct IsdnCardState *cs, struct pci_dev *pdev, int i)
+{
+	int rc;
+
+	rc = -EBUSY;
+	if (pci_enable_device(pdev))
+		goto err;
+
+	pci_set_master(pdev);
+
+	cs->irq = pdev->irq;
+	cs->irq_flags |= SA_SHIRQ;
+	cs->hw.hfcpci.pdev = pdev;
+
+	cs->hw.hfcpci.pci_io = request_mmio(&cs->rs, 
+					    pci_resource_start(pdev, 1), 128,
+					    "hfc_pci");
+	if (!cs->hw.hfcpci.pci_io)
+		goto err;
+	
+	/* Allocate memory for FIFOS */
+	rc = -ENOMEM;
+	cs->hw.hfcpci.fifos = pci_alloc_consistent(pdev, 32768, 
+						   &cs->hw.hfcpci.fifos_dma);
+	if (!cs->hw.hfcpci.fifos)
+		goto err;
+
+	pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
+			       (u_int)cs->hw.hfcpci.fifos_dma);
+	printk(KERN_INFO "HiSax: HFC-PCI card manufacturer: %s name: %s\n",
+	       id_list[i].vendor_name, id_list[i].card_name);
+	printk(KERN_INFO "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d\n",
+	       (u_int) cs->hw.hfcpci.pci_io, (u_int) cs->hw.hfcpci.fifos,
+	       (u_int) cs->hw.hfcpci.fifos_dma, cs->irq);
+	printk("ChipID: %x\n", Read_hfc(cs, HFCPCI_CHIP_ID));
+	cs->hw.hfcpci.int_m2 = 0;	/* disable alle interrupts */
+	cs->hw.hfcpci.int_m1 = 0;
+	Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
+	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
+	/* At this point the needed PCI config is done */
+	/* fifos are still not enabled */
+
+	init_timer(&cs->hw.hfcpci.timer);
+	cs->hw.hfcpci.timer.function = (void *) hfcpci_Timer;
+	cs->hw.hfcpci.timer.data = (long) cs;
+
+	hfcpci_reset(cs);
+	cs->auxcmd = &hfcpci_auxcmd;
+	cs->card_ops = &hfcpci_ops;
+	return 0;
+ err:
+	hisax_release_resources(cs);
+	return -EBUSY;
+}
+
 /* this variable is used as card index when more than one cards are present */
 static struct pci_dev *dev_hfcpci __initdata = NULL;
 
@@ -1399,74 +1455,16 @@ setup_hfcpci(struct IsdnCard *card)
 	cs->dc.hfcpci.ph_state = 0;
 	cs->hw.hfcpci.fifo = 255;
 
-	i = 0;
-	while (id_list[i].vendor_id) {
+	for (i = 0; id_list[i].vendor_id; i++) {
 		tmp_hfcpci = pci_find_device(id_list[i].vendor_id,
 					     id_list[i].device_id,
 					     dev_hfcpci);
-		i++;
-		if (tmp_hfcpci) {
-			if (pci_enable_device(tmp_hfcpci))
-				continue;
-			pci_set_master(tmp_hfcpci);
-			if ((card->para[0]) && (card->para[0] != (tmp_hfcpci->resource[ 0].start & PCI_BASE_ADDRESS_IO_MASK)))
-				continue;
-			else
-				break;
-		}
-	}
-	
-	if (tmp_hfcpci) {
-		i--;
-		dev_hfcpci = tmp_hfcpci;	/* old device */
-		cs->irq = dev_hfcpci->irq;
-		cs->hw.hfcpci.pdev = tmp_hfcpci;
-		if (!cs->irq) {
-			printk(KERN_WARNING "HFC-PCI: No IRQ for PCI card found\n");
-			return (0);
-		}
-		printk(KERN_INFO "HiSax: HFC-PCI card manufacturer: %s card name: %s\n", id_list[i].vendor_name, id_list[i].card_name);
-	} else {
-		printk(KERN_WARNING "HFC-PCI: No PCI card found\n");
-		return (0);
-	}
-	/* Allocate memory for FIFOS */
-	cs->hw.hfcpci.fifos = pci_alloc_consistent(tmp_hfcpci, 32768, &cs->hw.hfcpci.fifos_dma);
-	if (!cs->hw.hfcpci.fifos) {
-		printk(KERN_WARNING "HFC-PCI: Error allocating memory for FIFO!\n");
-		return 0;
-	}
-	pci_write_config_dword(cs->hw.hfcpci.pdev, 0x80,
-			       (u_int)cs->hw.hfcpci.fifos_dma);
-	cs->hw.hfcpci.pci_io = request_mmio(&cs->rs, dev_hfcpci->resource[ 1].start, 256, "hfc_pci");
-	if (!cs->hw.hfcpci.pci_io)
-		goto err;
-	
-	printk(KERN_INFO
-	       "HFC-PCI: defined at mem %#x fifo %#x(%#x) IRQ %d HZ %d\n",
-	       (u_int) cs->hw.hfcpci.pci_io,
-	       (u_int) cs->hw.hfcpci.fifos,
-	       (u_int) cs->hw.hfcpci.fifos_dma,
-	       cs->irq, HZ);
-	printk("ChipID: %x\n", Read_hfc(cs, HFCPCI_CHIP_ID));
-	cs->hw.hfcpci.int_m2 = 0;	/* disable alle interrupts */
-	cs->hw.hfcpci.int_m1 = 0;
-	Write_hfc(cs, HFCPCI_INT_M1, cs->hw.hfcpci.int_m1);
-	Write_hfc(cs, HFCPCI_INT_M2, cs->hw.hfcpci.int_m2);
-	/* At this point the needed PCI config is done */
-	/* fifos are still not enabled */
+		if (!tmp_hfcpci)
+			continue;
 
-	cs->irq_flags |= SA_SHIRQ;
-
-	cs->hw.hfcpci.timer.function = (void *) hfcpci_Timer;
-	cs->hw.hfcpci.timer.data = (long) cs;
-	init_timer(&cs->hw.hfcpci.timer);
-
-	hfcpci_reset(cs);
-	cs->auxcmd = &hfcpci_auxcmd;
-	cs->card_ops = &hfcpci_ops;
-	return 1;
- err:
-	hisax_release_resources(cs);
+		if (niccy_pci_probe(card->cs, tmp_hfcpci, i) < 0)
+			return 0;
+		return 1;
+	}
 	return 0;
 }

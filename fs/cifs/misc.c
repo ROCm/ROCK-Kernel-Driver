@@ -153,7 +153,8 @@ buf_get(void)
 
 /* We could use negotiated size instead of max_msgsize - 
    but it may be more efficient to always alloc same size 
-   albeit slightly larger */
+   albeit slightly larger than necessary and maxbuffersize 
+   defaults to this and can not be bigger */
 	ret_buf =
 	    (struct smb_hdr *) kmem_cache_alloc(cifs_req_cachep, SLAB_KERNEL);
 

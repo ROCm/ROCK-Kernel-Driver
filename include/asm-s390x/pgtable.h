@@ -488,14 +488,14 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 /* Find an entry in the second-level page table.. */
-#define __pmd_offset(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
+#define pmd_index(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 #define pmd_offset(dir,addr) \
-	((pmd_t *) pgd_page_kernel(*(dir)) + __pmd_offset(addr))
+	((pmd_t *) pgd_page_kernel(*(dir)) + pmd_index(addr))
 
 /* Find an entry in the third-level page table.. */
-#define __pte_offset(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
+#define pte_index(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
 #define pte_offset_kernel(pmd, address) \
-	((pte_t *) pmd_page_kernel(*(pmd)) + __pte_offset(address))
+	((pte_t *) pmd_page_kernel(*(pmd)) + pte_index(address))
 #define pte_offset_map(pmd, address) pte_offset_kernel(pmd, address)
 #define pte_offset_map_nested(pmd, address) pte_offset_kernel(pmd, address)
 #define pte_unmap(pte) do { } while (0)

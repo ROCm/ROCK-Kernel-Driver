@@ -231,7 +231,7 @@ fcclassic_setup(struct fritz_adapter *adapter)
 	adapter->isac.write_isac      = &fcclassic_write_isac;
 	adapter->isac.read_isac_fifo  = &fcclassic_read_isac_fifo;
 	adapter->isac.write_isac_fifo = &fcclassic_write_isac_fifo;
-	isac_setup(&adapter->isac);
+	hisax_isac_setup(&adapter->isac);
 	for (i = 0; i < 2; i++) {
 		hscx_init(&adapter->hscx[i]);
 		adapter->hscx[i].priv            = adapter;

@@ -33,17 +33,8 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 		return -ENOMEM;
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define COLOR_HALIGN(addr) ((addr + HPAGE_SIZE - 1) & ~(HPAGE_SIZE - 1))
-#define TASK_HPAGE_BASE ((REGION_HPAGE << REGION_SHIFT) | HPAGE_SIZE)
-	if (filp && is_file_hugepages(filp)) {
-		if ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE -1)))
-			addr = TASK_HPAGE_BASE;
-		addr = COLOR_HALIGN(addr);
-	}
-	else {
-		if (REGION_NUMBER(addr) == REGION_HPAGE)
-			addr = 0;
-	}
+	if (REGION_NUMBER(addr) == REGION_HPAGE)
+		addr = 0;
 #endif
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;

@@ -825,7 +825,7 @@ ia64_init_handler (struct pt_regs *regs)
 	plog_ptr=(ia64_err_rec_t *)IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_INIT);
 	proc_ptr = &plog_ptr->proc_err;
 
-	ia64_process_min_state_save(&proc_ptr->processor_static_info.min_state_area);
+	ia64_process_min_state_save(&SAL_LPI_PSI_INFO(proc_ptr)->min_state_area);
 
 	/* Clear the INIT SAL logs now that they have been saved in the OS buffer */
 	ia64_sal_clear_state_info(SAL_INFO_TYPE_INIT);
@@ -1620,7 +1620,7 @@ ia64_log_proc_dev_err_info_print (sal_log_processor_info_t  *slpi,
 	 *  absent. Also, current implementations only allocate space for number of
 	 *  elements used.  So we walk the data pointer from here on.
 	 */
-	p_data = &slpi->cache_check_info[0];
+	p_data = &slpi->info[0];
 
 	/* Print the cache check information if any*/
 	for (i = 0 ; i < slpi->valid.num_cache_check; i++, p_data++)

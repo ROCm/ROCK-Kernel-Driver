@@ -64,26 +64,10 @@
 #include <linux/sdlapci.h>
 #include <linux/if_wanpipe_common.h>
 
-#if defined(LINUX_2_4)
+#define netdevice_t struct net_device
 
- #include <asm/uaccess.h>	/* kernel <-> user copy */
- #include <linux/inetdevice.h>
- #define netdevice_t struct net_device 
-
-#elif defined(LINUX_2_1)
-
- #include <asm/uaccess.h>	/* kernel <-> user copy */
- #include <linux/inetdevice.h>
- #define netdevice_t struct device 
-
-#else
-
- #include <asm/segment.h>
- #define devinet_ioctl(x,y) dev_ioctl(x,y)
- #define netdevice_t struct device 
- #define test_and_set_bit set_bit
- typedef unsigned long mm_segment_t; 
-#endif
+#include <asm/uaccess.h>	/* kernel <-> user copy */
+#include <linux/inetdevice.h>
 
 #include <linux/ip.h>
 #include <net/route.h>
@@ -240,23 +224,12 @@ static sdla_t* card_array = NULL;	/* adapter data space */
  * function, which will execute all pending,
  * tasks in wanpipe_tq_custom queue */
 
-#ifdef LINUX_2_4
 DECLARE_TASK_QUEUE(wanpipe_tq_custom);
 static struct tq_struct wanpipe_tq_task = 
 {
 	.routine = (void (*)(void *)) run_wanpipe_tq,
 	.data = &wanpipe_tq_custom
 };
-#else
-static struct tq_struct *wanpipe_tq_custom = NULL;
-static struct tq_struct wanpipe_tq_task = 
-{
-	NULL,
-	0,
-	(void *)(void *) run_wanpipe_tq,
-	&wanpipe_tq_custom
-};
-#endif
 
 static int wanpipe_bh_critical=0;
 
@@ -511,9 +484,7 @@ static int setup (wan_device_t* wandev, wandev_conf_t* conf)
 	if (!card->configured){
 
 		/* Initialize the Spin lock */
-#if defined(__SMP__) || defined(LINUX_2_4) 
 		printk(KERN_INFO "%s: Initializing for SMP\n",wandev->name);
-#endif
 
 		/* Piggyback spin lock has already been initialized,
 		 * in check_s514/s508_conflicts() */
@@ -974,26 +945,13 @@ static int ioctl_dump (sdla_t* card, sdla_dump_t* u_dump)
 	unsigned long smp_flags;
 	int err = 0;
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	if(copy_from_user((void*)&dump, (void*)u_dump, sizeof(sdla_dump_t)))
 		return -EFAULT;
-      #else
-        if ((u_dump == NULL) ||
-            verify_area(VERIFY_READ, u_dump, sizeof(sdla_dump_t)))
-                return -EFAULT;
-        memcpy_fromfs((void*)&dump, (void*)u_dump, sizeof(sdla_dump_t));
-      #endif
 		
 	if ((dump.magic != WANPIPE_MAGIC) ||
 	    (dump.offset + dump.length > card->hw.memory))
 		return -EINVAL;
 	
-      #ifdef LINUX_2_0
-        if ((dump.ptr == NULL) ||
-            verify_area(VERIFY_WRITE, dump.ptr, dump.length))
-                return -EFAULT;
-      #endif	
-
 	winsize = card->hw.dpmsize;
 
 	if(card->hw.type != SDLA_S514) {
@@ -1014,17 +972,13 @@ static int ioctl_dump (sdla_t* card, sdla_dump_t* u_dump)
                                 break;
                         }
 			
-                      #if defined(LINUX_2_1) || defined(LINUX_2_4)
                         if(copy_to_user((void *)dump.ptr,
                                 (u8 *)card->hw.dpmbase + pos, len)){ 
 				
 				unlock_adapter_irq(&card->wandev.lock, &smp_flags);
 				return -EFAULT;
 			}
-                      #else
-			memcpy_tofs((void*)(dump.ptr),
-                        	(void*)(card->hw.dpmbase + pos), len);
-                      #endif
+
                         dump.length     -= len;
                         dump.offset     += len;
                         (char*)dump.ptr += len;
@@ -1035,15 +989,10 @@ static int ioctl_dump (sdla_t* card, sdla_dump_t* u_dump)
         
 	}else {
 
-	     #if defined(LINUX_2_1) || defined(LINUX_2_4) 
                if(copy_to_user((void *)dump.ptr,
 			       (u8 *)card->hw.dpmbase + dump.offset, dump.length)){
 			return -EFAULT;
 		}
-             #else
-                memcpy_tofs((void*)(dump.ptr),
-                (void*)(card->hw.dpmbase + dump.offset), dump.length);
-             #endif
 	}
 
 	return err;
@@ -1064,15 +1013,8 @@ static int ioctl_exec (sdla_t* card, sdla_exec_t* u_exec, int cmd)
 		return -ENODEV;
 	}
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)	
 	if(copy_from_user((void*)&exec, (void*)u_exec, sizeof(sdla_exec_t)))
 		return -EFAULT;
-      #else
-        if ((u_exec == NULL) ||
-            verify_area(VERIFY_READ, u_exec, sizeof(sdla_exec_t)))
-                return -EFAULT;
-        memcpy_fromfs((void*)&exec, (void*)u_exec, sizeof(sdla_exec_t));
-      #endif
 
 	if ((exec.magic != WANPIPE_MAGIC) || (exec.cmd == NULL))
 		return -EINVAL;
@@ -1345,60 +1287,33 @@ int change_dev_flags (netdevice_t *dev, unsigned flags)
 unsigned long get_ip_address (netdevice_t *dev, int option)
 {
 	
-      #ifdef LINUX_2_4
 	struct in_ifaddr *ifaddr;
 	struct in_device *in_dev;
 
 	if ((in_dev = __in_dev_get(dev)) == NULL){
 		return 0;
 	}
-      #elif defined(LINUX_2_1)
-	struct in_ifaddr *ifaddr;
-	struct in_device *in_dev;
-	
-	if ((in_dev = dev->ip_ptr) == NULL){
-		return 0;
-	}
-      #endif
 
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	if ((ifaddr = in_dev->ifa_list)== NULL ){
 		return 0;
 	}
-      #endif
 	
 	switch (option){
 
 	case WAN_LOCAL_IP:
-	      #ifdef LINUX_2_0
-		return dev->pa_addr;
-	      #else	
 		return ifaddr->ifa_local;
-	      #endif	
 		break;
 	
 	case WAN_POINTOPOINT_IP:
-	      #ifdef LINUX_2_0
-		return dev->pa_dstaddr;
-	      #else	
 		return ifaddr->ifa_address;
-	      #endif	
 		break;	
 
 	case WAN_NETMASK_IP:
-	      #ifdef LINUX_2_0
-		return dev->pa_mask;
-	      #else	
 		return ifaddr->ifa_mask;
-	      #endif	
 		break;
 
 	case WAN_BROADCAST_IP:
-	      #ifdef LINUX_2_0
-		return dev->pa_brdaddr;
-	      #else	
 		return ifaddr->ifa_broadcast;
-	      #endif	
 		break;
 	default:
 		return 0;
@@ -1431,11 +1346,7 @@ void add_gateway(sdla_t *card, netdevice_t *dev)
 
 	oldfs = get_fs();
 	set_fs(get_ds());
-      #if defined(LINUX_2_1) || defined(LINUX_2_4)
 	res = ip_rt_ioctl(SIOCADDRT,&route);
-      #else
-	res = ip_rt_new(&route);
-      #endif
 	set_fs(oldfs);
 
 	if (res == 0){
