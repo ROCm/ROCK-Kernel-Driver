@@ -211,6 +211,7 @@ static int isdn_uihdlc_setup(isdn_net_dev *p);
 static int isdn_iptyp_setup(isdn_net_dev *p);
 
 static void isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
+static void isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp, struct sk_buff *skb);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
@@ -1230,11 +1231,8 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 			isdn_ether_receive(lp->netdev, olp, skb);
 			return;
 		case ISDN_NET_ENCAP_UIHDLC:
-			/* HDLC with UI-frame (for ispa with -h1 option) */
-			olp->huptimer = 0;
-			lp->huptimer = 0;
-			skb_pull(skb, 2);
-			/* Fall through */
+			isdn_uihdlc_receive(lp->netdev, olp, skb);
+			return;
 		case ISDN_NET_ENCAP_RAWIP:
 			/* RAW-IP without MAC-Header */
 			olp->huptimer = 0;
@@ -2540,6 +2538,17 @@ isdn_uihdlc_header(struct sk_buff *skb, struct net_device *dev,
 {
 	put_u16(skb_push(skb, 2), 0x0103);
 	return 2;
+}
+
+static void
+isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp, 
+		    struct sk_buff *skb)
+{
+	isdn_net_local *lp = &p->local;
+
+	isdn_net_reset_huptimer(lp, olp);
+	skb_pull(skb, 2);
+	netif_rx(skb);
 }
 
 int
