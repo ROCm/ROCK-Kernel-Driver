@@ -503,11 +503,18 @@ void scsi_old_done(Scsi_Cmnd * SCpnt)
 					break;
 
 				case RESERVATION_CONFLICT:
-					printk("scsi%d, channel %d : RESERVATION CONFLICT performing"
-					       " reset.\n", SCpnt->host->host_no, SCpnt->channel);
-					scsi_reset(SCpnt, SCSI_RESET_SYNCHRONOUS);
-					status = REDO;
+					/*
+					 * Most HAs will return an error for
+					 * this, so usually reservation
+					 * conflicts will  be processed under
+					 * DID_ERROR code
+					 */
+					printk("scsi%d (%d,%d,%d) : RESERVATION CONFLICT\n", 
+					       SCpnt->host->host_no, SCpnt->channel,
+					       SCpnt->device->id, SCpnt->device->lun);
+					status = CMD_FINISHED; /* returns I/O error */
 					break;
+                                        
 				default:
 					printk("Internal error %s %d \n"
 					 "status byte = %d \n", __FILE__,
@@ -557,6 +564,14 @@ void scsi_old_done(Scsi_Cmnd * SCpnt)
 		exit = (DRIVER_HARD | SUGGEST_ABORT);
 		break;
 	case DID_ERROR:
+		if (msg_byte(result) == COMMAND_COMPLETE &&
+		    status_byte(result) == RESERVATION_CONFLICT) {
+			printk("scsi%d (%d,%d,%d) : RESERVATION CONFLICT\n", 
+			       SCpnt->host->host_no, SCpnt->channel,
+			       SCpnt->device->id, SCpnt->device->lun);
+			status = CMD_FINISHED; /* returns I/O error */
+			break;
+		}
 		status = MAYREDO;
 		exit = (DRIVER_HARD | SUGGEST_ABORT);
 		break;
@@ -1098,6 +1113,34 @@ int update_timeout(Scsi_Cmnd * SCset, int timeout)
 	return rtn;
 }
 
+
+/*
+ * This function exports SCSI Bus, Device or Host reset capability
+ * and is for use with the SCSI generic driver.
+ */
+int
+scsi_old_reset(Scsi_Cmnd *SCpnt, unsigned int flag)
+{
+	unsigned int old_flags = SCSI_RESET_SYNCHRONOUS;
+
+	switch(flag) {
+	case SCSI_TRY_RESET_DEVICE:
+		/* no suggestion flags to add, device reset is default */
+		break;
+	case SCSI_TRY_RESET_BUS:
+		old_flags |= SCSI_RESET_SUGGEST_BUS_RESET;
+		break;
+	case SCSI_TRY_RESET_HOST:
+		old_flags |= SCSI_RESET_SUGGEST_HOST_RESET;
+		break;
+	default:
+		return FAILED;
+	}
+
+	if (scsi_reset(SCpnt, old_flags))
+		return FAILED;
+	return SUCCESS;
+}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

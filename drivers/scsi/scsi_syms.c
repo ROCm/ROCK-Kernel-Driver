@@ -84,6 +84,11 @@ EXPORT_SYMBOL(scsi_register_blocked_host);
 EXPORT_SYMBOL(scsi_deregister_blocked_host);
 
 /*
+ * This symbol is for the highlevel drivers (e.g. sg) only.
+ */
+EXPORT_SYMBOL(scsi_reset_provider);
+
+/*
  * These are here only while I debug the rest of the scsi stuff.
  */
 EXPORT_SYMBOL(scsi_hostlist);

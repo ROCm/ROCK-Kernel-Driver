@@ -849,6 +849,16 @@ struct scsi_cmnd {
 	current->state = TASK_RUNNING;	\
     }; }
 
+/*
+ * old style reset request from external source
+ * (private to sg.c and scsi_error.c, supplied by scsi_obsolete.c)
+ */
+#define SCSI_TRY_RESET_DEVICE	1
+#define SCSI_TRY_RESET_BUS	2
+#define SCSI_TRY_RESET_HOST	3
+
+extern int scsi_reset_provider(Scsi_Device *, int);
+
 #endif
 
 /*

@@ -984,15 +984,24 @@ int scsi_decide_disposition(Scsi_Cmnd * SCpnt)
 	case DID_SOFT_ERROR:
 		goto maybe_retry;
 
+	case DID_ERROR:
+		if (msg_byte(SCpnt->result) == COMMAND_COMPLETE &&
+		    status_byte(SCpnt->result) == RESERVATION_CONFLICT)
+			/*
+			 * execute reservation conflict processing code
+			 * lower down
+			 */
+			break;
+		/* FALLTHROUGH */
+
 	case DID_BUS_BUSY:
 	case DID_PARITY:
-	case DID_ERROR:
 		goto maybe_retry;
 	case DID_TIME_OUT:
 		/*
-		   * When we scan the bus, we get timeout messages for
-		   * these commands if there is no device available.
-		   * Other hosts report DID_NO_CONNECT for the same thing.
+		 * When we scan the bus, we get timeout messages for
+		 * these commands if there is no device available.
+		 * Other hosts report DID_NO_CONNECT for the same thing.
 		 */
 		if ((SCpnt->cmnd[0] == TEST_UNIT_READY ||
 		     SCpnt->cmnd[0] == INQUIRY)) {
@@ -1053,8 +1062,13 @@ int scsi_decide_disposition(Scsi_Cmnd * SCpnt)
 		 */
 		return SUCCESS;
 	case BUSY:
-	case RESERVATION_CONFLICT:
 		goto maybe_retry;
+
+	case RESERVATION_CONFLICT:
+		printk("scsi%d (%d,%d,%d) : RESERVATION CONFLICT\n", 
+		       SCpnt->host->host_no, SCpnt->channel,
+		       SCpnt->device->id, SCpnt->device->lun);
+		return SUCCESS; /* causes immediate I/O error */
 	default:
 		return FAILED;
 	}
@@ -1957,6 +1971,45 @@ void scsi_error_handler(void *data)
 	 */
 	if (host->eh_notify != NULL)
 		up(host->eh_notify);
+}
+
+/*
+ * Function:	scsi_new_reset
+ *
+ * Purpose:	Send requested reset to a bus or device at any phase.
+ *
+ * Arguments:	SCpnt	- command ptr to send reset with (usually a dummy)
+ *		flag - reset type (see scsi.h)
+ *
+ * Returns:	SUCCESS/FAILURE.
+ *
+ * Notes:	This is used by the SCSI Generic driver to provide
+ *		Bus/Device reset capability.
+ */
+int
+scsi_new_reset(Scsi_Cmnd *SCpnt, int flag)
+{
+	int rtn;
+
+	switch(flag) {
+	case SCSI_TRY_RESET_DEVICE:
+		rtn = scsi_try_bus_device_reset(SCpnt, 0);
+		if (rtn == SUCCESS)
+			break;
+		/* FALLTHROUGH */
+	case SCSI_TRY_RESET_BUS:
+		rtn = scsi_try_bus_reset(SCpnt);
+		if (rtn == SUCCESS)
+			break;
+		/* FALLTHROUGH */
+	case SCSI_TRY_RESET_HOST:
+		rtn = scsi_try_host_reset(SCpnt);
+		break;
+	default:
+		rtn = FAILED;
+	}
+
+	return rtn;
 }
 
 /*
