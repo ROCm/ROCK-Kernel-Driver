@@ -191,12 +191,12 @@ static int joydev_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t joydev_write(struct file * file, const char * buffer, size_t count, loff_t *ppos)
+static ssize_t joydev_write(struct file * file, const char __user * buffer, size_t count, loff_t *ppos)
 {
 	return -EINVAL;
 }
 
-static ssize_t joydev_read(struct file *file, char *buf, size_t count, loff_t *ppos)
+static ssize_t joydev_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
@@ -291,6 +291,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
 	struct input_dev *dev = joydev->handle.dev;
+	void __user *argp = (void __user *)arg;
 	int i, j;
 
 	if (!joydev->exist) return -ENODEV;
@@ -298,34 +299,34 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	switch (cmd) {
 
 		case JS_SET_CAL:
-			return copy_from_user(&joydev->glue.JS_CORR, (struct JS_DATA_TYPE *) arg,
+			return copy_from_user(&joydev->glue.JS_CORR, argp,
 				sizeof(struct JS_DATA_TYPE)) ? -EFAULT : 0;
 		case JS_GET_CAL:
-			return copy_to_user((struct JS_DATA_TYPE *) arg, &joydev->glue.JS_CORR,
+			return copy_to_user(argp, &joydev->glue.JS_CORR,
 				sizeof(struct JS_DATA_TYPE)) ? -EFAULT : 0;
 		case JS_SET_TIMEOUT:
-			return get_user(joydev->glue.JS_TIMEOUT, (int *) arg);
+			return get_user(joydev->glue.JS_TIMEOUT, (int __user *) arg);
 		case JS_GET_TIMEOUT:
-			return put_user(joydev->glue.JS_TIMEOUT, (int *) arg);
+			return put_user(joydev->glue.JS_TIMEOUT, (int __user *) arg);
 		case JS_SET_TIMELIMIT:
-			return get_user(joydev->glue.JS_TIMELIMIT, (long *) arg);
+			return get_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
 		case JS_GET_TIMELIMIT:
-			return put_user(joydev->glue.JS_TIMELIMIT, (long *) arg);
+			return put_user(joydev->glue.JS_TIMELIMIT, (long __user *) arg);
 		case JS_SET_ALL:
-			return copy_from_user(&joydev->glue, (struct JS_DATA_SAVE_TYPE *) arg,
+			return copy_from_user(&joydev->glue, argp,
 						sizeof(struct JS_DATA_SAVE_TYPE)) ? -EFAULT : 0;
 		case JS_GET_ALL:
-			return copy_to_user((struct JS_DATA_SAVE_TYPE *) arg, &joydev->glue,
+			return copy_to_user(argp, &joydev->glue,
 						sizeof(struct JS_DATA_SAVE_TYPE)) ? -EFAULT : 0;
 
 		case JSIOCGVERSION:
-			return put_user(JS_VERSION, (__u32 *) arg);
+			return put_user(JS_VERSION, (__u32 __user *) arg);
 		case JSIOCGAXES:
-			return put_user(joydev->nabs, (__u8 *) arg);
+			return put_user(joydev->nabs, (__u8 __user *) arg);
 		case JSIOCGBUTTONS:
-			return put_user(joydev->nkey, (__u8 *) arg);
+			return put_user(joydev->nkey, (__u8 __user *) arg);
 		case JSIOCSCORR:
-			if (copy_from_user(joydev->corr, (struct js_corr *)arg,
+			if (copy_from_user(joydev->corr, argp,
 				      sizeof(struct js_corr) * joydev->nabs))
 			    return -EFAULT;
 			for (i = 0; i < joydev->nabs; i++) {
@@ -334,10 +335,10 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			return 0;
 		case JSIOCGCORR:
-			return copy_to_user((struct js_corr *) arg, joydev->corr,
+			return copy_to_user(argp, joydev->corr,
 						sizeof(struct js_corr) * joydev->nabs) ? -EFAULT : 0;
 		case JSIOCSAXMAP:
-			if (copy_from_user(joydev->abspam, (__u8 *) arg, sizeof(__u8) * ABS_MAX))
+			if (copy_from_user(joydev->abspam, argp, sizeof(__u8) * ABS_MAX))
 				return -EFAULT;
 			for (i = 0; i < joydev->nabs; i++) {
 				if (joydev->abspam[i] > ABS_MAX) return -EINVAL;
@@ -345,10 +346,10 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			return 0;
 		case JSIOCGAXMAP:
-			return copy_to_user((__u8 *) arg, joydev->abspam,
+			return copy_to_user(argp, joydev->abspam,
 						sizeof(__u8) * ABS_MAX) ? -EFAULT : 0;
 		case JSIOCSBTNMAP:
-			if (copy_from_user(joydev->keypam, (__u16 *) arg, sizeof(__u16) * (KEY_MAX - BTN_MISC)))
+			if (copy_from_user(joydev->keypam, argp, sizeof(__u16) * (KEY_MAX - BTN_MISC)))
 				return -EFAULT;
 			for (i = 0; i < joydev->nkey; i++) {
 				if (joydev->keypam[i] > KEY_MAX || joydev->keypam[i] < BTN_MISC) return -EINVAL;
@@ -356,7 +357,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			return 0;
 		case JSIOCGBTNMAP:
-			return copy_to_user((__u16 *) arg, joydev->keypam,
+			return copy_to_user(argp, joydev->keypam,
 						sizeof(__u16) * (KEY_MAX - BTN_MISC)) ? -EFAULT : 0;
 		default:
 			if ((cmd & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT)) == JSIOCGNAME(0)) {
@@ -364,7 +365,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				if (!dev->name) return 0;
 				len = strlen(dev->name) + 1;
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
-				if (copy_to_user((char *) arg, dev->name, len)) return -EFAULT;
+				if (copy_to_user(argp, dev->name, len)) return -EFAULT;
 				return len;
 			}
 	}

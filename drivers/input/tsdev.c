@@ -151,7 +151,7 @@ static int tsdev_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t tsdev_read(struct file *file, char *buffer, size_t count,
+static ssize_t tsdev_read(struct file *file, char __user *buffer, size_t count,
 			  loff_t * ppos)
 {
 	struct tsdev_list *list = file->private_data;

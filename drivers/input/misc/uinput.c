@@ -166,7 +166,7 @@ static int uinput_validate_absbits(struct input_dev *dev)
 	return retval;
 }
 
-static int uinput_alloc_device(struct file *file, const char *buffer, size_t count)
+static int uinput_alloc_device(struct file *file, const char __user *buffer, size_t count)
 {
 	struct uinput_user_dev	*user_dev;
 	struct input_dev	*dev;
@@ -226,7 +226,7 @@ exit:
 	return retval;
 }
 
-static ssize_t uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t uinput_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device	*udev = file->private_data;
 
@@ -243,7 +243,7 @@ static ssize_t uinput_write(struct file *file, const char *buffer, size_t count,
 	return count;
 }
 
-static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t uinput_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device *udev = file->private_data;
 	int retval = 0;
