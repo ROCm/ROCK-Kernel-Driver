@@ -1,20 +1,11 @@
 /*
- *	ROSE release 003
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	ROSE 001	Jonathan(G4KLX)	Cloned from nr_out.c
- *	ROSE 003	Jonathan(G4KLX)	New timer architecture.
- *					Removed M bit processing.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -36,7 +27,7 @@
 #include <linux/interrupt.h>
 #include <net/rose.h>
 
-/* 
+/*
  *	This procedure is passed a buffer descriptor for an iframe. It builds
  *	the rest of the control part of the frame and then writes it out.
  */
@@ -52,7 +43,7 @@ static void rose_send_iframe(struct sock *sk, struct sk_buff *skb)
 
 	rose_start_idletimer(sk);
 
-	rose_transmit_link(skb, rose->neighbour);	
+	rose_transmit_link(skb, rose->neighbour);
 }
 
 void rose_kick(struct sock *sk)

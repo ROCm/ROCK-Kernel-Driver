@@ -1,20 +1,11 @@
 /*
- *	NET/ROM release 007
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	NET/ROM 007	Tomi(OH2BNS)	Created this file.
- *                                      Small change in nr_loopback_queue().
- *
+ * Copyright Tomi Manninen OH2BNS (oh2bns@sral.fi)
  */
-
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/timer.h>

@@ -1,27 +1,12 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Most of this code is based on the SDL diagrams published in the 7th
- *	ARRL Computer Networking Conference papers. The diagrams have mistakes
- *	in them, but are mostly correct. Before you modify the code could you
- *	read the SDL diagrams as the code is not obvious and probably very
- *	easy to break;
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Cloned from ax25_out.c and ax25_subr.c.
- *			Joerg(DL1BKE)	Changed ax25_ds_enquiry_response(),
- *					fixed ax25_dama_on() and ax25_dama_off().
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -31,6 +16,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 #include <linux/sockios.h>
+#include <linux/spinlock.h>
 #include <linux/net.h>
 #include <net/ax25.h>
 #include <linux/inet.h>
@@ -73,7 +59,7 @@ void ax25_ds_enquiry_response(ax25_cb *ax25)
 	 *	DL1BKE-7->DB0PRA-6 DB0ACH <I C S3 R5>
 	 *
 	 * Flexnet refuses to send us *any* I frame if we send
-	 * a REJ in case AX25_COND_REJECT is set. It is superfluous in 
+	 * a REJ in case AX25_COND_REJECT is set. It is superfluous in
 	 * this mode anyway (a RR or RNR invokes the retransmission).
 	 * Is this a Flexnet bug?
 	 */
@@ -93,6 +79,7 @@ void ax25_ds_enquiry_response(ax25_cb *ax25)
 	ax25_start_t3timer(ax25);
 	ax25_ds_set_timer(ax25->ax25_dev);
 
+	spin_lock_bh(&ax25_list_lock);
 	for (ax25o = ax25_list; ax25o != NULL; ax25o = ax25o->next) {
 		if (ax25o == ax25)
 			continue;
@@ -118,6 +105,7 @@ void ax25_ds_enquiry_response(ax25_cb *ax25)
 		if (ax25o->state != AX25_STATE_0)
 			ax25_start_t3timer(ax25o);
 	}
+	spin_unlock_bh(&ax25_list_lock);
 }
 
 void ax25_ds_establish_data_link(ax25_cb *ax25)
@@ -132,8 +120,8 @@ void ax25_ds_establish_data_link(ax25_cb *ax25)
 
 /*
  *	:::FIXME:::
- *	This is a kludge. Not all drivers recognize kiss commands. 
- *	We need a driver level  request to switch duplex mode, that does 
+ *	This is a kludge. Not all drivers recognize kiss commands.
+ *	We need a driver level  request to switch duplex mode, that does
  *	either SCC changing, PI config or KISS as required. Currently
  *	this request isn't reliable.
  */
@@ -164,19 +152,24 @@ static void ax25_kiss_cmd(ax25_dev *ax25_dev, unsigned char cmd, unsigned char p
  *	A nasty problem arises if we count the number of DAMA connections
  *	wrong, especially when connections on the device already existed
  *	and our network node (or the sysop) decides to turn on DAMA Master
- *	mode. We thus flag the 'real' slave connections with 
+ *	mode. We thus flag the 'real' slave connections with
  *	ax25->dama_slave=1 and look on every disconnect if still slave
  *	connections exist.
  */
 static int ax25_check_dama_slave(ax25_dev *ax25_dev)
 {
 	ax25_cb *ax25;
+	int res = 0;
 
+	spin_lock_bh(&ax25_list_lock);
 	for (ax25 = ax25_list; ax25 != NULL ; ax25 = ax25->next)
-		if (ax25->ax25_dev == ax25_dev && (ax25->condition & AX25_COND_DAMA_MODE) && ax25->state > AX25_STATE_1)
-			return 1;
+		if (ax25->ax25_dev == ax25_dev && (ax25->condition & AX25_COND_DAMA_MODE) && ax25->state > AX25_STATE_1) {
+			res = 1;
+			break;
+		}
+	spin_unlock_bh(&ax25_list_lock);
 
-	return 0;
+	return res;
 }
 
 void ax25_dev_dama_on(ax25_dev *ax25_dev)
