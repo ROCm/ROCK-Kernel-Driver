@@ -364,6 +364,6 @@ config ACPI_INITRD
 	  attach the DSDT to the initrd or initramfs 
 	  (see http://gaugusch.at/kernel.shtml for details)
 	  If there is no DSDT found in the initrd, the DSDT from the BIOS is
-	  used. It is save to say yes here.
+	  used. It is safe to say yes here.
 
 endmenu
