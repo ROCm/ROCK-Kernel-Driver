@@ -56,13 +56,16 @@
 
 static unsigned char which_scsi = 0;
 
+int MCA_bus = 0;
+EXPORT_SYMBOL(MCA_bus);
+
 /*
  * Motherboard register spinlock. Untested on SMP at the moment, but
  * are there any MCA SMP boxes?
  *
  * Yes - Alan
  */
-spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
 
 /* Build the status info for the adapter */
 
@@ -119,7 +122,7 @@ static void mca_configure_adapter_status(struct mca_device *mca_dev) {
 
 /*--------------------------------------------------------------------*/
 
-struct resource mca_standard_resources[] = {
+static struct resource mca_standard_resources[] = {
 	{ "system control port B (MCA)", 0x60, 0x60 },
 	{ "arbitration (MCA)", 0x90, 0x90 },
 	{ "card Select Feedback (MCA)", 0x91, 0x91 },

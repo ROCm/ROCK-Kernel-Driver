@@ -21,10 +21,6 @@
 #include <asm/segment.h>
 #include <asm/page.h>
 
-/* Bus types */
-#define MCA_bus 0
-#define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
 /* The sparc has no problems with write protection */
 #define wp_works_ok 1
 #define wp_works_ok__is_a_macro /* for versions in ksyms.c */
