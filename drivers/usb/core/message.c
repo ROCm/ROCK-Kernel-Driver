@@ -795,6 +795,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	struct usb_interface *iface;
 	struct usb_host_interface *iface_as;
 	int i, ret;
+	void (*disable)(struct usb_device *, int) = dev->bus->op->disable;
 
 	iface = usb_ifnum_to_if(dev, interface);
 	if (!iface) {
@@ -832,9 +833,11 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 		u8	ep = iface_as->endpoint [i].desc.bEndpointAddress;
 		int	out = !(ep & USB_DIR_IN);
 
+		/* clear out hcd state, then usbcore state */
+		if (disable)
+			disable (dev, ep);
 		ep &= USB_ENDPOINT_NUMBER_MASK;
 		(out ? dev->epmaxpacketout : dev->epmaxpacketin ) [ep] = 0;
-		// FIXME want hcd hook here, "no such endpoint"
 	}
 	iface->act_altsetting = alternate;
 
@@ -898,6 +901,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
 	struct usb_host_config *cp = NULL;
+	void (*disable)(struct usb_device *, int) = dev->bus->op->disable;
 	
 	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
@@ -911,11 +915,15 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	}
 
 	/* if it's already configured, clear out old state first. */
-	if (dev->state != USB_STATE_ADDRESS) {
-		/* FIXME unbind drivers from all "old" interfaces.
-		 * handshake with hcd to reset cached hc endpoint state.
-		 */
+	if (dev->state != USB_STATE_ADDRESS && disable) {
+		for (i = 0; i < 15; i++) {
+			disable (dev, i);
+			disable (dev, USB_DIR_IN | i);
+		}
 	}
+	dev->toggle[0] = dev->toggle[1] = 0;
+	dev->halted[0] = dev->halted[1] = 0;
+	dev->state = USB_STATE_ADDRESS;
 
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
@@ -923,15 +931,9 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		return ret;
 	if (configuration)
 		dev->state = USB_STATE_CONFIGURED;
-	else
-		dev->state = USB_STATE_ADDRESS;
 	dev->actconfig = cp;
 
 	/* reset more hc/hcd endpoint state */
-	dev->toggle[0] = 0;
-	dev->toggle[1] = 0;
-	dev->halted[0] = 0;
-	dev->halted[1] = 0;
 	usb_set_maxpacket(dev);
 
 	return 0;
