@@ -165,7 +165,7 @@ qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 				break;
 			}
 			WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
-			RD_REG_WORD(&reg->hccr);
+			RD_REG_WORD_RELAXED(&reg->hccr);
 		}
 	}
 

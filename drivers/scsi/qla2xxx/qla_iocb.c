@@ -390,7 +390,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	if (ha->req_q_cnt < (sp->req_cnt + 2)) {
 		/* Calculate number of free request entries */
-		cnt = RD_REG_WORD(ISP_REQ_Q_OUT(ha, reg));
+		cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha, reg));
 		if (ha->req_ring_index < cnt)
 			ha->req_q_cnt = cnt - ha->req_ring_index;
 		else
@@ -499,7 +499,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	/* Set chip new ring index. */
 	WRT_REG_WORD(ISP_REQ_Q_IN(ha, reg), ha->req_ring_index);
-	RD_REG_WORD(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
+	RD_REG_WORD_RELAXED(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return (QLA_SUCCESS);
@@ -748,5 +748,5 @@ qla2x00_isp_cmd(scsi_qla_host_t *ha)
 
 	/* Set chip new ring index. */
 	WRT_REG_WORD(ISP_REQ_Q_IN(ha, reg), ha->req_ring_index);
-	RD_REG_WORD(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
+	RD_REG_WORD_RELAXED(ISP_REQ_Q_IN(ha, reg));	/* PCI Posting. */
 }
