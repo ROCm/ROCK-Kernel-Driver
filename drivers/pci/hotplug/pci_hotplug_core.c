@@ -104,8 +104,19 @@ static struct kobj_type hotplug_slot_ktype = {
 	.release = &hotplug_slot_release,
 };
 
-decl_subsys(pci_hotplug_slots, &hotplug_slot_ktype, NULL);
-
+/* 
+ * We create a struct subsystem on our own and not use decl_subsys so
+ * we can have a sane name "slots" in sysfs, yet still keep a good
+ * global variable name "pci_hotplug_slots_subsys.
+ * If the decl_subsys() #define ever changes, this declaration will
+ * need to be update to make sure everything is initialized properly.
+ */
+struct subsystem pci_hotplug_slots_subsys = {
+	.kset = {
+		.kobj = { .name = "slots" },
+		.ktype = &hotplug_slot_ktype,
+	}
+};
 
 /* these strings match up with the values in pci_bus_speed */
 static char *pci_bus_speed_strings[] = {
