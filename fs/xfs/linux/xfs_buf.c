@@ -45,7 +45,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -167,7 +166,6 @@ pagebuf_trace(
 		NULL, NULL, NULL, NULL, NULL);
 }
 ktrace_t *pagebuf_trace_buf;
-EXPORT_SYMBOL(pagebuf_trace_buf);
 #define PAGEBUF_TRACE_SIZE	4096
 #define PB_TRACE(pb, id, data)	\
 	pagebuf_trace(pb, id, (void *)data, (void *)__builtin_return_address(0))
@@ -2058,12 +2056,3 @@ pagebuf_terminate(void)
 	remove_proc_entry("fs/pagebuf", NULL);
 #endif
 }
-
-
-/*
- *	Module management (for kernel debugger module)
- */
-EXPORT_SYMBOL(pagebuf_offset);
-#ifdef DEBUG
-EXPORT_SYMBOL(pbd_delwrite_queue);
-#endif
