@@ -15,19 +15,15 @@ endif
 endif
 endif
 
-host-progs := lxdialog
+host-progs    := lxdialog
+build-targets := $(host-progs)
 
 lxdialog-objs := checklist.o menubox.o textbox.o yesno.o inputbox.o \
 		 util.o lxdialog.o msgbox.o
 
-EXTRA_TARGETS := lxdialog
-
 first_rule: ncurses
 
-include $(TOPDIR)/Rules.make
-
 .PHONY: ncurses
-
 ncurses:
 	@echo "main() {}" > lxtemp.c
 	@if $(HOSTCC) lxtemp.c  $(HOST_LOADLIBES); then \
