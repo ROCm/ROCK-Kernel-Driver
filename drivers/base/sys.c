@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/errno.h>
 
 static struct device system_bus = {
        name:           "System Bus",
