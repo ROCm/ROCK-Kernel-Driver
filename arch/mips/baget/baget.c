@@ -1,5 +1,4 @@
-/* $Id: baget.c,v 1.1 1999/01/17 03:49:37 ralf Exp $
- *
+/*
  * baget.c: Baget low level stuff
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
@@ -21,7 +20,7 @@
  *  Following code is based on routines from 'mm/vmalloc.c'
  *  Additional parameters  ioaddr  is needed to iterate across real I/O address.
  */
-static inline int alloc_area_pte(pte_t * pte, unsigned long address, 
+static inline int alloc_area_pte(pte_t * pte, unsigned long address,
 				 unsigned long size, unsigned long ioaddr)
 {
         unsigned long end;
@@ -36,7 +35,7 @@ static inline int alloc_area_pte(pte_t * pte, unsigned long address,
                         printk("kseg2_alloc_io: page already exists\n");
 		/*
 		 *  For MIPS looks pretty to have transparent mapping
-		 *  for KSEG2 areas  -- user can't access one, and no 
+		 *  for KSEG2 areas  -- user can't access one, and no
 		 *  problems with  virtual <--> physical  translation.
 		 */
                 page = ioaddr & PAGE_MASK;
@@ -50,7 +49,7 @@ static inline int alloc_area_pte(pte_t * pte, unsigned long address,
         return 0;
 }
 
-static inline int alloc_area_pmd(pmd_t * pmd, unsigned long address, 
+static inline int alloc_area_pmd(pmd_t * pmd, unsigned long address,
 				 unsigned long size, unsigned long ioaddr)
 {
         unsigned long end;

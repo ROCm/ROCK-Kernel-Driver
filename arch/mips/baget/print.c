@@ -1,9 +1,7 @@
-/* $Id: print.c,v 1.1 1999/01/17 03:49:38 ralf Exp $
- *
+/*
  * print.c: Simple print fascility
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
- *
  */
 #include <stdarg.h>
 #include <linux/kernel.h>
@@ -16,7 +14,7 @@
  */
 // #define BAGET_PRINTK
 
-/* 
+/*
  *  This function is same for BALO and Linux baget_printk,
  *  and normally prints characted to second (UART A) console.
  */
@@ -27,7 +25,7 @@ static void outc_low(char c)
 {
         int i;
         vac_outb(c, VAC_UART_B_TX);
-        for (i=0; i<10000; i++) 
+        for (i=0; i<10000; i++)
                 delay();
 }
 
@@ -38,7 +36,7 @@ void outc(char c)
         outc_low(c);
 }
 
-void outs(char *s) 
+void outs(char *s)
 {
         while(*s) outc(*s++);
 }
@@ -79,7 +77,7 @@ static __inline__ void puthex( int a )
 void __init balo_printf( char *f, ... )
 {
         int *arg = (int*)&f + 1;
-        char c; 
+        char c;
         int format = 0;
 
         while((c = *f++) != 0) {
@@ -112,7 +110,7 @@ void __init balo_printf( char *f, ... )
 }
 
 void __init balo_hungup(void)
-{ 
+{
         outs("Hunging up.\n");
-        while(1); 
+        while(1);
 }

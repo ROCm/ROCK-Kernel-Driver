@@ -4,9 +4,10 @@
 #
 
 obj-y			:= baget.o print.o setup.o time.o irq.o bagetIRQ.o \
-			   reset.o wbflush.o
-obj-$(CONFIG_SERIAL)	+= vacserial.o
+			   reset.o
 obj-$(CONFIG_VAC_RTC)	+= vacrtc.o
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 bagetIRQ.o : bagetIRQ.S
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -28,7 +29,7 @@ dummy.c:
 dummy.o: dummy.c image.bin ramdisk.bin
 	$(CC) $(CFLAGS) -c -o $@ $<
 	$(OBJCOPY) --add-section=.vmlinux=image.bin \
-                   --add-section=.ramdisk=ramdisk.bin   $@ 
+                   --add-section=.ramdisk=ramdisk.bin   $@
 
 balo.h: image
 	$(NM) $< | awk ' \
@@ -39,13 +40,13 @@ balo.h: image
 	/balo_ramdisk_size/ { printf "#define RAMDISK_SIZE 0x%s\n", $$1 } \
                        ' > $@
 balo.o:   balo.c balo.h
-	$(CC) $(CFLAGS) -c $< 
+	$(CC) $(CFLAGS) -c $<
 
 balo_supp.o: balo_supp.S
 	$(CC) $(CFLAGS) -c $<
 
 balo:   balo.o dummy.o balo_supp.o print.o
-	$(LD) $(LDFLAGS) -T ld.script.balo -o $@ $^ 
+	$(LD) $(LDFLAGS) -T ld.script.balo -o $@ $^
 
 clean:
 	rm -f balo balo.h dummy.c image image.bin
