@@ -116,6 +116,7 @@ Version 0.0.6    2.1.110   07-aug-98   Eduardo Marcelo Serrat
 #include <linux/inet.h>
 #include <linux/route.h>
 #include <linux/netfilter.h>
+#include <linux/seq_file.h>
 #include <net/sock.h>
 #include <net/tcp.h>
 #include <net/flow.h>
@@ -676,45 +677,6 @@ char *dn_addr2asc(dn_address addr, char *buf)
 }
 
 
-static char *dn_state2asc(unsigned char state)
-{
-	switch(state) {
-		case DN_O:
-			return "OPEN";
-		case DN_CR:
-			return "  CR";
-		case DN_DR:
-			return "  DR";
-		case DN_DRC:
-			return " DRC";
-		case DN_CC:
-			return "  CC";
-		case DN_CI:
-			return "  CI";
-		case DN_NR:
-			return "  NR";
-		case DN_NC:
-			return "  NC";
-		case DN_CD:
-			return "  CD";
-		case DN_RJ:
-			return "  RJ";
-		case DN_RUN:
-			return " RUN";
-		case DN_DI:
-			return "  DI";
-		case DN_DIC:
-			return " DIC";
-		case DN_DN:
-			return "  DN";
-		case DN_CL:
-			return "  CL";
-		case DN_CN:
-			return "  CN";
-	}
-
-	return "????";
-}
 
 static int dn_create(struct socket *sock, int protocol)
 {
@@ -1001,6 +963,7 @@ static int __dn_connect(struct sock *sk, struct sockaddr_dn *addr, int addrlen, 
 	fl.fld_dst = dn_saddr2dn(&scp->peer);
 	fl.fld_src = dn_saddr2dn(&scp->addr);
 	dn_sk_ports_copy(&fl, scp);
+	fl.proto = DNPROTO_NSP;
 	if (dn_route_output_sock(&sk->dst_cache, &fl, sk, flags) < 0)
 		goto out;
 	sk->route_caps = sk->dst_cache->dev->features;
@@ -1964,7 +1927,7 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 	unsigned char fctype;
 	long timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
 
-	if (flags & ~(MSG_TRYHARD|MSG_OOB|MSG_DONTWAIT|MSG_EOR|MSG_NOSIGNAL))
+	if (flags & ~(MSG_TRYHARD|MSG_OOB|MSG_DONTWAIT|MSG_EOR|MSG_NOSIGNAL|MSG_MORE))
 		return -EOPNOTSUPP;
 
 	if (addr_len && (addr_len != sizeof(struct sockaddr_dn)))
@@ -2143,6 +2106,95 @@ static struct packet_type dn_dix_packet_type = {
 	.data =		(void*)1,
 };
 
+#ifdef CONFIG_PROC_FS
+struct dn_iter_state {
+	int bucket;
+};
+
+static struct sock *dn_socket_get_first(struct seq_file *seq)
+{
+	struct dn_iter_state *state = seq->private;
+	struct sock *n = NULL;
+
+	for(state->bucket = 0;
+	    state->bucket < DN_SK_HASH_SIZE;
+	    ++state->bucket) {
+		n = dn_sk_hash[state->bucket];
+		if (n)
+			break;
+	}
+
+	return n;
+}
+
+static struct sock *dn_socket_get_next(struct seq_file *seq,
+				       struct sock *n)
+{
+	struct dn_iter_state *state = seq->private;
+
+	n = n->next;
+try_again:
+	if (n)
+		goto out;
+	if (++state->bucket >= DN_SK_HASH_SIZE)
+		goto out;
+	n = dn_sk_hash[state->bucket];
+	goto try_again;
+out:
+	return n;
+}
+
+static struct sock *socket_get_idx(struct seq_file *seq, loff_t *pos)
+{
+	struct sock *sk = dn_socket_get_first(seq);
+
+	if (sk) {
+		while(*pos && (sk = dn_socket_get_next(seq, sk)))
+			--*pos;
+	}
+	return *pos ? NULL : sk;
+}
+
+static void *dn_socket_get_idx(struct seq_file *seq, loff_t pos)
+{
+	void *rc;
+	read_lock_bh(&dn_hash_lock);
+	rc = socket_get_idx(seq, &pos);
+	if (!rc) {
+		read_unlock_bh(&dn_hash_lock);
+	}
+	return rc;
+}
+
+static void *dn_socket_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	return *pos ? dn_socket_get_idx(seq, *pos - 1) : (void*)1;
+}
+
+static void *dn_socket_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	void *rc;
+
+	if (v == (void*)1) {
+		rc = dn_socket_get_idx(seq, 0);
+		goto out;
+	}
+
+	rc = dn_socket_get_next(seq, v);
+	if (rc)
+		goto out;
+	read_unlock_bh(&dn_hash_lock);
+out:
+	++*pos;
+	return rc;
+}
+
+static void dn_socket_seq_stop(struct seq_file *seq, void *v)
+{
+	if (v && v != (void*)1)
+		read_unlock_bh(&dn_hash_lock);
+}
+
 #define IS_NOT_PRINTABLE(x) ((x) < 32 || (x) > 126)
 
 static void dn_printable_object(struct sockaddr_dn *dn, unsigned char *buf)
@@ -2163,70 +2215,127 @@ static void dn_printable_object(struct sockaddr_dn *dn, unsigned char *buf)
     	}
 }
 
-static int dn_get_info(char *buffer, char **start, off_t offset, int length)
+static char *dn_state2asc(unsigned char state)
 {
-	struct sock *sk;
-	struct dn_scp *scp;
-	int len = 0;
-	off_t pos = 0;
-	off_t begin = 0;
+	switch(state) {
+		case DN_O:
+			return "OPEN";
+		case DN_CR:
+			return "  CR";
+		case DN_DR:
+			return "  DR";
+		case DN_DRC:
+			return " DRC";
+		case DN_CC:
+			return "  CC";
+		case DN_CI:
+			return "  CI";
+		case DN_NR:
+			return "  NR";
+		case DN_NC:
+			return "  NC";
+		case DN_CD:
+			return "  CD";
+		case DN_RJ:
+			return "  RJ";
+		case DN_RUN:
+			return " RUN";
+		case DN_DI:
+			return "  DI";
+		case DN_DIC:
+			return " DIC";
+		case DN_DN:
+			return "  DN";
+		case DN_CL:
+			return "  CL";
+		case DN_CN:
+			return "  CN";
+	}
+
+	return "????";
+}
+
+static inline void dn_socket_format_entry(struct seq_file *seq, struct sock *sk)
+{
+	struct dn_scp *scp = DN_SK(sk);
 	char buf1[DN_ASCBUF_LEN];
 	char buf2[DN_ASCBUF_LEN];
 	char local_object[DN_MAXOBJL+3];
 	char remote_object[DN_MAXOBJL+3];
-	int i;
 
-	len += sprintf(buffer + len, "Local                                              Remote\n");
+	dn_printable_object(&scp->addr, local_object);
+	dn_printable_object(&scp->peer, remote_object);
 
-	read_lock(&dn_hash_lock);
-	for(i = 0; i < DN_SK_HASH_SIZE; i++) {
-		for(sk = dn_sk_hash[i]; sk != NULL; sk = sk->next) {
-			scp = DN_SK(sk);
-
-			dn_printable_object(&scp->addr, local_object);
-			dn_printable_object(&scp->peer, remote_object);
-
-			len += sprintf(buffer + len,
-					"%6s/%04X %04d:%04d %04d:%04d %01d %-16s %6s/%04X %04d:%04d %04d:%04d %01d %-16s %4s %s\n",
-					dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->addr)), buf1),
-					scp->addrloc,
-					scp->numdat,
-					scp->numoth,
-					scp->ackxmt_dat,
-					scp->ackxmt_oth,
-					scp->flowloc_sw,
-					local_object,
-					dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->peer)), buf2),
-					scp->addrrem,
-					scp->numdat_rcv,
-					scp->numoth_rcv,
-					scp->ackrcv_dat,
-					scp->ackrcv_oth,
-					scp->flowrem_sw,
-					remote_object,
-					dn_state2asc(scp->state),
-					((scp->accept_mode == ACC_IMMED) ? "IMMED" : "DEFER"));
-
-			pos = begin + len;
-			if (pos < offset) {
-				len = 0;
-				begin = pos;
-			}
-			if (pos > (offset + length))
-				break;
-		}
-	}
-	read_unlock(&dn_hash_lock);
-
-	*start = buffer + (offset - begin);
-	len -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	seq_printf(seq,
+		   "%6s/%04X %04d:%04d %04d:%04d %01d %-16s "
+		   "%6s/%04X %04d:%04d %04d:%04d %01d %-16s %4s %s\n",
+		   dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->addr)), buf1),
+		   scp->addrloc,
+		   scp->numdat,
+		   scp->numoth,
+		   scp->ackxmt_dat,
+		   scp->ackxmt_oth,
+		   scp->flowloc_sw,
+		   local_object,
+		   dn_addr2asc(dn_ntohs(dn_saddr2dn(&scp->peer)), buf2),
+		   scp->addrrem,
+		   scp->numdat_rcv,
+		   scp->numoth_rcv,
+		   scp->ackrcv_dat,
+		   scp->ackrcv_oth,
+		   scp->flowrem_sw,
+		   remote_object,
+		   dn_state2asc(scp->state),
+		   ((scp->accept_mode == ACC_IMMED) ? "IMMED" : "DEFER"));
 }
 
+static int dn_socket_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void*)1) {
+		seq_puts(seq, "Local                                              Remote\n");
+	} else {
+		dn_socket_format_entry(seq, v);
+	}
+	return 0;
+}
+
+static struct seq_operations dn_socket_seq_ops = {
+	.start	= dn_socket_seq_start,
+	.next	= dn_socket_seq_next,
+	.stop	= dn_socket_seq_stop,
+	.show	= dn_socket_seq_show,
+};
+
+static int dn_socket_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct dn_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &dn_socket_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq		= file->private_data;
+	seq->private	= s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations dn_socket_seq_fops = {
+	.open		= dn_socket_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release_private,
+};
+#endif
 
 static struct net_proto_family	dn_family_ops = {
 	.family =	AF_DECnet,
@@ -2258,13 +2367,11 @@ static struct proto_ops dn_proto_ops = {
 void dn_register_sysctl(void);
 void dn_unregister_sysctl(void);
 
-
 MODULE_DESCRIPTION("The Linux DECnet Network Protocol");
 MODULE_AUTHOR("Linux DECnet Project Team");
 MODULE_LICENSE("GPL");
 
-
-static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.5.67s (C) 1995-2003 Linux DECnet Project Team\n";
+static char banner[] __initdata = KERN_INFO "NET4: DECnet for Linux: V.2.5.68s (C) 1995-2003 Linux DECnet Project Team\n";
 
 static int __init decnet_init(void)
 {
@@ -2281,15 +2388,12 @@ static int __init decnet_init(void)
 	dev_add_pack(&dn_dix_packet_type);
 	register_netdevice_notifier(&dn_dev_notifier);
 
-	proc_net_create("decnet", 0, dn_get_info);
+	proc_net_fops_create("decnet", S_IRUGO, &dn_socket_seq_fops);
 
 	dn_neigh_init();
 	dn_dev_init();
 	dn_route_init();
-
-#ifdef CONFIG_DECNET_ROUTER
 	dn_fib_init();
-#endif /* CONFIG_DECNET_ROUTER */
 
 	dn_register_sysctl();
 
@@ -2316,10 +2420,7 @@ static void __exit decnet_exit(void)
 	dn_route_cleanup();
 	dn_dev_cleanup();
 	dn_neigh_cleanup();
-
-#ifdef CONFIG_DECNET_ROUTER
 	dn_fib_cleanup();
-#endif /* CONFIG_DECNET_ROUTER */
 
 	proc_net_remove("decnet");
 

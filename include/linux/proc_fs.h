@@ -163,6 +163,15 @@ static inline struct proc_dir_entry *proc_net_create(const char *name,
 	return create_proc_info_entry(name,mode,proc_net,get_info);
 }
 
+static inline struct proc_dir_entry *proc_net_fops_create(const char *name,
+	mode_t mode, struct file_operations *fops)
+{
+	struct proc_dir_entry *res = create_proc_entry(name, mode, proc_net);
+	if (res)
+		res->proc_fops = fops;
+	return res;
+}
+
 static inline void proc_net_remove(const char *name)
 {
 	remove_proc_entry(name,proc_net);
@@ -171,7 +180,7 @@ static inline void proc_net_remove(const char *name)
 #else
 
 #define proc_root_driver NULL
-
+#define proc_net_fops_create(name,mode,fops) do {} while(0)
 static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
 	get_info_t *get_info) {return NULL;}
 static inline void proc_net_remove(const char *name) {}

@@ -96,6 +96,7 @@ try_again:
 	fl.fld_src = dn_saddr2dn(&scp->addr);
 	fl.fld_dst = dn_saddr2dn(&scp->peer);
 	dn_sk_ports_copy(&fl, scp);
+	fl.proto = DNPROTO_NSP;
 	if (dn_route_output_sock(&sk->dst_cache, &fl, sk, 0) == 0) {
 		dst = sk_dst_get(sk);
 		sk->route_caps = dst->dev->features;
@@ -349,8 +350,7 @@ static inline unsigned char *dn_mk_common_header(struct dn_scp *scp, struct sk_b
 {
 	unsigned char *ptr = skb_push(skb, len);
 
-	if (len < 5)
-		BUG();
+	BUG_ON(len < 5);
 
 	*ptr++ = msgflag;
 	*((unsigned short *)ptr) = scp->addrrem;
@@ -367,8 +367,7 @@ static unsigned short *dn_mk_ack_header(struct sock *sk, struct sk_buff *skb, un
 	unsigned short ackcrs = scp->numoth_rcv & 0x0FFF;
 	unsigned short *ptr;
 
-	if (hlen < 9)
-		BUG();
+	BUG_ON(hlen < 9);
 
 	scp->ackxmt_dat = acknum;
 	scp->ackxmt_oth = ackcrs;
@@ -485,8 +484,8 @@ int dn_nsp_check_xmit_queue(struct sock *sk, struct sk_buff *skb, struct sk_buff
 		 * We don't expect to see acknowledgements for packets we
 		 * haven't sent yet.
 		 */
-		if (xmit_count == 0)
-			BUG();
+		WARN_ON(xmit_count == 0);
+
 		/*
 		 * If the packet has only been sent once, we can use it
 		 * to calculate the RTT and also open the window a little

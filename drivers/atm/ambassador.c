@@ -290,12 +290,11 @@ static inline void __init show_version (void) {
 /********** microcode **********/
 
 #ifdef AMB_NEW_MICROCODE
-#define UCODE(x) UCODE1(atmsar12.,x)
+#define UCODE(x) UCODE2(atmsar12.x)
 #else
-#define UCODE(x) UCODE1(atmsar11.,x)
+#define UCODE(x) UCODE2(atmsar11.x)
 #endif
 #define UCODE2(x) #x
-#define UCODE1(x,y) UCODE2(x ## y)
 
 static u32 __initdata ucode_start = 
 #include UCODE(start)

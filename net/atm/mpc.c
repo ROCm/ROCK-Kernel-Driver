@@ -324,7 +324,9 @@ static void stop_mpc(struct mpoa_client *mpc)
 	return;
 }
 
-static const char * __attribute__ ((unused)) mpoa_device_type_string(char type)
+static const char *mpoa_device_type_string(char type) __attribute__ ((unused));
+
+static const char *mpoa_device_type_string(char type)
 {
 	switch(type) {
 	case NON_MPOA:
@@ -429,7 +431,7 @@ static void lane2_assoc_ind(struct net_device *dev, uint8_t *mac_addr,
 		if (tlvs == NULL) return;
 	}
 	if (end_of_tlvs - tlvs != 0)
-		printk("mpoa: (%s) lane2_assoc_ind: ignoring %d bytes of trailing TLV carbage\n",
+		printk("mpoa: (%s) lane2_assoc_ind: ignoring %Zd bytes of trailing TLV carbage\n",
 		       dev->name, end_of_tlvs - tlvs);
 	return;
 }

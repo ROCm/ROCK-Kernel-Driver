@@ -74,7 +74,7 @@ struct dn_route {
 	__u16 rt_saddr;
 	__u16 rt_daddr;
 	__u16 rt_gateway;
-	__u16 __padding;
+	__u16 rt_local_src;	/* Source used for forwarding packets */
 	__u16 rt_src_map;
 	__u16 rt_dst_map;
 

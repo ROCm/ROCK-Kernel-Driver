@@ -60,5 +60,6 @@ int seq_printf(struct seq_file *, const char *, ...)
 
 int single_open(struct file *, int (*)(struct seq_file *, void *), void *);
 int single_release(struct inode *, struct file *);
+int seq_release_private(struct inode *, struct file *);
 #endif
 #endif

@@ -16,10 +16,10 @@ extern unsigned int do_bindings(struct ip_conntrack *ct,
 
 extern struct list_head protos;
 
-extern unsigned int icmp_reply_translation(struct sk_buff *skb,
-					   struct ip_conntrack *conntrack,
-					   unsigned int hooknum,
-					   int dir);
+extern int icmp_reply_translation(struct sk_buff **pskb,
+				  struct ip_conntrack *conntrack,
+				  unsigned int hooknum,
+				  int dir);
 
 extern void replace_in_hashes(struct ip_conntrack *conntrack,
 			      struct ip_nat_info *info);
@@ -30,4 +30,10 @@ extern void place_in_hashes(struct ip_conntrack *conntrack,
 extern struct ip_nat_protocol ip_nat_protocol_tcp;
 extern struct ip_nat_protocol ip_nat_protocol_udp;
 extern struct ip_nat_protocol ip_nat_protocol_icmp;
+
+/* Call this before modifying an existing IP packet: ensures it is
+   modifiable and linear to the point you care about (writable_len).
+   Returns true or false. */
+extern int skb_ip_make_writable(struct sk_buff **pskb,
+				unsigned int writable_len);
 #endif /* _IP_NAT_CORE_H */

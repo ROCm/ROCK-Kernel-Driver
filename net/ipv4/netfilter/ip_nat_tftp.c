@@ -57,9 +57,7 @@ tftp_nat_help(struct ip_conntrack *ct,
 	      struct sk_buff **pskb)
 {
 	int dir = CTINFO2DIR(ctinfo);
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct udphdr *udph = (void *)iph + iph->ihl * 4;
-	struct tftphdr *tftph = (void *)udph + 8;
+	struct tftphdr tftph;
 	struct ip_conntrack_tuple repl;
 
 	if (!((hooknum == NF_IP_POST_ROUTING && dir == IP_CT_DIR_ORIGINAL)
@@ -71,7 +69,11 @@ tftp_nat_help(struct ip_conntrack *ct,
 		return NF_ACCEPT;
 	}
 
-	switch (ntohs(tftph->opcode)) {
+	if (skb_copy_bits(*pskb, (*pskb)->nh.iph->ihl*4+sizeof(struct udphdr),
+			  &tftph, sizeof(tftph)) != 0)
+		return NF_DROP;
+
+	switch (ntohs(tftph.opcode)) {
 	/* RRQ and WRQ works the same way */
 	case TFTP_OPCODE_READ:
 	case TFTP_OPCODE_WRITE:
@@ -104,8 +106,10 @@ tftp_nat_expected(struct sk_buff **pskb,
 #if 0
 	const struct ip_conntrack_tuple *repl =
 			&master->tuplehash[IP_CT_DIR_REPLY].tuple;
-	struct iphdr *iph = (*pskb)->nh.iph;
-	struct udphdr *udph = (void *)iph + iph->ihl*4;
+	struct udphdr udph;
+
+	if (skb_copy_bits(*pskb,(*pskb)->nh.iph->ihl*4,&udph,sizeof(udph))!=0)
+		return NF_DROP;
 #endif
 
 	IP_NF_ASSERT(info);
@@ -119,8 +123,8 @@ tftp_nat_expected(struct sk_buff **pskb,
 		mr.range[0].min_ip = mr.range[0].max_ip = orig->dst.ip; 
 		DEBUGP("orig: %u.%u.%u.%u:%u <-> %u.%u.%u.%u:%u "
 			"newsrc: %u.%u.%u.%u\n",
-                        NIPQUAD((*pskb)->nh.iph->saddr), ntohs(udph->source),
-			NIPQUAD((*pskb)->nh.iph->daddr), ntohs(udph->dest),
+                        NIPQUAD((*pskb)->nh.iph->saddr), ntohs(udph.source),
+ 			NIPQUAD((*pskb)->nh.iph->daddr), ntohs(udph.dest),
 			NIPQUAD(orig->dst.ip));
 	} else {
 		mr.range[0].min_ip = mr.range[0].max_ip = orig->src.ip;
@@ -130,8 +134,8 @@ tftp_nat_expected(struct sk_buff **pskb,
 
 		DEBUGP("orig: %u.%u.%u.%u:%u <-> %u.%u.%u.%u:%u "
 			"newdst: %u.%u.%u.%u:%u\n",
-                        NIPQUAD((*pskb)->nh.iph->saddr), ntohs(udph->source),
-                        NIPQUAD((*pskb)->nh.iph->daddr), ntohs(udph->dest),
+                        NIPQUAD((*pskb)->nh.iph->saddr), ntohs(udph.source),
+                        NIPQUAD((*pskb)->nh.iph->daddr), ntohs(udph.dest),
                         NIPQUAD(orig->src.ip), ntohs(orig->src.u.udp.port));
 	}
 
