@@ -79,8 +79,8 @@ void q40ide_init(void)
     for (i = 0; i < Q40IDE_NUM_HWIFS; i++) {
 	hw_regs_t hw;
 
-	ide_setup_ports(&hw,(ide_ioreg_t) pcide_bases[i], (int *)pcide_offsets,
-			pcide_bases[i] + 0x206,
+	ide_setup_ports(&hw, (ide_ioreg_t)pcide_bases[i], (int *)pcide_offsets,
+			(ide_ioreg_t)pcide_bases[i]+0x206,
 			0, NULL, q40ide_default_irq(pcide_bases[i]));
 	ide_register_hw(&hw);
     }

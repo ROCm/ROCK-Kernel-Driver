@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
 #include <linux/kernel_stat.h>
+#include <linux/timer.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -9,6 +10,7 @@
 #include <asm/page.h>
 #include <asm/machdep.h>
 #include <asm/apollohw.h>
+#include <asm/errno.h>
 
 static irq_handler_t dn_irqs[16];
 

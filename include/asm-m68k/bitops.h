@@ -8,6 +8,8 @@
  * for more details.
  */
 
+#include <linux/compiler.h>
+
 /*
  * Require 68020 or better.
  *

@@ -22,6 +22,8 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <linux/major.h>
+#include <linux/genhd.h>
+#include <linux/rtc.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>

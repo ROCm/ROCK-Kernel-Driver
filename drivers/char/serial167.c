@@ -62,6 +62,7 @@
 #include <linux/major.h>
 #include <linux/mm.h>
 #include <linux/console.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/io.h>

@@ -639,7 +639,7 @@ static void lance_load_multicast (struct net_device *dev)
 	volatile u16 *mcast_table = (u16 *)&ib->filter;
 	struct dev_mc_list *dmi=dev->mc_list;
 	char *addrs;
-	int i, j, bit, byte;
+	int i;
 	u32 crc;
 	
 	/* set all multicast bits */

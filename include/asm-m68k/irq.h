@@ -73,6 +73,8 @@ extern void (*disable_irq)(unsigned int);
 #define disable_irq_nosync	disable_irq
 #define enable_irq_nosync	enable_irq
 
+struct pt_regs;
+
 extern int sys_request_irq(unsigned int, 
 	void (*)(int, void *, struct pt_regs *), 
 	unsigned long, const char *, void *);
