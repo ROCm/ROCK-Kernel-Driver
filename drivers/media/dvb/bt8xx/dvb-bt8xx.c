@@ -179,40 +179,6 @@ static int __init dvb_bt8xx_card_match(unsigned int bttv_nr, char *card_name, u3
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-/* with 2.6.x not needed thanks to the driver model + sysfs */
-
-extern struct i2c_adapter *bttv_get_i2c_adap(unsigned int card);
-
-static void __init dvb_bt8xx_get_adaps(void)
-{
-	struct dvb_bt8xx_card *card;
-	struct list_head *entry, *entry_safe;
-
-	list_for_each_safe(entry, entry_safe, &card_list) {
-		card = list_entry(entry, struct dvb_bt8xx_card, list);
-		card->i2c_adapter =  bttv_get_i2c_adap(card->bttv_nr);
-		if (!card->i2c_adapter) {
-			printk("dvb_bt8xx: unable to determine i2c adaptor of card %d, deleting\n", card->bttv_nr);
-
-			list_del(&card->list);
-			kfree(card);
-		}
-	}
-}
-
-static void dvb_bt8xx_i2c_adap_free(struct i2c_adapter *adap)
-{
-}
-
-static void __exit dvb_bt8xx_exit_adaps(void)
-{
-}
-
-#else
-
-/* More complicated. but cleaner better */
-
 static struct dvb_bt8xx_card *dvb_bt8xx_find_by_i2c_adap(struct i2c_adapter *adap)
 {
 	struct dvb_bt8xx_card *card;
@@ -308,7 +274,6 @@ static void __exit dvb_bt8xx_exit_adaps(void)
 {
 	i2c_del_driver(&dvb_bt8xx_driver);
 }
-#endif
 
 static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 {

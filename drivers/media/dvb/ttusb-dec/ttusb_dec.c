@@ -28,9 +28,7 @@
 #include <linux/usb.h>
 #include <linux/version.h>
 #include <linux/interrupt.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 #include <linux/firmware.h>
-#endif
 
 #include "dmxdev.h"
 #include "dvb_demux.h"
@@ -473,11 +471,7 @@ static void ttusb_dec_process_urb_frame_list(unsigned long data)
 	}
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_dec_process_urb(struct urb *urb)
-#else
 static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
-#endif
 {
 	struct ttusb_dec *dec = urb->context;
 
@@ -485,11 +479,8 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 		int i;
 
 		for (i = 0; i < FRAMES_PER_ISO_BUF; i++) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-			struct iso_packet_descriptor *d;
-#else
 			struct usb_iso_packet_descriptor *d;
-#endif
+
 			u8 *b;
 			int length;
 			struct urb_frame *frame;
@@ -522,10 +513,8 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 				urb->status);
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	if (dec->iso_stream_count)
 		usb_submit_urb(urb, GFP_ATOMIC);
-#endif
 }
 
 static void ttusb_dec_setup_urbs(struct ttusb_dec *dec)
@@ -542,12 +531,9 @@ static void ttusb_dec_setup_urbs(struct ttusb_dec *dec)
 		urb->context = dec;
 		urb->complete = ttusb_dec_process_urb;
 		urb->pipe = dec->stream_pipe;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		urb->transfer_flags = URB_ISO_ASAP;
 		urb->interval = 1;
-#else
-		urb->transfer_flags = USB_ISO_ASAP;
-#endif
+
 		urb->number_of_packets = FRAMES_PER_ISO_BUF;
 		urb->transfer_buffer_length = ISO_FRAME_SIZE *
 					      FRAMES_PER_ISO_BUF;
@@ -614,12 +600,8 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 		ttusb_dec_setup_urbs(dec);
 
 		for (i = 0; i < ISO_BUF_COUNT; i++) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 			if ((result = usb_submit_urb(dec->iso_urb[i],
 						     GFP_ATOMIC))) {
-#else
-			if ((result = usb_submit_urb(dec->iso_urb[i]))) {
-#endif
 				printk("%s: failed urb submission %d: "
 				       "error %d\n", __FUNCTION__, i, result);
 
@@ -640,10 +622,6 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 	dec->iso_stream_count++;
 
 	up(&dec->iso_sem);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ttusb_dec_set_streaming_interface(dec);
-#endif
 
 	return 0;
 }
@@ -775,11 +753,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
 		struct urb *urb;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		if (!(urb = usb_alloc_urb(FRAMES_PER_ISO_BUF, GFP_ATOMIC))) {
-#else
-		if (!(urb = usb_alloc_urb(FRAMES_PER_ISO_BUF))) {
-#endif
 			ttusb_dec_free_iso_urbs(dec);
 			return -ENOMEM;
 		}
@@ -788,13 +762,6 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 	}
 
 	ttusb_dec_setup_urbs(dec);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	for (i = 0; i < ISO_BUF_COUNT; i++) {
-		int next = (i + 1) % ISO_BUF_COUNT;
-		dec->iso_urb[i]->next = dec->iso_urb[next];
-	}
-#endif
 
 	return 0;
 }
@@ -831,11 +798,6 @@ static void ttusb_dec_init_usb(struct ttusb_dec *dec)
 	ttusb_dec_alloc_iso_urbs(dec);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#include "dsp_dec2000t.h"
-#include "dsp_dec3000s.h"
-#endif
-
 static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 {
 	int i, j, actual_len, result, size, trans_count;
@@ -848,13 +810,10 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	u32 firmware_csum = 0;
 	u32 firmware_size_nl;
 	u32 firmware_csum_nl;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	const struct firmware *fw_entry = NULL;
-#endif
 
 	dprintk("%s\n", __FUNCTION__);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	if (request_firmware(&fw_entry, dec->firmware_name, &dec->udev->dev)) {
 		printk(KERN_ERR "%s: Firmware (%s) unavailable.\n",
 		       __FUNCTION__, dec->firmware_name);
@@ -863,21 +822,13 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 
 	firmware = fw_entry->data;
 	firmware_size = fw_entry->size;
-#endif
+
 	switch (dec->model) {
 		case TTUSB_DEC2000T:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-			firmware = &dsp_dec2000t[0];
-			firmware_size = sizeof(dsp_dec2000t);
-#endif
 			firmware_csum = 0x1bc86100;
 			break;
 
 		case TTUSB_DEC3000S:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-			firmware = &dsp_dec3000s[0];
-			firmware_size = sizeof(dsp_dec3000s);
-#endif
 			firmware_csum = 0x00000000;
 			break;
 	}
@@ -1313,22 +1264,6 @@ static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
 	dvb_unregister_frontend(dec->frontend_ioctl, &dec->i2c_bus);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void *ttusb_dec_probe(struct usb_device *udev, unsigned int ifnum,
-			     const struct usb_device_id *id)
-{
-	struct ttusb_dec *dec;
-
-	dprintk("%s\n", __FUNCTION__);
-
-	if (ifnum != 0)
-		return NULL;
-
-	if (!(dec = kmalloc(sizeof(struct ttusb_dec), GFP_KERNEL))) {
-		printk("%s: couldn't allocate memory.\n", __FUNCTION__);
-		return NULL;
-	}
-#else
 static int ttusb_dec_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id)
 {
@@ -1345,7 +1280,6 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	}
 
 	usb_set_intfdata(intf, (void *)dec);
-#endif
 
 	memset(dec, 0, sizeof(struct ttusb_dec));
 
@@ -1377,26 +1311,16 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 
 	dec->active = 1;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return (void *)dec;
-#else
 	ttusb_dec_set_streaming_interface(dec);
 
 	return 0;
-#endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_dec_disconnect(struct usb_device *udev, void *data)
-{
-	struct ttusb_dec *dec = data;
-#else
 static void ttusb_dec_disconnect(struct usb_interface *intf)
 {
 	struct ttusb_dec *dec = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
-#endif
 
 	dprintk("%s\n", __FUNCTION__);
 

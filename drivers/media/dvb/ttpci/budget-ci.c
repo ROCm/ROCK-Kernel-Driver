@@ -35,12 +35,6 @@
 #include <linux/interrupt.h>
 #include <linux/input.h>
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#include "input_fake.h"
-#endif
-
-
-
 struct budget_ci {
 	struct budget budget;
 	struct input_dev input_dev;

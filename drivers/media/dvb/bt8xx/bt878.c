@@ -44,11 +44,7 @@
 #include "dmxdev.h"
 #include "dvbdev.h"
 #include "bt878.h"
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 #include "dst-bt878.h"
-#else
-#include "../frontends/dst-bt878.h"
-#endif
 
 #include "dvb_functions.h"
 

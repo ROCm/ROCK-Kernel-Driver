@@ -1,3 +1,8 @@
+/*
+ * dst-bt878.h: part of the DST driver for the TwinHan DST Frontend
+ *
+ * Copyright (C) 2003 Jamie Honan
+ */
 
 struct dst_gpio_enable {
 	u32	mask;
@@ -27,7 +32,6 @@ union dst_gpio_packet {
 
 struct bt878 ;
 
-int
-bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
+int bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
 
 struct bt878 *bt878_find_by_dvb_adap(struct dvb_adapter *adap);
