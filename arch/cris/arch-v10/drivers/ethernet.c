@@ -401,7 +401,6 @@ static irqreturn_t e100nw_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void e100_rx(struct net_device *dev);
 static int e100_close(struct net_device *dev);
 static int e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
-static int e100_ethtool_ioctl(struct net_device* dev, struct ifreq *ifr);
 static int e100_set_config(struct net_device* dev, struct ifmap* map);
 static void e100_tx_timeout(struct net_device *dev);
 static struct net_device_stats *e100_get_stats(struct net_device *dev);
@@ -410,6 +409,7 @@ static void e100_hardware_send_packet(char *buf, int length);
 static void update_rx_stats(struct net_device_stats *);
 static void update_tx_stats(struct net_device_stats *);
 static int e100_probe_transceiver(void);
+static struct ethtool_ops ethtool_ops;
 
 static void e100_check_speed(unsigned long dummy);
 static void e100_set_speed(unsigned long speed);
@@ -483,6 +483,7 @@ etrax_ethernet_init(void)
 	dev->do_ioctl           = e100_ioctl;
 	dev->set_config		= e100_set_config;
 	dev->tx_timeout         = e100_tx_timeout;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	/* Initialise the list of Etrax DMA-descriptors */
 
@@ -1401,8 +1402,6 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	spin_lock(&np->lock); /* Preempt protection */
 	switch (cmd) {
-		case SIOCETHTOOL:
-			return e100_ethtool_ioctl(dev,ifr);
 		case SIOCGMIIPHY: /* Get PHY address */
 			data->phy_id = mdio_phy_addr;
 			break;
@@ -1439,87 +1438,70 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return 0;
 }
 
-static int
-e100_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
+static int e100_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	struct ethtool_cmd ecmd;
+	ecmd->supported = 
+	  SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII |
+	  SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full | 
+	  SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full;
+	ecmd->port = PORT_TP;
+	ecmd->transceiver = XCVR_EXTERNAL;
+	ecmd->phy_address = mdio_phy_addr;
+	ecmd->speed = current_speed;
+	ecmd->duplex = full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+	ecmd->advertising = ADVERTISED_TP;
+	if (current_duplex == autoneg && current_speed_selection == 0)
+		ecmd->advertising |= ADVERTISED_Autoneg;
+	else {
+		ecmd->advertising |= 
+		  ADVERTISED_10baseT_Half | ADVERTISED_10baseT_Full |
+		  ADVERTISED_100baseT_Half | ADVERTISED_100baseT_Full;
+		if (current_speed_selection == 10)
+			ecmd->advertising &= ~(ADVERTISED_100baseT_Half | ADVERTISED_100baseT_Full);
+		else if (current_speed_selection == 100)
+			ecmd->advertising &= ~(ADVERTISED_10baseT_Half | ADVERTISED_10baseT_Full);
+		if (current_duplex == half)
+			ecmd->advertising &= ~(ADVERTISED_10baseT_Full | ADVERTISED_100baseT_Full);
+		else if (current_duplex == full)
+			ecmd->advertising &= ~(ADVERTISED_10baseT_Half | ADVERTISED_100baseT_Half);
+	}
+	ecmd->autoneg = AUTONEG_ENABLE;
+	return 0;
+}
 
-	if (copy_from_user(&ecmd, ifr->ifr_data, sizeof (ecmd)))
-		return -EFAULT;
-
-	switch (ecmd.cmd) {
-		case ETHTOOL_GSET:
-		{
-			memset((void *) &ecmd, 0, sizeof (ecmd));
-			ecmd.supported = 
-			  SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII |
-			  SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full | 
-			  SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full;
-			ecmd.port = PORT_TP;
-			ecmd.transceiver = XCVR_EXTERNAL;
-			ecmd.phy_address = mdio_phy_addr;
-			ecmd.speed = current_speed;
-			ecmd.duplex = full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
-			ecmd.advertising = ADVERTISED_TP;
-			if (current_duplex == autoneg && current_speed_selection == 0)
-				ecmd.advertising |= ADVERTISED_Autoneg;
-			else {
-				ecmd.advertising |= 
-				  ADVERTISED_10baseT_Half | ADVERTISED_10baseT_Full |
-				  ADVERTISED_100baseT_Half | ADVERTISED_100baseT_Full;
-				if (current_speed_selection == 10)
-					ecmd.advertising &= ~(ADVERTISED_100baseT_Half | ADVERTISED_100baseT_Full);
-				else if (current_speed_selection == 100)
-					ecmd.advertising &= ~(ADVERTISED_10baseT_Half | ADVERTISED_10baseT_Full);
-				if (current_duplex == half)
-					ecmd.advertising &= ~(ADVERTISED_10baseT_Full | ADVERTISED_100baseT_Full);
-				else if (current_duplex == full)
-					ecmd.advertising &= ~(ADVERTISED_10baseT_Half | ADVERTISED_100baseT_Half);
-			}
-			ecmd.autoneg = AUTONEG_ENABLE;
-			if (copy_to_user(ifr->ifr_data, &ecmd, sizeof (ecmd)))
-				return -EFAULT;
-		}
-		break;
-		case ETHTOOL_SSET:
-		{
-			if (!capable(CAP_NET_ADMIN)) {
-				return -EPERM;
-			}
-			if (ecmd.autoneg == AUTONEG_ENABLE) {
-				e100_set_duplex(autoneg);
-				e100_set_speed(0);
-			} else {
-				e100_set_duplex(ecmd.duplex == DUPLEX_HALF ? half : full);
-				e100_set_speed(ecmd.speed == SPEED_10 ? 10: 100);
-			}
-		}
-		break;
-		case ETHTOOL_GDRVINFO:
-		{
-			struct ethtool_drvinfo info;
-			memset((void *) &info, 0, sizeof (info));
-			strncpy(info.driver, "ETRAX 100LX", sizeof(info.driver) - 1);
-			strncpy(info.version, "$Revision: 1.22 $", sizeof(info.version) - 1);
-			strncpy(info.fw_version, "N/A", sizeof(info.fw_version) - 1);
-			strncpy(info.bus_info, "N/A", sizeof(info.bus_info) - 1);
-			info.regdump_len = 0;
-			info.eedump_len = 0;
-			info.testinfo_len = 0;
-			if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
-				return -EFAULT;
-		}
-		break;
-		case ETHTOOL_NWAY_RST:
-			if (current_duplex == autoneg && current_speed_selection == 0)
-				e100_negotiate();
-		break;
-		default:
-			return -EOPNOTSUPP;
-		break;
+static int e100_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	if (ecmd->autoneg == AUTONEG_ENABLE) {
+		e100_set_duplex(autoneg);
+		e100_set_speed(0);
+	} else {
+		e100_set_duplex(ecmd->duplex == DUPLEX_HALF ? half : full);
+		e100_set_speed(ecmd->speed == SPEED_10 ? 10: 100);
 	}
 	return 0;
 }
+
+static void e100_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	strncpy(info->driver, "ETRAX 100LX", sizeof(info->driver) - 1);
+	strncpy(info->version, "$Revision: 1.22 $", sizeof(info->version) - 1);
+	strncpy(info->fw_version, "N/A", sizeof(info->fw_version) - 1);
+	strncpy(info->bus_info, "N/A", sizeof(info->bus_info) - 1);
+}
+
+static int e100_nway_reset(struct net_device *dev)
+{
+	if (current_duplex == autoneg && current_speed_selection == 0)
+		e100_negotiate();
+	return 0;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.get_settings = e100_get_settings,
+	.set_settings = e100_set_settings,
+	.get_drvinfo = e100_get_drvinfo,
+	.nway_reset = e100_nway_reset,
+};
 
 static int
 e100_set_config(struct net_device *dev, struct ifmap *map)

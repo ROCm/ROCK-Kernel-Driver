@@ -766,7 +766,7 @@ struct amd8111e_priv{
 	dma_addr_t tx_dma_addr[NUM_TX_BUFFERS];
 	dma_addr_t rx_dma_addr[NUM_RX_BUFFERS];
 	/* Reg memory mapped address */
-	void *  mmio;
+	void __iomem *mmio;
 	
 	spinlock_t lock;	/* Guard lock */
 	unsigned long rx_idx, tx_idx;	/* The next free ring entry */

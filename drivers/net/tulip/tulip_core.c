@@ -830,29 +830,17 @@ static struct net_device_stats *tulip_get_stats(struct net_device *dev)
 }
 
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void tulip_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct tulip_private *np = netdev_priv(dev);
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(np->pdev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-        }
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pdev));
 }
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = tulip_get_drvinfo
+};
 
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
@@ -865,9 +853,6 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	unsigned int regnum = data->reg_num;
 
 	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
-
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)
 			data->phy_id = phy;
@@ -1644,6 +1629,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	dev->poll_controller = &poll_tulip;
 #endif
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	if (register_netdev(dev))
 		goto err_out_free_ring;

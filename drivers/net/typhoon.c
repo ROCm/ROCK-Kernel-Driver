@@ -688,7 +688,7 @@ out:
 static void
 typhoon_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 	int err;
 
@@ -726,7 +726,7 @@ typhoon_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 static void
 typhoon_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	spin_lock_bh(&tp->state_lock);
 	if(tp->vlgrp)
 		tp->vlgrp->vlan_devices[vid] = NULL;
@@ -757,7 +757,7 @@ typhoon_tso_fill(struct sk_buff *skb, struct transmit_ring *txRing,
 static int
 typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct transmit_ring *txRing;
 	struct tx_desc *txd, *first_txd;
 	dma_addr_t skb_dma;
@@ -908,7 +908,7 @@ typhoon_start_tx(struct sk_buff *skb, struct net_device *dev)
 static void
 typhoon_set_rx_mode(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 	u32 mc_filter[2];
 	u16 filter;
@@ -1002,7 +1002,7 @@ typhoon_do_get_stats(struct typhoon *tp)
 static struct net_device_stats *
 typhoon_get_stats(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct net_device_stats *stats = &tp->stats;
 	struct net_device_stats *saved = &tp->stats_saved;
 
@@ -1155,89 +1155,54 @@ typhoon_ethtool_sset(struct typhoon *tp, struct ethtool_cmd *cmd)
 	return 0;
 }
 
-static inline int
-typhoon_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void typhoon_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
-	u32 ethcmd;
-
-	if(copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO: {
-			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-
-			typhoon_ethtool_gdrvinfo(tp, &info);
-			if(copy_to_user(useraddr, &info, sizeof(info)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GSET: {
-			struct ethtool_cmd cmd = { ETHTOOL_GSET };
-
-			typhoon_ethtool_gset(tp, &cmd);
-			if(copy_to_user(useraddr, &cmd, sizeof(cmd)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_SSET: {
-			struct ethtool_cmd cmd;
-			if(copy_from_user(&cmd, useraddr, sizeof(cmd)))
-				return -EFAULT;
-
-			return typhoon_ethtool_sset(tp, &cmd);
-		}
-	case ETHTOOL_GLINK:{
-			struct ethtool_value edata = { ETHTOOL_GLINK };
-
-			edata.data = netif_carrier_ok(dev) ? 1 : 0;
-			if(copy_to_user(useraddr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-	case ETHTOOL_GWOL: {
-			struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-
-			if(tp->wol_events & TYPHOON_WAKE_LINK_EVENT)
-				wol.wolopts |= WAKE_PHY;
-			if(tp->wol_events & TYPHOON_WAKE_MAGIC_PKT)
-				wol.wolopts |= WAKE_MAGIC;
-			if(copy_to_user(useraddr, &wol, sizeof(wol)))
-				return -EFAULT;
-			return 0;
-	}
-	case ETHTOOL_SWOL: {
-			struct ethtool_wolinfo wol;
-
-			if(copy_from_user(&wol, useraddr, sizeof(wol)))
-				return -EFAULT;
-			tp->wol_events = 0;
-			if(wol.wolopts & WAKE_PHY)
-				tp->wol_events |= TYPHOON_WAKE_LINK_EVENT;
-			if(wol.wolopts & WAKE_MAGIC)
-				tp->wol_events |= TYPHOON_WAKE_MAGIC_PKT;
-			return 0;
-	}
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	struct typhoon *tp = netdev_priv(dev);
+	typhoon_ethtool_gdrvinfo(tp, info);
 }
 
-static int
-typhoon_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+static int typhoon_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return typhoon_ethtool_ioctl(dev, ifr->ifr_data);
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	struct typhoon *tp = netdev_priv(dev);
+	typhoon_ethtool_gset(tp, cmd);
+	return 0;
 }
+
+static int typhoon_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	typhoon_ethtool_sset(tp, cmd);
+	return 0;
+}
+
+static void typhoon_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	if (tp->wol_events & TYPHOON_WAKE_LINK_EVENT)
+		wol->wolopts |= WAKE_PHY;
+	if (tp->wol_events & TYPHOON_WAKE_MAGIC_PKT)
+		wol->wolopts |= WAKE_MAGIC;
+}
+
+static int typhoon_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct typhoon *tp = netdev_priv(dev);
+	tp->wol_events = 0;
+	if (wol->wolopts & WAKE_PHY)
+		tp->wol_events |= TYPHOON_WAKE_LINK_EVENT;
+	if (wol->wolopts & WAKE_MAGIC)
+		tp->wol_events |= TYPHOON_WAKE_MAGIC_PKT;
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = typhoon_get_drvinfo,
+	.get_settings = typhoon_get_settings,
+	.set_settings = typhoon_set_settings,
+	.get_link = ethtool_op_get_link,
+	.get_wol = typhoon_get_wol,
+	.set_wol = typhoon_set_wol,
+};
 
 static int
 typhoon_wait_interrupt(void __iomem *ioaddr)
@@ -1756,7 +1721,7 @@ typhoon_fill_free_ring(struct typhoon *tp)
 static int
 typhoon_poll(struct net_device *dev, int *total_budget)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct typhoon_indexes *indexes = tp->indexes;
 	int orig_budget = *total_budget;
 	int budget, work_done, done;
@@ -2069,7 +2034,7 @@ typhoon_stop_runtime(struct typhoon *tp, int wait_type)
 static void
 typhoon_tx_timeout(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	if(typhoon_reset(tp->ioaddr, WaitNoSleep) < 0) {
 		printk(KERN_WARNING "%s: could not reset in tx timeout\n",
@@ -2099,7 +2064,7 @@ truely_dead:
 static int
 typhoon_open(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	int err;
 
 	err = typhoon_wakeup(tp, WaitSleep);
@@ -2141,7 +2106,7 @@ out:
 static int
 typhoon_close(struct net_device *dev)
 {
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -2169,7 +2134,7 @@ static int
 typhoon_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 
 	/* If we're down, resume when we are upped.
 	 */
@@ -2201,7 +2166,7 @@ static int
 typhoon_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) dev->priv;
+	struct typhoon *tp = netdev_priv(dev);
 	struct cmd_desc xp_cmd;
 
 	/* If we're down, we're already suspended.
@@ -2367,7 +2332,7 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	dev->irq = pdev->irq;
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 	tp->shared = (struct typhoon_shared *) shared;
 	tp->shared_dma = shared_dma;
 	tp->pdev = pdev;
@@ -2465,9 +2430,9 @@ typhoon_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->watchdog_timeo	= TX_TIMEOUT;
 	dev->get_stats		= typhoon_get_stats;
 	dev->set_mac_address	= typhoon_set_mac_address;
-	dev->do_ioctl		= typhoon_ioctl;
 	dev->vlan_rx_register	= typhoon_vlan_rx_register;
 	dev->vlan_rx_kill_vid	= typhoon_vlan_rx_kill_vid;
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	/* We can handle scatter gather, up to 16 entries, and
 	 * we can do IP checksumming (only version 4, doh...)
@@ -2538,7 +2503,7 @@ static void __devexit
 typhoon_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct typhoon *tp = (struct typhoon *) (dev->priv);
+	struct typhoon *tp = netdev_priv(dev);
 
 	unregister_netdev(dev);
 	pci_set_power_state(pdev, 0);
