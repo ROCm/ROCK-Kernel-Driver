@@ -142,15 +142,15 @@ typedef struct icn_card {
 	int myid;               /* Driver-Nr. assigned by linklevel */
 	int rvalid;             /* IO-portregion has been requested */
 	int leased;             /* Flag: This Adapter is connected  */
-	/*       to a leased line           */
+	                        /*       to a leased line           */
 	unsigned short flags;   /* Statusflags                      */
 	int doubleS0;           /* Flag: ICN4B                      */
 	int secondhalf;         /* Flag: Second half of a doubleS0  */
 	int fw_rev;             /* Firmware revision loaded         */
 	int ptype;              /* Protocol type (1TR6 or Euro)     */
-	struct timer_list st_timer;	/* Timer for Status-Polls           */
-	struct timer_list rb_timer;	/* Timer for B-Channel-Polls        */
-	u_char rcvbuf[ICN_BCH][4096];	/* B-Channel-Receive-Buffers        */
+	struct timer_list st_timer;   /* Timer for Status-Polls     */
+	struct timer_list rb_timer;   /* Timer for B-Channel-Polls  */
+	u_char rcvbuf[ICN_BCH][4096]; /* B-Channel-Receive-Buffers  */
 	int rcvidx[ICN_BCH];    /* Index for above buffers          */
 	int l2_proto[ICN_BCH];  /* Current layer-2-protocol         */
 	isdn_if interface;      /* Interface to upper layer         */
@@ -162,18 +162,18 @@ typedef struct icn_card {
 	char *msg_buf_end;      /* Pointer to end of statusbuffer   */
 	int sndcount[ICN_BCH];  /* Byte-counters for B-Ch.-send     */
 	int xlen[ICN_BCH];      /* Byte-counters/Flags for sent-ACK */
-	struct sk_buff *xskb[ICN_BCH];
-	                        /* Current transmitted skb          */
-	struct sk_buff_head
-	 spqueue[ICN_BCH];      /* Sendqueue                        */
+	struct sk_buff *xskb[ICN_BCH]; /* Current transmitted skb   */
+	struct sk_buff_head spqueue[ICN_BCH];  /* Sendqueue         */
 	char regname[35];       /* Name used for request_region     */
-	u_char xmit_lock[ICN_BCH];	/* Semaphore for pollbchan_send()   */
+	u_char xmit_lock[ICN_BCH]; /* Semaphore for pollbchan_send()*/
+	spinlock_t lock;        /* protect critical operations      */
 } icn_card;
 
 /*
  * Main driver data
  */
 typedef struct icn_dev {
+	spinlock_t devlock;     /* spinlock to protect this struct  */
 	unsigned long memaddr;	/* Address of memory mapped buffers */
 	icn_shmem *shmem;       /* Pointer to memory-mapped-buffers */
 	int mvalid;             /* IO-shmem has been requested      */

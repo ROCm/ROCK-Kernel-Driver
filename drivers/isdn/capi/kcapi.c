@@ -77,31 +77,17 @@ static struct work_struct tq_recv_notify;
 static inline struct capi_ctr *
 capi_ctr_get(struct capi_ctr *card)
 {
-	if (try_module_get(card->owner))
-		return card;
-	return NULL;
+	if (!try_module_get(card->owner))
+		return NULL;
+	DBG("Reserve module: %s", card->owner->name);
+	return card;
 }
 
 static inline void
 capi_ctr_put(struct capi_ctr *card)
 {
 	module_put(card->owner);
-	DBG("MOD_COUNT DEC");
-}
-
-/* -------- own ref counting -------------------------------------- */
-
-static inline void
-kcapi_get_ref(void)
-{
-	if (!try_module_get(THIS_MODULE))
-		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
-}
-
-static inline void
-kcapi_put_ref(void)
-{
-	module_put(THIS_MODULE);
+	DBG("Release module: %s", card->owner->name);
 }
 
 /* ------------------------------------------------------------- */
@@ -224,10 +210,13 @@ static int notify_push(unsigned int cmd, u32 controller,
 {
 	struct capi_notifier *np;
 
-	kcapi_get_ref();
+	if (!try_module_get(THIS_MODULE)) {
+		printk(KERN_WARNING "%s: cannot reserve module\n", __FUNCTION__);
+		return -1;
+	}
 	np = (struct capi_notifier *)kmalloc(sizeof(struct capi_notifier), GFP_ATOMIC);
 	if (!np) {
-		kcapi_put_ref();
+		module_put(THIS_MODULE);
 		return -1;
 	}
 	memset(np, 0, sizeof(struct capi_notifier));
@@ -241,9 +230,9 @@ static int notify_push(unsigned int cmd, u32 controller,
 	 * of devices. Devices can only removed in
 	 * user process, not in bh.
 	 */
-	kcapi_get_ref();
+	__module_get(THIS_MODULE);
 	if (schedule_work(&tq_state_notify) == 0)
-		kcapi_put_ref();
+		module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -301,9 +290,9 @@ static void notify_handler(void *dummy)
 	while ((np = notify_dequeue()) != 0) {
 		notify_doit(np);
 		kfree(np);
-		kcapi_put_ref();
+		module_put(THIS_MODULE);
 	}
-	kcapi_put_ref();
+	module_put(THIS_MODULE);
 }
 	
 /* -------- Receiver ------------------------------------------ */
