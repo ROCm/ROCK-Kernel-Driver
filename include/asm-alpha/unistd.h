@@ -349,7 +349,8 @@
 #define __NR_sys_epoll_wait		409
 #define __NR_remap_file_pages		410
 #define __NR_set_tid_address		411
-#define NR_SYSCALLS			412
+#define __NR_restart_syscall		412
+#define NR_SYSCALLS			413
 
 #if defined(__GNUC__)
 

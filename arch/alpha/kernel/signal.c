@@ -587,6 +587,10 @@ syscall_restart(unsigned long r0, unsigned long r19,
 		regs->r19 = r19;
 		regs->pc -= 4;
 		break;
+	case ERESTART_RESTARTBLOCK:
+		current_thread_info()->restart_block.fn = do_no_restart_syscall;
+		regs->r0 = EINTR;
+		break;
 	}
 }
 
@@ -628,13 +632,22 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 		return 1;
 	}
 
-	if (r0 &&
-	    (regs->r0 == ERESTARTNOHAND ||
-	     regs->r0 == ERESTARTSYS ||
-	     regs->r0 == ERESTARTNOINTR)) {
-		regs->r0 = r0;	/* reset v0 and a3 and replay syscall */
-		regs->r19 = r19;
-		regs->pc -= 4;
+	if (r0) {
+	  	switch (regs->r0) {
+		case ERESTARTNOHAND:
+		case ERESTARTSYS:
+		case ERESTARTNOINTR:
+			/* Reset v0 and a3 and replay syscall.  */
+			regs->r0 = r0;
+			regs->r19 = r19;
+			regs->pc -= 4;
+			break;
+		case ERESTART_RESTARTBLOCK:
+			/* Force v0 to the restart syscall and reply.  */
+			regs->r0 = __NR_restart_syscall;
+			regs->pc -= 4;
+			break;
+		}
 	}
 	if (single_stepping)
 		ptrace_set_bpt(current);	/* re-set breakpoint */
