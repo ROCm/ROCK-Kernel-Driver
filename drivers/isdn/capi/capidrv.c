@@ -140,7 +140,7 @@ typedef struct capidrv_bchan capidrv_bchan;
 /* -------- data definitions ----------------------------------------- */
 
 static capidrv_data global;
-static spinlock_t global_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(global_lock);
 
 static void handle_dtrace_data(capidrv_contr *card,
 	int send, int level2, u8 *data, u16 len);
