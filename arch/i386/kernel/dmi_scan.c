@@ -1115,7 +1115,7 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"),
 			NO_MATCH }},
 
-	{ disable_acpi_pci, "IBM HS20", { 
+	{ disable_acpi_pci, "IBM Bladecenter HS40", { 
 			MATCH(DMI_SYS_VENDOR, "IBM"),
 			MATCH(DMI_PRODUCT_NAME, "eServer BladeCenter HS40"),
 			NO_MATCH, NO_MATCH }},
