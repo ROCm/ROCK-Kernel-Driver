@@ -305,13 +305,66 @@ static int proc_read_clients(char *buf, char **start, off_t pos,
     
 ======================================================================*/
 
-static int pccardd(void *__skt);
-void pcmcia_unregister_socket(struct class_device *dev);
+/**
+ * socket drivers are expected to use the following callbacks in their 
+ * .drv struct:
+ *  - pcmcia_socket_dev_suspend
+ *  - pcmcia_socket_dev_resume
+ * These functions check for the appropriate struct pcmcia_soket arrays,
+ * and pass them to the low-level functions pcmcia_{suspend,resume}_socket
+ */
+static int socket_resume(socket_info_t *skt);
+static int socket_suspend(socket_info_t *skt);
 
+int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
+{
+	struct pcmcia_socket *socket;
+
+	if (level != SUSPEND_SAVE_STATE)
+		return 0;
+
+	down_read(&pcmcia_socket_list_rwsem);
+	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
+		if (socket->dev.dev != dev)
+			continue;
+		down(&socket->skt_sem);
+		socket_suspend(socket);
+		up(&socket->skt_sem);
+	}
+	up_read(&pcmcia_socket_list_rwsem);
+
+	return 0;
+}
+EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
+
+int pcmcia_socket_dev_resume(struct device *dev, u32 level)
+{
+	struct pcmcia_socket *socket;
+
+	if (level != RESUME_RESTORE_STATE)
+		return 0;
+
+	down_read(&pcmcia_socket_list_rwsem);
+	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
+		if (socket->dev.dev != dev)
+			continue;
+		down(&socket->skt_sem);
+		socket_resume(socket);
+		up(&socket->skt_sem);
+	}
+	up_read(&pcmcia_socket_list_rwsem);
+
+	return 0;
+}
+EXPORT_SYMBOL(pcmcia_socket_dev_resume);
+
+
+static int pccardd(void *__skt);
 #define to_class_data(dev) dev->class_data
 
-static int pcmcia_add_socket(struct pcmcia_socket *socket)
+static int pcmcia_add_socket(struct class_device *class_dev)
 {
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	int ret = 0;
 
 	/* base address = 0, map = 0 */
@@ -352,8 +405,9 @@ static int pcmcia_add_socket(struct pcmcia_socket *socket)
 	return 0;
 }
 
-static void pcmcia_remove_socket(struct pcmcia_socket *socket)
+static void pcmcia_remove_socket(struct class_device *class_dev)
 {
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	client_t *client;
 
 #ifdef CONFIG_PROC_FS
@@ -385,66 +439,74 @@ static void pcmcia_remove_socket(struct pcmcia_socket *socket)
 /**
  * pcmcia_register_socket - add a new pcmcia socket device
  */
-int pcmcia_register_socket(struct class_device *class_dev)
+int pcmcia_register_socket(struct pcmcia_socket *socket)
 {
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	socket_info_t *s_info;
-	unsigned int i, ret;
-
-	if (!cls_d)
+	if (!socket || !socket->ss_entry || !socket->dev.dev)
 		return -EINVAL;
 
-	DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", cls_d->ops);
+	DEBUG(0, "cs: pcmcia_register_socket(0x%p)\n", socket->ss_entry);
 
-	s_info = kmalloc(cls_d->nsock * sizeof(struct pcmcia_socket), GFP_KERNEL);
-	if (!s_info)
-		return -ENOMEM;
-	memset(s_info, 0, cls_d->nsock * sizeof(struct pcmcia_socket));
-
-	cls_d->s_info = s_info;
-	ret = 0;
-
-	/* socket initialization */
-	for (i = 0; i < cls_d->nsock; i++) {
-		struct pcmcia_socket *socket = &s_info[i];
-
-		socket->sock = i + cls_d->sock_offset;
-
-		down_write(&pcmcia_socket_list_rwsem);
-		list_add(&socket->socket_list, &pcmcia_socket_list);
-		up_write(&pcmcia_socket_list_rwsem);
-
-		pcmcia_add_socket(socket);
+	/* try to obtain a socket number [yes, it gets ugly if we
+	 * register more than 2^sizeof(unsigned int) pcmcia 
+	 * sockets... but the socket number is deprecated 
+	 * anyways, so I don't care] */
+	down_write(&pcmcia_socket_list_rwsem);
+	if (list_empty(&pcmcia_socket_list))
+		socket->sock = 0;
+	else {
+		unsigned int found, i = 1;
+		struct pcmcia_socket *tmp;
+		do {
+			found = 1;
+			list_for_each_entry(tmp, &pcmcia_socket_list, socket_list) {
+				if (tmp->sock == i)
+					found = 0;
+			}
+			i++;
+		} while (!found);
+		socket->sock = i - 1;
 	}
-	return ret;
+	list_add_tail(&socket->socket_list, &pcmcia_socket_list);
+	up_write(&pcmcia_socket_list_rwsem);
+
+
+	/* set proper values in socket->dev */
+	socket->dev.class_data = socket;
+	socket->dev.class = &pcmcia_socket_class;
+	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u\n", socket->sock);
+
+	/* register with the device core */
+	if (class_device_register(&socket->dev)) {
+		down_write(&pcmcia_socket_list_rwsem);
+		list_del(&socket->socket_list);
+		up_write(&pcmcia_socket_list_rwsem);
+		return -EINVAL;
+	}
+
+	return 0;
 } /* pcmcia_register_socket */
+EXPORT_SYMBOL(pcmcia_register_socket);
 
 
 /**
  * pcmcia_unregister_socket - remove a pcmcia socket device
  */
-void pcmcia_unregister_socket(struct class_device *class_dev)
+void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 {
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	unsigned int i;
-	struct pcmcia_socket *socket;
-
-	if (!cls_d)
+	if (!socket)
 		return;
 
-	socket = cls_d->s_info;
+	DEBUG(0, "cs: pcmcia_unregister_socket(0x%p)\n", socket->ss_entry);
 
-	for (i = 0; i < cls_d->nsock; i++) {
-		pcmcia_remove_socket(socket);
+	/* remove from the device core */
+	class_device_unregister(&socket->dev);
 
- 		down_write(&pcmcia_socket_list_rwsem);
- 		list_del(&socket->socket_list);
- 		up_write(&pcmcia_socket_list_rwsem);
-
-		socket++;
-	}
-	kfree(cls_d->s_info);
+	/* remove from our own list */
+	down_write(&pcmcia_socket_list_rwsem);
+	list_del(&socket->socket_list);
+	up_write(&pcmcia_socket_list_rwsem);
 } /* pcmcia_unregister_socket */
+EXPORT_SYMBOL(pcmcia_unregister_socket);
 
 
 struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr)
@@ -828,68 +890,6 @@ static void parse_events(void *info, u_int events)
 
 	wake_up(&s->thread_wait);
 } /* parse_events */
-
-/*======================================================================
-
-    Another event handler, for power management events.
-
-    This does not comply with the latest PC Card spec for handling
-    power management events.
-    
-======================================================================*/
-
-void pcmcia_suspend_socket (socket_info_t *skt)
-{
-	down(&skt->skt_sem);
-	socket_suspend(skt);
-	up(&skt->skt_sem);
-}
-
-void pcmcia_resume_socket (socket_info_t *skt)
-{
-	down(&skt->skt_sem);
-	socket_resume(skt);
-	up(&skt->skt_sem);
-}
-
-
-int pcmcia_socket_dev_suspend(struct pcmcia_socket_class_data *cls_d, u32 state, u32 level)
-{
-	socket_info_t *s;
-	int i;
-
-	if ((!cls_d) || (level != SUSPEND_SAVE_STATE))
-		return 0;
-
-	s = (socket_info_t *) cls_d->s_info;
-
-	for (i = 0; i < cls_d->nsock; i++) {
-		pcmcia_suspend_socket(s);
-		s++;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
-
-int pcmcia_socket_dev_resume(struct pcmcia_socket_class_data *cls_d, u32 level)
-{
-	socket_info_t *s;
-	int i;
-
-	if ((!cls_d) || (level != RESUME_RESTORE_STATE))
-		return 0;
-
-	s = (socket_info_t *) cls_d->s_info;
-
-	for (i = 0; i < cls_d->nsock; i++) {
-		pcmcia_resume_socket(s);
-		s++;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(pcmcia_socket_dev_resume);
 
 
 /*======================================================================
@@ -2547,11 +2547,6 @@ EXPORT_SYMBOL(MTDHelperEntry);
 EXPORT_SYMBOL(proc_pccard);
 #endif
 
-EXPORT_SYMBOL(pcmcia_register_socket);
-EXPORT_SYMBOL(pcmcia_unregister_socket);
-EXPORT_SYMBOL(pcmcia_suspend_socket);
-EXPORT_SYMBOL(pcmcia_resume_socket);
-
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
 };
@@ -2559,8 +2554,8 @@ EXPORT_SYMBOL(pcmcia_socket_class);
 
 static struct class_interface pcmcia_socket = {
 	.class = &pcmcia_socket_class,
-	.add = &pcmcia_register_socket,
-	.remove = &pcmcia_unregister_socket,
+	.add = &pcmcia_add_socket,
+	.remove = &pcmcia_remove_socket,
 };
 
 

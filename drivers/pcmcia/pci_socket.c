@@ -148,15 +148,10 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	
 	memset(socket, 0, sizeof(*socket));
 
-	/* prepare class_data */
-	socket->cls_d.sock_offset = nr;
-	socket->cls_d.nsock = 1; /* yenta is 1, no other low-level driver uses
-			     this yet */
-	socket->cls_d.ops = &pci_socket_operations;
-	socket->cls_d.class_dev.class = &pcmcia_socket_class;
-	socket->cls_d.class_dev.dev = &dev->dev;
-	strlcpy(socket->cls_d.class_dev.class_id, dev->dev.bus_id, BUS_ID_SIZE);
-	class_set_devdata(&socket->cls_d.class_dev, &socket->cls_d);
+	/* prepare pcmcia_socket */
+	socket->socket.ss_entry = &pci_socket_operations;
+	socket->socket.dev.dev = &dev->dev;
+	socket->socket.driver_data = socket;
 
 	/* prepare pci_socket_t */
 	socket->dev = dev;
@@ -168,7 +163,7 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 		socket->dev = NULL;
 		pci_set_drvdata(dev, NULL);
 	} else {
-		class_device_register(&socket->cls_d.class_dev);
+		pcmcia_register_socket(&socket->socket);
 	}
 	return err;
 }
@@ -196,7 +191,7 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 	pci_socket_t *socket = pci_get_drvdata(dev);
 
 	/* note: we are already unregistered from the cs core */
-	class_device_unregister(&socket->cls_d.class_dev);
+	pcmcia_unregister_socket(&socket->socket);
 	if (socket->op && socket->op->close)
 		socket->op->close(socket);
 	pci_set_drvdata(dev, NULL);
@@ -204,14 +199,12 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 
 static int cardbus_suspend (struct pci_dev *dev, u32 state)
 {
-	pci_socket_t *socket = pci_get_drvdata(dev);
-	return pcmcia_socket_dev_suspend(&socket->cls_d, state, 0);
+	return pcmcia_socket_dev_suspend(&dev->dev, state, 0);
 }
 
 static int cardbus_resume (struct pci_dev *dev)
 {
-	pci_socket_t *socket = pci_get_drvdata(dev);
-	return pcmcia_socket_dev_resume(&socket->cls_d, RESUME_RESTORE_STATE);
+	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
 }
 
 

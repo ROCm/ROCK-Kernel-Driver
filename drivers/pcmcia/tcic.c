@@ -121,6 +121,7 @@ typedef struct socket_info_t {
     void	*info;
     u_char	last_sstat;
     u_char	id;
+    struct pcmcia_socket	socket;
 } socket_info_t;
 
 static struct timer_list poll_timer;
@@ -372,15 +373,11 @@ static int __init get_tcic_id(void)
 
 /*====================================================================*/
 
-static struct pcmcia_socket_class_data tcic_data = {
-	.ops = &tcic_operations,
-};
-
 static struct device_driver tcic_driver = {
 	.name = "tcic-pcmcia",
 	.bus = &platform_bus_type,
-/*	.suspend = pcmcia_socket_dev_suspend,	FIXME?	*/
-/*	.resume = pcmcia_socket_dev_resume,	FIXME?	*/
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device tcic_device = {
@@ -391,13 +388,10 @@ static struct platform_device tcic_device = {
 	},
 };
 
-static struct class_device tcic_class_data = {
-	.class = &pcmcia_socket_class,
-};
 
 static int __init init_tcic(void)
 {
-    int i, sock;
+    int i, sock, ret = 0;
     u_int mask, scan;
     servinfo_t serv;
 
@@ -524,13 +518,17 @@ static int __init init_tcic(void)
     /* jump start interrupt handler, if needed */
     tcic_interrupt(0, NULL, NULL);
 
-    tcic_data.nsock = sockets;
-    tcic_class_data.dev = &tcic_device.dev;
-    tcic_class_data.class_data = &tcic_data;
-    strlcpy(tcic_class_data.class_id, "tcic-pcmcia", BUS_ID_SIZE);
-    
     platform_device_register(&tcic_device);
-    class_device_register(&tcic_class_data);
+
+    for (i = 0; i < sockets; i++) {
+	    socket_table[i].socket.ss_entry = &tcic_operations;
+	    socket_table[i].socket.dev.dev = &tcic_device.dev;
+	    ret = pcmcia_register_socket(&socket_table[i].socket);	    
+	    if (ret && i)
+		    pcmcia_unregister_socket(&socket_table[0].socket);
+    }
+    
+    return ret;
 
     return 0;
     
@@ -540,13 +538,19 @@ static int __init init_tcic(void)
 
 static void __exit exit_tcic(void)
 {
+    int i;
+
     del_timer_sync(&poll_timer);
     if (cs_irq != 0) {
 	tcic_aux_setw(TCIC_AUX_SYSCFG, TCIC_SYSCFG_AUTOBUSY|0x0a00);
 	free_irq(cs_irq, tcic_interrupt);
     }
     release_region(tcic_base, 16);
-    class_device_unregister(&tcic_class_data);
+
+    for (i = 0; i < sockets; i++) {
+	    pcmcia_unregister_socket(&socket_table[i].socket);	    
+    }
+
     platform_device_unregister(&tcic_device);
     driver_unregister(&tcic_driver);
 } /* exit_tcic */

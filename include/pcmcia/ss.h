@@ -154,13 +154,6 @@ struct pcmcia_socket_class_data {
 	struct class_device class_dev;		/* generic class structure */
 };
 
-extern struct class pcmcia_socket_class;
-
-/* socket drivers are expected to use these callbacks in their .drv struct */
-extern int pcmcia_socket_dev_suspend(struct pcmcia_socket_class_data *cls_d, u32 state, u32 level);
-extern int pcmcia_socket_dev_resume(struct pcmcia_socket_class_data *cls_d, u32 level);
-
-
 typedef struct erase_busy_t {
 	eraseq_entry_t		*erase;
 	client_handle_t		client;
@@ -249,8 +242,24 @@ struct pcmcia_socket {
 	struct resource *		cb_cis_res;
 	u_char				*cb_cis_virt;
 #endif
+
+	/* socket device */
+	struct class_device		dev;
+	void				*driver_data;	/* data internal to the socket driver */
+
 };
 
-__deprecated struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr);
+struct pcmcia_socket * pcmcia_get_socket_by_nr(unsigned int nr);
+
+
+
+extern int pcmcia_register_socket(struct pcmcia_socket *socket);
+extern void pcmcia_unregister_socket(struct pcmcia_socket *socket);
+
+extern struct class pcmcia_socket_class;
+
+/* socket drivers are expected to use these callbacks in their .drv struct */
+extern int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level);
+extern int pcmcia_socket_dev_resume(struct device *dev, u32 level);
 
 #endif /* _LINUX_SS_H */

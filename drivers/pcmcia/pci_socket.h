@@ -23,7 +23,7 @@ typedef struct pci_socket {
 	struct work_struct tq_task;
 	struct timer_list poll_timer;
 
-	struct pcmcia_socket_class_data cls_d;
+	struct pcmcia_socket socket;
 	/* A few words of private data for the low-level driver.. */
 	unsigned int private[8];
 } pci_socket_t;

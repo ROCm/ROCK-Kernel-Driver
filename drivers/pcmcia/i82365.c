@@ -166,6 +166,7 @@ typedef struct vg46x_state_t {
 
 typedef struct socket_info_t {
     u_short		type, flags;
+    struct pcmcia_socket	socket;
     socket_cap_t	cap;
     ioaddr_t		ioaddr;
     u_short		psock;
@@ -1502,15 +1503,11 @@ static struct pccard_operations pcic_operations = {
 
 /*====================================================================*/
 
-static struct pcmcia_socket_class_data i82365_data = {
-	.ops = &pcic_operations,
-};
-
 static struct device_driver i82365_driver = {
 	.name = "i82365",
 	.bus = &platform_bus_type,
-/*	.suspend = pcmcia_socket_dev_suspend,	FIXME?	*/
-/*	.resume = pcmcia_socket_dev_resume,	FIXME?	*/
+	.suspend = pcmcia_socket_dev_suspend,
+	.resume = pcmcia_socket_dev_resume,
 };
 
 static struct platform_device i82365_device = {
@@ -1521,13 +1518,11 @@ static struct platform_device i82365_device = {
 	},
 };
 
-static struct class_device i82365_class_data = {
-	.class = &pcmcia_socket_class,
-};
-
 static int __init init_i82365(void)
 {
     servinfo_t serv;
+    int i, ret;
+
     pcmcia_get_card_services_info(&serv);
     if (serv.Revision != CS_RELEASE_CODE) {
 	printk(KERN_NOTICE "i82365: Card Services release "
@@ -1551,19 +1546,25 @@ static int __init init_i82365(void)
 	return -ENODEV;
     }
 
+    platform_device_register(&i82365_device);
+
     /* Set up interrupt handler(s) */
 #ifdef CONFIG_ISA
     if (grab_irq != 0)
 	request_irq(cs_irq, pcic_interrupt, 0, "i82365", pcic_interrupt);
 #endif
     
-    i82365_data.nsock = sockets;
-    i82365_class_data.dev = &i82365_device.dev;
-    i82365_class_data.class_data = &i82365_data;
-    strlcpy(i82365_class_data.class_id, "i82365", BUS_ID_SIZE);
-    
-    platform_device_register(&i82365_device);
-    class_device_register(&i82365_class_data);
+    /* register sockets with the pcmcia core */
+    for (i = 0; i < sockets; i++) {
+	    socket[i].socket.dev.dev = &i82365_device.dev;
+	    socket[i].socket.ss_entry = &pcic_operations;
+	    ret = pcmcia_register_socket(&socket[i].socket);	    
+	    if (ret && i--) {
+		    for (; i>= 0; i--)
+			    pcmcia_unregister_socket(&socket[i].socket);
+		    break;
+	    }
+    }
 
     /* Finally, schedule a polling interrupt */
     if (poll_interval != 0) {
@@ -1581,10 +1582,12 @@ static int __init init_i82365(void)
 static void __exit exit_i82365(void)
 {
     int i;
+    for (i = 0; i < sockets; i++) {
+	    pcmcia_unregister_socket(&socket[i].socket);
 #ifdef CONFIG_PROC_FS
-    for (i = 0; i < sockets; i++) pcic_proc_remove(i);
+	    pcic_proc_remove(i);
 #endif
-    class_device_unregister(&i82365_class_data);
+    }
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
 	del_timer_sync(&poll_timer);

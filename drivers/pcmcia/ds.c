@@ -107,7 +107,6 @@ struct pcmcia_bus_socket {
 	struct work_struct	removal;
 	socket_bind_t		*bind;
 	struct device		*socket_dev;
-	struct list_head	socket_list;
 	unsigned int		socket_no; /* deprecated */
 	struct pcmcia_socket	*parent;
 };
@@ -122,10 +121,6 @@ struct pcmcia_bus_socket {
 static dev_info_t dev_info = "Driver Services";
 
 static int major_dev = -1;
-
-/* list of all sockets registered with the pcmcia bus driver */
-static DECLARE_RWSEM(bus_socket_list_rwsem);
-static LIST_HEAD(bus_socket_list);
 
 extern struct proc_dir_entry *proc_pccard;
 
@@ -825,8 +820,9 @@ static struct file_operations ds_fops = {
 	.poll		= ds_poll,
 };
 
-static int __devinit pcmcia_bus_add_socket(struct pcmcia_socket *socket, struct device *dev, unsigned int socket_nr)
+static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 {
+	struct pcmcia_socket *socket = class_dev->class_data;
 	client_reg_t client_reg;
 	bind_req_t bind;
 	struct pcmcia_bus_socket *s;
@@ -848,7 +844,7 @@ static int __devinit pcmcia_bus_add_socket(struct pcmcia_socket *socket, struct 
 	init_waitqueue_head(&s->request);
 
 	/* initialize data */
-	s->socket_dev = dev;
+	s->socket_dev = socket->dev.dev;
 	INIT_WORK(&s->removal, handle_removal, s);
 	s->socket_no = socket->sock;
 	s->parent = socket;
@@ -882,51 +878,25 @@ static int __devinit pcmcia_bus_add_socket(struct pcmcia_socket *socket, struct 
 	}
 
 	socket->pcmcia = s;
-	list_add(&s->socket_list, &bus_socket_list);
 
 	return 0;
 }
 
 
-static int pcmcia_bus_add_socket_dev(struct class_device *class_dev)
+static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	unsigned int i;
-	unsigned int ret = 0;
+	struct pcmcia_socket *socket = class_dev->class_data;
 
-	if (!cls_d)
-		return -ENODEV;
-
-	down_write(&bus_socket_list_rwsem);
-        for (i = 0; i < cls_d->nsock; i++)
-		ret += pcmcia_bus_add_socket(&cls_d->s_info[i], class_dev->dev, i);
-	up_write(&bus_socket_list_rwsem);
-
-	return ret;
-}
-
-static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
-{
-	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
-	struct list_head *list_loop;
-	struct list_head *tmp_storage;
-
-	if (!cls_d)
+	if (!socket || !socket->pcmcia)
 		return;
 
 	flush_scheduled_work();
 
-	down_write(&bus_socket_list_rwsem);
-	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
-		struct pcmcia_bus_socket *bus_sock = container_of(list_loop, struct pcmcia_bus_socket, socket_list);
-		if (bus_sock->socket_dev == class_dev->dev) {
-			bus_sock->parent->pcmcia = NULL;
-			pcmcia_deregister_client(bus_sock->handle);
-			list_del(&bus_sock->socket_list);
-			kfree(bus_sock);
-		}
-	}
-	up_write(&bus_socket_list_rwsem);
+	pcmcia_deregister_client(socket->pcmcia->handle);
+
+	kfree(socket->pcmcia);
+	socket->pcmcia = NULL;
+
 	return;
 }
 
@@ -934,8 +904,8 @@ static void pcmcia_bus_remove_socket_dev(struct class_device *class_dev)
 /* the pcmcia_bus_interface is used to handle pcmcia socket devices */
 static struct class_interface pcmcia_bus_interface = {
 	.class = &pcmcia_socket_class,
-	.add = &pcmcia_bus_add_socket_dev,
-	.remove = &pcmcia_bus_remove_socket_dev,
+	.add = &pcmcia_bus_add_socket,
+	.remove = &pcmcia_bus_remove_socket,
 };
 
 
