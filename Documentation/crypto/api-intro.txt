@@ -101,6 +101,10 @@ will not be included in the mainline until around 2011), and be based
 on a recognized standard and/or have been subjected to appropriate
 peer review.
 
+Also check for any RFCs which may relate to the use of specific algorithms,
+as well as general application notes such as RFC2451 ("The ESP CBC-Mode
+Cipher Algorithms").
+
 
 BUGS
 
@@ -164,6 +168,7 @@ Original developers of the initial set of crypto algorithms:
   Andrew Tridgell and Steve French (MD4)
   Colin Plumb (MD5)
   Steve Raid (SHA1)
+  Jean-Luc Cooke (SHA256)
   Kazunori Miyazawa / USAGI (HMAC)
 
 The DES code was subsequently redeveloped by:
@@ -171,6 +176,11 @@ The DES code was subsequently redeveloped by:
   Raimar Falke
   Gisle Sælensminde
   Niels Möller
+
+The Blowfish code was subsequently redeveloped by:
+  Herbert Valerio Riedel
+  Kyle McMartin
+
 
 Please send any credits updates or corrections to:
 James Morris <jmorris@intercode.com.au>

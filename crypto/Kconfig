@@ -32,24 +32,35 @@ config CRYPTO_SHA1
 	tristate "SHA1 digest algorithm"
 	depends on CRYPTO
 	help
-	  SHA-1 secure hash standard (FIPS 180-1).
+	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2).
 
 config CRYPTO_SHA256
 	tristate "SHA256 digest algorithm"
 	depends on CRYPTO
 	help
-	  SHA256 secure hash standard.
+	  SHA256 secure hash standard (DFIPS 180-2).
 	  
 	  This version of SHA implements a 256 bit hash with 128 bits of
-	  security against collision attacks.  It is described in:
-	  http://csrc.nist.gov/cryptval/shs/sha256-384-512.pdf
-	  
+	  security against collision attacks.
 
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO
 	help
 	  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
+
+config CRYPTO_BLOWFISH
+	tristate "Blowfish cipher algorithm"
+	depends on CRYPTO
+	help
+	  Blowfish cipher algorithm, by Bruce Schneier.
+	  
+	  This is a fast cipher which can use variable length key from 32
+	  bits to 448 bits.  It's fast, simple and specifically designed for
+	  use on "large microprocessors".
+	  
+	  See also:
+	  http://www.counterpane.com/blowfish.html
 
 config CRYPTO_TEST
 	tristate "Testing module"

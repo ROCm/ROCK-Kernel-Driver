@@ -47,7 +47,7 @@ static char *xbuf;
 static char *tvmem;
 
 static char *check[] = {
-	"des", "md5", "des3_ede", "rot13", "sha1", "sha256",
+	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
 	 NULL
 };
 
@@ -1480,6 +1480,210 @@ test_des3_ede(void)
 	crypto_free_tfm(tfm);
 }
 
+void
+test_blowfish(void)
+{
+	unsigned int ret, i;
+	unsigned int tsize;
+	char *p, *q;
+	struct crypto_tfm *tfm;
+	char *key;
+	struct bf_tv *bf_tv;
+	struct scatterlist sg[1];
+
+	printk("\ntesting blowfish encryption\n");
+
+	tsize = sizeof (bf_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, bf_enc_tv_template, tsize);
+	bf_tv = (void *) tvmem;
+
+	tfm = crypto_alloc_tfm("blowfish", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for blowfish (default ecb)\n");
+		return;
+	}
+
+	for (i = 0; i < BF_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, bf_tv[i].keylen * 8);
+		key = bf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, bf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!bf_tv[i].fail)
+				goto out;
+		}
+
+		p = bf_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = bf_tv[i].plen;
+		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		if (ret) {
+			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, bf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, bf_tv[i].result, bf_tv[i].rlen) ?
+			"fail" : "pass");
+	}
+
+	printk("\ntesting blowfish decryption\n");
+
+	tsize = sizeof (bf_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, bf_dec_tv_template, tsize);
+	bf_tv = (void *) tvmem;
+
+	for (i = 0; i < BF_DEC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, bf_tv[i].keylen * 8);
+		key = bf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, bf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!bf_tv[i].fail)
+				goto out;
+		}
+
+		p = bf_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = bf_tv[i].plen;
+		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		if (ret) {
+			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, bf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, bf_tv[i].result, bf_tv[i].rlen) ?
+			"fail" : "pass");
+	}
+	
+	crypto_free_tfm(tfm);
+	
+	tfm = crypto_alloc_tfm("blowfish", CRYPTO_TFM_MODE_CBC);
+	if (tfm == NULL) {
+		printk("failed to load transform for blowfish cbc\n");
+		return;
+	}
+
+	printk("\ntesting blowfish cbc encryption\n");
+
+	tsize = sizeof (bf_cbc_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+	memcpy(tvmem, bf_cbc_enc_tv_template, tsize);
+	bf_tv = (void *) tvmem;
+
+	for (i = 0; i < BF_CBC_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, bf_tv[i].keylen * 8);
+
+		key = bf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, bf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		p = bf_tv[i].plaintext;
+
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length =  bf_tv[i].plen;;
+
+		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
+				     crypto_tfm_alg_ivsize(tfm));
+
+		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		if (ret) {
+			printk("blowfish_cbc_encrypt() failed flags=%x\n",
+			       tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, bf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, bf_tv[i].result, bf_tv[i].rlen)
+			? "fail" : "pass");
+	}
+
+	printk("\ntesting blowfish cbc decryption\n");
+
+	tsize = sizeof (bf_cbc_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+	memcpy(tvmem, bf_cbc_dec_tv_template, tsize);
+	bf_tv = (void *) tvmem;
+
+	for (i = 0; i < BF_CBC_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, bf_tv[i].keylen * 8);
+		key = bf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, bf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		p = bf_tv[i].plaintext;
+
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length =  bf_tv[i].plen;;
+
+		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
+				     crypto_tfm_alg_ivsize(tfm));
+
+		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		if (ret) {
+			printk("blowfish_cbc_decrypt() failed flags=%x\n",
+			       tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, bf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, bf_tv[i].result, bf_tv[i].rlen)
+			? "fail" : "pass");
+	}
+
+out:
+	crypto_free_tfm(tfm);
+}
+
 static void
 test_available(void)
 {
@@ -1504,6 +1708,8 @@ do_test(void)
 		test_des();
 		test_des3_ede();
 		test_md4();
+		test_sha256();
+		test_blowfish();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -1533,6 +1739,10 @@ do_test(void)
 		
 	case 6:
 		test_sha256();
+		break;
+	
+	case 7:
+		test_blowfish();
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC

@@ -188,8 +188,14 @@ static void ecb_process(struct crypto_tfm *tfm, u8 *block,
 
 static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
 {
-	return tfm->__crt_alg->cra_cipher.cia_setkey(tfm->crt_ctx, key,
-	                                             keylen, &tfm->crt_flags);
+	struct cipher_alg *cia = &tfm->__crt_alg->cra_cipher;
+	
+	if (keylen < cia->cia_min_keysize || keylen > cia->cia_max_keysize) {
+		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
+		return -EINVAL;
+	} else
+		return cia->cia_setkey(tfm->crt_ctx, key, keylen,
+		                       &tfm->crt_flags);
 }
 
 static int ecb_encrypt(struct crypto_tfm *tfm,
