@@ -200,6 +200,12 @@ enum av7110_rec_play_state {
 	__Continue
 };
 
+enum av7110_fw_cmd_misc {
+	AV7110_FW_VIDEO_ZOOM = 1,
+	AV7110_FW_VIDEO_COMMAND,
+	AV7110_FW_AUDIO_COMMAND
+};
+
 enum av7110_command_type {
 	COMTYPE_NOCOM,
 	COMTYPE_PIDFILTER,
@@ -218,6 +224,7 @@ enum av7110_command_type {
 	COMTYPE_VIDEO,
 	COMTYPE_AUDIO,
 	COMTYPE_CI_LL,
+	COMTYPE_MISC = 0x80
 };
 
 #define VID_NONE_PREF		0x00	/* No aspect ration processing preferred */
@@ -225,6 +232,23 @@ enum av7110_command_type {
 #define VID_VERT_COMP_PREF	0x02	/* Vertical compression display preferred */
 #define VID_VC_AND_PS_PREF	0x03	/* PanScan and vertical Compression if allowed */
 #define VID_CENTRE_CUT_PREF	0x05	/* PanScan with zero vector */
+
+/* MPEG video decoder commands */
+#define VIDEO_CMD_STOP		0x000e
+#define VIDEO_CMD_PLAY		0x000d
+#define VIDEO_CMD_FREEZE	0x0102
+#define VIDEO_CMD_FFWD		0x0016
+#define VIDEO_CMD_SLOW		0x0022
+
+/* MPEG audio decoder commands */
+#define AUDIO_CMD_MUTE		0x0001
+#define AUDIO_CMD_UNMUTE	0x0002
+#define AUDIO_CMD_PCM16		0x0010
+#define AUDIO_CMD_STEREO	0x0080
+#define AUDIO_CMD_MONO_L	0x0100
+#define AUDIO_CMD_MONO_R	0x0200
+#define AUDIO_CMD_SYNC_OFF	0x000e
+#define AUDIO_CMD_SYNC_ON	0x000f
 
 /* firmware data interface codes */
 #define DATA_NONE		 0x00
@@ -457,21 +481,21 @@ static inline int SendDAC(struct av7110 *av7110, u8 addr, u8 data)
 	return av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, AudioDAC, 2, addr, data);
 }
 
-static inline void VidMode(struct av7110 *av7110, int mode)
+static inline void av7710_set_video_mode(struct av7110 *av7110, int mode)
 {
 	av7110_fw_cmd(av7110, COMTYPE_ENCODER, SetVidMode, 1, mode);
 }
 
 static int inline vidcom(struct av7110 *av7110, u32 com, u32 arg)
 {
-	return av7110_fw_cmd(av7110, 0x80, 0x02, 4,
+	return av7110_fw_cmd(av7110, COMTYPE_MISC, AV7110_FW_VIDEO_COMMAND, 4,
 			     (com>>16), (com&0xffff),
 			     (arg>>16), (arg&0xffff));
 }
 
 static int inline audcom(struct av7110 *av7110, u32 com)
 {
-	return av7110_fw_cmd(av7110, 0x80, 0x03, 4,
+	return av7110_fw_cmd(av7110, COMTYPE_MISC, AV7110_FW_AUDIO_COMMAND, 4,
 			     (com>>16), (com&0xffff));
 }
 

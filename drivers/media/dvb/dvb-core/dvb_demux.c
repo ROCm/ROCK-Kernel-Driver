@@ -192,7 +192,6 @@ static inline int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
 	struct dvb_demux *demux = feed->demux;
 	struct dvb_demux_filter *f = feed->filter;
 	struct dmx_section_feed *sec = &feed->feed.sec;
-	u8 *buf = sec->secbuf;
 	int section_syntax_indicator;
 
 	if (!sec->is_filtering)
@@ -215,8 +214,6 @@ static inline int dvb_dmx_swfilter_section_feed (struct dvb_demux_feed *feed)
 
 	sec->seclen = 0;
 
-	memset(buf, 0, DVB_DEMUX_MASK_MAX);
- 
 	return 0;
 }
 

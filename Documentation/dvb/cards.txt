@@ -50,6 +50,8 @@ o Cards based on the Phillips saa7146 multimedia PCI bridge chip:
     - Technotrend Budget / Hauppauge WinTV-Nova PCI Cards
     - SATELCO Multimedia PCI
     - KNC1 DVB-S
+    - Typhoon DVB-S budget
+    - Fujitsu-Siemens Activy DVB-S budget card
 
 o Cards based on the B2C2 Inc. FlexCopII/IIb/III:
   - Technisat SkyStar2 PCI DVB card revision 2.3, 2.6B, 2.6C

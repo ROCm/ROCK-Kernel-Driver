@@ -50,7 +50,7 @@ static struct dvb_frontend_info tdmb7_info = {
 	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | 
-	      FE_CAN_CLEAN_SETUP | FE_CAN_RECOVER
+              FE_CAN_RECOVER
 };
 
 
@@ -390,8 +390,14 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         case FE_INIT:
 		return cx22700_init (i2c);
 
-        case FE_RESET:
-                break;
+	case FE_GET_TUNE_SETTINGS:
+	{
+	        struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+	        fesettings->min_delay_ms = 150;
+	        fesettings->step_size = 166667;
+	        fesettings->max_drift = 166667*2;
+	        return 0;
+	}	    
 
 	default:
 		return -EOPNOTSUPP;

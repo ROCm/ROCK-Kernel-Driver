@@ -32,14 +32,15 @@
  */
 
 
+#define __KERNEL_SYSCALLS__
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/syscalls.h>
 #include <linux/fs.h>
+#include <linux/unistd.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 #include "dvb_frontend.h"
@@ -167,7 +168,6 @@ static struct dvb_frontend_info tda10046h_info = {
 };
 
 
-#pragma pack(1)
 struct tda1004x_state {
 	u8 tda1004x_address;
 	u8 tuner_address;
@@ -175,7 +175,7 @@ struct tda1004x_state {
         u8 tuner_type:2;
         u8 fe_type:2;
 };
-#pragma pack()
+
 
 struct fwinfo {
 	int file_size;
@@ -396,13 +396,13 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 
 	// Load the firmware
 	set_fs(get_ds());
-	fd = sys_open(tda1004x_firmware, 0, 0);
+	fd = open(tda1004x_firmware, 0, 0);
 	if (fd < 0) {
 		printk("%s: Unable to open firmware %s\n", __FUNCTION__,
 		       tda1004x_firmware);
 		return -EIO;
 	}
-	filesize = sys_lseek(fd, 0L, 2);
+	filesize = lseek(fd, 0L, 2);
 	if (filesize <= 0) {
 		printk("%s: Firmware %s is empty\n", __FUNCTION__,
 		       tda1004x_firmware);
@@ -433,8 +433,8 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 	}
 
 	// read it!
-        sys_lseek(fd, fw_offset, 0);
-	if (sys_read(fd, firmware, fw_size) != fw_size) {
+	lseek(fd, fw_offset, 0);
+	if (read(fd, firmware, fw_size) != fw_size) {
 		printk("%s: Failed to read firmware\n", __FUNCTION__);
 		vfree(firmware);
 		sys_close(fd);
@@ -447,6 +447,7 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
         switch(tda_state->fe_type) {
         case FE_TYPE_TDA10045H:
                 // reset chip
+		tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 0x10, 0);
                 tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 8, 8);
                 tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 8, 0);
                 dvb_delay(10);
@@ -457,6 +458,7 @@ static int tda1004x_fwupload(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda
 
         case FE_TYPE_TDA10046H:
                 // reset chip
+		tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 1, 0);
                 tda1004x_write_mask(i2c, tda_state, TDA10046H_CONF_TRISTATE1, 1, 0);
                 dvb_delay(10);
 
@@ -538,6 +540,8 @@ static int tda10045h_init(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_st
 
         dprintk("%s\n", __FUNCTION__);
 
+	tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFADC1, 0x10, 0); // wake up the ADC
+
         // Disable the MC44BC374C
         tda1004x_enable_tuner_i2c(i2c, tda_state);
         tuner_msg.addr = MC44BC374_ADDRESS;
@@ -573,6 +577,8 @@ static int tda10046h_init(struct dvb_i2c_bus *i2c, struct tda1004x_state *tda_st
         static u8 disable_mc44BC374c[] = { 0x1d, 0x74, 0xa0, 0x68 };
 
         dprintk("%s\n", __FUNCTION__);
+
+	tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 1, 0); // wake up the chip
 
         // Disable the MC44BC374C
         tda1004x_enable_tuner_i2c(i2c, tda_state);
@@ -1277,12 +1283,27 @@ static int tda1004x_read_ber(struct dvb_i2c_bus *i2c, struct tda1004x_state* tda
 	return 0;
 }
 
+static int tda1004x_sleep(struct dvb_i2c_bus *i2c, struct tda1004x_state* tda_state)
+{
+	switch(tda_state->fe_type) {
+	case FE_TYPE_TDA10045H:
+		tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFADC1, 0x10, 0x10);
+		break;
+
+	case FE_TYPE_TDA10046H:
+		tda1004x_write_mask(i2c, tda_state, TDA1004X_CONFC4, 1, 1);
+		break;
+	}
+
+	return 0;
+}
+
 
 static int tda1004x_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
 	int status = 0;
 	struct dvb_i2c_bus *i2c = fe->i2c;
-	struct tda1004x_state *tda_state = (struct tda1004x_state *) &(fe->data);
+	struct tda1004x_state *tda_state = (struct tda1004x_state *) fe->data;
 
 	dprintk("%s: cmd=0x%x\n", __FUNCTION__, cmd);
 
@@ -1320,7 +1341,12 @@ static int tda1004x_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	case FE_GET_FRONTEND:
 		return tda1004x_get_fe(i2c, tda_state, (struct dvb_frontend_parameters*) arg);
 
+	case FE_SLEEP:
+		tda_state->initialised = 0;
+		return tda1004x_sleep(i2c, tda_state);
+
 	case FE_INIT:
+
 		// don't bother reinitialising
 		if (tda_state->initialised)
 			return 0;
@@ -1339,6 +1365,15 @@ static int tda1004x_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 			tda_state->initialised = 1;
 		return status;
 
+	case FE_GET_TUNE_SETTINGS:
+	{
+		struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+		fesettings->min_delay_ms = 800;
+		fesettings->step_size = 166667;
+		fesettings->max_drift = 166667*2;
+		return 0;
+	}
+	    
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -1354,6 +1389,7 @@ static int tda1004x_attach(struct dvb_i2c_bus *i2c, void **data)
         int fe_type = -1;
         int tuner_type = -1;
 	struct tda1004x_state tda_state;
+	struct tda1004x_state* ptda_state;
 	struct i2c_msg tuner_msg = {.addr=0, .flags=0, .buf=0, .len=0 };
         static u8 td1344_init[] = { 0x0b, 0xf5, 0x88, 0xab };
         static u8 td1316_init[] = { 0x0b, 0xf5, 0x85, 0xab };
@@ -1446,13 +1482,20 @@ static int tda1004x_attach(struct dvb_i2c_bus *i2c, void **data)
         // upload firmware
         if ((status = tda1004x_fwupload(i2c, &tda_state)) != 0) return status;
 
+	// create the real state we'll be passing about
+	if ((ptda_state = (struct tda1004x_state*) kmalloc(sizeof(struct tda1004x_state), GFP_KERNEL)) == NULL) {
+		return -ENOMEM;
+	}
+	memcpy(ptda_state, &tda_state, sizeof(struct tda1004x_state));
+	*data = ptda_state;
+
 	// register
         switch(tda_state.fe_type) {
         case FE_TYPE_TDA10045H:
-        	return dvb_register_frontend(tda1004x_ioctl, i2c, (void *)(*((u32*) &tda_state)), &tda10045h_info);
+		return dvb_register_frontend(tda1004x_ioctl, i2c, ptda_state, &tda10045h_info);
 
         case FE_TYPE_TDA10046H:
-                return dvb_register_frontend(tda1004x_ioctl, i2c, (void *)(*((u32*) &tda_state)), &tda10046h_info);
+		return dvb_register_frontend(tda1004x_ioctl, i2c, ptda_state, &tda10046h_info);
         }
 
         // should not get here
@@ -1465,6 +1508,7 @@ void tda1004x_detach(struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk("%s\n", __FUNCTION__);
 
+	kfree(data);
 	dvb_unregister_frontend(tda1004x_ioctl, i2c);
 }
 

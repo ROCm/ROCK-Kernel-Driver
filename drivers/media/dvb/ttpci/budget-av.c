@@ -39,6 +39,7 @@ struct budget_av {
 	struct budget budget;
 	struct video_device vd;
 	int cur_input;
+	int has_saa7113;
 };
 
 /****************************************************************************
@@ -149,6 +150,9 @@ static int saa7113_setinput (struct budget_av *budget_av, int input)
 {
 	struct budget *budget = &budget_av->budget;
 
+	if ( 1 != budget_av->has_saa7113 )
+		return -ENODEV;
+
 	if (input == 1) {
 		i2c_writereg(budget->i2c_bus, 0x4a, 0x02, 0xc7);
 		i2c_writereg(budget->i2c_bus, 0x4a, 0x09, 0x80);
@@ -170,11 +174,13 @@ static int budget_av_detach (struct saa7146_dev *dev)
 
 	DEB_EE(("dev: %p\n",dev));
 
+	if ( 1 == budget_av->has_saa7113 ) {
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
 
 	dvb_delay(200);
 
 	saa7146_unregister_device (&budget_av->vd, dev);
+	}
 
 	err = ttpci_budget_deinit (&budget_av->budget);
 
@@ -221,11 +227,8 @@ static int budget_av_attach (struct saa7146_dev* dev,
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTHI);
 	dvb_delay(500);
 
-	if ((err = saa7113_init (budget_av))) {
-		/* fixme: proper cleanup here */
-		ERR(("cannot init saa7113.\n"));
-		return err;
-	}
+	if ( 0 == saa7113_init(budget_av) ) {
+		budget_av->has_saa7113 = 1;
 
 	if ( 0 != saa7146_vv_init(dev,&vv_data)) {
 		/* fixme: proper cleanup here */
@@ -246,14 +249,12 @@ static int budget_av_attach (struct saa7146_dev* dev,
 					SAA7146_HPS_SYNC_PORT_A);
 
 	saa7113_setinput (budget_av, 0);
+	} else {
+		budget_av->has_saa7113 = 0;
 
-	/* what is this? since we don't support open()/close()
-	   notifications, we simply put this into the release handler... */
-/*
 	saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout (20);
-*/
+	}
+
 	/* fixme: find some sane values here... */
 	saa7146_write(dev, PCI_BT_V1, 0x1c00101f);
 
@@ -333,13 +334,13 @@ static int av_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 static struct saa7146_standard standard[] = {
 	{
 		.name	= "PAL", 	.id	= V4L2_STD_PAL,
-		.v_offset	= 0x17,	.v_field 	= 288,	.v_calc		= 576,
-		.h_offset	= 0x14,	.h_pixels 	= 680,	.h_calc		= 680+1,
-		.v_max_out	= 576,	.h_max_out	= 768,
+		.v_offset	= 0x17,	.v_field 	= 288,
+		.h_offset	= 0x14,	.h_pixels 	= 680,  	      
+		.v_max_out	= 576,	.h_max_out	= 768
 	}, {
 		.name	= "NTSC", 	.id	= V4L2_STD_NTSC,
-		.v_offset	= 0x16,	.v_field 	= 240,	.v_calc		= 480,
-		.h_offset	= 0x06,	.h_pixels 	= 708,	.h_calc		= 708+1,
+		.v_offset	= 0x16,	.v_field 	= 240,
+		.h_offset	= 0x06,	.h_pixels 	= 708,
 		.v_max_out	= 480,	.h_max_out	= 640,
 	}
 };
