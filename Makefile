@@ -285,8 +285,8 @@ export MODLIB
 
 vmlinux-objs := $(HEAD) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
-quiet_cmd_link_vmlinux = LD      $@
-define cmd_link_vmlinux
+quiet_cmd_vmlinux__ = LD      $@
+define cmd_vmlinux__
 	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(init-y) \
 	--start-group \
 	$(core-y) \
@@ -294,20 +294,26 @@ define cmd_link_vmlinux
 	$(drivers-y) \
 	$(net-y) \
 	--end-group \
-	$(filter $(kallsyms.o),$^) \
+	$(filter .tmp_kallsyms%,$^) \
 	-o $@
 endef
 
 #	set -e makes the rule exit immediately on error
 
-define rule_vmlinux
+define rule_vmlinux__
 	set -e
-	echo '  Generating build number'
-	. scripts/mkversion > .tmp_version
-	mv -f .tmp_version .version
-	+$(call descend,init,)
-	$(call cmd,link_vmlinux)
-	echo 'cmd_$@ := $(cmd_link_vmlinux)' > $(@D)/.$(@F).cmd
+	$(if $(filter .tmp_kallsyms%,$^),,
+	  echo '  Generating build number'
+	  . scripts/mkversion > .tmp_version
+	  mv -f .tmp_version .version
+	  +$(call descend,init,)
+	)
+	$(call cmd,vmlinux__)
+	echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
+endef
+
+define rule_vmlinux
+	$(rule_vmlinux__)
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
@@ -315,44 +321,33 @@ LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
 
 #	Generate section listing all symbols and add it into vmlinux
 #	It's a three stage process:
-#	o .tmp_vmlinux has all symbols and sections, but __kallsyms is
+#	o .tmp_vmlinux1 has all symbols and sections, but __kallsyms is
 #	  empty
 #	  Running kallsyms on that gives as .tmp_kallsyms1.o with
 #	  the right size
-#	o .tmp_vmlinux1 now has a __kallsyms section of the right size,
+#	o .tmp_vmlinux2 now has a __kallsyms section of the right size,
 #	  but due to the added section, some addresses have shifted
-#	  From here, we generate a correct .tmp_kallsyms.o
-#	o The correct .tmp_kallsyms.o is linked into the final vmlinux
-#	  below.
+#	  From here, we generate a correct .tmp_kallsyms2.o
+#	o The correct .tmp_kallsyms2.o is linked into the final vmlinux.
 
 ifdef CONFIG_KALLSYMS
 
-kallsyms.o := .tmp_kallsyms.o
+kallsyms.o := .tmp_kallsyms2.o
 
 quiet_cmd_kallsyms = KSYM    $@
 cmd_kallsyms = $(KALLSYMS) $< > $@
-cmd_kallsyms = \
-	$(KALLSYMS) $< > .tmp_kallsyms1.o; \
-	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) .tmp_vmlinux .tmp_kallsyms1.o \
-		-o .tmp_vmlinux1; \
-	$(KALLSYMS) .tmp_vmlinux1 > $@; \
-	rm -f .tmp_kallsyms1.o .tmp_vmlinux1
 
-.tmp_kallsyms.o: .tmp_vmlinux
+.tmp_kallsyms1.o: .tmp_vmlinux1
 	$(call cmd,kallsyms)
 
-# 	After generating .tmp_vmlinux just like vmlinux, decrement the version
-#	number again, so the final vmlinux gets the same one.
-#	Ignore return value of 'expr'.
+.tmp_kallsyms2.o: .tmp_vmlinux2
+	$(call cmd,kallsyms)
 
-define rule_.tmp_vmlinux
-	$(rule_vmlinux)
-	if expr 0`cat .version` - 1 > .tmp_version; then true; fi
-	mv -f .tmp_version .version
-endef
+.tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
+	$(call if_changed_rule,vmlinux__)
 
-.tmp_vmlinux: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,.tmp_vmlinux)
+.tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/vmlinux.lds.s FORCE
+	$(call if_changed_rule,vmlinux__)
 
 endif
 
@@ -393,17 +388,17 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 # ---------------------------------------------------------------------------
 
 %.s: %.c FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 %.i: %.c FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 %.o: %.c FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 %.lst: %.c FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 %.s: %.S FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 %.o: %.S FORCE
-	+@$(call descend,$(@D),$(@F))
+	+@$(call descend,$(@D),$@)
 
 # 	FIXME: The asm symlink changes when $(ARCH) changes. That's
 #	hard to detect, but I suppose "make mrproper" is a good idea
