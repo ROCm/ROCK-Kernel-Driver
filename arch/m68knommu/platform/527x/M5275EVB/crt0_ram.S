@@ -1,27 +1,36 @@
 /*****************************************************************************/
 
 /*
- *	crt0_ram.S -- startup code for MCF5206e ColdFire based CADRE3 boards.
+ *	crt0_ram.S -- startup code for MCF527x ColdFire based Freescale boards.
  *
- *	(C) Copyright 1999-2002, Greg Ungerer (gerg@snapgear.com)
- *
- * 	1999/02/24 Modified for the 5307 processor David W. Miller
+ *	(C) Copyright 2003-2004, Greg Ungerer (gerg@snapgear.com).
  */
 
 /*****************************************************************************/
 
-#include "linux/autoconf.h"
-#include "asm/coldfire.h"
-#include "asm/mcfsim.h"
+#include <linux/config.h>
+#include <linux/threads.h>
+#include <linux/linkage.h>
+#include <asm/segment.h>
+#include <asm/coldfire.h>
+#include <asm/mcfsim.h>
 
 /*****************************************************************************/
 
 /*
- *	Cadre-III M5206e ColdFire eval board, chip select and memory setup.
+ *	Freescale M5275EVB ColdFire eval board, chip select and memory setup.
  */
 
 #define	MEM_BASE	0x00000000	/* Memory base at address 0 */
 #define	VBR_BASE	MEM_BASE	/* Vector address */
+
+#if defined(CONFIG_RAM4MB)
+#define	MEM_SIZE	0x00400000	/* Memory size 4Mb */
+#elif defined(CONFIG_RAM8MB)
+#define	MEM_SIZE	0x00800000	/* Memory size 8Mb */
+#else
+#define	MEM_SIZE	0x01000000	/* Memory size 16Mb */
+#endif
 
 /*****************************************************************************/
 
@@ -77,49 +86,29 @@ _start:
 
 
 	/*
-	 *	SDRAM size for the Cadre III board (m5206e).
+	 *	Set memory size.
 	 */
-#if defined(CONFIG_RAMAUTO)
-	movea.l	#0x00000000,%a0
-	move.l	MCF_MBAR+MCFSIM_DCMR0,%d0
-	and.l	#0x00fe0000, %d0
-	beq	noaddr1
-	add.l	#0x00020000,%d0
-	move.l	%d0,%a0
-noaddr1:
-	move.l	MCF_MBAR+MCFSIM_DCMR1,%d0
-	and.l	#0x00fe0000, %d0
-	beq	noaddr2
-	add.l	#0x00020000,%d0
-	add.l	%d0,%a0
-noaddr2:
-
-#else
-
-#if defined(CONFIG_RAM32MB)
-#define MEM_SIZE	0x02000000	/* Memory size 32Mb */
-#elif defined(CONFIG_RAM16MB)
-#define MEM_SIZE	0x01000000	/* Memory size 16Mb */
-#elif defined(CONFIG_RAM8MB)
-#define MEM_SIZE	0x00800000	/* Memory size 8Mb */
-#else
-#define MEM_SIZE	0x00400000	/* Memory size 4Mb */
-#endif
 	move.l	#MEM_SIZE, %a0
-#endif
 
 	move.l	%a0, %d0			/* Mem end addr is in a0 */
 	move.l	%d0, %sp			/* Set up initial stack ptr */
 	move.l	%d0, _ramend			/* Set end ram addr */
 
-
 	/*
 	 *	Enable CPU internal cache.
 	 */
-	move.l	#0x01000000, %d0		/* Invalidate cache cmd */
+	move.l	#0x01400000, %d0
 	movec	%d0, %CACR			/* Invalidate cache */
-	move.l	#0x80000100, %d0		/* Setup cache mask */
+	nop
+
+	move.l	#0x0000c000, %d0		/* Set SDRAM cached only */
+	movec	%d0, %ACR0
+	move.l	#0x00000000, %d0		/* No other regions cached */
+	movec	%d0, %ACR1
+
+	move.l	#0x80400100, %d0		/* Configure cache */
 	movec	%d0, %CACR			/* Enable cache */
+	nop
 
 
 #ifdef CONFIG_ROMFS_FS
@@ -143,7 +132,6 @@ _copy_romfs:
 	move.l	%d0, -(%a1)
 	cmp.l	%a0, %a2			/* Check if at end */
 	bne	_copy_romfs
-
 #else /* CONFIG_ROMFS_FS */
 	lea.l	_ebss, %a1
 	move.l	%a1, _ramstart
@@ -162,7 +150,7 @@ _clear_bss:
 	bne	_clear_bss
 
 	/*
-	 *	Load the current task pointer and stack.
+	 *	Load the current thread pointer and stack.
 	 */
 	lea	init_thread_union, %a0
 	lea	0x2000(%a0), %sp

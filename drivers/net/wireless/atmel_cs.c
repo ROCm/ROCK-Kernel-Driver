@@ -350,13 +350,10 @@ static struct {
 /* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
 static struct device *atmel_device(void)
 {
-	static char *kobj_name = "atmel_cs";
-
 	static struct device dev = {
 		.bus_id    = "pcmcia",
 	};
-	dev.kobj.k_name = kmalloc(strlen(kobj_name)+1, GFP_KERNEL);
-	strcpy(dev.kobj.k_name, kobj_name);
+	kobject_set_name(&dev.kobj, "atmel_cs");
 	kobject_init(&dev.kobj);
 	
 	return &dev;

@@ -781,7 +781,7 @@ fst_disable_intr(struct fst_card_info *card)
 	}
 }
 
-/*      Process the result of trying to pass a recieved frame up the stack
+/*      Process the result of trying to pass a received frame up the stack
  */
 static void
 fst_process_rx_status(int rx_status, char *name)

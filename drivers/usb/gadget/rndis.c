@@ -121,7 +121,7 @@ static int gen_ndis_query_resp (int configNr, u32 OID, rndis_resp_t *r)
 		DEBUG("%s: OID_GEN_HARDWARE_STATUS\n", __FUNCTION__);
 		length = 4;
 		/* Bogus question! 
-		 * Hardware must be ready to recieve high level protocols.
+		 * Hardware must be ready to receive high level protocols.
 		 * BTW: 
 		 * reddite ergo quae sunt Caesaris Caesari
 		 * et quae sunt Dei Deo!

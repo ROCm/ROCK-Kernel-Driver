@@ -23,7 +23,6 @@
 #include <asm/mcftimer.h>
 #include <asm/mcfsim.h>
 #include <asm/mcfdma.h>
-#include <asm/delay.h>
 
 /***************************************************************************/
 
@@ -110,13 +109,17 @@ void config_BSP(char *commandp, int size)
 #if defined(CONFIG_BOOTPARAM)
 	strncpy(commandp, CONFIG_BOOTPARAM_STRING, size);
 	commandp[size-1] = 0;
-#elif defined(CONFIG_NETtel)
+#elif defined(CONFIG_NETtel) || defined(CONFIG_SCALES)
 	/* Copy command line from FLASH to local buffer... */
 	memcpy(commandp, (char *) 0xf0004000, size);
 	commandp[size-1] = 0;
 #elif defined(CONFIG_MTD_KeyTechnology)
 	/* Copy command line from FLASH to local buffer... */
 	memcpy(commandp, (char *) 0xffe06000, size);
+	commandp[size-1] = 0;
+#elif defined(CONFIG_CANCam)
+	/* Copy command line from FLASH to local buffer... */
+	memcpy(commandp, (char *) 0xf0010000, size);
 	commandp[size-1] = 0;
 #else
 	memset(commandp, 0, size);

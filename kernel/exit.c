@@ -1335,14 +1335,15 @@ repeat:
 			ret = eligible_child(pid, options, p);
 			if (!ret)
 				continue;
-			flag = 1;
 
 			switch (p->state) {
 			case TASK_TRACED:
+				flag = 1;
 				if (!my_ptrace_child(p))
 					continue;
 				/*FALLTHROUGH*/
 			case TASK_STOPPED:
+				flag = 1;
 				if (!(options & WUNTRACED) &&
 				    !my_ptrace_child(p))
 					continue;
@@ -1377,6 +1378,7 @@ repeat:
 						goto end;
 					break;
 				}
+				flag = 1;
 check_continued:
 				if (!unlikely(options & WCONTINUED))
 					continue;

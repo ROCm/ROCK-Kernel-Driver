@@ -517,7 +517,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 		bus->resource[0]->flags |= IORESOURCE_IO;
 		bus->resource[1]->flags |= IORESOURCE_MEM;
 
-		/* For now, propogate host limits to the bus;
+		/* For now, propagate host limits to the bus;
 		 * we'll adjust them later. */
 
 #if 1

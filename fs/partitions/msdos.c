@@ -374,6 +374,7 @@ static struct {
 	{MINIX_PARTITION, parse_minix},
 	{UNIXWARE_PARTITION, parse_unixware},
 	{SOLARIS_X86_PARTITION, parse_solaris_x86},
+	{NEW_SOLARIS_X86_PARTITION, parse_solaris_x86},
 	{0, NULL},
 };
  

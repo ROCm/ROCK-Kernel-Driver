@@ -127,8 +127,8 @@ void __ntfs_debug (const char *file, int line, const char *function,
 	va_start(args, fmt);
 	vsnprintf(err_buf, sizeof(err_buf), fmt, args);
 	va_end(args);
-	printk(KERN_DEBUG "NTFS-fs DEBUG (%s, %d): %s(): %s\n",
-		file, line, flen ? function : "", err_buf);
+	printk(KERN_DEBUG "NTFS-fs DEBUG (%s, %d): %s(): %s\n", file, line,
+			flen ? function : "", err_buf);
 	spin_unlock(&err_buf_lock);
 }
 
@@ -141,8 +141,7 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 
 	if (!debug_msgs)
 		return;
-	printk(KERN_DEBUG "NTFS-fs DEBUG: Dumping runlist (values "
-			"in hex):\n");
+	printk(KERN_DEBUG "NTFS-fs DEBUG: Dumping runlist (values in hex):\n");
 	if (!rl) {
 		printk(KERN_DEBUG "Run list not present.\n");
 		return;
@@ -157,14 +156,14 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 			if (index > -LCN_ENOENT - 1)
 				index = 3;
 			printk(KERN_DEBUG "%-16Lx %s %-16Lx%s\n",
-				(rl + i)->vcn, lcn_str[index],
-				(rl + i)->length, (rl + i)->length ?
-				"" : " (runlist end)");
+					(rl + i)->vcn, lcn_str[index],
+					(rl + i)->length, (rl + i)->length ?
+					"" : " (runlist end)");
 		} else
 			printk(KERN_DEBUG "%-16Lx %-16Lx  %-16Lx%s\n",
-				(rl + i)->vcn, (rl + i)->lcn,
-				(rl + i)->length, (rl + i)->length ?
-				"" : " (runlist end)");
+					(rl + i)->vcn, (rl + i)->lcn,
+					(rl + i)->length, (rl + i)->length ?
+					"" : " (runlist end)");
 		if (!(rl + i)->length)
 			break;
 	}

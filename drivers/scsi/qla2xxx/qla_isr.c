@@ -583,7 +583,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		}
 
 		/*
-		 * If PORT UPDATE is global (recieved LIP_OCCURED/LIP_RESET
+		 * If PORT UPDATE is global (received LIP_OCCURRED/LIP_RESET
 		 * event etc. earlier indicating loop is down) then process
 		 * it.  Otherwise ignore it and Wait for RSCN to come in.
 		 */

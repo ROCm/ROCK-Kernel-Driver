@@ -490,13 +490,10 @@ static int bt3c_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long 
 
 static struct device *bt3c_device(void)
 {
-	static char *kobj_name = "bt3c";
-
 	static struct device dev = {
 		.bus_id = "pcmcia",
 	};
-	dev.kobj.k_name = kmalloc(strlen(kobj_name) + 1, GFP_KERNEL);
-	strcpy(dev.kobj.k_name, kobj_name);
+	kobject_set_name(&dev.kobj, "bt3c");
 	kobject_init(&dev.kobj);
 
 	return &dev;
