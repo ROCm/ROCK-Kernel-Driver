@@ -147,7 +147,6 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 	}
 
 	if (ax25->sk != NULL && ax25->ax25_dev->values[AX25_VALUES_CONMODE] == 2) {
-		bh_lock_sock(ax25->sk);
 		if ((!ax25->pidincl && ax25->sk->sk_protocol == pid) ||
 		    ax25->pidincl) {
 			if (sock_queue_rcv_skb(ax25->sk, skb) == 0)
@@ -155,7 +154,6 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 			else
 				ax25->condition |= AX25_COND_OWN_RX_BUSY;
 		}
-		bh_unlock_sock(ax25->sk);
 	}
 
 	return queued;
@@ -195,7 +193,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	ax25_address src, dest, *next_digi = NULL;
 	int type = 0, mine = 0, dama;
-	struct sock *make, *sk, *raw;
+	struct sock *make, *sk;
 	ax25_digi dp, reverse_dp;
 	ax25_cb *ax25;
 	ax25_dev *ax25_dev;
@@ -243,10 +241,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	if ((*skb->data & ~0x10) == AX25_UI && dp.lastrepeat + 1 == dp.ndigi) {
 		skb->h.raw = skb->data + 2;		/* skip control and pid */
 
-		if ((raw = ax25_addr_match(&dest)) != NULL) {
-			ax25_send_to_raw(raw, skb, skb->data[1]);
-			release_sock(raw);
-		}
+		ax25_send_to_raw(&dest, skb, skb->data[1]);
 
 		if (!mine && ax25cmp(&dest, (ax25_address *)dev->broadcast) != 0) {
 			kfree_skb(skb);
@@ -381,7 +376,6 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 		sk->sk_ack_backlog++;
 		bh_unlock_sock(sk);
-		sock_put(sk);
 	} else {
 		if (!mine) {
 			kfree_skb(skb);
@@ -407,6 +401,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	    (ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
 		kfree_skb(skb);
 		ax25_destroy_socket(ax25);
+		if (sk)
+			sock_put(sk);
 		return 0;
 	}
 
@@ -446,6 +442,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (sk) {
 		if (!sock_flag(sk, SOCK_DEAD))
 			sk->sk_data_ready(sk, skb->len);
+		sock_put(sk);
 	} else
 		kfree_skb(skb);
 

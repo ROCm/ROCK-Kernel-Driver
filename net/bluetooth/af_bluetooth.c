@@ -360,3 +360,4 @@ module_exit(bt_cleanup);
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth Core ver " VERSION);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_NETPROTO(PF_BLUETOOTH);
