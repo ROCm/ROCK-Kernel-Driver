@@ -40,41 +40,15 @@ config ACPI
 	  available at:
 	  <http://www.acpi.info>
 
-config ACPI_HT_ONLY
-	bool "Restrict ACPI to minimum boot code to enable HT"
-	depends on X86
-	depends on ACPI
-	depends on SMP
-	default n
-	---help---
-	  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
-	  and physical processors.  It is designed to obsolete several older
-	  specifications, including the MultiProcessor Specification (MPS),
-	  which supported only physical processors.
-
-	  CONFIG_ACPI_HT_ONLY includes just the minimal ACPI boot-time code
-	  necessary to enumerate logical processors and enable HT.
-
-	  CONFIG_ACPI includes this, plus IO APIC enumeration,
-	  and the hooks to run the ACPI AML interpreter for run-time events.
-
-	  When CONFIG_ACPI is selected, the command-line option "acpi=ht"
-	  is available to run just the ACPI boot-time code -- just as if
-	  only CONFIG_ACPI_HT_ONLY were selected.
-
-	  Note that "acpi=off" can be used to disable all ACPI code in the kernel.
-
-
 config ACPI_BOOT
 	bool
-	depends on ACPI
+	depends on ACPI || X86_HT
 	default y
 
 config ACPI_INTERPRETER
 	bool
 	depends on ACPI
 	depends on !IA64_SGI_SN
-	depends on !ACPI_HT_ONLY
 	default y
 
 config ACPI_SLEEP
