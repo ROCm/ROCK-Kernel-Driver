@@ -2508,11 +2508,26 @@ int register_serial(struct serial_struct *req)
 		port.iobase |= (long) req->port_high << HIGH_BITS_OFFSET;
 
 	/*
-	 * If a clock rate wasn't specified by the low level
-	 * driver, then default to the standard clock rate.
+	 * If a clock rate wasn't specified by the low level driver, then
+	 * default to the standard clock rate.  This should be 115200 (*16)
+	 * and should not depend on the architecture's BASE_BAUD definition.
+	 * However, since this API will be deprecated, it's probably a
+	 * better idea to convert the drivers to use the new API
+	 * (serial8250_register_port and serial8250_unregister_port).
 	 */
-	if (port.uartclk == 0)
+	if (port.uartclk == 0) {
+		printk(KERN_WARNING
+		       "Serial: registering port at [%08lx,%08lx,%p] irq %d with zero baud_base\n",
+		       port.iobase, port.mapbase, port.membase, port.irq);
+		printk(KERN_WARNING "Serial: see %s:%d for more information\n",
+		       __FILE__, __LINE__);
+		dump_stack();
+
+		/*
+		 * Fix it up for now, but this is only a temporary measure.
+		 */
 		port.uartclk = BASE_BAUD * 16;
+	}
 
 	return serial8250_register_port(&port);
 }
