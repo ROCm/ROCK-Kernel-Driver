@@ -799,9 +799,9 @@ struct symlink_type
 struct devfs_inode     /*  This structure is for "persistent" inode storage  */
 {
     struct dentry *dentry;
-    time_t atime;
-    time_t mtime;
-    time_t ctime;
+    struct timespec atime;
+    struct timespec mtime;
+    struct timespec ctime;
     unsigned int ino;            /*  Inode number as seen in the VFS         */
     uid_t uid;
     gid_t gid;
@@ -2509,9 +2509,9 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
     de->mode = inode->i_mode;
     de->inode.uid = inode->i_uid;
     de->inode.gid = inode->i_gid;
-    de->inode.atime = inode->i_atime.tv_sec;
-    de->inode.mtime = inode->i_mtime.tv_sec;
-    de->inode.ctime = inode->i_ctime.tv_sec;
+    de->inode.atime = inode->i_atime;
+    de->inode.mtime = inode->i_mtime;
+    de->inode.ctime = inode->i_ctime;
     if ( ( iattr->ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID) ) &&
 	 !is_devfsd_or_child (fs_info) )
 	devfsd_notify_de (de, DEVFSD_NOTIFY_CHANGE, inode->i_mode,
@@ -2610,12 +2610,9 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     inode->i_mode = de->mode;
     inode->i_uid = de->inode.uid;
     inode->i_gid = de->inode.gid;
-    inode->i_atime.tv_sec = de->inode.atime;
-    inode->i_mtime.tv_sec = de->inode.mtime;
-    inode->i_ctime.tv_sec = de->inode.ctime;
-    inode->i_atime.tv_nsec = 0;
-    inode->i_mtime.tv_nsec = 0;
-    inode->i_ctime.tv_nsec = 0;
+    inode->i_atime = de->inode.atime;
+    inode->i_mtime = de->inode.mtime;
+    inode->i_ctime = de->inode.ctime;
     DPRINTK (DEBUG_I_GET, "():   mode: 0%o  uid: %d  gid: %d\n",
 	     (int) inode->i_mode, (int) inode->i_uid, (int) inode->i_gid);
     return inode;
