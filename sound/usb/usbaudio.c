@@ -2640,6 +2640,7 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 	struct audioformat *fp;
 	struct usb_host_interface *alts;
 	int stream, err;
+	int *rate_table = NULL;
 
 	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
 	if (! fp) {
@@ -2647,16 +2648,30 @@ static int create_fixed_stream_quirk(snd_usb_audio_t *chip,
 		return -ENOMEM;
 	}
 	memcpy(fp, quirk->data, sizeof(*fp));
+	if (fp->nr_rates > 0) {
+		rate_table = kmalloc(sizeof(int) * fp->nr_rates, GFP_KERNEL);
+		if (!rate_table) {
+			kfree(fp);
+			return -ENOMEM;
+		}
+		memcpy(rate_table, fp->rate_table, sizeof(int) * fp->nr_rates);
+		fp->rate_table = rate_table;
+	}
+
 	stream = (fp->endpoint & USB_DIR_IN)
 		? SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
 	err = add_audio_endpoint(chip, stream, fp);
 	if (err < 0) {
 		kfree(fp);
+		if (rate_table)
+			kfree(rate_table);
 		return err;
 	}
 	if (fp->iface != get_iface_desc(&iface->altsetting[0])->bInterfaceNumber ||
 	    fp->altset_idx >= iface->num_altsetting) {
 		kfree(fp);
+		if (rate_table)
+			kfree(rate_table);
 		return -EINVAL;
 	}
 	alts = &iface->altsetting[fp->altset_idx];
