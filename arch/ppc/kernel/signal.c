@@ -344,7 +344,7 @@ static void
 setup_frame(struct pt_regs *regs, struct sigregs *frame,
 	    unsigned long newsp)
 {
-	struct sigcontext *sc = (struct sigcontext_struct *) newsp;
+	struct sigcontext *sc = (struct sigcontext *) newsp;
 
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
