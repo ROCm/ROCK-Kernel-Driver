@@ -80,7 +80,7 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 
 	if (datalen != EBT_ALIGN(sizeof(struct ebt_ip_info)))
 		return -EINVAL;
-	if (e->ethproto != __constant_htons(ETH_P_IP) ||
+	if (e->ethproto != htons(ETH_P_IP) ||
 	   e->invflags & EBT_IPROTO)
 		return -EINVAL;
 	if (info->bitmask & ~EBT_IP_MASK || info->invflags & ~EBT_IP_MASK)

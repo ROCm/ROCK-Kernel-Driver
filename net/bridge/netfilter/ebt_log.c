@@ -121,7 +121,7 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 
 		/* If it's for Ethernet and the lengths are OK,
 		 * then log the ARP payload */
-		if (ah->ar_hrd == __constant_htons(1) &&
+		if (ah->ar_hrd == htons(1) &&
 		    ah->ar_hln == ETH_ALEN &&
 		    ah->ar_pln == sizeof(uint32_t)) {
 			struct arppayload _arpp, *ap;
