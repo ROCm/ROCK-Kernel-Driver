@@ -207,7 +207,8 @@ static unsigned long __init get_dma_base(struct ata_channel *hwif, int extra, co
 
 	if ((dev->vendor == PCI_VENDOR_ID_AL && dev->device == PCI_DEVICE_ID_AL_M5219) ||
 			(dev->vendor == PCI_VENDOR_ID_AMD && dev->device == PCI_DEVICE_ID_AMD_VIPER_7409) ||
-			(dev->vendor == PCI_VENDOR_ID_CMD && dev->device == PCI_DEVICE_ID_CMD_643)) {
+			(dev->vendor == PCI_VENDOR_ID_CMD && dev->device == PCI_DEVICE_ID_CMD_643) ||
+			(dev->vendor == PCI_VENDOR_ID_SERVERWORKS && dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE)) {
 		outb(inb(dma_base + 2) & 0x60, dma_base+2);
 		if (inb(dma_base + 2) & 0x80)
 			printk(KERN_INFO "%s: simplex device: DMA forced\n", name);
@@ -553,14 +554,14 @@ static void __init pdc20270_device_order_fixup (struct pci_dev *dev, struct ata_
 			}
 		}
 	}
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-			dev->name, dev->slot_name, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-			dev2->name, dev2->slot_name, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -583,8 +584,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-		dev->name, dev->slot_name, dev->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+		dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2) {
 		return;
@@ -600,8 +601,8 @@ static void __init hpt374_device_order_fixup (struct pci_dev *dev, struct ata_pc
 		}
 	}
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s dev %02x\n",
-		dev2->name, dev2->slot_name, dev2->devfn);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+		dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 
 }
@@ -622,7 +623,8 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 	switch(class_rev) {
 		case 5:
 		case 4:
-		case 3:	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
+		case 3:	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+					dev->name, dev->slot_name);
 			setup_pci_device(dev, d);
 			return;
 		default:	break;
@@ -643,12 +645,14 @@ static void __init hpt366_device_order_fixup (struct pci_dev *dev, struct ata_pc
 			break;
 		}
 	}
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev->name, dev->slot_name);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev->name, dev->slot_name);
 	setup_pci_device(dev, d);
 	if (!dev2)
 		return;
 	d2 = d;
-	printk(KERN_INFO "ATA: %s: controller on PCI slot %s\n", dev2->name, dev2->slot_name);
+	printk(KERN_INFO "ATA: %s: controller, PCI slot %s\n",
+			dev2->name, dev2->slot_name);
 	setup_pci_device(dev2, d2);
 }
 
@@ -683,7 +687,7 @@ static void __init scan_pcidev(struct pci_dev *dev)
 		 * beeing grabbed by generic drivers.
 		 */
 		if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
-			printk(KERN_INFO "ATA: unknown interface: %s, on PCI slot %s\n",
+			printk(KERN_INFO "ATA: unknown interface: %s, PCI slot %s\n",
 					dev->name, dev->slot_name);
 		}
 		return;
@@ -707,8 +711,8 @@ static void __init scan_pcidev(struct pci_dev *dev)
 	} else if (d->vendor == PCI_VENDOR_ID_PROMISE && d->device == PCI_DEVICE_ID_PROMISE_20268R)
 		pdc20270_device_order_fixup(dev, d);
 	else {
-		printk(KERN_INFO "ATA: %s (%04x:%04x) on PCI slot %s\n",
-				dev->name, vendor, device, dev->slot_name);
+		printk(KERN_INFO "ATA: %s, PCI slot %s\n",
+				dev->name, dev->slot_name);
 		setup_pci_device(dev, d);
 	}
 }

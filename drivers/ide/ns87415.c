@@ -33,7 +33,7 @@ static unsigned int ns87415_count = 0, ns87415_control[MAX_HWIFS] = { 0 };
  * the IRQ associated with the port (drive->channel),
  * and selects either PIO or DMA handshaking for the next I/O operation.
  */
-static void ns87415_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
+static void ns87415_prepare_drive(struct ata_device *drive, unsigned int use_dma)
 {
 	struct ata_channel *hwif = drive->channel;
 	unsigned int bit, other, new, *old = (unsigned int *) hwif->select_data;
@@ -78,7 +78,7 @@ static void ns87415_prepare_drive (ide_drive_t *drive, unsigned int use_dma)
 	__restore_flags(flags);	/* local CPU only */
 }
 
-static void ns87415_selectproc (ide_drive_t *drive)
+static void ns87415_selectproc(struct ata_device *drive)
 {
 	ns87415_prepare_drive (drive, drive->using_dma);
 }

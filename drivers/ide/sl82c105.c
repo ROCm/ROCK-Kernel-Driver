@@ -71,7 +71,7 @@ static unsigned int get_timing_sl82c105(struct ata_timing *t)
 /*
  * Configure the drive and chipset for PIO
  */
-static void config_for_pio(ide_drive_t *drive, int pio, int report)
+static void config_for_pio(struct ata_device *drive, int pio, int report)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -109,7 +109,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 /*
  * Configure the drive and the chipset for DMA
  */
-static int config_for_dma(ide_drive_t *drive)
+static int config_for_dma(struct ata_device *drive)
 {
 	struct ata_channel *hwif = drive->channel;
 	struct pci_dev *dev = hwif->pci_dev;
@@ -131,7 +131,7 @@ static int config_for_dma(ide_drive_t *drive)
  * Check to see if the drive and
  * chipset is capable of DMA mode
  */
-static int sl82c105_check_drive(ide_drive_t *drive)
+static int sl82c105_check_drive(struct ata_device *drive)
 {
 	int on = 0;
 
@@ -240,7 +240,7 @@ static void sl82c105_timeout(struct ata_device *drive)
  * This function is called when the IDE timer expires, the drive
  * indicates that it is READY, and we were waiting for DMA to complete.
  */
-static void sl82c105_lostirq(ide_drive_t *drive)
+static void sl82c105_lostirq(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	struct pci_dev *dev = ch->pci_dev;
@@ -273,7 +273,7 @@ static void sl82c105_lostirq(ide_drive_t *drive)
  * We only deal with PIO mode here - DMA mode 'using_dma' is not
  * initialised at the point that this function is called.
  */
-static void tune_sl82c105(ide_drive_t *drive, byte pio)
+static void tune_sl82c105(struct ata_device *drive, byte pio)
 {
 	config_for_pio(drive, pio, 1);
 

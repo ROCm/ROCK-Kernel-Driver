@@ -226,9 +226,9 @@ static void amd_set_speed(struct pci_dev *dev, unsigned char dn, struct ata_timi
  * by upper layers.
  */
 
-static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
+static int amd_set_drive(struct ata_device *drive, unsigned char speed)
 {
-	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
+	struct ata_device *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
 	int T, UT;
 
@@ -263,7 +263,7 @@ static int amd_set_drive(ide_drive_t *drive, unsigned char speed)
  * PIO-only tuning.
  */
 
-static void amd74xx_tune_drive(ide_drive_t *drive, unsigned char pio)
+static void amd74xx_tune_drive(struct ata_device *drive, u8 pio)
 {
 	if (!((amd_enabled >> drive->channel->unit) & 1))
 		return;

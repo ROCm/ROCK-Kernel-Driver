@@ -502,11 +502,14 @@ static void idescsi_revalidate(struct ata_device *_dummy)
 	 */
 }
 
+static void idescsi_attach(struct ata_device *drive);
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static struct ata_operations idescsi_driver = {
 	owner:			THIS_MODULE,
+	attach:			idescsi_attach,
 	cleanup:		idescsi_cleanup,
 	standby:		NULL,
 	do_request:		idescsi_do_request,
@@ -519,45 +522,40 @@ static struct ata_operations idescsi_driver = {
 	capacity:		NULL,
 };
 
-/*
- *	idescsi_init will register the driver for each scsi.
- */
-int idescsi_init(void)
+static void idescsi_attach(struct ata_device *drive)
 {
-	struct ata_device *drive;
 	idescsi_scsi_t *scsi;
-	/* FIXME: The following is just plain wrong, since those are definitely *not* the
-	 * media types supported by the ATA layer */
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed, id;
+	int i, id;
+	char *req;
+	struct ata_channel *channel;
+	int unit;
 
 	if (idescsi_initialized)
-		return 0;
+		return;
 	idescsi_initialized = 1;
 	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
 		idescsi_drives[i] = NULL;
-	MOD_INC_USE_COUNT;
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], "ide-scsi", NULL, failed++)) != NULL) {
 
-			if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
-				printk (KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
-				continue;
-			}
-			if (ide_register_subdriver (drive, &idescsi_driver)) {
-				printk (KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
-				kfree (scsi);
-				continue;
-			}
-			for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
-				idescsi_setup (drive, scsi, id);
-			failed--;
-		}
+	req = drive->driver_req;
+	if (req[0] != '\0' && strcmp(req, "ide-scsi"))
+		return;
+
+	if ((scsi = (idescsi_scsi_t *) kmalloc (sizeof (idescsi_scsi_t), GFP_KERNEL)) == NULL) {
+		printk(KERN_ERR "ide-scsi: %s: Can't allocate a scsi structure\n", drive->name);
+		return;
 	}
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-	return 0;
+	if (ide_register_subdriver (drive, &idescsi_driver)) {
+		printk(KERN_ERR "ide-scsi: %s: Failed to register the driver with ide.c\n", drive->name);
+		kfree (scsi);
+		return;
+	}
+	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++);
+	idescsi_setup (drive, scsi, id);
+
+	channel = drive->channel;
+	unit = drive - channel->drives;
+
+	ide_revalidate_disk(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 int idescsi_detect (Scsi_Host_Template *host_template)
@@ -805,38 +803,31 @@ static Scsi_Host_Template idescsi_template = {
 	emulated:	1,
 };
 
-static int __init init_idescsi_module(void)
+
+static int __init idescsi_init(void)
 {
-	idescsi_init();
+	int ret;
+	ret = ata_driver_module(&idescsi_driver);
 	scsi_register_host(&idescsi_template);
 	return 0;
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	struct ata_device *drive;
-	byte media[] = {TYPE_DISK, TYPE_TAPE, TYPE_PROCESSOR, TYPE_WORM, TYPE_ROM, TYPE_SCANNER, TYPE_MOD, 255};
-	int i, failed;
-
 	scsi_unregister_host(&idescsi_template);
 
-	/* FIXME: The media types scanned here have literally nothing to do
-	 * with the media types used by the overall ATA code!
-	 *
-	 * This is basically showing us, that there is something wrong with the
-	 * ide_scan_devices function.
-	 */
+#if 0
+	/* FIXME: what about this cleanup stuff here? This all should be done
+	 * on close time perhaps? */
 
-	for (i = 0; media[i] != 255; i++) {
-		failed = 0;
-		while ((drive = ide_scan_devices (media[i], "ide-scsi", &idescsi_driver, failed)) != NULL)
-			if (idescsi_cleanup (drive)) {
-				printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
-				failed++;
-			}
+	if (idescsi_cleanup (drive)) {
+		printk ("%s: exit_idescsi_module() called while still busy\n", drive->name);
 	}
+#endif
+
+	unregister_ata_driver(&idescsi_driver);
 }
 
-module_init(init_idescsi_module);
+module_init(idescsi_init);
 module_exit(exit_idescsi_module);
 MODULE_LICENSE("GPL");

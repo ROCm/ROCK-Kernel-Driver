@@ -68,6 +68,11 @@
 #include "ata-timing.h"
 #include "pcihost.h"
 
+
+MODULE_DESCRIPTION("ATA/ATAPI driver infrastructure");
+MODULE_PARM(options,"s");
+MODULE_LICENSE("GPL");
+
 /*
  * Those will be moved into separate header files eventually.
  */
@@ -133,6 +138,10 @@ static int irq_lock;
 #endif
 
 int noautodma = 0;
+
+/* Single linked list of sub device type drivers */
+static struct ata_operations *ata_drivers; /* = NULL */
+static spinlock_t ata_drivers_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -687,7 +696,7 @@ static void ata_dump_bits(struct ata_bit_messages *msgs, int nr, byte bits)
 u8 ide_dump_status(struct ata_device *drive, struct request * rq, const char *msg, u8 stat)
 {
 	unsigned long flags;
-	byte err = 0;
+	u8 err = 0;
 
 	__save_flags (flags);	/* local CPU only */
 	ide__sti();		/* local CPU only */
@@ -1633,6 +1642,8 @@ struct ata_device *get_info_ptr(kdev_t i_rdev)
 }
 
 /*
+ * FIXME: rename to ata_wipe_partitions.
+ *
  * This routine is called to flush all partitions and partition tables
  * for a changed disk, and then re-read the new partition table.
  * If we are revalidating a disk because of a media change, then we
@@ -1683,10 +1694,9 @@ int ide_revalidate_disk(kdev_t i_rdev)
 }
 
 /*
- * Look again for all drives in the system on all interfaces.  This is used
- * after a new driver category has been loaded as module.
+ * Look again for all drives in the system on all interfaces.
  */
-void revalidate_drives(void)
+static void revalidate_drives(void)
 {
 	int i;
 
@@ -1706,7 +1716,7 @@ void revalidate_drives(void)
 	}
 }
 
-static void ide_driver_module (void)
+static void ide_driver_module(void)
 {
 	int i;
 
@@ -2016,10 +2026,10 @@ abort:
  * may set up the hw structure yourself OR use this routine to
  * do it for you.
  */
-void ide_setup_ports (	hw_regs_t *hw,
-			ide_ioreg_t base, int *offsets,
-			ide_ioreg_t ctrl, ide_ioreg_t intr,
-			ide_ack_intr_t *ack_intr, int irq)
+void ide_setup_ports(hw_regs_t *hw,
+		ide_ioreg_t base, int *offsets,
+		ide_ioreg_t ctrl, ide_ioreg_t intr,
+		ide_ack_intr_t *ack_intr, int irq)
 {
 	int i;
 
@@ -2041,6 +2051,46 @@ void ide_setup_ports (	hw_regs_t *hw,
 	hw->ack_intr = ack_intr;
 }
 
+static int subdriver_match(struct ata_channel *channel, struct ata_operations *ops)
+{
+	int count, unit;
+
+	if (!channel->present)
+		return 0;
+
+	count = 0;
+	for (unit = 0; unit < MAX_DRIVES; ++unit) {
+		struct ata_device *drive = &channel->drives[unit];
+		if (drive->present && !drive->driver) {
+			(*ops->attach)(drive);
+			if (drive->driver != NULL)
+				count++;
+		}
+	}
+	return count;
+}
+
+static struct ata_operations * subdriver_interator(struct ata_operations *prev)
+{
+	struct ata_operations *tmp;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ata_drivers_lock, flags);
+
+	/* Restart from beginning if current ata_operations was deallocated,
+	   or if prev is NULL. */
+	for(tmp = ata_drivers; tmp != prev && tmp; tmp = tmp->next);
+	if (!tmp)
+		tmp = ata_drivers;
+	else
+		tmp = tmp->next;
+
+	spin_unlock_irqrestore(&ata_drivers_lock, flags);
+
+	return tmp;
+
+}
+
 /*
  * Register an IDE interface, specifing exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
@@ -2049,18 +2099,19 @@ int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp)
 {
 	int h;
 	int retry = 1;
-	struct ata_channel *hwif;
+	struct ata_channel *ch;
+	struct ata_operations *subdriver;
 
 	do {
 		for (h = 0; h < MAX_HWIFS; ++h) {
-			hwif = &ide_hwifs[h];
-			if (hwif->hw.io_ports[IDE_DATA_OFFSET] == hw->io_ports[IDE_DATA_OFFSET])
+			ch = &ide_hwifs[h];
+			if (ch->hw.io_ports[IDE_DATA_OFFSET] == hw->io_ports[IDE_DATA_OFFSET])
 				goto found;
 		}
 		for (h = 0; h < MAX_HWIFS; ++h) {
-			hwif = &ide_hwifs[h];
-			if ((!hwif->present && (hwif->unit == ATA_PRIMARY) && !initializing) ||
-			    (!hwif->hw.io_ports[IDE_DATA_OFFSET] && initializing))
+			ch = &ide_hwifs[h];
+			if ((!ch->present && (ch->unit == ATA_PRIMARY) && !initializing) ||
+			    (!ch->hw.io_ports[IDE_DATA_OFFSET] && initializing))
 				goto found;
 		}
 		for (h = 0; h < MAX_HWIFS; ++h)
@@ -2070,14 +2121,14 @@ int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp)
 	return -1;
 
 found:
-	ide_unregister(hwif);
-	if (hwif->present)
+	ide_unregister(ch);
+	if (ch->present)
 		return -1;
-	memcpy(&hwif->hw, hw, sizeof(*hw));
-	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->hw.io_ports));
-	hwif->irq = hw->irq;
-	hwif->noprobe = 0;
-	hwif->chipset = hw->chipset;
+	memcpy(&ch->hw, hw, sizeof(*hw));
+	memcpy(ch->io_ports, ch->hw.io_ports, sizeof(ch->hw.io_ports));
+	ch->irq = hw->irq;
+	ch->noprobe = 0;
+	ch->chipset = hw->chipset;
 
 	if (!initializing) {
 		ideprobe_init();
@@ -2086,10 +2137,19 @@ found:
 		ide_driver_module();
 	}
 
-	if (hwifp)
-		*hwifp = hwif;
+	/* Look up whatever there is a subdriver, which will serve this
+	 * device.
+	 */
+	subdriver = NULL;
+	while ((subdriver = subdriver_interator(subdriver))) {
+		if (subdriver_match(ch, subdriver) > 0)
+			break;
+	}
 
-	return (initializing || hwif->present) ? h : -1;
+	if (hwifp)
+		*hwifp = ch;
+
+	return (initializing || ch->present) ? h : -1;
 }
 
 /*
@@ -2178,7 +2238,7 @@ void ide_delay_50ms (void)
 #else
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/20);
-#endif /* CONFIG_BLK_DEV_IDECS */
+#endif
 }
 
 /*
@@ -2941,34 +3001,7 @@ int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 }
 
 /*
- * Lookup ATA devices, which requested a particular driver.
- */
-struct ata_device *ide_scan_devices(byte type, const char *name, struct ata_operations *driver, int n)
-{
-	unsigned int unit, index, i;
-
-	for (index = 0, i = 0; index < MAX_HWIFS; ++index) {
-		struct ata_channel *ch = &ide_hwifs[index];
-
-		if (!ch->present)
-			continue;
-
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *drive = &ch->drives[unit];
-			char *req = drive->driver_req;
-
-			if (*req && !strstr(name, req))
-				continue;
-			if (drive->present && drive->type == type && drive->driver == driver && ++i > n)
-				return drive;
-		}
-	}
-
-	return NULL;
-}
-
-/*
- * This is in fact registering a drive not a driver.
+ * This is in fact registering a device not a driver.
  */
 int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driver)
 {
@@ -3056,7 +3089,6 @@ int ide_unregister_subdriver(struct ata_device *drive)
 	pnpide_init(0);
 #endif
 	drive->driver = NULL;
-	drive->present = 0;
 
 	restore_flags(flags);		/* all CPUs */
 
@@ -3065,23 +3097,56 @@ int ide_unregister_subdriver(struct ata_device *drive)
 
 
 /*
- * Register an ATA driver for a particular device type.
+ * Register an ATA subdriver for a particular device type.
  */
 
-int register_ata_driver(unsigned int type, struct ata_operations *driver)
+int register_ata_driver(struct ata_operations *driver)
 {
-	return 0;
+	unsigned long flags;
+	int index;
+	int count = 0;
+
+	spin_lock_irqsave(&ata_drivers_lock, flags);
+	driver->next = ata_drivers;
+	ata_drivers = driver;
+	spin_unlock_irqrestore(&ata_drivers_lock, flags);
+
+	for (index = 0; index < MAX_HWIFS; ++index)
+		count += subdriver_match(&ide_hwifs[index], driver);
+
+	return count;
 }
 
 EXPORT_SYMBOL(register_ata_driver);
 
 /*
- * Unregister an ATA driver for a particular device type.
+ * Unregister an ATA subdriver for a particular device type.
  */
-
-int unregister_ata_driver(unsigned int type, struct ata_operations *driver)
+void unregister_ata_driver(struct ata_operations *driver)
 {
-	return 0;
+	struct ata_operations **tmp;
+	unsigned long flags;
+	int index;
+	int unit;
+
+	spin_lock_irqsave(&ata_drivers_lock, flags);
+	for (tmp = &ata_drivers; *tmp != NULL; tmp = &(*tmp)->next) {
+		if (*tmp == driver) {
+			*tmp = driver->next;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&ata_drivers_lock, flags);
+
+	for (index = 0; index < MAX_HWIFS; ++index) {
+		struct ata_channel *ch = &ide_hwifs[index];
+		for (unit = 0; unit < MAX_DRIVES; ++unit) {
+			struct ata_device *drive = &ch->drives[unit];
+
+			if (drive->driver == driver)
+				(*ata_ops(drive)->cleanup)(drive);
+		}
+	}
 }
 
 EXPORT_SYMBOL(unregister_ata_driver);
@@ -3098,21 +3163,14 @@ struct block_device_operations ide_fops[] = {{
 EXPORT_SYMBOL(ide_fops);
 EXPORT_SYMBOL(ide_hwifs);
 EXPORT_SYMBOL(ide_spin_wait_hwgroup);
-EXPORT_SYMBOL(revalidate_drives);
 
-/*
- * Probe module
- */
 devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ide_lock);
 EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(do_ide_request);
-/*
- * Driver module
- */
-EXPORT_SYMBOL(ide_scan_devices);
+
 EXPORT_SYMBOL(ide_register_subdriver);
 EXPORT_SYMBOL(ide_unregister_subdriver);
 EXPORT_SYMBOL(ide_set_handler);
@@ -3134,7 +3192,10 @@ EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(ide_setup_ports);
 EXPORT_SYMBOL(get_info_ptr);
 
-static int ide_notify_reboot (struct notifier_block *this, unsigned long event, void *x)
+/*
+ * Handle power handling related events ths system informs us about.
+ */
+static int ata_sys_notify(struct notifier_block *this, unsigned long event, void *x)
 {
 	int i;
 
@@ -3178,8 +3239,8 @@ static int ide_notify_reboot (struct notifier_block *this, unsigned long event, 
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block ide_notifier = {
-	ide_notify_reboot,
+static struct notifier_block ata_notifier = {
+	ata_sys_notify,
 	NULL,
 	5
 };
@@ -3191,19 +3252,20 @@ static int __init ata_module_init(void)
 {
 	int h;
 
-	printk(KERN_INFO "ATA/ATAPI driver v" VERSION "\n");
+	printk(KERN_INFO "ATA/ATAPI device driver v" VERSION "\n");
 
 	ide_devfs_handle = devfs_mk_dir (NULL, "ide", NULL);
 
-/*
- * Because most of the ATA adapters represent the timings in unit of bus
- * clocks, and there is no known reliable way to detect the bus clock
- * frequency, we assume 50 MHz for non-PCI (VLB, EISA) and 33 MHz for PCI based
- * systems. Since assuming only hurts performance and not stability, this is
- * OK. The user can change this on the command line by using the "idebus=XX"
- * parameter. While the system_bus_speed variable is in kHz units, we accept
- * both MHz and kHz entry on the command line for backward compatibility.
- */
+	/*
+	 * Because most of the ATA adapters represent the timings in unit of
+	 * bus clocks, and there is no known reliable way to detect the bus
+	 * clock frequency, we assume 50 MHz for non-PCI (VLB, EISA) and 33 MHz
+	 * for PCI based systems. Since assuming only hurts performance and not
+	 * stability, this is OK. The user can change this on the command line
+	 * by using the "idebus=XX" parameter. While the system_bus_speed
+	 * variable is in kHz units, we accept both MHz and kHz entry on the
+	 * command line for backward compatibility.
+	 */
 
 	system_bus_speed = 50000;
 
@@ -3224,7 +3286,7 @@ static int __init ata_module_init(void)
 
 	if (idebus_parameter >= 20000 && idebus_parameter <= 80000)
 	    system_bus_speed = idebus_parameter;
-	
+
 	printk(KERN_INFO "ATA: %s bus speed %d.%dMHz\n",
 		pci_present() ? "PCI" : "System", system_bus_speed / 1000, system_bus_speed / 100 % 10);
 
@@ -3385,7 +3447,7 @@ static int __init ata_module_init(void)
 # ifdef CONFIG_SCSI
 	idescsi_init();
 # else
-   #warning ATA SCSI emulation selected but no SCSI-subsystem in kernel
+   #error ATA SCSI emulation selected but no SCSI-subsystem in kernel
 # endif
 #endif
 
@@ -3397,14 +3459,12 @@ static int __init ata_module_init(void)
 			ide_geninit(channel);
 	}
 
-	register_reboot_notifier(&ide_notifier);
+	register_reboot_notifier(&ata_notifier);
 
 	return 0;
 }
 
 static char *options = NULL;
-MODULE_PARM(options,"s");
-MODULE_LICENSE("GPL");
 
 static int __init init_ata(void)
 {
@@ -3426,7 +3486,7 @@ static void __exit cleanup_ata(void)
 {
 	int h;
 
-	unregister_reboot_notifier(&ide_notifier);
+	unregister_reboot_notifier(&ata_notifier);
 	for (h = 0; h < MAX_HWIFS; ++h) {
 		ide_unregister(&ide_hwifs[h]);
 	}

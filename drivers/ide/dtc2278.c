@@ -66,7 +66,7 @@ static void sub22 (char b, char c)
 	}
 }
 
-static void tune_dtc2278 (ide_drive_t *drive, byte pio)
+static void tune_dtc2278(struct ata_device *drive, byte pio)
 {
 	unsigned long flags;
 

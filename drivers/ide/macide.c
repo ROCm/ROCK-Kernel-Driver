@@ -119,7 +119,7 @@ void macide_init(void)
 			/* hardware ID, and we cna't get that without	*/
 			/* probing the drive which freezes a 190.	*/
 
-			ide_drive_t *drive = &ide_hwifs[index].drives[0];
+			struct ata_device *drive = &ide_hwifs[index].drives[0];
         		drive->capacity = drive->cyl*drive->head*drive->sect;
 
 #ifdef CONFIG_BLK_DEV_MAC_MEDIABAY

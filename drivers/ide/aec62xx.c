@@ -607,27 +607,7 @@ static struct ata_pci_device chipsets[] __initdata = {
 		enablebits: { {0x00,0x00,0x00},	{0x00,0x00,0x00} },
 		bootable: OFF_BOARD,
 		flags: ATA_F_IRQ | ATA_F_DMA
-	},
-	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP865,
-		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x00,0x00,0x00},	{0x00,0x00,0x00} },
-		bootable: NEVER_BOARD,
-		flags: ATA_F_IRQ | ATA_F_NOADMA | ATA_F_DMA
-	},
-	{
-		vendor: PCI_VENDOR_ID_ARTOP,
-		device: PCI_DEVICE_ID_ARTOP_ATP865R,
-		init_chipset: aec62xx_init_chipset,
-		ata66_check: aec62xx_ata66_check,
-		init_channel: aec62xx_init_channel,
-		enablebits: { {0x4a,0x02,0x02},	{0x4a,0x04,0x04} },
-		bootable: OFF_BOARD,
-		flags: ATA_F_IRQ | ATA_F_DMA
-	},
+	}
 };
 
 int __init init_aec62xx(void)
