@@ -72,6 +72,10 @@ struct inode_operations nfs_dir_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
+	.listxattr	= nfs_listxattr,
+	.getxattr	= nfs_getxattr,
+	.setxattr	= nfs_setxattr,
+	.removexattr	= nfs_removexattr,
 };
 
 #ifdef CONFIG_NFS_V4

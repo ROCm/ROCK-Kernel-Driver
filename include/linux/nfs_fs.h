@@ -333,6 +333,22 @@ static inline struct rpc_cred *nfs_file_cred(struct file *file)
 }
 
 /*
+ * linux/fs/nfs/xattr.c
+ */
+#ifdef CONFIG_NFS_ACL
+extern ssize_t nfs_listxattr(struct dentry *, char *, size_t);
+extern ssize_t nfs_getxattr(struct dentry *, const char *, void *, size_t);
+extern int nfs_setxattr(struct dentry *, const char *,
+			const void *, size_t, int);
+extern int nfs_removexattr (struct dentry *, const char *name);
+#else
+# define nfs_listxattr NULL
+# define nfs_getxattr NULL
+# define nfs_setxattr NULL
+# define nfs_removexattr NULL
+#endif
+
+/*
  * linux/fs/nfs/direct.c
  */
 extern ssize_t nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,

@@ -10,6 +10,9 @@
 struct nfs_server {
 	struct rpc_clnt *	client;		/* RPC client handle */
 	struct rpc_clnt *	client_sys;	/* 2nd handle for FSINFO */
+#ifdef CONFIG_NFS_ACL
+	struct rpc_clnt *	client_acl;	/* ACL RPC client handle */
+#endif  /* CONFIG_NFS_ACL */
 	struct nfs_rpc_ops *	rpc_ops;	/* NFS protocol vector */
 	struct backing_dev_info	backing_dev_info;
 	int			flags;		/* various flags */
