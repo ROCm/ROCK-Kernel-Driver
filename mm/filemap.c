@@ -559,21 +559,12 @@ void do_generic_mapping_read(struct address_space *mapping,
 		page_cache_readahead(mapping, ra, filp, index);
 
 		nr = nr - offset;
-
-		/*
-		 * Try to find the data in the page cache..
-		 */
 find_page:
-		read_lock(&mapping->page_lock);
-		page = radix_tree_lookup(&mapping->page_tree, index);
-		if (!page) {
-			read_unlock(&mapping->page_lock);
-			handle_ra_miss(mapping,ra);
+		page = find_get_page(mapping, index);
+		if (unlikely(page == NULL)) {
+			handle_ra_miss(mapping, ra);
 			goto no_cached_page;
 		}
-		page_cache_get(page);
-		read_unlock(&mapping->page_lock);
-
 		if (!PageUptodate(page))
 			goto page_not_up_to_date;
 page_ok:
