@@ -16,6 +16,8 @@
 #include <linux/atalk.h>
 
 #ifdef CONFIG_PROC_FS
+extern struct file_operations atalk_seq_arp_fops;
+
 static __inline__ struct atalk_iface *atalk_get_interface_idx(loff_t pos)
 {
 	struct atalk_iface *i;
@@ -292,9 +294,16 @@ int __init atalk_proc_init(void)
 		goto out_socket;
 	p->proc_fops = &atalk_seq_socket_fops;
 
+	p = create_proc_entry("arp", S_IRUGO, atalk_proc_dir);
+	if (!p) 
+		goto out_arp;
+	p->proc_fops = &atalk_seq_arp_fops;
+
 	rc = 0;
 out:
 	return rc;
+out_arp:
+	remove_proc_entry("socket", atalk_proc_dir);
 out_socket:
 	remove_proc_entry("route", atalk_proc_dir);
 out_route:
@@ -309,6 +318,7 @@ void __exit atalk_proc_exit(void)
 	remove_proc_entry("interface", atalk_proc_dir);
 	remove_proc_entry("route", atalk_proc_dir);
 	remove_proc_entry("socket", atalk_proc_dir);
+	remove_proc_entry("arp", atalk_proc_dir);
 	remove_proc_entry("atalk", proc_net);
 }
 

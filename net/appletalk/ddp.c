@@ -61,11 +61,6 @@
 #include <net/route.h>
 #include <linux/atalk.h>
 
-#ifdef CONFIG_PROC_FS
-extern void aarp_register_proc_fs(void);
-extern void aarp_unregister_proc_fs(void);
-#endif
-
 extern void aarp_cleanup_module(void);
 
 extern void aarp_probe_network(struct atalk_iface *atif);
@@ -1831,9 +1826,6 @@ static int __init atalk_init(void)
 	register_netdevice_notifier(&ddp_notifier);
 	aarp_proto_init();
 	atalk_proc_init();
-#ifdef CONFIG_PROC_FS
-	aarp_register_proc_fs();
-#endif /* CONFIG_PROC_FS */
 	atalk_register_sysctl();
 	printk(atalk_banner);
 	return 0;
@@ -1855,9 +1847,6 @@ static void __exit atalk_exit(void)
 	atalk_unregister_sysctl();
 #endif /* CONFIG_SYSCTL */
 	atalk_proc_exit();
-#ifdef CONFIG_PROC_FS
-	aarp_unregister_proc_fs();
-#endif /* CONFIG_PROC_FS */
 	aarp_cleanup_module();	/* General aarp clean-up. */
 	unregister_netdevice_notifier(&ddp_notifier);
 	dev_remove_pack(&ltalk_packet_type);

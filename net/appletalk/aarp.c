@@ -1067,15 +1067,3 @@ void aarp_cleanup_module(void)
 	unregister_snap_client(aarp_dl);
 	aarp_purge();
 }
-
-#ifdef CONFIG_PROC_FS
-void aarp_register_proc_fs(void)
-{
-	proc_net_fops_create("aarp", S_IRUGO, &atalk_seq_arp_fops);
-}
-
-void aarp_unregister_proc_fs(void)
-{
-	proc_net_remove("aarp");
-}
-#endif
