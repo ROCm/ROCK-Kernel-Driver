@@ -2098,7 +2098,7 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	 * Register the port whether it's detected or not.  This allows
 	 * setserial to be used to alter this ports parameters.
 	 */
-	tty_register_devfs(drv->tty_driver, 0, drv->minor + port->line);
+	tty_register_device(drv->tty_driver, drv->minor + port->line);
 
 	if (port->type != PORT_UNKNOWN) {
 		unsigned long flags;
@@ -2155,7 +2155,7 @@ __uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
 	/*
 	 * Remove the devices from devfs
 	 */
-	tty_unregister_devfs(drv->tty_driver, drv->minor + port->line);
+	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
 
 	/*
 	 * Free the port IO and memory resources, if any.

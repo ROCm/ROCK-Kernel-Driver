@@ -1351,7 +1351,7 @@ retry_open:
 		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
 		minor -= driver->minor_start;
 		devpts_pty_new(driver->other->name_base + minor, MKDEV(driver->other->major, minor + driver->other->minor_start));
-		tty_register_devfs(&pts_driver[major], DEVFS_FL_DEFAULT,
+		tty_register_device(&pts_driver[major],
 				   pts_driver[major].minor_start + minor);
 		noctty = 1;
 		goto init_dev_done;
@@ -2038,9 +2038,6 @@ void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 	tty->driver.write(tty, 0, &ch, 1);
 }
 
-/*
- * Register a tty device described by <driver>, with minor number <minor>.
- */
 void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned minor)
 {
 #ifdef CONFIG_DEVFS_FS
@@ -2077,8 +2074,21 @@ void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
 	devfs_remove(driver->name, minor-driver->minor_start+driver->name_base);
 }
 
-EXPORT_SYMBOL(tty_register_devfs);
-EXPORT_SYMBOL(tty_unregister_devfs);
+/*
+ * Register a tty device described by <driver>, with minor number <minor>.
+ */
+void tty_register_device (struct tty_driver *driver, unsigned minor)
+{
+	tty_register_devfs(driver, 0, minor);
+}
+
+void tty_unregister_device (struct tty_driver *driver, unsigned minor)
+{
+	tty_unregister_devfs(driver, minor);
+}
+
+EXPORT_SYMBOL(tty_register_device);
+EXPORT_SYMBOL(tty_unregister_device);
 
 /*
  * Called by a tty driver to register itself.
@@ -2104,7 +2114,7 @@ int tty_register_driver(struct tty_driver *driver)
 	
 	if ( !(driver->flags & TTY_DRIVER_NO_DEVFS) ) {
 		for(i = 0; i < driver->num; i++)
-		    tty_register_devfs(driver, 0, driver->minor_start + i);
+		    tty_register_device(driver, driver->minor_start + i);
 	}
 	proc_tty_register_driver(driver);
 	return error;
@@ -2159,7 +2169,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 			driver->termios_locked[i] = NULL;
 			kfree(tp);
 		}
-		tty_unregister_devfs(driver, driver->minor_start + i);
+		tty_unregister_device(driver, driver->minor_start + i);
 	}
 	proc_tty_unregister_driver(driver);
 	return 0;

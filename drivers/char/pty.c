@@ -97,7 +97,7 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 			}
 		}
 #endif
-		tty_unregister_devfs (&tty->link->driver, minor(tty->device));
+		tty_unregister_device (&tty->link->driver, minor(tty->device));
 		tty_vhangup(tty->link);
 	}
 }
@@ -307,6 +307,7 @@ static void pty_flush_buffer(struct tty_struct *tty)
 	}
 }
 
+extern void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned minor);
 static int pty_open(struct tty_struct *tty, struct file * filp)
 {
 	int	retval;

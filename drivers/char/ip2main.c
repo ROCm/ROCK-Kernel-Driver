@@ -899,11 +899,11 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 			        {
 				    if ( pB->i2eChannelMap[box] & (1 << j) )
 				    {
-				        tty_register_devfs(&ip2_tty_driver,
-					    0, j + ABS_BIGGEST_BOX *
+				        tty_register_device(&ip2_tty_driver,
+					    j + ABS_BIGGEST_BOX *
 						    (box+i*ABS_MAX_BOXES));
-				            tty_register_devfs(&ip2_callout_driver,
-					    0, j + ABS_BIGGEST_BOX *
+				            tty_register_device(&ip2_callout_driver,
+					    j + ABS_BIGGEST_BOX *
 						    (box+i*ABS_MAX_BOXES));
 			    	    }
 			        }
