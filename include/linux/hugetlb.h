@@ -58,6 +58,10 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #define follow_huge_pmd(mm, addr, pmd, write)	0
 #define pmd_huge(x)	0
 
+#ifndef HPAGE_MASK
+#define HPAGE_MASK	0		/* Keep the compiler happy */
+#endif
+
 #endif /* !CONFIG_HUGETLB_PAGE */
 
 #ifdef CONFIG_HUGETLBFS

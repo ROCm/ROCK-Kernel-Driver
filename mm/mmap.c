@@ -1223,6 +1223,11 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 		return 0;
 	/* we have  start < mpnt->vm_end  */
 
+	if (is_vm_hugetlb_page(mpnt)) {
+		if ((start & ~HPAGE_MASK) || (len & ~HPAGE_MASK))
+			return -EINVAL;
+	}
+
 	/* if it doesn't overlap, we have nothing.. */
 	end = start + len;
 	if (mpnt->vm_start >= end)
