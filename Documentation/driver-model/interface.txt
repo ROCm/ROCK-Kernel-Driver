@@ -81,7 +81,7 @@ structure the interface is allocating anyway.
 Devices are enumerated within the interface. This happens in interface_add_data()
 and the enumerated value is stored in the struct intf_data for that device. 
 
-driverfs
+sysfs
 ~~~~~~~~
 Each interface is given a directory in the directory of the device
 class it belongs to:

@@ -64,7 +64,7 @@ refcount:      Reference count on the device.
 
 bus:	       Pointer to struct bus_type that device belongs to.
 
-dir:	       Device's driverfs directory.
+dir:	       Device's sysfs directory.
 
 driver:	       Pointer to struct device_driver that controls the device.
 
@@ -125,8 +125,8 @@ struct device_attribute {
 Attributes of devices can be exported via drivers using a simple
 procfs-like interface. 
 
-Please see Documentation/filesystems/driverfs.txt for more information
-on how driverfs works.
+Please see Documentation/filesystems/sysfs.txt for more information
+on how sysfs works.
 
 Attributes are declared using a macro called DEVICE_ATTR:
 

@@ -281,6 +281,8 @@ int cb_alloc(socket_info_t * s)
 		dev->vendor = vend;
 		pci_readw(dev, PCI_DEVICE_ID, &dev->device);
 		dev->hdr_type = hdr & 0x7f;
+		dev->dma_mask = 0xffffffff;
+		dev->dev.dma_mask = &dev->dma_mask;
 
 		pci_setup_device(dev);
 		if (pci_enable_device(dev))

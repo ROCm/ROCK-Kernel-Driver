@@ -951,11 +951,19 @@ static int fjn_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     struct local_info_t *lp = (struct local_info_t *)dev->priv;
     ioaddr_t ioaddr = dev->base_addr;
+    short length = skb->len;
+    
+    if (length < ETH_ZLEN)
+    {
+    	skb = skb_padto(skb, ETH_ZLEN);
+    	if (skb == NULL)
+    		return 0;
+    	length = ETH_ZLEN;
+    }
 
     netif_stop_queue(dev);
 
     {
-	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	unsigned char *buf = skb->data;
 
 	if (length > ETH_FRAME_LEN) {

@@ -80,7 +80,7 @@ int sys_register_root(struct sys_root * root)
  *	and @root->dev.
  *	If both are 0, they will be cleaned up by the core.
  */
-void sys_unegister_root(struct sys_root *  root)
+void sys_unregister_root(struct sys_root *root)
 {
 	device_unregister(&root->sysdev);
 	device_unregister(&root->dev);

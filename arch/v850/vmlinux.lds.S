@@ -1,8 +1,8 @@
 /*
  * arch/v850/vmlinux.lds.S -- kernel linker script for v850 platforms
  *
- *  Copyright (C) 2002  NEC Electronics Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -51,6 +51,9 @@
 		___start___ksymtab = . ;/* Kernel symbol table.  */	      \
 			*(__ksymtab)					      \
 		___stop___ksymtab = . ;					      \
+		___start___gpl_ksymtab = . ; /* Same for GPL symbols.  */     \
+			*(__gpl_ksymtab)				      \
+		___stop___gpl_ksymtab = . ;				      \
 		. = ALIGN (4) ;						      \
 		__etext = . ;
 

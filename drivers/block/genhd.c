@@ -276,17 +276,17 @@ subsys_initcall(device_init);
 
 struct disk_attribute {
 	struct attribute attr;
-	ssize_t (*show)(struct gendisk *, char *, size_t, loff_t);
+	ssize_t (*show)(struct gendisk *, char *);
 };
 
 static ssize_t disk_attr_show(struct kobject * kobj, struct attribute * attr,
-			      char * page, size_t count, loff_t off)
+			      char * page)
 {
 	struct gendisk * disk = to_disk(kobj);
 	struct disk_attribute * disk_attr = container_of(attr,struct disk_attribute,attr);
 	ssize_t ret = 0;
 	if (disk_attr->show)
-		ret = disk_attr->show(disk,page,count,off);
+		ret = disk_attr->show(disk,page);
 	return ret;
 }
 
@@ -294,21 +294,18 @@ static struct sysfs_ops disk_sysfs_ops = {
 	.show	= &disk_attr_show,
 };
 
-static ssize_t disk_dev_read(struct gendisk * disk,
-			     char *page, size_t count, loff_t off)
+static ssize_t disk_dev_read(struct gendisk * disk, char *page)
 {
 	dev_t base = MKDEV(disk->major, disk->first_minor); 
-	return off ? 0 : sprintf(page, "%04x\n",base);
+	return sprintf(page, "%04x\n",base);
 }
-static ssize_t disk_range_read(struct gendisk * disk,
-			       char *page, size_t count, loff_t off)
+static ssize_t disk_range_read(struct gendisk * disk, char *page)
 {
-	return off ? 0 : sprintf(page, "%d\n",disk->minors);
+	return sprintf(page, "%d\n",disk->minors);
 }
-static ssize_t disk_size_read(struct gendisk * disk,
-			      char *page, size_t count, loff_t off)
+static ssize_t disk_size_read(struct gendisk * disk, char *page)
 {
-	return off ? 0 : sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
+	return sprintf(page, "%llu\n",(unsigned long long)get_capacity(disk));
 }
 
 static inline unsigned jiffies_to_msec(unsigned jif)
@@ -321,11 +318,10 @@ static inline unsigned jiffies_to_msec(unsigned jif)
 	return (jif / HZ) * 1000 + (jif % HZ) * 1000 / HZ;
 #endif
 }
-static ssize_t disk_stat_read(struct gendisk * disk,
-			      char *page, size_t count, loff_t off)
+static ssize_t disk_stat_read(struct gendisk * disk, char *page)
 {
 	disk_round_stats(disk);
-	return off ? 0 : sprintf(page,
+	return sprintf(page,
 		"%8u %8u %8llu %8u "
 		"%8u %8u %8llu %8u "
 		"%8u %8u %8u"

@@ -148,7 +148,7 @@ active readers for more than 60 seconds, further requests will not be
 added to the channel but instead all looks that do not find a valid
 entry will fail.  This is partly for backward compatability: The
 previous nfs exports table was deemed to be authoritative and a
-failed lookup meant a definate 'no'.
+failed lookup meant a definite 'no'.
 
 request/response format
 -----------------------

@@ -1350,20 +1350,18 @@ __setup("sg_def_reserved_size=", sg_def_reserved_size_setup);
 
 /* Driverfs file support */
 static ssize_t
-sg_device_kdev_read(struct device *driverfs_dev, char *page,
-		    size_t count, loff_t off)
+sg_device_kdev_read(struct device *driverfs_dev, char *page)
 {
 	Sg_device *sdp = list_entry(driverfs_dev, Sg_device, sg_driverfs_dev);
-	return off ? 0 : sprintf(page, "%x\n", MKDEV(sdp->disk->major,
-						     sdp->disk->first_minor));
+	return sprintf(page, "%x\n", MKDEV(sdp->disk->major,
+					   sdp->disk->first_minor));
 }
 static DEVICE_ATTR(kdev,S_IRUGO,sg_device_kdev_read,NULL);
 
 static ssize_t
-sg_device_type_read(struct device *driverfs_dev, char *page,
-		    size_t count, loff_t off)
+sg_device_type_read(struct device *driverfs_dev, char *page)
 {
-	return off ? 0 : sprintf(page, "CHR\n");
+	return sprintf(page, "CHR\n");
 }
 
 static DEVICE_ATTR(type,S_IRUGO,sg_device_type_read,NULL);

@@ -2,7 +2,7 @@
  * class.c - basic device class management
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -14,28 +14,26 @@
 #define to_class(obj) container_of(obj,struct device_class,subsys.kset.kobj)
 
 static ssize_t
-devclass_attr_show(struct kobject * kobj, struct attribute * attr,
-	      char * buf, size_t count, loff_t off)
+devclass_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
 	struct devclass_attribute * class_attr = to_class_attr(attr);
 	struct device_class * dc = to_class(kobj);
 	ssize_t ret = 0;
 
 	if (class_attr->show)
-		ret = class_attr->show(dc,buf,count,off);
+		ret = class_attr->show(dc,buf);
 	return ret;
 }
 
 static ssize_t
-devclass_attr_store(struct kobject * kobj, struct attribute * attr,
-	       const char * buf, size_t count, loff_t off)
+devclass_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
 {
 	struct devclass_attribute * class_attr = to_class_attr(attr);
 	struct device_class * dc = to_class(kobj);
 	ssize_t ret = 0;
 
 	if (class_attr->store)
-		ret = class_attr->store(dc,buf,count,off);
+		ret = class_attr->store(dc,buf);
 	return ret;
 }
 
@@ -100,15 +98,19 @@ void devclass_remove_file(struct device_class * cls, struct devclass_attribute *
 int devclass_add_driver(struct device_driver * drv)
 {
 	struct device_class * cls = get_devclass(drv->devclass);
+	int error = 0;
+
 	if (cls) {
 		down_write(&cls->subsys.rwsem);
 		pr_debug("device class %s: adding driver %s:%s\n",
 			 cls->name,drv->bus->name,drv->name);
-		list_add_tail(&drv->class_list,&cls->drivers.list);
-		devclass_drv_link(drv);
+		error = devclass_drv_link(drv);
+		
+		if (!error)
+			list_add_tail(&drv->class_list,&cls->drivers.list);
 		up_write(&cls->subsys.rwsem);
 	}
-	return 0;
+	return error;
 }
 
 void devclass_remove_driver(struct device_driver * drv)

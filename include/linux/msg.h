@@ -69,6 +69,7 @@ struct msg_msg {
 	long  m_type;          
 	int m_ts;           /* message text size */
 	struct msg_msgseg* next;
+	void *security;
 	/* the actual message follows immediately */
 };
 

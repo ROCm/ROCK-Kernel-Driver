@@ -2838,16 +2838,18 @@ static void md_do_sync(void *data)
 				       mdidx(mddev), mdidx(mddev2));
 				if (mddev < mddev2) {/* arbitrarily yield */
 					mddev->curr_resync = 1;
-					yield();
+					wake_up(&resync_wait);
 				}
 				if (wait_event_interruptible(resync_wait,
-							     mddev2->curr_resync < 2)) {
+							     mddev2->curr_resync < mddev->curr_resync)) {
 					flush_curr_signals();
 					err = -EINTR;
 					mddev_put(mddev2);
 					goto skip;
 				}
 			}
+			if (mddev->curr_resync == 1)
+				break;
 		}
 	} while (mddev->curr_resync < 2);
 

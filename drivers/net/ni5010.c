@@ -114,7 +114,7 @@ static void	reset_receiver(struct net_device *dev);
 
 static int	process_xmt_interrupt(struct net_device *dev);
 #define tx_done(dev) 1
-static void	hardware_send_packet(struct net_device *dev, char *buf, int length);
+static void	hardware_send_packet(struct net_device *dev, char *buf, int length, int pad);
 static void 	chipset_init(struct net_device *dev, int startp);
 static void	dump_packet(void *buf, int len);
 static void 	ni5010_show_registers(struct net_device *dev);
@@ -441,7 +441,7 @@ static int ni5010_send_packet(struct sk_buff *skb, struct net_device *dev)
 	 */
 	
 	netif_stop_queue(dev);
-	hardware_send_packet(dev, (unsigned char *)skb->data, length);
+	hardware_send_packet(dev, (unsigned char *)skb->data, skb->len, length-skb->len);
 	dev->trans_start = jiffies;
 	dev_kfree_skb (skb);
 	return 0;
@@ -665,7 +665,7 @@ static void ni5010_set_multicast_list(struct net_device *dev)
 	}
 }
 
-static void hardware_send_packet(struct net_device *dev, char *buf, int length)
+static void hardware_send_packet(struct net_device *dev, char *buf, int length, int pad)
 {
 	struct ni5010_local *lp = (struct ni5010_local *)dev->priv;
 	int ioaddr = dev->base_addr;
@@ -690,8 +690,8 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length)
 	
 	if (NI5010_DEBUG > 3) dump_packet(buf, length);
 
-        buf_offs = NI5010_BUFSIZE - length;
-        lp->o_pkt_size = length;
+        buf_offs = NI5010_BUFSIZE - length - pad;
+        lp->o_pkt_size = length + pad;
 
 	save_flags(flags);	
 	cli();
@@ -702,6 +702,9 @@ static void hardware_send_packet(struct net_device *dev, char *buf, int length)
 
 	outw(buf_offs, IE_GP); /* Point GP at start of packet */
 	outsb(IE_XBUF, buf, length); /* Put data in buffer */
+	while(pad--)
+		outb(0, IE_XBUF);
+		
 	outw(buf_offs, IE_GP); /* Rewrite where packet starts */
 
 	/* should work without that outb() (Crynwr used it) */

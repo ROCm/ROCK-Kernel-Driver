@@ -215,14 +215,13 @@ static void pnp_print_resources(pnp_info_buffer_t *buffer, char *space, struct p
 		pnp_print_mem32(buffer, space, mem32);
 }
 
-static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf, size_t count, loff_t off)
+static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	struct pnp_resources * res = dev->res;
 	int dep = 0;
 	pnp_info_buffer_t *buffer;
-	if (off)
-		return 0;
+
 	buffer = (pnp_info_buffer_t *) pnp_alloc(sizeof(pnp_info_buffer_t));
 	if (!buffer)
 		return -ENOMEM;
@@ -242,13 +241,12 @@ static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf, size
 
 static DEVICE_ATTR(possible,S_IRUGO,pnp_show_possible_resources,NULL);
 
-static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf, size_t count, loff_t off)
+static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char *str = buf;
 	int i;
-	if (off)
-		return 0;
+
 	if (!dev->active){
 		str += sprintf(str,"DISABLED\n");
 		goto done;
@@ -282,7 +280,7 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf, size_
 }
 
 static ssize_t
-pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count, loff_t off)
+pnp_set_current_resources(struct device * dmdev, const char * buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char	command[20];
@@ -290,8 +288,7 @@ pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count,
 	int	num_args;
 	int	error = 0;
 	int	depnum, mode = 0;
-	if (off)
-		return 0;
+
 	num_args = sscanf(buf,"%10s %i %10s",command,&depnum,type);
 	if (!num_args)
 		goto done;
@@ -328,19 +325,18 @@ pnp_set_current_resources(struct device * dmdev, const char * buf, size_t count,
 		goto done;
 	}
  done:
-	return error < 0 ? error : count;
+	return error < 0 ? error : strlen(buf);
 }
 
 static DEVICE_ATTR(resources,S_IRUGO | S_IWUSR,
 		   pnp_show_current_resources,pnp_set_current_resources);
 
-static ssize_t pnp_show_current_ids(struct device *dmdev, char *buf, size_t count, loff_t off)
+static ssize_t pnp_show_current_ids(struct device *dmdev, char *buf)
 {
 	char *str = buf;
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	struct pnp_id * pos = dev->id;
-	if (off)
-		return 0;
+
 	while (pos) {
 		str += sprintf(str,"%s\n", pos->id);
 		pos = pos->next;

@@ -35,28 +35,26 @@ DECLARE_MUTEX(device_sem);
 extern struct attribute * dev_default_attrs[];
 
 static ssize_t
-dev_attr_show(struct kobject * kobj, struct attribute * attr,
-	      char * buf, size_t count, loff_t off)
+dev_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
 	struct device_attribute * dev_attr = to_dev_attr(attr);
 	struct device * dev = to_dev(kobj);
 	ssize_t ret = 0;
 
 	if (dev_attr->show)
-		ret = dev_attr->show(dev,buf,count,off);
+		ret = dev_attr->show(dev,buf);
 	return ret;
 }
 
 static ssize_t
-dev_attr_store(struct kobject * kobj, struct attribute * attr,
-	       const char * buf, size_t count, loff_t off)
+dev_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
 {
 	struct device_attribute * dev_attr = to_dev_attr(attr);
 	struct device * dev = to_dev(kobj);
 	ssize_t ret = 0;
 
 	if (dev_attr->store)
-		ret = dev_attr->store(dev,buf,count,off);
+		ret = dev_attr->store(dev,buf);
 	return ret;
 }
 

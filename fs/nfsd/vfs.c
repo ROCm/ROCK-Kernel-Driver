@@ -1515,11 +1515,11 @@ nfsd_permission(struct svc_export *exp, struct dentry *dentry, int acc)
 		inode->i_uid, inode->i_gid, current->fsuid, current->fsgid);
 #endif
 
-	/* only care about readonly exports for files and
-	 * directories. links don't have meaningful write access,
-	 * and all else is local to the client
+	/* Normally we reject any write/sattr etc access on a read-only file
+	 * system.  But if it is IRIX doing check on write-access for a 
+	 * device special file, we ignore rofs.
 	 */
-	if (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) 
+	if (!(acc & MAY_LOCAL_ACCESS))
 		if (acc & (MAY_WRITE | MAY_SATTR | MAY_TRUNC)) {
 			if (EX_RDONLY(exp) || IS_RDONLY(inode))
 				return nfserr_rofs;

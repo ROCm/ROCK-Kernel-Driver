@@ -297,7 +297,7 @@ static int	el16_close(struct net_device *dev);
 static struct net_device_stats *el16_get_stats(struct net_device *dev);
 static void el16_tx_timeout (struct net_device *dev);
 
-static void hardware_send_packet(struct net_device *dev, void *buf, short length);
+static void hardware_send_packet(struct net_device *dev, void *buf, short length, short pad);
 static void init_82586_mem(struct net_device *dev);
 static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 
@@ -499,7 +499,7 @@ static int el16_send_packet (struct sk_buff *skb, struct net_device *dev)
 	/* Disable the 82586's input to the interrupt line. */
 	outb (0x80, ioaddr + MISC_CTRL);
 
-	hardware_send_packet (dev, buf, length);
+	hardware_send_packet (dev, buf, skb->len, length - skb->len);
 
 	dev->trans_start = jiffies;
 	/* Enable the 82586 interrupt input. */
@@ -752,12 +752,13 @@ static void init_82586_mem(struct net_device *dev)
 	return;
 }
 
-static void hardware_send_packet(struct net_device *dev, void *buf, short length)
+static void hardware_send_packet(struct net_device *dev, void *buf, short length, short pad)
 {
 	struct net_local *lp = (struct net_local *)dev->priv;
 	short ioaddr = dev->base_addr;
 	ushort tx_block = lp->tx_head;
 	unsigned long write_ptr = dev->mem_start + tx_block;
+	static char padding[ETH_ZLEN];
 
 	/* Set the write pointer to the Tx block, and put out the header. */
 	isa_writew(0x0000,write_ptr);			/* Tx status */
@@ -766,7 +767,7 @@ static void hardware_send_packet(struct net_device *dev, void *buf, short length
 	isa_writew(tx_block+8,write_ptr+=2);			/* Data Buffer offset. */
 
 	/* Output the data buffer descriptor. */
-	isa_writew(length | 0x8000,write_ptr+=2);		/* Byte count parameter. */
+	isa_writew((pad + length) | 0x8000,write_ptr+=2);		/* Byte count parameter. */
 	isa_writew(-1,write_ptr+=2);			/* No next data buffer. */
 	isa_writew(tx_block+22+SCB_BASE,write_ptr+=2);	/* Buffer follows the NoOp command. */
 	isa_writew(0x0000,write_ptr+=2);			/* Buffer address high bits (always zero). */
@@ -778,6 +779,8 @@ static void hardware_send_packet(struct net_device *dev, void *buf, short length
 
 	/* Output the packet at the write pointer. */
 	isa_memcpy_toio(write_ptr+2, buf, length);
+	if (pad)
+		isa_memcpy_toio(write_ptr+length+2, padding, pad);
 
 	/* Set the old command link pointing to this send packet. */
 	isa_writew(tx_block,dev->mem_start + lp->tx_cmd_link);

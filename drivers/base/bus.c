@@ -31,28 +31,26 @@
 
 
 static ssize_t
-drv_attr_show(struct kobject * kobj, struct attribute * attr,
-	      char * buf, size_t count, loff_t off)
+drv_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
 	struct driver_attribute * drv_attr = to_drv_attr(attr);
 	struct device_driver * drv = to_driver(kobj);
 	ssize_t ret = 0;
 
 	if (drv_attr->show)
-		ret = drv_attr->show(drv,buf,count,off);
+		ret = drv_attr->show(drv,buf);
 	return ret;
 }
 
 static ssize_t
-drv_attr_store(struct kobject * kobj, struct attribute * attr,
-	       const char * buf, size_t count, loff_t off)
+drv_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
 {
 	struct driver_attribute * drv_attr = to_drv_attr(attr);
 	struct device_driver * drv = to_driver(kobj);
 	ssize_t ret = 0;
 
 	if (drv_attr->store)
-		ret = drv_attr->store(drv,buf,count,off);
+		ret = drv_attr->store(drv,buf);
 	return ret;
 }
 
@@ -80,28 +78,26 @@ static struct kobj_type ktype_driver = {
 
 
 static ssize_t
-bus_attr_show(struct kobject * kobj, struct attribute * attr,
-	      char * buf, size_t count, loff_t off)
+bus_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 {
 	struct bus_attribute * bus_attr = to_bus_attr(attr);
 	struct bus_type * bus = to_bus(kobj);
 	ssize_t ret = 0;
 
 	if (bus_attr->show)
-		ret = bus_attr->show(bus,buf,count,off);
+		ret = bus_attr->show(bus,buf);
 	return ret;
 }
 
 static ssize_t
-bus_attr_store(struct kobject * kobj, struct attribute * attr,
-	       const char * buf, size_t count, loff_t off)
+bus_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
 {
 	struct bus_attribute * bus_attr = to_bus_attr(attr);
 	struct bus_type * bus = to_bus(kobj);
 	ssize_t ret = 0;
 
 	if (bus_attr->store)
-		ret = bus_attr->store(bus,buf,count,off);
+		ret = bus_attr->store(bus,buf);
 	return ret;
 }
 
@@ -316,12 +312,14 @@ static int device_attach(struct device * dev)
  *	If bus_match() returns 0 and the @dev->driver is set, we've found
  *	a compatible pair, so we call devclass_add_device() to add the 
  *	device to the class. 
+ *
+ *	Note that we ignore the error from bus_match(), since it's perfectly
+ *	valid for a driver not to bind to any devices.
  */
 static int driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
 	struct list_head * entry;
-	int error = 0;
 
 	if (!bus->match)
 		return 0;
@@ -333,7 +331,7 @@ static int driver_attach(struct device_driver * drv)
 				devclass_add_device(dev);
 		}
 	}
-	return error;
+	return 0;
 }
 
 
@@ -387,15 +385,18 @@ static void driver_detach(struct device_driver * drv)
 int bus_add_device(struct device * dev)
 {
 	struct bus_type * bus = get_bus(dev->bus);
+	int error = 0;
+
 	if (bus) {
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
-		device_attach(dev);
+		if ((error = device_attach(dev)))
+			list_del_init(&dev->bus_list);
 		up_write(&dev->bus->subsys.rwsem);
 		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
-	return 0;
+	return error;
 }
 
 /**
@@ -429,19 +430,33 @@ void bus_remove_device(struct device * dev)
 int bus_add_driver(struct device_driver * drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
+	int error = 0;
+
 	if (bus) {
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
 
 		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
 		drv->kobj.kset = &bus->drivers;
-		kobject_register(&drv->kobj);
+
+		if ((error = kobject_register(&drv->kobj))) {
+			put_bus(bus);
+			return error;
+		}
 
 		down_write(&bus->subsys.rwsem);
-		devclass_add_driver(drv);
-		driver_attach(drv);
+		if (!(error = devclass_add_driver(drv))) {
+			if ((error = driver_attach(drv))) {
+				devclass_remove_driver(drv);
+			}
+		}
 		up_write(&bus->subsys.rwsem);
+
+		if (error) {
+			kobject_unregister(&drv->kobj);
+			put_bus(bus);
+		}
 	}
-	return 0;
+	return error;
 }
 
 

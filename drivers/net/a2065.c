@@ -570,6 +570,14 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	unsigned long flags;
 
 	skblen = skb->len;
+	len = skblen;
+	
+	if (len < ETH_ZLEN) {
+		len = ETH_ZLEN:
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
 
 	local_irq_save(flags);
 
@@ -590,7 +598,6 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 #endif
-	len = (skblen <= ETH_ZLEN) ? ETH_ZLEN : skblen;
 	entry = lp->tx_new & lp->tx_ring_mod_mask;
 	ib->btx_ring [entry].length = (-len) | 0xf000;
 	ib->btx_ring [entry].misc = 0;

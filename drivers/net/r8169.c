@@ -822,6 +822,12 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	void *ioaddr = tp->mmio_addr;
 	int entry = tp->cur_tx % NUM_TX_DESC;
 
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
+	
 	spin_lock_irq(&tp->lock);
 
 	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {

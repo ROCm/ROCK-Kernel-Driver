@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/system.h -- Low-level interrupt/thread ops
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -67,6 +67,7 @@ static inline int irqs_disabled (void)
 #define mb()			__asm__ __volatile__ ("" ::: "memory")
 #define rmb()			mb ()
 #define wmb()			mb ()
+#define read_barrier_depends()	((void)0)
 #define set_rmb(var, value)	do { xchg (&var, value); } while (0)
 #define set_mb(var, value)	set_rmb (var, value)
 #define set_wmb(var, value)	do { var = value; wmb (); } while (0)

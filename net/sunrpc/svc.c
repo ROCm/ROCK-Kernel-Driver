@@ -304,16 +304,21 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	 * We do this before anything else in order to get a decent
 	 * auth verifier.
 	 */
-	if (svc_authenticate(rqstp, &rpc_stat, &auth_stat, proc))
-		/* drop the request, it has probably been deferred */
-		goto dropit;
-
-	if (rpc_stat != rpc_success)
-		goto err_garbage;
-
-	if (auth_stat != rpc_auth_ok)
+	switch (svc_authenticate(rqstp, &auth_stat)) {
+	case SVC_OK:
+		break;
+	case SVC_GARBAGE:
+		rpc_stat = rpc_garbage_args;
+		goto err_bad;
+	case SVC_SYSERR:
+		rpc_stat = rpc_system_err;
+		goto err_bad;
+	case SVC_DENIED:
 		goto err_bad_auth;
-
+	case SVC_DROP:
+		goto dropit;
+	}
+		
 	progp = serv->sv_program;
 	if (prog != progp->pg_prog)
 		goto err_bad_prog;
@@ -458,7 +463,9 @@ err_garbage:
 #ifdef RPC_PARANOIA
 	printk("svc: failed to decode args\n");
 #endif
+	rpc_stat = rpc_garbage_args;
+err_bad:
 	serv->sv_stats->rpcbadfmt++;
-	svc_putu32(resv, rpc_garbage_args);
+	svc_putu32(resv, rpc_stat);
 	goto sendit;
 }

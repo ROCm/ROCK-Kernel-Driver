@@ -28,7 +28,7 @@
  *		  globally-visible functions take an IOP number instead of an
  *		  an actual base address.
  * 990610 (jmt) - Finished the message passing framework and it seems to work.
- *		  Sending _definately_ works; my adb-bus.c mods can send
+ *		  Sending _definitely_ works; my adb-bus.c mods can send
  *		  messages and receive the MSG_COMPLETED status back from the
  *		  IOP. The trick now is figuring out the message formats.
  * 990611 (jmt) - More cleanups. Fixed problem where unclaimed messages on a

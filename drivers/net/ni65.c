@@ -1145,6 +1145,8 @@ static int ni65_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 			memcpy((char *) p->tmdbounce[p->tmdbouncenum] ,(char *)skb->data,
 							 (skb->len > T_BUF_SIZE) ? T_BUF_SIZE : skb->len);
+			if (len > skb->len)
+				memset((char *)p->tmdbounce[p->tmdbouncenum]+skb->len, 0, len-skb->len);
 			dev_kfree_skb (skb);
 
 			save_flags(flags);

@@ -147,10 +147,10 @@ node access, and does proper reference counting on each device as it
 accesses it. 
 
 
-driverfs
+sysfs
 ~~~~~~~~
 
-When a driver is registered, a driverfs directory is created in its
+When a driver is registered, a sysfs directory is created in its
 bus's directory. In this directory, the driver can export an interface
 to userspace to control operation of the driver on a global basis;
 e.g. toggling debugging output in the driver.
@@ -268,7 +268,7 @@ struct driver_attribute {
         ssize_t (*store)(struct device_driver *, const char * buf, size_t count, loff_t off);
 };
 
-Device drivers can export attributes via their driverfs directories. 
+Device drivers can export attributes via their sysfs directories. 
 Drivers can declare attributes using a DRIVER_ATTR macro that works
 identically to the DEVICE_ATTR macro. 
 

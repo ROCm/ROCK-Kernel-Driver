@@ -885,7 +885,15 @@ i596_start_xmit (struct sk_buff *skb, struct net_device *dev) {
 	if (skb->len <= 0)
 		return 0;
 
-	length = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
+	length = skb->len;
+	
+	if (length < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		length = ETH_ZLEN;
+	}
+	
 	dev->trans_start = jiffies;
 
 	tx_cmd = (struct tx_cmd *)

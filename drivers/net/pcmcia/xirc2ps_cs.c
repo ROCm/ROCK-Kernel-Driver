@@ -1547,7 +1547,6 @@ do_start_xmit(struct sk_buff *skb, struct net_device *dev)
     DEBUG(1, "do_start_xmit(skb=%p, dev=%p) len=%u\n",
 	  skb, dev, pktlen);
 
-    netif_stop_queue(dev);
 
     /* adjust the packet length to min. required
      * and hope that the buffer is large enough
@@ -1557,8 +1556,14 @@ do_start_xmit(struct sk_buff *skb, struct net_device *dev)
      * pad this in his buffer with random bytes
      */
     if (pktlen < ETH_ZLEN)
+    {
+        skb = skb_padto(skb, ETH_ZLEN);
+        if (skb == NULL)
+        	return 0;
 	pktlen = ETH_ZLEN;
+    }
 
+    netif_stop_queue(dev);
     SelectPage(0);
     PutWord(XIRCREG0_TRS, (u_short)pktlen+2);
     freespace = GetWord(XIRCREG0_TSO);
