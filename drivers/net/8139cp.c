@@ -32,7 +32,7 @@
 	  h/w stats can be reset only by software reset
 	* Tx checksumming
 	* Handle netif_rx return value
-	* ETHTOOL_GREGS, ETHTOOL_[GS]WOL,
+	* ETHTOOL_[GS]WOL,
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error
@@ -41,12 +41,14 @@
 	  Tx descriptor bit
 	* The real minimum of CP_MIN_MTU is 4 bytes.  However,
 	  for this to be supported, one must(?) turn on packet padding.
+	* Support 8169 GMII
+	* Support external MII transceivers
 
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.0.7"
-#define DRV_RELDATE		"Feb 27, 2002"
+#define DRV_VERSION		"0.1.0"
+#define DRV_RELDATE		"Jun 14, 2002"
 
 
 #include <linux/config.h>
@@ -99,6 +101,7 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered mul
 				 NETIF_MSG_PROBE 	| \
 				 NETIF_MSG_LINK)
 #define CP_REGS_SIZE		(0xff + 1)
+#define CP_REGS_VER		1		/* version 1 */
 #define CP_RX_RING_SIZE		64
 #define CP_TX_RING_SIZE		64
 #define CP_RING_BYTES		\
@@ -152,7 +155,9 @@ enum {
 	NWayExpansion	= 0x6A, /* MII Expansion */
 	Config5		= 0xD8,	/* Config5 */
 	TxPoll		= 0xD9,	/* Tell chip to check Tx descriptors for work */
+	RxMaxSize	= 0xDA, /* Max size of an Rx packet (8169 only) */
 	CpCmd		= 0xE0, /* C+ Command register (C+ mode only) */
+	IntrMitigate	= 0xE2,	/* rx/tx interrupt mitigation control */
 	RxRingAddr	= 0xE4, /* 64-bit start addr of Rx ring */
 	TxThresh	= 0xEC, /* Early Tx threshold */
 	OldRxBufAddr	= 0x30, /* DMA address of Rx ring buffer (C mode) */
@@ -313,6 +318,7 @@ struct cp_private {
 
 	struct sk_buff		*frag_skb;
 	unsigned		dropping_frag : 1;
+	unsigned int		board_type;
 
 	struct mii_if_info	mii_if;
 };
@@ -341,10 +347,28 @@ static void __cp_set_rx_mode (struct net_device *dev);
 static void cp_tx (struct cp_private *cp);
 static void cp_clean_rings (struct cp_private *cp);
 
+enum board_type {
+	RTL8139Cp,
+	RTL8169,
+};
+
+static struct cp_board_info {
+	const char *name;
+} cp_board_tbl[] __devinitdata = {
+	/* RTL8139Cp */
+	{ "RTL-8139C+" },
+
+	/* RTL8169 */
+	{ "RTL-8169" },
+};
 
 static struct pci_device_id cp_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_REALTEK_8139,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139Cp },
+#if 0
+	{ PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_REALTEK_8169,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8169 },
+#endif
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, cp_pci_tbl);
@@ -890,7 +914,10 @@ static void cp_reset_hw (struct cp_private *cp)
 static inline void cp_start_hw (struct cp_private *cp)
 {
 	cpw8(Cmd, RxOn | TxOn);
-	cpw16(CpCmd, PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
+	if (cp->board_type == RTL8169)
+		cpw16(CpCmd, PCIMulRW | RxChkSum);
+	else
+		cpw16(CpCmd, PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
 }
 
 static void cp_init_hw (struct cp_private *cp)
@@ -912,16 +939,14 @@ static void cp_init_hw (struct cp_private *cp)
 	cpw32_f (TxConfig, IFG | (TX_DMA_BURST << TxDMAShift));
 
 	cpw8(Config1, cpr8(Config1) | DriverLoaded | PMEnable);
-	cpw8(Config3, PARMEnable); /* disables magic packet and WOL */
+	if (cp->board_type == RTL8139Cp)
+		cpw8(Config3, PARMEnable); /* disables magic packet and WOL */
 	cpw8(Config5, cpr8(Config5) & PMEStatus); /* disables more WOL stuff */
+	if (cp->board_type == RTL8169)
+		cpw16(RxMaxSize, cp->rx_buf_sz);
 
 	cpw32_f(HiTxRingAddr, 0);
 	cpw32_f(HiTxRingAddr + 4, 0);
-	cpw32_f(OldRxBufAddr, 0);
-	cpw32_f(OldTSD0, 0);
-	cpw32_f(OldTSD0 + 4, 0);
-	cpw32_f(OldTSD0 + 8, 0);
-	cpw32_f(OldTSD0 + 12, 0);
 
 	cpw32_f(RxRingAddr, cp->ring_dma);
 	cpw32_f(RxRingAddr + 4, 0);
@@ -930,9 +955,9 @@ static void cp_init_hw (struct cp_private *cp)
 
 	cpw16(MultiIntr, 0);
 
-	cpw16(IntrMask, cp_intr_mask);
+	cpw16_f(IntrMask, cp_intr_mask);
 
-	cpw8_f (Cfg9346, Cfg9346_Lock);
+	cpw8_f(Cfg9346, Cfg9346_Lock);
 }
 
 static int cp_refill_rx (struct cp_private *cp)
@@ -1094,6 +1119,8 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 
 	dev->mtu = new_mtu;
 	cp_set_rxbufsize(cp);		/* set new rx buf size */
+	if (cp->board_type == RTL8169)
+		cpw16(RxMaxSize, cp->rx_buf_sz);
 
 	rc = cp_init_rings(cp);		/* realloc and restart h/w */
 	cp_start_hw(cp);
@@ -1153,6 +1180,7 @@ static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
 		strcpy (info.bus_info, cp->pdev->slot_name);
+		info.regdump_len = CP_REGS_SIZE;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;
@@ -1206,6 +1234,128 @@ static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 		if (copy_from_user(&edata, useraddr, sizeof(edata)))
 			return -EFAULT;
 		cp->msg_enable = edata.data;
+		return 0;
+	}
+
+	/* NIC register dump */
+	case ETHTOOL_GREGS: {
+                struct ethtool_regs regs;
+                u8 *regbuf = kmalloc(CP_REGS_SIZE, GFP_KERNEL);
+                int rc;
+
+		if (!regbuf)
+			return -ENOMEM;
+		memset(regbuf, 0, CP_REGS_SIZE);
+
+                rc = copy_from_user(&regs, useraddr, sizeof(regs));
+		if (rc) {
+			rc = -EFAULT;
+			goto err_out_gregs;
+		}
+                
+                if (regs.len > CP_REGS_SIZE)
+                        regs.len = CP_REGS_SIZE;
+                if (regs.len < CP_REGS_SIZE) {
+			rc = -EINVAL;
+			goto err_out_gregs;
+		}
+
+                regs.version = CP_REGS_VER;
+                rc = copy_to_user(useraddr, &regs, sizeof(regs));
+		if (rc) {
+			rc = -EFAULT;
+			goto err_out_gregs;
+		}
+
+                useraddr += offsetof(struct ethtool_regs, data);
+
+                spin_lock_irq(&cp->lock);
+                memcpy_fromio(regbuf, cp->regs, CP_REGS_SIZE);
+                spin_unlock_irq(&cp->lock);
+
+                if (copy_to_user(useraddr, regbuf, regs.len))
+                        rc = -EFAULT;
+
+err_out_gregs:
+		kfree(regbuf);
+		return rc;
+	}
+
+	/* get/set RX checksumming */
+	case ETHTOOL_GRXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
+		u16 cmd = cpr16(CpCmd) & RxChkSum;
+
+		edata.data = cmd ? 1 : 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SRXCSUM: {
+		struct ethtool_value edata;
+		u16 cmd = cpr16(CpCmd), newcmd;
+
+		newcmd = cmd;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (edata.data)
+			newcmd |= RxChkSum;
+		else
+			newcmd &= ~RxChkSum;
+
+		if (newcmd == cmd)
+			return 0;
+
+		spin_lock_irq(&cp->lock);
+		cpw16_f(CpCmd, newcmd);
+		spin_unlock_irq(&cp->lock);
+	}
+
+	/* get/set TX checksumming */
+	case ETHTOOL_GTXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
+
+		edata.data = (cp->dev->features & NETIF_F_IP_CSUM) != 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_STXCSUM: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (edata.data)
+			cp->dev->features |= NETIF_F_IP_CSUM;
+		else
+			cp->dev->features &= ~NETIF_F_IP_CSUM;
+
+		return 0;
+	}
+
+	/* get/set scatter-gather */
+	case ETHTOOL_GSG: {
+		struct ethtool_value edata = { ETHTOOL_GSG };
+
+		edata.data = (cp->dev->features & NETIF_F_SG) != 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SSG: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (edata.data)
+			cp->dev->features |= NETIF_F_SG;
+		else
+			cp->dev->features &= ~NETIF_F_SG;
+
 		return 0;
 	}
 
@@ -1332,6 +1482,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	unsigned addr_len, i;
 	u8 pci_rev, cache_size;
 	u16 pci_command;
+	unsigned int board_type = (unsigned int) ent->driver_data;
 
 #ifndef MODULE
 	static int version_printed;
@@ -1355,6 +1506,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	cp = dev->priv;
 	cp->pdev = pdev;
+	cp->board_type = board_type;
 	cp->dev = dev;
 	cp->msg_enable = (debug < 0 ? CP_DEF_MSG_ENABLE : debug);
 	spin_lock_init (&cp->lock);
@@ -1440,7 +1592,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 		"%02x:%02x:%02x:%02x:%02x:%02x, "
 		"IRQ %d\n",
 		dev->name,
-		"RTL-8139C+",
+		cp_board_tbl[board_type].name,
 		dev->base_addr,
 		dev->dev_addr[0], dev->dev_addr[1],
 		dev->dev_addr[2], dev->dev_addr[3],
