@@ -203,6 +203,7 @@ struct xfrm_userpolicy_id {
 struct xfrm_user_acquire {
 	struct xfrm_id			id;
 	xfrm_address_t			saddr;
+	struct xfrm_selector		sel;
 	struct xfrm_userpolicy_info	policy;
 	__u32				aalgos;
 	__u32				ealgos;

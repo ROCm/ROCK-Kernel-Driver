@@ -152,7 +152,6 @@ static ctl_table sctp_net_table[] = {
 	{
 		.ctl_name	= NET_SCTP,
 		.procname	= "sctp",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= sctp_table
 	},
@@ -163,7 +162,6 @@ static ctl_table sctp_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= sctp_net_table
 	},

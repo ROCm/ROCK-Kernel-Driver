@@ -30,7 +30,6 @@ static ctl_table unix_net_table[] = {
 	{
 		.ctl_name	= NET_UNIX,
 		.procname	= "unix",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= unix_table
 	},
@@ -41,7 +40,6 @@ static ctl_table unix_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= unix_net_table
 	},
