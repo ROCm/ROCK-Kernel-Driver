@@ -207,7 +207,7 @@ tcx_blank(int blank, struct fb_info *info)
 	val = sbus_readl(&thc->thc_misc);
 
 	switch (blank) {
-	case FB_BLAnK_UNBLANK: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		val &= ~(TCX_THC_MISC_VSYNC_DIS |
 			 TCX_THC_MISC_HSYNC_DIS);
 		val |= TCX_THC_MISC_VIDEO;
