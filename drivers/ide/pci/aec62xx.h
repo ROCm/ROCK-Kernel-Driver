@@ -11,7 +11,7 @@ struct chipset_bus_clock_list_entry {
 	byte		ultra_settings;
 };
 
-struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
+static struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 	{	XFER_UDMA_6,	0x31,	0x07	},
 	{	XFER_UDMA_5,	0x31,	0x06	},
 	{	XFER_UDMA_4,	0x31,	0x05	},
@@ -31,7 +31,7 @@ struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 	{	0,		0x00,	0x00	}
 };
 
-struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
+static struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 	{	XFER_UDMA_6,	0x41,	0x06	},
 	{	XFER_UDMA_5,	0x41,	0x05	},
 	{	XFER_UDMA_4,	0x41,	0x04	},

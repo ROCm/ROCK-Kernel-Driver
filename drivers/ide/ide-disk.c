@@ -390,7 +390,7 @@ out:
 	return err;
 }
 
-ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
+static ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 {
 	ide_hwif_t *hwif;
 	struct request *rq;
@@ -450,7 +450,7 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 	return ide_stopped;
 }
 
-ide_startstop_t idedisk_abort(ide_drive_t *drive, const char *msg)
+static ide_startstop_t idedisk_abort(ide_drive_t *drive, const char *msg)
 {
 	ide_hwif_t *hwif;
 	struct request *rq;

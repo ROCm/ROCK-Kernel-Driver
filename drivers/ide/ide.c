@@ -1846,7 +1846,7 @@ int __init ide_setup (char *s)
 #endif /* CONFIG_BLK_DEV_IDEDOUBLER */
 
 	if (!strcmp(s, "ide=nodma")) {
-		printk("IDE: Prevented DMA\n");
+		printk(" : Prevented DMA\n");
 		noautodma = 1;
 		return 1;
 	}

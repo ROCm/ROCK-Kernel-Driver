@@ -504,10 +504,12 @@ running once the system is up.
 	icn=		[HW,ISDN]
 			Format: <io>[,<membase>[,<icn_id>[,<icn_id2>]]]
 
+	ide=		[HW] (E)IDE subsystem
+			Format: ide=nodma or ide=doubler or ide=reverse
+			See Documentation/ide.txt.
+
 	ide?=		[HW] (E)IDE subsystem
-			Config (iomem/irq), tuning or debugging
-			(serialize,reset,no{dma,tune,probe}) or chipset
-			specific parameters.
+			Format: ide?=noprobe or chipset specific parameters.
 			See Documentation/ide.txt.
 	
 	idebus=		[HW] (E)IDE subsystem - VLB/PCI bus speed

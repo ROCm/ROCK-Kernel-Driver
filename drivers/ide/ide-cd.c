@@ -562,7 +562,7 @@ static void cdrom_queue_request_sense(ide_drive_t *drive, void *sense,
 /*
  * ide_error() takes action based on the error returned by the drive.
  */
-ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
+static ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
 {
 	struct request *rq;
 	byte err;
@@ -598,7 +598,7 @@ ide_startstop_t ide_cdrom_error (ide_drive_t *drive, const char *msg, byte stat)
 	return ide_stopped;
 }
 
-ide_startstop_t ide_cdrom_abort (ide_drive_t *drive, const char *msg)
+static ide_startstop_t ide_cdrom_abort (ide_drive_t *drive, const char *msg)
 {
 	struct request *rq;
 
@@ -3430,7 +3430,7 @@ static struct block_device_operations idecd_ops = {
 };
 
 /* options */
-char *ignore = NULL;
+static char *ignore = NULL;
 
 module_param(ignore, charp, 0400);
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
