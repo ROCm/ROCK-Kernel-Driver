@@ -8,19 +8,19 @@
 #include <linux/compat.h>
 
 struct compat_msghdr {
-	compat_uptr_t	msg_name;
-	s32		msg_namelen;
-	compat_uptr_t	msg_iov;
+	compat_uptr_t	msg_name;	/* void * */
+	compat_int_t	msg_namelen;
+	compat_uptr_t	msg_iov;	/* struct compat_iovec * */
 	compat_size_t	msg_iovlen;
-	compat_uptr_t	msg_control;
+	compat_uptr_t	msg_control;	/* void * */
 	compat_size_t	msg_controllen;
-	u32		msg_flags;
+	compat_uint_t	msg_flags;
 };
 
 struct compat_cmsghdr {
 	compat_size_t	cmsg_len;
-	s32		cmsg_level;
-	s32		cmsg_type;
+	compat_int_t	cmsg_level;
+	compat_int_t	cmsg_type;
 };
 
 #else /* defined(CONFIG_COMPAT) */
