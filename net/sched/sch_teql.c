@@ -475,8 +475,10 @@ int __init teql_init(void)
 		if (!dev)
 			return -ENOMEM;
 
-		if ((err = register_netdev(dev)))
+		if ((err = register_netdev(dev))) {
+			free_netdev(dev);
 			goto out;
+		}
 
 		master = dev->priv;
 		spin_lock(&master_dev_lock);
@@ -497,6 +499,7 @@ static void __exit teql_exit(void)
 		list_del(&master->master_list);
 
 		unregister_qdisc(&master->qops);
+		/* FIXME: we're inside a spinlock; unregister_netdev() blocks */
 		unregister_netdev(master->dev);
 		free_netdev(master->dev);
 	}

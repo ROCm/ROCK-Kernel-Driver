@@ -729,10 +729,6 @@ static int smctr_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 	
-#ifdef MODULE
-        MOD_DEC_USE_COUNT;
-#endif
-
 	tp->cleanup = 1;
 
         /* Check to see if adapter is already in a closed state. */
@@ -3489,10 +3485,6 @@ static int smctr_open(struct net_device *dev)
         err = smctr_init_adapter(dev);
         if(err < 0)
                 return (err);
-
-#ifdef MODULE
-        MOD_INC_USE_COUNT;
-#endif
 
         return (err);
 }
