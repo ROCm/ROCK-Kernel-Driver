@@ -23,8 +23,6 @@
 # under Linux.
 #
 
-O_TARGET := atlas.o
-
 obj-y   := atlas_int.o atlas_rtc.o atlas_setup.o
 
 include $(TOPDIR)/Rules.make

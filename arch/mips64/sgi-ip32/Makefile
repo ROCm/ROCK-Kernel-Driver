@@ -3,7 +3,6 @@
 # under Linux.
 #
 
-O_TARGET	:= ip32-kern.a
 EXTRA_TARGETS	:= ip32-irq-glue.o
 
 obj-y		+= ip32-irq.o ip32-rtc.o ip32-setup.o ip32-irq-glue.o \

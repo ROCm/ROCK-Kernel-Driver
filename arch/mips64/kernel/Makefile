@@ -2,7 +2,6 @@
 # Makefile for the Linux/MIPS kernel.
 #
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= mips64_ksyms.o

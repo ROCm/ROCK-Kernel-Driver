@@ -63,29 +63,26 @@ ifdef CONFIG_CPU_R10000
 CFLAGS		:= $(CFLAGS) -mcpu=r8000 -mips4
 endif
 
-ifdef CONFIG_MIPS_FPU_EMULATOR
-CORE_FILES	+= arch/mips64/math-emu/fpu_emulator.o
-SUBDIRS		+= arch/mips64/math-emu
-endif
+core-$(CONFIG_MIPS_FPU_EMULATOR)	+= arch/mips64/math-emu/
 
 #
 # Board-dependent options and extra files
 #
+
 ifdef CONFIG_SGI_IP22
-LIBS          += arch/mips64/sgi-ip22/lib.a arch/mips64/arc/lib.a
-SUBDIRS       += arch/mips64/sgi-ip22 arch/mips64/arc
+libs-y					+= arch/mips64/sgi-ip22/ \
+					   arch/mips64/arc/
 #
 # Set LOADADDR to >= 0x88069000 if you want to leave space for symmon,
 # 0x88004000 for production kernels.  Note that the value must be
 # 16kb aligned or the handling of the current variable will break.
 #
-LOADADDR      += 0x88004000
+LOADADDR	+= 0x88004000
 endif
 
 ifdef CONFIG_SGI_IP27
-CORE_FILES    += arch/mips64/sgi-ip27/ip27.o
-LIBS          += arch/mips64/arc/lib.a
-SUBDIRS       += arch/mips64/sgi-ip27 arch/mips64/arc
+core-y					+= arch/mips64/sgi-ip27/
+libs-y					+= arch/mips64/arc/
 #
 # Set LOADADDR to >= 0xc000000000300000 if you want to leave space for
 # symmon, 0xc00000000001c000 for production kernels.  Note that the value
@@ -100,8 +97,8 @@ endif
 endif
 
 ifdef CONFIG_SGI_IP32
-LIBS		+= arch/mips64/sgi-ip32/ip32-kern.a arch/mips64/arc/lib.a
-SUBDIRS		+= arch/mips64/sgi-ip32 arch/mips64/arc
+libs-y					+= arch/mips64/sgi-ip32/
+					   arch/mips64/arc/
 #
 # Set LOADADDR to >= 0x????????? if you want to leave space for symmon,
 # 0x80002000 for production kernels.  Note that the value must be
@@ -133,9 +130,9 @@ LDFLAGS_vmlinux += -Ttext $(LOADADDR)
 
 HEAD := arch/mips64/kernel/head.o arch/mips64/kernel/init_task.o
 
-SUBDIRS := $(addprefix arch/mips64/, tools) $(SUBDIRS) $(addprefix arch/mips64/, kernel mm lib)
-CORE_FILES := arch/mips64/kernel/kernel.o arch/mips64/mm/mm.o $(CORE_FILES)
-LIBS := arch/mips64/lib/lib.a $(LIBS)
+SUBDIRS		:= arch/mips64/tools $(SUBDIRS)
+core-y		+= arch/mips64/kernel/ arch/mips64/mm/
+libs-y		+= arch/mips64/lib/lib.a
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
