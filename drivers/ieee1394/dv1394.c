@@ -2703,7 +2703,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	struct ti_ohci *ohci;
 	struct video_card *video = NULL;
 	unsigned long flags;
-	struct list_head *lh;
+	struct list_head *lh, *templh;
 	char buf[32];
 	int	n;
 	
@@ -2717,7 +2717,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	/* find the corresponding video_cards */
 	spin_lock_irqsave(&dv1394_cards_lock, flags);
 	if(!list_empty(&dv1394_cards)) {
-		list_for_each(lh, &dv1394_cards) {
+		list_for_each_safe(lh, templh, &dv1394_cards) {
 			video = list_entry(lh, struct video_card, list);
 			if((video->id >> 2) == ohci->id)
 				dv1394_un_init(video);
