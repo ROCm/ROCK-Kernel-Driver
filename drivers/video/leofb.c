@@ -451,13 +451,13 @@ static void leo_restore_palette (struct fb_info_sbusfb *fb)
 }
 
 static struct display_switch leo_dispsw __initdata = {
-	setup:		leo_setup,
-	bmove:		fbcon_redraw_bmove,
-	clear:		leo_clear,
-	putc:		leo_putc,
-	putcs:		leo_putcs,
-	revc:		leo_revc, 
-	fontwidthmask:	FONTWIDTHRANGE(1,16) /* Allow fontwidths up to 16 */
+	.setup =	leo_setup,
+	.bmove =	fbcon_redraw_bmove,
+	.clear =	leo_clear,
+	.putc =		leo_putc,
+	.putcs =	leo_putcs,
+	.revc =		leo_revc, 
+	.fontwidthmask =FONTWIDTHRANGE(1,16) /* Allow fontwidths up to 16 */
 };
 
 static void leo_setcursormap (struct fb_info_sbusfb *fb, u8 *red, u8 *green, u8 *blue)

@@ -810,15 +810,15 @@ static int vga16fb_blank(int blank, struct fb_info *fb_info)
 }
 
 static struct fb_ops vga16fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	vga16fb_get_fix,
-	fb_get_var:	vga16fb_get_var,
-	fb_set_var:	vga16fb_set_var,
-	fb_get_cmap:	vga16fb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	vga16fb_setcolreg,
-	fb_pan_display:	vga16fb_pan_display,
-	fb_blank:	vga16fb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	vga16fb_get_fix,
+	.fb_get_var =	vga16fb_get_var,
+	.fb_set_var =	vga16fb_set_var,
+	.fb_get_cmap =	vga16fb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	vga16fb_setcolreg,
+	.fb_pan_display =vga16fb_pan_display,
+	.fb_blank =	vga16fb_blank,
 };
 
 int vga16fb_setup(char *options)

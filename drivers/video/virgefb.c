@@ -1348,12 +1348,12 @@ static void virgefb_move_cursor(u_short x, u_short y)
 /* -------------------- Interfaces to hardware functions -------------------- */
 
 static struct fb_hwswitch virgefb_hw_switch = {
-	init:		virge_init,
-	encode_fix:	virgefb_encode_fix,
-	decode_var:	virgefb_decode_var,
-	encode_var:	virgefb_encode_var,
-	getcolreg:	virgefb_getcolreg,
-	blank:		virgefb_gfx_on_off
+	.init		= virge_init,
+	.encode_fix	= virgefb_encode_fix,
+	.decode_var	= virgefb_decode_var,
+	.encode_var	= virgefb_encode_var,
+	.getcolreg	= virgefb_getcolreg,
+	.blank		= virgefb_gfx_on_off
 };
 
 
@@ -1626,14 +1626,14 @@ static int virgefb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 
 static struct fb_ops virgefb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	virgefb_get_fix,
-	fb_get_var:	virgefb_get_var,
-	fb_set_var:	virgefb_set_var,
-	fb_get_cmap:	virgefb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	virgefb_setcolreg,
-	fb_blank:	virgefb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	virgefb_get_fix,
+	.fb_get_var =	virgefb_get_var,
+	.fb_set_var =	virgefb_set_var,
+	.fb_get_cmap =	virgefb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	virgefb_setcolreg,
+	.fb_blank =	virgefb_blank,
 };
 
 int __init virgefb_setup(char *options)
@@ -1917,14 +1917,14 @@ static void fbcon_virge8_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch fbcon_virge8 = {
-	setup:		fbcon_cfb8_setup,
-	bmove:		fbcon_virge8_bmove,
-	clear:		fbcon_virge8_clear,
-	putc:		fbcon_virge8_putc,
-	putcs:		fbcon_virge8_putcs,
-	revc:		fbcon_virge8_revc,
-	clear_margins:	fbcon_virge8_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup		= fbcon_cfb8_setup,
+	.bmove		= fbcon_virge8_bmove,
+	.clear		= fbcon_virge8_clear,
+	.putc		= fbcon_virge8_putc,
+	.putcs		= fbcon_virge8_putcs,
+	.revc		= fbcon_virge8_revc,
+	.clear_margins	= fbcon_virge8_clear_margins,
+	.fontwidthmask	= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 
@@ -1982,14 +1982,14 @@ static void fbcon_virge16_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch fbcon_virge16 = {
-	setup:		fbcon_cfb16_setup,
-	bmove:		fbcon_virge16_bmove,
-	clear:		fbcon_virge16_clear,
-	putc:		fbcon_virge16_putc,
-	putcs:		fbcon_virge16_putcs,
-	revc:		fbcon_virge16_revc,
-	clear_margins:	fbcon_virge16_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup		= fbcon_cfb16_setup,
+	.bmove		= fbcon_virge16_bmove,
+	.clear		= fbcon_virge16_clear,
+	.putc		= fbcon_virge16_putc,
+	.putcs		= fbcon_virge16_putcs,
+	.revc		= fbcon_virge16_revc,
+	.clear_margins	= fbcon_virge16_clear_margins,
+	.fontwidthmask	= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 
@@ -2047,14 +2047,14 @@ static void fbcon_virge32_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 static struct display_switch fbcon_virge32 = {
-	setup:		fbcon_cfb32_setup,
-	bmove:		fbcon_virge32_bmove,
-	clear:		fbcon_virge32_clear,
-	putc:		fbcon_virge32_putc,
-	putcs:		fbcon_virge32_putcs,
-	revc:		fbcon_virge32_revc,
-	clear_margins:	fbcon_virge32_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup		= fbcon_cfb32_setup,
+	.bmove		= fbcon_virge32_bmove,
+	.clear		= fbcon_virge32_clear,
+	.putc		= fbcon_virge32_putc,
+	.putcs		= fbcon_virge32_putcs,
+	.revc		= fbcon_virge32_revc,
+	.clear_margins	= fbcon_virge32_clear_margins,
+	.fontwidthmask	= FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 

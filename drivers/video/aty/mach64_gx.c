@@ -191,13 +191,13 @@ static void aty_set_pll_514(const struct fb_info *info,
 }
 
 const struct aty_dac_ops aty_dac_ibm514 = {
-	set_dac:aty_set_dac_514,
+	.set_dac	= aty_set_dac_514,
 };
 
 const struct aty_pll_ops aty_pll_ibm514 = {
-	var_to_pll:aty_var_to_pll_514,
-	pll_to_var:aty_pll_514_to_var,
-	set_pll:aty_set_pll_514,
+	.var_to_pll	= aty_var_to_pll_514,
+	.pll_to_var	= aty_pll_514_to_var,
+	.set_pll	= aty_set_pll_514,
 };
 
 
@@ -280,7 +280,7 @@ static int aty_set_dac_ATI68860_B(const struct fb_info *info,
 }
 
 const struct aty_dac_ops aty_dac_ati68860b = {
-	set_dac:aty_set_dac_ATI68860_B,
+	.set_dac	= aty_set_dac_ATI68860_B,
 };
 
 
@@ -333,7 +333,7 @@ static int aty_set_dac_ATT21C498(const struct fb_info *info,
 }
 
 const struct aty_dac_ops aty_dac_att21c498 = {
-	set_dac:	aty_set_dac_ATT21C498,
+	.set_dac	= aty_set_dac_ATT21C498,
 };
 
 
@@ -487,9 +487,9 @@ static void aty_set_pll18818(const struct fb_info *info,
 }
 
 const struct aty_pll_ops aty_pll_ati18818_1 = {
-	var_to_pll:aty_var_to_pll_18818,
-	pll_to_var:aty_pll_18818_to_var,
-	set_pll:aty_set_pll18818,
+	.var_to_pll	= aty_var_to_pll_18818,
+	.pll_to_var	= aty_pll_18818_to_var,
+	.set_pll	= aty_set_pll18818,
 };
 
 
@@ -603,9 +603,9 @@ static void aty_set_pll_1703(const struct fb_info *info,
 }
 
 const struct aty_pll_ops aty_pll_stg1703 = {
-	var_to_pll:aty_var_to_pll_1703,
-	pll_to_var:aty_pll_1703_to_var,
-	set_pll:aty_set_pll_1703,
+	.var_to_pll	= aty_var_to_pll_1703,
+	.pll_to_var	= aty_pll_1703_to_var,
+	.set_pll	= aty_set_pll_1703,
 };
 
 
@@ -727,9 +727,9 @@ static void aty_set_pll_8398(const struct fb_info *info,
 }
 
 const struct aty_pll_ops aty_pll_ch8398 = {
-	var_to_pll:aty_var_to_pll_8398,
-	pll_to_var:aty_pll_8398_to_var,
-	set_pll:aty_set_pll_8398,
+	.var_to_pll	= aty_var_to_pll_8398,
+	.pll_to_var	= aty_pll_8398_to_var,
+	.set_pll	= aty_set_pll_8398,
 };
 
 
@@ -874,9 +874,9 @@ static void aty_set_pll_408(const struct fb_info *info,
 }
 
 const struct aty_pll_ops aty_pll_att20c408 = {
-	var_to_pll:aty_var_to_pll_408,
-	pll_to_var:aty_pll_408_to_var,
-	set_pll:aty_set_pll_408,
+	.var_to_pll	= aty_var_to_pll_408,
+	.pll_to_var	= aty_pll_408_to_var,
+	.set_pll	= aty_set_pll_408,
 };
 
 
@@ -904,11 +904,11 @@ static int dummy(void)
 }
 
 const struct aty_dac_ops aty_dac_unsupported = {
-	set_dac:aty_set_dac_unsupported,
+	.set_dac	= aty_set_dac_unsupported,
 };
 
 const struct aty_pll_ops aty_pll_unsupported = {
-	var_to_pll:(void *) dummy,
-	pll_to_var:(void *) dummy,
-	set_pll:(void *) dummy,
+	.var_to_pll	= (void *) dummy,
+	.pll_to_var	= (void *) dummy,
+	.set_pll	= (void *) dummy,
 };

@@ -316,12 +316,6 @@ struct fb_ops {
     struct module *owner;
     int (*fb_open)(struct fb_info *info, int user);
     int (*fb_release)(struct fb_info *info, int user);
-    /* get non settable parameters */
-    int (*fb_get_fix)(struct fb_fix_screeninfo *fix, int con,
-		      struct fb_info *info); 
-    /* get settable parameters */
-    int (*fb_get_var)(struct fb_var_screeninfo *var, int con,
-		      struct fb_info *info);		
     /* set settable parameters */
     int (*fb_set_var)(struct fb_var_screeninfo *var, int con,
 		      struct fb_info *info);		
@@ -399,10 +393,6 @@ struct fb_info {
      *  `Generic' versions of the frame buffer device operations
      */
 
-extern int gen_get_fix(struct fb_fix_screeninfo *fix, int con,
-		       struct fb_info *info);
-extern int gen_get_var(struct fb_var_screeninfo *var, int con,
-		       struct fb_info *info);
 extern int gen_set_var(struct fb_var_screeninfo *var, int con,
 		       struct fb_info *info);
 extern int gen_get_cmap(struct fb_cmap *cmap, int kspc, int con,

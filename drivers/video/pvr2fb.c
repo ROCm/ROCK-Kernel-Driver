@@ -252,15 +252,15 @@ static int pvr2_get_param(const struct pvr2_params *p, const char *s,
                             int val, int size);
 
 static struct fb_ops pvr2fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	pvr2fb_get_fix,
-	fb_get_var:	pvr2fb_get_var,
-	fb_set_var:	pvr2fb_set_var,
-	fb_get_cmap:	pvr2fb_get_cmap,
-	fb_set_cmap:	pvr2fb_set_cmap,
-	fb_setcolreg:	pvr2fb_setcolreg,
-	fb_pan_display: pvr2fb_pan_display,
-	fb_blank:	pvr2fb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	pvr2fb_get_fix,
+	.fb_get_var =	pvr2fb_get_var,
+	.fb_set_var =	pvr2fb_set_var,
+	.fb_get_cmap =	pvr2fb_get_cmap,
+	.fb_set_cmap =	pvr2fb_set_cmap,
+	.fb_setcolreg =	pvr2fb_setcolreg,
+	.fb_pan_display = pvr2fb_pan_display,
+	.fb_blank =	pvr2fb_blank,
 };
 
 static struct fb_videomode pvr2_modedb[] __initdata = {

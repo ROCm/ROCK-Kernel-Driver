@@ -149,14 +149,14 @@ int platinum_init(void);
 int platinum_setup(char*);
 
 static struct fb_ops platinumfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	platinum_get_fix,
-	fb_get_var:	platinum_get_var,
-	fb_set_var:	platinum_set_var,
-	fb_get_cmap:	platinum_get_cmap,
-	fb_set_cmap:	platinum_set_cmap,
-	fb_setcolreg:	platinum_setcolreg,
-	fb_blank:	platinum_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	platinum_get_fix,
+	.fb_get_var =	platinum_get_var,
+	.fb_set_var =	platinum_set_var,
+	.fb_get_cmap =	platinum_get_cmap,
+	.fb_set_cmap =	platinum_set_cmap,
+	.fb_setcolreg =	platinum_setcolreg,
+	.fb_blank =	platinum_blank,
 };
 
 static int platinum_get_fix(struct fb_fix_screeninfo *fix, int con,

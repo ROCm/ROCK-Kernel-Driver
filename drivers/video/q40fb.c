@@ -37,27 +37,27 @@ static struct fb_info fb_info;
 static struct display display;
 
 static struct fb_fix_screeninfo q40fb_fix __initdata = {
-	id:		"Q40",
-	smem_len:	1024*1024,
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_TRUECOLOR,
-	line_length:	1024*2,
-	accel:		FB_ACCEL_NONE,
+	.id		= "Q40",
+	.smem_len	= 1024*1024,
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.visual		= FB_VISUAL_TRUECOLOR,
+	.line_length	= 1024*2,
+	.accel		= FB_ACCEL_NONE,
 };
 
 static struct fb_var_screeninfo q40fb_var __initdata = {
-	xres:		1024,
-	yres:		512,
-	xres_virtual:	1024,
-	yres_virtual:	512,
-	bits_per_pixel:	16,
-    	red:		{6, 5, 0}, 
-	green:		{11, 5, 0},
-	blue:		{0, 6, 0},
-	activate:	FB_ACTIVATE_NOW,
-	height:		230,
-	width:		300,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.xres		= 1024,
+	.yres		= 512,
+	.xres_virtual	= 1024,
+	.yres_virtual	= 512,
+	.bits_per_pixel	= 16,
+    	.red		= {6, 5, 0}, 
+	.green		= {11, 5, 0},
+	.blue		= {0, 6, 0},
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= 230,
+	.width		= 300,
+	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 /* frame buffer operations */
@@ -68,16 +68,14 @@ static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
                            struct fb_info *info);
 
 static struct fb_ops q40fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	q40fb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= q40fb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,

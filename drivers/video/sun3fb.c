@@ -109,14 +109,14 @@ static int sun3fb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
 
 static struct fb_ops sun3fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	sun3fb_get_fix,
-	fb_get_var:	sun3fb_get_var,
-	fb_set_var:	sun3fb_set_var,
-	fb_get_cmap:	sun3fb_get_cmap,
-	fb_set_cmap:	sun3fb_set_cmap,
-	fb_setcolreg:	sun3fb_setcolreg,
-	fb_blank:	sun3fb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	sun3fb_get_fix,
+	.fb_get_var =	sun3fb_get_var,
+	.fb_set_var =	sun3fb_set_var,
+	.fb_get_cmap =	sun3fb_get_cmap,
+	.fb_set_cmap =	sun3fb_set_cmap,
+	.fb_setcolreg =	sun3fb_setcolreg,
+	.fb_blank =	sun3fb_blank,
 };
 
 static void sun3fb_clear_margin(struct display *p, int s)
