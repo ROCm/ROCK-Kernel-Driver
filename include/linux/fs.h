@@ -1086,11 +1086,6 @@ extern void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 /* reiserfs_writepage needs this */
 extern void set_buffer_async_io(struct buffer_head *bh) ;
 
-#define BUF_CLEAN	0
-#define BUF_LOCKED	1	/* Buffers scheduled for write */
-#define BUF_DIRTY	2	/* Dirty buffers, not yet scheduled for write */
-#define NR_LIST		3
-
 static inline void get_bh(struct buffer_head * bh)
 {
         atomic_inc(&(bh)->b_count);

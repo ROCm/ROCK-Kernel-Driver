@@ -873,6 +873,13 @@ struct page * find_or_create_page(struct address_space *mapping, unsigned long i
 	return page;	
 }
 
+/*
+ * Returns locked page at given index in given cache, creating it if needed.
+ */
+struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
+{
+	return find_or_create_page(mapping, index, mapping->gfp_mask);
+}
 
 
 #if 0
@@ -1005,24 +1012,6 @@ static inline int get_max_readahead(struct inode * inode)
 	return max_readahead[MAJOR(inode->i_dev)][MINOR(inode->i_dev)];
 }
 
-static inline unsigned long calc_end_index(struct inode * inode)
-{
-	unsigned long end_index;
-
-	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
-
-	return end_index;
-}
-
-static inline loff_t calc_rsize(struct inode * inode)
-{
-	loff_t rsize;
-
-	rsize = inode->i_size;
-
-	return rsize;
-}
-
 static void generic_file_readahead(int reada_ok,
 	struct file * filp, struct inode * inode,
 	struct page * page)
@@ -1033,7 +1022,7 @@ static void generic_file_readahead(int reada_ok,
 	unsigned long raend;
 	int max_readahead = get_max_readahead(inode);
 
-	end_index = calc_end_index(inode);
+	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 
 	raend = filp->f_raend;
 	max_ahead = 0;
@@ -1157,8 +1146,8 @@ void mark_page_accessed(struct page *page)
  */
 void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * desc, read_actor_t actor)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
-	struct address_space *mapping = inode->i_mapping;
+	struct address_space *mapping = filp->f_dentry->d_inode->i_mapping;
+	struct inode *inode = mapping->host;
 	unsigned long index, offset;
 	struct page *cached_page;
 	int reada_ok;
@@ -1212,13 +1201,13 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 		struct page *page, **hash;
 		unsigned long end_index, nr, ret;
 
-		end_index = calc_end_index(inode);
+		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 			
 		if (index > end_index)
 			break;
 		nr = PAGE_CACHE_SIZE;
 		if (index == end_index) {
-			nr = calc_rsize(inode) & ~PAGE_CACHE_MASK;
+			nr = inode->i_size & ~PAGE_CACHE_MASK;
 			if (nr <= offset)
 				break;
 		}
@@ -1595,7 +1584,6 @@ struct page * filemap_nopage(struct vm_area_struct * area,
 	struct address_space *mapping = inode->i_mapping;
 	struct page *page, **hash, *old_page;
 	unsigned long size, pgoff;
-	loff_t rsize;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 
@@ -1604,8 +1592,7 @@ retry_all:
 	 * An external ptracer can access pages that normally aren't
 	 * accessible..
 	 */
-	rsize = calc_rsize(inode);
-	size = (rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	if ((pgoff >= size) && (area->vm_mm == current->mm))
 		return NULL;
 
@@ -2104,14 +2091,13 @@ static long madvise_willneed(struct vm_area_struct * vma,
 	long error = -EBADF;
 	struct file * file;
 	unsigned long size, rlim_rss;
-	loff_t rsize;
 
 	/* Doesn't work if there's no mapped file. */
 	if (!vma->vm_file)
 		return error;
 	file = vma->vm_file;
-	rsize = calc_rsize(file->f_dentry->d_inode);
-	size = (rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+	size = (file->f_dentry->d_inode->i_size + PAGE_CACHE_SIZE - 1) >>
+							PAGE_CACHE_SHIFT;
 
 	start = ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 	if (end > vma->vm_end)
@@ -2549,19 +2535,6 @@ repeat:
 	return page;
 }
 
-/*
- * Returns locked page at given index in given cache, creating it if needed.
- */
-
-struct page *grab_cache_page(struct address_space *mapping, unsigned long index)
-{
-	struct page *cached_page = NULL;
-	struct page *page = __grab_cache_page(mapping,index,&cached_page);
-	if (cached_page)
-		page_cache_release(cached_page);
-	return page;
-}
-
 inline void remove_suid(struct inode *inode)
 {
 	unsigned int mode;
@@ -2595,8 +2568,8 @@ inline void remove_suid(struct inode *inode)
 ssize_t
 generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode; 
-	struct address_space *mapping = inode->i_mapping;
+	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
+	struct inode	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t		pos;
 	struct page	*page, *cached_page;
@@ -2628,8 +2601,7 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 
 	written = 0;
 
-	/* FIXME: this is for backwards compatibility with 2.4 */
-	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
+	if (file->f_flags & O_APPEND)
 		pos = inode->i_size;
 
 	/*
@@ -2690,17 +2662,15 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 			err = -EPERM;
 			goto out;
 		}
-		if (pos >= calc_rsize(inode)) {
-			if (count || pos > calc_rsize(inode)) {
-				/* FIXME: this is for backwards compatibility with 2.4 */
+		if (pos >= inode->i_size) {
+			if (count || pos > inode->i_size) {
 				err = -ENOSPC;
 				goto out;
 			}
-			/* zero-length writes at blkdev end are OK */
 		}
 
-		if (pos + count > calc_rsize(inode))
-			count = calc_rsize(inode) - pos;
+		if (pos + count > inode->i_size)
+			count = inode->i_size - pos;
 	}
 
 	err = 0;

@@ -67,6 +67,17 @@ static unsigned int max_block(kdev_t dev)
 	return retval;
 }
 
+static loff_t blkdev_size(kdev_t dev)
+{
+	unsigned int blocks = ~0U;
+	int major = MAJOR(dev);
+
+	if (blk_size[major]) {
+		int minor = MINOR(dev);
+		blocks = blk_size[major][minor];
+	}
+	return (loff_t) blocks << BLOCK_SIZE_BITS;
+}
 
 static inline int blkdev_get_block(struct inode * inode, long iblock, struct buffer_head * bh_result)
 {
@@ -308,7 +319,6 @@ static int __blkdev_commit_write(struct inode *inode, struct page *page,
 			set_bit(BH_Uptodate, &bh->b_state);
 			if (!atomic_set_buffer_dirty(bh)) {
 				__mark_dirty(bh);
-				buffer_insert_inode_data_queue(bh, inode);
 				need_balance_dirty = 1;
 			}
 		}
@@ -404,6 +414,7 @@ static struct super_block *bd_read_super(struct super_block *sb, void *data, int
 	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
 	root->i_uid = root->i_gid = 0;
 	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
+	sb->s_maxbytes = ~0ULL;
 	sb->s_blocksize = 1024;
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = 0x62646576;
@@ -521,9 +532,11 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
 			new_bdev->bd_inode = inode;
+			inode->i_size = blkdev_size(dev);
 			inode->i_rdev = to_kdev_t(dev);
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
+			inode->i_data.gfp_mask = GFP_USER;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);
 			if (!bdev) {
@@ -810,22 +823,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 	down(&bdev->bd_sem);
 	lock_kernel();
 	if (kind == BDEV_FILE) {
-		struct super_block * sb;
-
 		__block_fsync(bd_inode);
-
-		/* Janitorianism: this shit must go away */
-		sb = get_super(bd_inode->i_rdev);
-		if (sb) {
-			if (sb->s_flags & MS_RDONLY) {
-				shrink_dcache_sb(sb);
-				invalidate_inodes(sb);
-				invalidate_buffers(bd_inode->i_rdev);
-			}
-			lock_super(sb);
-			unlock_super(sb);
-			drop_super(sb);
-		}
 	} else if (kind == BDEV_FS)
 		fsync_no_super(rdev);
 	if (!--bdev->bd_openers) {

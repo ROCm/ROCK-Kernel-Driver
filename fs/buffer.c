@@ -52,22 +52,13 @@
 #include <asm/bitops.h>
 #include <asm/mmu_context.h>
 
-#define NR_SIZES 7
-static char buffersize_index[65] =
-{-1,  0,  1, -1,  2, -1, -1, -1, 3, -1, -1, -1, -1, -1, -1, -1,
-  4, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1,
-  5, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1,
- -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1,
-  6};
-
-#define BUFSIZE_INDEX(X) ((int) buffersize_index[(X)>>9])
 #define MAX_BUF_PER_PAGE (PAGE_CACHE_SIZE / 512)
 #define NR_RESERVED (10*MAX_BUF_PER_PAGE)
 #define MAX_UNUSED_BUFFERS NR_RESERVED+20 /* don't ever have more than this 
 					     number of unused buffer heads */
 
 /* Anti-deadlock ordering:
- *	lru_list_lock > hash_table_lock > free_list_lock > unused_list_lock
+ *	lru_list_lock > hash_table_lock > unused_list_lock
  */
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_inode_buffers)
@@ -80,6 +71,11 @@ static unsigned int bh_hash_shift;
 static struct buffer_head **hash_table;
 static rwlock_t hash_table_lock = RW_LOCK_UNLOCKED;
 
+#define BUF_CLEAN	0
+#define BUF_LOCKED	1	/* Buffers scheduled for write */
+#define BUF_DIRTY	2	/* Dirty buffers, not yet scheduled for write */
+#define NR_LIST		3
+
 static struct buffer_head *lru_list[NR_LIST];
 static spinlock_t lru_list_lock = SPIN_LOCK_UNLOCKED;
 static int nr_buffers_type[NR_LIST];
@@ -90,14 +86,8 @@ static int nr_unused_buffer_heads;
 static spinlock_t unused_list_lock = SPIN_LOCK_UNLOCKED;
 static DECLARE_WAIT_QUEUE_HEAD(buffer_wait);
 
-struct bh_free_head {
-	struct buffer_head *list;
-	spinlock_t lock;
-};
-static struct bh_free_head free_list[NR_SIZES];
-
 static void truncate_buffers(kdev_t dev);
-static int grow_buffers(kdev_t dev, int block, int size);
+static int grow_buffers(kdev_t dev, unsigned long block, int size);
 static void __refile_buffer(struct buffer_head *);
 
 /* This is used by some architectures to estimate available memory. */
@@ -482,12 +472,16 @@ out:
 	  ((block) << (bh_hash_shift - 12))))
 #define hash(dev,block) hash_table[(_hashfn(HASHDEV(dev),block) & bh_hash_mask)]
 
-static __inline__ void __hash_link(struct buffer_head *bh, struct buffer_head **head)
+static inline void __insert_into_hash_list(struct buffer_head *bh)
 {
-	if ((bh->b_next = *head) != NULL)
-		bh->b_next->b_pprev = &bh->b_next;
+	struct buffer_head **head = &hash(bh->b_dev, bh->b_blocknr);
+	struct buffer_head *next = *head;
+
 	*head = bh;
 	bh->b_pprev = head;
+	bh->b_next = next;
+	if (next != NULL)
+		next->b_pprev = &bh->b_next;
 }
 
 static __inline__ void __hash_unlink(struct buffer_head *bh)
@@ -503,6 +497,8 @@ static __inline__ void __hash_unlink(struct buffer_head *bh)
 static void __insert_into_lru_list(struct buffer_head * bh, int blist)
 {
 	struct buffer_head **bhp = &lru_list[blist];
+
+	if (bh->b_prev_free || bh->b_next_free) BUG();
 
 	if(!*bhp) {
 		*bhp = bh;
@@ -531,33 +527,12 @@ static void __remove_from_lru_list(struct buffer_head * bh, int blist)
 	}
 }
 
-static void __remove_from_free_list(struct buffer_head * bh, int index)
-{
-	if(bh->b_next_free == bh)
-		 free_list[index].list = NULL;
-	else {
-		bh->b_prev_free->b_next_free = bh->b_next_free;
-		bh->b_next_free->b_prev_free = bh->b_prev_free;
-		if (free_list[index].list == bh)
-			 free_list[index].list = bh->b_next_free;
-	}
-	bh->b_next_free = bh->b_prev_free = NULL;
-}
-
 /* must be called with both the hash_table_lock and the lru_list_lock
    held */
 static void __remove_from_queues(struct buffer_head *bh)
 {
 	__hash_unlink(bh);
 	__remove_from_lru_list(bh, bh->b_list);
-}
-
-static void __insert_into_queues(struct buffer_head *bh)
-{
-	struct buffer_head **head = &hash(bh->b_dev, bh->b_blocknr);
-
-	__hash_link(bh, head);
-	__insert_into_lru_list(bh, bh->b_list);
 }
 
 struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
@@ -1214,6 +1189,7 @@ static __inline__ void __put_unused_buffer_head(struct buffer_head * bh)
 	if (nr_unused_buffer_heads >= MAX_UNUSED_BUFFERS) {
 		kmem_cache_free(bh_cachep, bh);
 	} else {
+		bh->b_dev = B_FREE;
 		bh->b_blocknr = -1;
 		bh->b_this_page = NULL;
 
@@ -1320,7 +1296,7 @@ try_again:
 		if (!bh)
 			goto no_grow;
 
-		bh->b_dev = B_FREE;  /* Flag as unused */
+		bh->b_dev = NODEV;
 		bh->b_this_page = head;
 		head = bh;
 
@@ -1376,15 +1352,18 @@ no_grow:
 
 /*
  * Called when truncating a buffer on a page completely.
- *
- * We can avoid IO by marking it clean.
- * FIXME!! FIXME!! FIXME!! We need to unmap it too,
- * so that the filesystem won't write to it. There's
- * some bug somewhere..
  */
 static void discard_buffer(struct buffer_head * bh)
 {
-	mark_buffer_clean(bh);
+	if (buffer_mapped(bh)) {
+		mark_buffer_clean(bh);
+		lock_buffer(bh);
+		clear_bit(BH_Uptodate, &bh->b_state);
+		clear_bit(BH_Mapped, &bh->b_state);
+		clear_bit(BH_Req, &bh->b_state);
+		clear_bit(BH_New, &bh->b_state);
+		unlock_buffer(bh);
+	}
 }
 
 /*
@@ -2120,7 +2099,6 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 				}
 				tmp = bhs[bhind++];
 
-				tmp->b_dev = B_FREE;
 				tmp->b_size = size;
 				set_bh_page(tmp, map, offset);
 				tmp->b_this_page = tmp;
@@ -2304,7 +2282,6 @@ static void hash_page_buffers(struct page *page, kdev_t dev, int block, int size
 	if (Page_Uptodate(page))
 		uptodate |= 1 << BH_Uptodate;
 
-	spin_lock(&lru_list_lock);
 	write_lock(&hash_table_lock);
 	do {
 		if (!(bh->b_state & (1 << BH_Mapped))) {
@@ -2314,23 +2291,21 @@ static void hash_page_buffers(struct page *page, kdev_t dev, int block, int size
 			bh->b_state = uptodate;
 		}
 
-		/* Insert the buffer into the regular lists */
-		if (!bh->b_pprev) {
-			__insert_into_queues(bh);
-		}
+		/* Insert the buffer into the hash lists if necessary */
+		if (!bh->b_pprev)
+			__insert_into_hash_list(bh);
 
 		block++;
 		bh = bh->b_this_page;
 	} while (bh != head);
 	write_unlock(&hash_table_lock);
-	spin_unlock(&lru_list_lock);
 }
 
 /*
  * Try to increase the number of buffers available: the size argument
  * is used to determine what kind of buffers we want.
  */
-static int grow_buffers(kdev_t dev, int block, int size)
+static int grow_buffers(kdev_t dev, unsigned long block, int size)
 {
 	struct page * page;
 	struct block_device *bdev;
@@ -2389,7 +2364,7 @@ static int sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)
 					ll_rw_block(WRITE, 1, &p);
 					tryagain = 0;
 				} else if (buffer_locked(p)) {
-					if (gfp_mask & __GFP_WAIT) {
+					if (gfp_mask & __GFP_WAITBUF) {
 						wait_on_buffer(p);
 						tryagain = 1;
 					} else
@@ -2424,12 +2399,10 @@ static int sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)
 int try_to_free_buffers(struct page * page, unsigned int gfp_mask)
 {
 	struct buffer_head * tmp, * bh = page->buffers;
-	int index = BUFSIZE_INDEX(bh->b_size);
 
 cleaned_buffers_try_again:
 	spin_lock(&lru_list_lock);
 	write_lock(&hash_table_lock);
-	spin_lock(&free_list[index].lock);
 	tmp = bh;
 	do {
 		if (buffer_busy(tmp))
@@ -2443,14 +2416,10 @@ cleaned_buffers_try_again:
 		struct buffer_head * p = tmp;
 		tmp = tmp->b_this_page;
 
-		/* The buffer can be either on the regular
-		 * queues or on the free list..
-		 */
-		if (p->b_dev != B_FREE) {
-			remove_inode_queue(p);
-			__remove_from_queues(p);
-		} else
-			__remove_from_free_list(p, index);
+		if (p->b_dev == B_FREE) BUG();
+
+		remove_inode_queue(p);
+		__remove_from_queues(p);
 		__put_unused_buffer_head(p);
 	} while (tmp != bh);
 	spin_unlock(&unused_list_lock);
@@ -2461,14 +2430,12 @@ cleaned_buffers_try_again:
 	/* And free the page */
 	page->buffers = NULL;
 	page_cache_release(page);
-	spin_unlock(&free_list[index].lock);
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
 	return 1;
 
 busy_buffer_page:
 	/* Uhhuh, start writeback so that we don't end up with all dirty pages */
-	spin_unlock(&free_list[index].lock);
 	write_unlock(&hash_table_lock);
 	spin_unlock(&lru_list_lock);
 	if (gfp_mask & __GFP_IO) {
@@ -2580,12 +2547,6 @@ void __init buffer_init(unsigned long mempages)
 	/* Setup hash chains. */
 	for(i = 0; i < nr_hash; i++)
 		hash_table[i] = NULL;
-
-	/* Setup free lists. */
-	for(i = 0; i < NR_SIZES; i++) {
-		free_list[i].list = NULL;
-		free_list[i].lock = SPIN_LOCK_UNLOCKED;
-	}
 
 	/* Setup lru lists. */
 	for(i = 0; i < NR_LIST; i++)

@@ -2105,13 +2105,12 @@ ppp_register_compressor(struct compressor *cp)
 {
 	struct compressor_entry *ce;
 	int ret;
-
 	spin_lock(&compressor_list_lock);
 	ret = -EEXIST;
 	if (find_comp_entry(cp->compress_proto) != 0)
 		goto out;
 	ret = -ENOMEM;
-	ce = kmalloc(sizeof(struct compressor_entry), GFP_KERNEL);
+	ce = kmalloc(sizeof(struct compressor_entry), GFP_ATOMIC);
 	if (ce == 0)
 		goto out;
 	ret = 0;
@@ -2216,11 +2215,11 @@ ppp_create_interface(int unit, int *retp)
 
 	/* Create a new ppp structure and link it before `list'. */
 	ret = -ENOMEM;
-	ppp = kmalloc(sizeof(struct ppp), GFP_KERNEL);
+	ppp = kmalloc(sizeof(struct ppp), GFP_ATOMIC);
 	if (ppp == 0)
 		goto out;
 	memset(ppp, 0, sizeof(struct ppp));
-	dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
+	dev = kmalloc(sizeof(struct net_device), GFP_ATOMIC);
 	if (dev == 0) {
 		kfree(ppp);
 		goto out;
@@ -2285,6 +2284,7 @@ init_ppp_file(struct ppp_file *pf, int kind)
 static void ppp_destroy_interface(struct ppp *ppp)
 {
 	struct net_device *dev;
+	int n_channels ;
 
 	spin_lock(&all_ppp_lock);
 	list_del(&ppp->file.list);
@@ -2314,6 +2314,7 @@ static void ppp_destroy_interface(struct ppp *ppp)
 #endif /* CONFIG_PPP_FILTER */
 	dev = ppp->dev;
 	ppp->dev = 0;
+	n_channels = ppp->n_channels ;
 	ppp_unlock(ppp);
 
 	if (dev) {
@@ -2329,7 +2330,7 @@ static void ppp_destroy_interface(struct ppp *ppp)
 	 * ppp structure.  Otherwise we leave it around until the
 	 * last channel disconnects from it.
 	 */
-	if (ppp->n_channels == 0)
+	if (n_channels == 0) 
 		kfree(ppp);
 
 	spin_unlock(&all_ppp_lock);

@@ -541,11 +541,15 @@ int pppoe_release(struct socket *sock)
 	sk->state = PPPOX_DEAD;
 
 	po = sk->protinfo.pppox;
-	if (po->pppoe_pa.sid)
+	if (po->pppoe_pa.sid) {
 		delete_item(po->pppoe_pa.sid, po->pppoe_pa.remote);
+		po->pppoe_pa.sid = 0 ;
+	}
 
 	if (po->pppoe_dev)
 	    dev_put(po->pppoe_dev);
+
+	po->pppoe_dev = NULL ;
 
 	sock_orphan(sk);
 	sock->sk = NULL;

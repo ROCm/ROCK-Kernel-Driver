@@ -319,7 +319,9 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 		if (pte_none(pte))
 			continue;
 		if (pte_present(pte)) {
-			freed ++;
+			struct page *page = pte_page(pte);
+			if (VALID_PAGE(page) && !PageReserved(page))
+				freed ++;
 			/* This will eventually call __free_pte on the pte. */
 			tlb_remove_page(tlb, ptep, address + offset);
 		} else {

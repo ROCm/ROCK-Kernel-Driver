@@ -261,18 +261,14 @@ static int pci_conf2_read_config_word(struct pci_dev *dev, int where, u16 *value
 	u32 data;
 	result = pci_conf2_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
 		PCI_FUNC(dev->devfn), where, 2, &data);
-	*value = (u8)data;
+	*value = (u16)data;
 	return result;
 }
 
 static int pci_conf2_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 {
-	int result; 
-	u32 data;
-	result = pci_conf2_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, 4, &data);
-	*value = (u8)data;
-	return result;
+	return pci_conf2_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
+		PCI_FUNC(dev->devfn), where, 4, value);
 }
 
 static int pci_conf2_write_config_byte(struct pci_dev *dev, int where, u8 value)
