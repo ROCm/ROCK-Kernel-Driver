@@ -988,8 +988,6 @@ static void enq_scb_freelist (mega_host_config *, mega_scb *,
 			      int lock, int intr);
 
 static int mega_is_bios_enabled (mega_host_config *);
-static void mega_reorder_hosts (void);
-static void mega_swap_hosts (struct Scsi_Host *, struct Scsi_Host *);
 
 static void mega_create_proc_entry (int index, struct proc_dir_entry *);
 static int mega_support_ext_cdb(mega_host_config *);
