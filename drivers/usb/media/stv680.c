@@ -510,6 +510,57 @@ exit:
 
 /***************** last of pencam  routines  *******************/
 
+/****************************************************************************
+ *  sysfs
+ ***************************************************************************/
+static inline struct usb_stv *cd_to_stv(struct class_device *cd)
+{
+	struct video_device *vdev = to_video_device(cd);
+	return video_get_drvdata(vdev);
+}
+
+#define stv680_file(name, variable, field)				\
+static ssize_t show_##name(struct class_device *class_dev, char *buf)	\
+{									\
+	struct video_device *vdev = to_video_device(class_dev);		\
+	struct usb_stv *stv = video_get_drvdata(vdev);			\
+	return sprintf(buf, field, stv->variable);			\
+}									\
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_##name, NULL);
+
+stv680_file(model, camera_name, "%s\n");
+stv680_file(in_use, user, "%d\n");
+stv680_file(streaming, streaming, "%d\n");
+stv680_file(palette, palette, "%i\n");
+stv680_file(frames_total, readcount, "%d\n");
+stv680_file(frames_read, framecount, "%d\n");
+stv680_file(packets_dropped, dropped, "%d\n");
+stv680_file(decoding_errors, error, "%d\n");
+
+static void stv680_create_sysfs_files(struct video_device *vdev)
+{
+	video_device_create_file(vdev, &class_device_attr_model);
+	video_device_create_file(vdev, &class_device_attr_in_use);
+	video_device_create_file(vdev, &class_device_attr_streaming);
+	video_device_create_file(vdev, &class_device_attr_palette);
+	video_device_create_file(vdev, &class_device_attr_frames_total);
+	video_device_create_file(vdev, &class_device_attr_frames_read);
+	video_device_create_file(vdev, &class_device_attr_packets_dropped);
+	video_device_create_file(vdev, &class_device_attr_decoding_errors);
+}
+
+static void stv680_remove_sysfs_files(struct video_device *vdev)
+{
+	video_device_remove_file(vdev, &class_device_attr_model);
+	video_device_remove_file(vdev, &class_device_attr_in_use);
+	video_device_remove_file(vdev, &class_device_attr_streaming);
+	video_device_remove_file(vdev, &class_device_attr_palette);
+	video_device_remove_file(vdev, &class_device_attr_frames_total);
+	video_device_remove_file(vdev, &class_device_attr_frames_read);
+	video_device_remove_file(vdev, &class_device_attr_packets_dropped);
+	video_device_remove_file(vdev, &class_device_attr_decoding_errors);
+}
+
 /********************************************************************
  * Camera control
  *******************************************************************/
@@ -1388,6 +1439,7 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev->minor);
 
 	usb_set_intfdata (intf, stv680);
+	stv680_create_sysfs_files(stv680->vdev);
 	return 0;
 
 error:
@@ -1432,6 +1484,7 @@ static void stv680_disconnect (struct usb_interface *intf)
 	if (stv680) {
 		/* We don't want people trying to open up the device */
 		if (stv680->vdev) {
+			stv680_remove_sysfs_files(stv680->vdev);
 			video_unregister_device(stv680->vdev);
 			stv680->vdev = NULL;
 		}
