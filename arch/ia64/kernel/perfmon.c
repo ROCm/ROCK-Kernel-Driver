@@ -21,7 +21,6 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
-#include <linux/wrapper.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/smp.h>

@@ -142,9 +142,6 @@ void __init disable_early_printk(void)
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-	/* This should be fixed properly in kernel/resource.c */
-	iomem_resource.end = MEM_SPACE_LIMIT;
-
 #ifdef CONFIG_XMON_DEFAULT
 	debugger = xmon;
 	debugger_bpt = xmon_bpt;

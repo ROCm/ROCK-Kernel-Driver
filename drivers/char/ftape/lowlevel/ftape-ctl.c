@@ -29,7 +29,6 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
-#include <linux/wrapper.h>
 
 #include <linux/ftape.h>
 #include <linux/qic117.h>

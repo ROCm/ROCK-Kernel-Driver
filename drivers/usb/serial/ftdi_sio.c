@@ -175,6 +175,8 @@ static int  ftdi_sio_write_room		(struct usb_serial_port *port);
 static void ftdi_sio_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void ftdi_sio_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void ftdi_sio_set_termios	(struct usb_serial_port *port, struct termios * old);
+static int  ftdi_sio_tiocmget		(struct usb_serial_port *port, struct file *file);
+static int  ftdi_sio_tiocmset		(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 static int  ftdi_sio_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void ftdi_sio_break_ctl		(struct usb_serial_port *port, int break_state );
 
@@ -198,6 +200,8 @@ static struct usb_serial_device_type ftdi_sio_device = {
 	.ioctl =		ftdi_sio_ioctl,
 	.set_termios =		ftdi_sio_set_termios,
 	.break_ctl =		ftdi_sio_break_ctl,
+	.tiocmget =		ftdi_sio_tiocmget,
+	.tiocmset =		ftdi_sio_tiocmset,
 	.attach =		ftdi_sio_startup,
         .shutdown =             ftdi_sio_shutdown,
 };
@@ -219,6 +223,8 @@ static struct usb_serial_device_type ftdi_8U232AM_device = {
 	.ioctl =		ftdi_sio_ioctl,
 	.set_termios =		ftdi_sio_set_termios,
 	.break_ctl =		ftdi_sio_break_ctl,
+	.tiocmget =		ftdi_sio_tiocmget,
+	.tiocmset =		ftdi_sio_tiocmset,
 	.attach =		ftdi_8U232AM_startup,
         .shutdown =             ftdi_sio_shutdown,
 };
@@ -823,125 +829,100 @@ static void ftdi_sio_set_termios (struct usb_serial_port *port, struct termios *
 	return;
 } /* ftdi_sio_set_termios */
 
-static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+static int ftdi_sio_tiocmget (struct usb_serial_port *port, struct file *file)
 {
 	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
-	__u16 urb_value=0; /* Will hold the new flags */
-	char buf[2];
-	int  ret, mask;
+	char *buf = NULL;
+	int ret = -EINVAL;
+	int size;
 	
+	dbg("%s", __FUNCTION__);
+
+	buf = kmalloc(2, GFP_KERNEL);
+	if (!buf)
+		goto exit;
+
+	if (priv->ftdi_type == sio) {
+		size = 1;
+	} else {
+		/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same 
+		   format as the data returned from the in point */
+		size = 2;
+	}
+	ret = usb_control_msg(serial->dev,
+			      usb_rcvctrlpipe(serial->dev, 0),
+			      FTDI_SIO_GET_MODEM_STATUS_REQUEST,
+			      FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
+			      0, 0, buf, size, WDR_TIMEOUT);
+	if (ret < 0) {
+		err("%s Could not get modem status of device - err: %d",
+		    __FUNCTION__, ret);
+		goto exit;
+	}
+
+	ret = (buf[0] & FTDI_SIO_DSR_MASK ? TIOCM_DSR : 0) |
+		(buf[0] & FTDI_SIO_CTS_MASK ? TIOCM_CTS : 0) |
+		(buf[0]  & FTDI_SIO_RI_MASK  ? TIOCM_RI  : 0) |
+		(buf[0]  & FTDI_SIO_RLSD_MASK ? TIOCM_CD  : 0);
+
+exit:
+	kfree(buf);
+	return ret;
+}
+
+static int ftdi_sio_tiocmset (struct usb_serial_port *port, struct file *file,
+			      unsigned int set, unsigned int clear)
+{
+	struct usb_serial *serial = port->serial;
+	int ret = 0;
+	
+	dbg("%s", __FUNCTION__);
+
+	if (set & TIOCM_RTS)
+		if ((ret = set_rts(serial->dev, 
+				   usb_sndctrlpipe(serial->dev, 0),
+				   HIGH)) < 0) {
+			err("Urb to set RTS failed");
+			goto exit;
+		}
+
+	if (set & TIOCM_DTR)
+		if ((ret = set_dtr(serial->dev, 
+				   usb_sndctrlpipe(serial->dev, 0),
+				   HIGH)) < 0) {
+			err("Urb to set DTR failed");
+			goto exit;
+		}
+
+	if (clear & TIOCM_RTS)
+		if ((ret = set_rts(serial->dev, 
+				   usb_sndctrlpipe(serial->dev, 0),
+				   LOW)) < 0) {
+			err("Urb to unset RTS failed");
+			goto exit;
+		}
+
+	if (clear & TIOCM_DTR)
+		if ((ret = set_dtr(serial->dev, 
+				   usb_sndctrlpipe(serial->dev, 0),
+				   LOW)) < 0) {
+			err("Urb to unset DTR failed");
+			goto exit;
+		}
+
+exit:
+	return ret;
+}
+
+static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+{
 	dbg("%s cmd 0x%04x", __FUNCTION__, cmd);
 
-	/* Based on code from acm.c and others */
 	switch (cmd) {
-
-	case TIOCMGET:
-		dbg("%s TIOCMGET", __FUNCTION__);
-		if (priv->ftdi_type == sio){
-			/* Request the status from the device */
-			if ((ret = usb_control_msg(serial->dev, 
-						   usb_rcvctrlpipe(serial->dev, 0),
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
-						   0, 0, 
-						   buf, 1, WDR_TIMEOUT)) < 0 ) {
-				err("%s Could not get modem status of device - err: %d", __FUNCTION__,
-				    ret);
-				return(ret);
-			}
-		} else {
-			/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same 
-			   format as the data returned from the in point */
-			if ((ret = usb_control_msg(serial->dev, 
-						   usb_rcvctrlpipe(serial->dev, 0),
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
-						   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
-						   0, 0, 
-						   buf, 2, WDR_TIMEOUT)) < 0 ) {
-				err("%s Could not get modem status of device - err: %d", __FUNCTION__,
-				    ret);
-				return(ret);
-			}
-		}
-
-		return put_user((buf[0] & FTDI_SIO_DSR_MASK ? TIOCM_DSR : 0) |
-				(buf[0] & FTDI_SIO_CTS_MASK ? TIOCM_CTS : 0) |
-				(buf[0]  & FTDI_SIO_RI_MASK  ? TIOCM_RI  : 0) |
-				(buf[0]  & FTDI_SIO_RLSD_MASK ? TIOCM_CD  : 0),
-				(unsigned long *) arg);
-		break;
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-		dbg("%s TIOCMSET", __FUNCTION__);
-		if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-		urb_value = ((mask & TIOCM_DTR) ? HIGH : LOW);
-		if (set_dtr(serial->dev, usb_sndctrlpipe(serial->dev, 0),urb_value) < 0){
-			err("Error from DTR set urb (TIOCMSET)");
-		}
-		urb_value = ((mask & TIOCM_RTS) ? HIGH : LOW);
-		if (set_rts(serial->dev, usb_sndctrlpipe(serial->dev, 0),urb_value) < 0){
-			err("Error from RTS set urb (TIOCMSET)");
-		}	
-		break;
-					
-	case TIOCMBIS: /* turns on (Sets) the lines as specified by the mask */
-		dbg("%s TIOCMBIS", __FUNCTION__);
- 	        if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-  	        if (mask & TIOCM_DTR){
-			if ((ret = set_dtr(serial->dev, 
-					   usb_sndctrlpipe(serial->dev, 0),
-					   HIGH)) < 0) {
-				err("Urb to set DTR failed");
-				return(ret);
-			}
-		}
-		if (mask & TIOCM_RTS) {
-			if ((ret = set_rts(serial->dev, 
-					   usb_sndctrlpipe(serial->dev, 0),
-					   HIGH)) < 0){
-				err("Urb to set RTS failed");
-				return(ret);
-			}
-		}
-					break;
-
-	case TIOCMBIC: /* turns off (Clears) the lines as specified by the mask */
-		dbg("%s TIOCMBIC", __FUNCTION__);
- 	        if (get_user(mask, (unsigned long *) arg))
-			return -EFAULT;
-  	        if (mask & TIOCM_DTR){
-			if ((ret = set_dtr(serial->dev, 
-					   usb_sndctrlpipe(serial->dev, 0),
-					   LOW)) < 0){
-				err("Urb to unset DTR failed");
-				return(ret);
-			}
-		}	
-		if (mask & TIOCM_RTS) {
-			if ((ret = set_rts(serial->dev, 
-					   usb_sndctrlpipe(serial->dev, 0),
-					   LOW)) < 0){
-				err("Urb to unset RTS failed");
-				return(ret);
-			}
-		}
-		break;
-
-		/*
-		 * I had originally implemented TCSET{A,S}{,F,W} and
-		 * TCGET{A,S} here separately, however when testing I
-		 * found that the higher layers actually do the termios
-		 * conversions themselves and pass the call onto
-		 * ftdi_sio_set_termios. 
-		 *
-		 */
-
 	default:
 	  /* This is not an error - turns out the higher layers will do 
-	   *  some ioctls itself (see comment above)
+	   *  some ioctls itself
  	   */
 		dbg("%s arg not supported - it was 0x%04x", __FUNCTION__,cmd);
 		return(-ENOIOCTLCMD);

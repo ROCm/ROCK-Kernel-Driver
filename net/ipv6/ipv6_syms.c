@@ -34,5 +34,6 @@ EXPORT_SYMBOL(ipv6_get_saddr);
 EXPORT_SYMBOL(ipv6_chk_addr);
 EXPORT_SYMBOL(in6addr_any);
 EXPORT_SYMBOL(in6addr_loopback);
+EXPORT_SYMBOL(in6_dev_finish_destroy);
 EXPORT_SYMBOL(xfrm6_rcv);
 EXPORT_SYMBOL(xfrm6_clear_mutable_options);

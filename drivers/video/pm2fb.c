@@ -2269,7 +2269,6 @@ int __init pm2fb_init(void) {
 	fb_info.gen.parsize=sizeof(struct pm2fb_par);
 	fb_info.gen.fbhw=&pm2fb_hwswitch;
 	strcpy(fb_info.gen.info.modename, permedia2_name);
-	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.flags=FBINFO_FLAG_DEFAULT;
 	fb_info.gen.info.fbops=&pm2fb_ops;
 	fb_info.gen.info.disp=&fb_info.disp;
@@ -2288,7 +2287,7 @@ int __init pm2fb_init(void) {
 		return -EINVAL;
 	}
 	printk(KERN_INFO "fb%d: %s (%s), using %uK of video memory.\n",
-				minor(fb_info.gen.info.node),
+				fb_info.gen.info.node,
 				board_table[fb_info.board].name,
 				permedia2_name,
 				(u32 )(fb_info.regions.fb_size>>10));

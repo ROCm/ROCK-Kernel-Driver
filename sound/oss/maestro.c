@@ -208,7 +208,6 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
-#include <linux/wrapper.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/ioport.h>

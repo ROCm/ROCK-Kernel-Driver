@@ -1785,9 +1785,10 @@ int mcfrs_console_setup(struct console *cp, char *arg)
 }
 
 
-static kdev_t mcfrs_console_device(struct console *c)
+static struct tty_driver *mcfrs_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &mcfrs_serial_driver;
 }
 
 

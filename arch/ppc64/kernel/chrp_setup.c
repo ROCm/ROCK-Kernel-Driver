@@ -79,7 +79,7 @@ void fwnmi_init(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
-kdev_t boot_dev;
+dev_t boot_dev;
 unsigned long  virtPython0Facilities = 0;  // python0 facility area (memory mapped io) (64-bit format) VIRTUAL address.
 
 extern unsigned long loops_per_jiffy;

@@ -2403,42 +2403,27 @@ static void edge_set_termios (struct usb_serial_port *port, struct termios *old_
 	return;
 }
 
-static int set_modem_info (struct edgeport_port *edge_port, unsigned int cmd, unsigned int *value)
+static int edge_tiocmset (struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear)
 {
-	unsigned int mcr = edge_port->shadow_mcr;
-	unsigned int arg;
+        struct edgeport_port *edge_port = usb_get_serial_port_data(port);
+	unsigned int mcr;
 
-	if (copy_from_user(&arg, value, sizeof(int)))
-		return -EFAULT;
+	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	switch (cmd) {
-		case TIOCMBIS:
-			if (arg & TIOCM_RTS)
-				mcr |= MCR_RTS;
-			if (arg & TIOCM_DTR)
-				mcr |= MCR_RTS;
-			if (arg & TIOCM_LOOP)
-				mcr |= MCR_LOOPBACK;
-			break;
+	mcr = edge_port->shadow_mcr;
+	if (set & TIOCM_RTS)
+		mcr |= MCR_RTS;
+	if (set & TIOCM_DTR)
+		mcr |= MCR_DTR;
+	if (set & TIOCM_LOOP)
+		mcr |= MCR_LOOPBACK;
 
-		case TIOCMBIC:
-			if (arg & TIOCM_RTS)
-				mcr &= ~MCR_RTS;
-			if (arg & TIOCM_DTR)
-				mcr &= ~MCR_RTS;
-			if (arg & TIOCM_LOOP)
-				mcr &= ~MCR_LOOPBACK;
-			break;
-
-		case TIOCMSET:
-			/* turn off the RTS and DTR and LOOPBACK 
-			 * and then only turn on what was asked to */
-			mcr &=  ~(MCR_RTS | MCR_DTR | MCR_LOOPBACK);
-			mcr |= ((arg & TIOCM_RTS) ? MCR_RTS : 0);
-			mcr |= ((arg & TIOCM_DTR) ? MCR_DTR : 0);
-			mcr |= ((arg & TIOCM_LOOP) ? MCR_LOOPBACK : 0);
-			break;
-	}
+	if (clear & TIOCM_RTS)
+		mcr &= ~MCR_RTS;
+	if (clear & TIOCM_DTR)
+		mcr &= ~MCR_DTR;
+	if (clear & TIOCM_LOOP)
+		mcr &= ~MCR_LOOPBACK;
 
 	edge_port->shadow_mcr = mcr;
 
@@ -2447,12 +2432,17 @@ static int set_modem_info (struct edgeport_port *edge_port, unsigned int cmd, un
 	return 0;
 }
 
-static int get_modem_info (struct edgeport_port *edge_port, unsigned int *value)
+static int edge_tiocmget(struct usb_serial_port *port, struct file *file)
 {
+        struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	unsigned int result = 0;
-	unsigned int msr = edge_port->shadow_msr;
-	unsigned int mcr = edge_port->shadow_mcr;
+	unsigned int msr;
+	unsigned int mcr;
 
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	msr = edge_port->shadow_msr;
+	mcr = edge_port->shadow_mcr;
 	result = ((mcr & MCR_DTR)	? TIOCM_DTR: 0)	  /* 0x002 */
 		  | ((mcr & MCR_RTS)	? TIOCM_RTS: 0)   /* 0x004 */
 		  | ((msr & MSR_CTS)	? TIOCM_CTS: 0)   /* 0x020 */
@@ -2463,9 +2453,7 @@ static int get_modem_info (struct edgeport_port *edge_port, unsigned int *value)
 
 	dbg("%s -- %x", __FUNCTION__, result);
 
-	if (copy_to_user(value, &result, sizeof(int)))
-		return -EFAULT;
-	return 0;
+	return result;
 }
 
 static int get_serial_info (struct edgeport_port *edge_port, struct serial_struct * retinfo)
@@ -2513,18 +2501,6 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 		case TIOCSERGETLSR:
 			dbg("%s - (%d) TIOCSERGETLSR", __FUNCTION__, port->number);
 //			return get_lsr_info(edge_port, (unsigned int *) arg);
-			break;
-
-		case TIOCMBIS:
-		case TIOCMBIC:
-		case TIOCMSET:
-			dbg("%s - (%d) TIOCMSET/TIOCMBIC/TIOCMSET", __FUNCTION__, port->number);
-			return set_modem_info(edge_port, cmd, (unsigned int *) arg);
-			break;
-
-		case TIOCMGET:  
-			dbg("%s - (%d) TIOCMGET", __FUNCTION__, port->number);
-			return get_modem_info(edge_port, (unsigned int *) arg);
 			break;
 
 		case TIOCGSERIAL:
@@ -2665,6 +2641,8 @@ static struct usb_serial_device_type edgeport_1port_device = {
 	.shutdown		= edge_shutdown,
 	.ioctl			= edge_ioctl,
 	.set_termios		= edge_set_termios,
+	.tiocmget		= edge_tiocmget,
+	.tiocmset		= edge_tiocmset,
 	.write			= edge_write,
 	.write_room		= edge_write_room,
 	.chars_in_buffer	= edge_chars_in_buffer,
@@ -2688,6 +2666,8 @@ static struct usb_serial_device_type edgeport_2port_device = {
 	.shutdown		= edge_shutdown,
 	.ioctl			= edge_ioctl,
 	.set_termios		= edge_set_termios,
+	.tiocmget		= edge_tiocmget,
+	.tiocmset		= edge_tiocmset,
 	.write			= edge_write,
 	.write_room		= edge_write_room,
 	.chars_in_buffer	= edge_chars_in_buffer,

@@ -4208,7 +4208,7 @@ STATIC PortAddr     _asc_def_iop_base[];
  * advansys.h contains function prototypes for functions global to Linux.
  */
 
-STATIC void       advansys_interrupt(int, void *, struct pt_regs *);
+STATIC irqreturn_t advansys_interrupt(int, void *, struct pt_regs *);
 STATIC int	  advansys_slave_configure(Scsi_Device *);
 STATIC void       asc_scsi_done_list(Scsi_Cmnd *, int from_isr);
 STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
@@ -4393,32 +4393,6 @@ advansys_proc_info(char *buffer, char **start, off_t offset, int length,
     }
     advoffset += cplen;
     curbuf += cnt;
-
-    /*
-     * Display target driver information for each device attached
-     * to the board.
-     */
-    list_for_each_entry (scd, &shp->my_devices, siblings)
-    {
-        if (scd->host == shp) {
-            cp = boardp->prtbuf;
-            /*
-             * Note: If proc_print_scsidevice() writes more than
-             * ASC_PRTBUF_SIZE bytes, it will overrun 'prtbuf'.
-             */
-            proc_print_scsidevice(scd, cp, &cplen, 0);
-            ASC_ASSERT(cplen < ASC_PRTBUF_SIZE);
-            cnt = asc_proc_copy(advoffset, offset, curbuf, leftlen, cp, cplen);
-            totcnt += cnt;
-            leftlen -= cnt;
-            if (leftlen == 0) {
-                ASC_DBG1(1, "advansys_proc_info: totcnt %d\n", totcnt);
-                return totcnt;
-            }
-            advoffset += cplen;
-            curbuf += cnt;
-        }
-    }
 
     /*
      * Display EEPROM configuration for the board.
@@ -6246,7 +6220,7 @@ Scsi_Host_Template driver_template = ADVANSYS;
  * to the AdvanSys driver which is for a device sharing an interrupt with
  * an AdvanSys adapter.
  */
-STATIC void
+STATIC irqreturn_t
 advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     ulong           flags;
@@ -6336,7 +6310,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     asc_scsi_done_list(done_scp, 1);
 
     ASC_DBG(1, "advansys_interrupt: end\n");
-    return;
+    return IRQ_HANDLED;
 }
 
 /*
@@ -8370,7 +8344,6 @@ asc_prt_driver_conf(struct Scsi_Host *shp, char *cp, int cplen)
     int                    totlen;
     int                    len;
     int                    chip_scsi_id;
-    int                    i;
 
     boardp = ASC_BOARDP(shp);
 

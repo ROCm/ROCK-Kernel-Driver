@@ -3339,7 +3339,7 @@ static void BusLogic_ProcessCompletedCCBs(BusLogic_HostAdapter_T *HostAdapter)
   Adapters.
 */
 
-static void BusLogic_InterruptHandler(int IRQ_Channel,
+static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel,
 				      void *DeviceIdentifier,
 				      Registers_T *InterruptRegisters)
 {
@@ -3420,6 +3420,7 @@ static void BusLogic_InterruptHandler(int IRQ_Channel,
     Release exclusive access to Host Adapter.
   */
   BusLogic_ReleaseHostAdapterLockIH(HostAdapter, &ProcessorFlags);
+  return IRQ_HANDLED;
 }
 
 
@@ -4261,7 +4262,7 @@ int BusLogic_BIOSDiskParameters(struct scsi_device *sdev, struct block_device *D
       PartitionTable_T *FirstPartitionEntry = (PartitionTable_T *) buf;
       PartitionTable_T *PartitionEntry = FirstPartitionEntry;
       int SavedCylinders = DiskParameters->Cylinders, PartitionNumber;
-      unsigned char PartitionEntryEndHead, PartitionEntryEndSector;
+      unsigned char PartitionEntryEndHead=0, PartitionEntryEndSector=0;
       for (PartitionNumber = 0; PartitionNumber < 4; PartitionNumber++)
 	{
 	  PartitionEntryEndHead = PartitionEntry->end_head;

@@ -95,7 +95,7 @@ static int tea6420_switch(struct i2c_client *client, int i, int o, int g)
 }
 
 /* this function is called by i2c_probe */
-static int tea6420_detect(struct i2c_adapter *adapter, int address, unsigned short flags, int kind)
+static int tea6420_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	struct	i2c_client *client;
 	int err = 0, i = 0;

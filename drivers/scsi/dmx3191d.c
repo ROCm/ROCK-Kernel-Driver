@@ -96,7 +96,7 @@ static int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 			printk(KERN_WARNING "dmx3191: IRQ %d not available - switching to polled mode.\n", pdev->irq);
 			/* Steam powered scsi controllers run without an IRQ
 			   anyway */
-			instance->irq = IRQ_NONE;
+			instance->irq = SCSI_IRQ_NONE;
 		}
 
 		boards++;
@@ -113,7 +113,7 @@ static const char * dmx3191d_info(struct Scsi_Host *host) {
 static int dmx3191d_release_resources(struct Scsi_Host *instance)
 {
 	release_region(instance->io_port, DMX3191D_REGION);
-	if(instance->irq!=IRQ_NONE)
+	if(instance->irq!=SCSI_IRQ_NONE)
 		free_irq(instance->irq, instance);
 
 	return 0;

@@ -646,7 +646,7 @@ static struct {
 };
 
 /* setup & interrupt */
-static void intr(int irq, void *dev_id, struct pt_regs *);
+static irqreturn_t intr(int irq, void *dev_id, struct pt_regs *);
 static void reset_ports(struct Scsi_Host *shpnt);
 static void aha152x_error(struct Scsi_Host *shpnt, char *msg);
 static void done(struct Scsi_Host *shpnt, int error);
@@ -936,18 +936,19 @@ static inline struct Scsi_Host *lookup_irq(int irqno)
 	return 0;
 }
 
-static void swintr(int irqno, void *dev_id, struct pt_regs *regs)
+static irqreturn_t swintr(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	struct Scsi_Host *shpnt = lookup_irq(irqno);
 
 	if (!shpnt) {
         	printk(KERN_ERR "aha152x%d: catched software interrupt %d for unknown controller.\n", HOSTNO, irqno);
-		return;
+		return IRQ_NONE;
 	}
 
 	HOSTDATA(shpnt)->swint++;
 
 	SETPORT(DMACNTRL0, INTEN);
+	return IRQ_HANDLED;
 }
 
 #ifdef __ISAPNP__
@@ -1379,8 +1380,6 @@ static int aha152x_release(struct Scsi_Host *shpnt)
  */ 
 static int setup_expected_interrupts(struct Scsi_Host *shpnt)
 {
-	ASSERT_LOCK(&QLOCK,1);
-
 	if(CURRENT_SC) {
 		CURRENT_SC->SCp.phase |= 1 << 16;
 	
@@ -1873,13 +1872,13 @@ static void run(void)
  *
  */
 
-static void intr(int irqno, void *dev_id, struct pt_regs *regs)
+static irqreturn_t intr(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	struct Scsi_Host *shpnt = lookup_irq(irqno);
 
 	if (!shpnt) {
 		printk(KERN_ERR "aha152x: catched interrupt %d for unknown controller.\n", irqno);
-		return;
+		return IRQ_NONE;
 	}
 
 	/* no more interrupts from the controller, while we're busy.
@@ -1899,6 +1898,7 @@ static void intr(int irqno, void *dev_id, struct pt_regs *regs)
 	HOSTDATA(shpnt)->service++;
 	INIT_WORK(&aha152x_tq, (void *) run, NULL);
 	schedule_work(&aha152x_tq);
+	return IRQ_HANDLED;
 }
 
 /*

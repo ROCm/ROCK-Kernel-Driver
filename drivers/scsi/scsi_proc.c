@@ -149,8 +149,8 @@ void scsi_proc_host_rm(struct Scsi_Host *shost)
 		remove_proc_entry(shost->hostt->proc_name, proc_scsi);
 }
 
-/* XXX: this shouldn't really be exposed to drivers. */
-void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len)
+static void proc_print_scsidevice(struct scsi_device* sdev, char *buffer,
+				  int *size, int len)
 {
 
 	int x, y = *size;
@@ -195,7 +195,6 @@ void proc_print_scsidevice(Scsi_Device * sdev, char *buffer, int *size, int len)
 	*size = y;
 	return;
 }
-EXPORT_SYMBOL(proc_print_scsidevice);
 
 /* 
  * proc_scsi_dev_info_read: dump the scsi_dev_info_list via

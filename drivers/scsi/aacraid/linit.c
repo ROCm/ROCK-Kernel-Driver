@@ -48,6 +48,7 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
+#include <linux/interrupt.h>
 #include <asm/semaphore.h>
 #include <linux/blk.h>
 #include "scsi.h"

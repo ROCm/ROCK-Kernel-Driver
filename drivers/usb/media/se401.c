@@ -38,7 +38,6 @@ static const char version[] = "0.24";
 #include <linux/usb.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
-#include <linux/wrapper.h>
 #include <linux/mm.h>
 
 #include "se401.h"

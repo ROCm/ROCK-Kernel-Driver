@@ -1090,7 +1090,7 @@ detect_isa_irq (volatile ucchar *address)
    whenever the card wants its hand held--chars
    received, out buffer empty, modem change, etc.
  */
-static void
+static irqreturn_t
 cyy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
   struct tty_struct *tty;
@@ -1113,7 +1113,7 @@ cyy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef CY_DEBUG_INTERRUPTS
 	printk("cyy_interrupt: spurious interrupt %d\n\r", irq);
 #endif
-        return; /* spurious interrupt */
+        return IRQ_NONE; /* spurious interrupt */
     }
 
     card_base_addr = (unsigned char *)cinfo->base_addr;
@@ -1500,6 +1500,7 @@ cyy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
    cy_writeb((u_long)card_base_addr + (Cy_ClrIntr<<index), 0);
                                 /* Cy_ClrIntr is 0x1800 */
    spin_unlock(&cinfo->card_lock);
+   return IRQ_HANDLED;
 } /* cyy_interrupt */
 
 /***********************************************************/
@@ -1881,7 +1882,7 @@ cyz_handle_cmd(struct cyclades_card *cinfo)
 }
 
 #ifdef CONFIG_CYZ_INTR
-static void
+static irqreturn_t
 cyz_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
   struct cyclades_card *cinfo;
@@ -1890,20 +1891,20 @@ cyz_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef CY_DEBUG_INTERRUPTS
 	printk("cyz_interrupt: spurious interrupt %d\n\r", irq);
 #endif
-        return; /* spurious interrupt */
+        return IRQ_NONE; /* spurious interrupt */
     }
 
     if (!ISZLOADED(*cinfo)) {
 #ifdef CY_DEBUG_INTERRUPTS
 	printk("cyz_interrupt: board not yet loaded (IRQ%d).\n\r", irq);
 #endif
-	return;
+	return IRQ_NONE;
     }
 
     /* Handle the interrupts */
     cyz_handle_cmd(cinfo);
 
-    return;
+    return IRQ_HANDLED;
 } /* cyz_interrupt */
 
 static void

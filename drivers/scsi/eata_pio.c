@@ -155,24 +155,6 @@ static int eata_pio_proc_info(char *buffer, char **start, off_t offset,
     if (pos > offset + length)
 	goto stop_output;
     
-    size = sprintf(buffer+len,"Attached devices: %s\n", 
-		   (!list_empty(&shost->my_devices))?"":"none");
-    len += size; 
-    pos = begin + len;
-    
-    list_for_each_entry(sdev, &shost->my_devices, siblings) {
-	    proc_print_scsidevice(sdev, buffer, &size, len);
-	    len += size; 
-	    pos = begin + len;
-	    
-	    if (pos < offset) {
-		len = 0;
-		begin = pos;
-	    }
-	    if (pos > offset + length)
-		goto stop_output;
-    }
-    
  stop_output:
     DBG(DBG_PROC, printk("2pos: %ld offset: %ld len: %d\n", pos, offset, len));
     *start=buffer+(offset-begin);   /* Start of wanted data */
@@ -213,7 +195,8 @@ static void IncStat(Scsi_Pointer * SCp, uint Increment)
 
 static void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs);
 
-static void do_eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_eata_pio_int_handler(int irq, void *dev_id,
+						struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct Scsi_Host *dev = dev_id;
@@ -221,6 +204,7 @@ static void do_eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(dev->host_lock, flags);
 	eata_pio_int_handler(irq, dev_id, regs);
 	spin_unlock_irqrestore(dev->host_lock, flags);
+	return IRQ_HANDLED;
 }
 
 static void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs *regs)

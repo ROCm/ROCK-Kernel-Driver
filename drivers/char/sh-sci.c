@@ -1179,9 +1179,10 @@ static void serial_console_write(struct console *co, const char *s,
 	put_string(sercons_port, s, count);
 }
 
-static kdev_t serial_console_device(struct console *c)
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
-	return mk_kdev(SCI_MAJOR, SCI_MINOR_START + c->index);
+	*index = c->index;
+	return &sci_driver;
 }
 
 /*

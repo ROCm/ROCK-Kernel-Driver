@@ -2773,6 +2773,10 @@ static struct sg_proc_leaf sg_proc_leaf_arr[] = {
 				size : begin + len - offset;    \
     } while(0)
 
+/* this should _really_ be private to the scsi midlayer.  But
+   /proc/scsi/sg is an established name, so.. */
+extern struct proc_dir_entry *proc_scsi;
+
 static int
 sg_proc_init()
 {

@@ -30,26 +30,26 @@
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX	{						\
-	proc_info: aic7xxx_proc_info,				\
-	detect: aic7xxx_detect,					\
-	release: aic7xxx_release,				\
-	info: aic7xxx_info,					\
-	queuecommand: aic7xxx_queue,				\
-	slave_alloc: aic7xxx_slave_alloc,			\
-	slave_configure: aic7xxx_slave_configure,		\
-	slave_destroy: aic7xxx_slave_destroy,			\
-	bios_param: aic7xxx_biosparam,				\
-	eh_abort_handler: aic7xxx_abort,			\
-	eh_device_reset_handler: aic7xxx_bus_device_reset,	\
-	eh_host_reset_handler: aic7xxx_reset,			\
-	can_queue: 255,		/* max simultaneous cmds      */\
-	this_id: -1,		/* scsi id of host adapter    */\
-	sg_tablesize: 0,	/* max scatter-gather cmds    */\
-	max_sectors: 2048,	/* max physical sectors in 1 cmd */\
-	cmd_per_lun: 3,		/* cmds per lun (linked cmds) */\
-	present: 0,		/* number of 7xxx's present   */\
-	unchecked_isa_dma: 0,	/* no memory DMA restrictions */\
-	use_clustering: ENABLE_CLUSTERING,			\
+	.proc_info		= aic7xxx_proc_info,		\
+	.detect			= aic7xxx_detect,		\
+	.release		= aic7xxx_release,		\
+	.info			= aic7xxx_info,			\
+	.queuecommand		= aic7xxx_queue,		\
+	.slave_alloc		= aic7xxx_slave_alloc,		\
+	.slave_configure	= aic7xxx_slave_configure,	\
+	.slave_destroy		= aic7xxx_slave_destroy,	\
+	.bios_param		= aic7xxx_biosparam,		\
+	.eh_abort_handler	= aic7xxx_abort,		\
+	.eh_device_reset_handler	= aic7xxx_bus_device_reset,	\
+	.eh_host_reset_handler	= aic7xxx_reset,			\
+	.can_queue		= 255,	/* max simultaneous cmds      */\
+	.this_id		= -1,	/* scsi id of host adapter    */\
+	.sg_tablesize		= 0,	/* max scatter-gather cmds    */\
+	.max_sectors		= 2048,	/* max physical sectors in 1 cmd */\
+	.cmd_per_lun		= 3,	/* cmds per lun (linked cmds) */\
+	.present		= 0,	/* number of 7xxx's present   */\
+	.unchecked_isa_dma	= 0,	/* no memory DMA restrictions */\
+	.use_clustering		= ENABLE_CLUSTERING,			\
 }
 
 extern int aic7xxx_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));

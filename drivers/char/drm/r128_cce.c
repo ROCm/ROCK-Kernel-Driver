@@ -619,9 +619,12 @@ int r128_do_cleanup_cce( drm_device_t *dev )
 #if __REALLY_HAVE_SG
 		if ( !dev_priv->is_pci ) {
 #endif
-			DRM_IOREMAPFREE( dev_priv->cce_ring );
-			DRM_IOREMAPFREE( dev_priv->ring_rptr );
-			DRM_IOREMAPFREE( dev_priv->buffers );
+			if ( dev_priv->cce_ring != NULL )
+				DRM_IOREMAPFREE( dev_priv->cce_ring );
+			if ( dev_priv->ring_rptr != NULL )
+				DRM_IOREMAPFREE( dev_priv->ring_rptr );
+			if ( dev_priv->buffers != NULL )
+				DRM_IOREMAPFREE( dev_priv->buffers );
 #if __REALLY_HAVE_SG
 		} else {
 			if (!DRM(ati_pcigart_cleanup)( dev,

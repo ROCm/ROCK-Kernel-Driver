@@ -1036,7 +1036,7 @@ static irqreturn_t snd_ali_card_interrupt(int irq,
 					  void *dev_id,
 					  struct pt_regs *regs)
 {
-	ali_t 	*codec = snd_magic_cast(ali_t, dev_id, return);
+	ali_t *codec = snd_magic_cast(ali_t, dev_id, return IRQ_NONE);
 
 	if (codec == NULL)
 		return IRQ_NONE;

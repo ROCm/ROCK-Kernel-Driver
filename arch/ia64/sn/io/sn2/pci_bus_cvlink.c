@@ -323,12 +323,6 @@ sn_pci_fixup(int arg)
 	ioport_resource.end =    0xcfffffffffffffff;
 
 	/*
-	 * Set the root start and end for Mem Resource.
-	 */
-	iomem_resource.start = 0;
-	iomem_resource.end = 0xffffffffffffffff;
-
-	/*
 	 * Initialize the device vertex in the pci_dev struct.
 	 */
 	pci_for_each_dev(device_dev) {

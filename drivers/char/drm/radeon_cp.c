@@ -36,12 +36,6 @@
 
 #define RADEON_FIFO_DEBUG	0
 
-#if defined(__alpha__) || defined(__powerpc__)
-# define PCIGART_ENABLED
-#else
-# undef PCIGART_ENABLED
-#endif
-
 
 /* CP microcode (from ATI) */
 static u32 R200_cp_microcode[][2] = {
@@ -777,7 +771,7 @@ static void radeon_do_cp_reset( drm_radeon_private_t *dev_priv )
 
 	cur_read_ptr = RADEON_READ( RADEON_CP_RB_RPTR );
 	RADEON_WRITE( RADEON_CP_RB_WPTR, cur_read_ptr );
-	*dev_priv->ring.head = cur_read_ptr;
+	SET_RING_HEAD( dev_priv, cur_read_ptr );
 	dev_priv->ring.tail = cur_read_ptr;
 }
 
@@ -889,13 +883,18 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 	/* Initialize the ring buffer's read and write pointers */
 	cur_read_ptr = RADEON_READ( RADEON_CP_RB_RPTR );
 	RADEON_WRITE( RADEON_CP_RB_WPTR, cur_read_ptr );
-	*dev_priv->ring.head = cur_read_ptr;
+	SET_RING_HEAD( dev_priv, cur_read_ptr );
 	dev_priv->ring.tail = cur_read_ptr;
 
+#if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
 		RADEON_WRITE( RADEON_CP_RB_RPTR_ADDR,
-			      dev_priv->ring_rptr->offset );
-	} else {
+			      dev_priv->ring_rptr->offset
+			      - dev->agp->base
+			      + dev_priv->agp_vm_start);
+	} else
+#endif
+	{
 		drm_sg_mem_t *entry = dev->sg;
 		unsigned long tmp_ofs, page_ofs;
 
@@ -920,7 +919,7 @@ static void radeon_cp_init_ring_buffer( drm_device_t *dev,
 					 + RADEON_SCRATCH_REG_OFFSET );
 
 	dev_priv->scratch = ((__volatile__ u32 *)
-			     dev_priv->ring.head +
+			     dev_priv->ring_rptr->handle +
 			     (RADEON_SCRATCH_REG_OFFSET / sizeof(u32)));
 
 	RADEON_WRITE( RADEON_SCRATCH_UMSK, 0x7 );
@@ -989,17 +988,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	memset( dev_priv, 0, sizeof(drm_radeon_private_t) );
 
 	dev_priv->is_pci = init->is_pci;
-
-#if !defined(PCIGART_ENABLED)
-	/* PCI support is not 100% working, so we disable it here.
-	 */
-	if ( dev_priv->is_pci ) {
-		DRM_ERROR( "PCI GART not yet supported for Radeon!\n" );
-		dev->dev_private = (void *)dev_priv;
-		radeon_do_cleanup_cp(dev);
-		return DRM_ERR(EINVAL);
-	}
-#endif
 
 	if ( dev_priv->is_pci && !dev->sg ) {
 		DRM_ERROR( "PCI GART memory not allocated!\n" );
@@ -1097,6 +1085,13 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 					 RADEON_ROUND_PREC_8TH_PIX);
 
 	DRM_GETSAREA();
+
+	dev_priv->fb_offset = init->fb_offset;
+	dev_priv->mmio_offset = init->mmio_offset;
+	dev_priv->ring_offset = init->ring_offset;
+	dev_priv->ring_rptr_offset = init->ring_rptr_offset;
+	dev_priv->buffers_offset = init->buffers_offset;
+	dev_priv->agp_textures_offset = init->agp_textures_offset;
 	
 	if(!dev_priv->sarea) {
 		DRM_ERROR("could not find sarea!\n");
@@ -1204,9 +1199,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	DRM_DEBUG( "dev_priv->agp_buffers_offset 0x%lx\n",
 		   dev_priv->agp_buffers_offset );
 
-	dev_priv->ring.head = ((__volatile__ u32 *)
-			       dev_priv->ring_rptr->handle);
-
 	dev_priv->ring.start = (u32 *)dev_priv->cp_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cp_ring->handle
 			      + init->ring_size / sizeof(u32));
@@ -1217,7 +1209,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		(dev_priv->ring.size / sizeof(u32)) - 1;
 
 	dev_priv->ring.high_mark = RADEON_RING_HIGH_MARK;
-	dev_priv->ring.ring_rptr = dev_priv->ring_rptr;
 
 #if __REALLY_HAVE_SG
 	if ( dev_priv->is_pci ) {
@@ -1279,9 +1270,12 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 		drm_radeon_private_t *dev_priv = dev->dev_private;
 
 		if ( !dev_priv->is_pci ) {
-			DRM_IOREMAPFREE( dev_priv->cp_ring );
-			DRM_IOREMAPFREE( dev_priv->ring_rptr );
-			DRM_IOREMAPFREE( dev_priv->buffers );
+			if ( dev_priv->cp_ring != NULL )
+				DRM_IOREMAPFREE( dev_priv->cp_ring );
+			if ( dev_priv->ring_rptr != NULL )
+				DRM_IOREMAPFREE( dev_priv->ring_rptr );
+			if ( dev_priv->buffers != NULL )
+				DRM_IOREMAPFREE( dev_priv->buffers );
 		} else {
 #if __REALLY_HAVE_SG
 			if (!DRM(ati_pcigart_cleanup)( dev,
@@ -1592,10 +1586,10 @@ int radeon_wait_ring( drm_radeon_private_t *dev_priv, int n )
 {
 	drm_radeon_ring_buffer_t *ring = &dev_priv->ring;
 	int i;
-	u32 last_head = GET_RING_HEAD(ring);
+	u32 last_head = GET_RING_HEAD( dev_priv );
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		u32 head = GET_RING_HEAD(ring);
+		u32 head = GET_RING_HEAD( dev_priv );
 
 		ring->space = (head - ring->tail) * sizeof(u32);
 		if ( ring->space <= 0 )

@@ -1295,7 +1295,7 @@ int __init init_module(void)
 
 static void __exit ltpc_cleanup(void)
 {
-	long timeout;
+	unsigned long timeout;
 
 	ltpc_timer.data = 0;  /* signal the poll routine that we're done */
 

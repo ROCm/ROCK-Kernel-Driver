@@ -224,8 +224,6 @@ extern int parse_rock_ridge_inode(struct iso_directory_record *, struct inode *)
 extern int get_rock_ridge_filename(struct iso_directory_record *, char *, struct inode *);
 extern int isofs_name_translate(struct iso_directory_record *, char *, struct inode *);
 
-extern int find_rock_ridge_relocation(struct iso_directory_record *, struct inode *);
-
 int get_joliet_filename(struct iso_directory_record *, unsigned char *, struct inode *);
 int get_acorn_filename(struct iso_directory_record *, char *, struct inode *);
 

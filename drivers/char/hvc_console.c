@@ -324,9 +324,10 @@ void hvc_console_print(struct console *co, const char *b, unsigned count)
 	}
 }
 
-static kdev_t hvc_console_device(struct console *c)
+static struct tty_driver *hvc_console_device(struct console *c, int *index)
 {
-	return mk_kdev(HVC_MAJOR, HVC_MINOR + c->index);
+	*index = c->index;
+	return &hvc_driver;
 }
 
 static int __init hvc_console_setup(struct console *co, char *options)

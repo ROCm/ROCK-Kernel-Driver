@@ -390,7 +390,6 @@ tsunami_init_arch(void)
 #endif
 	/* With multiple PCI busses, we play with I/O as physical addrs.  */
 	ioport_resource.end = ~0UL;
-	iomem_resource.end = ~0UL;
 
 	/* Find how many hoses we have, and initialize them.  TSUNAMI
 	   and TYPHOON can have 2, but might only have 1 (DS10).  */

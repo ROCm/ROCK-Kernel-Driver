@@ -49,11 +49,6 @@ static void DRM(parse_option)(char *s)
 	for (c = s; *c && *c != ':'; c++); /* find : or \0 */
 	if (*c) r = c + 1; else r = NULL;  /* remember remainder */
 	*c = '\0';			   /* terminate */
-	if (!strcmp(s, "noctx")) {
-		DRM(flags) |= DRM_FLAG_NOCTX;
-		DRM_INFO("Server-mediated context switching OFF\n");
-		return;
-	}
 	if (!strcmp(s, "debug")) {
 		DRM(flags) |= DRM_FLAG_DEBUG;
 		DRM_INFO("Debug messages ON\n");

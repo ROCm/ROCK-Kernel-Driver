@@ -33,7 +33,6 @@
 #include <linux/kmod.h>
 #endif
 #include <linux/fcntl.h>
-#include <linux/wrapper.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 

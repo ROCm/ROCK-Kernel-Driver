@@ -360,8 +360,7 @@ static struct tasklet_struct cm206_tasklet;
    as there seems so reason for this to happen.
 */
 
-static void cm206_interrupt(int sig, void *dev_id, struct pt_regs *regs)
-/* you rang? */
+static irqreturn_t cm206_interrupt(int sig, void *dev_id, struct pt_regs *regs)
 {
 	volatile ush fool;
 	cd->intr_ds = inw(r_data_status);	/* resets data_ready, data_error,
@@ -436,6 +435,7 @@ static void cm206_interrupt(int sig, void *dev_id, struct pt_regs *regs)
 		|| cd->fifo_overflowed))
 		tasklet_schedule(&cm206_tasklet);	/* issue a stop read command */
 	stats(interrupt);
+	return IRQ_HANDLED;
 }
 
 /* we have put the address of the wait queue in who */

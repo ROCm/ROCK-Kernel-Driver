@@ -46,6 +46,7 @@
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/fs.h>
 #include <linux/ioport.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>

@@ -447,15 +447,6 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 	invalidate_inode_pages(bdev->bd_inode->i_mapping);
 }
 
-void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev) {
-		invalidate_bdev(bdev, destroy_dirty_buffers);
-		bdput(bdev);
-	}
-}
-
 /*
  * Kick pdflush then try to free up some ZONE_NORMAL memory.
  */

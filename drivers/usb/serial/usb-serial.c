@@ -785,6 +785,51 @@ done:
 	return ((count < begin+length-off) ? count : begin+length-off);
 }
 
+static int serial_tiocmget (struct tty_struct *tty, struct file *file)
+{
+	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
+	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+
+	if (!serial)
+		goto exit;
+
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	if (!port->open_count) {
+		dbg("%s - port not open", __FUNCTION__);
+		goto exit;
+	}
+
+	if (serial->type->tiocmget)
+		return serial->type->tiocmget(port, file);
+
+exit:
+	return -EINVAL;
+}
+
+static int serial_tiocmset (struct tty_struct *tty, struct file *file,
+			    unsigned int set, unsigned int clear)
+{
+	struct usb_serial_port *port = (struct usb_serial_port *) tty->driver_data;
+	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+
+	if (!serial)
+		goto exit;
+
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	if (!port->open_count) {
+		dbg("%s - port not open", __FUNCTION__);
+		goto exit;
+	}
+
+	if (serial->type->tiocmset)
+		return serial->type->tiocmset(port, file, set, clear);
+
+exit:
+	return -EINVAL;
+}
+
 void usb_serial_port_softint(void *private)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)private;
@@ -1286,6 +1331,8 @@ struct tty_driver usb_serial_tty_driver = {
 	.break_ctl =		serial_break,
 	.chars_in_buffer =	serial_chars_in_buffer,
 	.read_proc =		serial_read_proc,
+	.tiocmget =		serial_tiocmget,
+	.tiocmset =		serial_tiocmset,
 };
 
 

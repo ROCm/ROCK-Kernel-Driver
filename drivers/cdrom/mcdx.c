@@ -260,9 +260,6 @@ static struct block_device_operations mcdx_bdops =
 	addresses, such as mcdx_open and mcdx_close in the
 	structure mcdx_dops. */
 
-/* ???  exported by the mcdx_sigaction struct */
-static void mcdx_intr(int, void *, struct pt_regs *);
-
 /* exported by file_ops */
 static int mcdx_open(struct cdrom_device_info *cdi, int purpose);
 static void mcdx_close(struct cdrom_device_info *cdi);
@@ -854,7 +851,7 @@ static void mcdx_delay(struct s_drive_stuff *stuff, long jifs)
 	}
 }
 
-static void mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct s_drive_stuff *stuffp;
 	unsigned char b;
@@ -863,7 +860,7 @@ static void mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (stuffp == NULL) {
 		xwarn("mcdx: no device for intr %d\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 #ifdef AK2
 	if (!stuffp->busy && stuffp->pending)
@@ -895,6 +892,7 @@ static void mcdx_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	stuffp->busy = 0;
 	wake_up_interruptible(&stuffp->busyq);
+	return IRQ_HANDLED;
 }
 
 

@@ -94,7 +94,7 @@ static struct bc_hw_ops isar_ops = {
 	.write_reg = WriteISAR,
 };
 
-static void
+static irqreturn_t
 isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -130,6 +130,7 @@ isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writeb(0, cs->hw.isurf.isac + ISAC_MASK);mb();
 	writeb(ISAR_IRQMSK, cs->hw.isurf.isar + ISAR_IRQBIT); mb();
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static void

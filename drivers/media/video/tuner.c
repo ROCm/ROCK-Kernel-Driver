@@ -776,8 +776,7 @@ static void set_radio_freq(struct i2c_client *c, int freq)
 
 /* ---------------------------------------------------------------------- */
 
-static int tuner_attach(struct i2c_adapter *adap, int addr,
-			unsigned short flags, int kind)
+static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct tuner *t;
 	struct i2c_client *client;

@@ -90,16 +90,10 @@ static void sun3x_prom_write(struct console *co, const char *s,
 /* debug console - write-only */
 
 static struct console sun3x_debug = {
-	"debug",
-	sun3x_prom_write,  	/* write */
-	NULL,			/* read */
-	NULL,			/* device */
-	NULL,			/* unblank */
-	NULL,			/* setup */
-	CON_PRINTBUFFER,
-	-1,
-	0,
-	NULL
+	.name  =	"debug",
+	.write =	sun3x_prom_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 void sun3x_prom_init(void)

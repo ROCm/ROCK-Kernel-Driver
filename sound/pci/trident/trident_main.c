@@ -3689,7 +3689,7 @@ int snd_trident_free(trident_t *trident)
 
 static irqreturn_t snd_trident_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	trident_t *trident = snd_magic_cast(trident_t, dev_id, return);
+	trident_t *trident = snd_magic_cast(trident_t, dev_id, return IRQ_NONE);
 	unsigned int audio_int, chn_int, stimer, channel, mask, tmp;
 	int delta;
 	snd_trident_voice_t *voice;

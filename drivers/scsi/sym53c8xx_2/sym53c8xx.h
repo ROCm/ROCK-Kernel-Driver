@@ -106,22 +106,22 @@ int sym53c8xx_release(struct Scsi_Host *);
 #include <scsi/scsicam.h>
 
 #define SYM53C8XX {							\
-	name:			"sym53c8xx",				\
-	detect:			sym53c8xx_detect,			\
-	release:		sym53c8xx_release,			\
-	info:			sym53c8xx_info, 			\
-	queuecommand:		sym53c8xx_queue_command,		\
-	slave_configure:	sym53c8xx_slave_configure,		\
-	eh_abort_handler:	sym53c8xx_eh_abort_handler,		\
-	eh_device_reset_handler:sym53c8xx_eh_device_reset_handler,	\
-	eh_bus_reset_handler:	sym53c8xx_eh_bus_reset_handler,		\
-	eh_host_reset_handler:	sym53c8xx_eh_host_reset_handler,	\
-	can_queue:		0,					\
-	this_id:		7,					\
-	sg_tablesize:		0,					\
-	cmd_per_lun:		0,					\
-	use_clustering:		DISABLE_CLUSTERING,			\
-	highmem_io:		1}
+	.name			= "sym53c8xx",				\
+	.detect			= sym53c8xx_detect,			\
+	.release		= sym53c8xx_release,			\
+	.info			= sym53c8xx_info, 			\
+	.queuecommand		= sym53c8xx_queue_command,		\
+	.slave_configure	= sym53c8xx_slave_configure,		\
+	.eh_abort_handler	= sym53c8xx_eh_abort_handler,		\
+	.eh_device_reset_handler	= sym53c8xx_eh_device_reset_handler,\
+	.eh_bus_reset_handler	= sym53c8xx_eh_bus_reset_handler,	\
+	.eh_host_reset_handler	= sym53c8xx_eh_host_reset_handler,	\
+	.can_queue		= 0,					\
+	.this_id		= 7,					\
+	.sg_tablesize		= 0,					\
+	.cmd_per_lun		= 0,					\
+	.use_clustering		= DISABLE_CLUSTERING,			\
+	.highmem_io		= 1}
 
 #endif /* defined(HOSTS_C) || defined(MODULE) */ 
 

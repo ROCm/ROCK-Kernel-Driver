@@ -434,19 +434,9 @@ retry_segments:
 	return len;
 }
 
-/**
- *	bio_map_user	-	map user address into bio
- *	@bdev: destination block device
- *	@uaddr: start of user address
- *	@len: length in bytes
- *	@write_to_vm: bool indicating writing to pages or not
- *
- *	Map the user space address into a bio suitable for io to a block
- *	device. Caller should check the size of the returned bio, we might
- *	not have mapped the entire range specified.
- */
-struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
-			 unsigned int len, int write_to_vm)
+static struct bio *__bio_map_user(struct block_device *bdev,
+				  unsigned long uaddr, unsigned int len,
+				  int write_to_vm)
 {
 	unsigned long end = (uaddr + len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	unsigned long start = uaddr >> PAGE_SHIFT;
@@ -510,8 +500,11 @@ struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
 	kfree(pages);
 
 	/*
-	 * check if the mapped pages need bouncing for an isa host.
+	 * set data direction, and check if mapped pages need bouncing
 	 */
+	if (!write_to_vm)
+		bio->bi_rw |= (1 << BIO_RW);
+
 	blk_queue_bounce(q, &bio);
 	return bio;
 out:
@@ -521,17 +514,42 @@ out:
 }
 
 /**
- *	bio_unmap_user	-	unmap a bio
- *	@bio:		the bio being unmapped
- *	@write_to_vm:	bool indicating whether pages were written to
+ *	bio_map_user	-	map user address into bio
+ *	@bdev: destination block device
+ *	@uaddr: start of user address
+ *	@len: length in bytes
+ *	@write_to_vm: bool indicating writing to pages or not
  *
- *	Unmap a bio previously mapped by bio_map_user(). The @write_to_vm
- *	must be the same as passed into bio_map_user(). Must be called with
- *	a process context.
- *
- *	bio_unmap_user() may sleep.
+ *	Map the user space address into a bio suitable for io to a block
+ *	device.
  */
-void bio_unmap_user(struct bio *bio, int write_to_vm)
+struct bio *bio_map_user(struct block_device *bdev, unsigned long uaddr,
+			 unsigned int len, int write_to_vm)
+{
+	struct bio *bio;
+
+	bio = __bio_map_user(bdev, uaddr, len, write_to_vm);
+
+	if (bio) {
+		if (bio->bi_size < len) {
+			bio_endio(bio, bio->bi_size, 0);
+			bio_unmap_user(bio, 0);
+			return NULL;
+		}
+
+		/*
+		 * subtle -- if __bio_map_user() ended up bouncing a bio,
+		 * it would normally disappear when its bi_end_io is run.
+		 * however, we need it for the unmap, so grab an extra
+		 * reference to it
+		 */
+		bio_get(bio);
+	}
+
+	return bio;
+}
+
+static void __bio_unmap_user(struct bio *bio, int write_to_vm)
 {
 	struct bio_vec *bvec;
 	int i;
@@ -558,6 +576,23 @@ void bio_unmap_user(struct bio *bio, int write_to_vm)
 		page_cache_release(bvec->bv_page);
 	}
 
+	bio_put(bio);
+}
+
+/**
+ *	bio_unmap_user	-	unmap a bio
+ *	@bio:		the bio being unmapped
+ *	@write_to_vm:	bool indicating whether pages were written to
+ *
+ *	Unmap a bio previously mapped by bio_map_user(). The @write_to_vm
+ *	must be the same as passed into bio_map_user(). Must be called with
+ *	a process context.
+ *
+ *	bio_unmap_user() may sleep.
+ */
+void bio_unmap_user(struct bio *bio, int write_to_vm)
+{
+	__bio_unmap_user(bio, write_to_vm);
 	bio_put(bio);
 }
 

@@ -99,16 +99,16 @@
 **==========================================================
 */
 
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
+#include <linux/version.h>
 
 #include <linux/module.h>
 
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,17)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
-#elif LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 #include <asm/spinlock.h>
 #endif
 #include <linux/delay.h>
@@ -123,10 +123,9 @@
 #include <linux/timer.h>
 #include <linux/stat.h>
 
-#include <linux/version.h>
 #include <linux/blk.h>
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,35)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
 #include <linux/init.h>
 #endif
 
@@ -137,7 +136,7 @@
 #define	__initdata
 #endif
 
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,1,92)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #include <linux/bios32.h>
 #endif
 
@@ -170,7 +169,7 @@ typedef u64 u_int64;
 **	Donnot compile integrity checking code for Linux-2.3.0 
 **	and above since SCSI data structures are not ready yet.
 */
-/* #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,0) */
+/* #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 #if 0
 #define	SCSI_NCR_INTEGRITY_CHECKING
 #endif
@@ -183,7 +182,7 @@ typedef u64 u_int64;
 **	despite the fact that the PCI specifications are looking 
 **	so smart and simple! ;-)
 */
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,47)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,47)
 #define SCSI_NCR_DYNAMIC_DMA_MAPPING
 #endif
 
@@ -439,7 +438,7 @@ static inline struct xpt_quehead *xpt_remque_tail(struct xpt_quehead *head)
 **	code.
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,2,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
 
 typedef struct pci_dev *pcidev_t;
 #define PCIDEV_NULL		(0)
@@ -454,7 +453,7 @@ pci_get_base_cookie(struct pci_dev *pdev, int index)
 {
 	u_long base;
 
-#if LINUX_VERSION_CODE > LinuxVersionCode(2,3,12)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,12)
 	base = pdev->resource[index].start;
 #else
 	base = pdev->base_address[index];
@@ -574,13 +573,13 @@ pci_get_base_cookie(struct pci_dev *pdev, int offset)
 	return base;
 }
 
-#endif	/* LINUX_VERSION_CODE >= LinuxVersionCode(2,2,0) */
+#endif	/* LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0) */
 
 /* Does not make sense in earlier kernels */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 #define pci_enable_device(pdev)		(0)
 #endif
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
 #define	scsi_set_pci_device(inst, pdev)	(0)
 #endif
 
@@ -630,7 +629,7 @@ static int ncr_debug = SCSI_NCR_DEBUG_FLAGS;
 **	  wished (e.g.: threaded by controller).
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 
 spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_DRIVER(flags)     spin_lock_irqsave(&sym53c8xx_lock, flags)
@@ -670,7 +669,7 @@ spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 **	architecture.
 */
 
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,1,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0)
 #define ioremap vremap
 #define iounmap vfree
 #endif
@@ -713,7 +712,7 @@ static void __init unmap_pci_mem(u_long vaddr, u_long size)
 **	inaccurate on Pentium processors.
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,105)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,105)
 #define UDELAY udelay
 #define MDELAY mdelay
 #else
@@ -735,7 +734,7 @@ static void MDELAY(long ms) { while (ms--) UDELAY(1000); }
 **	real bus astraction, btw).
 */
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 #define __GetFreePages(flags, order) __get_free_pages(flags, order)
 #else
 #define __GetFreePages(flags, order) __get_free_pages(flags, order, 0)
@@ -1282,7 +1281,7 @@ static __inline__ int scsi_data_direction(Scsi_Cmnd *cmd)
 /*
 **	/proc directory entry and proc_info function
 */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
 static struct proc_dir_entry proc_scsi_sym53c8xx = {
     PROC_SCSI_SYM53C8XX, 9, NAME53C8XX,
     S_IFDIR | S_IRUGO | S_IXUGO, 2
@@ -1307,7 +1306,7 @@ static struct ncr_driver_setup
 	driver_safe_setup __initdata	= SCSI_NCR_DRIVER_SAFE_SETUP;
 # ifdef	MODULE
 char *sym53c8xx = 0;	/* command line passed by insmod */
-#  if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,30)
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_PARM(sym53c8xx, "s");
 #  endif
 # endif
@@ -2026,7 +2025,7 @@ struct ncb {
 					/*  when lcb is not allocated.	*/
 	Scsi_Cmnd	*done_list;	/* Commands waiting for done()  */
 					/* callback to be invoked.      */ 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t	smp_lock;	/* Lock for SMP threading       */
 #endif
 
@@ -5843,7 +5842,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 			((driver_setup.irqm & 0x20) ? 0 : SA_INTERRUPT),
 #else
 			((driver_setup.irqm & 0x10) ? 0 : SA_SHIRQ) |
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,2,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
 			((driver_setup.irqm & 0x20) ? 0 : SA_INTERRUPT),
 #else
 			0,
@@ -5907,7 +5906,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->max_id	= np->maxwide ? 16 : 8;
 	instance->max_lun	= MAX_LUN;
 #ifndef SCSI_NCR_IOMAPPED
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,29)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,29)
 	instance->base		= (unsigned long) np->reg;
 #else
 	instance->base		= (char *) np->reg;
@@ -7406,7 +7405,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		}
 	}
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,99)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,99)
 	/*
 	**	Move residual byte count to user structure.
 	*/
@@ -12774,7 +12773,7 @@ int __init sym53c8xx_setup(char *str)
 	return 1;
 }
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,13)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 #ifndef MODULE
 __setup("sym53c8xx=", sym53c8xx_setup);
 #endif
@@ -12915,7 +12914,7 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 	**    Initialize driver general stuff.
 	*/
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
      tpnt->proc_dir  = &proc_scsi_sym53c8xx;
 #else
      tpnt->proc_name = NAME53C8XX;
@@ -13244,7 +13243,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 		pci_write_config_word(pdev, PCI_COMMAND, command);
 	}
 
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,2,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
 	if ( is_prep ) {
 		if (io_port >= 0x10000000) {
 			printk(NAME53C8XX ": reallocating io_port (Wacky IBM)");
@@ -13270,7 +13269,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 
 #if defined(__i386__) && !defined(MODULE)
 	if (!cache_line_size) {
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,1,75)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,75)
 		extern char x86;
 		switch(x86) {
 #else
@@ -14719,10 +14718,10 @@ sym_read_Tekram_nvram (ncr_slot *np, u_short device_id, Tekram_nvram *nvram)
 
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static
 #endif
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
 Scsi_Host_Template driver_template = SYM53C8XX;
 #include "scsi_module.c"
 #endif

@@ -1783,7 +1783,6 @@ int __init virgefb_init(void)
 	fbhw = &virgefb_hw_switch;
 	strcpy(fb_info.modename, virgefb_name);
 	fb_info.changevar = NULL;
-	fb_info.node = NODEV;
 	fb_info.fbops = &virgefb_ops;
 	fb_info.disp = &disp;
 	fb_info.currcon = -1;
@@ -1806,7 +1805,7 @@ int __init virgefb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device, using %ldK of video memory\n",
-	       minor(fb_info.node), fb_info.modename, v_ram_size>>10);
+	       fb_info.node, fb_info.modename, v_ram_size>>10);
 
 	/* TODO: This driver cannot be unloaded yet */
 

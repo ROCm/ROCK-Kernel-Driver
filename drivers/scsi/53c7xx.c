@@ -6056,7 +6056,7 @@ NCR53c7x0_release(struct Scsi_Host *host) {
 	(struct NCR53c7x0_hostdata *) host->hostdata[0];
     struct NCR53c7x0_cmd *cmd, *tmp;
     shutdown (host);
-    if (host->irq != IRQ_NONE)
+    if (host->irq != SCSI_IRQ_NONE)
 	{
 	    int irq_count;
 	    struct Scsi_Host *tmp;

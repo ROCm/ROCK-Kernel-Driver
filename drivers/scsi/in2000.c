@@ -832,7 +832,7 @@ static void transfer_bytes(Scsi_Cmnd * cmd, int data_in_dir)
  * but it _does_ need to be able to compile and run in an SMP kernel.)
  */
 
-static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 {
 	struct Scsi_Host *instance = dev_id;
 	struct IN2000_hostdata *hostdata;
@@ -986,7 +986,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 /* release the SMP spin_lock and restore irq state */
 		spin_unlock_irqrestore(instance->host_lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 /* This interrupt was triggered by the WD33c93 chip. The fifo interrupt
@@ -1004,7 +1004,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 /* release the SMP spin_lock and restore irq state */
 		spin_unlock_irqrestore(instance->host_lock, flags);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	DB(DB_INTR, printk("{%02x:%02x-", asr, sr))
@@ -1416,7 +1416,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 /* release the SMP spin_lock and restore irq state */
 			spin_unlock_irqrestore(instance->host_lock, flags);
-			return;
+			return IRQ_HANDLED;
 		}
 		DB(DB_INTR, printk("UNEXP_DISC-%ld", cmd->pid))
 		    hostdata->connected = NULL;
@@ -1589,7 +1589,7 @@ static void in2000_intr(int irqnum, void *dev_id, struct pt_regs *ptregs)
 
 /* release the SMP spin_lock and restore irq state */
 	    spin_unlock_irqrestore(instance->host_lock, flags);
-
+	return IRQ_HANDLED;
 }
 
 
@@ -1910,7 +1910,7 @@ static int __init in2000_detect(Scsi_Host_Template * tpnt)
 	unsigned short base;
 	uchar switches;
 	uchar hrev;
-	int flags;
+	unsigned long flags;
 	int val;
 	char buf[32];
 

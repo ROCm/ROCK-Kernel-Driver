@@ -426,7 +426,6 @@ int __init vfb_init(void)
 	memset(videomemory, 0, videomemorysize);
 
 	fb_info.screen_base = videomemory;
-	fb_info.node = NODEV;
 	fb_info.fbops = &vfb_ops;
 
 	retval = fb_find_mode(&fb_info.var, &fb_info, NULL,
@@ -447,7 +446,7 @@ int __init vfb_init(void)
 
 	printk(KERN_INFO
 	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       minor(fb_info.node), videomemorysize >> 10);
+	       fb_info.node, videomemorysize >> 10);
 	return 0;
 }
 

@@ -41,6 +41,7 @@
 #include <linux/types.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/fs.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>

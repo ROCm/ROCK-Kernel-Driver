@@ -1,3 +1,33 @@
+Version 0.75
+------------
+Fix delete of readonly file to Windows servers.  Reflect
+presence or absence of read only dos attribute in mode
+bits for servers that do not support CIFS Unix extensions.
+Fix shortened results on readdir of large directories to
+servers supporting CIFS Unix extensions (caused by
+incorrect resume key).
+
+Version 0.74
+------------
+Fix truncate bug (set file size) that could cause hangs e.g. running fsx
+
+Version 0.73
+------------
+unload nls if mount fails.
+
+Version 0.72
+------------
+Add resume key support to search (readdir) code to workaround
+Windows bug.  Add /proc/fs/cifs/LookupCacheEnable which
+allows disabling caching of attribute information for
+lookups.
+
+Version 0.71
+------------
+Add more oplock handling (distributed caching code).  Remove
+dead code.  Remove excessive stack space utilization from
+symlink routines.
+
 Version 0.70
 ------------
 Fix oops in get dfs referral (triggered when null path sent in to

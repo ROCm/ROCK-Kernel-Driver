@@ -8,6 +8,8 @@
 #ifndef _53C700_H
 #define _53C700_H
 
+#include <linux/interrupt.h>
+
 #include <asm/io.h>
 
 /* Turn on for general debugging---too verbose for normal use */
@@ -52,7 +54,7 @@ struct NCR_700_Host_Parameters;
 /* These are the externally used routines */
 struct Scsi_Host *NCR_700_detect(Scsi_Host_Template *, struct NCR_700_Host_Parameters *);
 int NCR_700_release(struct Scsi_Host *host);
-void NCR_700_intr(int, void *, struct pt_regs *);
+irqreturn_t NCR_700_intr(int, void *, struct pt_regs *);
 
 
 enum NCR_700_Host_State {

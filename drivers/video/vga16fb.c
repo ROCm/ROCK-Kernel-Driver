@@ -1364,7 +1364,6 @@ int __init vga16fb_init(void)
 	vga16fb_defined.blue.length  = i;	
 
 	/* name should not depend on EGA/VGA */
-	vga16fb.node = NODEV;
 	vga16fb.fbops = &vga16fb_ops;
 	vga16fb.var = vga16fb_defined;
 	vga16fb.fix = vga16fb_fix;
@@ -1385,7 +1384,7 @@ int __init vga16fb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       minor(vga16fb.node), vga16fb.fix.id);
+	       vga16fb.node, vga16fb.fix.id);
 
 	return 0;
 }

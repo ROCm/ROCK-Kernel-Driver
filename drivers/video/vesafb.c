@@ -359,7 +359,6 @@ int __init vesafb_init(void)
 		}
 	}
 	
-	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;
 	fb_info.fix = vesafb_fix;
@@ -372,7 +371,7 @@ int __init vesafb_init(void)
 		return -EINVAL;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       minor(fb_info.node), fb_info.fix.id);
+	       fb_info.node, fb_info.fix.id);
 	return 0;
 }
 
