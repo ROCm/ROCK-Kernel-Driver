@@ -54,7 +54,9 @@ struct appldata_mem_data {
 	u64 freeswap;		/* free swap space */
 
 // New in 2.6 -->
-	u64 pgalloc;		/* page allocations */
+	u64 pgalloc_high;	/* page allocations */
+	u64 pgalloc_normal;
+	u64 pgalloc_dma;
 	u64 pgfault;		/* page faults (major+minor) */
 	u64 pgmajfault;		/* page faults (major only) */
 // <-- New in 2.6
@@ -69,7 +71,9 @@ static inline void appldata_debug_print(struct appldata_mem_data *mem_data)
 	P_DEBUG("pgpgout    = %8lu KB\n", mem_data->pgpgout);
 	P_DEBUG("pswpin     = %8lu Pages\n", mem_data->pswpin);
 	P_DEBUG("pswpout    = %8lu Pages\n", mem_data->pswpout);
-	P_DEBUG("pgalloc    = %8lu \n", mem_data->pgalloc);
+	P_DEBUG("pgalloc_high   = %8lu \n", mem_data->pgalloc_high);
+	P_DEBUG("pgalloc_normal = %8lu \n", mem_data->pgalloc_normal);
+	P_DEBUG("pgalloc_dma    = %8lu \n", mem_data->pgalloc_dma);
 	P_DEBUG("pgfault    = %8lu \n", mem_data->pgfault);
 	P_DEBUG("pgmajfault = %8lu \n", mem_data->pgmajfault);
 	P_DEBUG("sharedram  = %8lu KB\n", mem_data->sharedram);
@@ -105,11 +109,14 @@ static void appldata_get_mem_data(void *data)
 	mem_data->pgpgout    = ps.pgpgout >> 1;
 	mem_data->pswpin     = ps.pswpin;
 	mem_data->pswpout    = ps.pswpout;
-	mem_data->pgalloc    = ps.pgalloc;
+	mem_data->pgalloc_high   = ps.pgalloc_high;
+	mem_data->pgalloc_normal = ps.pgalloc_normal;
+	mem_data->pgalloc_dma    = ps.pgalloc_dma;
 	mem_data->pgfault    = ps.pgfault;
 	mem_data->pgmajfault = ps.pgmajfault;
 
-P_DEBUG("pgalloc = %lu, pgfree = %lu\n", ps.pgalloc, ps.pgfree);
+P_DEBUG("pgalloc_high = %lu, pgalloc_normal = %lu, pgalloc_dma = %lu, pgfree = %lu\n",
+	ps.pgalloc_high, ps.pgalloc_normal, ps.pgalloc_dma, ps.pgfree);
 
 	si_meminfo(&val);
 	mem_data->sharedram = val.sharedram;
