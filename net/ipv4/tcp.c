@@ -1449,6 +1449,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
 		if (!desc->count)
 			break;
 	}
+	tp->copied_seq = seq;
 	/* Clean up data we have read: This will do ACK frames. */
 	if (copied)
 		cleanup_rbuf(sk, copied);
