@@ -75,36 +75,96 @@ struct fb_fix_screeninfo igafb_fix __initdata = {
 };
 
 struct fb_var_screeninfo default_var = {
-    /* 640x480, 60 Hz, Non-Interlaced (25.175 MHz dotclock) */
-    640, 480, 640, 480, 0, 0, 8, 0,
-    {0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-    0, 0, -1, -1, 0, 39722, 48, 16, 33, 10, 96, 2,
-    0, FB_VMODE_NONINTERLACED
+	/* 640x480, 60 Hz, Non-Interlaced (25.175 MHz dotclock) */
+	.xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480,
+	.bits_per_pixel	= 8,
+	.red		= {0, 8, 0 },
+	.green		= {0, 8, 0 },
+	.blue		= {0, 8, 0 },
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= FB_ACCEL_NONE,
+	.pixclock	= 39722,
+	.left_margin	= 48,
+	.right_margin	= 16,
+	.upper_margin	= 33,
+	.lower_margin	= 10,
+	.hsync_len	= 96,
+	.vsync_len	= 2,
+	.vmode		= FB_VMODE_NONINTERLACED
 };
 
 #ifdef __sparc__
 struct fb_var_screeninfo default_var_1024x768 __initdata = {
-    /* 1024x768, 75 Hz, Non-Interlaced (78.75 MHz dotclock) */
-    1024, 768, 1024, 768, 0, 0, 8, 0,
-    {0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-    0, 0, -1, -1, 0, 12699, 176, 16, 28, 1, 96, 3,
-    FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	/* 1024x768, 75 Hz, Non-Interlaced (78.75 MHz dotclock) */
+	.xres		= 1024,
+	.yres		= 768,
+	.xres_virtual	= 1024,
+	.yres_virtual	= 768,
+	.bits_per_pixel	= 8,
+	.red		= {0, 8, 0 },
+	.green		= {0, 8, 0 },
+	.blue		= {0, 8, 0 },
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= FB_ACCEL_NONE,
+	.pixclock	= 12699,
+	.left_margin	= 176,
+	.right_margin	= 16,
+	.upper_margin	= 28,
+	.lower_margin	= 1,
+	.hsync_len	= 96,
+	.vsync_len	= 3,
+	.vmode		= FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
 };
 
 struct fb_var_screeninfo default_var_1152x900 __initdata = {
-    /* 1152x900, 76 Hz, Non-Interlaced (110.0 MHz dotclock) */
-    1152, 900, 1152, 900, 0, 0, 8, 0,
-    {0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-    0, 0, -1, -1, 0, 9091, 234, 24, 34, 3, 100, 3,
-    FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	/* 1152x900, 76 Hz, Non-Interlaced (110.0 MHz dotclock) */
+	.xres		= 1152,
+	.yres		= 900,
+	.xres_virtual	= 1152,
+	.yres_virtual	= 900,
+	.bits_per_pixel	= 8,
+	.red		= { 0, 8, 0 },
+	.green		= { 0, 8, 0 },
+	.blue		= { 0, 8, 0 },
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= FB_ACCEL_NONE,
+	.pixclock	= 9091,
+	.left_margin	= 234,
+	.right_margin	= 24,
+	.upper_margin	= 34,
+	.lower_margin	= 3,
+	.hsync_len	= 100,
+	.vsync_len	= 3,
+	.vmode		= FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
 };
 
 struct fb_var_screeninfo default_var_1280x1024 __initdata = {
-    /* 1280x1024, 75 Hz, Non-Interlaced (135.00 MHz dotclock) */
-    1280, 1024, 1280, 1024, 0, 0, 8, 0,
-    {0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-    0, 0, -1, -1, 0, 7408, 248, 16, 38, 1, 144, 3,
-    FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	/* 1280x1024, 75 Hz, Non-Interlaced (135.00 MHz dotclock) */
+	.xres		= 1280,
+	.yres		= 1024,
+	.xres_virtual	= 1280,
+	.yres_virtaul	= 1024,
+	.bits_per_pixel	= 8,
+	.red		= {0, 8, 0 }, 
+	.green		= {0, 8, 0 },
+	.blue		= {0, 8, 0 },
+	.height		= -1,
+	.width		= -1,
+	.accel_flags	= 0,
+	.pixclock	= 7408,
+	.left_margin	= 248,
+	.right_margin	= 16,
+	.upper_margin	= 38,
+	.lower_margin	= 1,
+	.hsync_len	= 144,
+	.vsync_len	= 3,
+	.vmode		= FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
 };
 
 /*

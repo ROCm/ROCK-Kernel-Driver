@@ -34,7 +34,7 @@
 #include <linux/in.h>
 #include <linux/module.h>
 #include <linux/namei.h>
-
+#include <linux/vfs.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #ifdef CONFIG_NFSD_V3

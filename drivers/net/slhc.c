@@ -95,7 +95,6 @@ slhc_init(int rslots, int tslots)
 	register struct cstate *ts;
 	struct slcompress *comp;
 
-	MOD_INC_USE_COUNT;
 	comp = (struct slcompress *)kmalloc(sizeof(struct slcompress),
 					    GFP_KERNEL);
 	if (! comp)
@@ -147,7 +146,6 @@ out_free2:
 out_free:
 	kfree((unsigned char *)comp);
 out_fail:
-	MOD_DEC_USE_COUNT;
 	return NULL;
 }
 
@@ -166,7 +164,6 @@ slhc_free(struct slcompress *comp)
 		kfree( comp->rstate );
 
 	kfree( comp );
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -684,7 +681,6 @@ slhc_remember(struct slcompress *comp, unsigned char *icp, int isize)
 	comp->sls_i_uncompressed++;
 	return isize;
 }
-
 
 int
 slhc_toss(struct slcompress *comp)

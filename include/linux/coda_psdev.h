@@ -6,6 +6,8 @@
 
 #define CODA_SUPER_MAGIC	0x73757245
 
+struct statfs;
+
 struct coda_sb_info
 {
 	struct venus_comm * sbi_vcomm;

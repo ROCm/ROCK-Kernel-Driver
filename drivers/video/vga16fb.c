@@ -329,9 +329,6 @@ static int vga16fb_release(struct fb_info *info, int user)
 static int vga16fb_check_var(struct fb_var_screeninfo *var,
 			     struct fb_info *info)
 {
-#ifdef FBCON_HAS_VGA
-	struct display *p = (info->currcon < 0) ? info->disp : (fb_display + info->currcon);
-#endif
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
 	u32 xres, right, hslen, left, xtotal;
 	u32 yres, lower, vslen, upper, ytotal;
@@ -368,20 +365,7 @@ static int vga16fb_check_var(struct fb_var_screeninfo *var,
 			mode = MODE_SKIP4 | MODE_8BPP | MODE_CFB;
 			maxmem = 16384;
 		}
-	}
-#ifdef FBCON_HAS_VGA	
-	else if (var->bits_per_pixel == 0) {
-		int fh;
-
-		shift = 3;
-		mode = MODE_TEXT;
-		fh = fontheight(p);
-		if (!fh)
-			fh = 16;
-		maxmem = 32768 * fh;
-	}
-#endif
-	else
+	} else
 		return -EINVAL;
 
 	xres = (var->xres + 7) & ~7;
@@ -548,42 +532,6 @@ static int vga16fb_check_var(struct fb_var_screeninfo *var,
 }
 #undef FAIL
 
-#ifdef FBCON_HAS_VGA
-static void vga16fb_load_font(struct display* p)
-{
-	int chars;
-	unsigned char* font;
-	unsigned char* dest;
-	int chars;
-	
-	if (!p || !p->fontdata)
-		return;
-	chars = 256;
-	font = p->fontdata;
-	dest = vga16fb.screen_base;
-	
-	vga_io_wseq(0x00, 0x01);
-	vga_io_wseq(VGA_SEQ_PLANE_WRITE, 0x04);
-	vga_io_wseq(VGA_SEQ_MEMORY_MODE, 0x07);
-	vga_io_wseq(0x00, 0x03);
-	vga_io_wgfx(VGA_GFX_MODE, 0x00);
-	vga_io_wgfx(VGA_GFX_MISC, 0x04);
-	while (chars--) {
-		int i;
-		
-		for (i = fontheight(p); i > 0; i--)
-			writeb(*font++, dest++);
-		dest += 32 - fontheight(p);
-	}
-	vga_io_wseq(0x00, 0x01);
-	vga_io_wseq(VGA_SEQ_PLANE_WRITE, 0x03);
-	vga_io_wseq(VGA_SEQ_MEMORY_MODE, 0x03);
-	vga_io_wseq(0x00, 0x03);
-	vga_io_wgfx(VGA_GFX_MODE, 0x10);
-	vga_io_wgfx(VGA_GFX_MISC, 0x06);
-}
-#endif
-
 static int vga16fb_set_par(struct fb_info *info)
 {
 	struct vga16fb_par *par = (struct vga16fb_par *) info->par;
@@ -690,10 +638,6 @@ static int vga16fb_set_par(struct fb_info *info)
 		vga_io_wattr(i, atc[i]);
 	}
 
-#ifdef FBCON_HAS_VGA
-	if (par->mode & MODE_TEXT)
-		vga16fb_load_font(p);
-#endif	
 	/* Wait for screen to stabilize. */
 	mdelay(50);
 
@@ -1051,10 +995,6 @@ void vga16fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 		} else 
 			vga_8planes_fillrect(info, rect);
 		break;
-#ifdef FBCON_HAS_VGA
-	case FB_TYPE_TEXT:
-		break;
-#endif
 	case FB_TYPE_PACKED_PIXELS:
 	default:
 		cfb_fillrect(info, rect);
@@ -1198,10 +1138,6 @@ void vga16fb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		} else 
 			vga_8planes_copyarea(info, area);
 		break;
-#ifdef FBCON_HAS_VGA
-	case FB_TYPE_TEXT:
-		break;
-#endif
 	case FB_TYPE_PACKED_PIXELS:
 	default:
 		cfb_copyarea(info, area);
@@ -1313,10 +1249,6 @@ void vga_imageblit_expand(struct fb_info *info, struct fb_image *image)
 		} else 
 			vga_8planes_imageblit(info, image);
 		break;
-#ifdef FBCON_HAS_VGA
-	case FB_TYPE_TEXT:
-		break;
-#endif
 	case FB_TYPE_PACKED_PIXELS:
 	default:
 		cfb_imageblit(info, image);

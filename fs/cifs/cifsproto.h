@@ -22,6 +22,8 @@
 #define _CIFSPROTO_H
 #include <linux/nls.h>
 
+struct statfs;
+
 /*
  *****************************************************************
  * All Prototypes

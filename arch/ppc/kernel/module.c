@@ -101,24 +101,31 @@ static unsigned long get_plt_size(const Elf32_Ehdr *hdr,
 	return ret;
 }
 
-long module_core_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
+int module_frob_arch_sections(Elf32_Ehdr *hdr,
+			      Elf32_Shdr *sechdrs,
+			      const char *secstrings,
+			      struct module *me)
 {
-	module->arch.core_plt_offset = ALIGN(module->core_size, 4);
-	return module->arch.core_plt_offset
-		+ get_plt_size(hdr, sechdrs, secstrings, 0);
-}
+	unsigned int i;
 
-long module_init_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	module->arch.init_plt_offset = ALIGN(module->init_size, 4);
-	return module->arch.init_plt_offset
-		+ get_plt_size(hdr, sechdrs, secstrings, 1);
+	/* Find .plt and .pltinit sections */
+	for (i = 0; i < hdr->e_shnum; i++) {
+		if (strcmp(secstrings + sechdrs[i].sh_name, ".plt.init") == 0)
+			me->arch.init_plt_section = i;
+		else if (strcmp(secstrings + sechdrs[i].sh_name, ".plt") == 0)
+			me->arch.core_plt_section = i;
+	}
+	if (!me->arch.core_plt_section || !me->arch.init_plt_section) {
+		printk("Module doesn't contain .plt or .plt.init sections.\n");
+		return -ENOEXEC;
+	}
+
+	/* Override their sizes */
+	sechdrs[me->arch.core_plt_section].sh_size
+		= get_plt_size(hdr, sechdrs, secstrings, 0);
+	sechdrs[me->arch.init_plt_section].sh_size
+		= get_plt_size(hdr, sechdrs, secstrings, 1);
+	return 0;
 }
 
 int apply_relocate(Elf32_Shdr *sechdrs,
@@ -141,17 +148,20 @@ static inline int entry_matches(struct ppc_plt_entry *entry, Elf32_Addr val)
 }
 
 /* Set up a trampoline in the PLT to bounce us to the distant function */
-static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
+static uint32_t do_plt_call(void *location,
+			    Elf32_Addr val, 
+			    Elf32_Shdr *sechdrs,
+			    struct module *mod)
 {
 	struct ppc_plt_entry *entry;
 
 	DEBUGP("Doing plt for call to 0x%x at 0x%x\n", val, (unsigned int)location);
 	/* Init, or core PLT? */
 	if (location >= mod->module_core
-	    && location < mod->module_core + mod->arch.core_plt_offset)
-		entry = mod->module_core + mod->arch.core_plt_offset;
+	    && location < mod->module_core + mod->core_size)
+		entry = (void *)sechdrs[mod->arch.core_plt_section].sh_addr;
 	else
-		entry = mod->module_init + mod->arch.init_plt_offset;
+		entry = (void *)sechdrs[mod->arch.init_plt_section].sh_addr;
 
 	/* Find this entry, or if that fails, the next avail. entry */
 	while (entry->jump[0]) {
@@ -176,7 +186,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		       struct module *module)
 {
 	unsigned int i;
-	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_offset;
+	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_addr;
 	Elf32_Sym *sym;
 	uint32_t *location;
 	uint32_t value;
@@ -185,10 +195,10 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	       sechdrs[relsec].sh_info);
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rela); i++) {
 		/* This is where to make the change */
-		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_offset
+		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rela[i].r_offset;
 		/* This is the symbol it is referring to */
-		sym = (Elf32_Sym *)sechdrs[symindex].sh_offset
+		sym = (Elf32_Sym *)sechdrs[symindex].sh_addr
 			+ ELF32_R_SYM(rela[i].r_info);
 		if (!sym->st_value) {
 			printk(KERN_WARNING "%s: Unknown symbol %s\n",
@@ -220,7 +230,8 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 		case R_PPC_REL24:
 			if ((int)(value - (uint32_t)location) < -0x02000000
 			    || (int)(value - (uint32_t)location) >= 0x02000000)
-				value = do_plt_call(location, value, module);
+				value = do_plt_call(location, value,
+						    sechdrs, module);
 
 			/* Only replace bits 2 through 26 */
 			DEBUGP("REL24 value = %08X. location = %08X\n",

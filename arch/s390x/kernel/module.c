@@ -52,24 +52,14 @@ void module_free(struct module *mod, void *module_region)
 }
 
 /* s390/s390x needs additional memory for GOT/PLT sections. */
-long module_core_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
+int module_frob_arch_sections(const Elf_Ehdr *hdr,
+			      const Elf_Shdr *sechdrs,
+			      const char *secstrings,
+			      struct module *mod)
 {
 	// FIXME: add space needed for GOT/PLT
-	return module->core_size;
+	return 0;
 }
-
-long module_init_size(const Elf32_Ehdr *hdr,
-		      const Elf32_Shdr *sechdrs,
-		      const char *secstrings,
-		      struct module *module)
-{
-	return module->init_size;
-}
-
-
 
 int apply_relocate(Elf_Shdr *sechdrs,
 		   const char *strtab,
@@ -78,7 +68,7 @@ int apply_relocate(Elf_Shdr *sechdrs,
 		   struct module *me)
 {
 	unsigned int i;
-	ElfW(Rel) *rel = (void *)sechdrs[relsec].sh_offset;
+	ElfW(Rel) *rel = (void *)sechdrs[relsec].sh_addr;
 	ElfW(Sym) *sym;
 	ElfW(Addr) *location;
 
@@ -86,10 +76,10 @@ int apply_relocate(Elf_Shdr *sechdrs,
 	       sechdrs[relsec].sh_info);
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
 		/* This is where to make the change */
-		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_offset
+		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
 		/* This is the symbol it is referring to */
-		sym = (ElfW(Sym) *)sechdrs[symindex].sh_offset
+		sym = (ElfW(Sym) *)sechdrs[symindex].sh_addr
 			+ ELFW(R_SYM)(rel[i].r_info);
 		if (!sym->st_value) {
 			printk(KERN_WARNING "%s: Unknown symbol %s\n",

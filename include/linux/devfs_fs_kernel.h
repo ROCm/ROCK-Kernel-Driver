@@ -53,17 +53,8 @@ extern int devfs_mk_symlink (devfs_handle_t dir, const char *name,
 			     devfs_handle_t *handle, void *info);
 extern devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name,
 				    void *info);
-extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
-					int traverse_symlinks);
-extern devfs_handle_t devfs_get_handle_from_inode (struct inode *inode);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
 extern int devfs_set_file_size (devfs_handle_t de, unsigned long size);
-extern void *devfs_get_info (devfs_handle_t de);
-extern int devfs_set_info (devfs_handle_t de, void *info);
-extern devfs_handle_t devfs_get_parent (devfs_handle_t de);
-extern devfs_handle_t devfs_get_first_child (devfs_handle_t de);
-extern devfs_handle_t devfs_get_next_sibling (devfs_handle_t de);
-extern const char *devfs_get_name (devfs_handle_t de, unsigned int *namelen);
 extern int devfs_only (void);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
@@ -115,18 +106,8 @@ static inline devfs_handle_t devfs_mk_dir (devfs_handle_t dir,
 {
     return NULL;
 }
-static inline devfs_handle_t devfs_get_handle (devfs_handle_t dir,
-					       const char *name,
-					       int traverse_symlinks)
-{
-    return NULL;
-}
 static inline void devfs_remove(const char *fmt, ...)
 {
-}
-static inline devfs_handle_t devfs_get_handle_from_inode (struct inode *inode)
-{
-    return NULL;
 }
 static inline int devfs_generate_path (devfs_handle_t de, char *path,
 				       int buflen)
@@ -136,31 +117,6 @@ static inline int devfs_generate_path (devfs_handle_t de, char *path,
 static inline int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 {
     return -ENOSYS;
-}
-static inline void *devfs_get_info (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline int devfs_set_info (devfs_handle_t de, void *info)
-{
-    return 0;
-}
-static inline devfs_handle_t devfs_get_parent (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline devfs_handle_t devfs_get_first_child (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline devfs_handle_t devfs_get_next_sibling (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline const char *devfs_get_name (devfs_handle_t de,
-					  unsigned int *namelen)
-{
-    return NULL;
 }
 static inline int devfs_only (void)
 {
