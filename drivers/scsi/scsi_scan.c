@@ -1096,6 +1096,7 @@ struct scsi_device *__scsi_add_device(struct Scsi_Host *shost, uint channel,
 
 	return sdev;
 }
+EXPORT_SYMBOL(__scsi_add_device);
 
 void scsi_rescan_device(struct device *dev)
 {
@@ -1239,6 +1240,7 @@ void scsi_scan_host(struct Scsi_Host *shost)
 	scsi_scan_host_selected(shost, SCAN_WILD_CARD, SCAN_WILD_CARD,
 				SCAN_WILD_CARD, 0);
 }
+EXPORT_SYMBOL(scsi_scan_host);
 
 void scsi_forget_host(struct Scsi_Host *shost)
 {
@@ -1293,6 +1295,7 @@ struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
 	}
 	return sdev;
 }
+EXPORT_SYMBOL(scsi_get_host_dev);
 
 /*
  * Function:    scsi_free_host_dev()
@@ -1317,3 +1320,5 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 		sdev->host->transportt->device_destroy(sdev);
 	put_device(&sdev->sdev_gendev);
 }
+EXPORT_SYMBOL(scsi_free_host_dev);
+

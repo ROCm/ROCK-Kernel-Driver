@@ -233,7 +233,8 @@ void scsi_do_req(struct scsi_request *sreq, const void *cmnd,
 	 */
 	scsi_insert_special_req(sreq, 1);
 }
- 
+EXPORT_SYMBOL(scsi_do_req);
+
 static void scsi_wait_done(struct scsi_cmnd *cmd)
 {
 	struct request *req = cmd->request;
@@ -267,6 +268,7 @@ void scsi_wait_req(struct scsi_request *sreq, const void *cmnd, void *buffer,
 
 	__scsi_release_request(sreq);
 }
+EXPORT_SYMBOL(scsi_wait_req);
 
 /*
  * Function:    scsi_init_cmd_errh()
@@ -885,6 +887,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		cmd = scsi_end_request(cmd, 0, block_bytes, 1);
 	}
 }
+EXPORT_SYMBOL(scsi_io_completion);
 
 /*
  * Function:    scsi_init_io()
@@ -1345,6 +1348,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 
 	return bounce_limit;
 }
+EXPORT_SYMBOL(scsi_calculate_bounce_limit);
 
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
@@ -1394,6 +1398,7 @@ void scsi_block_requests(struct Scsi_Host *shost)
 {
 	shost->host_self_blocked = 1;
 }
+EXPORT_SYMBOL(scsi_block_requests);
 
 /*
  * Function:    scsi_unblock_requests()
@@ -1420,6 +1425,7 @@ void scsi_unblock_requests(struct Scsi_Host *shost)
 	shost->host_self_blocked = 0;
 	scsi_run_host_queues(shost);
 }
+EXPORT_SYMBOL(scsi_unblock_requests);
 
 int __init scsi_init_queue(void)
 {
@@ -1554,6 +1560,7 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 
 	return sreq->sr_result;
 }
+EXPORT_SYMBOL(__scsi_mode_sense);
 
 /**
  *	scsi_mode_sense - issue a mode sense, falling back from 10 to 
@@ -1588,6 +1595,7 @@ scsi_mode_sense(struct scsi_device *sdev, int dbd, int modepage,
 
 	return ret;
 }
+EXPORT_SYMBOL(scsi_mode_sense);
 
 int
 scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)

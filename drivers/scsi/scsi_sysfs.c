@@ -611,6 +611,7 @@ void scsi_remove_device(struct scsi_device *sdev)
 out:
 	up(&shost->scan_mutex);
 }
+EXPORT_SYMBOL(scsi_remove_device);
 
 int scsi_register_driver(struct device_driver *drv)
 {
@@ -618,6 +619,7 @@ int scsi_register_driver(struct device_driver *drv)
 
 	return driver_register(drv);
 }
+EXPORT_SYMBOL(scsi_register_driver);
 
 int scsi_register_interface(struct class_interface *intf)
 {
@@ -625,6 +627,7 @@ int scsi_register_interface(struct class_interface *intf)
 
 	return class_interface_register(intf);
 }
+EXPORT_SYMBOL(scsi_register_interface);
 
 
 static struct class_device_attribute *class_attr_overridden(

@@ -173,6 +173,7 @@ int scsi_set_medium_removal(struct scsi_device *sdev, char state)
 		sdev->locked = (state == SCSI_REMOVAL_PREVENT);
 	return ret;
 }
+EXPORT_SYMBOL(scsi_set_medium_removal);
 
 /*
  * This interface is deprecated - users should use the scsi generic (sg)
@@ -354,6 +355,7 @@ error:
 	kfree(buf);
 	return result;
 }
+EXPORT_SYMBOL(scsi_ioctl_send_command);
 
 /*
  * The scsi_ioctl_get_pci() function places into arg the value
@@ -463,6 +465,7 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 	}
 	return -EINVAL;
 }
+EXPORT_SYMBOL(scsi_ioctl);
 
 /*
  * the scsi_nonblock_ioctl() function is designed for ioctls which may

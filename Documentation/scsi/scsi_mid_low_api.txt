@@ -363,8 +363,8 @@ and Adaptec have their own coding conventions.
 Mid level supplied functions
 ============================
 These functions are supplied by the SCSI mid level for use by LLDs.
-The names (i.e. entry points) of these functions are exported (mainly in 
-scsi_syms.c) so an LLD that is a module can access them. The kernel will
+The names (i.e. entry points) of these functions are exported 
+so an LLD that is a module can access them. The kernel will
 arrange for the SCSI mid level to be loaded and initialized before any LLD
 is initialized. The functions below are listed alphabetically and their
 names all start with "scsi_".

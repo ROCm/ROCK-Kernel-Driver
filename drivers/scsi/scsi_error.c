@@ -125,6 +125,7 @@ void scsi_add_timer(struct scsi_cmnd *scmd, int timeout,
 
 	add_timer(&scmd->eh_timeout);
 }
+EXPORT_SYMBOL(scsi_add_timer);
 
 /**
  * scsi_delete_timer - Delete/cancel timer for a given function.
@@ -152,6 +153,7 @@ int scsi_delete_timer(struct scsi_cmnd *scmd)
 
 	return rtn;
 }
+EXPORT_SYMBOL(scsi_delete_timer);
 
 /**
  * scsi_times_out - Timeout function for normal scsi commands.
@@ -214,6 +216,7 @@ int scsi_block_when_processing_errors(struct scsi_device *sdev)
 
 	return online;
 }
+EXPORT_SYMBOL(scsi_block_when_processing_errors);
 
 #ifdef CONFIG_SCSI_LOGGING
 /**
@@ -1752,6 +1755,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 		}
 	}
 }
+EXPORT_SYMBOL(scsi_report_bus_reset);
 
 /*
  * Function:    scsi_report_device_reset()
@@ -1787,6 +1791,7 @@ void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
 		}
 	}
 }
+EXPORT_SYMBOL(scsi_report_device_reset);
 
 static void
 scsi_reset_provider_done_command(struct scsi_cmnd *scmd)
@@ -1866,6 +1871,7 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
 	scsi_next_command(scmd);
 	return rtn;
 }
+EXPORT_SYMBOL(scsi_reset_provider);
 
 /**
  * scsi_normalize_sense - normalize main elements from either fixed or

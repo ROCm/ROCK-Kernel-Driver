@@ -41,6 +41,7 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
 	}
 	return res;
 }
+EXPORT_SYMBOL(scsi_bios_ptable);
 
 /*
  * Function : int scsicam_bios_param (struct block_device *bdev, ector_t capacity, int *ip)
@@ -94,6 +95,7 @@ int scsicam_bios_param(struct block_device *bdev, sector_t capacity, int *ip)
 
 	return 0;
 }
+EXPORT_SYMBOL(scsicam_bios_param);
 
 /*
  * Function : static int scsi_partsize(unsigned char *buf, unsigned long 
@@ -175,6 +177,7 @@ int scsi_partsize(unsigned char *buf, unsigned long capacity,
 	}
 	return -1;
 }
+EXPORT_SYMBOL(scsi_partsize);
 
 /*
  * Function : static int setsize(unsigned long capacity,unsigned int *cyls,

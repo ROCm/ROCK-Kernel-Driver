@@ -352,6 +352,7 @@ void __scsi_print_command(unsigned char *command)
 		printk(" %02x", command[k]);
 	printk("\n");
 }
+EXPORT_SYMBOL(__scsi_print_command);
 
 /* This function (perhaps with the addition of peripheral device type)
  * is more approriate than __scsi_print_command(). Perhaps that static
@@ -403,6 +404,7 @@ scsi_print_status(unsigned char scsi_status) {
 	printk(KERN_INFO "0x%0x", scsi_status);
 #endif
 }
+EXPORT_SYMBOL(scsi_print_status);
 
 #ifdef CONFIG_SCSI_CONSTANTS
 
@@ -1106,6 +1108,7 @@ scsi_sense_key_string(unsigned char key) {
 #endif
 	return NULL;
 }
+EXPORT_SYMBOL(scsi_sense_key_string);
 
 /*
  * Get additional sense code string or NULL if not available.
@@ -1128,6 +1131,7 @@ scsi_extd_sense_format(unsigned char asc, unsigned char ascq) {
 #endif
 	return NULL;
 }
+EXPORT_SYMBOL(scsi_extd_sense_format);
 
 /* Print extended sense information; no leadin, no linefeed */
 static void
@@ -1256,12 +1260,14 @@ void scsi_print_sense(const char *devclass, struct scsi_cmnd *cmd)
 	print_sense_internal(devclass, cmd->sense_buffer,
 			     SCSI_SENSE_BUFFERSIZE, cmd->request);
 }
+EXPORT_SYMBOL(scsi_print_sense);
 
 void scsi_print_req_sense(const char *devclass, struct scsi_request *sreq)
 {
 	print_sense_internal(devclass, sreq->sr_sense_buffer,
 			     SCSI_SENSE_BUFFERSIZE, sreq->sr_request);
 }
+EXPORT_SYMBOL(scsi_print_req_sense);
 
 #ifdef CONFIG_SCSI_CONSTANTS
 static const char *one_byte_msgs[] = {
@@ -1340,6 +1346,7 @@ int scsi_print_msg (const unsigned char *msg)
 		printk("reserved");
 	return len;
 }
+EXPORT_SYMBOL(scsi_print_msg);
 
 #else  /* ifndef CONFIG_SCSI_CONSTANTS */
 
@@ -1367,6 +1374,7 @@ int scsi_print_msg (const unsigned char *msg)
 		printk("%02x ", msg[0]);
 	return len;
 }
+EXPORT_SYMBOL(scsi_print_msg);
 #endif /* ! CONFIG_SCSI_CONSTANTS */
 
 void scsi_print_command(struct scsi_cmnd *cmd)
@@ -1379,6 +1387,7 @@ void scsi_print_command(struct scsi_cmnd *cmd)
 	printk(KERN_INFO "        command: ");
 	scsi_print_cdb(cmd->cmnd, cmd->cmd_len, 0);
 }
+EXPORT_SYMBOL(scsi_print_command);
 
 #ifdef CONFIG_SCSI_CONSTANTS
 
