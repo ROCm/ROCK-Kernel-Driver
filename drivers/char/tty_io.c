@@ -2274,14 +2274,14 @@ int tty_register_driver(struct tty_driver *driver)
 		driver->termios_locked = NULL;
 	}
 
-	strcpy(driver->cdev.kobj.name, driver->name);
+	cdev_set_name(&driver->cdev, driver->name);
 	for (s = strchr(driver->cdev.kobj.name, '/'); s; s = strchr(s, '/'))
 		*s = '!';
 	cdev_init(&driver->cdev, &tty_fops);
 	driver->cdev.owner = driver->owner;
 	error = cdev_add(&driver->cdev, dev, driver->num);
 	if (error) {
-		kobject_del(&driver->cdev.kobj);
+		cdev_del(&driver->cdev);
 		unregister_chrdev_region(dev, driver->num);
 		driver->ttys = NULL;
 		driver->termios = driver->termios_locked = NULL;
@@ -2414,7 +2414,7 @@ static struct cdev vc0_cdev;
  */
 static int __init tty_init(void)
 {
-	strcpy(tty_cdev.kobj.name, "dev.tty");
+	cdev_set_name(&tty_cdev, "dev.tty");
 	cdev_init(&tty_cdev, &tty_fops);
 	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
@@ -2422,7 +2422,7 @@ static int __init tty_init(void)
 	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
 	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 0), NULL, "tty");
 
-	strcpy(console_cdev.kobj.name, "dev.console");
+	cdev_set_name(&console_cdev, "dev.console");
 	cdev_init(&console_cdev, &console_fops);
 	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
@@ -2431,7 +2431,7 @@ static int __init tty_init(void)
 	class_simple_device_add(tty_class, MKDEV(TTYAUX_MAJOR, 1), NULL, "console");
 
 #ifdef CONFIG_UNIX98_PTYS
-	strcpy(ptmx_cdev.kobj.name, "dev.ptmx");
+	cdev_set_name(&ptmx_cdev, "dev.ptmx");
 	cdev_init(&ptmx_cdev, &tty_fops);
 	if (cdev_add(&ptmx_cdev, MKDEV(TTYAUX_MAJOR, 2), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 2), 1, "/dev/ptmx") < 0)
@@ -2441,7 +2441,7 @@ static int __init tty_init(void)
 #endif
 
 #ifdef CONFIG_VT
-	strcpy(vc0_cdev.kobj.name, "dev.vc0");
+	cdev_set_name(&vc0_cdev, "dev.vc0");
 	cdev_init(&vc0_cdev, &console_fops);
 	if (cdev_add(&vc0_cdev, MKDEV(TTY_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTY_MAJOR, 0), 1, "/dev/vc/0") < 0)

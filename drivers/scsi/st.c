@@ -3888,8 +3888,7 @@ static int st_probe(struct device *dev)
 				       dev_num);
 				goto out_free_tape;
 			}
-			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%sm%d%s", disk->disk_name,
-				 mode, j ? "n" : "");
+			cdev_set_name(cdev, "%sm%d%s", disk->disk_name, mode, j ? "n" : "");
 			cdev->owner = THIS_MODULE;
 			cdev->ops = &st_fops;
 
@@ -3944,7 +3943,7 @@ out_free_tape:
 		}
 	}
 	if (cdev)
-		kobject_put(&cdev->kobj);
+		cdev_del(cdev);
 	write_lock(&st_dev_arr_lock);
 	scsi_tapes[dev_num] = NULL;
 	st_nr_dev--;
