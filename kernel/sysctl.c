@@ -72,7 +72,10 @@ extern int printk_ratelimit_burst;
 static int maxolduid = 65535;
 static int minolduid;
 
-static int ngroups_max = NGROUPS_MAX;
+int ngroups_max = __NGROUPS_MAX;
+EXPORT_SYMBOL(ngroups_max);
+static int min_ngroups = 16;
+static int max_ngroups = __NGROUPS_MAX;
 
 #ifdef CONFIG_KMOD
 extern char modprobe_path[];
@@ -639,33 +642,12 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_NGROUPS_MAX,
 		.procname	= "ngroups_max",
 		.data		= &ngroups_max,
-		.maxlen		= sizeof (int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MAXTIMESLICE, 
-		.procname	= "max-timeslice",
-		.data		=  &max_timeslice,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_MINTIMESLICE, 
-		.procname	= "min-timeslice",
-		.data		= &min_timeslice,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_HZ, 
-		.procname	= "HZ",
-		.data		= &__HZ,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &min_ngroups,
+		.extra2		= &max_ngroups,
 	},
 	{ .ctl_name = 0 }
 };
@@ -916,6 +898,30 @@ static ctl_table fs_table[] = {
 		.data		= &aio_max_nr,
 		.maxlen		= sizeof(aio_max_nr),
 		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MAXTIMESLICE, 
+		.procname	= "max-timeslice",
+		.data		=  &max_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MINTIMESLICE, 
+		.procname	= "min-timeslice",
+		.data		= &min_timeslice,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_HZ, 
+		.procname	= "HZ",
+		.data		= &__HZ,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 }
