@@ -17,6 +17,14 @@ bz64wrap: helper script. Uncompressed input is piped to this script,
 which compresses its input, and then outputs the uu-/base64-encoded
 version of the compressed input.
 
+cpcset: Copy changeset between unrelated repositories.
+Attempts to preserve changeset user, user address, description, in
+addition to the changeset (the patch) itself.
+Typical usage:
+	cd my-updated-repo
+	bk changes	# looking for a changeset...
+	cpcset 1.1511 . ../another-repo
+
 csets-to-patches: Produces a delta of two BK repositories, in the form
 of individual files, each containing a single cset as a GNU patch.
 Output is several files, each with the filename "/tmp/rev-$REV.patch"
@@ -32,6 +40,11 @@ Typical usage:
 	cd my-updated-repo
 	bk changes -L ~/repo/original-repo 2>&1 | \
 		perl cset-to-linus > summary.txt
+
+gcapatch:  Generates patch containing changes in local repository.
+Typical usage:
+	cd my-updated-repo
+	gcapatch > foo.patch
 
 unbz64wrap: Reverse an encoded, compressed data stream created by
 bz64wrap into an uncompressed, typically text/plain output.
