@@ -268,8 +268,14 @@ const char *module_address_lookup(unsigned long addr,
 #define symbol_put(x) do { } while(0)
 #define symbol_put_addr(x) do { } while(0)
 
-#define try_module_get(module) 1
-#define module_put(module) do { } while(0)
+static inline int try_module_get(struct module *module)
+{
+	return 1;
+}
+
+static inline void module_put(struct module *module)
+{
+}
 
 #define module_name(mod) "kernel"
 
