@@ -1452,11 +1452,12 @@ pcnet32_start_xmit(struct sk_buff *skb, struct net_device *dev)
     status = 0x8300;
     entry = (lp->cur_tx - lp->dirty_tx) & TX_RING_MOD_MASK;
     if ((lp->ltint) &&
-	((entry == TX_RING_SIZE/2) ||
+	((entry == TX_RING_SIZE/3) ||
+	 (entry == (TX_RING_SIZE*2)/3) ||
 	 (entry >= TX_RING_SIZE-2)))
     {
 	/* Enable Successful-TxDone interrupt if we have
-	 * 1/2 of, or nearly all of, our ring buffer Tx'd
+	 * 1/3, 2/3 or nearly all of, our ring buffer Tx'd
 	 * but not yet cleaned up.  Thus, most of the time,
 	 * we will not enable Successful-TxDone interrupts.
 	 */
