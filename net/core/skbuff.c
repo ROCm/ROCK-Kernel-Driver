@@ -1350,7 +1350,7 @@ void skb_add_mtu(int mtu)
 }
 #endif
 
-static void inline skb_split_inside_header(struct sk_buff *skb,
+static inline void skb_split_inside_header(struct sk_buff *skb,
 					   struct sk_buff* skb1,
 					   const u32 len, const int pos)
 {
@@ -1371,7 +1371,7 @@ static void inline skb_split_inside_header(struct sk_buff *skb,
 	skb->tail		   = skb->data + len;
 }
 
-static void inline skb_split_no_header(struct sk_buff *skb,
+static inline void skb_split_no_header(struct sk_buff *skb,
 				       struct sk_buff* skb1,
 				       const u32 len, int pos)
 {
