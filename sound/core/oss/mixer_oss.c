@@ -56,14 +56,8 @@ static int snd_mixer_oss_open(struct inode *inode, struct file *file)
 	fmixer->card = card;
 	fmixer->mixer = card->mixer_oss;
 	file->private_data = fmixer;
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	if (!try_module_get(card->module)) {
 		kfree(fmixer);
-#ifdef LINUX_2_2
-		MOD_DEC_USE_COUNT;
-#endif
 		snd_card_file_remove(card, file);
 		return -EFAULT;
 	}
@@ -77,9 +71,6 @@ static int snd_mixer_oss_release(struct inode *inode, struct file *file)
 	if (file->private_data) {
 		fmixer = (snd_mixer_oss_file_t *) file->private_data;
 		module_put(fmixer->card->module);
-#ifdef LINUX_2_2
-		MOD_DEC_USE_COUNT;
-#endif
 		snd_card_file_remove(fmixer->card, file);
 		kfree(fmixer);
 	}

@@ -246,6 +246,7 @@ static dev_link_t *awc_attach(void)
 
 	memset(link->dev, 0, sizeof(struct dev_node_t));
 
+	init_timer(&link->release);
 	link->release.function = &awc_release;
 	link->release.data = (u_long)link;
 //	link->io.NumPorts1 = 32;

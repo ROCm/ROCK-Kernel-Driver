@@ -78,7 +78,8 @@ static struct irqdesc bad_irq_desc = {
  *	disable_irq - disable an irq and wait for completion
  *	@irq: Interrupt to disable
  *
- *	Disable the selected interrupt line.  We do this lazily.
+ *	Disable the selected interrupt line.  Enables and disables
+ *	are nested.  We do this lazily.
  *
  *	This function may be called from IRQ context.
  */
@@ -88,8 +89,7 @@ void disable_irq(unsigned int irq)
 	unsigned long flags;
 
 	spin_lock_irqsave(&irq_controller_lock, flags);
-	if (!desc->depth++)
-		desc->enabled = 0;
+	desc->disable_depth++;
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
 
@@ -107,24 +107,25 @@ void enable_irq(unsigned int irq)
 {
 	struct irqdesc *desc = irq_desc + irq;
 	unsigned long flags;
-	int pending = 0;
 
 	spin_lock_irqsave(&irq_controller_lock, flags);
-	if (unlikely(!desc->depth)) {
+	if (unlikely(!desc->disable_depth)) {
 		printk("enable_irq(%u) unbalanced from %p\n", irq,
 			__builtin_return_address(0));
-	} else if (!--desc->depth) {
+	} else if (!--desc->disable_depth) {
 		desc->probing = 0;
-		desc->enabled = 1;
 		desc->chip->unmask(irq);
-		pending = desc->pending;
-		desc->pending = 0;
+
 		/*
-		 * If the interrupt was waiting to be processed,
-		 * retrigger it.
+		 * If the interrupt is waiting to be processed,
+		 * try to re-run it.  We can't directly run it
+		 * from here since the caller might be in an
+		 * interrupt-protected region.
 		 */
-		if (pending)
+		if (desc->pending) {
+			desc->pending = 0;
 			desc->chip->rerun(irq);
+		}
 	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
 }
@@ -264,7 +265,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	 * we shouldn't process the IRQ.  Instead, turn on the
 	 * hardware masks.
 	 */
-	if (unlikely(desc->running || !desc->enabled))
+	if (unlikely(desc->running || desc->disable_depth))
 		goto running;
 
 	/*
@@ -286,13 +287,13 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		if (!action)
 			break;
 
-		if (desc->pending && desc->enabled) {
+		if (desc->pending && !desc->disable_depth) {
 			desc->pending = 0;
 			desc->chip->unmask(irq);
 		}
 
 		__do_irq(irq, action, regs);
-	} while (desc->pending && desc->enabled);
+	} while (desc->pending && !desc->disable_depth);
 
 	desc->running = 0;
 
@@ -328,7 +329,7 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	 */
 	desc->chip->ack(irq);
 
-	if (likely(desc->enabled)) {
+	if (likely(!desc->disable_depth)) {
 		kstat_cpu(cpu).irqs[irq]++;
 
 		/*
@@ -338,7 +339,7 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 		if (action) {
 			__do_irq(irq, desc->action, regs);
 
-			if (likely(desc->enabled &&
+			if (likely(!desc->disable_depth &&
 				   !check_irq_lock(desc, irq, regs)))
 				desc->chip->unmask(irq);
 		}
@@ -390,14 +391,13 @@ void __set_irq_handler(unsigned int irq, irq_handler_t handle, int is_chained)
 	if (handle == do_bad_IRQ) {
 		desc->chip->mask(irq);
 		desc->chip->ack(irq);
-		desc->depth = 1;
-		desc->enabled = 0;
+		desc->disable_depth = 1;
 	}
 	desc->handle = handle;
 	if (handle != do_bad_IRQ && is_chained) {
 		desc->valid = 0;
 		desc->probe_ok = 0;
-		desc->depth = 0;
+		desc->disable_depth = 0;
 		desc->chip->unmask(irq);
 	}
 	spin_unlock_irqrestore(&irq_controller_lock, flags);
@@ -512,10 +512,9 @@ int setup_irq(unsigned int irq, struct irqaction *new)
  		desc->probing = 0;
 		desc->running = 0;
 		desc->pending = 0;
-		desc->depth = 1;
+		desc->disable_depth = 1;
 		if (!desc->noautoenable) {
-			desc->depth = 0;
-			desc->enabled = 1;
+			desc->disable_depth = 0;
 			desc->chip->unmask(irq);
 		}
 	}

@@ -941,7 +941,7 @@ static __inline__ struct fib_node *fib_get_next(struct seq_file *seq)
 
 			if (!iter->zone)
 				goto out;
-			if (iter->zone->fz_next);
+			if (iter->zone->fz_next)
 				break;
 		}
 		

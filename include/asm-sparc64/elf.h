@@ -111,6 +111,8 @@ do {	unsigned long new_flags = current_thread_info()->flags; \
 	if ((current_thread_info()->flags & _TIF_32BIT) \
 	    != new_flags)				\
 		set_thread_flag(TIF_ABI_PENDING);	\
+	else						\
+		clear_thread_flag(TIF_ABI_PENDING);	\
 	/* flush_thread will update pgd cache */	\
 	if (ibcs2)					\
 		set_personality(PER_SVR4);		\

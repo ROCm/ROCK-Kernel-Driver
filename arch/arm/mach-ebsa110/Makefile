@@ -4,7 +4,7 @@
 
 # Object file lists.
 
-obj-y			:= core.o io.o time.o
+obj-y			:= core.o io.o
 obj-m			:=
 obj-n			:=
 obj-			:=

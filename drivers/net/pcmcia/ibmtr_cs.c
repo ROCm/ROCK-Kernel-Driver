@@ -221,6 +221,7 @@ static dev_link_t *ibmtr_attach(void)
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
 
+    init_timer(&link->release);
     link->release.function = &ibmtr_release;
     link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;

@@ -20,9 +20,7 @@
 /* Does not work. Warning may block system in capture mode */
 /* #define USE_VAR48KRATE */
 
-/* Define this if you want soft ac3 encoding - it's still buggy..  */
-/* #define DO_SOFT_AC3 */
-/* #define USE_AES_IEC958 */
+/* Define this if you want soft ac3 encoding */
 #define DO_SOFT_AC3
 #define USE_AES_IEC958
 
@@ -59,6 +57,9 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static long mpu_port[SNDRV_CARDS] = {0x330, [1 ... (SNDRV_CARDS-1)]=-1};
 static long fm_port[SNDRV_CARDS] = {0x388, [1 ... (SNDRV_CARDS-1)]=-1};
+#ifdef DO_SOFT_AC3
+static int soft_ac3[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)]=1};
+#endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for C-Media PCI soundcard.");
@@ -75,6 +76,11 @@ MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{-1},{0x330},{0x320},{0x310
 MODULE_PARM(fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(fm_port, "FM port.");
 MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
+#ifdef DO_SOFT_AC3
+MODULE_PARM(soft_ac3, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
+MODULE_PARM_SYNTAX(soft_ac3, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
+#endif
 
 #ifndef PCI_DEVICE_ID_CMEDIA_CM8738
 #define PCI_DEVICE_ID_CMEDIA_CM8738	0x0111
@@ -442,6 +448,7 @@ struct snd_stru_cmipci {
 	unsigned int can_ac3_sw: 1;
 	unsigned int can_ac3_hw: 1;
 	unsigned int can_multi_ch: 1;
+	unsigned int do_soft_ac3: 1;
 
 	unsigned int spdif_playback_avail: 1;	/* spdif ready? */
 	unsigned int spdif_playback_enabled: 1;	/* spdif switch enabled? */
@@ -472,7 +479,6 @@ struct snd_stru_cmipci {
 	snd_rawmidi_t *rmidi;
 
 	spinlock_t reg_lock;
-	snd_info_entry_t *proc_entry;
 };
 
 
@@ -1961,11 +1967,22 @@ static snd_pcm_ops_t snd_cmipci_playback_spdif_ops = {
 	.prepare =	snd_cmipci_playback_spdif_prepare,	/* set up rate */
 	.trigger =	snd_cmipci_playback_trigger,
 	.pointer =	snd_cmipci_playback_pointer,
+};
+
 #ifdef DO_SOFT_AC3
+static snd_pcm_ops_t snd_cmipci_playback_spdif_soft_ops = {
+	.open =		snd_cmipci_playback_spdif_open,
+	.close =	snd_cmipci_playback_spdif_close,
+	.ioctl =	snd_pcm_lib_ioctl,
+	.hw_params =	snd_cmipci_hw_params,
+	.hw_free =	snd_cmipci_playback_hw_free,
+	.prepare =	snd_cmipci_playback_spdif_prepare,	/* set up rate */
+	.trigger =	snd_cmipci_playback_trigger,
+	.pointer =	snd_cmipci_playback_pointer,
 	.copy =		snd_cmipci_ac3_copy,
 	.silence =	snd_cmipci_ac3_silence,
-#endif
 };
+#endif
 
 static snd_pcm_ops_t snd_cmipci_capture_spdif_ops = {
 	.open =		snd_cmipci_capture_spdif_open,
@@ -2041,7 +2058,14 @@ static int __devinit snd_cmipci_pcm_spdif_new(cmipci_t *cm, int device)
 	if (err < 0)
 		return err;
 
+#ifdef DO_SOFT_AC3
+	if (cm->can_ac3_hw)
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_ops);
+	else
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_soft_ops);
+#else
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_cmipci_playback_spdif_ops);
+#endif
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_cmipci_capture_spdif_ops);
 
 	pcm->private_data = cm;
@@ -2746,26 +2770,8 @@ static void __devinit snd_cmipci_proc_init(cmipci_t *cm)
 {
 	snd_info_entry_t *entry;
 
-	if ((entry = snd_info_create_card_entry(cm->card, "cmipci", cm->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = cm;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 256;
-		entry->c.text.read = snd_cmipci_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	cm->proc_entry = entry;
-}
-
-static void snd_cmipci_proc_done(cmipci_t *cm)
-{
-	if (cm->proc_entry) {
-		snd_info_unregister(cm->proc_entry);
-		cm->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(cm->card, "cmipci", &entry))
+		snd_info_set_text_ops(entry, cm, snd_cmipci_proc_read);
 }
 
 
@@ -2795,7 +2801,10 @@ static void __devinit query_chip(cmipci_t *cm)
 		if (! detect) {
 			cm->chip_version = 33;
 			cm->max_channels = 2;
-			cm->can_ac3_sw = 1;
+			if (cm->do_soft_ac3)
+				cm->can_ac3_sw = 1;
+			else
+				cm->can_ac3_hw = 1;
 			cm->has_dual_dac = 1;
 		} else {
 			cm->chip_version = 37;
@@ -2832,8 +2841,6 @@ static void __devinit query_chip(cmipci_t *cm)
 
 static int snd_cmipci_free(cmipci_t *cm)
 {
-	snd_cmipci_proc_done(cm);
-
 	if (cm->irq >= 0) {
 		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_FM_EN);
 		snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT);
@@ -2864,11 +2871,8 @@ static int snd_cmipci_dev_free(snd_device_t *device)
 	return snd_cmipci_free(cm);
 }
 
-static int __devinit snd_cmipci_create(snd_card_t *card,
-				    struct pci_dev *pci,
-				    unsigned long iomidi,
-				    unsigned long iosynth,
-				    cmipci_t **rcmipci)
+static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
+				       int dev, cmipci_t **rcmipci)
 {
 	cmipci_t *cm;
 	int err;
@@ -2876,8 +2880,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 		.dev_free =	snd_cmipci_dev_free,
 	};
 	unsigned int val = 0;
+	unsigned long iomidi = mpu_port[dev];
+	unsigned long iosynth = fm_port[dev];
 	int pcm_index, pcm_spdif_index;
-	
+
 	*rcmipci = NULL;
 
 	if ((err = pci_enable_device(pci)) < 0)
@@ -2918,6 +2924,9 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 	cm->chip_version = 0;
 	cm->max_channels = 2;
+#ifdef DO_SOFT_AC3
+	cm->do_soft_ac3 = soft_ac3[dev];
+#endif
 
 	query_chip(cm);
 
@@ -2949,20 +2958,10 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 	/* Assume TX and compatible chip set (Autodetection required for VX chip sets) */
 	switch (pci->device) {
-		struct list_head *pos;
-		int txvx;
 	case PCI_DEVICE_ID_CMEDIA_CM8738:
 	case PCI_DEVICE_ID_CMEDIA_CM8738B:
-		txvx = 1;
-		list_for_each(pos, &(pci->global_list)) {
-			struct pci_dev * cur = list_entry(pos, struct pci_dev, global_list);
-			if (cur->vendor != 0x8086) /* PCI_VENDOR_ID_INTEL */
-				continue;
-			if (cur->device != 0x7030) /* PCI_DEVICE_ID_INTEL_82437VX */
-				continue;
-			txvx = 0;
-		}
-		if (txvx)
+		/* PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437VX */
+		if (! pci_find_device(0x8086, 0x7030, NULL))
 			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_TXVX);
 		break;
 	default:
@@ -3109,10 +3108,7 @@ static int __devinit snd_cmipci_probe(struct pci_dev *pci,
 		break;
 	}
 
-	if ((err = snd_cmipci_create(card, pci,
-				     mpu_port[dev],
-				     fm_port[dev],
-				     &cm)) < 0) {
+	if ((err = snd_cmipci_create(card, pci, dev, &cm)) < 0) {
 		snd_card_free(card);
 		return err;
 	}

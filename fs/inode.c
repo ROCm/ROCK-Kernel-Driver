@@ -176,6 +176,7 @@ void inode_init_once(struct inode *inode)
 	spin_lock_init(&inode->i_data.private_lock);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap);
 	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
+	spin_lock_init(&inode->i_lock);
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)

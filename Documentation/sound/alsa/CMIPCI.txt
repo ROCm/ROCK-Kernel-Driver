@@ -82,9 +82,15 @@ as you like and set the format S16LE.  For example, for playback with
 
 and use the interleaved 4 channel data.
 
-There is a control switch, "Line-In As Bass".  As you can imagine from
-its name, the line-in jack is used for the bass (5th and 6th channels)
-output.
+There are some control switchs affecting to the speaker connections:
+
+"Line-In As Rear"	- As mentioned above, the line-in jack is used
+	for the rear (3th and 4th channels) output.
+"Line-In As Bass"	- The line-in jack is used for the bass (5th
+	and 6th channels) output.
+"Mic As Center/LFE"	- The mic jack is used for the bass output.
+	If this switch is on, you cannot use a microphone as a capture
+	source, of course.
 
 
 Digital I/O
@@ -134,8 +140,7 @@ Additionally there are relevant control switches:
 	(see the next section).
 
 "IEC958 In Select"  - Select SPDIF input, the internal CD-in (false)
-	and the external input (true).  This switch appears only on
-	the chip models 039 or later.
+	and the external input (true).
 
 "IEC958 Loop"       - SPDIF input data is loop back into SPDIF
 	output (aka bypass)

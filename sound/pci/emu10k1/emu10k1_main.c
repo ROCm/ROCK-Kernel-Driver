@@ -161,6 +161,26 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 			SPCS_CHANNELNUM_LEFT | SPCS_SOURCENUM_UNSPEC |
 			SPCS_GENERATIONSTATUS | 0x00001200 |
 			0x00000000 | SPCS_EMPHASIS_NONE | SPCS_COPYRIGHT);
+
+	if (emu->audigy && emu->revision == 4) { /* audigy2 */
+		/* Hacks for Alice3 to work independent of haP16V driver */
+		u32 tmp;
+
+		//Setup SRCMulti_I2S SamplingRate
+		tmp = snd_emu10k1_ptr_read(emu, A_SPDIF_SAMPLERATE, 0);
+		tmp &= 0xfffff1ff;
+		tmp |= (0x2<<9);
+		snd_emu10k1_ptr_write(emu, A_SPDIF_SAMPLERATE, 0, tmp);
+
+		/* Setup SRCSel (Enable Spdif,I2S SRCMulti) */
+		outl(0x600000, emu->port + 0x20);
+		outl(0x14, emu->port + 0x24);
+
+		/* Setup SRCMulti Input Audio Enable */
+		outl(0x6E0000, emu->port + 0x20);
+		outl(0xFF00FF00, emu->port + 0x24);
+	}
+
 	/*
 	 *  Clear page with silence & setup all pointers to this page
 	 */
@@ -185,9 +205,15 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	 *   Lock Sound Memory = 0
 	 *   Auto Mute = 1
 	 */
-	if (emu->audigy)
-		outl(HCFG_AUTOMUTE | HCFG_JOYENABLE, emu->port + HCFG);
-	else if (emu->model == 0x20 ||
+	if (emu->audigy) {
+		if (emu->revision == 4) /* audigy2 */
+			outl(HCFG_AUDIOENABLE |
+			     HCFG_AC3ENABLE_CDSPDIF |
+			     HCFG_AC3ENABLE_GPSPDIF |
+			     HCFG_AUTOMUTE | HCFG_JOYENABLE, emu->port + HCFG);
+		else
+			outl(HCFG_AUTOMUTE | HCFG_JOYENABLE, emu->port + HCFG);
+	} else if (emu->model == 0x20 ||
 	    emu->model == 0xc400 ||
 	    (emu->model == 0x21 && emu->revision < 6))
 		outl(HCFG_LOCKTANKCACHE_MASK | HCFG_AUTOMUTE, emu->port + HCFG);
@@ -221,9 +247,17 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	outl(inl(emu->port + HCFG) | HCFG_AUDIOENABLE, emu->port + HCFG);
 
 	/* Enable analog/digital outs on audigy */
-	if (emu->audigy)
+	if (emu->audigy) {
 		outl(inl(emu->port + A_IOCFG) & ~0x44, emu->port + A_IOCFG);
-
+ 
+		if (emu->revision == 4) { /* audigy2 */
+			/* Unmute Analog now.  Set GPO6 to 1 for Apollo.
+			 * This has to be done after init ALice3 I2SOut beyond 48KHz.
+			 * So, sequence is important. */
+			outl(inl(emu->port + A_IOCFG) | 0x0040, emu->port + A_IOCFG);
+		}
+	}
+	
 #if 0
 	{
 	unsigned int tmp;
@@ -494,7 +528,6 @@ static int __devinit snd_emu10k1_ecard_init(emu10k1_t * emu)
 
 static int snd_emu10k1_free(emu10k1_t *emu)
 {
-	snd_emu10k1_proc_done(emu);
 	if (emu->res_port != NULL) {	/* avoid access to already used hardware */
 	       	snd_emu10k1_fx8010_tram_setup(emu, 0);
 		snd_emu10k1_done(emu);

@@ -542,6 +542,19 @@ static int snd_pcm_substream_proc_done(snd_pcm_substream_t *substream)
 	return 0;
 }
 
+/**
+ * snd_pcm_new_stream - create a new PCM stream
+ * @pcm: the pcm instance
+ * @stream: the stream direction, SNDRV_PCM_STREAM_XXX
+ * @substream_count: the number of substreams
+ *
+ * Creates a new stream for the pcm.
+ * The corresponding stream on the pcm must have been empty before
+ * calling this, i.e. zero must be given to the argument of
+ * snd_pcm_new().
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 {
 	int idx, err;
@@ -582,7 +595,7 @@ int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 			snd_magic_kfree(substream);
 			return err;
 		}
-		substream->dma_type = SNDRV_PCM_DMA_TYPE_ISA;
+		substream->dma_type = SNDRV_PCM_DMA_TYPE_UNKNOWN;
 		substream->dma_private = NULL;
 		spin_lock_init(&substream->timer_lock);
 		prev = substream;
@@ -590,6 +603,22 @@ int snd_pcm_new_stream(snd_pcm_t *pcm, int stream, int substream_count)
 	return 0;
 }				
 
+/**
+ * snd_pcm_new - create a new PCM instance
+ * @card: the card instance
+ * @id: the id string
+ * @device: the device index (zero based)
+ * @playback_count: the number of substreams for playback
+ * @capture_count: the number of substreams for capture
+ * @rpcm: the pointer to store the new pcm instance
+ *
+ * Creates a new PCM instance.
+ *
+ * The pcm operators have to be set afterwards to the new instance
+ * via snd_pcm_set_ops().
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_pcm_new(snd_card_t * card, char *id, int device,
 		int playback_count, int capture_count,
 	        snd_pcm_t ** rpcm)
@@ -660,6 +689,7 @@ static int snd_pcm_free(snd_pcm_t *pcm)
 	snd_assert(pcm != NULL, return -ENXIO);
 	if (pcm->private_free)
 		pcm->private_free(pcm);
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 	snd_pcm_free_stream(&pcm->streams[SNDRV_PCM_STREAM_PLAYBACK]);
 	snd_pcm_free_stream(&pcm->streams[SNDRV_PCM_STREAM_CAPTURE]);
 	snd_magic_kfree(pcm);
@@ -774,6 +804,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 	runtime->status->state = SNDRV_PCM_STATE_OPEN;
 
 	substream->runtime = runtime;
+	substream->private_data = pcm->private_data;
 	pstr->substream_opened++;
 	*rsubstream = substream;
 	return 0;

@@ -1297,7 +1297,7 @@ asmlinkage int sunos_sigaction (int sig, u32 act, u32 oact)
 	int ret;
 
 	if (act) {
-		old_sigset_t32 mask;
+		compat_old_sigset_t mask;
 
 		if (get_user((long)new_ka.sa.sa_handler, &((struct old_sigaction32 *)A(act))->sa_handler) ||
 		    __get_user(new_ka.sa.sa_flags, &((struct old_sigaction32 *)A(act))->sa_flags))
