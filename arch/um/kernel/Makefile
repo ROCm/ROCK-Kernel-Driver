@@ -5,6 +5,11 @@
 
 extra-y := vmlinux.lds uml.lds dyn.lds
 
+# Descend into ../util for make clean.  This is here because it doesn't work
+# in arch/um/Makefile.
+
+subdir- = ../util
+
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o main.o mem.o mem_user.o \
 	physmem.o process.o process_kern.o ptrace.o reboot.o resource.o \

@@ -5,6 +5,11 @@ TOP_ADDR = 0xc0000000
 endif
 
 CFLAGS += -U__$(SUBARCH)__ -U$(SUBARCH)
+
+ifneq ($(CONFIG_GPROF),y)
+ARCH_CFLAGS += -DUM_FASTCALL
+endif
+
 ELF_ARCH = $(SUBARCH)
 ELF_FORMAT = elf32-$(SUBARCH)
 
