@@ -213,7 +213,9 @@ config NET_SCH_NETEM
 	  testing applications or protocols.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called sch_delay.
+	  will be called sch_netem.
+
+	  If unsure, say N.
 
 config NET_SCH_INGRESS
 	tristate "Ingress Qdisc"

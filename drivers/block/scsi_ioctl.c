@@ -211,7 +211,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 			hdr->sb_len_wr = len;
 	}
 
-	if (blk_rq_unmap_user(rq, hdr->dxferp, bio, hdr->dxfer_len))
+	if (blk_rq_unmap_user(rq, bio, hdr->dxfer_len))
 		return -EFAULT;
 
 	/* may not have succeeded, but output values written to control
