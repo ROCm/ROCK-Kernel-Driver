@@ -176,24 +176,6 @@ typedef struct local_info_t {
 
 /*======================================================================
   
-  This bit of code is used to avoid unregistering network devices
-  at inappropriate times.  2.2 and later kernels are fairly picky
-  about when this can happen.
-  
-  ======================================================================*/
-
-static void flush_stale_links(void)
-{
-	dev_link_t *link, *next;
-	for (link = dev_list; link; link = next) {
-		next = link->next;
-		if (link->state & DEV_STALE_LINK)
-			atmel_detach(link);
-	}
-}
- 
-/*======================================================================
-  
   atmel_attach() creates an "instance" of the driver, allocating
   local data structures for one device.  The device is registered
   with Card Services.
@@ -212,8 +194,7 @@ static dev_link_t *atmel_attach(void)
 	int ret, i;
 	
 	DEBUG(0, "atmel_attach()\n");
-	flush_stale_links();
-	
+
 	/* Initialize the dev_link_t structure */
 	link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
 	if (!link) {
@@ -296,29 +277,19 @@ static void atmel_detach(dev_link_t *link)
 	if (*linkp == NULL)
 		return;
 
-	if ( link->state & DEV_CONFIG ) {
+	if (link->state & DEV_CONFIG)
 		atmel_release(link);
-		if ( link->state & DEV_STALE_CONFIG ) {
-			link->state |= DEV_STALE_LINK;
-			return;
-		}
-	}
-	
 		
 	/* Break the link with Card Services */
 	if (link->handle)
 		CardServices(DeregisterClient, link->handle);
-	
-	
-	
+
 	/* Unlink device structure, free pieces */
 	*linkp = link->next;
-	if (link->priv) {
+	if (link->priv)
 		kfree(link->priv);
-	}
 	kfree(link);
-	
-} /* atmel_detach */
+}
 
 /*======================================================================
   
