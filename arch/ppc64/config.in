@@ -152,12 +152,7 @@ source drivers/media/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'Console drivers'
-   source drivers/video/Config.in
-   endmenu
-fi
+source drivers/video/Config.in
 
 mainmenu_option next_comment
 comment 'Sound'

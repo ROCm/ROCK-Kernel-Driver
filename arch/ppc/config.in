@@ -459,14 +459,7 @@ source net/irda/Config.in
 
 source drivers/isdn/Config.in
 
-mainmenu_option next_comment
-comment 'Console drivers'
-if [ "$CONFIG_4xx" != "y" -a "$CONFIG_8xx" != "y" ]; then
-   bool 'VGA text console' CONFIG_VGA_CONSOLE
-fi
 source drivers/video/Config.in
-endmenu
-
 
 if [ "$CONFIG_PPC_ISERIES" = "y" ]; then
    mainmenu_option next_comment

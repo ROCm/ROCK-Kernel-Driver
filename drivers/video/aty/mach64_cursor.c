@@ -11,8 +11,6 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-
 #ifdef __sparc__
 #include <asm/pbm.h>
 #include <asm/fbio.h>

@@ -168,24 +168,7 @@ if [ "$CONFIG_SOUND" != "n" ]; then
 fi
 endmenu
 
-if [ "$CONFIG_VT" = "y" ]; then
-  mainmenu_option next_comment
-  comment 'Console drivers'
-  source drivers/video/Config.in
-
-#  bool 'IODC console' CONFIG_IODC_CONSOLE
-  bool 'STI console' CONFIG_STI_CONSOLE
-  if [ "$CONFIG_IODC_CONSOLE" = "n" ]; then
-    if [ "$CONFIG_GSC_PS2" = "y" ]; then
-      define_bool CONFIG_DUMMY_CONSOLE y
-    fi
-  fi
-  if [ "$CONFIG_STI_CONSOLE" = "y" ]; then
-    define_bool CONFIG_DUMMY_CONSOLE y
-  fi
-  endmenu
-fi
-# endmenu
+source drivers/video/Config.in
 
 mainmenu_option next_comment
 comment 'Kernel hacking'

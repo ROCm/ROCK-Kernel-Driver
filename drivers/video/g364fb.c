@@ -31,8 +31,6 @@
 #include <asm/io.h>
 #include <asm/jazz.h>
 
-#include <video/fbcon.h>
-
 /* 
  * Various defines for the G364
  */
@@ -74,7 +72,6 @@
 #define MON_ID_REG 	0xe4100000	/* unused */
 #define RESET_REG 	0xe4180000	/* Write only */
 
-static struct display disp;
 static struct fb_info fb_info;
 
 static struct fb_fix_screeninfo fb_fix __initdata = {
@@ -109,7 +106,7 @@ static struct fb_var_screeninfo fb_var __initdata = {
  */
 int g364fb_init(void);
 
-static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int g364fb_pan_display(struct fb_var_screeninfo *var,
 			      struct fb_info *info);
 static int g364fb_setcolreg(u_int regno, u_int red, u_int green,
 			    u_int blue, u_int transp,
@@ -118,9 +115,6 @@ static int g364fb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops g364fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= g364fb_setcolreg,
 	.fb_pan_display	= g364fb_pan_display,
 	.fb_blank	= g364fb_blank,
@@ -151,7 +145,7 @@ void fbcon_g364fb_cursor(struct display *p, int mode, int x, int y)
  *
  *  This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
  */
-static int g364fb_pan_display(struct fb_var_screeninfo *var, int con,
+static int g364fb_pan_display(struct fb_var_screeninfo *var, 
 			      struct fb_info *info)
 {
 	if (var->xoffset || var->yoffset + var->yres > var->yres_virtual)
@@ -239,7 +233,6 @@ int __init g364fb_init(void)
 	fb_fix.smem_len = (1 << (mem * 2)) * 512 * 1024;
 	fb_var.yres_virtual = fb_fix.smem_len / fb_var.xres;
 
-	strcpy(fb_info.modename, fb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fbops = &g364fb_ops;
 	fb_info.screen_base = (char *) G364_MEM_BASE;	/* virtual kernel address */
@@ -247,15 +240,7 @@ int __init g364fb_init(void)
 	fb_info.fix = fb_fix;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	fb_info.disp = &disp;
-	fb_info.currcon = -1;
-	fb_info.fontname[0] = '\0';
-	fb_info.changevar = NULL;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
-
 	fb_alloc_cmap(&fb_info.cmap, 255, 0);
-	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0)
 		return -EINVAL;
