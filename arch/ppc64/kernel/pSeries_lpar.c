@@ -356,8 +356,13 @@ static int udbg_getc_pollLP(void)
 		/* get some more chars. */
 		inbuflen = 0;
 		rc = plpar_get_term_char(vtermno, &inbuflen, buf);
-		if (inbuflen == 0 && rc == H_Success)
-			return -1;
+		if (rc != H_Success)
+			inbuflen = 0;	/* otherwise inbuflen is garbage */
+	}
+	if (inbuflen <= 0 || inbuflen > 16) {
+		/* Catch error case as well as other oddities (corruption) */
+		inbuflen = 0;
+		return -1;
 	}
 	ch = buf[0];
 	for (i = 1; i < inbuflen; i++)	/* shuffle them down. */
