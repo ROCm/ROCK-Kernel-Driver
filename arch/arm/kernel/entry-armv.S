@@ -623,10 +623,15 @@ ENTRY(soft_irq_mask)
 		.endm
 
 		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+#ifdef CONFIG_PXA27x
+		mrc	p6, 0, \irqstat, c0, c0, 0		@ ICIP
+		mrc	p6, 0, \irqnr, c1, c0, 0		@ ICMR
+#else
 		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
 		add	\base, \base, #0x00d00000
 		ldr	\irqstat, [\base, #0]		@ ICIP
 		ldr	\irqnr, [\base, #4]		@ ICMR
+#endif
 		ands	\irqnr, \irqstat, \irqnr
 		beq	1001f
 		rsb	\irqstat, \irqnr, #0
