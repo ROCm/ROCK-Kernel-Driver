@@ -201,9 +201,10 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			memset(smb_buffer, 0, sizeof (struct smb_hdr));
 
 		if (smb_buffer == NULL) {
-			cERROR(1,
-			       ("Can not get mem for SMB response buffer "));
-			return -ENOMEM;
+			cERROR(1,("Can not get memory for SMB response"));
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ * 3); /* give system time to free memory */
+			continue;
 		}
 		iov.iov_base = smb_buffer;
 		iov.iov_len = sizeof (struct smb_hdr) - 1;	

@@ -1362,6 +1362,11 @@ static void reset_resume_key(struct file * dir_file,
 	cifsFile->search_resume_name = 
 		kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 
+	if(cifsFile->search_resume_name == NULL) {
+		cERROR(1,("failed new resume key allocate, length %d",
+				  cifsFile->resume_name_length));
+		return;
+	}
 	if(Unicode)
 		cifs_strtoUCS((wchar_t *) cifsFile->search_resume_name,
 			filename, len, nls_tab);

@@ -1509,7 +1509,7 @@ CIFSSMBUnixQPathInfo(const int xid, struct cifsTconInfo *tcon,
 	TRANSACTION2_QPI_REQ *pSMB = NULL;
 	TRANSACTION2_QPI_RSP *pSMBr = NULL;
 	int rc = 0;
-	int bytes_returned;
+	int bytes_returned = 0;
 	int name_len;
 
 	cFYI(1, ("In QPathInfo (Unix) the path %s", searchName));
@@ -1565,9 +1565,13 @@ UnixQPathInfoRetry:
 	} else {		/* decode response */
 		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
 		/* BB also check if enough total bytes returned */
-		if ((pSMBr->ByteCount < 40) || (pSMBr->DataOffset > 512))
+		if ((pSMBr->ByteCount < sizeof(FILE_UNIX_BASIC_INFO) + sizeof(FILE_UNIX_BASIC_INFO)) || 
+			(pSMBr->DataOffset > 512) || 
+			(pSMBr->DataOffset < sizeof(struct smb_hdr))) {
+			cFYI(1,("UnixQPathinfo invalid data offset %d bytes returned %d",
+					(int)pSMBr->DataOffset,bytes_returned));
 			rc = -EIO;	/* bad smb */
-		else {
+		} else {
 			memcpy((char *) pFindData,
 			       (char *) &pSMBr->hdr.Protocol +
 			       pSMBr->DataOffset,

@@ -1,7 +1,12 @@
+Version 1.12
+------------
+Fixes for large file copy, signal handling, socket retry, buffer
+allocation and low memory situations.
+
 Version 1.11
 ------------
-Better port 139 support to Windows servers (RFC1001/RFC1002 Session_Initialize) also
-now allowing support for specifying client netbiosname.  NT4 support added.
+Better port 139 support to Windows servers (RFC1001/RFC1002 Session_Initialize)
+also now allowing support for specifying client netbiosname.  NT4 support added.
 
 Version 1.10
 ------------
