@@ -2779,6 +2779,10 @@ N: Christopher Smith
 E: x@xman.org
 D: Tulip net driver hacker
 
+N: Mark Smith
+E: mark.smith@comdev.cc
+D: Multicast support in bonding driver
+
 N: Miquel van Smoorenburg
 E: miquels@cistron.nl
 D: Kernel and net hacker. Sysvinit, minicom. doing Debian stuff.

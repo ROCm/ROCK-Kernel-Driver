@@ -1069,7 +1069,9 @@ static void idedisk_setup(struct ata_device *drive)
                         }
 #else
 			printk("%s: setmax_ext LBA %llu, native  %llu\n",
-				drive->name, set_max_ext, capacity_2);
+				drive->name,
+			       (long long) set_max_ext,
+			       (long long) capacity_2);
 #endif
 		}
 		drive->bios_cyl	= drive->cyl;

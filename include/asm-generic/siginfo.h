@@ -232,6 +232,8 @@ typedef struct sigevent {
 
 #ifdef __KERNEL__
 
+struct siginfo;
+
 #ifndef HAVE_ARCH_COPY_SIGINFO
 
 #include <linux/string.h>

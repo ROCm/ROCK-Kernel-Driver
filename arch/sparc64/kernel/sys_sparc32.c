@@ -2879,16 +2879,19 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-	if ((bprm.argc = count32(argv, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-	if ((bprm.envc = count32(envp, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.envc;
-	}
+
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm) 
+		goto out_file;
+
+	bprm.argc = count32(argv, bprm.p / sizeof(u32));
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = count32(envp, bprm.p / sizeof(u32));
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
 
 	retval = prepare_binprm(&bprm);
 	if (retval < 0)
@@ -2914,14 +2917,20 @@ do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs * regs)
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	allow_write_access(bprm.file);
-	if (bprm.file)
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
+
+out_mm:
+	mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
 		fput(bprm.file);
-
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)
-		if (bprm.page[i])
-			__free_page(bprm.page[i]);
-
+	}
 	return retval;
 }
 
