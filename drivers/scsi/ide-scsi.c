@@ -306,7 +306,7 @@ ide_startstop_t idescsi_atapi_error (ide_drive_t *drive, const char *msg, byte s
 	struct request *rq;
 	byte err;
 
-	err = ide_dump_atapi_status(drive, msg, stat);
+	err = ide_dump_status(drive, msg, stat);
 
 	if (drive == NULL || (rq = HWGROUP(drive)->rq) == NULL)
 		return ide_stopped;

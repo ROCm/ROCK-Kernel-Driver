@@ -1147,13 +1147,6 @@ extern void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigne
 extern void ide_execute_command(ide_drive_t *, task_ioreg_t cmd, ide_handler_t *, unsigned int, ide_expiry_t *);
 
 /*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- *
- * (drive, msg, status)
- */
-byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat);
-
-/*
  * ide_error() takes action based on the error returned by the controller.
  * The caller should return immediately after invoking this.
  *
@@ -1511,8 +1504,7 @@ extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
 
-void ide_dump_opcode(ide_drive_t *);
-extern byte ide_dump_atapi_status(ide_drive_t *drive, const char *msg, byte stat);
+u8 ide_dump_status(ide_drive_t *, const char *, u8);
 
 typedef struct ide_pio_timings_s {
 	int	setup_time;	/* Address setup (ns) minimum */
