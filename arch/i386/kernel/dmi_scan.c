@@ -609,8 +609,14 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 #ifdef	CONFIG_ACPI_PCI
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
 { 
-	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	acpi_noirq_set();
+	if (!acpi_force) { 
+		printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
+		acpi_noirq_set();
+	} else { 
+		printk(KERN_NOTICE 
+		       "Warning: acpi=force overrules DMI blacklist for %s\n",
+		       d->ident); 
+	} 
 	return 0;
 } 
 
