@@ -21,6 +21,8 @@ extern void release_thread_skas(struct task_struct *task);
 extern void exit_thread_skas(void);
 extern void initial_thread_cb_skas(void (*proc)(void *), void *arg);
 extern void init_idle_skas(void);
+extern void flush_tlb_kernel_range_skas(unsigned long start, 
+					unsigned long end);
 extern void flush_tlb_kernel_vm_skas(void);
 extern void __flush_tlb_one_skas(unsigned long addr);
 extern void flush_tlb_range_skas(struct vm_area_struct *vma, 

@@ -8,24 +8,24 @@
 
 #include "uml-config.h"
 
-#ifdef CONFIG_MODE_TT
+#ifdef UML_CONFIG_MODE_TT
 #include "ptrace-tt.h"
 #endif
 
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 #include "ptrace-skas.h"
 #endif
 
 #include "choose-mode.h"
 
 union uml_pt_regs {
-#ifdef CONFIG_MODE_TT
+#ifdef UML_CONFIG_MODE_TT
 	struct tt_regs {
 		long syscall;
 		void *sc;
 	} tt;
 #endif
-#ifdef CONFIG_MODE_SKAS
+#ifdef UML_CONFIG_MODE_SKAS
 	struct skas_regs {
 		unsigned long regs[HOST_FRAME_SIZE];
 		unsigned long fp[HOST_FP_SIZE];

@@ -30,18 +30,6 @@
 EXPORT_SYMBOL(block_signals);
 EXPORT_SYMBOL(unblock_signals);
 
-int probe_stack(unsigned long sp, int delta)
-{
-	int n;
-
-	if((get_user(n, (int *) sp) != 0) ||
-	   (put_user(n, (int *) sp) != 0) ||
-	   (get_user(n, (int *) (sp - delta)) != 0) ||
-	   (put_user(n, (int *) (sp - delta)) != 0))
-		return(-EFAULT);
-	return(0);
-}
-
 static void force_segv(int sig)
 {
 	if(sig == SIGSEGV){

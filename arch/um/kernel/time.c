@@ -111,7 +111,7 @@ void idle_sleep(int secs)
 
 	ts.tv_sec = secs;
 	ts.tv_nsec = 0;
-	nanosleep(&ts, &ts);
+	nanosleep(&ts, NULL);
 }
 
 /*

@@ -8,13 +8,13 @@
 
 #include "uml-config.h"
 
-#if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
+#if defined(UML_CONFIG_MODE_TT) && defined(UML_CONFIG_MODE_SKAS)
 #define CHOOSE_MODE(tt, skas) (mode_tt ? (tt) : (skas))
 
-#elif defined(CONFIG_MODE_SKAS)
+#elif defined(UML_CONFIG_MODE_SKAS)
 #define CHOOSE_MODE(tt, skas) (skas)
 
-#elif defined(CONFIG_MODE_TT)
+#elif defined(UML_CONFIG_MODE_TT)
 #define CHOOSE_MODE(tt, skas) (tt)
 #endif
 

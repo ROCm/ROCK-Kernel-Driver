@@ -109,7 +109,8 @@ unsigned long segv(unsigned long address, unsigned long ip, int is_write,
                 flush_tlb_kernel_vm();
                 return(0);
         }
-        if(current->mm == NULL) panic("Segfault with no mm");
+        if(current->mm == NULL)
+		panic("Segfault with no mm");
 	err = handle_page_fault(address, ip, is_write, is_user, &si.si_code);
 
 	catcher = current->thread.fault_catcher;

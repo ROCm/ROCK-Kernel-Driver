@@ -52,7 +52,7 @@ void __init check_one_sigio(void (*proc)(int, int))
 {
 	struct sigaction old, new;
 	struct termios tt;
-	struct openpty_arg pty = { master : -1, slave : -1 };
+	struct openpty_arg pty = { .master = -1, .slave = -1 };
 	int master, slave, flags;
 
 	initial_thread_cb(openpty_cb, &pty);
@@ -111,6 +111,7 @@ static void tty_output(int master, int slave)
 
 	printk("Checking that host ptys support output SIGIO...");
 
+	memset(buf, 0, sizeof(buf));
 	while(write(master, buf, sizeof(buf)) > 0) ;
 	if(errno != EAGAIN)
 		panic("check_sigio : write failed, errno = %d\n", errno);
@@ -170,15 +171,15 @@ struct pollfds {
  * synchronizes with it.
  */
 struct pollfds current_poll = {
-	poll : 		NULL,
-	size :		0,
-	used :		0
+	.poll  		= NULL,
+	.size 		= 0,
+	.used 		= 0
 };
 
 struct pollfds next_poll = {
-	poll : 		NULL,
-	size :		0,
-	used :		0
+	.poll  		= NULL,
+	.size 		= 0,
+	.used 		= 0
 };
 
 static int write_sigio_thread(void *unused)
@@ -267,7 +268,8 @@ static void update_thread(void)
 	return;
  fail:
 	sigio_lock();
-	if(write_sigio_pid != -1) kill(write_sigio_pid, SIGKILL);
+	if(write_sigio_pid != -1) 
+		os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
 	close(sigio_private[0]);
 	close(sigio_private[1]);	
@@ -298,9 +300,9 @@ int add_sigio_fd(int fd, int read)
 	if(read) events = POLLIN;
 	else events = POLLOUT;
 
-	next_poll.poll[n - 1] = ((struct pollfd) { fd : 	fd,
-						   events :	events,
-						   revents :	0 });
+	next_poll.poll[n - 1] = ((struct pollfd) { .fd  	= fd,
+						   .events 	= events,
+						   .revents 	= 0 });
 	update_thread();
  out:
 	sigio_unlock();
@@ -348,12 +350,12 @@ static int setup_initial_poll(int fd)
 		printk("setup_initial_poll : failed to allocate poll\n");
 		return(-1);
 	}
-	*p = ((struct pollfd) { fd : 	fd,
-				events :	POLLIN,
-				revents :	0 });
-	current_poll = ((struct pollfds) { poll :	p,
-					   used :	1,
-					   size :	1 });
+	*p = ((struct pollfd) { .fd  	= fd,
+				.events 	= POLLIN,
+				.revents 	= 0 });
+	current_poll = ((struct pollfds) { .poll 	= p,
+					   .used 	= 1,
+					   .size 	= 1 });
 	return(0);
 }
 
@@ -394,7 +396,7 @@ void write_sigio_workaround(void)
 	return;
 
  out_kill:
-	kill(write_sigio_pid, SIGKILL);
+	os_kill_process(write_sigio_pid, 1);
 	write_sigio_pid = -1;
  out_close2:
 	close(sigio_private[0]);
@@ -420,7 +422,8 @@ int read_sigio_fd(int fd)
 
 static void sigio_cleanup(void)
 {
-	if(write_sigio_pid != -1) kill(write_sigio_pid, SIGKILL);
+	if(write_sigio_pid != -1)
+		os_kill_process(write_sigio_pid, 1);
 }
 
 __uml_exitcall(sigio_cleanup);

@@ -232,11 +232,11 @@ static int setup_one_range(int fd, char *driver, unsigned long start,
 			panic("Failed to allocating mem_region");
 	}
 
-	*region = ((struct mem_region) { driver :	driver,
-					 start_pfn :	pfn,
-					 start :	start, 
-					 len :		len, 
-					 fd :		fd } );
+	*region = ((struct mem_region) { .driver 	= driver,
+					 .start_pfn 	= pfn,
+					 .start 	= start, 
+					 .len 		= len, 
+					 .fd 		= fd } );
 	regions[i] = region;
  out:
 	up(&regions_sem);
@@ -444,15 +444,15 @@ static struct list_head vm_reserved = LIST_HEAD_INIT(vm_reserved);
 
 /* Static structures, linked in to the list in early boot */
 static struct vm_reserved head = {
-	list :		LIST_HEAD_INIT(head.list),
-	start :		0,
-	end :		0xffffffff
+	.list 		= LIST_HEAD_INIT(head.list),
+	.start 		= 0,
+	.end 		= 0xffffffff
 };
 
 static struct vm_reserved tail = {
-	list :		LIST_HEAD_INIT(tail.list),
-	start :		0,
-	end :		0xffffffff
+	.list 		= LIST_HEAD_INIT(tail.list),
+	.start 		= 0,
+	.end 		= 0xffffffff
 };
 
 void set_usable_vm(unsigned long start, unsigned long end)
@@ -488,9 +488,9 @@ int reserve_vm(unsigned long start, unsigned long end, void *e)
 		goto out;
 	}
 	*entry = ((struct vm_reserved) 
-		{ list :	LIST_HEAD_INIT(entry->list),
-		  start :	start,
-		  end :		end });
+		{ .list 	= LIST_HEAD_INIT(entry->list),
+		  .start 	= start,
+		  .end 		= end });
 	list_add(&entry->list, &prev->list);
 	err = 0;
  out:
@@ -560,9 +560,9 @@ struct iomem {
  */
 
 struct iomem iomem_regions[NREGIONS] = { [ 0 ... NREGIONS - 1 ] =
-					 { name : 	NULL,
-					   fd : 	-1,
-					   size :	0 } };
+					 { .name  	= NULL,
+					   .fd  	= -1,
+					   .size 	= 0 } };
 
 int num_iomem_regions = 0;
 
@@ -572,9 +572,9 @@ void add_iomem(char *name, int fd, unsigned long size)
 		return;
 	size = (size + PAGE_SIZE - 1) & PAGE_MASK;
 	iomem_regions[num_iomem_regions++] = 
-		((struct iomem) { name :	name,
-				  fd :		fd,
-				  size :	size } );
+		((struct iomem) { .name 	= name,
+				  .fd 		= fd,
+				  .size 	= size } );
 }
 
 int setup_iomem(void)

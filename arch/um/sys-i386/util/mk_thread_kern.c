@@ -1,3 +1,4 @@
+#include "linux/config.h"
 #include "linux/stddef.h"
 #include "linux/sched.h"
 
@@ -12,7 +13,9 @@ int main(int argc, char **argv)
 {
   print_head();
   print_constant_ptr("TASK_DEBUGREGS", THREAD_OFFSET(arch.debugregs));
+#ifdef CONFIG_MODE_TT
   print_constant("TASK_EXTERN_PID", "int", THREAD_OFFSET(mode.tt.extern_pid));
+#endif
   print_tail();
   return(0);
 }

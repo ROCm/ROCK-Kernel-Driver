@@ -78,7 +78,8 @@ static int capture_stack(int (*child)(void *arg), void *arg, void *sp,
 
 	/* It has outlived its usefulness, so continue it so it can exit */
 	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0){
-		printf("capture_stack : mmap failed - errno = %d\n", errno);
+		printf("capture_stack : PTRACE_CONT failed - errno = %d\n", 
+		       errno);
 		exit(1);
 	}
 	if(waitpid(pid, &status, 0) < 0){
