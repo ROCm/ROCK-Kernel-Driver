@@ -1991,25 +1991,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
-	if (port->type == PORT_UNKNOWN)
-		return -ENODEV;
-#ifdef	CONFIG_KDB
-		/*
-		 * Remember the line number of the first serial
-		 * console.  We'll make this the kdb serial console too.
-		 */
-	if (kdb_serial_line == -1) {
-	    kdb_serial_line = co->index;
-	    kdb_serial.io_type = port->iotype;
-	    if (port->iotype == SERIAL_IO_MEM) {
-		kdb_serial.iobase = (int)(port->membase);
-		kdb_serial.ioreg_shift = port->regshift;
-	    } else {
-		kdb_serial.iobase = port->iobase;
-		kdb_serial.ioreg_shift = 0;
-	    }
-	}
-#endif	/* CONFIG_KDB */
 
 	/*
 	 * Temporary fix.
@@ -2046,14 +2027,6 @@ static int __init serial8250_console_init(void)
 	return 0;
 }
 console_initcall(serial8250_console_init);
-
-static int __init serial8250_late_console_init(void)
-{
-	if (!(serial8250_console.flags & CON_ENABLED))
-		register_console(&serial8250_console);
-	return 0;
-}
-late_initcall(serial8250_late_console_init);
 
 #define SERIAL8250_CONSOLE	&serial8250_console
 #else
@@ -2129,6 +2102,23 @@ int __init early_serial_setup(struct uart_port *port)
 {
 	if (port->line >= ARRAY_SIZE(serial8250_ports))
 		return -ENODEV;
+#ifdef	CONFIG_KDB
+		/*
+		 * Remember the line number of the first serial
+		 * console.  We'll make this the kdb serial console too.
+		 */
+	if (kdb_serial_line == -1) {
+	    kdb_serial_line = co->index;
+	    kdb_serial.io_type = port->iotype;
+	    if (port->iotype == SERIAL_IO_MEM) {
+		kdb_serial.iobase = (int)(port->membase);
+		kdb_serial.ioreg_shift = port->regshift;
+	    } else {
+		kdb_serial.iobase = port->iobase;
+		kdb_serial.ioreg_shift = 0;
+	    }
+	}
+#endif	/* CONFIG_KDB */
 
 	serial8250_isa_init_ports();
 	serial8250_ports[port->line].port	= *port;
