@@ -37,7 +37,7 @@
 #include <linux/errno.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-pcf.h>
-#include "i2c-pcf8584.h"
+#include "i2c-algo-pcf.h"
 
 
 /* ----- global defines ----------------------------------------------- */

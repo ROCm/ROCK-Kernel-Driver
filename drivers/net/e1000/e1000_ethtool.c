@@ -230,11 +230,15 @@ e1000_ethtool_spause(struct e1000_adapter *adapter,
 
 	hw->original_fc = hw->fc;
 
-	if(netif_running(adapter->netdev)) {
-		e1000_down(adapter);
-		e1000_up(adapter);
-	} else
-		e1000_reset(adapter);
+	if(adapter->fc_autoneg == AUTONEG_ENABLE) {
+		if(netif_running(adapter->netdev)) {
+			e1000_down(adapter);
+			e1000_up(adapter);
+		} else
+			e1000_reset(adapter);
+	}
+	else
+		return e1000_force_mac_fc(hw);
 	
 	return 0;
 }

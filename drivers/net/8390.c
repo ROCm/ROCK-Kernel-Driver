@@ -1173,14 +1173,3 @@ void cleanup_module(void)
 
 #endif /* MODULE */
 MODULE_LICENSE("GPL");
-
-
-/*
- * Local variables:
- *  compile-command: "gcc -D__KERNEL__ -I/usr/src/linux/net/inet -Wall -Wstrict-prototypes -O6 -m486 -c 8390.c"
- *  version-control: t
- *  kept-new-versions: 5
- *  c-indent-level: 4
- *  tab-width: 4
- * End:
- */

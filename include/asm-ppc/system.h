@@ -7,7 +7,6 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 
-#include <asm/processor.h>
 #include <asm/atomic.h>
 #include <asm/hw_irq.h>
 
@@ -50,6 +49,9 @@
 #endif /* CONFIG_SMP */
 
 #ifdef __KERNEL__
+struct task_struct;
+struct pt_regs;
+
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
@@ -83,7 +85,6 @@ extern void cacheable_memzero(void *p, unsigned int nb);
 struct device_node;
 extern void note_scsi_host(struct device_node *, void *);
 
-struct task_struct;
 extern struct task_struct *__switch_to(struct task_struct *,
 	struct task_struct *);
 #define switch_to(prev, next, last)	((last) = __switch_to((prev), (next)))
@@ -94,7 +95,6 @@ extern struct task_struct *_switch(struct thread_struct *prev,
 
 extern unsigned int rtas_data;
 
-struct pt_regs;
 extern void dump_regs(struct pt_regs *);
 
 static __inline__ unsigned long

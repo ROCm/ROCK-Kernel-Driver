@@ -595,11 +595,9 @@ config MICROCODE
 	  ingredients for this driver, check:
 	  <http://www.urbanmyth.org/microcode/>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called microcode.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  If
-	  you use modprobe or kmod you may also want to add the line
+	  To compile this driver as a module, choose M here: the
+	  module will be called microcode.
+	  If you use modprobe or kmod you may also want to add the line
 	  'alias char-major-10-184 microcode' to your /etc/modules.conf file.
 
 config X86_MSR
@@ -867,10 +865,8 @@ config APM
 	  11) exchange RAM chips
 	  12) exchange the motherboard.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  apm.
+	  To compile this driver as a module, choose M here: the
+	  module will be called apm.
 
 config APM_IGNORE_USER_SUSPEND
 	bool "Ignore USER SUSPEND"
@@ -1148,10 +1144,6 @@ source "drivers/message/i2o/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/telephony/Kconfig"
@@ -1173,8 +1165,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/i386/oprofile/Kconfig"
 
@@ -1312,4 +1302,9 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on SMP || X86_VISWS
+	default y
+
+config PC
+	bool
+	depends on X86 && !EMBEDDED
 	default y

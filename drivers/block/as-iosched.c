@@ -99,6 +99,7 @@ struct as_data {
 	sector_t last_sector[2];	/* last REQ_SYNC & REQ_ASYNC sectors */
 	struct list_head *dispatch;	/* driver dispatch queue */
 	struct list_head *hash;		/* request hash */
+	unsigned long new_success; /* anticipation success on new proc */
 	unsigned long current_batch_expires;
 	unsigned long last_check_fifo[2];
 	int changed_batch;		/* 1: waiting for old batch to end */
@@ -302,7 +303,7 @@ static struct request *as_find_arq_hash(struct as_data *ad, sector_t offset)
 		BUG_ON(!arq->on_hash);
 
 		if (!rq_mergeable(__rq)) {
-			__as_del_arq_hash(arq);
+			as_remove_merge_hints(ad->q, arq);
 			continue;
 		}
 
@@ -588,11 +589,18 @@ static void as_antic_stop(struct as_data *ad)
 	int status = ad->antic_status;
 
 	if (status == ANTIC_WAIT_REQ || status == ANTIC_WAIT_NEXT) {
+		struct as_io_context *aic;
+
 		if (status == ANTIC_WAIT_NEXT)
 			del_timer(&ad->antic_timer);
 		ad->antic_status = ANTIC_FINISHED;
 		/* see as_work_handler */
 		kblockd_schedule_work(&ad->antic_work);
+
+		aic = ad->io_context->aic;
+		if (aic->seek_samples == 0)
+			/* new process */
+			ad->new_success = (ad->new_success * 3) / 4 + 256;
 	}
 }
 
@@ -608,8 +616,14 @@ static void as_antic_timeout(unsigned long data)
 	spin_lock_irqsave(q->queue_lock, flags);
 	if (ad->antic_status == ANTIC_WAIT_REQ
 			|| ad->antic_status == ANTIC_WAIT_NEXT) {
+		struct as_io_context *aic;
 		ad->antic_status = ANTIC_FINISHED;
 		kblockd_schedule_work(&ad->antic_work);
+
+		aic = ad->io_context->aic;
+		if (aic->seek_samples == 0)
+			/* new process */
+			ad->new_success = (ad->new_success * 3) / 4;
 	}
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
@@ -698,10 +712,11 @@ static int as_can_break_anticipation(struct as_data *ad, struct as_rq *arq)
 		return 1;
 	}
 
-	if (aic->seek_samples == 0 || aic->ttime_samples == 0) {
+	if (ad->new_success < 256 &&
+			(aic->seek_samples == 0 || aic->ttime_samples == 0)) {
 		/*
-		 * Process has just started IO so default to not anticipate.
-		 * Maybe should be smarter.
+		 * Process has just started IO and we have a bad history of
+		 * success anticipating on new processes!
 		 */
 		return 1;
 	}
@@ -1028,9 +1043,15 @@ static void as_remove_request(request_queue_t *q, struct request *rq)
 		return;
 	}
 
-	if (ON_RB(&arq->rb_node))
+	if (ON_RB(&arq->rb_node)) {
+		/*
+		 * We'll lose the aliased request(s) here. I don't think this
+		 * will ever happen, but if it does, hopefully someone will
+		 * report it.
+		 */
+		WARN_ON(!list_empty(&rq->queuelist));
 		as_remove_queued_request(q, rq);
-	else
+	} else
 		as_remove_dispatched_request(q, rq);
 }
 
@@ -1085,6 +1106,7 @@ static inline int as_batch_expired(struct as_data *ad)
  */
 static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 {
+	struct request *rq = arq->request;
 	struct list_head *insert;
 	const int data_dir = arq->is_sync;
 
@@ -1097,8 +1119,7 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	 * This has to be set in order to be correctly updated by
 	 * as_find_next_arq
 	 */
-	ad->last_sector[data_dir] = arq->request->sector
-					+ arq->request->nr_sectors;
+	ad->last_sector[data_dir] = rq->sector + rq->nr_sectors;
 
 	if (data_dir == REQ_SYNC) {
 		/* In case we have to anticipate after this */
@@ -1119,15 +1140,15 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	/*
 	 * take it off the sort and fifo list, add to dispatch queue
 	 */
-	as_remove_queued_request(ad->q, arq->request);
+	as_remove_queued_request(ad->q, rq);
 
 	insert = ad->dispatch->prev;
 
-	while (!list_empty(&arq->request->queuelist)) {
-		struct request *rq = list_entry_rq(arq->request->queuelist.next);
-		struct as_rq *__arq = RQ_DATA(rq);
+	while (!list_empty(&rq->queuelist)) {
+		struct request *__rq = list_entry_rq(rq->queuelist.next);
+		struct as_rq *__arq = RQ_DATA(__rq);
 
-		list_move_tail(&rq->queuelist, ad->dispatch);
+		list_move_tail(&__rq->queuelist, ad->dispatch);
 
 		if (__arq->io_context && __arq->io_context->aic)
 			atomic_inc(&__arq->io_context->aic->nr_dispatched);
@@ -1138,7 +1159,7 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 		ad->nr_dispatched++;
 	}
 
-	list_add(&arq->request->queuelist, insert);
+	list_add(&rq->queuelist, insert);
 	if (arq->io_context && arq->io_context->aic)
 		atomic_inc(&arq->io_context->aic->nr_dispatched);
 
@@ -1146,7 +1167,6 @@ static void as_move_to_dispatch(struct as_data *ad, struct as_rq *arq)
 	arq->state = AS_RQ_DISPATCHED;
 
 	ad->nr_dispatched++;
-
 }
 
 /*
@@ -1310,13 +1330,12 @@ as_add_aliased_request(struct as_data *ad, struct as_rq *arq, struct as_rq *alia
 	 * Link this request to that sector. They are untangled in
 	 * as_move_to_dispatch
 	 */
-	list_add_tail(&arq->request->queuelist,	&alias->request->queuelist);
+	list_add_tail(&arq->request->queuelist, &alias->request->queuelist);
 
 	/*
 	 * Don't want to have to handle merges.
 	 */
 	as_remove_merge_hints(ad->q, arq);
-
 }
 
 /*
@@ -1433,7 +1452,7 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
 			as_add_request(ad, arq);
 			break;
 		default:
-			printk("%s: bad insert point %d\n", __FUNCTION__,where);
+			BUG();
 			return;
 	}
 }
@@ -1527,10 +1546,13 @@ as_merge(request_queue_t *q, struct request **req, struct bio *bio)
 
 	return ELEVATOR_NO_MERGE;
 out:
-	q->last_merge = __rq;
+	if (rq_mergeable(__rq))
+		q->last_merge = __rq;
 out_insert:
-	if (ret)
-		as_hot_arq_hash(ad, RQ_DATA(__rq));
+	if (ret) {
+		if (rq_mergeable(__rq))
+			as_hot_arq_hash(ad, RQ_DATA(__rq));
+	}
 	*req = __rq;
 	return ret;
 }
@@ -1550,7 +1572,10 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 	 * if the merge was a front merge, we need to reposition request
 	 */
 	if (rq_rb_key(req) != arq->rb_key) {
-		struct as_rq *alias;
+		struct as_rq *alias, *next_arq = NULL;
+
+		if (ad->next_arq[arq->is_sync] == arq)
+			next_arq = as_find_next_arq(ad, arq);
 
 		/*
 		 * Note! We should really be moving any old aliased requests
@@ -1561,6 +1586,8 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 		if ((alias = as_add_arq_rb(ad, arq)) ) {
 			list_del_init(&arq->fifo);
 			as_add_aliased_request(ad, arq, alias);
+			if (next_arq)
+				ad->next_arq[arq->is_sync] = next_arq;
 		}
 		/*
 		 * Note! At this stage of this and the next function, our next
@@ -1591,11 +1618,17 @@ as_merged_requests(request_queue_t *q, struct request *req,
 	as_add_arq_hash(ad, arq);
 
 	if (rq_rb_key(req) != arq->rb_key) {
-		struct as_rq *alias;
+		struct as_rq *alias, *next_arq = NULL;
+
+		if (ad->next_arq[arq->is_sync] == arq)
+			next_arq = as_find_next_arq(ad, arq);
+
 		as_del_arq_rb(ad, arq);
 		if ((alias = as_add_arq_rb(ad, arq)) ) {
 			list_del_init(&arq->fifo);
 			as_add_aliased_request(ad, arq, alias);
+			if (next_arq)
+				ad->next_arq[arq->is_sync] = next_arq;
 		}
 	}
 
@@ -1613,6 +1646,18 @@ as_merged_requests(request_queue_t *q, struct request *req,
 			 */
 			swap_io_context(&arq->io_context, &anext->io_context);
 		}
+	}
+
+	/*
+	 * Transfer list of aliases
+	 */
+	while (!list_empty(&next->queuelist)) {
+		struct request *__rq = list_entry_rq(next->queuelist.next);
+		struct as_rq *__arq = RQ_DATA(__rq);
+
+		list_move_tail(&__rq->queuelist, &req->queuelist);
+
+		WARN_ON(__arq->state != AS_RQ_QUEUED);
 	}
 
 	/*
@@ -1765,6 +1810,9 @@ static int as_init(request_queue_t *q, elevator_t *e)
 	ad->write_batch_count = ad->batch_expire[REQ_ASYNC] / 10;
 	if (ad->write_batch_count < 2)
 		ad->write_batch_count = 2;
+
+	ad->new_success = 512;
+
 	return 0;
 }
 

@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.21 $
+ * $Revision: 1.22 $
  */
 
 #include <linux/config.h>
@@ -66,10 +66,16 @@ dasd_devices_show(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "(none)");
 	/* Print kdev. */
-	seq_printf(m, " at (%3d:%3d)",
-		   device->gdp->major, device->gdp->first_minor);
+	if (device->gdp)
+		seq_printf(m, " at (%3d:%3d)",
+			   device->gdp->major, device->gdp->first_minor);
+	else
+		seq_printf(m, "  at (???:???)");
 	/* Print device name. */
-	seq_printf(m, " is %-7s", device->gdp->disk_name);
+	if (device->gdp)
+		seq_printf(m, " is %-7s", device->gdp->disk_name);
+	else
+		seq_printf(m, " is ???????");
 	/* Print devices features. */
 	substr = device->ro_flag ? "(ro)" : " ";
 	seq_printf(m, "%4s: ", substr);
@@ -86,9 +92,6 @@ dasd_devices_show(struct seq_file *m, void *v)
 		break;
 	case DASD_STATE_BASIC:
 		seq_printf(m, "basic");
-		break;
-	case DASD_STATE_ACCEPT:
-		seq_printf(m, "accepted");
 		break;
 	case DASD_STATE_READY:
 	case DASD_STATE_ONLINE:

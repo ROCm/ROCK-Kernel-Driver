@@ -13,7 +13,6 @@
 #include <asm/bootinfo.h>
 #include <asm/mmu.h>
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/residual.h>
 #if defined(CONFIG_4xx)
 #include <asm/ibm4xx.h>

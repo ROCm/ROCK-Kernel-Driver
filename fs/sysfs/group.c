@@ -46,9 +46,9 @@ int sysfs_create_group(struct kobject * kobj,
 	int error;
 
 	if (grp->name) {
-		dir = sysfs_create_subdir(kobj,grp->name);
-		if (IS_ERR(dir))
-			return PTR_ERR(dir);
+		error = sysfs_create_subdir(kobj,grp->name,&dir);
+		if (error)
+			return error;
 	} else
 		dir = kobj->dentry;
 	dir = dget(dir);

@@ -30,7 +30,6 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 
 extern void
 print_8xx_pte(struct mm_struct *mm, unsigned long addr);

@@ -21,6 +21,18 @@ config SENSORS_ADM1021
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1021.
 
+config SENSORS_EEPROM
+	tristate "EEPROM (DIMM) reader"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get read-only access to the EEPROM data
+	  available on modern memory DIMMs, and which could theoretically
+	  also be available on other devices.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called eeprom.
+
 config SENSORS_IT87
 	tristate "National Semiconductors IT87 and compatibles"
 	depends on I2C && EXPERIMENTAL

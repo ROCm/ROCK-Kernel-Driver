@@ -293,7 +293,6 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	finished_sccb = ext_int_param & EXT_INT_SCCB_MASK;
 	evbuf_pending = ext_int_param & (EXT_INT_EVBUF_PENDING |
 					 EXT_INT_STATECHANGE_PENDING);
-	irq_enter();
 	req = NULL;
 	if (finished_sccb != 0U) {
 		list_for_each(l, &sclp_req_queue) {
@@ -321,7 +320,6 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	spin_unlock(&sclp_lock);
 	/* and start next request on the queue */
 	sclp_start_request();
-	irq_exit();
 }
 
 /*

@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.31 $
+ * $Revision: 1.32 $
  */
 
 #include <linux/config.h>
@@ -170,7 +170,6 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	ip = S390_lowcore.ext_params;
 
 	cpu = smp_processor_id();
-	irq_enter();
 
 	if (!ip) {		/* no intparm: unsolicited interrupt */
 		MESSAGE(KERN_DEBUG, "%s", "caught unsolicited interrupt");
@@ -218,7 +217,6 @@ dasd_ext_handler(struct pt_regs *regs, __u16 code)
 	dasd_schedule_bh(device);
 
 	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
-	irq_exit();
 }
 
 static int

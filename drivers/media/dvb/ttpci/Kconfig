@@ -33,11 +33,8 @@ config DVB_BUDGET
 
 	  Say Y if you own such a card and want to use it.
 
-	  This driver is available as a module called
-	  dvb-ttpci-budget.o ( = code which can be inserted in
-	  and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called budget.
 
 config DVB_BUDGET_CI
 	tristate "Budget cards with onboard CI connector"
@@ -49,11 +46,8 @@ config DVB_BUDGET_CI
 
 	  Say Y if you own such a card and want to use it.
 
-	  This driver is available as a module called
-	  dvb-ttpci-budget-av.o ( = code which can be inserted in
-	  and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called budget-ci.
 
 config DVB_BUDGET_AV
 	tristate "Budget cards with analog video inputs"
@@ -65,10 +59,8 @@ config DVB_BUDGET_AV
 
 	  Say Y if you own such a card and want to use it.
 
-	  This driver is available as a module called
-	  dvb-ttpci-budget-av.o ( = code which can be inserted in
-	  and removed from the running kernel whenever you want).
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called budget-av.
 
 config DVB_BUDGET_PATCH
 	tristate "AV7110 cards with Budget Patch"
@@ -85,8 +77,5 @@ config DVB_BUDGET_PATCH
 
 	  Say Y if you own such a card and want to use it.
 
-	  This driver is available as a module called
-	  dvb-ttpci-budget-patch.o ( = code which can be inserted in
-	  and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called budget-patch.

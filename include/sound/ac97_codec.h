@@ -214,10 +214,46 @@
 #define AC97_CXR_SPDIF_AC3	0x2
 
 /* specific - ALC */
+#define AC97_ALC650_SPDIF_INPUT_STATUS1	0x60
+/* S/PDIF input status 1 bit defines */
+#define AC97_ALC650_PRO             0x0001  /* Professional status */
+#define AC97_ALC650_NAUDIO          0x0002  /* Non audio stream */
+#define AC97_ALC650_COPY            0x0004  /* Copyright status */
+#define AC97_ALC650_PRE             0x0038  /* Preemphasis status */
+#define AC97_ALC650_PRE_SHIFT       3
+#define AC97_ALC650_MODE            0x00C0  /* Preemphasis status */
+#define AC97_ALC650_MODE_SHIFT      6
+#define AC97_ALC650_CC_MASK         0x7f00  /* Category Code mask */
+#define AC97_ALC650_CC_SHIFT        8
+#define AC97_ALC650_L               0x8000  /* Generation Level status */
+
+#define AC97_ALC650_SPDIF_INPUT_STATUS2	0x62
+/* S/PDIF input status 2 bit defines */
+#define AC97_ALC650_SOUCE_MASK      0x000f  /* Source number */
+#define AC97_ALC650_CHANNEL_MASK    0x00f0  /* Channel number */
+#define AC97_ALC650_CHANNEL_SHIFT   4 
+#define AC97_ALC650_SPSR_MASK       0x0f00  /* S/PDIF Sample Rate bits */
+#define AC97_ALC650_SPSR_SHIFT      8
+#define AC97_ALC650_SPSR_44K        0x0000  /* Use 44.1kHz Sample rate */
+#define AC97_ALC650_SPSR_48K        0x0200  /* Use 48kHz Sample rate */
+#define AC97_ALC650_SPSR_32K        0x0300  /* Use 32kHz Sample rate */
+#define AC97_ALC650_CLOCK_ACCURACY  0x3000  /* Clock accuracy */
+#define AC97_ALC650_CLOCK_SHIFT     12
+#define AC97_ALC650_CLOCK_LOCK      0x4000  /* Clock locked status */
+#define AC97_ALC650_V               0x8000  /* Validity status */
+
 #define AC97_ALC650_SURR_DAC_VOL	0x64
 #define AC97_ALC650_LFE_DAC_VOL		0x66
-#define AC97_ALC650_MULTICH	0x6a
-#define AC97_ALC650_CLOCK	0x7a
+#define AC97_ALC650_UNKNOWN1		0x68
+#define AC97_ALC650_MULTICH		0x6a
+#define AC97_ALC650_UNKNOWN2		0x6c
+#define AC97_ALC650_REVISION		0x6e
+#define AC97_ALC650_UNKNOWN3		0x70
+#define AC97_ALC650_UNKNOWN4		0x72
+#define AC97_ALC650_MISC		0x74
+#define AC97_ALC650_GPIO_SETUP		0x76
+#define AC97_ALC650_GPIO_STATUS		0x78
+#define AC97_ALC650_CLOCK		0x7a
 
 /* specific - Yamaha YMF753 */
 #define AC97_YMF753_DIT_CTRL2	0x66	/* DIT Control 2 */
@@ -248,6 +284,7 @@
 #define AC97_AD_MULTI		(1<<1)	/* Analog Devices - multi codecs */
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
 #define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
+#define AC97_STEREO_MUTES	(1<<4)	/* has stereo mute bits */
 
 /* rates indexes */
 #define AC97_RATES_FRONT_DAC	0

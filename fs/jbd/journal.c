@@ -31,7 +31,6 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/pagemap.h>
 #include <asm/uaccess.h>
@@ -1801,7 +1800,7 @@ int read_jbd_debug(char *page, char **start, off_t off,
 	return ret;
 }
 
-int write_jbd_debug(struct file *file, const char *buffer,
+int write_jbd_debug(struct file *file, const char __user *buffer,
 			   unsigned long count, void *data)
 {
 	char buf[32];

@@ -17,6 +17,7 @@
  */
 #include <linux/config.h>
 #include <linux/types.h>
+#include <asm/reg.h>
 #include <asm/ibm44x.h>
 #include <asm/mmu.h>
 

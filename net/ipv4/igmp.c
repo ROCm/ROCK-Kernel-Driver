@@ -72,8 +72,8 @@
  *					Vinay Kulkarni
  */
 
-
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <linux/types.h>
@@ -2438,3 +2438,6 @@ int __init igmp_mc_proc_init(void)
 }
 #endif
 
+EXPORT_SYMBOL(ip_mc_dec_group);
+EXPORT_SYMBOL(ip_mc_inc_group);
+EXPORT_SYMBOL(ip_mc_join_group);

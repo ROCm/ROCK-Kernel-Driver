@@ -304,22 +304,16 @@ int __init ide_probe_for_pdc4030(void)
 
 #ifndef MODULE
 	if (enable_promise_support == 0)
-		return;
+		return 0;
 #endif
 
 	for (index = 0; index < MAX_HWIFS; index++) {
 		hwif = &ide_hwifs[index];
-		if (hwif->chipset == ide_unknown && detect_pdc4030(hwif)) {
-#ifndef MODULE
-			setup_pdc4030(hwif);
-#else
+		if (hwif->chipset == ide_unknown && detect_pdc4030(hwif))
 			return setup_pdc4030(hwif);
-#endif
-		}
 	}
-#ifdef MODULE
+
 	return 0;
-#endif
 }
 
 static void __exit release_pdc4030(ide_hwif_t *hwif, ide_hwif_t *mate)

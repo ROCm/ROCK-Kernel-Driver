@@ -1978,7 +1978,7 @@ static struct packet_type ax25_packet_type = {
 	.type	=	__constant_htons(ETH_P_AX25),
 	.dev	=	NULL,				/* All devices */
 	.func	=	ax25_kiss_rcv,
-	.data	=	(void *) 1
+	.data	=	PKT_CAN_SHARE_SKB,
 };
 
 static struct notifier_block ax25_dev_notifier = {

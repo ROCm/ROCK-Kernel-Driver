@@ -342,3 +342,4 @@ ccw_device_sense_id_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	}
 }
 
+EXPORT_SYMBOL(diag210);

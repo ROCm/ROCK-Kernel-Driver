@@ -26,7 +26,8 @@
  */
 ext_int_info_t *ext_int_hash[256] = { 0, };
 
-int register_external_interrupt(__u16 code, ext_int_handler_t handler) {
+int register_external_interrupt(__u16 code, ext_int_handler_t handler)
+{
         ext_int_info_t *p;
         int index;
 
@@ -42,7 +43,8 @@ int register_external_interrupt(__u16 code, ext_int_handler_t handler) {
 }
 
 int register_early_external_interrupt(__u16 code, ext_int_handler_t handler,
-				      ext_int_info_t *p) {
+				      ext_int_info_t *p)
+{
         int index;
 
         if (p == NULL)
@@ -55,7 +57,8 @@ int register_early_external_interrupt(__u16 code, ext_int_handler_t handler,
         return 0;
 }
 
-int unregister_external_interrupt(__u16 code, ext_int_handler_t handler) {
+int unregister_external_interrupt(__u16 code, ext_int_handler_t handler)
+{
         ext_int_info_t *p, *q;
         int index;
 
@@ -79,7 +82,8 @@ int unregister_external_interrupt(__u16 code, ext_int_handler_t handler) {
 }
 
 int unregister_early_external_interrupt(__u16 code, ext_int_handler_t handler,
-					ext_int_info_t *p) {
+					ext_int_info_t *p)
+{
 	ext_int_info_t *q;
 	int index;
 
@@ -101,9 +105,23 @@ int unregister_early_external_interrupt(__u16 code, ext_int_handler_t handler,
 	return 0;
 }
 
-void do_extint(void)
+void do_extint(struct pt_regs *regs, unsigned short code)
 {
+        ext_int_info_t *p;
+        int index;
+
+	irq_enter();
+	if (S390_lowcore.int_clock >= S390_lowcore.jiffy_timer)
+		account_ticks(regs);
 	kstat_cpu(smp_processor_id()).irqs[EXTERNAL_INTERRUPT]++;
+        index = code & 0xff;
+	for (p = ext_int_hash[index]; p; p = p->next) {
+		if (likely(p->code == code)) {
+			if (likely(p->handler))
+				p->handler(regs, code);
+		}
+	}
+	irq_exit();
 }
 
 EXPORT_SYMBOL(register_external_interrupt);

@@ -69,6 +69,7 @@
  *		Arnaldo C. Melo :	convert /proc/net/arp to seq_file
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
@@ -630,12 +631,6 @@ int arp_process(struct sk_buff *skb)
 	if (in_dev == NULL)
 		goto out;
 
-	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
-	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
-				 (2 * dev->addr_len) +
-				 (2 * sizeof(u32)))))
-		goto out;
-
 	arp = skb->nh.arph;
 
 	switch (dev_type) {
@@ -835,8 +830,15 @@ out:
 
 int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
-	struct arphdr *arp = skb->nh.arph;
+	struct arphdr *arp;
 
+	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
+	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
+				 (2 * dev->addr_len) +
+				 (2 * sizeof(u32)))))
+		goto freeskb;
+
+	arp = skb->nh.arph;
 	if (arp->ar_hln != dev->addr_len ||
 	    dev->flags & IFF_NOARP ||
 	    skb->pkt_type == PACKET_OTHERHOST ||
@@ -1108,7 +1110,7 @@ void arp_ifdown(struct net_device *dev)
 static struct packet_type arp_packet_type = {
 	.type =	__constant_htons(ETH_P_ARP),
 	.func =	arp_rcv,
-	.data =	(void*) 1, /* understand shared skbs */
+	.data =	PKT_CAN_SHARE_SKB,
 };
 
 static int arp_proc_init(void);
@@ -1429,3 +1431,13 @@ static int __init arp_proc_init(void)
 }
 
 #endif /* CONFIG_PROC_FS */
+
+EXPORT_SYMBOL(arp_broken_ops);
+EXPORT_SYMBOL(arp_find);
+EXPORT_SYMBOL(arp_rcv);
+EXPORT_SYMBOL(arp_send);
+EXPORT_SYMBOL(arp_tbl);
+
+#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
+EXPORT_SYMBOL(clip_tbl_hook);
+#endif

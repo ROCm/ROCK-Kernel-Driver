@@ -23,8 +23,7 @@ config BRIDGE_EBT_BROUTE
 	  brouter. See the man page for ebtables(8) and examples on the ebtables
 	  website.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_T_FILTER
 	tristate "ebt: filter table support"
@@ -34,8 +33,7 @@ config BRIDGE_EBT_T_FILTER
 	  local input, forwarding and local output. See the man page for
 	  ebtables(8).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_T_NAT
 	tristate "ebt: nat table support"
@@ -45,8 +43,7 @@ config BRIDGE_EBT_T_NAT
 	  source address (MAC SNAT) or the MAC destination address (MAC DNAT).
 	  See the man page for ebtables(8).
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 #
 # matches
 #
@@ -56,8 +53,7 @@ config BRIDGE_EBT_802_3
 	help
 	  This option adds matching support for 802.3 Ethernet frames.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_ARP
 	tristate "ebt: ARP filter support"
@@ -66,8 +62,7 @@ config BRIDGE_EBT_ARP
 	  This option adds the ARP match, which allows ARP and RARP header field
 	  filtering.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_IP
 	tristate "ebt: IP filter support"
@@ -75,6 +70,16 @@ config BRIDGE_EBT_IP
 	help
 	  This option adds the IP match, which allows basic IP header field
 	  filtering.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_LIMIT
+	tristate "ebt: limit match support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the limit match, which allows you to control
+	  the rate at which a rule can be matched. This match is the
+	  equivalent of the iptables limit match.
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
@@ -88,8 +93,7 @@ config BRIDGE_EBT_MARK
 	  This value is the same as the one used in the iptables mark match and
 	  target.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_PKTTYPE
 	tristate "ebt: packet type filter support"
@@ -100,8 +104,7 @@ config BRIDGE_EBT_PKTTYPE
 	  the generic networking code): broadcast, multicast,
 	  for this host alone or for another host.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_STP
 	tristate "ebt: STP filter support"
@@ -110,8 +113,7 @@ config BRIDGE_EBT_STP
 	  This option adds the Spanning Tree Protocol match, which
 	  allows STP header field filtering.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_VLAN
 	tristate "ebt: 802.1Q VLAN filter support"
@@ -120,8 +122,7 @@ config BRIDGE_EBT_VLAN
 	  This option adds the 802.1Q vlan match, which allows the filtering of
 	  802.1Q vlan fields.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 #
 # targets
 #
@@ -132,8 +133,7 @@ config BRIDGE_EBT_ARPREPLY
 	  This option adds the arp reply target, which allows
 	  automatically sending arp replies to arp requests.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_DNAT
 	tristate "ebt: dnat target support"
@@ -142,8 +142,7 @@ config BRIDGE_EBT_DNAT
 	  This option adds the MAC DNAT target, which allows altering the MAC
 	  destination address of frames.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_MARK_T
 	tristate "ebt: mark target support"
@@ -154,8 +153,7 @@ config BRIDGE_EBT_MARK_T
 	  This value is the same as the one used in the iptables mark match and
 	  target.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_REDIRECT
 	tristate "ebt: redirect target support"
@@ -164,8 +162,7 @@ config BRIDGE_EBT_REDIRECT
 	  This option adds the MAC redirect target, which allows altering the MAC
 	  destination address of a frame to that of the device it arrived on.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 config BRIDGE_EBT_SNAT
 	tristate "ebt: snat target support"
@@ -174,8 +171,7 @@ config BRIDGE_EBT_SNAT
 	  This option adds the MAC SNAT target, which allows altering the MAC
 	  source address of frames.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 #
 # watchers
 #
@@ -186,7 +182,6 @@ config BRIDGE_EBT_LOG
 	  This option adds the log target, that you can use in any rule in
 	  any ebtables table. It records the frame header to the syslog.
 
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+	  To compile it as a module, choose M here.  If unsure, say N.
 
 endmenu

@@ -562,16 +562,3 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-
-/*
- * Local variables:
- *  compile-command: "gcc -D__KERNEL__ -Wall -O6 -I/usr/src/linux/net/inet -c smc-ultra.c"
- *  version-control: t
- *  kept-new-versions: 5
- *  c-indent-level: 4
- *  c-basic-offset: 4
- *  tab-width: 4
- * End:
- */

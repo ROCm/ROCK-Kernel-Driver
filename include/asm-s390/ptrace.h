@@ -301,7 +301,8 @@ struct pt_regs
 	unsigned long gprs[NUM_GPRS];
 	unsigned int  acrs[NUM_ACRS];
 	unsigned long orig_gpr2;
-	unsigned int  trap;
+	unsigned short ilc;
+	unsigned short trap;
 } __attribute__ ((packed));
 
 /*

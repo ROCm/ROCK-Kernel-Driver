@@ -90,10 +90,8 @@ config COMPUTONE
 	  order to become a dial-in server. If you have a card like that, say
 	  Y here and read <file:Documentation/computone.txt>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. You will get
-	  two modules called ip2 and ip2main.
+	  To compile this driver as modules, choose M here: the
+	  modules will be called ip2 and ip2main.
 
 config ROCKETPORT
 	tristate "Comtrol RocketPort support"
@@ -104,9 +102,8 @@ config ROCKETPORT
           modems.  For information about the RocketPort/RocketModem  boards
           and this driver read <file:Documentation/rocket.txt>.
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  rocket.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rocket.
 
 	  If you want to compile this driver into the kernel, say Y here.  If
           you don't have a Comtrol RocketPort/RocketModem card installed, say N.
@@ -124,10 +121,8 @@ config CYCLADES
 	  As of 1.3.9x kernels, this driver's minor numbers start at 0 instead
 	  of 32.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called cyclades.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cyclades.
 
 	  If you haven't heard about it, it's safe to say N.
 
@@ -159,8 +154,8 @@ config DIGIEPCA
 	  "Digiboard PC/Xx Support" below. You should (and can) only select
 	  one of the two drivers.
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called epca.
+	  To compile this driver as a module, choose M here: the
+	  module will be called epca.
 
 config DIGI
 	tristate "Digiboard PC/Xx Support"
@@ -172,8 +167,8 @@ config DIGI
 	  order to become a dial-in server. If you have a card like that, say
 	  Y here and read the file <file:Documentation/digiboard.txt>.
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called pcxx.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcxx.
 
 config ESPSERIAL
 	tristate "Hayes ESP serial port support"
@@ -183,10 +178,10 @@ config ESPSERIAL
 	  port cards and multiport cards are supported.  Make sure to read
 	  <file:Documentation/hayes-esp.txt>.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>.  The module will be
-	  called esp.  If unsure, say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called esp.
+
+	  If unsure, say N.
 
 config MOXA_INTELLIO
 	tristate "Moxa Intellio support"
@@ -194,10 +189,8 @@ config MOXA_INTELLIO
 	help
 	  Say Y here if you have a Moxa Intellio multiport serial card.
 
-	  This driver can also be built as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called moxa. If you want to do that, say M
-	  here.
+	  To compile this driver as a module, choose M here: the
+	  module will be called moxa.
 
 config MOXA_SMARTIO
 	tristate "Moxa SmartIO support"
@@ -216,10 +209,8 @@ config ISI
 	help
 	  This is a driver for the Multi-Tech cards which provide several
 	  serial ports.  The driver is experimental and can currently only be
-	  built as a module ( = code which can be inserted in and removed from
-	  the running kernel whenever you want).  Please read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  isicom.
+	  built as a module. The module will be called isicom.
+	  If you want to do that, choose M here.
 
 config SYNCLINK
 	tristate "Microgate SyncLink card support"
@@ -345,10 +336,8 @@ config STALLION
 	  card, then this is for you; say Y.  Make sure to read
 	  <file:Documentation/stallion.txt>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called stallion.
+	  To compile this driver as a module, choose M here: the
+	  module will be called stallion.
 
 config ISTALLION
 	tristate "Stallion EC8/64, ONboard, Brumby support"
@@ -358,10 +347,8 @@ config ISTALLION
 	  serial multiport card, say Y here. Make sure to read
 	  <file:Documentation/stallion.txt>.
 
-	  To compile it as a module ( = code which can be inserted in and
-	  removed from the running kernel whenever you want), say M here and
-	  read <file:Documentation/modules.txt>. The module will be called
-	  istallion.
+	  To compile this driver as a module, choose M here: the
+	  module will be called istallion.
 
 config SERIAL_TX3912
 	bool "TMPTX3912/PR31700 serial port support"
@@ -437,8 +424,7 @@ config A2232
 
 	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232". If you want to do this, answer M here and read
-	  "<file:Documentation/modules.txt>".
+	  "ser_a2232". If you want to do this, answer M here.
 
 source "drivers/serial/Kconfig"
 
@@ -496,10 +482,9 @@ config PRINTER
 
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
-	  corresponding drivers into the kernel.  If you want to compile this
-	  driver as a module however ( = code which can be inserted in and
-	  removed from the running kernel whenever you want), say M here and
-	  read <file:Documentation/modules.txt> and
+	  corresponding drivers into the kernel.
+
+	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
@@ -541,10 +526,8 @@ config PPDEV
 	  It is safe to say N to this -- it is not needed for normal printing
 	  or parallel port CD-ROM/disk support.
 
-	  This support is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  ppdev.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ppdev.
 
 	  If unsure, say N.
 
@@ -561,10 +544,8 @@ config TIPAR
 	  to use this precise link cable (depending on the permissions on
 	  the device nodes, though).
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tipar. If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called tipar.
 
 	  If you don't know what a parallel link cable is or what a Texas
 	  Instruments graphing calculator is, then you probably don't need this
@@ -612,21 +593,18 @@ config BUSMOUSE
 	  you will have to say Y here and also to the specific driver for your
 	  mouse below.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called busmouse. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called busmouse.
 
 endmenu
 
 config QIC02_TAPE
 	tristate "QIC-02 tape support"
 	help
-	  If you have a non-SCSI tape drive like that, say Y. Or, if you want
-	  to compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  tpqic02.
+	  If you have a non-SCSI tape drive like that, say Y.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tpqic02.
 
 config QIC02_DYNCONF
 	bool "Do you want runtime configuration for QIC-02"
@@ -687,11 +665,8 @@ config NWBUTTON
 	  button; it will still execute a hard reset if the button is held
 	  down for longer than approximately five seconds.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  nwbutton.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nwbutton.
 
 	  Most people will answer Y to this question and "Reboot Using Button"
 	  below to be able to initiate a system shutdown from the button.
@@ -718,10 +693,8 @@ config NWFLASH
 	  flash contents can render your computer unbootable. On no account
 	  allow random users access to this device. :-)
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nwflash. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nwflash.
 
 	  If you're not sure, say N.
 
@@ -735,10 +708,8 @@ config HW_RANDOM
 
 	  Provides a character driver, used to read() entropy data.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  hw_random.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hw_random.
 
 	  If unsure, say N.
 
@@ -764,10 +735,8 @@ config NVRAM
 	  On Atari machines, /dev/nvram is always configured and does not need
 	  to be selected.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nvram. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nvram.
 
 config RTC
 	tristate "Enhanced Real Time Clock Support"
@@ -792,10 +761,8 @@ config RTC
 	  sampling), then say Y here, and read <file:Documentation/rtc.txt>
 	  for details.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtc.
 
 config GEN_RTC
 	tristate "Generic /dev/rtc emulation"
@@ -812,12 +779,9 @@ config GEN_RTC
 	  for RTC_UIE which is required by some programs and may improve
 	  precision in some cases.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called genrtc. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>. To load the
-	  module automatically add 'alias char-major-10-135 genrtc' to your
-	  /etc/modules.conf
+	  To compile this driver as a module, choose M here: the
+	  module will be called genrtc. To load the module automatically
+	  add 'alias char-major-10-135 genrtc' to your /etc/modules.conf
 
 config GEN_RTC_X
 	bool "Extended RTC operation"
@@ -854,10 +818,10 @@ config DTLK
 	help
 	  This driver is for the DoubleTalk PC, a speech synthesizer
 	  manufactured by RC Systems (<http://www.rcsys.com/>).  It is also
-	  called the `internal DoubleTalk'.  If you want to compile this as a
-	  module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called dtlk.
+	  called the `internal DoubleTalk'.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called dtlk.
 
 config R3964
 	tristate "Siemens R3964 line discipline"
@@ -866,10 +830,8 @@ config R3964
 	  Siemens R3964 packet protocol. Unless you are dealing with special
 	  hardware like PLCs, you are unlikely to need this.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  n_r3964.
+	  To compile this driver as a module, choose M here: the
+	  module will be called n_r3964.
 
 	  If unsure, say N.
 
@@ -882,10 +844,8 @@ config APPLICOM
 	  <http://www.applicom-int.com/>, or by email from David Woodhouse
 	  <dwmw2@infradead.org>.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  applicom.
+	  To compile this driver as a module, choose M here: the
+	  module will be called applicom.
 
 	  If unsure, say N.
 
@@ -899,10 +859,8 @@ config SONYPI
 	  If you have one of those laptops, read
 	  <file:Documentation/sonypi.txt>, and say Y or M here.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called sonypi.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sonypi.
 
 
 menu "Ftape, the floppy tape device driver"
@@ -931,9 +889,7 @@ config FTAPE
 	  please read the file <file:drivers/char/ftape/README.PCI>.
 
 	  The ftape kernel driver is also available as a runtime loadable
-	  module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want). If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>. The
+	  module. To compile this driver as a module, choose M here: the
 	  module will be called ftape.
 
 	  Note that the Ftape-HOWTO is out of date (sorry) and documents the
@@ -979,10 +935,8 @@ config MWAVE
 	  If you own one of the above IBM Thinkpads which has the Mwave chipset
 	  in it, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mwave. If you want to compile it as
-	  a module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mwave.
 
 config SCx200_GPIO
 	tristate "NatSemi SCx200 GPIO Support"

@@ -15,7 +15,6 @@
 #include <linux/config.h>
 #include <linux/blkdev.h>
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/mtio.h>
 #include <linux/interrupt.h>

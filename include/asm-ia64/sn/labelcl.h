@@ -40,7 +40,7 @@ typedef struct label_info_s {
 /*
  * Definition of the data structure that provides the link to 
  * the hwgraph fastinfo and the label entries associated with a 
- * particular devfs entry.
+ * particular hwgraph entry.
  */
 typedef struct labelcl_info_s {
 	unsigned long	hwcl_magic;
@@ -87,6 +87,5 @@ extern int labelcl_info_replace_IDX(vertex_hdl_t, int, arbitrary_info_t,
 			arbitrary_info_t *);
 extern int labelcl_info_connectpt_set(vertex_hdl_t, vertex_hdl_t);
 extern int labelcl_info_get_IDX(vertex_hdl_t, int, arbitrary_info_t *);
-extern struct devfs_handle_t device_info_connectpt_get(vertex_hdl_t);
 
 #endif /* _ASM_IA64_SN_LABELCL_H */

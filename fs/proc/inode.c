@@ -15,7 +15,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
-#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>

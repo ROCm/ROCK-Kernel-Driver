@@ -1631,11 +1631,6 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 			char *p = (char *) arg;
 			int i;
 
-			if ((ret = verify_area(VERIFY_WRITE, (void *) arg,
-					       (ISDN_MODEM_NUMREG + ISDN_MSNLEN + ISDN_LMSNLEN)
-					       * ISDN_MAX_CHANNELS)))
-				return ret;
-
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 				if (copy_to_user(p, isdn_mdm.info[i].emu.profile,
 						 ISDN_MODEM_NUMREG))
@@ -1657,11 +1652,6 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		if (arg) {
 			char *p = (char *) arg;
 			int i;
-
-			if ((ret = verify_area(VERIFY_READ, (void *) arg,
-					       (ISDN_MODEM_NUMREG + ISDN_MSNLEN + ISDN_LMSNLEN)
-					       * ISDN_MAX_CHANNELS)))
-				return ret;
 
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 				if (copy_from_user(isdn_mdm.info[i].emu.profile, p,
@@ -1700,9 +1690,8 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 					int j = 0;
 
 					while (1) {
-						if ((ret = verify_area(VERIFY_READ, p, 1)))
+						if ((ret = get_user(bname[j], p++)))
 							return ret;
-						get_user(bname[j], p++);
 						switch (bname[j]) {
 						case '\0':
 							loop = 0;
@@ -2240,7 +2229,7 @@ static int __init isdn_init(void)
 	isdn_info_update();
 	return 0;
 
- err_tty_modem:
+/* err_tty_modem:*/
 	isdn_tty_exit();
  err_cleanup_devfs:
 	isdn_cleanup_devfs();

@@ -56,29 +56,7 @@ struct clip_priv {
 
 
 #ifdef __KERNEL__
-struct atm_clip_ops {
-	int (*clip_create)(int number);
-	int (*clip_mkip)(struct atm_vcc *vcc,int timeout);
-	int (*clip_setentry)(struct atm_vcc *vcc,u32 ip);
-	int (*clip_encap)(struct atm_vcc *vcc,int mode);
-	void (*clip_push)(struct atm_vcc *vcc,struct sk_buff *skb);
-	int (*atm_init_atmarp)(struct atm_vcc *vcc);
-	struct module *owner;
-};
-
-void atm_clip_ops_set(struct atm_clip_ops *);
-#if defined(CONFIG_ATM_CLIP) || defined(CONFIG_ATM_CLIP_MODULE)
-int try_atm_clip_ops(void);
-#else
-static inline int try_atm_clip_ops(void)
-{
-	return 0;
-}
-#endif
-
-
 extern struct neigh_table *clip_tbl_hook;
-extern struct atm_clip_ops *atm_clip_ops;
 #endif
 
 #endif

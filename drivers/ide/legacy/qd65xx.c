@@ -338,12 +338,12 @@ static int __init qd_testreg(int port)
  * called to setup an ata channel : adjusts attributes & links for tuning
  */
 
-void __init qd_setup (int unit, int base, int config, unsigned int data0, unsigned int data1, void (*tuneproc) (ide_drive_t *, u8 pio))
+static void __init qd_setup(ide_hwif_t *hwif, int base, int config,
+			    unsigned int data0, unsigned int data1,
+			    void (*tuneproc) (ide_drive_t *, u8 pio))
 {
-	ide_hwif_t *hwif = &ide_hwifs[unit];
-
 	hwif->chipset = ide_qd65xx;
-	hwif->channel = unit;
+	hwif->channel = hwif->index;
 	hwif->select_data = base;
 	hwif->config_data = config;
 	hwif->drives[0].drive_data = data0;
@@ -354,19 +354,20 @@ void __init qd_setup (int unit, int base, int config, unsigned int data0, unsign
 	probe_hwif_init(hwif);
 }
 
+#ifdef MODULE
 /*
  * qd_unsetup:
  *
  * called to unsetup an ata channel : back to default values, unlinks tuning
  */
-static void __exit qd_unsetup (int unit)
+static void __exit qd_unsetup(ide_hwif_t *hwif)
 {
-	ide_hwif_t *hwif = &ide_hwifs[unit];
 	u8 config = hwif->config_data;
 	int base = hwif->select_data;
 	void *tuneproc = (void *) hwif->tuneproc;
 
-	if (!(hwif->chipset == ide_qd65xx)) return;
+	if (hwif->chipset != ide_qd65xx)
+		return;
 
 	printk(KERN_NOTICE "%s: back to defaults\n", hwif->name);
 
@@ -381,13 +382,14 @@ static void __exit qd_unsetup (int unit)
 			qd_write_reg(QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
 			qd_write_reg(QD6580_DEF_DATA2, QD_TIMREG(&hwif->drives[1]));
 		} else {
-			qd_write_reg(unit?QD6580_DEF_DATA2:QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
+			qd_write_reg(hwif->channel ? QD6580_DEF_DATA2 : QD6580_DEF_DATA, QD_TIMREG(&hwif->drives[0]));
 		}
 	} else {
 		printk(KERN_WARNING "Unknown qd65xx tuning fonction !\n");
 		printk(KERN_WARNING "keeping settings !\n");
 	}
 }
+#endif
 
 /*
  * qd_probe:
@@ -396,8 +398,9 @@ static void __exit qd_unsetup (int unit)
  * return 1 if another qd may be probed
  */
 
-int __init qd_probe (int base)
+static int __init qd_probe(int base)
 {
+	ide_hwif_t *hwif;
 	u8 config;
 	u8 unit;
 
@@ -414,9 +417,8 @@ int __init qd_probe (int base)
 
 		/* qd6500 found */
 
-		printk(KERN_NOTICE "%s: qd6500 at %#x\n",
-			ide_hwifs[unit].name, base);
-		
+		hwif = &ide_hwifs[unit];
+		printk(KERN_NOTICE "%s: qd6500 at %#x\n", hwif->name, base);
 		printk(KERN_DEBUG "qd6500: config=%#x, ID3=%u\n",
 			config, QD_ID3);
 		
@@ -425,8 +427,8 @@ int __init qd_probe (int base)
 			return 1;
 		}
 
-		qd_setup(unit, base, config, QD6500_DEF_DATA,
-			QD6500_DEF_DATA, &qd6500_tune_drive);
+		qd_setup(hwif, base, config, QD6500_DEF_DATA, QD6500_DEF_DATA,
+			 &qd6500_tune_drive);
 		return 1;
 	}
 
@@ -448,25 +450,31 @@ int __init qd_probe (int base)
 
 		if (control & QD_CONTR_SEC_DISABLED) {
 			/* secondary disabled */
+
+			hwif = &ide_hwifs[unit];
 			printk(KERN_INFO "%s: qd6580: single IDE board\n",
-					ide_hwifs[unit].name);
-			qd_setup(unit, base, config | (control << 8),
-				QD6580_DEF_DATA, QD6580_DEF_DATA2,
-				&qd6580_tune_drive);
+					 hwif->name);
+			qd_setup(hwif, base, config | (control << 8),
+				 QD6580_DEF_DATA, QD6580_DEF_DATA2,
+				 &qd6580_tune_drive);
 			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
 
 			return 1;
 		} else {
+			ide_hwif_t *mate;
+
+			hwif = &ide_hwifs[0];
+			mate = &ide_hwifs[1];
 			/* secondary enabled */
 			printk(KERN_INFO "%s&%s: qd6580: dual IDE board\n",
-					ide_hwifs[0].name,ide_hwifs[1].name);
+					hwif->name, mate->name);
 
-			qd_setup(0, base, config | (control << 8),
-				QD6580_DEF_DATA, QD6580_DEF_DATA,
-				&qd6580_tune_drive);
-			qd_setup(1, base, config | (control << 8),
-				QD6580_DEF_DATA2, QD6580_DEF_DATA2,
-				&qd6580_tune_drive);
+			qd_setup(hwif, base, config | (control << 8),
+				 QD6580_DEF_DATA, QD6580_DEF_DATA,
+				 &qd6580_tune_drive);
+			qd_setup(mate, base, config | (control << 8),
+				 QD6580_DEF_DATA2, QD6580_DEF_DATA2,
+				 &qd6580_tune_drive);
 			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
 
 			return 0; /* no other qd65xx possible */
@@ -476,38 +484,28 @@ int __init qd_probe (int base)
 	return 1;
 }
 
-#ifndef MODULE
-/*
- * init_qd65xx:
- *
- * called by ide.c when parsing command line
- */
-
-void __init init_qd65xx (void)
+/* Can be called directly from ide.c. */
+int __init qd65xx_init(void)
 {
-	if (qd_probe(0x30)) qd_probe(0xb0);
-}
-
-#else
-
-MODULE_AUTHOR("Samuel Thibault");
-MODULE_DESCRIPTION("support of qd65xx vlb ide chipset");
-MODULE_LICENSE("GPL");
-
-static int __init qd65xx_mod_init(void)
-{
-	if (qd_probe(0x30)) qd_probe(0xb0);
+	if (qd_probe(0x30))
+		qd_probe(0xb0);
 	if (ide_hwifs[0].chipset != ide_qd65xx &&
 	    ide_hwifs[1].chipset != ide_qd65xx)
 		return -ENODEV;
 	return 0;
 }
-module_init(qd65xx_mod_init);
 
-static void __exit qd65xx_mod_exit(void)
+#ifdef MODULE
+static void __exit qd65xx_exit(void)
 {
-	qd_unsetup(0);
-	qd_unsetup(1);
+	qd_unsetup(&ide_hwifs[0]);
+	qd_unsetup(&ide_hwifs[1]);
 }
-module_exit(qd65xx_mod_exit);
+
+module_init(qd65xx_init);
+module_exit(qd65xx_exit);
 #endif
+
+MODULE_AUTHOR("Samuel Thibault");
+MODULE_DESCRIPTION("support of qd65xx vlb ide chipset");
+MODULE_LICENSE("GPL");

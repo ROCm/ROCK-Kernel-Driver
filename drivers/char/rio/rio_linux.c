@@ -689,9 +689,7 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     break;
 #endif
   case TIOCSSOFTCAR:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       tty->termios->c_cflag =
         (tty->termios->c_cflag & ~CLOCAL) |
         (ival ? CLOCAL : 0);
@@ -741,25 +739,19 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     }
     break;
   case TIOCMBIS:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
                            ((ival & TIOCM_RTS) ? 1 : -1));
     }
     break;
   case TIOCMBIC:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
                            ((ival & TIOCM_RTS) ? 0 : -1));
     }
     break;
   case TIOCMSET:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
                            ((ival & TIOCM_RTS) ? 1 : 0));
     }
@@ -1010,9 +1002,9 @@ static int rio_init_datastructures (void)
 
  free6:for (i--;i>=0;i--)
         kfree (p->RIOPortp[i]);
-/*free5: */
+/*free5:
  free4:
- free3:kfree (p->RIOPortp);
+ free3:*/kfree (p->RIOPortp);
  free2:kfree (p->RIOHosts);
  free1:
   rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p\n", 

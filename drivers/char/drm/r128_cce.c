@@ -81,8 +81,6 @@ static u32 r128_cce_microcode[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-int r128_do_wait_for_idle( drm_r128_private_t *dev_priv );
-
 int R128_READ_PLL(drm_device_t *dev, int addr)
 {
 	drm_r128_private_t *dev_priv = dev->dev_private;
@@ -151,7 +149,7 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 	return DRM_ERR(EBUSY);
 }
 
-int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
+static int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 {
 	int i, ret;
 

@@ -13,7 +13,6 @@
 #ifdef __KERNEL__
 
 #include <linux/sched.h>
-#include <asm/processor.h>
 #include <asm/mpc8xx.h>
 
 #ifndef MAX_HWIFS

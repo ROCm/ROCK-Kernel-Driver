@@ -27,7 +27,6 @@
 #include <linux/ioctl32.h>
 #include <linux/init.h>
 #include <linux/sockios.h>	/* for SIOCDEVPRIVATE */
-#include <linux/fs.h>
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
@@ -120,7 +119,12 @@ static int put_compat_statfs(struct compat_statfs *ubuf, struct kstatfs *kbuf)
 	    __put_user(kbuf->f_namelen, &ubuf->f_namelen) ||
 	    __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]) ||
 	    __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]) ||
-	    __put_user(kbuf->f_frsize, &ubuf->f_frsize))
+	    __put_user(kbuf->f_frsize, &ubuf->f_frsize) ||
+	    __put_user(0, &ubuf->f_spare[0]) || 
+	    __put_user(0, &ubuf->f_spare[1]) || 
+	    __put_user(0, &ubuf->f_spare[2]) || 
+	    __put_user(0, &ubuf->f_spare[3]) || 
+	    __put_user(0, &ubuf->f_spare[4]))
 		return -EFAULT;
 	return 0;
 }

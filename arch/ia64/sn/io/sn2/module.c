@@ -166,7 +166,6 @@ int module_probe_snum(module_t *m, nasid_t nasid)
 {
     lboard_t	       *board;
     klmod_serial_num_t *comp;
-    char * bcopy(const char * src, char * dest, int count);
     char serial_number[16];
 
     /*
@@ -215,9 +214,9 @@ int module_probe_snum(module_t *m, nasid_t nasid)
 #endif
 
 	    if (comp->snum.snum_str[0] != '\0') {
-		bcopy(comp->snum.snum_str,
-		      m->sys_snum,
-		      MAX_SERIAL_NUM_SIZE);
+		memcpy(m->sys_snum,
+		       comp->snum.snum_str,
+		       MAX_SERIAL_NUM_SIZE);
 		m->sys_snum_valid = 1;
 	    }
     }

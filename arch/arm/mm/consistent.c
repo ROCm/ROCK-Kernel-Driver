@@ -321,28 +321,33 @@ static int __init consistent_init(void)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
+	int ret = 0;
+
+	spin_lock(&init_mm.page_table_lock);
 
 	do {
 		pgd = pgd_offset(&init_mm, CONSISTENT_BASE);
 		pmd = pmd_alloc(&init_mm, pgd, CONSISTENT_BASE);
 		if (!pmd) {
-			printk(KERN_ERR "consistent_init: out of pmd tables\n");
-			return -ENOMEM;
+			printk(KERN_ERR "consistent_init: no pmd tables\n");
+			ret = -ENOMEM;
+			break;
 		}
-		if (!pmd_none(*pmd)) {
-			printk(KERN_ERR "consistent_init: PMD already allocated\n");
-			return -EINVAL;
-		}
+		WARN_ON(!pmd_none(*pmd));
+
 		pte = pte_alloc_kernel(&init_mm, pmd, CONSISTENT_BASE);
 		if (!pte) {
-			printk(KERN_ERR "consistent_init: out of pte tables\n");
-			return -ENOMEM;
+			printk(KERN_ERR "consistent_init: no pte tables\n");
+			ret = -ENOMEM;
+			break;
 		}
 
 		consistent_pte = pte;
 	} while (0);
 
-	return 0;
+	spin_unlock(&init_mm.page_table_lock);
+
+	return ret;
 }
 
 core_initcall(consistent_init);

@@ -55,6 +55,14 @@ static u64 xtime_cc;
 
 extern unsigned long wall_jiffies;
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	return (get_clock() - jiffies_timer_cc) >> 2;
+}
+
 void tod_to_timeval(__u64 todval, struct timespec *xtime)
 {
 	unsigned long long sec;
@@ -70,8 +78,7 @@ static inline unsigned long do_gettimeoffset(void)
 {
 	__u64 now;
 
-	asm volatile ("STCK 0(%0)" : : "a" (&now) : "memory", "cc");
-        now = (now - jiffies_timer_cc) >> 12;
+        now = (get_clock() - jiffies_timer_cc) >> 12;
 	/* We require the offset from the latest update of xtime */
 	now -= (__u64) wall_jiffies*USECS_PER_JIFFY;
 	return (unsigned long) now;
@@ -159,28 +166,28 @@ __calculate_ticks(__u64 elapsed)
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
+void account_ticks(struct pt_regs *regs)
 {
 	__u64 tmp;
 	__u32 ticks;
 
 	/* Calculate how many ticks have passed. */
-	asm volatile ("STCK 0(%0)" : : "a" (&tmp) : "memory", "cc");
-	tmp = tmp - S390_lowcore.jiffy_timer;
-	if (tmp >= 2*CLK_TICKS_PER_JIFFY) {  /* more than one tick ? */
-		ticks = __calculate_ticks(tmp);
+	tmp = S390_lowcore.int_clock - S390_lowcore.jiffy_timer;
+	if (tmp >= 2*CLK_TICKS_PER_JIFFY) {  /* more than two ticks ? */
+		ticks = __calculate_ticks(tmp) + 1;
 		S390_lowcore.jiffy_timer +=
 			CLK_TICKS_PER_JIFFY * (__u64) ticks;
+	} else if (tmp >= CLK_TICKS_PER_JIFFY) {
+		ticks = 2;
+		S390_lowcore.jiffy_timer += 2*CLK_TICKS_PER_JIFFY;
 	} else {
 		ticks = 1;
 		S390_lowcore.jiffy_timer += CLK_TICKS_PER_JIFFY;
 	}
 
 	/* set clock comparator for next tick */
-	tmp = S390_lowcore.jiffy_timer + CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
+	tmp = S390_lowcore.jiffy_timer + CPU_DEVIATION;
         asm volatile ("SCKC %0" : : "m" (tmp));
-
-	irq_enter();
 
 #ifdef CONFIG_SMP
 	/*
@@ -209,8 +216,6 @@ static void do_comparator_interrupt(struct pt_regs *regs, __u16 error_code)
 	while (ticks--)
 		do_timer(regs);
 #endif
-
-	irq_exit();
 }
 
 /*
@@ -222,7 +227,7 @@ void init_cpu_timer(void)
 	__u64 timer;
 
 	timer = jiffies_timer_cc + jiffies_64 * CLK_TICKS_PER_JIFFY;
-	S390_lowcore.jiffy_timer = timer;
+	S390_lowcore.jiffy_timer = timer + CLK_TICKS_PER_JIFFY;
 	timer += CLK_TICKS_PER_JIFFY + CPU_DEVIATION;
 	asm volatile ("SCKC %0" : : "m" (timer));
         /* allow clock comparator timer interrupt */
@@ -269,7 +274,7 @@ void __init time_init(void)
                                 -xtime.tv_sec, -xtime.tv_nsec);
 
         /* request the 0x1004 external interrupt */
-        if (register_early_external_interrupt(0x1004, do_comparator_interrupt,
+        if (register_early_external_interrupt(0x1004, 0,
 					      &ext_int_info_timer) != 0)
                 panic("Couldn't request external interrupt 0x1004");
 

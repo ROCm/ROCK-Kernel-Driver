@@ -4,7 +4,6 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <asm/processor.h>
 
 extern void __bad_pte(pmd_t *pmd);
 

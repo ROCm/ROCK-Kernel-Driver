@@ -216,7 +216,12 @@ struct exception_table_entry
 	__pu_err;						\
 })
 
-#define put_user(x, ptr) __put_user(x, ptr)
+#define put_user(x, ptr)					\
+({								\
+	might_sleep();						\
+	__put_user(x, ptr);					\
+})
+
 
 extern int __put_user_bad(void);
 
@@ -224,18 +229,18 @@ extern int __put_user_bad(void);
 
 #define __get_user_asm_8(x, ptr, err) \
 ({								\
-	register __typeof__(*(ptr)) const * __from asm("2");	\
-	register __typeof__(x) * __to asm("4");			\
+	register __typeof__(*(ptr)) const * __from asm("4");	\
+	register __typeof__(x) * __to asm("2");			\
 	__from = (ptr);						\
 	__to = &(x);						\
 	__asm__ __volatile__ (					\
 		"   sacf  512\n"				\
-		"0: mvc	  0(8,%1),0(%2)\n"			\
+		"0: mvc	  0(8,%2),0(%4)\n"			\
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
 		: "=&d" (err), "=m" (x)				\
-		: "a" (__to),"a" (__from),"K" (-EFAULT),"0" (0)	\
+		: "a" (__to),"K" (-EFAULT),"a" (__from),"0" (0)	\
 		: "cc" );					\
 })
 
@@ -300,7 +305,7 @@ extern int __put_user_bad(void);
 		"   sacf  0\n"					\
 		"1:\n"						\
 		__uaccess_fixup					\
-		: "=&d" (err), "=d" (x)				\
+		: "=&d" (err), "=&d" (x)			\
 		: "a" (__ptr), "K" (-EFAULT), "0" (0)		\
 		: "cc" );					\
 })
@@ -331,7 +336,11 @@ extern int __put_user_bad(void);
 	__gu_err;						\
 })
 
-#define get_user(x, ptr) __get_user(x, ptr)
+#define get_user(x, ptr)					\
+({								\
+	might_sleep();						\
+	__get_user(x, ptr);					\
+})
 
 extern int __get_user_bad(void);
 
@@ -351,6 +360,7 @@ extern long __copy_to_user_asm(const void *from, long n, const void *to);
 ({                                                              \
         long err = 0;                                           \
         __typeof__(n) __n = (n);                                \
+        might_sleep();						\
         if (__access_ok(to,__n)) {                              \
                 err = __copy_to_user_asm(from, __n, to);        \
         }                                                       \
@@ -370,6 +380,7 @@ extern long __copy_from_user_asm(void *to, long n, const void *from);
 ({                                                              \
         long err = 0;                                           \
         __typeof__(n) __n = (n);                                \
+        might_sleep();						\
         if (__access_ok(from,__n)) {                            \
                 err = __copy_from_user_asm(to, __n, from);      \
         }                                                       \
@@ -461,6 +472,7 @@ static inline long
 strncpy_from_user(char *dst, const char *src, long count)
 {
         long res = -EFAULT;
+        might_sleep();
         if (access_ok(VERIFY_READ, src, 1))
                 res = __strncpy_from_user(dst, src, count);
         return res;
@@ -477,6 +489,7 @@ strncpy_from_user(char *dst, const char *src, long count)
 static inline unsigned long
 strnlen_user(const char * src, unsigned long n)
 {
+	might_sleep();
 	__asm__ __volatile__ (
 		"   alr   %0,%1\n"
 		"   slr   0,0\n"
@@ -510,6 +523,7 @@ strnlen_user(const char * src, unsigned long n)
 static inline unsigned long
 strnlen_user(const char * src, unsigned long n)
 {
+	might_sleep();
 #if 0
 	__asm__ __volatile__ (
 		"   algr  %0,%1\n"
@@ -574,6 +588,7 @@ extern long __clear_user_asm(void *to, long n);
 static inline unsigned long
 clear_user(void *to, unsigned long n)
 {
+	might_sleep();
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __clear_user(to, n);
 	return n;

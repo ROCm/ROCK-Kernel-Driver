@@ -120,12 +120,13 @@ static int mca_default_procfn(char* buf, struct mca_device *mca_dev)
 	len += sprintf(buf+len, "Id: %02x%02x\n",
 		mca_dev->pos[1], mca_dev->pos[0]);
 	len += sprintf(buf+len, "Enabled: %s\nPOS: ",
-		mca_isenabled(slot) ? "Yes" : "No");
+		mca_device_status(mca_dev) == MCA_ADAPTER_NORMAL ?
+			"Yes" : "No");
 	for(i=0; i<8; i++) {
 		len += sprintf(buf+len, "%02x ", mca_dev->pos[i]);
 	}
 	len += sprintf(buf+len, "\nDriver Installed: %s",
-		mca_is_adapter_used(slot) ? "Yes" : "No");
+		mca_device_claimed(mca_dev) ? "Yes" : "No");
 	buf[len++] = '\n';
 	buf[len] = 0;
 
@@ -189,6 +190,7 @@ void __init mca_do_proc_init(void)
 	/* Initialize /proc/mca entries for existing adapters */
 
 	for(i = 0; i < MCA_NUMADAPTERS; i++) {
+		enum MCA_AdapterStatus status;
 		mca_dev = mca_find_device_by_slot(i);
 		if(!mca_dev)
 			continue;
@@ -200,7 +202,10 @@ void __init mca_do_proc_init(void)
 		else if(i == MCA_INTEGSCSI) sprintf(mca_dev->procname,"scsi");
 		else if(i == MCA_MOTHERBOARD) sprintf(mca_dev->procname,"planar");
 
-		if(!mca_isadapter(i)) continue;
+		status = mca_device_status(mca_dev);
+		if (status != MCA_ADAPTER_NORMAL &&
+		    status != MCA_ADAPTER_DISABLED)
+			continue;
 
 		node = create_proc_read_entry(mca_dev->procname, 0, proc_mca,
 					      mca_read_proc, (void *)mca_dev);

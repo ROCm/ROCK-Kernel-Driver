@@ -35,9 +35,9 @@
 #include <linux/delay.h>
 
 
-irqreturn_t DRM(dma_service)(int irq, void *device, struct pt_regs *regs)
+irqreturn_t DRM(dma_service)( DRM_IRQ_ARGS )
 {
-	drm_device_t	 *dev = (drm_device_t *)device;
+	drm_device_t	 *dev = (drm_device_t *)arg;
       	drm_i830_private_t *dev_priv = (drm_i830_private_t *)dev->dev_private;
    	u16 temp;
 

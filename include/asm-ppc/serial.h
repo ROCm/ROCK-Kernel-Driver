@@ -37,7 +37,6 @@
  * This is true for PReP and CHRP at least.
  */
 #include <asm/pc_serial.h>
-#include <asm/processor.h>
 
 #if defined(CONFIG_MAC_SERIAL)
 #define SERIAL_DEV_OFFSET	((_machine == _MACH_prep || _machine == _MACH_chrp) ? 0 : 2)

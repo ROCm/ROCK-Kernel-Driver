@@ -33,7 +33,7 @@ config USB
 
 	  It doesn't normally hurt to select them all if you are not certain.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called usbcore.
 
 source "drivers/usb/core/Kconfig"
@@ -80,7 +80,7 @@ config USB_USS720
 	  Say Y here if you own an USS-720 USB->Parport cable and intend to
 	  connect anything other than a printer to it.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called uss720.
 
 source "drivers/usb/serial/Kconfig"

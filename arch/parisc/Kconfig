@@ -190,12 +190,6 @@ source drivers/message/fusion/Kconfig
 
 #source drivers/message/i2o/Kconfig
 
-source "net/Kconfig"
-
-#source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 #source "drivers/isdn/Kconfig"
 
 #source "drivers/telephony/Kconfig"
@@ -216,8 +210,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/parisc/oprofile/Kconfig"
 

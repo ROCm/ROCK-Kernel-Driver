@@ -22,6 +22,7 @@
 #include <linux/shm.h>
 #include <linux/bootmem.h>
 #include <linux/mount.h>
+#include <linux/blkdev.h>
 
 #include <asm/setup.h>
 #include <asm/machdep.h>

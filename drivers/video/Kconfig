@@ -158,10 +158,8 @@ config FB_AMIGA
 	  This is the frame buffer device driver for the builtin graphics
 	  chipset found in Amigas.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called amifb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called amifb.
 
 config FB_AMIGA_OCS
 	bool "Amiga OCS chipset support"
@@ -190,19 +188,19 @@ config FB_AMIGA_AGA
 	  otherwise say N.
 
 config FB_CYBER
-	tristate "Amiga CyberVision support"
-	depends on FB && ZORRO
+	tristate "Amiga CyberVision 64 support"
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Cybervision 64 graphics card from
 	  Phase5. Please note that its use is not all that intuitive (i.e. if
 	  you have any questions, be sure to ask!). Say N unless you have a
 	  Cybervision 64 or plan to get one before you next recompile the
 	  kernel. Please note that this driver DOES NOT support the
-	  Cybervision 64 3D card, as they use incompatible video chips.
+	  Cybervision 64/3D card, as they use incompatible video chips.
 
 config FB_VIRGE
-	bool "Amiga CyberVision3D support "
-	depends on FB && ZORRO
+	bool "Amiga CyberVision 64/3D support "
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Cybervision 64/3D graphics card from
 	  Phase5. Please note that its use is not all that intuitive (i.e. if
@@ -212,8 +210,8 @@ config FB_VIRGE
 	  Cybervision 64 card, as they use incompatible video chips.
 
 config FB_RETINAZ3
-	tristate "Amiga RetinaZ3 support"
-	depends on FB && ZORRO
+	tristate "Amiga Retina Z3 support"
+	depends on FB && ZORRO && BROKEN
 	help
 	  This enables support for the Retina Z3 graphics card. Say N unless
 	  you have a Retina Z3 or plan to get one before you next recompile
@@ -228,7 +226,7 @@ config FB_FM2
 
 config FB_ATARI
 	bool "Atari native chipset support"
-	depends on FB && ATARI
+	depends on FB && ATARI && BROKEN
 	help
 	  This is the frame buffer device driver for the builtin graphics
 	  chipset found in Ataris.
@@ -288,11 +286,8 @@ config FB_VGA16
 	  This is the frame buffer device driver for VGA 16 color graphic
 	  cards. Say Y if you have such a card.
 
-	  This code is also available as a module. If you want to compile it
-	  as a module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  vga16fb.
+	  To compile this driver as a module, choose M here: the
+	  module will be called vga16fb.
 
 config FB_STI
 	tristate "HP STI frame buffer device support"
@@ -348,10 +343,8 @@ config FB_HGA
 	help
 	  Say Y here if you have a Hercules mono graphics card.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called hgafb. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hgafb.
 
 	  As this card technology is 15 years old, most people will answer N
 	  here.
@@ -374,7 +367,7 @@ config BUS_I2C
 
 config FB_SUN3
 	bool "Sun3 framebuffer support"
-	depends on FB && (SUN3 || SUN3X)
+	depends on FB && (SUN3 || SUN3X) && BROKEN
 
 config FB_BW2
 	bool "BWtwo support"
@@ -404,10 +397,8 @@ config FB_PVR2
 	  This driver may or may not work on other PowerVR 2 cards, but is
 	  totally untested.  Use at your own risk.  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called pvr2fb.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pvr2fb.
 
 	  You can pass several parameters to the driver at boot time or at
 	  module load time.  The parameters look like "video=pvr2:XXX", where
@@ -460,10 +451,8 @@ config FB_RIVA
 	  chips.
 	  Say Y if you have such a graphics board.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called rivafb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rivafb.
 
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
@@ -472,10 +461,8 @@ config FB_I810
 	  This driver supports the on-board graphics built in to the Intel 810 
           and 815 chipsets.  Say Y if you have and plan to use such a board.
 
-          The driver is also available as a module ( = code which can be
-          inserted and removed from the running kernel whenever you want). 
-          The module will be called i810fb. If you want to compile it as a
-          module, say M here and read <file:Documentation/modules.txt>.
+          To compile this driver as a module, choose M here: the
+	  module will be called i810fb.
 
           For more information, please read 
 	  <file:Documentation/fb/intel810.txt>
@@ -512,10 +499,8 @@ config FB_MATROX
 	  Mystique G200, Matrox Millennium G200, Matrox Marvel G200 video,
 	  Matrox G400, G450 or G550 card in your box.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called matroxfb. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called matroxfb.
 
 	  You can pass several parameters to the driver at boot time or at
 	  module load time. The parameters look like "video=matrox:XXX", and
@@ -677,10 +662,8 @@ config FB_ATY128
 	  Say Y if you have such a graphics board and read
 	  <file:Documentation/fb/aty128fb.txt>.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called aty128fb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called aty128fb.
 
 config FB_ATY
 	tristate "ATI Mach64 display support" if PCI || ATARI
@@ -689,10 +672,8 @@ config FB_ATY
 	  This driver supports graphics boards with the ATI Mach64 chips.
 	  Say Y if you have such a graphics board.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called atyfb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called atyfb.
 
 config FB_ATY_CT
 	bool "Mach64 CT/VT/GT/LT (incl. 3D RAGE) support"
@@ -750,10 +731,8 @@ config FB_NEOMAGIC
 	  This driver supports notebooks with NeoMagic PCI chips.
 	  Say Y if you have such a graphics card. 
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called neofb. If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called neofb.
 
 config FB_3DFX
 	tristate "3Dfx Banshee/Voodoo3 display support"
@@ -762,10 +741,8 @@ config FB_3DFX
 	  This driver supports graphics boards with the 3Dfx Banshee/Voodoo3
 	  chips. Say Y if you have such a graphics board.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called tdfxfb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called tdfxfb.
 
 config FB_VOODOO1
 	tristate "3Dfx Voodoo Graphics (sst1) support"
@@ -774,10 +751,8 @@ config FB_VOODOO1
 	  Say Y here if you have a 3Dfx Voodoo Graphics (Voodoo1/sst1) or 
 	  Voodoo2 (cvg) based graphics card.
 
-	  This driver is also available as a module ( = code which can be 
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called sstfb. If you want to compile it as
-	  a module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sstfb.
 
 	  WARNING: Do not use any application that uses the 3D engine
 	  (namely glide) while using this driver.
@@ -795,10 +770,8 @@ config FB_TRIDENT
 
 	  Say Y if you have such a graphics board.
 
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called tridentfb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called tridentfb.
 
 config FB_PM3
 	tristate "Permedia3 support"
@@ -921,10 +894,8 @@ config FB_VIRTUAL
 	  the innocent, it has to be enabled explicitly at boot time using the
 	  kernel option `video=vfb:'.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called vfb. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called vfb.
 
 	  If unsure, say N.
 if VT

@@ -695,6 +695,28 @@ int patch_ad1886(ac97_t * ac97)
 	return 0;
 }
 
+/* MISC bits */
+#define AC97_AD198X_MBC		0x0003	/* mic boost */
+#define AC97_AD198X_MBC_20	0x0000	/* +20dB */
+#define AC97_AD198X_MBC_10	0x0001	/* +10dB */
+#define AC97_AD198X_MBC_30	0x0002	/* +30dB */
+#define AC97_AD198X_VREFD	0x0004	/* VREF high-Z */
+#define AC97_AD198X_VREFH	0x0008	/* 2.25V, 3.7V */
+#define AC97_AD198X_VREF_0	0x000c	/* 0V */
+#define AC97_AD198X_SRU		0x0010	/* sample rate unlock */
+#define AC97_AD198X_LOSEL	0x0020	/* LINE_OUT amplifiers input select */
+#define AC97_AD198X_2MIC	0x0040	/* 2-channel mic select */
+#define AC97_AD198X_SPRD	0x0080	/* SPREAD enable */
+#define AC97_AD198X_DMIX0	0x0100	/* downmix mode: 0 = 6-to-4, 1 = 6-to-2 downmix */
+#define AC97_AD198X_DMIX1	0x0300	/* downmix mode: 1 = enabled */
+#define AC97_AD198X_HPSEL	0x0400	/* headphone amplifier input select */
+#define AC97_AD198X_CLDIS	0x0800	/* center/lfe disable */
+#define AC97_AD198X_LODIS	0x1000	/* LINE_OUT disable */
+#define AC97_AD198X_MSPLT	0x2000	/* mute split */
+#define AC97_AD198X_AC97NC	0x4000	/* AC97 no compatible mode */
+#define AC97_AD198X_DACZ	0x8000	/* DAC zero-fill mode */
+
+
 static int snd_ac97_ad1980_spdif_source_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	static char *texts[2] = { "AC-Link", "A/D Converter" };
@@ -754,8 +776,13 @@ int patch_ad1980(ac97_t * ac97)
 	ac97->build_ops = &patch_ad1980_build_ops;
 	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
+	/* Stereo mutes enabled */
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
-	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x0420);
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
+			     AC97_AD198X_LOSEL |
+			     AC97_AD198X_HPSEL |
+			     AC97_AD198X_MSPLT);
+	ac97->flags |= AC97_STEREO_MUTES;
 	return 0;
 }
 
@@ -768,7 +795,17 @@ int patch_ad1985(ac97_t * ac97)
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	/* switch front/surround line-out/hp-out */
 	/* center/LFE, surround in High-Z mode */
-	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc | 0x1c28);
+	/* AD-compatible mode */
+	/* Stereo mutes enabled */
+	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
+			     AC97_AD198X_VREFD |
+			     AC97_AD198X_LOSEL |
+			     AC97_AD198X_HPSEL |
+			     AC97_AD198X_CLDIS |
+			     AC97_AD198X_LODIS |
+			     AC97_AD198X_MSPLT |
+			     AC97_AD198X_AC97NC);
+	ac97->flags |= AC97_STEREO_MUTES;
 	return 0;
 }
 
@@ -863,19 +900,24 @@ int patch_alc650(ac97_t * ac97)
 	unsigned short val;
 	int spdif = 0;
 
-	/* FIXME: set the below 1 if we can detect the chip rev.E correctly.
-	 *        this is used for switching mic and center/lfe, which needs
-	 *        resetting GPIO0 level on the older revision.
-	 */
 	ac97->build_ops = &patch_alc650_ops;
-	ac97->spec.dev_flags = 0;
+
+	/* revision E or F */
+	/* FIXME: what about revision D ? */
+	ac97->spec.dev_flags = (ac97->id == 0x414c4722 ||
+				ac97->id == 0x414c4723);
 
 	/* check spdif (should be only on rev.E) */
-	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-	if (val & AC97_EA_SPCV)
-		spdif = 1;
+	if (ac97->spec.dev_flags) {
+		val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+		if (val & AC97_EA_SPCV)
+			spdif = 1;
+	}
 
 	if (spdif) {
+		/* enable AC97_ALC650_GPIO_SETUP, AC97_ALC650_CLOCK for R/W */
+		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_STATUS, 
+			snd_ac97_read(ac97, AC97_ALC650_GPIO_STATUS) | 0x8000);
 		/* enable spdif in */
 		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
 				     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
@@ -891,18 +933,18 @@ int patch_alc650(ac97_t * ac97)
 		int mic_off;
 		mic_off = snd_ac97_read(ac97, AC97_ALC650_MULTICH) & (1 << 10);
 		/* GPIO0 direction */
-		val = snd_ac97_read(ac97, 0x76);
+		val = snd_ac97_read(ac97, AC97_ALC650_GPIO_SETUP);
 		if (mic_off)
 			val &= ~0x01;
 		else
 			val |= 0x01;
-		snd_ac97_write_cache(ac97, 0x76, val);
-		val = snd_ac97_read(ac97, 0x78);
+		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_SETUP, val);
+		val = snd_ac97_read(ac97, AC97_ALC650_GPIO_STATUS);
 		if (mic_off)
 			val &= ~0x100;
 		else
 			val = val | 0x100;
-		snd_ac97_write_cache(ac97, 0x78, val);
+		snd_ac97_write_cache(ac97, AC97_ALC650_GPIO_STATUS, val);
 	}
 
 	/* full DAC volume */

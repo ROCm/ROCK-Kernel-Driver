@@ -98,7 +98,7 @@ KERN_INFO "baycom_epp: version 0.7 compiled " __TIME__ " " __DATE__ "\n";
 
 #define NR_PORTS 4
 
-static struct net_device baycom_device[NR_PORTS];
+static struct net_device *baycom_device[NR_PORTS];
 
 /* --------------------------------------------------------------------- */
 
@@ -1084,7 +1084,6 @@ static int epp_open(struct net_device *dev)
 	/* start the bottom half stuff */
 	schedule_delayed_work(&bc->run_work, 1);
 	netif_start_queue(dev);
-	MOD_INC_USE_COUNT;
 	return 0;
 
  epptimeout:
@@ -1119,7 +1118,6 @@ static int epp_close(struct net_device *dev)
 	bc->skb = NULL;
 	printk(KERN_INFO "%s: close epp at iobase 0x%lx irq %u\n",
 	       bc_drvname, dev->base_addr, dev->irq);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1357,69 +1355,76 @@ MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 
+static void __init baycom_epp_dev_setup(struct net_device *dev)
+{
+	struct baycom_state *bc = dev->priv;
+
+	/*
+	 * initialize part of the baycom_state struct
+	 */
+	bc->magic = BAYCOM_MAGIC;
+	bc->cfg.fclk = 19666600;
+	bc->cfg.bps = 9600;
+	/*
+	 * initialize part of the device struct
+	 */
+	dev->init = baycom_probe;
+}
+
 static int __init init_baycomepp(void)
 {
-	struct net_device *dev;
 	int i, found = 0;
 	char set_hw = 1;
-	struct baycom_state *bc;
 
 	printk(bc_drvinfo);
 	/*
 	 * register net devices
 	 */
 	for (i = 0; i < NR_PORTS; i++) {
-		dev = baycom_device+i;
+		struct net_device *dev;
+		
+		dev = alloc_netdev(sizeof(struct baycom_state), "bce%d",
+				   baycom_epp_dev_setup);
+
+		if (!dev) {
+			printk(KERN_WARNING "bce%d : out of memory\n", i);
+			return found ? 0 : -ENOMEM;
+		}
+			
+		sprintf(dev->name, "bce%d", i);
+		dev->base_addr = iobase[i];
+
 		if (!mode[i])
 			set_hw = 0;
 		if (!set_hw)
 			iobase[i] = 0;
-		memset(dev, 0, sizeof(struct net_device));
-		if (!(bc = dev->priv = kmalloc(sizeof(struct baycom_state), GFP_KERNEL)))
-			return -ENOMEM;
-		/*
-		 * initialize part of the baycom_state struct
-		 */
-		memset(bc, 0, sizeof(struct baycom_state));
-		bc->magic = BAYCOM_MAGIC;
-		sprintf(dev->name, "bce%d", i);
-		bc->cfg.fclk = 19666600;
-		bc->cfg.bps = 9600;
-		/*
-		 * initialize part of the device struct
-		 */
-		dev->if_port = 0;
-		dev->init = baycom_probe;
-		dev->base_addr = iobase[i];
-		dev->irq = 0;
-		dev->dma = 0;
+
 		if (register_netdev(dev)) {
 			printk(KERN_WARNING "%s: cannot register net device %s\n", bc_drvname, dev->name);
-			kfree(dev->priv);
-			return -ENXIO;
+			kfree(dev);
+			break;
 		}
-		if (set_hw && baycom_setmode(bc, mode[i]))
+		if (set_hw && baycom_setmode(dev->priv, mode[i]))
 			set_hw = 0;
+		baycom_device[i] = dev;
 		found++;
 	}
-	if (!found)
-		return -ENXIO;
-	return 0;
+
+	return found ? 0 : -ENXIO;
 }
 
 static void __exit cleanup_baycomepp(void)
 {
-	struct net_device *dev;
-	struct baycom_state *bc;
 	int i;
 
 	for(i = 0; i < NR_PORTS; i++) {
-		dev = baycom_device+i;
-		bc = (struct baycom_state *)dev->priv;
-		if (bc) {
+		struct net_device *dev = baycom_device[i];
+
+		if (dev) {
+			struct baycom_state *bc = dev->priv;
 			if (bc->magic == BAYCOM_MAGIC) {
 				unregister_netdev(dev);
-				kfree(dev->priv);
+				free_netdev(dev);
 			} else
 				printk(paranoia_str, "cleanup_module");
 		}

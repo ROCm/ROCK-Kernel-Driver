@@ -52,11 +52,7 @@ static int sun3scsi_detect (Scsi_Host_Template *);
 static const char *sun3scsi_info (struct Scsi_Host *);
 static int sun3scsi_bus_reset(Scsi_Cmnd *);
 static int sun3scsi_queue_command (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-#ifdef MODULE
 static int sun3scsi_release (struct Scsi_Host *);
-#else
-#define sun3scsi_release NULL
-#endif
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2

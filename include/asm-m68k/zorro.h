@@ -42,4 +42,4 @@ extern inline void *z_remap_fullcache(unsigned long physaddr,
 #define z_iounmap iounmap
 #define z_ioremap z_remap_nocache_ser
 
-#endif /* _ASM_ZORRO_H */
+#endif /* _ASM_M68K_ZORRO_H */

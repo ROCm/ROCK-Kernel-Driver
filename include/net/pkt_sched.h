@@ -8,6 +8,7 @@
 #define PSCHED_CLOCK_SOURCE	PSCHED_JIFFIES
 
 #include <linux/config.h>
+#include <linux/netdevice.h>
 #include <linux/types.h>
 #include <linux/pkt_sched.h>
 #include <net/pkt_cls.h>

@@ -1554,7 +1554,11 @@ struct sysinfo32 {
         u32 totalswap;
         u32 freeswap;
         unsigned short procs;
-        char _f[22];
+	unsigned short pads;
+	u32 totalhigh;
+	u32 freehigh;
+	unsigned int mem_unit;
+        char _f[8];
 };
 
 extern asmlinkage int sys_sysinfo(struct sysinfo *info);
@@ -1579,6 +1583,9 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 	err |= __put_user (s.totalswap, &info->totalswap);
 	err |= __put_user (s.freeswap, &info->freeswap);
 	err |= __put_user (s.procs, &info->procs);
+	err |= __put_user (s.totalhigh, &info->totalhigh);
+	err |= __put_user (s.freehigh, &info->freehigh);
+	err |= __put_user (s.mem_unit, &info->mem_unit);
 	if (err)
 		return -EFAULT;
 	return ret;
@@ -2581,10 +2588,10 @@ static int cp_stat64(struct stat64_emu31 *ubuf, struct kstat *stat)
 	tmp.__st_ino = (u32)stat->ino;
 	tmp.st_mode = stat->mode;
 	tmp.st_nlink = (unsigned int)stat->nlink;
-	tmp.uid = stat->uid;
-	tmp.gid = stat->gid;
+	tmp.st_uid = stat->uid;
+	tmp.st_gid = stat->gid;
 	tmp.st_rdev = huge_encode_dev(stat->rdev);
-	tmp.st_size = stat->st_size;
+	tmp.st_size = stat->size;
 	tmp.st_blksize = (u32)stat->blksize;
 	tmp.st_blocks = (u32)stat->blocks;
 	tmp.st_atime = (u32)stat->atime.tv_sec;
@@ -2773,7 +2780,6 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
-	struct task_struct *p;
 	int *parent_tidptr, *child_tidptr;
 
         clone_flags = regs.gprs[3] & 0xffffffffUL;
@@ -2782,7 +2788,8 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 	child_tidptr = (int *) (regs.gprs[5] & 0x7fffffffUL);
         if (!newsp)
                 newsp = regs.gprs[15];
-        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
-		    parent_tidptr, child_tidptr);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+		       parent_tidptr, child_tidptr);
 }
+
+

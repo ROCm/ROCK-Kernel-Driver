@@ -164,36 +164,7 @@ config CPU_FREQ
 
 	  If in doubt, say N.
 
-config CPU_FREQ_TABLE
-	bool
-	depends on CPU_FREQ
-	default y
-
-config CPU_FREQ_PROC_INTF
-	bool "/proc/cpufreq interface (DEPRECATED)"
-	depends on CPU_FREQ && PROC_FS
-	help
-	  This enables the /proc/cpufreq interface for controlling
-	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically).
-	
-	  For details, take a look at linux/Documentation/cpufreq.
-	
-	  If in doubt, say N.
-
-config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
-	depends on CPU_FREQ
-	help
-	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses a sysfs interface instead. Please note that some drivers do
-	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
-	  so if in doubt, say N here.
-
-	  For details, take a look at linux/Documentation/cpufreq.
-
-	  If in doubt, say N.
+source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_PMAC
 	bool "Support for Apple PowerBooks"
@@ -202,6 +173,11 @@ config CPU_FREQ_PMAC
 	  This adds support for frequency switching on Apple PowerBooks,
 	  this currently includes some models of iBook & Titanium
 	  PowerBook.
+
+config CPU_FREQ_TABLE
+	bool
+	depends on CPU_FREQ_PMAC
+	default y
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
@@ -849,10 +825,7 @@ config AMIGA_BUILTIN_SERIAL
 	  If you want to use your Amiga's built-in serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config GVPIOEXT
 	tristate "GVP IO-Extender support"
@@ -882,10 +855,7 @@ config MULTIFACE_III_TTY
 	  If you want to use a Multiface III card's serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config A2232
 	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
@@ -901,8 +871,7 @@ config A2232
 
 	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232". If you want to do this, answer M here and read
-	  "<file:Documentation/modules.txt>".
+	  "ser_a2232". If you want to do this, answer M here.
 
 config WHIPPET_SERIAL
 	tristate "Hisoft Whippet PCMCIA serial support"
@@ -918,10 +887,8 @@ config APNE
 	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
 	  say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). The module is called apne. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called apne.
 
 config SERIAL_CONSOLE
 	bool "Support for serial port console"
@@ -1142,10 +1109,6 @@ source "drivers/message/i2o/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/video/Kconfig"
@@ -1322,8 +1285,6 @@ config SERIAL_SICC_CONSOLE
 endmenu
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "lib/Kconfig"
 

@@ -109,10 +109,6 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#ifdef CONFIG_PLIP
-extern int plip_init(void);
-#endif
-
 #include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
@@ -183,6 +179,7 @@ int netdev_fastroute_obstacles;
 
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
+extern int netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -233,7 +230,7 @@ void dev_add_pack(struct packet_type *pt)
 	spin_lock_bh(&ptype_lock);
 #ifdef CONFIG_NET_FASTROUTE
 	/* Hack to detect packet socket */
-	if (pt->data && (long)(pt->data) != 1) {
+	if (pt->data && pt->data != PKT_CAN_SHARE_SKB) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -281,7 +278,7 @@ void __dev_remove_pack(struct packet_type *pt)
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
 #ifdef CONFIG_NET_FASTROUTE
-			if (pt->data)
+			if (pt->data && pt->data != PKT_CAN_SHARE_SKB)
 				netdev_fastroute_obstacles--;
 #endif
 			list_del_rcu(&pt->list);
@@ -1640,8 +1637,8 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 #ifdef CONFIG_NET_HW_FLOWCONTROL
 		if (queue->throttle &&
 		    queue->input_pkt_queue.qlen < no_cong_thresh ) {
+			queue->throttle = 0;
 			if (atomic_dec_and_test(&netdev_dropping)) {
-				queue->throttle = 0;
 				netdev_wakeup();
 				break;
 			}
@@ -2823,7 +2820,7 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			class_device_del(&dev->class_dev);
+			netdev_unregister_sysfs(dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);
@@ -3039,3 +3036,63 @@ out:
 }
 
 subsys_initcall(net_dev_init);
+
+EXPORT_SYMBOL(__dev_get);
+EXPORT_SYMBOL(__dev_get_by_flags);
+EXPORT_SYMBOL(__dev_get_by_index);
+EXPORT_SYMBOL(__dev_get_by_name);
+EXPORT_SYMBOL(__dev_remove_pack);
+EXPORT_SYMBOL(__skb_linearize);
+EXPORT_SYMBOL(call_netdevice_notifiers);
+EXPORT_SYMBOL(dev_add_pack);
+EXPORT_SYMBOL(dev_alloc);
+EXPORT_SYMBOL(dev_alloc_name);
+EXPORT_SYMBOL(dev_close);
+EXPORT_SYMBOL(dev_get_by_flags);
+EXPORT_SYMBOL(dev_get_by_index);
+EXPORT_SYMBOL(dev_get_by_name);
+EXPORT_SYMBOL(dev_getbyhwaddr);
+EXPORT_SYMBOL(dev_ioctl);
+EXPORT_SYMBOL(dev_new_index);
+EXPORT_SYMBOL(dev_open);
+EXPORT_SYMBOL(dev_queue_xmit);
+EXPORT_SYMBOL(dev_queue_xmit_nit);
+EXPORT_SYMBOL(dev_remove_pack);
+EXPORT_SYMBOL(dev_set_allmulti);
+EXPORT_SYMBOL(dev_set_promiscuity);
+EXPORT_SYMBOL(free_netdev);
+EXPORT_SYMBOL(netdev_boot_setup_check);
+EXPORT_SYMBOL(netdev_set_master);
+EXPORT_SYMBOL(netdev_state_change);
+EXPORT_SYMBOL(netif_receive_skb);
+EXPORT_SYMBOL(netif_rx);
+EXPORT_SYMBOL(register_gifconf);
+EXPORT_SYMBOL(register_netdevice);
+EXPORT_SYMBOL(register_netdevice_notifier);
+EXPORT_SYMBOL(skb_checksum_help);
+EXPORT_SYMBOL(synchronize_net);
+EXPORT_SYMBOL(unregister_netdevice);
+EXPORT_SYMBOL(unregister_netdevice_notifier);
+
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+EXPORT_SYMBOL(br_handle_frame_hook);
+#endif
+/* for 801q VLAN support */
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+EXPORT_SYMBOL(dev_change_flags);
+#endif
+#ifdef CONFIG_KMOD
+EXPORT_SYMBOL(dev_load);
+#endif
+#ifdef CONFIG_NET_HW_FLOWCONTROL
+EXPORT_SYMBOL(netdev_dropping);
+EXPORT_SYMBOL(netdev_fc_xoff);
+EXPORT_SYMBOL(netdev_register_fc);
+EXPORT_SYMBOL(netdev_unregister_fc);
+#endif
+#ifdef CONFIG_NET_FASTROUTE
+EXPORT_SYMBOL(netdev_fastroute);
+EXPORT_SYMBOL(netdev_fastroute_obstacles);
+#endif
+
+EXPORT_PER_CPU_SYMBOL(softnet_data);

@@ -6,7 +6,7 @@ menu "Block devices"
 
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
-	depends on !X86_PC9800
+	depends on !X86_PC9800 && !ARCH_S390
 	---help---
 	  If you want to use the floppy disk drive(s) of your PC under Linux,
 	  say Y. Information about this driver, especially important for IBM
@@ -15,10 +15,8 @@ config BLK_DEV_FD
 	  well as location of the fdutils package used to configure additional
 	  parameters of the driver at run time.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called floppy. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called floppy.
 
 config AMIGA_FLOPPY
 	tristate "Amiga floppy support"
@@ -37,7 +35,7 @@ config BLK_DEV_FD98
 
 config BLK_DEV_SWIM_IOP
 	bool "Macintosh IIfx/Quadra 900/Quadra 950 floppy support (EXPERIMENTAL)"
-	depends on MAC && EXPERIMENTAL
+	depends on MAC && EXPERIMENTAL && BROKEN
 	help
 	  Say Y here to support the SWIM (Super Woz Integrated Machine) IOP
 	  floppy controller on the Macintosh IIfx and Quadra 900/950.
@@ -49,10 +47,8 @@ config BLK_DEV_PS2
 	  Say Y here if you have a PS/2 machine with a MCA bus and an ESDI
 	  hard disk.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ps2esdi.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ps2esdi.
 
 config AMIGA_Z2RAM
 	tristate "Amiga Zorro II ramdisk support"
@@ -60,15 +56,14 @@ config AMIGA_Z2RAM
 	help
 	  This enables support for using Chip RAM and Zorro II RAM as a
 	  ramdisk or as a swap partition. Say Y if you want to include this
-	  driver in the kernel. This driver is also available as a module
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want). The module is called z2ram. If you want
-	  to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  driver in the kernel.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called z2ram.
 
 config ATARI_ACSI
 	tristate "Atari ACSI support"
-	depends on ATARI
+	depends on ATARI && BROKEN
 	---help---
 	  This enables support for the Atari ACSI interface. The driver
 	  supports hard disks and CD-ROMs, which have 512-byte sectors, or can
@@ -80,9 +75,8 @@ config ATARI_ACSI
 	  Ethernet, and PAMsNet Ethernet. If you want to use one of these
 	  devices, you need ACSI support, too.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called acsi.
+	  To compile this driver as a module, choose M here: the
+	  module will be called acsi.
 
 comment "Some devices (e.g. CD jukebox) support multiple LUNs"
 	depends on ATARI && ATARI_ACSI
@@ -116,10 +110,8 @@ config BLK_DEV_XD
 	  Very old 8 bit hard disk controllers used in the IBM XT computer
 	  will be supported if you say Y here.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called xd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called xd.
 
 	  It's pretty unlikely that you have one of these: say N.
 
@@ -195,10 +187,8 @@ config BLK_DEV_DAC960
 	  <file:Documentation/README.DAC960> for further information about
 	  this driver.
 
-	  If you want to compile the driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called DAC960.
+	  To compile this driver as a module, choose M here: the
+	  module will be called DAC960.
 
 config BLK_DEV_UMEM
 	tristate "Micro Memory MM5415 Battery Backed RAM support (EXPERIMENTAL)"
@@ -211,10 +201,8 @@ config BLK_DEV_UMEM
 	  The cards appear as block devices that can be partitioned into
 	  as many as 15 partitions.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. The module will be
-	  called umem.
+	  To compile this driver as a module, choose M here: the
+	  module will be called umem.
 
 	  The umem driver has not yet been allocated a MAJOR number, so
 	  one is chosen dynamically.  Use "devfs" or look in /proc/devices
@@ -255,10 +243,8 @@ config BLK_DEV_LOOP
 	  Note that this loop device has nothing to do with the loopback
 	  device used for network connections from the machine to itself.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called loop.
+	  To compile this driver as a module, choose M here: the
+	  module will be called loop.
 
 	  Most users will answer N here.
 
@@ -293,10 +279,8 @@ config BLK_DEV_NBD
 	  Note that this has nothing to do with the network file systems NFS
 	  or Coda; you can say N here even if you intend to use NFS or Coda.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called nbd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nbd.
 
 	  If unsure, say N.
 
@@ -313,10 +297,8 @@ config BLK_DEV_RAM
 	  Note that the kernel command line option "ramdisk=XX" is now
 	  obsolete. For details, read <file:Documentation/ramdisk.txt>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M and read <file:Documentation/modules.txt>. The module will be
-	  called rd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rd.
 
 	  Most normal users won't need the RAM disk functionality, and can
 	  thus say N here.
@@ -346,5 +328,6 @@ config LBD
 	  your machine, or if you want to have a raid or loopback device
 	  bigger than 2TB.  Otherwise say N.
 
-endmenu
+source "drivers/s390/block/Kconfig"
 
+endmenu

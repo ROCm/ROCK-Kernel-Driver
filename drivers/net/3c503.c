@@ -692,12 +692,3 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-/*
- * Local variables:
- *  version-control: t
- *  kept-new-versions: 5
- *  c-indent-level: 4
- * End:
- */

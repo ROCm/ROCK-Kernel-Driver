@@ -13,7 +13,6 @@
  */
 
 #include <asm/ppc_asm.h>
-#include <asm/processor.h>
 #include <asm/cache.h>
 #include <asm/gt64260_defs.h>
 

@@ -269,6 +269,7 @@ ccw_device_recog_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 void
 ccw_device_verify_done(struct ccw_device *cdev, int err)
 {
+	cdev->private->flags.doverify = 0;
 	switch (err) {
 	case 0:
 		ccw_device_done(cdev, DEV_STATE_ONLINE);
@@ -419,13 +420,21 @@ ccw_device_online_verify(struct ccw_device *cdev, enum dev_event dev_event)
 {
 	struct subchannel *sch;
 
-	sch = to_subchannel(cdev->dev.parent);
+	if (!cdev->private->options.pgroup)
+		return;
 	if (cdev->private->state == DEV_STATE_W4SENSE) {
-		cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
+		cdev->private->flags.doverify = 1;
 		return;
 	}
-	if (sch->schib.scsw.actl != 0) {
-		cdev->private->state = DEV_STATE_ONLINE_VERIFY;
+	sch = to_subchannel(cdev->dev.parent);
+	if (sch->schib.scsw.actl != 0 ||
+	    (cdev->private->irb.scsw.stctl & SCSW_STCTL_STATUS_PEND)) {
+		/*
+		 * No final status yet or final status not yet delivered
+		 * to the device driver. Can't do path verfication now,
+		 * delay until final status was delivered.
+		 */
+		cdev->private->flags.doverify = 1;
 		return;
 	}
 	/* Device is idle, we can do the path verification. */
@@ -453,19 +462,14 @@ ccw_device_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	ccw_device_accumulate_irb(cdev, irb);
 	if (cdev->private->flags.dosense) {
 		if (ccw_device_do_sense(cdev, irb) == 0) {
-			/* Check if we have to trigger path verification. */
-			if (irb->esw.esw0.erw.pvrf)
-				cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
-			else
-				cdev->private->state = DEV_STATE_W4SENSE;
+			cdev->private->state = DEV_STATE_W4SENSE;
 		}
 		return;
 	}
-	if (irb->esw.esw0.erw.pvrf)
-		/* Try to start path verification. */
+	/* Call the handler. */
+	if (ccw_device_call_handler(cdev) && cdev->private->flags.doverify)
+		/* Start delayed path verification. */
 		ccw_device_online_verify(cdev, 0);
-	/* No basic sense required, call the handler. */
-	ccw_device_call_handler(cdev);
 }
 
 /*
@@ -483,32 +487,6 @@ ccw_device_online_timeout(struct ccw_device *cdev, enum dev_event dev_event)
 	if (cdev->handler)
 		cdev->handler(cdev, cdev->private->intparm,
 			      ERR_PTR(-ETIMEDOUT));
-}
-
-static void
-ccw_device_irq_verify(struct ccw_device *cdev, enum dev_event dev_event)
-{
-	struct irb *irb;
-
-	irb = (struct irb *) __LC_IRB;
-	/* Check for unsolicited interrupt. */
-	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		if (cdev->handler)
-			cdev->handler (cdev, 0, irb);
-		return;
-	}
-	/* Accumulate status and find out if a basic sense is needed. */
-	ccw_device_accumulate_irb(cdev, irb);
-	if (cdev->private->flags.dosense) {
-		if (ccw_device_do_sense(cdev, irb) == 0)
-			cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
-		return;
-	}
-	/* Try to start delayed device verification. */
-	ccw_device_online_verify(cdev, 0);
-	/* No basic sense required, call the handler. */
-	ccw_device_call_handler(cdev);
 }
 
 /*
@@ -530,46 +508,15 @@ ccw_device_w4sense(struct ccw_device *cdev, enum dev_event dev_event)
 	/* Add basic sense info to irb. */
 	ccw_device_accumulate_basic_sense(cdev, irb);
 	if (cdev->private->flags.dosense) {
-		/* Check if we have to trigger path verification. */
-		if (irb->esw.esw0.erw.pvrf)
-			cdev->private->state = DEV_STATE_W4SENSE_VERIFY;
 		/* Another basic sense is needed. */
 		ccw_device_do_sense(cdev, irb);
 		return;
 	}
 	cdev->private->state = DEV_STATE_ONLINE;
-	if (irb->esw.esw0.erw.pvrf)
-		/* Try to start path verification. */
+	/* Call the handler. */
+	if (ccw_device_call_handler(cdev) && cdev->private->flags.doverify)
+		/* Start delayed path verification. */
 		ccw_device_online_verify(cdev, 0);
-	/* Call the handler. */
-	ccw_device_call_handler(cdev);
-}
-
-static void
-ccw_device_w4sense_verify(struct ccw_device *cdev, enum dev_event dev_event)
-{
-	struct irb *irb;
-
-	irb = (struct irb *) __LC_IRB;
-	/* Check for unsolicited interrupt. */
-	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		if (cdev->handler)
-			cdev->handler (cdev, 0, irb);
-		return;
-	}
-	/* Add basic sense info to irb. */
-	ccw_device_accumulate_basic_sense(cdev, irb);
-	if (cdev->private->flags.dosense) {
-		/* Another basic sense is needed. */
-		ccw_device_do_sense(cdev, irb);
-		return;
-	}
-	cdev->private->state = DEV_STATE_ONLINE_VERIFY;
-	/* Start delayed device verification. */
-	ccw_device_online_verify(cdev, 0);
-	/* Call the handler. */
-	ccw_device_call_handler(cdev);
 }
 
 static void
@@ -718,18 +665,6 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
 	/* states to wait for i/o completion before doing something */
-	[DEV_STATE_ONLINE_VERIFY] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_irq_verify,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
-	},
-	[DEV_STATE_W4SENSE_VERIFY] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_w4sense_verify,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
-	},
 	[DEV_STATE_CLEAR_VERIFY] {
 		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
 		[DEV_EVENT_INTERRUPT]   ccw_device_clear_verify,

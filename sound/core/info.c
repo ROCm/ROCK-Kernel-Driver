@@ -180,7 +180,7 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 	snd_info_buffer_t *buf;
-	long size = 0, size1;
+	size_t size = 0;
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	snd_assert(data != NULL, return -ENXIO);
@@ -192,10 +192,8 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 			return -EIO;
 		if (file->f_pos >= (long)buf->size)
 			return 0;
-		size = buf->size < count ? buf->size : count;
-		size1 = buf->size - file->f_pos;
-		if (size1 < size)
-			size = size1;
+		size = buf->size - file->f_pos;
+		size = min(count, size);
 		if (copy_to_user(buffer, buf->buffer + file->f_pos, size))
 			return -EFAULT;
 		file->f_pos += size;
@@ -205,8 +203,6 @@ static ssize_t snd_info_entry_read(struct file *file, char *buffer,
 			return entry->c.ops->read(entry,
 						  data->file_private_data,
 						  file, buffer, count);
-		if (size > 0)
-			file->f_pos += size;
 		break;
 	}
 	return size;
@@ -218,7 +214,7 @@ static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
 	snd_info_buffer_t *buf;
-	long size = 0, size1;
+	size_t size = 0;
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	snd_assert(data != NULL, return -ENXIO);
@@ -232,10 +228,8 @@ static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
 			return -EINVAL;
 		if (file->f_pos >= (long)buf->len)
 			return -ENOMEM;
-		size = buf->len < count ? buf->len : count;
-		size1 = buf->len - file->f_pos;
-		if (size1 < size)
-			size = size1;
+		size = buf->len - file->f_pos;
+		size = min(count, size);
 		if (copy_from_user(buf->buffer + file->f_pos, buffer, size))
 			return -EFAULT;
 		if ((long)buf->size < file->f_pos + size)
@@ -247,8 +241,6 @@ static ssize_t snd_info_entry_write(struct file *file, const char *buffer,
 			return entry->c.ops->write(entry,
 						   data->file_private_data,
 						   file, buffer, count);
-		if (size > 0)
-			file->f_pos += size;
 		break;
 	}
 	return size;

@@ -10,10 +10,8 @@ config SCSI_AIC7XXX
 	SCSI controllers (the 274x and 284x series).  For AAA and ARO based
 	configurations, only SCSI functionality is provided.
 
-	If you want to compile the driver as a module ( = code which can be
-	inserted in and removed from the running kernel whenever you want),
-	say M here and read <file:Documentation/modules.txt>.  The module
-	will be called aic7xxx.
+	To compile this driver as a module, choose M here: the
+	module will be called aic7xxx.
 
 config AIC7XXX_CMDS_PER_DEVICE
 	int "Maximum number of TCQ commands per device"

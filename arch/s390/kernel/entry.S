@@ -45,8 +45,9 @@ SP_R15       =  STACK_FRAME_OVERHEAD + PT_GPR15
 SP_AREGS     =  STACK_FRAME_OVERHEAD + PT_ACR0
 SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 /* Now the additional entries */
-SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
-SP_SIZE      =  (SP_TRAP+4)
+SP_ILC       =  (SP_ORIG_R2+GPR_SIZE)
+SP_TRAP      =  (SP_ILC+2)
+SP_SIZE      =  (SP_TRAP+2)
 
 _TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
 _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
@@ -98,7 +99,8 @@ entry_base:
         stam    %a0,%a15,SP_AREGS(%r15)   # store access registers to kst.
         mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+12 # store ac. regs
         mvc     SP_PSW(8,%r15),\psworg    # move user PSW to stack
-	mvc	SP_TRAP(4,%r15),BASED(.L\psworg) # store trap indication
+	mvc	SP_ILC(2,%r15),__LC_SVC_ILC      # store instruction length
+	mvc	SP_TRAP(2,%r15),BASED(.L\psworg) # store trap indication
         xc      0(4,%r15),0(%r15)         # clear back chain
         .endm
 
@@ -123,25 +125,26 @@ entry_base:
  * Returns:
  *  gpr2 = prev
  */
-        .globl  resume
-resume:
+        .globl  __switch_to
+__switch_to:
         basr    %r1,0
-resume_base:
+__switch_to_base:
 	tm	__THREAD_per(%r3),0xe8		# new process is using per ?
-	bz	resume_noper-resume_base(%r1)	# if not we're fine
+	bz	__switch_to_noper-__switch_to_base(%r1)	# if not we're fine
         stctl   %c9,%c11,24(%r15)		# We are using per stuff
         clc     __THREAD_per(12,%r3),24(%r15)
-        be      resume_noper-resume_base(%r1)	# we got away w/o bashing TLB's
+        be      __switch_to_noper-__switch_to_base(%r1)	# we got away w/o bashing TLB's
         lctl    %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
-resume_noper:
-        stm     %r6,%r15,24(%r15)       # store resume registers of prev task
+__switch_to_noper:
+        stm     %r6,%r15,24(%r15)       # store __switch_to registers of prev task
 	st	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
 	l	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
 	stam    %a2,%a2,__THREAD_ar2(%r2)	# store kernel access reg. 2
 	stam    %a4,%a4,__THREAD_ar4(%r2)	# store kernel access reg. 4
 	lam     %a2,%a2,__THREAD_ar2(%r3)	# load kernel access reg. 2
 	lam     %a4,%a4,__THREAD_ar4(%r3)	# load kernel access reg. 4
-	lm	%r6,%r15,24(%r15)	# load resume registers of next task
+	lm	%r6,%r15,24(%r15)	# load __switch_to registers of next task
+	st	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
 	l	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	ahi	%r3,8192
 	st	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
@@ -199,6 +202,8 @@ sysc_do_restart:
 
 sysc_return:
 	stnsm   24(%r15),0xfc     # disable I/O and ext. interrupts
+	tm	SP_PSW+1(%r15),0x01	# returning to user ?
+	bno	BASED(sysc_leave)
 	tm	__TI_flags+3(%r9),_TIF_WORK_SVC
 	bnz	BASED(sysc_work)  # there is work to do (signals etc.)
 sysc_leave:
@@ -512,12 +517,9 @@ io_int_handler:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_IO_OLD_PSW,0
         GET_THREAD_INFO           # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
         l       %r1,BASED(.Ldo_IRQ)        # load address of do_IRQ
         la      %r2,SP_PTREGS(%r15) # address of register-save area
-        sr      %r3,%r3
-        icm     %r3,3,__LC_SUBCHANNEL_NR   # load subchannel nr & extend to int
-        l       %r4,__LC_IO_INT_PARM       # load interruption parm
-	l       %r5,__LC_IO_INT_WORD       # load interruption word
         basr    %r14,%r1          # branch to standard irq handler
 
 io_return:
@@ -606,26 +608,11 @@ ext_int_handler:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
+	la	%r2,SP_PTREGS(%r15)    # address of register-save area
+	lh	%r3,__LC_EXT_INT_CODE  # get interruption code
 	l	%r1,BASED(.Ldo_extint)
 	basr	%r14,%r1
-	lh	%r6,__LC_EXT_INT_CODE  # get interruption code
-	lr	%r1,%r6		       # calculate index = code & 0xff
-	n	%r1,BASED(.Lc0xff)
-	sll	%r1,2
-	l	%r7,BASED(.Lext_hash)
-	l	%r7,0(%r1,%r7)	       # get first list entry for hash value
-	ltr	%r7,%r7		       # == NULL ?
-	bz	BASED(io_return)       # yes, nothing to do, exit
-ext_int_loop:
-	ch	%r6,8(%r7)	       # compare external interrupt code
-	bne	BASED(ext_int_next)
-	l	%r1,4(%r7)	       # get handler address
-	la	%r2,SP_PTREGS(%r15)    # address of register-save area
-	lr	%r3,%r6		       # interruption code
-	basr	%r14,%r1	       # call handler
-ext_int_next:
-	icm	%r7,15,0(%r7)	       # next list entry
-	bnz	BASED(ext_int_loop)
 	b	BASED(io_return)
 
 /*
@@ -685,11 +672,11 @@ restart_go:
 .Lc_pactive:   .long  PREEMPT_ACTIVE
 .Lc0xff:       .long  0xff
 .Lnr_syscalls: .long  NR_syscalls
-.L0x018:       .long  0x018
-.L0x020:       .long  0x020
-.L0x028:       .long  0x028
-.L0x030:       .long  0x030
-.L0x038:       .long  0x038
+.L0x018:       .word  0x018
+.L0x020:       .word  0x020
+.L0x028:       .word  0x028
+.L0x030:       .word  0x030
+.L0x038:       .word  0x038
 
 /*
  * Symbol constants

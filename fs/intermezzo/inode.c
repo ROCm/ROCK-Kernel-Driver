@@ -37,11 +37,6 @@
 #include <asm/uaccess.h>
 
 #include <linux/fs.h>
-#include <linux/stat.h>
-#include <linux/errno.h>
-#include <linux/smp_lock.h>
-#include <linux/string.h>
-#include <asm/uaccess.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <asm/segment.h>

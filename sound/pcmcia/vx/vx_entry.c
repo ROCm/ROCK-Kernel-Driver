@@ -34,7 +34,7 @@ static void vxpocket_config(dev_link_t *link);
 static int vxpocket_event(event_t event, int priority, event_callback_args_t *args);
 
 
-static void vxpocket_release(dev_link_t* link)
+static void vxpocket_release(dev_link_t *link)
 {
 	if (link->state & DEV_CONFIG) {
 		/* release cs resources */

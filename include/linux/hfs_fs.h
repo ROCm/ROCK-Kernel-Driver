@@ -267,9 +267,9 @@ extern void hfs_nat_drop_dentry(struct dentry *, const ino_t);
 
 /* file.c */
 extern hfs_s32 hfs_do_read(struct inode *, struct hfs_fork *, hfs_u32,
-			   char *, hfs_u32);
+			   char __user *, hfs_u32);
 extern hfs_s32 hfs_do_write(struct inode *, struct hfs_fork *, hfs_u32,
-			    const char *, hfs_u32);
+			    const char __user *, hfs_u32);
 extern void hfs_file_fix_mode(struct hfs_cat_entry *entry);
 extern struct inode_operations hfs_file_inode_operations;
 extern struct file_operations hfs_file_operations;

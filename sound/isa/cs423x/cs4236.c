@@ -525,7 +525,7 @@ static int __devinit snd_card_cs423x_probe(int dev, struct pnp_card_link *pcard,
 		chip->port,
 		irq[dev],
 		dma1[dev]);
-	if (dma1[dev] >= 0)
+	if (dma2[dev] >= 0)
 		sprintf(card->longname + strlen(card->longname), "&%d", dma2[dev]);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

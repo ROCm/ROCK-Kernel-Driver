@@ -434,11 +434,11 @@ int hci_inquiry(unsigned long arg)
 
 	BT_DBG("num_rsp %d", ir.num_rsp);
 
-	if (!verify_area(VERIFY_WRITE, ptr, sizeof(ir) + 
-			(sizeof(struct inquiry_info) * ir.num_rsp))) {
-		copy_to_user(ptr, &ir, sizeof(ir));
+	if (!copy_to_user(ptr, &ir, sizeof(ir))) {
 		ptr += sizeof(ir);
-	        copy_to_user(ptr, buf, sizeof(struct inquiry_info) * ir.num_rsp);
+	        if (copy_to_user(ptr, buf, sizeof(struct inquiry_info) *
+					ir.num_rsp))
+			err = -EFAULT;
 	} else 
 		err = -EFAULT;
 

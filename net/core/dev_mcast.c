@@ -22,6 +22,7 @@
  */
 
 #include <linux/config.h> 
+#include <linux/module.h> 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -273,3 +274,6 @@ void __init dev_mcast_init(void)
 #endif
 }
 
+EXPORT_SYMBOL(dev_mc_add);
+EXPORT_SYMBOL(dev_mc_delete);
+EXPORT_SYMBOL(dev_mc_upload);

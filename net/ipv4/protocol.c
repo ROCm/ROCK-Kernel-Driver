@@ -27,6 +27,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -95,3 +96,6 @@ int inet_del_protocol(struct inet_protocol *prot, unsigned char protocol)
 
 	return ret;
 }
+
+EXPORT_SYMBOL(inet_add_protocol);
+EXPORT_SYMBOL(inet_del_protocol);

@@ -65,6 +65,7 @@ config PM_DISK
 
 config PM_DISK_PARTITION
 	string "Default resume partition"
+	depends on PM_DISK
 	default ""
 	---help---
 	  The default resume partition is the partition that the pmdisk suspend-

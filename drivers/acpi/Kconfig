@@ -69,7 +69,6 @@ config ACPI_SLEEP
 	bool "Sleep States (EXPERIMENTAL)"
 	depends on X86 && ACPI
 	depends on EXPERIMENTAL && PM
-	select SOFTWARE_SUSPEND
 	default y
 	---help---
 	  This option adds support for ACPI suspend states. 

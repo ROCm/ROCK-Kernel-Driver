@@ -354,6 +354,7 @@ static ssize_t
 ep_io (struct ep_data *epdata, void *buf, unsigned len)
 {
 	DECLARE_COMPLETION (done);
+	int value;
 
 	spin_lock_irq (&epdata->dev->lock);
 	if (likely (epdata->ep != NULL)) {
@@ -363,14 +364,12 @@ ep_io (struct ep_data *epdata, void *buf, unsigned len)
 		req->complete = epio_complete;
 		req->buf = buf;
 		req->length = len;
-		epdata->status = usb_ep_queue (epdata->ep, req, GFP_ATOMIC);
+		value = usb_ep_queue (epdata->ep, req, GFP_ATOMIC);
 	} else
-		epdata->status = -ENODEV;
+		value = -ENODEV;
 	spin_unlock_irq (&epdata->dev->lock);
 
-	if (epdata->status == 0) {
-		int	value;
-
+	if (likely (value == 0)) {
 		value = wait_event_interruptible (done.wait, done.done);
 		if (value != 0) {
 			spin_lock_irq (&epdata->dev->lock);
@@ -378,17 +377,21 @@ ep_io (struct ep_data *epdata, void *buf, unsigned len)
 				DBG (epdata->dev, "%s i/o interrupted\n",
 						epdata->name);
 				usb_ep_dequeue (epdata->ep, epdata->req);
+				spin_unlock_irq (&epdata->dev->lock);
+
 				wait_event (done.wait, done.done);
-				if (epdata->status == 0)
-					epdata->status = value;
+				if (epdata->status == -ECONNRESET)
+					epdata->status = -EINTR;
 			} else {
+				spin_unlock_irq (&epdata->dev->lock);
+
 				DBG (epdata->dev, "endpoint gone\n");
 				epdata->status = -ENODEV;
 			}
-			spin_unlock_irq (&epdata->dev->lock);
 		}
+		return epdata->status;
 	}
-	return epdata->status;
+	return value;
 }
 
 
@@ -424,10 +427,12 @@ ep_read (struct file *fd, char *buf, size_t len, loff_t *ptr)
 	if (unlikely (!kbuf))
 		goto free1;
 
-	VDEBUG (data->dev, "%s read %d OUT\n", data->name, len);
 	value = ep_io (data, kbuf, len);
+	VDEBUG (data->dev, "%s read %d OUT, status %d\n",
+		data->name, len, value);
 	if (value >= 0 && copy_to_user (buf, kbuf, value))
 		value = -EFAULT;
+
 free1:
 	up (&data->lock);
 	kfree (kbuf);
@@ -470,8 +475,9 @@ ep_write (struct file *fd, const char *buf, size_t len, loff_t *ptr)
 		goto free1;
 	}
 
-	VDEBUG (data->dev, "%s write %d IN\n", data->name, len);
 	value = ep_io (data, kbuf, len);
+	VDEBUG (data->dev, "%s write %d IN, status %d\n",
+		data->name, len, value);
 free1:
 	up (&data->lock);
 	kfree (kbuf);
@@ -1200,9 +1206,11 @@ gadgetfs_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			if (value >= 0)
 				value = min (ctrl->wLength, (u16) value);
 			break;
-
-		default:
+		case USB_DT_STRING:
 			goto unrecognized;
+
+		default:		// all others are errors
+			break;
 		}
 		break;
 

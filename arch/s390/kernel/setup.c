@@ -97,7 +97,6 @@ void __devinit cpu_init (void)
          */
         asm volatile ("stidp %0": "=m" (S390_lowcore.cpu_data.cpu_id));
         S390_lowcore.cpu_data.cpu_addr = addr;
-        S390_lowcore.cpu_data.cpu_nr = nr;
 
         /*
          * Force FPU initialization:
@@ -418,7 +417,7 @@ void __init setup_arch(char **cmdline_p)
 	 * we are rounding upwards:
 	 */
 	start_pfn = (__pa(&_end) + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	end_pfn = memory_end >> PAGE_SHIFT;
+	end_pfn = max_pfn = memory_end >> PAGE_SHIFT;
 
 	/*
 	 * Initialize the boot-time allocator (with low memory only):
@@ -497,21 +496,17 @@ void __init setup_arch(char **cmdline_p)
 	lc->io_new_psw.addr = PSW_ADDR_AMODE + (unsigned long) io_int_handler;
 	lc->ipl_device = S390_lowcore.ipl_device;
 	lc->jiffy_timer = -1LL;
-#ifndef CONFIG_ARCH_S390X
-	lc->kernel_stack = ((__u32) &init_thread_union) + 8192;
-	lc->async_stack = (__u32)
-		__alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0) + 8192;
-	set_prefix((__u32) lc);
-#else /* CONFIG_ARCH_S390X */
-	lc->kernel_stack = ((__u64) &init_thread_union) + 16384;
-	lc->async_stack = (__u64)
-		__alloc_bootmem(4*PAGE_SIZE, 4*PAGE_SIZE, 0) + 16384;
+	lc->kernel_stack = ((unsigned long) &init_thread_union) + THREAD_SIZE;
+	lc->async_stack = (unsigned long)
+		__alloc_bootmem(ASYNC_SIZE, ASYNC_SIZE, 0) + ASYNC_SIZE;
+	lc->current_task = (unsigned long) init_thread_union.thread_info.task;
+#ifdef CONFIG_ARCH_S390X
 	if (MACHINE_HAS_DIAG44)
 		lc->diag44_opcode = 0x83000044;
 	else
 		lc->diag44_opcode = 0x07000700;
-	set_prefix((__u32)(__u64) lc);
 #endif /* CONFIG_ARCH_S390X */
+	set_prefix((u32)(unsigned long) lc);
         cpu_init();
         __cpu_logical_map[0] = S390_lowcore.cpu_data.cpu_addr;
 

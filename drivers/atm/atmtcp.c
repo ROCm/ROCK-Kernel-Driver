@@ -8,6 +8,7 @@
 #include <linux/atmdev.h>
 #include <linux/atm_tcp.h>
 #include <linux/bitops.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
@@ -431,32 +432,52 @@ int atmtcp_remove_persistent(int itf)
 	return 0;
 }
 
-
-#ifdef MODULE
-
-int init_module(void)
+static int atmtcp_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
-	atm_tcp_ops.attach = atmtcp_attach;
-	atm_tcp_ops.create_persistent = atmtcp_create_persistent;
-	atm_tcp_ops.remove_persistent = atmtcp_remove_persistent;
+	int err = 0;
+	struct atm_vcc *vcc = ATM_SD(sock);
+
+	if (cmd != SIOCSIFATMTCP && cmd != ATMTCP_CREATE && cmd != ATMTCP_REMOVE)
+		return -ENOIOCTLCMD;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	switch (cmd) {
+		case SIOCSIFATMTCP:
+			err = atmtcp_attach(vcc, (int) arg);
+			if (err >= 0) {
+				sock->state = SS_CONNECTED;
+				__module_get(THIS_MODULE);
+			}
+			break;
+		case ATMTCP_CREATE:
+			err = atmtcp_create_persistent((int) arg);
+			break;
+		case ATMTCP_REMOVE:
+			err = atmtcp_remove_persistent((int) arg);
+			break;
+	}
+	return err;
+}
+
+static struct atm_ioctl atmtcp_ioctl_ops = {
+	.owner 	= THIS_MODULE,
+	.ioctl	= atmtcp_ioctl,
+};
+
+static __init int atmtcp_init(void)
+{
+	register_atm_ioctl(&atmtcp_ioctl_ops);
 	return 0;
 }
 
 
-void cleanup_module(void)
+static void __exit atmtcp_exit(void)
 {
-	atm_tcp_ops.attach = NULL;
-	atm_tcp_ops.create_persistent = NULL;
-	atm_tcp_ops.remove_persistent = NULL;
+	deregister_atm_ioctl(&atmtcp_ioctl_ops);
 }
 
 MODULE_LICENSE("GPL");
-#else
-
-struct atm_tcp_ops atm_tcp_ops = {
-	atmtcp_attach,			/* attach */
-	atmtcp_create_persistent,	/* create_persistent */
-	atmtcp_remove_persistent	/* remove_persistent */
-};
-
-#endif
+module_init(atmtcp_init);
+module_exit(atmtcp_exit);

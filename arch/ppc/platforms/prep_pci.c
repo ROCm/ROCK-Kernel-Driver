@@ -19,7 +19,6 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 #include <asm/residual.h>
-#include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/open_pic.h>

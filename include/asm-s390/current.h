@@ -12,17 +12,11 @@
 #define _S390_CURRENT_H
 
 #ifdef __KERNEL__
-
-#include <linux/thread_info.h>
+#include <asm/lowcore.h>
 
 struct task_struct;
 
-static inline struct task_struct * get_current(void)
-{
-	return current_thread_info()->task;
-}
-
-#define current get_current()
+#define current ((struct task_struct *const)S390_lowcore.current_task)
 
 #endif
 

@@ -19,11 +19,6 @@ enum ip_nat_manip_type
 #define HOOK2MANIP(hooknum) ((hooknum) != NF_IP_POST_ROUTING && (hooknum) != NF_IP_LOCAL_IN)
 #endif
 
-/* 2.3.19 (I hope) will define this in linux/netfilter_ipv4.h. */
-#ifndef SO_ORIGINAL_DST
-#define SO_ORIGINAL_DST 80
-#endif
-
 #define IP_NAT_RANGE_MAP_IPS 1
 #define IP_NAT_RANGE_PROTO_SPECIFIED 2
 /* Used internally by get_unique_tuple(). */

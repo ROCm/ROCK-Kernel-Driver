@@ -12,7 +12,6 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
-#include <asm/processor.h>
 
 extern void _tlbie(unsigned long address);
 extern void _tlbia(void);

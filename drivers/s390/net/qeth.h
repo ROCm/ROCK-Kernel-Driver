@@ -14,7 +14,7 @@
 
 #define QETH_NAME " qeth"
 
-#define VERSION_QETH_H "$Revision: 1.49 $"
+#define VERSION_QETH_H "$Revision: 1.56 $"
 
 /******************** CONFIG STUFF ***********************/
 //#define QETH_DBF_LIKE_HELL
@@ -567,21 +567,12 @@ struct sparebufs {
 #define QETH_LOCK_NORMAL 1
 #define QETH_LOCK_FLUSH 2
 
-#define QETH_MAX_DEVICES 16
-	/* DEPENDENCY ON QETH_MAX_DEVICES.
-	 *__MOUDLE_STRING expects simple literals */
-#define QETH_MAX_DEVICES_TIMES_4 64
-#define QETH_MAX_DEVNAMES 16
-#define QETH_DEVNAME "eth"
-
 #define QETH_TX_TIMEOUT 100*HZ	/* 100 seconds */
 
 #define QETH_REMOVE_WAIT_TIME 200
 #define QETH_WAIT_FOR_THREAD_TIME 20
 #define QETH_IDLE_WAIT_TIME 10
 #define QETH_WAIT_BEFORE_2ND_DOIO 1000
-
-#define QETH_MAX_PARM_LEN 128
 
 #define QETH_FAKE_LL_LEN ETH_HLEN	/* 14 */
 #define QETH_FAKE_LL_PROT_LEN 2
@@ -609,16 +600,12 @@ struct sparebufs {
 				 IPA_PDU_HEADER_SIZE+sizeof(struct ipa_cmd)), \
 			   QETH_RCD_LENGTH)
 
-#define QETH_FINAL_STATUS_TIMEOUT 1500
-#define QETH_CLEAR_TIMEOUT 1500
-#define QETH_RCD_TIMEOUT 1500
 #define QETH_NOP_TIMEOUT 1500
 #define QETH_QUIESCE_NETDEV_TIME 300
 #define QETH_QUIESCE_WAIT_BEFORE_CLEAR 4000
 #define QETH_QUIESCE_WAIT_AFTER_CLEAR 4000
 
 #define NOP_STATE 0x1001
-#define READ_CONF_DATA_STATE 0x1002
 #define IDX_ACTIVATE_READ_STATE 0x1003
 #define IDX_ACTIVATE_WRITE_STATE 0x1004
 #define MPC_SETUP_STATE 0x1005
@@ -647,8 +634,6 @@ struct sparebufs {
 #define BROADCAST_LOCAL 1
 #define MACADDR_NONCANONICAL 0
 #define MACADDR_CANONICAL 1
-#define MEMUSAGE_DISCONTIG 0
-#define MEMUSAGE_CONTIG 1
 #define ENABLE_TAKEOVER 0
 #define DISABLE_TAKEOVER 1
 #define FAKE_BROADCAST 0
@@ -656,8 +641,6 @@ struct sparebufs {
 
 #define FAKE_LL 0
 #define DONT_FAKE_LL 1
-#define SYNC_IQD 0
-#define ASYNC_IQD 1
 
 #define QETH_BREAKOUT_LEAVE 1
 #define QETH_BREAKOUT_AGAIN 2
@@ -683,9 +666,6 @@ struct sparebufs {
 #define SENSE_COMMAND_REJECT_FLAG 0x80
 #define SENSE_RESETTING_EVENT_BYTE 1
 #define SENSE_RESETTING_EVENT_FLAG 0x80
-
-#define DEFAULT_RCD_CMD 0x72
-#define DEFAULT_RCD_COUNT 0x80
 
 #define BUFFER_USED 1
 #define BUFFER_UNUSED -1
@@ -744,14 +724,12 @@ struct qeth_card_options {
 	int polltime;
 	char portname[9];
 	int portno;
-	int memusage;
 	int broadcast_mode;
 	int macaddr_mode;
 	int ena_ipat;
 	int fake_broadcast;
 	int add_hhlen;
 	int fake_ll;
-	int async_iqd;
 };
 
 struct qeth_hdr {
@@ -811,7 +789,6 @@ struct qeth_perf_stats {
 
 /* ugly. I know. */
 struct qeth_card {	/* pointed to by dev->priv */
-	int easy_copy_cap;
 
 	/* pointer to options (defaults + parameters) */
 	struct qeth_card_options options;
@@ -930,8 +907,6 @@ struct qeth_card {	/* pointed to by dev->priv */
 	int is_multicast_different;	/* if multicast traffic is to be sent
 					   on a different queue, this is the
 					   queue+no_queues */
-	int can_do_async_iqd;	/* 1 only on IQD that provides async
-				   unicast sigas */
 	__u32 ipa_supported;
 	__u32 ipa_enabled;
 	__u32 ipa6_supported;
@@ -950,6 +925,7 @@ struct qeth_card {	/* pointed to by dev->priv */
 	int unique_id;
 
 	/* device and I/O data */
+	struct ccwgroup_device *gdev;
 	struct ccw_device *rdev;
 	struct ccw_device *wdev;
 	struct ccw_device *ddev;
@@ -969,8 +945,6 @@ struct qeth_card {	/* pointed to by dev->priv */
 
 	atomic_t ioctl_data_has_arrived;
 	wait_queue_head_t ioctl_wait_q;
-	atomic_t ioctl_wait_q_active;
-	spinlock_t ioctl_wait_q_lock;
 
 /* stuff under 2 gb */
 	struct qeth_dma_stuff *dma_stuff;
@@ -987,8 +961,6 @@ struct qeth_card {	/* pointed to by dev->priv */
 	atomic_t shutdown_phase;
 	atomic_t data_has_arrived;
 	wait_queue_head_t wait_q;
-	atomic_t wait_q_active;
-	spinlock_t wait_q_lock;	/* for wait_q_active and wait_q */
 
 	atomic_t clear_succeeded0;
 	atomic_t clear_succeeded1;
@@ -1031,21 +1003,6 @@ qeth_get_arphrd_type(int cardtype, int linktype)
 		return ARPHRD_ETHER;
 	default:
 		return ARPHRD_ETHER;
-	}
-}
-
-inline static int
-qeth_determine_easy_copy_cap(int cardtype)
-{
-	switch (cardtype) {
-	case QETH_CARD_TYPE_UNKNOWN:
-		return 0;	/* better be cautious */
-	case QETH_CARD_TYPE_OSAE:
-		return 1;
-	case QETH_CARD_TYPE_IQD:
-		return 0;
-	default:
-		return 0;	/* ?? */
 	}
 }
 

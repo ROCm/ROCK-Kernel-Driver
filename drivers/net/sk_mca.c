@@ -89,7 +89,7 @@ History:
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/time.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/version.h>

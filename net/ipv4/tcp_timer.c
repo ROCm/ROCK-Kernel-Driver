@@ -20,6 +20,7 @@
  *		Jorge Cwik, <jorge@laser.satlink.net>
  */
 
+#include <linux/module.h>
 #include <net/tcp.h>
 
 int sysctl_tcp_syn_retries = TCP_SYN_RETRIES; 
@@ -656,3 +657,8 @@ out:
 	bh_unlock_sock(sk);
 	sock_put(sk);
 }
+
+EXPORT_SYMBOL(tcp_clear_xmit_timers);
+EXPORT_SYMBOL(tcp_delete_keepalive_timer);
+EXPORT_SYMBOL(tcp_init_xmit_timers);
+EXPORT_SYMBOL(tcp_reset_keepalive_timer);

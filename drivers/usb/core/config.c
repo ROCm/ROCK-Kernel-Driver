@@ -237,9 +237,6 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer, int si
 		memset(interface, 0, sizeof(struct usb_interface));
 		interface->dev.release = usb_release_intf;
 		device_initialize(&interface->dev);
-
-		/* put happens in usb_destroy_configuration */
-		get_device(&interface->dev);
 	}
 
 	/* Go through the descriptors, checking their length and counting the

@@ -426,7 +426,7 @@ sn_pci_fixup(int arg)
 	struct pci_dev *device_dev = NULL;
 	struct sn_widget_sysdata *widget_sysdata;
 	struct sn_device_sysdata *device_sysdata;
-	pciio_intr_t intr_handle;
+	pcibr_intr_t intr_handle;
 	int cpuid;
 	vertex_hdl_t device_vertex;
 	pciio_intr_line_t lines;
@@ -438,14 +438,18 @@ sn_pci_fixup(int arg)
 		extern void register_sn_procfs(void);
 #endif
 		extern void irix_io_init(void);
+		extern void sn_init_cpei_timer(void);
 		
 		init_hcl();
 		irix_io_init();
 		
 		for (cnode = 0; cnode < numnodes; cnode++) {
-			extern void intr_init_vecblk(nodepda_t *npda, cnodeid_t, int);
-			intr_init_vecblk(NODEPDA(cnode), cnode, 0);
+			extern void intr_init_vecblk(cnodeid_t);
+			intr_init_vecblk(cnode);
 		} 
+
+		sn_init_cpei_timer();
+
 #ifdef CONFIG_PROC_FS
 		register_sn_procfs();
 #endif
@@ -545,17 +549,17 @@ sn_pci_fixup(int arg)
 				     (unsigned char *)&lines);
 	 
 		irqpdaindr->curr = device_dev;
-		intr_handle = pciio_intr_alloc(device_vertex, NULL, lines, device_vertex);
+		intr_handle = pcibr_intr_alloc(device_vertex, NULL, lines, device_vertex);
 
-		irq = intr_handle->pi_irq;
+		irq = intr_handle->bi_irq;
 		irqpdaindr->device_dev[irq] = device_dev;
-		cpuid = intr_handle->pi_cpu;
-		pciio_intr_connect(intr_handle, (intr_func_t)0, (intr_arg_t)0);
+		cpuid = intr_handle->bi_cpu;
+		pcibr_intr_connect(intr_handle, (intr_func_t)0, (intr_arg_t)0);
 		device_dev->irq = irq;
-		register_pcibr_intr(irq, (pcibr_intr_t)intr_handle);
+		register_pcibr_intr(irq, intr_handle);
 
 		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
-			int ibits = ((pcibr_intr_t)intr_handle)->bi_ibits;
+			int ibits = intr_handle->bi_ibits;
 			int i;
 
 			size = device_dev->resource[idx].end -
@@ -700,12 +704,12 @@ pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid)
 		 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
 		 */
 		busnum_to_atedmamaps[num_bridges - 1] = (void *) kmalloc(
-			sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS, GFP_KERNEL);
+			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
 		if (!busnum_to_atedmamaps[num_bridges - 1])
 			printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
 
 		memset(busnum_to_atedmamaps[num_bridges - 1], 0x0, 
-			sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS);
+			sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
 
 	}
 
@@ -764,12 +768,12 @@ pci_bus_map_create(vertex_hdl_t xtalk, char * io_moduleid)
 			 * Pre assign DMA maps needed for 32 Bits Page Map DMA.
 			 */
 			busnum_to_atedmamaps[bus_number] = (void *) kmalloc(
-				sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS, GFP_KERNEL);
+				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS, GFP_KERNEL);
 			if (!busnum_to_atedmamaps[bus_number])
 				printk("WARNING: pci_bus_map_create: Unable to precreate ATE DMA Maps for busnum %d vertex 0x%p\n", num_bridges - 1, (void *)xwidget);
 	
 			memset(busnum_to_atedmamaps[bus_number], 0x0, 
-				sizeof(struct sn_dma_maps_s) * MAX_ATE_MAPS);
+				sizeof(struct pcibr_dmamap_s) * MAX_ATE_MAPS);
 		}
 	}
 

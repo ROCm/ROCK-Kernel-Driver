@@ -285,9 +285,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			ret = read_long(child, addr, &tmp);
 			if (ret < 0)
 				break ;
-			ret = verify_area(VERIFY_WRITE, (void *) data, sizeof(long));
-			if (!ret)
-				put_user(tmp, (unsigned long *) data);
+			ret = put_user(tmp, (unsigned long *) data);
 			break ;
 		}
 
@@ -298,10 +296,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
 				ret = -EIO;
 			
-			ret = verify_area(VERIFY_WRITE, (void *) data,
-					  sizeof(long));
-			if (ret)
-				break ;
 			tmp = 0;  /* Default return condition */
 			addr = addr >> 2; /* temporary hack. */
 			if (addr < 10)
@@ -310,8 +304,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 				ret = -EIO;
 				break ;
 			}
-			put_user(tmp,(unsigned long *) data);
-			ret = 0;
+			ret = put_user(tmp,(unsigned long *) data);
 			break ;
 		}
 

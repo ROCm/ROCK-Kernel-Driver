@@ -497,7 +497,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;
 	cmd->buffer = sreq->sr_buffer;
-	cmd->flags = 0;
 	cmd->retries = 0;
 	cmd->allowed = sreq->sr_allowed;
 	cmd->done = sreq->sr_done;
@@ -535,7 +534,7 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 /*
  * Per-CPU I/O completion queue.
  */
-static struct list_head done_q[NR_CPUS] __cacheline_aligned;
+static DEFINE_PER_CPU(struct list_head, scsi_done_q);
 
 /**
  * scsi_done - Enqueue the finished SCSI command into the done queue.
@@ -553,7 +552,6 @@ static struct list_head done_q[NR_CPUS] __cacheline_aligned;
 void scsi_done(struct scsi_cmnd *cmd)
 {
 	unsigned long flags;
-	int cpu;
 
 	/*
 	 * We don't have to worry about this one timing out any more.
@@ -580,8 +578,7 @@ void scsi_done(struct scsi_cmnd *cmd)
 	 * and need no spinlock.
 	 */
 	local_irq_save(flags);
-	cpu = smp_processor_id();
-	list_add_tail(&cmd->eh_entry, &done_q[cpu]);
+	list_add_tail(&cmd->eh_entry, &__get_cpu_var(scsi_done_q));
 	raise_softirq_irqoff(SCSI_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -600,7 +597,7 @@ static void scsi_softirq(struct softirq_action *h)
 	LIST_HEAD(local_q);
 
 	local_irq_disable();
-	list_splice_init(&done_q[smp_processor_id()], &local_q);
+	list_splice_init(&__get_cpu_var(scsi_done_q), &local_q);
 	local_irq_enable();
 
 	while (!list_empty(&local_q)) {
@@ -889,21 +886,24 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 int scsi_device_get(struct scsi_device *sdev)
 {
 	struct class *class = class_get(&sdev_class);
-	int error = -ENXIO;
 
-	if (class) {
-		down_write(&class->subsys.rwsem);
-		if (!test_bit(SDEV_DEL, &sdev->sdev_state))
-			if (try_module_get(sdev->host->hostt->module)) 
-				if (get_device(&sdev->sdev_gendev)) {
-					sdev->access_count++;
-					error = 0;
-				}
-		up_write(&class->subsys.rwsem);
-		class_put(&sdev_class);
-	}
+	if (!class)
+		goto out;
+	if (test_bit(SDEV_DEL, &sdev->sdev_state))
+		goto out;
+	if (!try_module_get(sdev->host->hostt->module))
+		goto out;
+	if (!get_device(&sdev->sdev_gendev))
+		goto out_put_module;
+	atomic_inc(&sdev->access_count);
+	class_put(&sdev_class);
+	return 0;
 
-	return error;
+ out_put_module:
+	module_put(sdev->host->hostt->module);
+ out:
+	class_put(&sdev_class);
+	return -ENXIO;
 }
 
 void scsi_device_put(struct scsi_device *sdev)
@@ -913,15 +913,11 @@ void scsi_device_put(struct scsi_device *sdev)
 	if (!class)
 		return;
 
-	down_write(&class->subsys.rwsem);
 	module_put(sdev->host->hostt->module);
-	if (--sdev->access_count == 0) {
+	if (atomic_dec_and_test(&sdev->access_count))
 		if (test_bit(SDEV_DEL, &sdev->sdev_state))
 			device_del(&sdev->sdev_gendev);
-	}
 	put_device(&sdev->sdev_gendev);
-	up_write(&class->subsys.rwsem);
-
 	class_put(&sdev_class);
 }
 
@@ -1009,7 +1005,7 @@ static int __init init_scsi(void)
 		goto cleanup_sysctl;
 
 	for (i = 0; i < NR_CPUS; i++)
-		INIT_LIST_HEAD(&done_q[i]);
+		INIT_LIST_HEAD(&per_cpu(scsi_done_q, i));
 
 	devfs_mk_dir("scsi");
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);

@@ -1,4 +1,4 @@
-/* $Id: mntfunc.c,v 1.15 2003/08/25 14:49:53 schindler Exp $
+/* $Id: mntfunc.c,v 1.16 2003/09/18 06:57:17 schindler Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * Maint module
@@ -14,7 +14,6 @@
 #include "platform.h"
 #include "di_defs.h"
 #include "divasync.h"
-#include "di_defs.h"
 #include "debug_if.h"
 
 extern char *DRIVERRELEASE_MNT;

@@ -29,9 +29,9 @@
 /*================ Forward declarations ================*/
 static loff_t      cap_info_llseek(struct file *, loff_t,
                                    int);
-static hfs_rwret_t cap_info_read(struct file *, char *,
+static hfs_rwret_t cap_info_read(struct file *, char __user *,
 				 hfs_rwarg_t, loff_t *);
-static hfs_rwret_t cap_info_write(struct file *, const char *,
+static hfs_rwret_t cap_info_write(struct file *, const char __user *,
 				  hfs_rwarg_t, loff_t *);
 /*================ Function-like macros ================*/
 
@@ -121,7 +121,7 @@ static loff_t cap_info_llseek(struct file *file, loff_t offset, int origin)
  * 'file->f_pos' to user-space at the address 'buf'.  The return value
  * is the number of bytes actually transferred.
  */
-static hfs_rwret_t cap_info_read(struct file *filp, char *buf,
+static hfs_rwret_t cap_info_read(struct file *filp, char __user *buf,
 				 hfs_rwarg_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
@@ -189,7 +189,7 @@ static hfs_rwret_t cap_info_read(struct file *filp, char *buf,
  * '*ppos' from user-space at the address 'buf'.
  * The return value is the number of bytes actually transferred.
  */
-static hfs_rwret_t cap_info_write(struct file *filp, const char *buf, 
+static hfs_rwret_t cap_info_write(struct file *filp, const char __user *buf, 
 				  hfs_rwarg_t count, loff_t *ppos)
 {
         struct inode *inode = filp->f_dentry->d_inode;

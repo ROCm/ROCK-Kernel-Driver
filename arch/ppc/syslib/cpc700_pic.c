@@ -21,7 +21,6 @@
 #include <linux/irq.h>
 
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 

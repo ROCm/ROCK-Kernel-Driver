@@ -2,8 +2,8 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.15 $
- * Date:	$Date: 2003/07/17 14:54:09 $
+ * Version:	$Revision: 1.1 $
+ * Date:	$Date: 2003/07/21 07:22:43 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
@@ -26,6 +26,9 @@
  * History:
  *
  *	$Log: skdrv1st.h,v $
+ *	Revision 1.1  2003/07/21 07:22:43  rroesler
+ *	Fix: Re-Enter after CVS crash
+ *	
  *	Revision 1.15  2003/07/17 14:54:09  rroesler
  *	Fix: Corrected SK_PNMI_READ macros to copy right amount of bytes
  *	

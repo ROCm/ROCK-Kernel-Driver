@@ -387,9 +387,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_L3CR)
  * clobbers r0, r3, ctr, cr0
  *
  */
- 	.globl	__flush_disable_L1
- __flush_disable_L1:
-
+_GLOBAL(__flush_disable_L1)
 	/* Stop pending alitvec streams and memory accesses */
 BEGIN_FTR_SECTION
 	DSSALL
@@ -435,8 +433,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  *
  * clobbers r3
  */
- 	.globl	__inval_enable_L1
- __inval_enable_L1:
+_GLOBAL(__inval_enable_L1)
 	/* Enable and then Flash inval the instruction & data cache */
 	mfspr	r3,SPRN_HID0
 	ori	r3,r3, HID0_ICE|HID0_ICFI|HID0_DCE|HID0_DCI

@@ -30,6 +30,7 @@
 #include <linux/config.h>
 #include <asm/setup.h>
 #include <asm/lowcore.h>
+#include <asm/offsets.h>
 
 #ifndef CONFIG_IPL
         .org   0
@@ -633,6 +634,7 @@ _stext:	basr  %r13,0                    # get base
 # Setup stack
 #
         l     %r15,.Linittu-.LPG2(%r13)
+	mvc   __LC_CURRENT(4),__TI_task(%r15)
         ahi   %r15,8192                 # init_task_union + 8192
         st    %r15,__LC_KERNEL_STACK    # set end of kernel stack
         ahi   %r15,-96

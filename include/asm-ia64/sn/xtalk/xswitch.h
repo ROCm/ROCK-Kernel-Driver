@@ -17,7 +17,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/devfs_fs_kernel.h>
 #include <asm/sn/xtalk/xtalk.h>
 
 typedef struct xswitch_info_s *xswitch_info_t;

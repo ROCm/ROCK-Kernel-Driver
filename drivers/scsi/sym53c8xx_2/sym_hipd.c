@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  */
 
-#define SYM_DRIVER_NAME	"sym-2.1.17a"
+#define SYM_DRIVER_NAME	"sym-2.1.18b"
 
 #ifdef __FreeBSD__
 #include <dev/sym/sym_glue.h>
@@ -734,6 +734,41 @@ static void sym_save_initial_setting (hcb_p np)
 		np->sv_ctest5	= INB(nc_ctest5) & 0x24;
 }
 
+#ifdef CONFIG_PARISC
+static u32 parisc_setup_hcb(hcb_p np, u32 period)
+{
+	unsigned long pdc_period;
+	char scsi_mode;
+	struct hardware_path hwpath;
+
+	/* Host firmware (PDC) keeps a table for crippling SCSI capabilities.
+	 * Many newer machines export one channel of 53c896 chip
+	 * as SE, 50-pin HD.  Also used for Multi-initiator SCSI clusters
+	 * to set the SCSI Initiator ID.
+	 */
+	get_pci_node_path(np->s.device, &hwpath);
+	if (!pdc_get_initiator(&hwpath, &np->myaddr, &pdc_period,
+				&np->maxwide, &scsi_mode))
+		return period;
+
+	printk("scsi_mode = %d, period = %ld\n", scsi_mode, pdc_period);
+
+	if (scsi_mode >= 0) {
+		/* C3000 PDC reports period/mode */
+		SYM_SETUP_SCSI_DIFF = 0;
+		switch(scsi_mode) {
+		case 0:	np->scsi_mode = SMODE_SE; break;
+		case 1:	np->scsi_mode = SMODE_HVD; break;
+		case 2:	np->scsi_mode = SMODE_LVD; break;
+		default:	break;
+		}
+	}
+
+	return (u32) pdc_period;
+}
+#else
+static inline int parisc_setup_hcb(hcb_p np, u32 period) { return period; }
+#endif
 /*
  *  Prepare io register values used by sym_start_up() 
  *  according to selected and supported features.
@@ -743,12 +778,6 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	u_char	burst_max;
 	u32	period;
 	int i;
-
-#ifdef CONFIG_PARISC
-	unsigned long pdc_period;
-	char scsi_mode = -1;
-	struct hardware_path hwpath;
-#endif
 
 	/*
 	 *  Wide ?
@@ -807,29 +836,7 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	 */
 	period = (4 * div_10M[0] + np->clock_khz - 1) / np->clock_khz;
 
-#if defined(CONFIG_PARISC)
-	/* Host firmware (PDC) keeps a table for crippling SCSI capabilities.
-	 * Many newer machines export one channel of 53c896 chip
-	 * as SE, 50-pin HD.  Also used for Multi-initiator SCSI clusters
-	 * to set the SCSI Initiator ID.
-	 */
-	get_pci_node_path(np->s.device, &hwpath);
-	if (pdc_get_initiator(&hwpath, &np->myaddr, &pdc_period, &np->maxwide, &scsi_mode))
-	{
-		if (scsi_mode >= 0) {
-			/* C3000 PDC reports period/mode */
-			SYM_SETUP_SCSI_DIFF = 0;
-			switch(scsi_mode) {
-			case 0:	np->scsi_mode = SMODE_SE; break;
-			case 1:	np->scsi_mode = SMODE_HVD; break;
-			case 2:	np->scsi_mode = SMODE_LVD; break;
-			default:	break;
-			}
-		}
-
-		period = (u32) pdc_period;
-	}
-#endif
+	period = parisc_setup_hcb(np, period);
 
 	if	(period <= 250)		np->minsync = 10;
 	else if	(period <= 303)		np->minsync = 11;
@@ -5882,9 +5889,9 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	/*
 	 *  Copy scripts to controller instance.
 	 */
-	bcopy(fw->a_base, np->scripta0, np->scripta_sz);
-	bcopy(fw->b_base, np->scriptb0, np->scriptb_sz);
-	bcopy(fw->z_base, np->scriptz0, np->scriptz_sz);
+	memcpy(np->scripta0, fw->a_base, np->scripta_sz);
+	memcpy(np->scriptb0, fw->b_base, np->scriptb_sz);
+	memcpy(np->scriptz0, fw->z_base, np->scriptz_sz);
 
 	/*
 	 *  Setup variable parts in scripts and compute

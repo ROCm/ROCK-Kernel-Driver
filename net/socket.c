@@ -1989,3 +1989,18 @@ void socket_seq_show(struct seq_file *seq)
 	seq_printf(seq, "sockets: used %d\n", counter);
 }
 #endif /* CONFIG_PROC_FS */
+
+/* ABI emulation layers need these two */
+EXPORT_SYMBOL(move_addr_to_kernel);
+EXPORT_SYMBOL(move_addr_to_user);
+EXPORT_SYMBOL(sock_alloc);
+EXPORT_SYMBOL(sock_alloc_inode);
+EXPORT_SYMBOL(sock_create);
+EXPORT_SYMBOL(sock_map_fd);
+EXPORT_SYMBOL(sock_recvmsg);
+EXPORT_SYMBOL(sock_register);
+EXPORT_SYMBOL(sock_release);
+EXPORT_SYMBOL(sock_sendmsg);
+EXPORT_SYMBOL(sock_unregister);
+EXPORT_SYMBOL(sock_wake_async);
+EXPORT_SYMBOL(sockfd_lookup);

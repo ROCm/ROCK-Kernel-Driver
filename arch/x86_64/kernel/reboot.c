@@ -160,7 +160,7 @@ void machine_restart(char * __unused)
 		}
 
 		case BOOT_TRIPLE: 
-		__asm__ __volatile__("lidt %0": :"m" (no_idt));
+		__asm__ __volatile__("lidt (%0)": :"r" (&no_idt));
 		__asm__ __volatile__("int3");
 
 			reboot_type = BOOT_KBD;

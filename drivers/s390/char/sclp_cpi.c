@@ -9,6 +9,7 @@
 #include <linux/version.h>
 #include <linux/kmod.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/timer.h>
 #include <linux/string.h>
@@ -58,12 +59,12 @@ MODULE_DESCRIPTION(
 	"or zSeries hardware");
 
 static char *system_name = NULL;
-MODULE_PARM(system_name, "s");
+module_param(system_name, charp, 0);
 MODULE_PARM_DESC(system_name, "e.g. hostname - max. 8 characters");
 
 static char *sysplex_name = NULL;
 #ifdef ALLOW_SYSPLEX_NAME
-MODULE_PARM(sysplex_name, "s");
+module_param(sysplex_name, charp, 0);
 MODULE_PARM_DESC(sysplex_name, "if applicable - max. 8 characters");
 #endif
 

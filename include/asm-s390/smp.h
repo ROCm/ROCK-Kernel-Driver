@@ -46,7 +46,7 @@ extern cpumask_t cpu_possible_map;
  
 #define PROC_CHANGE_PENALTY	20		/* Schedule penalty */
 
-#define smp_processor_id() (current_thread_info()->cpu)
+#define smp_processor_id() (S390_lowcore.cpu_data.cpu_nr)
 
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 #define cpu_possible(cpu) cpu_isset(cpu, cpu_possible_map)

@@ -28,6 +28,8 @@ MODULE_PARM(psmouse_noext, "1i");
 MODULE_PARM_DESC(psmouse_noext, "Disable any protocol extensions. Useful for KVM switches.");
 MODULE_PARM(psmouse_resolution, "i");
 MODULE_PARM_DESC(psmouse_resolution, "Resolution, in dpi.");
+MODULE_PARM(psmouse_rate, "i");
+MODULE_PARM_DESC(psmouse_rate, "Report rate, in reports per second.");
 MODULE_PARM(psmouse_smartscroll, "i");
 MODULE_PARM_DESC(psmouse_smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
 MODULE_PARM(psmouse_resetafter, "i");
@@ -38,6 +40,7 @@ MODULE_LICENSE("GPL");
 
 static int psmouse_noext;
 int psmouse_resolution;
+unsigned int psmouse_rate = 60;
 int psmouse_smartscroll = PSMOUSE_LOGITECH_SMARTSCROLL;
 unsigned int psmouse_resetafter;
 
@@ -173,7 +176,6 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		 * so it needs to receive all bytes one at a time.
 		 */
 		synaptics_process_byte(psmouse, regs);
-		psmouse->pktcnt = 0;
 		goto out;
 	}
 
@@ -444,22 +446,32 @@ static void psmouse_set_resolution(struct psmouse *psmouse)
 }
 
 /*
+ * Here we set the mouse report rate.
+ */
+
+static void psmouse_set_rate(struct psmouse *psmouse)
+{
+	unsigned char rates[] = { 200, 100, 80, 60, 40, 20, 10, 0 };
+	int i = 0;
+
+	while (rates[i] > psmouse_rate) i++;
+	psmouse_command(psmouse, rates + i, PSMOUSE_CMD_SETRATE);
+}
+
+/*
  * psmouse_initialize() initializes the mouse to a sane state.
  */
 
 static void psmouse_initialize(struct psmouse *psmouse)
 {
 	unsigned char param[2];
+	
 
 /*
- * We set the mouse report rate to a highest possible value.
- * We try 100 first in case mouse fails to set 200.
+ * We set the mouse report rate.
  */
-	param[0] = 100;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
 
-	param[0] = 200;
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE);
+	psmouse_set_rate(psmouse);
 
 /*
  * We also set the resolution and scaling.

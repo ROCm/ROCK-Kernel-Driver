@@ -1228,10 +1228,6 @@ source "drivers/message/i2o/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/telephony/Kconfig"
@@ -1272,12 +1268,10 @@ config SOUND
 	  If you have a PnP sound card and you want to configure it at boot
 	  time using the ISA PnP tools (read
 	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
-	  compile the sound card support as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want)
-	  and load that module after the PnP configuration is finished.  To do
-	  this, say M here and read <file:Documentation/modules.txt> as well
-	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.
+	  compile the sound card support as a module and load that module
+	  after the PnP configuration is finished. To do this, choose M here
+	  and read <file:Documentation/sound/README.modules>; the module
+	  will be called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.
@@ -1289,8 +1283,6 @@ source "sound/Kconfig"
 endmenu
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 
 menu "Kernel hacking"

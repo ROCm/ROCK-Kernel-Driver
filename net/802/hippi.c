@@ -20,6 +20,7 @@
  *		2 of the License, or (at your option) any later version.
  */
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -151,3 +152,5 @@ unsigned short hippi_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 	return hip->snap.ethertype;
 }
+
+EXPORT_SYMBOL(hippi_type_trans);

@@ -396,13 +396,3 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-/*
- * Local variables:
- * compile-command: "gcc -D__KERNEL__ -I/usr/src/linux/net/inet -Wall -Wstrict-prototypes -O6 -m486 -c ac3200.c"
- *  version-control: t
- *  kept-new-versions: 5
- *  tab-width: 4
- * End:
- */

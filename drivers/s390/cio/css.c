@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.43 $
+ *   $Revision: 1.49 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -27,7 +27,6 @@ unsigned int highest_subchannel;
 int css_init_done = 0;
 
 struct device css_bus_device = {
-	.name	= "Channel Subsystem 0",
 	.bus_id = "css0",
 };
 
@@ -79,17 +78,6 @@ css_free_subchannel(int irq)
 static int
 css_register_subchannel(struct subchannel *sch)
 {
-	static const char *subchannel_types[] = {
-		"I/O Subchannel",
-		"CHSC Subchannel",
-		"Message Subchannel",
-		"ADM Subchannel",
-		"undefined subchannel type 4",
-		"undefined subchannel type 5",
-		"undefined subchannel type 6",
-		"undefined subchannel type 7",
-		"undefined subchannel type 8",
-	};
 	int ret;
 
 	/* Initialize the subchannel structure */
@@ -97,8 +85,7 @@ css_register_subchannel(struct subchannel *sch)
 	sch->dev.bus = &css_bus_type;
 
 	/* Set a name for the subchannel */
-	strlcpy (sch->dev.name, subchannel_types[sch->st], DEVICE_NAME_SIZE);
-	snprintf (sch->dev.bus_id, DEVICE_ID_SIZE, "0:%04x", sch->irq);
+	snprintf (sch->dev.bus_id, BUS_ID_SIZE, "0.0.%04x", sch->irq);
 
 	/* make it known to the system */
 	ret = device_register(&sch->dev);
