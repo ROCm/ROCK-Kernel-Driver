@@ -1430,20 +1430,6 @@ ioc_iova_init(struct ioc *ioc)
 	ioc->ibase = READ_REG(ioc->ioc_hpa + IOC_IBASE) & ~0x1UL;
 	ioc->iov_size = ~(READ_REG(ioc->ioc_hpa + IOC_IMASK) & 0xFFFFFFFFUL) + 1;
 
-	if (ioc->ibase == 0) {
-		if (((unsigned long) ioc->ioc_hpa & 0x3000UL) == 0x2000)
-			ioc->ibase = 0xc0000000;
-		else
-			ioc->ibase = 0x80000000;
-		printk("WARNING: IBASE is zero; setting to 0x%lx\n", ioc->ibase);
-	}
-
-	if (ioc->ibase < 0xfed00000UL && ioc->ibase + ioc->iov_size >= 0xfee00000UL) {
-		printk("WARNING: IOV space overlaps local config and interrupt message, "
-		       "truncating\n");
-		ioc->iov_size /= 2;
-	}
-
 	/*
 	** iov_order is always based on a 1GB IOVA space since we want to
 	** turn on the other half for AGP GART.
