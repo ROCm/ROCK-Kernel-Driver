@@ -805,8 +805,8 @@ static struct timer_rand_state *irq_timer_state[NR_IRQS];
  */
 static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 {
-	cycles_t time;
-	long delta, delta2, delta3;
+	cycles_t data;
+	long delta, delta2, delta3, time;
 	int entropy = 0;
 
 	preempt_disable();
@@ -816,20 +816,12 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		goto out;
 
 	/*
-	 * Use get_cycles() if implemented, otherwise fall back to
-	 * jiffies.
-	 */
-	time = get_cycles();
-	if (time)
-		num ^= (u32)((time >> 31) >> 1);
-	else
-		time = jiffies;
-
-	/*
 	 * Calculate number of bits of randomness we probably added.
 	 * We take into account the first, second and third-order deltas
 	 * in order to make our estimate.
 	 */
+	time = jiffies;
+
 	if (!state->dont_count_entropy) {
 		delta = time - state->last_time;
 		state->last_time = time;
@@ -861,7 +853,18 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 
 		entropy = int_ln_12bits(delta);
 	}
-	batch_entropy_store(num, time, entropy);
+
+	/*
+	 * Use get_cycles() if implemented, otherwise fall back to
+	 * jiffies.
+	 */
+	data = get_cycles();
+	if (data)
+		num ^= (u32)((data >> 31) >> 1);
+	else
+		data = time;
+
+	batch_entropy_store(num, data, entropy);
 out:
 	preempt_enable();
 }
