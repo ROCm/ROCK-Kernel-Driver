@@ -20,7 +20,6 @@
 
 const char *l1_revision = "$Revision: 2.41.6.5 $";
 
-#define __NO_VERSION__
 #include <linux/init.h>
 #include "hisax.h"
 #include "isdnl1.h"

@@ -17,8 +17,6 @@
  *		
  */
 
-#define __NO_VERSION__
-
 #include <linux/module.h>
 
 #include <linux/sched.h>
