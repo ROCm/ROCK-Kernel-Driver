@@ -128,48 +128,11 @@ struct pcmcia_bus_socket {
 
 /*====================================================================*/
 
-/* Device driver ID passed to Card Services */
-static dev_info_t dev_info = "Driver Services";
-
 static int major_dev = -1;
 
 /*====================================================================*/
 
 /* code which was in cs.c before */
-
-/*======================================================================
-
-    Bind_device() associates a device driver with a particular socket.
-    It is normally called by Driver Services after it has identified
-    a newly inserted card.  An instance of that driver will then be
-    eligible to register as a client of this socket.
-    
-======================================================================*/
-
-static int pcmcia_bind_device(bind_req_t *req)
-{
-	client_t *client;
-	struct pcmcia_socket *s;
-
-	s = req->Socket;
-	if (!s)
-		return CS_BAD_SOCKET;
-
-	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
-	if (!client) 
-		return CS_OUT_OF_RESOURCE;
-	memset(client, '\0', sizeof(client_t));
-	client->client_magic = CLIENT_MAGIC;
-	strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-	client->Socket = s;
-	client->Function = req->Function;
-	client->state = CLIENT_UNBOUND;
-	client->next = s->clients;
-	s->clients = client;
-	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
-		cs_socket_name(client->Socket), client, client->dev_info);
-	return CS_SUCCESS;
-} /* bind_device */
 
 /* String tables for error messages */
 
@@ -528,79 +491,89 @@ static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 
 /*======================================================================
 
+    bind_request() and bind_device() are merged by now. Individual
+    descriptions:
+
     bind_request() connects a socket to a particular client driver.
     It looks up the specified device ID in the list of registered
     drivers, binds it to the socket, and tries to create an instance
     of the device.  unbind_request() deletes a driver instance.
     
+    Bind_device() associates a device driver with a particular socket.
+    It is normally called by Driver Services after it has identified
+    a newly inserted card.  An instance of that driver will then be
+    eligible to register as a client of this socket.
+
 ======================================================================*/
 
 static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
-    struct pcmcia_driver *driver;
-    socket_bind_t *b;
-    bind_req_t bind_req;
-    int ret;
+	struct pcmcia_driver *driver;
+	socket_bind_t *b;
+	client_t *client;
 
-    if (!s)
-	    return -EINVAL;
+	if (!s)
+		return -EINVAL;
 
-    ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
-	  (char *)bind_info->dev_info);
-    driver = get_pcmcia_driver(&bind_info->dev_info);
-    if (!driver)
-	    return -EINVAL;
+	ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
+	       (char *)bind_info->dev_info);
+	driver = get_pcmcia_driver(&bind_info->dev_info);
+	if (!driver)
+		return -EINVAL;
 
-    for (b = s->bind; b; b = b->next)
-	if ((driver == b->driver) &&
-	    (bind_info->function == b->function))
-	    break;
-    if (b != NULL) {
-	bind_info->instance = b->instance;
-	return -EBUSY;
-    }
-
-    if (!try_module_get(driver->owner))
-	    return -EINVAL;
-
-    bind_req.Socket = s->parent;
-    bind_req.Function = bind_info->function;
-    bind_req.dev_info = (dev_info_t *) driver->drv.name;
-    ret = pcmcia_bind_device(&bind_req);
-    if (ret != CS_SUCCESS) {
-	cs_error(NULL, BindDevice, ret);
-	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
-	       (char *)dev_info, s->parent->sock);
-	module_put(driver->owner);
-	return -ENODEV;
-    }
-
-    /* Add binding to list for this socket */
-    driver->use_count++;
-    b = kmalloc(sizeof(socket_bind_t), GFP_KERNEL);
-    if (!b) 
-    {
-    	driver->use_count--;
-	module_put(driver->owner);
-	return -ENOMEM;    
-    }
-    b->driver = driver;
-    b->function = bind_info->function;
-    b->instance = NULL;
-    b->next = s->bind;
-    s->bind = b;
-    
-    if (driver->attach) {
-	b->instance = driver->attach();
-	if (b->instance == NULL) {
-	    printk(KERN_NOTICE "ds: unable to create instance "
-		   "of '%s'!\n", (char *)bind_info->dev_info);
-	    module_put(driver->owner);
-	    return -ENODEV;
+	for (b = s->bind; b; b = b->next)
+		if ((driver == b->driver) &&
+		    (bind_info->function == b->function))
+			break;
+	if (b != NULL) {
+		bind_info->instance = b->instance;
+		return -EBUSY;
 	}
-    }
+
+	if (!try_module_get(driver->owner))
+		return -EINVAL;
+
+	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
+	if (!client) {
+		module_put(driver->owner);
+		return -ENOMEM;
+	}
+	memset(client, 0, sizeof(client_t));
+
+	client->client_magic = CLIENT_MAGIC;
+	client->Socket = s->parent;
+	client->Function = bind_info->function;
+	client->state = CLIENT_UNBOUND;
+	client->next = s->parent->clients;
+	strlcpy(client->dev_info, driver->drv.name, DEV_NAME_LEN);
+	s->parent->clients = client;
+
+	/* Add binding to list for this socket */
+	b = kmalloc(sizeof(socket_bind_t), GFP_KERNEL);
+	if (!b)
+	{
+		module_put(driver->owner);
+		return -ENOMEM;
+	}
+	b->driver = driver;
+	b->function = bind_info->function;
+	b->instance = NULL;
+	b->next = s->bind;
+	s->bind = b;
+
+	driver->use_count++;
+	if (driver->attach) {
+		b->instance = driver->attach();
+		if (b->instance == NULL) {
+			printk(KERN_NOTICE "ds: unable to create instance "
+			       "of '%s'!\n", (char *)bind_info->dev_info);
+			module_put(driver->owner);
+			/* FIXME: client isn't freed here */
+			return -ENODEV;
+		}
+	}
     
-    return 0;
+	return 0;
 } /* bind_request */
 
 /*====================================================================*/

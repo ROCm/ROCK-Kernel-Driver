@@ -315,13 +315,6 @@ typedef struct error_info_t {
     int		retcode;
 } error_info_t;
 
-/* Special stuff for binding drivers to sockets */
-typedef struct bind_req_t {
-    struct pcmcia_socket	*Socket;
-    u_char	Function;
-    dev_info_t	*dev_info;
-} bind_req_t;
-
 /* Flag to bind to all functions */
 #define BIND_FN_ALL	0xff
 
@@ -412,6 +405,8 @@ enum service {
     SuspendCard, ResumeCard, EjectCard, InsertCard, ReplaceCIS,
     GetFirstWindow, GetNextWindow, GetMemPage
 };
+
+struct pcmcia_socket;
 
 int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg);
 int pcmcia_deregister_client(client_handle_t handle);
