@@ -6,37 +6,40 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include "nonstdio.h"
 #include <asm/processor.h>
 #include <asm/page.h>
+
+#include "nonstdio.h"
+#include "of1275.h"
+#include "zlib.h"
 
 /* Passed from the linker */
 extern char __image_begin, __image_end;
 extern char __ramdisk_begin[], __ramdisk_end;
 extern char _start, _end;
 
-extern int getprop(void *, const char *, void *, int);
+extern char image_data[], initrd_data[];
+extern int initrd_len, image_len;
 extern unsigned int heap_max;
-extern void *claim(unsigned int virt, unsigned int size, unsigned int align);
-extern void *finddevice(const char *);
 extern void flush_cache(void *start, unsigned int len);
 extern void gunzip(void *, int, unsigned char *, int *);
 extern void make_bi_recs(unsigned long addr, char *name, unsigned int mach,
 		unsigned int progend);
-extern void pause(void);
-extern void release(void *ptr, unsigned int len);
+extern void setup_bats(unsigned long start);
 
 char *avail_ram;
 char *begin_avail, *end_avail;
 char *avail_high;
 
+#define RAM_START	0
+#define RAM_END		(RAM_START + 0x800000)	/* only 8M mapped with BATs */
 
-#define RAM_END		(16 << 20)
-
-#define PROG_START	0x00010000
-#define PROG_SIZE	0x003f0000
+#define PROG_START	RAM_START
+#define PROG_SIZE	0x00400000
 
 #define SCRATCH_SIZE	(128 << 10)
+
+static char heap[SCRATCH_SIZE];
 
 typedef void (*kernel_start_t)(int, int, void *);
 
@@ -47,7 +50,8 @@ void boot(int a1, int a2, void *prom)
     unsigned char *im;
     unsigned initrd_start, initrd_size;
     
-    printf("chrpboot starting: loaded at 0x%p\n", &_start);
+    printf("coffboot starting: loaded at 0x%p\n", &_start);
+    setup_bats(RAM_START);
 
     initrd_size = (char *)(&__ramdisk_end) - (char *)(&__ramdisk_begin);
     if (initrd_size) {
@@ -63,27 +67,25 @@ void boot(int a1, int a2, void *prom)
 
     im = (char *)(&__image_begin);
     len = (char *)(&__image_end) - (char *)(&__image_begin);
-    /* claim 3MB starting at PROG_START */
-    claim(PROG_START, PROG_SIZE, 0);
-    dst = (void *) PROG_START;
+    /* claim 4MB starting at 0 */
+    claim(0, PROG_SIZE, 0);
+    dst = (void *) RAM_START;
     if (im[0] == 0x1f && im[1] == 0x8b) {
-	/* claim some memory for scratch space */
-	avail_ram = (char *) claim(0, SCRATCH_SIZE, 0x10);
-	begin_avail = avail_high = avail_ram;
-	end_avail = avail_ram + SCRATCH_SIZE;
+	/* set up scratch space */
+	begin_avail = avail_high = avail_ram = heap;
+	end_avail = heap + sizeof(heap);
 	printf("heap at 0x%p\n", avail_ram);
 	printf("gunzipping (0x%p <- 0x%p:0x%p)...", dst, im, im+len);
 	gunzip(dst, PROG_SIZE, im, &len);
 	printf("done %u bytes\n", len);
 	printf("%u bytes of heap consumed, max in use %u\n",
 	       avail_high - begin_avail, heap_max);
-	release(begin_avail, SCRATCH_SIZE);
     } else {
 	memmove(dst, im, len);
     }
 
     flush_cache(dst, len);
-    make_bi_recs(((unsigned long) dst + len), "chrpboot", _MACH_Pmac,
+    make_bi_recs(((unsigned long) dst + len), "coffboot", _MACH_Pmac,
 		    (PROG_START + PROG_SIZE));
 
     sa = (unsigned long)PROG_START;

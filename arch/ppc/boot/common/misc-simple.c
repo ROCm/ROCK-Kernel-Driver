@@ -64,6 +64,7 @@ extern char _end[];
 extern unsigned long start;
 
 extern int CRT_tstc(void);
+extern unsigned long get_mem_size(void);
 extern unsigned long serial_init(int chan, void *ignored);
 extern void serial_close(unsigned long com_port);
 extern void gunzip(void *, int, unsigned char *, int *);
@@ -75,9 +76,18 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	int timer = 0;
 	char *cp, ch;
 	struct bi_record *rec, *birecs;
+	unsigned long TotalMemory = 0;
 
 	serial_fixups();
 	com_port = serial_init(0, NULL);
+
+#if defined(CONFIG_LOPEC) || defined(CONFIG_PAL4)
+	/*
+	 * Call get_mem_size(), which is memory controller dependant,
+	 * and we must have the correct file linked in here.
+	 */
+	TotalMemory = get_mem_size();
+#endif
 
 	/* assume the chunk below 8M is free */
 	end_avail = (char *)0x00800000;
@@ -193,6 +203,13 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	rec->tag = BI_FIRST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
+
+	if ( TotalMemory ) {
+		rec->tag = BI_MEMSIZE;
+		rec->data[0] = TotalMemory;
+		rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
+		rec = (struct bi_record *)((unsigned long)rec + rec->size);
+	}
 
 	rec->tag = BI_CMD_LINE;
 	memcpy( (char *)rec->data, cmd_line, strlen(cmd_line)+1);

@@ -39,7 +39,7 @@ SECTIONS
   PROVIDE (etext = .);
 
   /* Read-write section, merged into data segment: */
-  . = (. + 0x0FFF) & 0xFFFFF000;
+  . = ALIGN(8);
   .data    :
   {
     *(.data)
@@ -69,6 +69,7 @@ SECTIONS
   _edata  =  .;
   PROVIDE (edata = .);
 
+  . = ALIGN(8);
   __bss_start = .;
   .bss       :
   {

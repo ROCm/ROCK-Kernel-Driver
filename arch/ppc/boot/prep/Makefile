@@ -19,13 +19,14 @@ TFTPIMAGE			= $(TFTPBOOT).smp
 endif
 
 LD_ARGS				= -T ../ld.script -Ttext 0x00800000 -Bstatic
-boot-y				:= head.o ../simple/legacy.o misc.o of1275.o \
+boot-y				:= head.o ../simple/legacy.o misc.o \
 					../common/util.o ../common/string.o \
-					../common/misc-common.o
+					../common/misc-common.o \
+					../common/mpc10x_memory.o
 OBJCOPY_ARGS			= -O elf32-powerpc
 LIBS 				= ../lib/zlib.a
 
-boot-$($CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
+boot-$(CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
 EXTRA_TARGETS			:= $(boot-y)

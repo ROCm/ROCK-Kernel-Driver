@@ -80,7 +80,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum, b
 	 * initialize the serial console port.
 	 */
 	embed_config(&bp);
-#ifdef CONFIG_SERIAL_CONSOLE
+#if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_SERIAL_8250_CONSOLE)
 	com_port = serial_init(0, bp);
 #endif
 
