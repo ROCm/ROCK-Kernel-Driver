@@ -65,37 +65,6 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Library module for ATA devices");
 MODULE_LICENSE("GPL");
 
-static const char * thr_state_name[] = {
-	"THR_UNKNOWN",
-	"THR_PORT_RESET",
-	"THR_AWAIT_DEATH",
-	"THR_PROBE_FAILED",
-	"THR_IDLE",
-	"THR_PROBE_SUCCESS",
-	"THR_PROBE_START",
-};
-
-/**
- *	ata_thr_state_name - convert thread state enum to string
- *	@thr_state: thread state to be converted to string
- *
- *	Converts the specified thread state id to a constant C string.
- *
- *	LOCKING:
- *	None.
- *
- *	RETURNS:
- *	The THR_xxx-prefixed string naming the specified thread
- *	state id, or the string "<invalid THR_xxx state>".
- */
-
-static const char *ata_thr_state_name(unsigned int thr_state)
-{
-	if (thr_state < ARRAY_SIZE(thr_state_name))
-		return thr_state_name[thr_state];
-	return "<invalid THR_xxx state>";
-}
-
 /**
  *	ata_tf_load_pio - send taskfile registers to host controller
  *	@ap: Port to which output is sent
@@ -1150,13 +1119,16 @@ err_out:
 }
 
 /**
- *	ata_port_reset -
- *	@ap:
+ *	ata_bus_probe - Reset and probe ATA bus
+ *	@ap: Bus to probe
  *
  *	LOCKING:
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on error.
  */
 
-static void ata_port_reset(struct ata_port *ap)
+static int ata_bus_probe(struct ata_port *ap)
 {
 	unsigned int i, found = 0;
 
@@ -1180,14 +1152,12 @@ static void ata_port_reset(struct ata_port *ap)
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		goto err_out_disable;
 
-	ap->thr_state = THR_PROBE_SUCCESS;
-
-	return;
+	return 0;
 
 err_out_disable:
 	ap->ops->port_disable(ap);
 err_out:
-	ap->thr_state = THR_PROBE_FAILED;
+	return -1;
 }
 
 /**
@@ -2719,62 +2689,6 @@ irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 }
 
 /**
- *	ata_thread_iter -
- *	@ap:
- *
- *	LOCKING:
- *
- *	RETURNS:
- *
- */
-
-static unsigned long ata_thread_iter(struct ata_port *ap)
-{
-	long timeout = 0;
-
-	DPRINTK("ata%u: thr_state %s\n",
-		ap->id, ata_thr_state_name(ap->thr_state));
-
-	switch (ap->thr_state) {
-	case THR_UNKNOWN:
-		ap->thr_state = THR_PORT_RESET;
-		break;
-
-	case THR_PROBE_START:
-		ap->thr_state = THR_PORT_RESET;
-		break;
-
-	case THR_PORT_RESET:
-		ata_port_reset(ap);
-		break;
-
-	case THR_PROBE_SUCCESS:
-		up(&ap->probe_sem);
-		ap->thr_state = THR_IDLE;
-		break;
-
-	case THR_PROBE_FAILED:
-		up(&ap->probe_sem);
-		ap->thr_state = THR_AWAIT_DEATH;
-		break;
-
-	case THR_AWAIT_DEATH:
-	case THR_IDLE:
-		timeout = -1;
-		break;
-
-	default:
-		printk(KERN_DEBUG "ata%u: unknown thr state %s\n",
-		       ap->id, ata_thr_state_name(ap->thr_state));
-		break;
-	}
-
-	DPRINTK("ata%u: new thr_state %s, returning %ld\n",
-		ap->id, ata_thr_state_name(ap->thr_state), timeout);
-	return timeout;
-}
-
-/**
  *	atapi_packet_task - Write CDB bytes to hardware
  *	@_data: Port to which ATAPI device is attached.
  *
@@ -2855,21 +2769,6 @@ void ata_port_stop (struct ata_port *ap)
 	pci_free_consistent(pdev, ATA_PRD_TBL_SZ, ap->prd, ap->prd_dma);
 }
 
-static void ata_probe_task(void *_data)
-{
-	struct ata_port *ap = _data;
-	long timeout;
-
-	timeout = ata_thread_iter(ap);
-	if (timeout < 0)
-		return;
-
-	if (timeout > 0)
-		queue_delayed_work(ata_wq, &ap->probe_task, timeout);
-	else
-		queue_work(ata_wq, &ap->probe_task);
-}
-
 /**
  *	ata_host_remove - Unregister SCSI host structure with upper layers
  *	@ap: Port to unregister
@@ -2926,7 +2825,6 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 	ap->udma_mask = ent->udma_mask;
 	ap->flags |= ent->host_flags;
 	ap->ops = ent->port_ops;
-	ap->thr_state = THR_PROBE_START;
 	ap->cbl = ATA_CBL_NONE;
 	ap->device[0].flags = ATA_DFLAG_MASTER;
 	ap->active_tag = ATA_TAG_POISON;
@@ -2934,12 +2832,9 @@ static void ata_host_init(struct ata_port *ap, struct Scsi_Host *host,
 
 	INIT_WORK(&ap->packet_task, atapi_packet_task, ap);
 	INIT_WORK(&ap->pio_task, ata_pio_task, ap);
-	INIT_WORK(&ap->probe_task, ata_probe_task, ap);
 
 	for (i = 0; i < ATA_MAX_DEVICES; i++)
 		ap->device[i].devno = i;
-
-	init_MUTEX_LOCKED(&ap->probe_sem);
 
 #ifdef ATA_IRQ_TRAP
 	ap->stats.unhandled_irq = 1;
@@ -3063,12 +2958,17 @@ int ata_device_add(struct ata_probe_ent *ent)
 		ap = host_set->ports[i];
 
 		DPRINTK("ata%u: probe begin\n", ap->id);
-		queue_work(ata_wq, &ap->probe_task);	/* start probe */
+		rc = ata_bus_probe(ap);
+		DPRINTK("ata%u: probe end\n", ap->id);
 
-		DPRINTK("ata%u: probe-wait begin\n", ap->id);
-		down(&ap->probe_sem);	/* wait for end */
-
-		DPRINTK("ata%u: probe-wait end\n", ap->id);
+		if (rc) {
+			/* FIXME: do something useful here?
+			 * Current libata behavior will
+			 * tear down everything when
+			 * the module is removed
+			 * or the h/w is unplugged.
+			 */
+		}
 
 		rc = scsi_add_host(ap->host, &pdev->dev);
 		if (rc) {

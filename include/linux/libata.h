@@ -133,15 +133,6 @@ enum {
 	BUS_IDENTIFY		= 8,
 	BUS_PACKET		= 9,
 
-	/* thread states */
-	THR_UNKNOWN		= 0,
-	THR_PORT_RESET		= (THR_UNKNOWN + 1),
-	THR_AWAIT_DEATH		= (THR_PORT_RESET + 1),
-	THR_PROBE_FAILED	= (THR_AWAIT_DEATH + 1),
-	THR_IDLE		= (THR_PROBE_FAILED + 1),
-	THR_PROBE_SUCCESS	= (THR_IDLE + 1),
-	THR_PROBE_START		= (THR_PROBE_SUCCESS + 1),
-
 	/* SATA port states */
 	PORT_UNKNOWN		= 0,
 	PORT_ENABLED		= 1,
@@ -294,17 +285,11 @@ struct ata_port {
 	struct ata_host_stats	stats;
 	struct ata_host_set	*host_set;
 
-	struct semaphore	probe_sem;
-
-	unsigned int		thr_state;
-
 	struct work_struct	packet_task;
 
 	struct work_struct	pio_task;
 	unsigned int		pio_task_state;
 	unsigned long		pio_task_timeout;
-
-	struct work_struct	probe_task;
 
 	void			*private_data;
 };
