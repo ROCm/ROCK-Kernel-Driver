@@ -65,7 +65,8 @@ struct bus_type {
 	struct driver_dir_entry	device_dir;
 	struct driver_dir_entry	driver_dir;
 
-	int	(*match)	(struct device * dev, struct device_driver * drv);
+	int		(*match)(struct device * dev, struct device_driver * drv);
+	struct device * (*add)	(struct device * parent, char * bus_id);
 };
 
 
@@ -281,6 +282,8 @@ struct device {
 	void		*driver_data;	/* data private to the driver */
 
 	u32		class_num;	/* class-enumerated value */
+	void		* class_data;	/* class-specific data */
+
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 
@@ -365,6 +368,9 @@ extern void put_device(struct device * dev);
 /* drivers/base/sys.c */
 extern int register_sys_device(struct device * dev);
 extern void unregister_sys_device(struct device * dev);
+
+/* drivers/base/platform.c */
+extern struct bus_type platform_bus;
 
 /* drivers/base/power.c */
 extern int device_suspend(u32 state, u32 level);
