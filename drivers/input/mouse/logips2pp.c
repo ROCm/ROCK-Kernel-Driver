@@ -142,7 +142,7 @@ void ps2pp_set_800dpi(struct psmouse *psmouse)
  * touchpad.
  */
 
-int ps2pp_detect_model(struct psmouse *psmouse, unsigned char param *param)
+int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
 {
 	int i;
 	static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
