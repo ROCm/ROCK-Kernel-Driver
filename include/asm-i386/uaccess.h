@@ -375,8 +375,10 @@ do {									\
 		: "m"(__m(addr)), "i"(errret), "0"(err))
 
 
-unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned long n);
-unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned long n);
+unsigned long __must_check __copy_to_user_ll(void __user *to,
+				const void *from, unsigned long n);
+unsigned long __must_check __copy_from_user_ll(void *to,
+				const void __user *from, unsigned long n);
 
 /*
  * Here we special-case 1, 2 and 4-byte copy_*_user invocations.  On a fault
@@ -399,7 +401,7 @@ unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned lo
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
-static inline unsigned long
+static inline unsigned long __must_check
 __copy_to_user_inatomic(void __user *to, const void *from, unsigned long n)
 {
 	if (__builtin_constant_p(n)) {
@@ -420,7 +422,7 @@ __copy_to_user_inatomic(void __user *to, const void *from, unsigned long n)
 	return __copy_to_user_ll(to, from, n);
 }
 
-static inline unsigned long
+static inline unsigned long __must_check
 __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
        might_sleep();
@@ -471,11 +473,14 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
        might_sleep();
        return __copy_from_user_inatomic(to, from, n);
 }
-unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
-unsigned long copy_from_user(void *to,
-			const void __user *from, unsigned long n);
-long strncpy_from_user(char *dst, const char __user *src, long count);
-long __strncpy_from_user(char *dst, const char __user *src, long count);
+unsigned long __must_check copy_to_user(void __user *to,
+				const void *from, unsigned long n);
+unsigned long __must_check copy_from_user(void *to,
+				const void __user *from, unsigned long n);
+long __must_check strncpy_from_user(char *dst, const char __user *src,
+				long count);
+long __must_check __strncpy_from_user(char *dst,
+				const char __user *src, long count);
 
 /**
  * strlen_user: - Get the size of a string in user space.
@@ -494,7 +499,7 @@ long __strncpy_from_user(char *dst, const char __user *src, long count);
 #define strlen_user(str) strnlen_user(str, ~0UL >> 1)
 
 long strnlen_user(const char __user *str, long n);
-unsigned long clear_user(void __user *mem, unsigned long len);
-unsigned long __clear_user(void __user *mem, unsigned long len);
+unsigned long __must_check clear_user(void __user *mem, unsigned long len);
+unsigned long __must_check __clear_user(void __user *mem, unsigned long len);
 
 #endif /* __i386_UACCESS_H */
