@@ -452,7 +452,7 @@ int __irport_change_speed(struct irda_task *task)
 			task->state = IRDA_TASK_WAIT;
 
 			/* Try again later */
-			ret = MSECS_TO_JIFFIES(20);
+			ret = msecs_to_jiffies(20);
 			break;
 		}
 
@@ -474,7 +474,7 @@ int __irport_change_speed(struct irda_task *task)
 			irda_task_next_state(task, IRDA_TASK_CHILD_WAIT);
 
 			/* Give dongle 1 sec to finish */
-			ret = MSECS_TO_JIFFIES(1000);
+			ret = msecs_to_jiffies(1000);
 		} else
 			/* Child finished immediately */
 			irda_task_next_state(task, IRDA_TASK_CHILD_DONE);

@@ -468,7 +468,7 @@ void start_hz_timer(struct pt_regs *regs)
 	__u64 tmp;
 	__u32 ticks;
 
-	if (!cpu_isset(smp_processor_id(), idle_cpu_mask))
+	if (!cpu_isset(smp_processor_id(), nohz_cpu_mask))
 		return;
 
 	/* Calculate how many ticks have passed */
@@ -511,7 +511,7 @@ void start_hz_timer(struct pt_regs *regs)
 			do_timer(regs);
 #endif
 	}
-	cpu_clear(smp_processor_id(), idle_cpu_mask);
+	cpu_clear(smp_processor_id(), nohz_cpu_mask);
 }
 
 /*
@@ -536,7 +536,7 @@ int stop_hz_timer(void)
 	 * This cpu is going really idle. Set up the clock comparator
 	 * for the next event.
 	 */
-	cpu_set(smp_processor_id(), idle_cpu_mask);
+	cpu_set(smp_processor_id(), nohz_cpu_mask);
 	timer = (__u64) (next_timer_interrupt() - jiffies) + jiffies_64;
 	timer = jiffies_timer_cc + timer * CLK_TICKS_PER_JIFFY;
 	asm volatile ("SCKC %0" : : "m" (timer));

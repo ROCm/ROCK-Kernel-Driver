@@ -1065,6 +1065,7 @@ static int vgacon_dummy(struct vc_data *c)
 #define DUMMY (void *) vgacon_dummy
 
 const struct consw vga_con = {
+	.owner = THIS_MODULE,
 	.con_startup = vgacon_startup,
 	.con_init = vgacon_init,
 	.con_deinit = vgacon_deinit,

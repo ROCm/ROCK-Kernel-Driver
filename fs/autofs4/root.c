@@ -107,7 +107,9 @@ static int try_to_fill_dentry(struct dentry *dentry,
 		/* Turn this into a real negative dentry? */
 		if (status == -ENOENT) {
 			dentry->d_time = jiffies + AUTOFS_NEGATIVE_TIMEOUT;
+			spin_lock(&dentry->d_lock);
 			dentry->d_flags &= ~DCACHE_AUTOFS_PENDING;
+			spin_unlock(&dentry->d_lock);
 			return 1;
 		} else if (status) {
 			/* Return a negative dentry, but leave it "pending" */
@@ -132,7 +134,9 @@ static int try_to_fill_dentry(struct dentry *dentry,
 	if (!autofs4_oz_mode(sbi))
 		autofs4_update_usage(dentry);
 
+	spin_lock(&dentry->d_lock);
 	dentry->d_flags &= ~DCACHE_AUTOFS_PENDING;
+	spin_unlock(&dentry->d_lock);
 	return 1;
 }
 
@@ -269,8 +273,11 @@ static struct dentry *autofs4_root_lookup(struct inode *dir, struct dentry *dent
 	 */
 	dentry->d_op = &autofs4_root_dentry_operations;
 
-	if (!oz_mode)
+	if (!oz_mode) {
+		spin_lock(&dentry->d_lock);
 		dentry->d_flags |= DCACHE_AUTOFS_PENDING;
+		spin_unlock(&dentry->d_lock);
+	}
 	dentry->d_fsdata = NULL;
 	d_add(dentry, NULL);
 

@@ -161,6 +161,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 #define CLR_TOP32(r)
 #endif /* CONFIG_PPC64BRIDGE */
 
+#define RFMCI		.long 0x4c00004c	/* rfmci instruction */
+
 #ifdef CONFIG_IBM405_ERR77
 #define PPC405_ERR77(ra,rb)	dcbt	ra, rb;
 #define	PPC405_ERR77_SYNC	sync;

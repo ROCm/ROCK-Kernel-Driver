@@ -155,9 +155,6 @@ static int  cyberjack_open (struct usb_serial_port *port, struct file *filp)
 	unsigned long flags;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	dbg("%s - usb_clear_halt", __FUNCTION__ );
@@ -321,21 +318,13 @@ static void cyberjack_read_int_callback( struct urb *urb, struct pt_regs *regs )
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* the urb might have been killed. */
 	if (urb->status)
-		return;
-
-	serial = port->serial;
-	if (serial_paranoia_check (serial, __FUNCTION__))
 		return;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
@@ -386,7 +375,6 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	short todo;
@@ -395,11 +383,6 @@ static void cyberjack_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-
 	if (urb->status) {
 		usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -447,15 +430,9 @@ static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct cyberjack_private *priv = usb_get_serial_port_data(port);
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		return;
@@ -483,11 +460,11 @@ static void cyberjack_write_bulk_callback (struct urb *urb, struct pt_regs *regs
 		priv->wrsent+=length;
 
 		/* set up our urb */
-		usb_fill_bulk_urb(port->write_urb, serial->dev, 
-			      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
+		usb_fill_bulk_urb(port->write_urb, port->serial->dev, 
+			      usb_sndbulkpipe(port->serial->dev, port->bulk_out_endpointAddress),
 			      port->write_urb->transfer_buffer, length,
-			      ((serial->type->write_bulk_callback) ? 
-			       serial->type->write_bulk_callback : 
+			      ((port->serial->type->write_bulk_callback) ? 
+			       port->serial->type->write_bulk_callback : 
 			       cyberjack_write_bulk_callback), 
 			      port);
 

@@ -29,7 +29,7 @@
 #include <asm/machdep.h>
 
 static unsigned int nvram_size;
-static unsigned int nvram_fetch, nvram_store;
+static int nvram_fetch, nvram_store;
 static char nvram_buf[NVRW_CNT];	/* assume this is in the first 4GB */
 static spinlock_t nvram_lock = SPIN_LOCK_UNLOCKED;
 

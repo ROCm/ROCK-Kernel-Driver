@@ -574,6 +574,7 @@ static int promcon_dummy(void)
 #define DUMMY (void *) promcon_dummy
 
 const struct consw prom_con = {
+	.owner =		THIS_MODULE,
 	.con_startup =		promcon_startup,
 	.con_init =		promcon_init,
 	.con_deinit =		promcon_deinit,

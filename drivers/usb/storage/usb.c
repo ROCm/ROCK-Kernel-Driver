@@ -84,8 +84,6 @@
 
 
 #include <linux/module.h>
-#include <linux/sched.h>
-#include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 
@@ -490,7 +488,7 @@ static void get_device_info(struct us_data *us, int id_index)
 		if (unusual_dev->useTransport != US_PR_DEVICE &&
 			us->protocol == idesc->bInterfaceProtocol)
 			msg += 2;
-		if (msg >= 0)
+		if (msg >= 0 && !(unusual_dev->flags & US_FL_NEED_OVERRIDE))
 			printk(KERN_NOTICE USB_STORAGE "This device "
 				"(%04x,%04x,%04x S %02x P %02x)"
 				" has %s in unusual_devs.h\n"

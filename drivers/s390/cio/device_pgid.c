@@ -338,6 +338,10 @@ ccw_device_verify_irq(struct ccw_device *cdev, enum dev_event dev_event)
 		 * One of those strange devices which claim to be able
 		 * to do multipathing but not for Set Path Group ID.
 		 */
+		if (cdev->private->flags.pgid_single) {
+			ccw_device_verify_done(cdev, -EOPNOTSUPP);
+			break;
+		}
 		cdev->private->flags.pgid_single = 1;
 		/* fall through. */
 	case -EAGAIN:		/* Try again. */

@@ -112,9 +112,6 @@ struct vm_area_struct {
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
 
-/* It makes sense to apply VM_ACCOUNT to this vma. */
-#define VM_MAYACCT(vma) (!!((vma)->vm_flags & VM_HUGETLB))
-
 #ifndef VM_STACK_DEFAULT_FLAGS		/* arch can override this */
 #define VM_STACK_DEFAULT_FLAGS VM_DATA_DEFAULT_FLAGS
 #endif
@@ -179,7 +176,7 @@ typedef unsigned long page_flags_t;
 struct page {
 	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
-	atomic_t count;			/* Usage count, see below. */
+	atomic_t _count;		/* Usage count, see below. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
@@ -227,15 +224,35 @@ struct page {
  *
  * Also, many kernel routines increase the page count before a critical
  * routine so they can be sure the page doesn't go away from under them.
+ *
+ * Since 2.6.6 (approx), a free page has ->_count = -1.  This is so that we
+ * can use atomic_add_negative(-1, page->_count) to detect when the page
+ * becomes free and so that we can also use atomic_inc_and_test to atomically
+ * detect when we just tried to grab a ref on a page which some other CPU has
+ * already deemed to be freeable.
+ *
+ * NO code should make assumptions about this internal detail!  Use the provided
+ * macros which retain the old rules: page_count(page) == 0 is a free page.
+ */
+
+/*
+ * Drop a ref, return true if the logical refcount fell to zero (the page has
+ * no users)
  */
 #define put_page_testzero(p)				\
 	({						\
 		BUG_ON(page_count(p) == 0);		\
-		atomic_dec_and_test(&(p)->count);	\
+		atomic_add_negative(-1, &(p)->_count);	\
 	})
 
-#define set_page_count(p,v) 	atomic_set(&(p)->count, v)
-#define __put_page(p)		atomic_dec(&(p)->count)
+/*
+ * Grab a ref, return true if the page previously had a logical refcount of
+ * zero.  ie: returns true if we just grabbed an already-deemed-to-be-free page
+ */
+#define get_page_testone(p)	atomic_inc_and_test(&(p)->_count)
+
+#define set_page_count(p,v) 	atomic_set(&(p)->_count, v - 1)
+#define __put_page(p)		atomic_dec(&(p)->_count)
 
 extern void FASTCALL(__page_cache_release(struct page *));
 
@@ -245,25 +262,25 @@ static inline int page_count(struct page *p)
 {
 	if (PageCompound(p))
 		p = (struct page *)p->private;
-	return atomic_read(&(p)->count);
+	return atomic_read(&(p)->_count) + 1;
 }
 
 static inline void get_page(struct page *page)
 {
 	if (unlikely(PageCompound(page)))
 		page = (struct page *)page->private;
-	atomic_inc(&page->count);
+	atomic_inc(&page->_count);
 }
 
 void put_page(struct page *page);
 
 #else		/* CONFIG_HUGETLB_PAGE */
 
-#define page_count(p)		atomic_read(&(p)->count)
+#define page_count(p)		(atomic_read(&(p)->_count) + 1)
 
 static inline void get_page(struct page *page)
 {
-	atomic_inc(&page->count);
+	atomic_inc(&page->_count);
 }
 
 static inline void put_page(struct page *page)
@@ -280,13 +297,13 @@ static inline void put_page(struct page *page)
  * zeroes, and text pages of executables and shared libraries have
  * only one copy in memory, at most, normally.
  *
- * For the non-reserved pages, page->count denotes a reference count.
- *   page->count == 0 means the page is free.
- *   page->count == 1 means the page is used for exactly one purpose
+ * For the non-reserved pages, page_count(page) denotes a reference count.
+ *   page_count() == 0 means the page is free.
+ *   page_count() == 1 means the page is used for exactly one purpose
  *   (e.g. a private data page of one process).
  *
  * A page may be used for kmalloc() or anyone else who does a
- * __get_free_page(). In this case the page->count is at least 1, and
+ * __get_free_page(). In this case the page_count() is at least 1, and
  * all other fields are unused but should be 0 or NULL. The
  * management of this page is the responsibility of the one who uses
  * it.
@@ -303,14 +320,14 @@ static inline void put_page(struct page *page)
  * page's address_space.  Usually, this is the address of a circular
  * list of the page's disk buffers.
  *
- * For pages belonging to inodes, the page->count is the number of
+ * For pages belonging to inodes, the page_count() is the number of
  * attaches, plus 1 if `private' contains something, plus one for
  * the page cache itself.
  *
  * All pages belonging to an inode are in these doubly linked lists:
  * mapping->clean_pages, mapping->dirty_pages and mapping->locked_pages;
  * using the page->list list_head. These fields are also used for
- * freelist managemet (when page->count==0).
+ * freelist managemet (when page_count()==0).
  *
  * There is also a per-mapping radix tree mapping index to the page
  * in memory if present. The tree is rooted at mapping->root.  

@@ -150,7 +150,7 @@ static struct usb_driver ipaq_driver = {
 
 
 /* All of the device info needed for the Compaq iPAQ */
-struct usb_serial_device_type ipaq_device = {
+static struct usb_serial_device_type ipaq_device = {
 	.owner =		THIS_MODULE,
 	.name =			"PocketPC PDA",
 	.id_table =		ipaq_id_table,
@@ -181,10 +181,6 @@ static int ipaq_open(struct usb_serial_port *port, struct file *filp)
 	int			i, result = 0;
 	int			retries = KP_RETRIES;
 
-	if (port_paranoia_check(port, __FUNCTION__)) {
-		return -ENODEV;
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	bytes_in = 0;
@@ -288,23 +284,13 @@ error:
 
 static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 {
-	struct usb_serial	*serial;
 	struct ipaq_private	*priv = usb_get_serial_port_data(port);
 
-	if (port_paranoia_check(port, __FUNCTION__)) {
-		return; 
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial(port, __FUNCTION__);
-	if (!serial)
-		return;
-
 	/*
 	 * shut down bulk read and write
 	 */
-
 	usb_unlink_urb(port->write_urb);
 	usb_unlink_urb(port->read_urb);
 	ipaq_destroy_lists(port);
@@ -318,20 +304,11 @@ static void ipaq_close(struct usb_serial_port *port, struct file *filp)
 static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port	*port = (struct usb_serial_port *)urb->context;
-	struct usb_serial	*serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct	*tty;
 	unsigned char		*data = urb->transfer_buffer;
 	int			i, result;
 
-	if (port_paranoia_check(port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -355,8 +332,8 @@ static void ipaq_read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	}
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb(port->read_urb, serial->dev, 
-		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb(port->read_urb, port->serial->dev, 
+		      usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ipaq_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
@@ -488,10 +465,6 @@ static void ipaq_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	unsigned long		flags;
 	int			result;
 
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {

@@ -499,7 +499,7 @@ static int cpia_probe(struct usb_interface *intf,
 	if (udev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	interface = &intf->altsetting[0];
+	interface = intf->cur_altsetting;
 
 	printk(KERN_INFO "USB CPiA camera found\n");
 
@@ -620,8 +620,6 @@ static void cpia_disconnect(struct usb_interface *intf)
 		wake_up_interruptible(&ucpia->wq_stream);
 
 	udev = interface_to_usbdev(intf);
-	usb_driver_release_interface(&cpia_driver,
-				     udev->actconfig->interface[0]);
 
 	ucpia->curbuff = ucpia->workbuff = NULL;
 

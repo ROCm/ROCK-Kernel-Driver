@@ -6,11 +6,7 @@
 #ifndef _ASM_H8300_TIMEX_H
 #define _ASM_H8300_TIMEX_H
 
-#define H8300_TIMER_DEFINE
-#include <asm/machine-depend.h>
-#undef  H8300_TIMER_DEFINE
-
-#define CLOCK_TICK_RATE H8300_TIMER_FREQ
+#define CLOCK_TICK_RATE CONFIG_CPU_CLOCK*1000/8192 /* Timer input freq. */
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */
 #define FINETUNE ((((((long)LATCH * HZ - CLOCK_TICK_RATE) << SHIFT_HZ) * \
 	(1000000/CLOCK_TICK_FACTOR) / (CLOCK_TICK_RATE/CLOCK_TICK_FACTOR)) \

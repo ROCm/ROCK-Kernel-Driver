@@ -357,16 +357,6 @@ static ssize_t disk_size_read(struct gendisk * disk, char *page)
 	return sprintf(page, "%llu\n", (unsigned long long)get_capacity(disk));
 }
 
-static inline unsigned jiffies_to_msec(unsigned jif)
-{
-#if 1000 % HZ == 0
-	return jif * (1000 / HZ);
-#elif HZ % 1000 == 0
-	return jif / (HZ / 1000);
-#else
-	return (jif / HZ) * 1000 + (jif % HZ) * 1000 / HZ;
-#endif
-}
 static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 {
 	disk_round_stats(disk);
@@ -377,14 +367,14 @@ static ssize_t disk_stats_read(struct gendisk * disk, char *page)
 		"\n",
 		disk_stat_read(disk, reads), disk_stat_read(disk, read_merges),
 		(unsigned long long)disk_stat_read(disk, read_sectors),
-		jiffies_to_msec(disk_stat_read(disk, read_ticks)),
+		jiffies_to_msecs(disk_stat_read(disk, read_ticks)),
 		disk_stat_read(disk, writes), 
 		disk_stat_read(disk, write_merges),
 		(unsigned long long)disk_stat_read(disk, write_sectors),
-		jiffies_to_msec(disk_stat_read(disk, write_ticks)),
+		jiffies_to_msecs(disk_stat_read(disk, write_ticks)),
 		disk->in_flight,
-		jiffies_to_msec(disk_stat_read(disk, io_ticks)),
-		jiffies_to_msec(disk_stat_read(disk, time_in_queue)));
+		jiffies_to_msecs(disk_stat_read(disk, io_ticks)),
+		jiffies_to_msecs(disk_stat_read(disk, time_in_queue)));
 }
 static struct disk_attribute disk_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
@@ -498,13 +488,13 @@ static int diskstats_show(struct seq_file *s, void *v)
 		gp->major, n + gp->first_minor, disk_name(gp, n, buf),
 		disk_stat_read(gp, reads), disk_stat_read(gp, read_merges),
 		(unsigned long long)disk_stat_read(gp, read_sectors),
-		jiffies_to_msec(disk_stat_read(gp, read_ticks)),
+		jiffies_to_msecs(disk_stat_read(gp, read_ticks)),
 		disk_stat_read(gp, writes), disk_stat_read(gp, write_merges),
 		(unsigned long long)disk_stat_read(gp, write_sectors),
-		jiffies_to_msec(disk_stat_read(gp, write_ticks)),
+		jiffies_to_msecs(disk_stat_read(gp, write_ticks)),
 		gp->in_flight,
-		jiffies_to_msec(disk_stat_read(gp, io_ticks)),
-		jiffies_to_msec(disk_stat_read(gp, time_in_queue)));
+		jiffies_to_msecs(disk_stat_read(gp, io_ticks)),
+		jiffies_to_msecs(disk_stat_read(gp, time_in_queue)));
 
 	/* now show all non-0 size partitions of it */
 	for (n = 0; n < gp->minors - 1; n++) {

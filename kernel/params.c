@@ -161,7 +161,7 @@ int parse_args(const char *name,
 									\
 		if (!val) return -EINVAL;				\
 		l = strtolfn(val, &endp, 0);				\
-		if (endp == val || *endp || ((type)l != l))		\
+		if (endp == val || ((type)l != l))			\
 			return -EINVAL;					\
 		*((type *)kp->arg) = l;					\
 		return 0;						\

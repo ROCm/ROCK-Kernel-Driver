@@ -1238,7 +1238,7 @@ config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
 	depends on 4xx || GT64260 || LOPEC || PPLUS || PRPMC800 || PPC_GEN550
 
-config OCP
+config PPC_OCP
 	bool
 	depends on IBM_OCP
 	default y

@@ -672,6 +672,8 @@ extern void kernel_set_cachemode (unsigned long address, unsigned long size,
 
 typedef pte_t *pte_addr_t;
 
+extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
+
 #endif /* !__ASSEMBLY__ */
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG

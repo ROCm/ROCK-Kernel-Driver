@@ -186,7 +186,7 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	if (PageReserved(page))
 		return pte_chain;
 
-	rmap_lock(page);
+	page_map_lock(page);
 
 	if (page->pte.direct == 0) {
 		page->pte.direct = pte_paddr;
@@ -223,7 +223,7 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	cur_pte_chain->ptes[pte_chain_idx(cur_pte_chain) - 1] = pte_paddr;
 	cur_pte_chain->next_and_idx--;
 out:
-	rmap_unlock(page);
+	page_map_unlock(page);
 	return pte_chain;
 }
 
@@ -245,7 +245,7 @@ void fastcall page_remove_rmap(struct page *page, pte_t *ptep)
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
 
-	rmap_lock(page);
+	page_map_lock(page);
 
 	if (!page_mapped(page))
 		goto out_unlock;	/* remap_page_range() from a driver? */
@@ -294,7 +294,7 @@ out:
 		dec_page_state(nr_mapped);
 	}
 out_unlock:
-	rmap_unlock(page);
+	page_map_unlock(page);
 }
 
 /**

@@ -122,10 +122,23 @@ sal_desc_entry_point (void *p)
 static void __init
 set_smp_redirect (int flag)
 {
+#ifndef CONFIG_HOTPLUG_CPU
 	if (no_int_routing)
 		smp_int_redirect &= ~flag;
 	else
 		smp_int_redirect |= flag;
+#else
+	/*
+	 * For CPU Hotplug we dont want to do any chipset supported
+	 * interrupt redirection. The reason is this would require that
+	 * All interrupts be stopped and hard bind the irq to a cpu.
+	 * Later when the interrupt is fired we need to set the redir hint
+	 * on again in the vector. This is combersome for something that the
+	 * user mode irq balancer will solve anyways.
+	 */
+	no_int_routing=1;
+	smp_int_redirect &= ~flag;
+#endif
 }
 #else
 #define set_smp_redirect(flag)	do { } while (0)

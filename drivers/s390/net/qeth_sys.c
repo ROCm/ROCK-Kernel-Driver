@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.24 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.29 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -19,6 +19,8 @@
 #include "qeth.h"
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
+
+const char *VERSION_QETH_SYS_C = "$Revision: 1.29 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -736,6 +738,10 @@ qeth_dev_ipato_enable_store(struct device *dev, const char *buf, size_t count)
 
 	if (!card)
 		return -EINVAL;
+
+	if ((card->state != CARD_STATE_DOWN) &&
+	    (card->state != CARD_STATE_RECOVER))
+		return -EPERM;
 
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "toggle")){

@@ -789,7 +789,8 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 	struct urb *urb;
 	int i, j, ret;
 
-	struct usb_host_interface *idesc;
+	struct usb_interface *intf;
+	struct usb_host_interface *idesc = NULL;
 
 	if (pdev == NULL)
 		return -EFAULT;
@@ -801,7 +802,9 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 	/* Get the current alternate interface, adjust packet size */
 	if (!udev->actconfig)
 		return -EFAULT;
-	idesc = &udev->actconfig->interface[0]->altsetting[pdev->valternate];
+	intf = usb_ifnum_to_if(udev, 0);
+	if (intf)
+		idesc = usb_altnum_to_altsetting(intf, pdev->valternate);
 	if (!idesc)
 		return -EFAULT;
 

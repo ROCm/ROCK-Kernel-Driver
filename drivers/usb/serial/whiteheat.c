@@ -984,7 +984,6 @@ static void command_port_write_callback (struct urb *urb, struct pt_regs *regs)
 static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *command_port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (command_port, __FUNCTION__);
 	struct whiteheat_command_private *command_info;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
@@ -997,11 +996,6 @@ static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 		return;
 	}
 
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-	
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	command_info = usb_get_serial_port_data(command_port);
@@ -1029,7 +1023,7 @@ static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 	}
 	
 	/* Continue trying to always read */
-	command_port->read_urb->dev = serial->dev;
+	command_port->read_urb->dev = command_port->serial->dev;
 	result = usb_submit_urb(command_port->read_urb, GFP_ATOMIC);
 	spin_unlock_irqrestore(&command_info->lock, flags);
 	if (result)
@@ -1040,7 +1034,6 @@ static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 static void whiteheat_read_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct whiteheat_urb_wrap *wrap;
 	unsigned char *data = urb->transfer_buffer;
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
@@ -1056,14 +1049,6 @@ static void whiteheat_read_callback(struct urb *urb, struct pt_regs *regs)
 	}
 	list_del(&wrap->list);
 	spin_unlock(&info->lock);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		spin_lock(&info->lock);
-		list_add(&wrap->list, &info->rx_urbs_free);
-		spin_unlock(&info->lock);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -1091,7 +1076,6 @@ static void whiteheat_read_callback(struct urb *urb, struct pt_regs *regs)
 static void whiteheat_write_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
 	struct whiteheat_urb_wrap *wrap;
 
@@ -1107,11 +1091,6 @@ static void whiteheat_write_callback(struct urb *urb, struct pt_regs *regs)
 	list_del(&wrap->list);
 	list_add(&wrap->list, &info->tx_urbs_free);
 	spin_unlock(&info->lock);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);

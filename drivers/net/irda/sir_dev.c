@@ -74,7 +74,7 @@ int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 	while (dev->tx_buff.len > 0) {			/* wait until tx idle */
 		spin_unlock_irqrestore(&dev->tx_lock, flags);
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(MSECS_TO_JIFFIES(10));
+		schedule_timeout(msecs_to_jiffies(10));
 		spin_lock_irqsave(&dev->tx_lock, flags);
 	}
 

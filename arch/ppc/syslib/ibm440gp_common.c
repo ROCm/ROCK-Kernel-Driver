@@ -24,7 +24,7 @@
 /*
  * Calculate 440GP clocks
  */
-void __init ibm440gp_get_clocks(struct ibm440gp_clocks* p,
+void __init ibm440gp_get_clocks(struct ibm44x_clocks* p,
 				unsigned int sys_clk,
 				unsigned int ser_clk)
 {
@@ -68,11 +68,11 @@ void __init ibm440gp_get_clocks(struct ibm440gp_clocks* p,
 
 	if (cpc0_cr0 & 0x00400000){
 		/* External UART clock */
-		p->uart = ser_clk;
+		p->uart0 = p->uart1 = ser_clk;
 	}
 	else {
 		/* Internal UART clock */
     		u32 uart_div = ((cpc0_cr0 >> 16) & 0x1f) + 1;
-		p->uart = p->plb / uart_div;
+		p->uart0 = p->uart1 = p->plb / uart_div;
 	}
 }

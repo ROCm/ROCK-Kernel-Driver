@@ -86,6 +86,20 @@ do {						\
 #define SPRN_IVOR13	0x19D	/* Interrupt Vector Offset Register 13 */
 #define SPRN_IVOR14	0x19E	/* Interrupt Vector Offset Register 14 */
 #define SPRN_IVOR15	0x19F	/* Interrupt Vector Offset Register 15 */
+#define SPRN_MCSRR0	0x23A	/* Machine Check Save and Restore Register 0 */
+#define SPRN_MCSRR1	0x23B	/* Machine Check Save and Restore Register 1 */
+#define SPRN_MCSR	0x23C	/* Machine Check Status Register */
+#ifdef CONFIG_440A
+#define  MCSR_MCS	0x80000000 /* Machine Check Summary */
+#define  MCSR_IB	0x40000000 /* Instruction PLB Error */
+#define  MCSR_DRB	0x20000000 /* Data Read PLB Error */
+#define  MCSR_DWB	0x10000000 /* Data Write PLB Error */
+#define  MCSR_TLBP	0x08000000 /* TLB Parity Error */
+#define  MCSR_ICP	0x04000000 /* I-Cache Parity Error */
+#define  MCSR_DCSP	0x02000000 /* D-Cache Search Parity Error */
+#define  MCSR_DCFP	0x01000000 /* D-Cache Flush Parity Error */
+#define  MCSR_IMPE	0x00800000 /* Imprecise Machine Check Exception */
+#endif
 #define SPRN_ZPR	0x3B0	/* Zone Protection Register (40x) */
 #define SPRN_MMUCR	0x3B2	/* MMU Control Register */
 #define SPRN_CCR0	0x3B3	/* Core Configuration Register */
@@ -144,6 +158,7 @@ do {						\
  */
 #ifdef CONFIG_BOOKE
 #define DBSR_IC		0x08000000	/* Instruction Completion */
+#define DBSR_BT		0x04000000	/* Branch Taken */
 #define DBSR_TIE	0x01000000	/* Trap Instruction Event */
 #endif
 #ifdef CONFIG_40x
@@ -250,6 +265,8 @@ do {						\
 #define CSRR0	SPRN_SRR2	/* Logically and functionally equivalent. */
 #define CSRR1	SPRN_SRR3	/* Logically and functionally equivalent. */
 #endif
+#define MCSRR0	SPRN_MCSRR0	/* Machine Check Save and Restore Register 0 */
+#define MCSRR1	SPRN_MCSRR1	/* Machine Check Save and Restore Register 1 */
 #define DCMP	SPRN_DCMP	/* Data TLB Compare Register */
 #define SPRG4R	SPRN_SPRG4R	/* Supervisor Private Registers */
 #define SPRG5R	SPRN_SPRG5R

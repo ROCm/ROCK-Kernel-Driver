@@ -26,8 +26,6 @@
 #include <linux/highmem.h>
 #include <linux/smp_lock.h>
 #include <asm/mmu_context.h>
-#include <linux//pagemap.h>
-#include <asm/tlb.h>
 #include <linux/interrupt.h>
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
@@ -74,13 +72,6 @@
  */
 #define NS_TO_JIFFIES(TIME)	((TIME) / (1000000000 / HZ))
 #define JIFFIES_TO_NS(TIME)	((TIME) * (1000000000 / HZ))
-
-#ifndef JIFFIES_TO_MSEC
-# define JIFFIES_TO_MSEC(x) ((x) * 1000 / HZ)
-#endif
-#ifndef MSEC_TO_JIFFIES
-# define MSEC_TO_JIFFIES(x) ((x) * HZ / 1000)
-#endif
 
 /*
  * These are the 'tuning knobs' of the scheduler:
@@ -1088,7 +1079,7 @@ unsigned long nr_uninterruptible(void)
 {
 	unsigned long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		sum += cpu_rq(i)->nr_uninterruptible;
 
 	return sum;
@@ -1098,7 +1089,7 @@ unsigned long long nr_context_switches(void)
 {
 	unsigned long long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		sum += cpu_rq(i)->nr_switches;
 
 	return sum;
@@ -1108,7 +1099,7 @@ unsigned long nr_iowait(void)
 {
 	unsigned long i, sum = 0;
 
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		sum += atomic_read(&cpu_rq(i)->nr_iowait);
 
 	return sum;
@@ -1309,14 +1300,6 @@ static void sched_migrate_task(task_t *p, int dest_cpu)
 		wake_up_process(mt);
 		put_task_struct(mt);
 		wait_for_completion(&req.done);
-
-		/*
-		 * we want a new context here. This eliminates TLB
-		 * flushes on the cpus where the process executed prior to
-		 * the migration.
-		 */
-		tlb_migrate_prepare(current->mm);
-
 		return;
 	}
 out:
@@ -1880,7 +1863,7 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 			interval *= sd->busy_factor;
 
 		/* scale ms to jiffies */
-		interval = MSEC_TO_JIFFIES(interval);
+		interval = msecs_to_jiffies(interval);
 		if (unlikely(!interval))
 			interval = 1;
 
@@ -2319,7 +2302,7 @@ need_resched:
 EXPORT_SYMBOL(preempt_schedule);
 #endif /* CONFIG_PREEMPT */
 
-int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
+int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
 {
 	task_t *p = curr->task;
 	return try_to_wake_up(p, mode, sync);
@@ -2337,7 +2320,7 @@ EXPORT_SYMBOL(default_wake_function);
  * zero in this (rare) case, and we handle it by continuing to scan the queue.
  */
 static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
-			     int nr_exclusive, int sync)
+			     int nr_exclusive, int sync, void *key)
 {
 	struct list_head *tmp, *next;
 
@@ -2346,7 +2329,7 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
 		unsigned flags;
 		curr = list_entry(tmp, wait_queue_t, task_list);
 		flags = curr->flags;
-		if (curr->func(curr, mode, sync) &&
+		if (curr->func(curr, mode, sync, key) &&
 		    (flags & WQ_FLAG_EXCLUSIVE) &&
 		    !--nr_exclusive)
 			break;
@@ -2359,12 +2342,13 @@ static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
  * @mode: which threads
  * @nr_exclusive: how many wake-one or wake-many threads to wake up
  */
-void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode, int nr_exclusive)
+void fastcall __wake_up(wait_queue_head_t *q, unsigned int mode,
+				int nr_exclusive, void *key)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&q->lock, flags);
-	__wake_up_common(q, mode, nr_exclusive, 0);
+	__wake_up_common(q, mode, nr_exclusive, 0, key);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
@@ -2375,7 +2359,7 @@ EXPORT_SYMBOL(__wake_up);
  */
 void fastcall __wake_up_locked(wait_queue_head_t *q, unsigned int mode)
 {
-	__wake_up_common(q, mode, 1, 0);
+	__wake_up_common(q, mode, 1, 0, NULL);
 }
 
 /**
@@ -2403,7 +2387,7 @@ void fastcall __wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr_exc
 		sync = 0;
 
 	spin_lock_irqsave(&q->lock, flags);
-	__wake_up_common(q, mode, nr_exclusive, sync);
+	__wake_up_common(q, mode, nr_exclusive, sync, NULL);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 EXPORT_SYMBOL_GPL(__wake_up_sync);	/* For internal use only */
@@ -2415,7 +2399,7 @@ void fastcall complete(struct completion *x)
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done++;
 	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,
-			 1, 0);
+			 1, 0, NULL);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 EXPORT_SYMBOL(complete);
@@ -2427,7 +2411,7 @@ void fastcall complete_all(struct completion *x)
 	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done += UINT_MAX/2;
 	__wake_up_common(&x->wait, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,
-			 0, 0);
+			 0, 0, NULL);
 	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 EXPORT_SYMBOL(complete_all);
@@ -2979,6 +2963,7 @@ asmlinkage long sys_sched_yield(void)
 	 * no need to preempt:
 	 */
 	_raw_spin_unlock(&rq->lock);
+	local_irq_enable();
 	preempt_enable_no_resched();
 
 	schedule();
@@ -3219,7 +3204,7 @@ void show_state(void)
 	read_unlock(&tasklist_lock);
 }
 
-void __init init_idle(task_t *idle, int cpu)
+void __devinit init_idle(task_t *idle, int cpu)
 {
 	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(task_cpu(idle));
 	unsigned long flags;
@@ -3246,13 +3231,13 @@ void __init init_idle(task_t *idle, int cpu)
 }
 
 /*
- * In a system that switches off the HZ timer idle_cpu_mask
+ * In a system that switches off the HZ timer nohz_cpu_mask
  * indicates which cpus entered this state. This is used
  * in the rcu update to wait only for active cpus. For system
- * which do not switch off the HZ timer idle_cpu_mask should
+ * which do not switch off the HZ timer nohz_cpu_mask should
  * always be CPU_MASK_NONE.
  */
-cpumask_t idle_cpu_mask = CPU_MASK_NONE;
+cpumask_t nohz_cpu_mask = CPU_MASK_NONE;
 
 #ifdef CONFIG_SMP
 /*

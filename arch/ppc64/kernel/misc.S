@@ -316,6 +316,8 @@ _GLOBAL(_insb)
 	eieio
 	stbu	r5,1(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsb)
@@ -325,8 +327,8 @@ _GLOBAL(_outsb)
 	blelr-
 00:	lbzu	r5,1(r4)
 	stb	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insw)
@@ -338,6 +340,8 @@ _GLOBAL(_insw)
 	eieio
 	sthu	r5,2(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsw)
@@ -346,9 +350,9 @@ _GLOBAL(_outsw)
 	subi	r4,r4,2
 	blelr-
 00:	lhzu	r5,2(r4)
-	eieio
 	sthbrx	r5,0,r3	
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insl)
@@ -360,6 +364,8 @@ _GLOBAL(_insl)
 	eieio
 	stwu	r5,4(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsl)
@@ -369,8 +375,8 @@ _GLOBAL(_outsl)
 	blelr-
 00:	lwzu	r5,4(r4)
 	stwbrx	r5,0,r3
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 /* _GLOBAL(ide_insw) now in drivers/ide/ide-iops.c */
@@ -383,6 +389,8 @@ _GLOBAL(_insw_ns)
 	eieio
 	sthu	r5,2(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 /* _GLOBAL(ide_outsw) now in drivers/ide/ide-iops.c */
@@ -393,8 +401,8 @@ _GLOBAL(_outsw_ns)
 	blelr-
 00:	lhzu	r5,2(r4)
 	sth	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(_insl_ns)
@@ -406,6 +414,8 @@ _GLOBAL(_insl_ns)
 	eieio
 	stwu	r5,4(r4)
 	bdnz	00b
+	twi	0,r5,0
+	isync
 	blr
 
 _GLOBAL(_outsl_ns)
@@ -415,8 +425,8 @@ _GLOBAL(_outsl_ns)
 	blelr-
 00:	lwzu	r5,4(r4)
 	stw	r5,0(r3)
-	eieio
 	bdnz	00b
+	sync
 	blr	
 
 _GLOBAL(abs)

@@ -136,11 +136,11 @@ config SENSORS_LM85
 
 config SENSORS_LM90
 	tristate "National Semiconductor LM90 and compatibles"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C
 	select I2C_SENSOR
 	help
-	  If you say yes here you get support for National Semiconductor LM90
-	  and Analog Devices ADM1032 sensor chips.
+	  If you say yes here you get support for National Semiconductor LM90,
+	  LM89 and LM99, and Analog Devices ADM1032 sensor chips.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm90.
@@ -163,7 +163,7 @@ config SENSORS_W83781D
 	select I2C_SENSOR
 	help
 	  If you say yes here you get support for the Winbond W8378x series
-	  of sensor chips: the W83781D, W83782D, W83783S and W83682HF,
+	  of sensor chips: the W83781D, W83782D, W83783S and W83627HF,
 	  and the similar Asus AS99127F.
 	  
 	  This driver can also be built as a module.  If so, the module
@@ -229,5 +229,15 @@ config SENSORS_PCF8591
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called pcf8591.
+
+config SENSORS_RTC8564
+	tristate "Epson 8564 RTC chip"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the Epson 8564 RTC chip.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-rtc8564.
 
 endmenu

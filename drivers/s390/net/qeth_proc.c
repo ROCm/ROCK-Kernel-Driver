@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.5 $)
+ * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.9 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to procfs.
@@ -20,6 +20,8 @@
 #include "qeth.h"
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
+
+const char *VERSION_QETH_PROC_C = "$Revision: 1.9 $";
 
 /***** /proc/qeth *****/
 #define QETH_PROCFILE_NAME "qeth"
@@ -91,13 +93,19 @@ qeth_get_router_str(struct qeth_card *card, int ipv)
 		return "pri";
 	else if (routing_type == SECONDARY_ROUTER)
 		return "sec";
-	else if (routing_type == MULTICAST_ROUTER)
+	else if (routing_type == MULTICAST_ROUTER) {
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return "mc+";
 		return "mc";
-	else if (routing_type == PRIMARY_CONNECTOR)
+	} else if (routing_type == PRIMARY_CONNECTOR) {
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return "p+c";
 		return "p.c";
-	else if (routing_type == SECONDARY_CONNECTOR)
+	} else if (routing_type == SECONDARY_CONNECTOR) {
+		if (card->info.broadcast_capable == QETH_BROADCAST_WITHOUT_ECHO)
+			return "s+c";
 		return "s.c";
-	else if (routing_type == NO_ROUTER)
+	} else if (routing_type == NO_ROUTER)
 		return "no";
 	else
 		return "unk";
@@ -244,14 +252,18 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 				: 0
 		  );
 	seq_printf(s, "  Inbound time (in us)                   : %i\n"
-		      "  Inbound cnt                            : %i\n"
+		      "  Inbound count                          : %i\n"
+		      "  Inboud do_QDIO count                   : %i\n"
 		      "  Outbound time (in us, incl QDIO)       : %i\n"
-		      "  Outbound cnt                           : %i\n"
+		      "  Outbound count                         : %i\n"
+		      "  Outbound do_QDIO count                 : %i\n"
 		      "  Watermarks L/H                         : %i/%i\n\n",
 		        card->perf_stats.inbound_time,
 			card->perf_stats.inbound_cnt,
+			card->perf_stats.inbound_do_qdio,
 			card->perf_stats.outbound_time,
 			card->perf_stats.outbound_cnt,
+			card->perf_stats.outbound_do_qdio,
 			QETH_LOW_WATERMARK_PACK, QETH_HIGH_WATERMARK_PACK
 		  );
 

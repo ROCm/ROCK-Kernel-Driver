@@ -65,8 +65,6 @@
 #define UART1_IO_BASE	(u8 *) 0xE0000300
 
 #define BASE_BAUD	33000000/3/16
-#define UART0_INT	0
-#define UART1_INT	1
 
 #define STD_UART_OP(num)					\
 	{ 0, BASE_BAUD, 0, UART##num##_INT,			\

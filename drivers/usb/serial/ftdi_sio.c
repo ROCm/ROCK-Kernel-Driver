@@ -1282,7 +1282,7 @@ static void ftdi_shutdown (struct usb_serial *serial)
 static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 { /* ftdi_open */
 	struct termios tmp_termios;
-	struct usb_serial *serial = port->serial;
+	struct usb_device *dev = port->serial->dev;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	
 	int result = 0;
@@ -1295,7 +1295,7 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 
 	/* No error checking for this (will get errors later anyway) */
 	/* See ftdi_sio.h for description of what is reset */
-	usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+	usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			FTDI_SIO_RESET_REQUEST, FTDI_SIO_RESET_REQUEST_TYPE, 
 			FTDI_SIO_RESET_SIO, 
 			0, buf, 0, WDR_TIMEOUT);
@@ -1318,8 +1318,8 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 	}
 
 	/* Start reading from the device */
-	usb_fill_bulk_urb(port->read_urb, serial->dev, 
-		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb(port->read_urb, dev,
+		      usb_rcvbulkpipe(dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
@@ -1342,47 +1342,37 @@ static int  ftdi_open (struct usb_serial_port *port, struct file *filp)
 
 static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 { /* ftdi_close */
-	struct usb_serial *serial;
 	unsigned int c_cflag = port->tty->termios->c_cflag;
 	char buf[1];
 
 	dbg("%s", __FUNCTION__);
 
-	serial = get_usb_serial ( port, __FUNCTION__);
-	if (!serial)
-		return;
+	if (c_cflag & HUPCL){
+		/* Disable flow control */
+		if (usb_control_msg(port->serial->dev, 
+				    usb_sndctrlpipe(port->serial->dev, 0),
+				    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
+				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
+				    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
+			err("error from flowcontrol urb");
+		}	    
 
-	if (serial->dev) {
-		if (c_cflag & HUPCL){
-			/* Disable flow control */
-			if (usb_control_msg(serial->dev, 
-					    usb_sndctrlpipe(serial->dev, 0),
-					    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
-					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
-					    0, 0, buf, 0, WDR_TIMEOUT) < 0) {
-				err("error from flowcontrol urb");
-			}	    
-
-			/* drop DTR */
-			if (set_dtr(port, LOW) < 0){
-				err("Error from DTR LOW urb");
-			}
-			/* drop RTS */
-			if (set_rts(port, LOW) < 0) {
-				err("Error from RTS LOW urb");
-			}
-		} /* Note change no line if hupcl is off */
-		
-		/* shutdown our bulk read */
-		if (port->read_urb) {
-			if (usb_unlink_urb (port->read_urb) < 0) {
-				err("Error unlinking read urb");
-			}
+		/* drop DTR */
+		if (set_dtr(port, LOW) < 0){
+			err("Error from DTR LOW urb");
 		}
-
-	} /* if (serial->dev) */
-
-
+		/* drop RTS */
+		if (set_rts(port, LOW) < 0) {
+			err("Error from RTS LOW urb");
+		}
+	} /* Note change no line if hupcl is off */
+	
+	/* shutdown our bulk read */
+	if (port->read_urb) {
+		if (usb_unlink_urb (port->read_urb) < 0) {
+			err("Error unlinking read urb");
+		}
+	}
 } /* ftdi_close */
 
 
@@ -1397,7 +1387,6 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 static int ftdi_write (struct usb_serial_port *port, int from_user,
 			   const unsigned char *buf, int count)
 { /* ftdi_write */
-	struct usb_serial *serial = get_usb_serial ( port, __FUNCTION__);
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	struct urb *urb;
 	unsigned char *buffer;
@@ -1484,8 +1473,8 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 	usb_serial_debug_data (__FILE__, __FUNCTION__, transfer_size, buffer);
 
 	/* fill the buffer and send it */
-	usb_fill_bulk_urb(urb, serial->dev, 
-		      usb_sndbulkpipe(serial->dev, port->bulk_out_endpointAddress),
+	usb_fill_bulk_urb(urb, port->serial->dev, 
+		      usb_sndbulkpipe(port->serial->dev, port->bulk_out_endpointAddress),
 		      buffer, transfer_size,
 		      ftdi_write_bulk_callback, port);
 
@@ -1513,9 +1502,6 @@ static void ftdi_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
@@ -1558,7 +1544,6 @@ static int ftdi_chars_in_buffer (struct usb_serial_port *port)
 static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 { /* ftdi_read_bulk_callback */
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial;
 	struct tty_struct *tty;
 	struct ftdi_private *priv;
 	char error_flag;
@@ -1577,18 +1562,9 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		return;
-	}
 	if (port->open_count <= 0)
 		return;
 
-	serial = get_usb_serial(port,__FUNCTION__);
-	if (!serial){
-		dbg("%s - bad serial pointer - exiting",__FUNCTION__);
-		return;
-	}
-	
 	tty = port->tty;
 	if (!tty) {
 		dbg("%s - bad tty pointer - exiting",__FUNCTION__);
@@ -1696,8 +1672,8 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* if the port is closed stop trying to read */
 	if (port->open_count > 0){
 		/* Continue trying to always read  */
-		usb_fill_bulk_urb(port->read_urb, serial->dev, 
-			      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+		usb_fill_bulk_urb(port->read_urb, port->serial->dev, 
+			      usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
 			      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 			      ftdi_read_bulk_callback, port);
 
@@ -1712,7 +1688,6 @@ static void ftdi_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 static void ftdi_break_ctl( struct usb_serial_port *port, int break_state )
 {
-	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	__u16 urb_value = 0; 
 	char buf[1];
@@ -1728,7 +1703,7 @@ static void ftdi_break_ctl( struct usb_serial_port *port, int break_state )
 	}
 
 	
-	if (usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+	if (usb_control_msg(port->serial->dev, usb_sndctrlpipe(port->serial->dev, 0),
 			    FTDI_SIO_SET_DATA_REQUEST, 
 			    FTDI_SIO_SET_DATA_REQUEST_TYPE,
 			    urb_value , 0,
@@ -1748,7 +1723,7 @@ static void ftdi_break_ctl( struct usb_serial_port *port, int break_state )
 
 static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_termios)
 { /* ftdi_termios */
-	struct usb_serial *serial = port->serial;
+	struct usb_device *dev = port->serial->dev;
 	unsigned int cflag = port->tty->termios->c_cflag;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	__u16 urb_value; /* will hold the new flags */
@@ -1807,7 +1782,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 	 *  or'ed with this value  */
 	priv->last_set_data_urb_value = urb_value;
 	
-	if (usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+	if (usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			    FTDI_SIO_SET_DATA_REQUEST, 
 			    FTDI_SIO_SET_DATA_REQUEST_TYPE,
 			    urb_value , 0,
@@ -1818,7 +1793,7 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 	/* Now do the baudrate */
 	if ((cflag & CBAUD) == B0 ) {
 		/* Disable flow control */
-		if (usb_control_msg(serial->dev, usb_sndctrlpipe(serial->dev, 0),
+		if (usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
 				    0, 0, 
@@ -1844,8 +1819,8 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 	/* Note device also supports DTR/CD (ugh) and Xon/Xoff in hardware */
 	if (cflag & CRTSCTS) {
 		dbg("%s Setting to CRTSCTS flow control", __FUNCTION__);
-		if (usb_control_msg(serial->dev, 
-				    usb_sndctrlpipe(serial->dev, 0),
+		if (usb_control_msg(dev, 
+				    usb_sndctrlpipe(dev, 0),
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 				    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
 				    0 , FTDI_SIO_RTS_CTS_HS,
@@ -1870,8 +1845,8 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 			vstop=port->tty->termios->c_cc[VSTOP];
 			urb_value=(vstop << 8) | (vstart);
 
-			if (usb_control_msg(serial->dev,
-					    usb_sndctrlpipe(serial->dev, 0),
+			if (usb_control_msg(dev,
+					    usb_sndctrlpipe(dev, 0),
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST,
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
 					    urb_value , FTDI_SIO_XON_XOFF_HS,
@@ -1882,8 +1857,8 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 			/* else clause to only run if cfag ! CRTSCTS and iflag ! XOFF */
 			/* CHECKME Assuming XON/XOFF handled by tty stack - not by device */
 			dbg("%s Turning off hardware flow control", __FUNCTION__);
-			if (usb_control_msg(serial->dev, 
-					    usb_sndctrlpipe(serial->dev, 0),
+			if (usb_control_msg(dev, 
+					    usb_sndctrlpipe(dev, 0),
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST, 
 					    FTDI_SIO_SET_FLOW_CTRL_REQUEST_TYPE,
 					    0, 0, 
@@ -1899,7 +1874,6 @@ static void ftdi_set_termios (struct usb_serial_port *port, struct termios *old_
 
 static int ftdi_tiocmget (struct usb_serial_port *port, struct file *file)
 {
-	struct usb_serial *serial = port->serial;
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	unsigned char buf[2];
 	int ret;
@@ -1908,8 +1882,8 @@ static int ftdi_tiocmget (struct usb_serial_port *port, struct file *file)
 	switch (priv->chip_type) {
 	case SIO:
 		/* Request the status from the device */
-		if ((ret = usb_control_msg(serial->dev, 
-					   usb_rcvctrlpipe(serial->dev, 0),
+		if ((ret = usb_control_msg(port->serial->dev, 
+					   usb_rcvctrlpipe(port->serial->dev, 0),
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
 					   0, 0, 
@@ -1923,8 +1897,8 @@ static int ftdi_tiocmget (struct usb_serial_port *port, struct file *file)
 	case FT232BM:
 		/* the 8U232AM returns a two byte value (the sio is a 1 byte value) - in the same
 		   format as the data returned from the in point */
-		if ((ret = usb_control_msg(serial->dev, 
-					   usb_rcvctrlpipe(serial->dev, 0),
+		if ((ret = usb_control_msg(port->serial->dev, 
+					   usb_rcvctrlpipe(port->serial->dev, 0),
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST, 
 					   FTDI_SIO_GET_MODEM_STATUS_REQUEST_TYPE,
 					   0, 0, 
@@ -2107,14 +2081,13 @@ static void ftdi_throttle (struct usb_serial_port *port)
 static void ftdi_unthrottle (struct usb_serial_port *port)
 {
 	int result;
-	struct usb_serial *serial = port->serial;
 
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	port->read_urb->dev = serial->dev;
+	port->read_urb->dev = port->serial->dev;
 
-	usb_fill_bulk_urb(port->read_urb, serial->dev, 
-		      usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb(port->read_urb, port->serial->dev, 
+		      usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
 		      port->read_urb->transfer_buffer, port->read_urb->transfer_buffer_length,
 		      ftdi_read_bulk_callback, port);
 

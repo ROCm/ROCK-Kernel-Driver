@@ -178,7 +178,7 @@ EXPORT_SYMBOL(loops_per_jiffy);
    better than 1% */
 #define LPS_PREC 8
 
-void __init calibrate_delay(void)
+void __devinit calibrate_delay(void)
 {
 	unsigned long ticks, loopbit;
 	int lps_precision = LPS_PREC;
@@ -354,10 +354,10 @@ static void __init smp_init(void)
 	unsigned j = 1;
 
 	/* FIXME: This should be done in userspace --RR */
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_present_cpu(i) {
 		if (num_online_cpus() >= max_cpus)
 			break;
-		if (cpu_possible(i) && !cpu_online(i)) {
+		if (!cpu_online(i)) {
 			cpu_up(i);
 			j++;
 		}
@@ -583,6 +583,24 @@ static void run_init_process(char *init_filename)
 	execve(init_filename, argv_init, envp_init);
 }
 
+static inline void fixup_cpu_present_map(void)
+{
+#ifdef CONFIG_SMP
+	int i;
+
+	/*
+	 * If arch is not hotplug ready and did not populate
+	 * cpu_present_map, just make cpu_present_map same as cpu_possible_map
+	 * for other cpu bringup code to function as normal. e.g smp_init() etc.
+	 */
+	if (cpus_empty(cpu_present_map)) {
+		for_each_cpu(i) {
+			cpu_set(i, cpu_present_map);
+		}
+	}
+#endif
+}
+
 static int init(void * unused)
 {
 	lock_kernel();
@@ -601,6 +619,7 @@ static int init(void * unused)
 
 	do_pre_smp_initcalls();
 
+	fixup_cpu_present_map();
 	smp_init();
 	sched_init_smp();
 

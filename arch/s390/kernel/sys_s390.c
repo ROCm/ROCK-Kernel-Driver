@@ -138,38 +138,6 @@ asmlinkage long old_select(struct sel_arg_struct *arg)
 	return sys_select(a.n, a.inp, a.outp, a.exp, a.tvp);
 
 }
-#else /* CONFIG_ARCH_S390X */
-unsigned long
-arch_get_unmapped_area(struct file *filp, unsigned long addr,
-		       unsigned long len, unsigned long pgoff,
-		       unsigned long flags)
-{
-	struct vm_area_struct *vma;
-	unsigned long end;
-
-	if (test_thread_flag(TIF_31BIT)) { 
-		if (!addr) 
-			addr = 0x40000000; 
-		end = 0x80000000;		
-	} else { 
-		if (!addr) 
-			addr = TASK_SIZE / 2;
-		end = TASK_SIZE; 
-	}
-
-	if (len > end)
-		return -ENOMEM;
-	addr = PAGE_ALIGN(addr);
-
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
-		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (end - len < addr)
-			return -ENOMEM;
-		if (!vma || addr + len <= vma->vm_start)
-			return addr;
-		addr = vma->vm_end;
-	}
-}
 #endif /* CONFIG_ARCH_S390X */
 
 /*

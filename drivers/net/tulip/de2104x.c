@@ -357,13 +357,6 @@ static u16 t21041_csr14[] = { 0xFFFF, 0xF7FD, 0xF7FD, 0x6F3F, 0x6F3D, };
 static u16 t21041_csr15[] = { 0x0008, 0x0006, 0x000E, 0x0008, 0x0008, };
 
 
-static inline unsigned long
-msec_to_jiffies(unsigned long ms)
-{
-	return (((ms)*HZ+999)/1000);
-}
-
-
 #define dr32(reg)		readl(de->regs + (reg))
 #define dw32(reg,val)		writel((val), de->regs + (reg))
 
@@ -1216,7 +1209,7 @@ static void de_adapter_wake (struct de_private *de)
 
 		/* de4x5.c delays, so we do too */
 		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(msec_to_jiffies(10));
+		schedule_timeout(msecs_to_jiffies(10));
 	}
 }
 

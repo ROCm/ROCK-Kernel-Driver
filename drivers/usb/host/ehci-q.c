@@ -193,7 +193,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 			/* ... update hc-wide periodic stats (for usbfs) */
 			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
 		}
-		qh_put (ehci, qh);
+		qh_put (qh);
 	}
 
 	spin_lock (&urb->lock);
@@ -708,7 +708,7 @@ qh_make (
 	default:
  		dbg ("bogus dev %p speed %d", urb->dev, urb->dev->speed);
 done:
-		qh_put (ehci, qh);
+		qh_put (qh);
 		return 0;
 	}
 
@@ -951,7 +951,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	// qh->hw_next = cpu_to_le32 (qh->qh_dma);
 	qh->qh_state = QH_STATE_IDLE;
 	qh->qh_next.qh = 0;
-	qh_put (ehci, qh);			// refcount from reclaim 
+	qh_put (qh);			// refcount from reclaim 
 
 	/* other unlink(s) may be pending (in QH_STATE_UNLINK_WAIT) */
 	next = qh->reclaim;
@@ -965,7 +965,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 			&& HCD_IS_RUNNING (ehci->hcd.state))
 		qh_link_async (ehci, qh);
 	else {
-		qh_put (ehci, qh);		// refcount from async list
+		qh_put (qh);		// refcount from async list
 
 		/* it's not free to turn the async schedule on/off; leave it
 		 * active but idle for a while once it empties.
@@ -1067,7 +1067,7 @@ rescan:
 				qh = qh_get (qh);
 				qh->stamp = ehci->stamp;
 				temp = qh_completions (ehci, qh, regs);
-				qh_put (ehci, qh);
+				qh_put (qh);
 				if (temp != 0) {
 					goto rescan;
 				}

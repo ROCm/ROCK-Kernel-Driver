@@ -575,7 +575,7 @@ get_max_cacheline_size (void)
 void
 cpu_init (void)
 {
-	extern void __init ia64_mmu_init (void *);
+	extern void __devinit ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;

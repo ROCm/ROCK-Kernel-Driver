@@ -167,7 +167,7 @@ struct rtl8150 {
 
 typedef struct rtl8150 rtl8150_t;
 
-unsigned long multicast_filter_limit = 32;
+static unsigned long multicast_filter_limit = 32;
 
 static void fill_skb_pool(rtl8150_t *);
 static void free_skb_pool(rtl8150_t *);
@@ -516,7 +516,7 @@ static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	netif_wake_queue(dev->netdev);
 }
 
-void intr_callback(struct urb *urb, struct pt_regs *regs)
+static void intr_callback(struct urb *urb, struct pt_regs *regs)
 {
 	rtl8150_t *dev;
 	__u8 *d;
@@ -977,13 +977,13 @@ static void rtl8150_disconnect(struct usb_interface *intf)
 	}
 }
 
-int __init usb_rtl8150_init(void)
+static int __init usb_rtl8150_init(void)
 {
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return usb_register(&rtl8150_driver);
 }
 
-void __exit usb_rtl8150_exit(void)
+static void __exit usb_rtl8150_exit(void)
 {
 	usb_deregister(&rtl8150_driver);
 }

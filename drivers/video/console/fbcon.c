@@ -304,8 +304,7 @@ int set_con2fb_map(int unit, int newidx)
 		return -ENODEV;
 	con2fb_map[unit] = newidx;
 	fbcon_is_default = (vc->vc_sw == &fb_con) ? 1 : 0;
-	take_over_console(&fb_con, unit, unit, fbcon_is_default);
-	return 0;
+	return take_over_console(&fb_con, unit, unit, fbcon_is_default);
 }
 
 /*
@@ -2257,6 +2256,7 @@ static int fbcon_event_notify(struct notifier_block *self,
  */
 
 const struct consw fb_con = {
+	.owner			= THIS_MODULE,
 	.con_startup 		= fbcon_startup,
 	.con_init 		= fbcon_init,
 	.con_deinit 		= fbcon_deinit,
@@ -2286,10 +2286,16 @@ static int fbcon_event_notifier_registered;
 
 int __init fb_console_init(void)
 {
+	int err;
+
 	if (!num_registered_fb)
 		return -ENODEV;
 
-	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
+	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
+				fbcon_is_default);
+	if (err)
+		return err;
+
 	acquire_console_sem();
 	if (!fbcon_event_notifier_registered) {
 		fb_register_client(&fbcon_event_notifer);

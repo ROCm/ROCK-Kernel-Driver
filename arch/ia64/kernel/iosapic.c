@@ -32,6 +32,8 @@
  * 03/02/19	B. Helgaas	Make pcat_compat system-wide, not per-IOSAPIC.
  *				Remove iosapic_address & gsi_base from external interfaces.
  *				Rationalize __init/__devinit attributes.
+ * 04/12/04 Ashok Raj	<ashok.raj@intel.com> Intel Corporation 2004
+ *				Updated to work with irq migration necessary for CPU Hotplug
  */
 /*
  * Here is what the interrupt logic between a PCI device and the kernel looks like:
@@ -98,6 +100,7 @@
 #endif
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
+cpumask_t	__cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
@@ -188,8 +191,10 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 	pol     = iosapic_intr_info[vector].polarity;
 	trigger = iosapic_intr_info[vector].trigger;
 	dmode   = iosapic_intr_info[vector].dmode;
+	vector &= (~IA64_IRQ_REDIRECTED);
 
 	redir = (dmode == IOSAPIC_LOWEST_PRIORITY) ? 1 : 0;
+
 #ifdef CONFIG_SMP
 	{
 		unsigned int irq;
@@ -311,9 +316,8 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
-		/* get current delivery mode by reading the low32 */
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
 		low32 = iosapic_intr_info[vec].low32 & ~(7 << IOSAPIC_DELIVERY_SHIFT);
+
 		if (redir)
 		        /* change delivery mode to lowest priority */
 			low32 |= (IOSAPIC_LOWEST_PRIORITY << IOSAPIC_DELIVERY_SHIFT);
@@ -329,6 +333,21 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 #endif
+}
+
+static inline void move_irq(int irq)
+{
+	/* note - we hold desc->lock */
+	cpumask_t tmp;
+	irq_desc_t *desc = irq_descp(irq);
+
+	if (!cpus_empty(pending_irq_cpumask[irq])) {
+		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
+		if (unlikely(!cpus_empty(tmp))) {
+			desc->handler->set_affinity(irq, pending_irq_cpumask[irq]);
+		}
+		cpus_clear(pending_irq_cpumask[irq]);
+	}
 }
 
 /*
@@ -347,6 +366,7 @@ iosapic_end_level_irq (unsigned int irq)
 {
 	ia64_vector vec = irq_to_vector(irq);
 
+	move_irq(irq);
 	writel(vec, iosapic_intr_info[vec].addr + IOSAPIC_EOI);
 }
 
@@ -386,6 +406,8 @@ static void
 iosapic_ack_edge_irq (unsigned int irq)
 {
 	irq_desc_t *idesc = irq_descp(irq);
+
+	move_irq(irq);
 	/*
 	 * Once we have recorded IRQ_PENDING already, we can mask the
 	 * interrupt for real. This prevents IRQ storms from unhandled

@@ -171,10 +171,10 @@ static const u8 fs_rh_config_descriptor [] = {
 	0x01,       /*  __u8  bNumInterfaces; (1) */
 	0x01,       /*  __u8  bConfigurationValue; */
 	0x00,       /*  __u8  iConfiguration; */
-	0x40,       /*  __u8  bmAttributes; 
-				 Bit 7: Bus-powered,
+	0xc0,       /*  __u8  bmAttributes; 
+				 Bit 7: must be set,
 				     6: Self-powered,
-				     5 Remote-wakwup,
+				     5: Remote wakeup,
 				     4..0: resvd */
 	0x00,       /*  __u8  MaxPower; */
       
@@ -218,10 +218,10 @@ static const u8 hs_rh_config_descriptor [] = {
 	0x01,       /*  __u8  bNumInterfaces; (1) */
 	0x01,       /*  __u8  bConfigurationValue; */
 	0x00,       /*  __u8  iConfiguration; */
-	0x40,       /*  __u8  bmAttributes; 
-				 Bit 7: Bus-powered,
+	0xc0,       /*  __u8  bmAttributes; 
+				 Bit 7: must be set,
 				     6: Self-powered,
-				     5 Remote-wakwup,
+				     5: Remote wakeup,
 				     4..0: resvd */
 	0x00,       /*  __u8  MaxPower; */
       
@@ -324,13 +324,15 @@ static int rh_string (
 /* Root hub control transfers execute synchronously */
 static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 {
-	struct usb_ctrlrequest *cmd = (struct usb_ctrlrequest *) urb->setup_packet;
+	struct usb_ctrlrequest *cmd;
  	u16		typeReq, wValue, wIndex, wLength;
 	const u8	*bufp = 0;
 	u8		*ubuf = urb->transfer_buffer;
 	int		len = 0;
+	int		patch_wakeup = 0;
 	unsigned long	flags;
 
+	cmd = (struct usb_ctrlrequest *) urb->setup_packet;
 	typeReq  = (cmd->bRequestType << 8) | cmd->bRequest;
 	wValue   = le16_to_cpu (cmd->wValue);
 	wIndex   = le16_to_cpu (cmd->wIndex);
@@ -347,13 +349,21 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 	/* DEVICE REQUESTS */
 
 	case DeviceRequest | USB_REQ_GET_STATUS:
-		// DEVICE_REMOTE_WAKEUP
-		ubuf [0] = 1; // selfpowered
+		ubuf [0] = (hcd->remote_wakeup << USB_DEVICE_REMOTE_WAKEUP)
+				| (1 << USB_DEVICE_SELF_POWERED);
 		ubuf [1] = 0;
-			/* FALLTHROUGH */
+		break;
 	case DeviceOutRequest | USB_REQ_CLEAR_FEATURE:
+		if (wValue == USB_DEVICE_REMOTE_WAKEUP)
+			hcd->remote_wakeup = 0;
+		else
+			goto error;
+		break;
 	case DeviceOutRequest | USB_REQ_SET_FEATURE:
-		dev_dbg (hcd->self.controller, "no device features yet yet\n");
+		if (hcd->can_wakeup && wValue == USB_DEVICE_REMOTE_WAKEUP)
+			hcd->remote_wakeup = 1;
+		else
+			goto error;
 		break;
 	case DeviceRequest | USB_REQ_GET_CONFIGURATION:
 		ubuf [0] = 1;
@@ -379,6 +389,8 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 				bufp = fs_rh_config_descriptor;
 				len = sizeof fs_rh_config_descriptor;
 			}
+			if (hcd->can_wakeup)
+				patch_wakeup = 1;
 			break;
 		case USB_DT_STRING << 8:
 			urb->actual_length = rh_string (
@@ -444,6 +456,11 @@ error:
 		urb->actual_length = len;
 		// always USB_DIR_IN, toward host
 		memcpy (ubuf, bufp, len);
+
+		/* report whether RH hardware supports remote wakeup */
+		if (patch_wakeup)
+			((struct usb_config_descriptor *)ubuf)->bmAttributes
+				|= USB_CONFIG_ATT_WAKEUP;
 	}
 
 	/* any errors get returned through the urb completion */
@@ -762,10 +779,22 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	set_bit (devnum, usb_dev->bus->devmap.devicemap);
 	usb_dev->state = USB_STATE_ADDRESS;
 
+	usb_dev->epmaxpacketin[0] = usb_dev->epmaxpacketout[0] = 64;
+	retval = usb_get_device_descriptor(usb_dev, USB_DT_DEVICE_SIZE);
+	if (retval != sizeof usb_dev->descriptor) {
+		dev_dbg (parent_dev, "can't read %s device descriptor %d\n",
+				usb_dev->dev.bus_id, retval);
+		return (retval < 0) ? retval : -EMSGSIZE;
+	}
+
+	(void) usb_get_dev (usb_dev);
+	down (&usb_dev->serialize);
 	retval = usb_new_device (usb_dev);
 	if (retval)
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				usb_dev->dev.bus_id, retval);
+	up (&usb_dev->serialize);
+	usb_put_dev (usb_dev);
 	return retval;
 }
 EXPORT_SYMBOL (usb_register_root_hub);

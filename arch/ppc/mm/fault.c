@@ -51,11 +51,6 @@ unsigned long pte_misses;	/* updated by do_page_fault() */
 unsigned long pte_errors;	/* updated by do_page_fault() */
 unsigned int probingmem;
 
-extern void die_if_kernel(char *, struct pt_regs *, long);
-void bad_page_fault(struct pt_regs *, unsigned long, int sig);
-void do_page_fault(struct pt_regs *, unsigned long, unsigned long);
-extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
-
 /*
  * Check whether the instruction at regs->nip is a store using
  * an update addressing form which will update r1.
@@ -227,8 +222,7 @@ good_area:
 			struct page *page = pte_page(*ptep);
 
 			if (! test_bit(PG_arch_1, &page->flags)) {
-				unsigned long phys = page_to_pfn(page) << PAGE_SHIFT;
-				__flush_dcache_icache_phys(phys);
+				flush_dcache_icache_page(page);
 				set_bit(PG_arch_1, &page->flags);
 			}
 			pte_update(ptep, 0, _PAGE_HWEXEC);
@@ -332,7 +326,6 @@ do_sigbus:
 void
 bad_page_fault(struct pt_regs *regs, unsigned long address, int sig)
 {
-	extern void die(const char *,struct pt_regs *,long);
 	const struct exception_table_entry *entry;
 
 	/* Are we prepared to handle this fault?  */
@@ -359,7 +352,6 @@ pte_t *va_to_pte(unsigned long address)
 	pgd_t *dir;
 	pmd_t *pmd;
 	pte_t *pte;
-	struct mm_struct *mm;
 
 	if (address < TASK_SIZE)
 		return NULL;

@@ -388,7 +388,7 @@ void map_high_region(unsigned long start_pfn, unsigned long end_pfn)
 
 		ClearPageReserved(page);
 		set_bit(PG_highmem, &page->flags);
-		atomic_set(&page->count, 1);
+		set_page_count(page, 1);
 		__free_page(page);
 		totalhigh_pages++;
 	}

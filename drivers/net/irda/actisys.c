@@ -238,7 +238,7 @@ static int actisys_reset(struct irda_task *task)
 		self->set_dtr_rts(self->dev, TRUE, TRUE);
 		
 		/* Sleep 50 ms to make sure capacitor is charged */
-		ret = MSECS_TO_JIFFIES(50);
+		ret = msecs_to_jiffies(50);
 		irda_task_next_state(task, IRDA_TASK_WAIT);
 		break;
 	case IRDA_TASK_WAIT:			

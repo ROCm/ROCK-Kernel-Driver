@@ -22,22 +22,23 @@
 
 #include <linux/timex.h>
 
-extern int request_irq_boot(unsigned int,
-		             irqreturn_t (*handler)(int, void *, struct pt_regs *),
-		             unsigned long, const char *, void *);
-
-
 #if defined(CONFIG_H83007) || defined(CONFIG_H83068)
 #include <asm/regs306x.h>
 #define CMFA 6
 
+#define CMIEA 0x40
+#define CCLR_CMA 0x08
+#define CLK_DIV8192 0x03
+
+#define H8300_TIMER_FREQ CONFIG_CPU_CLOCK*1000/8192 /* Timer input freq. */
+
 int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	ctrl_outb(H8300_TIMER_COUNT_DATA,TCORA2);
-	ctrl_outb(0x00,_8TCSR2);
-	request_irq(40,timer_int,0,"timer",0);
-	ctrl_outb(0x40|0x08|0x03,_8TCR2);
-	return 0;
+	/* setup 8bit timer ch2 */
+	ctrl_outb(H8300_TIMER_FREQ / HZ, TCORA2);      /* set interval */
+	ctrl_outb(0x00, _8TCSR2);                      /* no output */
+	request_irq(40, timer_int, 0, "timer", 0);
+	ctrl_outb(CMIEA|CCLR_CMA|CLK_DIV8192, _8TCR2); /* start count */
 }
 
 void platform_timer_eoi(void)
@@ -46,7 +47,7 @@ void platform_timer_eoi(void)
 }
 #endif
 
-#if defined(H8_3002) || defined(CONFIG_H83048)
+#if defined(CONFIG_H83002) || defined(CONFIG_H83048)
 /* FIXME! */
 #define TSTR 0x00ffff60
 #define TSNC 0x00ffff61
@@ -54,6 +55,7 @@ void platform_timer_eoi(void)
 #define TFCR 0x00ffff63
 #define TOER 0x00ffff90
 #define TOCR 0x00ffff91
+/* ITU0 */
 #define TCR  0x00ffff64
 #define TIOR 0x00ffff65
 #define TIER 0x00ffff66
@@ -62,23 +64,28 @@ void platform_timer_eoi(void)
 #define GRA  0x00ffff6a
 #define GRB  0x00ffff6c
 
+#define CCLR_CMGRA 0x20
+#define CLK_DIV8 0x03
+
+#define H8300_TIMER_FREQ CONFIG_CPU_CLOCK*1000/8 /* Timer input freq. */
+
 int platform_timer_setup(irqreturn_t (*timer_int)(int, void *, struct pt_regs *))
 {
-	*(unsigned short *)GRA= H8300_TIMER_COUNT_DATA;
-	*(unsigned short *)TCNT=0;
-	ctrl_outb(0x23,TCR);
-	ctrl_outb(0x00,TIOR);
-	request_timer_irq(26,timer_int,0,"timer",0);
-	ctrl_outb(inb(TIER) | 0x01,TIER);
-	ctrl_outb(inb(TSNC) & ~0x01,TSNC);
-	ctrl_outb(inb(TMDR) & ~0x01,TMDR);
-	ctrl_outb(inb(TSTR) | 0x01,TSTR);
+	*(unsigned short *)GRA= H8300_TIMER_FREQ / HZ;  /* set interval */
+	*(unsigned short *)TCNT=0;                      /* clear counter */
+	ctrl_outb(0x80|CCLR_CMGRA|CLK_DIV8, TCR);       /* set ITU0 clock */
+	ctrl_outb(0x88, TIOR);                          /* no output */
+	request_irq(26, timer_int, 0, "timer", 0);
+	ctrl_outb(0xf9, TIER);                          /* compare match GRA interrupt */
+	ctrl_outb(ctrl_inb(TSNC) & ~0x01, TSNC);        /* ITU0 async */
+	ctrl_outb(ctrl_inb(TMDR) & ~0x01, TMDR);        /* ITU0 normal mode */
+	ctrl_outb(ctrl_inb(TSTR) | 0x01, TSTR);         /* ITU0 Start */
 	return 0;
 }
 
 void platform_timer_eoi(void)
 {
-	ctrl_outb(inb(TSR) & ~0x01,TSR);
+	ctrl_outb(ctrl_inb(TSR) & ~0x01,TSR);
 }
 #endif
 

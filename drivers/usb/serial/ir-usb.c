@@ -138,7 +138,7 @@ static struct usb_driver ir_driver = {
 };
 
 
-struct usb_serial_device_type ir_device = {
+static struct usb_serial_device_type ir_device = {
 	.owner =		THIS_MODULE,
 	.name =			"IR Dongle",
 	.id_table =		id_table,
@@ -279,13 +279,9 @@ static int ir_startup (struct usb_serial *serial)
 
 static int ir_open (struct usb_serial_port *port, struct file *filp)
 {
-	struct usb_serial *serial = port->serial;
 	char *buffer;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (buffer_size) {
@@ -313,8 +309,8 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 	/* Start reading from the device */
 	usb_fill_bulk_urb (
 		port->read_urb,
-		serial->dev, 
-		usb_rcvbulkpipe(serial->dev, port->bulk_in_endpointAddress),
+		port->serial->dev, 
+		usb_rcvbulkpipe(port->serial->dev, port->bulk_in_endpointAddress),
 		port->read_urb->transfer_buffer,
 		port->read_urb->transfer_buffer_length,
 		ir_read_bulk_callback,
@@ -328,21 +324,10 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 
 static void ir_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
-	if (serial->dev) {
-		/* shutdown our bulk read */
-		usb_unlink_urb (port->read_urb);
-	}
+	/* shutdown our bulk read */
+	usb_unlink_urb (port->read_urb);
 }
 
 static int ir_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
@@ -411,9 +396,6 @@ static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
@@ -433,20 +415,11 @@ static void ir_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (!port->open_count) {
 		dbg("%s - port closed.", __FUNCTION__);
@@ -496,8 +469,8 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			/* Continue trying to always read */
 			usb_fill_bulk_urb (
 				port->read_urb,
-				serial->dev, 
-				usb_rcvbulkpipe(serial->dev,
+				port->serial->dev, 
+				usb_rcvbulkpipe(port->serial->dev,
 					port->bulk_in_endpointAddress),
 				port->read_urb->transfer_buffer,
 				port->read_urb->transfer_buffer_length,

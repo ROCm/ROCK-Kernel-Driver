@@ -192,7 +192,7 @@ static int ma600_change_speed(struct sir_dev *dev, unsigned speed)
 
 	/* Wait at least 10ms: fake wait_until_sent - 10 bits at 9600 baud*/
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(15));		/* old ma600 uses 15ms */
+	schedule_timeout(msecs_to_jiffies(15));		/* old ma600 uses 15ms */
 
 #if 1
 	/* read-back of the control byte. ma600 is the first dongle driver
@@ -216,7 +216,7 @@ static int ma600_change_speed(struct sir_dev *dev, unsigned speed)
 
 	/* Wait at least 10ms */
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(10));
+	schedule_timeout(msecs_to_jiffies(10));
 
 	/* dongle is now switched to the new speed */
 	dev->speed = speed;
@@ -246,12 +246,12 @@ int ma600_reset(struct sir_dev *dev)
 	/* Reset the dongle : set DTR low for 10 ms */
 	sirdev_set_dtr_rts(dev, FALSE, TRUE);
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(10));
+	schedule_timeout(msecs_to_jiffies(10));
 
 	/* Go back to normal mode */
 	sirdev_set_dtr_rts(dev, TRUE, TRUE);
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(10));
+	schedule_timeout(msecs_to_jiffies(10));
 
 	dev->speed = 9600;      /* That's the dongle-default */
 

@@ -705,7 +705,7 @@ embed_config(bd_t ** bdp)
 #ifdef CONFIG_IBM_OPENBIOS
 /* This could possibly work for all treeboot roms.
 */
-#if defined(CONFIG_ASH) || defined(CONFIG_BEECH)
+#if defined(CONFIG_ASH) || defined(CONFIG_BEECH) || defined(CONFIG_BUBINGA)
 #define BOARD_INFO_VECTOR       0xFFF80B50 /* openbios 1.19 moved this vector down  - armin */
 #else
 #define BOARD_INFO_VECTOR	0xFFFE0B50
@@ -742,7 +742,7 @@ embed_config(bd_t **bdp)
 	 */
 	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);     /* 1st reset MAL */
 	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {}; /* wait for the reset */	
-	out_be32(EMAC0_BASE,0x20000000);        /* then reset EMAC */
+	out_be32((volatile u32*)EMAC0_BASE,0x20000000);        /* then reset EMAC */
 #endif
 
 	bd = &bdinfo;

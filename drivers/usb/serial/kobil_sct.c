@@ -110,7 +110,7 @@ static struct usb_driver kobil_driver = {
 };
 
 
-struct usb_serial_device_type kobil_device = {
+static struct usb_serial_device_type kobil_device = {
 	.owner =		THIS_MODULE,
 	.name =			"KOBIL USB smart card terminal",
 	.id_table =		id_table,
@@ -183,7 +183,7 @@ static int kobil_startup (struct usb_serial *serial)
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
  	interface = actconfig->interface[0];
-	altsetting = interface->altsetting;
+	altsetting = interface->cur_altsetting;
  	endpoint = altsetting->endpoint;
   
  	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
@@ -229,9 +229,6 @@ static int kobil_open (struct usb_serial_port *port, struct file *filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	priv = usb_get_serial_port_data(port);
 	priv->line_state = 0;
-
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
 
 	// someone sets the dev to 0 if the close method has been called
 	port->interrupt_in_urb->dev = port->serial->dev;

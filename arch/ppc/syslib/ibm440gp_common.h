@@ -1,5 +1,5 @@
 /*
- * arch/ppc/syslib/ibm440gp_common.h
+ * arch/ppc/kernel/ibm440gp_common.h
  *
  * PPC440GP system library
  *
@@ -20,24 +20,14 @@
 
 #include <linux/config.h>
 #include <linux/init.h>
-
-/*
- * All clocks are in Hz
- */
-struct ibm440gp_clocks {
-	unsigned int cpu;	/* CPUCoreClk */
-	unsigned int plb;	/* PLBClk */
-	unsigned int opb;	/* OPBClk */
-	unsigned int ebc;	/* PerClk */
-	unsigned int uart;
-};
+#include <syslib/ibm44x_common.h>
 
 /*
  * Please, refer to the Figure 13.1 in 440GP user manual
  *
  * if internal UART clock is used, ser_clk is ignored
  */
-void ibm440gp_get_clocks(struct ibm440gp_clocks*, unsigned int sys_clk,
+void ibm440gp_get_clocks(struct ibm44x_clocks*, unsigned int sys_clk,
 	unsigned int ser_clk) __init;
 
 #endif /* __ASSEMBLY__ */

@@ -74,6 +74,8 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	 */
 	struct hc_driver	*driver;	/* hw-specific hooks */
 	unsigned		saw_irq : 1;
+	unsigned		can_wakeup:1;	/* hw supports wakeup? */
+	unsigned		remote_wakeup:1;/* sw should use wakeup? */
 	int			irq;		/* irq allocated */
 	void			*regs;		/* device memory/io */
 
@@ -94,7 +96,7 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 #	define	USB_STATE_RUNNING	(__ACTIVE)
 #	define	USB_STATE_QUIESCING	(__SUSPEND|__TRANSIENT|__ACTIVE)
 #	define	USB_STATE_RESUMING	(__SUSPEND|__TRANSIENT)
-#	define	USB_STATE_SUSPENDED	(__SUSPEND)
+#	define	HCD_STATE_SUSPENDED	(__SUSPEND)
 
 #define	HCD_IS_RUNNING(state) ((state) & __ACTIVE)
 #define	HCD_IS_SUSPENDED(state) ((state) & __SUSPEND)
@@ -344,9 +346,16 @@ extern void usb_deregister_bus (struct usb_bus *);
 extern int usb_register_root_hub (struct usb_device *usb_dev,
 		struct device *parent_dev);
 
-/* for portability to 2.4, hcds should call this */
 static inline int hcd_register_root (struct usb_hcd *hcd)
 {
+	/* hcd->driver->start() reported can_wakeup, probably with
+	 * assistance from board's boot firmware.
+	 * NOTE:  normal devices won't enable wakeup by default.
+	 */
+	if (hcd->can_wakeup)
+		dev_dbg (hcd->self.controller, "supports USB remote wakeup\n");
+	hcd->remote_wakeup = hcd->can_wakeup;
+
 	return usb_register_root_hub (
 		hcd_to_bus (hcd)->root_hub, hcd->self.controller);
 }

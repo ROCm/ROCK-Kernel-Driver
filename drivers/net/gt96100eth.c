@@ -1070,22 +1070,18 @@ gt96100_open(struct net_device *dev)
 {
 	int retval;
     
-	MOD_INC_USE_COUNT;
-
 	dbg(2, "%s: dev=%p\n", __FUNCTION__, dev);
 
 	// Initialize and startup the GT-96100 ethernet port
 	if ((retval = gt96100_init(dev))) {
 		err("error in gt96100_init\n");
 		free_irq(dev->irq, dev);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 
 	if ((retval = request_irq(dev->irq, &gt96100_interrupt,
 				  SA_SHIRQ, dev->name, dev))) {
 		err("unable to get IRQ %d\n", dev->irq);
-		MOD_DEC_USE_COUNT;
 		return retval;
 	}
 	
@@ -1106,8 +1102,6 @@ gt96100_close(struct net_device *dev)
 	}
 
 	free_irq(dev->irq, dev);
-    
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

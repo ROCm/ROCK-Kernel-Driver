@@ -41,16 +41,23 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
+#include <asm/ocp.h>
 #include <asm/pci-bridge.h>
 #include <asm/time.h>
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
 
-extern void abort(void);
+#include <syslib/ibm440gx_common.h>
 
-/* Global Variables */
-bd_t __res;
+/*
+ * This is a horrible kludge, we eventually need to abstract this
+ * generic PHY stuff, so the  standard phy mode defines can be
+ * easily used from arch code.
+ */
+#include "../../../../drivers/net/ibm_emac/ibm_emac_phy.h"
+
+extern void abort(void);
 
 static void __init
 ocotea_calibrate_decr(void)
@@ -202,15 +209,15 @@ ocotea_setup_hose(void)
 TODC_ALLOC();
 
 static void __init
-ocotea_early_serial_map(void)
+ocotea_early_serial_map(const struct ibm44x_clocks *clks)
 {
 	struct uart_port port;
 
 	/* Setup ioremapped serial port access */
 	memset(&port, 0, sizeof(port));
 	port.membase = ioremap64(PPC440GX_UART0_ADDR, 8);
-	port.irq = 0;
-	port.uartclk = BASE_BAUD * 16;
+	port.irq = UART0_INT;
+	port.uartclk = clks->uart0;
 	port.regshift = 0;
 	port.iotype = SERIAL_IO_MEM;
 	port.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
@@ -221,7 +228,8 @@ ocotea_early_serial_map(void)
 	}
 
 	port.membase = ioremap64(PPC440GX_UART1_ADDR, 8);
-	port.irq = 1;
+	port.irq = UART1_INT;
+	port.uartclk = clks->uart1;
 	port.line = 1;
 
 	if (early_serial_setup(&port) != 0) {
@@ -234,14 +242,41 @@ ocotea_setup_arch(void)
 {
 	unsigned char *addr;
 	unsigned long long mac64;
+	struct ocp_def *def;
+	struct ocp_func_emac_data *emacdata;
+	int i;
+	struct ibm44x_clocks clocks;
 
-	/* Retrieve MAC addresses from flash */
+	/*
+	 * Note: Current rev. board only operates in Group 4a
+	 * mode, so we always set EMAC0-1 for SMII and EMAC2-3
+	 * for RGMII (though these could run in RTBI just the same).
+	 *
+	 * The FPGA reg 3 information isn't even suitable for
+	 * determining the phy_mode, so if the board becomes
+	 * usable in !4a, it will be necessary to parse an environment
+	 * variable from the firmware or similar to properly configure
+	 * the phy_map/phy_mode.
+	 */
+	/* Set phy_map, phy_mode, and mac_addr for each EMAC */
 	addr = ioremap64(OCOTEA_MAC_BASE, OCOTEA_MAC_SIZE);
-	mac64 = simple_strtoull(addr, 0, 16);
-	memcpy(__res.bi_enetaddr[0], (char *)&mac64+2, 6);
-	mac64 = simple_strtoull(addr+OCOTEA_MAC1_OFFSET, 0, 16);
-	memcpy(__res.bi_enetaddr[1], (char *)&mac64+2, 6);
+	for (i=0; i<4; i++) {
+		mac64 = simple_strtoull(addr+OCOTEA_MAC_OFFSET*i, 0, 16);
+		def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, i);
+		emacdata = def->additions;
+		if (i < 2) {
+			emacdata->phy_map = 0x00000001;	/* Skip 0x00 */
+			emacdata->phy_mode = PHY_MODE_SMII;
+		}
+		else {
+			emacdata->phy_map = 0x0000ffff; /* Skip 0x00-0x0f */
+			emacdata->phy_mode = PHY_MODE_RGMII;
+		}
+		memcpy(emacdata->mac_addr, (char *)&mac64+2, 6);
+	}
 	iounmap(addr);
+
+	ibm440gx_tah_enable();
 
 #if !defined(CONFIG_BDI_SWITCH)
 	/*
@@ -250,6 +285,15 @@ ocotea_setup_arch(void)
 	 */
         mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
 #endif
+
+	/*
+	 * Determine various clocks.
+	 * To be completely correct we should get SysClk
+	 * from FPGA, because it can be changed by on-board switches
+	 * --ebs
+	 */
+	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
+	ocp_sys_info.opb_bus_freq = clocks.opb;
 
 	/* Setup TODC access */
 	TODC_INIT(TODC_TYPE_DS1743,
@@ -279,7 +323,7 @@ ocotea_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 
-	ocotea_early_serial_map();
+	ocotea_early_serial_map(&clocks);
 
 	/* Identify the system */
 	printk("IBM Ocotea port (MontaVista Software, Inc. <source@mvista.com>)\n");
@@ -370,9 +414,6 @@ ocotea_init_irq(void)
 {
 	int i;
 
-	/* Enable PPC440GP interrupt compatibility mode */
-	SDR_WRITE(DCRN_SDR_MFR,SDR_READ(DCRN_SDR_MFR) | DCRN_SDR_MFR_PCM);
-
 	ppc4xx_pic_init();
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -430,6 +471,9 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo((struct bi_record *) (r3 + KERNELBASE));
+
+	/* Disable L2-Cache due to hardware issues */
+	ibm440gx_l2c_disable();
 
 	ppc_md.setup_arch = ocotea_setup_arch;
 	ppc_md.show_cpuinfo = ocotea_show_cpuinfo;

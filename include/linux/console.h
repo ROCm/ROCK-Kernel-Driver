@@ -19,6 +19,7 @@
 
 struct vc_data;
 struct console_font_op;
+struct module;
 
 /*
  * this is what the terminal answers to a ESC-Z or csi0c query.
@@ -27,6 +28,7 @@ struct console_font_op;
 #define VT102ID "\033[?6c"
 
 struct consw {
+	struct module *owner;
 	const char *(*con_startup)(void);
 	void	(*con_init)(struct vc_data *, int);
 	void	(*con_deinit)(struct vc_data *);
@@ -58,7 +60,7 @@ extern const struct consw vga_con;	/* VGA text console */
 extern const struct consw newport_con;	/* SGI Newport console  */
 extern const struct consw prom_con;	/* SPARC PROM console */
 
-void take_over_console(const struct consw *sw, int first, int last, int deflt);
+int take_over_console(const struct consw *sw, int first, int last, int deflt);
 void give_up_console(const struct consw *sw);
 
 /* scroll */

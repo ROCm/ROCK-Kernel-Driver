@@ -438,11 +438,6 @@ static int carm_bdev_ioctl(struct inode *ino, struct file *fil,
 	return -EOPNOTSUPP;
 }
 
-static inline unsigned long msecs_to_jiffies(unsigned long msecs)
-{
-	return ((HZ * msecs + 999) / 1000);
-}
-
 static void msleep(unsigned long msecs)
 {
 	set_current_state(TASK_UNINTERRUPTIBLE);

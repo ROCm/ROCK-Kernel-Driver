@@ -43,6 +43,26 @@ static void invalidate_bh_lrus(void);
 
 #define BH_ENTRY(list) list_entry((list), struct buffer_head, b_assoc_buffers)
 
+struct bh_wait_queue {
+	struct buffer_head *bh;
+	wait_queue_t wait;
+};
+
+#define __DEFINE_BH_WAIT(name, b, f)					\
+	struct bh_wait_queue name = {					\
+		.bh	= b,						\
+		.wait	= {						\
+				.task	= current,			\
+				.flags	= f,				\
+				.func	= bh_wake_function,		\
+				.task_list =				\
+					LIST_HEAD_INIT(name.wait.task_list),\
+			},						\
+	}
+#define DEFINE_BH_WAIT(name, bh)	__DEFINE_BH_WAIT(name, bh, 0)
+#define DEFINE_BH_WAIT_EXCLUSIVE(name, bh) \
+		__DEFINE_BH_WAIT(name, bh, WQ_FLAG_EXCLUSIVE)
+
 /*
  * Hashed waitqueue_head's for wait_on_buffer()
  */
@@ -74,9 +94,49 @@ void wake_up_buffer(struct buffer_head *bh)
 
 	smp_mb();
 	if (waitqueue_active(wq))
-		wake_up_all(wq);
+		__wake_up(wq, TASK_INTERRUPTIBLE|TASK_UNINTERRUPTIBLE, 1, bh);
 }
 EXPORT_SYMBOL(wake_up_buffer);
+
+static int bh_wake_function(wait_queue_t *wait, unsigned mode,
+				int sync, void *key)
+{
+	struct buffer_head *bh = key;
+	struct bh_wait_queue *wq;
+
+	wq = container_of(wait, struct bh_wait_queue, wait);
+	if (wq->bh != bh || buffer_locked(bh))
+		return 0;
+	else
+		return autoremove_wake_function(wait, mode, sync, key);
+}
+
+static void sync_buffer(struct buffer_head *bh)
+{
+	struct block_device *bd;
+
+	smp_mb();
+	bd = bh->b_bdev;
+	if (bd)
+		blk_run_address_space(bd->bd_inode->i_mapping);
+}
+
+void fastcall __lock_buffer(struct buffer_head *bh)
+{
+	wait_queue_head_t *wqh = bh_waitq_head(bh);
+	DEFINE_BH_WAIT_EXCLUSIVE(wait, bh);
+
+	do {
+		prepare_to_wait_exclusive(wqh, &wait.wait,
+					TASK_UNINTERRUPTIBLE);
+		if (buffer_locked(bh)) {
+			sync_buffer(bh);
+			io_schedule();
+		}
+	} while (test_set_buffer_locked(bh));
+	finish_wait(wqh, &wait.wait);
+}
+EXPORT_SYMBOL(__lock_buffer);
 
 void fastcall unlock_buffer(struct buffer_head *bh)
 {
@@ -93,20 +153,16 @@ void fastcall unlock_buffer(struct buffer_head *bh)
 void __wait_on_buffer(struct buffer_head * bh)
 {
 	wait_queue_head_t *wqh = bh_waitq_head(bh);
-	DEFINE_WAIT(wait);
+	DEFINE_BH_WAIT(wait, bh);
 
 	do {
-		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
+		prepare_to_wait(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
 		if (buffer_locked(bh)) {
-			struct block_device *bd;
-			smp_mb();
-			bd = bh->b_bdev;
-			if (bd)
-				blk_run_address_space(bd->bd_inode->i_mapping);
+			sync_buffer(bh);
 			io_schedule();
 		}
 	} while (buffer_locked(bh));
-	finish_wait(wqh, &wait);
+	finish_wait(wqh, &wait.wait);
 }
 
 static void
@@ -2904,10 +2960,7 @@ EXPORT_SYMBOL(try_to_free_buffers);
 
 int block_sync_page(struct page *page)
 {
-	struct address_space *mapping;
-	smp_mb();
-	mapping = page->mapping;
-	blk_run_address_space(mapping);
+	blk_run_page(page);
 	return 0;
 }
 
@@ -2966,7 +3019,7 @@ static void recalc_bh_state(void)
 	if (__get_cpu_var(bh_accounting).ratelimit++ < 4096)
 		return;
 	__get_cpu_var(bh_accounting).ratelimit = 0;
-	for_each_cpu(i)
+	for_each_online_cpu(i)
 		tot += per_cpu(bh_accounting, i).nr;
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }

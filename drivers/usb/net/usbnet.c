@@ -107,7 +107,13 @@
  *
  *-------------------------------------------------------------------------*/
 
+// #define	DEBUG			// error path messages, extra info
+// #define	VERBOSE			// more; success messages
+
 #include <linux/config.h>
+#ifdef	CONFIG_USB_DEBUG
+#   define DEBUG
+#endif
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/sched.h>
@@ -120,24 +126,14 @@
 #include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
-
-
-// #define	DEBUG			// error path messages, extra info
-// #define	VERBOSE			// more; success messages
-#define	REALLY_QUEUE
-
-#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
-#   define DEBUG
-#endif
 #include <linux/usb.h>
-
 #include <asm/io.h>
 #include <asm/scatterlist.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 
-
 #define DRIVER_VERSION		"25-Aug-2003"
+
 
 /*-------------------------------------------------------------------------*/
 
@@ -148,13 +144,8 @@
  * For high speed, each frame comfortably fits almost 36 max size
  * Ethernet packets (so queues should be bigger).
  */
-#ifdef REALLY_QUEUE
 #define	RX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
 #define	TX_QLEN(dev) (((dev)->udev->speed == USB_SPEED_HIGH) ? 60 : 4)
-#else
-#define	RX_QLEN(dev)		1
-#define	TX_QLEN(dev)		1
-#endif
 
 // packets are always ethernet inside
 // ... except they can be bigger (limit of 64K with NetChip framing)
@@ -606,7 +597,7 @@ static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, i
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
 }
 
-void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt;
@@ -626,7 +617,7 @@ void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	}
 }
 
-int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt = 0;
@@ -646,8 +637,8 @@ int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	return 0;
 }
 
-int ax8817x_get_eeprom(struct net_device *net, 
-		       struct ethtool_eeprom *eeprom, u8 *data)
+static int ax8817x_get_eeprom(struct net_device *net,
+			      struct ethtool_eeprom *eeprom, u8 *data)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u16 *ebuf = (u16 *)data;
@@ -928,8 +919,8 @@ static struct usb_driver usbnet_driver;
  */
 static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 {
-	u8				*buf = intf->altsetting->extra;
-	int				len = intf->altsetting->extralen;
+	u8				*buf = intf->cur_altsetting->extra;
+	int				len = intf->cur_altsetting->extralen;
 	struct usb_interface_descriptor	*d;
 	struct cdc_state		*info = (void *) &dev->data;
 	int				status;
@@ -955,7 +946,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	/* this assumes that if there's a non-RNDIS vendor variant
 	 * of cdc-acm, it'll fail RNDIS requests cleanly.
 	 */
-	rndis = (intf->altsetting->desc.bInterfaceProtocol == 0xff);
+	rndis = (intf->cur_altsetting->desc.bInterfaceProtocol == 0xff);
 
 	memset (info, 0, sizeof *info);
 	info->control = intf;
@@ -1006,7 +997,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			if (!info->control || !info->data) {
 				dev_dbg (&intf->dev,
 					"master #%u/%p slave #%u/%p\n",
-					info->u->bMasterInterface0
+					info->u->bMasterInterface0,
 					info->control,
 					info->u->bSlaveInterface0,
 					info->data);
@@ -1025,7 +1016,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			}
 
 			/* a data interface altsetting does the real i/o */
-			d = &info->data->altsetting->desc;
+			d = &info->data->cur_altsetting->desc;
 			if (d->bInterfaceClass != USB_CLASS_CDC_DATA) {
 				dev_dbg (&intf->dev, "slave class %u\n",
 					d->bInterfaceClass);
@@ -1142,10 +1133,13 @@ get_ethernet_addr (struct usbnet *dev, struct ether_desc *e)
 	unsigned char	buf [13];
 
 	tmp = usb_string (dev->udev, e->iMACAddress, buf, sizeof buf);
-	if (tmp < 0)
+	if (tmp != 12) {
+		dev_dbg (&dev->udev->dev,
+			"bad MAC string %d fetch, %d\n", e->iMACAddress, tmp);
+		if (tmp >= 0)
+			tmp = -EINVAL;
 		return tmp;
-	else if (tmp != 12)
-		return -EINVAL;
+	}
 	for (i = tmp = 0; i < 6; i++, tmp += 2)
 		dev->net->dev_addr [i] =
 			 (nibble (buf [tmp]) << 4) + nibble (buf [tmp + 1]);
@@ -3014,7 +3008,7 @@ static struct ethtool_ops usbnet_ethtool_ops;
 
 // precondition: never called in_interrupt
 
-int
+static int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
@@ -3204,6 +3198,10 @@ static const struct usb_device_id	products [] = {
 	// Hawking UF200, TrendNet TU2-ET100
 	USB_DEVICE (0x07b8, 0x420a),
 	.driver_info =  (unsigned long) &hawking_uf200_info,
+}, {
+        // Billionton Systems, USB2AR 
+        USB_DEVICE (0x08dd, 0x90ff),
+        .driver_info =  (unsigned long) &ax8817x_info,
 }, {
 	// ATEN UC210T
 	USB_DEVICE (0x0557, 0x2009),

@@ -415,7 +415,7 @@ static void irda_config_fsm(void *data)
 		fsm->state = next_state;
 	} while(!delay);
 
-	irda_queue_delayed_request(&fsm->rq, MSECS_TO_JIFFIES(delay));
+	irda_queue_delayed_request(&fsm->rq, msecs_to_jiffies(delay));
 }
 
 /* schedule some device configuration task for execution by kIrDAd

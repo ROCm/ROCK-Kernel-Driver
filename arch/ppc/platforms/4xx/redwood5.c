@@ -20,8 +20,6 @@
 void __init
 redwood5_setup_arch(void)
 {
-	bd_t *bip = &__res;
-
 	ppc4xx_setup_arch();
 
 #ifdef CONFIG_DEBUG_BRINGUP

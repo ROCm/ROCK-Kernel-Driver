@@ -28,6 +28,7 @@
 #include <asm/page.h>
 #include <asm/time.h>
 #include <asm/io.h>
+#include <asm/ocp.h>
 #include <asm/ibm_ocp_pci.h>
 #include <asm/todc.h>
 
@@ -77,6 +78,8 @@ walnut_setup_arch(void)
 	void *fpga_trigger;
 
 	ppc4xx_setup_arch();
+
+	ibm_ocp_set_emac(0, 0);
 
 	kb_data = ioremap(WALNUT_PS2_BASE, 8);
 	if (!kb_data) {

@@ -37,6 +37,9 @@
 
     Get rid of check_region, check kmalloc return in lance_probe1
     Arnaldo Carvalho de Melo <acme@conectiva.com.br> - 11/01/2001
+
+	Reworked detection, added support for Racal InterLan EtherBlaster cards
+	Vesselin Kostadinov <vesok at yahoo dot com > - 22/4/2004
 */
 
 static const char version[] = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker@cesdis.gsfc.nasa.gov\n";
@@ -61,6 +64,26 @@ static const char version[] = "lance.c:v1.15ac 1999/11/13 dplatt@3do.com, becker
 static unsigned int lance_portlist[] __initdata = { 0x300, 0x320, 0x340, 0x360, 0};
 static int lance_probe1(struct net_device *dev, int ioaddr, int irq, int options);
 static int __init do_lance_probe(struct net_device *dev);
+
+
+static struct card {
+	char id_offset14;
+	char id_offset15;
+} cards[] = {
+	{	//"normal"
+		.id_offset14 = 0x57,
+		.id_offset15 = 0x57,
+	},
+	{	//NI6510EB
+		.id_offset14 = 0x52,
+		.id_offset15 = 0x44,
+	},
+	{	//Racal InterLan EtherBlaster
+		.id_offset14 = 0x52,
+		.id_offset15 = 0x49,
+	},
+};
+#define NUM_CARDS 3
 
 #ifdef LANCE_DEBUG
 static int lance_debug = LANCE_DEBUG;
@@ -380,13 +403,20 @@ static int __init do_lance_probe(struct net_device *dev)
 							"lance-probe");
 
 		if (r) {
-			/* Detect "normal" 0x57 0x57 and the NI6510EB 0x52 0x44
-			   signatures w/ minimal I/O reads */
-			char offset15, offset14 = inb(ioaddr + 14);
-			
-			if ((offset14 == 0x52 || offset14 == 0x57) &&
-				((offset15 = inb(ioaddr + 15)) == 0x57 ||
-				 offset15 == 0x44)) {
+			/* Detect the card with minimal I/O reads */
+			char offset14 = inb(ioaddr + 14);
+			int card;
+			for (card = 0; card < NUM_CARDS; ++card)
+				if (cards[card].id_offset14 == offset14)
+					break;
+			if (card < NUM_CARDS) {/*yes, the first byte matches*/
+				char offset15 = inb(ioaddr + 15);
+				for (card = 0; card < NUM_CARDS; ++card)
+					if ((cards[card].id_offset14 == offset14) &&
+						(cards[card].id_offset15 == offset15))
+						break;
+			}
+			if (card < NUM_CARDS) { /*Signature OK*/
 				result = lance_probe1(dev, ioaddr, 0, 0);
 				if (!result) {
 					struct lance_private *lp = dev->priv;

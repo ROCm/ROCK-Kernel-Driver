@@ -279,8 +279,8 @@ static int TIPurgeDataSync (struct usb_serial_port *port, __u16 mask)
  * @address_type: Can read both XDATA and I2C
  * @buffer: pointer to input data buffer
  */
-int TIReadDownloadMemory (struct usb_device *dev, int start_address, int length,
-			  __u8 address_type, __u8 *buffer)
+static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
+				int length, __u8 address_type, __u8 *buffer)
 {
 	int status = 0;
 	__u8 read_length;
@@ -328,7 +328,7 @@ int TIReadDownloadMemory (struct usb_device *dev, int start_address, int length,
 	return status;
 }
 
-int TIReadRam (struct usb_device *dev, int start_address, int length, __u8 *buffer)
+static int TIReadRam (struct usb_device *dev, int start_address, int length, __u8 *buffer)
 {
 	return TIReadDownloadMemory (dev,
 				     start_address,
@@ -612,7 +612,7 @@ static int TIChooseConfiguration (struct usb_device *dev)
 	return 0;
 }
 
-int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
+static int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
 {
 	int status;
 
@@ -632,7 +632,7 @@ int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __
 	return status;
 }
 
-int TIWriteRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
+static int TIWriteRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
 {
 	if (serial->product_info.TiMode == TI_MODE_BOOT)
 		return TIWriteBootMemory (serial,
@@ -995,7 +995,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 	if (status)
 		return status;
 
-	interface = &serial->serial->dev->config->interface[0]->altsetting->desc;
+	interface = &serial->serial->interface->cur_altsetting->desc;
 	if (!interface) {
 		dev_err (&serial->serial->dev->dev, "%s - no interface set, error!", __FUNCTION__);
 		return -ENODEV;
@@ -1649,10 +1649,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 
 	dbg("%s", __FUNCTION__);
 
-	if (serial_paranoia_check (edge_serial->serial, __FUNCTION__)) {
-		return;
-	}
-
 	switch (urb->status) {
 	case 0:
 		/* success */
@@ -1685,11 +1681,6 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 	dbg ("%s - port_number %d, function %d, info 0x%x",
 	     __FUNCTION__, port_number, function, data[1]);
 	port = edge_serial->serial->port[port_number];
-	if (port_paranoia_check (port, __FUNCTION__)) {
-		dbg ("%s - change found for port that is not present",
-		     __FUNCTION__);
-		return;
-	}
 	edge_port = usb_get_serial_port_data(port);
 	if (!edge_port) {
 		dbg ("%s - edge_port not found", __FUNCTION__);
@@ -1743,9 +1734,6 @@ static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
 	int port_number;
 
 	dbg("%s", __FUNCTION__);
-
-	if (port_paranoia_check (edge_port->port, __FUNCTION__))
-		return;
 
 	if (urb->status) {
 		dbg ("%s - nonzero read bulk status received: %d",
@@ -1804,15 +1792,9 @@ exit:
 static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 
 	dbg ("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg ("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg ("%s - nonzero write bulk status received: %d",
@@ -1820,7 +1802,7 @@ static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
 
 		if (urb->status == -EPIPE) {
 			/* clear any problem that might have happened on this pipe */
-			usb_clear_halt (serial->dev, urb->pipe);
+			usb_clear_halt (port->serial->dev, urb->pipe);
 		}
 		return;
 	}
@@ -1848,9 +1830,6 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	u16 open_settings;
 	u8 transaction_timeout;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (edge_port == NULL)
@@ -1993,61 +1972,50 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 
 static void edge_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	struct edgeport_serial *edge_serial;
 	struct edgeport_port *edge_port;
 	int port_number;
 	int status;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
-	edge_serial = usb_get_serial_data(serial);
+	edge_serial = usb_get_serial_data(port->serial);
 	edge_port = usb_get_serial_port_data(port);
 	if ((edge_serial == NULL) || (edge_port == NULL))
 		return;
 	
-	if (serial->dev) {
-		/* The bulkreadcompletion routine will check 
-		 * this flag and dump add read data */
-		edge_port->close_pending = 1;
+	/* The bulkreadcompletion routine will check 
+	 * this flag and dump add read data */
+	edge_port->close_pending = 1;
 
-		/* chase the port close */
-		TIChasePort (edge_port);
+	/* chase the port close */
+	TIChasePort (edge_port);
 
-		usb_unlink_urb (port->read_urb);
+	usb_unlink_urb (port->read_urb);
 
-		/* assuming we can still talk to the device,
-		 * send a close port command to it */
-		dbg("%s - send umpc_close_port", __FUNCTION__);
-		port_number = port->number - port->serial->minor;
-		status = TIWriteCommandSync (port->serial->dev,
-					     UMPC_CLOSE_PORT,
-					     (__u8)(UMPM_UART1_PORT + port_number),
-					     0,
-					     NULL,
-					     0);
-		--edge_port->edge_serial->num_ports_open;
-		if (edge_port->edge_serial->num_ports_open <= 0) {
-			/* last port is now closed, let's shut down our interrupt urb */
-			usb_unlink_urb (serial->port[0]->interrupt_in_urb);
-			edge_port->edge_serial->num_ports_open = 0;
-		}
-	edge_port->close_pending = 0;
+	/* assuming we can still talk to the device,
+	 * send a close port command to it */
+	dbg("%s - send umpc_close_port", __FUNCTION__);
+	port_number = port->number - port->serial->minor;
+	status = TIWriteCommandSync (port->serial->dev,
+				     UMPC_CLOSE_PORT,
+				     (__u8)(UMPM_UART1_PORT + port_number),
+				     0,
+				     NULL,
+				     0);
+	--edge_port->edge_serial->num_ports_open;
+	if (edge_port->edge_serial->num_ports_open <= 0) {
+		/* last port is now closed, let's shut down our interrupt urb */
+		usb_unlink_urb (port->serial->port[0]->interrupt_in_urb);
+		edge_port->edge_serial->num_ports_open = 0;
 	}
+	edge_port->close_pending = 0;
 
 	dbg("%s - exited", __FUNCTION__);
 }
 
 static int edge_write (struct usb_serial_port *port, int from_user, const unsigned char *data, int count)
 {
-	struct usb_serial *serial = port->serial;
 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
 	int result;
 
@@ -2080,8 +2048,8 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	usb_serial_debug_data (__FILE__, __FUNCTION__, count, port->write_urb->transfer_buffer);
 
 	/* set up our urb */
-	usb_fill_bulk_urb (port->write_urb, serial->dev,
-			   usb_sndbulkpipe (serial->dev,
+	usb_fill_bulk_urb (port->write_urb, port->serial->dev,
+			   usb_sndbulkpipe (port->serial->dev,
 					    port->bulk_out_endpointAddress),
 			   port->write_urb->transfer_buffer, count,
 			   edge_bulk_out_callback,

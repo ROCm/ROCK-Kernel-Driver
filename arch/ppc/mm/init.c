@@ -458,7 +458,7 @@ void __init mem_init(void)
 
 			ClearPageReserved(page);
 			set_bit(PG_highmem, &page->flags);
-			atomic_set(&page->count, 1);
+			set_page_count(page, 1);
 			__free_page(page);
 			totalhigh_pages++;
 		}
@@ -572,6 +572,16 @@ void flush_dcache_page(struct page *page)
 	clear_bit(PG_arch_1, &page->flags);
 }
 
+void flush_dcache_icache_page(struct page *page)
+{
+#ifdef CONFIG_BOOKE
+	__flush_dcache_icache(kmap(page));
+	kunmap(page);
+#else
+	__flush_dcache_icache_phys(page_to_pfn(page) << PAGE_SHIFT);
+#endif
+
+}
 void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 {
 	clear_page(page);
@@ -614,7 +624,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 			if (vma->vm_mm == current->active_mm)
 				__flush_dcache_icache((void *) address);
 			else
-				__flush_dcache_icache_phys(pfn << PAGE_SHIFT);
+				flush_dcache_icache_page(page);
 			set_bit(PG_arch_1, &page->flags);
 		}
 	}

@@ -93,6 +93,16 @@ config PPC_PMAC
 	bool "Apple PowerMac G5 support"
 	select ADB_PMU
 
+config PPC_SPLPAR
+	depends on PPC_PSERIES
+	bool "Support for shared-processor logical partitions"
+	default n
+	help
+	  Enabling this option will make the kernel run more efficiently
+	  on logically-partitioned pSeries systems which use shared
+	  processors, that is, which share physical processors between
+	  two or more partitions.
+
 config PMAC_DART
 	bool "Enable DART/IOMMU on PowerMac (allow >2G of RAM)"
 	depends on PPC_PMAC
@@ -409,6 +419,16 @@ config DEBUG_INFO
 	  If you don't debug the kernel, you can say N.
 	  
 endmenu
+
+config SPINLINE
+	bool "Inline spinlock code at each call site"
+	depends on SMP && !PPC_SPLPAR && !PPC_ISERIES
+	help
+	  Say Y if you want to have the code for acquiring spinlocks
+	  and rwlocks inlined at each call site.  This makes the kernel
+	  somewhat bigger, but can be useful when profiling the kernel.
+
+	  If in doubt, say N.
 
 source "security/Kconfig"
 

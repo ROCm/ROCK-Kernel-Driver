@@ -32,10 +32,6 @@
 #define NUM_FPRS      16
 #define NUM_ACRS      16    
 
-#define TASK31_SIZE		(0x80000000UL)
-#undef TASK_SIZE
-#define TASK_SIZE TASK31_SIZE
-
 /* For SVR4/S390 the function pointer to be registered with `atexit` is
    passed in R14. */
 #define ELF_PLAT_INIT(_r, load_addr) \
@@ -51,7 +47,7 @@
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
-#define ELF_ET_DYN_BASE         (TASK31_SIZE / 3 * 2)
+#define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
 
 /* Wow, the "main" arch needs arch dependent functions too.. :) */
 
@@ -169,7 +165,6 @@ struct elf_prpsinfo32
 #undef start_thread
 #define start_thread                    start_thread31 
 #define setup_arg_pages(bprm, exec)     setup_arg_pages32(bprm, exec)
-#define elf_map				elf_map32
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with 32bit Linux for S390 binaries,"
                    " Copyright 2000 IBM Corporation"); 
@@ -188,19 +183,3 @@ jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
 
 #include "../../../fs/binfmt_elf.c"
 
-static unsigned long
-elf_map32 (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
-{
-	unsigned long map_addr;
-
-	if (!addr) 
-		addr = TASK_UNMAPPED_BASE;
-
-	down_write(&current->mm->mmap_sem);
-	map_addr = do_mmap(filep, ELF_PAGESTART(addr),
-			   eppnt->p_filesz + ELF_PAGEOFFSET(eppnt->p_vaddr),
-			   prot, type,
-			   eppnt->p_offset - ELF_PAGEOFFSET(eppnt->p_vaddr));
-	up_write(&current->mm->mmap_sem);
-	return(map_addr);
-}

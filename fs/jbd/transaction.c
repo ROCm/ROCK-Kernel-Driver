@@ -633,12 +633,20 @@ repeat:
 
 		if (jh->b_jlist == BJ_Shadow) {
 			wait_queue_head_t *wqh;
+			DEFINE_WAIT(wait);
 
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			jbd_unlock_bh_state(bh);
 			/* commit wakes up all shadow buffers after IO */
-			wqh = bh_waitq_head(jh2bh(jh));
-			wait_event(*wqh, (jh->b_jlist != BJ_Shadow));
+			wqh = bh_waitq_head(bh);
+			for ( ; ; ) {
+				prepare_to_wait(wqh, &wait,
+						TASK_UNINTERRUPTIBLE);
+				if (jh->b_jlist != BJ_Shadow)
+					break;
+				schedule();
+			}
+			finish_wait(wqh, &wait);
 			goto repeat;
 		}
 

@@ -36,9 +36,8 @@ extern struct smp_boot_data {
 	int cpu_phys_id[NR_CPUS];
 } smp_boot_data __initdata;
 
-extern char no_int_routing __initdata;
+extern char no_int_routing __devinitdata;
 
-extern cpumask_t phys_cpu_present_map;
 extern cpumask_t cpu_online_map;
 extern unsigned long ipi_base_addr;
 extern unsigned char smp_int_redirect;
@@ -47,8 +46,6 @@ extern volatile int ia64_cpu_to_sapicid[];
 #define cpu_physical_id(i)	ia64_cpu_to_sapicid[i]
 
 extern unsigned long ap_wakeup_vector;
-
-#define cpu_possible_map phys_cpu_present_map
 
 /*
  * Function to map hard smp processor id to logical id.  Slow, so don't use this in
@@ -113,6 +110,7 @@ hard_smp_processor_id (void)
 /* Upping and downing of CPUs */
 extern int __cpu_disable (void);
 extern void __cpu_die (unsigned int cpu);
+extern void cpu_die (void) __attribute__ ((noreturn));
 extern int __cpu_up (unsigned int cpu);
 extern void __init smp_build_cpu_map(void);
 
@@ -122,6 +120,8 @@ extern void smp_do_timer (struct pt_regs *regs);
 extern int smp_call_function_single (int cpuid, void (*func) (void *info), void *info,
 				     int retry, int wait);
 extern void smp_send_reschedule (int cpu);
+extern void lock_ipi_calllock(void);
+extern void unlock_ipi_calllock(void);
 
 #endif /* CONFIG_SMP */
 #endif /* _ASM_IA64_SMP_H */

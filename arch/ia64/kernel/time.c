@@ -10,6 +10,7 @@
  */
 #include <linux/config.h>
 
+#include <linux/cpu.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -244,6 +245,10 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long new_itm;
 
+	if (unlikely(cpu_is_offline(smp_processor_id()))) {
+		return IRQ_HANDLED;
+	}
+
 	platform_timer_interrupt(irq, dev_id, regs);
 
 	new_itm = local_cpu_data->itm_next;
@@ -326,7 +331,7 @@ ia64_cpu_local_tick (void)
 	ia64_set_itm(local_cpu_data->itm_next);
 }
 
-void __init
+void __devinit
 ia64_init_itm (void)
 {
 	unsigned long platform_base_freq, itc_freq;

@@ -211,7 +211,7 @@ static int tekram_reset(struct sir_dev *dev)
 
 	/* Should sleep 1 ms */
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(MSECS_TO_JIFFIES(1));
+	schedule_timeout(msecs_to_jiffies(1));
 
 	/* Set DTR, Set RTS */
 	sirdev_set_dtr_rts(dev, TRUE, TRUE);

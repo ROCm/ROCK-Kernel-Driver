@@ -159,13 +159,17 @@ static int command_abort( Scsi_Cmnd *srb )
 		return FAILED;
 	}
 
-	/* Set state to ABORTING, set the ABORTING bit, and release the lock */
+	/* Set state to ABORTING and set the ABORTING bit, but only if
+	 * a device reset isn't already in progress (to avoid interfering
+	 * with the reset).  To prevent races with auto-reset, we must
+	 * stop any ongoing USB transfers while still holding the host
+	 * lock. */
 	us->sm_state = US_STATE_ABORTING;
-	set_bit(US_FLIDX_ABORTING, &us->flags);
+	if (!test_bit(US_FLIDX_RESETTING, &us->flags)) {
+		set_bit(US_FLIDX_ABORTING, &us->flags);
+		usb_stor_stop_transport(us);
+	}
 	scsi_unlock(host);
-
-	/* Stop an ongoing USB transfer */
-	usb_stor_stop_transport(us);
 
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
@@ -254,18 +258,17 @@ static int bus_reset( Scsi_Cmnd *srb )
 }
 
 /* Report a driver-initiated device reset to the SCSI layer.
- * Calling this for a SCSI-initiated reset is unnecessary but harmless. */
+ * Calling this for a SCSI-initiated reset is unnecessary but harmless.
+ * The caller must own the SCSI host lock. */
 void usb_stor_report_device_reset(struct us_data *us)
 {
 	int i;
 
-	scsi_lock(us->host);
 	scsi_report_device_reset(us->host, 0, 0);
 	if (us->flags & US_FL_SCM_MULT_TARG) {
 		for (i = 1; i < us->host->max_id; ++i)
 			scsi_report_device_reset(us->host, 0, i);
 	}
-	scsi_unlock(us->host);
 }
 
 /***********************************************************************

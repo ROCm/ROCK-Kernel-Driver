@@ -325,7 +325,7 @@ befs_read_inode(struct inode *inode)
 		   befs_ino->i_inode_num.allocation_group,
 		   befs_ino->i_inode_num.start, befs_ino->i_inode_num.len);
 
-	bh = befs_bread_iaddr(sb, befs_ino->i_inode_num);
+	bh = befs_bread(sb, inode->i_ino);
 	if (!bh) {
 		befs_error(sb, "unable to read inode block - "
 			   "inode = %lu", inode->i_ino);
@@ -376,7 +376,7 @@ befs_read_inode(struct inode *inode)
 	befs_ino->i_attribute = fsrun_to_cpu(sb, raw_inode->attributes);
 	befs_ino->i_flags = fs32_to_cpu(sb, raw_inode->flags);
 
-	if (S_ISLNK(inode->i_mode) && !(inode->i_flags & BEFS_LONG_SYMLINK)) {
+	if (S_ISLNK(inode->i_mode) && !(befs_ino->i_flags & BEFS_LONG_SYMLINK)){
 		inode->i_size = 0;
 		inode->i_blocks = befs_sb->block_size / VFS_BLOCK_SIZE;
 		strncpy(befs_ino->i_data.symlink, raw_inode->data.symlink,
@@ -855,6 +855,13 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 
 	if (befs_check_sb(sb) != BEFS_OK)
 		goto unaquire_priv_sbp;
+
+	if( befs_sb->num_blocks > ~((sector_t)0) ) {
+		befs_error(sb, "blocks count: %Lu "
+			"is larger than the host can use",
+			befs_sb->num_blocks);
+		goto unaquire_priv_sbp;
+	}
 
 	/*
 	 * set up enough so that it can read an inode
