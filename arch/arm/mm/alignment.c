@@ -133,6 +133,18 @@ union offset_union {
 #define TYPE_LDST	2
 #define TYPE_DONE	3
 
+#ifdef __ARMEB__
+#define BE		1
+#define FIRST_BYTE_16	"mov	%1, %1, ror #8\n"
+#define FIRST_BYTE_32	"mov	%1, %1, ror #24\n"
+#define NEXT_BYTE	"ror #24"
+#else
+#define BE		0
+#define FIRST_BYTE_16
+#define FIRST_BYTE_32
+#define NEXT_BYTE	"lsr #8"
+#endif
+
 #define __get8_unaligned_check(ins,val,addr,err)	\
 	__asm__(					\
 	"1:	"ins"	%1, [%2], #1\n"			\
@@ -152,9 +164,10 @@ union offset_union {
 #define __get16_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v, a = addr;		\
-		__get8_unaligned_check(ins,val,a,err);		\
 		__get8_unaligned_check(ins,v,a,err);		\
-		val |= v << 8;					\
+		val =  v << ((BE) ? 8 : 0);			\
+		__get8_unaligned_check(ins,v,a,err);		\
+		val |= v << ((BE) ? 0 : 8);			\
 		if (err)					\
 			goto fault;				\
 	} while (0)
@@ -168,13 +181,14 @@ union offset_union {
 #define __get32_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v, a = addr;		\
-		__get8_unaligned_check(ins,val,a,err);		\
 		__get8_unaligned_check(ins,v,a,err);		\
-		val |= v << 8;					\
+		val =  v << ((BE) ? 24 :  0);			\
 		__get8_unaligned_check(ins,v,a,err);		\
-		val |= v << 16;					\
+		val |= v << ((BE) ? 16 :  8);			\
 		__get8_unaligned_check(ins,v,a,err);		\
-		val |= v << 24;					\
+		val |= v << ((BE) ?  8 : 16);			\
+		__get8_unaligned_check(ins,v,a,err);		\
+		val |= v << ((BE) ?  0 : 24);			\
 		if (err)					\
 			goto fault;				\
 	} while (0)
@@ -188,9 +202,9 @@ union offset_union {
 #define __put16_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v = val, a = addr;	\
-		__asm__(					\
+		__asm__( FIRST_BYTE_16				\
 		"1:	"ins"	%1, [%2], #1\n"			\
-		"	mov	%1, %1, lsr #8\n"		\
+		"	mov	%1, %1, "NEXT_BYTE"\n"		\
 		"2:	"ins"	%1, [%2]\n"			\
 		"3:\n"						\
 		"	.section .fixup,\"ax\"\n"		\
@@ -218,13 +232,13 @@ union offset_union {
 #define __put32_unaligned_check(ins,val,addr)			\
 	do {							\
 		unsigned int err = 0, v = val, a = addr;	\
-		__asm__(					\
+		__asm__( FIRST_BYTE_32				\
 		"1:	"ins"	%1, [%2], #1\n"			\
-		"	mov	%1, %1, lsr #8\n"		\
+		"	mov	%1, %1, "NEXT_BYTE"\n"		\
 		"2:	"ins"	%1, [%2], #1\n"			\
-		"	mov	%1, %1, lsr #8\n"		\
+		"	mov	%1, %1, "NEXT_BYTE"\n"		\
 		"3:	"ins"	%1, [%2], #1\n"			\
-		"	mov	%1, %1, lsr #8\n"		\
+		"	mov	%1, %1, "NEXT_BYTE"\n"		\
 		"4:	"ins"	%1, [%2]\n"			\
 		"5:\n"						\
 		"	.section .fixup,\"ax\"\n"		\
