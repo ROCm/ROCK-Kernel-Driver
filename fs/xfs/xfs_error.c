@@ -258,11 +258,11 @@ xfs_error_report(
 		if (mp != NULL) {
 			xfs_cmn_err(XFS_PTAG_ERROR_REPORT,
 				    CE_ALERT, mp,
-		"XFS internal error %s at line %d of file %s.  Caller 0x%x\n",
+		"XFS internal error %s at line %d of file %s.  Caller 0x%p\n",
 				    tag, linenum, fname, ra);
 		} else {
 			cmn_err(CE_ALERT,
-		"XFS internal error %s at line %d of file %s.  Caller 0x%x\n",
+		"XFS internal error %s at line %d of file %s.  Caller 0x%p\n",
 				tag, linenum, fname, ra);
 		}
 
