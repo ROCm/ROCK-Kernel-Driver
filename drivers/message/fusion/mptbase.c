@@ -2416,7 +2416,7 @@ GetIocFacts(MPT_ADAPTER *ioc, int sleepFlag, int reason)
 		}
 	} else {
 		printk(MYIOC_s_ERR_FMT 
-		     "Invalid IOC facts reply, msgLength=%d offsetof=%d!\n",
+		     "Invalid IOC facts reply, msgLength=%d offsetof=%zd!\n",
 		     ioc->name, facts->MsgLength, (offsetof(IOCFactsReply_t,
 		     RequestFrameSize)/sizeof(u32)));
 		return -66;
