@@ -254,7 +254,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 define_tristate CONFIG_FBCON_CFB2 y
 	 define_tristate CONFIG_FBCON_CFB4 y
       else
-	 if [ "$CONFIG_FB_ACORN" = "m" -o "$CONFIG_FB_SA1100" = "m"]; then 
+	 if [ "$CONFIG_FB_ACORN" = "m" -o "$CONFIG_FB_SA1100" = "m" ]; then 
 	    define_tristate CONFIG_FBCON_CFB2 m
 	    define_tristate CONFIG_FBCON_CFB4 m
 	 fi
