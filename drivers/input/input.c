@@ -67,9 +67,6 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 {
 	struct input_handle *handle;
 
-	if (dev->pm_dev)
-		pm_access(dev->pm_dev);
-
 	if (type > EV_MAX || !test_bit(type, dev->evbit))
 		return;
 
@@ -230,8 +227,6 @@ void input_release_device(struct input_handle *handle)
 
 int input_open_device(struct input_handle *handle)
 {
-	if (handle->dev->pm_dev)
-		pm_access(handle->dev->pm_dev);
 	handle->open++;
 	if (handle->dev->open)
 		return handle->dev->open(handle->dev);
@@ -249,8 +244,6 @@ int input_flush_device(struct input_handle* handle, struct file* file)
 void input_close_device(struct input_handle *handle)
 {
 	input_release_device(handle);
-	if (handle->dev->pm_dev)
-		pm_dev_idle(handle->dev->pm_dev);
 	if (handle->dev->close)
 		handle->dev->close(handle->dev);
 	handle->open--;
