@@ -1,5 +1,5 @@
 /*
-   drivers/sound/lowlevel/aedsp16.c
+   sound/oss/aedsp16.c
 
    Audio Excel DSP 16 software configuration routines
    Copyright (C) 1995,1996,1997,1998  Riccardo Facchetti (fizban@tin.it)
