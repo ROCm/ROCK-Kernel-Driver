@@ -225,28 +225,30 @@ int device_add(struct device *dev)
 		dev->kobj.parent = &parent->kobj;
 
 	if ((error = kobject_add(&dev->kobj)))
-		goto register_done;
-
-	/* now take care of our own registration */
-
+		goto Error;
+	if ((error = device_pm_add(dev)))
+		goto PMError;
+	if ((error = bus_add_device(dev)))
+		goto BusError;
 	down_write(&devices_subsys.rwsem);
 	if (parent)
 		list_add_tail(&dev->node,&parent->children);
 	up_write(&devices_subsys.rwsem);
 
-	bus_add_device(dev);
-
-	device_pm_add(dev);
-
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
-
- register_done:
-	if (error && parent)
-		put_device(parent);
+ Done:
 	put_device(dev);
 	return error;
+ BusError:
+	device_pm_remove(dev);
+ PMError:
+	kobject_unregister(&dev->kobj);
+ Error:
+	if (parent)
+		put_device(parent);
+	goto Done;
 }
 
 
@@ -312,8 +314,6 @@ void device_del(struct device * dev)
 {
 	struct device * parent = dev->parent;
 
-	device_pm_remove(dev);
-
 	down_write(&devices_subsys.rwsem);
 	if (parent)
 		list_del_init(&dev->node);
@@ -324,14 +324,11 @@ void device_del(struct device * dev)
 	 */
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
-
 	bus_remove_device(dev);
-
+	device_pm_remove(dev);
 	kobject_del(&dev->kobj);
-
 	if (parent)
 		put_device(parent);
-
 }
 
 /**

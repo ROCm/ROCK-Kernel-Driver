@@ -28,6 +28,19 @@ int resume_device(struct device * dev)
 }
 
 
+
+void dpm_resume(void)
+{
+	while(!list_empty(&dpm_off)) {
+		struct list_head * entry = dpm_off.next;
+		struct device * dev = to_device(entry);
+		list_del_init(entry);
+		resume_device(dev);
+		list_add_tail(entry,&dpm_active);
+	}
+}
+
+
 /**
  *	device_resume - Restore state of each device in system.
  *
@@ -38,13 +51,7 @@ int resume_device(struct device * dev)
 void device_resume(void)
 {
 	down(&dpm_sem);
-	while(!list_empty(&dpm_off)) {
-		struct list_head * entry = dpm_off.next;
-		struct device * dev = to_device(entry);
-		list_del_init(entry);
-		resume_device(dev);
-		list_add_tail(entry,&dpm_active);
-	}
+	dpm_resume();
 	up(&dpm_sem);
 }
 
