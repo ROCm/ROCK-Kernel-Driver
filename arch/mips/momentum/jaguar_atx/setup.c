@@ -46,6 +46,7 @@
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
@@ -119,19 +120,21 @@ static __init void wire_stupidity_into_tlb(void)
 //	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000),
 //	                0xfe000000UL, PM_16M);
 
-	mv64340_base = 0xf4000000;
+	marvell_base = 0xf4000000;
 	//mv64340_sram_base = 0xfe000000;	/* Currently unused */
 #endif
 }
 
-unsigned long mv64340_base	= 0xf4000000L;
+unsigned long marvell_base	= 0xf4000000L;
 unsigned long ja_fpga_base	= JAGUAR_ATX_CS0_ADDR;
 unsigned long uart_base		= 0xfd000000L;
 static unsigned char *rtc_base	= (unsigned char*) 0xfc800000L;
 
+EXPORT_SYMBOL(marvell_base);
+
 static __init int per_cpu_mappings(void)
 {
-	mv64340_base	= (unsigned long) ioremap(0xf4000000, 0x10000);
+	marvell_base	= (unsigned long) ioremap(0xf4000000, 0x10000);
 	ja_fpga_base	= (unsigned long) ioremap(JAGUAR_ATX_CS0_ADDR,  0x1000);
 	uart_base	= (unsigned long) ioremap(0xfd000000UL, 0x1000);
 	rtc_base	= ioremap(0xfc000000UL, 0x8000);
@@ -233,12 +236,14 @@ static struct resource mv_pci_mem0_resource = {
 	.flags	= IORESOURCE_MEM
 };
 
-extern struct pci_ops mv64340_bus0_pci_ops;
-
-static struct pci_controller mv_bus0_controller = {
-	.pci_ops	= &mv64340_bus0_pci_ops,
-	.mem_resource	= &mv_pci_mem0_resource,
-	.io_resource	= &mv_pci_io_mem0_resource,
+static struct mv_pci_controller mv_bus0_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &mv_pci_mem0_resource,
+		.io_resource	= &mv_pci_io_mem0_resource,
+	},
+	.config_addr	= MV64340_PCI_0_CONFIG_ADDR,
+	.config_vreg	= MV64340_PCI_0_CONFIG_DATA_VIRTUAL_REG,
 };
 
 static uint32_t mv_io_base, mv_io_size;
@@ -253,16 +258,16 @@ static void ja_pci0_init(void)
 	mem0_base = MV_READ(MV64340_PCI_0_MEMORY0_BASE_ADDR) << 16;
 	mem0_size = (MV_READ(MV64340_PCI_0_MEMORY0_SIZE) + 1) << 16;
 
-	mv_pci_io_mem0_resource.start	= 0;
-	mv_pci_io_mem0_resource.end	= io_size - 1;
-	mv_pci_mem0_resource.start	= mem0_base;
-	mv_pci_mem0_resource.end	= mem0_base + mem0_size - 1;
-	mv_bus0_controller.mem_offset	= mem0_base;
-	mv_bus0_controller.io_offset	= 0;
+	mv_pci_io_mem0_resource.start		= 0;
+	mv_pci_io_mem0_resource.end		= io_size - 1;
+	mv_pci_mem0_resource.start		= mem0_base;
+	mv_pci_mem0_resource.end		= mem0_base + mem0_size - 1;
+	mv_bus0_controller.pcic.mem_offset	= mem0_base;
+	mv_bus0_controller.pcic.io_offset	= 0;
 
 	ioport_resource.end		= io_size - 1;
 
-	register_pci_controller(&mv_bus0_controller);
+	register_pci_controller(&mv_bus0_controller.pcic);
 
 	mv_io_base = io_base;
 	mv_io_size = io_size;
@@ -278,12 +283,14 @@ static struct resource mv_pci_mem1_resource = {
 	.flags	= IORESOURCE_MEM
 };
 
-extern struct pci_ops mv64340_bus1_pci_ops;
-
-static struct pci_controller mv_bus1_controller = {
-	.pci_ops	= &mv64340_bus1_pci_ops,
-	.mem_resource	= &mv_pci_mem1_resource,
-	.io_resource	= &mv_pci_io_mem1_resource,
+static struct mv_pci_controller mv_bus1_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &mv_pci_mem1_resource,
+		.io_resource	= &mv_pci_io_mem1_resource,
+	},
+	.config_addr	= MV64340_PCI_1_CONFIG_ADDR,
+	.config_vreg	= MV64340_PCI_1_CONFIG_DATA_VIRTUAL_REG,
 };
 
 static __init void ja_pci1_init(void)
@@ -301,16 +308,16 @@ static __init void ja_pci1_init(void)
 	 * the first.  A gap is no problem but would waste address space for
 	 * remapping the port space.
 	 */
-	mv_pci_io_mem1_resource.start	= mv_io_size;
-	mv_pci_io_mem1_resource.end	= mv_io_size + io_size - 1;
-	mv_pci_mem1_resource.start	= mem0_base;
-	mv_pci_mem1_resource.end	= mem0_base + mem0_size - 1;
-	mv_bus1_controller.mem_offset	= mem0_base;
-	mv_bus1_controller.io_offset	= 0;
+	mv_pci_io_mem1_resource.start		= mv_io_size;
+	mv_pci_io_mem1_resource.end		= mv_io_size + io_size - 1;
+	mv_pci_mem1_resource.start		= mem0_base;
+	mv_pci_mem1_resource.end		= mem0_base + mem0_size - 1;
+	mv_bus1_controller.pcic.mem_offset	= mem0_base;
+	mv_bus1_controller.pcic.io_offset	= 0;
 
 	ioport_resource.end		= io_base + io_size -mv_io_base - 1;
 
-	register_pci_controller(&mv_bus1_controller);
+	register_pci_controller(&mv_bus1_controller.pcic);
 
 	mv_io_size = io_base + io_size - mv_io_base;
 }

@@ -39,12 +39,16 @@ static struct resource gt_pci_io_mem0_resource = {
 	.flags	= IORESOURCE_IO
 };
 
-static struct pci_controller gt_bus0_controller = {
-	.pci_ops	= &gt_bus0_pci_ops,
-	.mem_resource	= &gt_pci_mem0_resource,
-	.mem_offset	= 0xc0000000UL,
-	.io_resource	= &gt_pci_io_mem0_resource,
-	.io_offset	= 0x00000000UL
+static struct mv_pci_controller gt_bus0_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &gt_pci_mem0_resource,
+		.mem_offset	= 0xc0000000UL,
+		.io_resource	= &gt_pci_io_mem0_resource,
+		.io_offset	= 0x00000000UL
+	},
+	.config_addr	= PCI_0CONFIGURATION_ADDRESS,
+	.config_vreg	= PCI_0CONFIGURATION_DATA_VIRTUAL_REGISTER,
 };
 
 static struct resource gt_pci_mem1_resource = {
@@ -61,12 +65,16 @@ static struct resource gt_pci_io_mem1_resource = {
 	.flags	= IORESOURCE_IO
 };
 
-static struct pci_controller gt_bus1_controller = {
-	.pci_ops	= &gt_bus1_pci_ops,
-	.mem_resource	= &gt_pci_mem1_resource,
-	.mem_offset	= 0xd0000000UL,
-	.io_resource	= &gt_pci_io_mem1_resource,
-	.io_offset	= 0x10000000UL
+static struct mv_pci_controller gt_bus1_controller = {
+	.pcic = {
+		.pci_ops	= &mv_pci_ops,
+		.mem_resource	= &gt_pci_mem1_resource,
+		.mem_offset	= 0xd0000000UL,
+		.io_resource	= &gt_pci_io_mem1_resource,
+		.io_offset	= 0x10000000UL
+	},
+	.config_addr	= PCI_1CONFIGURATION_ADDRESS,
+	.config_vreg	= PCI_1CONFIGURATION_DATA_VIRTUAL_REGISTER,
 };
 
 static __init int __init ocelot_g_pci_init(void)
@@ -81,8 +89,8 @@ static __init int __init ocelot_g_pci_init(void)
 		set_io_port_base(io_v_base);
 	}
 
-	register_pci_controller(&gt_bus0_controller);
-	register_pci_controller(&gt_bus1_controller);
+	register_pci_controller(&gt_bus0_controller.pcic);
+	register_pci_controller(&gt_bus1_controller.pcic);
 
 	return 0;
 }

@@ -147,44 +147,6 @@ static void rm7k_sc_disable(void)
 	clear_c0_config(1<<3);				/* CONF_SE */
 }
 
-static inline int __init rm7k_sc_probe(void)
-{
-	unsigned int config = read_c0_config();
-
-	if ((config >> 31) & 1)
-		return 0;
-
-	printk(KERN_INFO "Secondary cache size %dK, linesize %d bytes.\n",
-	       (scache_size >> 10), sc_lsize);
-
-	if ((config >> 3) & 1)                          /* CONF_SE */
-		return 1;
-
-	/*
-	 * While we're at it let's deal with the tertiary cache.
-	 */
-	if ((config >> 17) & 1)
-		return 1;
-
-	/*
-	 * We can't enable the L3 cache yet. There may be board-specific
-	 * magic necessary to turn it on, and blindly asking the CPU to
-	 * start using it would may give cache errors.
-	 *
-	 * Also, board-specific knowledge may allow us to use the
-	 * CACHE Flash_Invalidate_T instruction if the tag RAM supports
-	 * it, and may specify the size of the L3 cache so we don't have
-	 * to probe it.
-	 */
-	printk(KERN_INFO "Tertiary cache present, %s enabled\n",
-	       config&(1<<12) ? "already" : "not (yet)");
-
-	if ((config >> 12) & 1)
-		rm7k_tcache_enabled = 1;
-
-	return 1;
-}
-
 struct bcache_ops rm7k_sc_ops = {
 	.bc_enable = rm7k_sc_enable,
 	.bc_disable = rm7k_sc_disable,
@@ -194,8 +156,38 @@ struct bcache_ops rm7k_sc_ops = {
 
 void __init rm7k_sc_init(void)
 {
-	if (rm7k_sc_probe()) {
+	unsigned int config = read_c0_config();
+
+	if ((config >> 31) & 1)		/* Bit 31 set -> no S-Cache */
+		return;
+
+	printk(KERN_INFO "Secondary cache size %dK, linesize %d bytes.\n",
+	       (scache_size >> 10), sc_lsize);
+
+	if (!((config >> 3) & 1))	/* CONF_SE */
 		rm7k_sc_enable();
-		bcops = &rm7k_sc_ops;
+
+	/*
+	 * While we're at it let's deal with the tertiary cache.
+	 */
+	if (!((config >> 17) & 1)) {
+
+		/*
+		 * We can't enable the L3 cache yet. There may be board-specific
+		 * magic necessary to turn it on, and blindly asking the CPU to
+		 * start using it would may give cache errors.
+		 *
+		 * Also, board-specific knowledge may allow us to use the
+		 * CACHE Flash_Invalidate_T instruction if the tag RAM supports
+		 * it, and may specify the size of the L3 cache so we don't have
+		 * to probe it.
+		 */
+		printk(KERN_INFO "Tertiary cache present, %s enabled\n",
+		       config&(1<<12) ? "already" : "not (yet)");
+
+		if ((config >> 12) & 1)
+			rm7k_tcache_enabled = 1;
 	}
+
+	bcops = &rm7k_sc_ops;
 }

@@ -26,7 +26,7 @@
 
 struct callvectors* debug_vectors;
 
-extern unsigned long gt64240_base;
+extern unsigned long marvell_base;
 extern unsigned long bus_clock;
 
 #ifdef CONFIG_GALILLEO_GT64240_ETH
@@ -69,7 +69,7 @@ void __init prom_init(void)
 
 	while (*env) {
 		if (strncmp("gtbase", *env, strlen("gtbase")) == 0) {
-			gt64240_base = simple_strtol(*env + strlen("gtbase="),
+			marvell_base = simple_strtol(*env + strlen("gtbase="),
 							NULL, 16);
 		}
 		if (strncmp("busclock", *env, strlen("busclock")) == 0) {

@@ -28,6 +28,7 @@ CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_IKCONFIG is not set
 CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
@@ -54,7 +55,6 @@ CONFIG_KMOD=y
 CONFIG_MACH_VR41XX=y
 # CONFIG_CASIO_E55 is not set
 # CONFIG_IBM_WORKPAD is not set
-# CONFIG_NEC_EAGLE is not set
 # CONFIG_TANBAC_TB0226 is not set
 # CONFIG_TANBAC_TB0229 is not set
 CONFIG_VICTOR_MPC30X=y
@@ -147,6 +147,7 @@ CONFIG_TRAD_SIGNALS=y
 #
 # Generic Driver Options
 #
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 
 #
 # Memory Technology Devices (MTD)
@@ -172,7 +173,7 @@ CONFIG_TRAD_SIGNALS=y
 # CONFIG_BLK_DEV_UMEM is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_CARMEL is not set
+# CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_RAM is not set
 # CONFIG_LBD is not set
 
@@ -261,6 +262,7 @@ CONFIG_XFRM=y
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -607,6 +609,7 @@ CONFIG_CRYPTO_CRC32C=m
 #
 # Library routines
 #
+CONFIG_CRC16=m
 # CONFIG_CRC32 is not set
 CONFIG_LIBCRC32C=m
 CONFIG_ZLIB_INFLATE=y

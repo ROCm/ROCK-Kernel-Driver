@@ -28,6 +28,7 @@ CONFIG_IKCONFIG=y
 CONFIG_IKCONFIG_PROC=y
 CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
+# CONFIG_KALLSYMS_EXTRA_PASS is not set
 CONFIG_FUTEX=y
 CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
@@ -137,6 +138,7 @@ CONFIG_TRAD_SIGNALS=y
 #
 # Generic Driver Options
 #
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 
 #
 # Memory Technology Devices (MTD)
@@ -161,7 +163,7 @@ CONFIG_TRAD_SIGNALS=y
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
-# CONFIG_BLK_DEV_CARMEL is not set
+# CONFIG_BLK_DEV_SX8 is not set
 # CONFIG_BLK_DEV_RAM is not set
 # CONFIG_LBD is not set
 
@@ -232,6 +234,7 @@ CONFIG_IP_PNP_BOOTP=y
 # QoS and/or fair queueing
 #
 # CONFIG_NET_SCHED is not set
+# CONFIG_NET_CLS_ROUTE is not set
 
 #
 # Network testing
@@ -517,5 +520,6 @@ CONFIG_CMDLINE=""
 #
 # Library routines
 #
+CONFIG_CRC16=m
 # CONFIG_CRC32 is not set
 # CONFIG_LIBCRC32C is not set

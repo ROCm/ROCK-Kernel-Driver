@@ -464,12 +464,6 @@ core-$(CONFIG_MACH_VR41XX)	+= arch/mips/vr41xx/common/
 cflags-$(CONFIG_MACH_VR41XX)	+= -Iinclude/asm-mips/mach-vr41xx
 
 #
-# NEC Eagle/Hawk (VR4122/VR4131) board
-#
-core-$(CONFIG_NEC_EAGLE)	+= arch/mips/vr41xx/nec-eagle/
-load-$(CONFIG_NEC_EAGLE)	+= 0x80000000
-
-#
 # ZAO Networks Capcella (VR4131)
 #
 core-$(CONFIG_ZAO_CAPCELLA)	+= arch/mips/vr41xx/zao-capcella/

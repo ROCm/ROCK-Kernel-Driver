@@ -10,7 +10,7 @@
 #define __ASM_MIPS_MV64240_H
 
 #include <asm/addrspace.h>
-#include <asm/byteorder.h>
+#include <asm/marvell.h>
 
 /*
  * CPU Control Registers
@@ -1231,34 +1231,5 @@
 #define MPSC0_MASK						0xb884
 #define MPSC1_CAUSE						0xb80c
 #define MPSC1_MASK						0xb88c
-
-extern unsigned long gt64240_base;
-
-#define GT64240_BASE	   (gt64240_base)
-
-/*
- * Because of an error/peculiarity in the Galileo chip, we need to swap the
- * bytes when running bigendian.
- */
-#define __GT_READ(ofs)							\
-	(*(volatile u32 *)(GT64240_BASE+(ofs)))
-#define __GT_WRITE(ofs, data)						\
-	do { *(volatile u32 *)(GT64240_BASE+(ofs)) = (data); } while (0)
-
-#define GT_READ(ofs)		le32_to_cpu(__GT_READ(ofs))
-#define GT_WRITE(ofs, data)	__GT_WRITE(ofs, cpu_to_le32(data))
-
-#define GT_READ_16(ofs, data)						\
-        le16_to_cpu(*(volatile u16 *)(GT64240_BASE+(ofs)))
-#define GT_WRITE_16(ofs, data)  \
-        *(volatile u16 *)(GT64240_BASE+(ofs)) = cpu_to_le16(data)
-
-#define GT_READ_8(ofs, data)						\
-        *(data) = *(volatile u8 *)(GT64240_BASE+(ofs))
-#define GT_WRITE_8(ofs, data)						\
-        *(volatile u8 *)(GT64240_BASE+(ofs)) = data
-
-extern struct pci_ops gt_bus0_pci_ops;
-extern struct pci_ops gt_bus1_pci_ops;
 
 #endif	/* __ASM_MIPS_MV64240_H */
