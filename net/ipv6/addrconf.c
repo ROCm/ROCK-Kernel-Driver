@@ -1646,7 +1646,6 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 
 static void init_loopback(struct net_device *dev)
 {
-	struct in6_addr addr;
 	struct inet6_dev  *idev;
 	struct inet6_ifaddr * ifp;
 
@@ -1654,15 +1653,12 @@ static void init_loopback(struct net_device *dev)
 
 	ASSERT_RTNL();
 
-	memset(&addr, 0, sizeof(struct in6_addr));
-	addr.s6_addr[15] = 1;
-
 	if ((idev = ipv6_find_idev(dev)) == NULL) {
 		printk(KERN_DEBUG "init loopback: add_dev failed\n");
 		return;
 	}
 
-	ifp = ipv6_add_addr(idev, &addr, 128, IFA_HOST, IFA_F_PERMANENT);
+	ifp = ipv6_add_addr(idev, &in6addr_loopback, 128, IFA_HOST, IFA_F_PERMANENT);
 	if (ifp) {
 		spin_lock_bh(&ifp->lock);
 		ifp->flags &= ~IFA_F_TENTATIVE;
