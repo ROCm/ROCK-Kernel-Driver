@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 38 $
+ *              $Revision: 39 $
  *
  *****************************************************************************/
 
@@ -172,7 +172,7 @@ acpi_ex_convert_to_integer (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Convert an ACPI Object to an Buffer
+ * DESCRIPTION: Convert an ACPI Object to a Buffer
  *
  ******************************************************************************/
 
@@ -256,7 +256,6 @@ acpi_ex_convert_to_buffer (
 		/* Return the new buffer descriptor */
 
 		*result_desc = ret_desc;
-
 		break;
 
 
@@ -280,11 +279,13 @@ acpi_ex_convert_to_buffer (
  *
  * FUNCTION:    Acpi_ex_convert_ascii
  *
- * PARAMETERS:  Integer
+ * PARAMETERS:  Integer         - Value to be converted
+ *              Base            - 10 or 16
+ *              String          - Where the string is returned
  *
  * RETURN:      Actual string length
  *
- * DESCRIPTION: Convert an ACPI Integer to a hex string
+ * DESCRIPTION: Convert an ACPI Integer to a hex or decimal string
  *
  ******************************************************************************/
 
@@ -596,8 +597,8 @@ acpi_ex_convert_to_target_type (
 			/* No conversion allowed for these types */
 
 			if (destination_type != ACPI_GET_OBJECT_TYPE (source_desc)) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-					"Target does not allow conversion of type %s to %s\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+					"Explicit operator, will store (%s) over existing type (%s)\n",
 					acpi_ut_get_object_type_name (source_desc),
 					acpi_ut_get_type_name (destination_type)));
 				status = AE_TYPE;

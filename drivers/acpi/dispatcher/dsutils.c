@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 94 $
+ *              $Revision: 95 $
  *
  ******************************************************************************/
 
@@ -300,7 +300,6 @@ acpi_ds_create_operand (
 	u32                     arg_index)
 {
 	acpi_status             status = AE_OK;
-	acpi_status             status2;
 	NATIVE_CHAR             *name_string;
 	u32                     name_length;
 	acpi_operand_object     *obj_desc;
@@ -308,7 +307,6 @@ acpi_ds_create_operand (
 	u16                     opcode;
 	acpi_interpreter_mode   interpreter_mode;
 	const acpi_opcode_info  *op_info;
-	char                    *name;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ds_create_operand", arg);
@@ -384,15 +382,11 @@ acpi_ds_create_operand (
 				 * very serious error at this point
 				 */
 				status = AE_AML_NAME_NOT_FOUND;
-
-				name = NULL;
-				status2 = acpi_ns_externalize_name (ACPI_UINT32_MAX, name_string, NULL, &name);
-				if (ACPI_SUCCESS (status2)) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-							"Object name [%s] was not found in namespace\n", name));
-					ACPI_MEM_FREE (name);
-				}
 			}
+		}
+
+		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (name_string, status);
 		}
 
 		/* Free the namestring created above */

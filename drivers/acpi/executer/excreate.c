@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: excreate - Named object creation
- *              $Revision: 93 $
+ *              $Revision: 94 $
  *
  *****************************************************************************/
 
@@ -53,7 +53,8 @@ acpi_status
 acpi_ex_create_alias (
 	acpi_walk_state         *walk_state)
 {
-	acpi_namespace_node     *source_node;
+	acpi_namespace_node     *target_node;
+	acpi_namespace_node     *alias_node;
 	acpi_status             status;
 
 
@@ -62,25 +63,61 @@ acpi_ex_create_alias (
 
 	/* Get the source/alias operands (both namespace nodes) */
 
-	source_node = (acpi_namespace_node *) walk_state->operands[1];
+	alias_node = (acpi_namespace_node *) walk_state->operands[0];
+	target_node = (acpi_namespace_node *) walk_state->operands[1];
 
-
-	/* Attach the original source object to the new Alias Node */
-
-	status = acpi_ns_attach_object ((acpi_namespace_node *) walk_state->operands[0],
-			   acpi_ns_get_attached_object (source_node),
-			   source_node->type);
+	if (target_node->type == INTERNAL_TYPE_ALIAS) {
+		/*
+		 * Dereference an existing alias so that we don't create a chain
+		 * of aliases.  With this code, we guarantee that an alias is
+		 * always exactly one level of indirection away from the
+		 * actual aliased name.
+		 */
+		target_node = (acpi_namespace_node *) target_node->object;
+	}
 
 	/*
-	 * The new alias assumes the type of the source, but it points
-	 * to the same object.  The reference count of the object has an
-	 * additional reference to prevent deletion out from under either the
-	 * source or the alias Node
+	 * For objects that can never change (i.e., the NS node will
+	 * permanently point to the same object), we can simply attach
+	 * the object to the new NS node.  For other objects (such as
+	 * Integers, buffers, etc.), we have to point the Alias node
+	 * to the original Node.
 	 */
+	switch (target_node->type) {
+	case ACPI_TYPE_INTEGER:
+	case ACPI_TYPE_STRING:
+	case ACPI_TYPE_BUFFER:
+	case ACPI_TYPE_PACKAGE:
+	case ACPI_TYPE_BUFFER_FIELD:
+
+		/*
+		 * The new alias has the type ALIAS and points to the original
+		 * NS node, not the object itself.  This is because for these
+		 * types, the object can change dynamically via a Store.
+		 */
+		alias_node->type = INTERNAL_TYPE_ALIAS;
+		alias_node->object = (acpi_operand_object *) target_node;
+		break;
+
+	default:
+
+		/* Attach the original source object to the new Alias Node */
+
+		/*
+		 * The new alias assumes the type of the target, and it points
+		 * to the same object.  The reference count of the object has an
+		 * additional reference to prevent deletion out from under either the
+		 * target node or the alias Node
+		 */
+		status = acpi_ns_attach_object (alias_node,
+				 acpi_ns_get_attached_object (target_node),
+				 target_node->type);
+		break;
+	}
 
 	/* Since both operands are Nodes, we don't need to delete them */
 
-	return_ACPI_STATUS (status);
+	return_ACPI_STATUS (AE_OK);
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsobject - Dispatcher object management routines
- *              $Revision: 107 $
+ *              $Revision: 108 $
  *
  *****************************************************************************/
 
@@ -240,12 +240,12 @@ acpi_ds_build_internal_object (
 {
 	acpi_operand_object     *obj_desc;
 	acpi_status             status;
-	char                    *name;
 
 
 	ACPI_FUNCTION_TRACE ("Ds_build_internal_object");
 
 
+	*obj_desc_ptr = NULL;
 	if (op->common.aml_opcode == AML_INT_NAMEPATH_OP) {
 		/*
 		 * This is an named object reference.  If this name was
@@ -259,24 +259,8 @@ acpi_ds_build_internal_object (
 					  (acpi_namespace_node **) &(op->common.node));
 
 			if (ACPI_FAILURE (status)) {
-				if (status == AE_NOT_FOUND) {
-					name = NULL;
-					status = acpi_ns_externalize_name (ACPI_UINT32_MAX, op->common.value.string, NULL, &name);
-					if (ACPI_SUCCESS (status)) {
-						ACPI_REPORT_WARNING (("Reference %s at AML %X not found\n",
-								 name, op->common.aml_offset));
-						ACPI_MEM_FREE (name);
-					}
-					else {
-						ACPI_REPORT_WARNING (("Reference %s at AML %X not found\n",
-								   op->common.value.string, op->common.aml_offset));
-					}
-
-					*obj_desc_ptr = NULL;
-				}
-				else {
-					return_ACPI_STATUS (status);
-				}
+				ACPI_REPORT_NSERROR (op->common.value.string, status);
+				return_ACPI_STATUS (status);
 			}
 		}
 	}

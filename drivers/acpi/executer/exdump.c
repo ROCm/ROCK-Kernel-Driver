@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 159 $
+ *              $Revision: 160 $
  *
  *****************************************************************************/
 
@@ -577,6 +577,14 @@ acpi_ex_dump_object_descriptor (
 		{
 			return_VOID;
 		}
+	}
+
+	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) == ACPI_DESC_TYPE_NAMED)
+	{
+		acpi_ex_dump_node ((acpi_namespace_node *) obj_desc, flags);
+		acpi_os_printf ("\nAttached Object (%p):\n", ((acpi_namespace_node *) obj_desc)->object);
+		acpi_ex_dump_object_descriptor (((acpi_namespace_node *) obj_desc)->object, flags);
+		return;
 	}
 
 	if (ACPI_GET_DESCRIPTOR_TYPE (obj_desc) != ACPI_DESC_TYPE_OPERAND)

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 140 $
+ *              $Revision: 141 $
  *
  *****************************************************************************/
 
@@ -387,6 +387,11 @@ acpi_ns_dump_one_object (
 			break;
 
 
+		case INTERNAL_TYPE_ALIAS:
+
+			acpi_os_printf (" Target %4.4s (%p)\n", ((acpi_namespace_node *) obj_desc)->name.ascii, obj_desc);
+			break;
+
 		default:
 
 			acpi_os_printf (" Object %p\n", obj_desc);
@@ -477,9 +482,9 @@ acpi_ns_dump_one_object (
 
 	/* If there is an attached object, display it */
 
-	dbg_level = acpi_dbg_level;
+	dbg_level    = acpi_dbg_level;
 	acpi_dbg_level = 0;
-	obj_desc = acpi_ns_get_attached_object (this_node);
+	obj_desc     = acpi_ns_get_attached_object (this_node);
 	acpi_dbg_level = dbg_level;
 
 	/* Dump attached objects */
@@ -648,7 +653,7 @@ acpi_ns_dump_tables (
 		 * If the name space has not been initialized,
 		 * there is nothing to dump.
 		 */
-		ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "name space not initialized!\n"));
+		ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "namespace not initialized!\n"));
 		return_VOID;
 	}
 

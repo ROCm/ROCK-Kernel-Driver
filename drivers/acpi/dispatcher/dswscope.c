@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswscope - Scope stack manipulation
- *              $Revision: 52 $
+ *              $Revision: 53 $
  *
  *****************************************************************************/
 
@@ -63,7 +63,7 @@ acpi_ds_scope_stack_clear (
 		walk_state->scope_info = scope_info->scope.next;
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-			"Popped object type %X\n", scope_info->common.value));
+			"Popped object type (%s)\n", acpi_ut_get_type_name (scope_info->common.value)));
 		acpi_ut_delete_generic_state (scope_info);
 	}
 }
@@ -164,7 +164,7 @@ acpi_ds_scope_stack_pop (
 	}
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-		"Popped object type %X\n", scope_info->common.value));
+		"Popped object type (%s)\n", acpi_ut_get_type_name (scope_info->common.value)));
 
 	acpi_ut_delete_generic_state (scope_info);
 

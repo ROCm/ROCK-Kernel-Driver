@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstorob - AML Interpreter object store support, store to object
- *              $Revision: 44 $
+ *              $Revision: 45 $
  *
  *****************************************************************************/
 
@@ -87,7 +87,6 @@ acpi_ex_store_buffer_to_buffer (
 		ACPI_MEMSET (target_desc->buffer.pointer, 0, target_desc->buffer.length);
 		ACPI_MEMCPY (target_desc->buffer.pointer, buffer, length);
 	}
-
 	else {
 		/*
 		 * Truncate the source, copy only what will fit
@@ -102,7 +101,6 @@ acpi_ex_store_buffer_to_buffer (
 	/* Copy flags */
 
 	target_desc->buffer.flags = source_desc->buffer.flags;
-
 	return (AE_OK);
 }
 
@@ -142,15 +140,16 @@ acpi_ex_store_string_to_string (
 	 * Setting a string value replaces the old string
 	 */
 	if (length < target_desc->string.length) {
-		/* Clear old string and copy in the new one */
-
-		ACPI_MEMSET (target_desc->string.pointer, 0, target_desc->string.length);
+		/*
+		 * String will fit in existing buffer.
+		 * Clear old string and copy in the new one
+		 */
+		ACPI_MEMSET (target_desc->string.pointer, 0, target_desc->string.length + 1);
 		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
-
 	else {
 		/*
-		 * Free the current buffer, then allocate a buffer
+		 * Free the current buffer, then allocate a new buffer
 		 * large enough to hold the value
 		 */
 		if (target_desc->string.pointer &&
@@ -161,15 +160,17 @@ acpi_ex_store_string_to_string (
 			ACPI_MEM_FREE (target_desc->string.pointer);
 		}
 
-		target_desc->string.pointer = ACPI_MEM_ALLOCATE ((ACPI_SIZE) length + 1);
+		target_desc->string.pointer = ACPI_MEM_CALLOCATE ((ACPI_SIZE) length + 1);
 		if (!target_desc->string.pointer) {
 			return (AE_NO_MEMORY);
 		}
 
-		target_desc->string.length = length;
 		ACPI_MEMCPY (target_desc->string.pointer, buffer, length);
 	}
 
+	/* Set the new target length */
+
+	target_desc->string.length = length;
 	return (AE_OK);
 }
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 57 $
+ *              $Revision: 58 $
  *
  *****************************************************************************/
 
@@ -320,6 +320,10 @@ acpi_ex_resolve_operands (
 			return_ACPI_STATUS (status);
 		}
 
+		/* Get the resolved object */
+
+		obj_desc = *stack_ptr;
+
 		/*
 		 * Check the resulting object (value) type
 		 */
@@ -379,18 +383,27 @@ acpi_ex_resolve_operands (
 			/*
 			 * Need an operand of type ACPI_TYPE_INTEGER,
 			 * But we can implicitly convert from a STRING or BUFFER
+			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_integer (*stack_ptr, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_integer (obj_desc, stack_ptr, walk_state);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 						"Needed [Integer/String/Buffer], found [%s] %p\n",
-						acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+						acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 				}
 
 				return_ACPI_STATUS (status);
+			}
+
+			if (obj_desc != *stack_ptr) {
+				/*
+				 * We just created a new object, remove a reference
+				 * on the original operand object
+				 */
+				acpi_ut_remove_reference (obj_desc);
 			}
 			goto next_operand;
 
@@ -400,18 +413,27 @@ acpi_ex_resolve_operands (
 			/*
 			 * Need an operand of type ACPI_TYPE_BUFFER,
 			 * But we can implicitly convert from a STRING or INTEGER
+			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_buffer (*stack_ptr, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 						"Needed [Integer/String/Buffer], found [%s] %p\n",
-						acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+						acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 				}
 
 				return_ACPI_STATUS (status);
+			}
+
+			if (obj_desc != *stack_ptr) {
+				/*
+				 * We just created a new object, remove a reference
+				 * on the original operand object
+				 */
+				acpi_ut_remove_reference (obj_desc);
 			}
 			goto next_operand;
 
@@ -421,18 +443,27 @@ acpi_ex_resolve_operands (
 			/*
 			 * Need an operand of type ACPI_TYPE_STRING,
 			 * But we can implicitly convert from a BUFFER or INTEGER
+			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_string (*stack_ptr, stack_ptr, 16, ACPI_UINT32_MAX, walk_state);
+			status = acpi_ex_convert_to_string (obj_desc, stack_ptr, 16, ACPI_UINT32_MAX, walk_state);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 						"Needed [Integer/String/Buffer], found [%s] %p\n",
-						acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+						acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 				}
 
 				return_ACPI_STATUS (status);
+			}
+
+			if (obj_desc != *stack_ptr) {
+				/*
+				 * We just created a new object, remove a reference
+				 * on the original operand object
+				 */
+				acpi_ut_remove_reference (obj_desc);
 			}
 			goto next_operand;
 
@@ -441,7 +472,7 @@ acpi_ex_resolve_operands (
 
 			/* Need an operand of type INTEGER, STRING or BUFFER */
 
-			switch (ACPI_GET_OBJECT_TYPE (*stack_ptr)) {
+			switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 			case ACPI_TYPE_INTEGER:
 			case ACPI_TYPE_STRING:
 			case ACPI_TYPE_BUFFER:
@@ -452,7 +483,7 @@ acpi_ex_resolve_operands (
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"Needed [Integer/String/Buffer], found [%s] %p\n",
-					acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+					acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 			}
@@ -467,40 +498,7 @@ acpi_ex_resolve_operands (
 			 * The only reference allowed here is a direct reference to
 			 * a namespace node.
 			 */
-#if 0
-			if (ACPI_GET_OBJECT_TYPE (*stack_ptr) == INTERNAL_TYPE_REFERENCE) {
-				if (!(*stack_ptr)->reference.node) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Needed [Node Reference], found [%p]\n",
-						*stack_ptr));
-
-					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
-				}
-
-				/* Get the object attached to the node */
-
-				temp_node = acpi_ns_get_attached_object ((*stack_ptr)->reference.node);
-				if (!temp_node) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Node [%p] has no attached object\n",
-						(*stack_ptr)->reference.node));
-
-					return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
-				}
-
-				/*
-				 * Swap the reference object with the node's object.  Must add
-				 * a reference to the node object, and remove a reference from
-				 * the original reference object.
-				 */
-				acpi_ut_add_reference (temp_node);
-				acpi_ut_remove_reference (*stack_ptr);
-				(*stack_ptr) = temp_node;
-			}
-#endif
-			/* Need a buffer, string, package */
-
-			switch (ACPI_GET_OBJECT_TYPE (*stack_ptr)) {
+			switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 			case ACPI_TYPE_PACKAGE:
 			case ACPI_TYPE_STRING:
 			case ACPI_TYPE_BUFFER:
@@ -512,7 +510,7 @@ acpi_ex_resolve_operands (
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"Needed [Buf/Str/Pkg], found [%s] %p\n",
-					acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+					acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 			}
@@ -523,7 +521,7 @@ acpi_ex_resolve_operands (
 
 			/* Need a buffer or package or (ACPI 2.0) String */
 
-			switch (ACPI_GET_OBJECT_TYPE (*stack_ptr)) {
+			switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 			case ACPI_TYPE_PACKAGE:
 			case ACPI_TYPE_STRING:
 			case ACPI_TYPE_BUFFER:
@@ -534,7 +532,7 @@ acpi_ex_resolve_operands (
 			default:
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 					"Needed [Buf/Str/Pkg], found [%s] %p\n",
-					acpi_ut_get_object_type_name (*stack_ptr), *stack_ptr));
+					acpi_ut_get_object_type_name (obj_desc), obj_desc));
 
 				return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 			}
@@ -546,7 +544,7 @@ acpi_ex_resolve_operands (
 			/* Unknown type */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"Internal - Unknown ARGI type %X\n",
+				"Internal - Unknown ARGI (required operand) type %X\n",
 				this_arg_type));
 
 			return_ACPI_STATUS (AE_BAD_PARAMETER);

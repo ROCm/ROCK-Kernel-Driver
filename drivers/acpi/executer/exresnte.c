@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 58 $
+ *              $Revision: 59 $
  *
  *****************************************************************************/
 
@@ -87,6 +87,15 @@ acpi_ex_resolve_node_to_value (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p Type=%X\n",
 		 node, source_desc, entry_type));
+
+	if (entry_type == INTERNAL_TYPE_ALIAS) {
+		/* There is always exactly one level of indirection */
+
+		node       = (acpi_namespace_node *) node->object;
+		source_desc = acpi_ns_get_attached_object (node);
+		entry_type = acpi_ns_get_type ((acpi_handle) node);
+		*object_ptr = node;
+	}
 
 	/*
 	 * Several object types require no further processing:
@@ -204,7 +213,7 @@ acpi_ex_resolve_node_to_value (
 		break;
 
 
-	/* TYPE_Any is untyped, and thus there is no object associated with it */
+	/* TYPE_ANY is untyped, and thus there is no object associated with it */
 
 	case ACPI_TYPE_ANY:
 

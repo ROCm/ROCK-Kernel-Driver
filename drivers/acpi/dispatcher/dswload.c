@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 73 $
+ *              $Revision: 75 $
  *
  *****************************************************************************/
 
@@ -183,6 +183,7 @@ acpi_ds_load1_begin_op (
 	status = acpi_ns_lookup (walk_state->scope_info, path, object_type,
 			  ACPI_IMODE_LOAD_PASS1, flags, walk_state, &(node));
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (path, status);
 		return (status);
 	}
 
@@ -194,7 +195,6 @@ acpi_ds_load1_begin_op (
 		switch (node->type) {
 		case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
 		case ACPI_TYPE_DEVICE:
-		case ACPI_TYPE_METHOD:
 		case ACPI_TYPE_POWER:
 		case ACPI_TYPE_PROCESSOR:
 		case ACPI_TYPE_THERMAL:
@@ -212,10 +212,12 @@ acpi_ds_load1_begin_op (
 			 *
 			 *  Name (DEB, 0)
 			 *  Scope (DEB) { ... }
+			 *
+			 * Note: silently change the type here.  On the second pass, we will report a warning
 			 */
 
-			ACPI_REPORT_WARNING (("Invalid type (%s) for target of Scope operator [%4.4s], changing type to ANY\n",
-				acpi_ut_get_type_name (node->type), path));
+			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Type override - [%4.4s] had invalid type (%s) for Scope operator, changed to (Scope)\n",
+				path, acpi_ut_get_type_name (node->type)));
 
 			node->type = ACPI_TYPE_ANY;
 			walk_state->scope_info->common.value = ACPI_TYPE_ANY;
@@ -225,7 +227,7 @@ acpi_ds_load1_begin_op (
 
 			/* All other types are an error */
 
-			ACPI_REPORT_ERROR (("Invalid type (%s) for target of Scope operator [%4.4s]\n",
+			ACPI_REPORT_ERROR (("Invalid type (%s) for target of Scope operator [%4.4s] (Cannot override)\n",
 				acpi_ut_get_type_name (node->type), path));
 
 			return (AE_AML_OPERAND_TYPE);
@@ -458,76 +460,79 @@ acpi_ds_load2_begin_op (
 				  ACPI_IMODE_EXECUTE, ACPI_NS_NO_UPSEARCH, walk_state, &(node));
 	}
 
-	if (ACPI_SUCCESS (status)) {
-		/*
-		 * For the scope op, we must check to make sure that the target is
-		 * one of the opcodes that actually opens a scope
-		 */
-		if (walk_state->opcode == AML_SCOPE_OP) {
-			switch (node->type) {
-			case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
-			case ACPI_TYPE_DEVICE:
-			case ACPI_TYPE_METHOD:
-			case ACPI_TYPE_POWER:
-			case ACPI_TYPE_PROCESSOR:
-			case ACPI_TYPE_THERMAL:
-
-				/* These are acceptable types */
-				break;
-
-			case ACPI_TYPE_INTEGER:
-			case ACPI_TYPE_STRING:
-			case ACPI_TYPE_BUFFER:
-
-				/*
-				 * These types we will allow, but we will change the type.  This
-				 * enables some existing code of the form:
-				 *
-				 *  Name (DEB, 0)
-				 *  Scope (DEB) { ... }
-				 */
-
-				ACPI_REPORT_WARNING (("Invalid type (%s) for target of Scope operator [%4.4s], changing type to ANY\n",
-					acpi_ut_get_type_name (node->type), buffer_ptr));
-
-				node->type = ACPI_TYPE_ANY;
-				walk_state->scope_info->common.value = ACPI_TYPE_ANY;
-				break;
-
-		   default:
-
-				/* All other types are an error */
-
-				ACPI_REPORT_ERROR (("Invalid type (%s) for target of Scope operator [%4.4s]\n",
-					acpi_ut_get_type_name (node->type), buffer_ptr));
-
-				return (AE_AML_OPERAND_TYPE);
-			}
-		}
-		if (!op) {
-			/* Create a new op */
-
-			op = acpi_ps_alloc_op (walk_state->opcode);
-			if (!op) {
-				return_ACPI_STATUS (AE_NO_MEMORY);
-			}
-
-			/* Initialize the new op */
-
-			if (node) {
-				op->named.name = node->name.integer;
-			}
-			if (out_op) {
-				*out_op = op;
-			}
-		}
-
-		/*
-		 * Put the Node in the "op" object that the parser uses, so we
-		 * can get it again quickly when this scope is closed
-		 */
-		op->common.node = node;
+	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (buffer_ptr, status);
+		return_ACPI_STATUS (status);
 	}
+
+	/*
+	 * For the scope op, we must check to make sure that the target is
+	 * one of the opcodes that actually opens a scope
+	 */
+	if (walk_state->opcode == AML_SCOPE_OP) {
+		switch (node->type) {
+		case ACPI_TYPE_ANY:         /* Scope nodes are untyped (ANY) */
+		case ACPI_TYPE_DEVICE:
+		case ACPI_TYPE_POWER:
+		case ACPI_TYPE_PROCESSOR:
+		case ACPI_TYPE_THERMAL:
+
+			/* These are acceptable types */
+			break;
+
+		case ACPI_TYPE_INTEGER:
+		case ACPI_TYPE_STRING:
+		case ACPI_TYPE_BUFFER:
+
+			/*
+			 * These types we will allow, but we will change the type.  This
+			 * enables some existing code of the form:
+			 *
+			 *  Name (DEB, 0)
+			 *  Scope (DEB) { ... }
+			 */
+
+			ACPI_REPORT_WARNING (("Type override - [%4.4s] had invalid type (%s) for Scope operator, changed to (Scope)\n",
+				buffer_ptr, acpi_ut_get_type_name (node->type)));
+
+			node->type = ACPI_TYPE_ANY;
+			walk_state->scope_info->common.value = ACPI_TYPE_ANY;
+			break;
+
+	   default:
+
+			/* All other types are an error */
+
+			ACPI_REPORT_ERROR (("Invalid type (%s) for target of Scope operator [%4.4s]\n",
+				acpi_ut_get_type_name (node->type), buffer_ptr));
+
+			return (AE_AML_OPERAND_TYPE);
+		}
+	}
+
+	if (!op) {
+		/* Create a new op */
+
+		op = acpi_ps_alloc_op (walk_state->opcode);
+		if (!op) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+		/* Initialize the new op */
+
+		if (node) {
+			op->named.name = node->name.integer;
+		}
+		if (out_op) {
+			*out_op = op;
+		}
+	}
+
+	/*
+	 * Put the Node in the "op" object that the parser uses, so we
+	 * can get it again quickly when this scope is closed
+	 */
+	op->common.node = node;
 
 	return_ACPI_STATUS (status);
 }
@@ -834,7 +839,9 @@ acpi_ds_load2_end_op (
 			 */
 			op->common.node = new_node;
 		}
-
+		else {
+			ACPI_REPORT_NSERROR (arg->common.value.string, status);
+		}
 		break;
 
 

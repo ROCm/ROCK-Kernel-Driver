@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exstore - AML Interpreter object store support
- *              $Revision: 171 $
+ *              $Revision: 172 $
  *
  *****************************************************************************/
 
@@ -459,8 +459,12 @@ acpi_ex_store_object_to_node (
 			 * Store the new New_desc as the new value of the Name, and set
 			 * the Name's type to that of the value being stored in it.
 			 * Source_desc reference count is incremented by Attach_object.
+			 *
+			 * Note: This may change the type of the node if an explicit store
+			 * has been performed such that the node/object type has been
+			 * changed.
 			 */
-			status = acpi_ns_attach_object (node, new_desc, target_type);
+			status = acpi_ns_attach_object (node, new_desc, new_desc->common.type);
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
 				"Store %s into %s via Convert/Attach\n",

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg2 - AML execution - opcodes with 2 arguments
- *              $Revision: 110 $
+ *              $Revision: 111 $
  *
  *****************************************************************************/
 
@@ -244,9 +244,10 @@ acpi_ex_opcode_2A_1T_1R (
 {
 	acpi_operand_object     **operand   = &walk_state->operands[0];
 	acpi_operand_object     *return_desc = NULL;
-	acpi_operand_object     *temp_desc;
+	acpi_operand_object     *temp_desc = NULL;
 	u32                     index;
 	acpi_status             status      = AE_OK;
+	ACPI_SIZE               length;
 
 
 	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -284,7 +285,6 @@ acpi_ex_opcode_2A_1T_1R (
 
 		status = acpi_ut_divide (&operand[0]->integer.value, &operand[1]->integer.value,
 				  NULL, &return_desc->integer.value);
-
 		break;
 
 
@@ -299,15 +299,15 @@ acpi_ex_opcode_2A_1T_1R (
 		 */
 		switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
 		case ACPI_TYPE_INTEGER:
-			status = acpi_ex_convert_to_integer (operand[1], &operand[1], walk_state);
+			status = acpi_ex_convert_to_integer (operand[1], &temp_desc, walk_state);
 			break;
 
 		case ACPI_TYPE_STRING:
-			status = acpi_ex_convert_to_string (operand[1], &operand[1], 16, ACPI_UINT32_MAX, walk_state);
+			status = acpi_ex_convert_to_string (operand[1], &temp_desc, 16, ACPI_UINT32_MAX, walk_state);
 			break;
 
 		case ACPI_TYPE_BUFFER:
-			status = acpi_ex_convert_to_buffer (operand[1], &operand[1], walk_state);
+			status = acpi_ex_convert_to_buffer (operand[1], &temp_desc, walk_state);
 			break;
 
 		default:
@@ -323,14 +323,63 @@ acpi_ex_opcode_2A_1T_1R (
 		 * (Both are Integer, String, or Buffer), and we can now perform the
 		 * concatenation.
 		 */
-		status = acpi_ex_do_concatenate (operand[0], operand[1], &return_desc, walk_state);
+		status = acpi_ex_do_concatenate (operand[0], temp_desc, &return_desc, walk_state);
+		if (temp_desc != operand[1]) {
+			acpi_ut_remove_reference (temp_desc);
+		}
 		break;
 
 
 	case AML_TO_STRING_OP:          /* To_string (Buffer, Length, Result) (ACPI 2.0) */
 
-		status = acpi_ex_convert_to_string (operand[0], &return_desc, 16,
-				  (u32) operand[1]->integer.value, walk_state);
+		/*
+		 * Input object is guaranteed to be a buffer at this point (it may have
+		 * been converted.)  Copy the raw buffer data to a new object of type String.
+		 */
+
+		/* Get the length of the new string */
+
+		length = 0;
+		if (operand[1]->integer.value == 0) {
+			/* Handle optional length value */
+
+			operand[1]->integer.value = ACPI_INTEGER_MAX;
+		}
+
+		while ((length < operand[0]->buffer.length) &&
+			   (length < operand[1]->integer.value) &&
+			   (operand[0]->buffer.pointer[length])) {
+			length++;
+		}
+
+		if (length > ACPI_MAX_STRING_CONVERSION) {
+			status = AE_AML_STRING_LIMIT;
+			goto cleanup;
+		}
+
+		/* Create the internal return object */
+
+		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_STRING);
+		if (!return_desc) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		/* Allocate a new string buffer (Length + 1 for null terminator) */
+
+		return_desc->string.pointer = ACPI_MEM_CALLOCATE (length + 1);
+		if (!return_desc->string.pointer) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		/* Copy the raw buffer data with no transform */
+
+		ACPI_MEMCPY (return_desc->string.pointer, operand[0]->buffer.pointer, length);
+
+		/* Set the string length */
+
+		return_desc->string.length = length;
 		break;
 
 

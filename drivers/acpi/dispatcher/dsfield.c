@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 67 $
+ *              $Revision: 68 $
  *
  *****************************************************************************/
 
@@ -106,6 +106,7 @@ acpi_ds_create_buffer_field (
 			 INTERNAL_TYPE_DEF_ANY, ACPI_IMODE_LOAD_PASS1,
 			 flags, walk_state, &(node));
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (arg->common.value.string, status);
 		return_ACPI_STATUS (status);
 	}
 
@@ -245,12 +246,12 @@ acpi_ds_get_field_names (
 					  info->field_type, ACPI_IMODE_EXECUTE, ACPI_NS_DONT_OPEN_SCOPE,
 					  walk_state, &info->field_node);
 			if (ACPI_FAILURE (status)) {
+				ACPI_REPORT_NSERROR ((char *) &arg->named.name, status);
 				if (status != AE_ALREADY_EXISTS) {
 					return_ACPI_STATUS (status);
 				}
 
-				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
-						(char *) &arg->named.name));
+				/* Already exists, ignore error */
 			}
 			else {
 				arg->common.node = info->field_node;
@@ -329,6 +330,7 @@ acpi_ds_create_field (
 				  ACPI_TYPE_REGION, ACPI_IMODE_EXECUTE,
 				  ACPI_NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (arg->common.value.name, status);
 			return_ACPI_STATUS (status);
 		}
 	}
@@ -412,12 +414,10 @@ acpi_ds_init_field_objects (
 					  ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND,
 					  walk_state, &node);
 			if (ACPI_FAILURE (status)) {
+				ACPI_REPORT_NSERROR ((char *) &arg->named.name, status);
 				if (status != AE_ALREADY_EXISTS) {
 					return_ACPI_STATUS (status);
 				}
-
-				ACPI_REPORT_ERROR (("Field name [%4.4s] already exists in current scope\n",
-						(char *) &arg->named.name));
 
 				/* Name already exists, just ignore this error */
 
@@ -472,6 +472,7 @@ acpi_ds_create_bank_field (
 				  ACPI_TYPE_REGION, ACPI_IMODE_EXECUTE,
 				  ACPI_NS_SEARCH_PARENT, walk_state, &region_node);
 		if (ACPI_FAILURE (status)) {
+			ACPI_REPORT_NSERROR (arg->common.value.name, status);
 			return_ACPI_STATUS (status);
 		}
 	}
@@ -483,6 +484,7 @@ acpi_ds_create_bank_field (
 			  INTERNAL_TYPE_BANK_FIELD_DEFN, ACPI_IMODE_EXECUTE,
 			  ACPI_NS_SEARCH_PARENT, walk_state, &info.register_node);
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (arg->common.value.string, status);
 		return_ACPI_STATUS (status);
 	}
 
@@ -542,6 +544,7 @@ acpi_ds_create_index_field (
 			  ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
 			  ACPI_NS_SEARCH_PARENT, walk_state, &info.register_node);
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (arg->common.value.string, status);
 		return_ACPI_STATUS (status);
 	}
 
@@ -552,6 +555,7 @@ acpi_ds_create_index_field (
 			  INTERNAL_TYPE_INDEX_FIELD_DEFN, ACPI_IMODE_EXECUTE,
 			  ACPI_NS_SEARCH_PARENT, walk_state, &info.data_register_node);
 	if (ACPI_FAILURE (status)) {
+		ACPI_REPORT_NSERROR (arg->common.value.string, status);
 		return_ACPI_STATUS (status);
 	}
 
@@ -559,7 +563,6 @@ acpi_ds_create_index_field (
 
 	arg = arg->common.next;
 	info.field_flags = arg->common.value.integer8;
-
 
 	/* Each remaining arg is a Named Field */
 
