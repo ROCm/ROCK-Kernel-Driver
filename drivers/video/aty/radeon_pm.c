@@ -180,7 +180,7 @@ void radeon_pm_disable_dynamic_mode(struct radeonfb_info *rinfo)
 		tmp = INPLL(pllMCLK_CNTL);
 		tmp &= ~(MCLK_CNTL__FORCE_MCLKA |
 			 MCLK_CNTL__FORCE_YCLKA);
-		OUTREG(pllMCLK_CNTL, tmp);
+		OUTPLL(pllMCLK_CNTL, tmp);
 		radeon_msleep(16);
 	}
 	/* Hrm... same shit, X doesn't do that but I have to */
@@ -404,7 +404,7 @@ void radeon_pm_enable_dynamic_mode(struct radeonfb_info *rinfo)
 	    ((INREG(CONFIG_CNTL) & CFG_ATI_REV_ID_MASK) < CFG_ATI_REV_A13)) {
 		tmp = INPLL(pllPLL_PWRMGT_CNTL);
 		tmp |= PLL_PWRMGT_CNTL__TCL_BYPASS_DISABLE;
-		OUTREG(pllPLL_PWRMGT_CNTL, tmp);
+		OUTPLL(pllPLL_PWRMGT_CNTL, tmp);
 		radeon_msleep(15);
 	}
 
