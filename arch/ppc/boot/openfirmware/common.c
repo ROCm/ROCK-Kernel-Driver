@@ -10,6 +10,7 @@
 #include "zlib.h"
 #include "nonstdio.h"
 #include "of1275.h"
+#include <linux/string.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
 
