@@ -375,7 +375,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		spin_lock(&GlobalMid_Lock);
 		list_for_each(tmp, &server->pending_mid_q) {
 		mid_entry = list_entry(tmp, struct mid_q_entry, qhead);
-			if ((mid_entry->mid == smb_buffer->Mid) && (mid_entry->midState == MID_REQUEST_SUBMITTED)) {
+			if (mid_entry->midState == MID_REQUEST_SUBMITTED) {
 				cFYI(1,
 					 (" Clearing Mid 0x%x - waking up ",mid_entry->mid));
 				task_to_wake = mid_entry->tsk;
