@@ -3366,25 +3366,8 @@ static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
 			     cpumask_t *new_mask)
 {
 	if (len < sizeof(cpumask_t)) {
-		/* Smaller is ok as long as all online CPUs are covered */
-		int i, max = 0;
-		for_each_online_cpu(i)
-			max = i;
-		if (len < (max + 7)/8)
-			return -EINVAL;
 		memset(new_mask, 0, sizeof(cpumask_t));
 	} else if (len > sizeof(cpumask_t)) {
-		/* Longer is ok as long as all high bits are 0 */
-		int i;
-		if (len > PAGE_SIZE)
-			return -EINVAL;
-		for (i = sizeof(cpumask_t); i < len; i++) {
-			unsigned char val;
-			if (get_user(val, (unsigned char *)user_mask_ptr + i))
-				return -EFAULT;
-			if (val)
-				return -EINVAL;
-		}
 		len = sizeof(cpumask_t);
 	}
 	return copy_from_user(new_mask, user_mask_ptr, len) ? -EFAULT : 0;
