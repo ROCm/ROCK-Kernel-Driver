@@ -138,10 +138,11 @@ static int pci_device_probe(struct device * dev)
 
 	drv = to_pci_driver(dev->driver);
 	pci_dev = to_pci_dev(dev);
-	if (get_device(dev)) {
-		error = __pci_device_probe(drv, pci_dev);
-		put_device(dev);
-	}
+	pci_get_dev(pci_dev);
+	error = __pci_device_probe(drv, pci_dev);
+	if (error)
+		pci_put_dev(pci_dev);
+
 	return error;
 }
 
@@ -155,6 +156,7 @@ static int pci_device_remove(struct device * dev)
 			drv->remove(pci_dev);
 		pci_dev->driver = NULL;
 	}
+	pci_put_dev(pci_dev);
 	return 0;
 }
 
