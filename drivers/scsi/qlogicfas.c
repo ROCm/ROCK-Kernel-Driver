@@ -652,10 +652,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 	} else
 		printk(KERN_INFO "Ql: Using preset IRQ %d\n", qlirq);
 
-	if (qlirq >= 0 && !request_irq(qlirq, do_ql_ihandl, 0, qlogicfas_name, NULL))
-		host->can_queue = 1;
-
-	hreg = scsi_register(host, 0);	/* no host data */
+	hreg = scsi_host_alloc(host, 0);	/* no host data */
 	if (!hreg)
 		goto err_release_mem;
 	hreg->io_port = qbase;
@@ -669,14 +666,25 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host)
 		qltyp, qbase, qlirq, QL_TURBO_PDMA);
 	host->name = qlogicfas_name;
 
+	if (request_irq(qlirq, do_ql_ihandl, 0, qlogicfas_name, hreg))
+		goto free_scsi_host;
+
+	if (scsi_add_host(hreg, NULL))
+		goto free_interrupt;
+
+	scsi_scan_host(hreg);
+
 	return hreg;
+
+free_interrupt:
+	free_irq(qlirq, hreg);
+
+free_scsi_host:
+	scsi_host_put(hreg);
 
 err_release_mem:
 	release_region(qbase, 0x10);
-	if (host->can_queue)
-		free_irq(qlirq, do_ql_ihandl);
-	return NULL;;
-
+	return NULL;
 }
 
 int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
@@ -687,12 +695,14 @@ int __devinit qlogicfas_detect(Scsi_Host_Template *sht)
 static int qlogicfas_release(struct Scsi_Host *shost)
 {
 	if (shost->irq)
-		free_irq(shost->irq, NULL);
+		free_irq(shost->irq, shost);
 	if (shost->dma_channel != 0xff)
 		free_dma(shost->dma_channel);
 	if (shost->io_port && shost->n_io_port)
 		release_region(shost->io_port, shost->n_io_port);
-	scsi_unregister(shost);
+	scsi_remove_host(shost);
+	scsi_host_put(shost);
+
 	return 0;
 }
 
