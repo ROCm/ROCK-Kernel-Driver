@@ -38,6 +38,21 @@
 #define dprintk(msg...) do { } while(0)
 #endif
 
+struct cpu_id
+{
+	__u8	x86;            /* CPU family */
+	__u8	x86_vendor;     /* CPU vendor */
+	__u8	x86_model;	/* model */
+	__u8	x86_mask;	/* stepping */
+};
+
+static const struct cpu_id cpu_id_banias = {
+	.x86_vendor = X86_VENDOR_INTEL,
+	.x86 = 6,
+	.x86_model = 9,
+	.x86_mask = 5,
+};
+
 struct cpu_model
 {
 	const char	*model_name;
@@ -217,6 +232,16 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 static inline int centrino_cpu_init_table(struct cpufreq_policy *policy) { return -ENODEV; }
 #endif /* CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE */
 
+static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x)
+{
+	if ((c->x86 == x->x86) &&
+	    (c->x86_vendor == x->x86_vendor) &&
+	    (c->x86_model == x->x86_model) &&
+	    (c->x86_mask == x->x86_mask))
+		return 0;
+	return -ENODEV;
+}
+
 /* Extract clock in kHz from PERF_CTL value */
 static unsigned extract_clock(unsigned msr)
 {
@@ -362,10 +387,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	/* Only Intel Pentium M stepping 5 for now - add new CPUs as
 	   they appear after making sure they use PERF_CTL in the same
 	   way. */
-	if (cpu->x86_vendor != X86_VENDOR_INTEL ||
-	    cpu->x86        != 6 ||
-	    cpu->x86_model  != 9 ||
-	    cpu->x86_mask   != 5) {
+	if (centrino_verify_cpu_id(cpu, &cpu_id_banias)) {
 		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
 		       "send /proc/cpuinfo to " MAINTAINER "\n");
 		return -ENODEV;
