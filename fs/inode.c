@@ -669,27 +669,6 @@ EXPORT_SYMBOL(iget5_locked);
 EXPORT_SYMBOL(iget_locked);
 EXPORT_SYMBOL(unlock_new_inode);
 
-struct inode *iget4(struct super_block *sb, unsigned long ino, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
-{
-	struct inode *inode = iget5_locked(sb, ino, test, set, data);
-
-	if (inode && (inode->i_state & I_NEW)) {
-		/* reiserfs specific hack right here.  We don't
-		** want this to last, and are looking for VFS changes
-		** that will allow us to get rid of it.
-		** -- mason@suse.com 
-		*/
-		if (sb->s_op->read_inode2) {
-			sb->s_op->read_inode2(inode, data);
-		} else {
-			sb->s_op->read_inode(inode);
-		}
-		unlock_new_inode(inode);
-	}
-
-	return inode;
-}
-
 /**
  *	insert_inode_hash - hash an inode
  *	@inode: unhashed inode

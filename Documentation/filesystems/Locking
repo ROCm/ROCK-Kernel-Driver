@@ -115,7 +115,7 @@ statfs:		yes	no	no
 remount_fs:	yes	yes	maybe		(see below)
 umount_begin:	yes	no	maybe		(see below)
 
-->read_inode() is not a method - it's a callback used in iget()/iget4().
+->read_inode() is not a method - it's a callback used in iget().
 rules for mount_sem are not too nice - it is going to die and be replaced
 by better scheme anyway.
 
