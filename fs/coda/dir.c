@@ -512,7 +512,7 @@ int coda_readdir(struct file *coda_file, void *dirent, filldir_t filldir)
 		ret = -ENOENT;
 		if (!IS_DEADDIR(host_inode)) {
 			ret = host_file->f_op->readdir(host_file, filldir, dirent);
-			update_atime(host_inode);
+			file_accessed(host_file);
 		}
 	}
 out:

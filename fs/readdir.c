@@ -32,7 +32,7 @@ int vfs_readdir(struct file *file, filldir_t filler, void *buf)
 	res = -ENOENT;
 	if (!IS_DEADDIR(inode)) {
 		res = file->f_op->readdir(file, buf, filler);
-		update_atime(inode);
+		file_accessed(file);
 	}
 	up(&inode->i_sem);
 out:
