@@ -249,7 +249,7 @@ static struct clk cp_clcd_clk = {
 
 static struct clk cp_mmci_clk = {
 	.name	= "MCLK",
-	.rate	= 33000000,
+	.rate	= 14745600,
 };
 
 /*
@@ -351,7 +351,7 @@ static unsigned int mmc_status(struct device *dev)
 }
 
 static struct mmc_platform_data mmc_data = {
-	.mclk		= 33000000,
+	.mclk		= 14745600,
 	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
 	.status		= mmc_status,
 };
