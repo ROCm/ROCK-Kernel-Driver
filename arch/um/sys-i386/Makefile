@@ -6,10 +6,9 @@ obj-$(CONFIG_HIGHMEM) += highmem.o
 USER_OBJS := bugs.o ptrace_user.o sigcontext.o fault.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
-SYMLINKS = semaphore.c extable.c highmem.c module.c
+SYMLINKS = semaphore.c highmem.c module.c
 
 semaphore.c-dir = kernel
-extable.c-dir = mm
 highmem.c-dir = mm
 module.c-dir = kernel
 
