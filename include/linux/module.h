@@ -57,13 +57,14 @@ search_extable(const struct exception_table_entry *first,
 	       unsigned long value);
 
 #ifdef MODULE
+#define ___module_cat(a,b) a ## b
+#define __module_cat(a,b) ___module_cat(a,b)
+/* For userspace: you can also call me... */
+#define MODULE_ALIAS(alias)					\
+	static const char __module_cat(__alias_,__LINE__)[]	\
+		__attribute__((section(".modinfo"),unused)) = "alias=" alias
 
-/* For replacement modutils, use an alias not a pointer. */
 #define MODULE_GENERIC_TABLE(gtype,name)			\
-static const unsigned long __module_##gtype##_size		\
-  __attribute__ ((unused)) = sizeof(struct gtype##_id);		\
-static const struct gtype##_id * __module_##gtype##_table	\
-  __attribute__ ((unused)) = name;				\
 extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
@@ -103,6 +104,7 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 
 #else  /* !MODULE */
 
+#define MODULE_ALIAS(alias)
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
 #define MOD_INC_USE_COUNT	do { } while (0)
