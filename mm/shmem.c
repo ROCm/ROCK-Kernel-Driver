@@ -52,7 +52,7 @@
 
 #define VM_ACCT(size)    (PAGE_CACHE_ALIGN(size) >> PAGE_SHIFT)
 
-/* info->flags needs a VM_flag to handle swapoff/truncate races efficiently */
+/* info->flags needs a VM_flag to handle pagein/truncate races efficiently */
 #define SHMEM_PAGEIN	 VM_READ
 
 /* Pretend that each entry is of this size in directory's i_size */
@@ -498,6 +498,8 @@ done2:
 		 * Call truncate_inode_pages again: racing shmem_unuse_inode
 		 * may have swizzled a page in from swap since vmtruncate or
 		 * generic_delete_inode did it, before we lowered next_index.
+		 * Also, though shmem_getpage checks i_size before adding to
+		 * cache, no recheck after: so fix the narrow window there too.
 		 */
 		spin_unlock(&info->lock);
 		truncate_inode_pages(inode->i_mapping, inode->i_size);
@@ -863,6 +865,7 @@ repeat:
 			swap_free(swap);
 		} else if (!(error = move_from_swap_cache(
 				swappage, idx, mapping))) {
+			info->flags |= SHMEM_PAGEIN;
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
@@ -932,6 +935,7 @@ repeat:
 					goto failed;
 				goto repeat;
 			}
+			info->flags |= SHMEM_PAGEIN;
 		}
 
 		info->alloced++;
