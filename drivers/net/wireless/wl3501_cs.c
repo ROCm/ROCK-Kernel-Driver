@@ -86,16 +86,8 @@ MODULE_PARM(pc_debug, "i");
  * was obtained from the Planet WAP 1000 Access Point web interface. -acme
  */
 static int wl3501_chan2freq[] = {
-	[0] = 2412,
-	[1] = 2417,
-	[2] = 2422,
-	[3] = 2427,
-	[4] = 2432,
-	[5] = 2437,
-	[6] = 2442,
-	[7] = 2447,
-	[8] = 2452,
-	[9] = 2457,
+	[0] = 2412, [1] = 2417, [2] = 2422, [3] = 2427, [4] = 2432,
+	[5] = 2437, [6] = 2442, [7] = 2447, [8] = 2452, [9] = 2457,
 	[10] = 2462,
 };
 
@@ -141,7 +133,7 @@ static dev_info_t wl3501_dev_info = "wl3501_cs";
  */
 static dev_link_t *wl3501_dev_list;
 
-static __inline__ void wl3501_switch_page(struct wl3501_card *this, u8 page)
+static inline void wl3501_switch_page(struct wl3501_card *this, u8 page)
 {
 	wl3501_outb(page, this->base_addr + WL3501_NIC_BSS);
 }
@@ -392,7 +384,7 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 			wl3501_free_tx_buffer(this, sig_bf);
 			return -ENOMEM;
 		}
-		memcpy((char *)&(sig.daddr[0]), pdata, 12);
+		memcpy(&sig.daddr[0], pdata, 12);
 		pktlen = len - 12;
 		pdata += 12;
 		sig.next_blk = 0;
@@ -459,80 +451,79 @@ static int wl3501_send_pkt(struct wl3501_card *this, u8 *data, u16 len)
 
 static int wl3501_mgmt_resync(struct wl3501_card *this)
 {
-	struct wl3501_resync_req signal;
+	struct wl3501_resync_req sig = {
+		.sig_id = WL3501_SIG_RESYNC_REQ,
+	};
 
-	signal.next_blk = 0;
-	signal.sig_id = WL3501_SIG_RESYNC_REQ;
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
+}
+
+static inline int wl3501_fw_bss_type(struct wl3501_card *this)
+{
+	return this->net_type == IW_MODE_INFRA ? WL3501_NET_TYPE_INFRA :
+						 WL3501_NET_TYPE_ADHOC;
+}
+
+static inline int wl3501_fw_cap_info(struct wl3501_card *this)
+{
+	return this->net_type == IW_MODE_INFRA ? WL3501_MGMT_CAPABILITY_ESS :
+						 WL3501_MGMT_CAPABILITY_IBSS;
 }
 
 static int wl3501_mgmt_scan(struct wl3501_card *this, u16 chan_time)
 {
-	struct wl3501_scan_req signal;
-
-	signal.next_blk = 0;
-	signal.sig_id = WL3501_SIG_SCAN_REQ;
-	signal.ssid[0] = signal.ssid[1] = 0;
-	signal.scan_type = WL3501_SCAN_TYPE_ACTIVE;
-	signal.probe_delay = 0x10;
-	signal.min_chan_time = signal.max_chan_time = chan_time;
-
-	if (this->net_type == IW_MODE_INFRA)
-		signal.bss_type = WL3501_NET_TYPE_INFRA;
-	else
-		signal.bss_type = WL3501_NET_TYPE_ADHOC;
+	struct wl3501_scan_req sig = {
+		.sig_id		= WL3501_SIG_SCAN_REQ,
+		.scan_type	= WL3501_SCAN_TYPE_ACTIVE,
+		.probe_delay	= 0x10,
+		.min_chan_time	= chan_time,
+		.max_chan_time	= chan_time,
+		.bss_type	= wl3501_fw_bss_type(this),
+	};
 
 	this->bss_cnt = this->join_sta_bss = 0;
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
 static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 {
-	struct wl3501_join_req signal;
+	struct wl3501_join_req sig = {
+		.sig_id	  = WL3501_SIG_JOIN_REQ,
+		.timeout  = 10,
+		.phy_pset = {
+			[2] = this->def_chan,
+		},
+	};
 
-	signal.next_blk = 0;
-	signal.sig_id = WL3501_SIG_JOIN_REQ;
-	signal.timeout = 10;
-	memcpy((char *)&(signal.beacon_period),
-	       (char *)&(this->bss_set[stas].beacon_period), 72);
-	signal.phy_pset[2] = this->def_chan;
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	memcpy(&sig.beacon_period, &this->bss_set[stas].beacon_period, 72);
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
 static int wl3501_mgmt_start(struct wl3501_card *this)
 {
-	struct wl3501_start_req signal;
+	struct wl3501_start_req sig = {
+		.sig_id			= WL3501_SIG_START_REQ,
+		.beacon_period		= 400,
+		.dtim_period		= 1,
+		.phy_pset		= {
+			[0] = 3, [1] = 1, [2] = this->chan,
+		},
+		.bss_basic_rate_set	= {
+			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		},
+		.operational_rate_set	= {
+			[0] = 0x01, [1] = 0x02, [2] = 0x82, [3] = 0x84,
+		},
+		.ibss_pset		= {
+			[0] = 6, [1] = 2, [2] = 10,
+		},
+		.bss_type		= wl3501_fw_bss_type(this),
+		.cap_info		= wl3501_fw_cap_info(this),
+	};
 
-	signal.next_blk = 0;
-	signal.sig_id = WL3501_SIG_START_REQ;
-	memcpy((char *)signal.ssid, (char *)this->essid, WL3501_ESSID_MAX_LEN);
-	memcpy((char *)this->keep_essid, (char *)this->essid,
-	       WL3501_ESSID_MAX_LEN);
-	if (this->net_type == IW_MODE_INFRA) {
-		signal.bss_type = WL3501_NET_TYPE_INFRA;
-		signal.cap_info = WL3501_MGMT_CAPABILITY_ESS;
-	} else {
-		signal.bss_type = WL3501_NET_TYPE_ADHOC;
-		signal.cap_info = WL3501_MGMT_CAPABILITY_IBSS;
-	}
-	signal.beacon_period = 400;
-	signal.dtim_period = 1;
-	signal.phy_pset[0] = 3;
-	signal.phy_pset[1] = 1;
-	signal.phy_pset[2] = this->chan;
-	signal.bss_basic_rate_set[0] = 0x01;
-	signal.bss_basic_rate_set[1] = 0x02;
-	signal.bss_basic_rate_set[2] = 0x82;
-	signal.bss_basic_rate_set[3] = 0x84;
-	signal.operational_rate_set[0] = 0x01;
-	signal.operational_rate_set[1] = 0x02;
-	signal.operational_rate_set[2] = 0x82;
-	signal.operational_rate_set[3] = 0x84;
-	signal.ibss_pset[0] = 6;
-	signal.ibss_pset[1] = 2;
-	signal.ibss_pset[2] = 10;
-	signal.ibss_pset[3] = 0;
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	memcpy(sig.ssid, this->essid, WL3501_ESSID_MAX_LEN);
+	memcpy(this->keep_essid, this->essid, WL3501_ESSID_MAX_LEN);
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
 static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
@@ -557,26 +548,23 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 				matchflag = 1;
 			else if (this->essid[1] != signal.ssid[1])
 				matchflag = 0;
-			else if (memcmp((char *)&(this->essid[2]),
-					(char *)&(signal.ssid[2]),
+			else if (memcmp(&this->essid[2], &signal.ssid[2],
 					this->essid[1]))
 				matchflag = 0;
 			else
 				matchflag = 1;
 			if (matchflag) {
 				for (i = 0; i < this->bss_cnt; i++) {
-					if (!memcmp
-					    ((char *)this->bss_set[i].bssid,
-					     (char *)signal.bssid, ETH_ALEN)) {
+					if (!memcmp(this->bss_set[i].bssid,
+						    signal.bssid, ETH_ALEN)) {
 						matchflag = 0;
 						break;
 					}
 				}
 			}
 			if (matchflag && (i < 20)) {
-				memcpy((char *)
-				       &(this->bss_set[i].beacon_period),
-				       (char *)&(signal.beacon_period), 73);
+				memcpy(&this->bss_set[i].beacon_period,
+				       &signal.beacon_period, 73);
 				this->bss_cnt++;
 				this->rssi = signal.rssi;
 			}
@@ -598,7 +586,6 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 				else
 					wl3501_mgmt_scan(this, 100);
 			}
-
 		}
 	}
 }
@@ -656,8 +643,7 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 	wl3501_get_from_wla(this, this->start_seg + 2,
 			    &next_addr, sizeof(next_addr));
 	if (this->ether_type == ARPHRD_ETHER) {
-		if (size >
-		    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
+		if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr)) {
 			wl3501_get_from_wla(this,
 					    this->start_seg +
 						sizeof(struct wl3501_rx_hdr),
@@ -678,8 +664,7 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 		*data = (size >> 8) & 0xff;
 		*(data + 1) = size & 0xff;
 		data += 2;
-		if (size >
-		    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
+		if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
 			wl3501_get_from_wla(this,
 					    this->start_seg + offset_addr4,
 					    data,
@@ -761,29 +746,29 @@ static void wl3501_esbq_confirm_done(struct wl3501_card *this)
 
 static int wl3501_mgmt_auth(struct wl3501_card *this)
 {
-	struct wl3501_auth_req signal;
+	struct wl3501_auth_req sig = {
+		.sig_id	 = WL3501_SIG_AUTH_REQ,
+		.type	 = WL3501_SYS_TYPE_OPEN,
+		.timeout = 1000,
+	};
 
 	dprintk(3, "entry");
-	signal.next_blk = 0;
-	signal.sig_id = WL3501_SIG_AUTH_REQ;
-	signal.type = WL3501_SYS_TYPE_OPEN;
-	signal.timeout = 1000;
-	memcpy((char *)&(signal.mac_addr), (char *)&(this->bssid), ETH_ALEN);
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	memcpy(sig.mac_addr, this->bssid, ETH_ALEN);
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
 static int wl3501_mgmt_association(struct wl3501_card *this)
 {
-	struct wl3501_assoc_req signal;
+	struct wl3501_assoc_req sig = {
+		.sig_id		 = WL3501_SIG_ASSOC_REQ,
+		.timeout	 = 1000,
+		.listen_interval = 5,
+		.cap_info	 = this->cap_info,
+	};
 
 	dprintk(3, "entry");
-	signal.next_blk		= 0;
-	signal.sig_id		= WL3501_SIG_ASSOC_REQ;
-	signal.timeout		= 1000;
-	signal.listen_interval	= 5;
-	signal.cap_info		= this->cap_info;
-	memcpy((char *)&(signal.mac_addr), (char *)&(this->bssid), ETH_ALEN);
-	return wl3501_esbq_exec(this, &signal, sizeof(signal));
+	memcpy(sig.mac_addr, this->bssid, ETH_ALEN);
+	return wl3501_esbq_exec(this, &sig, sizeof(sig));
 }
 
 static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
@@ -797,23 +782,19 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev, u16 addr)
 		if (this->net_type == IW_MODE_INFRA) {
 			if (this->join_sta_bss < this->bss_cnt) {
 				const int i = this->join_sta_bss;
-				memcpy((char *)&(this->bssid),
-				       (char *)&(this->bss_set[i].bssid),
-				       ETH_ALEN);
+				memcpy(this->bssid,
+				       this->bss_set[i].bssid, ETH_ALEN);
 				this->chan = this->bss_set[i].phy_pset[2];
-				memcpy((char *)this->keep_essid,
-				       (char *)this->bss_set[i].ssid,
+				memcpy(this->keep_essid, this->bss_set[i].ssid,
 				       WL3501_ESSID_MAX_LEN);
 				wl3501_mgmt_auth(this);
 			}
 		} else {
 			const int i = this->join_sta_bss;
-			memcpy((char *)&(this->bssid),
-			       (char *)&(this->bss_set[i].bssid), ETH_ALEN);
+			memcpy(this->bssid, this->bss_set[i].bssid, ETH_ALEN);
 			this->chan = this->bss_set[i].phy_pset[2];
-			memcpy((char *)this->keep_essid,
-			       (char *)this->bss_set[i].ssid,
-			       WL3501_ESSID_MAX_LEN);
+			memcpy(this->keep_essid,
+			       this->bss_set[i].ssid, WL3501_ESSID_MAX_LEN);
 			wl3501_online(dev);
 		}
 	} else {
@@ -1408,17 +1389,11 @@ static int wl3501_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int rc = -ENODEV;
 
-	if (!netif_device_present(dev))
-		goto out;
-
-	switch (cmd) {
-	case SIOCETHTOOL:
-		rc = wl3501_ethtool_ioctl(dev, (void *)rq->ifr_data);
-		break;
-	default:
+	if (netif_device_present(dev)) {
 		rc = -EOPNOTSUPP;
+		if (cmd == SIOCETHTOOL)
+			rc = wl3501_ethtool_ioctl(dev, (void *)rq->ifr_data);
 	}
-out:
 	return rc;
 }
 
@@ -1590,10 +1565,9 @@ static int wl3501_set_wap(struct net_device *dev, struct iw_request_info *info,
 		goto out;
 	if (!memcmp(bcast, wrqu->ap_addr.sa_data, ETH_ALEN)) {
 		/* FIXME: rescan? */
-	} else {
-		memcpy(&this->bssid, wrqu->ap_addr.sa_data, ETH_ALEN);
+	} else
+		memcpy(this->bssid, wrqu->ap_addr.sa_data, ETH_ALEN);
 		/* FIXME: rescan? deassoc & scan? */
-	}
 	rc = 0;
 out:
 	return rc;
@@ -1605,7 +1579,7 @@ static int wl3501_get_wap(struct net_device *dev, struct iw_request_info *info,
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
 	wrqu->ap_addr.sa_family = this->ether_type;
-	memcpy(wrqu->ap_addr.sa_data, &this->bssid, ETH_ALEN);
+	memcpy(wrqu->ap_addr.sa_data, this->bssid, ETH_ALEN);
 	return 0;
 }
 
