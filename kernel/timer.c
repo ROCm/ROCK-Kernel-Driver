@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/thread_info.h>
 
 #include <asm/uaccess.h>
 
@@ -1020,37 +1021,60 @@ asmlinkage long sys_gettid(void)
 	return current->pid;
 }
 
-long do_nanosleep(struct timespec *t)
+static long nanosleep_restart(struct restart_block *restart)
 {
-	unsigned long expire;
+	unsigned long expire = restart->arg0, now = jiffies;
+	struct timespec *rmtp = (struct timespec *) restart->arg1;
+	long ret;
 
-	if ((t->tv_nsec >= 1000000000L) || (t->tv_nsec < 0) || (t->tv_sec < 0))
-		return -EINVAL;
-
-	expire = timespec_to_jiffies(t) + (t->tv_sec || t->tv_nsec);
+	/* Did it expire while we handled signals? */
+	if (!time_after(expire, now))
+		return 0;
 
 	current->state = TASK_INTERRUPTIBLE;
-	expire = schedule_timeout(expire);
+	expire = schedule_timeout(expire - now);
 
+	ret = 0;
 	if (expire) {
-		jiffies_to_timespec(expire, t);
-		return -EINTR;
+		struct timespec t;
+		jiffies_to_timespec(expire, &t);
+
+		ret = -ERESTART_RESTARTBLOCK;
+		if (copy_to_user(rmtp, &t, sizeof(t)))
+			ret = -EFAULT;
+		/* The 'restart' block is already filled in */
 	}
-	return 0;
+	return ret;
 }
 
 asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 {
 	struct timespec t;
+	unsigned long expire;
 	long ret;
 
 	if (copy_from_user(&t, rqtp, sizeof(t)))
 		return -EFAULT;
 
-	ret = do_nanosleep(&t);
-	if (rmtp && (ret == -EINTR)) {
+	if ((t.tv_nsec >= 1000000000L) || (t.tv_nsec < 0) || (t.tv_sec < 0))
+		return -EINVAL;
+
+	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
+	current->state = TASK_INTERRUPTIBLE;
+	expire = schedule_timeout(expire);
+
+	ret = 0;
+	if (expire) {
+		struct restart_block *restart;
+		jiffies_to_timespec(expire, &t);
 		if (copy_to_user(rmtp, &t, sizeof(t)))
 			return -EFAULT;
+
+		restart = &current_thread_info()->restart_block;
+		restart->fn = nanosleep_restart;
+		restart->arg0 = jiffies + expire;
+		restart->arg1 = (unsigned long) rmtp;
+		ret = -ERESTART_RESTARTBLOCK;
 	}
 	return ret;
 }
