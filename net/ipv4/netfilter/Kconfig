@@ -292,7 +292,7 @@ config IP_NF_MATCH_OWNER
 
 config IP_NF_MATCH_PHYSDEV
 	tristate "Physdev match support"
-	depends on IP_NF_IPTABLES!=n && BRIDGE!=n
+	depends on IP_NF_IPTABLES!=n && BRIDGE_NETFILTER
 	help
 	  Physdev packet matching matches against the physical bridge ports
 	  the IP packet arrived on or will leave by.

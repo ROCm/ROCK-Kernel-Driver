@@ -98,7 +98,7 @@ struct nf_ct_info {
 	struct nf_conntrack *master;
 };
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 struct nf_bridge_info {
 	atomic_t use;
 	struct net_device *physindev;
@@ -244,7 +244,7 @@ struct sk_buff {
 #ifdef CONFIG_NETFILTER_DEBUG
         unsigned int		nf_debug;
 #endif
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 	struct nf_bridge_info	*nf_bridge;
 #endif
 #endif /* CONFIG_NETFILTER */
@@ -1195,7 +1195,7 @@ static inline void nf_conntrack_get(struct nf_ct_info *nfct)
 		atomic_inc(&nfct->master->use);
 }
 
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+#ifdef CONFIG_BRIDGE_NETFILTER
 static inline void nf_bridge_put(struct nf_bridge_info *nf_bridge)
 {
 	if (nf_bridge && atomic_dec_and_test(&nf_bridge->use))
