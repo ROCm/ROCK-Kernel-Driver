@@ -2126,9 +2126,9 @@ static void gem_init_hw(struct gem *gp, int restart_link)
 	 */
 	if (restart_link)
 		gem_init_phy(gp);
+	gem_init_pause_thresholds(gp);
 	gem_init_dma(gp);
 	gem_init_mac(gp);
-	gem_init_pause_thresholds(gp);
 
 	if (restart_link) {
 		/* Default aneg parameters */
