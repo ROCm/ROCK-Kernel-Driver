@@ -1910,13 +1910,13 @@ static struct block_device_operations floppy_fops = {
 	revalidate:		floppy_revalidate,
 };
 
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = minor & 3;
-	int type  = minor >> 2;
+	int drive = *part & 3;
+	int type  = *part >> 2;
 	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
 		return NULL;
-	return unit[drive].disk;
+	return get_disk(unit[drive].disk);
 }
 
 int __init atari_floppy_init (void)
@@ -1975,7 +1975,8 @@ int __init atari_floppy_init (void)
 	}
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &ataflop_lock);
-	blk_set_probe(MAJOR_NR, floppy_find);
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
 	       DriveType == 0 ? 'D' : DriveType == 1 ? 'H' : 'E',
@@ -2033,12 +2034,12 @@ int init_module (void)
 void cleanup_module (void)
 {
 	int i;
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		del_gendisk(unit[i].disk);
 		put_disk(unit[i].disk);
 	}
 	unregister_blkdev(MAJOR_NR, "fd");
-	blk_set_probe(MAJOR_NR, NULL);
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	del_timer_sync(&fd_timer);

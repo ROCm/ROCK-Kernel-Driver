@@ -4212,14 +4212,14 @@ static struct platform_device floppy_device = {
 	},
 };
 
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = (minor&3) | ((minor&0x80) >> 5);
+	int drive = (*part&3) | ((*part&0x80) >> 5);
 	if (drive >= N_DRIVE ||
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
 		return NULL;
-	return disks[drive];
+	return get_disk(disks[drive]);
 }
 
 int __init floppy_init(void)
@@ -4249,7 +4249,8 @@ int __init floppy_init(void)
 		sprintf(disks[i]->disk_name, "fd%d", i);
 	}
 
-	blk_set_probe(MAJOR_NR, floppy_find);
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	for (i=0; i<256; i++)
 		if (ITYPE(i))
@@ -4368,9 +4369,9 @@ int __init floppy_init(void)
 out1:
 	del_timer(&fd_timeout);
 out2:
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	unregister_blkdev(MAJOR_NR,"fd");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	blk_set_probe(MAJOR_NR, NULL);
 out:
 	for (i=0; i<N_DRIVE; i++)
 		put_disk(disks[i]);
@@ -4563,8 +4564,8 @@ void cleanup_module(void)
 		
 	platform_device_unregister(&floppy_device);
 	devfs_unregister (devfs_handle);
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	unregister_blkdev(MAJOR_NR, "fd");
-	blk_set_probe(MAJOR_NR, NULL);
 	for (drive = 0; drive < N_DRIVE; drive++) {
 		if ((allowed_drive_mask & (1 << drive)) &&
 		    fdc_state[FDC(drive)].version != FDC_NONE)

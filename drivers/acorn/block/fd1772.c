@@ -1528,12 +1528,12 @@ static struct block_device_operations floppy_fops =
 	.revalidate		= floppy_revalidate,
 };
 
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = minor & 3;
-	if ((minor>> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
+	int drive = *part & 3;
+	if ((*part >> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
-	return disks[drive];
+	return get_disk(disks[drive]);
 }
 
 int fd1772_init(void)
@@ -1589,7 +1589,8 @@ int fd1772_init(void)
 		sprintf(disks[i]->disk_name, "fd%d", i);
 		set_capacity(disks[i], MAX_DISK_SIZE * 2);
 	}
-	blk_set_probe(MAJOR_NR, floppy_find);
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	for (i = 0; i < FD_MAX_UNITS; i++)
 		add_disk(disks[i]);

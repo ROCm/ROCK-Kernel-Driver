@@ -1758,12 +1758,12 @@ static int __init fd_probe_drives(void)
 	return -ENOMEM;
 }
  
-static struct gendisk *floppy_find(int minor)
+static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 {
-	int drive = minor & 3;
+	int drive = *part & 3;
 	if (unit[drive].type->code == FD_NODRIVE)
 		return NULL;
-	return unit[drive].gendisk;
+	return get_disk(unit[drive].gendisk);
 }
 
 int __init amiga_floppy_init(void)
@@ -1808,9 +1808,7 @@ int __init amiga_floppy_init(void)
 		unregister_blkdev(MAJOR_NR,"fd");
 		return -EBUSY;
 	}
-	blk_set_probe(MAJOR_NR, floppy_find);
 	if (fd_probe_drives() < 1) { /* No usable drives */
-		blk_set_probe(MAJOR_NR, NULL);
 		free_irq(IRQ_AMIGA_CIAA_TB, NULL);
 		free_irq(IRQ_AMIGA_DSKBLK, NULL);
 		amiga_chip_free(raw_buf);
@@ -1818,6 +1816,8 @@ int __init amiga_floppy_init(void)
 		unregister_blkdev(MAJOR_NR,"fd");
 		return -ENXIO;
 	}
+	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
+				floppy_find, NULL, NULL);
 
 	/* initialize variables */
 	init_timer(&motor_on_timer);
@@ -1877,7 +1877,7 @@ void cleanup_module(void)
 			kfree(unit[i].trackbuf);
 		}
 	}
-	blk_set_probe(MAJOR_NR, NULL);
+	blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
 	free_irq(IRQ_AMIGA_CIAA_TB, NULL);
 	free_irq(IRQ_AMIGA_DSKBLK, NULL);
 	custom.dmacon = DMAF_DISK; /* disable DMA */

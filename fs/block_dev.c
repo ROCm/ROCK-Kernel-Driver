@@ -606,6 +606,13 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (owner)
 			__MOD_INC_USE_COUNT(owner);
 	}
+	disk = get_gendisk(bdev->bd_dev, &part);
+	if (!disk) {
+		if (owner)
+			__MOD_DEC_USE_COUNT(owner);
+		bdput(bdev);
+		return ret;
+	}
 
 	down(&bdev->bd_sem);
 	old = bdev->bd_op;
@@ -617,9 +624,6 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		if (owner)
 			__MOD_DEC_USE_COUNT(owner);
 	}
-	disk = get_gendisk(bdev->bd_dev, &part);
-	if (!disk)
-		goto out1;
 	if (!bdev->bd_contains) {
 		bdev->bd_contains = bdev;
 		if (part) {
