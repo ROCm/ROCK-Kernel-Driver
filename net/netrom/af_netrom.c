@@ -1363,6 +1363,7 @@ static int __init nr_proto_init(void)
 
 	for (i = 0; i < nr_ndevs; i++) {
 		sprintf(dev_nr[i].name, "nr%d", i);
+		dev_nr[i].base_addr = i;
 		dev_nr[i].init = nr_init;
 		register_netdev(&dev_nr[i]);
 	}
@@ -1407,23 +1408,23 @@ static void __exit nr_exit(void)
 
 	nr_rt_free();
 
-	ax25_protocol_release(AX25_P_NETROM);
-	ax25_linkfail_release(nr_link_failed);
-
-	unregister_netdevice_notifier(&nr_dev_notifier);
-
 #ifdef CONFIG_SYSCTL
 	nr_unregister_sysctl();
 #endif
+
+	ax25_linkfail_release(nr_link_failed);
+	ax25_protocol_release(AX25_P_NETROM);
+
+	unregister_netdevice_notifier(&nr_dev_notifier);
+
 	sock_unregister(PF_NETROM);
 
 	for (i = 0; i < nr_ndevs; i++) {
 		if (dev_nr[i].priv != NULL) {
+			unregister_netdev(&dev_nr[i]);
 			kfree(dev_nr[i].priv);
 			dev_nr[i].priv = NULL;
-			unregister_netdev(&dev_nr[i]);
 		}
-		kfree(dev_nr[i].name);
 	}
 
 	kfree(dev_nr);

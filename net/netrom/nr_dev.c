@@ -159,11 +159,13 @@ static int nr_set_mac_address(struct net_device *dev, void *addr)
 {
 	struct sockaddr *sa = addr;
 
-	ax25_listen_release((ax25_address *)dev->dev_addr, NULL);
+	if (dev->flags & IFF_UP)
+		ax25_listen_release((ax25_address *)dev->dev_addr, NULL);
 
 	memcpy(dev->dev_addr, sa->sa_data, dev->addr_len);
 
-	ax25_listen_register((ax25_address *)dev->dev_addr, NULL);
+	if (dev->flags & IFF_UP)
+		ax25_listen_register((ax25_address *)dev->dev_addr, NULL);
 
 	return 0;
 }
@@ -177,8 +179,8 @@ static int nr_open(struct net_device *dev)
 
 static int nr_close(struct net_device *dev)
 {
-	netif_stop_queue(dev);
 	ax25_listen_release((ax25_address *)dev->dev_addr, NULL);
+	netif_stop_queue(dev);
 	return 0;
 }
 
@@ -207,6 +209,7 @@ int nr_init(struct net_device *dev)
 	dev->hard_header_len	= NR_NETWORK_LEN + NR_TRANSPORT_LEN;
 	dev->addr_len		= AX25_ADDR_LEN;
 	dev->type		= ARPHRD_NETROM;
+	dev->tx_queue_len	= 40;
 	dev->rebuild_header	= nr_rebuild_header;
 	dev->set_mac_address    = nr_set_mac_address;
 
