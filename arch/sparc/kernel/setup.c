@@ -233,7 +233,6 @@ extern char cputypval;
 extern unsigned long start, end;
 extern void panic_setup(char *, int *);
 extern void srmmu_end_memory(unsigned long, unsigned long *);
-extern void sun_serial_setup(void);
 
 extern unsigned short root_flags;
 extern unsigned short root_dev;
