@@ -1038,9 +1038,9 @@ struct scsi_qla_host {
 	/* Linux adapter configuration data */
 	struct Scsi_Host *host;	/* pointer to host data */
 	struct scsi_qla_host *next;
-	struct device_reg *iobase;	/* Base Memory-mapped I/O address */
+	struct device_reg __iomem *iobase;	/* Base Memory-mapped I/O address */
 
-	unsigned char *mmpbase;	/* memory mapped address */
+	unsigned char __iomem *mmpbase;	/* memory mapped address */
 	unsigned long host_no;
 	struct pci_dev *pdev;
 	uint8_t devnum;
