@@ -21,12 +21,7 @@
 #define DEVICE_NR(device) (device)
 #define LOCAL_END_REQUEST
 #include <linux/blk.h>
-
-#ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-static devfs_handle_t devfs_dir_handle = NULL;
-static devfs_handle_t devfs_rw_handle[MAX_MTD_DEVICES];
-#endif
 
 static void mtd_notify_add(struct mtd_info* mtd);
 static void mtd_notify_remove(struct mtd_info* mtd);
@@ -533,15 +528,15 @@ static struct block_device_operations mtd_fops =
 static void mtd_notify_add(struct mtd_info* mtd)
 {
 	struct gendisk *disk;
-        char name[8];
+        char name[16];
 
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
 
 #ifdef CONFIG_DEVFS_FS
-        sprintf(name, "%d", mtd->index);
-        devfs_rw_handle[mtd->index] = devfs_register(devfs_dir_handle, name,
-                        DEVFS_FL_DEFAULT, MTD_BLOCK_MAJOR, mtd->index,
+        sprintf(name, DEVICE_NAME"/%d", mtd->index);
+        devfs_register(NULL, name, DEVFS_FL_DEFAULT,
+			MTD_BLOCK_MAJOR, mtd->index,
                         S_IFBLK | S_IRUGO | S_IWUGO,
                         &mtd_fops, NULL);
 #endif
@@ -566,9 +561,7 @@ static void mtd_notify_remove(struct mtd_info* mtd)
         if (!mtd || mtd->type == MTD_ABSENT)
                 return;
 
-#ifdef CONFIG_DEVFS_FS
-        devfs_unregister(devfs_rw_handle[mtd->index]);
-#endif
+        devfs_remove(DEVICE_NAME"/%d", mtd->index);
 
         if (mtddisk[mtd->index]) {
 		del_gendisk(mtddisk[mtd->index]);
@@ -588,7 +581,7 @@ int __init init_mtdblock(void)
 		return -EAGAIN;
 	}
 #ifdef CONFIG_DEVFS_FS
-	devfs_dir_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
+	devfs_mk_dir(NULL, DEVICE_NAME, NULL);
 #endif
 	register_mtd_user(&notifier);
 	
@@ -605,7 +598,7 @@ static void __exit cleanup_mtdblock(void)
 	down(&thread_sem);
 	unregister_mtd_user(&notifier);
 #ifdef CONFIG_DEVFS_FS
-	devfs_unregister(devfs_dir_handle);
+	devfs_remove(DEVICE_NAME);
 #endif
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
 	blk_cleanup_queue(&mtd_queue);

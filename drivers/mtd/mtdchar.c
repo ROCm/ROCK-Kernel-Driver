@@ -23,9 +23,6 @@ static struct mtd_notifier notifier = {
 	remove:	mtd_notify_remove,
 };
 
-static devfs_handle_t devfs_dir_handle;
-static devfs_handle_t devfs_rw_handle[MAX_MTD_DEVICES];
-static devfs_handle_t devfs_ro_handle[MAX_MTD_DEVICES];
 #endif
 
 static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
@@ -464,19 +461,19 @@ static struct file_operations mtd_fops = {
 
 static void mtd_notify_add(struct mtd_info* mtd)
 {
-	char name[8];
+	char name[16];
 
 	if (!mtd)
 		return;
 
-	sprintf(name, "%d", mtd->index);
-	devfs_rw_handle[mtd->index] = devfs_register(devfs_dir_handle, name,
+	sprintf(name, "mtd/%d", mtd->index);
+	devfs_register(NULL, name,
 			DEVFS_FL_DEFAULT, MTD_CHAR_MAJOR, mtd->index*2,
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			&mtd_fops, NULL);
 
-	sprintf(name, "%dro", mtd->index);
-	devfs_ro_handle[mtd->index] = devfs_register(devfs_dir_handle, name,
+	sprintf(name, "mtd/%dro", mtd->index);
+	devfs_register(NULL, name,
 			DEVFS_FL_DEFAULT, MTD_CHAR_MAJOR, mtd->index*2+1,
 			S_IFCHR | S_IRUGO | S_IWUGO,
 			&mtd_fops, NULL);
@@ -486,9 +483,8 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 {
 	if (!mtd)
 		return;
-
-	devfs_unregister(devfs_rw_handle[mtd->index]);
-	devfs_unregister(devfs_ro_handle[mtd->index]);
+	devfs_remove("mtd/%d", mtd->index);
+	devfs_remove("mtd/%dro", mtd->index);
 }
 #endif
 
@@ -501,7 +497,7 @@ static int __init init_mtdchar(void)
 	}
 
 #ifdef CONFIG_DEVFS_FS
-	devfs_dir_handle = devfs_mk_dir(NULL, "mtd", NULL);
+	devfs_mk_dir(NULL, "mtd", NULL);
 
 	register_mtd_user(&notifier);
 #endif
@@ -512,7 +508,7 @@ static void __exit cleanup_mtdchar(void)
 {
 #ifdef CONFIG_DEVFS_FS
 	unregister_mtd_user(&notifier);
-	devfs_unregister(devfs_dir_handle);
+	devfs_remove("mtd");
 #endif
 	unregister_chrdev(MTD_CHAR_MAJOR, "mtd");
 }
