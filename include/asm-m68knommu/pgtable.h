@@ -38,6 +38,8 @@ extern void paging_init(void);
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val })
 
+static inline int pte_file(pte_t pte) { return 0; }
+
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
@@ -55,5 +57,12 @@ extern int is_in_rom(unsigned long);
  */
 #define pgtable_cache_init()	do { } while (0)
 #define io_remap_page_range	remap_page_range
+
+/*
+ * All 32bit addresses are effectively valid for vmalloc...
+ * Sort of meaningless for non-VM targets.
+ */
+#define	VMALLOC_START	0
+#define	VMALLOC_END	0xffffffff
 
 #endif /* _M68KNOMMU_PGTABLE_H */
