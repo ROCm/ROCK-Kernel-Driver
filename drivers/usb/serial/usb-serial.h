@@ -280,7 +280,7 @@ static inline void usb_serial_console_exit (void) { }
 #endif
 
 /* Functions needed by other parts of the usbserial core */
-extern struct usb_serial *usb_serial_get_by_minor (unsigned int minor);
+extern struct usb_serial *usb_serial_get_by_index (unsigned int minor);
 extern int usb_serial_generic_open (struct usb_serial_port *port, struct file *filp);
 extern int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
 extern void usb_serial_generic_close (struct usb_serial_port *port, struct file *filp);
