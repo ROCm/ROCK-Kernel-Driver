@@ -875,9 +875,7 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		 * We ignore the result for the halt clear.
 		 */
 
-		/* reset the toggles and endpoint flags */
-		usb_endpoint_running(sc->dev, usb_pipeendpoint(sc->last_pipe),
-			usb_pipeout(sc->last_pipe));
+		/* reset the endpoint toggle */
 		usb_settoggle(sc->dev, usb_pipeendpoint(sc->last_pipe),
 			usb_pipeout(sc->last_pipe), 0);
 
@@ -900,9 +898,7 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		 * We ignore the result for the halt clear.
 		 */
 
-		/* reset the toggles and endpoint flags */
-		usb_endpoint_running(sc->dev, usb_pipeendpoint(sc->last_pipe),
-			usb_pipeout(sc->last_pipe));
+		/* reset the endpoint toggle */
 		usb_settoggle(sc->dev, usb_pipeendpoint(sc->last_pipe),
 			usb_pipeout(sc->last_pipe), 0);
 
@@ -1695,8 +1691,7 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 
 	wait_for_completion(&compl);
 
-	/* reset the toggles and endpoint flags */
-	usb_endpoint_running(sc->dev, endp, usb_pipeout(sc->last_pipe));
+	/* reset the endpoint toggle */
 	usb_settoggle(sc->dev, endp, usb_pipeout(sc->last_pipe), 0);
 
 	return 0;
