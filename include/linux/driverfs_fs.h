@@ -37,9 +37,16 @@ struct device;
 struct device_attribute {
 	char			* name;
 	mode_t			mode;
-
 	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
 	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
+
+#define DEVICE_ATTR(_name,_str,_mode,_show,_store) \
+struct device_attribute dev_attr_##_name = { \
+	.name	= _str,		\
+	.mode	= _mode,	\
+	.show	= _show,	\
+	.store	= _store,	\
 };
 
 extern int
