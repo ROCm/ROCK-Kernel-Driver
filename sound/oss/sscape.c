@@ -600,10 +600,9 @@ static coproc_operations sscape_coproc_operations =
 	&adev_info
 };
 
-static int sscape_detected;
 static int sscape_is_pnp;
 
-void __init attach_sscape(struct address_info *hw_config)
+static void __init attach_sscape(struct address_info *hw_config)
 {
 #ifndef SSCAPE_REGS
 	/*
@@ -638,9 +637,6 @@ void __init attach_sscape(struct address_info *hw_config)
 
 	int i, irq_bits = 0xff;
 
-	if (sscape_detected != hw_config->io_base)
-		return;
-
 	request_region(devc->base + 2, 6, "SoundScape");
 	if (old_hardware)
 	{
@@ -650,7 +646,7 @@ void __init attach_sscape(struct address_info *hw_config)
 	else
 		conf_printf("Ensoniq SoundScape", hw_config);
 
-	for (i = 0; i < sizeof(valid_interrupts); i++)
+	for (i = 0; i < 4; i++)
 	{
 		if (hw_config->irq == valid_interrupts[i])
 		{
@@ -661,45 +657,30 @@ void __init attach_sscape(struct address_info *hw_config)
 	if (hw_config->irq > 15 || (regs[4] = irq_bits == 0xff))
 	{
 		printk(KERN_ERR "Invalid IRQ%d\n", hw_config->irq);
+		if (sscape_is_pnp)
+			release_region(devc->codec, 2);
 		return;
 	}
 	
 	if (!sscape_is_pnp) {
 	
 		spin_lock_irqsave(&devc->lock,flags);
-	    for (i = 1; i < 10; i++)
-	    {
-		switch (i)
-		{
-			case 1:	/* Host interrupt enable */
-				sscape_write(devc, i, 0xf0);	/* All interrupts enabled */
-				break;
-
-			case 2:	/* DMA A status/trigger register */
-			case 3:	/* DMA B status/trigger register */
-				sscape_write(devc, i, 0x20);	/* DMA channel disabled */
-				break;
-
-			case 4:	/* Host interrupt config reg */
-				sscape_write(devc, i, 0xf0 | (irq_bits << 2) | irq_bits);
-				break;
-
-			case 5:	/* Don't destroy CD-ROM DMA config bits (0xc0) */
-				sscape_write(devc, i, (regs[i] & 0x3f) | (sscape_read(devc, i) & 0xc0));
-				break;
-
-			case 6:	/* CD-ROM config (WSS codec actually) */
-				sscape_write(devc, i, regs[i]);
-				break;
-
-			case 9:	/* Master control reg. Don't modify CR-ROM bits. Disable SB emul */
-				sscape_write(devc, i, (sscape_read(devc, i) & 0xf0) | 0x08);
-				break;
-
-			default:
-				sscape_write(devc, i, regs[i]);
-		}
-	    }
+		/* Host interrupt enable */
+		sscape_write(devc, 1, 0xf0);	/* All interrupts enabled */
+		/* DMA A status/trigger register */
+		sscape_write(devc, 2, 0x20);	/* DMA channel disabled */
+		/* DMA B status/trigger register */
+		sscape_write(devc, 3, 0x20);	/* DMA channel disabled */
+		/* Host interrupt config reg */
+		sscape_write(devc, 4, 0xf0 | (irq_bits << 2) | irq_bits);
+		/* Don't destroy CD-ROM DMA config bits (0xc0) */
+		sscape_write(devc, 5, (regs[5] & 0x3f) | (sscape_read(devc, 5) & 0xc0));
+		/* CD-ROM config (WSS codec actually) */
+		sscape_write(devc, 6, regs[6]);
+		sscape_write(devc, 7, regs[7]);
+		sscape_write(devc, 8, regs[8]);
+		/* Master control reg. Don't modify CR-ROM bits. Disable SB emul */
+		sscape_write(devc, 9, (sscape_read(devc, 9) & 0xf0) | 0x08);
 		spin_unlock_irqrestore(&devc->lock,flags);
 	}
 #ifdef SSCAPE_DEBUG2
@@ -1115,9 +1096,9 @@ static void __init sscape_pnp_init_hw(sscape_info* devc)
 		sscape_write( devc, 9, i | 3 );
 		sscape_write( devc, 3, 0x40);
 
-		if (check_region(0x228, 1)) {
-		    	    outb(0, 0x228);
-			    release_region(0x228,1);
+		if (request_region(0x228, 1, "sscape setup junk")) {
+			outb(0, 0x228);
+			release_region(0x228,1);
 		}
 		sscape_write( devc, 3, (devc -> dma << 4) | 0x80);
 		sscape_write( devc, 9, i );
@@ -1139,45 +1120,46 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 		return 0;
 	}
 		
-	if (check_region(devc->codec, 2)) {
+	if (!request_region(devc->codec, 2, "sscape codec")) {
 		printk(KERN_ERR "detect_sscape_pnp: port %x is not free\n", devc->codec);	
 		return 0;
 	}
 
-	if ( (inb( devc -> base + 2) & 0x78) != 0) return 0;
+	if ((inb(devc->base + 2) & 0x78) != 0)
+		goto fail;
 
 	d = inb ( devc -> base + 4) & 0xF0;
-	if (  (d & 0x80) != 0)  return 0;
+	if (d & 0x80)
+		goto fail;
 	
 	if (d == 0) {
-			devc->codec_type = 1;
-			devc->ic_type = IC_ODIE;
-	}
-	else if ( (d & 0x60) != 0) {
-			devc->codec_type = 2;
-			devc->ic_type = IC_OPUS;
-	}
-	else if ( (d & 0x40) != 0) {
-			devc->codec_type = 2;
-			devc->ic_type = IC_ODIE;
-	} 
-	else return 0;
+		devc->codec_type = 1;
+		devc->ic_type = IC_ODIE;
+	} else if ( (d & 0x60) != 0) {
+		devc->codec_type = 2;
+		devc->ic_type = IC_OPUS;
+	} else if ( (d & 0x40) != 0) {	/* WTF? */
+		devc->codec_type = 2;
+		devc->ic_type = IC_ODIE;
+	} else
+		goto fail;
 	
 	sscape_is_pnp = 1;
 		
 	outb(0xFA, devc -> base+4);
 	if  ((inb( devc -> base+4) & 0x9F) != 0x0A)
-		return 0;
+		goto fail;
 	outb(0xFE, devc -> base+4);
 	if  ( (inb(devc -> base+4) & 0x9F) != 0x0E)
-		return 0;
+		goto fail;
 	if  ( (inb(devc -> base+5) & 0x9F) != 0x0E)
-		return 0;
+		goto fail;
 
 	if (devc->codec_type == 2) {
-		if (devc -> codec != devc -> base + 8)
+		if (devc->codec != devc->base + 8) {
 			printk("soundscape warning: incorrect codec port specified\n");
-		devc -> codec = devc -> base + 8;
+			goto fail;
+		}
 		d = 0x10 | (sscape_read(devc, 9)  & 0xCF);
 		sscape_write(devc, 9, d);
 		sscape_write(devc, 6, 0x80);
@@ -1193,9 +1175,9 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 
 	d = inb(devc -> codec);
 	if (d & 0x80)
-		return 0;
+		goto fail;
 	if ( inb(devc -> codec + 2) == 0xFF)
-		return 0;
+		goto fail;
 
 	sscape_write(devc, 9, sscape_read(devc, 9)  & 0x3F );
 
@@ -1217,7 +1199,7 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 		
 	sscape_pnp_init_hw(devc);
 
-	for (i = 0; i < sizeof(valid_interrupts); i++)
+	for (i = 0; i < 4; i++)
 	{
 		if (devc->codec_irq == valid_interrupts[i]) {
 			irq_bits = i;
@@ -1234,15 +1216,14 @@ static int __init detect_sscape_pnp(sscape_info* devc)
 	sscape_pnp_write_codec( devc, 0, sscape_pnp_read_codec( devc, 0) | 0x20);
 	sscape_pnp_write_codec( devc, 0, sscape_pnp_read_codec( devc, 1) | 0x20);
 
-	return 1;	
+	return 1;
+fail:
+	release_region(devc->codec, 2);
+	return 0;
 }
 
 static int __init probe_sscape(struct address_info *hw_config)
 {
-
-	if (sscape_detected != 0 && sscape_detected != hw_config->io_base)
-		return 0;
-
 	devc->base = hw_config->io_base;
 	devc->irq = hw_config->irq;
 	devc->dma = hw_config->dma;
@@ -1263,11 +1244,9 @@ static int __init probe_sscape(struct address_info *hw_config)
 	devc->failed = 1;
 
 	if (!detect_ga(devc)) {
-		if (detect_sscape_pnp(devc)) {		        
-			sscape_detected = hw_config->io_base;
+		if (detect_sscape_pnp(devc))
 			return 1;
-		} 
-		else return 0;
+		return 0;
 	}
 
 	if (old_hardware)	/* Check that it's really an old Spea/Reveal card. */
@@ -1282,11 +1261,10 @@ static int __init probe_sscape(struct address_info *hw_config)
 				inb(devc->base + ODIE_ADDR);
 		}
 	}
-	sscape_detected = hw_config->io_base;
 	return 1;
 }
 
-static int __init probe_ss_ms_sound(struct address_info *hw_config)
+static int __init init_ss_ms_sound(struct address_info *hw_config)
 {
 	int i, irq_bits = 0xff;
 	int ad_flags = 0;
@@ -1301,7 +1279,7 @@ static int __init probe_ss_ms_sound(struct address_info *hw_config)
 		printk(KERN_ERR "soundscape: Invalid initialization order.\n");
 		return 0;
 	}
-	for (i = 0; i < sizeof(valid_interrupts); i++)
+	for (i = 0; i < 4; i++)
 	{
 		if (hw_config->irq == valid_interrupts[i])
 		{
@@ -1309,37 +1287,18 @@ static int __init probe_ss_ms_sound(struct address_info *hw_config)
 			break;
 		}
 	}
-	if (hw_config->irq > 15 || irq_bits == 0xff)
-	{
+	if (irq_bits == 0xff) {
 		printk(KERN_ERR "soundscape: Invalid MSS IRQ%d\n", hw_config->irq);
 		return 0;
 	}
 	
-	if (!sscape_is_pnp) {
-		if (old_hardware)
-			ad_flags = 0x12345677;	/* Tell that we may have a CS4248 chip (Spea-V7 Media FX) */
-		return ad1848_detect(hw_config->io_base, &ad_flags, hw_config->osp);
-	} 
-	else {
-		if (old_hardware)
-			ad_flags = 0x12345677;	/* Tell that we may have a CS4248 chip (Spea-V7 Media FX) */
-		else
-			ad_flags = 0x87654321;  /* Tell that we have a soundscape pnp with 1845 chip */
-		return ad1848_detect(hw_config->io_base, &ad_flags, hw_config->osp);
-	}
-}
+	if (old_hardware)
+		ad_flags = 0x12345677;	/* Tell that we may have a CS4248 chip (Spea-V7 Media FX) */
+	else if (sscape_is_pnp)
+		ad_flags = 0x87654321;  /* Tell that we have a soundscape pnp with 1845 chip */
+	if (!ad1848_detect(hw_config->io_base, &ad_flags, hw_config->osp))
+		return 0;
 
-static void __init attach_ss_ms_sound(struct address_info *hw_config)
-{
-	/*
-	 * This routine configures the SoundScape card for use with the
-	 * Win Sound System driver. The AD1848 codec interface uses the CD-ROM
-	 * config registers of the "ODIE".
-	 */
-
-	int i, irq_bits = 0xff;
-
- 		
  	if (!sscape_is_pnp)  /*pnp is already setup*/
  	{
  		/*
@@ -1355,14 +1314,6 @@ static void __init attach_ss_ms_sound(struct address_info *hw_config)
  		/*
  		 * Init the AD1848 (CD-ROM) config reg.
  		 */
- 		for (i = 0; i < sizeof(valid_interrupts); i++)
- 		{
- 			if (hw_config->irq == valid_interrupts[i])
- 			{
- 				irq_bits = i;
- 				break;
- 			}
- 		}	
  		sscape_write(devc, GA_CDCFG_REG, 0x89 | (hw_config->dma << 4) | (irq_bits << 1));
  	}
  	
@@ -1402,13 +1353,15 @@ static void __init attach_ss_ms_sound(struct address_info *hw_config)
 			printk("I%d = %02x\n", i, sscape_read(devc, i));
 	}
 #endif
-
+	return 1;
 }
 
 static void __exit unload_sscape(struct address_info *hw_config)
 {
 	release_region(devc->base + 2, 6);
 	unload_mpu401(hw_config);
+	if (sscape_is_pnp)
+		release_region(devc->codec, 2);
 }
 
 static void __exit unload_ss_ms_sound(struct address_info *hw_config)
@@ -1480,10 +1433,7 @@ static int __init init_sscape(void)
 
 	attach_sscape(&cfg_mpu);
 	
-	mss = probe_ss_ms_sound(&cfg);
-
-	if (mss)
-		attach_ss_ms_sound(&cfg);
+	mss = init_ss_ms_sound(&cfg);
 
 	return 0;
 }
