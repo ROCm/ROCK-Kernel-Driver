@@ -662,6 +662,10 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 				return 0;
 			sbi->s_resuid = v;
 		}
+		else if (!strcmp (this_char, "oldalloc"))
+			set_opt (sbi->s_mount_opt, OLDALLOC);
+		else if (!strcmp (this_char, "orlov"))
+			clear_opt (sbi->s_mount_opt, OLDALLOC);
 #ifdef CONFIG_JBD_DEBUG
 		else if (!strcmp (this_char, "ro-after")) {
 			unsigned long v;
