@@ -689,7 +689,7 @@ static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
 /*
  * Probe for a cmd640 chipset, and initialize it if found.  Called from ide.c
  */
-int __init ide_probe_for_cmd640x (void)
+int __init ide_probe_for_cmd640x(void)
 {
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 	int second_port_toggled = 0;
@@ -793,9 +793,7 @@ int __init ide_probe_for_cmd640x (void)
 		cmd_hwif0->serialized = 1;
 		cmd_hwif1->serialized = 1;
 		cmd_hwif1->chipset = ide_cmd640;
-		cmd_hwif0->mate = cmd_hwif1;
-		cmd_hwif1->mate = cmd_hwif0;
-		cmd_hwif1->unit = 1;
+		cmd_hwif1->unit = ATA_SECONDARY;
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 		cmd_hwif1->tuneproc = &cmd640_tune_drive;
 #endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
@@ -811,8 +809,8 @@ int __init ide_probe_for_cmd640x (void)
 		ide_drive_t *drive = cmd_drives[index];
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 		if (drive->autotune || ((index > 1) && second_port_toggled)) {
-	 		/*
-	 		 * Reset timing to the slowest speed and turn off prefetch.
+			/*
+			 * Reset timing to the slowest speed and turn off prefetch.
 			 * This way, the drive identify code has a better chance.
 			 */
 			setup_counts    [index] = 4;	/* max possible */

@@ -146,7 +146,7 @@ void __init init_umc8672 (void)	/* called from ide.c */
 	{
 		__restore_flags(flags);	/* local CPU only */
 		printk ("umc8672: not found\n");
-		return;  
+		return;
 	}
 	outb_p (0xa5,0x108); /* disable umc */
 
@@ -158,7 +158,6 @@ void __init init_umc8672 (void)	/* called from ide.c */
 	ide_hwifs[1].chipset = ide_umc8672;
 	ide_hwifs[0].tuneproc = &tune_umc;
 	ide_hwifs[1].tuneproc = &tune_umc;
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].unit = 1;
+	ide_hwifs[0].unit = ATA_PRIMARY;
+	ide_hwifs[1].unit = ATA_SECONDARY;
 }

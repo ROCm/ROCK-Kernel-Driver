@@ -2177,7 +2177,7 @@ int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp)
 		}
 		for (h = 0; h < MAX_HWIFS; ++h) {
 			hwif = &ide_hwifs[h];
-			if ((!hwif->present && !hwif->mate && !initializing) ||
+			if ((!hwif->present && (hwif->unit == ATA_PRIMARY) && !initializing) ||
 			    (!hwif->hw.io_ports[IDE_DATA_OFFSET] && initializing))
 				goto found;
 		}
@@ -3052,9 +3052,13 @@ int __init ide_setup (char *s)
 				goto done;
 			case -2: /* "serialize" */
 			do_serialize:
-				hwif->mate = &ide_hwifs[hw^1];
-				hwif->mate->mate = hwif;
-				hwif->serialized = hwif->mate->serialized = 1;
+				{
+					struct ata_channel *mate;
+
+					mate = &ide_hwifs[hw ^ 1];
+					hwif->serialized = 1;
+					mate->serialized = 1;
+				}
 				goto done;
 
 			case -1: /* "noprobe" */

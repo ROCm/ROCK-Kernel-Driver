@@ -1,5 +1,5 @@
 /*
- * $Id: piix.c,v 1.2 2002/03/13 22:50:43 vojtech Exp $
+ * $Id: piix.c,v 1.3 2002/03/29 16:06:06 vojtech Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik
  *
@@ -128,7 +128,7 @@ static int piix_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	piix_print("----------PIIX BusMastering IDE Configuration---------------");
 
-	piix_print("Driver Version:                     1.2");
+	piix_print("Driver Version:                     1.3");
 	piix_print("South Bridge:                       %s", bmide_dev->name);
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
@@ -331,7 +331,7 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 		umul = 2;
 
 	T = 1000000000 / piix_clock;
-	UT = T / umul;
+	UT = umul ? (T / umul) : 0;
 
 	ata_timing_compute(drive, speed, &t, T, UT);
 

@@ -421,7 +421,7 @@ int check_drive_lists (ide_drive_t *drive, int good_bad)
 	return 0;
 }
 
-static int report_drive_dmaing (ide_drive_t *drive)
+int report_drive_dmaing (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 
