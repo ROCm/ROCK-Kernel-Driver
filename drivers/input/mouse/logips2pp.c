@@ -143,7 +143,7 @@ void ps2pp_set_800dpi(struct psmouse *psmouse)
  * touchpad.
  */
 
-int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
+static int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
 {
 	int i;
 	static int logitech_4btn[] = { 12, 40, 41, 42, 43, 52, 73, 80, -1 };
@@ -227,3 +227,22 @@ int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
 
 	return 0;
 }
+
+/*
+ * Logitech magic init.
+ */
+int ps2pp_detect(struct psmouse *psmouse)
+{
+	unsigned char param[4];
+
+	param[0] = 0;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11);
+	param[1] = 0;
+	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
+
+	return param[1] != 0 ? ps2pp_detect_model(psmouse, param) : 0;
+}
+

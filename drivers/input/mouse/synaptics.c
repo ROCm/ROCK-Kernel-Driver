@@ -377,7 +377,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_data old_priv = *priv;
 
-	if (synaptics_detect(psmouse))
+	if (!synaptics_detect(psmouse))
 		return -1;
 
 	if (synaptics_query_hardware(psmouse)) {
@@ -411,7 +411,7 @@ int synaptics_detect(struct psmouse *psmouse)
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
-	return param[1] == 0x47 ? 0 : -1;
+	return param[1] == 0x47;
 }
 
 int synaptics_init(struct psmouse *psmouse)
