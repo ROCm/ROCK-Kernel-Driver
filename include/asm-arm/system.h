@@ -65,12 +65,13 @@ extern int cpu_architecture(void);
  * The `mb' is to tell GCC not to cache `current' across this call.
  */
 struct thread_info;
-extern struct thread_info *__switch_to(struct thread_info *, struct thread_info *);
+struct task_struct;
+extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
 
-#define switch_to(prev,next,last)					\
-	do {			 					\
-		__switch_to(prev->thread_info,next->thread_info);	\
-		mb();							\
+#define switch_to(prev,next,last)						\
+	do {									\
+		last = __switch_to(prev,prev->thread_info,next->thread_info);	\
+		mb();								\
 	} while (0)
 
 #ifdef CONFIG_SMP

@@ -75,7 +75,6 @@ no_work_pending:
  * This is how we return from a fork.
  */
 ENTRY(ret_from_fork)
-	ldr	r0, [r0, #TI_TASK]
 	bl	schedule_tail
 	get_thread_info tsk
 	ldr	r1, [tsk, #TI_FLAGS]		@ check for syscall tracing
