@@ -41,10 +41,6 @@
 #include <linux/ticable.h>
 #include "tiglusb.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-# define minor(x) MINOR(x)
-#endif
-
 /*
  * Version Information
  */
