@@ -607,7 +607,7 @@ static int __init empeg_init (void)
 	/* create our write urb pool and transfer buffers */ 
 	spin_lock_init (&write_urb_pool_lock);
 	for (i = 0; i < NUM_URBS; ++i) {
-		urb = usb_alloc_urb(0);
+		urb = usb_alloc_urb(0, GFP_KERNEL);
 		write_urb_pool[i] = urb;
 		if (urb == NULL) {
 			err("No more urbs???");
