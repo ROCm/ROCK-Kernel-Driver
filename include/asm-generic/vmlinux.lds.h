@@ -16,6 +16,16 @@
 		*(.rodata1)						\
 	}								\
 									\
+	/* PCI quirks */						\
+	.pci_fixup        : AT(ADDR(.pci_fixup) - LOAD_OFFSET) {	\
+		VMLINUX_SYMBOL(__start_pci_fixups_header) = .;		\
+		*(.pci_fixup_header)					\
+		VMLINUX_SYMBOL(__end_pci_fixups_header) = .;		\
+		VMLINUX_SYMBOL(__start_pci_fixups_final) = .;		\
+		*(.pci_fixup_final)					\
+		VMLINUX_SYMBOL(__end_pci_fixups_final) = .;		\
+	}								\
+									\
 	/* Kernel symbol table: Normal symbols */			\
 	__ksymtab         : AT(ADDR(__ksymtab) - LOAD_OFFSET) {		\
 		VMLINUX_SYMBOL(__start___ksymtab) = .;			\

@@ -55,12 +55,6 @@ unsigned int pcibios_assign_all_busses(void)
 unsigned long isa_io_base;	/* NULL if no ISA bus */
 unsigned long pci_io_base;
 
-void pcibios_name_device(struct pci_dev* dev);
-void pcibios_final_fixup(void);
-static void fixup_broken_pcnet32(struct pci_dev* dev);
-static void fixup_windbond_82c105(struct pci_dev* dev);
-extern void fixup_k2_sata(struct pci_dev* dev);
-
 void iSeries_pcibios_init(void);
 
 struct pci_controller *hose_head;
@@ -74,20 +68,6 @@ int global_phb_number;		/* Global phb counter */
 /* Cached ISA bridge dev. */
 struct pci_dev *ppc64_isabridge_dev = NULL;
 
-struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_TRIDENT,		PCI_ANY_ID,
-	  fixup_broken_pcnet32 },
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_WINBOND,		PCI_DEVICE_ID_WINBOND_82C105,
-	  fixup_windbond_82c105 },
-	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,    			PCI_ANY_ID,
-	  pcibios_name_device },
-#ifdef CONFIG_PPC_PMAC
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SERVERWORKS,	0x0240,
-	  fixup_k2_sata },
-#endif
-	{ 0 }
-};
-
 static void fixup_broken_pcnet32(struct pci_dev* dev)
 {
 	if ((dev->class>>8 == PCI_CLASS_NETWORK_ETHERNET)) {
@@ -96,6 +76,7 @@ static void fixup_broken_pcnet32(struct pci_dev* dev)
 		pci_name_device(dev);
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_TRIDENT, PCI_ANY_ID, fixup_broken_pcnet32);
 
 static void fixup_windbond_82c105(struct pci_dev* dev)
 {
@@ -118,6 +99,7 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 			dev->resource[i].flags &= ~IORESOURCE_IO;
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, fixup_windbond_82c105);
 
 void 
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,

@@ -777,3 +777,4 @@ void fixup_k2_sata(struct pci_dev* dev)
 		}
 	}
 }
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SERVERWORKS, 0x0240, fixup_k2_sata);

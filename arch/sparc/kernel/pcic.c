@@ -36,10 +36,6 @@
 #include <asm/uaccess.h>
 
 
-struct pci_fixup pcibios_fixups[] = {
-	{ 0 }
-};
-
 unsigned int pcic_pin_to_irq(unsigned int pin, char *name);
 
 /*
