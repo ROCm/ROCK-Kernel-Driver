@@ -269,9 +269,9 @@
 /* Number 256 is reserved for sys_debug_setcontext */
 /* Number 257 is reserved for vserver */
 /* Number 258 is reserved for new sys_remap_file_pages */
-/* Number 259 is reserved for new sys_mbind */
-/* Number 260 is reserved for new sys_get_mempolicy */
-/* Number 261 is reserved for new sys_set_mempolicy */
+#define __NR_mbind		259
+#define __NR_get_mempolicy	260
+#define __NR_set_mempolicy	261
 #define __NR_mq_open		262
 #define __NR_mq_unlink		263
 #define __NR_mq_timedsend	264
