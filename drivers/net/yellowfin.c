@@ -1201,13 +1201,8 @@ static int yellowfin_rx(struct net_device *dev)
 					break;
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
-#if HAS_IP_COPYSUM
 				eth_copy_and_sum(skb, rx_skb->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
-#else
-				memcpy(skb_put(skb, pkt_len), 
-					rx_skb->tail, pkt_len);
-#endif
 				pci_dma_sync_single_for_device(yp->pci_dev, desc->addr,
 											   yp->rx_buf_sz,
 											   PCI_DMA_FROMDEVICE);
