@@ -451,7 +451,6 @@ enum RxConfigBits {
 	RxNoWrap = (1 << 7),
 };
 
-
 /* Twister tuning parameters from RealTek.
    Completely undocumented, but required to tune bad links on some boards. */
 enum CSCRBits {
@@ -462,28 +461,10 @@ enum CSCRBits {
 	CSCR_LinkDownCmd = 0x0f3c0,
 };
 
-
 enum Cfg9346Bits {
 	Cfg9346_Lock = 0x00,
 	Cfg9346_Unlock = 0xC0,
 };
-
-#ifdef CONFIG_8139TOO_TUNE_TWISTER
-
-enum TwisterParamVals {
-	PARA78_default	= 0x78fa8388,
-	PARA7c_default	= 0xcb38de43,	/* param[0][3] */
-	PARA7c_xxx	= 0xcb38de43,
-};
-
-static const unsigned long param[4][4] = {
-	{0xcb39de43, 0xcb39ce43, 0xfb38de03, 0xcb38de43},
-	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
-	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
-	{0xbb39de43, 0xbb39ce43, 0xbb39ce83, 0xbb39ce83}
-};
-
-#endif /* CONFIG_8139TOO_TUNE_TWISTER */
 
 typedef enum {
 	CH_8139 = 0,
@@ -621,7 +602,7 @@ static int rtl8139_open (struct net_device *dev);
 static int mdio_read (struct net_device *dev, int phy_id, int location);
 static void mdio_write (struct net_device *dev, int phy_id, int location,
 			int val);
-static int rtl8139_thread (void *data);
+static inline void rtl8139_start_thread(struct net_device *dev);
 static void rtl8139_tx_timeout (struct net_device *dev);
 static void rtl8139_init_ring (struct net_device *dev);
 static int rtl8139_start_xmit (struct sk_buff *skb,
@@ -1332,8 +1313,6 @@ static int rtl8139_open (struct net_device *dev)
 
 	tp->mii.full_duplex = tp->mii.force_media;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
-	tp->twistie = (tp->chipset == CH_8139_K) ? 1 : 0;
-	tp->time_to_die = 0;
 
 	rtl8139_init_ring (dev);
 	rtl8139_hw_start (dev);
@@ -1344,10 +1323,7 @@ static int rtl8139_open (struct net_device *dev)
 			dev->irq, RTL_R8 (MediaStatus),
 			tp->mii.full_duplex ? "full" : "half");
 
-	tp->thr_pid = kernel_thread (rtl8139_thread, dev, CLONE_FS | CLONE_FILES);
-	if (tp->thr_pid < 0)
-		printk (KERN_WARNING "%s: unable to start kernel thread\n",
-			dev->name);
+	rtl8139_start_thread(dev);
 
 	return 0;
 }
@@ -1455,6 +1431,19 @@ static int next_tick = 3 * HZ;
 static inline void rtl8139_tune_twister (struct net_device *dev,
 				  struct rtl8139_private *tp) {}
 #else
+enum TwisterParamVals {
+	PARA78_default	= 0x78fa8388,
+	PARA7c_default	= 0xcb38de43,	/* param[0][3] */
+	PARA7c_xxx	= 0xcb38de43,
+};
+
+static const unsigned long param[4][4] = {
+	{0xcb39de43, 0xcb39ce43, 0xfb38de03, 0xcb38de43},
+	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
+	{0xcb39de43, 0xcb39ce43, 0xcb39ce83, 0xcb39ce83},
+	{0xbb39de43, 0xbb39ce43, 0xbb39ce83, 0xbb39ce83}
+};
+
 static void rtl8139_tune_twister (struct net_device *dev,
 				  struct rtl8139_private *tp)
 {
@@ -1541,7 +1530,6 @@ static void rtl8139_tune_twister (struct net_device *dev,
 }
 #endif /* CONFIG_8139TOO_TUNE_TWISTER */
 
-
 static inline void rtl8139_thread_iter (struct net_device *dev,
 				 struct rtl8139_private *tp,
 				 void *ioaddr)
@@ -1588,7 +1576,6 @@ static inline void rtl8139_thread_iter (struct net_device *dev,
 		 RTL_R8 (Config1));
 }
 
-
 static int rtl8139_thread (void *data)
 {
 	struct net_device *dev = data;
@@ -1622,6 +1609,24 @@ static int rtl8139_thread (void *data)
 	complete_and_exit (&tp->thr_exited, 0);
 }
 
+static inline void rtl8139_start_thread(struct net_device *dev)
+{
+	struct rtl8139_private *tp = dev->priv;
+
+	tp->thr_pid = -1;
+	tp->twistie = 0;
+	tp->time_to_die = 0;
+	if (tp->chipset == CH_8139_K)
+		tp->twistie = 1;
+	else if (tp->drv_flags & HAS_LNK_CHNG)
+		return;
+
+	tp->thr_pid = kernel_thread(rtl8139_thread, dev, CLONE_FS|CLONE_FILES);
+	if (tp->thr_pid < 0) {
+		printk (KERN_WARNING "%s: unable to start kernel thread\n",
+			dev->name);
+	}
+}
 
 static void rtl8139_tx_clear (struct rtl8139_private *tp)
 {
