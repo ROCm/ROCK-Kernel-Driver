@@ -322,9 +322,8 @@ struct getdents_callback32 {
 	int error;
 };
 
-static int
-filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
-		               unsigned int d_type)
+static int filldir(void * __buf, const char * name, int namlen, off_t offset,
+		   ino_t ino, unsigned int d_type)
 {
 	struct linux_dirent32 * dirent;
 	struct getdents_callback32 * buf = (struct getdents_callback32 *) __buf;
@@ -334,28 +333,44 @@ filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
 	if (reclen > buf->count)
 		return -EINVAL;
 	dirent = buf->previous;
-	if (dirent)
-		put_user(offset, &dirent->d_off);
+	if (dirent) {
+		if (__put_user(offset, &dirent->d_off))
+			goto efault;
+	}
 	dirent = buf->current_dir;
+	if (__put_user(ino, &dirent->d_ino))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (__put_user(0, dirent->d_name + namlen))
+		goto efault;
+	if (__put_user(d_type, (char *) dirent + reclen - 1))
+		goto efault;
 	buf->previous = dirent;
-	put_user(ino, &dirent->d_ino);
-	put_user(reclen, &dirent->d_reclen);
-	copy_to_user(dirent->d_name, name, namlen);
-	put_user(0, dirent->d_name + namlen);
-	put_user(d_type, (char *) dirent + reclen - 1);
-	((char *) dirent) += reclen;
+	dirent = (void *)dirent + reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
+efault:
+	buf->error = -EFAULT;
+	return -EFAULT;
 }
 
-asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, unsigned int count)
+long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent,
+		    unsigned int count)
 {
 	struct file * file;
 	struct linux_dirent32 * lastdirent;
 	struct getdents_callback32 buf;
-	int error = -EBADF;
+	int error;
 
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
+
+	error = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -368,19 +383,20 @@ asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, u
 	error = vfs_readdir(file, (filldir_t)filldir, &buf);
 	if (error < 0)
 		goto out_putf;
-	lastdirent = buf.previous;
 	error = buf.error;
-	if(lastdirent) {
-		put_user(file->f_pos, &lastdirent->d_off);
-		error = count - buf.count;
+	lastdirent = buf.previous;
+	if (lastdirent) {
+		if (put_user(file->f_pos, &lastdirent->d_off))
+			error = -EFAULT;
+		else
+			error = count - buf.count;
 	}
- out_putf:
-	fput(file);
 
- out:
+out_putf:
+	fput(file);
+out:
 	return error;
 }
-/* end of readdir & getdents */
 
 /*
  * Ooo, nasty.  We need here to frob 32-bit unsigned longs to
