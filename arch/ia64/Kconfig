@@ -544,6 +544,8 @@ source "drivers/pnp/Kconfig"
 
 source "drivers/block/Kconfig"
 
+source "drivers/ide/Kconfig"
+
 source "drivers/ieee1394/Kconfig"
 
 source "drivers/message/i2o/Kconfig"
@@ -786,6 +788,10 @@ config IA64_EARLY_PRINTK_UART_BASE
 config IA64_EARLY_PRINTK_VGA
 	bool "Early printk on VGA"
 	depends on IA64_EARLY_PRINTK
+
+config IA64_EARLY_PRINTK_SGI_SN
+	bool "Early printk on SGI SN serial console"
+	depends on IA64_EARLY_PRINTK && (IA64_GENERIC || IA64_SGI_SN2)
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"

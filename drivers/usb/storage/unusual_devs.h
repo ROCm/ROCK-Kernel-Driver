@@ -595,6 +595,16 @@ UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
 		
+/* Pentax Optio S digital camera
+ * adapted from http://www2.goldfisch.at/knowledge/233
+ * (Peter Pilsl <pilsl@goldfisch.at>)
+ * by Christoph Weidemann <cweidema@indiana.edu> */
+UNUSUAL_DEV(  0x0a17, 0x0006, 0x0000, 0xffff,
+		"Pentax",
+		"Optio S",
+		US_SC_8070, US_PR_CB, NULL,
+		US_FL_MODE_XLATE|US_FL_FIX_INQUIRY),
+
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
 		"ATI",
@@ -609,6 +619,16 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x0001,
 		"EasyDisk EDxxxx",
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE | US_FL_FIX_INQUIRY ),
+
+/* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
+ * Tested on hardware version 1.10.
+ * Entry is needed only for the initializer function override.
+ */
+UNUSUAL_DEV(  0x1019, 0x0c55, 0x0000, 0x9999,
+		"Desknote",
+		"UCR-61S2B",
+		US_SC_DEVICE, US_PR_DEVICE, usb_stor_ucr61s2b_init,
+		0 ),
 
 /* Reported by Dan Pilone <pilone@slac.com>
  * The device needs the flags only.

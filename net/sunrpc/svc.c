@@ -113,9 +113,12 @@ svc_destroy(struct svc_serv *serv)
 static int
 svc_init_buffer(struct svc_rqst *rqstp, unsigned int size)
 {
-	int pages = 2 + (size+ PAGE_SIZE -1) / PAGE_SIZE;
+	int pages;
 	int arghi;
 	
+	if (size > RPCSVC_MAXPAYLOAD)
+		size = RPCSVC_MAXPAYLOAD;
+	pages = 2 + (size+ PAGE_SIZE -1) / PAGE_SIZE;
 	rqstp->rq_argused = 0;
 	rqstp->rq_resused = 0;
 	arghi = 0;

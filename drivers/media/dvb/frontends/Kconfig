@@ -5,10 +5,9 @@ config DVB_STV0299
 	tristate "STV0299 based DVB-S frontend (QPSK)"
 	depends on DVB_CORE
 	help
-	  A DVB-S tuner module. 
-
-	  Say Y when you want to support frontend based on this 
-	  demodulator.
+	  The stv0299 by ST is used in many DVB-S tuner modules, 
+	  say Y when you want to support frontends based on this 
+	  DVB-S demodulator.
 
 	  Some examples are the Alps BSRU6, the Philips SU1278 and
 	  the LG TDQB-S00x.
@@ -61,6 +60,17 @@ config DVB_ATMEL_AT76C651
 
 	  If you don't know what tuner module is soldered on your
 	  DVB adapter simply enable all supported frontends, the
+	  right one will get autodetected.
+
+config DVB_CX24110
+	tristate "Frontends with Connexant CX24110 demodulator (QPSK)"
+	depends on DVB_CORE
+	help
+	  The CX24110 Demodulator is used in some DVB-S frontends. 
+	  Say Y if you want support for this chip in your kernel.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
 config DVB_GRUNDIG_29504_491

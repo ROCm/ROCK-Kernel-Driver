@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1999 by Ralf Baechle
+ * Copyright (C) 1995, 1999, 2002 by Ralf Baechle
  */
 #ifndef _ASM_MMAN_H
 #define _ASM_MMAN_H
@@ -14,10 +14,12 @@
  * without PROT_READ.  The only guarantees are that no writing will be
  * allowed without PROT_WRITE and no access will be allowed for PROT_NONE.
  */
-#define PROT_NONE	0x0		/* page can not be accessed */
-#define PROT_READ	0x1		/* page can be read */
-#define PROT_WRITE	0x2		/* page can be written */
-#define PROT_EXEC	0x4		/* page can be executed */
+#define PROT_NONE	0x00		/* page can not be accessed */
+#define PROT_READ	0x01		/* page can be read */
+#define PROT_WRITE	0x02		/* page can be written */
+#define PROT_EXEC	0x04		/* page can be executed */
+/*			0x08		   reserved for PROT_EXEC_NOFLUSH */
+#define PROT_SEM	0x10		/* page may be used for atomic ops */
 
 /*
  * Flags for mmap
@@ -40,6 +42,8 @@
 #define MAP_DENYWRITE	0x2000		/* ETXTBSY */
 #define MAP_EXECUTABLE	0x4000		/* mark it as an executable */
 #define MAP_LOCKED	0x8000		/* pages are locked */
+#define MAP_POPULATE	0x10000		/* populate (prefault) pagetables */
+#define MAP_NONBLOCK	0x20000		/* do not block on IO */
 
 /*
  * Flags for msync

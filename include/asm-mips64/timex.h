@@ -10,7 +10,9 @@
 #ifndef _ASM_TIMEX_H
 #define _ASM_TIMEX_H
 
-#define CLOCK_TICK_RATE	1193180 /* Underlying HZ */
+#include <asm/mipsregs.h>
+
+#define CLOCK_TICK_RATE		1193182	/* Underlying HZ */
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */
 #define FINETUNE ((((((long)LATCH * HZ - CLOCK_TICK_RATE) << SHIFT_HZ) * \
 	(1000000/CLOCK_TICK_FACTOR) / (CLOCK_TICK_RATE/CLOCK_TICK_FACTOR)) \
@@ -20,7 +22,7 @@
  * Standard way to access the cycle counter.
  * Currently only used on SMP for scheduling.
  *
- * Only the low 32 bits are available as a continuously counting entity. 
+ * Only the low 32 bits are available as a continuously counting entity.
  * But this only means we'll force a reschedule every 8 seconds or so,
  * which isn't an evil thing.
  *
@@ -32,15 +34,7 @@ extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles (void)
 {
-	cycles_t val;
-
-	__asm__ __volatile__(
-		".set noreorder\n\t"
-		"mfc0 %0, $9\n\t"
-		".set reorder"
-		: "=r" (val));
-
-	return val;
+	return read_c0_count();
 }
 
 #endif /*  _ASM_TIMEX_H */

@@ -1,12 +1,11 @@
-/* $Id$
- *
+/*
  * vac.h: Various VIC controller defines.  The VIC is a VME controller
  *        used in Baget/MIPS series.
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
  */
-#ifndef _MIPS_VAC_H
-#define _MIPS_VAC_H
+#ifndef _ASM_VAC_H
+#define _ASM_VAC_H
 
 #define VAC_SLSEL1_MASK      0x000
 #define VAC_SLSEL1_BASE      0x100
@@ -22,8 +21,8 @@
 #define    VAC_A24_MASK          (0x3f<<9)
 #define    VAC_A24_D32_ENABLE    (1<<8)
 #define    VAC_A24_A24_CACHINH   (1<<7)
-#define    VAC_A24_A16D32_ENABLE (1<<6)  
-#define    VAC_A24_A16D32        (1<<5)  
+#define    VAC_A24_A16D32_ENABLE (1<<6)
+#define    VAC_A24_A16D32        (1<<5)
 #define    VAC_A24_DATAPATH      (1<<4)
 #define    VAC_A24_IO_CACHINH    (1<<3)
 #define VAC_REG1             0x900
@@ -197,13 +196,13 @@
 #define VAC_ID               0x2900
 
 
-#ifndef __LANGUAGE_ASSEMBLY__
+#ifndef __ASSEMBLY__
 
 #define vac_inb(p)    (*(volatile unsigned char *)(VAC_BASE + (p)))
 #define vac_outb(v,p) (*((volatile unsigned char *)(VAC_BASE + (p))) = v)
 #define vac_inw(p)    (*(volatile unsigned short*)(VAC_BASE + (p)))
 #define vac_outw(v,p) (*((volatile unsigned short*)(VAC_BASE + (p))) = v)
 
-#endif /* __LANGUAGE_ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */
 
-#endif /* !(_MIPS_VAC_H) */
+#endif /* _ASM_VAC_H */

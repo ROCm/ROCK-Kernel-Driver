@@ -2,7 +2,7 @@
 
     A driver for PCMCIA serial devices
 
-    serial_cs.c 1.123 2000/08/24 18:46:38
+    serial_cs.c 1.134 2002/05/04 05:48:53
 
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
@@ -43,7 +43,6 @@
 #include <linux/serial.h>
 #include <linux/serial_core.h>
 #include <linux/major.h>
-#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -59,7 +58,7 @@
 static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-static char *version = "serial_cs.c 1.123 2000/08/24 18:46:38 (David Hinds)";
+static char *version = "serial_cs.c 1.134 2002/05/04 05:48:53 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -74,10 +73,13 @@ static int irq_list[4] = { -1 };
 
 /* Enable the speaker? */
 static int do_sound = 1;
+/* Skip strict UART tests? */
+static int buggy_uart;
 
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
 MODULE_PARM(do_sound, "i");
+MODULE_PARM(buggy_uart, "i");
 
 /*====================================================================*/
 
@@ -100,7 +102,7 @@ static struct multi_id multi_id[] = {
 };
 #define MULTI_COUNT (sizeof(multi_id)/sizeof(struct multi_id))
 
-typedef struct serial_info {
+struct serial_info {
 	dev_link_t		link;
 	int			ndev;
 	int			multi;
@@ -108,8 +110,7 @@ typedef struct serial_info {
 	int			manfid;
 	dev_node_t		node[4];
 	int			line[4];
-	struct work_struct	remove;
-} serial_info_t;
+};
 
 static void serial_config(dev_link_t * link);
 static int serial_event(event_t event, int priority,
@@ -124,20 +125,19 @@ static dev_link_t *dev_list = NULL;
 
 /*======================================================================
 
-    After a card is removed, do_serial_release() will unregister
+    After a card is removed, serial_remove() will unregister
     the serial device(s), and release the PCMCIA configuration.
     
 ======================================================================*/
 
-/*
- * This always runs in process context.
- */
-static void do_serial_release(void *arg)
+static void serial_remove(dev_link_t *link)
 {
-	struct serial_info *info = arg;
-	int i;
+	struct serial_info *info = link->priv;
+	int i, ret;
 
-	DEBUG(0, "serial_release(0x%p)\n", &info->link);
+	link->state &= ~DEV_PRESENT;
+
+	DEBUG(0, "serial_release(0x%p)\n", link);
 
 	/*
 	 * Recheck to see if the device is still configured.
@@ -158,25 +158,6 @@ static void do_serial_release(void *arg)
 	}
 }
 
-/*
- * This may be called from IRQ context.
- */
-static void serial_remove(dev_link_t *link)
-{
-	struct serial_info *info = link->priv;
-
-	link->state &= ~DEV_PRESENT;
-
-	/*
-	 * FIXME: Since the card has probably been removed,
-	 * we should call into the serial layer and hang up
-	 * the ports on the card immediately.
-	 */
-
-	if (link->state & DEV_CONFIG)
-		schedule_work(&info->remove);
-}
-
 /*======================================================================
 
     serial_attach() creates an "instance" of the driver, allocating
@@ -187,7 +168,7 @@ static void serial_remove(dev_link_t *link)
 
 static dev_link_t *serial_attach(void)
 {
-	serial_info_t *info;
+	struct serial_info *info;
 	client_reg_t client_reg;
 	dev_link_t *link;
 	int i, ret;
@@ -202,8 +183,6 @@ static dev_link_t *serial_attach(void)
 	link = &info->link;
 	link->priv = info;
 
-	INIT_WORK(&info->remove, do_serial_release, info);
-
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
@@ -214,7 +193,6 @@ static dev_link_t *serial_attach(void)
 		for (i = 0; i < 4; i++)
 			link->irq.IRQInfo2 |= 1 << irq_list[i];
 	link->conf.Attributes = CONF_ENABLE_IRQ;
-	link->conf.Vcc = 50;
 	if (do_sound) {
 		link->conf.Attributes |= CONF_ENABLE_SPKR;
 		link->conf.Status = CCSR_AUDIO_ENA;
@@ -254,7 +232,7 @@ static dev_link_t *serial_attach(void)
 
 static void serial_detach(dev_link_t * link)
 {
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	dev_link_t **linkp;
 	int ret;
 
@@ -275,7 +253,7 @@ static void serial_detach(dev_link_t * link)
 	/*
 	 * Ensure that the ports have been released.
 	 */
-	do_serial_release(info);
+	serial_remove(link);
 
 	if (link->handle) {
 		ret = CardServices(DeregisterClient, link->handle);
@@ -290,7 +268,7 @@ static void serial_detach(dev_link_t * link)
 
 /*====================================================================*/
 
-static int setup_serial(serial_info_t * info, ioaddr_t port, int irq)
+static int setup_serial(struct serial_info * info, ioaddr_t port, int irq)
 {
 	struct serial_struct serial;
 	int line;
@@ -299,11 +277,13 @@ static int setup_serial(serial_info_t * info, ioaddr_t port, int irq)
 	serial.port = port;
 	serial.irq = irq;
 	serial.flags = UPF_SKIP_TEST | UPF_SHARE_IRQ;
+	if (buggy_uart)
+		serial.flags |= UPF_BUGGY_UART;
 	line = register_serial(&serial);
 	if (line < 0) {
 		printk(KERN_NOTICE "serial_cs: register_serial() at 0x%04lx,"
 		       " irq %d failed\n", (u_long) serial.port, serial.irq);
-		return -1;
+		return -EINVAL;
 	}
 
 	info->line[info->ndev] = line;
@@ -341,7 +321,7 @@ static int simple_config(dev_link_t * link)
 {
 	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_char buf[256];
 	cisparse_t parse;
@@ -445,12 +425,20 @@ static int simple_config(dev_link_t * link)
 static int multi_config(dev_link_t * link)
 {
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_char buf[256];
 	cisparse_t parse;
 	cistpl_cftable_entry_t *cf = &parse.cftable_entry;
+	config_info_t config;
 	int i, base2 = 0;
+
+	i = CardServices(GetConfigurationInfo, handle, &config);
+	if (i != CS_SUCCESS) {
+		cs_error(handle, GetConfiguration, i);
+		return -1;
+	}
+	link->conf.Vcc = config.Vcc;
 
 	tuple.TupleData = (cisdata_t *) buf;
 	tuple.TupleOffset = 0;
@@ -524,6 +512,19 @@ static int multi_config(dev_link_t * link)
 		return -1;
 	}
 
+	/* The Oxford Semiconductor OXCF950 cards are in fact single-port:
+	   8 registers are for the UART, the others are extra registers */
+	if (info->manfid == MANFID_OXSEMI) {
+		if (cf->index == 1 || cf->index == 3) {
+			setup_serial(info, base2, link->irq.AssignedIRQ);
+			outb(12, link->io.BasePort1 + 1);
+		} else {
+			setup_serial(info, link->io.BasePort1, link->irq.AssignedIRQ);
+			outb(12, base2 + 1);
+		}
+		return 0;
+	}
+
 	setup_serial(info, link->io.BasePort1, link->irq.AssignedIRQ);
 	/* The Nokia cards are not really multiport cards */
 	if (info->manfid == MANFID_NOKIA)
@@ -548,7 +549,7 @@ while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
 void serial_config(dev_link_t * link)
 {
 	client_handle_t handle = link->handle;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 	tuple_t tuple;
 	u_short buf[128];
 	cisparse_t parse;
@@ -631,7 +632,8 @@ void serial_config(dev_link_t * link)
  cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
  failed:
-	do_serial_release(info);
+	serial_remove(link);
+	link->state &= ~DEV_CONFIG_PENDING;
 }
 
 /*======================================================================
@@ -647,7 +649,7 @@ static int
 serial_event(event_t event, int priority, event_callback_args_t * args)
 {
 	dev_link_t *link = args->client_data;
-	serial_info_t *info = link->priv;
+	struct serial_info *info = link->priv;
 
 	DEBUG(1, "serial_event(0x%06x)\n", event);
 

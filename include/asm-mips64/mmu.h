@@ -1,7 +1,6 @@
-#ifndef __MMU_H
-#define __MMU_H
+#ifndef __ASM_MMU_H
+#define __ASM_MMU_H
 
-/* Default "unsigned long" context */
-typedef unsigned long mm_context_t;
+typedef unsigned long mm_context_t[NR_CPUS];
 
-#endif
+#endif /* __ASM_MMU_H */

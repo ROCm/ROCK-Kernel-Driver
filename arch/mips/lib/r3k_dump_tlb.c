@@ -12,11 +12,12 @@
 
 #include <asm/bootinfo.h>
 #include <asm/cachectl.h>
+#include <asm/cpu.h>
 #include <asm/mipsregs.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-#define mips_tlb_entries 64
+extern int r3k_have_wired_reg;	/* defined in tlb-r3k.c */
 
 void
 dump_tlb(int first, int last)
@@ -25,18 +26,18 @@ dump_tlb(int first, int last)
 	unsigned int asid;
 	unsigned long entryhi, entrylo0;
 
-	asid = get_entryhi() & 0xfc0;
+	asid = read_c0_entryhi() & 0xfc0;
 
 	for(i=first;i<=last;i++)
 	{
-		write_32bit_cp0_register(CP0_INDEX, i<<8);
+		write_c0_index(i<<8);
 		__asm__ __volatile__(
 			".set\tnoreorder\n\t"
 			"tlbr\n\t"
 			"nop\n\t"
 			".set\treorder");
-		entryhi  = read_32bit_cp0_register(CP0_ENTRYHI);
-		entrylo0 = read_32bit_cp0_register(CP0_ENTRYLO0);
+		entryhi  = read_c0_entryhi();
+		entrylo0 = read_c0_entrylo0();
 
 		/* Unused entries have a virtual address of KSEG0.  */
 		if ((entryhi & 0xffffe000) != 0x80000000
@@ -59,22 +60,22 @@ dump_tlb(int first, int last)
 	}
 	printk("\n");
 
-	set_entryhi(asid);
+	write_c0_entryhi(asid);
 }
 
 void
 dump_tlb_all(void)
 {
-	dump_tlb(0, mips_tlb_entries - 1);
+	dump_tlb(0, current_cpu_data.tlbsize - 1);
 }
 
 void
 dump_tlb_wired(void)
 {
-	int	wired = 7;
+	int wired = r3k_have_wired_reg ? read_c0_wired() : 8;
 
 	printk("Wired: %d", wired);
-	dump_tlb(0, read_32bit_cp0_register(CP0_WIRED));
+	dump_tlb(0, wired - 1);
 }
 
 void
@@ -84,11 +85,11 @@ dump_tlb_addr(unsigned long addr)
 	int index;
 
 	local_irq_save(flags);
-	oldpid = get_entryhi() & 0xff;
-	set_entryhi((addr & PAGE_MASK) | oldpid);
+	oldpid = read_c0_entryhi() & 0xff;
+	write_c0_entryhi((addr & PAGE_MASK) | oldpid);
 	tlb_probe();
-	index = get_index();
-	set_entryhi(oldpid);
+	index = read_c0_index();
+	write_c0_entryhi(oldpid);
 	local_irq_restore(flags);
 
 	if (index < 0) {
@@ -103,7 +104,8 @@ dump_tlb_addr(unsigned long addr)
 void
 dump_tlb_nonwired(void)
 {
-	dump_tlb(8, mips_tlb_entries - 1);
+	int wired = r3k_have_wired_reg ? read_c0_wired() : 8;
+	dump_tlb(wired, current_cpu_data.tlbsize - 1);
 }
 
 void

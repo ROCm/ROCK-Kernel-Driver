@@ -2,7 +2,7 @@
  * arch/mips/dec/int-handler.S
  *
  * Copyright (C) 1995, 1996, 1997 Paul M. Antoine and Harald Koerfgen
- * Copyright (C) 2000  Maciej W. Rozycki
+ * Copyright (C) 2000, 2001, 2002, 2003  Maciej W. Rozycki
  *
  * Written by Ralf Baechle and Andreas Busse, modified for DECStation
  * support by Paul Antoine and Harald Koerfgen.
@@ -10,6 +10,8 @@
  * completly rewritten:
  * Copyright (C) 1998 Harald Koerfgen
  *
+ * Rewritten extensively for controller-driven IRQ support
+ * by Maciej W. Rozycki.
  */
 #include <asm/asm.h>
 #include <asm/regdef.h>
@@ -17,12 +19,13 @@
 #include <asm/stackframe.h>
 #include <asm/addrspace.h>
 
+#include <asm/dec/interrupts.h>
+#include <asm/dec/ioasic_addrs.h>
+#include <asm/dec/ioasic_ints.h>
 #include <asm/dec/kn01.h>
 #include <asm/dec/kn02.h>
 #include <asm/dec/kn02xa.h>
 #include <asm/dec/kn03.h>
-#include <asm/dec/ioasic_addrs.h>
-#include <asm/dec/interrupts.h>
 
 
 		.text
@@ -84,7 +87,7 @@
  *             4        TurboChannel Slot 2
  *             5        TurboChannel Slot 3 (ASIC)
  *             6        Halt button
- *             7        FPU
+ *             7        FPU/R4k timer
  *
  * DS5000/2x's, aka kn02ca, aka maxine:
  *
@@ -97,7 +100,7 @@
  *             4        I/O write timeout
  *             5        TurboChannel (ASIC)
  *             6        Halt Keycode from Access.Bus keyboard (CTRL-ALT-ENTER)
- *             7        FPU
+ *             7        FPU/R4k timer
  *
  * DS5000/2xx's, aka kn03, aka 3maxplus:
  *
@@ -110,22 +113,11 @@
  *             4        Reserved
  *             5        Memory
  *             6        Halt Button
- *             7        FPU
+ *             7        FPU/R4k timer
  *
- * We handle the IRQ according to _our_ priority.
- * Priority is:
- *
- * Highest ----     RTC
- *                  SCSI (if separate from TC)
- *                  Ethernet (if separate from TC)
- *		    Serial (if separate from TC)
- *                  TurboChannel (if there is one!)
- *                  Memory Controller (execept kmin)
- * Lowest  ----     Halt (if there is one!)
- *
- * then we just return, if multiple IRQs are pending then we will just take
- * another exception, big deal.
- *
+ * We handle the IRQ according to _our_ priority (see setup.c),
+ * then we just return.  If multiple IRQs are pending then we will
+ * just take another exception, big deal.
  */
 		.align	5
 		NESTED(decstation_handle_int, PT_SIZE, ra)
@@ -139,226 +131,166 @@
 		 * Get pending Interrupts
 		 */
 		mfc0	t0,CP0_CAUSE		# get pending interrupts
-		mfc0	t2,CP0_STATUS
-		la	t1,cpu_mask_tbl
-		and	t0,t2			# isolate allowed ones
+		mfc0	t1,CP0_STATUS
+#ifdef CONFIG_MIPS32
+		lw	t2,cpu_fpu_mask
+#endif
+		andi	t0,ST0_IM		# CAUSE.CE may be non-zero!
+		and	t0,t1			# isolate allowed ones
+
+		beqz	t0,spurious
+
+#ifdef CONFIG_MIPS32
+		 and	t2,t0
+		bnez	t2,fpu			# handle FPU immediately
+#endif
+
+		/*
+		 * Find irq with highest priority
+		 */
+		 PTR_LA	t1,cpu_mask_nr_tbl
+1:		lw	t2,(t1)
+		nop
+		and	t2,t0
+		beqz	t2,1b
+		 addu	t1,2*PTRSIZE		# delay slot
+
+		/*
+		 * Do the low-level stuff
+		 */
+		lw	a0,(-PTRSIZE)(t1)
+		nop
+		bgez	a0,handle_it		# irq_nr >= 0?
+						# irq_nr < 0: it is an address
+		 nop
+		jr	a0
+						# a trick to save a branch:
+		 lui	t2,(KN03_IOASIC_BASE>>16)&0xffff
+						# upper part of IOASIC Address
+
+/*
+ * Handle "IRQ Controller" Interrupts
+ * Masked Interrupts are still visible and have to be masked "by hand".
+ */
+		FEXPORT(kn02_io_int)		# 3max
+		lui	t0,(KN02_CSR_BASE>>16)&0xffff
+						# get interrupt status and mask
+		lw	t0,(t0)
+		nop
+		andi	t1,t0,KN02_IRQ_ALL
+		b	1f
+		 srl	t0,16			# shift interrupt mask
+
+		FEXPORT(kn02xa_io_int)		# 3min/maxine
+		lui	t2,(KN02XA_IOASIC_BASE>>16)&0xffff
+						# upper part of IOASIC Address
+
+		FEXPORT(kn03_io_int)		# 3max+ (t2 loaded earlier)
+		lw	t0,IO_REG_SIR(t2)	# get status: IOASIC sir
+		lw	t1,IO_REG_SIMR(t2)	# get mask:   IOASIC simr
+		nop
+
+1:		and	t0,t1			# mask out allowed ones
 
 		beqz	t0,spurious
 
 		/*
 		 * Find irq with highest priority
 		 */
-1:		 lw	t2,(t1)
-		move	t3,t0
-		and	t3,t2
-		beq	t3,zero,1b
-		 addu	t1,PTRSIZE		# delay slot
+		 PTR_LA	t1,asic_mask_nr_tbl
+2:		lw	t2,(t1)
+		nop
+		and	t2,t0
+		beq	zero,t2,2b
+		 addu	t1,2*PTRSIZE		# delay slot
 
 		/*
 		 * Do the low-level stuff
 		 */
-		lw	a0,%lo(cpu_irq_nr-cpu_mask_tbl-PTRSIZE)(t1)
-		lw	t0,%lo(cpu_ivec_tbl-cpu_mask_tbl-PTRSIZE)(t1)
-		bgez	a0, handle_it		# irq_nr >= 0?
-						# irq_nr < 0: t0 contains an address
+		lw	a0,%lo(-PTRSIZE)(t1)
+		nop
+		bgez	a0,handle_it		# irq_nr >= 0?
+						# irq_nr < 0: it is an address
 		 nop
-		jr	t0
+		jr	a0
 		 nop				# delay slot
 
 /*
- * Handle "IRQ Controller" Interrupts
- * Masked Interrupts are still visible and have to be masked "by hand".
+ * Dispatch low-priority interrupts.  We reconsider all status
+ * bits again, which looks like a lose, but it makes the code
+ * simple and O(log n), so it gets compensated.
  */
-		EXPORT(kn02_io_int)
-kn02_io_int:					# 3max
-		lui	t0,KN02_CSR_ADDR>>16	# get interrupt status and mask
-		lw	t0,(t0)
-		la	t1,asic_mask_tbl
-		move	t3,t0
-		sll	t3,16			# shift interrupt status
-		b	find_int
-		 and	t0,t3			# mask out allowed ones
+		FEXPORT(cpu_all_int)		# HALT, timers, software junk
+		li	a0,DEC_CPU_IRQ_BASE
+		srl	t0,CAUSEB_IP
+		li	t1,CAUSEF_IP>>CAUSEB_IP	# mask
+		b	1f
+		 li	t2,4			# nr of bits / 2
 
-		EXPORT(kn03_io_int)
-kn03_io_int:					# 3max+
-		lui	t2,KN03_IOASIC_BASE>>16	# upper part of IOASIC Address
-		lw	t0,SIR(t2)		# get status: IOASIC isr
-		lw	t3,SIMR(t2)		# get mask:   IOASIC isrm
-		la	t1,asic_mask_tbl
-		b	find_int
-		 and	t0,t3			# mask out allowed ones
+		FEXPORT(kn02_all_int)		# impossible ?
+		li	a0,KN02_IRQ_BASE
+		li	t1,KN02_IRQ_ALL		# mask
+		b	1f
+		 li	t2,4			# nr of bits / 2
 
-		EXPORT(kn02xa_io_int)
-kn02xa_io_int:					# 3min/maxine
-		lui	t2,KN02XA_IOASIC_BASE>>16		
-						# upper part of IOASIC Address
-		lw	t0,SIR(t2)		# get status: IOASIC isr
-		lw	t3,SIMR(t2)		# get mask:   IOASIC isrm
-		la	t1,asic_mask_tbl
-		and	t0,t3
+		FEXPORT(asic_all_int)		# various I/O ASIC junk
+		li	a0,IO_IRQ_BASE
+		li	t1,IO_IRQ_ALL		# mask
+		b	1f
+		 li	t2,8			# nr of bits / 2
 
-		/*
-		 * Find irq with highest priority
-		 */
-find_int:	beqz	t0,spurious
-
-1:		 lw	t2,(t1)
-		move	t3,t0
-		and	t3,t2
-		beq	zero,t3,1b
-		 addu	t1,PTRSIZE		# delay slot
+/*
+ * Dispatch DMA interrupts -- O(log n).
+ */
+		FEXPORT(asic_dma_int)		# I/O ASIC DMA events
+		li	a0,IO_IRQ_BASE+IO_INR_DMA
+		srl	t0,IO_INR_DMA
+		li	t1,IO_IRQ_DMA>>IO_INR_DMA # mask
+		li	t2,8			# nr of bits / 2
 
 		/*
-		 * Do the low-level stuff
+		 * Find irq with highest priority.
+		 * Highest irq number takes precedence.
 		 */
-		lw	a0,%lo(asic_irq_nr-asic_mask_tbl-PTRSIZE)(t1)
-                nop
+1:		srlv	t3,t1,t2
+2:		xor	t1,t3
+		and	t3,t0,t1
+		beqz	t3,3f
+		 nop
+		move	t0,t3
+		addu	a0,t2
+3:		srl	t2,1
+		bnez	t2,2b
+		 srlv	t3,t1,t2
 
-handle_it:	jal	do_IRQ
+handle_it:
+		jal	do_IRQ
 		 move	a1,sp
+
 		j	ret_from_irq
 		 nop
+
+#ifdef CONFIG_MIPS32
+fpu:
+		j	handle_fpe_int
+		 nop
+#endif
 
 spurious:
 		j	spurious_interrupt
 		 nop
 		END(decstation_handle_int)
-/*
-  * Interrupt routines common to all DECStations first.
- */
-		EXPORT(dec_intr_fpu)
-dec_intr_fpu:	PANIC("Unimplemented FPU interrupt handler")
 
 /*
- * Generic unimplemented interrupt routines - ivec_tbl is initialised to
- * point all interrupts here.  The table is then filled in by machine-specific
- * initialisation in dec_setup().
+ * Generic unimplemented interrupt routines -- cpu_mask_nr_tbl
+ * and asic_mask_nr_tbl are initialized to point all interrupts here.
+ * The tables are then filled in by machine-specific initialisation
+ * in dec_setup().
  */
-		EXPORT(dec_intr_unimplemented)
-dec_intr_unimplemented:
-		mfc0	a1,CP0_CAUSE		# cheats way of printing an arg!
-		nop				# to be sure...
-		PANIC("Unimplemented cpu interrupt! CP0_CAUSE: 0x%x");
-
-		EXPORT(asic_intr_unimplemented)
-asic_intr_unimplemented:
+		FEXPORT(dec_intr_unimplemented)
 		move	a1,t0			# cheats way of printing an arg!
-		PANIC("Unimplemented asic interrupt! ASIC ISR: 0x%x");
+		PANIC("Unimplemented cpu interrupt! CP0_CAUSE: 0x%08x");
 
-/*
- * FIXME: This interrupt vector table is experimental.  It is initialised with 
- *	  *_intr_unimplemented and filled in with the addresses of
- *	  machine-specific interrupt routines in dec_setup()  Paul 10/5/97.
- *
- *	  The mask_tbls contain the interrupt masks which are used. It is 
- *	  initialised with all possible interrupt status bits set, so that 
- * 	  unused Interrupts are catched.				Harald
- */
-		.data
-		EXPORT(cpu_mask_tbl)
-cpu_mask_tbl:
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000		# these two are unlikely 
-		.word	0x00000000		# to be used
-		.word	0x0000ff00		# End of list
-
-		EXPORT(cpu_irq_nr)
-cpu_irq_nr:
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000
-		.word	0x00000000		# these two are unlikely 
-		.word	0x00000000		# to be used
-		.word	0x00ffffff		# End of list
-
-		EXPORT(cpu_ivec_tbl)
-cpu_ivec_tbl:
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented
-		PTR	dec_intr_unimplemented	# these two are unlikely
-		PTR	dec_intr_unimplemented	# to be used
-		PTR	dec_intr_unimplemented	# EOL
-
-		EXPORT(asic_mask_tbl)
-asic_mask_tbl:
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0xffffffff			# EOL
-
-		EXPORT(asic_irq_nr)
-asic_irq_nr:
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0
-		.word	0xffffffff		# EOL
+		FEXPORT(asic_intr_unimplemented)
+		move	a1,t0			# cheats way of printing an arg!
+		PANIC("Unimplemented asic interrupt! ASIC ISR: 0x%08x");

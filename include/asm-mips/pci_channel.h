@@ -23,7 +23,7 @@ struct pci_channel {
 	int last_devfn;
 };
 
-/* 
+/*
  * each board defines an array of pci_channels, that ends with all NULL entry
  */
 extern struct pci_channel mips_pci_channels[];
@@ -33,7 +33,7 @@ extern struct pci_channel mips_pci_channels[];
  */
 extern void pcibios_fixup_irqs(void);
 
-/* 
+/*
  * board supplied pci fixup routines
  */
 extern void pcibios_fixup_resources(struct pci_dev *dev);

@@ -25,6 +25,7 @@
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/net.h>
+#include <linux/workqueue.h>
 #include <asm/ioctls.h>
 #include <linux/sunrpc/types.h>
 #include <linux/sunrpc/cache.h>
@@ -165,6 +166,9 @@ static struct file_operations cache_file_operations;
 static struct file_operations content_file_operations;
 static struct file_operations cache_flush_operations;
 
+static void do_cache_clean(void *data);
+static DECLARE_WORK(cache_cleaner, do_cache_clean, NULL);
+
 void cache_register(struct cache_detail *cd)
 {
 	cd->proc_ent = proc_mkdir(cd->name, proc_net_rpc);
@@ -208,6 +212,9 @@ void cache_register(struct cache_detail *cd)
 	cd->last_close = 0;
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
+
+	/* start the cleaning process */
+	schedule_work(&cache_cleaner);
 }
 
 int cache_unregister(struct cache_detail *cd)
@@ -228,6 +235,11 @@ int cache_unregister(struct cache_detail *cd)
 	if (cd->proc_ent) {
 		cd->proc_ent = NULL;
 		remove_proc_entry(cd->name, proc_net_rpc);
+	}
+	if (list_empty(&cache_list)) {
+		/* module must be being unloaded so its safe to kill the worker */
+		cancel_delayed_work(&cache_cleaner);
+		flush_scheduled_work();
 	}
 	return 0;
 }
@@ -319,8 +331,8 @@ int cache_clean(void)
 			if (test_and_clear_bit(CACHE_PENDING, &ch->flags))
 				queue_loose(current_detail, ch);
 
-			if (atomic_read(&ch->refcnt))
-				continue;
+			if (!atomic_read(&ch->refcnt))
+				break;
 		}
 		if (ch) {
 			cache_get(ch);
@@ -340,6 +352,23 @@ int cache_clean(void)
 
 	return rv;
 }
+
+/*
+ * We want to regularly clean the cache, so we need to schedule some work ...
+ */
+static void do_cache_clean(void *data)
+{
+	int delay = 5;
+	if (cache_clean() == -1)
+		delay = 30*HZ;
+
+	if (list_empty(&cache_list))
+		delay = 0;
+
+	if (delay)
+		schedule_delayed_work(&cache_cleaner, delay);
+}
+
 
 /* 
  * Clean all caches promptly.  This just calls cache_clean
@@ -1063,10 +1092,15 @@ static int c_show(struct seq_file *m, void *p)
 	if (p == (void *)1)
 		return cd->cache_show(m, cd, NULL, pbuf);
 
+	ifdebug(CACHE)
+		seq_printf(m, "# expiry=%ld refcnt=%d\n",
+			   cp->expiry_time, atomic_read(&cp->refcnt));
 	cache_get(cp);
 	if (cache_check(cd, cp, NULL))
-		return 0;
-	cache_put(cp, cd);
+		/* cache_check does a cache_put on failure */
+		seq_printf(m, "# ");
+	else
+		cache_put(cp, cd);
 
 	return cd->cache_show(m, cd, cp, pbuf);
 }

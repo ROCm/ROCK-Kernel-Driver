@@ -1,20 +1,15 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 static int vbi_pixel_to_capture = 720 * 2;
 
-static
-int vbi_workaround(struct saa7146_dev *dev)
+static int vbi_workaround(struct saa7146_dev *dev)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
         u32          *cpu;
         dma_addr_t   dma_addr;
 	
-	int i, index;
+	int i;
 
 	DECLARE_WAITQUEUE(wait, current);
 	
@@ -38,8 +33,43 @@ int vbi_workaround(struct saa7146_dev *dev)
 	saa7146_write(dev, NUM_LINE_BYTE3, (2<<16)|((vbi_pixel_to_capture)<<0));
 	saa7146_write(dev, MC2, MASK_04|MASK_20);
 
-
-	/* we have to do the workaround two times to be sure that
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* BXO = 1h, BRS to outbound */
+		WRITE_RPS1(0xc000008c);   
+		/* wait for vbi_a */
+		WRITE_RPS1(CMD_PAUSE | MASK_10);
+		/* upload brs */
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* BYO = 1, BXO = NQBIL (=1728 for PAL, for NTSC this is 858*2) - NumByte3 (=1440) = 288 */
+		WRITE_RPS1(((1728-(vbi_pixel_to_capture)) << 7) | MASK_19);
+		/* wait for brs_done */
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
+		/* upload brs */
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
+		/* load video-dma3 NumLines3 and NumBytes3 */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4));
+		/* dev->vbi_count*2 lines, 720 pixel (= 1440 Bytes) */
+		WRITE_RPS1((2 << 16) | (vbi_pixel_to_capture));
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* Set BRS right: note: this is an experimental value for BXO (=> PAL!) */
+		WRITE_RPS1((540 << 7) | (5 << 19));  // 5 == vbi_start  
+		/* wait for brs_done */
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
+		/* upload brs and video-dma3*/
+		WRITE_RPS1(CMD_UPLOAD | MASK_08 | MASK_04);
+		/* load mc2 register: enable dma3 */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC1/4));
+		WRITE_RPS1(MASK_20 | MASK_04);
+		/* generate interrupt */
+		WRITE_RPS1(CMD_INTERRUPT);
+		/* stop rps1 */
+		WRITE_RPS1(CMD_STOP);
+	
+	/* we have to do the workaround twice to be sure that
 	   everything is ok */
 	for(i = 0; i < 2; i++) {
 
@@ -49,44 +79,6 @@ int vbi_workaround(struct saa7146_dev *dev)
 		saa7146_write(dev, NUM_LINE_BYTE3, (1<<16)|(2<<0));
 		saa7146_write(dev, MC2, MASK_04|MASK_20);
 	
-		index = 0;
-
-		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
-		/* BXO = 1h, BRS to outbound */
-		dev->rps1[index++]=0xc000008c;   
-		/* wait for vbi_a */
-		dev->rps1[index++] = CMD_PAUSE | MASK_10;
-		/* upload brs */
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08;
-		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
-		/* BYO = 1, BXO = NQBIL (=1728 for PAL, for NTSC this is 858*2) - NumByte3 (=1440) = 288 */
-		dev->rps1[index++] = ((1728-(vbi_pixel_to_capture)) << 7) | MASK_19;
-		/* wait for brs_done */
-		dev->rps1[index++] = CMD_PAUSE | MASK_08;
-		/* upload brs */
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08;
-		/* load video-dma3 NumLines3 and NumBytes3 */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4);
-		/* dev->vbi_count*2 lines, 720 pixel (= 1440 Bytes) */
-		dev->rps1[index++]= (2 << 16) | (vbi_pixel_to_capture);
-		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
-		/* Set BRS right: note: this is an experimental value for BXO (=> PAL!) */
-		dev->rps1[index++] = (540 << 7) | (5 << 19);  // 5 == vbi_start  
-		/* wait for brs_done */
-		dev->rps1[index++] = CMD_PAUSE | MASK_08;
-		/* upload brs and video-dma3*/
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08 | MASK_04;
-		/* load mc2 register: enable dma3 */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (MC1/4);
-		dev->rps1[index++] = MASK_20 | MASK_04;
-		/* generate interrupt */
-		dev->rps1[index++] = CMD_INTERRUPT;
-		/* stop rps1 */
-		dev->rps1[index++] = CMD_STOP;
-	
 		/* enable rps1 irqs */
 		IER_ENABLE(dev,MASK_28);
 
@@ -95,7 +87,7 @@ int vbi_workaround(struct saa7146_dev *dev)
 		current->state = TASK_INTERRUPTIBLE;
 
 		/* start rps1 to enable workaround */
-		saa7146_write(dev, RPS_ADDR1, virt_to_bus(&dev->rps1[ 0]));
+		saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
 		saa7146_write(dev, MC1, (MASK_13 | MASK_29));	
 		
 		schedule();
@@ -164,40 +156,39 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	   but by doing this, we can use the whole engine from video-buf.c... */
 	
 /*
-	dev->rps1[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG1 | e_wait;
-	dev->rps1[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG1 | o_wait;
+	WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | e_wait);
+	WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | o_wait);
 */
 	/* set bit 1 */
-	dev->rps1[ count++ ] = CMD_WR_REG | (1 << 8) | (MC2/4); 	
-	dev->rps1[ count++ ] = MASK_28 | MASK_12;
+	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC2/4)); 	
+	WRITE_RPS1(MASK_28 | MASK_12);
 	
 	/* turn on video-dma3 */
-	dev->rps1[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-	dev->rps1[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-	dev->rps1[ count++ ] = MASK_04 | MASK_20;			/* => values */
+	WRITE_RPS1(CMD_WR_REG_MASK | (MC1/4));		
+	WRITE_RPS1(MASK_04 | MASK_20);	    		/* => mask */
+	WRITE_RPS1(MASK_04 | MASK_20);			/* => values */
 	
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
-	dev->rps1[ count++ ] = CMD_PAUSE | o_wait;
-	dev->rps1[ count++ ] = CMD_PAUSE | e_wait;
+	WRITE_RPS1(CMD_PAUSE | o_wait);
+	WRITE_RPS1(CMD_PAUSE | e_wait);
 
 	/* generate interrupt */
-	dev->rps1[ count++ ] = CMD_INTERRUPT;					
+	WRITE_RPS1(CMD_INTERRUPT);					
 
 	/* stop */
-	dev->rps1[ count++ ] = CMD_STOP;					
+	WRITE_RPS1(CMD_STOP);					
 
 	/* enable rps1 irqs */
 	IER_ENABLE(dev, MASK_28);
 
 	/* write the address of the rps-program */
-	saa7146_write(dev, RPS_ADDR1, virt_to_bus(&dev->rps1[ 0]));
+	saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
 
 	/* turn on rps */
 	saa7146_write(dev, MC1, (MASK_13 | MASK_29));	
 }
 
-static
-int buffer_activate(struct saa7146_dev *dev,
+static int buffer_activate(struct saa7146_dev *dev,
 			   struct saa7146_buf *buf,
 			   struct saa7146_buf *next)
 {
@@ -211,8 +202,7 @@ int buffer_activate(struct saa7146_dev *dev,
 	return 0;
 }
 
-static
-int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
+static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -261,8 +251,7 @@ int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field
 	return err;
 }
 
-static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 {
 	int llength,lines;
 	
@@ -277,8 +266,7 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static
-void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -289,8 +277,7 @@ void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	saa7146_buffer_queue(dev,&vv->vbi_q,buf);
 }
 
-static
-void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(struct file *file, struct videobuf_buffer *vb)
 {
 	struct saa7146_fh *fh   = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
@@ -300,8 +287,7 @@ void buffer_release(struct file *file, struct videobuf_buffer *vb)
 	saa7146_dma_free(dev,buf);
 }
 
-static
-struct videobuf_queue_ops vbi_qops = {
+static struct videobuf_queue_ops vbi_qops = {
 	.buf_setup    = buffer_setup,
 	.buf_prepare  = buffer_prepare,
 	.buf_queue    = buffer_queue,
@@ -310,8 +296,7 @@ struct videobuf_queue_ops vbi_qops = {
 
 /* ------------------------------------------------------------------ */
 
-static
-void vbi_stop(struct saa7146_fh *fh)
+static void vbi_stop(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -333,8 +318,7 @@ void vbi_stop(struct saa7146_fh *fh)
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
 
-static
-void vbi_read_timeout(unsigned long data)
+static void vbi_read_timeout(unsigned long data)
 {
 	struct saa7146_fh *fh = (struct saa7146_fh *)data;
 	struct saa7146_dev *dev = fh->dev;
@@ -344,8 +328,7 @@ void vbi_read_timeout(unsigned long data)
 	vbi_stop(fh);
 }
 
-static
-void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
+static void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 {
 	DEB_VBI(("dev:%p\n",dev));
 
@@ -359,8 +342,7 @@ void vbi_init(struct saa7146_dev *dev, struct saa7146_vv *vv)
 	init_waitqueue_head(&vv->vbi_wq);
 }
 
-static
-void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
+static void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 {
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
 
@@ -391,8 +373,7 @@ void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 	vbi_workaround(dev);
 }
 
-static
-void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
+static void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	DEB_VBI(("dev:%p, fh:%p\n",dev,fh));
@@ -402,8 +383,7 @@ void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file
 	}
 }
 
-static
-void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
+static void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	spin_lock(&dev->slock);
@@ -422,8 +402,7 @@ void vbi_irq_done(struct saa7146_dev *dev, unsigned long status)
 	spin_unlock(&dev->slock);
 }
 
-static
-ssize_t vbi_read(struct file *file, char *data, size_t count, loff_t *ppos)
+static ssize_t vbi_read(struct file *file, char *data, size_t count, loff_t *ppos)
 {
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;

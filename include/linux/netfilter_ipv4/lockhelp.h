@@ -42,22 +42,22 @@ do { if (atomic_read(&(l)->locked_by) == smp_processor_id())		\
 	printk("ASSERT %s:%u %s locked\n", __FILE__, __LINE__, #l);	\
 } while(0)
 
-/* Write locked OK as well. */						    \
+/* Write locked OK as well. */
 #define MUST_BE_READ_LOCKED(l)						    \
-do { if (!((l)->read_locked_map & (1 << smp_processor_id()))		    \
-	 && !((l)->write_locked_map & (1 << smp_processor_id())))	    \
+do { if (!((l)->read_locked_map & (1UL << smp_processor_id()))		    \
+	 && !((l)->write_locked_map & (1UL << smp_processor_id())))	    \
 	printk("ASSERT %s:%u %s not readlocked\n", __FILE__, __LINE__, #l); \
 } while(0)
 
 #define MUST_BE_WRITE_LOCKED(l)						     \
-do { if (!((l)->write_locked_map & (1 << smp_processor_id())))		     \
+do { if (!((l)->write_locked_map & (1UL << smp_processor_id())))	     \
 	printk("ASSERT %s:%u %s not writelocked\n", __FILE__, __LINE__, #l); \
 } while(0)
 
 #define MUST_BE_READ_WRITE_UNLOCKED(l)					  \
-do { if ((l)->read_locked_map & (1 << smp_processor_id()))		  \
+do { if ((l)->read_locked_map & (1UL << smp_processor_id()))		  \
 	printk("ASSERT %s:%u %s readlocked\n", __FILE__, __LINE__, #l);	  \
- else if ((l)->write_locked_map & (1 << smp_processor_id()))		  \
+ else if ((l)->write_locked_map & (1UL << smp_processor_id()))		  \
 	 printk("ASSERT %s:%u %s writelocked\n", __FILE__, __LINE__, #l); \
 } while(0)
 
@@ -91,7 +91,7 @@ do {									  \
 
 #define READ_UNLOCK(lk)							\
 do {									\
-	if (!((lk)->read_locked_map & (1 << smp_processor_id())))	\
+	if (!((lk)->read_locked_map & (1UL << smp_processor_id())))	\
 		printk("ASSERT: %s:%u %s not readlocked\n", 		\
 		       __FILE__, __LINE__, #lk);			\
 	clear_bit(smp_processor_id(), &(lk)->read_locked_map);		\

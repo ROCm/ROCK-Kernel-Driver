@@ -4,20 +4,22 @@
  * for more details.
  *
  * (C) Copyright 1995 1996 Linus Torvalds
- * (C) Copyright 2001 Ralf Baechle
+ * (C) Copyright 2001, 2002 Ralf Baechle
  */
 #include <linux/module.h>
 #include <asm/addrspace.h>
 #include <asm/byteorder.h>
 
 #include <linux/vmalloc.h>
+#include <asm/cacheflush.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
-static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline void remap_area_pte(pte_t * pte, unsigned long address,
+	phys_t size, phys_t phys_addr, unsigned long flags)
 {
-	unsigned long end;
+	phys_t end;
 	unsigned long pfn;
 	pgprot_t pgprot = __pgprot(_PAGE_GLOBAL | _PAGE_PRESENT | __READABLE
 	                           | __WRITEABLE | flags);
@@ -41,10 +43,10 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 	} while (address && (address < end));
 }
 
-static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline int remap_area_pmd(pmd_t * pmd, unsigned long address,
+	phys_t size, phys_t phys_addr, unsigned long flags)
 {
-	unsigned long end;
+	phys_t end;
 
 	address &= ~PGDIR_MASK;
 	end = address + size;
@@ -54,7 +56,7 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (address >= end)
 		BUG();
 	do {
-		pte_t * pte = pte_alloc(&init_mm, pmd, address);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_area_pte(pte, address, end - address, address + phys_addr, flags);
@@ -64,8 +66,8 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	return 0;
 }
 
-static int remap_area_pages(unsigned long address, unsigned long phys_addr,
-				 unsigned long size, unsigned long flags)
+static int remap_area_pages(unsigned long address, phys_t phys_addr,
+	phys_t size, unsigned long flags)
 {
 	int error;
 	pgd_t * dir;
@@ -109,13 +111,14 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
  * caller shouldn't need to know that small detail.
  */
 
-#define IS_LOW512(addr) (!((unsigned long)(addr) & ~0x1fffffffUL))
+#define IS_LOW512(addr) (!((phys_t)(addr) & ~0x1fffffffUL))
 
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void * __ioremap(phys_t phys_addr, phys_t size, unsigned long flags)
 {
-	void * addr;
 	struct vm_struct * area;
-	unsigned long offset, last_addr;
+	unsigned long offset;
+	phys_t last_addr;
+	void * addr;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -123,10 +126,11 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		return NULL;
 
 	/*
-	 * Map objects in the low 512mb of address space using KSEG1, otherwise
-	 * map using page tables.
+	 * Map uncached objects in the low 512mb of address space using KSEG1,
+	 * otherwise map using page tables.
 	 */
-	if (IS_LOW512(phys_addr) && IS_LOW512(phys_addr + size - 1))
+	if (IS_LOW512(phys_addr) && IS_LOW512(last_addr) &&
+	    flags == _CACHE_UNCACHED)
 		return (void *) KSEG1ADDR(phys_addr);
 
 	/*
@@ -138,7 +142,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 
 		t_addr = __va(phys_addr);
 		t_end = t_addr + (size - 1);
-	   
+
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
 			if(!PageReserved(page))
 				return NULL;
@@ -159,7 +163,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		return NULL;
 	addr = area->addr;
 	if (remap_area_pages(VMALLOC_VMADDR(addr), phys_addr, size, flags)) {
-		vfree(addr);
+		vunmap(addr);
 		return NULL;
 	}
 
@@ -170,8 +174,19 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 
 void iounmap(void *addr)
 {
-	if (!IS_KSEG1(addr))
-		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
+	struct vm_struct *p;
+
+	if (IS_KSEG1(addr))
+		return;
+
+	vfree((void *) (PAGE_MASK & (unsigned long) addr));
+	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long) addr));
+	if (!p) {
+		printk(KERN_ERR "iounmap: bad address %p\n", addr);
+		return;
+	}
+
+        kfree(p);
 }
 
 EXPORT_SYMBOL(__ioremap);

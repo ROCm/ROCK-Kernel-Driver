@@ -12,7 +12,6 @@
 
 static void pci_free_resources(struct pci_dev *dev);
 
-#ifdef CONFIG_HOTPLUG
 int pci_hotplug (struct device *dev, char **envp, int num_envp,
 		 char *buffer, int buffer_size)
 {
@@ -209,16 +208,6 @@ int pci_remove_device_safe(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_remove_device_safe);
 
-#else /* CONFIG_HOTPLUG */
-
-int pci_hotplug (struct device *dev, char **envp, int num_envp,
-		 char *buffer, int buffer_size)
-{
-	return -ENODEV;
-}
-
-#endif /* CONFIG_HOTPLUG */
-
 static void
 pci_free_resources(struct pci_dev *dev)
 {
@@ -283,7 +272,5 @@ void pci_remove_behind_bridge(struct pci_dev *dev)
 	}
 }
 
-#ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(pci_remove_bus_device);
 EXPORT_SYMBOL(pci_remove_behind_bridge);
-#endif

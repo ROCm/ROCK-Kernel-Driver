@@ -1275,6 +1275,7 @@ void __init print_IO_APIC(void)
 	struct IO_APIC_reg_00 reg_00;
 	struct IO_APIC_reg_01 reg_01;
 	struct IO_APIC_reg_02 reg_02;
+	struct IO_APIC_reg_03 reg_03;
 	unsigned long flags;
 
  	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
@@ -1295,6 +1296,8 @@ void __init print_IO_APIC(void)
 	*(int *)&reg_01 = io_apic_read(apic, 1);
 	if (reg_01.version >= 0x10)
 		*(int *)&reg_02 = io_apic_read(apic, 2);
+	if (reg_01.version >= 0x20)
+		*(int *)&reg_03 = io_apic_read(apic, 3);
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	printk("\n");
@@ -1332,10 +1335,28 @@ void __init print_IO_APIC(void)
 	if (reg_01.__reserved_1 || reg_01.__reserved_2)
 		UNEXPECTED_IO_APIC();
 
-	if (reg_01.version >= 0x10) {
+	/*
+	 * Some Intel chipsets with IO APIC VERSION of 0x1? don't have reg_02,
+	 * but the value of reg_02 is read as the previous read register
+	 * value, so ignore it if reg_02 == reg_01.
+	 */
+	if (reg_01.version >= 0x10 && *(int *)&reg_02 != *(int *)&reg_01) {
 		printk(KERN_DEBUG ".... register #02: %08X\n", *(int *)&reg_02);
 		printk(KERN_DEBUG ".......     : arbitration: %02X\n", reg_02.arbitration);
 		if (reg_02.__reserved_1 || reg_02.__reserved_2)
+			UNEXPECTED_IO_APIC();
+	}
+
+	/*
+	 * Some Intel chipsets with IO APIC VERSION of 0x2? don't have reg_02
+	 * or reg_03, but the value of reg_0[23] is read as the previous read
+	 * register value, so ignore it if reg_03 == reg_0[12].
+	 */
+	if (reg_01.version >= 0x20 && *(int *)&reg_03 != *(int *)&reg_02 &&
+	    *(int *)&reg_03 != *(int *)&reg_01) {
+		printk(KERN_DEBUG ".... register #03: %08X\n", *(int *)&reg_03);
+		printk(KERN_DEBUG ".......     : Boot DT    : %X\n", reg_03.boot_DT);
+		if (reg_03.__reserved_1)
 			UNEXPECTED_IO_APIC();
 	}
 

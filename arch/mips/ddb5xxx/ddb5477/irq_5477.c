@@ -1,4 +1,4 @@
-/***********************************************************************
+/*
  * Copyright 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  *
@@ -9,7 +9,7 @@
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
- ***********************************************************************
+ *
  */
 
 /*
@@ -19,37 +19,36 @@
  *	vrc5477_irq_init(u32 irq_base);
  */
 
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/types.h>
 #include <linux/ptrace.h>
 
-#include <asm/ddb5xxx/ddb5xxx.h>
+#include <asm/debug.h>
 
-/* [jsun] sooner or later we should move this debug stuff to MIPS common */
-#include <asm/ddb5xxx/debug.h>
+#include <asm/ddb5xxx/ddb5xxx.h>
 
 /* number of total irqs supported by Vrc5477 */
 #define	NUM_5477_IRQ		32
 
-static int vrc5477_irq_base=-1;
+static int vrc5477_irq_base = -1;
 
 
-static void 
+static void
 vrc5477_irq_enable(unsigned int irq)
 {
-	MIPS_ASSERT(vrc5477_irq_base != -1);
-	MIPS_ASSERT(irq >= vrc5477_irq_base);
-	MIPS_ASSERT(irq < vrc5477_irq_base+ NUM_5477_IRQ);
+	db_assert(vrc5477_irq_base != -1);
+	db_assert(irq >= vrc5477_irq_base);
+	db_assert(irq < vrc5477_irq_base+ NUM_5477_IRQ);
 
 	ll_vrc5477_irq_enable(irq - vrc5477_irq_base);
 }
 
-static void 
+static void
 vrc5477_irq_disable(unsigned int irq)
 {
-	MIPS_ASSERT(vrc5477_irq_base != -1);
-	MIPS_ASSERT(irq >= vrc5477_irq_base);
-	MIPS_ASSERT(irq < vrc5477_irq_base + NUM_5477_IRQ);
+	db_assert(vrc5477_irq_base != -1);
+	db_assert(irq >= vrc5477_irq_base);
+	db_assert(irq < vrc5477_irq_base + NUM_5477_IRQ);
 
 	ll_vrc5477_irq_disable(irq - vrc5477_irq_base);
 }
@@ -65,9 +64,9 @@ static unsigned int vrc5477_irq_startup(unsigned int irq)
 static void
 vrc5477_irq_ack(unsigned int irq)
 {
-	MIPS_ASSERT(vrc5477_irq_base != -1);
-	MIPS_ASSERT(irq >= vrc5477_irq_base);
-	MIPS_ASSERT(irq < vrc5477_irq_base+ NUM_5477_IRQ);
+	db_assert(vrc5477_irq_base != -1);
+	db_assert(irq >= vrc5477_irq_base);
+	db_assert(irq < vrc5477_irq_base+ NUM_5477_IRQ);
 
 	/* clear the interrupt bit */
 	/* some irqs require the driver to clear the sources */
@@ -82,11 +81,12 @@ vrc5477_irq_ack(unsigned int irq)
 static void
 vrc5477_irq_end(unsigned int irq)
 {
-	MIPS_ASSERT(vrc5477_irq_base != -1);
-	MIPS_ASSERT(irq >= vrc5477_irq_base);
-	MIPS_ASSERT(irq < vrc5477_irq_base + NUM_5477_IRQ);
+	db_assert(vrc5477_irq_base != -1);
+	db_assert(irq >= vrc5477_irq_base);
+	db_assert(irq < vrc5477_irq_base + NUM_5477_IRQ);
 
-	ll_vrc5477_irq_enable( irq - vrc5477_irq_base);
+	if(!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+		ll_vrc5477_irq_enable( irq - vrc5477_irq_base);
 }
 
 hw_irq_controller vrc5477_irq_controller = {
@@ -100,7 +100,7 @@ hw_irq_controller vrc5477_irq_controller = {
 	NULL			/* no affinity stuff for UP */
 };
 
-void 
+void
 vrc5477_irq_init(u32 irq_base)
 {
 	extern irq_desc_t irq_desc[];
@@ -112,17 +112,8 @@ vrc5477_irq_init(u32 irq_base)
 		irq_desc[i].depth = 1;
 		irq_desc[i].handler = &vrc5477_irq_controller;
 	}
-	
+
 	vrc5477_irq_base = irq_base;
-}
-
-
-int vrc5477_irq_to_irq(int irq)
-{
-	MIPS_ASSERT(irq >= 0);
-	MIPS_ASSERT(irq < NUM_5477_IRQ);
-
-	return irq + vrc5477_irq_base;
 }
 
 void ll_vrc5477_irq_route(int vrc5477_irq, int ip)
@@ -131,10 +122,10 @@ void ll_vrc5477_irq_route(int vrc5477_irq, int ip)
 	u32 reg_bitmask;
 	u32 reg_index;
 
-	MIPS_ASSERT(vrc5477_irq >= 0);
-	MIPS_ASSERT(vrc5477_irq < NUM_5477_IRQ);
-	MIPS_ASSERT(ip >= 0);
-	MIPS_ASSERT((ip < 5) || (ip == 6));
+	db_assert(vrc5477_irq >= 0);
+	db_assert(vrc5477_irq < NUM_5477_IRQ);
+	db_assert(ip >= 0);
+	db_assert((ip < 5) || (ip == 6));
 
 	reg_index = DDB_INTCTRL0 + vrc5477_irq/8*4;
 	reg_value = ddb_in32(reg_index);
@@ -150,13 +141,13 @@ void ll_vrc5477_irq_enable(int vrc5477_irq)
 	u32 reg_bitmask;
 	u32 reg_index;
 
-	MIPS_ASSERT(vrc5477_irq >= 0);
-	MIPS_ASSERT(vrc5477_irq < NUM_5477_IRQ);
+	db_assert(vrc5477_irq >= 0);
+	db_assert(vrc5477_irq < NUM_5477_IRQ);
 
 	reg_index = DDB_INTCTRL0 + vrc5477_irq/8*4;
 	reg_value = ddb_in32(reg_index);
 	reg_bitmask = 8 << (vrc5477_irq % 8 * 4);
-	MIPS_ASSERT((reg_value & reg_bitmask) == 0);
+	db_assert((reg_value & reg_bitmask) == 0);
 	ddb_out32(reg_index, reg_value | reg_bitmask);
 }
 
@@ -166,14 +157,14 @@ void ll_vrc5477_irq_disable(int vrc5477_irq)
 	u32 reg_bitmask;
 	u32 reg_index;
 
-	MIPS_ASSERT(vrc5477_irq >= 0);
-	MIPS_ASSERT(vrc5477_irq < NUM_5477_IRQ);
+	db_assert(vrc5477_irq >= 0);
+	db_assert(vrc5477_irq < NUM_5477_IRQ);
 
 	reg_index = DDB_INTCTRL0 + vrc5477_irq/8*4;
 	reg_value = ddb_in32(reg_index);
 	reg_bitmask = 8 << (vrc5477_irq % 8 * 4);
 
 	/* we assert that the interrupt is enabled (perhaps over-zealous) */
-	MIPS_ASSERT( (reg_value & reg_bitmask) != 0);
+	db_assert( (reg_value & reg_bitmask) != 0);
 	ddb_out32(reg_index, reg_value & ~reg_bitmask);
 }

@@ -12,7 +12,7 @@
 #ifndef _ASM_XTALK_XTALK_H
 #define _ASM_XTALK_XTALK_H
 
-#if defined(_LANGUAGE_C) || defined(_LANGUAGE_C_PLUS_PLUS)
+#ifndef __ASSEMBLY__
 /*
  * User-level device driver visible types
  */
@@ -47,6 +47,6 @@ typedef struct xtalk_piomap_s *xtalk_piomap_t;
 #define	XIO_PORT(x)	((xwidgetnum_t)(((x)&XIO_PORT_BITS) >> XIO_PORT_SHIFT))
 #define	XIO_PACK(p,o)	((((uint64_t)(p))<<XIO_PORT_SHIFT) | ((o)&XIO_ADDR_BITS))
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 #endif /* _ASM_XTALK_XTALK_H */

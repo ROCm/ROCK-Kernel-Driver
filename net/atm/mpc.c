@@ -28,7 +28,7 @@
 
 #include "lec.h"
 #include "mpc.h"
-#include "resources.h"  /* for bind_vcc() */
+#include "resources.h"
 
 /*
  * mpc.c: Implementation of MPOA client kernel part 
@@ -789,7 +789,8 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 	}
 
 	mpc->mpoad_vcc = vcc;
-	bind_vcc(vcc, &mpc_dev);
+	vcc->dev = &mpc_dev;
+	vcc_insert_socket(vcc->sk);
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
 

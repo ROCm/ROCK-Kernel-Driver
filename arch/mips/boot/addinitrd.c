@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <netinet/in.h>
 
 #include "ecoff.h"
 
@@ -44,7 +46,7 @@ int main (int argc, char *argv[])
 	char buf[1024];
 	unsigned long loadaddr;
 	unsigned long initrd_header[2];
-	int i;
+	int i,cnt;
 	int swab = 0;
 
 	if (argc != 4) {
@@ -60,7 +62,6 @@ int main (int argc, char *argv[])
 		die ("read aout header");
 	if (read (fd_vmlinux, esecs, sizeof esecs) != sizeof esecs)
 		die ("read section headers");
-
 	/*
 	 * check whether the file is good for us
 	 */
@@ -81,7 +82,7 @@ int main (int argc, char *argv[])
 		die ("open initrd");
 	if (fstat (fd_initrd, &st) < 0)
 		die ("fstat initrd");
-	loadaddr = ((SWAB(esecs[2].s_vaddr) + SWAB(esecs[2].s_size) 
+	loadaddr = ((SWAB(esecs[2].s_vaddr) + SWAB(esecs[2].s_size)
 			+ MIPS_PAGE_SIZE-1) & ~MIPS_PAGE_MASK) - 8;
 	if (loadaddr < (SWAB(esecs[2].s_vaddr) + SWAB(esecs[2].s_size)))
 		loadaddr += MIPS_PAGE_SIZE;
@@ -98,9 +99,20 @@ int main (int argc, char *argv[])
 		die ("write aout header");
 	if (write (fd_outfile, esecs, sizeof esecs) != sizeof esecs)
 		die ("write section headers");
-	while ((i = read (fd_vmlinux, buf, sizeof buf)) > 0)
+	/* skip padding */
+	if(lseek(fd_vmlinux, SWAB(esecs[0].s_scnptr), SEEK_SET) == (off_t)-1)
+		die ("lseek vmlinux");
+	if(lseek(fd_outfile, SWAB(esecs[0].s_scnptr), SEEK_SET) == (off_t)-1)
+		die ("lseek outfile");
+	/* copy text segment */
+	cnt = SWAB(eaout.tsize);
+	while (cnt) {
+		if ((i = read (fd_vmlinux, buf, sizeof buf)) <= 0)
+			die ("read vmlinux");
 		if (write (fd_outfile, buf, i) != i)
 			die ("write vmlinux");
+		cnt -= i;
+	}
 	if (write (fd_outfile, initrd_header, sizeof initrd_header) != sizeof initrd_header)
 		die ("write initrd header");
 	while ((i = read (fd_initrd, buf, sizeof buf)) > 0)

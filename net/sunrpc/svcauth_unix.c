@@ -209,7 +209,7 @@ static int ip_map_parse(struct cache_detail *cd,
 		auth_domain_put(dom);
 	if (!ipmp)
 		return -ENOMEM;
-
+	cache_flush();
 	return 0;
 }
 
@@ -220,6 +220,7 @@ static int ip_map_show(struct seq_file *m,
 {
 	struct ip_map *im;
 	struct in_addr addr;
+	char *dom = "-no-domain-";
 
 	if (h == NULL) {
 		seq_puts(m, "#class IP domain\n");
@@ -228,13 +229,18 @@ static int ip_map_show(struct seq_file *m,
 	im = container_of(h, struct ip_map, h);
 	/* class addr domain */
 	addr = im->m_addr;
+
+	if (test_bit(CACHE_VALID, &h->flags) && 
+	    !test_bit(CACHE_NEGATIVE, &h->flags))
+		dom = im->m_client->h.name;
+
 	seq_printf(m, "%s %d.%d.%d.%d %s\n",
 		   im->m_class,
 		   htonl(addr.s_addr) >> 24 & 0xff,
 		   htonl(addr.s_addr) >> 16 & 0xff,
 		   htonl(addr.s_addr) >>  8 & 0xff,
 		   htonl(addr.s_addr) >>  0 & 0xff,
-		   im->m_client->h.name
+		   dom
 		   );
 	return 0;
 }
@@ -250,7 +256,7 @@ struct cache_detail ip_map_cache = {
 	.cache_show	= ip_map_show,
 };
 
-static DefineSimpleCacheLookup(ip_map)
+static DefineSimpleCacheLookup(ip_map, 0)
 
 
 int auth_unix_add_addr(struct in_addr addr, struct auth_domain *dom)

@@ -48,7 +48,7 @@ unsigned long xfs_physmem;
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
  * other XFS code uses these values.
  */
-xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3, 30 * HZ };
+xfs_param_t xfs_params = { 0, 1, 0, 0, 3, 30 * HZ, 0 };
 
 /*
  * Global system credential structure.

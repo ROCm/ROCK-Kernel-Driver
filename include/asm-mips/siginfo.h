@@ -1,5 +1,4 @@
-/* $Id: siginfo.h,v 1.5 1999/08/18 23:37:49 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -13,7 +12,13 @@
 
 #define HAVE_ARCH_SIGINFO_T
 #define HAVE_ARCH_SIGEVENT_T
+
+/*
+ * We duplicate the generic versions - <asm-generic/siginfo.h> is just borked
+ * by design ...
+ */
 #define HAVE_ARCH_COPY_SIGINFO
+struct siginfo;
 
 #include <asm-generic/siginfo.h>
 
@@ -66,8 +71,11 @@ typedef struct siginfo {
 
 		/* POSIX.1b timers */
 		struct {
-			unsigned int _timer1;
-			unsigned int _timer2;
+			timer_t _tid;		/* timer id */
+			int _overrun;		/* overrun count */
+			char _pad[sizeof( __ARCH_SI_UID_T) - sizeof(int)];
+			sigval_t _sigval;	/* same as below */
+			int _sys_private;	/* not to be passed to user */
 		} _timer;
 
 		/* POSIX.1b signals */
@@ -93,8 +101,8 @@ typedef struct siginfo {
 
 /*
  * sigevent definitions
- * 
- * It seems likely that SIGEV_THREAD will have to be handled from 
+ *
+ * It seems likely that SIGEV_THREAD will have to be handled from
  * userspace, libpthread transmuting it to SIGEV_SIGNAL, which the
  * thread manager then catches and does the appropriate nonsense.
  * However, everything is written out here so as to not get lost.
@@ -109,21 +117,25 @@ typedef struct siginfo {
 
 /* XXX This one isn't yet IRIX / ABI compatible.  */
 typedef struct sigevent {
-	int sigev_notify;
-	sigval_t sigev_value;
-	int sigev_signo;
+	int	sigev_notify;
+	sigval_t	sigev_value;
+	int	sigev_signo;
 	union {
-		int _pad[SIGEV_PAD_SIZE];
+		int	_pad[SIGEV_PAD_SIZE];
+		int	_tid;
 
 		struct {
-			void (*_function)(sigval_t);
-			void *_attribute;	/* really pthread_attr_t */
+			void	(*_function)(sigval_t);
+			void	*_attribute;	/* really pthread_attr_t */
 		} _sigev_thread;
 	} _sigev_un;
 } sigevent_t;
 
 #ifdef __KERNEL__
 
+/*
+ * Duplicated here because of <asm-generic/siginfo.h> braindamage ...
+ */
 #include <linux/string.h>
 
 static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)

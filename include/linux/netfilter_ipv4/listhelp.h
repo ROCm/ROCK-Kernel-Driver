@@ -39,6 +39,22 @@
 	(type)__i;				\
 })
 
+/* Just like LIST_FIND but we search backwards */
+#define LIST_FIND_B(head, cmpfn, type, args...)		\
+({							\
+	const struct list_head *__i = (head);		\
+							\
+	ASSERT_READ_LOCK(head);				\
+	do {						\
+		__i = __i->prev;			\
+		if (__i == (head)) {			\
+			__i = NULL;			\
+			break;				\
+		}					\
+	} while (!cmpfn((const type)__i , ## args));	\
+	(type)__i;					\
+})
+
 static inline int
 __list_cmp_same(const void *p1, const void *p2) { return p1 == p2; }
 

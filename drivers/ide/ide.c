@@ -216,7 +216,7 @@ EXPORT_SYMBOL(idetape);
 EXPORT_SYMBOL(idescsi);
 
 extern ide_driver_t idedefault_driver;
-static void setup_driver_defaults (ide_drive_t *drive);
+static void setup_driver_defaults(ide_driver_t *driver);
 
 /*
  * Do not even *think* about calling this!
@@ -275,7 +275,6 @@ static void init_hwif_data (unsigned int index)
 		drive->using_dma		= 0;
 		drive->is_flash			= 0;
 		drive->driver			= &idedefault_driver;
-		setup_driver_defaults(drive);
 		drive->vdma			= 0;
 		INIT_LIST_HEAD(&drive->list);
 	}
@@ -307,6 +306,8 @@ static void __init init_ide_data (void)
 	if (magic_cookie != MAGIC_COOKIE)
 		return;		/* already initialized */
 	magic_cookie = 0;
+
+	setup_driver_defaults(&idedefault_driver);
 
 	/* Initialise all interface structures */
 	for (index = 0; index < MAX_HWIFS; ++index)
@@ -673,8 +674,8 @@ void ide_unregister (unsigned int index)
 		blk_cleanup_queue(&drive->queue);
 	}
 	if (hwif->next == hwif) {
-		kfree(hwgroup);
 		BUG_ON(hwgroup->hwif != hwif);
+		kfree(hwgroup);
 	} else {
 		/* There is another interface in hwgroup.
 		 * Unlink us, and set hwgroup->drive and ->hwif to
@@ -1134,13 +1135,12 @@ ide_settings_t *ide_find_setting_by_name (ide_drive_t *drive, char *name)
  *
  *	Automatically remove all the driver specific settings for this
  *	drive. This function may sleep and must not be called from IRQ
- *	context. Takes the settings_lock
+ *	context. The caller must hold ide_setting_sem.
  */
  
 static void auto_remove_settings (ide_drive_t *drive)
 {
 	ide_settings_t *setting;
-	down(&ide_setting_sem);
 repeat:
 	setting = drive->settings;
 	while (setting) {
@@ -1150,7 +1150,6 @@ repeat:
 		}
 		setting = setting->next;
 	}
-	up(&ide_setting_sem);
 }
 
 /**
@@ -2346,10 +2345,8 @@ static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
 	return ide_abort(drive, msg);
 }
 
-static void setup_driver_defaults (ide_drive_t *drive)
+static void setup_driver_defaults (ide_driver_t *d)
 {
-	ide_driver_t *d = drive->driver;
-
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->shutdown == NULL)	d->shutdown = default_shutdown;
 	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
@@ -2377,7 +2374,6 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 		return 1;
 	}
 	drive->driver = driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
 	list_add_tail(&drive->list, &driver->drives);
@@ -2408,9 +2404,11 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 {
 	unsigned long flags;
 	
+	down(&ide_setting_sem);
 	spin_lock_irqsave(&ide_lock, flags);
 	if (drive->usage || drive->driver == &idedefault_driver || DRIVER(drive)->busy) {
 		spin_unlock_irqrestore(&ide_lock, flags);
+		up(&ide_setting_sem);
 		return 1;
 	}
 #if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
@@ -2422,8 +2420,8 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 #endif
 	auto_remove_settings(drive);
 	drive->driver = &idedefault_driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
+	up(&ide_setting_sem);
 	spin_lock(&drives_lock);
 	list_del_init(&drive->list);
 	spin_unlock(&drives_lock);
@@ -2445,6 +2443,8 @@ int ide_register_driver(ide_driver_t *driver)
 	struct list_head list;
 	struct list_head *list_loop;
 	struct list_head *tmp_storage;
+
+	setup_driver_defaults(driver);
 
 	spin_lock(&drivers_lock);
 	list_add(&driver->drivers, &drivers);

@@ -150,8 +150,10 @@ linvfs_mknod(
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
-		validate_fields(dir);
+		else if (S_ISDIR(mode))
+			validate_fields(ip);
 		d_instantiate(dentry, ip);
+		validate_fields(dir);
 	}
 
 	if (!error && have_default_acl) {
@@ -663,8 +665,10 @@ linvfs_getxattr(
 	}
 
 	/* Convert Linux syscall to XFS internal ATTR flags */
-	if (!size)
+	if (!size) {
 		xflags |= ATTR_KERNOVAL;
+		data = NULL;
+	}
 
 	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
 			xfs_namespaces[ROOT_NAMES].namelen) == 0) {

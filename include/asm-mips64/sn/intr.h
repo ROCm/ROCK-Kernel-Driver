@@ -19,7 +19,7 @@
 
 #include <asm/sn/intr_public.h>
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 /*
  * Macros to manipulate the interrupt register on the calling hub chip.
@@ -31,7 +31,7 @@
 		REMOTE_HUB_S((_hub), PI_INT_PEND_MOD, (0x100|(_level)))
 
 /*
- * When clearing the interrupt, make sure this clear does make it 
+ * When clearing the interrupt, make sure this clear does make it
  * to the hub. Otherwise we could end up losing interrupts.
  * We do an uncached load of the int_pend0 register to ensure this.
  */
@@ -43,9 +43,9 @@
 		REMOTE_HUB_S((_hub), PI_INT_PEND_MOD, (_level)),	\
                 REMOTE_HUB_L((_hub), PI_INT_PEND0)
 
-#else /* LANGUAGE_ASSEMBLY */
+#else /* __ASSEMBLY__ */
 
-#endif /* LANGUAGE_C */
+#endif /* __ASSEMBLY__ */
 
 /*
  * Hard-coded interrupt levels:

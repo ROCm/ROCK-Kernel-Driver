@@ -7,6 +7,8 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/binfmts.h>
+#include <linux/highuid.h>
 #include <linux/pagemap.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
@@ -24,6 +26,8 @@
 #include <linux/utsname.h>
 #include <linux/file.h>
 #include <linux/vfs.h>
+#include <linux/namei.h>
+#include <linux/socket.h>
 
 #include <asm/ptrace.h>
 #include <asm/page.h>
@@ -55,7 +59,7 @@ asmlinkage int irix_sysmp(struct pt_regs *regs)
 		break;
 	case MP_NPROCS:
 	case MP_NAPROCS:
-		error = smp_num_cpus;
+		error = num_online_cpus();
 		break;
 	default:
 		printk("SYSMP[%s:%d]: Unsupported opcode %d\n",
@@ -111,7 +115,7 @@ asmlinkage int irix_prctl(struct pt_regs *regs)
 		if (error)
 			error = (task->run_list.next != NULL);
 		read_unlock(&tasklist_lock);
-		/* Can _your_ OS find this out that fast? */ 
+		/* Can _your_ OS find this out that fast? */
 		break;
 	}
 
@@ -334,7 +338,7 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		       current->comm, current->pid, name, value, retval);
 /*		if (retval == PROM_ENOENT)
 		  	retval = -ENOENT; */
-		break;				   
+		break;
 	}
 #endif
 
@@ -507,7 +511,7 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		}
 		break;
 	}
-	
+
 	default:
 		printk("irix_syssgi: Unsupported command %d\n", (int)cmd);
 		retval = -EINVAL;
@@ -600,7 +604,7 @@ out:
 
 asmlinkage int irix_getpid(struct pt_regs *regs)
 {
-	regs->regs[3] = current->p_opptr->pid;
+	regs->regs[3] = current->real_parent->pid;
 	return current->pid;
 }
 
@@ -623,9 +627,11 @@ asmlinkage int irix_stime(int value)
 
 	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = value;
-	xtime.tv_usec = 0;
-	time_maxerror = MAXPHASE;
-	time_esterror = MAXPHASE;
+	xtime.tv_nsec = 0;
+	time_adjust = 0;			/* stop active adjtime() */
+	time_status |= STA_UNSYNC;
+	time_maxerror = NTP_PHASE_LIMIT;
+	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
 
 	return 0;
@@ -819,10 +825,10 @@ asmlinkage int irix_times(struct tms * tbuf)
 		err = verify_area(VERIFY_WRITE,tbuf,sizeof *tbuf);
 		if (err)
 			return err;
-		err |= __put_user(current->times.tms_utime,&tbuf->tms_utime);
-		err |= __put_user(current->times.tms_stime,&tbuf->tms_stime);
-		err |= __put_user(current->times.tms_cutime,&tbuf->tms_cutime);
-		err |= __put_user(current->times.tms_cstime,&tbuf->tms_cstime);
+		err |= __put_user(current->utime, &tbuf->tms_utime);
+		err |= __put_user(current->stime, &tbuf->tms_stime);
+		err |= __put_user(current->cutime, &tbuf->tms_cutime);
+		err |= __put_user(current->cstime, &tbuf->tms_cstime);
 	}
 
 	return err;
@@ -1048,7 +1054,23 @@ asmlinkage int irix_sgikopt(char *istring, char *ostring, int len)
 
 asmlinkage int irix_gettimeofday(struct timeval *tv)
 {
-	return copy_to_user(tv, &xtime, sizeof(*tv)) ? -EFAULT : 0;
+	time_t sec;
+	long nsec, seq;
+	int err;
+
+	if (verify_area(VERIFY_WRITE, tv, sizeof(struct timeval)))
+		return -EFAULT;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		sec = xtime.tv_sec;
+		nsec = xtime.tv_nsec;
+	} while (read_seqretry(&xtime_lock, seq));
+
+	err = __put_user(sec, &tv->tv_sec);
+	err |= __put_user((nsec / 1000), &tv->tv_usec);
+
+	return err;
 }
 
 #define IRIX_MAP_AUTOGROW 0x40
@@ -1068,7 +1090,7 @@ asmlinkage unsigned long irix_mmap32(unsigned long addr, size_t len, int prot,
 		if (flags & IRIX_MAP_AUTOGROW) {
 			unsigned long old_pos;
 			long max_size = offset + len;
-			
+
 			if (max_size > file->f_dentry->d_inode->i_size) {
 				old_pos = sys_lseek (fd, max_size - 1, 0);
 				sys_write (fd, "", 1);
@@ -1198,14 +1220,14 @@ static inline int irix_xstat32_xlate(struct kstat *stat, void *ubuf)
 #if BITS_PER_LONG == 32
 	if (stat->size > MAX_NON_LFS)
 		return -EOVERFLOW;
-#endif	
+#endif
 	ub.st_size    = stat->size;
-	ub.st_atime0  = stat->atime;
-	ub.st_atime1  = 0;
-	ub.st_mtime0  = stat->mtime;
-	ub.st_mtime1  = 0;
-	ub.st_ctime0  = stat->ctime;
-	ub.st_ctime1  = 0;
+	ub.st_atime0  = stat->atime.tv_sec;
+	ub.st_atime1  = stat->atime.tv_nsec;
+	ub.st_mtime0  = stat->mtime.tv_sec;
+	ub.st_mtime1  = stat->atime.tv_nsec;
+	ub.st_ctime0  = stat->ctime.tv_sec;
+	ub.st_ctime1  = stat->atime.tv_nsec;
 	ub.st_blksize = stat->blksize;
 	ub.st_blocks  = stat->blocks;
 	strcpy (ub.st_fstype, "efs");
@@ -1243,9 +1265,12 @@ static inline void irix_xstat64_xlate(struct kstat *stat, void *ubuf)
 	ks.st_pad3 = 0;
 
 	/* XXX hackety hack... */
-	ks.st_atime.tv_sec = (s32) stat->atime; ks.st_atime.tv_nsec = 0;
-	ks.st_mtime.tv_sec = (s32) stat->atime; ks.st_mtime.tv_nsec = 0;
-	ks.st_ctime.tv_sec = (s32) stat->atime; ks.st_ctime.tv_nsec = 0;
+	ks.st_atime.tv_sec = (s32) stat->atime.tv_sec;
+	ks.st_atime.tv_nsec = stat->atime.tv_nsec;
+	ks.st_mtime.tv_sec = (s32) stat->mtime.tv_sec;
+	ks.st_mtime.tv_nsec = stat->mtime.tv_nsec;;
+	ks.st_ctime.tv_sec = (s32) stat->ctime.tv_sec;
+	ks.st_ctime.tv_nsec = stat->ctime.tv_nsec;;
 
 	ks.st_blksize = (s32) stat->blksize;
 	ks.st_blocks = (long long) stat->blocks;
@@ -1812,7 +1837,8 @@ static int irix_filldir32(void *__buf, const char *name, int namlen,
 	return 0;
 }
 
-asmlinkage int irix_ngetdents(unsigned int fd, void * dirent, unsigned int count, int *eob)
+asmlinkage int irix_ngetdents(unsigned int fd, void * dirent,
+	unsigned int count, int *eob)
 {
 	struct file *file;
 	struct irix_dirent32 *lastdirent;
@@ -1836,6 +1862,7 @@ asmlinkage int irix_ngetdents(unsigned int fd, void * dirent, unsigned int count
 	error = vfs_readdir(file, irix_filldir32, &buf);
 	if (error < 0)
 		goto out_putf;
+
 	error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
@@ -1844,10 +1871,9 @@ asmlinkage int irix_ngetdents(unsigned int fd, void * dirent, unsigned int count
 	}
 
 	if (put_user(0, eob) < 0) {
-		error = EFAULT;
+		error = -EFAULT;
 		goto out_putf;
 	}
-
 
 #ifdef DEBUG_GETDENTS
 	printk("eob=%d returning %d\n", *eob, count - buf.count);

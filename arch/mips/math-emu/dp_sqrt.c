@@ -27,16 +27,6 @@
 
 #include "ieee754dp.h"
 
-static const struct ieee754dp_konst knan = {
-#if (defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN) || defined(__MIPSEL__)
-	0, 0, DP_EBIAS + DP_EMAX + 1, 0
-#else
-	0, DP_EBIAS + DP_EMAX + 1, 0, 0
-#endif
-};
-
-#define nan	((ieee754dp)knan)
-
 static const unsigned table[] = {
 	0, 1204, 3062, 5746, 9193, 13348, 18162, 23592,
 	29598, 36145, 43202, 50740, 58733, 67158, 75992,
@@ -53,29 +43,37 @@ ieee754dp ieee754dp_sqrt(ieee754dp x)
 	COMPXDP;
 
 	EXPLODEXDP;
+	CLEARCX;
+	FLUSHXDP;
 
 	/* x == INF or NAN? */
 	switch (xc) {
 	case IEEE754_CLASS_QNAN:
-	case IEEE754_CLASS_SNAN:
 		/* sqrt(Nan) = Nan */
 		return ieee754dp_nanxcpt(x, "sqrt");
+	case IEEE754_CLASS_SNAN:
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754dp_nanxcpt(ieee754dp_indef(), "sqrt");
 	case IEEE754_CLASS_ZERO:
 		/* sqrt(0) = 0 */
 		return x;
 	case IEEE754_CLASS_INF:
-		if (xs)
+		if (xs) {
 			/* sqrt(-Inf) = Nan */
-			return ieee754dp_nanxcpt(nan, "sqrt");
+			SETCX(IEEE754_INVALID_OPERATION);
+			return ieee754dp_nanxcpt(ieee754dp_indef(), "sqrt");
+		}
 		/* sqrt(+Inf) = Inf */
 		return x;
 	case IEEE754_CLASS_DNORM:
 		DPDNORMX;
 		/* fall through */
 	case IEEE754_CLASS_NORM:
-		if (xs)
+		if (xs) {
 			/* sqrt(-x) = Nan */
-			return ieee754dp_nanxcpt(nan, "sqrt");
+			SETCX(IEEE754_INVALID_OPERATION);
+			return ieee754dp_nanxcpt(ieee754dp_indef(), "sqrt");
+		}
 		break;
 	}
 
@@ -101,7 +99,7 @@ ieee754dp ieee754dp_sqrt(ieee754dp x)
 	yh = y.bits >> 32;
 	yh = (yh >> 1) + 0x1ff80000;
 	yh = yh - table[(yh >> 15) & 31];
-	y.bits = ((unsigned long long) yh << 32) | (y.bits & 0xffffffff);
+	y.bits = ((u64) yh << 32) | (y.bits & 0xffffffff);
 
 	/* Heron's rule once with correction to improve to ~18 sig. bits */
 	/* t=x/y; y=y+t; py[n0]=py[n0]-0x00100006; py[n1]=0; */

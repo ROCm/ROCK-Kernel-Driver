@@ -33,12 +33,12 @@ typedef __signed__ long __s64;
 typedef unsigned long __u64;
 
 #else
- 
+
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
 #endif
- 
+
 #endif
 
 #endif /* __ASSEMBLY__ */
@@ -75,7 +75,10 @@ typedef unsigned long long u64;
 
 #endif
 
-typedef unsigned long dma_addr_t;
+typedef u64 dma_addr_t;
+typedef u64 dma64_addr_t;
+
+typedef unsigned long phys_t;
 
 #endif /* __ASSEMBLY__ */
 

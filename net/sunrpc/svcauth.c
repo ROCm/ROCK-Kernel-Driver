@@ -152,7 +152,8 @@ DefineCacheLookup(struct auth_domain,
 		  auth_domain_match(tmp, item),
 		  kfree(new); if(!set) return NULL;
 		  new=item; atomic_inc(&new->h.refcnt),
-		  /* no update */
+		  /* no update */,
+		  0 /* no inplace updates */
 		  )
 
 struct auth_domain *auth_domain_find(char *name)

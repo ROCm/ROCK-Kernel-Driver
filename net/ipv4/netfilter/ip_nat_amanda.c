@@ -84,7 +84,7 @@ amanda_nat_expected(struct sk_buff **pskb,
 		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
 		mr.range[0].min = mr.range[0].max
 			= ((union ip_conntrack_manip_proto)
-				{ htons(port) });
+				{ .udp = { htons(port) } });
 	}
 
 	return ip_nat_setup_info(ct, &mr, hooknum);

@@ -42,7 +42,16 @@ ieee754dp ieee754dp_copysign(ieee754dp x, ieee754dp y)
 
 ieee754dp ieee754dp_neg(ieee754dp x)
 {
+	COMPXDP;
+
+	EXPLODEXDP;
 	CLEARCX;
+	FLUSHXDP;
+
+	if (xc == IEEE754_CLASS_SNAN) {
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754dp_nanxcpt(ieee754dp_indef(), "neg");
+	}
 
 	if (ieee754dp_isnan(x))	/* but not infinity */
 		return ieee754dp_nanxcpt(x, "neg", x);
@@ -55,7 +64,16 @@ ieee754dp ieee754dp_neg(ieee754dp x)
 
 ieee754dp ieee754dp_abs(ieee754dp x)
 {
+	COMPXDP;
+
+	EXPLODEXDP;
 	CLEARCX;
+	FLUSHXDP;
+
+	if (xc == IEEE754_CLASS_SNAN) {
+		SETCX(IEEE754_INVALID_OPERATION);
+		return ieee754dp_nanxcpt(ieee754dp_indef(), "neg");
+	}
 
 	if (ieee754dp_isnan(x))	/* but not infinity */
 		return ieee754dp_nanxcpt(x, "abs", x);

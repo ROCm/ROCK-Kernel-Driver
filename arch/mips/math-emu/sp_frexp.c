@@ -27,7 +27,7 @@
 
 #include "ieee754sp.h"
 
-/* close to ieeep754sp_logb 
+/* close to ieeep754sp_logb
 */
 ieee754sp ieee754sp_frexp(ieee754sp x, int *eptr)
 {

@@ -8,8 +8,6 @@
 #ifndef _ASM_USER_H
 #define _ASM_USER_H
 
-#include <linux/ptrace.h>
-
 #include <asm/page.h>
 #include <asm/reg.h>
 
@@ -37,7 +35,7 @@
  *	to write an integer number of pages.
  */
 struct user {
-	unsigned long	regs[EF_SIZE/4+64];	/* integer and fp regs */
+	unsigned long	regs[EF_SIZE/8+64];	/* integer and fp regs */
 	size_t		u_tsize;		/* text size (pages) */
 	size_t		u_dsize;		/* data size (pages) */
 	size_t		u_ssize;		/* stack size (pages) */

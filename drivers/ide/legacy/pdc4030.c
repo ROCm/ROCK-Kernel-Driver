@@ -613,8 +613,6 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 		 */
 		taskfile_output_data(drive, buffer, nsect<<7);
 	} while (mcount);
-
-	return 0;
 }
 #endif
 
@@ -624,7 +622,9 @@ static void promise_multwrite (ide_drive_t *drive, unsigned int mcount)
 static ide_startstop_t promise_write_pollfunc (ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+#ifdef CONFIG_IDE_TASKFILE_IO
 	struct request *rq = hwgroup->rq;
+#endif
 
 	if (HWIF(drive)->INB(IDE_NSECTOR_REG) != 0) {
 		if (time_before(jiffies, hwgroup->poll_timeout)) {
@@ -818,7 +818,8 @@ static ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, 
 	   Feature register.
 	   FIXME: Is promise_selectproc now redundant??
 	*/
-	int drive_number = (HWIF(drive)->channel << 1) + drive->select.b.unit;
+	ide_hwif_t *hwif = HWIF(drive);
+	int drive_number = (hwif->channel << 1) + drive->select.b.unit;
 #ifdef CONFIG_IDE_TASKFILE_IO
 	struct hd_drive_task_hdr taskfile;
 	ide_task_t args;

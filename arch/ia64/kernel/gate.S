@@ -199,7 +199,7 @@ GLOBAL_ENTRY(__kernel_sigtramp)
 	cmp.ne p8,p0=r15,r0		// do we need to switch the rbs?
 	mov.m r9=ar.bsp			// fetch ar.bsp
 	.spillsp.p p8, ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
-(p8)	br.cond.spnt setup_rbs		// yup -> (clobbers r14, r15, and r16)
+(p8)	br.cond.spnt setup_rbs		// yup -> (clobbers p8, r14-r16, and r18-r20)
 back_from_setup_rbs:
 	alloc r8=ar.pfs,0,0,3,0
 	ld8 out0=[base0],16		// load arg0 (signum)
@@ -268,26 +268,30 @@ back_from_restore_rbs:
 setup_rbs:
 	mov ar.rsc=0				// put RSE into enforced lazy mode
 	;;
-	.save ar.rnat, r16
-	mov r16=ar.rnat				// save RNaT before switching backing store area
+	.save ar.rnat, r19
+	mov r19=ar.rnat				// save RNaT before switching backing store area
 	adds r14=(RNAT_OFF+SIGCONTEXT_OFF),sp
 
+	mov r18=ar.bspstore
 	mov ar.bspstore=r15			// switch over to new register backing store area
 	;;
-	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
-	st8 [r14]=r16				// save sc_ar_rnat
-	.body
-	adds r14=(LOADRS_OFF+SIGCONTEXT_OFF),sp
 
+	.spillsp ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
+	st8 [r14]=r19				// save sc_ar_rnat
+	.body
 	mov.m r16=ar.bsp			// sc_loadrs <- (new bsp - new bspstore) << 16
+	adds r14=(LOADRS_OFF+SIGCONTEXT_OFF),sp
 	;;
 	invala
 	sub r15=r16,r15
+	extr.u r20=r18,3,6
 	;;
+	mov ar.rsc=0xf				// set RSE into eager mode, pl 3
+	cmp.eq p8,p0=63,r20
 	shl r15=r15,16
 	;;
 	st8 [r14]=r15				// save sc_loadrs
-	mov ar.rsc=0xf				// set RSE into eager mode, pl 3
+(p8)	st8 [r18]=r19		// if bspstore points at RNaT slot, store RNaT there now
 	.restore sp				// pop .prologue
 	br.cond.sptk back_from_setup_rbs
 

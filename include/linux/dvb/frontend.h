@@ -26,11 +26,7 @@
 #ifndef _DVBFRONTEND_H_
 #define _DVBFRONTEND_H_
 
-#ifdef __KERNEL__
-#include <linux/types.h>
-#else
-#include <stdint.h>
-#endif
+#include <asm/types.h>
 
 
 typedef enum fe_type {
@@ -72,14 +68,14 @@ typedef enum fe_caps {
 struct dvb_frontend_info {
 	char       name[128];
         fe_type_t  type;
-        uint32_t   frequency_min;
-        uint32_t   frequency_max;
-	uint32_t   frequency_stepsize;
-	uint32_t   frequency_tolerance;
-	uint32_t   symbol_rate_min;
-        uint32_t   symbol_rate_max;
-	uint32_t   symbol_rate_tolerance;     /* ppm */
-	uint32_t   notifier_delay;            /* ms */
+        __u32      frequency_min;
+        __u32      frequency_max;
+	__u32      frequency_stepsize;
+	__u32      frequency_tolerance;
+	__u32      symbol_rate_min;
+        __u32      symbol_rate_max;
+	__u32      symbol_rate_tolerance;     /* ppm */
+	__u32      notifier_delay;            /* ms */
 	fe_caps_t  caps;
 };
 
@@ -89,21 +85,22 @@ struct dvb_frontend_info {
  *  the meaning of this struct...
  */
 struct dvb_diseqc_master_cmd {
-        uint8_t msg [6];        /*  { framing, address, command, data [3] } */
-        uint8_t msg_len;        /*  valid values are 3...6  */
+        __u8 msg [6];        /*  { framing, address, command, data [3] } */
+        __u8 msg_len;        /*  valid values are 3...6  */
 };
 
 
 struct dvb_diseqc_slave_reply {
-	uint8_t msg [4];        /*  { framing, data [3] } */
-	uint8_t msg_len;        /*  valid values are 0...4, 0 means no msg  */
+	__u8 msg [4];        /*  { framing, data [3] } */
+	__u8 msg_len;        /*  valid values are 0...4, 0 means no msg  */
 	int     timeout;        /*  return from ioctl after timeout ms with */
 };                              /*  errorcode when no message was received  */
 
 
 typedef enum fe_sec_voltage {
         SEC_VOLTAGE_13,
-        SEC_VOLTAGE_18
+        SEC_VOLTAGE_18,
+	SEC_VOLTAGE_OFF
 } fe_sec_voltage_t;
 
 
@@ -195,13 +192,13 @@ typedef enum fe_hierarchy {
 
 
 struct dvb_qpsk_parameters {
-        uint32_t        symbol_rate;  /* symbol rate in Symbols per second */
+        __u32           symbol_rate;  /* symbol rate in Symbols per second */
         fe_code_rate_t  fec_inner;    /* forward error correction (see above) */
 };
 
 
 struct dvb_qam_parameters {
-        uint32_t         symbol_rate; /* symbol rate in Symbols per second */
+        __u32            symbol_rate; /* symbol rate in Symbols per second */
         fe_code_rate_t   fec_inner;   /* forward error correction (see above) */
         fe_modulation_t  modulation;  /* modulation type (see above) */
 };
@@ -219,7 +216,7 @@ struct dvb_ofdm_parameters {
 
 
 struct dvb_frontend_parameters {
-        uint32_t frequency;       /* (absolute) frequency in Hz for QAM/OFDM */
+        __u32 frequency;     /* (absolute) frequency in Hz for QAM/OFDM */
                                   /* intermediate frequency in kHz for QPSK */
 	fe_spectral_inversion_t inversion;
 	union {
@@ -249,10 +246,10 @@ struct dvb_frontend_event {
 #define FE_ENABLE_HIGH_LNB_VOLTAGE _IO('o', 68)  /* int */
 
 #define FE_READ_STATUS             _IOR('o', 69, fe_status_t)
-#define FE_READ_BER                _IOR('o', 70, uint32_t)
-#define FE_READ_SIGNAL_STRENGTH    _IOR('o', 71, uint16_t)
-#define FE_READ_SNR                _IOR('o', 72, uint16_t)
-#define FE_READ_UNCORRECTED_BLOCKS _IOR('o', 73, uint32_t)
+#define FE_READ_BER                _IOR('o', 70, __u32)
+#define FE_READ_SIGNAL_STRENGTH    _IOR('o', 71, __u16)
+#define FE_READ_SNR                _IOR('o', 72, __u16)
+#define FE_READ_UNCORRECTED_BLOCKS _IOR('o', 73, __u32)
 
 #define FE_SET_FRONTEND            _IOW('o', 76, struct dvb_frontend_parameters)
 #define FE_GET_FRONTEND            _IOR('o', 77, struct dvb_frontend_parameters)

@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -20,7 +20,7 @@
 #define INTPEND0_MAXMASK	(N_INTPEND0_MASKS - 1)
 #define INTPEND1_MAXMASK	(N_INTPEND1_MASKS - 1)
 
-#if _LANGUAGE_C
+#ifndef __ASSEMBLY__
 #include <asm/sn/arch.h>
 
 struct intr_vecblk_s;	/* defined in asm/sn/intr.h */
@@ -40,14 +40,14 @@ typedef struct hub_intmasks_s {
 	 * in the lowest-numbered masks (i.e., 0, 1, 2...).
 	 */
 	/* INT_PEND0: */
-	hubreg_t		intpend0_masks[N_INTPEND0_MASKS]; 
+	hubreg_t		intpend0_masks[N_INTPEND0_MASKS];
 	/* INT_PEND1: */
 	hubreg_t		intpend1_masks[N_INTPEND1_MASKS];
 	/* INT_PEND0: */
-	struct intr_vecblk_s	*dispatch0;	
+	struct intr_vecblk_s	*dispatch0;
 	/* INT_PEND1: */
 	struct intr_vecblk_s	*dispatch1;
 } hub_intmasks_t;
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 #endif /* __ASM_SN_INTR_PUBLIC_H */

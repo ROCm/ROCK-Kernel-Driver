@@ -198,7 +198,7 @@ static int PCI_ScanBusForNonBridge(struct controller *ctrl, u8 bus_num, u8 * dev
 
 	ctrl->pci_bus->number = bus_num;
 
-	for (tdevice = 0; tdevice < 0x100; tdevice++) {
+	for (tdevice = 0; tdevice < 0xFF; tdevice++) {
 		//Scan for access first
 		if (PCI_RefinedAccessConfig(ctrl->pci_bus, tdevice, 0x08, &work) == -1)
 			continue;
@@ -210,7 +210,7 @@ static int PCI_ScanBusForNonBridge(struct controller *ctrl, u8 bus_num, u8 * dev
 			return 0;
 		}
 	}
-	for (tdevice = 0; tdevice < 0x100; tdevice++) {
+	for (tdevice = 0; tdevice < 0xFF; tdevice++) {
 		//Scan for access first
 		if (PCI_RefinedAccessConfig(ctrl->pci_bus, tdevice, 0x08, &work) == -1)
 			continue;

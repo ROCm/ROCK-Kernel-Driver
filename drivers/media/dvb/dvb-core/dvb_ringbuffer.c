@@ -32,16 +32,18 @@
 
 
 #define __KERNEL_SYSCALLS__
+#include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/module.h>
+#include <linux/sched.h>
+#include <linux/string.h>
 #include <asm/uaccess.h>
 
 #include "dvb_ringbuffer.h"
 
 
 
-void dvb_ringbuffer_init(dvb_ringbuffer_t *rbuf, void *data, size_t len)
+void dvb_ringbuffer_init(struct dvb_ringbuffer *rbuf, void *data, size_t len)
 {
         rbuf->pread=rbuf->pwrite=0;
         rbuf->data=data;
@@ -50,19 +52,18 @@ void dvb_ringbuffer_init(dvb_ringbuffer_t *rbuf, void *data, size_t len)
         init_waitqueue_head(&rbuf->queue);
 
         spin_lock_init(&(rbuf->lock));
-        rbuf->lock=SPIN_LOCK_UNLOCKED;
 }
 
 
 
-int dvb_ringbuffer_empty(dvb_ringbuffer_t *rbuf)
+int dvb_ringbuffer_empty(struct dvb_ringbuffer *rbuf)
 {
         return (rbuf->pread==rbuf->pwrite);
 }
 
 
 
-ssize_t dvb_ringbuffer_free(dvb_ringbuffer_t *rbuf)
+ssize_t dvb_ringbuffer_free(struct dvb_ringbuffer *rbuf)
 {
         ssize_t free;
   
@@ -74,7 +75,7 @@ ssize_t dvb_ringbuffer_free(dvb_ringbuffer_t *rbuf)
 
 
 
-ssize_t dvb_ringbuffer_avail(dvb_ringbuffer_t *rbuf)
+ssize_t dvb_ringbuffer_avail(struct dvb_ringbuffer *rbuf)
 {
         ssize_t avail;
   
@@ -86,14 +87,14 @@ ssize_t dvb_ringbuffer_avail(dvb_ringbuffer_t *rbuf)
 
 
 
-void dvb_ringbuffer_flush(dvb_ringbuffer_t *rbuf)
+void dvb_ringbuffer_flush(struct dvb_ringbuffer *rbuf)
 {
         rbuf->pread = rbuf->pwrite;
 }
 
 
 
-void dvb_ringbuffer_flush_spinlock_wakeup(dvb_ringbuffer_t *rbuf)
+void dvb_ringbuffer_flush_spinlock_wakeup(struct dvb_ringbuffer *rbuf)
 {
         unsigned long flags;
 
@@ -106,7 +107,7 @@ void dvb_ringbuffer_flush_spinlock_wakeup(dvb_ringbuffer_t *rbuf)
 
 
 
-ssize_t dvb_ringbuffer_read(dvb_ringbuffer_t *rbuf, u8 *buf, size_t len, int usermem)
+ssize_t dvb_ringbuffer_read(struct dvb_ringbuffer *rbuf, u8 *buf, size_t len, int usermem)
 {
         size_t todo = len;
         size_t split;
@@ -135,7 +136,7 @@ ssize_t dvb_ringbuffer_read(dvb_ringbuffer_t *rbuf, u8 *buf, size_t len, int use
 
 
 
-ssize_t dvb_ringbuffer_write(dvb_ringbuffer_t *rbuf, const u8 *buf,
+ssize_t dvb_ringbuffer_write(struct dvb_ringbuffer *rbuf, const u8 *buf,
                              size_t len, int usermem)
 {
         size_t todo = len;

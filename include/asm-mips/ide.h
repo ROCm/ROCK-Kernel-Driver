@@ -14,6 +14,7 @@
 #ifdef __KERNEL__
 
 #include <linux/config.h>
+#include <asm/byteorder.h>
 #include <asm/io.h>
 
 #ifndef MAX_HWIFS
@@ -58,10 +59,15 @@ static __inline__ void ide_init_default_hwifs(void)
 	for(index = 0; index < MAX_HWIFS; index++) {
 		ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, NULL);
 		hw.irq = ide_default_irq(ide_default_io_base(index));
-		ide_register_hw(&hw);
+		ide_register_hw(&hw, NULL);
 	}
 #endif
 }
+
+#define __ide_mm_insw   ide_insw
+#define __ide_mm_insl   ide_insl
+#define __ide_mm_outsw  ide_outsw
+#define __ide_mm_outsl  ide_outsl
 
 #endif /* __KERNEL__ */
 

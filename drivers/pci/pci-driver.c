@@ -486,6 +486,14 @@ void pci_dev_put(struct pci_dev *dev)
 		put_device(&dev->dev);
 }
 
+#ifndef CONFIG_HOTPLUG
+int pci_hotplug (struct device *dev, char **envp, int num_envp,
+		 char *buffer, int buffer_size)
+{
+	return -ENODEV;
+}
+#endif
+
 struct bus_type pci_bus_type = {
 	.name		= "pci",
 	.match		= pci_bus_match,

@@ -15,7 +15,7 @@ extern void __put_unaligned_bad_length(void);
 /*
  * Load quad unaligned.
  */
-extern inline unsigned long __ldq_u(const unsigned long * __addr)
+static inline unsigned long __ldq_u(const unsigned long * __addr)
 {
 	unsigned long __res;
 
@@ -29,7 +29,7 @@ extern inline unsigned long __ldq_u(const unsigned long * __addr)
 /*
  * Load long unaligned.
  */
-extern inline unsigned long __ldl_u(const unsigned int * __addr)
+static inline unsigned long __ldl_u(const unsigned int * __addr)
 {
 	unsigned long __res;
 
@@ -43,7 +43,7 @@ extern inline unsigned long __ldl_u(const unsigned int * __addr)
 /*
  * Load word unaligned.
  */
-extern inline unsigned long __ldw_u(const unsigned short * __addr)
+static inline unsigned long __ldw_u(const unsigned short * __addr)
 {
 	unsigned long __res;
 
@@ -55,9 +55,9 @@ extern inline unsigned long __ldw_u(const unsigned short * __addr)
 }
 
 /*
- * Store quad ununaligned.
+ * Store quad unaligned.
  */
-extern inline void __stq_u(unsigned long __val, unsigned long * __addr)
+static inline void __stq_u(unsigned long __val, unsigned long * __addr)
 {
 	__asm__("usd\t%1, %0"
 		: "=m" (*__addr)
@@ -65,9 +65,9 @@ extern inline void __stq_u(unsigned long __val, unsigned long * __addr)
 }
 
 /*
- * Store long ununaligned.
+ * Store long unaligned.
  */
-extern inline void __stl_u(unsigned long __val, unsigned int * __addr)
+static inline void __stl_u(unsigned long __val, unsigned int * __addr)
 {
 	__asm__("usw\t%1, %0"
 		: "=m" (*__addr)
@@ -75,9 +75,9 @@ extern inline void __stl_u(unsigned long __val, unsigned int * __addr)
 }
 
 /*
- * Store word ununaligned.
+ * Store word unaligned.
  */
-extern inline void __stw_u(unsigned long __val, unsigned short * __addr)
+static inline void __stw_u(unsigned long __val, unsigned short * __addr)
 {
 	__asm__("ush\t%1, %0"
 		: "=m" (*__addr)
@@ -88,8 +88,8 @@ extern inline void __stw_u(unsigned long __val, unsigned short * __addr)
  * get_unaligned - get value from possibly mis-aligned location
  * @ptr: pointer to value
  *
- * This macro should be used for accessing values larger in size than 
- * single bytes at locations that are expected to be improperly aligned, 
+ * This macro should be used for accessing values larger in size than
+ * single bytes at locations that are expected to be improperly aligned,
  * e.g. retrieving a u16 value from a location not u16-aligned.
  *
  * Note that unaligned accesses can be very expensive on some architectures.
@@ -124,8 +124,8 @@ extern inline void __stw_u(unsigned long __val, unsigned short * __addr)
  * @val: value to place
  * @ptr: pointer to location
  *
- * This macro should be used for placing values larger in size than 
- * single bytes at locations that are expected to be improperly aligned, 
+ * This macro should be used for placing values larger in size than
+ * single bytes at locations that are expected to be improperly aligned,
  * e.g. writing a u16 value to a location not u16-aligned.
  *
  * Note that unaligned accesses can be very expensive on some architectures.

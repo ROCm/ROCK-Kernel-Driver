@@ -5,7 +5,7 @@
  *
  * This also contains some streams and idev bits.
  *
- * They may contain errors, please, refer to the source code of the Linux  
+ * They may contain errors, please, refer to the source code of the Linux
  * kernel for a definitive answer on what we have implemented
  *
  * Miguel.
@@ -91,7 +91,7 @@ struct shmqevent {
  * head   is the user index into the events, user can modify this one.
  * tail   is managed by the kernel.
  * flags  is one of SHMIQ_OVERFLOW or SHMIQ_CORRUPTED
- *        if OVERFLOW is set it seems ioctl QUIOCSERVICED should be called 
+ *        if OVERFLOW is set it seems ioctl QUIOCSERVICED should be called
  *        to notify the kernel.
  * events where the kernel sticks the events.
  */
@@ -186,14 +186,14 @@ typedef struct {
         unsigned        hwMaxRes;
         int             hwMinVal;
         int             hwMaxVal;
-	
+
         unsigned char   possibleModes;
 #define IDEV_ABSOLUTE           0x0
 #define IDEV_RELATIVE           0x1
 #define IDEV_EITHER             0x2
-	
+
         unsigned char   mode;	/* One of: IDEV_ABSOLUTE, IDEV_RELATIVE */
-	
+
         unsigned short  resolution;
         int             minVal;
         int             maxVal;

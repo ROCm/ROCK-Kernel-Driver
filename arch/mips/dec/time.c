@@ -2,12 +2,14 @@
  *  linux/arch/mips/dec/time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
- *  Copyright (C) 2000  Maciej W. Rozycki
+ *  Copyright (C) 2000, 2003  Maciej W. Rozycki
  *
  * This file contains the time handling details for PC-style clocks as
  * found in some MIPS systems.
  *
  */
+#include <linux/bcd.h>
+#include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/sched.h>
@@ -45,7 +47,9 @@ extern volatile unsigned long wall_jiffies;
 
 /* This is for machines which generate the exact clock. */
 #define USECS_PER_JIFFY (1000000/HZ)
-#define USECS_PER_JIFFY_FRAC ((1000000ULL << 32) / HZ & 0xffffffff)
+#define USECS_PER_JIFFY_FRAC ((u32)((1000000ULL << 32) / HZ))
+
+#define TICK_SIZE	(tick_nsec / 1000)
 
 /* Cycle counter value at the previous timer interrupt.. */
 
@@ -99,7 +103,7 @@ static unsigned long do_fast_gettimeoffset(void)
 	    }
 	}
 	/* Get last timer tick in absolute kernel time */
-	count = read_32bit_cp0_register(CP0_COUNT);
+	count = read_c0_count();
 
 	/* .. relative to previous jiffy (32 bits is enough) */
 	count -= timerlo;
@@ -110,7 +114,7 @@ static unsigned long do_fast_gettimeoffset(void)
 		: "r" (count), "r" (quotient));
 
 	/*
-	 * Due to possible jiffies inconsistencies, we need to check 
+	 * Due to possible jiffies inconsistencies, we need to check
 	 * the result so that we'll get a timer that is monotonic.
 	 */
 	if (res >= USECS_PER_JIFFY)
@@ -140,7 +144,7 @@ static unsigned long do_ioasic_gettimeoffset(void)
 		}
 	}
 	/* Get last timer tick in absolute kernel time */
-	count = ioasic_read(FCTR);
+	count = ioasic_read(IO_REG_FCTR);
 
 	/* .. relative to previous jiffy (32 bits is enough) */
 	count -= timerlo;
@@ -160,9 +164,9 @@ static unsigned long do_ioasic_gettimeoffset(void)
 	return res;
 }
 
-/* This function must be called with interrupts disabled 
+/* This function must be called with interrupts disabled
  * It was inspired by Steve McCanne's microtime-i386 for BSD.  -- jrs
- * 
+ *
  * However, the pc-audio speaker driver changes the divisor so that
  * it gets interrupted rather more often - it loads 64 into the
  * counter rather than 11932! This has an adverse impact on
@@ -176,7 +180,7 @@ static unsigned long do_ioasic_gettimeoffset(void)
  * using either the RTC or the 8253 timer. The decision would be
  * based on whether there was any other device around that needed
  * to trample on the 8253. I'd set up the RTC to interrupt at 1024 Hz,
- * and then do some jiggery to have a version of do_timer that 
+ * and then do some jiggery to have a version of do_timer that
  * advanced the clock by 1/1024 s. Every time that reached over 1/100
  * of a second, then do all the old code. If the time was kept correct
  * then do_gettimeoffset could just return 0 - there is no low order
@@ -187,12 +191,10 @@ static unsigned long do_ioasic_gettimeoffset(void)
  * often than every 120 us or so.
  *
  * Anyway, this needs more thought....          pjsg (1993-08-28)
- * 
+ *
  * If you are really that interested, you should be reading
  * comp.protocols.time.ntp!
  */
-
-#define TICK_SIZE tick
 
 static unsigned long do_slow_gettimeoffset(void)
 {
@@ -206,57 +208,58 @@ static unsigned long do_slow_gettimeoffset(void)
 static unsigned long (*do_gettimeoffset) (void) = do_slow_gettimeoffset;
 
 /*
- * This version of gettimeofday has near microsecond resolution.
+ * This version of gettimeofday has microsecond resolution
+ * and better than microsecond precision on fast x86 machines with TSC.
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
 	unsigned long seq;
+	unsigned long usec, sec;
 
 	do {
-		seq = read_seqbegin_irqsave(&xtime_lock, flags);
-		*tv = xtime;
-		tv->tv_usec += do_gettimeoffset();
+		seq = read_seqbegin(&xtime_lock);
+		usec = do_gettimeoffset();
+		{
+			unsigned long lost = jiffies - wall_jiffies;
+			if (lost)
+				usec += lost * (1000000 / HZ);
+		}
+		sec = xtime.tv_sec;
+		usec += (xtime.tv_nsec / 1000);
+	} while (read_seqretry(&xtime_lock, seq));
 
-		/*
-		 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-		 * is nonzero if the timer bottom half hasnt executed yet.
-		 */
-		if (jiffies - wall_jiffies)
-			tv->tv_usec += USECS_PER_JIFFY;
-
-	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
-
-
-	if (tv->tv_usec >= 1000000) {
-		tv->tv_usec -= 1000000;
-		tv->tv_sec++;
+	while (usec >= 1000000) {
+		usec -= 1000000;
+		sec++;
 	}
+
+	tv->tv_sec = sec;
+	tv->tv_usec = usec;
 }
 
 void do_settimeofday(struct timeval *tv)
 {
 	write_seqlock_irq(&xtime_lock);
-
-	/* This is revolting. We need to set the xtime.tv_usec
-	 * correctly. However, the value in this location is
-	 * is value at the last tick.
-	 * Discover what correction gettimeofday
-	 * would have done, and then undo it!
+	/*
+	 * This is revolting. We need to set "xtime" correctly. However, the
+	 * value in this location is the value at the most recent update of
+	 * wall time.  Discover what correction gettimeofday() would have
+	 * made, and then undo it!
 	 */
 	tv->tv_usec -= do_gettimeoffset();
+	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
 
-	if (tv->tv_usec < 0) {
+	while (tv->tv_usec < 0) {
 		tv->tv_usec += 1000000;
 		tv->tv_sec--;
 	}
 
-	xtime = *tv;
+	xtime.tv_sec = tv->tv_sec;
+	xtime.tv_nsec = (tv->tv_usec * 1000);
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
-
 	write_sequnlock_irq(&xtime_lock);
 }
 
@@ -281,7 +284,7 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	cmos_minutes = CMOS_READ(RTC_MINUTES);
 	if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
-		BCD_TO_BIN(cmos_minutes);
+		cmos_minutes = BCD2BIN(cmos_minutes);
 
 	/*
 	 * since we're only adjusting minutes and seconds,
@@ -297,8 +300,8 @@ static int set_rtc_mmss(unsigned long nowtime)
 
 	if (abs(real_minutes - cmos_minutes) < 30) {
 		if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
-			BIN_TO_BCD(real_seconds);
-			BIN_TO_BCD(real_minutes);
+			real_seconds = BIN2BCD(real_seconds);
+			real_minutes = BIN2BCD(real_minutes);
 		}
 		CMOS_WRITE(real_seconds, RTC_SECONDS);
 		CMOS_WRITE(real_minutes, RTC_MINUTES);
@@ -366,8 +369,8 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		if ((time_status & STA_UNSYNC) == 0
 		    && xtime.tv_sec > last_rtc_update + 660
-		    && xtime.tv_usec >= 500000 - tick / 2
-		    && xtime.tv_usec <= 500000 + tick / 2) {
+		    && (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2
+		    && (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
 			if (set_rtc_mmss(xtime.tv_sec) == 0)
 				last_rtc_update = xtime.tv_sec;
 			else
@@ -381,7 +384,7 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	   rigged to be safe on the 386 - basically it's a hack, so don't look
 	   closely for now.. */
 	/*smp_message_pass(MSG_ALL_BUT_SELF, MSG_RESCHEDULE, 0L, 0); */
-
+	write_sequnlock(&xtime_lock);
 }
 
 static void r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -392,7 +395,7 @@ static void r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * The cycle counter is only 32 bit which is good for about
 	 * a minute at current count rates of upto 150MHz or so.
 	 */
-	count = read_32bit_cp0_register(CP0_COUNT);
+	count = read_c0_count();
 	timerhi += (count < timerlo);	/* Wrap around */
 	timerlo = count;
 
@@ -402,7 +405,7 @@ static void r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		 * update the timer[hi]/[lo] to make do_fast_gettimeoffset()
 		 * quotient calc still valid. -arca
 		 */
-		write_32bit_cp0_register(CP0_COUNT, 0);
+		write_c0_count(0);
 		timerhi = timerlo = 0;
 	}
 
@@ -417,7 +420,7 @@ static void ioasic_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * The free-running counter is 32 bit which is good for about
 	 * 2 minutes, 50 seconds at possible count rates of upto 25MHz.
 	 */
-	count = ioasic_read(FCTR);
+	count = ioasic_read(IO_REG_FCTR);
 	timerhi += (count < timerlo);	/* Wrap around */
 	timerlo = count;
 
@@ -427,15 +430,18 @@ static void ioasic_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		 * update the timer[hi]/[lo] to make do_fast_gettimeoffset()
 		 * quotient calc still valid. -arca
 		 */
-		ioasic_write(FCTR, 0);
+		ioasic_write(IO_REG_FCTR, 0);
 		timerhi = timerlo = 0;
 	}
 
 	timer_interrupt(irq, dev_id, regs);
 }
 
-struct irqaction irq0 = {timer_interrupt, SA_INTERRUPT, 0,
-			 "timer", NULL, NULL};
+struct irqaction irq0 = {
+	.handler = timer_interrupt,
+	.flags = SA_INTERRUPT,
+	.name = "timer",
+};
 
 void __init time_init(void)
 {
@@ -463,12 +469,12 @@ void __init time_init(void)
 		year = CMOS_READ(RTC_YEAR);
 	} while (sec != CMOS_READ(RTC_SECONDS));
 	if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
-		BCD_TO_BIN(sec);
-		BCD_TO_BIN(min);
-		BCD_TO_BIN(hour);
-		BCD_TO_BIN(day);
-		BCD_TO_BIN(mon);
-		BCD_TO_BIN(year);
+		sec = BCD2BIN(sec);
+		min = BCD2BIN(min);
+		hour = BCD2BIN(hour);
+		day = BCD2BIN(day);
+		mon = BCD2BIN(mon);
+		year = BCD2BIN(year);
 	}
 	/*
 	 * The PROM will reset the year to either '72 or '73.
@@ -480,15 +486,15 @@ void __init time_init(void)
 
 	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 	write_sequnlock_irq(&xtime_lock);
 
-	if (mips_cpu.options & MIPS_CPU_COUNTER) {
-		write_32bit_cp0_register(CP0_COUNT, 0);
+	if (cpu_has_counter) {
+		write_c0_count(0);
 		do_gettimeoffset = do_fast_gettimeoffset;
 		irq0.handler = r4k_timer_interrupt;
 	} else if (IOASIC) {
-		ioasic_write(FCTR, 0);
+		ioasic_write(IO_REG_FCTR, 0);
 		do_gettimeoffset = do_ioasic_gettimeoffset;
 		irq0.handler = ioasic_timer_interrupt;
         }

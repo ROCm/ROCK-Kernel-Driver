@@ -15,6 +15,9 @@
 
 #include <linux/errno.h>
 
+extern asmlinkage void handle_ibe(void);
+extern asmlinkage void handle_dbe(void);
+
 #define put_dbe(x,ptr) __put_dbe((x),(ptr),sizeof(*(ptr)))
 #define get_dbe(x,ptr) __get_dbe((x),(ptr),sizeof(*(ptr)))
 
@@ -87,5 +90,10 @@ __asm__ __volatile__( \
 	:"r" (__pu_val), "o" (__mp(__pu_addr)), "i" (-EFAULT)); })
 
 extern void __put_dbe_unknown(void);
+
+extern asmlinkage void handle_ibe(void);
+extern asmlinkage void handle_dbe(void);
+
+extern unsigned long search_dbe_table(unsigned long addr);
 
 #endif /* _ASM_PACCESS_H */

@@ -27,7 +27,7 @@ GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | 
 
 GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
-arch-cppflags	:= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(LD) $(OBJDUMP))
+arch-cppflags	:= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(OBJDUMP))
 cflags-y	+= $(arch-cppflags)
 AFLAGS		+= $(arch-cppflags)
 
@@ -66,7 +66,8 @@ core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/
 drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
-drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/
+drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/ \
+				   arch/ia64/sn/
 
 boot := arch/ia64/boot
 

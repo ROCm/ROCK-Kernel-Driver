@@ -515,7 +515,7 @@ static int rsvp_change(struct tcf_proto *tp, unsigned long base,
 
 	for (sp = &data->ht[h1]; (s=*sp) != NULL; sp = &s->next) {
 		if (dst[RSVP_DST_LEN-1] == s->dst[RSVP_DST_LEN-1] &&
-		    pinfo->protocol == s->protocol &&
+		    pinfo && pinfo->protocol == s->protocol &&
 		    memcmp(&pinfo->dpi, &s->dpi, sizeof(s->dpi)) == 0
 #if RSVP_DST_LEN == 4
 		    && dst[0] == s->dst[0]
@@ -557,9 +557,12 @@ insert:
 		goto errout;
 	memset(s, 0, sizeof(*s));
 	memcpy(s->dst, dst, sizeof(s->dst));
-	s->dpi = pinfo->dpi;
-	s->protocol = pinfo->protocol;
-	s->tunnelid = pinfo->tunnelid;
+
+	if (pinfo) {
+		s->dpi = pinfo->dpi;
+		s->protocol = pinfo->protocol;
+		s->tunnelid = pinfo->tunnelid;
+	}
 	for (sp = &data->ht[h1]; *sp; sp = &(*sp)->next) {
 		if (((*sp)->dpi.mask&s->dpi.mask) != s->dpi.mask)
 			break;

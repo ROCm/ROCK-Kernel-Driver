@@ -18,20 +18,18 @@ enum wref_type {
 	wr_load = 2
 };
 
-extern char watch_available;
-
 extern asmlinkage void __watch_set(unsigned long addr, enum wref_type ref);
 extern asmlinkage void __watch_clear(void);
 extern asmlinkage void __watch_reenable(void);
 
 #define watch_set(addr, ref)					\
-	if (watch_available)					\
+	if (cpu_has_watch)					\
 		__watch_set(addr, ref)
 #define watch_clear()						\
-	if (watch_available)					\
+	if (cpu_has_watch)					\
 		__watch_clear()
 #define watch_reenable()					\
-	if (watch_available)					\
+	if (cpu_has_watch)					\
 		__watch_reenable()
 
 #endif /* _ASM_WATCH_H  */

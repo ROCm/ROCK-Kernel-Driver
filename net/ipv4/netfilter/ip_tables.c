@@ -1703,14 +1703,15 @@ static struct ipt_match icmp_matchstruct = {
 };
 
 #ifdef CONFIG_PROC_FS
-static inline int print_name(const struct ipt_table *t,
+static inline int print_name(const char *i,
 			     off_t start_offset, char *buffer, int length,
 			     off_t *pos, unsigned int *count)
 {
 	if ((*count)++ >= start_offset) {
 		unsigned int namelen;
 
-		namelen = sprintf(buffer + *pos, "%s\n", t->name);
+		namelen = sprintf(buffer + *pos, "%s\n",
+				  i + sizeof(struct list_head));
 		if (*pos + namelen > length) {
 			/* Stop iterating */
 			return 1;
@@ -1728,7 +1729,7 @@ static int ipt_get_tables(char *buffer, char **start, off_t offset, int length)
 	if (down_interruptible(&ipt_mutex) != 0)
 		return 0;
 
-	LIST_FIND(&ipt_tables, print_name, struct ipt_table *,
+	LIST_FIND(&ipt_tables, print_name, void *,
 		  offset, buffer, length, &pos, &count);
 
 	up(&ipt_mutex);
@@ -1737,6 +1738,46 @@ static int ipt_get_tables(char *buffer, char **start, off_t offset, int length)
 	*start=(char *)((unsigned long)count-offset);
 	return pos;
 }
+
+static int ipt_get_targets(char *buffer, char **start, off_t offset, int length)
+{
+	off_t pos = 0;
+	unsigned int count = 0;
+
+	if (down_interruptible(&ipt_mutex) != 0)
+		return 0;
+
+	LIST_FIND(&ipt_target, print_name, void *,
+		  offset, buffer, length, &pos, &count);
+	
+	up(&ipt_mutex);
+
+	*start = (char *)((unsigned long)count - offset);
+	return pos;
+}
+
+static int ipt_get_matches(char *buffer, char **start, off_t offset, int length)
+{
+	off_t pos = 0;
+	unsigned int count = 0;
+
+	if (down_interruptible(&ipt_mutex) != 0)
+		return 0;
+	
+	LIST_FIND(&ipt_match, print_name, void *,
+		  offset, buffer, length, &pos, &count);
+
+	up(&ipt_mutex);
+
+	*start = (char *)((unsigned long)count - offset);
+	return pos;
+}
+
+static struct { char *name; get_info_t *get_info; } ipt_proc_entry[] =
+{ { "ip_tables_names", ipt_get_tables },
+  { "ip_tables_targets", ipt_get_targets },
+  { "ip_tables_matches", ipt_get_matches },
+  { NULL, NULL} };
 #endif /*CONFIG_PROC_FS*/
 
 static int __init init(void)
@@ -1762,13 +1803,19 @@ static int __init init(void)
 #ifdef CONFIG_PROC_FS
 	{
 	struct proc_dir_entry *proc;
+	int i;
 
-	proc = proc_net_create("ip_tables_names", 0, ipt_get_tables);
-	if (!proc) {
-		nf_unregister_sockopt(&ipt_sockopts);
-		return -ENOMEM;
+	for (i = 0; ipt_proc_entry[i].name; i++) {
+		proc = proc_net_create(ipt_proc_entry[i].name, 0,
+				       ipt_proc_entry[i].get_info);
+		if (!proc) {
+			while (--i >= 0)
+				proc_net_remove(ipt_proc_entry[i].name);
+			nf_unregister_sockopt(&ipt_sockopts);
+			return -ENOMEM;
+		}
+		proc->owner = THIS_MODULE;
 	}
-	proc->owner = THIS_MODULE;
 	}
 #endif
 
@@ -1780,7 +1827,11 @@ static void __exit fini(void)
 {
 	nf_unregister_sockopt(&ipt_sockopts);
 #ifdef CONFIG_PROC_FS
-	proc_net_remove("ip_tables_names");
+	{
+	int i;
+	for (i = 0; ipt_proc_entry[i].name; i++)
+		proc_net_remove(ipt_proc_entry[i].name);
+	}
 #endif
 }
 

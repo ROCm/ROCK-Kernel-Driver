@@ -6,478 +6,768 @@
  * for more details.
  *
  * Copyright (C) 1998 Harald Koerfgen
- * Copyright (C) 2000 Maciej W. Rozycki
+ * Copyright (C) 2000, 2001, 2002, 2003  Maciej W. Rozycki
  */
+#include <linux/config.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/param.h>
 #include <linux/console.h>
-#include <asm/mipsregs.h>
-#include <asm/bootinfo.h>
 #include <linux/init.h>
+#include <linux/module.h>
+#include <linux/spinlock.h>
+#include <linux/types.h>
+
+#include <asm/cpu.h>
+#include <asm/bootinfo.h>
 #include <asm/irq.h>
+#include <asm/irq_cpu.h>
+#include <asm/mipsregs.h>
 #include <asm/reboot.h>
+#include <asm/traps.h>
+#include <asm/wbflush.h>
 
 #include <asm/dec/interrupts.h>
-#include <asm/dec/kn01.h>
-#include <asm/dec/kn02.h>
-#include <asm/dec/kn02xa.h>
-#include <asm/dec/kn03.h>
 #include <asm/dec/ioasic.h>
 #include <asm/dec/ioasic_addrs.h>
 #include <asm/dec/ioasic_ints.h>
+#include <asm/dec/kn01.h>
+#include <asm/dec/kn02.h>
+#include <asm/dec/kn02ba.h>
+#include <asm/dec/kn02ca.h>
+#include <asm/dec/kn03.h>
+#include <asm/dec/kn230.h>
 
-
-char *dec_rtc_base = (void *) KN01_RTC_BASE;	/* Assume DS2100/3100 initially */
-
-volatile unsigned int *ioasic_base;
-
-decint_t dec_interrupt[NR_INTS];
-
-/*
- * Information regarding the IRQ Controller
- */
-
-volatile unsigned int *isr = 0L;	/* address of the interrupt status register     */
-volatile unsigned int *imr = 0L;	/* address of the interrupt mask register       */
 
 extern void dec_machine_restart(char *command);
 extern void dec_machine_halt(void);
 extern void dec_machine_power_off(void);
 extern void dec_intr_halt(int irq, void *dev_id, struct pt_regs *regs);
 
-extern void wbflush_setup(void);
+extern asmlinkage void decstation_handle_int(void);
 
-extern struct rtc_ops dec_rtc_ops;
+spinlock_t ioasic_ssr_lock;
 
-extern int setup_dec_irq(int, struct irqaction *);
+volatile u32 *ioasic_base;
+unsigned long dec_kn_slot_size;
 
-void (*board_time_init) (struct irqaction * irq);
+/*
+ * IRQ routing and priority tables.  Priorites are set as follows:
+ *
+ * 		KN01	KN230	KN02	KN02-BA	KN02-CA	KN03
+ *
+ * MEMORY	CPU	CPU	CPU	ASIC	CPU	CPU
+ * RTC		CPU	CPU	CPU	ASIC	CPU	CPU
+ * DMA		-	-	-	ASIC	ASIC	ASIC
+ * SERIAL0	CPU	CPU	CSR	ASIC	ASIC	ASIC
+ * SERIAL1	-	-	-	ASIC	-	ASIC
+ * SCSI		CPU	CPU	CSR	ASIC	ASIC	ASIC
+ * ETHERNET	CPU	*	CSR	ASIC	ASIC	ASIC
+ * other	-	-	-	ASIC	-	-
+ * TC2		-	-	CSR	CPU	ASIC	ASIC
+ * TC1		-	-	CSR	CPU	ASIC	ASIC
+ * TC0		-	-	CSR	CPU	ASIC	ASIC
+ * other	-	CPU	-	CPU	ASIC	ASIC
+ * other	-	-	-	-	CPU	CPU
+ *
+ * * -- shared with SCSI
+ */
 
-static struct irqaction irq10 = {dec_intr_halt, 0, 0, "halt", NULL, NULL};
+int dec_interrupt[DEC_NR_INTS] = {
+	[0 ... DEC_NR_INTS - 1] = -1
+};
+int_ptr cpu_mask_nr_tbl[DEC_MAX_CPU_INTS][2] = {
+	{ { .i = ~0 }, { .p = dec_intr_unimplemented } },
+};
+int_ptr asic_mask_nr_tbl[DEC_MAX_ASIC_INTS][2] = {
+	{ { .i = ~0 }, { .p = asic_intr_unimplemented } },
+};
+int cpu_fpu_mask = DEC_CPU_IRQ_MASK(DEC_CPU_INR_FPU);
+
+static struct irqaction ioirq = {
+	.handler = no_action,
+	.name = "cascade",
+};
+static struct irqaction fpuirq = {
+	.handler = no_action,
+	.name = "fpu",
+};
+
+static struct irqaction busirq = {
+	.flags = SA_INTERRUPT,
+	.name = "bus error",
+};
+
+static struct irqaction haltirq = {
+	.handler = dec_intr_halt,
+	.name = "halt",
+};
+
+
+void (*board_time_init)(struct irqaction *irq);
+
 
 /*
  * enable the periodic interrupts
  */
 static void __init dec_time_init(struct irqaction *irq)
 {
-    /*
-     * Here we go, enable periodic rtc interrupts.
-     */
+	/*
+	* Here we go, enable periodic rtc interrupts.
+	*/
 
 #ifndef LOG_2_HZ
 #  define LOG_2_HZ 7
 #endif
 
-    CMOS_WRITE(RTC_REF_CLCK_32KHZ | (16 - LOG_2_HZ), RTC_REG_A);
-    CMOS_WRITE(CMOS_READ(RTC_REG_B) | RTC_PIE, RTC_REG_B);
-    setup_dec_irq(CLOCK, irq);
+	CMOS_WRITE(RTC_REF_CLCK_32KHZ | (16 - LOG_2_HZ), RTC_REG_A);
+	CMOS_WRITE(CMOS_READ(RTC_REG_B) | RTC_PIE, RTC_REG_B);
+	setup_irq(dec_interrupt[DEC_IRQ_RTC], irq);
 }
 
+
 /*
- * Enable the halt interrupt.
+ * Bus error (DBE/IBE exceptions and bus interrupts) handling setup.
  */
-static void __init dec_halt_init(struct irqaction *irq)
+void __init dec_be_init(void)
 {
-    setup_dec_irq(HALT, irq);
+	switch (mips_machtype) {
+	case MACH_DS23100:	/* DS2100/DS3100 Pmin/Pmax */
+		busirq.flags |= SA_SHIRQ;
+		break;
+	case MACH_DS5000_200:	/* DS5000/200 3max */
+	case MACH_DS5000_2X0:	/* DS5000/240 3max+ */
+	case MACH_DS5900:	/* DS5900 bigmax */
+		board_be_handler = dec_ecc_be_handler;
+		busirq.handler = dec_ecc_be_interrupt;
+		dec_ecc_be_init();
+		break;
+	}
 }
+
 
 void __init decstation_setup(void)
 {
-    board_time_init = dec_time_init;
+	board_be_init = dec_be_init;
+	board_time_init = dec_time_init;
 
-    wbflush_setup();
+	wbflush_setup();
 
-    _machine_restart = dec_machine_restart;
-    _machine_halt = dec_machine_halt;
-    _machine_power_off = dec_machine_power_off;
+	_machine_restart = dec_machine_restart;
+	_machine_halt = dec_machine_halt;
+	_machine_power_off = dec_machine_power_off;
 
 #ifdef CONFIG_FB
-    conswitchp = &dummy_con;
+	conswitchp = &dummy_con;
 #endif
 
-    rtc_ops = &dec_rtc_ops;
+	rtc_ops = &dec_rtc_ops;
 }
 
+
 /*
- * Machine-specific initialisation for kn01, aka Pmax, aka DS2100, DS3100,
- * and possibly also the DS5100.
+ * Machine-specific initialisation for KN01, aka DS2100 (aka Pmin)
+ * or DS3100 (aka Pmax).
  */
+static int kn01_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= -1,
+	[DEC_IRQ_AB_RECV]	= -1,
+	[DEC_IRQ_AB_XMIT]	= -1,
+	[DEC_IRQ_DZ11]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_DZ11),
+	[DEC_IRQ_ASC]		= -1,
+	[DEC_IRQ_FLOPPY]	= -1,
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= -1,
+	[DEC_IRQ_ISDN]		= -1,
+	[DEC_IRQ_LANCE]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_LANCE),
+	[DEC_IRQ_BUS]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_BUS),
+	[DEC_IRQ_PSU]		= -1,
+	[DEC_IRQ_RTC]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_RTC),
+	[DEC_IRQ_SCC0]		= -1,
+	[DEC_IRQ_SCC1]		= -1,
+	[DEC_IRQ_SII]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_SII),
+	[DEC_IRQ_TC0]		= -1,
+	[DEC_IRQ_TC1]		= -1,
+	[DEC_IRQ_TC2]		= -1,
+	[DEC_IRQ_TIMER]		= -1,
+	[DEC_IRQ_VIDEO]		= DEC_CPU_IRQ_NR(KN01_CPU_INR_VIDEO),
+	[DEC_IRQ_ASC_MERR]	= -1,
+	[DEC_IRQ_ASC_ERR]	= -1,
+	[DEC_IRQ_ASC_DMA]	= -1,
+	[DEC_IRQ_FLOPPY_ERR]	= -1,
+	[DEC_IRQ_ISDN_ERR]	= -1,
+	[DEC_IRQ_ISDN_RXDMA]	= -1,
+	[DEC_IRQ_ISDN_TXDMA]	= -1,
+	[DEC_IRQ_LANCE_MERR]	= -1,
+	[DEC_IRQ_SCC0A_RXERR]	= -1,
+	[DEC_IRQ_SCC0A_RXDMA]	= -1,
+	[DEC_IRQ_SCC0A_TXERR]	= -1,
+	[DEC_IRQ_SCC0A_TXDMA]	= -1,
+	[DEC_IRQ_AB_RXERR]	= -1,
+	[DEC_IRQ_AB_RXDMA]	= -1,
+	[DEC_IRQ_AB_TXERR]	= -1,
+	[DEC_IRQ_AB_TXDMA]	= -1,
+	[DEC_IRQ_SCC1A_RXERR]	= -1,
+	[DEC_IRQ_SCC1A_RXDMA]	= -1,
+	[DEC_IRQ_SCC1A_TXERR]	= -1,
+	[DEC_IRQ_SCC1A_TXDMA]	= -1,
+};
+
+static int_ptr kn01_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN01_CPU_INR_BUS) },
+		{ .i = DEC_CPU_IRQ_NR(KN01_CPU_INR_BUS) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN01_CPU_INR_RTC) },
+		{ .i = DEC_CPU_IRQ_NR(KN01_CPU_INR_RTC) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN01_CPU_INR_DZ11) },
+		{ .i = DEC_CPU_IRQ_NR(KN01_CPU_INR_DZ11) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN01_CPU_INR_SII) },
+		{ .i = DEC_CPU_IRQ_NR(KN01_CPU_INR_SII) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN01_CPU_INR_LANCE) },
+		{ .i = DEC_CPU_IRQ_NR(KN01_CPU_INR_LANCE) } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
 void __init dec_init_kn01(void)
 {
-    /*
-     * Setup some memory addresses.
-     */
-    dec_rtc_base = (char *) KN01_RTC_BASE;
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn01_interrupt,
+		sizeof(kn01_interrupt));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ3;
-    dec_interrupt[CLOCK].iemask = 0;
-    cpu_mask_tbl[0] = IE_IRQ3;
-    cpu_irq_nr[0] = CLOCK;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn01_cpu_mask_nr_tbl,
+		sizeof(kn01_cpu_mask_nr_tbl));
 
-    dec_interrupt[SCSI_INT].cpu_mask = IE_IRQ0;
-    dec_interrupt[SCSI_INT].iemask = 0;
-    cpu_mask_tbl[1] = IE_IRQ0;
-    cpu_irq_nr[1] = SCSI_INT;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
 
-    dec_interrupt[ETHER].cpu_mask = IE_IRQ1;
-    dec_interrupt[ETHER].iemask = 0;
-    cpu_mask_tbl[2] = IE_IRQ1;
-    cpu_irq_nr[2] = ETHER;
-
-    dec_interrupt[SERIAL].cpu_mask = IE_IRQ2;
-    dec_interrupt[SERIAL].iemask = 0;
-    cpu_mask_tbl[3] = IE_IRQ2;
-    cpu_irq_nr[3] = SERIAL;
-
-    dec_interrupt[MEMORY].cpu_mask = IE_IRQ4;
-    dec_interrupt[MEMORY].iemask = 0;
-    cpu_mask_tbl[4] = IE_IRQ4;
-    cpu_irq_nr[4] = MEMORY;
-
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[5] = IE_IRQ5;
-    cpu_irq_nr[5] = FPU;
 }				/* dec_init_kn01 */
 
+
 /*
- * Machine-specific initialisation for kn230, aka MIPSmate, aka DS5100
- *
- * There are a lot of experiments to do, this is definitely incomplete.
+ * Machine-specific initialisation for KN230, aka DS5100, aka MIPSmate.
  */
+static int kn230_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= -1,
+	[DEC_IRQ_AB_RECV]	= -1,
+	[DEC_IRQ_AB_XMIT]	= -1,
+	[DEC_IRQ_DZ11]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_DZ11),
+	[DEC_IRQ_ASC]		= -1,
+	[DEC_IRQ_FLOPPY]	= -1,
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_HALT),
+	[DEC_IRQ_ISDN]		= -1,
+	[DEC_IRQ_LANCE]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_LANCE),
+	[DEC_IRQ_BUS]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_BUS),
+	[DEC_IRQ_PSU]		= -1,
+	[DEC_IRQ_RTC]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_RTC),
+	[DEC_IRQ_SCC0]		= -1,
+	[DEC_IRQ_SCC1]		= -1,
+	[DEC_IRQ_SII]		= DEC_CPU_IRQ_NR(KN230_CPU_INR_SII),
+	[DEC_IRQ_TC0]		= -1,
+	[DEC_IRQ_TC1]		= -1,
+	[DEC_IRQ_TC2]		= -1,
+	[DEC_IRQ_TIMER]		= -1,
+	[DEC_IRQ_VIDEO]		= -1,
+	[DEC_IRQ_ASC_MERR]	= -1,
+	[DEC_IRQ_ASC_ERR]	= -1,
+	[DEC_IRQ_ASC_DMA]	= -1,
+	[DEC_IRQ_FLOPPY_ERR]	= -1,
+	[DEC_IRQ_ISDN_ERR]	= -1,
+	[DEC_IRQ_ISDN_RXDMA]	= -1,
+	[DEC_IRQ_ISDN_TXDMA]	= -1,
+	[DEC_IRQ_LANCE_MERR]	= -1,
+	[DEC_IRQ_SCC0A_RXERR]	= -1,
+	[DEC_IRQ_SCC0A_RXDMA]	= -1,
+	[DEC_IRQ_SCC0A_TXERR]	= -1,
+	[DEC_IRQ_SCC0A_TXDMA]	= -1,
+	[DEC_IRQ_AB_RXERR]	= -1,
+	[DEC_IRQ_AB_RXDMA]	= -1,
+	[DEC_IRQ_AB_TXERR]	= -1,
+	[DEC_IRQ_AB_TXDMA]	= -1,
+	[DEC_IRQ_SCC1A_RXERR]	= -1,
+	[DEC_IRQ_SCC1A_RXDMA]	= -1,
+	[DEC_IRQ_SCC1A_TXERR]	= -1,
+	[DEC_IRQ_SCC1A_TXDMA]	= -1,
+};
+
+static int_ptr kn230_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN230_CPU_INR_BUS) },
+		{ .i = DEC_CPU_IRQ_NR(KN230_CPU_INR_BUS) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN230_CPU_INR_RTC) },
+		{ .i = DEC_CPU_IRQ_NR(KN230_CPU_INR_RTC) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN230_CPU_INR_DZ11) },
+		{ .i = DEC_CPU_IRQ_NR(KN230_CPU_INR_DZ11) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN230_CPU_INR_SII) },
+		{ .i = DEC_CPU_IRQ_NR(KN230_CPU_INR_SII) } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
 void __init dec_init_kn230(void)
 {
-    /*
-     * Setup some memory addresses.
-     */
-    dec_rtc_base = (char *) KN01_RTC_BASE;
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn230_interrupt,
+		sizeof(kn230_interrupt));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ2;
-    dec_interrupt[CLOCK].iemask = 0;
-    cpu_mask_tbl[0] = IE_IRQ2;
-    cpu_irq_nr[0] = CLOCK;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn230_cpu_mask_nr_tbl,
+		sizeof(kn230_cpu_mask_nr_tbl));
 
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[5] = IE_IRQ5;
-    cpu_irq_nr[5] = FPU;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
+
 }				/* dec_init_kn230 */
 
+
 /*
- * Machine-specific initialisation for kn02, aka 3max, aka DS5000/2xx.
+ * Machine-specific initialisation for KN02, aka DS5000/200, aka 3max.
  */
+static int kn02_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= DEC_CPU_IRQ_NR(KN02_CPU_INR_CASCADE),
+	[DEC_IRQ_AB_RECV]	= -1,
+	[DEC_IRQ_AB_XMIT]	= -1,
+	[DEC_IRQ_DZ11]		= KN02_IRQ_NR(KN02_CSR_INR_DZ11),
+	[DEC_IRQ_ASC]		= KN02_IRQ_NR(KN02_CSR_INR_ASC),
+	[DEC_IRQ_FLOPPY]	= -1,
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= -1,
+	[DEC_IRQ_ISDN]		= -1,
+	[DEC_IRQ_LANCE]		= KN02_IRQ_NR(KN02_CSR_INR_LANCE),
+	[DEC_IRQ_BUS]		= DEC_CPU_IRQ_NR(KN02_CPU_INR_BUS),
+	[DEC_IRQ_PSU]		= -1,
+	[DEC_IRQ_RTC]		= DEC_CPU_IRQ_NR(KN02_CPU_INR_RTC),
+	[DEC_IRQ_SCC0]		= -1,
+	[DEC_IRQ_SCC1]		= -1,
+	[DEC_IRQ_SII]		= -1,
+	[DEC_IRQ_TC0]		= KN02_IRQ_NR(KN02_CSR_INR_TC0),
+	[DEC_IRQ_TC1]		= KN02_IRQ_NR(KN02_CSR_INR_TC1),
+	[DEC_IRQ_TC2]		= KN02_IRQ_NR(KN02_CSR_INR_TC2),
+	[DEC_IRQ_TIMER]		= -1,
+	[DEC_IRQ_VIDEO]		= -1,
+	[DEC_IRQ_ASC_MERR]	= -1,
+	[DEC_IRQ_ASC_ERR]	= -1,
+	[DEC_IRQ_ASC_DMA]	= -1,
+	[DEC_IRQ_FLOPPY_ERR]	= -1,
+	[DEC_IRQ_ISDN_ERR]	= -1,
+	[DEC_IRQ_ISDN_RXDMA]	= -1,
+	[DEC_IRQ_ISDN_TXDMA]	= -1,
+	[DEC_IRQ_LANCE_MERR]	= -1,
+	[DEC_IRQ_SCC0A_RXERR]	= -1,
+	[DEC_IRQ_SCC0A_RXDMA]	= -1,
+	[DEC_IRQ_SCC0A_TXERR]	= -1,
+	[DEC_IRQ_SCC0A_TXDMA]	= -1,
+	[DEC_IRQ_AB_RXERR]	= -1,
+	[DEC_IRQ_AB_RXDMA]	= -1,
+	[DEC_IRQ_AB_TXERR]	= -1,
+	[DEC_IRQ_AB_TXDMA]	= -1,
+	[DEC_IRQ_SCC1A_RXERR]	= -1,
+	[DEC_IRQ_SCC1A_RXDMA]	= -1,
+	[DEC_IRQ_SCC1A_TXERR]	= -1,
+	[DEC_IRQ_SCC1A_TXDMA]	= -1,
+};
+
+static int_ptr kn02_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN02_CPU_INR_BUS) },
+		{ .i = DEC_CPU_IRQ_NR(KN02_CPU_INR_BUS) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02_CPU_INR_RTC) },
+		{ .i = DEC_CPU_IRQ_NR(KN02_CPU_INR_RTC) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02_CPU_INR_CASCADE) },
+		{ .p = kn02_io_int } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
+static int_ptr kn02_asic_mask_nr_tbl[][2] __initdata = {
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_DZ11) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_DZ11) } },
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_ASC) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_ASC) } },
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_LANCE) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_LANCE) } },
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_TC2) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_TC2) } },
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_TC1) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_TC1) } },
+	{ { .i = KN02_IRQ_MASK(KN02_CSR_INR_TC0) },
+		{ .i = KN02_IRQ_NR(KN02_CSR_INR_TC0) } },
+	{ { .i = KN02_IRQ_ALL },
+		{ .p = kn02_all_int } },
+};
+
 void __init dec_init_kn02(void)
 {
-    /*
-     * Setup some memory addresses. FIXME: probably incomplete!
-     */
-    dec_rtc_base = (char *) KN02_RTC_BASE;
-    isr = (void *) KN02_CSR_ADDR;
-    imr = (void *) KN02_CSR_ADDR;
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn02_interrupt,
+		sizeof(kn02_interrupt));
 
-    /*
-     * Setup IOASIC interrupt
-     */
-    cpu_ivec_tbl[1] = kn02_io_int;
-    cpu_mask_tbl[1] = IE_IRQ0;
-    cpu_irq_nr[1] = -1;
-    *imr = *imr & 0xff00ff00;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn02_cpu_mask_nr_tbl,
+		sizeof(kn02_cpu_mask_nr_tbl));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ1;
-    dec_interrupt[CLOCK].iemask = 0;
-    cpu_mask_tbl[0] = IE_IRQ1;
-    cpu_irq_nr[0] = CLOCK;
+	/* KN02 CSR IRQ priorities. */
+	memcpy(&asic_mask_nr_tbl, &kn02_asic_mask_nr_tbl,
+		sizeof(kn02_asic_mask_nr_tbl));
 
-    dec_interrupt[SCSI_INT].cpu_mask = IE_IRQ0;
-    dec_interrupt[SCSI_INT].iemask = KN02_SLOT5;
-    asic_mask_tbl[0] = KN02_SLOT5;
-    asic_irq_nr[0] = SCSI_INT;
-
-    dec_interrupt[ETHER].cpu_mask = IE_IRQ0;
-    dec_interrupt[ETHER].iemask = KN02_SLOT6;
-    asic_mask_tbl[1] = KN02_SLOT6;
-    asic_irq_nr[1] = ETHER;
-
-    dec_interrupt[SERIAL].cpu_mask = IE_IRQ0;
-    dec_interrupt[SERIAL].iemask = KN02_SLOT7;
-    asic_mask_tbl[2] = KN02_SLOT7;
-    asic_irq_nr[2] = SERIAL;
-
-    dec_interrupt[TC0].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC0].iemask = KN02_SLOT0;
-    asic_mask_tbl[3] = KN02_SLOT0;
-    asic_irq_nr[3] = TC0;
-
-    dec_interrupt[TC1].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC1].iemask = KN02_SLOT1;
-    asic_mask_tbl[4] = KN02_SLOT1;
-    asic_irq_nr[4] = TC1;
-
-    dec_interrupt[TC2].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC2].iemask = KN02_SLOT2;
-    asic_mask_tbl[5] = KN02_SLOT2;
-    asic_irq_nr[5] = TC2;
-
-    dec_interrupt[MEMORY].cpu_mask = IE_IRQ3;
-    dec_interrupt[MEMORY].iemask = 0;
-    cpu_mask_tbl[2] = IE_IRQ3;
-    cpu_irq_nr[2] = MEMORY;
-
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[3] = IE_IRQ5;
-    cpu_irq_nr[3] = FPU;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
+	init_kn02_irqs(KN02_IRQ_BASE);
 
 }				/* dec_init_kn02 */
 
+
 /*
- * Machine-specific initialisation for kn02ba, aka 3min, aka DS5000/1xx.
+ * Machine-specific initialisation for KN02-BA, aka DS5000/1xx
+ * (xx = 20, 25, 33), aka 3min.  Also applies to KN04(-BA), aka
+ * DS5000/150, aka 4min.
  */
+static int kn02ba_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= DEC_CPU_IRQ_NR(KN02BA_CPU_INR_CASCADE),
+	[DEC_IRQ_AB_RECV]	= -1,
+	[DEC_IRQ_AB_XMIT]	= -1,
+	[DEC_IRQ_DZ11]		= -1,
+	[DEC_IRQ_ASC]		= IO_IRQ_NR(KN02BA_IO_INR_ASC),
+	[DEC_IRQ_FLOPPY]	= -1,
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= DEC_CPU_IRQ_NR(KN02BA_CPU_INR_HALT),
+	[DEC_IRQ_ISDN]		= -1,
+	[DEC_IRQ_LANCE]		= IO_IRQ_NR(KN02BA_IO_INR_LANCE),
+	[DEC_IRQ_BUS]		= IO_IRQ_NR(KN02BA_IO_INR_BUS),
+	[DEC_IRQ_PSU]		= IO_IRQ_NR(KN02BA_IO_INR_PSU),
+	[DEC_IRQ_RTC]		= IO_IRQ_NR(KN02BA_IO_INR_RTC),
+	[DEC_IRQ_SCC0]		= IO_IRQ_NR(KN02BA_IO_INR_SCC0),
+	[DEC_IRQ_SCC1]		= IO_IRQ_NR(KN02BA_IO_INR_SCC1),
+	[DEC_IRQ_SII]		= -1,
+	[DEC_IRQ_TC0]		= DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC0),
+	[DEC_IRQ_TC1]		= DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC1),
+	[DEC_IRQ_TC2]		= DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC2),
+	[DEC_IRQ_TIMER]		= -1,
+	[DEC_IRQ_VIDEO]		= -1,
+	[DEC_IRQ_ASC_MERR]	= IO_IRQ_NR(IO_INR_ASC_MERR),
+	[DEC_IRQ_ASC_ERR]	= IO_IRQ_NR(IO_INR_ASC_ERR),
+	[DEC_IRQ_ASC_DMA]	= IO_IRQ_NR(IO_INR_ASC_DMA),
+	[DEC_IRQ_FLOPPY_ERR]	= -1,
+	[DEC_IRQ_ISDN_ERR]	= -1,
+	[DEC_IRQ_ISDN_RXDMA]	= -1,
+	[DEC_IRQ_ISDN_TXDMA]	= -1,
+	[DEC_IRQ_LANCE_MERR]	= IO_IRQ_NR(IO_INR_LANCE_MERR),
+	[DEC_IRQ_SCC0A_RXERR]	= IO_IRQ_NR(IO_INR_SCC0A_RXERR),
+	[DEC_IRQ_SCC0A_RXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_RXDMA),
+	[DEC_IRQ_SCC0A_TXERR]	= IO_IRQ_NR(IO_INR_SCC0A_TXERR),
+	[DEC_IRQ_SCC0A_TXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_TXDMA),
+	[DEC_IRQ_AB_RXERR]	= -1,
+	[DEC_IRQ_AB_RXDMA]	= -1,
+	[DEC_IRQ_AB_TXERR]	= -1,
+	[DEC_IRQ_AB_TXDMA]	= -1,
+	[DEC_IRQ_SCC1A_RXERR]	= IO_IRQ_NR(IO_INR_SCC1A_RXERR),
+	[DEC_IRQ_SCC1A_RXDMA]	= IO_IRQ_NR(IO_INR_SCC1A_RXDMA),
+	[DEC_IRQ_SCC1A_TXERR]	= IO_IRQ_NR(IO_INR_SCC1A_TXERR),
+	[DEC_IRQ_SCC1A_TXDMA]	= IO_IRQ_NR(IO_INR_SCC1A_TXDMA),
+};
+
+static int_ptr kn02ba_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN02BA_CPU_INR_CASCADE) },
+		{ .p = kn02xa_io_int } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02BA_CPU_INR_TC2) },
+		{ .i = DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC2) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02BA_CPU_INR_TC1) },
+		{ .i = DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC1) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02BA_CPU_INR_TC0) },
+		{ .i = DEC_CPU_IRQ_NR(KN02BA_CPU_INR_TC0) } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
+static int_ptr kn02ba_asic_mask_nr_tbl[][2] __initdata = {
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_BUS) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_BUS) } },
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_RTC) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_RTC) } },
+	{ { .i = IO_IRQ_DMA },
+		{ .p = asic_dma_int } },
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_SCC0) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_SCC0) } },
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_SCC1) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_SCC1) } },
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_ASC) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_ASC) } },
+	{ { .i = IO_IRQ_MASK(KN02BA_IO_INR_LANCE) },
+		{ .i = IO_IRQ_NR(KN02BA_IO_INR_LANCE) } },
+	{ { .i = IO_IRQ_ALL },
+		{ .p = asic_all_int } },
+};
+
 void __init dec_init_kn02ba(void)
 {
-    /*
-     * Setup some memory addresses.
-     */
-    ioasic_base = (void *) KN02XA_IOASIC_BASE;
-    dec_rtc_base = (char *) KN02XA_RTC_BASE;
-    isr = (void *) KN02XA_IOASIC_REG(SIR);
-    imr = (void *) KN02XA_IOASIC_REG(SIMR);
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn02ba_interrupt,
+		sizeof(kn02ba_interrupt));
 
-    /*
-     * Setup IOASIC interrupt
-     */
-    cpu_mask_tbl[0] = IE_IRQ3;
-    cpu_irq_nr[0] = -1;
-    cpu_ivec_tbl[0] = kn02xa_io_int;
-    *imr = 0;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn02ba_cpu_mask_nr_tbl,
+		sizeof(kn02ba_cpu_mask_nr_tbl));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ3;
-    dec_interrupt[CLOCK].iemask = KMIN_CLOCK;
-    asic_mask_tbl[0] = KMIN_CLOCK;
-    asic_irq_nr[0] = CLOCK;
+	/* I/O ASIC IRQ priorities. */
+	memcpy(&asic_mask_nr_tbl, &kn02ba_asic_mask_nr_tbl,
+		sizeof(kn02ba_asic_mask_nr_tbl));
 
-    dec_interrupt[SCSI_DMA_INT].cpu_mask = IE_IRQ3;
-    dec_interrupt[SCSI_DMA_INT].iemask = SCSI_DMA_INTS;
-    asic_mask_tbl[1] = SCSI_DMA_INTS;
-    asic_irq_nr[1] = SCSI_DMA_INT;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
+	init_ioasic_irqs(IO_IRQ_BASE);
 
-    dec_interrupt[SCSI_INT].cpu_mask = IE_IRQ3;
-    dec_interrupt[SCSI_INT].iemask = SCSI_CHIP;
-    asic_mask_tbl[2] = SCSI_CHIP;
-    asic_irq_nr[2] = SCSI_INT;
-
-    dec_interrupt[ETHER].cpu_mask = IE_IRQ3;
-    dec_interrupt[ETHER].iemask = LANCE_INTS;
-    asic_mask_tbl[3] = LANCE_INTS;
-    asic_irq_nr[3] = ETHER;
-
-    dec_interrupt[SERIAL].cpu_mask = IE_IRQ3;
-    dec_interrupt[SERIAL].iemask = SERIAL_INTS;
-    asic_mask_tbl[4] = SERIAL_INTS;
-    asic_irq_nr[4] = SERIAL;
-
-    dec_interrupt[MEMORY].cpu_mask = IE_IRQ3;
-    dec_interrupt[MEMORY].iemask = KMIN_TIMEOUT;
-    asic_mask_tbl[5] = KMIN_TIMEOUT;
-    asic_irq_nr[5] = MEMORY;
-
-    dec_interrupt[TC0].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC0].iemask = 0;
-    cpu_mask_tbl[1] = IE_IRQ0;
-    cpu_irq_nr[1] = TC0;
-
-    dec_interrupt[TC1].cpu_mask = IE_IRQ1;
-    dec_interrupt[TC1].iemask = 0;
-    cpu_mask_tbl[2] = IE_IRQ1;
-    cpu_irq_nr[2] = TC1;
-
-    dec_interrupt[TC2].cpu_mask = IE_IRQ2;
-    dec_interrupt[TC2].iemask = 0;
-    cpu_mask_tbl[3] = IE_IRQ2;
-    cpu_irq_nr[3] = TC2;
-
-    dec_interrupt[HALT].cpu_mask = IE_IRQ4;
-    dec_interrupt[HALT].iemask = 0;
-    cpu_mask_tbl[4] = IE_IRQ4;
-    cpu_irq_nr[4] = HALT;
-
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[5] = IE_IRQ5;
-    cpu_irq_nr[5] = FPU;
-
-    dec_halt_init(&irq10);
 }				/* dec_init_kn02ba */
 
+
 /*
- * Machine-specific initialisation for kn02ca, aka maxine, aka DS5000/2x.
+ * Machine-specific initialisation for KN02-CA, aka DS5000/xx,
+ * (xx = 20, 25, 33), aka MAXine.  Also applies to KN04(-CA), aka
+ * DS5000/50, aka 4MAXine.
  */
+static int kn02ca_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= DEC_CPU_IRQ_NR(KN02CA_CPU_INR_CASCADE),
+	[DEC_IRQ_AB_RECV]	= IO_IRQ_NR(KN02CA_IO_INR_AB_RECV),
+	[DEC_IRQ_AB_XMIT]	= IO_IRQ_NR(KN02CA_IO_INR_AB_XMIT),
+	[DEC_IRQ_DZ11]		= -1,
+	[DEC_IRQ_ASC]		= IO_IRQ_NR(KN02CA_IO_INR_ASC),
+	[DEC_IRQ_FLOPPY]	= IO_IRQ_NR(KN02CA_IO_INR_FLOPPY),
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= DEC_CPU_IRQ_NR(KN02CA_CPU_INR_HALT),
+	[DEC_IRQ_ISDN]		= IO_IRQ_NR(KN02CA_IO_INR_ISDN),
+	[DEC_IRQ_LANCE]		= IO_IRQ_NR(KN02CA_IO_INR_LANCE),
+	[DEC_IRQ_BUS]		= DEC_CPU_IRQ_NR(KN02CA_CPU_INR_BUS),
+	[DEC_IRQ_PSU]		= -1,
+	[DEC_IRQ_RTC]		= DEC_CPU_IRQ_NR(KN02CA_CPU_INR_RTC),
+	[DEC_IRQ_SCC0]		= IO_IRQ_NR(KN02CA_IO_INR_SCC0),
+	[DEC_IRQ_SCC1]		= -1,
+	[DEC_IRQ_SII]		= -1,
+	[DEC_IRQ_TC0]		= IO_IRQ_NR(KN02CA_IO_INR_TC0),
+	[DEC_IRQ_TC1]		= IO_IRQ_NR(KN02CA_IO_INR_TC1),
+	[DEC_IRQ_TC2]		= -1,
+	[DEC_IRQ_TIMER]		= DEC_CPU_IRQ_NR(KN02CA_CPU_INR_TIMER),
+	[DEC_IRQ_VIDEO]		= IO_IRQ_NR(KN02CA_IO_INR_VIDEO),
+	[DEC_IRQ_ASC_MERR]	= IO_IRQ_NR(IO_INR_ASC_MERR),
+	[DEC_IRQ_ASC_ERR]	= IO_IRQ_NR(IO_INR_ASC_ERR),
+	[DEC_IRQ_ASC_DMA]	= IO_IRQ_NR(IO_INR_ASC_DMA),
+	[DEC_IRQ_FLOPPY_ERR]	= IO_IRQ_NR(IO_INR_FLOPPY_ERR),
+	[DEC_IRQ_ISDN_ERR]	= IO_IRQ_NR(IO_INR_ISDN_ERR),
+	[DEC_IRQ_ISDN_RXDMA]	= IO_IRQ_NR(IO_INR_ISDN_RXDMA),
+	[DEC_IRQ_ISDN_TXDMA]	= IO_IRQ_NR(IO_INR_ISDN_TXDMA),
+	[DEC_IRQ_LANCE_MERR]	= IO_IRQ_NR(IO_INR_LANCE_MERR),
+	[DEC_IRQ_SCC0A_RXERR]	= IO_IRQ_NR(IO_INR_SCC0A_RXERR),
+	[DEC_IRQ_SCC0A_RXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_RXDMA),
+	[DEC_IRQ_SCC0A_TXERR]	= IO_IRQ_NR(IO_INR_SCC0A_TXERR),
+	[DEC_IRQ_SCC0A_TXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_TXDMA),
+	[DEC_IRQ_AB_RXERR]	= IO_IRQ_NR(IO_INR_AB_RXERR),
+	[DEC_IRQ_AB_RXDMA]	= IO_IRQ_NR(IO_INR_AB_RXDMA),
+	[DEC_IRQ_AB_TXERR]	= IO_IRQ_NR(IO_INR_AB_TXERR),
+	[DEC_IRQ_AB_TXDMA]	= IO_IRQ_NR(IO_INR_AB_TXDMA),
+	[DEC_IRQ_SCC1A_RXERR]	= -1,
+	[DEC_IRQ_SCC1A_RXDMA]	= -1,
+	[DEC_IRQ_SCC1A_TXERR]	= -1,
+	[DEC_IRQ_SCC1A_TXDMA]	= -1,
+};
+
+static int_ptr kn02ca_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN02CA_CPU_INR_BUS) },
+		{ .i = DEC_CPU_IRQ_NR(KN02CA_CPU_INR_BUS) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02CA_CPU_INR_RTC) },
+		{ .i = DEC_CPU_IRQ_NR(KN02CA_CPU_INR_RTC) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN02CA_CPU_INR_CASCADE) },
+		{ .p = kn02xa_io_int } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
+static int_ptr kn02ca_asic_mask_nr_tbl[][2] __initdata = {
+	{ { .i = IO_IRQ_DMA },
+		{ .p = asic_dma_int } },
+	{ { .i = IO_IRQ_MASK(KN02CA_IO_INR_SCC0) },
+		{ .i = IO_IRQ_NR(KN02CA_IO_INR_SCC0) } },
+	{ { .i = IO_IRQ_MASK(KN02CA_IO_INR_ASC) },
+		{ .i = IO_IRQ_NR(KN02CA_IO_INR_ASC) } },
+	{ { .i = IO_IRQ_MASK(KN02CA_IO_INR_LANCE) },
+		{ .i = IO_IRQ_NR(KN02CA_IO_INR_LANCE) } },
+	{ { .i = IO_IRQ_MASK(KN02CA_IO_INR_TC1) },
+		{ .i = IO_IRQ_NR(KN02CA_IO_INR_TC1) } },
+	{ { .i = IO_IRQ_MASK(KN02CA_IO_INR_TC0) },
+		{ .i = IO_IRQ_NR(KN02CA_IO_INR_TC0) } },
+	{ { .i = IO_IRQ_ALL },
+		{ .p = asic_all_int } },
+};
+
 void __init dec_init_kn02ca(void)
 {
-    /*
-     * Setup some memory addresses. FIXME: probably incomplete!
-     */
-    ioasic_base = (void *) KN02XA_IOASIC_BASE;
-    dec_rtc_base = (char *) KN02XA_RTC_BASE;
-    isr = (void *) KN02XA_IOASIC_REG(SIR);
-    imr = (void *) KN02XA_IOASIC_REG(SIMR);
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn02ca_interrupt,
+		sizeof(kn02ca_interrupt));
 
-    /*
-     * Setup IOASIC interrupt
-     */
-    cpu_ivec_tbl[1] = kn02xa_io_int;
-    cpu_irq_nr[1] = -1;
-    cpu_mask_tbl[1] = IE_IRQ3;
-    *imr = 0;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn02ca_cpu_mask_nr_tbl,
+		sizeof(kn02ca_cpu_mask_nr_tbl));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ1;
-    dec_interrupt[CLOCK].iemask = 0;
-    cpu_mask_tbl[0] = IE_IRQ1;
-    cpu_irq_nr[0] = CLOCK;
+	/* I/O ASIC IRQ priorities. */
+	memcpy(&asic_mask_nr_tbl, &kn02ca_asic_mask_nr_tbl,
+		sizeof(kn02ca_asic_mask_nr_tbl));
 
-    dec_interrupt[SCSI_DMA_INT].cpu_mask = IE_IRQ3;
-    dec_interrupt[SCSI_DMA_INT].iemask = SCSI_DMA_INTS;
-    asic_mask_tbl[0] = SCSI_DMA_INTS;
-    asic_irq_nr[0] = SCSI_DMA_INT;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
+	init_ioasic_irqs(IO_IRQ_BASE);
 
-    dec_interrupt[SCSI_INT].cpu_mask = IE_IRQ3;
-    dec_interrupt[SCSI_INT].iemask = SCSI_CHIP;
-    asic_mask_tbl[1] = SCSI_CHIP;
-    asic_irq_nr[1] = SCSI_INT;
-
-    dec_interrupt[ETHER].cpu_mask = IE_IRQ3;
-    dec_interrupt[ETHER].iemask = LANCE_INTS;
-    asic_mask_tbl[2] = LANCE_INTS;
-    asic_irq_nr[2] = ETHER;
-
-    dec_interrupt[SERIAL].cpu_mask = IE_IRQ3;
-    dec_interrupt[SERIAL].iemask = XINE_SERIAL_INTS;
-    asic_mask_tbl[3] = XINE_SERIAL_INTS;
-    asic_irq_nr[3] = SERIAL;
-
-    dec_interrupt[TC0].cpu_mask = IE_IRQ3;
-    dec_interrupt[TC0].iemask = MAXINE_TC0;
-    asic_mask_tbl[4] = MAXINE_TC0;
-    asic_irq_nr[4] = TC0;
-
-    dec_interrupt[TC1].cpu_mask = IE_IRQ3;
-    dec_interrupt[TC1].iemask = MAXINE_TC1;
-    asic_mask_tbl[5] = MAXINE_TC1;
-    asic_irq_nr[5] = TC1;
-
-    dec_interrupt[MEMORY].cpu_mask = IE_IRQ2;
-    dec_interrupt[MEMORY].iemask = 0;
-    cpu_mask_tbl[2] = IE_IRQ2;
-    cpu_irq_nr[2] = MEMORY;
-
-    dec_interrupt[HALT].cpu_mask = IE_IRQ4;
-    dec_interrupt[HALT].iemask = 0;
-    cpu_mask_tbl[3] = IE_IRQ4;
-    cpu_irq_nr[3] = HALT;
-
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[4] = IE_IRQ5;
-    cpu_irq_nr[4] = FPU;
-
-    dec_halt_init(&irq10);
 }				/* dec_init_kn02ca */
 
+
 /*
- * Machine-specific initialisation for kn03, aka 3max+, aka DS5000/240.
+ * Machine-specific initialisation for KN03, aka DS5000/240,
+ * aka 3max+ and DS5900, aka BIGmax.  Also applies to KN05, aka
+ * DS5000/260, aka 4max+ and DS5900/260.
  */
+static int kn03_interrupt[DEC_NR_INTS] __initdata = {
+	[DEC_IRQ_CASCADE]	= DEC_CPU_IRQ_NR(KN03_CPU_INR_CASCADE),
+	[DEC_IRQ_AB_RECV]	= -1,
+	[DEC_IRQ_AB_XMIT]	= -1,
+	[DEC_IRQ_DZ11]		= -1,
+	[DEC_IRQ_ASC]		= IO_IRQ_NR(KN03_IO_INR_ASC),
+	[DEC_IRQ_FLOPPY]	= -1,
+	[DEC_IRQ_FPU]		= DEC_CPU_IRQ_NR(DEC_CPU_INR_FPU),
+	[DEC_IRQ_HALT]		= DEC_CPU_IRQ_NR(KN03_CPU_INR_HALT),
+	[DEC_IRQ_ISDN]		= -1,
+	[DEC_IRQ_LANCE]		= IO_IRQ_NR(KN03_IO_INR_LANCE),
+	[DEC_IRQ_BUS]		= DEC_CPU_IRQ_NR(KN03_CPU_INR_BUS),
+	[DEC_IRQ_PSU]		= IO_IRQ_NR(KN03_IO_INR_PSU),
+	[DEC_IRQ_RTC]		= DEC_CPU_IRQ_NR(KN03_CPU_INR_RTC),
+	[DEC_IRQ_SCC0]		= IO_IRQ_NR(KN03_IO_INR_SCC0),
+	[DEC_IRQ_SCC1]		= IO_IRQ_NR(KN03_IO_INR_SCC1),
+	[DEC_IRQ_SII]		= -1,
+	[DEC_IRQ_TC0]		= IO_IRQ_NR(KN03_IO_INR_TC0),
+	[DEC_IRQ_TC1]		= IO_IRQ_NR(KN03_IO_INR_TC1),
+	[DEC_IRQ_TC2]		= IO_IRQ_NR(KN03_IO_INR_TC2),
+	[DEC_IRQ_TIMER]		= -1,
+	[DEC_IRQ_VIDEO]		= -1,
+	[DEC_IRQ_ASC_MERR]	= IO_IRQ_NR(IO_INR_ASC_MERR),
+	[DEC_IRQ_ASC_ERR]	= IO_IRQ_NR(IO_INR_ASC_ERR),
+	[DEC_IRQ_ASC_DMA]	= IO_IRQ_NR(IO_INR_ASC_DMA),
+	[DEC_IRQ_FLOPPY_ERR]	= -1,
+	[DEC_IRQ_ISDN_ERR]	= -1,
+	[DEC_IRQ_ISDN_RXDMA]	= -1,
+	[DEC_IRQ_ISDN_TXDMA]	= -1,
+	[DEC_IRQ_LANCE_MERR]	= IO_IRQ_NR(IO_INR_LANCE_MERR),
+	[DEC_IRQ_SCC0A_RXERR]	= IO_IRQ_NR(IO_INR_SCC0A_RXERR),
+	[DEC_IRQ_SCC0A_RXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_RXDMA),
+	[DEC_IRQ_SCC0A_TXERR]	= IO_IRQ_NR(IO_INR_SCC0A_TXERR),
+	[DEC_IRQ_SCC0A_TXDMA]	= IO_IRQ_NR(IO_INR_SCC0A_TXDMA),
+	[DEC_IRQ_AB_RXERR]	= -1,
+	[DEC_IRQ_AB_RXDMA]	= -1,
+	[DEC_IRQ_AB_TXERR]	= -1,
+	[DEC_IRQ_AB_TXDMA]	= -1,
+	[DEC_IRQ_SCC1A_RXERR]	= IO_IRQ_NR(IO_INR_SCC1A_RXERR),
+	[DEC_IRQ_SCC1A_RXDMA]	= IO_IRQ_NR(IO_INR_SCC1A_RXDMA),
+	[DEC_IRQ_SCC1A_TXERR]	= IO_IRQ_NR(IO_INR_SCC1A_TXERR),
+	[DEC_IRQ_SCC1A_TXDMA]	= IO_IRQ_NR(IO_INR_SCC1A_TXDMA),
+};
+
+static int_ptr kn03_cpu_mask_nr_tbl[][2] __initdata = {
+	{ { .i = DEC_CPU_IRQ_MASK(KN03_CPU_INR_BUS) },
+		{ .i = DEC_CPU_IRQ_NR(KN03_CPU_INR_BUS) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN03_CPU_INR_RTC) },
+		{ .i = DEC_CPU_IRQ_NR(KN03_CPU_INR_RTC) } },
+	{ { .i = DEC_CPU_IRQ_MASK(KN03_CPU_INR_CASCADE) },
+		{ .p = kn03_io_int } },
+	{ { .i = DEC_CPU_IRQ_ALL },
+		{ .p = cpu_all_int } },
+};
+
+static int_ptr kn03_asic_mask_nr_tbl[][2] __initdata = {
+	{ { .i = IO_IRQ_DMA },
+		{ .p = asic_dma_int } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_SCC0) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_SCC0) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_SCC1) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_SCC1) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_ASC) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_ASC) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_LANCE) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_LANCE) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_TC2) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_TC2) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_TC1) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_TC1) } },
+	{ { .i = IO_IRQ_MASK(KN03_IO_INR_TC0) },
+		{ .i = IO_IRQ_NR(KN03_IO_INR_TC0) } },
+	{ { .i = IO_IRQ_ALL },
+		{ .p = asic_all_int } },
+};
+
 void __init dec_init_kn03(void)
 {
-    /*
-     * Setup some memory addresses. FIXME: probably incomplete!
-     */
-    ioasic_base = (void *) KN03_IOASIC_BASE;
-    dec_rtc_base = (char *) KN03_RTC_BASE;
-    isr = (void *) KN03_IOASIC_REG(SIR);
-    imr = (void *) KN03_IOASIC_REG(SIMR);
+	/* IRQ routing. */
+	memcpy(&dec_interrupt, &kn03_interrupt,
+		sizeof(kn03_interrupt));
 
-    /*
-     * Setup IOASIC interrupt
-     */
-    cpu_ivec_tbl[1] = kn03_io_int;
-    cpu_mask_tbl[1] = IE_IRQ0;
-    cpu_irq_nr[1] = -1;
-    *imr = 0;
+	/* CPU IRQ priorities. */
+	memcpy(&cpu_mask_nr_tbl, &kn03_cpu_mask_nr_tbl,
+		sizeof(kn03_cpu_mask_nr_tbl));
 
-    /*
-     * Setup interrupt structure
-     */
-    dec_interrupt[CLOCK].cpu_mask = IE_IRQ1;
-    dec_interrupt[CLOCK].iemask = 0;
-    cpu_mask_tbl[0] = IE_IRQ1;
-    cpu_irq_nr[0] = CLOCK;
+	/* I/O ASIC IRQ priorities. */
+	memcpy(&asic_mask_nr_tbl, &kn03_asic_mask_nr_tbl,
+		sizeof(kn03_asic_mask_nr_tbl));
 
-    dec_interrupt[SCSI_DMA_INT].cpu_mask = IE_IRQ0;
-    dec_interrupt[SCSI_DMA_INT].iemask = SCSI_DMA_INTS;
-    asic_mask_tbl[0] = SCSI_DMA_INTS;
-    asic_irq_nr[0] = SCSI_DMA_INT;
+	mips_cpu_irq_init(DEC_CPU_IRQ_BASE);
+	init_ioasic_irqs(IO_IRQ_BASE);
 
-    dec_interrupt[SCSI_INT].cpu_mask = IE_IRQ0;
-    dec_interrupt[SCSI_INT].iemask = SCSI_CHIP;
-    asic_mask_tbl[1] = SCSI_CHIP;
-    asic_irq_nr[1] = SCSI_INT;
-
-    dec_interrupt[ETHER].cpu_mask = IE_IRQ0;
-    dec_interrupt[ETHER].iemask = LANCE_INTS;
-    asic_mask_tbl[2] = LANCE_INTS;
-    asic_irq_nr[2] = ETHER;
-
-    dec_interrupt[SERIAL].cpu_mask = IE_IRQ0;
-    dec_interrupt[SERIAL].iemask = SERIAL_INTS;
-    asic_mask_tbl[3] = SERIAL_INTS;
-    asic_irq_nr[3] = SERIAL;
-
-    dec_interrupt[TC0].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC0].iemask = KN03_TC0;
-    asic_mask_tbl[4] = KN03_TC0;
-    asic_irq_nr[4] = TC0;
-
-    dec_interrupt[TC1].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC1].iemask = KN03_TC1;
-    asic_mask_tbl[5] = KN03_TC1;
-    asic_irq_nr[5] = TC1;
-
-    dec_interrupt[TC2].cpu_mask = IE_IRQ0;
-    dec_interrupt[TC2].iemask = KN03_TC2;
-    asic_mask_tbl[6] = KN03_TC2;
-    asic_irq_nr[6] = TC2;
-
-    dec_interrupt[MEMORY].cpu_mask = IE_IRQ3;
-    dec_interrupt[MEMORY].iemask = 0;
-    cpu_mask_tbl[2] = IE_IRQ3;
-    cpu_irq_nr[2] = MEMORY;
-
-    dec_interrupt[HALT].cpu_mask = IE_IRQ4;
-    dec_interrupt[HALT].iemask = 0;
-    cpu_mask_tbl[3] = IE_IRQ4;
-    cpu_irq_nr[3] = HALT;
-
-    dec_interrupt[FPU].cpu_mask = IE_IRQ5;
-    dec_interrupt[FPU].iemask = 0;
-    cpu_mask_tbl[4] = IE_IRQ5;
-    cpu_irq_nr[4] = FPU;
-
-    dec_halt_init(&irq10);
 }				/* dec_init_kn03 */
+
+
+void __init init_IRQ(void)
+{
+	switch (mips_machtype) {
+	case MACH_DS23100:	/* DS2100/DS3100 Pmin/Pmax */
+		dec_init_kn01();
+		break;
+	case MACH_DS5100:	/* DS5100 MIPSmate */
+		dec_init_kn230();
+		break;
+	case MACH_DS5000_200:	/* DS5000/200 3max */
+		dec_init_kn02();
+		break;
+	case MACH_DS5000_1XX:	/* DS5000/1xx 3min */
+		dec_init_kn02ba();
+		break;
+	case MACH_DS5000_2X0:	/* DS5000/240 3max+ */
+	case MACH_DS5900:	/* DS5900 bigmax */
+		dec_init_kn03();
+		break;
+	case MACH_DS5000_XX:	/* Personal DS5000/xx */
+		dec_init_kn02ca();
+		break;
+	case MACH_DS5800:	/* DS5800 Isis */
+		panic("Don't know how to set this up!");
+		break;
+	case MACH_DS5400:	/* DS5400 MIPSfair */
+		panic("Don't know how to set this up!");
+		break;
+	case MACH_DS5500:	/* DS5500 MIPSfair-2 */
+		panic("Don't know how to set this up!");
+		break;
+	}
+	set_except_vector(0, decstation_handle_int);
+
+	/* Free the FPU interrupt if the exception is present. */
+	if (!cpu_has_nofpuex) {
+		cpu_fpu_mask = 0;
+		dec_interrupt[DEC_IRQ_FPU] = -1;
+	}
+
+	/* Register board interrupts: FPU and cascade. */
+	if (dec_interrupt[DEC_IRQ_FPU] >= 0)
+		setup_irq(dec_interrupt[DEC_IRQ_FPU], &fpuirq);
+	if (dec_interrupt[DEC_IRQ_CASCADE] >= 0)
+		setup_irq(dec_interrupt[DEC_IRQ_CASCADE], &ioirq);
+
+	/* Register the bus error interrupt. */
+	if (dec_interrupt[DEC_IRQ_BUS] >= 0 && busirq.handler)
+		setup_irq(dec_interrupt[DEC_IRQ_BUS], &busirq);
+
+	/* Register the HALT interrupt. */
+	if (dec_interrupt[DEC_IRQ_HALT] >= 0)
+		setup_irq(dec_interrupt[DEC_IRQ_HALT], &haltirq);
+}
+
+EXPORT_SYMBOL(ioasic_base);
+EXPORT_SYMBOL(dec_kn_slot_size);
+EXPORT_SYMBOL(dec_interrupt);

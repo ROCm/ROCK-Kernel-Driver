@@ -12,6 +12,10 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
  *
+ * (06/03/2003) Judd Montgomery <judd at jpilot.org>
+ *     Added support for module parameter options for untested/unknown
+ *     devices.
+ *
  * (03/09/2003) gkh
  *	Added support for the Sony Clie NZ90V device.  Thanks to Martin Brachtl
  *	<brachtl@redgrep.cz> for the information.
@@ -188,6 +192,9 @@ static int  treo_attach		(struct usb_serial *serial);
 static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_id *id);
 static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id);
 
+/* Parameters that may be passed into the module. */
+static int vendor = -1;
+static int product = -1;
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
@@ -223,6 +230,7 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
 };
 
@@ -250,6 +258,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID) },
+	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
 };
 
@@ -942,6 +951,33 @@ static void visor_set_termios (struct usb_serial_port *port, struct termios *old
 
 static int __init visor_init (void)
 {
+	int i;
+	/* Only if parameters were passed to us */
+	if ((vendor>0) && (product>0)) {
+		struct usb_device_id usb_dev_temp[]=
+			{{USB_DEVICE(vendor, product),
+			.driver_info = (kernel_ulong_t)&palm_os_4_probe }};
+
+		/* Find the last entry in id_table */
+		for (i=0; ; i++) {
+			if (id_table[i].idVendor==0) {
+				id_table[i] = usb_dev_temp[0];
+				break;
+			}
+		}
+		/* Find the last entry in id_table_combined */
+		for (i=0; ; i++) {
+			if (id_table_combined[i].idVendor==0) {
+				id_table_combined[i] = usb_dev_temp[0];
+				break;
+			}
+		}
+		info("Untested USB device specified at time of module insertion");
+		info("Warning: This is not guaranteed to work");
+		info("Using a newer kernel is preferred to this method");
+		info("Adding Palm OS protocol 4.x support for unknown device: 0x%x/0x%x",
+			vendor, product);
+	}
 	usb_serial_register (&handspring_device);
 	usb_serial_register (&clie_3_5_device);
 	usb_register (&visor_driver);
@@ -969,3 +1005,7 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
+MODULE_PARM(vendor, "i");
+MODULE_PARM_DESC(vendor, "User specified vendor ID");
+MODULE_PARM(product, "i");
+MODULE_PARM_DESC(product, "User specified product ID");

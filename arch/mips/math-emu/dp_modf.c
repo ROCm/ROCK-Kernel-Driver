@@ -59,7 +59,7 @@ ieee754dp ieee754dp_modf(ieee754dp x, ieee754dp * ip)
 		*ip = x;
 		return ieee754dp_zero(xs);
 	}
-	/* generate ipart mantissa by clearing bottom bits 
+	/* generate ipart mantissa by clearing bottom bits
 	 */
 	*ip = builddp(xs, xe + DP_EBIAS,
 		      ((xm >> (DP_MBITS - xe)) << (DP_MBITS - xe)) &

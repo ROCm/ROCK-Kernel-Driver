@@ -36,17 +36,20 @@
 #include <asm/floppy.h>
 #endif
 #include <asm/dma.h>
+#include <asm/time.h>
+#include <asm/traps.h>
+#ifdef CONFIG_VT
+#include <linux/console.h>
+#endif
 
 #if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_PROM_CONSOLE)
 extern void console_setup(char *, int *);
 char serial_console[20];
 #endif
 
-#ifdef CONFIG_REMOTE_DEBUG
-extern void set_debug_traps(void);
+#ifdef CONFIG_KGDB
 extern void rs_kgdb_hook(int);
-extern void breakpoint(void);
-static int remote_debug = 0;
+int remote_debug = 0;
 #endif
 
 extern struct ide_ops std_ide_ops;
@@ -55,6 +58,10 @@ extern struct rtc_ops malta_rtc_ops;
 extern struct kbd_ops std_kbd_ops;
 
 extern void mips_reboot_setup(void);
+
+extern void mips_time_init(void);
+extern void mips_timer_setup(struct irqaction *irq);
+extern unsigned long mips_rtc_get_time(void);
 
 struct resource standard_io_resources[] = {
 	{ "dma1", 0x00, 0x1f, IORESOURCE_BUSY },
@@ -65,9 +72,14 @@ struct resource standard_io_resources[] = {
 
 #define STANDARD_IO_RESOURCES (sizeof(standard_io_resources)/sizeof(struct resource))
 
+const char *get_system_type(void)
+{
+	return "MIPS Malta";
+}
+
 void __init malta_setup(void)
 {
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 	int rs_putDebugChar(char);
 	char rs_getDebugChar(void);
 	extern int (*generic_putDebugChar)(char);
@@ -80,7 +92,7 @@ void __init malta_setup(void)
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
 		request_resource(&ioport_resource, standard_io_resources+i);
 
-	/* 
+	/*
 	 * Enable DMA channel 4 (cascade channel) in the PIIX4 south bridge.
 	 */
 	enable_dma(4);
@@ -93,7 +105,7 @@ void __init malta_setup(void)
 	}
 #endif
 
-#ifdef CONFIG_REMOTE_DEBUG
+#ifdef CONFIG_KGDB
 	argptr = prom_getcmdline();
 	if ((argptr = strstr(argptr, "kgdb=ttyS")) != NULL) {
 		int line;
@@ -119,17 +131,38 @@ void __init malta_setup(void)
 
 	argptr = prom_getcmdline();
 	if ((argptr = strstr(argptr, "nofpu")) != NULL)
-		mips_cpu.options &= ~MIPS_CPU_FPU;
-		
+		cpu_data[0].options &= ~MIPS_CPU_FPU;
+
 	rtc_ops = &malta_rtc_ops;
+
 #ifdef CONFIG_BLK_DEV_IDE
         ide_ops = &std_ide_ops;
 #endif
 #ifdef CONFIG_BLK_DEV_FD
         fd_ops = &std_fd_ops;
 #endif
-#ifdef CONFIG_PC_KEYB
-	kbd_ops = &std_kbd_ops;
+#ifdef CONFIG_VT
+#if defined(CONFIG_VGA_CONSOLE)
+        conswitchp = &vga_con;
+
+	screen_info = (struct screen_info) {
+		0, 25,			/* orig-x, orig-y */
+		0,			/* unused */
+		0,			/* orig-video-page */
+		0,			/* orig-video-mode */
+		80,			/* orig-video-cols */
+		0,0,0,			/* ega_ax, ega_bx, ega_cx */
+		25,			/* orig-video-lines */
+		1,			/* orig-video-isVGA */
+		16			/* orig-video-points */
+	};
+#elif defined(CONFIG_DUMMY_CONSOLE)
+        conswitchp = &dummy_con;
+#endif
 #endif
 	mips_reboot_setup();
+
+	board_time_init = mips_time_init;
+	board_timer_setup = mips_timer_setup;
+	rtc_get_time = mips_rtc_get_time;
 }

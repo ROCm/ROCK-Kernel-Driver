@@ -4,7 +4,7 @@
  * for more details.
  *
  * Copyright (C) 1994 Waldorf GMBH
- * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 Ralf Baechle
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2001, 2002, 2003 Ralf Baechle
  * Modified further for R[236]000 compatibility by Paul M. Antoine
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
@@ -15,55 +15,56 @@
 
 /*
  * Return current * instruction pointer ("program counter").
- *
- * Two implementations.  The ``la'' version results in shorter code for
- * the kernel which we assume to reside in the 32-bit compat address space.
- * The  ``jal'' version is for use by modules which live in outer space.
- * This is just a single instruction unlike the long dla macro expansion.
  */
-#ifdef MODULE
 #define current_text_addr()						\
 ({									\
 	void *_a;							\
 									\
-	__asm__ ("jal\t1f, %0\n\t"					\
-		"1:"							\
-		: "=r" (_a));						\
+	__asm__ ("bal\t1f\t\t\t# current_text_addr\n"			\
+		"1:\tmove\t%0, $31"					\
+		: "=r" (_a)						\
+		:							\
+		: "$31");						\
 									\
 	_a;								\
 })
-#else
-#define current_text_addr()						\
-({									\
-	void *_a;							\
-									\
-	__asm__ ("dla\t%0, 1f\n\t"					\
-		"1:"							\
-		: "=r" (_a));						\
-									\
-	_a;								\
-})
-#endif
 
-#if !defined (_LANGUAGE_ASSEMBLY)
+#ifndef __ASSEMBLY__
+#include <linux/cache.h>
+#include <linux/threads.h>
+
 #include <asm/cachectl.h>
 #include <asm/mipsregs.h>
 #include <asm/reg.h>
 #include <asm/system.h>
 
-#if (defined(CONFIG_SGI_IP27))
+#if defined(CONFIG_SGI_IP27)
 #include <asm/sn/types.h>
 #include <asm/sn/intr_public.h>
 #endif
 
+/*
+ * Descriptor for a cache
+ */
+struct cache_desc {
+	unsigned short linesz;
+	unsigned short ways;
+	unsigned int sets;
+	unsigned int waybit;	/* Bits to select in a cache set */
+	unsigned int flags;	/* Flags describingcache properties */
+};
+
+/*
+ * Flag definitions
+ */
+#define MIPS_CACHE_NOT_PRESENT	0x00000001
+#define MIPS_CACHE_VTAG		0x00000002	/* Virtually tagged cache */
+#define MIPS_CACHE_ALIASES	0x00000004	/* Cache could have aliases */
+#define MIPS_CACHE_IC_F_DC	0x00000008	/* Ic can refill from D-cache */
+
 struct cpuinfo_mips {
-	unsigned long udelay_val;
-	unsigned long *pgd_quick;
-	unsigned long *pmd_quick;
-	unsigned long *pte_quick;
-	unsigned long pgtable_cache_sz;
-	unsigned long last_asn;
-	unsigned long asid_cache;
+	unsigned long	udelay_val;
+	unsigned long	asid_cache;
 #if defined(CONFIG_SGI_IP27)
 	cpuid_t		p_cpuid;	/* PROM assigned cpuid */
 	cnodeid_t	p_nodeid;	/* my node ID in compact-id-space */
@@ -71,54 +72,79 @@ struct cpuinfo_mips {
 	unsigned char	p_slice;	/* Physical position on node board */
 	hub_intmasks_t	p_intmasks;	/* SN0 per-CPU interrupt masks */
 #endif
-} __attribute__((aligned(128)));
+#if 0
+	unsigned long loops_per_sec;
+	unsigned long ipi_count;
+	unsigned long irq_attempt[NR_IRQS];
+	unsigned long smp_local_irq_count;
+	unsigned long prof_multiplier;
+	unsigned long prof_counter;
+#endif
+
+	/*
+	 * Capability and feature descriptor structure for MIPS CPU
+	 */
+	unsigned long options;
+	unsigned int processor_id;
+	unsigned int fpu_id;
+	unsigned int cputype;
+	int isa_level;
+	int tlbsize;
+	struct cache_desc icache;	/* Primary I-cache */
+	struct cache_desc dcache;	/* Primary D or combined I/D cache */
+	struct cache_desc scache;	/* Secondary cache */
+	struct cache_desc tcache;	/* Tertiary/split secondary cache */
+} __attribute__((aligned(SMP_CACHE_BYTES)));
+
+/*
+ * Assumption: Options of CPU 0 are a superset of all processors.
+ * This is true for all known MIPS systems.
+ */
+#define cpu_has_tlb		(cpu_data[0].options & MIPS_CPU_TLB)
+#define cpu_has_4kex		(cpu_data[0].options & MIPS_CPU_4KEX)
+#define cpu_has_4ktlb		(cpu_data[0].options & MIPS_CPU_4KTLB)
+#define cpu_has_fpu		(cpu_data[0].options & MIPS_CPU_FPU)
+#define cpu_has_32fpr		(cpu_data[0].options & MIPS_CPU_32FPR)
+#define cpu_has_counter		(cpu_data[0].options & MIPS_CPU_COUNTER)
+#define cpu_has_watch		(cpu_data[0].options & MIPS_CPU_WATCH)
+#define cpu_has_mips16		(cpu_data[0].options & MIPS_CPU_MIPS16)
+#define cpu_has_divec		(cpu_data[0].options & MIPS_CPU_DIVEC)
+#define cpu_has_vce		(cpu_data[0].options & MIPS_CPU_VCE)
+#define cpu_has_cache_cdex	(cpu_data[0].options & MIPS_CPU_CACHE_CDEX)
+#define cpu_has_mcheck		(cpu_data[0].options & MIPS_CPU_MCHECK)
+#define cpu_has_ejtag		(cpu_data[0].options & MIPS_CPU_EJTAG)
+#define cpu_has_nofpuex		(cpu_data[0].options & MIPS_CPU_NOFPUEX)
+#define cpu_has_llsc		(cpu_data[0].options & MIPS_CPU_LLSC)
+#define cpu_has_vtag_icache	(cpu_data[0].icache.flags & MIPS_CACHE_VTAG)
+#define cpu_has_dc_aliases	(cpu_data[0].dcache.flags & MIPS_CACHE_ALIASES)
+#define cpu_has_ic_fills_f_dc	(cpu_data[0].dcache.flags & MIPS_CACHE_IC_F_DC)
+#define cpu_has_64bits		1
+#define cpu_has_subset_pcaches	(cpu_data[0].options & MIPS_CPU_SUBSET_CACHES)
+
+extern struct cpuinfo_mips cpu_data[];
+#define current_cpu_data cpu_data[smp_processor_id()]
+
+extern void cpu_probe(void);
+extern void cpu_report(void);
 
 /*
  * System setup and hardware flags..
- * XXX: Should go into mips_cpuinfo.
  */
-extern char wait_available;		/* only available on R4[26]00 */
-extern char cyclecounter_available;	/* only available from R4000 upwards. */
-extern char dedicated_iv_available;	/* some embedded MIPS like Nevada */
-extern char vce_available;		/* Supports VCED / VCEI exceptions */
-extern char mips4_available;		/* CPU has MIPS IV ISA or better */
+extern void (*cpu_wait)(void);
 
 extern unsigned int vced_count, vcei_count;
-extern struct cpuinfo_mips cpu_data[];
-
-#ifdef CONFIG_SMP
-#define current_cpu_data cpu_data[smp_processor_id()]
-#else
-#define current_cpu_data cpu_data[0]
-#endif
 
 /*
  * Bus types (default is ISA, but people can check others with these..)
- * MCA_bus hardcoded to 0 for now.
- *
- * This needs to be extended since MIPS systems are being delivered with
- * numerous different types of bus systems.
  */
+#ifdef CONFIG_EISA
 extern int EISA_bus;
+#else
+#define EISA_bus (0)
+#endif
+
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
-
-/*
- * MIPS has no problems with write protection
- */
-#define wp_works_ok 1
-#define wp_works_ok__is_a_macro /* for versions in ksyms.c */
-
-/* Lazy FPU handling on uni-processor */
-extern struct task_struct *last_task_used_math;
-
-#ifndef CONFIG_SMP
-#define IS_FPU_OWNER()		(last_task_used_math == current)
-#define CLEAR_FPU_OWNER()	last_task_used_math = NULL;
-#else
-#define IS_FPU_OWNER()		(current->flags & PF_USEDFPU)
-#define CLEAR_FPU_OWNER()	current->flags &= ~PF_USEDFPU;
-#endif
 
 /*
  * User space process size: 1TB. This is hardcoded into a few places,
@@ -126,14 +152,14 @@ extern struct task_struct *last_task_used_math;
  * is limited to 1TB by the R4000 architecture; R10000 and better can
  * support 16TB.
  */
-#define TASK_SIZE32	   0x80000000UL
+#define TASK_SIZE32	   0x7fff8000UL
 #define TASK_SIZE	0x10000000000UL
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	((current->thread.mflags & MF_32BIT) ? \
-	(TASK_SIZE32 / 3) : (TASK_SIZE / 3))
+#define TASK_UNMAPPED_BASE	((current->thread.mflags & MF_32BIT_ADDR) ? \
+	PAGE_ALIGN(TASK_SIZE32 / 3) : PAGE_ALIGN(TASK_SIZE / 3))
 
 /*
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
@@ -148,11 +174,17 @@ struct mips_fpu_hard_struct {
 };
 
 /*
- * FIXME: no fpu emulator yet (but who cares anyway?)
+ * It would be nice to add some more fields for emulator statistics, but there
+ * are a number of fixed offsets in offset.h and elsewhere that would have to
+ * be recalculated by hand.  So the additional information will be private to
+ * the FPU emulator for now.  See asm-mips/fpu_emulator.h.
  */
+typedef u64 fpureg_t;
 struct mips_fpu_soft_struct {
-	long	dummy;
+	fpureg_t	regs[NUM_FPU_REGS];
+	unsigned int	sr;
 };
+
 
 union mips_fpu_union {
         struct mips_fpu_hard_struct hard;
@@ -187,16 +219,21 @@ struct thread_struct {
 	unsigned long cp0_baduaddr;	/* Last kernel fault accessing USEG */
 	unsigned long error_code;
 	unsigned long trap_no;
-#define MF_FIXADE 1			/* Fix address errors in software */
-#define MF_LOGADE 2			/* Log address errors to syslog */
-#define MF_32BIT  4			/* Process is in 32-bit compat mode */
+#define MF_FIXADE	1		/* Fix address errors in software */
+#define MF_LOGADE	2		/* Log address errors to syslog */
+#define MF_32BIT_REGS	4		/* also implies 16/32 fprs */
+#define MF_32BIT_ADDR	8		/* 32-bit address space (o32/n32) */
 	unsigned long mflags;
-	mm_segment_t current_ds;
 	unsigned long irix_trampoline;  /* Wheee... */
 	unsigned long irix_oldctx;
 };
 
-#endif /* !defined (_LANGUAGE_ASSEMBLY) */
+#define MF_ABI_MASK	(MF_32BIT_REGS | MF_32BIT_ADDR)
+#define MF_O32		(MF_32BIT_REGS | MF_32BIT_ADDR)
+#define MF_N32		MF_32BIT_ADDR
+#define MF_N64		0
+
+#endif /* !__ASSEMBLY__ */
 
 #define INIT_THREAD  { \
         /* \
@@ -219,14 +256,14 @@ struct thread_struct {
 	/* \
 	 * For now the default is to fix address errors \
 	 */ \
-	MF_FIXADE, { 0 }, 0, 0 \
+	MF_FIXADE, 0, 0 \
 }
 
 #ifdef __KERNEL__
 
 #define KERNEL_STACK_SIZE 0x4000
 
-#if !defined (_LANGUAGE_ASSEMBLY)
+#ifndef __ASSEMBLY__
 
 /* Free all resources held by a thread. */
 #define release_thread(thread) do { } while(0)
@@ -236,62 +273,27 @@ struct thread_struct {
 
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-/*
- * Return saved PC of a blocked thread.
- */
-extern inline unsigned long thread_saved_pc(struct thread_struct *t)
-{
-	extern void ret_from_sys_call(void);
-
-	/* New born processes are a special case */
-	if (t->reg31 == (unsigned long) ret_from_sys_call)
-		return t->reg31;
-
-	return ((unsigned long*)t->reg29)[11];
-}
+extern unsigned long thread_saved_pc(struct thread_struct *t);
 
 #define user_mode(regs)	(((regs)->cp0_status & ST0_KSU) == KSU_USER)
 
 /*
  * Do necessary setup to start up a newly executed thread.
  */
-#define start_thread(regs, pc, sp) 					\
-do {									\
-	unsigned long __status;						\
-									\
-	/* New thread loses kernel privileges. */			\
-	__status = regs->cp0_status & ~(ST0_CU0|ST0_FR|ST0_KSU);	\
-	__status |= KSU_USER;						\
-	__status |= (current->thread.mflags & MF_32BIT) ? 0 : ST0_FR;	\
-	regs->cp0_status = __status;					\
-	regs->cp0_epc = pc;						\
-	regs->regs[29] = sp;						\
-	current->thread.current_ds = USER_DS;				\
-} while(0)
+extern void start_thread(struct pt_regs * regs, unsigned long pc, unsigned long sp);
 
+struct task_struct;
 unsigned long get_wchan(struct task_struct *p);
 
 #define __PT_REG(reg) ((long)&((struct pt_regs *)0)->reg - sizeof(struct pt_regs))
-#define __KSTK_TOS(tsk) ((unsigned long)(tsk) + KERNEL_STACK_SIZE - 32)
+#define __KSTK_TOS(tsk) ((unsigned long)(tsk->thread_info) + KERNEL_STACK_SIZE - 32)
 #define KSTK_EIP(tsk) (*(unsigned long *)(__KSTK_TOS(tsk) + __PT_REG(cp0_epc)))
 #define KSTK_ESP(tsk) (*(unsigned long *)(__KSTK_TOS(tsk) + __PT_REG(regs[29])))
-
-/* Allocation and freeing of basic task resources. */
-/*
- * NOTE! The task struct and the stack go together
- */
-#define THREAD_SIZE (2*PAGE_SIZE)
-#define alloc_task_struct() \
-	((struct task_struct *) __get_free_pages(GFP_KERNEL, 2))
-#define free_task_struct(p)	free_pages((unsigned long)(p), 2)
-#define get_task_struct(tsk)	atomic_inc(&virt_to_page(tsk)->count)
-
-#define init_task	(init_task_union.task)
-#define init_stack	(init_task_union.stack)
+#define KSTK_STATUS(tsk) (*(unsigned long *)(__KSTK_TOS(tsk) + __PT_REG(cp0_status)))
 
 #define cpu_relax()	barrier()
 
-#endif /* !defined (_LANGUAGE_ASSEMBLY) */
+#endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
 
 /*

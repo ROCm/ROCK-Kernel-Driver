@@ -3,14 +3,23 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1997, 1998, 1999 Ralf Baechle
+ * Copyright (C) 1997, 98, 99, 2000, 2003 Ralf Baechle
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_CACHE_H
 #define _ASM_CACHE_H
 
-/* bytes per L1 cache line */
-#define L1_CACHE_BYTES		(1 << CONFIG_L1_CACHE_SHIFT)
-#define L1_CACHE_SHIFT_MAX 7	/* largest L1 which this arch supports */
+#include <linux/config.h>
+
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_R6000) || \
+    defined(CONFIG_CPU_TX39XX)
+#define L1_CACHE_BYTES		16
+#define L1_CACHE_SHIFT_MAX	 4	/* largest L1 which this arch supports */
+#else
+#define L1_CACHE_BYTES 		32	/* A guess */
+#define L1_CACHE_SHIFT_MAX	 6	/* largest L1 which this arch supports */
+#endif
+
+#define SMP_CACHE_BYTES		L1_CACHE_BYTES
 
 #endif /* _ASM_CACHE_H */

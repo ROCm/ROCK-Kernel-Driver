@@ -30,7 +30,8 @@ struct loop_func_table;
 struct loop_device {
 	int		lo_number;
 	int		lo_refcnt;
-	int		lo_offset;
+	loff_t		lo_offset;
+	loff_t		lo_sizelimit;
 	int		lo_flags;
 	int		(*transfer)(struct loop_device *, int cmd,
 				    char *raw_buf, char *loop_buf, int size,
@@ -64,10 +65,6 @@ struct loop_device {
 	request_queue_t		lo_queue;
 };
 
-typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
-				char *raw_buf, char *loop_buf, int size,
-				int real_block);
-
 #endif /* __KERNEL__ */
 
 /*
@@ -96,13 +93,14 @@ struct loop_info {
 };
 
 struct loop_info64 {
-	__u64		   lo_device; 		/* ioctl r/o */
-	__u64		   lo_inode; 		/* ioctl r/o */
-	__u64		   lo_rdevice; 		/* ioctl r/o */
+	__u64		   lo_device;			/* ioctl r/o */
+	__u64		   lo_inode;			/* ioctl r/o */
+	__u64		   lo_rdevice;			/* ioctl r/o */
 	__u64		   lo_offset;
-	__u32		   lo_number;		/* ioctl r/o */
+	__u64		   lo_sizelimit;/* bytes, 0 == max available */
+	__u32		   lo_number;			/* ioctl r/o */
 	__u32		   lo_encrypt_type;
-	__u32		   lo_encrypt_key_size; 	/* ioctl w/o */
+	__u32		   lo_encrypt_key_size;		/* ioctl w/o */
 	__u32		   lo_flags;			/* ioctl r/o */
 	__u8		   lo_name[LO_NAME_SIZE];
 	__u8		   lo_encrypt_key[LO_KEY_SIZE]; /* ioctl w/o */
@@ -113,21 +111,22 @@ struct loop_info64 {
  * Loop filter types
  */
 
-#define LO_CRYPT_NONE	  0
-#define LO_CRYPT_XOR	  1
-#define LO_CRYPT_DES	  2
-#define LO_CRYPT_FISH2    3    /* Brand new Twofish encryption */
-#define LO_CRYPT_BLOW     4
-#define LO_CRYPT_CAST128  5
-#define LO_CRYPT_IDEA     6
-#define LO_CRYPT_DUMMY    9
-#define LO_CRYPT_SKIPJACK 10
-#define MAX_LO_CRYPT	20
+#define LO_CRYPT_NONE		0
+#define LO_CRYPT_XOR		1
+#define LO_CRYPT_DES		2
+#define LO_CRYPT_FISH2		3    /* Twofish encryption */
+#define LO_CRYPT_BLOW		4
+#define LO_CRYPT_CAST128	5
+#define LO_CRYPT_IDEA		6
+#define LO_CRYPT_DUMMY		9
+#define LO_CRYPT_SKIPJACK	10
+#define LO_CRYPT_CRYPTOAPI	18
+#define MAX_LO_CRYPT		20
 
 #ifdef __KERNEL__
 /* Support for loadable transfer modules */
 struct loop_func_table {
-	int number; 	/* filter type */ 
+	int number;	/* filter type */ 
 	int (*transfer)(struct loop_device *lo, int cmd, char *raw_buf,
 			char *loop_buf, int size, sector_t real_block);
 	int (*init)(struct loop_device *, const struct loop_info64 *); 

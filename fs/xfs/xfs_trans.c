@@ -850,15 +850,6 @@ shut_us_down:
 	 * running in simulation mode (the log is explicitly turned
 	 * off).
 	 */
-#if defined(XLOG_NOLOG) || defined(DEBUG)
-	if (xlog_debug) {
-		tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
-		tp->t_logcb.cb_arg = tp;
-		error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
-	} else {
-		xfs_trans_committed(tp, 0);
-	}
-#else
 	tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 	tp->t_logcb.cb_arg = tp;
 
@@ -869,7 +860,6 @@ shut_us_down:
 	 * waiting for an item to unlock.
 	 */
 	error = xfs_log_notify(mp, commit_iclog, &(tp->t_logcb));
-#endif
 
 	/*
 	 * Once all the items of the transaction have been copied

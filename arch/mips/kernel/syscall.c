@@ -14,6 +14,7 @@
 #undef CONF_DEBUG_IRIX
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <linux/linkage.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
@@ -28,7 +29,7 @@
 #include <asm/offset.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
-#include <asm/stackframe.h>
+#include <asm/shmparam.h>
 #include <asm/uaccess.h>
 
 extern asmlinkage void syscall_trace(void);
@@ -52,6 +53,61 @@ asmlinkage int sys_pipe(struct pt_regs regs)
 	res = fd[0];
 out:
 	return res;
+}
+
+unsigned long shm_align_mask = PAGE_SIZE - 1;	/* Sane caches */
+
+#define COLOUR_ALIGN(addr,pgoff)				\
+	((((addr) + shm_align_mask) & ~shm_align_mask) +	\
+	 (((pgoff) << PAGE_SHIFT) & shm_align_mask))
+
+unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
+	unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	struct vm_area_struct * vmm;
+	int do_color_align;
+
+	if (flags & MAP_FIXED) {
+		/*
+		 * We do not accept a shared mapping if it would violate
+		 * cache aliasing constraints.
+		 */
+		if ((flags & MAP_SHARED) && (addr & shm_align_mask))
+			return -EINVAL;
+		return addr;
+	}
+
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+	do_color_align = 0;
+	if (filp || (flags & MAP_SHARED))
+		do_color_align = 1;
+	if (addr) {
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
+		else
+			addr = PAGE_ALIGN(addr);
+		vmm = find_vma(current->mm, addr);
+		if (TASK_SIZE - len >= addr &&
+		    (!vmm || addr + len <= vmm->vm_start))
+			return addr;
+	}
+	addr = TASK_UNMAPPED_BASE;
+	if (do_color_align)
+		addr = COLOUR_ALIGN(addr, pgoff);
+	else
+		addr = PAGE_ALIGN(addr);
+
+	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
+		/* At this point:  (!vmm || addr < vmm->vm_end). */
+		if (TASK_SIZE - len < addr)
+			return -ENOMEM;
+		if (!vmm || addr + len <= vmm->vm_start)
+			return addr;
+		addr = vmm->vm_end;
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
+	}
 }
 
 /* common code for old and new mmaps */
@@ -82,7 +138,16 @@ out:
 asmlinkage unsigned long old_mmap(unsigned long addr, size_t len, int prot,
                                   int flags, int fd, off_t offset)
 {
-	return do_mmap2(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
+	int result;
+
+	result = -EINVAL;
+	if (offset & ~PAGE_MASK)
+		goto out;
+
+	result = do_mmap2(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
+
+out:
+	return result;
 }
 
 asmlinkage long
@@ -95,10 +160,7 @@ sys_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
 save_static_function(sys_fork);
 static_unused int _sys_fork(struct pt_regs regs)
 {
-	struct task_struct *p;
-
-	p = do_fork(SIGCHLD, regs.regs[29], &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(SIGCHLD, regs.regs[29], &regs, 0, NULL, NULL);
 }
 
 
@@ -107,14 +169,16 @@ static_unused int _sys_clone(struct pt_regs regs)
 {
 	unsigned long clone_flags;
 	unsigned long newsp;
-	struct task_struct *p;
+	int *parent_tidptr, *child_tidptr;
 
 	clone_flags = regs.regs[4];
 	newsp = regs.regs[5];
 	if (!newsp)
 		newsp = regs.regs[29];
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	parent_tidptr = (int *) regs.regs[6];
+	child_tidptr = (int *) regs.regs[7];
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+	               parent_tidptr, child_tidptr);
 }
 
 /*
@@ -158,7 +222,7 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 		return -EFAULT;
 	if (!access_ok(VERIFY_WRITE,name,sizeof(struct oldold_utsname)))
 		return -EFAULT;
-  
+
 	error = __copy_to_user(&name->sysname,&system_utsname.sysname,__OLD_UTS_LEN);
 	error -= __put_user(0,name->sysname+__OLD_UTS_LEN);
 	error -= __copy_to_user(&name->nodename,&system_utsname.nodename,__OLD_UTS_LEN);
@@ -172,76 +236,6 @@ asmlinkage int sys_olduname(struct oldold_utsname * name)
 	error = error ? -EFAULT : 0;
 
 	return error;
-}
-
-/*
- * Do the indirect syscall syscall.
- * Don't care about kernel locking; the actual syscall will do it.
- *
- * XXX This is borken.
- */
-asmlinkage int sys_syscall(struct pt_regs regs)
-{
-	syscall_t syscall;
-	unsigned long syscallnr = regs.regs[4];
-	unsigned long a0, a1, a2, a3, a4, a5, a6;
-	int nargs, errno;
-
-	if (syscallnr > __NR_Linux + __NR_Linux_syscalls)
-		return -ENOSYS;
-
-	syscall = sys_call_table[syscallnr];
-	nargs = sys_narg_table[syscallnr];
-	/*
-	 * Prevent stack overflow by recursive
-	 * syscall(__NR_syscall, __NR_syscall,...);
-	 */
-	if (syscall == (syscall_t) sys_syscall) {
-		return -EINVAL;
-	}
-
-	if (syscall == NULL) {
-		return -ENOSYS;
-	}
-
-	if(nargs > 3) {
-		unsigned long usp = regs.regs[29];
-		unsigned long *sp = (unsigned long *) usp;
-		if(usp & 3) {
-			printk("unaligned usp -EFAULT\n");
-			force_sig(SIGSEGV, current);
-			return -EFAULT;
-		}
-		errno = verify_area(VERIFY_READ, (void *) (usp + 16),
-		                    (nargs - 3) * sizeof(unsigned long));
-		if(errno) {
-			return -EFAULT;
-		}
-		switch(nargs) {
-		case 7:
-			a3 = sp[4]; a4 = sp[5]; a5 = sp[6]; a6 = sp[7];
-			break;
-		case 6:
-			a3 = sp[4]; a4 = sp[5]; a5 = sp[6]; a6 = 0;
-			break;
-		case 5:
-			a3 = sp[4]; a4 = sp[5]; a5 = a6 = 0;
-			break;
-		case 4:
-			a3 = sp[4]; a4 = a5 = a6 = 0;
-			break;
-
-		default:
-			a3 = a4 = a5 = a6 = 0;
-			break;
-		}
-	} else {
-		a3 = a4 = a5 = a6 = 0;
-	}
-	a0 = regs.regs[5]; a1 = regs.regs[6]; a2 = regs.regs[7];
-	if(nargs == 0)
-		a0 = (unsigned long) &regs;
-	return syscall((void *)a0, a1, a2, a3, a4, a5, a6);
 }
 
 /*

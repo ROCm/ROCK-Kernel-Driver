@@ -57,11 +57,11 @@ struct svc_serv {
  * Requests are copied into these pages as they arrive.  Remaining
  * pages are available to write the reply into.
  *
- * Currently pages are all re-used by the same server.  Later we 
- * will use ->sendpage to transmit pages with reduced copying.  In
- * that case we will need to give away the page and allocate new ones.
- * In preparation for this, we explicitly move pages off the recv
- * list onto the transmit list, and back.
+ * Pages are sent using ->sendpage so each server thread needs to
+ * allocate more to replace those used in sending.  To help keep track
+ * of these pages we have a receive list where all pages initialy live,
+ * and a send list where pages are moved to when there are to be part
+ * of a reply.
  *
  * We use xdr_buf for holding responses as it fits well with NFS
  * read responses (that have a header, and some data pages, and possibly
@@ -72,8 +72,11 @@ struct svc_serv {
  * list.  xdr_buf.tail points to the end of the first page.
  * This assumes that the non-page part of an rpc reply will fit
  * in a page - NFSd ensures this.  lockd also has no trouble.
+ *
+ * Each request/reply pair can have at most one "payload", plus two pages,
+ * one for the request, and one for the reply.
  */
-#define RPCSVC_MAXPAGES		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 1)
+#define RPCSVC_MAXPAGES		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 2)
 
 static inline u32 svc_getu32(struct iovec *iov)
 {

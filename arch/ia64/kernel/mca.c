@@ -734,7 +734,7 @@ ia64_mca_init(void)
 		if (cpev >= 0) {
 			for (irq = 0; irq < NR_IRQS; ++irq)
 				if (irq_to_vector(irq) == cpev) {
-					desc = irq_desc(irq);
+					desc = irq_descp(irq);
 					desc->status |= IRQ_PER_CPU;
 					desc->handler = &irq_type_iosapic_level;
 					setup_irq(irq, &mca_cpe_irqaction);

@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,7 +6,7 @@
  * This is the user-visible SGI GFX interface.
  *
  * This must be used verbatim into the GNU libc.  It does not include
- * any kernel-only bits on it.  
+ * any kernel-only bits on it.
  *
  * miguel@nuclecu.unam.mx
  */

@@ -192,11 +192,11 @@ static int help(struct sk_buff *skb,
 
 			exp->tuple = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
-				  { htonl(dcc_ip), { htons(dcc_port) },
+				  { htonl(dcc_ip), { .tcp = { htons(dcc_port) } },
 				    IPPROTO_TCP }});
 			exp->mask = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
-				  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+				  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 
 			exp->expectfn = NULL;
 
@@ -243,8 +243,6 @@ static int __init init(void)
 
 	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
 		hlpr = &irc_helpers[i];
-		memset(hlpr, 0,
-		       sizeof(struct ip_conntrack_helper));
 		hlpr->tuple.src.u.tcp.port = htons(ports[i]);
 		hlpr->tuple.dst.protonum = IPPROTO_TCP;
 		hlpr->mask.src.u.tcp.port = 0xFFFF;

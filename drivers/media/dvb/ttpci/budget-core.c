@@ -1,26 +1,12 @@
 #include "budget.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-        #define KBUILD_MODNAME budget
-#endif
 
 int budget_debug = 0;
-
-/****************************************************************************
- * General helper functions
- ****************************************************************************/
-
-static inline void ddelay(int i) 
-{
-        current->state=TASK_INTERRUPTIBLE;
-        schedule_timeout((HZ*i)/100);
-}
 
 /****************************************************************************
  * TT budget / WinTV Nova
  ****************************************************************************/
 
-static
-int stop_ts_capture(struct budget *budget)
+static int stop_ts_capture(struct budget *budget)
 {
 	DEB_EE(("budget: %p\n",budget));
 
@@ -33,8 +19,7 @@ int stop_ts_capture(struct budget *budget)
 }
 
 
-static
-int start_ts_capture (struct budget *budget)
+static int start_ts_capture (struct budget *budget)
 {
         struct saa7146_dev *dev=budget->dev;
 
@@ -75,8 +60,7 @@ int start_ts_capture (struct budget *budget)
 }
 
 
-static
-void vpeirq (unsigned long data)
+static void vpeirq (unsigned long data)
 {
         struct budget *budget = (struct budget*) data;
         u8 *mem = (u8 *)(budget->grabbing);
@@ -113,8 +97,7 @@ void vpeirq (unsigned long data)
  * DVB API SECTION
  ****************************************************************************/
 
-static
-int budget_start_feed(struct dvb_demux_feed *feed)
+static int budget_start_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget*) demux->priv;
@@ -127,8 +110,7 @@ int budget_start_feed(struct dvb_demux_feed *feed)
 	return start_ts_capture (budget); 
 }
 
-static
-int budget_stop_feed(struct dvb_demux_feed *feed)
+static int budget_stop_feed(struct dvb_demux_feed *feed)
 {
         struct dvb_demux *demux = feed->demux;
         struct budget *budget = (struct budget *) demux->priv;
@@ -139,17 +121,13 @@ int budget_stop_feed(struct dvb_demux_feed *feed)
 }
 
 
-static
-int budget_register(struct budget *budget)
+static int budget_register(struct budget *budget)
 {
-        int ret;
-        dmx_frontend_t *dvbfront=&budget->hw_frontend;
         struct dvb_demux *dvbdemux=&budget->demux;
+        int ret;
 
 	DEB_EE(("budget: %p\n",budget));
 
-        memcpy(budget->demux_id, "demux0_0", 9);
-        budget->demux_id[5] = budget->dvb_adapter->num + '0';
         dvbdemux->priv = (void *) budget;
 
 	dvbdemux->filternum = 256;
@@ -158,18 +136,10 @@ int budget_register(struct budget *budget)
         dvbdemux->stop_feed = budget_stop_feed;
         dvbdemux->write_to_decoder = NULL;
 
-        dvbdemux->dmx.vendor = "CIM";
-        dvbdemux->dmx.model = "sw";
-        dvbdemux->dmx.id = budget->demux_id;
         dvbdemux->dmx.capabilities = (DMX_TS_FILTERING | DMX_SECTION_FILTERING |
                                       DMX_MEMORY_BASED_FILTERING);
 
         dvb_dmx_init(&budget->demux);
-
-        dvbfront->id = "hw_frontend";
-        dvbfront->vendor = "VLSI";
-        dvbfront->model = "DVB Frontend";
-        dvbfront->source = DMX_FRONTEND_0;
 
         budget->dmxdev.filternum = 256;
         budget->dmxdev.demux = &dvbdemux->dmx;
@@ -177,14 +147,13 @@ int budget_register(struct budget *budget)
 
         dvb_dmxdev_init(&budget->dmxdev, budget->dvb_adapter);
 
-        ret=dvbdemux->dmx.add_frontend (&dvbdemux->dmx, 
-                                        &budget->hw_frontend);
+        budget->hw_frontend.source = DMX_FRONTEND_0;
+
+        ret = dvbdemux->dmx.add_frontend(&dvbdemux->dmx, &budget->hw_frontend);
+
         if (ret < 0)
                 return ret;
         
-        budget->mem_frontend.id = "mem_frontend";
-        budget->mem_frontend.vendor = "memory";
-        budget->mem_frontend.model = "sw";
         budget->mem_frontend.source = DMX_MEMORY_FE;
         ret=dvbdemux->dmx.add_frontend (&dvbdemux->dmx, 
                                         &budget->mem_frontend);
@@ -203,8 +172,7 @@ int budget_register(struct budget *budget)
 }
 
 
-static
-void budget_unregister(struct budget *budget)
+static void budget_unregister(struct budget *budget)
 {
         struct dvb_demux *dvbdemux=&budget->demux;
 
@@ -221,8 +189,7 @@ void budget_unregister(struct budget *budget)
 }
 
 
-static
-int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
+static int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
 {
 	struct saa7146_dev *dev = i2c->data;
 	return saa7146_i2c_transfer(dev, msgs, num, 6);
@@ -278,9 +245,9 @@ int ttpci_budget_init (struct budget *budget,
 
 	saa7146_setgpio(dev, 2, SAA7146_GPIO_OUTHI); /* frontend power on */
 
-        if (budget_register(budget) == 0)
+        if (budget_register(budget) == 0) {
 		return 0;
-
+	}
 err:
 	if (budget->grabbing)
 		vfree(budget->grabbing);
@@ -312,7 +279,6 @@ int ttpci_budget_deinit (struct budget *budget)
 	saa7146_pgtable_free (dev->pci, &budget->pt);
 
 	vfree (budget->grabbing);
-	kfree (budget);
 
 	return 0;
 }

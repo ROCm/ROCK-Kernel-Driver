@@ -23,12 +23,13 @@
 
 /**************************************************************************
  *  Nov 7, 2000
- *  Added preprocessor hacks to map to Linux kernel diagnostics. 
+ *  Added preprocessor hacks to map to Linux kernel diagnostics.
  *
  *  Kevin D. Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
  *  Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  *************************************************************************/
 
+#include <linux/kernel.h>
 #include "ieee754.h"
 
 /*
@@ -42,7 +43,7 @@ static const char *const rtnames[] = {
 
 void ieee754_xcpt(struct ieee754xctx *xcp)
 {
-	printk("floating point exception in \"%s\", type=%s\n",
+	printk(KERN_DEBUG "floating point exception in \"%s\", type=%s\n",
 		xcp->op, rtnames[xcp->rt]);
 }
 

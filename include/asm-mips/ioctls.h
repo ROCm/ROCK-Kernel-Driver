@@ -12,7 +12,7 @@
 #include <asm/ioctl.h>
 
 #define TCGETA		0x5401
-#define TCSETA		0x5402
+#define TCSETA		0x5402	/* Clashes with SNDCTL_TMR_START sound ioctl */
 #define TCSETAW		0x5403
 #define TCSETAF		0x5404
 
@@ -49,7 +49,7 @@
 #define TIOCGETD	0x7400
 
 #define FIOCLEX		0x6601
-#define FIONCLEX	0x6602		/* these numbers need to be adjusted. */
+#define FIONCLEX	0x6602
 #define FIOASYNC	0x667d
 #define FIONBIO		0x667e
 #define FIOQSIZE	0x667f
@@ -66,7 +66,7 @@
 #define TIOCGETP        0x7408
 #define TIOCSETP        0x7409
 #define TIOCSETN        0x740a			/* TIOCSETP wo flush */
- 
+
 /* #define TIOCSETA	_IOW('t', 20, struct termios) set termios struct */
 /* #define TIOCSETAW	_IOW('t', 21, struct termios) drain output, set */
 /* #define TIOCSETAF	_IOW('t', 22, struct termios) drn out, fls in, set */

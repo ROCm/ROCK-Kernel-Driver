@@ -1,8 +1,6 @@
 #ifndef __ASM_MIPS_USER_H
 #define __ASM_MIPS_USER_H
 
-#include <linux/ptrace.h>
-
 #include <asm/page.h>
 #include <asm/reg.h>
 

@@ -33,7 +33,6 @@ obj-$(CONFIG_SBUS)		+= sbus/
 obj-$(CONFIG_ZORRO)		+= zorro/
 obj-$(CONFIG_PPC_PMAC)		+= macintosh/
 obj-$(CONFIG_MAC)		+= macintosh/
-obj-$(CONFIG_SGI)		+= sgi/
 obj-$(CONFIG_PARIDE) 		+= block/paride/
 obj-$(CONFIG_TC)		+= tc/
 obj-$(CONFIG_USB)		+= usb/

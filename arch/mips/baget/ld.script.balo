@@ -1,4 +1,4 @@
-OUTPUT_FORMAT("elf32-bigmips")
+OUTPUT_FORMAT("elf32-tradbigmips")
 OUTPUT_ARCH(mips)
 ENTRY(balo_entry)
 SECTIONS
@@ -42,13 +42,13 @@ SECTIONS
   /* Startup code */
   . = ALIGN(4096);
   __init_begin = .;
-  *(.text.init) 
-  *(.data.init) 
+  *(.text.init)
+  *(.data.init)
   . = ALIGN(4096);	/* Align double page for init_task_union */
   __init_end = .;
 
-   *(.fini)    
-  *(.reginfo) 
+   *(.fini)
+  *(.reginfo)
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  It would
      be more correct to do this:
@@ -68,18 +68,18 @@ SECTIONS
     *(.data)
     CONSTRUCTORS
 
-  *(.data1) 
+  *(.data1)
   _gp = . + 0x8000;
-  *(.lit8) 
-  *(.lit4) 
-  *(.ctors)   
-  *(.dtors)   
-  *(.got.plt) *(.got) 
-  *(.dynamic) 
+  *(.lit8)
+  *(.lit4)
+  *(.ctors)
+  *(.dtors)
+  *(.got.plt) *(.got)
+  *(.dynamic)
   /* We want the small data sections together, so single-instruction offsets
      can access them all, and initialized data all before uninitialized, so
      we can shorten the on-disk segment size.  */
-  *(.sdata) 
+  *(.sdata)
   _edata  =  .;
   PROVIDE (edata = .);
 
@@ -96,21 +96,21 @@ SECTIONS
 
   /* These are needed for ELF backends which have not yet been
      converted to the new style linker.  */
-  *(.stab) 
-  *(.stabstr) 
+  *(.stab)
+  *(.stabstr)
   /* DWARF debug sections.
      Symbols in the .debug DWARF section are relative to the beginning of the
      section so we begin .debug at 0.  It's not clear yet what needs to happen
      for the others.   */
-  *(.debug) 
-  *(.debug_srcinfo) 
-  *(.debug_aranges) 
-  *(.debug_pubnames) 
-  *(.debug_sfnames) 
-  *(.line) 
+  *(.debug)
+  *(.debug_srcinfo)
+  *(.debug_aranges)
+  *(.debug_pubnames)
+  *(.debug_sfnames)
+  *(.line)
   /* These must appear regardless of  .  */
-  *(.gptab.data) *(.gptab.sdata) 
-  *(.gptab.bss) *(.gptab.sbss) 
+  *(.gptab.data) *(.gptab.sdata)
+  *(.gptab.bss) *(.gptab.sbss)
 
   _vmlinux_start = .;
   *(.vmlinux)

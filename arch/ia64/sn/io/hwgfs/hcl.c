@@ -113,22 +113,10 @@ static int hcl_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations hcl_fops = {
-	(struct module *)0,
-	NULL,		/* lseek - default */
-	NULL,		/* read - general block-dev read */
-	NULL,		/* write - general block-dev write */
-	NULL,		/* readdir - bad */
-	NULL,		/* poll */
-	hcl_ioctl,      /* ioctl */
-	NULL,		/* mmap */
-	hcl_open,	/* open */
-	NULL,		/* flush */
-	hcl_close,	/* release */
-	NULL,		/* fsync */
-	NULL,		/* fasync */
-	NULL,		/* lock */
-	NULL,		/* readv */
-	NULL,		/* writev */
+	.owner = (struct module *)0,
+	.ioctl = hcl_ioctl,
+	.open = hcl_open,
+	.release = hcl_close,
 };
 
 
@@ -140,7 +128,6 @@ int __init init_hcl(void)
 {
 	extern void string_table_init(struct string_table *);
 	extern struct string_table label_string_table;
-	extern int init_ifconfig_net(void);
 	extern int init_ioconfig_bus(void);
 	extern int init_hwgfs_fs(void);
 	int rv = 0;
@@ -195,7 +182,6 @@ int __init init_hcl(void)
 	 * Initialize the ifconfgi_net driver that does network devices 
 	 * Persistent Naming.
 	 */
-	init_ifconfig_net();
 	init_ioconfig_bus();
 
 	return(0);
@@ -258,6 +244,7 @@ hwgraph_fastinfo_get(vertex_hdl_t de)
 
 	if (!de) {
 		printk(KERN_WARNING "HCL: hwgraph_fastinfo_get handle given is NULL.\n");
+		dump_stack();
 		return(-1);
 	}
 
@@ -568,7 +555,7 @@ hwgraph_edge_add(vertex_hdl_t from, vertex_hdl_t to, char *name)
 	 * In this case the vertex was previous created with a REAL pathname.
 	 */
 	rv = hwgfs_mk_symlink (from, (const char *)name,
-			       DEVFS_FL_DEFAULT, link,
+			       0, link,
 			       &handle, NULL);
 	kfree(path);
 	kfree(link);

@@ -306,6 +306,7 @@ EXPORT_SYMBOL(xfrm_state_alloc);
 EXPORT_SYMBOL(__xfrm_state_destroy);
 EXPORT_SYMBOL(xfrm_state_find);
 EXPORT_SYMBOL(xfrm_state_insert);
+EXPORT_SYMBOL(xfrm_state_replace);
 EXPORT_SYMBOL(xfrm_state_check_expire);
 EXPORT_SYMBOL(xfrm_state_check_space);
 EXPORT_SYMBOL(xfrm_state_lookup);

@@ -3,14 +3,15 @@
 #
 
 obj-y		+= access.o bus.o probe.o pci.o pool.o quirks.o \
-			names.o pci-driver.o search.o hotplug.o \
-			pci-sysfs.o
+			names.o pci-driver.o search.o pci-sysfs.o
 obj-$(CONFIG_PM)  += power.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 ifndef CONFIG_SPARC64
 obj-$(CONFIG_PCI) += setup-res.o
 endif
+
+obj-$(CONFIG_HOTPLUG) += hotplug.o
 
 # Build the PCI Hotplug drivers if we were asked to
 obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
@@ -24,8 +25,8 @@ obj-$(CONFIG_PARISC) += setup-bus.o
 obj-$(CONFIG_SUPERH) += setup-bus.o setup-irq.o
 obj-$(CONFIG_PPC32) += setup-irq.o
 obj-$(CONFIG_PPC64) += setup-bus.o
-obj-$(CONFIG_DDB5476) += setup-bus.o
 obj-$(CONFIG_SGI_IP27) += setup-irq.o
+obj-$(CONFIG_SGI_IP32) += setup-irq.o
 obj-$(CONFIG_X86_VISWS) += setup-irq.o
 
 # CompactPCI hotplug requires the pbus_* functions

@@ -18,7 +18,7 @@
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
  * ########################################################################
- * 
+ *
  * Display routines for display messages in MIPS boards ascii display.
  *
  */
@@ -39,9 +39,11 @@ void mips_display_message(const char *str)
 	}
 }
 
+#ifndef CONFIG_MIPS_SEAD
 void mips_display_word(unsigned int num)
 {
         volatile unsigned int *display = (void *)ASCII_DISPLAY_WORD_BASE;
-	
+
 	*display = num;
 }
+#endif

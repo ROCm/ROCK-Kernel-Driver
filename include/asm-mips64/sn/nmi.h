@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -8,7 +8,7 @@
 #ifndef __ASM_SN_NMI_H
 #define __ASM_SN_NMI_H
 
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.5 $"
 
 #include <asm/sn/addrs.h>
 
@@ -48,7 +48,7 @@
  *
  */
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef struct nmi_s {
 	volatile unsigned long	 magic;		/* Magic number */
@@ -59,13 +59,13 @@ typedef struct nmi_s {
 	volatile unsigned long	 gmaster;	/* Flag true only on global master*/
 } nmi_t;
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /* Following definitions are needed both in the prom & the kernel
  * to identify the format of the nmi cpu register save area in the
  * low memory on each node.
  */
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 struct reg_struct {
 	unsigned long	gpr[32];
@@ -78,7 +78,7 @@ struct reg_struct {
 	unsigned long	nmi_sr;
 };
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /* These are the assembly language offsets into the reg_struct structure */
 

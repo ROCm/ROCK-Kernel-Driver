@@ -40,39 +40,32 @@
 #include "dvb_net.h"
 #include "dvb_ringbuffer.h"
 
-typedef enum BOOTSTATES
+enum av7110_bootstate
 {
 	BOOTSTATE_BUFFER_EMPTY	= 0,
 	BOOTSTATE_BUFFER_FULL	= 1,
 	BOOTSTATE_BOOT_COMPLETE	= 2
-} BOOTSTATES;
+};
 
-typedef enum
+enum av7110_type_rec_play_format
 {	RP_None,
 	AudioPES,
 	AudioMp2,
 	AudioPCM,
 	VideoPES,
 	AV_PES
-} TYPE_REC_PLAY_FORMAT;
+};
 
-typedef struct PARAMSTRUCT
-{
-	unsigned int	wCommand;
-        int             error;
-	unsigned long	pdwData[100];
-} PARAMSTRUCT, *PPARAMSTRUCT;
-
-typedef enum OSDPALTYPE
+enum av7110_osd_palette_type
 {
 	NoPalet =  0,      /* No palette */
 	Pal1Bit =  2,      /* 2 colors for 1 Bit Palette    */
 	Pal2Bit =  4,      /* 4 colors for 2 bit palette    */
 	Pal4Bit =  16,     /* 16 colors for 4 bit palette   */
 	Pal8Bit =  256     /* 256 colors for 16 bit palette */
-} OSDPALTYPE, *POSDPALTYPE;
+};
 
-typedef enum {
+enum av7110_window_display_type {
    BITMAP1,           /* 1 bit bitmap */
    BITMAP2,           /* 2 bit bitmap */
    BITMAP4,           /* 4 bit bitmap */
@@ -93,9 +86,9 @@ typedef enum {
    VIDEOTDSIZE,       /* True Size MPEG Video Display Double Resolution */
    VIDEONSIZE,        /* Full Size MPEG Video Display */
    CURSOR             /* Cursor */
-} DISPTYPE;           /* Window display type           */
+};
 
-// switch defines
+/* switch defines */
 #define SB_GPIO 3
 #define SB_OFF	SAA7146_GPIO_OUTLO  //SlowBlank aus (TV-Mode)
 #define SB_ON	SAA7146_GPIO_INPUT  //SlowBlank an  (AV-Mode)
@@ -106,14 +99,13 @@ typedef enum {
 #define FB_ON   SAA7146_GPIO_OUTHI  //FastBlank an  (RGB-Mode)
 #define FB_LOOP	SAA7146_GPIO_INPUT  //FastBlank der PC-Grafik durchschleifen
 
-typedef enum VIDEOOUTPUTMODE
+enum av7110_video_output_mode
 {
         NO_OUT       = 0,		//disable analog Output
 	CVBS_RGB_OUT = 1,
 	CVBS_YC_OUT  = 2,
 	YC_OUT	     = 3
-} VIDEOOUTPUTMODE, *PVIDEOOUTPUTMODE;
-
+};
 
 #define GPMQFull        0x0001                  //Main Message Queue Full
 #define GPMQOver        0x0002                  //Main Message Queue Overflow
@@ -127,9 +119,9 @@ typedef enum VIDEOOUTPUTMODE
 #define	SECTION_CYCLE		0x02
 #define	SECTION_CONTINUOS	0x04
 #define	SECTION_MODE		0x06
-#define SECTION_IPMPE		0x0C	// bis zu 4k gro_
-#define SECTION_HIGH_SPEED	0x1C	// vergrv_erter Puffer f|r High Speed Filter
-#define DATA_PIPING_FLAG	0x20	// f|r Data Piping Filter
+#define SECTION_IPMPE		0x0C	// bis zu 4k groß
+#define SECTION_HIGH_SPEED	0x1C	// vergrößerter Puffer für High Speed Filter
+#define DATA_PIPING_FLAG	0x20	// für Data Piping Filter
 
 #define	PBUFSIZE_NONE 0x0000
 #define	PBUFSIZE_1P   0x0100
@@ -141,7 +133,7 @@ typedef enum VIDEOOUTPUTMODE
 #define PBUFSIZE_16K  0x0700
 #define PBUFSIZE_32K  0x0800
 
-typedef enum {	
+enum av7110_osd_command {	
         WCreate,
 	WDestroy,
 	WMoveD,
@@ -162,9 +154,9 @@ typedef enum {
 	ReleaseBmp,
 	SetWTrans,
 	SetWNoTrans
-} OSDCOM;
+};
 
-typedef enum { 
+enum av7110_pid_command { 
 	MultiPID,
         VideoPID,
 	AudioPID,
@@ -177,13 +169,13 @@ typedef enum {
 	Scan,
 	SetDescr,
         SetIR
-} PIDCOM;
+};
 			
-typedef enum {
+enum av7110_mpeg_command {
         SelAudChannels
-} MPEGCOM;
+};
 
-typedef enum  { 
+enum av7110_audio_command { 
         AudioDAC,
 	CabADAC,
 	ON22K,
@@ -192,9 +184,9 @@ typedef enum  {
 	ADSwitch,
 	SendDiSEqC,
 	SetRegister
-} AUDCOM;
+};
 
-typedef enum  {
+enum av7110_request_command {
         AudioState,
 	AudioBuffState,
 	VideoState1,
@@ -203,19 +195,21 @@ typedef enum  {
 	CrashCounter,
 	ReqVersion,
 	ReqVCXO,
-	ReqRegister
-} REQCOM;
+	ReqRegister,
+	ReqSecFilterError,
+	ReqSTC
+};
 
-typedef enum  {
+enum av7110_encoder_command {
         SetVidMode,
 	SetTestMode,
 	LoadVidCode,
 	SetMonitorType,
 	SetPanScanType,
 	SetFreezeMode
-} ENC;
+};
 
-typedef enum  { 
+enum av7110_rec_play_state { 
         __Record,
 	__Stop,
 	__Play,
@@ -224,9 +218,9 @@ typedef enum  {
 	__FF_IP,
 	__Scan_I,
 	__Continue
-} REC_PLAY;
+};
 
-typedef enum  { 
+enum av7110_command_type { 
         COMTYPE_NOCOM,
 	COMTYPE_PIDFILTER,
 	COMTYPE_MPEGDECODER,
@@ -244,17 +238,7 @@ typedef enum  {
 	COMTYPE_VIDEO,
 	COMTYPE_AUDIO,
 	COMTYPE_CI_LL,
-} COMTYPE;
-
-typedef enum {
-	AV7110_VIDEO_FREEZE,
-	AV7110_VIDEO_CONTINUE
-} VIDEOCOM;
-
-typedef enum {
-	DVB_AUDIO_PAUSE,
-} AUDIOCOM;
-
+};
 
 #define VID_NONE_PREF           0x00    /* No aspect ration processing preferred */
 #define VID_PAN_SCAN_PREF       0x01    /* Pan and Scan Display preferred */
@@ -275,6 +259,7 @@ typedef enum {
 #define DATA_STREAMING           0x0a
 #define DATA_CI_GET              0x0b
 #define DATA_CI_PUT              0x0c
+#define DATA_MPEG_VIDEO_EVENT    0x0d
 
 #define DATA_PES_RECORD          0x10
 #define DATA_PES_PLAY            0x11
@@ -364,14 +349,6 @@ typedef enum {
 #define MAX_PLENGTH      0xFFFF
 #define MAX_VID_PES      0x1FFF
 
-typedef struct section_s {
-        int               id;
-        int               length;
-        int               found;
-        u8                payload[4096+3];
-} section_t;
-
-
 #define MY_STATE_PES_START     1
 #define MY_STATE_PES_STARTED   2
 #define MY_STATE_FULL          4
@@ -393,64 +370,34 @@ struct dvb_filter {
 
 enum {AV_PES_STREAM, PS_STREAM, TS_STREAM, PES_STREAM};
 
-typedef struct ps_packet_s{
-        u8                scr[6];
-        u8                mux_rate[3];
-        u8                stuff_length;
-        u8                data[20];
-        u8                sheader_llength[2];
-        int               sheader_length;
-        u8                rate_bound[3];
-        u8                audio_bound;
-        u8                video_bound;
-        u8                reserved;
-        int               npes;
-        int               mpeg;
-} ps_packet_t;
-
-typedef struct a2p_s{
-        int               type;
-        int               found;
-        int               length;
-        int               headr;
-        u8                cid;
-        u8                flags;
-        u8                abuf[MAX_PLENGTH];
-        int               alength;
-        u8                vbuf[MAX_PLENGTH];
-        int               vlength;
-        int               plength;
-        u8                last_av_pts[4];
-        u8                av_pts[4];
-        u8                scr[4];
-        u16               count0;
-        u16               count1;
-        u16               pidv;
-        u16               pida;
-        u16               countv;
-        u16               counta;
-        void             *dataA;
-        void             *dataV;
-        void              (*write_cb)(u8 const *buf, long int count,
-                                      void     *data);
-} a2p_t;
-
-
-typedef struct p2t_s {
+struct av7110_p2t {
         u8                pes[TS_SIZE];
         u8                counter;
         long int          pos;
         int               frags;
         struct dvb_demux_feed *feed;
-} p2t_t;
+};
+
+/* video MPEG decoder events: */
+/* (code copied from dvb_frontend.c, should maybe be factored out...) */
+#define MAX_VIDEO_EVENT 8
+struct dvb_video_events {
+	struct video_event        events[MAX_VIDEO_EVENT];
+	int                       eventw;
+	int                       eventr;
+	int                       overflow;
+	wait_queue_head_t         wait_queue;
+	spinlock_t                lock;
+};
+
 
 /* place to store all the necessary device information */
-typedef struct av7110_s {
+struct av7110 {
 
         /* devices */
 
         struct dvb_device       dvb_dev;
-        dvb_net_t               dvb_net;
+        struct dvb_net               dvb_net;
 	struct video_device	vd;
 
         struct saa7146_dev	*dev;
@@ -464,15 +411,16 @@ typedef struct av7110_s {
         int adac_type;         /* audio DAC type */
 #define DVB_ADAC_TI       0
 #define DVB_ADAC_CRYSTAL  1
+#define DVB_ADAC_MSP      2
 #define DVB_ADAC_NONE    -1
 
 
         /* buffers */
 
         void                   *iobuf;   /* memory for all buffers */
-        dvb_ringbuffer_t        avout;   /* buffer for video or A/V mux */
+        struct dvb_ringbuffer        avout;   /* buffer for video or A/V mux */
 #define AVOUTLEN (128*1024)
-        dvb_ringbuffer_t        aout;    /* buffer for audio */
+        struct dvb_ringbuffer        aout;    /* buffer for audio */
 #define AOUTLEN (64*1024)
         void                   *bmpbuf;
 #define BMPLEN (8*32768+1024)
@@ -522,12 +470,11 @@ typedef struct av7110_s {
         ca_slot_info_t          ci_slot[2];
 
         int                     vidmode;
-        dmxdev_t                dmxdev;
+        struct dmxdev		dmxdev;
         struct dvb_demux             demux;
-        char                    demux_id[16];
 
-        dmx_frontend_t          hw_frontend;
-        dmx_frontend_t          mem_frontend;
+        struct dmx_frontend	hw_frontend;
+        struct dmx_frontend	mem_frontend;
 
         int                     fe_synced; 
         struct semaphore        pid_mutex;
@@ -543,9 +490,9 @@ typedef struct av7110_s {
         struct audio_status      audiostate;
 
         struct dvb_demux_filter     *handle2filter[32];
-        p2t_t                   p2t_filter[MAXFILT];
-        dvb_filter_pes2ts_t     p2t[2];
-        struct ipack_s          ipack[2];
+        struct av7110_p2t		p2t_filter[MAXFILT];
+        struct dvb_filter_pes2ts	p2t[2];
+        struct ipack			ipack[2];
         u8                     *kbuf[2];
 
         int sinfo;
@@ -573,8 +520,8 @@ typedef struct av7110_s {
 
         u16                 pids[DMX_PES_OTHER];
         
-        dvb_ringbuffer_t    ci_rbuffer;
-        dvb_ringbuffer_t    ci_wbuffer;
+        struct dvb_ringbuffer    ci_rbuffer;
+        struct dvb_ringbuffer    ci_wbuffer;
 
 
         struct dvb_adapter       *dvb_adapter;
@@ -583,8 +530,13 @@ typedef struct av7110_s {
         struct dvb_device        *ca_dev;
         struct dvb_device        *osd_dev;
 
+	struct dvb_video_events  video_events;
+	video_size_t             video_size;
+
         int                 dsp_dev;
-} av7110_t;
+
+        u32                 ir_config;
+};
 
 
 #define	DPRAM_BASE 0x4000
@@ -623,25 +575,14 @@ typedef struct av7110_s {
 #define Reserved	(DPRAM_BASE + 0x1E00)
 #define Reserved_SIZE	0x1C0
 
-#define DEBUG_WINDOW	(DPRAM_BASE + 0x1FC0)
-#define	DBG_LOOP_CNT	(DEBUG_WINDOW + 0x00)
-#define DBG_SEC_CNT	(DEBUG_WINDOW + 0x02)
-#define DBG_AVRP_BUFF	(DEBUG_WINDOW + 0x04)
-#define DBG_AVRP_PEAK	(DEBUG_WINDOW + 0x06)
-#define DBG_MSG_CNT	(DEBUG_WINDOW + 0x08)
-#define DBG_CODE_REG	(DEBUG_WINDOW + 0x0a)
-#define DBG_TTX_Q	(DEBUG_WINDOW + 0x0c)
-#define DBG_AUD_EN	(DEBUG_WINDOW + 0x0e)
-#define DBG_WRONG_COM	(DEBUG_WINDOW + 0x10)
-#define DBG_ARR_OVFL	(DEBUG_WINDOW + 0x12)
-#define DBG_BUFF_OVFL	(DEBUG_WINDOW + 0x14)
-#define DBG_OVFL_CNT	(DEBUG_WINDOW + 0x16)
-#define DBG_SEC_OVFL	(DEBUG_WINDOW + 0x18)
-
 #define STATUS_BASE	(DPRAM_BASE + 0x1FC0)
 #define STATUS_SCR      (STATUS_BASE + 0x00)
 #define STATUS_MODES    (STATUS_BASE + 0x04)
 #define STATUS_LOOPS    (STATUS_BASE + 0x08)
+
+#define STATUS_MPEG_WIDTH     (STATUS_BASE + 0x0C)
+/* ((aspect_ratio & 0xf) << 12) | (height & 0xfff) */
+#define STATUS_MPEG_HEIGHT_AR (STATUS_BASE + 0x0E)
 
 #define RX_TYPE         (DPRAM_BASE + 0x1FE8)
 #define RX_LEN          (DPRAM_BASE + 0x1FEA)
@@ -673,7 +614,7 @@ extern int av7110_dpram_len, av7110_root_len;
 
 extern void av7110_register_irc_handler(void (*func)(u32));
 extern void av7110_unregister_irc_handler(void (*func)(u32)); 
-extern void av7110_setup_irc_config (av7110_t *av7110, u32 ir_config);
+extern void av7110_setup_irc_config (struct av7110 *av7110, u32 ir_config);
 
 extern int av7110_ir_init (void);
 extern void av7110_ir_exit (void);

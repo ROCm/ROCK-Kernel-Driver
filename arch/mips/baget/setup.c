@@ -1,9 +1,7 @@
-/* $Id: setup.c,v 1.4 1999/10/09 00:00:57 ralf Exp $
- *
+/*
  * setup.c: Baget/MIPS specific setup, including init of the feature struct.
  *
  * Copyright (C) 1998 Gleb Raiko & Vladimir Roganov
- *
  */
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -17,9 +15,9 @@
 long int vac_memory_upper;
 
 #define CACHEABLE_STR(val) ((val) ? "not cached" : "cached")
-		
+
 static void __init vac_show(void)
-{ 
+{
 	int i;
 	unsigned short val, decode = vac_inw(VAC_DECODE_CTRL);
 	unsigned short a24_base = vac_inw(VAC_A24_BASE);
@@ -38,7 +36,7 @@ static void __init vac_show(void)
 				     VAC_IOSEL3_CTRL,
 				     VAC_IOSEL4_CTRL,
 				     VAC_IOSEL5_CTRL };
-	
+
 	printk("[DSACKi %s, DRAMCS%s qualified, boundary%s qualified%s]\n",
 	       (decode & VAC_DECODE_DSACKI)     ? "on" : "off",
 	       (decode & VAC_DECODE_QFY_DRAMCS) ? ""   : " not",
@@ -72,24 +70,24 @@ static void __init vac_show(void)
 			VAC_ICFSEL_MODULE_VAL(vac_inw(VAC_ICFSEL_BASE)))<<4,
 		       (decode & VAC_DECODE_QFY_ICFSEL) ? "qualified" : "");
 
-	
+
 	printk("region0 at 00000000 (%dMB)\t[dram, %s, delay %d cpuclk"
 	       ", cached]\n",
 	       (vac_inw(VAC_DRAM_MASK)+1)>>4,
 	       (decode & VAC_DECODE_DSACK) ? "D32" : "3state",
 	       VAC_DECODE_CPUCLK_VAL(decode));
-	
+
 	for (i = 0; i < sizeof(regs)/sizeof(regs[0]); i++) {
-		unsigned long from = 
+		unsigned long from =
 			((unsigned long)vac_inw(bndr[i]))<<16;
-		unsigned long to   = 
+		unsigned long to   =
 			((unsigned long)
-			 ((i+1 == sizeof(bndr)/sizeof(bndr[0])) ? 
+			 ((i+1 == sizeof(bndr)/sizeof(bndr[0])) ?
 			  0xff00 : vac_inw(bndr[i+1])))<<16;
-		
-		
+
+
 		val = vac_inw(regs[i]);
-		printk("region%d at %08lx (%dMB)\t[%s %s/%s, %s]\n", 
+		printk("region%d at %08lx (%dMB)\t[%s %s/%s, %s]\n",
 		       i+1,
 		       from,
 		       (unsigned int)((to - from) >> 20),
@@ -97,13 +95,13 @@ static void __init vac_show(void)
 		       asiz[VAC_REG_ASIZ_VAL(val)],
 		       ((val & VAC_REG_WORD) ?  "D16" : "D32"),
 		       CACHEABLE_STR(val&VAC_A24_A24_CACHINH));
-		
+
 		if (a24_addr >= from && a24_addr < to)
 			printk("\ta24 at %08lx (%dMB)\t[vme, A24/%s, %s]\n",
 			       a24_addr,
 			       min((unsigned int)(a24_addr - from)>>20, 32U),
 			       (a24_base & VAC_A24_DATAPATH) ?  "user" :
-			       ((a24_base & VAC_A24_D32_ENABLE)  ?  
+			       ((a24_base & VAC_A24_D32_ENABLE)  ?
 				"D32" : "D16"),
 			       CACHEABLE_STR(a24_base & VAC_A24_A24_CACHINH));
 	}
@@ -123,7 +121,7 @@ static void __init vac_show(void)
 	       (VAC_CTRL_DELAY_IOWR_VAL(val)&1) ? ".5" : "",
 	       VAC_CTRL_DELAY_IOSELI_VAL(val)/2,
 	       (VAC_CTRL_DELAY_IOSELI_VAL(val)&1) ? ".5" : "");
-	
+
 	printk("region5 at fff00000 (896KB)\t[local io, %s]\n",
 	       CACHEABLE_STR(vac_inw(VAC_A24_BASE) & VAC_A24_IO_CACHINH));
 
@@ -132,7 +130,7 @@ static void __init vac_show(void)
 		printk("\tio%d[ack %d cpuclk%s, %s%srecovery %d cpuclk, "
 		       "\n\t read %d%s cpuclk, write %d%s cpuclk, "
 		       "assert %d%s%s cpuclk]\n",
-		       i, 
+		       i,
 		       VAC_CTRL_DELAY_DSACKI_VAL(val),
 		       state[val & (VAC_CTRL_IORD|VAC_CTRL_IOWR)],
 		       (val & VAC_CTRL_DSACK0) ? "dsack0*, " : "",
@@ -144,15 +142,15 @@ static void __init vac_show(void)
 		       (VAC_CTRL_DELAY_IOWR_VAL(val)&1) ? ".5" : "",
 		       VAC_CTRL_DELAY_IOSELI_VAL(val)/2,
 		       (VAC_CTRL_DELAY_IOSELI_VAL(val)&1) ? ".5" : "",
-		       (vac_inw(VAC_DEV_LOC) & VAC_DEV_LOC_IOSEL(i)) ? 
+		       (vac_inw(VAC_DEV_LOC) & VAC_DEV_LOC_IOSEL(i)) ?
 		          ", id" : "");
 	}
-		
+
 	printk("region6 at fffe0000 (128KB)\t[vme, A16/%s, "
 	       "not cached]\n",
-	       (a24_base & VAC_A24_A16D32_ENABLE) ? 
+	       (a24_base & VAC_A24_A16D32_ENABLE) ?
 	       ((a24_base & VAC_A24_A16D32) ? "D32" : "D16") : "user");
-		       
+
 	val = vac_inw(VAC_SHRCS_CTRL);
 	printk("shared[ack %d cpuclk%s, %s%srecovery %d cpuclk, "
 	       "read %d%s, write %d%s, assert %d%s]\n",
@@ -183,8 +181,8 @@ static void __init vac_init(void)
 	default:
 		panic("Unknown VAC revision number");
 	}
-	
-	vac_outw(mem_limit-1, VAC_DRAM_MASK); 
+
+	vac_outw(mem_limit-1, VAC_DRAM_MASK);
 	vac_outw(mem_limit, VAC_BNDR2);
 	vac_outw(mem_limit, VAC_BNDR3);
 	vac_outw(((BAGET_A24M_BASE>>16)&~VAC_A24_D32_ENABLE)|VAC_A24_DATAPATH,
@@ -294,19 +292,19 @@ static void __init vac_start(void)
 	vac_outw(VAC_INT_CTRL_TIMER_PIO10|
 		 VAC_INT_CTRL_UART_B_PIO7|
 		 VAC_INT_CTRL_UART_A_PIO7,VAC_INT_CTRL);
-	/* 
+	/*
 	 *  Set quadro speed for both UARTs.
 	 *  To do it we need use formulae from VIC/VAC manual,
 	 *  keeping in mind Baget's 50MHz frequency...
 	 */
-	vac_outw((500000/(384*16))<<8,VAC_CPU_CLK_DIV); 
+	vac_outw((500000/(384*16))<<8,VAC_CPU_CLK_DIV);
 }
 
 static void __init vic_show(void)
 {
 	unsigned char val;
 	char *timeout[]  = { "4", "16", "32", "64", "128", "256", "disabled" };
-	char *deadlock[] = { "[dedlk only]", "[dedlk only]", 
+	char *deadlock[] = { "[dedlk only]", "[dedlk only]",
 			     "[dedlk], [halt w/ rmc], [lberr]",
 			     "[dedlk], [halt w/o rmc], [lberr]" };
 
@@ -319,7 +317,7 @@ static void __init vic_show(void)
 		printk("metastability delay ");
 	printk("%s ",
 	       deadlock[VIC_IFACE_CFG_DEADLOCK_VAL(val)]);
-	
+
 
 	printk("interrupts: ");
 	val = vic_inb(VIC_ERR_INT);
@@ -332,7 +330,7 @@ static void __init vic_show(void)
 	if (!(val & VIC_ERR_INT_ACFAIL))
 		printk("[acfail] ");
 	printk("\n");
-	
+
 	printk("timeouts: ");
 	val = vic_inb(VIC_XFER_TIMO);
 	printk("local %s, vme %s ",
@@ -358,7 +356,7 @@ static void __init vic_show(void)
 		printk("[local boundary cross]");
 	if (val & VIC_BXFER_DEF_VME_CROSS)
 		printk("[vme boundary cross]");
-	
+
 }
 
 static void __init vic_init(void)
@@ -373,7 +371,7 @@ static void __init vic_init(void)
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_DISABLE,VIC_VME_INT2);
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_DISABLE,VIC_VME_INT3);
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_DISABLE,VIC_VME_INT4);
-/*	 
+/*
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_DISABLE, VIC_VME_INT5);
 */
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_DISABLE, VIC_VME_INT6);
@@ -388,7 +386,7 @@ static void __init vic_init(void)
 		  VIC_INT_HIGH|VIC_INT_DISABLE, VIC_LINT3);
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_NOAUTO|VIC_INT_EDGE|
 		  VIC_INT_LOW|VIC_INT_DISABLE, VIC_LINT4);
-/*	 
+/*
 	 vic_outb(VIC_INT_IPL(3)|VIC_INT_NOAUTO|VIC_INT_LEVEL|
 		  VIC_INT_LOW|VIC_INT_DISABLE, VIC_LINT5);
 */
@@ -447,7 +445,7 @@ static void __init vic_init(void)
 		  VIC_RELEASE_RWD, VIC_RELEASE);
 	 vic_outb(VIC_IC6_RUN, VIC_IC6);
 	 vic_outb(0, VIC_IC7);
-	 
+
 	 vic_show();
 }
 
@@ -471,7 +469,7 @@ void __init baget_irq_setup(void)
 extern void baget_machine_restart(char *command);
 extern void baget_machine_halt(void);
 extern void baget_machine_power_off(void);
- 
+
 void __init baget_setup(void)
 {
 	printk("BT23/63-201n found.\n");
