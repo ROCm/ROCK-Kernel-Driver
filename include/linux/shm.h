@@ -2,6 +2,7 @@
 #define _LINUX_SHM_H_
 
 #include <linux/ipc.h>
+#include <linux/errno.h>
 #include <asm/page.h>
 
 /*
@@ -91,9 +92,10 @@ struct shmid_kernel /* private to the kernel */
 #define SHM_HUGETLB     04000   /* segment will use huge TLB pages */
 
 #ifdef CONFIG_SYSVIPC
-long do_shmat (int shmid, char __user *shmaddr, int shmflg, unsigned long *addr);
+long do_shmat(int shmid, char __user *shmaddr, int shmflg, unsigned long *addr);
 #else
-inline long do_shmat (int shmid, char __user *shmaddr, int shmflg, unsigned long *addr)
+static inline long do_shmat(int shmid, char __user *shmaddr,
+				int shmflg, unsigned long *addr)
 {
 	return -ENOSYS;
 }
