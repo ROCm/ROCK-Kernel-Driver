@@ -101,5 +101,22 @@ extern int pcibios_remove_root_bus(struct pci_controller *phb);
 
 extern void phbs_remap_io(void);
 
+static inline struct pci_controller *pci_bus_to_host(struct pci_bus *bus)
+{
+	struct device_node *busdn;
+
+	busdn = bus->sysdata;
+	if (busdn == 0) {
+		struct pci_bus *b;
+		for (b = bus->parent; b && bus->sysdata == 0; b = b->parent)
+			;
+		busdn = b->sysdata;
+	}
+	if (busdn == NULL)
+		return NULL;
+	return busdn->phb;
+}
+
+
 #endif
 #endif /* __KERNEL__ */
