@@ -43,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include <linux/jffs2.h>
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>

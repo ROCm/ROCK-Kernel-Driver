@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/buffer_head.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
 
