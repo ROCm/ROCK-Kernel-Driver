@@ -241,7 +241,7 @@ static struct i2c_adapter iic_ite_ops = {
 };
 
 /* Called when the module is loaded.  This function starts the
- * cascade of calls up through the heirarchy of i2c modules (i.e. up to the
+ * cascade of calls up through the hierarchy of i2c modules (i.e. up to the
  *  algorithm layer and into to the core layer)
  */
 static int __init iic_ite_init(void) 
