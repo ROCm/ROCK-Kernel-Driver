@@ -184,18 +184,22 @@ extern void save_fpu(struct task_struct *__tsk);
 
 #define unlazy_fpu(tsk) do { 			\
 	if ((tsk)->flags & PF_USEDFPU) {	\
-		grab_fpu();			\
 		save_fpu(tsk); 			\
 	}					\
 } while (0)
 
 #define clear_fpu(tsk) do { 			\
-	if ((tsk)->flags & PF_USEDFPU)	 	\
+	if ((tsk)->flags & PF_USEDFPU) { 	\
 		(tsk)->flags &= ~PF_USEDFPU; 	\
+		release_fpu();			\
+	}					\
 } while (0)
 
 /* Double presision, NANS as NANS, rounding to nearest, no exceptions */
 #define FPSCR_INIT  0x00080000
+
+#define	FPSCR_CAUSE_MASK	0x0001f000	/* Cause bits */
+#define	FPSCR_FLAG_MASK		0x0000007c	/* Flag bits */
 
 /*
  * Return saved PC of a blocked thread.

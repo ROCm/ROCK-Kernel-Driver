@@ -300,10 +300,19 @@ static inline int handle_unaligned_delayslot(struct pt_regs *regs)
 /*
  * handle an instruction that does an unaligned memory access
  * - have to be careful of branch delay-slot instructions that fault
+ *  SH3:
  *   - if the branch would be taken PC points to the branch
  *   - if the branch would not be taken, PC points to delay-slot
+ *  SH4:
+ *   - PC always points to delayed branch
  * - return 0 if handled, -EFAULT if failed (may not return if in kernel)
  */
+
+/* Macros to determine offset from current PC for branch instructions */
+/* Explicit type coercion is used to force sign extension where needed */
+#define SH_PC_8BIT_OFFSET(instr) ((((signed char)(instr))*2) + 4)
+#define SH_PC_12BIT_OFFSET(instr) ((((signed short)(instr<<4))>>3) + 4)
+
 static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 {
 	u_int rm;
@@ -392,15 +401,27 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 			break;
 		case 0x0F00: /* bf/s lab */
 			ret = handle_unaligned_delayslot(regs);
-			if (ret==0)
-				regs->pc += (instruction&0x00FF)*2 + 4;
+			if (ret==0) {
+#if defined(__SH4__)
+				if ((regs->sr & 0x00000001) != 0)
+					regs->pc += 4; /* next after slot */
+				else
+#endif
+					regs->pc += SH_PC_8BIT_OFFSET(instruction);
+			}
 			break;
 		case 0x0900: /* bt   lab - no delayslot */
 			break;
 		case 0x0D00: /* bt/s lab */
 			ret = handle_unaligned_delayslot(regs);
-			if (ret==0)
-				regs->pc += (instruction&0x00FF)*2 + 4;
+			if (ret==0) {
+#if defined(__SH4__)
+				if ((regs->sr & 0x00000001) == 0)
+					regs->pc += 4; /* next after slot */
+				else
+#endif
+					regs->pc += SH_PC_8BIT_OFFSET(instruction);
+			}
 			break;
 		}
 		break;
@@ -408,14 +429,14 @@ static int handle_unaligned_access(u16 instruction, struct pt_regs *regs)
 	case 0xA000: /* bra label */
 		ret = handle_unaligned_delayslot(regs);
 		if (ret==0)
-			regs->pc += (instruction&0x0FFF)*2 + 4;
+			regs->pc += SH_PC_12BIT_OFFSET(instruction);
 		break;
 
 	case 0xB000: /* bsr label */
 		ret = handle_unaligned_delayslot(regs);
 		if (ret==0) {
 			regs->pr = regs->pc + 4;
-			regs->pc += (instruction&0x0FFF)*2 + 4;
+			regs->pc += SH_PC_12BIT_OFFSET(instruction);
 		}
 		break;
 	}

@@ -77,17 +77,6 @@ static int multicast_filter_limit = 32;
 MODULE_PARM (multicast_filter_limit, "i");
 MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered multicast addresses");
 
-/* Set the copy breakpoint for the copy-only-tiny-buffer Rx structure. */
-#if defined(__alpha__) || defined(__arm__) || defined(__hppa__) \
-        || defined(__sparc_) || defined(__ia64__) \
-        || defined(__sh__) || defined(__mips__)
-static int rx_copybreak = 1518;
-#else
-static int rx_copybreak = 100;
-#endif
-MODULE_PARM (rx_copybreak, "i");
-MODULE_PARM_DESC (rx_copybreak, "8139cp Breakpoint at which Rx packets are copied");
-
 #define PFX			DRV_NAME ": "
 
 #define CP_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
@@ -334,8 +323,8 @@ static inline void cp_rx_skb (struct cp_private *cp, struct sk_buff *skb)
 	netif_rx (skb);
 }
 
-static inline void cp_rx_err_acct (struct cp_private *cp, unsigned rx_tail,
-				   u32 status, u32 len)
+static void cp_rx_err_acct (struct cp_private *cp, unsigned rx_tail,
+			    u32 status, u32 len)
 {
 	if (netif_msg_rx_err (cp))
 		printk (KERN_DEBUG
@@ -429,8 +418,8 @@ static void cp_rx (struct cp_private *cp)
 	while (rx_work--) {
 		u32 status, len;
 		dma_addr_t mapping;
-		struct sk_buff *skb, *copy_skb;
-		unsigned copying_skb, buflen;
+		struct sk_buff *skb, *new_skb;
+		unsigned buflen;
 
 		skb = cp->rx_skb[rx_tail].skb;
 		if (!skb)
@@ -453,43 +442,30 @@ static void cp_rx (struct cp_private *cp)
 			goto rx_next;
 		}
 
-		copying_skb = (len <= rx_copybreak);
-
 		if (netif_msg_rx_status(cp))
-			printk(KERN_DEBUG "%s: rx slot %d status 0x%x len %d copying? %d\n",
-			       cp->dev->name, rx_tail, status, len,
-			       copying_skb);
+			printk(KERN_DEBUG "%s: rx slot %d status 0x%x len %d\n",
+			       cp->dev->name, rx_tail, status, len);
 
-		buflen = copying_skb ? len : cp->rx_buf_sz;
-		copy_skb = dev_alloc_skb (buflen + RX_OFFSET);
-		if (!copy_skb) {
+		buflen = cp->rx_buf_sz + RX_OFFSET;
+		new_skb = dev_alloc_skb (buflen);
+		if (!new_skb) {
 			cp->net_stats.rx_dropped++;
 			goto rx_next;
 		}
 
-		skb_reserve(copy_skb, RX_OFFSET);
-		copy_skb->dev = cp->dev;
+		skb_reserve(new_skb, RX_OFFSET);
+		new_skb->dev = cp->dev;
 
-		if (!copying_skb) {
-			pci_unmap_single(cp->pdev, mapping,
-					 buflen, PCI_DMA_FROMDEVICE);
-			skb->ip_summed = CHECKSUM_NONE;
-			skb_trim(skb, len);
+		pci_unmap_single(cp->pdev, mapping,
+				 buflen, PCI_DMA_FROMDEVICE);
+		skb->ip_summed = CHECKSUM_NONE;
+		skb_put(skb, len);
 
-			mapping =
-			cp->rx_skb[rx_tail].mapping =
-				pci_map_single(cp->pdev, copy_skb->data,
-					       buflen, PCI_DMA_FROMDEVICE);
-			cp->rx_skb[rx_tail].skb = copy_skb;
-			skb_put(copy_skb, buflen);
-		} else {
-			skb_put(copy_skb, len);
-			pci_dma_sync_single(cp->pdev, mapping, len, PCI_DMA_FROMDEVICE);
-			memcpy(copy_skb->data, skb->data, len);
-
-			/* We'll reuse the original ring buffer. */
-			skb = copy_skb;
-		}
+		mapping =
+		cp->rx_skb[rx_tail].mapping =
+			pci_map_single(cp->pdev, new_skb->tail,
+				       buflen, PCI_DMA_FROMDEVICE);
+		cp->rx_skb[rx_tail].skb = new_skb;
 
 		cp_rx_skb(cp, skb);
 
@@ -884,10 +860,9 @@ static int cp_refill_rx (struct cp_private *cp)
 
 		skb->dev = cp->dev;
 		skb_reserve(skb, RX_OFFSET);
-		skb_put(skb, cp->rx_buf_sz);
 
 		cp->rx_skb[i].mapping = pci_map_single(cp->pdev,
-			skb->data, cp->rx_buf_sz, PCI_DMA_FROMDEVICE);
+			skb->tail, cp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 		cp->rx_skb[i].skb = skb;
 		cp->rx_skb[i].frag = 0;
 
@@ -1045,6 +1020,9 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct cp_private *cp = dev->priv;
 	int rc = 0;
+
+	if (!netif_running(dev))
+		return -EINVAL;
 
 	switch (cmd) {
 	case SIOCETHTOOL:

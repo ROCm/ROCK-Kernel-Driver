@@ -413,6 +413,7 @@ static struct display disp;
 static struct clgenfb_info boards[MAX_NUM_BOARDS];	/* the boards */
 
 static unsigned clgen_def_mode = 1;
+static int noaccel = 0;
 
 static int release_io_ports = 0;
 
@@ -1405,7 +1406,9 @@ static void clgen_set_par (const void *par, struct fb_info_gen *info)
 			break;
 
 		case BT_PICASSO4:
+#ifdef CONFIG_ZORRO
 			vga_wseq (fb_info->regs, CL_SEQRF, 0xb8);	/* ### INCOMPLETE!! */
+#endif
 /*          vga_wseq (fb_info->regs, CL_SEQR1F, 0x1c); */
 			break;
 
@@ -2748,6 +2751,23 @@ int __init clgenfb_init(void)
 
 	DPRINTK ("clgen: (RAM start set to: 0x%p)\n", fb_info->fbmem);
 
+	if (noaccel)
+	{
+		printk("clgen: disabling text acceleration support\n");
+#ifdef FBCON_HAS_CFB8
+		fbcon_clgen_8.bmove = fbcon_cfb8_bmove;
+		fbcon_clgen_8.clear = fbcon_cfb8_clear;
+#endif
+#ifdef FBCON_HAS_CFB16
+		fbcon_clgen_16.bmove = fbcon_cfb16_bmove;
+		fbcon_clgen_16.clear = fbcon_cfb16_clear;
+#endif
+#ifdef FBCON_HAS_CFB32
+		fbcon_clgen_32.bmove = fbcon_cfb32_bmove;
+		fbcon_clgen_32.clear = fbcon_cfb32_clear;
+#endif
+	}
+
 	init_vgachip (fb_info);
 
 	/* set up a few more things, register framebuffer driver etc */
@@ -2851,6 +2871,8 @@ int __init clgenfb_setup(char *options) {
 			if (strcmp (this_opt, s) == 0)
 				clgen_def_mode = i;
 		}
+		if (!strcmp(this_opt, "noaccel"))
+			noaccel = 1;
 	}
 	return 0;
 }

@@ -142,9 +142,8 @@ static void sh_console_write(struct console *co, const char *s,
 
 static kdev_t sh_console_device(struct console *c)
 {
-    	/* TODO: this is totally bogus */
-	/* return MKDEV(SCI_MAJOR, SCI_MINOR_START + c->index); */
-	return 0;
+	/* /dev/null */
+	return mk_kdev(MEM_MAJOR, 3);
 }
 
 /*

@@ -50,12 +50,6 @@ ENTRY(_stext)
 	sub	r1, r0		!
 	ldc	r0, r7_bank	! ... and init_task
 	!
-#if defined(__SH4__)
-	!                       Initialize fpu
-	mov.l   7f, r0
-	jsr     @r0
-	 nop
-#endif
 	!			Enable cache
 	mov.l	6f, r0
 	jsr	@r0
@@ -74,12 +68,9 @@ ENTRY(_stext)
 	 nop
 
 	.balign 4
-1:	.long	0x400000F0		! MD=1, RB=0, BL=0, FD=0, IMASK=0xF
+1:	.long	0x400080F0		! MD=1, RB=0, BL=0, FD=1, IMASK=0xF
 2:	.long	SYMBOL_NAME(stack)
 3:	.long	SYMBOL_NAME(__bss_start)
 4:	.long	SYMBOL_NAME(_end)
 5:	.long	SYMBOL_NAME(start_kernel)
 6:	.long	SYMBOL_NAME(cache_init)
-#if defined(__SH4__)
-7:	.long   SYMBOL_NAME(fpu_init)
-#endif

@@ -1358,7 +1358,7 @@ out:
 
 static int via_mixer_open (struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct via_info *card;
 	struct pci_dev *pdev;
 	struct pci_driver *drvr;
@@ -2974,7 +2974,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 
 static int via_dsp_open (struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct via_info *card;
 	struct pci_dev *pdev;
 	struct via_channel *chan;

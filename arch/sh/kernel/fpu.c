@@ -18,6 +18,10 @@
 #include <asm/processor.h>
 #include <asm/io.h>
 
+/*
+ * Save FPU registers onto task structure.
+ * Assume called with FPU enabled (SR.FD=0).
+ */
 void
 save_fpu(struct task_struct *tsk)
 {
@@ -118,7 +122,8 @@ restore_fpu(struct task_struct *tsk)
  * double precission represents signaling NANS.  
  */
 
-void fpu_init(void)
+static void
+fpu_init(void)
 {
 	asm volatile("lds	%0, fpul\n\t"
 		     "lds	%1, fpscr\n\t"
@@ -160,15 +165,125 @@ void fpu_init(void)
 		     : "r" (0), "r" (FPSCR_INIT));
 }
 
+/**
+ *	denormal_to_double - Given denormalized float number,
+ *	                     store double float
+ *
+ *	@fpu: Pointer to sh_fpu_hard structure
+ *	@n: Index to FP register
+ */
+static void
+denormal_to_double (struct sh_fpu_hard_struct *fpu, int n)
+{
+	unsigned long du, dl;
+	unsigned long x = fpu->fpul;
+	int exp = 1023 - 126;
+
+	if (x != 0 && (x & 0x7f800000) == 0) {
+		du = (x & 0x80000000);
+		while ((x & 0x00800000) == 0) {
+			x <<= 1;
+			exp--;
+		}
+		x &= 0x007fffff;
+		du |= (exp << 20) | (x >> 3);
+		dl = x << 29;
+
+		fpu->fp_regs[n] = du;
+		fpu->fp_regs[n+1] = dl;
+	}
+}
+
+/**
+ *	ieee_fpe_handler - Handle denormalized number exception
+ *
+ *	@regs: Pointer to register structure
+ *
+ *	Returns 1 when it's handled (should not cause exception).
+ */
+static int
+ieee_fpe_handler (struct pt_regs *regs)
+{
+	unsigned short insn = *(unsigned short *) regs->pc;
+	unsigned short finsn;
+	unsigned long nextpc;
+	int nib[4] = {
+		(insn >> 12) & 0xf,
+		(insn >> 8) & 0xf,
+		(insn >> 4) & 0xf,
+		insn & 0xf};
+
+	if (nib[0] == 0xb ||
+	    (nib[0] == 0x4 && nib[2] == 0x0 && nib[3] == 0xb)) /* bsr & jsr */
+		regs->pr = regs->pc + 4;
+  
+	if (nib[0] == 0xa || nib[0] == 0xb) { /* bra & bsr */
+		nextpc = regs->pc + 4 + ((short) ((insn & 0xfff) << 4) >> 3);
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else if (nib[0] == 0x8 && nib[1] == 0xd) { /* bt/s */
+		if (regs->sr & 1)
+			nextpc = regs->pc + 4 + ((char) (insn & 0xff) << 1);
+		else
+			nextpc = regs->pc + 4;
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else if (nib[0] == 0x8 && nib[1] == 0xf) { /* bf/s */
+		if (regs->sr & 1)
+			nextpc = regs->pc + 4;
+		else
+			nextpc = regs->pc + 4 + ((char) (insn & 0xff) << 1);
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else if (nib[0] == 0x4 && nib[3] == 0xb &&
+		 (nib[2] == 0x0 || nib[2] == 0x2)) { /* jmp & jsr */
+		nextpc = regs->regs[nib[1]];
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else if (nib[0] == 0x0 && nib[3] == 0x3 &&
+		 (nib[2] == 0x0 || nib[2] == 0x2)) { /* braf & bsrf */
+		nextpc = regs->pc + 4 + regs->regs[nib[1]];
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else if (insn == 0x000b) { /* rts */
+		nextpc = regs->pr;
+		finsn = *(unsigned short *) (regs->pc + 2);
+	} else {
+		nextpc = regs->pc + 2;
+		finsn = insn;
+	}
+
+	if ((finsn & 0xf1ff) == 0xf0ad) { /* fcnvsd */
+		struct task_struct *tsk = current;
+
+		save_fpu(tsk);
+		if ((tsk->thread.fpu.hard.fpscr & (1 << 17))) {
+			/* FPU error */
+			denormal_to_double (&tsk->thread.fpu.hard,
+					    (finsn >> 8) & 0xf);
+			tsk->thread.fpu.hard.fpscr &=
+				~(FPSCR_CAUSE_MASK | FPSCR_FLAG_MASK);
+			grab_fpu();
+			restore_fpu(tsk);
+			tsk->flags |= PF_USEDFPU;
+		} else {
+			tsk->thread.trap_no = 11;
+			tsk->thread.error_code = 0;
+			force_sig(SIGFPE, tsk);
+		}
+
+		regs->pc = nextpc;
+		return 1;
+	}
+
+	return 0;
+}
+
 asmlinkage void
 do_fpu_error(unsigned long r4, unsigned long r5, unsigned long r6, unsigned long r7,
 	     struct pt_regs regs)
 {
 	struct task_struct *tsk = current;
 
-	regs.pc += 2;
+	if (ieee_fpe_handler (&regs))
+		return;
 
-	grab_fpu();
+	regs.pc += 2;
 	save_fpu(tsk);
 	tsk->thread.trap_no = 11;
 	tsk->thread.error_code = 0;
@@ -181,102 +296,12 @@ do_fpu_state_restore(unsigned long r4, unsigned long r5, unsigned long r6,
 {
 	struct task_struct *tsk = current;
 
-	if (!user_mode(&regs)) {
-		if (tsk != &init_task) {
-			unlazy_fpu(tsk);
-		}
-		tsk = &init_task;
-		if (tsk->flags & PF_USEDFPU) {
-			/*
-			 * This weird situation can be occurred.
-			 *
-			 * There's race condition in __cli:
-			 *
-			 *   (1) SR --> register
-			 *   (2) Set IMASK of register
-			 *   (3) SR <-- register
-			 *
-			 * Between (1) and (2), or (2) and (3) getting
-			 * interrupt, and interrupt handler (or
-			 * softirq) may use FPU.
-			 *
-			 * Then, SR.FD is overwritten by (3).
-			 *
-			 * This results init_task.PF_USEDFPU is on,
-			 * with SR.FD == 1.
-			 *
-			 */
-			release_fpu();
-			return;
-		}
-	}
-
 	grab_fpu();
-	if (tsk->used_math) {
-		/* Using the FPU again.  */
-		restore_fpu(tsk);
-	} else	{
-		/* First time FPU user.  */
-		fpu_init();
-		tsk->used_math = 1;
-	}
-	tsk->flags |= PF_USEDFPU;
-	release_fpu();
-}
-
-/*
- * Change current FD flag to set FD flag back to exception
- */
-asmlinkage void
-fpu_prepare_fd(unsigned long sr, unsigned long r5, unsigned long r6,
-	       unsigned long r7, struct pt_regs regs)
-{
-	__cli();
 	if (!user_mode(&regs)) {
-		if (init_task.flags & PF_USEDFPU)
-			grab_fpu();
-		else {
-			if (!(sr & SR_FD)) {
-				BUG();
-				release_fpu();
-			}
-		}
+		printk(KERN_ERR "BUG: FPU is used in kernel mode.\n");
 		return;
 	}
 
-	if (sr & SR_FD) { /* Kernel doesn't grab FPU */
-		if (current->flags & PF_USEDFPU)
-			grab_fpu();
-		else {
-			if (init_task.flags & PF_USEDFPU) {
-				/*
-				 * This weird situation can be occurred.
-				 * See the comment in do_fpu_state_restore.
-				 */
-				grab_fpu();
-				save_fpu(&init_task);
-			}
-		}
-	} else {
-		if (init_task.flags & PF_USEDFPU)
-			save_fpu(&init_task);
-		else {
-			BUG();
-			release_fpu();
-		}
-	}
-}
-
-/* Short cut for the FPU exception */
-asmlinkage void
-enable_fpu_in_danger(void)
-{
-	struct task_struct *tsk = current;
-
-	if (tsk != &init_task)
-		unlazy_fpu(tsk);
-
-	tsk = &init_task;
 	if (tsk->used_math) {
 		/* Using the FPU again.  */
 		restore_fpu(tsk);

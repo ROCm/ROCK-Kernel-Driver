@@ -537,7 +537,7 @@ printk("PP_addr=0x%x\n", inw(ioaddr + ADD_PORT));
                         dev->dev_addr[i*2+1] = eeprom_buff[i] >> 8;
                 }
 		if (net_debug > 1)
-			printk(KERN_DEBUG "%s: new adapter_cnf: 0%x\n",
+			printk(KERN_DEBUG "%s: new adapter_cnf: 0x%x\n",
 				dev->name, lp->adapter_cnf);
         }
 
@@ -582,8 +582,8 @@ printk("PP_addr=0x%x\n", inw(ioaddr + ADD_PORT));
 		i = lp->isa_config & INT_NO_MASK;
 		if (lp->chip_type == CS8900) {
 			/* Translate the IRQ using the IRQ mapping table. */
-			if (i > sizeof(cs8900_irq_map)/sizeof(cs8900_irq_map[0]))
-				printk("\ncs89x0: bug: isa_config is %d\n", i);
+			if (i >= sizeof(cs8900_irq_map)/sizeof(cs8900_irq_map[0]))
+				printk("\ncs89x0: invalid ISA interrupt number %d\n", i);
 			else
 				i = cs8900_irq_map[i];
 			

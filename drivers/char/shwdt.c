@@ -19,7 +19,6 @@
 #include <linux/watchdog.h>
 #include <linux/reboot.h>
 #include <linux/notifier.h>
-#include <linux/smp_lock.h>
 #include <linux/ioport.h>
 
 #include <asm/io.h>
@@ -47,18 +46,47 @@
 #define WTCSR_CKS1	0x02
 #define WTCSR_CKS0	0x01
 
-#define WTCSR_CKS	0x07
-#define WTCSR_CKS_1	0x00
-#define WTCSR_CKS_4	0x01
-#define WTCSR_CKS_16	0x02
-#define WTCSR_CKS_32	0x03
-#define WTCSR_CKS_64	0x04
-#define WTCSR_CKS_256	0x05
-#define WTCSR_CKS_1024	0x06
+/*
+ * CKS0-2 supports a number of clock division ratios. At the time the watchdog
+ * is enabled, it defaults to a 41 usec overflow period .. we overload this to
+ * something a little more reasonable, and really can't deal with anything
+ * lower than WTCSR_CKS_1024, else we drop back into the usec range.
+ *
+ * Clock Division Ratio         Overflow Period
+ * --------------------------------------------
+ *     1/32 (initial value)       41 usecs
+ *     1/64                       82 usecs
+ *     1/128                     164 usecs
+ *     1/256                     328 usecs
+ *     1/512                     656 usecs
+ *     1/1024                   1.31 msecs
+ *     1/2048                   2.62 msecs
+ *     1/4096                   5.25 msecs
+ */
+#define WTCSR_CKS_32	0x00
+#define WTCSR_CKS_64	0x01
+#define WTCSR_CKS_128	0x02
+#define WTCSR_CKS_256	0x03
+#define WTCSR_CKS_512	0x04
+#define WTCSR_CKS_1024	0x05
+#define WTCSR_CKS_2048	0x06
 #define WTCSR_CKS_4096	0x07
 
-static int sh_is_open = 0;
+/*
+ * Default clock division ratio is 5.25 msecs. Overload this at module load
+ * time. Any value not in the msec range will default to a timeout of one
+ * jiffy, which exceeds the usec overflow periods.
+ */
+static int clock_division_ratio = WTCSR_CKS_4096;
+
+#define msecs_to_jiffies(msecs)	(jiffies + ((HZ * msecs + 999) / 1000))
+#define next_ping_period(cks)	msecs_to_jiffies(cks - 4)
+#define user_ping_period(cks)	(next_ping_period(cks) * 10)
+
+static unsigned long sh_is_open = 0;
 static struct watchdog_info sh_wdt_info;
+static struct timer_list timer;
+static unsigned long next_heartbeat;
 
 /**
  *	sh_wdt_write_cnt - Write to Counter
@@ -93,6 +121,10 @@ static void sh_wdt_write_csr(__u8 val)
  */
 static void sh_wdt_start(void)
 {
+	timer.expires = next_ping_period(clock_division_ratio);
+	next_heartbeat = user_ping_period(clock_division_ratio);
+	add_timer(&timer);
+
 	sh_wdt_write_csr(WTCSR_WT | WTCSR_CKS_4096);
 	sh_wdt_write_cnt(0);
 	sh_wdt_write_csr((ctrl_inb(WTCSR) | WTCSR_TME));
@@ -105,6 +137,8 @@ static void sh_wdt_start(void)
  */
 static void sh_wdt_stop(void)
 {
+	del_timer(&timer);
+
 	sh_wdt_write_csr((ctrl_inb(WTCSR) & ~WTCSR_TME));
 }
 
@@ -117,8 +151,13 @@ static void sh_wdt_stop(void)
  */
 static void sh_wdt_ping(unsigned long data)
 {
-	sh_wdt_write_csr((ctrl_inb(WTCSR) & ~WTCSR_IOVF));
-	sh_wdt_write_cnt(0);
+	if (time_before(jiffies, next_heartbeat)) {
+		sh_wdt_write_csr((ctrl_inb(WTCSR) & ~WTCSR_IOVF));
+		sh_wdt_write_cnt(0);
+
+		timer.expires = next_ping_period(clock_division_ratio);
+		add_timer(&timer);
+	}
 }
 
 /**
@@ -133,14 +172,12 @@ static int sh_wdt_open(struct inode *inode, struct file *file)
 {
 	switch (minor(inode->i_rdev)) {
 		case WATCHDOG_MINOR:
-			if (sh_is_open) {
+			if (test_and_set_bit(0, &sh_is_open))
 				return -EBUSY;
-			}
 
-			sh_is_open = 1;
 			sh_wdt_start();
 
-			return 0;
+			break;
 		default:
 			return -ENODEV;
 	}
@@ -158,17 +195,13 @@ static int sh_wdt_open(struct inode *inode, struct file *file)
  */
 static int sh_wdt_close(struct inode *inode, struct file *file)
 {
-	lock_kernel();
-	
 	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
 		sh_wdt_stop();
 #endif
-		sh_is_open = 0;
+		clear_bit(0, &sh_is_open);
 	}
 	
-	unlock_kernel();
-
 	return 0;
 }
 
@@ -206,7 +239,7 @@ static ssize_t sh_wdt_write(struct file *file, const char *buf,
 		return -ESPIPE;
 
 	if (count) {
-		sh_wdt_ping(0);
+		next_heartbeat = user_ping_period(clock_division_ratio);
 		return 1;
 	}
 
@@ -245,7 +278,7 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 
 			break;
 		case WDIOC_KEEPALIVE:
-			sh_wdt_ping(0);
+			next_heartbeat = user_ping_period(clock_division_ratio);
 			
 			break;
 		default:
@@ -336,6 +369,10 @@ static int __init sh_wdt_init(void)
 		return -EINVAL;
 	}
 
+	init_timer(&timer);
+	timer.function = sh_wdt_ping;
+	timer.data = 0;
+
 	return 0;
 }
 
@@ -358,6 +395,8 @@ EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Paul Mundt <lethal@chaoticdreams.org>");
 MODULE_DESCRIPTION("SH 3/4 watchdog driver");
 MODULE_LICENSE("GPL");
+MODULE_PARM(clock_division_ratio, "i");
+MODULE_PARM_DESC(clock_division_ratio, "Clock division ratio. Valid ranges are from 0x5 (1.31ms) to 0x7 (5.25ms). Defaults to 0x7.");
 
 module_init(sh_wdt_init);
 module_exit(sh_wdt_exit);

@@ -1018,7 +1018,7 @@ void __init smp_boot_cpus(void)
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
-	global_irq_holder = 0;
+	global_irq_holder = NO_PROC_ID;
 	current->cpu = 0;
 	smp_tune_scheduling();
 

@@ -105,9 +105,11 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int dev)
 {
 	struct inode *inode = driverfs_get_inode(dir->i_sb, mode, dev);
-	int error = -ENOSPC;
+	int error = -EPERM;
 
-	if (inode) {
+	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
+	 * comes from the driverfs API below. */
+	if (dentry->d_fsdata && inode) {
 		d_instantiate(dentry, inode);
 		dget(dentry);
 		error = 0;
@@ -239,18 +241,14 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
 	}
+	if (!entry->show)
+		return 0;
 
 	dev = list_entry(entry->parent,struct device, dir);
-	get_device(dev);
-
-	if (!entry->show)
-		goto done;
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
-	if (!page) {
-		retval = -ENOMEM;
-		goto done;
-	}
+	if (!page)
+		return -ENOMEM;
 
 	while (count > 0) {
 		ssize_t len;
@@ -274,9 +272,6 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 		retval += len;
 	}
 	free_page((unsigned long)page);
-
- done:
-	put_device(dev);
 	return retval;
 }
 
@@ -305,12 +300,10 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 		DBG("%s: file entry is NULL\n",__FUNCTION__);
 		return -ENOENT;
 	}
+	if (!entry->store)
+		return 0;
 
 	dev = list_entry(entry->parent,struct device, dir);
-	get_device(dev);
-
-	if (!entry->store)
-		goto done;
 
 	while (count > 0) {
 		ssize_t len;
@@ -327,8 +320,6 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 		*ppos += len;
 		buf += len;
 	}
- done:
-	put_device(dev);
 	return retval;
 }
 
@@ -358,9 +349,28 @@ driverfs_file_lseek(struct file *file, loff_t offset, int orig)
 
 static int driverfs_open_file(struct inode * inode, struct file * filp)
 {
-	if (filp && inode)
-		filp->private_data = inode->u.generic_ip;
+	struct driver_file_entry * entry;
+	struct device * dev;
 
+	entry = (struct driver_file_entry *)inode->u.generic_ip;
+	if (!entry)
+		return -EFAULT;
+	dev = (struct device *)list_entry(entry->parent,struct device,dir);
+	get_device(dev);
+	filp->private_data = entry;
+	return 0;
+}
+
+static int driverfs_flush(struct file * filp)
+{
+	struct driver_file_entry * entry;
+	struct device * dev;
+
+	entry = (struct driver_file_entry *)filp->private_data;
+	if (!entry)
+		return -EFAULT;
+	dev = (struct device *)list_entry(entry->parent,struct device,dir);
+	put_device(dev);
 	return 0;
 }
 
@@ -392,6 +402,7 @@ static struct file_operations driverfs_file_operations = {
 	llseek:		driverfs_file_lseek,
 	mmap:		generic_file_mmap,
 	open:		driverfs_open_file,
+	flush:		driverfs_flush,
 	fsync:		driverfs_sync_file,
 };
 
@@ -623,13 +634,13 @@ driverfs_create_file(struct driver_file_entry * entry,
 	dentry = lookup_hash(&qstr,parent_dentry);
 	if (IS_ERR(dentry))
 		error = PTR_ERR(dentry);
-	else
+	else {
+		dentry->d_fsdata = (void *)entry;
 		error = vfs_create(parent_dentry->d_inode,dentry,entry->mode);
-
+	}
 
 	/* Still good? Ok, then fill in the blanks: */
 	if (!error) {
-		dentry->d_fsdata = (void *)entry;
 		dentry->d_inode->u.generic_ip = (void *)entry;
 
 		entry->dentry = dentry;

@@ -185,6 +185,9 @@ if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then
 fi
 endmenu
 
+mainmenu_option next_comment
+comment 'General options'
+
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
 #bool 'SGI Visual Workstation support' CONFIG_VISWS

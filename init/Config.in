@@ -6,6 +6,8 @@ bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL
 
+endmenu
+
 mainmenu_option next_comment
 comment 'Code maturity level options'
 bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
@@ -19,5 +21,3 @@ if [ "$CONFIG_MODULES" = "y" ]; then
    bool '  Kernel module loader' CONFIG_KMOD
 fi
 endmenu
-
-

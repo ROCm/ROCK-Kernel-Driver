@@ -16,11 +16,16 @@
 
 	Support and updates available at
 	http://www.scyld.com/network/sundance.html
+
+
+	Version 1.01a (jgarzik):
+	- Replace some MII-related magic numbers with constants
+
 */
 
 #define DRV_NAME	"sundance"
-#define DRV_VERSION	"1.01"
-#define DRV_RELDATE	"4/09/00"
+#define DRV_VERSION	"1.01a"
+#define DRV_RELDATE	"11-Nov-2001"
 
 
 /* The user-configurable values.
@@ -443,7 +448,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	int irq;
 	int i;
 	long ioaddr;
-	u16 mii_reg0;
+	u16 mii_ctl;
 	void *ring_space;
 	dma_addr_t ring_dma;
 
@@ -582,15 +587,15 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		}
 	}
 	/* Reset PHY */
-	mdio_write (dev, np->phys[0], 0, 0x8000);
+	mdio_write (dev, np->phys[0], MII_BMCR, BMCR_RESET);
 	mdelay (300);
-	mdio_write (dev, np->phys[0], 0, 0x1200);
+	mdio_write (dev, np->phys[0], MII_BMCR, BMCR_ANENABLE|BMCR_ANRESTART);
 	/* Force media type */
 	if (!np->an_enable) {
-		mii_reg0 = 0;
-		mii_reg0 |= (np->speed == 100) ? 0x2000 : 0;
-		mii_reg0 |= (np->full_duplex) ? 0x0100 : 0;
-		mdio_write (dev, np->phys[0], 0, mii_reg0);
+		mii_ctl = 0;
+		mii_ctl |= (np->speed == 100) ? BMCR_SPEED100 : 0;
+		mii_ctl |= (np->full_duplex) ? BMCR_FULLDPLX : 0;
+		mdio_write (dev, np->phys[0], MII_BMCR, mii_ctl);
 		printk (KERN_INFO "Override speed=%d, %s duplex\n",
 			np->speed, np->full_duplex ? "Full" : "Half");
 
@@ -798,12 +803,12 @@ static void check_duplex(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int mii_reg5 = mdio_read(dev, np->phys[0], 5);
-	int negotiated = mii_reg5 & np->advertising;
+	int mii_lpa = mdio_read(dev, np->phys[0], MII_LPA);
+	int negotiated = mii_lpa & np->advertising;
 	int duplex;
 	
 	/* Force media */
-	if (!np->an_enable || mii_reg5 == 0xffff) {
+	if (!np->an_enable || mii_lpa == 0xffff) {
 		if (np->full_duplex)
 			writew (readw (ioaddr + MACCtrl0) | EnbFullDuplex,
 				ioaddr + MACCtrl0);
@@ -1184,7 +1189,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
-	u16 mii_reg0, mii_reg4, mii_reg5;
+	u16 mii_ctl, mii_advertise, mii_lpa;
 	int speed;
 
 	if (intr_status & IntrDrvRqst) {
@@ -1200,27 +1205,27 @@ static void netdev_error(struct net_device *dev, int intr_status)
 	}
 	if (intr_status & LinkChange) {
 		if (np->an_enable) {
-			mii_reg4 = mdio_read (dev, np->phys[0], 4);
-			mii_reg5= mdio_read (dev, np->phys[0], 5);
-			mii_reg4 &= mii_reg5;
+			mii_advertise = mdio_read (dev, np->phys[0], MII_ADVERTISE);
+			mii_lpa= mdio_read (dev, np->phys[0], MII_LPA);
+			mii_advertise &= mii_lpa;
 			printk (KERN_INFO "%s: Link changed: ", dev->name);
-			if (mii_reg4 & 0x0100)
+			if (mii_advertise & ADVERTISE_100FULL)
 				printk ("100Mbps, full duplex\n");
-			else if (mii_reg4 & 0x0080)
+			else if (mii_advertise & ADVERTISE_100HALF)
 				printk ("100Mbps, half duplex\n");
-			else if (mii_reg4 & 0x0040)
+			else if (mii_advertise & ADVERTISE_10FULL)
 				printk ("10Mbps, full duplex\n");
-			else if (mii_reg4 & 0x0020)
+			else if (mii_advertise & ADVERTISE_10HALF)
 				printk ("10Mbps, half duplex\n");
 			else
 				printk ("\n");
 
 		} else {
-			mii_reg0 = mdio_read (dev, np->phys[0], 0);
-			speed = (mii_reg0 & 0x2000) ? 100 : 10;
+			mii_ctl = mdio_read (dev, np->phys[0], MII_BMCR);
+			speed = (mii_ctl & BMCR_SPEED100) ? 100 : 10;
 			printk (KERN_INFO "%s: Link changed: %dMbps ,",
 				dev->name, speed);
-			printk ("%s duplex.\n", (mii_reg0 & 0x0100) ?
+			printk ("%s duplex.\n", (mii_ctl & BMCR_FULLDPLX) ?
 				"full" : "half");
 		}
 		check_duplex (dev);
