@@ -329,11 +329,11 @@ static void __hbird_write_compare(unsigned long val)
 {
 	unsigned long low = (val & 0xffffffffUL);
 	unsigned long high = (val >> 32UL);
-	unsigned long addr = HBIRD_STICKCMP_ADDR;
+	unsigned long addr = HBIRD_STICKCMP_ADDR + 0x8UL;
 
-	__asm__ __volatile__("stxa	%2, [%0] %4\n\t"
-			     "add	%0, 0x8, %0\n\t"
-			     "stxa	%3, [%0] %4"
+	__asm__ __volatile__("stxa	%3, [%0] %4\n\t"
+			     "sub	%0, 0x8, %0\n\t"
+			     "stxa	%2, [%0] %4"
 			     : "=&r" (addr)
 			     : "0" (addr), "r" (low), "r" (high),
 			       "i" (ASI_PHYS_BYPASS_EC_E));
