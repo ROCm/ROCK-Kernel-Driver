@@ -255,7 +255,7 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	sk = sk_alloc(family, GFP_KERNEL, 1, NULL);
 	if (!sk)
 		return -ENOMEM;
-	sock_init_data(NULL, sk);
+	sock_init_data(sock, sk);
 	sk->sk_state_change = vcc_def_wakeup;
 
 	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
@@ -277,8 +277,6 @@ int vcc_create(struct socket *sock, int protocol, int family)
 	vcc->push_oam = NULL;
 	vcc->vpi = vcc->vci = 0; /* no VCI/VPI yet */
 	vcc->atm_options = vcc->aal_options = 0;
-	init_waitqueue_head(&vcc->sleep);
-	sk->sk_sleep = &vcc->sleep;
 	sk->sk_destruct = vcc_sock_destruct;
 	sock->sk = sk;
 	return 0;
@@ -330,7 +328,7 @@ void vcc_release_async(struct atm_vcc *vcc, int reply)
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	vcc->reply = reply;
 	vcc->sk->sk_err = -reply;
-	wake_up(&vcc->sleep);
+	wake_up(vcc->sk->sk_sleep);
 }
 
 
@@ -577,7 +575,7 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	}
 	/* verify_area is done by net/socket.c */
 	eff = (size+3) & ~3; /* align to word boundary */
-	prepare_to_wait(&vcc->sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	error = 0;
 	while (!(skb = alloc_tx(vcc,eff))) {
 		if (m->msg_flags & MSG_DONTWAIT) {
@@ -598,9 +596,9 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 			error = -EPIPE;
 			break;
 		}
-		prepare_to_wait(&vcc->sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(&vcc->sleep, &wait);
+	finish_wait(sk->sk_sleep, &wait);
 	if (error)
 		goto out;
 	skb->dev = NULL; /* for paths shared with net_device interfaces */
@@ -625,7 +623,7 @@ unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait)
 	unsigned int mask;
 
 	vcc = ATM_SD(sock);
-	poll_wait(file,&vcc->sleep,wait);
+	poll_wait(file, vcc->sk->sk_sleep, wait);
 	mask = 0;
 	if (skb_peek(&vcc->sk->sk_receive_queue))
 		mask |= POLLIN | POLLRDNORM;

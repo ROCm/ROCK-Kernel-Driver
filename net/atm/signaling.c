@@ -61,7 +61,7 @@ static void sigd_put_skb(struct sk_buff *skb)
 #endif
 	atm_force_charge(sigd,skb->truesize);
 	skb_queue_tail(&sigd->sk->sk_receive_queue,skb);
-	wake_up(&sigd->sleep);
+	wake_up(sigd->sk->sk_sleep);
 }
 
 
@@ -137,7 +137,7 @@ static int sigd_send(struct atm_vcc *vcc,struct sk_buff *skb)
 			}
 			vcc->sk->sk_ack_backlog++;
 			skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-			DPRINTK("waking vcc->sleep 0x%p\n", &vcc->sleep);
+			DPRINTK("waking vcc->sk->sk_sleep 0x%p\n", vcc->sk->sk_sleep);
 			vcc->sk->sk_state_change(vcc->sk);
 as_indicate_complete:
 			release_sock(vcc->sk);
@@ -204,7 +204,7 @@ static void purge_vcc(struct atm_vcc *vcc)
 		set_bit(ATM_VF_RELEASED,&vcc->flags);
 		vcc->reply = -EUNATCH;
 		vcc->sk->sk_err = EUNATCH;
-		wake_up(&vcc->sleep);
+		wake_up(vcc->sk->sk_sleep);
 	}
 }
 

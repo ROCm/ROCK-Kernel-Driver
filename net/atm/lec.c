@@ -134,7 +134,7 @@ static void lec_handle_bridge(struct sk_buff *skb, struct net_device *dev)
                 priv = (struct lec_priv *)dev->priv;
                 atm_force_charge(priv->lecd, skb2->truesize);
                 skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb2);
-                wake_up(&priv->lecd->sleep);
+                wake_up(priv->lecd->sk->sk_sleep);
         }
 
         return;
@@ -513,7 +513,7 @@ lec_atm_send(struct atm_vcc *vcc, struct sk_buff *skb)
                         memcpy(skb2->data, mesg, sizeof(struct atmlec_msg));
                         atm_force_charge(priv->lecd, skb2->truesize);
                         skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb2);
-                        wake_up(&priv->lecd->sleep);
+                        wake_up(priv->lecd->sk->sk_sleep);
                 }
                 if (f != NULL) br_fdb_put_hook(f);
 #endif /* defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) */
@@ -598,13 +598,13 @@ send_to_lecd(struct lec_priv *priv, atmlec_msg_type type,
 
         atm_force_charge(priv->lecd, skb->truesize);
 	skb_queue_tail(&priv->lecd->sk->sk_receive_queue, skb);
-        wake_up(&priv->lecd->sleep);
+        wake_up(priv->lecd->sk->sk_sleep);
 
         if (data != NULL) {
                 DPRINTK("lec: about to send %d bytes of data\n", data->len);
                 atm_force_charge(priv->lecd, data->truesize);
                 skb_queue_tail(&priv->lecd->sk->sk_receive_queue, data);
-                wake_up(&priv->lecd->sleep);
+                wake_up(priv->lecd->sk->sk_sleep);
         }
 
         return 0;
@@ -686,7 +686,7 @@ lec_push(struct atm_vcc *vcc, struct sk_buff *skb)
         if (memcmp(skb->data, lec_ctrl_magic, 4) ==0) { /* Control frame, to daemon*/
                 DPRINTK("%s: To daemon\n",dev->name);
                 skb_queue_tail(&vcc->sk->sk_receive_queue, skb);
-                wake_up(&vcc->sleep);
+                wake_up(vcc->sk->sk_sleep);
         } else { /* Data frame, queue to protocol handlers */
                 unsigned char *dst;
 
