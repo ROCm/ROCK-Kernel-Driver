@@ -374,7 +374,9 @@ find_via_pmu(void)
 	printk(KERN_INFO "PMU driver %d initialized for %s, firmware: %02x\n",
 	       PMU_DRIVER_VERSION, pbook_type[pmu_kind], pmu_version);
 	       
+#ifndef CONFIG_PPC64
 	sys_ctrler = SYS_CTRLER_PMU;
+#endif
 	
 	return 1;
 }
@@ -459,7 +461,9 @@ static int __init via_pmu_dev_init(void)
 	if (vias == NULL)
 		return -ENODEV;
 
+#ifndef CONFIG_PPC64
 	request_OF_resource(vias, 0, NULL);
+#endif
 #ifdef CONFIG_PMAC_BACKLIGHT
 	/* Enable backlight */
 	register_backlight_controller(&pmu_backlight_controller, NULL, "pmu");
@@ -590,6 +594,7 @@ pmu_get_model(void)
 	return pmu_kind;
 }
 
+#ifndef CONFIG_PPC64
 static inline void wakeup_decrementer(void)
 {
 	set_dec(tb_ticks_per_jiffy);
@@ -598,6 +603,7 @@ static inline void wakeup_decrementer(void)
 	 */
 	last_jiffy_stamp(0) = tb_last_stamp = get_tbl();
 }
+#endif
 
 static void pmu_set_server_mode(int server_mode)
 {
@@ -1389,7 +1395,7 @@ next:
 			}
 			pmu_done(req);
 		} else {
-#ifdef CONFIG_XMON
+#if defined(CONFIG_XMON) && !defined(CONFIG_PPC64)
 			if (len == 4 && data[1] == 0x2c) {
 				extern int xmon_wants_key, xmon_adb_keycode;
 				if (xmon_wants_key) {
@@ -1397,7 +1403,7 @@ next:
 					return;
 				}
 			}
-#endif /* CONFIG_XMON */
+#endif /* defined(CONFIG_XMON) && !defined(CONFIG_PPC64) */
 #ifdef CONFIG_ADB
 			/*
 			 * XXX On the [23]400 the PMU gives us an up
