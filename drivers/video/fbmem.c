@@ -1089,18 +1089,26 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 	if (var->activate & FB_ACTIVATE_INV_MODE) {
 		struct fb_videomode mode1, mode2;
-		struct fb_event event;
+		int ret = 0;
 
 		fb_var_to_videomode(&mode1, var);
 		fb_var_to_videomode(&mode2, &info->var);
 		/* make sure we don't delete the videomode of current var */
-		if (fb_mode_is_equal(&mode1, &mode2))
-			return -EINVAL;
-		event.info = info;
-		event.data = &mode1;
-		notifier_call_chain(&fb_notifier_list, FB_EVENT_MODE_DELETE,
-				    &event);
-		return 0;
+		ret = fb_mode_is_equal(&mode1, &mode2);
+
+		if (!ret) {
+		    struct fb_event event;
+
+		    event.info = info;
+		    event.data = &mode1;
+		    ret = notifier_call_chain(&fb_notifier_list,
+					      FB_EVENT_MODE_DELETE, &event);
+		}
+
+		if (!ret)
+		    fb_delete_videomode(&mode1, &info->monspecs.modelist);
+
+		return ret;
 	}
 
 	if ((var->activate & FB_ACTIVATE_FORCE) ||

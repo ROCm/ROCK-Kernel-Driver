@@ -2671,8 +2671,8 @@ static void fbcon_modechanged(struct fb_info *info)
 	}
 }
 
-static void fbcon_mode_deleted(struct fb_info *info,
-			       struct fb_videomode *mode)
+static int fbcon_mode_deleted(struct fb_info *info,
+			      struct fb_videomode *mode)
 {
 	struct fb_info *fb_info;
 	struct display *p;
@@ -2694,8 +2694,7 @@ static void fbcon_mode_deleted(struct fb_info *info,
 			break;
 		}
 	}
-	if (!found)
-		fb_delete_videomode(mode, &info->monspecs.modelist);
+	return found;
 }
 
 static int fbcon_event_notify(struct notifier_block *self, 
@@ -2704,6 +2703,7 @@ static int fbcon_event_notify(struct notifier_block *self,
 	struct fb_event *event = (struct fb_event *) data;
 	struct fb_info *info = event->info;
 	struct fb_videomode *mode;
+	int ret = 0;
 
 	switch(action) {
 	case FB_EVENT_SUSPEND:
@@ -2717,11 +2717,11 @@ static int fbcon_event_notify(struct notifier_block *self,
 		break;
 	case FB_EVENT_MODE_DELETE:
 		mode = (struct fb_videomode *) event->data;
-		fbcon_mode_deleted(info, mode);
+		ret = fbcon_mode_deleted(info, mode);
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 
 /*
