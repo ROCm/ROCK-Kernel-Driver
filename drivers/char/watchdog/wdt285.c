@@ -25,7 +25,6 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/smp_lock.h>
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>

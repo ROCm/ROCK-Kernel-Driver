@@ -33,16 +33,10 @@
 #include <linux/config.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
-#include "wd501p.h"
-#include <linux/slab.h>
 #include <linux/ioport.h>
-#include <linux/fcntl.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
@@ -50,6 +44,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
+#include "wd501p.h"
 
 static unsigned long wdt_is_open;
 static int expect_close;

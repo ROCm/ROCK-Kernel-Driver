@@ -25,7 +25,6 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/init.h>
-#include <linux/smp_lock.h>
 #include <linux/watchdog.h>
 
 #include <asm/io.h>
