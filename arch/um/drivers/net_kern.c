@@ -30,6 +30,8 @@
 #include "irq_user.h"
 #include "irq_kern.h"
 
+#define DRIVER_NAME "uml-netdev"
+
 static spinlock_t opened_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(opened);
 
@@ -246,7 +248,7 @@ static int uml_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	static const struct ethtool_drvinfo info = {
 		.cmd     = ETHTOOL_GDRVINFO,
-		.driver  = "uml virtual ethernet",
+		.driver  = DRIVER_NAME,
 		.version = "42",
 	};
 	void *useraddr;
@@ -282,6 +284,12 @@ void uml_net_user_timer_expire(unsigned long _conn)
 
 static spinlock_t devices_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head devices = LIST_HEAD_INIT(devices);
+
+static struct device_driver uml_net_driver = {
+	.name  = DRIVER_NAME,
+	.bus   = &platform_bus_type,
+};
+static int driver_registered;
 
 static int eth_configure(int n, void *init, char *mac,
 			 struct transport *transport)
@@ -323,6 +331,16 @@ static int eth_configure(int n, void *init, char *mac,
 		printk(KERN_ERR "eth_configure: failed to allocate device\n");
 		return 1;
 	}
+
+	/* sysfs register */
+	if (!driver_registered) {
+		driver_register(&uml_net_driver);
+		driver_registered = 1;
+	}
+	device->pdev.id = n;
+	device->pdev.name = DRIVER_NAME;
+	platform_device_register(&device->pdev);
+	SET_NETDEV_DEV(dev,&device->pdev.dev);
 
 	/* If this name ends up conflicting with an existing registered
 	 * netdevice, that is OK, register_netdev{,ice}() will notice this
@@ -559,6 +577,7 @@ __uml_help(eth_setup,
 "    Configure a network device.\n\n"
 );
 
+#if 0
 static int eth_init(void)
 {
 	struct list_head *ele, *next;
@@ -573,8 +592,8 @@ static int eth_init(void)
 	
 	return(1);
 }
-
 __initcall(eth_init);
+#endif
 
 static int net_config(char *str)
 {
@@ -615,6 +634,7 @@ static int net_remove(char *str)
 	if(lp->fd > 0) return(-1);
 	if(lp->remove != NULL) (*lp->remove)(&lp->user);
 	unregister_netdev(dev);
+	platform_device_unregister(&device->pdev);
 
 	list_del(&device->list);
 	kfree(device);
