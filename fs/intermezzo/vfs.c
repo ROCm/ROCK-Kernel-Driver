@@ -407,11 +407,11 @@ int presto_do_create(struct presto_file_set *fset, struct dentry *dir,
         mode &= S_IALLUGO;
         mode |= S_IFREG;
 
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQHIGH); 
 	if (error) {
 		EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
 		return error;
 	}
 
@@ -495,7 +495,7 @@ int presto_do_create(struct presto_file_set *fset, struct dentry *dir,
         presto_trans_commit(fset, handle);
  exit_pre_lock:
 	presto_release_space(fset->fset_cache, PRESTO_REQHIGH); 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         return error;
 }
 
@@ -583,11 +583,11 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
         struct presto_version new_link_ver;
         void *handle;
 
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQHIGH); 
 	if (error) {
 		EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
 		return error;
 	}
         error = -ENOENT;
@@ -662,7 +662,7 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
         presto_trans_commit(fset, handle);
 exit_lock:
 	presto_release_space(fset->fset_cache, PRESTO_REQHIGH); 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         return error;
 }
 
@@ -728,11 +728,11 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
         int do_kml = 0, do_expect =0;
 	int linkno = 0;
         ENTRY;
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
         error = may_delete(dir->d_inode, dentry, 0);
         if (error) {
                 EXIT;
-                up(&dir->d_inode->i_zombie);
+                up(&dir->d_inode->i_sem);
                 return error;
         }
 
@@ -740,14 +740,14 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
         iops = filter_c2cdiops(fset->fset_cache->cache_filter);
         if (!iops->unlink) {
                 EXIT;
-                up(&dir->d_inode->i_zombie);
+                up(&dir->d_inode->i_sem);
                 return error;
         }
 
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQLOW); 
 	if (error) {
 		EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
 		return error;
 	}
 
@@ -757,7 +757,7 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
         if ( IS_ERR(handle) ) {
 		presto_release_space(fset->fset_cache, PRESTO_REQLOW); 
                 printk("ERROR: presto_do_unlink: no space for transaction. Tell Peter.\n");
-                up(&dir->d_inode->i_zombie);
+                up(&dir->d_inode->i_sem);
                 return -ENOSPC;
         }
         DQUOT_INIT(dir->d_inode);
@@ -792,7 +792,7 @@ int presto_do_unlink(struct presto_file_set *fset, struct dentry *dir,
                 goto exit;
         }
 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         if (error) {
                 EXIT;
                 goto exit;
@@ -882,12 +882,12 @@ int presto_do_symlink(struct presto_file_set *fset, struct dentry *dir,
         void *handle;
 
         ENTRY;
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
 	/* record + max path len + space to free */ 
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQHIGH + 4096); 
 	if (error) {
 		EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
 		return error;
 	}
 
@@ -965,7 +965,7 @@ exit:
         presto_trans_commit(fset, handle);
  exit_lock:
 	presto_release_space(fset->fset_cache, PRESTO_REQHIGH + 4096); 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         return error;
 }
 
@@ -1043,12 +1043,12 @@ int presto_do_mkdir(struct presto_file_set *fset, struct dentry *dir,
         void *handle;
 
         ENTRY;
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
 	/* one journal record + directory block + room for removals*/ 
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQHIGH + 4096); 
 	if (error) { 
                 EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
                 return error;
         }
 
@@ -1129,7 +1129,7 @@ exit:
         presto_trans_commit(fset, handle);
  exit_lock:
 	presto_release_space(fset->fset_cache, PRESTO_REQHIGH + 4096); 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         return error;
 }
 
@@ -1241,7 +1241,7 @@ int presto_do_rmdir(struct presto_file_set *fset, struct dentry *dir,
         do_kml = presto_do_kml(info, dir->d_inode);
         do_expect = presto_do_expect(info, dir->d_inode);
 
-        double_down(&dir->d_inode->i_zombie, &dentry->d_inode->i_zombie);
+        double_down(&dir->d_inode->i_sem, &dentry->d_inode->i_sem);
         d_unhash(dentry);
         if (IS_DEADDIR(dir->d_inode))
                 error = -ENOENT;
@@ -1257,7 +1257,7 @@ int presto_do_rmdir(struct presto_file_set *fset, struct dentry *dir,
 					       ATTR_CTIME | ATTR_MTIME);
 		}
         }
-        double_up(&dir->d_inode->i_zombie, &dentry->d_inode->i_zombie);
+        double_up(&dir->d_inode->i_sem, &dentry->d_inode->i_sem);
         if (!error)
                 d_delete(dentry);
         dput(dentry);
@@ -1343,12 +1343,12 @@ int presto_do_mknod(struct presto_file_set *fset, struct dentry *dir,
 
         ENTRY;
 
-        down(&dir->d_inode->i_zombie);
+        down(&dir->d_inode->i_sem);
 	/* one KML entry */ 
 	error = presto_reserve_space(fset->fset_cache, PRESTO_REQHIGH); 
 	if (error) {
 		EXIT;
-        	up(&dir->d_inode->i_zombie);
+        	up(&dir->d_inode->i_sem);
 		return error;
 	}
 
@@ -1429,7 +1429,7 @@ int presto_do_mknod(struct presto_file_set *fset, struct dentry *dir,
         unlock_kernel();
  exit_lock:
 	presto_release_space(fset->fset_cache, PRESTO_REQHIGH); 
-        up(&dir->d_inode->i_zombie);
+        up(&dir->d_inode->i_sem);
         return error;
 }
 
@@ -1624,13 +1624,13 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
                 goto out_unlock;
         target = new_dentry->d_inode;
         if (target) { /* Hastur! Hastur! Hastur! */
-                triple_down(&old_dir->i_zombie,
-                            &new_dir->i_zombie,
-                            &target->i_zombie);
+                triple_down(&old_dir->i_sem,
+                            &new_dir->i_sem,
+                            &target->i_sem);
                 d_unhash(new_dentry);
         } else
-                double_down(&old_dir->i_zombie,
-                            &new_dir->i_zombie);
+                double_down(&old_dir->i_sem,
+                            &new_dir->i_sem);
         if (IS_DEADDIR(old_dir)||IS_DEADDIR(new_dir))
                 error = -ENOENT;
         else if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
@@ -1641,15 +1641,15 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
         if (target) {
                 if (!error)
                         target->i_flags |= S_DEAD;
-                triple_up(&old_dir->i_zombie,
-                          &new_dir->i_zombie,
-                          &target->i_zombie);
+                triple_up(&old_dir->i_sem,
+                          &new_dir->i_sem,
+                          &target->i_sem);
                 if (d_unhashed(new_dentry))
                         d_rehash(new_dentry);
                 dput(new_dentry);
         } else
-                double_up(&old_dir->i_zombie,
-                          &new_dir->i_zombie);
+                double_up(&old_dir->i_sem,
+                          &new_dir->i_sem);
                 
         if (!error)
                 d_move(old_dentry,new_dentry);
@@ -1689,13 +1689,13 @@ int presto_rename_other(struct presto_file_set *fset, struct dentry *old_parent,
 
         DQUOT_INIT(old_dir);
         DQUOT_INIT(new_dir);
-        double_down(&old_dir->i_zombie, &new_dir->i_zombie);
+        double_down(&old_dir->i_sem, &new_dir->i_sem);
         if (d_mountpoint(old_dentry)||d_mountpoint(new_dentry))
                 error = -EBUSY;
         else
                 error = do_rename(fset, old_parent, old_dentry,
                                          new_parent, new_dentry, info);
-        double_up(&old_dir->i_zombie, &new_dir->i_zombie);
+        double_up(&old_dir->i_sem, &new_dir->i_sem);
         if (error)
                 return error;
         /* The following d_move() should become unconditional */
