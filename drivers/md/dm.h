@@ -177,6 +177,9 @@ void dm_linear_exit(void);
 int dm_stripe_init(void);
 void dm_stripe_exit(void);
 
+int kcopyd_init(void);
+void kcopyd_exit(void);
+
 void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size);
 
 #endif

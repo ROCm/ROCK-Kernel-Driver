@@ -153,6 +153,7 @@ static struct {
 	xx(dm_target)
 	xx(dm_linear)
 	xx(dm_stripe)
+	xx(kcopyd)
 	xx(dm_interface)
 #undef xx
 };
