@@ -805,6 +805,7 @@ struct vortex_private {
 	u16 io_size;						/* Size of PCI region (for release_region) */
 	spinlock_t lock;					/* Serialise access to device & its vortex_private */
 	spinlock_t mdio_lock;				/* Serialise access to mdio hardware */
+	struct mii_if_info mii;				/* MII lib hooks/info */
 };
 
 #ifdef CONFIG_PCI
@@ -1220,6 +1221,11 @@ static int __devinit vortex_probe1(struct device *gendev,
 	spin_lock_init(&vp->lock);
 	spin_lock_init(&vp->mdio_lock);
 	vp->gendev = gendev;
+	vp->mii.dev = dev;
+	vp->mii.mdio_read = mdio_read;
+	vp->mii.mdio_write = mdio_write;
+	vp->mii.phy_id_mask = 0x1f;
+	vp->mii.reg_num_mask = 0x1f;
 
 	/* Makes sure rings are at least 16 byte aligned. */
 	vp->rx_ring = pci_alloc_consistent(pdev, sizeof(struct boom_rx_desc) * RX_RING_SIZE
@@ -1454,6 +1460,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 				mdio_write(dev, vp->phys[0], 4, vp->advertising);
 			}
 		}
+		vp->mii.phy_id = vp->phys[0];
 	}
 
 	if (vp->capabilities & CapBusMaster) {
@@ -2900,41 +2907,6 @@ static struct ethtool_ops vortex_ethtool_ops = {
 };
 
 #ifdef CONFIG_PCI
-static int vortex_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	struct vortex_private *vp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
-	struct mii_ioctl_data *data = if_mii(rq);
-	int phy = vp->phys[0] & 0x1f;
-	int retval;
-
-	switch(cmd) {
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = phy;
-
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		EL3WINDOW(4);
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		retval = 0;
-		break;
-
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN)) {
-			retval = -EPERM;
-		} else {
-			EL3WINDOW(4);
-			mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-			retval = 0;
-		}
-		break;
-	default:
-		retval = -EOPNOTSUPP;
-		break;
-	}
-
-	return retval;
-}
-
 /*
  *	Must power the device up to do MDIO operations
  */
@@ -2942,6 +2914,7 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int err;
 	struct vortex_private *vp = netdev_priv(dev);
+	long ioaddr = dev->base_addr;
 	int state = 0;
 
 	if(VORTEX_PCI(vp))
@@ -2951,7 +2924,8 @@ static int vortex_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	if(state != 0)
 		pci_set_power_state(VORTEX_PCI(vp), PCI_D0);
-	err = vortex_do_ioctl(dev, rq, cmd);
+	EL3WINDOW(4);
+	err = generic_mii_ioctl(&vp->mii, if_mii(rq), cmd, NULL);
 	if(state != 0)
 		pci_set_power_state(VORTEX_PCI(vp), state);
 
