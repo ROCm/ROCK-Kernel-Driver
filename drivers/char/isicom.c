@@ -48,6 +48,7 @@
 #include <linux/miscdevice.h>
 #include <linux/interrupt.h>
 #include <linux/timer.h>
+#include <linux/delay.h>
 #include <linux/ioport.h>
 
 #include <asm/uaccess.h>
@@ -1906,8 +1907,7 @@ int init_module(void)
 void cleanup_module(void)
 {
 	re_schedule = 0;
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
+	msleep(1000);
 
 #ifdef ISICOM_DEBUG	
 	printk("ISICOM: isicom_tx tx_count = %ld.\n", tx_count);
