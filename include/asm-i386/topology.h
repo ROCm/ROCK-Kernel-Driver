@@ -80,6 +80,7 @@ static inline cpumask_t pcibus_to_cpumask(int bus)
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_LOAD_BALANCE	\
 				| SD_BALANCE_EXEC	\
+				| SD_WAKE_IDLE		\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\

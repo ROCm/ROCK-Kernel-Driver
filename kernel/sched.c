@@ -935,9 +935,10 @@ static inline unsigned long target_load(int cpu)
 #endif
 
 /*
- * wake_idle() is useful especially on SMT architectures to wake a
- * task onto an idle sibling if we would otherwise wake it onto a
- * busy sibling.
+ * wake_idle() will wake a task on an idle cpu if task->cpu is
+ * not idle and an idle cpu is available.  The span of cpus to
+ * search starts with cpus closest then further out as needed,
+ * so we always favor a closer, idle cpu.
  *
  * Returns the CPU we should wake onto.
  */
@@ -945,24 +946,23 @@ static inline unsigned long target_load(int cpu)
 static int wake_idle(int cpu, task_t *p)
 {
 	cpumask_t tmp;
-	runqueue_t *rq = cpu_rq(cpu);
 	struct sched_domain *sd;
 	int i;
 
 	if (idle_cpu(cpu))
 		return cpu;
 
-	sd = rq->sd;
-	if (!(sd->flags & SD_WAKE_IDLE))
-		return cpu;
-
-	cpus_and(tmp, sd->span, p->cpus_allowed);
-
-	for_each_cpu_mask(i, tmp) {
-		if (idle_cpu(i))
-			return i;
+	for_each_domain(cpu, sd) {
+		if (sd->flags & SD_WAKE_IDLE) {
+			cpus_and(tmp, sd->span, cpu_online_map);
+			cpus_and(tmp, tmp, p->cpus_allowed);
+			for_each_cpu_mask(i, tmp) {
+				if (idle_cpu(i))
+					return i;
+			}
+		}
+		else break;
 	}
-
 	return cpu;
 }
 #else
@@ -1074,7 +1074,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 out_set_cpu:
 	schedstat_inc(rq, ttwu_attempts);
 	new_cpu = wake_idle(new_cpu, p);
-	if (new_cpu != cpu && cpu_isset(new_cpu, p->cpus_allowed)) {
+	if (new_cpu != cpu) {
 		schedstat_inc(rq, ttwu_moved);
 		set_task_cpu(p, new_cpu);
 		task_rq_unlock(rq, &flags);
