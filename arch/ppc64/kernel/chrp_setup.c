@@ -101,13 +101,24 @@ chrp_get_cpuinfo(struct seq_file *m)
 	seq_printf(m, "machine\t\t: CHRP %s\n", model);
 }
 
-void __init chrp_request_regions(void) {
+#define I8042_DATA_REG 0x60
+
+void __init chrp_request_regions(void) 
+{
 	request_region(0x20,0x20,"pic1");
 	request_region(0xa0,0x20,"pic2");
 	request_region(0x00,0x20,"dma1");
 	request_region(0x40,0x20,"timer");
 	request_region(0x80,0x10,"dma page reg");
 	request_region(0xc0,0x20,"dma2");
+
+	/*
+	 * Some machines have an unterminated i8042 so check the device
+	 * tree and reserve the region if it does not appear. Later on
+	 * the i8042 code will try and reserve this region and fail.
+	 */
+	if (!find_type_devices("8042"))
+		request_region(I8042_DATA_REG, 16, "reserved (no i8042)");
 }
 
 void __init
