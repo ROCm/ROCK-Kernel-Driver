@@ -214,7 +214,7 @@ xfs_inode_item_format(
 	xfs_log_iovec_t		*vecp;
 	xfs_inode_t		*ip;
 	size_t			data_bytes;
-	xfs_bmbt_rec_32_t	*ext_buffer;
+	xfs_bmbt_rec_t		*ext_buffer;
 	int			nrecs;
 	xfs_mount_t		*mp;
 
@@ -314,6 +314,7 @@ xfs_inode_item_format(
 			nrecs = ip->i_df.if_bytes /
 				(uint)sizeof(xfs_bmbt_rec_t);
 			ASSERT(nrecs > 0);
+#if ARCH_CONVERT == ARCH_NOCONVERT
 			if (nrecs == ip->i_d.di_nextents) {
 				/*
 				 * There are no delayed allocation
@@ -323,10 +324,14 @@ xfs_inode_item_format(
 				vecp->i_addr =
 					(char *)(ip->i_df.if_u1.if_extents);
 				vecp->i_len = ip->i_df.if_bytes;
-			} else {
+			} else 
+#endif
+			{
 				/*
 				 * There are delayed allocation extents
-				 * in the inode.  Use xfs_iextents_copy()
+				 * in the inode, or we need to convert
+				 * the extents to on disk format.
+				 * Use xfs_iextents_copy()
 				 * to copy only the real extents into
 				 * a separate buffer.  We'll free the
 				 * buffer in the unlock routine.
@@ -336,7 +341,7 @@ xfs_inode_item_format(
 				iip->ili_extents_buf = ext_buffer;
 				vecp->i_addr = (xfs_caddr_t)ext_buffer;
 				vecp->i_len = xfs_iextents_copy(ip, ext_buffer,
-					XFS_DATA_FORK);
+						XFS_DATA_FORK);
 			}
 			ASSERT(vecp->i_len <= ip->i_df.if_bytes);
 			iip->ili_format.ilf_dsize = vecp->i_len;
@@ -428,6 +433,7 @@ xfs_inode_item_format(
 		ASSERT(!(iip->ili_format.ilf_fields &
 			 (XFS_ILOG_ADATA | XFS_ILOG_ABROOT)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_AEXT) {
+			ASSERT(!(iip->ili_format.ilf_fields & XFS_ILOG_DEXT));
 			ASSERT(ip->i_afp->if_bytes > 0);
 			ASSERT(ip->i_afp->if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_anextents > 0);
@@ -437,12 +443,25 @@ xfs_inode_item_format(
 #endif
 			ASSERT(nrecs > 0);
 			ASSERT(nrecs == ip->i_d.di_anextents);
+#if ARCH_CONVERT == ARCH_NOCONVERT
 			/*
 			 * There are not delayed allocation extents
 			 * for attributes, so just point at the array.
 			 */
 			vecp->i_addr = (char *)(ip->i_afp->if_u1.if_extents);
 			vecp->i_len = ip->i_afp->if_bytes;
+#else		
+			ASSERT(iip->ili_aextents_buf == NULL);
+			/*
+			 * Need to endian flip before logging
+			 */
+			ext_buffer = kmem_alloc(ip->i_df.if_bytes,
+				KM_SLEEP);
+			iip->ili_aextents_buf = ext_buffer;
+			vecp->i_addr = (xfs_caddr_t)ext_buffer;
+			vecp->i_len = xfs_iextents_copy(ip, ext_buffer,
+					XFS_ATTR_FORK);
+#endif
 			iip->ili_format.ilf_asize = vecp->i_len;
 			vecp++;
 			nvecs++;
@@ -630,7 +649,6 @@ xfs_inode_item_unlock(
 	 * If the inode needed a separate buffer with which to log
 	 * its extents, then free it now.
 	 */
-	/* FIXME */
 	if (iip->ili_extents_buf != NULL) {
 		ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS);
 		ASSERT(ip->i_d.di_nextents > 0);
@@ -638,6 +656,14 @@ xfs_inode_item_unlock(
 		ASSERT(ip->i_df.if_bytes > 0);
 		kmem_free(iip->ili_extents_buf, ip->i_df.if_bytes);
 		iip->ili_extents_buf = NULL;
+	}
+	if (iip->ili_aextents_buf != NULL) {
+		ASSERT(ip->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS);
+		ASSERT(ip->i_d.di_anextents > 0);
+		ASSERT(iip->ili_format.ilf_fields & XFS_ILOG_AEXT);
+		ASSERT(ip->i_afp->if_bytes > 0);
+		kmem_free(iip->ili_aextents_buf, ip->i_afp->if_bytes);
+		iip->ili_aextents_buf = NULL;
 	}
 
 	/*

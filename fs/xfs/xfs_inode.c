@@ -56,8 +56,9 @@ STATIC int xfs_iformat_btree(xfs_inode_t *, xfs_dinode_t *, int);
  */
 STATIC void
 xfs_validate_extents(
-	xfs_bmbt_rec_32_t	*ep,
+	xfs_bmbt_rec_t		*ep,
 	int			nrecs,
+	int			disk,
 	xfs_exntfmt_t		fmt)
 {
 	xfs_bmbt_irec_t		irec;
@@ -66,14 +67,17 @@ xfs_validate_extents(
 
 	for (i = 0; i < nrecs; i++) {
 		memcpy(&rec, ep, sizeof(rec));
-		xfs_bmbt_get_all(&rec, &irec);
+		if (disk)
+			xfs_bmbt_disk_get_all(&rec, &irec);
+		else
+			xfs_bmbt_get_all(&rec, &irec);
 		if (fmt == XFS_EXTFMT_NOSTATE)
 			ASSERT(irec.br_state == XFS_EXT_NORM);
 		ep++;
 	}
 }
 #else /* DEBUG */
-#define xfs_validate_extents(ep, nrecs, fmt)
+#define xfs_validate_extents(ep, nrecs, disk, fmt)
 #endif /* DEBUG */
 
 /*
@@ -598,9 +602,10 @@ xfs_iformat_extents(
 	int		whichfork)
 {
 	xfs_ifork_t	*ifp;
-	int		nex;
+	int		nex, i;
 	int		real_size;
 	int		size;
+	xfs_bmbt_rec_t	*ep, *dp;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS_ARCH(dip, whichfork, ARCH_CONVERT);
@@ -633,10 +638,18 @@ xfs_iformat_extents(
 	ifp->if_real_bytes = real_size;
 	if (size) {
 		xfs_validate_extents(
-			(xfs_bmbt_rec_32_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, ARCH_CONVERT),
-			nex, XFS_EXTFMT_INODE(ip));
-		memcpy(ifp->if_u1.if_extents,
-			XFS_DFORK_PTR_ARCH(dip, whichfork, ARCH_CONVERT), size);
+			(xfs_bmbt_rec_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, ARCH_CONVERT),
+			nex, 1, XFS_EXTFMT_INODE(ip));
+		dp = (xfs_bmbt_rec_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, ARCH_CONVERT);
+		ep = ifp->if_u1.if_extents;
+#if ARCH_CONVERT != ARCH_NOCONVERT
+		for (i = 0; i < nex; i++, ep++, dp++) {
+			ep->l0 = INT_GET(dp->l0, ARCH_CONVERT);
+			ep->l1 = INT_GET(dp->l1, ARCH_CONVERT);
+		}
+#else
+		memcpy(ep, dp, size);
+#endif
 		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex,
 			whichfork);
 		if (whichfork != XFS_DATA_FORK ||
@@ -979,8 +992,8 @@ xfs_iread_extents(
 		ifp->if_flags &= ~XFS_IFEXTENTS;
 		return error;
 	}
-	xfs_validate_extents((xfs_bmbt_rec_32_t *)ifp->if_u1.if_extents,
-		XFS_IFORK_NEXTENTS(ip, whichfork), XFS_EXTFMT_INODE(ip));
+	xfs_validate_extents((xfs_bmbt_rec_t *)ifp->if_u1.if_extents,
+		XFS_IFORK_NEXTENTS(ip, whichfork), 0, XFS_EXTFMT_INODE(ip));
 	return 0;
 }
 
@@ -2617,11 +2630,11 @@ xfs_iunpin_wait(
 int
 xfs_iextents_copy(
 	xfs_inode_t		*ip,
-	xfs_bmbt_rec_32_t	*buffer,
+	xfs_bmbt_rec_t		*buffer,
 	int			whichfork)
 {
 	int			copied;
-	xfs_bmbt_rec_32_t	*dest_ep;
+	xfs_bmbt_rec_t		*dest_ep;
 	xfs_bmbt_rec_t		*ep;
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_iextents_copy";
@@ -2638,28 +2651,13 @@ xfs_iextents_copy(
 	nrecs = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	xfs_bmap_trace_exlist(fname, ip, nrecs, whichfork);
 	ASSERT(nrecs > 0);
-	if (nrecs == XFS_IFORK_NEXTENTS(ip, whichfork)) {
-		/*
-		 * There are no delayed allocation extents,
-		 * so just copy everything.
-		 */
-		ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
-		ASSERT(ifp->if_bytes ==
-		       (XFS_IFORK_NEXTENTS(ip, whichfork) *
-			(uint)sizeof(xfs_bmbt_rec_t)));
-		memcpy(buffer, ifp->if_u1.if_extents, ifp->if_bytes);
-		xfs_validate_extents(buffer, nrecs, XFS_EXTFMT_INODE(ip));
-		return ifp->if_bytes;
-	}
 
-	ASSERT(whichfork == XFS_DATA_FORK);
 	/*
 	 * There are some delayed allocation extents in the
 	 * inode, so copy the extents one at a time and skip
 	 * the delayed ones.  There must be at least one
 	 * non-delayed extent.
 	 */
-	ASSERT(nrecs > ip->i_d.di_nextents);
 	ep = ifp->if_u1.if_extents;
 	dest_ep = buffer;
 	copied = 0;
@@ -2673,15 +2671,19 @@ xfs_iextents_copy(
 			continue;
 		}
 
-		*dest_ep = *(xfs_bmbt_rec_32_t *)ep;
+#if ARCH_CONVERT != ARCH_NOCONVERT
+		/* Translate to on disk format */
+		dest_ep->l0 = INT_GET(ep->l0, ARCH_CONVERT);
+		dest_ep->l1 = INT_GET(ep->l1, ARCH_CONVERT);
+#else
+		*dest_ep = *ep;
+#endif
 		dest_ep++;
 		ep++;
 		copied++;
 	}
 	ASSERT(copied != 0);
-	ASSERT(copied == ip->i_d.di_nextents);
-	ASSERT((copied * (uint)sizeof(xfs_bmbt_rec_t)) <= XFS_IFORK_DSIZE(ip));
-	xfs_validate_extents(buffer, copied, XFS_EXTFMT_INODE(ip));
+	xfs_validate_extents(buffer, copied, 1, XFS_EXTFMT_INODE(ip));
 
 	return (copied * (uint)sizeof(xfs_bmbt_rec_t));
 }
@@ -2754,7 +2756,7 @@ xfs_iflush_fork(
 		if ((iip->ili_format.ilf_fields & extflag[whichfork]) &&
 		    (ifp->if_bytes > 0)) {
 			ASSERT(XFS_IFORK_NEXTENTS(ip, whichfork) > 0);
-			(void)xfs_iextents_copy(ip, (xfs_bmbt_rec_32_t *)cp,
+			(void)xfs_iextents_copy(ip, (xfs_bmbt_rec_t *)cp,
 				whichfork);
 		}
 		break;

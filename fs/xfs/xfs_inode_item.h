@@ -141,7 +141,10 @@ typedef struct xfs_inode_log_item {
 	unsigned short		ili_flags;	   /* misc flags */
 	unsigned short		ili_logged;	   /* flushed logged data */
 	unsigned int		ili_last_fields;   /* fields when flushed */
-	struct xfs_bmbt_rec_32	*ili_extents_buf;  /* array of logged exts */
+	struct xfs_bmbt_rec_32	*ili_extents_buf;  /* array of logged
+						      data exts */
+	struct xfs_bmbt_rec_32	*ili_aextents_buf; /* array of logged
+						      attr exts */
 	unsigned int		ili_pushbuf_flag;  /* one bit used in push_ail */
 
 #ifdef DEBUG

@@ -3174,7 +3174,7 @@ xfs_bmap_extents_to_btree(
 	xfs_btree_cur_t		*cur;		/* bmap btree cursor */
 	xfs_bmbt_rec_t		*ep;		/* extent list pointer */
 	int			error;		/* error return value */
-	xfs_extnum_t		i;		/* extent list index */
+	xfs_extnum_t		i, cnt;		/* extent list index */
 	xfs_ifork_t		*ifp;		/* inode fork pointer */
 	xfs_bmbt_key_t		*kp;		/* root block key pointer */
 	xfs_mount_t		*mp;		/* mount structure */
@@ -3256,24 +3256,25 @@ xfs_bmap_extents_to_btree(
 	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
 	INT_SET(ablock->bb_magic, ARCH_CONVERT, XFS_BMAP_MAGIC);
 	INT_ZERO(ablock->bb_level, ARCH_CONVERT);
-	INT_ZERO(ablock->bb_numrecs, ARCH_CONVERT);
 	INT_SET(ablock->bb_leftsib, ARCH_CONVERT, NULLDFSBNO);
 	INT_SET(ablock->bb_rightsib, ARCH_CONVERT, NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
-	for (ep = ifp->if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
+	for (ep = ifp->if_u1.if_extents, cnt = i = 0; i < nextents; i++, ep++) {
 		if (!ISNULLSTARTBLOCK(xfs_bmbt_get_startblock(ep))) {
-			*arp++ = *ep;
-			INT_MOD(ablock->bb_numrecs, ARCH_CONVERT, +1);
+			arp->l0 = INT_GET(ep->l0, ARCH_CONVERT);
+			arp->l1 = INT_GET(ep->l1, ARCH_CONVERT);
+			arp++; cnt++;
 		}
 	}
+	INT_SET(ablock->bb_numrecs, ARCH_CONVERT, cnt);
 	ASSERT(INT_GET(ablock->bb_numrecs, ARCH_CONVERT) == XFS_IFORK_NEXTENTS(ip, whichfork));
 	/*
 	 * Fill in the root key and pointer.
 	 */
 	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
-	INT_SET(kp->br_startoff, ARCH_CONVERT, xfs_bmbt_get_startoff(arp));
+	INT_SET(kp->br_startoff, ARCH_CONVERT, xfs_bmbt_disk_get_startoff(arp));
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 	INT_SET(*pp, ARCH_CONVERT, args.fsbno);
 	/*
@@ -4332,7 +4333,7 @@ xfs_bmap_read_extents(
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_read_extents";
 #endif
-	xfs_extnum_t		i;	/* index into the extents list */
+	xfs_extnum_t		i, j;	/* index into the extents list */
 	xfs_ifork_t		*ifp;	/* fork structure */
 	int			level;	/* btree level, for checking */
 	xfs_mount_t		*mp;	/* file system mount structure */
@@ -4389,7 +4390,7 @@ xfs_bmap_read_extents(
 	 * Loop over all leaf nodes.  Copy information to the extent list.
 	 */
 	for (;;) {
-		xfs_bmbt_rec_t	*frp;
+		xfs_bmbt_rec_t	*frp, *temp;
 		xfs_fsblock_t	nextbno;
 		xfs_extnum_t	num_recs;
 
@@ -4417,18 +4418,21 @@ xfs_bmap_read_extents(
 		 */
 		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt,
 			block, 1, mp->m_bmap_dmxr[0]);
-		memcpy(trp, frp, num_recs * sizeof(*frp));
+		temp = trp;
+		for (j = 0; j < num_recs; j++, frp++, trp++) {
+			trp->l0 = INT_GET(frp->l0, ARCH_CONVERT);
+			trp->l1 = INT_GET(frp->l1, ARCH_CONVERT);
+		}
 		if (exntf == XFS_EXTFMT_NOSTATE) {
 			/*
 			 * Check all attribute bmap btree records and
 			 * any "older" data bmap btree records for a
 			 * set bit in the "extent flag" position.
 			 */
-			if (xfs_check_nostate_extents(trp, num_recs)) {
+			if (xfs_check_nostate_extents(temp, num_recs)) {
 				goto error0;
 			}
 		}
-		trp += num_recs;
 		i += num_recs;
 		xfs_trans_brelse(tp, bp);
 		bno = nextbno;
@@ -6257,7 +6261,7 @@ xfs_bmap_count_leaves(
 	int		b;
 
 	for ( b = 1; b <= numrecs; b++, frp++)
-		*count += xfs_bmbt_get_blockcount(frp);
+		*count += xfs_bmbt_disk_get_blockcount(frp);
 	return 0;
 }
 

@@ -520,7 +520,7 @@ void		xfs_iext_realloc(xfs_inode_t *, int, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
-int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
+int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
 int		xfs_ibusy_check(xfs_inode_t *, int);

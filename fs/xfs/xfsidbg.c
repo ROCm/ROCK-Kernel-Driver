@@ -2364,7 +2364,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			r = (xfs_bmbt_rec_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
 
-			xfs_bmbt_get_all((xfs_bmbt_rec_t *)r, &irec);
+			xfs_bmbt_disk_get_all((xfs_bmbt_rec_t *)r, &irec);
 			kdb_printf("rec %d startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
 				i, irec.br_startoff,
 				(__uint64_t)irec.br_startblock, 
