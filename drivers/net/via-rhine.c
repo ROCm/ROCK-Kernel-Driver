@@ -726,21 +726,6 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	if (dev->mem_start)
 		option = dev->mem_start;
 
-	/* The lower four bits are the media type. */
-	if (option > 0) {
-		if (option & 0x200)
-			np->mii_if.full_duplex = 1;
-		np->default_port = option & 15;
-	}
-	if (card_idx < MAX_UNITS  &&  full_duplex[card_idx] > 0)
-		np->mii_if.full_duplex = 1;
-
-	if (np->mii_if.full_duplex) {
-		printk(KERN_INFO "%s: Set to forced full duplex, autonegotiation"
-			   " disabled.\n", dev->name);
-		np->mii_if.force_media = 1;
-	}
-
 	/* The chip-specific entries in the device structure. */
 	dev->open = via_rhine_open;
 	dev->hard_start_xmit = via_rhine_start_tx;
@@ -752,10 +737,26 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 	if (np->drv_flags & ReqTxAlign)
 		dev->features |= NETIF_F_SG|NETIF_F_HW_CSUM;
-	
+
+	/* dev->name not defined before register_netdev()! */
 	i = register_netdev(dev);
 	if (i)
 		goto err_out_unmap;
+
+	/* The lower four bits are the media type. */
+	if (option > 0) {
+		if (option & 0x220)
+			np->mii_if.full_duplex = 1;
+		np->default_port = option & 15;
+	}
+	if (card_idx < MAX_UNITS  &&  full_duplex[card_idx] > 0)
+		np->mii_if.full_duplex = 1;
+
+	if (np->mii_if.full_duplex) {
+		printk(KERN_INFO "%s: Set to forced full duplex, autonegotiation"
+			   " disabled.\n", dev->name);
+		np->mii_if.force_media = 1;
+	}
 
 	printk(KERN_INFO "%s: %s at 0x%lx, ",
 		   dev->name, via_rhine_chip_info[chip_id].name,
@@ -992,6 +993,7 @@ static void init_registers(struct net_device *dev)
 	writeb(0x20, ioaddr + TxConfig);
 	np->tx_thresh = 0x20;
 	np->rx_thresh = 0x60;			/* Written in via_rhine_set_rx_mode(). */
+	np->mii_if.full_duplex = 0;
 
 	if (dev->if_port == 0)
 		dev->if_port = np->default_port;
