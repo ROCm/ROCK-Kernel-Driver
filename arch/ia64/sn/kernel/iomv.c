@@ -54,19 +54,16 @@ void *sn_io_addr(unsigned long port)
 EXPORT_SYMBOL(sn_io_addr);
 
 /**
- * sn_mmiob - I/O space memory barrier
+ * __sn_mmiowb - I/O space memory barrier
  *
- * Acts as a memory mapped I/O barrier for platforms that queue writes to 
- * I/O space.  This ensures that subsequent writes to I/O space arrive after
- * all previous writes.  For most ia64 platforms, this is a simple
- * 'mf.a' instruction.  For other platforms, mmiob() may have to read
- * a chipset register to ensure ordering.
+ * See include/asm-ia64/io.h and Documentation/DocBook/deviceiobook.tmpl
+ * for details.
  *
  * On SN2, we wait for the PIO_WRITE_STATUS SHub register to clear.
  * See PV 871084 for details about the WAR about zero value.
  *
  */
-void sn_mmiob(void)
+void __sn_mmiowb(void)
 {
 	while ((((volatile unsigned long)(*pda->pio_write_status_addr)) &
 		SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_MASK) !=
@@ -74,4 +71,4 @@ void sn_mmiob(void)
 		cpu_relax();
 }
 
-EXPORT_SYMBOL(sn_mmiob);
+EXPORT_SYMBOL(__sn_mmiowb);

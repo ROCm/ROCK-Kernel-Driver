@@ -158,6 +158,8 @@ extern void _outsw_ns(volatile u16 *port, const void *buf, int ns);
 extern void _insl_ns(volatile u32 *port, void *buf, int nl);
 extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
 
+#define mmiowb()
+
 /*
  * output pause versions need a delay at least for the
  * w83c105 ide controller in a p610.

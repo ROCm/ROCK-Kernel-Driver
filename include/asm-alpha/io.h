@@ -495,6 +495,8 @@ extern inline void writeq(u64 b, volatile void __iomem *addr)
 #define readl_relaxed(addr) __raw_readl(addr)
 #define readq_relaxed(addr) __raw_readq(addr)
 
+#define mmiowb()
+
 /*
  * String version of IO memory access ops:
  */

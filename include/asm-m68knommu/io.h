@@ -102,6 +102,8 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 		*bp++ = _swapl(*ap);
 }
 
+#define mmiowb()
+
 /*
  *	make the short names macros so specific devices
  *	can override them as required
