@@ -397,7 +397,8 @@ static inline void __run_timers(tvec_base_t *base)
 
 	spin_lock_irq(&base->lock);
 	while (time_after_eq(jiffies, base->timer_jiffies)) {
-		struct list_head *head;
+		struct list_head work_list = LIST_HEAD_INIT(work_list);
+		struct list_head *head = &work_list;
  		int index = base->timer_jiffies & TVR_MASK;
  
 		/*
@@ -409,8 +410,8 @@ static inline void __run_timers(tvec_base_t *base)
 					!cascade(base, &base->tv4, INDEX(2)))
 			cascade(base, &base->tv5, INDEX(3));
 		++base->timer_jiffies; 
+		list_splice_init(base->tv1.vec + index, &work_list);
 repeat:
-		head = base->tv1.vec + index;
 		if (!list_empty(head)) {
 			void (*fn)(unsigned long);
 			unsigned long data;
