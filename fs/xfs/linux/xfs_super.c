@@ -102,11 +102,11 @@ __uint64_t
 xfs_max_file_offset(
 	unsigned int		blockshift)
 {
-	unsigned int		pageshift = 1;
+	unsigned int		pagefactor = 1;
 
 	/* Figure out maximum filesize, on Linux this can depend on
 	 * the filesystem blocksize (on 32 bit platforms).
-	 * __block_prepare_write does this in an unsigned long...
+	 * __block_prepare_write does this in an [unsigned] long...
 	 *      page->index << (PAGE_CACHE_SHIFT - bbits)
 	 * So, for page sized blocks (4K on 32 bit platforms),
 	 * this wraps at around 8Tb (hence MAX_LFS_FILESIZE which is
@@ -114,16 +114,18 @@ xfs_max_file_offset(
 	 * but for smaller blocksizes it is less (bbits = log2 bsize).
 	 * Note1: get_block_t takes a long (implicit cast from above)
 	 * Note2: The Large Block Device (LBD and HAVE_SECTOR_T) patch
-	 * can optionally convert the unsigned long fropm above into
-	 * an unsigned long long.
+	 * can optionally convert the [unsigned] long from above into
+	 * an [unsigned] long long.
 	 */
 
 #if defined(HAVE_SECTOR_T)
 	ASSERT(sizeof(sector_t) == 8);
+	pagefactor = PAGE_CACHE_SIZE;
 #elif BITS_PER_LONG == 32
-	pageshift = PAGE_CACHE_SHIFT >> (PAGE_CACHE_SHIFT - blockshift);
+	pagefactor = PAGE_CACHE_SIZE >> (PAGE_CACHE_SHIFT - blockshift);
 #endif
-	return (((__uint64_t)pageshift) << (BITS_PER_LONG - 1)) - 1;
+
+	return (((__uint64_t)pagefactor) << (BITS_PER_LONG - 1)) - 1;
 }
 
 STATIC __inline__ void

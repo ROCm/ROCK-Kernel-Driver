@@ -66,6 +66,12 @@
 # define XFS_REALTIME_STRING
 #endif
 
+#if XFS_BIG_FILESYSTEMS
+# define XFS_BIGFS_STRING	"big filesystems, "
+#else
+# define XFS_BIGFS_STRING
+#endif
+
 #ifdef CONFIG_XFS_VNODE_TRACING
 # define XFS_VNTRACE_STRING	"VN-trace, "
 #else
@@ -80,6 +86,7 @@
 
 #define XFS_BUILD_OPTIONS	XFS_ACL_STRING \
 				XFS_REALTIME_STRING \
+				XFS_BIGFS_STRING \
 				XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 
