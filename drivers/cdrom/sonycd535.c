@@ -1448,18 +1448,25 @@ cdu_release(struct inode *inode,
 
 static struct block_device_operations cdu_fops =
 {
-	owner:			THIS_MODULE,
-	open:			cdu_open,
-	release:		cdu_release,
-	ioctl:			cdu_ioctl,
-	check_media_change:	cdu535_check_media_change,
+	.owner			= THIS_MODULE,
+	.open			= cdu_open,
+	.release		= cdu_release,
+	.ioctl			= cdu_ioctl,
+	.check_media_change	= cdu535_check_media_change,
 };
+
+static struct gendisk cdu_disk =
+{
+	.major = MAJOR_NR,
+	.first_minor = 0,
+	.minor_shift = 0,
+	.fops = &cdu_fops,
+	.major_name = "cdu"
 
 /*
  * Initialize the driver.
  */
-int __init 
-sony535_init(void)
+static int __init sony535_init(void)
 {
 	struct s535_sony_drive_config drive_config;
 	Byte cmd_buff[3];
@@ -1648,7 +1655,7 @@ sony535_init(void)
 
 		return -EIO;
 		}
-	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &cdu_fops, 0);
+	add_disk(&cdu_disk);
 	return 0;
 }
 
@@ -1688,7 +1695,7 @@ __setup("sonycd535=", sonycd535_setup);
 #endif /* MODULE */
 
 void __exit
-sony535_exit(void)
+static sony535_exit(void)
 {
 	int i;
 
@@ -1700,15 +1707,14 @@ sony535_exit(void)
 	kfree(sony_toc);
 	devfs_find_and_unregister(NULL, CDU535_HANDLE, 0, 0,
 				  DEVFS_SPECIAL_BLK, 0);
+	del_gendisk(&cdu_disk);
 	if (unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else
 		printk(KERN_INFO CDU535_HANDLE " module released\n");
 }
 
-#ifdef MODULE
 module_init(sony535_init);
-#endif
 module_exit(sony535_exit);
 
 
