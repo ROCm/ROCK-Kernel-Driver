@@ -34,6 +34,7 @@
 #include <linux/capability.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -363,7 +364,7 @@ rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *errp)
 	sz_idx = type>>2;
 	kind = type&3;
 
-	if (kind != 2 && !cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN)) {
+	if (kind != 2 && security_netlink_recv(skb)) {
 		*errp = -EPERM;
 		return -1;
 	}

@@ -614,11 +614,9 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 ETHERNET BRIDGE
-P:	Lennert Buytenhek
-M:	buytenh@gnu.org
 L:	bridge@math.leidenuniv.nl
 W:	http://bridge.sourceforge.net/
-S:	Maintained
+S:	Unmaintained
 
 ETHERTEAM 16I DRIVER
 P:	Mika Kuoppala

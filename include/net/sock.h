@@ -44,6 +44,7 @@
 
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>	/* struct sk_buff */
+#include <linux/security.h>
 
 #ifdef CONFIG_FILTER
 #include <linux/filter.h>
@@ -458,28 +459,45 @@ extern void sock_init_data(struct socket *sock, struct sock *sk);
 #ifdef CONFIG_FILTER
 
 /**
- *	sk_filter - run a packet through a socket filter
+ *	__sk_filter - run a packet through a socket filter
+ *	@sk: sock associated with &sk_buff
  *	@skb: buffer to filter
- *	@filter: filter to apply
+ *	@needlock: set to 1 if the sock is not locked by caller.
  *
  * Run the filter code and then cut skb->data to correct size returned by
  * sk_run_filter. If pkt_len is 0 we toss packet. If skb->len is smaller
  * than pkt_len we keep whole skb->data. This is the socket level
  * wrapper to sk_run_filter. It returns 0 if the packet should
- * be accepted or 1 if the packet should be tossed.
+ * be accepted or -EPERM if the packet should be tossed.
+ *
+ * This function should not be called directly, use sk_filter instead
+ * to ensure that the LSM security check is also performed.
  */
- 
-static inline int sk_filter(struct sk_buff *skb, struct sk_filter *filter)
+
+static inline int __sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
 {
-	int pkt_len;
+	int err = 0;
 
-        pkt_len = sk_run_filter(skb, filter->insns, filter->len);
-        if(!pkt_len)
-                return 1;	/* Toss Packet */
-        else
-                skb_trim(skb, pkt_len);
+	if (sk->filter) {
+		struct sk_filter *filter;
+		
+		if (needlock)
+			bh_lock_sock(sk);
+		
+		filter = sk->filter;
+		if (filter) {
+			int pkt_len = sk_run_filter(skb, filter->insns,
+						    filter->len);
+			if (!pkt_len)
+				err = -EPERM;
+			else
+				skb_trim(skb, pkt_len);
+		}
 
-	return 0;
+		if (needlock)
+			bh_unlock_sock(sk);
+	}
+	return err;
 }
 
 /**
@@ -506,7 +524,25 @@ static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
 	atomic_add(sk_filter_len(fp), &sk->omem_alloc);
 }
 
+#else
+
+static inline int __sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
+{
+	return 0;
+}
+
 #endif /* CONFIG_FILTER */
+
+static inline int sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
+{
+	int err;
+	
+	err = security_sock_rcv_skb(sk, skb);
+	if (err)
+		return err;
+	
+	return __sk_filter(sk, skb, needlock);
+}
 
 /*
  * Socket reference counting postulates.
@@ -712,36 +748,31 @@ static inline void skb_set_owner_r(struct sk_buff *skb, struct sock *sk)
 
 static inline int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
+	int err = 0;
+
 	/* Cast skb->rcvbuf to unsigned... It's pointless, but reduces
 	   number of warnings when compiling with -W --ANK
 	 */
-	if (atomic_read(&sk->rmem_alloc) + skb->truesize >= (unsigned)sk->rcvbuf)
-                return -ENOMEM;
-
-#ifdef CONFIG_FILTER
-	if (sk->filter) {
-		int err = 0;
-		struct sk_filter *filter;
-
-		/* It would be deadlock, if sock_queue_rcv_skb is used
-		   with socket lock! We assume that users of this
-		   function are lock free.
-		 */
-		bh_lock_sock(sk);
-		if ((filter = sk->filter) != NULL && sk_filter(skb, filter))
-			err = -EPERM;
-		bh_unlock_sock(sk);
-		if (err)
-			return err;	/* Toss packet */
+	if (atomic_read(&sk->rmem_alloc) + skb->truesize >= (unsigned)sk->rcvbuf) {
+		err = -ENOMEM;
+		goto out;
 	}
-#endif /* CONFIG_FILTER */
+
+	/* It would be deadlock, if sock_queue_rcv_skb is used
+	   with socket lock! We assume that users of this
+	   function are lock free.
+	*/
+	err = sk_filter(sk, skb, 1);
+	if (err)
+		goto out;
 
 	skb->dev = NULL;
 	skb_set_owner_r(skb, sk);
 	skb_queue_tail(&sk->receive_queue, skb);
 	if (!sk->dead)
 		sk->data_ready(sk,skb->len);
-	return 0;
+out:
+	return err;
 }
 
 static inline int sock_queue_err_skb(struct sock *sk, struct sk_buff *skb)
