@@ -1274,9 +1274,7 @@ static ide_startstop_t cdrom_seek_intr (ide_drive_t *drive)
 			 * this condition is far too common, to bother
 			 * users about it
 			 */
-#if 0
-			printk("%s: disabled DSC seek overlap\n", drive->name);
-#endif
+			/* printk("%s: disabled DSC seek overlap\n", drive->name);*/ 
 			drive->dsc_overlap = 0;
 		}
 	}
@@ -2963,8 +2961,10 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	printk(", %dkB Cache", be16_to_cpu(cap.buffer_size));
 
+#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) HWIF(drive)->ide_dma_verbose(drive);
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 
 	return nslots;
@@ -3259,11 +3259,7 @@ static ide_driver_t ide_cdrom_driver = {
 	.version		= IDECD_VERSION,
 	.media			= ide_cdrom,
 	.busy			= 0,
-#ifdef CONFIG_IDEDMA_ONLYDISK
-	.supports_dma		= 0,
-#else
 	.supports_dma		= 1,
-#endif
 	.supports_dsc_overlap	= 1,
 	.cleanup		= ide_cdrom_cleanup,
 	.do_request		= ide_do_rw_cdrom,
