@@ -93,7 +93,7 @@ inline void copy_item_head(struct item_head * p_v_to,
    Returns: -1 if key1 < key2 
    0 if key1 == key2
    1 if key1 > key2 */
-inline int  comp_short_keys (const struct key * le_key, 
+inline int  comp_short_keys (const struct reiserfs_key * le_key,
 			     const struct cpu_key * cpu_key)
 {
   __u32 * p_s_le_u32, * p_s_cpu_u32;
@@ -117,7 +117,7 @@ inline int  comp_short_keys (const struct key * le_key,
    Compare keys using all 4 key fields.
    Returns: -1 if key1 < key2 0
    if key1 = key2 1 if key1 > key2 */
-inline int  comp_keys (const struct key * le_key, const struct cpu_key * cpu_key)
+inline int  comp_keys (const struct reiserfs_key * le_key, const struct cpu_key * cpu_key)
 {
   int retval;
 
@@ -174,7 +174,7 @@ inline int comp_cpu_keys (const struct cpu_key * key1,
     return 0;
 }
 
-inline int comp_short_le_keys (const struct key * key1, const struct key * key2)
+inline int comp_short_le_keys (const struct reiserfs_key * key1, const struct reiserfs_key * key2)
 {
   __u32 * p_s_1_u32, * p_s_2_u32;
   int n_key_length = REISERFS_SHORT_KEY_LEN;
@@ -216,7 +216,7 @@ inline void cpu_key2cpu_key (struct cpu_key * to, const struct cpu_key * from)
 }
 
 
-inline void le_key2cpu_key (struct cpu_key * to, const struct key * from)
+inline void le_key2cpu_key (struct cpu_key * to, const struct reiserfs_key * from)
 {
     to->on_disk_key.k_dir_id = le32_to_cpu (from->k_dir_id);
     to->on_disk_key.k_objectid = le32_to_cpu (from->k_objectid);
@@ -236,9 +236,9 @@ inline void le_key2cpu_key (struct cpu_key * to, const struct key * from)
 
 // this does not say which one is bigger, it only returns 1 if keys
 // are not equal, 0 otherwise
-inline int comp_le_keys (const struct key * k1, const struct key * k2)
+inline int comp_le_keys (const struct reiserfs_key * k1, const struct reiserfs_key * k2)
 {
-    return memcmp (k1, k2, sizeof (struct key));
+    return memcmp (k1, k2, sizeof (struct reiserfs_key));
 }
 
 /**************************************************************************
@@ -272,7 +272,7 @@ inline	int bin_search (
     int   n_rbound, n_lbound, n_j;
 
    for ( n_j = ((n_rbound = p_n_num - 1) + (n_lbound = 0))/2; n_lbound <= n_rbound; n_j = (n_rbound + n_lbound)/2 )
-     switch( COMP_KEYS((struct key *)((char * )p_v_base + n_j * p_n_width), (struct cpu_key *)p_v_key) )  {
+     switch( COMP_KEYS((struct reiserfs_key *)((char * )p_v_base + n_j * p_n_width), (struct cpu_key *)p_v_key) )  {
      case -1: n_lbound = n_j + 1; continue;
      case  1: n_rbound = n_j - 1; continue;
      case  0: *p_n_pos = n_j;     return ITEM_FOUND; /* Key found in the array.  */
@@ -291,17 +291,17 @@ extern struct tree_balance * cur_tb;
 
 
 /* Minimal possible key. It is never in the tree. */
-const struct key  MIN_KEY = {0, 0, {{0, 0},}};
+const struct reiserfs_key  MIN_KEY = {0, 0, {{0, 0},}};
 
 /* Maximal possible key. It is never in the tree. */
-const struct key  MAX_KEY = {0xffffffff, 0xffffffff, {{0xffffffff, 0xffffffff},}};
+const struct reiserfs_key  MAX_KEY = {0xffffffff, 0xffffffff, {{0xffffffff, 0xffffffff},}};
 
 
 /* Get delimiting key of the buffer by looking for it in the buffers in the path, starting from the bottom
    of the path, and going upwards.  We must check the path's validity at each step.  If the key is not in
    the path, there is no delimiting key in the tree (buffer is first or last buffer in tree), and in this
    case we return a special key, either MIN_KEY or MAX_KEY. */
-inline	const struct  key * get_lkey  (
+inline	const struct  reiserfs_key * get_lkey  (
 	                const struct path         * p_s_chk_path,
                         const struct super_block  * p_s_sb
                       ) {
@@ -340,7 +340,7 @@ inline	const struct  key * get_lkey  (
 
 
 /* Get delimiting key of the buffer at the path and its right neighbor. */
-inline	const struct  key * get_rkey  (
+inline	const struct  reiserfs_key * get_rkey  (
 	                const struct path         * p_s_chk_path,
                         const struct super_block  * p_s_sb
                       ) {
@@ -802,7 +802,7 @@ io_error:
 	{
 	    int pos = p_s_last_element->pe_position;
 	    int limit = B_NR_ITEMS(p_s_bh);
-	    struct key *le_key;
+	    struct reiserfs_key *le_key;
 
 	    if (p_s_search_path->reada & PATH_READA_BACK)
 		limit = 0;
@@ -1247,7 +1247,7 @@ void padd_item (char * item, int total_length, int length)
 }
 
 #ifdef REISERQUOTA_DEBUG
-char key2type(struct key *ih)
+char key2type(struct reiserfs_key *ih)
 {
   if (is_direntry_le_key(2, ih))
     return 'd';
@@ -1417,7 +1417,7 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 /* this deletes item which never gets split */
 void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 				 struct inode *inode,
-				 struct key * key)
+				 struct reiserfs_key * key)
 {
     struct tree_balance tb;
     INITIALIZE_PATH (path);

@@ -133,7 +133,7 @@ static void internal_insert_childs (struct buffer_info * cur_bi,
     struct buffer_head * cur = cur_bi->bi_bh;
     struct block_head * blkh;
     int nr;
-    struct key * ih;
+    struct reiserfs_key * ih;
     struct disk_child new_dc[2];
     struct disk_child * dc;
     int i;
@@ -209,7 +209,7 @@ static void	internal_delete_pointers_items (
   struct buffer_head * cur = cur_bi->bi_bh;
   int nr;
   struct block_head * blkh;
-  struct key * key;
+  struct reiserfs_key * key;
   struct disk_child * dc;
 
   RFALSE( cur == NULL, "buffer is 0");
@@ -300,7 +300,7 @@ static void internal_copy_pointers_items (
   int nr_dest, nr_src;
   int dest_order, src_order;
   struct block_head * blkh;
-  struct key * key;
+  struct reiserfs_key * key;
   struct disk_child * dc;
 
   nr_src = B_NR_ITEMS (src);
@@ -409,7 +409,7 @@ static void internal_insert_key (struct buffer_info * dest_bi,
     struct buffer_head * dest = dest_bi->bi_bh;
     int nr;
     struct block_head * blkh;
-    struct key * key;
+    struct reiserfs_key * key;
 
     RFALSE( dest == NULL || src == NULL,
 	    "source(%p) or dest(%p) buffer is 0", src, dest);

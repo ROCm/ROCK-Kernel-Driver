@@ -106,7 +106,7 @@ void reiserfs_unlockfs(struct super_block *s) {
   reiserfs_allow_writes(s) ;
 }
 
-extern const struct key  MAX_KEY;
+extern const struct reiserfs_key  MAX_KEY;
 
 
 /* this is used to delete "save link" when there are no items of a
@@ -116,7 +116,7 @@ extern const struct key  MAX_KEY;
    protecting unlink is bigger that a key lf "save link" which
    protects truncate), so there left no items to make truncate
    completion on */
-static int remove_save_link_only (struct super_block * s, struct key * key, int oid_free)
+static int remove_save_link_only (struct super_block * s, struct reiserfs_key * key, int oid_free)
 {
     struct reiserfs_transaction_handle th;
     int err;
@@ -140,7 +140,7 @@ static int finish_unfinished (struct super_block * s)
 {
     INITIALIZE_PATH (path);
     struct cpu_key max_cpu_key, obj_key;
-    struct key save_link_key;
+    struct reiserfs_key save_link_key;
     int retval = 0;
     struct item_head * ih;
     struct buffer_head * bh;
@@ -335,7 +335,7 @@ void add_save_link (struct reiserfs_transaction_handle * th,
 int remove_save_link (struct inode * inode, int truncate)
 {
     struct reiserfs_transaction_handle th;
-    struct key key;
+    struct reiserfs_key key;
     int err;
  
     /* we are going to do one balancing only */
