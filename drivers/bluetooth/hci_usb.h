@@ -41,6 +41,9 @@
 #define HCI_MAX_BULK_TX     	4
 #define HCI_MAX_BULK_RX     	1
 
+#define HCI_MAX_ISOC_RX		2
+#define HCI_MAX_ISOC_TX		2
+
 #define HCI_MAX_ISOC_FRAMES     10
 
 struct _urb_queue {

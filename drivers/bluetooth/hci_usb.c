@@ -303,7 +303,8 @@ static int hci_usb_open(struct hci_dev *hdev)
 
 #ifdef CONFIG_BT_USB_SCO
 		if (husb->isoc_iface)
-			hci_usb_isoc_rx_submit(husb);
+			for (i = 0; i < HCI_MAX_ISOC_RX; i++)
+				hci_usb_isoc_rx_submit(husb);
 #endif
 	} else {
 		clear_bit(HCI_RUNNING, &hdev->flags);
@@ -520,7 +521,7 @@ static void hci_usb_tx_process(struct hci_usb *husb)
 #ifdef CONFIG_BT_USB_SCO
 		/* Process SCO queue */
 		q = __transmit_q(husb, HCI_SCODATA_PKT);
-		if (!atomic_read(__pending_tx(husb, HCI_SCODATA_PKT)) &&
+		if (atomic_read(__pending_tx(husb, HCI_SCODATA_PKT)) < HCI_MAX_ISOC_TX &&
 				(skb = skb_dequeue(q))) {
 			if (hci_usb_send_isoc(husb, skb) < 0)
 				skb_queue_head(q, skb);
@@ -828,7 +829,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 #ifdef CONFIG_BT_USB_SCO
 				case USB_ENDPOINT_XFER_ISOC:
-					if (ep->desc.wMaxPacketSize < size)
+					if (ep->desc.wMaxPacketSize < size || a > 2)
 						break;
 					size = ep->desc.wMaxPacketSize;
 
