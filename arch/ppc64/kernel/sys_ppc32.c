@@ -1773,6 +1773,22 @@ do_sys32_shmctl(int first, int second, void *uptr)
 	return err;
 }
 
+static int sys32_semtimedop(int semid, struct sembuf *tsems, int nsems,
+			    const struct compat_timespec *timeout32)
+{
+	struct compat_timespec t32;
+	struct timespec *t64 = compat_alloc_user_space(sizeof(*t64));
+
+	if (copy_from_user(&t32, timeout32, sizeof(t32)))
+		return -EFAULT;
+
+	if (put_user(t32.tv_sec, &t64->tv_sec) ||
+	    put_user(t32.tv_nsec, &t64->tv_nsec))
+		return -EFAULT;
+
+	return sys_semtimedop(semid, tsems, nsems, t64);
+}
+
 /*
  * Note: it is necessary to treat first_parm, second_parm, and
  * third_parm as unsigned ints, with the corresponding cast to a
@@ -1795,8 +1811,12 @@ asmlinkage long sys32_ipc(u32 call, u32 first_parm, u32 second_parm, u32 third_p
 
 	case SEMOP:
 		/* struct sembuf is the same on 32 and 64bit :)) */
-		err = sys_semop(first, (struct sembuf *)AA(ptr),
-				second);
+		err = sys_semtimedop(first, (struct sembuf *)AA(ptr),
+				     second, NULL);
+		break;
+	case SEMTIMEDOP:
+		err = sys32_semtimedop(first, (struct sembuf *)AA(ptr), second,
+				       (const struct compat_timespec *)AA(fifth));
 		break;
 	case SEMGET:
 		err = sys_semget(first, second, third);
@@ -2775,6 +2795,47 @@ long sys32_io_submit(aio_context_t ctx_id, u32 number, u32 *iocbpp)
 
 	put_ioctx(ctx);
 	return i ? i : ret;
+}
+
+int get_compat_timeval(struct timeval *tv, struct compat_timeval *ctv)
+{
+	return (verify_area(VERIFY_READ, ctv, sizeof(*ctv)) ||
+		__get_user(tv->tv_sec, &ctv->tv_sec) ||
+		__get_user(tv->tv_usec, &ctv->tv_usec)) ? -EFAULT : 0;
+}
+
+long sys32_utimes(char *filename, struct compat_timeval *tvs)
+{
+	char *kfilename;
+	struct timeval ktvs[2];
+	mm_segment_t old_fs;
+	long ret;
+
+	kfilename = getname(filename);
+	ret = PTR_ERR(kfilename);
+	if (!IS_ERR(kfilename)) {
+		if (tvs) {
+			if (get_compat_timeval(&ktvs[0], &tvs[0]) ||
+			    get_compat_timeval(&ktvs[1], &tvs[1]))
+				return -EFAULT;
+		}
+
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		ret = do_utimes(kfilename, (tvs ? &ktvs[0] : NULL));
+		set_fs(old_fs);
+
+		putname(kfilename);
+	}
+	return ret;
+}
+
+extern long sys_tgkill(int tgid, int pid, int sig);
+
+long sys32_tgkill(u32 tgid, u32 pid, int sig)
+{
+	/* sign extend tgid, pid */
+	return sys_tgkill((int)tgid, (int)pid, sig);
 }
 
 /* 
