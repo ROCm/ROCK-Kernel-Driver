@@ -46,7 +46,13 @@
 /*
  * Maximum number of events stored
  */
-#define APM_MAX_EVENTS		20
+#define APM_MAX_EVENTS		16
+
+struct apm_queue {
+	unsigned int		event_head;
+	unsigned int		event_tail;
+	apm_event_t		events[APM_MAX_EVENTS];
+};
 
 /*
  * The per-file APM data
@@ -54,27 +60,25 @@
 struct apm_user {
 	struct list_head	list;
 
-	int			suser: 1;
-	int			writer: 1;
-	int			reader: 1;
-	int			suspend_wait: 1;
+	unsigned int		suser: 1;
+	unsigned int		writer: 1;
+	unsigned int		reader: 1;
+
 	int			suspend_result;
+	unsigned int		suspend_state;
+#define SUSPEND_NONE	0		/* no suspend pending */
+#define SUSPEND_PENDING	1		/* suspend pending read */
+#define SUSPEND_READ	2		/* suspend read, pending ack */
+#define SUSPEND_ACKED	3		/* suspend acked */
+#define SUSPEND_DONE	4		/* suspend completed */
 
-	int			suspends_pending;
-	int			standbys_pending;
-	unsigned int		suspends_read;
-	unsigned int		standbys_read;
-
-	int			event_head;
-	int			event_tail;
-	apm_event_t		events[APM_MAX_EVENTS];
+	struct apm_queue	queue;
 };
 
 /*
  * Local variables
  */
 static int suspends_pending;
-static int standbys_pending;
 static int apm_disabled;
 
 static DECLARE_WAIT_QUEUE_HEAD(apm_waitqueue);
@@ -83,14 +87,19 @@ static DECLARE_WAIT_QUEUE_HEAD(apm_suspend_waitqueue);
 /*
  * This is a list of everyone who has opened /dev/apm_bios
  */
-static spinlock_t user_list_lock = SPIN_LOCK_UNLOCKED;
+static DECLARE_RWSEM(user_list_lock);
 static LIST_HEAD(apm_user_list);
 
 /*
- * The kapmd info.
+ * kapmd info.  kapmd provides us a process context to handle
+ * "APM" events within - specifically necessary if we're going
+ * to be suspending the system.
  */
-static struct task_struct *kapmd;
+static DECLARE_WAIT_QUEUE_HEAD(kapmd_wait);
 static DECLARE_COMPLETION(kapmd_exit);
+static spinlock_t kapmd_queue_lock = SPIN_LOCK_UNLOCKED;
+static struct apm_queue kapmd_queue;
+
 
 static const char driver_version[] = "1.13";	/* no spaces */
 
@@ -102,19 +111,6 @@ static const char driver_version[] = "1.13";	/* no spaces */
  */
 static void __apm_get_power_status(struct apm_power_info *info)
 {
-#if 0 && defined(CONFIG_SA1100_H3600) && defined(CONFIG_TOUCHSCREEN_H3600)
-	extern int h3600_apm_get_power_status(u_char *, u_char *, u_char *,
-					      u_char *, u_short *);
-
-	if (machine_is_h3600()) {
-		int dx;
-		h3600_apm_get_power_status(&info->ac_line_status,
-				&info->battery_status, &info->battery_flag,
-				&info->battery_life, &dx);
-		info->time = dx & 0x7fff;
-		info->units = dx & 0x8000 ? 0 : 1;
-	}
-#endif
 }
 
 /*
@@ -123,65 +119,71 @@ static void __apm_get_power_status(struct apm_power_info *info)
 void (*apm_get_power_status)(struct apm_power_info *) = __apm_get_power_status;
 EXPORT_SYMBOL(apm_get_power_status);
 
-static int queue_empty(struct apm_user *as)
+
+/*
+ * APM event queue management.
+ */
+static inline int queue_empty(struct apm_queue *q)
 {
-	return as->event_head == as->event_tail;
+	return q->event_head == q->event_tail;
 }
 
-static apm_event_t get_queued_event(struct apm_user *as)
+static inline apm_event_t queue_get_event(struct apm_queue *q)
 {
-	as->event_tail = (as->event_tail + 1) % APM_MAX_EVENTS;
-	return as->events[as->event_tail];
+	q->event_tail = (q->event_tail + 1) % APM_MAX_EVENTS;
+	return q->events[q->event_tail];
 }
 
-static void queue_event_one_user(struct apm_user *as, apm_event_t event)
+static void queue_add_event(struct apm_queue *q, apm_event_t event)
 {
-	as->event_head = (as->event_head + 1) % APM_MAX_EVENTS;
-	if (as->event_head == as->event_tail) {
+	q->event_head = (q->event_head + 1) % APM_MAX_EVENTS;
+	if (q->event_head == q->event_tail) {
 		static int notified;
 
 		if (notified++ == 0)
 		    printk(KERN_ERR "apm: an event queue overflowed\n");
-		as->event_tail = (as->event_tail + 1) % APM_MAX_EVENTS;
+		q->event_tail = (q->event_tail + 1) % APM_MAX_EVENTS;
 	}
-	as->events[as->event_head] = event;
+	q->events[q->event_head] = event;
+}
 
-	if (!as->suser || !as->writer)
-		return;
+static void queue_event_one_user(struct apm_user *as, apm_event_t event)
+{
+	if (as->suser && as->writer) {
+		switch (event) {
+		case APM_SYS_SUSPEND:
+		case APM_USER_SUSPEND:
+			/*
+			 * If this user already has a suspend pending,
+			 * don't queue another one.
+			 */
+			if (as->suspend_state != SUSPEND_NONE)
+				return;
 
-	switch (event) {
-	case APM_SYS_SUSPEND:
-	case APM_USER_SUSPEND:
-		as->suspends_pending++;
-		suspends_pending++;
-		break;
-
-	case APM_SYS_STANDBY:
-	case APM_USER_STANDBY:
-		as->standbys_pending++;
-		standbys_pending++;
-		break;
+			as->suspend_state = SUSPEND_PENDING;
+			suspends_pending++;
+			break;
+		}
 	}
+	queue_add_event(&as->queue, event);
 }
 
 static void queue_event(apm_event_t event, struct apm_user *sender)
 {
-	struct list_head *l;
+	struct apm_user *as;
 
-	spin_lock(&user_list_lock);
-	list_for_each(l, &apm_user_list) {
-		struct apm_user *as = list_entry(l, struct apm_user, list);
-
+	down_read(&user_list_lock);
+	list_for_each_entry(as, &apm_user_list, list) {
 		if (as != sender && as->reader)
 			queue_event_one_user(as, event);
 	}
-	spin_unlock(&user_list_lock);
+	up_read(&user_list_lock);
 	wake_up_interruptible(&apm_waitqueue);
 }
 
-static int apm_suspend(void)
+static void apm_suspend(void)
 {
-	struct list_head *l;
+	struct apm_user *as;
 	int err = pm_suspend(PM_SUSPEND_MEM);
 
 	/*
@@ -193,52 +195,39 @@ static int apm_suspend(void)
 	/*
 	 * Finally, wake up anyone who is sleeping on the suspend.
 	 */
-	spin_lock(&user_list_lock);
-	list_for_each(l, &apm_user_list) {
-		struct apm_user *as = list_entry(l, struct apm_user, list);
-
+	down_read(&user_list_lock);
+	list_for_each_entry(as, &apm_user_list, list) {
 		as->suspend_result = err;
-		as->suspend_wait = 0;
+		as->suspend_state = SUSPEND_DONE;
 	}
-	spin_unlock(&user_list_lock);
+	up_read(&user_list_lock);
 
 	wake_up_interruptible(&apm_suspend_waitqueue);
-	return err;
 }
 
 static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct apm_user *as = fp->private_data;
 	apm_event_t event;
-	int i = count, ret = 0, nonblock = fp->f_flags & O_NONBLOCK;
+	int i = count, ret = 0;
 
 	if (count < sizeof(apm_event_t))
 		return -EINVAL;
 
-	if (queue_empty(as) && nonblock)
+	if (queue_empty(&as->queue) && fp->f_flags & O_NONBLOCK)
 		return -EAGAIN;
 
-	wait_event_interruptible(apm_waitqueue, !queue_empty(as));
+	wait_event_interruptible(apm_waitqueue, !queue_empty(&as->queue));
 
-	while ((i >= sizeof(event)) && !queue_empty(as)) {
-		event = get_queued_event(as);
-		printk("  apm_read: event=%d\n", event);
+	while ((i >= sizeof(event)) && !queue_empty(&as->queue)) {
+		event = queue_get_event(&as->queue);
 
 		ret = -EFAULT;
 		if (copy_to_user(buf, &event, sizeof(event)))
 			break;
 
-		switch (event) {
-		case APM_SYS_SUSPEND:
-		case APM_USER_SUSPEND:
-			as->suspends_read++;
-			break;
-
-		case APM_SYS_STANDBY:
-		case APM_USER_STANDBY:
-			as->standbys_read++;
-			break;
-		}
+		if (event == APM_SYS_SUSPEND || event == APM_USER_SUSPEND)
+			as->suspend_state = SUSPEND_READ;
 
 		buf += sizeof(event);
 		i -= sizeof(event);
@@ -252,10 +241,10 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 
 static unsigned int apm_poll(struct file *fp, poll_table * wait)
 {
-	struct apm_user * as = fp->private_data;
+	struct apm_user *as = fp->private_data;
 
 	poll_wait(fp, &apm_waitqueue, wait);
-	return queue_empty(as) ? 0 : POLLIN | POLLRDNORM;
+	return queue_empty(&as->queue) ? 0 : POLLIN | POLLRDNORM;
 }
 
 /*
@@ -272,43 +261,57 @@ static int
 apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 {
 	struct apm_user *as = filp->private_data;
+	unsigned long flags;
 	int err = -EINVAL;
 
 	if (!as->suser || !as->writer)
 		return -EPERM;
 
 	switch (cmd) {
-	case APM_IOC_STANDBY:
-		break;
-
 	case APM_IOC_SUSPEND:
-		/*
-		 * If we read a suspend command from /dev/apm_bios,
-		 * then the corresponding APM_IOC_SUSPEND ioctl is
-		 * interpreted as an acknowledge.
-		 */
-		if (as->suspends_read > 0) {
-			as->suspends_read--;
-			as->suspends_pending--;
+		as->suspend_result = -EINTR;
+
+		if (as->suspend_state == SUSPEND_READ) {
+			/*
+			 * If we read a suspend command from /dev/apm_bios,
+			 * then the corresponding APM_IOC_SUSPEND ioctl is
+			 * interpreted as an acknowledge.
+			 */
+			as->suspend_state = SUSPEND_ACKED;
 			suspends_pending--;
 		} else {
+			/*
+			 * Otherwise it is a request to suspend the system.
+			 * Queue an event for all readers, and expect an
+			 * acknowledge from all writers who haven't already
+			 * acknowledged.
+			 */
 			queue_event(APM_USER_SUSPEND, as);
 		}
 
 		/*
-		 * If there are outstanding suspend requests for other
-		 * people on /dev/apm_bios, we must sleep for them.
-		 * Last one to bed turns the lights out.
+		 * If there are no further acknowledges required, suspend
+		 * the system.
 		 */
-		if (suspends_pending > 0) {
-			as->suspend_wait = 1;
-			err = wait_event_interruptible(apm_suspend_waitqueue,
-						 as->suspend_wait == 0);
-			if (err == 0)
-				err = as->suspend_result;
-		} else {			
-			err = apm_suspend();
-		}
+		if (suspends_pending == 0)
+			apm_suspend();
+
+		/*
+		 * Wait for the suspend/resume to complete.  If there are
+		 * pending acknowledges, we wait here for them.
+		 *
+		 * Note that we need to ensure that the PM subsystem does
+		 * not kick us out of the wait when it suspends the threads.
+		 */
+		flags = current->flags;
+		current->flags |= PF_NOFREEZE;
+
+		wait_event_interruptible(apm_suspend_waitqueue,
+					 as->suspend_state == SUSPEND_DONE);
+
+		current->flags = flags;
+		err = as->suspend_result;
+		as->suspend_state = SUSPEND_NONE;
 		break;
 	}
 
@@ -320,24 +323,19 @@ static int apm_release(struct inode * inode, struct file * filp)
 	struct apm_user *as = filp->private_data;
 	filp->private_data = NULL;
 
-	spin_lock(&user_list_lock);
+	down_write(&user_list_lock);
 	list_del(&as->list);
-	spin_unlock(&user_list_lock);
+	up_write(&user_list_lock);
 
 	/*
 	 * We are now unhooked from the chain.  As far as new
 	 * events are concerned, we no longer exist.  However, we
-	 * need to balance standbys_pending and suspends_pending,
-	 * which means the possibility of sleeping.
+	 * need to balance suspends_pending, which means the
+	 * possibility of sleeping.
 	 */
-	if (as->standbys_pending > 0) {
-		standbys_pending -= as->standbys_pending;
-//		if (standbys_pending <= 0)
-//			standby();
-	}
-	if (as->suspends_pending > 0) {
-		suspends_pending -= as->suspends_pending;
-		if (suspends_pending <= 0)
+	if (as->suspend_state != SUSPEND_NONE) {
+		suspends_pending -= 1;
+		if (suspends_pending == 0)
 			apm_suspend();
 	}
 
@@ -364,9 +362,9 @@ static int apm_open(struct inode * inode, struct file * filp)
 		as->writer = (filp->f_mode & FMODE_WRITE) == FMODE_WRITE;
 		as->reader = (filp->f_mode & FMODE_READ) == FMODE_READ;
 
-		spin_lock(&user_list_lock);
+		down_write(&user_list_lock);
 		list_add(&as->list, &apm_user_list);
-		spin_unlock(&user_list_lock);
+		up_write(&user_list_lock);
 
 		filp->private_data = as;
 	}
@@ -438,7 +436,7 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 	info.ac_line_status = 0xff;
 	info.battery_status = 0xff;
 	info.battery_flag   = 0xff;
-	info.battery_life   = 255;
+	info.battery_life   = -1;
 	info.time	    = -1;
 	info.units	    = -1;
 
@@ -461,34 +459,53 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 }
 #endif
 
-#if 0
-static int kapmd(void *startup)
+static int kapmd(void *arg)
 {
-	struct task_struct *tsk = current;
-
-	daemonize();
-	strcpy(tsk->comm, "kapmd");
-	kapmd = tsk;
-
-	spin_lock_irq(&tsk->sigmask_lock);
-	siginitsetinv(&tsk->blocked, sigmask(SIGQUIT));
-	recalc_sigpending(tsk);
-	spin_unlock_irq(&tsk->sigmask_lock);
-
-	complete((struct completion *)startup);
+	daemonize("kapmd");
+	current->flags |= PF_NOFREEZE;
 
 	do {
-		set_task_state(tsk, TASK_INTERRUPTIBLE);
-		schedule();
-	} while (!signal_pending(tsk));
+		apm_event_t event;
+
+		wait_event_interruptible(kapmd_wait,
+				!queue_empty(&kapmd_queue) || !pm_active);
+
+		if (!pm_active)
+			break;
+
+		spin_lock_irq(&kapmd_queue_lock);
+		event = 0;
+		if (!queue_empty(&kapmd_queue))
+			event = queue_get_event(&kapmd_queue);
+		spin_unlock_irq(&kapmd_queue_lock);
+
+		switch (event) {
+		case 0:
+			break;
+
+		case APM_LOW_BATTERY:
+		case APM_POWER_STATUS_CHANGE:
+			queue_event(event, NULL);
+			break;
+
+		case APM_USER_SUSPEND:
+		case APM_SYS_SUSPEND:
+			queue_event(event, NULL);
+			if (suspends_pending == 0)
+				apm_suspend();
+			break;
+
+		case APM_CRITICAL_SUSPEND:
+			apm_suspend();
+			break;
+		}
+	} while (1);
 
 	complete_and_exit(&kapmd_exit, 0);
 }
-#endif
 
 static int __init apm_init(void)
 {
-//	struct completion startup = COMPLETION_INITIALIZER(startup);
 	int ret;
 
 	if (apm_disabled) {
@@ -501,12 +518,13 @@ static int __init apm_init(void)
 		return -EINVAL;
 	}
 
-//	ret = kernel_thread(kapmd, &startup, CLONE_FS | CLONE_FILES);
-//	if (ret)
-//		return ret;
-//	wait_for_completion(&startup);
-
 	pm_active = 1;
+
+	ret = kernel_thread(kapmd, NULL, CLONE_KERNEL);
+	if (ret < 0) {
+		pm_active = 0;
+		return ret;
+	}
 
 #ifdef CONFIG_PROC_FS
 	create_proc_info_entry("apm", 0, NULL, apm_get_info);
@@ -514,9 +532,10 @@ static int __init apm_init(void)
 
 	ret = misc_register(&apm_device);
 	if (ret != 0) {
-		pm_active = 0;
 		remove_proc_entry("apm", NULL);
-		send_sig(SIGQUIT, kapmd, 1);
+
+		pm_active = 0;
+		wake_up(&kapmd_wait);
 		wait_for_completion(&kapmd_exit);
 	}
 
@@ -527,9 +546,10 @@ static void __exit apm_exit(void)
 {
 	misc_deregister(&apm_device);
 	remove_proc_entry("apm", NULL);
+
 	pm_active = 0;
-//	send_sig(SIGQUIT, kapmd, 1);
-//	wait_for_completion(&kapmd_exit);
+	wake_up(&kapmd_wait);
+	wait_for_completion(&kapmd_exit);
 }
 
 module_init(apm_init);
@@ -556,3 +576,27 @@ static int __init apm_setup(char *str)
 
 __setup("apm=", apm_setup);
 #endif
+
+/**
+ * apm_queue_event - queue an APM event for kapmd
+ * @event: APM event
+ *
+ * Queue an APM event for kapmd to process and ultimately take the
+ * appropriate action.  Only a subset of events are handled:
+ *   %APM_LOW_BATTERY
+ *   %APM_POWER_STATUS_CHANGE
+ *   %APM_USER_SUSPEND
+ *   %APM_SYS_SUSPEND
+ *   %APM_CRITICAL_SUSPEND
+ */
+void apm_queue_event(apm_event_t event)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&kapmd_queue_lock, flags);
+	queue_add_event(&kapmd_queue, event);
+	spin_unlock_irqrestore(&kapmd_queue_lock, flags);
+
+	wake_up_interruptible(&kapmd_wait);
+}
+EXPORT_SYMBOL(apm_queue_event);

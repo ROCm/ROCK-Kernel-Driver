@@ -14,6 +14,7 @@
  *  06-Jun-2003 BJD  Added CPU frequency settings
  *  03-Sep-2003 BJD  Linux v2.6 support
  *  12-Mar-2004 BJD  Fixed include protection, fixed type of clock vars
+ *  14-Sep-2004 BJD  Added misccr and getpin to gpio
 */
 
 #ifndef __ASM_ARCH_HARDWARE_H
@@ -60,6 +61,10 @@ extern void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function);
 extern void s3c2410_gpio_pullup(unsigned int pin, unsigned int to);
 
 extern void s3c2410_gpio_setpin(unsigned int pin, unsigned int to);
+
+extern unsigned int s3c2410_gpio_getpin(unsigned int pin);
+
+extern unsigned int s3c2410_modify_misccr(unsigned int clr, unsigned int chg);
 
 #endif /* __ASSEMBLY__ */
 
