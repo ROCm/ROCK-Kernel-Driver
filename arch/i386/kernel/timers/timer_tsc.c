@@ -35,7 +35,7 @@ static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
 int tsc_delay_at_last_interrupt;
 
-static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
+unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
 static unsigned long last_tsc_high; /* msb 32 bits of Time Stamp Counter */
 static unsigned long long monotonic_base;
 static seqlock_t monotonic_lock = SEQLOCK_UNLOCKED;
@@ -76,7 +76,7 @@ static int count2; /* counter for mark_offset_tsc() */
  * Equal to 2^32 * (1 / (clocks per usec) ).
  * Initialized in time_init.
  */
-static unsigned long fast_gettimeoffset_quotient;
+unsigned long fast_gettimeoffset_quotient;
 
 static unsigned long get_offset_tsc(void)
 {
