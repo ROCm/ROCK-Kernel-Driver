@@ -18,7 +18,8 @@
  */
 
 #include <linux/string.h>
-#include <linux/module.h> /* needed for MODULE_PARM */
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include "ieee1394_types.h"
 #include "hosts.h"
@@ -27,9 +28,10 @@
 
 /* Module Parameters */
 /* this module parameter can be used to disable mapping of the FCP registers */
-MODULE_PARM(fcp,"i");
-MODULE_PARM_DESC(fcp, "Map FCP registers (default = 1, disable = 0).");
+
 static int fcp = 1;
+module_param(fcp, int, 0444);
+MODULE_PARM_DESC(fcp, "Map FCP registers (default = 1, disable = 0).");
 
 static u16 csr_crc16(unsigned *data, int length)
 {

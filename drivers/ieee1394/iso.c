@@ -14,7 +14,7 @@
 
 void hpsb_iso_stop(struct hpsb_iso *iso)
 {
-	if(!iso->flags & HPSB_ISO_DRIVER_STARTED)
+	if (!(iso->flags & HPSB_ISO_DRIVER_STARTED))
 		return;
 
 	iso->host->driver->isoctl(iso, iso->type == HPSB_ISO_XMIT ?
