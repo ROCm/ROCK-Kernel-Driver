@@ -195,6 +195,8 @@ static struct pci_device_id voodoo3_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, voodoo3_ids);
+
 static int __devinit voodoo3_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;

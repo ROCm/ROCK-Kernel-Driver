@@ -157,6 +157,8 @@ static struct pci_device_id savage4_ids[] __devinitdata = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, savage4_ids);
+
 static int __devinit savage4_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;

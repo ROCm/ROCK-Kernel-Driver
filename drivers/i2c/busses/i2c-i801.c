@@ -599,6 +599,8 @@ static struct pci_device_id i801_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, i801_ids);
+
 static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 

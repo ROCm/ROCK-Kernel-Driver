@@ -201,6 +201,8 @@ static struct pci_device_id i810_ids[] __devinitdata = {
 	{ 0, },
 };
 
+MODULE_DEVICE_TABLE (pci, i810_ids);
+
 static int __devinit i810_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	int retval;

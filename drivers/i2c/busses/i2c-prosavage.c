@@ -313,6 +313,8 @@ static struct pci_device_id prosavage_pci_tbl[] = {
 	{ 0, },
 };
 
+MODULE_DEVICE_TABLE (pci, prosavage_pci_tbl);
+
 static struct pci_driver prosavage_driver = {
 	.name		=	"prosavage_smbus",
 	.id_table	=	prosavage_pci_tbl,

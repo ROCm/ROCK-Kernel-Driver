@@ -486,6 +486,8 @@ static struct pci_device_id ali15x3_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, ali15x3_ids);
+
 static int __devinit ali15x3_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	if (ali15x3_setup(dev)) {

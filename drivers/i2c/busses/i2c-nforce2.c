@@ -298,6 +298,9 @@ static struct pci_device_id nforce2_ids[] = {
 };
 
 
+MODULE_DEVICE_TABLE (pci, nforce2_ids);
+
+
 static int __devinit nforce2_probe_smb (struct pci_dev *dev, int reg,
 	struct nforce2_smbus *smbus, char *name)
 {
