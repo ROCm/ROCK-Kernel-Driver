@@ -751,6 +751,11 @@
 
 #define S3C2410_MISCCR_nRSTCON	    (1<<16)
 
+#define S3C2410_MISCCR_nEN_SCLK0    (1<<17)
+#define S3C2410_MISCCR_nEN_SCLK1    (1<<18)
+#define S3C2410_MISCCR_nEN_SCLKE    (1<<19)
+#define S3C2410_MISCCR_SDSLEEP	    (7<<17)
+
 /* external interrupt control... */
 /* S3C2410_EXTINT0 -> irq sense control for EINT0..EINT7
  * S3C2410_EXTINT1 -> irq sense control for EINT8..EINT15
