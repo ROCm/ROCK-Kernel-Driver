@@ -349,6 +349,7 @@ e1000_probe(struct pci_dev *pdev,
 	int mmio_len;
 	int pci_using_dac;
 	int i;
+	uint16_t eeprom_data;
 
 	if((i = pci_enable_device(pdev)))
 		return i;
@@ -501,8 +502,9 @@ e1000_probe(struct pci_dev *pdev,
 	 * enable the ACPI Magic Packet filter
 	 */
 
+	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG, &eeprom_data);
 	if((adapter->hw.mac_type >= e1000_82544) &&
-	   (E1000_READ_REG(&adapter->hw, WUC) & E1000_WUC_APME))
+	   (eeprom_data & E1000_EEPROM_APME))
 		adapter->wol |= E1000_WUFC_MAG;
 
 	/* reset the hardware with the new settings */
@@ -2437,14 +2439,19 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-	uint32_t ctrl, ctrl_ext, rctl, manc;
+	uint32_t ctrl, ctrl_ext, rctl, manc, status;
+	uint32_t wufc = adapter->wol;
 
 	netif_device_detach(netdev);
 
 	if(netif_running(netdev))
 		e1000_down(adapter);
 
-	if(adapter->wol) {
+	status = E1000_READ_REG(&adapter->hw, STATUS);
+	if(status & E1000_STATUS_LU)
+		wufc &= ~E1000_WUFC_LNKC;
+
+	if(wufc) {
 		e1000_setup_rctl(adapter);
 		e1000_set_multi(netdev);
 
@@ -2474,7 +2481,7 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 		}
 
 		E1000_WRITE_REG(&adapter->hw, WUC, E1000_WUC_PME_EN);
-		E1000_WRITE_REG(&adapter->hw, WUFC, adapter->wol);
+		E1000_WRITE_REG(&adapter->hw, WUFC, wufc);
 		pci_enable_wake(pdev, 3, 1);
 		pci_enable_wake(pdev, 4, 1); /* 4 == D3 cold */
 	} else {
