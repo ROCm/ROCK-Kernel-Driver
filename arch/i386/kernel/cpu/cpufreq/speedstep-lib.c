@@ -148,11 +148,14 @@ unsigned int speedstep_detect_processor (void)
 		return 0;
 
 	if (c->x86 == 0xF) {
-		/* Intel Pentium 4 Mobile P4-M */
+		/* Intel Mobile Pentium 4-M
+		 * or Intel Mobile Pentium 4 with 533 MHz FSB */
 		if (c->x86_model != 2)
 			return 0;
 
-		if ((c->x86_mask != 4) && (c->x86_mask != 7))
+		if ((c->x86_mask != 4) && /* B-stepping [M-P4-M] */
+			(c->x86_mask != 7) && /* C-stepping [M-P4-M] */
+			(c->x86_mask != 9))   /* D-stepping [M-P4-M or M-P4/533] */
 			return 0;
 
 		ebx = cpuid_ebx(0x00000001);
