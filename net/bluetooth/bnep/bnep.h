@@ -168,11 +168,11 @@ struct bnep_session {
 	u64    mc_filter;
 	
 	struct socket    *sock;
-	struct net_device dev;
+	struct net_device *dev;
 	struct net_device_stats stats;
 };
 
-int bnep_net_init(struct net_device *dev);
+void bnep_net_setup(struct net_device *dev);
 int bnep_sock_init(void);
 int bnep_sock_cleanup(void);
 

@@ -122,6 +122,52 @@ struct ipv6hdr {
 	struct	in6_addr	daddr;
 };
 
+/*
+ * This structure contains configuration options per IPv6 link.
+ */
+struct ipv6_devconf {
+	__s32		forwarding;
+	__s32		hop_limit;
+	__s32		mtu6;
+	__s32		accept_ra;
+	__s32		accept_redirects;
+	__s32		autoconf;
+	__s32		dad_transmits;
+	__s32		rtr_solicits;
+	__s32		rtr_solicit_interval;
+	__s32		rtr_solicit_delay;
+#ifdef CONFIG_IPV6_PRIVACY
+	__s32		use_tempaddr;
+	__s32		temp_valid_lft;
+	__s32		temp_prefered_lft;
+	__s32		regen_max_retry;
+	__s32		max_desync_factor;
+#endif
+	void		*sysctl;
+};
+
+/* index values for the variables in ipv6_devconf */
+enum {
+	DEVCONF_FORWARDING = 0,
+	DEVCONF_HOPLIMIT,
+	DEVCONF_MTU6,
+	DEVCONF_ACCEPT_RA,
+	DEVCONF_ACCEPT_REDIRECTS,
+	DEVCONF_AUTOCONF,
+	DEVCONF_DAD_TRANSMITS,
+	DEVCONF_RTR_SOLICITS,
+	DEVCONF_RTR_SOLICIT_INTERVAL,
+	DEVCONF_RTR_SOLICIT_DELAY,
+#ifdef CONFIG_IPV6_PRIVACY
+	DEVCONF_USE_TEMPADDR,
+	DEVCONF_TEMP_VALID_LFT,
+	DEVCONF_TEMP_PREFERED_LFT,
+	DEVCONF_REGEN_MAX_RETRY,
+	DEVCONF_MAX_DESYNC_FACTOR,
+#endif
+	DEVCONF_MAX
+};
+
 #ifdef __KERNEL__
 #include <linux/in6.h>          /* struct sockaddr_in6 */
 #include <linux/icmpv6.h>

@@ -99,7 +99,7 @@ static int irc_data_fixup(const struct ip_ct_irc_expect *ct_irc_info,
 	struct ip_conntrack_tuple t;
 	struct iphdr *iph = (*pskb)->nh.iph;
 	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
-	int port;
+	u_int16_t port;
 
 	/* "4294967296 65635 " */
 	char buffer[18];
