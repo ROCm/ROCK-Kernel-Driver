@@ -215,6 +215,7 @@ AES algorithm contributors:
   Herbert Valerio Riedel
   Kyle McMartin
   Adam J. Richter
+  Fruhwirth Clemens (i586)
 
 CAST5 algorithm contributors:
   Kartikey Mahendra Bhatt (original developers unknown, FSF copyright).
