@@ -91,13 +91,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/version.h>
 #include <linux/string.h>
 #include <linux/wait.h>
+#include <linux/reboot.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/processor.h>
-#ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
 #include <linux/inetdevice.h>
-#endif
 
 #include <linux/if.h>
 #include <asm/uaccess.h>
@@ -146,6 +145,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define E100_MAX_SCB_WAIT	100	/* Max udelays in wait_scb */
 #define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
+
+/* HWI feature related constant */
+#define HWI_MAX_LOOP                    100
+#define MAX_SAME_RESULTS		3
+#define HWI_REGISTER_GRANULARITY        80	/* register granularity = 80 Cm */
+#define HWI_NEAR_END_BOUNDARY           1000	/* Near end is defined as < 10 meters */
 
 /* CPUSAVER_BUNDLE_MAX: Sets the maximum number of frames that will be bundled.
  * In some situations, such as the TCP windowing algorithm, it may be
@@ -504,6 +509,7 @@ enum led_state_e {
 #define IS_ICH             0x00000020
 #define DF_SPEED_FORCED    0x00000040	/* set if speed is forced */
 #define LED_IS_ON	   0x00000080	/* LED is turned ON by the driver */
+#define DF_LINK_FC_TX_ONLY 0x00000100	/* Received PAUSE frames are honored*/
 
 typedef struct net_device_stats net_dev_stats_t;
 
@@ -774,15 +780,7 @@ typedef struct _tcb_ipcb_t {
 	u16 total_tcp_payload;
 } tcb_ipcb_t __attribute__ ((__packed__));
 
-#ifdef MAX_SKB_FRAGS
-#define E100_ZEROCOPY
-#endif
-
-#ifdef E100_ZEROCOPY
 #define E100_TBD_ARRAY_SIZE (2+MAX_SKB_FRAGS)
-#else
-#define E100_TBD_ARRAY_SIZE 2
-#endif /*E100_ZEROCOPY */
 
 /* Transmit Command Block (TCB)*/
 struct _tcb_t {
@@ -803,19 +801,15 @@ struct _tcb_t {
 	 */
 	tbd_t *tbd_ptr;
 
-#ifdef E100_ZEROCOPY
 	u32 tcb_tbd_dflt_ptr;	/* TBD address for non-segmented packet */
 	u32 tcb_tbd_expand_ptr;	/* TBD address for segmented packet */
-#endif				/*E100_ZEROCOPY */
 
 	struct sk_buff *tcb_skb;	/* the associated socket buffer */
 	dma_addr_t tcb_phys;	/* phys addr of the TCB */
 } __attribute__ ((__packed__));
 
-#ifndef _TCB_T_
 #define _TCB_T_
 typedef struct _tcb_t tcb_t;
-#endif
 
 /* Receive Frame Descriptor (RFD) - will be using the simple model*/
 struct _rfd_t {
@@ -836,10 +830,8 @@ struct _rfd_t {
 
 } __attribute__ ((__packed__));
 
-#ifndef _RFD_T_
 #define _RFD_T_
 typedef struct _rfd_t rfd_t;
-#endif
 
 /* Receive Buffer Descriptor (RBD)*/
 typedef struct _rbd_t {
@@ -901,14 +893,12 @@ struct cfg_params {
 	int PollingMaxWork;
 	u32 b_params;
 };
-#ifdef ETHTOOL_TEST 
 struct ethtool_lpbk_data{
         dma_addr_t dma_handle;
         tcb_t *tcb;
         rfd_t *rfd;
 
 };
-#endif
 
 struct e100_private {
 	u32 flags;		/* board management flags */
@@ -987,28 +977,33 @@ struct e100_private {
 
 	rwlock_t isolate_lock;
 	int driver_isolated;
+	char *id_string;
+	char *cable_status;
+	char *mdix_status;
+
+	/* Variables for HWI */
+	int saved_open_circut;
+	int saved_short_circut;
+	int saved_distance;
+	int saved_i;
+	int saved_same;
+	unsigned char hwi_started;
+	struct timer_list hwi_timer;	/* hwi timer id */
 
 	u32 speed_duplex_caps;	/* adapter's speed/duplex capabilities */
 
 	struct tasklet_struct polling_tasklet;
 
-#ifdef ETHTOOL_GWOL
 	/* WOL params for ethtool */
 	u32 wolsupported;
 	u32 wolopts;
 	u16 ip_lbytes;
-#endif
-#ifdef ETHTOOL_TEST 
 	struct ethtool_lpbk_data loopback;
-#endif
-#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;	/* led blink timer id */
-#endif
 
 #ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
-
 };
 
 #define E100_AUTONEG        0
@@ -1036,8 +1031,6 @@ extern void e100_deisolate_driver(struct e100_private *bdp,
 extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
 					   u32 reset_cmd);
 
-#ifdef ETHTOOL_TEST
-
 #define ROM_TEST_FAIL		0x01
 #define REGISTER_TEST_FAIL	0x02
 #define SELF_TEST_FAIL		0x04
@@ -1053,6 +1046,5 @@ enum test_offsets {
 	E100_LPBK_PHY_FAIL,
 	E100_MAX_TEST_RES
 };
-#endif
 
 #endif

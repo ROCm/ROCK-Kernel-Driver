@@ -124,6 +124,27 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NSC_CONG_CONTROL_REG	    0x17	/* National (TX) congestion control */
 #define NSC_SPEED_IND_REG	    0x19	/* National (TX) speed indication */
 
+#define HWI_CONTROL_REG             0x1D	/* HWI Control register */
+/* MDI/MDI-X Control Register bit definitions */
+#define MDI_MDIX_RES_TIMER          BIT_0_3	/* minimum slot time for resolution timer */
+#define MDI_MDIX_CONFIG_IS_OK       BIT_4	/* 1 = resolution algorithm completes OK */
+#define MDI_MDIX_STATUS             BIT_5	/* 1 = MDIX (croos over), 0 = MDI (straight through) */
+#define MDI_MDIX_SWITCH             BIT_6	/* 1 = Forces to MDIX, 0 = Forces to MDI */
+#define MDI_MDIX_AUTO_SWITCH_ENABLE BIT_7	/* 1 = MDI/MDI-X feature enabled */
+#define MDI_MDIX_CONCT_CONFIG       BIT_8	/* Sets the MDI/MDI-X connectivity configuration (test prupose only) */
+#define MDI_MDIX_CONCT_TEST_ENABLE  BIT_9	/* 1 = Enables connectivity testing */
+#define MDI_MDIX_RESET_ALL_MASK     0x0000
+
+/* HWI Control Register bit definitions */
+#define HWI_TEST_DISTANCE           BIT_0_8	/* distance to cable problem */
+#define HWI_TEST_HIGHZ_PROBLEM      BIT_9	/* 1 = Open Circuit */
+#define HWI_TEST_LOWZ_PROBLEM       BIT_10	/* 1 = Short Circuit */
+#define HWI_TEST_RESERVED           (BIT_11 | BIT_12)	/* reserved */
+#define HWI_TEST_EXECUTE            BIT_13	/* 1 = Execute the HWI test on the PHY */
+#define HWI_TEST_ABILITY            BIT_14	/* 1 = test passed */
+#define HWI_TEST_ENABLE             BIT_15	/* 1 = Enables the HWI feature */
+#define HWI_RESET_ALL_MASK          0x0000
+
 /* ############Start of 82555 specific defines################## */
 
 /* Intel 82555 specific registers */

@@ -70,13 +70,35 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
-
 #define __E1000_MAIN__
 #include "e1000.h"
 
+/* Change Log
+ *
+ * 4.3.2       7/5/02
+ *   o Bug fix: perform controller reset using I/O rather than mmio because
+ *     some chipsets try to perform a 64-bit write, but the controller ignores
+ *     the upper 32-bit write once the reset is intiated by the lower 32-bit
+ *     write, causing a master abort.
+ *   o Bug fix: fixed jumbo frames sized from 1514 to 2048.
+ *   o ASF support: disable ARP when driver is loaded or resumed; enable when 
+ *     driver is removed or suspended.
+ *   o Bug fix: changed default setting for RxIntDelay to 0 for 82542/3/4
+ *     controllers to workaround h/w errata where controller will hang when
+ *     RxIntDelay <> 0 under certian network conditions.
+ *   o Clean up: removed unused and undocumented user-settable settings for
+ *     PHY.
+ *   o Bug fix: ethtool GEEPROM was using byte address rather than word
+ *     addressing.
+ *   o Feature: added support for ethtool SEEPROM.
+ *   o Feature: added support for entropy pool.
+ *
+ * 4.2.17      5/30/02
+ */
+
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.2.17-k1";
+char e1000_driver_version[] = "4.3.2-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -156,7 +178,6 @@ static void e1000_set_multi(struct net_device *netdev);
 static void e1000_update_phy_info(unsigned long data);
 static void e1000_watchdog(unsigned long data);
 static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
-static void e1000_tx_timeout(struct net_device *dev);
 static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
@@ -173,11 +194,11 @@ static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
                                      struct e1000_rx_desc *rx_desc,
                                      struct sk_buff *skb);
-#ifdef NETIF_F_HW_VLAN_TX
+static void e1000_tx_timeout(struct net_device *dev);
+
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
 static void e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid);
-#endif
 
 static int e1000_notify_reboot(struct notifier_block *, unsigned long event, void *ptr);
 static int e1000_suspend(struct pci_dev *pdev, uint32_t state);
@@ -260,7 +281,7 @@ e1000_up(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ,
+	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ | SA_SAMPLE_RANDOM,
 	               netdev->name, netdev))
 		return -1;
 
@@ -380,6 +401,15 @@ e1000_probe(struct pci_dev *pdev,
 	if(!adapter->hw.hw_addr)
 		goto err_ioremap;
 
+	for(i = BAR_1; i <= BAR_5; i++) {
+		if(pci_resource_len(pdev, i) == 0)
+			continue;
+		if(pci_resource_flags(pdev, i) & IORESOURCE_IO) {
+			adapter->hw.io_base = pci_resource_start(pdev, i);
+			break;
+		}
+	}
+
 	netdev->open = &e1000_open;
 	netdev->stop = &e1000_close;
 	netdev->hard_start_xmit = &e1000_xmit_frame;
@@ -390,14 +420,13 @@ e1000_probe(struct pci_dev *pdev,
 	netdev->do_ioctl = &e1000_ioctl;
 	netdev->tx_timeout = &e1000_tx_timeout;
 	netdev->watchdog_timeo = HZ;
-#ifdef NETIF_F_HW_VLAN_TX
 	netdev->vlan_rx_register = e1000_vlan_rx_register;
 	netdev->vlan_rx_add_vid = e1000_vlan_rx_add_vid;
 	netdev->vlan_rx_kill_vid = e1000_vlan_rx_kill_vid;
-#endif
 
 	netdev->irq = pdev->irq;
-	netdev->base_addr = mmio_start;
+	netdev->mem_start = mmio_start;
+	netdev->base_addr = adapter->hw.io_base;
 
 	adapter->bd_number = cards_found;
 	adapter->id_string = e1000_strings[ent->driver_data];
@@ -407,15 +436,11 @@ e1000_probe(struct pci_dev *pdev,
 	e1000_sw_init(adapter);
 
 	if(adapter->hw.mac_type >= e1000_82543) {
-#ifdef NETIF_F_HW_VLAN_TX
 		netdev->features = NETIF_F_SG |
 			           NETIF_F_HW_CSUM |
 		       	           NETIF_F_HW_VLAN_TX |
 		                   NETIF_F_HW_VLAN_RX |
 				   NETIF_F_HW_VLAN_FILTER;
-#else
-		netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM;
-#endif
 	} else {
 		netdev->features = NETIF_F_SG;
 	}
@@ -509,7 +534,16 @@ e1000_remove(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-
+	uint32_t manc;
+	
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		if(manc & E1000_MANC_SMBUS_EN) {
+			manc |= E1000_MANC_ARP_EN;
+			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+		}
+	}
+		
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
@@ -540,18 +574,12 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* PCI config space info */
 
-	uint16_t *vendor = &hw->vendor_id;
-	uint16_t *device = &hw->device_id;
-	uint16_t *subvendor = &hw->subsystem_vendor_id;
-	uint16_t *subsystem = &hw->subsystem_id;
-	uint8_t  *revision  = &hw->revision_id;
-
-	pci_read_config_word(pdev, PCI_VENDOR_ID, vendor);
-	pci_read_config_word(pdev, PCI_DEVICE_ID, device);
-	pci_read_config_byte(pdev, PCI_REVISION_ID, revision);
-	pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, subvendor);
-	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, subsystem);
-
+	pci_read_config_word(pdev, PCI_VENDOR_ID, &hw->vendor_id);
+	pci_read_config_word(pdev, PCI_DEVICE_ID, &hw->device_id);
+	pci_read_config_word(pdev, PCI_SUBSYSTEM_VENDOR_ID, 
+	                     &hw->subsystem_vendor_id);
+	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &hw->subsystem_id);
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &hw->revision_id);
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
 
 	adapter->rx_buffer_len = E1000_RXBUFFER_2048;
@@ -561,9 +589,9 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* identify the MAC */
 
-	switch (*device) {
+	switch (hw->device_id) {
 	case E1000_DEV_ID_82542:
-		switch (*revision) {
+		switch (hw->revision_id) {
 		case E1000_82542_2_0_REV_ID:
 			hw->mac_type = e1000_82542_rev2_0;
 			break;
@@ -597,7 +625,7 @@ e1000_sw_init(struct e1000_adapter *adapter)
 		hw->mac_type = e1000_82546;
 		break;
 	default:
-		/* should never have loaded on this device */
+		E1000_ERR("Should never have loaded on this device\n");
 		BUG();
 	}
 
@@ -629,6 +657,13 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->wait_autoneg_complete = FALSE;
 	hw->tbi_compatibility_en = TRUE;
 	hw->adaptive_ifs = TRUE;
+
+	/* Copper options */
+	
+	if(hw->media_type == e1000_media_type_copper) {
+		hw->mdix = AUTO_ALL_MODES;
+		hw->disable_polarity_correction = FALSE;
+	}
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->stats_lock);
@@ -1089,20 +1124,16 @@ e1000_clean_rx_ring(struct e1000_adapter *adapter)
 static void
 e1000_enter_82542_rst(struct e1000_adapter *adapter)
 {
-	struct pci_dev *pdev = adapter->pdev;
 	struct net_device *netdev = adapter->netdev;
-	uint16_t pci_command_word = adapter->hw.pci_cmd_word;
 	uint32_t rctl;
 
-	if(pci_command_word & PCI_COMMAND_INVALIDATE) {
-		pci_command_word &= ~PCI_COMMAND_INVALIDATE;
-		pci_write_config_word(pdev, PCI_COMMAND, pci_command_word);
-	}
+	e1000_pci_clear_mwi(&adapter->hw);
 
 	rctl = E1000_READ_REG(&adapter->hw, RCTL);
 	rctl |= E1000_RCTL_RST;
 	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
-	msec_delay(5);
+	E1000_WRITE_FLUSH(&adapter->hw);
+	mdelay(5);
 
 	if(netif_running(netdev))
 		e1000_clean_rx_ring(adapter);
@@ -1111,18 +1142,17 @@ e1000_enter_82542_rst(struct e1000_adapter *adapter)
 static void
 e1000_leave_82542_rst(struct e1000_adapter *adapter)
 {
-	struct pci_dev *pdev = adapter->pdev;
 	struct net_device *netdev = adapter->netdev;
-	uint16_t pci_command_word = adapter->hw.pci_cmd_word;
 	uint32_t rctl;
 
 	rctl = E1000_READ_REG(&adapter->hw, RCTL);
 	rctl &= ~E1000_RCTL_RST;
 	E1000_WRITE_REG(&adapter->hw, RCTL, rctl);
-	msec_delay(5);
+	E1000_WRITE_FLUSH(&adapter->hw);
+	mdelay(5);
 
-	if(pci_command_word & PCI_COMMAND_INVALIDATE)
-		pci_write_config_word(pdev, PCI_COMMAND, pci_command_word);
+	if(adapter->hw.pci_cmd_word & PCI_COMMAND_INVALIDATE)
+		e1000_pci_set_mwi(&adapter->hw);
 
 	if(netif_running(netdev)) {
 		e1000_configure_rx(adapter);
@@ -1429,6 +1459,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 
 	tx_ring->next_to_use = i;
 	E1000_WRITE_REG(&adapter->hw, TDT, i);
+	E1000_WRITE_FLUSH(&adapter->hw);
 }
 
 #define TXD_USE_COUNT(S, X) (((S) / (X)) + (((S) % (X)) ? 1 : 0))
@@ -1458,12 +1489,10 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
-#ifdef NETIF_F_HW_VLAN_TX
 	if(adapter->vlgrp && vlan_tx_tag_present(skb)) {
 		tx_flags |= E1000_TX_FLAGS_VLAN;
 		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
 	}
-#endif
 
 	count = e1000_tx_map(adapter, skb);
 
@@ -1525,7 +1554,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 		return -EINVAL;
 	}
 
-	if(max_frame <= E1000_RXBUFFER_2048) {
+	if(max_frame <= MAXIMUM_ETHERNET_FRAME_SIZE) {
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(adapter->hw.mac_type < e1000_82543) {
@@ -1699,6 +1728,7 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 {
 	atomic_inc(&adapter->irq_sem);
 	E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+	E1000_WRITE_FLUSH(&adapter->hw);
 	synchronize_irq(adapter->netdev->irq);
 }
 
@@ -1710,8 +1740,10 @@ e1000_irq_disable(struct e1000_adapter *adapter)
 static inline void
 e1000_irq_enable(struct e1000_adapter *adapter)
 {
-	if(atomic_dec_and_test(&adapter->irq_sem))
+	if(atomic_dec_and_test(&adapter->irq_sem)) {
 		E1000_WRITE_REG(&adapter->hw, IMS, IMS_ENABLE_MASK);
+		E1000_WRITE_FLUSH(&adapter->hw);
+	}
 }
 
 /**
@@ -1779,8 +1811,7 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 			tx_ring->buffer_info[i].skb = NULL;
 		}
 
-		memset(tx_desc, 0, sizeof(struct e1000_tx_desc));
-		mb();
+		tx_desc->upper.data = 0;
 
 		i = (i + 1) % tx_ring->count;
 		tx_desc = E1000_TX_DESC(*tx_ring, i);
@@ -1833,8 +1864,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			E1000_DBG("Receive packet consumed multiple buffers\n");
 
 			dev_kfree_skb_irq(skb);
-			memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
-			mb();
+			rx_desc->status = 0;
 			rx_ring->buffer_info[i].skb = NULL;
 
 			i = (i + 1) % rx_ring->count;
@@ -1862,8 +1892,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			} else {
 
 				dev_kfree_skb_irq(skb);
-				memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
-				mb();
+				rx_desc->status = 0;
 				rx_ring->buffer_info[i].skb = NULL;
 
 				i = (i + 1) % rx_ring->count;
@@ -1880,20 +1909,15 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		e1000_rx_checksum(adapter, rx_desc, skb);
 
 		skb->protocol = eth_type_trans(skb, netdev);
-#ifdef NETIF_F_HW_VLAN_TX
 		if(adapter->vlgrp && (rx_desc->status & E1000_RXD_STAT_VP)) {
 			vlan_hwaccel_rx(skb, adapter->vlgrp,
 				(rx_desc->special & E1000_RXD_SPC_VLAN_MASK));
 		} else {
 			netif_rx(skb);
 		}
-#else
-		netif_rx(skb);
-#endif
 		netdev->last_rx = jiffies;
 
-		memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
-		mb();
+		rx_desc->status = 0;
 		rx_ring->buffer_info[i].skb = NULL;
 
 		i = (i + 1) % rx_ring->count;
@@ -2018,6 +2042,22 @@ e1000_rx_checksum(struct e1000_adapter *adapter,
 }
 
 void
+e1000_pci_set_mwi(struct e1000_hw *hw)
+{
+	struct e1000_adapter *adapter = hw->back;
+
+	pci_set_mwi(adapter->pdev);
+}
+
+void
+e1000_pci_clear_mwi(struct e1000_hw *hw)
+{
+	struct e1000_adapter *adapter = hw->back;
+
+	pci_clear_mwi(adapter->pdev);
+}
+
+void
 e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
 	struct e1000_adapter *adapter = hw->back;
@@ -2033,7 +2073,18 @@ e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 	pci_write_config_word(adapter->pdev, reg, *value);
 }
 
-#ifdef NETIF_F_HW_VLAN_TX
+uint32_t
+e1000_io_read(struct e1000_hw *hw, uint32_t port)
+{
+	return inl(port);
+}
+
+void
+e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value)
+{
+	outl(value, port);
+}
+
 static void
 e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
 {
@@ -2109,7 +2160,6 @@ e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid)
 	vfta &= ~(1 << (vid & 0x1F));
 	e1000_write_vfta(&adapter->hw, index, vfta);
 }
-#endif
 
 static int
 e1000_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
@@ -2133,7 +2183,7 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-	uint32_t ctrl, ctrl_ext, rctl;
+	uint32_t ctrl, ctrl_ext, rctl, manc;
 
 	netif_device_detach(netdev);
 
@@ -2171,7 +2221,15 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 	}
 
 	pci_save_state(pdev, adapter->pci_state);
-	pci_set_power_state(pdev, 3);
+
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		if(manc & E1000_MANC_SMBUS_EN) {
+			manc |= E1000_MANC_ARP_EN;
+			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+		}
+	} else
+		pci_set_power_state(pdev, 3);
 
 	return 0;
 }
@@ -2182,6 +2240,7 @@ e1000_resume(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t manc;
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, adapter->pci_state);
@@ -2195,6 +2254,12 @@ e1000_resume(struct pci_dev *pdev)
 		e1000_up(adapter);
 
 	netif_device_attach(netdev);
+
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		manc &= ~(E1000_MANC_ARP_EN);
+		E1000_WRITE_REG(&adapter->hw, MANC, manc);
+	}
 
 	return 0;
 }

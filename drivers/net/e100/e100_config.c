@@ -86,10 +86,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *               operating system.                                     *
 *                                                                     *
 **********************************************************************/
-#ifdef SIOCETHTOOL
-#include <linux/ethtool.h>
-#endif
-
 #include "e100_config.h"
 
 static void e100_config_long_rx(struct e100_private *bdp, unsigned char enable);
@@ -308,85 +304,58 @@ exit:
 
 /**
  * e100_config_fc - config flow-control state
- * @bdp: atapter's private data struct
+ * @bdp: adapter's private data struct
  *
  * This routine will enable or disable flow control support in the adapter's
  * config block. Flow control will be enable only if requested using the command
  * line option, and if the link is flow-contorl capable (both us and the link
- * partner).
- *
- * Returns:
- *      true: if then option was indeed changed
- *      false: if no change was needed
+ * partner). But, if link partner is capable of autoneg, but not capable of
+ * flow control, received PAUSE	frames are still honored.
  */
-unsigned char
+void
 e100_config_fc(struct e100_private *bdp)
 {
 	unsigned char enable = false;
-	unsigned char changed = false;
-
 	/* 82557 doesn't support fc. Don't touch this option */
 	if (!(bdp->flags & IS_BACHELOR))
-		return false;
+		return;
 
 	/* Enable fc if requested and if the link supports it */
-	if ((bdp->params.b_params & PRM_FC) && (bdp->flags & DF_LINK_FC_CAP)) {
+	if ((bdp->params.b_params & PRM_FC) && (bdp->flags & 
+		(DF_LINK_FC_CAP | DF_LINK_FC_TX_ONLY))) {
 		enable = true;
 	}
 
 	spin_lock_bh(&(bdp->config_lock));
 
 	if (enable) {
-
-		if (bdp->config[16] != DFLT_FC_DELAY_LSB) {
+		if (bdp->flags & DF_LINK_FC_TX_ONLY) {
+			/* If link partner is capable of autoneg, but  */
+			/* not capable of flow control, Received PAUSE */
+			/* frames are still honored, i.e.,             */
+			/* transmitted frames would be paused by       */
+			/* incoming PAUSE frames                       */
+			bdp->config[16] = DFLT_NO_FC_DELAY_LSB;
+			bdp->config[17] = DFLT_NO_FC_DELAY_MSB;
+			bdp->config[19] &= ~(CB_CFIG_FC_RESTOP | CB_CFIG_FC_RESTART);
+			bdp->config[19] |= CB_CFIG_FC_REJECT;
+			bdp->config[19] &= ~CB_CFIG_TX_FC_DIS;
+		} else {
 			bdp->config[16] = DFLT_FC_DELAY_LSB;
-			E100_CONFIG(bdp, 16);
-			changed = true;
-		}
-
-		if (bdp->config[17] != DFLT_FC_DELAY_LSB) {
 			bdp->config[17] = DFLT_FC_DELAY_MSB;
-			E100_CONFIG(bdp, 17);
-			changed = true;
-		}
-
-		/* check if *all* fc config options were already set */
-		if (((bdp->config[19] & CB_CFIG_FC_OPTS) != CB_CFIG_FC_OPTS) ||
-		    (bdp->config[19] & CB_CFIG_TX_FC_DIS)) {
-
 			bdp->config[19] |= CB_CFIG_FC_OPTS;
 			bdp->config[19] &= ~CB_CFIG_TX_FC_DIS;
-			E100_CONFIG(bdp, 19);
-			changed = true;
 		}
-
 	} else {
-		if (bdp->config[16] != DFLT_NO_FC_DELAY_LSB) {
-			bdp->config[16] = DFLT_NO_FC_DELAY_LSB;
-			E100_CONFIG(bdp, 16);
-			changed = true;
-		}
-
-		if (bdp->config[17] != DFLT_NO_FC_DELAY_MSB) {
-			bdp->config[17] = DFLT_NO_FC_DELAY_MSB;
-			E100_CONFIG(bdp, 17);
-			changed = true;
-		}
-
-		/* check if *any* fc config options was already set */
-		if ((bdp->config[19] & CB_CFIG_FC_OPTS) ||
-		    !(bdp->config[19] & CB_CFIG_TX_FC_DIS)) {
-
-			bdp->config[19] &= ~CB_CFIG_FC_OPTS;
-			bdp->config[19] |= CB_CFIG_TX_FC_DIS;
-			E100_CONFIG(bdp, 19);
-			changed = true;
-		}
+		bdp->config[16] = DFLT_NO_FC_DELAY_LSB;
+		bdp->config[17] = DFLT_NO_FC_DELAY_MSB;
+		bdp->config[19] &= ~CB_CFIG_FC_OPTS;
+		bdp->config[19] |= CB_CFIG_TX_FC_DIS;
 	}
-
+	E100_CONFIG(bdp, 19);
 	spin_unlock_bh(&(bdp->config_lock));
 
-	return changed;
+	return;
 }
 
 /**
@@ -566,7 +535,6 @@ e100_config_long_rx(struct e100_private *bdp, unsigned char enable)
 	}
 }
 
-#ifdef ETHTOOL_GWOL
 /**
  * e100_config_wol
  * @bdp: atapter's private data struct
@@ -591,7 +559,6 @@ e100_config_wol(struct e100_private *bdp)
 
 	spin_unlock_bh(&(bdp->config_lock));
 }
-#endif
 
 /**
  * e100_config_loopback_mode
@@ -618,7 +585,7 @@ e100_config_loopback_mode(struct e100_private *bdp, u8 mode)
 		config_byte = CB_CFIG_LOOPBACK_EXTERNAL;
 		break;
 	default:
-		printk(KERN_NOTICE "e100_config_loopback_mode: "
+		printk(KERN_NOTICE "e100: e100_config_loopback_mode: "
 		       "Invalid argument 'mode': %d\n", mode);
 		goto exit;
 	}

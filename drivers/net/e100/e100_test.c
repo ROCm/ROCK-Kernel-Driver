@@ -72,7 +72,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "e100.h"
 #include "e100_config.h"
-#ifdef ETHTOOL_TEST
 
 extern u16 e100_eeprom_read(struct e100_private *, u16);
 extern int e100_wait_exec_cmplx(struct e100_private *, u32,u8);
@@ -380,11 +379,11 @@ e100_diag_loopback_cu_ru_exec(struct e100_private *bdp)
 {
 	/*load CU & RU base */ 
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE))
-		printk("@@@ SCB_CUC_LOAD_BASE failed\n");
+		printk("e100: SCB_CUC_LOAD_BASE failed\n");
 	if(!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE))
-		printk("@@@ SCB_RUC_LOAD_BASE failed!\n");
+		printk("e100: SCB_RUC_LOAD_BASE failed!\n");
 	if(!e100_wait_exec_cmplx(bdp, bdp->loopback.dma_handle, SCB_RUC_START))
-		printk("@@@ SCB_RUC_START failed!\n");
+		printk("e100: SCB_RUC_START failed!\n");
 
 	bdp->next_cu_cmd = START_WAIT;
 	e100_start_cu(bdp, bdp->loopback.tcb);
@@ -456,6 +455,4 @@ e100_diag_loopback_free (struct e100_private *bdp)
         pci_free_consistent(bdp->pdev, sizeof(rfd_t), bdp->loopback.rfd,
 			    bdp->loopback.dma_handle);
 }
-
-#endif
 

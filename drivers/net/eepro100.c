@@ -25,6 +25,8 @@
 		Disabled FC and ER, to avoid lockups when when we get FCP interrupts.
 	2000 Jul 17 Goutham Rao <goutham.rao@intel.com>
 		PCI DMA API fixes, adding pci_dma_sync_single calls where neccesary
+    2000 Aug 31 David Mosberger <davidm@hpl.hp.com>
+	    RX_ALIGN support: enables rx DMA without causing unaligned accesses.
 */
 
 static const char *version =
@@ -41,14 +43,18 @@ static int rxfifo = 8;		/* Rx FIFO threshold, default 32 bytes. */
 static int txdmacount = 128;
 static int rxdmacount /* = 0 */;
 
+#if defined(__ia64__) || defined(__alpha__) || defined(__sparc__) || defined(__mips__) || \
+	defined(__arm__)
+  /* align rx buffers to 2 bytes so that IP header is aligned */
+# define RX_ALIGN
+# define RxFD_ALIGNMENT		__attribute__ ((aligned (2), packed))
+#else
+# define RxFD_ALIGNMENT
+#endif
+
 /* Set the copy breakpoint for the copy-only-tiny-buffer Rx method.
    Lower values use more memory, but are faster. */
-#if defined(__alpha__) || defined(__sparc__) || defined(__mips__) || \
-    defined(__arm__)
-static int rx_copybreak = 1518;
-#else
 static int rx_copybreak = 200;
-#endif
 
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 20;
@@ -377,18 +383,18 @@ enum SCBPort_cmds {
 
 /* The Speedo3 Rx and Tx frame/buffer descriptors. */
 struct descriptor {			    /* A generic descriptor. */
-	s32 cmd_status;				/* All command and status fields. */
+	volatile s32 cmd_status;	/* All command and status fields. */
 	u32 link;				    /* struct descriptor *  */
 	unsigned char params[0];
 };
 
 /* The Speedo3 Rx and Tx buffer descriptors. */
 struct RxFD {					/* Receive frame descriptor. */
-	s32 status;
+	volatile s32 status;
 	u32 link;					/* struct RxFD * */
 	u32 rx_buf_addr;			/* void * */
 	u32 count;
-};
+} RxFD_ALIGNMENT;
 
 /* Selected elements of the Tx/RxFD.status word. */
 enum RxFD_bits {
@@ -523,7 +529,12 @@ static const char is_mii[] = { 0, 1, 1, 0, 1, 1, 0, 1 };
 
 static int eepro100_init_one(struct pci_dev *pdev,
 		const struct pci_device_id *ent);
+
 static void eepro100_remove_one (struct pci_dev *pdev);
+#ifdef CONFIG_PM
+static int eepro100_suspend (struct pci_dev *pdev, u32 state);
+static int eepro100_resume (struct pci_dev *pdev);
+#endif
 
 static int do_eeprom_cmd(long ioaddr, int cmd, int cmd_len);
 static int mdio_read(long ioaddr, int phy_id, int location);
@@ -1229,6 +1240,9 @@ speedo_init_rx_ring(struct net_device *dev)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb;
 		skb = dev_alloc_skb(PKT_BUF_SZ + sizeof(struct RxFD));
+#ifdef RX_ALIGN
+		skb_reserve(skb, 2);	/* Align IP on 16 byte boundary */
+#endif
 		sp->rx_skbuff[i] = skb;
 		if (skb == NULL)
 			break;			/* OK.  Just initially short of Rx bufs. */
@@ -1620,6 +1634,9 @@ static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)
 	struct sk_buff *skb;
 	/* Get a fresh skbuff to replace the consumed one. */
 	skb = dev_alloc_skb(PKT_BUF_SZ + sizeof(struct RxFD));
+#ifdef RX_ALIGN
+	skb_reserve(skb, 2);	/* Align IP on 16 byte boundary */
+#endif
 	sp->rx_skbuff[entry] = skb;
 	if (skb == NULL) {
 		sp->rx_ringp[entry] = NULL;
@@ -2303,7 +2320,9 @@ static struct pci_driver eepro100_driver = {
 	name:		"eepro100",
 	id_table:	eepro100_pci_tbl,
 	probe:		eepro100_init_one,
+# if defined(MODULE) || defined(CONFIG_HOTPLUG)
 	remove:		__devexit_p(eepro100_remove_one),
+# endif
 #ifdef CONFIG_PM
 	suspend:	eepro100_suspend,
 	resume:		eepro100_resume,

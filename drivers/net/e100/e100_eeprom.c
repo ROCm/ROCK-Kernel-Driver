@@ -145,8 +145,6 @@ eeprom_set_semaphore(struct e100_private *adapter)
 		data |= SCB_GCR2_EEPROM_ACCESS_SEMAPHORE;
 		writeb(data, &CSR_GENERAL_CONTROL2_FIELD(adapter));
 
-		barrier();
-
 		// Check to see if this bit set or not.
 		data = readb(&CSR_GENERAL_CONTROL2_FIELD(adapter));
 
@@ -224,6 +222,7 @@ e100_eeprom_size(struct e100_private *adapter)
 		x &= ~EEDI;	// address consists of all zeros
 
 		writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+		readw(&(adapter->scb->scb_status));
 		udelay(EEPROM_STALL_TIME);
 		raise_clock(adapter, &x);
 		lower_clock(adapter, &x);

@@ -21,13 +21,13 @@
 	Contributors:
 	
 		Wake-on-LAN support - Felipe Damasio <felipewd@terra.com.br>
+		PCI suspend/resume  - Felipe Damasio <felipewd@terra.com.br>
 			
 	TODO, in rough priority order:
 	* dev->tx_timeout
 	* LinkChg interrupt
 	* Support forcing media type with a module parameter,
 	  like dl2k.c/sundance.c
-	* Implement PCI suspend/resume
 	* Constants (module parms?) for Rx work limit
 	* support 64-bit PCI DMA
 	* Complete reset on PciErr
@@ -360,6 +360,7 @@ struct cp_private {
 	unsigned int		board_type;
 
 	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
+	u32			power_state[16];
 
 	struct mii_if_info	mii_if;
 };
@@ -976,11 +977,11 @@ static void cp_reset_hw (struct cp_private *cp)
 
 static inline void cp_start_hw (struct cp_private *cp)
 {
-	cpw8(Cmd, RxOn | TxOn);
 	if (cp->board_type == RTL8169)
 		cpw16(CpCmd, PCIMulRW | RxChkSum);
 	else
 		cpw16(CpCmd, PCIMulRW | RxChkSum | CpRxOn | CpTxOn);
+	cpw8(Cmd, RxOn | TxOn);
 }
 
 static void cp_init_hw (struct cp_private *cp)
@@ -1896,11 +1897,68 @@ static void __devexit cp_remove_one (struct pci_dev *pdev)
 	kfree(dev);
 }
 
+#ifdef CONFIG_PM
+static int cp_suspend (struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev;
+	struct cp_private *cp;
+	unsigned long flags;
+
+	dev = pci_get_drvdata (pdev);
+	cp  = dev->priv;
+
+	if (!dev || !netif_running (dev)) return 0;
+
+	netif_device_detach (dev);
+	netif_stop_queue (dev);
+
+	spin_lock_irqsave (&cp->lock, flags);
+
+	/* Disable Rx and Tx */
+	cpw16 (IntrMask, 0);
+	cpw8  (Cmd, cpr8 (Cmd) & (~RxOn | ~TxOn));
+
+	spin_unlock_irqrestore (&cp->lock, flags);
+
+	if (cp->pdev && cp->wol_enabled) {
+		pci_save_state (cp->pdev, cp->power_state);
+		cp_set_d3_state (cp);
+	}
+
+	return 0;
+}
+
+static int cp_resume (struct pci_dev *pdev)
+{
+	struct net_device *dev;
+	struct cp_private *cp;
+
+	dev = pci_get_drvdata (pdev);
+	cp  = dev->priv;
+
+	netif_device_attach (dev);
+	
+	if (cp->pdev && cp->wol_enabled) {
+		pci_set_power_state (cp->pdev, 0);
+		pci_restore_state (cp->pdev, cp->power_state);
+	}
+	
+	cp_init_hw (cp);
+	netif_start_queue (dev);
+	
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static struct pci_driver cp_driver = {
 	.name         = DRV_NAME,
 	.id_table     = cp_pci_tbl,
 	.probe        =	cp_init_one,
 	.remove       = __devexit_p(cp_remove_one),
+#ifdef CONFIG_PM
+	.resume       = cp_resume,
+	.suspend      = cp_suspend,
+#endif
 };
 
 static int __init cp_init (void)

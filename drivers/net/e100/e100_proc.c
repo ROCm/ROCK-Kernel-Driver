@@ -91,11 +91,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <linux/config.h>
 
-#ifndef CONFIG_PROC_FS
-#undef E100_CONFIG_PROC_FS
-#endif
-
-#ifdef E100_CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 #include "e100.h"
 /* MDI sleep time is at least 50 ms, in jiffies */
 #define MDI_SLEEP_TIME ((HZ / 20) + 1)
@@ -106,16 +102,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 static struct proc_dir_entry *adapters_proc_dir = 0;
 
 /* externs from e100_main.c */
-extern const char *e100_short_driver_name;
-extern const char *e100_version;
+extern char e100_short_driver_name[];
+extern char e100_driver_version[];
 extern struct net_device_stats *e100_get_stats(struct net_device *dev);
 extern char *e100_get_brand_msg(struct e100_private *bdp);
 extern void e100_mdi_write(struct e100_private *, u32, u32, u16);
 
 static void e100_proc_cleanup(void);
 static unsigned char e100_init_proc_dir(void);
-
-#define E100_EOU
 
 #define ADAPTERS_PROC_DIR "PRO_LAN_Adapters"
 #define WRITE_BUF_MAX_LEN 20	
@@ -191,7 +185,7 @@ read_descr(char *page, char **start, off_t off, int count, int *eof, void *data)
 	struct e100_private *bdp = data;
 	int len;
 
-	len = sprintf(page, "%s\n", e100_get_brand_msg(bdp));
+	len = sprintf(page, "%s\n", bdp->id_string);
 
 	return generic_read(page, start, off, count, eof, len);
 }
@@ -223,23 +217,15 @@ read_part_number(char *page, char **start, off_t off,
 static void
 set_led(struct e100_private *bdp, u16 led_mdi_op)
 {
-	spin_lock_bh(&bdp->mdi_access_lock);
-
 	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
 		       bdp->phy_addr, led_mdi_op);
-
-	spin_unlock_bh(&bdp->mdi_access_lock);
 
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(MDI_SLEEP_TIME);
 
-	spin_lock_bh(&bdp->mdi_access_lock);
-
 	/* turn led ownership to the chip */
 	e100_mdi_write(bdp, PHY_82555_LED_SWITCH_CONTROL,
 		       bdp->phy_addr, PHY_82555_LED_NORMAL_CONTROL);
-
-	spin_unlock_bh(&bdp->mdi_access_lock);
 }
 
 static int
@@ -350,335 +336,6 @@ read_info(char *page, char **start, off_t off, int count, int *eof, void *data)
 	return generic_read(page, start, off, count, eof, len);
 }
 
-#ifdef E100_EOU
-/**********************
- *  parameter entries
- **********************/
-static int
-read_int_param(char *page, char *name, char *desc, int def, int min, int max)
-{
-	int len;
-
-	len = sprintf(page, "Name: %s\n", name);
-	len += sprintf(page + len, "Description: %s\n", desc);
-	len += sprintf(page + len, "Default_Value: %d\n", def);
-	len += sprintf(page + len, "Type: Range\n");
-	len += sprintf(page + len, "Min: %d\n", min);
-	len += sprintf(page + len, "Max: %d\n", max);
-	len += sprintf(page + len, "Step:1\n");
-	len += sprintf(page + len, "Radix: dec\n");
-
-	return len;
-}
-
-static int
-read_bool_param(char *page, char *name, char *desc, int def)
-{
-	int len;
-
-	len = sprintf(page, "Name: %s\n", name);
-	len += sprintf(page + len, "Description: %s\n", desc);
-	len += sprintf(page + len, "Default_Value: %d\n", def);
-	len += sprintf(page + len, "Type: Enum\n");
-	len += sprintf(page + len, "0: Off\n");
-	len += sprintf(page + len, "1: On\n");
-
-	return len;
-}
-
-static int
-read_speed_duplex_def(char *page, char **start, off_t off,
-		      int count, int *eof, void *data)
-{
-	int len;
-
-	len = sprintf(page, "Name: Speed and Duplex\n");
-	len += sprintf(page + len, "Description: Sets the adapter's "
-		       "speed and duplex mode\n");
-	len += sprintf(page + len, "Default_Value: 0\n");
-	len += sprintf(page + len, "Type: Enum\n");
-	len += sprintf(page + len, "0: Auto-Negotiate\n");
-	len += sprintf(page + len, "1: 10 Mbps / Half Duplex\n");
-	len += sprintf(page + len, "2: 10 Mbps / Full Duplex\n");
-	len += sprintf(page + len, "3: 100 Mbps / Half Duplex\n");
-	len += sprintf(page + len, "4: 100 Mbps / Full Duplex\n");
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_tx_desc_def(char *page, char **start, off_t off,
-		 int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_int_param(page, "Transmit Descriptors",
-			     "Sets the number of Tx descriptors "
-			     "available for the adapter",
-			     E100_DEFAULT_TCB, E100_MIN_TCB, E100_MAX_TCB);
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_rx_desc_def(char *page, char **start, off_t off,
-		 int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_int_param(page, "Receive Descriptors",
-			     "Sets the number of Rx descriptors "
-			     "available for the adapter",
-			     E100_DEFAULT_RFD, E100_MIN_RFD, E100_MAX_RFD);
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_ber_def(char *page, char **start, off_t off,
-	     int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_int_param(page, "Bit Error Rate",
-			     "Sets the value for the BER correction algorithm",
-			     E100_DEFAULT_BER, 0, ZLOCK_MAX_ERRORS);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_xsum_rx_def(char *page, char **start, off_t off,
-		 int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "RX Checksum",
-			      "Setting this value to \"On\" enables "
-			      "receive checksum", E100_DEFAULT_XSUM);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_ucode_def(char *page, char **start, off_t off,
-	       int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "Microcode",
-			      "Setting this value to \"On\" enables "
-			      "the adapter's microcode", E100_DEFAULT_UCODE);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_bundle_small_def(char *page, char **start, off_t off,
-		      int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "Bundle Small Frames",
-			      "Setting this value to \"On\" enables "
-			      "interrupt bundling of small frames",
-			      E100_DEFAULT_BUNDLE_SMALL_FR);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_fc_def(char *page, char **start, off_t off,
-	    int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "Flow Control",
-			      "Setting this value to \"On\" enables processing "
-			      "flow-control packets", E100_DEFAULT_FC);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_rcv_cong_def(char *page, char **start, off_t off,
-		  int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "Receive Congestion Control",
-			      "Setting this value to \"On\" enables switching "
-			      "to polling mode on receive",
-			      E100_DEFAULT_RX_CONGESTION_CONTROL);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_poll_max_def(char *page, char **start, off_t off,
-		  int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-
-	int len;
-
-	len = read_int_param(page, "Maximum Polling Work",
-			     "Sets the max number of RX packets processed"
-			     " by single polling function call",
-			     bdp->params.RxDescriptors, 1, E100_MAX_RFD);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_int_delay_def(char *page, char **start, off_t off,
-		   int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_int_param(page, "CPU Saver Interrupt Delay",
-			     "Sets the value for CPU saver's interrupt delay",
-			     E100_DEFAULT_CPUSAVER_INTERRUPT_DELAY, 0x0,
-			     0xFFFF);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_bundle_max_def(char *page, char **start, off_t off,
-		    int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_int_param(page, "CPU Saver Maximum Bundle",
-			     "Sets CPU saver's maximum value",
-			     E100_DEFAULT_CPUSAVER_BUNDLE_MAX, 0x1, 0xFFFF);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_ifs_def(char *page, char **start, off_t off,
-	     int count, int *eof, void *data)
-{
-	int len;
-
-	len = read_bool_param(page, "IFS",
-			      "Setting this value to \"On\" enables "
-			      "the adaptive IFS algorithm", E100_DEFAULT_IFS);
-
-	return generic_read(page, start, off, count, eof, len);
-}
-
-static int
-read_xsum_rx_val(char *page, char **start, off_t off,
-		 int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_XSUMRX) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_ucode_val(char *page, char **start, off_t off,
-	       int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_UCODE) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_fc_val(char *page, char **start, off_t off,
-	    int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_FC) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_ifs_val(char *page, char **start, off_t off,
-	     int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_IFS) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_bundle_small_val(char *page, char **start, off_t off,
-		      int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_BUNDLE_SMALL) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_rcv_cong_val(char *page, char **start, off_t off,
-		  int count, int *eof, void *data)
-{
-	struct e100_private *bdp = data;
-	unsigned long val;
-
-	val = (bdp->params.b_params & PRM_RX_CONG) ? 1 : 0;
-	return read_ulong(page, start, off, count, eof, val);
-}
-
-static int
-read_gen_prm(char *page, char **start, off_t off,
-	     int count, int *eof, void *data)
-{
-	int val = 0;
-
-	if (data)
-		val = *((int *) data);
-
-	return read_ulong(page, start, off, count, eof, (unsigned long) val);
-}
-
-static e100_proc_entry e100_proc_params[] = { 
-	/* definitions */
-	{"e100_speed_duplex.def", read_speed_duplex_def, 0, 0},
-	{"RxDescriptors.def",     read_rx_desc_def,      0, 0},
-	{"TxDescriptors.def",     read_tx_desc_def,      0, 0},
-	{"XsumRX.def",            read_xsum_rx_def,      0, 0},
-	{"ucode.def",             read_ucode_def,        0, 0},
-	{"BundleSmallFr.def",     read_bundle_small_def, 0, 0},
-	{"IntDelay.def",          read_int_delay_def,    0, 0},
-	{"BundleMax.def",         read_bundle_max_def,   0, 0},
-	{"ber.def",               read_ber_def,          0, 0},
-	{"flow_control.def",      read_fc_def,           0, 0},
-	{"IFS.def",               read_ifs_def,          0, 0},
-	{"RxCongestionControl.def", read_rcv_cong_def,   0, 0},
-	{"PollingMaxWork.def",      read_poll_max_def,   0, 0},
-	/* values */
-	{"e100_speed_duplex.val", read_gen_prm, 0, bdp_prm_off(e100_speed_duplex)},
-	{"RxDescriptors.val",     read_gen_prm, 0, bdp_prm_off(RxDescriptors)},
-	{"TxDescriptors.val",     read_gen_prm, 0, bdp_prm_off(TxDescriptors)},
-	{"XsumRX.val",            read_xsum_rx_val,      0, 0},
-	{"ucode.val",             read_ucode_val,        0, 0},
-	{"BundleSmallFr.val",     read_bundle_small_val, 0, 0},
-	{"IntDelay.val",          read_gen_prm, 0, bdp_prm_off(IntDelay)},
-	{"BundleMax.val",         read_gen_prm, 0, bdp_prm_off(BundleMax)},
-	{"ber.val",               read_gen_prm, 0, bdp_prm_off(ber)},
-	{"flow_control.val",      read_fc_val,           0, 0},
-	{"IFS.val",               read_ifs_val,          0, 0},
-	{"RxCongestionControl.val", read_rcv_cong_val,   0, 0},
-	{"PollingMaxWork.val",      read_gen_prm, 0, bdp_prm_off(PollingMaxWork)},
-	{"", 0, 0, 0}
-};
-#endif /* E100_EOU */
-
 static struct proc_dir_entry * __devinit
 create_proc_rw(char *name, void *data, struct proc_dir_entry *parent,
 	       read_proc_t * read_proc, write_proc_t * write_proc)
@@ -705,58 +362,6 @@ create_proc_rw(char *name, void *data, struct proc_dir_entry *parent,
 	return pdep;
 }
 
-#ifdef E100_EOU
-static int __devinit
-create_proc_param_subdir(struct e100_private *bdp,
-			 struct proc_dir_entry *dev_dir)
-{
-	struct proc_dir_entry *param_dir;
-	e100_proc_entry *pe;
-	void *data;
-
-	param_dir = create_proc_entry("LoadParameters", S_IFDIR, dev_dir);
-	if (!param_dir)
-		return -ENOMEM;
-
-	for (pe = e100_proc_params; pe->name[0]; pe++) {
-
-		data = ((char *) bdp) + pe->offset;
-
-		if (!(create_proc_rw(pe->name, data, param_dir,
-				     pe->read_proc, pe->write_proc))) {
-			return -ENOMEM;
-		}
-	}
-
-	return 0;
-}
-
-static void
-remove_proc_param_subdir(struct proc_dir_entry *parent)
-{
-	struct proc_dir_entry *de;
-	e100_proc_entry *pe;
-	int len;
-
-	len = strlen("LoadParameters");
-
-	for (de = parent->subdir; de; de = de->next) {
-		if ((de->namelen == len) &&
-		    (!memcmp(de->name, "LoadParameters", len)))
-			break;
-	}
-
-	if (!de)
-		return;
-
-	for (pe = e100_proc_params; pe->name[0]; pe++) {
-		remove_proc_entry(pe->name, de);
-	}
-
-	remove_proc_entry("LoadParameters", parent);
-}
-#endif /* E100_EOU */
-
 void
 e100_remove_proc_subdir(struct e100_private *bdp)
 {
@@ -781,9 +386,6 @@ e100_remove_proc_subdir(struct e100_private *bdp)
 			remove_proc_entry(pe->name, bdp->proc_parent);
 		}
 
-#ifdef E100_EOU
-		remove_proc_param_subdir(bdp->proc_parent);
-#endif
 		remove_proc_entry(bdp->device->name, adapters_proc_dir);
 		bdp->proc_parent = NULL;
 	}
@@ -843,13 +445,6 @@ e100_create_proc_subdir(struct e100_private *bdp)
 			return -ENOMEM;
 		}
 	}
-
-#ifdef E100_EOU
-	if (create_proc_param_subdir(bdp, dev_dir)) {
-		e100_remove_proc_subdir(bdp);
-		return -ENOMEM;
-	}
-#endif
 
 	return 0;
 }
