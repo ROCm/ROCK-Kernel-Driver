@@ -1,5 +1,5 @@
 /*
- * $Id: hid-ff.c,v 1.3 2002/06/09 11:06:38 jdeneux Exp $
+ * $Id: hid-ff.c,v 1.2 2002/04/18 22:02:47 jdeneux Exp $
  *
  *  Force feedback support for hid devices.
  *  Not all hid devices use the same protocol. For example, some use PID,
@@ -44,17 +44,15 @@ extern int hid_pid_init(struct hid_device* hid);
  * devices, you need to add the USB vendor and product ids here.
  */
 struct hid_ff_initializer {
-	__u16 idVendor;
-	__u16 idProduct;
+	u16 idVendor;
+	u16 idProduct;
 	int (*init)(struct hid_device*);
 };
 
 static struct hid_ff_initializer inits[] = {
-#ifdef CONFIG_LOGITECH_RUMBLE
+#ifdef CONFIG_LOGITECH_FF
 	{0x46d, 0xc211, hid_lgff_init},
-#endif
-#ifdef CONFIG_LOGITECH_3D
-	{0x46d, 0xc283, hid_lg3d_init},
+	{0x46d, 0xc283, hid_lgff_init},
 #endif
 #ifdef CONFIG_HID_PID
 	{0x45e, 0x001b, hid_pid_init},
@@ -68,8 +66,8 @@ static struct hid_ff_initializer *hid_get_ff_init(__u16 idVendor,
 	struct hid_ff_initializer *init;
 	for (init = inits;
 	     init->idVendor
-		     && !(init->idVendor == idVendor
-			  && init->idProduct == idProduct);
+	     && !(init->idVendor == idVendor
+		  && init->idProduct == idProduct);
 	     init++);
 
 	return init->idVendor? init : NULL;

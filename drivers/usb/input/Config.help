@@ -30,10 +30,13 @@ CONFIG_HID_FF
 
   If unsure, say N.
 
-CONFIG_LOGITECH_RUMBLE
-  Say Y here if you have a Logitech WingMan Cordless rumble pad and if you
-  want to enable force feedback. Note: if you say N here, this device will
-  still be supported, but without force feedback.
+CONFIG_LOGITECH_FF
+  Say Y here if you have one of these devices:
+  - Logitech WingMan Cordless RumblePad
+  - Logitech WingMan Force 3D
+  and if you want to enable force feedback for them.
+  Note: if you say N here, this device will still be supported, but without
+  force feedback.
 
 CONFIG_HID_PID
   Say Y here if you have a PID-compliant joystick and wish to enable force
