@@ -606,8 +606,8 @@ static void ether1394_add_host (struct hpsb_host *host)
 		goto out;
 	}
 
-	ETH1394_PRINT (KERN_ERR, dev->name, "IEEE-1394 IPv4 over 1394 Ethernet (%s)\n",
-		       host->driver->name);
+	ETH1394_PRINT (KERN_ERR, dev->name, "IEEE-1394 IPv4 over 1394 Ethernet (fw-host%d)\n",
+		       host->id);
 
 	hi->host = host;
 	hi->dev = dev;
@@ -641,6 +641,7 @@ static void ether1394_add_host (struct hpsb_host *host)
 			       "Config ROM\n");
 		goto out;
 	}
+	hi->host->update_config_rom = 1;
 	return;
 
 out:
@@ -1683,7 +1684,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	     IN_MULTICAST(__constant_ntohl(skb->nh.iph->daddr)))) {
 		tx_type = ETH1394_GASP;
 		dest_node = LOCAL_BUS | ALL_NODES;
-		max_payload = priv->bc_maxpayload - ETHER1394_GASP_OVERHEAD;
+		max_payload = priv->bc_maxpayload;
 		BUG_ON(max_payload < (512 - ETHER1394_GASP_OVERHEAD));
 		dgl = priv->bc_dgl;
 		if (max_payload < dg_size + hdr_type_len[ETH1394_HDR_LF_UF])
