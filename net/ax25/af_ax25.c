@@ -2017,9 +2017,6 @@ static struct proto_ops ax25_proto_ops = {
 	.sendpage	sock_no_sendpage,
 };
 
-#include <linux/smp_lock.h>
-SOCKOPS_WRAP(ax25_proto, PF_AX25);
-
 /*
  *	Called by socket.c on kernel start up
  */
