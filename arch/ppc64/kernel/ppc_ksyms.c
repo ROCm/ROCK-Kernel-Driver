@@ -136,7 +136,7 @@ EXPORT_SYMBOL(local_irq_restore);
 
 EXPORT_SYMBOL(ppc_md);
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);
