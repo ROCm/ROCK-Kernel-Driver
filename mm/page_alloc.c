@@ -607,8 +607,16 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	int i;
 	int alloc_type;
 	int do_retry;
+	int can_try_harder;
 
 	might_sleep_if(wait);
+
+	/*
+	 * The caller may dip into page reserves a bit more if the caller
+	 * cannot run direct reclaim, or is the caller has realtime scheduling
+	 * policy
+	 */
+	can_try_harder = (unlikely(rt_task(p)) && !in_interrupt()) || !wait;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 
@@ -641,9 +649,9 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
-			min -= min>>1;
-		if (unlikely(rt_task(p)) && !in_interrupt())
-			min -= min>>2;
+			min /= 2;
+		if (can_try_harder)
+			min -= min / 4;
 		min += (1<<order) + z->protection[alloc_type];
 
 		if (z->free_pages < min)
@@ -684,9 +692,9 @@ rebalance:
 	for (i = 0; (z = zones[i]) != NULL; i++) {
 		min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
-			min -= min>>1;
-		if (unlikely(rt_task(p)) && !in_interrupt())
-			min -= min>>2;
+			min /= 2;
+		if (can_try_harder)
+			min -= min / 4;
 		min += (1<<order) + z->protection[alloc_type];
 
 		if (z->free_pages < min)
