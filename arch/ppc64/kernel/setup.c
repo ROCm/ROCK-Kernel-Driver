@@ -431,6 +431,8 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 }
 
+
+#ifdef CONFIG_PPC_PSERIES
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout;
@@ -482,7 +484,6 @@ static int __init set_preferred_console(void)
 }
 console_initcall(set_preferred_console);
 
-#ifdef CONFIG_PPC_PSERIES
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;
