@@ -362,8 +362,6 @@ enum pci_mmap_state {
 #define PCI_DMA_NONE		3
 
 #define DEVICE_COUNT_COMPATIBLE	4
-#define DEVICE_COUNT_IRQ	2
-#define DEVICE_COUNT_DMA	2
 #define DEVICE_COUNT_RESOURCE	12
 
 /*
