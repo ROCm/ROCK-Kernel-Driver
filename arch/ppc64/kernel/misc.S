@@ -935,27 +935,27 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
 	.llong .ppc32_timer_create	/* 240 */
-	.llong .compat_timer_settime
-	.llong .compat_timer_gettime
+	.llong .compat_sys_timer_settime
+	.llong .compat_sys_timer_gettime
 	.llong .sys_timer_getoverrun
 	.llong .sys_timer_delete
-	.llong .compat_clock_settime	/* 245 */
-	.llong .compat_clock_gettime
-	.llong .compat_clock_getres
-	.llong .compat_clock_nanosleep
+	.llong .compat_sys_clock_settime	/* 245 */
+	.llong .compat_sys_clock_gettime
+	.llong .compat_sys_clock_getres
+	.llong .compat_sys_clock_nanosleep
 	.llong .ppc32_swapcontext
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
-	.llong .compat_statfs64
-	.llong .compat_fstatfs64
+	.llong .compat_sys_statfs64
+	.llong .compat_sys_fstatfs64
 	.llong .ppc32_fadvise64_64	/* 32bit only fadvise64_64 */
 	.llong .ppc_rtas		/* 255 */
 	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
 	.llong .sys_ni_syscall		/* 257 reserved for vserver */
 	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
-	.llong .compat_mbind
-	.llong .compat_get_mempolicy	/* 260 */
-	.llong .compat_set_mempolicy
+	.llong .compat_sys_mbind
+	.llong .compat_sys_get_mempolicy	/* 260 */
+	.llong .compat_sys_set_mempolicy
 	.llong .compat_sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .compat_sys_mq_timedsend
