@@ -60,7 +60,7 @@
 #define ACPI_THERMAL_NOTIFY_HOT		0xF1
 #define ACPI_THERMAL_MODE_ACTIVE	0x00
 #define ACPI_THERMAL_MODE_PASSIVE	0x01
-#define ACPI_THERMAL_MODE_CRT   	0xff
+#define ACPI_THERMAL_MODE_CRITICAL   	0xff
 #define ACPI_THERMAL_PATH_POWEROFF	"/sbin/poweroff"
 
 #define ACPI_THERMAL_MAX_ACTIVE	10
@@ -951,7 +951,7 @@ static int acpi_thermal_cooling_seq_show(struct seq_file *seq, void *offset)
 		seq_puts(seq, "<setting not supported>\n");
 	}
 
-	if ( tz->cooling_mode == ACPI_THERMAL_MODE_CRT )
+	if ( tz->cooling_mode == ACPI_THERMAL_MODE_CRITICAL )
 		seq_printf(seq, "cooling mode:	critical\n");
 	else
 		seq_printf(seq, "cooling mode:	%s\n",
@@ -1260,7 +1260,7 @@ acpi_thermal_get_info (
 			tz->cooling_mode = ACPI_THERMAL_MODE_ACTIVE;
 		} else {
 			/* _ACx and _PSV are optional, but _CRT is required */
-			tz->cooling_mode = ACPI_THERMAL_MODE_CRT;
+			tz->cooling_mode = ACPI_THERMAL_MODE_CRITICAL;
 		}
 	}
 
