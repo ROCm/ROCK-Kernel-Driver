@@ -1458,7 +1458,7 @@ tcp_find_option(u_int8_t option,
 		int *hotdrop)
 {
 	/* tcp.doff is only 4 bits, ie. max 15 * 4 bytes */
-	char opt[60 - sizeof(struct tcphdr)];
+	u_int8_t opt[60 - sizeof(struct tcphdr)];
 	unsigned int i;
 
 	duprintf("tcp_match: finding option\n");

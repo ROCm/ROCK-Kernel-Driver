@@ -577,7 +577,7 @@ prism54_set_scan(struct net_device *dev, struct iw_request_info *info,
  * the "Aironet driver for 4500 and 4800 series cards" (GPL)
  */
 
-inline char *
+static char *
 prism54_translate_bss(struct net_device *ndev, char *current_ev,
 		      char *end_buf, struct obj_bss *bss, char noise)
 {
@@ -1502,7 +1502,7 @@ prism54_kick_mac(struct net_device *ndev, struct iw_request_info *info,
 
 /* Translate a TRAP oid into a wireless event. Called in islpci_mgt_receive. */
 
-static inline void
+static void
 format_event(islpci_private *priv, char *dest, const char *str,
 	     const struct obj_mlme *mlme, u16 *length, int error)
 {

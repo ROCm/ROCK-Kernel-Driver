@@ -259,7 +259,7 @@ tcp_grow_window(struct sock *sk, struct tcp_opt *tp, struct sk_buff *skb)
 	/* Check #1 */
 	if (tp->rcv_ssthresh < tp->window_clamp &&
 	    (int)tp->rcv_ssthresh < tcp_space(sk) &&
-	    !tcp_prot.memory_pressure) {
+	    !tcp_memory_pressure) {
 		int incr;
 
 		/* Check #2. Increase window, if skb with such overhead
@@ -349,7 +349,7 @@ static void tcp_clamp_window(struct sock *sk, struct tcp_opt *tp)
 	if (ofo_win) {
 		if (sk->sk_rcvbuf < sysctl_tcp_rmem[2] &&
 		    !(sk->sk_userlocks & SOCK_RCVBUF_LOCK) &&
-		    !tcp_prot.memory_pressure &&
+		    !tcp_memory_pressure &&
 		    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0])
 			sk->sk_rcvbuf = min(atomic_read(&sk->sk_rmem_alloc),
 					    sysctl_tcp_rmem[2]);
@@ -3764,7 +3764,7 @@ static int tcp_prune_queue(struct sock *sk)
 
 	if (atomic_read(&sk->sk_rmem_alloc) >= sk->sk_rcvbuf)
 		tcp_clamp_window(sk, tp);
-	else if (tcp_prot.memory_pressure)
+	else if (tcp_memory_pressure)
 		tp->rcv_ssthresh = min(tp->rcv_ssthresh, 4U * tp->advmss);
 
 	tcp_collapse_ofo_queue(sk);
@@ -3844,7 +3844,7 @@ static void tcp_new_space(struct sock *sk)
 
 	if (tp->packets_out < tp->snd_cwnd &&
 	    !(sk->sk_userlocks & SOCK_SNDBUF_LOCK) &&
-	    !tcp_prot.memory_pressure &&
+	    !tcp_memory_pressure &&
 	    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0]) {
  		int sndmem = max_t(u32, tp->mss_clamp, tp->mss_cache) +
 			MAX_TCP_HEADER + 16 + sizeof(struct sk_buff),

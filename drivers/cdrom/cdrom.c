@@ -901,6 +901,7 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 				goto err;
 			if (cdrom_open_write(cdi))
 				goto err;
+			ret = 0;
 		}
 	}
 

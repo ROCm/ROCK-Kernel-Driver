@@ -262,6 +262,19 @@ static void com20020_detach(dev_link_t *link)
 
     dev = info->dev;
 
+    if (link->dev) {
+	DEBUG(1,"unregister...\n");
+
+	unregister_netdev(dev);
+	    
+	/*
+	 * this is necessary because we register our IRQ separately
+	 * from card services.
+	 */
+	if (dev->irq)
+	    free_irq(dev->irq, dev);
+    }
+
     if (link->state & DEV_CONFIG)
         com20020_release(link);
 
@@ -276,21 +289,6 @@ static void com20020_detach(dev_link_t *link)
 	dev = info->dev;
 	if (dev)
 	{
-	    if (link->dev)
-	    {
-		DEBUG(1,"unregister...\n");
-
-		unregister_netdev(dev);
-	    
-		/*
-		 * this is necessary because we register our IRQ separately
-		 * from card services.
-		 */
-		if (dev->irq)
-		    free_irq(dev->irq, dev);
-		/* ...but I/O ports are done automatically by card services */
-	    }
-	    
 	    DEBUG(1,"kfree...\n");
 	    free_netdev(dev);
 	}
@@ -461,10 +459,8 @@ static int com20020_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
         link->state &= ~DEV_PRESENT;
-        if (link->state & DEV_CONFIG) {
+        if (link->state & DEV_CONFIG)
             netif_device_detach(dev);
-            link->state |= DEV_RELEASE_PENDING;
-        }
         break;
     case CS_EVENT_CARD_INSERTION:
         link->state |= DEV_PRESENT;

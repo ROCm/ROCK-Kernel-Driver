@@ -116,12 +116,6 @@ static int rx_copybreak;
 #define TX_FIFO_THRESH 256
 #define RX_FIFO_THRESH 1		/* 0-3, 0==32, 64,96, or 3==128 bytes  */
 
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

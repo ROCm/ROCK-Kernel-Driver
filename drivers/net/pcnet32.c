@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30f"
-#define DRV_RELDATE	"06.16.2004"
+#define DRV_VERSION	"1.30i"
+#define DRV_RELDATE	"06.28.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -46,6 +46,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/moduleparam.h>
 
 #include <asm/bitops.h>
 #include <asm/dma.h>
@@ -137,6 +138,7 @@ static const char pcnet32_gstrings_test[][ETH_GSTRING_LEN] = {
 #define MAX_UNITS 8	/* More are supported, limit only on options */
 static int options[MAX_UNITS];
 static int full_duplex[MAX_UNITS];
+static int homepna[MAX_UNITS];
 
 /*
  *				Theory of Operation
@@ -250,6 +252,10 @@ static int full_duplex[MAX_UNITS];
  * v1.30f  16 Jun 2004 Don Fry cleanup IRQ to allow 0 and 1 for PCI,
  * 	   expanding on suggestions from Ralf Baechle <ralf@linux-mips.org>,
  * 	   and Brian Murphy <brian@murphy.dk>.
+ * v1.30g  22 Jun 2004 Patrick Simmons <psimmons@flash.net> added option
+ *	   homepna for selecting HomePNA mode for PCNet/Home 79C978.
+ * v1.30h  24 Jun 2004 Don Fry correctly select auto, speed, duplex in bcr32.
+ * v1.30i  28 Jun 2004 Don Fry change to use module_param.
  */
 
 
@@ -1084,15 +1090,17 @@ pcnet32_probe1(unsigned long ioaddr, int shared, struct pci_dev *pdev)
 	fdx = 1;
 	/*
 	 * This is based on specs published at www.amd.com.  This section
-	 * assumes that a card with a 79C978 wants to go into 1Mb HomePNA
-	 * mode.  The 79C978 can also go into standard ethernet, and there
-	 * probably should be some sort of module option to select the
-	 * mode by which the card should operate
+	 * assumes that a card with a 79C978 wants to go into standard
+	 * ethernet mode.  The 79C978 can also go into 1Mb HomePNA mode,
+	 * and the module option homepna=1 can select this instead.
 	 */
-	/* switch to home wiring mode */
 	media = a->read_bcr(ioaddr, 49);
+	media &= ~3;		/* default to 10Mb ethernet */
+	if (cards_found < MAX_UNITS && homepna[cards_found])
+	    media |= 1; 	/* switch to home wiring mode */
 	if (pcnet32_debug & NETIF_MSG_PROBE)
-	    printk(KERN_DEBUG PFX "media reset to %#x.\n",  media);
+	    printk(KERN_DEBUG PFX "media set to %sMbit mode.\n", 
+		    (media & 1) ? "1" : "10");
 	a->write_bcr(ioaddr, 49, media);
 	break;
     case 0x2627:
@@ -1417,9 +1425,13 @@ pcnet32_open(struct net_device *dev)
 	val |= 0x10;
     lp->a.write_csr (ioaddr, 124, val);
 
+    /* 24 Jun 2004 according AMD, in order to change the PHY,
+     * DANAS (or DISPM for 79C976) must be set; then select the speed,
+     * duplex, and/or enable auto negotiation, and clear DANAS */
     if (lp->mii && !(lp->options & PCNET32_PORT_ASEL)) {
+	lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	/* disable Auto Negotiation, set 10Mpbs, HD */
-	val = lp->a.read_bcr (ioaddr, 32) & ~0x38;
+	val = lp->a.read_bcr(ioaddr, 32) & ~0xb8;
 	if (lp->options & PCNET32_PORT_FD)
 	    val |= 0x10;
 	if (lp->options & PCNET32_PORT_100)
@@ -1427,6 +1439,7 @@ pcnet32_open(struct net_device *dev)
 	lp->a.write_bcr (ioaddr, 32, val);
     } else {
 	if (lp->options & PCNET32_PORT_ASEL) {
+	    lp->a.write_bcr(ioaddr, 32, lp->a.read_bcr(ioaddr, 32) | 0x0080);
 	    /* enable auto negotiate, setup, disable fd */
 	    val = lp->a.read_bcr(ioaddr, 32) & ~0x98;
 	    val |= 0x20;
@@ -1753,7 +1766,7 @@ pcnet32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     spin_lock(&lp->lock);
 
     rap = lp->a.read_rap(ioaddr);
-    while ((csr0 = lp->a.read_csr (ioaddr, 0)) & 0x8600 && --boguscnt >= 0) {
+    while ((csr0 = lp->a.read_csr (ioaddr, 0)) & 0x8f00 && --boguscnt >= 0) {
 	if (csr0 == 0xffff) {
 	    break;			/* PCMCIA remove happened */
 	}
@@ -2247,31 +2260,35 @@ static struct pci_driver pcnet32_driver = {
     .id_table	= pcnet32_pci_tbl,
 };
 
-MODULE_PARM(debug, "i");
+/* An additional parameter that may be passed in... */
+static int debug = -1;
+static int tx_start_pt = -1;
+static int pcnet32_have_pci;
+static int num_params;
+
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, DRV_NAME " debug level");
-MODULE_PARM(max_interrupt_work, "i");
+module_param(max_interrupt_work, int, 0);
 MODULE_PARM_DESC(max_interrupt_work, DRV_NAME " maximum events handled per interrupt");
-MODULE_PARM(rx_copybreak, "i");
+module_param(rx_copybreak, int, 0);
 MODULE_PARM_DESC(rx_copybreak, DRV_NAME " copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM(tx_start_pt, "i");
+module_param(tx_start_pt, int, 0);
 MODULE_PARM_DESC(tx_start_pt, DRV_NAME " transmit start point (0-3)");
-MODULE_PARM(pcnet32vlb, "i");
+module_param(pcnet32vlb, int, 0);
 MODULE_PARM_DESC(pcnet32vlb, DRV_NAME " Vesa local bus (VLB) support (0/1)");
-MODULE_PARM(options, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param_array(options, int, num_params, 0);
 MODULE_PARM_DESC(options, DRV_NAME " initial option setting(s) (0-15)");
-MODULE_PARM(full_duplex, "1-" __MODULE_STRING(MAX_UNITS) "i");
+module_param_array(full_duplex, int, num_params, 0);
 MODULE_PARM_DESC(full_duplex, DRV_NAME " full duplex setting(s) (1)");
+/* Module Parameter for HomePNA cards added by Patrick Simmons, 2004 */
+module_param_array(homepna, int, num_params, 0);
+MODULE_PARM_DESC(homepna, DRV_NAME " mode for 79C978 cards (1 for HomePNA, 0 for Ethernet, default Ethernet");
 
 MODULE_AUTHOR("Thomas Bogendoerfer");
 MODULE_DESCRIPTION("Driver for PCnet32 and PCnetPCI based ethercards");
 MODULE_LICENSE("GPL");
 
 #define PCNET32_MSG_DEFAULT (NETIF_MSG_DRV | NETIF_MSG_PROBE | NETIF_MSG_LINK)
-
-/* An additional parameter that may be passed in... */
-static int debug = -1;
-static int tx_start_pt = -1;
-static int pcnet32_have_pci;
 
 static int __init pcnet32_init_module(void)
 {

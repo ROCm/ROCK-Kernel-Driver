@@ -675,7 +675,7 @@ mgt_commit(islpci_private *priv)
 
 /* This will tell you if you are allowed to answer a mlme(ex) request .*/
 
-inline int
+int
 mgt_mlme_answer(islpci_private *priv)
 {
 	u32 mlmeautolevel;
@@ -692,7 +692,7 @@ mgt_mlme_answer(islpci_private *priv)
 		(mlmeautolevel >= DOT11_MLME_INTERMEDIATE));
 }
 
-inline enum oid_num_t
+enum oid_num_t
 mgt_oidtonum(u32 oid)
 {
 	int i;
