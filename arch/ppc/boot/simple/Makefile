@@ -96,10 +96,6 @@ EXTRA				:= chrpmap.o
 END				:= pcore
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
-# The PowerPMC 250 needs the dummy serial_fixups()
-ifeq ($(CONFIG_POWERPMC250),y)
-EXTRA				:= direct.o
-endif
 ifeq ($(CONFIG_SANDPOINT),y)
 EXTRA				:= direct.o
 TFTPIMAGE			:= /tftpboot/zImage.sandpoint
