@@ -2267,7 +2267,7 @@ sys32_sigaltstack (ia32_stack_t *uss32, ia32_stack_t *uoss32,
 	uss.ss_flags = buf32.ss_flags;
 	/* MINSIGSTKSZ is different for ia32 vs ia64. We lie here to pass the 
            check and set it to the user requested value later */
-	if (buf32.ss_size < MINSIGSTKSZ_IA32) {
+	if ((buf32.ss_flags != SS_DISABLE) && (buf32.ss_size < MINSIGSTKSZ_IA32)) {
 		ret = -ENOMEM;
 		goto out;
 	}
