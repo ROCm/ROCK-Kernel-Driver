@@ -1656,8 +1656,6 @@ EXPORT_SYMBOL(dget_locked);
 EXPORT_SYMBOL(dput);
 EXPORT_SYMBOL(find_inode_number);
 EXPORT_SYMBOL(have_submounts);
-EXPORT_SYMBOL(is_subdir);
 EXPORT_SYMBOL(names_cachep);
-EXPORT_SYMBOL(shrink_dcache_anon);
 EXPORT_SYMBOL(shrink_dcache_parent);
 EXPORT_SYMBOL(shrink_dcache_sb);
