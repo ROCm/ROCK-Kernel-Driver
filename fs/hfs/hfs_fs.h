@@ -207,6 +207,13 @@ extern struct inode *hfs_iget(struct super_block *, struct hfs_cat_key *, hfs_ca
 extern void hfs_clear_inode(struct inode *);
 extern void hfs_delete_inode(struct inode *);
 
+/* attr.c */
+extern int hfs_setxattr(struct dentry *dentry, const char *name,
+			const void *value, size_t size, int flags);
+extern ssize_t hfs_getxattr(struct dentry *dentry, const char *name,
+			    void *value, size_t size);
+extern ssize_t hfs_listxattr(struct dentry *dentry, char *buffer, size_t size);
+
 /* mdb.c */
 extern int hfs_mdb_get(struct super_block *);
 extern void hfs_mdb_commit(struct super_block *);

@@ -627,4 +627,7 @@ struct inode_operations hfs_file_inode_operations = {
 	.truncate	= hfs_file_truncate,
 	.setattr	= hfs_inode_setattr,
 	.permission	= hfs_permission,
+	.setxattr	= hfs_setxattr,
+	.getxattr	= hfs_getxattr,
+	.listxattr	= hfs_listxattr,
 };

@@ -301,6 +301,9 @@ struct inode_operations hfsplus_file_inode_operations = {
 	.lookup		= hfsplus_file_lookup,
 	.truncate	= hfsplus_file_truncate,
 	.permission	= hfsplus_permission,
+	.setxattr	= hfsplus_setxattr,
+	.getxattr	= hfsplus_getxattr,
+	.listxattr	= hfsplus_listxattr,
 };
 
 struct file_operations hfsplus_file_operations = {

@@ -341,6 +341,11 @@ void hfsplus_delete_inode(struct inode *);
 /* ioctl.c */
 int hfsplus_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		  unsigned long arg);
+int hfsplus_setxattr(struct dentry *dentry, const char *name,
+		     const void *value, size_t size, int flags);
+ssize_t hfsplus_getxattr(struct dentry *dentry, const char *name,
+			 void *value, size_t size);
+ssize_t hfsplus_listxattr(struct dentry *dentry, char *buffer, size_t size);
 
 /* options.c */
 int parse_options(char *, struct hfsplus_sb_info *);
