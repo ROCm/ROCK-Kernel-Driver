@@ -173,7 +173,8 @@ static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
  * Return: 0 if OK, <0 on errors.
  */
 static int tpam_command_ioctl_dsprun(tpam_card *card) {
-	u32 signature = 0, timeout, i;
+	u32 signature = 0, i;
+	unsigned long timeout;
 	isdn_ctrl ctrl;
 	struct sk_buff *skb;
 

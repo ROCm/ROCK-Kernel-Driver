@@ -28,6 +28,7 @@
 #include <linux/tty.h>
 #include <linux/serial_reg.h>
 #include <linux/netdevice.h>
+#include <linux/interrupt.h>
 
 #define ERROR_STATISTIC
 
@@ -886,7 +887,7 @@ struct card_ops {
 	void   (*release)    (struct IsdnCardState *);
 	void   (*aux_ind)    (struct IsdnCardState *, void *);
 	void   (*led_handler)(struct IsdnCardState *);
-	void   (*irq_func)   (int, void *, struct pt_regs *);
+	irqreturn_t (*irq_func)   (int, void *, struct pt_regs *);
 };
 
 /* Card specific drivers provide methods to access the

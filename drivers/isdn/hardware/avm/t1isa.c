@@ -124,7 +124,7 @@ static int t1_detectandinit(unsigned int base, unsigned irq, int cardnr)
         return 0;
 }
 
-static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
+static irqreturn_t t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 	avmctrl_info *cinfo = &card->ctrlinfo[0];
@@ -252,13 +252,14 @@ static void t1isa_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 		case 0xff:
 			printk(KERN_ERR "%s: card reseted ?\n", card->name);
-			return;
+			return IRQ_HANDLED;
 		default:
 			printk(KERN_ERR "%s: b1_interrupt: 0x%x ???\n",
 					card->name, b1cmd);
-			return;
+			return IRQ_NONE;
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 /* ------------------------------------------------------------- */

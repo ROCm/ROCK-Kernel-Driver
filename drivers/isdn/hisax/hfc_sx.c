@@ -661,7 +661,7 @@ receive_emsg(struct IsdnCardState *cs)
 /*********************/
 /* Interrupt handler */
 /*********************/
-static void
+static irqreturn_t
 hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -672,17 +672,17 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 	if (!cs) {
 		printk(KERN_WARNING "HFC-SX: Spurious interrupt!\n");
-		return;
+		return IRQ_NONE;
 	}
 	if (!(cs->hw.hfcsx.int_m2 & 0x08))
-		return;		/* not initialised */
+		return IRQ_NONE;		/* not initialised */
 
 	if (HFCSX_ANYINT & (stat = Read_hfc(cs, HFCSX_STATUS))) {
 		val = Read_hfc(cs, HFCSX_INT_S1);
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "HFC-SX: stat(%02x) s1(%02x)", stat, val);
 	} else
-		return;
+		return IRQ_NONE;
 
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "HFC-SX irq %x", val);
@@ -756,6 +756,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		} else
 			val = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /********************************************************************/

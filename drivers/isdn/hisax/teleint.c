@@ -178,7 +178,7 @@ static struct bc_hw_ops hfc_ops = {
 	.write_reg = WriteHFC,
 };
 
-static void
+static irqreturn_t
 teleint_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -198,6 +198,7 @@ teleint_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	writereg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_MASK, 0xFF);
 	writereg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_MASK, 0x0);
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static void
