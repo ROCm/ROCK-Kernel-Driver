@@ -299,10 +299,23 @@ static int pci_device_suspend(struct device * dev, u32 state)
 {
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 	struct pci_driver * drv = pci_dev->driver;
+	u32 dev_state;
 	int i = 0;
 
+	/* Translate PM_SUSPEND_xx states to PCI device states */
+	static u32 state_conversion[] = {
+		[PM_SUSPEND_ON] = 0,
+		[PM_SUSPEND_STANDBY] = 1,
+		[PM_SUSPEND_MEM] = 3,
+		[PM_SUSPEND_DISK] = 3,
+	};
+
+	if (state >= sizeof(state_conversion) / sizeof(state_conversion[1]))
+		return -EINVAL;
+
+	dev_state = state_conversion[state];
 	if (drv && drv->suspend)
-		i = drv->suspend(pci_dev,state);
+		i = drv->suspend(pci_dev, dev_state);
 		
 	pci_save_state(pci_dev, pci_dev->saved_config_space);
 	return i;

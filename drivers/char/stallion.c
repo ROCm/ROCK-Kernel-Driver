@@ -1197,8 +1197,7 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 		portp->tx.tail = (char *) NULL;
 	}
 	set_bit(TTY_IO_ERROR, &tty->flags);
-	if (tty->ldisc.flush_buffer)
-		(tty->ldisc.flush_buffer)(tty);
+	tty_ldisc_flush(tty);
 
 	tty->closing = 0;
 	portp->tty = (struct tty_struct *) NULL;
@@ -1809,10 +1808,7 @@ static void stl_flushbuffer(struct tty_struct *tty)
 		return;
 
 	stl_flush(portp);
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*****************************************************************************/
@@ -2193,10 +2189,7 @@ static void stl_offintr(void *private)
 
 	lock_kernel();
 	if (test_bit(ASYI_TXLOW, &portp->istate)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 	if (test_bit(ASYI_DCDCHANGE, &portp->istate)) {
 		clear_bit(ASYI_DCDCHANGE, &portp->istate);

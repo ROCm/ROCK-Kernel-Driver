@@ -139,10 +139,7 @@ sclp_vt220_process_queue(struct sclp_vt220_request *request)
 	wake_up(&sclp_vt220_waitq);
 	/* Check if the tty needs a wake up call */
 	if (sclp_vt220_tty != NULL) {
-		if ((sclp_vt220_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    (sclp_vt220_tty->ldisc.write_wakeup != NULL))
-			(sclp_vt220_tty->ldisc.write_wakeup)(sclp_vt220_tty);
-		wake_up_interruptible(&sclp_vt220_tty->write_wait);
+		tty_wakeup(tty);
 	}
 }
 

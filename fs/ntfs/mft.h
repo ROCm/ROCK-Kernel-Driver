@@ -111,6 +111,8 @@ static inline int write_mft_record(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	return err;
 }
 
+extern int ntfs_extent_mft_record_free(ntfs_inode *ni, MFT_RECORD *m);
+
 #endif /* NTFS_RW */
 
 #endif /* _LINUX_NTFS_MFT_H */

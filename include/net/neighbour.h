@@ -7,6 +7,11 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
+ *
+ * 	Changes:
+ *
+ *	Harald Welte:		<laforge@gnumonks.org>
+ *		- Add neighbour cache statistics like rtstat
  */
 
 /* The following flags & states are exported to user space,
@@ -90,11 +95,24 @@ struct neigh_parms
 
 struct neigh_statistics
 {
-	unsigned long allocs;
-	unsigned long res_failed;
-	unsigned long rcv_probes_mcast;
-	unsigned long rcv_probes_ucast;
+	unsigned long allocs;		/* number of allocated neighs */
+	unsigned long destroys;		/* number of destroyed neighs */
+	unsigned long hash_grows;	/* number of hash resizes */
+
+	unsigned long res_failed;	/* nomber of failed resolutions */
+
+	unsigned long lookups;		/* number of lookups */
+	unsigned long hits;		/* number of hits (among lookups) */
+
+	unsigned long rcv_probes_mcast;	/* number of received mcast ipv6 */
+	unsigned long rcv_probes_ucast; /* number of received ucast ipv6 */
+
+	unsigned long periodic_gc_runs;	/* number of periodic GC runs */
+	unsigned long forced_gc_runs;	/* number of forced GC runs */
 };
+
+#define NEIGH_CACHE_STAT_INC(tbl, field)				\
+		(per_cpu_ptr((tbl)->stats, smp_processor_id())->field++)
 
 struct neighbour
 {
@@ -172,12 +190,15 @@ struct neigh_table
 	unsigned long		last_rand;
 	struct neigh_parms	*parms_list;
 	kmem_cache_t		*kmem_cachep;
-	struct neigh_statistics	stats;
+	struct neigh_statistics	*stats;
 	struct neighbour	**hash_buckets;
 	unsigned int		hash_mask;
 	__u32			hash_rnd;
 	unsigned int		hash_chain_gc;
 	struct pneigh_entry	**phash_buckets;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*pde;
+#endif
 };
 
 /* flags for neigh_update() */

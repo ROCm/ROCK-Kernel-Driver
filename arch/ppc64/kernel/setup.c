@@ -99,7 +99,7 @@ unsigned long decr_overclock_set = 0;
 unsigned long decr_overclock_proc0_set = 0;
 
 int have_of = 1;
-
+int boot_cpuid = 0;
 dev_t boot_dev;
 
 /*
@@ -405,16 +405,6 @@ void __init early_setup(unsigned long dt_ptr)
 	EARLY_DEBUG_INIT();
 
 	DBG("Found, Initializing memory management...\n");
-
-#ifdef CONFIG_U3_DART
-	/*
-	 * On U3, the DART (iommu) must be allocated now since it
-	 * has an impact on htab_initialize (due to the large page it
-	 * occupies having to be broken up so the DART itself is not
-	 * part of the cacheable linar mapping
-	 */
-	alloc_u3_dart_table();
-#endif /* CONFIG_U3_DART */
 
 	/*
 	 * Initialize stab / SLB management
@@ -723,7 +713,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #ifdef CONFIG_SMP
 	pvr = per_cpu(pvr, cpu_id);
 #else
-	pvr = mfpvr(PSRN_PVR);
+	pvr = mfspr(SPRN_PVR);
 #endif
 	maj = (pvr >> 8) & 0xFF;
 	min = pvr & 0xFF;

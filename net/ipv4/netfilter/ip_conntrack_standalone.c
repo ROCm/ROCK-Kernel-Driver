@@ -268,10 +268,13 @@ static void *ct_cpu_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	for (cpu = *pos-1; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return &per_cpu(ip_conntrack_stat, cpu);
 	}
 
@@ -282,10 +285,10 @@ static void *ct_cpu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos + 1; cpu < NR_CPUS; ++cpu) {
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return &per_cpu(ip_conntrack_stat, cpu);
 	}
 
@@ -300,6 +303,11 @@ static int ct_cpu_seq_show(struct seq_file *seq, void *v)
 {
 	unsigned int nr_conntracks = atomic_read(&ip_conntrack_count);
 	struct ip_conntrack_stat *st = v;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq, "entries  searched found new invalid ignore delete delete_list insert insert_failed drop early_drop icmp_error  expect_new expect_create expect_delete\n");
+		return 0;
+	}
 
 	seq_printf(seq, "%08x  %08x %08x %08x %08x %08x %08x %08x "
 			"%08x %08x %08x %08x %08x  %08x %08x %08x \n",
@@ -735,10 +743,11 @@ static int init_or_cleanup(int init)
 					&exp_file_ops);
 	if (!proc_exp) goto cleanup_proc;
 
-	proc_stat = proc_net_fops_create("ip_conntrack_stat", S_IRUGO,
-					 &ct_cpu_seq_fops);
+	proc_stat = create_proc_entry("ip_conntrack", S_IRUGO, proc_net_stat);
 	if (!proc_stat)
 		goto cleanup_proc_exp;
+
+	proc_stat->proc_fops = &ct_cpu_seq_fops;
 	proc_stat->owner = THIS_MODULE;
 #endif
 

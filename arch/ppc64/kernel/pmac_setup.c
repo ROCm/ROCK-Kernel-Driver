@@ -447,6 +447,14 @@ static int __init pmac_probe(int platform)
 	if (platform != PLATFORM_POWERMAC)
 		return 0;
 
+	/*
+	 * On U3, the DART (iommu) must be allocated now since it
+	 * has an impact on htab_initialize (due to the large page it
+	 * occupies having to be broken up so the DART itself is not
+	 * part of the cacheable linar mapping
+	 */
+	alloc_u3_dart_table();
+
 	return 1;
 }
 
