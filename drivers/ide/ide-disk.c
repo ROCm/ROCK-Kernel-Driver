@@ -1616,7 +1616,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	 * expect it to flag support properly. We can safely support
 	 * FLUSH_CACHE on lba48, if capacity doesn't exceed lba28
 	 */
-	barrier = ide_id_has_flush_cache(id);
+	barrier = 1;
 	if (drive->addressing == 1) {
 		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
 			barrier = 0;

@@ -81,10 +81,13 @@ static struct request *ide_queue_flush_cmd(ide_drive_t *drive,
 	struct request *flush_rq = &HWGROUP(drive)->wrq;
 
 	/*
-	 * write cache disabled, just return barrier write immediately
+	 * write cache disabled, clear the barrier bit and treat it like
+	 * an ordinary write
 	 */
-	if (!drive->wcache)
+	if (!drive->wcache) {
+		rq->flags |= REQ_BAR_PREFLUSH;
 		return rq;
+	}
 
 	ide_init_drive_cmd(flush_rq);
 	ide_fill_flush_cmd(drive, flush_rq);
@@ -163,7 +166,7 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	if (!nr_sectors)
 		nr_sectors = rq->hard_cur_sectors;
 
-	if (!blk_barrier_rq(rq))
+	if (!blk_barrier_rq(rq) || !drive->wcache)
 		ret = __ide_end_request(drive, rq, uptodate, nr_sectors);
 	else {
 		struct request *flush_rq = &HWGROUP(drive)->wrq;
