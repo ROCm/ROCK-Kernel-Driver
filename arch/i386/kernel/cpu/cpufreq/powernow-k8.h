@@ -5,6 +5,32 @@
  *  http://www.gnu.org/licenses/gpl.html
  */
 
+struct powernow_k8_data {
+	unsigned int    cpu;
+
+	u32 numps;  /* number of p-states */
+	u32 batps;  /* number of p-states supported on battery */
+
+	/* these values are constant when the PSB is used to determine
+	 * vid/fid pairings, but are modified during the ->target() call
+	 * when ACPI is used */
+	u32 rvo;     /* ramp voltage offset */
+	u32 irt;     /* isochronous relief time */
+	u32 vidmvs;  /* usable value calculated from mvs */
+	u32 vstable; /* voltage stabilization time, units 20 us */
+	u32     plllock; /* pll lock time, units 1 us */
+
+	/* keep track of the current fid / vid */
+	u32 currvid;
+	u32 currfid;
+
+	/* the powernow_table includes all frequency and vid/fid pairings:
+	 * fid are the lower 8 bits of the index, vid are the upper 8 bits.
+	 * frequency is in kHz */
+	struct cpufreq_frequency_table  *powernow_table;
+};
+
+
 /* processor's cpuid instruction support */
 #define CPUID_PROCESSOR_SIGNATURE             1	/* function 1               */
 #define CPUID_F1_FAM                 0x00000f00	/* family mask              */
@@ -117,6 +143,7 @@ struct pst_s {
 #define dprintk(msg...) do { } while(0)
 #endif
 
-static inline int core_voltage_pre_transition(u32 reqvid);
-static inline int core_voltage_post_transition(u32 reqvid);
-static inline int core_frequency_transition(u32 reqfid);
+static inline int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid);
+static inline int core_voltage_post_transition(struct powernow_k8_data *data, u32 reqvid);
+static inline int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid);
+
