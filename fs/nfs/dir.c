@@ -850,22 +850,22 @@ static int nfs_open_revalidate(struct dentry *dentry, struct nameidata *nd)
 	unsigned long verifier;
 	int openflags, ret = 0;
 
-	/* NFS only supports OPEN for regular files */
-	if (inode && !S_ISREG(inode->i_mode))
-		goto no_open;
 	parent = dget_parent(dentry);
 	dir = parent->d_inode;
 	if (!is_atomic_open(dir, nd))
 		goto no_open;
+	/* We can't create new files in nfs_open_revalidate(), so we
+	 * optimize away revalidation of negative dentries.
+	 */
+	if (inode == NULL)
+		goto out;
+	/* NFS only supports OPEN on regular files */
+	if (!S_ISREG(inode->i_mode))
+		goto no_open;
 	openflags = nd->intent.open.flags;
-	if (openflags & O_CREAT) {
-		/* If this is a negative dentry, just drop it */
-		if (!inode)
-			goto out;
-		/* If this is exclusive open, just revalidate */
-		if (openflags & O_EXCL)
-			goto no_open;
-	}
+	/* We cannot do exclusive creation on a positive dentry */
+	if ((openflags & (O_CREAT|O_EXCL)) == (O_CREAT|O_EXCL))
+		goto no_open;
 	/* We can't create new files, or truncate existing ones here */
 	openflags &= ~(O_CREAT|O_TRUNC);
 
