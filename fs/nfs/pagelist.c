@@ -103,6 +103,7 @@ nfs_create_request(struct rpc_cred *cred, struct inode *inode,
 	 * long write-back delay. This will be adjusted in
 	 * update_nfs_request below if the region is not locked. */
 	req->wb_page    = page;
+	req->wb_index	= page->index;
 	page_cache_get(page);
 	req->wb_offset  = offset;
 	req->wb_bytes   = count;
@@ -188,7 +189,6 @@ void
 nfs_list_add_request(struct nfs_page *req, struct list_head *head)
 {
 	struct list_head *pos;
-	unsigned long pg_idx = page_index(req->wb_page);
 
 #ifdef NFS_PARANOIA
 	if (!list_empty(&req->wb_list)) {
@@ -198,7 +198,7 @@ nfs_list_add_request(struct nfs_page *req, struct list_head *head)
 #endif
 	list_for_each_prev(pos, head) {
 		struct nfs_page	*p = nfs_list_entry(pos);
-		if (page_index(p->wb_page) < pg_idx)
+		if (p->wb_index < req->wb_index)
 			break;
 	}
 	list_add(&req->wb_list, pos);
@@ -247,7 +247,7 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
 		if (prev) {
 			if (req->wb_cred != prev->wb_cred)
 				break;
-			if (page_index(req->wb_page) != page_index(prev->wb_page)+1)
+			if (req->wb_index != (prev->wb_index + 1))
 				break;
 
 			if (req->wb_offset != 0)
@@ -280,7 +280,7 @@ nfs_scan_forward(struct nfs_page *req, struct list_head *dst, int nmax)
 	struct nfs_server *server = NFS_SERVER(req->wb_inode);
 	struct list_head *pos, *head = req->wb_list_head;
 	struct rpc_cred *cred = req->wb_cred;
-	unsigned long idx = page_index(req->wb_page) + 1;
+	unsigned long idx = req->wb_index + 1;
 	int npages = 0;
 
 	for (pos = req->wb_list.next; nfs_lock_request(req); pos = pos->next) {
@@ -296,7 +296,7 @@ nfs_scan_forward(struct nfs_page *req, struct list_head *dst, int nmax)
 		if (req->wb_offset + req->wb_bytes != PAGE_CACHE_SIZE)
 			break;
 		req = nfs_list_entry(pos);
-		if (page_index(req->wb_page) != idx++)
+		if (req->wb_index != idx++)
 			break;
 		if (req->wb_offset != 0)
 			break;
@@ -393,17 +393,15 @@ nfs_scan_list(struct list_head *head, struct list_head *dst,
 		idx_end = idx_start + npages - 1;
 
 	list_for_each_safe(pos, tmp, head) {
-		unsigned long pg_idx;
 
 		req = nfs_list_entry(pos);
 
 		if (file && req->wb_file != file)
 			continue;
 
-		pg_idx = page_index(req->wb_page);
-		if (pg_idx < idx_start)
+		if (req->wb_index < idx_start)
 			continue;
-		if (pg_idx > idx_end)
+		if (req->wb_index > idx_end)
 			break;
 
 		if (!nfs_lock_request(req))

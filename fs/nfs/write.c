@@ -291,7 +291,7 @@ region_locked(struct inode *inode, struct nfs_page *req)
 	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM)
 		return 0;
 
-	rqstart = page_offset(req->wb_page) + req->wb_offset;
+	rqstart = req_offset(req) + req->wb_offset;
 	rqend = rqstart + req->wb_bytes;
 	for (fl = inode->i_flock; fl; fl = fl->fl_next) {
 		if (fl->fl_owner == current->files && (fl->fl_flags & FL_POSIX)
@@ -357,7 +357,7 @@ nfs_inode_remove_request(struct nfs_page *req)
  * Find a request
  */
 static inline struct nfs_page *
-_nfs_find_request(struct inode *inode, struct page *page)
+_nfs_find_request(struct inode *inode, unsigned long index)
 {
 	struct nfs_inode *nfsi = NFS_I(inode);
 	struct list_head	*head, *next;
@@ -367,7 +367,7 @@ _nfs_find_request(struct inode *inode, struct page *page)
 	while (next != head) {
 		struct nfs_page *req = nfs_inode_wb_entry(next);
 		next = next->next;
-		if (page_index(req->wb_page) != page_index(page))
+		if (req->wb_index != index)
 			continue;
 		req->wb_count++;
 		return req;
@@ -376,12 +376,12 @@ _nfs_find_request(struct inode *inode, struct page *page)
 }
 
 static struct nfs_page *
-nfs_find_request(struct inode *inode, struct page *page)
+nfs_find_request(struct inode *inode, unsigned long index)
 {
 	struct nfs_page		*req;
 
 	spin_lock(&nfs_wreq_lock);
-	req = _nfs_find_request(inode, page);
+	req = _nfs_find_request(inode, index);
 	spin_unlock(&nfs_wreq_lock);
 	return req;
 }
@@ -457,7 +457,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 	head = &nfsi->writeback;
 	p = head->next;
 	while (p != head) {
-		unsigned long pg_idx;
 		struct nfs_page *req = nfs_inode_wb_entry(p);
 
 		p = p->next;
@@ -465,8 +464,7 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 		if (file && req->wb_file != file)
 			continue;
 
-		pg_idx = page_index(req->wb_page);
-		if (pg_idx < idx_start || pg_idx > idx_end)
+		if (req->wb_index < idx_start || req->wb_index > idx_end)
 			continue;
 
 		if (!NFS_WBACK_BUSY(req))
@@ -654,7 +652,7 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 		 * A request for the page we wish to update
 		 */
 		spin_lock(&nfs_wreq_lock);
-		req = _nfs_find_request(inode, page);
+		req = _nfs_find_request(inode, page->index);
 		if (req) {
 			if (!nfs_lock_request_dontget(req)) {
 				int error;
@@ -776,7 +774,7 @@ nfs_flush_incompatible(struct file *file, struct page *page)
 	 * Also do the same if we find a request from an existing
 	 * dropped page.
 	 */
-	req = nfs_find_request(inode,page);
+	req = nfs_find_request(inode, page->index);
 	if (req) {
 		if (req->wb_file != file || req->wb_cred != cred || req->wb_page != page)
 			status = nfs_wb_page(inode, page);
@@ -884,7 +882,7 @@ nfs_write_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 	data->inode = req->wb_inode;
 	data->cred = req->wb_cred;
 	data->args.fh     = NFS_FH(req->wb_inode);
-	data->args.offset = page_offset(req->wb_page) + req->wb_offset;
+	data->args.offset = req_offset(req) + req->wb_offset;
 	data->args.pgbase = req->wb_offset;
 	data->args.count  = count;
 	data->res.fattr   = &data->fattr;
@@ -1072,7 +1070,7 @@ nfs_writeback_done(struct rpc_task *task)
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(page_offset(page) + req->wb_offset));
+			(long long)(req_offset(req) + req->wb_offset));
 
 		if (task->tk_status < 0) {
 			ClearPageUptodate(page);
@@ -1126,8 +1124,8 @@ nfs_commit_rpcsetup(struct list_head *head, struct nfs_write_data *data)
 	 * Determine the offset range of requests in the COMMIT call.
 	 * We rely on the fact that data->pages is an ordered list...
 	 */
-	start = page_offset(first->wb_page) + first->wb_offset;
-	end = page_offset(last->wb_page) + (last->wb_offset + last->wb_bytes);
+	start = req_offset(first) + first->wb_offset;
+	end = req_offset(last) + (last->wb_offset + last->wb_bytes);
 	len = end - start;
 	/* If 'len' is not a 32-bit quantity, pass '0' in the COMMIT call */
 	if (end >= inode->i_size || len < 0 || len > (~((u32)0) >> 1))
@@ -1224,7 +1222,7 @@ nfs_commit_done(struct rpc_task *task)
 			req->wb_inode->i_sb->s_id,
 			(long long)NFS_FILEID(req->wb_inode),
 			req->wb_bytes,
-			(long long)(page_offset(req->wb_page) + req->wb_offset));
+			(long long)(req_offset(req) + req->wb_offset));
 		if (task->tk_status < 0) {
 			if (req->wb_file)
 				req->wb_file->f_error = task->tk_status;

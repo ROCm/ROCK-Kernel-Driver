@@ -176,7 +176,7 @@ static int nfs_sync_page(struct page *page)
 {
 	struct address_space *mapping;
 	struct inode	*inode;
-	unsigned long	index = page_index(page);
+	unsigned long	index = page->index;
 	unsigned int	rpages;
 	int		result;
 

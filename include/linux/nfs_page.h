@@ -33,7 +33,8 @@ struct nfs_page {
 	struct page		*wb_page;	/* page to read in/write out */
 	wait_queue_head_t	wb_wait;	/* wait queue */
 	unsigned long		wb_timeout;	/* when to read/write/commit */
-	unsigned int		wb_offset,	/* Offset of read/write */
+	unsigned long		wb_index;	/* Offset within mapping */
+	unsigned int		wb_offset,	/* Offset within page */
 				wb_bytes,	/* Length of request */
 				wb_count;	/* reference count */
 	unsigned long		wb_flags;
