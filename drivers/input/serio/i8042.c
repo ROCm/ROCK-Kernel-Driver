@@ -375,7 +375,7 @@ static char i8042_mux_phys[4][32];
 static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-	unsigned char str, data;
+	unsigned char str, data = 0;
 	unsigned int dfl;
 	int ret;
 
