@@ -70,7 +70,7 @@ extern struct net_device *e2100_probe(int unit);
 extern struct net_device *ni5010_probe(int unit);
 extern struct net_device *ni52_probe(int unit);
 extern struct net_device *ni65_probe(int unit);
-extern int sonic_probe(struct net_device *);
+extern struct net_device *sonic_probe(int unit);
 extern struct net_device *SK_init(int unit);
 extern struct net_device *seeq8005_probe(int unit);
 extern struct net_device *smc_init(int unit);
@@ -335,14 +335,10 @@ static struct devprobe m68k_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe mips_probes[] __initdata = {
+static struct devprobe2 mips_probes[] __initdata = {
 #ifdef CONFIG_MIPS_JAZZ_SONIC
 	{sonic_probe, 0},
 #endif
-	{NULL, 0},
-};
-
-static struct devprobe2 mips_probes2[] __initdata = {
 #ifdef CONFIG_BAGETLANCE        /* Lance-based Baget ethernet boards */
         {bagetlance_probe, 0},
 #endif
@@ -379,8 +375,7 @@ static int __init ethif_probe(int unit)
 	 * The arch specific probes are 1st so that any on-board ethernet
 	 * will be probed before other ISA/EISA/MCA/PCI bus cards.
 	 */
-	if (probe_list(dev, m68k_probes) == 0 ||
-	    probe_list(dev, mips_probes) == 0)
+	if (probe_list(dev, m68k_probes) == 0)
 		err = register_netdev(dev);
 
 	if (err)
@@ -396,7 +391,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	probe_list2(unit, mips_probes2, base_addr == 0) &&
+	probe_list2(unit, mips_probes, base_addr == 0) &&
 	probe_list2(unit, eisa_probes, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
 	probe_list2(unit, isa_probes, base_addr == 0) &&
