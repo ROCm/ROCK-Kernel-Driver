@@ -65,11 +65,13 @@ static int jfs_open(struct inode *inode, struct file *file)
 	if (S_ISREG(inode->i_mode) && file->f_mode & FMODE_WRITE &&
 	    (inode->i_size == 0)) {
 		struct jfs_inode_info *ji = JFS_IP(inode);
+		spin_lock_irq(&ji->ag_lock);
 		if (ji->active_ag == -1) {
 			ji->active_ag = ji->agno;
 			atomic_inc(
 			    &JFS_SBI(inode->i_sb)->bmap->db_active[ji->agno]);
 		}
+		spin_unlock_irq(&ji->ag_lock);
 	}
 
 	return 0;
@@ -78,11 +80,13 @@ static int jfs_release(struct inode *inode, struct file *file)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 
+	spin_lock_irq(&ji->ag_lock);
 	if (ji->active_ag != -1) {
 		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
 		atomic_dec(&bmap->db_active[ji->active_ag]);
 		ji->active_ag = -1;
 	}
+	spin_unlock_irq(&ji->ag_lock);
 
 	return 0;
 }
