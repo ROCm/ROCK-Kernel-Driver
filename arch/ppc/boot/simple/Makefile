@@ -140,6 +140,7 @@ boot-$(CONFIG_GT64260_CONSOLE)   += gt64260_tty.o
 boot-$(CONFIG_SERIAL)		+= ../common/ns16550.o
 endif
 
+EXTRA_TARGETS			:= $(boot-y)
 LIBS				:= ../lib/zlib.a
 
 # Tools

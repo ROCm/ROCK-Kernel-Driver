@@ -30,6 +30,8 @@ LIBS 				= ../lib/zlib.a
 boot-$(CONFIG_SERIAL_CONSOLE)	+= ../common/ns16550.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
+EXTRA_TARGETS			:= $(boot-y)
+
 # Tools
 MKPREP				:= ../utils/mkprep
 SIZE				:= ../utils/size

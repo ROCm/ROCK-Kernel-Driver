@@ -11,7 +11,11 @@ LD_ARGS = -T ../ld.script -Ttext 0x00400000
 
 OBJS = ../common/crt0.o start.o main.o misc.o ../common/string.o image.o \
 	../common/ofcommon.o
+
+EXTRA_TARGETS	:= $(OBJS)
 LIBS = $(TOPDIR)/lib/lib.a ../lib/zlib.a
+
+# Utils
 ADDNOTE = ../utils/addnote
 PIGGYBACK = ../utils/piggyback
 
