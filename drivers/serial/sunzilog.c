@@ -457,10 +457,10 @@ static void sunzilog_status_handle(struct uart_sunzilog_port *up,
 		 * But it does not tell us which bit has changed, we have to keep
 		 * track of this ourselves.
 		 */
-		if ((status & DCD) ^ up->prev_status)
+		if ((status ^ up->prev_status) ^ DCD)
 			uart_handle_dcd_change(&up->port,
 					       (status & DCD));
-		if ((status & CTS) ^ up->prev_status)
+		if ((status ^ up->prev_status) ^ CTS)
 			uart_handle_cts_change(&up->port,
 					       (status & CTS));
 
