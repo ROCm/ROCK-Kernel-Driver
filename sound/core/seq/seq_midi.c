@@ -257,17 +257,12 @@ static int midisynth_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 /* delete given midi synth port */
 static void snd_seq_midisynth_delete(seq_midisynth_t *msynth)
 {
-	snd_seq_port_info_t port;
-	
 	if (msynth == NULL)
 		return;
 
 	if (msynth->seq_client > 0) {
 		/* delete port */
-		memset(&port, 0, sizeof(port));
-		port.addr.client = msynth->seq_client;
-		port.addr.port = msynth->seq_port;
-		snd_seq_kernel_client_ctl(port.addr.client, SNDRV_SEQ_IOCTL_DELETE_PORT, &port);
+		snd_seq_event_port_detach(msynth->seq_client, msynth->seq_port);
 	}
 
 	if (msynth->parser)
