@@ -490,6 +490,7 @@ char * reiserfs_hashname(int code)
 
     return "unknown";
 }
+
 /* return 1 if this is not super block */
 static int print_super_block (struct buffer_head * bh)
 {
@@ -509,8 +510,8 @@ static int print_super_block (struct buffer_head * bh)
 	return 1;
     }
 
-    printk ("%s\'s super block in block %ld\n======================\n",
-            bdevname (bh->b_bdev), bh->b_blocknr);
+    printk ("%s\'s super block is in block %ld\n", bdevname (bh->b_bdev), 
+            bh->b_blocknr);
     printk ("Reiserfs version %s\n", version );
     printk ("Block count %u\n", sb_block_count(rs));
     printk ("Blocksize %d\n", sb_blocksize(rs));

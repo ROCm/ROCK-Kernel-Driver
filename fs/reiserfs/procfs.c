@@ -500,7 +500,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 			"prepare_retry: \t%12lu\n",
 
                         DJP( jp_journal_1st_block ),
-                        DJP( jp_journal_dev ) == 0 ? "none" : __bdevname(to_kdev_t(DJP( jp_journal_dev ))),
+                        bdevname(SB_JOURNAL(sb)->j_dev_bd),
                         DJP( jp_journal_dev ),
                         DJP( jp_journal_size ),
                         DJP( jp_journal_trans_max ),
