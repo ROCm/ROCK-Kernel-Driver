@@ -26,29 +26,26 @@
 #include <asm/mpc8260.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/immap_8260.h>
-#include <asm/cpm_8260.h>
+#include <asm/immap_cpm2.h>
+#include <asm/cpm2.h>
 
 static	uint	dp_alloc_base;	/* Starting offset in DP ram */
 static	uint	dp_alloc_top;	/* Max offset + 1 */
 static	uint	host_buffer;	/* One page of host buffer */
 static	uint	host_end;	/* end + 1 */
-cpm8260_t	*cpmp;		/* Pointer to comm processor space */
+cpm_cpm2_t	*cpmp;		/* Pointer to comm processor space */
 
 /* We allocate this here because it is used almost exclusively for
  * the communication processor devices.
  */
-immap_t		*immr;
+cpm2_map_t *cpm2_immr;
 
 void
-m8260_cpm_reset(void)
+cpm2_reset(void)
 {
-	volatile immap_t	 *imp;
-	volatile cpm8260_t	*commproc;
-	uint			vpgaddr;
+	uint vpgaddr;
 
-	immr = imp = (volatile immap_t *)IMAP_ADDR;
-	commproc = &imp->im_cpm;
+	cpm2_immr = (cpm2_map_t *)CPM_MAP_ADDR;
 
 	/* Reclaim the DP memory for our use.
 	*/
@@ -65,7 +62,7 @@ m8260_cpm_reset(void)
 
 	/* Tell everyone where the comm processor resides.
 	*/
-	cpmp = (cpm8260_t *)commproc;
+	cpmp = &cpm2_immr->im_cpm;
 }
 
 /* Allocate some memory from the dual ported ram.
@@ -73,7 +70,7 @@ m8260_cpm_reset(void)
  * if they ask.
  */
 uint
-m8260_cpm_dpalloc(uint size, uint align)
+cpm2_dpalloc(uint size, uint align)
 {
 	uint	retloc;
 	uint	align_mask, off;
@@ -100,7 +97,7 @@ m8260_cpm_dpalloc(uint size, uint align)
  * UART "fifos" and the like.
  */
 uint
-m8260_cpm_hostalloc(uint size, uint align)
+cpm2_hostalloc(uint size, uint align)
 {
 	uint	retloc;
 	uint	align_mask, off;
@@ -140,17 +137,17 @@ m8260_cpm_hostalloc(uint size, uint align)
  * oversampled clock.
  */
 void
-m8260_cpm_setbrg(uint brg, uint rate)
+cpm2_setbrg(uint brg, uint rate)
 {
 	volatile uint	*bp;
 
 	/* This is good enough to get SMCs running.....
 	*/
 	if (brg < 4) {
-		bp = (uint *)&immr->im_brgc1;
+		bp = (uint *)&cpm2_immr->im_brgc1;
 	}
 	else {
-		bp = (uint *)&immr->im_brgc5;
+		bp = (uint *)&cpm2_immr->im_brgc5;
 		brg -= 4;
 	}
 	bp += brg;
@@ -161,15 +158,15 @@ m8260_cpm_setbrg(uint brg, uint rate)
  * clocks.
  */
 void
-m8260_cpm_fastbrg(uint brg, uint rate, int div16)
+cpm2_fastbrg(uint brg, uint rate, int div16)
 {
 	volatile uint	*bp;
 
 	if (brg < 4) {
-		bp = (uint *)&immr->im_brgc1;
+		bp = (uint *)&cpm2_immr->im_brgc1;
 	}
 	else {
-		bp = (uint *)&immr->im_brgc5;
+		bp = (uint *)&cpm2_immr->im_brgc5;
 		brg -= 4;
 	}
 	bp += brg;

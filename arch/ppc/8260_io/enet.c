@@ -40,12 +40,12 @@
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/pgtable.h>
 #include <asm/mpc8260.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/cpm_8260.h>
+#include <asm/cpm2.h>
 #include <asm/irq.h>
 
 /*
@@ -376,7 +376,7 @@ scc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	    }
 
 	    if (must_restart) {
-		volatile cpm8260_t *cp;
+		volatile cpm_cpm2_t *cp;
 
 		/* Some transmit errors cause the transmitter to shut
 		 * down.  We now issue a restart transmit.  Since the
@@ -552,10 +552,10 @@ static void set_multicast_list(struct net_device *dev)
 	
 		/* Log any net taps. */
 		printk("%s: Promiscuous mode enabled.\n", dev->name);
-		cep->sccp->scc_pmsr |= SCC_PSMR_PRO;
+		cep->sccp->scc_psmr |= SCC_PSMR_PRO;
 	} else {
 
-		cep->sccp->scc_pmsr &= ~SCC_PSMR_PRO;
+		cep->sccp->scc_psmr &= ~SCC_PSMR_PRO;
 
 		if (dev->flags & IFF_ALLMULTI) {
 			/* Catch all multicast addresses, so set the
@@ -617,15 +617,15 @@ static int __init scc_enet_init(void)
 	unsigned long	mem_addr;
 	bd_t		*bd;
 	volatile	cbd_t		*bdp;
-	volatile	cpm8260_t	*cp;
+	volatile	cpm_cpm2_t	*cp;
 	volatile	scc_t		*sccp;
 	volatile	scc_enet_t	*ep;
-	volatile	immap_t		*immap;
-	volatile	iop8260_t	*io;
+	volatile	cpm2_map_t		*immap;
+	volatile	iop_cpm2_t	*io;
 
 	cp = cpmp;	/* Get pointer to Communication Processor */
 
-	immap = (immap_t *)IMAP_ADDR;	/* and to internal registers */
+	immap = (cpm2_map_t *)CPM_MAP_ADDR;	/* and to internal registers */
 	io = &immap->im_ioport;
 
 	bd = (bd_t *)__res;
@@ -680,11 +680,11 @@ static int __init scc_enet_init(void)
 	 * These are relative offsets in the DP ram address space.
 	 * Initialize base addresses for the buffer descriptors.
 	 */
-	i = m8260_cpm_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
+	i = cpm2_dpalloc(sizeof(cbd_t) * RX_RING_SIZE, 8);
 	ep->sen_genscc.scc_rbase = i;
 	cep->rx_bd_base = (cbd_t *)&immap->im_dprambase[i];
 
-	i = m8260_cpm_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
+	i = cpm2_dpalloc(sizeof(cbd_t) * TX_RING_SIZE, 8);
 	ep->sen_genscc.scc_tbase = i;
 	cep->tx_bd_base = (cbd_t *)&immap->im_dprambase[i];
 
@@ -820,7 +820,7 @@ static int __init scc_enet_init(void)
 	/* Set processing mode.  Use Ethernet CRC, catch broadcast, and
 	 * start frame search 22 bit times after RENA.
 	 */
-	sccp->scc_pmsr = (SCC_PSMR_ENCRC | SCC_PSMR_NIB22);
+	sccp->scc_psmr = (SCC_PSMR_ENCRC | SCC_PSMR_NIB22);
 
 	/* It is now OK to enable the Ethernet transmitter.
 	 * Unfortunately, there are board implementation differences here.

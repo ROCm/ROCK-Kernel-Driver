@@ -324,7 +324,7 @@ config RPXLITE
 
 	  HERMES:
 	  Hermes-Pro ISDN/LAN router with integrated 8 x hub
-	  Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+	  Manufacturer: Multidata Gesellschaft fÃ¼r Datentechnik und Informatik
 	  <http://www.multidata.de/>
 	  Date of Release: 2000 (?)
 	  End of life: -
@@ -598,7 +598,15 @@ config TQM8260
 	  End of Life: not yet :-)
 	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
 
+config ADS8272
+	bool "ADS8272"
+
 endchoice
+
+config PQ2ADS
+	bool
+	depends on ADS8272
+	default y
 
 config TQM8xxL
 	bool
@@ -611,14 +619,32 @@ config EMBEDDEDBOOT
 	default y
 
 config 8260
-	bool "MPC8260 CPM Support" if WILLOW
+	bool "CPM2 Support" if WILLOW
 	depends on 6xx
 	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260 || SBC82xx
 	help
-	  The MPC8260 CPM (Communications Processor Module) is a typical
-	  embedded CPU made by Motorola.  Selecting this option means that
-	  you wish to build a kernel for a machine with specifically an 8260
-	  for a CPU.
+	  The MPC8260 is a typical embedded CPU made by Motorola.  Selecting
+	  this option means that you wish to build a kernel for a machine with
+	  an 8260 class CPU.
+
+config 8272
+	bool
+	depends on 6xx
+	default y if ADS8272
+	select 8260
+	help
+	  The MPC8272 CPM has a different internal dpram setup than other CPM2
+	  devices
+
+config CPM2
+	bool
+	depends on 8260
+	default y
+	help
+	  The CPM2 (Communications Processor Module) is a coprocessor on
+	  embedded CPUs made by Motorola.  Selecting this option means that
+	  you wish to build a kernel for a machine with a CPM2 coprocessor
+	  on it (826x, 827x, 8560).
 
 config PPC_CHRP
 	bool
@@ -701,11 +727,11 @@ config SPRUCE_BAUD_33M
 
 config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
-	depends on 4xx || 8260
+	depends on 4xx || CPM2
 
 config SERIAL_CONSOLE
 	bool
-	depends on 8xx || 8260
+	depends on 8xx
 	default y
 
 config SERIAL_CONSOLE_BAUD
@@ -986,7 +1012,7 @@ config ISA
 
 config GENERIC_ISA_DMA
 	bool
-	depends on POWER3 || POWER4 || 6xx && !8260
+	depends on POWER3 || POWER4 || 6xx && !CPM2
 	default y
 
 config EISA
@@ -1003,10 +1029,10 @@ config MCA
 	bool
 
 config PCI
-	bool "PCI support" if 40x || 8260 || 85xx
-	default y if !40x && !8260 && !8xx && !APUS && !85xx
-	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
-	default PCI_QSPAN if !4xx && !8260 && 8xx
+	bool "PCI support" if 40x || CPM2 || 85xx
+	default y if !40x && !CPM2 && !8xx && !APUS && !85xx
+	default PCI_PERMEDIA if !4xx && !CPM2 && !8xx && APUS
+	default PCI_QSPAN if !4xx && !CPM2 && 8xx
 	help
 	  Find out whether your system includes a PCI bus. PCI is the name of
 	  a bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1019,11 +1045,16 @@ config PCI_DOMAINS
 
 config PCI_QSPAN
 	bool "QSpan PCI"
-	depends on !4xx && !8260 && 8xx
+	depends on !4xx && !CPM2 && 8xx
 	help
 	  Say Y here if you have a system based on a Motorola 8xx-series
 	  embedded processor with a QSPAN PCI interface, otherwise say N.
 
+config PCI_8260
+	bool
+	depends on PCI && 8260 && !8272
+	default y
+	
 config PCI_PERMEDIA
 	bool "PCI for Permedia2"
 	depends on !4xx && !8xx && APUS
@@ -1258,7 +1289,7 @@ endchoice
 
 config KGDB_CONSOLE
 	bool "Enable serial console thru kgdb port"
-	depends on KGDB && 8xx || 8260
+	depends on KGDB && 8xx || CPM2
 	help
 	  If you enable this, all serial console messages will be sent
 	  over the gdb stub.

@@ -1,17 +1,16 @@
 /*
- * MPC8260 Communication Processor Module.
- * Copyright (c) 1999 Dan Malek (dmalek@jlc.net)
+ * Communication Processor Module v2.
  *
  * This file contains structures and information for the communication
  * processor channels found in the dual port RAM or parameter RAM.
- * All CPM control and status is available through the MPC8260 internal
- * memory map.  See immap.h for details.
+ * All CPM control and status is available through the CPM2 internal
+ * memory map.  See immap_cpm2.h for details.
  */
 #ifdef __KERNEL__
-#ifndef __CPM_82XX__
-#define __CPM_82XX__
+#ifndef __CPM2__
+#define __CPM2__
 
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 
 /* CPM Command register.
 */
@@ -72,6 +71,8 @@
 #define CPM_CR_STOP_TX		((ushort)0x0004)
 #define CPM_CR_RESTART_TX	((ushort)0x0006)
 #define CPM_CR_SET_GADDR	((ushort)0x0008)
+#define CPM_CR_START_IDMA	((ushort)0x0009)
+#define CPM_CR_STOP_IDMA	((ushort)0x000b)
 
 #define mk_cr_cmd(PG, SBC, MCN, OP) \
 	((PG << 26) | (SBC << 21) | (MCN << 6) | OP)
@@ -83,9 +84,14 @@
  * downloading RAM microcode.
  */
 #define CPM_DATAONLY_BASE	((uint)128)
-#define CPM_DATAONLY_SIZE	((uint)(16 * 1024) - CPM_DATAONLY_BASE)
 #define CPM_DP_NOSPACE		((uint)0x7fffffff)
+#ifdef CONFIG_8272
+#define CPM_DATAONLY_SIZE	((uint)(8 * 1024) - CPM_DATAONLY_BASE)
+#define CPM_FCC_SPECIAL_BASE	((uint)0x00009000)
+#else
+#define CPM_DATAONLY_SIZE	((uint)(16 * 1024) - CPM_DATAONLY_BASE)
 #define CPM_FCC_SPECIAL_BASE	((uint)0x0000b000)
+#endif
 
 /* The number of pages of host memory we allocate for CPM.  This is
  * done early in kernel initialization to get physically contiguous
@@ -97,11 +103,11 @@
 /* Export the base address of the communication processor registers
  * and dual port ram.
  */
-extern	cpm8260_t	*cpmp;		/* Pointer to comm processor */
-uint		m8260_cpm_dpalloc(uint size, uint align);
-uint		m8260_cpm_hostalloc(uint size, uint align);
-void		m8260_cpm_setbrg(uint brg, uint rate);
-void		m8260_cpm_fastbrg(uint brg, uint rate, int div16);
+extern		cpm_cpm2_t	*cpmp;	 /* Pointer to comm processor */
+uint		cpm2_dpalloc(uint size, uint align);
+uint		cpm2_hostalloc(uint size, uint align);
+void		cpm2_setbrg(uint brg, uint rate);
+void		cpm2_fastbrg(uint brg, uint rate, int div16);
 
 /* Buffer descriptors used by many of the CPM protocols.
 */
@@ -504,21 +510,21 @@ typedef struct scc_uart {
 #define UART_SCCM_TX		((ushort)0x0002)
 #define UART_SCCM_RX		((ushort)0x0001)
 
-/* The SCC PMSR when used as a UART.
+/* The SCC PSMR when used as a UART.
 */
-#define SCU_PMSR_FLC		((ushort)0x8000)
-#define SCU_PMSR_SL		((ushort)0x4000)
-#define SCU_PMSR_CL		((ushort)0x3000)
-#define SCU_PMSR_UM		((ushort)0x0c00)
-#define SCU_PMSR_FRZ		((ushort)0x0200)
-#define SCU_PMSR_RZS		((ushort)0x0100)
-#define SCU_PMSR_SYN		((ushort)0x0080)
-#define SCU_PMSR_DRT		((ushort)0x0040)
-#define SCU_PMSR_PEN		((ushort)0x0010)
-#define SCU_PMSR_RPM		((ushort)0x000c)
-#define SCU_PMSR_REVP		((ushort)0x0008)
-#define SCU_PMSR_TPM		((ushort)0x0003)
-#define SCU_PMSR_TEVP		((ushort)0x0003)
+#define SCU_PSMR_FLC		((ushort)0x8000)
+#define SCU_PSMR_SL		((ushort)0x4000)
+#define SCU_PSMR_CL		((ushort)0x3000)
+#define SCU_PSMR_UM		((ushort)0x0c00)
+#define SCU_PSMR_FRZ		((ushort)0x0200)
+#define SCU_PSMR_RZS		((ushort)0x0100)
+#define SCU_PSMR_SYN		((ushort)0x0080)
+#define SCU_PSMR_DRT		((ushort)0x0040)
+#define SCU_PSMR_PEN		((ushort)0x0010)
+#define SCU_PSMR_RPM		((ushort)0x000c)
+#define SCU_PSMR_REVP		((ushort)0x0008)
+#define SCU_PSMR_TPM		((ushort)0x0003)
+#define SCU_PSMR_TEVP		((ushort)0x0003)
 
 /* CPM Transparent mode SCC.
  */
@@ -612,7 +618,7 @@ typedef struct fcc_enet {
 	ushort	fen_paddrm;
 	ushort	fen_paddrl;
 	ushort	fen_ibdcount;	/* Internal BD counter */
-	ushort	fen_idbstart;	/* Internal BD start pointer */
+	ushort	fen_ibdstart;	/* Internal BD start pointer */
 	ushort	fen_ibdend;	/* Internal BD end pointer */
 	ushort	fen_txlen;	/* Internal Tx frame length counter */
 	uint	fen_ibdbase[8]; /* Internal use */
@@ -696,7 +702,336 @@ typedef struct iic {
 	uint	iic_txtmp;	/* Internal */
 } iic_t;
 
+/* SPI parameter RAM.
+*/
+typedef struct spi {
+	ushort	spi_rbase;	/* Rx Buffer descriptor base address */
+	ushort	spi_tbase;	/* Tx Buffer descriptor base address */
+	u_char	spi_rfcr;	/* Rx function code */
+	u_char	spi_tfcr;	/* Tx function code */
+	ushort	spi_mrblr;	/* Max receive buffer length */
+	uint	spi_rstate;	/* Internal */
+	uint	spi_rdp;	/* Internal */
+	ushort	spi_rbptr;	/* Internal */
+	ushort	spi_rbc;	/* Internal */
+	uint	spi_rxtmp;	/* Internal */
+	uint	spi_tstate;	/* Internal */
+	uint	spi_tdp;	/* Internal */
+	ushort	spi_tbptr;	/* Internal */
+	ushort	spi_tbc;	/* Internal */
+	uint	spi_txtmp;	/* Internal */
+	uint	spi_res;	/* Tx temp. */
+	uint	spi_res1[4];	/* SDMA temp. */
+} spi_t;
+
+/* SPI Mode register.
+*/
+#define SPMODE_LOOP	((ushort)0x4000)	/* Loopback */
+#define SPMODE_CI	((ushort)0x2000)	/* Clock Invert */
+#define SPMODE_CP	((ushort)0x1000)	/* Clock Phase */
+#define SPMODE_DIV16	((ushort)0x0800)	/* BRG/16 mode */
+#define SPMODE_REV	((ushort)0x0400)	/* Reversed Data */
+#define SPMODE_MSTR	((ushort)0x0200)	/* SPI Master */
+#define SPMODE_EN	((ushort)0x0100)	/* Enable */
+#define SPMODE_LENMSK	((ushort)0x00f0)	/* character length */
+#define SPMODE_PMMSK	((ushort)0x000f)	/* prescale modulus */
+
+#define SPMODE_LEN(x)	((((x)-1)&0xF)<<4)
+#define SPMODE_PM(x)	((x) &0xF)
+
+#define SPI_EB		((u_char)0x10)		/* big endian byte order */
+
 #define BD_IIC_START		((ushort)0x0400)
 
-#endif /* __CPM_82XX__ */
+/* IDMA parameter RAM
+*/
+typedef struct idma {
+	ushort ibase;		/* IDMA buffer descriptor table base address */
+	ushort dcm;		/* DMA channel mode */
+	ushort ibdptr;		/* IDMA current buffer descriptor pointer */
+	ushort dpr_buf;		/* IDMA transfer buffer base address */
+	ushort buf_inv;		/* internal buffer inventory */
+	ushort ss_max;		/* steady-state maximum transfer size */
+	ushort dpr_in_ptr;	/* write pointer inside the internal buffer */
+	ushort sts;		/* source transfer size */
+	ushort dpr_out_ptr;	/* read pointer inside the internal buffer */
+	ushort seob;		/* source end of burst */
+	ushort deob;		/* destination end of burst */
+	ushort dts;		/* destination transfer size */
+	ushort ret_add;		/* return address when working in ERM=1 mode */
+	ushort res0;		/* reserved */
+	uint   bd_cnt;		/* internal byte count */
+	uint   s_ptr;		/* source internal data pointer */
+	uint   d_ptr;		/* destination internal data pointer */
+	uint   istate;		/* internal state */
+	u_char res1[20];	/* pad to 64-byte length */
+} idma_t;
+
+/* DMA channel mode bit fields
+*/
+#define IDMA_DCM_FB		((ushort)0x8000) /* fly-by mode */
+#define IDMA_DCM_LP		((ushort)0x4000) /* low priority */
+#define IDMA_DCM_TC2		((ushort)0x0400) /* value driven on TC[2] */
+#define IDMA_DCM_DMA_WRAP_MASK	((ushort)0x01c0) /* mask for DMA wrap */
+#define IDMA_DCM_DMA_WRAP_64	((ushort)0x0000) /* 64-byte DMA xfer buffer */
+#define IDMA_DCM_DMA_WRAP_128	((ushort)0x0040) /* 128-byte DMA xfer buffer */
+#define IDMA_DCM_DMA_WRAP_256	((ushort)0x0080) /* 256-byte DMA xfer buffer */
+#define IDMA_DCM_DMA_WRAP_512	((ushort)0x00c0) /* 512-byte DMA xfer buffer */
+#define IDMA_DCM_DMA_WRAP_1024	((ushort)0x0100) /* 1024-byte DMA xfer buffer */
+#define IDMA_DCM_DMA_WRAP_2048	((ushort)0x0140) /* 2048-byte DMA xfer buffer */
+#define IDMA_DCM_SINC		((ushort)0x0020) /* source inc addr */
+#define IDMA_DCM_DINC		((ushort)0x0010) /* destination inc addr */
+#define IDMA_DCM_ERM		((ushort)0x0008) /* external request mode */
+#define IDMA_DCM_DT		((ushort)0x0004) /* DONE treatment */
+#define IDMA_DCM_SD_MASK	((ushort)0x0003) /* mask for SD bit field */
+#define IDMA_DCM_SD_MEM2MEM	((ushort)0x0000) /* memory-to-memory xfer */
+#define IDMA_DCM_SD_PER2MEM	((ushort)0x0002) /* peripheral-to-memory xfer */
+#define IDMA_DCM_SD_MEM2PER	((ushort)0x0001) /* memory-to-peripheral xfer */
+
+/* IDMA Buffer Descriptors
+*/
+typedef struct idma_bd {
+	uint flags;
+	uint len;	/* data length */
+	uint src;	/* source data buffer pointer */
+	uint dst;	/* destination data buffer pointer */
+} idma_bd_t;
+
+/* IDMA buffer descriptor flag bit fields
+*/
+#define IDMA_BD_V	((uint)0x80000000)	/* valid */
+#define IDMA_BD_W	((uint)0x20000000)	/* wrap */
+#define IDMA_BD_I	((uint)0x10000000)	/* interrupt */
+#define IDMA_BD_L	((uint)0x08000000)	/* last */
+#define IDMA_BD_CM	((uint)0x02000000)	/* continuous mode */
+#define IDMA_BD_SDN	((uint)0x00400000)	/* source done */
+#define IDMA_BD_DDN	((uint)0x00200000)	/* destination done */
+#define IDMA_BD_DGBL	((uint)0x00100000)	/* destination global */
+#define IDMA_BD_DBO_LE	((uint)0x00040000)	/* little-end dest byte order */
+#define IDMA_BD_DBO_BE	((uint)0x00080000)	/* big-end dest byte order */
+#define IDMA_BD_DDTB	((uint)0x00010000)	/* destination data bus */
+#define IDMA_BD_SGBL	((uint)0x00002000)	/* source global */
+#define IDMA_BD_SBO_LE	((uint)0x00000800)	/* little-end src byte order */
+#define IDMA_BD_SBO_BE	((uint)0x00001000)	/* big-end src byte order */
+#define IDMA_BD_SDTB	((uint)0x00000200)	/* source data bus */
+
+/* per-channel IDMA registers
+*/
+typedef struct im_idma {
+	u_char idsr;			/* IDMAn event status register */
+	u_char res0[3];
+	u_char idmr;			/* IDMAn event mask register */
+	u_char res1[3];
+} im_idma_t;
+
+/* IDMA event register bit fields
+*/
+#define IDMA_EVENT_SC	((unsigned char)0x08)	/* stop completed */
+#define IDMA_EVENT_OB	((unsigned char)0x04)	/* out of buffers */
+#define IDMA_EVENT_EDN	((unsigned char)0x02)	/* external DONE asserted */
+#define IDMA_EVENT_BC	((unsigned char)0x01)	/* buffer descriptor complete */
+
+/* RISC Controller Configuration Register (RCCR) bit fields
+*/
+#define RCCR_TIME	((uint)0x80000000) /* timer enable */
+#define RCCR_TIMEP_MASK	((uint)0x3f000000) /* mask for timer period bit field */
+#define RCCR_DR0M	((uint)0x00800000) /* IDMA0 request mode */
+#define RCCR_DR1M	((uint)0x00400000) /* IDMA1 request mode */
+#define RCCR_DR2M	((uint)0x00000080) /* IDMA2 request mode */
+#define RCCR_DR3M	((uint)0x00000040) /* IDMA3 request mode */
+#define RCCR_DR0QP_MASK	((uint)0x00300000) /* mask for IDMA0 req priority */
+#define RCCR_DR0QP_HIGH ((uint)0x00000000) /* IDMA0 has high req priority */
+#define RCCR_DR0QP_MED	((uint)0x00100000) /* IDMA0 has medium req priority */
+#define RCCR_DR0QP_LOW	((uint)0x00200000) /* IDMA0 has low req priority */
+#define RCCR_DR1QP_MASK	((uint)0x00030000) /* mask for IDMA1 req priority */
+#define RCCR_DR1QP_HIGH ((uint)0x00000000) /* IDMA1 has high req priority */
+#define RCCR_DR1QP_MED	((uint)0x00010000) /* IDMA1 has medium req priority */
+#define RCCR_DR1QP_LOW	((uint)0x00020000) /* IDMA1 has low req priority */
+#define RCCR_DR2QP_MASK	((uint)0x00000030) /* mask for IDMA2 req priority */
+#define RCCR_DR2QP_HIGH ((uint)0x00000000) /* IDMA2 has high req priority */
+#define RCCR_DR2QP_MED	((uint)0x00000010) /* IDMA2 has medium req priority */
+#define RCCR_DR2QP_LOW	((uint)0x00000020) /* IDMA2 has low req priority */
+#define RCCR_DR3QP_MASK	((uint)0x00000003) /* mask for IDMA3 req priority */
+#define RCCR_DR3QP_HIGH ((uint)0x00000000) /* IDMA3 has high req priority */
+#define RCCR_DR3QP_MED	((uint)0x00000001) /* IDMA3 has medium req priority */
+#define RCCR_DR3QP_LOW	((uint)0x00000002) /* IDMA3 has low req priority */
+#define RCCR_EIE	((uint)0x00080000) /* external interrupt enable */
+#define RCCR_SCD	((uint)0x00040000) /* scheduler configuration */
+#define RCCR_ERAM_MASK	((uint)0x0000e000) /* mask for enable RAM microcode */
+#define RCCR_ERAM_0KB	((uint)0x00000000) /* use 0KB of dpram for microcode */
+#define RCCR_ERAM_2KB	((uint)0x00002000) /* use 2KB of dpram for microcode */
+#define RCCR_ERAM_4KB	((uint)0x00004000) /* use 4KB of dpram for microcode */
+#define RCCR_ERAM_6KB	((uint)0x00006000) /* use 6KB of dpram for microcode */
+#define RCCR_ERAM_8KB	((uint)0x00008000) /* use 8KB of dpram for microcode */
+#define RCCR_ERAM_10KB	((uint)0x0000a000) /* use 10KB of dpram for microcode */
+#define RCCR_ERAM_12KB	((uint)0x0000c000) /* use 12KB of dpram for microcode */
+#define RCCR_EDM0	((uint)0x00000800) /* DREQ0 edge detect mode */
+#define RCCR_EDM1	((uint)0x00000400) /* DREQ1 edge detect mode */
+#define RCCR_EDM2	((uint)0x00000200) /* DREQ2 edge detect mode */
+#define RCCR_EDM3	((uint)0x00000100) /* DREQ3 edge detect mode */
+#define RCCR_DEM01	((uint)0x00000008) /* DONE0/DONE1 edge detect mode */
+#define RCCR_DEM23	((uint)0x00000004) /* DONE2/DONE3 edge detect mode */
+
+/*-----------------------------------------------------------------------
+ * CMXFCR - CMX FCC Clock Route Register
+ */
+#define CMXFCR_FC1         0x40000000   /* FCC1 connection              */
+#define CMXFCR_RF1CS_MSK   0x38000000   /* Receive FCC1 Clock Source Mask */
+#define CMXFCR_TF1CS_MSK   0x07000000   /* Transmit FCC1 Clock Source Mask */
+#define CMXFCR_FC2         0x00400000   /* FCC2 connection              */
+#define CMXFCR_RF2CS_MSK   0x00380000   /* Receive FCC2 Clock Source Mask */
+#define CMXFCR_TF2CS_MSK   0x00070000   /* Transmit FCC2 Clock Source Mask */
+#define CMXFCR_FC3         0x00004000   /* FCC3 connection              */
+#define CMXFCR_RF3CS_MSK   0x00003800   /* Receive FCC3 Clock Source Mask */
+#define CMXFCR_TF3CS_MSK   0x00000700   /* Transmit FCC3 Clock Source Mask */
+
+#define CMXFCR_RF1CS_BRG5  0x00000000   /* Receive FCC1 Clock Source is BRG5 */
+#define CMXFCR_RF1CS_BRG6  0x08000000   /* Receive FCC1 Clock Source is BRG6 */
+#define CMXFCR_RF1CS_BRG7  0x10000000   /* Receive FCC1 Clock Source is BRG7 */
+#define CMXFCR_RF1CS_BRG8  0x18000000   /* Receive FCC1 Clock Source is BRG8 */
+#define CMXFCR_RF1CS_CLK9  0x20000000   /* Receive FCC1 Clock Source is CLK9 */
+#define CMXFCR_RF1CS_CLK10 0x28000000   /* Receive FCC1 Clock Source is CLK10 */
+#define CMXFCR_RF1CS_CLK11 0x30000000   /* Receive FCC1 Clock Source is CLK11 */
+#define CMXFCR_RF1CS_CLK12 0x38000000   /* Receive FCC1 Clock Source is CLK12 */
+
+#define CMXFCR_TF1CS_BRG5  0x00000000   /* Transmit FCC1 Clock Source is BRG5 */
+#define CMXFCR_TF1CS_BRG6  0x01000000   /* Transmit FCC1 Clock Source is BRG6 */
+#define CMXFCR_TF1CS_BRG7  0x02000000   /* Transmit FCC1 Clock Source is BRG7 */
+#define CMXFCR_TF1CS_BRG8  0x03000000   /* Transmit FCC1 Clock Source is BRG8 */
+#define CMXFCR_TF1CS_CLK9  0x04000000   /* Transmit FCC1 Clock Source is CLK9 */
+#define CMXFCR_TF1CS_CLK10 0x05000000   /* Transmit FCC1 Clock Source is CLK10 */
+#define CMXFCR_TF1CS_CLK11 0x06000000   /* Transmit FCC1 Clock Source is CLK11 */
+#define CMXFCR_TF1CS_CLK12 0x07000000   /* Transmit FCC1 Clock Source is CLK12 */
+
+#define CMXFCR_RF2CS_BRG5  0x00000000   /* Receive FCC2 Clock Source is BRG5 */
+#define CMXFCR_RF2CS_BRG6  0x00080000   /* Receive FCC2 Clock Source is BRG6 */
+#define CMXFCR_RF2CS_BRG7  0x00100000   /* Receive FCC2 Clock Source is BRG7 */
+#define CMXFCR_RF2CS_BRG8  0x00180000   /* Receive FCC2 Clock Source is BRG8 */
+#define CMXFCR_RF2CS_CLK13 0x00200000   /* Receive FCC2 Clock Source is CLK13 */
+#define CMXFCR_RF2CS_CLK14 0x00280000   /* Receive FCC2 Clock Source is CLK14 */
+#define CMXFCR_RF2CS_CLK15 0x00300000   /* Receive FCC2 Clock Source is CLK15 */
+#define CMXFCR_RF2CS_CLK16 0x00380000   /* Receive FCC2 Clock Source is CLK16 */
+
+#define CMXFCR_TF2CS_BRG5  0x00000000   /* Transmit FCC2 Clock Source is BRG5 */
+#define CMXFCR_TF2CS_BRG6  0x00010000   /* Transmit FCC2 Clock Source is BRG6 */
+#define CMXFCR_TF2CS_BRG7  0x00020000   /* Transmit FCC2 Clock Source is BRG7 */
+#define CMXFCR_TF2CS_BRG8  0x00030000   /* Transmit FCC2 Clock Source is BRG8 */
+#define CMXFCR_TF2CS_CLK13 0x00040000   /* Transmit FCC2 Clock Source is CLK13 */
+#define CMXFCR_TF2CS_CLK14 0x00050000   /* Transmit FCC2 Clock Source is CLK14 */
+#define CMXFCR_TF2CS_CLK15 0x00060000   /* Transmit FCC2 Clock Source is CLK15 */
+#define CMXFCR_TF2CS_CLK16 0x00070000   /* Transmit FCC2 Clock Source is CLK16 */
+
+#define CMXFCR_RF3CS_BRG5  0x00000000   /* Receive FCC3 Clock Source is BRG5 */
+#define CMXFCR_RF3CS_BRG6  0x00000800   /* Receive FCC3 Clock Source is BRG6 */
+#define CMXFCR_RF3CS_BRG7  0x00001000   /* Receive FCC3 Clock Source is BRG7 */
+#define CMXFCR_RF3CS_BRG8  0x00001800   /* Receive FCC3 Clock Source is BRG8 */
+#define CMXFCR_RF3CS_CLK13 0x00002000   /* Receive FCC3 Clock Source is CLK13 */
+#define CMXFCR_RF3CS_CLK14 0x00002800   /* Receive FCC3 Clock Source is CLK14 */
+#define CMXFCR_RF3CS_CLK15 0x00003000   /* Receive FCC3 Clock Source is CLK15 */
+#define CMXFCR_RF3CS_CLK16 0x00003800   /* Receive FCC3 Clock Source is CLK16 */
+
+#define CMXFCR_TF3CS_BRG5  0x00000000   /* Transmit FCC3 Clock Source is BRG5 */
+#define CMXFCR_TF3CS_BRG6  0x00000100   /* Transmit FCC3 Clock Source is BRG6 */
+#define CMXFCR_TF3CS_BRG7  0x00000200   /* Transmit FCC3 Clock Source is BRG7 */
+#define CMXFCR_TF3CS_BRG8  0x00000300   /* Transmit FCC3 Clock Source is BRG8 */
+#define CMXFCR_TF3CS_CLK13 0x00000400   /* Transmit FCC3 Clock Source is CLK13 */
+#define CMXFCR_TF3CS_CLK14 0x00000500   /* Transmit FCC3 Clock Source is CLK14 */
+#define CMXFCR_TF3CS_CLK15 0x00000600   /* Transmit FCC3 Clock Source is CLK15 */
+#define CMXFCR_TF3CS_CLK16 0x00000700   /* Transmit FCC3 Clock Source is CLK16 */
+
+/*-----------------------------------------------------------------------
+ * CMXSCR - CMX SCC Clock Route Register
+ */
+#define CMXSCR_GR1         0x80000000   /* Grant Support of SCC1        */
+#define CMXSCR_SC1         0x40000000   /* SCC1 connection              */
+#define CMXSCR_RS1CS_MSK   0x38000000   /* Receive SCC1 Clock Source Mask */
+#define CMXSCR_TS1CS_MSK   0x07000000   /* Transmit SCC1 Clock Source Mask */
+#define CMXSCR_GR2         0x00800000   /* Grant Support of SCC2        */
+#define CMXSCR_SC2         0x00400000   /* SCC2 connection              */
+#define CMXSCR_RS2CS_MSK   0x00380000   /* Receive SCC2 Clock Source Mask */
+#define CMXSCR_TS2CS_MSK   0x00070000   /* Transmit SCC2 Clock Source Mask */
+#define CMXSCR_GR3         0x00008000   /* Grant Support of SCC3        */
+#define CMXSCR_SC3         0x00004000   /* SCC3 connection              */
+#define CMXSCR_RS3CS_MSK   0x00003800   /* Receive SCC3 Clock Source Mask */
+#define CMXSCR_TS3CS_MSK   0x00000700   /* Transmit SCC3 Clock Source Mask */
+#define CMXSCR_GR4         0x00000080   /* Grant Support of SCC4        */
+#define CMXSCR_SC4         0x00000040   /* SCC4 connection              */
+#define CMXSCR_RS4CS_MSK   0x00000038   /* Receive SCC4 Clock Source Mask */
+#define CMXSCR_TS4CS_MSK   0x00000007   /* Transmit SCC4 Clock Source Mask */
+
+#define CMXSCR_RS1CS_BRG1  0x00000000   /* SCC1 Rx Clock Source is BRG1 */
+#define CMXSCR_RS1CS_BRG2  0x08000000   /* SCC1 Rx Clock Source is BRG2 */
+#define CMXSCR_RS1CS_BRG3  0x10000000   /* SCC1 Rx Clock Source is BRG3 */
+#define CMXSCR_RS1CS_BRG4  0x18000000   /* SCC1 Rx Clock Source is BRG4 */
+#define CMXSCR_RS1CS_CLK11 0x20000000   /* SCC1 Rx Clock Source is CLK11 */
+#define CMXSCR_RS1CS_CLK12 0x28000000   /* SCC1 Rx Clock Source is CLK12 */
+#define CMXSCR_RS1CS_CLK3  0x30000000   /* SCC1 Rx Clock Source is CLK3 */
+#define CMXSCR_RS1CS_CLK4  0x38000000   /* SCC1 Rx Clock Source is CLK4 */
+
+#define CMXSCR_TS1CS_BRG1  0x00000000   /* SCC1 Tx Clock Source is BRG1 */
+#define CMXSCR_TS1CS_BRG2  0x01000000   /* SCC1 Tx Clock Source is BRG2 */
+#define CMXSCR_TS1CS_BRG3  0x02000000   /* SCC1 Tx Clock Source is BRG3 */
+#define CMXSCR_TS1CS_BRG4  0x03000000   /* SCC1 Tx Clock Source is BRG4 */
+#define CMXSCR_TS1CS_CLK11 0x04000000   /* SCC1 Tx Clock Source is CLK11 */
+#define CMXSCR_TS1CS_CLK12 0x05000000   /* SCC1 Tx Clock Source is CLK12 */
+#define CMXSCR_TS1CS_CLK3  0x06000000   /* SCC1 Tx Clock Source is CLK3 */
+#define CMXSCR_TS1CS_CLK4  0x07000000   /* SCC1 Tx Clock Source is CLK4 */
+
+#define CMXSCR_RS2CS_BRG1  0x00000000   /* SCC2 Rx Clock Source is BRG1 */
+#define CMXSCR_RS2CS_BRG2  0x00080000   /* SCC2 Rx Clock Source is BRG2 */
+#define CMXSCR_RS2CS_BRG3  0x00100000   /* SCC2 Rx Clock Source is BRG3 */
+#define CMXSCR_RS2CS_BRG4  0x00180000   /* SCC2 Rx Clock Source is BRG4 */
+#define CMXSCR_RS2CS_CLK11 0x00200000   /* SCC2 Rx Clock Source is CLK11 */
+#define CMXSCR_RS2CS_CLK12 0x00280000   /* SCC2 Rx Clock Source is CLK12 */
+#define CMXSCR_RS2CS_CLK3  0x00300000   /* SCC2 Rx Clock Source is CLK3 */
+#define CMXSCR_RS2CS_CLK4  0x00380000   /* SCC2 Rx Clock Source is CLK4 */
+
+#define CMXSCR_TS2CS_BRG1  0x00000000   /* SCC2 Tx Clock Source is BRG1 */
+#define CMXSCR_TS2CS_BRG2  0x00010000   /* SCC2 Tx Clock Source is BRG2 */
+#define CMXSCR_TS2CS_BRG3  0x00020000   /* SCC2 Tx Clock Source is BRG3 */
+#define CMXSCR_TS2CS_BRG4  0x00030000   /* SCC2 Tx Clock Source is BRG4 */
+#define CMXSCR_TS2CS_CLK11 0x00040000   /* SCC2 Tx Clock Source is CLK11 */
+#define CMXSCR_TS2CS_CLK12 0x00050000   /* SCC2 Tx Clock Source is CLK12 */
+#define CMXSCR_TS2CS_CLK3  0x00060000   /* SCC2 Tx Clock Source is CLK3 */
+#define CMXSCR_TS2CS_CLK4  0x00070000   /* SCC2 Tx Clock Source is CLK4 */
+
+#define CMXSCR_RS3CS_BRG1  0x00000000   /* SCC3 Rx Clock Source is BRG1 */
+#define CMXSCR_RS3CS_BRG2  0x00000800   /* SCC3 Rx Clock Source is BRG2 */
+#define CMXSCR_RS3CS_BRG3  0x00001000   /* SCC3 Rx Clock Source is BRG3 */
+#define CMXSCR_RS3CS_BRG4  0x00001800   /* SCC3 Rx Clock Source is BRG4 */
+#define CMXSCR_RS3CS_CLK5  0x00002000   /* SCC3 Rx Clock Source is CLK5 */
+#define CMXSCR_RS3CS_CLK6  0x00002800   /* SCC3 Rx Clock Source is CLK6 */
+#define CMXSCR_RS3CS_CLK7  0x00003000   /* SCC3 Rx Clock Source is CLK7 */
+#define CMXSCR_RS3CS_CLK8  0x00003800   /* SCC3 Rx Clock Source is CLK8 */
+
+#define CMXSCR_TS3CS_BRG1  0x00000000   /* SCC3 Tx Clock Source is BRG1 */
+#define CMXSCR_TS3CS_BRG2  0x00000100   /* SCC3 Tx Clock Source is BRG2 */
+#define CMXSCR_TS3CS_BRG3  0x00000200   /* SCC3 Tx Clock Source is BRG3 */
+#define CMXSCR_TS3CS_BRG4  0x00000300   /* SCC3 Tx Clock Source is BRG4 */
+#define CMXSCR_TS3CS_CLK5  0x00000400   /* SCC3 Tx Clock Source is CLK5 */
+#define CMXSCR_TS3CS_CLK6  0x00000500   /* SCC3 Tx Clock Source is CLK6 */
+#define CMXSCR_TS3CS_CLK7  0x00000600   /* SCC3 Tx Clock Source is CLK7 */
+#define CMXSCR_TS3CS_CLK8  0x00000700   /* SCC3 Tx Clock Source is CLK8 */
+
+#define CMXSCR_RS4CS_BRG1  0x00000000   /* SCC4 Rx Clock Source is BRG1 */
+#define CMXSCR_RS4CS_BRG2  0x00000008   /* SCC4 Rx Clock Source is BRG2 */
+#define CMXSCR_RS4CS_BRG3  0x00000010   /* SCC4 Rx Clock Source is BRG3 */
+#define CMXSCR_RS4CS_BRG4  0x00000018   /* SCC4 Rx Clock Source is BRG4 */
+#define CMXSCR_RS4CS_CLK5  0x00000020   /* SCC4 Rx Clock Source is CLK5 */
+#define CMXSCR_RS4CS_CLK6  0x00000028   /* SCC4 Rx Clock Source is CLK6 */
+#define CMXSCR_RS4CS_CLK7  0x00000030   /* SCC4 Rx Clock Source is CLK7 */
+#define CMXSCR_RS4CS_CLK8  0x00000038   /* SCC4 Rx Clock Source is CLK8 */
+
+#define CMXSCR_TS4CS_BRG1  0x00000000   /* SCC4 Tx Clock Source is BRG1 */
+#define CMXSCR_TS4CS_BRG2  0x00000001   /* SCC4 Tx Clock Source is BRG2 */
+#define CMXSCR_TS4CS_BRG3  0x00000002   /* SCC4 Tx Clock Source is BRG3 */
+#define CMXSCR_TS4CS_BRG4  0x00000003   /* SCC4 Tx Clock Source is BRG4 */
+#define CMXSCR_TS4CS_CLK5  0x00000004   /* SCC4 Tx Clock Source is CLK5 */
+#define CMXSCR_TS4CS_CLK6  0x00000005   /* SCC4 Tx Clock Source is CLK6 */
+#define CMXSCR_TS4CS_CLK7  0x00000006   /* SCC4 Tx Clock Source is CLK7 */
+#define CMXSCR_TS4CS_CLK8  0x00000007   /* SCC4 Tx Clock Source is CLK8 */
+
+#endif /* __CPM2__ */
 #endif /* __KERNEL__ */
+
+

@@ -36,6 +36,10 @@
 #include <platforms/tqm8260.h>
 #endif
 
+#ifdef CONFIG_PQ2ADS
+#include <platforms/pq2ads.h>
+#endif
+
 /* Make sure the memory translation stuff is there if PCI not used.
  */
 #ifndef _IO_BASE

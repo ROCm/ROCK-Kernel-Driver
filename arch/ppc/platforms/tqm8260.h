@@ -11,7 +11,7 @@
 
 #include <asm/ppcboot.h>
 
-#define IMAP_ADDR		((uint)0xFFF00000)
+#define CPM_MAP_ADDR		((uint)0xFFF00000)
 #define PHY_INTERRUPT		25
 
 #define BOOTROM_RESTART_ADDR	((uint)0x40000104)
