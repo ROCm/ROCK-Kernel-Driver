@@ -238,6 +238,7 @@
 #include <linux/spinlock.h>
 #include <linux/smp.h>
 #include <linux/blk.h>
+#include <linux/interrupt.h>
 #include "scsi.h"
 #include "hosts.h"
 #include "aic7xxx_old/aic7xxx.h"

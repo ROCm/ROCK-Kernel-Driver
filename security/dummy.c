@@ -240,13 +240,13 @@ static int dummy_inode_rmdir (struct inode *inode, struct dentry *dentry)
 }
 
 static int dummy_inode_mknod (struct inode *inode, struct dentry *dentry,
-			      int major, dev_t minor)
+			      int mode, dev_t dev)
 {
 	return 0;
 }
 
 static void dummy_inode_post_mknod (struct inode *inode, struct dentry *dentry,
-				    int major, dev_t minor)
+				    int mode, dev_t dev)
 {
 	return;
 }

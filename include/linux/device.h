@@ -438,9 +438,9 @@ extern void device_resume(u32 level);
 extern void device_shutdown(void);
 
 
-/* drivrs/base/firmware.c */
+/* drivers/base/firmware.c */
 extern int firmware_register(struct subsystem *);
-extern void firmware_uregister(struct subsystem *);
+extern void firmware_unregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
 #ifdef DEBUG

@@ -208,6 +208,10 @@
 #define __NR_io_submit		246
 #define __NR_io_cancel		247
 #define __NR_exit_group		248
+#define __NR_epoll_create	249
+#define __NR_epoll_ctl		250
+#define __NR_epoll_wait		251
+#define __NR_set_tid_address	252
 
 
 /* user-visible error numbers are in the range -1 - -122: see <asm-s390/errno.h> */
@@ -221,11 +225,11 @@ do {                                                         \
         return (type) (res);                                 \
 } while (0)
 
-#define _svc_clobber "2", "cc", "memory"
+#define _svc_clobber "cc", "memory"
 
 #define _syscall0(type,name)                                 \
 type name(void) {                                            \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
@@ -238,13 +242,13 @@ type name(void) {                                            \
 #define _syscall1(type,name,type1,arg1)                      \
 type name(type1 arg1) {                                      \
         register type1 __arg1 asm("2") = arg1;               \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
                 : "=d" (__res)                               \
                 : "i" (__NR_##name),                         \
-                  "d" (__arg1)                               \
+                  "0" (__arg1)                               \
                 : _svc_clobber );                            \
         __syscall_return(type,__res);                        \
 }
@@ -253,13 +257,13 @@ type name(type1 arg1) {                                      \
 type name(type1 arg1, type2 arg2) {                          \
         register type1 __arg1 asm("2") = arg1;               \
         register type2 __arg2 asm("3") = arg2;               \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
                 : "=d" (__res)                               \
                 : "i" (__NR_##name),                         \
-                  "d" (__arg1),                              \
+                  "0" (__arg1),                              \
                   "d" (__arg2)                               \
                 : _svc_clobber );                            \
         __syscall_return(type,__res);                        \
@@ -270,13 +274,13 @@ type name(type1 arg1, type2 arg2, type3 arg3) {              \
         register type1 __arg1 asm("2") = arg1;               \
         register type2 __arg2 asm("3") = arg2;               \
         register type3 __arg3 asm("4") = arg3;               \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
                 : "=d" (__res)                               \
                 : "i" (__NR_##name),                         \
-                  "d" (__arg1),                              \
+                  "0" (__arg1),                              \
                   "d" (__arg2),                              \
                   "d" (__arg3)                               \
                 : _svc_clobber );                            \
@@ -290,13 +294,13 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4) {  \
         register type2 __arg2 asm("3") = arg2;               \
         register type3 __arg3 asm("4") = arg3;               \
         register type4 __arg4 asm("5") = arg4;               \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
                 : "=d" (__res)                               \
                 : "i" (__NR_##name),                         \
-                  "d" (__arg1),                              \
+                  "0" (__arg1),                              \
                   "d" (__arg2),                              \
                   "d" (__arg3),                              \
                   "d" (__arg4)                               \
@@ -313,13 +317,13 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
         register type3 __arg3 asm("4") = arg3;               \
         register type4 __arg4 asm("5") = arg4;               \
         register type5 __arg5 asm("6") = arg5;               \
-        long __res;                                          \
+        register long __res asm("2");                        \
         __asm__ __volatile__ (                               \
                 "    svc %b1\n"                              \
                 "    lgr  %0,2"                              \
                 : "=d" (__res)                               \
                 : "i" (__NR_##name),                         \
-                  "d" (__arg1),                              \
+                  "0" (__arg1),                              \
                   "d" (__arg2),                              \
                   "d" (__arg3),                              \
                   "d" (__arg4),                              \

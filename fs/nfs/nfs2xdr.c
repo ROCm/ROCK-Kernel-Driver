@@ -86,10 +86,20 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fhandle)
 }
 
 static inline u32*
-xdr_decode_time(u32 *p, u64 *timep)
+xdr_encode_time(u32 *p, struct timespec *timep)
 {
-	u64 tmp = (u64)ntohl(*p++) << 32;
-	*timep = tmp + (u64)ntohl(*p++);
+	*p++ = htonl(timep->tv_sec);
+	/* Convert nanoseconds into microseconds */
+	*p++ = htonl(timep->tv_nsec / 1000);
+	return p;
+}
+
+static inline u32*
+xdr_decode_time(u32 *p, struct timespec *timep)
+{
+	timep->tv_sec = ntohl(*p++);
+	/* Convert microseconds into nanoseconds */
+	timep->tv_nsec = ntohl(*p++) * 1000;
 	return p;
 }
 
@@ -131,16 +141,14 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	SATTR(p, attr, ATTR_SIZE, ia_size);
 
 	if (attr->ia_valid & (ATTR_ATIME|ATTR_ATIME_SET)) {
-		*p++ = htonl(attr->ia_atime.tv_sec);
-		*p++ = 0;
+		p = xdr_encode_time(p, &attr->ia_atime);
 	} else {
 		*p++ = ~(u32) 0;
 		*p++ = ~(u32) 0;
 	}
 
 	if (attr->ia_valid & (ATTR_MTIME|ATTR_MTIME_SET)) {
-		*p++ = htonl(attr->ia_mtime.tv_sec);
-		*p++ = 0;
+		p = xdr_encode_time(p, &attr->ia_mtime);
 	} else {
 		*p++ = ~(u32) 0;	
 		*p++ = ~(u32) 0;

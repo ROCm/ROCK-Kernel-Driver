@@ -503,13 +503,13 @@ static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff 
 	return -1;
 }
 
-void netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
-		       u32 group, int allocation)
+int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
+		      u32 group, int allocation)
 {
 	struct sock *sk;
 	struct sk_buff *skb2 = NULL;
 	int protocol = ssk->protocol;
-	int failure = 0;
+	int failure = 0, delivered = 0;
 
 	/* While we sleep in clone, do not allow to change socket list */
 
@@ -544,8 +544,10 @@ void netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 			failure = 1;
 		} else if (netlink_broadcast_deliver(sk, skb2)) {
 			netlink_overrun(sk);
-		} else
+		} else {
+			delivered = 1;
 			skb2 = NULL;
+		}
 		sock_put(sk);
 	}
 
@@ -554,6 +556,12 @@ void netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	if (skb2)
 		kfree_skb(skb2);
 	kfree_skb(skb);
+
+	if (delivered)
+		return 0;
+	if (failure)
+		return -ENOBUFS;
+	return -ESRCH;
 }
 
 void netlink_set_err(struct sock *ssk, u32 pid, u32 group, int code)

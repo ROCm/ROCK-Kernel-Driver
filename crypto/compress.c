@@ -33,10 +33,14 @@ int crypto_init_compress_flags(struct crypto_tfm *tfm, u32 flags)
 	return crypto_cipher_flags(flags) ? -EINVAL : 0;
 }
 
-void crypto_init_compress_ops(struct crypto_tfm *tfm)
+int crypto_init_compress_ops(struct crypto_tfm *tfm)
 {
 	struct compress_tfm *ops = &tfm->crt_compress;
 	
 	ops->cot_compress = crypto_compress;
 	ops->cot_decompress = crypto_decompress;
+	return 0;
 }
+
+void crypto_exit_compress_ops(struct crypto_tfm *tfm)
+{ }

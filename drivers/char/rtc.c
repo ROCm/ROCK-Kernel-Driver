@@ -807,8 +807,8 @@ static int __init rtc_init(void)
 	struct linux_ebus *ebus;
 	struct linux_ebus_device *edev;
 #ifdef __sparc_v9__
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev;
 #endif
 #endif
 

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: readinode.c,v 1.73 2002/05/20 14:56:38 dwmw2 Exp $
+ * $Id: readinode.c,v 1.95 2002/11/12 11:17:29 dwmw2 Exp $
  *
  */
 
@@ -15,24 +15,43 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/crc32.h>
+#include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
 #include "nodelist.h"
 
 
-D1(void jffs2_print_frag_list(struct jffs2_inode_info *f)
+D1(static void jffs2_print_fragtree(struct rb_root *list, int permitbug)
 {
-	struct jffs2_node_frag *this = f->fraglist;
+	struct jffs2_node_frag *this = frag_first(list);
+	uint32_t lastofs = 0;
+	int buggy = 0;
 
 	while(this) {
 		if (this->node)
-			printk(KERN_DEBUG "frag %04x-%04x: 0x%08x on flash (*%p->%p)\n", this->ofs, this->ofs+this->size, this->node->raw->flash_offset &~3, this, this->next);
+			printk(KERN_DEBUG "frag %04x-%04x: 0x%08x(%d) on flash (*%p). left (%p), right (%p), parent (%p)\n",
+			       this->ofs, this->ofs+this->size, ref_offset(this->node->raw), ref_flags(this->node->raw),
+			       this, frag_left(this), frag_right(this), frag_parent(this));
 		else 
-			printk(KERN_DEBUG "frag %04x-%04x: hole (*%p->%p)\n", this->ofs, this->ofs+this->size, this, this->next);
-		this = this->next;
+			printk(KERN_DEBUG "frag %04x-%04x: hole (*%p). left (%p} right (%p), parent (%p)\n", this->ofs, 
+			       this->ofs+this->size, this, frag_left(this), frag_right(this), frag_parent(this));
+		if (this->ofs != lastofs)
+			buggy = 1;
+		lastofs = this->ofs+this->size;
+		this = frag_next(this);
 	}
+	if (buggy && !permitbug) {
+		printk(KERN_CRIT "Frag tree got a hole in it\n");
+		BUG();
+	}
+})
+
+D1(void jffs2_print_frag_list(struct jffs2_inode_info *f)
+{
+	jffs2_print_fragtree(&f->fragtree, 0);
+
 	if (f->metadata) {
-		printk(KERN_DEBUG "metadata at 0x%08x\n", f->metadata->raw->flash_offset &~3);
+		printk(KERN_DEBUG "metadata at 0x%08x\n", ref_offset(f->metadata->raw));
 	}
 })
 
@@ -45,7 +64,7 @@ int jffs2_add_full_dnode_to_inode(struct jffs2_sb_info *c, struct jffs2_inode_in
 	int ret;
 	D1(printk(KERN_DEBUG "jffs2_add_full_dnode_to_inode(ino #%u, f %p, fn %p)\n", f->inocache->ino, f, fn));
 
-	ret = jffs2_add_full_dnode_to_fraglist(c, &f->fraglist, fn);
+	ret = jffs2_add_full_dnode_to_fraglist(c, &f->fragtree, fn);
 
 	D2(jffs2_print_frag_list(f));
 	return ret;
@@ -58,13 +77,14 @@ static void jffs2_obsolete_node_frag(struct jffs2_sb_info *c, struct jffs2_node_
 		if (!this->node->frags) {
 			/* The node has no valid frags left. It's totally obsoleted */
 			D2(printk(KERN_DEBUG "Marking old node @0x%08x (0x%04x-0x%04x) obsolete\n",
-				  this->node->raw->flash_offset &~3, this->node->ofs, this->node->ofs+this->node->size));
+				  ref_offset(this->node->raw), this->node->ofs, this->node->ofs+this->node->size));
 			jffs2_mark_node_obsolete(c, this->node->raw);
 			jffs2_free_full_dnode(this->node);
 		} else {
-			D2(printk(KERN_DEBUG "Not marking old node @0x%08x (0x%04x-0x%04x) obsolete. frags is %d\n",
-				  this->node->raw->flash_offset &~3, this->node->ofs, this->node->ofs+this->node->size,
+			D2(printk(KERN_DEBUG "Marking old node @0x%08x (0x%04x-0x%04x) REF_NORMAL. frags is %d\n",
+				  ref_offset(this->node->raw), this->node->ofs, this->node->ofs+this->node->size,
 				  this->node->frags));
+			mark_ref_normal(this->node->raw);
 		}
 		
 	}
@@ -72,27 +92,24 @@ static void jffs2_obsolete_node_frag(struct jffs2_sb_info *c, struct jffs2_node_
 }
 
 /* Doesn't set inode->i_size */
-int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct jffs2_node_frag **list, struct jffs2_full_dnode *fn)
+int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct rb_root *list, struct jffs2_full_dnode *fn)
 {
-	
-	struct jffs2_node_frag *this, **prev, *old;
-	struct jffs2_node_frag *newfrag, *newfrag2;
-	uint32_t lastend = 0;
-
+	struct jffs2_node_frag *this;
+	struct jffs2_node_frag *newfrag;
+	uint32_t lastend;
 
 	newfrag = jffs2_alloc_node_frag();
 	if (!newfrag) {
 		return -ENOMEM;
 	}
 
-	D2(if (fn->raw)
-		printk(KERN_DEBUG "adding node %04x-%04x @0x%08x on flash, newfrag *%p\n", fn->ofs, fn->ofs+fn->size, fn->raw->flash_offset &~3, newfrag);
-	else
-		printk(KERN_DEBUG "adding hole node %04x-%04x on flash, newfrag *%p\n", fn->ofs, fn->ofs+fn->size, newfrag));
-	
-	prev = list;
-	this = *list;
+	if (!fn->raw) {
+		printk(KERN_WARNING "dwmw2 is stupid. j_a_f_d_t_f should never happen with ->raw == NULL\n");
+		BUG();
+	}
 
+	D2(printk(KERN_DEBUG "adding node %04x-%04x @0x%08x on flash, newfrag *%p\n", fn->ofs, fn->ofs+fn->size, ref_offset(fn->raw), newfrag));
+	
 	if (!fn->size) {
 		jffs2_free_node_frag(newfrag);
 		return 0;
@@ -102,21 +119,33 @@ int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct jffs2_node_
 	newfrag->size = fn->size;
 	newfrag->node = fn;
 	newfrag->node->frags = 1;
-	newfrag->next = (void *)0xdeadbeef;
 
 	/* Skip all the nodes which are completed before this one starts */
-	while(this && fn->ofs >= this->ofs+this->size) {
+	this = jffs2_lookup_node_frag(list, fn->ofs);
+
+	if (this) {
+		D2(printk(KERN_DEBUG "j_a_f_d_t_f: Lookup gave frag 0x%04x-0x%04x; phys 0x%08x (*%p)\n",
+			  this->ofs, this->ofs+this->size, this->node?(ref_offset(this->node->raw)):0xffffffff, this));
 		lastend = this->ofs + this->size;
-
-		D2(printk(KERN_DEBUG "j_a_f_d_t_f: skipping frag 0x%04x-0x%04x; phys 0x%08x (*%p->%p)\n", 
-			  this->ofs, this->ofs+this->size, this->node?(this->node->raw->flash_offset &~3):0xffffffff, this, this->next));
-		prev = &this->next;
-		this = this->next;
+	} else {
+		D2(printk(KERN_DEBUG "j_a_f_d_t_f: Lookup gave no frag\n"));
+		lastend = 0;
 	}
-
+			  
 	/* See if we ran off the end of the list */
-	if (!this) {
+	if (lastend <= newfrag->ofs) {
 		/* We did */
+
+		/* Check if 'this' node was on the same page as the new node.
+		   If so, both 'this' and the new node get marked REF_NORMAL so
+		   the GC can take a look.
+		*/
+		if ((lastend-1) >> PAGE_CACHE_SHIFT == newfrag->ofs >> PAGE_CACHE_SHIFT) {
+			if (this->node)
+				mark_ref_normal(this->node->raw);
+			mark_ref_normal(fn->raw);
+		}
+
 		if (lastend < fn->ofs) {
 			/* ... and we need to put a hole in before the new node */
 			struct jffs2_node_frag *holefrag = jffs2_alloc_node_frag();
@@ -124,96 +153,162 @@ int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct jffs2_node_
 				return -ENOMEM;
 			holefrag->ofs = lastend;
 			holefrag->size = fn->ofs - lastend;
-			holefrag->next = NULL;
 			holefrag->node = NULL;
-			*prev = holefrag;
-			prev = &holefrag->next;
+			if (this) {
+				/* By definition, the 'this' node has no right-hand child, 
+				   because there are no frags with offset greater than it.
+				   So that's where we want to put the hole */
+				D2(printk(KERN_DEBUG "Adding hole frag (%p) on right of node at (%p)\n", holefrag, this));
+				rb_link_node(&holefrag->rb, &this->rb, &this->rb.rb_right);
+			} else {
+				D2(printk(KERN_DEBUG "Adding hole frag (%p) at root of tree\n", holefrag));
+				rb_link_node(&holefrag->rb, NULL, &list->rb_node);
+			}
+			rb_insert_color(&holefrag->rb, list);
+			this = holefrag;
 		}
-		newfrag->next = NULL;
-		*prev = newfrag;
+		if (this) {
+			/* By definition, the 'this' node has no right-hand child, 
+			   because there are no frags with offset greater than it.
+			   So that's where we want to put the hole */
+			D2(printk(KERN_DEBUG "Adding new frag (%p) on right of node at (%p)\n", newfrag, this));
+			rb_link_node(&newfrag->rb, &this->rb, &this->rb.rb_right);			
+		} else {
+			D2(printk(KERN_DEBUG "Adding new frag (%p) at root of tree\n", newfrag));
+			rb_link_node(&newfrag->rb, NULL, &list->rb_node);
+		}
+		rb_insert_color(&newfrag->rb, list);
 		return 0;
 	}
 
-	D2(printk(KERN_DEBUG "j_a_f_d_t_f: dealing with frag 0x%04x-0x%04x; phys 0x%08x (*%p->%p)\n", 
-		  this->ofs, this->ofs+this->size, this->node?(this->node->raw->flash_offset &~3):0xffffffff, this, this->next));
+	D2(printk(KERN_DEBUG "j_a_f_d_t_f: dealing with frag 0x%04x-0x%04x; phys 0x%08x (*%p)\n", 
+		  this->ofs, this->ofs+this->size, this->node?(ref_offset(this->node->raw)):0xffffffff, this));
 
-	/* OK. 'this' is pointing at the first frag that fn->ofs at least partially obsoletes,
-	 * - i.e. fn->ofs < this->ofs+this->size && fn->ofs >= this->ofs  
+	/* OK. 'this' is pointing at the first frag that newfrag->ofs at least partially obsoletes,
+	 * - i.e. newfrag->ofs < this->ofs+this->size && newfrag->ofs >= this->ofs  
 	 */
-	if (fn->ofs > this->ofs) {
+	if (newfrag->ofs > this->ofs) {
 		/* This node isn't completely obsoleted. The start of it remains valid */
-		if (this->ofs + this->size > fn->ofs + fn->size) {
+
+		/* Mark the new node and the partially covered node REF_NORMAL -- let 
+		   the GC take a look at them */
+		mark_ref_normal(fn->raw);
+		if (this->node)
+			mark_ref_normal(this->node->raw);
+
+		if (this->ofs + this->size > newfrag->ofs + newfrag->size) {
 			/* The new node splits 'this' frag into two */
-			newfrag2 = jffs2_alloc_node_frag();
+			struct jffs2_node_frag *newfrag2 = jffs2_alloc_node_frag();
 			if (!newfrag2) {
 				jffs2_free_node_frag(newfrag);
 				return -ENOMEM;
 			}
-			D1(printk(KERN_DEBUG "split old frag 0x%04x-0x%04x -->", this->ofs, this->ofs+this->size);
+			D2(printk(KERN_DEBUG "split old frag 0x%04x-0x%04x -->", this->ofs, this->ofs+this->size);
 			if (this->node)
-				printk("phys 0x%08x\n", this->node->raw->flash_offset &~3);
+				printk("phys 0x%08x\n", ref_offset(this->node->raw));
 			else 
 				printk("hole\n");
 			   )
-			newfrag2->ofs = fn->ofs + fn->size;
+			
+			/* New second frag pointing to this's node */
+			newfrag2->ofs = newfrag->ofs + newfrag->size;
 			newfrag2->size = (this->ofs+this->size) - newfrag2->ofs;
-			newfrag2->next = this->next;
 			newfrag2->node = this->node;
 			if (this->node)
 				this->node->frags++;
-			newfrag->next = newfrag2;
-			this->next = newfrag;
+
+			/* Adjust size of original 'this' */
 			this->size = newfrag->ofs - this->ofs;
+
+			/* Now, we know there's no node with offset
+			   greater than this->ofs but smaller than
+			   newfrag2->ofs or newfrag->ofs, for obvious
+			   reasons. So we can do a tree insert from
+			   'this' to insert newfrag, and a tree insert
+			   from newfrag to insert newfrag2. */
+			jffs2_fragtree_insert(newfrag, this);
+			rb_insert_color(&newfrag->rb, list);
+			
+			jffs2_fragtree_insert(newfrag2, newfrag);
+			rb_insert_color(&newfrag2->rb, list);
+			
 			return 0;
 		}
 		/* New node just reduces 'this' frag in size, doesn't split it */
-		this->size = fn->ofs - this->ofs;
-		newfrag->next = this->next;
-		this->next = newfrag;
-		this = newfrag->next;
+		this->size = newfrag->ofs - this->ofs;
+
+		/* Again, we know it lives down here in the tree */
+		jffs2_fragtree_insert(newfrag, this);
+		rb_insert_color(&newfrag->rb, list);
 	} else {
-		D2(printk(KERN_DEBUG "Inserting newfrag (*%p) in before 'this' (*%p)\n", newfrag, this));
-		*prev = newfrag;
-	        newfrag->next = this;
+		/* New frag starts at the same point as 'this' used to. Replace 
+		   it in the tree without doing a delete and insertion */
+		D2(printk(KERN_DEBUG "Inserting newfrag (*%p),%d-%d in before 'this' (*%p),%d-%d\n",
+			  newfrag, newfrag->ofs, newfrag->ofs+newfrag->size,
+			  this, this->ofs, this->ofs+this->size));
+	
+		rb_replace_node(&this->rb, &newfrag->rb, list);
+		
+		if (newfrag->ofs + newfrag->size >= this->ofs+this->size) {
+			D2(printk(KERN_DEBUG "Obsoleting node frag %p (%x-%x)\n", this, this->ofs, this->ofs+this->size));
+			jffs2_obsolete_node_frag(c, this);
+		} else {
+			this->ofs += newfrag->size;
+			this->size -= newfrag->size;
+
+			jffs2_fragtree_insert(this, newfrag);
+			rb_insert_color(&this->rb, list);
+			return 0;
+		}
 	}
-	/* OK, now we have newfrag added in the correct place in the list, but
-	   newfrag->next points to a fragment which may be overlapping it
+	/* OK, now we have newfrag added in the correct place in the tree, but
+	   frag_next(newfrag) may be a fragment which is overlapped by it 
 	*/
-	while (this && newfrag->ofs + newfrag->size >= this->ofs + this->size) {
-		/* 'this' frag is obsoleted. */
-		old = this;
-		this = old->next;
-		jffs2_obsolete_node_frag(c, old);
+	while ((this = frag_next(newfrag)) && newfrag->ofs + newfrag->size >= this->ofs + this->size) {
+		/* 'this' frag is obsoleted completely. */
+		D2(printk(KERN_DEBUG "Obsoleting node frag %p (%x-%x) and removing from tree\n", this, this->ofs, this->ofs+this->size));
+		rb_erase(&this->rb, list);
+		jffs2_obsolete_node_frag(c, this);
 	}
 	/* Now we're pointing at the first frag which isn't totally obsoleted by 
 	   the new frag */
-	newfrag->next = this;
 
 	if (!this || newfrag->ofs + newfrag->size == this->ofs) {
 		return 0;
 	}
-	/* Still some overlap */
+	/* Still some overlap but we don't need to move it in the tree */
 	this->size = (this->ofs + this->size) - (newfrag->ofs + newfrag->size);
 	this->ofs = newfrag->ofs + newfrag->size;
+
+	/* And mark them REF_NORMAL so the GC takes a look at them */
+	if (this->node)
+		mark_ref_normal(this->node->raw);
+	mark_ref_normal(fn->raw);
+
 	return 0;
 }
 
-void jffs2_truncate_fraglist (struct jffs2_sb_info *c, struct jffs2_node_frag **list, uint32_t size)
+void jffs2_truncate_fraglist (struct jffs2_sb_info *c, struct rb_root *list, uint32_t size)
 {
+	struct jffs2_node_frag *frag = jffs2_lookup_node_frag(list, size);
+
 	D1(printk(KERN_DEBUG "Truncating fraglist to 0x%08x bytes\n", size));
 
-	while (*list) {
-		if ((*list)->ofs >= size) {
-			struct jffs2_node_frag *this = *list;
-			*list = this->next;
-			D1(printk(KERN_DEBUG "Removing frag 0x%08x-0x%08x\n", this->ofs, this->ofs+this->size));
-			jffs2_obsolete_node_frag(c, this);
-			continue;
-		} else if ((*list)->ofs + (*list)->size > size) {
-			D1(printk(KERN_DEBUG "Truncating frag 0x%08x-0x%08x\n", (*list)->ofs, (*list)->ofs + (*list)->size));
-			(*list)->size = size - (*list)->ofs;
+	/* We know frag->ofs <= size. That's what lookup does for us */
+	if (frag && frag->ofs != size) {
+		if (frag->ofs+frag->size >= size) {
+			D1(printk(KERN_DEBUG "Truncating frag 0x%08x-0x%08x\n", frag->ofs, frag->ofs+frag->size));
+			frag->size = size - frag->ofs;
 		}
-		list = &(*list)->next;
+		frag = frag_next(frag);
+	}
+	while (frag && frag->ofs >= size) {
+		struct jffs2_node_frag *next = frag_next(frag);
+
+		D1(printk(KERN_DEBUG "Removing frag 0x%08x-0x%08x\n", frag->ofs, frag->ofs+frag->size));
+		frag_erase(frag, list);
+		jffs2_obsolete_node_frag(c, frag);
+		frag = next;
 	}
 }
 
@@ -271,7 +366,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		fn = tn->fn;
 
 		if (f->metadata && tn->version > mdata_ver) {
-			D1(printk(KERN_DEBUG "Obsoleting old metadata at 0x%08x\n", f->metadata->raw->flash_offset &~3));
+			D1(printk(KERN_DEBUG "Obsoleting old metadata at 0x%08x\n", ref_offset(f->metadata->raw)));
 			jffs2_mark_node_obsolete(c, f->metadata->raw);
 			jffs2_free_full_dnode(f->metadata);
 			f->metadata = NULL;
@@ -283,7 +378,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			jffs2_add_full_dnode_to_inode(c, f, fn);
 		} else {
 			/* Zero-sized node at end of version list. Just a metadata update */
-			D1(printk(KERN_DEBUG "metadata @%08x: ver %d\n", fn->raw->flash_offset &~3, tn->version));
+			D1(printk(KERN_DEBUG "metadata @%08x: ver %d\n", ref_offset(fn->raw), tn->version));
 			f->metadata = fn;
 			mdata_ver = tn->version;
 		}
@@ -299,16 +394,16 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			}
 			printk(KERN_WARNING "jffs2_do_read_inode(): But it has children so we fake some modes for it\n");
 		}
-		latest_node->mode = S_IFDIR | S_IRUGO | S_IWUSR | S_IXUGO;
-		latest_node->version = 0;
-		latest_node->atime = latest_node->ctime = latest_node->mtime = 0;
-		latest_node->isize = 0;
-		latest_node->gid = 0;
-		latest_node->uid = 0;
+		latest_node->mode = cpu_to_je32(S_IFDIR|S_IRUGO|S_IWUSR|S_IXUGO);
+		latest_node->version = cpu_to_je32(0);
+		latest_node->atime = latest_node->ctime = latest_node->mtime = cpu_to_je32(0);
+		latest_node->isize = cpu_to_je32(0);
+		latest_node->gid = cpu_to_je16(0);
+		latest_node->uid = cpu_to_je16(0);
 		return 0;
 	}
 
-	ret = jffs2_flash_read(c, fn->raw->flash_offset & ~3, sizeof(*latest_node), &retlen, (void *)latest_node);
+	ret = jffs2_flash_read(c, ref_offset(fn->raw), sizeof(*latest_node), &retlen, (void *)latest_node);
 	if (ret || retlen != sizeof(*latest_node)) {
 		printk(KERN_NOTICE "MTD read in jffs2_do_read_inode() failed: Returned %d, %ld of %d bytes read\n",
 		       ret, (long)retlen, sizeof(*latest_node));
@@ -319,26 +414,26 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	}
 
 	crc = crc32(0, latest_node, sizeof(*latest_node)-8);
-	if (crc != latest_node->node_crc) {
-		printk(KERN_NOTICE "CRC failed for read_inode of inode %u at physical location 0x%x\n", ino, fn->raw->flash_offset & ~3);
+	if (crc != je32_to_cpu(latest_node->node_crc)) {
+		printk(KERN_NOTICE "CRC failed for read_inode of inode %u at physical location 0x%x\n", ino, ref_offset(fn->raw));
 		up(&f->sem);
 		jffs2_do_clear_inode(c, f);
 		return -EIO;
 	}
 
-	switch(latest_node->mode & S_IFMT) {
+	switch(je32_to_cpu(latest_node->mode) & S_IFMT) {
 	case S_IFDIR:
-		if (mctime_ver > latest_node->version) {
+		if (mctime_ver > je32_to_cpu(latest_node->version)) {
 			/* The times in the latest_node are actually older than
 			   mctime in the latest dirent. Cheat. */
-			latest_node->ctime = latest_node->mtime = latest_mctime;
+			latest_node->ctime = latest_node->mtime = cpu_to_je32(latest_mctime);
 		}
 		break;
 
 			
 	case S_IFREG:
 		/* If it was a regular file, truncate it to the latest node's isize */
-		jffs2_truncate_fraglist(c, &f->fraglist, latest_node->isize);
+		jffs2_truncate_fraglist(c, &f->fragtree, je32_to_cpu(latest_node->isize));
 		break;
 
 	case S_IFLNK:
@@ -346,7 +441,7 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		   Remove this when dwmw2 comes to his senses and stops
 		   symlinks from being an entirely gratuitous special
 		   case. */
-		if (!latest_node->isize)
+		if (!je32_to_cpu(latest_node->isize))
 			latest_node->isize = latest_node->dsize;
 		/* fall through... */
 
@@ -355,82 +450,79 @@ int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		/* Xertain inode types should have only one data node, and it's
 		   kept as the metadata node */
 		if (f->metadata) {
-			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had metadata node\n", ino, latest_node->mode);
+			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had metadata node\n", ino, je32_to_cpu(latest_node->mode));
 			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
-		if (!f->fraglist) {
-			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o has no fragments\n", ino, latest_node->mode);
+		if (!frag_first(&f->fragtree)) {
+			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o has no fragments\n", ino, je32_to_cpu(latest_node->mode));
 			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		/* ASSERT: f->fraglist != NULL */
-		if (f->fraglist->next) {
-			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had more than one node\n", ino, latest_node->mode);
+		if (frag_next(frag_first(&f->fragtree))) {
+			printk(KERN_WARNING "Argh. Special inode #%u with mode 0%o had more than one node\n", ino, je32_to_cpu(latest_node->mode));
 			/* FIXME: Deal with it - check crc32, check for duplicate node, check times and discard the older one */
 			up(&f->sem);
 			jffs2_do_clear_inode(c, f);
 			return -EIO;
 		}
 		/* OK. We're happy */
-		f->metadata = f->fraglist->node;
-		jffs2_free_node_frag(f->fraglist);
-		f->fraglist = NULL;
+		f->metadata = frag_first(&f->fragtree)->node;
+		jffs2_free_node_frag(frag_first(&f->fragtree));
+		f->fragtree = RB_ROOT;
 		break;
 	}
+	f->inocache->state = INO_STATE_PRESENT;
 
 	return 0;
 }
 
-
 void jffs2_do_clear_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f)
 {
-	struct jffs2_node_frag *frag, *frags;
 	struct jffs2_full_dirent *fd, *fds;
+	/* I don't think we care about the potential race due to reading this
+	   without f->sem. It can never get undeleted. */
+	int deleted = f->inocache && !f->inocache->nlink;
 
-	/* If it's a deleted inode, grab the alloc_sem to keep the
-	   (maybe temporary) BUG() in jffs2_mark_node_obsolete() 
-	   from triggering */
-	if(!f->inocache->nlink)
+	/* If it's a deleted inode, grab the alloc_sem. This prevents
+	   jffs2_garbage_collect_pass() from deciding that it wants to
+	   garbage collect one of the nodes we're just about to mark 
+	   obsolete -- by the time we drop alloc_sem and return, all
+	   the nodes are marked obsolete, and jffs2_g_c_pass() won't
+	   call iget() for the inode in question.
+
+	   We also do this to keep the (maybe temporary) BUG() in 
+	   jffs2_mark_node_obsolete() from triggering. 
+	*/
+	if(deleted)
 		down(&c->alloc_sem);
 
 	down(&f->sem);
 
-	frags = f->fraglist;
-	fds = f->dents;
 	if (f->metadata) {
-		if (!f->inocache->nlink)
+		if (deleted)
 			jffs2_mark_node_obsolete(c, f->metadata->raw);
 		jffs2_free_full_dnode(f->metadata);
 	}
 
-	while (frags) {
-		frag = frags;
-		frags = frag->next;
-		D2(printk(KERN_DEBUG "jffs2_do_clear_inode: frag at 0x%x-0x%x: node %p, frags %d--\n", frag->ofs, frag->ofs+frag->size, frag->node, frag->node?frag->node->frags:0));
+	jffs2_kill_fragtree(&f->fragtree, deleted?c:NULL);
 
-		if (frag->node && !(--frag->node->frags)) {
-			/* Not a hole, and it's the final remaining frag of this node. Free the node */
-			if (!f->inocache->nlink)
-				jffs2_mark_node_obsolete(c, frag->node->raw);
+	fds = f->dents;
 
-			jffs2_free_full_dnode(frag->node);
-		}
-		jffs2_free_node_frag(frag);
-	}
 	while(fds) {
 		fd = fds;
 		fds = fd->next;
 		jffs2_free_full_dirent(fd);
 	}
 
-	/* Urgh. Is there a nicer way to do this? */
-	if(!f->inocache->nlink) {
-		up(&f->sem);
+	if (f->inocache)
+		f->inocache->state = INO_STATE_CHECKEDABSENT;
+
+	up(&f->sem);
+
+	if(deleted)
 		up(&c->alloc_sem);
-	} else {
-		up(&f->sem);
-	}
 }

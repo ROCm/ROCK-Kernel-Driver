@@ -563,13 +563,13 @@ nfs4_setup_setclientid(struct nfs4_compound *cp, u32 program, unsigned short por
 {
 	struct nfs4_setclientid *setclientid = GET_OP(cp, setclientid);
 	struct nfs_server *server = cp->server;
-	struct timeval tv;
+	struct timespec tv;
 	u32 *p;
 
-	do_gettimeofday(&tv);
-	p = (u32 *)setclientid->sc_verifier;
+	tv = CURRENT_TIME;
+ 	p = (u32 *)setclientid->sc_verifier;
 	*p++ = tv.tv_sec;
-	*p++ = tv.tv_usec;
+	*p++ = tv.tv_nsec;
 	setclientid->sc_name = server->ip_addr;
 	sprintf(setclientid->sc_netid, "udp");
 	sprintf(setclientid->sc_uaddr, "%s.%d.%d", server->ip_addr, port >> 8, port & 255);

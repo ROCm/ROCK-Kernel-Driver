@@ -109,6 +109,9 @@ It's a good idea to avoid using lots of macros and use inlined functions
 instead, as gcc does a good job with inlining, while excessive use of
 macros can cause compilation problems on some platforms.
 
+Also check the TODO list at the web site listed below to see what people
+might already be working on.
+
 
 BUGS
 

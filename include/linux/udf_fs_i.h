@@ -43,10 +43,7 @@ typedef struct
 
 struct udf_inode_info
 {
-	long			i_umtime;
-	long			i_uctime;
-	long			i_crtime;
-	long			i_ucrtime;
+	struct timespec		i_crtime;
 	/* Physical address of inode */
 	lb_addr			i_location;
 	__u64			i_unique;

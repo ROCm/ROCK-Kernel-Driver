@@ -98,9 +98,11 @@ unsigned char aux_device_present = 0xaa;
 
 #define N(a) (sizeof(a)/sizeof(a[0]))
 
-static struct alpha_machine_vector *get_sysvec(long, long, long);
+static struct alpha_machine_vector *get_sysvec(unsigned long, unsigned long,
+					       unsigned long);
 static struct alpha_machine_vector *get_sysvec_byname(const char *);
-static void get_sysnames(long, long, long, char **, char **);
+static void get_sysnames(unsigned long, unsigned long, unsigned long,
+			 char **, char **);
 
 static char command_line[COMMAND_LINE_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
@@ -202,7 +204,7 @@ reserve_std_resources(void)
 	};
 
 	struct resource *io = &ioport_resource;
-	long i;
+	size_t i;
 
 	if (hose_head) {
 		struct pci_controller *hose;
@@ -258,7 +260,7 @@ setup_memory(void *kernel_end)
 	unsigned long start_kernel_pfn, end_kernel_pfn;
 	unsigned long bootmap_size, bootmap_pages, bootmap_start;
 	unsigned long start, end;
-	int i;
+	unsigned long i;
 
 	/* Find free clusters, and init and free the bootmem accordingly.  */
 	memdesc = (struct memdesc_struct *)
@@ -327,7 +329,7 @@ setup_memory(void *kernel_end)
 		}
 	}
 
-	if (bootmap_start == -1) {
+	if (bootmap_start == ~0UL) {
 		max_low_pfn >>= 1;
 		goto try_again;
 	}
@@ -398,7 +400,7 @@ page_is_ram(unsigned long pfn)
 {
 	struct memclust_struct * cluster;
 	struct memdesc_struct * memdesc;
-	int i;
+	unsigned long i;
 
 	memdesc = (struct memdesc_struct *)
 		(hwrpb->mddt_offset + (unsigned long) hwrpb);
@@ -691,7 +693,7 @@ static char tsunami_names[][16] = {
 static int tsunami_indices[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
 
 static struct alpha_machine_vector * __init
-get_sysvec(long type, long variation, long cpu)
+get_sysvec(unsigned long type, unsigned long variation, unsigned long cpu)
 {
 	static struct alpha_machine_vector *systype_vecs[] __initdata =
 	{
@@ -798,10 +800,6 @@ get_sysvec(long type, long variation, long cpu)
 
 	struct alpha_machine_vector *vec;
 
-	/* Restore real CABRIO and EB66+ family names, ie EB64+ and EB66 */
-	if (type < 0)
-		type = -type;
-
 	/* Search the system tables first... */
 	vec = NULL;
 	if (type < N(systype_vecs)) {
@@ -818,7 +816,7 @@ get_sysvec(long type, long variation, long cpu)
 
 	if (!vec) {
 		/* Member ID is a bit-field. */
-		long member = (variation >> 10) & 0x3f;
+		unsigned long member = (variation >> 10) & 0x3f;
 
 		cpu &= 0xffffffff; /* make it usable */
 
@@ -917,8 +915,9 @@ get_sysvec_byname(const char *name)
 		&xlt_mv
 	};
 
-	int i, n = sizeof(all_vecs)/sizeof(*all_vecs);
-	for (i = 0; i < n; ++i) {
+	size_t i;
+
+	for (i = 0; i < N(all_vecs); ++i) {
 		struct alpha_machine_vector *mv = all_vecs[i];
 		if (strcasecmp(mv->vector_name, name) == 0)
 			return mv;
@@ -927,14 +926,10 @@ get_sysvec_byname(const char *name)
 }
 
 static void
-get_sysnames(long type, long variation, long cpu,
+get_sysnames(unsigned long type, unsigned long variation, unsigned long cpu,
 	     char **type_name, char **variation_name)
 {
-	long member;
-
-	/* Restore real CABRIO and EB66+ family names, ie EB64+ and EB66 */
-	if (type < 0)
-		type = -type;
+	unsigned long member;
 
 	/* If not in the tables, make it UNKNOWN,
 	   else set type name to family */
@@ -952,7 +947,7 @@ get_sysnames(long type, long variation, long cpu,
 		return;
 	}
 
-	/* Set variation to "0"; if variation is zero, done */
+	/* Set variation to "0"; if variation is zero, done.  */
 	*variation_name = systype_names[0];
 	if (variation == 0) {
 		return;
@@ -1042,7 +1037,8 @@ static int
 get_nr_processors(struct percpu_struct *cpubase, unsigned long num)
 {
 	struct percpu_struct *cpu;
-	int i, count = 0;
+	unsigned long i;
+	int count = 0;
 
 	for (i = 0; i < num; i++) {
 		cpu = (struct percpu_struct *)

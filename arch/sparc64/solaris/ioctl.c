@@ -24,6 +24,8 @@
 #include <linux/mtio.h>
 #include <linux/time.h>
 
+#include <net/sock.h>
+
 #include <asm/uaccess.h>
 #include <asm/termios.h>
 #include <asm/openpromio.h>

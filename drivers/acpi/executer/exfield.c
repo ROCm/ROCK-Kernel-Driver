@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfield - ACPI AML (p-code) execution - field manipulation
- *              $Revision: 113 $
+ *              $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -27,8 +27,6 @@
 #include "acpi.h"
 #include "acdispat.h"
 #include "acinterp.h"
-#include "acevents.h"
-#include "amlcode.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -90,24 +88,10 @@ acpi_ex_read_data_from_field (
 		 * This is an SMBus read.  We must create a buffer to hold the data
 		 * and directly access the region handler.
 		 */
-		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		buffer_desc = acpi_ut_create_buffer_object (ACPI_SMBUS_BUFFER_SIZE);
 		if (!buffer_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
-
-		/* Create the actual read buffer */
-
-		buffer_desc->buffer.pointer = ACPI_MEM_CALLOCATE (ACPI_SMBUS_BUFFER_SIZE);
-		if (!buffer_desc->buffer.pointer) {
-			acpi_ut_remove_reference (buffer_desc);
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		/* Complete the buffer object initialization */
-
-		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
-		buffer_desc->buffer.length = ACPI_SMBUS_BUFFER_SIZE;
-		buffer = buffer_desc->buffer.pointer;
 
 		/* Lock entire transaction if requested */
 
@@ -118,7 +102,7 @@ acpi_ex_read_data_from_field (
 		 * Note: Smbus protocol value is passed in upper 16-bits of Function
 		 */
 		status = acpi_ex_access_region (obj_desc, 0,
-				  (acpi_integer *) buffer_desc->buffer.pointer,
+				  ACPI_CAST_PTR (acpi_integer, buffer_desc->buffer.pointer),
 				  ACPI_READ | (obj_desc->field.attribute << 16));
 		acpi_ex_release_global_lock (locked);
 		goto exit;
@@ -138,23 +122,10 @@ acpi_ex_read_data_from_field (
 	if (length > acpi_gbl_integer_byte_width) {
 		/* Field is too large for an Integer, create a Buffer instead */
 
-		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		buffer_desc = acpi_ut_create_buffer_object (length);
 		if (!buffer_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
-
-		/* Create the actual read buffer */
-
-		buffer_desc->buffer.pointer = ACPI_MEM_CALLOCATE (length);
-		if (!buffer_desc->buffer.pointer) {
-			acpi_ut_remove_reference (buffer_desc);
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		/* Complete the buffer object initialization */
-
-		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
-		buffer_desc->buffer.length = length;
 		buffer = buffer_desc->buffer.pointer;
 	}
 	else {
@@ -270,26 +241,12 @@ acpi_ex_write_data_to_field (
 			return_ACPI_STATUS (AE_AML_BUFFER_LIMIT);
 		}
 
-		buffer_desc = acpi_ut_create_internal_object (ACPI_TYPE_BUFFER);
+		buffer_desc = acpi_ut_create_buffer_object (ACPI_SMBUS_BUFFER_SIZE);
 		if (!buffer_desc) {
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		/* Create the actual read buffer */
-
-		buffer_desc->buffer.pointer = ACPI_MEM_CALLOCATE (ACPI_SMBUS_BUFFER_SIZE);
-		if (!buffer_desc->buffer.pointer) {
-			acpi_ut_remove_reference (buffer_desc);
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		/* Complete the buffer object initialization */
-
-		buffer_desc->common.flags = AOPOBJ_DATA_VALID;
-		buffer_desc->buffer.length = ACPI_SMBUS_BUFFER_SIZE;
 		buffer = buffer_desc->buffer.pointer;
-
-
 		ACPI_MEMCPY (buffer, source_desc->buffer.pointer, ACPI_SMBUS_BUFFER_SIZE);
 
 		/* Lock entire transaction if requested */

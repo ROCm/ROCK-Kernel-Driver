@@ -52,13 +52,30 @@ static inline struct crypto_alg *crypto_alg_mod_lookup(const char *name)
 }
 #endif
 
+#ifdef CONFIG_CRYPTO_HMAC
+int crypto_alloc_hmac_block(struct crypto_tfm *tfm);
+void crypto_free_hmac_block(struct crypto_tfm *tfm);
+#else
+static inline int crypto_alloc_hmac_block(struct crypto_tfm *tfm)
+{
+	return 0;
+}
+
+static inline void crypto_free_hmac_block(struct crypto_tfm *tfm)
+{ }
+#endif
+
 int crypto_init_digest_flags(struct crypto_tfm *tfm, u32 flags);
 int crypto_init_cipher_flags(struct crypto_tfm *tfm, u32 flags);
 int crypto_init_compress_flags(struct crypto_tfm *tfm, u32 flags);
 
-void crypto_init_digest_ops(struct crypto_tfm *tfm);
-void crypto_init_cipher_ops(struct crypto_tfm *tfm);
-void crypto_init_compress_ops(struct crypto_tfm *tfm);
+int crypto_init_digest_ops(struct crypto_tfm *tfm);
+int crypto_init_cipher_ops(struct crypto_tfm *tfm);
+int crypto_init_compress_ops(struct crypto_tfm *tfm);
+
+void crypto_exit_digest_ops(struct crypto_tfm *tfm);
+void crypto_exit_cipher_ops(struct crypto_tfm *tfm);
+void crypto_exit_compress_ops(struct crypto_tfm *tfm);
 
 #endif	/* _CRYPTO_INTERNAL_H */
 

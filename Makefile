@@ -157,7 +157,7 @@ OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 AWK		= awk
 GENKSYMS	= /sbin/genksyms
-KALLSYMS	= /sbin/kallsyms
+KALLSYMS	= scripts/kallsyms
 PERL		= perl
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
@@ -335,7 +335,7 @@ ifdef CONFIG_KALLSYMS
 kallsyms.o := .tmp_kallsyms2.o
 
 quiet_cmd_kallsyms = KSYM    $@
-cmd_kallsyms = $(KALLSYMS) $< > $@
+cmd_kallsyms = sh $(KALLSYMS) $< $@
 
 .tmp_kallsyms1.o: .tmp_vmlinux1
 	$(call cmd,kallsyms)

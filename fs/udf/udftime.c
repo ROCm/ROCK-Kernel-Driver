@@ -121,7 +121,7 @@ udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
 
 
 timestamp *
-udf_time_to_stamp(timestamp *dest, time_t tv_sec, long tv_usec)
+udf_time_to_stamp(timestamp *dest, struct timespec ts)
 {
 	long int days, rem, y;
 	const unsigned short int *ip;
@@ -134,9 +134,9 @@ udf_time_to_stamp(timestamp *dest, time_t tv_sec, long tv_usec)
 
 	dest->typeAndTimezone = 0x1000 | (offset & 0x0FFF);
 
-	tv_sec += offset * 60;
-	days = tv_sec / SECS_PER_DAY;
-	rem = tv_sec % SECS_PER_DAY;
+	ts.tv_sec += offset * 60;
+	days = ts.tv_sec / SECS_PER_DAY;
+	rem = ts.tv_sec % SECS_PER_DAY;
 	dest->hour = rem / SECS_PER_HOUR;
 	rem %= SECS_PER_HOUR;
 	dest->minute = rem / 60;
@@ -164,9 +164,9 @@ udf_time_to_stamp(timestamp *dest, time_t tv_sec, long tv_usec)
 	dest->month = y + 1;
 	dest->day = days + 1;
 
-	dest->centiseconds = tv_usec / 10000;
-	dest->hundredsOfMicroseconds = (tv_usec - dest->centiseconds * 10000) / 100;
-	dest->microseconds = (tv_usec - dest->centiseconds * 10000 -
+	dest->centiseconds = ts.tv_nsec / 10000000;
+	dest->hundredsOfMicroseconds = (ts.tv_nsec / 1000 - dest->centiseconds * 10000) / 100;
+	dest->microseconds = (ts.tv_nsec / 1000 - dest->centiseconds * 10000 -
 		dest->hundredsOfMicroseconds * 100);
 	return dest;
 }

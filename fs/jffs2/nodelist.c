@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.c,v 1.47 2002/06/26 01:25:30 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.65 2002/11/12 09:50:13 dwmw2 Exp $
  *
  */
 
@@ -15,6 +15,9 @@
 #include <linux/fs.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
+#include <linux/rbtree.h>
+#include <linux/crc32.h>
+#include <linux/slab.h>
 #include "nodelist.h"
 
 void jffs2_add_fd_to_list(struct jffs2_sb_info *c, struct jffs2_full_dirent *new, struct jffs2_full_dirent **list)
@@ -116,9 +119,9 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 
 	for (ref = f->inocache->nodes; ref && ref->next_in_ino; ref = ref->next_in_ino) {
 		/* Work out whether it's a data node or a dirent node */
-		if (ref->flash_offset & 1) {
+		if (ref_obsolete(ref)) {
 			/* FIXME: On NAND flash we may need to read these */
-			D1(printk(KERN_DEBUG "node at 0x%08x is obsoleted. Ignoring.\n", ref->flash_offset &~3));
+			D1(printk(KERN_DEBUG "node at 0x%08x is obsoleted. Ignoring.\n", ref_offset(ref)));
 			continue;
 		}
 		/* We can hold a pointer to a non-obsolete node without the spinlock,
@@ -126,9 +129,12 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 		   they're in gets erased */
 		spin_unlock_bh(&c->erase_completion_lock);
 
-		err = jffs2_flash_read(c, (ref->flash_offset & ~3), min(ref->totlen, sizeof(node)), &retlen, (void *)&node);
+		cond_resched();
+
+		/* FIXME: point() */
+		err = jffs2_flash_read(c, (ref_offset(ref)), min(ref->totlen, sizeof(node)), &retlen, (void *)&node);
 		if (err) {
-			printk(KERN_WARNING "error %d reading node at 0x%08x in get_inode_nodes()\n", err, (ref->flash_offset) & ~3);
+			printk(KERN_WARNING "error %d reading node at 0x%08x in get_inode_nodes()\n", err, ref_offset(ref));
 			goto free_out;
 		}
 			
@@ -140,20 +146,24 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			goto free_out;
 		}
 			
-		switch (node.u.nodetype) {
+		switch (je16_to_cpu(node.u.nodetype)) {
 		case JFFS2_NODETYPE_DIRENT:
-			D1(printk(KERN_DEBUG "Node at %08x is a dirent node\n", ref->flash_offset &~3));
+			D1(printk(KERN_DEBUG "Node at %08x (%d) is a dirent node\n", ref_offset(ref), ref_flags(ref)));
+			if (ref_flags(ref) == REF_UNCHECKED) {
+				printk(KERN_WARNING "BUG: Dirent node at 0x%08x never got checked? How?\n", ref_offset(ref));
+				BUG();
+			}
 			if (retlen < sizeof(node.d)) {
 				printk(KERN_WARNING "short read in get_inode_nodes()\n");
 				err = -EIO;
 				goto free_out;
 			}
-			if (node.d.version > *highest_version)
-				*highest_version = node.d.version;
-			if (ref->flash_offset & 1) {
+			if (je32_to_cpu(node.d.version) > *highest_version)
+				*highest_version = je32_to_cpu(node.d.version);
+			if (ref_obsolete(ref)) {
 				/* Obsoleted. This cannot happen, surely? dwmw2 20020308 */
 				printk(KERN_ERR "Dirent node at 0x%08x became obsolete while we weren't looking\n",
-				       ref->flash_offset & ~3);
+				       ref_offset(ref));
 				BUG();
 			}
 			fd = jffs2_alloc_full_dirent(node.d.nsize+1);
@@ -163,14 +173,14 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			}
 			memset(fd,0,sizeof(struct jffs2_full_dirent) + node.d.nsize+1);
 			fd->raw = ref;
-			fd->version = node.d.version;
-			fd->ino = node.d.ino;
+			fd->version = je32_to_cpu(node.d.version);
+			fd->ino = je32_to_cpu(node.d.ino);
 			fd->type = node.d.type;
 
 			/* Pick out the mctime of the latest dirent */
 			if(fd->version > *mctime_ver) {
 				*mctime_ver = fd->version;
-				*latest_mctime = node.d.mctime;
+				*latest_mctime = je32_to_cpu(node.d.mctime);
 			}
 
 			/* memcpy as much of the name as possible from the raw
@@ -183,9 +193,10 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			   from the flash?
 			*/
 			if (node.d.nsize + sizeof(struct jffs2_raw_dirent) > retlen) {
+				/* FIXME: point() */
 				int already = retlen - sizeof(struct jffs2_raw_dirent);
 					
-				err = jffs2_flash_read(c, (ref->flash_offset & ~3) + retlen, 
+				err = jffs2_flash_read(c, (ref_offset(ref)) + retlen, 
 						   node.d.nsize - already, &retlen, &fd->name[already]);
 				if (!err && retlen != node.d.nsize - already)
 					err = -EIO;
@@ -206,22 +217,75 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			break;
 
 		case JFFS2_NODETYPE_INODE:
-			D1(printk(KERN_DEBUG "Node at %08x is a data node\n", ref->flash_offset &~3));
+			D1(printk(KERN_DEBUG "Node at %08x (%d) is a data node\n", ref_offset(ref), ref_flags(ref)));
 			if (retlen < sizeof(node.i)) {
 				printk(KERN_WARNING "read too short for dnode\n");
 				err = -EIO;
 				goto free_out;
 			}
-			if (node.d.version > *highest_version)
-				*highest_version = node.i.version;
-			D1(printk(KERN_DEBUG "version %d, highest_version now %d\n", node.d.version, *highest_version));
+			if (je32_to_cpu(node.i.version) > *highest_version)
+				*highest_version = je32_to_cpu(node.i.version);
+			D1(printk(KERN_DEBUG "version %d, highest_version now %d\n", je32_to_cpu(node.i.version), *highest_version));
 
-			if (ref->flash_offset & 1) {
+			if (ref_obsolete(ref)) {
 				/* Obsoleted. This cannot happen, surely? dwmw2 20020308 */
 				printk(KERN_ERR "Inode node at 0x%08x became obsolete while we weren't looking\n",
-				       ref->flash_offset & ~3);
+				       ref_offset(ref));
 				BUG();
 			}
+
+			/* If we've never checked the CRCs on this node, check them now. */
+			if (ref_flags(ref) == REF_UNCHECKED) {
+				uint32_t crc;
+				struct jffs2_eraseblock *jeb;
+
+				crc = crc32(0, &node, sizeof(node.i)-8);
+				if (crc != je32_to_cpu(node.i.node_crc)) {
+					printk(KERN_NOTICE "jffs2_get_inode_nodes(): CRC failed on node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+					       ref_offset(ref), je32_to_cpu(node.i.node_crc), crc);
+					jffs2_mark_node_obsolete(c, ref);
+					spin_lock_bh(&c->erase_completion_lock);
+					continue;
+				}
+
+				if (node.i.compr != JFFS2_COMPR_ZERO && je32_to_cpu(node.i.csize)) {
+					/* FIXME: point() */
+					char *buf = kmalloc(je32_to_cpu(node.i.csize), GFP_KERNEL);
+					if (!buf)
+						return -ENOMEM;
+
+					err = jffs2_flash_read(c, ref_offset(ref) + sizeof(node.i), je32_to_cpu(node.i.csize),
+							       &retlen, buf);
+					if (!err && retlen != je32_to_cpu(node.i.csize))
+						err = -EIO;
+					if (err) {
+						kfree(buf);
+						return err;
+					}
+					
+					crc = crc32(0, buf, je32_to_cpu(node.i.csize));
+					kfree(buf);
+
+					if (crc != je32_to_cpu(node.i.data_crc)) {
+						printk(KERN_NOTICE "jffs2_get_inode_nodes(): Data CRC failed on node at 0x%08x: Read 0x%08x, calculated 0x%08x\n",
+						       ref_offset(ref), je32_to_cpu(node.i.data_crc), crc);
+						jffs2_mark_node_obsolete(c, ref);
+						spin_lock_bh(&c->erase_completion_lock);
+						continue;
+					}
+					
+				}
+
+				/* Mark the node as having been checked and fix the accounting accordingly */
+				jeb = &c->blocks[ref->flash_offset / c->sector_size];
+				jeb->used_size += ref->totlen;
+				jeb->unchecked_size -= ref->totlen;
+				c->used_size += ref->totlen;
+				c->unchecked_size -= ref->totlen;
+
+				mark_ref_normal(ref);
+			}
+
 			tn = jffs2_alloc_tmp_dnode_info();
 			if (!tn) {
 				D1(printk(KERN_DEBUG "alloc tn failed\n"));
@@ -236,34 +300,66 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 				jffs2_free_tmp_dnode_info(tn);
 				goto free_out;
 			}
-			tn->version = node.i.version;
-			tn->fn->ofs = node.i.offset;
+			tn->version = je32_to_cpu(node.i.version);
+			tn->fn->ofs = je32_to_cpu(node.i.offset);
 			/* There was a bug where we wrote hole nodes out with
 			   csize/dsize swapped. Deal with it */
-			if (node.i.compr == JFFS2_COMPR_ZERO && !node.i.dsize && node.i.csize)
-				tn->fn->size = node.i.csize;
+			if (node.i.compr == JFFS2_COMPR_ZERO && !je32_to_cpu(node.i.dsize) && je32_to_cpu(node.i.csize))
+				tn->fn->size = je32_to_cpu(node.i.csize);
 			else // normal case...
-				tn->fn->size = node.i.dsize;
+				tn->fn->size = je32_to_cpu(node.i.dsize);
 			tn->fn->raw = ref;
-			D1(printk(KERN_DEBUG "dnode @%08x: ver %u, offset %04x, dsize %04x\n", ref->flash_offset &~3, node.i.version, node.i.offset, node.i.dsize));
+			D1(printk(KERN_DEBUG "dnode @%08x: ver %u, offset %04x, dsize %04x\n",
+				  ref_offset(ref), je32_to_cpu(node.i.version),
+				  je32_to_cpu(node.i.offset), je32_to_cpu(node.i.dsize)));
 			jffs2_add_tn_to_list(tn, &ret_tn);
 			break;
 
 		default:
-			switch(node.u.nodetype & JFFS2_COMPAT_MASK) {
+			if (ref_flags(ref) == REF_UNCHECKED) {
+				struct jffs2_eraseblock *jeb;
+
+				printk(KERN_ERR "Eep. Unknown node type %04x at %08x was marked REF_UNCHECKED\n",
+				       je16_to_cpu(node.u.nodetype), ref_offset(ref));
+
+				/* Mark the node as having been checked and fix the accounting accordingly */
+				jeb = &c->blocks[ref->flash_offset / c->sector_size];
+				jeb->used_size += ref->totlen;
+				jeb->unchecked_size -= ref->totlen;
+				c->used_size += ref->totlen;
+				c->unchecked_size -= ref->totlen;
+				
+				mark_ref_normal(ref);
+			}
+			node.u.nodetype = cpu_to_je16(JFFS2_NODE_ACCURATE | je16_to_cpu(node.u.nodetype));
+			if (crc32(0, &node, sizeof(struct jffs2_unknown_node)-4) != je32_to_cpu(node.u.hdr_crc)) {
+				/* Hmmm. This should have been caught at scan time. */
+				printk(KERN_ERR "Node header CRC failed at %08x. But it must have been OK earlier.\n",
+				       ref_offset(ref));
+				printk(KERN_ERR "Node was: { %04x, %04x, %08x, %08x }\n", 
+				       je16_to_cpu(node.u.magic), je16_to_cpu(node.u.nodetype), je32_to_cpu(node.u.totlen),
+				       je32_to_cpu(node.u.hdr_crc));
+				jffs2_mark_node_obsolete(c, ref);
+			} else switch(je16_to_cpu(node.u.nodetype) & JFFS2_COMPAT_MASK) {
 			case JFFS2_FEATURE_INCOMPAT:
-				printk(KERN_NOTICE "Unknown INCOMPAT nodetype %04X at %08X\n", node.u.nodetype, ref->flash_offset & ~3);
+				printk(KERN_NOTICE "Unknown INCOMPAT nodetype %04X at %08x\n", je16_to_cpu(node.u.nodetype), ref_offset(ref));
+				/* EEP */
+				BUG();
 				break;
 			case JFFS2_FEATURE_ROCOMPAT:
-				printk(KERN_NOTICE "Unknown ROCOMPAT nodetype %04X at %08X\n", node.u.nodetype, ref->flash_offset & ~3);
+				printk(KERN_NOTICE "Unknown ROCOMPAT nodetype %04X at %08x\n", je16_to_cpu(node.u.nodetype), ref_offset(ref));
+				if (!(c->flags & JFFS2_SB_FLAG_RO))
+					BUG();
 				break;
 			case JFFS2_FEATURE_RWCOMPAT_COPY:
-				printk(KERN_NOTICE "Unknown RWCOMPAT_COPY nodetype %04X at %08X\n", node.u.nodetype, ref->flash_offset & ~3);
+				printk(KERN_NOTICE "Unknown RWCOMPAT_COPY nodetype %04X at %08x\n", je16_to_cpu(node.u.nodetype), ref_offset(ref));
 				break;
 			case JFFS2_FEATURE_RWCOMPAT_DELETE:
-				printk(KERN_NOTICE "Unknown RWCOMPAT_DELETE nodetype %04X at %08X\n", node.u.nodetype, ref->flash_offset & ~3);
+				printk(KERN_NOTICE "Unknown RWCOMPAT_DELETE nodetype %04X at %08x\n", je16_to_cpu(node.u.nodetype), ref_offset(ref));
+				jffs2_mark_node_obsolete(c, ref);
 				break;
 			}
+
 		}
 		spin_lock_bh(&c->erase_completion_lock);
 
@@ -369,3 +465,126 @@ void jffs2_free_raw_node_refs(struct jffs2_sb_info *c)
 	}
 }
 	
+struct jffs2_node_frag *jffs2_lookup_node_frag(struct rb_root *fragtree, uint32_t offset)
+{
+	/* The common case in lookup is that there will be a node 
+	   which precisely matches. So we go looking for that first */
+	struct rb_node *next;
+	struct jffs2_node_frag *prev = NULL;
+	struct jffs2_node_frag *frag = NULL;
+
+	D2(printk(KERN_DEBUG "jffs2_lookup_node_frag(%p, %d)\n", fragtree, offset));
+
+	next = fragtree->rb_node;
+
+	while(next) {
+		frag = rb_entry(next, struct jffs2_node_frag, rb);
+
+		D2(printk(KERN_DEBUG "Considering frag %d-%d (%p). left %p, right %p\n",
+			  frag->ofs, frag->ofs+frag->size, frag, frag->rb.rb_left, frag->rb.rb_right));
+		if (frag->ofs + frag->size <= offset) {
+			D2(printk(KERN_DEBUG "Going right from frag %d-%d, before the region we care about\n",
+				  frag->ofs, frag->ofs+frag->size));
+			/* Remember the closest smaller match on the way down */
+			if (!prev || frag->ofs > prev->ofs)
+				prev = frag;
+			next = frag->rb.rb_right;
+		} else if (frag->ofs > offset) {
+			D2(printk(KERN_DEBUG "Going left from frag %d-%d, after the region we care about\n",
+				  frag->ofs, frag->ofs+frag->size));
+			next = frag->rb.rb_left;
+		} else {
+			D2(printk(KERN_DEBUG "Returning frag %d,%d, matched\n",
+				  frag->ofs, frag->ofs+frag->size));
+			return frag;
+		}
+	}
+
+	/* Exact match not found. Go back up looking at each parent,
+	   and return the closest smaller one */
+
+	if (prev)
+		D2(printk(KERN_DEBUG "No match. Returning frag %d,%d, closest previous\n",
+			  prev->ofs, prev->ofs+prev->size));
+	else 
+		D2(printk(KERN_DEBUG "Returning NULL, empty fragtree\n"));
+	
+	return prev;
+}
+
+/* Pass 'c' argument to indicate that nodes should be marked obsolete as
+   they're killed. */
+void jffs2_kill_fragtree(struct rb_root *root, struct jffs2_sb_info *c)
+{
+	struct jffs2_node_frag *frag;
+	struct jffs2_node_frag *parent;
+
+	if (!root->rb_node)
+		return;
+
+	frag = (rb_entry(root->rb_node, struct jffs2_node_frag, rb));
+
+	while(frag) {
+		if (frag->rb.rb_left) {
+			D2(printk(KERN_DEBUG "Going left from frag (%p) %d-%d\n", 
+				  frag, frag->ofs, frag->ofs+frag->size));
+			frag = frag_left(frag);
+			continue;
+		}
+		if (frag->rb.rb_right) {
+			D2(printk(KERN_DEBUG "Going right from frag (%p) %d-%d\n", 
+				  frag, frag->ofs, frag->ofs+frag->size));
+			frag = frag_right(frag);
+			continue;
+		}
+
+		D2(printk(KERN_DEBUG "jffs2_kill_fragtree: frag at 0x%x-0x%x: node %p, frags %d--\n",
+			  frag->ofs, frag->ofs+frag->size, frag->node,
+			  frag->node?frag->node->frags:0));
+			
+		if (frag->node && !(--frag->node->frags)) {
+			/* Not a hole, and it's the final remaining frag 
+			   of this node. Free the node */
+			if (c)
+				jffs2_mark_node_obsolete(c, frag->node->raw);
+			
+			jffs2_free_full_dnode(frag->node);
+		}
+		parent = frag_parent(frag);
+		if (parent) {
+			if (frag_left(parent) == frag)
+				parent->rb.rb_left = NULL;
+			else 
+				parent->rb.rb_right = NULL;
+		}
+
+		jffs2_free_node_frag(frag);
+		frag = parent;
+	}
+}
+
+void jffs2_fragtree_insert(struct jffs2_node_frag *newfrag, struct jffs2_node_frag *base)
+{
+	struct rb_node *parent = &base->rb;
+	struct rb_node **link = &parent;
+
+	D2(printk(KERN_DEBUG "jffs2_fragtree_insert(%p; %d-%d, %p)\n", newfrag, 
+		  newfrag->ofs, newfrag->ofs+newfrag->size, base));
+
+	while (*link) {
+		parent = *link;
+		base = rb_entry(parent, struct jffs2_node_frag, rb);
+	
+		D2(printk(KERN_DEBUG "fragtree_insert considering frag at 0x%x\n", base->ofs));
+		if (newfrag->ofs > base->ofs)
+			link = &base->rb.rb_right;
+		else if (newfrag->ofs < base->ofs)
+			link = &base->rb.rb_left;
+		else {
+			printk(KERN_CRIT "Duplicate frag at %08x (%p,%p)\n", newfrag->ofs, newfrag, base);
+			BUG();
+		}
+	}
+
+	rb_link_node(&newfrag->rb, &base->rb, link);
+}

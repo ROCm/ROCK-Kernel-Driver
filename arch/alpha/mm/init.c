@@ -242,7 +242,7 @@ callback_init(void * kernel_end)
 	if (alpha_using_srm) {
 		static struct vm_struct console_remap_vm;
 		unsigned long vaddr = VMALLOC_START;
-		long i, j;
+		unsigned long i, j;
 
 		/* Set up the third level PTEs and update the virtual
 		   addresses of the CRB entries.  */

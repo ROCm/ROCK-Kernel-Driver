@@ -195,6 +195,7 @@ struct xfrm_policy
 	/* This lock only affects elements except for entry. */
 	rwlock_t		lock;
 	atomic_t		refcnt;
+	struct timer_list	timer;
 
 	u32			priority;
 	u32			index;

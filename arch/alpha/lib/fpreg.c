@@ -48,6 +48,7 @@ alpha_read_fp_reg (unsigned long reg)
 	      case 29: STT(29, val); break;
 	      case 30: STT(30, val); break;
 	      case 31: STT(31, val); break;
+	      default: return 0;
 	}
 	return val;
 }
@@ -141,6 +142,7 @@ alpha_read_fp_reg_s (unsigned long reg)
 	      case 29: STS(29, val); break;
 	      case 30: STS(30, val); break;
 	      case 31: STS(31, val); break;
+	      default: return 0;
 	}
 	return val;
 }

@@ -10,10 +10,12 @@
 #include <asm/pbm.h>
 #include <asm/oplib.h>
 
-struct isa_device {
-	struct isa_device	*next;
-	struct isa_device	*child;
-	struct isa_bridge	*bus;
+struct sparc_isa_bridge;
+
+struct sparc_isa_device {
+	struct sparc_isa_device	*next;
+	struct sparc_isa_device	*child;
+	struct sparc_isa_bridge	*bus;
 	int			prom_node;
 	char			prom_name[64];
 	char			compatible[64];
@@ -21,9 +23,9 @@ struct isa_device {
 	unsigned int		irq;
 };
 
-struct isa_bridge {
-	struct isa_bridge	*next;
-	struct isa_device	*devices;
+struct sparc_isa_bridge {
+	struct sparc_isa_bridge	*next;
+	struct sparc_isa_device	*devices;
 	struct pci_pbm_info	*parent;
 	struct pci_dev		*self;
 	int			index;
@@ -34,7 +36,7 @@ struct isa_bridge {
 	int			num_isa_ranges;
 };
 
-extern struct isa_bridge	*isa_chain;
+extern struct sparc_isa_bridge	*isa_chain;
 
 extern void isa_init(void);
 

@@ -177,25 +177,24 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
  */
 #define __put_user(x, ptr)                                      \
 ({                                                              \
-        __typeof__(*(ptr)) *__pu_addr = (ptr);                  \
         __typeof__(*(ptr)) __x = (x);                           \
         int __pu_err;                                           \
-        switch (sizeof (*(__pu_addr))) {                        \
+        switch (sizeof (*(ptr))) {                              \
         case 1:                                                 \
                 __pu_err = __put_user_asm_1((__u8)(__u64)(__x), \
-                                            __pu_addr);         \
+                                            ptr);               \
                 break;                                          \
         case 2:                                                 \
                 __pu_err = __put_user_asm_2((__u16)(__u64)(__x),\
-                                            __pu_addr);         \
+                                            ptr);               \
                 break;                                          \
         case 4:                                                 \
                 __pu_err = __put_user_asm_4((__u32)(__u64)(__x),\
-                                            __pu_addr);         \
+                                            ptr);               \
                 break;                                          \
         case 8:                                                 \
                 __pu_err = __put_user_asm_8((__u64)(__x),       \
-                                            __pu_addr);         \
+                                            ptr);               \
                 break;                                          \
         default:                                                \
                 __pu_err = __put_user_bad();                    \
@@ -290,21 +289,20 @@ extern int __put_user_bad(void);
 
 #define __get_user(x, ptr)                                      \
 ({                                                              \
-        __typeof__(ptr) __gu_addr = (ptr);                      \
         __typeof__(*(ptr)) __x;                                 \
         int __gu_err;                                           \
         switch (sizeof(*(ptr))) {                               \
         case 1:                                                 \
-                __get_user_asm_1(__x,__gu_addr,__gu_err);       \
+                __get_user_asm_1(__x,ptr,__gu_err);             \
                 break;                                          \
         case 2:                                                 \
-                __get_user_asm_2(__x,__gu_addr,__gu_err);       \
+                __get_user_asm_2(__x,ptr,__gu_err);             \
                 break;                                          \
         case 4:                                                 \
-                __get_user_asm_4(__x,__gu_addr,__gu_err);       \
+                __get_user_asm_4(__x,ptr,__gu_err);             \
                 break;                                          \
         case 8:                                                 \
-                __get_user_asm_8(__x,__gu_addr,__gu_err);       \
+                __get_user_asm_8(__x,ptr,__gu_err);             \
                 break;                                          \
         default:                                                \
                 __x = 0;                                        \

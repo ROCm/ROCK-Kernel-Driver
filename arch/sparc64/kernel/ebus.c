@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/interrupt.h>
 
 #include <asm/system.h>
 #include <asm/page.h>

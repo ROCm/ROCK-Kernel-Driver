@@ -6,8 +6,8 @@
 struct nfs_fattr {
 	unsigned short		valid;		/* which fields are valid */
 	__u64			pre_size;	/* pre_op_attr.size	  */
-	__u64			pre_mtime;	/* pre_op_attr.mtime	  */
-	__u64			pre_ctime;	/* pre_op_attr.ctime	  */
+	struct timespec		pre_mtime;	/* pre_op_attr.mtime	  */
+	struct timespec		pre_ctime;	/* pre_op_attr.ctime	  */
 	enum nfs_ftype		type;		/* always use NFSv2 types */
 	__u32			mode;
 	__u32			nlink;
@@ -32,9 +32,9 @@ struct nfs_fattr {
 		} nfs4;
 	} fsid_u;
 	__u64			fileid;
-	__u64			atime;
-	__u64			mtime;
-	__u64			ctime;
+	struct timespec		atime;
+	struct timespec		mtime;
+	struct timespec		ctime;
 	__u64			change_attr;	/* NFSv4 change attribute */
 	__u64			pre_change_attr;/* pre-op NFSv4 change attribute */
 	unsigned long		timestamp;
@@ -219,7 +219,7 @@ struct nfs3_sattrargs {
 	struct nfs_fh *		fh;
 	struct iattr *		sattr;
 	unsigned int		guard;
-	__u64			guardtime;
+	struct timespec		guardtime;
 };
 
 struct nfs3_diropargs {

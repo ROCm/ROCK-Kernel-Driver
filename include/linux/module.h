@@ -14,6 +14,8 @@
 #include <linux/compiler.h>
 #include <linux/cache.h>
 #include <linux/kmod.h>
+#include <linux/elf.h>
+
 #include <asm/module.h>
 #include <asm/uaccess.h> /* For struct exception_table_entry */
 
@@ -29,7 +31,6 @@
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define MODULE_DEVICE_TABLE(type,name)
 #define MODULE_PARM_DESC(var,desc)
-#define print_symbol(format, addr)
 #define print_modules()
 
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
@@ -47,21 +48,6 @@ extern struct module __this_module;
 #else
 #define THIS_MODULE ((struct module *)0)
 #endif
-
-#ifdef CONFIG_MODULES
-/* Get/put a kernel symbol (calls must be symmetric) */
-void *__symbol_get(const char *symbol);
-void *__symbol_get_gpl(const char *symbol);
-#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
-
-/* For every exported symbol, place a struct in the __ksymtab section */
-#define EXPORT_SYMBOL(sym)				\
-	const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab")))		\
-	= { (unsigned long)&sym, #sym }
-
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
 
 struct kernel_symbol_group
 {
@@ -82,6 +68,22 @@ struct exception_table
 	unsigned int num_entries;
 	const struct exception_table_entry *entry;
 };
+
+
+#ifdef CONFIG_MODULES
+/* Get/put a kernel symbol (calls must be symmetric) */
+void *__symbol_get(const char *symbol);
+void *__symbol_get_gpl(const char *symbol);
+#define symbol_get(x) ((typeof(&x))(__symbol_get(#x)))
+
+/* For every exported symbol, place a struct in the __ksymtab section */
+#define EXPORT_SYMBOL(sym)				\
+	const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__ksymtab")))		\
+	= { (unsigned long)&sym, #sym }
+
+#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
 
 struct module_ref
 {
@@ -135,6 +137,13 @@ struct module
 
 	/* Destruction function. */
 	void (*exit)(void);
+#endif
+
+#ifdef CONFIG_KALLSYMS
+	/* We keep the symbol and string tables for kallsyms. */
+	Elf_Sym *symtab;
+	unsigned long num_syms;
+	char *strtab;
 #endif
 
 	/* The command line arguments (may be mangled).  People like
@@ -211,6 +220,12 @@ do {									     \
 	}								     \
 } while(0)
 
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+const char *module_address_lookup(unsigned long addr,
+				  unsigned long *symbolsize,
+				  unsigned long *offset,
+				  char **modname);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -227,6 +242,15 @@ do {									     \
 #define module_name(mod) "kernel"
 
 #define __unsafe(mod)
+
+/* For kallsyms to ask for address resolution.  NULL means not found. */
+static inline const char *module_address_lookup(unsigned long addr,
+						unsigned long *symbolsize,
+						unsigned long *offset,
+						char **modname)
+{
+	return NULL;
+}
 #endif /* CONFIG_MODULES */
 
 /* For archs to search exception tables */
@@ -278,6 +302,14 @@ extern int module_dummy_usage;
 	int __initfn(void)
 #define cleanup_module(voidarg) __exitfn(void)
 #endif
+
+/*
+ * The exception and symbol tables, and the lock
+ * to protect them.
+ */
+extern spinlock_t modlist_lock;
+extern struct list_head extables;
+extern struct list_head symbols;
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE

@@ -910,9 +910,8 @@ static int xfrm_send_notify(struct xfrm_state *x, int hard)
 		BUG();
 
 	NETLINK_CB(skb).dst_groups = XFRMGRP_EXPIRE;
-	netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_EXPIRE, GFP_ATOMIC);
 
-	return 0;
+	return netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_EXPIRE, GFP_ATOMIC);
 }
 
 /* XXX Make this xfrm_state.c:xfrm_get_acqseq() */
@@ -971,9 +970,8 @@ static int xfrm_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *xt,
 		BUG();
 
 	NETLINK_CB(skb).dst_groups = XFRMGRP_ACQUIRE;
-	netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_ACQUIRE, GFP_ATOMIC);
 
-	return 0;
+	return netlink_broadcast(xfrm_nl, skb, 0, XFRMGRP_ACQUIRE, GFP_ATOMIC);
 }
 
 /* User gives us xfrm_user_policy_info followed by an array of 0
