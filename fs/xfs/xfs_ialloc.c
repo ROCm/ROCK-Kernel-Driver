@@ -336,6 +336,21 @@ xfs_ialloc_ag_alloc(
 	return 0;
 }
 
+STATIC __inline xfs_agnumber_t
+xfs_ialloc_next_ag(
+	xfs_mount_t	*mp)
+{
+	xfs_agnumber_t	agno;
+
+	spin_lock(&mp->m_agirotor_lock);
+	agno = mp->m_agirotor;
+	if (++mp->m_agirotor == mp->m_maxagi)
+		mp->m_agirotor = 0;
+	spin_unlock(&mp->m_agirotor_lock);
+
+	return agno;
+}
+
 /*
  * Select an allocation group to look for a free inode in, based on the parent
  * inode and then mode.	 Return the allocation group buffer.
@@ -366,7 +381,7 @@ xfs_ialloc_ag_select(
 	mp = tp->t_mountp;
 	agcount = mp->m_maxagi;
 	if (S_ISDIR(mode))
-		pagno = atomicIncWithWrap((int *)&mp->m_agirotor, agcount);
+		pagno = xfs_ialloc_next_ag(mp);
 	else {
 		pagno = XFS_INO_TO_AGNO(mp, parent);
 		if (pagno >= agcount)
@@ -394,7 +409,7 @@ xfs_ialloc_ag_select(
 			agbp = NULL;
 
 		if (!pag->pagi_inodeok) {
-			atomicIncWithWrap((int *)&mp->m_agirotor, agcount);
+			xfs_ialloc_next_ag(mp);
 			goto unlock_nextag;
 		}
 

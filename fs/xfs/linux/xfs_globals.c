@@ -49,11 +49,6 @@ unsigned long xfs_physmem;
 xfs_param_t xfs_params = { 0, 1, 0, 0, 0, 3 };
 
 /*
- * Used to serialize atomicIncWithWrap.
- */
-spinlock_t xfs_atomic_spin = SPIN_LOCK_UNLOCKED;
-
-/*
  * Global system credential structure.
  */
 cred_t sys_cred_val, *sys_cred = &sys_cred_val;
