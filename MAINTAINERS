@@ -1055,23 +1055,33 @@ M:	tigran@veritas.com
 S:	Maintained
 
 INTEL PRO/100 ETHERNET SUPPORT
-P:	Scott Feldman
-M:	scott.feldman@intel.com
-S:	Supported
-
-INTEL PRO/1000 GIGABIT ETHERNET SUPPORT
-P:	Jeb Cramer
-M:	cramerj@intel.com
+P:	John Ronciak
+M:	john.ronciak@intel.com
+P:	Ganesh Venkatesan
+M:	ganesh.venkatesan@intel.com
 P:	Scott Feldman
 M:	scott.feldman@intel.com
 W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
-INTEL PRO/10GbE SUPPORT
+INTEL PRO/1000 GIGABIT ETHERNET SUPPORT
+P:	Jeb Cramer
+M:	cramerj@intel.com
+P:	John Ronciak
+M:	john.ronciak@intel.com
 P:	Ganesh Venkatesan
-M:	Ganesh.Venkatesan@intel.com
-P:	Scott Feldman
-M:	scott.feldman@intel.com
+M:	ganesh.venkatesan@intel.com
+W:	http://sourceforge.net/projects/e1000/
+S:	Supported
+
+INTEL PRO/10GbE SUPPORT
+P:	Ayyappan Veeraiyan
+M:	ayyappan.veeraiyan@intel.com
+P:	Ganesh Venkatesan
+M:	ganesh.venkatesan@intel.com
+P:	John Ronciak
+M:	john.ronciak@intel.com
+W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
 INTERMEZZO FILE SYSTEM
