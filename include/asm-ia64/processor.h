@@ -89,6 +89,9 @@
 #include <asm/rse.h>
 #include <asm/unwind.h>
 #include <asm/atomic.h>
+#ifdef CONFIG_NUMA
+#include <asm/nodedata.h>
+#endif
 
 /* like above but expressed as bitfields for more efficient access: */
 struct ia64_psr {
@@ -174,6 +177,10 @@ struct cpuinfo_ia64 {
 	__u64 prof_counter;
 	__u64 prof_multiplier;
 #endif
+#ifdef CONFIG_NUMA
+	struct ia64_node_data *node_data;
+	int nodeid;
+#endif
 };
 
 DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
@@ -184,6 +191,10 @@ DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
  */
 #define local_cpu_data		(&__get_cpu_var(cpu_info))
 #define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
+
+#ifdef CONFIG_NUMA
+#define numa_node_id()		(local_cpu_data->nodeid)
+#endif
 
 extern void identify_cpu (struct cpuinfo_ia64 *);
 extern void print_cpu_info (struct cpuinfo_ia64 *);

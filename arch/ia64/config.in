@@ -66,6 +66,10 @@ fi
 
 if [ "$CONFIG_IA64_GENERIC" = "y" -o "$CONFIG_IA64_DIG" = "y" -o "$CONFIG_IA64_HP_ZX1" = "y" ];
 then
+	bool '  Enable NUMA support' CONFIG_NUMA
+	if [ "$CONFIG_NUMA" = "y" ]; then
+		define_bool CONFIG_DISCONTIGMEM y
+	fi
 	bool '  Enable IA-64 Machine Check Abort' CONFIG_IA64_MCA
 	define_bool CONFIG_PM y
 	define_bool CONFIG_IOSAPIC y
@@ -267,6 +271,7 @@ choice 'Physical memory granularity'				\
 
 bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
 if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS
    bool '  Print possible IA64 hazards to console' CONFIG_IA64_PRINT_HAZARDS
    bool '  Disable VHPT' CONFIG_DISABLE_VHPT
    bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ

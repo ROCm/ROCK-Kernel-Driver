@@ -148,8 +148,8 @@ copy_siginfo (siginfo_t *to, siginfo_t *from)
 	if (from->si_code < 0)
 		memcpy(to, from, sizeof(siginfo_t));
 	else
-		/* _sigchld is currently the largest know union member */
-		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigchld));
+		/* _sigprof is currently the largest know union member */
+		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigprof));
 }
 
 extern int copy_siginfo_from_user(siginfo_t *to, siginfo_t *from);

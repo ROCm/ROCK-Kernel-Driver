@@ -2,7 +2,7 @@
  * PAL & SAL emulation.
  *
  * Copyright (C) 1998-2001 Hewlett-Packard Co
- * Copyright (C) 1998-2001 David Mosberger-Tang <davidm@hpl.hp.com>
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * For the HP simulator, this file gets include in boot/bootloader.c.
  * For SoftSDV, this file gets included in sys_softsdv.c.
