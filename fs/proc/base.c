@@ -778,10 +778,9 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	.follow_link	= proc_pid_follow_link
 };
 
-static int pid_alive(struct task_struct *p)
+static inline int pid_alive(struct task_struct *p)
 {
-	BUG_ON(p->pids[PIDTYPE_PID].pidptr != &p->pids[PIDTYPE_PID].pid);
-	return atomic_read(&p->pids[PIDTYPE_PID].pid.count);
+	return p->pids[PIDTYPE_PID].nr != 0;
 }
 
 #define NUMBUF 10

@@ -28,25 +28,25 @@
 /* Symlink caching in the page cache is even more simplistic
  * and straight-forward than readdir caching.
  *
- * We place the length at the beginning of the page, in host byte order,
- * followed by the string.  The XDR response verification will NUL-terminate
- * it.  In the very end of page we store pointer to struct page in question,
+ * At the beginning of the page we store pointer to struct page in question,
  * simplifying nfs_put_link() (if inode got invalidated we can't find the page
  * to be freed via pagecache lookup).
+ * The NUL-terminated string follows immediately thereafter.
  */
 
 struct nfs_symlink {
-	u32 length;
-	char body[PAGE_SIZE - sizeof(u32) - sizeof(struct page *)];
 	struct page *page;
-} __attribute__((packed));	/* this must be page-sized */
+	char body[0];
+};
 
 static int nfs_symlink_filler(struct inode *inode, struct page *page)
 {
+	const unsigned int pgbase = offsetof(struct nfs_symlink, body);
+	const unsigned int pglen = PAGE_SIZE - pgbase;
 	int error;
 
 	lock_kernel();
-	error = NFS_PROTO(inode)->readlink(inode, page);
+	error = NFS_PROTO(inode)->readlink(inode, page, pgbase, pglen);
 	unlock_kernel();
 	if (error < 0)
 		goto error;
@@ -79,15 +79,10 @@ static int nfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 		goto getlink_read_error;
 	}
 	p = kmap(page);
-	if (p->length > sizeof(p->body) - 1)
-		goto too_long;
 	p->page = page;
 	nd_set_link(nd, p->body);
 	return 0;
 
-too_long:
-	err = ERR_PTR(-ENAMETOOLONG);
-	kunmap(page);
 getlink_read_error:
 	page_cache_release(page);
 read_failed:

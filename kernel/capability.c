@@ -89,14 +89,12 @@ static inline void cap_set_pg(int pgrp, kernel_cap_t *effective,
 			      kernel_cap_t *permitted)
 {
 	task_t *g, *target;
-	struct list_head *l;
-	struct pid *pid;
 
-	for_each_task_pid(pgrp, PIDTYPE_PGID, g, l, pid) {
+	do_each_task_pid(pgrp, PIDTYPE_PGID, g) {
 		target = g;
 		while_each_thread(g, target)
 			security_capset_set(target, effective, inheritable, permitted);
-	}
+	} while_each_task_pid(pgrp, PIDTYPE_PGID, g);
 }
 
 /*

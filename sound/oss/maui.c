@@ -383,9 +383,8 @@ static int __init probe_maui(struct address_info *hw_config)
 		 */
 
 		synth = midi_devs[this_dev]->converter;
-		synth->id = "MAUI";
-
 		if (synth != NULL) {
+			synth->id = "MAUI";
 			orig_load_patch = synth->load_patch;
 			synth->load_patch = &maui_load_patch;
 		} else

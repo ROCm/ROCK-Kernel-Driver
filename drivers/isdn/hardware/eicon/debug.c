@@ -891,6 +891,7 @@ void diva_mnt_add_xdi_adapter (const DESCRIPTOR* d) {
     if (clients[id].hDbg && (clients[id].request == d->request)) {
       diva_os_leave_spin_lock (&dbg_q_lock, &old_irql, "register");
       diva_os_leave_spin_lock (&dbg_adapter_lock, &old_irql1, "register");
+      diva_os_free(0, pmem);
       return;
     }
     if (clients[id].hDbg) { /* slot is busy */
