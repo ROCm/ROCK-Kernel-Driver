@@ -3533,14 +3533,14 @@ static ssize_t st_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
-static DEVICE_ATTR(kdev,"kdev",S_IRUGO,st_device_kdev_read,NULL);
+static DEVICE_ATTR(kdev,S_IRUGO,st_device_kdev_read,NULL);
 
 static ssize_t st_device_type_read(struct device *driverfs_dev, 
 				   char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,st_device_type_read,NULL);
+static DEVICE_ATTR(type,S_IRUGO,st_device_type_read,NULL);
 
 
 static struct file_operations st_fops =

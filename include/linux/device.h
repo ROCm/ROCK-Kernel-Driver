@@ -93,9 +93,9 @@ struct bus_attribute {
 	ssize_t (*store)(struct bus_type *, const char * buf, size_t count, loff_t off);
 };
 
-#define BUS_ATTR(_name,_str,_mode,_show,_store)	\
+#define BUS_ATTR(_name,_mode,_show,_store)	\
 struct bus_attribute bus_attr_##_name = { 		\
-	.attr = {.name	= _str,	.mode	= _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };
@@ -150,9 +150,9 @@ struct driver_attribute {
 	ssize_t (*store)(struct device_driver *, const char * buf, size_t count, loff_t off);
 };
 
-#define DRIVER_ATTR(_name,_str,_mode,_show,_store)	\
+#define DRIVER_ATTR(_name,_mode,_show,_store)	\
 struct driver_attribute driver_attr_##_name = { 		\
-	.attr = {.name	= _str,	.mode	= _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };
@@ -222,12 +222,13 @@ struct device_attribute {
 	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
 };
 
-#define DEVICE_ATTR(_name,_str,_mode,_show,_store)	\
+#define DEVICE_ATTR(_name,_mode,_show,_store) \
 struct device_attribute dev_attr_##_name = { 		\
-	.attr = {.name	= _str,	.mode	= _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };
+
 
 extern int device_create_file(struct device *device, struct device_attribute * entry);
 extern void device_remove_file(struct device * dev, struct device_attribute * attr);
