@@ -90,3 +90,15 @@ config KEYBOARD_AMIGA
 	  The module will be called amikbd. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config KEYBOARD_98KBD
+	tristate "NEC PC-9800 Keyboard support"
+	depends on X86_PC9800 && INPUT && INPUT_KEYBOARD && SERIO
+	help
+	  Say Y here if you want to use the NEC PC-9801/PC-9821 keyboard (or
+	  compatible) on your system. 
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called xtkbd.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
