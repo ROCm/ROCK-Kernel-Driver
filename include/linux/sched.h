@@ -1083,6 +1083,17 @@ extern int cond_resched_lock(spinlock_t * lock);
 # define need_lockbreak(lock) 0
 #endif
 
+/*
+ * Does a critical section need to be broken due to another
+ * task waiting or preemption being signalled:
+ */
+static inline int lock_need_resched(spinlock_t *lock)
+{
+	if (need_lockbreak(lock) || need_resched())
+		return 1;
+	return 0;
+}
+
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
    callers must hold sighand->siglock.  */
