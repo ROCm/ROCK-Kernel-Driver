@@ -898,9 +898,9 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		if(list_empty(pages))
 			break;
 
-		page = list_entry(pages->prev, struct page, list);
+		page = list_entry(pages->prev, struct page, lru);
 
-		list_del(&page->list);
+		list_del(&page->lru);
 
 		if (add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
 			page_cache_release(page);
@@ -962,7 +962,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	for(i = 0;i<num_pages;) {
 		if(list_empty(page_list))
 			break;
-		page = list_entry(page_list->prev, struct page, list);
+		page = list_entry(page_list->prev, struct page, lru);
 		offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
 
 		/* for reads over a certain size could initiate async read ahead */
@@ -984,8 +984,9 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			/* clean up remaing pages off list */
             
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev,
+						struct page, lru);
+				list_del(&page->lru);
 			}
 			break;
 		} else if (bytes_read > 0) {
@@ -1002,8 +1003,9 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 			cFYI(1,("No bytes read cleaning remaining pages off readahead list"));
 			/* BB turn off caching and do new lookup on file size at server? */
 			while (!list_empty(page_list) && (i < num_pages)) {
-				page = list_entry(page_list->prev, struct page, list);
-				list_del(&page->list);
+				page = list_entry(page_list->prev,
+						struct page, lru);
+				list_del(&page->lru);
 			}
 
 			break;
