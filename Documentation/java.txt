@@ -1,4 +1,4 @@
-               Java(tm) Binary Kernel Support for Linux v1.02
+               Java(tm) Binary Kernel Support for Linux v1.03
                ----------------------------------------------
 
 Linux beats them ALL! While all other OS's are TALKING about direct
@@ -30,6 +30,8 @@ other program after you have done the following:
    (you should really have read binfmt_misc.txt now):
    support for Java applications:
      ':Java:M::\xca\xfe\xba\xbe::/usr/local/bin/javawrapper:'
+   support for executable Jar files:
+     ':ExecutableJAR:E::jar::/usr/local/bin/jarwrapper:'
    support for Java Applets:
      ':Applet:E::html::/usr/bin/appletviewer:'
    or the following, if you want to be more selective:
@@ -343,7 +345,15 @@ int main(int argc, char **argv)
 ====================== Cut here ===================
 
 
-Now simply chmod +x the .class and/or .html files you want to execute.
+====================== Cut here ===================
+#!/bin/bash
+# /usr/local/java/bin/jarwrapper - the wrapper for binfmt_misc/jar
+
+java -jar $1
+====================== Cut here ===================
+
+
+Now simply chmod +x the .class, .jar and/or .html files you want to execute.
 To add a Java program to your path best put a symbolic link to the main
 .class file into /usr/bin (or another place you like) omitting the .class
 extension. The directory containing the original .class file will be
@@ -369,6 +379,11 @@ And then execute it:
 	./HelloWorld.class
 
 
+To execute Java Jar files, simple chmod the *.jar files to include
+the execution bit, then just do
+       ./Application.jar
+
+
 To execute Java Applets, simple chmod the *.html files to include
 the execution bit, then just do
 	./Applet.html
@@ -376,5 +391,6 @@ the execution bit, then just do
 
 originally by Brian A. Lantz, brian@lantz.com
 heavily edited for binfmt_misc by Richard Günther
-new scripts by Colin J. Watson <cjw44@cam.ac.uk>.
+new scripts by Colin J. Watson <cjw44@cam.ac.uk>
+added executable Jar file support by Kurt Huwig <kurt@iku-netz.de>
 

@@ -255,22 +255,26 @@ static struct ipddp_route* ipddp_find_route(struct ipddp_route *rt)
 static int ipddp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
         struct ipddp_route *rt = (struct ipddp_route *)ifr->ifr_data;
+        struct ipddp_route rcp;
 
         if(!capable(CAP_NET_ADMIN))
                 return -EPERM;
 
+	if(copy_from_user(&rcp, rt, sizeof(rcp)))
+		return -EFAULT;
+
         switch(cmd)
         {
 		case SIOCADDIPDDPRT:
-                        return (ipddp_create(rt));
+                        return (ipddp_create(&rcp));
 
                 case SIOCFINDIPDDPRT:
-                        if(copy_to_user(rt, ipddp_find_route(rt), sizeof(struct ipddp_route)))
+                        if(copy_to_user(rt, ipddp_find_route(&rcp), sizeof(struct ipddp_route)))
                                 return -EFAULT;
                         return 0;
 
                 case SIOCDELIPDDPRT:
-                        return (ipddp_delete(rt));
+                        return (ipddp_delete(&rcp));
 
                 default:
                         return -EINVAL;

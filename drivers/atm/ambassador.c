@@ -613,19 +613,21 @@ static int command_do (amb_dev * dev, command * cmd) {
     while (timeout) {
       // go to sleep
       // PRINTD (DBG_CMD, "wait: sleeping %lu for command", timeout);
+      set_current_state(TASK_UNINTERRUPTIBLE);
       timeout = schedule_timeout (timeout);
-      // woken up by timeout or signal
     }
     
     // wait for my slot to be reached (all waiters are here or above, until...)
     while (ptrs->out != my_slot) {
       PRINTD (DBG_CMD, "wait: command slot (now at %p)", ptrs->out);
+      set_current_state(TASK_UNINTERRUPTIBLE);
       schedule();
     }
     
     // wait on my slot (... one gets to its slot, and... )
     while (ptrs->out->request != cpu_to_be32 (SRB_COMPLETE)) {
       PRINTD (DBG_CMD, "wait: command slot completion");
+      set_current_state(TASK_UNINTERRUPTIBLE);
       schedule();
     }
     
@@ -1986,6 +1988,7 @@ static int __init do_loader_command (volatile loader_block * lb,
   
   while (!lb->result || lb->result == cpu_to_be32 (COMMAND_IN_PROGRESS))
     if (timeout) {
+      set_current_state(TASK_UNINTERRUPTIBLE);
       timeout = schedule_timeout (timeout);
     } else {
       PRINTD (DBG_LOAD|DBG_ERR, "command %d timed out", cmd);
@@ -2110,12 +2113,15 @@ static int amb_reset (amb_dev * dev, int diags) {
     unsigned long timeout;
     // 4.2 second wait
     timeout = HZ*42/10;
-    while (timeout)
+    while (timeout) {
+      set_current_state(TASK_UNINTERRUPTIBLE);
       timeout = schedule_timeout (timeout);
+    }
     // half second time-out
     timeout = HZ/2;
     while (!rd_plain (dev, offsetof(amb_mem, mb.loader.ready)))
       if (timeout) {
+        set_current_state(TASK_UNINTERRUPTIBLE);
 	timeout = schedule_timeout (timeout);
       } else {
 	PRINTD (DBG_LOAD|DBG_ERR, "reset timed out");
@@ -2255,8 +2261,10 @@ static void __init amb_ucode_version (amb_dev * dev) {
   u32 minor;
   command cmd;
   cmd.request = cpu_to_be32 (SRB_GET_VERSION);
-  while (command_do (dev, &cmd))
+  while (command_do (dev, &cmd)) {
+    set_current_state(TASK_UNINTERRUPTIBLE);
     schedule();
+  }
   major = be32_to_cpu (cmd.args.version.major);
   minor = be32_to_cpu (cmd.args.version.minor);
   PRINTK (KERN_INFO, "microcode version is %u.%u", major, minor);
@@ -2280,8 +2288,10 @@ static void __init amb_esi (amb_dev * dev, u8 * esi) {
   }
   
   cmd.request = cpu_to_be32 (SRB_GET_BIA);
-  while (command_do (dev, &cmd))
+  while (command_do (dev, &cmd)) {
+    set_current_state(TASK_UNINTERRUPTIBLE);
     schedule();
+  }
   lower4 = be32_to_cpu (cmd.args.bia.lower4);
   upper2 = be32_to_cpu (cmd.args.bia.upper2);
   PRINTD (DBG_LOAD, "BIA: lower4: %08x, upper2 %04x", lower4, upper2);
@@ -2362,7 +2372,7 @@ static int __init amb_probe (void) {
   struct pci_dev * pci_dev;
   int devs;
   
-  void do_pci_device (void) {
+  void __init do_pci_device (void) {
     amb_dev * dev;
     
     // read resources from PCI configuration space

@@ -59,7 +59,7 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 	struct pci_dev *pdev = NULL;
 
 	if (!pci_present()) {
-		dmx3191d_printk("PCI support not enabled\n");
+		printk(KERN_WARNING "dmx3191: PCI support not enabled\n");
 		return 0;
 	}
 
@@ -75,7 +75,7 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 		port = pci_resource_start (pdev, 0);
 		
 		if (!request_region(port, DMX3191D_REGION, DMX3191D_DRIVER_NAME)) {
-			dmx3191d_printk("region 0x%lx-0x%lx already reserved\n",
+			printk(KERN_ERR "dmx3191: region 0x%lx-0x%lx already reserved\n",
 				port, port + DMX3191D_REGION);
 			continue;
 		}
@@ -93,7 +93,7 @@ int __init dmx3191d_detect(Scsi_Host_Template *tmpl) {
 
 		if (request_irq(pdev->irq, dmx3191d_do_intr, SA_SHIRQ,
 				DMX3191D_DRIVER_NAME, instance)) {
-			dmx3191d_printk("irq %d not available\n", pdev->irq);
+			printk(KERN_WARNING "dmx3191: IRQ %d not available - switching to polled mode.\n", pdev->irq);
 			/* Steam powered scsi controllers run without an IRQ
 			   anyway */
 			instance->irq = IRQ_NONE;

@@ -312,6 +312,13 @@ static struct file_operations proc_info_file_operations = {
 #define MAY_PTRACE(p) \
 (p==current||(p->p_pptr==current&&(p->ptrace & PT_PTRACED)&&p->state==TASK_STOPPED))
 
+
+static int mem_open(struct inode* inode, struct file* file)
+{
+	file->private_data = (void*)(current->self_exec_id);
+	return 0;
+}
+
 static ssize_t mem_read(struct file * file, char * buf,
 			size_t count, loff_t *ppos)
 {
@@ -319,6 +326,8 @@ static ssize_t mem_read(struct file * file, char * buf,
 	char *page;
 	unsigned long src = *ppos;
 	int copied = 0;
+	struct mm_struct *mm;
+
 
 	if (!MAY_PTRACE(task))
 		return -ESRCH;
@@ -326,6 +335,18 @@ static ssize_t mem_read(struct file * file, char * buf,
 	page = (char *)__get_free_page(GFP_USER);
 	if (!page)
 		return -ENOMEM;
+
+	task_lock(task);
+	mm = task->mm;
+	if (mm)
+		atomic_inc(&mm->mm_users);
+	task_unlock(task);
+
+	if (file->private_data != (void*)(current->self_exec_id) ) {
+		mmput(mm);
+		return -EIO;
+	}
+		
 
 	while (count > 0) {
 		int this_len, retval;
@@ -347,6 +368,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 		count -= retval;
 	}
 	*ppos = src;
+	mmput(mm);
 	free_page((unsigned long) page);
 	return copied;
 }
@@ -398,6 +420,7 @@ static ssize_t mem_write(struct file * file, const char * buf,
 static struct file_operations proc_mem_operations = {
 	read:		mem_read,
 	write:		mem_write,
+	open:		mem_open,
 };
 
 static struct inode_operations proc_mem_inode_operations = {

@@ -144,6 +144,7 @@
 #include <linux/ioport.h>
 #include <linux/blk.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/bitops.h>
 #include <asm/system.h>
@@ -156,6 +157,8 @@
 #include "../../scsi/constants.h"
 #include "acornscsi.h"
 #include "msgqueue.h"
+
+#include <scsi/scsicam.h>
 
 #define VER_MAJOR 2
 #define VER_MINOR 0
@@ -206,24 +209,24 @@ static void acornscsi_abortcmd(AS_Host *host, unsigned char tag);
 static inline void
 sbic_arm_write(unsigned int io_port, int reg, int value)
 {
-    outb_t(reg, io_port);
-    outb_t(value, io_port + 4);
+    __raw_writeb(reg, io_port);
+    __raw_writeb(value, io_port + 4);
 }
 
 #define sbic_arm_writenext(io,val) \
-	outb_t((val), (io) + 4)
+	__raw_writeb((val), (io) + 4)
 
 static inline
 int sbic_arm_read(unsigned int io_port, int reg)
 {
     if(reg == ASR)
-	   return inl_t(io_port) & 255;
-    outb_t(reg, io_port);
-    return inl_t(io_port + 4) & 255;
+	   return __raw_readl(io_port) & 255;
+    __raw_writeb(reg, io_port);
+    return __raw_readl(io_port + 4) & 255;
 }
 
 #define sbic_arm_readnext(io) \
-	inb_t((io) + 4)
+	__raw_readb((io) + 4)
 
 #ifdef USE_DMAC
 #define dmac_read(io_port,reg) \
@@ -2858,7 +2861,7 @@ static struct expansion_card *ecs[MAX_ECARDS];
  * Params   : host - host to setup
  */
 static
-void acornscsi_init(AS_Host *host)
+void acornscsi_host_init(AS_Host *host)
 {
     memset(&host->stats, 0, sizeof (host->stats));
     queue_initialise(&host->queues.issue);
@@ -2926,7 +2929,7 @@ int acornscsi_detect(Scsi_Host_Template * tpnt)
 	    host->scsi.irq = NO_IRQ;
 	}
 
-	acornscsi_init(host);
+	acornscsi_host_init(host);
 
 	++count;
     }
@@ -3118,9 +3121,40 @@ int acornscsi_proc_info(char *buffer, char **start, off_t offset,
     return pos;
 }
 
-#ifdef MODULE
+static Scsi_Host_Template acornscsi_template = {
+	module:			THIS_MODULE,
+	proc_info:		acornscsi_proc_info,
+	name:			"AcornSCSI",
+	detect:			acornscsi_detect,
+	release:		acornscsi_release,
+	info:			acornscsi_info,
+	queuecommand:		acornscsi_queuecmd,
+	abort:			acornscsi_abort,
+	reset:			acornscsi_reset,
+	bios_param:		scsicam_bios_param,
+	can_queue:		16,
+	this_id:		7,
+	sg_tablesize:		SG_ALL,
+	cmd_per_lun:		2,
+	unchecked_isa_dma:	0,
+	use_clustering:		DISABLE_CLUSTERING
+};
 
-Scsi_Host_Template driver_template = ACORNSCSI_3;
+static int __init acornscsi_init(void)
+{
+	acornscsi_template.module = THIS_MODULE;
+	scsi_register_module(MODULE_SCSI_HA, &acornscsi_template);
+	if (acornscsi_template.present)
+		return 0;
 
-#include "../../scsi/scsi_module.c"
-#endif
+	scsi_unregister_module(MODULE_SCSI_HA, &acornscsi_template);
+	return -ENODEV;
+}
+
+static void __exit acornscsi_exit(void)
+{
+	scsi_unregister_module(MODULE_SCSI_HA, &acornscsi_template);
+}
+
+module_init(acornscsi_init);
+module_exit(acornscsi_exit);

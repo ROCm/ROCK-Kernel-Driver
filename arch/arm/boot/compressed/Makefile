@@ -30,7 +30,7 @@ OBJS		+= head-shark.o ofw-shark.o
 endif
 
 ifeq ($(CONFIG_ARCH_INTEGRATOR),y)
-OBJS		+= head-netwinder.o
+OBJS		+= head-integrator.o
 endif
 
 ifeq ($(CONFIG_ARCH_FTVPCI),y)

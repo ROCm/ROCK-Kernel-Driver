@@ -70,7 +70,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-static const char version[] __initdata = "ether3 ethernet driver (c) 1995-2000 R.M.King v1.17\n";
+static char version[] __initdata = "ether3 ethernet driver (c) 1995-2000 R.M.King v1.17\n";
 
 #include "ether3.h"
 
@@ -777,7 +777,7 @@ static void __init ether3_banner(void)
 	static unsigned version_printed = 0;
 
 	if (net_debug && version_printed++ == 0)
-		printk(version);
+		printk(KERN_INFO "%s", version);
 }
 
 static const char * __init

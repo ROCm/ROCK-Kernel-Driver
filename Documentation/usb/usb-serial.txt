@@ -245,6 +245,17 @@ Inside Out Networks Edgeport Driver
        Edgeport/16 Dual
 
 
+REINER SCT cyberJack pinpad/e-com USB chipcard reader
+   
+  Interface to ISO 7816 compatible contactbased chipcards, e.g. GSM SIMs.
+  
+Current status:
+  This is the kernel part of the driver for this USB card reader.
+  There is also a user part for a CT-API driver available. A site
+  for downloading is TBA. For now, you can request it from the
+  maintainer (linux-usb@sii.li).
+
+
 Generic Serial driver
 
   If your device is not one of the above listed devices, compatible with

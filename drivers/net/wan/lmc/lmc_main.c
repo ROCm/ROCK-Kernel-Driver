@@ -507,7 +507,12 @@ int lmc_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd) /*fold00*/
                             break;
                     }
                     
-                    LMC_COPY_FROM_USER(data, xc.data, xc.len);
+                    if(copy_from_user(data, xc.data, xc.len))
+                    {
+                    	kfree(data);
+                    	ret = -ENOMEM;
+                    	break;
+                    }
 
                     printk("%s: Starting load of data Len: %d at 0x%p == 0x%p\n", dev->name, xc.len, xc.data, data);
 

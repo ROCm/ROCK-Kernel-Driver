@@ -784,15 +784,21 @@ M:	eis@baty.hanse.de
 L:	linux-x25@vger.kernel.org
 S:	Maintained
 
-LINUX FOR POWERPC
-P:	Cort Dougan
-M:	cort@fsmlabs.com
-W:	http://www.fsmlabs.com/linuxppcbk.html
-S:	Maintained
+LINUX FOR IBM pSERIES (RS/6000)
+P:	Paul Mackerras
+M:	paulus@au.ibm.com
+W:	http://www.ibm.com/linux/ltc/projects/ppc
+S:	Supported
 
-LINUX FOR POWER MACINTOSH
+LINUX FOR POWERPC
 P:	Paul Mackerras
 M:	paulus@samba.org
+W:	http://www.fsmlabs.com/linuxppcbk.html
+S:	Supported
+
+LINUX FOR POWER MACINTOSH
+P:	Benjamin Herrenschmidt
+M:	benh@kernel.crashing.org
 W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
@@ -1461,6 +1467,12 @@ M:	xavyer@ix.netcom.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+
+USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
+M:  linux-usb@sii.li
+L:  linux-usb-users@lists.sourceforge.net
+L:  linux-usb-devel@lists.sourceforge.net
+S:  Supported
 
 USB MASS STORAGE DRIVER
 P:	Matthew Dharm

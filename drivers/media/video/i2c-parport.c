@@ -74,6 +74,10 @@ static void i2c_parport_attach(struct parport *port)
 {
   struct parport_i2c_bus *b = kmalloc(sizeof(struct parport_i2c_bus), 
 				      GFP_KERNEL);
+  if (!b) {
+	  printk(KERN_ERR "i2c_parport: Memory allocation failed. Not attaching.\n");
+	  return;
+  }
   b->i2c = parport_i2c_bus_template;
   b->i2c.data = parport_get_port (port);
   strncpy(b->i2c.name, port->name, 32);

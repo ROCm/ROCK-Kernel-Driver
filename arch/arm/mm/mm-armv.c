@@ -79,36 +79,39 @@ pgd_t *get_pgd_slow(struct mm_struct *mm)
 
 	memzero(new_pgd, FIRST_KERNEL_PGD_NR * sizeof(pgd_t));
 
-	/*
-	 * This lock is here just to satisfy pmd_alloc and pte_lock
-	 */
-	spin_lock(&mm->page_table_lock);
-
-	/*
-	 * On ARM, first page must always be allocated since it contains
-	 * the machine vectors.
-	 */
-	new_pmd = pmd_alloc(mm, new_pgd, 0);
-	if (!new_pmd)
-		goto no_pmd;
-
-	new_pte = pte_alloc(mm, new_pmd, 0);
-	if (!new_pte)
-		goto no_pte;
-
 	init_pgd = pgd_offset_k(0);
-	init_pmd = pmd_offset(init_pgd, 0);
-	init_pte = pte_offset(init_pmd, 0);
 
-	set_pte(new_pte, *init_pte);
+	if (vectors_base() == 0) {
+		init_pmd = pmd_offset(init_pgd, 0);
+		init_pte = pte_offset(init_pmd, 0);
+
+		/*
+		 * This lock is here just to satisfy pmd_alloc and pte_lock
+		 */
+		spin_lock(&mm->page_table_lock);
+
+		/*
+		 * On ARM, first page must always be allocated since it
+		 * contains the machine vectors.
+		 */
+		new_pmd = pmd_alloc(mm, new_pgd, 0);
+		if (!new_pmd)
+			goto no_pmd;
+
+		new_pte = pte_alloc(mm, new_pmd, 0);
+		if (!new_pte)
+			goto no_pte;
+
+		set_pte(new_pte, *init_pte);
+
+		spin_unlock(&mm->page_table_lock);
+	}
 
 	/*
 	 * Copy over the kernel and IO PGD entries
 	 */
-	memcpy(new_pgd  + FIRST_KERNEL_PGD_NR, init_pgd + FIRST_KERNEL_PGD_NR,
+	memcpy(new_pgd + FIRST_KERNEL_PGD_NR, init_pgd + FIRST_KERNEL_PGD_NR,
 		       (PTRS_PER_PGD - FIRST_KERNEL_PGD_NR) * sizeof(pgd_t));
-
-	spin_unlock(&mm->page_table_lock);
 
 	/*
 	 * FIXME: this should not be necessary
@@ -134,25 +137,26 @@ no_pgd:
 
 void free_pgd_slow(pgd_t *pgd)
 {
-	if (pgd) { /* can pgd be NULL? */
-		pmd_t *pmd;
-		pte_t *pte;
+	pmd_t *pmd;
+	pte_t *pte;
 
-		/* pgd is always present and good */
-		pmd = (pmd_t *)pgd;
-		if (pmd_none(*pmd))
-			goto free;
-		if (pmd_bad(*pmd)) {
-			pmd_ERROR(*pmd);
-			pmd_clear(pmd);
-			goto free;
-		}
+	if (!pgd)
+		return;
 
-		pte = pte_offset(pmd, 0);
+	/* pgd is always present and good */
+	pmd = (pmd_t *)pgd;
+	if (pmd_none(*pmd))
+		goto free;
+	if (pmd_bad(*pmd)) {
+		pmd_ERROR(*pmd);
 		pmd_clear(pmd);
-		pte_free(pte);
-		pmd_free(pmd);
+		goto free;
 	}
+
+	pte = pte_offset(pmd, 0);
+	pmd_clear(pmd);
+	pte_free(pte);
+	pmd_free(pmd);
 free:
 	free_pages((unsigned long) pgd, 2);
 }
@@ -296,17 +300,6 @@ void __init memtable_init(struct meminfo *mi)
 
 	init_maps = p = alloc_bootmem_low_pages(PAGE_SIZE);
 
-	p->physical   = virt_to_phys(init_maps);
-	p->virtual    = 0;
-	p->length     = PAGE_SIZE;
-	p->domain     = DOMAIN_USER;
-	p->prot_read  = 0;
-	p->prot_write = 0;
-	p->cacheable  = 1;
-	p->bufferable = 0;
-
-	p ++;
-
 	for (i = 0; i < mi->nr_banks; i++) {
 		if (mi->bank[i].size == 0)
 			continue;
@@ -350,16 +343,9 @@ void __init memtable_init(struct meminfo *mi)
 #endif
 
 	/*
-	 * We may have a mapping in virtual address 0.
-	 * Clear it out.
-	 */
-	clear_mapping(0);
-
-	/*
 	 * Go through the initial mappings, but clear out any
 	 * pgdir entries that are not in the description.
 	 */
-	i = 0;
 	q = init_maps;
 	do {
 		if (address < q->virtual || q == p) {
@@ -374,6 +360,21 @@ void __init memtable_init(struct meminfo *mi)
 			q ++;
 		}
 	} while (address != 0);
+
+	/*
+	 * Create a mapping for the machine vectors at virtual address 0
+	 * or 0xffff0000.  We should always try the high mapping.
+	 */
+	init_maps->physical   = virt_to_phys(init_maps);
+	init_maps->virtual    = vectors_base();
+	init_maps->length     = PAGE_SIZE;
+	init_maps->domain     = DOMAIN_USER;
+	init_maps->prot_read  = 0;
+	init_maps->prot_write = 0;
+	init_maps->cacheable  = 1;
+	init_maps->bufferable = 0;
+
+	create_mapping(init_maps);
 
 	flush_cache_all();
 }

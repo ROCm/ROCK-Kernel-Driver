@@ -2585,15 +2585,15 @@ ohci_pci_remove (struct pci_dev *dev)
 
 /*-------------------------------------------------------------------------*/
 
-static void
-ohci_pci_suspend (struct pci_dev *dev)
+static int
+ohci_pci_suspend (struct pci_dev *dev, u32 state)
 {
 	ohci_t		*ohci = (ohci_t *) dev->driver_data;
 
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
 		dbg ("can't suspend usb-%s (state is %s)", dev->slot_name,
 			hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS));
-		return;
+		return -EIO;
 	}
 
 	/* act as if usb suspend can always be used */
@@ -2605,11 +2605,13 @@ ohci_pci_suspend (struct pci_dev *dev)
 	ohci->hc_control = OHCI_USB_SUSPEND;
 	writel (ohci->hc_control, &ohci->regs->control);
 	wait_ms (10);
+
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
 
-static void
+static int
 ohci_pci_resume (struct pci_dev *dev)
 {
 	ohci_t		*ohci = (ohci_t *) dev->driver_data;
@@ -2620,7 +2622,7 @@ ohci_pci_resume (struct pci_dev *dev)
 	if (atomic_read (&ohci->resume_count) != 1) {
 		err ("concurrent PCI resumes for usb-%s", dev->slot_name);
 		atomic_dec (&ohci->resume_count);
-		return;
+		return -EBUSY;
 	}
 
 	/* did we suspend, or were we powered off? */
@@ -2653,7 +2655,7 @@ ohci_pci_resume (struct pci_dev *dev)
 		if (temp != OHCI_USB_RESUME) {
 			err ("controller usb-%s won't resume", dev->slot_name);
 			ohci->disabled = 1;
-			return;
+			return -EIO;
 		}
 
 		ohci->disabled = 0;
@@ -2676,6 +2678,8 @@ ohci_pci_resume (struct pci_dev *dev)
 
 	/* controller is operational, extra resumes are harmless */
 	atomic_dec (&ohci->resume_count);
+
+	return 0;
 }
 
 #endif	/* CONFIG_PM */

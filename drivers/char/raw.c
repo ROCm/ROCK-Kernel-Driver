@@ -194,7 +194,7 @@ int raw_ctl_ioctl(struct inode *inode,
 			break;
 		
 		minor = rq.raw_minor;
-		if (minor == 0 || minor > MINORMASK) {
+		if (minor <= 0 || minor > MINORMASK) {
 			err = -EINVAL;
 			break;
 		}

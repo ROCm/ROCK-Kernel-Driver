@@ -100,7 +100,7 @@ void show_mem(void)
 extern char _text, _etext, _edata, __bss_start, _end;
 extern char __init_begin, __init_end;
 
-pgd_t swapper_pg_dir[1024];
+pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
 /* It'd be good if these lines were in the standard header file. */
 #define START_PFN	(NODE_DATA(0)->bdata->node_boot_start >> PAGE_SHIFT)
@@ -120,7 +120,7 @@ void __init paging_init(void)
 	/* We don't need kernel mapping as hardware support that. */
 	pg_dir = swapper_pg_dir;
 
-	for (i=0; i < USER_PTRS_PER_PGD*2; i++)
+	for (i=0; i < PTRS_PER_PGD; i++)
 		pgd_val(pg_dir[i]) = 0;
 
 	/* Enable MMU */

@@ -147,7 +147,7 @@ static char *sppp_lcp_type_name (u8 type);
 static char *sppp_ipcp_type_name (u8 type);
 static void sppp_print_bytes (u8 *p, u16 len);
 
-static int debug = 0;
+static int debug;
 
 
 /*
@@ -518,8 +518,10 @@ badreq:
 		}
 		/* Send Configure-Ack packet. */
 		sp->pp_loopcnt = 0;
-		sppp_cp_send (sp, PPP_LCP, LCP_CONF_ACK,
-				h->ident, len-4, h+1);
+		if (sp->lcp.state != LCP_STATE_OPENED) {
+			sppp_cp_send (sp, PPP_LCP, LCP_CONF_ACK,
+					h->ident, len-4, h+1);
+		}
 		/* Change the state. */
 		switch (sp->lcp.state) {
 		case LCP_STATE_CLOSED:
@@ -535,7 +537,9 @@ badreq:
 			sp->ipcp.state = IPCP_STATE_CLOSED;
 			/* Initiate renegotiation. */
 			sppp_lcp_open (sp);
-			/* An ACK has already been sent. */
+			/* Send ACK after our REQ in attempt to break loop */
+			sppp_cp_send (sp, PPP_LCP, LCP_CONF_ACK,
+					h->ident, len-4, h+1);
 			sp->lcp.state = LCP_STATE_ACK_SENT;
 			break;
 		}
@@ -1388,25 +1392,21 @@ static int sppp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_t
 	return 0;
 }
 
-
-struct packet_type sppp_packet_type=
-{
-	0,
-	NULL,
-	sppp_rcv,
-	NULL,
-	NULL
+struct packet_type sppp_packet_type = {
+	type:	__constant_htons(ETH_P_WAN_PPP),
+	func:	sppp_rcv,
 };
 
-
+static const char banner[] __initdata = 
+	KERN_INFO "Cronyx Ltd, Synchronous PPP and CISCO HDLC (c) 1994\n"
+	KERN_INFO "Linux port (c) 1998 Building Number Three Ltd & "
+		  "Jan \"Yenya\" Kasprzak.\n";
 
 static int __init sync_ppp_init(void)
 {
 	if(debug)
 		debug=PP_DEBUG;
-	printk(KERN_INFO "Cronyx Ltd, Synchronous PPP and CISCO HDLC (c) 1994\n");
-	printk(KERN_INFO "Linux port (c) 1998 Building Number Three Ltd & Jan \"Yenya\" Kasprzak.\n");
-	sppp_packet_type.type=htons(ETH_P_WAN_PPP);	
+	printk(banner);
 	dev_add_pack(&sppp_packet_type);
 	return 0;
 }

@@ -753,6 +753,10 @@ static int pt_ioctl(struct inode *inode,struct file *file,
 			pt_rewind(unit);
 			return 0;
 
+		    case MTWEOF:
+			pt_write_fm(unit);
+			return 0;
+
 		    default:	
 			printk("%s: Unimplemented mt_op %d\n",PT.name,
 					mtop.mt_op);

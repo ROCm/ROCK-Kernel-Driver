@@ -1104,7 +1104,7 @@ static void show_task(struct task_struct * p)
 	int state;
 	static const char * stat_nam[] = { "R", "S", "D", "Z", "T", "W" };
 
-	printk("%-8s  ", p->comm);
+	printk("%-13.13s ", p->comm);
 	state = p->state ? ffz(~p->state) + 1 : 0;
 	if (((unsigned) state) < sizeof(stat_nam)/sizeof(char *))
 		printk(stat_nam[state]);
@@ -1132,21 +1132,21 @@ static void show_task(struct task_struct * p)
 		printk("%5d ", p->p_cptr->pid);
 	else
 		printk("      ");
-	if (!p->mm)
-		printk(" (L-TLB) ");
-	else
-		printk(" (NOTLB) ");
 	if (p->p_ysptr)
 		printk("%7d", p->p_ysptr->pid);
 	else
 		printk("       ");
 	if (p->p_osptr)
-		printk(" %5d\n", p->p_osptr->pid);
+		printk(" %5d", p->p_osptr->pid);
 	else
-		printk("\n");
+		printk("      ");
+	if (!p->mm)
+		printk(" (L-TLB)\n");
+	else
+		printk(" (NOTLB)\n");
 
-#if defined(CONFIG_X86) || defined(CONFIG_SPARC64)
-/* This is very useful, but only works on x86 and sparc64 right now */
+#if defined(CONFIG_X86) || defined(CONFIG_SPARC64) || defined(CONFIG_ARM)
+/* This is very useful, but only works on ARM, x86 and sparc64 right now */
 	{
 		extern void show_trace_task(struct task_struct *tsk);
 		show_trace_task(p);

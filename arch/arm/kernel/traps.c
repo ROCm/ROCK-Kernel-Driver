@@ -20,6 +20,7 @@
 #include <linux/mm.h>
 #include <linux/spinlock.h>
 #include <linux/ptrace.h>
+#include <linux/elf.h>
 #include <linux/init.h>
 
 #include <asm/atomic.h>
@@ -27,6 +28,7 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #include "ptrace.h"
 
@@ -143,12 +145,24 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 		c_backtrace(fp, processor_mode(regs));
 }
 
+/*
+ * This is called from SysRq-T (show_task) to display the current
+ * call trace for each process.  Very useful.
+ */
+void show_trace_task(struct task_struct *tsk)
+{
+	if (tsk != current) {
+		unsigned int fp = tsk->thread.save->fp;
+		c_backtrace(fp, 0x10);
+	}
+}
+
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This function is protected against re-entrancy.
  */
-void die(const char *str, struct pt_regs *regs, int err)
+NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 {
 	struct task_struct *tsk = current;
 
@@ -173,9 +187,9 @@ void die(const char *str, struct pt_regs *regs, int err)
 		fs = get_fs();
 		set_fs(KERNEL_DS);
 
-		dump_instr(regs);
 		dump_stack(tsk, (unsigned long)(regs + 1));
 		dump_backtrace(regs, tsk);
+		dump_instr(regs);
 
 		set_fs(fs);
 	}
@@ -448,9 +462,12 @@ void abort(void)
 
 void __init trap_init(void)
 {
-	extern void __trap_init(void);
+	extern void __trap_init(void *);
 
-	__trap_init();
+	__trap_init((void *)vectors_base());
+	if (vectors_base() != 0)
+		printk("Relocating machine vectors to 0x%08x\n",
+			vectors_base());
 #ifdef CONFIG_CPU_32
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 #endif

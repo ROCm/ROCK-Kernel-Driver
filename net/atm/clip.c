@@ -685,8 +685,6 @@ static struct notifier_block clip_inet_notifier = {
 
 static void atmarpd_close(struct atm_vcc *vcc)
 {
-	struct sk_buff *skb;
-
 	DPRINTK("atmarpd_close\n");
 	atmarpd = NULL; /* assumed to be atomic */
 	barrier();
@@ -695,7 +693,7 @@ static void atmarpd_close(struct atm_vcc *vcc)
 	if (skb_peek(&vcc->recvq))
 		printk(KERN_ERR "atmarpd_close: closing with requests "
 		    "pending\n");
-	while ((skb = skb_dequeue(&vcc->recvq))) kfree_skb(skb);
+	skb_queue_purge(&vcc->recvq);
 	DPRINTK("(done)\n");
 }
 

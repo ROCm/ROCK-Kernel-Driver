@@ -99,6 +99,9 @@ static int proc_scsi_write(struct file * file, const char * buf,
 	char * page;
 	char *start;
     
+	if (hpnt->hostt->proc_info == NULL)
+		ret = -ENOSYS;
+
 	if (count > PROC_BLOCK_SIZE)
 		return -EOVERFLOW;
 
@@ -110,11 +113,9 @@ static int proc_scsi_write(struct file * file, const char * buf,
 		return -EFAULT;
 	}
 
-	if (hpnt->hostt->proc_info == NULL)
-		ret = -ENOSYS;
-	else
-		ret = hpnt->hostt->proc_info(page, &start, 0, count,
-						hpnt->host_no, 1);
+	ret = hpnt->hostt->proc_info(page, &start, 0, count,
+				     hpnt->host_no, 1);
+
 	free_page((ulong) page);
 	return(ret);
 }
@@ -125,6 +126,10 @@ void build_proc_dir_entries(Scsi_Host_Template * tpnt)
 	char name[10];	/* see scsi_unregister_host() */
 
 	tpnt->proc_dir = proc_mkdir(tpnt->proc_name, proc_scsi);
+        if (!tpnt->proc_dir) {
+                printk(KERN_ERR "Unable to proc_mkdir in scsi.c/build_proc_dir_entries");
+                return;
+        }
 	tpnt->proc_dir->owner = tpnt->module;
 
 	hpnt = scsi_hostlist;

@@ -31,7 +31,7 @@
 
 struct user_fpu_struct {
 	unsigned long fp_regs[16];
-	unsigned long long xd_regs[8];
+	unsigned long xfp_regs[16];
 	unsigned long fpscr;
 	unsigned long fpul;
 };

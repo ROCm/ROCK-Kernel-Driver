@@ -32,7 +32,7 @@ static void __init check_bugs(void)
 		break;
 	case CPU_SH7750:
 		*p++ = '4';
-		printk("CPU: SH7750\n");
+		printk("CPU: SH7750/SH7751\n");
 		break;
 	case CPU_ST40STB1:
 		*p++ = '4';

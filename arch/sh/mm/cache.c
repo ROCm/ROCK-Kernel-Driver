@@ -151,7 +151,8 @@ detect_cpu_and_cache_system(void)
 #elif defined(__SH4__)
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
 	cpu_data->type = CPU_ST40STB1;
-#elif defined(CONFIG_CPU_SUBTYPE_SH7750)
+#elif defined(CONFIG_CPU_SUBTYPE_SH7750) || \
+      defined(CONFIG_CPU_SUBTYPE_SH7751)
 	cpu_data->type = CPU_SH7750;
 #else
 #error Unknown SH4 CPU type

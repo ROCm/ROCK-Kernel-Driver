@@ -17,7 +17,7 @@
  * Allocate and free page tables.
  */
 
-static __inline__ pgd_t *get_pgd_slow(void)
+static inline pgd_t *get_pgd_slow(void)
 {
 	unsigned int pgd_size = (USER_PTRS_PER_PGD * sizeof(pgd_t));
 	pgd_t *pgd = (pgd_t *)kmalloc(pgd_size, GFP_KERNEL);
@@ -28,7 +28,7 @@ static __inline__ pgd_t *get_pgd_slow(void)
 	return pgd;
 }
 
-static __inline__ pgd_t *get_pgd_fast(void)
+static inline pgd_t *get_pgd_fast(void)
 {
 	unsigned long *ret;
 
@@ -41,14 +41,14 @@ static __inline__ pgd_t *get_pgd_fast(void)
 	return (pgd_t *)ret;
 }
 
-static __inline__ void free_pgd_fast(pgd_t *pgd)
+static inline void free_pgd_fast(pgd_t *pgd)
 {
 	*(unsigned long *)pgd = (unsigned long) pgd_quicklist;
 	pgd_quicklist = (unsigned long *) pgd;
 	pgtable_cache_size++;
 }
 
-static __inline__ void free_pgd_slow(pgd_t *pgd)
+static inline void free_pgd_slow(pgd_t *pgd)
 {
 	kfree(pgd);
 }
@@ -69,33 +69,33 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long addr
 
 	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
 		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
+		ret[0] = 0;
 		pgtable_cache_size--;
 	}
 	return (pte_t *)ret;
 }
 
-static __inline__ void pte_free_fast(pte_t *pte)
+static inline void pte_free_fast(pte_t *pte)
 {
 	*(unsigned long *)pte = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	pgtable_cache_size++;
 }
 
-static __inline__ void pte_free_slow(pte_t *pte)
+static inline void pte_free_slow(pte_t *pte)
 {
 	free_page((unsigned long)pte);
 }
 
-#define pte_free(pte)		pte_free_slow(pte)
-#define pgd_free(pgd)		free_pgd_slow(pgd)
+#define pte_free(pte)		pte_free_fast(pte)
+#define pgd_free(pgd)		free_pgd_fast(pgd)
 #define pgd_alloc(mm)		get_pgd_fast()
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
  */
-static __inline__ void pmd_free(pmd_t * pmd)
+static inline void pmd_free(pmd_t * pmd)
 {
 }
 
@@ -116,7 +116,7 @@ extern int do_check_pgt_cache(int, int);
  *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
  *  - flush_tlb_page(vma, vmaddr) flushes one page
  *  - flush_tlb_range(mm, start, end) flushes a range of pages
- *
+ *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  */
 
 extern void flush_tlb(void);
@@ -126,9 +126,9 @@ extern void flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			    unsigned long end);
 extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long page);
 
-static __inline__ void flush_tlb_pgtables(struct mm_struct *mm,
-					  unsigned long start, unsigned long end)
-{
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
+				      unsigned long start, unsigned long end)
+{ /* Nothing to do */
 }
 
 #endif /* __ASM_SH_PGALLOC_H */

@@ -38,7 +38,10 @@ void drm_dma_setup(drm_device_t *dev)
 {
 	int i;
 	
-	dev->dma = drm_alloc(sizeof(*dev->dma), DRM_MEM_DRIVER);
+	if (!(dev->dma = drm_alloc(sizeof(*dev->dma), DRM_MEM_DRIVER))) {
+                printk(KERN_ERR "drm_dma_setup: can't drm_alloc dev->dma");
+                return;
+        }       
 	memset(dev->dma, 0, sizeof(*dev->dma));
 	for (i = 0; i <= DRM_MAX_ORDER; i++)
 		memset(&dev->dma->bufs[i], 0, sizeof(dev->dma->bufs[0]));

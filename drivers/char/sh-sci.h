@@ -46,7 +46,7 @@
 # define SCPDR  0xA4000136 /* 8  bit SCI and SCIF */
 # define SCSCR_INIT(port)          0x30 /* TIE=0,RIE=0,TE=1,RE=1 */
 # define SCI_AND_SCIF
-#elif defined(CONFIG_CPU_SUBTYPE_SH7750)
+#elif defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751)
 # define SCI_NPORTS 2
 # define SCI_INIT { \
   { {}, PORT_SCI,  0xffe00000, SCI_IRQS,      sci_init_pins_sci  }, \
@@ -294,7 +294,7 @@ static inline int sci_rxd_in(struct sci_port *port)
 		return ctrl_inb(SCPDR)&0x04 ? 1 : 0; /* IRDA */
 	return 1;
 }
-#elif defined(CONFIG_CPU_SUBTYPE_SH7750)
+#elif defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751)
 static inline int sci_rxd_in(struct sci_port *port)
 {
 #ifndef SCIF_ONLY

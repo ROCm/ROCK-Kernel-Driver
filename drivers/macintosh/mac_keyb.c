@@ -305,7 +305,7 @@ int mackbd_translate(unsigned char keycode, unsigned char *keycodep,
 	return 1;
 }
 
-int mackbd_unexpected_up(unsigned char keycode)
+char mackbd_unexpected_up(unsigned char keycode)
 {
 	return 0x80;
 }

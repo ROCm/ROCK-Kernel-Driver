@@ -1633,38 +1633,44 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	u_long iobase = dev->base_addr;
 	int i, j, status = 0;
 	u_char csr;
-	union {
+	union ewrk3_addr {
 		u_char addr[HASH_TABLE_LEN * ETH_ALEN];
 		u_short val[(HASH_TABLE_LEN * ETH_ALEN) >> 1];
-	} tmp;
+	};
+	
+	union ewrk3_addr *tmp;
+
+	tmp = kmalloc(sizeof(union ewrk3_addr), GFP_KERNEL);
+	if(tmp==NULL)
+		return -ENOMEM;
 
 	switch (ioc->cmd) {
 	case EWRK3_GET_HWADDR:	/* Get the hardware address */
 		for (i = 0; i < ETH_ALEN; i++) {
-			tmp.addr[i] = dev->dev_addr[i];
+			tmp->addr[i] = dev->dev_addr[i];
 		}
 		ioc->len = ETH_ALEN;
-		if (copy_to_user(ioc->data, tmp.addr, ioc->len)) {
+		if (copy_to_user(ioc->data, tmp->addr, ioc->len))
 			status = -EFAULT;
-			break;
-		}
+		break;
+		
 	case EWRK3_SET_HWADDR:	/* Set the hardware address */
 		if (capable(CAP_NET_ADMIN)) {
-				csr = inb(EWRK3_CSR);
-				csr |= (CSR_TXD | CSR_RXD);
-				outb(csr, EWRK3_CSR);	/* Disable the TX and RX */
+			csr = inb(EWRK3_CSR);
+			csr |= (CSR_TXD | CSR_RXD);
+			outb(csr, EWRK3_CSR);	/* Disable the TX and RX */
 
-				if (copy_from_user(tmp.addr, ioc->data, ETH_ALEN)) {
-					status = -EFAULT;
-					break;
-				}
-				for (i = 0; i < ETH_ALEN; i++) {
-					dev->dev_addr[i] = tmp.addr[i];
-					outb(tmp.addr[i], EWRK3_PAR0 + i);
-				}
+			if (copy_from_user(tmp->addr, ioc->data, ETH_ALEN)) {
+				status = -EFAULT;
+				break;
+			}
+			for (i = 0; i < ETH_ALEN; i++) {
+				dev->dev_addr[i] = tmp->addr[i];
+				outb(tmp->addr[i], EWRK3_PAR0 + i);
+			}
 
-				csr &= ~(CSR_TXD | CSR_RXD);	/* Enable the TX and RX */
-				outb(csr, EWRK3_CSR);
+			csr &= ~(CSR_TXD | CSR_RXD);	/* Enable the TX and RX */
+			outb(csr, EWRK3_CSR);
 		} else {
 			status = -EPERM;
 		}
@@ -1691,32 +1697,28 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		}
 
 		break;
-	case EWRK3_SAY_BOO:	/* Say "Boo!" to the kernel log file */
-		printk("%s: Boo!\n", dev->name);
-
-		break;
 	case EWRK3_GET_MCA:	/* Get the multicast address table */
 		spin_lock_irq(&lp->hw_lock);
 		if (lp->shmem_length == IO_ONLY) {
 			outb(0, EWRK3_IOPR);
 			outw(PAGE0_HTE, EWRK3_PIR1);
 			for (i = 0; i < (HASH_TABLE_LEN >> 3); i++) {
-				tmp.addr[i] = inb(EWRK3_DATA);
+				tmp->addr[i] = inb(EWRK3_DATA);
 			}
 		} else {
 			outb(0, EWRK3_MPR);
-			isa_memcpy_fromio(tmp.addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
+			isa_memcpy_fromio(tmp->addr, lp->shmem_base + PAGE0_HTE, (HASH_TABLE_LEN >> 3));
 		}
 		spin_unlock_irq(&lp->hw_lock);
 
 		ioc->len = (HASH_TABLE_LEN >> 3);
-		if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+		if (copy_to_user(ioc->data, tmp->addr, ioc->len))
 			status = -EFAULT;
 
 		break;
 	case EWRK3_SET_MCA:	/* Set a multicast address */
 		if (capable(CAP_NET_ADMIN)) {
-			if (copy_from_user(tmp.addr, ioc->data, ETH_ALEN * ioc->len)) {
+			if (copy_from_user(tmp->addr, ioc->data, ETH_ALEN * ioc->len)) {
 				status = -EFAULT;
 				break;
 			}
@@ -1764,18 +1766,18 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		break;
 	case EWRK3_GET_CSR:	/* Get the CSR Register contents */
-		tmp.addr[0] = inb(EWRK3_CSR);
+		tmp->addr[0] = inb(EWRK3_CSR);
 		ioc->len = 1;
-		if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+		if (copy_to_user(ioc->data, tmp->addr, ioc->len))
 			status = -EFAULT;
 		break;
 	case EWRK3_SET_CSR:	/* Set the CSR Register contents */
 		if (capable(CAP_NET_ADMIN)) {
-			if (copy_from_user(tmp.addr, ioc->data, 1)) {
+			if (copy_from_user(tmp->addr, ioc->data, 1)) {
 				status = -EFAULT;
 				break;
 			}
-			outb(tmp.addr[0], EWRK3_CSR);
+			outb(tmp->addr[0], EWRK3_CSR);
 		} else {
 			status = -EPERM;
 		}
@@ -1784,15 +1786,15 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case EWRK3_GET_EEPROM:	/* Get the EEPROM contents */
 		if (capable(CAP_NET_ADMIN)) {
 			for (i = 0; i < (EEPROM_MAX >> 1); i++) {
-				tmp.val[i] = (short) Read_EEPROM(iobase, i);
+				tmp->val[i] = (short) Read_EEPROM(iobase, i);
 			}
 			i = EEPROM_MAX;
-			tmp.addr[i++] = inb(EWRK3_CMR);		/* Config/Management Reg. */
+			tmp->addr[i++] = inb(EWRK3_CMR);		/* Config/Management Reg. */
 			for (j = 0; j < ETH_ALEN; j++) {
-				tmp.addr[i++] = inb(EWRK3_PAR0 + j);
+				tmp->addr[i++] = inb(EWRK3_PAR0 + j);
 			}
 			ioc->len = EEPROM_MAX + 1 + ETH_ALEN;
-			if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+			if (copy_to_user(ioc->data, tmp->addr, ioc->len))
 				status = -EFAULT;
 		} else {
 			status = -EPERM;
@@ -1801,12 +1803,12 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 	case EWRK3_SET_EEPROM:	/* Set the EEPROM contents */
 		if (capable(CAP_NET_ADMIN)) {
-			if (copy_from_user(tmp.addr, ioc->data, EEPROM_MAX)) {
+			if (copy_from_user(tmp->addr, ioc->data, EEPROM_MAX)) {
 				status = -EFAULT;
 				break;
 			}
 			for (i = 0; i < (EEPROM_MAX >> 1); i++) {
-				Write_EEPROM(tmp.val[i], iobase, i);
+				Write_EEPROM(tmp->val[i], iobase, i);
 			}
 		} else {
 			status = -EPERM;
@@ -1814,9 +1816,9 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 		break;
 	case EWRK3_GET_CMR:	/* Get the CMR Register contents */
-		tmp.addr[0] = inb(EWRK3_CMR);
+		tmp->addr[0] = inb(EWRK3_CMR);
 		ioc->len = 1;
-		if (copy_to_user(ioc->data, tmp.addr, ioc->len))
+		if (copy_to_user(ioc->data, tmp->addr, ioc->len))
 			status = -EFAULT;
 		break;
 	case EWRK3_SET_TX_CUT_THRU:	/* Set TX cut through mode */
@@ -1838,7 +1840,7 @@ static int ewrk3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	default:
 		status = -EOPNOTSUPP;
 	}
-
+	kfree(tmp);
 	return status;
 }
 

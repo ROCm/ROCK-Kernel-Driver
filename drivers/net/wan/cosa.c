@@ -1046,15 +1046,15 @@ static inline int cosa_download(struct cosa_data *cosa, struct cosa_download *d)
 	    __get_user(code, &(d->code)))
 		return -EFAULT;
 
-	if (d->addr < 0 || d->addr > COSA_MAX_FIRMWARE_SIZE)
+	if (addr < 0 || addr > COSA_MAX_FIRMWARE_SIZE)
 		return -EINVAL;
-	if (d->len < 0 || d->len > COSA_MAX_FIRMWARE_SIZE)
+	if (len < 0 || len > COSA_MAX_FIRMWARE_SIZE)
 		return -EINVAL;
 
 	/* If something fails, force the user to reset the card */
 	cosa->firmware_status &= ~(COSA_FW_RESET|COSA_FW_DOWNLOAD);
 
-	if ((i=download(cosa, d->code, len, addr)) < 0) {
+	if ((i=download(cosa, code, len, addr)) < 0) {
 		printk(KERN_NOTICE "cosa%d: microcode download failed: %d\n",
 			cosa->num, i);
 		return -EIO;

@@ -2897,16 +2897,18 @@ _static int __init uhci_start_usb (uhci_t *s)
 }
 
 #ifdef CONFIG_PM
-_static void
-uhci_pci_suspend (struct pci_dev *dev)
+_static int
+uhci_pci_suspend (struct pci_dev *dev, u32 state)
 {
 	reset_hc((uhci_t *) dev->driver_data);
+	return 0;
 }
 
-_static void
+_static int
 uhci_pci_resume (struct pci_dev *dev)
 {
 	start_hc((uhci_t *) dev->driver_data);
+	return 0;
 }
 #endif
 

@@ -51,6 +51,16 @@ const char *quirk_drives[] = {
 };
 
 const char *bad_ata100_5[] = {
+	"IBM-DTLA-307075",
+	"IBM-DTLA-307060",
+	"IBM-DTLA-307045",
+	"IBM-DTLA-307030",
+	"IBM-DTLA-307020",
+	"IBM-DTLA-307015",
+	"IBM-DTLA-305040",
+	"IBM-DTLA-305030",
+	"IBM-DTLA-305020",
+	"WDC AC310200R",
 	NULL
 };
 

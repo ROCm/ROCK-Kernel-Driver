@@ -390,7 +390,7 @@ kbd_wontreset:
 		kbd_state, keyval);
 #endif
 	mdelay(1);
-	inb(IOC_KARTRX);
+	ioc_readb(IOC_KARTRX);
 	a5kkbd_sendbyte (HRST);
 	kbd_state = KBD_INITRST;
 	return 0;
@@ -407,13 +407,13 @@ kbd_error:
 static void a5kkbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	kbd_pt_regs = regs;
-	if (handle_rawcode(inb(IOC_KARTRX)))
+	if (handle_rawcode(ioc_readb(IOC_KARTRX)))
 		tasklet_schedule(&keyboard_tasklet);
 }
 
 static void a5kkbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
-	outb (kbd_txval[kbd_txtail], IOC_KARTTX);
+	ioc_writeb (kbd_txval[kbd_txtail], IOC_KARTTX);
 	KBD_INCTXPTR(kbd_txtail);
 	if (kbd_txtail == kbd_txhead)
 		disable_irq(irq);
@@ -431,7 +431,7 @@ void __init a5kkbd_init_hw (void)
 
 	if (request_irq (IRQ_KEYBOARDTX, a5kkbd_tx, 0, "keyboard", NULL) != 0)
 		panic("Could not allocate keyboard transmit IRQ!");
-	(void)inb(IOC_KARTRX);
+	(void)ioc_readb(IOC_KARTRX);
 	if (request_irq (IRQ_KEYBOARDRX, a5kkbd_rx, 0, "keyboard", NULL) != 0)
 		panic("Could not allocate keyboard receive IRQ!");
 

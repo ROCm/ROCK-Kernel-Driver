@@ -172,8 +172,10 @@ static int wss_set_codec_fmt(struct net_device *dev, struct sm_state *sm, unsign
 		/* MCE and interface config reg */
 		write_codec(dev, 0x49, fdx ? 0x8 : 0xc);
 	outb(0xb, WSS_CODEC_IA(dev->base_addr)); /* leave MCE */
-	if (SCSTATE->crystal && !fullcalib)
+	if (SCSTATE->crystal && !fullcalib) {
+		restore_flags(flags);
 		return 0;
+	}
 	/*
 	 * wait for ACI start
 	 */

@@ -6,6 +6,7 @@
  *  With additional hacking by Jeffrey Kuskin (jsk@mojave.stanford.edu)
  *  Modified by Danilo Beuche 1998
  *  Some register values added by Damien Doligez, INRIA Rocquencourt
+ *  Various cleanups by Paul Mundt (lethal@chaoticdreams.org)
  *
  *  This file was written by Ryan Nielsen (ran@krazynet.com)
  *  Most of the frame buffer device stuff was copied from atyfb.c
@@ -378,6 +379,7 @@ enum {
 #define CURSOR_DRAW_DELAY	2
 
 static int currcon = 0;
+static int inverse = 0;
 static char fontname[40] __initdata = { 0 };
 static char curblink __initdata = 1;
 static char noaccel __initdata = 0;
@@ -1235,7 +1237,6 @@ imsttfb_setcolreg (u_int regno, u_int red, u_int green, u_int blue,
 {
 	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
 	u_int bpp = fb_display[currcon].var.bits_per_pixel;
-	u_int i;
 
 	if (regno > 255)
 		return 1;
@@ -1413,7 +1414,7 @@ set_disp (struct display *disp, struct fb_info_imstt *p)
 	disp->type_aux = p->fix.type_aux;
 	disp->line_length = disp->var.xres * (disp->var.bits_per_pixel >> 3);
 	disp->can_soft_blank = 1;
-	disp->inverse = 0;
+	disp->inverse = inverse;
 	disp->ypanstep = 1;
 	disp->ywrapstep = 0;
 	if (accel) {
@@ -1887,7 +1888,6 @@ imsttfb_init(void)
 	struct pci_dev *pdev = NULL;
 	struct fb_info_imstt *p;
 	unsigned long addr, size;
-	__u16 cmd;
 
 	while ((pdev = pci_find_device(PCI_VENDOR_ID_IMS, PCI_ANY_ID, pdev))) {
 		if ((pdev->class >> 16) != PCI_BASE_CLASS_DISPLAY)
@@ -1963,6 +1963,9 @@ imsttfb_setup(char *options)
 			curblink = 0;
 		} else if (!strncmp(this_opt, "noaccel", 7)) {
 			noaccel = 1;
+		} else if (!strncmp(this_opt, "inverse", 7)) {
+			inverse = 1;
+			fb_invert_cmaps();
 		}
 #if defined(CONFIG_PPC)
 		else if (!strncmp(this_opt, "vmode:", 6)) {
@@ -1994,16 +1997,8 @@ imsttfb_setup(char *options)
 }
 
 #else /* MODULE */
-
-int __init
-init_module (void)
-{
-
-	return imsttfb_init();
-}
-
-void
-cleanup_module (void)
+static void __exit
+imsttfb_exit(void)
 {
 	struct fb_info_imstt *p;
 	__u32 i;
@@ -2012,13 +2007,18 @@ cleanup_module (void)
 		p = fb_info_imstt_p[i];
 		if (!p)
 			continue;
+		unregister_framebuffer(&p->info);
 		iounmap(p->cmap_regs);
 		iounmap(p->dc_regs);
 		iounmap(p->frame_buffer);
-		kfree(p);
 		release_mem_region(p->frame_buffer_phys, p->board_size);
+		kfree(p);
 	}
 }
 
 #include "macmodes.c"
+
+module_init(imsttfb_init);
+module_exit(imsttfb_exit);
 #endif /* MODULE */
+

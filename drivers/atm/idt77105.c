@@ -144,18 +144,18 @@ static void idt77105_restart_timer_func(unsigned long dummy)
 static int fetch_stats(struct atm_dev *dev,struct idt77105_stats *arg,int zero)
 {
 	unsigned long flags;
-	int error;
+	struct idt77105_stats stats;
 
-	error = 0;
 	save_flags(flags);
 	cli();
-	if (arg)
-		error = copy_to_user(arg,&PRIV(dev)->stats,
-		    sizeof(struct idt77105_stats));
-	if (zero && !error)
-		memset(&PRIV(dev)->stats,0,sizeof(struct idt77105_stats));
+	memcpy(&stats, &PRIV(dev)->stats, sizeof(struct idt77105_stats));
+	if (zero)
+		memset(&PRIV(dev)->stats, 0, sizeof(struct idt77105_stats));
 	restore_flags(flags);
-	return error ? -EFAULT : sizeof(struct idt77105_stats);
+	if (arg == NULL)
+		return 0;
+	return copy_to_user(arg, &PRIV(dev)->stats,
+		    sizeof(struct idt77105_stats)) ? -EFAULT : 0;
 }
 
 

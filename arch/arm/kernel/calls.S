@@ -13,6 +13,7 @@
 #define NR_syscalls 256
 #else
 
+__syscall_start:
 /* 0 */		.long	SYMBOL_NAME(sys_ni_syscall)
 		.long	SYMBOL_NAME(sys_exit)
 		.long	SYMBOL_NAME(sys_fork_wrapper)
@@ -176,7 +177,7 @@
 /* 160 */	.long	SYMBOL_NAME(sys_sched_get_priority_min)
 		.long	SYMBOL_NAME(sys_sched_rr_get_interval)
 		.long	SYMBOL_NAME(sys_nanosleep)
-		.long	SYMBOL_NAME(sys_mremap)
+		.long	SYMBOL_NAME(sys_arm_mremap)
 		.long	SYMBOL_NAME(sys_setresuid16)
 /* 165 */	.long	SYMBOL_NAME(sys_getresuid16)
 		.long	SYMBOL_NAME(sys_ni_syscall)
@@ -231,8 +232,13 @@
 /* 215 */	.long	SYMBOL_NAME(sys_setfsuid)
 		.long	SYMBOL_NAME(sys_setfsgid)
 		.long	SYMBOL_NAME(sys_getdents64)
+		.long	SYMBOL_NAME(sys_pivot_root)
+		.long	SYMBOL_NAME(sys_mincore)
+/* 220 */	.long	SYMBOL_NAME(sys_madvise)
+		.long	SYMBOL_NAME(sys_fcntl64)
+__syscall_end:
 
-		.rept	NR_syscalls-217
+		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4
 			.long	SYMBOL_NAME(sys_ni_syscall)
 		.endr
 #endif

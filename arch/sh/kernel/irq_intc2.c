@@ -45,7 +45,7 @@ static unsigned int startup_intc2_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type intc2_irq_type = {
-	"INTC2-based-IRQ",
+	"INTC2-IRQ",
 	startup_intc2_irq,
 	shutdown_intc2_irq,
 	enable_intc2_irq,

@@ -1488,7 +1488,11 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
 		default:
 #ifdef CONFIG_NETFILTER
 		{
-			int val, len = *optlen;
+			int val, len;
+			
+			if(get_user(len, optlen))
+				return -EFAULT;
+			
 			val = nf_getsockopt(sk, PF_DECnet, optname, 
 							optval, &len);
 			if (val >= 0)

@@ -489,8 +489,9 @@ __sct:	.long	SYMBOL_NAME(sys_call_table)
 __syscall_ret_trace:
 	.long	syscall_ret_trace
 __syscall_ret:
-	.long	SYMBOL_NAME(syscall_ret)
-
+	.long	syscall_ret
+__INV_IMASK:
+	.long	0xffffff0f	! ~(IMASK)
 
 
 	.align	2
@@ -502,30 +503,16 @@ reschedule:
 	.align	2
 1:	.long	SYMBOL_NAME(schedule)
 
-ENTRY(ret_from_irq)
+ret_from_irq:
+ret_from_exception:
 	mov	#OFF_SR, r0
 	mov.l	@(r0,r15), r0	! get status register
 	shll	r0
 	shll	r0		! kernel space?
 	bt	restore_all	! Yes, it's from kernel, go back soon
 	!
-	STI()
-	bra	ret_with_reschedule
-	 nop
-
-ENTRY(ret_from_exception)
-	mov	#OFF_SR, r0
-	mov.l	@(r0,r15), r0	! get status register
-	shll	r0
-	shll	r0		! kernel space?
-	bt	restore_all	! Yes, it's from kernel, go back soon
-	!
-	STI()
 	bra	ret_from_syscall
 	 nop
-	.align	2
-__INV_IMASK:
-	.long	0xffffff0f	! ~(IMASK)
 
 	.align 2
 #ifdef COMPAT_OLD_SYSCALL_ABI
@@ -538,16 +525,11 @@ syscall_ret:
 	/* fall through */
 
 ENTRY(ret_from_syscall)
-	mov.l	__irq_stat, r0	! softirq_active
-	mov.l	@r0, r1
-	mov.l	@(4,r0), r2	! softirq_mask
-	tst	r2, r1
-	bt	ret_with_reschedule
-handle_softirq:
-	mov.l	__do_softirq, r0
-	jsr	@r0
-	 nop
-ret_with_reschedule:
+	/* CLI */
+	stc	sr, r0
+	or	#0xf0, r0
+	ldc	r0, sr
+	!
 	stc	k_current, r1
 	mov.l	@(need_resched,r1), r0
 	tst	r0, r0
@@ -567,8 +549,6 @@ __do_signal:
 	.long	SYMBOL_NAME(do_signal)
 __irq_stat:
 	.long	SYMBOL_NAME(irq_stat)
-__do_softirq:
-	.long	SYMBOL_NAME(do_softirq)
 
 	.align 2
 restore_all:
@@ -707,7 +687,7 @@ general_exception:
 	bra	handle_exception
 	 mov.l	@k2, k2
 	.align	2
-2:	.long	SYMBOL_NAME(ret_from_exception)
+2:	.long	ret_from_exception
 1:	.long	EXPEVT
 !
 !
@@ -728,8 +708,8 @@ interrupt:
 	.align	2
 1:	.long	EXPEVT
 2:	.long	INTEVT
-3:	.long	SYMBOL_NAME(ret_from_irq)
-4:	.long	SYMBOL_NAME(ret_from_exception)
+3:	.long	ret_from_irq
+4:	.long	ret_from_exception
 
 !
 !
@@ -941,24 +921,143 @@ ENTRY(interrupt_table)
 	.long   SYMBOL_NAME(do_IRQ)	! 63      pcc1i
 #endif
 #elif defined(__SH4__)
-	.long	SYMBOL_NAME(do_IRQ)	! Hitachi UDI
-	.long	SYMBOL_NAME(do_IRQ)	! GPIO
-	.long	SYMBOL_NAME(do_IRQ)	! DMAC dmte0
-	.long	SYMBOL_NAME(do_IRQ)	!      dmte1
-	.long	SYMBOL_NAME(do_IRQ)	!      dmte2
-	.long	SYMBOL_NAME(do_IRQ)	!      dmte3
-	.long	SYMBOL_NAME(do_IRQ)	!      dmae
-	.long	SYMBOL_NAME(do_IRQ)
-	.long	SYMBOL_NAME(do_IRQ)	! SCIF eri
-	.long	SYMBOL_NAME(do_IRQ)	!      rxi
-	.long	SYMBOL_NAME(do_IRQ)	!      bri
-	.long	SYMBOL_NAME(do_IRQ)	!      txi
+	.long	SYMBOL_NAME(do_IRQ)	! 32 Hitachi UDI
+	.long	SYMBOL_NAME(do_IRQ)	! 33 GPIO
+	.long	SYMBOL_NAME(do_IRQ)	! 34 DMAC dmte0
+	.long	SYMBOL_NAME(do_IRQ)	! 35      dmte1
+	.long	SYMBOL_NAME(do_IRQ)	! 36      dmte2
+	.long	SYMBOL_NAME(do_IRQ)	! 37      dmte3
+	.long	SYMBOL_NAME(do_IRQ)	! 38      dmae
+	.long	error			! 39
+	.long	SYMBOL_NAME(do_IRQ)	! 40 SCIF eri
+	.long	SYMBOL_NAME(do_IRQ)	! 41      rxi
+	.long	SYMBOL_NAME(do_IRQ)	! 42      bri
+	.long	SYMBOL_NAME(do_IRQ)	! 43      txi
+	.long	error			! 44
+	.long	error			! 45
+	.long	error			! 46
+	.long	error			! 47
+	.long	SYMBOL_NAME(do_fpu_state_restore)	! 48
+	.long	SYMBOL_NAME(do_fpu_state_restore)	! 49
+#endif
+#if defined(CONFIG_CPU_SUBTYPE_SH7751)
 	.long	error
 	.long	error
 	.long	error
 	.long	error
-	.long	SYMBOL_NAME(do_fpu_state_restore)
-	.long	SYMBOL_NAME(do_fpu_state_restore)
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	error
+	.long	SYMBOL_NAME(do_IRQ)	! PCI serr
+	.long	SYMBOL_NAME(do_IRQ)	!     dma3
+	.long	SYMBOL_NAME(do_IRQ)	!     dma2
+	.long	SYMBOL_NAME(do_IRQ)	!     dma1
+	.long	SYMBOL_NAME(do_IRQ)	!     dma0
+	.long	SYMBOL_NAME(do_IRQ)	!     pwon
+	.long	SYMBOL_NAME(do_IRQ)	!     pwdwn
+	.long	SYMBOL_NAME(do_IRQ)	!     err
+#elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+	.long	error			!  50 0x840
+	.long	error			!  51 0x860
+	.long	error			!  52 0x880
+	.long	error			!  53 0x8a0
+	.long	error			!  54 0x8c0
+	.long	error			!  55 0x8e0
+	.long	error			!  56 0x900
+	.long	error			!  57 0x920
+	.long	error			!  58 0x940
+	.long	error			!  59 0x960
+	.long	error			!  60 0x980
+	.long	error			!  61 0x9a0
+	.long	error			!  62 0x9c0
+	.long	error			!  63 0x9e0
+	.long	SYMBOL_NAME(do_IRQ)	!  64 0xa00 PCI serr
+	.long	SYMBOL_NAME(do_IRQ)	!  65 0xa20     err
+	.long	SYMBOL_NAME(do_IRQ)	!  66 0xa40     ad
+	.long	SYMBOL_NAME(do_IRQ)	!  67 0xa60     pwr_dwn
+	.long	error			!  68 0xa80
+	.long	error			!  69 0xaa0
+	.long	error			!  70 0xac0
+	.long	error			!  71 0xae0
+	.long	SYMBOL_NAME(do_IRQ)	!  72 0xb00 DMA INT0
+	.long	SYMBOL_NAME(do_IRQ)	!  73 0xb20     INT1
+	.long	SYMBOL_NAME(do_IRQ)	!  74 0xb40     INT2
+	.long	SYMBOL_NAME(do_IRQ)	!  75 0xb60     INT3
+	.long	SYMBOL_NAME(do_IRQ)	!  76 0xb80     INT4
+	.long	error			!  77 0xba0
+	.long	SYMBOL_NAME(do_IRQ)	!  78 0xbc0 DMA ERR
+	.long	error			!  79 0xbe0
+	.long	SYMBOL_NAME(do_IRQ)	!  80 0xc00 PIO0
+	.long	SYMBOL_NAME(do_IRQ)	!  81 0xc20 PIO1
+	.long	SYMBOL_NAME(do_IRQ)	!  82 0xc40 PIO2
+	.long	error			!  83 0xc60
+	.long	error			!  84 0xc80
+	.long	error			!  85 0xca0
+	.long	error			!  86 0xcc0
+	.long	error			!  87 0xce0
+	.long	error			!  88 0xd00
+	.long	error			!  89 0xd20
+	.long	error			!  90 0xd40
+	.long	error			!  91 0xd60
+	.long	error			!  92 0xd80
+	.long	error			!  93 0xda0
+	.long	error			!  94 0xdc0
+	.long	error			!  95 0xde0
+	.long	error			!  96 0xe00
+	.long	error			!  97 0xe20
+	.long	error			!  98 0xe40
+	.long	error			!  99 0xe60
+	.long	error			! 100 0xe80
+	.long	error			! 101 0xea0
+	.long	error			! 102 0xec0
+	.long	error			! 103 0xee0
+	.long	error			! 104 0xf00
+	.long	error			! 105 0xf20
+	.long	error			! 106 0xf40
+	.long	error			! 107 0xf60
+	.long	error			! 108 0xf80
+	.long	error			! 109 0xfa0
+	.long	error			! 110 0xfc0
+	.long	error			! 111 0xfe0
+	.long	SYMBOL_NAME(do_IRQ)	! 112 0x1000 Mailbox
+	.long	error			! 113 0x1020
+	.long	error			! 114 0x1040
+	.long	error			! 115 0x1060
+	.long	error			! 116 0x1080
+	.long	error			! 117 0x10a0
+	.long	error			! 118 0x10c0
+	.long	error			! 119 0x10e0
+	.long	error			! 120 0x1100
+	.long	error			! 121 0x1120
+	.long	error			! 122 0x1140
+	.long	error			! 123 0x1160
+	.long	error			! 124 0x1180
+	.long	error			! 125 0x11a0
+	.long	error			! 126 0x11c0
+	.long	error			! 127 0x11e0
+	.long	error			! 128 0x1200
+	.long	error			! 129 0x1220
+	.long	error			! 130 0x1240
+	.long	error			! 131 0x1260
+	.long	error			! 132 0x1280
+	.long	error			! 133 0x12a0
+	.long	error			! 134 0x12c0
+	.long	error			! 135 0x12e0
+	.long	error			! 136 0x1300
+	.long	error			! 137 0x1320
+	.long	error			! 138 0x1340
+	.long	error			! 139 0x1360
+	.long	SYMBOL_NAME(do_IRQ)	! 140 0x1380 EMPI INV_ADDR
+	.long	error			! 141 0x13a0
+	.long	error			! 142 0x13c0
+	.long	error			! 143 0x13e0
 #endif
 
 ENTRY(sys_call_table)

@@ -875,6 +875,9 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 	} else {
 		agp_segment *segment;
 
+		if (reserve.seg_count >= 16384)
+			return -EINVAL;
+			
 		segment = kmalloc((sizeof(agp_segment) * reserve.seg_count),
 				  GFP_KERNEL);
 

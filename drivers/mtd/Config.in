@@ -26,14 +26,15 @@ comment 'User Modules And Translation Layers'
    if [ "$CONFIG_NFTL" = "y" -o "$CONFIG_NFTL" = "m" ]; then
       bool '    Write support for NFTL (BETA)' CONFIG_NFTL_RW
    fi
+
+   source drivers/mtd/chips/Config.in
+
+   source drivers/mtd/maps/Config.in
+
+   source drivers/mtd/devices/Config.in
+
+   source drivers/mtd/nand/Config.in
+
 fi
-
-source drivers/mtd/chips/Config.in
-
-source drivers/mtd/maps/Config.in
-
-source drivers/mtd/devices/Config.in
-
-source drivers/mtd/nand/Config.in
 
 endmenu

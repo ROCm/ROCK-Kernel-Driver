@@ -141,6 +141,31 @@ static u32 __init r2p2(u32 num)
 	return tmp;
 }
 
+static void __init pci_fixup_ide_bases(struct pci_dev *d)
+{
+	int i;
+
+	/*
+	 * PCI IDE controllers use non-standard I/O port decoding, respect it.
+	 */
+	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
+		return;
+	printk("PCI: IDE base address fixup for %s\n", d->slot_name);
+	for(i=0; i<4; i++) {
+		struct resource *r = &d->resource[i];
+		if ((r->start & ~0x80) == 0x374) {
+			r->start |= 2;
+			r->end = r->start;
+		}
+	}
+}
+
+
+/* Add future fixups here... */
+struct pci_fixup pcibios_fixups[] = {
+	{ PCI_FIXUP_HEADER,	PCI_ANY_ID,	PCI_ANY_ID,	pci_fixup_ide_bases },
+	{ 0 }
+};
 
 int __init st40pci_init(unsigned memStart, unsigned memSize)
 {
@@ -232,6 +257,11 @@ int __init st40pci_init(unsigned memStart, unsigned memSize)
 
 
 	return 1;
+}
+
+char * __init pcibios_setup(char *str)
+{
+	return str;
 }
 
 
@@ -390,9 +420,13 @@ pcibios_fixup_pbus_ranges(struct pci_bus *bus,
 	ranges->mem_end -= bus->resource[1]->start;
 }
 
-void __init st40_pcibios_init(void)
+void __init pcibios_init(void)
 {
 	extern unsigned long memory_start, memory_end;
+
+	if (sh_mv.mv_init_pci != NULL) {
+		sh_mv.mv_init_pci();
+	}
 
 	/* The pci subsytem needs to know where memory is and how much 
 	 * of it there is. I've simply made these globals. A better mechanism
@@ -491,4 +525,24 @@ void __init pcibios_update_irq(struct pci_dev *dev, int irq)
 {
 	printk("PCI: Assigning IRQ %02d to %s\n", irq, dev->name);
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
+}
+
+/*
+ *  If we set up a device for bus mastering, we need to check the latency
+ *  timer as certain crappy BIOSes forget to set it properly.
+ */
+unsigned int pcibios_max_latency = 255;
+
+void pcibios_set_master(struct pci_dev *dev)
+{
+	u8 lat;
+	pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
+	if (lat < 16)
+		lat = (64 <= pcibios_max_latency) ? 64 : pcibios_max_latency;
+	else if (lat > pcibios_max_latency)
+		lat = pcibios_max_latency;
+	else
+		return;
+	printk("PCI: Setting latency timer of device %s to %d\n", dev->slot_name, lat);
+	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
 }

@@ -17,6 +17,7 @@
 
 #define PTRS_PER_PTE	1024
 
+#ifndef __ASSEMBLY__
 #define pte_ERROR(e) \
 	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, pte_val(e))
 #define pmd_ERROR(e) \
@@ -32,7 +33,7 @@
 static inline int pgd_none(pgd_t pgd)		{ return 0; }
 static inline int pgd_bad(pgd_t pgd)		{ return 0; }
 static inline int pgd_present(pgd_t pgd)	{ return 1; }
-static inline void pgd_clear (pgd_t * pgd) 	{ }
+static inline void pgd_clear (pgd_t * pgdp) 	{ pgd_val(*(pgdp)) = 0; }
 
 /*
  * Certain architectures need to do special things when PTEs
@@ -54,5 +55,6 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 {
 	return (pmd_t *) dir;
 }
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_SH_PGTABLE_2LEVEL_H */

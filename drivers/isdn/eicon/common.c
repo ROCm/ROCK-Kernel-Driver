@@ -857,7 +857,7 @@ int DivasGetList(dia_card_list_t *card_list)
 {
 	int i;
 
-	bzero(card_list, sizeof(dia_card_list_t));
+	memset(card_list, 0, sizeof(dia_card_list_t));
 
 	for(i = 0; i < DivasCardNext; i++)
 	{

@@ -188,6 +188,7 @@ u16 __inw(int port)
 u32 __inl(int port)
 {
 	BUG();
+	return 0;
 }
 
 EXPORT_SYMBOL(__inb);

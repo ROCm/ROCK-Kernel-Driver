@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_bmap.c,v 1.20 2001/04/25 18:11:23 hch Exp hch $"
+#ident "$Id: vxfs_bmap.c,v 1.22 2001/05/26 22:41:23 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - filesystem to disk block mapping.
@@ -70,7 +70,7 @@ vxfs_bmap_ext4(struct inode *ip, long iblock)
 	struct super_block		*sbp = ip->i_sb;
 	kdev_t				dev = ip->i_dev;
 	u_long				bsize = sbp->s_blocksize;
-	u_long				size = 0;
+	long				size = 0;
 	int				i;
 
 	for (i = 0; i < VXFS_NDADDR; i++) {
@@ -135,7 +135,7 @@ vxfs_bmap_indir(struct inode *ip, long indir, int size, long block)
 
 	for (i = 0; i < size * VXFS_TYPED_PER_BLOCK(ip->i_sb); i++) {
 		struct vxfs_typed	*typ;
-		u_int64_t		off;
+		int64_t			off;
 
 		bp = bread(ip->i_dev,
 				indir + (i / VXFS_TYPED_PER_BLOCK(ip->i_sb)),
@@ -166,10 +166,12 @@ vxfs_bmap_indir(struct inode *ip, long indir, int size, long block)
 			goto out;
 		case VXFS_TYPED_INDIRECT_DEV4:
 		case VXFS_TYPED_DATA_DEV4: {
-			struct vxfs_typed_dev4	*typ4 = (struct vxfs_typed_dev4 *)typ;
+			struct vxfs_typed_dev4	*typ4 =
+				(struct vxfs_typed_dev4 *)typ;
+
 			printk(KERN_INFO "\n\nTYPED_DEV4 detected!\n");
-			printk(KERN_INFO "block: %Ld\tsize: %Ld\tdev: %d\n",
-			       (long long)typ4->vd4_block, (long long)typ4->vd4_size, typ4->vd4_dev);
+			printk(KERN_INFO "block: %Lu\tsize: %Ld\tdev: %d\n",
+				typ4->vd4_block, typ4->vd4_size, typ4->vd4_dev);
 			goto fail;
 		}
 		default:
@@ -205,7 +207,7 @@ vxfs_bmap_typed(struct inode *ip, long iblock)
 
 	for (i = 0; i < VXFS_NTYPED; i++) {
 		struct vxfs_typed	*typ = vip->vii_org.typed + i;
-		u_int64_t		off = (typ->vt_hdr & VXFS_TYPED_OFFSETMASK);
+		int64_t			off = (typ->vt_hdr & VXFS_TYPED_OFFSETMASK);
 
 #ifdef DIAGNOSTIC
 		vxfs_typdump(typ);
@@ -225,10 +227,12 @@ vxfs_bmap_typed(struct inode *ip, long iblock)
 			break;
 		case VXFS_TYPED_INDIRECT_DEV4:
 		case VXFS_TYPED_DATA_DEV4: {
-			struct vxfs_typed_dev4	*typ4 = (struct vxfs_typed_dev4 *)typ;
+			struct vxfs_typed_dev4	*typ4 =
+				(struct vxfs_typed_dev4 *)typ;
+
 			printk(KERN_INFO "\n\nTYPED_DEV4 detected!\n");
-			printk(KERN_INFO "block: %Ld\tsize: %Ld\tdev: %d\n",
-			       (long long)typ4->vd4_block, (long long)typ4->vd4_size, typ4->vd4_dev);
+			printk(KERN_INFO "block: %Lu\tsize: %Ld\tdev: %d\n",
+				typ4->vd4_block, typ4->vd4_size, typ4->vd4_dev);
 			return 0;
 		}
 		default:

@@ -30,7 +30,7 @@
 #ifndef _VXFS_FSHEAD_H_
 #define _VXFS_FSHEAD_H_
 
-#ident "$Id: vxfs_fshead.h,v 1.6 2001/04/25 18:11:23 hch Exp hch $"
+#ident "$Id: vxfs_fshead.h,v 1.7 2001/05/23 17:27:39 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - fileset header structures.
@@ -61,8 +61,8 @@ struct vxfs_fsh {
 
 	/*
 	 * Slightly more fields follow, but they
-	 *  a) are not of any interested for us, and
-	 *  b) differ much in different vxfs versions/ports
+	 *  a) are not of any interest for us, and
+	 *  b) differ a lot in different vxfs versions/ports
 	 */
 };
 

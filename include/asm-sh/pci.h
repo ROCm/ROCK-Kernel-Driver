@@ -9,19 +9,33 @@
 
 #define pcibios_assign_all_busses()	1
 
+#if defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 /* These are currently the correct values for the STM overdrive board. 
  * We need some way of setting this on a board specific way, it will 
  * not be the same on other boards I think
  */
-#if 1 /* def CONFIG_SH_7750_OVERDRIVE || def CONFIG_CPU_SUBTYPE_ST40STB1 */
 #define PCIBIOS_MIN_IO		0x2000
 #define PCIBIOS_MIN_MEM		0x10000000
+
+#elif defined(CONFIG_SH_DREAMCAST)
+#define PCIBIOS_MIN_IO		0x2000
+#define PCIBIOS_MIN_MEM		0x10000000
+#elif defined(CONFIG_SH_BIGSUR) && defined(CONFIG_CPU_SUBTYPE_SH7751)
+#define PCIBIOS_MIN_IO		0x2000
+#define PCIBIOS_MIN_MEM		0xFD000000
+
+#elif defined(CONFIG_SH_7751_SOLUTION_ENGINE) && defined(CONFIG_CPU_SUBTYPE_SH7751)
+#define PCIBIOS_MIN_IO          0x4000
+#define PCIBIOS_MIN_MEM         0xFD000000
 #endif
 
-static inline void pcibios_set_master(struct pci_dev *dev)
-{
+struct pci_dev;
+
+extern void pcibios_set_master(struct pci_dev *dev);
+//static inline void pcibios_set_master(struct pci_dev *dev)
+//{
 	/* No special bus mastering setup handling */
-}
+//}
 
 static inline void pcibios_penalize_isa_irq(int irq)
 {
@@ -37,8 +51,6 @@ static inline void pcibios_penalize_isa_irq(int irq)
 #include <asm/scatterlist.h>
 #include <linux/string.h>
 #include <asm/io.h>
-
-struct pci_dev;
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,

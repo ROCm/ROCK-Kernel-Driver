@@ -1,5 +1,5 @@
 /*
- * $Id: c4.c,v 1.20.6.8 2001/05/17 21:15:33 kai Exp $
+ * $Id: c4.c,v 1.20.6.10 2001/06/09 15:14:15 kai Exp $
  * 
  * Module for AVM C4 & C2 card.
  * 
@@ -27,7 +27,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.9 $";
+static char *revision = "$Revision: 1.20.6.10 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG

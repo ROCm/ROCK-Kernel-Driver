@@ -119,7 +119,7 @@ extern void __iounmap(void *addr);
  * is in pci.h
  */
 extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr);
+extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
 extern void consistent_sync(void *vaddr, size_t size, int rw);
 
 #define __raw_writeb(v,a)		__arch_putb(v,a)

@@ -67,18 +67,21 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 #endif
 
 	/*
-	 * free wasted pages.  We skip the first page since
-	 * we know that it will have count = 1 and won't
-	 * require freeing.
+	 * free wasted pages.  We skip the first page since we know
+	 * that it will have count = 1 and won't require freeing.
+	 * We also mark the pages in use as reserved so that
+	 * remap_page_range works.
 	 */
 	page = virt_to_page(virt);
 	free = page + (size >> PAGE_SHIFT);
 	end  = page + (1 << order);
 
-	while (++page < end) {
+	for (; page < end; page++) {
 		set_page_count(page, 1);
 		if (page >= free)
 			__free_page(page);
+		else
+			SetPageReserved(page);
 	}
 	return ret;
 
@@ -108,10 +111,26 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *handl
  * free a page as defined by the above mapping.  We expressly forbid
  * calling this from interrupt context.
  */
-void consistent_free(void *vaddr)
+void consistent_free(void *vaddr, size_t size, dma_addr_t handle)
 {
+	struct page *page, *end;
+	void *virt;
+
 	if (in_interrupt())
 		BUG();
+
+	virt = bus_to_virt(handle);
+
+	/*
+	 * More messing around with the MM internals.  This is
+	 * sick, but then so is remap_page_range().
+	 */
+	size = PAGE_ALIGN(size);
+	page = virt_to_page(virt);
+	end = page + (size >> PAGE_SHIFT);
+
+	for (; page < end; page++)
+		ClearPageReserved(page);
 
 	__iounmap(vaddr);
 }

@@ -391,6 +391,7 @@ struct page * reclaim_page(zone_t * zone)
 	goto out;
 
 found_page:
+	memory_pressure++;
 	del_page_from_inactive_clean_list(page);
 	UnlockPage(page);
 	page->age = PAGE_AGE_START;
@@ -400,7 +401,6 @@ found_page:
 out:
 	spin_unlock(&pagemap_lru_lock);
 	spin_unlock(&pagecache_lock);
-	memory_pressure++;
 	return page;
 }
 

@@ -10,7 +10,6 @@
 #include <asm/hardware.h>
 #include <asm/page.h>
 #include <asm/proc/domain.h>
-#include <asm/setup.h>
 
 #include <asm/mach/map.h>
 

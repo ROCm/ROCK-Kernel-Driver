@@ -24,8 +24,15 @@ obj-$(CONFIG_SH_RTC)            += rtc.o
 obj-$(CONFIG_SH_STANDARD_BIOS)	+= sh_bios.o
 
 ifeq ($(CONFIG_PCI),y)
-obj-y				+= pci-sh.o 
+ifeq ($(CONFIG_SH_DREAMCAST),y)
+obj-y 				+= pci-dc.o
+else
+obj-y                           += pci-dma.o 
 obj-$(CONFIG_CPU_SUBTYPE_ST40STB1)+= pci_st40.o
+obj-$(CONFIG_CPU_SUBTYPE_SH7751)+= pci-sh7751.o 
+obj-$(CONFIG_SH_BIGSUR)+= pci-bigsur.o
+obj-$(CONFIG_SH_7751_SOLUTION_ENGINE)+= pci-7751se.o
+endif
 endif
 
 obj-$(CONFIG_SH_HP600)		+= mach_hp600.o
@@ -33,6 +40,15 @@ machine-specific-objs		+= mach_hp600.o
 
 obj-$(CONFIG_SH_SOLUTION_ENGINE)+= mach_se.o setup_se.o io_se.o led_se.o
 machine-specific-objs		+= mach_se.o setup_se.o io_se.o led_se.o
+
+obj-$(CONFIG_SH_7751_SOLUTION_ENGINE)+= mach_se.o setup_se.o io_se.o led_se.o pci-7751se.o
+machine-specific-objs           += mach_se.o setup_se.o io_se.o led_se.o pci-7751se.o
+
+obj-$(CONFIG_SH_BIGSUR)		+= mach_bigsur.o setup_bigsur.o io_bigsur.o led_bigsur.o
+machine-specific-objs		+= mach_bigsur.o setup_bigsur.o io_bigsur.o led_bigsur.o
+
+obj-$(CONFIG_SH_SH2000)		+= setup_sh2000.o io_sh2000.o
+machine-specific-objs		+= setup_sh2000.o io_sh2000.o
 
 obj-$(CONFIG_SH_CAT68701) 	+= mach_cat68701.o io_cat68701.o
 machine-specific-objs		+= mach_cat68701.o io_cat68701.o

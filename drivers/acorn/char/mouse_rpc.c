@@ -34,9 +34,9 @@ mouse_rpc_irq(int irq, void *dev_id, struct pt_regs *regs)
 	short x, y, dx, dy;
 	int buttons;
 
-	x = (short)inl(IOMD_MOUSEX);
-	y = (short)inl(IOMD_MOUSEY);
-	buttons = (inl (0x800C4000) >> 4) & 7;
+	x = (short)iomd_readl(IOMD_MOUSEX);
+	y = (short)iomd_readl(IOMD_MOUSEY);
+	buttons = (__raw_readl(0xe0310000) >> 4) & 7;
 
 	dx = x - old_x;
 	old_x = x;
@@ -60,9 +60,9 @@ static int __init mouse_rpc_init(void)
 	if (mousedev < 0)
 		printk("rpcmouse: could not register mouse driver\n");
 	else {
-		old_x = (short)inl(IOMD_MOUSEX);
-		old_y = (short)inl(IOMD_MOUSEY);
-		old_b = (inl (0x800C4000) >> 4) & 7;
+		old_x = (short)iomd_readl(IOMD_MOUSEX);
+		old_y = (short)iomd_readl(IOMD_MOUSEY);
+		old_b = (__raw_readl(0xe0310000) >> 4) & 7;
 		if (request_irq(IRQ_VSYNCPULSE, mouse_rpc_irq, SA_SHIRQ, "mouse", &mousedev)) {
 			printk("rpcmouse: unable to allocate VSYNC interrupt\n");
 			unregister_busmouse(mousedev);

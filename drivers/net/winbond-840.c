@@ -839,7 +839,7 @@ static void init_registers(struct net_device *dev)
 		C000	32  longwords		0400 4 longwords
 	   Wait the specified 50 PCI cycles after a reset by initializing
 	   Tx and Rx queues and the address filter list. */
-#if defined(__powerpc__)		/* Big-endian */
+#if defined(__powerpc__) || defined(__sparc__)		/* Big-endian */
 	writel(0x00100080 | 0xE010, ioaddr + PCIBusCfg);
 #elif defined(__alpha__)
 	writel(0xE010, ioaddr + PCIBusCfg);
@@ -884,13 +884,12 @@ static void tx_timeout(struct net_device *dev)
 	printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
 		   " resetting...\n", dev->name, (int)readl(ioaddr + IntrStatus));
 
-#ifndef __alpha__
 	{
 		int i;
-		printk(KERN_DEBUG "  Rx ring %8.8x: ", (int)np->rx_ring);
+		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
 		for (i = 0; i < RX_RING_SIZE; i++)
 			printk(" %8.8x", (unsigned int)np->rx_ring[i].status);
-		printk("\n"KERN_DEBUG"  Tx ring %8.8x: ", (int)np->tx_ring);
+		printk("\n"KERN_DEBUG"  Tx ring %p: ", np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(" %8.8x", np->tx_ring[i].status);
 		printk("\n");
@@ -899,7 +898,6 @@ static void tx_timeout(struct net_device *dev)
 				np->cur_tx, np->dirty_tx, np->tx_full,np->tx_q_bytes);
 	printk(KERN_DEBUG "Tx Descriptor addr %xh.\n",readl(ioaddr+0x4C));
 
-#endif
 	spin_lock_irq(&np->lock);
 	/*
 	 * Under high load dirty_tx and the internal tx descriptor pointer
@@ -1376,7 +1374,6 @@ static int netdev_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
-	int i;
 
 	netif_stop_queue(dev);
 
@@ -1399,6 +1396,8 @@ static int netdev_close(struct net_device *dev)
 
 #ifdef __i386__
 	if (debug > 2) {
+		int i;
+
 		printk("\n"KERN_DEBUG"  Tx ring at %8.8x:\n",
 			   (int)np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)

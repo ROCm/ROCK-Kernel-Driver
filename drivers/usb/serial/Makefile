@@ -18,6 +18,8 @@ obj-$(CONFIG_USB_SERIAL_BELKIN)			+= belkin_sa.o
 obj-$(CONFIG_USB_SERIAL_EMPEG)			+= empeg.o
 obj-$(CONFIG_USB_SERIAL_MCT_U232)		+= mct_u232.o
 obj-$(CONFIG_USB_SERIAL_EDGEPORT)		+= io_edgeport.o
+obj-$(CONFIG_USB_SERIAL_PL2303)			+= pl2303.o
+obj-$(CONFIG_USB_SERIAL_CYBERJACK)		+= cyberjack.o
  
 # Objects that export symbols.
 export-objs	:= usbserial.o

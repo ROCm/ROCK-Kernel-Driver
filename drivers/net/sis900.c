@@ -1002,7 +1002,7 @@ sis900_init_rx_ring(struct net_device *net_dev)
 static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
-	u16 reg14h, eq_value, max_value=0, min_value=0;
+	u16 reg14h, eq_value=0, max_value=0, min_value=0;
 	u8 host_bridge_rev;
 	int i, maxcount=10;
 	struct pci_dev *dev=NULL;

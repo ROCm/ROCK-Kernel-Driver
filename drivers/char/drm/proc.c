@@ -92,6 +92,7 @@ int drm_proc_init(drm_device_t *dev)
 		if (!drm_dev_root) {
 			DRM_ERROR("Cannot create /proc/%s\n", drm_slot_name);
 			remove_proc_entry("dri", NULL);
+			break;
 		}
 		if (drm_dev_root->nlink == 2) break;
 		drm_dev_root = NULL;

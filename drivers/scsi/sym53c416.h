@@ -31,14 +31,14 @@
 
 #define SYM53C416_SCSI_ID 7
 
-extern int sym53c416_detect(Scsi_Host_Template *);
-extern const char *sym53c416_info(struct Scsi_Host *);
-extern int sym53c416_command(Scsi_Cmnd *);
-extern int sym53c416_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-extern int sym53c416_abort(Scsi_Cmnd *);
-extern int sym53c416_reset(Scsi_Cmnd *, unsigned int);
-extern int sym53c416_bios_param(Disk *, kdev_t, int *);
-extern void sym53c416_setup(char *str, int *ints);
+static int sym53c416_detect(Scsi_Host_Template *);
+static const char *sym53c416_info(struct Scsi_Host *);
+static int sym53c416_command(Scsi_Cmnd *);
+static int sym53c416_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int sym53c416_abort(Scsi_Cmnd *);
+static int sym53c416_reset(Scsi_Cmnd *, unsigned int);
+static int sym53c416_bios_param(Disk *, kdev_t, int *);
+static void sym53c416_setup(char *str, int *ints);
 
 #define SYM53C416 {                                          \
                   proc_name:         "sym53c416",   \

@@ -62,6 +62,7 @@ obj-$(CONFIG_USB_USS720)	+= uss720.o
 obj-$(CONFIG_USB_DABUSB)	+= dabusb.o
 obj-$(CONFIG_USB_PLUSB)		+= plusb.o
 obj-$(CONFIG_USB_OV511)		+= ov511.o
+obj-$(CONFIG_USB_SE401)		+= se401.o
 obj-$(CONFIG_USB_PEGASUS)	+= pegasus.o
 obj-$(CONFIG_USB_CATC)		+= catc.o
 obj-$(CONFIG_USB_RIO500)	+= rio500.o

@@ -6,17 +6,20 @@
 
 static int matroxfb_g450_get_reg(WPMINFO int reg) {
 	int val;
+	unsigned long flags;
 
-	matroxfb_DAC_lock();
+	matroxfb_DAC_lock_irqsave(flags);
 	val = matroxfb_DAC_in(PMINFO reg);
-	matroxfb_DAC_unlock();
+	matroxfb_DAC_unlock_irqrestore(flags);
 	return val;
 }
 
 static int matroxfb_g450_set_reg(WPMINFO int reg, int val) {
-	matroxfb_DAC_lock();
+	unsigned long flags;
+
+	matroxfb_DAC_lock_irqsave(flags);
 	matroxfb_DAC_out(PMINFO reg, val);
-	matroxfb_DAC_unlock();
+	matroxfb_DAC_unlock_irqrestore(flags);
 	return 0;
 }
 

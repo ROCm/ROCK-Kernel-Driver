@@ -77,6 +77,10 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
+#if BITS_PER_LONG == 64
+#error FIXME: driver does not support 64-bit platforms
+#endif
+
 
 /* Board/System/Debug information/definition ---------------- */
 #define PCI_DM9132_ID   0x91321282      /* Davicom DM9132 ID */

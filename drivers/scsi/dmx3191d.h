@@ -20,8 +20,6 @@
 #define PCI_DEVICE_ID_DOMEX_DMX3191D	0x0001
 #endif
 
-#define dmx3191d_printk( args... )	printk(__FILE__": " ##args)
-
 #ifndef ASM
 int dmx3191d_abort(Scsi_Cmnd *);
 int dmx3191d_detect(Scsi_Host_Template *);

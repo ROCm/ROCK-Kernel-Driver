@@ -2045,19 +2045,17 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 
 	switch (cmd) {
 	case SNDCTL_SYNTH_INFO:
-		memcpy (&((char *) arg)[0], &wavefront_info,
-			sizeof (wavefront_info));
+		if(copy_to_user(&((char *) arg)[0], &wavefront_info,
+			sizeof (wavefront_info)))
+			return -EFAULT;
 		return 0;
-		break;
 
 	case SNDCTL_SEQ_RESETSAMPLES:
-		printk (KERN_WARNING LOGNAME "driver cannot reset samples.\n");
+//		printk (KERN_WARNING LOGNAME "driver cannot reset samples.\n");
 		return 0; /* don't force an error */
-		break;
 
 	case SNDCTL_SEQ_PERCMODE:
 		return 0; /* don't force an error */
-		break;
 
 	case SNDCTL_SYNTH_MEMAVL:
 		if ((dev.freemem = wavefront_freemem ()) < 0) {
@@ -2069,10 +2067,11 @@ wavefront_oss_ioctl (int devno, unsigned int cmd, caddr_t arg)
 		break;
 
 	case SNDCTL_SYNTH_CONTROL:
-		copy_from_user (&wc, arg, sizeof (wc));
-
-		if ((err = wavefront_synth_control (cmd, &wc)) == 0) {
-			copy_to_user (arg, &wc, sizeof (wc));
+		if(copy_from_user (&wc, arg, sizeof (wc)))
+			err = -EFAULT;
+		else if ((err = wavefront_synth_control (cmd, &wc)) == 0) {
+			if(copy_to_user (arg, &wc, sizeof (wc)))
+				err = -EFAULT;
 		}
 
 		return err;

@@ -832,6 +832,7 @@ int mga_iload(struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
+	if(iload.idx < 0 || iload.idx > dma->buf_count) return -EINVAL;
 	buf = dma->buflist[iload.idx];
 	buf_priv = buf->dev_private;
 	bus_address = buf->bus_address;
@@ -873,6 +874,8 @@ int mga_vertex(struct inode *inode, struct file *filp,
 		DRM_ERROR("mga_vertex called without lock held\n");
 		return -EINVAL;
 	}
+
+	if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
 
 	buf = dma->buflist[vertex.idx];
 	buf_priv = buf->dev_private;
@@ -920,6 +923,7 @@ int mga_indices(struct inode *inode, struct file *filp,
 		return -EINVAL;
 	}
 
+	if(indices.idx < 0 || indices.idx > dma->buf_count) return -EINVAL;
 	buf = dma->buflist[indices.idx];
 	buf_priv = buf->dev_private;
 

@@ -1528,6 +1528,7 @@ void qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
     if(test_and_set_bit(QLA1280_IN_ISR_BIT, &ha->flags))
     {
         COMTRACE('X')
+        spin_unlock_irqrestore(&io_request_lock, cpu_flags);
         return;
     }
     ha->isr_count++;

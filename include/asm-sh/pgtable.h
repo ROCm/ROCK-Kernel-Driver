@@ -3,6 +3,8 @@
 
 /* Copyright (C) 1999 Niibe Yutaka */
 
+#include <asm/pgtable-2level.h>
+
 /*
  * This file contains the functions and defines necessary to modify and use
  * the SuperH page table tree.
@@ -12,7 +14,7 @@
 #include <asm/addrspace.h>
 #include <linux/threads.h>
 
-extern pgd_t swapper_pg_dir[1024];
+extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init(void);
 
 #if defined(__sh3__)
@@ -70,8 +72,6 @@ extern unsigned long empty_zero_page[1024];
 
 #endif /* !__ASSEMBLY__ */
 
-#include <asm/pgtable-2level.h>
-
 #define __beep() asm("")
 
 #define PMD_SIZE	(1UL << PMD_SHIFT)
@@ -81,13 +81,6 @@ extern unsigned long empty_zero_page[1024];
 
 #define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
-
-#define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
-#define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
-
-#define TWOLEVEL_PGDIR_SHIFT	22
-#define BOOT_USER_PGD_PTRS (PAGE_OFFSET >> TWOLEVEL_PGDIR_SHIFT)
-#define BOOT_KERNEL_PGD_PTRS (1024-BOOT_USER_PGD_PTRS)
 
 #ifndef __ASSEMBLY__
 #define VMALLOC_START	P3SEG
@@ -123,7 +116,15 @@ extern unsigned long empty_zero_page[1024];
 
 
 /* Mask which drop software flags */
+#if defined(__sh3__)
+/*
+ * MMU on SH-3 has bug on SH-bit: We can't use it if MMUCR.IX=1.
+ * Work around: Just drop SH-bit.
+ */
+#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff1fc
+#else
 #define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff1fe
+#endif
 /* Hardware flags: SZ=1 (4k-byte) */
 #define _PAGE_FLAGS_HARD		0x00000010
 
@@ -240,9 +241,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
-#define __pmd_offset(address) \
-		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
-
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
@@ -263,6 +261,12 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 #define pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define swp_entry_to_pte(x)	((pte_t) { (x).val })
 
+/*
+ * Routines for update of PTE 
+ *
+ * We just can use generic implementation, as SuperH has no SMP feature.
+ * (We needed atomic implementation for SMP)
+ */
 #include <asm-generic/pgtable.h>
 
 #endif /* !__ASSEMBLY__ */

@@ -16,16 +16,16 @@
 		.text
 
 GPIO_BASE:	.long	0x90040000
-#define GPLR	0x00
-#define GPDR	0x04
-#define GPSR	0x08
-#define GAFR	0x1c
+#define GPLR		0x00
+#define GPDR		0x04
+#define GPSR		0x08
+#define GAFR		0x1c
 
 PPC_BASE:	.long	0x90060000
-#define PPAR	0x08
+#define PPAR		0x08
 
 IC_BASE:	.long	0x90050000
-#define ICMR	0x04
+#define ICMR		0x04
 
 UART1_BASE:	.long	0x80010000
 UART3_BASE:	.long	0x80050000
@@ -95,7 +95,11 @@ skip_SCR:
 		@ Initialize UART (if bootloader has not done it yet)...
 		teq	r3, #MACH_TYPE_BRUTUS
 		teqne	r3, #MACH_TYPE_ASSABET
+		teqne   r3, #MACH_TYPE_ITSY
+		teqne   r3, #MACH_TYPE_OMNIMETER
+		teqne   r3, #MACH_TYPE_JORNADA720
 		teqne	r3, #MACH_TYPE_GRAPHICSCLIENT
+		teqne	r3, #MACH_TYPE_FLEXANET
 		bne	skip_uart
 
 		@ UART3 if Assabet is used with Neponset

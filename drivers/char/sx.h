@@ -36,9 +36,9 @@ struct sx_port {
 
 struct sx_board {
   int magic;
-  unsigned int base;
-  unsigned int base2;
-  unsigned int hw_base;
+  unsigned long base;
+  unsigned long base2;
+  unsigned long hw_base;
   int eisa_base;
   int port_base; /* Number of the first port */
   struct sx_port *ports;

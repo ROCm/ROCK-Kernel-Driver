@@ -121,6 +121,7 @@ static int rose_rebuild_header(struct sk_buff *skb)
 	if (!rose_route_frame(skbn, NULL)) {
 		kfree_skb(skbn);
 		stats->tx_errors++;
+		return 1;
 	}
 
 	stats->tx_packets++;

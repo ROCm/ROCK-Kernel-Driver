@@ -94,7 +94,15 @@ static const struct fb_videomode mac_modedb[] = {
 	/* 1280x1024, 75 Hz, Non-Interlaced (135.00 MHz dotclock) */
 	"mac20", 75, 1280, 1024, 7408, 232, 64, 38, 1, 112, 3,
 	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
-    },
+    }, {
+	/* 1152x768, 60 Hz, Titanium PowerBook */
+	"mac21", 60, 1152, 768, 15386, 158, 26, 29, 3, 136, 6,
+	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+    }, {
+	/* 1600x1024, 60 Hz, Non-Interlaced (112.27 MHz dotclock) */
+	"mac22", 60, 1600, 1024, 8908, 88, 104, 1, 10, 16, 1,
+	FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+    }
 
 #if 0
     /* Anyone who has timings for these? */
@@ -154,12 +162,16 @@ static const struct mode_map {
     { VMODE_1024_768_75V, &mac_modedb[9] },
     { VMODE_1024_768_70, &mac_modedb[8] },
     { VMODE_1024_768_60, &mac_modedb[7] },
+    /* 1152x768 */
+    { VMODE_1152_768_60, &mac_modedb[14] },
     /* 1152x870 */
     { VMODE_1152_870_75, &mac_modedb[11] },
     /* 1280x960 */
     { VMODE_1280_960_75, &mac_modedb[12] },
     /* 1280x1024 */
     { VMODE_1280_1024_75, &mac_modedb[13] },
+    /* 1600x1024 */
+    { VMODE_1600_1024_60, &mac_modedb[15] },
     { -1, NULL }
 };
 
@@ -191,6 +203,7 @@ static const struct monitor_map {
     { 0x730, VMODE_768_576_50I },	/* PAL (Alternate) */
     { 0x73a, VMODE_1152_870_75 },	/* 3rd party 19" */
     { 0x73f, VMODE_640_480_67 },	/* no sense lines connected at all */
+    { 0xBEEF, VMODE_1600_1024_60 },	/* 22" Apple Cinema Display */
     { -1,    VMODE_640_480_60 },	/* catch-all, must be last */
 };
 

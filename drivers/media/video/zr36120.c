@@ -1025,7 +1025,7 @@ int zoran_ioctl(struct video_device* dev, unsigned int cmd, void *arg)
 		v.norm=VIDEO_MODE_PAL;
 #endif
 		/* too many inputs? no decoder -> no channels */
-		if (!ztv->have_decoder || v.channel >= ztv->card->video_inputs)
+		if (!ztv->have_decoder || v.channel < 0 ||  v.channel >= ztv->card->video_inputs)
 			return -EINVAL;
 
 		/* now determine the name of the channel */

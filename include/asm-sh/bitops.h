@@ -19,6 +19,16 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 	restore_flags(flags);
 }
 
+static __inline__ void __set_bit(int nr, volatile void * addr)
+{
+	int	mask;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	*a |= mask;
+}
+
 /*
  * clear_bit() doesn't provide any barrier for the compiler.
  */
@@ -37,6 +47,16 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 	restore_flags(flags);
 }
 
+static __inline__ void __clear_bit(int nr, volatile void * addr)
+{
+	int	mask;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	*a &= ~mask;
+}
+
 static __inline__ void change_bit(int nr, volatile void * addr)
 {
 	int	mask;
@@ -48,6 +68,16 @@ static __inline__ void change_bit(int nr, volatile void * addr)
 	save_and_cli(flags);
 	*a ^= mask;
 	restore_flags(flags);
+}
+
+static __inline__ void __change_bit(int nr, volatile void * addr)
+{
+	int	mask;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	*a ^= mask;
 }
 
 static __inline__ int test_and_set_bit(int nr, volatile void * addr)
@@ -62,6 +92,19 @@ static __inline__ int test_and_set_bit(int nr, volatile void * addr)
 	retval = (mask & *a) != 0;
 	*a |= mask;
 	restore_flags(flags);
+
+	return retval;
+}
+
+static __inline__ int __test_and_set_bit(int nr, volatile void * addr)
+{
+	int	mask, retval;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	retval = (mask & *a) != 0;
+	*a |= mask;
 
 	return retval;
 }
@@ -82,6 +125,19 @@ static __inline__ int test_and_clear_bit(int nr, volatile void * addr)
 	return retval;
 }
 
+static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
+{
+	int	mask, retval;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	retval = (mask & *a) != 0;
+	*a &= ~mask;
+
+	return retval;
+}
+
 static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 {
 	int	mask, retval;
@@ -98,6 +154,18 @@ static __inline__ int test_and_change_bit(int nr, volatile void * addr)
 	return retval;
 }
 
+static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
+{
+	int	mask, retval;
+	volatile unsigned int *a = addr;
+
+	a += nr >> 5;
+	mask = 1 << (nr & 0x1f);
+	retval = (mask & *a) != 0;
+	*a ^= mask;
+
+	return retval;
+}
 
 static __inline__ int test_bit(int nr, const volatile void *addr)
 {
@@ -156,6 +224,23 @@ found_middle:
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
+
+/*
+ * ffs: find first bit set. This is defined the same way as
+ * the libc and compiler builtin ffs routines, therefore
+ * differs in spirit from the above ffz (man ffs).
+ */
+
+#define ffs(x) generic_ffs(x)
+
+/*
+ * hweightN: returns the hamming weight (i.e. the number
+ * of bits set) of a N-bit word
+ */
+
+#define hweight32(x) generic_hweight32(x)
+#define hweight16(x) generic_hweight16(x)
+#define hweight8(x) generic_hweight8(x)
 
 #ifdef __LITTLE_ENDIAN__
 #define ext2_set_bit(nr, addr) test_and_set_bit((nr), (addr))

@@ -448,7 +448,7 @@ static void transmit_chars(struct mac_serial *info)
 		goto out;
 	info->tx_active = 0;
 
-	if (info->x_char) {
+	if (info->x_char && !info->power_wait) {
 		/* Send next char */
 		write_zsdata(info->zs_channel, info->x_char);
 		info->x_char = 0;
@@ -456,7 +456,8 @@ static void transmit_chars(struct mac_serial *info)
 		goto out;
 	}
 
-	if ((info->xmit_cnt <= 0) || info->tty->stopped || info->tx_stopped) {
+	if ((info->xmit_cnt <= 0) || info->tty->stopped || info->tx_stopped
+	    || info->power_wait) {
 		write_zsreg(info->zs_channel, 0, RES_Tx_P);
 		goto out;
 	}
@@ -472,6 +473,14 @@ static void transmit_chars(struct mac_serial *info)
 
  out:
 	restore_flags(flags);
+}
+
+static void powerup_done(unsigned long data)
+{
+	struct mac_serial *info = (struct mac_serial *) data;
+
+	info->power_wait = 0;
+	transmit_chars(info);
 }
 
 static _INLINE_ void status_handle(struct mac_serial *info)
@@ -730,7 +739,7 @@ static void do_softint(void *private_)
 	}
 }
 
-static int startup(struct mac_serial * info, int can_sleep)
+static int startup(struct mac_serial * info)
 {
 	int delay;
 
@@ -753,21 +762,24 @@ static int startup(struct mac_serial * info, int can_sleep)
 
 	setup_scc(info);
 
+	if (delay) {
+		unsigned long flags;
+
+		/* delay is in ms */
+		save_flags(flags);
+		cli();
+		info->power_wait = 1;
+		mod_timer(&info->powerup_timer,
+			  jiffies + (delay * HZ + 999) / 1000);
+		restore_flags(flags);
+	}
+
 	OPNDBG("enabling IRQ on ttyS%d (irq %d)...\n", info->line, info->irq);
 
 	info->flags |= ZILOG_INITIALIZED;
 	enable_irq(info->irq);
 	if (info->dma_initted) {
 		enable_irq(info->rx_dma_irq);
-	}
-
-	if (delay) {
-		if (can_sleep) {
-			/* we need to wait a bit before using the port */
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(delay * HZ / 1000);
-		} else
-			mdelay(delay);
 	}
 
 	return 0;
@@ -863,7 +875,7 @@ out:
 		queue_task(&tty->flip.tqueue, &tq_timer);
 }
 
-static void poll_rxdma(void *private_)
+static void poll_rxdma(unsigned long private_)
 {
 	struct mac_serial	*info = (struct mac_serial *) private_;
 	unsigned long flags;
@@ -2325,7 +2337,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	 * Start up serial port
 	 */
 
-	retval = startup(info, 1);
+	retval = startup(info);
 	if (retval)
 		return retval;
 
@@ -2426,6 +2438,10 @@ chan_init(struct mac_serial *zss, struct mac_zschannel *zs_chan,
 		zss->rx_dma_irq = ch->intrs[2].line;
 		spin_lock_init(&zss->rx_dma_lock);
 	}
+
+	init_timer(&zss->powerup_timer);
+	zss->powerup_timer.function = powerup_done;
+	zss->powerup_timer.data = (unsigned long) zss;
 }
 
 /* Ask the PROM how many Z8530s we have and initialize their zs_channels */
@@ -2680,14 +2696,7 @@ int macserial_init(void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module(void)
-{
-	macserial_init();
-	return 0;
-}
-
-void cleanup_module(void)
+void macserial_cleanup(void)
 {
 	int i;
 	unsigned long flags;
@@ -2717,7 +2726,9 @@ void cleanup_module(void)
 		pmu_unregister_sleep_notifier(&serial_sleep_notifier);
 #endif /* CONFIG_PMAC_PBOOK */
 }
-#endif /* MODULE */
+
+module_init(macserial_init);
+module_exit(macserial_cleanup);
 
 #if 0
 /*
@@ -3119,7 +3130,7 @@ serial_notify_sleep(struct pmu_sleep_notifier *self, int when)
 			struct mac_serial *info = &zs_soft[i];
 			if (info->flags & ZILOG_SLEEPING) {
 				info->flags &= ~ZILOG_SLEEPING;
-				startup(info, 0);
+				startup(info);
 			}
 		}
 		break;

@@ -544,7 +544,7 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 {
 	struct atm_dev *dev;
 	struct atm_vcc *vcc;
-	int *tmp_buf;
+	int *tmp_buf, *tmp_p;
 	void *buf;
 	int error,len,size,number, ret_val;
 
@@ -598,14 +598,13 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 				ret_val = -ENOMEM;
 				goto done;
 			}
+			tmp_p = tmp_buf;
 			for (dev = atm_devs; dev; dev = dev->next)
-				*tmp_buf++ = dev->number;
-			if (copy_to_user(buf,(char *) tmp_buf-size,size)) {
-				ret_val = -EFAULT;
-				goto done;
-			}
-		        ret_val = put_user(size,
-			    &((struct atm_iobuf *) arg)->length) ? -EFAULT : 0;
+				*tmp_p++ = dev->number;
+		        ret_val = ((copy_to_user(buf, tmp_buf, size)) ||
+			    put_user(size, &((struct atm_iobuf *) arg)->length)
+			    ) ? -EFAULT : 0;
+			kfree(tmp_buf);
 			goto done;
 		case SIOCGSTAMP: /* borrowed from IP */
 			if (!vcc->timestamp.tv_sec) {

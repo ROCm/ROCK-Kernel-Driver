@@ -1,7 +1,7 @@
 #ifndef _ASM_SH_HD64465_GPIO_
 #define _ASM_SH_HD64465_GPIO_ 1
 /*
- * $Id: hd64465_gpio.h,v 1.1 2001/01/02 15:35:22 mjd Exp $
+ * $Id: hd64465_gpio.h,v 1.2 2001/05/24 00:14:13 gniibe Exp $
  *
  * Hitachi HD64465 companion chip: General Purpose IO pins support.
  * This layer enables other device drivers to configure GPIO

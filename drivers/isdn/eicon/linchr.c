@@ -46,161 +46,110 @@ void UnlockDivas(void);
 int do_ioctl(struct inode *pDivasInode, struct file *pDivasFile, 
 			 unsigned int command, unsigned long arg)
 {
-	dia_load_t *pDivaLoad;
-	dia_start_t *pDivaStart;
-	dia_config_t *pDivaConfig;
-	dia_log_t *pDivaLog;
 	byte *pUserCards, card_i;
 	word wCardNum;
-	mem_block_t *mem_block;
 
 	switch (command)
 	{
 		case DIA_IOCTL_CONFIG:
-			pDivaConfig = (dia_config_t *) arg;
-			
-			if (!verify_area(VERIFY_READ, pDivaConfig, sizeof(dia_config_t)))
-			{
-				DivasCardConfig(pDivaConfig);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete CONFIG ioctl (verify area failed)\n");
-				return -1;
-			}
-				return 0;
+		{
+			dia_config_t DivaConfig;
+			if (copy_from_user(&DivaConfig, (void *)arg, sizeof(dia_config_t)))
+				return -EFAULT;
+			DivasCardConfig(&DivaConfig);
+			return 0;
+		}
 
 		case DIA_IOCTL_DETECT:
 			pUserCards = (byte *) arg;
 
 			if (!verify_area(VERIFY_WRITE, pUserCards, 20))
 			{
-				put_user(DivasCardNext, pUserCards++);
+				if(__put_user(DivasCardNext, pUserCards++))
+					return -EFAULT;
 
 				for (card_i=1; card_i < 20; card_i++)
 				{
-					put_user((byte) DivasCards[card_i - 1].cfg.card_type, pUserCards++);
+					if(__put_user((byte) DivasCards[card_i - 1].cfg.card_type, pUserCards++))
+						return -EFAULT;
 				}
 			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete DETECT ioctl (verify area failed)\n");
-				return -1;
-			}
+			else return -EFAULT;
+
 			return 0;
 
 		case DIA_IOCTL_START:
-			pDivaStart = (dia_start_t *) arg;
-			
-			if (!verify_area(VERIFY_READ, pDivaStart, sizeof(dia_start_t)))
-			{
-				return DivasCardStart(pDivaStart->card_id);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete START ioctl (verify area failed)\n");
-				return -1;
-			}
-
+		{
+			dia_start_t DivaStart;
+			if (copy_from_user(&DivaStart, (void *)arg, sizeof(dia_start_t)))
+				return -EFAULT;
+			return DivasCardStart(DivaStart.card_id);
+		}
 
 		case DIA_IOCTL_FLAVOUR:
 			return 0;
 
 		case DIA_IOCTL_LOAD:
-			pDivaLoad = (dia_load_t *) arg;
-			if (!verify_area(VERIFY_READ, pDivaLoad->code,pDivaLoad->length))
+		{
+			dia_load_t DivaLoad;
+			if(copy_from_user(&DivaLoad, (void *)arg, sizeof(dia_load_t)))
+				return -EFAULT;
+			if (!verify_area(VERIFY_READ, DivaLoad.code,DivaLoad.length))
 			{
-				if (DivasCardLoad(pDivaLoad))
+				if (DivasCardLoad(&DivaLoad))
 				{
 					printk(KERN_WARNING "Divas: Error loading DIVA Server adapter\n");
 					return -EINVAL;
 				}
+				return 0;
 			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Error in LOAD parameters (verify failed)\n");
-				return -EINVAL;
-			}
-			return 0;
-
+			return -EFAULT;
+		}
 		case DIA_IOCTL_LOG:
-			pDivaLog = (dia_log_t *) arg;
-			
-			if (!verify_area(VERIFY_READ, pDivaLog, sizeof(dia_log_t)))
-			{
-				DivasLog(pDivaLog);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete LOG ioctl (verify area failed)\n");
-				return -1;
-			}
+		{
+			dia_log_t DivaLog;
+			if (copy_from_user(&DivaLog, (void *) arg, sizeof(dia_log_t)))
+				return -EFAULT;
+			DivasLog(&DivaLog);
 			return 0;
+		}
 
 		case DIA_IOCTL_XLOG_REQ:
-			
-			if (!verify_area(VERIFY_READ, (void *)arg, sizeof(word)))
-			{
-				wCardNum = * (word *) arg;
-				DivasXlogReq(wCardNum);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete XLOG_REQ ioctl (verify area failed)\n");
-				return -1;
-			}
+			if(get_user(wCardNum, (word *) arg))
+				return -EFAULT;
+			DivasXlogReq(wCardNum);
 			return 0;
 
 		case DIA_IOCTL_GET_NUM:
-			
-			if (!verify_area(VERIFY_WRITE, (void *)arg, sizeof(int)))
-			{
-				* (int *) arg = DivasCardNext;
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete GET_NUM ioctl (verify area failed)\n");
-				return -1;
-			}
+			if(put_user(DivasCardNext, (int *)arg))
+				return -EFAULT;
 			return 0;
 
 		case DIA_IOCTL_GET_LIST:
+		{
+			dia_card_list_t cards;
 			DPRINTF(("divas: DIA_IOCTL_GET_LIST"));
-			
-			if (!verify_area(VERIFY_WRITE, (void *)arg, sizeof(dia_card_list_t)))
-			{
-				DivasGetList((dia_card_list_t *)arg);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete GET_LIST ioctl (verify area failed)\n");
-				return -1;
-			}
+			DivasGetList(&cards);
+			if(copy_to_user((void *)arg, &cards, sizeof(cards)))
+				return -EFAULT;
 			return 0;
-
+		}
 		case DIA_IOCTL_GET_MEM:
-			mem_block = (mem_block_t *) arg;
-			
-			if (!verify_area(VERIFY_WRITE, mem_block, sizeof(mem_block_t)))
-			{
-				DivasGetMem(mem_block);
-			}
-			else
-			{
-				printk(KERN_WARNING "Divas: Unable to complete GET_MEM ioctl (verify area failed)\n");
-				return -1;
-			}
+		{
+			mem_block_t mem_block;
+			if (copy_from_user(&mem_block, (void *)arg, sizeof(mem_block_t)))
+				return -EFAULT;
+			DivasGetMem(&mem_block);
 			return 0;
+		}
 
 		case DIA_IOCTL_UNLOCK:
 			UnlockDivas();
 			return 0;
 
 		default:
-			printk(KERN_WARNING "Divas: Unknown IOCTL Received by DIVA Server Driver(%d)\n", command);
 			return -EINVAL;
 	}
-	
 	return -EINVAL;
 }
 

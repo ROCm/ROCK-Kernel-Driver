@@ -743,7 +743,7 @@ static unsigned char *cy_isa_addresses[] = {
 #define NR_ISA_ADDRS (sizeof(cy_isa_addresses)/sizeof(unsigned char*))
 
 #ifdef MODULE
-static int maddr[NR_CARDS] = { 0, };
+static long maddr[NR_CARDS] = { 0, };
 static int irq[NR_CARDS]  = { 0, };
 
 MODULE_PARM(maddr, "1-" __MODULE_STRING(NR_CARDS) "l");
@@ -2983,10 +2983,11 @@ cy_write(struct tty_struct * tty, int from_user,
         return 0;
     }
 
-    CY_LOCK(info, flags);
     if (from_user) {
 	down(&tmp_buf_sem);
 	while (1) {
+	    int c1;
+	    
 	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 				SERIAL_XMIT_SIZE - info->xmit_head));
 	    if (c <= 0)
@@ -2999,23 +3000,30 @@ cy_write(struct tty_struct * tty, int from_user,
 		}
 		break;
 	    }
-	    c = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+	    CY_LOCK(info, flags);
+	    c1 = MIN(c, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
 			SERIAL_XMIT_SIZE - info->xmit_head));
+			
+	    if (c1 < c)
+	    	c = c1;
 	    memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
 	    info->xmit_head = ((info->xmit_head + c) & (SERIAL_XMIT_SIZE-1));
 	    info->xmit_cnt += c;
+            CY_UNLOCK(info, flags);
 	    buf += c;
 	    count -= c;
 	    ret += c;
 	}
 	up(&tmp_buf_sem);
     } else {
+	CY_LOCK(info, flags);
 	while (1) {
 	    c = MIN(count, MIN(SERIAL_XMIT_SIZE - info->xmit_cnt - 1, 
 			SERIAL_XMIT_SIZE - info->xmit_head));
-	    if (c <= 0) {
+	        
+	    if (c <= 0)
 		break;
-	    }
+
 	    memcpy(info->xmit_buf + info->xmit_head, buf, c);
 	    info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
 	    info->xmit_cnt += c;
@@ -3023,8 +3031,8 @@ cy_write(struct tty_struct * tty, int from_user,
 	    count -= c;
 	    ret += c;
 	}
+        CY_UNLOCK(info, flags);
     }
-    CY_UNLOCK(info, flags);
 
     info->idle_stats.xmit_bytes += ret;
     info->idle_stats.xmit_idle   = jiffies;

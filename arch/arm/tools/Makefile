@@ -16,7 +16,7 @@ $(TOPDIR)/include/asm-arm/mach-types.h: mach-types gen-mach-types
 
 $(TOPDIR)/include/asm-arm/constants.h: constants-hdr getconstants.c
 	$(CC) $(CFLAGS) -S -o - getconstants.c | \
-	 sed 's/^\(#define .* \)#\(.*\)/\1\2/;/^#define/!d' | \
+	 sed 's/^\(#define .* \)[#$$]\(.*\)/\1\2/;/^#define/!d' | \
 	 cat constants-hdr - > $@.tmp
 	cmp $@.tmp $@ >/dev/null 2>&1 || mv $@.tmp $@; $(RM) $@.tmp
 

@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/reboot.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -219,11 +220,21 @@ alcor_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 static void
 alcor_kill_arch(int mode)
 {
-	/* Who said DEC engineer's have no sense of humor? ;-)  */
-	if (alpha_using_srm) {
-		*(vuip) GRU_RESET = 0x0000dead;
-		mb();
+	switch(mode) {
+	case LINUX_REBOOT_CMD_RESTART:
+		/* Who said DEC engineer's have no sense of humor? ;-)  */
+		if (alpha_using_srm) {
+			*(vuip) GRU_RESET = 0x0000dead;
+			mb();
+		}
+		break;
+	case LINUX_REBOOT_CMD_HALT:
+		break;
+	case LINUX_REBOOT_CMD_POWER_OFF:
+		break;
 	}
+
+	halt();
 }
 
 

@@ -492,6 +492,7 @@ struct matrox_fb_info {
 		int		cross4MB;
 		int		text;
 		int		plnwt;
+		int		srcorg;
 			      } capable;
 	struct {
 		unsigned int	size;
@@ -738,6 +739,7 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 
 /* G200 only */
 #define M_SRCORG	0x2CB4
+#define M_DSTORG	0x2CB8
 
 #define M_RAMDAC_BASE	0x3C00
 

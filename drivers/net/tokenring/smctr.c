@@ -26,10 +26,6 @@
  *    1. Multicast support.
  */
 
-#if defined(__alpha__) || defined(__ia64__)
-#error FIXME: driver does not support 64-bit platforms
-#endif
-
 #ifdef MODULE
 #include <linux/module.h>
 #include <linux/version.h>
@@ -62,6 +58,10 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/trdevice.h>
+
+#if BITS_PER_LONG == 64
+#error FIXME: driver does not support 64-bit platforms
+#endif
 
 #include "smctr.h"               /* Our Stuff */
 #include "smctr_firmware.h"      /* SMC adapter firmware */

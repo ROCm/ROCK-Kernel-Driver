@@ -132,10 +132,10 @@ static void remove_client_block(struct r3964_info *pInfo,
 
 static int  r3964_open(struct tty_struct *tty);
 static void r3964_close(struct tty_struct *tty);
-static int  r3964_read(struct tty_struct *tty, struct file *file,
-                     unsigned char *buf, unsigned int nr);
-static int  r3964_write(struct tty_struct * tty, struct file * file,
-                      const unsigned char * buf, unsigned int nr);
+static ssize_t r3964_read(struct tty_struct *tty, struct file *file,
+                     unsigned char *buf, size_t nr);
+static ssize_t r3964_write(struct tty_struct * tty, struct file * file,
+                      const unsigned char * buf, size_t nr);
 static int r3964_ioctl(struct tty_struct * tty, struct file * file,
                        unsigned int cmd, unsigned long arg);
 static void r3964_set_termios(struct tty_struct *tty, struct termios * old);
@@ -1238,8 +1238,8 @@ static void r3964_close(struct tty_struct *tty)
     MOD_DEC_USE_COUNT;
 }
 
-static int r3964_read(struct tty_struct *tty, struct file *file,
-                     unsigned char *buf, unsigned int nr)
+static ssize_t r3964_read(struct tty_struct *tty, struct file *file,
+			  unsigned char *buf, size_t nr)
 {
    struct r3964_info *pInfo=(struct r3964_info*)tty->disc_data;
    struct r3964_client_info *pClient;
@@ -1299,8 +1299,8 @@ repeat:
    return -EPERM;
 }
 
-static int r3964_write(struct tty_struct * tty, struct file * file,
-                      const unsigned char *data, unsigned int count)
+static ssize_t r3964_write(struct tty_struct * tty, struct file * file,
+			   const unsigned char *data, size_t count)
 {
    struct r3964_info *pInfo=(struct r3964_info*)tty->disc_data;
    struct r3964_block_header *pHeader;

@@ -182,7 +182,7 @@ void __init intel_mcheck_init(struct cpuinfo_x86 *c)
  *	Set up machine check reporting on the Winchip C6 series
  */
  
-static void winchip_mcheck_init(struct cpuinfo_x86 *c)
+static void __init winchip_mcheck_init(struct cpuinfo_x86 *c)
 {
 	u32 lo, hi;
 	/* Not supported on C3 */
@@ -207,8 +207,14 @@ static void winchip_mcheck_init(struct cpuinfo_x86 *c)
  *	This has to be run for each processor
  */
 
+
+static int mce_disabled = 0;
+
 void __init mcheck_init(struct cpuinfo_x86 *c)
 {
+	if(mce_disabled)
+		return;
+		
 	switch(c->x86_vendor)
 	{
 		case X86_VENDOR_AMD:
@@ -226,3 +232,9 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 			break;
 	}
 }
+
+static void __init mcheck_disable(char *str, int *unused)
+{
+	mce_disabled = 1;
+}
+__setup("nomce", mcheck_disable);

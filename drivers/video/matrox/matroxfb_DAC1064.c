@@ -4,7 +4,7 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.52 2001/02/02
+ * Version: 1.53 2001/06/18
  *
  * See matroxfb_base.c for contributors.
  *
@@ -33,12 +33,14 @@
 #define DAC1064_OPT_RESERVED	0x10
 
 static void matroxfb_DAC1064_flashcursor(unsigned long ptr) {
+	unsigned long flags;
+
 #define minfo ((struct matrox_fb_info*)ptr)
-	matroxfb_DAC_lock();
+	matroxfb_DAC_lock_irqsave(flags);
 	outDAC1064(PMINFO M1064_XCURCTRL, inDAC1064(PMINFO M1064_XCURCTRL) ^ M1064_XCURCTRL_DIS ^ M1064_XCURCTRL_XGA);
 	ACCESS_FBINFO(cursor.timer.expires) = jiffies + HZ/2;
 	add_timer(&ACCESS_FBINFO(cursor.timer));
-	matroxfb_DAC_unlock();
+	matroxfb_DAC_unlock_irqrestore(flags);
 #undef minfo
 }
 
@@ -719,7 +721,8 @@ static int MGAG100_preinit(WPMINFO struct matrox_hw_state* hw){
 	ACCESS_FBINFO(capable.vxres) = vxres_g100;
 	ACCESS_FBINFO(features.accel.has_cacheflush) = 1;
 	ACCESS_FBINFO(cursor.timer.function) = matroxfb_DAC1064_flashcursor;
-	ACCESS_FBINFO(capable.plnwt) = ACCESS_FBINFO(devflags.accelerator) != FB_ACCEL_MATROX_MGAG100;
+	ACCESS_FBINFO(capable.plnwt) = ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG100
+			? ACCESS_FBINFO(devflags.sgram) : 1;
 
 	ACCESS_FBINFO(primout) = &m1064;
 

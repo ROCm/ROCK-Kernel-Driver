@@ -109,10 +109,10 @@
 
 # if defined(CONFIG_SH_HP600)
 #  include <asm/io_hd64461.h>
-# elif defined(CONFIG_SH_7750_OVERDRIVE)
-#  include <asm/io_od.h>
-# elif defined(CONFIG_SH_SOLUTION_ENGINE)
+# elif (defined(CONFIG_SH_SOLUTION_ENGINE) || defined(CONFIG_SH_7751_SOLUTION_ENGINE))
 #  include <asm/io_se.h>
+# elif defined(CONFIG_SH_SH2000)
+#  include <asm/io_sh2000.h>
 # elif defined(CONFIG_SH_DMIDA) || \
        defined(CONFIG_SH_STB1_HARP) || \
        defined(CONFIG_SH_STB1_OVERDRIVE)
@@ -123,6 +123,8 @@
 #  include <asm/io_dc.h>
 # elif defined(CONFIG_SH_CAT68701)
 #  include <asm/io_cat68701.h>
+# elif defined(CONFIG_SH_BIGSUR)
+#  include <asm/io_bigsur.h>
 # elif defined(CONFIG_SH_UNKNOWN)
 #  include <asm/io_unknown.h>
 # else

@@ -658,7 +658,7 @@ static int cs4281_write_ac97(struct cs4281_state *card, u32 offset,
 	       card->pBA0 + BA0_ACCTL);
 
 	// Wait for the write to occur.
-	for (count = 0; count < 10; count++) {
+	for (count = 0; count < 100; count++) {
 		// First, we want to wait for a short time.
 		udelay(25);
 		// Now, check to see if the write has completed.
@@ -4463,9 +4463,9 @@ static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 	unregister_sound_midi(s->dev_midi);
 	iounmap(s->pBA1);
 	iounmap(s->pBA0);
-	kfree(s);
 	pci_set_drvdata(pci_dev,NULL);
 	list_del(&s->list);
+	kfree(s);
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
 		 "cs4281: cs4281_remove()-: remove successful\n"));
 }

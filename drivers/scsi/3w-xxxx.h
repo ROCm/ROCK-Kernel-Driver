@@ -129,9 +129,9 @@
 #define TW_COMMAND_ALIGNMENT_MASK	      0x1ff
 #define TW_INIT_MESSAGE_CREDITS		      0x100
 #define TW_INIT_COMMAND_PACKET_SIZE	      0x3
-#define TW_POLL_MAX_RETRIES        	      10000
+#define TW_POLL_MAX_RETRIES        	      20000
 #define TW_MAX_SGL_LENGTH		      62
-#define TW_Q_LENGTH			      256
+#define TW_Q_LENGTH			      16
 #define TW_Q_START			      0
 #define TW_MAX_SLOT			      32
 #define TW_MAX_PCI_BUSES		      255
@@ -262,8 +262,11 @@ typedef struct TAG_TW_Device_Extension {
 	TW_Registers		registers;
 	u32			*alignment_virtual_address[TW_Q_LENGTH];
 	u32			alignment_physical_address[TW_Q_LENGTH];
+	u32			*bounce_buffer[TW_Q_LENGTH];
 	int			is_unit_present[TW_MAX_UNITS];
+	int			is_raid_five[TW_MAX_UNITS];
 	int			num_units;
+	int			num_raid_five;
 	u32			*command_packet_virtual_address[TW_Q_LENGTH];
 	u32			command_packet_physical_address[TW_Q_LENGTH];
 	struct pci_dev		*tw_pci_dev;
@@ -286,6 +289,7 @@ typedef struct TAG_TW_Device_Extension {
 	u32			num_resets;
 	u32			sector_count;
 	u32			max_sector_count;
+	u32			aen_count;
 	struct Scsi_Host	*host;
 	spinlock_t		tw_lock;
 	unsigned char		ioctl_size[TW_Q_LENGTH];

@@ -30,7 +30,7 @@
 #ifndef _VXFS_INODE_H_
 #define _VXFS_INODE_H_
 
-#ident "$Id: vxfs_inode.h,v 1.14 2001/04/25 18:11:23 hch Exp hch $"
+#ident "$Id: vxfs_inode.h,v 1.15 2001/05/26 22:41:23 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - inode structure.
@@ -77,7 +77,7 @@ struct vxfs_ext4 {
 	vx_daddr_t		ve4_indir[VXFS_NIADDR];	/* Indirect extents */
 	struct direct {					/* Direct extents */
 		vx_daddr_t	extent;			/* Extent number */
-		u_int32_t	size;			/* Size of extent */
+		int32_t		size;			/* Size of extent */
 	} ve4_direct[VXFS_NDADDR];
 };
 

@@ -26,7 +26,7 @@ apcs-y				:=
 apcs-$(CONFIG_CPU_26)		:=-mcpu=arm3 -Os
 
 arch-y				:=
-arch-$(CONFIG_CPU_32v3)		:=-march=armv3m
+arch-$(CONFIG_CPU_32v3)		:=-march=armv3
 arch-$(CONFIG_CPU_32v4)		:=-march=armv4
 arch-$(CONFIG_CPU_32v5)		:=-march=armv5
 
@@ -123,6 +123,10 @@ TEXTADDR	 = 0xc0018000
 MACHINE		 = clps711x
 endif
 
+ifeq ($(CONFIG_ARCH_ANAKIN),y)
+MACHINE		 = anakin
+endif
+
 export	LIBGCC MACHINE PROCESSOR TEXTADDR GZFLAGS
 
 # Only set INCDIR if its not already defined above
@@ -156,7 +160,7 @@ ifeq ($(CONFIG_FPE_FASTFPE),y)
 LIBS		:= arch/arm/fastfpe/fast-math-emu.o $(LIBS)
 endif
 
-ifeq ($(CONFIG_ARCH_CLPS7500),y)
+ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
 SUBDIRS		+= drivers/acorn/char
 DRIVERS		+= drivers/acorn/char/acorn-char.o
 endif
@@ -237,8 +241,8 @@ bp:;	@$(MAKEBOOT) bootpImage
 	@( \
 	CFG=$(@:_config=); \
 	if [ -f arch/arm/def-configs/$$CFG ]; then \
-	  $(RM) arch/arm/defconfig; \
-	  cp arch/arm/def-configs/$$CFG arch/arm/defconfig; \
+	  [ -f .config ] && $(MV) .config .config.old; \
+	  cp arch/arm/def-configs/$$CFG .config; \
 	  echo "*** Default configuration for $$CFG installed"; \
 	  echo "*** Next, you may run 'make oldconfig'"; \
 	else \

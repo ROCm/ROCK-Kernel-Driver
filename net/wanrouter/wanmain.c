@@ -611,10 +611,10 @@ static int device_setup (wan_device_t *wandev, wandev_conf_t *u_conf)
 
 	if (conf->data_size && conf->data){
 		if(conf->data_size > 128000 || conf->data_size < 0) {
-			kfree(conf);
 			printk(KERN_INFO 
 			    "%s: ERROR, Invalid firmware data size %i !\n",
 					wandev->name, conf->data_size);
+			kfree(conf);
 		        return -EINVAL;;
 		}
 
@@ -764,23 +764,23 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 {
 	wanif_conf_t conf;
 	netdevice_t *dev=NULL;
-      #ifdef CONFIG_WANPIPE_MULTPPP
+#ifdef CONFIG_WANPIPE_MULTPPP
 	struct ppp_device *pppdev=NULL;
-      #endif
+#endif
 	int err;
 
 	if ((wandev->state == WAN_UNCONFIGURED) || (wandev->new_if == NULL))
 		return -ENODEV;
 	
-      #if defined (LINUX_2_1) || defined (LINUX_2_4)	
+#if defined (LINUX_2_1) || defined (LINUX_2_4)	
 	if(copy_from_user(&conf, u_conf, sizeof(wanif_conf_t)))
 		return -EFAULT;
-      #else
+#else
         err = verify_area(VERIFY_READ, u_conf, sizeof(wanif_conf_t));
         if (err)
                 return err;
         memcpy_fromfs((void*)&conf, (void*)u_conf, sizeof(wanif_conf_t));
-      #endif
+#endif
 		
 	if (conf.magic != ROUTER_MAGIC)
 		return -EINVAL;
@@ -797,13 +797,14 @@ static int device_new_if (wan_device_t *wandev, wanif_conf_t *u_conf)
 		}
 		memset(pppdev, 0, sizeof(struct ppp_device));
 
-	      #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,16)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,16)
 		pppdev->dev = kmalloc(sizeof(netdevice_t), GFP_KERNEL);
 		if (pppdev->dev == NULL){
+			kfree(pppdev);
 			return -ENOBUFS;
 		}
 		memset(pppdev->dev, 0, sizeof(netdevice_t));
-	      #endif
+#endif
 		
 		err = wandev->new_if(wandev, (netdevice_t *)pppdev, &conf);
 		

@@ -4,7 +4,7 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.52 2001/02/02
+ * Version: 1.53 2001/06/18
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -71,6 +71,9 @@
  *
  *               "Ken Aaker" <kdaaker@rchland.vnet.ibm.com>
  *                     memtype extension (needed for GXT130P RS/6000 adapter)
+ *
+ *               "Uns Lider" <unslider@miranda.org>
+ *                     G100 PLNWT fixes
  *
  * (following author is not in any relation with this code, but his code
  *  is included in this driver)
@@ -1409,7 +1412,7 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 
 #define DEVF_VIDEO64BIT		0x0001
 #define	DEVF_SWAPS		0x0002
-/* #define DEVF_recycled	0x0004 */
+#define DEVF_SRCORG		0x0004
 /* #define DEVF_recycled	0x0008 */
 #define DEVF_CROSS4MB		0x0010
 #define DEVF_TEXT4B		0x0020
@@ -1424,12 +1427,12 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_G450DAC		0x4000
 
 #define DEVF_GCORE	(DEVF_VIDEO64BIT | DEVF_SWAPS | DEVF_CROSS4MB | DEVF_DDC_8_2)
-#define DEVF_G2CORE	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_MAVEN_CAPABLE | DEVF_PANELLINK_CAPABLE)
+#define DEVF_G2CORE	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_MAVEN_CAPABLE | DEVF_PANELLINK_CAPABLE | DEVF_SRCORG)
 #define DEVF_G100	(DEVF_GCORE) /* no doc, no vxres... */
 #define DEVF_G200	(DEVF_G2CORE)
 #define DEVF_G400	(DEVF_G2CORE | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2)
 /* if you'll find how to drive DFP... */
-#define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC)
+#define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC | DEVF_SRCORG)
 
 static struct board {
 	unsigned short vendor, device, rev, svid, sid;
@@ -1556,7 +1559,7 @@ static struct board {
 		DEVF_G200,
 		230000,
 		&vbG200,
-		"unknown G200 (AGP)"},
+		"G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,	0x80,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MILLENNIUM_G400_MAX_AGP,
 		DEVF_G400,
@@ -1568,13 +1571,13 @@ static struct board {
 		DEVF_G400,
 		300000,
 		&vbG400,
-		"unknown G400 (AGP)"},
+		"G400 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400_AGP,	0xFF,
 		0,			0,
 		DEVF_G450,
 		500000,		/* ??? vco goes up to 900MHz... */
 		&vbG400,
-		"unknown G450 (AGP)"},
+		"G450 (AGP)"},
 #endif
 	{0,			0,				0xFF,
 		0,			0,
@@ -1611,6 +1614,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	printk(KERN_INFO "matroxfb: Matrox %s detected\n", b->name);
 	ACCESS_FBINFO(capable.plnwt) = 1;
+	ACCESS_FBINFO(capable.srcorg) = b->flags & DEVF_SRCORG;
 	ACCESS_FBINFO(devflags.video64bits) = b->flags & DEVF_VIDEO64BIT;
 	if (b->flags & DEVF_TEXT4B) {
 		ACCESS_FBINFO(devflags.vgastep) = 4;
@@ -2483,7 +2487,7 @@ int __init matroxfb_setup(char *options) {
 	return 0;
 }
 
-static int initialized __initdata = 0;
+static int __initdata initialized = 0;
 
 int __init matroxfb_init(void)
 {
@@ -2495,6 +2499,7 @@ int __init matroxfb_init(void)
 		initialized = 1;
 		matrox_init();
 	}
+	hotplug = 1;
 	/* never return failure, user can hotplug matrox later... */
 	return 0;
 }
@@ -2526,7 +2531,7 @@ MODULE_PARM_DESC(memtype, "Memory type for G200/G400 (see Documentation/fb/matro
 MODULE_PARM(mtrr, "i");
 MODULE_PARM_DESC(mtrr, "This speeds up video memory accesses (0=disabled or 1) (default=1)");
 MODULE_PARM(sgram, "i");
-MODULE_PARM_DESC(sgram, "Indicates that G200/G400 has SGRAM memory (0=SDRAM, 1=SGRAM) (default=0)");
+MODULE_PARM_DESC(sgram, "Indicates that G100/G200/G400 has SGRAM memory (0=SDRAM, 1=SGRAM) (default=0)");
 MODULE_PARM(inv24, "i");
 MODULE_PARM_DESC(inv24, "Inverts clock polarity for 24bpp and loop frequency > 100MHz (default=do not invert polarity)");
 MODULE_PARM(inverse, "i");

@@ -4,6 +4,14 @@
  *
  * 20/08/2000	RMK	use __ioremap to map flash into virtual memory
  *			make a few more places use "volatile"
+ * 22/05/2001	RMK	- Lock read against write
+ *			- merge printk level changes (with mods) from Alan Cox.
+ *			- use *ppos as the file position, not file->f_pos.
+ *			- fix check for out of range pos and r/w size
+ *
+ * Please note that we are tampering with the only flash chip in the
+ * machine, which contains the bootup code.  We therefore have the
+ * power to convert these machines into doorstops...
  */
 
 #include <linux/module.h>
@@ -16,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
+#include <linux/rwsem.h>
 #include <linux/init.h>
 
 #include <asm/hardware/dec21285.h>
@@ -28,21 +37,12 @@
 /*****************************************************************************/
 #include <asm/nwflash.h>
 
-//#define MINIKERNEL 1          //export flash write, erase routines for MiniKernel
+#define	NWFLASH_VERSION "6.4"
 
-#ifndef MINIKERNEL
-#define MSTATIC static
-#else
-#define MSTATIC
-#endif
-
-#define	NWFLASH_VERSION "6.3"
-
-MSTATIC void kick_open(void);
-MSTATIC int get_flash_id(void);
-MSTATIC int erase_block(int nBlock);
-MSTATIC int write_block(unsigned long p, const char *buf, int count);
-static int open_flash(struct inode *inodep, struct file *filep);
+static void kick_open(void);
+static int get_flash_id(void);
+static int erase_block(int nBlock);
+static int write_block(unsigned long p, const char *buf, int count);
 static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cmd, unsigned long arg);
 static ssize_t flash_read(struct file *file, char *buf, size_t count, loff_t * ppos);
 static ssize_t flash_write(struct file *file, const char *buf, size_t count, loff_t * ppos);
@@ -58,26 +58,9 @@ static int flashdebug;		//if set - we will display progress msgs
 static int gbWriteEnable;
 static int gbWriteBase64Enable;
 static volatile unsigned char *FLASH_BASE;
-MSTATIC int gbFlashSize = KFLASH_SIZE;
+static int gbFlashSize = KFLASH_SIZE;
 
 extern spinlock_t gpio_lock;
-
-static struct file_operations flash_fops =
-{
-	owner:		THIS_MODULE,
-	llseek:		flash_llseek,
-	read:		flash_read,
-	write:		flash_write,
-	ioctl:		flash_ioctl,
-	open:		open_flash,
-};
-
-static struct miscdevice flash_miscdev =
-{
-	FLASH_MINOR,
-	"nwflash",
-	&flash_fops
-};
 
 /*
  * the delay routine - it is often required to let the flash "breeze"...
@@ -88,7 +71,7 @@ void flash_wait(int timeout)
 	schedule_timeout(timeout);
 }
 
-MSTATIC int get_flash_id(void)
+static int get_flash_id(void)
 {
 	volatile unsigned int c1, c2;
 
@@ -123,23 +106,8 @@ MSTATIC int get_flash_id(void)
 	return c2;
 }
 
-static int open_flash(struct inode *inodep, struct file *filep)
-{
-	int id;
-
-	id = get_flash_id();
-	if ((id != KFLASH_ID) && (id != KFLASH_ID4)) {
-		printk("Flash: incorrect ID 0x%04X.\n", id);
-		return -ENXIO;
-	}
-
-	return 0;
-}
-
 static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cmd, unsigned long arg)
 {
-//      printk("Flash_ioctl: cmd = 0x%X.\n",cmd);
-
 	switch (cmd) {
 	case CMD_WRITE_DISABLE:
 		gbWriteBase64Enable = 0;
@@ -159,41 +127,48 @@ static int flash_ioctl(struct inode *inodep, struct file *filep, unsigned int cm
 		gbWriteEnable = 0;
 		return -EINVAL;
 	}
-
 	return 0;
 }
 
-
-
-static ssize_t flash_read(struct file *file, char *buf, size_t count, loff_t * ppos)
-{
-	unsigned long p = file->f_pos;
-	int read;
-
-	if (flashdebug)
-		printk("Flash_dev: flash_read: offset=0x%X, buffer=0x%X, count=0x%X.\n",
-		       (unsigned int) p, (unsigned int) buf, count);
-
-
-	if (count < 0)
-		return -EINVAL;
-
-	if (count > gbFlashSize - p)
-		count = gbFlashSize - p;
-
-	read = 0;
-
-	if (copy_to_user(buf, (void *)(FLASH_BASE + p), count))
-		return -EFAULT;
-	read += count;
-	file->f_pos += read;
-	return read;
-}
-
-static ssize_t flash_write(struct file *file, const char *buf, size_t count, loff_t * ppos)
+static ssize_t flash_read(struct file *file, char *buf, size_t size, loff_t * ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	unsigned long p = file->f_pos;
+	unsigned long p = *ppos;
+	unsigned int count = size;
+	int ret = 0;
+
+	if (flashdebug)
+		printk(KERN_DEBUG "flash_read: flash_read: offset=0x%lX, buffer=%p, count=0x%X.\n",
+		       p, buf, count);
+
+	if (count)
+		ret = -ENXIO;
+
+	if (p < gbFlashSize) {
+		if (count > gbFlashSize - p)
+			count = gbFlashSize - p;
+
+		/*
+		 * We now lock against reads and writes. --rmk
+		 */
+		if (down_interruptible(&inode->i_sem))
+			return -ERESTARTSYS;
+
+		ret = copy_to_user(buf, (void *)(FLASH_BASE + p), count);
+		if (ret == 0) {
+			ret = count;
+			*ppos += count;
+		}
+		up(&inode->i_sem);
+	}
+	return ret;
+}
+
+static ssize_t flash_write(struct file *file, const char *buf, size_t size, loff_t * ppos)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	unsigned long p = *ppos;
+	unsigned int count = size;
 	int written;
 	int nBlock, temp, rc;
 	int i, j;
@@ -209,20 +184,19 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t count, lof
 		return -EINVAL;
 
 	/*
-	 * if byte count is -ve or to big - error!
+	 * check for out of range pos or count
 	 */
-	if (count < 0 || count > gbFlashSize - p)
-		return -EINVAL;
+	if (p >= gbFlashSize)
+		return count ? -ENXIO : 0;
 
+	if (count > gbFlashSize - p)
+		count = gbFlashSize - p;
+			
 	if (verify_area(VERIFY_READ, buf, count))
 		return -EFAULT;
 
-
 	/*
-	 * We now should lock around writes.  Really, we shouldn't
-	 * allow the flash to be opened more than once in write
-	 * mode though (note that you can't stop two processes having
-	 * it open even then). --rmk
+	 * We now lock against reads and writes. --rmk
 	 */
 	if (down_interruptible(&inode->i_sem))
 		return -ERESTARTSYS;
@@ -246,11 +220,12 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t count, lof
 		temp -= 1;
 
 	if (flashdebug)
-		printk("FlashWrite: writing %d block(s) starting at %d.\n", temp, nBlock);
+		printk(KERN_DEBUG "flash_write: writing %d block(s) "
+			"starting at %d.\n", temp, nBlock);
 
 	for (; temp; temp--, nBlock++) {
 		if (flashdebug)
-			printk("FlashWrite: erasing block %d.\n", nBlock);
+			printk(KERN_DEBUG "flash_write: erasing block %d.\n", nBlock);
 
 		/*
 		 * first we have to erase the block(s), where we will write...
@@ -264,14 +239,12 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t count, lof
 		} while (rc && i < 10);
 
 		if (rc) {
-			if (flashdebug)
-				printk("FlashWrite: erase error %X. Aborting...\n", rc);
-
+			printk(KERN_ERR "flash_write: erase error %x\n", rc);
 			break;
 		}
 		if (flashdebug)
-			printk("FlashWrite: writing offset %X, from buf %X, bytes left %X.\n",
-			       (unsigned int) p, (unsigned int) buf, count - written);
+			printk(KERN_DEBUG "flash_write: writing offset %lX, from buf "
+				"%p, bytes left %X.\n", p, buf, count - written);
 
 		/*
 		 * write_block will limit write to space left in this block
@@ -296,17 +269,16 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t count, lof
 
 		}
 		if (rc < 0) {
-			if (flashdebug)
-				printk("FlashWrite: write error %X. Aborting...\n", rc);
+			printk(KERN_ERR "flash_write: write error %X\n", rc);
 			break;
 		}
 		p += rc;
 		buf += rc;
 		written += rc;
-		file->f_pos += rc;
+		*ppos += rc;
 
 		if (flashdebug)
-			printk("FlashWrite: written 0x%X bytes OK.\n", written);
+			printk(KERN_DEBUG "flash_write: written 0x%X bytes OK.\n", written);
 	}
 
 	/*
@@ -331,8 +303,8 @@ static ssize_t flash_write(struct file *file, const char *buf, size_t count, lof
 static long long flash_llseek(struct file *file, long long offset, int orig)
 {
 	if (flashdebug)
-		printk("Flash_dev: flash_lseek, offset=0x%X, orig=0x%X.\n",
-		       (unsigned int) offset, (unsigned int) orig);
+		printk(KERN_DEBUG "flash_llseek: offset=0x%X, orig=0x%X.\n",
+		       (unsigned int) offset, orig);
 
 	switch (orig) {
 	case 0:
@@ -362,7 +334,7 @@ static long long flash_llseek(struct file *file, long long offset, int orig)
  * so just go ahead and erase, what requested!
  */
 
-MSTATIC int erase_block(int nBlock)
+static int erase_block(int nBlock)
 {
 	volatile unsigned int c1;
 	volatile unsigned char *pWritePtr;
@@ -440,13 +412,12 @@ MSTATIC int erase_block(int nBlock)
 	 * check if erase errors were reported
 	 */
 	if (c1 & 0x20) {
-		if (flashdebug)
-			printk("Flash_erase: err at %X.\n", (unsigned int) pWritePtr);
+		printk(KERN_ERR "flash_erase: err at %p\n", pWritePtr);
+
 		/*
 		 * reset error
 		 */
 		*(volatile unsigned char *) (FLASH_BASE + 0x8000) = 0x50;
-
 		return -2;
 	}
 
@@ -459,9 +430,8 @@ MSTATIC int erase_block(int nBlock)
 
 	for (temp = 0; temp < 16 * 1024; temp++, pWritePtr += 4) {
 		if ((temp1 = *(volatile unsigned int *) pWritePtr) != 0xFFFFFFFF) {
-			if (flashdebug)
-				printk("Flash_erase: verify err at %X = %X.\n",
-				       (unsigned int) pWritePtr, temp1);
+			printk(KERN_ERR "flash_erase: verify err at %p = %X\n",
+			       pWritePtr, temp1);
 			return -1;
 		}
 	}
@@ -473,7 +443,7 @@ MSTATIC int erase_block(int nBlock)
 /*
  * write_block will limit number of bytes written to the space in this block
  */
-MSTATIC int write_block(unsigned long p, const char *buf, int count)
+static int write_block(unsigned long p, const char *buf, int count)
 {
 	volatile unsigned int c1;
 	volatile unsigned int c2;
@@ -591,7 +561,7 @@ MSTATIC int write_block(unsigned long p, const char *buf, int count)
 			 */
 			if (time_before(jiffies, timeout)) {
 				if (flashdebug)
-					printk("FlashWrite: Retrying write (addr=0x%X)...\n",
+					printk(KERN_DEBUG "write_block: Retrying write at 0x%X)n",
 					       pWritePtr - FLASH_BASE);
 
 				/*
@@ -609,7 +579,7 @@ MSTATIC int write_block(unsigned long p, const char *buf, int count)
 
 				goto WriteRetry;
 			} else {
-				printk("Timeout in flash write! (addr=0x%X) Aborting...\n",
+				printk(KERN_ERR "write_block: timeout at 0x%X\n",
 				       pWritePtr - FLASH_BASE);
 				/*
 				 * return error -2
@@ -636,9 +606,8 @@ MSTATIC int write_block(unsigned long p, const char *buf, int count)
 			return -EFAULT;
 		buf++;
 		if ((c1 = *pWritePtr++) != c) {
-			if (flashdebug)
-				printk("flash write verify error at 0x%X! (%02X!=%02X) Retrying...\n",
-				       (unsigned int) pWritePtr, c1, c);
+			printk(KERN_ERR "write_block: verify error at 0x%X (%02X!=%02X)\n",
+			       pWritePtr - FLASH_BASE, c1, c);
 			return 0;
 		}
 	}
@@ -647,7 +616,7 @@ MSTATIC int write_block(unsigned long p, const char *buf, int count)
 }
 
 
-MSTATIC void kick_open(void)
+static void kick_open(void)
 {
 	unsigned long flags;
 
@@ -665,7 +634,23 @@ MSTATIC void kick_open(void)
 	udelay(25);
 }
 
-MSTATIC int __init nwflash_init(void)
+static struct file_operations flash_fops =
+{
+	owner:		THIS_MODULE,
+	llseek:		flash_llseek,
+	read:		flash_read,
+	write:		flash_write,
+	ioctl:		flash_ioctl,
+};
+
+static struct miscdevice flash_miscdev =
+{
+	FLASH_MINOR,
+	"nwflash",
+	&flash_fops
+};
+
+static int __init nwflash_init(void)
 {
 	int ret = -ENODEV;
 
@@ -677,6 +662,13 @@ MSTATIC int __init nwflash_init(void)
 			goto out;
 
 		id = get_flash_id();
+		if ((id != KFLASH_ID) && (id != KFLASH_ID4)) {
+			ret = -ENXIO;
+			iounmap((void *)FLASH_BASE);
+			printk("Flash: incorrect ID 0x%04X.\n", id);
+			goto out;
+		}
+
 		printk("Flash ROM driver v.%s, flash device ID 0x%04X, size %d Mb.\n",
 		       NWFLASH_VERSION, id, gbFlashSize / (1024 * 1024));
 
@@ -688,7 +680,7 @@ out:
 	return ret;
 }
 
-MSTATIC void __exit nwflash_exit(void)
+static void __exit nwflash_exit(void)
 {
 	misc_deregister(&flash_miscdev);
 	iounmap((void *)FLASH_BASE);

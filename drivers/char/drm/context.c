@@ -91,10 +91,13 @@ static int drm_alloc_queue(drm_device_t *dev)
 		atomic_dec(&dev->queuelist[i]->use_count);
 	}
 				/* Allocate a new queue */
-	down(&dev->struct_sem);
 	
 	queue = drm_alloc(sizeof(*queue), DRM_MEM_QUEUES);
+	if(queue == NULL)
+		return -ENOMEM;	
+
 	memset(queue, 0, sizeof(*queue));
+	down(&dev->struct_sem);
 	atomic_set(&queue->use_count, 1);
 	
 	++dev->queue_count;

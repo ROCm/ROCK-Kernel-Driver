@@ -48,7 +48,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#define FIQ_VECTOR 0x1c
+#define FIQ_VECTOR (vectors_base() + 0x1c)
 
 static unsigned long no_fiq_insn;
 

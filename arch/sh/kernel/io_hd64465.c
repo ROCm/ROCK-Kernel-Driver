@@ -1,5 +1,5 @@
 /*
- * $Id: io_hd64465.c,v 1.6 2001/02/15 09:13:51 dave_mckay Exp $
+ * $Id: io_hd64465.c,v 1.7 2001/05/09 07:39:36 gniibe Exp $
  * by Greg Banks <gbanks@pocketpenguins.com>
  * (c) 2000 PocketPenguins Inc
  *
@@ -52,6 +52,8 @@ static unsigned char	hd64465_iomap_hi_shift[HD64465_IOMAP_HI_NMAP];
 #define MAX(a,b)    ((a)>(b)?(a):(b))
 #endif
 
+#define PORT2ADDR(x) (sh_mv.mv_isa_port2addr(x))
+
 void hd64465_port_map(unsigned short baseport, unsigned int nports,
 		      unsigned long addr, unsigned char shift)
 {
@@ -101,7 +103,7 @@ void hd64465_port_unmap(unsigned short baseport, unsigned int nports)
 }
 EXPORT_SYMBOL(hd64465_port_unmap);
 
-static /*__inline__*/ unsigned long PORT2ADDR(unsigned long port)
+unsigned long hd64465_isa_port2addr(unsigned long port)
 {
     	unsigned long addr = 0;
 	unsigned char shift;

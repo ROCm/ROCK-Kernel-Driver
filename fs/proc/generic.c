@@ -192,13 +192,22 @@ static int xlate_proc_name(const char *name,
 
 static unsigned char proc_alloc_map[PROC_NDYNAMIC / 8];
 
+spinlock_t proc_alloc_map_lock = SPIN_LOCK_UNLOCKED;
+
 static int make_inode_number(void)
 {
-	int i = find_first_zero_bit((void *) proc_alloc_map, PROC_NDYNAMIC);
-	if (i<0 || i>=PROC_NDYNAMIC) 
-		return -1;
+	int i;
+	spin_lock(&proc_alloc_map_lock);
+	i = find_first_zero_bit((void *) proc_alloc_map, PROC_NDYNAMIC);
+	if (i<0 || i>=PROC_NDYNAMIC) {
+		i = -1;
+		goto out;
+	}
 	set_bit(i, (void *) proc_alloc_map);
-	return PROC_DYNAMIC_FIRST + i;
+	i += PROC_DYNAMIC_FIRST;
+out:
+	spin_unlock(&proc_alloc_map_lock);
+	return i;
 }
 
 static int proc_readlink(struct dentry *dentry, char *buffer, int buflen)

@@ -15,6 +15,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sysctl.h>
 #include <linux/input.h>
+#include <linux/module.h>
 
 #ifdef CONFIG_MAC_ADBKEYCODES
 #include <linux/keyboard.h>
@@ -401,6 +402,8 @@ int mac_hid_keyboard_sends_linux_keycodes(void)
 	return keyboard_sends_linux_keycodes;
 }
 
+EXPORT_SYMBOL(mac_hid_keyboard_sends_linux_keycodes);
+
 static int __init mac_hid_setup(char *str)
 {
 	int ints[2];
@@ -448,6 +451,8 @@ int mac_hid_mouse_emulate_buttons(int caller, unsigned int keycode, int down)
 	return 0;
 }
 
+EXPORT_SYMBOL(mac_hid_mouse_emulate_buttons);
+
 static void emumousebtn_input_register(void)
 {
 	emumousebtn.name = "Macintosh mouse button emulation";
@@ -473,9 +478,19 @@ void __init mac_hid_init_hw(void)
 #ifdef CONFIG_MAC_ADBKEYCODES
 	memcpy(pc_key_maps_save, key_maps, sizeof(key_maps));
 
-	if (!keyboard_sends_linux_keycodes)
-		memcpy(key_maps, mac_key_maps_save, sizeof(key_maps));
+	if (!keyboard_sends_linux_keycodes) {
+#ifdef CONFIG_MAGIC_SYSRQ
+		ppc_md.ppc_kbd_sysrq_xlate   = mac_hid_kbd_sysrq_xlate;
+		SYSRQ_KEY                = 0x69;
 #endif
+		memcpy(key_maps, mac_key_maps_save, sizeof(key_maps));
+	} else {
+#ifdef CONFIG_MAGIC_SYSRQ
+		ppc_md.ppc_kbd_sysrq_xlate   = pckbd_sysrq_xlate;
+		SYSRQ_KEY                = 0x54;
+#endif
+	}
+#endif /* CONFIG_MAC_ADBKEYCODES */
 
 #ifdef CONFIG_MAC_EMUMOUSEBTN
 	emumousebtn_input_register();

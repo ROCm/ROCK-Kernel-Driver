@@ -64,7 +64,11 @@
 #define CCN_PVR_CHIP_MASK  0xff
 #define CCN_PVR_CHIP_ST40STB1 0x4
 
-#endif
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+#define CLOCKGEN_MEMCLKCR 0xbb040038
+#define MEMCLKCR_RATIO_MASK 0x7
+#endif /* CONFIG_CPU_SUBTYPE_ST40STB1 */
+#endif /* __sh3__ or __SH4__ */
 
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
@@ -285,6 +289,9 @@ static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NUL
 void __init time_init(void)
 {
 	unsigned int cpu_clock, master_clock, bus_clock, module_clock;
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	unsigned int memory_clock;
+#endif
 	unsigned int timer_freq;
 	unsigned short frqcr, ifc, pfc, bfc;
 	unsigned long interval;
@@ -335,23 +342,35 @@ void __init time_init(void)
 		{ 0x123, {{1,4}, {1,4}, {1,8}}},
 		{ 0x16C, {{1,4}, {1,8}, {1,8}}},
 	};
+
+	struct memclk_data {
+		unsigned char multiplier;
+		unsigned char divisor;
+	};
+	static struct memclk_data st40_memclk_table[8] = {
+		{1,1},	// 000
+		{1,2},	// 001
+		{1,3},	// 010
+		{2,3},	// 011
+		{1,4},	// 100
+		{1,6},	// 101
+		{1,8},	// 110
+		{1,8}	// 111
+	};
 #endif
 #endif
 
-#if defined(CONFIG_SH_DREAMCAST)
-	xtime.tv_sec = 0;
-	xtime.tv_usec = 0;
-#else
-	rtc_gettimeofday(&xtime);
-#endif
+	if (MACH_DREAMCAST)
+		xtime.tv_sec = xtime.tv_usec = 0;
+	else
+		rtc_gettimeofday(&xtime);
 
 	setup_irq(TIMER_IRQ, &irq0);
 
-#if defined(CONFIG_SH_DREAMCAST)
-	timer_freq = 50*1000*1000/4;
-#else
-	timer_freq = get_timer_frequency();
-#endif
+	if (MACH_DREAMCAST)
+		timer_freq = 50*1000*1000/4;
+	else
+		timer_freq = get_timer_frequency();
 
 	module_clock = timer_freq * 4;
 
@@ -386,6 +405,8 @@ void __init time_init(void)
 			/* Unfortunatly the STB1 FRQCR values are different from the 7750 ones */
 			struct frqcr_data *d;
 			int a;
+			unsigned long memclkcr;
+			struct memclk_data *e;
 
 			for (a=0; a<ARRAY_SIZE(st40_frqcr_table); a++) {
 				d = &st40_frqcr_table[a];
@@ -397,13 +418,18 @@ void __init time_init(void)
 				printk("ERROR: Unrecognised FRQCR value, using default multipliers\n");
 			}
 
-			printk("Clock multipliers: CPU: %d/%d Bus: %d/%d Periph: %d/%d\n",
+			memclkcr = ctrl_inl(CLOCKGEN_MEMCLKCR);
+			e = &st40_memclk_table[memclkcr & MEMCLKCR_RATIO_MASK];
+
+			printk("Clock multipliers: CPU: %d/%d Bus: %d/%d Mem: %d/%d Periph: %d/%d\n",
 			       d->factor[0].multiplier, d->factor[0].divisor,
 			       d->factor[1].multiplier, d->factor[1].divisor,
+			       e->multiplier,           e->divisor,
 			       d->factor[2].multiplier, d->factor[2].divisor);
 			
 			master_clock = module_clock * d->factor[2].divisor    / d->factor[2].multiplier;
 			bus_clock    = master_clock * d->factor[1].multiplier / d->factor[1].divisor;
+			memory_clock = master_clock * e->multiplier           / e->divisor;
 			cpu_clock    = master_clock * d->factor[0].multiplier / d->factor[0].divisor;
 			goto skip_calc;
 		} else
@@ -418,11 +444,17 @@ void __init time_init(void)
 	master_clock = module_clock * pfc;
 	bus_clock = master_clock / bfc;
 	cpu_clock = master_clock / ifc;
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
  skip_calc:
+#endif
 	printk("CPU clock: %d.%02dMHz\n",
 	       (cpu_clock / 1000000), (cpu_clock % 1000000)/10000);
 	printk("Bus clock: %d.%02dMHz\n",
 	       (bus_clock/1000000), (bus_clock % 1000000)/10000);
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	printk("Memory clock: %d.%02dMHz\n",
+	       (memory_clock/1000000), (memory_clock % 1000000)/10000);
+#endif
 	printk("Module clock: %d.%02dMHz\n",
 	       (module_clock/1000000), (module_clock % 1000000)/10000);
 	interval = (module_clock/4 + HZ/2) / HZ;
@@ -432,6 +464,9 @@ void __init time_init(void)
 	current_cpu_data.cpu_clock    = cpu_clock;
 	current_cpu_data.master_clock = master_clock;
 	current_cpu_data.bus_clock    = bus_clock;
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	current_cpu_data.memory_clock = memory_clock;
+#endif
 	current_cpu_data.module_clock = module_clock;
 
 	/* Start TMU0 */

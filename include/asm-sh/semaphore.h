@@ -3,6 +3,7 @@
 
 #include <linux/linkage.h>
 
+#ifdef __KERNEL__
 /*
  * SMP- and interrupt-safe semaphores.
  *
@@ -84,13 +85,10 @@ asmlinkage void __down(struct semaphore * sem);
 asmlinkage int  __down_interruptible(struct semaphore * sem);
 asmlinkage int  __down_trylock(struct semaphore * sem);
 asmlinkage void __up(struct semaphore * sem);
-extern struct rw_semaphore *__down_read(struct rw_semaphore *sem, int carry);
-extern struct rw_semaphore *__down_write(struct rw_semaphore *sem, int carry);
-asmlinkage struct rw_semaphore *__rwsem_wake(struct rw_semaphore *sem);
 
 extern spinlock_t semaphore_wake_lock;
 
-extern __inline__ void down(struct semaphore * sem)
+static inline void down(struct semaphore * sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
@@ -100,7 +98,7 @@ extern __inline__ void down(struct semaphore * sem)
 		__down(sem);
 }
 
-extern __inline__ int down_interruptible(struct semaphore * sem)
+static inline int down_interruptible(struct semaphore * sem)
 {
 	int ret = 0;
 #if WAITQUEUE_DEBUG
@@ -112,7 +110,7 @@ extern __inline__ int down_interruptible(struct semaphore * sem)
 	return ret;
 }
 
-extern __inline__ int down_trylock(struct semaphore * sem)
+static inline int down_trylock(struct semaphore * sem)
 {
 	int ret = 0;
 #if WAITQUEUE_DEBUG
@@ -128,7 +126,7 @@ extern __inline__ int down_trylock(struct semaphore * sem)
  * Note! This is subtle. We jump to wake people up only if
  * the semaphore was negative (== somebody was waiting on it).
  */
-extern __inline__ void up(struct semaphore * sem)
+static inline void up(struct semaphore * sem)
 {
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
@@ -137,4 +135,5 @@ extern __inline__ void up(struct semaphore * sem)
 		__up(sem);
 }
 
+#endif
 #endif /* __ASM_SH_SEMAPHORE_H */

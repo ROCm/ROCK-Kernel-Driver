@@ -33,6 +33,7 @@
 
 #define MAJOR_NR	FLOPPY_MAJOR
 #include <linux/blk.h>
+#include <linux/devfs_fs_kernel.h>
 
 static int floppy_blocksizes[2] = {512,512};
 static int floppy_sizes[2] = {2880,2880};
@@ -248,10 +249,7 @@ static int swim3_add_device(struct device_node *swims);
 int swim3_init(void);
 
 #ifndef CONFIG_PMAC_PBOOK
-static inline int check_media_bay(struct device_node *which_bay, int what)
-{
-	return 1;
-}
+#define check_media_bay(which, what)	1
 #endif
 
 static void swim3_select(struct floppy_state *fs, int sel)
@@ -1014,9 +1012,13 @@ static struct block_device_operations floppy_fops = {
 	revalidate:		floppy_revalidate,
 };
 
+static devfs_handle_t floppy_devfs_handle;
+
 int swim3_init(void)
 {
 	struct device_node *swim;
+
+	floppy_devfs_handle = devfs_mk_dir(NULL, "floppy", NULL);
 
 	swim = find_devices("floppy");
 	while (swim && (floppy_count < MAX_FLOPPIES))
@@ -1034,7 +1036,7 @@ int swim3_init(void)
 
 	if (floppy_count > 0)
 	{
-		if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
+		if (devfs_register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
 			printk(KERN_ERR "Unable to get major %d for floppy\n",
 			       MAJOR_NR);
 			return -EBUSY;
@@ -1051,7 +1053,9 @@ static int swim3_add_device(struct device_node *swim)
 {
 	struct device_node *mediabay;
 	struct floppy_state *fs = &floppy_states[floppy_count];
-	
+	char floppy_name[16];
+	devfs_handle_t floppy_handle;
+
 	if (swim->n_addrs < 2)
 	{
 		printk(KERN_INFO "swim3: expecting 2 addrs (n_addrs:%d, n_intrs:%d)\n",
@@ -1108,6 +1112,12 @@ static int swim3_add_device(struct device_node *swim)
 
 	printk(KERN_INFO "fd%d: SWIM3 floppy controller %s\n", floppy_count,
 		mediabay ? "in media bay" : "");
+	sprintf(floppy_name, "%s%d", floppy_devfs_handle ? "" : "floppy",
+			floppy_count);
+	floppy_handle = devfs_register(floppy_devfs_handle, floppy_name, 
+			DEVFS_FL_DEFAULT, MAJOR_NR, floppy_count, 
+			S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP, 
+			&floppy_fops, NULL);
 
 	floppy_count++;
 	

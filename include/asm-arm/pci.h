@@ -41,7 +41,7 @@ extern inline void
 pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
 		    dma_addr_t dma_handle)
 {
-	consistent_free(vaddr);
+	consistent_free(vaddr, size, dma_handle);
 }
 
 /* Map a single buffer of the indicated size for DMA in streaming mode.

@@ -1998,14 +1998,14 @@ static void busfree_run(struct Scsi_Host *shpnt)
 			if (!HOSTDATA(shpnt)->commands)
 				SETPORT(PORTA, 0);	/* turn led off */
 
-			kfree(DONE_SC->host_scribble);
-			DONE_SC->host_scribble=0;
-
 			DO_UNLOCK(flags);
 			DPRINTK(debug_done, DEBUG_LEAD "calling scsi_done(%p)\n", CMDINFO(DONE_SC), DONE_SC);
                 	DONE_SC->scsi_done(DONE_SC);
 			DPRINTK(debug_done, DEBUG_LEAD "scsi_done(%p) returned\n", CMDINFO(DONE_SC), DONE_SC);
 			DO_LOCK(flags);
+
+			kfree(DONE_SC->host_scribble);
+			DONE_SC->host_scribble=0;
 		}
 
 		DONE_SC=0;
@@ -2872,11 +2872,11 @@ static void rsti_run(struct Scsi_Host *shpnt)
 		if (!ptr->device->soft_reset) {
 			remove_SC(&DISCONNECTED_SC, ptr);
 
-			kfree(ptr->host_scribble);
-			ptr->host_scribble=0;
-
 			ptr->result =  DID_RESET << 16;
 			ptr->scsi_done(ptr);
+
+			kfree(ptr->host_scribble);
+			ptr->host_scribble=0;
 		}
 
 		ptr = next;

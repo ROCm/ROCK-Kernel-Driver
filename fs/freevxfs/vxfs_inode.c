@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_inode.c,v 1.34 2001/05/21 15:33:08 hch Exp hch $"
+#ident "$Id: vxfs_inode.c,v 1.36 2001/05/26 22:28:02 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - inode routines.
@@ -47,6 +47,7 @@ extern struct address_space_operations vxfs_immed_aops;
 extern struct inode_operations vxfs_immed_symlink_iops;
 
 static struct file_operations vxfs_file_operations = {
+	.llseek =		generic_file_llseek,
 	.read =			generic_file_read,
 	.mmap =			generic_file_mmap,
 };
@@ -91,7 +92,7 @@ vxfs_dumpi(struct vxfs_inode_info *vip, ino_t ino)
  *  Returns the matching VxFS inode on success, else a NULL pointer.
  *
  * NOTE:
- *  While __vxfs_iget uses that pagecache this function uses the
+ *  While __vxfs_iget uses the pagecache vxfs_blkiget uses the
  *  buffercache.  This function should not be used outside the
  *  read_super() method, othwerwise the data may be incoherent.
  */
@@ -138,7 +139,7 @@ fail:
  *  Returns the matching VxFS inode on success, else a NULL pointer.
  */
 static struct vxfs_inode_info *
-__vxfs_iget(struct super_block *sbp, ino_t ino, struct inode *ilistp)
+__vxfs_iget(ino_t ino, struct inode *ilistp)
 {
 	struct page			*pp;
 	u_long				offset;
@@ -184,7 +185,7 @@ fail:
 struct vxfs_inode_info *
 vxfs_stiget(struct super_block *sbp, ino_t ino)
 {
-        return __vxfs_iget(sbp, ino, VXFS_SBI(sbp)->vsi_stilist);
+        return __vxfs_iget(ino, VXFS_SBI(sbp)->vsi_stilist);
 }
 
 /**
@@ -288,7 +289,7 @@ vxfs_read_inode(struct inode *ip)
 	struct address_space_operations	*aops;
 	ino_t				ino = ip->i_ino;
 
-	if (!(vip = __vxfs_iget(sbp, ino, VXFS_SBI(sbp)->vsi_ilist)))
+	if (!(vip = __vxfs_iget(ino, VXFS_SBI(sbp)->vsi_ilist)))
 		return;
 
 	vxfs_iinit(ip, vip);

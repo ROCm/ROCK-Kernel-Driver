@@ -2,9 +2,9 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.50 2000/08/10
+ * Version: 1.51 2001/06/18
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -129,6 +129,10 @@ void matrox_cfbX_init(WPMINFO struct display* p) {
 	mga_outl(M_YDSTORG, curr_ydstorg(MINFO));
 	if (ACCESS_FBINFO(capable.plnwt))
 		mga_outl(M_PLNWT, -1);
+	if (ACCESS_FBINFO(capable.srcorg)) {
+		mga_outl(M_SRCORG, 0);
+		mga_outl(M_DSTORG, 0);
+	}
 	mga_outl(M_OPMODE, mopmode);
 	mga_outl(M_CXBNDRY, 0xFFFF0000);
 	mga_outl(M_YTOP, 0);

@@ -1,5 +1,5 @@
 /*
- * $Id: capi.c,v 1.44.6.11 2001/05/17 20:41:51 kai Exp $
+ * $Id: capi.c,v 1.44.6.12 2001/06/09 15:14:15 kai Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
@@ -43,7 +43,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.44.6.11 $";
+static char *revision = "$Revision: 1.44.6.12 $";
 
 MODULE_AUTHOR("Carsten Paeth (calle@calle.in-berlin.de)");
 
@@ -256,7 +256,6 @@ struct capiminor *capiminor_alloc(__u16 applid, __u32 ncci)
 void capiminor_free(struct capiminor *mp)
 {
 	struct capiminor **pp;
-	struct sk_buff *skb;
 
 	pp = &minors;
 	while (*pp) {
@@ -264,12 +263,9 @@ void capiminor_free(struct capiminor *mp)
 			*pp = (*pp)->next;
 			if (mp->ttyskb) kfree_skb(mp->ttyskb);
 			mp->ttyskb = 0;
-			while ((skb = skb_dequeue(&mp->recvqueue)) != 0)
-				kfree_skb(skb);
-			while ((skb = skb_dequeue(&mp->inqueue)) != 0)
-				kfree_skb(skb);
-			while ((skb = skb_dequeue(&mp->outqueue)) != 0)
-				kfree_skb(skb);
+			skb_queue_purge(&mp->recvqueue);
+			skb_queue_purge(&mp->inqueue);
+			skb_queue_purge(&mp->outqueue);
 			capiminor_del_all_ack(mp);
 			kmem_cache_free(capiminor_cachep, mp);
 			MOD_DEC_USE_COUNT;
@@ -411,15 +407,12 @@ static struct capidev *capidev_alloc(struct file *file)
 static void capidev_free(struct capidev *cdev)
 {
 	struct capidev **pp;
-	struct sk_buff *skb;
 
 	if (cdev->applid)
 		(*capifuncs->capi_release) (cdev->applid);
 	cdev->applid = 0;
 
-	while ((skb = skb_dequeue(&cdev->recvqueue)) != 0) {
-		kfree_skb(skb);
-	}
+	skb_queue_purge(&cdev->recvqueue);
 	
 	pp=&capidev_openlist;
 	while (*pp && *pp != cdev) pp = &(*pp)->next;

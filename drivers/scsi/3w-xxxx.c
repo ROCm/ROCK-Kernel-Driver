@@ -76,6 +76,20 @@
                  Make tw_setfeature() call with interrupts disabled.
                  Register interrupt handler before enabling interrupts.
                  Clear attention interrupt before draining aen queue.
+   1.02.00.005 - Allocate bounce buffers and custom queue depth for raid5 for
+                 6000 and 5000 series controllers.
+                 Reduce polling mdelays causing problems on some systems.
+                 Fix use_sg = 1 calculation bug.
+                 Check for scsi_register returning NULL.
+                 Add aen count to /proc/scsi/3w-xxxx.
+                 Remove aen code unit masking in tw_aen_complete().
+   1.02.00.006 - Remove unit from printk in tw_scsi_eh_abort(), causing
+                 possible oops.
+                 Fix possible null pointer dereference in tw_scsi_queue()
+                 if done function pointer was invalid.
+   1.02.00.007 - Fix possible null pointer dereferences in tw_ioctl().
+                 Remove check for invalid done function pointer from
+                 tw_scsi_queue().
 */
 
 #include <linux/module.h>
@@ -121,7 +135,7 @@ static struct notifier_block tw_notifier = {
 };
 
 /* Globals */
-char *tw_driver_version="1.02.00.004";
+char *tw_driver_version="1.02.00.007";
 TW_Device_Extension *tw_device_extension_list[TW_MAX_SLOT];
 int tw_device_extension_count = 0;
 
@@ -131,7 +145,7 @@ int tw_device_extension_count = 0;
 int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id) 
 {
 	TW_Param *param;
-	unsigned short aen, aen_code;
+	unsigned short aen;
 
 	if (tw_dev->alignment_virtual_address[request_id] == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_aen_complete(): Bad alignment virtual address.\n");
@@ -139,10 +153,9 @@ int tw_aen_complete(TW_Device_Extension *tw_dev, int request_id)
 	}
 	param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
 	aen = *(unsigned short *)(param->data);
-	aen_code = (aen & 0x0ff);
-	dprintk(KERN_NOTICE "3w-xxxx: tw_aen_complete(): Queue'd code 0x%x\n", aen_code);
+	dprintk(KERN_NOTICE "3w-xxxx: tw_aen_complete(): Queue'd code 0x%x\n", aen);
 	/* Now queue the code */
-	tw_dev->aen_queue[tw_dev->aen_tail] = aen_code;
+	tw_dev->aen_queue[tw_dev->aen_tail] = aen;
 	if (tw_dev->aen_tail == TW_Q_LENGTH - 1) {
 		tw_dev->aen_tail = TW_Q_START;
 	} else {
@@ -241,7 +254,7 @@ int tw_aen_drain_queue(TW_Device_Extension *tw_dev)
     
 		/* Now poll for completion */
 		for (i=0;i<imax;i++) {
-			mdelay(10);
+			mdelay(5);
 			status_reg_value = inl(status_reg_addr);
 			if (tw_check_bits(status_reg_value)) {
 				printk(KERN_WARNING "3w-xxxx: tw_aen_drain_queue(): Unexpected bits.\n");
@@ -437,13 +450,21 @@ int tw_allocate_memory(TW_Device_Extension *tw_dev, int request_id, int size, in
 		return 1;
 	}
 
-	if (which == 0) {
+	switch(which) {
+	case 0:
 		tw_dev->command_packet_virtual_address[request_id] = virt_addr;
-		tw_dev->command_packet_physical_address[request_id] = 
-		virt_to_bus(virt_addr);
-	} else {
+		tw_dev->command_packet_physical_address[request_id] = virt_to_bus(virt_addr);
+		break;
+	case 1:
 		tw_dev->alignment_virtual_address[request_id] = virt_addr;
 		tw_dev->alignment_physical_address[request_id] = virt_to_bus(virt_addr);
+		break;
+	case 2:
+		tw_dev->bounce_buffer[request_id] = virt_addr;
+		break;
+	default:
+		printk(KERN_WARNING "3w-xxxx: tw_allocate_memory(): case slip in tw_allocate_memory()\n");
+		return 1;
 	}
 	return 0;
 } /* End tw_allocate_memory() */
@@ -709,8 +730,8 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 
 		/* Register the card with the kernel SCSI layer */
 			host = scsi_register(tw_host, sizeof(TW_Device_Extension));
-			if( host == NULL)
-			{
+			if (host == NULL) {
+				printk(KERN_WARNING "3w-xxxx: tw_findcards(): scsi_register() failed for card %d.\n", numcards-1);
 				release_region((tw_dev->tw_pci_dev->resource[0].start), TW_IO_ADDRESS_RANGE);
 				tw_free_device_extension(tw_dev);
 				kfree(tw_dev);
@@ -788,6 +809,9 @@ void tw_free_device_extension(TW_Device_Extension *tw_dev)
 
 		if (tw_dev->alignment_virtual_address[i])
 			kfree(tw_dev->alignment_virtual_address[i]);
+
+		if (tw_dev->bounce_buffer[i])
+			kfree(tw_dev->bounce_buffer[i]);
 	}
 } /* End tw_free_device_extension() */
 
@@ -853,7 +877,7 @@ int tw_initconnection(TW_Device_Extension *tw_dev, int message_credits)
 	/* Poll for completion */
 	imax = TW_POLL_MAX_RETRIES;
 	for (i=0;i<imax;i++) {
-		mdelay(10);
+		mdelay(5);
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_initconnection(): Unexpected bits.\n");
@@ -909,8 +933,10 @@ int tw_initialize_device_extension(TW_Device_Extension *tw_dev)
 		tw_dev->aen_queue[i] = 0;
 	}
 
-	for (i=0;i<TW_MAX_UNITS;i++)
+	for (i=0;i<TW_MAX_UNITS;i++) {
 		tw_dev->is_unit_present[i] = 0;
+		tw_dev->is_raid_five[i] = 0;
+	}
 
 	tw_dev->num_units = 0;
 	tw_dev->num_aborts = 0;
@@ -928,6 +954,8 @@ int tw_initialize_device_extension(TW_Device_Extension *tw_dev)
 	tw_dev->aen_tail = 0;
 	tw_dev->sector_count = 0;
 	tw_dev->max_sector_count = 0;
+	tw_dev->aen_count = 0;
+	tw_dev->num_raid_five = 0;
 	spin_lock_init(&tw_dev->tw_lock);
 	tw_dev->flags = 0;
 	return 0;
@@ -940,13 +968,14 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 	unsigned char request_id = 0;
 	TW_Command *command_packet;
 	TW_Param *param;
-	int i, imax, num_units = 0;
+	int i, j, imax, num_units = 0, num_raid_five = 0;
 	u32 status_reg_addr, status_reg_value;
 	u32 command_que_addr, command_que_value;
 	u32 response_que_addr;
 	TW_Response_Queue response_queue;
 	u32 param_value;
 	unsigned char *is_unit_present;
+	unsigned char *raid_level;
 
 	dprintk(KERN_NOTICE "3w-xxxx: tw_initialize_units()\n");
 
@@ -1001,7 +1030,7 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 	/* Poll for completion */
 	imax = TW_POLL_MAX_RETRIES;
 	for(i=0; i<imax; i++) {
-		mdelay(10);
+		mdelay(5);
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Unexpected bits.\n");
@@ -1051,6 +1080,110 @@ int tw_initialize_units(TW_Device_Extension *tw_dev)
 	if (num_units == 0) {
 		printk(KERN_NOTICE "3w-xxxx: tw_initialize_units(): No units found.\n");
 		return 1;
+	}
+
+	/* Find raid 5 arrays */
+	for (j=0;j<TW_MAX_UNITS;j++) {
+		if (tw_dev->is_unit_present[j] == 0)
+			continue;
+		command_packet = (TW_Command *)tw_dev->command_packet_virtual_address[request_id];
+		if (command_packet == NULL) {
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bad command packet virtual address.\n");
+			return 1;
+		}
+		memset(command_packet, 0, sizeof(TW_Sector));
+		command_packet->byte0.opcode      = TW_OP_GET_PARAM;
+		command_packet->byte0.sgl_offset  = 2;
+		command_packet->size              = 4;
+		command_packet->request_id        = request_id;
+		command_packet->byte3.unit        = 0;
+		command_packet->byte3.host_id     = 0;
+		command_packet->status            = 0;
+		command_packet->flags             = 0;
+		command_packet->byte6.block_count = 1;
+
+		/* Now setup the param */
+		if (tw_dev->alignment_virtual_address[request_id] == NULL) {
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bad alignment virtual address.\n");
+			return 1;
+		}
+		param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
+		memset(param, 0, sizeof(TW_Sector));
+		param->table_id = 0x300+j; /* unit summary table */
+		param->parameter_id = 0x6; /* unit descriptor */
+		param->parameter_size_bytes = 0xc;
+		param_value = tw_dev->alignment_physical_address[request_id];
+		if (param_value == 0) {
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bad alignment physical address.\n");
+			return 1;
+		}
+
+		command_packet->byte8.param.sgl[0].address = param_value;
+		command_packet->byte8.param.sgl[0].length = sizeof(TW_Sector);
+
+		/* Post the command packet to the board */
+		command_que_value = tw_dev->command_packet_physical_address[request_id];
+		if (command_que_value == 0) {
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bad command packet physical address.\n");
+			return 1;
+		}
+		outl(command_que_value, command_que_addr);
+
+		/* Poll for completion */
+		imax = TW_POLL_MAX_RETRIES;
+		for(i=0; i<imax; i++) {
+			mdelay(5);
+			status_reg_value = inl(status_reg_addr);
+			if (tw_check_bits(status_reg_value)) {
+				printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Unexpected bits.\n");
+				return 1;
+			}
+			if ((status_reg_value & TW_STATUS_RESPONSE_QUEUE_EMPTY) == 0) {
+				response_queue.value = inl(response_que_addr);
+				request_id = (unsigned char)response_queue.u.response_id;
+				if (request_id != 0) {
+					/* unexpected request id */
+					printk(KERN_WARNING "3w-xxxx: tw_initia
+lize_units(): Unexpected request id.\n");
+					return 1;
+				}
+				if (command_packet->status != 0) {
+					/* bad response */
+					printk(KERN_WARNING "3w-xxxx: tw_initia
+lize_units(): Bad response, status = 0x%x, flags = 0x%x.\n", command_packet->status, command_packet->flags);
+					return 1;
+				}
+				found = 1;
+				break;
+			}
+		}
+		if (found == 0) {
+			/* response never received */
+			printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): No
+ response.\n");
+			return 1;
+		}
+
+		param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
+		raid_level = (unsigned char *)&(param->data[1]);
+		if (*raid_level == 5) {
+			dprintk(KERN_WARNING "3w-xxxx: Found unit %d to be a raid5 unit.\n", j);
+			tw_dev->is_raid_five[j] = 1;
+			num_raid_five++;
+		}
+	}
+	tw_dev->num_raid_five = num_raid_five;
+
+	/* Now allocate raid5 bounce buffers */
+	if ((num_raid_five != 0) && (tw_dev->tw_pci_dev->device == TW_DEVICE_ID)) {
+		for (i=0;i<TW_Q_LENGTH;i++) {
+			tw_allocate_memory(tw_dev, i, sizeof(TW_Sector)*256, 2);
+			if (tw_dev->bounce_buffer[i] == NULL) {
+				printk(KERN_WARNING "3w-xxxx: tw_initialize_units(): Bounce buffer allocation failed.\n");
+				return 1;
+			}
+			memset(tw_dev->bounce_buffer[i], 0, sizeof(TW_Sector)*256);
+		}
 	}
   
 	return 0;
@@ -1288,12 +1421,17 @@ int tw_ioctl(TW_Device_Extension *tw_dev, int request_id)
 		case TW_OP_SET_PARAM:
 			dprintk(KERN_NOTICE "3w-xxxx: tw_ioctl(): caught TW_OP_SET_PARAM: table_id = %d, parameter_id = %d, parameter_size_bytes = %d.\n",
 			ioctl->table_id, ioctl->parameter_id, ioctl->parameter_size_bytes);
-			command_packet->byte0.opcode = TW_OP_SET_PARAM;
-			param->table_id = ioctl->table_id;
-			param->parameter_id = ioctl->parameter_id;
-			param->parameter_size_bytes = ioctl->parameter_size_bytes;
-			memcpy(param->data, ioctl->data, ioctl->parameter_size_bytes);
-			break;
+			if (ioctl->data != NULL) {
+				command_packet->byte0.opcode = TW_OP_SET_PARAM;
+				param->table_id = ioctl->table_id;
+				param->parameter_id = ioctl->parameter_id;
+				param->parameter_size_bytes = ioctl->parameter_size_bytes;
+				memcpy(param->data, ioctl->data, ioctl->parameter_size_bytes);
+				break;
+			} else {
+				printk(KERN_WARNING "3w-xxxx: tw_ioctl(): ioctl->data NULL.\n");
+				return 1;
+			}
 		case TW_OP_AEN_LISTEN:
 			dprintk(KERN_NOTICE "3w-xxxx: tw_ioctl(): caught TW_OP_AEN_LISTEN.\n");
 			if (tw_dev->aen_head == tw_dev->aen_tail) {
@@ -1318,11 +1456,15 @@ int tw_ioctl(TW_Device_Extension *tw_dev, int request_id)
 			tw_dev->srb[request_id]->scsi_done(tw_dev->srb[request_id]);
 			return 0;
 	        case TW_CMD_PACKET:
-		  memcpy(command_packet, ioctl->data, sizeof(TW_Command));
-		  command_packet->request_id = request_id;
-		  tw_post_command_packet(tw_dev, request_id);
-
-		  return 0;
+			if (ioctl->data != NULL) {
+				memcpy(command_packet, ioctl->data, sizeof(TW_Command));
+				command_packet->request_id = request_id;
+				tw_post_command_packet(tw_dev, request_id);
+				return 0;
+			} else {
+				printk(KERN_WARNING "3w-xxxx: tw_ioctl(): ioctl->data NULL.\n");
+				return 1;
+			}
 		default:
 			printk(KERN_WARNING "3w-xxxx: Unknown ioctl 0x%x.\n", opcode);
 			tw_dev->state[request_id] = TW_S_COMPLETED;
@@ -1602,10 +1744,8 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 		return 0;
 	}
 
-	spin_unlock_irq(&io_request_lock);
 	ret = tw_findcards(tw_host);
-	spin_lock_irq(&io_request_lock);
-	
+
 	return ret;
 } /* End tw_scsi_detect() */
 
@@ -1763,6 +1903,7 @@ int tw_scsi_proc_info(char *buffer, char **start, off_t offset, int length, int 
 		tw_copy_info(&info, "Max sector count:              %3d\n", tw_dev->max_sector_count);
 		tw_copy_info(&info, "Resets:                        %3d\n", tw_dev->num_resets);
 		tw_copy_info(&info, "Aborts:                        %3d\n", tw_dev->num_aborts);
+		tw_copy_info(&info, "AEN's:                         %3d\n", tw_dev->aen_count);
 	}
 	if (info.position > info.offset) {
 		return (info.position - info.offset);
@@ -1780,26 +1921,19 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int flags = 0;
 	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
 
+	if (tw_dev == NULL) {
+		printk(KERN_WARNING "3w-xxxx: tw_scsi_queue(): Invalid device extension.\n");
+		SCpnt->result = (DID_ERROR << 16);
+		done(SCpnt);
+		return 0;
+	}
+
 	spin_lock_irqsave(&tw_dev->tw_lock, flags);
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_queue()\n");
 
 	/* Skip scsi command if it isn't for us */
 	if ((tw_dev->is_unit_present[SCpnt->target] == FALSE) || (SCpnt->lun != 0)) {
 		SCpnt->result = (DID_BAD_TARGET << 16);
-		done(SCpnt);
-		spin_unlock_irqrestore(&tw_dev->tw_lock, flags);
-		return 0;
-	}
-	if (done == NULL) {
-		printk(KERN_WARNING "3w-xxxx: tw_scsi_queue(): Invalid done function.\n");
-		SCpnt->result = (DID_ERROR << 16);
-		done(SCpnt);
-		spin_unlock_irqrestore(&tw_dev->tw_lock, flags);
-		return 0;
-	}
-	if (tw_dev == NULL) {
-		printk(KERN_WARNING "3w-xxxx: tw_scsi_queue(): Invalid device extension.\n");
-		SCpnt->result = (DID_ERROR << 16);
 		done(SCpnt);
 		spin_unlock_irqrestore(&tw_dev->tw_lock, flags);
 		return 0;
@@ -2104,7 +2238,7 @@ int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id)
 	TW_Command *command_packet;
 	u32 command_que_addr, command_que_value = 0;
 	u32 lba = 0x0, num_sectors = 0x0;
-	int i;
+	int i, count = 0;
 	Scsi_Cmnd *srb;
 	struct scatterlist *sglist;
 
@@ -2161,23 +2295,45 @@ int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id)
 	command_packet->byte8.io.lba = lba;
 	command_packet->byte6.block_count = num_sectors;
 
-	/* Do this if there are no sg list entries */
-	if (tw_dev->srb[request_id]->use_sg == 0) {    
-		dprintk(KERN_NOTICE "3w-xxxx: tw_scsiop_read_write(): SG = 0\n");
-		command_packet->byte8.io.sgl[0].address = virt_to_bus(tw_dev->srb[request_id]->request_buffer);
-		command_packet->byte8.io.sgl[0].length = tw_dev->srb[request_id]->request_bufflen;
-	}
-
-	/* Do this if we have multiple sg list entries */
-	if (tw_dev->srb[request_id]->use_sg > 0) {
-		for (i=0;i<tw_dev->srb[request_id]->use_sg; i++) {
-			command_packet->byte8.io.sgl[i].address = virt_to_bus(sglist[i].address);
-			command_packet->byte8.io.sgl[i].length = sglist[i].length;
-			command_packet->size+=2;
+	if ((tw_dev->is_raid_five[tw_dev->srb[request_id]->target] == 0) || (srb->cmnd[0] == READ_6) || (srb->cmnd[0] == READ_10) || (tw_dev->tw_pci_dev->device == TW_DEVICE_ID2)) {
+		/* Do this if there are no sg list entries */
+		if (tw_dev->srb[request_id]->use_sg == 0) {    
+			dprintk(KERN_NOTICE "3w-xxxx: tw_scsiop_read_write(): SG = 0\n");
+			command_packet->byte8.io.sgl[0].address = virt_to_bus(tw_dev->srb[request_id]->request_buffer);
+			command_packet->byte8.io.sgl[0].length = tw_dev->srb[request_id]->request_bufflen;
 		}
-		if (tw_dev->srb[request_id]->use_sg > 1)
-			command_packet->size-=2;
-	}
+
+		/* Do this if we have multiple sg list entries */
+		if (tw_dev->srb[request_id]->use_sg > 0) {
+			for (i=0;i<tw_dev->srb[request_id]->use_sg; i++) {
+				command_packet->byte8.io.sgl[i].address = virt_to_bus(sglist[i].address);
+				command_packet->byte8.io.sgl[i].length = sglist[i].length;
+				command_packet->size+=2;
+			}
+			if (tw_dev->srb[request_id]->use_sg >= 1)
+				command_packet->size-=2;
+		}
+	} else {
+                /* Do this if there are no sg list entries for raid 5 */
+                if (tw_dev->srb[request_id]->use_sg == 0) {
+			dprintk(KERN_WARNING "doing raid 5 write use_sg = 0, bounce_buffer[%d] = 0x%p\n", request_id, tw_dev->bounce_buffer[request_id]);
+			memcpy(tw_dev->bounce_buffer[request_id], tw_dev->srb[request_id]->request_buffer, tw_dev->srb[request_id]->request_bufflen);
+			command_packet->byte8.io.sgl[0].address = virt_to_bus(tw_dev->bounce_buffer[request_id]);
+			command_packet->byte8.io.sgl[0].length = tw_dev->srb[request_id]->request_bufflen;
+                }
+
+                /* Do this if we have multiple sg list entries for raid 5 */
+                if (tw_dev->srb[request_id]->use_sg > 0) {
+                        dprintk(KERN_WARNING "doing raid 5 write use_sg = %d, sglist[0].length = %d\n", tw_dev->srb[request_id]->use_sg, sglist[0].length);
+                        for (i=0;i<tw_dev->srb[request_id]->use_sg; i++) {
+                                memcpy((char *)(tw_dev->bounce_buffer[request_id])+count, sglist[i].address, sglist[i].length);
+				count+=sglist[i].length;
+                        }
+                        command_packet->byte8.io.sgl[0].address = virt_to_bus(tw_dev->bounce_buffer[request_id]);
+                        command_packet->byte8.io.sgl[0].length = count;
+                        command_packet->size = 5; /* single sgl */
+                }
+        }
 
 	/* Update SG statistics */
 	tw_dev->sgl_entries = tw_dev->srb[request_id]->use_sg;
@@ -2287,7 +2443,7 @@ int tw_setfeature(TW_Device_Extension *tw_dev, int parm, int param_size,
 	/* Poll for completion */
 	imax = TW_POLL_MAX_RETRIES;
 	for (i=0;i<imax;i++) {
-		mdelay(10);
+		mdelay(5);
 		status_reg_value = inl(status_reg_addr);
 		if (tw_check_bits(status_reg_value)) {
 			printk(KERN_WARNING "3w-xxxx: tw_setfeature(): Unexpected bits.\n");

@@ -1,5 +1,5 @@
 /*
- *	$Id: mach_dc.c,v 1.1 2001/04/01 15:02:00 yaegashi Exp $
+ *	$Id: mach_dc.c,v 1.4 2001/05/24 05:09:16 mrbrown Exp $
  *	SEGA Dreamcast machine vector
  */
 
@@ -23,7 +23,7 @@ void __init dreamcast_pcibios_init(void);
 struct sh_machine_vector mv_dreamcast __initmv = {
 	mv_name:		"dreamcast",
 
-	mv_nr_irqs:		48,
+	mv_nr_irqs:		NR_IRQS,
 
 	mv_inb:			generic_inb,
 	mv_inw:			generic_inw,
@@ -57,11 +57,9 @@ struct sh_machine_vector mv_dreamcast __initmv = {
 	mv_iounmap:		generic_iounmap,
 
 	mv_init_arch:		setup_dreamcast,
-#ifdef CONFIG_PCI
-	mv_init_pci:		dreamcast_pcibios_init,
-#endif
 	mv_isa_port2addr:	dreamcast_isa_port2addr,
+	mv_irq_demux:		systemasic_irq_demux,
 
-	mv_hw_dreamcast:		1,
+	mv_hw_dreamcast:	1,
 };
 ALIAS_MV(dreamcast)

@@ -42,19 +42,10 @@
  */
 void nr_clear_queues(struct sock *sk)
 {
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&sk->write_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.nr->ack_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.nr->reseq_queue)) != NULL)
-		kfree_skb(skb);
-
-	while ((skb = skb_dequeue(&sk->protinfo.nr->frag_queue)) != NULL)
-		kfree_skb(skb);
+	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->protinfo.nr->ack_queue);
+	skb_queue_purge(&sk->protinfo.nr->reseq_queue);
+	skb_queue_purge(&sk->protinfo.nr->frag_queue);
 }
 
 /*

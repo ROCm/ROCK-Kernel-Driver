@@ -957,7 +957,7 @@ static int startup(struct esp_struct * info)
 		if (!dma_buffer)
 			info->stat_flags |= ESP_STAT_USE_PIO;
 		else if (request_dma(dma, "esp serial")) {
-			free_pages((unsigned int)dma_buffer,
+			free_pages((unsigned long)dma_buffer,
 				   get_order(DMA_BUFFER_SZ));
 			dma_buffer = 0;
 			info->stat_flags |= ESP_STAT_USE_PIO;
@@ -1061,7 +1061,7 @@ static void shutdown(struct esp_struct * info)
 
 		if (!current_port) {
 			free_dma(dma);
-			free_pages((unsigned int)dma_buffer,
+			free_pages((unsigned long)dma_buffer,
 				   get_order(DMA_BUFFER_SZ));
 			dma_buffer = 0;
 		}		
@@ -2770,7 +2770,7 @@ void cleanup_module(void)
 	}
 
 	if (dma_buffer)
-		free_pages((unsigned int)dma_buffer,
+		free_pages((unsigned long)dma_buffer,
 			get_order(DMA_BUFFER_SZ));
 
 	if (tmp_buf)

@@ -281,11 +281,12 @@ void update_mmu_cache(struct vm_area_struct * vma,
 {
 	unsigned long flags;
 	unsigned long pteval;
-	unsigned long pteaddr;
+	unsigned long vpn;
+#if defined(__SH4__)
 	unsigned long ptea;
+#endif
 
 	save_and_cli(flags);
-
 #if defined(__SH4__)
 	if (pte_shared(pte)) {
 		struct page *pg;
@@ -305,13 +306,13 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	}
 
 	/* Set PTEH register */
-	pteaddr = (address & MMU_VPN_MASK) | get_asid();
-	ctrl_outl(pteaddr, MMU_PTEH);
+	vpn = (address & MMU_VPN_MASK) | get_asid();
+	ctrl_outl(vpn, MMU_PTEH);
 
-	/* Set PTEA register */
-	/* TODO: make this look less hacky */
 	pteval = pte_val(pte);
 #if defined(__SH4__)
+	/* Set PTEA register */
+	/* TODO: make this look less hacky */
 	ptea = ((pteval >> 28) & 0xe) | (pteval & 0x1);
 	ctrl_outl(ptea, MMU_PTEA);
 #endif
@@ -341,9 +342,9 @@ static void __flush_tlb_page(unsigned long asid, unsigned long page)
 	data = (page & 0xfffe0000) | asid; /* VALID bit is off */
 	ctrl_outl(data, addr);
 #elif defined(__SH4__)
-	jump_to_P2();
 	addr = MMU_UTLB_ADDRESS_ARRAY | MMU_PAGE_ASSOC_BIT;
 	data = page | asid; /* VALID bit is off */
+	jump_to_P2();
 	ctrl_outl(data, addr);
 	back_to_P1();
 #endif
@@ -352,27 +353,34 @@ static void __flush_tlb_page(unsigned long asid, unsigned long page)
 #if defined(__SH4__)
 static void __flush_tlb_phys(unsigned long phys)
 {
-	int i;
-	unsigned long addr, data;
+	unsigned long addr, data, pte;
 
-	jump_to_P2();
-	for (i = 0; i < MMU_UTLB_ENTRIES; i++) {
-		addr = MMU_UTLB_DATA_ARRAY | (i<<MMU_U_ENTRY_SHIFT);
+	pte = phys | MMU_UTLB_VALID;
+	for (addr = MMU_UTLB_DATA_ARRAY;
+	     addr < MMU_UTLB_DATA_ARRAY+(MMU_UTLB_ENTRIES<<MMU_U_ENTRY_SHIFT);
+	     addr += (1<<MMU_U_ENTRY_SHIFT)) {
 		data = ctrl_inl(addr);
-		if ((data & MMU_UTLB_VALID) && (data&PAGE_MASK) == phys) {
+		if ((data & (MMU_UTLB_VALID|PAGE_MASK)) == pte) {
 			data &= ~MMU_UTLB_VALID;
+			jump_to_P2();
 			ctrl_outl(data, addr);
+			back_to_P1();
+			break;
 		}
 	}
-	for (i = 0; i < MMU_ITLB_ENTRIES; i++) {
-		addr = MMU_ITLB_DATA_ARRAY | (i<<MMU_I_ENTRY_SHIFT);
+	pte = phys | MMU_ITLB_VALID;
+	for (addr = MMU_ITLB_DATA_ARRAY;
+	     addr < MMU_ITLB_DATA_ARRAY+(MMU_ITLB_ENTRIES<<MMU_I_ENTRY_SHIFT);
+	     addr += (1<<MMU_I_ENTRY_SHIFT)) {
 		data = ctrl_inl(addr);
-		if ((data & MMU_ITLB_VALID) && (data&PAGE_MASK) == phys) {
+		if ((data & (MMU_ITLB_VALID|PAGE_MASK)) == pte) {
 			data &= ~MMU_ITLB_VALID;
+			jump_to_P2();
 			ctrl_outl(data, addr);
+			back_to_P1();
+			break;
 		}
 	}
-	back_to_P1();
 }
 #endif
 

@@ -174,9 +174,13 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 
 		/* now scan */
 		for(ofs = 0; ofs != count; ofs++) 
+		{
+			char c;
+			if(get_user(c, buf+ofs))
+				return -EFAULT;
 			if(buf[ofs] == 'V')
 				wdt_expect_close = 1;
-
+		}
 		/* Well, anyhow someone wrote to us, we should return that favour */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
 		return 1;

@@ -4480,9 +4480,15 @@ static int ixj_build_filter_cadence(IXJ *j, IXJ_FILTER_CADENCE * cp)
 	if (lcp == NULL)
 		return -ENOMEM;
 	if (copy_from_user(lcp, (char *) cp, sizeof(IXJ_FILTER_CADENCE)))
+	{
+		kfree(lcp);
 		return -EFAULT;
+	}
 	if (lcp->filter >= 4)
+	{
+		kfree(lcp);
 		return -1;
+	}
 	j->cadence_f[lcp->filter].state = 0;
 	j->cadence_f[lcp->filter].enable = lcp->enable;
 	j->filter_en[lcp->filter] = j->cadence_f[lcp->filter].en_filter = lcp->en_filter;
@@ -4647,13 +4653,18 @@ static void add_caps(IXJ *j)
 	}
 }
 
-static int capabilities_check(IXJ *j, struct phone_capability *pcreq)
+static int capabilities_check(IXJ *j, struct phone_capability *u_pcreq)
 {
 	int cnt;
 	int retval = 0;
+	struct phone_capability pcreq;
+	
+	if(copy_from_user(&pcreq, u_pcreq, sizeof(struct phone_capability)))
+		return -EFAULT;
+		
 	for (cnt = 0; cnt < j->caps; cnt++) {
-		if (pcreq->captype == j->caplist[cnt].captype
-		    && pcreq->cap == j->caplist[cnt].cap) {
+		if (pcreq.captype == j->caplist[cnt].captype
+		    && pcreq.cap == j->caplist[cnt].cap) {
 			retval = 1;
 			break;
 		}
@@ -4704,7 +4715,8 @@ int ixj_ioctl(struct inode *inode, struct file *file_p, unsigned int cmd, unsign
 			return -EFAULT;
 		break;
 	case PHONE_RING_CADENCE:
-		j->ring_cadence = arg;
+		if(get_user(j->ring_cadence, (int *)arg))
+			return -EFAULT;
 		break;
 	case IXJCTL_CIDCW:
 		if(arg) {

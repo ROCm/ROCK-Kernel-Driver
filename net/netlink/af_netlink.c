@@ -9,6 +9,9 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  * 
+ * Tue Jun 26 14:36:48 MEST 2001 Herbert "herp" Rosmanith
+ *                               added netlink_proto_exit
+ *
  */
 
 #include <linux/config.h>
@@ -985,4 +988,11 @@ static int __init netlink_proto_init(void)
 	return 0;
 }
 
+static void __exit netlink_proto_exit(void)
+{
+	sock_unregister(PF_NETLINK);
+	remove_proc_entry("net/netlink", NULL);
+}
+
 module_init(netlink_proto_init);
+module_exit(netlink_proto_exit);

@@ -1,5 +1,15 @@
-/*
- *	$Id: setup_dc.c,v 1.1 2001/04/01 15:02:00 yaegashi Exp $
+/* arch/sh/kernel/setup_dc.c
+ *
+ * Hardware support for the Sega Dreamcast.
+ *
+ * Copyright (c) 2001 M. R. Brown <mrbrown@linuxdc.org>
+ *
+ * This file is part of the LinuxDC project (www.linuxdc.org)
+ *
+ * Released under the terms of the GNU GPL v2.0.
+ * 
+ * This file originally bore the message:
+ *	$Id: setup_dc.c,v 1.5 2001/05/24 05:09:16 mrbrown Exp $
  *	SEGA Dreamcast support
  */
 
@@ -9,105 +19,167 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/irq.h>
-#include <linux/pci.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/dc_sysasic.h>
 
-#define	GAPSPCI_REGS		0x01001400
-#define GAPSPCI_DMA_BASE	0x01840000
-#define GAPSPCI_DMA_SIZE	32768
-#define GAPSPCI_BBA_CONFIG	0x01001600
+int __init gapspci_init(void);
 
-#define	GAPSPCI_IRQ		11
-#define	GAPSPCI_INTC		0x005f6924
+#define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
 
-static int gapspci_dma_used;
+/* Dreamcast System ASIC Hardware Events -
+ 
+   The Dreamcast's System ASIC (located on the PowerVR2 chip) is responsible
+   for receiving hardware events from system peripherals and triggering an
+   SH7750 IRQ.  Hardware events can trigger IRQs 13, 11, or 9 depending on
+   which bits are set in the Event Mask Registers (EMRs).  When a hardware
+   event is triggered, it's corresponding bit in the Event Status Registers
+   (ESRs) is set, and that bit should be rewritten to the ESR to acknowledge
+   that event.
 
-static struct pci_bus *pci_root_bus;
+   There are three 32-bit ESRs located at 0xa05f8900 - 0xa05f6908.  Event
+   types can be found in include/asm-sh/dc_sysasic.h.  There are three groups
+   of EMRs that parallel the ESRs.  Each EMR group corresponds to an IRQ, so
+   0xa05f6910 - 0xa05f6918 triggers IRQ 13, 0xa05f6920 - 0xa05f6928 triggers
+   IRQ 11, and 0xa05f6930 - 0xa05f6938 triggers IRQ 9.
 
-static void disable_gapspci_irq(unsigned int irq)
+   In the kernel, these events are mapped to virtual IRQs so that drivers can
+   respond to them as they would a normal interrupt.  In order to keep this
+   mapping simple, the events are mapped as:
+
+   6900/6910 - Events  0-31, IRQ 13
+   6904/6924 - Events 32-63, IRQ 11
+   6908/6938 - Events 64-95, IRQ  9
+
+*/
+
+#define ESR_BASE 0x005f6900    /* Base event status register */
+#define EMR_BASE 0x005f6910    /* Base event mask register */
+
+/* Helps us determine the EMR group that this event belongs to: 0 = 0x6910,
+   1 = 0x6920, 2 = 0x6930; also determine the event offset */
+#define LEVEL(event) (((event) - HW_EVENT_IRQ_BASE) / 32)
+
+/* Return the hardware event's bit positon within the EMR/ESR */
+#define EVENT_BIT(event) (((event) - HW_EVENT_IRQ_BASE) & 31)
+
+/* For each of these *_irq routines, the IRQ passed in is the virtual IRQ
+   (logically mapped to the corresponding bit for the hardware event). */
+
+/* Disable the hardware event by masking its bit in its EMR */
+static inline void disable_systemasic_irq(unsigned int irq)
 {
-	unsigned long flags;
-	unsigned long intc;
-
-	save_and_cli(flags);
-	intc = inl(GAPSPCI_INTC);
-	intc &= ~(1<<3);
-	outl(intc, GAPSPCI_INTC);
-	restore_flags(flags);
+	__u32 emr = EMR_BASE + (LEVEL(irq) << 4) + (LEVEL(irq) << 2);
+	__u32 mask;
+	mask = inl(emr);
+	mask &= ~(1 << EVENT_BIT(irq));
+	outl(mask, emr);
 }
 
-
-static void enable_gapspci_irq(unsigned int irq)
+/* Enable the hardware event by setting its bit in its EMR */
+static inline void enable_systemasic_irq(unsigned int irq)
 {
-	unsigned long flags;
-	unsigned long intc;
-
-	save_and_cli(flags);
-	intc = inl(GAPSPCI_INTC);
-	intc |= (1<<3);
-	outl(intc, GAPSPCI_INTC);
-	restore_flags(flags);
+	__u32 emr = EMR_BASE + (LEVEL(irq) << 4) + (LEVEL(irq) << 2);
+	__u32 mask;
+	mask = inl(emr);
+	mask |= (1 << EVENT_BIT(irq));
+	outl(mask, emr);
 }
 
-
-static void mask_and_ack_gapspci_irq(unsigned int irq)
+/* Acknowledge a hardware event by writing its bit back to its ESR */
+static void ack_systemasic_irq(unsigned int irq)
 {
-	unsigned long flags;
-	unsigned long intc;
-
-	save_and_cli(flags);
-	intc = inl(GAPSPCI_INTC);
-	intc &= ~(1<<3);
-	outl(intc, GAPSPCI_INTC);
-	restore_flags(flags);
+	__u32 esr = ESR_BASE + (LEVEL(irq) << 2);
+	disable_systemasic_irq(irq);
+	outl((1 << EVENT_BIT(irq)), esr);
 }
 
-
-static void end_gapspci_irq(unsigned int irq)
+/* After a IRQ has been ack'd and responded to, it needs to be renabled */
+static void end_systemasic_irq(unsigned int irq)
 {
-	enable_gapspci_irq(irq);
+	enable_systemasic_irq(irq);
 }
 
+static unsigned int startup_systemasic_irq(unsigned int irq)
+{
+	enable_systemasic_irq(irq);
 
-static unsigned int startup_gapspci_irq(unsigned int irq)
-{ 
-	enable_gapspci_irq(irq);
 	return 0;
 }
 
-
-static void shutdown_gapspci_irq(unsigned int irq)
+static void shutdown_systemasic_irq(unsigned int irq)
 {
-	disable_gapspci_irq(irq);
+	disable_systemasic_irq(irq);
 }
 
-
-static struct hw_interrupt_type gapspci_irq_type = {
-	"GAPSPCI-IRQ",
-	startup_gapspci_irq,
-	shutdown_gapspci_irq,
-	enable_gapspci_irq,
-	disable_gapspci_irq,
-	mask_and_ack_gapspci_irq,
-	end_gapspci_irq
+static struct hw_interrupt_type systemasic_int = {
+	typename:       "System ASIC",
+	startup:        startup_systemasic_irq,
+	shutdown:       shutdown_systemasic_irq,
+	enable:         enable_systemasic_irq,
+	disable:        disable_systemasic_irq,
+	ack:            ack_systemasic_irq,
+	end:            end_systemasic_irq,
 };
 
-
-static u8 __init no_swizzle(struct pci_dev *dev, u8 * pin)
+/*
+ * Map the hardware event indicated by the processor IRQ to a virtual IRQ.
+ */
+int systemasic_irq_demux(int irq)
 {
-	return PCI_SLOT(dev->devfn);
-}
+	__u32 emr, esr, status, level;
+	__u32 j, bit;
 
-static int __init map_od_irq(struct pci_dev *dev, u8 slot, u8 pin)
-{
-	return GAPSPCI_IRQ;
+	switch (irq) {
+		case 13:
+			level = 0;
+			break;
+		case 11:
+			level = 1;
+			break;
+		case  9:
+			level = 2;
+			break;
+		default:
+			return irq;
+	}
+	emr = EMR_BASE + (level << 4) + (level << 2);
+	esr = ESR_BASE + (level << 2);
+
+	/* Mask the ESR to filter any spurious, unwanted interrtupts */
+	status = inl(esr);
+	status &= inl(emr);
+
+	/* Now scan and find the first set bit as the event to map */
+	for (bit = 1, j = 0; j < 32; bit <<= 1, j++) {
+		if (status & bit) {
+			irq = HW_EVENT_IRQ_BASE + j + (level << 5);
+			return irq;
+		}
+	}
+
+	/* Not reached */
+	return irq;
 }
 
 int __init setup_dreamcast(void)
 {
+	int i;
+
+	/* Mask all hardware events */
+	/* XXX */
+
+	/* Acknowledge any previous events */
+	/* XXX */
+
+	/* Assign all virtual IRQs to the System ASIC int. handler */
+	for (i = HW_EVENT_IRQ_BASE; i < HW_EVENT_IRQ_MAX; i++)
+		irq_desc[i].handler = &systemasic_int;
+
+#ifdef CONFIG_PCI
 	gapspci_init();
+#endif
 
 	printk(KERN_INFO "SEGA Dreamcast support.\n");
 #if 0
@@ -128,232 +200,5 @@ int __init setup_dreamcast(void)
  *	PCR: 0x0000
  */
 #endif
-	return 0;
-}
-
-
-/*
- *	Dreamcast PCI: Supports SEGA Broadband Adaptor only.
- */
-
-#define BBA_SELECTED(dev) (dev->bus->number==0 && dev->devfn==0)
-
-static int gapspci_read_config_byte(struct pci_dev *dev, int where,
-                                    u8 * val)
-{
-	if (BBA_SELECTED(dev))
-		*val = inb(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xff;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_read_config_word(struct pci_dev *dev, int where,
-                                    u16 * val)
-{
-        if (BBA_SELECTED(dev))
-		*val = inw(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xffff;
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_read_config_dword(struct pci_dev *dev, int where,
-                                     u32 * val)
-{
-        if (BBA_SELECTED(dev))
-		*val = inl(GAPSPCI_BBA_CONFIG+where);
-	else
-                *val = 0xffffffff;
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_write_config_byte(struct pci_dev *dev, int where,
-                                     u8 val)
-{
-        if (BBA_SELECTED(dev))
-		outb(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-
-static int gapspci_write_config_word(struct pci_dev *dev, int where,
-                                     u16 val)
-{
-        if (BBA_SELECTED(dev))
-		outw(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static int gapspci_write_config_dword(struct pci_dev *dev, int where,
-                                      u32 val)
-{
-        if (BBA_SELECTED(dev))
-		outl(val, GAPSPCI_BBA_CONFIG+where);
-
-        return PCIBIOS_SUCCESSFUL;
-}
-
-static struct pci_ops pci_config_ops = {
-        gapspci_read_config_byte,
-        gapspci_read_config_word,
-        gapspci_read_config_dword,
-        gapspci_write_config_byte,
-        gapspci_write_config_word,
-        gapspci_write_config_dword
-};
-
-
-void pcibios_align_resource(void *data, struct resource *res,
-			    unsigned long size)
-{
-}
-
-
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-}
-
-
-void __init pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
-{
-}
-
-
-int pcibios_enable_device(struct pci_dev *dev)
-{
-
-	u16 cmd, old_cmd;
-	int idx;
-	struct resource *r;
-
-	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-	old_cmd = cmd;
-	for (idx = 0; idx < 6; idx++) {
-		r = dev->resource + idx;
-		if (!r->start && r->end) {
-			printk(KERN_ERR
-			       "PCI: Device %s not available because"
-			       " of resource collisions\n",
-			       dev->slot_name);
-			return -EINVAL;
-		}
-		if (r->flags & IORESOURCE_IO)
-			cmd |= PCI_COMMAND_IO;
-		if (r->flags & IORESOURCE_MEM)
-			cmd |= PCI_COMMAND_MEMORY;
-	}
-	if (cmd != old_cmd) {
-		printk("PCI: enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
-		pci_write_config_word(dev, PCI_COMMAND, cmd);
-	}
-	return 0;
-
-}
-
-
-void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-			   dma_addr_t * dma_handle)
-{
-	unsigned long buf;
-
-	if (gapspci_dma_used+size > GAPSPCI_DMA_SIZE)
-		return NULL;
-
-	buf = GAPSPCI_DMA_BASE+gapspci_dma_used;
-
-	gapspci_dma_used = PAGE_ALIGN(gapspci_dma_used+size);
-	
-	printk("pci_alloc_consistent: %d bytes at 0x%08x\n", size, buf);
-
-	*dma_handle = (dma_addr_t)buf;
-
-	return (void *)P2SEGADDR(buf);
-}
-
-
-void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-			 void *vaddr, dma_addr_t dma_handle)
-{
-}
-
-
-void __init
-pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
-{
-}                                                                                
-
-void __init pcibios_fixup_bus(struct pci_bus *bus)
-{
-	struct list_head *ln;
-	struct pci_dev *dev;
-
-	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-		dev = pci_dev_b(ln);
-		if (!BBA_SELECTED(dev)) continue;
-
-		printk("PCI: MMIO fixup to %s\n", dev->name);
-		dev->resource[1].start=0x01001700;
-		dev->resource[1].end=0x010017ff;
-	}
-}
-
-
-void __init dreamcast_pcibios_init(void)
-{
-	pci_root_bus = pci_scan_bus(0, &pci_config_ops, NULL);
-	/* pci_assign_unassigned_resources(); */
-	pci_fixup_irqs(no_swizzle, map_od_irq);
-}
-
-
-static __init int gapspci_init(void)
-{
-	int i;
-	char idbuf[16];
-
-	for(i=0; i<16; i++)
-		idbuf[i]=inb(GAPSPCI_REGS+i);
-
-	if(strncmp(idbuf, "GAPSPCI_BRIDGE_2", 16))
-		return -1;
-
-	outl(0x5a14a501, GAPSPCI_REGS+0x18);
-
-	for(i=0; i<1000000; i++);
-
-	if(inl(GAPSPCI_REGS+0x18)!=1)
-		return -1;
-
-	outl(0x01000000, GAPSPCI_REGS+0x20);
-	outl(0x01000000, GAPSPCI_REGS+0x24);
-
-	outl(GAPSPCI_DMA_BASE, GAPSPCI_REGS+0x28);
-	outl(GAPSPCI_DMA_BASE+GAPSPCI_DMA_SIZE, GAPSPCI_REGS+0x2c);
-
-	outl(1, GAPSPCI_REGS+0x14);
-	outl(1, GAPSPCI_REGS+0x34);
-
-	gapspci_dma_used=0;
-
-	/*  */
-	irq_desc[GAPSPCI_IRQ].handler = &gapspci_irq_type;
-
-	/* Setting Broadband Adapter */
-	outw(0xf900, GAPSPCI_BBA_CONFIG+0x06);
-	outl(0x00000000, GAPSPCI_BBA_CONFIG+0x30);
-	outb(0x00, GAPSPCI_BBA_CONFIG+0x3c);
-	outb(0xf0, GAPSPCI_BBA_CONFIG+0x0d);
-	outw(0x0006, GAPSPCI_BBA_CONFIG+0x04);
-	outl(0x00002001, GAPSPCI_BBA_CONFIG+0x10);
-	outl(0x01000000, GAPSPCI_BBA_CONFIG+0x14);
-
 	return 0;
 }

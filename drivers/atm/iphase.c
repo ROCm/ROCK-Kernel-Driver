@@ -97,6 +97,10 @@ MODULE_PARM(IA_RX_BUF_SZ, "i");
 MODULE_PARM(IADebugFlag, "i");
 #endif
 
+#if BITS_PER_LONG != 32
+#  error FIXME: this driver only works on 32-bit platforms
+#endif
+
 /**************************** IA_LIB **********************************/
 
 static void ia_init_rtn_q (IARTN_Q *que) 

@@ -1,10 +1,7 @@
 /*
  *  linux/arch/arm/mach-ebsa110/arch.c
  *
- *  Architecture specific fixups.  This is where any
- *  parameters in the params struct are fixed up, or
- *  any additional architecture specific information
- *  is pulled from the params struct.
+ *  Architecture specific fixups.
  */
 #include <linux/tty.h>
 #include <linux/delay.h>

@@ -1612,14 +1612,15 @@ static void __devexit cyberpro_remove(struct pci_dev *dev)
 	}
 }
 
-static void cyberpro_suspend(struct pci_dev *dev)
+static int cyberpro_suspend(struct pci_dev *dev, u32 state)
 {
+	return 0;
 }
 
 /*
  * Re-initialise the CyberPro hardware
  */
-static void cyberpro_resume(struct pci_dev *dev)
+static int cyberpro_resume(struct pci_dev *dev)
 {
 	struct cfb_info *cfb = (struct cfb_info *)dev->driver_data;
 
@@ -1633,6 +1634,8 @@ static void cyberpro_resume(struct pci_dev *dev)
 		cfb->fb.var.activate = FB_ACTIVATE_NOW;
 		cyber2000fb_set_var(&cfb->fb.var, -1, &cfb->fb);
 	}
+
+	return 0;
 }
 
 static struct pci_device_id cyberpro_pci_table[] __devinitdata = {

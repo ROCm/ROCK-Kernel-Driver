@@ -420,6 +420,7 @@ static void __init ps2esdi_geninit(void)
 	request_dma(dma_arb_level, "ed");
 	request_region(io_base, 4, "ed");
 	blksize_size[MAJOR_NR] = ps2esdi_blocksizes;
+	max_sectors[MAJOR_NR] = ps2esdi_maxsect;
 
 	for (i = 0; i < ps2esdi_drives; i++) {
 		register_disk(&ps2esdi_gendisk,MKDEV(MAJOR_NR,i<<6),1<<6,

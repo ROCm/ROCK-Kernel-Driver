@@ -38,7 +38,9 @@
 #define VMODE_1152_870_75	18	/* 1152x870, 75Hz */
 #define VMODE_1280_960_75	19	/* 1280x960, 75Hz */
 #define VMODE_1280_1024_75	20	/* 1280x1024, 75Hz */
-#define VMODE_MAX		20
+#define VMODE_1152_768_60	21	/* 1152x768, 60Hz     Titanium PowerBook */
+#define VMODE_1600_1024_60	22	/* 1600x1024, 60Hz 22" Cinema Display */
+#define VMODE_MAX		22
 #define VMODE_CHOOSE		99
 
 #define CMODE_NVRAM		-1

@@ -1286,6 +1286,8 @@ int i810_dma_vertex(struct inode *inode, struct file *filp,
 	DRM_DEBUG("i810 dma vertex, idx %d used %d discard %d\n",
 		  vertex.idx, vertex.used, vertex.discard);
 
+	if(vertex.idx < 0 || vertex.idx > dma->buf_count) return -EINVAL;
+
 	i810_dma_dispatch_vertex( dev, 
 				  dma->buflist[ vertex.idx ], 
 				  vertex.discard, vertex.used );
@@ -1409,7 +1411,7 @@ int i810_copybuf(struct inode *inode, struct file *filp, unsigned int cmd,
    	if (copy_from_user(&d, (drm_i810_copy_t *)arg, sizeof(d)))
 		return -EFAULT;
 
-	if(d.idx > dma->buf_count) return -EINVAL;
+	if(d.idx < 0 || d.idx > dma->buf_count) return -EINVAL;
 	buf = dma->buflist[ d.idx ];
    	buf_priv = buf->dev_private;
 	if (buf_priv->currently_mapped != I810_BUF_MAPPED) return -EPERM;

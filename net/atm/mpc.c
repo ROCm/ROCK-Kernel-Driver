@@ -772,6 +772,8 @@ int atm_mpoa_mpoad_attach (struct atm_vcc *vcc, int arg)
 	if (mpc == NULL) {
 		dprintk("mpoa: mpoad_attach: allocating new mpc for itf %d\n", arg);
 		mpc = alloc_mpc();
+		if (mpc == NULL)
+			return -ENOMEM;
 		mpc->dev_num = arg;
 		mpc->dev = find_lec_by_itfnum(arg); /* NULL if there was no lec */
 	}

@@ -132,6 +132,11 @@ int radeon_addbufs_agp(struct inode *inode, struct file *filp,
 		buf->dev_priv_size = sizeof(drm_radeon_buf_priv_t);
 		buf->dev_private   = drm_alloc(sizeof(drm_radeon_buf_priv_t),
 					       DRM_MEM_BUFS);
+                if (!buf->dev_private) {
+                        up(&dev->struct_sem);
+                        atomic_dec(&dev->buf_alloc);
+                        return -ENOMEM;
+                }
 		memset(buf->dev_private, 0, buf->dev_priv_size);
 
 #if DRM_DMA_HISTOGRAM

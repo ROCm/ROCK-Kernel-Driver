@@ -38,12 +38,6 @@
 #include <linux/irq.h>
 
 /*
- * Micro-access to controllers is serialized over the whole
- * system. We never hold this lock when we call the actual
- * IRQ handler.
- */
-spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
-/*
  * Controller mappings for all interrupt sources:
  */
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
@@ -160,14 +154,15 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
  */
 void disable_irq_nosync(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
 
-	spin_lock_irqsave(&irq_controller_lock, flags);
-	if (!irq_desc[irq].depth++) {
-		irq_desc[irq].status |= IRQ_DISABLED;
-		irq_desc[irq].handler->disable(irq);
+	spin_lock_irqsave(&desc->lock, flags);
+	if (!desc->depth++) {
+		desc->status |= IRQ_DISABLED;
+		desc->handler->disable(irq);
 	}
-	spin_unlock_irqrestore(&irq_controller_lock, flags);
+	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 /*
@@ -187,28 +182,29 @@ void disable_irq(unsigned int irq)
 
 void enable_irq(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
 
-	spin_lock_irqsave(&irq_controller_lock, flags);
-	switch (irq_desc[irq].depth) {
+	spin_lock_irqsave(&desc->lock, flags);
+	switch (desc->depth) {
 	case 1: {
-		unsigned int status = irq_desc[irq].status & ~IRQ_DISABLED;
-		irq_desc[irq].status = status;
+		unsigned int status = desc->status & ~IRQ_DISABLED;
+		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
-			irq_desc[irq].status = status | IRQ_REPLAY;
-			hw_resend_irq(irq_desc[irq].handler,irq);
+			desc->status = status | IRQ_REPLAY;
+			hw_resend_irq(desc->handler,irq);
 		}
-		irq_desc[irq].handler->enable(irq);
+		desc->handler->enable(irq);
 		/* fall-through */
 	}
 	default:
-		irq_desc[irq].depth--;
+		desc->depth--;
 		break;
 	case 0:
 		printk("enable_irq() unbalanced from %p\n",
 		       __builtin_return_address(0));
 	}
-	spin_unlock_irqrestore(&irq_controller_lock, flags);
+	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
 /*
@@ -245,7 +241,7 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 
 	kstat.irqs[cpu][irq]++;
 	desc = irq_desc + irq;
-	spin_lock(&irq_controller_lock);
+	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*
 	   REPLAY is when Linux resends an IRQ that was dropped earlier
@@ -265,7 +261,6 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 		status |= IRQ_INPROGRESS; /* we are handling it */
 	}
 	desc->status = status;
-	spin_unlock(&irq_controller_lock);
 
 	/*
 	 * If there is no IRQ handler or it was disabled, exit early.
@@ -274,7 +269,7 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 	   will take care of it.
 	 */
 	if (!action)
-		return 1;
+		goto out;
 
 	/*
 	 * Edge triggered interrupts need to remember
@@ -287,23 +282,24 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 	 * SMP environment.
 	 */
 	for (;;) {
+		spin_unlock(&desc->lock);
 		handle_IRQ_event(irq, &regs, action);
-		spin_lock(&irq_controller_lock);
+		spin_lock(&desc->lock);
 
 		if (!(desc->status & IRQ_PENDING))
 			break;
 		desc->status &= ~IRQ_PENDING;
-		spin_unlock(&irq_controller_lock);
 	}
 	desc->status &= ~IRQ_INPROGRESS;
-	if (!(desc->status & IRQ_DISABLED))
-		desc->handler->end(irq);
-	spin_unlock(&irq_controller_lock);
+out:
+	/*
+	 * The ->end() handler has to deal with interrupts which got
+	 * disabled while the handler was running.
+	 */
+	desc->handler->end(irq);
+	spin_unlock(&desc->lock);
 
-#if 0
-	__sti();
-#endif
-	if (softirq_active(cpu)&softirq_mask(cpu))
+	if (softirq_pending(cpu))
 		do_softirq();
 	return 1;
 }
@@ -342,14 +338,16 @@ int request_irq(unsigned int irq,
 
 void free_irq(unsigned int irq, void *dev_id)
 {
+	irq_desc_t *desc;
 	struct irqaction **p;
 	unsigned long flags;
 
 	if (irq >= ACTUAL_NR_IRQS)
 		return;
 
-	spin_lock_irqsave(&irq_controller_lock,flags);
-	p = &irq_desc[irq].action;
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&desc->lock,flags);
+	p = &desc->action;
 	for (;;) {
 		struct irqaction * action = *p;
 		if (action) {
@@ -360,19 +358,21 @@ void free_irq(unsigned int irq, void *dev_id)
 
 			/* Found it - now remove it from the list of entries */
 			*pp = action->next;
-			if (!irq_desc[irq].action) {
-				irq_desc[irq].status |= IRQ_DISABLED;
-				irq_desc[irq].handler->shutdown(irq);
+			if (!desc->action) {
+				desc->status |= IRQ_DISABLED;
+				desc->handler->shutdown(irq);
 			}
-			spin_unlock_irqrestore(&irq_controller_lock,flags);
+			spin_unlock_irqrestore(&desc->lock,flags);
 			kfree(action);
 			return;
 		}
 		printk("Trying to free free IRQ%d\n",irq);
-		spin_unlock_irqrestore(&irq_controller_lock,flags);
+		spin_unlock_irqrestore(&desc->lock,flags);
 		return;
 	}
 }
+
+static DECLARE_MUTEX(probe_sem);
 
 /*
  * IRQ autodetection code..
@@ -385,21 +385,44 @@ void free_irq(unsigned int irq, void *dev_id)
 unsigned long probe_irq_on(void)
 {
 	unsigned int i;
-	unsigned long delay;
+	irq_desc_t *desc;
 	unsigned long val;
+	unsigned long delay;
+
+	down(&probe_sem);
+	/* 
+	 * something may have generated an irq long ago and we want to
+	 * flush such a longstanding irq before considering it as spurious. 
+	 */
+	for (i = NR_IRQS-1; i > 0; i--) {
+		desc = irq_desc + i;
+
+		spin_lock_irq(&desc->lock);
+		if (!desc->action)
+		  desc->handler->startup(i);
+		spin_unlock_irq(&desc->lock);
+	}
+
+	/* Wait for longstanding interrupts to trigger. */
+	for (delay = jiffies + HZ/50; time_after(delay, jiffies); )
+		/* about 20ms delay */ synchronize_irq();
 
 	/*
-	 * first, enable any unassigned irqs
+	 * enable any unassigned irqs
+	 * (we must startup again here because if a longstanding irq
+	 * happened in the previous stage, it may have masked itself)
 	 */
-	spin_lock_irq(&irq_controller_lock);
 	for (i = NR_IRQS-1; i > 0; i--) {
-		if (!irq_desc[i].action) {
-			irq_desc[i].status |= IRQ_AUTODETECT | IRQ_WAITING;
-			if (irq_desc[i].handler->startup(i))
-				irq_desc[i].status |= IRQ_PENDING;
+		desc = irq_desc + i;
+
+		spin_lock_irq(&desc->lock);
+		if (!desc->action) {
+			desc->status |= IRQ_AUTODETECT | IRQ_WAITING;
+			if (desc->handler->startup(i))
+				desc->status |= IRQ_PENDING;
 		}
+		spin_unlock_irq(&desc->lock);
 	}
-	spin_unlock_irq(&irq_controller_lock);
 
 	/*
 	 * Wait for spurious interrupts to trigger
@@ -411,23 +434,25 @@ unsigned long probe_irq_on(void)
 	 * Now filter out any obviously spurious interrupts
 	 */
 	val = 0;
-	spin_lock_irq(&irq_controller_lock);
 	for (i=0; i<NR_IRQS; i++) {
-		unsigned int status = irq_desc[i].status;
+		desc = irq_desc + i;
+		unsigned int status;
 
-		if (!(status & IRQ_AUTODETECT))
-			continue;
+		spin_lock_irq(&desc->lock);
+		status = desc->status;
 
-		/* It triggered already - consider it spurious. */
-		if (!(status & IRQ_WAITING)) {
-			irq_desc[i].status = status & ~IRQ_AUTODETECT;
-			irq_desc[i].handler->shutdown(i);
+		if (status & IRQ_AUTODETECT) {
+			/* It triggered already - consider it spurious. */
+			if (!(status & IRQ_WAITING)) {
+				desc->status = status & ~IRQ_AUTODETECT;
+				desc->handler->shutdown(i);
+			} else
+				if (i < 32)
+					val |= 1 << i;
 		}
-
-		if (i < 32)
-			val |= 1 << i;
+		spin_unlock_irq(&desc->lock);
 	}
-	spin_unlock_irq(&irq_controller_lock);
+	spin_unlock_irq(&desc->lock);
 
 	return val;
 }
@@ -438,22 +463,25 @@ int probe_irq_off(unsigned long val)
 
 	nr_irqs = 0;
 	irq_found = 0;
-	spin_lock_irq(&irq_controller_lock);
 	for (i=0; i<NR_IRQS; i++) {
-		unsigned int status = irq_desc[i].status;
+		irq_desc_t *desc = irq_desc + i;
+		unsigned int status;
 
-		if (!(status & IRQ_AUTODETECT))
-			continue;
+		spin_lock_irq(&desc->lock);
+		status = desc->status;
 
-		if (!(status & IRQ_WAITING)) {
-			if (!nr_irqs)
-				irq_found = i;
-			nr_irqs++;
+		if (status & IRQ_AUTODETECT) {
+			if (!(status & IRQ_WAITING)) {
+				if (!nr_irqs)
+					irq_found = i;
+				nr_irqs++;
+			}
+			desc->status = status & ~IRQ_AUTODETECT;
+			desc->handler->shutdown(i);
 		}
-		irq_desc[i].status = status & ~IRQ_AUTODETECT;
-		irq_desc[i].handler->shutdown(i);
+		spin_unlock_irq(&desc->lock);
 	}
-	spin_unlock_irq(&irq_controller_lock);
+	up(&probe_sem);
 
 	if (nr_irqs > 1)
 		irq_found = -irq_found;
@@ -465,6 +493,7 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	int shared = 0;
 	struct irqaction *old, **p;
 	unsigned long flags;
+	irq_desc_t *desc = irq_desc + irq;
 
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
@@ -486,12 +515,12 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	/*
 	 * The following block of code has to be executed atomically
 	 */
-	spin_lock_irqsave(&irq_controller_lock,flags);
-	p = &irq_desc[irq].action;
+	spin_lock_irqsave(&desc->lock,flags);
+	p = &desc->action;
 	if ((old = *p) != NULL) {
 		/* Can't share interrupts unless both agree to */
 		if (!(old->flags & new->flags & SA_SHIRQ)) {
-			spin_unlock_irqrestore(&irq_controller_lock,flags);
+			spin_unlock_irqrestore(&desc->lock,flags);
 			return -EBUSY;
 		}
 
@@ -506,11 +535,11 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	*p = new;
 
 	if (!shared) {
-		irq_desc[irq].depth = 0;
-		irq_desc[irq].status &= ~IRQ_DISABLED;
-		irq_desc[irq].handler->startup(irq);
+		desc->depth = 0;
+		desc->status &= ~IRQ_DISABLED;
+		desc->handler->startup(irq);
 	}
-	spin_unlock_irqrestore(&irq_controller_lock,flags);
+	spin_unlock_irqrestore(&desc->lock,flags);
 	return 0;
 }
 

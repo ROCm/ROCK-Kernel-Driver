@@ -8,6 +8,8 @@
 #ifndef __LINUX_MII_H__
 #define __LINUX_MII_H__
 
+#include <linux/types.h>
+
 /* Inside the Happy Meal transceiver is the physical layer, they use an
  * implementations for National Semiconductor, part number DP83840VCE.
  * You can retrieve the data sheets and programming docs for this beast
@@ -125,6 +127,16 @@
 #define CSCONFIG_TCDISABLE      0x2000  /* Disable timeout counter     */
 #define CSCONFIG_RESV4          0x4000  /* Unused...                   */
 #define CSCONFIG_NDISABLE       0x8000  /* Disable NRZI                */
+
+
+/* This structure is used in all SIOCxMIIxxx ioctl calls */
+struct mii_ioctl_data {
+	u16		phy_id;
+	u16		reg_num;
+	u16		val_in;
+	u16		val_out;
+};
+
 
 /**
  * mii_nway_result

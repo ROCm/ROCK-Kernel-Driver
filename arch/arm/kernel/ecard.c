@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/ecard.c
  *
- *  Copyright 1995-1998 Russell King
+ *  Copyright 1995-2001 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,7 +26,6 @@
  *  17-Apr-1999	RMK	Support for EASI Type C cycles.
  */
 #define ECARD_C
-#define __KERNEL_SYSCALLS__
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -34,6 +33,7 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/reboot.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
@@ -382,12 +382,12 @@ ecard_call(struct ecard_request *req)
  * We ignore all calls, unless it is a SYS_RESTART call - power down/halts
  * will be followed by a SYS_RESTART if ctrl-alt-del is pressed again.
  */
-static void ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
+static int ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
 {
 	struct ecard_request req;
 
 	if (val != SYS_RESTART)
-		return;
+		return 0;
 
 	/*
 	 * Disable the expansion card interrupt
@@ -414,6 +414,7 @@ static void ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
 	have_expmask = ~0;
 	__raw_writeb(have_expmask, EXPMASK_ENABLE);
 #endif
+	return 0;
 }
 
 static struct notifier_block ecard_reboot_notifier = {

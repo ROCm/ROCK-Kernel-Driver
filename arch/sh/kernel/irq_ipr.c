@@ -46,7 +46,7 @@ static unsigned int startup_ipr_irq(unsigned int irq)
 }
 
 static struct hw_interrupt_type ipr_irq_type = {
-	"IPR-based-IRQ",
+	"IPR-IRQ",
 	startup_ipr_irq,
 	shutdown_ipr_irq,
 	enable_ipr_irq,
@@ -189,7 +189,9 @@ void make_pint_irq(unsigned int irq)
 
 void __init init_IRQ(void)
 {
+#if defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
 	int i;
+#endif
 
 	make_ipr_irq(TIMER_IRQ, TIMER_IPR_ADDR, TIMER_IPR_POS, TIMER_PRIORITY);
 	make_ipr_irq(RTC_IRQ, RTC_IPR_ADDR, RTC_IPR_POS, RTC_PRIORITY);
@@ -226,27 +228,6 @@ void __init init_IRQ(void)
 	 * Initialize the Interrupt Controller (INTC)
 	 * registers to their power on values
 	 */ 
-#if 0
-	/*
-	 * XXX: I think that this is the job of boot loader. -- gniibe
-	 *
-	 * When Takeshi released new boot loader following setting
-	 * will be removed shortly.
-	 */
-	ctrl_outb(0, INTC_IRR0);
-	ctrl_outb(0, INTC_IRR1);
-	ctrl_outb(0, INTC_IRR2);
-
-	ctrl_outw(0, INTC_ICR0);
-	ctrl_outw(0, INTC_ICR1);/* Really? 0x4000?*/
-	ctrl_outw(0, INTC_ICR2);
-	ctrl_outw(0, INTC_INTER);
-	ctrl_outw(0, INTC_IPRA);
-	ctrl_outw(0, INTC_IPRB);
-	ctrl_outw(0, INTC_IPRC);
-	ctrl_outw(0, INTC_IPRD);
-	ctrl_outw(0, INTC_IPRE);
-#endif
 
 	/*
 	 * Enable external irq (INTC IRQ mode).

@@ -299,6 +299,8 @@ extern inline unsigned int lcm(unsigned int x, unsigned int y)
 
 #ifdef __i386__
 
+#include <asm/msr.h>
+
 /*
  * only do 32bit cycle counter arithmetic; we hope we won't overflow.
  * in fact, overflowing modems would require over 2THz CPU clock speeds :-)
@@ -307,10 +309,10 @@ extern inline unsigned int lcm(unsigned int x, unsigned int y)
 #define time_exec(var,cmd)                                              \
 ({                                                                      \
 	if (cpu_has_tsc) {                                              \
-		unsigned int cnt1, cnt2, cnt3;                          \
-		__asm__(".byte 0x0f,0x31" : "=a" (cnt1), "=d" (cnt3));  \
+		unsigned int cnt1, cnt2;                                \
+		rdtscl(cnt1);                                           \
 		cmd;                                                    \
-		__asm__(".byte 0x0f,0x31" : "=a" (cnt2), "=d" (cnt3));  \
+		rdtscl(cnt2);                                           \
 		var = cnt2-cnt1;                                        \
 	} else {                                                        \
 		cmd;                                                    \

@@ -86,16 +86,17 @@ static int set_framing(struct atm_dev *dev,unsigned char framing)
 static int get_sense(struct atm_dev *dev,u8 *arg)
 {
 	unsigned long flags;
- 	int error;
+	unsigned char s[3];
 
 	save_flags(flags);
 	cli();
-	error = put_user(GET(C11R),arg) || put_user(GET(C12R),arg+1) ||
-	    put_user(GET(C13R),arg+2);
+	s[0] = GET(C11R);
+	s[1] = GET(C12R);
+	s[2] = GET(C13R);
 	restore_flags(flags);
-	error = error || put_user(0xff,arg+3) || put_user(0xff,arg+4) ||
-	    put_user(0xff,arg+5);
-	return error ? -EFAULT : 0;
+	return (put_user(s[0], arg) || put_user(s[1], arg+1) ||
+	    put_user(s[2], arg+2) || put_user(0xff, arg+3) ||
+	    put_user(0xff, arg+4) || put_user(0xff, arg+5)) ? -EFAULT : 0;
 }
 
 

@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sat Apr 7 09:45:09 2001
+# Last update: Sun Jun 17 00:53:17 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -63,7 +63,7 @@ edb7211			ARCH_EDB7211		EDB7211			50
 citygo			SA1100_CITYGO		CITYGO			51
 pfs168			SA1100_PFS168		PFS168			52
 spot			SA1100_SPOT		SPOT			53
-flexanet		ARCH_FLEXANET		FLEXANET		54
+flexanet		SA1100_FLEXANET		FLEXANET		54
 webpal			ARCH_WEBPAL		WEBPAL			55
 linpda			SA1100_LINPDA		LINPDA			56
 anakin			ARCH_ANAKIN		ANAKIN			57
@@ -77,6 +77,26 @@ psion_series7		SA1100_PSION_SERIES7	PSION_SERIES7		64
 xfile			SA1100_XFILE		XFILE			65
 accelent_ep9312		ARCH_ACCELENT_EP9312	ACCELENT_EP9312		66
 ic200			ARCH_IC200		IC200			67
+creditlart		SA1100_CREDITLART	CREDITLART		68
+htm			SA1100_HTM		HTM			69
+iq80310			ARCH_IQ80310		IQ80310			70
+freebot			SA1100_FREEBOT		FREEBOT			71
+entel			ARCH_ENTEL		ENTEL			72
+enp3510			ARCH_ENP3510		ENP3510			73
+trizeps			SA1100_TRIZEPS		TRIZEPS			74
+nesa			SA1100_NESA		NESA			75
+venus			ARCH_VENUS		VENUS			76
+tardis			ARCH_TARDIS		TARDIS			77
+mercury			ARCH_MERCURY		MERCURY			78
+empeg			SA1100_EMPEG		EMPEG			79
+adi_eb			ARCH_I80200FCC		I80200FCC		80
+itt_cpb			SA1100_ITT_CPB		ITT_CPB			81
+sa1110_svc		ARCH_SA1110_SVC		SA1110_SVC		82
+alpha2			SA1100_ALPHA2		ALPHA2			84
+alpha1			SA1100_ALPHA1		ALPHA1			85
+netarm			ARCH_NETARM		NETARM			86
+simpad			SA1100_SIMPAD		SIMPAD			87
+pda1			ARCH_PDA1		PDA1			88
+lubbock			ARCH_LUBBOCK		LUBBOCK			89
 
 # The following are unallocated
-empeg			SA1100_EMPEG		EMPEG

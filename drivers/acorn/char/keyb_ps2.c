@@ -24,6 +24,7 @@
 #include <linux/random.h>
 #include <linux/ctype.h>
 #include <linux/kbd_ll.h>
+#include <linux/delay.h>
 #include <linux/init.h>
 
 #include <asm/bitops.h>
@@ -36,6 +37,12 @@
 extern struct tasklet_struct keyboard_tasklet;
 extern void kbd_reset_kdown(void);
 int kbd_read_mask;
+
+#define TX_DONE 0
+#define TX_SENT 1
+#define TX_SEND 2
+
+static volatile int tx_state;
 
 #define VERSION 100
 
@@ -233,8 +240,33 @@ static inline void ps2kbd_key(unsigned int keycode, unsigned int up_flag)
 
 static inline void ps2kbd_sendbyte(unsigned char val)
 {
-	while(!(inb(IOMD_KCTRL) & (1 << 7)));
-	outb(val, IOMD_KARTTX);
+	int tries = 3, timeout = 1000;
+
+	tx_state = TX_SEND;
+
+	do {
+		switch (tx_state) {
+		case TX_SEND:
+			tx_state = TX_SENT;
+			timeout = 1000;
+			tries --;
+
+			while(!(iomd_readb(IOMD_KCTRL) & (1 << 7)));
+			iomd_writeb(val, IOMD_KARTTX);
+			break;
+
+		case TX_SENT:
+			udelay(1000);
+			if (--timeout == 0) {
+				printk(KERN_ERR "Keyboard timeout\n");
+				tx_state = TX_DONE;
+			}
+			break;
+
+		case TX_DONE:
+			break;
+		}
+	} while (tries > 0 && tx_state != TX_DONE);
 }
 
 static unsigned char status;
@@ -254,18 +286,30 @@ static void handle_rawcode(int keyval)
 
 	if (keyval > 0x83) {
 		switch (keyval) {
-			case KBD_ESCAPEE0:
-				ncodes = 2;
-				bi = 0;
-				break;
-			case KBD_ESCAPEE1:
-				ncodes = 3;
-				bi = 0;
-				break;
-			case KBD_BREAK:
-				status |= CODE_BREAK;
-			default:
-				return;
+		case KBD_ESCAPEE0:
+			ncodes = 2;
+			bi = 0;
+			break;
+
+		case KBD_ESCAPEE1:
+			ncodes = 3;
+			bi = 0;
+			break;
+
+		case KBD_ACK:
+			tx_state = TX_DONE;
+			return;
+
+		case KBD_RESEND:
+			tx_state = TX_SEND;
+			return;
+
+		case KBD_BREAK:
+			status |= CODE_BREAK;
+			return;
+
+		default:
+			return;
 		}
 	}
 
@@ -278,6 +322,13 @@ static void handle_rawcode(int keyval)
 		switch (buffer[0] << 8 | buffer[1]) {
 		case ESCE0(0x11): keysym = K_RALT; break;
 		case ESCE0(0x14): keysym = K_RCTL; break;
+		/*
+		 * take care of MS extra keys (actually
+		 * 0x7d - 0x7f, but last one is already K_NONE
+		 */
+		case ESCE0(0x1f): keysym = 124;    break;
+		case ESCE0(0x27): keysym = 125;    break;
+		case ESCE0(0x2f): keysym = 126;    break;
 		case ESCE0(0x4a): keysym = KP_SLH; break;
 		case ESCE0(0x5a): keysym = KP_ENT; break;
 		case ESCE0(0x69): keysym = K_END;  break;
@@ -320,8 +371,8 @@ static void ps2kbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
 	kbd_pt_regs = regs;
 
-	while (inb(IOMD_KCTRL) & (1 << 5))
-		handle_rawcode(inb(IOMD_KARTRX));
+	while (iomd_readb(IOMD_KCTRL) & (1 << 5))
+		handle_rawcode(iomd_readb(IOMD_KARTRX));
 	tasklet_schedule(&keyboard_tasklet);
 }
 
@@ -332,10 +383,10 @@ static void ps2kbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 int __init ps2kbd_init_hw(void)
 {
 	/* Reset the keyboard state machine. */
-	outb(0, IOMD_KCTRL);
-	outb(8, IOMD_KCTRL);
+	iomd_writeb(0, IOMD_KCTRL);
+	iomd_writeb(8, IOMD_KCTRL);
+	iomd_readb(IOMD_KARTRX);
 
-	(void)IOMD_KARTRX;
 	if (request_irq (IRQ_KEYBOARDRX, ps2kbd_rx, 0, "keyboard", NULL) != 0)
 		panic("Could not allocate keyboard receive IRQ!");
 	if (request_irq (IRQ_KEYBOARDTX, ps2kbd_tx, 0, "keyboard", NULL) != 0)

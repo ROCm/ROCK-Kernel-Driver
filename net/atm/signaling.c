@@ -211,14 +211,13 @@ static void purge_vccs(struct atm_vcc *vcc)
 
 static void sigd_close(struct atm_vcc *vcc)
 {
-	struct sk_buff *skb;
 	struct atm_dev *dev;
 
 	DPRINTK("sigd_close\n");
 	sigd = NULL;
 	if (skb_peek(&vcc->recvq))
 		printk(KERN_ERR "sigd_close: closing with requests pending\n");
-	while ((skb = skb_dequeue(&vcc->recvq))) kfree_skb(skb);
+	skb_queue_purge(&vcc->recvq);
 	purge_vccs(nodev_vccs);
 
 	spin_lock (&atm_dev_lock);

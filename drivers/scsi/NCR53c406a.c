@@ -665,7 +665,7 @@ static void internal_done(Scsi_Cmnd *SCpnt) {
 }
 
 
-static void wait_intr() {
+static void wait_intr(void) {
     int i = jiffies + WATCHDOG;
     
     while(time_after(i,jiffies) && !(inb(STAT_REG)&0xe0)) /* wait for a pseudo-interrupt */
@@ -981,7 +981,7 @@ NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs){
 }
 
 #ifndef IRQ_LEV
-static int irq_probe()
+static int irq_probe(void)
 {
     int irqs, irq;
     int i;
@@ -1013,7 +1013,7 @@ static int irq_probe()
 }
 #endif /* IRQ_LEV */
 
-static void chip_init()
+static void chip_init(void)
 {
     REG1;
 #if USE_DMA

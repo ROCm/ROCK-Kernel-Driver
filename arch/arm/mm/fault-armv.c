@@ -24,6 +24,7 @@
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/unaligned.h>
 
@@ -45,9 +46,8 @@ extern void do_bad_area(struct task_struct *tsk, struct mm_struct *mm,
  *
  * Speed optimisations and better fault handling by Russell King.
  *
- * NOTE!!! This is not portable onto the ARM6/ARM7 processors yet.  Also,
- * it seems to give a severe performance impact (1 abort/ms - NW runs at
- * ARM6 speeds) with GCC 2.7.2.2 - needs checking with a later GCC/EGCS.
+ * *** NOTE ***
+ * This code is not portable to processors with late data abort handling.
  */
 #define CODING_BITS(i)	(i & 0x0e000000)
 
@@ -56,6 +56,8 @@ extern void do_bad_area(struct task_struct *tsk, struct mm_struct *mm,
 #define LDST_U_BIT(i)	(i & (1 << 23))		/* Add offset		*/
 #define LDST_W_BIT(i)	(i & (1 << 21))		/* Writeback		*/
 #define LDST_L_BIT(i)	(i & (1 << 20))		/* Load			*/
+
+#define LDST_P_EQ_U(i)	((((i) ^ ((i) >> 1)) & (1 << 23)) == 0)
 
 #define LDSTH_I_BIT(i)	(i & (1 << 22))		/* half-word immed	*/
 #define LDM_S_BIT(i)	(i & (1 << 22))		/* write CPSR from SPSR	*/
@@ -336,29 +338,48 @@ fault:
 	return TYPE_FAULT;
 }
 
+/*
+ * LDM/STM alignment handler.
+ *
+ * There are 4 variants of this instruction:
+ *
+ * B = rn pointer before instruction, A = rn pointer after instruction
+ *              ------ increasing address ----->
+ *	        |    | r0 | r1 | ... | rx |    |
+ * PU = 01             B                    A
+ * PU = 11        B                    A
+ * PU = 00        A                    B
+ * PU = 10             A                    B
+ */
 static int
 do_alignment_ldmstm(unsigned long addr, unsigned long instr, struct pt_regs *regs)
 {
 	unsigned int rd, rn, correction, nr_regs, regbits;
-	unsigned long eaddr;
-
-	correction = 4; /* sometimes 8 on ARMv3 */
-	regs->ARM_pc += correction;
-
-	rd = RD_BITS(instr);
-	rn = RN_BITS(instr);
-	eaddr = regs->uregs[rn];
+	unsigned long eaddr, newaddr;
 
 	if (LDM_S_BIT(instr))
 		goto bad;
 
+	correction = 4; /* processor implementation defined */
+	regs->ARM_pc += correction;
+
 	ai_multi += 1;
 
+	/* count the number of registers in the mask to be transferred */
 	for (regbits = REGMASK_BITS(instr), nr_regs = 0; regbits; regbits >>= 1)
 		nr_regs += 4;
 
+	rn = RN_BITS(instr);
+	newaddr = eaddr = regs->uregs[rn];
+
 	if (!LDST_U_BIT(instr))
-		eaddr -= nr_regs;
+		nr_regs = -nr_regs;
+	newaddr += nr_regs;
+	if (!LDST_U_BIT(instr))
+		eaddr = newaddr;
+
+	if (LDST_P_EQ_U(instr))	/* U = P */
+		eaddr += 4;
 
 	/*
 	 * This is a "hint" - we already have eaddr worked out by the
@@ -369,34 +390,23 @@ do_alignment_ldmstm(unsigned long addr, unsigned long instr, struct pt_regs *reg
 			"addr = %08lx, eaddr = %08lx\n",
 			 instruction_pointer(regs), instr, addr, eaddr);
 
-	if ((LDST_U_BIT(instr) == 0 && LDST_P_BIT(instr) == 0) ||
-	    (LDST_U_BIT(instr)      && LDST_P_BIT(instr)))
-		eaddr += 4;
-
 	for (regbits = REGMASK_BITS(instr), rd = 0; regbits; regbits >>= 1, rd += 1)
 		if (regbits & 1) {
-			if (LDST_L_BIT(instr)) {
+			if (LDST_L_BIT(instr))
 				get32_unaligned_check(regs->uregs[rd], eaddr);
-				if (rd == 15)
-					correction = 0;
-			} else
+			else
 				put32_unaligned_check(regs->uregs[rd], eaddr);
 			eaddr += 4;
 		}
 
-	if (LDST_W_BIT(instr)) {
-		if (LDST_P_BIT(instr) && !LDST_U_BIT(instr))
-			eaddr -= nr_regs;
-		else if (LDST_P_BIT(instr))
-			eaddr -= 4;
-		else if (!LDST_U_BIT(instr))
-			eaddr -= 4 + nr_regs;
-		regs->uregs[rn] = eaddr;
-	}
-	regs->ARM_pc -= correction;
+	if (LDST_W_BIT(instr))
+		regs->uregs[rn] = newaddr;
+	if (!LDST_L_BIT(instr) || !(REGMASK_BITS(instr) & (1 << 15)))
+		regs->ARM_pc -= correction;
 	return TYPE_DONE;
 
 fault:
+	regs->ARM_pc -= correction;
 	return TYPE_FAULT;
 
 bad:

@@ -574,7 +574,7 @@ static int __init nubus_get_vidnames(struct nubus_board* board,
 		/* Now clobber the whole thing */
 		if (size > sizeof(mode) - 1)
 			size = sizeof(mode) - 1;
-		memset(&mode, sizeof(mode), 0);
+		memset(&mode, 0, sizeof(mode));
 		nubus_get_rsrc_mem(&mode, &ent, size);
 		printk (KERN_INFO "      %02X: (%02X) %s\n", ent.type,
 			mode.id, mode.name);

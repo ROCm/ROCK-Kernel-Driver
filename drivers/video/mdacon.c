@@ -21,6 +21,9 @@
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive for
  *  more details.
+ *
+ *  Changelog:
+ *  Paul G. (03/2001) Fix mdacon= boot prompt to use __setup().
  */
 
 #include <linux/types.h>
@@ -129,6 +132,7 @@ static void write_mda_w(unsigned int val, unsigned char reg)
 	spin_unlock_irqrestore(&mda_lock, flags);
 }
 
+#ifdef TEST_MDA_B
 static int test_mda_b(unsigned char val, unsigned char reg)
 {
 	unsigned long flags;
@@ -143,6 +147,7 @@ static int test_mda_b(unsigned char val, unsigned char reg)
 	spin_unlock_irqrestore(&mda_lock, flags);
 	return val;
 }
+#endif
 
 static inline void mda_set_origin(unsigned int location)
 {
@@ -182,20 +187,27 @@ static inline void mda_set_cursor_size(int from, int to)
 
 
 #ifndef MODULE
-void __init mdacon_setup(char *str, int *ints)
+static int __init mdacon_setup(char *str)
 {
 	/* command line format: mdacon=<first>,<last> */
 
+	int ints[3];
+
+	str = get_options(str, ARRAY_SIZE(ints), ints);
+
 	if (ints[0] < 2)
-		return;
+		return 0;
 
 	if (ints[1] < 1 || ints[1] > MAX_NR_CONSOLES || 
 	    ints[2] < 1 || ints[2] > MAX_NR_CONSOLES)
-		return;
+		return 0;
 
-	mda_first_vc = ints[1]-1;
-	mda_last_vc  = ints[2]-1;
+	mda_first_vc = ints[1];
+	mda_last_vc  = ints[2];
+	return 1;
 }
+
+__setup("mdacon=", mdacon_setup);
 #endif
 
 static int __init mda_detect(void)
@@ -237,17 +249,19 @@ static int __init mda_detect(void)
 	 * memory location, so now we do an I/O port test.
 	 */
 
+#ifdef TEST_MDA_B
 	/* Edward: These two mess `tests' mess up my cursor on bootup */
 
 	/* cursor low register */
-	/* if (! test_mda_b(0x66, 0x0f)) {
+	if (! test_mda_b(0x66, 0x0f)) {
 		return 0;
-	} */
+	}
 
 	/* cursor low register */
-	/* if (! test_mda_b(0x99, 0x0f)) {
+	if (! test_mda_b(0x99, 0x0f)) {
 		return 0;
-	} */
+	}
+#endif
 
 	/* See if the card is a Hercules, by checking whether the vsync
 	 * bit of the status register is changing.  This test lasts for

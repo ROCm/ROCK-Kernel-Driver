@@ -2024,8 +2024,10 @@ fore200e_get_esi(struct fore200e* fore200e)
     if (!prom)
 	return -ENOMEM;
     ok = fore200e->bus->prom_read(fore200e, prom);
-    if (ok < 0)
+    if (ok < 0) {
+	fore200e_kfree(prom);
 	return -EBUSY;
+    }
 	
     printk(FORE200E "device %s, rev. %c, S/N: %d, ESI: %02x:%02x:%02x:%02x:%02x:%02x\n", 
 	   fore200e->name, 

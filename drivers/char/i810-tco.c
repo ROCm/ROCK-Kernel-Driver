@@ -232,19 +232,40 @@ static int i810tco_ioctl (struct inode *inode, struct file *file,
 	}
 }
 
+/*
+ * Data for PCI driver interface
+ *
+ * This data only exists for exporting the supported
+ * PCI ids via MODULE_DEVICE_TABLE.  We do not actually
+ * register a pci_driver, because someone else might one day
+ * want to register another driver on the same PCI id.
+ */
+static struct pci_device_id i810tco_pci_tbl[] __initdata = {
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AA_0,	PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801AB_0,	PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_0,	PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_10,	PCI_ANY_ID, PCI_ANY_ID, },
+	{ 0, },
+};
+MODULE_DEVICE_TABLE (pci, i810tco_pci_tbl);
+
 static struct pci_dev *i810tco_pci;
 
 static unsigned char i810tco_getdevice (void)
 {
+	struct pci_dev *dev;
 	u8 val1, val2;
 	u16 badr;
 	/*
-	 *      Find the PCI device which has vendor id 0x8086
-	 *      and device ID 0x2410
+	 *      Find the PCI device
 	 */
-	i810tco_pci = pci_find_device (PCI_VENDOR_ID_INTEL,
-				       PCI_DEVICE_ID_INTEL_82801AA_0, NULL);
-	if (i810tco_pci) {
+
+	pci_for_each_dev(dev) {
+		if (pci_match_device(i810tco_pci_tbl, dev))
+			break;
+	}
+
+	if ((i810tco_pci = dev)) {
 		/*
 		 *      Find the ACPI base I/O address which is the base
 		 *      for the TCO registers (TCOBASE=ACPIBASE + 0x60)

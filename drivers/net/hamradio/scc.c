@@ -216,7 +216,7 @@ static struct net_device_stats * scc_net_get_stats(struct net_device *dev);
 
 static unsigned char SCC_DriverName[] = "scc";
 
-static struct irqflags { unsigned char used : 1; } Ivec[16];
+static struct irqflags { unsigned char used : 1; } Ivec[NR_IRQS];
 	
 static struct scc_channel SCC_Info[2 * SCC_MAXCHIPS];	/* information per channel */
 
@@ -1484,7 +1484,7 @@ static void z8530_init(void)
 	printk(KERN_INFO "Init Z8530 driver: %u channels, IRQ", Nchips*2);
 	
 	flag=" ";
-	for (k = 0; k < 16; k++)
+	for (k = 0; k < NR_IRQS; k++)
 		if (Ivec[k].used) 
 		{
 			printk("%s%d", flag, k);
@@ -1764,6 +1764,9 @@ static int scc_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 			if (hwcfg.irq == 2) hwcfg.irq = 9;
 
+			if (hwcfg.irq <0 || hwcfg.irq > NR_IRQS)
+				return -EINVAL;
+				
 			if (!Ivec[hwcfg.irq].used && hwcfg.irq)
 			{
 				if (request_irq(hwcfg.irq, scc_isr, SA_INTERRUPT, "AX.25 SCC", NULL))
@@ -2162,7 +2165,7 @@ static void __exit scc_cleanup_driver(void)
 		}
 	}
 	
-	for (k=0; k < 16 ; k++)
+	for (k=0; k < NR_IRQS ; k++)
 		if (Ivec[k].used) free_irq(k, NULL);
 		
 	if (Vector_Latch)

@@ -60,6 +60,10 @@
 #include "epca.h"
 #include "epcaconfig.h"
 
+#if BITS_PER_LONG != 32
+#  error FIXME: this driver only works on 32-bit platforms
+#endif
+
 /* ---------------------- Begin defines ------------------------ */
 
 #define VERSION            "1.3.0.1-LK"

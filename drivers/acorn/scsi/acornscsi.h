@@ -12,52 +12,6 @@
 #ifndef ACORNSCSI_H
 #define ACORNSCSI_H
 
-#ifndef ASM
-extern int acornscsi_detect (Scsi_Host_Template *);
-extern int acornscsi_release (struct Scsi_Host *);
-extern const char *acornscsi_info (struct Scsi_Host *);
-extern int acornscsi_queuecmd (Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-extern int acornscsi_abort (Scsi_Cmnd *);
-extern int acornscsi_reset (Scsi_Cmnd *, unsigned int);
-extern int acornscsi_proc_info (char *, char **, off_t, int, int, int);
-extern int acornscsi_biosparam (Disk *, kdev_t, int []);
-
-#ifndef NULL
-#define NULL 0
-#endif
-
-#ifndef CMD_PER_LUN
-#define CMD_PER_LUN 2
-#endif
-
-#ifndef CAN_QUEUE
-#define CAN_QUEUE 16
-#endif
-
-#include "linux/proc_fs.h"
-
-#include <scsi/scsicam.h>
-
-#define ACORNSCSI_3 {							\
-proc_info:		acornscsi_proc_info,				\
-name:			"AcornSCSI",					\
-detect:			acornscsi_detect,				\
-release:		acornscsi_release,	/* Release */		\
-info:			acornscsi_info,					\
-queuecommand:		acornscsi_queuecmd,				\
-abort:			acornscsi_abort,				\
-reset:			acornscsi_reset,				\
-bios_param:		scsicam_bios_param,				\
-can_queue:		CAN_QUEUE,		/* can_queue */		\
-this_id:		7,			/* this id */		\
-sg_tablesize:		SG_ALL,			/* sg_tablesize */	\
-cmd_per_lun:		CMD_PER_LUN,		/* cmd_per_lun */	\
-unchecked_isa_dma:	0,			/* unchecked isa dma */	\
-use_clustering:		DISABLE_CLUSTERING				\
-	}
-
-#ifndef HOSTS_C
-
 /* SBIC registers */
 #define OWNID			0
 #define OWNID_FS1		(1<<7)
@@ -405,7 +359,4 @@ typedef struct acornscsi_hostdata {
     struct status_entry status[9][STATUS_BUFFER_SIZE];
 } AS_Host;
 
-#endif /* ndef HOSTS_C */
-
-#endif /* ndef ASM */
 #endif /* ACORNSCSI_H */

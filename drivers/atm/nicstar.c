@@ -62,6 +62,9 @@
 #include "idt77105.h"
 #endif /* CONFIG_ATM_NICSTAR_USE_IDT77105 */
 
+#if BITS_PER_LONG != 32
+#  error FIXME: this driver requires a 32-bit platform
+#endif
 
 /* Additional code ************************************************************/
 

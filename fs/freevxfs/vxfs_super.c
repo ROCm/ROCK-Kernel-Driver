@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_super.c,v 1.24 2001/05/20 15:21:14 hch Exp hch $"
+#ident "$Id: vxfs_super.c,v 1.25 2001/05/25 18:25:55 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - superblock related routines.
@@ -168,18 +168,18 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 	bp = bread(dev, 1, bsize);
 	if (!bp) {
 		printk(KERN_WARNING "vxfs: unable to read disk superblock\n");
-		return NULL;
+		goto out;
 	}
 
 	rsbp = (struct vxfs_sb *)bp->b_data;
 	if (rsbp->vs_magic != VXFS_SUPER_MAGIC) {
 		printk(KERN_NOTICE "vxfs: WRONG superblock magic\n");
-		return NULL;
+		goto out;
 	}
 
 	if (rsbp->vs_version < 2 || rsbp->vs_version > 4) {
 		printk(KERN_NOTICE "vxfs: unsupported VxFS version (%d)\n", rsbp->vs_version);
-		return NULL;
+		goto out;
 	}
 
 #ifdef DIAGNOSTIC
@@ -210,12 +210,12 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 	default:
 		printk(KERN_WARNING "vxfs: unsupported blocksise: %d\n",
 				rsbp->vs_bsize);
-		return NULL;
+		goto out;
 	}
 
 	if (vxfs_read_olt(sbp, bsize)) {
 		printk(KERN_WARNING "vxfs: unable to read olt\n");
-		return NULL;
+		goto out;
 	}
 
 	if (vxfs_read_fshead(sbp)) {
@@ -228,6 +228,8 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 		return (sbp);
 	
 	printk(KERN_WARNING "vxfs: unable to get root dentry.\n");
+out:
+	kfree(infp);
 	return NULL;
 }
 

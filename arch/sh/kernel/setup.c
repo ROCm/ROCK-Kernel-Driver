@@ -521,6 +521,9 @@ int get_cpuinfo(char *buffer)
 	
 	PRINT_CLOCK("CPU", boot_cpu_data.cpu_clock);
 	PRINT_CLOCK("Bus", boot_cpu_data.bus_clock);
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	PRINT_CLOCK("Memory", boot_cpu_data.memory_clock);
+#endif
 	PRINT_CLOCK("Peripheral module", boot_cpu_data.module_clock);
 
 	return p - buffer;

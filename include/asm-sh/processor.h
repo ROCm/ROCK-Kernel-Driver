@@ -23,7 +23,7 @@
 enum cpu_type {
 	CPU_SH7708,		/* Represents 7707, 7708, 7708S, 7708R, 7709 */
 	CPU_SH7729,		/* Represents 7709A, 7729 */
-	CPU_SH7750,
+	CPU_SH7750,     /* Represents 7750, 7751 */
 	CPU_ST40STB1,
 	CPU_SH_NONE
 };
@@ -38,6 +38,9 @@ struct sh_cpuinfo {
 	unsigned long *pte_quick;
 	unsigned long pgtable_cache_sz;
 	unsigned int cpu_clock, master_clock, bus_clock, module_clock;
+#ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	unsigned int memory_clock;
+#endif
 };
 
 extern struct sh_cpuinfo boot_cpu_data;
@@ -76,7 +79,7 @@ extern struct sh_cpuinfo boot_cpu_data;
 
 struct sh_fpu_hard_struct {
 	unsigned long fp_regs[16];
-	unsigned long long xd_regs[8];
+	unsigned long xfp_regs[16];
 	unsigned long fpscr;
 	unsigned long fpul;
 
@@ -86,7 +89,7 @@ struct sh_fpu_hard_struct {
 /* Dummy fpu emulator  */
 struct sh_fpu_soft_struct {
 	unsigned long fp_regs[16];
-	unsigned long long xd_regs[8];
+	unsigned long xfp_regs[16];
 	unsigned long fpscr;
 	unsigned long fpul;
 
@@ -112,7 +115,7 @@ struct thread_struct {
 };
 
 #define INIT_MMAP \
-{ &init_mm, 0x80000000, 0xa0000000, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
+{ &init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, NULL, NULL }
 
 #define INIT_THREAD  {						\
 	sizeof(init_stack) + (long) &init_stack, /* sp */	\

@@ -260,7 +260,7 @@ sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 	fd_set_bits fds;
 	char *bits;
 	long timeout;
-	int ret, size;
+	int ret, size, max_fdset;
 
 	timeout = MAX_SCHEDULE_TIMEOUT;
 	if (tvp) {
@@ -285,8 +285,10 @@ sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 	if (n < 0)
 		goto out_nofds;
 
-	if (n > current->files->max_fdset)
-		n = current->files->max_fdset;
+	/* max_fdset can increase, so grab it once to avoid race */
+	max_fdset = current->files->max_fdset;
+	if (n > max_fdset)
+		n = max_fdset;
 
 	/*
 	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),

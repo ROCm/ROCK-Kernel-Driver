@@ -29,7 +29,9 @@ comment 'Processor type and features'
 choice 'SuperH system type'					\
 	"Generic		CONFIG_SH_GENERIC		\
 	 SolutionEngine		CONFIG_SH_SOLUTION_ENGINE	\
-	 Overdrive		CONFIG_SH_OVERDRIVE		\
+	 SolutionEngine7751	CONFIG_SH_7751_SOLUTION_ENGINE	\
+	 STB1_Harp		CONFIG_SH_STB1_HARP		\
+	 STB1_Overdrive		CONFIG_SH_STB1_OVERDRIVE	\
 	 HP620			CONFIG_SH_HP620			\
 	 HP680			CONFIG_SH_HP680			\
 	 HP690			CONFIG_SH_HP690			\
@@ -37,9 +39,17 @@ choice 'SuperH system type'					\
 	 DMIDA			CONFIG_SH_DMIDA    		\
 	 EC3104			CONFIG_SH_EC3104		\
 	 Dreamcast		CONFIG_SH_DREAMCAST		\
+	 CAT68701		CONFIG_SH_CAT68701		\
+	 BigSur			CONFIG_SH_BIGSUR		\
+	 SH2000			CONFIG_SH_SH2000		\
 	 BareCPU		CONFIG_SH_UNKNOWN" Generic
 
-define_bool CONFIG_SH_RTC y
+# The SH7750 RTC module is disabled in the Dreamcast
+if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
+   define_bool CONFIG_SH_RTC n
+else
+   define_bool CONFIG_SH_RTC y
+fi
 
 if [ "$CONFIG_SH_HP620" = "y" -o "$CONFIG_SH_HP680" = "y" -o \
      "$CONFIG_SH_HP690" = "y" ]; then
@@ -50,7 +60,9 @@ choice 'Processor type' \
    "SH7707 CONFIG_CPU_SUBTYPE_SH7707 \
     SH7708 CONFIG_CPU_SUBTYPE_SH7708 \
     SH7709 CONFIG_CPU_SUBTYPE_SH7709 \
-    SH7750 CONFIG_CPU_SUBTYPE_SH7750" SH7708
+    SH7750 CONFIG_CPU_SUBTYPE_SH7750 \
+    SH7751 CONFIG_CPU_SUBTYPE_SH7751 \
+    ST40STB1 CONFIG_CPU_SUBTYPE_ST40STB1" SH7708
 if [ "$CONFIG_CPU_SUBTYPE_SH7707" = "y" ]; then
    define_bool CONFIG_CPU_SH3 y
    define_bool CONFIG_CPU_SH4 n
@@ -67,12 +79,30 @@ if [ "$CONFIG_CPU_SUBTYPE_SH7750" = "y" ]; then
    define_bool CONFIG_CPU_SH3 n
    define_bool CONFIG_CPU_SH4 y
 fi
+if [ "$CONFIG_CPU_SUBTYPE_SH7751" = "y" ]; then
+   define_bool CONFIG_CPU_SH3 n
+   define_bool CONFIG_CPU_SH4 y
+fi
+if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
+   define_bool CONFIG_CPU_SH3 n
+   define_bool CONFIG_CPU_SH4 y
+fi
 bool 'Little Endian' CONFIG_CPU_LITTLE_ENDIAN
 if [ "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o "$CONFIG_SH_HP600" = "y" -o \
-     "$CONFIG_SH_OVERDRIVE" = "y" ]; then
+     "$CONFIG_SH_BIGSUR" = "y" -o "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" -o \
+     "$CONFIG_SH_DREAMCAST" = "y" -o "$CONFIG_SH_SH2000" = "y" ]; then
   define_hex CONFIG_MEMORY_START 0c000000
 else
-  hex 'Physical memory start address' CONFIG_MEMORY_START 08000000
+  if [ "$CONFIG_CPU_SUBTYPE_ST40STB1" = "y" ]; then
+    bool 'Memory on LMI' CONFIG_ST40_LMI_MEMORY
+    if [ "$CONFIG_ST40_LMI_MEMORY" = "y" ] ; then
+      define_hex CONFIG_MEMORY_START 08000000
+    else
+      hex 'EMI physical memory start address' CONFIG_MEMORY_START 08000000
+    fi
+  else
+    hex 'Physical memory start address' CONFIG_MEMORY_START 08000000
+  fi
 fi
 endmenu
 
@@ -89,7 +119,8 @@ define_bool CONFIG_SBUS n
 
 bool 'Networking support' CONFIG_NET
 
-if [ "$CONFIG_SH_GENERIC" = "y" -o "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o "$CONFIG_SH_UNKNOWN" = "y" ]; then
+if [ "$CONFIG_SH_GENERIC" = "y" -o "$CONFIG_SH_SOLUTION_ENGINE" = "y" -o \
+     "$CONFIG_SH_UNKNOWN" = "y" -o "$CONFIG_SH_CAT68701" = "y" ]; then
   bool 'Compact Flash Enabler support' CONFIG_CF_ENABLER
 fi
 
@@ -101,6 +132,7 @@ fi
 
 bool 'Hitachi HD64465 companion chip support' CONFIG_HD64465
 if [ "$CONFIG_HD64465" = "y" ]; then
+   hex 'HD64465 start address' CONFIG_HD64465_IOBASE b0000000
    int 'HD64465 IRQ' CONFIG_HD64465_IRQ 5
 fi
 
@@ -197,6 +229,10 @@ fi
 #
 source drivers/input/Config.in
 
+if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
+source drivers/maple/Config.in
+fi
+
 mainmenu_option next_comment
 comment 'Character devices'
 
@@ -217,9 +253,28 @@ if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
 fi
 
 if [ "$CONFIG_SH_GENERIC" = "y" -o \
-     "$CONFIG_SH_OVERDRIVE" = "y" -o "$CONFIG_SH_SOLUTION_ENGINE" = "y" ]; then
+     "$CONFIG_SH_CAT68701" = "y" -o \
+     "$CONFIG_SH_STB1_HARP" = "y" -o \
+     "$CONFIG_SH_STB1_OVERDRIVE" = "y" -o \
+     "$CONFIG_SH_BIGSUR" = "y" -o \
+     "$CONFIG_SH_7751_SOLUTION_ENGINE" = "y" -o \
+     "$CONFIG_SH_SOLUTION_ENGINE" = "y" ]; then
   bool 'Heartbeat LED' CONFIG_HEARTBEAT
 fi
+
+if [ "$CONFIG_SH_DREAMCAST" = "y" -a "$CONFIG_MAPLE" != "n" ]; then
+   mainmenu_option next_comment
+   comment 'Maple Bus input peripherals'
+   if [ "$CONFIG_INPUT" != "n" ]; then
+      dep_tristate '  Maple Bus keyboard support' CONFIG_MAPLE_KEYBOARD $CONFIG_INPUT
+      dep_tristate '  Maple Bus mouse support' CONFIG_MAPLE_MOUSE $CONFIG_INPUT
+   else
+      comment 'Input core support is required for Maple input peripherals'
+   fi
+   endmenu
+fi
+
+source drivers/char/joystick/Config.in
 
 if [ "$CONFIG_PARPORT" != "n" ]; then
    dep_tristate 'Parallel printer support' CONFIG_PRINTER $CONFIG_PARPORT
@@ -228,13 +283,16 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    fi
    dep_tristate 'Support for user-space parallel port device drivers' CONFIG_PPDEV $CONFIG_PARPORT
 fi
-endmenu
-
+bool 'PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
+tristate 'Enhanced Real Time Clock Support' CONFIG_RTC
 if [ "$CONFIG_HOTPLUG" = "y" -a "$CONFIG_PCMCIA" != "n" ]; then
    source drivers/char/pcmcia/Config.in
 fi
+endmenu
 
 source fs/Config.in
+
+source drivers/media/Config.in
 
 if [ "$CONFIG_VT" = "y" ]; then
    mainmenu_option next_comment

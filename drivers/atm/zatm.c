@@ -255,9 +255,7 @@ static void refill_pool(struct atm_dev *dev,int pool)
 
 static void drain_free(struct atm_dev *dev,int pool)
 {
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&ZATM_DEV(dev)->pool[pool]))) kfree_skb(skb);
+	skb_queue_purge(&ZATM_DEV(dev)->pool[pool]);
 }
 
 
@@ -1464,6 +1462,9 @@ static int __init zatm_start(struct atm_dev *dev)
 
 	DPRINTK("zatm_start\n");
 	zatm_dev = ZATM_DEV(dev);
+	zatm_dev->rx_map = zatm_dev->tx_map = NULL;
+	for (i = 0; i < NR_MBX; i++)
+		zatm_dev->mbx_start[i] = 0;
 	if (request_irq(zatm_dev->irq,&zatm_int,SA_SHIRQ,DEV_LABEL,dev)) {
 		printk(KERN_ERR DEV_LABEL "(itf %d): IRQ%d is already in use\n",
 		    dev->number,zatm_dev->irq);
@@ -1496,25 +1497,27 @@ static int __init zatm_start(struct atm_dev *dev)
 	    "%ld VCs\n",dev->number,NR_SHAPERS,pools,rx,
 	    (zatm_dev->mem-curr*4)/VC_SIZE);
 	/* create mailboxes */
-	for (i = 0; i < NR_MBX; i++) zatm_dev->mbx_start[i] = 0;
 	for (i = 0; i < NR_MBX; i++)
 		if (mbx_entries[i]) {
 			unsigned long here;
 
 			here = (unsigned long) kmalloc(2*MBX_SIZE(i),
 			    GFP_KERNEL);
-			if (!here) return -ENOMEM;
+			if (!here) {
+				error = -ENOMEM;
+				goto out;
+			}
 			if ((here^(here+MBX_SIZE(i))) & ~0xffffUL)/* paranoia */
 				here = (here & ~0xffffUL)+0x10000;
+			zatm_dev->mbx_start[i] = here;
 			if ((here^virt_to_bus((void *) here)) & 0xffff) {
 				printk(KERN_ERR DEV_LABEL "(itf %d): system "
 				    "bus incompatible with driver\n",
 				    dev->number);
-				kfree((void *) here);
-				return -ENODEV;
+				error = -ENODEV;
+				goto out;
 			}
 			DPRINTK("mbx@0x%08lx-0x%08lx\n",here,here+MBX_SIZE(i));
-			zatm_dev->mbx_start[i] = here;
 			zatm_dev->mbx_end[i] = (here+MBX_SIZE(i)) & 0xffff;
 			zout(virt_to_bus((void *) here) >> 16,MSH(i));
 			zout(virt_to_bus((void *) here),MSL(i));
@@ -1523,15 +1526,25 @@ static int __init zatm_start(struct atm_dev *dev)
 			zout(here & 0xffff,MWA(i));
 		}
 	error = start_tx(dev);
-	if (error) return error;
+	if (error) goto out;
 	error = start_rx(dev);
-	if (error) return error;
+	if (error) goto out;
 	error = dev->phy->start(dev);
-	if (error) return error;
+	if (error) goto out;
 	zout(0xffffffff,IMR); /* enable interrupts */
 	/* enable TX & RX */
 	zout(zin(GMR) | uPD98401_GMR_SE | uPD98401_GMR_RE,GMR);
 	return 0;
+    out:
+	for (i = 0; i < NR_MBX; i++)
+		if (zatm_dev->mbx_start[i] != 0)
+			kfree((void *) zatm_dev->mbx_start[i]);
+	if (zatm_dev->rx_map != NULL)
+		kfree(zatm_dev->rx_map);
+	if (zatm_dev->tx_map != NULL)
+		kfree(zatm_dev->tx_map);
+	free_irq(zatm_dev->irq, dev);
+	return error;
 }
 
 
@@ -1681,22 +1694,16 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 		case ZATM_GETTHIST:
 			{
 				int i;
-
+				struct zatm_t_hist hs[ZATM_TIMER_HISTORY_SIZE];
 				save_flags(flags);
 				cli();
-				for (i = 0; i < ZATM_TIMER_HISTORY_SIZE; i++) {
-					if (!copy_to_user(
-					    (struct zatm_t_hist *) arg+i,
-					    &zatm_dev->timer_history[
+				for (i = 0; i < ZATM_TIMER_HISTORY_SIZE; i++)
+					hs[i] = zatm_dev->timer_history[
 					    (zatm_dev->th_curr+i) &
-					    (ZATM_TIMER_HISTORY_SIZE-1)],
-					    sizeof(struct zatm_t_hist)))
-						 continue;
-					restore_flags(flags);
-					return -EFAULT;
-				}
+					    (ZATM_TIMER_HISTORY_SIZE-1)];
 				restore_flags(flags);
-				return 0;
+				return copy_to_user((struct zatm_t_hist *) arg,
+				    hs, sizeof(hs)) ? -EFAULT : 0;
 			}
 #endif
 		default:
@@ -1828,11 +1835,11 @@ int __init zatm_detect(void)
 			    zatm_dev),GFP_KERNEL);
 			if (!zatm_dev) {
 				printk(KERN_EMERG "zatm.c: memory shortage\n");
-				goto out;
+				return devs;
 			}
 		}
 	}
-out:
+	kfree(zatm_dev);
 	return devs;
 }
 

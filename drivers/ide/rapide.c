@@ -17,7 +17,7 @@
 
 #include <asm/ecard.h>
 
-static const card_ids __init rapide_cids[] = {
+static card_ids __init rapide_cids[] = {
 	{ MANU_YELLOWSTONE, PROD_YELLOWSTONE_RAPIDE32 },
 	{ 0xffff, 0xffff }
 };

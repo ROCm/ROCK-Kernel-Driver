@@ -1035,7 +1035,11 @@ static int sci_init_drivers(void)
 	memset(&sci_driver, 0, sizeof(sci_driver));
 	sci_driver.magic = TTY_DRIVER_MAGIC;
 	sci_driver.driver_name = "sci";
+#ifdef CONFIG_DEVFS_FS
+	sci_driver.name = "ttsc/%d";
+#else
 	sci_driver.name = "ttySC";
+#endif
 	sci_driver.major = SCI_MAJOR;
 	sci_driver.minor_start = SCI_MINOR_START;
 	sci_driver.num = SCI_NPORTS;
@@ -1070,7 +1074,11 @@ static int sci_init_drivers(void)
 #endif
 
 	sci_callout_driver = sci_driver;
+#ifdef CONFIG_DEVFS_FS
+	sci_callout_driver.name = "cusc/%d";
+#else
 	sci_callout_driver.name = "cusc";
+#endif
 	sci_callout_driver.major = SCI_MAJOR+1;
 	sci_callout_driver.subtype = SERIAL_TYPE_CALLOUT;
 	sci_callout_driver.read_proc = NULL;

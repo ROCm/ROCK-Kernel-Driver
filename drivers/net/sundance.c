@@ -740,18 +740,16 @@ static void tx_timeout(struct net_device *dev)
 	printk(KERN_WARNING "%s: Transmit timed out, status %2.2x,"
 		   " resetting...\n", dev->name, readb(ioaddr + TxStatus));
 
-#ifndef __alpha__
 	{
 		int i;
-		printk(KERN_DEBUG "  Rx ring %8.8x: ", (int)np->rx_ring);
+		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
 		for (i = 0; i < RX_RING_SIZE; i++)
 			printk(" %8.8x", (unsigned int)np->rx_ring[i].status);
-		printk("\n"KERN_DEBUG"  Tx ring %8.8x: ", (int)np->tx_ring);
+		printk("\n"KERN_DEBUG"  Tx ring %p: ", np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(" %4.4x", np->tx_ring[i].status);
 		printk("\n");
 	}
-#endif
 
 	/* Perhaps we should reinitialize the hardware here. */
 	dev->if_port = 0;

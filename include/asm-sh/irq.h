@@ -43,7 +43,8 @@
 #define DMA_PRIORITY	7
 
 #if defined (CONFIG_CPU_SUBTYPE_SH7707) || defined (CONFIG_CPU_SUBTYPE_SH7708) || \
-    defined (CONFIG_CPU_SUBTYPE_SH7709) || defined (CONFIG_CPU_SUBTYPE_SH7750)
+    defined (CONFIG_CPU_SUBTYPE_SH7709) || defined (CONFIG_CPU_SUBTYPE_SH7750) || \
+    defined (CONFIG_CPU_SUBTYPE_SH7751)
 #define SCI_ERI_IRQ	23
 #define SCI_RXI_IRQ	24
 #define SCI_TXI_IRQ	25
@@ -68,7 +69,8 @@
 #define IRDA_IPR_ADDR	INTC_IPRE
 #define IRDA_IPR_POS	2
 #define IRDA_PRIORITY	3
-#elif defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+#elif defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751) || \
+      defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 #define SCIF_ERI_IRQ	40
 #define SCIF_RXI_IRQ	41
 #define SCIF_BRI_IRQ	42
@@ -95,7 +97,7 @@
 
 /* 1. ONCHIP_NR_IRQS */
 #ifdef CONFIG_SH_GENERIC
-# define ONCHIP_NR_IRQS 89
+# define ONCHIP_NR_IRQS 144
 #else
 # if defined(CONFIG_CPU_SUBTYPE_SH7707)
 #  define ONCHIP_NR_IRQS 64
@@ -107,8 +109,10 @@
 #  define PINT_NR_IRQS   16
 # elif defined(CONFIG_CPU_SUBTYPE_SH7750)
 #  define ONCHIP_NR_IRQS 48	// Actually 44
+# elif defined(CONFIG_CPU_SUBTYPE_SH7751)
+#  define ONCHIP_NR_IRQS 72
 # elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
-#  define ONCHIP_NR_IRQS 89
+#  define ONCHIP_NR_IRQS 144
 # endif
 #endif
 
@@ -131,10 +135,14 @@
 #else
 # if defined(CONFIG_HD64461)
 #  define OFFCHIP_NR_IRQS 16
+# elif defined (CONFIG_SH_BIGSUR) /* must be before CONFIG_HD64465 */
+#  define OFFCHIP_NR_IRQS 48
 # elif defined(CONFIG_HD64465)
 #  define OFFCHIP_NR_IRQS 16
 # elif defined (CONFIG_SH_EC3104)
 #  define OFFCHIP_NR_IRQS 16
+# elif defined (CONFIG_SH_DREAMCAST)
+#  define OFFCHIP_NR_IRQS 96
 # else
 #  define OFFCHIP_NR_IRQS 0
 # endif
@@ -240,6 +248,16 @@ extern int ipr_irq_demux(int irq);
 #define __irq_demux(irq) irq
 #endif /* CONFIG_CPU_SUBTYPE_SH7707 || CONFIG_CPU_SUBTYPE_SH7709 */
 
+#if defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751) || \
+    defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+#define INTC_ICR        0xffd00000
+#define INTC_ICR_NMIL	(1<<15)
+#define INTC_ICR_MAI	(1<<14)
+#define INTC_ICR_NMIB	(1<<9)
+#define INTC_ICR_NMIE	(1<<8)
+#define INTC_ICR_IRLM	(1<<7)
+#endif
+
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
 #define INTC2_FIRST_IRQ 64
 #define NR_INTC2_IRQS 25
@@ -266,6 +284,11 @@ extern __inline__ int irq_demux(int irq) {
 	return __irq_demux(irq);
 }
 
+#elif defined(CONFIG_SH_BIGSUR)
+
+extern int bigsur_irq_demux(int irq);
+#define irq_demux(irq) bigsur_irq_demux(irq)
+
 #elif defined(CONFIG_HD64461)
 
 extern int hd64461_irq_demux(int irq);
@@ -285,6 +308,11 @@ extern int ec3104_irq_demux(int irq);
 
 extern int cat68701_irq_demux(int irq);
 #define irq_demux cat68701_irq_demux
+
+#elif defined(CONFIG_SH_DREAMCAST)
+
+extern int systemasic_irq_demux(int irq);
+#define irq_demux systemasic_irq_demux
 
 #else
 

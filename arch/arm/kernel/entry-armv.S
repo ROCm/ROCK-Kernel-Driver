@@ -1179,7 +1179,6 @@ ENTRY(__trap_init)
 		stmfd	sp!, {r4 - r6, lr}
 
 		adr	r1, .LCvectors			@ set up the vectors
-		mov	r0, #0
 		ldmia	r1, {r1, r2, r3, r4, r5, r6, ip, lr}
 		stmia	r0, {r1, r2, r3, r4, r5, r6, ip, lr}
 

@@ -16,6 +16,7 @@
  * Ported to Linux 2.3.x and MTD:
  * Copyright (C) 2000  Alexander Larsson (alex@cendio.se), Cendio Systems AB
  *
+ * Copyright 2000, 2001  Red Hat, Inc.
  */
 
 /* inode.c -- Contains the code that is called from the VFS.  */
@@ -1719,9 +1720,6 @@ static DECLARE_FSTYPE_DEV(jffs_fs_type, "jffs", jffs_read_super);
 static int __init
 init_jffs_fs(void)
 {
-	printk("JFFS version "
-	       JFFS_VERSION_STRING
-	       ", (C) 1999, 2000  Axis Communications AB\n");
 	return register_filesystem(&jffs_fs_type);
 }
 

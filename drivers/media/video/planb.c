@@ -50,6 +50,7 @@
 #include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/irq.h>
+#include <asm/semaphore.h>
 
 #include "planb.h"
 #include "saa7196.h"
@@ -326,41 +327,14 @@ static volatile struct dbdma_cmd *cmd_geo_setup(
 /* misc. supporting functions */
 /******************************/
 
-static void __planb_wait(struct planb *pb)
-{
-	DECLARE_WAITQUEUE(wait, current);
-
-	add_wait_queue(&pb->lockq, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (pb->lock) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(&pb->lockq, &wait);
-	current->state = TASK_RUNNING;
-}
-
-static inline void planb_wait(struct planb *pb)
-{
-	DEBUG("PlanB: planb_wait\n");
-	if(pb->lock)
-		__planb_wait(pb);
-}
-
 static inline void planb_lock(struct planb *pb)
 {
-	DEBUG("PlanB: planb_lock\n");
-	if(pb->lock)
-		__planb_wait(pb);
-	pb->lock = 1;
+	down(&pb->lock);
 }
 
 static inline void planb_unlock(struct planb *pb)
 {
-	DEBUG("PlanB: planb_unlock\n");
-	pb->lock = 0;
-	wake_up(&pb->lockq);
+	up(&pb->lock);
 }
 
 /***************/
@@ -2098,7 +2072,7 @@ static int init_planb(struct planb *pb)
 	pb->tab_size = PLANB_MAXLINES + 40;
 	pb->suspend = 0;
 	pb->lock = 0;
-	init_waitqueue_head(&pb->lockq);
+	init_MUTEX(&pb->lock);
 	pb->ch1_cmd = 0;
 	pb->ch2_cmd = 0;
 	pb->mask = 0;

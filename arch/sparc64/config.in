@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.144 2001/06/01 08:12:10 davem Exp $
+# $Id: config.in,v 1.146 2001/06/16 04:15:26 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -36,6 +36,7 @@ define_bool CONFIG_HAVE_DEC_LOCK y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 define_bool CONFIG_ISA n
+define_bool CONFIG_ISAPNP n
 define_bool CONFIG_EISA n
 define_bool CONFIG_MCA n
 define_bool CONFIG_PCMCIA n
@@ -235,71 +236,7 @@ if [ "$CONFIG_NET" = "y" ]; then
 
    bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
-      tristate '  Dummy net driver support' CONFIG_DUMMY
-      tristate '  Bonding driver support' CONFIG_BONDING
-      tristate '  Universal TUN/TAP device driver support' CONFIG_TUN
-      if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-        if [ "$CONFIG_NETLINK" = "y" ]; then
-          tristate '  Ethertap network tap (OBSOLETE)' CONFIG_ETHERTAP
-        fi
-      fi
-      tristate '  PPP (point-to-point) support' CONFIG_PPP
-      if [ ! "$CONFIG_PPP" = "n" ]; then
-         dep_tristate '  PPP support for async serial ports' CONFIG_PPP_ASYNC $CONFIG_PPP
-         dep_tristate '  PPP support for sync tty ports' CONFIG_PPP_SYNC_TTY $CONFIG_PPP
-         dep_tristate '  PPP Deflate compression' CONFIG_PPP_DEFLATE $CONFIG_PPP
-         dep_tristate '  PPP BSD-Compress compression' CONFIG_PPP_BSDCOMP m
-         if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-            dep_tristate '  PPP over Ethernet (EXPERIMENTAL)' CONFIG_PPPOE $CONFIG_PPP
-         fi
-      fi
-      tristate '  SLIP (serial line) support' CONFIG_SLIP
-      if [ "$CONFIG_SLIP" != "n" ]; then
-	 bool '    CSLIP compressed headers' CONFIG_SLIP_COMPRESSED
-	 bool '    Keepalive and linefill' CONFIG_SLIP_SMART
-	 bool '    Six bit SLIP encapsulation' CONFIG_SLIP_MODE_SLIP6
-      fi
-
-      mainmenu_option next_comment
-      comment 'Ethernet (10 or 100Mbit)'
-
-      tristate 'Sun LANCE support' CONFIG_SUNLANCE
-      tristate 'Sun Happy Meal 10/100baseT support' CONFIG_HAPPYMEAL
-      if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-	 tristate 'Sun BigMAC 10/100baseT support (EXPERIMENTAL)' CONFIG_SUNBMAC
-      fi
-      tristate '  Sun QuadEthernet support' CONFIG_SUNQE
-      if [ "$CONFIG_PCI" = "y" ]; then
-	 tristate 'Generic DECchip & DIGITAL EtherWORKS PCI/EISA' CONFIG_DE4X5
-	 tristate 'DECchip Tulip (dc21x4x) PCI support' CONFIG_TULIP
-	 tristate '3c590/3c900 series (592/595/597) "Vortex/Boomerang" support' CONFIG_VORTEX
-	 tristate 'RealTek RTL-8139 support' CONFIG_8139TOO
-	 tristate 'PCI NE2000 support' CONFIG_NE2K_PCI
-	 tristate 'VIA Rhine support' CONFIG_VIA_RHINE
-	 tristate 'EtherExpressPro/100 support' CONFIG_EEPRO100
-	 tristate 'Adaptec Starfire support' CONFIG_ADAPTEC_STARFIRE
-      fi
-      endmenu
-
-      mainmenu_option next_comment
-      comment 'Ethernet (1000 Mbit)'
-
-      if [ "$CONFIG_PCI" = "y" ]; then
-	  tristate 'Alteon AceNIC/3Com 3C985/NetGear GA620 Gigabit support' CONFIG_ACENIC
-	  if [ "$CONFIG_ACENIC" != "n" ]; then
-	    bool '  Omit support for old Tigon I based AceNICs' CONFIG_ACENIC_OMIT_TIGON_I
-	  fi
-	  tristate 'SysKonnect SK-98xx support' CONFIG_SK98LIN
-	  tristate 'Sun GEM support' CONFIG_SUNGEM
-      fi
-      tristate 'MyriCOM Gigabit Ethernet support' CONFIG_MYRI_SBUS
-      endmenu
-
-      bool 'FDDI driver support' CONFIG_FDDI
-      if [ "$CONFIG_FDDI" = "y" ]; then
-          tristate '  SysKonnect FDDI PCI support' CONFIG_SKFP
-      fi
-
+      source drivers/net/Config.in
       if [ "$CONFIG_ATM" = "y" ]; then
 	source drivers/atm/Config.in
       fi
@@ -330,6 +267,11 @@ mainmenu_option next_comment
 comment 'XFree86 DRI support'
 bool 'Direct Rendering Manager (XFree86 DRI support)' CONFIG_DRM
 dep_tristate '  Creator/Creator3D' CONFIG_DRM_FFB $CONFIG_DRM
+dep_tristate '  3dfx Banshee/Voodoo3+' CONFIG_DRM_TDFX $CONFIG_DRM
+dep_tristate '  ATI Rage 128' CONFIG_DRM_R128 $CONFIG_DRM
+if [ "$CONFIG_DRM_R128" != "n" ]; then
+   define_bool CONFIG_AGP y
+fi
 endmenu
 
 source drivers/input/Config.in

@@ -168,6 +168,11 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
     retval->loaded_as_module = 1;
     if (flag_new) {
 	shn = (Scsi_Host_Name *) kmalloc(sizeof(Scsi_Host_Name), GFP_ATOMIC);
+        if (!shn) {
+                kfree(retval);
+                printk(KERN_ERR "scsi: out of memory(2) in scsi_register.\n");
+                return NULL;
+        }
 	shn->name = kmalloc(hname_len + 1, GFP_ATOMIC);
 	if (hname_len > 0)
 	    strncpy(shn->name, hname, hname_len);

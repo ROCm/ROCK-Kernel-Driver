@@ -833,18 +833,16 @@ static void tx_timeout(struct net_device *dev)
 	printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
 		   " resetting...\n", dev->name, (int)readl(ioaddr + TxRingPtr));
 
-#ifndef __alpha__
 	{
 		int i;
-		printk(KERN_DEBUG "  Rx ring %8.8x: ", (int)np->rx_ring);
+		printk(KERN_DEBUG "  Rx ring %p: ", np->rx_ring);
 		for (i = 0; i < RX_RING_SIZE; i++)
 			printk(" %8.8x", (unsigned int)np->rx_ring[i].cmd_status);
-		printk("\n"KERN_DEBUG"  Tx ring %8.8x: ", (int)np->tx_ring);
+		printk("\n"KERN_DEBUG"  Tx ring %p: ", np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(" %4.4x", np->tx_ring[i].cmd_status);
 		printk("\n");
 	}
-#endif
 	spin_lock_irq(&np->lock);
 	natsemi_reset(dev);
 	drain_ring(dev);

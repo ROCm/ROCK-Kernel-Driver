@@ -75,7 +75,7 @@ static void ether1_timeout(struct net_device *dev);
 
 /* ------------------------------------------------------------------------- */
 
-static const char version[] __initdata = KERN_INFO "ether1 ethernet driver (c) 2000 Russell King v1.07\n";
+static char version[] __initdata = "ether1 ethernet driver (c) 2000 Russell King v1.07\n";
 
 #define BUS_16 16
 #define BUS_8  8
@@ -990,7 +990,7 @@ static void __init ether1_banner(void)
 	static unsigned int version_printed = 0;
 
 	if (net_debug && version_printed++ == 0)
-		printk (version);
+		printk(KERN_INFO "%s", version);
 }
 
 static struct net_device * __init ether1_init_one(struct expansion_card *ec)
@@ -1045,7 +1045,6 @@ static struct net_device * __init ether1_init_one(struct expansion_card *ec)
 release:
 	release_region(dev->base_addr, 16);
 	release_region(dev->base_addr + 0x800, 4096);
-free:
 	unregister_netdev(dev);
 	kfree(dev);
 out:

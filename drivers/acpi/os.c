@@ -293,19 +293,19 @@ acpi_os_mem_in32 (ACPI_PHYSICAL_ADDRESS phys_addr)
 void
 acpi_os_mem_out8 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT8 value)
 {
-	*(u8*) (u32) phys_addr = value;
+	*(u8*) phys_to_virt(phys_addr) = value;
 }
 
 void
 acpi_os_mem_out16 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT16 value)
 {
-	*(u16*) (u32) phys_addr = value;
+	*(u16*) phys_to_virt(phys_addr) = value;
 }
 
 void
 acpi_os_mem_out32 (ACPI_PHYSICAL_ADDRESS phys_addr, UINT32 value)
 {
-	*(u32*) (u32) phys_addr = value;
+	*(u32*) phys_to_virt(phys_addr) = value;
 }
 
 ACPI_STATUS

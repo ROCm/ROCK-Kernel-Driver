@@ -347,7 +347,7 @@ Network
 
 PPP
 ---
-o  <ftp://ftp.samba.org/ppp/ppp-2.4.0.tar.gz>
+o  <ftp://ftp.samba.org/pub/ppp/ppp-2.4.0.tar.gz>
 
 Isdn4k-utils
 ------------

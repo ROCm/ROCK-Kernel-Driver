@@ -53,8 +53,8 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.4.18 2001/03/18 (C) 1999-2000"
-#define DRIVER_AUTHOR "Petko Manolov <petkan@dce.bg>"
+#define DRIVER_VERSION "v0.4.19 2001/06/07 (C) 1999-2001"
+#define DRIVER_AUTHOR "Petko Manolov <pmanolov@lnxw.com>"
 #define DRIVER_DESC "ADMtek AN986 Pegasus USB Ethernet driver"
 
 #define	PEGASUS_USE_INTR
@@ -117,8 +117,7 @@ static void ctrl_callback( urb_t *urb )
 			warn( __FUNCTION__ " status %d", urb->status);
 	}
 	pegasus->flags &= ~ETH_REGS_CHANGED;
-	if ( pegasus->flags & CTRL_URB_SLEEP ) {
-		pegasus->flags &= ~CTRL_URB_SLEEP;
+	if ( waitqueue_active(&pegasus->ctrl_wait) ) {
 		wake_up_interruptible( &pegasus->ctrl_wait );
 	}
 }
@@ -137,10 +136,9 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 	memcpy(buffer,data,size);
 	
-	while ( pegasus->flags & ETH_REGS_CHANGED ) {
-		pegasus->flags |= CTRL_URB_SLEEP;
+	while ( pegasus->flags & ETH_REGS_CHANGED )
 		interruptible_sleep_on( &pegasus->ctrl_wait );
-	}
+
 	pegasus->dr.requesttype = PEGASUS_REQT_READ;
 	pegasus->dr.request = PEGASUS_REQ_GET_REGS;
 	pegasus->dr.value = cpu_to_le16 (0);
@@ -155,7 +153,6 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
-	pegasus->flags |= CTRL_URB_SLEEP;
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRLs %d", ret);
@@ -163,11 +160,12 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 
 	schedule();
-	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 out:
+	remove_wait_queue( &pegasus->ctrl_wait, &wait );
 	memcpy(data,buffer,size);
 	kfree(buffer);
-	return	ret;
+
+	return ret;
 }
 
 
@@ -184,10 +182,9 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	}
 	memcpy(buffer, data, size);
 
-	while ( pegasus->flags & ETH_REGS_CHANGED ) {
-		pegasus->flags |= CTRL_URB_SLEEP ;
+	while ( pegasus->flags & ETH_REGS_CHANGED )
 		interruptible_sleep_on( &pegasus->ctrl_wait );
-	}
+
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REGS;
 	pegasus->dr.value = cpu_to_le16 (0);
@@ -202,19 +199,18 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 			  
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
-	pegasus->flags |= CTRL_URB_SLEEP;
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
-		kfree(buffer);
-		return	ret;
+		goto out;
 	}
-
+	
 	schedule();
+out:
 	remove_wait_queue( &pegasus->ctrl_wait, &wait );
-
 	kfree(buffer);
-	return	ret;
+	
+	return ret;
 }
 
 
@@ -232,10 +228,9 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 	}
 	memcpy(buffer, &data, 1);
 
-	while ( pegasus->flags & ETH_REGS_CHANGED ) {
-		pegasus->flags |= CTRL_URB_SLEEP;
+	while ( pegasus->flags & ETH_REGS_CHANGED )
 		interruptible_sleep_on( &pegasus->ctrl_wait );
-	}
+
 	pegasus->dr.requesttype = PEGASUS_REQT_WRITE;
 	pegasus->dr.request = PEGASUS_REQ_SET_REG;
 	pegasus->dr.value = cpu_to_le16p( &dat);
@@ -250,19 +245,18 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_INTERRUPTIBLE );
-	pegasus->flags |= CTRL_URB_SLEEP;
 
 	if ( (ret = usb_submit_urb( &pegasus->ctrl_urb )) ) {
 		err( __FUNCTION__ " BAD CTRL %d", ret);
-		kfree(buffer);
-		return	ret;
+		goto out;
 	}
 
 	schedule();
+out:
 	remove_wait_queue( &pegasus->ctrl_wait, &wait );
-
 	kfree(buffer);
-	return	ret;
+
+	return ret;
 }
 
 
@@ -451,7 +445,7 @@ static inline int reset_mac( pegasus_t *pegasus )
 		return 1;
 
 	if ( usb_dev_id[pegasus->dev_index].vendor == VENDOR_LINKSYS ||
-	     usb_dev_id[pegasus->dev_index].vendor == VENDOR_DLINK1 ) {
+	     usb_dev_id[pegasus->dev_index].vendor == VENDOR_DLINK ) {
 		__u16	auxmode;
 
 		read_mii_word( pegasus, 0, 0x1b, &auxmode );
@@ -797,7 +791,6 @@ static void pegasus_set_multicast( struct net_device *net )
 	} else {
 		pegasus->eth_regs[EthCtrl0] &= ~RX_MULTICAST;
 		pegasus->eth_regs[EthCtrl2] &= ~RX_PROMISCUOUS;
-		info("%s: set Rx mode", net->name);
 	}
 
 	pegasus->flags |= ETH_REGS_CHANGE;

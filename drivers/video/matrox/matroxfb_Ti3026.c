@@ -279,12 +279,14 @@ static const unsigned char MGADACbpp32[] =
   0x00, 0x00, TVP3026_XCURCTRL_DIS };
 
 static void matroxfb_ti3026_flashcursor(unsigned long ptr) {
+	unsigned long flags;
+
 #define minfo ((struct matrox_fb_info*)ptr)
-	matroxfb_DAC_lock();
+	matroxfb_DAC_lock_irqsave(flags);
 	outTi3026(PMINFO TVP3026_XCURCTRL, inTi3026(PMINFO TVP3026_XCURCTRL) ^ TVP3026_XCURCTRL_DIS ^ TVP3026_XCURCTRL_XGA);
 	ACCESS_FBINFO(cursor.timer.expires) = jiffies + HZ/2;
 	add_timer(&ACCESS_FBINFO(cursor.timer));
-	matroxfb_DAC_unlock();
+	matroxfb_DAC_unlock_irqrestore(flags);
 #undef minfo
 }
 

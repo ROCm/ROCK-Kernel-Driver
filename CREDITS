@@ -454,6 +454,11 @@ N: Gary Brubaker
 E: xavyer@ix.netcom.com
 D: USB Serial Empeg Empeg-car Mark I/II Driver
 
+N: Matthias Bruestle
+E: m@mbsks.franken.de
+D: REINER SCT cyberJack pinpad/e-com USB chipcard reader driver
+S: Germany
+
 N: Ray Burr
 E: ryb@nightmare.com
 D: Original author of Amiga FFS filesystem
@@ -1136,13 +1141,11 @@ S: Mountain View, California 94041
 S: USA
 
 N: Benjamin Herrenschmidt
-E: bh40@calva.net
+E: benh@kernel.crashing.org
 E: benh@mipsys.com
-D: PowerMac booter (BootX)
-D: Additional PowerBook support
-D: Apple "Core99" machines support (ibook,g4,...)
-S: 22, rue des Marguettes
-S: 75012 Paris
+D: Various parts of PPC & PowerMac
+S: 122, boulevard Baille
+S: 13005 Marseille
 S: France
 
 N: Sebastian Hetze
@@ -1755,6 +1758,8 @@ S: Czech Republic
 
 N: Paul Mackerras
 E: paulus@samba.org
+D: PPP driver
+D: Linux for PowerPC
 D: Linux port for PCI Power Macintosh
 
 N: Pat Mackinlay
@@ -2894,6 +2899,14 @@ D: Various IP firewall updates, ipfwadm
 S: X/OS Experts in Open Systems BV
 S: Kruislaan 419
 S: 1098 VA Amsterdam 
+S: The Netherlands
+
+N: Jeroen Vreeken
+E: pe1rxq@amsat.org
+W: http://www.chello.nl/~j.vreeken/
+D: SE401 usb webcam driver
+S: Maastrichterweg 63
+S: 5554 GG Valkenswaard
 S: The Netherlands
 
 N: Peter Shaobo Wang

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_lookup.c,v 1.17 2001/05/21 15:23:53 hch Exp hch $"
+#ident "$Id: vxfs_lookup.c,v 1.19 2001/05/30 19:50:20 hch Exp hch $"
 
 /*
  * Veritas filesystem driver - lookup and other directory related code.
@@ -240,9 +240,8 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 	struct inode		*ip = fp->f_dentry->d_inode;
 	struct super_block	*sbp = ip->i_sb;
 	u_long			bsize = sbp->s_blocksize;
-	u_long			page, npages, block, nblocks, offset;
+	u_long			page, npages, block, pblocks, nblocks, offset;
 	loff_t			pos;
-	int			pblocks;
 
 	switch ((long)fp->f_pos) {
 	case 0:
@@ -262,13 +261,13 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 	if (pos > VXFS_DIRROUND(ip->i_size))
 		return 0;
 
-	page = pos >> PAGE_CACHE_SHIFT;
-	offset = pos & ~PAGE_CACHE_MASK;
-	block = pos >> sbp->s_blocksize_bits;
-
 	npages = dir_pages(ip);
 	nblocks = dir_blocks(ip);
 	pblocks = VXFS_BLOCK_PER_PAGE(sbp);
+
+	page = pos >> PAGE_CACHE_SHIFT;
+	offset = pos & ~PAGE_CACHE_MASK;
+	block = (u_long)(pos >> sbp->s_blocksize_bits) % pblocks;
 
 	for (; page < npages; page++, block = 0) {
 		caddr_t			kaddr;
@@ -310,6 +309,7 @@ vxfs_readdir(struct file *fp, void *retp, filldir_t filler)
 					goto done;
 				}
 			}
+			offset = 0;
 		}
 		vxfs_put_page(pp);
 		offset = 0;

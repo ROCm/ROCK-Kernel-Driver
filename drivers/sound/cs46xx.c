@@ -50,6 +50,7 @@
  *	20010409-tw	add hercules game theatre XP amp code.
  *	20010420-tw	cleanup powerdown/up code.
  *	20010521-tw	eliminate pops, and fixes for powerdown.
+ *	20010525-tw	added fixes for thinkpads with powerdown logic.
  *
  *	Status:
  *	Playback/Capture supported from 8k-48k.
@@ -179,7 +180,7 @@ static unsigned long hercules_egpio_disable=0;  /* if non-zero set all EGPIO to 
 MODULE_PARM(hercules_egpio_disable, "i");
 static unsigned long initdelay=700;  /* PM delay in millisecs */
 MODULE_PARM(initdelay, "i");
-static unsigned long powerdown=1;  /* turn on/off powerdown processing in driver */
+static unsigned long powerdown=-1;  /* turn on/off powerdown processing in driver */
 MODULE_PARM(powerdown, "i");
 #define DMABUF_DEFAULTORDER 3
 static unsigned long defaultorder=DMABUF_DEFAULTORDER;
@@ -190,6 +191,14 @@ MODULE_PARM(external_amp, "i");
 static int thinkpad;
 MODULE_PARM(thinkpad, "i");
 
+/*
+* set the powerdown module parm to 0 to disable all 
+* powerdown. also set thinkpad to 1 to disable powerdown, 
+* but also to enable the clkrun functionality.
+*/
+static unsigned cs_powerdown=1;
+static unsigned cs_laptop_wait=1;
+
 /* An instance of the 4610 channel */
 struct cs_channel 
 {
@@ -199,7 +208,7 @@ struct cs_channel
 };
 
 #define CS46XX_MAJOR_VERSION "1"
-#define CS46XX_MINOR_VERSION "27"
+#define CS46XX_MINOR_VERSION "28"
 
 #ifdef __ia64__
 #define CS46XX_ARCH	     	"64"	//architecture key
@@ -284,6 +293,8 @@ struct cs_state {
 		int ossmaxfrags;
 		unsigned subdivision;
 	} dmabuf;
+	/* Guard against mmap/write/read races */
+	struct semaphore sem;
 };
 
 struct cs_card {
@@ -370,8 +381,10 @@ static int cs_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 static loff_t cs_llseek(struct file *file, loff_t offset, int origin);
 static int cs_hardware_init(struct cs_card *card);
 static int cs46xx_powerup(struct cs_card *card, unsigned int type);
-static int cs461x_powerdown(struct cs_card *card, unsigned int type);
+static int cs461x_powerdown(struct cs_card *card, unsigned int type, int suspendflag);
 static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type);
+static void cs46xx_suspend_tbl(struct pci_dev *pcidev);
+static void cs46xx_resume_tbl(struct pci_dev *pcidev);
 
 static inline unsigned ld2(unsigned int x)
 {
@@ -688,7 +701,7 @@ static void cs_mute(struct cs_card *card, int state)
 {
 	struct ac97_codec *dev=card->ac97_codec[0];
 
-	CS_DBGOUT(CS_FUNCTION, 2, printk("cs46xx: cs_mute()+ %s\n",
+	CS_DBGOUT(CS_FUNCTION, 2, printk(KERN_INFO "cs46xx: cs_mute()+ %s\n",
 		(state == CS_TRUE) ? "Muting" : "UnMuting") );
 
 	if(state == CS_TRUE)
@@ -717,7 +730,7 @@ static void cs_mute(struct cs_card *card, int state)
 		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME_MONO, card->pm.u32AC97_master_volume_mono);
 		cs_ac97_set(dev, (u8)BA0_AC97_PCM_OUT_VOLUME, card->pm.u32AC97_pcm_out_volume);
 	}
-	CS_DBGOUT(CS_FUNCTION, 2, printk("cs46xx: cs_mute()-\n"));
+	CS_DBGOUT(CS_FUNCTION, 2, printk(KERN_INFO "cs46xx: cs_mute()-\n"));
 }
 
 /* set playback sample rate */
@@ -1250,7 +1263,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 	dmabuf->SGok = 0;
 }
 
-static int prog_dmabuf(struct cs_state *state)
+static int __prog_dmabuf(struct cs_state *state)
 {
         struct dmabuf *dmabuf = &state->dmabuf;
         unsigned long flags;
@@ -1429,6 +1442,17 @@ static int prog_dmabuf(struct cs_state *state)
 			dmabuf->type));
 	}
 	return 1;
+}
+
+static int prog_dmabuf(struct cs_state *state)
+{
+	int ret;
+	
+	down(&state->sem);
+	ret = __prog_dmabuf(state);
+	up(&state->sem);
+	
+	return ret;
 }
 
 static void cs_clear_tail(struct cs_state *state)
@@ -2089,11 +2113,12 @@ static ssize_t cs_read(struct file *file, char *buffer, size_t count, loff_t *pp
 		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
-	if (!dmabuf->ready && (ret = prog_dmabuf(state)))
-		return ret;
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
-	ret = 0;
+	
+	down(&state->sem);
+	if (!dmabuf->ready && (ret = __prog_dmabuf(state)))
+		goto out;
 
 	add_wait_queue(&state->dmabuf.wait, &wait);
 	while (count > 0) {
@@ -2101,8 +2126,8 @@ static ssize_t cs_read(struct file *file, char *buffer, size_t count, loff_t *pp
 		{
 			schedule();
 			if (signal_pending(current)) {
-				ret = ret ? ret : -ERESTARTSYS;
-				break;
+				if(!ret) ret = -ERESTARTSYS;
+				goto out;
 			}
 		}
 		spin_lock_irqsave(&state->card->lock, flags);
@@ -2122,12 +2147,20 @@ static ssize_t cs_read(struct file *file, char *buffer, size_t count, loff_t *pp
 			start_adc(state);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
-				break;
+				goto out;
  			}
+			up(&state->sem);
 			schedule();
 			if (signal_pending(current)) {
-				ret = ret ? ret : -ERESTARTSYS;
-				break;
+				if(!ret) ret = -ERESTARTSYS;
+				goto out;
+			}
+			down(&state->sem);
+			if (dmabuf->mapped) 
+			{
+				if(!ret)
+					ret = -ENXIO;
+				goto out;
 			}
  			continue;
 		}
@@ -2142,7 +2175,7 @@ static ssize_t cs_read(struct file *file, char *buffer, size_t count, loff_t *pp
 			(void *)((unsigned)dmabuf->rawbuf + swptr), cnt, &copied))
 		{
 			if (!ret) ret = -EFAULT;
-			break;
+			goto out;
 		}
                 swptr = (swptr + cnt) % dmabuf->dmasize;
                 spin_lock_irqsave(&card->lock, flags);
@@ -2154,6 +2187,8 @@ static ssize_t cs_read(struct file *file, char *buffer, size_t count, loff_t *pp
                 ret += copied;
                 start_adc(state);
 	}
+out:
+	up(&state->sem);
 	remove_wait_queue(&state->dmabuf.wait, &wait);
 	set_current_state(TASK_RUNNING);
 	CS_DBGOUT(CS_WAVE_READ | CS_FUNCTION, 4, 
@@ -2183,12 +2218,21 @@ static ssize_t cs_write(struct file *file, const char *buffer, size_t count, lof
 
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
+
+	down(&state->sem);
 	if (dmabuf->mapped)
-		return -ENXIO;
-	if (!dmabuf->ready && (ret = prog_dmabuf(state)))
-		return ret;
+	{
+		ret = -ENXIO;
+		goto out;
+	}
+
+	if (!dmabuf->ready && (ret = __prog_dmabuf(state)))
+		goto out;
 	if (!access_ok(VERIFY_READ, buffer, count))
-		return -EFAULT;
+	{
+	ret = -EFAULT;
+	goto out;
+	}
 	add_wait_queue(&state->dmabuf.wait, &wait);
 	ret = 0;
 /*
@@ -2200,8 +2244,8 @@ static ssize_t cs_write(struct file *file, const char *buffer, size_t count, lof
 		{
 			schedule();
 			if (signal_pending(current)) {
-				ret = ret ? ret : -ERESTARTSYS;
-				break;
+				if(!ret) ret = -ERESTARTSYS;
+				goto out;
 			}
 		}
 		spin_lock_irqsave(&state->card->lock, flags);
@@ -2234,18 +2278,26 @@ static ssize_t cs_write(struct file *file, const char *buffer, size_t count, lof
 			start_dac(state);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret) ret = -EAGAIN;
-				break;
+				goto out;
  			}
+			up(&state->sem);
 			schedule();
  			if (signal_pending(current)) {
-				ret = ret ? ret : -ERESTARTSYS;
-				break;
+				if(!ret) ret = -ERESTARTSYS;
+				goto out;
  			}
+			down(&state->sem);
+			if (dmabuf->mapped)
+			{
+				if(!ret)
+					ret = -ENXIO;
+				goto out;
+			}
  			continue;
  		}
 		if (copy_from_user(dmabuf->rawbuf + swptr, buffer, cnt)) {
 			if (!ret) ret = -EFAULT;
-			return ret;
+			goto out;
 		}
 		spin_lock_irqsave(&state->card->lock, flags);
 		swptr = (swptr + cnt) % dmabuf->dmasize;
@@ -2265,6 +2317,8 @@ static ssize_t cs_write(struct file *file, const char *buffer, size_t count, lof
 		ret += cnt;
 		start_dac(state);
 	}
+out:
+	up(&state->sem);
 	remove_wait_queue(&state->dmabuf.wait, &wait);
 	set_current_state(TASK_RUNNING);
 
@@ -2352,9 +2406,9 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
 	struct cs_card *card = (struct cs_card *)file->private_data;
 	struct cs_state *state;
 	struct dmabuf *dmabuf;
-	int ret;
+	int ret = 0;
 	unsigned long size;
-	
+
 	CS_DBGOUT(CS_FUNCTION | CS_PARMS, 2, printk("cs46xx: cs_mmap()+ file=0x%x %s %s\n", 
 		(unsigned)file, vma->vm_flags & VM_WRITE ? "VM_WRITE" : "",
 		vma->vm_flags & VM_READ ? "VM_READ" : "") );
@@ -2393,24 +2447,39 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
  */
 	state = card->states[1];  
 	if(!(unsigned)state)
-		return -EINVAL;
+	{
+		ret = -EINVAL;
+		goto out;
+	}
 
+	down(&state->sem);	
 	dmabuf = &state->dmabuf;
 	if (cs4x_pgoff(vma) != 0)
-		return -EINVAL;
+	{
+		ret = -EINVAL;
+		goto out;
+	}
 	size = vma->vm_end - vma->vm_start;
 
 	CS_DBGOUT(CS_PARMS, 2, printk("cs46xx: cs_mmap(): size=%d\n",(unsigned)size) );
 
 	if (size > (PAGE_SIZE << dmabuf->buforder))
-		return -EINVAL;
+	{
+		ret = -EINVAL;
+		goto out;
+	}
 	if (remap_page_range(vma->vm_start, virt_to_phys(dmabuf->rawbuf),
 			     size, vma->vm_page_prot))
-		return -EAGAIN;
+	{
+		ret = -EAGAIN;
+		goto out;
+	}
 	dmabuf->mapped = 1;
 
 	CS_DBGOUT(CS_FUNCTION, 2, printk("cs46xx: cs_mmap()-\n") );
-	return 0;
+out:
+	up(&state->sem);
+	return ret;	
 }
 
 static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -3146,6 +3215,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			if (state == NULL)
 				return -ENOMEM;
 			memset(state, 0, sizeof(struct cs_state));
+			init_MUTEX(&state->sem);
 			dmabuf = &state->dmabuf;
 			dmabuf->pbuf = (void *)get_free_page(GFP_KERNEL | GFP_DMA);
 			if(dmabuf->pbuf==NULL)
@@ -3217,6 +3287,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			if (state == NULL)
 				return -ENOMEM;
 			memset(state, 0, sizeof(struct cs_state));
+			init_MUTEX(&state->sem);
 			dmabuf = &state->dmabuf;
 			dmabuf->pbuf = (void *)get_free_page(GFP_KERNEL | GFP_DMA);
 			if(dmabuf->pbuf==NULL)
@@ -3281,7 +3352,6 @@ static int cs_open(struct inode *inode, struct file *file)
 		if((ret = prog_dmabuf(state)))
 			return ret;
 	}
-
 	CS_DBGOUT(CS_OPEN | CS_FUNCTION, 2, printk("cs46xx: cs_open()- 0\n") );
 	return 0;
 }
@@ -3321,11 +3391,10 @@ static int cs_release(struct inode *inode, struct file *file)
 			state->card->states[state->virt] = NULL;
 			state->open_mode &= (~file->f_mode) & (FMODE_READ|FMODE_WRITE);
 
-			if( (tmp = cs461x_powerdown(card, CS_POWER_DAC )) )
+			if( (tmp = cs461x_powerdown(card, CS_POWER_DAC, CS_FALSE )) )
 			{
 				CS_DBGOUT(CS_ERROR, 1, printk(KERN_INFO 
 					"cs46xx: cs_release_mixdev() powerdown DAC failure (0x%x)\n",tmp) );
-				return -EIO;
 			}
 
 			/* Now turn off external AMP if needed */
@@ -3355,11 +3424,10 @@ static int cs_release(struct inode *inode, struct file *file)
 			state->card->states[state->virt] = NULL;
 			state->open_mode &= (~file->f_mode) & (FMODE_READ|FMODE_WRITE);
 
-			if( (tmp = cs461x_powerdown(card, CS_POWER_ADC )) )
+			if( (tmp = cs461x_powerdown(card, CS_POWER_ADC, CS_FALSE )) )
 			{
 				CS_DBGOUT(CS_ERROR, 1, printk(KERN_INFO 
 					"cs46xx: cs_release_mixdev() powerdown ADC failure (0x%x)\n",tmp) );
-				return -EIO;
 			}
 
 			/* Now turn off external AMP if needed */
@@ -3419,8 +3487,8 @@ static void printpm(struct cs_card *s)
 void cs46xx_ac97_suspend(struct cs_card *card)
 {
 	int Count,i;
-	unsigned int tmp;
 	struct ac97_codec *dev=card->ac97_codec[0];
+	unsigned int tmp;
 
 	CS_DBGOUT(CS_PM, 9, printk("cs46xx: cs46xx_ac97_suspend()+\n"));
 
@@ -3445,7 +3513,6 @@ void cs46xx_ac97_suspend(struct cs_card *card)
 * Save the ac97 volume registers as well as the current powerdown state.
 * Now, mute the all the outputs (master, headphone, and mono), as well
 * as the PCM volume, in preparation for powering down the entire part.
-*/ 
 	card->pm.u32AC97_master_volume = (u32)cs_ac97_get( dev, 
 			(u8)BA0_AC97_MASTER_VOLUME); 
 	card->pm.u32AC97_headphone_volume = (u32)cs_ac97_get(dev, 
@@ -3454,22 +3521,27 @@ void cs46xx_ac97_suspend(struct cs_card *card)
 			(u8)BA0_AC97_MASTER_VOLUME_MONO); 
 	card->pm.u32AC97_pcm_out_volume = (u32)cs_ac97_get(dev, 
 			(u8)BA0_AC97_PCM_OUT_VOLUME);
-		
+*/ 
+/*
+* mute the outputs
+*/
 	cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME, 0x8000);
 	cs_ac97_set(dev, (u8)BA0_AC97_HEADPHONE_VOLUME, 0x8000);
 	cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME_MONO, 0x8000);
 	cs_ac97_set(dev, (u8)BA0_AC97_PCM_OUT_VOLUME, 0x8000);
 
+/*
+* save the registers that cause pops
+*/
 	card->pm.u32AC97_powerdown = (u32)cs_ac97_get(dev, (u8)AC97_POWER_CONTROL); 
 	card->pm.u32AC97_general_purpose = (u32)cs_ac97_get(dev, (u8)BA0_AC97_GENERAL_PURPOSE); 
-
 /*
 * And power down everything on the AC97 codec.
 * well, for now, only power down the DAC/ADC and MIXER VREFON components. 
 * trouble with removing VREF.
 */
 	if( (tmp = cs461x_powerdown(card, CS_POWER_DAC | CS_POWER_ADC |
-			CS_POWER_MIXVON )) )
+			CS_POWER_MIXVON, CS_TRUE )) )
 	{
 		CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
 			"cs46xx: cs46xx_ac97_suspend() failure (0x%x)\n",tmp) );
@@ -3502,17 +3574,12 @@ void cs46xx_ac97_resume(struct cs_card *card)
 */
 	cs_ac97_set(dev, (u8)BA0_AC97_GENERAL_PURPOSE, 
 		(u16)card->pm.u32AC97_general_purpose);
-
-	cs_ac97_set(dev, (u8)AC97_POWER_CONTROL, 
-		(u16)card->pm.u32AC97_powerdown);
-	mdelay(10);
-
 /*
 * Now, while the outputs are still muted, restore the state of power
 * on the AC97 part.
 */
 	cs_ac97_set(dev, (u8)BA0_AC97_POWERDOWN, (u16)card->pm.u32AC97_powerdown);
-	mdelay(5);
+	mdelay(5 * cs_laptop_wait);
 /*
 * Restore just the first set of registers, from register number
 * 0x02 to the register number that ulHighestRegToRestore specifies.
@@ -3544,7 +3611,7 @@ static int cs46xx_restart_part(struct cs_card *card)
 		dmabuf->ready = 0;
 		resync_dma_ptrs(card->states[1]);
 		cs_set_divisor(dmabuf);
-		if(prog_dmabuf(card->states[1]))
+		if(__prog_dmabuf(card->states[1]))
 		{
 			CS_DBGOUT(CS_PM | CS_ERROR, 1, 
 				printk("cs46xx: cs46xx_restart_part()- (-1) prog_dmabuf() dac error\n"));
@@ -3558,7 +3625,7 @@ static int cs46xx_restart_part(struct cs_card *card)
 		dmabuf->ready = 0;
 		resync_dma_ptrs(card->states[0]);
 		cs_set_divisor(dmabuf);
-		if(prog_dmabuf(card->states[0]))
+		if(__prog_dmabuf(card->states[0]))
 		{
 			CS_DBGOUT(CS_PM | CS_ERROR, 1, 
 				printk("cs46xx: cs46xx_restart_part()- (-1) prog_dmabuf() adc error\n"));
@@ -3704,7 +3771,7 @@ static int cs46xx_resume(struct cs_card *card)
 		{
 			CS_DBGOUT(CS_PM | CS_ERROR, 4, printk(
 				"cs46xx: cs46xx_resume()- ERROR in cs_hardware_init()\n"));
-			mdelay(10);
+			mdelay(10 * cs_laptop_wait);
 			cs461x_reset(card);
 			continue;
 		}
@@ -3789,12 +3856,13 @@ static u16 cs_ac97_get(struct ac97_codec *dev, u8 reg)
 	if(!(card->pm.flags & CS46XX_PM_IDLE))
 		loopcnt = 2000;
 	else
-		loopcnt = 500;
+		loopcnt = 500 * cs_laptop_wait;
+ 	loopcnt *= cs_laptop_wait;
 	for (count = 0; count < loopcnt; count++) {
 		/*
 		 *  First, we want to wait for a short time.
 	 	 */
-		udelay(10);
+		udelay(10 * cs_laptop_wait);
 		/*
 		 *  Now, check to see if the read has completed.
 		 *  ACCTL = 460h, DCV should be reset by now and 460h = 17h
@@ -3819,7 +3887,8 @@ static u16 cs_ac97_get(struct ac97_codec *dev, u8 reg)
 	if(!(card->pm.flags & CS46XX_PM_IDLE))
 		loopcnt = 2000;
 	else
-		loopcnt = 100;
+		loopcnt = 1000;
+ 	loopcnt *= cs_laptop_wait;
 	for (count = 0; count < loopcnt; count++) {
 		/*
 		 *  Read the AC97 status register.
@@ -3828,16 +3897,16 @@ static u16 cs_ac97_get(struct ac97_codec *dev, u8 reg)
 		 */
 		if (cs461x_peekBA0(card, BA0_ACSTS) & ACSTS_VSTS)
 			break;
-		udelay(10);
+		udelay(10 * cs_laptop_wait);
 	}
 	
 	/*
 	 *  Make sure we got valid status.
 	 */
 	if (!( (tmp=cs461x_peekBA0(card, BA0_ACSTS)) & ACSTS_VSTS)) {
-		CS_DBGOUT(CS_ERROR, 1, printk(KERN_WARNING 
-			"cs46xx: AC'97 read problem (ACSTS_VSTS), reg = 0x%x val=0x%x \n", reg, tmp));
-		CS_DBGOUT(CS_ERROR, 9, printk(KERN_WARNING "returning 0xffff\n"));
+		CS_DBGOUT(CS_ERROR, 2, printk(KERN_WARNING 
+			"cs46xx: AC'97 read problem (ACSTS_VSTS), reg = 0x%x val=0x%x 0xffff \n", 
+				reg, tmp));
 		return 0xffff;
 	}
 
@@ -3849,7 +3918,7 @@ static u16 cs_ac97_get(struct ac97_codec *dev, u8 reg)
 		"cs46xx: cs_ac97_get() reg = 0x%x, val = 0x%x, BA0_ACCAD = 0x%x\n", 
 			reg, cs461x_peekBA0(card, BA0_ACSDA),
 			cs461x_peekBA0(card, BA0_ACCAD)));
-	return (cs461x_peekBA0(card, BA0_ACSDA));
+	return(cs461x_peekBA0(card, BA0_ACSDA));
 }
 
 static void cs_ac97_set(struct ac97_codec *dev, u8 reg, u16 val)
@@ -3893,7 +3962,7 @@ static void cs_ac97_set(struct ac97_codec *dev, u8 reg, u16 val)
 		/*
 		 *  First, we want to wait for a short time.
 		 */
-		udelay(10);
+		udelay(10 * cs_laptop_wait);
 		/*
 		 *  Now, check to see if the write has completed.
 		 *  ACCTL = 460h, DCV should be reset by now and 460h = 07h
@@ -4032,24 +4101,28 @@ static int cs_release_mixdev(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 match:
-	card->active_ctrl(card, -1);
-	card->amplifier_ctrl(card, -1);
 	MOD_DEC_USE_COUNT;
 	if(!CS_DEC_AND_TEST(&card->mixer_use_cnt))
 	{
 		CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,
 			  printk(KERN_INFO "cs46xx: cs_release_mixdev()- no powerdown, usecnt>0\n"));
+		card->active_ctrl(card, -1);
+		card->amplifier_ctrl(card, -1);
 		return 0;
 	}
 /*
 * ok, no outstanding mixer opens, so powerdown.
 */
-	if( (tmp = cs461x_powerdown(card, CS_POWER_MIXVON )) )
+	if( (tmp = cs461x_powerdown(card, CS_POWER_MIXVON, CS_FALSE )) )
 	{
 		CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
 			"cs46xx: cs_release_mixdev() powerdown MIXVON failure (0x%x)\n",tmp) );
+		card->active_ctrl(card, -1);
+		card->amplifier_ctrl(card, -1);
 		return -EIO;
 	}
+	card->active_ctrl(card, -1);
+	card->amplifier_ctrl(card, -1);
 	CS_DBGOUT(CS_FUNCTION | CS_RELEASE, 4,
 		  printk(KERN_INFO "cs46xx: cs_release_mixdev()- 0\n"));
 	return 0;
@@ -4341,14 +4414,14 @@ static void cs461x_clear_serial_FIFOs(struct cs_card *card, int type)
 }
 
 
-static int cs461x_powerdown(struct cs_card *card, unsigned int type)
+static int cs461x_powerdown(struct cs_card *card, unsigned int type, int suspendflag)
 {
 	int count;
-	unsigned int tmp=0;
+	unsigned int tmp=0,muted=0;
 
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO 
 		"cs46xx: cs461x_powerdown()+ type=0x%x\n",type));
-	if(!powerdown)
+	if(!cs_powerdown && !suspendflag)
 	{
 		CS_DBGOUT(CS_FUNCTION, 8, printk(KERN_INFO 
 			"cs46xx: cs461x_powerdown() DISABLED exiting\n"));
@@ -4380,8 +4453,6 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 	type &= ~CS_POWER_MIXVON;
 	type &= ~CS_POWER_MIXVOFF;
 
-	cs_mute(card, CS_TRUE);
-
 	/*
 	 *  Power down indicated areas.
 	 */
@@ -4396,6 +4467,11 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (tmp & CS_AC97_POWER_CONTROL_MIXVOFF_ON)
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp |= CS_AC97_POWER_CONTROL_MIXVOFF;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4439,6 +4515,11 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (tmp & CS_AC97_POWER_CONTROL_MIXVON_ON)
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp |= CS_AC97_POWER_CONTROL_MIXVON;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4480,6 +4561,11 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (tmp & CS_AC97_POWER_CONTROL_ADC_ON)
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp |= CS_AC97_POWER_CONTROL_ADC;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 
@@ -4524,6 +4610,11 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (tmp & CS_AC97_POWER_CONTROL_DAC_ON)
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp |= CS_AC97_POWER_CONTROL_DAC;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4557,7 +4648,8 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 		}
 	}
 	tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
-	cs_mute(card, CS_FALSE);
+	if(muted)
+		cs_mute(card, CS_FALSE);
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO 
 		"cs46xx: cs461x_powerdown()- 0 tmp=0x%x\n",tmp));
 	return 0;
@@ -4566,7 +4658,7 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 {
 	int count;
-	unsigned int tmp=0;
+	unsigned int tmp=0,muted=0;
 
 	CS_DBGOUT(CS_FUNCTION, 8, printk(KERN_INFO 
 		"cs46xx: cs46xx_powerup()+ type=0x%x\n",type));
@@ -4578,7 +4670,6 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 	if(type & (CS_POWER_DAC | CS_POWER_ADC))
 		type |= CS_POWER_MIXVON | CS_POWER_MIXVOFF;
 
-	cs_mute(card, CS_TRUE);
 	/*
 	 *  Power up indicated areas.
 	 */
@@ -4593,6 +4684,11 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (!(tmp & CS_AC97_POWER_CONTROL_MIXVOFF_ON))
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp &= ~CS_AC97_POWER_CONTROL_MIXVOFF;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4636,6 +4732,11 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (!(tmp & CS_AC97_POWER_CONTROL_MIXVON_ON))
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp &= ~CS_AC97_POWER_CONTROL_MIXVON;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4677,6 +4778,11 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (!(tmp & CS_AC97_POWER_CONTROL_ADC_ON))
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp &= ~CS_AC97_POWER_CONTROL_ADC;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 
@@ -4721,6 +4827,11 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
 		if (!(tmp & CS_AC97_POWER_CONTROL_DAC_ON))
 		{
+			if(!muted)
+			{
+				cs_mute(card, CS_TRUE);
+				muted=1;
+			}
 			tmp &= ~CS_AC97_POWER_CONTROL_DAC;
 			cs_ac97_set(card->ac97_codec[0], AC97_POWER_CONTROL, tmp );
 			/*
@@ -4754,7 +4865,8 @@ static int cs46xx_powerup(struct cs_card *card, unsigned int type)
 		}
 	}
 	tmp = cs_ac97_get(card->ac97_codec[0], AC97_POWER_CONTROL);
-	cs_mute(card, CS_FALSE);
+	if(muted)
+		cs_mute(card, CS_FALSE);
 	CS_DBGOUT(CS_FUNCTION, 4, printk(KERN_INFO 
 		"cs46xx: cs46xx_powerup()- 0 tmp=0x%x\n",tmp));
 	return 0;
@@ -4843,7 +4955,7 @@ static int cs_hardware_init(struct cs_card *card)
 	 *  generating bit clock (so we don't try to start the PLL without an
 	 *  input clock).
 	 */
-	mdelay(5);		/* 1 should be enough ?? (and pigs might fly) */
+	mdelay(5 * cs_laptop_wait);		/* 1 should be enough ?? (and pigs might fly) */
 
 	/*
 	 *  Set the serial port timing configuration, so that
@@ -4876,7 +4988,7 @@ static int cs_hardware_init(struct cs_card *card)
 	/*
          *  Wait until the PLL has stabilized.
 	 */
-	mdelay(5);		/* Again 1 should be enough ?? */
+	mdelay(5 * cs_laptop_wait);		/* Again 1 should be enough ?? */
 
 	/*
 	 *  Turn on clocking of the core so that we can setup the serial ports.
@@ -4903,7 +5015,7 @@ static int cs_hardware_init(struct cs_card *card)
 	cs461x_pokeBA0(card, BA0_SERMC1, SERMC1_PTC_AC97 | SERMC1_MSPE);
 
 
-	mdelay(5);		/* Shouldnt be needed ?? */
+	mdelay(5 * cs_laptop_wait);		/* Shouldnt be needed ?? */
 	
 /*
 * If we are resuming under 2.2.x then we can not schedule a timeout.
@@ -4930,7 +5042,7 @@ static int cs_hardware_init(struct cs_card *card)
 	{
 		for (count = 0; count < 100; count++) {
 		// First, we want to wait for a short time.
-			udelay(25);
+			udelay(25 * cs_laptop_wait);
 
 			if (cs461x_peekBA0(card, BA0_ACSTS) & ACSTS_CRDY)
 				break;
@@ -4978,7 +5090,7 @@ static int cs_hardware_init(struct cs_card *card)
 	{
 		for (count = 0; count < 100; count++) {
 		// First, we want to wait for a short time.
-			udelay(25);
+			udelay(25 * cs_laptop_wait);
 
 			if ((cs461x_peekBA0(card, BA0_ACISV) & (ACISV_ISV3 | ACISV_ISV4)) == (ACISV_ISV3 | ACISV_ISV4))
 				break;
@@ -5068,7 +5180,7 @@ static int cs_hardware_init(struct cs_card *card)
 	 */
 	if(card->pm.flags & CS46XX_PM_IDLE)
 	{
-		if(!powerdown)
+		if(!cs_powerdown)
 		{
 			if( (tmp = cs46xx_powerup(card, CS_POWER_DAC | CS_POWER_ADC |
 					CS_POWER_MIXVON )) )
@@ -5081,7 +5193,7 @@ static int cs_hardware_init(struct cs_card *card)
 		else
 		{
 			if( (tmp = cs461x_powerdown(card, CS_POWER_DAC | CS_POWER_ADC |
-					CS_POWER_MIXVON )) )
+					CS_POWER_MIXVON, CS_FALSE )) )
 			{
 				CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
 					"cs46xx: cs461x_powerdown() failure (0x%x)\n",tmp) );
@@ -5148,6 +5260,7 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 	CS_DBGOUT(CS_FUNCTION | CS_INIT, 2,
 		  printk(KERN_INFO "cs46xx: probe()+\n"));
 
+	dma_mask = 0xffffffff;	/* this enables playback and recording */
 	if (pci_enable_device(pci_dev)) {
 		CS_DBGOUT(CS_INIT | CS_ERROR, 1, printk(KERN_ERR
 			 "cs46xx: pci_enable_device() failed\n"));
@@ -5169,8 +5282,6 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 		      "cs46xx: probe() architecture does not support 32bit PCI busmaster DMA\n"));
 		return -1;
 	}
-	dma_mask = 0xffffffff;	/* this enables playback and recording */
-
 	pci_read_config_word(pci_dev, PCI_SUBSYSTEM_VENDOR_ID, &ss_vendor);
 	pci_read_config_word(pci_dev, PCI_SUBSYSTEM_ID, &ss_card);
 
@@ -5239,7 +5350,31 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 		printk(KERN_INFO "cs46xx: Activating CLKRUN hack for Thinkpad.\n");
 		card->active_ctrl = clkrun_hack;
 	}
-	
+/*
+* The thinkpads don't work well without runtime updating on their kernel 
+* delay values (or any laptop with variable CPU speeds really).
+* so, just to be safe set the init delay to 2100.  Eliminates
+* failures on T21 Thinkpads.  remove this code when the udelay
+* and mdelay kernel code is replaced by a pm timer, or the delays
+* work well for battery and/or AC power both.
+*/
+	if(card->active_ctrl == clkrun_hack)
+	{
+		initdelay = 2100;
+		cs_laptop_wait = 5;
+	}
+	if((card->active_ctrl == clkrun_hack) && !(powerdown == 1))
+	{
+/*
+* for some currently unknown reason, powering down the DAC and ADC component
+* blocks on thinkpads causes some funky behavior... distoorrrtion and ac97 
+* codec access problems.  probably the serial clock becomes unsynced. 
+* added code to sync the chips back up, but only helped about 70% the time.
+*/
+		cs_powerdown = 0;
+	}
+	if(powerdown == 0)
+		cs_powerdown = 0;
 	card->active_ctrl(card, 1);
 
 	/* claim our iospace and irq */
@@ -5290,7 +5425,7 @@ static int __devinit cs46xx_probe(struct pci_dev *pci_dev,
 					unregister_sound_mixer(card->ac97_codec[j]->dev_mixer);
 					kfree (card->ac97_codec[j]);
 				}
-			mdelay(10);
+			mdelay(10 * cs_laptop_wait);
 			continue;
 		}
 		break;
@@ -5413,7 +5548,7 @@ static void __devinit cs46xx_remove(struct pci_dev *pci_dev)
 	 *  them.
 	 */
 	if( (tmp = cs461x_powerdown(card, CS_POWER_DAC | CS_POWER_ADC |
-			CS_POWER_MIXVON )) )
+			CS_POWER_MIXVON, CS_TRUE )) )
 	{
 		CS_DBGOUT(CS_ERROR | CS_INIT, 1, printk(KERN_INFO 
 			"cs46xx: cs461x_powerdown() failure (0x%x)\n",tmp) );
@@ -5553,21 +5688,22 @@ int cs46xx_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
-static void cs46xx_suspend_tbl(struct pci_dev *pcidev)
+#if CS46XX_ACPI_SUPPORT
+static int cs46xx_suspend_tbl(struct pci_dev *pcidev, u32 state)
 {
 	struct cs_card *s = PCI_GET_DRIVER_DATA(pcidev);
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 2, 
 		printk(KERN_INFO "cs46xx: cs46xx_suspend_tbl request\n"));
 	cs46xx_suspend(s);
-	return;
+	return 0;
 }
 
-static void cs46xx_resume_tbl(struct pci_dev *pcidev)
+static int cs46xx_resume_tbl(struct pci_dev *pcidev)
 {
 	struct cs_card *s = PCI_GET_DRIVER_DATA(pcidev);
 	CS_DBGOUT(CS_PM | CS_FUNCTION, 2, 
 		printk(KERN_INFO "cs46xx: cs46xx_resume_tbl request\n"));
 	cs46xx_resume(s);
-	return;
+	return 0;
 }
-
+#endif

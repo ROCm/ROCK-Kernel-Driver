@@ -72,8 +72,10 @@ struct sh_machine_vector
 	unsigned int mv_hw_hp680 : 1;
 	unsigned int mv_hw_hp690 : 1;
 	unsigned int mv_hw_hd64461 : 1;
+	unsigned int mv_hw_sh2000 : 1;
 	unsigned int mv_hw_hd64465 : 1;
 	unsigned int mv_hw_dreamcast : 1;
+	unsigned int mv_hw_bigsur : 1;
 };
 
 extern struct sh_machine_vector sh_mv;
@@ -87,9 +89,12 @@ extern struct sh_machine_vector sh_mv;
 #define MACH_HP690	(sh_mv.mv_hw_hp690)
 #define MACH_HD64461	(sh_mv.mv_hw_hd64461)
 #define MACH_HD64465	(sh_mv.mv_hw_hd64465)
+#define MACH_SH2000	(sh_mv.mv_hw_sh2000)
 #define MACH_DREAMCAST	(sh_mv.mv_hw_dreamcast)
+#define MACH_BIGSUR	(sh_mv.mv_hw_bigsur)
 #else
-# ifdef CONFIG_SH_SOLUTION_ENGINE
+# if defined(CONFIG_SH_SOLUTION_ENGINE) || \
+     defined(CONFIG_SH_7751_SOLUTION_ENGINE)
 #  define MACH_SE		1
 # else
 #  define MACH_SE		0
@@ -114,6 +119,7 @@ extern struct sh_machine_vector sh_mv;
 # else
 #  define MACH_HP690		0
 # endif
+# endif
 # ifdef CONFIG_HD64461
 #  define MACH_HD64461		1
 # else
@@ -123,6 +129,11 @@ extern struct sh_machine_vector sh_mv;
 #  define MACH_HD64465		1
 # else
 #  define MACH_HD64465		0
+# endif
+# ifdef CONFIG_SH_SH2000
+#  define MACH_SH2000		1
+# else
+#  define MACH_SH2000		0
 # endif
 # ifdef CONFIG_SH_EC3104
 #  define MACH_EC3104		1
@@ -134,6 +145,10 @@ extern struct sh_machine_vector sh_mv;
 # else
 #  define MACH_DREAMCAST	0
 # endif
+# ifdef CONFIG_SH_BIGSUR
+#  define MACH_BIGSUR		1
+# else
+#  define MACH_BIGSUR		0
 #endif
 
 #endif /* _ASM_SH_MACHVEC_H */

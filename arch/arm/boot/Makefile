@@ -90,9 +90,17 @@ endif
 ifeq ($(CONFIG_SA1100_GRAPHICSCLIENT),y)
   ZTEXTADDR	 = 0xC0200000
 endif
+ifeq ($(CONFIG_SA1100_YOPY),y)
+  ZTEXTADDR      = 0x00080000
+  ZBSSADDR       = 0xc0200000
+endif
 ifeq ($(CONFIG_SA1111),y)
   ZRELADDR	 = 0xc0208000
 endif
+endif
+
+ifeq ($(CONFIG_ARCH_ANAKIN),y)
+ZTEXTADDR	 = 0x20008000
 endif
 
 #

@@ -11243,6 +11243,29 @@ CONFIG_USB_SERIAL_MCT_U232
   The module will be called mct_u232.o.  If you want to compile it as
   a module, say M here and read Documentation/modules.txt.
 
+USB Prolific 2303 Single Port Serial Driver
+CONFIG_USB_SERIAL_PL2303
+  Say Y here if you want to use the PL2303 USB Serial single port
+  adapter from Prolific.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pl2303.o.  If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+
+USB REINER SCT cyberJack pinpad/e-com chipcard reader
+CONFIG_USB_SERIAL_CYBERJACK
+  Say Y here if you want to use a cyberJack pinpad/e-com USB chipcard
+  reader. This is an interface to ISO 7816 compatible contactbased
+  chipcards, e.g. GSM SIMs.
+ 
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called cyberjack.o. If you want to compile it as
+  a module, say M here and read Documentation/modules.txt.
+ 
+  If unsure, say N.
+
 USB Edgeport Serial Driver
 CONFIG_USB_SERIAL_EDGEPORT
   Say Y here if you want to use any of the following devices from
@@ -11347,6 +11370,22 @@ CONFIG_USB_PWC
   The module will be called pwc.o. If you want to compile it as a
   module, say M here and read Documentation/modules.txt.
 
+
+USB SE401 Camera support
+CONFIG_USB_SE401
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. See Documentation/usb/se401.txt for more
+  information and for a list of supported cameras.
+  
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at http://roadrunner.swansea.uk.linux.org/v4l.shtml .
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called se401.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
 
 USB ADMtek Pegasus-based ethernet device support
 CONFIG_USB_PEGASUS

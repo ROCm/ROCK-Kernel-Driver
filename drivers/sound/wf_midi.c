@@ -591,19 +591,17 @@ wf_mpu_synth_ioctl (int dev,
 	switch (cmd) {
 
 	case SNDCTL_SYNTH_INFO:
-		copy_to_user (&((char *) arg)[0],
+		if(copy_to_user (&((char *) arg)[0],
 			      &wf_mpu_synth_info[index],
-			      sizeof (struct synth_info));
-	
+			      sizeof (struct synth_info)))
+			return -EFAULT;
 		return 0;
-		break;
 	
 	case SNDCTL_SYNTH_MEMAVL:
 		return 0x7fffffff;
-		break;
 	
 	default:
-		return -(EINVAL);
+		return -EINVAL;
 	}
 }
 

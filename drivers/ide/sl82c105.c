@@ -56,10 +56,9 @@ static unsigned int get_timing_sl82c105(ide_pio_data_t *p)
 }
 
 /*
- * We only deal with PIO mode here - DMA mode 'using_dma' is not
- * initialised at the point that this function is called.
+ * Configure the drive and chipset for PIO
  */
-static void tune_sl82c105(ide_drive_t *drive, byte pio)
+static void config_for_pio(ide_drive_t *drive, int pio, int report)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct pci_dev *dev = hwif->pci_dev;
@@ -83,42 +82,212 @@ static void tune_sl82c105(ide_drive_t *drive, byte pio)
 	if (ide_config_drive_speed(drive, xfer_mode) == 0)
 		drv_ctrl = get_timing_sl82c105(&p);
 
-	pci_write_config_word(dev, reg, drv_ctrl);
-	pci_read_config_word(dev, reg, &drv_ctrl);
+	if (drive->using_dma == 0) {
+		/*
+		 * If we are actually using MW DMA, then we can not
+		 * reprogram the interface drive control register.
+		 */
+		pci_write_config_word(dev, reg, drv_ctrl);
+		pci_read_config_word(dev, reg, &drv_ctrl);
 
-	printk("%s: selected %s (%dns) (%04X)\n", drive->name,
-	       ide_xfer_verbose(xfer_mode), p.cycle_time, drv_ctrl);
+		if (report) {
+			printk("%s: selected %s (%dns) (%04X)\n", drive->name,
+			       ide_xfer_verbose(xfer_mode), p.cycle_time, drv_ctrl);
+		}
+	}
 }
-#endif
 
-void __init ide_dmacapable_sl82c105(ide_hwif_t *hwif, unsigned long dmabase)
+/*
+ * Configure the drive and the chipset for DMA
+ */
+static int config_for_dma(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = HWIF(drive);
+	struct pci_dev *dev = hwif->pci_dev;
+	unsigned short drv_ctrl = 0x909;
+	unsigned int reg;
+
+	reg = (hwif->channel ? 0x4c : 0x44) + (drive->select.b.unit ? 4 : 0);
+
+	if (ide_config_drive_speed(drive, XFER_MW_DMA_2) == 0)
+		drv_ctrl = 0x0240;
+
+	pci_write_config_word(dev, reg, drv_ctrl);
+
+	return 0;
+}
+
+/*
+ * Check to see if the drive and
+ * chipset is capable of DMA mode
+ */
+static int sl82c105_check_drive(ide_drive_t *drive)
+{
+	ide_dma_action_t dma_func = ide_dma_off_quietly;
+
+	do {
+		struct hd_driveid *id = drive->id;
+		ide_hwif_t *hwif = HWIF(drive);
+
+		if (!hwif->autodma)
+			break;
+
+		if (!id || !(id->capability & 1))
+			break;
+
+		/* Consult the list of known "bad" drives */
+		if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+			dma_func = ide_dma_off;
+			break;
+		}
+
+		if (id->field_valid & 2) {
+			if  (id->dma_mword & 7 || id->dma_1word & 7)
+				dma_func = ide_dma_on;
+			break;
+		}
+
+		if (ide_dmaproc(ide_dma_good_drive, drive)) {
+			dma_func = ide_dma_on;
+			break;
+		}
+	} while (0);
+
+	return HWIF(drive)->dmaproc(dma_func, drive);
+}
+
+/*
+ * Our own dmaproc, only to intercept ide_dma_check
+ */
+static int sl82c105_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
+{
+	switch (func) {
+	case ide_dma_check:
+		return sl82c105_check_drive(drive);
+	case ide_dma_on:
+		if (config_for_dma(drive))
+			func = ide_dma_off;
+		/* fall through */
+	case ide_dma_off_quietly:
+	case ide_dma_off:
+		config_for_pio(drive, 4, 0);
+		break;
+	default:
+		break;
+	}
+	return ide_dmaproc(func, drive);
+}
+
+/*
+ * We only deal with PIO mode here - DMA mode 'using_dma' is not
+ * initialised at the point that this function is called.
+ */
+static void tune_sl82c105(ide_drive_t *drive, byte pio)
+{
+	config_for_pio(drive, pio, 1);
+
+	/*
+	 * We support 32-bit I/O on this interface, and it
+	 * doesn't have problems with interrupts.
+	 */
+	drive->io_32bit = 1;
+	drive->unmask = 1;
+}
+
+/*
+ * Return the revision of the Winbond bridge
+ * which this function is part of.
+ */
+static unsigned int sl82c105_bridge_revision(struct pci_dev *dev)
+{
+	struct pci_dev *bridge;
 	unsigned char rev;
 
-	pci_read_config_byte(hwif->pci_dev, PCI_REVISION_ID, &rev);
+	bridge = pci_find_device(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_83C553, NULL);
 
+	/*
+	 * If we are part of a Winbond 553
+	 */
+	if (!bridge || bridge->class >> 8 != PCI_CLASS_BRIDGE_ISA)
+		return -1;
+
+	if (bridge->bus != dev->bus ||
+	    PCI_SLOT(bridge->devfn) != PCI_SLOT(dev->devfn))
+		return -1;
+
+	/*
+	 * We need to find function 0's revision, not function 1
+	 */
+	pci_read_config_byte(bridge, PCI_REVISION_ID, &rev);
+
+	return rev;
+}
+
+/*
+ * Enable the PCI device
+ */
+unsigned int __init pci_init_sl82c105(struct pci_dev *dev, const char *msg)
+{
+	unsigned char ctrl_stat;
+
+	/*
+	 * Enable the ports
+	 */
+	pci_read_config_byte(dev, 0x40, &ctrl_stat);
+	pci_write_config_byte(dev, 0x40, ctrl_stat | 0x33);
+
+	return dev->irq;
+}
+
+void __init dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
+{
+	unsigned int rev;
+	byte dma_state;
+
+	dma_state = inb(dma_base + 2);
+	rev = sl82c105_bridge_revision(hwif->pci_dev);
 	if (rev <= 5) {
 		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
-		printk("    %s: revision %d, Bus-Master DMA disabled\n",
+		printk("    %s: Winbond 553 bridge revision %d, BM-DMA disabled\n",
 		       hwif->name, rev);
+		dma_state &= ~0x60;
+	} else {
+		dma_state |= 0x60;
+		hwif->autodma = 1;
 	}
-	ide_setup_dma(hwif, dmabase, 8);
+	outb(dma_state, dma_base + 2);
+
+	hwif->dmaproc = NULL;
+	ide_setup_dma(hwif, dma_base, 8);
+	if (hwif->dmaproc)
+		hwif->dmaproc = sl82c105_dmaproc;
+}
+
+/*
+ * Initialise the chip
+ */
+void __init ide_init_sl82c105(ide_hwif_t *hwif)
+{
+	hwif->tuneproc = tune_sl82c105;
+}
+
+#else
+
+unsigned int pci_init_sl82c105(struct pci_dev *dev, const char *msg)
+{
+	return ide_special_settings(dev, msg);
+}
+
+void dma_init_sl82c105(ide_hwif_t *hwif, unsigned long dma_base)
+{
+	ide_setup_dma(hwif, dma_base, 8);
 }
 
 void __init ide_init_sl82c105(ide_hwif_t *hwif)
 {
 	struct pci_dev *dev = hwif->pci_dev;
-
-#ifdef CONFIG_ARCH_NETWINDER
-	unsigned char ctrl_stat;
-
-	pci_read_config_byte(dev, 0x40, &ctrl_stat);
-	pci_write_config_byte(dev, 0x40, ctrl_stat | 0x33);
-
-	hwif->tuneproc = tune_sl82c105;
-#else
 	unsigned short t16;
 	unsigned int t32;
 	pci_read_config_word(dev, PCI_COMMAND, &t16);
@@ -134,5 +303,6 @@ void __init ide_init_sl82c105(ide_hwif_t *hwif)
 	printk("IDE control/status register: %08x\n",t32);
 	pci_write_config_dword(dev, 0x40, 0x10ff08a1);
 #endif /* CONFIG_MBX */
-#endif
 }
+#endif
+
