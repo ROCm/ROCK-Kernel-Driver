@@ -14,8 +14,6 @@
 #include <net/checksum.h>
 #include <net/ipv6.h>
 
-#include <asm/byteorder.h>
-
 #include <linux/netfilter_ipv6/ip6_tables.h>
 #include <linux/netfilter_ipv6/ip6t_frag.h>
 
@@ -28,29 +26,6 @@ MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
 #else
 #define DEBUGP(format, args...)
 #endif
-
-#if 0
-#if     BYTE_ORDER == BIG_ENDIAN
-#define IP6F_OFF_MASK       0xfff8  /* mask out offset from _offlg */
-#define IP6F_RESERVED_MASK  0x0006  /* reserved bits in ip6f_offlg */
-#define IP6F_MORE_FRAG      0x0001  /* more-fragments flag */
-#else   /* BYTE_ORDER == LITTLE_ENDIAN */
-#define IP6F_OFF_MASK       0xf8ff  /* mask out offset from _offlg */
-#define IP6F_RESERVED_MASK  0x0600  /* reserved bits in ip6f_offlg */
-#define IP6F_MORE_FRAG      0x0100  /* more-fragments flag */
-#endif
-#endif
-
-#define IP6F_OFF_MASK       0xf8ff  /* mask out offset from _offlg */
-#define IP6F_RESERVED_MASK  0x0600  /* reserved bits in ip6f_offlg */
-#define IP6F_MORE_FRAG      0x0100  /* more-fragments flag */
-
-struct fraghdr {
-       __u8    nexthdr;
-       __u8    hdrlen;
-       __u16   info;
-       __u32   id;
-};
 
 /* Returns 1 if the id is matched by the range, 0 otherwise */
 static inline int
@@ -74,7 +49,7 @@ match(const struct sk_buff *skb,
       u_int16_t datalen,
       int *hotdrop)
 {
-       struct fraghdr *frag = NULL;
+       struct frag_hdr *frag = NULL;
        const struct ip6t_frag *fraginfo = matchinfo;
        unsigned int temp;
        int len;
@@ -107,7 +82,7 @@ match(const struct sk_buff *skb,
                      break;
               }
 
-              hdr=(struct ipv6_opt_hdr *)skb->data+ptr;
+              hdr=(struct ipv6_opt_hdr *)(skb->data+ptr);
 
               /* Calculate the header length */
                 if (nexthdr == NEXTHDR_FRAGMENT) {
@@ -150,59 +125,62 @@ match(const struct sk_buff *skb,
        /* FRAG header not found */
        if ( temp != MASK_FRAGMENT ) return 0;
 
-       if (len < (int)sizeof(struct fraghdr)){
+       if (len < sizeof(struct frag_hdr)){
 	       *hotdrop = 1;
        		return 0;
        }
 
-       frag = (struct fraghdr *) (skb->data + ptr);
+       frag = (struct frag_hdr *) (skb->data + ptr);
 
-       DEBUGP("IPv6 FRAG LEN %u %u ", hdrlen, frag->hdrlen);
-       DEBUGP("INFO %04X ", frag->info);
-       DEBUGP("OFFSET %04X ", frag->info & IP6F_OFF_MASK);
-       DEBUGP("RES %04X ", frag->info & IP6F_RESERVED_MASK);
-       DEBUGP("MF %04X ", frag->info & IP6F_MORE_FRAG);
-       DEBUGP("ID %u %08X\n", ntohl(frag->id), ntohl(frag->id));
+       DEBUGP("INFO %04X ", frag->frag_off);
+       DEBUGP("OFFSET %04X ", ntohs(frag->frag_off) & ~0x7);
+       DEBUGP("RES %02X %04X", frag->reserved, ntohs(frag->frag_off) & 0x6);
+       DEBUGP("MF %04X ", frag->frag_off & htons(IP6_MF));
+       DEBUGP("ID %u %08X\n", ntohl(frag->identification),
+	      ntohl(frag->identification));
 
        DEBUGP("IPv6 FRAG id %02X ",
        		(id_match(fraginfo->ids[0], fraginfo->ids[1],
-                           ntohl(frag->id),
+                           ntohl(frag->identification),
                            !!(fraginfo->invflags & IP6T_FRAG_INV_IDS))));
-       DEBUGP("len %02X %04X %02X ",
-       		fraginfo->hdrlen, hdrlen,
-       		(!fraginfo->hdrlen ||
-                           (fraginfo->hdrlen == hdrlen) ^
-                           !!(fraginfo->invflags & IP6T_FRAG_INV_LEN)));
-       DEBUGP("res %02X %02X %02X ", 
-       		(fraginfo->flags & IP6T_FRAG_RES), frag->info & IP6F_RESERVED_MASK,
-       		!((fraginfo->flags & IP6T_FRAG_RES) && (frag->info & IP6F_RESERVED_MASK)));
+       DEBUGP("res %02X %02X%04X %02X ", 
+       		(fraginfo->flags & IP6T_FRAG_RES), frag->reserved,
+		ntohs(frag->frag_off) & 0x6,
+       		!((fraginfo->flags & IP6T_FRAG_RES)
+			&& (frag->reserved || (ntohs(frag->frag_off) & 0x6))));
        DEBUGP("first %02X %02X %02X ", 
-       		(fraginfo->flags & IP6T_FRAG_FST), frag->info & IP6F_OFF_MASK,
-       		!((fraginfo->flags & IP6T_FRAG_FST) && (frag->info & IP6F_OFF_MASK)));
+       		(fraginfo->flags & IP6T_FRAG_FST),
+		ntohs(frag->frag_off) & ~0x7,
+       		!((fraginfo->flags & IP6T_FRAG_FST)
+			&& (ntohs(frag->frag_off) & ~0x7)));
        DEBUGP("mf %02X %02X %02X ", 
-       		(fraginfo->flags & IP6T_FRAG_MF), frag->info & IP6F_MORE_FRAG,
-       		!((fraginfo->flags & IP6T_FRAG_MF) && !((frag->info & IP6F_MORE_FRAG))));
+       		(fraginfo->flags & IP6T_FRAG_MF),
+		ntohs(frag->frag_off) & IP6_MF,
+       		!((fraginfo->flags & IP6T_FRAG_MF)
+			&& !((ntohs(frag->frag_off) & IP6_MF))));
        DEBUGP("last %02X %02X %02X\n", 
-       		(fraginfo->flags & IP6T_FRAG_NMF), frag->info & IP6F_MORE_FRAG,
-       		!((fraginfo->flags & IP6T_FRAG_NMF) && (frag->info & IP6F_MORE_FRAG)));
+       		(fraginfo->flags & IP6T_FRAG_NMF),
+		ntohs(frag->frag_off) & IP6_MF,
+       		!((fraginfo->flags & IP6T_FRAG_NMF)
+			&& (ntohs(frag->frag_off) & IP6_MF)));
 
        return (frag != NULL)
        		&&
        		(id_match(fraginfo->ids[0], fraginfo->ids[1],
-                           ntohl(frag->id),
+			  ntohl(frag->identification),
                            !!(fraginfo->invflags & IP6T_FRAG_INV_IDS)))
 		&&
-	      	(!fraginfo->hdrlen ||
-                           (fraginfo->hdrlen == hdrlen) ^
-                           !!(fraginfo->invflags & IP6T_FRAG_INV_LEN))
+		!((fraginfo->flags & IP6T_FRAG_RES)
+			&& (frag->reserved || (ntohs(frag->frag_off) & 0x6)))
 		&&
-		!((fraginfo->flags & IP6T_FRAG_RES) && (frag->info & IP6F_RESERVED_MASK))
+		!((fraginfo->flags & IP6T_FRAG_FST)
+			&& (ntohs(frag->frag_off) & ~0x7))
 		&&
-		!((fraginfo->flags & IP6T_FRAG_FST) && (frag->info & IP6F_OFF_MASK))
+		!((fraginfo->flags & IP6T_FRAG_MF)
+			&& !(ntohs(frag->frag_off) & IP6_MF))
 		&&
-		!((fraginfo->flags & IP6T_FRAG_MF) && !((frag->info & IP6F_MORE_FRAG)))
-		&&
-		!((fraginfo->flags & IP6T_FRAG_NMF) && (frag->info & IP6F_MORE_FRAG));
+		!((fraginfo->flags & IP6T_FRAG_NMF)
+			&& (ntohs(frag->frag_off) & IP6_MF));
 }
 
 /* Called when user tries to insert an entry of this type. */

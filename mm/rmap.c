@@ -35,6 +35,7 @@
  *         mm->page_table_lock
  *           zone->lru_lock (in mark_page_accessed)
  *           swap_list_lock (in swap_free etc's swap_info_get)
+ *             mmlist_lock (in mmput, drain_mmlist and others)
  *             swap_device_lock (in swap_duplicate, swap_info_get)
  *             mapping->private_lock (in __set_page_dirty_buffers)
  *             inode_lock (in set_page_dirty's __mark_inode_dirty)
@@ -576,6 +577,11 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 		 */
 		BUG_ON(!PageSwapCache(page));
 		swap_duplicate(entry);
+		if (list_empty(&mm->mmlist)) {
+			spin_lock(&mmlist_lock);
+			list_add(&mm->mmlist, &init_mm.mmlist);
+			spin_unlock(&mmlist_lock);
+		}
 		set_pte(pte, swp_entry_to_pte(entry));
 		BUG_ON(pte_file(*pte));
 	}

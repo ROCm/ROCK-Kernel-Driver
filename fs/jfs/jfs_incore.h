@@ -21,7 +21,7 @@
 
 #include <linux/rwsem.h>
 #include <linux/slab.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include "jfs_types.h"
 #include "jfs_xtree.h"
 #include "jfs_dtree.h"

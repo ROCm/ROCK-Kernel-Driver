@@ -55,6 +55,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_SERIAL_CONSOLE
 #include <linux/console.h>
 #endif
@@ -63,7 +64,6 @@
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/wbflush.h>
 #include <asm/bootinfo.h>

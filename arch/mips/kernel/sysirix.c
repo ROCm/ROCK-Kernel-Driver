@@ -619,8 +619,14 @@ asmlinkage int irix_getgid(struct pt_regs *regs)
 
 asmlinkage int irix_stime(int value)
 {
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+	int err;
+	struct timespec tv;
+
+	tv.tv_sec = value;
+	tv.tv_nsec = 0;
+	err = security_settime(&tv, NULL);
+	if (err)
+		return err;
 
 	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = value;

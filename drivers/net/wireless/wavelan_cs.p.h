@@ -428,10 +428,10 @@
 #include <linux/spinlock.h>
 #include <linux/in.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>

@@ -59,8 +59,8 @@ static const char version[] =
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>

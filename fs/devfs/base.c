@@ -677,13 +677,13 @@
 #include <linux/rwsem.h>
 #include <linux/sched.h>
 #include <linux/namei.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/atomic.h>
 
 #define DEVFS_VERSION            "2004-01-31"

@@ -186,8 +186,8 @@ config X86_LONGRUN
 	tristate "Transmeta LongRun"
 	depends on CPU_FREQ
 	help
-	  This adds the CPUFreq driver for Transmeta Crusoe processors which
-	  support LongRun.
+	  This adds the CPUFreq driver for Transmeta Crusoe and Efficeon processors
+	  which support LongRun.
 
 	  For details, take a look at <file:Documentation/cpu-freq/>.
 

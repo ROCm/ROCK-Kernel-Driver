@@ -20,7 +20,6 @@
 #include <linux/random.h>
 #include <linux/sched.h>
 
-#include <asm/bitops.h>
 #include <asm/mipsregs.h>
 #include <asm/signal.h>
 #include <asm/system.h>

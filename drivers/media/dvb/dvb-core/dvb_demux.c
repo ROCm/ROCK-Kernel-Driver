@@ -31,7 +31,6 @@
 #include <asm/uaccess.h>
 
 #include "dvb_demux.h"
-#include "dvb_functions.h"
 
 #define NOBUFS  
 /* 
@@ -570,24 +569,30 @@ static int dvb_demux_feed_find(struct dvb_demux_feed *feed)
 
 static void dvb_demux_feed_add(struct dvb_demux_feed *feed)
 {
+	spin_lock_irq(&feed->demux->lock);
 	if (dvb_demux_feed_find(feed)) {
 		printk(KERN_ERR "%s: feed already in list (type=%x state=%x pid=%x)\n",
 				__FUNCTION__, feed->type, feed->state, feed->pid);
-		return;
+		goto out;
 	}
 
 	list_add(&feed->list_head, &feed->demux->feed_list);
+out:
+	spin_unlock_irq(&feed->demux->lock);
 }
 
 static void dvb_demux_feed_del(struct dvb_demux_feed *feed)
 {
+	spin_lock_irq(&feed->demux->lock);
 	if (!(dvb_demux_feed_find(feed))) {
 		printk(KERN_ERR "%s: feed not in list (type=%x state=%x pid=%x)\n",
 				__FUNCTION__, feed->type, feed->state, feed->pid);
-		return;
+		goto out;
 }
 
 	list_del(&feed->list_head);
+out:
+	spin_unlock_irq(&feed->demux->lock);
 }
 
 static int dmx_ts_feed_set (struct dmx_ts_feed* ts_feed, u16 pid, int ts_type, 
@@ -789,7 +794,7 @@ static int dvbdmx_release_ts_feed(struct dmx_demux *dmx, struct dmx_ts_feed *ts_
 
 		feed->pid = 0xffff;
 	
-	if (feed->ts_type & TS_DECODER)
+	if (feed->ts_type & TS_DECODER && feed->pes_type < DMX_TS_PES_OTHER)
 		demux->pesfilter[feed->pes_type] = NULL;
 
 	up(&demux->mutex);

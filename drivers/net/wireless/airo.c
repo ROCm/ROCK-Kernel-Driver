@@ -35,9 +35,9 @@
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
 #include <linux/in.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>

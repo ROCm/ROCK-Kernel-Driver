@@ -34,13 +34,13 @@
 #include <linux/serialP.h>
 #include <linux/console.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/semaphore.h>
-#include <asm/bitops.h>
 #include <asm/delay.h>
 #include <asm/coldfire.h>
 #include <asm/mcfsim.h>

@@ -51,9 +51,9 @@
 #include <linux/if_arp.h>
 #include <linux/if_frad.h>
 #include <linux/sdla.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>

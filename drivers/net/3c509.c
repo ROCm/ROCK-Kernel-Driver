@@ -90,9 +90,9 @@ static int max_interrupt_work = 10;
 #include <linux/ethtool.h>
 #include <linux/device.h>
 #include <linux/eisa.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 

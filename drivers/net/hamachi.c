@@ -170,10 +170,10 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/cache.h>

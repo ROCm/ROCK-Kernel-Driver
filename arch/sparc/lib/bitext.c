@@ -10,9 +10,9 @@
  */
 
 #include <linux/smp_lock.h>
+#include <linux/bitops.h>
 
 #include <asm/bitext.h>
-#include <asm/bitops.h>
 
 /**
  * bit_map_string_get - find and set a bit string in bit map.

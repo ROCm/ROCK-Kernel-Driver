@@ -56,6 +56,9 @@ MODULE_LICENSE("GPL");
 
 #define VRC4173_SYSINT1REG	0x060
 #define VRC4173_MSYSINT1REG	0x06c
+#define VRC4173_MPIUINTREG	0x06e
+#define VRC4173_MAIUINTREG	0x070
+#define VRC4173_MKIUINTREG	0x072
 
 #define VRC4173_SELECTREG	0x09e
  #define SEL3			0x0008
@@ -329,7 +332,7 @@ void vrc4173_enable_piuint(uint16_t mask)
 	spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-EXPORT_SYMBOL(vrc4173_eanble_piuint);
+EXPORT_SYMBOL(vrc4173_enable_piuint);
 
 void vrc4173_disable_piuint(uint16_t mask)
 {

@@ -19,8 +19,8 @@
 #include <linux/timer.h>
 
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/errno.h>
 #include <linux/delay.h>

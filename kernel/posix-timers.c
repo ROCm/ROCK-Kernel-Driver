@@ -10,6 +10,10 @@
  * 2004-06-01  Fix CLOCK_REALTIME clock/timer TIMER_ABSTIME bug.
  *			     Copyright (C) 2004 Boris Hu
  *
+ * 2004-07-27 Provide POSIX compliant clocks
+ *		CLOCK_PROCESS_CPUTIME_ID and CLOCK_THREAD_CPUTIME_ID.
+ *		by Christoph Lameter
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or (at
@@ -134,18 +138,10 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
  *	    resolution.	 Here we define the standard CLOCK_REALTIME as a
  *	    1/HZ resolution clock.
  *
- * CPUTIME & THREAD_CPUTIME: We are not, at this time, definding these
- *	    two clocks (and the other process related clocks (Std
- *	    1003.1d-1999).  The way these should be supported, we think,
- *	    is to use large negative numbers for the two clocks that are
- *	    pinned to the executing process and to use -pid for clocks
- *	    pinned to particular pids.	Calls which supported these clock
- *	    ids would split early in the function.
- *
  * RESOLUTION: Clock resolution is used to round up timer and interval
  *	    times, NOT to report clock times, which are reported with as
  *	    much resolution as the system can muster.  In some cases this
- *	    resolution may depend on the underlaying clock hardware and
+ *	    resolution may depend on the underlying clock hardware and
  *	    may not be quantifiable until run time, and only then is the
  *	    necessary code is written.	The standard says we should say
  *	    something about this issue in the documentation...
@@ -163,7 +159,7 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
  *
  *          At this time all functions EXCEPT clock_nanosleep can be
  *          redirected by the CLOCKS structure.  Clock_nanosleep is in
- *          there, but the code ignors it.
+ *          there, but the code ignores it.
  *
  * Permissions: It is assumed that the clock_settime() function defined
  *	    for each clock will take care of permission checks.	 Some
@@ -193,12 +189,12 @@ static struct k_clock_abs abs_list = {.list = LIST_HEAD_INIT(abs_list.list),
 #define p_timer_del(clock,a) \
 		if_clock_do((clock)->timer_del, do_timer_delete, (a))
 
-void register_posix_clock(int clock_id, struct k_clock *new_clock);
 static int do_posix_gettime(struct k_clock *clock, struct timespec *tp);
 static u64 do_posix_clock_monotonic_gettime_parts(
 	struct timespec *tp, struct timespec *mo);
 int do_posix_clock_monotonic_gettime(struct timespec *tp);
-int do_posix_clock_monotonic_settime(struct timespec *tp);
+static int do_posix_clock_process_gettime(struct timespec *tp);
+static int do_posix_clock_thread_gettime(struct timespec *tp);
 static struct k_itimer *lock_timer(timer_t timer_id, unsigned long *flags);
 
 static inline void unlock_timer(struct k_itimer *timr, unsigned long flags)
@@ -217,11 +213,27 @@ static __init int init_posix_timers(void)
 	struct k_clock clock_monotonic = {.res = CLOCK_REALTIME_RES,
 		.abs_struct = NULL,
 		.clock_get = do_posix_clock_monotonic_gettime,
-		.clock_set = do_posix_clock_monotonic_settime
+		.clock_set = do_posix_clock_nosettime
+	};
+	struct k_clock clock_thread = {.res = CLOCK_REALTIME_RES,
+		.abs_struct = NULL,
+		.clock_get = do_posix_clock_thread_gettime,
+		.clock_set = do_posix_clock_nosettime,
+		.timer_create = do_posix_clock_notimer_create,
+		.nsleep = do_posix_clock_nonanosleep
+	};
+	struct k_clock clock_process = {.res = CLOCK_REALTIME_RES,
+		.abs_struct = NULL,
+		.clock_get = do_posix_clock_process_gettime,
+		.clock_set = do_posix_clock_nosettime,
+		.timer_create = do_posix_clock_notimer_create,
+		.nsleep = do_posix_clock_nonanosleep
 	};
 
 	register_posix_clock(CLOCK_REALTIME, &clock_realtime);
 	register_posix_clock(CLOCK_MONOTONIC, &clock_monotonic);
+	register_posix_clock(CLOCK_PROCESS_CPUTIME_ID, &clock_process);
+	register_posix_clock(CLOCK_THREAD_CPUTIME_ID, &clock_thread);
 
 	posix_timers_cache = kmem_cache_create("posix_timers_cache",
 					sizeof (struct k_itimer), 0, 0, NULL, NULL);
@@ -572,6 +584,10 @@ sys_timer_create(clockid_t which_clock,
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
 				!posix_clocks[which_clock].res)
 		return -EINVAL;
+
+	if (posix_clocks[which_clock].timer_create)
+		return posix_clocks[which_clock].timer_create(which_clock,
+				timer_event_spec, created_timer_id);
 
 	new_timer = alloc_posix_timer();
 	if (unlikely(!new_timer))
@@ -1218,15 +1234,86 @@ int do_posix_clock_monotonic_gettime(struct timespec *tp)
 	return 0;
 }
 
-int do_posix_clock_monotonic_settime(struct timespec *tp)
+int do_posix_clock_nosettime(struct timespec *tp)
 {
 	return -EINVAL;
+}
+
+int do_posix_clock_notimer_create(int which_clock,
+		struct sigevent __user *timer_event_spec,
+		timer_t __user *created_timer_id) {
+	return -EINVAL;
+}
+
+int do_posix_clock_nonanosleep(int which_lock, int flags,struct timespec * t) {
+/* Single Unix specficiation says to return ENOTSUP but we do not have that */
+	return -EINVAL;
+}
+
+static unsigned long process_ticks(task_t *p) {
+	unsigned long ticks;
+	task_t *t;
+
+	spin_lock(&p->sighand->siglock);
+	/* The signal structure is shared between all threads */
+	ticks = p->signal->utime + p->signal->stime;
+
+	/* Add up the cpu time for all the still running threads of this process */
+	t = p;
+	do {
+		ticks += t->utime + t->stime;
+		t = next_thread(t);
+	} while (t != p);
+
+	spin_unlock(&p->sighand->siglock);
+	return ticks;
+}
+
+static inline unsigned long thread_ticks(task_t *p) {
+	return p->utime + current->stime;
+}
+
+/*
+ * Single Unix Specification V3:
+ *
+ * Implementations shall also support the special clockid_t value
+ * CLOCK_THREAD_CPUTIME_ID, which represents the CPU-time clock of the calling
+ * thread when invoking one of the clock_*() or timer_*() functions. For these
+ * clock IDs, the values returned by clock_gettime() and specified by
+ * clock_settime() shall represent the amount of execution time of the thread
+ * associated with the clock.
+ */
+static int do_posix_clock_thread_gettime(struct timespec *tp)
+{
+	jiffies_to_timespec(thread_ticks(current), tp);
+	return 0;
+}
+
+/*
+ * Single Unix Specification V3:
+ *
+ * Implementations shall also support the special clockid_t value
+ * CLOCK_PROCESS_CPUTIME_ID, which represents the CPU-time clock of the
+ * calling process when invoking one of the clock_*() or timer_*() functions.
+ * For these clock IDs, the values returned by clock_gettime() and specified
+ * by clock_settime() represent the amount of execution time of the process
+ * associated with the clock.
+ */
+
+static int do_posix_clock_process_gettime(struct timespec *tp)
+{
+	jiffies_to_timespec(process_ticks(current), tp);
+	return 0;
 }
 
 asmlinkage long
 sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 {
 	struct timespec new_tp;
+
+	/* Cannot set process specific clocks */
+	if (which_clock<0)
+		return -EINVAL;
 
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
 					!posix_clocks[which_clock].res)
@@ -1245,6 +1332,29 @@ sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp)
 	struct timespec rtn_tp;
 	int error = 0;
 
+	/* Process process specific clocks */
+	if (which_clock < 0) {
+		task_t *t;
+		int pid = -which_clock;
+
+		if (pid < PID_MAX_LIMIT) {
+			if ((t = find_task_by_pid(pid))) {
+				jiffies_to_timespec(process_ticks(t), tp);
+				return 0;
+			}
+			return -EINVAL;
+		}
+		if (pid < 2*PID_MAX_LIMIT) {
+			if ((t = find_task_by_pid(pid - PID_MAX_LIMIT))) {
+				jiffies_to_timespec(thread_ticks(t), tp);
+				return 0;
+			}
+			return -EINVAL;
+		}
+		/* More process specific clocks could follow here */
+		return -EINVAL;
+	}
+
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
 					!posix_clocks[which_clock].res)
 		return -EINVAL;
@@ -1262,6 +1372,9 @@ asmlinkage long
 sys_clock_getres(clockid_t which_clock, struct timespec __user *tp)
 {
 	struct timespec rtn_tp;
+
+	/* All process clocks have the resolution of CLOCK_PROCESS_CPUTIME_ID */
+	if (which_clock < 0 ) which_clock = CLOCK_PROCESS_CPUTIME_ID;
 
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
 					!posix_clocks[which_clock].res)
@@ -1409,7 +1522,10 @@ sys_clock_nanosleep(clockid_t which_clock, int flags,
 	if ((unsigned) t.tv_nsec >= NSEC_PER_SEC || t.tv_sec < 0)
 		return -EINVAL;
 
-	ret = do_clock_nanosleep(which_clock, flags, &t);
+	if (posix_clocks[which_clock].nsleep)
+		ret = posix_clocks[which_clock].nsleep(which_clock, flags, &t);
+	else
+		ret = do_clock_nanosleep(which_clock, flags, &t);
 	/*
 	 * Do this here as do_clock_nanosleep does not have the real address
 	 */

@@ -238,7 +238,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         frame = ((struct fake_frame *)
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
-	p->set_child_tid = p->clear_child_tid = NULL;
 	/* Store access registers to kernel stack of new process. */
         frame->childregs = *regs;
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */

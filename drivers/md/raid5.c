@@ -21,7 +21,7 @@
 #include <linux/slab.h>
 #include <linux/raid/raid5.h>
 #include <linux/highmem.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/atomic.h>
 
 /*
@@ -1410,7 +1410,7 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		new_sector = raid5_compute_sector(logical_sector,
 						  raid_disks, data_disks, &dd_idx, &pd_idx, conf);
 
-		PRINTK("raid5: make_request, sector %Lu logical %Lu\n",
+		PRINTK("raid5: make_request, sector %llu logical %llu\n",
 			(unsigned long long)new_sector, 
 			(unsigned long long)logical_sector);
 

@@ -4,7 +4,7 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
 
 unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,

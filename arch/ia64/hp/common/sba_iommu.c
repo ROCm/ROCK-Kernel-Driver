@@ -33,13 +33,13 @@
 #include <linux/seq_file.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/bitops.h>         /* hweight64() */
 
 #include <asm/delay.h>		/* ia64_get_itc() */
 #include <asm/io.h>
 #include <asm/page.h>		/* PAGE_OFFSET */
 #include <asm/dma.h>
 #include <asm/system.h>		/* wmb() */
-#include <asm/bitops.h>		/* hweight64() */
 
 #include <asm/acpi-ext.h>
 

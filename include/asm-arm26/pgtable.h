@@ -288,7 +288,7 @@ static inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
  * into virtual address `from'
  */
 #define io_remap_page_range(vma,from,phys,size,prot) \
-		remap_page_range(vma,from,phys,size,prot)
+		remap_pfn_range(vma, from, (phys) >> PAGE_SHIFT, size, prot)
 
 #endif /* !__ASSEMBLY__ */
 

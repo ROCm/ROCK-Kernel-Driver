@@ -46,8 +46,6 @@
 
 #define ALIGN(val,align)	(((val) + ((align) - 1)) & ~((align) - 1))
 
-#define MAX(val1, val2)		(((val1) > (val2)) ? val1 : val2)
-
 /*
  * Offsets relative to the I/O and memory base addresses from where resources
  * are allocated.
@@ -171,7 +169,7 @@ static void __init layout_dev(struct pci_dev *dev)
 			 * Align to multiple of size of minimum base.
 			 */
 
-			alignto = MAX(0x040, size) ;
+			alignto = max_t(unsigned int, 0x040, size);
 			base = ALIGN(io_base, alignto);
 			io_base = base + size;
 			pci_write_config_dword(dev, reg, base | PCI_BASE_ADDRESS_SPACE_IO);
@@ -214,7 +212,7 @@ static void __init layout_dev(struct pci_dev *dev)
 			 * Align to multiple of size of minimum base.
 			 */
 
-			alignto = MAX(0x1000, size) ;
+			alignto = max_t(unsigned int, 0x1000, size);
 			base = ALIGN(mem_base, alignto);
 			mem_base = base + size;
 			pci_write_config_dword(dev, reg, base);

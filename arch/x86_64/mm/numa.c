@@ -164,6 +164,7 @@ void __init numa_init_array(void)
 	set_bit(0, &node_to_cpumask[cpu_to_node(0)]);
 }
 
+#ifdef CONFIG_NUMA_EMU
 int numa_fake __initdata = 0;
 
 /* Numa emulation */
@@ -208,13 +209,16 @@ static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
  	numa_init_array();
  	return 0;
 }
+#endif
 
 void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 { 
 	int i;
 
+#ifdef CONFIG_NUMA_EMU
 	if (numa_fake && !numa_emulation(start_pfn, end_pfn))
  		return;
+#endif
 
 #ifdef CONFIG_K8_NUMA
 	if (!numa_off && !k8_scan_nodes(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT))

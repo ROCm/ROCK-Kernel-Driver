@@ -34,6 +34,7 @@
 #include <asm/hpet.h>
 #include <asm/sections.h>
 #include <linux/cpufreq.h>
+#include <linux/hpet.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
@@ -52,9 +53,9 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 static int nohpet __initdata = 0;
+static int notsc __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS
-
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
@@ -726,6 +727,55 @@ static unsigned int __init pit_calibrate_tsc(void)
 	return (end - start) / 50;
 }
 
+#ifdef	CONFIG_HPET
+static __init int late_hpet_init(void)
+{
+	struct hpet_data	hd;
+	unsigned int 		ntimer;
+
+	if (!vxtime.hpet_address)
+          return -1;
+
+	memset(&hd, 0, sizeof (hd));
+
+	ntimer = hpet_readl(HPET_ID);
+	ntimer = (ntimer & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+	ntimer++;
+
+	/*
+	 * Register with driver.
+	 * Timer0 and Timer1 is used by platform.
+	 */
+	hd.hd_address = (void *)fix_to_virt(FIX_HPET_BASE);
+	hd.hd_nirqs = ntimer;
+	hd.hd_flags = HPET_DATA_PLATFORM;
+	hpet_reserve_timer(&hd, 0);
+#ifdef	CONFIG_HPET_EMULATE_RTC
+	hpet_reserve_timer(&hd, 1);
+#endif
+	hd.hd_irq[0] = HPET_LEGACY_8254;
+	hd.hd_irq[1] = HPET_LEGACY_RTC;
+	if (ntimer > 2) {
+		struct hpet		*hpet;
+		struct hpet_timer	*timer;
+		int			i;
+
+		hpet = (struct hpet *) fix_to_virt(FIX_HPET_BASE);
+
+		for (i = 2, timer = &hpet->hpet_timers[2]; i < ntimer;
+		     timer++, i++)
+			hd.hd_irq[i] = (timer->hpet_config &
+					Tn_INT_ROUTE_CNF_MASK) >>
+				Tn_INT_ROUTE_CNF_SHIFT;
+
+	}
+
+	hpet_alloc(&hd);
+	return 0;
+}
+fs_initcall(late_hpet_init);
+#endif
+
 static int hpet_init(void)
 {
 	unsigned int cfg, id;
@@ -859,15 +909,31 @@ void __init time_init_smp(void)
 {
 	char *timetype;
 
-	if (vxtime.hpet_address) {
+	/*
+	 * AMD systems with more than one CPU don't have fully synchronized
+	 * TSCs. Always use HPET gettimeofday for these, although it is slower.
+	 * Intel SMP systems usually have synchronized TSCs, so use always
+	 * the TSC.
+	 *
+	 * Exceptions:
+	 * IBM Summit. Will need to be special cased later.
+ 	 * AMD dual core may also not need HPET. Check me.
+	 *
+	 * Can be turned off with "notsc".
+	 */
+	if (num_online_cpus() > 1 &&
+	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		notsc = 1;
+	if (vxtime.hpet_address && notsc) {
 		timetype = "HPET";
 		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
 		vxtime.mode = VXTIME_HPET;
 		do_gettimeoffset = do_gettimeoffset_hpet;
 	} else {
-		timetype = "PIT/TSC";
+		timetype = vxtime.hpet_address ? "HPET/TSC" : "PIT/TSC";
 		vxtime.mode = VXTIME_TSC;
 	}
+
 	printk(KERN_INFO "time.c: Using %s based timekeeping.\n", timetype);
 }
 
@@ -1154,3 +1220,14 @@ static int __init nohpet_setup(char *s)
 } 
 
 __setup("nohpet", nohpet_setup);
+
+
+static int __init notsc_setup(char *s)
+{
+	notsc = 1;
+	return 0;
+}
+
+__setup("notsc", notsc_setup);
+
+

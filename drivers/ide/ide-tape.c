@@ -442,13 +442,13 @@
 #include <linux/ide.h>
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unaligned.h>
-#include <asm/bitops.h>
 
 /*
  * partition

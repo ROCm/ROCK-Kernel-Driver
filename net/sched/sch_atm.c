@@ -449,12 +449,12 @@ static int atm_tc_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 	    result == TC_POLICE_SHOT ||
 #endif
 	    (ret = flow->q->enqueue(skb,flow->q)) != 0) {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		if (flow) flow->stats.drops++;
 		return ret;
 	}
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
+	sch->bstats.bytes += skb->len;
+	sch->bstats.packets++;
 	flow->stats.bytes += skb->len;
 	flow->stats.packets++;
 	/*
@@ -547,7 +547,7 @@ static int atm_tc_requeue(struct sk_buff *skb,struct Qdisc *sch)
 	ret = p->link.q->ops->requeue(skb,p->link.q);
 	if (!ret) sch->q.qlen++;
 	else {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		p->link.stats.drops++;
 	}
 	return ret;

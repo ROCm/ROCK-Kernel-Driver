@@ -72,8 +72,8 @@
  *		<linux/slab.h>
  *		<linux/interrupt.h>
  *		<linux/pci.h>
+ *		<linux/bitops.h>
  *		<asm/byteorder.h>
- *		<asm/bitops.h>
  *		<asm/io.h>
  *		<linux/netdevice.h>
  *		<linux/etherdevice.h>

@@ -22,6 +22,7 @@ static char version[] =
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <net/dst.h>
 #include <net/arp.h>
@@ -29,7 +30,6 @@ static char version[] =
 #include <net/ipv6.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/byteorder.h>

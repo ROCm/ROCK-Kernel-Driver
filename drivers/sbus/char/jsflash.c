@@ -21,7 +21,7 @@
  * as a silly safeguard.
  *
  * XXX The flash.c manipulates page caching characteristics in a certain
- * dubious way; also it assumes that remap_page_range() can remap
+ * dubious way; also it assumes that remap_pfn_range() can remap
  * PCI bus locations, which may be false. ioremap() must be used
  * instead. We should discuss this.
  */

@@ -102,11 +102,11 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Richard Procter <rnp@paradise.net.
 #include <linux/wait.h>
 #include <linux/ethtool.h>
 #include <linux/completion.h>
+#include <linux/bitops.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

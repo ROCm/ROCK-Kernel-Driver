@@ -81,10 +81,10 @@ mmapper_mmap(struct file *file, struct vm_area_struct * vma)
 	size = vma->vm_end - vma->vm_start;
 	if(size > mmapper_size) return(-EFAULT);
 
-	/* XXX A comment above remap_page_range says it should only be
+	/* XXX A comment above remap_pfn_range says it should only be
 	 * called when the mm semaphore is held
 	 */
-	if (remap_page_range(vma, vma->vm_start, p_buf, size, 
+	if (remap_pfn_range(vma, vma->vm_start, p_buf >> PAGE_SHIFT, size,
 			     vma->vm_page_prot))
 		goto out;
 	ret = 0;

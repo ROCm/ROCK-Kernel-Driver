@@ -84,6 +84,7 @@ earlier 3Com products.
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/ethtool.h>
+#include <linux/bitops.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -97,7 +98,6 @@ earlier 3Com products.
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 /*====================================================================*/
 

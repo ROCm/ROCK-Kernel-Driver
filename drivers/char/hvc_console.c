@@ -221,6 +221,7 @@ static int hvc_open(struct tty_struct *tty, struct file * filp)
 		spin_unlock_irqrestore(&hp->lock, flags);
 		tty->driver_data = NULL;
 		kobject_put(kobjp);
+		printk(KERN_ERR "hvc_open: request_irq failed with rc %d.\n", rc);
 	}
 	/* Force wakeup of the polling thread */
 	hvc_kick();
@@ -240,7 +241,7 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 
 	/*
 	 * No driver_data means that this close was issued after a failed
-	 * hvcs_open by the tty layer's release_dev() function and we can just
+	 * hvc_open by the tty layer's release_dev() function and we can just
 	 * exit cleanly because the kobject reference wasn't made.
 	 */
 	if (!tty->driver_data)
@@ -266,13 +267,6 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 		 */
 		tty_wait_until_sent(tty, HVC_CLOSE_WAIT);
 
-		/*
-		 * Since the line disc doesn't block writes during tty close
-		 * operations we'll set driver_data to NULL and then make sure
-		 * to check tty->driver_data for NULL in hvc_write().
-		 */
-		tty->driver_data = NULL;
-
 		if (irq != NO_IRQ)
 			free_irq(irq, hp);
 
@@ -294,7 +288,21 @@ static void hvc_hangup(struct tty_struct *tty)
 	int temp_open_count;
 	struct kobject *kobjp;
 
+	if (!hp)
+		return;
+
 	spin_lock_irqsave(&hp->lock, flags);
+
+	/*
+	 * The N_TTY line discipline has problems such that in a close vs
+	 * open->hangup case this can be called after the final close so prevent
+	 * that from happening for now.
+	 */
+	if (hp->count <= 0) {
+		spin_unlock_irqrestore(&hp->lock, flags);
+		return;
+	}
+
 	kobjp = &hp->kobj;
 	temp_open_count = hp->count;
 	hp->count = 0;
@@ -427,6 +435,9 @@ static int hvc_write(struct tty_struct *tty, int from_user,
 	/* This write was probably executed during a tty close. */
 	if (!hp)
 		return -EPIPE;
+
+	if (hp->count <= 0)
+		return -EIO;
 
 	if (from_user)
 		written = __hvc_write_user(hp, buf, count);

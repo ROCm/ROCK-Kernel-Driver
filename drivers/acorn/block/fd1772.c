@@ -138,9 +138,9 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
+#include <linux/bitops.h>
 
 #include <asm/arch/oldlatches.h>
-#include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/hardware.h>
 #include <asm/hardware/ioc.h>

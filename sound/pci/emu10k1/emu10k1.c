@@ -48,25 +48,24 @@ static int seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
 static int max_synth_voices[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 64};
 static int max_buffer_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 128};
 static int enable_ir[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for the EMU10K1 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for the EMU10K1 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable the EMU10K1 soundcard.");
-module_param_array(extin, int, boot_devs, 0444);
+module_param_array(extin, int, NULL, 0444);
 MODULE_PARM_DESC(extin, "Available external inputs for FX8010. Zero=default.");
-module_param_array(extout, int, boot_devs, 0444);
+module_param_array(extout, int, NULL, 0444);
 MODULE_PARM_DESC(extout, "Available external outputs for FX8010. Zero=default.");
-module_param_array(seq_ports, int, boot_devs, 0444);
+module_param_array(seq_ports, int, NULL, 0444);
 MODULE_PARM_DESC(seq_ports, "Allocated sequencer ports for internal synthesizer.");
-module_param_array(max_synth_voices, int, boot_devs, 0444);
+module_param_array(max_synth_voices, int, NULL, 0444);
 MODULE_PARM_DESC(max_synth_voices, "Maximum number of voices for WaveTable.");
-module_param_array(max_buffer_size, int, boot_devs, 0444);
+module_param_array(max_buffer_size, int, NULL, 0444);
 MODULE_PARM_DESC(max_buffer_size, "Maximum sample buffer size in MB.");
-module_param_array(enable_ir, bool, boot_devs, 0444);
+module_param_array(enable_ir, bool, NULL, 0444);
 MODULE_PARM_DESC(enable_ir, "Enable IR.");
 
 static struct pci_device_id snd_emu10k1_ids[] = {

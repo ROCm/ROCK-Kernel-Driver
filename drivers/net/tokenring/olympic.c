@@ -99,12 +99,12 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <net/checksum.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 #include "olympic.h"
 

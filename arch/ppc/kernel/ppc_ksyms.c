@@ -15,6 +15,7 @@
 #include <linux/delay.h>
 #include <linux/ide.h>
 #include <linux/pm.h>
+#include <linux/bitops.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -23,7 +24,6 @@
 #include <asm/io.h>
 #include <asm/ide.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>

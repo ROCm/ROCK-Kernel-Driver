@@ -124,9 +124,9 @@ static const char version[] =
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 #include <linux/netdevice.h>

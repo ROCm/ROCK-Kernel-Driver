@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/console.h>
+#include <linux/bitops.h>
 
 #ifdef CONFIG_CPU_FREQ
 #include <linux/notifier.h>
@@ -51,7 +52,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include <linux/generic_serial.h>
 

@@ -44,10 +44,10 @@
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/poll.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 /* number of characters left in xmit buffer before select has we have room */
 #define WAKEUP_CHARS 256

@@ -94,7 +94,6 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/irq.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>

@@ -29,9 +29,9 @@
 #include <linux/spinlock.h>
 #include <linux/efi.h>
 #include <linux/percpu.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/cache.h>
 #include <asm/current.h>
 #include <asm/delay.h>

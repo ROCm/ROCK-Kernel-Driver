@@ -45,6 +45,7 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/sched.h>
+#include <linux/bitops.h>
 
 #include <linux/signal.h>
 #include <linux/string.h>
@@ -58,7 +59,6 @@
 #include <net/dst.h>
 
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 #include "iucv.h"

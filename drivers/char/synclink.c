@@ -97,7 +97,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/dma.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/types.h>
 #include <linux/termios.h>
 #include <linux/workqueue.h>

@@ -60,12 +60,12 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/oplib.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/kdebug.h>
 #include <asm/sbus.h>
 #include <asm/uaccess.h>

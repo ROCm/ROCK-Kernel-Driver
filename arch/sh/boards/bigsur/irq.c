@@ -29,10 +29,10 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/irq.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 
 #include <asm/bigsur/io.h>
 #include <asm/hd64465/hd64465.h>

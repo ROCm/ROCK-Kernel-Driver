@@ -202,7 +202,7 @@ static irqreturn_t macio_adb_interrupt(int irq, void *arg,
 				       struct pt_regs *regs)
 {
 	int i, n, err;
-	struct adb_request *req;
+	struct adb_request *req = NULL;
 	unsigned char ibuf[16];
 	int ibuf_len = 0;
 	int complete = 0;

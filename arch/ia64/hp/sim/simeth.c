@@ -20,7 +20,7 @@
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #include <linux/notifier.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 

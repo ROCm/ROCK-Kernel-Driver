@@ -21,9 +21,9 @@
 #include <linux/smp_lock.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/mmu.h>
 #include <asm/residual.h>
 #include <asm/io.h>

@@ -28,8 +28,8 @@
 #include <linux/init.h>
 #include <linux/crc32.h>
 #include <linux/ethtool.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/delay.h>

@@ -480,8 +480,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 #endif
 	}
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	/*
 	 *  p->thread_info         new_stack   childregs
 	 *  !                      !           !             {if(PSR_PS) }

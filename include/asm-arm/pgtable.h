@@ -412,7 +412,7 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
  * into virtual address `from'
  */
 #define io_remap_page_range(vma,from,phys,size,prot) \
-		remap_page_range(vma,from,phys,size,prot)
+		remap_pfn_range(vma, from, (phys) >> PAGE_SHIFT, size, prot)
 
 #define pgtable_cache_init() do { } while (0)
 

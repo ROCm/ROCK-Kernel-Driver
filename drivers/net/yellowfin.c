@@ -124,10 +124,10 @@ static int gx_fix;
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/unaligned.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 /* These identify the driver base version and may not be removed. */

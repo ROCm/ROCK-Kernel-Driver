@@ -38,7 +38,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/moduleparam.h>
