@@ -322,7 +322,6 @@ static struct file_operations proc_slabinfo_operations = {
 int show_stat(struct seq_file *p, void *v)
 {
 	int i;
-	extern unsigned long total_forks;
 	unsigned long jif;
 	u64	sum = 0, user = 0, nice = 0, system = 0,
 		idle = 0, iowait = 0, irq = 0, softirq = 0;

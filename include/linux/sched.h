@@ -88,6 +88,7 @@ extern unsigned long avenrun[];		/* Load averages */
 #define CT_TO_SECS(x)	((x) / HZ)
 #define CT_TO_USECS(x)	(((x) % HZ) * 1000000/HZ)
 
+extern unsigned long total_forks;
 extern int nr_threads;
 extern int last_pid;
 DECLARE_PER_CPU(unsigned long, process_counts);

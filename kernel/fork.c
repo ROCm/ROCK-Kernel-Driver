@@ -48,13 +48,13 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-/* The idle threads do not count..
- * Protected by write_lock_irq(&tasklist_lock)
+/*
+ * Protected counters by write_lock_irq(&tasklist_lock)
  */
-int nr_threads;
-
-int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
+int nr_threads; 		/* The idle threads do not count.. */
+
+int max_threads;		/* tunable limit on nr_threads */
 
 DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
@@ -1035,6 +1035,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	nr_threads++;
+	total_forks++;
 	write_unlock_irq(&tasklist_lock);
 	retval = 0;
 
@@ -1167,7 +1168,6 @@ long do_fork(unsigned long clone_flags,
 			wake_up_new_task(p, clone_flags);
 		else
 			p->state = TASK_STOPPED;
-		++total_forks;
 
 		if (unlikely (trace)) {
 			current->ptrace_message = pid;
