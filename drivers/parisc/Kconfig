@@ -54,6 +54,8 @@ config EISA
 	  supports both the Mongoose & Wax EISA adapters.  It is sadly
 	  incomplete and lacks support for card-to-host DMA.
 
+source "drivers/eisa/Kconfig"
+
 config ISA
 	bool
 	depends on EISA

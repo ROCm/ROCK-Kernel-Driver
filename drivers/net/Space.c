@@ -55,7 +55,6 @@ extern int hp_probe(struct net_device *dev);
 extern int hp_plus_probe(struct net_device *dev);
 extern int express_probe(struct net_device *);
 extern int eepro_probe(struct net_device *);
-extern int el3_probe(struct net_device *);
 extern int at1500_probe(struct net_device *);
 extern int at1700_probe(struct net_device *);
 extern int fmv18x_probe(struct net_device *);
@@ -210,9 +209,6 @@ static struct devprobe mca_probes[] __initdata = {
  * look for EISA/PCI/MCA cards in addition to ISA cards).
  */
 static struct devprobe isa_probes[] __initdata = {
-#ifdef CONFIG_EL3		/* ISA, EISA, MCA 3c5x9 */
-	{el3_probe, 0},
-#endif
 #ifdef CONFIG_HP100 		/* ISA, EISA & PCI */
 	{hp100_probe, 0},
 #endif	
