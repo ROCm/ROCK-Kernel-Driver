@@ -263,7 +263,7 @@ _GLOBAL(htab_call_hpte_updatepp)
 	/* if we failed because typically the HPTE wasn't really here
 	 * we try an insertion. 
 	 */
-	cmpi	0,r3,-1
+	cmpdi	0,r3,-1
 	beq-	htab_insert_pte
 
 	/* Clear the BUSY bit and Write out the PTE */
