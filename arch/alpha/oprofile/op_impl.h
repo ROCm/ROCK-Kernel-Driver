@@ -47,7 +47,7 @@ struct op_axp_model {
 	void (*reset_ctr) (struct op_register_config *, unsigned long);
 	void (*handle_interrupt) (unsigned long, struct pt_regs *,
 				  struct op_counter_config *);
-	enum oprofile_cpu cpu;
+	char *cpu_type;
 	unsigned char num_counters;
 	unsigned char can_set_proc_mode;
 };

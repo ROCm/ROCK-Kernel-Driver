@@ -110,7 +110,7 @@ struct op_axp_model op_model_ev4 = {
 	.cpu_setup		= ev4_cpu_setup,
 	.reset_ctr		= NULL,
 	.handle_interrupt	= ev4_handle_interrupt,
-	.cpu			= OPROFILE_CPU_AXP_EV4,
+	.cpu_type		= "alpha/ev4",
 	.num_counters		= 2,
 	.can_set_proc_mode	= 0,
 };

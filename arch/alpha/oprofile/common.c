@@ -143,53 +143,46 @@ static struct oprofile_operations oprof_axp_ops = {
 	.setup		= op_axp_setup,
 	.shutdown	= op_axp_shutdown,
 	.start		= op_axp_start,
-	.stop		= op_axp_stop
+	.stop		= op_axp_stop,
+	.cpu_type	= NULL		/* To be filled in below.  */
 };
 
 int __init
-oprofile_arch_init(struct oprofile_operations **ops, enum oprofile_cpu *cpu)
+oprofile_arch_init(struct oprofile_operations **ops)
 {
 	struct op_axp_model *lmodel = NULL;
-	const char *vername = NULL;
 
 	switch (implver()) {
 	case IMPLVER_EV4:
 		lmodel = &op_model_ev4;
-		vername = "EV4";
 		break;
 	case IMPLVER_EV5:
 		/* 21164PC has a slightly different set of events.
 		   Recognize the chip by the presence of the MAX insns.  */
-		if (!amask(AMASK_MAX)) {
+		if (!amask(AMASK_MAX))
 			lmodel = &op_model_pca56;
-			vername = "PCA56";
-		} else {
+		else
 			lmodel = &op_model_ev5;
-			vername = "EV5";
-		}
 		break;
 	case IMPLVER_EV6:
 		/* 21264A supports ProfileMe.
 		   Recognize the chip by the presence of the CIX insns.  */
-		if (!amask(AMASK_CIX)) {
+		if (!amask(AMASK_CIX))
 			lmodel = &op_model_ev67;
-			vername = "EV67";
-		} else {
+		else
 			lmodel = &op_model_ev6;
-			vername = "EV6";
-		}
 		break;
 	}
 
 	if (!lmodel)
 		return ENODEV;
-
 	model = lmodel;
+
+	oprof_axp_ops.cpu_type = lmodel->cpu_type;
 	*ops = &oprof_axp_ops;
-	*cpu = model->cpu;
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
-	       vername);
+	       lmodel->cpu_type);
 
 	return 0;
 }

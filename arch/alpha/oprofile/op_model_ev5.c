@@ -195,7 +195,7 @@ struct op_axp_model op_model_ev5 = {
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
 	.handle_interrupt	= ev5_handle_interrupt,
-	.cpu			= OPROFILE_CPU_AXP_EV5,
+	.cpu			= "alpha/ev5",
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,
 };
@@ -205,7 +205,7 @@ struct op_axp_model op_model_pca56 = {
 	.cpu_setup		= ev5_cpu_setup,
 	.reset_ctr		= ev5_reset_ctr,
 	.handle_interrupt	= ev5_handle_interrupt,
-	.cpu			= OPROFILE_CPU_AXP_PCA56,
+	.cpu			= "alpha/pca56",
 	.num_counters		= 3,
 	.can_set_proc_mode	= 1,
 };

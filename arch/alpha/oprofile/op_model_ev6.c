@@ -97,7 +97,7 @@ struct op_axp_model op_model_ev6 = {
 	.cpu_setup		= ev6_cpu_setup,
 	.reset_ctr		= ev6_reset_ctr,
 	.handle_interrupt	= ev6_handle_interrupt,
-	.cpu			= OPROFILE_CPU_AXP_EV6,
+	.cpu			= "alpha/ev6",
 	.num_counters		= 2,
 	.can_set_proc_mode	= 0,
 };

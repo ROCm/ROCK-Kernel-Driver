@@ -257,7 +257,7 @@ struct op_axp_model op_model_ev67 = {
 	.cpu_setup		= ev67_cpu_setup,
 	.reset_ctr		= ev67_reset_ctr,
 	.handle_interrupt	= ev67_handle_interrupt,
-	.cpu			= OPROFILE_CPU_AXP_EV67,
+	.cpu			= "alpha/ev67",
 	.num_counters		= 20,
 	.can_set_proc_mode	= 0,
 };
