@@ -1747,8 +1747,8 @@ static int __init fd_probe_drives(void)
 			disk->first_minor = drive;
 			disk->minor_shift = 0;
 			disk->fops = &floppy_fops;
-			sprintf(names[drive], "fd%d");
-			disk->name = names[drive];
+			sprintf(names[drive], "fd%d", drive);
+			disk->major_name = names[drive];
 			set_capacity(disk, 880*2);
 			add_disk(disk);
 		}

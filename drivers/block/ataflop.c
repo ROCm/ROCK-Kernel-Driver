@@ -222,8 +222,6 @@ static struct atari_disk_type user_params[FD_MAX_UNITS];
  */
 static struct atari_disk_type default_params[FD_MAX_UNITS];
 
-static int floppy_sizes[256];
-
 /* current info on each unit */
 static struct atari_floppy_struct {
 	int connected;				/* !=0 : drive is connected */
@@ -237,6 +235,8 @@ static struct atari_floppy_struct {
 	unsigned int wpstat;	/* current state of WP signal (for
 				   disk change detection) */
 	int flags;		/* flags */
+	struct gendisk disk;
+	char name[4];
 } unit[FD_MAX_UNITS];
 
 #define	UD	unit[drive]
@@ -1094,7 +1094,8 @@ static void fd_rwsec_done1(int status)
 			    if (SUDT[-1].blocks > ReqBlock) {
 				/* try another disk type */
 				SUDT--;
-				floppy_sizes[SelectedDrive] = SUDT->blocks >> 1;
+				set_capacity(&unit[SelectedDrive].disk,
+							SUDT->blocks);
 			    } else
 				Probing = 0;
 			}
@@ -1108,7 +1109,8 @@ static void fd_rwsec_done1(int status)
 /* record not found, but not probing. Maybe stretch wrong ? Restart probing */
 			if (SUD.autoprobe) {
 				SUDT = disk_type + StartDiskType[DriveType];
-				floppy_sizes[SelectedDrive] = SUDT->blocks >> 1;
+				set_capacity(&unit[SelectedDrive].disk,
+							SUDT->blocks);
 				Probing = 1;
 			}
 		}
@@ -1469,7 +1471,7 @@ repeat:
 		if (!UDT) {
 			Probing = 1;
 			UDT = disk_type + StartDiskType[DriveType];
-			floppy_sizes[drive] = UDT->blocks >> 1;
+			set_capacity(&unit[drive].disk, UDT->blocks);
 			UD.autoprobe = 1;
 		}
 	} 
@@ -1487,7 +1489,7 @@ repeat:
 		}
 		type = minor2disktype[type].index;
 		UDT = &disk_type[type];
-		floppy_sizes[drive] = UDT->blocks >> 1;
+		set_capacity(&unit[drive].disk, UDT->blocks);
 		UD.autoprobe = 0;
 	}
 	
@@ -1547,7 +1549,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 	drive &= 3;
 	switch (cmd) {
 	case FDGETPRM:
-	case BLKGETSIZE:
 		if (type) {
 			if (--type >= NUM_DISK_MINORS)
 				return -ENODEV;
@@ -1565,9 +1566,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 			else
 				dtp = UDT;
 		}
-		if (cmd == BLKGETSIZE)
-			return put_user(dtp->blocks, (unsigned long *)param);
-
 		memset((void *)&getprm, 0, sizeof(getprm));
 		getprm.size = dtp->blocks;
 		getprm.sect = dtp->spt;
@@ -1638,7 +1636,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 				    printk (KERN_INFO "floppy%d: setting %s %p!\n",
 				        drive, dtp->name, dtp);
 				UDT = dtp;
-				floppy_sizes[drive] = UDT->blocks >> 1;
+				set_capacity(&unit[drive].disk, UDT->blocks);
 
 				if (cmd == FDDEFPRM) {
 				  /* save settings as permanent default type */
@@ -1684,7 +1682,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		UDT = dtp;
-		floppy_sizes[drive] = UDT->blocks >> 1;
+		set_capacity(&unit[drive].disk, UDT->blocks);
 
 		return 0;
 	case FDMSGON:
@@ -1707,7 +1705,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		UDT = NULL;
 		/* MSch: invalidate default_params */
 		default_params[drive].blocks  = 0;
-		floppy_sizes[drive] = MAX_DISK_SIZE;
+		set_capacity(&unit[drive].disk, MAX_DISK_SIZE * 2);
 	case FDFMTEND:
 	case FDFLUSH:
 		/* invalidate the buffer track to force a reread */
@@ -1861,11 +1859,6 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	int drive, type;
 	int old_dev;
 
-	if (!filp) {
-		DPRINT (("Weird, open called with filp=0\n"));
-		return -EIO;
-	}
-
 	drive = minor(inode->i_rdev) & 3;
 	type  = minor(inode->i_rdev) >> 2;
 	DPRINT(("fd_open: type=%d\n",type));
@@ -1930,6 +1923,15 @@ static struct block_device_operations floppy_fops = {
 	revalidate:		floppy_revalidate,
 };
 
+static struct gendisk *floppy_find(int minor)
+{
+	int drive = minor & 3;
+	int type  = minor >> 2;
+	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
+		return NULL;
+	return &unit[drive].disk;
+}
+
 int __init atari_floppy_init (void)
 {
 	int i;
@@ -1972,17 +1974,17 @@ int __init atari_floppy_init (void)
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		unit[i].flags = 0;
+		unit[i].disk.major = MAJOR_NR;
+		unit[i].disk.first_minor = i;
+		sprintf(unit[i].name, "fd%d", i);
+		unit[i].disk.major_name = names[drive];
+		unit[i].disk.fops = &floppy_fops;
+		set_capacity(&unit[i].disk, MAX_DISK_SIZE * 2);
+		add_disk(&unit[i].disk);
 	}
 
-	for (i = 0; i < 256; i++)
-		if ((i >> 2) > 0 && (i >> 2) <= NUM_DISK_MINORS) {
-			int type = minor2disktype[(i >> 2) - 1].index;
-			floppy_sizes[i] = disk_type[type].blocks >> 1;
-		} else
-			floppy_sizes[i] = MAX_DISK_SIZE;
-
-	blk_size[MAJOR_NR] = floppy_sizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_fd_request, &ataflop_lock);
+	blk_set_probe(MAJOR_NR, floppy_find);
 
 	printk(KERN_INFO "Atari floppy driver: max. %cD, %strack buffering\n",
 	       DriveType == 0 ? 'D' : DriveType == 1 ? 'H' : 'E',
@@ -2034,7 +2036,11 @@ int init_module (void)
 
 void cleanup_module (void)
 {
+	int i;
+	for (i = 0; i < FD_MAX_UNITS; i++)
+		del_gendisk(&unit[i].disk);
 	unregister_blkdev(MAJOR_NR, "fd");
+	blk_set_probe(MAJOR_NR, NULL);
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	del_timer_sync(&fd_timer);
