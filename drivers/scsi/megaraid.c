@@ -3009,11 +3009,10 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 
 		if (!(flag & BOARD_QUARTZ)) {
 			/* Request our IO Range */
-			if (check_region (megaBase, 16)) {
+			if (!request_region(megaBase, 16, "megaraid")) {
 				printk(KERN_WARNING "megaraid: Couldn't register I/O range!\n");
 				goto err_unregister;
 			}
-			request_region(megaBase, 16, "megaraid");
 		}
 
 		/* Request our IRQ */
