@@ -1,17 +1,15 @@
 /*
+ * arch/ppc/platforms/4xx/ash.h
  *
+ * Macros, definitions, and data structures specific to the IBM PowerPC
+ * Ash eval board.
  *
- *    Copyright 2000-2002  MontaVista Software Inc.
- * 	Author: MontaVista Software, Inc.
- *         	akuster@mvista.com or source@mvista.com
+ * Author: Armin Kuster <akuster@mvista.com>
  *
- *    Module name: ash.h
- *
- *    Description:
- *      Macros, definitions, and data structures specific to the IBM PowerPC
- *      Ash eval board.
- *
- *
+ * 2000-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #ifdef __KERNEL__

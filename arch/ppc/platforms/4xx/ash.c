@@ -1,8 +1,14 @@
 /*
+ * arch/ppc/platforms/4xx/ash.c
+ * 
+ * Support for the IBM NP405H ash eval board
+ * 
+ * Author: Armin Kuster <akuster@mvista.com>
  *
- *    Copyright 2001-2002 MontaVista Software Inc.
- *        <akuster@mvista.com>
- *	IBM NP405H ash eval board
+ * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 #include <linux/config.h>
 #include <linux/init.h>

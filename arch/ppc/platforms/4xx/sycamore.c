@@ -1,15 +1,15 @@
 /*
+ * arch/ppc/platforms/4xx/sycamore.c
  *
- *    Copyright 2000-2002 MontaVista Software Inc.
- *      Author: Armin Kuster <akuster@mvista.com>
- *      MontaVista Software, Inc.  <source@mvista.com>
+ * Architecture- / platform-specific boot-time initialization code for
+ * IBM PowerPC 4xx based boards. 
  *
- *    Module name: sycamore.c
+ * Author: Armin Kuster <akuster@mvista.com>
  *
- *    Description:
- *      Architecture- / platform-specific boot-time initialization code for
- *      IBM PowerPC 4xx based boards. 
- *
+ * 2000-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 #include <linux/config.h>
 #include <linux/init.h>

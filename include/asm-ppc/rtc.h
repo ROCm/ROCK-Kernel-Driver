@@ -1,8 +1,12 @@
 /* 
  * inclue/asm-ppc/rtc.h
  *
- * Copyright 2002 MontaVista Software Inc.
  * Author: Tom Rini <trini@mvista.com>
+ *
+ * 2002 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  *
  * Based on:
  * include/asm-m68k/rtc.h
@@ -15,10 +19,6 @@
  * Copyright (C) 1996 Thomas K. Dyas (tdyas@eden.rutgers.edu)
  *
  * With additional work by Paul Mackerras and Franz Sirl.
- */
-/* permission is hereby granted to copy, modify and redistribute this code
- * in terms of the GNU Library General Public License, Version 2 or later,
- * at your option.
  */
 
 #ifndef __ASM_RTC_H__

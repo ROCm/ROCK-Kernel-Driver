@@ -3,7 +3,10 @@
 #
 # Author: Tom Rini <trini@mvista.com>
 #
-# Copyright 2001-2002 MontaVista Software Inc.
+# 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
+# the terms of the GNU General Public License version 2.1.  This program
+# is licensed "as is" without any warranty of any kind, whether express
+# or implied.
 #
 # Notes:
 # (1) For machine targets which produce more than one image, define
@@ -18,11 +21,6 @@
 # (4) It is advisable to pass in the memory size using BI_MEMSIZE and
 # get_mem_size(), which is memory controller dependant.  Add in the correct
 # XXX_memory.o file for this to work, as well as editing the $(MISC) file.
-#
-# This program is free software; you can redistribute  it and/or modify it
-# under  the terms of  the GNU General  Public License as published by the
-# Free Software Foundation;  either version 2 of the  License, or (at your
-# option) any later version.
 
 boot: zImage
 
