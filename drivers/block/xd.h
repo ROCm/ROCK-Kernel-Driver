@@ -113,7 +113,6 @@ static void xd_geninit (void);
 static int xd_open (struct inode *inode,struct file *file);
 static void do_xd_request (request_queue_t * q);
 static int xd_ioctl (struct inode *inode,struct file *file,unsigned int cmd,unsigned long arg);
-static int xd_release (struct inode *inode,struct file *file);
 static int xd_reread_partitions (kdev_t dev);
 static int xd_readwrite (u_char operation,u_char drive,char *buffer,u_int block,u_int count);
 static void xd_recalibrate (u_char drive);

@@ -132,7 +132,7 @@ conf_read(unsigned long addr)
 	unsigned long flags, code, stat0;
 	unsigned int value;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Reset status register to avoid loosing errors.  */
 	stat0 = *(vulp)LCA_IOC_STAT0;
@@ -160,7 +160,7 @@ conf_read(unsigned long addr)
 
 		value = 0xffffffff;
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	return value;
 }
 
@@ -169,7 +169,7 @@ conf_write(unsigned long addr, unsigned int value)
 {
 	unsigned long flags, code, stat0;
 
-	__save_and_cli(flags);	/* avoid getting hit by machine check */
+	local_irq_save(flags);	/* avoid getting hit by machine check */
 
 	/* Reset status register to avoid loosing errors.  */
 	stat0 = *(vulp)LCA_IOC_STAT0;
@@ -195,7 +195,7 @@ conf_write(unsigned long addr, unsigned int value)
 		/* Reset machine check. */
 		wrmces(0x7);
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static int

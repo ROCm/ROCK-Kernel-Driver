@@ -1313,7 +1313,7 @@ int qla1280_release(struct Scsi_Host *);
 int qla1280_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int qla1280_abort(Scsi_Cmnd *);
 int qla1280_reset(Scsi_Cmnd *, unsigned int);
-int qla1280_biosparam(Disk *, kdev_t, int[]);
+int qla1280_biosparam(Disk *, struct block_device *, int[]);
 void qla1280_intr_handler(int, void *, struct pt_regs *);
 void qla1280_setup(char *s, int *dummy);
 

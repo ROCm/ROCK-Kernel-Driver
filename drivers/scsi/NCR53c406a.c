@@ -760,7 +760,7 @@ NCR53c406a_reset(Scsi_Cmnd *SCpnt, unsigned int ignored){
 }
 
 int 
-NCR53c406a_biosparm(Scsi_Disk *disk, kdev_t dev, int* info_array){
+NCR53c406a_biosparm(Scsi_Disk *disk, struct block_device *dev, int* info_array){
     int size;
     
     DEB(printk("NCR53c406a_biosparm called\n"));

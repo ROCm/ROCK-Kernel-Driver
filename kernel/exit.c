@@ -530,10 +530,10 @@ NORET_TYPE void do_exit(long code)
 	tsk->flags |= PF_EXITING;
 	del_timer_sync(&tsk->real_timer);
 
-	if (unlikely(preempt_get_count()))
+	if (unlikely(preempt_count()))
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
 				current->comm, current->pid,
-				preempt_get_count());
+				preempt_count());
 
 fake_volatile:
 	acct_process(code);

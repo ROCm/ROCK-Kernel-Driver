@@ -49,7 +49,6 @@
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
-#include <linux/kdev_t.h>
 #include <linux/blk.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
@@ -2903,7 +2902,7 @@ int Pci2220i_Release (struct Scsi_Host *pshost)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Pci2220i_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
+int Pci2220i_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
 	{
 	POUR_DEVICE	pdev;
 

@@ -872,17 +872,6 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		break;
 
-
-	case BLKFLSBUF:
-		/* flush buffer cache */
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-
-		P_IOCTL("BLKFLSBUF\n");
-
-		fsync_bdev(inode->i_bdev);
-		invalidate_buffers(inode->i_rdev);
-		break;
-
 	case HDIO_GETGEO:
 		/* get disk geometry */
 		P_IOCTL("%s -- lvm_blk_ioctl -- HDIO_GETGEO\n", lvm_name);

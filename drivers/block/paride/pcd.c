@@ -137,6 +137,7 @@ static int pcd_drive_count;
 /* end of parameters */
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -199,9 +200,6 @@ MODULE_PARM(drive3,"1-6i");
 #define IDE_DRQ         0x08
 #define IDE_READY       0x40
 #define IDE_BUSY        0x80
-
-int pcd_init(void);
-void cleanup_module( void );
 
 static int pcd_open(struct cdrom_device_info *cdi, int purpose);
 static void pcd_release(struct cdrom_device_info *cdi);
@@ -327,83 +325,17 @@ static void pcd_init_units( void )
         }
 }
 
-int pcd_init (void)	/* preliminary initialisation */
-{
-	int unit;
-
-	if (disable) return -1;
-
-	pcd_init_units();
-
-	if (pcd_detect()) return -1;
-
-	/* get the atapi capabilities page */
-	pcd_probe_capabilities();
-
-	if (register_blkdev(MAJOR_NR,name,&pcd_bdops)) {
-		printk("pcd: unable to get major number %d\n",MAJOR_NR);
-		return -1;
-	}
-
-	for (unit=0;unit<PCD_UNITS;unit++) {
-		if (PCD.present) {
-			register_cdrom(&PCD.info);
-			devfs_plain_cdrom(&PCD.info, &pcd_bdops);
-		}
-	}
-
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
-
-	return 0;
-}
-
 static int pcd_open(struct cdrom_device_info *cdi, int purpose)
-
-{	int unit = DEVICE_NR(cdi->dev);
-
-	if  ((unit >= PCD_UNITS) || (!PCD.present)) return -ENODEV;
-
+{
+	int unit = DEVICE_NR(cdi->dev);
+	if  ((unit >= PCD_UNITS) || (!PCD.present))
+		return -ENODEV;
 	return 0;
 }
 
 static void pcd_release(struct cdrom_device_info *cdi)
-
 {
 }
-
-#ifdef MODULE
-
-/* Glue for modules ... */
-
-int	init_module(void)
-
-{	int	err;
-
-#ifdef PARIDE_JUMBO
-       { extern paride_init();
-         paride_init();
-       } 
-#endif
-
-	err = pcd_init();
-
-	return err;
-}
-
-void	cleanup_module(void)
-
-{	int unit;
-	
-        for (unit=0;unit<PCD_UNITS;unit++) 
-           if (PCD.present) {
-		pi_release(PI);
-		unregister_cdrom(&PCD.info);
-	   }
-
-	unregister_blkdev(MAJOR_NR,name);
-}
-
-#endif
 
 #define WR(c,r,v)       pi_write_regr(PI,c,r,v)
 #define RR(c,r)         (pi_read_regr(PI,c,r))
@@ -950,6 +882,50 @@ static int pcd_get_mcn (struct cdrom_device_info *cdi, struct cdrom_mcn *mcn)
 	return 0;
 }
 
-/* end of pcd.c */
+
+static int __init pcd_init(void)
+{
+	int unit;
+
+	if (disable)
+		return -1;
+
+	pcd_init_units();
+
+	if (pcd_detect())
+		return -1;
+
+	/* get the atapi capabilities page */
+	pcd_probe_capabilities();
+
+	if (register_blkdev(MAJOR_NR,name,&pcd_bdops)) {
+		printk("pcd: unable to get major number %d\n",MAJOR_NR);
+		return -1;
+	}
+
+	for (unit=0;unit<PCD_UNITS;unit++) {
+		if (PCD.present) {
+			register_cdrom(&PCD.info);
+			devfs_plain_cdrom(&PCD.info, &pcd_bdops);
+		}
+	}
+
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_pcd_request, &pcd_lock);
+
+	return 0;
+}
+
+static void __exit pcd_exit(void)
+{
+	int unit;
+	for (unit=0;unit<PCD_UNITS;unit++) 
+		if (PCD.present) {
+			pi_release(PI);
+			unregister_cdrom(&PCD.info);
+		}
+	unregister_blkdev(MAJOR_NR,name);
+}
 
 MODULE_LICENSE("GPL");
+module_init(pcd_init)
+module_exit(pcd_exit)

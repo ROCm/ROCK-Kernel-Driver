@@ -12,9 +12,8 @@
 
 #ifndef SCSICAM_H
 #define SCSICAM_H
-#include <linux/kdev_t.h>
-extern int scsicam_bios_param (Disk *disk, kdev_t dev, int *ip);
+extern int scsicam_bios_param (Disk *disk, struct block_device *bdev, int *ip);
 extern int scsi_partsize(unsigned char *buf, unsigned long capacity,
            unsigned int  *cyls, unsigned int *hds, unsigned int *secs);
-extern unsigned char *scsi_bios_ptable(kdev_t dev);
+extern unsigned char *scsi_bios_ptable(struct block_device *bdev);
 #endif /* def SCSICAM_H */

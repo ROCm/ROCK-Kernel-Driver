@@ -98,8 +98,8 @@ static int guillemot_read_packet(struct gameport *gameport, u8 *data)
 	t = gameport_time(gameport, GUILLEMOT_MAX_START);
 	s = gameport_time(gameport, GUILLEMOT_MAX_STROBE);
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	gameport_trigger(gameport);
 	v = gameport_read(gameport);
 
@@ -113,7 +113,7 @@ static int guillemot_read_packet(struct gameport *gameport, u8 *data)
 		}
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return i;
 }

@@ -1573,16 +1573,10 @@ end_io:
 static inline void blk_partition_remap(struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
-	struct gendisk *g;
-
 	if (bdev == bdev->bd_contains)
 		return;
 
-	g = get_gendisk(to_kdev_t(bdev->bd_dev));
-	if (!g)
-		BUG();
-
-	bio->bi_sector += g->part[minor(to_kdev_t((bdev->bd_dev)))].start_sect;
+	bio->bi_sector += bdev->bd_offset;
 	bio->bi_bdev = bdev->bd_contains;
 	/* lots of checks are possible */
 }
@@ -2046,9 +2040,6 @@ int __init blk_dev_init(void)
 
 #if defined(CONFIG_IDE) && defined(CONFIG_BLK_DEV_HD)
 	hd_init();
-#endif
-#if defined(__i386__)	/* Do we even need this? */
-	outb_p(0xc, 0x3f2);
 #endif
 
 	return 0;

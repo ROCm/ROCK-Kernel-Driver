@@ -2158,7 +2158,7 @@ char buf[32];
  *       supposed to do...
  */
 
-int in2000_biosparam(Disk *disk, kdev_t dev, int *iinfo)
+int in2000_biosparam(Disk *disk, struct block_device *dev, int *iinfo)
 {
 int size;
 

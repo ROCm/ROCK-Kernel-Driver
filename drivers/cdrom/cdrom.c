@@ -1732,11 +1732,6 @@ int cdrom_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	   because they fill up the sys log when CD players poll
 	   the drive. */
 	switch (cmd) {
-	case BLKROSET:
-	case BLKROGET:
-	case BLKFLSBUF:
-	case BLKSSZGET:
-		return blk_ioctl(ip->i_bdev, cmd, arg);
 	case CDROMSUBCHNL: {
 		struct cdrom_subchnl q;
 		u_char requested, back;

@@ -27,7 +27,6 @@
 #endif
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 #define SYM53C416_SCSI_ID 7
 
@@ -37,7 +36,7 @@ static int sym53c416_command(Scsi_Cmnd *);
 static int sym53c416_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int sym53c416_abort(Scsi_Cmnd *);
 static int sym53c416_reset(Scsi_Cmnd *, unsigned int);
-static int sym53c416_bios_param(Disk *, kdev_t, int *);
+static int sym53c416_bios_param(Disk *, struct block_device *, int *);
 static void sym53c416_setup(char *str, int *ints);
 
 #define SYM53C416 {                                          \

@@ -177,7 +177,7 @@ static void
 ppc4xx_power_off(void)
 {
 	printk("System Halted\n");
-	__cli();
+	local_irq_disable();
 	while (1) ;
 }
 
@@ -185,7 +185,7 @@ static void
 ppc4xx_halt(void)
 {
 	printk("System Halted\n");
-	__cli();
+	local_irq_disable();
 	while (1) ;
 }
 

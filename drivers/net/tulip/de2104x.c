@@ -1455,7 +1455,7 @@ static void de_tx_timeout (struct net_device *dev)
 	/* Update the error counts. */
 	__de_get_stats(de);
 
-	synchronize_irq();
+	synchronize_irq(dev->irq);
 	de_clean_rings(de);
 
 	de_init_hw(de);

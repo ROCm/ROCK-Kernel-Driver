@@ -305,7 +305,7 @@ void __init gemini_init_l2(void)
 void
 gemini_restart(char *cmd)
 {
-	__cli();
+	local_irq_disable();
 	/* make a clean restart, not via the MPIC */
 	_gemini_reboot();
 	for(;;);

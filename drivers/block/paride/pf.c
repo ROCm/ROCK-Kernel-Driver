@@ -153,11 +153,9 @@ static int pf_drive_count;
 
 
 #include <linux/module.h>
-#include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/kernel.h>
 #include <linux/delay.h>
-#include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/cdrom.h>
 #include <linux/spinlock.h>
@@ -240,7 +238,6 @@ MODULE_PARM(drive3,"1-7i");
 #define ATAPI_READ_10		0x28
 #define ATAPI_WRITE_10		0x2a
 
-int pf_init(void);
 #ifdef MODULE
 void cleanup_module( void );
 #endif
@@ -337,34 +334,6 @@ void pf_init_units( void )
         }
 } 
 
-int pf_init (void)      /* preliminary initialisation */
-
-{       int i;
-	request_queue_t * q; 
-
-	if (disable) return -1;
-
-	pf_init_units();
-
-	if (pf_detect()) return -1;
-	pf_busy = 0;
-
-        if (register_blkdev(MAJOR_NR,name,&pf_fops)) {
-                printk("pf_init: unable to get major number %d\n",
-                        major);
-                return -1;
-        }
-	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
-	blk_init_queue(q, do_pf_request, &pf_spin_lock);
-	blk_queue_max_phys_segments(q, cluster);
-	blk_queue_max_hw_segments(q, cluster);
-
-	for (i=0;i<PF_UNITS;i++)
-		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &pf_fops, 0);
-
-        return 0;
-}
-
 static int pf_open (struct inode *inode, struct file *file)
 
 {       int	unit = DEVICE_NR(inode->i_rdev);
@@ -423,10 +392,6 @@ static int pf_ioctl(struct inode *inode,struct file *file,
                 return put_user(PF.capacity,(long *) arg);
             case BLKGETSIZE64:
                 return put_user((u64)PF.capacity << 9,(u64 *)arg);
-	    case BLKROSET:
-	    case BLKROGET:
-	    case BLKFLSBUF:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
             default:
                 return -EINVAL;
         }
@@ -457,39 +422,6 @@ static int pf_check_media( kdev_t dev)
 
 {       return 1;
 }
-
-#ifdef MODULE
-
-/* Glue for modules ... */
-
-void    cleanup_module(void);
-
-int     init_module(void)
-
-{       int     err;
-
-#ifdef PARIDE_JUMBO
-       { extern paride_init();
-         paride_init();
-       } 
-#endif
-
-        err = pf_init();
-
-        return err;
-}
-
-void    cleanup_module(void)
-
-{       int unit;
-
-        unregister_blkdev(MAJOR_NR,name);
-
-	for (unit=0;unit<PF_UNITS;unit++)
-	  if (PF.present) pi_release(PI);
-}
-
-#endif
 
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
 #define	RR(c,r)		(pi_read_regr(PI,c,r))
@@ -1040,6 +972,44 @@ static void do_pf_write_done( void )
 	spin_unlock_irqrestore(&pf_spin_lock,saved_flags);
 }
 
-/* end of pf.c */
+static int __init pf_init(void)      /* preliminary initialisation */
+{
+	int i;
+	request_queue_t * q; 
 
+	if (disable)
+		return -1;
+
+	pf_init_units();
+
+	if (pf_detect())
+		return -1;
+	pf_busy = 0;
+
+	if (register_blkdev(MAJOR_NR,name,&pf_fops)) {
+		printk("pf_init: unable to get major number %d\n", major);
+		return -1;
+	}
+	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
+	blk_init_queue(q, do_pf_request, &pf_spin_lock);
+	blk_queue_max_phys_segments(q, cluster);
+	blk_queue_max_hw_segments(q, cluster);
+
+	for (i=0;i<PF_UNITS;i++)
+		register_disk(NULL, mk_kdev(MAJOR_NR, i), 1, &pf_fops, 0);
+
+	return 0;
+}
+
+static void __exit pf_exit(void)
+{
+	int unit;
+	unregister_blkdev(MAJOR_NR,name);
+	for (unit=0;unit<PF_UNITS;unit++)
+		if (PF.present)
+			pi_release(PI);
+}
+ 
 MODULE_LICENSE("GPL");
+module_init(pf_init)
+module_exit(pf_exit)

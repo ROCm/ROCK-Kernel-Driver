@@ -775,7 +775,7 @@ static void openpic_end_ipi(unsigned int irq_nr)
 	 * SA_INTERRUPT flag and let them execute with all interrupts OFF.
 	 * This would have the side effect of either running cross-CPU
 	 * functions with interrupts off, or we can re-enable them explicitely
-	 * with a __sti() in smp_call_function_interrupt(), since
+	 * with a local_irq_enable() in smp_call_function_interrupt(), since
 	 * smp_call_function() is protected by a spinlock.
 	 * Or maybe we shouldn't set the IRQ_PER_CPU flag on cross-CPU
 	 * function calls IPI at all but that would make a special case.

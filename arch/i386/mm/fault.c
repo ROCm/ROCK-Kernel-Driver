@@ -107,27 +107,25 @@ extern spinlock_t timerlist_lock;
  */
 void bust_spinlocks(int yes)
 {
+	int loglevel_save = console_loglevel;
+
 	spin_lock_init(&timerlist_lock);
 	if (yes) {
 		oops_in_progress = 1;
-#ifdef CONFIG_SMP
-		global_irq_lock = 0;	/* Many serial drivers do __global_cli() */
-#endif
-	} else {
-		int loglevel_save = console_loglevel;
-#ifdef CONFIG_VT
-		unblank_screen();
-#endif
-		oops_in_progress = 0;
-		/*
-		 * OK, the message is on the console.  Now we call printk()
-		 * without oops_in_progress set so that printk will give klogd
-		 * a poke.  Hold onto your hats...
-		 */
-		console_loglevel = 15;		/* NMI oopser may have shut the console up */
-		printk(" ");
-		console_loglevel = loglevel_save;
+		return;
 	}
+#ifdef CONFIG_VT
+	unblank_screen();
+#endif
+	oops_in_progress = 0;
+	/*
+	 * OK, the message is on the console.  Now we call printk()
+	 * without oops_in_progress set so that printk will give klogd
+	 * a poke.  Hold onto your hats...
+	 */
+	console_loglevel = 15;		/* NMI oopser may have shut the console up */
+	printk(" ");
+	console_loglevel = loglevel_save;
 }
 
 asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);

@@ -1383,9 +1383,8 @@ int fd_mcs_reset( Scsi_Cmnd *SCpnt, unsigned int reset_flags )
 #include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
-int fd_mcs_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
+int fd_mcs_biosparam( Scsi_Disk *disk, struct block_device *bdev, int *info_array )
 {
-  int              drive;
   unsigned char    buf[512 + sizeof( int ) * 2];
   int		    size      = disk->capacity;
   int              *sizes    = (int *)buf;
@@ -1394,8 +1393,6 @@ int fd_mcs_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
   int              retcode;
 
   /* BIOS >= 3.4 for MCA cards */
-  drive = MINOR(dev) / 16;
-
   /* This algorithm was provided by Future Domain (much thanks!). */
 
   sizes[0] = 0;		/* zero bytes out */

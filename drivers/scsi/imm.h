@@ -162,7 +162,7 @@ int imm_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int imm_abort(Scsi_Cmnd *);
 int imm_reset(Scsi_Cmnd *);
 int imm_proc_info(char *, char **, off_t, int, int, int);
-int imm_biosparam(Disk *, kdev_t, int *);
+int imm_biosparam(Disk *, struct block_device *, int *);
 
 #define IMM {	proc_name:			"imm",			\
 		proc_info:			imm_proc_info,		\

@@ -13,20 +13,18 @@ obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o raw.o pty.o misc.o random.o
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
 export-objs     :=	busmouse.o console.o keyboard.o sysrq.o \
-			misc.o pty.o random.o selection.o serial.o \
+			misc.o pty.o random.o selection.o \
 			sonypi.o tty_io.o tty_ioctl.o generic_serial.o rtc.o \
 			ip2main.o
 
 KEYMAP   =defkeymap.o
 KEYBD    =pc_keyb.o
 CONSOLE  =console.o
-SERIAL   =serial.o
 
 ifeq ($(ARCH),s390)
   KEYMAP   =
   KEYBD    =
   CONSOLE  =
-  SERIAL   =
 endif
 
 ifeq ($(ARCH),mips)
@@ -39,7 +37,6 @@ ifeq ($(ARCH),s390x)
   KEYMAP   =
   KEYBD    =
   CONSOLE  =
-  SERIAL   =
 endif
 
 ifeq ($(ARCH),m68k)
@@ -48,7 +45,6 @@ ifeq ($(ARCH),m68k)
    else
       KEYBD =
    endif
-   SERIAL   =
 endif
 
 ifeq ($(ARCH),arm)
@@ -96,15 +92,6 @@ endif
 
 ifeq ($(CONFIG_BAGET_MIPS),y)
   KEYBD    =
-  SERIAL   =
-endif
-
-ifeq ($(CONFIG_NINO),y)
-  SERIAL   =
-endif
-
-ifneq ($(CONFIG_SUN_SERIAL),)
-  SERIAL   =
 endif
 
 ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
@@ -113,11 +100,7 @@ ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
 endif
 
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
-obj-$(CONFIG_SERIAL) += $(SERIAL)
-obj-$(CONFIG_SERIAL_ACPI) += acpi_serial.o
-obj-$(CONFIG_SERIAL_21285) += serial_21285.o
-obj-$(CONFIG_SERIAL_SA1100) += serial_sa1100.o
-obj-$(CONFIG_SERIAL_AMBA) += serial_amba.o
+#obj-$(CONFIG_SERIAL) += $(SERIAL) # Fix for decserial.o
 
 ifndef CONFIG_SUN_KEYBOARD
   obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)

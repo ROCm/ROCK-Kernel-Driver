@@ -1,0 +1,225 @@
+# $Id: Config.help,v 1.5 2002/07/06 17:16:24 rmk Exp $
+
+CONFIG_SERIAL_8250
+  This selects whether you want to include the driver for the standard
+  serial ports.  The standard answer is Y.  People who might say N
+  here are those that are setting up dedicated Ethernet WWW/FTP
+  servers, or users that have one of the various bus mice instead of a
+  serial mouse and don't intend to use their machine's standard serial
+  port for anything.  (Note that the Cyclades and Stallion multi
+  serial port drivers do not need this driver built in for them to
+  work.)
+
+  If you want to compile this driver as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  serial.o.
+  [WARNING: Do not compile this driver as a module if you are using
+  non-standard serial ports, since the configuration information will
+  be lost when the driver is unloaded.  This limitation may be lifted
+  in the future.]
+
+  BTW1: If you have a mouseman serial mouse which is not recognized by
+  the X window system, try running gpm first.
+
+  BTW2: If you intend to use a software modem (also called Winmodem)
+  under Linux, forget it.  These modems are crippled and require
+  proprietary drivers which are only available under Windows.
+
+  Most people will say Y or M here, so that they can use serial mice,
+  modems and similar devices connecting to the standard serial ports.
+
+CONFIG_SERIAL_8250_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode). This could be useful if some terminal or printer is connected
+  to that serial port.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+  If you don't have a VGA card installed and you say Y here, the
+  kernel will automatically use the first serial line, /dev/ttyS0, as
+  system console.
+
+  If unsure, say N.
+
+CONFIG_SERIAL_8250_CS
+  Say Y here to enable support for 16-bit PCMCIA serial devices,
+  including serial port cards, modems, and the modem functions of
+  multi-function Ethernet/modem cards. (PCMCIA- or PC-cards are
+  credit-card size devices often used with laptops.)
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called serial_cs.o.  If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+  If unsure, say N.
+
+CONFIG_SERIAL_8250_EXTENDED
+  If you wish to use any non-standard features of the standard "dumb"
+  driver, say Y here. This includes HUB6 support, shared serial
+  interrupts, special multiport support, support for more than the
+  four COM 1/2/3/4 boards, etc.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about serial driver options. If unsure, say N.
+
+CONFIG_SERIAL_8250_MANY_PORTS
+  Say Y here if you have dumb serial boards other than the four
+  standard COM 1/2/3/4 ports. This may happen if you have an AST
+  FourPort, Accent Async, Boca (read the Boca mini-HOWTO, available
+  from <http://www.linuxdoc.org/docs.html#howto>), or other custom
+  serial port hardware which acts similar to standard serial port
+  hardware. If you only use the standard COM 1/2/3/4 ports, you can
+  say N here to save some memory. You can also say Y if you have an
+  "intelligent" multiport card such as Cyclades, Digiboards, etc.
+
+CONFIG_SERIAL_8250_SHARE_IRQ
+  Some serial boards have hardware support which allows multiple dumb
+  serial ports on the same board to share a single IRQ. To enable
+  support for this in the serial driver, say Y here.
+
+CONFIG_SERIAL_8250_DETECT_IRQ
+  Say Y here if you want the kernel to try to guess which IRQ
+  to use for your serial port.
+
+  This is considered unsafe; it is far better to configure the IRQ in
+  a boot script using the setserial command.
+
+  If unsure, say N.
+
+CONFIG_SERIAL_8250_MULTIPORT
+  Some multiport serial ports have special ports which are used to
+  signal when there are any serial ports on the board which need
+  servicing. Say Y here to enable the serial driver to take advantage
+  of those special I/O ports.
+
+CONFIG_SERIAL_8250_RSA
+  ::: To be written :::
+
+CONFIG_ATOMWIDE_SERIAL
+  If you have an Atomwide Serial card for an Acorn system, say Y to
+  this option.  The driver can handle 1, 2, or 3 port cards.
+  If unsure, say N.
+
+CONFIG_DUALSP_SERIAL
+  If you have the Serial Port's dual serial card for an Acorn system,
+  say Y to this option.  If unsure, say N.
+
+CONFIG_SERIAL_ANAKIN
+  ::: To be written :::
+CONFIG_SERIAL_ANAKIN_CONSOLE
+  ::: To be written :::
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyAN0". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+CONFIG_ANAKIN_DEFAULT_BAUDRATE
+  ::: To be written :::
+
+CONFIG_SERIAL_AMBA
+  This selects the ARM(R) AMBA(R) PrimeCell UART.  If you have an
+  Integrator platform, say Y or M here.
+
+  If unsure, say N.
+
+CONFIG_SERIAL_AMBA_CONSOLE
+  Say Y here if you wish to use an AMBA PrimeCell UART as the system
+  console (the system console is the device which receives all kernel
+  messages and warnings and which allows logins in single user mode).
+
+  Even if you say Y here, the currently visible framebuffer console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyAM0". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+CONFIG_SERIAL_CLPS711X
+  ::: To be written :::
+
+CONFIG_SERIAL_CLPS711X_CONSOLE
+  ::: To be written :::
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyCL1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+CONFIG_SERIAL_CLPS711X_OLD_NAME
+  ::: To be written :::
+
+CONFIG_SERIAL_21285
+  If you have a machine based on a 21285 (Footbridge) StrongARM(R)/
+  PCI bridge you can enable its onboard serial port by enabling this
+  option.
+
+CONFIG_SERIAL_21285_OLD
+  Use the old /dev/ttyS name, major 4 minor 64.  This is obsolete
+  and will be removed during later 2.5 development.
+
+CONFIG_SERIAL_21285_CONSOLE
+  If you have enabled the serial port on the 21285 footbridge you can
+  make it the console by answering Y to this option.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyFB". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+CONFIG_SERIAL_UART00
+  Say Y here if you want to use the hard logic uart on Excalibur. This
+  driver also supports soft logic implentations of this uart core.
+
+CONFIG_SERIAL_UART00_CONSOLE
+  Say Y here if you want to support a serial console on an Excalibur
+  hard logic uart or uart00 IP core.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttyS1". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+CONFIG_SERIAL_SA1100
+  If you have a machine based on a SA1100/SA1110 StrongARM(R) CPU you
+  can enable its onboard serial port by enabling this option.
+  Please read <file:Documentation/arm/SA1100/serial_UART> for further
+  info.
+
+CONFIG_SERIAL_SA1100_CONSOLE
+  If you have enabled the serial port on the SA1100/SA1110 StrongARM
+  CPU you can make it the console by answering Y to this option.
+
+  Even if you say Y here, the currently visible virtual console
+  (/dev/tty0) will still be used as the system console by default, but
+  you can alter that using a kernel command line option such as
+  "console=ttySA0". (Try "man bootparam" or see the documentation of
+  your boot loader (lilo or loadlin) about how to pass options to the
+  kernel at boot time.)
+
+#CONFIG_SERIAL_L7200
+#  If you have a LinkUp Systems L7200 board you can enable its two
+#  onboard serial ports by enabling this option. The device numbers
+#  are major ID 4 with minor 64 and 65 respectively.
+#
+#CONFIG_SERIAL_L7200_CONSOLE
+#  If you have enabled the serial ports on the L7200 development board
+#  you can make the first serial port the console by answering Y to
+#  this option.
+

@@ -73,14 +73,13 @@ kmem_cache_t     *fm_cache = NULL;
 /* Called by the VFS at mount time to initialize the whole file system.  */
 static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 {
-	kdev_t dev = to_kdev_t(sb->s_dev);
 	struct inode *root_inode;
 	struct jffs_control *c;
 
 	D1(printk(KERN_NOTICE "JFFS: Trying to mount device %s.\n",
 		  sb->s_id));
 
-	if (major(dev) != MTD_BLOCK_MAJOR) {
+	if (MAJOR(sb->s_dev) != MTD_BLOCK_MAJOR) {
 		printk(KERN_WARNING "JFFS: Trying to mount a "
 		       "non-mtd device.\n");
 		return -EINVAL;
@@ -115,7 +114,7 @@ static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 
 #ifdef CONFIG_JFFS_PROC_FS
 	/* Set up the jffs proc file system.  */
-	if (jffs_register_jffs_proc_dir(dev, c) < 0) {
+	if (jffs_register_jffs_proc_dir(MINOR(sb->s_dev), c) < 0) {
 		printk(KERN_WARNING "JFFS: Failed to initialize the JFFS "
 			"proc file system for device %s.\n",
 			sb->s_id);

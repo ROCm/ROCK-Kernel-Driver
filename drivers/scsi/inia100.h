@@ -83,7 +83,7 @@ extern int inia100_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 extern int inia100_abort(Scsi_Cmnd *);
 extern int inia100_reset(Scsi_Cmnd *, unsigned int);
 
-extern int inia100_biosparam(Scsi_Disk *, kdev_t, int *);	/*for linux v2.0 */
+extern int inia100_biosparam(Scsi_Disk *, struct block_device *, int *);
 
 #define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02c"
 

@@ -1803,10 +1803,10 @@ int eata2x_reset(Scsi_Cmnd *SCarg) {
    return do_reset(SCarg);
 }
 
-int eata2x_biosparam(Disk *disk, kdev_t dev, int *dkinfo) {
+int eata2x_biosparam(Disk *disk, struct block_device *bdev, int *dkinfo) {
    int size = disk->capacity;
 
-   if (ext_tran || (scsicam_bios_param(disk, dev, dkinfo) < 0)) {
+   if (ext_tran || (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);

@@ -1452,7 +1452,7 @@ int u14_34f_reset(Scsi_Cmnd *SCarg) {
    return do_reset(SCarg);
 }
 
-int u14_34f_biosparam(Disk *disk, kdev_t dev, int *dkinfo) {
+int u14_34f_biosparam(Disk *disk, struct block_device *bdev, int *dkinfo) {
    unsigned int j = 0;
    int size = disk->capacity;
 
@@ -1460,7 +1460,7 @@ int u14_34f_biosparam(Disk *disk, kdev_t dev, int *dkinfo) {
    dkinfo[1] = HD(j)->sectors;
    dkinfo[2] = size / (HD(j)->heads * HD(j)->sectors);
 
-   if (ext_tran && (scsicam_bios_param(disk, dev, dkinfo) < 0)) {
+   if (ext_tran && (scsicam_bios_param(disk, bdev, dkinfo) < 0)) {
       dkinfo[0] = 255;
       dkinfo[1] = 63;
       dkinfo[2] = size / (dkinfo[0] * dkinfo[1]);

@@ -85,9 +85,9 @@ wait_on_irq(int cpu, void *where)
 				show("wait_on_irq", where);
 				count = MAXCOUNT;
 			}
-			__sti();
+			local_irq_enable();
 			udelay(1); /* make sure to run pending irqs */
-			__cli();
+			local_irq_disable();
 
 			if (irqs_running())
 				continue;
@@ -153,7 +153,7 @@ __global_sti(void)
 
         if (!local_irq_count(cpu))
 		release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 }
 
 /*
@@ -171,7 +171,7 @@ __global_save_flags(void)
         unsigned long flags;
 	int cpu = smp_processor_id();
 
-        __save_flags(flags);
+        local_save_flags(flags);
         local_enabled = (!(flags & 7));
         /* default to local */
         retval = 2 + local_enabled;
@@ -197,10 +197,10 @@ __global_restore_flags(unsigned long flags)
                 __global_sti();
                 break;
         case 2:
-                __cli();
+                local_irq_disable();
                 break;
         case 3:
-                __sti();
+                local_irq_enable();
                 break;
         default:
                 printk(KERN_ERR "global_restore_flags: %08lx (%p)\n",

@@ -590,7 +590,7 @@ int aha1740_reset(Scsi_Cmnd * SCpnt, unsigned int ignored)
     return SCSI_RESET_PUNT;
 }
 
-int aha1740_biosparam(Disk * disk, kdev_t dev, int* ip)
+int aha1740_biosparam(Disk * disk, struct block_device *dev, int* ip)
 {
     int size = disk->capacity;
     int extended = HOSTDATA(disk->device->host)->translation;

@@ -28,6 +28,7 @@
 #define	FRIQ_VERSION	"1.01" 
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -250,35 +251,34 @@ static void friq_release_proto( PIA *pi)
 	MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol friq = {"friq",0,5,2,1,1,
-                           friq_write_regr,
-                           friq_read_regr,
-                           friq_write_block,
-                           friq_read_block,
-                           friq_connect,
-                           friq_disconnect,
-                           0,
-                           0,
-                           friq_test_proto,
-                           friq_log_adapter,
-                           friq_init_proto,
-                           friq_release_proto
-                          };
+static struct pi_protocol friq = {
+	.name		= "friq",
+	.max_mode	= 5,
+	.epp_first	= 2,
+	.default_delay	= 1,
+	.max_units	= 1,
+	.write_regr	= friq_write_regr,
+	.read_regr	= friq_read_regr,
+	.write_block	= friq_write_block,
+	.read_block	= friq_read_block,
+	.connect	= friq_connect,
+	.disconnect	= friq_disconnect,
+	.test_proto	= friq_test_proto,
+	.log_adapter	= friq_log_adapter,
+	.init_proto	= friq_init_proto,
+	.release_proto	= friq_release_proto,
+};
 
-
-#ifdef MODULE
-
-int     init_module(void)
-
-{       return pi_register( &friq ) - 1;
+static int __init friq_init(void)
+{
+	return pi_register(&friq)-1;
 }
 
-void    cleanup_module(void)
-
-{       pi_unregister( &friq );
+static void __exit friq_exit(void)
+{
+	pi_unregister(&friq);
 }
 
-#endif
-
-/* end of friq.c */
 MODULE_LICENSE("GPL");
+module_init(friq_init)
+module_exit(friq_exit)
