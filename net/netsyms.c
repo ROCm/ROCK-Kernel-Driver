@@ -16,7 +16,5 @@ EXPORT_SYMBOL(files_stat);
 /* support for loadable net drivers */
 #ifdef CONFIG_NET
 EXPORT_SYMBOL(loopback_dev);
-EXPORT_SYMBOL(dev_base);
-EXPORT_SYMBOL(dev_base_lock);
 EXPORT_SYMBOL(__kill_fasync);
 #endif  /* CONFIG_NET */

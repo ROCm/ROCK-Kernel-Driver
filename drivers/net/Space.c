@@ -480,3 +480,5 @@ void __init probe_old_netdevs(void)
 struct net_device *dev_base;
 rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
 
+EXPORT_SYMBOL(dev_base);
+EXPORT_SYMBOL(dev_base_lock);
