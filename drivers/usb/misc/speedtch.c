@@ -93,7 +93,7 @@
 #ifdef DEBUG
 #define DEBUG_ON(x)	BUG_ON(x)
 #else
-#define DEBUG_ON(x)	do { if (x); } while (0)
+#define DEBUG_ON(x)
 #endif
 
 #ifdef VERBOSE_DEBUG
@@ -518,7 +518,8 @@ static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb,
 		memset (target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
-		DEBUG_ON (--ctrl->num_cells);
+		--ctrl->num_cells;
+		DEBUG_ON (ctrl->num_cells);
 	}
 
 	memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -1243,8 +1244,10 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	do {
 		count = 0;
 		spin_lock_irq (&instance->receive_lock);
-		list_for_each (pos, &instance->spare_receivers)
-			DEBUG_ON (++count > num_rcv_urbs);
+		list_for_each (pos, &instance->spare_receivers) {
+			++count;
+			DEBUG_ON (count > num_rcv_urbs);
+		}
 		spin_unlock_irq (&instance->receive_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare receivers", count);
@@ -1279,8 +1282,10 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	do {
 		count = 0;
 		spin_lock_irq (&instance->send_lock);
-		list_for_each (pos, &instance->spare_senders)
-			DEBUG_ON (++count > num_snd_urbs);
+		list_for_each (pos, &instance->spare_senders) {
+			++count;
+			DEBUG_ON (count > num_snd_urbs);
+		}
 		spin_unlock_irq (&instance->send_lock);
 
 		dbg ("udsl_usb_disconnect: found %u spare senders", count);
