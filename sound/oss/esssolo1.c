@@ -2384,9 +2384,9 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	return 0;
 
  err:
-	unregister_sound_dsp(s->dev_dmfm);
+	unregister_sound_special(s->dev_dmfm);
  err_dev4:
-	unregister_sound_dsp(s->dev_midi);
+	unregister_sound_midi(s->dev_midi);
  err_dev3:
 	unregister_sound_mixer(s->dev_mixer);
  err_dev2:
@@ -2397,13 +2397,13 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
  err_irq:
 	if (s->gameport.io)
 		release_region(s->gameport.io, GAMEPORT_EXTENT);
-	release_region(s->iobase, IOBASE_EXTENT);
- err_region4:
-	release_region(s->sbbase+FMSYNTH_EXTENT, SBBASE_EXTENT-FMSYNTH_EXTENT);
- err_region3:
-	release_region(s->ddmabase, DDMABASE_EXTENT);
- err_region2:
 	release_region(s->mpubase, MPUBASE_EXTENT);
+ err_region4:
+	release_region(s->ddmabase, DDMABASE_EXTENT);
+ err_region3:
+	release_region(s->sbbase+FMSYNTH_EXTENT, SBBASE_EXTENT-FMSYNTH_EXTENT);
+ err_region2:
+	release_region(s->iobase, IOBASE_EXTENT);
  err_region1:
 	kfree(s);
 	return ret;
