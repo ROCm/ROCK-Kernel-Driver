@@ -54,6 +54,7 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 
 		return NULL;
 	}
+	smp_rmb();
 
 	group_desc = block_group / EXT3_DESC_PER_BLOCK(sb);
 	desc = block_group % EXT3_DESC_PER_BLOCK(sb);
@@ -274,8 +275,9 @@ void ext3_discard_reservation(struct inode *inode)
 }
 
 /* Free given blocks, update quota and i_blocks field */
-void ext3_free_blocks(handle_t *handle, struct inode *inode,
-			unsigned long block, unsigned long count)
+void ext3_free_blocks_sb(handle_t *handle, struct super_block *sb,
+			 unsigned long block, unsigned long count,
+			 int *pdquot_freed_blocks)
 {
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *gd_bh;
@@ -283,18 +285,12 @@ void ext3_free_blocks(handle_t *handle, struct inode *inode,
 	unsigned long bit;
 	unsigned long i;
 	unsigned long overflow;
-	struct super_block * sb;
 	struct ext3_group_desc * gdp;
 	struct ext3_super_block * es;
 	struct ext3_sb_info *sbi;
 	int err = 0, ret;
-	int dquot_freed_blocks = 0;
 
-	sb = inode->i_sb;
-	if (!sb) {
-		printk ("ext3_free_blocks: nonexistent device");
-		return;
-	}
+	*pdquot_freed_blocks = 0;
 	sbi = EXT3_SB(sb);
 	es = EXT3_SB(sb)->s_es;
 	if (block < le32_to_cpu(es->s_first_data_block) ||
@@ -421,7 +417,7 @@ do_more:
 			jbd_lock_bh_state(bitmap_bh);
 			BUFFER_TRACE(bitmap_bh, "bit already cleared");
 		} else {
-			dquot_freed_blocks++;
+			(*pdquot_freed_blocks)++;
 		}
 	}
 	jbd_unlock_bh_state(bitmap_bh);
@@ -429,7 +425,7 @@ do_more:
 	spin_lock(sb_bgl_lock(sbi, block_group));
 	gdp->bg_free_blocks_count =
 		cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count) +
-			dquot_freed_blocks);
+			*pdquot_freed_blocks);
 	spin_unlock(sb_bgl_lock(sbi, block_group));
 	percpu_counter_mod(&sbi->s_freeblocks_counter, count);
 
@@ -451,6 +447,22 @@ do_more:
 error_return:
 	brelse(bitmap_bh);
 	ext3_std_error(sb, err);
+	return;
+}
+
+/* Free given blocks, update quota and i_blocks field */
+void ext3_free_blocks(handle_t *handle, struct inode *inode,
+			unsigned long block, unsigned long count)
+{
+	struct super_block * sb;
+	int dquot_freed_blocks;
+
+	sb = inode->i_sb;
+	if (!sb) {
+		printk ("ext3_free_blocks: nonexistent device");
+		return;
+	}
+	ext3_free_blocks_sb(handle, sb, block, count, &dquot_freed_blocks);
 	if (dquot_freed_blocks)
 		DQUOT_FREE_BLOCK(inode, dquot_freed_blocks);
 	return;
@@ -1141,6 +1153,8 @@ int ext3_new_block(handle_t *handle, struct inode *inode,
 #ifdef EXT3FS_DEBUG
 	static int goal_hits, goal_attempts;
 #endif
+	unsigned long ngroups;
+
 	*errp = -ENOSPC;
 	sb = inode->i_sb;
 	if (!sb) {
@@ -1205,13 +1219,16 @@ retry:
 			goto allocated;
 	}
 
+	ngroups = EXT3_SB(sb)->s_groups_count;
+	smp_rmb();
+
 	/*
 	 * Now search the rest of the groups.  We assume that 
 	 * i and gdp correctly point to the last group visited.
 	 */
-	for (bgi = 0; bgi < EXT3_SB(sb)->s_groups_count; bgi++) {
+	for (bgi = 0; bgi < ngroups; bgi++) {
 		group_no++;
-		if (group_no >= EXT3_SB(sb)->s_groups_count)
+		if (group_no >= ngroups)
 			group_no = 0;
 		gdp = ext3_get_group_desc(sb, group_no, &gdp_bh);
 		if (!gdp) {
@@ -1362,6 +1379,7 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 	unsigned long desc_count;
 	struct ext3_group_desc *gdp;
 	int i;
+	unsigned long ngroups;
 #ifdef EXT3FS_DEBUG
 	struct ext3_super_block *es;
 	unsigned long bitmap_count, x;
@@ -1394,7 +1412,9 @@ unsigned long ext3_count_free_blocks(struct super_block *sb)
 	return bitmap_count;
 #else
 	desc_count = 0;
-	for (i = 0; i < EXT3_SB(sb)->s_groups_count; i++) {
+	ngroups = EXT3_SB(sb)->s_groups_count;
+	smp_rmb();
+	for (i = 0; i < ngroups; i++) {
 		gdp = ext3_get_group_desc(sb, i, NULL);
 		if (!gdp)
 			continue;

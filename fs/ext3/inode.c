@@ -2231,8 +2231,10 @@ static unsigned long ext3_get_inode_block(struct super_block *sb,
 	struct buffer_head *bh;
 	struct ext3_group_desc * gdp;
 
+
 	if ((ino != EXT3_ROOT_INO &&
 		ino != EXT3_JOURNAL_INO &&
+		ino != EXT3_RESIZE_INO &&
 		ino < EXT3_FIRST_INO(sb)) ||
 		ino > le32_to_cpu(
 			EXT3_SB(sb)->s_es->s_inodes_count)) {
@@ -2246,6 +2248,7 @@ static unsigned long ext3_get_inode_block(struct super_block *sb,
 			    "group >= groups count");
 		return 0;
 	}
+	smp_rmb();
 	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(sb);
 	desc = block_group & (EXT3_DESC_PER_BLOCK(sb) - 1);
 	bh = EXT3_SB(sb)->s_group_desc[group_desc];

@@ -196,6 +196,31 @@ struct ext3_group_desc
 #define EXT3_STATE_JDATA		0x00000001 /* journaled data exists */
 #define EXT3_STATE_NEW			0x00000002 /* inode is newly created */
 
+
+/* Used to pass group descriptor data when online resize is done */
+struct ext3_new_group_input {
+	__u32 group;            /* Group number for this data */
+	__u32 block_bitmap;     /* Absolute block number of block bitmap */
+	__u32 inode_bitmap;     /* Absolute block number of inode bitmap */
+	__u32 inode_table;      /* Absolute block number of inode table start */
+	__u32 blocks_count;     /* Total number of blocks in this group */
+	__u16 reserved_blocks;  /* Number of reserved blocks in this group */
+	__u16 unused;
+};
+
+/* The struct ext3_new_group_input in kernel space, with free_blocks_count */
+struct ext3_new_group_data {
+	__u32 group;
+	__u32 block_bitmap;
+	__u32 inode_bitmap;
+	__u32 inode_table;
+	__u32 blocks_count;
+	__u16 reserved_blocks;
+	__u16 unused;
+	__u32 free_blocks_count;
+};
+
+
 /*
  * ioctl commands
  */
@@ -203,6 +228,8 @@ struct ext3_group_desc
 #define	EXT3_IOC_SETFLAGS		_IOW('f', 2, long)
 #define	EXT3_IOC_GETVERSION		_IOR('f', 3, long)
 #define	EXT3_IOC_SETVERSION		_IOW('f', 4, long)
+#define EXT3_IOC_GROUP_EXTEND		_IOW('f', 7, unsigned long)
+#define EXT3_IOC_GROUP_ADD		_IOW('f', 8,struct ext3_new_group_input)
 #define	EXT3_IOC_GETVERSION_OLD		_IOR('v', 1, long)
 #define	EXT3_IOC_SETVERSION_OLD		_IOW('v', 2, long)
 #ifdef CONFIG_JBD_DEBUG
@@ -421,7 +448,7 @@ struct ext3_super_block {
 	 */
 	__u8	s_prealloc_blocks;	/* Nr of blocks to try to preallocate*/
 	__u8	s_prealloc_dir_blocks;	/* Nr to preallocate for dirs */
-	__u16	s_padding1;
+	__u16	s_reserved_gdt_blocks;	/* Per group desc for online growth */
 	/*
 	 * Journaling support valid if EXT3_FEATURE_COMPAT_HAS_JOURNAL set.
 	 */
@@ -687,6 +714,8 @@ extern unsigned long ext3_bg_num_gdb(struct super_block *sb, int group);
 extern int ext3_new_block (handle_t *, struct inode *, unsigned long, int *);
 extern void ext3_free_blocks (handle_t *, struct inode *, unsigned long,
 			      unsigned long);
+extern void ext3_free_blocks_sb (handle_t *, struct super_block *,
+				 unsigned long, unsigned long, int *);
 extern unsigned long ext3_count_free_blocks (struct super_block *);
 extern void ext3_check_blocks_bitmap (struct super_block *);
 extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
@@ -748,6 +777,13 @@ extern int ext3_orphan_add(handle_t *, struct inode *);
 extern int ext3_orphan_del(handle_t *, struct inode *);
 extern int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 				__u32 start_minor_hash, __u32 *next_hash);
+
+/* resize.c */
+extern int ext3_group_add(struct super_block *sb,
+				struct ext3_new_group_data *input);
+extern int ext3_group_extend(struct super_block *sb,
+				struct ext3_super_block *es,
+				unsigned long n_blocks_count);
 
 /* super.c */
 extern void ext3_error (struct super_block *, const char *, const char *, ...)

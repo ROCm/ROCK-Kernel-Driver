@@ -320,8 +320,6 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 		desc = ext3_get_group_desc (sb, group, &bh);
 		if (!desc || !desc->bg_free_inodes_count)
 			continue;
-		if (sbi->s_debts[group] >= max_debt)
-			continue;
 		if (le16_to_cpu(desc->bg_used_dirs_count) >= max_dirs)
 			continue;
 		if (le16_to_cpu(desc->bg_free_inodes_count) < min_inodes)

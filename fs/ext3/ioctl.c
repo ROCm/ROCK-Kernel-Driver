@@ -175,6 +175,51 @@ flags_err:
 			rsv_window_size = EXT3_MAX_RESERVE_BLOCKS;
 		atomic_set(&ei->i_rsv_window.rsv_goal_size, rsv_window_size);
 		return 0;
+	case EXT3_IOC_GROUP_EXTEND: {
+		unsigned long n_blocks_count;
+		struct super_block *sb = inode->i_sb;
+		int err;
+
+		if (!capable(CAP_SYS_RESOURCE))
+			return -EPERM;
+
+		if (IS_RDONLY(inode))
+			return -EROFS;
+
+		if (get_user(n_blocks_count, (__u32 *)arg))
+			return -EFAULT;
+
+		err = ext3_group_extend(sb, EXT3_SB(sb)->s_es, n_blocks_count);
+		journal_lock_updates(EXT3_SB(sb)->s_journal);
+		journal_flush(EXT3_SB(sb)->s_journal);
+		journal_unlock_updates(EXT3_SB(sb)->s_journal);
+
+		return err;
+	}
+	case EXT3_IOC_GROUP_ADD: {
+		struct ext3_new_group_data input;
+		struct super_block *sb = inode->i_sb;
+		int err;
+
+		if (!capable(CAP_SYS_RESOURCE))
+			return -EPERM;
+
+		if (IS_RDONLY(inode))
+			return -EROFS;
+
+		if (copy_from_user(&input, (struct ext3_new_group_input *)arg,
+				sizeof(input)))
+			return -EFAULT;
+
+		err = ext3_group_add(sb, &input);
+		journal_lock_updates(EXT3_SB(sb)->s_journal);
+		journal_flush(EXT3_SB(sb)->s_journal);
+		journal_unlock_updates(EXT3_SB(sb)->s_journal);
+
+		return err;
+	}
+
+
 	default:
 		return -ENOTTY;
 	}
