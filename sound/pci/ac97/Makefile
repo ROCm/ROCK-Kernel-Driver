@@ -5,7 +5,7 @@
 
 export-objs  := ac97_codec.o ak4531_codec.o
 
-snd-ac97-codec-objs := ac97_codec.o
+snd-ac97-codec-objs := ac97_codec.o ac97_patch.o
 snd-ak4531-codec-objs := ak4531_codec.o
 
 # Toplevel Module Dependency
