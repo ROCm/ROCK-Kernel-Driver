@@ -262,7 +262,11 @@ linvfs_readdir(
 	uio.uio_iov = &iov;
 	uio.uio_fmode = filp->f_mode;
 	uio.uio_segflg = UIO_SYSSPACE;
-	curr_offset = uio.uio_offset = filp->f_pos;
+	curr_offset = filp->f_pos;
+	if (filp->f_pos != 0x7fffffff)
+		uio.uio_offset = filp->f_pos;
+	else
+		uio.uio_offset = 0xffffffff;
 
 	while (!eof) {
 		uio.uio_resid = iov.iov_len = rlen;
@@ -283,13 +287,13 @@ linvfs_readdir(
 			namelen = strlen(dbp->d_name);
 
 			if (filldir(dirent, dbp->d_name, namelen,
-					(loff_t) curr_offset,
+					(loff_t) curr_offset & 0x7fffffff,
 					(ino_t) dbp->d_ino,
 					DT_UNKNOWN)) {
 				goto done;
 			}
 			size -= dbp->d_reclen;
-			curr_offset = (loff_t)dbp->d_off & 0x7fffffff;
+			curr_offset = (loff_t)dbp->d_off /* & 0x7fffffff */;
 			dbp = nextdp(dbp);
 		}
 	}

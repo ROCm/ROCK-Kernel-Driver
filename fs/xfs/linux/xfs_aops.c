@@ -803,7 +803,7 @@ next_bh:
 		bh = bh->b_this_page;
 	} while (offset < end_offset);
 
-	if (uptodate)
+	if (uptodate && bh == head)
 		SetPageUptodate(page);
 
 	if (startio)
