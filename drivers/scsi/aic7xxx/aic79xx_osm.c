@@ -407,12 +407,6 @@ uint32_t aic79xx_periodic_otag;
  * Module information and settable options.
  */
 static char *aic79xx = NULL;
-/*
- * Just in case someone uses commas to separate items on the insmod
- * command line, we define a dummy buffer here to avoid having insmod
- * write wild stuff into our code segment
- */
-static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
 MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
 MODULE_DESCRIPTION("Adaptec Aic790X U320 SCSI Host Bus Adapter driver");
@@ -835,12 +829,6 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	 */
 	if (aic79xx)
 		aic79xx_setup(aic79xx);
-	if (dummy_buffer[0] != 'P')
-		printk(KERN_WARNING
-"aic79xx: Please read the file /usr/src/linux/drivers/scsi/README.aic79xx\n"
-"aic79xx: to see the proper way to specify options to the aic79xx module\n"
-"aic79xx: Specifically, don't use any commas when passing arguments to\n"
-"aic79xx: insmod or else it might trash certain memory areas.\n");
 #endif
 
 	template->proc_name = "aic79xx";
