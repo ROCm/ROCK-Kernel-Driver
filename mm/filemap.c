@@ -60,8 +60,8 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->page_lock
- *      ->inode_lock		(__mark_inode_dirty)
- *        ->sb_lock		(fs/fs-writeback.c)
+ *  ->inode_lock
+ *    ->sb_lock			(fs/fs-writeback.c)
  */
 
 /*
