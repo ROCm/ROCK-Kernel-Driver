@@ -71,35 +71,35 @@ extern unsigned long pci_io_base;
 
 static inline unsigned char __raw_readb(const volatile void __iomem *addr)
 {
-	return *(unsigned char __force *)addr;
+	return *(volatile unsigned char __force *)addr;
 }
 static inline unsigned short __raw_readw(const volatile void __iomem *addr)
 {
-	return *(unsigned short __force *)addr;
+	return *(volatile unsigned short __force *)addr;
 }
 static inline unsigned int __raw_readl(const volatile void __iomem *addr)
 {
-	return *(unsigned int __force *)addr;
+	return *(volatile unsigned int __force *)addr;
 }
 static inline unsigned long __raw_readq(const volatile void __iomem *addr)
 {
-	return *(unsigned long __force *)addr;
+	return *(volatile unsigned long __force *)addr;
 }
 static inline void __raw_writeb(unsigned char v, volatile void __iomem *addr)
 {
-	*(unsigned char __force *)addr = v;
+	*(volatile unsigned char __force *)addr = v;
 }
 static inline void __raw_writew(unsigned short v, volatile void __iomem *addr)
 {
-	*(unsigned short __force *)addr = v;
+	*(volatile unsigned short __force *)addr = v;
 }
 static inline void __raw_writel(unsigned int v, volatile void __iomem *addr)
 {
-	*(unsigned int __force *)addr = v;
+	*(volatile unsigned int __force *)addr = v;
 }
 static inline void __raw_writeq(unsigned long v, volatile void __iomem *addr)
 {
-	*(unsigned long __force *)addr = v;
+	*(volatile unsigned long __force *)addr = v;
 }
 #define readb(addr)		eeh_readb(addr)
 #define readw(addr)		eeh_readw(addr)
