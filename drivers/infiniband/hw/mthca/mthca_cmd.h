@@ -215,6 +215,13 @@ struct mthca_init_ib_param {
 	u64 si_guid;
 };
 
+struct mthca_set_ib_param {
+	int set_si_guid;
+	int reset_qkey_viol;
+	u64 si_guid;
+	u32 cap_mask;
+};
+
 int mthca_cmd_use_events(struct mthca_dev *dev);
 void mthca_cmd_use_polling(struct mthca_dev *dev);
 void mthca_cmd_event(struct mthca_dev *dev, u16 token,
@@ -241,6 +248,8 @@ int mthca_INIT_IB(struct mthca_dev *dev,
 		  int port, u8 *status);
 int mthca_CLOSE_IB(struct mthca_dev *dev, int port, u8 *status);
 int mthca_CLOSE_HCA(struct mthca_dev *dev, int panic, u8 *status);
+int mthca_SET_IB(struct mthca_dev *dev, struct mthca_set_ib_param *param,
+		 int port, u8 *status);
 int mthca_MAP_ICM(struct mthca_dev *dev, struct mthca_icm *icm, u64 virt, u8 *status);
 int mthca_MAP_ICM_page(struct mthca_dev *dev, u64 dma_addr, u64 virt, u8 *status);
 int mthca_UNMAP_ICM(struct mthca_dev *dev, u64 virt, u32 page_count, u8 *status);

@@ -1238,6 +1238,41 @@ int mthca_CLOSE_HCA(struct mthca_dev *dev, int panic, u8 *status)
 	return mthca_cmd(dev, 0, 0, panic, CMD_CLOSE_HCA, HZ, status);
 }
 
+int mthca_SET_IB(struct mthca_dev *dev, struct mthca_set_ib_param *param,
+		 int port, u8 *status)
+{
+	u32 *inbox;
+	dma_addr_t indma;
+	int err;
+	u32 flags = 0;
+
+#define SET_IB_IN_SIZE         0x40
+#define SET_IB_FLAGS_OFFSET    0x00
+#define SET_IB_FLAG_SIG        (1 << 18)
+#define SET_IB_FLAG_RQK        (1 <<  0)
+#define SET_IB_CAP_MASK_OFFSET 0x04
+#define SET_IB_SI_GUID_OFFSET  0x08
+
+	inbox = pci_alloc_consistent(dev->pdev, SET_IB_IN_SIZE, &indma);
+	if (!inbox)
+		return -ENOMEM;
+
+	memset(inbox, 0, SET_IB_IN_SIZE);
+
+	flags |= param->set_si_guid     ? SET_IB_FLAG_SIG : 0;
+	flags |= param->reset_qkey_viol ? SET_IB_FLAG_RQK : 0;
+	MTHCA_PUT(inbox, flags, SET_IB_FLAGS_OFFSET);
+
+	MTHCA_PUT(inbox, param->cap_mask, SET_IB_CAP_MASK_OFFSET);
+	MTHCA_PUT(inbox, param->si_guid,  SET_IB_SI_GUID_OFFSET);
+
+	err = mthca_cmd(dev, indma, port, 0, CMD_SET_IB,
+			CMD_TIME_CLASS_B, status);
+
+	pci_free_consistent(dev->pdev, INIT_HCA_IN_SIZE, inbox, indma);
+	return err;
+}
+
 int mthca_MAP_ICM(struct mthca_dev *dev, struct mthca_icm *icm, u64 virt, u8 *status)
 {
 	return mthca_map_cmd(dev, CMD_MAP_ICM, icm, virt, status);

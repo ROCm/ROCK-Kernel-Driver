@@ -234,6 +234,7 @@ struct mthca_dev {
 	u64              ddr_end;
 
 	MTHCA_DECLARE_DOORBELL_LOCK(doorbell_lock)
+	struct semaphore cap_mask_mutex;
 
 	void __iomem    *hcr;
 	void __iomem    *clr_base;
