@@ -598,8 +598,8 @@ sys_call_table:
 
 	ENTRY_SAME(sendfile64)
 	ENTRY_COMP(futex)		/* 210 */
-	ENTRY_SAME(sched_setaffinity)
-	ENTRY_SAME(sched_getaffinity)
+	ENTRY_COMP(sched_setaffinity)
+	ENTRY_COMP(sched_getaffinity)
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(io_setup)		/* 215 */

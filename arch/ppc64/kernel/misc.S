@@ -724,8 +724,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lremovexattr
 	.llong .sys_fremovexattr	/* 220 */
 	.llong .compat_sys_futex
-	.llong .sys32_sched_setaffinity
-	.llong .sys32_sched_getaffinity
+	.llong .compat_sys_sched_setaffinity
+	.llong .compat_sys_sched_getaffinity
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 	.llong .sys32_sendfile64

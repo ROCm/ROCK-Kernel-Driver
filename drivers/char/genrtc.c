@@ -88,7 +88,7 @@ static struct timer_list timer_task;
 
 static unsigned int oldsecs;
 static int lostint;
-static int tt_exp;
+static unsigned long tt_exp;
 
 static void gen_rtc_timer(unsigned long data);
 

@@ -77,6 +77,16 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
 # define timer_active(tmr) BARFY	// error to use outside of SMP
 # define set_timer_inactive(tmr) do { } while (0)
 #endif
+
+/*
+ * For some reason mips/mips64 define the SIGEV constants plus 128.
+ * Here we define a mask to get rid of the common bits.	 The
+ * optimizer should make this costless to all but mips.
+ */
+#define MIPS_SIGEV ~(SIGEV_NONE & \
+		      SIGEV_SIGNAL & \
+		      SIGEV_THREAD &  \
+		      SIGEV_THREAD_ID)
 /*
  * The timer ID is turned into a timer address by idr_find().
  * Verifying a valid ID consists of:
@@ -225,10 +235,9 @@ static void schedule_next_timer(struct k_itimer *timr)
 	struct now_struct now;
 
 	/* Set up the timer for the next interval (if there is one) */
-	if (!timr->it_incr) {
-		set_timer_inactive(timr);
+	if (!timr->it_incr) 
 		return;
-	}
+
 	posix_get_now(&now);
 	do {
 		posix_bump_timer(timr);
@@ -258,7 +267,7 @@ void do_schedule_next_timer(struct siginfo *info)
 
 	timr = lock_timer(info->si_tid, &flags);
 
-	if (!timr || !timr->it_requeue_pending)
+	if (!timr || timr->it_requeue_pending != info->si_sys_private)
 		goto exit;
 
 	schedule_next_timer(timr);
@@ -276,7 +285,17 @@ exit:
  * indicating that the signal was either not queued or was queued
  * without an info block.  In this case, we will not get a call back to
  * do_schedule_next_timer() so we do it here.  This should be rare...
+
+ * An interesting problem can occure if, while a signal, and thus a call
+ * back is pending, the timer is rearmed, i.e. stopped and restarted.
+ * We then need to sort out the call back and do the right thing.  What
+ * we do is to put a counter in the info block and match it with the
+ * timers copy on the call back.  If they don't match, we just ignore
+ * the call back.  Note that we do allow the timer to be deleted while
+ * a signal is pending.  The standard says we can allow that signal to
+ * be delivered, and we do.
  */
+static int pendcount = 1;
 
 static void timer_notify_task(struct k_itimer *timr)
 {
@@ -291,12 +310,19 @@ static void timer_notify_task(struct k_itimer *timr)
 	info.si_code = SI_TIMER;
 	info.si_tid = timr->it_id;
 	info.si_value = timr->it_sigev_value;
-	if (!timr->it_incr)
-		set_timer_inactive(timr);
-	else
-		timr->it_requeue_pending = info.si_sys_private = 1;
-
-	ret = send_sig_info(info.si_signo, &info, timr->it_process);
+	if (timr->it_incr){
+		/*
+		 * Don't allow a call back counter of zero...
+		 * and avoid the test by using 2.
+		 */
+		pendcount += 2;
+		timr->it_requeue_pending = info.si_sys_private = pendcount;
+	}
+	if( timr->it_sigev_notify & SIGEV_THREAD_ID & MIPS_SIGEV){
+		ret = send_sig_info(info.si_signo, &info, timr->it_process);
+	}else
+		ret = send_group_sig_info(info.si_signo, &info, 
+					  timr->it_process);
 	switch (ret) {
 
 	default:
@@ -332,23 +358,11 @@ static void posix_timer_fn(unsigned long __data)
 	unsigned long flags;
 
 	spin_lock_irqsave(&timr->it_lock, flags);
+ 	set_timer_inactive(timr);
 	timer_notify_task(timr);
 	unlock_timer(timr, flags);
 }
 
-/*
- * For some reason mips/mips64 define the SIGEV constants plus 128.
- * Here we define a mask to get rid of the common bits.	 The
- * optimizer should make this costless to all but mips.
- */
-#if defined(ARCH) && ((ARCH == mips) || (ARCH == mips64))
-#define MIPS_SIGEV ~(SIGEV_NONE & \
-		      SIGEV_SIGNAL & \
-		      SIGEV_THREAD &  \
-		      SIGEV_THREAD_ID)
-#else
-#define MIPS_SIGEV (int)-1
-#endif
 
 static inline struct task_struct * good_sigevent(sigevent_t * event)
 {
@@ -848,8 +862,7 @@ static inline int do_timer_delete(struct k_itimer *timer)
 {
 	timer->it_incr = 0;
 #ifdef CONFIG_SMP
-	if (timer_active(timer) &&
-	    !del_timer(&timer->it_timer) && !timer->it_requeue_pending)
+	if (timer_active(timer) && !del_timer(&timer->it_timer))
 		/*
 		 * It can only be active if on an other cpu.  Since
 		 * we have cleared the interval stuff above, it should

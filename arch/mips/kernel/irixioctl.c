@@ -34,7 +34,7 @@ static struct tty_struct *get_tty(int fd)
 	struct file *filp;
 	struct tty_struct *ttyp = NULL;
 
-	read_lock(&current->files->file_lock);
+	spin_lock(&current->files->file_lock);
 	filp = fcheck(fd);
 	if(filp && filp->private_data) {
 		ttyp = (struct tty_struct *) filp->private_data;
@@ -42,7 +42,7 @@ static struct tty_struct *get_tty(int fd)
 		if(ttyp->magic != TTY_MAGIC)
 			ttyp =NULL;
 	}
-	read_unlock(&current->files->file_lock);
+	spin_unlock(&current->files->file_lock);
 	return ttyp;
 }
 

@@ -63,5 +63,15 @@ extern int current_is_keventd(void);
 
 extern void init_workqueues(void);
 
+/*
+ * Kill off a pending schedule_delayed_work().  Note that the work callback
+ * function may still be running on return from cancel_delayed_work().  Run
+ * flush_scheduled_work() to wait on it.
+ */
+static inline int cancel_delayed_work(struct work_struct *work)
+{
+	return del_timer_sync(&work->timer);
+}
+
 #endif
 
