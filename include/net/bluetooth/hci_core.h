@@ -176,6 +176,12 @@ static inline void inquiry_cache_init(struct hci_dev *hdev)
 	c->list = NULL;
 }
 
+static inline int inquiry_cache_empty(struct hci_dev *hdev)
+{
+	struct inquiry_cache *c = &hdev->inq_cache;
+	return (c->list == NULL);
+}
+
 static inline long inquiry_cache_age(struct hci_dev *hdev)
 {
 	struct inquiry_cache *c = &hdev->inq_cache;
