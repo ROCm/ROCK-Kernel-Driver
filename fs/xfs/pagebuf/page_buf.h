@@ -48,11 +48,6 @@
 #include <linux/uio.h>
 
 /*
- * Turn this on to get pagebuf lock ownership
-#define PAGEBUF_LOCK_TRACKING
-*/
-
-/*
  *	Base types
  */
 
@@ -60,8 +55,6 @@
 typedef loff_t page_buf_daddr_t;
 
 #define PAGE_BUF_DADDR_NULL ((page_buf_daddr_t) (-1LL))
-
-typedef size_t page_buf_dsize_t;		/* size of buffer in blocks */
 
 #define page_buf_ctob(pp)	((pp) * PAGE_CACHE_SIZE)
 #define page_buf_btoc(dd)	(((dd) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
