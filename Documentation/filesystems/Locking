@@ -88,6 +88,7 @@ prototypes:
 	void (*read_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
+	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	void (*put_super) (struct super_block *);
 	void (*write_super) (struct super_block *);
@@ -102,6 +103,7 @@ locking rules:
 read_inode:	yes				(see below)
 write_inode:	no	
 put_inode:	no	
+drop_inode:	no				!!!inode_lock!!!
 delete_inode:	no	
 clear_inode:	no	
 put_super:	yes	yes	maybe		(see below)

@@ -178,6 +178,7 @@ struct super_operations {
 	void (*read_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
+	void (*drop_inode) (struct inode *);
 	void (*delete_inode) (struct inode *);
 	int (*notify_change) (struct dentry *, struct iattr *);
 	void (*put_super) (struct super_block *);
@@ -203,6 +204,19 @@ or bottom half).
 
   put_inode: called when the VFS inode is removed from the inode
 	cache. This method is optional
+
+  drop_inode: called when the last access to the inode is dropped,
+	with the inode_lock spinlock held.
+
+	This method should be either NULL (normal unix filesystem
+	semantics) or "generic_delete_inode" (for filesystems that do not
+	want to cache inodes - causing "delete_inode" to always be
+	called regardless of the value of i_nlink)
+
+	The "generic_delete_inode()" behaviour is equivalent to the
+	old practice of using "force_delete" in the put_inode() case,
+	but does not have the races that the "force_delete()" approach
+	had. 
 
   delete_inode: called when the VFS wants to delete an inode
 

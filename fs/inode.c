@@ -782,6 +782,97 @@ void remove_inode_hash(struct inode *inode)
 	spin_unlock(&inode_lock);
 }
 
+void generic_delete_inode(struct inode *inode)
+{
+	struct super_operations *op = inode->i_sb->s_op;
+
+	list_del(&inode->i_hash);
+	INIT_LIST_HEAD(&inode->i_hash);
+	list_del(&inode->i_list);
+	INIT_LIST_HEAD(&inode->i_list);
+	inode->i_state|=I_FREEING;
+	inodes_stat.nr_inodes--;
+	spin_unlock(&inode_lock);
+
+	if (inode->i_data.nrpages)
+		truncate_inode_pages(&inode->i_data, 0);
+
+	if (op && op->delete_inode) {
+		void (*delete)(struct inode *) = op->delete_inode;
+		if (!is_bad_inode(inode))
+			DQUOT_INIT(inode);
+		/* s_op->delete_inode internally recalls clear_inode() */
+		delete(inode);
+	} else
+		clear_inode(inode);
+	if (inode->i_state != I_CLEAR)
+		BUG();
+	destroy_inode(inode);
+}
+EXPORT_SYMBOL(generic_delete_inode);
+
+static void generic_forget_inode(struct inode *inode)
+{
+	struct super_block *sb = inode->i_sb;
+
+	if (!list_empty(&inode->i_hash)) {
+		if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
+			list_del(&inode->i_list);
+			list_add(&inode->i_list, &inode_unused);
+		}
+		inodes_stat.nr_unused++;
+		spin_unlock(&inode_lock);
+		if (!sb || (sb->s_flags & MS_ACTIVE))
+			return;
+		write_inode_now(inode, 1);
+		spin_lock(&inode_lock);
+		inodes_stat.nr_unused--;
+		list_del_init(&inode->i_hash);
+	}
+	list_del_init(&inode->i_list);
+	inode->i_state|=I_FREEING;
+	inodes_stat.nr_inodes--;
+	spin_unlock(&inode_lock);
+	if (inode->i_data.nrpages)
+		truncate_inode_pages(&inode->i_data, 0);
+	clear_inode(inode);
+	destroy_inode(inode);
+}
+
+/*
+ * Normal UNIX filesystem behaviour: delete the
+ * inode when the usage count drops to zero, and
+ * i_nlink is zero.
+ */
+static void generic_drop_inode(struct inode *inode)
+{
+	if (!inode->i_nlink)
+		generic_delete_inode(inode);
+	else
+		generic_forget_inode(inode);
+}
+
+/*
+ * Called when we're dropping the last reference
+ * to an inode. 
+ *
+ * Call the FS "drop()" function, defaulting to
+ * the legacy UNIX filesystem behaviour..
+ *
+ * NOTE! NOTE! NOTE! We're called with the inode lock
+ * held, and the drop function is supposed to release
+ * the lock!
+ */
+static inline void iput_final(struct inode *inode)
+{
+	struct super_operations *op = inode->i_sb->s_op;
+	void (*drop)(struct inode *) = generic_drop_inode;
+
+	if (op && op->drop_inode)
+		drop = op->drop_inode;
+	drop(inode);
+}
+
 /**
  *	iput	- put an inode 
  *	@inode: inode to put
@@ -793,77 +884,17 @@ void remove_inode_hash(struct inode *inode)
 void iput(struct inode *inode)
 {
 	if (inode) {
-		struct super_block *sb = inode->i_sb;
-		struct super_operations *op = NULL;
+		struct super_operations *op = inode->i_sb->s_op;
 
 		if (inode->i_state == I_CLEAR)
 			BUG();
 
-		if (sb && sb->s_op)
-			op = sb->s_op;
 		if (op && op->put_inode)
 			op->put_inode(inode);
 
-		if (!atomic_dec_and_lock(&inode->i_count, &inode_lock))
-			return;
-
-		if (!inode->i_nlink) {
-			list_del(&inode->i_hash);
-			INIT_LIST_HEAD(&inode->i_hash);
-			list_del(&inode->i_list);
-			INIT_LIST_HEAD(&inode->i_list);
-			inode->i_state|=I_FREEING;
-			inodes_stat.nr_inodes--;
-			spin_unlock(&inode_lock);
-
-			if (inode->i_data.nrpages)
-				truncate_inode_pages(&inode->i_data, 0);
-
-			if (op && op->delete_inode) {
-				void (*delete)(struct inode *) = op->delete_inode;
-				if (!is_bad_inode(inode))
-					DQUOT_INIT(inode);
-				/* s_op->delete_inode internally recalls clear_inode() */
-				delete(inode);
-			} else
-				clear_inode(inode);
-			if (inode->i_state != I_CLEAR)
-				BUG();
-		} else {
-			if (!list_empty(&inode->i_hash)) {
-				if (!(inode->i_state & (I_DIRTY|I_LOCK))) {
-					list_del(&inode->i_list);
-					list_add(&inode->i_list, &inode_unused);
-				}
-				inodes_stat.nr_unused++;
-				spin_unlock(&inode_lock);
-				if (!sb || (sb->s_flags & MS_ACTIVE))
-					return;
-				write_inode_now(inode, 1);
-				spin_lock(&inode_lock);
-				inodes_stat.nr_unused--;
-				list_del_init(&inode->i_hash);
-			}
-			list_del_init(&inode->i_list);
-			inode->i_state|=I_FREEING;
-			inodes_stat.nr_inodes--;
-			spin_unlock(&inode_lock);
-			if (inode->i_data.nrpages)
-				truncate_inode_pages(&inode->i_data, 0);
-			clear_inode(inode);
-		}
-		destroy_inode(inode);
+		if (atomic_dec_and_lock(&inode->i_count, &inode_lock))
+			iput_final(inode);
 	}
-}
-
-void force_delete(struct inode *inode)
-{
-	/*
-	 * Kill off unused inodes ... iput() will unhash and
-	 * delete the inode if we set i_nlink to zero.
-	 */
-	if (atomic_read(&inode->i_count) == 1)
-		inode->i_nlink = 0;
 }
 
 /**

@@ -442,7 +442,7 @@ static struct dentry_operations driverfs_dentry_file_ops = {
 
 static struct super_operations driverfs_ops = {
 	statfs:		simple_statfs,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 };
 
 static int driverfs_fill_super(struct super_block *sb, void *data, int silent)

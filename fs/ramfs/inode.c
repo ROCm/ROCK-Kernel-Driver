@@ -277,7 +277,7 @@ static struct inode_operations ramfs_dir_inode_operations = {
 
 static struct super_operations ramfs_ops = {
 	statfs:		simple_statfs,
-	put_inode:	force_delete,
+	drop_inode:	generic_delete_inode,
 };
 
 static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
