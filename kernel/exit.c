@@ -648,8 +648,8 @@ repeat:
 				}
 				goto end_wait4;
 			case TASK_ZOMBIE:
-				current->times.tms_cutime += p->times.tms_utime + p->times.tms_cutime;
-				current->times.tms_cstime += p->times.tms_stime + p->times.tms_cstime;
+				current->cutime += p->utime + p->cutime;
+				current->cstime += p->stime + p->cstime;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
 				if (!retval && stat_addr)

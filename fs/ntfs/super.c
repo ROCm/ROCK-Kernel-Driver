@@ -605,17 +605,17 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 				sizeof(unsigned long) * 4);
 		return FALSE;
 	}
-	vol->_VCL(nr_clusters) = ll;
-	ntfs_debug("vol->nr_clusters = 0x%Lx", (long long)vol->_VCL(nr_clusters));
+	vol->nr_clusters = ll;
+	ntfs_debug("vol->nr_clusters = 0x%Lx", (long long)vol->nr_clusters);
 	ll = sle64_to_cpu(b->mft_lcn);
-	if (ll >= vol->_VCL(nr_clusters)) {
+	if (ll >= vol->nr_clusters) {
 		ntfs_error(vol->sb, "MFT LCN is beyond end of volume. Weird.");
 		return FALSE;
 	}
 	vol->mft_lcn = ll;
 	ntfs_debug("vol->mft_lcn = 0x%Lx", (long long)vol->mft_lcn);
 	ll = sle64_to_cpu(b->mftmirr_lcn);
-	if (ll >= vol->_VCL(nr_clusters)) {
+	if (ll >= vol->nr_clusters) {
 		ntfs_error(vol->sb, "MFTMirr LCN is beyond end of volume. "
 				"Weird.");
 		return FALSE;
@@ -629,7 +629,7 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	 * Determine MFT zone size. This is not strictly the right place to do
 	 * this, but I am too lazy to create a function especially for it...
 	 */
-	vol->mft_zone_end = vol->_VCL(nr_clusters);
+	vol->mft_zone_end = vol->nr_clusters;
 	switch (vol->mft_zone_multiplier) {  /* % of volume size in clusters */
 	case 4:
 		vol->mft_zone_end = vol->mft_zone_end >> 1;	/* 50%   */
@@ -678,9 +678,9 @@ static BOOL load_and_init_upcase(ntfs_volume *vol)
 
 	ntfs_debug("Entering.");
 	/* Read upcase table and setup vol->upcase and vol->upcase_len. */
-	ino = iget(sb, FILE_UpCase);
-	if (!ino || is_bad_inode(ino)) {
-		if (ino)
+	ino = ntfs_iget(sb, FILE_UpCase);
+	if (IS_ERR(ino) || is_bad_inode(ino)) {
+		if (!IS_ERR(ino))
 			iput(ino);
 		goto upcase_failed;
 	}
@@ -848,7 +848,7 @@ static BOOL load_system_files(ntfs_volume *vol)
 			vol->mftbmp_allocated_size =
 					sle64_to_cpu(attr->_ANR(allocated_size));
 			/* Consistency check. */
-			if (vol->mftbmp_size < (vol->_VMM(nr_mft_records) + 7) >> 3) {
+			if (vol->mftbmp_size < (vol->nr_mft_records + 7) >> 3) {
 				ntfs_error(sb, "$MFT/$BITMAP is too short to "
 						"contain a complete mft "
 						"bitmap: impossible. $MFT is "
@@ -914,9 +914,9 @@ unmap_err_out:
 	// volume read-write...
 
 	/* Get mft mirror inode. */
-	vol->mftmirr_ino = iget(sb, FILE_MFTMirr);
-	if (!vol->mftmirr_ino || is_bad_inode(vol->mftmirr_ino)) {
-		if (is_bad_inode(vol->mftmirr_ino))
+	vol->mftmirr_ino = ntfs_iget(sb, FILE_MFTMirr);
+	if (IS_ERR(vol->mftmirr_ino) || is_bad_inode(vol->mftmirr_ino)) {
+		if (!IS_ERR(vol->mftmirr_ino))
 			iput(vol->mftmirr_ino);
 		ntfs_error(sb, "Failed to load $MFTMirr.");
 		return FALSE;
@@ -932,13 +932,13 @@ unmap_err_out:
 	 * need for any locking at this stage as we are already running
 	 * exclusively as we are mount in progress task.
 	 */
-	vol->lcnbmp_ino = iget(sb, FILE_Bitmap);
-	if (!vol->lcnbmp_ino || is_bad_inode(vol->lcnbmp_ino)) {
-		if (is_bad_inode(vol->lcnbmp_ino))
+	vol->lcnbmp_ino = ntfs_iget(sb, FILE_Bitmap);
+	if (IS_ERR(vol->lcnbmp_ino) || is_bad_inode(vol->lcnbmp_ino)) {
+		if (!IS_ERR(vol->lcnbmp_ino))
 			iput(vol->lcnbmp_ino);
 		goto bitmap_failed;
 	}
-	if ((vol->_VCL(nr_lcn_bits) + 7) >> 3 > vol->lcnbmp_ino->i_size) {
+	if ((vol->nr_clusters + 7) >> 3 > vol->lcnbmp_ino->i_size) {
 		iput(vol->lcnbmp_ino);
 bitmap_failed:
 		ntfs_error(sb, "Failed to load $Bitmap.");
@@ -948,9 +948,9 @@ bitmap_failed:
 	 * Get the volume inode and setup our cache of the volume flags and
 	 * version.
 	 */
-	vol->vol_ino = iget(sb, FILE_Volume);
-	if (!vol->vol_ino || is_bad_inode(vol->vol_ino)) {
-		if (is_bad_inode(vol->vol_ino))
+	vol->vol_ino = ntfs_iget(sb, FILE_Volume);
+	if (IS_ERR(vol->vol_ino) || is_bad_inode(vol->vol_ino)) {
+		if (!IS_ERR(vol->vol_ino))
 			iput(vol->vol_ino);
 volume_failed:
 		ntfs_error(sb, "Failed to load $Volume.");
@@ -993,9 +993,9 @@ get_ctx_vol_failed:
 	 * Get the inode for the logfile and empty it if this is a read-write
 	 * mount.
 	 */
-	tmp_ino = iget(sb, FILE_LogFile);
-	if (!tmp_ino || is_bad_inode(tmp_ino)) {
-		if (is_bad_inode(tmp_ino))
+	tmp_ino = ntfs_iget(sb, FILE_LogFile);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $LogFile.");
 		// FIMXE: We only want to empty the thing so pointless bailing
@@ -1010,9 +1010,9 @@ get_ctx_vol_failed:
 	 * Get the inode for the attribute definitions file and parse the
 	 * attribute definitions.
 	 */ 
-	tmp_ino = iget(sb, FILE_AttrDef);
-	if (!tmp_ino || is_bad_inode(tmp_ino)) {
-		if (is_bad_inode(tmp_ino))
+	tmp_ino = ntfs_iget(sb, FILE_AttrDef);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $AttrDef.");
 		goto iput_vol_bmp_mirr_err_out;
@@ -1020,9 +1020,9 @@ get_ctx_vol_failed:
 	// FIXME: Parse the attribute definitions.
 	iput(tmp_ino);
 	/* Get the root directory inode. */
-	vol->root_ino = iget(sb, FILE_root);
-	if (!vol->root_ino || is_bad_inode(vol->root_ino)) {
-		if (is_bad_inode(vol->root_ino))
+	vol->root_ino = ntfs_iget(sb, FILE_root);
+	if (IS_ERR(vol->root_ino) || is_bad_inode(vol->root_ino)) {
+		if (!IS_ERR(vol->root_ino))
 			iput(vol->root_ino);
 		ntfs_error(sb, "Failed to load root directory.");
 		goto iput_vol_bmp_mirr_err_out;
@@ -1032,18 +1032,18 @@ get_ctx_vol_failed:
 		return TRUE;
 	/* NTFS 3.0+ specific initialization. */
 	/* Get the security descriptors inode. */
-	vol->secure_ino = iget(sb, FILE_Secure);
-	if (!vol->secure_ino || is_bad_inode(vol->secure_ino)) {
-		if (is_bad_inode(vol->secure_ino))
+	vol->secure_ino = ntfs_iget(sb, FILE_Secure);
+	if (IS_ERR(vol->secure_ino) || is_bad_inode(vol->secure_ino)) {
+		if (!IS_ERR(vol->secure_ino))
 			iput(vol->secure_ino);
 		ntfs_error(sb, "Failed to load $Secure.");
 		goto iput_root_vol_bmp_mirr_err_out;
 	}
 	// FIXME: Initialize security.
 	/* Get the extended system files' directory inode. */
-	tmp_ino = iget(sb, FILE_Extend);
-	if (!tmp_ino || is_bad_inode(tmp_ino)) {
-		if (is_bad_inode(tmp_ino))
+	tmp_ino = ntfs_iget(sb, FILE_Extend);
+	if (IS_ERR(tmp_ino) || is_bad_inode(tmp_ino)) {
+		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $Extend.");
 		goto iput_sec_root_vol_bmp_mirr_err_out;
@@ -1051,8 +1051,8 @@ get_ctx_vol_failed:
 	// FIXME: Do something. E.g. want to delete the $UsnJrnl if exists.
 	// Note we might be doing this at the wrong level; we might want to
 	// d_alloc_root() and then do a "normal" open(2) of $Extend\$UsnJrnl
-	// rather than using iget here, as we don't know the inode number for
-	// the files in $Extend directory.
+	// rather than using ntfs_iget here, as we don't know the inode number
+	// for the files in $Extend directory.
 	iput(tmp_ino);
 	return TRUE;
 iput_sec_root_vol_bmp_mirr_err_out:
@@ -1172,7 +1172,7 @@ s64 get_nr_free_clusters(ntfs_volume *vol)
 	 * Convert the number of bits into bytes rounded up, then convert into
 	 * multiples of PAGE_CACHE_SIZE.
 	 */
-	max_index = (vol->_VCL(nr_clusters) + 7) >> (3 + PAGE_CACHE_SHIFT);
+	max_index = (vol->nr_clusters + 7) >> (3 + PAGE_CACHE_SHIFT);
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $BITMAP, max_index = 0x%lx, max_size = 0x%x.",
@@ -1211,7 +1211,7 @@ handle_partial_page:
 		 * Get the multiples of 4 bytes in use in the final partial
 		 * page.
 		 */
-		max_size = ((((vol->_VCL(nr_clusters) + 7) >> 3) & ~PAGE_CACHE_MASK)
+		max_size = ((((vol->nr_clusters + 7) >> 3) & ~PAGE_CACHE_MASK)
 				+ 3) >> 2;
 		/* If there is a partial page go back and do it. */
 		if (max_size) {
@@ -1254,7 +1254,7 @@ unsigned long get_nr_free_mft_records(ntfs_volume *vol)
 	 * Convert the number of bits into bytes rounded up, then convert into
 	 * multiples of PAGE_CACHE_SIZE.
 	 */
-	max_index = (vol->_VMM(nr_mft_records) + 7) >> (3 + PAGE_CACHE_SHIFT);
+	max_index = (vol->nr_mft_records + 7) >> (3 + PAGE_CACHE_SHIFT);
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $MFT/$BITMAP, max_index = 0x%lx, max_size = "
@@ -1293,12 +1293,12 @@ handle_partial_page:
 		 * Get the multiples of 4 bytes in use in the final partial
 		 * page.
 		 */
-		max_size = ((((vol->_VMM(nr_mft_records) + 7) >> 3) &
+		max_size = ((((vol->nr_mft_records + 7) >> 3) &
 				~PAGE_CACHE_MASK) + 3) >> 2;
 		/* If there is a partial page go back and do it. */
 		if (max_size) {
 			/* Compensate for out of bounds zero bits. */
-			if ((i = vol->_VMM(nr_mft_records) & 31))
+			if ((i = vol->nr_mft_records & 31))
 				nr_free -= 32 - i;
 			ntfs_debug("Handling partial page, max_size = 0x%x",
 					max_size);
@@ -1345,7 +1345,7 @@ int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
 	 * inodes are also stored in data blocs ($MFT is a file) this is just
 	 * the total clusters.
 	 */
-	sfs->f_blocks = vol->_VCL(nr_clusters) << vol->cluster_size_bits >>
+	sfs->f_blocks = vol->nr_clusters << vol->cluster_size_bits >>
 				PAGE_CACHE_SHIFT;
 	/* Free data blocks in file system in units of f_bsize. */
 	size	      = get_nr_free_clusters(vol) << vol->cluster_size_bits >>
@@ -1394,8 +1394,6 @@ struct super_operations ntfs_mount_sops = {
 struct super_operations ntfs_sops = {
 	alloc_inode:	ntfs_alloc_big_inode,	/* VFS: Allocate a new inode. */
 	destroy_inode:	ntfs_destroy_big_inode,	/* VFS: Deallocate an inode. */
-	read_inode:	ntfs_read_inode,	/* VFS: Load inode from disk,
-						   called from iget(). */
 	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
 						   __mark_inode_dirty(). */
 	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
@@ -1575,9 +1573,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	/*
 	 * Now load the metadata required for the page cache and our address
 	 * space operations to function. We do this by setting up a specialised
-	 * read_inode method and then just calling iget() to obtain the inode
-	 * for $MFT which is sufficient to allow our normal inode operations
-	 * and associated address space operations to function.
+	 * read_inode method and then just calling the normal iget() to obtain
+	 * the inode for $MFT which is sufficient to allow our normal inode
+	 * operations and associated address space operations to function.
 	 */
 	/*
 	 * Poison vol->mft_ino so we know whether iget() called into our
@@ -1601,9 +1599,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	 * Note: sb->s_op has already been set to &ntfs_sops by our specialized
 	 * ntfs_read_inode_mount() method when it was invoked by iget().
 	 */
-
 	down(&ntfs_lock);
-
 	/*
 	 * The current mount is a compression user if the cluster size is
 	 * less than or equal 4kiB.
@@ -1618,7 +1614,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			goto iput_tmp_ino_err_out_now;
 		}
 	}
-
 	/*
 	 * Increment the number of mounts and generate the global default
 	 * upcase table if necessary. Also temporarily increment the number of
@@ -1629,12 +1624,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	ntfs_nr_upcase_users++;
 
 	up(&ntfs_lock);
-
 	/*
 	 * From now on, ignore @silent parameter. If we fail below this line,
 	 * it will be due to a corrupt fs or a system error, so we report it.
 	 */
-
 	/*
 	 * Open the system files with normal access functions and complete
 	 * setting up the ntfs super block.
@@ -1643,9 +1636,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 		ntfs_error(sb, "Failed to load system files.");
 		goto unl_upcase_iput_tmp_ino_err_out_now;
 	}
-
 	if ((sb->s_root = d_alloc_root(vol->root_ino))) {
-		/* We increment i_count simulating an iget(). */
+		/* We increment i_count simulating an ntfs_iget(). */
 		atomic_inc(&vol->root_ino->i_count);
 		ntfs_debug("Exiting, status successful.");
 		/* Release the default upcase if it has no users. */
@@ -1709,10 +1701,11 @@ cond_iput_mft_ino_err_out_now:
 	}
 #undef OGIN
 	/*
-	 * This is needed to get ntfs_clear_inode() called for each inode we
-	 * have ever called iget()/iput() on, otherwise we A) leak resources
-	 * and B) a subsequent mount fails automatically due to iget() never
-	 * calling down into our ntfs_read_inode{_mount}() methods again...
+	 * This is needed to get ntfs_clear_extent_inode() called for each
+	 * inode we have ever called ntfs_iget()/iput() on, otherwise we A)
+	 * leak resources and B) a subsequent mount fails automatically due to
+	 * ntfs_iget() never calling down into our ntfs_read_locked_inode()
+	 * method again...
 	 */
 	if (invalidate_inodes(sb)) {
 		ntfs_error(sb, "Busy inodes left. This is most likely a NTFS "
