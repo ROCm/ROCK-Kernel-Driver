@@ -44,8 +44,8 @@ struct rand_pool_info {
 
 extern void rand_initialize_irq(int irq);
 
-extern void add_keyboard_randomness(unsigned char scancode);
-extern void add_mouse_randomness(__u32 mouse_data);
+extern void add_input_randomness(unsigned int type, unsigned int code,
+				 unsigned int value);
 extern void add_interrupt_randomness(int irq);
 
 extern void get_random_bytes(void *buf, int nbytes);

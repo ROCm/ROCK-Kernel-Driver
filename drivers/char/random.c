@@ -125,15 +125,12 @@
  * The current exported interfaces for gathering environmental noise
  * from the devices are:
  *
- * 	void add_keyboard_randomness(unsigned char scancode);
- * 	void add_mouse_randomness(__u32 mouse_data);
+ * 	void add_input_randomness(unsigned int type, unsigned int code,
+ *                                unsigned int value);
  * 	void add_interrupt_randomness(int irq);
  *
- * add_keyboard_randomness() uses the inter-keypress timing, as well as the
- * scancode as random inputs into the "entropy pool".
- *
- * add_mouse_randomness() uses the mouse interrupt timing, as well as
- * the reported position of the mouse from the hardware.
+ * add_input_randomness() uses the input layer interrupt timing, as well as
+ * the event type information from the hardware.
  *
  * add_interrupt_randomness() uses the inter-interrupt timing as random
  * inputs to the entropy pool.  Note that not all interrupts are good
@@ -788,8 +785,7 @@ struct timer_rand_state {
 	unsigned dont_count_entropy:1;
 };
 
-static struct timer_rand_state keyboard_timer_state;
-static struct timer_rand_state mouse_timer_state;
+static struct timer_rand_state input_timer_state;
 static struct timer_rand_state extract_timer_state;
 static struct timer_rand_state *irq_timer_state[NR_IRQS];
 
@@ -869,24 +865,20 @@ out:
 	preempt_enable();
 }
 
-void add_keyboard_randomness(unsigned char scancode)
+extern void add_input_randomness(unsigned int type, unsigned int code,
+				 unsigned int value)
 {
-	static unsigned char last_scancode;
-	/* ignore autorepeat (multiple key down w/o key up) */
-	DEBUG_ENT("keyboard event\n");
-	if (scancode != last_scancode) {
-		last_scancode = scancode;
-		add_timer_randomness(&keyboard_timer_state, scancode);
-	}
-}
+	static unsigned char last_value;
 
-void add_mouse_randomness(__u32 mouse_data)
-{
-	DEBUG_ENT("mouse event\n");
-	add_timer_randomness(&mouse_timer_state, mouse_data);
-}
+	/* ignore autorepeat and the like */
+	if (value == last_value)
+		return;
 
-EXPORT_SYMBOL(add_mouse_randomness);
+	DEBUG_ENT("input event\n");
+	last_value = value;
+	add_timer_randomness(&input_timer_state,
+			     (type << 4) ^ code ^ (code >> 4) ^ value);
+}
 
 void add_interrupt_randomness(int irq)
 {
@@ -1550,8 +1542,7 @@ static int __init rand_initialize(void)
 #endif
 	for (i = 0; i < NR_IRQS; i++)
 		irq_timer_state[i] = NULL;
-	memset(&keyboard_timer_state, 0, sizeof(struct timer_rand_state));
-	memset(&mouse_timer_state, 0, sizeof(struct timer_rand_state));
+	memset(&input_timer_state, 0, sizeof(struct timer_rand_state));
 	memset(&extract_timer_state, 0, sizeof(struct timer_rand_state));
 	extract_timer_state.dont_count_entropy = 1;
 	return 0;

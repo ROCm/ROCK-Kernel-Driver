@@ -69,7 +69,6 @@
 #include <linux/init.h>
 #include <linux/kbd_ll.h>
 #include <linux/delay.h>
-#include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -442,7 +441,6 @@ static inline void handle_mouse_event(unsigned char scancode)
 		return;
 	}
 
-	add_mouse_randomness(scancode);
 	if (aux_count) {
 		int head = queue->head;
 
