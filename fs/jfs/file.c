@@ -114,11 +114,3 @@ struct file_operations jfs_file_operations = {
  	.sendfile	= generic_file_sendfile,
 	.fsync		= jfs_fsync,
 };
-
-struct inode_operations jfs_special_inode_operations = {
-	.setxattr	= jfs_setxattr,
-	.getxattr	= jfs_getxattr,
-	.listxattr	= jfs_listxattr,
-	.removexattr	= jfs_removexattr,
-};
-
