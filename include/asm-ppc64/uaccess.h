@@ -132,6 +132,7 @@ extern long __put_user_bad(void);
 
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
+	might_sleep();							\
 	retval = 0;							\
 	switch (size) {							\
 	  case 1: __put_user_asm(x,ptr,retval,"stb",errret); break;	\
@@ -185,6 +186,7 @@ extern long __get_user_bad(void);
 
 #define __get_user_size(x,ptr,size,retval,errret)			\
 do {									\
+	might_sleep();							\
 	retval = 0;							\
 	switch (size) {							\
 	  case 1: __get_user_asm(x,ptr,retval,"lbz",errret); break;	\
@@ -220,6 +222,7 @@ extern unsigned long __copy_tofrom_user(void *to, const void *from,
 static inline unsigned long
 __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
+	might_sleep();
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
 
@@ -244,6 +247,7 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 static inline unsigned long
 __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
+	might_sleep();
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
 
@@ -289,6 +293,7 @@ copy_to_user(void *to, const void *from, unsigned long n)
 static inline unsigned long
 copy_in_user(void *to, const void *from, unsigned long n)
 {
+	might_sleep();
 	if (likely(access_ok(VERIFY_READ, from, n) &&
 	    access_ok(VERIFY_WRITE, to, n)))
 		n =__copy_tofrom_user(to, from, n);
@@ -300,6 +305,7 @@ extern unsigned long __clear_user(void *addr, unsigned long size);
 static inline unsigned long
 clear_user(void *addr, unsigned long size)
 {
+	might_sleep();
 	if (likely(access_ok(VERIFY_WRITE, addr, size)))
 		size = __clear_user(addr, size);
 	return size;
@@ -310,6 +316,7 @@ extern int __strncpy_from_user(char *dst, const char *src, long count);
 static inline long
 strncpy_from_user(char *dst, const char *src, long count)
 {
+	might_sleep();
 	if (likely(access_ok(VERIFY_READ, src, 1)))
 		return __strncpy_from_user(dst, src, count);
 	return -EFAULT;
@@ -329,6 +336,7 @@ extern int __strnlen_user(const char *str, long len);
  */
 static inline int strnlen_user(const char *str, long len)
 {
+	might_sleep();
 	if (likely(access_ok(VERIFY_READ, str, 1)))
 		return __strnlen_user(str, len);
 	return 0;
