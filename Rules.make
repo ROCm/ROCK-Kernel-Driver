@@ -124,22 +124,25 @@ $(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
 $(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
 
-c_flags = $(CFLAGS) $(NOSTDINC_FLAGS) $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags) 
+c_flags = -Wp,-MD,.$(subst /,_,$@).d $(CFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
+	  -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
+	  $(export_flags) 
 
 quiet_cmd_cc_s_c = CC     $(RELDIR)/$@
 cmd_cc_s_c       = $(CC) $(c_flags) -S -o $@ $< 
 
 %.s: %.c FORCE
-	$(call cmd,cmd_cc_s_c)
+	$(call if_changed_dep,cc_s_c)
 
 quiet_cmd_cc_i_c = CPP    $(RELDIR)/$@
 cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 
 %.i: %.c FORCE
-	$(call cmd,cmd_cc_i_c)
+	$(call if_changed_dep,cc_i_c)
 
 quiet_cmd_cc_o_c = CC     $(RELDIR)/$@
-cmd_cc_o_c       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(c_flags) -c -o $@ $<
+cmd_cc_o_c       = $(CC) $(c_flags) -c -o $@ $<
 
 %.o: %.c FORCE
 	$(call if_changed_dep,cc_o_c)
@@ -148,7 +151,7 @@ quiet_cmd_cc_lst_c = Generating $(RELDIR)/$@
 cmd_cc_lst_c     = $(CC) $(c_flags) -g -c -o $*.o $< && $(TOPDIR)/scripts/makelst $*.o $(TOPDIR)/System.map $(OBJDUMP) > $@
 
 %.lst: %.c FORCE
-	$(call cmd,cmd_cc_lst_c)
+	$(call if_changed_dep,cc_lst_c)
 
 # Compile assembler sources (.S)
 # ---------------------------------------------------------------------------
@@ -162,16 +165,17 @@ $(real-objs-y:.o=.s): modkern_aflags := $(AFLAGS_KERNEL)
 $(real-objs-m)      : modkern_aflags := $(AFLAGS_MODULE)
 $(real-objs-m:.o=.s): modkern_aflags := $(AFLAGS_MODULE)
 
-a_flags = $(AFLAGS) $(NOSTDINC_FLAGS) $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+a_flags = -Wp,-MD,$(@D)/.$(@F).d $(AFLAGS) $(NOSTDINC_FLAGS) \
+	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_s_S = CPP    $(RELDIR)/$@
 cmd_as_s_S       = $(CPP) $(a_flags)   -o $@ $< 
 
 %.s: %.S FORCE
-	$(call cmd,cmd_as_s_S)
+	$(call if_changed_dep,as_s_S)
 
 quiet_cmd_as_o_S = AS     $(RELDIR)/$@
-cmd_as_o_S       = $(CC) -Wp,-MD,.$(subst /,_,$@).d $(a_flags) -c -o $@ $<
+cmd_as_o_S       = $(CC) $(a_flags) -c -o $@ $<
 
 %.o: %.S FORCE
 	$(call if_changed_dep,as_o_S)
@@ -193,7 +197,7 @@ cmd_link_o_target = $(if $(strip $(obj-y)),\
 		      rm -f $@; $(AR) rcs $@)
 
 $(O_TARGET): $(obj-y) FORCE
-	$(call if_changed,cmd_link_o_target)
+	$(call if_changed,link_o_target)
 endif # O_TARGET
 
 #
@@ -204,7 +208,7 @@ quiet_cmd_link_l_target = AR     $(RELDIR)/$@
 cmd_link_l_target = rm -f $@; $(AR) $(EXTRA_ARFLAGS) rcs $@ $(obj-y)
 
 $(L_TARGET): $(obj-y) FORCE
-	$(call if_changed,cmd_link_l_target)
+	$(call if_changed,link_l_target)
 endif
 
 #
@@ -219,10 +223,10 @@ cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs)
 # but that's not so easy, so we rather make all composite objects depend
 # on the set of all their parts
 $(multi-used-y) : %.o: $(multi-objs-y) FORCE
-	$(call if_changed,cmd_link_multi)
+	$(call if_changed,link_multi)
 
 $(multi-used-m) : %.o: $(multi-objs-m) FORCE
-	$(call if_changed,cmd_link_multi)
+	$(call if_changed,link_multi)
 
 # Compile programs on the host
 # ===========================================================================
@@ -250,7 +254,7 @@ cmd_host_cc__o        = $(HOSTCC) $(HOSTLDFLAGS) -o $@ $($@-objs) \
 			$(HOST_LOADLIBES)
 
 $(host-progs-multi): %: $(host-progs-multi-objs) FORCE
-	$(call if_changed,cmd_host_cc__o)
+	$(call if_changed,host_cc__o)
 
 
 # Descending when making module versions
@@ -401,9 +405,12 @@ endif
 # function to only execute the passed command if necessary
 
 if_changed = $(if $(strip $? \
-		          $(filter-out $($(1)),$(cmd_$(@F)))\
-			  $(filter-out $(cmd_$(@F)),$($(1)))),\
-	       @$(if $($(quiet)$(1)),echo '  $($(quiet)$(1))' &&) $($(1)) && echo 'cmd_$@ := $($(1))' > $(@D)/.$(@F).cmd)
+		          $(filter-out $(cmd_$(1)),$(cmd_$@))\
+			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
+	@set -e; \
+	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
+	$(cmd_$(1)); \
+	echo 'cmd_$@ := $(cmd_$(1))' > $(@D)/.$(@F).cmd)
 
 
 # execute the command and also postprocess generated .d dependencies
