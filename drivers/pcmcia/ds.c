@@ -479,6 +479,7 @@ static void pcmcia_release_dev(struct device *dev)
 {
 	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
 	p_dev->socket->pcmcia->device_count = 0;
+	pcmcia_put_bus_socket(p_dev->socket->pcmcia);
 	kfree(p_dev);
 }
 
@@ -693,6 +694,13 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	}
 	memset(p_dev, 0, sizeof(struct pcmcia_device));
 
+	s = pcmcia_get_bus_socket(s);
+ 	if (!s) {
+		ret = -ENODEV;
+		kfree(p_dev);
+		goto err_free_client;
+	}
+
 	p_dev->socket = s->parent;
 	p_dev->device_no = (s->device_count++);
 	p_dev->func   = bind_info->function;
@@ -706,6 +714,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	ret = device_register(&p_dev->dev);
 	if (ret) {
 		kfree(p_dev);
+		pcmcia_put_bus_socket(s);
 		goto err_free_client;
 	}
 
