@@ -112,9 +112,9 @@ to pan the display.  It is turned off by default because it
 seems not to work with some BIOS versions, but there are options
 to turn it on.
 
-You can pass options to vesafb using "video=vesa:option" on
+You can pass options to vesafb using "video=vesafb:option" on
 the kernel command line.  Multiple options should be separated
-by comma, like this: "video=vesa:ypan,invers"
+by comma, like this: "video=vesafb:ypan,invers"
 
 Accepted options:
 

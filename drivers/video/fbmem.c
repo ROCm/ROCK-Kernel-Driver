@@ -169,7 +169,7 @@ static struct {
 	 * Chipset specific drivers that use resource management
 	 */
 #ifdef CONFIG_FB_RETINAZ3
-	{ "retz3", retz3fb_init, retz3fb_setup },
+	{ "retz3fb", retz3fb_init, retz3fb_setup },
 #endif
 #ifdef CONFIG_FB_AMIGA
 	{ "amifb", amifb_init, amifb_setup },
@@ -181,10 +181,10 @@ static struct {
 	{ "clps711xfb", clps711xfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_CYBER
-	{ "cyber", cyberfb_init, cyberfb_setup },
+	{ "cyberfb", cyberfb_init, cyberfb_setup },
 #endif
 #ifdef CONFIG_FB_CYBER2000
-	{ "cyber2000", cyber2000fb_init, cyber2000fb_setup },
+	{ "cyber2000fb", cyber2000fb_init, cyber2000fb_setup },
 #endif
 #ifdef CONFIG_FB_PM2
 	{ "pm2fb", pm2fb_init, pm2fb_setup },
@@ -193,28 +193,28 @@ static struct {
 	{ "pm3fb", pm3fb_init, pm3fb_setup },
 #endif           
 #ifdef CONFIG_FB_CLGEN
-	{ "clgen", clgenfb_init, clgenfb_setup },
+	{ "clgenfb", clgenfb_init, clgenfb_setup },
 #endif
 #ifdef CONFIG_FB_ATY
 	{ "atyfb", atyfb_init, atyfb_setup },
 #endif
 #ifdef CONFIG_FB_MATROX
-	{ "matrox", matroxfb_init, matroxfb_setup },
+	{ "matroxfb", matroxfb_init, matroxfb_setup },
 #endif
 #ifdef CONFIG_FB_ATY128
 	{ "aty128fb", aty128fb_init, aty128fb_setup },
 #endif
 #ifdef CONFIG_FB_NEOMAGIC
-	{ "neo", neofb_init, neofb_setup },
+	{ "neofb", neofb_init, neofb_setup },
 #endif
 #ifdef CONFIG_FB_VIRGE
-	{ "virge", virgefb_init, virgefb_setup },
+	{ "virgefb", virgefb_init, virgefb_setup },
 #endif
 #ifdef CONFIG_FB_RIVA
-	{ "riva", rivafb_init, rivafb_setup },
+	{ "rivafb", rivafb_init, rivafb_setup },
 #endif
 #ifdef CONFIG_FB_RADEON
-	{ "radeon", radeonfb_init, radeonfb_setup },
+	{ "radeonfb", radeonfb_init, radeonfb_setup },
 #endif
 #ifdef CONFIG_FB_CONTROL
 	{ "controlfb", control_init, control_setup },
@@ -232,7 +232,7 @@ static struct {
 	{ "imsttfb", imsttfb_init, imsttfb_setup },
 #endif
 #ifdef CONFIG_FB_S3TRIO
-	{ "s3trio", s3triofb_init, NULL },
+	{ "s3triofb", s3triofb_init, NULL },
 #endif 
 #ifdef CONFIG_FB_FM2
 	{ "fm2fb", fm2fb_init, fm2fb_setup },
@@ -241,7 +241,7 @@ static struct {
 	{ "sisfb", sisfb_init, sisfb_setup },
 #endif
 #ifdef CONFIG_FB_TRIDENT
-	{ "trident", tridentfb_init, tridentfb_setup },
+	{ "tridentfb", tridentfb_init, tridentfb_setup },
 #endif
 #ifdef CONFIG_FB_I810
 	{ "i810fb", i810fb_init, i810fb_setup },
@@ -253,25 +253,25 @@ static struct {
 	{ "ffb", ffb_init, ffb_setup },
 #endif
 #ifdef CONFIG_FB_CG6
-	{ "cg6", cg6_init, cg6_setup },
+	{ "cg6fb", cg6_init, cg6_setup },
 #endif
 #ifdef CONFIG_FB_CG3
-	{ "cg3", cg3_init, cg3_setup },
+	{ "cg3fb", cg3_init, cg3_setup },
 #endif
 #ifdef CONFIG_FB_BW2
-	{ "bw2", bw2_init, bw2_setup },
+	{ "bw2fb", bw2_init, bw2_setup },
 #endif
 #ifdef CONFIG_FB_CG14
-	{ "cg14", cg14_init, cg14_setup },
+	{ "cg14fb", cg14_init, cg14_setup },
 #endif
 #ifdef CONFIG_FB_P9100
-	{ "p9100", p9100_init, p9100_setup },
+	{ "p9100fb", p9100_init, p9100_setup },
 #endif
 #ifdef CONFIG_FB_TCX
-	{ "tcx", tcx_init, tcx_setup },
+	{ "tcxfb", tcx_init, tcx_setup },
 #endif
 #ifdef CONFIG_FB_LEO
-	{ "leo", leo_init, leo_setup },
+	{ "leofb", leo_init, leo_setup },
 #endif
 
 	/*
@@ -286,7 +286,7 @@ static struct {
 	{ "offb", offb_init, NULL },
 #endif
 #ifdef CONFIG_FB_VESA
-	{ "vesa", vesafb_init, vesafb_setup },
+	{ "vesafb", vesafb_init, vesafb_setup },
 #endif 
 
 	/*
@@ -294,13 +294,13 @@ static struct {
 	 */
 
 #ifdef CONFIG_FB_3DFX
-	{ "tdfx", tdfxfb_init, tdfxfb_setup },
+	{ "tdfxfb", tdfxfb_init, tdfxfb_setup },
 #endif
 #ifdef CONFIG_FB_SGIVW
-	{ "sgivw", sgivwfb_init, sgivwfb_setup },
+	{ "sgivwfb", sgivwfb_init, sgivwfb_setup },
 #endif
 #ifdef CONFIG_FB_ACORN
-	{ "acorn", acornfb_init, acornfb_setup },
+	{ "acornfb", acornfb_init, acornfb_setup },
 #endif
 #ifdef CONFIG_FB_ATARI
 	{ "atafb", atafb_init, atafb_setup },
@@ -309,43 +309,43 @@ static struct {
 	{ "macfb", macfb_init, macfb_setup },
 #endif
 #ifdef CONFIG_FB_HGA
-	{ "hga", hgafb_init, hgafb_setup },
+	{ "hgafb", hgafb_init, hgafb_setup },
 #endif 
 #ifdef CONFIG_FB_IGA
 	{ "igafb", igafb_init, igafb_setup },
 #endif
 #ifdef CONFIG_APOLLO
-	{ "apollo", dnfb_init, NULL },
+	{ "apollofb", dnfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_Q40
 	{ "q40fb", q40fb_init, NULL },
 #endif
 #ifdef CONFIG_FB_TGA
-	{ "tga", tgafb_init, tgafb_setup },
+	{ "tgafb", tgafb_init, tgafb_setup },
 #endif
 #ifdef CONFIG_FB_HP300
 	{ "hpfb", hpfb_init, NULL },
 #endif 
 #ifdef CONFIG_FB_G364
-	{ "g364", g364fb_init, NULL },
+	{ "g364fb", g364fb_init, NULL },
 #endif
 #ifdef CONFIG_FB_SA1100
-	{ "sa1100", sa1100fb_init, NULL },
+	{ "sa1100fb", sa1100fb_init, NULL },
 #endif
 #ifdef CONFIG_FB_SUN3
-	{ "sun3", sun3fb_init, sun3fb_setup },
+	{ "sun3fb", sun3fb_init, sun3fb_setup },
 #endif
 #ifdef CONFIG_FB_HIT
 	{ "hitfb", hitfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_TX3912
-	{ "tx3912", tx3912fb_init, tx3912fb_setup },
+	{ "tx3912fb", tx3912fb_init, tx3912fb_setup },
 #endif
 #ifdef CONFIG_FB_E1355
 	{ "e1355fb", e1355fb_init, e1355fb_setup },
 #endif
 #ifdef CONFIG_FB_PVR2
-	{ "pvr2", pvr2fb_init, pvr2fb_setup },
+	{ "pvr2fb", pvr2fb_init, pvr2fb_setup },
 #endif
 #ifdef CONFIG_FB_PMAG_BA
 	{ "pmagbafb", pmagbafb_init, NULL },
@@ -357,19 +357,19 @@ static struct {
 	{ "maxinefb", maxinefb_init, NULL },
 #endif            
 #ifdef CONFIG_FB_VOODOO1
-	{ "sst", sstfb_init, sstfb_setup },
+	{ "sstfb", sstfb_init, sstfb_setup },
 #endif
 	/*
 	 * Generic drivers that don't use resource management (yet)
 	 */
 
 #ifdef CONFIG_FB_VGA16
-	{ "vga16", vga16fb_init, vga16fb_setup },
+	{ "vga16fb", vga16fb_init, vga16fb_setup },
 #endif 
 
 #ifdef CONFIG_GSP_RESOLVER
 	/* Not a real frame buffer device... */
-	{ "resolver", NULL, resolver_video_setup },
+	{ "resolverfb", NULL, resolver_video_setup },
 #endif
 
 #ifdef CONFIG_FB_VIRTUAL
@@ -454,19 +454,24 @@ void move_buf_unaligned(struct fb_info *info, u8 *dst, u8 *src, u32 d_pitch,
 u32 fb_get_buffer_offset(struct fb_info *info, u32 size)
 {
 	u32 align = info->pixmap.buf_align - 1;
-	u32 offset;
+	u32 offset, count = 1000;
 
 	spin_lock_irqsave(&info->pixmap.lock,
 			  info->pixmap.lock_flags);
 	offset = info->pixmap.offset + align;
 	offset &= ~align;
 	if (offset + size > info->pixmap.size) {
+		while (atomic_read(&info->pixmap.count) && count--);
 		if (info->fbops->fb_sync && 
 		    info->pixmap.flags & FB_PIXMAP_SYNC)
 			info->fbops->fb_sync(info);
 		offset = 0;
 	}
 	info->pixmap.offset = offset + size;
+
+	atomic_inc(&info->pixmap.count);	
+	smp_mb__after_atomic_inc();
+
 	spin_unlock_irqrestore(&info->pixmap.lock,
 			       info->pixmap.lock_flags);
 	return offset;
@@ -653,13 +658,10 @@ int fb_prepare_logo(struct fb_info *info)
 			fb_logo.needs_directpalette = 1;
 			fb_logo.needs_cmapreset = 1;
 			fb_logo.needs_logo = 8;
-		}
-		/* 16 colors */
-		else if (fb_logo.depth >= 16)
+		} else if (fb_logo.depth >= 16)	/* 16 colors */
 			fb_logo.needs_logo = 4;
-		/* 2 colors */
 		else
-			fb_logo.needs_logo = 1;
+			fb_logo.needs_logo = 1;	/* 2 colors */
 		break;
 	case FB_VISUAL_MONO01:
 		/* reversed 0 = fg, 1 = bg */
@@ -668,20 +670,15 @@ int fb_prepare_logo(struct fb_info *info)
 	case FB_VISUAL_MONO10:
 		fb_logo.needs_logo = 1;
 		break;
-	case FB_VISUAL_PSEUDOCOLOR:
-	default:
-		if (fb_logo.depth >= 8) {
-			fb_logo.needs_cmapreset = 1;
-			fb_logo.needs_logo = 8;
-		}
-		/* fall through */
 	case FB_VISUAL_STATIC_PSEUDOCOLOR:
-		/* 16 colors */
-		if (fb_logo.depth >= 4 && fb_logo.depth < 8)
-			fb_logo.needs_logo = 4;
-		/* 2 colors */
-		else if (fb_logo.depth < 4)
-			fb_logo.needs_logo = 1;
+		if (fb_logo.depth >= 8) {
+			fb_logo.needs_logo = 8;
+			if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+				fb_logo.needs_cmapreset = 1;
+		} else if (fb_logo.depth >= 4)
+			fb_logo.needs_logo = 4;	/* 16 colors */
+		else
+			fb_logo.needs_logo = 1;	
 		break;
 	}
 
@@ -757,6 +754,8 @@ int fb_show_logo(struct fb_info *info)
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;
 		info->fbops->fb_imageblit(info, &image);
+		atomic_dec(&info->pixmap.count);
+		smp_mb__after_atomic_dec();
 	}
 	
 	if (palette != NULL)

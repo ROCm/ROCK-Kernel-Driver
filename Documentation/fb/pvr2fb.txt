@@ -22,7 +22,7 @@ Configuration
 =============
 
 You can pass kernel command line options to pvr2fb with
-`video=pvr2:option1,option2:value2,option3' (multiple options should be
+`video=pvr2fb:option1,option2:value2,option3' (multiple options should be
 separated by comma, values are separated from options by `:').
 Accepted options:
 

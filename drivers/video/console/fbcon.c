@@ -302,84 +302,88 @@ static void putcs_unaligned(struct vc_data *vc, struct display *p,
                            struct fb_info *info, struct fb_image *image,
                            int count, const unsigned short *s)
 {
-       unsigned int width = (vc->vc_font.width + 7)/8;
-       unsigned int cellsize = vc->vc_font.height * width;
-       unsigned int maxcnt = info->pixmap.size/cellsize;
-       unsigned int pitch, cnt, k;
-       unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
-       unsigned int shift_high = 8, size;
-       unsigned int buf_align = info->pixmap.buf_align - 1;
-       unsigned int scan_align = info->pixmap.scan_align - 1;
-       unsigned int idx = vc->vc_font.width/8;
-       unsigned short charmask = p->charmask;
-       u8 mask, *src, *dst, *dst0;
+	unsigned int width = (vc->vc_font.width + 7)/8;
+	unsigned int cellsize = vc->vc_font.height * width;
+	unsigned int maxcnt = info->pixmap.size/cellsize;
+	unsigned int shift_low = 0, mod = vc->vc_font.width % 8;
+	unsigned int shift_high = 8, size, pitch, cnt, k;
+	unsigned int buf_align = info->pixmap.buf_align - 1;
+	unsigned int scan_align = info->pixmap.scan_align - 1;
+	unsigned int idx = vc->vc_font.width/8;
+	unsigned short charmask = p->charmask;
+	u8 mask, *src, *dst, *dst0;
 
-       while (count) {
-               if (count > maxcnt)
-                       cnt = k = maxcnt;
-               else
-                       cnt = k = count;
+	while (count) {
+		if (count > maxcnt)
+			cnt = k = maxcnt;
+		else
+			cnt = k = count;
 
-               image->width = vc->vc_font.width * cnt;
-               pitch = (image->width + 7)/8 + scan_align;
-               pitch &= ~scan_align;
-               size = pitch * vc->vc_font.height + buf_align;
-               size &= ~buf_align;
-               dst0 = info->pixmap.addr + fb_get_buffer_offset(info, size);
-               image->data = dst0;
-               while (k--) {
-                       src = p->fontdata + (scr_readw(s++) & charmask)*
-                               cellsize;
-                       dst = dst0;
-                       mask = (u8) (0xfff << shift_high);
-                       move_buf_unaligned(info, dst, src, pitch, image->height, mask,
-					  shift_high, shift_low, mod, idx);
-                       shift_low += mod;
-                       dst0 += (shift_low >= 8) ? width : width - 1;
-                       shift_low &= 7;
-                       shift_high = 8 - shift_low;
-               }
-               info->fbops->fb_imageblit(info, image);
-               image->dx += cnt * vc->vc_font.width;
-               count -= cnt;
-       }
+		image->width = vc->vc_font.width * cnt;
+		pitch = (image->width + 7)/8 + scan_align;
+		pitch &= ~scan_align;
+		size = pitch * vc->vc_font.height + buf_align;
+		size &= ~buf_align;
+		dst0 = info->pixmap.addr + fb_get_buffer_offset(info, size);
+		image->data = dst0;
+		while (k--) {
+			src = p->fontdata + (scr_readw(s++) & charmask)*
+			cellsize;
+			dst = dst0;
+			mask = (u8) (0xfff << shift_high);
+			move_buf_unaligned(info, dst, src, pitch, image->height,
+					mask, shift_high, shift_low, mod, idx);
+			shift_low += mod;
+			dst0 += (shift_low >= 8) ? width : width - 1;
+			shift_low &= 7;
+			shift_high = 8 - shift_low;
+		}
+		info->fbops->fb_imageblit(info, image);
+		image->dx += cnt * vc->vc_font.width;
+		count -= cnt;
+		atomic_dec(&info->pixmap.count);
+		smp_mb__after_atomic_dec();
+	}
 }
 
 static void putcs_aligned(struct vc_data *vc, struct display *p,
                          struct fb_info *info, struct fb_image *image,
                          int count, const unsigned short *s)
 {
-       unsigned int width = vc->vc_font.width/8;
-       unsigned int cellsize = vc->vc_font.height * width;
-       unsigned int maxcnt = info->pixmap.size/cellsize;
-       unsigned int scan_align = info->pixmap.scan_align - 1;
-       unsigned int buf_align = info->pixmap.buf_align - 1;
-       unsigned int pitch, cnt, size, k;
-       unsigned short charmask = p->charmask;
-       u8 *src, *dst, *dst0;
+	unsigned int width = vc->vc_font.width/8;
+	unsigned int cellsize = vc->vc_font.height * width;
+	unsigned int maxcnt = info->pixmap.size/cellsize;
+	unsigned int scan_align = info->pixmap.scan_align - 1;
+	unsigned int buf_align = info->pixmap.buf_align - 1;
+	unsigned int pitch, cnt, size, k;
+	unsigned short charmask = p->charmask;
+	u8 *src, *dst, *dst0;
 
-       while (count) {
-               if (count > maxcnt)
-                       cnt = k = maxcnt;
-               else
-                       cnt = k = count;
-               pitch = width * cnt + scan_align;
-               pitch &= ~scan_align;
-               size = pitch * vc->vc_font.height + buf_align;
-               size &= ~buf_align;
-               image->width = vc->vc_font.width * cnt;
-               dst0 = info->pixmap.addr + fb_get_buffer_offset(info, size);
-               image->data = dst0;
-               while (k--) {
-                       src = p->fontdata + (scr_readw(s++) & charmask)* cellsize;
-                       dst = dst0;
-                       move_buf_aligned(info, dst, src, pitch, width, image->height);
-                       dst0 += width;
-               }
-               info->fbops->fb_imageblit(info, image);
-               image->dx += cnt * vc->vc_font.width;
-               count -= cnt;
-       }
+	while (count) {
+		if (count > maxcnt)
+			cnt = k = maxcnt;
+		else
+			cnt = k = count;
+		
+		pitch = width * cnt + scan_align;
+		pitch &= ~scan_align;
+		size = pitch * vc->vc_font.height + buf_align;
+		size &= ~buf_align;
+		image->width = vc->vc_font.width * cnt;
+		dst0 = info->pixmap.addr + fb_get_buffer_offset(info, size);
+		image->data = dst0;
+		while (k--) {
+			src = p->fontdata + (scr_readw(s++)&charmask)*cellsize;
+			dst = dst0;
+			move_buf_aligned(info, dst, src, pitch, width, image->height);
+			dst0 += width;
+		}
+		info->fbops->fb_imageblit(info, image);
+		image->dx += cnt * vc->vc_font.width;
+		count -= cnt;
+		atomic_dec(&info->pixmap.count);
+		smp_mb__after_atomic_dec();
+	}
 }
 
 /*
@@ -448,6 +452,8 @@ static void accel_putc(struct vc_data *vc, struct display *p,
 	move_buf_aligned(info, dst, src, pitch, width, image.height);
 
 	info->fbops->fb_imageblit(info, &image);
+	atomic_dec(&info->pixmap.count);
+	smp_mb__after_atomic_dec();
 }
 
 void accel_putcs(struct vc_data *vc, struct display *p,

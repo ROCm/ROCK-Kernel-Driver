@@ -22,11 +22,11 @@ Disadvantages:
 How to use it?
 ==============
 
-Switching modes is done using the video=matrox:vesa:... boot parameter
+Switching modes is done using the video=matroxfb:vesa:... boot parameter
 or using `fbset' program.
 
 If you want, for example, enable a resolution of 1280x1024x24bpp you should
-pass to the kernel this command line: "video=matrox:vesa:0x1BB".
+pass to the kernel this command line: "video=matroxfb:vesa:0x1BB".
 
 You should compile in both vgacon (to boot if you remove you Matrox from
 box) and matroxfb (for graphics mode). You should not compile-in vesafb
@@ -73,7 +73,7 @@ You can enter these number either hexadecimal (leading `0x') or decimal
 with your old number passed to vesafb.
 
 Non-listed number can be achieved by more complicated command-line, for
-example 1600x1200x32bpp can be specified by `video=matrox:vesa:0x11C,depth:32'.
+example 1600x1200x32bpp can be specified by `video=matroxfb:vesa:0x11C,depth:32'.
 
 
 X11
@@ -106,7 +106,7 @@ Configuration
 =============
 
 You can pass kernel command line options to matroxfb with
-`video=matrox:option1,option2:value2,option3' (multiple options should be 
+`video=matroxfb:option1,option2:value2,option3' (multiple options should be 
 separated by comma, values are separated from options by `:'). 
 Accepted options:
 
@@ -116,7 +116,7 @@ mem:X    - size of memory (X can be in megabytes, kilobytes or bytes)
 	   memory usable for on-screen display (i.e. max. 8 MB).
 disabled - do not load driver; you can use also `off', but `disabled'
            is here too.
-enabled  - load driver, if you have `video=matrox:disabled' in LILO
+enabled  - load driver, if you have `video=matroxfb:disabled' in LILO
            configuration, you can override it by this (you cannot override
 	   `off'). It is default.
 noaccel  - do not use acceleration engine. It does not work on Alphas.
@@ -380,7 +380,7 @@ Driver supports dualhead G400 with some limitations:
    XFree when secondary head used to use acceleration.
  + secondary head always powerups in 640x480@60-32 videomode. You have to use
    fbset to change this mode.
- + secondary head always powerups in monitor mode. You have to use matroxset
+ + secondary head always powerups in monitor mode. You have to use fbmatroxset
    to change it to TV mode. Also, you must select at least 525 lines for
    NTSC output and 625 lines for PAL output.
  + kernel is not fully multihead ready. So some things are impossible to do.
