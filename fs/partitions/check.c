@@ -29,7 +29,6 @@
 #include "ldm.h"
 #include "mac.h"
 #include "msdos.h"
-#include "nec98.h"
 #include "osf.h"
 #include "sgi.h"
 #include "sun.h"

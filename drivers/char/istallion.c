@@ -851,7 +851,7 @@ static void __exit istallion_module_exit(void)
 	i = tty_unregister_driver(stli_serial);
 	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
-			"errno=%d,%d\n", -i);
+			"errno=%d\n", -i);
 		restore_flags(flags);
 		return;
 	}

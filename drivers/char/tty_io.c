@@ -91,6 +91,7 @@
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <linux/device.h>
+#include <linux/idr.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -128,6 +129,8 @@ DECLARE_MUTEX(tty_sem);
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
 extern int pty_limit;		/* Config limit on Unix98 ptys */
+static DEFINE_IDR(allocated_ptys);
+static DECLARE_MUTEX(allocated_ptys_lock);
 #endif
 
 extern void disable_early_printk(void);
@@ -1065,6 +1068,7 @@ static void release_dev(struct file * filp)
 {
 	struct tty_struct *tty, *o_tty;
 	int	pty_master, tty_closing, o_tty_closing, do_sleep;
+	int	devpts_master;
 	int	idx;
 	char	buf[64];
 	
@@ -1079,6 +1083,7 @@ static void release_dev(struct file * filp)
 	idx = tty->index;
 	pty_master = (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 		      tty->driver->subtype == PTY_TYPE_MASTER);
+	devpts_master = pty_master && (tty->driver->flags & TTY_DRIVER_DEVPTS_MEM);
 	o_tty = tty->link;
 
 #ifdef TTY_PARANOIA_CHECK
@@ -1295,11 +1300,21 @@ static void release_dev(struct file * filp)
 		o_tty->ldisc = ldiscs[N_TTY];
 	}
 
-	/* 
+	/*
 	 * The release_mem function takes care of the details of clearing
 	 * the slots and preserving the termios structure.
 	 */
 	release_mem(tty, idx);
+
+#ifdef CONFIG_UNIX98_PTYS
+	/* Make this pty number available for reallocation */
+	if (devpts_master) {
+		down(&allocated_ptys_lock);
+		idr_remove(&allocated_ptys, idx);
+		up(&allocated_ptys_lock);
+	}
+#endif
+
 }
 
 /*
@@ -1322,8 +1337,12 @@ static int tty_open(struct inode * inode, struct file * filp)
 	int index;
 	dev_t device = inode->i_rdev;
 	unsigned short saved_flags = filp->f_flags;
+
 retry_open:
 	noctty = filp->f_flags & O_NOCTTY;
+	index  = -1;
+	retval = 0;
+
 	if (device == MKDEV(TTYAUX_MAJOR,0)) {
 		if (!current->signal->tty)
 			return -ENXIO;
@@ -1361,24 +1380,40 @@ retry_open:
 
 #ifdef CONFIG_UNIX98_PTYS
 	if (device == MKDEV(TTYAUX_MAJOR,2)) {
+		int idr_ret;
+
 		/* find a device that is not in use. */
-		static int next_ptmx_dev = 0;
-		retval = -1;
-		driver = ptm_driver;
-		while (driver->refcount < pty_limit) {
-			index = next_ptmx_dev;
-			next_ptmx_dev = (next_ptmx_dev+1) % driver->num;
-			if (!init_dev(driver, index, &tty))
-				goto ptmx_found; /* ok! */
-		}
-		return -EIO; /* no free ptys */
-	ptmx_found:
-		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
-		if (devpts_pty_new(tty->link)) {
-			/* BADNESS - need to destroy both ptm and pts! */
+		down(&allocated_ptys_lock);
+		if (!idr_pre_get(&allocated_ptys, GFP_KERNEL)) {
+			up(&allocated_ptys_lock);
 			return -ENOMEM;
 		}
-		noctty = 1;
+		idr_ret = idr_get_new(&allocated_ptys, NULL, &index);
+		if (idr_ret < 0) {
+			up(&allocated_ptys_lock);
+			if (idr_ret == -EAGAIN)
+				return -ENOMEM;
+			return -EIO;
+		}
+		if (index >= pty_limit) {
+			idr_remove(&allocated_ptys, index);
+			up(&allocated_ptys_lock);
+			return -EIO;
+		}
+		up(&allocated_ptys_lock);
+
+		driver = ptm_driver;
+		retval = init_dev(driver, index, &tty);
+		if (retval) {
+			down(&allocated_ptys_lock);
+			idr_remove(&allocated_ptys, index);
+			up(&allocated_ptys_lock);
+			return retval;
+		}
+
+		set_bit(TTY_PTY_LOCK, &tty->flags); /* LOCK THE SLAVE */
+		if (devpts_pty_new(tty->link))
+			retval = -ENOMEM;
 	} else
 #endif
 	{
@@ -1400,10 +1435,12 @@ got_driver:
 #ifdef TTY_DEBUG_HANGUP
 	printk(KERN_DEBUG "opening %s...", tty->name);
 #endif
-	if (tty->driver->open)
-		retval = tty->driver->open(tty, filp);
-	else
-		retval = -ENODEV;
+	if (!retval) {
+		if (tty->driver->open)
+			retval = tty->driver->open(tty, filp);
+		else
+			retval = -ENODEV;
+	}
 	filp->f_flags = saved_flags;
 
 	if (!retval && test_bit(TTY_EXCLUSIVE, &tty->flags) && !capable(CAP_SYS_ADMIN))
@@ -1413,6 +1450,14 @@ got_driver:
 #ifdef TTY_DEBUG_HANGUP
 		printk(KERN_DEBUG "error %d in opening %s...", retval,
 		       tty->name);
+#endif
+
+#ifdef CONFIG_UNIX98_PTYS
+		if (index != -1) {
+			down(&allocated_ptys_lock);
+			idr_remove(&allocated_ptys, index);
+			up(&allocated_ptys_lock);
+		}
 #endif
 
 		release_dev(filp);

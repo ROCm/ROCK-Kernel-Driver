@@ -397,7 +397,6 @@ static struct k_itimer * alloc_posix_timer(void)
 	if (!tmr)
 		return tmr;
 	memset(tmr, 0, sizeof (struct k_itimer));
-	tmr->it_id = (timer_t)-1;
 	if (unlikely(!(tmr->sigq = sigqueue_alloc()))) {
 		kmem_cache_free(posix_timers_cache, tmr);
 		tmr = 0;
@@ -405,9 +404,11 @@ static struct k_itimer * alloc_posix_timer(void)
 	return tmr;
 }
 
-static void release_posix_timer(struct k_itimer *tmr)
+#define IT_ID_SET	1
+#define IT_ID_NOT_SET	0
+static void release_posix_timer(struct k_itimer *tmr, int it_id_set)
 {
-	if (tmr->it_id != -1) {
+	if (it_id_set) {
 		unsigned long flags;
 		spin_lock_irqsave(&idr_lock, flags);
 		idr_remove(&posix_timers_id, tmr->it_id);
@@ -429,10 +430,11 @@ sys_timer_create(clockid_t which_clock,
 {
 	int error = 0;
 	struct k_itimer *new_timer = NULL;
-	timer_t new_timer_id;
+	int new_timer_id;
 	struct task_struct *process = 0;
 	unsigned long flags;
 	sigevent_t event;
+	int it_id_set = IT_ID_NOT_SET;
 
 	if ((unsigned) which_clock >= MAX_CLOCKS ||
 				!posix_clocks[which_clock].res)
@@ -443,19 +445,38 @@ sys_timer_create(clockid_t which_clock,
 		return -EAGAIN;
 
 	spin_lock_init(&new_timer->it_lock);
-	do {
-		if (unlikely(!idr_pre_get(&posix_timers_id, GFP_KERNEL))) {
-			error = -EAGAIN;
-			new_timer->it_id = (timer_t)-1;
-			goto out;
-		}
-		spin_lock_irq(&idr_lock);
-		new_timer_id = (timer_t) idr_get_new(&posix_timers_id,
-							(void *) new_timer);
-		spin_unlock_irq(&idr_lock);
-	} while (unlikely(new_timer_id == -1));
+ retry:
+	if (unlikely(!idr_pre_get(&posix_timers_id, GFP_KERNEL))) {
+		error = -EAGAIN;
+		goto out;
+	}
+	spin_lock_irq(&idr_lock);
+	error = idr_get_new(&posix_timers_id,
+			    (void *) new_timer,
+			    &new_timer_id);
+	spin_unlock_irq(&idr_lock);
+	if (error == -EAGAIN)
+		goto retry;
+	else if (error) {
+		/*
+		 * Wierd looking, but we return EAGAIN if the IDR is
+		 * full (proper POSIX return value for this)
+		 */
+		error = -EAGAIN;
+		goto out;
+	}
 
-	new_timer->it_id = new_timer_id;
+	it_id_set = IT_ID_SET;
+	new_timer->it_id = (timer_t) new_timer_id;
+	new_timer->it_clock = which_clock;
+	new_timer->it_incr = 0;
+	new_timer->it_overrun = -1;
+	init_timer(&new_timer->it_timer);
+	new_timer->it_timer.expires = 0;
+	new_timer->it_timer.data = (unsigned long) new_timer;
+	new_timer->it_timer.function = posix_timer_fn;
+	set_timer_inactive(new_timer);
+
 	/*
 	 * return the timer_id now.  The next step is hard to
 	 * back out if there is an error.
@@ -470,6 +491,10 @@ sys_timer_create(clockid_t which_clock,
 			error = -EFAULT;
 			goto out;
 		}
+		new_timer->it_sigev_notify = event.sigev_notify;
+		new_timer->it_sigev_signo = event.sigev_signo;
+		new_timer->it_sigev_value = event.sigev_value;
+
 		read_lock(&tasklist_lock);
 		if ((process = good_sigevent(&event))) {
 			/*
@@ -489,6 +514,7 @@ sys_timer_create(clockid_t which_clock,
 			 */
 			spin_lock_irqsave(&process->sighand->siglock, flags);
 			if (!(process->flags & PF_EXITING)) {
+				new_timer->it_process = process;
 				list_add(&new_timer->list,
 					 &process->signal->posix_timers);
 				spin_unlock_irqrestore(&process->sighand->siglock, flags);
@@ -503,35 +529,27 @@ sys_timer_create(clockid_t which_clock,
 			error = -EINVAL;
 			goto out;
 		}
-		new_timer->it_sigev_notify = event.sigev_notify;
-		new_timer->it_sigev_signo = event.sigev_signo;
-		new_timer->it_sigev_value = event.sigev_value;
 	} else {
 		new_timer->it_sigev_notify = SIGEV_SIGNAL;
 		new_timer->it_sigev_signo = SIGALRM;
 		new_timer->it_sigev_value.sival_int = new_timer->it_id;
 		process = current->group_leader;
 		spin_lock_irqsave(&process->sighand->siglock, flags);
+		new_timer->it_process = process;
 		list_add(&new_timer->list, &process->signal->posix_timers);
 		spin_unlock_irqrestore(&process->sighand->siglock, flags);
 	}
 
-	new_timer->it_clock = which_clock;
-	new_timer->it_incr = 0;
-	new_timer->it_overrun = -1;
-	init_timer(&new_timer->it_timer);
-	new_timer->it_timer.expires = 0;
-	new_timer->it_timer.data = (unsigned long) new_timer;
-	new_timer->it_timer.function = posix_timer_fn;
-	set_timer_inactive(new_timer);
-
-	/*
-	 * Once we set the process, it can be found so do it last...
+ 	/*
+	 * In the case of the timer belonging to another task, after
+	 * the task is unlocked, the timer is owned by the other task
+	 * and may cease to exist at any time.  Don't use or modify
+	 * new_timer after the unlock call.
 	 */
-	new_timer->it_process = process;
+
 out:
 	if (error)
-		release_posix_timer(new_timer);
+		release_posix_timer(new_timer, it_id_set);
 
 	return error;
 }
@@ -952,7 +970,7 @@ retry_delete:
 	timer->it_process = NULL;
 	}
 	unlock_timer(timer, flags);
-	release_posix_timer(timer);
+	release_posix_timer(timer, IT_ID_SET);
 	return 0;
 }
 /*
@@ -989,7 +1007,7 @@ retry_delete:
 		timer->it_process = NULL;
 	}
 	unlock_timer(timer, flags);
-	release_posix_timer(timer);
+	release_posix_timer(timer, IT_ID_SET);
 }
 
 /*

@@ -23,7 +23,7 @@
 static const int h8300_register_offset[] = {
 	PT_REG(er1), PT_REG(er2), PT_REG(er3), PT_REG(er4),
 	PT_REG(er5), PT_REG(er6), PT_REG(er0), PT_REG(orig_er0),
-	PT_REG(ccr), PT_REG(pc), PT_REG(exr)
+	PT_REG(ccr), PT_REG(pc),  0,           PT_REG(exr)
 };
 
 /* read register */

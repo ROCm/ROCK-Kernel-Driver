@@ -432,6 +432,11 @@ config FB_RIVA
 	  To compile this driver as a module, choose M here: the
 	  module will be called rivafb.
 
+config FB_RIVA_I2C
+       bool "Enable DDC Support"
+       depends on FB_RIVA && I2C
+       help
+
 config FB_I810
 	tristate "Intel 810/815 support (EXPERIMENTAL)"
 	depends on FB && AGP && AGP_INTEL && EXPERIMENTAL && PCI	

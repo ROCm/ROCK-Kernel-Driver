@@ -419,7 +419,24 @@ _GLOBAL(_tlbia)
 	ble	1b
 
 	isync
-#else /* !(CONFIG_40x || CONFIG_44x) */
+#elif defined(CONFIG_FSL_BOOKE)
+	/* Invalidate all entries in TLB0 */
+	li	r3, 0x04
+	tlbivax	0,3
+	/* Invalidate all entries in TLB1 */
+	li	r3, 0x0c
+	tlbivax	0,3
+	/* Invalidate all entries in TLB2 */
+	li	r3, 0x14
+	tlbivax	0,3
+	/* Invalidate all entries in TLB3 */
+	li	r3, 0x1c
+	tlbivax	0,3
+	msync
+#ifdef CONFIG_SMP
+	tlbsync
+#endif /* CONFIG_SMP */
+#else /* !(CONFIG_40x || CONFIG_44x || CONFIG_FSL_BOOKE) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -487,7 +504,20 @@ _GLOBAL(_tlbie)
 	tlbwe	r3, r3, PPC44x_TLB_PAGEID
 	isync
 10:
-#else /* !(CONFIG_40x || CONFIG_44x) */
+#elif defined(CONFIG_FSL_BOOKE)
+	rlwinm	r4, r3, 0, 0, 19
+	ori	r5, r4, 0x08	/* TLBSEL = 1 */
+	ori	r6, r4, 0x10	/* TLBSEL = 2 */
+	ori	r7, r4, 0x18	/* TLBSEL = 3 */
+	tlbivax	0, r4
+	tlbivax	0, r5
+	tlbivax	0, r6
+	tlbivax	0, r7
+	msync
+#if defined(CONFIG_SMP)
+	tlbsync
+#endif /* CONFIG_SMP */
+#else /* !(CONFIG_40x || CONFIG_44x || CONFIG_FSL_BOOKE) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -544,6 +574,10 @@ _GLOBAL(flush_instruction_cache)
 	lis	r3, KERNELBASE@h
 	iccci	0,r3
 #endif
+#elif CONFIG_FSL_BOOKE
+	mfspr	r3,SPRN_L1CSR1
+	ori	r3,r3,L1CSR1_ICFI|L1CSR1_ICLFR
+	mtspr	SPRN_L1CSR1,r3
 #else
 	mfspr	r3,PVR
 	rlwinm	r3,r3,16,16,31
@@ -1047,7 +1081,7 @@ _GLOBAL(_get_SP)
  * and exceptions as if the cpu had performed the load or store.
  */
 
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_4xx) || defined(CONFIG_E500)
 _GLOBAL(cvt_fd)
 	lfs	0,0(r3)
 	stfd	0,0(r4)

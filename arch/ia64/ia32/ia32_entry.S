@@ -349,7 +349,7 @@ ia32_syscall_table:
 	data8 sys_setfsuid	/* 16-bit version */
 	data8 sys_setfsgid	/* 16-bit version */
 	data8 sys_llseek	  /* 140 */
-	data8 sys32_getdents
+	data8 compat_sys_getdents
 	data8 compat_sys_select
 	data8 sys_flock
 	data8 sys32_msync
@@ -428,7 +428,7 @@ ia32_syscall_table:
 	data8 sys_pivot_root
 	data8 sys_mincore
 	data8 sys_madvise
-	data8 sys_getdents64	  /* 220 */
+	data8 compat_sys_getdents64	  /* 220 */
 	data8 compat_sys_fcntl64
 	data8 sys_ni_syscall		/* reserved for TUX */
 	data8 sys_ni_syscall		/* reserved for Security */

@@ -306,9 +306,7 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	goto out;
       case SIG('C','L'):
 	ISOFS_I(inode)->i_first_extent = isonum_733(rr->u.CL.location);
-	reloc = iget(inode->i_sb,
-		     (ISOFS_I(inode)->i_first_extent <<
-		      ISOFS_SB(inode->i_sb)->s_log_zone_size));
+	reloc = isofs_iget(inode->i_sb, ISOFS_I(inode)->i_first_extent, 0);
 	if (!reloc)
 		goto out;
 	inode->i_mode = reloc->i_mode;
@@ -447,15 +445,15 @@ int parse_rock_ridge_inode(struct iso_directory_record * de,
 static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
+        struct iso_inode_info *ei = ISOFS_I(inode);
 	char *link = kmap(page);
 	unsigned long bufsize = ISOFS_BUFFER_SIZE(inode);
-	unsigned char bufbits = ISOFS_BUFFER_BITS(inode);
 	struct buffer_head *bh;
 	char *rpnt = link;
 	unsigned char *pnt;
 	struct iso_directory_record *raw_inode;
 	CONTINUE_DECLS;
-	int block;
+	unsigned long block, offset;
 	int sig;
 	int len;
 	unsigned char *chr;
@@ -464,20 +462,21 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 	if (!ISOFS_SB(inode->i_sb)->s_rock)
 		panic ("Cannot have symlink with high sierra variant of iso filesystem\n");
 
-	block = inode->i_ino >> bufbits;
+	block = ei->i_iget5_block;
 	lock_kernel();
 	bh = sb_bread(inode->i_sb, block);
 	if (!bh)
 		goto out_noread;
 
-	pnt = (unsigned char *) bh->b_data + (inode->i_ino & (bufsize - 1));
+        offset = ei->i_iget5_offset;
+	pnt = (unsigned char *) bh->b_data + offset;
 
 	raw_inode = (struct iso_directory_record *) pnt;
 
 	/*
 	 * If we go past the end of the buffer, there is some sort of error.
 	 */
-	if ((inode->i_ino & (bufsize - 1)) + *pnt > bufsize)
+	if (offset + *pnt > bufsize)
 		goto out_bad_span;
 
 	/* Now test for possible Rock Ridge extensions which will override

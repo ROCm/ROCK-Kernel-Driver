@@ -35,8 +35,12 @@ struct linux_binprm{
 	char * interp;		/* Name of the binary really executed. Most
 				   of the time same as filename, but could be
 				   different for binfmt_{misc,script} */
+	unsigned long interp_flags;
 	unsigned long loader, exec;
 };
+
+#define BINPRM_FLAGS_ENFORCE_NONDUMP_BIT 0
+#define BINPRM_FLAGS_ENFORCE_NONDUMP (1 << BINPRM_FLAGS_ENFORCE_NONDUMP_BIT)
 
 /*
  * This structure defines the functions that are used to load the binary formats that

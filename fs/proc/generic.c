@@ -288,18 +288,20 @@ static spinlock_t proc_inum_lock = SPIN_LOCK_UNLOCKED; /* protects the above */
  */
 static unsigned int get_inode_number(void)
 {
-	unsigned int i, inum = 0;
+	int i, inum = 0;
+	int error;
 
 retry:
 	if (idr_pre_get(&proc_inum_idr, GFP_KERNEL) == 0)
 		return 0;
 
 	spin_lock(&proc_inum_lock);
-	i = idr_get_new(&proc_inum_idr, NULL);
+	error = idr_get_new(&proc_inum_idr, NULL, &i);
 	spin_unlock(&proc_inum_lock);
-
-	if (i == -1)
+	if (error == -EAGAIN)
 		goto retry;
+	else if (error)
+		return 0;
 
 	inum = (i & MAX_ID_MASK) + PROC_DYNAMIC_FIRST;
 

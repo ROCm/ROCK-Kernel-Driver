@@ -1,0 +1,44 @@
+config 85xx
+	bool
+	depends on E500
+	default y
+
+config PPC_INDIRECT_PCI_BE
+	bool
+	depends on 85xx
+	default y
+
+menu "Freescale 85xx options"
+	depends on E500
+
+choice
+	prompt "Machine Type"
+	depends on 85xx
+	default MPC8540_ADS
+
+config MPC8540_ADS
+	bool "MPC8540ADS"
+	help
+	  This option enables support for the MPC 8540 ADS evaluation board.
+
+endchoice
+
+# It's often necessary to know the specific 85xx processor type.
+# Fortunately, it is implied (so far) from the board type, so we
+# don't need to ask more redundant questions.
+config MPC8540
+	bool
+	depends on MPC8540_ADS
+	default y
+
+config FSL_OCP
+	bool
+	depends on 85xx
+	default y
+
+config PPC_GEN550
+	bool
+	depends on MPC8540
+	default y
+
+endmenu

@@ -2571,6 +2571,14 @@ P: 1024D/EDBB6147 7B36 0E07 04BC 11DC A7A0  D3F7 7185 9E7A EDBB 6147
 D: sonypi, meye drivers, mct_u232 usb serial hacks
 S: Paris, France
 
+N: Matt Porter
+E: mporter@kernel.crashing.org
+D: Motorola PowerPC PReP support
+D: cPCI PowerPC support
+D: Embedded PowerPC 4xx/6xx/7xx/74xx support
+S: Chandler, Arizona 85249
+S: USA
+
 N: Frederic Potter 
 E: fpotter@cirpack.com
 D: Some PCI kernel support
@@ -3109,12 +3117,13 @@ S: Beaverton, Oregon 97005
 S: USA
 
 N: Marcelo W. Tosatti
-E: marcelo@conectiva.com.br
-W: http://bazar.conectiva.com.br/~marcelo/
-D: Miscellaneous kernel hacker (mostly VM/MM work)
-S: Conectiva S.A.
-S: R. Tocantins, 89 - Cristo Rei
-S: 80050-430 - Curitiba - Paraná
+E: marcelo.tosatti@cyclades.com
+D: Miscellaneous kernel hacker
+D: v2.4 kernel maintainer
+D: Current pc300/cyclades maintainer
+S: Cyclades Corporation
+S: Av Cristovao Colombo, 462. Floresta.
+S: Porto Alegre
 S: Brazil
 
 N: Stefan Traby

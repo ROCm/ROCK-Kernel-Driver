@@ -7,6 +7,8 @@
  *      1995  Mark Dobie - allow mounting of some weird VideoCDs and PhotoCDs.
  *	1997  Gordon Chaffee - Joliet CDs
  *	1998  Eric Lammerts - ISO 9660 Level 3
+ *	2004  Paul Serice - Inode Support pushed out from 4GB to 128GB
+ *	2004  Paul Serice - NFS Export Operations
  */
 
 #include <linux/config.h>
@@ -133,20 +135,6 @@ static struct super_operations isofs_sops = {
 	.put_super	= isofs_put_super,
 	.statfs		= isofs_statfs,
 	.remount_fs	= isofs_remount,
-};
-
-/* the export_operations structure for describing
- * how to export (e.g. via kNFSd) is deliberately
- * empty.
- * This means that the filesystem want to use iget
- * to map an inode number into an inode.
- * The lack of a get_parent operation means that 
- * if something isn't in the cache, then you cannot
- * access it.
- * It should be possible to write a get_parent,
- * but it would be a bit hairy...
- */
-static struct export_operations isofs_export_ops = {
 };
 
 
@@ -738,19 +726,14 @@ root_found:
 	/* Set this for reference. Its not currently used except on write
 	   which we don't have .. */
 	   
-	/* RDE: data zone now byte offset! */
-
-	first_data_zone = ((isonum_733 (rootp->extent) +
-			  isonum_711 (rootp->ext_attr_length))
-			 << sbi->s_log_zone_size);
+	first_data_zone = isonum_733 (rootp->extent) +
+			  isonum_711 (rootp->ext_attr_length);
 	sbi->s_firstdatazone = first_data_zone;
 #ifndef BEQUIET
 	printk(KERN_DEBUG "Max size:%ld   Log zone size:%ld\n",
 	       sbi->s_max_size,
 	       1UL << sbi->s_log_zone_size);
-	printk(KERN_DEBUG "First datazone:%ld   Root inode number:%ld\n",
-	       sbi->s_firstdatazone >> sbi->s_log_zone_size,
-	       sbi->s_firstdatazone);
+	printk(KERN_DEBUG "First datazone:%ld\n", sbi->s_firstdatazone);
 	if(sbi->s_high_sierra)
 		printk(KERN_DEBUG "Disc in High Sierra format.\n");
 #endif
@@ -767,9 +750,8 @@ root_found:
 		pri = (struct iso_primary_descriptor *) sec;
 		rootp = (struct iso_directory_record *)
 			pri->root_directory_record;
-		first_data_zone = ((isonum_733 (rootp->extent) +
-			  	isonum_711 (rootp->ext_attr_length))
-				 << sbi->s_log_zone_size);
+		first_data_zone = isonum_733 (rootp->extent) +
+			  	isonum_711 (rootp->ext_attr_length);
 	}
 
 	/*
@@ -835,7 +817,7 @@ root_found:
 	 * the s_rock flag. Once we have the final s_rock value,
 	 * we then decide whether to use the Joliet descriptor.
 	 */
-	inode = iget(s, sbi->s_firstdatazone);
+	inode = isofs_iget(s, sbi->s_firstdatazone, 0);
 
 	/*
 	 * If this disk has both Rock Ridge and Joliet on it, then we
@@ -854,7 +836,7 @@ root_found:
 			printk(KERN_DEBUG 
 				"ISOFS: changing to secondary root\n");
 			iput(inode);
-			inode = iget(s, sbi->s_firstdatazone);
+			inode = isofs_iget(s, sbi->s_firstdatazone, 0);
 		}
 	}
 
@@ -952,7 +934,7 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock_s,
 	unsigned long b_off;
 	unsigned offset, sect_size;
 	unsigned int firstext;
-	unsigned long nextino;
+	unsigned long nextblk, nextoff;
 	long iblock = (long)iblock_s;
 	int section, rv;
 	struct iso_inode_info *ei = ISOFS_I(inode);
@@ -970,7 +952,8 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock_s,
 	offset    = 0;
 	firstext  = ei->i_first_extent;
 	sect_size = ei->i_section_size >> ISOFS_BUFFER_BITS(inode);
-	nextino   = ei->i_next_section_ino;
+	nextblk   = ei->i_next_section_block;
+	nextoff   = ei->i_next_section_offset;
 	section   = 0;
 
 	while ( nblocks ) {
@@ -987,25 +970,28 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock_s,
 			goto abort;
 		}
 		
-		if (nextino) {
+		if (nextblk) {
 			while (b_off >= (offset + sect_size)) {
 				struct inode *ninode;
 				
 				offset += sect_size;
-				if (nextino == 0)
+				if (nextblk == 0)
 					goto abort;
-				ninode = iget(inode->i_sb, nextino);
+				ninode = isofs_iget(inode->i_sb, nextblk, nextoff);
 				if (!ninode)
 					goto abort;
 				firstext  = ISOFS_I(ninode)->i_first_extent;
-				sect_size = ISOFS_I(ninode)->i_section_size;
-				nextino   = ISOFS_I(ninode)->i_next_section_ino;
+				sect_size = ISOFS_I(ninode)->i_section_size >> ISOFS_BUFFER_BITS(ninode);
+				nextblk   = ISOFS_I(ninode)->i_next_section_block;
+				nextoff   = ISOFS_I(ninode)->i_next_section_offset;
 				iput(ninode);
 				
 				if (++section > 100) {
 					printk("isofs_get_blocks: More than 100 file sections ?!?, aborting...\n");
-					printk("isofs_get_blocks: ino=%lu block=%ld firstext=%u sect_size=%u nextino=%lu\n",
-					       inode->i_ino, iblock, firstext, (unsigned) sect_size, nextino);
+					printk("isofs_get_blocks: block=%ld firstext=%u sect_size=%u "
+					       "nextblk=%lu nextoff=%lu\n",
+					       iblock, firstext, (unsigned) sect_size,
+					       nextblk, nextoff);
 					goto abort;
 				}
 			}
@@ -1044,7 +1030,7 @@ static int isofs_get_block(struct inode *inode, sector_t iblock,
 	return isofs_get_blocks(inode, iblock, &bh_result, 1) ? 0 : -EIO;
 }
 
-static int isofs_bmap(struct inode *inode, int block)
+static int isofs_bmap(struct inode *inode, sector_t block)
 {
 	struct buffer_head dummy;
 	int error;
@@ -1097,21 +1083,25 @@ static inline void test_and_set_gid(gid_t *p, gid_t value)
 
 static int isofs_read_level3_size(struct inode * inode)
 {
-	unsigned long f_pos = inode->i_ino;
 	unsigned long bufsize = ISOFS_BUFFER_SIZE(inode);
 	int high_sierra = ISOFS_SB(inode->i_sb)->s_high_sierra;
 	struct buffer_head * bh = NULL;
-	unsigned long block, offset;
+	unsigned long block, offset, block_saved, offset_saved;
 	int i = 0;
 	int more_entries = 0;
 	struct iso_directory_record * tmpde = NULL;
 	struct iso_inode_info *ei = ISOFS_I(inode);
 
 	inode->i_size = 0;
-	ei->i_next_section_ino = 0;
 
-	block = f_pos >> ISOFS_BUFFER_BITS(inode);
-	offset = f_pos & (bufsize-1);
+	/* The first 16 blocks are reserved as the System Area.  Thus,
+	 * no inodes can appear in block 0.  We use this to flag that
+	 * this is the last section. */
+	ei->i_next_section_block = 0;
+	ei->i_next_section_offset = 0;
+
+	block = ei->i_iget5_block;
+	offset = ei->i_iget5_offset;
 
 	do {
 		struct iso_directory_record * de;
@@ -1128,12 +1118,13 @@ static int isofs_read_level3_size(struct inode * inode)
 		if (de_len == 0) {
 			brelse(bh);
 			bh = NULL;
-			f_pos = (f_pos + ISOFS_BLOCK_SIZE) & ~(ISOFS_BLOCK_SIZE - 1);
-			block = f_pos >> ISOFS_BUFFER_BITS(inode);
+			++block;
 			offset = 0;
 			continue;
 		}
 
+		block_saved = block;
+		offset_saved = offset;
 		offset += de_len;
 
 		/* Make sure we have a full directory entry */
@@ -1159,12 +1150,13 @@ static int isofs_read_level3_size(struct inode * inode)
 		}
 
 		inode->i_size += isonum_733(de->size);
-		if (i == 1)
-			ei->i_next_section_ino = f_pos;
+		if (i == 1) {
+			ei->i_next_section_block = block_saved;
+			ei->i_next_section_offset = offset_saved;
+		}
 
 		more_entries = de->flags[-high_sierra] & 0x80;
 
-		f_pos += de_len;
 		i++;
 		if(i > 100)
 			goto out_toomany;
@@ -1190,8 +1182,8 @@ out_noread:
 out_toomany:
 	printk(KERN_INFO "isofs_read_level3_size: "
 		"More than 100 file sections ?!?, aborting...\n"
-	  	"isofs_read_level3_size: inode=%lu ino=%lu\n",
-		inode->i_ino, f_pos);
+	  	"isofs_read_level3_size: inode=%lu\n",
+		inode->i_ino);
 	goto out;
 }
 
@@ -1200,21 +1192,22 @@ static void isofs_read_inode(struct inode * inode)
 	struct super_block *sb = inode->i_sb;
 	struct isofs_sb_info *sbi = ISOFS_SB(sb);
 	unsigned long bufsize = ISOFS_BUFFER_SIZE(inode);
-	int block = inode->i_ino >> ISOFS_BUFFER_BITS(inode);
+	unsigned long block;
 	int high_sierra = sbi->s_high_sierra;
 	struct buffer_head * bh = NULL;
 	struct iso_directory_record * de;
 	struct iso_directory_record * tmpde = NULL;
 	unsigned int de_len;
 	unsigned long offset;
-	int i;
 	struct iso_inode_info *ei = ISOFS_I(inode);
 
+	block = ei->i_iget5_block;
 	bh = sb_bread(inode->i_sb, block);
 	if (!bh)
 		goto out_badread;
 
-	offset = (inode->i_ino & (bufsize - 1));
+	offset = ei->i_iget5_offset;
+
 	de = (struct iso_directory_record *) (bh->b_data + offset);
 	de_len = *(unsigned char *) de;
 
@@ -1235,6 +1228,10 @@ static void isofs_read_inode(struct inode * inode)
 		de = tmpde;
 	}
 
+	inode->i_ino = isofs_get_ino(ei->i_iget5_block,
+				     ei->i_iget5_offset,
+				     ISOFS_BUFFER_BITS(inode));
+
 	/* Assume it is a normal-format file unless told otherwise */
 	ei->i_file_format = isofs_file_normal;
 
@@ -1250,14 +1247,6 @@ static void isofs_read_inode(struct inode * inode)
 		inode->i_mode = sbi->s_mode;
 		inode->i_nlink = 1;
 	        inode->i_mode |= S_IFREG;
-		/* If there are no periods in the name,
-		 * then set the execute permission bit
-		 */
-		for(i=0; i< de->name_len[0]; i++)
-			if(de->name[i]=='.' || de->name[i]==';')
-				break;
-		if(i == de->name_len[0] || de->name[i] == ';')
-			inode->i_mode |= S_IXUGO; /* execute permission */
 	}
 	inode->i_uid = sbi->s_uid;
 	inode->i_gid = sbi->s_gid;
@@ -1271,7 +1260,8 @@ static void isofs_read_inode(struct inode * inode)
 	if(de->flags[-high_sierra] & 0x80) {
 		if(isofs_read_level3_size(inode)) goto fail;
 	} else {
-		ei->i_next_section_ino = 0;
+		ei->i_next_section_block = 0;
+		ei->i_next_section_offset = 0;
 		inode->i_size = isonum_733 (de->size);
 	}
 
@@ -1383,6 +1373,61 @@ static void isofs_read_inode(struct inode * inode)
  fail:
 	make_bad_inode(inode);
 	goto out;
+}
+
+struct isofs_iget5_callback_data {
+	unsigned long block;
+	unsigned long offset;
+};
+
+static int isofs_iget5_test(struct inode *ino, void *data)
+{
+	struct iso_inode_info *i = ISOFS_I(ino);
+	struct isofs_iget5_callback_data *d =
+		(struct isofs_iget5_callback_data*)data;
+	return (i->i_iget5_block == d->block)
+	       && (i->i_iget5_offset == d->offset);
+}
+
+static int isofs_iget5_set(struct inode *ino, void *data)
+{
+	struct iso_inode_info *i = ISOFS_I(ino);
+	struct isofs_iget5_callback_data *d =
+		(struct isofs_iget5_callback_data*)data;
+	i->i_iget5_block = d->block;
+	i->i_iget5_offset = d->offset;
+	return 0;
+}
+
+/* Store, in the inode's containing structure, the block and block
+ * offset that point to the underlying meta-data for the inode.  The
+ * code below is otherwise similar to the iget() code in
+ * include/linux/fs.h */
+struct inode *isofs_iget(struct super_block *sb,
+			 unsigned long block,
+			 unsigned long offset)
+{
+	unsigned long hashval;
+	struct inode *inode;
+	struct isofs_iget5_callback_data data;
+
+	data.block = block;
+	data.offset = offset;
+
+	hashval = (block << sb->s_blocksize_bits) | offset;
+
+	inode = iget5_locked(sb,
+			     hashval,
+			     &isofs_iget5_test,
+			     &isofs_iget5_set,
+			     &data);
+
+	if (inode && (inode->i_state & I_NEW)) {
+		sb->s_op->read_inode(inode);
+		unlock_new_inode(inode);
+	}
+
+	return inode;
 }
 
 #ifdef LEAK_CHECK

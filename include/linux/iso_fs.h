@@ -231,9 +231,69 @@ extern struct dentry *isofs_lookup(struct inode *, struct dentry *, struct namei
 extern struct buffer_head *isofs_bread(struct inode *, sector_t);
 extern int isofs_get_blocks(struct inode *, sector_t, struct buffer_head **, unsigned long);
 
+extern struct inode *isofs_iget(struct super_block *sb,
+                                unsigned long block,
+                                unsigned long offset);
+
+/* Because the inode number is no longer relevant to finding the
+ * underlying meta-data for an inode, we are free to choose a more
+ * convenient 32-bit number as the inode number.  The inode numbering
+ * scheme was recommended by Sergey Vlasov and Eric Lammerts. */
+static inline unsigned long isofs_get_ino(unsigned long block,
+					  unsigned long offset,
+					  unsigned long bufbits)
+{
+	return (block << (bufbits - 5)) | (offset >> 5);
+}
+
+/* Every directory can have many redundant directory entries scattered
+ * throughout the directory tree.  First there is the directory entry
+ * with the name of the directory stored in the parent directory.
+ * Then, there is the "." directory entry stored in the directory
+ * itself.  Finally, there are possibly many ".." directory entries
+ * stored in all the subdirectories.
+ *
+ * In order for the NFS get_parent() method to work and for the
+ * general consistency of the dcache, we need to make sure the
+ * "i_iget5_block" and "i_iget5_offset" all point to exactly one of
+ * the many redundant entries for each directory.  We normalize the
+ * block and offset by always making them point to the "."  directory.
+ *
+ * Notice that we do not use the entry for the directory with the name
+ * that is located in the parent directory.  Even though choosing this
+ * first directory is more natural, it is much easier to find the "."
+ * entry in the NFS get_parent() method because it is implicitly
+ * encoded in the "extent + ext_attr_length" fields of _all_ the
+ * redundant entries for the directory.  Thus, it can always be
+ * reached regardless of which directory entry you have in hand.
+ *
+ * This works because the "." entry is simply the first directory
+ * record when you start reading the file that holds all the directory
+ * records, and this file starts at "extent + ext_attr_length" blocks.
+ * Because the "." entry is always the first entry listed in the
+ * directories file, the normalized "offset" value is always 0.
+ *
+ * You should pass the directory entry in "de".  On return, "block"
+ * and "offset" will hold normalized values.  Only directories are
+ * affected making it safe to call even for non-directory file
+ * types. */
+static void inline
+isofs_normalize_block_and_offset(struct iso_directory_record* de,
+				 unsigned long *block,
+				 unsigned long *offset)
+{
+	/* Only directories are normalized. */
+	if (de->flags[0] & 2) {
+		*offset = 0;
+		*block = (unsigned long)isonum_733(de->extent)
+			+ (unsigned long)isonum_711(de->ext_attr_length);
+	}
+}
+
 extern struct inode_operations isofs_dir_inode_operations;
 extern struct file_operations isofs_dir_operations;
 extern struct address_space_operations isofs_symlink_aops;
+extern struct export_operations isofs_export_ops;
 
 /* The following macros are used to check for memory leaks. */
 #ifdef LEAK_CHECK

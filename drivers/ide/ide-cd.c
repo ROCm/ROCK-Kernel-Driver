@@ -2816,7 +2816,6 @@ int ide_cdrom_open_real (struct cdrom_device_info *cdi, int purpose)
 	return 0;
 }
 
-
 /*
  * Close down the device.  Invalidate all cached blocks.
  */
@@ -2890,12 +2889,6 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 	if (!CDROM_CONFIG_FLAGS(drive)->mo_drive)
 		devinfo->mask |= CDC_MO_DRIVE;
-	if (!CDROM_CONFIG_FLAGS(drive)->mrw)
-		devinfo->mask |= CDC_MRW;
-	if (!CDROM_CONFIG_FLAGS(drive)->mrw_w)
-		devinfo->mask |= CDC_MRW_W;
-	if (!CDROM_CONFIG_FLAGS(drive)->ram)
-		devinfo->mask |= CDC_RAM;
 
 	devinfo->disk = drive->disk;
 	return register_cdrom(devinfo);
@@ -2932,7 +2925,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
 	struct atapi_capabilities_page cap;
-	int nslots = 1, mrw_write = 0, ram_write = 0;
+	int nslots = 1;
 
 	if (drive->media == ide_optical) {
 		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
@@ -2960,17 +2953,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	if (ide_cdrom_get_capabilities(drive, &cap))
 		return 0;
-
-	if (!cdrom_is_mrw(cdi, &mrw_write)) {
-		CDROM_CONFIG_FLAGS(drive)->mrw = 1;
-		if (mrw_write) {
-			CDROM_CONFIG_FLAGS(drive)->mrw_w = 1;
-			CDROM_CONFIG_FLAGS(drive)->ram = 1;
-		}
-	}
-	if (!cdrom_is_random_writable(cdi, &ram_write))
-		if (ram_write)
-			CDROM_CONFIG_FLAGS(drive)->ram = 1;
 
 	if (cap.lock == 0)
 		CDROM_CONFIG_FLAGS(drive)->no_doorlock = 1;
@@ -3050,9 +3032,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
         	printk(" CD%s%s", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_r)? "-R" : "", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_rw)? "/RW" : "");
-
-	if (CDROM_CONFIG_FLAGS(drive)->mrw || CDROM_CONFIG_FLAGS(drive)->mrw_w)
-		printk(" CD-MR%s", CDROM_CONFIG_FLAGS(drive)->mrw_w ? "W" : "");
 
         if (CDROM_CONFIG_FLAGS(drive)->is_changer) 
         	printk(" changer w/%d slots", nslots);

@@ -465,6 +465,36 @@ fail:
 	return -1;
 }
 
+static int ext3_has_free_blocks(struct ext3_sb_info *sbi)
+{
+	int free_blocks, root_blocks;
+
+	free_blocks = percpu_counter_read_positive(&sbi->s_freeblocks_counter);
+	root_blocks = le32_to_cpu(sbi->s_es->s_r_blocks_count);
+	if (free_blocks < root_blocks + 1 && !capable(CAP_SYS_RESOURCE) &&
+		sbi->s_resuid != current->fsuid &&
+		(sbi->s_resgid == 0 || !in_group_p (sbi->s_resgid))) {
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * ext3_should_retry_alloc() is called when ENOSPC is returned, and if
+ * it is profitable to retry the operation, this function will wait
+ * for the current or commiting transaction to complete, and then
+ * return TRUE.
+ */
+int ext3_should_retry_alloc(struct super_block *sb, int *retries)
+{
+	if (!ext3_has_free_blocks(EXT3_SB(sb)) || (*retries)++ > 3)
+		return 0;
+
+	jbd_debug(1, "%s: retrying operation after ENOSPC\n", sb->s_id);
+
+	return journal_force_commit_nested(EXT3_SB(sb)->s_journal);
+}
+
 /*
  * ext3_new_block uses a goal block to assist allocation.  If the goal is
  * free, or there is a free block within 32 blocks of the goal, that block
@@ -485,7 +515,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	int target_block;			/* tmp */
 	int fatal = 0, err;
 	int performed_allocation = 0;
-	int free_blocks, root_blocks;
+	int free_blocks;
 	struct super_block *sb;
 	struct ext3_group_desc *gdp;
 	struct ext3_super_block *es;
@@ -512,11 +542,7 @@ ext3_new_block(handle_t *handle, struct inode *inode, unsigned long goal,
 	es = EXT3_SB(sb)->s_es;
 	ext3_debug("goal=%lu.\n", goal);
 
-	free_blocks = percpu_counter_read_positive(&sbi->s_freeblocks_counter);
-	root_blocks = le32_to_cpu(es->s_r_blocks_count);
-	if (free_blocks < root_blocks + 1 && !capable(CAP_SYS_RESOURCE) &&
-		sbi->s_resuid != current->fsuid &&
-		(sbi->s_resgid == 0 || !in_group_p (sbi->s_resgid))) {
+	if (!ext3_has_free_blocks(sbi)) {
 		*errp = -ENOSPC;
 		goto out;
 	}

@@ -27,6 +27,7 @@
 #include <linux/aio.h>
 #include <linux/highmem.h>
 #include <linux/workqueue.h>
+#include <linux/security.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
@@ -1036,6 +1037,9 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 		ret = -EFAULT;
 		if (unlikely(!access_ok(VERIFY_WRITE, buf, iocb->aio_nbytes)))
 			goto out_put_req;
+		ret = security_file_permission (file, MAY_READ);
+		if (ret)
+			goto out_put_req;
 		ret = -EINVAL;
 		if (file->f_op->aio_read)
 			ret = file->f_op->aio_read(req, buf,
@@ -1047,6 +1051,9 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 			goto out_put_req;
 		ret = -EFAULT;
 		if (unlikely(!access_ok(VERIFY_READ, buf, iocb->aio_nbytes)))
+			goto out_put_req;
+		ret = security_file_permission (file, MAY_WRITE);
+		if (ret)
 			goto out_put_req;
 		ret = -EINVAL;
 		if (file->f_op->aio_write)

@@ -53,7 +53,6 @@
 #include <asm/macintosh.h>
 #include <asm/macints.h>
 #include <asm/mac_via.h>
-#include <asm/pgalloc.h>
 
 #define SREGS_PAD(n)    u16 n;
 

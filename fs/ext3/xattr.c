@@ -875,8 +875,9 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 	       const void *value, size_t value_len, int flags)
 {
 	handle_t *handle;
-	int error;
+	int error, retries = 0;
 
+retry:
 	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS);
 	if (IS_ERR(handle)) {
 		error = PTR_ERR(handle);
@@ -886,6 +887,9 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 		error = ext3_xattr_set_handle(handle, inode, name_index, name,
 					      value, value_len, flags);
 		error2 = ext3_journal_stop(handle);
+		if (error == -ENOSPC &&
+		    ext3_should_retry_alloc(inode->i_sb, &retries))
+			goto retry;
 		if (error == 0)
 			error = error2;
 	}

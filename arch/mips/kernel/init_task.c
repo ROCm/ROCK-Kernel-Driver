@@ -3,6 +3,7 @@
 #include <linux/sched.h>
 #include <linux/init_task.h>
 #include <linux/fs.h>
+#include <linux/mqueue.h>
 
 #include <asm/thread_info.h>
 #include <asm/uaccess.h>

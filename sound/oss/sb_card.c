@@ -309,7 +309,13 @@ static int __init sb_init(void)
 
 	/* If either PnP or Legacy registered a card then return
 	 * success */
-	return (pres > 0 || lres > 0) ? 0 : -ENODEV;
+	if (pres <= 0 && lres <= 0) {
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&sb_pnp_driver);
+#endif
+		return -ENODEV;
+	}
+	return 0;
 }
 
 static void __exit sb_exit(void)

@@ -176,12 +176,13 @@ int reiserfs_allocate_blocks_for_region(
     hint.formatted_node = 0; // We are allocating blocks for unformatted node.
 
     /* only preallocate if this is a small write */
-    if (blocks_to_allocate <
-        REISERFS_SB(inode->i_sb)->s_alloc_options.preallocsize)
+    if (REISERFS_I(inode)->i_prealloc_count ||
+       (!(write_bytes & (inode->i_sb->s_blocksize -1)) &&
+        blocks_to_allocate <
+        REISERFS_SB(inode->i_sb)->s_alloc_options.preallocsize))
         hint.preallocate = 1;
     else
         hint.preallocate = 0;
-
     /* Call block allocator to allocate blocks */
     res = reiserfs_allocate_blocknrs(&hint, allocated_blocks, blocks_to_allocate, blocks_to_allocate);
     if ( res != CARRY_ON ) {
@@ -467,6 +468,12 @@ retry:
     // the inode.
     //
     pathrelse(&path);
+    /*
+     * cleanup prellocation from previous writes
+     * if this is a partial block write
+     */
+    if (write_bytes & (inode->i_sb->s_blocksize -1))
+        reiserfs_discard_prealloc(th, inode);
     reiserfs_write_unlock(inode->i_sb);
 
     // go through all the pages/buffers and map the buffers to newly allocated
@@ -585,9 +592,19 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
     struct buffer_head *bh, *head;
     unsigned long i_size_index = inode->i_size >> PAGE_CACHE_SHIFT;
     int new;
+    int logit = reiserfs_file_data_log(inode);
+    struct super_block *s = inode->i_sb;
+    int bh_per_page = PAGE_CACHE_SIZE / s->s_blocksize;
+    struct reiserfs_transaction_handle th;
+    th.t_trans_id = 0;
 
     blocksize = 1 << inode->i_blkbits;
 
+    if (logit) {
+	reiserfs_write_lock(s);
+	journal_begin(&th, s, bh_per_page + 1);
+	reiserfs_update_inode_transaction(inode);
+    }
     for(bh = head = page_buffers(page), block_start = 0;
         bh != head || !block_start;
 	block_start=block_end, bh = bh->b_this_page)
@@ -601,7 +618,10 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 		    partial = 1;
 	} else {
 	    set_buffer_uptodate(bh);
-	    if (!buffer_dirty(bh)) {
+	    if (logit) {
+		reiserfs_prepare_for_journal(s, bh, 1);
+		journal_mark_dirty(&th, s, bh);
+	    } else if (!buffer_dirty(bh)) {
 		mark_buffer_dirty(bh);
 		/* do data=ordered on any page past the end
 		 * of file and any buffer marked BH_New.
@@ -613,7 +633,10 @@ int reiserfs_commit_page(struct inode *inode, struct page *page,
 	    }
 	}
     }
-
+    if (logit) {
+	journal_end(&th, s, bh_per_page + 1);
+	reiserfs_write_unlock(s);
+    }
     /*
      * If this is a partial write which happened to make all buffers
      * uptodate then we can optimize away a bogus readpage() for
@@ -1254,6 +1277,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
 	journal_end(&th, th.t_super, th.t_blocks_allocated);
         reiserfs_write_unlock(inode->i_sb);
     }
+
     if ((file->f_flags & O_SYNC) || IS_SYNC(inode))
 	res = generic_osync_inode(inode, file->f_mapping, OSYNC_METADATA|OSYNC_DATA);
 

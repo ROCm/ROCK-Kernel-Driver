@@ -34,6 +34,7 @@
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <linux/dirent.h>
 #include <linux/dnotify.h>
 #include <linux/highuid.h>
 #include <linux/sunrpc/svc.h>
@@ -796,6 +797,260 @@ asmlinkage long compat_sys_mount(char __user * dev_name, char __user * dir_name,
  out:
 	return retval;
 }
+
+#define NAME_OFFSET(de) ((int) ((de)->d_name - (char __user *) (de)))
+#define COMPAT_ROUND_UP(x) (((x)+sizeof(compat_long_t)-1) & \
+				~(sizeof(compat_long_t)-1))
+
+struct compat_old_linux_dirent {
+	compat_ulong_t	d_ino;
+	compat_ulong_t	d_offset;
+	unsigned short	d_namlen;
+	char		d_name[1];
+};
+
+struct compat_readdir_callback {
+	struct compat_old_linux_dirent __user *dirent;
+	int result;
+};
+
+static int compat_fillonedir(void *__buf, const char *name, int namlen,
+			loff_t offset, ino_t ino, unsigned int d_type)
+{
+	struct compat_readdir_callback *buf = __buf;
+	struct compat_old_linux_dirent __user *dirent;
+
+	if (buf->result)
+		return -EINVAL;
+	buf->result++;
+	dirent = buf->dirent;
+	if (!access_ok(VERIFY_WRITE, (unsigned long)dirent,
+			(unsigned long)(dirent->d_name + namlen + 1) -
+				(unsigned long)dirent))
+		goto efault;
+	if (	__put_user(ino, &dirent->d_ino) ||
+		__put_user(offset, &dirent->d_offset) ||
+		__put_user(namlen, &dirent->d_namlen) ||
+		__copy_to_user(dirent->d_name, name, namlen) ||
+		__put_user(0, dirent->d_name + namlen))
+		goto efault;
+	return 0;
+efault:
+	buf->result = -EFAULT;
+	return -EFAULT;
+}
+
+asmlinkage long compat_old_readdir(unsigned int fd,
+	struct compat_old_linux_dirent __user *dirent, unsigned int count)
+{
+	int error;
+	struct file *file;
+	struct compat_readdir_callback buf;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+
+	buf.result = 0;
+	buf.dirent = dirent;
+
+	error = vfs_readdir(file, compat_fillonedir, &buf);
+	if (error >= 0)
+		error = buf.result;
+
+	fput(file);
+out:
+	return error;
+}
+
+struct compat_linux_dirent {
+	compat_ulong_t	d_ino;
+	compat_ulong_t	d_off;
+	unsigned short	d_reclen;
+	char		d_name[1];
+};
+
+struct compat_getdents_callback {
+	struct compat_linux_dirent __user *current_dir;
+	struct compat_linux_dirent __user *previous;
+	int count;
+	int error;
+};
+
+static int compat_filldir(void *__buf, const char *name, int namlen,
+		loff_t offset, ino_t ino, unsigned int d_type)
+{
+	struct compat_linux_dirent __user * dirent;
+	struct compat_getdents_callback *buf = __buf;
+	int reclen = COMPAT_ROUND_UP(NAME_OFFSET(dirent) + namlen + 2);
+
+	buf->error = -EINVAL;	/* only used if we fail.. */
+	if (reclen > buf->count)
+		return -EINVAL;
+	dirent = buf->previous;
+	if (dirent) {
+		if (__put_user(offset, &dirent->d_off))
+			goto efault;
+	}
+	dirent = buf->current_dir;
+	if (__put_user(ino, &dirent->d_ino))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (__put_user(0, dirent->d_name + namlen))
+		goto efault;
+	if (__put_user(d_type, (char  __user *) dirent + reclen - 1))
+		goto efault;
+	buf->previous = dirent;
+	dirent = (void __user *)dirent + reclen;
+	buf->current_dir = dirent;
+	buf->count -= reclen;
+	return 0;
+efault:
+	buf->error = -EFAULT;
+	return -EFAULT;
+}
+
+asmlinkage long compat_sys_getdents(unsigned int fd,
+		struct compat_linux_dirent __user *dirent, unsigned int count)
+{
+	struct file * file;
+	struct compat_linux_dirent __user * lastdirent;
+	struct compat_getdents_callback buf;
+	int error;
+
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+
+	buf.current_dir = dirent;
+	buf.previous = NULL;
+	buf.count = count;
+	buf.error = 0;
+
+	error = vfs_readdir(file, compat_filldir, &buf);
+	if (error < 0)
+		goto out_putf;
+	error = buf.error;
+	lastdirent = buf.previous;
+	if (lastdirent) {
+		if (put_user(file->f_pos, &lastdirent->d_off))
+			error = -EFAULT;
+		else
+			error = count - buf.count;
+	}
+
+out_putf:
+	fput(file);
+out:
+	return error;
+}
+
+#ifndef __ARCH_OMIT_COMPAT_SYS_GETDENTS64
+#define COMPAT_ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
+
+struct compat_getdents_callback64 {
+	struct linux_dirent64 __user *current_dir;
+	struct linux_dirent64 __user *previous;
+	int count;
+	int error;
+};
+
+static int compat_filldir64(void * __buf, const char * name, int namlen, loff_t offset,
+		     ino_t ino, unsigned int d_type)
+{
+	struct linux_dirent64 __user *dirent;
+	struct compat_getdents_callback64 *buf = __buf;
+	int jj = NAME_OFFSET(dirent);
+	int reclen = COMPAT_ROUND_UP64(jj + namlen + 1);
+	u64 off;
+
+	buf->error = -EINVAL;	/* only used if we fail.. */
+	if (reclen > buf->count)
+		return -EINVAL;
+	dirent = buf->previous;
+
+	if (dirent) {
+		if (__put_user(offset, (u32 __user *)&dirent->d_off))
+			goto efault;
+		if (__put_user(offset >> 32,
+				((u32 __user *)&dirent->d_off) + 1))
+			goto efault;
+	}
+	dirent = buf->current_dir;
+	if ((__put_user(ino, (u32 __user *)&dirent->d_ino))
+	 || (__put_user(ino >> 32, ((u32 __user *)&dirent->d_ino) + 1)))
+		goto efault;
+	off = 0;
+	if ((__put_user(off, (u32 __user *)&dirent->d_off))
+	 || (__put_user(off >> 32, ((u32 __user *)&dirent->d_off) + 1)))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (__put_user(d_type, &dirent->d_type))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (__put_user(0, dirent->d_name + namlen))
+		goto efault;
+	buf->previous = dirent;
+	dirent = (void __user *)dirent + reclen;
+	buf->current_dir = dirent;
+	buf->count -= reclen;
+	return 0;
+efault:
+	buf->error = -EFAULT;
+	return -EFAULT;
+}
+
+asmlinkage long compat_sys_getdents64(unsigned int fd,
+		struct linux_dirent64 __user * dirent, unsigned int count)
+{
+	struct file * file;
+	struct linux_dirent64 __user * lastdirent;
+	struct compat_getdents_callback64 buf;
+	int error;
+
+	error = -EFAULT;
+	if (!access_ok(VERIFY_WRITE, dirent, count))
+		goto out;
+
+	error = -EBADF;
+	file = fget(fd);
+	if (!file)
+		goto out;
+
+	buf.current_dir = dirent;
+	buf.previous = NULL;
+	buf.count = count;
+	buf.error = 0;
+
+	error = vfs_readdir(file, compat_filldir64, &buf);
+	if (error < 0)
+		goto out_putf;
+	error = buf.error;
+	lastdirent = buf.previous;
+	if (lastdirent) {
+		typeof(lastdirent->d_off) d_off = file->f_pos;
+		__put_user(d_off, (u32 __user *)&lastdirent->d_off);
+		__put_user(d_off >> 32, ((u32 __user *)&lastdirent->d_off) + 1);
+		error = count - buf.count;
+	}
+
+out_putf:
+	fput(file);
+out:
+	return error;
+}
+#endif /* ! __ARCH_OMIT_COMPAT_SYS_GETDENTS64 */
 
 static ssize_t compat_do_readv_writev(int type, struct file *file,
 			       const struct compat_iovec __user *uvector,

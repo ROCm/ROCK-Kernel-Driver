@@ -38,8 +38,8 @@ void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *region)
 		return;
 	}
 
-	vxres = info->var.xres;
-	vyres = info->var.yres;
+	vxres = info->var.xres_virtual;
+	vyres = info->var.yres_virtual;
 
 	memcpy(&modded, region, sizeof(struct fb_fillrect));
 
@@ -104,8 +104,8 @@ void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 		return;
 	}
 
-	vxres = info->var.xres;
-	vyres = info->var.yres;
+	vxres = info->var.xres_virtual;
+	vyres = info->var.yres_virtual;
 
 	if(!modded.width || !modded.height ||
 	   modded.sx >= vxres || modded.sy >= vyres ||

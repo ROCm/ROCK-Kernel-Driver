@@ -58,6 +58,8 @@ static inline void register_cpu_control(struct cpu *cpu)
 
 /*
  * register_cpu - Setup a driverfs device for a CPU.
+ * @cpu - Callers can set the cpu->no_control field to 1, to indicate not to
+ *		  generate a control file in sysfs for this CPU.
  * @num - CPU number to use when creating the device.
  *
  * Initialize and register the CPU device.
@@ -75,7 +77,7 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 		error = sysfs_create_link(&root->sysdev.kobj,
 					  &cpu->sysdev.kobj,
 					  kobject_name(&cpu->sysdev.kobj));
-	if (!error)
+	if (!error && !cpu->no_control)
 		register_cpu_control(cpu);
 	return error;
 }

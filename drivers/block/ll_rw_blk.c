@@ -1123,7 +1123,7 @@ EXPORT_SYMBOL(blk_remove_plug);
 /*
  * remove the plug and let it rip..
  */
-static inline void __generic_unplug_device(request_queue_t *q)
+inline void __generic_unplug_device(request_queue_t *q)
 {
 	if (test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
 		return;
@@ -1137,6 +1137,7 @@ static inline void __generic_unplug_device(request_queue_t *q)
 	if (elv_next_request(q))
 		q->request_fn(q);
 }
+EXPORT_SYMBOL(__generic_unplug_device);
 
 /**
  * generic_unplug_device - fire a request queue
@@ -2280,13 +2281,9 @@ get_rq:
 out:
 	if (freereq)
 		__blk_put_request(q, freereq);
+	if (bio_sync(bio))
+		__generic_unplug_device(q);
 
-	if (blk_queue_plugged(q)) {
-		int nrq = q->rq.count[READ] + q->rq.count[WRITE] - q->in_flight;
-
-		if (nrq == q->unplug_thresh || bio_sync(bio))
-			__generic_unplug_device(q);
-	}
 	spin_unlock_irq(q->queue_lock);
 	return 0;
 

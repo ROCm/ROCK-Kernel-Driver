@@ -601,8 +601,9 @@ static void fbcon_init(struct vc_data *vc, int init)
 	int display_fg = (*default_mode)->vc_num;
 	int logo = 1, rows, cols, charcnt = 256;
 	unsigned short *save = NULL, *r, *q;
+	int cap = info->flags;
 
-	if (vc->vc_num != display_fg || (info->flags & FBINFO_FLAG_MODULE) ||
+	if (vc->vc_num != display_fg || (info->flags & FBINFO_MODULE) ||
 	    (info->fix.type == FB_TYPE_TEXT))
 		logo = 0;
 
@@ -635,10 +636,10 @@ static void fbcon_init(struct vc_data *vc, int init)
 	rows = info->var.yres / vc->vc_font.height;
 	vc_resize(vc->vc_num, cols, rows);
 
-	if (info->var.accel_flags)
-		p->scrollmode = SCROLL_YNOMOVE;
-	else
-		p->scrollmode = SCROLL_YREDRAW;
+	if ((cap & FBINFO_HWACCEL_COPYAREA) && !(cap & FBINFO_HWACCEL_DISABLED))
+		p->scrollmode = SCROLL_ACCEL;
+	else /* default to something safe */
+		p->scrollmode = SCROLL_REDRAW;
 
 	/*
 	 *  ++guenther: console.c:vc_allocate() relies on initializing
@@ -1245,7 +1246,7 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 {
 	struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
 	struct display *p = &fb_display[vc->vc_num];
-	int scroll_partial = !(p->scrollmode & __SCROLL_YNOPARTIAL);
+	int scroll_partial = info->flags & FBINFO_PARTIAL_PAN_OK;
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return 0;
@@ -1269,15 +1270,15 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			fbcon_softback_note(vc, t, count);
 		if (logo_shown >= 0)
 			goto redraw_up;
-		switch (p->scrollmode & __SCROLL_YMASK) {
-		case __SCROLL_YMOVE:
+		switch (p->scrollmode) {
+		case SCROLL_ACCEL:
 			accel_bmove(vc, info, t + count, 0, t, 0,
 					 b - t - count, vc->vc_cols);
 			accel_clear(vc, info, b - count, 0, count,
 					 vc->vc_cols);
 			break;
 
-		case __SCROLL_YWRAP:
+		case SCROLL_WRAP:
 			if (b - t - count > 3 * vc->vc_rows >> 2) {
 				if (t > 0)
 					fbcon_bmove(vc, 0, 0, count, 0, t,
@@ -1287,15 +1288,15 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 					fbcon_bmove(vc, b - count, 0, b, 0,
 						    vc->vc_rows - b,
 						    vc->vc_cols);
-			} else if (p->scrollmode & __SCROLL_YPANREDRAW)
-				goto redraw_up;
-			else
+			} else if (info->flags & FBINFO_READS_FAST)
 				fbcon_bmove(vc, t + count, 0, t, 0,
 					    b - t - count, vc->vc_cols);
+			else
+				goto redraw_up;
 			fbcon_clear(vc, b - count, 0, count, vc->vc_cols);
 			break;
 
-		case __SCROLL_YPAN:
+		case SCROLL_PAN:
 			if ((p->yscroll + count <=
 			     2 * (p->vrows - vc->vc_rows))
 			    && ((!scroll_partial && (b - t == vc->vc_rows))
@@ -1310,15 +1311,15 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 					fbcon_bmove(vc, b - count, 0, b, 0,
 						    vc->vc_rows - b,
 						    vc->vc_cols);
-			} else if (p->scrollmode & __SCROLL_YPANREDRAW)
-				goto redraw_up;
-			else
+			} else if (info->flags & FBINFO_READS_FAST)
 				fbcon_bmove(vc, t + count, 0, t, 0,
 					    b - t - count, vc->vc_cols);
+			else
+				goto redraw_up;
 			fbcon_clear(vc, b - count, 0, count, vc->vc_cols);
 			break;
 
-		case __SCROLL_YREDRAW:
+		case SCROLL_REDRAW:
 		      redraw_up:
 			fbcon_redraw(vc, p, t, b - t - count,
 				     count * vc->vc_cols);
@@ -1336,14 +1337,14 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 	case SM_DOWN:
 		if (count > vc->vc_rows)	/* Maximum realistic size */
 			count = vc->vc_rows;
-		switch (p->scrollmode & __SCROLL_YMASK) {
-		case __SCROLL_YMOVE:
+		switch (p->scrollmode) {
+		case SCROLL_ACCEL:
 			accel_bmove(vc, info, t, 0, t + count, 0,
 					 b - t - count, vc->vc_cols);
 			accel_clear(vc, info, t, 0, count, vc->vc_cols);
 			break;
 
-		case __SCROLL_YWRAP:
+		case SCROLL_WRAP:
 			if (b - t - count > 3 * vc->vc_rows >> 2) {
 				if (vc->vc_rows - b > 0)
 					fbcon_bmove(vc, b, 0, b - count, 0,
@@ -1353,15 +1354,15 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 				if (t > 0)
 					fbcon_bmove(vc, count, 0, 0, 0, t,
 						    vc->vc_cols);
-			} else if (p->scrollmode & __SCROLL_YPANREDRAW)
-				goto redraw_down;
-			else
+			} else if (info->flags & FBINFO_READS_FAST)
 				fbcon_bmove(vc, t, 0, t + count, 0,
 					    b - t - count, vc->vc_cols);
+			else
+				goto redraw_down;
 			fbcon_clear(vc, t, 0, count, vc->vc_cols);
 			break;
 
-		case __SCROLL_YPAN:
+		case SCROLL_PAN:
 			if ((count - p->yscroll <= p->vrows - vc->vc_rows)
 			    && ((!scroll_partial && (b - t == vc->vc_rows))
 				|| (scroll_partial
@@ -1375,15 +1376,15 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 				if (t > 0)
 					fbcon_bmove(vc, count, 0, 0, 0, t,
 						    vc->vc_cols);
-			} else if (p->scrollmode & __SCROLL_YPANREDRAW)
-				goto redraw_down;
-			else
+			} else if (info->flags & FBINFO_READS_FAST)
 				fbcon_bmove(vc, t, 0, t + count, 0,
 					    b - t - count, vc->vc_cols);
+			else
+				goto redraw_down;
 			fbcon_clear(vc, t, 0, count, vc->vc_cols);
 			break;
 
-		case __SCROLL_YREDRAW:
+		case SCROLL_REDRAW:
 		      redraw_down:
 			fbcon_redraw(vc, p, b - 1, b - t - count,
 				     -count * vc->vc_cols);
@@ -1467,21 +1468,27 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 
 static __inline__ void updatescrollmode(struct display *p, struct fb_info *info, struct vc_data *vc)
 {
-	int m;
+	int cap = info->flags;
+	int good_pan = (cap & FBINFO_HWACCEL_YPAN)
+		 && divides(info->fix.ypanstep, vc->vc_font.height)
+		 && info->var.yres_virtual >= 2*info->var.yres;
+	int good_wrap = (cap & FBINFO_HWACCEL_YWRAP)
+		 && divides(info->fix.ywrapstep, vc->vc_font.height)
+		 && divides(vc->vc_font.height, info->var.yres_virtual);
+	int reading_fast = cap & FBINFO_READS_FAST;
+	int fast_copyarea = (cap & FBINFO_HWACCEL_COPYAREA) && !(cap & FBINFO_HWACCEL_DISABLED);
 
-	if (p->scrollmode & __SCROLL_YFIXED)
-		return;
-	if (divides(info->fix.ywrapstep, vc->vc_font.height) &&
-	    divides(vc->vc_font.height, info->var.yres_virtual))
-		m = __SCROLL_YWRAP;
-	else if (divides(info->fix.ypanstep, vc->vc_font.height) &&
-		 info->var.yres_virtual >= info->var.yres + vc->vc_font.height)
-		m = __SCROLL_YPAN;
-	else if (p->scrollmode & __SCROLL_YNOMOVE)
-		m = __SCROLL_YREDRAW;
-	else
-		m = __SCROLL_YMOVE;
-	p->scrollmode = (p->scrollmode & ~__SCROLL_YMASK) | m;
+	if (good_wrap || good_pan) {
+		if (reading_fast || fast_copyarea)
+			p->scrollmode = good_wrap ? SCROLL_WRAP : SCROLL_PAN;
+		else
+			p->scrollmode = SCROLL_REDRAW;
+	} else {
+		if (reading_fast || fast_copyarea)
+			p->scrollmode = SCROLL_ACCEL;
+		else
+			p->scrollmode = SCROLL_REDRAW;
+	}
 }
 
 static int fbcon_resize(struct vc_data *vc, unsigned int width, 
@@ -1505,9 +1512,10 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 		if (!info->fbops->fb_set_par)
 			return -EINVAL;
 
-		sprintf(mode, "%dx%d", var.xres, var.yres);
-		err = fb_find_mode(&var, info, mode, NULL, 0, NULL,
-					info->var.bits_per_pixel);
+		snprintf(mode, 40, "%ix%i", var.xres, var.yres);
+		err = fb_find_mode(&var, info, mode, info->monspecs.modedb,
+				   info->monspecs.modedb_len, NULL,
+				   info->var.bits_per_pixel);
 		if (!err || width > var.xres/fw || height > var.yres/fh)
 			return -EINVAL;
 		DPRINTK("resize now %ix%i\n", var.xres, var.yres);
@@ -1555,12 +1563,12 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 	if (info)
 		info->var.yoffset = p->yscroll = 0;
-        fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
-	switch (p->scrollmode & __SCROLL_YMASK) {
-	case __SCROLL_YWRAP:
+ 	fbcon_resize(vc, vc->vc_cols, vc->vc_rows);
+	switch (p->scrollmode) {
+	case SCROLL_WRAP:
 		scrollback_phys_max = p->vrows - vc->vc_rows;
 		break;
-	case __SCROLL_YPAN:
+	case SCROLL_PAN:
 		scrollback_phys_max = p->vrows - 2 * vc->vc_rows;
 		if (scrollback_phys_max < 0)
 			scrollback_phys_max = 0;
@@ -2133,11 +2141,11 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines)
 
 	offset = p->yscroll - scrollback_current;
 	limit = p->vrows;
-	switch (p->scrollmode && __SCROLL_YMASK) {
-	case __SCROLL_YWRAP:
+	switch (p->scrollmode) {
+	case SCROLL_WRAP:
 		info->var.vmode |= FB_VMODE_YWRAP;
 		break;
-	case __SCROLL_YPAN:
+	case SCROLL_PAN:
 		limit -= vc->vc_rows;
 		info->var.vmode &= ~FB_VMODE_YWRAP;
 		break;

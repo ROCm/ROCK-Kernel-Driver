@@ -569,14 +569,19 @@ static spinlock_t unnamed_dev_lock = SPIN_LOCK_UNLOCKED;/* protects the above */
 int set_anon_super(struct super_block *s, void *data)
 {
 	int dev;
+	int error;
 
-	spin_lock(&unnamed_dev_lock);
-	if (idr_pre_get(&unnamed_dev_idr, GFP_ATOMIC) == 0) {
-		spin_unlock(&unnamed_dev_lock);
+ retry:
+	if (idr_pre_get(&unnamed_dev_idr, GFP_ATOMIC) == 0)
 		return -ENOMEM;
-	}
-	dev = idr_get_new(&unnamed_dev_idr, NULL);
+	spin_lock(&unnamed_dev_lock);
+	error = idr_get_new(&unnamed_dev_idr, NULL, &dev);
 	spin_unlock(&unnamed_dev_lock);
+	if (error == -EAGAIN)
+		/* We raced and lost with another CPU. */
+		goto retry;
+	else if (error)
+		return -EAGAIN;
 
 	if ((dev & MAX_ID_MASK) == (1 << MINORBITS)) {
 		spin_lock(&unnamed_dev_lock);

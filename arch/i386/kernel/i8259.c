@@ -317,16 +317,11 @@ void init_8259A(int auto_eoi)
  * be shot.
  */
  
-/*
- * =PC9800NOTE= In NEC PC-9800, we use irq8 instead of irq13!
- */
 
 static irqreturn_t math_error_irq(int cpl, void *dev_id, struct pt_regs *regs)
 {
 	extern void math_error(void *);
-#ifndef CONFIG_X86_PC9800
 	outb(0,0xF0);
-#endif
 	if (ignore_fpu_irq || !boot_cpu_data.hard_math)
 		return IRQ_NONE;
 	math_error((void *)regs->eip);

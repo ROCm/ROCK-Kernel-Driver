@@ -29,6 +29,12 @@
 /* Get/set floating-point exception mode (if meaningful) */
 #define PR_GET_FPEXC	11
 #define PR_SET_FPEXC	12
+# define PR_FP_EXC_SW_ENABLE	0x80	/* Use FPEXC for FP exception enables */
+# define PR_FP_EXC_DIV		0x010000	/* floating point divide by zero */
+# define PR_FP_EXC_OVF		0x020000	/* floating point overflow */
+# define PR_FP_EXC_UND		0x040000	/* floating point underflow */
+# define PR_FP_EXC_RES		0x080000	/* floating point inexact result */
+# define PR_FP_EXC_INV		0x100000	/* floating point invalid operation */
 # define PR_FP_EXC_DISABLED	0	/* FP exceptions disabled */
 # define PR_FP_EXC_NONRECOV	1	/* async non-recoverable exc. mode */
 # define PR_FP_EXC_ASYNC	2	/* async recoverable exception mode */

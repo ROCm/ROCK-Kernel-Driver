@@ -518,19 +518,6 @@ config V850E_UART_CONSOLE
 	depends on V850E_UART
 	select SERIAL_CORE_CONSOLE
 
-config SERIAL98
-	tristate "PC-9800 8251-based primary serial port support"
-	depends on X86_PC9800
-	select SERIAL_CORE
-	help
-	  If you want to use standard primary serial ports on PC-9800, 
-	  say Y.  Otherwise, say N.
-
-config SERIAL98_CONSOLE
-        bool "Support for console on PC-9800 standard serial port"
-        depends on SERIAL98=y
-	select SERIAL_CORE_CONSOLE
-
 config SERIAL_SH_SCI
 	tristate "SH SCI(F) serial port support"
 	depends on SUPERH || H8300

@@ -168,8 +168,6 @@ long io_schedule_timeout(long timeout);
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
-extern void update_one_process(struct task_struct *p, unsigned long user,
-			       unsigned long system, int cpu);
 extern void scheduler_tick(int user_tick, int system);
 extern unsigned long cache_decay_ticks;
 
@@ -314,6 +312,9 @@ struct user_struct {
 	atomic_t __count;	/* reference count */
 	atomic_t processes;	/* How many processes does this user have? */
 	atomic_t files;		/* How many open files does this user have? */
+	atomic_t sigpending;	/* How many pending signals does this user have? */
+	/* protected by mq_lock	*/
+	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
@@ -361,6 +362,12 @@ struct group_info {
 	gid_t *blocks[0];
 };
 
+/*
+ * get_group_info() must be called with the owning task locked (via task_lock())
+ * when task != current.  The reason being that the vast majority of callers are
+ * looking at current->group_info, which can not be changed except by the
+ * current task.  Changing current->group_info requires the task lock, too.
+ */
 #define get_group_info(group_info) do { \
 	atomic_inc(&(group_info)->usage); \
 } while (0)
@@ -681,9 +688,9 @@ extern void sched_balance_exec(void);
 
 extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
-extern int task_prio(task_t *p);
-extern int task_nice(task_t *p);
-extern int task_curr(task_t *p);
+extern int task_prio(const task_t *p);
+extern int task_nice(const task_t *p);
+extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
 
 void yield(void);
@@ -719,6 +726,11 @@ extern void __set_special_pids(pid_t session, pid_t pgrp);
 
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
+static inline struct user_struct *get_uid(struct user_struct *u)
+{
+	atomic_inc(&u->__count);
+	return u;
+}
 extern void free_uid(struct user_struct *);
 extern void switch_uid(struct user_struct *);
 
@@ -905,7 +917,7 @@ extern void wait_task_inactive(task_t * p);
 #define while_each_thread(g, t) \
 	while ((t = next_thread(t)) != g)
 
-extern task_t * FASTCALL(next_thread(task_t *p));
+extern task_t * FASTCALL(next_thread(const task_t *p));
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
@@ -922,7 +934,9 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace and synchronises with wait4().
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info and synchronises with
+ * wait4().
+ *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),
  * neither inside nor outside.
@@ -1044,7 +1058,7 @@ extern void signal_wake_up(struct task_struct *t, int resume_stopped);
  */
 #ifdef CONFIG_SMP
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return p->thread_info->cpu;
 }
@@ -1056,7 +1070,7 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #else
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return 0;
 }

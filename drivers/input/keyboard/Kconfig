@@ -96,15 +96,3 @@ config KEYBOARD_AMIGA
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called amikbd.
-
-config KEYBOARD_98KBD
-	tristate "NEC PC-9800 Keyboard support"
-	depends on X86_PC9800 && INPUT && INPUT_KEYBOARD
-	select SERIO
-	help
-	  Say Y here if you want to use the NEC PC-9801/PC-9821 keyboard (or
-	  compatible) on your system.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called 98kbd.
-

@@ -417,6 +417,8 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
 #ifdef CONFIG_SMP
+	if (!pte_young(*ptep))
+		return 0;
 	return test_and_clear_bit(xlate_pabit(_PAGE_ACCESSED_BIT), ptep);
 #else
 	pte_t pte = *ptep;
@@ -430,6 +432,8 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
 #ifdef CONFIG_SMP
+	if (!pte_dirty(*ptep))
+		return 0;
 	return test_and_clear_bit(xlate_pabit(_PAGE_DIRTY_BIT), ptep);
 #else
 	pte_t pte = *ptep;

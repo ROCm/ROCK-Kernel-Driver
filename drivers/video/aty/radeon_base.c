@@ -858,6 +858,7 @@ static int radeonfb_pan_display (struct fb_var_screeninfo *var,
         if (rinfo->asleep)
         	return 0;
 
+	radeon_fifo_wait(2);
         OUTREG(CRTC_OFFSET, ((var->yoffset * var->xres_virtual + var->xoffset)
 			     * var->bits_per_pixel / 8) & ~7);
         return 0;
@@ -887,6 +888,7 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			if (rc)
 				return rc;
 
+			radeon_fifo_wait(2);
 			if (value & 0x01) {
 				tmp = INREG(LVDS_GEN_CNTL);
 
@@ -963,6 +965,7 @@ static int radeon_screen_blank (struct radeonfb_info *rinfo, int blank)
                         break;
         }
 
+	radeon_fifo_wait(1);
 	switch (rinfo->mon1_type) {
 		case MT_LCD:
 			OUTREG(LVDS_GEN_CNTL, val2);
@@ -1021,6 +1024,7 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
         if (!rinfo->asleep) {
         	u32 dac_cntl2, vclk_cntl = 0;
         	
+		radeon_fifo_wait(9);
 		if (rinfo->is_mobility) {
 			vclk_cntl = INPLL(VCLK_ECP_CNTL);
 			OUTPLL(VCLK_ECP_CNTL, vclk_cntl & ~PIXCLK_DAC_ALWAYS_ONb);
@@ -1112,6 +1116,8 @@ static void radeon_write_pll_regs(struct radeonfb_info *rinfo, struct radeon_reg
 {
 	int i;
 
+	radeon_fifo_wait(20);
+
 	/* Workaround from XFree */
 	if (rinfo->is_mobility) {
 	        /* A temporal workaround for the occational blanking on certain laptop panels. 
@@ -1198,6 +1204,8 @@ static void radeon_lvds_timer_func(unsigned long data)
 {
 	struct radeonfb_info *rinfo = (struct radeonfb_info *)data;
 
+	radeon_fifo_wait(3);
+
 	OUTREG(LVDS_GEN_CNTL, rinfo->pending_lvds_gen_cntl);
 	if (rinfo->pending_pixclks_cntl) {
 		OUTPLL(PIXCLKS_CNTL, rinfo->pending_pixclks_cntl);
@@ -1222,6 +1230,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 	radeon_screen_blank(rinfo, VESA_POWERDOWN);
 
+	radeon_fifo_wait(31);
 	for (i=0; i<10; i++)
 		OUTREG(common_regs[i].reg, common_regs[i].val);
 
@@ -1249,6 +1258,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 	radeon_write_pll_regs(rinfo, mode);
 
 	if ((primary_mon == MT_DFP) || (primary_mon == MT_LCD)) {
+		radeon_fifo_wait(10);
 		OUTREG(FP_CRTC_H_TOTAL_DISP, mode->fp_crtc_h_total_disp);
 		OUTREG(FP_CRTC_V_TOTAL_DISP, mode->fp_crtc_v_total_disp);
 		OUTREG(FP_H_SYNC_STRT_WID, mode->fp_h_sync_strt_wid);
@@ -1288,6 +1298,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 	radeon_screen_blank(rinfo, VESA_NO_BLANKING);
 
+	radeon_fifo_wait(2);
 	OUTPLL(VCLK_ECP_CNTL, mode->vclk_ecp_cntl);
 	
 	return;
@@ -1864,6 +1875,7 @@ static int radeon_set_backlight_enable(int on, int level, void *data)
 	del_timer_sync(&rinfo->lvds_timer);
 
 	lvds_gen_cntl |= (LVDS_BL_MOD_EN | LVDS_BLON);
+	radeon_fifo_wait(3);
 	if (on && (level > BACKLIGHT_OFF)) {
 		lvds_gen_cntl |= LVDS_DIGON;
 		if (!(lvds_gen_cntl & LVDS_ON)) {
@@ -2136,6 +2148,7 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
           u32 tom = INREG(NB_TOM);
           tmp = ((((tom >> 16) - (tom & 0xffff) + 1) << 6) * 1024);
  
+ 		radeon_fifo_wait(6);
           OUTREG(MC_FB_LOCATION, tom);
           OUTREG(DISPLAY_BASE_ADDR, (tom & 0xffff) << 16);
           OUTREG(CRTC2_DISPLAY_BASE_ADDR, (tom & 0xffff) << 16);

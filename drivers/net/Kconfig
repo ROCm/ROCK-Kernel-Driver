@@ -922,7 +922,7 @@ config HP100
 
 config NET_ISA
 	bool "Other ISA cards"
-	depends on NET_ETHERNET && ISA && !X86_PC9800
+	depends on NET_ETHERNET && ISA
 	---help---
 	  If your network (Ethernet) card hasn't been mentioned yet and its
 	  bus system (that's the way the cards talks to the other components
@@ -1104,56 +1104,6 @@ config SK_G16
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
-
-config NET_CBUS
-	bool "NEC PC-9800 C-bus cards"
-	depends on NET_ETHERNET && ISA && X86_PC9800
-	---help---
-	  If your network (Ethernet) card hasn't been mentioned yet and its
-	  bus system (that's the way the cards talks to the other components
-	  of your computer) is NEC PC-9800 C-Bus, say Y.
-
-config NE2K_CBUS
-	tristate "Most NE2000-based Ethernet support"
-	depends on NET_CBUS
-	select CRC32
-
-config NE2K_CBUS_EGY98
-	bool "Melco EGY-98 support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_LGY98
-	bool "Melco LGY-98 support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_ICM
-	bool "ICM IF-27xxET support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_IOLA98
-	bool "I-O DATA LA-98 support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_CNET98EL
-	bool "Contec C-NET(98)E/L support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_CNET98EL_IO_BASE
-	hex "C-NET(98)E/L I/O base address (0xaaed or 0x55ed)"
-	depends on NE2K_CBUS_CNET98EL
-	default "0xaaed"
-
-config NE2K_CBUS_ATLA98
-	bool "Allied Telesis LA-98 Support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_BDN
-	bool "ELECOM Laneed LD-BDN[123]A Support"
-	depends on NE2K_CBUS
-
-config NE2K_CBUS_NEC108
-	bool "NEC PC-9801-108 Support"
-	depends on NE2K_CBUS
 
 config SKMC
 	tristate "SKnet MCA support"

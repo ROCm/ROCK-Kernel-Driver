@@ -25,33 +25,26 @@ static int proc_mf_dump_cmdline(char *page, char **start, off_t off,
 {
 	int len = count;
 	char *p;
-    
+
+	if (off) {
+		*eof = 1;
+		return 0;
+	}
+
 	len = mf_getCmdLine(page, &len, (u64)data);
    
-	p = page + len - 1;
-	while (p > page) {
-		if ((*p == 0) || (*p == ' '))
-			--p;
-		else
+	p = page;
+	while (len < (count - 1)) {
+		if (!*p || *p == '\n')
 			break;
+		p++;
+		len++;
 	}
-	if (*p != '\n') {
-		++p;
-		*p = '\n';
-	}
-	++p;
+	*p = '\n';
+	p++;
 	*p = 0;
-	len = p - page;
-    
-	len -= off;			
-	if (len < count) {		
-		*eof = 1;		
-		if (len <= 0)		
-			return 0;	
-	} else				
-		len = count;		
-	*start = page + off;		
-	return len;			
+
+	return p - page;
 }
 
 #if 0

@@ -70,7 +70,9 @@ void ncp_extract_file_info(void* src, struct nw_info_struct* target);
 int ncp_obtain_info(struct ncp_server *server, struct inode *, char *,
 		struct nw_info_struct *target);
 int ncp_obtain_nfs_info(struct ncp_server *server, struct nw_info_struct *target);
-int ncp_lookup_volume(struct ncp_server *, char *, struct nw_info_struct *);
+int ncp_get_volume_root(struct ncp_server *server, const char *volname,
+			__u32 *volume, __u32 *dirent, __u32 *dosdirent);
+int ncp_lookup_volume(struct ncp_server *, const char *, struct nw_info_struct *);
 int ncp_modify_file_or_subdir_dos_info(struct ncp_server *, struct inode *,
 	 __u32, const struct nw_modify_dos_info *info);
 int ncp_modify_file_or_subdir_dos_info_path(struct ncp_server *, struct inode *,
@@ -111,8 +113,8 @@ ncp_ClearPhysicalRecord(struct ncp_server *server,
 #endif	/* CONFIG_NCPFS_IOCTL_LOCKING */
 
 int
-ncp_mount_subdir(struct ncp_server *, struct nw_info_struct *,
-			__u8, __u8, __u32);
+ncp_mount_subdir(struct ncp_server *, __u8, __u8, __u32,
+		 __u32* volume, __u32* dirent, __u32* dosdirent);
 int ncp_dirhandle_alloc(struct ncp_server *, __u8 vol, __u32 dirent, __u8 *dirhandle);
 int ncp_dirhandle_free(struct ncp_server *, __u8 dirhandle);
 

@@ -64,6 +64,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 
     /*  reiserfs_warning (inode->i_sb, "reiserfs_readdir 1: f_pos = %Ld", filp->f_pos);*/
 
+    path_to_entry.reada = PATH_READA;
     while (1) {
     research:
 	/* search the directory item, containing entry with specified key */

@@ -45,7 +45,7 @@
 #include <asm/semaphore.h>
 #include <linux/init.h>
 
-#define IPMI_DEVINTF_VERSION "v31"
+#define IPMI_DEVINTF_VERSION "v32"
 
 struct ipmi_file_private
 {
@@ -199,7 +199,7 @@ static int handle_send_req(ipmi_user_t     user,
 			goto out;
 		}
 
-		if (copy_from_user(&msgdata,
+		if (copy_from_user(msgdata,
 				   req->msg.data,
 				   req->msg.data_len))
 		{

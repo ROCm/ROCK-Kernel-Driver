@@ -357,15 +357,14 @@ void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	HvCallEvent_dmaToSp(cmd_line, 2 * 64* 1024, 256,
 			HvLpDma_Direction_RemoteToLocal);
 
-	p = q = cmd_line + 255;
-	while (p > cmd_line) {
-		if ((*p == 0) || (*p == ' ') || (*p == '\n'))
-			--p;
-		else
+	p = cmd_line;
+	q = cmd_line + 255;
+	while( p < q ) {
+		if (!*p || *p == '\n')
 			break;
+		++p;
 	}
-	if (p < q)
-		*(p + 1) = 0;
+	*p = 0;
 
         if (strstr(cmd_line, "dprofile=")) {
                 for (q = cmd_line; (p = strstr(q, "dprofile=")) != 0; ) {

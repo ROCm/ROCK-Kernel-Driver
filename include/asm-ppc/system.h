@@ -76,6 +76,8 @@ extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
 extern void giveup_altivec(struct task_struct *);
 extern void load_up_altivec(struct task_struct *);
+extern void giveup_spe(struct task_struct *);
+extern void load_up_spe(struct task_struct *);
 extern int fix_alignment(struct pt_regs *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);

@@ -754,12 +754,11 @@ Enomem:
 static void get_capabilities(struct scsi_cd *cd)
 {
 	unsigned char *buffer;
-	int rc, n, mrw_write = 0, mrw = 1,ram_write=0;
 	struct scsi_mode_data data;
 	struct scsi_request *SRpnt;
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	unsigned int the_result;
-	int retries;
+	int retries, rc, n;
 
 	static char *loadmech[] =
 	{
@@ -830,19 +829,6 @@ static void get_capabilities(struct scsi_cd *cd)
 		printk("%s: scsi-1 drive\n", cd->cdi.name);
 		return;
 	}
-
-	if (cdrom_is_mrw(&cd->cdi, &mrw_write)) {
-		mrw = 0;
-		cd->cdi.mask |= CDC_MRW;
-		cd->cdi.mask |= CDC_MRW_W;
-	}
-	if (!mrw_write)
-		cd->cdi.mask |= CDC_MRW_W;
-
-	if (cdrom_is_random_writable(&cd->cdi, &ram_write))
-		cd->cdi.mask |= CDC_RAM;
-	if (!ram_write)
-		cd->cdi.mask |= CDC_RAM;
 
 	n = data.header_length + data.block_descriptor_length;
 	cd->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;

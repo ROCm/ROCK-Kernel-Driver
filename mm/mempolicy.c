@@ -1002,7 +1002,8 @@ void mpol_free_shared_policy(struct shared_policy *p)
 	up(&p->sem);
 }
 
-static __init int numa_policy_init(void)
+/* assumes fs == KERNEL_DS */
+void __init numa_policy_init(void)
 {
 	policy_cache = kmem_cache_create("numa_policy",
 					 sizeof(struct mempolicy),
@@ -1011,6 +1012,17 @@ static __init int numa_policy_init(void)
 	sn_cache = kmem_cache_create("shared_policy_node",
 				     sizeof(struct sp_node),
 				     0, SLAB_PANIC, NULL, NULL);
-	return 0;
+
+	/* Set interleaving policy for system init. This way not all
+	   the data structures allocated at system boot end up in node zero. */
+
+	if (sys_set_mempolicy(MPOL_INTERLEAVE, node_online_map, MAX_NUMNODES) < 0)
+		printk("numa_policy_init: interleaving failed\n");
 }
-module_init(numa_policy_init);
+
+/* Reset policy of current process to default.
+ * Assumes fs == KERNEL_DS */
+void __init numa_default_policy(void)
+{
+	sys_set_mempolicy(MPOL_DEFAULT, NULL, 0);
+}

@@ -246,6 +246,12 @@ void cs46xx_dsp_proc_register_scb_desc (cs46xx_t *chip,dsp_scb_descriptor_t * sc
 		if ((entry = snd_info_create_card_entry(ins->snd_card, scb->scb_name, 
 							ins->proc_dsp_dir)) != NULL) {
 			scb_info = kmalloc(sizeof(proc_scb_info_t), GFP_KERNEL);
+			if (!scb_info) {
+				snd_info_free_entry(entry);
+				entry = NULL;
+				goto out;
+			}
+
 			scb_info->chip = chip;
 			scb_info->scb_desc = scb;
       
@@ -262,7 +268,7 @@ void cs46xx_dsp_proc_register_scb_desc (cs46xx_t *chip,dsp_scb_descriptor_t * sc
 				entry = NULL;
 			}
 		}
-
+out:
 		scb->proc_info = entry;
 	}
 }

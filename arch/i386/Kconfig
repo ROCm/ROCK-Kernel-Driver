@@ -436,7 +436,8 @@ config HPET_TIMER
 	  Choose N to continue using the legacy 8254 timer.
 
 config HPET_EMULATE_RTC
-	def_bool HPET_TIMER && RTC=y
+	bool "Provide RTC interrupt"
+	depends on HPET_TIMER && RTC=y
 
 config SMP
 	bool "Symmetric multi-processing support"
@@ -1333,12 +1334,6 @@ config X86_BIOS_REBOOT
 config X86_TRAMPOLINE
 	bool
 	depends on X86_SMP || (X86_VOYAGER && SMP)
-	default y
-
-# std_resources is overridden for pc9800, but that's not
-# a currently selectable arch choice
-config X86_STD_RESOURCES
-	bool
 	default y
 
 config PC

@@ -22,7 +22,6 @@ static inline cpumask_t target_cpus(void)
 #define INT_DELIVERY_MODE dest_LowestPrio
 #define INT_DEST_MODE 0     /* physical delivery on LOCAL quad */
  
-#define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) physid_isset(apicid, bitmap)
 #define check_apicid_present(bit) physid_isset(bit, phys_cpu_present_map)
 #define apicid_cluster(apicid) (apicid & 0xF0)

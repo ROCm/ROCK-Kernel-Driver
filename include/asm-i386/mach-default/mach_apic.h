@@ -2,6 +2,7 @@
 #define __ASM_MACH_APIC_H
 
 #include <mach_apicdef.h>
+#include <asm/smp.h>
 
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
@@ -22,12 +23,6 @@ static inline cpumask_const_t target_cpus(void)
 
 #define INT_DELIVERY_MODE dest_LowestPrio
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
-
-/*
- * this isn't really broadcast, just a (potentially inaccurate) upper
- * bound for valid physical APIC id's
- */
-#define APIC_BROADCAST_ID      0x0F
 
 static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 {
@@ -85,7 +80,10 @@ static inline int cpu_to_logical_apicid(int cpu)
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return  mps_cpu;
+	if (mps_cpu < get_physical_broadcast())
+		return  mps_cpu;
+	else
+		return BAD_APICID;
 }
 
 static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)

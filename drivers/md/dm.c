@@ -394,7 +394,7 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	struct bio_vec *bv = bio->bi_io_vec + idx;
 
 	clone = bio_alloc(GFP_NOIO, 1);
-	memcpy(clone->bi_io_vec, bv, sizeof(*bv));
+	*clone->bi_io_vec = *bv;
 
 	clone->bi_sector = sector;
 	clone->bi_bdev = bio->bi_bdev;

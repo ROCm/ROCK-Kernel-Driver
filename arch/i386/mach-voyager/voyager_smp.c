@@ -24,7 +24,6 @@
 #include <asm/desc.h>
 #include <asm/voyager.h>
 #include <asm/vic.h>
-#include <asm/pgalloc.h>
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>

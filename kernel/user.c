@@ -30,7 +30,9 @@ static spinlock_t uidhash_lock = SPIN_LOCK_UNLOCKED;
 struct user_struct root_user = {
 	.__count	= ATOMIC_INIT(1),
 	.processes	= ATOMIC_INIT(1),
-	.files		= ATOMIC_INIT(0)
+	.files		= ATOMIC_INIT(0),
+	.sigpending	= ATOMIC_INIT(0),
+	.mq_bytes	= 0
 };
 
 /*
@@ -108,6 +110,9 @@ struct user_struct * alloc_uid(uid_t uid)
 		atomic_set(&new->__count, 1);
 		atomic_set(&new->processes, 0);
 		atomic_set(&new->files, 0);
+		atomic_set(&new->sigpending, 0);
+
+		new->mq_bytes = 0;
 
 		/*
 		 * Before adding this, check whether we raced

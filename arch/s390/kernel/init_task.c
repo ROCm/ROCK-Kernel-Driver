@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/init_task.h>
+#include <linux/mqueue.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

@@ -22,7 +22,6 @@
 #include <linux/pci.h>
 #include <linux/font.h>
 
-#include <asm/pgalloc.h>
 #include <asm/hardware.h>
 #include <asm/parisc-device.h>
 #include <asm/cacheflush.h>

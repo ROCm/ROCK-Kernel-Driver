@@ -490,6 +490,7 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	int res_specified = 0, bpp_specified = 0, refresh_specified = 0;
 	unsigned int xres = 0, yres = 0, bpp = default_bpp, refresh = 0;
 	int yres_specified = 0;
+	u32 best = -1, diff = -1;
 
 	for (i = namelen-1; i >= 0; i--) {
 	    switch (name[i]) {
@@ -529,14 +530,30 @@ int fb_find_mode(struct fb_var_screeninfo *var,
 	}
 done:
 	for (i = refresh_specified; i >= 0; i--) {
-	    DPRINTK("Trying specified video mode%s\n",
-		    i ? "" : " (ignoring refresh rate)");
+	    DPRINTK("Trying specified video mode%s %ix%i\n",
+		    i ? "" : " (ignoring refresh rate)", xres, yres);
 	    for (j = 0; j < dbsize; j++)
 		if ((name_matches(db[j], name, namelen) ||
 		     (res_specified && res_matches(db[j], xres, yres))) &&
 		    (!i || db[j].refresh == refresh) &&
 		    !fb_try_mode(var, info, &db[j], bpp))
 		    return 2-i;
+	}
+	DPRINTK("Trying best-fit modes\n");
+	for (i = 0; i < dbsize; i++) {
+	    if (xres <= db[i].xres && yres <= db[i].yres) {
+		DPRINTK("Trying %ix%i\n", db[i].xres, db[i].yres);
+		if (!fb_try_mode(var, info, &db[i], bpp)) {
+		    if (diff > (db[i].xres - xres) + (db[i].yres - yres)) {
+			diff = (db[i].xres - xres) + (db[i].yres - yres);
+			best = i;
+		    }
+		}
+	    }
+	}
+	if (best != -1) {
+	    fb_try_mode(var, info, &db[best], bpp);
+	    return 5;
 	}
     }
 

@@ -40,6 +40,14 @@
 	.globl n;\
 n:
 
+/*
+ * this is the minimum allowable io space due to the location
+ * of the io areas on prep (first one at 0x80000000) but
+ * as soon as I get around to remapping the io areas with the BATs
+ * to match the mac we can raise this. -- Cort
+ */
+#define TASK_SIZE	(CONFIG_TASK_SIZE)
+
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_PPC_MULTIPLATFORM
 extern int _machine;
@@ -79,14 +87,7 @@ extern long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 /* Lazy FPU handling on uni-processor */
 extern struct task_struct *last_task_used_math;
 extern struct task_struct *last_task_used_altivec;
-
-/*
- * this is the minimum allowable io space due to the location
- * of the io areas on prep (first one at 0x80000000) but
- * as soon as I get around to remapping the io areas with the BATs
- * to match the mac we can raise this. -- Cort
- */
-#define TASK_SIZE	(CONFIG_TASK_SIZE)
+extern struct task_struct *last_task_used_spe;
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
@@ -104,7 +105,7 @@ struct thread_struct {
 	void		*pgdir;		/* root of page-table tree */
 	int		fpexc_mode;	/* floating-point exception mode */
 	signed long	last_syscall;
-#ifdef CONFIG_4xx
+#if defined(CONFIG_4xx) || defined (CONFIG_BOOKE)
 	unsigned long	dbcr0;		/* debug control register values */
 	unsigned long	dbcr1;
 #endif
@@ -119,6 +120,12 @@ struct thread_struct {
 	unsigned long	vrsave;
 	int		used_vr;	/* set if process has used altivec */
 #endif /* CONFIG_ALTIVEC */
+#ifdef CONFIG_SPE
+	unsigned long	evr[32];	/* upper 32-bits of SPE regs */
+	u64		acc;		/* Accumulator */
+	unsigned long	spefscr;	/* SPE & eFP status */
+	int		used_spe;	/* set if process has used spe */
+#endif /* CONFIG_SPE */
 };
 
 #define ARCH_MIN_TASKALIGN 16

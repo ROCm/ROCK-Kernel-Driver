@@ -732,53 +732,12 @@ got_pg:
 
 EXPORT_SYMBOL(__alloc_pages);
 
-#ifdef CONFIG_NUMA
-/* Early boot: Everything is done by one cpu, but the data structures will be
- * used by all cpus - spread them on all nodes.
- */
-static __init unsigned long get_boot_pages(unsigned int gfp_mask, unsigned int order)
-{
-static int nodenr;
-	int i = nodenr;
-	struct page *page;
-
-	for (;;) {
-		if (i > nodenr + numnodes)
-			return 0;
-		if (node_present_pages(i%numnodes)) {
-			struct zone **z;
-			/* The node contains memory. Check that there is
-			 * memory in the intended zonelist.
-			 */
-			z = NODE_DATA(i%numnodes)->node_zonelists[gfp_mask & GFP_ZONEMASK].zones;
-			while (*z) {
-				if ( (*z)->free_pages > (1UL<<order))
-					goto found_node;
-				z++;
-			}
-		}
-		i++;
-	}
-found_node:
-	nodenr = i+1;
-	page = alloc_pages_node(i%numnodes, gfp_mask, order);
-	if (!page)
-		return 0;
-	return (unsigned long) page_address(page);
-}
-#endif
-
 /*
  * Common helper functions.
  */
 fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
 {
 	struct page * page;
-
-#ifdef CONFIG_NUMA
-	if (unlikely(system_state == SYSTEM_BOOTING))
-		return get_boot_pages(gfp_mask, order);
-#endif
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;

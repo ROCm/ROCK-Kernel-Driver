@@ -1716,18 +1716,6 @@ config SCSI_SUNESP
 	  To compile this driver as a module, choose M here: the
 	  module will be called esp.
 
-config SCSI_PC980155
-	tristate "NEC PC-9801-55 SCSI support"
-	depends on X86_PC9800 && SCSI
-	help
-	  If you have the NEC PC-9801-55 SCSI interface card or compatibles
-	  for NEC PC-9801/PC-9821, say Y.
-
-config WD33C93_PIO
-	bool
-	depends on SCSI_PC980155
-	default y
-
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 
 config ZFCP
