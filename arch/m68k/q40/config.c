@@ -23,6 +23,7 @@
 #include <linux/major.h>
 #include <linux/serial_reg.h>
 #include <linux/rtc.h>
+#include <linux/vt_kern.h>
 
 #include <asm/io.h>
 #include <asm/rtc.h>
@@ -61,7 +62,6 @@ void q40_halt(void);
 extern void q40_waitbut(void);
 void q40_set_vectors (void);
 
-extern void (*kd_mksound)(unsigned int, unsigned int);
 void q40_mksound(unsigned int /*freq*/, unsigned int /*ticks*/ );
 
 extern char *saved_command_line;
@@ -185,8 +185,10 @@ void __init config_q40(void)
 {
     mach_sched_init      = q40_sched_init;
 
+#ifdef CONFIG_VT
     mach_keyb_init       = q40kbd_init_hw;
     mach_kbd_translate   = q40kbd_translate;
+#endif
     mach_init_IRQ        = q40_init_IRQ;   
     mach_gettimeoffset   = q40_gettimeoffset; 
     mach_hwclk           = q40_hwclk; 
@@ -202,7 +204,9 @@ void __init config_q40(void)
     mach_default_handler = &q40_sys_default_handler;
     mach_get_model       = q40_get_model;
     mach_get_hardware_list = q40_get_hardware_list;
+#ifdef CONFIG_VT
     kd_mksound             = q40_mksound;
+#endif
 
 #ifdef CONFIG_MAGIC_SYSRQ
     mach_sysrq_key       = 0x54;
@@ -211,7 +215,9 @@ void __init config_q40(void)
     mach_heartbeat = q40_heartbeat;
 #endif
     mach_halt = q40_halt;
+#ifdef CONFIG_DUMMY_CONSOLE
     conswitchp = &dummy_con;
+#endif
 
     /* disable a few things that SMSQ might have left enabled */
     q40_disable_irqs();

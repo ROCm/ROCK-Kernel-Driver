@@ -145,13 +145,17 @@ void __init config_mvme16x(void)
 
     mach_max_dma_address = 0xffffffff;
     mach_sched_init      = mvme16x_sched_init;
+#ifdef CONFIG_VT
     mach_keyb_init       = mvme16x_keyb_init;
     mach_kbdrate         = mvme16x_kbdrate;
+#endif
     mach_init_IRQ        = mvme16x_init_IRQ;
     mach_gettimeoffset   = mvme16x_gettimeoffset;
     mach_hwclk           = mvme16x_hwclk;
     mach_set_clock_mmss	 = mvme16x_set_clock_mmss;
+#ifdef CONFIG_VT
 /*  kd_mksound           = mvme16x_mksound; */
+#endif
     mach_reset		 = mvme16x_reset;
     mach_free_irq	 = mvme16x_free_irq;
     mach_process_int	 = mvme16x_process_int;

@@ -14,11 +14,6 @@
 
 static irq_handler_t dn_irqs[16];
 
-extern void write_keyb_cmd(u_short length, u_char *cmd);
-static char BellOnCommand[] =  { 0xFF, 0x21, 0x81 },
-		    BellOffCommand[] = { 0xFF, 0x21, 0x82 };
-
-extern void dn_serial_print (const char *str);
 void dn_process_int(int irq, struct pt_regs *fp) {
 
 
@@ -122,6 +117,11 @@ struct fb_info *dn_dummy_fb_init(long *mem_start) {
 
 }
 
+#ifdef CONFIG_VT
+extern void write_keyb_cmd(u_short length, u_char *cmd);
+static char BellOnCommand[] =  { 0xFF, 0x21, 0x81 },
+		    BellOffCommand[] = { 0xFF, 0x21, 0x82 };
+
 static void dn_nosound (unsigned long ignored) {
 
 	write_keyb_cmd(sizeof(BellOffCommand),BellOffCommand);
@@ -143,6 +143,8 @@ void dn_mksound( unsigned int count, unsigned int ticks ) {
 	else
 		write_keyb_cmd(sizeof(BellOffCommand),BellOffCommand);
 }
+#endif /* CONFIG_VT */
+
 
 void dn_dummy_video_setup(char *options,int *ints) {
 

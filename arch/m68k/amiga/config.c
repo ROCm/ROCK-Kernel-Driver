@@ -20,6 +20,7 @@
 #include <linux/console.h>
 #include <linux/rtc.h>
 #include <linux/init.h>
+#include <linux/vt_kern.h>
 #ifdef CONFIG_ZORRO
 #include <linux/zorro.h>
 #endif
@@ -126,8 +127,6 @@ static char amiga_sysrq_xlate[128] =
 	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"	/* 0x60 - 0x6f */
 	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000";	/* 0x70 - 0x7f */
 #endif
-
-extern void (*kd_mksound)(unsigned int, unsigned int);
 
 
     /*
@@ -389,10 +388,11 @@ void __init config_amiga(void)
     request_resource(&iomem_resource, &((struct resource *)&mb_resources)[i]);
 
   mach_sched_init      = amiga_sched_init;
+#ifdef CONFIG_VT
   mach_keyb_init       = amiga_keyb_init;
   mach_kbdrate         = amiga_kbdrate;
   mach_kbd_translate   = amiga_kbd_translate;
-  SYSRQ_KEY            = 0xff;
+#endif
   mach_init_IRQ        = amiga_init_IRQ;
   mach_default_handler = &amiga_default_handler;
   mach_request_irq     = amiga_request_irq;
@@ -432,8 +432,11 @@ void __init config_amiga(void)
 #ifdef CONFIG_DUMMY_CONSOLE
   conswitchp           = &dummy_con;
 #endif
+#ifdef CONFIG_VT
   kd_mksound           = amiga_mksound;
+#endif
 #ifdef CONFIG_MAGIC_SYSRQ
+  SYSRQ_KEY            = 0xff;
   mach_sysrq_key = 0x5f;	     /* HELP */
   mach_sysrq_shift_state = 0x03; /* SHIFT+ALTGR */
   mach_sysrq_shift_mask = 0xff;  /* all modifiers except CapsLock */

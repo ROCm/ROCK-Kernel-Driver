@@ -151,7 +151,9 @@ void __init config_sun3(void)
         mach_default_handler = &sun3_default_handler;
         mach_request_irq     =  sun3_request_irq;
         mach_free_irq        =  sun3_free_irq;
+#ifdef CONFIG_VT
 //	mach_keyb_init       =  sun3_keyb_init;
+#endif
 	enable_irq     	     =  sun3_enable_irq;
         disable_irq  	     =  sun3_disable_irq;
 	mach_process_int     =  sun3_process_int;
@@ -162,7 +164,7 @@ void __init config_sun3(void)
 	mach_hwclk           =  sun3_hwclk;
 	mach_halt	     =  sun3_halt;
 	mach_get_hardware_list = sun3_get_hardware_list;
-#if !defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_FB)
+#if !defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp 	     = &dummy_con;
 #endif
 
@@ -175,8 +177,9 @@ void __init config_sun3(void)
 	
 	sun3_bootmem_alloc(memory_start, memory_end);
 
+#ifdef CONFIG_SUN3X_ZS
 	sun_serial_setup();
-
+#endif
 }
 
 void __init sun3_sched_init(void (*timer_routine)(int, void *, struct pt_regs *))

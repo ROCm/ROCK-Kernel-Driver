@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 /* keyb */
 #include <linux/init.h>
+#include <linux/vt_kern.h>
 
 #define BOOTINFO_COMPAT_1_0
 #include <asm/setup.h>
@@ -77,7 +78,6 @@ extern void oss_init(void);
 extern void psc_init(void);
 extern void baboon_init(void);
 
-extern void (*kd_mksound)(unsigned int, unsigned int);
 extern void mac_mksound(unsigned int, unsigned int);
 
 extern void nubus_sweep_video(void);
@@ -85,8 +85,6 @@ extern void nubus_sweep_video(void);
 /* Mac specific debug functions (in debug.c) */
 extern void mac_debug_init(void);
 extern void mac_debugging_long(int, long);
-
-extern void (*kd_mksound)(unsigned int, unsigned int);
 
 extern int mackbd_init_hw(void);
 extern void mackbd_leds(unsigned int leds);
@@ -208,7 +206,7 @@ void __init config_mac(void)
 	if (!MACH_IS_MAC) {
 	  printk("ERROR: no Mac, but config_mac() called!! \n");
 	}
-	
+
 #ifdef CONFIG_VT
 #ifdef CONFIG_INPUT_ADBHID
 	mach_keyb_init       = mac_hid_init_hw;
@@ -229,8 +227,10 @@ void __init config_mac(void)
 	mach_keyb_init       = mackbd_init_hw;
 	mach_kbd_leds        = mackbd_leds;
 	mach_kbd_translate   = mackbd_translate;
+#ifdef CONFIG_MAGIC_SYSRQ
 	mach_sysrq_xlate     = mackbd_sysrq_xlate;
 	SYSRQ_KEY = 0x69;
+#endif /* CONFIG_MAGIC_SYSRQ */
 #endif /* CONFIG_INPUT_ADBHID */
 #endif /* CONFIG_VT */
 
@@ -255,12 +255,16 @@ void __init config_mac(void)
 	mach_reset           = mac_reset;
 	mach_halt            = mac_poweroff;
 	mach_power_off       = mac_poweroff;
+#ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp	         = &dummy_con;
+#endif
 	mach_max_dma_address = 0xffffffff;
 #if 0
 	mach_debug_init	 = mac_debug_init;
 #endif
+#ifdef CONFIG_VT
 	kd_mksound		 = mac_mksound;
+#endif
 #ifdef CONFIG_HEARTBEAT
 #if 0
 	mach_heartbeat = mac_heartbeat;
