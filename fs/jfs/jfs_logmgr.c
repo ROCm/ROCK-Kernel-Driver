@@ -674,28 +674,29 @@ int lmGroupCommit(struct jfs_log * log, struct tblock * tblk)
 	}
 	jfs_info("lmGroup Commit: tblk = 0x%p, gcrtc = %d", tblk, log->gcrtc);
 
-	if (tblk->xflag & COMMIT_LAZY) {
-		/*
-		 * Lazy transactions can leave now
-		 */
+	if (tblk->xflag & COMMIT_LAZY)
 		tblk->flag |= tblkGC_LAZY;
-		LOGGC_UNLOCK(log);
-		return 0;
-	}
-	/*
-	 * group commit pageout in progress
-	 */
-	if ((!(log->cflag & logGC_PAGEOUT)) && log->cqueue.head) {
+
+	if ((!(log->cflag & logGC_PAGEOUT)) && log->cqueue.head &&
+	    (!(tblk->xflag & COMMIT_LAZY) || test_bit(log_FLUSH, &log->flag))) {
 		/*
-		 * only transaction in the commit queue:
+		 * No pageout in progress
 		 *
-		 * start one-transaction group commit as
-		 * its group leader.
+		 * start group commit as its group leader.
 		 */
 		log->cflag |= logGC_PAGEOUT;
 
 		lmGCwrite(log, 0);
 	}
+
+	if (tblk->xflag & COMMIT_LAZY) {
+		/*
+		 * Lazy transactions can leave now
+		 */
+		LOGGC_UNLOCK(log);
+		return 0;
+	}
+
 	/* lmGCwrite gives up LOGGC_LOCK, check again */
 
 	if (tblk->flag & tblkGC_COMMITTED) {
@@ -894,11 +895,8 @@ void lmPostGC(struct lbuf * bp)
 	 * the first transaction entering group commit
 	 * will elect herself as new group leader.
 	 */
-	else {
+	else
 		log->cflag &= ~logGC_PAGEOUT;
-		clear_bit(log_FLUSH, &log->flag);
-		WARN_ON(log->flush_tblk);
-	}
 
 	//LOGGC_UNLOCK(log);
 	spin_unlock_irqrestore(&log->gclock, flags);
