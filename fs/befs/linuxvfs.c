@@ -947,9 +947,19 @@ init_befs_fs(void)
 
 	err = befs_init_inodecache();
 	if (err)
-		return err;
+		goto unaquire_none;
 
-	return register_filesystem(&befs_fs_type);
+	err = register_filesystem(&befs_fs_type);
+	if (err)
+		goto unaquire_inodecache;
+
+	return 0;
+
+unaquire_inodecache:
+	befs_destroy_inodecache();
+
+unaquire_none:
+	return err;
 }
 
 static void __exit
