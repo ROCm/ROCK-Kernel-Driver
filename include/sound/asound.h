@@ -429,6 +429,8 @@ struct sndrv_pcm_mmap_control {
 };
 
 #define SNDRV_PCM_SYNC_PTR_HWSYNC	(1<<0)	/* execute hwsync */
+#define SNDRV_PCM_SYNC_PTR_APPL		(1<<1)	/* get appl_ptr from driver (r/w op) */
+#define SNDRV_PCM_SYNC_PTR_AVAIL_MIN	(1<<2)	/* get avail_min from driver */
 
 struct sndrv_pcm_sync_ptr {
 	unsigned int flags;

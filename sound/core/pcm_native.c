@@ -2356,8 +2356,14 @@ static int snd_pcm_sync_ptr(snd_pcm_substream_t *substream, struct sndrv_pcm_syn
 			return err;
 	}
 	snd_pcm_stream_lock_irq(substream);
-	control->appl_ptr = sync_ptr.c.control.appl_ptr;
-	control->avail_min = sync_ptr.c.control.avail_min;
+	if (!(sync_ptr.flags & SNDRV_PCM_SYNC_PTR_APPL))
+		control->appl_ptr = sync_ptr.c.control.appl_ptr;
+	else
+		sync_ptr.c.control.appl_ptr = control->appl_ptr;
+	if (!(sync_ptr.flags & SNDRV_PCM_SYNC_PTR_AVAIL_MIN))
+		control->avail_min = sync_ptr.c.control.avail_min;
+	else
+		sync_ptr.c.control.avail_min = control->avail_min;
 	sync_ptr.s.status.state = status->state;
 	sync_ptr.s.status.hw_ptr = status->hw_ptr;
 	sync_ptr.s.status.tstamp = status->tstamp;
