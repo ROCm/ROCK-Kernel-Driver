@@ -2240,9 +2240,9 @@ static int __init alsa_card_opti9xx_setup(char *str)
 	       get_option(&str,&index) == 2 &&
 	       get_id(&str,&id) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port) == 2 &&
-	       get_option(&str,(int *)&mpu_port) == 2 &&
-	       get_option(&str,(int *)&fm_port) == 2 &&
+	       get_option_long(&str,&port) == 2 &&
+	       get_option_long(&str,&mpu_port) == 2 &&
+	       get_option_long(&str,&fm_port) == 2 &&
 	       get_option(&str,&irq) == 2 &&
 	       get_option(&str,&mpu_irq) == 2 &&
 	       get_option(&str,&dma1) == 2

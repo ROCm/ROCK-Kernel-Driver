@@ -2160,17 +2160,15 @@ module_exit(alsa_card_via82xx_exit)
 static int __init alsa_card_via82xx_setup(char *str)
 {
 	static unsigned __initdata nr_dev = 0;
-	int port;
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
-	       get_option(&str,&port) == 2 &&
+	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
 	       get_option(&str,&dxs_support[nr_dev]) == 2);
-	mpu_port[nr_dev] = port;
 	nr_dev++;
 	return 1;
 }

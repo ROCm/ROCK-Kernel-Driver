@@ -31,6 +31,7 @@
 #include <sound/hwdep.h>
 #include <sound/cs4231.h>
 #include <sound/mpu401.h>
+#define SNDRV_GET_ID
 #include <sound/initval.h>
 
 #include <sound/sscape_ioctl.h>
@@ -1538,8 +1539,8 @@ static int __init builtin_sscape_setup(char *str)
 		return 0;
 
 	(void)((get_option(&str, &index[nr_dev]) == 2) &&
-	       (get_option(&str, (int*)&id[nr_dev]) == 2) &&
-	       (get_option(&str, (int*)&port[nr_dev]) == 2) &&
+	       (get_id(&str, &id[nr_dev]) == 2) &&
+	       (get_option_long(&str, &port[nr_dev]) == 2) &&
 	       (get_option(&str, &irq[nr_dev]) == 2) &&
 	       (get_option(&str, &mpu_irq[nr_dev]) == 2) &&
 	       (get_option(&str, &dma[nr_dev]) == 2)); 

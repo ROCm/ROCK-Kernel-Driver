@@ -756,13 +756,13 @@ static int __init alsa_card_wavefront_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&isapnp[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&cs4232_pcm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&cs4232_pcm_port[nr_dev]) == 2 &&
 	       get_option(&str,&cs4232_pcm_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&cs4232_mpu_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&cs4232_mpu_port[nr_dev]) == 2 &&
 	       get_option(&str,&cs4232_mpu_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&ics2115_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&ics2115_port[nr_dev]) == 2 &&
 	       get_option(&str,&ics2115_irq[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&fm_port[nr_dev]) == 2 &&
+	       get_option_long(&str,&fm_port[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&
 	       get_option(&str,&dma2[nr_dev]) == 2 &&
 	       get_option(&str,&use_cs4232_midi[nr_dev]) == 2);

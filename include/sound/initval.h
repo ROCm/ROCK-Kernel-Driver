@@ -163,4 +163,16 @@ static int __init get_id(char **str, char **dst)
 }
 #endif
 
+/* simple wrapper for long variable.
+ * the value more than 32bit won't work!
+ */
+inline static int get_option_long(char **str, long *valp)
+{
+	int val, ret;
+	ret = get_option(str, &val);
+	if (ret)
+		*valp = val;
+	return ret;
+}
+
 #endif /* __SOUND_INITVAL_H */

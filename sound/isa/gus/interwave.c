@@ -994,9 +994,9 @@ static int __init alsa_card_interwave_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option_long(&str,&port[nr_dev]) == 2 &&
 #ifdef SNDRV_STB
-	       get_option(&str,(int *)&port_tc[nr_dev]) == 2 &&
+	       get_option_long(&str,&port_tc[nr_dev]) == 2 &&
 #endif
 	       get_option(&str,&irq[nr_dev]) == 2 &&
 	       get_option(&str,&dma1[nr_dev]) == 2 &&
