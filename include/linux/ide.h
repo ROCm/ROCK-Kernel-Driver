@@ -17,6 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
 #include <linux/bio.h>
+#include <linux/pci.h>
 #include <asm/byteorder.h>
 #include <asm/system.h>
 #include <asm/hdreg.h>
