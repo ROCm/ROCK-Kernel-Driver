@@ -42,6 +42,8 @@
 
 #include "io_ports.h"
 
+atomic_t irq_mis_count;
+
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
 /*
@@ -254,8 +256,6 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 #  define TDprintk(x...) 
 #  define Dprintk(x...) 
 # endif
-
-extern cpumask_t irq_affinity[NR_IRQS];
 
 cpumask_t __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
 
@@ -1879,9 +1879,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 	ack_APIC_irq();
 
 	if (!(v & (1 << (i & 0x1f)))) {
-#ifdef APIC_MISMATCH_DEBUG
 		atomic_inc(&irq_mis_count);
-#endif
 		spin_lock(&ioapic_lock);
 		__mask_and_edge_IO_APIC_irq(irq);
 		__unmask_and_level_IO_APIC_irq(irq);

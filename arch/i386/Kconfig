@@ -1194,6 +1194,13 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
+#
+# Use the generic interrupt handling code in kernel/hardirq.c:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
+
 config X86_SMP
 	bool
 	depends on SMP && !X86_VOYAGER
