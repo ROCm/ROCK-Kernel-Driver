@@ -256,7 +256,7 @@ static int wm_dac_vol_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontr
 	voices = kcontrol->private_value >> 8;
 	ofs = kcontrol->private_value & 0xff;
 	snd_ice1712_save_gpio_status(ice);
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < voices; i++) {
 		idx  = WM_DAC_ATTEN + ofs + i;
 		nvol = ucontrol->value.integer.value[i] + 0x1a;
 		ovol = wm_get(ice, idx) & 0x7f;
@@ -928,6 +928,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon51_eeprom),
 		.eeprom_data = aureon51_eeprom,
+		.driver = "Aureon51",
 	},
 	{
 		.subvendor = VT1724_SUBDEVICE_AUREON71_SPACE,
@@ -937,6 +938,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(aureon71_eeprom),
 		.eeprom_data = aureon71_eeprom,
+		.driver = "Aureon71",
 	},
  	{
  		.subvendor = VT1724_SUBDEVICE_AUREON71_UNIVERSE,
@@ -946,6 +948,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
  		.build_controls = aureon_add_controls,
  		.eeprom_size = sizeof(aureon71_eeprom),
  		.eeprom_data = aureon71_eeprom,
+		.driver = "Aureon71",
 	},
 	{
 		.subvendor = VT1724_SUBDEVICE_PRODIGY71,
@@ -955,6 +958,7 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 		.build_controls = aureon_add_controls,
 		.eeprom_size = sizeof(prodigy71_eeprom),
 		.eeprom_data = prodigy71_eeprom,
+		.driver = "Prodigy71", /* should be identical with Aureon71 */
 	},
 	{ } /* terminator */
 };
