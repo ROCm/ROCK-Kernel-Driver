@@ -36,7 +36,7 @@ int device_suspend(u32 state, u32 level)
 	spin_lock(&device_lock);
 	dev = g_list_to_dev(prev->g_list.next);
 	while(dev != &device_root && !error) {
-		get_device(dev);
+		get_device_locked(dev);
 		spin_unlock(&device_lock);
 		put_device(prev);
 
@@ -71,7 +71,7 @@ void device_resume(u32 level)
 	spin_lock(&device_lock);
 	dev = g_list_to_dev(prev->g_list.prev);
 	while(dev != &device_root) {
-		get_device(dev);
+		get_device_locked(dev);
 		spin_unlock(&device_lock);
 		put_device(prev);
 
@@ -108,7 +108,7 @@ void device_shutdown(void)
 	spin_lock(&device_lock);
 	dev = g_list_to_dev(prev->g_list.next);
 	while(dev != &device_root) {
-		get_device(dev);
+		dev = get_device_locked(dev);
 		spin_unlock(&device_lock);
 		put_device(prev);
 

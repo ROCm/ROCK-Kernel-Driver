@@ -53,9 +53,9 @@ static int found_match(struct device * dev, struct device_driver * drv)
 	pr_debug("bound device '%s' to driver '%s'\n",
 		 dev->bus_id,drv->name);
 
-	write_lock(&drv->lock);
+	spin_lock(&device_lock);
 	list_add_tail(&dev->driver_list,&drv->devices);
-	write_unlock(&drv->lock);
+	spin_unlock(&device_lock);
 	
 	goto Done;
 
@@ -154,13 +154,13 @@ void driver_detach(struct device_driver * drv)
 	struct list_head * node;
 	int error = 0;
 
-	write_lock(&drv->lock);
+	spin_lock(&device_lock);
 	node = drv->devices.next;
 	while (node != &drv->devices) {
 		next = list_entry(node,struct device,driver_list);
-		get_device(next);
+		get_device_locked(next);
 		list_del_init(&next->driver_list);
-		write_unlock(&drv->lock);
+		spin_unlock(&device_lock);
 
 		if (dev)
 			put_device(dev);
@@ -169,10 +169,10 @@ void driver_detach(struct device_driver * drv)
 			put_device(dev);
 			break;
 		}
-		write_lock(&drv->lock);
+		spin_lock(&device_lock);
 		node = drv->devices.next;
 	}
-	write_unlock(&drv->lock);
+	spin_unlock(&device_lock);
 	if (dev)
 		put_device(dev);
 }
@@ -202,12 +202,12 @@ int device_register(struct device *dev)
 	spin_lock_init(&dev->lock);
 	atomic_set(&dev->refcount,2);
 
-	spin_lock(&device_lock);
 	if (dev != &device_root) {
 		if (!dev->parent)
 			dev->parent = &device_root;
 		get_device(dev->parent);
 
+		spin_lock(&device_lock);
 		if (list_empty(&dev->parent->children))
 			prev_dev = dev->parent;
 		else
@@ -215,8 +215,8 @@ int device_register(struct device *dev)
 		list_add(&dev->g_list, &prev_dev->g_list);
 
 		list_add_tail(&dev->node,&dev->parent->children);
+		spin_unlock(&device_lock);
 	}
-	spin_unlock(&device_lock);
 
 	pr_debug("DEV: registering device: ID = '%s', name = %s\n",
 		 dev->bus_id, dev->name);
@@ -238,6 +238,25 @@ int device_register(struct device *dev)
 	if (error && dev->parent)
 		put_device(dev->parent);
 	return error;
+}
+
+struct device * get_device_locked(struct device * dev)
+{
+	struct device * ret = dev;
+	if (dev && atomic_read(&dev->refcount))
+		atomic_inc(&dev->refcount);
+	else
+		ret = NULL;
+	return ret;
+}
+
+struct device * get_device(struct device * dev)
+{
+	struct device * ret;
+	spin_lock(&device_lock);
+	ret = get_device_locked(dev);
+	spin_unlock(&device_lock);
+	return ret;
 }
 
 /**
@@ -296,4 +315,5 @@ static int __init device_init(void)
 core_initcall(device_init);
 
 EXPORT_SYMBOL(device_register);
+EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);

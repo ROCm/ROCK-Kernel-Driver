@@ -42,12 +42,12 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 	int error = 0;
 
 	get_bus(bus);
-	read_lock(&bus->lock);
+	spin_lock(&device_lock);
 	node = bus->devices.next;
 	while (node != &bus->devices) {
 		next = list_entry(node,struct device,bus_list);
-		get_device(next);
-		read_unlock(&bus->lock);
+		get_device_locked(next);
+		spin_unlock(&device_lock);
 
 		if (dev)
 			put_device(dev);
@@ -56,10 +56,10 @@ int bus_for_each_dev(struct bus_type * bus, void * data,
 			put_device(dev);
 			break;
 		}
-		read_lock(&bus->lock);
+		spin_lock(&device_lock);
 		node = dev->bus_list.next;
 	}
-	read_unlock(&bus->lock);
+	spin_unlock(&device_lock);
 	if (dev)
 		put_device(dev);
 	put_bus(bus);
@@ -77,12 +77,12 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 	/* pin bus in memory */
 	get_bus(bus);
 
-	read_lock(&bus->lock);
+	spin_lock(&device_lock);
 	node = bus->drivers.next;
 	while (node != &bus->drivers) {
 		next = list_entry(node,struct device_driver,bus_list);
 		get_driver(next);
-		read_unlock(&bus->lock);
+		spin_unlock(&device_lock);
 
 		if (drv)
 			put_driver(drv);
@@ -91,10 +91,10 @@ int bus_for_each_drv(struct bus_type * bus, void * data,
 			put_driver(drv);
 			break;
 		}
-		read_lock(&bus->lock);
+		spin_lock(&device_lock);
 		node = drv->bus_list.next;
 	}
-	read_unlock(&bus->lock);
+	spin_unlock(&device_lock);
 	if (drv)
 		put_driver(drv);
 	put_bus(bus);
@@ -115,9 +115,9 @@ int bus_add_device(struct device * dev)
 	if (dev->bus) {
 		pr_debug("registering %s with bus '%s'\n",dev->bus_id,dev->bus->name);
 		get_bus(dev->bus);
-		write_lock(&dev->bus->lock);
+		spin_lock(&device_lock);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
-		write_unlock(&dev->bus->lock);
+		spin_unlock(&device_lock);
 		device_bus_link(dev);
 	}
 	return 0;
@@ -134,9 +134,9 @@ void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
 		device_remove_symlink(&dev->bus->device_dir,dev->bus_id);
-		write_lock(&dev->bus->lock);
+		spin_lock(&device_lock);
 		list_del_init(&dev->bus_list);
-		write_unlock(&dev->bus->lock);
+		spin_unlock(&device_lock);
 		put_bus(dev->bus);
 	}
 }

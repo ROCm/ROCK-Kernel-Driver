@@ -261,12 +261,7 @@ static inline void unlock_device(struct device * dev)
  * get_device - atomically increment the reference count for the device.
  *
  */
-static inline void get_device(struct device * dev)
-{
-	BUG_ON(!atomic_read(&dev->refcount));
-	atomic_inc(&dev->refcount);
-}
-
+extern struct device * get_device(struct device * dev);
 extern void put_device(struct device * dev);
 
 /* drivers/base/sys.c */
