@@ -1096,17 +1096,17 @@ static struct module *load_module(void *umod,
 	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now copy in args */
-	err = strlen_user(uargs);
-	if (err < 0)
+	arglen = strlen_user(uargs);
+	if (!arglen) {
+		err = -EFAULT;
 		goto free_hdr;
-	arglen = err;
-
-	args = kmalloc(arglen+1, GFP_KERNEL);
+	}
+	args = kmalloc(arglen, GFP_KERNEL);
 	if (!args) {
 		err = -ENOMEM;
 		goto free_hdr;
 	}
-	if (copy_from_user(args, uargs, arglen+1) != 0) {
+	if (copy_from_user(args, uargs, arglen) != 0) {
 		err = -EFAULT;
 		goto free_mod;
 	}
