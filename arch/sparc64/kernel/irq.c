@@ -90,6 +90,13 @@ struct irqaction *irq_action[NR_IRQS+1] = {
 	  NULL, NULL, NULL, NULL, NULL, NULL , NULL, NULL
 };
 
+/* This only synchronizes entities which modify IRQ handler
+ * state and some selected user-level spots that want to
+ * read things in the table.  IRQ handler processing orders
+ * its' accesses such that no locking is needed.
+ */
+static spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
+
 static void register_irq_proc (unsigned int irq);
 
 /*
@@ -109,14 +116,16 @@ static void register_irq_proc (unsigned int irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
+	unsigned long flags;
 	int i;
 	struct irqaction *action;
 #ifdef CONFIG_SMP
 	int j;
 #endif
 
-	for(i = 0; i < (NR_IRQS + 1); i++) {
-		if(!(action = *(i + irq_action)))
+	spin_lock_irqsave(&irq_action_lock, flags);
+	for (i = 0; i < (NR_IRQS + 1); i++) {
+		if (!(action = *(i + irq_action)))
 			continue;
 		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
@@ -131,12 +140,14 @@ int show_interrupts(struct seq_file *p, void *v)
 #endif
 		seq_printf(p, " %s:%lx", action->name,
 			   get_ino_in_irqaction(action));
-		for(action = action->next; action; action = action->next) {
+		for (action = action->next; action; action = action->next) {
 			seq_printf(p, ", %s:%lx", action->name,
 				   get_ino_in_irqaction(action));
 		}
 		seq_putc(p, '\n');
 	}
+	spin_unlock_irqrestore(&irq_action_lock, flags);
+
 	return 0;
 }
 
@@ -222,8 +233,8 @@ unsigned int build_irq(int pil, int inofixup, unsigned long iclr, unsigned long 
 	struct ino_bucket *bucket;
 	int ino;
 
-	if(pil == 0) {
-		if(iclr != 0UL || imap != 0UL) {
+	if (pil == 0) {
+		if (iclr != 0UL || imap != 0UL) {
 			prom_printf("Invalid dummy bucket for PIL0 (%lx:%lx)\n",
 				    iclr, imap);
 			prom_halt();
@@ -239,7 +250,7 @@ unsigned int build_irq(int pil, int inofixup, unsigned long iclr, unsigned long 
 	}
 	
 	ino = (upa_readl(imap) & (IMAP_IGN | IMAP_INO)) + inofixup;
-	if(ino > NUM_IVECS) {
+	if (ino > NUM_IVECS) {
 		prom_printf("Invalid INO %04x (%d:%d:%016lx:%016lx)\n",
 			    ino, pil, inofixup, iclr, imap);
 		prom_halt();
@@ -302,7 +313,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		       "from %p, irq %08x.\n", caller, irq);
 		return -EINVAL;
 	}	
-	if(!handler)
+	if (!handler)
 	    return -EINVAL;
 
 	if ((bucket != &pil0_dummy_bucket) && (irqflags & SA_SAMPLE_RANDOM)) {
@@ -319,15 +330,15 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		rand_initialize_irq(irq);
 	}
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&irq_action_lock, flags);
 
 	action = *(bucket->pil + irq_action);
-	if(action) {
-		if((action->flags & SA_SHIRQ) && (irqflags & SA_SHIRQ))
+	if (action) {
+		if ((action->flags & SA_SHIRQ) && (irqflags & SA_SHIRQ))
 			for (tmp = action; tmp->next; tmp = tmp->next)
 				;
 		else {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&irq_action_lock, flags);
 			return -EBUSY;
 		}
 		action = NULL;		/* Or else! */
@@ -336,19 +347,19 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	/* If this is flagged as statically allocated then we use our
 	 * private struct which is never freed.
 	 */
-	if(irqflags & SA_STATIC_ALLOC) {
-	    if(static_irq_count < MAX_STATIC_ALLOC)
+	if (irqflags & SA_STATIC_ALLOC) {
+	    if (static_irq_count < MAX_STATIC_ALLOC)
 		action = &static_irqaction[static_irq_count++];
 	    else
 		printk("Request for IRQ%d (%s) SA_STATIC_ALLOC failed "
 		       "using kmalloc\n", irq, name);
 	}	
-	if(action == NULL)
+	if (action == NULL)
 	    action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
 						 GFP_KERNEL);
 	
-	if(!action) { 
-		restore_flags(flags);
+	if (!action) { 
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -ENOMEM;
 	}
 
@@ -356,17 +367,17 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 		bucket->irq_info = action;
 		bucket->flags |= IBF_ACTIVE;
 	} else {
-		if((bucket->flags & IBF_ACTIVE) != 0) {
+		if ((bucket->flags & IBF_ACTIVE) != 0) {
 			void *orig = bucket->irq_info;
 			void **vector = NULL;
 
-			if((bucket->flags & IBF_PCI) == 0) {
+			if ((bucket->flags & IBF_PCI) == 0) {
 				printk("IRQ: Trying to share non-PCI bucket.\n");
 				goto free_and_ebusy;
 			}
-			if((bucket->flags & IBF_MULTI) == 0) {
+			if ((bucket->flags & IBF_MULTI) == 0) {
 				vector = kmalloc(sizeof(void *) * 4, GFP_KERNEL);
-				if(vector == NULL)
+				if (vector == NULL)
 					goto free_and_enomem;
 
 				/* We might have slept. */
@@ -395,8 +406,8 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 				int ent;
 
 				vector = (void **)orig;
-				for(ent = 0; ent < 4; ent++) {
-					if(vector[ent] == NULL) {
+				for (ent = 0; ent < 4; ent++) {
+					if (vector[ent] == NULL) {
 						vector[ent] = action;
 						break;
 					}
@@ -409,7 +420,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 			bucket->flags |= IBF_ACTIVE;
 		}
 		pending = bucket->pending;
-		if(pending)
+		if (pending)
 			bucket->pending = 0;
 	}
 
@@ -421,7 +432,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	put_ino_in_irqaction(action, irq);
 	put_smpaff_in_irqaction(action, 0);
 
-	if(tmp)
+	if (tmp)
 		tmp->next = action;
 	else
 		*(bucket->pil + irq_action) = action;
@@ -429,11 +440,11 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 	enable_irq(irq);
 
 	/* We ate the IVEC already, this makes sure it does not get lost. */
-	if(pending) {
+	if (pending) {
 		atomic_bucket_insert(bucket);
 		set_softint(1 << bucket->pil);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	if ((bucket != &pil0_dummy_bucket) && (!(irqflags & SA_STATIC_ALLOC)))
 		register_irq_proc(__irq_ino(irq));
 
@@ -444,12 +455,12 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 
 free_and_ebusy:
 	kfree(action);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	return -EBUSY;
 
 free_and_enomem:
 	kfree(action);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 	return -ENOMEM;
 }
 
@@ -471,37 +482,47 @@ void free_irq(unsigned int irq, void *dev_id)
 		return;
 	}
 	
+	spin_lock_irqsave(&irq_action_lock, flags);
+
 	action = *(bucket->pil + irq_action);
-	if(!action->handler) {
+	if (!action->handler) {
 		printk("Freeing free IRQ %d\n", bucket->pil);
 		return;
 	}
-	if(dev_id) {
-		for( ; action; action = action->next) {
-			if(action->dev_id == dev_id)
+	if (dev_id) {
+		for ( ; action; action = action->next) {
+			if (action->dev_id == dev_id)
 				break;
 			tmp = action;
 		}
-		if(!action) {
+		if (!action) {
 			printk("Trying to free free shared IRQ %d\n", bucket->pil);
+			spin_unlock_irqrestore(&irq_action_lock, flags);
 			return;
 		}
-	} else if(action->flags & SA_SHIRQ) {
+	} else if (action->flags & SA_SHIRQ) {
 		printk("Trying to free shared IRQ %d with NULL device ID\n", bucket->pil);
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return;
 	}
 
-	if(action->flags & SA_STATIC_ALLOC) {
+	if (action->flags & SA_STATIC_ALLOC) {
 		printk("Attempt to free statically allocated IRQ %d (%s)\n",
 		       bucket->pil, action->name);
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return;
 	}
 
-	save_and_cli(flags);
-	if(action && tmp)
+	if (action && tmp)
 		tmp->next = action->next;
 	else
 		*(bucket->pil + irq_action) = action->next;
+
+	spin_unlock_irqrestore(&irq_action_lock, flags);
+
+	synchronize_irq(irq);
+
+	spin_lock_irqsave(&irq_action_lock, flags);
 
 	if (bucket != &pil0_dummy_bucket) {
 		unsigned long imap = bucket->imap;
@@ -514,10 +535,10 @@ void free_irq(unsigned int irq, void *dev_id)
 		if ((bucket->flags & IBF_MULTI) != 0) {
 			int other = 0;
 			void *orphan = NULL;
-			for(ent = 0; ent < 4; ent++) {
-				if(vector[ent] == action)
+			for (ent = 0; ent < 4; ent++) {
+				if (vector[ent] == action)
 					vector[ent] = NULL;
-				else if(vector[ent] != NULL) {
+				else if (vector[ent] != NULL) {
 					orphan = vector[ent];
 					other++;
 				}
@@ -526,7 +547,7 @@ void free_irq(unsigned int irq, void *dev_id)
 			/* Only free when no other shared irq
 			 * uses this bucket.
 			 */
-			if(other) {
+			if (other) {
 				if (other == 1) {
 					/* Convert back to non-shared bucket. */
 					bucket->irq_info = orphan;
@@ -545,11 +566,11 @@ void free_irq(unsigned int irq, void *dev_id)
 		/* See if any other buckets share this bucket's IMAP
 		 * and are still active.
 		 */
-		for(ent = 0; ent < NUM_IVECS; ent++) {
+		for (ent = 0; ent < NUM_IVECS; ent++) {
 			bp = &ivector_table[ent];
-			if(bp != bucket		&&
-			   bp->imap == imap	&&
-			   (bp->flags & IBF_ACTIVE) != 0)
+			if (bp != bucket	&&
+			    bp->imap == imap	&&
+			    (bp->flags & IBF_ACTIVE) != 0)
 				break;
 		}
 
@@ -562,7 +583,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 out:
 	kfree(action);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 }
 
 #ifdef CONFIG_SMP
@@ -854,7 +875,7 @@ int request_fast_irq(unsigned int irq,
 		return -EINVAL;
 	}	
 	
-	if(!handler)
+	if (!handler)
 		return -EINVAL;
 
 	if ((bucket->pil == 0) || (bucket->pil == 14)) {
@@ -862,13 +883,16 @@ int request_fast_irq(unsigned int irq,
 		return -EBUSY;
 	}
 
+	spin_lock_irqsave(&irq_action_lock, flags);
+
 	action = *(bucket->pil + irq_action);
-	if(action) {
-		if(action->flags & SA_SHIRQ)
+	if (action) {
+		if (action->flags & SA_SHIRQ)
 			panic("Trying to register fast irq when already shared.\n");
-		if(irqflags & SA_SHIRQ)
+		if (irqflags & SA_SHIRQ)
 			panic("Trying to register fast irq as shared.\n");
 		printk("request_fast_irq: Trying to register yet already owned.\n");
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -EBUSY;
 	}
 
@@ -876,19 +900,18 @@ int request_fast_irq(unsigned int irq,
 	 * We do not check for SA_SAMPLE_RANDOM in this path. Neither do we
 	 * support smp intr affinity in this path.
 	 */
-	save_and_cli(flags);
-	if(irqflags & SA_STATIC_ALLOC) {
-		if(static_irq_count < MAX_STATIC_ALLOC)
+	if (irqflags & SA_STATIC_ALLOC) {
+		if (static_irq_count < MAX_STATIC_ALLOC)
 			action = &static_irqaction[static_irq_count++];
 		else
 			printk("Request for IRQ%d (%s) SA_STATIC_ALLOC failed "
 			       "using kmalloc\n", bucket->pil, name);
 	}
-	if(action == NULL)
+	if (action == NULL)
 		action = (struct irqaction *)kmalloc(sizeof(struct irqaction),
 						     GFP_KERNEL);
-	if(!action) {
-		restore_flags(flags);
+	if (!action) {
+		spin_unlock_irqrestore(&irq_action_lock, flags);
 		return -ENOMEM;
 	}
 	install_fast_irq(bucket->pil, handler);
@@ -907,7 +930,7 @@ int request_fast_irq(unsigned int irq,
 	*(bucket->pil + irq_action) = action;
 	enable_irq(irq);
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 
 #ifdef CONFIG_SMP
 	distribute_irqs();
@@ -955,7 +978,7 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	err = request_irq(build_irq(0, 0, 0UL, 0UL), cfunc, SA_STATIC_ALLOC,
 			  "timer", NULL);
 
-	if(err) {
+	if (err) {
 		prom_printf("Serious problem, cannot register TICK_INT\n");
 		prom_halt();
 	}
@@ -1032,7 +1055,7 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 			     : /* no outputs */
 			     : "r" (pstate));
 
-	sti();
+	__sti();
 }
 
 #ifdef CONFIG_SMP
@@ -1073,14 +1096,14 @@ static void distribute_irqs(void)
 	unsigned long flags;
 	int cpu, level;
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&irq_action_lock, flags);
 	cpu = 0;
 
 	/*
 	 * Skip the timer at [0], and very rare error/power intrs at [15].
 	 * Also level [12], it causes problems on Ex000 systems.
 	 */
-	for(level = 1; level < NR_IRQS; level++) {
+	for (level = 1; level < NR_IRQS; level++) {
 		struct irqaction *p = irq_action[level];
 		if (level == 12) continue;
 		while(p) {
@@ -1088,7 +1111,7 @@ static void distribute_irqs(void)
 			p = p->next;
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irq_action_lock, flags);
 }
 #endif
 
@@ -1107,14 +1130,14 @@ static void map_prom_timers(void)
 	/* Assume if node is not present, PROM uses different tick mechanism
 	 * which we should not care about.
 	 */
-	if(tnode == 0 || tnode == -1) {
+	if (tnode == 0 || tnode == -1) {
 		prom_timers = (struct sun5_timer *) 0;
 		return;
 	}
 
 	/* If PROM is really using this, it must be mapped by him. */
 	err = prom_getproperty(tnode, "address", (char *)addr, sizeof(addr));
-	if(err == -1) {
+	if (err == -1) {
 		prom_printf("PROM does not have timer mapped, trying to continue.\n");
 		prom_timers = (struct sun5_timer *) 0;
 		return;
@@ -1124,7 +1147,7 @@ static void map_prom_timers(void)
 
 static void kill_prom_timer(void)
 {
-	if(!prom_timers)
+	if (!prom_timers)
 		return;
 
 	/* Save them away for later. */
@@ -1151,7 +1174,7 @@ static void kill_prom_timer(void)
 
 void enable_prom_timer(void)
 {
-	if(!prom_timers)
+	if (!prom_timers)
 		return;
 
 	/* Set it to whatever was there before. */

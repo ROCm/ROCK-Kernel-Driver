@@ -129,9 +129,6 @@ extern void (*prom_keyboard)(void);
 
 void machine_halt(void)
 {
-	sti();
-	mdelay(8);
-	cli();
 #ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette (1);
@@ -144,9 +141,6 @@ void machine_halt(void)
 
 void machine_alt_power_off(void)
 {
-	sti();
-	mdelay(8);
-	cli();
 #ifdef CONFIG_SUN_CONSOLE
 	if (!serial_console && prom_palette)
 		prom_palette(1);
@@ -161,10 +155,6 @@ void machine_restart(char * cmd)
 {
 	char *p;
 	
-	sti();
-	mdelay(8);
-	cli();
-
 	p = strchr (reboot_command, '\n');
 	if (p) *p = 0;
 #ifdef CONFIG_SUN_CONSOLE
