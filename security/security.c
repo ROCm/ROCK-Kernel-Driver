@@ -29,11 +29,8 @@ struct security_operations *security_ops;	/* Initialized to NULL */
 static inline int verify (struct security_operations *ops)
 {
 	/* verify the security_operations structure exists */
-	if (!ops) {
-		printk (KERN_INFO "Passed a NULL security_operations "
-			"pointer, %s failed.\n", __FUNCTION__);
+	if (!ops)
 		return -EINVAL;
-	}
 	security_fixup_ops (ops);
 	return 0;
 }
@@ -85,16 +82,13 @@ int __init security_init(void)
 int register_security (struct security_operations *ops)
 {
 	if (verify (ops)) {
-		printk (KERN_INFO "%s could not verify "
+		printk(KERN_DEBUG "%s could not verify "
 			"security_operations structure.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
-	if (security_ops != &dummy_security_ops) {
-		printk (KERN_INFO "There is already a security "
-			"framework initialized, %s failed.\n", __FUNCTION__);
-		return -EINVAL;
-	}
+	if (security_ops != &dummy_security_ops)
+		return -EAGAIN;
 
 	security_ops = ops;
 
