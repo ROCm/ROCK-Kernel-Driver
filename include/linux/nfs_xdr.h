@@ -656,6 +656,8 @@ struct nfs4_compound {
 
 #endif /* CONFIG_NFS_V4 */
 
+struct nfs_page;
+
 struct nfs_read_data {
 	int			flags;
 	struct rpc_task		task;
@@ -664,12 +666,14 @@ struct nfs_read_data {
 	fl_owner_t		lockowner;
 	struct nfs_fattr	fattr;	/* fattr storage */
 	struct list_head	pages;	/* Coalesced read requests */
+	struct nfs_page		*req;	/* multi ops per nfs_page */
 	struct page		*pagevec[NFS_READ_MAXIOV];
 	struct nfs_readargs args;
 	struct nfs_readres  res;
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
 #endif
+	void (*complete) (struct nfs_read_data *, int);
 };
 
 struct nfs_write_data {
@@ -681,15 +685,15 @@ struct nfs_write_data {
 	struct nfs_fattr	fattr;
 	struct nfs_writeverf	verf;
 	struct list_head	pages;		/* Coalesced requests we wish to flush */
+	struct nfs_page		*req;		/* multi ops per nfs_page */
 	struct page		*pagevec[NFS_WRITE_MAXIOV];
 	struct nfs_writeargs	args;		/* argument struct */
 	struct nfs_writeres	res;		/* result struct */
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
 #endif
+	void (*complete) (struct nfs_write_data *, int);
 };
-
-struct nfs_page;
 
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
