@@ -303,9 +303,7 @@ static void sn_pci_fixup_bus(int segment, int busnum)
 
 	prom_bussoft_ptr = __va(prom_bussoft_ptr);
 	controller = sn_alloc_pci_sysdata();
-	if (!controller) {
-		BUG();
-	}
+	/* controller non-zero is BUG'd in sn_alloc_pci_sysdata */
 
 	bus = pci_scan_bus(busnum, &sn_pci_root_ops, controller);
 	if (bus == NULL) {
