@@ -58,6 +58,10 @@ __init_begin = .;
 	}
 	__initcall_end = .;
 	. = ALIGN(8192);
+	__initramfs_start = .;
+	.init.ramfs : { *(.init.ramfs) }
+	__initramfs_end = .;
+	. = ALIGN(8192);
 	__init_end = .;
 	.init.task : { *(init_task) }
 	
