@@ -68,13 +68,15 @@ typedef struct {
 
 
 /*
- * The following APIs are externalized to the kernel to allocate/free fetchop variables.
- * 	fetchop_kalloc_one	- Allocate/initialize 1 fetchop variable on the specified cnode.
- * 	fetchop_kfree_one	- Free a previously allocated fetchop variable 
+ * The following APIs are externalized to the kernel to allocate/free pages of
+ * fetchop variables.
+ *	fetchop_kalloc_page	- Allocate/initialize 1 fetchop page on the
+ *				  specified cnode. 
+ *	fetchop_kfree_page	- Free a previously allocated fetchop page
  */
 
-unsigned long fetchop_kalloc_one(int nid);
-void fetchop_kfree_one(unsigned long maddr);
+unsigned long fetchop_kalloc_page(int nid);
+void fetchop_kfree_page(unsigned long maddr);
 
 
 #endif /* __KERNEL__ */

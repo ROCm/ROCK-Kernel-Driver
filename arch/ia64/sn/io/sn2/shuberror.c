@@ -155,7 +155,7 @@ hubii_eint_init(cnodeid_t cnode)
 	
     rv = intr_connect_level(intr_cpu, SGI_II_ERROR, 0, NULL);
     request_irq(SGI_II_ERROR, hubii_eint_handler, SA_SHIRQ, "SN_hub_error", (void *)hub_v);
-    irq_desc(bit)->status |= SN2_IRQ_PER_HUB;
+    irq_descp(bit)->status |= SN2_IRQ_PER_HUB;
     ASSERT_ALWAYS(rv >= 0);
     hubio_eint.ii_iidsr_regval = 0;
     hubio_eint.ii_iidsr_fld_s.i_enable = 1;

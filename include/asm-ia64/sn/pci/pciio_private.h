@@ -89,7 +89,7 @@ struct pciio_win_map_s {
  * Opaque structure used to keep track of window allocation information.
  */
 struct pciio_win_alloc_s {
-	pciio_win_map_t	wa_map;		/* window map allocation is from */
+	struct resource *wa_resource;   /* window map allocation resource */
 	unsigned long	wa_base;	/* allocation starting page number */
 	size_t		wa_pages;	/* number of pages in allocation */
 };

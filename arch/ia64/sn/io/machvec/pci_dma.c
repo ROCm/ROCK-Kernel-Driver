@@ -153,8 +153,7 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 
 	*dma_handle = 0;
 
-	/* We can't easily support < 32 bit devices */
-	if (IS_PCI32L(hwdev))
+	if (hwdev->dma_mask < 0xffffffffUL)
 		return NULL;
 
 	/*
@@ -173,8 +172,6 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	if(!(cpuaddr = (void *)__get_free_pages(GFP_ATOMIC, get_order(size))))
 		return NULL;
 
-	memset(cpuaddr, 0, size); /* have to zero it out */
-
 	/* physical addr. of the memory we just got */
 	phys_addr = __pa(cpuaddr);
 
@@ -187,6 +184,16 @@ sn_pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_hand
 	*dma_handle = pciio_dmatrans_addr(vhdl, NULL, phys_addr, size,
 			((IS_PIC_DEVICE(hwdev)) ? 0 : PCIIO_BYTE_STREAM) |
 					  PCIIO_DMA_CMD);
+
+        /*
+	 * If this device is in PCI-X mode, the system would have
+	 * automatically allocated a 64Bits DMA Address.  Error out if the 
+	 * device cannot support DAC.
+	 */
+	if (*dma_handle > hwdev->consistent_dma_mask) {
+		free_pages((unsigned long) cpuaddr, get_order(size));
+		return NULL;
+	}
 
 	/*
 	 * It is a 32 bit card and we cannot do direct mapping,
