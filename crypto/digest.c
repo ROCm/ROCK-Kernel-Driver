@@ -33,7 +33,7 @@ static void update(struct crypto_tfm *tfm, struct scatterlist *sg, size_t nsg)
 		char *p = crypto_kmap(tfm, sg[i].page) + sg[i].offset;
 		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx,
 		                                      p, sg[i].length);
-		crypto_kunmap(tfm, sg[i].page, p);
+		crypto_kunmap(tfm, p);
 		crypto_yield(tfm);
 	}
 	return;
@@ -56,7 +56,7 @@ static void digest(struct crypto_tfm *tfm,
 		char *p = crypto_kmap(tfm, sg[i].page) + sg[i].offset;
 		tfm->__crt_alg->cra_digest.dia_update(tfm->crt_ctx,
 		                                      p, sg[i].length);
-		crypto_kunmap(tfm, sg[i].page, p);
+		crypto_kunmap(tfm, p);
 		crypto_yield(tfm);
 	}
 	crypto_digest_final(tfm, out);

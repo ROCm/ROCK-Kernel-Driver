@@ -27,10 +27,7 @@ static struct rw_semaphore crypto_alg_sem;
 
 static inline int crypto_alg_get(struct crypto_alg *alg)
 {
-	if (alg->cra_module)
-		return try_inc_mod_count(alg->cra_module);
-	else
-		return 1;
+	return try_inc_mod_count(alg->cra_module);
 }
 
 static inline void crypto_alg_put(struct crypto_alg *alg)
@@ -170,11 +167,11 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	int ret = -ENOENT;
 	struct list_head *p;
 	
-	down_write(&crypto_alg_sem);
+	BUG_ON(!alg->cra_module);
 	
+	down_write(&crypto_alg_sem);
 	list_for_each(p, &crypto_alg_list) {
 		if (alg == (struct crypto_alg *)p) {
-			BUG_ON(!alg->cra_module);
 			list_del(p);
 			ret = 0;
 			goto out;

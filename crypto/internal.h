@@ -23,21 +23,20 @@ static inline void *crypto_kmap(struct crypto_tfm *tfm, struct page *page)
 #ifdef CONFIG_HIGHMEM
 		local_bh_disable();
 #endif
-		return kmap_atomic(page, KM_CRYPTO);
+		return kmap_atomic(page, KM_CRYPTO_SOFTIRQ);
 	} else
-		return kmap(page);
+		return kmap_atomic(page, KM_CRYPTO_USER);
 }
 
-static inline void crypto_kunmap(struct crypto_tfm *tfm,
-                                 struct page *page, void *vaddr)
+static inline void crypto_kunmap(struct crypto_tfm *tfm, void *vaddr)
 {
 	if (tfm->crt_flags & CRYPTO_ATOMIC) {
-		kunmap_atomic(vaddr, KM_CRYPTO);
+		kunmap_atomic(vaddr, KM_CRYPTO_SOFTIRQ);
 #ifdef CONFIG_HIGHMEM
 		local_bh_enable();
 #endif
 	} else
-		kunmap(page);
+		kunmap_atomic(vaddr, KM_CRYPTO_USER);
 }
 
 static inline void crypto_yield(struct crypto_tfm *tfm)

@@ -76,7 +76,7 @@ static int copy_chunks(struct crypto_tfm *tfm, u8 *buf,
 		else
 			memcpy(p, &buf[copied], clen);
 		
-		crypto_kunmap(tfm, sg[i].page, p);
+		crypto_kunmap(tfm, p);
 		*last = aligned ? 0 : clen;
 		copied += clen;
 	}
@@ -130,7 +130,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 
 		while (len) {
 			if (len < bsize) {
-				crypto_kunmap(tfm, sg[i].page, p);
+				crypto_kunmap(tfm, p);
 				n = gather_chunks(tfm, tmp, sg, i, len, &coff);
 				prfn(tfm, tmp, crfn, enc);
 				scatter_chunks(tfm, tmp, sg, i, len, &coff);
@@ -138,7 +138,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 				goto unmapped;
 			} else {
 				prfn(tfm, p, crfn, enc);
-				crypto_kunmap(tfm, sg[i].page, p);
+				crypto_kunmap(tfm, p);
 				crypto_yield(tfm);
 				
 				/* remap and point to recalculated offset */
@@ -153,7 +153,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 					coff = 0;
 			}
 		}
-		crypto_kunmap(tfm, sg[i].page, p);	
+		crypto_kunmap(tfm, p);	
 unmapped:
 		i += n;
 

@@ -8,7 +8,6 @@
 enum km_type {
 	KM_BOUNCE_READ,
 	KM_SKB_SUNRPC_DATA,
-	KM_CRYPTO,
 	KM_SKB_DATA_SOFTIRQ,
 	KM_USER0,
 	KM_USER1,
@@ -18,6 +17,8 @@ enum km_type {
 	KM_PTE1,
 	KM_IRQ0,
 	KM_IRQ1,
+	KM_CRYPTO_USER,
+	KM_CRYPTO_SOFTIRQ,
 	KM_TYPE_NR
 };
 
