@@ -10,6 +10,5 @@ $(obj)/vmlinux.gz: vmlinux
 	$(OBJCOPY) -O binary $< $(@:.gz=)
 	gzip $(GZIP_FLAGS) $(@:.gz=)
 
-clean:
-	rm -f $(obj)/sImage $(obj)/vmapus $(obj)/vmlinux* $(obj)/miboot* 
-	rm -f $(obj)/zImage* z$(obj)/vmlinux*
+# Files generated that shall be removed upon make clean
+clean-files	:= sImage vmapus vmlinux* miboot* zImage*
