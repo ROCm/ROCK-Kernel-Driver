@@ -35,8 +35,9 @@
  ****************************************************************************/
 #define PCI2000_VERSION		"1.20"
 
+#include <linux/blk.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -45,15 +46,15 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
-#include <asm/dma.h>
-#include <asm/system.h>
-#include <asm/io.h>
-#include <linux/blk.h>
-#include "scsi.h"
-#include "hosts.h"
 #include <linux/stat.h>
 #include <linux/spinlock.h>
 
+#include <asm/dma.h>
+#include <asm/system.h>
+#include <asm/io.h>
+
+#include "scsi.h"
+#include "hosts.h"
 #include "pci2000.h"
 #include "psi_roy.h"
 
