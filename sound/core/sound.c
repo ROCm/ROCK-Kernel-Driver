@@ -57,6 +57,8 @@ MODULE_PARM(device_mode, "i");
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");
 MODULE_PARM_SYNTAX(device_mode, "default:0666,base:8");
 #endif
+// MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
+MODULE_ALIAS("char-major-" __stringify(CONFIG_SND_MAJOR));
 
 /* this one holds the actual max. card number currently available.
  * as default, it's identical with cards_limit option.  when more

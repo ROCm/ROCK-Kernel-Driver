@@ -547,6 +547,8 @@ EXPORT_SYMBOL(mod_firmware_load);
 MODULE_DESCRIPTION("Core sound module");
 MODULE_AUTHOR("Alan Cox");
 MODULE_LICENSE("GPL");
+// MODULE_ALIAS_CHARDEV_MAJOR(SOUND_MAJOR);
+MODULE_ALIAS("char-major-" __stringify(SOUND_MAJOR));
 
 static void __exit cleanup_soundcore(void)
 {

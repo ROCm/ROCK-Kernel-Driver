@@ -56,6 +56,8 @@ MODULE_PARM_SYNTAX(adsp_map, "default:1,skill:advanced");
 MODULE_PARM(nonblock_open, "i");
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
 MODULE_PARM_SYNTAX(nonblock_open, "default:0,skill:advanced");
+MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM);
+MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM1);
 
 extern int snd_mixer_oss_ioctl_card(snd_card_t *card, unsigned int cmd, unsigned long arg);
 static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file);

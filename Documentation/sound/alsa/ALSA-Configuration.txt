@@ -1153,160 +1153,49 @@ When the kernel is configured without ISA-PnP support, isapnp option
 will be not built in.
 
 
-modprobe/kmod support
-=====================
+Module Autoloading Support
+==========================
 
-The modprobe program must know which modules are used for the
-device major numbers.
-Native ALSA devices have got default number 116. Thus a line like
-'alias char-major-116 snd' must be added to /etc/modules.conf. If you have 
-compiled the ALSA driver with the OSS/Free emulation code, then you
-will need to add lines as explained below:
+The ALSA drivers can be loaded automatically on demand by defining
+module aliases.  The string 'snd-card-%1' is requested for ALSA native
+devices where %i is soundcard number from zero to seven.
 
-The ALSA driver uses soundcore multiplexer for 2.2+ kernels and OSS compatible
-devices. You should add line like 'alias char-major-14 soundcore'.
+To auto-load an ALSA driver for OSS services, define the string
+'sound-slot-%i' where %i means the slot number for OSS, which
+corresponds to the card index of ALSA.  Usually, define this
+as the the same card module.
 
-Example with OSS/Free emulation turned on:
+An example configuration for a single emu10k1 card is like below:
+----- /etc/modprobe.conf
+alias snd-card-0 snd-emu10k1
+alias sound-slot-0 snd-emu10k1
+----- /etc/modprobe.conf
 
------ /etc/modules.conf
+The available number of auto-loaded soundcards depends on the module
+option "cards_limit" of snd module.  As default it's set to 1.
+To enable the auto-loading of multiple cards, specify the number of
+soundcards in that option.
 
+When multiple cards are available, it'd better to specify the index
+number for each card via module option, too, so that the order of
+cards is kept consistent.
+
+An example configuration for two soundcards is like below:
+
+----- /etc/modprobe.conf
 # ALSA portion
-alias char-major-116 snd
-# OSS/Free portion
-alias char-major-14 soundcore
-
------ /etc/modules.conf
-
-After the main multiplexer is loaded, its code requests top-level soundcard
-module. String 'snd-card-%i' is requested for native devices where %i is
-soundcard number from zero to seven. String 'sound-slot-%i' is requested
-for native devices where %i is slot number (for ALSA owner this means soundcard
-number).
-
------ /etc/modules.conf
-
-# ALSA portion
+options snd cards_limit=2
 alias snd-card-0 snd-interwave
 alias snd-card-1 snd-ens1371
+options snd-interwave index=0
+options snd-ens1371 index=1
 # OSS/Free portion
-alias sound-slot-0 snd-card-0
-alias sound-slot-1 snd-card-1
+alias sound-slot-0 snd-interwave
+alias sound-slot-1 snd-ens1371
+----- /etc/moprobe.conf
 
------ /etc/modules.conf
-
-We are finished at this point with the configuration for ALSA native devices,
-but you may also need autoloading for ALSA's add-on OSS/Free emulation
-modules. At this time only one module does not depend on any others, thus
-must be loaded separately - snd-pcm-oss. String 'sound-service-%i-%i'
-is requested for OSS/Free service where first %i means slot number
-(e.g. card number) and second %i means service number.
-
------ /etc/modules.conf
-
-# OSS/Free portion - card #1
-alias sound-service-0-0 snd-mixer-oss
-alias sound-service-0-1 snd-seq-oss
-alias sound-service-0-3 snd-pcm-oss
-alias sound-service-0-8 snd-seq-oss
-alias sound-service-0-12 snd-pcm-oss
-# OSS/Free portion - card #2
-alias sound-service-1-0 snd-mixer-oss
-alias sound-service-1-3 snd-pcm-oss
-alias sound-service-1-12 snd-pcm-oss
-
------ /etc/modules.conf
-
-A complete example for Gravis UltraSound PnP soundcard:
-
------ /etc/modules.conf
-
-# ISA PnP support (don't use IRQs 9,10,11,12,13)
-options isapnp isapnp_reserve_irq=9,10,11,12,13
-
-# ALSA native device support
-alias char-major-116 snd
-options snd major=116 cards_limit=1
-alias snd-card-0 snd-interwave
-options snd-interwave index=0 id="GusPnP"
-
-# OSS/Free setup
-alias char-major-14 soundcore
-alias sound-slot-0 snd-card-0
-alias sound-service-0-0 snd-mixer-oss
-alias sound-service-0-1 snd-seq-oss
-alias sound-service-0-3 snd-pcm-oss
-alias sound-service-0-8 snd-seq-oss
-alias sound-service-0-12 snd-pcm-oss
-
------
-
-A complete example if you want to use more soundcards in one machine
-(the configuration below is for Sound Blaster 16 and Gravis UltraSound Classic):
-
------ /etc/modules.conf
-
-# ISA PnP support (don't use IRQs 9,10,11,12,13)
-# it's only an example to reserve some IRQs for another hardware
-options isapnp isapnp_reserve_irq=9,10,11,12,13
-
-# ALSA native device support
-alias char-major-116 snd
-options snd major=116 cards_limit=2
-alias snd-card-0 snd-gusclassic
-alias snd-card-1 snd-sb16
-options snd-gusclassic index=0 id="Gus" \
-        port=0x220 irq=5 dma1=6 dma2=7
-options snd-sb16 index=1 id="SB16"
-
-# OSS/Free setup
-alias char-major-14 soundcore
-alias sound-slot-0 snd-card-0
-alias sound-service-0-0 snd-mixer-oss
-alias sound-service-0-1 snd-seq-oss
-alias sound-service-0-3 snd-pcm-oss
-alias sound-service-0-8 snd-seq-oss
-alias sound-service-0-12 snd-pcm-oss
-alias sound-slot-1 snd-card-1
-alias sound-service-1-0 snd-mixer-oss
-alias sound-service-1-3 snd-pcm-oss
-alias sound-service-1-12 snd-pcm-oss
-
------
-
-A complete example, two Gravis UltraSound Classic soundcards are installed
-in the system:
-
------ /etc/modules.conf
-
-# ALSA native device support
-alias char-major-116 snd
-options snd major=116 cards_limit=2
-alias snd-card-0 snd-gusclassic
-alias snd-card-1 snd-gusclassic
-options snd-gusclassic index=0,1 id="Gus1","Gus2" \
-        port=0x220,0x240 irq=5,7 dma1=1,5 dma2=3,6
-
-# OSS/Free setup
-alias char-major-14 soundcore
-alias sound-slot-0 snd-card-0
-alias sound-service-0-0 snd-mixer-oss
-alias sound-service-0-1 snd-seq-oss
-alias sound-service-0-3 snd-pcm-oss
-alias sound-service-0-8 snd-seq-oss
-alias sound-service-0-12 snd-pcm-oss
-alias sound-slot-1 snd-card-1
-alias sound-service-1-0 snd-mixer-oss
-alias sound-service-1-3 snd-pcm-oss
-alias sound-service-1-12 snd-pcm-oss
-
------
-
-If you want to autoclean your modules, you should put below line to your
-/etc/crontab:
-
-*/10 * * * *   root  /sbin/modprobe -rs snd-card-0 snd-card-1; /sbin/rmmod -as
-
-You may also want to extend the soundcard list to follow your requirements.
+In this example, the interwave card is always loaded as the first card
+(index 0) and ens1371 as the second (index 1).
 
 
 ALSA PCM devices to OSS devices mapping
