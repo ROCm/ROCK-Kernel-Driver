@@ -111,8 +111,6 @@ typedef	u_long	vm_offset_t;
 /*
  * Configuration addendum for Linux.
  */
-#define	SYM_LINUX_DYNAMIC_DMA_MAPPING
-
 #define	SYM_CONF_TIMER_INTERVAL		((HZ+1)/2)
 
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
@@ -121,10 +119,7 @@ typedef	u_long	vm_offset_t;
 #define SYM_OPT_SNIFF_INQUIRY
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #define	SYM_OPT_ANNOUNCE_TRANSFER_RATE
-
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
 #define	SYM_OPT_BUS_DMA_ABSTRACTION
-#endif
 
 /*
  *  Print a message with severity.
@@ -496,9 +491,7 @@ typedef u_long m_addr_t;	/* Enough bits to represent any address */
 #ifdef	MODULE
 #define SYM_MEM_FREE_UNUSED	/* Free unused pages immediately */
 #endif
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
 typedef struct pci_dev *m_pool_ident_t;
-#endif
 
 /*
  *  Include driver soft definitions.
@@ -521,19 +514,7 @@ typedef struct pci_dev *m_pool_ident_t;
 void *sym_calloc(int size, char *name);
 void sym_mfree(void *m, int size, char *name);
 
-#ifndef	SYM_LINUX_DYNAMIC_DMA_MAPPING
 /*
- *  Simple case.
- *  All the memory assummed DMAable and O/S providing virtual 
- *  to bus physical address translation.
- */
-#define __sym_calloc_dma(pool_id, size, name)	sym_calloc(size, name)
-#define __sym_mfree_dma(pool_id, m, size, name)	sym_mfree(m, size, name)
-#define __vtobus(b, p)				virt_to_bus(p)
-
-#else	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
-/*
- *  Complex case.
  *  We have to provide the driver memory allocator with methods for 
  *  it to maintain virtual to bus physical address translations.
  */
@@ -560,14 +541,11 @@ static __inline void sym_m_free_dma_mem_cluster(m_pool_p mp, m_vtob_p vbp)
 }
 
 #define sym_m_create_dma_mem_tag(mp)	(0)
-
 #define sym_m_delete_dma_mem_tag(mp)	do { ; } while (0)
 
 void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name);
 void __sym_mfree_dma(m_pool_ident_t dev_dmat, void *m, int size, char *name);
 m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m);
-
-#endif	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
 
 /*
  *  Set the status field of a CAM CCB.

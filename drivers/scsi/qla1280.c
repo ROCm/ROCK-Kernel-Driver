@@ -3649,7 +3649,7 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 		(SCSI_TCN_32(cmd) | BIT_7) : SCSI_TCN_32(cmd);
 
 	/* Enable simple tag queuing if device supports it. */
-	if (cmd->device->tagged_queue)
+	if (cmd->device->simple_tags)
 		pkt->control_flags |= cpu_to_le16(BIT_3);
 
 	/* Load SCSI command packet. */
@@ -3949,7 +3949,7 @@ qla1280_32bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 		(SCSI_TCN_32(cmd) | BIT_7) : SCSI_TCN_32(cmd);
 
 	/* Enable simple tag queuing if device supports it. */
-	if (cmd->device->tagged_queue)
+	if (cmd->device->simple_tags)
 		pkt->control_flags |= cpu_to_le16(BIT_3);
 
 	/* Load SCSI command packet. */
@@ -4909,7 +4909,7 @@ qla12160_get_target_parameters(struct scsi_qla_host *ha, Scsi_Device *device)
 	} else
 		printk(" Async");
 
-	if (device->tagged_queue)
+	if (device->simple_tags)
 		printk(", Tagged queuing: depth %d", device->queue_depth);
 	printk("\n");
 }

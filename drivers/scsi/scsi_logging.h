@@ -46,30 +46,14 @@ extern unsigned int scsi_logging_level;
         if (((scsi_logging_level >> (SHIFT)) & mask) > (LEVEL))	\
 		(CMD);						\
 }
-
-#define SCSI_SET_LOGGING(SHIFT, BITS, LEVEL)			\
-{								\
-        unsigned int mask = ((1 << (BITS)) - 1) << SHIFT;	\
-        scsi_logging_level = ((scsi_logging_level & ~mask)	\
-                              | ((LEVEL << SHIFT) & mask));	\
-}
 #else
-/*
- * With no logging enabled, stub these out so they don't do anything.
- */
 #define SCSI_CHECK_LOGGING(SHIFT, BITS, LEVEL, CMD)
-#define SCSI_SET_LOGGING(SHIFT, BITS, LEVEL)
 #endif /* CONFIG_SCSI_LOGGING */
 
 /*
  * These are the macros that are actually used throughout the code to
  * log events.  If logging isn't enabled, they are no-ops and will be
  * completely absent from the user's code.
- *
- * The 'set' versions of the macros are really intended to only be called
- * from the /proc filesystem, and in production kernels this will be about
- * all that is ever used.  It could be useful in a debugging environment to
- * bump the logging level when certain strange events are detected, however.
  */
 #define SCSI_LOG_ERROR_RECOVERY(LEVEL,CMD)  \
         SCSI_CHECK_LOGGING(SCSI_LOG_ERROR_SHIFT, SCSI_LOG_ERROR_BITS, LEVEL,CMD);
@@ -92,26 +76,6 @@ extern unsigned int scsi_logging_level;
 #define SCSI_LOG_IOCTL(LEVEL,CMD)  \
         SCSI_CHECK_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL,CMD);
 
-
-#define SCSI_SET_ERROR_RECOVERY_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_ERROR_SHIFT, SCSI_LOG_ERROR_BITS, LEVEL);
-#define SCSI_SET_TIMEOUT_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_TIMEOUT_SHIFT, SCSI_LOG_TIMEOUT_BITS, LEVEL);
-#define SCSI_SET_SCAN_BUS_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_SCAN_SHIFT, SCSI_LOG_SCAN_BITS, LEVEL);
-#define SCSI_SET_MLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_MLQUEUE_SHIFT, SCSI_LOG_MLQUEUE_BITS, LEVEL);
-#define SCSI_SET_MLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_MLCOMPLETE_SHIFT, SCSI_LOG_MLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_LLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_LLQUEUE_SHIFT, SCSI_LOG_LLQUEUE_BITS, LEVEL);
-#define SCSI_SET_LLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_LLCOMPLETE_SHIFT, SCSI_LOG_LLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_HLQUEUE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_HLQUEUE_SHIFT, SCSI_LOG_HLQUEUE_BITS, LEVEL);
-#define SCSI_SET_HLCOMPLETE_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_HLCOMPLETE_SHIFT, SCSI_LOG_HLCOMPLETE_BITS, LEVEL);
-#define SCSI_SET_IOCTL_LOGGING(LEVEL)  \
-        SCSI_SET_LOGGING(SCSI_LOG_IOCTL_SHIFT, SCSI_LOG_IOCTL_BITS, LEVEL);
+extern unsigned int scsi_logging_level;
 
 #endif /* _SCSI_LOGGING_H */

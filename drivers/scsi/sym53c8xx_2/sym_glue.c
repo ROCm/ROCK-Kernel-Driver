@@ -57,7 +57,7 @@
 #define NAME53C		"sym53c"
 #define NAME53C8XX	"sym53c8xx"
 
-static int __init
+static int __devinit
 pci_get_base_address(struct pci_dev *pdev, int index, u_long *base)
 {
 	u32 tmp;
@@ -139,8 +139,6 @@ void sym_mfree(void *m, int size, char *name)
 	SYM_UNLOCK_DRIVER(flags);
 }
 
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
-
 void *__sym_calloc_dma(m_pool_ident_t dev_dmat, int size, char *name)
 {
 	u_long flags;
@@ -169,14 +167,11 @@ m_addr_t __vtobus(m_pool_ident_t dev_dmat, void *m)
 	return b;
 }
 
-#endif	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
-
-
 /*
  *  Map/unmap a PCI memory window.
  */
 #ifndef SYM_OPT_NO_BUS_MEMORY_MAPPING
-static u_long __init pci_map_mem(u_long base, u_long size)
+static u_long __devinit pci_map_mem(u_long base, u_long size)
 {
 	u_long page_base	= ((u_long) base) & PAGE_MASK;
 	u_long page_offs	= ((u_long) base) - page_base;
@@ -185,18 +180,12 @@ static u_long __init pci_map_mem(u_long base, u_long size)
 	return page_remapped? (page_remapped + page_offs) : 0UL;
 }
 
-static void __init pci_unmap_mem(u_long vaddr, u_long size)
+static void __devinit pci_unmap_mem(u_long vaddr, u_long size)
 {
 	if (vaddr)
 		iounmap((void *) (vaddr & PAGE_MASK));
 }
 #endif
-
-/*
- *  Used to retrieve the host structure when the 
- *  driver is called from the proc FS.
- */
-static struct Scsi_Host	*first_host = NULL;
 
 #define scsi_data_direction(cmd)	(cmd->sc_data_direction)
 
@@ -210,11 +199,7 @@ struct host_data {
 /*
  * Some type that fit DMA addresses as seen from BUS.
  */
-#ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
-typedef u_long		bus_addr_t;
-#else
 typedef dma_addr_t	bus_addr_t;
-#endif
 
 /*
  *  Used by the eh thread to wait for command completion.
@@ -233,10 +218,8 @@ struct sym_eh_wait {
  */
 struct sym_ucmd {		/* Override the SCSI pointer structure */
 	SYM_QUEHEAD link_cmdq;	/* Must stay at offset ZERO */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 	bus_addr_t data_mapping;
 	u_char	data_mapped;
-#endif
 	struct sym_eh_wait *eh_wait;
 };
 
@@ -249,39 +232,18 @@ typedef struct sym_ucmd *ucmd_p;
 /*
  *  Deal with DMA mapping/unmapping.
  */
-
-#ifndef SYM_LINUX_DYNAMIC_DMA_MAPPING
-
-/* Linux versions prior to pci bus iommu kernel interface */
-
-#define __unmap_scsi_data(pdev, cmd)	do {; } while (0)
-#define __map_scsi_single_data(pdev, cmd) (__vtobus(pdev,(cmd)->request_buffer))
-#define __map_scsi_sg_data(pdev, cmd)	((cmd)->use_sg)
-#define __sync_scsi_data(pdev, cmd)	do {; } while (0)
-
-#define bus_sg_dma_address(sc)		vtobus((sc)->address)
-#define bus_sg_dma_len(sc)		((sc)->length)
-
-#else /* Linux version with pci bus iommu kernel interface */
-
 #define	bus_unmap_sg(pdev, sgptr, sgcnt, dir)		\
 	pci_unmap_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_unmap_single(pdev, mapping, bufptr, dir)	\
 	pci_unmap_single(pdev, mapping, bufptr, dir)
-
 #define	bus_map_single(pdev, bufptr, bufsiz, dir)	\
 	pci_map_single(pdev, bufptr, bufsiz, dir)
- 
 #define	bus_map_sg(pdev, sgptr, sgcnt, dir)		\
 	pci_map_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_dma_sync_sg(pdev, sgptr, sgcnt, dir)	\
 	pci_dma_sync_sg(pdev, sgptr, sgcnt, dir)
-
 #define	bus_dma_sync_single(pdev, mapping, bufsiz, dir)	\
 	pci_dma_sync_single(pdev, mapping, bufsiz, dir)
-
 #define bus_sg_dma_address(sc)	sg_dma_address(sc)
 #define bus_sg_dma_len(sc)	sg_dma_len(sc)
 
@@ -344,8 +306,6 @@ static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 		break;
 	}
 }
-
-#endif	/* SYM_LINUX_DYNAMIC_DMA_MAPPING */
 
 #define unmap_scsi_data(np, cmd)	\
 		__unmap_scsi_data(np->s.device, cmd)
@@ -1748,7 +1708,6 @@ static void sym_free_resources(hcb_p np)
 /*
  *  Ask/tell the system about DMA addressing.
  */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 static int sym_setup_bus_dma_mask(hcb_p np)
 {
 #if   SYM_CONF_DMA_ADDRESSING_MODE == 0
@@ -1780,7 +1739,6 @@ out_err32:
 			sym_name(np));
 	return -1;
 }
-#endif /* SYM_LINUX_DYNAMIC_DMA_MAPPING */
 
 /*
  *  Host attach and initialisations.
@@ -1791,7 +1749,7 @@ out_err32:
  *  If all is OK, install interrupt handling and
  *  start the timer daemon.
  */
-static int __init 
+static int __devinit 
 sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 {
         struct host_data *host_data;
@@ -1837,7 +1795,6 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	 *  We keep track in the HCB of all the resources that 
 	 *  are to be released on error.
 	 */
-#ifdef	SYM_LINUX_DYNAMIC_DMA_MAPPING
 	np = __sym_calloc_dma(dev->pdev, sizeof(*np), "HCB");
 	if (np) {
 		np->s.device = dev->pdev;
@@ -1845,11 +1802,7 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	}
 	else
 		goto attach_failed;
-#else
-	np = sym_calloc_dma(sizeof(*np), "HCB");
-	if (!np)
-		goto attach_failed;
-#endif
+
 	host_data->ncb = np;
 	np->s.host = instance;
 
@@ -1883,10 +1836,8 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	/*
 	 *  Ask/tell the system about DMA addressing.
 	 */
-#ifdef SYM_LINUX_DYNAMIC_DMA_MAPPING
 	if (sym_setup_bus_dma_mask(np))
 		goto attach_failed;
-#endif
 
 	/*
 	 *  Try to map the controller chip to
@@ -1987,12 +1938,6 @@ sym_attach (struct scsi_host_template *tpnt, int unit, sym_device *dev)
 	sym_timer (np);
 
 	/*
-	 *  Done.
-	 */
-        if (!first_host)
-        	first_host = instance;
-
-	/*
 	 *  Fill Linux host instance structure
 	 *  and return success.
 	 */
@@ -2039,7 +1984,7 @@ attach_failed:
  *    Detect and try to read SYMBIOS and TEKRAM NVRAM.
  */
 #if SYM_CONF_NVRAM_SUPPORT
-static void __init sym_get_nvram(sym_device *devp, sym_nvram *nvp)
+static void __devinit sym_get_nvram(sym_device *devp, sym_nvram *nvp)
 {
 	if (!nvp)
 		return;
@@ -2269,7 +2214,7 @@ __setup("sym53c8xx=", sym53c8xx_setup);
  *  boards and save data for attaching after all boards have 
  *  been detected.
  */
-static int __init
+static int __devinit
 sym53c8xx_pci_init(struct pci_dev *pdev, sym_device *device)
 {
 	u_short vendor_id, device_id, command, status_reg;

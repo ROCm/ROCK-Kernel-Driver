@@ -381,6 +381,7 @@ int scsi_get_device_flags(unsigned char *vendor, unsigned char *model)
 	return scsi_default_dev_flags;
 }
 
+#ifdef CONFIG_SCSI_PROC_FS
 /* 
  * proc_scsi_dev_info_read: dump the scsi_dev_info_list via
  * /proc/scsi/device_info
@@ -451,6 +452,7 @@ out:
 	free_page((unsigned long)buffer);
 	return err;
 }
+#endif /* CONFIG_SCSI_PROC_FS */
 
 module_param_string(dev_flags, scsi_dev_flags, sizeof(scsi_dev_flags), 0);
 MODULE_PARM_DESC(dev_flags,
@@ -471,7 +473,9 @@ void scsi_exit_devinfo(void)
 	struct list_head *lh, *lh_next;
 	struct scsi_dev_info_list *devinfo;
 
+#ifdef CONFIG_SCSI_PROC_FS
 	remove_proc_entry("scsi/device_info", 0);
+#endif
 
 	list_for_each_safe(lh, lh_next, &scsi_dev_info_list) {
 		devinfo = list_entry(lh, struct scsi_dev_info_list,
@@ -490,7 +494,9 @@ void scsi_exit_devinfo(void)
  **/
 int scsi_init_devinfo(void)
 {
+#ifdef CONFIG_SCSI_PROC_FS
 	struct proc_dir_entry *p;
+#endif
 	int error, i;
 
 	error = scsi_dev_info_list_add_str(scsi_dev_flags);
@@ -507,6 +513,7 @@ int scsi_init_devinfo(void)
 			goto out;
 	}
 
+#ifdef CONFIG_SCSI_PROC_FS
 	p = create_proc_entry("scsi/device_info", 0, NULL);
 	if (!p) {
 		error = -ENOMEM;
@@ -516,6 +523,7 @@ int scsi_init_devinfo(void)
 	p->owner = THIS_MODULE;
 	p->get_info = proc_scsi_devinfo_read;
 	p->write_proc = proc_scsi_devinfo_write;
+#endif /* CONFIG_SCSI_PROC_FS */
 
  out:
 	if (error)
