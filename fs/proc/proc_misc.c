@@ -47,7 +47,6 @@
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/div64.h>
 

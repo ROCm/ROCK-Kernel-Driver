@@ -25,7 +25,6 @@
 #include <linux/rmap.h>
 
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 #include <asm/tlb.h>
 

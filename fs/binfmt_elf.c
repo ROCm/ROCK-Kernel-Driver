@@ -40,7 +40,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
-#include <asm/pgalloc.h>
 
 #include <linux/elf.h>
 

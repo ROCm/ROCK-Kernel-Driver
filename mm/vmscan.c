@@ -33,7 +33,6 @@
 #include <linux/cpu.h>
 #include <linux/notifier.h>
 
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
 
