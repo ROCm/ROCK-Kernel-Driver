@@ -1385,8 +1385,10 @@ static __inline__ void skb_bond(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 
-	if (dev->master)
+	if (dev->master) {
+		skb->real_dev = skb->dev;
 		skb->dev = dev->master;
+	}
 }
 
 static void net_tx_action(struct softirq_action *h)

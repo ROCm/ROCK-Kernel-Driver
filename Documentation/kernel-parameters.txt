@@ -652,6 +652,9 @@ running once the system is up.
 	opl3sa2=	[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>,<mss_io>,<mpu_io>,<ymode>,<loopback>[,<isapnp>,<multiple]
  
+	oprofile.timer=	[HW]
+			Use timer interrupt instead of performance counters
+
 	optcd=		[HW,CD]
 			Format: <io>
 
