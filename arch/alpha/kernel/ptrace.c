@@ -13,6 +13,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/slab.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -255,6 +256,8 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 	      struct pt_regs *regs)
 {
 	struct task_struct *child;
+	unsigned long tmp;
+	size_t copied;
 	long ret;
 
 	lock_kernel();
@@ -265,6 +268,9 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 		/* are we already being traced? */
 		if (current->ptrace & PT_PTRACED)
 			goto out_notsk;
+		ret = security_ptrace(current->parent, current);
+		if (ret)
+			goto out_notsk;
 		/* set the ptrace bit in the process ptrace flags. */
 		current->ptrace |= PT_PTRACED;
 		ret = 0;
@@ -272,6 +278,7 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 	}
 	if (pid == 1)		/* you may not mess with init */
 		goto out_notsk;
+
 	ret = -ESRCH;
 	read_lock(&tasklist_lock);
 	child = find_task_by_pid(pid);
@@ -280,77 +287,65 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 	read_unlock(&tasklist_lock);
 	if (!child)
 		goto out_notsk;
+
 	if (request == PTRACE_ATTACH) {
 		ret = ptrace_attach(child);
 		goto out;
 	}
-	ret = -ESRCH;
-	if (!(child->ptrace & PT_PTRACED)) {
-		DBG(DBG_MEM, ("child not traced\n"));
+
+	ret = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (ret < 0)
 		goto out;
-	}
-	if (child->state != TASK_STOPPED) {
-		DBG(DBG_MEM, ("child process not stopped\n"));
-		if (request != PTRACE_KILL)
-			goto out;
-	}
-	if (child->parent != current) {
-		DBG(DBG_MEM, ("child not parent of this process\n"));
-		goto out;
-	}
 
 	switch (request) {
 	/* When I and D space are separate, these will need to be fixed.  */
 	case PTRACE_PEEKTEXT: /* read word at location addr. */
-	case PTRACE_PEEKDATA: {
-		unsigned long tmp;
-		int copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
+	case PTRACE_PEEKDATA:
+		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
 		ret = -EIO;
 		if (copied != sizeof(tmp))
-			goto out;
+			break;
 		
 		regs->r0 = 0;	/* special return: no errors */
 		ret = tmp;
-		goto out;
-	}
+		break;
 
 	/* Read register number ADDR. */
 	case PTRACE_PEEKUSR:
 		regs->r0 = 0;	/* special return: no errors */
 		ret = get_reg(child, addr);
 		DBG(DBG_MEM, ("peek $%ld->%#lx\n", addr, ret));
-		goto out;
+		break;
 
 	/* When I and D space are separate, this will have to be fixed.  */
 	case PTRACE_POKETEXT: /* write the word at location addr. */
-	case PTRACE_POKEDATA: {
-		unsigned long tmp = data;
-		int copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 1);
+	case PTRACE_POKEDATA:
+		tmp = data;
+		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 1);
 		ret = (copied == sizeof(tmp)) ? 0 : -EIO;
-		goto out;
-	}
+		break;
 
 	case PTRACE_POKEUSR: /* write the specified register */
 		DBG(DBG_MEM, ("poke $%ld<-%#lx\n", addr, data));
 		ret = put_reg(child, addr, data);
-		goto out;
+		break;
 
-	case PTRACE_SYSCALL: /* continue and stop at next
-				(return from) syscall */
+	case PTRACE_SYSCALL:
+		/* continue and stop at next (return from) syscall */
 	case PTRACE_CONT:    /* restart after signal. */
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
-			goto out;
+			break;
 		if (request == PTRACE_SYSCALL)
 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		child->exit_code = data;
-		wake_up_process(child);
 		/* make sure single-step breakpoint is gone. */
 		ptrace_cancel_bpt(child);
-		ret = data;
-		goto out;
+		wake_up_process(child);
+		ret = 0;
+		break;
 
 	/*
 	 * Make the child exit.  Best I can do is send it a sigkill.
@@ -358,19 +353,19 @@ do_sys_ptrace(long request, long pid, long addr, long data,
 	 * exit.
 	 */
 	case PTRACE_KILL:
-		if (child->state != TASK_ZOMBIE) {
-			wake_up_process(child);
-			child->exit_code = SIGKILL;
-		}
+		ret = 0;
+		if (child->state == TASK_ZOMBIE)
+			break;
+		child->exit_code = SIGKILL;
 		/* make sure single-step breakpoint is gone. */
 		ptrace_cancel_bpt(child);
-		ret = 0;
+		wake_up_process(child);
 		goto out;
 
 	case PTRACE_SINGLESTEP:  /* execute single instruction. */
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
-			goto out;
+			break;
 		/* Mark single stepping.  */
 		child->thread_info->bpt_nsaved = -1;
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
