@@ -298,6 +298,7 @@ struct nfsd4_compoundres {
 
 #define NFS4_SVC_XDRSIZE		sizeof(struct nfsd4_compoundargs)
 
+#if CONFIG_NFSD_V3
 static inline void
 set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 {
@@ -308,6 +309,7 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 	cinfo->after_size = fhp->fh_post_size;
 	cinfo->after_ctime = fhp->fh_post_ctime;
 }
+#endif
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
 int nfs4svc_decode_compoundargs(struct svc_rqst *, u32 *, struct nfsd4_compoundargs *);
