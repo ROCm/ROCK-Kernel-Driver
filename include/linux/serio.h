@@ -40,6 +40,8 @@ struct serio {
 	int (*open)(struct serio *);
 	void (*close)(struct serio *);
 
+	struct serio *parent, *child;
+
 	struct serio_driver *drv; /* Accessed from interrupt, writes must be protected by serio_lock */
 
 	struct list_head node;
@@ -68,10 +70,8 @@ irqreturn_t serio_interrupt(struct serio *serio, unsigned char data, unsigned in
 
 void serio_register_port(struct serio *serio);
 void serio_register_port_delayed(struct serio *serio);
-void __serio_register_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
 void serio_unregister_port_delayed(struct serio *serio);
-void __serio_unregister_port(struct serio *serio);
 void serio_register_driver(struct serio_driver *drv);
 void serio_unregister_driver(struct serio_driver *drv);
 

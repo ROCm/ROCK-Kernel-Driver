@@ -212,14 +212,14 @@ static int synaptics_set_mode(struct psmouse *psmouse, int mode)
 /*****************************************************************************
  *	Synaptics pass-through PS/2 port support
  ****************************************************************************/
-static int synaptics_pt_write(struct serio *port, unsigned char c)
+static int synaptics_pt_write(struct serio *serio, unsigned char c)
 {
-	struct psmouse_ptport *ptport = port->port_data;
+	struct psmouse *parent = serio->parent->private;
 	char rate_param = SYN_PS_CLIENT_CMD; /* indicates that we want pass-through port */
 
-	if (psmouse_sliced_command(ptport->parent, c))
+	if (psmouse_sliced_command(parent, c))
 		return -1;
-	if (psmouse_command(ptport->parent, &rate_param, PSMOUSE_CMD_SETRATE))
+	if (psmouse_command(parent, &rate_param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
 }
@@ -248,7 +248,7 @@ static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet
 
 static void synaptics_pt_activate(struct psmouse *psmouse)
 {
-	struct psmouse *child = psmouse->ptport->serio->private;
+	struct psmouse *child = psmouse->serio->child->private;
 
 	/* adjust the touchpad to child's choice of protocol */
 	if (child && child->type >= PSMOUSE_GENPS) {
@@ -259,30 +259,25 @@ static void synaptics_pt_activate(struct psmouse *psmouse)
 
 static void synaptics_pt_create(struct psmouse *psmouse)
 {
-	struct psmouse_ptport *port;
 	struct serio *serio;
 
-	port = kmalloc(sizeof(struct psmouse_ptport), GFP_KERNEL);
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
-	if (!port || !serio) {
+	if (!serio) {
 		printk(KERN_ERR "synaptics: not enough memory to allocate pass-through port\n");
 		return;
 	}
 
-	memset(port, 0, sizeof(struct psmouse_ptport));
 	memset(serio, 0, sizeof(struct serio));
 
 	serio->type = SERIO_PS_PSTHRU;
 	strlcpy(serio->name, "Synaptics pass-through", sizeof(serio->name));
 	strlcpy(serio->phys, "synaptics-pt/serio0", sizeof(serio->name));
 	serio->write = synaptics_pt_write;
-	serio->port_data = port;
+	serio->parent = psmouse->serio;
 
-	port->serio = serio;
-	port->parent = psmouse;
-	port->activate = synaptics_pt_activate;
+	psmouse->pt_activate = synaptics_pt_activate;
 
-	psmouse->ptport = port;
+	psmouse->serio->child = serio;
 }
 
 /*****************************************************************************
@@ -477,8 +472,8 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 		if (unlikely(priv->pkt_type == SYN_NEWABS))
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
-		if (psmouse->ptport && psmouse->ptport->serio->drv && synaptics_is_pt_packet(psmouse->packet))
-			synaptics_pass_pt_packet(psmouse->ptport->serio, psmouse->packet);
+		if (psmouse->serio->child && psmouse->serio->child->drv && synaptics_is_pt_packet(psmouse->packet))
+			synaptics_pass_pt_packet(psmouse->serio->child, psmouse->packet);
 		else
 			synaptics_process_packet(psmouse);
 
