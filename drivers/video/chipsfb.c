@@ -126,14 +126,14 @@ static int chipsfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 static int chipsfb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops chipsfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	chips_get_fix,
-	fb_get_var:	chips_get_var,
-	fb_set_var:	chips_set_var,
-	fb_get_cmap:	chips_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	chipsfb_setcolreg,
-	fb_blank:	chipsfb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	chips_get_fix,
+	.fb_get_var =	chips_get_var,
+	.fb_set_var =	chips_set_var,
+	.fb_get_cmap =	chips_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	chipsfb_setcolreg,
+	.fb_blank =	chipsfb_blank,
 };
 
 static int chipsfb_getcolreg(u_int regno, u_int *red, u_int *green,

@@ -80,13 +80,13 @@ struct xxx_par;
  * to get a fb_var_screeninfo. Otherwise define a default var as well. 
  */
 static struct fb_fix_screeninfo xxxfb_fix __initdata = {
-	id:		"FB's name", 
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR,
-	xpanstep:	1,
-	ypanstep:	1,
-	ywrapstep:	1, 
-	accel:		FB_ACCEL_NONE,
+	.id =		"FB's name", 
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR,
+	.xpanstep =	1,
+	.ypanstep =	1,
+	.ywrapstep =	1, 
+	.accel =	FB_ACCEL_NONE,
 };
 
     /*
@@ -507,26 +507,24 @@ static int xxxfb_release(const struct fb_info *info, int user)
 }
 
 static struct fb_ops xxxfb_ops = {
-	owner:		THIS_MODULE,
-	fb_open:	xxxfb_open,    /* only if you need it to do something */
-	fb_release:	xxxfb_release, /* only if you need it to do something */
+	.owner		= THIS_MODULE,
+	.fb_open	= xxxfb_open,    /* only if you need it to do something */
+	.fb_release	= xxxfb_release, /* only if you need it to do something */
 	/* Stuff to go away. Use generic functions for now */
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,	
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
+	.fb_set_var	= gen_set_var,	
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
 
-	fb_check_var:	xxxfb_check_var,
-	fb_set_par:	xxxfb_set_par,	   /* optional */	
-	fb_setcolreg:	xxxfb_setcolreg,
-	fb_blank:	xxxfb_blank,	   /* optional */
-	fb_pan_display:	xxxfb_pan_display, /* optional */	
-	fb_fillrect:	xxxfb_fillrect,  
-	fb_copyarea:	xxxfb_copyarea,  
-	fb_imageblit:	xxxfb_imageblit, 
-	fb_ioctl:       xxxfb_ioctl,     /* optional */
-	fb_mmap:	xxxfb_mmap,      /* optional */	
+	.fb_check_var	= xxxfb_check_var,
+	.fb_set_par	= xxxfb_set_par,	/* optional */	
+	.fb_setcolreg	= xxxfb_setcolreg,
+	.fb_blank	= xxxfb_blank,		/* optional */
+	.fb_pan_display	= xxxfb_pan_display,	/* optional */	
+	.fb_fillrect	= xxxfb_fillrect,  
+	.fb_copyarea	= xxxfb_copyarea,  
+	.fb_imageblit	= xxxfb_imageblit, 
+	.fb_ioctl	= xxxfb_ioctl,		/* optional */
+	.fb_mmap	= xxxfb_mmap,		/* optional */	
 };
 
 /* ------------------------------------------------------------------------- */

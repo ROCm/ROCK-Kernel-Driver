@@ -1181,18 +1181,18 @@ static int matroxfb_blank(int blank, struct fb_info *info)
 }
 
 static struct fb_ops matroxfb_ops = {
-	owner:		THIS_MODULE,
-	fb_open:	matroxfb_open,
-	fb_release:	matroxfb_release,
-	fb_get_fix:	matroxfb_get_fix,
-	fb_get_var:	matroxfb_get_var,
-	fb_set_var:	matroxfb_set_var,
-	fb_get_cmap:	matroxfb_get_cmap,
-	fb_set_cmap:	matroxfb_set_cmap,
-	fb_setcolreg:	matroxfb_setcolreg,
-	fb_pan_display:	matroxfb_pan_display,
-	fb_blank:	matroxfb_blank,
-	fb_ioctl:	matroxfb_ioctl,
+	.owner =	THIS_MODULE,
+	.fb_open =	matroxfb_open,
+	.fb_release =	matroxfb_release,
+	.fb_get_fix =	matroxfb_get_fix,
+	.fb_get_var =	matroxfb_get_var,
+	.fb_set_var =	matroxfb_set_var,
+	.fb_get_cmap =	matroxfb_get_cmap,
+	.fb_set_cmap =	matroxfb_set_cmap,
+	.fb_setcolreg =	matroxfb_setcolreg,
+	.fb_pan_display =matroxfb_pan_display,
+	.fb_blank =	matroxfb_blank,
+	.fb_ioctl =	matroxfb_ioctl,
 };
 
 int matroxfb_switch(int con, struct fb_info *info)
@@ -2133,10 +2133,10 @@ MODULE_DEVICE_TABLE(pci, matroxfb_devices);
 
 
 static struct pci_driver matroxfb_driver = {
-	name:		"matroxfb",
-	id_table:	matroxfb_devices,
-	probe:		matroxfb_probe,
-	remove:		pci_remove_matrox,
+	.name =		"matroxfb",
+	.id_table =	matroxfb_devices,
+	.probe =	matroxfb_probe,
+	.remove =	pci_remove_matrox,
 };
 
 /* **************************** init-time only **************************** */

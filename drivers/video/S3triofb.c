@@ -124,15 +124,15 @@ static int s3trio_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
                          u_int *transp, struct fb_info *info);
 
 static struct fb_ops s3trio_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	s3trio_get_fix,
-	fb_get_var:	s3trio_get_var,
-	fb_set_var:	s3trio_set_var,
-	fb_get_cmap:	s3trio_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	s3trio_setcolreg,
-	fb_pan_display:	s3trio_pan_display,
-	fb_blank:	s3triofb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	s3trio_get_fix,
+	.fb_get_var =	s3trio_get_var,
+	.fb_set_var =	s3trio_set_var,
+	.fb_get_cmap =	s3trio_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	s3trio_setcolreg,
+	.fb_pan_display =s3trio_pan_display,
+	.fb_blank =	s3triofb_blank,
 };
 
     /*
@@ -776,14 +776,14 @@ static void fbcon_trio8_revc(struct display *p, int xx, int yy)
 }
 
 static struct display_switch fbcon_trio8 = {
-   setup:		fbcon_cfb8_setup,
-   bmove:		fbcon_trio8_bmove,
-   clear:		fbcon_trio8_clear,
-   putc:		fbcon_trio8_putc,
-   putcs:		fbcon_trio8_putcs,
-   revc:		fbcon_trio8_revc,
-   clear_margins:	fbcon_cfb8_clear_margins,
-   fontwidthmask:	FONTWIDTH(8)
+   .setup =		fbcon_cfb8_setup,
+   .bmove =		fbcon_trio8_bmove,
+   .clear =		fbcon_trio8_clear,
+   .putc =		fbcon_trio8_putc,
+   .putcs =		fbcon_trio8_putcs,
+   .revc =		fbcon_trio8_revc,
+   .clear_margins =	fbcon_cfb8_clear_margins,
+   .fontwidthmask =	FONTWIDTH(8)
 };
 #endif
 
