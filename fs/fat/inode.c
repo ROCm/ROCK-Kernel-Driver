@@ -765,8 +765,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi;
+	u16 logical_sector_size;
 	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
-	int logical_sector_size, debug, cp, first;
+	int debug, cp, first;
 	unsigned int media;
 	long error;
 	char buf[50];
@@ -831,14 +832,13 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
-	logical_sector_size =
-		CF_LE_W(get_unaligned((unsigned short *) &b->sector_size));
+	logical_sector_size = CF_LE_W(get_unaligned((u16 *)&b->sector_size));
 	if (!logical_sector_size
 	    || (logical_sector_size & (logical_sector_size - 1))
 	    || (logical_sector_size < 512)
 	    || (PAGE_CACHE_SIZE < logical_sector_size)) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus logical sector size %d\n",
+			printk(KERN_ERR "FAT: bogus logical sector size %u\n",
 			       logical_sector_size);
 		brelse(bh);
 		goto out_invalid;
@@ -847,7 +847,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (!sbi->sec_per_clus
 	    || (sbi->sec_per_clus & (sbi->sec_per_clus - 1))) {
 		if (!silent)
-			printk(KERN_ERR "FAT: bogus sectors per cluster %d\n",
+			printk(KERN_ERR "FAT: bogus sectors per cluster %u\n",
 			       sbi->sec_per_clus);
 		brelse(bh);
 		goto out_invalid;
@@ -855,7 +855,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 	if (logical_sector_size < sb->s_blocksize) {
 		printk(KERN_ERR "FAT: logical sector size too small for device"
-		       " (logical sector size = %d)\n", logical_sector_size);
+		       " (logical sector size = %u)\n", logical_sector_size);
 		brelse(bh);
 		goto out_fail;
 	}
@@ -863,7 +863,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 
 		if (!sb_set_blocksize(sb, logical_sector_size)) {
-			printk(KERN_ERR "FAT: unable to set blocksize %d\n",
+			printk(KERN_ERR "FAT: unable to set blocksize %u\n",
 			       logical_sector_size);
 			goto out_fail;
 		}
@@ -932,10 +932,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_per_block_bits = ffs(sbi->dir_per_block) - 1;
 
 	sbi->dir_start = sbi->fat_start + sbi->fats * sbi->fat_length;
-	sbi->dir_entries =
-		CF_LE_W(get_unaligned((unsigned short *)&b->dir_entries));
+	sbi->dir_entries = CF_LE_W(get_unaligned((u16 *)&b->dir_entries));
 	if (sbi->dir_entries & (sbi->dir_per_block - 1)) {
-		printk(KERN_ERR "FAT: bogus directroy-entries per block\n");
+		if (!silent)
+			printk(KERN_ERR "FAT: bogus directroy-entries per block"
+			       " (%u)\n", sbi->dir_entries);
 		brelse(bh);
 		goto out_invalid;
 	}
@@ -943,7 +944,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	rootdir_sectors = sbi->dir_entries
 		* sizeof(struct msdos_dir_entry) / sb->s_blocksize;
 	sbi->data_start = sbi->dir_start + rootdir_sectors;
-	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
+	total_sectors = CF_LE_W(get_unaligned((u16 *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
 
