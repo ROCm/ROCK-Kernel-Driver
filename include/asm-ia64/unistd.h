@@ -219,6 +219,7 @@
 #define __NR_lremovexattr		1227
 #define __NR_fremovexattr		1228
 #define __NR_tkill			1229
+#define __NR_futex			1230
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

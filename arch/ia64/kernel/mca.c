@@ -41,6 +41,7 @@
 #include <linux/irq.h>
 #include <linux/smp_lock.h>
 #include <linux/bootmem.h>
+#include <linux/acpi.h>
 
 #include <asm/machvec.h>
 #include <asm/page.h>
@@ -51,7 +52,6 @@
 
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
-#include <asm/acpi-ext.h>
 
 #undef MCA_PRT_XTRA_DATA
 
@@ -497,7 +497,7 @@ ia64_mca_init(void)
 	{
 		irq_desc_t *desc;
 		unsigned int irq;
-		int cpev = acpi_request_vector(ACPI20_ENTRY_PIS_CPEI);
+		int cpev = acpi_request_vector(ACPI_INTERRUPT_CPEI);
 
 		if (cpev >= 0) {
 			for (irq = 0; irq < NR_IRQS; ++irq)

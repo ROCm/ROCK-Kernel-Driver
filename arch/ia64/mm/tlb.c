@@ -79,7 +79,7 @@ wrap_mmu_context (struct mm_struct *mm)
 	flush_tlb_all();
 }
 
-static inline void
+void
 ia64_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbits)
 {
 	static spinlock_t ptcg_lock = SPIN_LOCK_UNLOCKED;

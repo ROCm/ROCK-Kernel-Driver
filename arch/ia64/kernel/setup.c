@@ -19,6 +19,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 
+#include <linux/acpi.h>
 #include <linux/bootmem.h>
 #include <linux/console.h>
 #include <linux/delay.h>
@@ -30,7 +31,6 @@
 #include <linux/threads.h>
 #include <linux/tty.h>
 
-#include <asm/acpi-ext.h>
 #include <asm/ia32.h>
 #include <asm/page.h>
 #include <asm/machvec.h>
@@ -63,6 +63,8 @@ struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
 
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
+
+unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
 #define COMMAND_LINE_SIZE	512
 
@@ -282,6 +284,7 @@ void __init
 setup_arch (char **cmdline_p)
 {
 	extern unsigned long ia64_iobase;
+	unsigned long phys_iobase;
 
 	unw_init();
 
@@ -314,24 +317,23 @@ setup_arch (char **cmdline_p)
 #endif
 
 	/*
-	 *  Set `iobase' to the appropriate address in region 6
-	 *    (uncached access range)
+	 *  Set `iobase' to the appropriate address in region 6 (uncached access range).
 	 *
-	 *  The EFI memory map is the "prefered" location to get the I/O port
-	 *  space base, rather the relying on AR.KR0. This should become more
-	 *  clear in future SAL specs. We'll fall back to getting it out of
-	 *  AR.KR0 if no appropriate entry is found in the memory map.
+	 *  The EFI memory map is the "preferred" location to get the I/O port space base,
+	 *  rather the relying on AR.KR0. This should become more clear in future SAL
+	 *  specs. We'll fall back to getting it out of AR.KR0 if no appropriate entry is
+	 *  found in the memory map.
 	 */
-	ia64_iobase = efi_get_iobase();
-	if (ia64_iobase)
+	phys_iobase = efi_get_iobase();
+	if (phys_iobase)
 		/* set AR.KR0 since this is all we use it for anyway */
-		ia64_set_kr(IA64_KR_IO_BASE, ia64_iobase);
+		ia64_set_kr(IA64_KR_IO_BASE, phys_iobase);
 	else {
-		ia64_iobase = ia64_get_kr(IA64_KR_IO_BASE);
+		phys_iobase = ia64_get_kr(IA64_KR_IO_BASE);
 		printk("No I/O port range found in EFI memory map, falling back to AR.KR0\n");
-		printk("I/O port base = 0x%lx\n", ia64_iobase);
+		printk("I/O port base = 0x%lx\n", phys_iobase);
 	}
-	ia64_iobase = __IA64_UNCACHED_OFFSET | (ia64_iobase & ~PAGE_OFFSET);
+	ia64_iobase = (unsigned long) ioremap(phys_iobase, 0);
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
@@ -339,19 +341,22 @@ setup_arch (char **cmdline_p)
 
 	cpu_init();	/* initialize the bootstrap CPU */
 
-	if (efi.acpi20) {
-		/* Parse the ACPI 2.0 tables */
-		acpi20_parse(efi.acpi20);
-	} else if (efi.acpi) {
-		/* Parse the ACPI tables */
-		acpi_parse(efi.acpi);
-	}
-
+#ifdef CONFIG_ACPI_BOOT
+	acpi_boot_init(*cmdline_p);
+#endif
 #ifdef CONFIG_VT
-# if defined(CONFIG_VGA_CONSOLE)
-	conswitchp = &vga_con;
-# elif defined(CONFIG_DUMMY_CONSOLE)
+# if defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
+# endif
+# if defined(CONFIG_VGA_CONSOLE)
+	/*
+	 * Non-legacy systems may route legacy VGA MMIO range to system
+	 * memory.  vga_con probes the MMIO hole, so memory looks like
+	 * a VGA device to it.  The EFI memory map can tell us if it's
+	 * memory so we can avoid this problem.
+	 */
+	if (efi_mem_type(0xA0000) != EFI_CONVENTIONAL_MEMORY)
+		conswitchp = &vga_con;
 # endif
 #endif
 
