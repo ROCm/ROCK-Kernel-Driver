@@ -437,7 +437,7 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	if (bio->bi_size)
 		return 1;
 
-	if (!err || bio_rw(bio) == WRITE) {
+	if (err || bio_rw(bio) == WRITE) {
 		bio_endio(rbh, rbh->bi_size, err);
 		if (atomic_dec_and_test(&lo->lo_pending))
 			up(&lo->lo_bh_mutex);
