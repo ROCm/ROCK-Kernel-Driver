@@ -356,8 +356,6 @@ int meth_open(struct net_device *dev)
 	meth_private *priv=dev->priv;
 	volatile meth_regs *regs=priv->regs;
 
-	MOD_INC_USE_COUNT;
-
 	/* Start DMA */
 	regs->dma_ctrl|=
 	        METH_DMA_TX_EN|/*METH_DMA_TX_INT_EN|*/
@@ -380,7 +378,6 @@ int meth_release(struct net_device *dev)
 		~(METH_DMA_TX_EN|METH_DMA_TX_INT_EN|
 		METH_DMA_RX_EN|METH_DMA_RX_INT_EN);
 	free_irq(dev->irq, dev);
-    MOD_DEC_USE_COUNT;
     return 0;
 }
 
