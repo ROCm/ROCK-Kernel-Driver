@@ -167,12 +167,21 @@ struct i2c_client {
 	  alignment considerations */
 	struct i2c_adapter *adapter;	/* the adapter we sit on	*/
 	struct i2c_driver *driver;	/* and our access routines	*/
-	void *data;			/* for the clients		*/
 	int usage_count;		/* How many accesses currently  */
 					/* to the client		*/
 	struct device dev;		/* the device structure		*/
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
+
+static inline void *i2c_get_clientdata (struct i2c_client *dev)
+{
+	return dev_get_drvdata (&dev->dev);
+}
+
+static inline void i2c_set_clientdata (struct i2c_client *dev, void *data)
+{
+	return dev_set_drvdata (&dev->dev, data);
+}
 
 /*
  * The following structs are for those who like to implement new bus drivers:

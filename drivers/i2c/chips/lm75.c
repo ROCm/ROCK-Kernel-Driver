@@ -142,8 +142,8 @@ static int lm75_detect(struct i2c_adapter *adapter, int address,
 	}
 
 	data = (struct lm75_data *) (new_client + 1);
+	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
-	new_client->data = data;
 	new_client->adapter = adapter;
 	new_client->driver = &lm75_driver;
 	new_client->flags = 0;
@@ -215,7 +215,7 @@ static int lm75_detect(struct i2c_adapter *adapter, int address,
 
 static int lm75_detach_client(struct i2c_client *client)
 {
-	struct lm75_data *data = client->data;
+	struct lm75_data *data = i2c_get_clientdata(client);
 
 	i2c_deregister_entry(data->sysctl_id);
 	i2c_detach_client(client);
@@ -263,7 +263,7 @@ static void lm75_init_client(struct i2c_client *client)
 
 static void lm75_update_client(struct i2c_client *client)
 {
-	struct lm75_data *data = client->data;
+	struct lm75_data *data = i2c_get_clientdata(client);
 
 	down(&data->update_lock);
 
@@ -286,7 +286,7 @@ static void lm75_update_client(struct i2c_client *client)
 static void lm75_temp(struct i2c_client *client, int operation, int ctl_name,
 		      int *nrels_mag, long *results)
 {
-	struct lm75_data *data = client->data;
+	struct lm75_data *data = i2c_get_clientdata(client);
 	if (operation == SENSORS_PROC_REAL_INFO)
 		*nrels_mag = 1;
 	else if (operation == SENSORS_PROC_REAL_READ) {
