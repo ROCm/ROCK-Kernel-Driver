@@ -39,6 +39,7 @@
 #include "oid_mgt.h"
 
 #define ISL3877_IMAGE_FILE	"isl3877"
+#define ISL3886_IMAGE_FILE	"isl3886"
 #define ISL3890_IMAGE_FILE	"isl3890"
 
 static int prism54_bring_down(islpci_private *);
@@ -856,12 +857,12 @@ islpci_setup(struct pci_dev *pdev)
 
 	/* select the firmware file depending on the device id */
 	switch (pdev->device) {
-	case PCIDEVICE_ISL3890:
-	case PCIDEVICE_3COM6001:
-		strcpy(priv->firmware, ISL3890_IMAGE_FILE);
-		break;
-	case PCIDEVICE_ISL3877:
+	case 0x3877:
 		strcpy(priv->firmware, ISL3877_IMAGE_FILE);
+		break;
+
+	case 0x3886:
+		strcpy(priv->firmware, ISL3886_IMAGE_FILE);
 		break;
 
 	default:
