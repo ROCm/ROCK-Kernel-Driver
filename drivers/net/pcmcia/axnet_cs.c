@@ -1135,27 +1135,6 @@ static int ei_open(struct net_device *dev)
 }
 
 /**
- * ei_close - shut down network device
- * @dev: network device to close
- *
- * Opposite of ei_open(). Only used when "ifconfig <devname> down" is done.
- */
-static int ei_close(struct net_device *dev)
-{
-	unsigned long flags;
-
-	/*
-	 *	Hold the page lock during close
-	 */
-
-	spin_lock_irqsave(&((struct ei_device *)dev->priv)->page_lock, flags);
-	NS8390_init(dev, 0);
-	spin_unlock_irqrestore(&((struct ei_device *)dev->priv)->page_lock, flags);
-	netif_stop_queue(dev);
-	return 0;
-}
-
-/**
  * ei_tx_timeout - handle transmit time out condition
  * @dev: network device which has apparently fallen asleep
  *
