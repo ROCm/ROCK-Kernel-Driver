@@ -341,7 +341,7 @@ static void posix_timer_fn(unsigned long __data)
  * Here we define a mask to get rid of the common bits.	 The
  * optimizer should make this costless to all but mips.
  */
-#if (ARCH == mips) || (ARCH == mips64)
+#if defined(ARCH) && ((ARCH == mips) || (ARCH == mips64))
 #define MIPS_SIGEV ~(SIGEV_NONE & \
 		      SIGEV_SIGNAL & \
 		      SIGEV_THREAD &  \
@@ -402,7 +402,8 @@ static void release_posix_timer(struct k_itimer *tmr)
 
 asmlinkage long
 sys_timer_create(clockid_t which_clock,
-		 struct sigevent *timer_event_spec, timer_t * created_timer_id)
+		 struct sigevent __user *timer_event_spec,
+		 timer_t __user * created_timer_id)
 {
 	int error = 0;
 	struct k_itimer *new_timer = NULL;
@@ -623,7 +624,7 @@ do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 
 /* Get the time remaining on a POSIX.1b interval timer. */
 asmlinkage long
-sys_timer_gettime(timer_t timer_id, struct itimerspec *setting)
+sys_timer_gettime(timer_t timer_id, struct itimerspec __user *setting)
 {
 	struct k_itimer *timr;
 	struct itimerspec cur_setting;
@@ -801,8 +802,8 @@ do_timer_settime(struct k_itimer *timr, int flags,
 /* Set a POSIX.1b interval timer */
 asmlinkage long
 sys_timer_settime(timer_t timer_id, int flags,
-		  const struct itimerspec *new_setting,
-		  struct itimerspec *old_setting)
+		  const struct itimerspec __user *new_setting,
+		  struct itimerspec __user *old_setting)
 {
 	struct k_itimer *timr;
 	struct itimerspec new_spec, old_spec;
@@ -985,7 +986,7 @@ int do_posix_clock_monotonic_settime(struct timespec *tp)
 }
 
 asmlinkage long
-sys_clock_settime(clockid_t which_clock, const struct timespec *tp)
+sys_clock_settime(clockid_t which_clock, const struct timespec __user *tp)
 {
 	struct timespec new_tp;
 
@@ -1002,7 +1003,7 @@ sys_clock_settime(clockid_t which_clock, const struct timespec *tp)
 }
 
 asmlinkage long
-sys_clock_gettime(clockid_t which_clock, struct timespec *tp)
+sys_clock_gettime(clockid_t which_clock, struct timespec __user *tp)
 {
 	struct timespec rtn_tp;
 	int error = 0;
@@ -1021,7 +1022,7 @@ sys_clock_gettime(clockid_t which_clock, struct timespec *tp)
 }
 
 asmlinkage long
-sys_clock_getres(clockid_t which_clock, struct timespec *tp)
+sys_clock_getres(clockid_t which_clock, struct timespec __user *tp)
 {
 	struct timespec rtn_tp;
 
@@ -1074,7 +1075,7 @@ extern long do_clock_nanosleep(clockid_t which_clock, int flags,
 #ifdef FOLD_NANO_SLEEP_INTO_CLOCK_NANO_SLEEP
 
 asmlinkage long
-sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
+sys_nanosleep(struct timespec __user *rqtp, struct timespec __user *rmtp)
 {
 	struct timespec t;
 	long ret;
@@ -1096,7 +1097,8 @@ sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 
 asmlinkage long
 sys_clock_nanosleep(clockid_t which_clock, int flags,
-		    const struct timespec *rqtp, struct timespec *rmtp)
+		    const struct timespec __user *rqtp,
+		    struct timespec __user *rmtp)
 {
 	struct timespec t;
 	int ret;
@@ -1218,7 +1220,7 @@ clock_nanosleep_restart(struct restart_block *restart_block)
 	int ret = do_clock_nanosleep(restart_block->arg0, 0, &t);
 
 	if ((ret == -ERESTART_RESTARTBLOCK) && restart_block->arg1 &&
-	    copy_to_user((struct timespec *)(restart_block->arg1), &t,
+	    copy_to_user((struct timespec __user *)(restart_block->arg1), &t,
 			 sizeof (t)))
 		return -EFAULT;
 	return ret;
