@@ -1233,7 +1233,7 @@ config SCSI_SEAGATE
 config SCSI_SIM710
 	tristate "Simple 53c710 SCSI support (Compaq, NCR machines)"
 	depends on (EISA || MCA) && SCSI
-	select SCSI_SPI_ATTR
+	select SCSI_SPI_ATTRS
 	---help---
 	  This driver for NCR53c710 based SCSI host adapters.
 
