@@ -388,14 +388,11 @@ int fat_free(struct inode *inode,int skip)
 			nr = -EIO;
 			goto error;
 		}
-		if (MSDOS_SB(sb)->free_clusters != -1) {
+		if (MSDOS_SB(sb)->free_clusters != -1)
 			MSDOS_SB(sb)->free_clusters++;
-			if (MSDOS_SB(sb)->fat_bits == 32) {
-				fat_clusters_flush(sb);
-			}
-		}
-		inode->i_blocks -= (1 << MSDOS_SB(sb)->cluster_bits) >> 9 ;
+		inode->i_blocks -= (1 << MSDOS_SB(sb)->cluster_bits) >> 9;
 	}
+	fat_clusters_flush(sb);
 	nr = 0;
 error:
 	unlock_fat(sb);

@@ -97,6 +97,11 @@ void fat_clusters_flush(struct super_block *sb)
 	struct buffer_head *bh;
 	struct fat_boot_fsinfo *fsinfo;
 
+	if (MSDOS_SB(sb)->fat_bits != 32)
+		return;
+	if (MSDOS_SB(sb)->free_clusters == -1)
+		return;
+
 	bh = fat_bread(sb, MSDOS_SB(sb)->fsinfo_sector);
 	if (bh == NULL) {
 		printk("FAT bread failed in fat_clusters_flush\n");
@@ -185,8 +190,7 @@ int fat_add_cluster(struct inode *inode)
 	fat_access(sb, nr, FAT_ENT_EOF);
 	if (MSDOS_SB(sb)->free_clusters != -1)
 		MSDOS_SB(sb)->free_clusters--;
-	if (MSDOS_SB(sb)->fat_bits == 32)
-		fat_clusters_flush(sb);
+	fat_clusters_flush(sb);
 	
 	unlock_fat(sb);
 

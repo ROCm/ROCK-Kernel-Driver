@@ -178,9 +178,7 @@ void fat_put_super(struct super_block *sb)
 		dec_cvf_format_use_count_by_version(sbi->cvf_format->cvf_version);
 		sbi->cvf_format->unmount_cvf(sb);
 	}
-	if (sbi->fat_bits == 32) {
-		fat_clusters_flush(sb);
-	}
+	fat_clusters_flush(sb);
 	fat_cache_inval_dev(sb);
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
