@@ -158,7 +158,7 @@ static int i2c_read_register(struct i2c_adapter *adap, int addr, int reg)
 
 static void tda9875_set(struct i2c_client *client)
 {
-	struct tda9875 *tda = client->data;
+	struct tda9875 *tda = i2c_get_clientdata(client);
 	unsigned char a;
 
 	dprintk(KERN_DEBUG "tda9875_set(%04x,%04x,%04x,%04x)\n",tda->lvol,tda->rvol,tda->bass,tda->treble);
@@ -176,7 +176,7 @@ static void tda9875_set(struct i2c_client *client)
 
 static void do_tda9875_init(struct i2c_client *client)
 {
-	struct tda9875 *t = client->data;
+	struct tda9875 *t = i2c_get_clientdata(client);
 	dprintk("In tda9875_init\n"); 
 	tda9875_write(client, TDA9875_CFG, 0xd0 ); /*reg de config 0 (reset)*/
     	tda9875_write(client, TDA9875_MSR, 0x03 );    /* Monitor 0b00000XXX*/
@@ -256,7 +256,7 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr,
         memcpy(client,&client_template,sizeof(struct i2c_client));
         client->adapter = adap;
         client->addr = addr;
-	client->data = t;
+	i2c_set_clientdata(client, t);
 
 	if(!tda9875_checkit(adap,addr)) {
 		kfree(t);
@@ -265,7 +265,7 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr,
 	
 	do_tda9875_init(client);
 	MOD_INC_USE_COUNT;
-	strcpy(client->name,"TDA9875");
+	strncpy(client->dev.name, "TDA9875", DEVICE_NAME_SIZE);
 	printk(KERN_INFO "tda9875: init\n");
 
 	i2c_attach_client(client);
@@ -281,7 +281,7 @@ static int tda9875_probe(struct i2c_adapter *adap)
 
 static int tda9875_detach(struct i2c_client *client)
 {
-	struct tda9875 *t  = client->data;
+	struct tda9875 *t = i2c_get_clientdata(client);
 
 	do_tda9875_init(client);
 	i2c_detach_client(client);
@@ -294,7 +294,7 @@ static int tda9875_detach(struct i2c_client *client)
 static int tda9875_command(struct i2c_client *client,
 				unsigned int cmd, void *arg)
 {
-	struct tda9875 *t = client->data;
+	struct tda9875 *t = i2c_get_clientdata(client);
 
 	dprintk("In tda9875_command...\n"); 
 
@@ -396,9 +396,11 @@ static struct i2c_driver driver = {
 
 static struct i2c_client client_template =
 {
-        .name    = "tda9875",
         .id      = -1,
         .driver  = &driver,
+        .dev	= {
+		.name	= "tda9875",
+	},
 };
 
 static int tda9875_init(void)

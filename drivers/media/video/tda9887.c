@@ -359,7 +359,7 @@ static int tda9887_attach(struct i2c_adapter *adap, int addr,
                 return -ENOMEM;
 	memset(t,0,sizeof(*t));
 	t->client = client_template;
-        t->client.data = t;
+        i2c_set_clientdata(&t->client, t);
 	t->pinnacle_id = -1;
         i2c_attach_client(&t->client);
         
@@ -376,12 +376,12 @@ static int tda9887_probe(struct i2c_adapter *adap)
 	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
 	case I2C_ALGO_SAA7134:
 		printk("tda9887: probing %s i2c adapter [id=0x%x]\n",
-		       adap->name,adap->id);
+		       adap->dev.name,adap->id);
 		rc = i2c_probe(adap, &addr_data, tda9887_attach);
 		break;
 	default:
 		printk("tda9887: ignoring %s i2c adapter [id=0x%x]\n",
-		       adap->name,adap->id);
+		       adap->dev.name,adap->id);
 		rc = 0;
 		/* nothing */
 	}
@@ -390,7 +390,7 @@ static int tda9887_probe(struct i2c_adapter *adap)
 
 static int tda9887_detach(struct i2c_client *client)
 {
-	struct tda9887 *t = (struct tda9887*)client->data;
+	struct tda9887 *t = i2c_get_clientdata(client);
 
 	i2c_detach_client(client);
 	kfree(t);
@@ -401,7 +401,7 @@ static int tda9887_detach(struct i2c_client *client)
 static int
 tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	struct tda9887 *t = (struct tda9887*)client->data;
+	struct tda9887 *t = i2c_get_clientdata(client);
 
         switch (cmd) {
 
@@ -456,9 +456,11 @@ static struct i2c_driver driver = {
 };
 static struct i2c_client client_template =
 {
-        .name   = "tda9887",
 	.flags  = I2C_CLIENT_ALLOW_USE,
         .driver = &driver,
+        .dev	= {
+		.name	= "tda9887",
+	},
 };
 
 static int tda9887_init_module(void)
