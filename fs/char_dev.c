@@ -115,7 +115,15 @@ get_chrfops(unsigned int major, unsigned int minor)
 }
 
 /*
- * Register a single major with a specified minor range
+ * Register a single major with a specified minor range.
+ *
+ * If major == 0 this functions will dynamically allocate a major and return
+ * its number.
+ *
+ * If major > 0 this function will attempt to reserve the passed range of
+ * minors and will return zero on success.
+ *
+ * Returns a -ve errno on failure.
  */
 int register_chrdev_region(unsigned int major, unsigned int baseminor,
 			   int minorct, const char *name,
@@ -125,22 +133,26 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 	int ret = 0;
 	int i;
 
-	/* temporary */
-	if (major == 0) {
-		read_lock(&chrdevs_lock);
-		for (i = ARRAY_SIZE(chrdevs)-1; i > 0; i--)
-			if (chrdevs[i] == NULL)
-				break;
-		read_unlock(&chrdevs_lock);
-
-		if (i == 0)
-			return -EBUSY;
-		ret = major = i;
-	}
-
 	cd = kmalloc(sizeof(struct char_device_struct), GFP_KERNEL);
 	if (cd == NULL)
 		return -ENOMEM;
+
+	write_lock_irq(&chrdevs_lock);
+
+	/* temporary */
+	if (major == 0) {
+		for (i = ARRAY_SIZE(chrdevs)-1; i > 0; i--) {
+			if (chrdevs[i] == NULL)
+				break;
+		}
+
+		if (i == 0) {
+			ret = -EBUSY;
+			goto out;
+		}
+		major = i;
+		ret = major;
+	}
 
 	cd->major = major;
 	cd->baseminor = baseminor;
@@ -150,7 +162,6 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	i = major_to_index(major);
 
-	write_lock_irq(&chrdevs_lock);
 	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
 		if ((*cp)->major > major ||
 		    ((*cp)->major == major && (*cp)->baseminor >= baseminor))
@@ -162,8 +173,10 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 		cd->next = *cp;
 		*cp = cd;
 	}
+out:
 	write_unlock_irq(&chrdevs_lock);
-
+	if (ret < 0)
+		kfree(cd);
 	return ret;
 }
 
