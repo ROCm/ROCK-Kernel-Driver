@@ -227,7 +227,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	/* Init the ipv4 part of the socket since we can have sockets
 	 * using v6 API for ipv4.
 	 */
-	inet->ttl	= 64;
+	inet->uc_ttl	= -1;
 
 	inet->mc_loop	= 1;
 	inet->mc_ttl	= 1;

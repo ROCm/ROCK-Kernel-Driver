@@ -501,11 +501,9 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 		case IP_TTL:
 			if (optlen<1)
 				goto e_inval;
-			if(val==-1)
-				val = sysctl_ip_default_ttl;
-			if(val<1||val>255)
+			if (val != -1 && (val < 1 || val>255))
 				goto e_inval;
-			inet->ttl = val;
+			inet->uc_ttl = val;
 			break;
 		case IP_HDRINCL:
 			if(sk->type!=SOCK_RAW) {
@@ -911,7 +909,9 @@ int ip_getsockopt(struct sock *sk, int level, int optname, char *optval, int *op
 			val = inet->tos;
 			break;
 		case IP_TTL:
-			val = inet->ttl;
+			val = (inet->uc_ttl == -1 ?
+			       sysctl_ip_default_ttl :
+			       inet->uc_ttl);
 			break;
 		case IP_HDRINCL:
 			val = inet->hdrincl;

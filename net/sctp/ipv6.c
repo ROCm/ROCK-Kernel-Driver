@@ -547,7 +547,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	/* Init the ipv4 part of the socket since we can have sockets
 	 * using v6 API for ipv4.
 	 */
-	newinet->ttl = sysctl_ip_default_ttl;
+	newinet->uc_ttl = -1;
 	newinet->mc_loop = 1;
 	newinet->mc_ttl = 1;
 	newinet->mc_index = 0;

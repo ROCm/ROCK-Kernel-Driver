@@ -74,7 +74,6 @@
 #include <linux/seq_file.h>
 
 extern int sysctl_ip_dynaddr;
-extern int sysctl_ip_default_ttl;
 int sysctl_tcp_tw_reuse;
 int sysctl_tcp_low_latency;
 
@@ -1213,7 +1212,6 @@ static void tcp_v4_send_reset(struct sk_buff *skb)
 				      sizeof(struct tcphdr), IPPROTO_TCP, 0);
 	arg.csumoffset = offsetof(struct tcphdr, check) / 2;
 
-	inet_sk(tcp_socket->sk)->ttl = sysctl_ip_default_ttl;
 	ip_send_reply(tcp_socket->sk, skb, &arg, sizeof rth);
 
 	TCP_INC_STATS_BH(TcpOutSegs);
@@ -2619,7 +2617,7 @@ void __init tcp_v4_init(struct net_proto_family *ops)
 	if (err < 0)
 		panic("Failed to create the TCP control socket.\n");
 	tcp_socket->sk->allocation   = GFP_ATOMIC;
-	inet_sk(tcp_socket->sk)->ttl = MAXTTL;
+	inet_sk(tcp_socket->sk)->uc_ttl = -1;
 
 	/* Unhash it so that IP input processing does not even
 	 * see it, we do not wish this socket to see incoming

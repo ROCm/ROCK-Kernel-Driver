@@ -111,7 +111,6 @@ fold_field(void *mib[], int nr)
  */
 static int snmp_seq_show(struct seq_file *seq, void *v)
 {
-	extern int sysctl_ip_default_ttl;
 	int i;
 
 	seq_printf(seq, "Ip: Forwarding DefaultTTL InReceives InHdrErrors "

@@ -860,7 +860,7 @@ static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 			iph->ttl = ((struct ipv6hdr*)old_iph)->hop_limit;
 #endif
 		else
-			iph->ttl = sysctl_ip_default_ttl;
+			iph->ttl = dst_metric(&rt->u.dst, RTAX_HOPLIMIT);
 	}
 
 	((u16*)(iph+1))[0] = tunnel->parms.o_flags;

@@ -398,7 +398,7 @@ static int inet_create(struct socket *sock, int protocol)
 	sk->protocol	= protocol;
 	sk->backlog_rcv = sk->prot->backlog_rcv;
 
-	inet->ttl	= sysctl_ip_default_ttl;
+	inet->uc_ttl	= -1;
 	inet->mc_loop	= 1;
 	inet->mc_ttl	= 1;
 	inet->mc_index	= 0;

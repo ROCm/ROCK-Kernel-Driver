@@ -113,7 +113,7 @@ struct inet_opt {
 	__u16			dport;		/* Destination port */
 	__u16			num;		/* Local port */
 	__u32			saddr;		/* Sending source */
-	int			ttl;		/* TTL setting */
+	int			uc_ttl;		/* Unicast TTL */
 	int			tos;		/* TOS */
 	unsigned	   	cmsg_flags;
 	struct ip_options	*opt;

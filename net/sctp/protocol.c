@@ -545,7 +545,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 	newinet->pmtudisc = inet->pmtudisc;
       	newinet->id = 0;
 
-	newinet->ttl = sysctl_ip_default_ttl;
+	newinet->uc_ttl = -1;
 	newinet->mc_loop = 1;
 	newinet->mc_ttl = 1;
 	newinet->mc_index = 0;
@@ -602,7 +602,7 @@ int sctp_ctl_sock_init(void)
 		return err;
 	}
 	sctp_ctl_socket->sk->allocation = GFP_ATOMIC;
-	inet_sk(sctp_ctl_socket->sk)->ttl = MAXTTL;
+	inet_sk(sctp_ctl_socket->sk)->uc_ttl = -1;
 
 	return 0;
 }
