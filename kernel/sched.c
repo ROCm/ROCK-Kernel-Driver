@@ -605,7 +605,7 @@ skip_queue:
 #define CAN_MIGRATE_TASK(p,rq,this_cpu)					\
 	((jiffies - (p)->sleep_timestamp > cache_decay_ticks) &&	\
 		((p) != (rq)->curr) &&					\
-			((p)->cpus_allowed & (1 << (this_cpu))))
+			((p)->cpus_allowed & (1UL << (this_cpu))))
 
 	if (!CAN_MIGRATE_TASK(tmp, busiest, this_cpu)) {
 		curr = curr->next;
@@ -777,8 +777,8 @@ need_resched:
 	spin_lock_irq(&rq->lock);
 
 	/*
-	 * if entering from preempt_schedule, off a kernel preemption,
-	 * go straight to picking the next task.
+	 * if entering off a kernel preemption go straight
+	 * to picking the next task.
 	 */
 	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
 		goto pick_next_task;
@@ -854,7 +854,9 @@ switch_tasks:
 
 #ifdef CONFIG_PREEMPT
 /*
- * this is is the entry point to schedule() from in-kernel preemption.
+ * this is is the entry point to schedule() from in-kernel preemption
+ * off of preempt_enable.  Kernel preemptions off return from interrupt
+ * occur there and call schedule directly.
  */
 asmlinkage void preempt_schedule(void)
 {
@@ -866,7 +868,6 @@ asmlinkage void preempt_schedule(void)
 	ti->preempt_count = PREEMPT_ACTIVE;
 	schedule();
 	ti->preempt_count = 0;
-	barrier();
 }
 #endif /* CONFIG_PREEMPT */
 
@@ -1661,7 +1662,8 @@ typedef struct {
  * is removed from the allowed bitmask.
  *
  * NOTE: the caller must have a valid reference to the task, the
- * task must not exit() & deallocate itself prematurely.
+ * task must not exit() & deallocate itself prematurely.  The
+ * call is not atomic; no spinlocks may be held.
  */
 void set_cpus_allowed(task_t *p, unsigned long new_mask)
 {
