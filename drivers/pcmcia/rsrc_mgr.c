@@ -638,7 +638,7 @@ struct resource *nonstatic_find_io_region(unsigned long base, int num,
 	return res;
 }
 
-struct resource *find_mem_region(u_long base, u_long num, u_long align,
+struct resource * nonstatic_find_mem_region(u_long base, u_long num, u_long align,
 				 int low, struct pcmcia_socket *s)
 {
 	struct resource *res = make_resource(0, num, IORESOURCE_MEM, s->dev.class_id);
@@ -1005,15 +1005,25 @@ struct resource *find_io_region(unsigned long base, int num,
 	return NULL;
 }
 
+struct resource *find_mem_region(u_long base, u_long num, u_long align,
+				 int low, struct pcmcia_socket *s)
+{
+	if (s->resource_ops->find_mem)
+		return s->resource_ops->find_mem(base, num, align, low, s);
+	return NULL;
+}
+
 
 struct pccard_resource_ops pccard_static_ops = {
 	.validate_mem = NULL,
 	.adjust_io_region = NULL,
 	.find_io = NULL,
+	.find_mem = NULL,
 };
 
 struct pccard_resource_ops pccard_nonstatic_ops = {
 	.validate_mem = pcmcia_nonstatic_validate_mem,
 	.adjust_io_region = nonstatic_adjust_io_region,
 	.find_io = nonstatic_find_io_region,
+	.find_mem = nonstatic_find_mem_region,
 };
