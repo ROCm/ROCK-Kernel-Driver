@@ -134,7 +134,7 @@ static inline int compat_ipc_parse_version(int *cmd)
 }
 
 static inline int __get_compat_ipc64_perm(struct ipc64_perm *p64,
-					  struct compat_ipc64_perm *up64)
+					  struct compat_ipc64_perm __user *up64)
 {
 	int err;
 
@@ -145,7 +145,7 @@ static inline int __get_compat_ipc64_perm(struct ipc64_perm *p64,
 }
 
 static inline int __get_compat_ipc_perm(struct ipc64_perm *p,
-					struct compat_ipc_perm *up)
+					struct compat_ipc_perm __user *up)
 {
 	int err;
 
@@ -156,7 +156,7 @@ static inline int __get_compat_ipc_perm(struct ipc64_perm *p,
 }
 
 static inline int __put_compat_ipc64_perm(struct ipc64_perm *p64,
-					  struct compat_ipc64_perm *up64)
+					  struct compat_ipc64_perm __user *up64)
 {
 	int err;
 
@@ -171,7 +171,7 @@ static inline int __put_compat_ipc64_perm(struct ipc64_perm *p64,
 }
 
 static inline int __put_compat_ipc_perm(struct ipc64_perm *p,
-					struct compat_ipc_perm *up)
+					struct compat_ipc_perm __user *up)
 {
 	int err;
 	compat_uid_t u;
@@ -192,7 +192,7 @@ static inline int __put_compat_ipc_perm(struct ipc64_perm *p,
 }
 
 static inline int get_compat_semid64_ds(struct semid64_ds *s64,
-					struct compat_semid64_ds *up64)
+					struct compat_semid64_ds __user *up64)
 {
 	if (!access_ok (VERIFY_READ, up64, sizeof(*up64)))
 		return -EFAULT;
@@ -200,7 +200,7 @@ static inline int get_compat_semid64_ds(struct semid64_ds *s64,
 }
 
 static inline int get_compat_semid_ds(struct semid64_ds *s,
-				      struct compat_semid_ds *up)
+				      struct compat_semid_ds __user *up)
 {
 	if (!access_ok (VERIFY_READ, up, sizeof(*up)))
 		return -EFAULT;
@@ -208,7 +208,7 @@ static inline int get_compat_semid_ds(struct semid64_ds *s,
 }
 
 static inline int put_compat_semid64_ds(struct semid64_ds *s64,
-					struct compat_semid64_ds *up64)
+					struct compat_semid64_ds __user *up64)
 {
 	int err;
 
@@ -222,7 +222,7 @@ static inline int put_compat_semid64_ds(struct semid64_ds *s64,
 }
 
 static inline int put_compat_semid_ds(struct semid64_ds *s,
-				      struct compat_semid_ds *up)
+				      struct compat_semid_ds __user *up)
 {
 	int err;
 
@@ -413,7 +413,7 @@ static inline int get_compat_msqid(struct msqid64_ds *m,
 }
 
 static inline int put_compat_msqid64_ds(struct msqid64_ds *m64,
-				 struct compat_msqid64_ds __user __user *up64)
+				 struct compat_msqid64_ds __user *up64)
 {
 	int err;
 
@@ -450,7 +450,7 @@ static inline int put_compat_msqid_ds(struct msqid64_ds *m,
 	return err;
 }
 
-static inline int do_msgctl(int first, int second, void __user *buf)
+static inline int do_msgctl(int first, int second, void *buf)
 {
 	mm_segment_t old_fs;
 	int err;
@@ -712,7 +712,8 @@ long compat_sys_shmctl(int first, int second, void __user *uptr)
 long compat_sys_semtimedop(int semid, struct sembuf __user *tsems,
 		unsigned nsops, const struct compat_timespec __user *timeout)
 {
-	struct timespec ts, __user *ts64;
+	struct timespec ts;
+	struct timespec __user *ts64;
 
 	/* parameter checking precedence should mirror sys_semtimedop() */
 	if (nsops < 1 || semid < 0)

@@ -154,14 +154,9 @@ do {									\
 
 #define GS_CLOSE_TIMEOUT		15
 
-/* debug macro */
+/* debug settings */
 #if G_SERIAL_DEBUG
 static int debug = G_SERIAL_DEBUG;
-#else
-static int debug = 0;
-#endif
-
-#if G_SERIAL_DEBUG
 
 #define gs_debug(format, arg...) \
 	do { if (debug) printk(KERN_DEBUG format, ## arg); } while(0)
@@ -598,8 +593,10 @@ MODULE_DESCRIPTION(GS_LONG_NAME);
 MODULE_AUTHOR("Al Borchers");
 MODULE_LICENSE("GPL");
 
+#if G_SERIAL_DEBUG
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Enable debugging, 0=off, 1=on");
+#endif
 
 MODULE_PARM(read_q_size, "i");
 MODULE_PARM_DESC(read_q_size, "Read request queue size, default=32");

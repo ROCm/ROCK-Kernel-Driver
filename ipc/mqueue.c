@@ -780,7 +780,7 @@ asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *u_msg_ptr,
 
 	/* First try to allocate memory, before doing anything with
 	 * existing queues. */
-	msg_ptr = load_msg((void *)u_msg_ptr, msg_len);
+	msg_ptr = load_msg(u_msg_ptr, msg_len);
 	if (unlikely(IS_ERR(msg_ptr))) {
 		ret = PTR_ERR(msg_ptr);
 		goto out_fput;

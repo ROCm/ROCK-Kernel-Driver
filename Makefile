@@ -1065,6 +1065,11 @@ buildcheck:
 endif #ifeq ($(config-targets),1)
 endif #ifeq ($(mixed-targets),1)
 
+.PHONY: checkstack
+checkstack:
+	$(OBJDUMP) -d vmlinux $$(find . -name '*.ko') | \
+	$(PERL) scripts/checkstack.pl $(ARCH)
+
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 

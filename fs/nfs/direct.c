@@ -536,7 +536,7 @@ out:
  * is no atomic O_APPEND write facility in the NFS protocol.
  */
 ssize_t
-nfs_file_direct_write(struct kiocb *iocb, const char *buf, size_t count, loff_t pos)
+nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
 {
 	ssize_t retval = -EINVAL;
 	loff_t *ppos = &iocb->ki_pos;
@@ -546,7 +546,7 @@ nfs_file_direct_write(struct kiocb *iocb, const char *buf, size_t count, loff_t 
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	struct iovec iov = {
-		.iov_base = (void __user *)buf,
+		.iov_base = buf,
 		.iov_len = count,
 	};
 

@@ -252,7 +252,7 @@ dispatch_read(char* page, char** start, off_t off, int count, int* eof,
 }
 
 static int
-dispatch_write(struct file* file, __user const char* buffer,
+dispatch_write(struct file* file, const char __user * buffer,
 	unsigned long count, ProcItem* item)
 {
 	int result;

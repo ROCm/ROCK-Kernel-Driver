@@ -339,7 +339,7 @@ static void mousedev_packet(struct mousedev_list *list, unsigned char off)
 }
 
 
-static ssize_t mousedev_write(struct file * file, const char * buffer, size_t count, loff_t *ppos)
+static ssize_t mousedev_write(struct file * file, const char __user * buffer, size_t count, loff_t *ppos)
 {
 	struct mousedev_list *list = file->private_data;
 	unsigned char c;
@@ -407,7 +407,7 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 	return count;
 }
 
-static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
+static ssize_t mousedev_read(struct file * file, char __user * buffer, size_t count, loff_t *ppos)
 {
 	struct mousedev_list *list = file->private_data;
 	int retval = 0;

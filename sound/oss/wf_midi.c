@@ -537,7 +537,7 @@ static inline int wf_mpu_end_read (int dev) {
 	return 0;
 }
 
-static int wf_mpu_ioctl (int dev, unsigned cmd, caddr_t arg)
+static int wf_mpu_ioctl (int dev, unsigned cmd, void __user *arg)
 {
 	printk (KERN_WARNING
 		"WF-MPU: Intelligent mode not supported by hardware.\n");
@@ -573,8 +573,7 @@ static struct synth_info wf_mpu_synth_info_proto =
 static struct synth_info wf_mpu_synth_info[2];
 
 static int
-wf_mpu_synth_ioctl (int dev,
-		    unsigned int cmd, caddr_t arg)
+wf_mpu_synth_ioctl (int dev, unsigned int cmd, void __user *arg)
 {
 	int             midi_dev;
 	int index;
@@ -595,7 +594,7 @@ wf_mpu_synth_ioctl (int dev,
 	switch (cmd) {
 
 	case SNDCTL_SYNTH_INFO:
-		if(copy_to_user (&((char *) arg)[0],
+		if (copy_to_user(arg,
 			      &wf_mpu_synth_info[index],
 			      sizeof (struct synth_info)))
 			return -EFAULT;

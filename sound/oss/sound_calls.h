@@ -9,7 +9,7 @@ int DMAbuf_getrdbuffer(int dev, char **buf, int *len, int dontblock);
 int DMAbuf_rmchars(int dev, int buff_no, int c);
 int DMAbuf_start_output(int dev, int buff_no, int l);
 int DMAbuf_move_wrpointer(int dev, int l);
-/* int DMAbuf_ioctl(int dev, unsigned int cmd, caddr_t arg, int local); */
+/* int DMAbuf_ioctl(int dev, unsigned int cmd, void __user *arg, int local); */
 void DMAbuf_init(int dev, int dma1, int dma2);
 void DMAbuf_deinit(int dev);
 int DMAbuf_start_dma (int dev, unsigned long physaddr, int count, int dma_mode);
@@ -31,25 +31,25 @@ int DMAbuf_sync (int dev);
  *	System calls for /dev/dsp and /dev/audio (audio.c)
  */
 
-int audio_read (int dev, struct file *file, char *buf, int count);
-int audio_write (int dev, struct file *file, const char *buf, int count);
+int audio_read (int dev, struct file *file, char __user *buf, int count);
+int audio_write (int dev, struct file *file, const char __user *buf, int count);
 int audio_open (int dev, struct file *file);
 void audio_release (int dev, struct file *file);
 int audio_ioctl (int dev, struct file *file,
-	   unsigned int cmd, caddr_t arg);
+	   unsigned int cmd, void __user *arg);
 void audio_init_devices (void);
 void reorganize_buffers (int dev, struct dma_buffparms *dmap, int recording);
-int dma_ioctl (int dev, unsigned int cmd, caddr_t arg);
+int dma_ioctl (int dev, unsigned int cmd, void __user *arg);
 
 /*
  *	System calls for the /dev/sequencer
  */
 
-int sequencer_read (int dev, struct file *file, char *buf, int count);
-int sequencer_write (int dev, struct file *file, const char *buf, int count);
+int sequencer_read (int dev, struct file *file, char __user *buf, int count);
+int sequencer_write (int dev, struct file *file, const char __user *buf, int count);
 int sequencer_open (int dev, struct file *file);
 void sequencer_release (int dev, struct file *file);
-int sequencer_ioctl (int dev, struct file *file, unsigned int cmd, caddr_t arg);
+int sequencer_ioctl (int dev, struct file *file, unsigned int cmd, void __user *arg);
 unsigned int sequencer_poll(int dev, struct file *file, poll_table * wait);
 
 void sequencer_init (void);
@@ -65,11 +65,11 @@ void seq_copy_to_input (unsigned char *event, int len);
  *	System calls for the /dev/midi
  */
 
-int MIDIbuf_read (int dev, struct file *file, char *buf, int count);
-int MIDIbuf_write (int dev, struct file *file, const char *buf, int count);
+int MIDIbuf_read (int dev, struct file *file, char __user *buf, int count);
+int MIDIbuf_write (int dev, struct file *file, const char __user *buf, int count);
 int MIDIbuf_open (int dev, struct file *file);
 void MIDIbuf_release (int dev, struct file *file);
-int MIDIbuf_ioctl (int dev, struct file *file, unsigned int cmd, caddr_t arg);
+int MIDIbuf_ioctl (int dev, struct file *file, unsigned int cmd, void __user *arg);
 unsigned int MIDIbuf_poll(int dev, struct file *file, poll_table * wait);
 int MIDIbuf_avail(int dev);
 

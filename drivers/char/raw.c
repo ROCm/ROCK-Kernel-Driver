@@ -140,7 +140,7 @@ static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
 
 		/* First, find out which raw minor we want */
 
-		if (copy_from_user(&rq, (void *) arg, sizeof(rq))) {
+		if (copy_from_user(&rq, (void __user *) arg, sizeof(rq))) {
 			err = -EFAULT;
 			goto out;
 		}
@@ -211,7 +211,7 @@ static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
 				rq.block_major = rq.block_minor = 0;
 			}
 			up(&raw_mutex);
-			if (copy_to_user((void *)arg, &rq, sizeof(rq))) {
+			if (copy_to_user((void __user *)arg, &rq, sizeof(rq))) {
 				err = -EFAULT;
 				goto out;
 			}
@@ -225,18 +225,24 @@ out:
 	return err;
 }
 
-static ssize_t raw_file_write(struct file *file, const char *buf,
+static ssize_t raw_file_write(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = {
+		.iov_base = (char __user *)buf,
+		.iov_len = count
+	};
 
 	return generic_file_write_nolock(file, &local_iov, 1, ppos);
 }
 
-static ssize_t raw_file_aio_write(struct kiocb *iocb, const char *buf,
+static ssize_t raw_file_aio_write(struct kiocb *iocb, const char __user *buf,
 					size_t count, loff_t pos)
 {
-	struct iovec local_iov = { .iov_base = (void *)buf, .iov_len = count };
+	struct iovec local_iov = {
+		.iov_base = (char __user *)buf,
+		.iov_len = count
+	};
 
 	return generic_file_aio_write_nolock(iocb, &local_iov, 1, &iocb->ki_pos);
 }

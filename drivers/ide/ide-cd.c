@@ -2535,7 +2535,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  	case CDROMSETSPINDOWN: {
  		char spindown;
  
- 		if (copy_from_user(&spindown, (void *) arg, sizeof(char)))
+ 		if (copy_from_user(&spindown, (void __user *) arg, sizeof(char)))
 			return -EFAULT;
  
                 if ((stat = cdrom_mode_sense(cdi, &cgc, GPMODE_CDROM_PAGE, 0)))
@@ -2554,7 +2554,7 @@ int ide_cdrom_dev_ioctl (struct cdrom_device_info *cdi,
  
  		spindown = buffer[11] & 0x0f;
  
-		if (copy_to_user((void *) arg, &spindown, sizeof (char)))
+		if (copy_to_user((void __user *) arg, &spindown, sizeof (char)))
 			return -EFAULT;
  
  		return 0;

@@ -229,7 +229,7 @@ asmlinkage long sys_msgget (key_t key, int msgflg)
 	return ret;
 }
 
-static inline unsigned long copy_msqid_to_user(void *buf, struct msqid64_ds *in, int version)
+static inline unsigned long copy_msqid_to_user(void __user *buf, struct msqid64_ds *in, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -280,7 +280,7 @@ struct msq_setbuf {
 	mode_t		mode;
 };
 
-static inline unsigned long copy_msqid_from_user(struct msq_setbuf *out, void *buf, int version)
+static inline unsigned long copy_msqid_from_user(struct msq_setbuf *out, void __user *buf, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -320,7 +320,7 @@ static inline unsigned long copy_msqid_from_user(struct msq_setbuf *out, void *b
 	}
 }
 
-asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
+asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds __user *buf)
 {
 	int err, version;
 	struct msg_queue *msq;
@@ -539,7 +539,7 @@ static inline int pipelined_send(struct msg_queue* msq, struct msg_msg* msg)
 	return 0;
 }
 
-asmlinkage long sys_msgsnd (int msqid, struct msgbuf *msgp, size_t msgsz, int msgflg)
+asmlinkage long sys_msgsnd (int msqid, struct msgbuf __user *msgp, size_t msgsz, int msgflg)
 {
 	struct msg_queue *msq;
 	struct msg_msg *msg;
@@ -645,7 +645,7 @@ static inline int convert_mode(long* msgtyp, int msgflg)
 	return SEARCH_EQUAL;
 }
 
-asmlinkage long sys_msgrcv (int msqid, struct msgbuf *msgp, size_t msgsz,
+asmlinkage long sys_msgrcv (int msqid, struct msgbuf __user *msgp, size_t msgsz,
 			    long msgtyp, int msgflg)
 {
 	struct msg_queue *msq;
