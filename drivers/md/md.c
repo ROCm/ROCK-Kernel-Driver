@@ -1438,7 +1438,7 @@ abort:
 }
 
 
-static struct gendisk *md_probe(dev_t dev, int *part, void *data)
+static struct kobject *md_probe(dev_t dev, int *part, void *data)
 {
 	static DECLARE_MUTEX(disks_sem);
 	int unit = MINOR(dev);

@@ -1226,7 +1226,7 @@ static int ata_lock(dev_t dev, void *data)
 	return 0;
 }
 
-struct gendisk *ata_probe(dev_t dev, int *part, void *data)
+struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
 	int unit = *part >> PARTN_BITS;

@@ -1730,7 +1730,7 @@ static int __init fd_probe_drives(void)
 	return -ENOMEM;
 }
  
-static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
+static struct kobject *floppy_find(dev_t dev, int *part, void *data)
 {
 	int drive = *part & 3;
 	if (unit[drive].type->code == FD_NODRIVE)

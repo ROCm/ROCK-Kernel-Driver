@@ -862,7 +862,7 @@ void nftl_request(struct request_queue *q)
 	}
 }
 
-static struct gendisk *nftl_probe(dev_t dev, int *part, void *data)
+static struct kobject *nftl_probe(dev_t dev, int *part, void *data)
 {
 	request_module("docprobe");
 	return NULL;

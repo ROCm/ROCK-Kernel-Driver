@@ -36,7 +36,7 @@ static struct blk_probe {
 	dev_t dev;
 	unsigned long range;
 	struct module *owner;
-	struct gendisk *(*get)(dev_t dev, int *part, void *data);
+	struct kobject *(*get)(dev_t dev, int *part, void *data);
 	int (*lock)(dev_t, void *);
 	void *data;
 } *probes[MAX_PROBE_HASH];
@@ -162,7 +162,7 @@ int unregister_blkdev(unsigned int major, const char *name)
  * The hash chain is sorted on range, so that subranges can override.
  */
 void blk_register_region(dev_t dev, unsigned long range, struct module *module,
-			 struct gendisk *(*probe)(dev_t, int *, void *),
+			 struct kobject *(*probe)(dev_t, int *, void *),
 			 int (*lock)(dev_t, void *), void *data)
 {
 	int index = dev_to_index(dev);
@@ -206,9 +206,10 @@ void blk_unregister_region(dev_t dev, unsigned long range)
 EXPORT_SYMBOL(blk_register_region);
 EXPORT_SYMBOL(blk_unregister_region);
 
-static struct gendisk *exact_match(dev_t dev, int *part, void *data)
+static struct kobject *exact_match(dev_t dev, int *part, void *data)
 {
-	return data;
+	struct gendisk *p = data;
+	return &p->kobj;
 }
 
 static int exact_lock(dev_t dev, void *data)
@@ -246,6 +247,8 @@ void unlink_gendisk(struct gendisk *disk)
 			      disk->minors);
 }
 
+#define to_disk(obj) container_of(obj,struct gendisk,kobj)
+
 /**
  * get_gendisk - get partitioning information for a given device
  * @dev: device to get partitioning information for
@@ -257,14 +260,14 @@ struct gendisk *
 get_gendisk(dev_t dev, int *part)
 {
 	int index = dev_to_index(dev);
-	struct gendisk *disk;
+	struct kobject *kobj;
 	struct blk_probe *p;
 	unsigned best = ~0U;
 
 retry:
 	down_read(&block_subsys.rwsem);
 	for (p = probes[index]; p; p = p->next) {
-		struct gendisk *(*probe)(dev_t, int *, void *);
+		struct kobject *(*probe)(dev_t, int *, void *);
 		struct module *owner;
 		void *data;
 
@@ -284,11 +287,11 @@ retry:
 			continue;
 		}
 		up_read(&block_subsys.rwsem);
-		disk = probe(dev, part, data);
+		kobj = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
 		module_put(owner);
-		if (disk)
-			return disk;
+		if (kobj)
+			return to_disk(kobj);
 		goto retry;		/* this terminates: best decreases */
 	}
 	up_read(&block_subsys.rwsem);
@@ -365,7 +368,7 @@ struct seq_operations partitions_op = {
 
 extern int blk_dev_init(void);
 
-static struct gendisk *base_probe(dev_t dev, int *part, void *data)
+static struct kobject *base_probe(dev_t dev, int *part, void *data)
 {
 	request_module("block-major-%d", MAJOR(dev));
 	return NULL;
@@ -393,8 +396,6 @@ subsys_initcall(device_init);
 /*
  * kobject & sysfs bindings for block devices
  */
-
-#define to_disk(obj) container_of(obj,struct gendisk,kobj)
 
 struct disk_attribute {
 	struct attribute attr;
@@ -632,7 +633,7 @@ struct gendisk *alloc_disk(int minors)
 	return disk;
 }
 
-struct gendisk *get_disk(struct gendisk *disk)
+struct kobject *get_disk(struct gendisk *disk)
 {
 	struct module *owner;
 	struct kobject *kobj;
@@ -647,7 +648,7 @@ struct gendisk *get_disk(struct gendisk *disk)
 		module_put(owner);
 		return NULL;
 	}
-	return to_disk(kobj);
+	return kobj;
 
 }
 
