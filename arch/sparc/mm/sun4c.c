@@ -1808,7 +1808,7 @@ static pte_t sun4c_pgoff_to_pte(unsigned long pgoff)
 
 static unsigned long sun4c_pte_to_pgoff(pte_t pte)
 {
-	return pte_val(pte) & ((1UL << SUN4C_PTE_FILE_MAX_BITS) - 1);
+	return pte_val(pte) & ((1UL << PTE_FILE_MAX_BITS) - 1);
 }
 
 
@@ -2126,8 +2126,6 @@ void __init ld_mmu_sun4c(void)
 	page_kernel = pgprot_val(SUN4C_PAGE_KERNEL);
 	pg_iobits = _SUN4C_PAGE_PRESENT | _SUN4C_READABLE | _SUN4C_WRITEABLE |
 		    _SUN4C_PAGE_IO | _SUN4C_PAGE_NOCACHE;
-
-	BTFIXUPSET_SIMM13(pte_file_max_bits, SUN4C_PTE_FILE_MAX_BITS);
 
 	/* Functions */
 	BTFIXUPSET_CALL(___xchg32, ___xchg32_sun4c, BTFIXUPCALL_NORM);

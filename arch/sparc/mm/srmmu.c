@@ -2199,8 +2199,6 @@ void __init ld_mmu_srmmu(void)
 	page_kernel = pgprot_val(SRMMU_PAGE_KERNEL);
 	pg_iobits = SRMMU_VALID | SRMMU_WRITE | SRMMU_REF;
 
-	BTFIXUPSET_SIMM13(pte_file_max_bits, SRMMU_PTE_FILE_MAX_BITS);
-
 	/* Functions */
 #ifndef CONFIG_SMP	
 	BTFIXUPSET_CALL(___xchg32, ___xchg32_sun4md, BTFIXUPCALL_SWAPG1G2);
