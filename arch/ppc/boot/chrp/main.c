@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.main.c 1.13 07/27/01 20:24:17 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -11,15 +11,14 @@
  */
 #include "nonstdio.h"
 #include <asm/processor.h>
+#include <asm/page.h>
 
-extern char _end[];
-extern char initrd_data[];
-extern char image_data[];
-extern char sysmap_data[];
+/* Passed from the linker */
+extern char __image_begin, __image_end;
+extern char __ramdisk_begin[], __ramdisk_end;
+extern char _start, _end;
+
 extern int getprop(void *, const char *, void *, int);
-extern int initrd_len;
-extern int image_len;
-extern int sysmap_len;
 extern unsigned int heap_max;
 extern void claim(unsigned int virt, unsigned int size, unsigned int align);
 extern void *finddevice(const char *);
@@ -53,22 +52,27 @@ chrpboot(int a1, int a2, void *prom)
     unsigned sa, len;
     void *dst;
     unsigned char *im;
-    unsigned initrd_start=0, initrd_size=0;
-    extern char _start;
+    unsigned int initrd_size, initrd_start;
     
     printf("chrpboot starting: loaded at 0x%p\n\r", &_start);
 
-    if (initrd_len) {
-	initrd_size = initrd_len;
+    initrd_size = (char *)(&__ramdisk_end) - (char *)(&__ramdisk_begin);
+    if (initrd_size) {
 	initrd_start = (RAM_END - initrd_size) & ~0xFFF;
+	a1 = initrd_start;
+	a2 = initrd_size;
 	claim(initrd_start, RAM_END - initrd_start, 0);
 	printf("initial ramdisk moving 0x%x <- 0x%p (%x bytes)\n\r",
-	       initrd_start, initrd_data, initrd_size);
-	memcpy((char *)initrd_start, initrd_data, initrd_size);
+	       initrd_start, (char *)(&__ramdisk_begin), initrd_size);
+	memcpy((char *)initrd_start, (char *)(&__ramdisk_begin), initrd_size);
+    } else {
+	initrd_start = 0;
+	initrd_size = 0;
+	a2 = 0xdeadbeef;
     }
 
-    im = image_data;
-    len = image_len;
+    im = (char *)(&__image_begin);
+    len = (char *)(&__image_end) - (char *)(&__image_begin);
     /* claim 4MB starting at PROG_START */
     claim(PROG_START, PROG_SIZE - PROG_START, 0);
     dst = (void *) PROG_START;

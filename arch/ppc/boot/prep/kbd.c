@@ -1,9 +1,10 @@
 /*
- * BK Id: SCCS/s.kbd.c 1.7 05/18/01 06:20:29 patch
+ * BK Id: %F% %I% %G% %U% %#%
  */
+
 #include <linux/keyboard.h>
 
-#include <../drivers/char/defkeymap.c>	/* yeah I know it's bad -- Cort */
+#include "defkeymap.c"	/* yeah I know it's bad -- Cort */
 
 
 unsigned char shfts, ctls, alts, caps;
@@ -130,20 +131,29 @@ enter:		    /* Wait for key up */
 	goto loop;
 }
 
-static void kbdreset(void)
+static int __kbdreset(void)
 {
 	unsigned char c;
-	int i;
+	int i, t;
 
 	/* flush input queue */
+	t = 2000;
 	while ((inb(KBSTATP) & KBINRDY))
 	{
 		(void)inb(KBDATAP);
+		if (--t == 0)
+			return 1;
 	}
 	/* Send self-test */
-	while (inb(KBSTATP) & KBOUTRDY) ;
+	t = 20000;
+	while (inb(KBSTATP) & KBOUTRDY)
+		if (--t == 0)
+			return 2;
 	outb(KBSTATP,0xAA);
-	while ((inb(KBSTATP) & KBINRDY) == 0) ;	/* wait input ready */
+	t = 200000;
+	while ((inb(KBSTATP) & KBINRDY) == 0)	/* wait input ready */
+		if (--t == 0)
+			return 3;
 	if ((c = inb(KBDATAP)) != 0x55)
 	{
 		puts("Keyboard self test failed - result:");
@@ -151,15 +161,23 @@ static void kbdreset(void)
 		puts("\n");
 	}
 	/* Enable interrupts and keyboard controller */
-	while (inb(KBSTATP) & KBOUTRDY) ;
-	outb(KBSTATP,0x60);	
-	while (inb(KBSTATP) & KBOUTRDY) ;
+	t = 20000;
+	while (inb(KBSTATP) & KBOUTRDY)
+		if (--t == 0) return 4;
+	outb(KBSTATP,0x60);
+	t = 20000;
+	while (inb(KBSTATP) & KBOUTRDY)
+		if (--t == 0) return 5;
 	outb(KBDATAP,0x45);
 	for (i = 0;  i < 10000;  i++) udelay(1);
-	
-	while (inb(KBSTATP) & KBOUTRDY) ;
+
+	t = 20000;
+	while (inb(KBSTATP) & KBOUTRDY)
+		if (--t == 0) return 6;
 	outb(KBSTATP,0x20);
-	while ((inb(KBSTATP) & KBINRDY) == 0) ; /* wait input ready */
+	t = 200000;
+	while ((inb(KBSTATP) & KBINRDY) == 0)	/* wait input ready */
+		if (--t == 0) return 7;
 	if (! (inb(KBDATAP) & 0x40)) {
 		/*
 		 * Quote from PS/2 System Reference Manual:
@@ -169,15 +187,31 @@ static void kbdreset(void)
 		 * output-buffer-full bit in the Controller Status
 		 * register are set 0." (KBINRDY and KBOUTRDY)
 		 */
-		
-		while (inb(KBSTATP) & (KBINRDY | KBOUTRDY)) ;
+		t = 200000;
+		while (inb(KBSTATP) & (KBINRDY | KBOUTRDY))
+			if (--t == 0) return 8;
 		outb(KBDATAP,0xF0);
-		while (inb(KBSTATP) & (KBINRDY | KBOUTRDY)) ;
+		t = 200000;
+		while (inb(KBSTATP) & (KBINRDY | KBOUTRDY))
+			if (--t == 0) return 9;
 		outb(KBDATAP,0x01);
 	}
-	
-	while (inb(KBSTATP) & KBOUTRDY) ;
+	t = 20000;
+	while (inb(KBSTATP) & KBOUTRDY)
+		if (--t == 0) return 10;
 	outb(KBSTATP,0xAE);
+	return 0;
+}
+
+static void kbdreset(void)
+{
+	int ret = __kbdreset();
+
+	if (ret) {
+		puts("__kbdreset failed: ");
+		puthex(ret);
+		puts("\n");
+	}
 }
 
 /* We have to actually read the keyboard when CRT_tstc is called,

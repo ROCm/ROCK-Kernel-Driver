@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ptrace.h 1.5 05/17/01 18:14:25 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifndef _PPC_PTRACE_H
 #define _PPC_PTRACE_H
@@ -38,6 +38,9 @@ struct pt_regs {
 	unsigned long result; 		/* Result of a system call */
 };
 #endif
+
+/* iSeries uses mq field for soft enable flag */
+#define softEnable mq
 
 #ifdef __KERNEL__
 #define STACK_FRAME_OVERHEAD	16	/* size of minimum stack frame */
@@ -103,5 +106,8 @@ struct pt_regs {
 #define PT_FPR31 (PT_FPR0 + 2*31)
 #define PT_FPSCR (PT_FPR0 + 2*32 + 1)
 
-#endif
+/* Get/set all the altivec registers vr0..vr31, vscr, vrsave, in one go */
+#define PTRACE_GETVRREGS	18
+#define PTRACE_SETVRREGS	19
 
+#endif

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mmu_context.h 1.18 09/26/01 16:02:49 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifdef __KERNEL__
 #ifndef __PPC_MMU_CONTEXT_H
@@ -9,6 +9,25 @@
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/mmu.h>
+
+#if MAX_RT_PRIO != 128 || MAX_PRIO != 168
+# error update this function.
+#endif
+
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (unlikely(b[3]))
+		return __ffs(b[3]) + 96;
+	if (b[4])
+		return __ffs(b[4]) + 128;
+	return __ffs(b[5]) + 32 + 128;
+}
 
 /*
  * On 32-bit PowerPC 6xx/7xx/7xxx CPUs, we use a set of 16 VSIDs

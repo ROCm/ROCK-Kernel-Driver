@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.delay.h 1.7 05/17/01 18:14:24 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 #ifdef __KERNEL__
 #ifndef _PPC_DELAY_H
@@ -18,35 +18,36 @@
 
 extern unsigned long loops_per_jiffy;
 
-/* maximum permitted argument to udelay */
-#define __MAX_UDELAY	1000000
-
 extern void __delay(unsigned int loops);
 
-/* N.B. the `secs' parameter here is a fixed-point number with
-   the binary point to the left of the most-significant bit. */
-extern __inline__ void __const_udelay(unsigned int secs)
+/*
+ * Note that 19 * 226 == 4294 ==~ 2^32 / 10^6, so
+ * loops = (4294 * usecs * loops_per_jiffy * HZ) / 2^32.
+ *
+ * The mulhwu instruction gives us loops = (a * b) / 2^32.
+ * We choose a = usecs * 19 * HZ and b = loops_per_jiffy * 226
+ * because this lets us support a wide range of HZ and
+ * loops_per_jiffy values without either a or b overflowing 2^32.
+ * Thus we need usecs * HZ <= (2^32 - 1) / 19 = 226050910 and
+ * loops_per_jiffy <= (2^32 - 1) / 226 = 19004280
+ * (which corresponds to ~3800 bogomips at HZ = 100).
+ *  -- paulus
+ */
+#define __MAX_UDELAY	(226050910/HZ)	/* maximum udelay argument */
+
+extern __inline__ void __udelay(unsigned int usecs)
 {
 	unsigned int loops;
 
 	__asm__("mulhwu %0,%1,%2" : "=r" (loops) :
-		"r" (secs), "r" (loops_per_jiffy));
-	__delay(loops * HZ);
-}
-
-/*
- * note that 4294 == 2^32 / 10^6, multiplying by 4294 converts from
- * microseconds to a 32-bit fixed-point number of seconds.
- */
-extern __inline__ void __udelay(unsigned int usecs)
-{
-	__const_udelay(usecs * 4294);
+		"r" (usecs * (19 * HZ)), "r" (loops_per_jiffy * 226));
+	__delay(loops);
 }
 
 extern void __bad_udelay(void);		/* deliberately undefined */
 
 #define udelay(n) (__builtin_constant_p(n)? \
-		   ((n) > __MAX_UDELAY? __bad_udelay(): __const_udelay((n) * 4294u)) : \
+		   ((n) > __MAX_UDELAY? __bad_udelay(): __udelay((n))) : \
 		   __udelay(n))
 
 #endif /* defined(_PPC_DELAY_H) */

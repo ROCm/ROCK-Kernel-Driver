@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mem_pieces.c 1.5 05/17/01 18:14:23 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  *    Copyright (c) 1996 Paul Mackerras <paulus@cs.anu.edu.au>
@@ -45,7 +45,7 @@ mem_pieces_find(unsigned int size, unsigned int align)
 		a = (a + align - 1) & -align;
 		if (a + size <= e) {
 			mem_pieces_remove(mp, a, size, 1);
-			return __va(a);
+			return (void *) __va(a);
 		}
 	}
 	panic("Couldn't find %u bytes at %u alignment\n", size, align);

@@ -25,7 +25,6 @@ CONFIG_PPC32=y
 # CONFIG_6xx is not set
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
-# CONFIG_POWER4 is not set
 CONFIG_8xx=y
 # CONFIG_PPC_STD_MMU is not set
 CONFIG_SERIAL_CONSOLE=y

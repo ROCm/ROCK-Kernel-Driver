@@ -26,15 +26,14 @@ extern void __setup_cpu_603(int cpu_nr);
 extern void __setup_cpu_604(int cpu_nr);
 extern void __setup_cpu_750(int cpu_nr);
 extern void __setup_cpu_7400(int cpu_nr);
+extern void __setup_cpu_7410(int cpu_nr);
 extern void __setup_cpu_7450(int cpu_nr);
 extern void __setup_cpu_power3(int cpu_nr);
-extern void __setup_cpu_power4(int cpu_nr);
 extern void __setup_cpu_8xx(int cpu_nr);
 extern void __setup_cpu_generic(int cpu_nr);
 
-#define CLASSIC_PPC (!defined(CONFIG_8xx) && 	 \
-		     !defined(CONFIG_4xx) && !defined(CONFIG_POWER3) &&  \
-		     !defined(CONFIG_POWER4) && !defined(CONFIG_PPC_ISERIES))
+#define CLASSIC_PPC (!defined(CONFIG_8xx) && !defined(CONFIG_4xx) && \
+		     !defined(CONFIG_POWER3) && !defined(CONFIG_PPC_ISERIES))
 
 /* This table only contains "desktop" CPUs, it need to be filled with embedded
  * ones as well...
@@ -113,16 +112,40 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_604
     },
-    {	/* 750 (0x4202, don't support TAU ?) */
-    	0xffffffff, 0x00084202, "750",
+    {	/* 740/750 (0x4202, don't support TAU ?) */
+    	0xffffffff, 0x00084202, "740/750",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
 	32, 32,
 	__setup_cpu_750
     },
-    {	/* 750CX */
-    	0xffffff00, 0x00082200, "750CX",
+    {	/* 745/755 */
+    	0xfffff000, 0x00083000, "745/755",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
+    {	/* 750CX (80100 and 8010x?) */
+    	0xfffffff0, 0x00080100, "750CX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
+    {	/* 750CX (82201 and 82202) */
+    	0xfffffff0, 0x00082200, "750CX",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_750
+    },
+    {	/* 750CXe (82214) */
+    	0xfffffff0, 0x00082210, "750CXe",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_HPTE_TABLE,
 	COMMON_PPC,
@@ -159,9 +182,18 @@ struct cpu_spec	cpu_specs[] = {
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_ALTIVEC_COMP | CPU_FTR_HPTE_TABLE,
 	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
 	32, 32,
-	__setup_cpu_7400
+	__setup_cpu_7410
     },
-    {	/* 7450 */
+    {	/* 7450 2.0 - no doze/nap */
+    	0xffffffff, 0x80000200, "7450",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB |
+	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_ALTIVEC_COMP |
+	CPU_FTR_HPTE_TABLE | CPU_FTR_SPEC7450,
+	COMMON_PPC | PPC_FEATURE_HAS_ALTIVEC,
+	32, 32,
+	__setup_cpu_7450
+    },
+    {	/* 7450 others */
     	0xffff0000, 0x80000000, "7450",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
 	CPU_FTR_L2CR | CPU_FTR_TAU | CPU_FTR_ALTIVEC_COMP |
@@ -215,15 +247,6 @@ struct cpu_spec	cpu_specs[] = {
 		__setup_cpu_power3
 	},
 #endif /* CONFIG_PPC64BRIDGE */    
-#ifdef CONFIG_POWER4
-    {	/* Power4 */
-    	0xffff0000, 0x00350000, "Power4",
-    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE,
-    	COMMON_PPC | PPC_FEATURE_64,
-	128, 128,
-	__setup_cpu_power4
-    },
-#endif /* CONFIG_POWER4 */    
 #ifdef CONFIG_8xx
     {	/* 8xx */
     	0xffff0000, 0x00500000, "8xx",
@@ -268,6 +291,20 @@ struct cpu_spec	cpu_specs[] = {
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
     	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
 	32, 32,
+	0, /*__setup_cpu_405 */
+    },
+    {	/* STB 04xxx */
+    	0xffff0000, 0x41810000, "STB04xxx",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+    	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+	32, 32,
+	0, /*__setup_cpu_405 */
+    },
+    {	/* NP405L */
+    	0xffff0000, 0x41610000, "NP405L",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+    	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+	16, 8,
 	0, /*__setup_cpu_405 */
     },
 #endif /* CONFIG_4xx */

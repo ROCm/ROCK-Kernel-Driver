@@ -25,6 +25,10 @@ if [ "$CONFIG_SMC2_UART" = "y" ]; then
 fi
 bool 'Enable SCC2 and SCC3 for UART' CONFIG_USE_SCC_IO
 
+if [ "$CONFIG_SOUND" = "y" ]; then
+	bool 'Embedded Planet HIOX Audio' CONFIG_HTDMSOUND
+fi
+
 # This doesn't really belong here, but it is convenient to ask
 # 8xx specific questions.
 

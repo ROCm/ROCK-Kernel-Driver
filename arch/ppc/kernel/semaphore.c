@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.semaphore.c 1.12 05/17/01 18:14:22 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * PowerPC-specific semaphore code.
@@ -39,6 +39,7 @@ static inline int __sem_update_count(struct semaphore *sem, int incr)
 "	srawi	%1,%0,31\n"
 "	andc	%1,%0,%1\n"
 "	add	%1,%1,%4\n"
+	PPC405_ERR77(0,%3)
 "	stwcx.	%1,0,%3\n"
 "	bne	1b"
 	: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)

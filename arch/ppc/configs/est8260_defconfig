@@ -23,7 +23,6 @@ CONFIG_PPC32=y
 CONFIG_6xx=y
 # CONFIG_4xx is not set
 # CONFIG_POWER3 is not set
-# CONFIG_POWER4 is not set
 # CONFIG_8xx is not set
 CONFIG_8260=y
 CONFIG_PPC_STD_MMU=y

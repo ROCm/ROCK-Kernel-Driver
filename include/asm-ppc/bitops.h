@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.bitops.h 1.9 05/26/01 14:48:14 paulus
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * bitops.h: Bit string operations on the ppc
@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <asm/byteorder.h>
+#include <asm/atomic.h>
 
 /*
  * The test_and_*_bit operations are taken to imply a memory barrier
@@ -36,8 +37,9 @@ static __inline__ void set_bit(int nr, volatile void * addr)
 	
 	__asm__ __volatile__("\n\
 1:	lwarx	%0,0,%3 \n\
-	or	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	or	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=m" (*p)
 	: "r" (mask), "r" (p), "m" (*p)
@@ -69,8 +71,9 @@ static __inline__ void clear_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__("\n\
 1:	lwarx	%0,0,%3 \n\
-	andc	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	andc	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=m" (*p)
 	: "r" (mask), "r" (p), "m" (*p)
@@ -96,8 +99,9 @@ static __inline__ void change_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__("\n\
 1:	lwarx	%0,0,%3 \n\
-	xor	%0,%0,%2 \n\
-	stwcx.	%0,0,%3 \n\
+	xor	%0,%0,%2 \n"
+	PPC405_ERR77(0,%3)
+"	stwcx.	%0,0,%3 \n\
 	bne-	1b"
 	: "=&r" (old), "=m" (*p)
 	: "r" (mask), "r" (p), "m" (*p)
@@ -126,8 +130,9 @@ static __inline__ int test_and_set_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	or	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	or	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)
@@ -158,8 +163,9 @@ static __inline__ int test_and_clear_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	andc	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	andc	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)
@@ -190,8 +196,9 @@ static __inline__ int test_and_change_bit(int nr, volatile void *addr)
 
 	__asm__ __volatile__(SMP_WMB "\n\
 1:	lwarx	%0,0,%4 \n\
-	xor	%1,%0,%3 \n\
-	stwcx.	%1,0,%4 \n\
+	xor	%1,%0,%3 \n"
+	PPC405_ERR77(0,%4)
+"	stwcx.	%1,0,%4 \n\
 	bne	1b"
 	SMP_MB
 	: "=&r" (old), "=&r" (t), "=m" (*p)
@@ -238,6 +245,11 @@ static __inline__ int ffz(unsigned int x)
 }
 
 #ifdef __KERNEL__
+
+static inline int __ffs(unsigned long x)
+{
+	return __ilog2(x & -x);
+}
 
 /*
  * ffs: find first bit set. This is defined the same way as

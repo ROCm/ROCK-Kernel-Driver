@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.ppc4xx_pic.c 1.5 05/17/01 18:14:21 cort
- */
-/*
  *
  *    Copyright (c) 1999 Grant Erickson <grant@lcse.umn.edu>
  *
@@ -33,25 +30,29 @@
 #include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/irq.h>
-
-#include "local_irq.h"
-#include "ppc4xx_pic.h"
-
+#include <asm/ibm4xx.h>
+#include <asm/ppc4xx_pic.h>
 
 /* Global Variables */
 
 struct hw_interrupt_type *ppc4xx_pic;
 
+/* Six of one, half dozen of the other....#ifdefs, separate files,
+ * other tricks.....
+ *
+ * There are basically two types of interrupt controllers, the 403 AIC
+ * and the "others" with UIC.  I just kept them both here separated
+ * with #ifdefs, but it seems to change depending upon how supporting
+ * files (like ppc4xx.h) change.		-- Dan.
+ */
+
+#ifdef CONFIG_403
 
 /* Function Prototypes */
 
-static void	 ppc403_aic_enable(unsigned int irq);
-static void	 ppc403_aic_disable(unsigned int irq);
-static void	 ppc403_aic_disable_and_ack(unsigned int irq);
-
-static void	 ppc405_uic_enable(unsigned int irq);
-static void	 ppc405_uic_disable(unsigned int irq);
-static void	 ppc405_uic_disable_and_ack(unsigned int irq);
+static void ppc403_aic_enable(unsigned int irq);
+static void ppc403_aic_disable(unsigned int irq);
+static void ppc403_aic_disable_and_ack(unsigned int irq);
 
 static struct hw_interrupt_type ppc403_aic = {
 	"403GC AIC",
@@ -63,55 +64,11 @@ static struct hw_interrupt_type ppc403_aic = {
 	0
 };
 
-static struct hw_interrupt_type ppc405_uic = {
-	"405GP UIC",
-	NULL,
-	NULL,
-	ppc405_uic_enable,
-	ppc405_uic_disable,
-	ppc405_uic_disable_and_ack,
-	0
-};
-
-/*
- * Document me.
- */
-void __init
-ppc4xx_pic_init(void)
-{
-	unsigned long ver = PVR_VER(mfspr(SPRN_PVR));
-
-	switch (ver) {
-
-	case PVR_VER(PVR_403GC):
-		/*
-		 * Disable all external interrupts until they are
-		 * explicity requested.
-		 */
-		ppc_cached_irq_mask[0] = 0;
-		mtdcr(DCRN_EXIER, 0);
-
-		ppc4xx_pic = &ppc403_aic;
-		break;
-
-	case PVR_VER(PVR_405GP):
-		ppc4xx_pic = &ppc405_uic;
-		break;
-	}
-
-	return;
-}
-
-/*
- * XXX - Currently 403-specific!
- *
- * Document me.
- */
 int
-ppc4xx_pic_get_irq(struct pt_regs *regs)
+ppc403_pic_get_irq(struct pt_regs *regs)
 {
 	int irq;
-	unsigned long bits, mask = (1 << 31);
+	unsigned long bits;
 
 	/*
 	 * Only report the status of those interrupts that are actually
@@ -123,19 +80,17 @@ ppc4xx_pic_get_irq(struct pt_regs *regs)
 	/*
 	 * Walk through the interrupts from highest priority to lowest, and
 	 * report the first pending interrupt found.
+	 * We want PPC, not C bit numbering, so just subtract the ffs()
+	 * result from 32.
 	 */
+	irq = 32 - ffs(bits);
 
-	for (irq = 0; irq < NR_IRQS; irq++, mask >>= 1) {
-		if (bits & mask)
-			break;
-	}
+	if (irq == NR_AIC_IRQS)
+		irq = -1;
 
 	return (irq);
 }
 
-/*
- * Document me.
- */
 static void
 ppc403_aic_enable(unsigned int irq)
 {
@@ -148,9 +103,6 @@ ppc403_aic_enable(unsigned int irq)
 	mtdcr(DCRN_EXIER, ppc_cached_irq_mask[word]);
 }
 
-/*
- * Document me.
- */
 static void
 ppc403_aic_disable(unsigned int irq)
 {
@@ -163,9 +115,6 @@ ppc403_aic_disable(unsigned int irq)
 	mtdcr(DCRN_EXIER, ppc_cached_irq_mask[word]);
 }
 
-/*
- * Document me.
- */
 static void
 ppc403_aic_disable_and_ack(unsigned int irq)
 {
@@ -179,29 +128,131 @@ ppc403_aic_disable_and_ack(unsigned int irq)
 	mtdcr(DCRN_EXISR, (1 << (31 - bit)));
 }
 
-/*
- * Document me.
- */
+#else				/* !CONFIG_403 */
+
 static void
 ppc405_uic_enable(unsigned int irq)
 {
-	/* XXX - Implement me. */
+	int bit, word;
+
+	bit = irq & 0x1f;
+	word = irq >> 5;
+
+	ppc_cached_irq_mask[word] |= 1 << (31 - bit);
+	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
 }
 
-/*
- * Document me.
- */
 static void
 ppc405_uic_disable(unsigned int irq)
 {
-	/* XXX - Implement me. */
+	int bit, word;
+
+	bit = irq & 0x1f;
+	word = irq >> 5;
+
+	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
+	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
 }
 
-/*
- * Document me.
- */
 static void
 ppc405_uic_disable_and_ack(unsigned int irq)
 {
-	/* XXX - Implement me. */
+	int bit, word;
+
+	bit = irq & 0x1f;
+	word = irq >> 5;
+
+	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
+	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
+	mtdcr(DCRN_UIC0_SR, (1 << (31 - bit)));
+}
+
+static void
+ppc405_uic_end(unsigned int irq)
+{
+	int bit, word;
+	unsigned int tr_bits;
+
+	bit = irq & 0x1f;
+	word = irq >> 5;
+
+	tr_bits = mfdcr(DCRN_UIC0_TR);
+	if ((tr_bits & (1 << (31 - bit))) == 0) {
+		/* level trigger */
+		mtdcr(DCRN_UIC0_SR, 1 << (31 - bit));
+	}
+
+	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
+		ppc_cached_irq_mask[word] |= 1 << (31 - bit);
+		mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[word]);
+	}
+}
+
+static struct hw_interrupt_type ppc405_uic = {
+#if defined (CONFIG_405GP)
+	"405GP UIC",
+#else
+	"NP405 UIC",
+#endif
+	NULL,
+	NULL,
+	ppc405_uic_enable,
+	ppc405_uic_disable,
+	ppc405_uic_disable_and_ack,
+	ppc405_uic_end,
+	0
+};
+
+int
+ppc405_pic_get_irq(struct pt_regs *regs)
+{
+	int irq;
+	unsigned long bits;
+
+	/*
+	 * Only report the status of those interrupts that are actually
+	 * enabled.
+	 */
+
+	bits = mfdcr(DCRN_UIC0_MSR);
+
+	/*
+	 * Walk through the interrupts from highest priority to lowest, and
+	 * report the first pending interrupt found.
+	 * We want PPC, not C bit numbering, so just subtract the ffs()
+	 * result from 32.
+	 */
+	irq = 32 - ffs(bits);
+
+	if (irq == NR_AIC_IRQS)
+		irq = -1;
+
+	return (irq);
+}
+#endif
+
+void __init
+ppc4xx_pic_init(void)
+{
+	/*
+	 * Disable all external interrupts until they are
+	 * explicity requested.
+	 */
+	ppc_cached_irq_mask[0] = 0;
+
+#ifdef CONFIG_403
+	mtdcr(DCRN_EXIER, ppc_cached_irq_mask[0]);
+
+	ppc4xx_pic = &ppc403_aic;
+	ppc_md.get_irq = ppc403_pic_get_irq;
+#else
+	mtdcr(DCRN_UIC0_ER, ppc_cached_irq_mask[0]);
+
+	/* Set all interrupts to non-critical.
+	 */
+	mtdcr(DCRN_UIC0_CR, 0);
+
+	ppc4xx_pic = &ppc405_uic;
+	ppc_md.get_irq = ppc405_pic_get_irq;
+#endif
 }

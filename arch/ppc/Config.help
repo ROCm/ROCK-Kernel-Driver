@@ -1086,3 +1086,45 @@ CONFIG_XMON
   Include in-kernel hooks for the xmon kernel monitor/debugger
   supported by the PPC port.
 
+CONFIG_ADVANCED_OPTIONS
+  This option will enable prompting for a variety of advanced kernel
+  configuration options.  These options can cause the kernel to not
+  work if they are set incorrectly, but can be used to optimize certain
+  aspects of kernel memory management.
+
+  Unless you know what you are doing you *should not* enable this option.
+
+CONFIG_HIGHMEM_START_BOOL
+  Unless you know what you are doing you *should not* set this option.
+
+  It can be used to override the default PKMAP_BASE address which
+  is the location of the high memory pool.  This can be useful in
+  optimizing virtual memory usage in a system.
+
+CONFIG_LOWMEM_SIZE_BOOL
+  Unless you know what you are doing you *should not* set this option.
+
+  It can be used to override the standard calculated value of
+  MAX_LOW_MEM. This can be useful in optimizing virtual memory usage
+  in a system.
+
+CONFIG_KERNEL_START_BOOL
+  Unless you know what you are doing you *should not* set this option.
+
+  It can be used to override the standard PAGE_OFFSET/KERNELBASE
+  value used by the kernel.  This can be useful in controlling
+  amount of virtual address space available to the kernel.
+
+CONFIG_TASK_SIZE_BOOL
+  Unless you know what you are doing you *should not* set this option.
+
+  It can be used to override the standard TASK_SIZE value used
+  by the kernel.  This can be useful in controlling amount of
+  virtual address space available to user tasks.
+
+CONFIG_BOOT_LOAD_BOOL
+  Unless you know what you are doing you *should not* set this option.
+
+  It can be used to change the initial load address of the zImage or
+  zImage.initrd file.  This can be useful if you are on a board which has
+  a small ammount of memory.
