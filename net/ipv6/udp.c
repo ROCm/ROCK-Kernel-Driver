@@ -658,7 +658,7 @@ static int udpv6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	/* 
 	 *	Multicast receive code 
 	 */
-	if (ipv6_addr_type(daddr) & IPV6_ADDR_MULTICAST) {
+	if (ipv6_addr_is_multicast(daddr)) {
 		udpv6_mcast_deliver(uh, saddr, daddr, skb);
 		return 0;
 	}
