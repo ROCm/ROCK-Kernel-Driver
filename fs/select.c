@@ -471,7 +471,7 @@ asmlinkage long sys_poll(struct pollfd * ufds, unsigned int nfds, long timeout)
 			walk->next = pp;
 
 		walk = pp;
-		if (copy_from_user(pp+1, ufds + nfds-i, 
+		if (copy_from_user(pp->entries, ufds + nfds-i, 
 				sizeof(struct pollfd)*pp->len)) {
 			err = -EFAULT;
 			goto out_fds;
