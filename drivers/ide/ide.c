@@ -482,22 +482,13 @@ ide_proc_entry_t generic_subdriver_entries[] = {
 static struct resource* hwif_request_region(ide_hwif_t *hwif,
 					    unsigned long addr, int num)
 {
-	struct resource *res;
-
-	if (hwif->mmio)
-		res = request_mem_region(addr, num, hwif->name);
-	else
-		res = request_region(addr, num, hwif->name);
+	struct resource *res = request_region(addr, num, hwif->name);
 
 	if (!res)
-		printk(KERN_ERR "%s: %s resource 0x%lX-0x%lX not free.\n",
-				hwif->name, hwif->mmio ? "MMIO" : "I/O",
-				addr, addr+num-1);
+		printk(KERN_ERR "%s: I/O resource 0x%lX-0x%lX not free.\n",
+				hwif->name, addr, addr+num-1);
 	return res;
 }
-
-#define hwif_release_region(addr, num) \
-	((hwif->mmio) ? release_mem_region((addr),(num)) : release_region((addr),(num)))
 
 /**
  *	ide_hwif_request_regions - request resources for IDE
@@ -515,6 +506,7 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 
 	if (hwif->mmio == 2)
 		return 0;
+	BUG_ON(hwif->mmio == 1);
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr && !hwif_request_region(hwif, addr, 1))
 		goto control_region_busy;
@@ -530,7 +522,7 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 		addr = hwif->io_ports[i];
 		if (!hwif_request_region(hwif, addr, 1)) {
 			while (--i)
-				hwif_release_region(addr, 1);
+				release_region(addr, 1);
 			goto data_region_busy;
 		}
 	}
@@ -539,7 +531,7 @@ int ide_hwif_request_regions(ide_hwif_t *hwif)
 data_region_busy:
 	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
 	if (addr)
-		hwif_release_region(addr, 1);
+		release_region(addr, 1);
 control_region_busy:
 	/* If any errors are return, we drop the hwif interface. */
 	return -EBUSY;
@@ -565,14 +557,14 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 	if (hwif->mmio == 2)
 		return;
 	if (hwif->io_ports[IDE_CONTROL_OFFSET])
-		hwif_release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
+		release_region(hwif->io_ports[IDE_CONTROL_OFFSET], 1);
 	if (hwif->straight8) {
-		hwif_release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
+		release_region(hwif->io_ports[IDE_DATA_OFFSET], 8);
 		return;
 	}
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++)
 		if (hwif->io_ports[i])
-			hwif_release_region(hwif->io_ports[i], 1);
+			release_region(hwif->io_ports[i], 1);
 }
 
 EXPORT_SYMBOL(ide_hwif_release_regions);

@@ -932,7 +932,7 @@ typedef struct hwif_s {
 	int sg_dma_direction;		/* dma transfer direction */
 	int sg_dma_active;		/* is it in use */
 
-	int		mmio;		/* hosts iomio (0), mmio (1) or custom (2) select */
+	int		mmio;		/* hosts iomio (0) or custom (2) select */
 	int		rqsize;		/* max sectors per request */
 	int		irq;		/* our irq number */
 
