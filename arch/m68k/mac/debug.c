@@ -235,20 +235,6 @@ void mac_scca_console_write (struct console *co, const char *str,
     }
 }
 
-#if defined(CONFIG_SERIAL_CONSOLE) || defined(DEBUG_SERIAL)
-int mac_sccb_console_wait_key(struct console *co)
-{
-    int i;
-    do {
-	for( i = uSEC; i > 0; --i )
-		barrier();
-    } while( !(scc.cha_b_ctrl & 0x01) ); /* wait for rx buf filled */
-    for( i = uSEC; i > 0; --i )
-	barrier();
-    return( scc.cha_b_data );
-}
-
-#endif
 
 /* The following two functions do a quick'n'dirty initialization of the MFP or
  * SCC serial ports. They're used by the debugging interface, kgdb, and the
@@ -390,9 +376,6 @@ void __init mac_debug_init(void)
 	/* Mac printer port */
 	mac_init_scc_port( B9600|CS8, 1 );
 	mac_console_driver.write = mac_sccb_console_write;
-#ifdef CONFIG_SERIAL_CONSOLE
-	mac_console_driver.wait_key = mac_sccb_console_wait_key;
-#endif
 	scc_port = 1;
     }
 #endif
