@@ -10,6 +10,7 @@
  * Modified by:   Dag Brattli <dagb@cs.uit.no>
  * 
  *     Copyright (c) 1999 Dag Brattli, All Rights Reserved.
+ *     Copyright (c) 2000-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     
  *     This program is free software; you can redistribute it and/or 
  *     modify it under the terms of the GNU General Public License as 
@@ -251,7 +252,6 @@ void ircomm_connect_indication(struct ircomm_cb *self, struct sk_buff *skb,
 						info->max_header_size, skb);
 	else {
 		IRDA_DEBUG(0, "%s(), missing handler\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 	}
 }
 
@@ -295,7 +295,6 @@ void ircomm_connect_confirm(struct ircomm_cb *self, struct sk_buff *skb,
 					     info->max_header_size, skb);
 	else {
 		IRDA_DEBUG(0, "%s(), missing handler\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 	}
 }
 
@@ -338,7 +337,6 @@ void ircomm_data_indication(struct ircomm_cb *self, struct sk_buff *skb)
 		self->notify.data_indication(self->notify.instance, self, skb);
 	else {
 		IRDA_DEBUG(0, "%s(), missing handler\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 	}
 }
 
@@ -370,9 +368,8 @@ void ircomm_process_data(struct ircomm_cb *self, struct sk_buff *skb)
 	if (skb->len)
 		ircomm_data_indication(self, skb);		
 	else {
-		IRDA_DEBUG(4, 
-			   "%s(), data was control info only!\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
+		IRDA_DEBUG(4, "%s(), data was control info only!\n",
+			   __FUNCTION__ );
 	}
 }
 
@@ -408,24 +405,28 @@ EXPORT_SYMBOL(ircomm_control_request);
 static void ircomm_control_indication(struct ircomm_cb *self, 
 				      struct sk_buff *skb, int clen)
 {
-	struct sk_buff *ctrl_skb;
-
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );	
 
-	ctrl_skb = skb_clone(skb, GFP_ATOMIC);
-	if (!ctrl_skb)
-		return;
-
-	/* Remove data channel from control channel */
-	skb_trim(ctrl_skb, clen+1);
-	
 	/* Use udata for delivering data on the control channel */
-	if (self->notify.udata_indication)
+	if (self->notify.udata_indication) {
+		struct sk_buff *ctrl_skb;
+
+		/* We don't own the skb, so clone it */
+		ctrl_skb = skb_clone(skb, GFP_ATOMIC);
+		if (!ctrl_skb)
+			return;
+
+		/* Remove data channel from control channel */
+		skb_trim(ctrl_skb, clen+1);
+	
 		self->notify.udata_indication(self->notify.instance, self, 
 					      ctrl_skb);
-	else {
+
+		/* Drop reference count -
+		 * see ircomm_tty_control_indication(). */
+		dev_kfree_skb(ctrl_skb);
+	} else {
 		IRDA_DEBUG(0, "%s(), missing handler\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 	}
 }
 
@@ -470,7 +471,6 @@ void ircomm_disconnect_indication(struct ircomm_cb *self, struct sk_buff *skb,
 						   info->reason, skb);
 	} else {
 		IRDA_DEBUG(0, "%s(), missing handler\n", __FUNCTION__ );
-		dev_kfree_skb(skb);
 	}
 }
 

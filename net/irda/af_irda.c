@@ -11,7 +11,7 @@
  * Sources:       af_netroom.c, af_ax25.c, af_rose.c, af_x25.c etc.
  *
  *     Copyright (c) 1999 Dag Brattli <dagb@cs.uit.no>
- *     Copyright (c) 1999-2001 Jean Tourrilhes <jt@hpl.hp.com>
+ *     Copyright (c) 1999-2003 Jean Tourrilhes <jt@hpl.hp.com>
  *     All Rights Reserved.
  *
  *     This program is free software; you can redistribute it and/or
@@ -190,6 +190,9 @@ static void irda_connect_confirm(void *instance, void *sap,
 	if (sk == NULL)
 		return;
 
+	dev_kfree_skb(skb);
+	// Should be ??? skb_queue_tail(&sk->receive_queue, skb);
+
 	/* How much header space do we need to reserve */
 	self->max_header_size = max_header_size;
 
@@ -220,8 +223,6 @@ static void irda_connect_confirm(void *instance, void *sap,
 		   self->max_data_size);
 
 	memcpy(&self->qos_tx, qos, sizeof(struct qos_info));
-	dev_kfree_skb(skb);
-	// Should be ??? skb_queue_tail(&sk->receive_queue, skb);
 
 	/* We are now connected! */
 	sk->state = TCP_ESTABLISHED;
@@ -260,6 +261,7 @@ static void irda_connect_indication(void *instance, void *sap,
 	case SOCK_STREAM:
 		if (max_sdu_size != 0) {
 			ERROR("%s: max_sdu_size must be 0\n", __FUNCTION__);
+			kfree_skb(skb);
 			return;
 		}
 		self->max_data_size = irttp_get_max_seg_size(self->tsap);
@@ -267,6 +269,7 @@ static void irda_connect_indication(void *instance, void *sap,
 	case SOCK_SEQPACKET:
 		if (max_sdu_size == 0) {
 			ERROR("%s: max_sdu_size cannot be 0\n", __FUNCTION__);
+			kfree_skb(skb);
 			return;
 		}
 		self->max_data_size = max_sdu_size;
@@ -359,7 +362,7 @@ static void irda_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
  * doesn't touch the dtsap_sel and save the full value structure...
  */
 static void irda_getvalue_confirm(int result, __u16 obj_id,
-					  struct ias_value *value, void *priv)
+				  struct ias_value *value, void *priv)
 {
 	struct irda_sock *self;
 
@@ -908,6 +911,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	new->tsap = irttp_dup(self->tsap, new);
 	if (!new->tsap) {
 		IRDA_DEBUG(0, "%s(), dup failed!\n", __FUNCTION__);
+		kfree_skb(skb);
 		return -1;
 	}
 
@@ -926,6 +930,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags)
 	/* Clean up the original one to keep it in listen state */
 	irttp_listen(self->tsap);
 
+	/* Wow ! What is that ? Jean II */
 	skb->sk = NULL;
 	skb->destructor = NULL;
 	kfree_skb(skb);
