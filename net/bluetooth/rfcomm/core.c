@@ -1649,7 +1649,9 @@ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
 
 	nsock->type = sock->type;
 	nsock->ops  = sock->ops;
-	
+
+	__module_get(nsock->ops->owner);
+
 	err = sock->ops->accept(sock, nsock, O_NONBLOCK);
 	if (err < 0) {
 		sock_release(nsock);
