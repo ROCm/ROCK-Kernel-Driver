@@ -79,10 +79,11 @@ mux.
 What you have to do is figure out the correct values for gpiomask and
 the audiomux array.  If you have Windows and the drivers four your
 card installed, you might to check out if you can read these registers
-values used by the windows driver.  A tool to do this is available from
-ftp://telepresence.dmem.strath.ac.uk/pub/bt848/winutil, but it does'nt
-work with bt878 boards according to some reports I received.  Another
-one is available from http://www.kki.net.pl/~borgx/bTV.html.
+values used by the windows driver.  A tool to do this is available
+from ftp://telepresence.dmem.strath.ac.uk/pub/bt848/winutil, but it
+does'nt work with bt878 boards according to some reports I received.
+Another one with bt878 suport is available from
+http://btwincap.sourceforge.net/Files/btspy2.00.zip
 
 You might also dig around in the *.ini files of the Windows applications.
 You can have a look at the board to see which of the gpio pins are
