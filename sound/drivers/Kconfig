@@ -6,6 +6,7 @@ menu "Generic devices"
 config SND_DUMMY
 	tristate "Dummy (/dev/null) soundcard"
 	depends on SND
+	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include dummy driver. This driver does nothing, but
 	  emulates various mixer controls and PCM devices.
