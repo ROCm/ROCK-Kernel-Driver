@@ -40,7 +40,7 @@
 #include <asm/cputable.h>
 #include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
-#include "ppc_defs.h"
+#include "asm-offsets.h"
 
 /* Preprocessor Defines */
 

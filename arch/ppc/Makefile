@@ -111,7 +111,7 @@ $(BOOT_TARGETS): vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) arch/ppc/defconfig
 
 archclean:
-	rm -f arch/ppc/kernel/{mk_defs,ppc_defs.h,find_name}
+	rm -f arch/ppc/kernel/{mk_defs,asm-offsets.h,find_name}
 	rm -f arch/ppc/iSeries/ReleaseData.h
 	@$(MAKEBOOT) clean
 

@@ -32,7 +32,7 @@
 #include <asm/pgtable.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include "ppc_defs.h"
+#include "asm-offsets.h"
 #include "iSeries_asm.h"
 
 

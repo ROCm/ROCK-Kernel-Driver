@@ -33,7 +33,7 @@
 #include <asm/cputable.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include <kernel/ppc_defs.h>
+#include "asm-offsets.h"
 
 #ifdef CONFIG_SMP
 	.comm	mmu_hash_lock,4

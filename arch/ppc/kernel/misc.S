@@ -26,7 +26,7 @@
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include "ppc_defs.h"
+#include "asm-offsets.h"
 
 	.text
 
