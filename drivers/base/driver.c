@@ -111,10 +111,29 @@ void driver_unregister(struct device_driver * drv)
 	up(&drv->unload_sem);
 }
 
+/**
+ *	driver_find - locate driver on a bus by its name.
+ *	@name:	name of the driver.
+ *	@bus:	bus to scan for the driver.
+ *
+ *	Call kset_find_obj() to iterate over list of drivers on
+ *	a bus to find driver by name. Return driver if found.
+ *
+ *	Note that kset_find_obj increments driver's reference count.
+ */
+struct device_driver *driver_find(const char *name, struct bus_type *bus)
+{
+	struct kobject *k = kset_find_obj(&bus->drivers, name);
+	if (k)
+		return to_drv(k);
+	return NULL;
+}
+
 EXPORT_SYMBOL(driver_register);
 EXPORT_SYMBOL(driver_unregister);
 EXPORT_SYMBOL(get_driver);
 EXPORT_SYMBOL(put_driver);
+EXPORT_SYMBOL(driver_find);
 
 EXPORT_SYMBOL(driver_create_file);
 EXPORT_SYMBOL(driver_remove_file);

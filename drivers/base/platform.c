@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/dma-mapping.h>
 #include <linux/bootmem.h>
+#include <linux/err.h>
 
 struct device platform_bus = {
 	.bus_id		= "platform",
@@ -133,19 +134,85 @@ int platform_device_register(struct platform_device * pdev)
 	return ret;
 }
 
+/**
+ *	platform_device_unregister - remove a platform-level device
+ *	@dev:	platform device we're removing
+ *
+ *	Note that this function will also release all memory- and port-based
+ *	resources owned by the device (@dev->resource).
+ */
 void platform_device_unregister(struct platform_device * pdev)
 {
 	int i;
 
 	if (pdev) {
-		device_unregister(&pdev->dev);
-
 		for (i = 0; i < pdev->num_resources; i++) {
 			struct resource *r = &pdev->resource[i];
 			if (r->flags & (IORESOURCE_MEM|IORESOURCE_IO))
 				release_resource(r);
 		}
+
+		device_unregister(&pdev->dev);
 	}
+}
+
+struct platform_object {
+        struct platform_device pdev;
+        struct resource resources[0];
+};
+
+static void platform_device_release_simple(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+
+	kfree(container_of(pdev, struct platform_object, pdev));
+}
+
+/**
+ *	platform_device_register_simple
+ *	@name:  base name of the device we're adding
+ *	@id:    instance id
+ *	@res:   set of resources that needs to be allocated for the device
+ *	@num:	number of resources
+ *
+ *	This function creates a simple platform device that requires minimal
+ *	resource and memory management. Canned release function freeing
+ *	memory allocated for the device allows drivers using such devices
+ *	to be unloaded iwithout waiting for the last reference to the device
+ *	to be dropped.
+ */
+struct platform_device *platform_device_register_simple(char *name, unsigned int id,
+							struct resource *res, unsigned int num)
+{
+	struct platform_object *pobj;
+	int retval;
+
+	pobj = kmalloc(sizeof(struct platform_object) + sizeof(struct resource) * num, GFP_KERNEL);
+	if (!pobj) {
+		retval = -ENOMEM;
+		goto error;
+	}
+
+	memset(pobj, 0, sizeof(*pobj));
+	pobj->pdev.name = name;
+	pobj->pdev.id = id;
+	pobj->pdev.dev.release = platform_device_release_simple;
+
+	if (num) {
+		memcpy(pobj->resources, res, sizeof(struct resource) * num);
+		pobj->pdev.resource = pobj->resources;
+		pobj->pdev.num_resources = num;
+	}
+
+	retval = platform_device_register(&pobj->pdev);
+	if (retval)
+		goto error;
+
+	return &pobj->pdev;
+
+error:
+	kfree(pobj);
+	return ERR_PTR(retval);
 }
 
 
@@ -237,6 +304,7 @@ EXPORT_SYMBOL(dma_get_required_mask);
 EXPORT_SYMBOL(platform_bus);
 EXPORT_SYMBOL(platform_bus_type);
 EXPORT_SYMBOL(platform_device_register);
+EXPORT_SYMBOL(platform_device_register_simple);
 EXPORT_SYMBOL(platform_device_unregister);
 EXPORT_SYMBOL(platform_get_irq);
 EXPORT_SYMBOL(platform_get_resource);

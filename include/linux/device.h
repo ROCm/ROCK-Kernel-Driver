@@ -56,6 +56,7 @@ struct bus_type {
 
 	struct bus_attribute	* bus_attrs;
 	struct device_attribute	* dev_attrs;
+	struct driver_attribute	* drv_attrs;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
@@ -119,6 +120,7 @@ extern void driver_unregister(struct device_driver * drv);
 
 extern struct device_driver * get_driver(struct device_driver * drv);
 extern void put_driver(struct device_driver * drv);
+extern struct device_driver *driver_find(const char *name, struct bus_type *bus);
 
 
 /* driverfs interface for exporting driver attributes */
@@ -380,6 +382,8 @@ extern struct device platform_bus;
 extern struct resource *platform_get_resource(struct platform_device *, unsigned int, unsigned int);
 extern int platform_get_irq(struct platform_device *, unsigned int);
 extern int platform_add_devices(struct platform_device **, int);
+
+extern struct platform_device *platform_device_register_simple(char *, unsigned int, struct resource *, unsigned int);
 
 /* drivers/base/power.c */
 extern void device_shutdown(void);

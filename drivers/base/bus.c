@@ -415,7 +415,7 @@ static int device_add_attrs(struct bus_type * bus, struct device * dev)
 static void device_remove_attrs(struct bus_type * bus, struct device * dev)
 {
 	int i;
-	
+
 	if (bus->dev_attrs) {
 		for (i = 0; attr_name(bus->dev_attrs[i]); i++)
 			device_remove_file(dev,&bus->dev_attrs[i]);
@@ -471,6 +471,37 @@ void bus_remove_device(struct device * dev)
 	}
 }
 
+static int driver_add_attrs(struct bus_type * bus, struct device_driver * drv)
+{
+	int error = 0;
+	int i;
+
+	if (bus->drv_attrs) {
+		for (i = 0; attr_name(bus->drv_attrs[i]); i++) {
+			error = driver_create_file(drv, &bus->drv_attrs[i]);
+			if (error)
+				goto Err;
+		}
+	}
+ Done:
+	return error;
+ Err:
+	while (--i >= 0)
+		driver_remove_file(drv, &bus->drv_attrs[i]);
+	goto Done;
+}
+
+
+static void driver_remove_attrs(struct bus_type * bus, struct device_driver * drv)
+{
+	int i;
+
+	if (bus->drv_attrs) {
+		for (i = 0; attr_name(bus->drv_attrs[i]); i++)
+			driver_remove_file(drv, &bus->drv_attrs[i]);
+	}
+}
+
 
 /**
  *	bus_add_driver - Add a driver to the bus.
@@ -499,6 +530,7 @@ int bus_add_driver(struct device_driver * drv)
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
 
+		driver_add_attrs(bus, drv);
 	}
 	return error;
 }
@@ -516,6 +548,7 @@ int bus_add_driver(struct device_driver * drv)
 void bus_remove_driver(struct device_driver * drv)
 {
 	if (drv->bus) {
+		driver_remove_attrs(drv->bus, drv);
 		down_write(&drv->bus->subsys.rwsem);
 		pr_debug("bus %s: remove driver %s\n", drv->bus->name, drv->name);
 		driver_detach(drv);
@@ -574,6 +607,8 @@ void put_bus(struct bus_type * bus)
  *
  *	Call kset_find_obj() to iterate over list of buses to
  *	find a bus by name. Return bus if found.
+ *
+ *	Note that kset_find_obj increments bus' reference count.
  */
 
 struct bus_type * find_bus(char * name)
@@ -610,7 +645,7 @@ static int bus_add_attrs(struct bus_type * bus)
 static void bus_remove_attrs(struct bus_type * bus)
 {
 	int i;
-	
+
 	if (bus->bus_attrs) {
 		for (i = 0; attr_name(bus->bus_attrs[i]); i++)
 			bus_remove_file(bus,&bus->bus_attrs[i]);
