@@ -41,18 +41,7 @@
 /*
  * Localizing ioctl32 differences
  */
-#if defined (CONFIG_COMPAT) || defined(__x86_64__) || defined(IA32_EMULATION)
-#if !defined(CONFIG_IA64)
-#define LSI_CONFIG_COMPAT
-#endif
-#endif
-
-#ifdef LSI_CONFIG_COMPAT
-#include <asm/ioctl32.h>
-#else
-#define register_ioctl32_conversion(a,b)	do{}while(0)
-#define unregister_ioctl32_conversion(a)	do{}while(0)
-#endif /* LSI_CONFIG_COMPAT */
+#include <linux/ioctl32.h>
 
 /**
  * mimd_t	: Old style ioctl packet structure (deprecated)
@@ -137,7 +126,7 @@ static int mraid_mm_setup_dma_pools(mraid_mmadp_t *);
 static void mraid_mm_free_adp_resources(mraid_mmadp_t *);
 static void mraid_mm_teardown_dma_pools(mraid_mmadp_t *);
 
-#ifdef LSI_CONFIG_COMPAT
+#ifdef CONFIG_COMPAT
 static int mraid_mm_compat_ioctl(unsigned int, unsigned int, unsigned long,
 		struct file *);
 #endif

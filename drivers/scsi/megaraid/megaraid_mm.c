@@ -1075,7 +1075,7 @@ mraid_mm_init(void)
 /**
  * mraid_mm_compat_ioctl	: 32bit to 64bit ioctl conversion routine
  */
-#ifdef LSI_CONFIG_COMPAT
+#ifdef CONFIG_COMPAT
 static int
 mraid_mm_compat_ioctl(unsigned int fd, unsigned int cmd,
 			unsigned long arg, struct file *filep)
