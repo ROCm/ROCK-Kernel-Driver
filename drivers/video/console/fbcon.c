@@ -1889,6 +1889,7 @@ static int fbcon_switch(struct vc_data *vc)
 	int i, prev_console, do_set_par = 0;
 
 	info = registered_fb[con2fb_map[vc->vc_num]];
+
 	if (softback_top) {
 		int l = fbcon_softback_size / vc->vc_size_row;
 		if (softback_lines)
@@ -1904,6 +1905,7 @@ static int fbcon_switch(struct vc_data *vc)
 			softback_top = 0;
 		}
 	}
+
 	if (logo_shown >= 0) {
 		struct vc_data *conp2 = vc_cons[logo_shown].d;
 
@@ -1953,6 +1955,7 @@ static int fbcon_switch(struct vc_data *vc)
 	}
 
 	set_blitting_type(vc, info, p);
+	((struct fbcon_ops *)info->fbcon_par)->cursor_reset = 1;
 
 	vc->vc_can_do_color = (fb_get_color_depth(info) != 1);
 	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
