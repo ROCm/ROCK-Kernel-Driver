@@ -2888,6 +2888,11 @@ static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 				goto done;
 		}
 #endif
+		/* You can't delete these via RTM_DELADDR, so we shouldn't
+		 * display them here. Otherwise "ip addr flush" will loop
+		 * forever trying to delete ff02::1 etc.
+		 * 				--okir */
+#if 0
 		/* multicast address */
 		for (ifmca = idev->mc_list; ifmca; 
 		     ifmca = ifmca->next, ip_idx++) {
@@ -2908,6 +2913,7 @@ static int inet6_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			    cb->nlh->nlmsg_seq, RTM_NEWADDR)) <= 0) 
 				goto done;
 		}
+#endif
 		read_unlock_bh(&idev->lock);
 		in6_dev_put(idev);
 	}
