@@ -1152,8 +1152,11 @@ static void __init calculate_zone_bitmap(struct pglist_data *pgdat,
 	for (i = 0; i < MAX_NR_ZONES; i++)
 		size += zones_size[i];
 	size = LONG_ALIGN((size + 7) >> 3);
-	pgdat->valid_addr_bitmap = (unsigned long *)alloc_bootmem_node(pgdat, size);
-	memset(pgdat->valid_addr_bitmap, 0, size);
+	if (size) {
+		pgdat->valid_addr_bitmap = 
+			(unsigned long *)alloc_bootmem_node(pgdat, size);
+		memset(pgdat->valid_addr_bitmap, 0, size);
+	}
 }
 
 /*
