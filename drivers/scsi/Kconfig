@@ -149,8 +149,8 @@ config SCSI_MULTI_LUN
 	  can say Y here to force the SCSI driver to probe for multiple LUNs.
 	  A SCSI device with multiple LUNs acts logically like multiple SCSI
 	  devices. The vast majority of SCSI devices have only one LUN, and
-	  so most people can say N here and should in fact do so, because it
-	  is safer.
+	  so most people can say N here. The max_luns boot/module parameter 
+	  allows to override this setting.
 
 config SCSI_REPORT_LUNS
 	bool "Build with SCSI REPORT LUNS support"

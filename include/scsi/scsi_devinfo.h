@@ -4,7 +4,8 @@
  * Flags for SCSI devices that need special treatment
  */
 #define BLIST_NOLUN     	0x001	/* Only scan LUN 0 */
-#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force scanning */
+#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force scanning,
+					   deprecated: Use max_luns=N */
 #define BLIST_BORKEN    	0x004	/* Flag for broken handshaking */
 #define BLIST_KEY       	0x008	/* unlock by special command */
 #define BLIST_SINGLELUN 	0x010	/* Do not use LUNs in parallel */
