@@ -12,7 +12,8 @@
  * project, the Linux wvlan_cs driver, Lucent's HCF-Light
  * (wvlan_hcf.c) library, and the NetBSD wireless driver.
  *
- * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2000, David Gibson, Linuxcare Australia.
+ * (C) Copyright David Gibson, IBM Corp. 2001-2003.
  *
  * Portions taken from hfa384x.h, Copyright (C) 1999 AbsoluteValue Systems, Inc. All Rights Reserved.
  *
@@ -124,29 +125,52 @@
 /*
  * Command codes
  */
-/*--- Controller Commands --------------------------*/
+/*--- Controller Commands ----------------------------*/
 #define		HERMES_CMD_INIT			(0x0000)
 #define		HERMES_CMD_ENABLE		(0x0001)
 #define		HERMES_CMD_DISABLE		(0x0002)
 #define		HERMES_CMD_DIAG			(0x0003)
 
-/*--- Buffer Mgmt Commands --------------------------*/
+/*--- Buffer Mgmt Commands ---------------------------*/
 #define		HERMES_CMD_ALLOC		(0x000A)
 #define		HERMES_CMD_TX			(0x000B)
-#define		HERMES_CMD_CLRPRST		(0x0012)
 
-/*--- Regulate Commands --------------------------*/
+/*--- Regulate Commands ------------------------------*/
 #define		HERMES_CMD_NOTIFY		(0x0010)
 #define		HERMES_CMD_INQUIRE		(0x0011)
 
-/*--- Configure Commands --------------------------*/
+/*--- Configure Commands -----------------------------*/
 #define		HERMES_CMD_ACCESS		(0x0021)
 #define		HERMES_CMD_DOWNLD		(0x0022)
 
+/*--- Serial I/O Commands ----------------------------*/
+#define		HERMES_CMD_READMIF		(0x0030)
+#define		HERMES_CMD_WRITEMIF		(0x0031)
+
 /*--- Debugging Commands -----------------------------*/
-#define 	HERMES_CMD_MONITOR		(0x0038)
-#define		HERMES_MONITOR_ENABLE		(0x000b)
-#define		HERMES_MONITOR_DISABLE		(0x000f)
+#define 	HERMES_CMD_TEST			(0x0038)
+
+
+/* Test command arguments */
+#define		HERMES_TEST_SET_CHANNEL		0x0800
+#define		HERMES_TEST_MONITOR		0x0b00
+#define		HERMES_TEST_STOP		0x0f00
+
+/* Authentication algorithms */
+#define		HERMES_AUTH_OPEN		1
+#define		HERMES_AUTH_SHARED_KEY		2
+
+/* WEP settings */
+#define		HERMES_WEP_PRIVACY_INVOKED	0x0001
+#define		HERMES_WEP_EXCL_UNENCRYPTED	0x0002
+#define		HERMES_WEP_HOST_ENCRYPT		0x0010
+#define		HERMES_WEP_HOST_DECRYPT		0x0080
+
+/* Symbol hostscan options */
+#define		HERMES_HOSTSCAN_SYMBOL_5SEC	0x0001
+#define		HERMES_HOSTSCAN_SYMBOL_ONCE	0x0002
+#define		HERMES_HOSTSCAN_SYMBOL_PASSIVE	0x0040
+#define		HERMES_HOSTSCAN_SYMBOL_BCAST	0x0080
 
 /*
  * Frame structures and constants
@@ -156,16 +180,6 @@
 #define HERMES_802_11_OFFSET		(14)
 #define HERMES_802_3_OFFSET		(14+32)
 #define HERMES_802_2_OFFSET		(14+32+14)
-
-struct hermes_rx_descriptor {
-	u16 status;
-	u32 time;
-	u8 silence;
-	u8 signal;
-	u8 rate;
-	u8 rxflow;
-	u32 reserved;
-} __attribute__ ((packed));
 
 #define HERMES_RXSTAT_ERR		(0x0003)
 #define	HERMES_RXSTAT_BADCRC		(0x0001)
@@ -201,7 +215,11 @@ struct hermes_tx_descriptor {
 
 #define HERMES_INQ_TALLIES		(0xF100)
 #define HERMES_INQ_SCAN			(0xF101)
+#define HERMES_INQ_CHANNELINFO		(0xF102)
+#define HERMES_INQ_HOSTSCAN		(0xF103)
+#define HERMES_INQ_HOSTSCAN_SYMBOL	(0xF104)
 #define HERMES_INQ_LINKSTATUS		(0xF200)
+#define HERMES_INQ_SEC_STAT_AGERE	(0xF202)
 
 struct hermes_tallies_frame {
 	u16 TxUnicastFrames;
@@ -233,23 +251,58 @@ struct hermes_tallies_frame {
 /* Grabbed from wlan-ng - Thanks Mark... - Jean II
  * This is the result of a scan inquiry command */
 /* Structure describing info about an Access Point */
-struct hermes_scan_apinfo {
+struct prism2_scan_apinfo {
 	u16 channel;		/* Channel where the AP sits */
 	u16 noise;		/* Noise level */
 	u16 level;		/* Signal level */
 	u8 bssid[ETH_ALEN];	/* MAC address of the Access Point */
-	u16 beacon_interv;	/* Beacon interval ? */
-	u16 capabilities;	/* Capabilities ? */
+	u16 beacon_interv;	/* Beacon interval */
+	u16 capabilities;	/* Capabilities */
+	u16 essid_len;		/* ESSID length */
 	u8 essid[32];		/* ESSID of the network */
 	u8 rates[10];		/* Bit rate supported */
-	u16 proberesp_rate;	/* ???? */
+	u16 proberesp_rate;	/* Data rate of the response frame */
+	u16 atim;		/* ATIM window time, Kus (hostscan only) */
 } __attribute__ ((packed));
-/* Container */
-struct hermes_scan_frame {
-	u16 rsvd;                   /* ??? */
-	u16 scanreason;             /* ??? */
-	struct hermes_scan_apinfo aps[35];        /* Scan result */
+
+/* Same stuff for the Lucent/Agere card.
+ * Thanks to h1kari <h1kari AT dachb0den.com> - Jean II */
+struct agere_scan_apinfo {
+	u16 channel;		/* Channel where the AP sits */
+	u16 noise;		/* Noise level */
+	u16 level;		/* Signal level */
+	u8 bssid[ETH_ALEN];	/* MAC address of the Access Point */
+	u16 beacon_interv;	/* Beacon interval */
+	u16 capabilities;	/* Capabilities */
+	/* bits: 0-ess, 1-ibss, 4-privacy [wep] */
+	u16 essid_len;		/* ESSID length */
+	u8 essid[32];		/* ESSID of the network */
 } __attribute__ ((packed));
+
+/* Moustafa: Scan structure for Symbol cards */
+struct symbol_scan_apinfo {
+	u8 channel;		/* Channel where the AP sits */
+	u8 unknown1;		/* 8 in 2.9x and 3.9x f/w, 0 otherwise */
+	u16 noise;		/* Noise level */
+	u16 level;		/* Signal level */
+	u8 bssid[ETH_ALEN];	/* MAC address of the Access Point */
+	u16 beacon_interv;	/* Beacon interval */
+	u16 capabilities;	/* Capabilities */
+	/* bits: 0-ess, 1-ibss, 4-privacy [wep] */
+	u16 essid_len;		/* ESSID length */
+	u8 essid[32];		/* ESSID of the network */
+    	u16 rates[5];		/* Bit rate supported */
+	u16 basic_rates;	/* Basic rates bitmask */
+	u8 unknown2[6];		/* Always FF:FF:FF:FF:00:00 */
+	u8 unknown3[8];		/* Always 0, appeared in f/w 3.91-68 */
+} __attribute__ ((packed));
+
+union hermes_scan_info {
+	struct agere_scan_apinfo	a;
+	struct prism2_scan_apinfo	p;
+	struct symbol_scan_apinfo	s;
+};
+
 #define HERMES_LINKSTATUS_NOT_CONNECTED   (0x0000)  
 #define HERMES_LINKSTATUS_CONNECTED       (0x0001)
 #define HERMES_LINKSTATUS_DISCONNECTED    (0x0002)
@@ -260,6 +313,20 @@ struct hermes_scan_frame {
   
 struct hermes_linkstatus {
 	u16 linkstatus;         /* Link status */
+} __attribute__ ((packed));
+
+struct hermes_response {
+	u16 status, resp0, resp1, resp2;
+};
+
+/* "ID" structure - used for ESSID and station nickname */
+struct hermes_idstring {
+	u16 len;
+	u16 val[16];
+} __attribute__ ((packed));
+
+struct hermes_multicast {
+	u8 addr[HERMES_MAX_MULTICAST][ETH_ALEN];
 } __attribute__ ((packed));
 
 // #define HERMES_DEBUG_BUFFER 1
@@ -294,10 +361,6 @@ typedef struct hermes {
 #endif
 } hermes_t;
 
-typedef struct hermes_response {
-	u16 status, resp0, resp1, resp2;
-} hermes_response_t;
-
 /* Register access convenience macros */
 #define hermes_read_reg(hw, off) ((hw)->io_space ? \
 	inw((hw)->iobase + ( (off) << (hw)->reg_spacing )) : \
@@ -312,9 +375,11 @@ typedef struct hermes_response {
 #define hermes_write_regn(hw, name, val) hermes_write_reg((hw), HERMES_##name, (val))
 
 /* Function prototypes */
-void hermes_struct_init(hermes_t *hw, ulong address, int io_space, int reg_spacing);
+void hermes_struct_init(hermes_t *hw, ulong address, int io_space,
+			int reg_spacing);
 int hermes_init(hermes_t *hw);
-int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0, hermes_response_t *resp);
+int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
+		      struct hermes_response *resp);
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid);
 
 int hermes_bap_pread(hermes_t *hw, int bap, void *buf, unsigned len,

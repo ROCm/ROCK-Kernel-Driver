@@ -13,8 +13,8 @@
  * (wvlan_hcf.c) library, and the NetBSD wireless driver (in no
  * particular order).
  *
- * Copyright (C) 2000, David Gibson, Linuxcare Australia <hermes@gibson.dropbear.id.au>
- * Copyright (C) 2001, David Gibson, IBM <hermes@gibson.dropbear.id.au>
+ * Copyright (C) 2000, David Gibson, Linuxcare Australia.
+ * (C) Copyright David Gibson, IBM Corp. 2001-2003.
  * 
  * The contents of this file are subject to the Mozilla Public License
  * Version 1.1 (the "License"); you may not use this file except in
@@ -53,10 +53,9 @@
 #include "hermes.h"
 
 MODULE_DESCRIPTION("Low-level driver helper for Lucent Hermes chipset and Prism II HFA384x wireless MAC controller");
-MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
-#ifdef MODULE_LICENSE
+MODULE_AUTHOR("Pavel Roskin <proski@gnu.org>"
+	" & David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_LICENSE("Dual MPL/GPL");
-#endif
 
 /* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
@@ -226,7 +225,7 @@ int hermes_init(hermes_t *hw)
  *
  * Callable from any context, but locking is your problem. */
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
-		      hermes_response_t *resp)
+		      struct hermes_response *resp)
 {
 	int err;
 	int k;
@@ -391,7 +390,6 @@ static int hermes_bap_seek(hermes_t *hw, int bap, u16 id, u16 offset)
 	if (reg & HERMES_OFFSET_ERR) {
 		return -EIO;
 	}
-
 
 	return 0;
 }
