@@ -47,6 +47,7 @@ struct alps_model_info {
 	{ { 0x20, 0x02, 0x0e },	ALPS_MODEL_DUALPOINT },
 	{ { 0x22, 0x02, 0x0a },	ALPS_MODEL_DUALPOINT },
 	{ { 0x22, 0x02, 0x14 }, ALPS_MODEL_DUALPOINT },
+	{ { 0x63, 0x03, 0xc8 },	ALPS_MODEL_DUALPOINT },
 };
 
 /*
