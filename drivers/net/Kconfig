@@ -2104,7 +2104,7 @@ config IXGB_NAPI
 endmenu
 
 
-config VETH
+config ISERIES_VETH
 	tristate "iSeries Virtual Ethernet driver support"
 	depends on NETDEVICES && PPC_ISERIES
 
