@@ -29,7 +29,7 @@ struct fc_starget_attrs {	/* aka fc_target_attrs */
 	uint64_t node_name;
 	uint64_t port_name;
 	uint32_t dev_loss_tmo;	/* Remote Port loss timeout in seconds. */
-	struct timer_list dev_loss_timer;
+	struct work_struct dev_loss_work;
 };
 
 #define fc_starget_port_id(x) \
@@ -40,18 +40,18 @@ struct fc_starget_attrs {	/* aka fc_target_attrs */
 	(((struct fc_starget_attrs *)&(x)->starget_data)->port_name)
 #define fc_starget_dev_loss_tmo(x) \
 	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_tmo)
-#define fc_starget_dev_loss_timer(x) \
-	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_timer)
+#define fc_starget_dev_loss_work(x) \
+	(((struct fc_starget_attrs *)&(x)->starget_data)->dev_loss_work)
 
 struct fc_host_attrs {
 	uint32_t link_down_tmo;	/* Link Down timeout in seconds. */
-	struct timer_list link_down_timer;
+	struct work_struct link_down_work;
 };
 
 #define fc_host_link_down_tmo(x) \
 	(((struct fc_host_attrs *)(x)->shost_data)->link_down_tmo)
-#define fc_host_link_down_timer(x) \
-	(((struct fc_host_attrs *)(x)->shost_data)->link_down_timer)
+#define fc_host_link_down_work(x) \
+	(((struct fc_host_attrs *)(x)->shost_data)->link_down_work)
 
 
 /* The functions by which the transport class and the driver communicate */
