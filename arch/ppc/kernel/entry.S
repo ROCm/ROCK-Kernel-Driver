@@ -31,6 +31,7 @@
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include "ppc_defs.h"
 #ifdef	CONFIG_PPC_ISERIES
@@ -95,8 +96,9 @@ _GLOBAL(DoSyscall)
 	beq-	10f
 	cmpi    0,r0,0x6666     /* Special case for 'sys_rt_sigreturn' */
 	beq-    16f
-	lbz	r10,SYSCALL_TRACE(r2)
-	cmpwi	r10,0
+	rlwinm	r10,r1,0,0,18	/* current_thread_info() */
+	lwz	r10,TI_FLAGS(r10)
+	andi.	r10,r10,_TIF_SYSCALL_TRACE
 	bne-	50f
 	cmpli	0,r0,NR_syscalls
 	bge-	66f
@@ -276,8 +278,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	.globl	ret_from_fork
 ret_from_fork:
 	bl	schedule_tail
-	lbz	r0,SYSCALL_TRACE(r2)
-	cmpwi	r0,0
+	rlwinm	r3,r1,0,0,18
+	lwz	r3,TI_FLAGS(r3)
+	andi.	r0,r3,_TIF_SYSCALL_TRACE
 	bnel-	do_syscall_trace
 	b	ret_from_except
 
@@ -295,8 +298,9 @@ ret_from_except:
 	REST_8GPRS(23,r1)
 	REST_GPR(31,r1)
 
-	/* Hard-disable interrupts so that current->work can't change
-	 * between when we test it and when we return from the interrupt. */
+	/* Hard-disable interrupts so that current_thread_info()->flags
+	 * can't change between when we test it and when we return
+	 * from the interrupt. */
 recheck:
 	mfmsr	r10
 	rlwinm	r0,r10,0,17,15	/* clear MSR_EE in r0 */
@@ -310,9 +314,10 @@ recheck:
 	andi.	r3,r3,MSR_PR
 	beq+	restore		/* if not, just restore regs and return */
 
-	/* Check current->work */
-	lwz	r3,TASK_WORK(r2)
-	rlwinm.	r0,r3,0,16,7	/* need_resched, sigpending, notify_resume */
+	/* Check current_thread_info()->flags */
+	rlwinm	r3,r1,0,0,18
+	lwz	r3,TI_FLAGS(r3)
+	andi.	r0,r3,(_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne	do_work
 
 	.globl ret_to_user_hook	
@@ -384,21 +389,19 @@ do_work:
 	ori	r10,r10,MSR_EE
 	SYNC
 	mtmsr	r10		/* hard-enable interrupts */
-	rlwinm.	r0,r3,0,0,7	/* test need_resched */
+	andi.	r0,r3,_TIF_NEED_RESCHED
 	beq	1f
 	bl	schedule
 	b	recheck
 1:
-	rlwinm.	r0,r3,0,16,23	/* test sigpending */
+	andi.	r0,r3,_TIF_SIGPENDING
 	beq	2f
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	do_signal
 	b	recheck
 2:
-	/* nobody uses work.notify_resume yet */
-	li	r0,0
-	stb	r0,NOTIFY_RESUME(r2)
+	/* nobody uses the TIF_NOTIFY_RESUME bit yet */
 	b	recheck
 
 /*

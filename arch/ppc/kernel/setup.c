@@ -35,6 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/pmac_feature.h>
+#include <asm/thread_info.h>
 
 #if defined CONFIG_KGDB
 #include <asm/kgdb.h>
@@ -536,10 +537,13 @@ int __init ppc_init(void)
 	if (ppc_md.init != NULL) {
 		ppc_md.init();
 	}
-	init_crc32();
+	return 0;
 }
 
 arch_initcall(ppc_init);
+
+/* Initial thread_info struct, copied into init_task_union */
+struct thread_info init_thread_values __initdata = INIT_THREAD_INFO(init_task);
 
 /* Warning, IO base is not yet inited */
 void __init setup_arch(char **cmdline_p)
@@ -548,6 +552,9 @@ void __init setup_arch(char **cmdline_p)
 	extern char _etext[], _edata[];
 	extern char *klimit;
 	extern void do_init_bootmem(void);
+
+	/* initialize the thread_info for the init task */
+	init_thread_info = init_thread_values;
 
 	/* so udelay does something sensible, assume <= 1000 bogomips */
 	loops_per_jiffy = 500000000 / HZ;

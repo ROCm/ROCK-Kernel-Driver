@@ -48,7 +48,7 @@ extern void smp_local_timer_interrupt(struct pt_regs *);
 #define cpu_logical_map(cpu) (cpu)
 #define cpu_number_map(x) (x)
 
-#define smp_processor_id() (current->cpu)
+#define smp_processor_id() (current_thread_info()->cpu)
 
 extern int smp_hw_index[NR_CPUS];
 #define hard_smp_processor_id() (smp_hw_index[smp_processor_id()])

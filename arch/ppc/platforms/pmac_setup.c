@@ -475,10 +475,10 @@ find_ide_boot(void)
 	kdev_t __init pmac_find_ide_boot(char *bootdevice, int n);
 
 	if (bootdevice == NULL)
-		return 0;
+		return NODEV;
 	p = strrchr(bootdevice, '/');
 	if (p == NULL)
-		return 0;
+		return NODEV;
 	n = p - bootdevice;
 
 	return pmac_find_ide_boot(bootdevice, n);
@@ -500,6 +500,16 @@ find_boot_device(void)
 #endif
 }
 
+static int initializing = 1;
+
+static int pmac_late_init(void)
+{
+	initializing = 0;
+	return 0;
+}
+
+late_initcall(pmac_late_init);
+
 /* can't be __init - can be called whenever a disk is first accessed */
 void __pmac
 note_bootable_part(kdev_t dev, int part, int goodness)
@@ -507,8 +517,7 @@ note_bootable_part(kdev_t dev, int part, int goodness)
 	static int found_boot = 0;
 	char *p;
 
-	/* Do nothing if the root has been mounted already. */
-	if (init_task.fs->rootmnt != NULL)
+	if (!initializing)
 		return;
 	if ((goodness <= current_root_goodness) &&
 	    !kdev_same(ROOT_DEV, to_kdev_t(DEFAULT_ROOT_DEVICE)))

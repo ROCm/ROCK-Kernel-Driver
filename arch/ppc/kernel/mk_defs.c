@@ -27,6 +27,7 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/Paca.h>
@@ -41,11 +42,11 @@
 int
 main(void)
 {
-	/*DEFINE(KERNELBASE, KERNELBASE);*/
+	DEFINE(THREAD_SIZE, THREAD_SIZE);
+	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
+	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(STATE, offsetof(struct task_struct, state));
-	DEFINE(NEXT_TASK, offsetof(struct task_struct, next_task));
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
-	DEFINE(CPU, offsetof(struct task_struct, cpu));
 	DEFINE(MM, offsetof(struct task_struct, mm));
 	DEFINE(ACTIVE_MM, offsetof(struct task_struct, active_mm));
 	DEFINE(TASK_STRUCT_SIZE, sizeof(struct task_struct));
@@ -54,11 +55,6 @@ main(void)
 	DEFINE(LAST_SYSCALL, offsetof(struct thread_struct, last_syscall));
 	DEFINE(PT_REGS, offsetof(struct thread_struct, regs));
 	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
-	DEFINE(TASK_WORK, offsetof(struct task_struct, work));
-	DEFINE(NEED_RESCHED, offsetof(struct task_struct, work.need_resched));
-	DEFINE(SYSCALL_TRACE, offsetof(struct task_struct, work.syscall_trace));
-	DEFINE(SIGPENDING, offsetof(struct task_struct, work.sigpending));
-	DEFINE(NOTIFY_RESUME, offsetof(struct task_struct, work.notify_resume));
 	DEFINE(THREAD_FPEXC_MODE, offsetof(struct thread_struct, fpexc_mode));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
@@ -68,7 +64,6 @@ main(void)
 	DEFINE(THREAD_VSCR, offsetof(struct thread_struct, vscr));
 #endif /* CONFIG_ALTIVEC */
 	/* Interrupt register frame */
-	DEFINE(TASK_UNION_SIZE, sizeof(union task_union));
 	DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
 	DEFINE(INT_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs));
 	/* in fact we only use gpr0 - gpr9 and gpr20 - gpr23 */

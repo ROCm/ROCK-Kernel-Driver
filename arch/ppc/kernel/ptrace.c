@@ -273,15 +273,9 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data > _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL) {
-			if (!(child->ptrace & PT_SYSCALLTRACE)) {
-				child->ptrace |= PT_SYSCALLTRACE;
-				child->work.syscall_trace++;
-			}
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		} else {
-			if (child->ptrace & PT_SYSCALLTRACE) {
-				child->ptrace &= ~PT_SYSCALLTRACE;
-				child->work.syscall_trace--;
-			}
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
 		child->exit_code = data;
 		/* make sure the single step bit is not set. */
@@ -311,10 +305,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		if (child->ptrace & PT_SYSCALLTRACE) {
-			child->ptrace &= ~PT_SYSCALLTRACE;
-			child->work.syscall_trace--;
-		}
+		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		set_single_step(child);
 		child->exit_code = data;
 		/* give it a chance to run. */
@@ -350,7 +341,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
@@ -358,8 +349,8 @@ out:
 
 void do_syscall_trace(void)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_SYSCALLTRACE))
-	    != (PT_PTRACED|PT_SYSCALLTRACE))
+        if (!test_thread_flag(TIF_SYSCALL_TRACE)
+	    || !(current->ptrace & PT_PTRACED))
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;

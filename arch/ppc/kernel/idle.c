@@ -78,16 +78,11 @@ int idled(void)
 #endif
 #ifdef CONFIG_SMP
 		if (!do_power_save) {
-			/*
-			 * Deal with another CPU just having chosen a thread to
-			 * run here:
-			 */
-			unsigned long oldval;
-
-			oldval = xchg(&current->work, 0xff000000);
-			if (!(oldval & 0xff000000)) {
-				while (current->work.need_resched == -1)
-					barrier();	/* Do Nothing */
+			if (!need_resched()) {
+				set_thread_flag(TIF_POLLING_NRFLAG);
+				while (!test_thread_flag(TIF_NEED_RESCHED))
+					barrier();
+				clear_thread_flag(TIF_POLLING_NRFLAG);
 			}
 		}
 #endif

@@ -12,6 +12,7 @@
 #define current_text_addr() ({ __label__ _l; _l: &&_l;})
 
 #include <linux/config.h>
+#include <linux/stringify.h>
 
 #include <asm/ptrace.h>
 #include <asm/types.h>
@@ -558,7 +559,6 @@
 #define _CHRP_Motorola 0x04  /* motorola chrp, the cobra */
 #define _CHRP_IBM      0x05  /* IBM chrp, the longtrail and longtrail 2 */
 
-#define __stringify(a) #a
 #define _GLOBAL(n)\
         .stabs __stringify(n:F-1),N_FUN,0,0,n;\
 	.globl n;\
@@ -743,21 +743,9 @@ static inline unsigned int __pack_fe01(unsigned int fpmode)
 	return ((fpmode << 10) & MSR_FE0) | ((fpmode << 8) & MSR_FE1);
 }
 
-/*
- * NOTE! The task struct and the stack go together
- */
-#define THREAD_SIZE (2*PAGE_SIZE)
-#define alloc_task_struct() \
-	((struct task_struct *) __get_free_pages(GFP_KERNEL,1))
-#define free_task_struct(p)	free_pages((unsigned long)(p),1)
-#define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
-
 /* in process.c - for early bootup debug -- Cort */
 int ll_printk(const char *, ...);
 void ll_puts(const char *);
-
-#define init_task	(init_task_union.task)
-#define init_stack	(init_task_union.stack)
 
 /* In misc.c */
 void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);

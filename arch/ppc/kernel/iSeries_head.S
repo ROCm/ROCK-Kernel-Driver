@@ -31,6 +31,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/ppc_asm.h>
+#include <asm/thread_info.h>
 #include "ppc_defs.h"
 #include "iSeries_asm.h"
 
@@ -565,9 +566,9 @@ transfer_to_handler:
  */
 stack_ovf:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_task_union@ha
-	addi	r1,r1,init_task_union@l
-	addi	r1,r1,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
+	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	mfspr	r24,SPRG1
 	li	r20,0
 	stb	r20,PACAPROCENABLED(r24)	/* soft disable */
@@ -706,7 +707,7 @@ secondary_start:
 	lwzx	r2,r2,r24
 
 	/* stack */
-	addi	r1,r2,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	addi	r1,r2,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	li	r0,0
 	stw	r0,0(r1)
 
@@ -767,8 +768,8 @@ start_here:
 
 	/* ptr to current */
 
-	lis	r2,init_task_union@h
-	ori	r2,r2,init_task_union@l
+	lis	r2,init_task@h
+	ori	r2,r2,init_task@l
 
 	/* Set up for using our exception vectors */
 
@@ -787,9 +788,10 @@ start_here:
 
 	stb	r3,PACAPROCENABLED(r11)	/* Soft disabled */
 
-	addi	r1,r2,TASK_UNION_SIZE
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
 	li	r0,0
-	stwu	r0,-STACK_FRAME_OVERHEAD(r1)
+	stwu	r0,THREAD_SIZE-STACK_FRAME_OVERHEAD(r1)
 
 	/* fix klimit for system map */
 	lis	r6,embedded_sysmap_end@ha
@@ -1494,6 +1496,10 @@ _GLOBAL(abort)
 	.data
 	.globl	sdata
 sdata:
+
+	.globl	init_thread_union
+init_thread_union:
+	.space	8192
 
 	.globl	empty_zero_page
 empty_zero_page:

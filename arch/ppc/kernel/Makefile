@@ -123,7 +123,3 @@ ppc_defs.h: mk_defs.c ppc_defs.head \
 
 find_name : find_name.c
 	$(HOSTCC) $(HOSTCFLAGS) -o find_name find_name.c
-
-checks: checks.c
-	$(HOSTCC) -I$(HPATH) $(HOSTCFLAGS) -D__KERNEL__ -fno-builtin -o checks checks.c
-	./checks

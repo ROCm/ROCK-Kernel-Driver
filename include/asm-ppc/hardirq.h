@@ -44,6 +44,7 @@ typedef struct {
 #define hardirq_exit(cpu)	(local_irq_count(cpu)--)
 
 #define synchronize_irq()	do { } while (0)
+#define release_irqlock(cpu)    do { } while (0)
 
 #else /* CONFIG_SMP */
 

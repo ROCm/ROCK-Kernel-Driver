@@ -38,6 +38,7 @@
 #include <asm/pgtable.h>
 #include <asm/ibm4xx.h>
 #include <asm/cputable.h>
+#include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include "ppc_defs.h"
 
@@ -895,9 +896,9 @@ _GLOBAL(transfer_to_handler)
 
 stack_ovf:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_task_union@ha
-	addi	r1,r1,init_task_union@l
-	addi	r1,r1,TASK_UNION_SIZE - STACK_FRAME_OVERHEAD
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
+	addi	r1,r1,THREAD_SIZE - STACK_FRAME_OVERHEAD
 	lis	r24,StackOverflow@ha
 	addi	r24,r24,StackOverflow@l
 	li	r20,MSR_KERNEL
@@ -937,8 +938,8 @@ _GLOBAL(abort)
 start_here:
 
 	/* ptr to current */
-	lis	r2,init_task_union@h
-	ori	r2,r2,init_task_union@l
+	lis	r2,init_task@h
+	ori	r2,r2,init_task@l
 
 	/* ptr to phys current thread */
 	tophys(r4,r2)
@@ -948,9 +949,10 @@ start_here:
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
 
 	/* stack */
-	addi	r1,r2,TASK_UNION_SIZE
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
 	li	r0,0
-	stwu	r0,-STACK_FRAME_OVERHEAD(r1)
+	stwu	r0,THREAD_SIZE-STACK_FRAME_OVERHEAD(r1)
 
 	bl	early_init	/* We have to do this with MMU on */
 
@@ -1080,6 +1082,8 @@ _GLOBAL(set_context)
  */
 	.data
 _GLOBAL(sdata)
+_GLOBAL(init_thread_union)
+	.space	8192
 _GLOBAL(empty_zero_page)
 	.space	4096
 _GLOBAL(swapper_pg_dir)

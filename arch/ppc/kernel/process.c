@@ -59,10 +59,8 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
-/* this is 16-byte aligned because it has a stack in it */
-union task_union __attribute((aligned(16))) init_task_union = {
-	INIT_TASK(init_task_union.task)
-};
+/* initial task structure */
+struct task_struct init_task = INIT_TASK(init_task);
 
 /* only used to get secondary processor up */
 struct task_struct *current_set[NR_CPUS] = {&init_task, };
@@ -333,7 +331,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 {
 	struct pt_regs *childregs, *kregs;
 	extern void ret_from_fork(void);
-	unsigned long sp = (unsigned long)p + sizeof(union task_union);
+	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
 	/* Copy registers */
@@ -503,7 +501,7 @@ print_backtrace(unsigned long *sp)
 
 void show_trace_task(struct task_struct *tsk)
 {
-	unsigned long stack_top = (unsigned long) tsk + THREAD_SIZE;
+	unsigned long stack_top = (unsigned long) tsk->thread_info + THREAD_SIZE;
 	unsigned long sp, prev_sp;
 	int count = 0;
 
@@ -623,7 +621,7 @@ extern void scheduling_functions_end_here(void);
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long ip, sp;
-	unsigned long stack_page = (unsigned long) p;
+	unsigned long stack_page = (unsigned long) p->thread_info;
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;

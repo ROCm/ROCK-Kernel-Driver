@@ -32,6 +32,7 @@
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
 #include <asm/cache.h>
+#include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
 #include "ppc_defs.h"
 
@@ -784,9 +785,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  */
 stack_ovf:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	lis	r1,init_task_union@ha
-	addi	r1,r1,init_task_union@l
-	addi	r1,r1,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
+	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	lis	r24,StackOverflow@ha
 	addi	r24,r24,StackOverflow@l
 	li	r20,MSR_KERNEL
@@ -1228,7 +1229,7 @@ __secondary_start:
 	lwzx	r2,r2,r24
 
 	/* stack */
-	addi	r1,r2,TASK_UNION_SIZE-STACK_FRAME_OVERHEAD
+	addi	r1,r2,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	li	r0,0
 	tophys(r3,r1)
 	stw	r0,0(r3)
@@ -1437,8 +1438,8 @@ start_here:
 	bl	call_setup_cpu
 
 	/* ptr to current */
-	lis	r2,init_task_union@h
-	ori	r2,r2,init_task_union@l
+	lis	r2,init_task@h
+	ori	r2,r2,init_task@l
 	/* Set up for using our exception vectors */
 	/* ptr to phys current thread */
 	tophys(r4,r2)
@@ -1449,9 +1450,10 @@ start_here:
 	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
 
 	/* stack */
-	addi	r1,r2,TASK_UNION_SIZE
+	lis	r1,init_thread_union@ha
+	addi	r1,r1,init_thread_union@l
 	li	r0,0
-	stwu	r0,-STACK_FRAME_OVERHEAD(r1)
+	stwu	r0,THREAD_SIZE-STACK_FRAME_OVERHEAD(r1)
 /*
  * Do early bootinfo parsing, platform-specific initialization,
  * and set up the MMU.
@@ -1725,6 +1727,10 @@ m8260_gorom:
 	.data
 	.globl	sdata
 sdata:
+	.globl	init_thread_union
+init_thread_union:
+	.space	8192
+
 	.globl	empty_zero_page
 empty_zero_page:
 	.space	4096

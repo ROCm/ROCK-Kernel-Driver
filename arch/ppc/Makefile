@@ -21,10 +21,6 @@ else
 KERNELLOAD	=0xc0000000
 endif
 
-ifeq ($(shell uname -m),ppc)
-CHECKS		= checks
-endif
-
 LINKFLAGS	= -T arch/ppc/vmlinux.lds -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
@@ -102,15 +98,12 @@ SUBDIRS += arch/ppc/iSeries
 CORE_FILES += arch/ppc/iSeries/iSeries.o
 endif
 
-checks:
-	@$(MAKE) -C arch/$(ARCH)/kernel checks
-
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
 # All the instructions talk about "make bzImage".
 bzImage: zImage
 
-$(BOOT_TARGETS): $(CHECKS) vmlinux
+$(BOOT_TARGETS): vmlinux
 	@$(MAKEBOOT) $@
 
 %_config: arch/ppc/configs/%_defconfig
@@ -118,7 +111,7 @@ $(BOOT_TARGETS): $(CHECKS) vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) arch/ppc/defconfig
 
 archclean:
-	rm -f arch/ppc/kernel/{mk_defs,ppc_defs.h,find_name,checks}
+	rm -f arch/ppc/kernel/{mk_defs,ppc_defs.h,find_name}
 	rm -f arch/ppc/iSeries/ReleaseData.h
 	@$(MAKEBOOT) clean
 
