@@ -1900,8 +1900,6 @@ int ntfs_read_inode_mount(struct inode *vi)
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
-			u64 ll;
-
 			if (attr->data.non_resident.lowest_vcn) {
 				ntfs_error(sb, "First extent of $DATA "
 						"attribute has non zero "
@@ -1920,17 +1918,15 @@ int ntfs_read_inode_mount(struct inode *vi)
 					non_resident.initialized_size);
 			ni->allocated_size = sle64_to_cpu(
 					attr->data.non_resident.allocated_size);
-			/* Set the number of mft records. */
-			ll = vi->i_size >> vol->mft_record_size_bits;
 			/*
 			 * Verify the number of mft records does not exceed
 			 * 2^32 - 1.
 			 */
-			if (ll >= (1ULL << 32)) {
+			if ((vi->i_size >> vol->mft_record_size_bits) >=
+					(1ULL << 32)) {
 				ntfs_error(sb, "$MFT is too big! Aborting.");
 				goto put_err_out;
 			}
-			vol->nr_mft_records = ll;
 			/*
 			 * We have got the first extent of the runlist for
 			 * $MFT which means it is now relatively safe to call
