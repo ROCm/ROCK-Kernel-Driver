@@ -115,19 +115,28 @@ static inline void dbg_hcc_params (struct ehci_hcd *ehci, char *label) {}
 #ifdef	DEBUG
 
 static void __attribute__((__unused__))
+dbg_qtd (char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
+{
+	ehci_dbg (ehci, "%s td %p n%08x %08x t%08x p0=%08x\n", label, qtd,
+		cpu_to_le32p (&qtd->hw_next),
+		cpu_to_le32p (&qtd->hw_alt_next),
+		cpu_to_le32p (&qtd->hw_token),
+		cpu_to_le32p (&qtd->hw_buf [0]));
+	if (qtd->hw_buf [1])
+		ehci_dbg (ehci, "  p1=%08x p2=%08x p3=%08x p4=%08x\n",
+			cpu_to_le32p (&qtd->hw_buf [1]),
+			cpu_to_le32p (&qtd->hw_buf [2]),
+			cpu_to_le32p (&qtd->hw_buf [3]),
+			cpu_to_le32p (&qtd->hw_buf [4]));
+}
+
+static void __attribute__((__unused__))
 dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
-	dbg ("%s %p n%08x info1 %x info2 %x hw_curr %x qtd_next %x", label,
+	ehci_dbg (ehci, "%s qh %p n%08x info %x %x qtd %x\n", label,
 		qh, qh->hw_next, qh->hw_info1, qh->hw_info2,
-		qh->hw_current, qh->hw_qtd_next);
-	dbg ("  alt+nak+t= %x, token= %x, page0= %x, page1= %x",
-		qh->hw_alt_next, qh->hw_token,
-		qh->hw_buf [0], qh->hw_buf [1]);
-	if (qh->hw_buf [2]) {
-		dbg ("  page2= %x, page3= %x, page4= %x",
-			qh->hw_buf [2], qh->hw_buf [3],
-			qh->hw_buf [4]);
-	}
+		qh->hw_current);
+	dbg_qtd ("overlay", ehci, (struct ehci_qtd *) &qh->hw_qtd_next);
 }
 
 static int __attribute__((__unused__))
@@ -284,8 +293,7 @@ static inline char token_mark (u32 token)
 		return '*';
 	if (token & QTD_STS_HALT)
 		return '-';
-	if (QTD_PID (token) != 1 /* not IN: OUT or SETUP */
-			|| QTD_LENGTH (token) == 0)
+	if (!IS_SHORT_READ (token))
 		return ' ';
 	/* tries to advance through hw_alt_next */
 	return '/';
@@ -307,11 +315,14 @@ static void qh_lines (
 	char			*next = *nextp;
 	char			mark;
 
-	mark = token_mark (qh->hw_token);
+	if (qh->hw_qtd_next == EHCI_LIST_END)	/* NEC does this */
+		mark = '@';
+	else
+		mark = token_mark (qh->hw_token);
 	if (mark == '/') {	/* qh_alt_next controls qh advance? */
 		if ((qh->hw_alt_next & QTD_MASK) == ehci->async->hw_alt_next)
 			mark = '#';	/* blocked */
-		else if (qh->hw_alt_next & cpu_to_le32 (0x01))
+		else if (qh->hw_alt_next == EHCI_LIST_END)
 			mark = '.';	/* use hw_qtd_next */
 		/* else alt_next points to some other qtd */
 	}
@@ -324,7 +335,7 @@ static void qh_lines (
 			(scratch >> 8) & 0x000f,
 			scratch, cpu_to_le32p (&qh->hw_info2),
 			cpu_to_le32p (&qh->hw_token), mark,
-			(cpu_to_le32 (0x8000000) & qh->hw_token)
+			(__constant_cpu_to_le32 (QTD_TOGGLE) & qh->hw_token)
 				? "data0" : "data1",
 			(cpu_to_le32p (&qh->hw_alt_next) >> 1) & 0x0f);
 	size -= temp;
@@ -390,6 +401,8 @@ show_async (struct device *dev, char *buf)
 	char			*next;
 	struct ehci_qh		*qh;
 
+	*buf = 0;
+
 	pdev = container_of (dev, struct pci_dev, dev);
 	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
 	next = buf;
@@ -412,7 +425,7 @@ show_async (struct device *dev, char *buf)
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
-	return PAGE_SIZE - size;
+	return strlen (buf);
 }
 static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
@@ -548,7 +561,8 @@ show_registers (struct device *dev, char *buf)
 	/* Capability Registers */
 	i = readw (&ehci->caps->hci_version);
 	temp = snprintf (next, size,
-		"EHCI %x.%02x, hcd state %d (version " DRIVER_VERSION ")\n",
+		"%s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
+		pdev->dev.name,
 		i >> 8, i & 0x0ff, ehci->hcd.state);
 	size -= temp;
 	next += temp;

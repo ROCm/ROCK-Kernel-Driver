@@ -259,7 +259,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 			 xpad->idata, XPAD_PKT_LEN, xpad_irq_in,
 			 xpad, ep_irq_in->bInterval);
 	xpad->irq_in->transfer_dma = xpad->idata_dma;
-	xpad->irq_in->transfer_flags |= URB_NO_DMA_MAP;
+	xpad->irq_in->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 	
 	xpad->udev = udev;
 	

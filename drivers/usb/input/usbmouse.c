@@ -207,7 +207,7 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 			 (maxp > 8 ? 8 : maxp),
 			 usb_mouse_irq, mouse, endpoint->bInterval);
 	mouse->irq->transfer_dma = mouse->data_dma;
-	mouse->irq->transfer_flags |= URB_NO_DMA_MAP;
+	mouse->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	input_register_device(&mouse->dev);
 	printk(KERN_INFO "input: %s on %s\n", mouse->name, path);

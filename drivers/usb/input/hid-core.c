@@ -1518,7 +1518,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			usb_fill_int_urb(hid->urbin, dev, pipe, hid->inbuf, 0,
 					 hid_irq_in, hid, endpoint->bInterval);
 			hid->urbin->transfer_dma = hid->inbuf_dma;
-			hid->urbin->transfer_flags |= URB_NO_DMA_MAP;
+			hid->urbin->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		} else {
 			if (hid->urbout)
 				continue;
@@ -1528,7 +1528,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			usb_fill_bulk_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
 					  hid_irq_out, hid);
 			hid->urbout->transfer_dma = hid->outbuf_dma;
-			hid->urbout->transfer_flags |= URB_NO_DMA_MAP;
+			hid->urbout->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		}
 	}
 
@@ -1577,7 +1577,8 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 			     hid->ctrlbuf, 1, hid_ctrl, hid);
 	hid->urbctrl->setup_dma = hid->cr_dma;
 	hid->urbctrl->transfer_dma = hid->ctrlbuf_dma;
-	hid->urbctrl->transfer_flags |= URB_NO_DMA_MAP;
+	hid->urbctrl->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP
+				| URB_NO_SETUP_DMA_MAP);
 
 	return hid;
 

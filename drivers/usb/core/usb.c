@@ -1234,7 +1234,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 }
 
 /**
- * usb_buffer_alloc - allocate dma-consistent buffer for URB_NO_DMA_MAP
+ * usb_buffer_alloc - allocate dma-consistent buffer for URB_NO_xxx_DMA_MAP
  * @dev: device the buffer will be used with
  * @size: requested buffer size
  * @mem_flags: affect whether allocation may block
@@ -1245,9 +1245,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
  * specified device.  Such cpu-space buffers are returned along with the DMA
  * address (through the pointer provided).
  *
- * These buffers are used with URB_NO_DMA_MAP set in urb->transfer_flags to
- * avoid behaviors like using "DMA bounce buffers", or tying down I/O mapping
- * hardware for long idle periods.  The implementation varies between
+ * These buffers are used with URB_NO_xxx_DMA_MAP set in urb->transfer_flags
+ * to avoid behaviors like using "DMA bounce buffers", or tying down I/O
+ * mapping hardware for long idle periods.  The implementation varies between
  * platforms, depending on details of how DMA will work to this device.
  * Using these buffers also helps prevent cacheline sharing problems on
  * architectures where CPU caches are not DMA-coherent.
@@ -1291,17 +1291,17 @@ void usb_buffer_free (
 
 /**
  * usb_buffer_map - create DMA mapping(s) for an urb
- * @urb: urb whose transfer_buffer will be mapped
+ * @urb: urb whose transfer_buffer/setup_packet will be mapped
  *
  * Return value is either null (indicating no buffer could be mapped), or
- * the parameter.  URB_NO_DMA_MAP is added to urb->transfer_flags if the
- * operation succeeds.  If the device is connected to this system through
- * a non-DMA controller, this operation always succeeds.
+ * the parameter.  URB_NO_TRANSFER_DMA_MAP and URB_NO_SETUP_DMA_MAP are
+ * added to urb->transfer_flags if the operation succeeds.  If the device
+ * is connected to this system through a non-DMA controller, this operation
+ * always succeeds.
  *
  * This call would normally be used for an urb which is reused, perhaps
  * as the target of a large periodic transfer, with usb_buffer_dmasync()
- * calls to synchronize memory and dma state.  It may not be used for
- * control requests.
+ * calls to synchronize memory and dma state.
  *
  * Reverse the effect of this call with usb_buffer_unmap().
  */
@@ -1311,7 +1311,6 @@ struct urb *usb_buffer_map (struct urb *urb)
 	struct device		*controller;
 
 	if (!urb
-			|| usb_pipecontrol (urb->pipe)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
 			|| !(controller = bus->controller))
@@ -1322,17 +1321,23 @@ struct urb *usb_buffer_map (struct urb *urb)
 			urb->transfer_buffer, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
+		if (usb_pipecontrol (urb->pipe))
+			urb->setup_dma = dma_map_single (controller,
+					urb->setup_packet,
+					sizeof (struct usb_ctrlrequest),
+					DMA_TO_DEVICE);
 	// FIXME generic api broken like pci, can't report errors
 	// if (urb->transfer_dma == DMA_ADDR_INVALID) return 0;
 	} else
 		urb->transfer_dma = ~0;
-	urb->transfer_flags |= URB_NO_DMA_MAP;
+	urb->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP
+				| URB_NO_SETUP_DMA_MAP);
 	return urb;
 }
 
 /**
  * usb_buffer_dmasync - synchronize DMA and CPU view of buffer(s)
- * @urb: urb whose transfer_buffer will be synchronized
+ * @urb: urb whose transfer_buffer/setup_packet will be synchronized
  */
 void usb_buffer_dmasync (struct urb *urb)
 {
@@ -1340,17 +1345,23 @@ void usb_buffer_dmasync (struct urb *urb)
 	struct device		*controller;
 
 	if (!urb
-			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
 			|| !(controller = bus->controller))
 		return;
 
-	if (controller->dma_mask)
+	if (controller->dma_mask) {
 		dma_sync_single (controller,
 			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
+		if (usb_pipecontrol (urb->pipe))
+			dma_sync_single (controller,
+					urb->setup_dma,
+					sizeof (struct usb_ctrlrequest),
+					DMA_TO_DEVICE);
+	}
 }
 
 /**
@@ -1365,18 +1376,25 @@ void usb_buffer_unmap (struct urb *urb)
 	struct device		*controller;
 
 	if (!urb
-			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
 			|| !(controller = bus->controller))
 		return;
 
-	if (controller->dma_mask)
+	if (controller->dma_mask) {
 		dma_unmap_single (controller,
 			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
 				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
-	urb->transfer_flags &= ~URB_NO_DMA_MAP;
+		if (usb_pipecontrol (urb->pipe))
+			dma_unmap_single (controller,
+					urb->setup_dma,
+					sizeof (struct usb_ctrlrequest),
+					DMA_TO_DEVICE);
+	}
+	urb->transfer_flags &= ~(URB_NO_TRANSFER_DMA_MAP
+				| URB_NO_SETUP_DMA_MAP);
 }
 
 /**
@@ -1391,7 +1409,7 @@ void usb_buffer_unmap (struct urb *urb)
  *
  * The caller is responsible for placing the resulting DMA addresses from
  * the scatterlist into URB transfer buffer pointers, and for setting the
- * URB_NO_DMA_MAP transfer flag in each of those URBs.
+ * URB_NO_TRANSFER_DMA_MAP transfer flag in each of those URBs.
  *
  * Top I/O rates come from queuing URBs, instead of waiting for each one
  * to complete before starting the next I/O.   This is particularly easy

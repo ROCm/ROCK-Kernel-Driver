@@ -459,7 +459,8 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	/* rh_timer protected by hcd_data_lock */
 	if (hcd->rh_timer.data
 			|| urb->status != -EINPROGRESS
-			|| urb->transfer_buffer_length < len) {
+			|| urb->transfer_buffer_length < len
+			|| !HCD_IS_RUNNING (hcd->state)) {
 		dev_dbg (hcd->controller,
 				"not queuing rh status urb, stat %d\n",
 				urb->status);
@@ -489,11 +490,10 @@ static void rh_report_status (unsigned long ptr)
 	local_irq_save (flags);
 	spin_lock (&urb->lock);
 
-	/* do nothing if the hc is gone or the urb's been unlinked */
+	/* do nothing if the urb's been unlinked */
 	if (!urb->dev
 			|| urb->status != -EINPROGRESS
-			|| (hcd = urb->dev->bus->hcpriv) == 0
-			|| !HCD_IS_RUNNING (hcd->state)) {
+			|| (hcd = urb->dev->bus->hcpriv) == 0) {
 		spin_unlock (&urb->lock);
 		local_irq_restore (flags);
 		return;
@@ -1027,7 +1027,8 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 		 * valid and usb_buffer_{sync,unmap}() not be needed, since
 		 * they could clobber root hub response data.
 		 */
-		urb->transfer_flags |= URB_NO_DMA_MAP;
+		urb->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP
+					| URB_NO_SETUP_DMA_MAP);
 		status = rh_urb_enqueue (hcd, urb);
 		goto done;
 	}
@@ -1035,15 +1036,16 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	/* lower level hcd code should use *_dma exclusively,
 	 * unless it uses pio or talks to another transport.
 	 */
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
-			&& hcd->controller->dma_mask) {
-		if (usb_pipecontrol (urb->pipe))
+	if (hcd->controller->dma_mask) {
+		if (usb_pipecontrol (urb->pipe)
+			&& !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP))
 			urb->setup_dma = dma_map_single (
 					hcd->controller,
 					urb->setup_packet,
 					sizeof (struct usb_ctrlrequest),
 					DMA_TO_DEVICE);
-		if (urb->transfer_buffer_length != 0)
+		if (urb->transfer_buffer_length != 0
+			&& !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP))
 			urb->transfer_dma = dma_map_single (
 					hcd->controller,
 					urb->transfer_buffer,
@@ -1410,12 +1412,14 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs 
 	// It would catch exit/unlink paths for all urbs.
 
 	/* lower level hcd code should use *_dma exclusively */
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
-		if (usb_pipecontrol (urb->pipe))
+	if (hcd->controller->dma_mask) {
+		if (usb_pipecontrol (urb->pipe)
+			&& !(urb->transfer_flags & URB_NO_SETUP_DMA_MAP))
 			pci_unmap_single (hcd->pdev, urb->setup_dma,
 					sizeof (struct usb_ctrlrequest),
 					PCI_DMA_TODEVICE);
-		if (urb->transfer_buffer_length != 0)
+		if (urb->transfer_buffer_length != 0
+			&& !(urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP))
 			pci_unmap_single (hcd->pdev, urb->transfer_dma,
 					urb->transfer_buffer_length,
 					usb_pipein (urb->pipe)

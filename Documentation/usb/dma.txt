@@ -15,10 +15,12 @@ OR:  they can now be DMA-aware.
   manage dma mappings for existing dma-ready buffers (see below).
 
 - URBs have an additional "transfer_dma" field, as well as a transfer_flags
-  bit saying if it's valid.  (Control requests also needed "setup_dma".) 
+  bit saying if it's valid.  (Control requests also have "setup_dma" and a
+  corresponding transfer_flags bit.)
 
-- "usbcore" will map those DMA addresses, if a DMA-aware driver didn't do it
-  first and set URB_NO_DMA_MAP.  HCDs don't manage dma mappings for urbs.
+- "usbcore" will map those DMA addresses, if a DMA-aware driver didn't do
+  it first and set URB_NO_TRANSFER_DMA_MAP or URB_NO_SETUP_DMA_MAP.  HCDs
+  don't manage dma mappings for URBs.
 
 - There's a new "generic DMA API", parts of which are usable by USB device
   drivers.  Never use dma_set_mask() on any USB interface or device; that
@@ -33,8 +35,9 @@ and effects like cache-trashing can impose subtle penalties.
 - When you're allocating a buffer for DMA purposes anyway, use the buffer
   primitives.  Think of them as kmalloc and kfree that give you the right
   kind of addresses to store in urb->transfer_buffer and urb->transfer_dma,
-  while guaranteeing that hidden copies through DMA "bounce" buffers won't
-  slow things down.  You'd also set URB_NO_DMA_MAP in urb->transfer_flags:
+  while guaranteeing that no hidden copies through DMA "bounce" buffers will
+  slow things down.  You'd also set URB_NO_TRANSFER_DMA_MAP in
+  urb->transfer_flags:
 
 	void *usb_buffer_alloc (struct usb_device *dev, size_t size,
 		int mem_flags, dma_addr_t *dma);
@@ -42,10 +45,18 @@ and effects like cache-trashing can impose subtle penalties.
 	void usb_buffer_free (struct usb_device *dev, size_t size,
 		void *addr, dma_addr_t dma);
 
+  For control transfers you can use the buffer primitives or not for each
+  of the transfer buffer and setup buffer independently.  Set the flag bits
+  URB_NO_TRANSFER_DMA_MAP and URB_NO_SETUP_DMA_MAP to indicate which
+  buffers you have prepared.  For non-control transfers URB_NO_SETUP_DMA_MAP
+  is ignored.
+
   The memory buffer returned is "dma-coherent"; sometimes you might need to
   force a consistent memory access ordering by using memory barriers.  It's
   not using a streaming DMA mapping, so it's good for small transfers on
-  systems where the I/O would otherwise tie up an IOMMU mapping.
+  systems where the I/O would otherwise tie up an IOMMU mapping.  (See
+  Documentation/DMA-mapping.txt for definitions of "coherent" and "streaming"
+  DMA mappings.)
 
   Asking for 1/Nth of a page (as well as asking for N pages) is reasonably
   space-efficient.
@@ -91,7 +102,8 @@ DMA address space of the device.
 
   These calls all work with initialized urbs:  urb->dev, urb->pipe,
   urb->transfer_buffer, and urb->transfer_buffer_length must all be
-  valid when these calls are used:
+  valid when these calls are used (urb->setup_packet must be valid too
+  if urb is a control request):
 
 	struct urb *usb_buffer_map (struct urb *urb);
 
@@ -99,6 +111,6 @@ DMA address space of the device.
 
 	void usb_buffer_unmap (struct urb *urb);
 
-  The calls manage urb->transfer_dma for you, and set URB_NO_DMA_MAP so that
-  usbcore won't map or unmap the buffer.
-
+  The calls manage urb->transfer_dma for you, and set URB_NO_TRANSFER_DMA_MAP
+  so that usbcore won't map or unmap the buffer.  The same goes for
+  urb->setup_dma and URB_NO_SETUP_DMA_MAP for control requests.

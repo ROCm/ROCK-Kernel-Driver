@@ -662,7 +662,7 @@ static int kaweth_close(struct net_device *net)
 	return 0;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
 	
@@ -689,7 +689,7 @@ static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(net, (void *) rq->ifr_data);
+		return netdev_ethtool_ioctl(net, (void __user *)rq->ifr_data);
 	}
 	return -EOPNOTSUPP;
 }
