@@ -269,4 +269,4 @@ static __init int usermodehelper_init(void)
 	BUG_ON(!khelper_wq);
 	return 0;
 }
-__initcall(usermodehelper_init);
+core_initcall(usermodehelper_init);
