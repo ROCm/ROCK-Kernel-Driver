@@ -13,6 +13,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/errno.h>
 #include <asm/byteorder.h>
 #include <linux/crypto.h>
 
