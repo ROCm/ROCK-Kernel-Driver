@@ -558,10 +558,12 @@ struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE
-extern void inter_module_register(const char *, struct module *, const void *);
-extern void inter_module_unregister(const char *);
-extern const void *inter_module_get(const char *);
-extern const void *inter_module_get_request(const char *, const char *);
-extern void inter_module_put(const char *);
+extern void __deprecated inter_module_register(const char *,
+		struct module *, const void *);
+extern void __deprecated inter_module_unregister(const char *);
+extern const void * __deprecated inter_module_get(const char *);
+extern const void * __deprecated inter_module_get_request(const char *,
+		const char *);
+extern void __deprecated inter_module_put(const char *);
 
 #endif /* _LINUX_MODULE_H */
