@@ -657,7 +657,7 @@ static int __init am79c961_init(void)
 	struct dev_priv *priv;
 	int i, ret;
 
-	dev = init_etherdev(NULL, sizeof(struct dev_priv));
+	dev = alloc_etherdev(sizeof(struct dev_priv));
 	ret = -ENOMEM;
 	if (!dev)
 		goto out;
@@ -715,12 +715,13 @@ static int __init am79c961_init(void)
 	dev->set_multicast_list	= am79c961_setmulticastlist;
 	dev->tx_timeout		= am79c961_timeout;
 
-	return 0;
+	ret = register_netdev(dev);
+	if (ret == 0)
+		return 0;
 
 release:
 	release_region(dev->base_addr, 0x18);
 nodev:
-	unregister_netdev(dev);
 	kfree(dev);
 out:
 	return ret;
